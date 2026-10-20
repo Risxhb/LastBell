@@ -12,6 +12,8 @@ func _initialize() -> void:
 	_test_provider_and_snapshot()
 	_test_roster()
 	_test_party_combat()
+	_test_hazard_anchors()
+	_test_hazard_admission()
 	print("Combat foundation: %d checks, %d failures" % [checks, failures])
 	quit(0 if failures == 0 else 1)
 
@@ -254,3 +256,131 @@ func _test_party_combat() -> void:
 	sim.step({7: {"basic": true}, 42: {"signature": true}})
 	check(sim.outcome == "victory" and sim.hazards.is_empty() and sim.events.is_empty(), "Party victory clears hazards before same-tick damage")
 	check(sim.actors[42].ready_at.signature == 0, "Later actor does not spend cooldown after lethal attack")
+
+func anchored_shape(mode: String = "follow_until_lock") -> Dictionary:
+	var hazard := shape("donut")
+	hazard.origin = Vector2(200, 300)
+	hazard.radius = 30.0
+	hazard.inner_radius = 0.0
+	hazard.warning_tick = 0
+	hazard.lock_tick = 2
+	hazard.resolve_tick = 4
+	hazard["anchor"] = mode
+	hazard["target_player_id"] = 1
+	return hazard
+
+func quiet_sim() -> CombatSimulation:
+	var sim := Sim.new()
+	sim.encounter_provider = func(_tick: int, _context: Dictionary) -> Array: return []
+	return sim
+
+func _test_hazard_anchors() -> void:
+	for mode in ["follow_until_lock", "snapshot_at_lock"]:
+		var sim := quiet_sim()
+		var hazard := anchored_shape(mode)
+		check(sim.queue_hazard(hazard), "Admit %s anchor" % mode)
+		check(sim.hazards[0].origin == (Sim.SPAWN if mode == "follow_until_lock" else hazard.origin), "Tracking follows immediately; snapshot preview stays authored")
+		hazard.origin = Vector2.ZERO
+		hazard.lock_tick = 99
+		sim.step({1: {"move": Vector2(1, 0)}})
+		check(not sim.hazards[0].locked and sim.hazards[0].lock_tick == 2, "Admitted hazard is detached and remains unlocked before lock tick")
+		check(sim.hazards[0].origin == (sim.player.position if mode == "follow_until_lock" else Vector2(200, 300)), "Prelock geometry matches anchor policy")
+		sim.step({1: {"move": Vector2(1, 0)}})
+		var locked_origin: Vector2 = sim.player.position
+		check(sim.hazards[0].locked and sim.hazards[0].origin == locked_origin, "Lock samples actor after movement on exact lock tick")
+		var detached: Dictionary = sim.snapshot()
+		detached.hazards[0].origin[0] = 0
+		check(sim.hazards[0].origin == locked_origin, "Locked geometry snapshot is detached")
+		# Leave the small footprint after lock; collision must use the frozen origin.
+		sim.player.position += Vector2(80, 0)
+		sim.step({})
+		check(sim.hazards[0].origin == locked_origin, "Movement after lock cannot move the hazard")
+		sim.step({})
+		check(sim.hazards.is_empty() and sim.player.hp == 5 and sim.events.back().outcome == "avoided", "Resolve uses locked footprint, not the moving target")
+		check(sim.events.back().lock_tick == 2 and sim.events.back().hazard_origin == [locked_origin.x, locked_origin.y] and sim.events.back().target_player_id == 1, "Resolution records lock geometry and target provenance")
+	# Direction tracking leaves the boss origin fixed and locks its aim at the target.
+	var sim := quiet_sim()
+	var cone := anchored_shape()
+	cone.kind = "cone"
+	cone.origin = Sim.BOSS_POSITION
+	cone.radius = 400.0
+	cone["anchor_component"] = "direction"
+	check(sim.queue_hazard(cone), "Admit aimed cone")
+	sim.step({1: {"move": Vector2(1, 0)}})
+	sim.step({1: {"move": Vector2(1, 0)}})
+	var aim: float = (Vector2(sim.player.position) - Sim.BOSS_POSITION).angle()
+	check(sim.hazards[0].origin == Sim.BOSS_POSITION and is_equal_approx(sim.hazards[0].direction, aim), "Cone tracks direction from fixed origin")
+	sim.player.position = Sim.BOSS_POSITION + Vector2(-100, 0)
+	sim.step({})
+	check(is_equal_approx(sim.hazards[0].direction, aim), "Cone aim freezes after lock")
+	# Same-warning lock samples immediately, including queue calls at tick zero.
+	sim = quiet_sim()
+	var immediate := anchored_shape("snapshot_at_lock")
+	immediate.lock_tick = 0
+	sim.queue_hazard(immediate)
+	check(sim.hazards[0].locked and sim.hazards[0].origin == Sim.SPAWN, "Immediate lock captures admission position")
+	# Cancellation is visible, deduplicated, and cannot damage the surviving actor.
+	sim = quiet_sim()
+	sim.configure_roster([{"player_id": 1}, {"player_id": 2}])
+	sim.queue_hazard(anchored_shape())
+	sim.actors[1].hp = 0
+	sim.step({})
+	check(sim.hazards.is_empty() and sim.events.size() == 1 and sim.events[0].type == "assignment_changed", "Unavailable prelock target cancels with an assignment event")
+	check(sim.events[0].cancelled and sim.events[0].old_player_id == 1 and sim.events[0].new_player_id == 0 and sim.events[0].generation == sim.generation, "Cancellation records target and attempt identity")
+	sim.step({})
+	check(sim.events.size() == 1 and sim.actors[2].hp == 5, "Cancelled warning cannot resolve or repeatedly emit cancellation")
+	# A locked attack has become world geometry and survives target knockout.
+	sim.reset()
+	sim.queue_hazard(immediate)
+	sim.actors[1].hp = 0
+	sim.actors[2].position = Sim.SPAWN
+	for index in range(4):
+		sim.step({})
+	check(sim.actors[2].hp == 4 and sim.events.back().type == "mechanic_resolved", "Already locked geometry persists after target knockout")
+	# The provider's same-tick warning follows movement, and reset reproduces locks.
+	sim = Sim.new()
+	sim.encounter_provider = func(current_tick: int, _context: Dictionary) -> Array:
+		if current_tick != 1:
+			return []
+		var authored := anchored_shape()
+		authored.warning_tick = 1
+		return [authored]
+	for index in range(4):
+		sim.step({1: {"move": Vector2(1, 0)}})
+	var first: Dictionary = sim.snapshot()
+	sim.reset()
+	for index in range(4):
+		sim.step({1: {"move": Vector2(1, 0)}})
+	var replay: Dictionary = sim.snapshot()
+	first.erase("generation")
+	replay.erase("generation")
+	for event in first.events:
+		event.erase("generation")
+	for event in replay.events:
+		event.erase("generation")
+	check(first == replay and sim.events.back().outcome == "hit", "Reset reproduces provider warning, lock and authoritative hit")
+
+func _test_hazard_admission() -> void:
+	var sim := quiet_sim()
+	var baseline: Dictionary = sim.snapshot()
+	var invalid: Array = [
+		{"id": 0}, {"id": 1.5}, {"name": null}, {"kind": "unknown"},
+		{"warning_tick": -1}, {"lock_tick": -1}, {"resolve_tick": 2},
+		{"lock_tick": 1.0}, {"anchor": "unknown"}, {"target_player_id": 999},
+		{"origin": Vector2(INF, 0)}, {"radius": NAN}, {"radius": -1},
+		{"inner_radius": 40}, {"anchor_component": "direction"}]
+	for override in invalid:
+		var hazard := anchored_shape()
+		hazard.merge(override, true)
+		check(not sim.queue_hazard(hazard) and sim.snapshot() == baseline, "Invalid hazard admission leaves state unchanged: %s" % str(override.keys()))
+	check(sim.queue_hazard(anchored_shape()), "Valid hazard admitted after failed attempts")
+	check(not sim.queue_hazard(anchored_shape()), "Duplicate active attack ID rejected")
+	for index in range(4):
+		sim.step({})
+	var reused := anchored_shape()
+	reused.warning_tick = sim.tick
+	reused.lock_tick = sim.tick + 1
+	reused.resolve_tick = sim.tick + 2
+	check(not sim.queue_hazard(reused), "Resolved attack IDs cannot be reused within an attempt")
+	sim.reset()
+	check(sim.queue_hazard(anchored_shape()), "New generation clears attack ID history")

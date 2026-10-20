@@ -111,7 +111,10 @@ func _draw_hazard(hazard: Dictionary) -> void:
 		_clipped_polygon(polygon, fill)
 		polygon.append(polygon[0])
 		_clipped_line(polygon, edge)
-	_text(Vector2(80, 169), "%s  •  LOCKED  •  %.1fs" % [hazard.name.to_upper(), (hazard.resolve_tick - sim.tick) / 60.0], 17, edge)
+	var state := "LOCKED"
+	if not hazard.get("locked", true):
+		state = "TRACKING" if hazard.get("anchor") == "follow_until_lock" else "PENDING LOCK"
+	_text(Vector2(80, 169), "%s  •  %s  •  %.1fs" % [hazard.name.to_upper(), state, (hazard.resolve_tick - sim.tick) / 60.0], 17, edge)
 	draw_rect(Rect2(80, 181, 220, 4), Color("343e50"))
 	draw_rect(Rect2(80, 181, 220 * progress, 4), edge)
 
@@ -170,17 +173,21 @@ func _draw_panel() -> void:
 		_text(Vector2(938, 342 + index * 49), status, 12, TEAL if status == "READY" else MUTED)
 	draw_line(Vector2(938, 513), Vector2(1196, 513), Color("334055"))
 	_text(Vector2(938, 543), "LAST RESOLUTION", 13, MUTED)
-	if sim.events.is_empty():
+	var event: Dictionary = {}
+	for index in range(sim.events.size() - 1, -1, -1):
+		var candidate: Dictionary = sim.events[index]
+		if candidate.type != "mechanic_resolved" or candidate.player_id != sim.player.id:
+			continue
+		if event.is_empty():
+			event = candidate
+		if sim.outcome != "defeat" or candidate.outcome == "hit":
+			event = candidate
+			break
+	if event.is_empty():
 		_text(Vector2(938, 575), "Read the warning. Find safety.", 15)
 		_text(Vector2(938, 603), "Hold J to repeat Basic in range.", 14, MUTED)
 		_text(Vector2(938, 627), "Guard protects for 0.4 seconds.", 14, MUTED)
 	else:
-		var event: Dictionary = sim.events.back()
-		if sim.outcome == "defeat":
-			for index in range(sim.events.size() - 1, -1, -1):
-				if sim.events[index].outcome == "hit":
-					event = sim.events[index]
-					break
 		_text(Vector2(938, 575), event.attack_name, 19, GOLD)
 		_text(Vector2(938, 604), "%s  /  %.2fs" % [event.outcome.to_upper(), event.tick / 60.0], 15, TEAL if event.outcome != "hit" else Color("ffb185"))
 		_text(Vector2(938, 632), "Leave the cone." if "cone" in event.required_behavior else "Use the center or outer edge.", 14, MUTED)

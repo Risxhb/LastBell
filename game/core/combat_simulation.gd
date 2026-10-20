@@ -27,6 +27,7 @@ var rng := RandomNumberGenerator.new()
 var next_hazard_id: int = 0
 var generation: int = 0
 var next_event_id: int = 0
+var used_hazard_ids: Dictionary = {}
 # Callable(tick, detached_context) -> Array[Dictionary]. Empty means use demo schedule.
 # Provider owns no hidden mutable state; reset must reproduce its output.
 var encounter_provider: Callable
@@ -76,6 +77,7 @@ func reset(new_seed: int = 1) -> void:
 	hazards.clear()
 	events.clear()
 	next_hazard_id = 0
+	used_hazard_ids.clear()
 	outcome = "playing"
 
 func step(commands: Dictionary) -> void:
@@ -95,11 +97,16 @@ func step(commands: Dictionary) -> void:
 		context["phase"] = "scheduling"
 		var scheduled: Array = encounter_provider.call(tick, context)
 		for hazard in scheduled:
-			hazards.append(hazard.duplicate(true))
+			if hazard is Dictionary:
+				queue_hazard(hazard)
 	elif tick % 210 == 1:
 		_spawn_demo_hazard()
-	var pending: Array[Dictionary] = []
+	var anchored: Array[Dictionary] = []
 	for hazard in hazards:
+		if _update_anchor(hazard):
+			anchored.append(hazard)
+	var pending: Array[Dictionary] = []
+	for hazard in anchored:
 		if tick >= int(hazard.resolve_tick):
 			resolve_hazard(hazard)
 		else:
@@ -110,6 +117,83 @@ func step(commands: Dictionary) -> void:
 		any_alive = any_alive or int(actor.hp) > 0
 	if not any_alive:
 		outcome = "defeat"
+
+## Trusted encounter API, not a network decoder. Admit only warnings for this tick.
+## Invalid or reused definitions leave authoritative state unchanged.
+func queue_hazard(definition: Dictionary) -> bool:
+	if outcome != "playing":
+		return false
+	var id_value: Variant = definition.get("id")
+	if not id_value is int or id_value <= 0 or used_hazard_ids.has(id_value):
+		return false
+	if not definition.get("name") is String or definition.get("kind") not in ["cone", "donut"]:
+		return false
+	var origin: Variant = definition.get("origin")
+	if not origin is Vector2 or not origin.is_finite():
+		return false
+	var warning: Variant = definition.get("warning_tick")
+	var resolve: Variant = definition.get("resolve_tick")
+	var lock: Variant = definition.get("lock_tick", warning)
+	if not warning is int or not resolve is int or not lock is int:
+		return false
+	if warning != tick or lock < warning or resolve <= lock:
+		return false
+	for field in ["radius", "inner_radius", "direction", "half_angle"]:
+		var value: Variant = definition.get(field, 0.0)
+		if not (value is float or value is int) or not is_finite(float(value)):
+			return false
+	if float(definition.get("radius", 0)) <= 0:
+		return false
+	if definition.kind == "donut":
+		if not definition.has("inner_radius") or float(definition.inner_radius) < 0 or float(definition.inner_radius) > float(definition.radius):
+			return false
+	elif not definition.has("direction") or not definition.has("half_angle") or float(definition.half_angle) < 0 or float(definition.half_angle) > PI:
+		return false
+	var anchor: Variant = definition.get("anchor", "fixed")
+	var component: Variant = definition.get("anchor_component", "origin")
+	if anchor not in ["fixed", "follow_until_lock", "snapshot_at_lock"] or component not in ["origin", "direction"]:
+		return false
+	if anchor == "fixed" and lock != warning:
+		return false
+	if component == "direction" and definition.kind != "cone":
+		return false
+	if anchor != "fixed":
+		var target_id: Variant = definition.get("target_player_id")
+		if not target_id is int or not actors.has(target_id) or int(actors[target_id].hp) <= 0:
+			return false
+	var hazard: Dictionary = definition.duplicate(true)
+	hazard["anchor"] = anchor
+	hazard["anchor_component"] = component
+	hazard["lock_tick"] = lock
+	hazard["locked"] = anchor == "fixed"
+	_update_anchor(hazard)
+	hazards.append(hazard)
+	used_hazard_ids[id_value] = true
+	return true
+
+func _update_anchor(hazard: Dictionary) -> bool:
+	if hazard.get("anchor", "fixed") == "fixed" or hazard.get("locked", false):
+		return true
+	var target_id: int = hazard.target_player_id
+	if not actors.has(target_id) or int(actors[target_id].hp) <= 0:
+		next_event_id += 1
+		events.append({"schema_version": 2, "generation": generation, "event_id": next_event_id,
+			"type": "assignment_changed", "tick": tick, "attack_id": hazard.id,
+			"attack_name": hazard.name, "old_player_id": target_id, "new_player_id": 0,
+			"cancelled": true, "reason": "target_unavailable"})
+		_trim_events()
+		return false
+	if hazard.anchor == "follow_until_lock" or tick >= int(hazard.lock_tick):
+		var position: Vector2 = actors[target_id].position
+		if hazard.get("anchor_component", "origin") == "direction":
+			var offset: Vector2 = position - Vector2(hazard.origin)
+			if not offset.is_zero_approx():
+				hazard.direction = offset.angle()
+		else:
+			hazard.origin = position
+	if tick >= int(hazard.lock_tick):
+		hazard["locked"] = true
+	return true
 
 func _step_actor(actor: Dictionary, command: Dictionary) -> void:
 	var move: Vector2 = command.get("move", Vector2.ZERO)
@@ -153,7 +237,7 @@ func _spawn_demo_hazard() -> void:
 			target = actors[member.player_id]
 			break
 	var direction := (Vector2(target.position) - BOSS_POSITION).angle() + rng.randf_range(-0.15, 0.15)
-	hazards.append({"id": next_hazard_id, "name": "Bell Sweep" if is_cone else "Hollow Toll",
+	queue_hazard({"id": next_hazard_id, "name": "Bell Sweep" if is_cone else "Hollow Toll",
 		"kind": "cone" if is_cone else "donut", "origin": BOSS_POSITION,
 		"direction": direction, "half_angle": PI / 5.0, "radius": 380.0,
 		"inner_radius": 155.0, "warning_tick": tick, "resolve_tick": tick + 90})
@@ -178,14 +262,19 @@ func _resolve_actor_hazard(hazard: Dictionary, actor: Dictionary) -> void:
 			actor.immune_until = tick + IMMUNITY_TICKS
 			result = "hit"
 	next_event_id += 1
-	events.append({"schema_version": 1, "generation": generation, "event_id": next_event_id,
+	events.append({"schema_version": 2, "generation": generation, "event_id": next_event_id,
 		"player_id": actor.id, "type": "mechanic_resolved", "tick": tick,
 		"source_attack_id": hazard.get("source_attack_id", 0),
 		"lock_tick": hazard.get("lock_tick", hazard.warning_tick),
+		"anchor": hazard.get("anchor", "fixed"), "target_player_id": hazard.get("target_player_id", 0),
+		"hazard_origin": [hazard.origin.x, hazard.origin.y], "hazard_direction": hazard.get("direction", 0.0),
 		"attack_id": hazard.id, "attack_name": hazard.name,
 		"position": [actor.position.x, actor.position.y], "outcome": result,
 		"required_behavior": "Leave the marked cone" if hazard.kind == "cone" else "Move inside the inner ring or beyond the outer ring",
 		"guarded": guarded, "mechanic_failed": inside})
+	_trim_events()
+
+func _trim_events() -> void:
 	if events.size() > 128:
 		events.pop_front()
 
@@ -202,7 +291,7 @@ func snapshot() -> Dictionary:
 		var shape: Dictionary = hazard.duplicate(true)
 		shape.origin = [hazard.origin.x, hazard.origin.y]
 		shapes.append(shape)
-	return {"schema_version": 1, "generation": generation, "tick": tick, "seed": seed_value,
+	return {"schema_version": 2, "generation": generation, "tick": tick, "seed": seed_value,
 		"actors": actor_snapshots, "roster": roster_snapshot,
 		"boss": {"hp": boss_hp, "max_hp": BOSS_MAX_HP, "position": [BOSS_POSITION.x, BOSS_POSITION.y]},
 		"hazards": shapes, "outcome": outcome, "events": events.duplicate(true)}
