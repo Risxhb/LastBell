@@ -1,4 +1,6 @@
-# Standalone session spike
+# Historical Godot session spike — superseded by Unity
+
+**Production engine is Unity/C#.** This document, the ENet adapter, GDScript tests and recorded results are retained only as historical behavior evidence. They do not validate Unity. New networking work follows [the Unity migration](https://github.com/Risxhb/collab/blob/docs/2-5d-isometric-direction/docs/plans/unity-migration.md) and [revised #7](https://github.com/Risxhb/collab/issues/7); do not integrate this Godot branch into the production path.
 
 Task: [#7](https://github.com/Risxhb/collab/issues/7). Parent foundation: [PR #10](https://github.com/Risxhb/collab/pull/10), commit `6fa2e6c3c0f3caf8499bbd481bbec15c8223dec3`.
 Toolchain: **Godot 4.7.2-stable standard editor**, typed GDScript. Matching export templates are needed only for exports, not these editor/headless tests.
