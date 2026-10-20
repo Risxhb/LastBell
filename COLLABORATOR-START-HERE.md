@@ -12,7 +12,7 @@ Send Risxhb your **GitHub username** through your usual communication channel. Y
 
 Risxhb will invite that account to this repository only. Sign in to your own GitHub account and accept the invitation. Then open the repository link above. A 404 usually means the invitation has not been accepted, you are signed into a different account, or access has not been granted yet.
 
-The repository has been created. The collaborator invitation remains pending until the owner has your username.
+The repository has been created and an invitation has been sent to **Chzy18**. Sign in as that account and accept the invitation before cloning or posting to the board.
 
 ## 2. Get a local copy
 
