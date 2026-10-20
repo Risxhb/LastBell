@@ -62,7 +62,7 @@ foreach ($pass in 1..$Repeat) {
             Wait-For { (Test-Path -LiteralPath (Join-Path $caseDirectory 'lobby.txt')) -or $hostWorker.Process.HasExited } 25 'ready lobby'
             if ($hostWorker.Process.HasExited) { throw 'Host exited before lobby gate' }
             if ($name -eq 'Eight') {
-                foreach ($probe in @('capacity','bad-length','partial-close','stall','wrong-room')) {
+                foreach ($probe in @('capacity','bad-length','partial-close','stall','slow-drip','wrong-room')) {
                     $probeName = 'probe-' + $probe
                     $worker = Start-Worker $probeName @('-Role','Client','-Port',[string]$port,'-Session',$sessionId,'-Mode',$probe,'-Report',(Join-Path $caseDirectory ($probeName + '.json')))
                     $probeReports += Read-Worker $probeName $worker
@@ -96,7 +96,7 @@ foreach ($pass in 1..$Repeat) {
                     if ($hostReport.Rejections.$reason -lt 1) { throw "Input rejection not exercised: $reason" }
                 }
                 if ($name -eq 'Eight') {
-                    foreach ($reason in @('session_full','frame_length','truncated_frame','frame_timeout','wrong_room')) {
+                    foreach ($reason in @('session_full','frame_length','truncated_frame','frame_timeout','frame_deadline','wrong_room')) {
                         if ($hostReport.Rejections.$reason -lt 1) { throw "Probe not rejected: $reason" }
                     }
                 }

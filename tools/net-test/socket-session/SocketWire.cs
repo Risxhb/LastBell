@@ -18,6 +18,7 @@ namespace LastBell.Network.SocketPrototype
     internal sealed class Channel : IDisposable
     {
         public const int MaxFrame = 65536, MaxQueued = 32, PartialTimeoutMs = 1000;
+        public const int AssemblyTimeoutMs = 2000, MaxPumpBytes = 8192;
         private readonly TcpClient client;
         private readonly NetworkStream stream;
         private readonly byte[] header = new byte[4], scratch = new byte[4096];
@@ -25,7 +26,7 @@ namespace LastBell.Network.SocketPrototype
         private readonly Stopwatch watch = Stopwatch.StartNew();
         private byte[] body;
         private int headerUsed, bodyUsed;
-        private long progress;
+        private long progress, frameStarted;
         public bool Closed { get; private set; }
         public long BytesRead, BytesWritten, FramesRead, FramesWritten;
         public Channel(TcpClient socket)
@@ -62,15 +63,20 @@ namespace LastBell.Network.SocketPrototype
         public void Raw(byte[] bytes) { stream.Write(bytes, 0, bytes.Length); BytesWritten += bytes.Length; }
         public void Pump()
         {
-            while (!Closed && client.Available > 0)
+            // Check before reading: a late byte must not revive an expired frame.
+            CheckDeadline();
+            int remaining = MaxPumpBytes;
+            while (!Closed && client.Available > 0 && remaining > 0)
             {
-                int count = stream.Read(scratch, 0, Math.Min(scratch.Length, client.Available));
+                int count = stream.Read(scratch, 0, Math.Min(remaining, Math.Min(scratch.Length, client.Available)));
                 if (count == 0) { Closed = true; break; }
+                remaining -= count;
                 BytesRead += count; progress = watch.ElapsedMilliseconds;
                 for (int i = 0; i < count; i++)
                 {
                     if (body == null)
                     {
+                        if (headerUsed == 0) frameStarted = watch.ElapsedMilliseconds;
                         header[headerUsed++] = scratch[i];
                         if (headerUsed != 4) continue;
                         uint length = ((uint)header[0] << 24) | ((uint)header[1] << 16) | ((uint)header[2] << 8) | header[3];
@@ -88,7 +94,14 @@ namespace LastBell.Network.SocketPrototype
             }
             if (!Closed && client.Client.Poll(0, SelectMode.SelectRead) && client.Available == 0) Closed = true;
             if (Closed && (body != null || headerUsed != 0)) throw new InvalidDataException("truncated_frame");
-            if (!Closed && (body != null || headerUsed != 0) && watch.ElapsedMilliseconds - progress > PartialTimeoutMs)
+            CheckDeadline();
+        }
+        private void CheckDeadline()
+        {
+            if (Closed || (body == null && headerUsed == 0)) return;
+            if (watch.ElapsedMilliseconds - frameStarted > AssemblyTimeoutMs)
+                throw new InvalidDataException("frame_deadline");
+            if (watch.ElapsedMilliseconds - progress > PartialTimeoutMs)
                 throw new InvalidDataException("frame_timeout");
         }
         public bool TryRead(out Message message)

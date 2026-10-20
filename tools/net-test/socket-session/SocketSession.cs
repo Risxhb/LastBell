@@ -247,11 +247,14 @@ namespace LastBell.Network.SocketPrototype
                 if (mode == "bad-length") channel.Raw(new byte[] { 127, 255, 255, 255 });
                 else if (mode == "partial-close")
                 { channel.Raw(new byte[] { 0, 0, 0, 10, 1 }); report.EndReason = "partial_frame_sent"; }
-                else if (mode == "stall") channel.Raw(new byte[] { 0, 0, 0, 10, 1 });
+                else if (mode == "stall" || mode == "slow-drip") channel.Raw(new byte[] { 0, 0, 0, 100, 1 });
                 else channel.Send(Op.Hello, Payload.Write(w => { w.Write((byte)1); w.Write((mode == "wrong-room" ? Guid.Empty : identity).ToByteArray()); w.Write(report.Pid); }), fragment: true);
+                long nextDrip = timer.ElapsedMilliseconds + 300;
                 while (report.EndReason == null && timer.ElapsedMilliseconds < 45000)
                 {
                     channel.Pump(); Message message;
+                    if (mode == "slow-drip" && !channel.Closed && timer.ElapsedMilliseconds >= nextDrip)
+                    { channel.Raw(new byte[] { 0 }); nextDrip = timer.ElapsedMilliseconds + 300; }
                     while (channel.TryRead(out message) && report.EndReason == null)
                     {
                         if (message.Kind == Op.Welcome)
@@ -323,7 +326,7 @@ namespace LastBell.Network.SocketPrototype
                     Thread.Sleep(1);
                 }
                 string expected = mode == "capacity" ? "session_full" : mode == "wrong-room" ? "wrong_room" : mode == "disconnect" ? "client_disconnect" :
-                    mode == "bad-length" || mode == "stall" || mode == "expect-eof" ? "socket_eof" : mode == "partial-close" ? "partial_frame_sent" : "graceful_host_shutdown";
+                    mode == "bad-length" || mode == "stall" || mode == "slow-drip" || mode == "expect-eof" ? "socket_eof" : mode == "partial-close" ? "partial_frame_sent" : "graceful_host_shutdown";
                 if (report.EndReason != expected || report.DuplicateEffects != 0) failures.Add("unexpected end/result: " + report.EndReason + " expected " + expected);
                 if ((mode == "play" || mode == "disconnect") && (!started || report.SentInputs == 0 || report.FeedbackEffects == 0)) failures.Add("play not exercised");
             }

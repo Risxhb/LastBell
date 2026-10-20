@@ -1,0 +1,13 @@
+{
+  "passed": true,
+  "networkSocketsExecuted": true,
+  "bindAddress": "127.0.0.1",
+  "checks": [
+    "pump byte budget and reassembly",
+    "complete frame resets deadline",
+    "coalesced queue cap",
+    "late byte cannot revive idle header",
+    "slow drip absolute assembly deadline"
+  ],
+  "executedAtUtc": "2026-10-20T21:22:13.6800178+00:00"
+}
