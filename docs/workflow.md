@@ -1,5 +1,7 @@
 # Collaboration workflow
 
+Every model starts with [AGENTS.md](../AGENTS.md) and [the architecture policy](architecture.md). Use its [review checklist](architecture.md#review-checklist) before requesting review. State the runtime actually tested and distinguish experimental work from adopted production behavior. Update decisions and the relevant authorized lane handoff when architecture or shared interfaces change.
+
 1. Open an issue describing the desired result and acceptance criteria.
 2. Agree on one owner before starting work.
 3. Create a branch from the latest main, such as `feature/short-description` or `docs/short-description`.

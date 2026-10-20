@@ -1,5 +1,9 @@
 # Collab
 
+## Current architecture decision
+
+Last Bell uses **Unity/C# for the finished game**, shared scene-independent **C# gameplay rules and tests**, optional browser experiments and Godot as a historical reference. This supersedes conflicting older engine plans. All agents must read [AGENTS.md](AGENTS.md) and [the architecture policy](docs/architecture.md); Claude also has [CLAUDE.md](CLAUDE.md). Unity setup and the shared integration contract still require implementation and review. Public project collaboration is approved; older private-only wording below is historical.
+
 Private workspace for a two-person project.
 
 ## Start here

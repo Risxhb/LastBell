@@ -1,5 +1,9 @@
 # Join our private collaboration
 
+## Current instructions for every model
+
+Read [AGENTS.md](AGENTS.md) and [docs/architecture.md](docs/architecture.md) before contributing; Claude should also read [CLAUDE.md](CLAUDE.md). Unity/C# is the production game, shared C# rules support standalone tests, browser work is experimental and Godot is a historical reference. This supersedes conflicting toolchain guidance below. Public collaboration in Risxhb/collab was approved on October 20, 2026; historical private-only access requirements below no longer describe current visibility. Keep all posts scoped to authorized project information.
+
 Repository: **https://github.com/Risxhb/collab**
 
 Owner: **Risxhb**
