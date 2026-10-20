@@ -4,13 +4,15 @@ Planning draft · October 20, 2026
 
 ## 1. Game direction
 
-**Pitch:** A 1–4 player, top-down action raid game where a compact combat kit meets intricate boss mechanics, and every short expedition offers new ways to build your character.
+**Pitch:** A 1–8 player, top-down action raid game where a compact combat kit meets intricate boss mechanics, and every short expedition offers new ways to build your character.
 
 Give **encounter mastery and roguelite build variety equal weight**, as requested. Learning the fight should improve your next attempt; choosing a different build should change the decisions you make during it.
 
 Working concept: **Last Bell**. Players are wardens exploring a suspended clockwork city whose guardians repeat distorted fragments of the past. Distinct silhouettes, mechanical architecture, and bell-driven attacks give the game its own identity. The title and setting are provisional.
 
-Planning assumptions: Windows PC first; small independent team; keyboard/mouse and controller; solo plus up to four friends online. Engine, team size, budget, art style, and commercial scope remain open. No implementation is included in this planning task.
+**Confirmed requirement: online co-op for 2–8 players, eight total including the host**, alongside solo play. Online play at the full eight-player capacity is part of the core product and must be demonstrated in the playable slice.
+
+Planning assumptions: Windows PC first; small independent team; keyboard/mouse and controller. Engine, team size, budget, art style, and commercial scope remain open. No implementation is included in this planning task.
 
 ## 2. What we learned from Rabbit & Steel
 
@@ -93,6 +95,8 @@ Second slice boss: **The Glass Cartographer**, using lanes, marked destinations,
 
 Author mechanics for each party size. For example, a stack becomes a designated solo shelter, a paired tether becomes a tether to an arena anchor in solo, and spreads choose a count appropriate to available players. Keep the same visual meaning even when the solution changes.
 
+For 5–8 players, author mechanics around subgroups, designated targets, and staggered assignments. An eight-player party can split into two groups of four for simultaneous stacks or four tether pairs. Odd party sizes need explicit rules, such as an unpaired player receiving an anchor tether. Avoid marking every player with a large spread unless the arena has enough reachable space. Support every party size from one through eight, using tested small-party and large-party variants with per-count assignments and health/damage-pressure tuning.
+
 Randomize tested pattern variants and player assignments, rather than arbitrary overlapping hazards. Build an encounter validator for incompatible timings and insufficient safe space. Each generated sequence must leave a reachable solution at baseline movement speed.
 
 ## 7. Roguelite builds and progression
@@ -130,6 +134,8 @@ Ship Standard and rehearsal first; expand difficulty after the core patterns wor
 
 Visual priority: hazards and safe boundaries → personal markers → players and boss → cosmetic attacks. Use color plus shape/icon, optional ally-effect reduction, scalable UI, remappable controls, hold-to-repeat attacks, and configurable screen shake. Show cooldown information close enough to the player that watching the arena remains practical.
 
+Design the arena, shared camera, and HUD for eight-player occupancy from the start. Give each player a stable number and recognizable marker, expose subgroup assignments, and keep the local player prominent. Reduce cosmetic ally effects by default in large parties while preserving all mechanic cues. Validate stacked-player readability and safe-zone capacity with eight players before finalizing arena dimensions. Eight players do not require eight distinct classes; duplicates remain supported.
+
 For every attack, define whether it locks onto a position, follows a player until a lock time, or continuously checks an area. Show the lock transition visibly. Telegraph geometry and collision geometry must share the same underlying definition.
 
 ## 9. Technology and architecture
@@ -152,7 +158,19 @@ For the prototype, use a player-hosted authoritative simulation, fixed simulatio
 
 Test responsiveness early. Compare the authoritative prototype against actual latency tolerance before committing to production networking; evaluate rollback only if the simpler approach cannot meet the combat target. Rabbit & Steel advertises rollback, but that does not make it an automatic requirement for this project. [Developer press kit](https://www.minodevgames.com/rabbit-steel-press-kit)
 
-LAN/direct connection is enough for the first network experiment. A public PC release needs a separately validated lobby and connection/relay solution; basic ENet alone does not solve consumer NAT traversal. Use a transport abstraction and schedule a Steam integration spike before promising online delivery. Host migration and drop-in participation during active fights are outside the initial scope. If the host disconnects, show a clear end-of-session result; other disconnects take effect at the next encounter boundary.
+### Required online co-op experience
+
+- One player hosts; up to seven friends join through a private lobby and invite flow, for eight players total.
+- Players select classes, review builds, and ready up before the host starts an encounter.
+- All players share boss phases, mechanic assignments, damage outcomes, upgrade selection boundaries, and expedition progress.
+- Internet connections must work without requiring players to configure router port forwarding. Validate a connection/relay solution early; Steam lobbies and invites are the provisional PC distribution route.
+- Display connection status and readable errors. A disconnected non-host immediately stops accepting input and is removed from live mechanic assignments through a defined cancellation or reassignment rule. Do not leave remaining players with an impossible stack or tether. Apply permanent party-size scaling at the next encounter boundary.
+- Support a returning player's reconnection to the same session at an encounter boundary, restoring their class and build while the host remains available.
+- Rehearsal and retries work for the online party, with a shared ready check before a phase restart.
+
+LAN/direct connection may be used for the first technical experiment, but the playable slice must also pass a real internet test between separate networks. Basic ENet alone does not solve consumer NAT traversal; validate the lobby and connection/relay path before expanding content. Keep the transport replaceable. Host migration and new players joining an active fight are outside the initial scope. If the host disconnects, end the session with a clear explanation.
+
+Online release acceptance: complete an expedition at every party size from 2 through 8 across separate networks; verify invites, eight-player lobby capacity and rejection of a ninth player, ready checks, synchronized rewards, non-host disconnect/reconnect, host loss, and mechanic fairness under the latency tests below. Include an eight-player soak test covering multiple consecutive mini-runs, measuring bandwidth, host frame time, corrections, and event delivery. Eight-player internet co-op is a release gate.
 
 ## 10. Build order and gates
 
@@ -161,12 +179,12 @@ The estimates below are rough **person-weeks for an experienced developer**, not
 | Stage | Deliverable | Exit gate | Initial effort |
 |---|---|---|---|
 | Combat experiment | One arena, one class, one boss pattern sequence, guard and damage feedback | Movement and attacking feel responsive; players understand hits | 1–2 person-weeks |
-| Network experiment | Two clients running the same encounter, latency simulation, event diagnostics | No divergent mechanic outcomes; acceptable movement and hit feedback | 1–2 person-weeks |
+| Network experiment | Begin with two participants, then eight running the same encounter; latency simulation, event diagnostics, initial internet connection/relay spike | No divergent mechanic outcomes; acceptable movement and hit feedback; successful eight-player connection across separate networks | 2–3 person-weeks |
 | Complete loop | One boss, upgrade selection, retry, run end, first rehearsal checkpoint | Upgrade choices visibly change play; retry takes under five seconds | 2–3 person-weeks |
-| Playable slice | Two bosses, two classes, 12 relics, six modifiers, solo and 2–4 player variants | Both mastery and build choices sustain repeated sessions | 4–6 person-weeks |
-| Production planning | External feedback, measured authoring cost, connection spike, revised budget | Evidence supports the next content investment | 1 person-week |
+| Playable slice | Two bosses, two classes, 12 relics, six modifiers, solo and 2–8 player online variants, private lobby/invites | Both mastery and build choices sustain repeated sessions; full eight-player mini-run succeeds across separate networks | 5–8 person-weeks |
+| Production planning | External feedback, measured authoring cost, online reliability findings, revised budget | Evidence supports the next content investment | 1 person-week |
 
-Total planning range: roughly **9–14 person-weeks to evaluate the slice**, with art, integration problems, or unfamiliar tools potentially extending it. Begin with placeholders and a deliberately simple interface.
+Total planning range: roughly **11–17 person-weeks to evaluate the slice**, with art, integration problems, or unfamiliar tools potentially extending it. The larger party adds encounter scaling, readability, and network validation work. This estimate is provisional until the eight-player internet connection/relay spike; revise it for lobby integration and reconnect work based on that result. Begin with placeholders and a deliberately simple interface.
 
 The full expedition length cannot be demonstrated by two bosses alone. The slice should be a 10–15 minute mini-run with enough reward decisions to test the loop; reserve the 20–30 minute target for broader production content.
 
@@ -178,8 +196,8 @@ Test these risks before expanding content:
 |---|---|
 | Players cannot explain a hit | After a failure, ask what resolved and where safety was; compare with the event log |
 | Roguelite choices are cosmetic | Ask players to explain how an upgrade changed their next decision; observe at least two successful builds per class |
-| Mechanics become unfair in a smaller party | Play each boss at 1, 2, 3, and 4 players, including duplicate classes |
-| Latency changes fairness | Test at 50/100/150 ms round-trip latency and modest packet loss; inspect guard and position corrections |
+| Mechanics become unfair at different party sizes | Play each boss at every count from 1 through 8, including odd counts, duplicate classes, and disconnects during assigned mechanics |
+| Latency changes fairness | Test at 50/100/150 ms round-trip latency and modest packet loss, including eight connected players; inspect guard and position corrections |
 | Random patterns create impossible states | Reproduce seeds, validate timing constraints, and inspect collision/safe-space overlays |
 | Boss creation costs too much | Build the second boss using existing mechanics and measure authoring/debugging time |
 | Practice undermines expeditions | Check whether players use rehearsal to return to runs, and whether run-specific builds still feel valuable |
@@ -194,7 +212,7 @@ Defer an open world, mandatory role trinity, large AI raid parties, competitive 
 
 ## 12. Immediate first milestone
 
-Build **Vanguard versus the Bellkeeper** with placeholder visuals, three taught mechanics, one Echo, six prototype upgrades, a failure explanation, and instant restart. Follow immediately with a two-client network experiment, then add Arcanist and the second boss.
+Build **Vanguard versus the Bellkeeper** with placeholder visuals, three taught mechanics, one Echo, six prototype upgrades, a failure explanation, and instant restart. Follow immediately with a two-participant network experiment, expand it to eight participants across separate networks, then add Arcanist and the second boss. Use duplicate Vanguards to test capacity before expanding the class roster.
 
 The decision at that point is concrete: does the same fight remain enjoyable as players learn it, and do different upgrades give them a reason to approach it differently? Both must work before scaling production.
 
