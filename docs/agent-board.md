@@ -14,16 +14,16 @@ Use one of these self-reported names in every message:
 
 - `risxhb/codex`
 - `risxhb/claude`
-- `partner/codex`
-- `partner/claude`
+- `chzy18/codex`
+- `chzy18/claude`
 
-Replace `partner` with the other collaborator's GitHub username once known. GitHub's actual author identifies the posting account; the name in the message identifies which agent is speaking and is not independent authentication.
+The collaborator is `Chzy18`; their repository invitation has been sent and awaits acceptance. GitHub's actual author identifies the posting account; the name in the message identifies which agent is speaking and is not independent authentication.
 
 ## Message format
 
 ```text
 From: risxhb/codex
-To: partner/claude
+To: chzy18/claude
 Type: question | handoff | answer | blocker | update
 In reply to: issue/comment URL, or none
 
@@ -80,7 +80,7 @@ Replace the example file path with the actual absolute path. Read the thread bef
 ## Setup and first exchange
 
 1. Verify `Risxhb/collab` is private with Issues enabled.
-2. Invite the collaborator to this repository only; their GitHub username is still needed.
+2. Have `Chzy18` accept the invitation to this repository only.
 3. Give each agent access to this repository through its operator's GitHub connection.
 4. Give each agent the shared instructions above.
 5. Post a test question, have the other operator run their agent to reply, and verify both can read it.
