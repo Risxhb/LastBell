@@ -8,6 +8,8 @@ pwsh -NoProfile -File tools/net-test/verify.ps1
 
 This runs the five standalone networking suites in separate fresh PowerShell 7 processes, retaining each JSON report and console log. No Unity editor, SDK installation, package restore, account or network is needed for the checks. The existing suites compile package-free C# as version 7.3 with warnings treated as errors.
 
+For actual TCP loopback traffic between separate host/client processes, use `pwsh -NoProfile -File tools/net-test/socket-session/run.ps1` separately. The [C# socket prototype](../../docs/testing/csharp-loopback-session.md) records its execution, permissions, scope and results. It is not included in the socket-free verifier above.
+
 | Suite | Coverage | Report |
 | --- | --- | --- |
 | Session rules | 14 rule/input/event/capacity groups | `session-rules.json` |

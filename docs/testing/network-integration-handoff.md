@@ -10,6 +10,8 @@ pwsh -NoProfile -File tools/net-test/verify.ps1
 
 The [verification entry point](../../tools/net-test/README.md) describes profiles, prerequisites, reports and error behavior. Full runs all five existing suites, including the long virtual cases. The [recorded summary](../../tools/net-test/evidence/verification.json) records the source/report hashes and suite outcomes. Offline success does not close the Unity/Internet/human gates.
 
+A separate [C# TCP loopback prototype](csharp-loopback-session.md) now executes host/client communication in real OS processes, including one host plus seven clients. Run `pwsh -NoProfile -File tools/net-test/socket-session/run.ps1` for that milestone. It retains explicit Unity/Internet/combat limitations and does not select the production transport.
+
 ## Review and integration order
 
 The current changes form a stacked dependency chain. Review/land from the bottom upward; this guide does not merge or retarget branches automatically. If a dependency is squash-merged, reconcile the next PR's base/history before merging it. The foundation must select which candidate behavior to adopt, rather than copying every lab into `Assets`.
@@ -23,6 +25,7 @@ The current changes form a stacked dependency chain. Review/land from the bottom
 | 5 | [#22](https://github.com/Risxhb/collab/pull/22), `tools/network-endurance` → previous | Independent diagnostic clocks, lifecycle/endurance evidence | `tools/net-test/endurance/` |
 | 6 | [#23](https://github.com/Risxhb/collab/pull/23), `tools/encounter-event-recovery` → previous | Event wire/chunks/checkpoint acknowledgment candidate | `tools/net-test/event-recovery/` |
 | 7 | `docs/network-integration-handoff` → previous | Unified verification and this integration map | `tools/net-test/verify.ps1`; this guide |
+| 8 | `prototype/csharp-loopback-session` → previous | Real-process loopback TCP session/input/event and lifecycle tests | `tools/net-test/socket-session/` |
 
 Historical [Godot PR #14](https://github.com/Risxhb/collab/pull/14) is a reference, outside this Unity candidate chain. The [Unity migration plan](https://github.com/Risxhb/collab/blob/docs/2-5d-isometric-direction/docs/plans/unity-migration.md) assigns U0/project/packages and U1/combat to foundation, U3/contracts jointly, and U4/network/content binding to the existing lane owners.
 

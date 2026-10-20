@@ -1,0 +1,995 @@
+{
+  "evidenceType": "csharp-loopback-tcp-separate-processes",
+  "executedAtUtc": "2026-10-20T21:07:35.3576834+00:00",
+  "runId": "20261020T210650695Z-06b129c2",
+  "networkSocketsExecuted": true,
+  "separateProcessesExecuted": true,
+  "unityEditorExecuted": false,
+  "internetExecuted": false,
+  "combatValidated": false,
+  "productionTransportSelected": false,
+  "bindAddress": "127.0.0.1",
+  "scenario": "All",
+  "repeat": 2,
+  "powershell": "7.6.5",
+  "runtime": ".NET 10.0.11",
+  "cases": [
+    {
+      "name": "two-1",
+      "passed": true,
+      "participants": 2,
+      "playerProcessIds": [
+        40520,
+        43236
+      ],
+      "launchedProcesses": 2,
+      "listenerStopped": true,
+      "hostKilled": false,
+      "host": {
+        "Pid": 40520,
+        "Port": 62321,
+        "ExpectedRemotes": 1,
+        "AcceptedRemotes": 1,
+        "MaxRoster": 2,
+        "CompletedTicks": 180,
+        "InputAccepted": 49,
+        "InputRejected": 4,
+        "Commands": 99,
+        "GuardCommands": 19,
+        "EventsIssued": 18,
+        "BytesRead": 5861,
+        "BytesWritten": 4731,
+        "DuplicateCommandTicks": 0,
+        "UnknownActorCommands": 0,
+        "ReadyGateReason": "players_not_ready",
+        "PhaseAfterShutdown": "Closed",
+        "Peers": [
+          {
+            "ClientPid": 43236,
+            "Connection": 100,
+            "PlayerId": 2,
+            "AcceptedSequence": 49,
+            "ProcessedSequence": 49,
+            "Disconnected": false,
+            "DisconnectReason": null
+          }
+        ],
+        "Rejections": {
+          "malformed_input": 1,
+          "wrong_session": 1,
+          "wrong_generation": 1,
+          "stale_sequence": 1
+        },
+        "Passed": true,
+        "Failures": []
+      },
+      "clients": [
+        {
+          "Pid": 43236,
+          "Port": 62321,
+          "Mode": "play",
+          "EndReason": "graceful_host_shutdown",
+          "Connection": 100,
+          "PlayerId": 2,
+          "LastTick": 180,
+          "LastProcessed": 49,
+          "SentInputs": 49,
+          "Counter": 18,
+          "FeedbackEffects": 18,
+          "DuplicateEffects": 0,
+          "BytesRead": 4731,
+          "BytesWritten": 5861,
+          "Passed": true,
+          "Failures": [],
+          "Rejections": {
+            "malformed_input": 1,
+            "wrong_session": 1,
+            "wrong_generation": 1,
+            "stale_sequence": 1
+          }
+        }
+      ],
+      "probes": [],
+      "failures": []
+    },
+    {
+      "name": "eight-1",
+      "passed": true,
+      "participants": 8,
+      "playerProcessIds": [
+        46972,
+        20276,
+        6112,
+        41184,
+        32012,
+        41336,
+        45196,
+        41492
+      ],
+      "launchedProcesses": 13,
+      "listenerStopped": true,
+      "hostKilled": false,
+      "host": {
+        "Pid": 46972,
+        "Port": 62329,
+        "ExpectedRemotes": 7,
+        "AcceptedRemotes": 7,
+        "MaxRoster": 8,
+        "CompletedTicks": 180,
+        "InputAccepted": 313,
+        "InputRejected": 10,
+        "Commands": 363,
+        "GuardCommands": 67,
+        "EventsIssued": 18,
+        "BytesRead": 36464,
+        "BytesWritten": 29811,
+        "DuplicateCommandTicks": 0,
+        "UnknownActorCommands": 0,
+        "ReadyGateReason": "players_not_ready",
+        "PhaseAfterShutdown": "Closed",
+        "Peers": [
+          {
+            "ClientPid": 20276,
+            "Connection": 100,
+            "PlayerId": 2,
+            "AcceptedSequence": 49,
+            "ProcessedSequence": 49,
+            "Disconnected": false,
+            "DisconnectReason": null
+          },
+          {
+            "ClientPid": 6112,
+            "Connection": 101,
+            "PlayerId": 3,
+            "AcceptedSequence": 49,
+            "ProcessedSequence": 49,
+            "Disconnected": false,
+            "DisconnectReason": null
+          },
+          {
+            "ClientPid": 32012,
+            "Connection": 102,
+            "PlayerId": 4,
+            "AcceptedSequence": 49,
+            "ProcessedSequence": 49,
+            "Disconnected": false,
+            "DisconnectReason": null
+          },
+          {
+            "ClientPid": 45196,
+            "Connection": 103,
+            "PlayerId": 5,
+            "AcceptedSequence": 49,
+            "ProcessedSequence": 49,
+            "Disconnected": false,
+            "DisconnectReason": null
+          },
+          {
+            "ClientPid": 41336,
+            "Connection": 104,
+            "PlayerId": 6,
+            "AcceptedSequence": 49,
+            "ProcessedSequence": 49,
+            "Disconnected": false,
+            "DisconnectReason": null
+          },
+          {
+            "ClientPid": 41492,
+            "Connection": 105,
+            "PlayerId": 7,
+            "AcceptedSequence": 19,
+            "ProcessedSequence": 19,
+            "Disconnected": true,
+            "DisconnectReason": "client_quit"
+          },
+          {
+            "ClientPid": 41184,
+            "Connection": 106,
+            "PlayerId": 8,
+            "AcceptedSequence": 49,
+            "ProcessedSequence": 49,
+            "Disconnected": false,
+            "DisconnectReason": null
+          }
+        ],
+        "Rejections": {
+          "session_full": 1,
+          "frame_length": 1,
+          "truncated_frame": 1,
+          "frame_timeout": 1,
+          "wrong_room": 1,
+          "malformed_input": 1,
+          "wrong_session": 1,
+          "wrong_generation": 1,
+          "stale_sequence": 7
+        },
+        "Passed": true,
+        "Failures": []
+      },
+      "clients": [
+        {
+          "Pid": 20276,
+          "Port": 62329,
+          "Mode": "play",
+          "EndReason": "graceful_host_shutdown",
+          "Connection": 100,
+          "PlayerId": 2,
+          "LastTick": 180,
+          "LastProcessed": 49,
+          "SentInputs": 49,
+          "Counter": 18,
+          "FeedbackEffects": 18,
+          "DuplicateEffects": 0,
+          "BytesRead": 4731,
+          "BytesWritten": 5861,
+          "Passed": true,
+          "Failures": [],
+          "Rejections": {
+            "malformed_input": 1,
+            "wrong_session": 1,
+            "wrong_generation": 1,
+            "stale_sequence": 1
+          }
+        },
+        {
+          "Pid": 6112,
+          "Port": 62329,
+          "Mode": "play",
+          "EndReason": "graceful_host_shutdown",
+          "Connection": 101,
+          "PlayerId": 3,
+          "LastTick": 180,
+          "LastProcessed": 49,
+          "SentInputs": 49,
+          "Counter": 18,
+          "FeedbackEffects": 18,
+          "DuplicateEffects": 0,
+          "BytesRead": 4672,
+          "BytesWritten": 5684,
+          "Passed": true,
+          "Failures": [],
+          "Rejections": {
+            "stale_sequence": 1
+          }
+        },
+        {
+          "Pid": 41184,
+          "Port": 62329,
+          "Mode": "play",
+          "EndReason": "graceful_host_shutdown",
+          "Connection": 106,
+          "PlayerId": 8,
+          "LastTick": 180,
+          "LastProcessed": 49,
+          "SentInputs": 49,
+          "Counter": 18,
+          "FeedbackEffects": 18,
+          "DuplicateEffects": 0,
+          "BytesRead": 4672,
+          "BytesWritten": 5684,
+          "Passed": true,
+          "Failures": [],
+          "Rejections": {
+            "stale_sequence": 1
+          }
+        },
+        {
+          "Pid": 32012,
+          "Port": 62329,
+          "Mode": "play",
+          "EndReason": "graceful_host_shutdown",
+          "Connection": 102,
+          "PlayerId": 4,
+          "LastTick": 180,
+          "LastProcessed": 49,
+          "SentInputs": 49,
+          "Counter": 18,
+          "FeedbackEffects": 18,
+          "DuplicateEffects": 0,
+          "BytesRead": 4672,
+          "BytesWritten": 5684,
+          "Passed": true,
+          "Failures": [],
+          "Rejections": {
+            "stale_sequence": 1
+          }
+        },
+        {
+          "Pid": 41336,
+          "Port": 62329,
+          "Mode": "play",
+          "EndReason": "graceful_host_shutdown",
+          "Connection": 104,
+          "PlayerId": 6,
+          "LastTick": 180,
+          "LastProcessed": 49,
+          "SentInputs": 49,
+          "Counter": 18,
+          "FeedbackEffects": 18,
+          "DuplicateEffects": 0,
+          "BytesRead": 4672,
+          "BytesWritten": 5684,
+          "Passed": true,
+          "Failures": [],
+          "Rejections": {
+            "stale_sequence": 1
+          }
+        },
+        {
+          "Pid": 45196,
+          "Port": 62329,
+          "Mode": "play",
+          "EndReason": "graceful_host_shutdown",
+          "Connection": 103,
+          "PlayerId": 5,
+          "LastTick": 180,
+          "LastProcessed": 49,
+          "SentInputs": 49,
+          "Counter": 18,
+          "FeedbackEffects": 18,
+          "DuplicateEffects": 0,
+          "BytesRead": 4672,
+          "BytesWritten": 5684,
+          "Passed": true,
+          "Failures": [],
+          "Rejections": {
+            "stale_sequence": 1
+          }
+        },
+        {
+          "Pid": 41492,
+          "Port": 62329,
+          "Mode": "disconnect",
+          "EndReason": "client_disconnect",
+          "Connection": 105,
+          "PlayerId": 7,
+          "LastTick": 60,
+          "LastProcessed": 19,
+          "SentInputs": 19,
+          "Counter": 5,
+          "FeedbackEffects": 5,
+          "DuplicateEffects": 0,
+          "BytesRead": 1688,
+          "BytesWritten": 2117,
+          "Passed": true,
+          "Failures": [],
+          "Rejections": {
+            "stale_sequence": 1
+          }
+        }
+      ],
+      "probes": [
+        {
+          "Pid": 46124,
+          "Port": 62329,
+          "Mode": "capacity",
+          "EndReason": "session_full",
+          "Connection": 0,
+          "PlayerId": 0,
+          "LastTick": 0,
+          "LastProcessed": 0,
+          "SentInputs": 0,
+          "Counter": 0,
+          "FeedbackEffects": 0,
+          "DuplicateEffects": 0,
+          "BytesRead": 17,
+          "BytesWritten": 26,
+          "Passed": true,
+          "Failures": [],
+          "Rejections": {
+            "session_full": 1
+          }
+        },
+        {
+          "Pid": 41400,
+          "Port": 62329,
+          "Mode": "bad-length",
+          "EndReason": "socket_eof",
+          "Connection": 0,
+          "PlayerId": 0,
+          "LastTick": 0,
+          "LastProcessed": 0,
+          "SentInputs": 0,
+          "Counter": 0,
+          "FeedbackEffects": 0,
+          "DuplicateEffects": 0,
+          "BytesRead": 0,
+          "BytesWritten": 4,
+          "Passed": true,
+          "Failures": [],
+          "Rejections": {}
+        },
+        {
+          "Pid": 2752,
+          "Port": 62329,
+          "Mode": "partial-close",
+          "EndReason": "partial_frame_sent",
+          "Connection": 0,
+          "PlayerId": 0,
+          "LastTick": 0,
+          "LastProcessed": 0,
+          "SentInputs": 0,
+          "Counter": 0,
+          "FeedbackEffects": 0,
+          "DuplicateEffects": 0,
+          "BytesRead": 0,
+          "BytesWritten": 5,
+          "Passed": true,
+          "Failures": [],
+          "Rejections": {}
+        },
+        {
+          "Pid": 35064,
+          "Port": 62329,
+          "Mode": "stall",
+          "EndReason": "socket_eof",
+          "Connection": 0,
+          "PlayerId": 0,
+          "LastTick": 0,
+          "LastProcessed": 0,
+          "SentInputs": 0,
+          "Counter": 0,
+          "FeedbackEffects": 0,
+          "DuplicateEffects": 0,
+          "BytesRead": 0,
+          "BytesWritten": 5,
+          "Passed": true,
+          "Failures": [],
+          "Rejections": {}
+        },
+        {
+          "Pid": 38916,
+          "Port": 62329,
+          "Mode": "wrong-room",
+          "EndReason": "wrong_room",
+          "Connection": 0,
+          "PlayerId": 0,
+          "LastTick": 0,
+          "LastProcessed": 0,
+          "SentInputs": 0,
+          "Counter": 0,
+          "FeedbackEffects": 0,
+          "DuplicateEffects": 0,
+          "BytesRead": 15,
+          "BytesWritten": 26,
+          "Passed": true,
+          "Failures": [],
+          "Rejections": {
+            "wrong_room": 1
+          }
+        }
+      ],
+      "failures": []
+    },
+    {
+      "name": "hostloss-1",
+      "passed": true,
+      "participants": 2,
+      "playerProcessIds": [
+        16888,
+        14552
+      ],
+      "launchedProcesses": 2,
+      "listenerStopped": true,
+      "hostKilled": true,
+      "host": null,
+      "clients": [
+        {
+          "Pid": 14552,
+          "Port": 60147,
+          "Mode": "expect-eof",
+          "EndReason": "socket_eof",
+          "Connection": 100,
+          "PlayerId": 2,
+          "LastTick": 33,
+          "LastProcessed": 10,
+          "SentInputs": 11,
+          "Counter": 3,
+          "FeedbackEffects": 3,
+          "DuplicateEffects": 0,
+          "BytesRead": 1040,
+          "BytesWritten": 1446,
+          "Passed": true,
+          "Failures": [],
+          "Rejections": {
+            "malformed_input": 1,
+            "wrong_session": 1,
+            "wrong_generation": 1,
+            "stale_sequence": 1
+          }
+        }
+      ],
+      "probes": [],
+      "failures": []
+    },
+    {
+      "name": "two-2",
+      "passed": true,
+      "participants": 2,
+      "playerProcessIds": [
+        14904,
+        13412
+      ],
+      "launchedProcesses": 2,
+      "listenerStopped": true,
+      "hostKilled": false,
+      "host": {
+        "Pid": 14904,
+        "Port": 60155,
+        "ExpectedRemotes": 1,
+        "AcceptedRemotes": 1,
+        "MaxRoster": 2,
+        "CompletedTicks": 180,
+        "InputAccepted": 49,
+        "InputRejected": 4,
+        "Commands": 99,
+        "GuardCommands": 19,
+        "EventsIssued": 18,
+        "BytesRead": 5808,
+        "BytesWritten": 4685,
+        "DuplicateCommandTicks": 0,
+        "UnknownActorCommands": 0,
+        "ReadyGateReason": "players_not_ready",
+        "PhaseAfterShutdown": "Closed",
+        "Peers": [
+          {
+            "ClientPid": 13412,
+            "Connection": 100,
+            "PlayerId": 2,
+            "AcceptedSequence": 49,
+            "ProcessedSequence": 49,
+            "Disconnected": false,
+            "DisconnectReason": null
+          }
+        ],
+        "Rejections": {
+          "malformed_input": 1,
+          "wrong_session": 1,
+          "wrong_generation": 1,
+          "stale_sequence": 1
+        },
+        "Passed": true,
+        "Failures": []
+      },
+      "clients": [
+        {
+          "Pid": 13412,
+          "Port": 60155,
+          "Mode": "play",
+          "EndReason": "graceful_host_shutdown",
+          "Connection": 100,
+          "PlayerId": 2,
+          "LastTick": 180,
+          "LastProcessed": 49,
+          "SentInputs": 49,
+          "Counter": 18,
+          "FeedbackEffects": 18,
+          "DuplicateEffects": 0,
+          "BytesRead": 4685,
+          "BytesWritten": 5808,
+          "Passed": true,
+          "Failures": [],
+          "Rejections": {
+            "malformed_input": 1,
+            "wrong_session": 1,
+            "wrong_generation": 1,
+            "stale_sequence": 1
+          }
+        }
+      ],
+      "probes": [],
+      "failures": []
+    },
+    {
+      "name": "eight-2",
+      "passed": true,
+      "participants": 8,
+      "playerProcessIds": [
+        34420,
+        33720,
+        47948,
+        35696,
+        29224,
+        11848,
+        39748,
+        38304
+      ],
+      "launchedProcesses": 13,
+      "listenerStopped": true,
+      "hostKilled": false,
+      "host": {
+        "Pid": 34420,
+        "Port": 57704,
+        "ExpectedRemotes": 7,
+        "AcceptedRemotes": 7,
+        "MaxRoster": 8,
+        "CompletedTicks": 180,
+        "InputAccepted": 313,
+        "InputRejected": 10,
+        "Commands": 363,
+        "GuardCommands": 67,
+        "EventsIssued": 18,
+        "BytesRead": 36464,
+        "BytesWritten": 29811,
+        "DuplicateCommandTicks": 0,
+        "UnknownActorCommands": 0,
+        "ReadyGateReason": "players_not_ready",
+        "PhaseAfterShutdown": "Closed",
+        "Peers": [
+          {
+            "ClientPid": 47948,
+            "Connection": 100,
+            "PlayerId": 2,
+            "AcceptedSequence": 49,
+            "ProcessedSequence": 49,
+            "Disconnected": false,
+            "DisconnectReason": null
+          },
+          {
+            "ClientPid": 33720,
+            "Connection": 101,
+            "PlayerId": 3,
+            "AcceptedSequence": 49,
+            "ProcessedSequence": 49,
+            "Disconnected": false,
+            "DisconnectReason": null
+          },
+          {
+            "ClientPid": 29224,
+            "Connection": 102,
+            "PlayerId": 4,
+            "AcceptedSequence": 49,
+            "ProcessedSequence": 49,
+            "Disconnected": false,
+            "DisconnectReason": null
+          },
+          {
+            "ClientPid": 35696,
+            "Connection": 103,
+            "PlayerId": 5,
+            "AcceptedSequence": 49,
+            "ProcessedSequence": 49,
+            "Disconnected": false,
+            "DisconnectReason": null
+          },
+          {
+            "ClientPid": 39748,
+            "Connection": 104,
+            "PlayerId": 6,
+            "AcceptedSequence": 49,
+            "ProcessedSequence": 49,
+            "Disconnected": false,
+            "DisconnectReason": null
+          },
+          {
+            "ClientPid": 11848,
+            "Connection": 105,
+            "PlayerId": 7,
+            "AcceptedSequence": 49,
+            "ProcessedSequence": 49,
+            "Disconnected": false,
+            "DisconnectReason": null
+          },
+          {
+            "ClientPid": 38304,
+            "Connection": 106,
+            "PlayerId": 8,
+            "AcceptedSequence": 19,
+            "ProcessedSequence": 19,
+            "Disconnected": true,
+            "DisconnectReason": "client_quit"
+          }
+        ],
+        "Rejections": {
+          "session_full": 1,
+          "frame_length": 1,
+          "truncated_frame": 1,
+          "frame_timeout": 1,
+          "wrong_room": 1,
+          "stale_sequence": 7,
+          "malformed_input": 1,
+          "wrong_session": 1,
+          "wrong_generation": 1
+        },
+        "Passed": true,
+        "Failures": []
+      },
+      "clients": [
+        {
+          "Pid": 33720,
+          "Port": 57704,
+          "Mode": "play",
+          "EndReason": "graceful_host_shutdown",
+          "Connection": 101,
+          "PlayerId": 3,
+          "LastTick": 180,
+          "LastProcessed": 49,
+          "SentInputs": 49,
+          "Counter": 18,
+          "FeedbackEffects": 18,
+          "DuplicateEffects": 0,
+          "BytesRead": 4731,
+          "BytesWritten": 5861,
+          "Passed": true,
+          "Failures": [],
+          "Rejections": {
+            "malformed_input": 1,
+            "wrong_session": 1,
+            "wrong_generation": 1,
+            "stale_sequence": 1
+          }
+        },
+        {
+          "Pid": 47948,
+          "Port": 57704,
+          "Mode": "play",
+          "EndReason": "graceful_host_shutdown",
+          "Connection": 100,
+          "PlayerId": 2,
+          "LastTick": 180,
+          "LastProcessed": 49,
+          "SentInputs": 49,
+          "Counter": 18,
+          "FeedbackEffects": 18,
+          "DuplicateEffects": 0,
+          "BytesRead": 4672,
+          "BytesWritten": 5684,
+          "Passed": true,
+          "Failures": [],
+          "Rejections": {
+            "stale_sequence": 1
+          }
+        },
+        {
+          "Pid": 35696,
+          "Port": 57704,
+          "Mode": "play",
+          "EndReason": "graceful_host_shutdown",
+          "Connection": 103,
+          "PlayerId": 5,
+          "LastTick": 180,
+          "LastProcessed": 49,
+          "SentInputs": 49,
+          "Counter": 18,
+          "FeedbackEffects": 18,
+          "DuplicateEffects": 0,
+          "BytesRead": 4672,
+          "BytesWritten": 5684,
+          "Passed": true,
+          "Failures": [],
+          "Rejections": {
+            "stale_sequence": 1
+          }
+        },
+        {
+          "Pid": 29224,
+          "Port": 57704,
+          "Mode": "play",
+          "EndReason": "graceful_host_shutdown",
+          "Connection": 102,
+          "PlayerId": 4,
+          "LastTick": 180,
+          "LastProcessed": 49,
+          "SentInputs": 49,
+          "Counter": 18,
+          "FeedbackEffects": 18,
+          "DuplicateEffects": 0,
+          "BytesRead": 4672,
+          "BytesWritten": 5684,
+          "Passed": true,
+          "Failures": [],
+          "Rejections": {
+            "stale_sequence": 1
+          }
+        },
+        {
+          "Pid": 11848,
+          "Port": 57704,
+          "Mode": "play",
+          "EndReason": "graceful_host_shutdown",
+          "Connection": 105,
+          "PlayerId": 7,
+          "LastTick": 180,
+          "LastProcessed": 49,
+          "SentInputs": 49,
+          "Counter": 18,
+          "FeedbackEffects": 18,
+          "DuplicateEffects": 0,
+          "BytesRead": 4672,
+          "BytesWritten": 5684,
+          "Passed": true,
+          "Failures": [],
+          "Rejections": {
+            "stale_sequence": 1
+          }
+        },
+        {
+          "Pid": 39748,
+          "Port": 57704,
+          "Mode": "play",
+          "EndReason": "graceful_host_shutdown",
+          "Connection": 104,
+          "PlayerId": 6,
+          "LastTick": 180,
+          "LastProcessed": 49,
+          "SentInputs": 49,
+          "Counter": 18,
+          "FeedbackEffects": 18,
+          "DuplicateEffects": 0,
+          "BytesRead": 4672,
+          "BytesWritten": 5684,
+          "Passed": true,
+          "Failures": [],
+          "Rejections": {
+            "stale_sequence": 1
+          }
+        },
+        {
+          "Pid": 38304,
+          "Port": 57704,
+          "Mode": "disconnect",
+          "EndReason": "client_disconnect",
+          "Connection": 106,
+          "PlayerId": 8,
+          "LastTick": 60,
+          "LastProcessed": 19,
+          "SentInputs": 19,
+          "Counter": 5,
+          "FeedbackEffects": 5,
+          "DuplicateEffects": 0,
+          "BytesRead": 1688,
+          "BytesWritten": 2117,
+          "Passed": true,
+          "Failures": [],
+          "Rejections": {
+            "stale_sequence": 1
+          }
+        }
+      ],
+      "probes": [
+        {
+          "Pid": 29508,
+          "Port": 57704,
+          "Mode": "capacity",
+          "EndReason": "session_full",
+          "Connection": 0,
+          "PlayerId": 0,
+          "LastTick": 0,
+          "LastProcessed": 0,
+          "SentInputs": 0,
+          "Counter": 0,
+          "FeedbackEffects": 0,
+          "DuplicateEffects": 0,
+          "BytesRead": 17,
+          "BytesWritten": 26,
+          "Passed": true,
+          "Failures": [],
+          "Rejections": {
+            "session_full": 1
+          }
+        },
+        {
+          "Pid": 36020,
+          "Port": 57704,
+          "Mode": "bad-length",
+          "EndReason": "socket_eof",
+          "Connection": 0,
+          "PlayerId": 0,
+          "LastTick": 0,
+          "LastProcessed": 0,
+          "SentInputs": 0,
+          "Counter": 0,
+          "FeedbackEffects": 0,
+          "DuplicateEffects": 0,
+          "BytesRead": 0,
+          "BytesWritten": 4,
+          "Passed": true,
+          "Failures": [],
+          "Rejections": {}
+        },
+        {
+          "Pid": 33352,
+          "Port": 57704,
+          "Mode": "partial-close",
+          "EndReason": "partial_frame_sent",
+          "Connection": 0,
+          "PlayerId": 0,
+          "LastTick": 0,
+          "LastProcessed": 0,
+          "SentInputs": 0,
+          "Counter": 0,
+          "FeedbackEffects": 0,
+          "DuplicateEffects": 0,
+          "BytesRead": 0,
+          "BytesWritten": 5,
+          "Passed": true,
+          "Failures": [],
+          "Rejections": {}
+        },
+        {
+          "Pid": 2640,
+          "Port": 57704,
+          "Mode": "stall",
+          "EndReason": "socket_eof",
+          "Connection": 0,
+          "PlayerId": 0,
+          "LastTick": 0,
+          "LastProcessed": 0,
+          "SentInputs": 0,
+          "Counter": 0,
+          "FeedbackEffects": 0,
+          "DuplicateEffects": 0,
+          "BytesRead": 0,
+          "BytesWritten": 5,
+          "Passed": true,
+          "Failures": [],
+          "Rejections": {}
+        },
+        {
+          "Pid": 4780,
+          "Port": 57704,
+          "Mode": "wrong-room",
+          "EndReason": "wrong_room",
+          "Connection": 0,
+          "PlayerId": 0,
+          "LastTick": 0,
+          "LastProcessed": 0,
+          "SentInputs": 0,
+          "Counter": 0,
+          "FeedbackEffects": 0,
+          "DuplicateEffects": 0,
+          "BytesRead": 15,
+          "BytesWritten": 26,
+          "Passed": true,
+          "Failures": [],
+          "Rejections": {
+            "wrong_room": 1
+          }
+        }
+      ],
+      "failures": []
+    },
+    {
+      "name": "hostloss-2",
+      "passed": true,
+      "participants": 2,
+      "playerProcessIds": [
+        45200,
+        10144
+      ],
+      "launchedProcesses": 2,
+      "listenerStopped": true,
+      "hostKilled": true,
+      "host": null,
+      "clients": [
+        {
+          "Pid": 10144,
+          "Port": 54173,
+          "Mode": "expect-eof",
+          "EndReason": "socket_eof",
+          "Connection": 100,
+          "PlayerId": 2,
+          "LastTick": 30,
+          "LastProcessed": 9,
+          "SentInputs": 10,
+          "Counter": 3,
+          "FeedbackEffects": 3,
+          "DuplicateEffects": 0,
+          "BytesRead": 1019,
+          "BytesWritten": 1387,
+          "Passed": true,
+          "Failures": [],
+          "Rejections": {
+            "malformed_input": 1,
+            "wrong_session": 1,
+            "wrong_generation": 1,
+            "stale_sequence": 1
+          }
+        }
+      ],
+      "probes": [],
+      "failures": []
+    }
+  ],
+  "passed": true
+}
