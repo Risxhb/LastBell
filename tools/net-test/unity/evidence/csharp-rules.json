@@ -1,0 +1,30 @@
+{
+  "evidenceType": "package-free-csharp-rules",
+  "unityEditorExecuted": false,
+  "networkSocketsExecuted": false,
+  "executedAtUtc": "2026-10-20T08:01:09.4136543+00:00",
+  "powershellVersion": "7.6.5",
+  "runtime": ".NET 10.0.11",
+  "platform": "Microsoft Windows 10.0.26200",
+  "architecture": "X64",
+  "languageVersion": "7.3",
+  "compiler": "5.0.0.0",
+  "assertions": 34514,
+  "passedScenarios": [
+    "session-validation",
+    "sequence-press-and-disconnect",
+    "wire-codec-and-golden-vector",
+    "rate-boundary",
+    "event-duplicate-gap-ack",
+    "event-checkpoint-generation-and-scope",
+    "event-batch-and-consumer-failure",
+    "in-memory-2-participants",
+    "in-memory-3-participants",
+    "in-memory-4-participants",
+    "in-memory-5-participants",
+    "in-memory-6-participants",
+    "in-memory-7-participants",
+    "in-memory-8-participants"
+  ],
+  "failures": []
+}
