@@ -17,6 +17,8 @@ const IMMUNITY_TICKS := 45
 var tick: int = 0
 var seed_value: int = 1
 var player: Dictionary = {}
+var actors: Dictionary = {}
+var roster: Array[Dictionary] = [{"player_id": 1, "class_id": "vanguard", "build": []}]
 var boss_hp: int = BOSS_MAX_HP
 var hazards: Array[Dictionary] = []
 var events: Array[Dictionary] = []
@@ -32,6 +34,28 @@ var encounter_provider: Callable
 func _init() -> void:
 	reset()
 
+## Replace the entire roster atomically and begin a fresh attempt with the same seed.
+## IDs are stable game IDs, never transport peer IDs. Only Vanguard is implemented.
+func configure_roster(entries: Array) -> bool:
+	if entries.is_empty() or entries.size() > 8:
+		return false
+	var configured: Array[Dictionary] = []
+	var ids: Dictionary = {}
+	for entry in entries:
+		if not entry is Dictionary:
+			return false
+		var id_value: Variant = entry.get("player_id")
+		if not id_value is int or id_value <= 0 or ids.has(id_value):
+			return false
+		if entry.get("class_id", "vanguard") != "vanguard" or not entry.get("build", []) is Array:
+			return false
+		ids[id_value] = true
+		configured.append({"player_id": id_value, "class_id": "vanguard", "build": entry.get("build", []).duplicate(true)})
+	configured.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a.player_id < b.player_id)
+	roster = configured
+	reset(seed_value)
+	return true
+
 func reset(new_seed: int = 1) -> void:
 	generation += 1
 	next_event_id = 0
@@ -39,9 +63,16 @@ func reset(new_seed: int = 1) -> void:
 	rng.seed = new_seed
 	tick = 0
 	boss_hp = BOSS_MAX_HP
-	player = {"id": 1, "position": SPAWN, "hp": 5, "resource": 0,
-		"ready_at": {"basic": 0, "technique": 0, "signature": 0, "guard": 0},
-		"guard_until": 0, "immune_until": 0, "attack_until": 0, "last_action": ""}
+	actors.clear()
+	for index in range(roster.size()):
+		var member: Dictionary = roster[index]
+		actors[member.player_id] = {"id": member.player_id, "class_id": member.class_id,
+			"build": member.build.duplicate(true), "position": SPAWN + Vector2((index % 4) * 40, floori(index / 4.0) * 40),
+			"hp": 5, "resource": 0,
+			"ready_at": {"basic": 0, "technique": 0, "signature": 0, "guard": 0},
+			"guard_until": 0, "immune_until": 0, "attack_until": 0, "last_action": ""}
+	# Compatibility alias for the solo view; multi-actor callers must use actors[id].
+	player = actors[roster[0].player_id]
 	hazards.clear()
 	events.clear()
 	next_hazard_id = 0
@@ -51,26 +82,16 @@ func step(commands: Dictionary) -> void:
 	if outcome != "playing":
 		return
 	tick += 1
-	var command: Dictionary = commands.get(1, {})
-	var move: Vector2 = command.get("move", Vector2.ZERO)
-	if not move.is_finite():
-		move = Vector2.ZERO
-	move = move.limit_length(1.0)
-	var position: Vector2 = player.position + move * SPEED / TICK_RATE
-	player.position = position.clamp(ARENA.position + Vector2(14, 14), ARENA.end - Vector2(14, 14))
-	if command.get("guard", false) and tick >= int(player.ready_at.guard):
-		player.guard_until = tick + GUARD_TICKS
-		player.ready_at.guard = tick + int(COOLDOWNS.guard)
-	for action in ["signature", "technique", "basic"]:
-		if command.get(action, false) and _attack(action):
-			break # Shared offensive cadence; guard is independent.
+	for member in roster:
+		var actor: Dictionary = actors[member.player_id]
+		if int(actor.hp) > 0:
+			_step_actor(actor, commands.get(member.player_id, {}))
 	if boss_hp <= 0:
 		outcome = "victory"
 		hazards.clear()
 		return
 	if encounter_provider.is_valid():
 		var context := snapshot()
-		context["roster"] = [{"player_id": 1, "class_id": "vanguard", "active": true}]
 		context["phase"] = "scheduling"
 		var scheduled: Array = encounter_provider.call(tick, context)
 		for hazard in scheduled:
@@ -84,68 +105,104 @@ func step(commands: Dictionary) -> void:
 		else:
 			pending.append(hazard)
 	hazards = pending
-	if int(player.hp) <= 0:
+	var any_alive := false
+	for actor in actors.values():
+		any_alive = any_alive or int(actor.hp) > 0
+	if not any_alive:
 		outcome = "defeat"
 
-func _attack(action: String) -> bool:
-	if tick < int(player.ready_at[action]) or tick < int(player.attack_until):
+func _step_actor(actor: Dictionary, command: Dictionary) -> void:
+	var move: Vector2 = command.get("move", Vector2.ZERO)
+	if not move.is_finite():
+		move = Vector2.ZERO
+	move = move.limit_length(1.0)
+	var position: Vector2 = actor.position + move * SPEED / TICK_RATE
+	actor.position = position.clamp(ARENA.position + Vector2(14, 14), ARENA.end - Vector2(14, 14))
+	if command.get("guard", false) and tick >= int(actor.ready_at.guard):
+		actor.guard_until = tick + GUARD_TICKS
+		actor.ready_at.guard = tick + int(COOLDOWNS.guard)
+	for action in ["signature", "technique", "basic"]:
+		if boss_hp <= 0:
+			break
+		if command.get(action, false) and _attack(action, actor):
+			break # Shared offensive cadence; guard is independent.
+
+func _attack(action: String, actor: Dictionary) -> bool:
+	if tick < int(actor.ready_at[action]) or tick < int(actor.attack_until):
 		return false
-	if action == "technique" and int(player.resource) < 3:
+	if action == "technique" and int(actor.resource) < 3:
 		return false
-	if player.position.distance_to(BOSS_POSITION) > float(RANGES[action]):
+	if actor.position.distance_to(BOSS_POSITION) > float(RANGES[action]):
 		return false
-	player.ready_at[action] = tick + int(COOLDOWNS[action])
-	player.attack_until = tick + 18
-	player.last_action = action
+	actor.ready_at[action] = tick + int(COOLDOWNS[action])
+	actor.attack_until = tick + 18
+	actor.last_action = action
 	if action == "basic":
-		player.resource = mini(int(player.resource) + 1, 6)
+		actor.resource = mini(int(actor.resource) + 1, 6)
 	elif action == "technique":
-		player.resource -= 3
+		actor.resource -= 3
 	boss_hp = maxi(0, boss_hp - int(DAMAGE[action]))
 	return true
 
 func _spawn_demo_hazard() -> void:
 	next_hazard_id += 1
 	var is_cone := next_hazard_id % 2 == 1
-	var direction := (Vector2(player.position) - BOSS_POSITION).angle() + rng.randf_range(-0.15, 0.15)
+	var target: Dictionary = player
+	for member in roster:
+		if int(actors[member.player_id].hp) > 0:
+			target = actors[member.player_id]
+			break
+	var direction := (Vector2(target.position) - BOSS_POSITION).angle() + rng.randf_range(-0.15, 0.15)
 	hazards.append({"id": next_hazard_id, "name": "Bell Sweep" if is_cone else "Hollow Toll",
 		"kind": "cone" if is_cone else "donut", "origin": BOSS_POSITION,
 		"direction": direction, "half_angle": PI / 5.0, "radius": 380.0,
 		"inner_radius": 155.0, "warning_tick": tick, "resolve_tick": tick + 90})
 
 func resolve_hazard(hazard: Dictionary) -> void:
-	var inside := Geometry.contains_point(hazard, player.position)
-	var guarded := inside and tick < int(player.guard_until)
+	for member in roster:
+		var actor: Dictionary = actors[member.player_id]
+		if int(actor.hp) > 0:
+			_resolve_actor_hazard(hazard, actor)
+
+func _resolve_actor_hazard(hazard: Dictionary, actor: Dictionary) -> void:
+	var inside := Geometry.contains_point(hazard, actor.position)
+	var guarded := inside and tick < int(actor.guard_until)
 	var result := "avoided"
 	if inside:
 		if guarded:
 			result = "guarded"
-		elif tick < int(player.immune_until):
+		elif tick < int(actor.immune_until):
 			result = "immune"
 		else:
-			player.hp = maxi(0, int(player.hp) - 1)
-			player.immune_until = tick + IMMUNITY_TICKS
+			actor.hp = maxi(0, int(actor.hp) - 1)
+			actor.immune_until = tick + IMMUNITY_TICKS
 			result = "hit"
 	next_event_id += 1
-	events.append({"schema_version": 0, "generation": generation, "event_id": next_event_id,
-		"player_id": 1, "type": "mechanic_resolved", "tick": tick,
+	events.append({"schema_version": 1, "generation": generation, "event_id": next_event_id,
+		"player_id": actor.id, "type": "mechanic_resolved", "tick": tick,
 		"source_attack_id": hazard.get("source_attack_id", 0),
 		"lock_tick": hazard.get("lock_tick", hazard.warning_tick),
 		"attack_id": hazard.id, "attack_name": hazard.name,
-		"position": [player.position.x, player.position.y], "outcome": result,
+		"position": [actor.position.x, actor.position.y], "outcome": result,
 		"required_behavior": "Leave the marked cone" if hazard.kind == "cone" else "Move inside the inner ring or beyond the outer ring",
 		"guarded": guarded, "mechanic_failed": inside})
 	if events.size() > 128:
 		events.pop_front()
 
 func snapshot() -> Dictionary:
-	var actor: Dictionary = player.duplicate(true)
-	actor.position = [player.position.x, player.position.y]
+	var actor_snapshots: Array[Dictionary] = []
+	var roster_snapshot: Array[Dictionary] = roster.duplicate(true)
+	for member in roster_snapshot:
+		var actor: Dictionary = actors[member.player_id].duplicate(true)
+		actor.position = [actor.position.x, actor.position.y]
+		actor_snapshots.append(actor)
+		member["active"] = int(actor.hp) > 0
 	var shapes: Array[Dictionary] = []
 	for hazard in hazards:
 		var shape: Dictionary = hazard.duplicate(true)
 		shape.origin = [hazard.origin.x, hazard.origin.y]
 		shapes.append(shape)
-	return {"schema_version": 0, "generation": generation, "tick": tick, "seed": seed_value, "actors": [actor],
+	return {"schema_version": 1, "generation": generation, "tick": tick, "seed": seed_value,
+		"actors": actor_snapshots, "roster": roster_snapshot,
 		"boss": {"hp": boss_hp, "max_hp": BOSS_MAX_HP, "position": [BOSS_POSITION.x, BOSS_POSITION.y]},
 		"hazards": shapes, "outcome": outcome, "events": events.duplicate(true)}

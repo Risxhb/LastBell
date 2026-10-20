@@ -10,6 +10,8 @@ func _initialize() -> void:
 	_test_guard_and_immunity()
 	_test_reset_and_seed()
 	_test_provider_and_snapshot()
+	_test_roster()
+	_test_party_combat()
 	print("Combat foundation: %d checks, %d failures" % [checks, failures])
 	quit(0 if failures == 0 else 1)
 
@@ -160,3 +162,95 @@ func _test_provider_and_snapshot() -> void:
 		if sim.outcome == "victory":
 			break
 	check(sim.outcome == "victory" and sim.boss_hp == 0, "Valid offense can finish the encounter")
+
+func _test_roster() -> void:
+	for count in range(1, 9):
+		var sim := Sim.new()
+		var entries: Array = []
+		for index in range(count):
+			entries.append({"player_id": 100 + index * 3, "class_id": "vanguard", "build": [{"id": "placeholder"}]})
+		entries.reverse()
+		check(sim.configure_roster(entries), "Party count %d configures" % count)
+		check(sim.actors.size() == count and sim.player.id == 100, "Stable IDs are sorted independently of entry order")
+		var initial: Dictionary = sim.snapshot()
+		var spawn_positions: Array = []
+		for actor in sim.actors.values():
+			spawn_positions.append(actor.position)
+		check(spawn_positions.size() == count and _unique_positions(spawn_positions) == count, "Party spawns are distinct")
+		entries[0].build[0].id = "changed by caller"
+		check(sim.snapshot() == initial, "Configuration is detached from caller input")
+		for index in range(15):
+			sim.step({100: {"move": Vector2(1, 0), "guard": true}})
+		sim.actors[100].build[0].id = "transient mutation"
+		sim.reset()
+		var restored: Dictionary = sim.snapshot()
+		check(restored.generation == initial.generation + 1, "Party retry advances generation")
+		initial.erase("generation")
+		restored.erase("generation")
+		check(restored == initial, "Retry preserves roster/build and restores every actor")
+	var sim := Sim.new()
+	var before: Dictionary = sim.snapshot()
+	var invalid: Array = [[], [null], [{"player_id": 0}], [{"player_id": -1}],
+		[{"player_id": 1.5}], [{"player_id": "1"}], [{"player_id": 1}, {"player_id": 1}],
+		[{"player_id": 1, "class_id": "arcanist"}], [{"player_id": 1, "build": {}}]]
+	var nine: Array = []
+	for id in range(1, 10):
+		nine.append({"player_id": id})
+	invalid.append(nine)
+	for entries in invalid:
+		check(not sim.configure_roster(entries) and sim.snapshot() == before, "Invalid roster rejects atomically")
+
+func _unique_positions(positions: Array) -> int:
+	var unique: Dictionary = {}
+	for position in positions:
+		unique[position] = true
+	return unique.size()
+
+func _test_party_combat() -> void:
+	var sim := Sim.new()
+	sim.configure_roster([{"player_id": 42}, {"player_id": 7}])
+	sim.encounter_provider = func(_tick: int, context: Dictionary) -> Array:
+		context.roster[0].build.append("mutation")
+		context.actors[1].hp = 0
+		return []
+	var idle_position: Vector2 = sim.actors[42].position
+	sim.step({7: {"move": Vector2(1, 0)}, 1: {"signature": true}, 999: {"guard": true}})
+	check(sim.actors[7].position.x > Sim.SPAWN.x and sim.actors[42].position == idle_position, "Only addressed stable ID moves; missing and unknown IDs are neutral")
+	check(sim.actors[42].hp == 5 and sim.roster[0].build.is_empty(), "Provider cannot mutate party actors or build config")
+	for actor in sim.actors.values():
+		actor.position = Sim.BOSS_POSITION + Vector2(100, 0)
+	sim.step({7: {"basic": true, "guard": true}, 42: {"signature": true}})
+	check(sim.boss_hp == Sim.BOSS_MAX_HP - 20, "Both actors contribute independent attacks")
+	check(sim.actors[7].resource == 1 and sim.actors[42].resource == 0, "Actor resources are independent")
+	check(sim.actors[7].ready_at.basic > 0 and sim.actors[42].ready_at.basic == 0, "Actor cooldown dictionaries are independent")
+	var hazard := shape("donut")
+	hazard.origin = Sim.BOSS_POSITION
+	hazard.radius = 200.0
+	hazard.inner_radius = 0.0
+	sim.resolve_hazard(hazard)
+	check(sim.actors[7].hp == 5 and sim.actors[42].hp == 4, "Guard and damage resolve per actor")
+	check(sim.events[0].player_id == 7 and sim.events[0].outcome == "guarded" and sim.events[1].player_id == 42 and sim.events[1].outcome == "hit", "Party events identify affected actor in stable ID order")
+	var detached: Dictionary = sim.snapshot()
+	detached.actors[1].ready_at.signature = 0
+	detached.roster[0].build.append("mutation")
+	check(sim.actors[42].ready_at.signature > 0 and sim.roster[0].build.is_empty(), "Party snapshot and roster are detached")
+	sim.actors[7].hp = 0
+	var knocked_position: Vector2 = sim.actors[7].position
+	sim.step({7: {"move": Vector2(1, 0), "signature": true}})
+	check(sim.outcome == "playing" and sim.actors[7].position == knocked_position and sim.actors[7].ready_at.signature == 0, "Knocked-out actor cannot act while living teammate continues")
+	check(not sim.snapshot().roster[0].active and sim.snapshot().roster[1].active, "Provider roster marks knockout inactive")
+	var event_count: int = sim.events.size()
+	sim.resolve_hazard(hazard)
+	check(sim.events.size() == event_count + 1 and sim.events.back().player_id == 42, "Hazards skip knocked-out actors")
+	sim.actors[42].hp = 0
+	sim.step({})
+	check(sim.outcome == "defeat", "Party defeat requires all actors knocked out")
+	sim.reset(55)
+	sim.boss_hp = 1
+	for actor in sim.actors.values():
+		actor.position = Sim.BOSS_POSITION + Vector2(100, 0)
+	hazard.resolve_tick = 1
+	sim.hazards.append(hazard)
+	sim.step({7: {"basic": true}, 42: {"signature": true}})
+	check(sim.outcome == "victory" and sim.hazards.is_empty() and sim.events.is_empty(), "Party victory clears hazards before same-tick damage")
+	check(sim.actors[42].ready_at.signature == 0, "Later actor does not spend cooldown after lethal attack")
