@@ -12,6 +12,10 @@ Before designing or changing characters, weapons, spells/abilities, bosses, envi
 
 The guide establishes visual direction. Its example timings, proposed budgets, future features and production suggestions do not independently authorize gameplay changes or establish implemented behavior. Current owner instructions and recorded decisions take precedence; inspect source for current mechanics.
 
+## Engine and implementation direction
+
+Use **Unity and C#** for new production work. Preserve the 2.5D style and planar authoritative combat architecture. Read [the Unity migration plan](docs/plans/unity-migration.md) before implementation. The Godot code under `game/` and its contract are historical behavior/test references; do not extend that engine path as production work. Pin the Unity editor and package versions in the first Unity bootstrap PR. Do not treat the old Godot version, GDScript signatures, ENet plan or export commands as Unity setup instructions.
+
 ## Project context and ownership
 
 Read [README.md](README.md), [the workflow](docs/workflow.md), [decisions](docs/decisions.md), and the relevant task before implementation. Use [the foundation plan](docs/plans/2-5d-isometric-foundation.md) and [combat contract](docs/combat-contract.md) for integration boundaries. Preserve the established foundation, networking and encounter lanes; coordinate shared-file changes with their owner.

@@ -2,11 +2,11 @@
 ## Clockwork Fantasy — Visual Art Direction Bible
 
 **Document type:** Art direction and production reference
-**Version:** 1.2 — adopted shared visual style; confirmed 2.5D isometric direction
+**Version:** 1.3 — Unity/C# production engine; adopted 2.5D visual style
 **Date:** October 20, 2026
 **Status:** Shared visual style adopted by Risxhb on October 20, 2026; production assets and unvalidated technical details remain planned
 **Project:** *Last Bell*, a 2.5D isometric action raid roguelite
-**Intended readers:** Creative director, concept artists, 3D/2D artists, animators, VFX artists, UI/UX designers, technical artists, and Godot developers
+**Intended readers:** Creative director, concept artists, 3D/2D artists, animators, VFX artists, UI/UX designers, technical artists, and Unity developers
 
 > **One-sentence vision:** A radiant, suspended clockwork city where heroic figures battle enormous bell-powered guardians across beautifully crafted mechanical arenas—painterly and whimsical at a glance, precise and dangerous when the bell tolls.
 
@@ -29,7 +29,7 @@
 13. [UI, typography, and icons](#13-ui-typography-and-icons)
 14. [Camera, framing, and readability budgets](#14-camera-framing-and-readability-budgets)
 15. [Sound-to-visual coordination](#15-sound-to-visual-coordination)
-16. [Godot implementation approach](#16-godot-implementation-approach)
+16. [Unity implementation approach](#16-unity-implementation-approach)
 17. [Asset pipeline and production specifications](#17-asset-pipeline-and-production-specifications)
 18. [Vertical-slice art brief](#18-vertical-slice-art-brief)
 19. [Quality gates and testing checklist](#19-quality-gates-and-testing-checklist)
@@ -51,7 +51,7 @@ The broader proposed game is a **1–8 player 2.5D isometric action raid rogueli
 
 ### 1.2 What is actually implemented as of the supplied context
 
-The available local Godot project is a **single-player combat experiment** with **Vanguard versus the Bellkeeper** in a fixed arena. It has movement, Basic/Technique/Signature/Guard, health and charge, cooldown feedback, a seeded alternating **cone** and **donut** hazard schedule, hit/guard/immunity results, victory/defeat, and restart. The visuals are **placeholder shapes and text**. Source inspection, not a runtime playtest, is the basis for this summary.
+The historical Godot reference project is a **single-player combat experiment** with **Vanguard versus the Bellkeeper** in a fixed arena. It has movement, Basic/Technique/Signature/Guard, health and charge, cooldown feedback, a seeded alternating **cone** and **donut** hazard schedule, hit/guard/immunity results, victory/defeat, and restart. The visuals are **placeholder shapes and text**. Source inspection, not a runtime playtest, is the basis for this summary.
 
 In particular:
 
@@ -591,7 +591,7 @@ Font licensing and actual font selection remain to be decided.
 
 ### 14.1 Camera proposal
 
-The confirmed target is a **fixed isometric Camera3D over a fully 3D arena and modeled characters**. Start with orthographic projection, a 45-degree yaw and approximately 35-degree downward elevation as blockout values; tune framing and zoom in playtests. All ground geometry shares one mapping into the XZ plane, so projected circles and cones stay consistent with hit testing. Camera rotation is deferred for the slice.
+The confirmed target is a **fixed isometric Unity Camera over a fully 3D arena and modeled characters**. Start with orthographic projection, a 45-degree yaw and approximately 35-degree downward elevation as blockout values; tune framing and zoom in playtests. All ground geometry shares one mapping into the XZ plane, so projected circles and cones stay consistent with hit testing. Camera rotation is deferred for the slice.
 
 **Current-source caveat:** The prototype is presently 2D-drawn at a 1280 × 800 project viewport. It does **not** establish a 3D camera, perspective lens, or character-model scale.
 
@@ -635,30 +635,30 @@ Any rhythm effects must respect gameplay timing and accessibility. The player sh
 
 ---
 
-## 16. Godot implementation approach
+## 16. Unity implementation approach
 
-**Scope note:** The owner confirmed the 2.5D isometric direction. The implementation details below are planned and must be verified against the current branch; they are not implemented render features.
+**Scope note:** Unity with C# is the selected production engine, superseding the earlier Godot implementation plan. The 2.5D visual direction is retained. No Unity project or C# port is implemented by this document. See [the Unity migration plan](../docs/plans/unity-migration.md); editor version, packages and render pipeline still need to be pinned and validated.
 
 ### 16.1 Preserve the existing separation of concerns
 
-The available source map is:
+The historical behavior references and proposed Unity responsibilities are:
 
-| Existing file | Current responsibility | Suggested visual integration |
-|---|---|---|
-| `game/core/combat_simulation.gd` | Authoritative deterministic gameplay and snapshots | Keep rendering decisions out of simulation |
-| `game/combat/hazard_geometry.gd` | Cone/donut membership and rendering geometry helpers | Continue using one geometry source for draw/collision |
-| `game/ui/combat_view.gd` | Input, fixed-step timing, arena/HUD drawing | Gradually layer art-driven presentation and feedback |
-| `game/main.tscn` | Current root scene | Compose appropriate art nodes after technical review |
-| `game/project.godot` | Project config, rendering settings | Test shaders against project's GL Compatibility choice |
+| Historical reference | Unity responsibility (planned) |
+|---|---|
+| `game/core/combat_simulation.gd` | Scene-independent C# combat state, authoritative ticks, snapshots and events |
+| `game/combat/hazard_geometry.gd` | Shared C# membership/mesh geometry; port boundary and tolerance tests |
+| `game/ui/combat_view.gd` | Input adapter, simulation driver, presentation and screen-space Canvas HUD |
+| `game/main.tscn` | Unity combat scene, Camera, actor prefabs and presentation binding |
+| `game/project.godot` | Unity editor/package pins, render pipeline and build configuration; no direct settings conversion |
 
 ### 16.2 Selected track: 2.5D presentation with modeled 3D visuals
 
-- Compose a Node3D arena, fixed isometric Camera3D, modeled characters, stylized materials, and a separate CanvasLayer HUD.
-- Keep authoritative combat on its existing Vector2 plane; use one documented adapter into world XZ. Cosmetic height is not gameplay elevation.
+- Compose a Unity scene with a 3D arena, fixed isometric Camera, modeled character prefabs, stylized materials, and a separate screen-space Canvas HUD.
+- Port authoritative combat behavior to a C# planar simulation; use one documented adapter into world XZ. Cosmetic height is not gameplay elevation.
 - Map actor feet, boss center, arena bounds and every telegraph through the same adapter. Camera-relative input is converted back to simulation movement before commands are submitted.
 - Generate floor meshes from shared hazard geometry, including a true donut hole; use explicit depth/layer rules to prevent z-fighting and occlusion.
-- Start with the pinned editor and current GL Compatibility renderer. Profile a representative scene before proposing a renderer change.
-- Retain the Node2D view only as a temporary regression/debug fixture during conversion. The selected 2.5D approach uses modeled 3D visuals on the existing planar combat simulation; a sprite-only or pre-rendered-character pipeline is not assumed.
+- Pin the Unity editor and package set in bootstrap; validate a render pipeline and representative stylized materials before committing to production shaders.
+- Retain the Godot Node2D project as a separate historical behavior/test reference during the C# port. The selected 2.5D approach uses modeled 3D visuals on the existing planar combat simulation; a sprite-only or pre-rendered-character pipeline is not assumed.
 
 See [the foundation implementation plan](../docs/plans/2-5d-isometric-foundation.md) for ownership, sequence, acceptance gates and integration dependencies.
 
@@ -691,15 +691,15 @@ Interpolate decorative movement as appropriate, but render a hazard's **dangerou
 - Use rim lighting selectively so characters separate from slate floors.
 - Use shader parameters for telegraph opacity and pulse, but **do not change the shape mask to alter gameplay geometry**.
 - In 3D, separate floor, telegraphs, feet markers, actors and effects using explicit depth and visibility rules.
-- Test GL Compatibility before relying on features requiring another render method.
+- Test all shaders and effect features against the selected Unity render pipeline and target Windows hardware; legacy Godot shaders require porting.
 
 ### 16.5 Deterministic visual events
 
-The simulation logs hazard outcomes but does not document a comprehensive attack/VFX event stream. If detailed animation syncing becomes necessary, propose a **small event adapter** or presentation event list and validate it against `CombatSimulation.step(...)`. Avoid embedding gameplay rules into particles, animation trees, or boss sprite frames.
+The simulation logs hazard outcomes but does not document a comprehensive attack/VFX event stream. If detailed animation syncing becomes necessary, propose a **small event adapter** or presentation event list and validate it against the C# simulation step API. Avoid embedding gameplay rules into particles, animation trees, or boss sprite frames.
 
 ### 16.6 Source verification before implementation
 
-The supplied context dates to **October 20, 2026**. Before changing code, inspect actual relevant scripts to confirm current signatures and behavior; re-check the current branch and pending foundation PRs. This document does not imply access to the full private repository or a live Godot runtime.
+The supplied context dates to **October 20, 2026**. Before changing code, inspect actual relevant scripts to confirm current signatures and behavior; re-check the current branch and pending foundation PRs. This document does not imply access to the full private repository or a live Unity runtime.
 
 ---
 
@@ -885,20 +885,20 @@ These prompts are **original concept starting points**. They do not guarantee pa
 
 This bible offers defaults, but the following require project-owner approval or playtest evidence:
 
-1. **Renderer and budgets:** full Node3D presentation is confirmed; profile renderer, lighting and performance on agreed hardware.
+1. **Renderer and budgets:** Unity-based 2.5D presentation is confirmed; profile renderer, lighting and performance on agreed hardware.
 2. **Final camera:** high oblique angle, zoom range, and projection behavior.
 3. **Class lineup and roles:** planned class names exist in design context, but class visuals and final mechanics are open.
 4. **Target platforms:** hardware targets and rendering budgets are not established by the supplied files.
 5. **Style intensity:** how painterly versus how cel-shaded / geometric.
 6. **Character proportions:** chibi-adjacent versus moderately heroic, tested in real combat shots.
 7. **Accessibility options:** exact user-facing settings and alternate colors/patterns.
-8. **Asset pipeline:** modeled and rigged 3D assets; settle modeling tools, glTF export conventions, scale and animation naming.
+8. **Asset pipeline:** modeled and rigged 3D assets; settle modeling tools, a validated Unity import/export workflow, scale and animation naming.
 9. **Final fonts:** licensing, localization, and readability testing.
 10. **World canon:** city naming, factions, chronology, and precise significance of the bells.
 
 ### Suggested default decisions for the first art pass
 
-- Start with a **3D blockout and fixed isometric camera**, preserving the existing fixed-step combat core.
+- Start with a **3D blockout and fixed isometric camera**, porting the existing fixed-step combat behavior into C#.
 - Adopt **Midnight Cobalt / Slate Blue / Clockwork Brass / Resonant Gold / Twilight Violet** as the foundation.
 - Keep **the arena floor quiet**; concentrate detail on boss, characters, and scenery outside playable bounds.
 - Make **Bell Sweep and Hollow Toll** the art team's core readability test cases.
@@ -924,6 +924,7 @@ The local reference folder also contains `art style reference.webp`; it has not 
 
 | Version | Date | Notes |
 |---|---|---|
+| 1.3 | 2026-10-20 | Unity/C# replaces Godot production implementation; style and planar combat preserved; migration and version-pinning gates added |
 | 1.2 | 2026-10-20 | Owner adopted the visual style for all collaborators; linked agent instructions, onboarding and visual review workflow |
 | 1.1 | 2026-10-20 | Confirmed 2.5D/isometric direction, Windblown and Hades inspirations, eight-player target, and foundation migration plan |
 | 1.0 | 2026-10-20 | Initial comprehensive visual-art-direction proposal, aligned with supplied prototype context |

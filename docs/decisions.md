@@ -2,6 +2,14 @@
 
 For each decision, record the date, decision, reason, and relevant issue or pull request.
 
+## 2026-10-20 — Unity replaces Godot as the production engine
+
+- Decision: Use **Unity with C#** for the project. This supersedes the Godot/GDScript toolchain and all Godot-specific future implementation plans below.
+- Reason: Risxhb confirmed the team's engine decision directly.
+- Preserved scope: 2.5D modeled visuals, fixed isometric framing, planar authoritative combat, clockwork-fantasy art direction, solo plus 2–8 total online, existing lane owners and slice VPN/direct-IP allowance.
+- Migration: Keep `game/` as the legacy behavior/test reference; port combat semantics and checks to C#. New project location is proposed as `unity/`. Pin editor and package versions, select a render pipeline and validate networking through the first Unity PRs; none are implied by this decision.
+- Status: Documentation and plans updated; no Unity runtime/project or C# port implemented yet. See [Unity migration plan](plans/unity-migration.md).
+
 ## 2026-10-20 — Shared clockwork-fantasy visual style
 
 - Decision: Adopt [the art-direction guide](../reference/LAST-BELL-CLOCKWORK-FANTASY-ART-DIRECTION.md) for characters, weapons, spells/abilities, bosses, environments, animation, VFX, icons and UI across all collaborator lanes.
@@ -15,11 +23,11 @@ For each decision, record the date, decision, reason, and relevant issue or pull
 - Decision: Last Bell will use modeled 3D environments/characters with a fixed isometric camera. Windblown and Hades are creative references; the game retains its original clockwork-fantasy setting, four-action kit, and raid/build focus.
 - Reason: Risxhb explicitly confirmed this direction after supplying the art-direction Markdown. The owner subsequently refined the direction to 2.5D. Here that means modeled 3D visuals, fixed isometric framing and strictly planar gameplay. This supersedes the imported reference's sprite/pre-rendered-art-first recommendation and the original flat Node2D presentation target.
 - Architecture: retain the planar authoritative 60 Hz simulation; map it to world XZ through one presentation adapter. Camera, models, animation and VFX do not determine damage or mechanic success.
-- Unchanged requirements: Godot 4.7.2-stable, solo plus 2–8 total online, existing lane owners, and slice Hamachi/ZeroTier/direct-IP allowance. Exact renderer, camera framing and art budgets require evidence.
+- Requirements retained at the time: solo plus 2–8 total online, existing lane owners, and slice Hamachi/ZeroTier/direct-IP allowance. The then-current Godot toolchain is superseded by the subsequent Unity decision above. Exact renderer, camera framing and art budgets require evidence.
 - Work: [foundation implementation plan](plans/2-5d-isometric-foundation.md), [art reference](../reference/LAST-BELL-CLOCKWORK-FANTASY-ART-DIRECTION.md), combat lane [#6](https://github.com/Risxhb/collab/issues/6).
 - Source: direct owner instruction on October 20, 2026; recorded here without publishing private chat.
 
-## 2026-10-20 — Prototype toolchain and work ownership
+## 2026-10-20 — Historical prototype toolchain and work ownership (engine superseded)
 
 - Decision: Godot 4.7.2-stable standard editor, typed GDScript, matching export templates. Pin changes through review.
 - Reason: Adopt the collaborator's 2D prototype recommendation and keep all three work lanes on one version. Risxhb authorized Codex to choose the division and begin delegation.

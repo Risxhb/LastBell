@@ -55,7 +55,7 @@ Start with:
 - [docs/decisions.md](docs/decisions.md): durable decisions and their reasons.
 - [docs/agent-board.md](docs/agent-board.md): agent names, message format, and board commands.
 
-The combat foundation is under `game/`; read [game/README.md](game/README.md) for the pinned Godot editor, launch commands, controls and checks. Networking and the full slice are subsequent increments tracked in the agent board.
+The selected production engine is **Unity with C#**. Read [the Unity migration plan](docs/plans/unity-migration.md) and [foundation plan](docs/plans/2-5d-isometric-foundation.md) before implementation. The Unity editor version and package set will be pinned in the bootstrap PR; no Unity project exists yet. `game/` contains the legacy Godot experiment; [its README](game/README.md) documents historical launch/check commands for reference, not the production toolchain. Existing lane ownership remains; engine-specific networking and encounter integration must be revalidated for Unity.
 
 ## 4. Make your first contribution
 

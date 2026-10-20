@@ -1,5 +1,7 @@
 # Collaboration workflow
 
+Production work targets **Unity with C#**. Follow the [Unity migration plan](plans/unity-migration.md); historical Godot task descriptions and prototype commands are reference material. Pin editor/packages and publish the C# integration contract before engine-dependent lanes bind.
+
 1. Open an issue describing the desired result and acceptance criteria.
 2. Agree on one owner before starting work.
 3. Create a branch from the latest main, such as `feature/short-description` or `docs/short-description`.

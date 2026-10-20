@@ -10,9 +10,9 @@ Give **encounter mastery and roguelite build variety equal weight**, as requeste
 
 Working concept: **Last Bell**. Players are wardens exploring a suspended clockwork city whose guardians repeat distorted fragments of the past. Distinct silhouettes, mechanical architecture, and bell-driven attacks give the game its own identity. The title and setting are provisional.
 
-Confirmed direction: Windows PC first; keyboard/mouse and controller; solo plus online co-op for 2–8 total, including the host; Godot 4.7.2-stable standard editor and typed GDScript; 2.5D presentation using 3D models on a planar playfield with a fixed isometric camera. Windblown and Hades are creative references for our desired movement feel, expressive combat feedback, stylized visuals and isometric composition. They do not prescribe an engine or a copied combat kit.
+Confirmed direction: Windows PC first; keyboard/mouse and controller; solo plus online co-op for 2–8 total, including the host; Unity with C#; 2.5D presentation using 3D models on a planar playfield with a fixed isometric camera. Windblown and Hades are creative references for our desired movement feel, expressive combat feedback, stylized visuals and isometric composition. They do not prescribe an engine or a copied combat kit.
 
-The clockwork-fantasy identity and readability rules are in the [art direction](reference/LAST-BELL-CLOCKWORK-FANTASY-ART-DIRECTION.md). The current solo Node2D combat experiment exists on the foundation PR stack; it is a temporary presentation of the reusable combat core. See [our foundation plan](docs/plans/2-5d-isometric-foundation.md) for the 2.5D presentation migration. Budget, staffing, final hardware targets and commercial scope remain open.
+The clockwork-fantasy identity and readability rules are in the [art direction](reference/LAST-BELL-CLOCKWORK-FANTASY-ART-DIRECTION.md). The current solo Node2D combat experiment exists on the foundation PR stack; it is a historical behavior reference for a C# port, not a reusable Unity implementation. See [our foundation plan](docs/plans/2-5d-isometric-foundation.md) for the 2.5D presentation migration. Budget, staffing, final hardware targets and commercial scope remain open.
 
 ## 2. What we learned from Rabbit & Steel
 
@@ -136,7 +136,7 @@ For every attack, define whether it locks onto a position, follows a player unti
 
 ## 9. Technology and architecture
 
-**Selected: Godot 4.7.2-stable, typed GDScript, 2.5D presentation using 3D models on a planar playfield and a fixed isometric Camera3D.** Preserve the existing node-free 60 Hz combat simulation and shared hazard geometry. A presentation adapter maps the combat plane into world XZ; a CanvasLayer holds the HUD. Rendering, animation and scene physics must not independently resolve damage. Start with GL Compatibility and profile before changing renderer. The exact camera framing, asset budgets and shader treatment are implementation experiments, not completed features.
+**Selected: Unity with C#, 2.5D presentation using 3D models on a planar playfield and a fixed isometric Camera.** Port the existing combat behavior and shared hazard geometry into a scene-independent C# simulation at 60 Hz. A presentation adapter maps combat coordinates into world XZ; a screen-space Canvas holds the HUD. Rendering, animation and scene physics must not independently resolve damage. Pin editor/package versions and validate a render pipeline in the bootstrap PR; those choices are not settled by selecting Unity. See [the Unity migration plan](docs/plans/unity-migration.md). Camera framing, asset budgets and shader treatment still require evidence.
 
 Keep these systems distinct:
 
@@ -154,7 +154,7 @@ For the prototype, use a player-hosted authoritative simulation, fixed simulatio
 
 Test responsiveness early. Compare the authoritative prototype against actual latency tolerance before committing to production networking; evaluate rollback only if the simpler approach cannot meet the combat target. Rabbit & Steel advertises rollback, but that does not make it an automatic requirement for this project. [Developer press kit](https://www.minodevgames.com/rabbit-steel-press-kit)
 
-LAN/direct connection is enough for the first network experiment. Hamachi, ZeroTier or direct IP are allowed for the playable slice; choose the exact setup before internet playtests. Steam integration is deferred for this slice. A public PC release needs a separately validated lobby and connection/relay solution; basic ENet alone does not solve consumer NAT traversal. Use a transport abstraction and schedule a Steam integration spike before promising online delivery. Host migration and drop-in participation during active fights are outside the initial scope. If the host disconnects, show a clear end-of-session result; other disconnects stop input immediately and cancel or reassign live mechanic requirements through the shared core, as do knockouts. Permanent party-size scaling and returning class/build restoration happen at an encounter boundary.
+LAN/direct connection is enough for the first network experiment. Hamachi, ZeroTier or direct IP are allowed for the playable slice; choose the exact setup before internet playtests. Steam integration is deferred for this slice. A public PC release needs a separately validated lobby and connection/relay solution; a direct transport alone does not establish the release connection experience. Use a Unity-compatible transport abstraction and validate the selected networking stack in an early spike; the earlier Godot/ENet implementation proposal is superseded. Schedule any eventual Steam integration separately from the VPN/direct-IP slice. Host migration and drop-in participation during active fights are outside the initial scope. If the host disconnects, show a clear end-of-session result; other disconnects stop input immediately and cancel or reassign live mechanic requirements through the shared core, as do knockouts. Permanent party-size scaling and returning class/build restoration happen at an encounter boundary.
 
 ## 10. Build order and gates
 
@@ -196,7 +196,7 @@ Defer an open world, mandatory role trinity, large AI raid parties, competitive 
 
 ## 12. Immediate first milestone
 
-First deliver the [2.5D foundation gates A1–A3](docs/plans/2-5d-isometric-foundation.md): a playable isometric blockout, truthful floor telegraphs, and one representative art/animation pass. Preserve the existing combat rules while testing movement and readability. Then build **Vanguard versus the Bellkeeper** with placeholder visuals, three taught mechanics, one Echo, six prototype upgrades, a failure explanation, and instant restart. Follow immediately with a two-client network experiment, then add Arcanist and the second boss.
+First complete the [Unity bootstrap and behavior port](docs/plans/unity-migration.md), then deliver the [2.5D foundation gates A1–A3](docs/plans/2-5d-isometric-foundation.md): a playable isometric blockout, truthful floor telegraphs, and one representative art/animation pass. Preserve the existing combat rules while testing movement and readability. Then build **Vanguard versus the Bellkeeper** with placeholder visuals, three taught mechanics, one Echo, six prototype upgrades, a failure explanation, and instant restart. Follow immediately with a two-client network experiment, then add Arcanist and the second boss.
 
 The decision at that point is concrete: does the same fight remain enjoyable as players learn it, and do different upgrades give them a reason to approach it differently? Both must work before scaling production.
 

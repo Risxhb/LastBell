@@ -1,4 +1,6 @@
-# Last Bell combat foundation
+# Last Bell — legacy Godot combat reference
+
+**Production engine changed to Unity with C# on October 20, 2026.** This directory is retained unchanged as a behavior and test reference for migration. Commands and APIs below run the historical Godot experiment only; they do not launch or validate a Unity build. Do not continue production implementation here. See [the Unity migration plan](../docs/plans/unity-migration.md).
 
 Use **Godot 4.7.2-stable, standard editor** and typed GDScript. Open `project.godot`, then press F6/F5 to run the scene/project. Exporting requires matching 4.7.2 standard export templates; editor play and the checks below do not require templates.
 
@@ -6,7 +8,7 @@ This first increment contains solo Vanguard, four actions, a bounded arena, alte
 
 ## Confirmed production direction
 
-The target is **2.5D with a fixed isometric camera**, inspired by Windblown and Hades. This branch still runs the temporary Node2D view; no 3D assets or camera are implemented by the documentation update. Keep the combat core and shared geometry during migration. See [the foundation plan](../docs/plans/2-5d-isometric-foundation.md) for delivery gates and [the art direction](../reference/LAST-BELL-CLOCKWORK-FANTASY-ART-DIRECTION.md) for visual constraints.
+The target is **2.5D with a fixed isometric camera**, inspired by Windblown and Hades. This branch still runs the temporary Node2D view; no 3D assets or camera are implemented by the documentation update. Port the combat behavior and shared geometry into C# during migration; existing GDScript cannot be reused as Unity scripts. See [the foundation plan](../docs/plans/2-5d-isometric-foundation.md) for delivery gates and [the art direction](../reference/LAST-BELL-CLOCKWORK-FANTASY-ART-DIRECTION.md) for visual constraints.
 
 ## Controls
 

@@ -1,4 +1,6 @@
-# Combat integration contract v2
+# Legacy Godot combat integration contract v2
+
+**Superseded as a production implementation contract by the Unity engine decision on October 20, 2026.** This document describes the existing Godot prototype only. Preserve its gameplay semantics, ordering, identities and test cases during the C# port, then publish a reviewed Unity contract before sessions or encounters bind. Do not call these GDScript APIs from Unity or assume snapshots/transport encoding transfer unchanged. See [the Unity migration plan](plans/unity-migration.md).
 
 Task and discussion: [#6](https://github.com/Risxhb/collab/issues/6). Session owner: [#7](https://github.com/Risxhb/collab/issues/7). Encounter owner: [#8](https://github.com/Risxhb/collab/issues/8).
 
