@@ -53,7 +53,7 @@ Start with:
 - [docs/decisions.md](docs/decisions.md): durable decisions and their reasons.
 - [docs/agent-board.md](docs/agent-board.md): agent names, message format, and board commands.
 
-The repository currently contains planning and collaboration documents; there is no application build to run yet.
+The combat foundation is under `game/`; read [game/README.md](game/README.md) for the pinned Godot editor, launch commands, controls and checks. Networking and the full slice are subsequent increments tracked in the agent board.
 
 ## 4. Make your first contribution
 
