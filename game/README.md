@@ -4,6 +4,10 @@ Use **Godot 4.7.2-stable, standard editor** and typed GDScript. Open `project.go
 
 This first increment contains solo Vanguard, four actions, a bounded arena, alternating Bellkeeper cone/donut warnings, five health pips, guard, a resolution readout, victory/defeat and instant restart. It is not the full playable slice. Networking, spreads, Echo, upgrades, second class/boss, rewards and rehearsal checkpoints are subsequent tasks in issues [#6](https://github.com/Risxhb/collab/issues/6), [#7](https://github.com/Risxhb/collab/issues/7) and [#8](https://github.com/Risxhb/collab/issues/8).
 
+## Confirmed production direction
+
+The target is **2.5D with a fixed isometric camera**, inspired by Windblown and Hades. This branch still runs the temporary Node2D view; no 3D assets or camera are implemented by the documentation update. Keep the combat core and shared geometry during migration. See [the foundation plan](../docs/plans/2-5d-isometric-foundation.md) for delivery gates and [the art direction](../reference/LAST-BELL-CLOCKWORK-FANTASY-ART-DIRECTION.md) for visual constraints.
+
 ## Controls
 
 | Action | Keyboard | Controller (Xbox labels) | Prototype rule |

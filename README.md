@@ -18,7 +18,9 @@ This is an independent repository. It does not deploy to GitHub Pages or change 
 
 ## Project overview
 
-The current planning draft is [raid-simulator-plan.md](raid-simulator-plan.md). Review the direction and agree on the first milestone together before implementation.
+**Last Bell** is a **2.5D isometric action raid roguelite for 1–8 total players**, with Windblown and Hades as creative references and an original clockwork-fantasy identity. Encounter mastery and build variety have equal weight. Here 2.5D means modeled 3D visuals on a flat gameplay plane, with fixed isometric framing and no vertical combat.
+
+Read the [design plan](raid-simulator-plan.md), [art direction](reference/LAST-BELL-CLOCKWORK-FANTASY-ART-DIRECTION.md), and [our 2.5D foundation implementation plan](docs/plans/2-5d-isometric-foundation.md). The current combat experiment uses a temporary Node2D presentation; the 2.5D presentation migration is planned and has not been implemented.
 
 ## Combat experiment
 

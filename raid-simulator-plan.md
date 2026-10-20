@@ -1,16 +1,18 @@
 # Raid simulator game plan
 
-Planning draft · October 20, 2026
+Direction updated · October 20, 2026
 
 ## 1. Game direction
 
-**Pitch:** A 1–4 player, top-down action raid game where a compact combat kit meets intricate boss mechanics, and every short expedition offers new ways to build your character.
+**Pitch:** A 1–8 player, 2.5D isometric action raid roguelite where a compact combat kit meets intricate boss mechanics, and every short expedition offers new ways to build your character.
 
 Give **encounter mastery and roguelite build variety equal weight**, as requested. Learning the fight should improve your next attempt; choosing a different build should change the decisions you make during it.
 
 Working concept: **Last Bell**. Players are wardens exploring a suspended clockwork city whose guardians repeat distorted fragments of the past. Distinct silhouettes, mechanical architecture, and bell-driven attacks give the game its own identity. The title and setting are provisional.
 
-Planning assumptions: Windows PC first; small independent team; keyboard/mouse and controller; solo plus up to four friends online. Engine, team size, budget, art style, and commercial scope remain open. No implementation is included in this planning task.
+Confirmed direction: Windows PC first; keyboard/mouse and controller; solo plus online co-op for 2–8 total, including the host; Godot 4.7.2-stable standard editor and typed GDScript; 2.5D presentation using 3D models on a planar playfield with a fixed isometric camera. Windblown and Hades are creative references for our desired movement feel, expressive combat feedback, stylized visuals and isometric composition. They do not prescribe an engine or a copied combat kit.
+
+The clockwork-fantasy identity and readability rules are in the [art direction](reference/LAST-BELL-CLOCKWORK-FANTASY-ART-DIRECTION.md). The current solo Node2D combat experiment exists on the foundation PR stack; it is a temporary presentation of the reusable combat core. See [our foundation plan](docs/plans/2-5d-isometric-foundation.md) for the 2.5D presentation migration. Budget, staffing, final hardware targets and commercial scope remain open.
 
 ## 2. What we learned from Rabbit & Steel
 
@@ -42,7 +44,7 @@ Initially, save a build recipe after a run for use in rehearsal. Resuming an ent
 
 ## 4. Combat model
 
-Use a fixed arena and shared view. Keep movement independent of targeting, with automatic boss targeting and a manual target-cycle option when adds exist. Attack shapes and range still matter. Avoid precision mouse aiming as a second mandatory skill.
+Use a fixed 3D arena and fixed isometric view. Keep authoritative combat on a planar simulation, with a single mapping to world XZ and camera-relative input. Visual height does not create jump, elevation, or physics-driven combat rules. Keep movement independent of targeting, with automatic boss targeting and a manual target-cycle option when adds exist. Attack shapes and range still matter. Avoid precision mouse aiming as a second mandatory skill.
 
 Every class has four actions:
 
@@ -91,7 +93,7 @@ Example first boss: **The Bellkeeper**, approximately three minutes, with a fina
 
 Second slice boss: **The Glass Cartographer**, using lanes, marked destinations, and paired tethers. Its purpose is to test whether the same engine can support a different movement puzzle.
 
-Author mechanics for each party size. For example, a stack becomes a designated solo shelter, a paired tether becomes a tether to an arena anchor in solo, and spreads choose a count appropriate to available players. Keep the same visual meaning even when the solution changes.
+Author mechanics for every party count 1–8 using tiers 1–4 and 5–8 with explicit per-count parameters. For example, a stack becomes a designated solo shelter, a paired tether becomes a tether to an arena anchor in solo, and spreads choose a count appropriate to available players. Keep the same visual meaning even when the solution changes.
 
 Randomize tested pattern variants and player assignments, rather than arbitrary overlapping hazards. Build an encounter validator for incompatible timings and insufficient safe space. Each generated sequence must leave a reachable solution at baseline movement speed.
 
@@ -106,7 +108,7 @@ Example original effects:
 - A stationary damage bonus persists briefly after moving, supporting repositioning between casts.
 - Spending a full resource bar produces a small protective field, capped to prevent permanent protection.
 
-After each boss, each player chooses a personal reward from three offers. Keep offer choices seeded for reproduction. Allow one reroll per expedition initially. Guarantee access to at least one broadly useful option; do not let progression depend on drawing a particular synergy.
+After each boss, each player chooses a personal reward from three offers. Choices happen simultaneously with a visible timeout; tune the duration in playtests. Keep offer choices seeded for reproduction. Allow one reroll per expedition initially. Guarantee access to at least one broadly useful option; do not let progression depend on drawing a particular synergy.
 
 Use an explicit effect pipeline: trigger → eligibility → cooldown/charge check → effect → event log. Limit recursive triggers and document which effects can trigger other effects. This prevents infinite proc loops and makes builds explainable.
 
@@ -134,7 +136,7 @@ For every attack, define whether it locks onto a position, follows a player unti
 
 ## 9. Technology and architecture
 
-**Provisional choice: Godot with GDScript for a 2D PC prototype**, unless the team already has stronger production experience in another engine. Godot documents a dedicated 2D workflow and high-level networking with replaceable multiplayer peers. This is a project recommendation, not a claim about Rabbit & Steel's internal architecture. [Godot 2D documentation](https://docs.godotengine.org/en/stable/tutorials/2d/index.html) · [Networking documentation](https://docs.godotengine.org/en/stable/tutorials/networking/high_level_multiplayer.html)
+**Selected: Godot 4.7.2-stable, typed GDScript, 2.5D presentation using 3D models on a planar playfield and a fixed isometric Camera3D.** Preserve the existing node-free 60 Hz combat simulation and shared hazard geometry. A presentation adapter maps the combat plane into world XZ; a CanvasLayer holds the HUD. Rendering, animation and scene physics must not independently resolve damage. Start with GL Compatibility and profile before changing renderer. The exact camera framing, asset budgets and shader treatment are implementation experiments, not completed features.
 
 Keep these systems distinct:
 
@@ -152,21 +154,21 @@ For the prototype, use a player-hosted authoritative simulation, fixed simulatio
 
 Test responsiveness early. Compare the authoritative prototype against actual latency tolerance before committing to production networking; evaluate rollback only if the simpler approach cannot meet the combat target. Rabbit & Steel advertises rollback, but that does not make it an automatic requirement for this project. [Developer press kit](https://www.minodevgames.com/rabbit-steel-press-kit)
 
-LAN/direct connection is enough for the first network experiment. A public PC release needs a separately validated lobby and connection/relay solution; basic ENet alone does not solve consumer NAT traversal. Use a transport abstraction and schedule a Steam integration spike before promising online delivery. Host migration and drop-in participation during active fights are outside the initial scope. If the host disconnects, show a clear end-of-session result; other disconnects take effect at the next encounter boundary.
+LAN/direct connection is enough for the first network experiment. Hamachi, ZeroTier or direct IP are allowed for the playable slice; choose the exact setup before internet playtests. Steam integration is deferred for this slice. A public PC release needs a separately validated lobby and connection/relay solution; basic ENet alone does not solve consumer NAT traversal. Use a transport abstraction and schedule a Steam integration spike before promising online delivery. Host migration and drop-in participation during active fights are outside the initial scope. If the host disconnects, show a clear end-of-session result; other disconnects stop input immediately and cancel or reassign live mechanic requirements through the shared core, as do knockouts. Permanent party-size scaling and returning class/build restoration happen at an encounter boundary.
 
 ## 10. Build order and gates
 
-The estimates below are rough **person-weeks for an experienced developer**, not a promised calendar schedule. They exclude substantial original art/music production and assume reuse of suitable development tools. Re-estimate after the first combat and networking experiments.
+The table below records the original rough **person-week estimates for an experienced developer** and is historical, not a current delivery forecast. They exclude substantial original art/music production and assume reuse of suitable development tools. Re-estimate after the first combat and networking experiments.
 
 | Stage | Deliverable | Exit gate | Initial effort |
 |---|---|---|---|
 | Combat experiment | One arena, one class, one boss pattern sequence, guard and damage feedback | Movement and attacking feel responsive; players understand hits | 1–2 person-weeks |
 | Network experiment | Two clients running the same encounter, latency simulation, event diagnostics | No divergent mechanic outcomes; acceptable movement and hit feedback | 1–2 person-weeks |
 | Complete loop | One boss, upgrade selection, retry, run end, first rehearsal checkpoint | Upgrade choices visibly change play; retry takes under five seconds | 2–3 person-weeks |
-| Playable slice | Two bosses, two classes, 12 relics, six modifiers, solo and 2–4 player variants | Both mastery and build choices sustain repeated sessions | 4–6 person-weeks |
+| Playable slice | Two bosses, two classes, 12 relics, six modifiers, solo and 2–8 player variants | Both mastery and build choices sustain repeated sessions | 4–6 person-weeks |
 | Production planning | External feedback, measured authoring cost, connection spike, revised budget | Evidence supports the next content investment | 1 person-week |
 
-Total planning range: roughly **9–14 person-weeks to evaluate the slice**, with art, integration problems, or unfamiliar tools potentially extending it. Begin with placeholders and a deliberately simple interface.
+The original **9–14 person-week** estimate predates confirmed 3D production and eight-player requirements and is superseded as a delivery forecast. Re-estimate after the 3D blockout, representative asset and network experiments. Begin with 3D placeholders and a simple interface; original models, rigs, animation and performance work require explicit estimates.
 
 The full expedition length cannot be demonstrated by two bosses alone. The slice should be a 10–15 minute mini-run with enough reward decisions to test the loop; reserve the 20–30 minute target for broader production content.
 
@@ -178,7 +180,7 @@ Test these risks before expanding content:
 |---|---|
 | Players cannot explain a hit | After a failure, ask what resolved and where safety was; compare with the event log |
 | Roguelite choices are cosmetic | Ask players to explain how an upgrade changed their next decision; observe at least two successful builds per class |
-| Mechanics become unfair in a smaller party | Play each boss at 1, 2, 3, and 4 players, including duplicate classes |
+| Mechanics become unfair in a smaller party | Play each boss at every count 1–8, including odd counts and duplicate classes; author tiers 1–4 and 5–8 with explicit per-count parameters |
 | Latency changes fairness | Test at 50/100/150 ms round-trip latency and modest packet loss; inspect guard and position corrections |
 | Random patterns create impossible states | Reproduce seeds, validate timing constraints, and inspect collision/safe-space overlays |
 | Boss creation costs too much | Build the second boss using existing mechanics and measure authoring/debugging time |
@@ -194,7 +196,7 @@ Defer an open world, mandatory role trinity, large AI raid parties, competitive 
 
 ## 12. Immediate first milestone
 
-Build **Vanguard versus the Bellkeeper** with placeholder visuals, three taught mechanics, one Echo, six prototype upgrades, a failure explanation, and instant restart. Follow immediately with a two-client network experiment, then add Arcanist and the second boss.
+First deliver the [2.5D foundation gates A1–A3](docs/plans/2-5d-isometric-foundation.md): a playable isometric blockout, truthful floor telegraphs, and one representative art/animation pass. Preserve the existing combat rules while testing movement and readability. Then build **Vanguard versus the Bellkeeper** with placeholder visuals, three taught mechanics, one Echo, six prototype upgrades, a failure explanation, and instant restart. Follow immediately with a two-client network experiment, then add Arcanist and the second boss.
 
 The decision at that point is concrete: does the same fight remain enjoyable as players learn it, and do different upgrades give them a reason to approach it differently? Both must work before scaling production.
 
