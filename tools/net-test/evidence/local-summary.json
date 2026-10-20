@@ -1,0 +1,379 @@
+[
+  {
+    "peers": [
+      {
+        "commands_ticks": 134,
+        "departure": false,
+        "elapsed_seconds": 6.00302899999999,
+        "max_commands_per_tick": 2,
+        "max_players": 2,
+        "max_tick": 279,
+        "passed": true,
+        "processed_ack": true,
+        "reason": "completed",
+        "role": "host",
+        "scenario": "smoke"
+      },
+      {
+        "commands_ticks": 0,
+        "departure": false,
+        "elapsed_seconds": 6.00012500000003,
+        "max_commands_per_tick": 0,
+        "max_players": 2,
+        "max_tick": 279,
+        "passed": true,
+        "processed_ack": true,
+        "reason": "completed",
+        "role": "client",
+        "scenario": "smoke"
+      }
+    ],
+    "passed": true,
+    "case": "two"
+  },
+  {
+    "peers": [
+      {
+        "commands_ticks": 148,
+        "departure": false,
+        "elapsed_seconds": 6.00159499999998,
+        "max_commands_per_tick": 8,
+        "max_players": 8,
+        "max_tick": 237,
+        "passed": true,
+        "processed_ack": true,
+        "reason": "completed",
+        "role": "host",
+        "scenario": "smoke"
+      },
+      {
+        "commands_ticks": 0,
+        "departure": false,
+        "elapsed_seconds": 6.00501299999999,
+        "max_commands_per_tick": 0,
+        "max_players": 8,
+        "max_tick": 237,
+        "passed": true,
+        "processed_ack": true,
+        "reason": "completed",
+        "role": "client",
+        "scenario": "smoke"
+      },
+      {
+        "commands_ticks": 0,
+        "departure": false,
+        "elapsed_seconds": 6.00052400000003,
+        "max_commands_per_tick": 0,
+        "max_players": 8,
+        "max_tick": 237,
+        "passed": true,
+        "processed_ack": true,
+        "reason": "completed",
+        "role": "client",
+        "scenario": "smoke"
+      },
+      {
+        "commands_ticks": 0,
+        "departure": false,
+        "elapsed_seconds": 6.00151999999999,
+        "max_commands_per_tick": 0,
+        "max_players": 8,
+        "max_tick": 237,
+        "passed": true,
+        "processed_ack": true,
+        "reason": "completed",
+        "role": "client",
+        "scenario": "smoke"
+      },
+      {
+        "commands_ticks": 0,
+        "departure": false,
+        "elapsed_seconds": 6.00178300000001,
+        "max_commands_per_tick": 0,
+        "max_players": 8,
+        "max_tick": 237,
+        "passed": true,
+        "processed_ack": true,
+        "reason": "completed",
+        "role": "client",
+        "scenario": "smoke"
+      },
+      {
+        "commands_ticks": 0,
+        "departure": false,
+        "elapsed_seconds": 6.00314899999999,
+        "max_commands_per_tick": 0,
+        "max_players": 8,
+        "max_tick": 237,
+        "passed": true,
+        "processed_ack": true,
+        "reason": "completed",
+        "role": "client",
+        "scenario": "smoke"
+      },
+      {
+        "commands_ticks": 0,
+        "departure": false,
+        "elapsed_seconds": 6.00168200000003,
+        "max_commands_per_tick": 0,
+        "max_players": 8,
+        "max_tick": 237,
+        "passed": true,
+        "processed_ack": true,
+        "reason": "completed",
+        "role": "client",
+        "scenario": "smoke"
+      },
+      {
+        "commands_ticks": 0,
+        "departure": false,
+        "elapsed_seconds": 6.00167999999999,
+        "max_commands_per_tick": 0,
+        "max_players": 8,
+        "max_tick": 237,
+        "passed": true,
+        "processed_ack": true,
+        "reason": "completed",
+        "role": "client",
+        "scenario": "smoke"
+      }
+    ],
+    "passed": true,
+    "case": "eight"
+  },
+  {
+    "peers": [
+      {
+        "commands_ticks": 122,
+        "departure": false,
+        "elapsed_seconds": 6.00021800000001,
+        "max_commands_per_tick": 8,
+        "max_players": 8,
+        "max_tick": 210,
+        "passed": true,
+        "processed_ack": true,
+        "reason": "completed",
+        "role": "host",
+        "scenario": "capacity"
+      },
+      {
+        "commands_ticks": 0,
+        "departure": false,
+        "elapsed_seconds": 6.00159300000002,
+        "max_commands_per_tick": 0,
+        "max_players": 8,
+        "max_tick": 210,
+        "passed": true,
+        "processed_ack": true,
+        "reason": "completed",
+        "role": "client",
+        "scenario": "capacity"
+      },
+      {
+        "commands_ticks": 0,
+        "departure": false,
+        "elapsed_seconds": 6.00050100000003,
+        "max_commands_per_tick": 0,
+        "max_players": 8,
+        "max_tick": 210,
+        "passed": true,
+        "processed_ack": true,
+        "reason": "completed",
+        "role": "client",
+        "scenario": "capacity"
+      },
+      {
+        "commands_ticks": 0,
+        "departure": false,
+        "elapsed_seconds": 6.00338500000003,
+        "max_commands_per_tick": 0,
+        "max_players": 8,
+        "max_tick": 210,
+        "passed": true,
+        "processed_ack": true,
+        "reason": "completed",
+        "role": "client",
+        "scenario": "capacity"
+      },
+      {
+        "commands_ticks": 0,
+        "departure": false,
+        "elapsed_seconds": 6.00420400000001,
+        "max_commands_per_tick": 0,
+        "max_players": 8,
+        "max_tick": 210,
+        "passed": true,
+        "processed_ack": true,
+        "reason": "completed",
+        "role": "client",
+        "scenario": "capacity"
+      },
+      {
+        "commands_ticks": 0,
+        "departure": false,
+        "elapsed_seconds": 6.00286000000002,
+        "max_commands_per_tick": 0,
+        "max_players": 8,
+        "max_tick": 210,
+        "passed": true,
+        "processed_ack": true,
+        "reason": "completed",
+        "role": "client",
+        "scenario": "capacity"
+      },
+      {
+        "commands_ticks": 0,
+        "departure": false,
+        "elapsed_seconds": 6.00069100000003,
+        "max_commands_per_tick": 0,
+        "max_players": 8,
+        "max_tick": 210,
+        "passed": true,
+        "processed_ack": true,
+        "reason": "completed",
+        "role": "client",
+        "scenario": "capacity"
+      },
+      {
+        "commands_ticks": 0,
+        "departure": false,
+        "elapsed_seconds": 6.00655000000003,
+        "max_commands_per_tick": 0,
+        "max_players": 8,
+        "max_tick": 210,
+        "passed": true,
+        "processed_ack": true,
+        "reason": "completed",
+        "role": "client",
+        "scenario": "capacity"
+      },
+      {
+        "commands_ticks": 0,
+        "departure": false,
+        "elapsed_seconds": 0.0678833333333333,
+        "max_commands_per_tick": 0,
+        "max_players": 0,
+        "max_tick": 0,
+        "passed": true,
+        "processed_ack": false,
+        "reason": "session_full",
+        "role": "overflow",
+        "scenario": "capacity"
+      }
+    ],
+    "passed": true,
+    "case": "ninth"
+  },
+  {
+    "peers": [
+      {
+        "commands_ticks": 108,
+        "departure": true,
+        "elapsed_seconds": 6.00007600000002,
+        "max_commands_per_tick": 2,
+        "max_players": 2,
+        "max_tick": 282,
+        "passed": true,
+        "processed_ack": true,
+        "reason": "completed",
+        "role": "host",
+        "scenario": "disconnect"
+      },
+      {
+        "commands_ticks": 0,
+        "departure": false,
+        "elapsed_seconds": 2.308659,
+        "max_commands_per_tick": 0,
+        "max_players": 2,
+        "max_tick": 90,
+        "passed": true,
+        "processed_ack": true,
+        "reason": "intentional_client_shutdown",
+        "role": "client",
+        "scenario": "disconnect"
+      }
+    ],
+    "passed": true,
+    "case": "disconnect"
+  },
+  {
+    "peers": [
+      {
+        "commands_ticks": 38,
+        "departure": false,
+        "elapsed_seconds": 2.794911,
+        "max_commands_per_tick": 2,
+        "max_players": 2,
+        "max_tick": 90,
+        "passed": true,
+        "processed_ack": true,
+        "reason": "intentional_host_shutdown",
+        "role": "host",
+        "scenario": "host-loss"
+      },
+      {
+        "commands_ticks": 0,
+        "departure": false,
+        "elapsed_seconds": 2.3454,
+        "max_commands_per_tick": 0,
+        "max_players": 2,
+        "max_tick": 90,
+        "passed": true,
+        "processed_ack": true,
+        "reason": "host_disconnected",
+        "role": "client",
+        "scenario": "host-loss"
+      }
+    ],
+    "passed": true,
+    "case": "host-loss"
+  },
+  {
+    "peers": [
+      {
+        "passed": true,
+        "role": "forced-termination",
+        "reason": "crash-client"
+      },
+      {
+        "commands_ticks": 179,
+        "departure": true,
+        "elapsed_seconds": 10.0010599999999,
+        "max_commands_per_tick": 2,
+        "max_players": 2,
+        "max_tick": 522,
+        "passed": true,
+        "processed_ack": true,
+        "reason": "completed",
+        "role": "host",
+        "scenario": "crash-client"
+      }
+    ],
+    "passed": true,
+    "case": "crash-client"
+  },
+  {
+    "peers": [
+      {
+        "passed": true,
+        "role": "forced-termination",
+        "reason": "crash-host"
+      },
+      {
+        "commands_ticks": 0,
+        "departure": false,
+        "elapsed_seconds": 3.59239544444445,
+        "max_commands_per_tick": 0,
+        "max_players": 2,
+        "max_tick": 90,
+        "passed": true,
+        "processed_ack": true,
+        "reason": "host_disconnected",
+        "role": "client",
+        "scenario": "crash-host"
+      }
+    ],
+    "passed": true,
+    "case": "crash-host"
+  }
+]
