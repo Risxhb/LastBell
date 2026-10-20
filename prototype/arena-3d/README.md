@@ -4,7 +4,7 @@ A browser prototype for settling how the classes and the Bellkeeper should look 
 
 ## What it shows
 
-- **Arena:** the Bellkeeper's Dais from the art bible §8.4. Cobalt slate floor with broad low-frequency tiles, a low-contrast brass dial that dims during warnings, ornate curb and bell towers outside the playable bounds, the great ring mechanism, suspended spires, a violet cloud ocean and drifting motes.
+- **Arena:** the Bellkeeper's Dais rebuilt from the key art (`shots/ref-key-art-arena.png`): a floating 26 × 26 m stone platform at sunset with a large clock dial under the boss, a broken parapet, lanterns, banners and a 3D sky city all around it (clock cathedral, blue domes, spires, bridges, floating islands). The playable square is ±12.4 m around the boss, so 8 players fit outside the Hollow Toll ring. It's built in `arena-env.js`, which the game and `arena-look.html` (look study, `?view=keyart|game`) share. `arena-size.html` compares dais sizes. Floor decoration dims while a warning is up.
 - **Classes** (art bible §9), built from shapes, toon shading and effects. No modeled art yet.
   - Vanguard: cobalt enamel, semicircular brass guard plate, clock-hand blade, gold slashes and a golden clock-hand Signature.
   - Arcanist: tall collar, split robe tails, floating astrolabe and lenses, straight-line teal beams, and a rooted cast that lifts the astrolabe overhead.

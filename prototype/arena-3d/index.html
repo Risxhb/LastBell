@@ -204,9 +204,11 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
    ===================================================================== */
 const TICK = 60, SPEED = 250, IMMUNE = 45, CADENCE = 18, CANCEL_MOVE = 0.2;
 let MAXHP = 5; // 5 pips (v0.1 timeline) or 10 (Bellkeeper v1.0: hits cost a share of max HP); set by each Sim
-const ARENA = { x0: 60, y0: 140, x1: 880, y1: 740 }, INSET = 14;
+// Playable square of the key-art dais (arena-env.js): ±12.4 m around the boss, inside the parapet. Sized so 8 players
+// can stand outside the Hollow Toll ring (see arena-size.html).
+const ARENA = { x0: -26, y0: -136, x1: 966, y1: 856 }, INSET = 14;
 // BOSS is the boss's current position (Bellkeeper v1.0 Pendulum Charge moves it). ORIGIN is the fixed arena reference for drawing.
-const ORIGIN = { x: 470, y: 360 }, BOSS = { x: 470, y: 360 }, BOSS_BODY = 56, SPAWN = { x: 470, y: 590 };
+const ORIGIN = { x: 470, y: 360 }, BOSS = { x: 470, y: 360 }, BOSS_BODY = 56, SPAWN = { x: 470, y: 680 };
 const BOSS_HP = { standard: 1800, short: 600, infinite: Infinity };
 const PHASE_START = [0, 1320, 2640, 3540, 5340, 14340];
 const ENRAGE = 14400;
@@ -821,24 +823,16 @@ const canvas = document.getElementById('view');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.95;
-const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0x3b3566, 34, 95);
-const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 400);
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
+const scene = new THREE.Scene(); // fog, sky and the key light come from arena-env.js
+const camera = new THREE.PerspectiveCamera(44, 1, 0.1, 900);
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
 const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.42, 0.4, 0.9);
 composer.addPass(bloom);
 composer.addPass(new OutputPass());
 
-// ---- Lights: warm key, cool fill, teal rim (art bible §6.1) ----
-scene.add(new THREE.HemisphereLight(0x9aa7e0, 0x2a2350, 0.95));
-const key = new THREE.DirectionalLight(0xffe2b0, 1.7);
-key.position.set(-9, 18, 7); key.castShadow = true;
-key.shadow.mapSize.set(2048, 2048);
-Object.assign(key.shadow.camera, { left: -16, right: 16, top: 16, bottom: -16, near: 1, far: 60 });
-key.shadow.bias = -0.0006; key.shadow.normalBias = 0.02;
-scene.add(key);
+// ---- Lights: the sunset sun, sky fill and bounce come from arena-env.js; characters keep a teal rim (art bible §6.1) ----
 const rim = new THREE.DirectionalLight(0x7fe3ff, 1.1); rim.position.set(6, 6, -14); scene.add(rim);
 const bellGlow = new THREE.PointLight(0xffb85a, 6, 9, 1.8); bellGlow.position.set(0, 2.2, 0); scene.add(bellGlow);
 
@@ -872,116 +866,10 @@ function bellGeo(r, h, seg = 32) {
 }
 const C = { cobalt: 0x17263F, slate: 0x314C69, brass: 0xC38D46, gold: 0xF6C968, ivory: 0xF4E9D1, violet: 0x655491, teal: 0x55C9CE, coral: 0xEB685D, ink: 0x101825, lavender: 0xA8A4D1 };
 
-/* ---------- Environment: the Bellkeeper's Dais (art bible §8.4) ---------- */
-const AW = (ARENA.x1 - ARENA.x0) * S, AH = (ARENA.y1 - ARENA.y0) * S;
-const ACX = ((ARENA.x0 + ARENA.x1) / 2 - ORIGIN.x) * S, ACZ = ((ARENA.y0 + ARENA.y1) / 2 - ORIGIN.y) * S;
-
-function floorTexture() {
-  const c = document.createElement('canvas'); c.width = 1640; c.height = 1200; const g = c.getContext('2d');
-  const rnd = mulberry32(11);
-  g.fillStyle = '#2d4663'; g.fillRect(0, 0, c.width, c.height);
-  for (let ty = 0; ty < 6; ty++) for (let tx = 0; tx < 9; tx++) {
-    const x = tx * 200 - (ty % 2) * 100, y = ty * 200, v = (rnd() - 0.5) * 14;
-    g.fillStyle = `rgb(${46 + v},${72 + v},${101 + v * 1.2})`;
-    g.fillRect(x + 4, y + 4, 192, 192);
-    for (let k = 0; k < 7; k++) { // broad painterly strokes, low frequency
-      g.fillStyle = `rgba(${rnd() < 0.5 ? "255,240,220" : "20,30,60"},${0.012 + rnd() * 0.016})`;
-      g.beginPath(); g.ellipse(x + 20 + rnd() * 160, y + 20 + rnd() * 160, 30 + rnd() * 60, 8 + rnd() * 20, rnd() * 3, 0, 7); g.fill();
-    }
-    if (rnd() < 0.25) { g.strokeStyle = 'rgba(16,24,37,0.35)'; g.lineWidth = 2; g.beginPath(); let px = x + 30 + rnd() * 140, py = y + 30 + rnd() * 140; g.moveTo(px, py); for (let s = 0; s < 4; s++) { px += (rnd() - 0.5) * 60; py += (rnd() - 0.5) * 60; g.lineTo(px, py); } g.stroke(); }
-  }
-  g.strokeStyle = 'rgba(16,24,37,0.75)'; g.lineWidth = 7;
-  for (let ty = 0; ty <= 6; ty++) { g.beginPath(); g.moveTo(0, ty * 200); g.lineTo(c.width, ty * 200); g.stroke(); }
-  for (let ty = 0; ty < 6; ty++) for (let tx = 0; tx <= 9; tx++) { const x = tx * 200 - (ty % 2) * 100; g.beginPath(); g.moveTo(x, ty * 200); g.lineTo(x, ty * 200 + 200); g.stroke(); }
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
-}
-function dialTexture() {
-  const c = document.createElement('canvas'); c.width = c.height = 1024; const g = c.getContext('2d');
-  const cx = 512, R = 500; g.translate(cx, cx);
-  g.strokeStyle = 'rgba(246,201,104,0.55)';
-  for (const [r, w] of [[0.98, 6], [0.9, 2], [0.62, 3], [0.36, 2]]) { g.lineWidth = w; g.beginPath(); g.arc(0, 0, R * r, 0, 7); g.stroke(); }
-  for (let i = 0; i < 60; i++) { const a = i / 60 * Math.PI * 2, l = i % 5 ? 0.04 : 0.09; g.lineWidth = i % 5 ? 2 : 5; g.beginPath(); g.moveTo(Math.cos(a) * R * 0.9, Math.sin(a) * R * 0.9); g.lineTo(Math.cos(a) * R * (0.9 - l), Math.sin(a) * R * (0.9 - l)); g.stroke(); }
-  g.fillStyle = 'rgba(246,201,104,0.5)'; g.font = '600 46px Cinzel, serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-  const num = ['XII', 'III', 'VI', 'IX'];
-  for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 - Math.PI / 2; g.save(); g.translate(Math.cos(a) * R * 0.76, Math.sin(a) * R * 0.76); g.rotate(a + Math.PI / 2); g.fillText(num[i], 0, 0); g.restore(); }
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
-}
-const env = group(scene);
-// platform slab and floor
-mesh(new THREE.BoxGeometry(AW + 4.2, 1.6, AH + 4.2), M(0x1d2c45), env, [ACX, -0.81, ACZ]).castShadow = false;
-mesh(new THREE.CylinderGeometry(9.5, 6.5, 5, 10), M(0x17263F), env, [ACX, -4.1, ACZ]).castShadow = false;
-const floor = mesh(new THREE.PlaneGeometry(AW, AH), new THREE.MeshToonMaterial({ map: floorTexture(), gradientMap: ramp }), env, [ACX, 0.001, ACZ], [-Math.PI / 2, 0, 0]);
-floor.castShadow = false;
-const dial = new THREE.Mesh(new THREE.PlaneGeometry(15, 15), new THREE.MeshBasicMaterial({ map: dialTexture(), transparent: true, opacity: 0.2, depthWrite: false }));
-dial.rotation.x = -Math.PI / 2; dial.position.y = 0.006; env.add(dial);
-// border: brass trim, ivory curb, outer ornate band (detail lives at the edge, not the play space)
-function strip(x, z, w, d, h, mat, y = 0) { return mesh(new THREE.BoxGeometry(w, h, d), mat, env, [x, y + h / 2, z]); }
-const brassM = M(C.brass), ivoryM = M(0xd9ccb0), darkM = M(0x22324d);
-strip(ACX, ACZ - AH / 2 - 0.08, AW + 0.32, 0.16, 0.07, brassM); strip(ACX, ACZ + AH / 2 + 0.08, AW + 0.32, 0.16, 0.07, brassM);
-strip(ACX - AW / 2 - 0.08, ACZ, 0.16, AH, 0.07, brassM); strip(ACX + AW / 2 + 0.08, ACZ, 0.16, AH, 0.07, brassM);
-strip(ACX, ACZ - AH / 2 - 0.75, AW + 2.6, 1.0, 0.22, ivoryM); strip(ACX, ACZ + AH / 2 + 0.75, AW + 2.6, 1.0, 0.22, ivoryM);
-strip(ACX - AW / 2 - 0.75, ACZ, 1.0, AH + 0.5, 0.22, ivoryM); strip(ACX + AW / 2 + 0.75, ACZ, 1.0, AH + 0.5, 0.22, ivoryM);
-for (let i = 0; i < 26; i++) { // brass studs / engraved plates along the curb
-  const t = (i + 0.5) / 26;
-  mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.05, 12), brassM, env, [ACX - AW / 2 + t * AW, 0.25, ACZ - AH / 2 - 0.75]);
-}
-// corner bell towers (outside collision bounds)
-const towerBells = [];
-function bellTower(x, z, h, s = 1) {
-  const g = group(env, [x, 0, z]); g.scale.setScalar(s);
-  mesh(new THREE.CylinderGeometry(0.85, 1.05, h, 8), ivoryM, g, [0, h / 2, 0]);
-  for (let i = 0; i < 4; i++) mesh(new THREE.BoxGeometry(0.22, 1.6, 0.22), ivoryM, g, [Math.cos(i * Math.PI / 2 + Math.PI / 4) * 0.72, h + 0.8, Math.sin(i * Math.PI / 2 + Math.PI / 4) * 0.72]);
-  mesh(new THREE.CylinderGeometry(0.95, 0.95, 0.2, 8), brassM, g, [0, h, 0]);
-  mesh(new THREE.ConeGeometry(1.15, 2.1, 8), M(0x2b4a8c), g, [0, h + 2.65, 0]);
-  mesh(new THREE.SphereGeometry(0.16, 10, 8), G(C.gold, 2), g, [0, h + 3.8, 0]);
-  const bell = group(g, [0, h + 1.5, 0]);
-  mesh(bellGeo(0.5, 0.8), M(C.brass, { side: THREE.DoubleSide }), bell, [0, -0.8, 0]);
-  towerBells.push(bell);
-  for (let i = 0; i < 3; i++) mesh(new THREE.BoxGeometry(0.16, 0.36, 0.05), G(0xffc477, 1.4), g, [0, h * (0.3 + i * 0.2), 1.03]).castShadow = false;
-  return g;
-}
-const tx = AW / 2 + 1.9, tzN = ACZ - AH / 2 - 1.9, tzS = ACZ + AH / 2 + 1.9;
-bellTower(ACX - tx, tzN, 7.5); bellTower(ACX + tx, tzN, 7.5); bellTower(ACX - tx, tzS, 3.2, 0.8); bellTower(ACX + tx, tzS, 3.2, 0.8);
-// great ring mechanism behind the dais (ceremonial circle)
-const greatRing = group(env, [ACX, 6.5, tzN - 3]);
-mesh(new THREE.TorusGeometry(6.2, 0.22, 10, 90), brassM, greatRing);
-mesh(new THREE.TorusGeometry(5.4, 0.08, 6, 90), M(C.gold), greatRing);
-for (let i = 0; i < 48; i++) { const a = i / 48 * Math.PI * 2; mesh(new THREE.BoxGeometry(0.25, 0.4, 0.18), brassM, greatRing, [Math.cos(a) * 6.55, Math.sin(a) * 6.55, 0], [0, 0, a]); }
-for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; mesh(new THREE.BoxGeometry(0.1, 5.2, 0.08), M(0x8a6332), greatRing, [Math.cos(a) * 2.7, Math.sin(a) * 2.7, -0.1], [0, 0, a + Math.PI / 2]); }
-const innerRing = group(greatRing); mesh(new THREE.TorusGeometry(3.6, 0.14, 8, 64, Math.PI * 1.6), M(C.brass), innerRing);
-// sky dome
-const sky = new THREE.Mesh(new THREE.SphereGeometry(200, 32, 16), new THREE.ShaderMaterial({
-  side: THREE.BackSide, depthWrite: false, fog: false,
-  uniforms: { top: { value: new THREE.Color(0x1a1f45) }, mid: { value: new THREE.Color(0x6a5a9e) }, low: { value: new THREE.Color(0xb59cc4) } },
-  vertexShader: 'varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }',
-  fragmentShader: 'uniform vec3 top,mid,low; varying vec3 vP; void main(){ float h = normalize(vP).y; vec3 c = h>0.05 ? mix(mid, top, smoothstep(0.05,0.6,h)) : mix(low, mid, smoothstep(-0.25,0.05,h)); gl_FragColor = vec4(c,1.); }',
-}));
-scene.add(sky);
-// cloud ocean
-const cloudMat = new THREE.ShaderMaterial({
-  transparent: true, depthWrite: false, fog: false,
-  uniforms: { t: { value: 0 } },
-  vertexShader: 'varying vec2 vU; varying vec3 vW; void main(){ vU = uv; vW = (modelMatrix*vec4(position,1.)).xyz; gl_Position = projectionMatrix*viewMatrix*vec4(vW,1.); }',
-  fragmentShader: `uniform float t; varying vec2 vU; varying vec3 vW;
-    float h(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5); }
-    float n(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f); return mix(mix(h(i),h(i+vec2(1,0)),f.x), mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x), f.y); }
-    float fbm(vec2 p){ float v=0., a=.5; for(int i=0;i<5;i++){ v+=a*n(p); p*=2.03; a*=.5; } return v; }
-    void main(){ vec2 p = vW.xz*0.035 + vec2(t*0.004, t*0.002); float c = fbm(p) * 0.7 + fbm(p*2.7 - t*0.003)*0.3;
-      vec3 col = mix(vec3(0.33,0.27,0.52), vec3(0.86,0.78,0.92), smoothstep(0.35,0.8,c));
-      float fade = 1. - smoothstep(60., 190., length(vW.xz)); gl_FragColor = vec4(col, 0.95*fade); }`,
-});
-const clouds = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), cloudMat); clouds.rotation.x = -Math.PI / 2; clouds.position.y = -9; scene.add(clouds);
-// distant suspended spires
-const spireRnd = mulberry32(5);
-for (let i = 0; i < 22; i++) {
-  const a = -Math.PI * 0.95 + spireRnd() * Math.PI * 0.9 + (i % 2 ? Math.PI : 0) * 0.0, r = 34 + spireRnd() * 40;
-  const x = Math.cos(a) * r, z = Math.sin(a) * r - 6, h = 6 + spireRnd() * 14, base = -6 + spireRnd() * 8;
-  const g = group(scene, [x, base, z]);
-  mesh(new THREE.CylinderGeometry(0.9, 1.4, h, 7), M(spireRnd() < 0.5 ? 0xcfc3ad : 0x8d88b8), g, [0, h / 2, 0]).castShadow = false;
-  mesh(new THREE.ConeGeometry(1.5, 3.5, 7), M(0x2f4f94), g, [0, h + 1.7, 0]).castShadow = false;
-  mesh(new THREE.ConeGeometry(1.3, 3, 7), M(0x5d5590), g, [0, -1.5, 0], [Math.PI, 0, 0]).castShadow = false;
-  if (spireRnd() < 0.7) mesh(new THREE.BoxGeometry(0.3, 0.5, 0.1), G(0xffc477, 1.8), g, [0, h * 0.7, 1.2]);
-}
+/* ---------- Environment: the Bellkeeper's Dais from the key art (arena-env.js, shared with arena-look.html) ---------- */
+window.THREE = THREE;
+await new Promise(res => { const sc = document.createElement('script'); sc.src = 'arena-env.js'; sc.onload = res; sc.onerror = res; document.head.appendChild(sc); });
+const arenaEnv = window.buildArenaEnv ? window.buildArenaEnv(THREE, scene, { sunIntensity: 2.3 }) : { update() {} };
 // drifting motes (kept above the play plane; dimmed during hazards)
 const moteGeo = new THREE.BufferGeometry(); const moteN = 160, motePos = new Float32Array(moteN * 3);
 for (let i = 0; i < moteN; i++) { motePos[i * 3] = (Math.random() - 0.5) * 40; motePos[i * 3 + 1] = 2 + Math.random() * 10; motePos[i * 3 + 2] = (Math.random() - 0.5) * 30 - 2; }
@@ -1356,7 +1244,7 @@ function makeTelegraph(h, style = 0) {
       time: { value: 0 }, flash: { value: 0 }, alpha: { value: 1 }, col: { value: new THREE.Color(color) }, arena: { value: new THREE.Vector4(ARENA.x0, ARENA.y0, ARENA.x1, ARENA.y1) },
     },
   });
-  const m = new THREE.Mesh(teleGeo, mat); m.position.set(ACX * 0, 0.02 + (style === 2 ? 0 : 0.004), 0); m.renderOrder = style === 2 ? 1 : 2;
+  const m = new THREE.Mesh(teleGeo, mat); m.position.set(0, 0.02 + (style === 2 ? 0 : 0.004), 0); m.renderOrder = style === 2 ? 1 : 2;
   scene.add(m); return m;
 }
 
@@ -1730,12 +1618,12 @@ function showCard(e) {
   card.style.opacity = 1; cardTimer = 6;
 }
 function miniMap(h) { // small arena diagram built from resolved geometry
-  const sx = 86 / (ARENA.x1 - ARENA.x0), sy = 63 / (ARENA.y1 - ARENA.y0), X = x => (x - ARENA.x0) * sx, Y = y => (y - ARENA.y0) * sy;
+  const sx = 70 / (ARENA.x1 - ARENA.x0), sy = 70 / (ARENA.y1 - ARENA.y0), X = x => (x - ARENA.x0) * sx, Y = y => (y - ARENA.y0) * sy;
   let shape = '';
   if (h.kind === 'circle') shape = `<circle cx="${X(h.ox)}" cy="${Y(h.oy)}" r="${Math.min(h.r * sx, 120)}" fill="${h.req === 'shelter' ? '#F6C96855' : '#EB685D66'}" stroke="${h.req === 'shelter' ? '#F6C968' : '#EB685D'}"/>`;
   else if (h.kind === 'donut') shape = `<circle cx="${X(h.ox)}" cy="${Y(h.oy)}" r="${(h.r + h.inner) / 2 * sx}" fill="none" stroke="#EB685D88" stroke-width="${(h.r - h.inner) * sx}"/>`;
   else { const a1 = h.dir - h.half, a2 = h.dir + h.half, r = h.r; shape = `<path d="M${X(h.ox)} ${Y(h.oy)} L${X(h.ox + Math.cos(a1) * r)} ${Y(h.oy + Math.sin(a1) * r)} A${r * sx} ${r * sy} 0 0 1 ${X(h.ox + Math.cos(a2) * r)} ${Y(h.oy + Math.sin(a2) * r)} Z" fill="#EB685D66" stroke="#EB685D"/>`; }
-  return `<svg width="86" height="63" style="background:#22344f;border:1px solid #c38d4666;border-radius:3px"><defs><clipPath id="cl"><rect width="86" height="63"/></clipPath></defs><g clip-path="url(#cl)">${shape}</g><circle cx="${X(BOSS.x)}" cy="${Y(BOSS.y)}" r="3" fill="#C38D46"/><circle cx="${X(sim.p.x)}" cy="${Y(sim.p.y)}" r="3" fill="#55C9CE" stroke="#fff"/></svg>`;
+  return `<svg width="70" height="70" style="background:#22344f;border:1px solid #c38d4666;border-radius:3px"><defs><clipPath id="cl"><rect width="70" height="70"/></clipPath></defs><g clip-path="url(#cl)">${shape}</g><circle cx="${X(BOSS.x)}" cy="${Y(BOSS.y)}" r="3" fill="#C38D46"/><circle cx="${X(sim.p.x)}" cy="${Y(sim.p.y)}" r="3" fill="#55C9CE" stroke="#fff"/></svg>`;
 }
 
 /* ---------- Character animation ---------- */
@@ -1884,16 +1772,13 @@ function buildRings() {
 
 /* ---------- World update ---------- */
 let shake = 0;
-const CAM_BASE = new THREE.Vector3(0, 21, 18.5), camLook = new THREE.Vector3(0, 0, 2.4), camBase = CAM_BASE.clone();
+const CAM_BASE = new THREE.Vector3(0, 29, 22.5), camLook = new THREE.Vector3(0, 0, 1.0), camBase = CAM_BASE.clone();
 let selectSpin = 0;
 function updateWorld(dt, alpha) {
-  cloudMat.uniforms.t.value = time * 60;
-  greatRing.rotation.z += dt * 0.05; innerRing.rotation.z -= dt * 0.15;
-  towerBells.forEach((b, i) => b.rotation.z = Math.sin(time * 0.8 + i) * 0.08);
   const mp = moteGeo.attributes.position; for (let i = 0; i < moteN; i++) { mp.array[i * 3 + 1] += dt * 0.25; if (mp.array[i * 3 + 1] > 12) mp.array[i * 3 + 1] = 2; } mp.needsUpdate = true;
   const quiet = sim && sim.hazards.length > 0;
   motes.material.opacity += ((quiet ? 0.25 : 0.7) - motes.material.opacity) * dt * 3;
-  dial.material.opacity += ((quiet ? 0.08 : 0.2) - dial.material.opacity) * dt * 4; // floor engravings dim during warnings
+  arenaEnv.update(time, dt, quiet); // floor engravings dim during warnings
   tickFx(dt);
 
   if (mode === 'select') {
@@ -2056,7 +1941,6 @@ function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h
 addEventListener('resize', resize); resize();
 buildSelect(); selectClass('vanguard');
 camera.position.set(0, 1.15, 10.3); camera.lookAt(0, 0.5, 6.2);
-document.fonts?.ready.then(() => { dial.material.map = dialTexture(); });
 hide('loading'); show('select');
 // ---------- Test autoplay (?autoplay=vanguard&inv&phase=N): a simple bot for screenshots and smoke tests ----------
 {
