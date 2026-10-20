@@ -8,6 +8,12 @@
 6. Ask the other collaborator to review before merging. Resolve feedback together.
 7. Merge, close the issue, and update relevant documentation.
 
+## Visual design review
+
+Use the [art-direction guide](../reference/LAST-BELL-CLOCKWORK-FANTASY-ART-DIRECTION.md) for all character, weapon, spell/ability, boss, environment, animation, VFX, icon and UI work. It is the adopted shared style reference; [AGENTS.md](../AGENTS.md) makes this discoverable to coding agents.
+
+Visual PRs should link the relevant guide sections and include a gameplay-camera preview when applicable. Check silhouette, palette/material language, telegraph accuracy, safe-region clarity and effect density. Record intentional deviations in the PR and update the guide through review if the shared style changes. Proposed budgets and example mechanics in the guide remain subject to current decisions and implementation evidence.
+
 ## Handoffs
 
 Leave a short update on the issue: Completed / Next / Blocked. Link the relevant branch, pull request, or document.

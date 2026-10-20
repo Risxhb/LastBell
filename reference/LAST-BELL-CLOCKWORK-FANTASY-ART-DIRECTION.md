@@ -2,9 +2,9 @@
 ## Clockwork Fantasy — Visual Art Direction Bible
 
 **Document type:** Art direction and production reference
-**Version:** 1.1 — confirmed 2.5D isometric direction; art details proposed
+**Version:** 1.2 — adopted shared visual style; confirmed 2.5D isometric direction
 **Date:** October 20, 2026
-**Status:** 2.5D isometric direction confirmed by Risxhb on October 20, 2026; production art remains proposed
+**Status:** Shared visual style adopted by Risxhb on October 20, 2026; production assets and unvalidated technical details remain planned
 **Project:** *Last Bell*, a 2.5D isometric action raid roguelite
 **Intended readers:** Creative director, concept artists, 3D/2D artists, animators, VFX artists, UI/UX designers, technical artists, and Godot developers
 
@@ -41,7 +41,9 @@
 
 ## 1. Purpose, project context, and source of truth
 
-This document establishes a **proposed** coherent visual language for *Last Bell*. It translates the previous discussion—stylized, painterly 3D action-game readability combined with brass-and-bells clockwork fantasy—into production decisions an art team can apply.
+This document establishes the **adopted shared visual language** for *Last Bell*. Use it when designing characters, weapons, spells/abilities, bosses, environments, animation, VFX, icons and UI. It translates stylized, painterly action-game readability combined with brass-and-bells clockwork fantasy into a consistent design reference for every collaborator.
+
+The owner adopted the style, not every proposed feature or example value in this document. Camera tuning, budgets, tooling and future mechanics remain subject to current project decisions and validation. See [collaborator guidance](../AGENTS.md) and [visual review workflow](../docs/workflow.md#visual-design-review). This repository copy of the owner-supplied reference incorporates the confirmed 2.5D and eight-player direction.
 
 ### 1.1 What the game aspires to be
 
@@ -914,7 +916,7 @@ This document is grounded in these user-provided project notes:
 - `README.md` — explains that the context files are documentation, not live repository/game access.
 - `STARTER-PROMPT.md` — requests that source-derived facts be distinguished from planned systems and recommendations.
 
-The creative visual details, palettes, style rules, design briefs, mockup targets, and production steps in **this document are recommendations written for this art-direction exercise**, not claims that matching assets already exist or that the game has adopted these decisions.
+The owner adopted this document's overall clockwork-fantasy style, palette families, silhouette language and readability priorities as the shared design reference. Example asset briefs and production steps guide implementation; they do not claim matching assets already exist. Numeric budgets, feature ideas and technical proposals still require validation against current decisions and source.
 
 The local reference folder also contains `art style reference.webp`; it has not been assessed or imported in this documentation change. This plan is grounded in the Markdown reference and the owner's direction.
 
@@ -922,6 +924,7 @@ The local reference folder also contains `art style reference.webp`; it has not 
 
 | Version | Date | Notes |
 |---|---|---|
+| 1.2 | 2026-10-20 | Owner adopted the visual style for all collaborators; linked agent instructions, onboarding and visual review workflow |
 | 1.1 | 2026-10-20 | Confirmed 2.5D/isometric direction, Windblown and Hades inspirations, eight-player target, and foundation migration plan |
 | 1.0 | 2026-10-20 | Initial comprehensive visual-art-direction proposal, aligned with supplied prototype context |
 

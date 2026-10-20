@@ -2,6 +2,14 @@
 
 For each decision, record the date, decision, reason, and relevant issue or pull request.
 
+## 2026-10-20 — Shared clockwork-fantasy visual style
+
+- Decision: Adopt [the art-direction guide](../reference/LAST-BELL-CLOCKWORK-FANTASY-ART-DIRECTION.md) for characters, weapons, spells/abilities, bosses, environments, animation, VFX, icons and UI across all collaborator lanes.
+- Reason: Risxhb explicitly requested that the supplied reference guide the team's visual designs consistently.
+- Application: Painterly stylized forms, ceremonial clockwork motifs, warm brass/ivory against cobalt/violet, readable silhouettes and authoritative telegraphs. Follow [agent guidance](../AGENTS.md) and [visual review workflow](workflow.md#visual-design-review).
+- Limits: Adopting the style does not implement assets or approve every future feature, example timing, technical proposal or budget in the reference. The confirmed 2.5D direction remains in effect.
+- Tracking: [documentation PR #13](https://github.com/Risxhb/collab/pull/13).
+
 ## 2026-10-20 — 2.5D with a fixed isometric camera
 
 - Decision: Last Bell will use modeled 3D environments/characters with a fixed isometric camera. Windblown and Hades are creative references; the game retains its original clockwork-fantasy setting, four-action kit, and raid/build focus.

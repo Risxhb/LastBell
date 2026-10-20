@@ -5,6 +5,7 @@ Private workspace for a two-person project.
 ## Start here
 
 - New collaborator: follow [COLLABORATOR-START-HERE.md](COLLABORATOR-START-HERE.md).
+- Artists and gameplay designers: use the [shared visual style guide](reference/LAST-BELL-CLOCKWORK-FANTASY-ART-DIRECTION.md) for characters, spells, bosses, environments and UI. Agent contributors should also read [AGENTS.md](AGENTS.md).
 - Use Issues to propose tasks and discuss questions.
 - Give each task one owner and a clear definition of done.
 - Make changes on a branch and open a pull request for review.

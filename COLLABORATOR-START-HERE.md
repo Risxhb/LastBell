@@ -48,6 +48,8 @@ Replace the placeholders. These commands apply only to this local repository.
 Start with:
 
 - [README.md](README.md): overview and links.
+- [AGENTS.md](AGENTS.md): shared guidance for agent contributors, including visual design requirements.
+- [Visual style guide](reference/LAST-BELL-CLOCKWORK-FANTASY-ART-DIRECTION.md): adopted clockwork-fantasy direction for characters, spells, bosses, environments, animation, VFX and UI; read before visual design work.
 - [raid-simulator-plan.md](raid-simulator-plan.md): current game planning draft, open decisions, and proposed direction.
 - [docs/workflow.md](docs/workflow.md): tasks, branches, review, and handoffs.
 - [docs/decisions.md](docs/decisions.md): durable decisions and their reasons.
