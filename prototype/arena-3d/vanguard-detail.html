@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vanguard Detail Mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Alegreya+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+html, body { margin: 0; height: 100%; overflow: hidden; background: #0d1222; color: #F4E9D1; font-family: 'Alegreya Sans', sans-serif; }
+canvas { display: block; position: fixed; inset: 0; width: 100vw; height: 100vh; }
+#label { position: fixed; left: 28px; top: 22px; pointer-events: none; }
+#label h1 { margin: 0; font-family: 'Cinzel', serif; letter-spacing: 0.22em; font-size: 30px; text-shadow: 0 2px 10px #000; }
+#label div { font-size: 13px; letter-spacing: 0.22em; color: #b9b2dc; text-transform: uppercase; }
+#hint { position: fixed; right: 22px; bottom: 18px; font-size: 13px; color: #9a94bd; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="label"><h1>VANGUARD</h1><div>Detail pass mockup · painted texture + sculpted armour</div></div>
+<div id="hint">Drag to turn · scroll to zoom</div>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+
+const QS = new URLSearchParams(location.search);
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(30, 1, 0.05, 100);
+
+// ---------- Windblown-style lit model (same as the arena mockup), plus height gradient for characters ----------
+const LOOK = {
+  lbRemapMin: { value: 0.38 }, lbRemapMax: { value: 0.64 }, lbBrush: { value: 0.07 },
+  lbTop: { value: new THREE.Color(0x8e86d0) }, lbTopStart: { value: 0.2 }, lbTopEnd: { value: 0.95 }, lbTopStr: { value: 0.5 },
+  lbRimStr: { value: 0.6 }, lbRimTight: { value: 3.0 }, lbRim: { value: new THREE.Color(0xe9dcff) },
+  lbFootDark: { value: 0.32 },
+};
+const LIT_PARS = `varying vec3 vWPos;
+uniform float lbRemapMin, lbRemapMax, lbBrush, lbTopStart, lbTopEnd, lbTopStr, lbRimStr, lbRimTight, lbMetal, lbFootDark; uniform vec3 lbTop, lbRim;
+float lbH(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float lbN(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3. - 2. * f); return mix(mix(lbH(i), lbH(i + vec2(1, 0)), f.x), mix(lbH(i + vec2(0, 1)), lbH(i + vec2(1, 1)), f.x), f.y); }
+float lbBrushN(vec3 p){ return (lbN(p.xz * 14.0 + p.y * 9.0) * 0.6 + lbN(p.xy * 31.0 - p.z * 13.0) * 0.4) * 2. - 1.; }
+varying vec3 vViewPosition;
+struct ToonMaterial { vec3 diffuseColor; };
+void RE_Direct_Toon(const in IncidentLight directLight, const in vec3 geometryPosition, const in vec3 geometryNormal, const in vec3 geometryViewDir, const in vec3 geometryClearcoatNormal, const in ToonMaterial material, inout ReflectedLight reflectedLight) {
+  float hl = dot(geometryNormal, directLight.direction) * 0.5 + 0.5 + lbBrushN(vWPos) * lbBrush;
+  float band = smoothstep(lbRemapMin, lbRemapMax, hl);
+  reflectedLight.directDiffuse += directLight.color * band * BRDF_Lambert(material.diffuseColor);
+  if (lbMetal > 0.) { vec3 H = normalize(directLight.direction + geometryViewDir); float NH = dot(geometryNormal, H);
+    float g = smoothstep(0.80, 0.9, NH) * 0.8 + smoothstep(0.95, 0.985, NH) * 1.4;
+    reflectedLight.directSpecular += directLight.color * g * lbMetal * (material.diffuseColor * 1.3 + 0.2); }
+}
+void RE_IndirectDiffuse_Toon(const in vec3 irradiance, const in vec3 geometryPosition, const in vec3 geometryNormal, const in vec3 geometryViewDir, const in vec3 geometryClearcoatNormal, const in ToonMaterial material, inout ReflectedLight reflectedLight) {
+  vec3 wN = normalize((vec4(geometryNormal, 0.) * viewMatrix).xyz);
+  float top = smoothstep(lbTopStart, lbTopEnd, wN.y) * lbTopStr;
+  vec3 irr = irradiance + lbTop * top; if (lbMetal > 0.5) irr = vec3(dot(irr, vec3(0.33))) * vec3(1.25, 0.95, 0.72); // warm metal shadows (no olive)
+  reflectedLight.indirectDiffuse += irr * BRDF_Lambert(material.diffuseColor);
+}
+#define RE_Direct RE_Direct_Toon
+#define RE_IndirectDiffuse RE_IndirectDiffuse_Toon`;
+const LIT_RIM = `{ vec3 lbV = normalize(vViewPosition); float lbR = pow(1. - saturate(dot(normal, lbV)), lbRimTight) * lbRimStr; outgoingLight += lbRim * lbR * (0.5 + 0.5 * diffuseColor.rgb);
+  outgoingLight *= mix(1.0 - lbFootDark, 1.0, smoothstep(0.0, 0.9, vWPos.y)); }`;
+function lit({ color = 0xffffff, map = null, bump = null, bumpScale = 1, metal = 0, emissive = 0x000000, ei = 1, side = THREE.FrontSide, transparent = false } = {}) {
+  const m = new THREE.MeshToonMaterial({ color, map, bumpMap: bump, bumpScale, emissive, emissiveIntensity: ei, side, transparent });
+  m.onBeforeCompile = sh => {
+    Object.assign(sh.uniforms, LOOK, { lbMetal: { value: metal } });
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWPos;').replace('#include <project_vertex>', '#include <project_vertex>\nvWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <lights_toon_pars_fragment>', LIT_PARS).replace('#include <opaque_fragment>', LIT_RIM + '\n#include <opaque_fragment>');
+  };
+  m.customProgramCacheKey = () => 'vdLit' + metal;
+  return m;
+}
+const glowMat = (c, k = 2.4) => new THREE.MeshBasicMaterial({ color: new THREE.Color(c).multiplyScalar(k) });
+
+// ---------- Painted textures (canvas): this is where most of the added detail lives ----------
+function tex(w, h, draw, { srgb = true, repeat = [1, 1] } = {}) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'); draw(g, w, h);
+  const t = new THREE.CanvasTexture(c); if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(...repeat); t.anisotropy = 8; return t;
+}
+const rnd = (() => { let a = 7; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; })();
+function noiseSpeckle(g, w, h, n, cols) { for (let i = 0; i < n; i++) { g.fillStyle = cols[i % cols.length]; g.fillRect(rnd() * w, rnd() * h, 1 + rnd() * 2, 1 + rnd() * 2); } }
+function scroll(g, x, y, s, flip = 1) { // filigree curl
+  g.beginPath(); g.moveTo(x, y); g.bezierCurveTo(x + 30 * s * flip, y - 26 * s, x + 64 * s * flip, y + 10 * s, x + 40 * s * flip, y + 30 * s);
+  g.bezierCurveTo(x + 22 * s * flip, y + 44 * s, x + 6 * s * flip, y + 22 * s, x + 22 * s * flip, y + 14 * s); g.stroke();
+  g.beginPath(); g.moveTo(x + 40 * s * flip, y + 30 * s); g.quadraticCurveTo(x + 70 * s * flip, y + 50 * s, x + 96 * s * flip, y + 34 * s); g.stroke();
+}
+function engrave(g, w, h, base) { // gold: brushed gradient, filigree with light/dark edge, border bands, wear
+  const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, base ? '#f0c76c' : '#fff'); gr.addColorStop(0.55, base ? '#d6a14b' : '#fff'); gr.addColorStop(1, base ? '#a8722f' : '#fff');
+  g.fillStyle = base ? gr : '#808080'; g.fillRect(0, 0, w, h);
+  if (base) { for (let i = 0; i < 260; i++) { g.strokeStyle = `rgba(${rnd() < 0.5 ? '255,236,180' : '120,70,20'},0.05)`; g.lineWidth = 1; const y = rnd() * h; g.beginPath(); g.moveTo(0, y); g.lineTo(w, y + (rnd() - 0.5) * 6); g.stroke(); } }
+  const draw = (col, off, lw) => { g.strokeStyle = col; g.lineWidth = lw; g.save(); g.translate(off, off);
+    for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) scroll(g, 20 + c * 128, 40 + r * 128, 0.9, (r + c) % 2 ? 1 : -1);
+    g.strokeRect(14, 14, w - 28, h - 28); g.strokeRect(26, 26, w - 52, h - 52); g.restore(); };
+  if (base) { draw('rgba(255,238,190,0.55)', -1.5, 3); draw('rgba(92,52,14,0.75)', 1.5, 3); noiseSpeckle(g, w, h, 900, ['rgba(80,45,10,0.25)', 'rgba(255,240,200,0.25)']); }
+  else draw('#000', 0, 5);
+}
+const goldMap = tex(512, 512, (g, w, h) => engrave(g, w, h, true));
+const goldBump = tex(512, 512, (g, w, h) => engrave(g, w, h, false), { srgb: false });
+const quilt = (g, w, h, base) => { // navy padded undersuit: diamond quilting with stitches
+  g.fillStyle = base ? '#1d2649' : '#808080'; g.fillRect(0, 0, w, h);
+  const s = 64;
+  for (let y = -s; y < h + s; y += s) for (let x = -s; x < w + s; x += s) {
+    const gr = g.createRadialGradient(x + s / 2, y + s / 2, 2, x + s / 2, y + s / 2, s * 0.7);
+    gr.addColorStop(0, base ? 'rgba(80,96,160,0.35)' : 'rgba(255,255,255,0.8)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr;
+    g.beginPath(); g.moveTo(x + s / 2, y); g.lineTo(x + s, y + s / 2); g.lineTo(x + s / 2, y + s); g.lineTo(x, y + s / 2); g.closePath(); g.fill();
+  }
+  g.strokeStyle = base ? 'rgba(8,10,24,0.8)' : '#000'; g.lineWidth = 3;
+  for (let k = -h; k < w + h; k += s) { g.beginPath(); g.moveTo(k, 0); g.lineTo(k + h, h); g.stroke(); g.beginPath(); g.moveTo(k + h, 0); g.lineTo(k, h); g.stroke(); }
+  if (base) { g.fillStyle = 'rgba(170,180,230,0.35)'; for (let k = -h; k < w + h; k += s) for (let t = 0; t < h; t += 9) { g.fillRect(k + t + 4, t, 2, 2); g.fillRect(k + h - t + 4, t, 2, 2); } }
+};
+const navyMap = tex(512, 512, (g, w, h) => quilt(g, w, h, true), { repeat: [2, 2] });
+const navyBump = tex(512, 512, (g, w, h) => quilt(g, w, h, false), { srgb: false, repeat: [2, 2] });
+const cloth = (g, w, h, base, borderAt = 'bottom') => { // royal blue cloth: weave, painted folds, embroidered gold border
+  g.fillStyle = base ? '#2453cf' : '#808080'; g.fillRect(0, 0, w, h);
+  for (let x = 0; x < w; x++) { const f = Math.sin(x / w * Math.PI * 7 + Math.sin(x / 37) * 0.8); g.fillStyle = base ? (f > 0 ? `rgba(140,170,255,${f * 0.12})` : `rgba(6,10,50,${-f * 0.28})`) : `rgba(${f > 0 ? 255 : 0},${f > 0 ? 255 : 0},${f > 0 ? 255 : 0},${Math.abs(f) * 0.5})`; g.fillRect(x, 0, 1, h); }
+  if (base) { for (let y = 0; y < h; y += 3) { g.fillStyle = 'rgba(0,0,30,0.08)'; g.fillRect(0, y, w, 1); } noiseSpeckle(g, w, h, 1500, ['rgba(255,255,255,0.05)', 'rgba(0,0,40,0.12)']);
+    const vg = g.createLinearGradient(0, 0, 0, h); vg.addColorStop(0, 'rgba(0,0,20,0.3)'); vg.addColorStop(0.3, 'rgba(0,0,0,0)'); g.fillStyle = vg; g.fillRect(0, 0, w, h); }
+  const by = borderAt === 'bottom' ? h - 70 : 0;
+  g.fillStyle = base ? '#c99640' : '#ffffff'; g.fillRect(0, by + 8, w, 54);
+  g.fillStyle = base ? '#16306f' : '#202020'; g.fillRect(0, by + 18, w, 34);
+  g.strokeStyle = base ? '#f2cb72' : '#ffffff'; g.lineWidth = 4;
+  for (let x = 0; x < w; x += 40) { g.beginPath(); g.moveTo(x, by + 35); g.lineTo(x + 20, by + 22); g.lineTo(x + 40, by + 35); g.lineTo(x + 20, by + 48); g.closePath(); g.stroke(); }
+  if (base) { g.fillStyle = '#79e9ff'; for (let x = 20; x < w; x += 40) { g.fillRect(x - 3, by + 32, 6, 6); } }
+};
+const clothMap = tex(512, 512, (g, w, h) => cloth(g, w, h, true));
+const clothBump = tex(512, 512, (g, w, h) => cloth(g, w, h, false), { srgb: false });
+const mail = (g, w, h, base) => { g.fillStyle = base ? '#3a4566' : '#000'; g.fillRect(0, 0, w, h); for (let y = 0; y < h + 12; y += 10) for (let x = 0; x < w + 12; x += 12) { const ox = (y / 10) % 2 ? 6 : 0; g.strokeStyle = base ? 'rgba(170,185,225,0.85)' : '#fff'; g.lineWidth = 2.5; g.beginPath(); g.arc(x + ox, y, 5.5, 0.2, Math.PI - 0.2); g.stroke(); if (base) { g.strokeStyle = 'rgba(10,12,30,0.8)'; g.lineWidth = 1.5; g.beginPath(); g.arc(x + ox, y + 2, 5.5, 0.2, Math.PI - 0.2); g.stroke(); } } };
+const mailMap = tex(256, 256, (g, w, h) => mail(g, w, h, true), { repeat: [4, 2] });
+const mailBump = tex(256, 256, (g, w, h) => mail(g, w, h, false), { srgb: false, repeat: [4, 2] });
+const leatherMap = tex(256, 256, (g, w, h) => { g.fillStyle = '#5b3a24'; g.fillRect(0, 0, w, h); noiseSpeckle(g, w, h, 2500, ['rgba(255,220,180,0.06)', 'rgba(20,8,0,0.2)']); g.strokeStyle = 'rgba(230,190,140,0.7)'; g.setLineDash([6, 6]); g.lineWidth = 2; g.beginPath(); g.moveTo(0, 14); g.lineTo(w, 14); g.moveTo(0, h - 14); g.lineTo(w, h - 14); g.stroke(); }, { repeat: [3, 1] });
+const bladeMap = tex(128, 512, (g, w, h) => {
+  const gr = g.createLinearGradient(0, 0, w, 0); gr.addColorStop(0, '#0b4fb8'); gr.addColorStop(0.42, '#7fe6ff'); gr.addColorStop(0.5, '#eaffff'); gr.addColorStop(0.58, '#7fe6ff'); gr.addColorStop(1, '#0b4fb8');
+  g.fillStyle = gr; g.fillRect(0, 0, w, h);
+  g.strokeStyle = '#ffffff'; g.lineWidth = 3; g.lineCap = 'square';
+  for (let i = 0; i < 6; i++) { const y = 60 + i * 70, x = w / 2; g.beginPath(); g.moveTo(x - 10, y); g.lineTo(x + 10, y); g.lineTo(x + 10, y + 16); g.lineTo(x - 4, y + 16); g.lineTo(x - 4, y + 8); g.stroke(); }
+});
+const runeTex = tex(256, 256, g => {
+  g.translate(128, 128); g.lineCap = 'square'; g.lineJoin = 'miter';
+  const sp = [[0, 0], [22, 0], [22, 22], [-30, 22], [-30, -34], [46, -34], [46, 50], [-62, 50], [-62, -66], [70, -66]];
+  for (const [w, a] of [[34, 0.18], [20, 0.5], [10, 1]]) { g.strokeStyle = `rgba(190,248,255,${a})`; g.lineWidth = w; g.beginPath(); sp.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.stroke(); }
+});
+const shieldFace = tex(512, 512, (g, w, h) => { const gr = g.createRadialGradient(w / 2, h * 0.4, 20, w / 2, h / 2, w * 0.7); gr.addColorStop(0, '#26407a'); gr.addColorStop(1, '#0e1530'); g.fillStyle = gr; g.fillRect(0, 0, w, h); noiseSpeckle(g, w, h, 3000, ['rgba(255,255,255,0.04)', 'rgba(0,0,0,0.2)']); g.strokeStyle = 'rgba(201,150,64,0.5)'; g.lineWidth = 6; g.strokeRect(30, 30, w - 60, h - 60); });
+
+// ---------- Materials ----------
+const MAT = {
+  gold: lit({ map: goldMap, bump: goldBump, bumpScale: -2.2, metal: 1 }),
+  goldDark: lit({ color: 0xb08a5a, map: goldMap, bump: goldBump, bumpScale: -2.2, metal: 1 }),
+  navy: lit({ map: navyMap, bump: navyBump, bumpScale: 2.5 }),
+  cloth: lit({ map: clothMap, bump: clothBump, bumpScale: 1.6, side: THREE.DoubleSide }),
+  clothDark: lit({ color: 0x8f9fd8, map: clothMap, bump: clothBump, bumpScale: 1.6, side: THREE.DoubleSide }),
+  mail: lit({ map: mailMap, bump: mailBump, bumpScale: 1.8, metal: 0.4, side: THREE.DoubleSide }),
+  leather: lit({ map: leatherMap }),
+  blade: lit({ map: bladeMap, emissive: 0x1e88e8, ei: 0.3, metal: 0.8 }),
+  face: new THREE.MeshBasicMaterial({ color: 0x03050c }),
+  gem: glowMat(0x6ff0ff, 1.5),
+  shieldFace: lit({ map: shieldFace }),
+};
+
+// ---------- Geometry helpers ----------
+const sm = g => { const m = mergeVertices(g, 1e-4); m.computeVertexNormals(); return m; };
+function mk(geo, mat, parent, pos, rot, scale) { const m = new THREE.Mesh(geo, mat); m.castShadow = m.receiveShadow = true; if (pos) m.position.set(...pos); if (rot) m.rotation.set(...rot); if (scale) m.scale.set(...scale); parent.add(m); return m; }
+function grp(parent, pos = [0, 0, 0], rot) { const g = new THREE.Group(); g.position.set(...pos); if (rot) g.rotation.set(...rot); parent.add(g); return g; }
+const lathe = (pts, seg = 28) => new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), seg);
+const shell = (r, t0, t1, p0 = 0, p1 = Math.PI * 2, seg = 32) => new THREE.SphereGeometry(r, seg, 16, p0, p1, t0, t1);
+const rivet = (parent, pos, r = 0.011) => mk(new THREE.SphereGeometry(r, 10, 8), MAT.gold, parent, pos);
+function rivetRing(parent, radius, y, n, from = 0, to = Math.PI * 2, r) { for (let i = 0; i < n; i++) { const a = from + (to - from) * (i + 0.5) / n; rivet(parent, [Math.sin(a) * radius, y, Math.cos(a) * radius], r); } }
+const band = (r, tube, parent, pos, rot, arc = Math.PI * 2, mat = MAT.goldDark) => mk(new THREE.TorusGeometry(r, tube, 10, 48, arc), mat, parent, pos, rot);
+
+// ---------- The detailed Vanguard ----------
+function buildDetailedVanguard() {
+  const root = new THREE.Group(), body = grp(root);
+  // legs
+  for (const s of [-1, 1]) {
+    const hip = grp(body, [s * 0.135, 0.62, 0]);
+    mk(new RoundedBoxGeometry(0.15, 0.1, 0.27, 3, 0.035), MAT.leather, hip, [0, -0.57, 0.035]);   // boot
+    mk(new RoundedBoxGeometry(0.155, 0.06, 0.09, 3, 0.025), MAT.gold, hip, [0, -0.545, 0.135], [0.25, 0, 0]); // toe cap
+    mk(lathe([[0.072, -0.53], [0.098, -0.47], [0.105, -0.4], [0.094, -0.34], [0.08, -0.31]]), MAT.gold, hip);                              // greave
+    band(0.1, 0.008, hip, [0, -0.47, 0], [Math.PI / 2, 0, 0]);
+    mk(new THREE.BoxGeometry(0.018, 0.17, 0.012), MAT.goldDark, hip, [0, -0.43, 0.102]);
+    const knee = grp(hip, [0, -0.31, 0.045]);
+    mk(sm(shell(0.075, 0, Math.PI * 0.55)), MAT.gold, knee, null, [Math.PI / 2, 0, 0]);
+    mk(new THREE.CylinderGeometry(0.1, 0.06, 0.05, 20, 1, true, -1.2, 2.4), MAT.goldDark, knee, [0, 0.02, -0.02], [0.2, 0, 0]);
+    rivet(knee, [0, 0, 0.075], 0.013);
+    mk(new THREE.CylinderGeometry(0.108, 0.088, 0.3, 24), MAT.navy, hip, [0, -0.15, 0]);                                                     // quilted thigh
+    for (let i = 0; i < 2; i++) { // tassets: curved gold lames
+      const t = mk(new THREE.CylinderGeometry(0.125 - i * 0.01, 0.13 - i * 0.01, 0.085, 24, 1, true, -1.15, 2.3), MAT.gold, hip, [0, -0.04 - i * 0.075, 0.012], [-0.1, 0, 0]);
+      band(0.128 - i * 0.01, 0.006, hip, [0, -0.08 - i * 0.075, 0.012], [Math.PI / 2, 0, 0], 2.3).rotation.z = Math.PI / 2 - 1.15;
+      rivetRing(hip, 0.13 - i * 0.01, -0.03 - i * 0.075, 3, -0.9, 0.9, 0.009);
+    }
+  }
+  // mail skirt, belt, pouches, tabards
+  mk(new THREE.CylinderGeometry(0.2, 0.25, 0.2, 32, 1, true), MAT.mail, body, [0, 0.56, 0]);
+  mk(new THREE.CylinderGeometry(0.212, 0.212, 0.07, 32), MAT.leather, body, [0, 0.665, 0]);
+  const buckle = grp(body, [0, 0.665, 0.215]);
+  mk(new THREE.TorusGeometry(0.04, 0.012, 8, 4), MAT.gold, buckle, null, [0, 0, Math.PI / 4]);
+  mk(new THREE.OctahedronGeometry(0.026), MAT.gem, buckle, [0, 0, 0.006], null, [1, 1, 0.5]);
+  for (const s of [-1, 1]) { const p = mk(new THREE.BoxGeometry(0.075, 0.08, 0.05), MAT.leather, body, [s * 0.16, 0.63, 0.13], [0, s * -0.5, 0]); mk(new THREE.BoxGeometry(0.078, 0.025, 0.054), MAT.leather, p, [0, 0.035, 0.003]); rivet(p, [0, 0.03, 0.03], 0.008); }
+  const tabard = (z, ry) => { const g = new THREE.PlaneGeometry(0.24, 0.34, 6, 10); const p = g.attributes.position; for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i); p.setZ(i, -x * x * 1.6 + (0.21 - y) * 0.12 + Math.sin(x * 40) * 0.006); if (y < -0.2) p.setY(i, y - (Math.abs(x) < 0.03 ? 0.04 : 0)); } g.computeVertexNormals(); const m = mk(g, MAT.cloth, body, [0, 0.5, z], [0, ry, 0]); return m; };
+  tabard(0.2, 0); tabard(-0.19, Math.PI);
+  // torso
+  const torso = grp(body, [0, 0.68, 0]);
+  mk(new THREE.CylinderGeometry(0.22, 0.19, 0.44, 28), MAT.navy, torso, [0, 0.21, 0], null, [1, 1, 0.8]);
+  const chest = mk(new THREE.LatheGeometry([[0.2, 0.0], [0.245, 0.1], [0.265, 0.22], [0.25, 0.33], [0.2, 0.41], [0.15, 0.44]].map(([r, y]) => new THREE.Vector2(r, y)), 32, -Math.PI / 2 - 0.2, Math.PI + 0.4), MAT.gold, torso, [0, 0.02, 0.0], null, [1, 1, 0.86]); // breastplate
+  mk(new THREE.BoxGeometry(0.014, 0.22, 0.02), MAT.goldDark, torso, [0, 0.21, 0.205]);                                                      // central ridge
+  for (let i = 0; i < 3; i++) { mk(new THREE.CylinderGeometry(0.2 - i * 0.008, 0.205 - i * 0.008, 0.055, 28, 1, true, -1.5, 3.0), MAT.gold, torso, [0, 0.04 - i * 0.05, 0.005], null, [1, 1, 0.82]); band(0.2 - i * 0.008, 0.005, torso, [0, 0.015 - i * 0.05, 0.005], [Math.PI / 2, 0, Math.PI / 2 - 1.5], 3.0).scale.set(1, 0.82, 1); }
+  const gemFrame = grp(torso, [0, 0.27, 0.215], [-0.15, 0, 0]);
+  mk(new THREE.TorusGeometry(0.058, 0.014, 8, 4), MAT.gold, gemFrame, null, [0, 0, Math.PI / 4]);
+  mk(new THREE.OctahedronGeometry(0.046), MAT.gem, gemFrame, [0, 0, 0.004], null, [1, 1.15, 0.45]);
+  for (const [x, y] of [[-0.085, 0], [0.085, 0], [0, 0.09], [0, -0.09]]) rivet(gemFrame, [x, y, 0], 0.01);
+  band(0.15, 0.03, torso, [0, 0.44, 0], [Math.PI / 2, 0, 0], Math.PI * 2, MAT.gold);  // gorget
+  band(0.165, 0.012, torso, [0, 0.42, 0], [Math.PI / 2, 0, 0]);
+  // pauldrons: four engraved lames, trim, rivets, spike
+  for (const s of [-1, 1]) {
+    const pg = grp(torso, [s * 0.3, 0.4, 0], [0, 0, s * -0.5]);
+    for (let i = 0; i < 4; i++) {
+      const r = 0.2 - i * 0.018, y = -i * 0.045, x = s * i * 0.03;
+      mk(sm(shell(r, 0, Math.PI * 0.5)), i % 2 ? MAT.goldDark : MAT.gold, pg, [x, y, 0], null, [1.12, 0.62, 1.05]);
+      band(r * 1.12, 0.008, pg, [x, y, 0], [Math.PI / 2, 0, 0]).scale.set(1, 1.05 / 1.12, 1);
+      if (i === 0) rivetRing(pg, r * 1.05, y + 0.012, 8, 0, Math.PI * 2, 0.01);
+    }
+    mk(new THREE.ConeGeometry(0.025, 0.09, 12), MAT.gold, pg, [s * 0.02, 0.13, 0], [0, 0, s * -0.3]);
+    mk(new THREE.PlaneGeometry(0.2, 0.16, 4, 4), MAT.clothDark, pg, [s * 0.05, -0.13, 0.0], [0, s * Math.PI / 2, 0]);
+  }
+  // arms
+  const arm = s => {
+    const sh = grp(torso, [s * 0.34, 0.31, 0]);
+    mk(new THREE.CylinderGeometry(0.085, 0.075, 0.22, 20), MAT.navy, sh, [0, -0.12, 0]);
+    const elbow = grp(sh, [0, -0.25, 0]);
+    mk(sm(shell(0.068, 0, Math.PI * 0.6)), MAT.gold, elbow, null, [-Math.PI / 2, 0, 0]);
+    mk(new THREE.CylinderGeometry(0.1, 0.05, 0.04, 20, 1, true, Math.PI - 1, 2), MAT.goldDark, elbow, [0, 0, -0.03], [-0.3, 0, 0]);
+    rivet(elbow, [0, 0, -0.07], 0.012);
+    mk(lathe([[0.068, 0.0], [0.082, -0.06], [0.1, -0.15], [0.116, -0.19], [0.1, -0.2]]), MAT.gold, sh, [0, -0.26, 0]);                      // vambrace + flared cuff
+    band(0.084, 0.007, sh, [0, -0.33, 0], [Math.PI / 2, 0, 0]);
+    const hand = grp(sh, [0, -0.47, 0.01]);
+    mk(new THREE.BoxGeometry(0.09, 0.085, 0.1), MAT.navy, hand);
+    for (let i = 0; i < 4; i++) mk(new THREE.BoxGeometry(0.022, 0.03, 0.105), MAT.gold, hand, [-0.033 + i * 0.022, 0.035, 0.002]);
+    return sh;
+  };
+  const armR = arm(-1), armL = arm(1);
+  // hood + mantle
+  const head = grp(torso, [0, 0.61, 0.01]);
+  { const hg = sm(shell(0.19, 0, Math.PI * 0.86, Math.PI / 2 + 0.58, Math.PI * 2 - 1.16, 40)); const hp = hg.attributes.position; for (let i = 0; i < hp.count; i++) { const x = hp.getX(i), y = hp.getY(i), z = hp.getZ(i), a = Math.atan2(x, z), k = 1 + 0.05 * Math.sin(a * 7) * (0.6 - y / 0.19 * 0.5) + (y > 0.12 ? (z < 0 ? 0.25 * (y - 0.12) / 0.07 : 0) : 0); hp.setXYZ(i, x * k, y, z * k); } hg.computeVertexNormals(); mk(hg, MAT.cloth, head, null, null, [1.04, 1.2, 1.14]); }
+  mk(new THREE.SphereGeometry(0.15, 24, 16), MAT.face, head, [0, -0.01, 0.03], null, [1, 1.05, 0.8]);
+  const hem = band(0.112, 0.022, head, [0, -0.005, 0.15], [0, 0, 0], Math.PI * 2, MAT.clothDark); hem.scale.set(0.82, 1.22, 1);
+  mk(new THREE.ConeGeometry(0.09, 0.22, 20), MAT.cloth, head, [0, 0.16, -0.1], [-0.75, 0, 0]);
+  { const cw = new THREE.CylinderGeometry(0.16, 0.27, 0.32, 40, 6, true, Math.PI * 0.55, Math.PI * 0.9); const cq = cw.attributes.position; for (let i = 0; i < cq.count; i++) { const x = cq.getX(i), y = cq.getY(i), z = cq.getZ(i), a = Math.atan2(x, z), k = 1 + 0.07 * Math.sin(a * 9) * (0.5 - y / 0.32); cq.setXYZ(i, x * k, y, z * k); } cw.computeVertexNormals(); mk(cw, MAT.cloth, head, [0, -0.14, -0.02]); } // draped cowl down the back
+  for (const s of [-1, 1]) mk(new THREE.BoxGeometry(0.052, 0.014, 0.01), MAT.gem, head, [s * 0.046, 0.0, 0.142], [0, s * 0.25, s * 0.28]);
+  const eyeGlow = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.08), new THREE.MeshBasicMaterial({ color: new THREE.Color(0x5fe3ff).multiplyScalar(0.4), transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending, depthWrite: false })); eyeGlow.position.set(0, 0, 0.15); head.add(eyeGlow);
+  const mantle = new THREE.CylinderGeometry(0.13, 0.28, 0.17, 40, 3, true); const mp = mantle.attributes.position;
+  for (let i = 0; i < mp.count; i++) { const a = Math.atan2(mp.getX(i), mp.getZ(i)), y = mp.getY(i); if (y < -0.05) mp.setY(i, y - 0.03 * (1 + Math.sin(a * 6))); }
+  mantle.computeVertexNormals(); mk(mantle, MAT.cloth, torso, [0, 0.47, -0.01]);
+  // cape with folds, embroidered hem, tattered points
+  const capeGeo = new THREE.PlaneGeometry(0.72, 1.02, 18, 20); const cp = capeGeo.attributes.position;
+  for (let i = 0; i < cp.count; i++) { const x = cp.getX(i), y = cp.getY(i), t = 0.51 - y;
+    const hem = y < -0.5 ? -0.07 * (0.5 + 0.5 * Math.cos(x * 44)) : 0;
+    cp.setXYZ(i, x * (0.7 + t * 0.62), y + hem, -Math.pow(t, 1.5) * 0.24 - x * x * 0.5 + Math.sin(x * 15 + t * 2) * 0.05 * Math.min(1, t * 1.6)); }
+  capeGeo.computeVertexNormals(); capeGeo.translate(0, -0.51, 0);
+  const cape = mk(capeGeo, MAT.clothDark, torso, [0, 0.44, -0.2]);
+  // sword
+  const sword = grp(armR, [0, -0.47, 0.03]);
+  const bs = new THREE.Shape(); bs.moveTo(0, 0); bs.lineTo(0.055, 0.06); bs.lineTo(0.05, 0.8); bs.quadraticCurveTo(0.03, 0.92, 0, 0.98); bs.quadraticCurveTo(-0.03, 0.92, -0.05, 0.8); bs.lineTo(-0.055, 0.06); bs.closePath();
+  const bg = new THREE.ExtrudeGeometry(bs, { depth: 0.012, bevelEnabled: true, bevelThickness: 0.014, bevelSize: 0.016, bevelSegments: 3, curveSegments: 12 });
+  // remap UVs so the blade texture runs along the length
+  { const uv = bg.attributes.uv, p = bg.attributes.position; for (let i = 0; i < uv.count; i++) uv.setXY(i, (p.getX(i) + 0.07) / 0.14, p.getY(i) / 0.98); }
+  bg.translate(0, 0, -0.006);
+  const bladeG = grp(sword, [0, 0, 0], [0, 0, Math.PI / 2]); mk(bg, MAT.blade, bladeG, [0, 0, 0.12], [Math.PI / 2, 0, 0]);
+  const guard = new THREE.Shape(); guard.moveTo(-0.17, 0.02); guard.quadraticCurveTo(-0.1, -0.03, 0, -0.025); guard.quadraticCurveTo(0.1, -0.03, 0.17, 0.02); guard.lineTo(0.15, 0.045); guard.quadraticCurveTo(0.08, 0.015, 0, 0.03); guard.quadraticCurveTo(-0.08, 0.015, -0.15, 0.045); guard.closePath();
+  mk(new THREE.ExtrudeGeometry(guard, { depth: 0.035, bevelEnabled: true, bevelThickness: 0.008, bevelSize: 0.008, bevelSegments: 2, curveSegments: 10 }), MAT.gold, sword, [0, 0.0175, 0.115], [Math.PI / 2, 0, 0]);
+  const gf = grp(sword, [0, 0.03, 0.11], [-Math.PI / 2, 0, 0]);
+  mk(new THREE.TorusGeometry(0.03, 0.01, 8, 4), MAT.gold, gf, null, [0, 0, Math.PI / 4]); mk(new THREE.OctahedronGeometry(0.022), MAT.gem, gf, null, null, [1, 1, 0.5]);
+  mk(new THREE.CylinderGeometry(0.02, 0.022, 0.15, 12), MAT.leather, sword, [0, 0, 0.03], [Math.PI / 2, 0, 0]);
+  for (let i = 0; i < 4; i++) band(0.022, 0.004, sword, [0, 0, -0.02 + i * 0.035], [0, 0, 0]);
+  mk(new THREE.OctahedronGeometry(0.032), MAT.gold, sword, [0, 0, -0.06]);
+  // shield
+  const shield = grp(armL, [0.08, -0.4, 0.1], [0, 0.55, 0]);
+  const heater = k => { const s = new THREE.Shape(); s.moveTo(-0.27 * k, 0.32 * k); s.quadraticCurveTo(0, 0.36 * k, 0.27 * k, 0.32 * k); s.lineTo(0.29 * k, 0.06 * k); s.quadraticCurveTo(0.26 * k, -0.26 * k, 0, -0.44 * k); s.quadraticCurveTo(-0.26 * k, -0.26 * k, -0.29 * k, 0.06 * k); s.closePath(); return s; };
+  const rim = new THREE.ExtrudeGeometry(heater(1), { depth: 0.03, bevelEnabled: true, bevelThickness: 0.022, bevelSize: 0.022, bevelSegments: 3, curveSegments: 16 });
+  { const uv = rim.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 1.6 + 0.5, uv.getY(i) * 1.6 + 0.5); }
+  mk(rim, MAT.gold, shield, [0, 0, -0.02]);
+  const face = new THREE.ExtrudeGeometry(heater(0.83), { depth: 0.02, bevelEnabled: true, bevelThickness: 0.012, bevelSize: 0.012, bevelSegments: 3, curveSegments: 16 });
+  { const uv = face.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 1.7 + 0.5, uv.getY(i) * 1.3 + 0.55); }
+  mk(face, MAT.shieldFace, shield, [0, 0.005, 0.028]);
+  const runeM = new THREE.Mesh(new THREE.PlaneGeometry(0.36, 0.36), new THREE.MeshBasicMaterial({ map: runeTex, color: new THREE.Color(0x5fe3ff).multiplyScalar(2.3), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })); runeM.position.set(0, -0.02, 0.065); shield.add(runeM);
+  for (let i = 0; i < 14; i++) { const t = i / 14; const pts = heater(0.93).getSpacedPoints(14); const p = pts[i]; rivet(shield, [p.x, p.y, 0.05], 0.012); }
+  for (const s of [-1, 1]) mk(new THREE.BoxGeometry(0.04, 0.12, 0.02), MAT.goldDark, shield, [s * 0.2, 0.2, 0.055], [0, 0, s * 0.6]);
+  return { root, body, torso, armL, armR, cape, sword, shield };
+}
+
+// ---------- Stage: dark vignette backdrop, slate plinth, warm key, cool fill, teal-violet rim ----------
+scene.add(new THREE.HemisphereLight(0x8f86d6, 0x241a3e, 0.9));
+const key = new THREE.DirectionalLight(0xffdcae, 2.0); key.position.set(-2.2, 3.4, 2.6); key.castShadow = true; key.shadow.mapSize.set(2048, 2048);
+Object.assign(key.shadow.camera, { left: -2, right: 2, top: 2.5, bottom: -0.5, near: 0.5, far: 10 }); key.shadow.bias = -0.0004; key.shadow.normalBias = 0.01; scene.add(key);
+const rim = new THREE.DirectionalLight(0xb8a6ff, 1.4); rim.position.set(2.5, 2.2, -2.5); scene.add(rim);
+const fill = new THREE.PointLight(0xcdbcff, 1.4, 4, 1.5); fill.position.set(0.8, 1.0, 1.3); scene.add(fill);
+const bgMat = new THREE.ShaderMaterial({ depthWrite: false, vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.9999, 1.); }',
+  fragmentShader: 'varying vec2 vUv; void main(){ float d = length((vUv - vec2(0.5, 0.55)) * vec2(1.6, 1.0)); vec3 c = mix(vec3(0.24, 0.20, 0.42), vec3(0.04, 0.05, 0.11), smoothstep(0.0, 0.9, d)); gl_FragColor = vec4(c, 1.); }' });
+const bg = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), bgMat); bg.frustumCulled = false; bg.renderOrder = -1; scene.add(bg);
+const plinth = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.95, 0.08, 64), lit({ color: 0x3d4d6e })); plinth.position.y = -0.04; plinth.receiveShadow = true; scene.add(plinth);
+const ring = new THREE.Mesh(new THREE.TorusGeometry(0.92, 0.012, 8, 96), lit({ color: 0xc38d46, metal: 1 })); ring.rotation.x = Math.PI / 2; scene.add(ring);
+
+const v = buildDetailedVanguard(); scene.add(v.root);
+// heroic ready stance
+v.armR.rotation.set(-0.5, 0.15, -0.35); v.armL.rotation.set(-0.85, 0, 0.25); v.body.rotation.x = 0.05; v.cape.rotation.x = 0.2;
+v.root.rotation.y = +(QS.get('yaw') ?? -0.45);
+
+// ---------- Post: MSAA, outlines, bloom, grade (same chain as the arena mockup) ----------
+const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(innerWidth, innerHeight, { samples: 4, type: THREE.HalfFloatType }));
+composer.addPass(new RenderPass(scene, camera));
+const nT = new THREE.WebGLRenderTarget(innerWidth, innerHeight, { depthTexture: new THREE.DepthTexture(innerWidth, innerHeight), type: THREE.HalfFloatType });
+const outline = new ShaderPass({ uniforms: { tDiffuse: { value: null }, tN: { value: null }, tD: { value: null }, res: { value: new THREE.Vector2() }, near: { value: 0.05 }, far: { value: 100 } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }',
+  fragmentShader: `uniform sampler2D tDiffuse, tN, tD; uniform vec2 res; uniform float near, far; varying vec2 vUv;
+    float L(vec2 u){ float z = texture2D(tD, u).x * 2. - 1.; return 2. * near * far / (far + near - z * (far - near)); }
+    vec3 N(vec2 u){ return texture2D(tN, u).xyz * 2. - 1.; }
+    void main(){ vec4 c = texture2D(tDiffuse, vUv); vec2 px = 1.0 / res; float D = L(vUv); vec3 n = N(vUv); float dd = 0., nd = 0.;
+      for (int i = 0; i < 4; i++) { vec2 o = i == 0 ? vec2(px.x, 0) : i == 1 ? vec2(-px.x, 0) : i == 2 ? vec2(0, px.y) : vec2(0, -px.y); dd = max(dd, abs(L(vUv + o) - D)); nd = max(nd, 1. - dot(n, N(vUv + o))); }
+      float e = max(smoothstep(0.02 * D, 0.05 * D, dd), smoothstep(0.35, 0.7, nd) * step(0.01, length(n)) * 0.6);
+      gl_FragColor = vec4(mix(c.rgb, vec3(0.06, 0.04, 0.13) + c.rgb * 0.2, e * 0.7), c.a); }` });
+outline.uniforms.tN.value = nT.texture; outline.uniforms.tD.value = nT.depthTexture; composer.addPass(outline);
+const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.5, 0.4, 0.9); composer.addPass(bloom);
+composer.addPass(new OutputPass());
+const grade = new ShaderPass({ uniforms: { tDiffuse: { value: null }, res: { value: new THREE.Vector2() }, time: { value: 0 } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }',
+  fragmentShader: `uniform sampler2D tDiffuse; uniform vec2 res; uniform float time; varying vec2 vUv; float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+    void main(){ vec3 c = texture2D(tDiffuse, vUv).rgb; float l = dot(c, vec3(.299, .587, .114)); c = mix(c, c * vec3(.92, .9, 1.08), (1. - l) * .35); c = mix(c, c * vec3(1.06, 1., .92), smoothstep(.4, 1., l) * .3);
+      c = mix(vec3(l), c, 1.1); c += (h(vUv * res + time) - .5) * .018; gl_FragColor = vec4(c, 1.); }` });
+composer.addPass(grade);
+const normalMat = new THREE.MeshNormalMaterial({ side: THREE.DoubleSide });
+function normals() { const hide = []; scene.traverse(o => { if (o.isMesh && !(o.material && o.material.isMeshToonMaterial)) { hide.push([o, o.visible]); o.visible = false; } });
+  scene.overrideMaterial = normalMat; renderer.setRenderTarget(nT); renderer.setClearColor(0, 0); renderer.clear(); renderer.render(scene, camera); renderer.setRenderTarget(null); scene.overrideMaterial = null; hide.forEach(([o, vis]) => o.visible = vis); }
+
+// ---------- Camera orbit ----------
+let yaw = 0, pitch = 0.16, dist = +(QS.get('dist') ?? 3.4), drag = null;
+addEventListener('pointerdown', e => drag = [e.clientX, e.clientY, yaw, pitch]);
+addEventListener('pointerup', () => drag = null);
+addEventListener('pointermove', e => { if (!drag) return; yaw = drag[2] - (e.clientX - drag[0]) * 0.008; pitch = Math.max(-0.2, Math.min(1.1, drag[3] + (e.clientY - drag[1]) * 0.005)); });
+addEventListener('wheel', e => { dist = Math.max(1.4, Math.min(6, dist * (1 + Math.sign(e.deltaY) * 0.08))); });
+function resize() { const w = innerWidth, h = innerHeight, pr = renderer.getPixelRatio(); renderer.setSize(w, h, false); composer.setSize(w, h); nT.setSize(w * pr, h * pr); outline.uniforms.res.value.set(w * pr, h * pr); grade.uniforms.res.value.set(w * pr, h * pr); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+addEventListener('resize', resize); resize();
+let t = 0;
+function frame() {
+  requestAnimationFrame(frame); t += 1 / 60;
+  const look = new THREE.Vector3(0, 0.78, 0);
+  camera.position.set(Math.sin(yaw) * dist * Math.cos(pitch), 0.78 + Math.sin(pitch) * dist, Math.cos(yaw) * dist * Math.cos(pitch)); camera.lookAt(look);
+  v.body.position.y = Math.sin(t * 1.8) * 0.006; v.cape.rotation.x = 0.2 + Math.sin(t * 1.4) * 0.04;
+  grade.uniforms.time.value = t; normals(); composer.render();
+}
+frame();
+</script>
+</body>
+</html>
