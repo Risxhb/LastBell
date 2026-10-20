@@ -1,0 +1,62 @@
+{
+  "evidenceType": "verification-runner-error-path-checks",
+  "fixtureReportsAreSynthetic": true,
+  "checks": [
+    {
+      "name": "valid-quick",
+      "passed": true,
+      "exitCode": 0
+    },
+    {
+      "name": "valid-full",
+      "passed": true,
+      "exitCode": 0
+    },
+    {
+      "name": "nonzero-exit",
+      "passed": true,
+      "exitCode": 1
+    },
+    {
+      "name": "reported-failure",
+      "passed": true,
+      "exitCode": 1
+    },
+    {
+      "name": "missing-report",
+      "passed": true,
+      "exitCode": 1
+    },
+    {
+      "name": "malformed-report",
+      "passed": true,
+      "exitCode": 1
+    },
+    {
+      "name": "empty-checks",
+      "passed": true,
+      "exitCode": 1
+    },
+    {
+      "name": "missing-repeat",
+      "passed": true,
+      "exitCode": 1
+    },
+    {
+      "name": "failed-case",
+      "passed": true,
+      "exitCode": 1
+    },
+    {
+      "name": "missing-scope",
+      "passed": true,
+      "exitCode": 1
+    },
+    {
+      "name": "changed-source",
+      "passed": true,
+      "exitCode": 1
+    }
+  ],
+  "failures": []
+}

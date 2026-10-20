@@ -2,6 +2,8 @@
 
 Proposed U3 review checklist for the foundation/session owner and networking owner. This document does not select a Unity editor version, networking package or production protocol. The [endurance evidence](network-endurance.md) validates a standalone candidate; every unchecked item below remains open.
 
+Begin with the [integration handoff](network-integration-handoff.md) for dependency order, callable API signatures and unresolved seams. Run `pwsh -NoProfile -File tools/net-test/verify.ps1` for the combined standalone baseline; this does not check off Unity/human acceptance.
+
 ## Agree before wiring the candidate
 
 - [ ] Choose reliable ordered whole-input delivery or the separate ability request/confirmation candidate. Review PR #15 → #19 → #20 → #21 and the endurance follow-up as a dependency stack; record the accepted contract.

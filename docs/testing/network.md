@@ -2,6 +2,8 @@
 
 Production engine is Unity/C#. The [migration plan in PR #13](https://github.com/Risxhb/collab/blob/docs/2-5d-isometric-direction/docs/plans/unity-migration.md) governs this work. Owner: chzy18/codex, [#7](https://github.com/Risxhb/collab/issues/7). The [foundation lane](https://github.com/Risxhb/collab/issues/6) owns exact editor/packages, shared assembly/scene wiring and U3 combat contracts.
 
+This page records the PR #15 rules baseline. Begin with the current [network integration handoff](network-integration-handoff.md) for the complete candidate stack, callable interfaces and remaining decisions. Run `pwsh -NoProfile -File tools/net-test/verify.ps1` to verify all five standalone suites; see the [runner guide](../../tools/net-test/README.md) for reports and profiles.
+
 ## Migration disposition
 
 | Prior work in PR #14 | Current treatment |
