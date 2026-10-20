@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dais Look Study</title>
+<style>
+html, body { margin: 0; height: 100%; overflow: hidden; background: #141a30; }
+canvas { display: block; }
+#vig { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 48%, transparent 45%, #0a0f22aa 100%); }
+#tabs { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; gap: 8px; font-family: Georgia, serif; }
+#tabs a { padding: 7px 14px; font-size: 15px; color: #f3ead6; text-decoration: none; background: #0d1422e0; border: 1px solid #c38d4688; border-radius: 8px; }
+#tabs a.on { background: #c38d46; color: #101825; }
+body.clean #tabs { display: none; }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas><div id="vig"></div>
+<div id="tabs"><a href="?view=ref">Reference angle</a><a href="?view=game">Whole dais</a></div>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+// Look study: the Bellkeeper's Dais rebuilt from panel 7 ("In-game environment context") of
+// Reference/LAST-BELL-VANGUARD-MOCKUP.png. Slate flagstones with gold-filled cracks, curved ochre
+// block walkways with brass edges, a brass clock wheel set into the floor, navy pillars with brass
+// bands and hanging gold-emblem banners. Size follows option B of arena-size.html (24 m round dais).
+// ?view=ref copies the panel's close high angle; ?view=game frames the whole dais. 1 unit = 1 m.
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const Q = new URLSearchParams(location.search), VIEW = Q.get('view') || 'ref';
+if (Q.has('clean')) document.body.classList.add('clean');
+document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.search === `?view=${VIEW}`));
+const R = 12;            // playable radius
+const BAND_IN = [3.0, 3.7], BAND_OUT = [7.0, 7.8], SPOKE_W = 1.5, SPOKE_ANG = [Math.PI / 4, 3 * Math.PI / 4, 5 * Math.PI / 4, 7 * Math.PI / 4];
+
+// ---- small helpers ----
+function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const hash = (x, y) => { const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); };
+function vnoise(x, y) { const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+  const a = hash(xi, yi), b = hash(xi + 1, yi), c = hash(xi, yi + 1), d = hash(xi + 1, yi + 1); return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v; }
+const fbm = (x, y) => vnoise(x, y) * 0.55 + vnoise(x * 2.1, y * 2.1) * 0.3 + vnoise(x * 4.3, y * 4.3) * 0.15;
+const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const mix = (a, b, t) => a + (b - a) * t;
+
+// ---- floor painter: Voronoi flagstones + ochre block walkways, colour and height in one pass ----
+// Returns { map, bump } canvases covering [-E, E] metres.
+function paintFloor(N, E, seed, tone = 1) {
+  const rnd = mulberry32(seed), cell = 1.05, G = Math.ceil(2 * E / cell) + 2, seeds = [];
+  for (let j = 0; j < G; j++) for (let i = 0; i < G; i++) seeds.push([-E + (i - 0.5 + 0.15 + rnd() * 0.7) * cell, -E + (j - 0.5 + 0.15 + rnd() * 0.7) * cell, rnd(), rnd()]);
+  const map = document.createElement('canvas'), bump = document.createElement('canvas'); map.width = map.height = bump.width = bump.height = N;
+  const mc = map.getContext('2d'), bc = bump.getContext('2d'), mi = mc.createImageData(N, N), bi = bc.createImageData(N, N), md = mi.data, bd = bi.data;
+  const LX = -0.62, LZ = -0.78; // light from the upper left of the picture
+  for (let py = 0; py < N; py++) {
+    const z = -E + (py + 0.5) / N * 2 * E;
+    for (let px = 0; px < N; px++) {
+      const x = -E + (px + 0.5) / N * 2 * E, o = (py * N + px) * 4;
+      const r = Math.hypot(x, z), ang = Math.atan2(z, x);
+      let cr, cg, cb, h;
+      // walkway membership: rings and four diagonal spokes from the outer ring to the rim
+      let band = null;
+      if (tone === 1) {
+        if (r >= BAND_IN[0] && r <= BAND_IN[1]) band = { u: ang * (BAND_IN[0] + BAND_IN[1]) / 2, v: (r - BAND_IN[0]) / (BAND_IN[1] - BAND_IN[0]), len: 0.75 };
+        else if (r >= BAND_OUT[0] && r <= BAND_OUT[1]) band = { u: ang * (BAND_OUT[0] + BAND_OUT[1]) / 2, v: (r - BAND_OUT[0]) / (BAND_OUT[1] - BAND_OUT[0]), len: 0.9 };
+        else if (r > BAND_OUT[1] - 0.1) for (const a of SPOKE_ANG) { const ca = Math.cos(a), sa = Math.sin(a), along = x * ca + z * sa, across = -x * sa + z * ca;
+          if (along > 0 && Math.abs(across) <= SPOKE_W / 2) { band = { u: along, v: across / SPOKE_W + 0.5, len: 0.7 }; break; } }
+      }
+      const n = fbm(x * 0.35, z * 0.35), fine = vnoise(x * 6, z * 6);
+      if (band) {
+        // ochre blocks with dark seams, brass lip on both long edges, worn centre
+        const k = band.u / band.len, bi_ = Math.floor(k), f = k - bi_, edge = Math.min(band.v, 1 - band.v);
+        const seam = Math.min(f, 1 - f) * band.len, lip = edge < 0.09;
+        const vv = hash(bi_, 7) * 0.16 - 0.08 + (n - 0.5) * 0.25 + (fine - 0.5) * 0.08;
+        cr = 176 + vv * 110; cg = 128 + vv * 85; cb = 62 + vv * 45;
+        const shade = (band.v - 0.5) * -0.18; cr *= 1 + shade; cg *= 1 + shade; cb *= 1 + shade;
+        if (lip) { const t = edge / 0.09; cr = mix(120, 232, t); cg = mix(78, 182, t); cb = mix(30, 92, t); }
+        h = lip ? 0.85 : 1;
+        if (seam < 0.03 && !lip) { cr *= 0.45; cg *= 0.42; cb *= 0.45; h = 0.7; }
+        else if (seam < 0.07 && !lip) { const t = (seam - 0.03) / 0.04, side = f < 0.5 ? 1.12 : 0.86; cr *= mix(side, 1, t); cg *= mix(side, 1, t); cb *= mix(side, 1, t); }
+      } else {
+        // two nearest seeds in the 3x3 neighbourhood
+        const gi = Math.floor((x + E) / cell + 0.5), gj = Math.floor((z + E) / cell + 0.5);
+        let d1 = 1e9, d2 = 1e9, s1 = null;
+        for (let j = gj - 1; j <= gj + 1; j++) for (let i = gi - 1; i <= gi + 1; i++) {
+          if (i < 0 || j < 0 || i >= G || j >= G) continue; const s = seeds[j * G + i], d = Math.hypot(x - s[0], z - s[1]);
+          if (d < d1) { d2 = d1; d1 = d; s1 = s; } else if (d < d2) d2 = d;
+        }
+        const edge = (d2 - d1) * 0.5; // distance to the cell border, roughly
+        const grout = 0.016, bev = 0.07;
+        const vv = (s1[2] - 0.5) * 0.22 + (n - 0.5) * 0.35 + (fine - 0.5) * 0.07, lav = s1[3] * 0.5;
+        cr = (84 + lav * 14) * (1 + vv); cg = (94 + lav * 6) * (1 + vv); cb = (124 + lav * 10) * (1 + vv);
+        if (tone !== 1) { cr *= 0.58; cg *= 0.6; cb *= 0.68; }
+        // bevel: faces toward the light brighten, away darken
+        if (edge < bev) {
+          const dx = (x - s1[0]) / (d1 + 1e-6), dz = (z - s1[1]) / (d1 + 1e-6), l = -(dx * LX + dz * LZ), t = 1 - smooth(grout, bev, edge);
+          const k = 1 + l * 0.32 * t; cr *= k; cg *= k; cb *= k;
+        }
+        h = 0.55 + 0.45 * smooth(grout * 0.6, bev * 1.4, edge) - (fine < 0.18 ? 0.06 : 0);
+        if (edge < grout) { const gold = hash(Math.floor(x * 3), Math.floor(z * 3)) > 0.985 && tone === 1;
+          if (gold) { cr = 214; cg = 160; cb = 66; } else { cr = 30; cg = 34; cb = 58; } h = 0.25; }
+      }
+      md[o] = Math.min(255, cr); md[o + 1] = Math.min(255, cg); md[o + 2] = Math.min(255, cb); md[o + 3] = 255;
+      const hb = Math.max(0, Math.min(255, h * 255)); bd[o] = bd[o + 1] = bd[o + 2] = hb; bd[o + 3] = 255;
+    }
+  }
+  mc.putImageData(mi, 0, 0); bc.putImageData(bi, 0, 0);
+  // thin cracks, a few of them filled with gold leaf as in the reference
+  const toPx = v => (v + E) / (2 * E) * N;
+  for (let i = 0; i < (tone === 1 ? 70 : 30); i++) {
+    let x = (rnd() * 2 - 1) * E, z = (rnd() * 2 - 1) * E; if (tone === 1 && Math.hypot(x, z) > R) continue;
+    const gold = rnd() < 0.35 && tone === 1;
+    mc.strokeStyle = gold ? 'rgba(226,170,70,0.95)' : 'rgba(24,28,50,0.7)'; mc.lineWidth = gold ? 3 : 2; bc.strokeStyle = 'rgba(40,40,40,0.8)'; bc.lineWidth = 2;
+    mc.beginPath(); bc.beginPath(); mc.moveTo(toPx(x), toPx(z)); bc.moveTo(toPx(x), toPx(z));
+    let a = rnd() * 6.28;
+    for (let s = 0; s < 4 + rnd() * 5; s++) { a += (rnd() - 0.5) * 1.2; x += Math.cos(a) * 0.22; z += Math.sin(a) * 0.22; mc.lineTo(toPx(x), toPx(z)); bc.lineTo(toPx(x), toPx(z)); }
+    mc.stroke(); bc.stroke();
+  }
+  return { map, bump };
+}
+const tex = (c, srgb = true) => { const t = new THREE.CanvasTexture(c); if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; };
+
+// ---- renderer, scene, light ----
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('view'), antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x151b33); scene.fog = new THREE.Fog(0x151b33, 30, 70);
+const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 200);
+scene.add(new THREE.HemisphereLight(0xb0b4f0, 0x2b2650, 0.8));
+const key = new THREE.DirectionalLight(0xffe4bd, 2.1); key.position.set(-10, 20, -6); key.castShadow = true;
+key.shadow.mapSize.set(4096, 4096); Object.assign(key.shadow.camera, { left: -18, right: 18, top: 18, bottom: -18, near: 1, far: 60 });
+key.shadow.bias = -0.0004; key.shadow.normalBias = 0.03; scene.add(key);
+const fill = new THREE.DirectionalLight(0x7f8cff, 0.5); fill.position.set(8, 6, 10); scene.add(fill);
+
+const stoneM = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9, metalness: 0, ...o });
+const brassM = new THREE.MeshStandardMaterial({ color: 0xd9a64c, roughness: 0.38, metalness: 0.75 });
+const brassDarkM = new THREE.MeshStandardMaterial({ color: 0x9b6a2a, roughness: 0.5, metalness: 0.7 });
+const ochreM = stoneM(0xc89548);
+const navyStoneM = stoneM(0x262d52, { roughness: 0.8 });
+function add(geo, mat, parent, pos, rot) { const m = new THREE.Mesh(geo, mat); m.castShadow = m.receiveShadow = true; if (pos) m.position.set(...pos); if (rot) m.rotation.set(...rot); parent.add(m); return m; }
+
+// ---- floor: playable disc, outer apron, ochre curb ----
+const arena = new THREE.Group(); scene.add(arena);
+const inner = paintFloor(3072, R, 3), outer = paintFloor(1536, 22, 9, 0);
+const floorMat = new THREE.MeshStandardMaterial({ map: tex(inner.map), bumpMap: tex(inner.bump, false), bumpScale: 3.5, roughness: 0.88 });
+const disc = add(new THREE.CircleGeometry(R, 128), floorMat, arena, [0, 0, 0], [-Math.PI / 2, 0, 0]);
+// CircleGeometry UVs map local (x, y) in [-R, R] to [0, 1]; after the -90° X turn local +y is world -z, the canvas top row.
+const apron = add(new THREE.RingGeometry(R + 0.9, 22, 128, 1), new THREE.MeshStandardMaterial({ map: tex(outer.map), bumpMap: tex(outer.bump, false), bumpScale: 3, roughness: 0.9 }), arena, [0, -0.35, 0], [-Math.PI / 2, 0, 0]);
+{ const uv = apron.geometry.attributes.uv, p = apron.geometry.attributes.position; for (let i = 0; i < uv.count; i++) uv.setXY(i, (p.getX(i) + 22) / 44, (p.getY(i) + 22) / 44); }
+// curb: a ring of ochre blocks with a brass lip, like the walkway edging in the reference
+for (let i = 0, n = 84; i < n; i++) {
+  const a = (i + 0.5) / n * Math.PI * 2, w = (2 * Math.PI * (R + 0.45)) / n - 0.05;
+  const b = add(new THREE.BoxGeometry(w, 0.32, 0.9), stoneM(new THREE.Color(0xc8964a).multiplyScalar(0.9 + hash(i, 2) * 0.2)), arena, [Math.cos(a) * (R + 0.45), -0.06, Math.sin(a) * (R + 0.45)], [0, -a + Math.PI / 2, 0]);
+}
+add(new THREE.TorusGeometry(R + 0.02, 0.05, 6, 160), brassM, arena, [0, 0.1, 0], [Math.PI / 2, 0, 0]);
+add(new THREE.CylinderGeometry(R + 0.9, R + 0.9, 0.5, 128, 1, true), stoneM(0x1c2242), arena, [0, -0.47, 0]);
+
+// ---- brass clock wheel set into the centre: rims, spokes, hub, teeth ----
+const wheel = new THREE.Group(); arena.add(wheel);
+add(new THREE.CircleGeometry(BAND_IN[0], 96), stoneM(0x2b3260, { roughness: 0.7 }), wheel, [0, 0.004, 0], [-Math.PI / 2, 0, 0]);
+for (const [r, t] of [[2.95, 0.09], [2.55, 0.06], [1.25, 0.07], [0.5, 0.08]]) add(new THREE.TorusGeometry(r, t, 8, 128), brassM, wheel, [0, 0.03, 0], [Math.PI / 2, 0, 0]);
+for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; add(new THREE.BoxGeometry(0.16, 0.08, 2.1), brassM, wheel, [Math.cos(a) * 1.55, 0.04, Math.sin(a) * 1.55], [0, -a + Math.PI / 2, 0]); }
+for (let i = 0; i < 60; i++) { const a = i / 60 * Math.PI * 2, big = i % 5 === 0; add(new THREE.BoxGeometry(big ? 0.09 : 0.04, 0.05, big ? 0.32 : 0.16), big ? brassM : brassDarkM, wheel, [Math.cos(a) * (2.75 - (big ? 0.06 : 0)), 0.03, Math.sin(a) * (2.75 - (big ? 0.06 : 0))], [0, -a + Math.PI / 2, 0]); }
+add(new THREE.CylinderGeometry(0.42, 0.5, 0.14, 24), brassM, wheel, [0, 0.07, 0]);
+add(new THREE.CylinderGeometry(0.18, 0.18, 0.2, 16), brassDarkM, wheel, [0, 0.12, 0]);
+// a second, smaller gear meshing at the edge of the wheel, as in the reference's off-centre mechanism
+const gear = new THREE.Group(); gear.position.set(-1.6, 0, -1.9); wheel.add(gear);
+add(new THREE.TorusGeometry(0.78, 0.07, 8, 64), brassM, gear, [0, 0.07, 0], [Math.PI / 2, 0, 0]);
+for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; add(new THREE.BoxGeometry(0.14, 0.09, 0.16), brassM, gear, [Math.cos(a) * 0.86, 0.07, Math.sin(a) * 0.86], [0, -a, 0]); }
+for (let i = 0; i < 5; i++) { const a = i / 5 * Math.PI * 2; add(new THREE.BoxGeometry(0.08, 0.06, 0.7), brassDarkM, gear, [Math.cos(a) * 0.38, 0.07, Math.sin(a) * 0.38], [0, -a + Math.PI / 2, 0]); }
+
+// ---- banner texture: navy cloth, gold border, bell emblem, swallowtail ----
+function bannerTexture() {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 1280; const g = c.getContext('2d');
+  g.beginPath(); g.moveTo(0, 0); g.lineTo(512, 0); g.lineTo(512, 1120); g.lineTo(256, 1270); g.lineTo(0, 1120); g.closePath();
+  const grd = g.createLinearGradient(0, 0, 512, 0); grd.addColorStop(0, '#141b3d'); grd.addColorStop(0.5, '#25306a'); grd.addColorStop(1, '#141b3d');
+  g.fillStyle = grd; g.fill(); g.save(); g.clip();
+  for (let i = 0; i < 40; i++) { g.fillStyle = `rgba(0,0,0,${0.03 + Math.random() * 0.04})`; g.fillRect(Math.random() * 512, 0, 4 + Math.random() * 14, 1280); }
+  g.restore();
+  g.strokeStyle = '#d9a64c'; g.lineWidth = 14; g.beginPath(); g.moveTo(30, 40); g.lineTo(482, 40); g.lineTo(482, 1100); g.lineTo(256, 1230); g.lineTo(30, 1100); g.closePath(); g.stroke();
+  g.lineWidth = 4; g.beginPath(); g.moveTo(52, 62); g.lineTo(460, 62); g.lineTo(460, 1088); g.lineTo(256, 1204); g.lineTo(52, 1088); g.closePath(); g.stroke();
+  // emblem: a bell inside a toothed ring with rays
+  g.save(); g.translate(256, 560); g.strokeStyle = '#f0bd5c'; g.fillStyle = '#e2ad55'; g.lineWidth = 10;
+  g.beginPath(); g.arc(0, 0, 170, 0, 7); g.stroke();
+  for (let i = 0; i < 24; i++) { const a = i / 24 * Math.PI * 2; g.save(); g.rotate(a); g.fillRect(-7, -196, 14, 22); g.restore(); }
+  for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; g.save(); g.rotate(a); g.beginPath(); g.moveTo(-6, -150); g.lineTo(6, -150); g.lineTo(0, -118); g.fill(); g.restore(); }
+  g.beginPath(); g.moveTo(-26, -96); g.quadraticCurveTo(-30, -112, 0, -112); g.quadraticCurveTo(30, -112, 26, -96);
+  g.bezierCurveTo(70, -80, 64, 10, 92, 60); g.lineTo(-92, 60); g.bezierCurveTo(-64, 10, -70, -80, -26, -96); g.fill();
+  g.fillRect(-104, 58, 208, 18); g.beginPath(); g.arc(0, 98, 20, 0, 7); g.fill();
+  g.strokeStyle = '#1b2350'; g.lineWidth = 6; g.beginPath(); g.moveTo(-50, 20); g.lineTo(50, 20); g.stroke();
+  g.restore();
+  // small ornament near the top and bottom
+  g.fillStyle = '#d9a64c'; for (const y of [150, 960]) { g.beginPath(); g.moveTo(256, y - 34); g.lineTo(290, y); g.lineTo(256, y + 34); g.lineTo(222, y); g.closePath(); g.fill(); }
+  return tex(c);
+}
+const bannerMat = new THREE.MeshStandardMaterial({ map: bannerTexture(), roughness: 0.85, side: THREE.DoubleSide, alphaTest: 0.5, transparent: false });
+const banners = [];
+
+// ---- pillars: navy stone with stepped plinth and capital, brass bands, gold inset strips ----
+function pillar(x, z, h, withBanner) {
+  const p = new THREE.Group(); p.position.set(x, -0.35, z); p.lookAt(0, -0.35, 0); arena.add(p);
+  add(new THREE.BoxGeometry(1.7, 0.5, 1.7), navyStoneM, p, [0, 0.25, 0]);
+  add(new THREE.BoxGeometry(1.45, 0.3, 1.45), brassDarkM, p, [0, 0.62, 0]);
+  add(new THREE.BoxGeometry(1.05, h, 1.05), navyStoneM, p, [0, 0.77 + h / 2, 0]);
+  for (const s of [-1, 1]) for (const face of [0, 1]) { // inset gold strips on all four faces
+    const w = face ? [0.08, h - 0.6, 0.02] : [0.02, h - 0.6, 0.08];
+    add(new THREE.BoxGeometry(...w), brassM, p, face ? [0.28 * s, 0.77 + h / 2, 0.535] : [0.535, 0.77 + h / 2, 0.28 * s]);
+    add(new THREE.BoxGeometry(...w), brassM, p, face ? [0.28 * s, 0.77 + h / 2, -0.535] : [-0.535, 0.77 + h / 2, 0.28 * s]);
+  }
+  for (const y of [1.3, 0.77 + h * 0.62]) add(new THREE.BoxGeometry(1.16, 0.16, 1.16), brassM, p, [0, y, 0]);
+  add(new THREE.BoxGeometry(1.35, 0.35, 1.35), brassDarkM, p, [0, 0.77 + h + 0.17, 0]);
+  add(new THREE.BoxGeometry(1.6, 0.3, 1.6), navyStoneM, p, [0, 0.77 + h + 0.5, 0]);
+  add(new THREE.ConeGeometry(0.35, 0.8, 4), brassM, p, [0, 0.77 + h + 1.05, 0], [0, Math.PI / 4, 0]);
+  if (withBanner) { // banner hung from a brass rod on the arena-facing side
+    add(new THREE.CylinderGeometry(0.05, 0.05, 1.9, 8), brassM, p, [0, 0.77 + h - 0.5, 0.75], [0, 0, Math.PI / 2]);
+    for (const s of [-1, 1]) add(new THREE.SphereGeometry(0.09, 10, 8), brassM, p, [s * 0.98, 0.77 + h - 0.5, 0.75]);
+    const geo = new THREE.PlaneGeometry(1.6, 4.0, 8, 20);
+    const b = add(geo, bannerMat, p, [0, 0.77 + h - 0.5 - 2.0, 0.78]);
+    b.userData.base = geo.attributes.position.array.slice(); banners.push(b);
+  }
+}
+const PILLARS = 12;
+for (let i = 0; i < PILLARS; i++) { const a = (i + 0.5) / PILLARS * Math.PI * 2; pillar(Math.cos(a) * 14.6, Math.sin(a) * 14.6, 5.6, i % 2 === 0); }
+
+// ---- the Vanguard for scale (characters session's model, loaded read-only) ----
+window.THREE = THREE;
+const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: o.metal ? 0.4 : 0.75, metalness: o.metal ? 0.7 : 0, side: o.side || THREE.FrontSide });
+const Gl = (c, k) => new THREE.MeshBasicMaterial({ color: new THREE.Color(c).multiplyScalar(k), toneMapped: false });
+const hero = new THREE.Group(); hero.position.set(-4.9, 0, 5.7); hero.rotation.y = Math.PI * 0.82; scene.add(hero);
+await new Promise(res => { const s = document.createElement('script'); s.src = 'vanguard-model.js'; s.onload = res; s.onerror = res; document.head.appendChild(s); });
+if (typeof window.buildVanguardModel === 'function') { const v = window.buildVanguardModel(M, Gl); const obj = v.root || v; obj.scale.setScalar(1.2); obj.traverse(o => { if (o.isMesh) o.castShadow = true; }); hero.add(obj); }
+else add(new THREE.CapsuleGeometry(0.35, 1, 4, 12), M(0x2050cc), hero, [0, 0.85, 0]);
+
+// ---- post: gentle bloom so brass and glows catch ----
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.35, 0.5, 0.92); composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+// ---- camera ----
+function frame() {
+  const w = innerWidth, h = innerHeight; renderer.setSize(w, h); composer.setSize(w, h); camera.aspect = w / h;
+  if (VIEW === 'game') { camera.fov = 38; camera.position.set(0, 25.5, 19.5); camera.lookAt(0, 0, 0.8); }
+  else { camera.fov = 32; const t = hero.position; camera.position.set(t.x + 0.9, 11, t.z + 7.6); camera.lookAt(t.x + 0.9, 0.5, t.z - 0.7); }
+  camera.updateProjectionMatrix();
+}
+addEventListener('resize', frame); frame();
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const t = clock.getElapsedTime();
+  for (const b of banners) { const p = b.geometry.attributes.position, base = b.userData.base;
+    for (let i = 0; i < p.count; i++) { const y = base[i * 3 + 1], drop = (2 - y) / 4; p.setZ(i, Math.sin(t * 1.3 + y * 1.4 + b.id) * 0.06 * drop + Math.sin(base[i * 3] * 2.5) * 0.04); }
+    p.needsUpdate = true; b.geometry.computeVertexNormals(); }
+  wheel.rotation.y = t * 0.03; gear.rotation.y = -t * 0.11;
+  composer.render();
+});
+</script>
+</body>
+</html>
