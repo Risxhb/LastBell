@@ -13,6 +13,7 @@ namespace LastBell.Network.ActionChecks
         public long Generated, Consumed, Expired, Unknown, Cancelled, Transmissions, Retries, Duplicates, Dropped;
         public long TechniqueConsumed, SignatureConsumed, GuardConsumed;
         public long InvalidResponses, LateConsumptions, DuplicateConsumptions;
+        public long ConfirmationsEncoded, ConfirmationsAccepted;
         public bool Passed;
         public string[] Failures;
     }
@@ -274,10 +275,16 @@ namespace LastBell.Network.ActionChecks
                             Request decoded;
                             if (!RequestCodec.TryDecode(wire, out decoded)) { errors.Add("codec"); return; }
                             Receipt receipt = host.Receive(client.Peer, decoded, link.NowMs);
+                            byte[] receiptWire;
+                            if (!ReceiptCodec.TryEncode(receipt, client.Peer, out receiptWire))
+                            { errors.Add("host confirmation encoding failed"); return; }
+                            result.ConfirmationsEncoded++;
                             Action confirm = () =>
                             {
-                                // Before first send every created request is outstanding, then retained by client history.
-                                if (!client.Client.OnReceipt(receipt)) result.InvalidResponses++;
+                                string reason;
+                                if (!ReceiptIngress.TryApply(receiptWire, 0, 0, client.Peer, client.Client, out reason))
+                                { result.InvalidResponses++; errors.Add("confirmation ingress: " + reason); }
+                                else result.ConfirmationsAccepted++;
                             };
                             if (dropReceipts && client.Peer == clients[count - 1].Peer && link.NowMs >= 1000 && link.NowMs < 1800) return;
                             if (client.Peer == 0) confirm(); else link.Send(client.Peer, confirm);

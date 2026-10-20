@@ -79,7 +79,7 @@ Expiry values are **experimental test settings**, not approved game balance: Gua
 
 Other test settings: retry every 50 ms; stop waiting after 2,000 ms; 32 pending requests, 64 retained terminal results/client records, maximum forward ID jump 64 and 120 requests/peer/second. Backpressure is nonterminal. Repeated expired requests cannot restart execution. Timeout/retention values require actual RTT/loss and gameplay evidence before production selection.
 
-The action request codec is a candidate fixed **56-byte**, little-endian format: ASCII `AP`, version 1, .NET Guid byte order (16 bytes), int32 generation, four int64 fields (ID/created/target/expiry) and one ability byte. Wrong length/header/version/ability is rejected before host rules. Receipts are immutable in-memory objects in the fixture; a bounded receipt wire codec and authoritative routing are still required for a real adapter.
+The action request codec is a candidate fixed **56-byte**, little-endian format: ASCII `AP`, version 1, .NET Guid byte order (16 bytes), int32 generation, four int64 fields (ID/created/target/expiry) and one ability byte. Wrong length/header/version/ability is rejected before host rules. The confirmation-wire follow-up now serializes receipts through a fixed codec and checks authenticated routing metadata; see [the wire format and current evidence](ability-confirmation-wire.md). The original evidence above remains the PR #20 baseline, while the current runner additionally executes the wire-validation suite.
 
 ## Fixture scope and U3 follow-up
 
