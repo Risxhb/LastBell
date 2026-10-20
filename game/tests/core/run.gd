@@ -116,8 +116,13 @@ func _test_reset_and_seed() -> void:
 	for index in range(800):
 		sim.step({1: {"move": Vector2(0.1, -0.1), "basic": true, "guard": true}})
 	sim.reset()
-	check(sim.snapshot() == initial, "Reset restores the full initial snapshot")
+	var restored: Dictionary = sim.snapshot()
+	check(restored.generation == initial.generation + 1, "Reset increments generation to reject stale attempt packets")
+	restored.erase("generation")
+	initial.erase("generation")
+	check(restored == initial, "Reset restores all transient combat state")
 	var baseline := Sim.new()
+	baseline.reset()
 	for index in range(70):
 		var commands := {1: {"move": Vector2(0.5, 0.2)}}
 		sim.step(commands)
@@ -132,14 +137,23 @@ func _test_reset_and_seed() -> void:
 
 func _test_provider_and_snapshot() -> void:
 	var sim := Sim.new()
-	sim.encounter_provider = func(_tick: int, _simulation: RefCounted) -> Array: return []
+	sim.encounter_provider = func(_tick: int, context: Dictionary) -> Array:
+		context.actors[0].hp = 0
+		return []
 	sim.step({})
 	check(sim.hazards.is_empty(), "Encounter provider replaces demo scheduling")
+	check(sim.player.hp == 5, "Encounter provider cannot modify authoritative actor state through context")
 	var copy: Dictionary = sim.snapshot()
 	copy.actors[0].hp = 0
 	copy.actors[0].ready_at.guard = 9999
 	check(sim.player.hp == 5 and sim.player.ready_at.guard == 0, "Snapshot is detached from authoritative state")
 	check(copy.actors[0].position is Array, "Snapshot uses transport-friendly positions")
+	var hazard := shape()
+	sim.player.position = Vector2(75, 0)
+	sim.resolve_hazard(hazard)
+	sim.resolve_hazard(hazard)
+	check(sim.events[1].event_id == sim.events[0].event_id + 1, "Resolved events have monotonic deduplication IDs")
+	check(sim.events[0].generation == sim.generation and sim.events[0].player_id == 1, "Event identity includes attempt and affected actor")
 	sim.player.position = Sim.BOSS_POSITION + Vector2(100, 0)
 	for index in range(4000):
 		sim.step({1: {"basic": true, "technique": true, "signature": true}})

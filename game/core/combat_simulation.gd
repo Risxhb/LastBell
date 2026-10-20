@@ -23,7 +23,9 @@ var events: Array[Dictionary] = []
 var outcome: String = "playing"
 var rng := RandomNumberGenerator.new()
 var next_hazard_id: int = 0
-# Callable(tick, simulation) -> Array[Dictionary]. Empty means use demo schedule.
+var generation: int = 0
+var next_event_id: int = 0
+# Callable(tick, detached_context) -> Array[Dictionary]. Empty means use demo schedule.
 # Provider owns no hidden mutable state; reset must reproduce its output.
 var encounter_provider: Callable
 
@@ -31,6 +33,8 @@ func _init() -> void:
 	reset()
 
 func reset(new_seed: int = 1) -> void:
+	generation += 1
+	next_event_id = 0
 	seed_value = new_seed
 	rng.seed = new_seed
 	tick = 0
@@ -65,7 +69,10 @@ func step(commands: Dictionary) -> void:
 		hazards.clear()
 		return
 	if encounter_provider.is_valid():
-		var scheduled: Array = encounter_provider.call(tick, self)
+		var context := snapshot()
+		context["roster"] = [{"player_id": 1, "class_id": "vanguard", "active": true}]
+		context["phase"] = "scheduling"
+		var scheduled: Array = encounter_provider.call(tick, context)
 		for hazard in scheduled:
 			hazards.append(hazard.duplicate(true))
 	elif tick % 210 == 1:
@@ -119,7 +126,12 @@ func resolve_hazard(hazard: Dictionary) -> void:
 			player.hp = maxi(0, int(player.hp) - 1)
 			player.immune_until = tick + IMMUNITY_TICKS
 			result = "hit"
-	events.append({"tick": tick, "attack_id": hazard.id, "attack_name": hazard.name,
+	next_event_id += 1
+	events.append({"schema_version": 0, "generation": generation, "event_id": next_event_id,
+		"player_id": 1, "type": "mechanic_resolved", "tick": tick,
+		"source_attack_id": hazard.get("source_attack_id", 0),
+		"lock_tick": hazard.get("lock_tick", hazard.warning_tick),
+		"attack_id": hazard.id, "attack_name": hazard.name,
 		"position": [player.position.x, player.position.y], "outcome": result,
 		"required_behavior": "Leave the marked cone" if hazard.kind == "cone" else "Move inside the inner ring or beyond the outer ring",
 		"guarded": guarded, "mechanic_failed": inside})
@@ -134,6 +146,6 @@ func snapshot() -> Dictionary:
 		var shape: Dictionary = hazard.duplicate(true)
 		shape.origin = [hazard.origin.x, hazard.origin.y]
 		shapes.append(shape)
-	return {"schema_version": 0, "tick": tick, "seed": seed_value, "actors": [actor],
+	return {"schema_version": 0, "generation": generation, "tick": tick, "seed": seed_value, "actors": [actor],
 		"boss": {"hp": boss_hp, "max_hp": BOSS_MAX_HP, "position": [BOSS_POSITION.x, BOSS_POSITION.y]},
 		"hazards": shapes, "outcome": outcome, "events": events.duplicate(true)}
