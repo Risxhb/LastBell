@@ -120,7 +120,112 @@ namespace LastBell.Network.SocketPrototype
                                 else if (message.Kind == Op.EventAck && events != null)
                                 {
                                     RuleResult ack = events.ReceiveAck(message.Data, peer.Result.Connection);
-                                    if (!ack.Ok && ack.Reason != "invalid_event_ac…1954 tokens truncated…
+                                    if (!ack.Ok && ack.Reason != "invalid_event_ack") throw new InvalidDataException("event_ack_" + ack.Reason);
+                                }
+                                else if (message.Kind == Op.Quit && message.Data.Length == 0) retire(peer, "client_quit");
+                                else throw new InvalidDataException("unexpected_message");
+                            }
+                            if (!peer.Dead && peer.Channel.Closed) retire(peer, "socket_eof");
+                            if (!peer.Dead && !peer.Joined && clock.ElapsedMilliseconds - peer.AcceptedAt > 3000)
+                                throw new InvalidDataException("hello_timeout");
+                        }
+                        catch (Exception ex) when (ex is InvalidDataException || ex is IOException || ex is SocketException || ex is ArgumentException)
+                        { rejectCount(ex is InvalidDataException ? ex.Message : "socket_error"); retire(peer, ex.Message); }
+                    }
+                    if (startedAt < 0)
+                    {
+                        if (report.AcceptedRemotes == expectedRemotes && all.Count(p => p.Joined && !p.Dead && p.Ready) == expectedRemotes)
+                        {
+                            if (!barrierPublished) { Atomic(Path.Combine(directory, "lobby.txt"), "ready"); barrierPublished = true; }
+                            if (File.Exists(Path.Combine(directory, "start.signal")))
+                            {
+                                RuleResult start = session.Control(0, new ControlRequest(identity, 0, ControlKind.Start), clock.ElapsedMilliseconds);
+                                if (!start.Ok) throw new InvalidOperationException("start: " + start.Reason);
+                                events = new EventSender(identity, session.Generation);
+                                foreach (Remote peer in all.Where(p => p.Joined && !p.Dead))
+                                {
+                                    events.Register(peer.Result.Connection);
+                                    peer.Channel.Send(Op.Start, Payload.Write(w => { w.Write(session.Generation); w.Write(0L); }));
+                                }
+                                startedAt = clock.ElapsedMilliseconds; Atomic(Path.Combine(directory, "running.txt"), "0");
+                            }
+                        }
+                    }
+                    else
+                    {
+                        long target = Math.Min(FinalTick, (clock.ElapsedMilliseconds - startedAt) * 60 / 1000);
+                        int catchup = 0;
+                        while (session.Tick < target && catchup++ < 8)
+                        {
+                            if (session.Tick < ActiveTicks && session.Tick % 3 == 0)
+                            {
+                                sequence++;
+                                var local = new InputRequest(identity, session.Generation, sequence, session.Tick + 1,
+                                    new PlanarMove(0.5, 0), true, false, false, sequence % 5 == 0);
+                                if (!session.SubmitInput(0, local, clock.ElapsedMilliseconds).Ok) throw new InvalidOperationException("local input");
+                            }
+                            foreach (var command in session.Advance())
+                            {
+                                report.Commands++; if (command.Value.Guard) report.GuardCommands++;
+                                if (!commandKeys.Add(session.Tick + "/" + command.Key)) report.DuplicateCommandTicks++;
+                                if (command.Key != 1 && !all.Any(p => p.Joined && !p.Dead && p.Result.PlayerId == command.Key)) report.UnknownActorCommands++;
+                            }
+                            if (session.Tick % 10 == 0)
+                            { eventCounter++; events.Append(session.Tick, "socket_counter", BitConverter.GetBytes(eventCounter)); }
+                            if (session.Tick == ActiveTicks)
+                            { foreach (Remote peer in all.Where(p => p.Joined && !p.Dead)) peer.Channel.Send(Op.StopInput, new byte[0]); stopSent = true; }
+                            if (session.Tick % 3 == 0)
+                            {
+                                SessionSnapshot snapshot = session.Snapshot();
+                                foreach (Remote peer in all.Where(p => p.Joined && !p.Dead))
+                                {
+                                    peer.Result.ProcessedSequence = snapshot.ProcessedSequences[peer.Result.PlayerId];
+                                    peer.Channel.Send(Op.Tick, Payload.Write(w => { w.Write(snapshot.Tick); w.Write(peer.Result.ProcessedSequence); }));
+                                }
+                            }
+                            if (session.Tick % 15 == 0) Atomic(Path.Combine(directory, "running.txt"), session.Tick.ToString());
+                        }
+                        if (clock.ElapsedMilliseconds >= nextEventSend)
+                        {
+                            foreach (Remote peer in all.Where(p => p.Joined && !p.Dead))
+                            {
+                                byte[] packet = events.BuildBatch(peer.Result.Connection);
+                                if (packet == null) packet = events.BuildCheckpoint(peer.Result.Connection, events.LastIssued, session.Tick, BitConverter.GetBytes(eventCounter));
+                                peer.Channel.Send(Op.Events, packet, duplicate: session.Tick >= 20 && session.Tick <= 25);
+                            }
+                            nextEventSend = clock.ElapsedMilliseconds + 50;
+                        }
+                        if (session.Tick == FinalTick)
+                        {
+                            if (drainAt < 0) drainAt = clock.ElapsedMilliseconds;
+                            bool drained = true;
+                            foreach (Remote peer in all.Where(p => p.Joined && !p.Dead))
+                            {
+                                byte[] packet = events.BuildBatch(peer.Result.Connection); EventFrame frame;
+                                if (packet == null || !EventWire.TryDecode(packet, out frame) || frame.Events.Length != 0) drained = false;
+                            }
+                            if (drained) break;
+                            if (clock.ElapsedMilliseconds - drainAt > 3000) throw new TimeoutException("event drain");
+                        }
+                    }
+                    Thread.Sleep(1);
+                }
+                if (session.Tick != FinalTick || !stopSent) failures.Add("run did not finish");
+                foreach (Remote peer in all.Where(p => p.Joined && !p.Dead))
+                {
+                    if (peer.Result.AcceptedSequence != peer.Result.ProcessedSequence) failures.Add("accepted input not consumed for " + peer.Result.PlayerId);
+                    peer.Channel.Send(Op.Shutdown, Payload.Write(w => { w.Write(session.Tick); w.Write(eventCounter); }));
+                }
+                session.Disconnect(0); report.PhaseAfterShutdown = session.Phase.ToString();
+                report.CompletedTicks = session.Tick; report.EventsIssued = eventCounter;
+                if (report.ReadyGateReason != "players_not_ready" || report.AcceptedRemotes != expectedRemotes ||
+                    report.MaxRoster != expectedRemotes + 1 || report.DuplicateCommandTicks != 0 || report.UnknownActorCommands != 0)
+                    failures.Add("session invariants");
+            }
+            catch (Exception ex) { failures.Add(ex.ToString()); }
+            finally
+            {
+                foreach (Remote peer in all)
                 { report.BytesRead += peer.Channel.BytesRead; report.BytesWritten += peer.Channel.BytesWritten; peer.Channel.Dispose(); }
                 listener.Stop();
             }
