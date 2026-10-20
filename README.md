@@ -4,6 +4,8 @@ Private workspace for a two-person project.
 
 ## Start here
 
+- Human project hub: [Project wiki](docs/wiki/README.md), including [work tracking](docs/wiki/work-tracker.md).
+
 - New collaborator: follow [COLLABORATOR-START-HERE.md](COLLABORATOR-START-HERE.md).
 - Use Issues to propose tasks and discuss questions.
 - Give each task one owner and a clear definition of done.
