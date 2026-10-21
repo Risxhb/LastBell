@@ -23,6 +23,7 @@ namespace LastBell.Run
         const float ChorusRadius = 6f;
 
         enum Act { None, Note, Strike, Refrain, Cresc, Chorus }
+        int buffered = -1, bufferAge; const int BufferTicks = 9;   // PF-05 input buffer
         Act act; int t;
         Vector3 aim;
         int noteCd, refrainCd, crescCd, chorusCd, charges = StrikeCharges, recharge;
@@ -49,6 +50,14 @@ namespace LastBell.Run
             _ => chorusCd > 0 ? Sec(chorusCd) : "ready"
         };
         static string Sec(int ticks) => (ticks / (float)Sim.Hz).ToString("0.0") + "s";
+        public override string Tooltip(int s) => s switch
+        {
+            0 => "RESONANT NOTE  [1 / LMB, hold to repeat]\nRanged sound bolt toward the cursor. +1 HARMONY on hit (max 5).",
+            1 => "BELLSTRIKE  [2]\nStrong aimed hit that rings a BELL on the target for 8 s. 2 charges, 6 s recharge each.\nOn a ringing bell: refreshes it and STRENGTHENS stored echoes (x1.5, up to twice).",
+            2 => "HARMONIC REFRAIN  [3]\nDamaging sound wave in a cone. Hitting a ringing bell stores an ECHO worth 60% of the wave.\nMax 2 echoes per bell. Cooldown 4 s.",
+            3 => "CRESCENDO  [4]\nSpends all HARMONY and detonates the bell and its echoes. Cooldown 5 s.\nEarly detonation pays out now; the full sequence pays far more.",
+            _ => "MENDING CHORUS  [6]\nInstant burst heal for you and allies within 6 m: +30 HP, capped. No lingering zone. Cooldown 15 s.\nHealing and dashing never clear Harmony, bells or echoes.",
+        };
         public override string ClassState()
         {
             string bell = Bell ? $"BELL {bellLeft / (float)Sim.Hz:0.0}s  strength {new string('+', Strength)}{(Strength == 0 ? "base" : "")}  echoes {Echoes}/{MaxEchoes}" : "no bell";
@@ -79,15 +88,18 @@ namespace LastBell.Run
         public override void Step(PlayerInput inp)
         {
             Timers(); aim = inp.Aim; Velocity = Vector3.zero; MoveScale = 1; FaceAim = false;
+            for (int i = 1; i <= 3; i++) if (inp.Pressed(i)) { buffered = i; bufferAge = 0; }
+            if (buffered >= 0 && ++bufferAge > BufferTicks) buffered = -1;
+            bool Want(int s) => inp.Pressed(s) || buffered == s;
             if (act == Act.None || act == Act.Chorus)
             {
                 // the heal is instant on press and can be woven into anything that isn't mid-cast
                 if (inp.Pressed(4) && chorusCd == 0) Chorus();
                 if (act == Act.None)
                 {
-                    if (inp.Pressed(3) && crescCd == 0 && (Harmony > 0 || Bell)) Begin(Act.Cresc, "Crescendo", CrescCast);
-                    else if (inp.Pressed(2) && refrainCd == 0) Begin(Act.Refrain, "HarmonicRefrain", RefrainCast);
-                    else if (inp.Pressed(1) && charges > 0) Begin(Act.Strike, "Bellstrike", StrikeCast);
+                    if (Want(3) && crescCd == 0 && (Harmony > 0 || Bell)) { buffered = -1; Begin(Act.Cresc, "Crescendo", CrescCast); }
+                    else if (Want(2) && refrainCd == 0) { buffered = -1; Begin(Act.Refrain, "HarmonicRefrain", RefrainCast); }
+                    else if (Want(1) && charges > 0) { buffered = -1; Begin(Act.Strike, "Bellstrike", StrikeCast); }
                     else if ((inp.Pressed(0) || inp.Held(0)) && noteCd == 0) Begin(Act.Note, "ResonantNote", NoteCast);
                 }
             }

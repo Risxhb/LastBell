@@ -1,0 +1,131 @@
+# Last Bell — playable run loop (overnight handoff, October 21, 2026)
+
+**Owner:** chzy18/claude, operator Chzy18. **Branch:** `feature/run-loop`, stacked on `feature/class-test-arena` (draft PR #27). **Engine:** Unity 6000.6.6f1, URP 17.6.0, glTFast 6.20, Input System 1.20. No package or pipeline changes. Asset manifest: [asset-manifest.md](asset-manifest.md).
+
+## What's playable end to end
+
+Menu → **Preparation** (Ready) → **Dial Warden** → **Pendulum Sentinel** → **Chimebound Oracle** → **Intermission** (future-shop placeholder, Continue) → **The Bellkeeper** (three HP phases) → **Results** (victory or defeat, with death recap and damage meter) → **Retry Run** (fresh run at encounter 1) or **Main Menu**. There's also **Practice** for any single encounter, which never advances a run, and a **Pause** menu (Esc) with Resume / Restart / Main Menu.
+
+All of it runs in the one key-art arena: `Assets/LastBell/Run/RunArena.unity`, a copy of `KeyArtTestArena.unity` with a `RunDirector`. Both classes are selectable: **Vanguard** (approved four-slot kit) and **Chimesinger** (approved DPS kit).
+
+## Launch
+
+- **Windows build:** `run-loop/unity/Builds/Windows/LastBell.exe` (not committed; about 425 MB). Double-click `Play Run Loop.cmd` in the repo root.
+- **Rebuild:** in Unity, **Last Bell → Run Loop → Build Windows Player**. In batch mode:
+  `Unity.exe -batchmode -projectPath unity -executeMethod LastBell.Run.EditorTools.RunBuild.BuildWindows`
+- **In the editor:** **Last Bell → Run Loop → Open Run Scene**, then press Play.
+- **Autotest:** `LastBell.exe -lastbellAutotest -lastbellOut <folder>` (or the editor: `-executeMethod LastBell.Run.EditorTools.RunBuild.PlayModeAutotest -lastbellAutotest -lastbellOut <folder>`). It writes `autotest-report.txt`, screenshots and video frames. `tools/run-loop/frames_to_mp4.py` (Blender) turns the frames into MP4s.
+
+## Controls (shown in the menu, the HUD and the skill tooltips)
+
+| Input | Action |
+| --- | --- |
+| WASD | move (camera-relative) |
+| Mouse | aim; every ability fires toward the cursor |
+| 1 / LMB (hold to repeat) | Basic: Steel Rhythm / Resonant Note |
+| 2, 3, 4 | Vanguard: Sundering Blow, Last Word, **hold** Brace. Chimesinger: Bellstrike, Harmonic Refrain, Crescendo |
+| 6 | Chimesinger: Mending Chorus |
+| 5 / RMB | dash (Clockstep / Harmonic Step) |
+| Space / Shift | jump / sprint (shared movement stamina) |
+| Enter | Ready / Continue / Start run |
+| Tab | damage meter (this encounter) |
+| Esc | pause |
+| R / M | Retry / Main menu on the results screen |
+| F9 / F8 | **dev:** defeat the current boss / jump it to its next phase |
+
+Gamepads aren't read: the user's rudder pedals register as a controller. UI clicks can't trigger attacks: gameplay input is blocked in menus and stays disarmed until every action button has been released once after a menu closes.
+
+## Run rules used (provisional where noted)
+
+- **Movement** (Game-Design delegated defaults): walk 6 m/s, sprint 9 m/s, dash 3 m in 0.2 s, jump about 0.8 m over 0.6 s. Stamina 100: sprint 25/s, jump 20, dash 30, regenerates 20/s after 0.75 s.
+- **No invincibility frames** anywhere. A hazard instance hits a player at most once, which replaces the old 0.75 s post-hit immunity. A hit causes 0.25 s stun and 1.5 m knockback (spec v0.2 §5).
+- **Between encounters:** health **carries over** (single-arena plan §6 proposal, provisional). Stamina, cooldowns and class state (Opening, Harmony, bells) reset, and the player returns to the start socket. The old test fight's potions are **not** in the run, since healing is deferred by the design and potions are an unapproved healing source.
+- **Defeat precedence:** if the player goes down on the same tick the boss dies, defeat wins (plan §10 / spec §4).
+- **Bellkeeper:** spec v0.2 Steady Ticking schedule. D1–D6 are applied provisionally: 6.5 m sweep, damage 30/25/30/15 (45 for the Final Toll sweep), phases at 70 % and 35 % queued to block boundaries.
+- **Boss HP is shortened for this test build:** minibosses 1500 / 1700 / 1700, Bellkeeper 3600. Design durations are 60–105 s and 3–4 min, so tuning is still open.
+- **Minibosses:** first-pass schedules with labelled stand-in geometry (encounter lane #8 to author):
+  - Dial Warden: Hand Sweep cone 6 m and Hollow Dial ring 2.4–6 m.
+  - Pendulum Sentinel: Charge lane 2.2 m wide, and Low Pendulum (a teal **JUMP** bar 1.4 m wide that can be jumped or gone around).
+  - Chimebound Oracle: three Shattered Chime markers, then the Dividing Chime cone.
+
+## Per-character status
+
+| Character | Model | Rig | Animation | VFX |
+| --- | --- | --- | --- | --- |
+| **Vanguard** | Rough production (Meshy multi-view, decimated to 40k tris) | Rough production (scripted armature, heat weights) | Rough production. **New tonight:** SteelRhythm1–3, SunderingBlow, LastWord, BraceRaise / Hold / Walk / Hit / Lower, Hit, Down, GetUp. No placeholders are needed in the run except Land | Rough production: slashes, Opening ring, Sundering split, Last Word windup / slam / shockwave, Brace disc |
+| **Chimesinger** | Rough production, **Unity copy is a stand-in** (pre-fix f84c4d5 export). The real export is owned by the Chimesinger animation-fixes session | Rough production | Approved-kit clips exist. **Placeholder:** Hit / Down / GetUp (procedural) until that session adds them | Rough production: note, bolt, bell mark with strength ring and echo pips, Refrain ripples, Crescendo burst, Chorus ring, note trail |
+| **Bellkeeper** (= "Bellwarden") | Rough production (Meshy) | Rough production | Rough production. **New tonight:** PhaseShift, Defeat | Existing telegraphs and resolves; gold (non-danger) phase-shift and defeat bursts |
+| Minibosses ×3 | **Placeholder** (code-built) | none | none (scripted transforms) | shared telegraphs and resolves |
+
+## Tests actually run (evidence in `run-loop-evidence/`, not committed)
+
+- **Windows player build:** succeeded seven times tonight (0 errors). The packaged exe launched and ran the full autotest each time.
+- **Autotest in the packaged build:** see `autotest-7/autotest-report.txt` for the final run. It covers:
+  - boot to menu in the arena
+  - repeated Ready, Continue and Retry presses (each starts exactly one transition)
+  - all four encounter slots, each started and ended exactly once
+  - boss death during a windup on all four bosses (pending hazards cancelled in the same tick, no damage or resolve afterwards, boss collision off)
+  - intermission free of hazards; health carried into the final fight
+  - Bellkeeper phase 2 and 3 transitions with the PhaseShift and Defeat clips playing
+  - victory after slot 4; retry after victory and after defeat both give a fresh run (HP/stamina full, cooldowns reset, no stale bosses, hazards or projectiles, one player)
+  - real-hazard defeat with its cause; return to menu from pause leaves no run objects
+  - a second full run with the Chimesinger; practice that never advances a run
+  - Vanguard kit: Opening from hit 3; dash cancelling an unreleased Sundering Blow with no cooldown spent; empowered Sundering Blow consuming Opening and taking 2 s off Last Word; Brace frontal −60 % with no knockback; rear hits bypassing Brace; Brace absorption granting Opening
+  - Low Pendulum avoided by jumping
+  - Chimesinger kit: Bellstrike charges, bell, refresh and strengthen; echo cap of two; Crescendo resolving exactly once; the full sequence out-damaging early detonation (196 vs 50); instant self-inclusive heal; heal and dash not clearing setup
+  - approved Vanguard clips actually playing
+  - zero errors or exceptions in the player log
+- **Unity compilation:** clean apart from pre-existing obsolete-API warnings in other files.
+- **Editor Play Mode:** see the final section of this file for whether it was run and its result.
+- **Not tested:** co-op or networking (on hold), gamepad, other resolutions, performance profiling, and human feel or readability review. The bot uses scripted input, not a human.
+
+Screens and videos: `run-loop-evidence/autotest-7/*.png` and `*.mp4` (vanguard_kit, low_pendulum_jump, bellkeeper_fight, bellkeeper_defeat, chimesinger_rotation). Contact sheets: `run-loop-evidence/vanguard/kit-contact-sheet.png`, `run-loop-evidence/bellkeeper-phase-defeat-sheet.png`.
+
+## Playtest feedback (PF, wiki, October 21) addressed in this branch
+
+- **PF-02** (key 4 froze the Vanguard): in the old test controller, key 4 was the superseded 1.85 s Guard pose. In the run, key 4 is **hold-to-Brace**: it's capped at 1.5 s, you can walk slowly, it lowers on release, and its exit after interruption, death and reset is tested.
+- **PF-03** skill bar: bindings, cooldown fill and seconds, charges, Opening / Harmony / bell state, and a dash slot.
+- **PF-04** hover tooltips on every skill, including the dash.
+- **PF-05** responsiveness:
+  - a 0.15 s input buffer for abilities
+  - after a basic hit connects, a ready ability cancels the rest of the swing (Basic 3 → Sundering Blow)
+  - Last Word recovery shortened from 0.6 s to 0.4 s after the release
+  - dash cancels basics and unreleased windups
+
+  Feel still needs a human playtest.
+- **PF-06** death recap: the last six hits with the killing blow marked.
+- **PF-07** first pass: a per-ability damage meter (damage, share, hits, largest hit, DPS) for the encounter (Tab) and the run (results). This is not Details! parity: no history segments, charts or damage-taken breakdown yet.
+- **PF-01** (dodge doesn't negate damage) is **not changed**. The current rules say no iframes, so a dash only helps if it carries you out of the shape before it resolves. The 3 m dash plus walking does that within the spec's windows. Whether dashing should grant immunity is a design decision for Risxhb/Chzy18.
+
+## Provisional decisions to review
+
+1. Health carries across encounters with no intermission heal, and potions are removed from the run.
+2. Boss HP is shortened for testing.
+3. Bellkeeper D1/D2 values are applied before review.
+4. Chimesinger tuning is entirely prototype: notes 16 dmg, Bellstrike 40 dmg with 2 charges and 6 s recharge, bell lasts 8 s, strength ×1.5 up to twice, Refrain 34 dmg with echoes worth 60 % (4 s cooldown), Crescendo 12 per Harmony + 50 bell + echoes (5 s cooldown), Chorus +30 HP within 6 m (15 s cooldown).
+5. Vanguard damage values (Steel Rhythm 22/22/42, Sundering 70 (+60 empowered), Last Word 140 + 90 shockwave) and frame timings are prototype.
+6. Mending Chorus is on key **6**, because the Chimesinger has five actions plus a dash.
+7. Brace mitigates `Strike` hazards (cones, lanes, bars) and never `Ground` ones (rings, chime circles).
+
+## Known bugs and limits
+
+- The Chimesinger in Unity is the pre-grip-fix export. Its Hit, Down and GetUp are procedural tilts.
+- The Down / GetUp silhouettes are rough. Land is the tail of Jump.
+- The camera follows closely, so the player can sit behind a tall boss for a moment.
+- The minibosses have no art and no animation.
+- There's no audio.
+- Pausing stops gameplay, but idle animations and FX keep moving.
+- Recreating the effect layers on retry crashed the player natively in `Mesh.set_colors`. They're now created once and reset between runs, but the root cause isn't understood.
+
+## Next steps (highest priority first)
+
+1. **Human playtest** of this build: feel (PF-05), Brace (PF-02) and readability. Decide PF-01 dodge immunity, the health-between-fights policy and the Bellkeeper D1–D6.
+2. Swap in the **fixed Chimesinger GLB** when the Chimesinger session delivers it, then add its Hit / Down / GetUp.
+3. Author the **three miniboss** models and schedules (encounter lane #8), replacing the stand-ins without changing the run flow.
+4. Tune boss HP and damage toward the design fight lengths, and run the escape checker on the miniboss schedules.
+5. An animation polish pass on the Vanguard ability clips (contact clearance, Down / GetUp), then the Arcanist (#41).
+6. Move the shared run/hazard code behind the foundation #6 contract (U3) when it lands.
+
+## Editor Play Mode check
+
+See the final summary in the PR / wiki P-entry for the editor run result.

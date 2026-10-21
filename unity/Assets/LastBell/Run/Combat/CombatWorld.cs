@@ -40,6 +40,17 @@ namespace LastBell.Run
         // statistics for the results screen
         public int DamageDealt, DamageTaken;
         public string LastDamageSource;
+        // PF-06 death recap and PF-07 meter (first pass): every resolved hit, once, from the authoritative tick
+        public readonly List<(int tick, string source, int damage, int hpAfter)> TakenLog = new List<(int, string, int, int)>();
+        public sealed class MeterRow { public string Ability; public int Damage, Hits, Largest; }
+        public readonly Dictionary<string, MeterRow> RunMeter = new Dictionary<string, MeterRow>(), EncounterMeter = new Dictionary<string, MeterRow>();
+        public int SegmentStartTick { get; private set; }
+        public void BeginSegment() { EncounterMeter.Clear(); SegmentStartTick = Tick; }
+        static void Add(Dictionary<string, MeterRow> m, string ability, int dmg)
+        {
+            if (!m.TryGetValue(ability, out var r)) m[ability] = r = new MeterRow { Ability = ability };
+            r.Damage += dmg; r.Hits++; r.Largest = Mathf.Max(r.Largest, dmg);
+        }
 
         public event Action<PlayerController, Hazard, int> PlayerHit;   // tests and HUD listen
 
@@ -117,12 +128,14 @@ namespace LastBell.Run
             var b = Boss; if (b == null || !b.Solid || damage <= 0) return 0;
             int dealt = b.TakeHit(damage, contact);
             DamageDealt += dealt;
+            if (dealt > 0) { Add(RunMeter, ability, dealt); Add(EncounterMeter, ability, dealt); }
             return dealt;
         }
 
         internal void ReportPlayerHit(PlayerController p, Hazard h, int dmg)
         {
             DamageTaken += dmg; LastDamageSource = h.Source;
+            TakenLog.Add((Tick, h.Source, dmg, p.Hp));
             PlayerHit?.Invoke(p, h, dmg);
         }
 

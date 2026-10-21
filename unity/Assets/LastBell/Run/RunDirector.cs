@@ -177,6 +177,7 @@ namespace LastBell.Run
             EncounterStarts++;
             Log.Add($"encounter start {Boss.Id}");
             World.CombatActive = true;
+            World.BeginSegment();
             Player.AbilitiesEnabled = true;
             Boss.BeginCombat();
             Go(RunState.Combat);

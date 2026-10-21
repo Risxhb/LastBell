@@ -87,7 +87,8 @@ namespace LastBell.Run
             Current = "phase shift"; SetPhase(name);
             presenter.PlayOnce("PhaseShift", 1.5f);
             glowTarget = 3f;
-            for (int i = 0; i < 90; i++) { if (i == 45) { W.BossFx.TollResolve(transform.position, 0.5f, 3f); Release(1.5f); } yield return 1; }
+            // the ring-out burst is gold, not the danger palette: a phase shift deals no damage
+            for (int i = 0; i < 90; i++) { if (i == 45) { W.Fx.Crescendo(transform.position, true, 0, false); Release(1.5f); } yield return 1; }
             glowTarget = 1;
         }
 
@@ -217,7 +218,7 @@ namespace LastBell.Run
         {
             glowTarget = 0.1f; glowLevel = 3f;
             presenter.PlayOnce("Defeat", 2.5f);
-            W.BossFx.TollResolve(transform.position, 0.4f, 4f);
+            W.Fx.Crescendo(transform.position, true, 2, true);   // gold release burst; coral is reserved for danger
         }
         public CharacterPresenter Presenter => presenter;
     }

@@ -82,6 +82,23 @@ namespace LastBell.Run
             Note("screenshot " + Path.GetFileName(path));
             yield return null;
         }
+        // Fixed-step frame capture for short videos: Time.captureFramerate makes every frame exactly 1/60 s of game
+        // time, so the sequence plays back at real speed whatever the capture cost. Frames become MP4 afterwards
+        // (tools: run-loop-logs/frames-to-mp4.py via Blender's bundled FFmpeg).
+        IEnumerator Capture(string name, int frames)
+        {
+            var cdir = Path.Combine(dir, "frames_" + name); Directory.CreateDirectory(cdir);
+            Time.captureFramerate = 60;
+            for (int i = 0; i < frames; i++)
+            {
+                yield return new WaitForEndOfFrame();
+                var tex = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
+                tex.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0); tex.Apply();
+                File.WriteAllBytes(Path.Combine(cdir, $"{i:0000}.jpg"), tex.EncodeToJPG(88)); Destroy(tex);
+            }
+            Time.captureFramerate = 0;
+            Note($"video frames {name}: {frames}");
+        }
         IEnumerator Wait(float s) { float t = 0; while (t < s) { t += Time.deltaTime; yield return null; } }
         bool Safe(Func<bool> c) { try { return c(); } catch (Exception) { return false; } }
         IEnumerator Until(Func<bool> cond, float timeout, string what)
@@ -147,7 +164,7 @@ namespace LastBell.Run
             }
             bot.Clear();
         }
-        static int VanguardRotation(int f) => f % 240 == 60 ? 1 : f % 600 == 120 ? 2 : f % 8 == 0 ? 0 : -1;
+        static int VanguardRotation(int f) => f % 240 == 60 ? 1 : f % 8 == 0 ? 0 : -1;
         int[] chimeSeq = { 1, 0, 0, 0, 2, 1, 0, 0, 0, 2, 3 }; int chimeStep; int chimeWait;
         int ChimeRotation(int f)
         {
@@ -155,13 +172,14 @@ namespace LastBell.Run
             int s = chimeSeq[chimeStep % chimeSeq.Length]; chimeStep++; chimeWait = s == 0 ? 26 : 34; return s;
         }
 
-        IEnumerator KillDuringWindup(string label)
+        IEnumerator KillDuringWindup(string label, string capture = null)
         {
             yield return Until(() => d.World != null && d.World.Hazards.Count > 0 && d.World.Hazards.Live.All(h => h.Age < h.ResolveAt - 6), 12, label + " hazard warning up");
             if (d.State != RunState.Combat) yield break;
             int hp0 = d.Player.Hp, resolved0 = d.World.Hazards.Resolved, pending = d.World.Hazards.Count;
             string names = string.Join(", ", d.World.Hazards.Live.Select(h => h.Source).Distinct());
             yield return Shot(label + "_windup");
+            if (capture != null) StartCoroutine(Capture(capture, 200));
             d.Boss.DebugDefeat();
             Check($"{label}: boss death cancels pending hazards", d.World.Hazards.Count == 0, $"{pending} pending ({names}) -> {d.World.Hazards.Count}");
             Check($"{label}: defeated boss stops colliding", d.Boss == null || !d.Boss.Solid);
@@ -199,10 +217,12 @@ namespace LastBell.Run
             StopCoroutine(fight); bot.Clear();
             Check("Vanguard strikes damage the boss through the kit", d.Boss.Hp < bossHp0, $"{bossHp0} -> {d.Boss.Hp}");
             Check("Steel Rhythm hit 3 granted Opening", sawOpening);
+            yield return VanguardShowcase();
             yield return VanguardKitChecks();
             yield return KillDuringWindup("dial_warden");
             yield return Until(() => d.State == RunState.Intro && d.Encounter == 1, 6, "intro 2");
             Check("encounter 1 ended exactly once", d.EncounterEnds == 1 && d.EncountersCleared == 1);
+            yield return null;   // Destroy lands at the end of the frame
             Check("previous boss removed", FindObjectsByType<BossEncounter>().Length == 1);
             yield return Until(() => d.State == RunState.Combat, 4, "combat 2");
             Check("encounter 2 is the Pendulum Sentinel", d.Boss is PendulumSentinel);
@@ -226,19 +246,23 @@ namespace LastBell.Run
             d.Player.DebugSetHp(PlayerController.MaxHp);   // test setup: the rest of this run checks phases, not survival
             var bk = (BellkeeperEncounter)d.Boss;
             Check("Bellkeeper uses its model", bk.Presenter != null && bk.Presenter.HasModel);
+            StartCoroutine(Capture("bellkeeper_fight", 300));
             fight = StartCoroutine(Fight(4.5f, VanguardRotation, 1.8f));
             yield return Wait(2.5f); yield return Shot("combat_bellkeeper"); yield return Wait(2.2f);
             StopCoroutine(fight); bot.Clear();
             d.Boss.DebugSetHpFraction(0.69f);
             yield return Survive(16, () => d.Boss.PhaseName == "The Dissonance");
             Check("phase 2 queued and entered", d.Boss.PhaseName == "The Dissonance");
+            yield return null; yield return null;
+            Check("Bellkeeper plays PhaseShift on the transition", bk.Presenter.CurrentClip == "PhaseShift", bk.Presenter.CurrentClip);
             yield return Survive(3f); yield return Shot("bellkeeper_phase2");
             d.Boss.DebugSetHpFraction(0.34f);
             d.Player.DebugSetHp(PlayerController.MaxHp);
             yield return Survive(18, () => d.Boss.PhaseName == "The Final Toll");
             Check("phase 3 queued and entered", d.Boss.PhaseName == "The Final Toll");
             yield return Survive(2.5f); yield return Shot("bellkeeper_final_toll");
-            yield return KillDuringWindup("bellkeeper");
+            yield return KillDuringWindup("bellkeeper", "bellkeeper_defeat");
+            Check("Bellkeeper plays Defeat", bk.Presenter.CurrentClip == "Defeat", bk.Presenter.CurrentClip);
             yield return Wait(1.0f); yield return Shot("bellkeeper_defeat");
             yield return Until(() => d.State == RunState.Results, 6, "results 1");
             Check("victory after the fourth encounter", d.Victory && d.EncountersCleared == 4 && d.EncounterStarts == 4 && d.EncounterEnds == 4,
@@ -261,6 +285,7 @@ namespace LastBell.Run
             float tt = 0;
             while (d.State == RunState.Combat && tt < 30) { if (d.Boss) { bot.Aim = d.Boss.transform.position; var to = Sim.Flat(d.Boss.transform.position - d.Player.transform.position); bot.MoveWorld = to.magnitude > 3f ? to.normalized : Vector3.zero; } tt += Time.deltaTime; yield return null; }
             bot.Clear();
+            Check("Vanguard plays Down", d.Player.Presenter.CurrentClip == "Down", d.Player.Presenter.CurrentClip);
             Check("player goes down from a real hazard", d.State == RunState.Downed || d.State == RunState.Results, $"state {d.State}, cause {d.DefeatCause}");
             yield return Wait(0.3f); yield return Shot("downed");
             yield return Until(() => d.State == RunState.Results, 4, "results 2");
@@ -338,15 +363,52 @@ namespace LastBell.Run
             if (bar == null) yield break;
             // put the player in the middle of the bar (test setup) and jump so the resolve tick lands mid-air
             d.Player.transform.position = bar.Origin + Sim.Dir(bar.Yaw) * Mathf.Min(4f, bar.Length * 0.5f);
-            int hp0 = d.Player.Hp; bool jumped = false;
+            int hp0 = d.Player.Hp; bool jumped = false, capStarted = false;
             yield return Shot("low_pendulum_jump_warning");
             while (d.World.Hazards.Live.Contains(bar))
             {
+                if (!capStarted && bar.ResolveAt - bar.Age <= 50) { capStarted = true; StartCoroutine(Capture("low_pendulum_jump", 110)); }
                 if (!jumped && bar.ResolveAt - bar.Age <= 16) { bot.jump = true; jumped = true; }
                 yield return null;
             }
             yield return Wait(0.3f);
             Check("jumping through the Low Pendulum avoids it", d.Player.Hp == hp0, $"hp {hp0} -> {d.Player.Hp}");
+        }
+
+        // One readable rotation on camera: Steel Rhythm x3 -> empowered Sundering Blow -> Brace -> Last Word.
+        IEnumerator VanguardShowcase()
+        {
+            var p = d.Player; var seen = new HashSet<string>();
+            yield return Until(() => d.World.Hazards.Count == 0, 6, "quiet before showcase");
+            d.Boss.Halt(); p.DebugSetHp(PlayerController.MaxHp);
+            yield return Survive(9f, () => p.Kit.Cooldown01(1) <= 0 && p.Kit.Cooldown01(2) <= 0);   // fresh cooldowns for the showcase
+            yield return Until(() => p.Kit.Cooldown01(1) <= 0, 1, "Sundering Blow ready for the showcase");
+            for (float w = 0; w < 3f; w += Time.deltaTime)   // walk back into reach
+            {
+                var to0 = Sim.Flat(d.Boss.transform.position - p.transform.position);
+                if (to0.magnitude - d.Boss.BodyRadius < 1.8f) break;
+                bot.Aim = d.Boss.transform.position; bot.MoveWorld = to0.normalized; yield return null;
+            }
+            StartCoroutine(Capture("vanguard_kit", 330));
+            float t = 0;
+            while (t < 5.4f)
+            {
+                var b = d.Boss; var to = Sim.Flat(b.transform.position - p.transform.position);
+                bot.Aim = b.transform.position; bot.MoveWorld = to.magnitude - b.BodyRadius > 1.8f ? to.normalized : Vector3.zero;
+                if (t < 1.25f) bot.press[0] = true;
+                else if (t < 1.4f) bot.press[1] = true;                 // buffered into the end of the third hit
+                else if (t > 2.2f && t < 3.0f) { bot.hold[3] = true; bot.press[3] = t < 2.25f; }
+                else if (t > 3.3f && t < 3.5f) { bot.hold[3] = false; bot.press[2] = true; }
+                seen.Add(p.Presenter.CurrentClip);
+                t += Time.deltaTime; yield return null;
+            }
+            bot.Clear();
+            Note("clips seen: " + string.Join(", ", seen));
+            foreach (var c in new[] { "SteelRhythm1", "SteelRhythm2", "SteelRhythm3", "SunderingBlow", "LastWord" })
+                Check("Vanguard plays " + c, seen.Contains(c));
+            Check("Vanguard plays the Brace set", seen.Contains("BraceRaise") || seen.Contains("BraceHold") || seen.Contains("BraceWalk"));
+            Check("Vanguard approved-kit clips need no placeholder", !p.Presenter.Placeholders.Any(x => x != "Land"), string.Join(",", p.Presenter.Placeholders));
+            d.Boss.BeginCombat();
         }
 
         IEnumerator VanguardKitChecks()
@@ -410,6 +472,7 @@ namespace LastBell.Run
             int early = k.LastCrescendo;
             Check("early Crescendo detonates and clears the bell", early > 0 && !k.Bell, "damage " + early);
             yield return Wait(5.2f);
+            StartCoroutine(Capture("chimesinger_rotation", 540));
             // full sequence: Bellstrike -> basics -> Refrain -> Bellstrike (refresh) -> basics -> Refrain -> Crescendo
             bot.Aim = d.Boss.transform.position;
             bot.press[1] = true; yield return Wait(0.45f);
@@ -458,6 +521,7 @@ namespace LastBell.Run
             yield return Wait(0.5f);
 #if UNITY_EDITOR
             UnityEditor.EditorApplication.isPlaying = false;
+            UnityEditor.EditorApplication.Exit(fail == 0 ? 0 : 1);   // launched from the command line for the Play Mode check
 #else
             Application.Quit(fail == 0 ? 0 : 1);
 #endif

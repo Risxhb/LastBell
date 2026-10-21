@@ -13,9 +13,10 @@ sc.render.resolution_x = sc.render.resolution_y = 320; sc.render.film_transparen
 sc.world = sc.world or bpy.data.worlds.new('W')
 arm = next(o for o in sc.objects if o.type == 'ARMATURE')
 cam_data = bpy.data.cameras.new('SheetCam'); cam = bpy.data.objects.new('SheetCam', cam_data); sc.collection.objects.link(cam)
-cam_data.type = 'ORTHO'; cam_data.ortho_scale = 3.4
+cam_data.type = 'ORTHO'; cam_data.ortho_scale = float(os.environ.get('SHEET_SCALE', '3.4'))   # 7 for the 5 m Bellkeeper
 # three-quarter front view (character faces -Y), slightly from above like the gameplay camera
-cam.location = Vector((2.6, -4.2, 2.6)); d = Vector((0, 0, 0.95)) - cam.location
+k = float(os.environ.get('SHEET_SCALE', '3.4')) / 3.4
+cam.location = Vector((2.6, -4.2, 2.6)) * k; d = Vector((0, 0, 0.95 * k)) - cam.location
 cam.rotation_euler = d.to_track_quat('-Z', 'Y').to_euler(); sc.camera = cam
 rows = []
 for spec in specs:

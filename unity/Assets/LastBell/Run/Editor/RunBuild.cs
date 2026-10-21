@@ -70,6 +70,16 @@ namespace LastBell.Run.EditorTools
             if (Application.isBatchMode) EditorApplication.Exit(s.result == BuildResult.Succeeded ? 0 : 1);
         }
 
+        // Editor Play Mode run of the same autotest (not batch mode: Play Mode needs the editor loop). Launch with
+        //   Unity.exe -projectPath unity -executeMethod LastBell.Run.EditorTools.RunBuild.PlayModeAutotest -lastbellAutotest -lastbellOut <dir>
+        // RunAutoTest stops Play Mode and exits the editor with 0 (all passed) or 1 when it finishes.
+        public static void PlayModeAutotest()
+        {
+            BuildScene();
+            EditorSceneManager.OpenScene(RunScene);
+            EditorApplication.isPlaying = true;
+        }
+
         // Batch compile check only (no build): -executeMethod LastBell.Run.EditorTools.RunBuild.CompileCheck
         public static void CompileCheck()
         {

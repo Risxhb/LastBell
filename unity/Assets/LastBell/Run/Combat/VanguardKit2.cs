@@ -21,13 +21,15 @@ namespace LastBell.Run
         const int SunderTotal = 42, SunderRelease = 20, SunderCd = 480, SunderDamage = 70, SunderBonus = 60, UltRefund = 120;
         const float SunderReach = 3.3f, SunderArc = 70, SunderLunge = 0.5f;
         // Last Word: ~0.8 s planted windup, overhead contact, shockwave toward the cursor
-        const int UltTotal = 84, UltRelease = 48, UltCd = 2700, UltDamage = 140, WaveDamage = 90;
+        const int UltTotal = 72, UltRelease = 48, UltCd = 2700, UltDamage = 140, WaveDamage = 90;
         const float UltReach = 2.6f, UltArc = 100, WaveSpeed = 18f, WaveRange = 8f, WaveWidth = 2.2f;
         // Brace: raise, hold up to 1.5 s, lower; 12 s cooldown from lowering
         const int BraceRaise = 6, BraceMax = 90, BraceLower = 9, BraceCd = 720;
         const float BraceReduction = 0.6f, BraceArc = 140, BraceMove = 0.35f;
 
         enum Act { None, Basic, Sunder, Ult, Brace }
+        int buffered = -1, bufferAge;   // PF-05: an ability pressed during another action fires as soon as it can (0.15 s)
+        const int BufferTicks = 9;
         Act act; int t;           // ticks into the current action
         int step;                 // basic: hit being played (0..2)
         bool queued, contactDone, sunderEmpowered;
@@ -55,6 +57,13 @@ namespace LastBell.Run
             _ => ""
         };
         static string Sec(int ticks) => (ticks / (float)Sim.Hz).ToString("0.0") + "s";
+        public override string Tooltip(int s) => s switch
+        {
+            0 => "STEEL RHYTHM  [1 / LMB, hold to repeat]\nThree-hit sword combo toward the cursor: two quick cuts, then a heavier cleave.\nLanding hit 3 grants OPENING (6 s, does not stack). No cooldown.\nA dash keeps your combo step for 3 s.",
+            1 => "SUNDERING BLOW  [2]\nHeavy aimed strike. Cooldown 8 s, starting on release.\nWith OPENING: extra damage and 2 s off Last Word's cooldown.\nDash before the release cancels it with no cooldown spent.",
+            2 => "LAST WORD  [3]\nPlanted 0.8 s windup, overhead strike, then a shockwave toward the cursor.\nCooldown 45 s. Works without OPENING. Dash during the windup cancels it (nothing spent).",
+            _ => "BRACE  [hold 4]\nRaise the shield toward the cursor for up to 1.5 s; you can still walk slowly.\nFrontal strikes: 60% less damage, no knockback. Rear hits and ground eruptions bypass it.\nFirst absorbed hit grants OPENING. Cooldown 12 s after lowering. No attacking while braced.",
+        };
         public override string ClassState() => OpeningActive ? $"OPENING {opening / (float)Sim.Hz:0.0}s" : "";
 
         public override void ResetAll()
@@ -81,6 +90,8 @@ namespace LastBell.Run
             Timers();
             aim = inp.Aim;
             Velocity = Vector3.zero; MoveScale = 1; FaceAim = false;
+            for (int i = 1; i <= 3; i++) if (inp.Pressed(i)) { buffered = i; bufferAge = 0; }
+            if (buffered >= 0 && ++bufferAge > BufferTicks) buffered = -1;
             switch (act)
             {
                 case Act.None: Idle(inp); break;
@@ -93,15 +104,17 @@ namespace LastBell.Run
 
         void Idle(PlayerInput inp)
         {
-            if ((inp.Pressed(3) || inp.Held(3)) && braceCd == 0) { StartBrace(); return; }   // hold works as a buffer
-            if (inp.Pressed(2) && ultCd == 0) { Start(Act.Ult); P.Presenter.Action("LastWord", UltTotal); return; }
-            if (inp.Pressed(1) && sunderCd == 0)
-            {
-                Start(Act.Sunder);
-                P.Presenter.Action("SunderingBlow", SunderTotal);
-                return;
-            }
+            if (TryAbility(inp)) return;
             if (inp.Pressed(0) || inp.Held(0)) StartBasic(comboExpire > 0 ? comboStep : 0);
+        }
+
+        bool TryAbility(PlayerInput inp)
+        {
+            bool Want(int s) => inp.Pressed(s) || buffered == s;
+            if ((Want(3) || inp.Held(3)) && braceCd == 0) { buffered = -1; StartBrace(); return true; }   // hold works as a buffer
+            if (Want(2) && ultCd == 0) { buffered = -1; Start(Act.Ult); P.Presenter.Action("LastWord", UltTotal); return true; }
+            if (Want(1) && sunderCd == 0) { buffered = -1; Start(Act.Sunder); P.Presenter.Action("SunderingBlow", SunderTotal); return true; }
+            return false;
         }
 
         void Start(Act a) { act = a; t = 0; contactDone = false; P.FaceNow(aim); }
@@ -124,7 +137,15 @@ namespace LastBell.Run
                 W.Fx.Slash(P, BasicReach[step], BasicArc[step], step == 2, step == 1);
                 if (dealt > 0 && step == 2) GrantOpening();
             }
-            // Brace or abilities can't interrupt a swing; the dash can (controller calls OnDash)
+            // after contact, a ready ability cancels the rest of the swing (Basic 3 -> empowered Special); the dash
+            // cancels at any time (controller calls OnDash)
+            if (t > BasicContact[step] + 1)
+            {
+                int keepStep = step; bool landed3 = step == 2;
+                act = Act.None;
+                if (TryAbility(inp)) { comboStep = landed3 ? 0 : Mathf.Min(2, keepStep + 1); comboExpire = landed3 ? 0 : ComboAfterDash; return; }
+                act = Act.Basic;
+            }
             if (queued && t >= BasicChainFrom[step] && step < 2) { StartBasic(step + 1); return; }
             if (t >= BasicTotal[step])
             {

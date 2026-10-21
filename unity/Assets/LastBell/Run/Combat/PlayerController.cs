@@ -265,6 +265,7 @@ namespace LastBell.Run
         public abstract string[] SlotKeys { get; }
         public abstract float Cooldown01(int slot);         // 0 ready .. 1 just used
         public abstract string SlotState(int slot);         // short text: seconds left, charges, "HOLD" ...
+        public abstract string Tooltip(int slot);           // PF-04: name, binding, effect, cooldown, conditions
         public abstract string ClassState();                // Opening / Harmony etc.
         public abstract void Step(PlayerInput inp);
         public virtual void TickTimersOnly() { }             // cooldowns keep running while stunned or dashing

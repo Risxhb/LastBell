@@ -16,6 +16,7 @@ namespace LastBell.Run
 
         RunDirector d; GUIStyle title, big, mid, small, tiny, num, box, btn, slot; Texture2D white;
         int menuClass;
+        public static bool ShowMeter;   // Tab
 
         static readonly Dictionary<string, string> Hints = new Dictionary<string, string>
         {
@@ -35,6 +36,7 @@ namespace LastBell.Run
                 if (f.age > 0.9f) floats.RemoveAt(i);
             }
             var kb = Keyboard.current; if (kb == null || d == null) return;
+            if (kb.tabKey.wasPressedThisFrame) ShowMeter = !ShowMeter;
             if (d.State == RunState.Results)
             {
                 if (kb.rKey.wasPressedThisFrame) d.RequestRetry();
@@ -180,6 +182,21 @@ namespace LastBell.Run
             lines += $"\n\nClass: {d.ClassName}   ·   Time in combat: {d.RunTicks / 60f / 60f:0}:{d.RunTicks / 60f % 60:00}   ·   Encounters cleared: {d.EncountersCleared}";
             if (w != null) lines += $"\nDamage dealt {w.DamageDealt}   ·   Damage taken {w.DamageTaken}";
             GUI.Label(new Rect(r.x + 20, r.y + 76, r.width - 40, 120), lines, mid);
+            if (w != null) Meter(r.x + r.width + 16, r.y, w.RunMeter, "DAMAGE · whole " + (d.Mode == RunMode.Practice ? "practice" : "run"), d.RunTicks / 60f);
+            if (!d.Victory && w != null && w.TakenLog.Count > 0)
+            {
+                // PF-06 death recap: the last hits in order, the killing blow marked
+                int from = Mathf.Max(0, w.TakenLog.Count - 6);
+                float rx = r.x - 336, ry = r.y; Rect(new Rect(rx, ry, 320, 40 + 20 * (w.TakenLog.Count - from)), new Color(0.03f, 0.04f, 0.08f, 0.82f));
+                GUI.Label(new Rect(rx + 8, ry + 4, 300, 20), "DEATH RECAP · last hits taken", small);
+                float yy = ry + 26; int last = w.TakenLog[w.TakenLog.Count - 1].tick;
+                for (int i = from; i < w.TakenLog.Count; i++)
+                {
+                    var e = w.TakenLog[i]; bool fatal = i == w.TakenLog.Count - 1;
+                    GUI.Label(new Rect(rx + 8, yy, 310, 20), $"{(fatal ? "KILLING BLOW " : "")}{e.source}  -{e.damage}  (hp {e.hpAfter}, {(e.tick - last) / 60f:0.0}s)", tiny);
+                    yy += 20;
+                }
+            }
             if (GUI.Button(new Rect(r.x + 40, r.y + 230, 220, 40), d.Mode == RunMode.Practice ? "RETRY PRACTICE  (R)" : "RETRY RUN  (R)", btn)) d.RequestRetry();
             if (GUI.Button(new Rect(r.x + r.width - 260, r.y + 230, 220, 40), "MAIN MENU  (M)", btn)) d.ReturnToMenu();
         }
@@ -236,7 +253,7 @@ namespace LastBell.Run
             Bar(new Rect(x, y + 16, pw, 14), (float)p.Hp / PlayerController.MaxHp, new Color(0.96f, 0.79f, 0.41f));
             Bar(new Rect(x, y + 36, pw, 6), p.Stamina / PlayerController.MaxStamina, new Color(0.45f, 0.85f, 0.75f));
             GUI.Label(new Rect(x + pw - 160, y - 4, 160, 20), "stamina " + Mathf.RoundToInt(p.Stamina), small);
-            var k = p.Kit; int n = k.SlotNames.Length; float sw = (pw - (n) * 6 - 70) / n;
+            var k = p.Kit; int n = k.SlotNames.Length; float sw = (pw - (n) * 6 - 70) / n; int hover = -1;
             for (int i = 0; i < n; i++)
             {
                 var r = new Rect(x + i * (sw + 6), y + 50, sw, 62);
@@ -246,6 +263,7 @@ namespace LastBell.Run
                 GUI.Label(new Rect(r.x, r.y + 2, r.width, 16), $"[{k.SlotKeys[i]}]", slot);
                 GUI.Label(new Rect(r.x, r.y + 16, r.width, 30), k.SlotNames[i], slot);
                 GUI.Label(new Rect(r.x, r.y + 44, r.width, 16), k.SlotState(i), slot);
+                if (r.Contains(Event.current.mousePosition)) hover = i;
             }
             var dr = new Rect(x + n * (sw + 6), y + 50, 64, 62);
             Rect(dr, new Color(0.12f, 0.15f, 0.26f, 0.95f));
@@ -254,8 +272,39 @@ namespace LastBell.Run
             GUI.Label(new Rect(dr.x, dr.y + 44, dr.width, 16), p.Stamina >= PlayerController.DashCost ? "ready" : "stamina", slot);
             string cs = k.ClassState();
             if (!string.IsNullOrEmpty(cs)) GUI.Label(new Rect(x, y + 116, pw, 20), cs, small);
-            string hint = d.State == RunState.Combat ? "WASD move · mouse aim · Space jump · Shift sprint" : "Abilities are off outside combat";
+            string hint = d.State == RunState.Combat ? "WASD move · mouse aim · Space jump · Shift sprint · Tab damage meter · hover a skill for details" : "Abilities are off outside combat";
             GUI.Label(new Rect(x, y + 132, pw, 18), hint, tiny);
+            if (dr.Contains(Event.current.mousePosition)) Tooltip(x, y, "DASH  [5 / RMB]\nShort burst (3 m in 0.2 s) in the move direction. Costs 30 stamina; sprint and jump share the bar.\nNo invincibility: get out of the shape before it resolves. Cancels basic attacks and unreleased windups.");
+            else if (hover >= 0) Tooltip(x, y, k.Tooltip(hover));
+            if (ShowMeter && d.World != null) Meter(Screen.width - 330, 150, d.World.EncounterMeter, "DAMAGE · this encounter", (d.World.Tick - d.World.SegmentStartTick) / 60f);
+        }
+
+        void Tooltip(float x, float y, string text)
+        {
+            var h = tiny.CalcHeight(new GUIContent(text), 500) + 12;
+            var r = new Rect(x + 10, y - 16 - h, 500, h);
+            Rect(r, new Color(0.02f, 0.03f, 0.07f, 0.95f)); Rect(new Rect(r.x, r.y, 3, r.height), new Color(0.95f, 0.75f, 0.35f));
+            GUI.Label(new Rect(r.x + 10, r.y + 6, r.width - 16, r.height - 8), text, tiny);
+        }
+
+        // PF-07 first pass: per-ability damage, share, hits, largest hit and DPS over the segment. Not Details! parity.
+        void Meter(float x, float y, Dictionary<string, CombatWorld.MeterRow> rows, string title, float seconds)
+        {
+            var list = new List<CombatWorld.MeterRow>(rows.Values); list.Sort((a, b) => b.Damage.CompareTo(a.Damage));
+            int total = 0; foreach (var r in list) total += r.Damage;
+            float h = 48 + 20 * Mathf.Max(1, list.Count);
+            Rect(new Rect(x, y, 316, h), new Color(0.03f, 0.04f, 0.08f, 0.82f));
+            GUI.Label(new Rect(x + 8, y + 4, 300, 20), $"{title} · {total} · {(seconds > 0.5f ? total / seconds : 0):0} DPS", small);
+            GUI.Label(new Rect(x + 8, y + 24, 300, 18), "ability                 dmg     %    hits  max", tiny);
+            float yy = y + 42;
+            foreach (var r in list)
+            {
+                float f = total > 0 ? (float)r.Damage / total : 0;
+                Rect(new Rect(x + 8, yy + 2, 300 * f, 16), new Color(0.95f, 0.7f, 0.3f, 0.35f));
+                GUI.Label(new Rect(x + 8, yy, 150, 20), r.Ability, tiny);
+                GUI.Label(new Rect(x + 150, yy, 160, 20), $"{r.Damage,6}  {f * 100,4:0}%  {r.Hits,4}  {r.Largest,4}", tiny);
+                yy += 20;
+            }
         }
 
         void Floats()
