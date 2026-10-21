@@ -144,10 +144,12 @@ namespace LastBell.Characters
             }
             if (player != null)
             {
-                GUI.Label(new Rect(20, h - 74, 300, 20), $"Vanguard  {player.Hp} / {PlayerVitals.MaxHp}", small);
-                Bar(new Rect(20, h - 52, 300, 16), (float)player.Hp / PlayerVitals.MaxHp, new Color(0.96f, 0.79f, 0.41f), new Color(0.1f, 0.12f, 0.2f));
+                // bottom centre, so it stays near the action on wide screens
+                float px = w / 2 - 170;
+                GUI.Label(new Rect(px, h - 74, 340, 20), $"Vanguard  {player.Hp} / {PlayerVitals.MaxHp}", small);
+                Bar(new Rect(px, h - 52, 340, 16), (float)player.Hp / PlayerVitals.MaxHp, new Color(0.96f, 0.79f, 0.41f), new Color(0.1f, 0.12f, 0.2f));
                 string pots = new string('●', player.Potions) + new string('○', PlayerVitals.MaxPotions - player.Potions);
-                GUI.Label(new Rect(20, h - 32, 400, 22), $"Potions {pots}  [F]   ·   R reset", small);
+                GUI.Label(new Rect(px, h - 32, 400, 22), $"Potions {pots}  [F]   ·   R reset", small);
             }
             var cam = Camera.main;
             if (cam)
