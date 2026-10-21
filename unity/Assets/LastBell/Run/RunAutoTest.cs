@@ -48,11 +48,22 @@ namespace LastBell.Run
         RunDirector d; readonly Bot bot = new Bot();
         readonly List<string> lines = new List<string>(); int pass, fail, errors, shots;
         readonly List<string> errorLines = new List<string>();
+        readonly List<string> directorLog = new List<string>();   // transitions from every map's director
         string dir;
+
+        // The test lives on its own object that survives scene loads, so the map tour can switch maps under it.
+        static RunAutoTest active;
+        public static void Launch()
+        {
+            if (active) return;
+            var go = new GameObject("Run AutoTest");
+            DontDestroyOnLoad(go);
+            active = go.AddComponent<RunAutoTest>();
+        }
 
         void Start()
         {
-            d = GetComponent<RunDirector>(); dir = OutDir; Directory.CreateDirectory(dir);
+            d = RunDirector.Instance; dir = OutDir; Directory.CreateDirectory(dir);
             Application.logMessageReceived += OnLog;
             Application.runInBackground = true;   // the project pauses unfocused players; the test must not
             Screen.SetResolution(1600, 900, FullScreenMode.Windowed);
@@ -194,7 +205,9 @@ namespace LastBell.Run
             Note($"Last Bell autotest · {Application.version} · Unity {Application.unityVersion} · {SystemInfo.graphicsDeviceName} · {DateTime.Now:yyyy-MM-dd HH:mm}");
             d.InputOverride = bot;
             yield return Wait(1.0f);
-            Check("boots into the menu in the arena scene", d.State == RunState.Menu && FindAnyObjectByType<LastBell.Arenas.KeyArtArena>() != null);
+            Check($"boots into the menu on a run map ({RunMaps.CurrentName})", d.State == RunState.Menu && RunMaps.Current >= 0);
+            for (int i = 0; i < RunMaps.All.Length; i++)
+                Check($"map selectable: {RunMaps.All[i].Name}", RunMaps.InBuild(i), RunMaps.All[i].RunScene);
             yield return Shot("menu");
             foreach (var cls in RunDirector.Classes)
             {
@@ -413,6 +426,34 @@ namespace LastBell.Run
             d.RequestRetry();
             Check("practice retry repeats the same encounter", d.State == RunState.Ready && d.Encounter == 3 && d.Mode == RunMode.Practice);
             d.ReturnToMenu();
+
+            // ---------- map tour: switch maps after fights have run (FX layers already exist), fight briefly on each ----------
+            if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); }   // the practice retry above leaves it in Ready
+            yield return Until(() => d.State == RunState.Menu, 2, "menu before the map tour");
+            int startMap = RunMaps.Current;
+            for (int step = 1; step <= RunMaps.All.Length; step++)
+            {
+                int m = (startMap + step) % RunMaps.All.Length; var map = RunMaps.All[m];
+                directorLog.AddRange(d.Log);
+                d.SelectMap(m);
+                yield return Until(() => RunMaps.Current == m && RunDirector.Instance && RunDirector.Instance.State == RunState.Menu, 30, "map loaded: " + map.Name);
+                d = RunDirector.Instance; d.InputOverride = bot; bot.Clear();
+                yield return Wait(1.5f);
+                Check($"map {map.Name}: loads into the menu with its arena", RunMaps.Current == m && d.State == RunState.Menu && HazardSystem.ArenaCount > 0, $"arena scripts {HazardSystem.ArenaCount}");
+                yield return Shot("map_" + map.Id + "_menu");
+                d.StartPractice("Vanguard", 3); d.RequestReady();
+                yield return Until(() => d.State == RunState.Combat, 4, map.Name + " practice combat");
+                int hp0 = d.Boss ? d.Boss.Hp : 0;
+                var fm = StartCoroutine(Fight(4f, VanguardRotation, 2.2f));
+                yield return Wait(4f); StopCoroutine(fm); bot.Clear();
+                yield return Shot("map_" + map.Id + "_combat");
+                Check($"map {map.Name}: Bellkeeper fight runs (boss takes damage, player stays on the floor)",
+                    d.Boss && d.Boss.Hp < hp0 && Sim.Flat(d.Player.transform.position).magnitude <= CombatWorld.PlayerBound + 0.01f, $"boss hp {hp0} -> {(d.Boss ? d.Boss.Hp : -1)}");
+                d.Boss.DebugDefeat();
+                yield return Until(() => d.State == RunState.Results, 6, map.Name + " practice results");
+                d.ReturnToMenu();
+            }
+            Check("map tour returns to the starting map", RunMaps.Current == startMap);
 
             // ---------- report ----------
             Check("no errors or exceptions logged", errors == 0, errors + " logged");
@@ -715,7 +756,8 @@ namespace LastBell.Run
         void Finish()
         {
             lines.Insert(0, $"RESULT: {(fail == 0 ? "ALL PASSED" : "FAILURES")} · {pass} passed, {fail} failed · errors logged: {errors}");
-            lines.Add(""); lines.Add("Director transitions:"); lines.AddRange(d.Log.Select(l => "  " + l));
+            directorLog.AddRange(d.Log);
+            lines.Add(""); lines.Add("Director transitions:"); lines.AddRange(directorLog.Select(l => "  " + l));
             if (errorLines.Count > 0) { lines.Add(""); lines.Add("Errors:"); lines.AddRange(errorLines); }
             File.WriteAllLines(Path.Combine(dir, "autotest-report.txt"), lines);
             Debug.Log($"[autotest] done: {pass} passed, {fail} failed");

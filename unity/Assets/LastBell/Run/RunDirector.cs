@@ -50,17 +50,26 @@ namespace LastBell.Run
 
         Transform scopeParent; float acc;
         LastBell.VFX.BellkeeperFx bossFx; PlayerFx playerFx;
+        static Transform sharedFxRoot; static LastBell.VFX.BellkeeperFx sharedBossFx; static PlayerFx sharedPlayerFx;
         Camera cam; Vector3 camVel;
         static readonly Vector3 FollowOffset = new Vector3(0, 13f, 9.7f), MenuCamPos = new Vector3(0, 29, 22.5f);
+
+        static bool mapArgHandled;
 
         void Awake()
         {
             Instance = this;
+            if (!mapArgHandled)
+            {
+                mapArgHandled = true;
+                int want = RunMaps.IndexOf(RunMaps.RequestedId ?? "");
+                if (want >= 0 && want != RunMaps.Current && RunMaps.InBuild(want)) { RunMaps.Load(want); return; }
+            }
             cam = Camera.main;
             HazardSystem.FindArena();
             if (!GetComponent<RunHud>()) gameObject.AddComponent<RunHud>();
             Application.targetFrameRate = 120;
-            if (RunAutoTest.Requested && !GetComponent<RunAutoTest>()) gameObject.AddComponent<RunAutoTest>();
+            if (RunAutoTest.Requested) RunAutoTest.Launch();
         }
         void OnDestroy() { if (Instance == this) Instance = null; }
 
@@ -84,6 +93,17 @@ namespace LastBell.Run
             Mode = mode; ClassName = Array.IndexOf(Classes, className) >= 0 ? className : "Vanguard";
             BuildRun(encounter);
             Go(RunState.Ready);
+            return true;
+        }
+
+        // Menu only: loads the chosen map's run scene (this director is replaced by the one in that scene).
+        public bool SelectMap(int index)
+        {
+            if (State != RunState.Menu || index < 0 || index >= RunMaps.All.Length) return false;
+            if (index == RunMaps.Current) return true;
+            if (!RunMaps.InBuild(index)) { Debug.LogError("Last Bell: map not in the build: " + RunMaps.All[index].RunScene + " (Last Bell > Run Loop > Rebuild Run Scenes)"); return false; }
+            Log.Add($"{Time.frameCount}: load map {RunMaps.All[index].Id}");
+            RunMaps.Load(index);
             return true;
         }
 
@@ -132,7 +152,16 @@ namespace LastBell.Run
             Teardown();
             RunsStarted++;
             scopeParent = new GameObject(Mode == RunMode.Run ? $"Run #{RunsStarted}" : $"Practice #{RunsStarted}").transform;
-            if (bossFx == null) { bossFx = LastBell.VFX.BellkeeperFx.Create(); bossFx.transform.SetParent(transform, false); playerFx = PlayerFx.Create(transform); }
+            // FX layers are created once per process and survive map loads: re-creating them crashed the player natively
+            // (Mesh.set_colors), so a new map's director adopts the existing ones.
+            if (sharedFxRoot == null)
+            {
+                sharedFxRoot = new GameObject("Run FX (persistent)").transform;
+                DontDestroyOnLoad(sharedFxRoot.gameObject);
+                sharedBossFx = LastBell.VFX.BellkeeperFx.Create(); sharedBossFx.transform.SetParent(sharedFxRoot, false);
+                sharedPlayerFx = PlayerFx.Create(sharedFxRoot);
+            }
+            bossFx = sharedBossFx; playerFx = sharedPlayerFx;
             World = new CombatWorld(scopeParent, bossFx, playerFx);
             Player = PlayerController.Spawn(World, ClassName, PlayerSocket, 180);
             Player.Input = InputOverride ?? new KeyboardMouseInput();
@@ -268,6 +297,7 @@ namespace LastBell.Run
         void LateUpdate()
         {
             if (!cam) cam = Camera.main; if (!cam) return;
+            cam.orthographic = false;   // some arenas' own top-down view key (C) switches the camera to orthographic
             Vector3 target, look;
             if (Player) { target = Player.transform.position + FollowOffset; look = Player.transform.position + Vector3.up; }
             else { target = MenuCamPos; look = new Vector3(0, 0, 1); }
