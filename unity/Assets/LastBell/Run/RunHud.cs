@@ -24,9 +24,9 @@ namespace LastBell.Run
             ["Pendulum Charge"] = "step sideways out of the lane", ["Low Pendulum"] = "JUMP over it or go around",
             ["Shattered Chime"] = "move: the marker follows you, then locks", ["Dividing Chime"] = "leave the cone",
             ["Bell Sweep"] = "leave the cone", ["Bell Sweep (Final Toll)"] = "leave the cone (heavy)", ["Hollow Toll"] = "inside the inner circle or outside the ring",
-            ["Meridian Cut"] = "cross his forward shoulder or stay beyond the tip", ["Zenith Pins"] = "move off your circle after it locks",
-            ["Processional Thrust"] = "step sideways, not along the lane", ["Crown Reversal"] = "leave his back: go to the flank",
-            ["Meridian Alignment"] = "ring I: stand close inside it or far outside", ["Meridian Alignment II"] = "ring II: move outward past it",
+            ["Meridian Cut"] = "it follows you, then locks: DASH out (or stay beyond the tip)", ["Zenith Pins"] = "it follows you, then locks: DASH off your circle",
+            ["Processional Thrust"] = "step sideways before the blade reaches you", ["Crown Reversal"] = "leave his back: go to the flank",
+            ["Meridian Alignment"] = "ring I: stand close inside it or far outside", ["Meridian Alignment II"] = "ring II: hug him or get outside it",
         };
 
         void Awake() { d = GetComponent<RunDirector>(); }

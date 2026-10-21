@@ -46,6 +46,7 @@ namespace LastBell.Run
             };
             int phaseEvents = 0; a.PhaseChanged += (b, n) => phaseEvents++;
             var mon = new AurelionMonitor(); var monitor = StartCoroutine(Monitor(a, mon));
+            StartCoroutine(AlignmentShots());
 
             // ---- phase 1: melee posture on the forward flank, then ranged posture (edge kiting draws the Thrust)
             yield return Shot("aurelion_phase1");
@@ -86,8 +87,10 @@ namespace LastBell.Run
             Check("Aurelion: phase transformations deal and warn nothing", mon.HazardsDuringShift == 0, mon.HazardsDuringShift + " ticks");
             Check("Aurelion: hits use the short 0.15 s stun", mon.WrongStun == 0);
             int total = taken.Values.Sum();
-            Note("dodge bot (4.2 m/s walk, 0.25 s reaction, no dash) damage taken: " + (total == 0 ? "none" : string.Join(", ", taken.Select(kv => $"{kv.Key} {kv.Value}"))));
-            Check("Aurelion: every pattern avoided on foot at 4.2 m/s (dodge bot takes no damage)", total == 0, total + " damage");
+            Note("dodge bot (4.2 m/s walk, 0.25 s reaction, dashes only when walking can't make it) damage taken: " + (total == 0 ? "none" : string.Join(", ", taken.Select(kv => $"{kv.Key} {kv.Value}"))));
+            Note("dodge bot dashes by attack: " + string.Join(", ", botDashes.Select(kv => $"{kv.Key} {kv.Value}")));
+            Check("Aurelion: every pattern avoided at 4.2 m/s without immunity (dodge bot takes no damage)", total == 0, total + " damage");
+            Check("Aurelion: the dash checks needed dashes (Cut and Pins)", botDashes.ContainsKey("Meridian Cut") && botDashes.ContainsKey("Zenith Pins"), string.Join(", ", botDashes.Keys));
             Check("Aurelion: the dodge bot is still standing", d.State == RunState.Combat && !d.Player.Down);
 
             // a withdrawn hazard (e.g. a pin whose recipient went down) never resolves
@@ -105,6 +108,21 @@ namespace LastBell.Run
             yield return Wait(2f);
             Check("Aurelion: a burst through 65 % and 30 % plays one transition", phaseEvents == 1 && a.PhaseName == "Exposed Meridian", $"events {phaseEvents}, {a.PhaseName}");
 
+            // Processional Thrust hits as he travels: standing still you are hit after the warning ends, when his front
+            // arrives; stepping sideways once he is already moving still avoids it
+            d.SetPaused(true); d.RequestRetry(); d.RequestReady();
+            yield return Until(() => d.State == RunState.Combat, 4, "Aurelion thrust combat");
+            a = d.Boss as AurelionEncounter;
+            int thrustHitAge = -1;
+            d.World.PlayerHit += (p, h, dmg) => { if (h.Source == "Processional Thrust" && thrustHitAge < 0) thrustHitAge = h.Age; };
+            yield return ThrustStand(a, () => thrustHitAge >= 0, false);
+            Check("Thrust: standing in the lane, the blade hits during his travel (not at the warning's end)", thrustHitAge > AurelionEncounter.ThrustWarn && thrustHitAge <= AurelionEncounter.ThrustWarn + AurelionEncounter.ThrustTravel, $"hit at lane age {thrustHitAge} (warning ends {AurelionEncounter.ThrustWarn}, travel ends {AurelionEncounter.ThrustWarn + AurelionEncounter.ThrustTravel})");
+            int hits0 = a.ThrustTravelHits, thrusts0 = a.ThrustsStarted;
+            yield return Wait(2.5f);
+            a.DebugReadyThrust();
+            yield return ThrustStand(a, () => a.ThrustsStarted > thrusts0 && !d.World.Hazards.Live.Any(h => h.Source == "Processional Thrust"), true);
+            Check("Thrust: a sidestep after he starts moving still avoids it", a.ThrustsStarted > thrusts0 && a.ThrustTravelHits == hits0, $"thrusts {a.ThrustsStarted - thrusts0}, hits {a.ThrustTravelHits - hits0}");
+
             // sustained damage for HP sizing (packet: HP = measured sustained DPS x 150 s)
             d.SetPaused(true); d.RequestRetry(); d.RequestReady();
             yield return Until(() => d.State == RunState.Combat, 4, "Aurelion DPS combat");
@@ -118,6 +136,18 @@ namespace LastBell.Run
             Check("Aurelion practice clear is a practice result", d.Mode == RunMode.Practice && d.Victory);
             d.ReturnToMenu();
             yield return null;
+        }
+
+        // evidence: the orrery rings late in each Alignment warning (first Alignment of the fight only)
+        IEnumerator AlignmentShots()
+        {
+            foreach (var (src, age) in new[] { ("Meridian Alignment", 100), ("Meridian Alignment II", 85) })
+            {
+                float t = 0;
+                while (t < 60 && d.World != null && !d.World.Hazards.Live.Any(h => h.Source == src && h.Age >= age)) { t += Time.deltaTime; yield return null; }
+                if (d.World == null || t >= 60) yield break;
+                yield return Shot(src == "Meridian Alignment" ? "aurelion_alignment_ring1" : "aurelion_alignment_ring2");
+            }
         }
 
         // ---------------------------------------------------------------- live invariants
@@ -156,8 +186,10 @@ namespace LastBell.Run
 
         // ---------------------------------------------------------------- dodging bot
         // Holds a posture (angle from the boss's facing, distance from its centre). When it stands in a hazard that
-        // locked at least 0.25 s ago it walks to the nearest spot outside every live hazard. Walk only: no sprint/dash.
+        // locked at least 0.25 s ago it heads for the nearest spot outside every live hazard: walking, plus one dash
+        // only when walking cannot get there before that hazard resolves. Never sprints, never jumps.
         // Once `until` holds it keeps dodging for `tail` seconds, so the attack that satisfied it is still avoided.
+        readonly Dictionary<string, int> botDashes = new Dictionary<string, int>();
         IEnumerator AurelionDodge(float seconds, float speed, float angle, float dist, Dictionary<string, int> taken, Func<bool> until = null, float tail = 3.5f)
         {
             float t = 0, scale = speed / PlayerController.WalkSpeed, stopAt = seconds;
@@ -169,9 +201,18 @@ namespace LastBell.Run
                 {
                     var pos = p.transform.position; var live = d.World.Hazards.Live;
                     bot.Aim = b.transform.position; bot.Sprint = false;
-                    bool threat = live.Any(h => h.Age >= Mathf.Max(h.LockAt, 0) + ReactTicks && h.Contains(pos));
+                    var threat = live.Where(h => h.Age >= Mathf.Max(h.LockAt, 0) + ReactTicks && h.Contains(pos)).OrderBy(h => h.ResolveAt - h.Age).FirstOrDefault();
                     Vector3 move;
-                    if (threat) move = NearestClear(pos, b, live);
+                    if (threat != null)
+                    {
+                        move = NearestClear(pos, b, live, out float need);
+                        float left = (threat.ResolveAt - threat.Age) / (float)Sim.Hz;
+                        if (move != Vector3.zero && need / speed > left - 0.05f && !p.Dashing && p.Stamina >= PlayerController.DashCost)
+                        {
+                            bot.dash = true;
+                            botDashes.TryGetValue(threat.Source, out int n); botDashes[threat.Source] = n + 1;
+                        }
+                    }
                     else
                     {
                         var want = b.transform.position + Sim.Dir(b.transform.eulerAngles.y + angle) * dist;
@@ -182,14 +223,14 @@ namespace LastBell.Run
                         if (move != Vector3.zero && live.Any(h => h.Contains(next)) && !live.Any(h => h.Contains(pos))) move = Vector3.zero;
                     }
                     bot.MoveWorld = move * scale;
-                    trace.Enqueue($"{d.World.Tick}: at {Sim.Flat(pos - b.transform.position).magnitude:0.00} m {(threat ? "ESCAPE" : "posture")} move ({move.x:0.0},{move.z:0.0}) inPin {live.Any(h => h.Source == "Zenith Pins" && h.Contains(pos))} boss '{b.Current}'"); while (trace.Count > 160) trace.Dequeue();
+                    trace.Enqueue($"{d.World.Tick}: at {Sim.Flat(pos - b.transform.position).magnitude:0.00} m {(threat != null ? "ESCAPE " + threat.Source : "posture")} move ({move.x:0.0},{move.z:0.0}) stamina {p.Stamina:0} boss '{b.Current}'"); while (trace.Count > 160) trace.Dequeue();
                 }
                 t += Time.deltaTime; yield return null;
             }
             bot.Clear();
         }
         readonly Queue<string> trace = new Queue<string>();
-        static Vector3 NearestClear(Vector3 pos, BossEncounter b, IReadOnlyList<Hazard> live)
+        static Vector3 NearestClear(Vector3 pos, BossEncounter b, IReadOnlyList<Hazard> live, out float need)
         {
             for (float r = 0.2f; r <= 10f; r += 0.2f)
                 for (int k = 0; k < 36; k++)
@@ -200,12 +241,54 @@ namespace LastBell.Run
                     // do not path through the boss body
                     var c = Sim.Flat(b.transform.position - pos); float along = Mathf.Clamp(Vector3.Dot(c, dir), 0, r);
                     if ((c - dir * along).magnitude < b.BodyRadius + PlayerController.Radius - 0.05f) continue;   // tolerance: standing flush against the body
-                    return dir;
+                    need = r; return dir;
                 }
-            return Vector3.zero;
+            need = 99; return Vector3.zero;
         }
         static bool OkSpot(Vector3 q, Vector3 boss, float bodyR) =>
             new Vector2(q.x, q.z).magnitude <= CombatWorld.PlayerBound - 0.1f && Sim.Flat(q - boss).magnitude >= bodyR + PlayerController.Radius + 0.05f;
+
+        // Thrust probe: stand ~8.8 m from him on the arena-centre side (draws the Thrust, out of Alignment range), then
+        // either stand still in the lane or step sideways only once he has started moving.
+        IEnumerator ThrustStand(AurelionEncounter a, Func<bool> done, bool sidestep)
+        {
+            float t = 0; Vector3 side = Vector3.zero;
+            while (t < 18f && d.State == RunState.Combat && !Safe(done))
+            {
+                var p = d.Player; var bpos = Sim.Flat(a.transform.position); var pos = p.transform.position;
+                bot.Aim = bpos; bot.Sprint = false;
+                var lane = d.World.Hazards.Live.FirstOrDefault(h => h.Source == "Processional Thrust");
+                Vector3 move = Vector3.zero;
+                if (lane == null)
+                {
+                    side = Vector3.zero;
+                    // the nearest spot 8.8 m from him that is on the floor and not behind his body
+                    Vector3 best = pos; float bestD = float.MaxValue;
+                    for (int k = 0; k < 36; k++)
+                    {
+                        var s = bpos + Sim.Dir(k * 10f) * 8.8f;
+                        if (new Vector2(s.x, s.z).magnitude > 10.5f) continue;
+                        var dir = Sim.Flat(s - pos); var c = bpos - Sim.Flat(pos);
+                        float along = Mathf.Clamp(Vector3.Dot(c, dir.normalized), 0, dir.magnitude);
+                        if ((c - dir.normalized * along).magnitude < a.BodyRadius + PlayerController.Radius + 0.3f) continue;
+                        if (dir.magnitude < bestD) { bestD = dir.magnitude; best = s; }
+                    }
+                    var v = Sim.Flat(best - pos);
+                    if (v.magnitude > 0.3f) move = v.normalized;
+                    else if (bestD == float.MaxValue) move = Sim.Flat(pos - bpos).normalized;   // boxed in: back off first
+                }
+                else if (sidestep && lane.Age >= AurelionEncounter.ThrustWarn)
+                {
+                    if (side == Vector3.zero) side = Sim.Dir(lane.Yaw + 90);
+                    move = side;
+                }
+                bot.MoveWorld = move;
+                if (Mathf.FloorToInt(t / 2f) != Mathf.FloorToInt((t + Time.deltaTime) / 2f))
+                    Note($"   thrust probe t {t:0} s: player {Sim.Flat(pos - bpos).magnitude:0.0} m from him at ({pos.x:0.0},{pos.z:0.0}), hp {p.Hp}, boss '{a.Current}', thrusts {a.ThrustsStarted}, lane {(lane != null ? lane.Age.ToString() : "-")}");
+                t += Time.deltaTime; yield return null;
+            }
+            bot.Clear();
+        }
 
         // ---------------------------------------------------------------- route proofs
         void AurelionRouteProofs()
@@ -214,7 +297,6 @@ namespace LastBell.Run
             var o = Vector3.zero;
             var cases = new (string name, Hazard h, float window)[]
             {
-                ("Meridian Cut", new Hazard { Shape = HazardShape.Cone, Origin = o, Radius = AurelionEncounter.CutReach, HalfAngle = AurelionEncounter.CutHalf }, (AurelionEncounter.CutWarn - AurelionEncounter.CutTrack) / 60f),
                 ("Processional Thrust", new Hazard { Shape = HazardShape.Lane, Origin = o, Width = AurelionEncounter.ThrustWidth, Length = AurelionEncounter.ThrustMax + body }, AurelionEncounter.ThrustWarn / 60f),
                 ("Crown Reversal", new Hazard { Shape = HazardShape.Cone, Origin = o, Yaw = 180, Radius = AurelionEncounter.RevReach, HalfAngle = AurelionEncounter.RevHalf }, AurelionEncounter.RevWarn / 60f),
                 ("Meridian Alignment I", new Hazard { Shape = HazardShape.Ring, Origin = o, Inner = AurelionEncounter.AlignOuterIn, Radius = AurelionEncounter.AlignOuterOut }, AurelionEncounter.AlignWarn1 / 60f),
@@ -225,19 +307,29 @@ namespace LastBell.Run
                 float worst = WorstExit(q => h.Contains(q), body, out var at);
                 RouteCheck(name, worst, window, $"worst start {Sim.Flat(at).magnitude:0.0} m from centre");
             }
+
+            // Ring II's safe pocket hugging his body is real: there is standing room between his body and the ring
+            var ring2 = cases[3].h; int pocket = 0;
+            for (int k = 0; k < 72; k++) { var q = Sim.Dir(k * 5f) * (body + PlayerController.Radius + 0.1f); if (!ring2.Contains(q)) pocket++; }
+            Check("Alignment II: the pocket hugging his body is safe all the way round", pocket == 72, $"{pocket}/72 directions, pocket {body + PlayerController.Radius:0.00}–{AurelionEncounter.AlignInnerIn - Hazard.Margin:0.00} m from his centre");
+
+            // dash checks: from the worst spot neither walking (6 m/s) nor sprinting (9 m/s) clears after the lock;
+            // walking plus one dash does, at both walk speeds
+            var cut = new Hazard { Shape = HazardShape.Cone, Origin = o, Radius = AurelionEncounter.CutReach, HalfAngle = AurelionEncounter.CutHalf };
+            float cutWorst = WorstExit(q => cut.Contains(q), body, out var cutAt);
+            DashCheck("Meridian Cut", cutWorst, (AurelionEncounter.CutWarn - AurelionEncounter.CutTrack) / 60f, $"worst start {Sim.Flat(cutAt).magnitude:0.0} m from centre");
             // Pins: the circle sits on the player when it locks; the floor bound can only shorten the way out
             float pinWorst = 0;
             for (float x = -11.5f; x <= 11.5f; x += 0.5f)
                 for (float z = -11.5f; z <= 11.5f; z += 0.5f)
                 {
                     var p = new Vector3(x, 0, z); if (!OkSpot(p, o, body)) continue;
-                    var c = PinCentre(p);
-                    var pin = new Hazard { Shape = HazardShape.Circle, Origin = c, Radius = AurelionEncounter.PinRadius };
+                    var pin = new Hazard { Shape = HazardShape.Circle, Origin = PinCentre(p), Radius = AurelionEncounter.PinRadius };
                     pinWorst = Mathf.Max(pinWorst, ExitFrom(p, q => pin.Contains(q), body));
                 }
-            RouteCheck("Zenith Pins", pinWorst, (AurelionEncounter.PinWarn - AurelionEncounter.PinTrack) / 60f, "circle on the player at lock");
+            DashCheck("Zenith Pins", pinWorst, (AurelionEncounter.PinWarn - AurelionEncounter.PinTrack) / 60f, "circle on the player at lock");
 
-            // Misalignment Pins -> Cut: one common walking route from every start in front of him
+            // Misalignment Pins -> Cut: one dash for the pins, one for the cut, from every start in front of him
             foreach (float speed in new[] { ProtoWalk, DesignWalk })
             {
                 int starts = 0, ok = 0; string firstFail = null;
@@ -248,7 +340,7 @@ namespace LastBell.Run
                         var s = Sim.Dir(off) * dist;
                         if (PinsCutRoute(s, speed, body)) ok++; else firstFail ??= $"{dist:0.0} m at {off:0}°";
                     }
-                Check($"route proof {speed:0.0} m/s: Pins -> Cut has a common walking route from every start", ok == starts, $"{ok}/{starts}" + (firstFail != null ? ", first fail " + firstFail : ""));
+                Check($"route proof {speed:0.0} m/s: Pins -> Cut has a route (walk + one dash each) from every start", ok == starts, $"{ok}/{starts}" + (firstFail != null ? ", first fail " + firstFail : ""));
             }
         }
         static Vector3 PinCentre(Vector3 p)
@@ -263,6 +355,20 @@ namespace LastBell.Run
             {
                 float need = exit / speed + ReactS;
                 Check($"route proof {speed:0.0} m/s: {name} escapable on foot", need <= window, $"walk {exit:0.00} m = {need:0.00} s incl. reaction, window {window:0.00} s, spare {window - need:0.00} s ({detail})");
+            }
+        }
+        // time to cover `exit` metres with one dash (3 m over 0.2 s) and walking after it, from the reaction
+        static float DashTime(float exit, float walk) =>
+            ReactS + (exit <= PlayerController.DashDistance ? exit / PlayerController.DashDistance * PlayerController.DashTicks / Sim.Hz
+                                                            : PlayerController.DashTicks / (float)Sim.Hz + (exit - PlayerController.DashDistance) / walk);
+        void DashCheck(string name, float exit, float window, string detail)
+        {
+            float walkNeed = exit / DesignWalk + ReactS, sprintNeed = exit / PlayerController.SprintSpeed + ReactS;
+            Check($"dash check: {name} cannot be walked or sprinted out of from the worst spot", walkNeed > window && sprintNeed > window, $"exit {exit:0.00} m: walk 6 m/s {walkNeed:0.00} s, sprint 9 m/s {sprintNeed:0.00} s, window {window:0.00} s ({detail})");
+            foreach (float speed in new[] { ProtoWalk, DesignWalk })
+            {
+                float need = DashTime(exit, speed);
+                Check($"dash check {speed:0.0} m/s: {name} escapable with one dash (no immunity)", need <= window, $"{need:0.00} s incl. reaction, window {window:0.00} s, spare {window - need:0.00} s");
             }
         }
         static float WorstExit(Func<Vector3, bool> inside, float body, out Vector3 worstAt)
@@ -292,31 +398,38 @@ namespace LastBell.Run
                 }
             return 99f;
         }
-        // Tick simulation from the pins' lock (= the cut's first warning tick): the cut tracks the player for 0.3 s at
-        // 240°/s and then locks; the player reacts after 0.25 s and walks one straight heading, held by the floor
-        // bound and the boss body. Pins resolve at +78 ticks, the cut at +96. A route = one heading that clears both.
+        // Tick simulation from the pins' lock (= the cut's first warning tick). The cut tracks the player at 240°/s for
+        // CutTrack ticks, then locks. The player reacts 0.25 s after each lock with a dash (3 m / 0.2 s) along one
+        // heading and keeps walking that way; floor bound and boss body hold it. Pins resolve at +27, the cut at +96.
+        // A route = one heading pair (pin dash, cut dash) that clears both.
         static bool PinsCutRoute(Vector3 start, float speed, float body)
         {
             var pin = new Hazard { Shape = HazardShape.Circle, Origin = PinCentre(start), Radius = AurelionEncounter.PinRadius };
-            for (int k = 0; k < 24; k++)
-            {
-                var dir = Sim.Dir(k * 15f); var pos = start;
-                var cut = new Hazard { Shape = HazardShape.Cone, Origin = Vector3.zero, Radius = AurelionEncounter.CutReach, HalfAngle = AurelionEncounter.CutHalf, Yaw = Sim.YawTo(Vector3.zero, start, 0) };
-                bool hit = false;
-                for (int t = 1; t <= AurelionEncounter.CutWarn && !hit; t++)
+            int pinEnd = AurelionEncounter.PinWarn - AurelionEncounter.PinTrack, cutLock = AurelionEncounter.CutTrack;
+            for (int ka = 0; ka < 24; ka++)
+                for (int kb = 0; kb < 24; kb++)
                 {
-                    if (t <= AurelionEncounter.CutTrack) cut.Yaw = Mathf.MoveTowardsAngle(cut.Yaw, Sim.YawTo(Vector3.zero, pos, cut.Yaw), 240f * Sim.Dt);
-                    if (t > ReactTicks)
+                    var pos = start; var dir = Sim.Dir(ka * 15f); int dashLeft = 0;
+                    var cut = new Hazard { Shape = HazardShape.Cone, Origin = Vector3.zero, Radius = AurelionEncounter.CutReach, HalfAngle = AurelionEncounter.CutHalf, Yaw = Sim.YawTo(Vector3.zero, start, 0) };
+                    bool hit = false;
+                    for (int t = 1; t <= AurelionEncounter.CutWarn && !hit; t++)
                     {
-                        pos += dir * speed * Sim.Dt;
-                        var f = new Vector2(pos.x, pos.z); if (f.magnitude > CombatWorld.PlayerBound) { f = f.normalized * CombatWorld.PlayerBound; pos = new Vector3(f.x, 0, f.y); }
-                        float m = body + PlayerController.Radius; if (Sim.Flat(pos).magnitude < m) pos = Sim.Flat(pos).normalized * m;
+                        if (t <= cutLock) cut.Yaw = Mathf.MoveTowardsAngle(cut.Yaw, Sim.YawTo(Vector3.zero, pos, cut.Yaw), 240f * Sim.Dt);
+                        if (t == ReactTicks) dashLeft = PlayerController.DashTicks;
+                        if (t == cutLock + ReactTicks) { dir = Sim.Dir(kb * 15f); dashLeft = PlayerController.DashTicks; }
+                        if (t >= ReactTicks)
+                        {
+                            float step = dashLeft > 0 ? PlayerController.DashDistance / PlayerController.DashTicks : speed * Sim.Dt;
+                            if (dashLeft > 0) dashLeft--;
+                            pos += dir * step;
+                            var f = new Vector2(pos.x, pos.z); if (f.magnitude > CombatWorld.PlayerBound) { f = f.normalized * CombatWorld.PlayerBound; pos = new Vector3(f.x, 0, f.y); }
+                            float m = body + PlayerController.Radius; if (Sim.Flat(pos).magnitude < m) pos = Sim.Flat(pos).normalized * m;
+                        }
+                        if (t == pinEnd && pin.Contains(pos)) hit = true;
+                        if (t == AurelionEncounter.CutWarn && cut.Contains(pos)) hit = true;
                     }
-                    if (t == AurelionEncounter.PinWarn - AurelionEncounter.PinTrack && pin.Contains(pos)) hit = true;
-                    if (t == AurelionEncounter.CutWarn && cut.Contains(pos)) hit = true;
+                    if (!hit) return true;
                 }
-                if (!hit) return true;
-            }
             return false;
         }
     }

@@ -32,6 +32,7 @@ namespace LastBell.Run
         public int Stun = 15;
         public Action<Hazard> Track;             // called every tick until locked (follow a target / the boss facing)
         public Action<Hazard> OnResolve;         // presentation of the resolve (effects), after the hit test
+        public bool HitOnResolve = true;         // false: the owner deals the hits itself while the warning is up (a sweeping charge)
 
         public int Age { get; internal set; }
         public bool Locked => Age >= LockAt;
@@ -122,7 +123,7 @@ namespace LastBell.Run
                 if (h.Age < h.ResolveAt) continue;
                 live.RemoveAt(i);
                 h.Tele.Resolve(); Resolved++;
-                foreach (var p in w.Players)
+                if (h.HitOnResolve) foreach (var p in w.Players)
                 {
                     if (p.Down || h.Hit.Contains(p) || !h.Contains(p.transform.position)) continue;
                     if (h.JumpClearable && p.Height >= h.ClearHeight) continue;   // the only height rule (R19)

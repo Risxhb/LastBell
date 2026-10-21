@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -5,13 +6,18 @@ namespace LastBell.Run
 {
     // Aurelion, the Meridian Regent: the Skyward Spire area boss. Graybox: code-built silhouette (4.2 m) and the
     // Steady Ticking schedule from the boss packet (bosses/1-skyward-spire-aurelion/BOSS.md, handoff PR #46). Every
-    // number below comes from that packet and is a proposal, not tested balance. Times are converted at 60 Hz:
-    //   attack               shape                       warn  lock  recover  cooldown  damage
-    //   Meridian Cut         80° cone, 6 m               96    18    90       300       14
-    //   Zenith Pins          circles r 1.3 on players    108   30    84       540       12
-    //   Processional Thrust  2 m lane, up to 9 m travel  102   0     132      660       16
-    //   Crown Reversal       rear 120° sector, 4 m       90    0     108      480       12  (phase 2+, rear camping)
-    //   Meridian Alignment   ring 4–8, then ring 1.7–4   120 + 108   180      1200      14 per ring
+    // number below starts from that packet and is a proposal, not tested balance. Times are converted at 60 Hz
+    // ("track" = ticks the warning follows before it locks):
+    //   attack               shape                       warn  track  recover  cooldown  damage
+    //   Meridian Cut         80° cone, 6 m               96    66     90       300       14  DASH CHECK
+    //   Zenith Pins          circles r 1.8 on players    105   78     84       540       12  DASH CHECK
+    //   Processional Thrust  2 m lane, up to 9 m travel  102   0      132      660       16  hits as he travels
+    //   Crown Reversal       rear 120° sector, 4 m       90    0      108      480       12  (phase 2+, rear camping)
+    //   Meridian Alignment   ring 4–8, then ring 2.6–4.6 120 + 108    180      1200      14 per ring
+    // Dash checks (user decision 2026-10-21): the warning still shows for ~1.6 s but keeps tracking, then locks with
+    // 0.5 s (Cut) / 0.45 s (Pins) left. From the worst spot neither walking nor sprinting gets out after the lock; a
+    // dash (3 m in 0.2 s, no immunity) does. Ring II keeps a real safe pocket hugging his body (1.55–2.3 m from his
+    // centre) as well as the outside, so melee can stay on him through the second pulse.
     // Phases: 100–65 % Perfect Order (isolated attacks), 65–30 % Misalignment (Pins lead into Cut, Reversal on),
     // 30–0 % Exposed Meridian (Alignment, then after full recovery a Thrust). Transitions queue to attack boundaries and
     // a burst through two thresholds plays one transition. At most two damaging patterns are ever live (Pins + Cut).
@@ -22,10 +28,10 @@ namespace LastBell.Run
         public override string DisplayName => "Aurelion, the Meridian Regent";
         public override string Lesson => "Watch the lock, take the flank, punish the lowered blade";
 
-        public const float CutReach = 6f, CutHalf = 40f, PinRadius = 1.3f, ThrustWidth = 2f, ThrustMax = 9f;
-        public const float RevReach = 4f, RevHalf = 60f, AlignOuterIn = 4f, AlignOuterOut = 8f, AlignInnerIn = 1.7f, AlignInnerOut = 4f;
-        public const int CutWarn = 96, CutTrack = 18, CutRec = 90, CutCd = 300, CutDmg = 14;
-        public const int PinWarn = 108, PinTrack = 30, PinRec = 84, PinCd = 540, PinDmg = 12;
+        public const float CutReach = 6f, CutHalf = 40f, PinRadius = 1.8f, ThrustWidth = 2f, ThrustMax = 9f;
+        public const float RevReach = 4f, RevHalf = 60f, AlignOuterIn = 4f, AlignOuterOut = 8f, AlignInnerIn = 2.6f, AlignInnerOut = 4.6f;
+        public const int CutWarn = 96, CutTrack = 66, CutRec = 90, CutCd = 300, CutDmg = 14;
+        public const int PinWarn = 105, PinTrack = 78, PinRec = 84, PinCd = 540, PinDmg = 12;
         public const int ThrustWarn = 102, ThrustTravel = 30, ThrustRec = 132, ThrustCd = 660, ThrustDmg = 16;
         public const int RevWarn = 90, RevRec = 108, RevCd = 480, RevDmg = 12, RevCamp = 180;
         public const int AlignWarn1 = 120, AlignWarn2 = 108, AlignRec = 180, AlignCd = 1200, AlignDmg = 14;
@@ -37,6 +43,7 @@ namespace LastBell.Run
         public int AlignmentsStarted, ReversalsStarted, PinVolleys, ThrustsStarted, CutsStarted, PinsCutCombos;
         public int MaxLiveHazards;                        // test evidence: never above two
         public int LastReversalBehindTicks, AlignThenThrust, AlignThenThrustGap = int.MaxValue;
+        public int ThrustTravelHits;                      // hits dealt by the moving blade (test evidence)
         int alignEndAge;
         int phase = 1;
         int cutReady, pinReady = 60, thrustReady = 240, revReady, alignReady = 600;
@@ -47,6 +54,7 @@ namespace LastBell.Run
         void Awake() { MaxHp = 13500;BodyRadius = 1.1f; HitHeight = 2.6f; MarkHeight = 5.2f; }
 
         int PhaseFor() => Hp > MaxHp * 0.65f ? 1 : Hp > MaxHp * 0.30f ? 2 : 3;
+        public void DebugReadyThrust() { thrustReady = 0; }   // test hook: the next pass may choose the Thrust
         public override float NextPhaseFraction() => Hp > MaxHp * 0.65f ? 0.64f : 0.29f;
         bool Ready(int at) => Age >= at;
 
@@ -70,7 +78,7 @@ namespace LastBell.Run
                     foreach (var w in Thrust()) yield return w;
                 }
             }
-            else if (phase < 3 && Ready(alignReady) && DistToTarget() < AlignOuterOut + 1)
+            else if (phase < 3 && Ready(alignReady) && DistToTarget() < AlignOuterOut + 0.5f)
                 foreach (var w in Alignment()) yield return w;
             else if (Ready(thrustReady) && DistToTarget() > CutReach + 1)
                 foreach (var w in Thrust()) yield return w;
@@ -157,7 +165,8 @@ namespace LastBell.Run
             foreach (var w in Recover(PinRec)) yield return w;
         }
 
-        // Misalignment: the Cut's warning starts when the pins lock, so the pins resolve (108) before the cut (126)
+        // Misalignment: the Cut's warning starts when the pins lock, so the pins resolve (105) well before the cut (174):
+        // two separate dash checks, about 1.2 s apart
         IEnumerable<int> PinsThenCut()
         {
             PinsCutCombos++;
@@ -178,11 +187,26 @@ namespace LastBell.Run
             var end = ClampToBound(start, start + dir * travel);   // the boss stays inside its bound: a wall corridor remains
             float yaw = Sim.YawTo(start, end, transform.eulerAngles.y);
             transform.rotation = Quaternion.Euler(0, yaw, 0);
-            var h = Tune(Lane("Processional Thrust", start, yaw, Vector3.Distance(start, end) + BodyRadius, ThrustWidth, ThrustWarn, ThrustDmg));
-            h.OnResolve = hz => { W.BossFx.ChargeTrail(transform, true); Release(); };
+            // the lane stays up through the travel; it deals no damage when it expires: the blade hits whoever is
+            // still inside the lane when his front (body + glaive tip) reaches them, so a late sidestep still works
+            var h = Tune(Lane("Processional Thrust", start, yaw, Vector3.Distance(start, end) + BodyRadius, ThrustWidth, ThrustWarn + ThrustTravel, ThrustDmg));
+            h.HitOnResolve = false;
             for (int i = 0; i < ThrustWarn; i++) { Windup(i / (float)ThrustWarn); yield return 1; }
-            pose = Pose.Thrust;
-            for (int i = 1; i <= ThrustTravel; i++) { transform.position = Vector3.Lerp(start, end, i / (float)ThrustTravel); yield return 1; }
+            pose = Pose.Thrust; Release(); W.BossFx.ChargeTrail(transform, true);
+            var fwd = Sim.Dir(yaw);
+            for (int i = 1; i <= ThrustTravel; i++)
+            {
+                transform.position = Vector3.Lerp(start, end, i / (float)ThrustTravel);
+                float front = Vector3.Distance(start, transform.position) + BodyRadius;
+                foreach (var p in W.Players)
+                {
+                    if (p.Down || h.Hit.Contains(p) || !h.Contains(p.transform.position)) continue;
+                    if (Vector3.Dot(Sim.Flat(p.transform.position - start), fwd) > front + Hazard.Margin) continue;   // not reached yet
+                    h.Hit.Add(p); p.ReceiveHit(h);
+                    ThrustTravelHits++;
+                }
+                yield return 1;
+            }
             W.BossFx.ChargeTrail(transform, false); W.BossFx.ChargeLand(transform.position);
             foreach (var w in Recover(ThrustRec)) yield return w;
             pose = Pose.Neutral;
@@ -224,15 +248,76 @@ namespace LastBell.Run
             bool firstDone = false;
             var a = Tune(Ring("Meridian Alignment", at, AlignOuterIn, AlignOuterOut, AlignWarn1, AlignDmg));
             a.OnResolve = hz => { W.BossFx.TollResolve(hz.Origin, hz.Inner, hz.Radius); Release(); firstDone = true; };
+            SpawnOrrery(a, 1);
             for (int i = 0; i < AlignWarn1; i++) { Windup(i / (float)AlignWarn1); yield return 1; }
             if (!firstDone) SecondRingSeenBeforeFirstResolved = true;   // test evidence: must never happen
             var b = Tune(Ring("Meridian Alignment II", at, AlignInnerIn, AlignInnerOut, AlignWarn2, AlignDmg));
             b.OnResolve = hz => { W.BossFx.TollResolve(hz.Origin, hz.Inner, hz.Radius); Release(1.2f); };
+            SpawnOrrery(b, -1);
             for (int i = 0; i < AlignWarn2; i++) { Windup(i / (float)AlignWarn2); yield return 1; }
             Current = "open chest"; pose = Pose.Exposed; glowTarget = 0.3f;
             alignEndAge = Age;   // the last ring has just resolved
             yield return AlignRec;
             glowTarget = 1; pose = Pose.Neutral;
+        }
+
+        // Orrery rings (presentation only): two dashed gold circles laid exactly on a ring warning's inner and outer
+        // edges, with clock ticks on the outer one and a planet bead riding it. They spin up and brighten as the pulse
+        // nears, flash on resolve and sink away. Because they trace the warning's own borders they add spectacle
+        // without drawing any light where there is no danger. A hazard cleared early (defeat) just fades them.
+        sealed class Orrery
+        {
+            public Hazard Hazard; public Transform Root, Bead; public Material Mat; public float Spin, Turn, Fade = -1, BeadR;
+        }
+        readonly List<Orrery> orreries = new List<Orrery>();
+        void SpawnOrrery(Hazard h, float spin)
+        {
+            var o = new Orrery { Hazard = h, Spin = spin, Mat = Prim.Material(Gold, 1f), BeadR = h.Radius };
+            o.Root = new GameObject("Orrery").transform; o.Root.SetParent(W.Root, false);
+            o.Root.position = new Vector3(h.Origin.x, 0.03f, h.Origin.z);
+            foreach (float r in new[] { h.Inner, h.Radius })
+            {
+                int n = Mathf.Max(12, Mathf.CeilToInt(2 * Mathf.PI * r / 0.6f));
+                for (int k = 0; k < n; k++)
+                {
+                    float ang = k * 360f / n;
+                    var seg = Prim.Make(PrimitiveKind.Cube, o.Root, Quaternion.Euler(0, ang, 0) * new Vector3(0, 0, r), new Vector3(2 * Mathf.PI * r / n * 0.62f, 0.05f, 0.06f), Gold, 0, Quaternion.Euler(0, ang + 90, 0));
+                    Share(seg, o.Mat);
+                }
+            }
+            for (int k = 0; k < 12; k++)
+            {
+                var tick = Prim.Make(PrimitiveKind.Cube, o.Root, Quaternion.Euler(0, k * 30, 0) * new Vector3(0, 0.04f, h.Radius - 0.25f), new Vector3(k % 3 == 0 ? 0.14f : 0.08f, 0.08f, k % 3 == 0 ? 0.6f : 0.35f), Gold, 0, Quaternion.Euler(0, k * 30, 0));
+                Share(tick, o.Mat);
+            }
+            o.Bead = Prim.Make(PrimitiveKind.Sphere, o.Root, new Vector3(0, 0.18f, h.Radius), Vector3.one * 0.3f, Gold);
+            Share(o.Bead, o.Mat);
+            orreries.Add(o);
+        }
+        static void Share(Transform t, Material m) { var r = t.GetComponent<Renderer>(); Destroy(r.sharedMaterial); r.sharedMaterial = m; }
+        void UpdateOrreries(float dt)
+        {
+            for (int i = orreries.Count - 1; i >= 0; i--)
+            {
+                var o = orreries[i];
+                if (!o.Root) { orreries.RemoveAt(i); continue; }
+                bool live = W != null && W.Hazards.Live.Contains(o.Hazard);
+                float k = Mathf.Clamp01(o.Hazard.Age / (float)Mathf.Max(1, o.Hazard.ResolveAt));
+                if (!live && o.Fade < 0) o.Fade = o.Hazard.Age >= o.Hazard.ResolveAt ? 1f : 0.4f;   // resolved: flash; cleared: dim
+                if (o.Fade >= 0)
+                {
+                    o.Fade -= dt * 1.6f;
+                    o.Mat.SetColor("_EmissionColor", Gold * Mathf.Max(0, o.Fade) * 6f);
+                    o.Root.position += Vector3.down * dt * 0.5f;
+                    if (o.Fade <= 0) { Destroy(o.Root.gameObject); Destroy(o.Mat); orreries.RemoveAt(i); }
+                    continue;
+                }
+                o.Turn += o.Spin * Mathf.Lerp(12f, 120f, k * k) * dt;   // the clockwork winds up toward the pulse
+                o.Root.rotation = Quaternion.Euler(0, o.Turn, 0);
+                o.Root.position = new Vector3(o.Root.position.x, Mathf.Lerp(0.03f, 0.12f, k), o.Root.position.z);
+                o.Bead.localPosition = Quaternion.Euler(0, o.Turn * 2.5f, 0) * new Vector3(0, 0.18f, o.BeadR);
+                o.Mat.SetColor("_EmissionColor", Gold * (0.3f + 2.4f * k * k));
+            }
         }
 
         // non-damaging, readable transformation; the boss stays targetable throughout
@@ -327,6 +412,7 @@ namespace LastBell.Run
         protected override void Update()
         {
             base.Update();
+            UpdateOrreries(Time.deltaTime);
             if (!body) return;
             float dt = Time.deltaTime;
             // one idle pendulum beat; it stops on defeat
