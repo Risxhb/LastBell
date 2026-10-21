@@ -63,7 +63,7 @@ Gamepads aren't read: the user's rudder pedals register as a controller. UI clic
 ## Tests actually run (evidence in `run-loop-evidence/`, not committed)
 
 - **Windows player build:** succeeded seven times tonight (0 errors). The packaged exe launched and ran the full autotest each time.
-- **Autotest in the packaged build, latest run (build 12, with the Arcanist): 104/104 passed, 0 errors logged.** Copy: [media/autotest-report-build12.txt](media/autotest-report-build12.txt). Arcanist coverage: Tick cap, Clockstep cancelling an unfinished Lance with Ticks kept, seal placement and charges, the empowered Lance inscribing the oldest seal, two separate seals on one target, both ripe together, a perfect Convergence (300) against an early one (30) resolving exactly once, Anchor record and return, the shield absorbing a hit, and a full Arcanist run to victory. Video: media/arcanist_rotation.mp4. Build 7 (84/84) is kept for the media. It covers:
+- **Autotest in the packaged build, latest run (build 14, with the Arcanist and the skill-bar icons): 108/108 passed, 0 errors logged.** Copy: [media/autotest-report-build14.txt](media/autotest-report-build14.txt). Arcanist coverage: Tick cap, Clockstep cancelling an unfinished Lance with Ticks kept, seal placement and charges, the empowered Lance inscribing the oldest seal, two separate seals on one target, both ripe together, a perfect Convergence (300) against an early one (30) resolving exactly once, Anchor record and return, the shield absorbing a hit, and a full Arcanist run to victory. Video: media/arcanist_rotation.mp4. Build 7 (84/84) is kept for the media. It covers:
   - boot to menu in the arena
   - repeated Ready, Continue and Retry presses (each starts exactly one transition)
   - all four encounter slots, each started and ended exactly once
@@ -89,6 +89,7 @@ Screens and videos: `run-loop-evidence/autotest-7/*.png` and `*.mp4` (vanguard_k
 - **PF-02** (key 4 froze the Vanguard): in the old test controller, key 4 was the superseded 1.85 s Guard pose. In the run, key 4 is **hold-to-Brace**: it's capped at 1.5 s, you can walk slowly, it lowers on release, and its exit after interruption, death and reset is tested.
 - **PF-03** skill bar: bindings, cooldown fill and seconds, charges, Opening / Harmony / bell state, and a dash slot.
 - **PF-04** hover tooltips on every skill, including the dash.
+- **Skill-bar icons** (Codex, #43 / PR #45, merged into this branch): 18 icons covering every class ability, the class dashes and the potion. Each tile shows the keybind, the icon, and a state line (seconds, charges, potions); a cooldown darkens the tile from the top. Screenshot: [media/skill-bar-icons.png](media/skill-bar-icons.png).
 - **PF-05** responsiveness:
   - a 0.15 s input buffer for abilities
   - after a basic hit connects, a ready ability cancels the rest of the swing (Basic 3 → Sundering Blow)

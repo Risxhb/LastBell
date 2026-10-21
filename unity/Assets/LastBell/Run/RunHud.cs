@@ -246,41 +246,70 @@ namespace LastBell.Run
             }
         }
 
+        // Skill bar icons by Codex (#43 / PR #45): Resources/Run/Icons/<file>.png, 256 px. Slot order = the kit's slots,
+        // then the class's dash, then the potion. A missing icon falls back to the ability name.
+        static readonly Dictionary<string, string[]> SlotIconNames = new Dictionary<string, string[]>
+        {
+            ["Vanguard"] = new[] { "vanguard_steel_rhythm", "vanguard_sundering_blow", "vanguard_last_word", "vanguard_brace", "vanguard_dash" },
+            ["Chimesinger"] = new[] { "chimesinger_resonant_note", "chimesinger_bellstrike", "chimesinger_harmonic_refrain", "chimesinger_crescendo", "chimesinger_mending_chorus", "chimesinger_harmonic_step" },
+            ["Arcanist"] = new[] { "arcanist_clockbolt", "arcanist_time_seal", "arcanist_arc_lance", "arcanist_convergence", "arcanist_temporal_anchor", "arcanist_clockstep" },
+        };
+        static readonly Dictionary<string, Texture2D> icons = new Dictionary<string, Texture2D>();
+        public static Texture2D Icon(string file)
+        {
+            if (!icons.TryGetValue(file, out var t)) icons[file] = t = Resources.Load<Texture2D>("Run/Icons/" + file);
+            return t;
+        }
+        // slot 0..n-1 = kit slots, n = dash; returns null when the class or icon is unknown
+        public static Texture2D SlotIcon(string className, int slot) =>
+            SlotIconNames.TryGetValue(className, out var names) && slot < names.Length ? Icon(names[slot]) : null;
+
+        // one bar tile: keybind on top, icon, state line at the bottom; the cooldown darkens the tile from the top and
+        // the state line spells out seconds / charges, so readiness never relies on colour
+        Rect Tile(float x, float y, string key, Texture2D icon, string name, string state, float cooldown01, bool dim)
+        {
+            const float W = 74, H = 88;
+            var r = new Rect(x, y, W, H);
+            Rect(r, new Color(0.06f, 0.08f, 0.15f, 0.95f));
+            Rect(new Rect(r.x, r.y, r.width, 2), new Color(0.76f, 0.55f, 0.27f, 0.9f));
+            var ir = new Rect(r.x + (W - 52) / 2, r.y + 18, 52, 52);
+            var old = GUI.color;
+            if (icon != null) { GUI.color = dim || cooldown01 > 0 ? new Color(0.78f, 0.78f, 0.82f, 0.9f) : Color.white; GUI.DrawTexture(ir, icon, ScaleMode.ScaleToFit, true); GUI.color = old; }
+            else GUI.Label(new Rect(r.x, r.y + 22, W, 30), name, slot);
+            if (cooldown01 > 0) Rect(new Rect(r.x, r.y + 17, W, (H - 33) * Mathf.Clamp01(cooldown01)), new Color(0, 0, 0, 0.4f));
+            GUI.Label(new Rect(r.x, r.y + 3, W, 16), "[" + key + "]", slot);
+            Rect(new Rect(r.x, r.y + H - 16, W, 16), new Color(0, 0, 0, 0.55f));
+            GUI.Label(new Rect(r.x, r.y + H - 16, W, 16), state, slot);
+            return r;
+        }
+
         void PlayerPanel()
         {
             var p = d.Player; if (p == null) return;
-            float w = Screen.width, h = Screen.height, pw = 520, x = w / 2 - pw / 2, y = h - 150;
-            Rect(new Rect(x - 10, y - 8, pw + 20, 146), new Color(0.03f, 0.04f, 0.08f, 0.6f));
+            var k = p.Kit; int n = k.SlotNames.Length;
+            const float tw = 74, gap = 6;
+            float barW = (n + 2) * tw + (n + 1) * gap;
+            float w = Screen.width, h = Screen.height, pw = Mathf.Max(520, barW), x = w / 2 - pw / 2, y = h - 184;
+            Rect(new Rect(x - 10, y - 8, pw + 20, 184), new Color(0.03f, 0.04f, 0.08f, 0.6f));
             GUI.Label(new Rect(x, y - 4, 300, 20), $"{p.ClassName}   {p.Hp} / {PlayerController.MaxHp}", small);
             Bar(new Rect(x, y + 16, pw, 14), (float)p.Hp / PlayerController.MaxHp, new Color(0.96f, 0.79f, 0.41f));
             Bar(new Rect(x, y + 36, pw, 6), p.Stamina / PlayerController.MaxStamina, new Color(0.45f, 0.85f, 0.75f));
             GUI.Label(new Rect(x + pw - 160, y - 4, 160, 20), "stamina " + Mathf.RoundToInt(p.Stamina), small);
-            var k = p.Kit; int n = k.SlotNames.Length; float sw = (pw - (n) * 6 - 140) / n; int hover = -1;
+            float bx = w / 2 - barW / 2, by = y + 50; int hover = -1;
             for (int i = 0; i < n; i++)
             {
-                var r = new Rect(x + i * (sw + 6), y + 50, sw, 62);
-                Rect(r, new Color(0.12f, 0.15f, 0.26f, 0.95f));
-                float cd = k.Cooldown01(i);
-                if (cd > 0) Rect(new Rect(r.x, r.y, r.width, r.height * cd), new Color(0, 0, 0, 0.6f));
-                GUI.Label(new Rect(r.x, r.y + 2, r.width, 16), $"[{k.SlotKeys[i]}]", slot);
-                GUI.Label(new Rect(r.x, r.y + 16, r.width, 30), k.SlotNames[i], slot);
-                GUI.Label(new Rect(r.x, r.y + 44, r.width, 16), k.SlotState(i), slot);
+                var r = Tile(bx + i * (tw + gap), by, k.SlotKeys[i], SlotIcon(p.ClassName, i), k.SlotNames[i], k.SlotState(i), k.Cooldown01(i), false);
                 if (r.Contains(Event.current.mousePosition)) hover = i;
             }
-            var dr = new Rect(x + n * (sw + 6), y + 50, 64, 62);
-            Rect(dr, new Color(0.12f, 0.15f, 0.26f, 0.95f));
-            GUI.Label(new Rect(dr.x, dr.y + 2, dr.width, 16), "[5 / RMB]", slot);
-            GUI.Label(new Rect(dr.x, dr.y + 16, dr.width, 30), p.ClassName == "Chimesinger" ? "Harmonic Step" : p.ClassName == "Arcanist" ? "Clockstep" : "Dash", slot);
-            GUI.Label(new Rect(dr.x, dr.y + 44, dr.width, 16), p.Stamina >= PlayerController.DashCost ? "ready" : "stamina", slot);
-            var pr = new Rect(dr.x + 70, y + 50, 64, 62);
-            Rect(pr, new Color(0.12f, 0.15f, 0.26f, 0.95f));
-            GUI.Label(new Rect(pr.x, pr.y + 2, pr.width, 16), "[F]", slot);
-            GUI.Label(new Rect(pr.x, pr.y + 16, pr.width, 30), "Potion", slot);
-            GUI.Label(new Rect(pr.x, pr.y + 40, pr.width, 20), new string('●', p.Potions) + new string('○', PlayerController.MaxPotions - p.Potions), slot);
+            bool dashReady = p.Stamina >= PlayerController.DashCost;
+            var dr = Tile(bx + n * (tw + gap), by, "5 / RMB", SlotIcon(p.ClassName, n), p.ClassName == "Chimesinger" ? "Harmonic Step" : p.ClassName == "Arcanist" ? "Clockstep" : "Dash",
+                          dashReady ? "ready" : "stamina", 0, !dashReady);
+            var pr = Tile(bx + (n + 1) * (tw + gap), by, "F", Icon("potion"), "Potion",
+                          new string('●', p.Potions) + new string('○', PlayerController.MaxPotions - p.Potions), 0, p.Potions == 0);
             string cs = k.ClassState();
-            if (!string.IsNullOrEmpty(cs)) GUI.Label(new Rect(x - 130, y + 116, pw + 260, 20), cs, small);   // wide: Arcanist seals list two seals
+            if (!string.IsNullOrEmpty(cs)) GUI.Label(new Rect(x - 130, y + 141, pw + 260, 20), cs, small);   // wide: Arcanist seals list two seals
             string hint = d.State == RunState.Combat ? "WASD move · mouse aim · Space jump · Shift sprint · Tab damage meter · hover a skill for details" : "Abilities are off outside combat";
-            GUI.Label(new Rect(x, y + 132, pw, 18), hint, tiny);
+            GUI.Label(new Rect(x, y + 161, pw, 18), hint, tiny);
             if (pr.Contains(Event.current.mousePosition)) Tooltip(x, y, $"POTION  [F]\n+{PlayerController.PotionHeal} HP, 1 s between drinks. {p.Potions}/{PlayerController.MaxPotions} left.\nPotions carry over between minibosses; health and potions refill before the final boss.");
             else if (dr.Contains(Event.current.mousePosition)) Tooltip(x, y, "DASH  [5 / RMB]\nShort burst (3 m in 0.2 s) in the move direction. Costs 30 stamina; sprint and jump share the bar.\nNo invincibility: get out of the shape before it resolves. Cancels basic attacks and unreleased windups.");
             else if (hover >= 0) Tooltip(x, y, k.Tooltip(hover));

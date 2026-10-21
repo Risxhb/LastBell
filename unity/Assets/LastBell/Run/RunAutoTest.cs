@@ -197,6 +197,13 @@ namespace LastBell.Run
             Check("boots into the menu in the arena scene", d.State == RunState.Menu && FindAnyObjectByType<LastBell.Arenas.KeyArtArena>() != null);
             Check("old test controllers did not auto-spawn", FindAnyObjectByType<LastBell.Characters.VanguardTestController>() == null && FindAnyObjectByType<LastBell.Characters.BellkeeperTestController>() == null);
             yield return Shot("menu");
+            foreach (var cls in RunDirector.Classes)
+            {
+                int slots = cls == "Vanguard" ? 5 : 6, found = 0;
+                for (int i = 0; i < slots; i++) if (RunHud.SlotIcon(cls, i) != null) found++;
+                Check($"{cls} skill-bar icons load ({slots} incl. dash)", found == slots, $"{found}/{slots}");
+            }
+            Check("potion icon loads", RunHud.Icon("potion") != null);
 
             // ---------- run 1: Vanguard, full victory, repeated presses ----------
             Check("StartRun accepted once", d.StartRun("Vanguard") && !d.StartRun("Vanguard"));
