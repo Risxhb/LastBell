@@ -5,9 +5,10 @@ namespace LastBell.Run
 {
     // The final boss. "Bellwarden" in the overnight request = this Bellkeeper: the Meshy source is
     // Meshy_AI_Bellwarden_*.glb and it builds Resources/Characters/Bellkeeper.glb, so the runtime ID stays "bellkeeper".
-    // Schedule follows the encounter spec v0.2 (collab PR #16, docs/design/bellkeeper.md) at Steady Ticking, with its
-    // pending recommendations applied provisionally: D1 6.5 m Bell Sweep, D2 damage 30/25/30/15 (45 for the Final
-    // Toll's sweep), HP-phase thresholds 70 % / 35 % queued to block boundaries, two damaging patterns at most.
+    // Schedule follows the encounter spec v0.3 (collab PR #16, docs/design/bellkeeper.md) at Steady Ticking: Codex's boss
+    // packet (PR #46) for names and the Unfinished Hour, v0.2's numbers for everything else. Pending recommendations are
+    // applied provisionally: D1 6.5 m Bell Sweep, D2 damage 30/25/30/15 (45 for the Final Toll's sweep), D7 echo damage =
+    // the recorded attack's, HP-phase thresholds 70 % / 35 % queued to block boundaries, two damaging patterns at most.
     // Boss HP is shortened for the test build (see handoff).
     public sealed class BellkeeperEncounter : BossEncounter
     {
@@ -16,13 +17,25 @@ namespace LastBell.Run
         public override string Lesson => "Everything you learned, combined";
         public override bool Placeholder => !presenter || !presenter.HasModel;
 
+        public const string Phase1 = "Last Guardian", Phase2 = "Broken Hour", Phase3 = "Final Toll";
+        public const string March = "Pendulum March", Echo = "The Unfinished Hour";
+
         const float SweepRadius = 6.5f, SweepHalf = 40f, TollInner = 2.6f, TollOuter = 6.8f, LaneWidth = 2.2f, Overshoot = 2.75f, ChimeRadius = 1.4f;
         const int SweepLock = 18, SweepResolve = 69, TollResolve = 72, ChargeResolve = 48, ChargeTravel = 18;
         const int ChimeFollow = 30, ChimeResolve = 78, ChimeGap = 24, Recovery = 120;
+        const int EchoWarning = 90;   // spec v0.3 §3.1 (First Chime would use 100)
         const int SweepDmg = 30, TollDmg = 25, ChargeDmg = 30, ChimeDmg = 15, FinalSweepDmg = 45;
 
         CharacterPresenter presenter;
-        int phase = 1;
+        int phase = 1, loop;
+
+        // The Unfinished Hour: one stored footprint (never live) and its inactive outline.
+        Hazard memory; LastBell.VFX.BellkeeperFx.Telegraph memoryMark;
+        public bool HasMemory => memory != null;
+        public Hazard LiveEcho { get; private set; }       // tests: the active echo, until it resolves
+        public Hazard LastFinalSweep { get; private set; }  // tests: the Final Toll's paired sweep
+        public Vector3 EchoBossPosition { get; private set; }
+        public int EchoesResolved { get; private set; }
 
         void Awake() { MaxHp = 3600; BodyRadius = 1.4f; HitHeight = 2.2f; MarkHeight = 5.6f; }
 
@@ -34,7 +47,7 @@ namespace LastBell.Run
                 Prim.Make(PrimitiveKind.Sphere, host, new Vector3(0, 4.1f, 0.2f), Vector3.one * 0.7f, new Color(0.95f, 0.92f, 0.85f), 1f);
                 return host;
             });
-            PhaseName = "The First Toll";
+            PhaseName = Phase1;
         }
 
         int PhaseFor() => Hp > MaxHp * 0.70f ? 1 : Hp > MaxHp * 0.35f ? 2 : 3;
@@ -47,36 +60,43 @@ namespace LastBell.Run
                 int want = PhaseFor();
                 if (want != phase)
                 {
-                    phase = want;
-                    foreach (var w in PhaseShift(phase == 2 ? "The Dissonance" : "The Final Toll")) yield return w;
+                    phase = want; loop = 0;
+                    foreach (var w in PhaseShift(phase == 2 ? Phase2 : Phase3)) yield return w;
                 }
                 if (phase == 1)
                 {
+                    // spec §4.1: the recorded attack rotates Sweep -> Toll -> March per loop
+                    int rec = loop++ % 3;
                     foreach (var w in Approach(5.0f, 1.75f)) yield return w;
-                    foreach (var w in Sweep(SweepDmg)) yield return w;
+                    foreach (var w in Sweep(SweepDmg, rec == 0)) yield return w;
                     if (PhaseFor() != phase) continue;
                     foreach (var w in Approach(4.6f, 1.75f, 120)) yield return w;
-                    foreach (var w in Toll(transform.position)) yield return w;
+                    foreach (var w in Toll(transform.position, rec == 1)) yield return w;
                     if (PhaseFor() != phase) continue;
-                    foreach (var w in Charge()) yield return w;
+                    foreach (var w in Charge(null, rec == 2)) yield return w;
                     if (PhaseFor() != phase) continue;
                     foreach (var w in Chimes()) yield return w;
                     foreach (var w in Vulnerable(54)) yield return w;
+                    if (PhaseFor() != phase) continue;
+                    foreach (var w in IsolatedEcho()) yield return w;
                     foreach (var w in WalkTo(Vector3.zero, 1.75f, 150)) yield return w;
                 }
                 else if (phase == 2)
                 {
-                    foreach (var w in Pursuit()) yield return w; yield return 30;
+                    // spec §4.2: A -> B -> C -> echo; the recorded attack rotates B's Sweep -> A's Toll -> C's March
+                    int rec = loop++ % 3;
+                    foreach (var w in Pursuit(rec == 1)) yield return w; yield return 30;
                     if (PhaseFor() != phase) continue;
-                    foreach (var w in Discord()) yield return w; yield return 30;
+                    foreach (var w in Discord(rec == 0)) yield return w; yield return 30;
                     if (PhaseFor() != phase) continue;
-                    foreach (var w in Reversal()) yield return w;
-                    foreach (var w in Vulnerable(60)) yield return w;
+                    foreach (var w in Reversal(rec == 2)) yield return w;
+                    if (PhaseFor() != phase) continue;
+                    foreach (var w in IsolatedEcho()) yield return w;
                 }
                 else
                 {
                     foreach (var w in FinalToll()) yield return w;
-                    foreach (var w in Pursuit()) yield return w;
+                    foreach (var w in Pursuit(false)) yield return w;
                     yield return 40;
                 }
             }
@@ -84,6 +104,7 @@ namespace LastBell.Run
 
         IEnumerable<int> PhaseShift(string name)
         {
+            Forget();   // a memory recorded in the previous phase never carries over
             Current = "phase shift"; SetPhase(name);
             presenter.PlayOnce("PhaseShift", 1.5f);
             glowTarget = 3f;
@@ -98,36 +119,106 @@ namespace LastBell.Run
             yield return ticks; glowTarget = 1;
         }
 
-        IEnumerable<int> Sweep(int dmg)
+        // ---------------- The Unfinished Hour (spec v0.3 §3.1) ----------------
+
+        // Store the resolved footprint of `src` and draw its inactive outline at the original world position.
+        void Record(Hazard src)
+        {
+            Forget();
+            memory = new Hazard
+            {
+                Source = Echo, Shape = src.Shape, Kind = src.Kind, Origin = src.Origin, Yaw = src.Yaw,
+                Radius = src.Radius, Inner = src.Inner, HalfAngle = src.HalfAngle, Length = src.Length, Width = src.Width,
+                Damage = src.Damage,   // D7: the recorded attack's damage
+            };
+            var fx = W.BossFx;
+            memoryMark = memory.Shape switch
+            {
+                HazardShape.Cone => fx.Cone(memory.Radius, memory.HalfAngle),
+                HazardShape.Ring => fx.Ring(memory.Inner, memory.Radius),
+                HazardShape.Lane => fx.Lane(memory.Length, memory.Width),
+                _ => fx.Circle(memory.Radius),
+            };
+            memoryMark.Memory(); memoryMark.Place(memory.Origin, memory.Yaw);
+        }
+        void Forget()
+        {
+            memoryMark?.Dismiss(); memoryMark = null; memory = null;
+        }
+        static void RecordOnResolve(Hazard h, System.Action<Hazard> record)
+        {
+            var show = h.OnResolve; h.OnResolve = hz => { show?.Invoke(hz); record(hz); };
+        }
+
+        // Turn the memory into a live hazard at its recorded position: a new instance with a full warning.
+        Hazard StartEcho()
+        {
+            if (memory == null) return null;
+            var m = memory; memoryMark?.Dismiss(); memoryMark = null; memory = null;
+            var h = W.Hazards.Spawn(new Hazard
+            {
+                Source = Echo, Shape = m.Shape, Kind = m.Kind, Origin = m.Origin, Yaw = m.Yaw, Radius = m.Radius, Inner = m.Inner,
+                HalfAngle = m.HalfAngle, Length = m.Length, Width = m.Width, LockAt = 0, ResolveAt = EchoWarning, Damage = m.Damage,
+            });
+            h.OnResolve = hz =>
+            {
+                switch (hz.Shape)
+                {
+                    case HazardShape.Cone: W.BossFx.SweepResolve(hz.Origin, hz.Yaw, hz.Radius, hz.HalfAngle); break;
+                    case HazardShape.Ring: W.BossFx.TollResolve(hz.Origin, hz.Inner, hz.Radius); break;
+                    default: W.BossFx.ChargeLand(hz.Origin + Sim.Dir(hz.Yaw) * (hz.Length - 1f)); break;
+                }
+                Release(); EchoesResolved++; if (LiveEcho == hz) LiveEcho = null;
+            };
+            LiveEcho = h; EchoBossPosition = transform.position;
+            return h;
+        }
+
+        // Phases 1-2: the echo alone (nothing else warning), then the chest opens for the punish window.
+        IEnumerable<int> IsolatedEcho()
+        {
+            if (memory == null) yield break;
+            Current = Echo;
+            StartEcho();
+            for (int i = 0; i < EchoWarning; i++) { Windup(i / (float)EchoWarning); yield return 1; }
+            foreach (var w in Vulnerable(Recovery)) yield return w;
+        }
+
+        // ---------------- attacks ----------------
+
+        IEnumerable<int> Sweep(int dmg, bool record = false)
         {
             Current = "Bell Sweep"; presenter.PlayOnce("BellSweep", 2.03f);
             var h = Cone("Bell Sweep", SweepRadius, SweepHalf, SweepLock, SweepResolve, dmg);
             h.OnResolve = hz => { W.BossFx.SweepResolve(hz.Origin, hz.Yaw, hz.Radius, hz.HalfAngle); Release(); };
+            if (record) RecordOnResolve(h, Record);
             for (int i = 0; i < SweepResolve; i++) { Windup(i / (float)SweepResolve); yield return 1; }
             yield return 36;
         }
 
-        Hazard TollAt(Vector3 at)
+        Hazard TollAt(Vector3 at, bool record = false)
         {
             var h = Ring("Hollow Toll", at, TollInner, TollOuter, TollResolve, TollDmg);
             h.OnResolve = hz => { W.BossFx.TollResolve(hz.Origin, hz.Inner, hz.Radius); Release(); };
+            if (record) RecordOnResolve(h, Record);
             return h;
         }
-        IEnumerable<int> Toll(Vector3 at)
+        IEnumerable<int> Toll(Vector3 at, bool record = false)
         {
             Current = "Hollow Toll"; presenter.PlayOnce("HollowToll", 2.03f);
-            TollAt(at);
+            TollAt(at, record);
             for (int i = 0; i < TollResolve; i++) { Windup(i / (float)TollResolve); yield return 1; }
             yield return 40;
         }
 
-        // the charge itself; the caller decides what overlaps it
-        IEnumerable<int> Charge(System.Action onLand = null)
+        // the march itself; the caller decides what overlaps it
+        IEnumerable<int> Charge(System.Action onLand = null, bool record = false)
         {
-            Current = "Pendulum Charge"; presenter.PlayOnce("PendulumCharge", 1.83f);
+            Current = March; presenter.PlayOnce("PendulumCharge", 1.83f);
             var (start, end, yaw, len) = ChargeLane(Overshoot);
-            var h = Lane("Pendulum Charge", start, yaw, len, LaneWidth, ChargeResolve, ChargeDmg);
+            var h = Lane(March, start, yaw, len, LaneWidth, ChargeResolve, ChargeDmg);
             h.OnResolve = hz => { W.BossFx.ChargeTrail(transform, true); Release(); };
+            if (record) RecordOnResolve(h, Record);
             for (int i = 0; i < ChargeResolve; i++) { TurnTowards(yaw, 480); Windup(i / (float)ChargeResolve); yield return 1; }
             for (int i = 1; i <= ChargeTravel; i++) { transform.position = Vector3.Lerp(start, end, i / (float)ChargeTravel); yield return 1; }
             W.BossFx.ChargeTrail(transform, false); W.BossFx.ChargeLand(transform.position);
@@ -149,50 +240,59 @@ namespace LastBell.Run
         }
 
         // Phase 2 blocks (spec §4.2)
-        IEnumerable<int> Pursuit()
+        IEnumerable<int> Pursuit(bool recordToll)
         {
-            // Pendulum Charge -> Hollow Toll at the landing point, warning on the landing tick
-            foreach (var w in Charge(() => { presenter.PlayOnce("HollowToll", 2.03f); TollAt(transform.position); })) yield return w;
+            // Pendulum March -> Hollow Toll at the landing point, warning on the landing tick
+            foreach (var w in Charge(() => { presenter.PlayOnce("HollowToll", 2.03f); TollAt(transform.position, recordToll); })) yield return w;
             Current = "Hollow Toll";
             yield return TollResolve + 30;
         }
-        IEnumerable<int> Discord()
+        IEnumerable<int> Discord(bool recordSweep)
         {
             // Shattered Chime -> Bell Sweep, which warns when the last marker locks
-            Hazard sweep = null;
-            foreach (var w in Chimes(() => { sweep = Cone("Bell Sweep", SweepRadius, SweepHalf, SweepLock, SweepResolve, SweepDmg); sweep.OnResolve = hz => { W.BossFx.SweepResolve(hz.Origin, hz.Yaw, hz.Radius, hz.HalfAngle); Release(); }; presenter.PlayOnce("BellSweep", 2.03f); })) yield return w;
+            foreach (var w in Chimes(() =>
+            {
+                var sweep = Cone("Bell Sweep", SweepRadius, SweepHalf, SweepLock, SweepResolve, SweepDmg);
+                sweep.OnResolve = hz => { W.BossFx.SweepResolve(hz.Origin, hz.Yaw, hz.Radius, hz.HalfAngle); Release(); };
+                if (recordSweep) RecordOnResolve(sweep, Record);
+                presenter.PlayOnce("BellSweep", 2.03f);
+            })) yield return w;
             yield return 30;
         }
-        IEnumerable<int> Reversal()
+        IEnumerable<int> Reversal(bool recordMarch)
         {
-            // Hollow Toll -> Pendulum Charge, which warns when the Toll resolves
+            // Hollow Toll -> Pendulum March, which warns when the Toll resolves; the echo warns 30 ticks after landing
             Current = "Hollow Toll"; presenter.PlayOnce("HollowToll", 2.03f);
             TollAt(transform.position);
             yield return TollResolve;
-            foreach (var w in Charge()) yield return w;
+            foreach (var w in Charge(null, recordMarch)) yield return w;
             yield return 30;
         }
 
-        // Phase 3: The Final Toll (spec §4.3 schedule, ticks from the start of the sequence)
+        // Phase 3: The Final Toll (spec v0.3 §4.3 schedule, ticks from the start of the sequence)
         IEnumerable<int> FinalToll()
         {
             Current = "The Final Toll";
-            foreach (var w in Charge()) yield return w;                      // 0..66
+            foreach (var w in Charge(null, true)) yield return w;              // 0..66, the lane is remembered at 48
             presenter.PlayOnce("HollowToll", 2.03f); TollAt(transform.position);   // warns 66, resolves 138
             yield return TollResolve;
             presenter.PlayOnce("ShatteredChime", 2.63f);
-            for (int i = 0; i < 3; i++)                                         // 138 / 162 / 186
+            for (int i = 0; i < 3; i++)                                         // 138 / 162 / 186, last resolves 264
             {
                 var h = Marker("Shattered Chime", ChimeRadius, ChimeFollow, ChimeResolve, ChimeDmg);
                 h.OnResolve = hz => { W.BossFx.ChimeResolve(hz.Origin, hz.Radius); Release(0.6f); };
                 yield return ChimeGap;
             }
-            yield return 240 - 138 - 3 * ChimeGap;                             // sweep warns at 240
+            yield return 265 - 138 - 3 * ChimeGap;                             // echo activates at 265
+            Current = Echo; StartEcho();                                        // resolves 355
+            yield return 286 - 265;                                             // sweep warns at 286
+            Current = "The Final Toll";
             presenter.PlayOnce("BellSweep", 2.03f);
             var s = Cone("Bell Sweep (Final Toll)", SweepRadius, SweepHalf, SweepLock, SweepResolve, FinalSweepDmg);
             s.OnResolve = hz => { W.BossFx.SweepResolve(hz.Origin, hz.Yaw, hz.Radius, hz.HalfAngle); Release(1.5f); };
-            yield return SweepResolve;                                         // resolves 309
-            foreach (var w in Vulnerable(Recovery)) yield return w;            // 2 s window to 429
+            LastFinalSweep = s;
+            yield return SweepResolve;                                         // locks 304, resolves 355 with the echo
+            foreach (var w in Vulnerable(Recovery)) yield return w;            // 2 s window to 475
         }
 
         protected override void StepAlways()
@@ -216,10 +316,12 @@ namespace LastBell.Run
         float defeatT;
         protected override void OnDefeat()
         {
+            Forget(); LiveEcho = null;   // the killing tick already cancelled live hazards; the memory goes with them
             glowTarget = 0.1f; glowLevel = 3f;
             presenter.PlayOnce("Defeat", 2.5f);
             W.Fx.Crescendo(transform.position, true, 2, true);   // gold release burst; coral is reserved for danger
         }
+        void OnDestroy() { Forget(); }   // retry / practice restart: no outline survives the encounter
         public CharacterPresenter Presenter => presenter;
     }
 }

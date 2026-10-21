@@ -48,11 +48,22 @@ namespace LastBell.Run
         RunDirector d; readonly Bot bot = new Bot();
         readonly List<string> lines = new List<string>(); int pass, fail, errors, shots;
         readonly List<string> errorLines = new List<string>();
+        readonly List<string> directorLog = new List<string>();   // transitions from every map's director
         string dir;
+
+        // The test lives on its own object that survives scene loads, so the map tour can switch maps under it.
+        static RunAutoTest active;
+        public static void Launch()
+        {
+            if (active) return;
+            var go = new GameObject("Run AutoTest");
+            DontDestroyOnLoad(go);
+            active = go.AddComponent<RunAutoTest>();
+        }
 
         void Start()
         {
-            d = GetComponent<RunDirector>(); dir = OutDir; Directory.CreateDirectory(dir);
+            d = RunDirector.Instance; dir = OutDir; Directory.CreateDirectory(dir);
             Application.logMessageReceived += OnLog;
             Application.runInBackground = true;   // the project pauses unfocused players; the test must not
             Screen.SetResolution(1600, 900, FullScreenMode.Windowed);
@@ -194,7 +205,9 @@ namespace LastBell.Run
             Note($"Last Bell autotest · {Application.version} · Unity {Application.unityVersion} · {SystemInfo.graphicsDeviceName} · {DateTime.Now:yyyy-MM-dd HH:mm}");
             d.InputOverride = bot;
             yield return Wait(1.0f);
-            Check("boots into the menu in the arena scene", d.State == RunState.Menu && FindAnyObjectByType<LastBell.Arenas.KeyArtArena>() != null);
+            Check($"boots into the menu on a run map ({RunMaps.CurrentName})", d.State == RunState.Menu && RunMaps.Current >= 0);
+            for (int i = 0; i < RunMaps.All.Length; i++)
+                Check($"map selectable: {RunMaps.All[i].Name}", RunMaps.InBuild(i), RunMaps.All[i].RunScene);
             yield return Shot("menu");
             if (OnlySylvara)
             {
@@ -272,19 +285,53 @@ namespace LastBell.Run
             fight = StartCoroutine(Fight(4.5f, VanguardRotation, 1.8f));
             yield return Wait(2.5f); yield return Shot("combat_bellkeeper"); yield return Wait(2.2f);
             StopCoroutine(fight); bot.Clear();
+            // The Unfinished Hour (spec v0.3 §3.1, §4.1): phase 1 records one footprint, then replays it alone
+            yield return Survive(8, () => bk.HasMemory);
+            Check("phase 1 records a footprint and shows its inactive outline", bk.HasMemory);
+            yield return Shot("bellkeeper_memory_outline");
+            d.Player.DebugSetHp(PlayerController.MaxHp);
+            yield return Survive(14, () => bk.LiveEcho != null);
+            var echo1 = bk.LiveEcho;
+            Check("phase 1 replays the memory as an isolated echo", echo1 != null && d.World.Hazards.Count == 1 && !bk.HasMemory,
+                $"echo {echo1 != null}, live hazards {d.World.Hazards.Count}");
+            Check("the echo warns for 90 ticks", echo1 != null && echo1.ResolveAt == 90 && echo1.LockAt == 0);
+            yield return Survive(1.0f); yield return Shot("bellkeeper_unfinished_hour");
+            yield return Survive(2, () => bk.EchoesResolved > 0);
+            Check("the echo resolves once and the memory is erased", bk.EchoesResolved == 1 && !bk.HasMemory && bk.LiveEcho == null);
+            yield return Survive(0.2f);
+            Check("the chest opens after the echo", d.Boss.Current == "recovery", d.Boss.Current);
+            d.Player.DebugSetHp(PlayerController.MaxHp);
             d.Boss.DebugSetHpFraction(0.69f);
-            yield return Survive(16, () => d.Boss.PhaseName == "The Dissonance");
-            Check("phase 2 queued and entered", d.Boss.PhaseName == "The Dissonance");
+            yield return Survive(16, () => d.Boss.PhaseName == BellkeeperEncounter.Phase2);
+            Check("phase 2 queued and entered", d.Boss.PhaseName == BellkeeperEncounter.Phase2);
             yield return null; yield return null;
             Check("Bellkeeper plays PhaseShift on the transition", bk.Presenter.CurrentClip == "PhaseShift", bk.Presenter.CurrentClip);
             yield return Survive(3f); yield return Shot("bellkeeper_phase2");
             d.Boss.DebugSetHpFraction(0.34f);
             d.Player.DebugSetHp(PlayerController.MaxHp);
-            yield return Survive(18, () => d.Boss.PhaseName == "The Final Toll");
-            Check("phase 3 queued and entered", d.Boss.PhaseName == "The Final Toll");
+            yield return Survive(22, () => d.Boss.PhaseName == BellkeeperEncounter.Phase3);
+            Check("phase 3 queued and entered", d.Boss.PhaseName == BellkeeperEncounter.Phase3);
             yield return Survive(2.5f); yield return Shot("bellkeeper_final_toll");
+            // spec v0.3 §4.3: the Final Toll remembers its own March and replays it with the paired Bell Sweep
+            d.Player.DebugSetHp(PlayerController.MaxHp);
+            yield return Survive(6, () => bk.LiveEcho != null);
+            var echo3 = bk.LiveEcho;
+            Check("the Final Toll replays its March lane", echo3 != null && echo3.Shape == HazardShape.Lane && echo3.Damage == 30);
+            Check("the echo stays where the March started, not on the boss",
+                echo3 != null && Sim.Flat(echo3.Origin - d.Boss.transform.position).magnitude > 1f,
+                echo3 == null ? "" : $"{Sim.Flat(echo3.Origin - d.Boss.transform.position).magnitude:0.0} m");
+            yield return Survive(1, () => bk.LastFinalSweep != null);
+            var sw = bk.LastFinalSweep;
+            Check("the paired Bell Sweep resolves on the same tick as the echo",
+                echo3 != null && sw != null && echo3.ResolveAt - echo3.Age == sw.ResolveAt - sw.Age,
+                echo3 == null || sw == null ? "" : $"echo {echo3.ResolveAt - echo3.Age}, sweep {sw.ResolveAt - sw.Age}");
+            Check("never more than two damaging patterns at once", d.World.Hazards.Count <= 2, d.World.Hazards.Count.ToString());
+            yield return Shot("bellkeeper_final_toll_pairing");
+            yield return Survive(2, () => bk.LiveEcho == null);
+            d.Player.DebugSetHp(PlayerController.MaxHp);
             yield return KillDuringWindup("bellkeeper", "bellkeeper_defeat");
             Check("Bellkeeper plays Defeat", bk.Presenter.CurrentClip == "Defeat", bk.Presenter.CurrentClip);
+            Check("defeat erases the memory and every hazard", !bk.HasMemory && bk.LiveEcho == null && d.World.Hazards.Count == 0);
             yield return Wait(1.0f); yield return Shot("bellkeeper_defeat");
             yield return Until(() => d.State == RunState.Results, 6, "results 1");
             Check("victory after the fourth encounter", d.Victory && d.EncountersCleared == 4 && d.EncounterStarts == 4 && d.EncounterEnds == 4,
@@ -333,7 +380,8 @@ namespace LastBell.Run
             d.RequestReady();
             yield return Until(() => d.State == RunState.Combat, 4, "chimesinger combat");
             yield return ChimesingerChecks();
-            for (int e = 0; e < 4; e++)
+            yield return TickRegressions();   // ends encounter 1 with a real Resonant Note killing blow
+            for (int e = 1; e < 4; e++)
             {
                 if (e == 3) { yield return Until(() => d.State == RunState.Intermission, 8, "intermission (chimesinger)"); d.RequestContinue(); }
                 yield return Until(() => d.State == RunState.Combat, 8, "combat " + (e + 1));
@@ -384,6 +432,34 @@ namespace LastBell.Run
             d.RequestRetry();
             Check("practice retry repeats the same encounter", d.State == RunState.Ready && d.Encounter == 3 && d.Mode == RunMode.Practice);
             d.ReturnToMenu();
+
+            // ---------- map tour: switch maps after fights have run (FX layers already exist), fight briefly on each ----------
+            if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); }   // the practice retry above leaves it in Ready
+            yield return Until(() => d.State == RunState.Menu, 2, "menu before the map tour");
+            int startMap = RunMaps.Current;
+            for (int step = 1; step <= RunMaps.All.Length; step++)
+            {
+                int m = (startMap + step) % RunMaps.All.Length; var map = RunMaps.All[m];
+                directorLog.AddRange(d.Log);
+                d.SelectMap(m);
+                yield return Until(() => RunMaps.Current == m && RunDirector.Instance && RunDirector.Instance.State == RunState.Menu, 30, "map loaded: " + map.Name);
+                d = RunDirector.Instance; d.InputOverride = bot; bot.Clear();
+                yield return Wait(1.5f);
+                Check($"map {map.Name}: loads into the menu with its arena", RunMaps.Current == m && d.State == RunState.Menu && HazardSystem.ArenaCount > 0, $"arena scripts {HazardSystem.ArenaCount}");
+                yield return Shot("map_" + map.Id + "_menu");
+                d.StartPractice("Vanguard", 3); d.RequestReady();
+                yield return Until(() => d.State == RunState.Combat, 4, map.Name + " practice combat");
+                int hp0 = d.Boss ? d.Boss.Hp : 0;
+                var fm = StartCoroutine(Fight(4f, VanguardRotation, 2.2f));
+                yield return Wait(4f); StopCoroutine(fm); bot.Clear();
+                yield return Shot("map_" + map.Id + "_combat");
+                Check($"map {map.Name}: Bellkeeper fight runs (boss takes damage, player stays on the floor)",
+                    d.Boss && d.Boss.Hp < hp0 && Sim.Flat(d.Player.transform.position).magnitude <= CombatWorld.PlayerBound + 0.01f, $"boss hp {hp0} -> {(d.Boss ? d.Boss.Hp : -1)}");
+                d.Boss.DebugDefeat();
+                yield return Until(() => d.State == RunState.Results, 6, map.Name + " practice results");
+                d.ReturnToMenu();
+            }
+            Check("map tour returns to the starting map", RunMaps.Current == startMap);
 
             yield return SylvaraChecks();
 
@@ -625,7 +701,13 @@ namespace LastBell.Run
         {
             // the practice section above leaves the director in Ready, where ReturnToMenu only works from the pause menu
             if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }
-            d.StartPractice("Vanguard", RunDirector.SylvaraPractice);
+            int verdant = RunMaps.IndexOf(RunDirector.SylvaraMap);
+            Check("Sylvara practice accepted from the menu", d.StartPractice("Vanguard", RunDirector.SylvaraPractice));
+            yield return Until(() => RunMaps.Current == verdant && RunDirector.Instance && RunDirector.Instance.State == RunState.Ready, 30, "Verdant Chimes loaded for Sylvara");
+            if (RunDirector.Instance != d) { directorLog.AddRange(d.Log); d = RunDirector.Instance; d.InputOverride = bot; bot.Clear(); }
+            if (d.Player) d.Player.Input = bot;   // the new scene built the player before the bot was attached
+            Check("Sylvara practice loads the Verdant Chimes arena", RunMaps.Current == verdant && HazardSystem.ArenaCount > 0, RunMaps.CurrentName);
+            Check("Sylvara practice keeps the chosen class across the map load", d.ClassName == "Vanguard" && d.Mode == RunMode.Practice && d.Encounter == RunDirector.SylvaraPractice);
             d.RequestReady();
             yield return Until(() => d.State == RunState.Combat, 4, "Sylvara practice combat");
             var sy = d.Boss as SylvaraEncounter;
@@ -728,10 +810,78 @@ namespace LastBell.Run
             d.ReturnToMenu(); yield return null;
         }
 
+        // Exact-tick regressions from the foundation review of PR #42 (risxhb/codex, Oct 21). The director is paused
+        // and the test steps the world itself, so every count below is in authoritative combat ticks.
+        bool StepUntil(Func<bool> cond, int max) { for (int i = 0; i < max && !cond(); i++) d.World.Step(); return cond(); }
+        void StepTicks(int n) { for (int i = 0; i < n; i++) d.World.Step(); }
+
+        IEnumerator TickRegressions()
+        {
+            var p = d.Player; var k = (ChimesingerKit)p.Kit; var w = d.World;
+            d.Boss.Halt(); yield return Until(() => p.Stunned == 0 && !p.Dashing, 2, "player free for the tick regressions");
+            d.SetPaused(true); bot.Clear();
+            w.ClearTransient(); p.DebugSetHp(PlayerController.MaxHp);
+            p.transform.position = d.Boss.transform.position + new Vector3(0, 0, 5f);
+            bot.Aim = d.Boss.transform.position;
+
+            // dash: 3 m over exactly 12 ticks, the activation tick included
+            StepTicks(120);   // stamina and dash lock recovered
+            var pos0 = p.transform.position;
+            bot.MoveWorld = Vector3.right; bot.dash = true; d.World.Step(); bot.MoveWorld = Vector3.zero;
+            int dashTicks = 1; while (p.Dashing && dashTicks < 40) { d.World.Step(); dashTicks++; }
+            float dashDist = Sim.Flat(p.transform.position - pos0).magnitude;
+            Check("dash moves 3 m over 12 ticks", dashTicks == PlayerController.DashTicks && Mathf.Abs(dashDist - PlayerController.DashDistance) < 0.01f, $"{dashDist:0.000} m in {dashTicks} ticks");
+
+            // capped bell: refreshes past strength 2 must not keep multiplying stored echoes
+            p.transform.position = d.Boss.transform.position + new Vector3(0, 0, 5f);
+            StepUntil(() => k.Charges == 2 && k.Cooldown01(2) <= 0, 900);
+            bot.press[1] = true; StepTicks(40);                                  // Bellstrike: bell rung
+            bot.press[2] = true; StepTicks(45);                                  // Refrain: one echo at strength 0
+            int echo0 = k.EchoTotal;
+            bot.press[1] = true; StepTicks(40);                                  // refresh: strength 1
+            int echo1 = k.EchoTotal;
+            StepUntil(() => k.Charges > 0, 400); bot.press[1] = true; StepTicks(40);   // refresh: strength 2
+            int echo2 = k.EchoTotal, strength2 = k.Strength;
+            StepUntil(() => k.Charges > 0, 400); bot.press[1] = true; StepTicks(40);   // refresh at the cap
+            int echo3 = k.EchoTotal;
+            Check("bell strengthens up to twice", k.Bell && strength2 == 2 && k.Strength == 2 && echo0 > 0 && echo1 > echo0 && echo2 > echo1, k.ClassState());
+            Check("refreshing a capped bell leaves stored echoes unchanged", echo3 == echo2, $"echo {echo0} -> {echo1} -> {echo2} -> {echo3}");
+            w.ClearTransient();
+
+            // input buffer: a press buffered during an action expires on absolute ticks, so it can't outlive a stun
+            StepUntil(() => k.Charges == 2 && k.Cooldown01(2) <= 0, 900);
+            bot.press[2] = true; d.World.Step();                                 // Refrain cast running
+            bot.press[1] = true; d.World.Step();                                 // Bellstrike buffered behind it
+            w.Hazards.Spawn(new Hazard { Source = "Test stun", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = p.transform.position, Radius = 1.5f, ResolveAt = 2, Damage = 5 });
+            StepUntil(() => p.Stunned > 0, 6);
+            int stunTicks = 0; while (p.Stunned > 0 && stunTicks < 60) { d.World.Step(); stunTicks++; }
+            int charges0 = k.Charges; StepTicks(40);
+            Check("buffered press expires during stun instead of firing on recovery", stunTicks > 9 && k.Charges == charges0 && charges0 == 2, $"stunned {stunTicks} ticks, charges {charges0} -> {k.Charges}");
+            p.DebugSetHp(PlayerController.MaxHp);
+
+            // a real projectile killing blow: no exception, and pending hazards and notes are cancelled in that tick
+            p.transform.position = d.Boss.transform.position + new Vector3(0, 0, 5f);
+            w.Hazards.Spawn(new Hazard { Source = "Test pending", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = d.Boss.transform.position + new Vector3(0, 0, -6f), Radius = 1f, ResolveAt = 600, Damage = 10 });
+            d.Boss.DebugSetHpFraction(0);   // 1 HP left
+            int resolved0 = w.Hazards.Resolved, inFlight = 0; string thrown = null;
+            bot.hold[0] = true;
+            try
+            {
+                for (int i = 0; i < 180 && !d.Boss.Dead; i++) { bot.press[0] = true; d.World.Step(); inFlight = Mathf.Max(inFlight, w.Projectiles.Count); }
+            }
+            catch (Exception e) { thrown = e.GetType().Name + ": " + e.Message; }
+            bot.Clear();
+            Check("Resonant Note killing blow kills the boss without an exception", thrown == null && d.Boss.Dead, thrown ?? $"dead {d.Boss.Dead}");
+            Check("projectile kill cancels pending hazards and notes in the same tick", w.Hazards.Count == 0 && w.Projectiles.Count == 0 && w.Hazards.Resolved == resolved0, $"hazards {w.Hazards.Count}, notes {w.Projectiles.Count} (max in flight {inFlight})");
+            d.SetPaused(false);
+            yield return Until(() => d.State != RunState.Combat, 2, "projectile kill ends encounter 1");
+        }
+
         void Finish()
         {
             lines.Insert(0, $"RESULT: {(fail == 0 ? "ALL PASSED" : "FAILURES")} · {pass} passed, {fail} failed · errors logged: {errors}");
-            lines.Add(""); lines.Add("Director transitions:"); lines.AddRange(d.Log.Select(l => "  " + l));
+            directorLog.AddRange(d.Log);
+            lines.Add(""); lines.Add("Director transitions:"); lines.AddRange(directorLog.Select(l => "  " + l));
             if (errorLines.Count > 0) { lines.Add(""); lines.Add("Errors:"); lines.AddRange(errorLines); }
             File.WriteAllLines(Path.Combine(dir, "autotest-report.txt"), lines);
             Debug.Log($"[autotest] done: {pass} passed, {fail} failed");
