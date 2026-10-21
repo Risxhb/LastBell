@@ -337,6 +337,29 @@ namespace LastBell.Run
             Check("Chimesinger run reaches victory", d.Victory && d.EncountersCleared == 4);
             d.ReturnToMenu(); yield return null;
 
+            // ---------- run 5: Arcanist rotation and full victory ----------
+            d.StartRun("Arcanist");
+            yield return Wait(0.4f); yield return Shot("ready_arcanist");
+            Check("Arcanist uses its model", d.Player.Presenter.HasModel);
+            d.RequestReady();
+            yield return Until(() => d.State == RunState.Combat, 4, "arcanist combat");
+            yield return ArcanistChecks();
+            for (int e = 0; e < 4; e++)
+            {
+                if (e == 3) { yield return Until(() => d.State == RunState.Intermission, 8, "intermission (arcanist)"); d.RequestContinue(); }
+                yield return Until(() => d.State == RunState.Combat, 8, "arcanist combat " + (e + 1));
+                if (d.State != RunState.Combat) break;
+                d.Player.DebugSetHp(PlayerController.MaxHp);
+                var f3 = StartCoroutine(Fight(e == 3 ? 4f : 2f, ArcRotation, 6f));
+                yield return Wait(e == 3 ? 4f : 2f); StopCoroutine(f3); bot.Clear();
+                if (e == 3) yield return Shot("arcanist_bellkeeper");
+                d.Boss.DebugDefeat();
+                yield return Until(() => d.State != RunState.Combat, 2, "arcanist boss defeated " + (e + 1));
+            }
+            yield return Until(() => d.State == RunState.Results, 8, "results 5");
+            Check("Arcanist run reaches victory", d.Victory && d.EncountersCleared == 4);
+            d.ReturnToMenu(); yield return null;
+
             // ---------- practice ----------
             d.StartPractice("Vanguard", 3);
             d.RequestReady();
@@ -463,6 +486,70 @@ namespace LastBell.Run
             var probe = w.Hazards.Live.Last();
             yield return Wait(0.3f);
             Check("one hazard instance hits at most once", hp0 - p.Hp == 10);
+            p.DebugSetHp(PlayerController.MaxHp);
+            d.Boss.BeginCombat();
+        }
+
+        static int ArcRotation(int f) => f % 150 == 10 ? 1 : f % 150 == 100 ? 2 : f % 300 == 140 ? 3 : f % 10 == 0 ? 0 : -1;
+
+        // #41 sequence: Seal A -> three Clockbolts -> empowered Lance -> Seal B -> three Clockbolts -> empowered Lance ->
+        // Convergence in the shared ripe window. Plus early detonation, Tick cap, dash-cancelled Lance and the Anchor.
+        IEnumerator ArcanistChecks()
+        {
+            var p = d.Player; var k = (ArcanistKit)p.Kit; var w = d.World;
+            d.Boss.Halt(); yield return Wait(0.3f); w.ClearTransient();
+            p.transform.position = d.Boss.transform.position + new Vector3(0, 0, 6f);
+            bot.Aim = d.Boss.transform.position;
+            // Tick cap
+            for (int i = 0; i < 5; i++) { bot.press[0] = true; yield return Wait(0.36f); }
+            Check("Clockbolt builds Ticks and caps at 3", k.Ticks == 3, k.ClassState());
+            // dash cancels an unfinished Lance: nothing spent, Ticks kept
+            bot.press[2] = true; yield return Wait(0.08f); bot.dash = true; bot.MoveWorld = Vector3.right; yield return Wait(0.3f); bot.Clear();
+            Check("Clockstep cancels an unfinished Arc Lance and keeps Ticks", k.Ticks == 3 && k.Cooldown01(2) <= 0, k.ClassState());
+            p.transform.position = d.Boss.transform.position + new Vector3(0, 0, 6f); bot.Aim = d.Boss.transform.position;
+            // early detonation: one fresh seal, no inscription
+            bot.press[1] = true; yield return Wait(0.4f);
+            Check("Time Seal places a seal and spends a charge", k.Seals.Count == 1 && k.Charges == 1, k.ClassState());
+            bot.press[3] = true; yield return Wait(0.5f);
+            int early = k.LastConvergence;
+            Check("early Convergence detonates and clears seals", early > 0 && k.Seals.Count == 0, "damage " + early);
+            yield return Until(() => k.Cooldown01(3) <= 0 && k.Charges == 2, 7, "Convergence and both seal charges ready");
+            // full sequence
+            StartCoroutine(Capture("arcanist_rotation", 480));
+            bot.Aim = d.Boss.transform.position;
+            float seq0 = Time.time;
+            bot.press[1] = true; yield return Wait(0.25f);                                      // Seal A
+            for (int i = 0; i < 3; i++) { bot.press[0] = true; yield return Wait(0.27f); }      // three Clockbolts
+            yield return Until(() => k.Ticks == 3, 0.4f, "3 Ticks after three Clockbolts");
+            Check("three Clockbolts reach 3 Ticks", k.Ticks == 3, k.ClassState());
+            bot.press[2] = true; yield return Wait(0.38f);                                      // empowered Lance
+            Check("empowered Arc Lance spends Ticks and inscribes the oldest seal", k.LastLanceEmpowered && k.Ticks == 0 && k.Seals.Count == 1 && k.Seals[0].Inscribed, k.ClassState());
+            bot.press[1] = true; yield return Wait(0.25f);                                      // Seal B, < 2 s after A
+            Note($"Seal A -> Seal B spacing: {(Time.time - seq0) - 0.25f:0.00} s (must be < 2 s for a shared ripe window)");
+            Check("Seal B is a separate seal on the same target", k.Seals.Count == 2 && !k.Seals[1].Inscribed, k.ClassState());
+            for (int i = 0; i < 3; i++) { bot.press[0] = true; yield return Wait(0.27f); }
+            bot.press[2] = true; yield return Wait(0.38f);
+            Check("second empowered Lance inscribes seal B", k.Seals.Count == 2 && k.Seals[0].Inscribed && k.Seals[1].Inscribed, k.ClassState());
+            yield return Until(() => k.Seals.Count == 2 && k.Seals[0].Ripe && k.Seals[1].Ripe, 5, "both seals ripe together");
+            Check("the two-seal schedule fits inside the shared ripe window", k.Seals.Count == 2 && k.Seals[1].Ripe, k.ClassState());
+            yield return Shot("arcanist_two_ripe_seals");
+            int bossHp = d.Boss.Hp;
+            bot.press[3] = true; yield return Wait(0.5f);
+            int full = k.LastConvergence;
+            Check("perfect Convergence out-damages early detonation", full > early * 4, $"perfect {full} vs early {early}");
+            Check("Convergence resolves exactly once", bossHp - d.Boss.Hp == full, $"boss lost {bossHp - d.Boss.Hp}, convergence {full}");
+            // Temporal Anchor: place, move, recast -> back at the anchor with a shield that absorbs a hit
+            yield return Wait(0.3f);
+            var anchorAt = p.transform.position;
+            bot.press[4] = true; yield return Wait(0.35f);
+            Check("Temporal Anchor records the position", k.AnchorSet);
+            bot.MoveWorld = Vector3.left; yield return Wait(0.6f); bot.Clear();
+            bot.press[4] = true; yield return Wait(0.25f);
+            Check("recast returns to the anchor", Sim.Flat(p.transform.position - anchorAt).magnitude < 0.5f, $"{Sim.Flat(p.transform.position - anchorAt).magnitude:0.00} m away");
+            int hp0 = p.Hp;
+            w.Hazards.Spawn(new Hazard { Source = "Test strike", Shape = HazardShape.Circle, Kind = HazardKind.Strike, Origin = p.transform.position, Radius = 1.5f, ResolveAt = 6, Damage = 20 });
+            yield return Wait(0.3f);
+            Check("Anchor shield absorbs the next hit", p.Hp == hp0 && k.ShieldHp == 10, $"hp {hp0} -> {p.Hp}, shield {k.ShieldHp}");
             p.DebugSetHp(PlayerController.MaxHp);
             d.Boss.BeginCombat();
         }

@@ -43,7 +43,7 @@ namespace LastBell.Run
         public float GlowLevel = 1;
 
         public static CharacterPresenter ForPlayer(Transform parent, string className) =>
-            Create(parent, className, className == "Vanguard" ? 2.5f : 2f, 1f, 0, PlaceholderBody(className));
+            Create(parent, className, className == "Chimesinger" ? 2f : 2.5f, 1f, 0, PlaceholderBody(className));   // astrolabe / rune glow restored like the Vanguard's
 
         public static CharacterPresenter Create(Transform parent, string resource, float glowBoost, float metalScale, float yawOffset, System.Func<Transform, Transform> placeholder)
         {
@@ -187,7 +187,7 @@ namespace LastBell.Run
         // simple readable stand-in body if a character GLB is missing from Resources
         static System.Func<Transform, Transform> PlaceholderBody(string className) => host =>
         {
-            var col = className == "Chimesinger" ? new Color(0.92f, 0.9f, 0.85f) : new Color(0.2f, 0.32f, 0.62f);
+            var col = className == "Chimesinger" ? new Color(0.92f, 0.9f, 0.85f) : className == "Arcanist" ? new Color(0.45f, 0.3f, 0.7f) : new Color(0.2f, 0.32f, 0.62f);
             Prim.Make(PrimitiveKind.Capsule, host, new Vector3(0, 0.9f, 0), new Vector3(0.7f, 0.9f, 0.7f), col);
             Prim.Make(PrimitiveKind.Cube, host, new Vector3(0, 1.3f, 0.4f), new Vector3(0.2f, 0.2f, 0.5f), new Color(1f, 0.8f, 0.3f), 1.5f);
             return host;

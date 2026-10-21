@@ -116,7 +116,7 @@ namespace LastBell.Run
             var pc = go.AddComponent<PlayerController>();
             pc.ClassName = className; pc.World = world;
             pc.Presenter = CharacterPresenter.ForPlayer(go.transform, className);
-            pc.Kit = className == "Chimesinger" ? new ChimesingerKit() : new VanguardKit2();
+            pc.Kit = className == "Chimesinger" ? new ChimesingerKit() : className == "Arcanist" ? new ArcanistKit() : (PlayerKit)new VanguardKit2();
             pc.Kit.Attach(pc);
             world.Players.Add(pc);
             return pc;
@@ -164,7 +164,8 @@ namespace LastBell.Run
         {
             if (Down) return;
             float mult = Kit.Mitigation(h, out bool noKnock);
-            int dmg = Mathf.Max(1, Mathf.RoundToInt(h.Damage * mult));
+            int dmg = Mathf.RoundToInt(h.Damage * mult);
+            if (mult >= 1) dmg = Mathf.Max(1, dmg);   // a shield can absorb a hit completely; nothing else can
             Hp = Mathf.Max(0, Hp - dmg);
             World.ReportPlayerHit(this, h, dmg);
             RunHud.Float(transform.position + Vector3.up * 2.4f, "-" + dmg, mult < 1 ? new Color(0.6f, 0.9f, 1f) : new Color(1f, 0.42f, 0.36f));

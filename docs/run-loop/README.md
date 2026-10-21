@@ -6,7 +6,7 @@
 
 Menu → **Preparation** (Ready) → **Dial Warden** → **Pendulum Sentinel** → **Chimebound Oracle** → **Intermission** (future-shop placeholder, Continue) → **The Bellkeeper** (three HP phases) → **Results** (victory or defeat, with death recap and damage meter) → **Retry Run** (fresh run at encounter 1) or **Main Menu**. There's also **Practice** for any single encounter, which never advances a run, and a **Pause** menu (Esc) with Resume / Restart / Main Menu.
 
-All of it runs in the one key-art arena: `Assets/LastBell/Run/RunArena.unity`, a copy of `KeyArtTestArena.unity` with a `RunDirector`. Both classes are selectable: **Vanguard** (approved four-slot kit) and **Chimesinger** (approved DPS kit).
+All of it runs in the one key-art arena: `Assets/LastBell/Run/RunArena.unity`, a copy of `KeyArtTestArena.unity` with a `RunDirector`. Three classes are selectable: **Vanguard** (approved four-slot kit), **Chimesinger** (approved DPS kit) and **Arcanist** (approved hard rotation, #41; added Oct 21 from the Arcanist session's handover).
 
 ## Launch
 
@@ -23,8 +23,8 @@ All of it runs in the one key-art arena: `Assets/LastBell/Run/RunArena.unity`, a
 | WASD | move (camera-relative) |
 | Mouse | aim; every ability fires toward the cursor |
 | 1 / LMB (hold to repeat) | Basic: Steel Rhythm / Resonant Note |
-| 2, 3, 4 | Vanguard: Sundering Blow, Last Word, **hold** Brace. Chimesinger: Bellstrike, Harmonic Refrain, Crescendo |
-| 6 | Chimesinger: Mending Chorus |
+| 2, 3, 4 | Vanguard: Sundering Blow, Last Word, **hold** Brace. Chimesinger: Bellstrike, Harmonic Refrain, Crescendo. Arcanist: Time Seal, Arc Lance, Convergence |
+| 6 | Chimesinger: Mending Chorus · Arcanist: Temporal Anchor (press again to return) |
 | 5 / RMB | dash (Clockstep / Harmonic Step) |
 | Space / Shift | jump / sprint (shared movement stamina) |
 | F | drink a potion (+40 HP) |
@@ -56,13 +56,14 @@ Gamepads aren't read: the user's rudder pedals register as a controller. UI clic
 | --- | --- | --- | --- | --- |
 | **Vanguard** | Rough production (Meshy multi-view, decimated to 40k tris) | Rough production (scripted armature, heat weights) | Rough production. **New tonight:** SteelRhythm1–3, SunderingBlow, LastWord, BraceRaise / Hold / Walk / Hit / Lower, Hit, Down, GetUp. No placeholders are needed in the run except Land | Rough production: slashes, Opening ring, Sundering split, Last Word windup / slam / shockwave, Brace disc |
 | **Chimesinger** | Rough production, **Unity copy is a stand-in** (pre-fix f84c4d5 export). The real export is owned by the Chimesinger animation-fixes session | Rough production | Approved-kit clips exist. **Placeholder:** Hit / Down / GetUp (procedural) until that session adds them | Rough production: note, bolt, bell mark with strength ring and echo pips, Refrain ripples, Crescendo burst, Chorus ring, note trail |
+| **Arcanist** | Rough production (Meshy body plus astrolabe, from the Arcanist session) | Rough production (robe cloth chains, astrolabe orbit bone) | Approved-kit clips from the Arcanist session. **Placeholder:** Hit / Down / GetUp | Rough production: bolt, seal dials (ripe ring and inscribed gem as shapes), Lance (normal and empowered), Convergence (early and perfect), Anchor marker / return / shield, Clockstep afterimage |
 | **Bellkeeper** (= "Bellwarden") | Rough production (Meshy) | Rough production | Rough production. **New tonight:** PhaseShift, Defeat | Existing telegraphs and resolves; gold (non-danger) phase-shift and defeat bursts |
 | Minibosses ×3 | **Placeholder** (code-built) | none | none (scripted transforms) | shared telegraphs and resolves |
 
 ## Tests actually run (evidence in `run-loop-evidence/`, not committed)
 
 - **Windows player build:** succeeded seven times tonight (0 errors). The packaged exe launched and ran the full autotest each time.
-- **Autotest in the packaged build, latest run (build 9, with potions and the health policy): 88/88 passed, 0 errors logged.** Copy: [media/autotest-report-build9.txt](media/autotest-report-build9.txt). Build 7 (84/84) is kept for the media. It covers:
+- **Autotest in the packaged build, latest run (build 12, with the Arcanist): 104/104 passed, 0 errors logged.** Copy: [media/autotest-report-build12.txt](media/autotest-report-build12.txt). Arcanist coverage: Tick cap, Clockstep cancelling an unfinished Lance with Ticks kept, seal placement and charges, the empowered Lance inscribing the oldest seal, two separate seals on one target, both ripe together, a perfect Convergence (300) against an early one (30) resolving exactly once, Anchor record and return, the shield absorbing a hit, and a full Arcanist run to victory. Video: media/arcanist_rotation.mp4. Build 7 (84/84) is kept for the media. It covers:
   - boot to menu in the arena
   - repeated Ready, Continue and Retry presses (each starts exactly one transition)
   - all four encounter slots, each started and ended exactly once
@@ -105,9 +106,17 @@ Screens and videos: `run-loop-evidence/autotest-7/*.png` and `*.mp4` (vanguard_k
 2. Boss HP is shortened for testing.
 3. Bellkeeper D1/D2 values are applied before review.
 4. Chimesinger tuning is entirely prototype: notes 16 dmg, Bellstrike 40 dmg with 2 charges and 6 s recharge, bell lasts 8 s, strength ×1.5 up to twice, Refrain 34 dmg with echoes worth 60 % (4 s cooldown), Crescendo 12 per Harmony + 50 bell + echoes (5 s cooldown), Chorus +30 HP within 6 m (15 s cooldown).
-5. Vanguard damage values (Steel Rhythm 22/22/42, Sundering 70 (+60 empowered), Last Word 140 + 90 shockwave) and frame timings are prototype.
-6. Mending Chorus is on key **6**, because the Chimesinger has five actions plus a dash.
-7. Brace mitigates `Strike` hazards (cones, lanes, bars) and never `Ground` ones (rings, chime circles).
+5. Arcanist tuning is prototype:
+   - Clockbolt: 14 damage, +1 Tick on hit only.
+   - Time Seal: 10 damage, 2 charges, 5 s recharge, and a missed seal still spends its charge.
+   - Arc Lance: 28 damage (46 empowered), and an empowered Lance spends Ticks even on a miss.
+   - Convergence: each seal deals 30, ×2 if ripe and ×2 if inscribed, plus 60 for a perfect pair; expired seals burst for 8; 4 s cooldown.
+   - Temporal Anchor: 4 s return window, 30-point shield for 2 s, 12 s cooldown.
+
+   **Measured schedule:** Seal A → three bolts → empowered Lance → Seal B took **1.52 s**, leaving a **0.48 s shared ripe window** for Convergence. That's feasible but tight. The perfect payoff is 300 damage against 30 for an early detonation. Both need playtesting.
+6. Vanguard damage values (Steel Rhythm 22/22/42, Sundering 70 (+60 empowered), Last Word 140 + 90 shockwave) and frame timings are prototype.
+7. Mending Chorus and Temporal Anchor are on key **6**, because those classes have five actions plus a dash.
+8. Brace mitigates `Strike` hazards (cones, lanes, bars) and never `Ground` ones (rings, chime circles).
 
 ## Known bugs and limits
 
@@ -125,7 +134,7 @@ Screens and videos: `run-loop-evidence/autotest-7/*.png` and `*.mp4` (vanguard_k
 2. Swap in the **fixed Chimesinger GLB** when the Chimesinger session delivers it, then add its Hit / Down / GetUp.
 3. Author the **three miniboss** models and schedules (encounter lane #8), replacing the stand-ins without changing the run flow.
 4. Tune boss HP and damage toward the design fight lengths, and run the escape checker on the miniboss schedules.
-5. An animation polish pass on the Vanguard ability clips (contact clearance, Down / GetUp), then the Arcanist (#41).
+5. An animation polish pass on the Vanguard ability clips (contact clearance, Down / GetUp), and Hit / Down / GetUp for the Arcanist and the Chimesinger.
 6. Move the shared run/hazard code behind the foundation #6 contract (U3) when it lands.
 
 ## Media

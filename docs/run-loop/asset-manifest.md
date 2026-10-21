@@ -85,6 +85,36 @@ Contact sheet: `run-loop-evidence/vanguard/kit-contact-sheet.png`.
 - Mending Chorus: one expanding heal ring at the 6 m radius that clears within 0.45 s, so it doesn't read as a lingering zone.
 - Harmonic Step: gold note motes along the dash.
 
+## Arcanist — model: Rough production · rig: Rough production · animation: Rough production · VFX: Rough production
+
+Handed over by the Arcanist session on Oct 21; its notes are in [arcanist-handover.md](arcanist-handover.md). The model, rig and clips are user-reviewed in that session's videos and browser viewer. The Unity kit (`Run/Combat/ArcanistKit.cs`) and FX (`PlayerFx.Arcanist.cs`) were added in this branch.
+
+- **Unity asset:** `unity/Assets/LastBell/Characters/Arcanist/Resources/Characters/Arcanist.glb` (JPEG). The astrolabe glow is restored ×2.5 at runtime.
+- **Editable source:** `prototype/arena-3d/models/blender/arcanist_prep.py` and `arcanist_rig.py`. Rebuild with `models/build-arcanist.ps1 -RunRef <Soldier.glb>`. The Meshy sources are not committed. Viewer: `prototype/arena-3d/arcanist-viewer.html`.
+- **Rig:** Vanguard-like body plus 16×3 robe chains (baked cloth), and a non-deforming `orbit` bone carrying the astrolabe. 1.8 m tall, faces +Z.
+
+| Clip | Loop | Gameplay use (ticks) | Marker → release tick |
+| --- | --- | --- | --- |
+| Idle / Run / Sprint | yes | locomotion | — |
+| Clockbolt / Clockbolt2 | no | 8-tick cast, alternating hands | release .35 → tick 3 |
+| TimeSeal | no | 12-tick cast | apply .58 → tick 7 |
+| ArcLance | no | 20-tick rooted cast (dash before release cancels) | release .45 → tick 9 |
+| Convergence | no | 16-tick cast | detonate .55 → tick 9 |
+| TemporalAnchor | no | 12-tick place | place .5 → tick 6 |
+| AnchorReturn | no | 10-tick return, teleport plus shield on press | — |
+| Dodge | no | Clockstep (the shared 3 m dash; the clip was baked for 4.5 m) | — |
+| Jump | no | jump | takeoff .22 / land .74 |
+| Hit / Down / GetUp | — | — | **Placeholder** (procedural) |
+
+**VFX:**
+- Clockbolt: teal bolt.
+- Time Seal: a closing ring on the target.
+- **Seal dials:** one dial per seal, in front of the target. The hand shows time left, a **ring of ticks marks a ripe seal** and a **centre gem marks an inscribed one**. These are shapes, not just colours.
+- Arc Lance: a tightening floor ring during the cast. The normal beam is narrow; the empowered beam is wide with sparks.
+- Convergence: a collapse pillar plus rings. A perfect pair gets a second ring and a screen shake.
+- Temporal Anchor: an upright clock-hand marker at the spot, a streak on return, then three turning shield rings.
+- Clockstep: a fractured clock-ring afterimage.
+
 ## Bellkeeper (= "Bellwarden") — model: Rough production · rig: Rough production · animation: Rough production · VFX: Rough production
 
 "Bellwarden" in the overnight request is this boss: the Meshy source is `Meshy_AI_Bellwarden_1021031533_texture.glb` and it builds `Bellkeeper.glb`. Runtime ID `boss.bellkeeper`; nothing was renamed.

@@ -22,7 +22,7 @@ namespace LastBell.Run
         public static RunDirector Instance { get; private set; }
 
         public static readonly string[] SlotNames = { "Dial Warden", "Pendulum Sentinel", "Chimebound Oracle", "Intermission", "Bellkeeper" };
-        public static readonly string[] Classes = { "Vanguard", "Chimesinger" };
+        public static readonly string[] Classes = { "Vanguard", "Chimesinger", "Arcanist" };
         const int IntroTicks = 120, ClearTicks = 180, DownedTicks = 100;
         static readonly Vector3 PlayerSocket = new Vector3(0, 0, 6.5f), BossSocket = new Vector3(0, 0, -1.5f);
 

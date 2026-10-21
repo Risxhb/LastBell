@@ -152,13 +152,15 @@ namespace LastBell.Run
             GUI.Label(new Rect(r.x + 30, r.y + 110, 200, 22), "Class", small);
             for (int i = 0; i < RunDirector.Classes.Length; i++)
             {
-                var br = new Rect(r.x + 30 + i * 330, r.y + 134, 320, 36);
+                var br = new Rect(r.x + 30 + i * 222, r.y + 134, 214, 36);
                 bool on = menuClass == i;
                 if (GUI.Toggle(br, on, (on ? "> " : "") + RunDirector.Classes[i], btn)) menuClass = i;
             }
             string desc = menuClass == 0
                 ? "Sword and shield. 1 Steel Rhythm (3-hit combo; hit 3 grants Opening) · 2 Sundering Blow · 3 Last Word · 4 hold Brace (frontal 60% reduction)."
-                : "Bell staff. 1 Resonant Note (+Harmony) · 2 Bellstrike (2 charges, rings a bell) · 3 Harmonic Refrain (adds echoes) · 4 Crescendo (detonate) · 6 Mending Chorus (instant heal).";
+                : menuClass == 1
+                ? "Bell staff. 1 Resonant Note (+Harmony) · 2 Bellstrike (2 charges, rings a bell) · 3 Harmonic Refrain (adds echoes) · 4 Crescendo (detonate) · 6 Mending Chorus (instant heal)."
+                : "Time magic. 1 Clockbolt (+Tick, max 3) · 2 Time Seal (2 charges, 6 s, ripe last 2 s) · 3 Arc Lance (3 Ticks: inscribes a seal) · 4 Convergence (detonate seals) · 6 Temporal Anchor (recast to return + shield).";
             GUI.Label(new Rect(r.x + 30, r.y + 176, r.width - 60, 40), desc, tiny);
             if (GUI.Button(new Rect(r.x + r.width / 2 - 140, r.y + 222, 280, 40), "START RUN  (Enter)", btn)) d.StartRun(RunDirector.Classes[menuClass]);
             GUI.Label(new Rect(r.x + 30, r.y + 276, 300, 22), "Practice one encounter", small);
@@ -166,9 +168,9 @@ namespace LastBell.Run
             for (int i = 0; i < 4; i++)
                 if (GUI.Button(new Rect(r.x + 30 + i * 166, r.y + 300, 160, 36), names[i], btn)) d.StartPractice(RunDirector.Classes[menuClass], i);
             GUI.Label(new Rect(r.x + 30, r.y + 350, r.width - 60, 120),
-                "Controls: WASD move · mouse aims · 1 / LMB basic · 2 3 4 class actions · 6 Mending Chorus (Chimesinger) · 5 / RMB dash · F potion · Space jump · Shift sprint · Esc pause\n" +
+                "Controls: WASD move · mouse aims · 1 / LMB basic · 2 3 4 class actions · 6 Mending Chorus / Temporal Anchor · 5 / RMB dash · F potion · Space jump · Shift sprint · Esc pause\n" +
                 "Movement stamina: sprint, jump and dash share one bar. No invincibility frames (dodging does not make you immune). F drinks a potion (+40 HP).\nHealth refills before each boss; potions carry over between minibosses and refill before the final boss. Retry restarts at the first miniboss.\n" +
-                "Minibosses are labelled stand-ins; the Bellkeeper uses its model. Dev keys in combat: F9 defeat boss, F8 next phase.", tiny);
+                "Minibosses are labelled stand-ins; the Bellkeeper uses its model. Arcanist kit numbers are prototype tuning. Dev keys in combat: F9 defeat boss, F8 next phase.", tiny);
             if (GUI.Button(new Rect(r.x + r.width - 130, r.y + r.height - 50, 100, 36), "Quit", btn)) Application.Quit();
         }
 
@@ -268,7 +270,7 @@ namespace LastBell.Run
             var dr = new Rect(x + n * (sw + 6), y + 50, 64, 62);
             Rect(dr, new Color(0.12f, 0.15f, 0.26f, 0.95f));
             GUI.Label(new Rect(dr.x, dr.y + 2, dr.width, 16), "[5 / RMB]", slot);
-            GUI.Label(new Rect(dr.x, dr.y + 16, dr.width, 30), p.ClassName == "Chimesinger" ? "Harmonic Step" : "Dash", slot);
+            GUI.Label(new Rect(dr.x, dr.y + 16, dr.width, 30), p.ClassName == "Chimesinger" ? "Harmonic Step" : p.ClassName == "Arcanist" ? "Clockstep" : "Dash", slot);
             GUI.Label(new Rect(dr.x, dr.y + 44, dr.width, 16), p.Stamina >= PlayerController.DashCost ? "ready" : "stamina", slot);
             var pr = new Rect(dr.x + 70, y + 50, 64, 62);
             Rect(pr, new Color(0.12f, 0.15f, 0.26f, 0.95f));
@@ -276,7 +278,7 @@ namespace LastBell.Run
             GUI.Label(new Rect(pr.x, pr.y + 16, pr.width, 30), "Potion", slot);
             GUI.Label(new Rect(pr.x, pr.y + 40, pr.width, 20), new string('●', p.Potions) + new string('○', PlayerController.MaxPotions - p.Potions), slot);
             string cs = k.ClassState();
-            if (!string.IsNullOrEmpty(cs)) GUI.Label(new Rect(x, y + 116, pw, 20), cs, small);
+            if (!string.IsNullOrEmpty(cs)) GUI.Label(new Rect(x - 130, y + 116, pw + 260, 20), cs, small);   // wide: Arcanist seals list two seals
             string hint = d.State == RunState.Combat ? "WASD move · mouse aim · Space jump · Shift sprint · Tab damage meter · hover a skill for details" : "Abilities are off outside combat";
             GUI.Label(new Rect(x, y + 132, pw, 18), hint, tiny);
             if (pr.Contains(Event.current.mousePosition)) Tooltip(x, y, $"POTION  [F]\n+{PlayerController.PotionHeal} HP, 1 s between drinks. {p.Potions}/{PlayerController.MaxPotions} left.\nPotions carry over between minibosses; health and potions refill before the final boss.");

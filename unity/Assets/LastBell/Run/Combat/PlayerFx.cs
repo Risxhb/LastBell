@@ -10,7 +10,7 @@ namespace LastBell.Run
     //  - floor-level player effects render below boss telegraphs (queue 3040 < telegraph 3050), so danger stays visible;
     //  - airborne arcs are short additive bands that clear within ~0.3 s;
     //  - state that matters (Opening, bell strength, echoes) also reads by shape/count, not colour alone.
-    public sealed class PlayerFx : MonoBehaviour
+    public sealed partial class PlayerFx : MonoBehaviour
     {
         public static readonly Color VanCyan = new Color(0.45f, 1.7f, 2.1f), VanGold = new Color(2.0f, 1.45f, 0.6f),
             NoteGold = new Color(2.2f, 1.6f, 0.65f), Ivory = new Color(1.9f, 1.85f, 1.6f), Heal = new Color(0.6f, 1.9f, 1.1f),
@@ -41,6 +41,7 @@ namespace LastBell.Run
             foreach (var s in shields.Values) if (s) Destroy(s.gameObject);
             shields.Clear(); openings.Clear(); trails.Clear(); ultCharge = null;
             if (bell) bell.gameObject.SetActive(false);
+            ResetArcanist();
             sparks.Clear(); motes.Clear();
         }
 
@@ -259,7 +260,7 @@ namespace LastBell.Run
                 tr = go.AddComponent<TrailRenderer>(); tr.time = 0.22f; tr.minVertexDistance = 0.1f; tr.widthMultiplier = 0.9f;
                 tr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 var m = new Material(add); m.SetFloat(PMode, 0); m.SetColor(PLow, Ink);
-                m.SetColor(PHigh, p.ClassName == "Chimesinger" ? NoteGold : VanCyan); m.SetFloat(PProgress, 0); m.SetFloat(PWidth, 0.05f); m.SetFloat(PTail, 0.6f); m.SetFloat(PDissolve, 0);
+                m.SetColor(PHigh, p.ClassName == "Chimesinger" ? NoteGold : p.ClassName == "Arcanist" ? TimeTeal : VanCyan); m.SetFloat(PProgress, 0); m.SetFloat(PWidth, 0.05f); m.SetFloat(PTail, 0.6f); m.SetFloat(PDissolve, 0);
                 tr.sharedMaterial = m; trails[p] = tr;
             }
             tr.Clear(); tr.emitting = true;
@@ -322,7 +323,8 @@ namespace LastBell.Run
             }
             bell.gameObject.SetActive(true);
             float s = 1 + 0.3f * strength;
-            bell.position = boss.transform.position + Vector3.up * (boss.MarkHeight + 0.4f * Mathf.Sin(Time.time * 3));
+            var cam = Camera.main; var toCam = cam ? Sim.Flat(-cam.transform.forward).normalized : Vector3.back;   // in front of the target, never off the top of the screen
+            bell.position = boss.transform.position + toCam * (boss.BodyRadius + 0.5f) + Vector3.up * (boss.HitHeight + 1.0f + 0.15f * Mathf.Sin(Time.time * 3));
             bell.localScale = Vector3.one * s;
             bell.rotation = Quaternion.Euler(Mathf.Sin(Time.time * 7) * 10, 0, 0);
             strengthRing.gameObject.SetActive(strength > 0);
