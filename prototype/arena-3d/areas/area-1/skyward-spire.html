@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skyward Spire Mockup</title>
+<style>
+html, body { margin: 0; height: 100%; overflow: hidden; background: #8fb8f0; }
+canvas { display: block; }
+#vig { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 50%, transparent 60%, #1a2a5a55 100%); }
+#tabs { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; gap: 8px; font-family: Georgia, serif; flex-wrap: wrap; justify-content: center; }
+#tabs a { padding: 7px 14px; font-size: 15px; color: #f6efdc; text-decoration: none; background: #101a34e0; border: 1px solid #d6aa5a88; border-radius: 8px; }
+#tabs a.on { background: #d6aa5a; color: #101825; }
+body.clean #tabs { display: none; }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas><div id="vig"></div>
+<div id="tabs"><a href="?view=game">Game camera</a><a href="?view=angle">Angle view</a><a href="?view=top">Top view</a><a href="?view=game&tele">Telegraph check</a></div>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+// Area 1 — The Skyward Spire. Look mockup from the first panel of
+// Reference/LAST-BELL-ARENA-ART-HANDOFF/artwork/a_wide_cinematic_concept_art_style_layout_poster.png:
+// a round ivory dais with cobalt and gold inlay, four bridges in a cross, ivory spires with cobalt banners,
+// open blue sky and clouds. One arena hosts 3 minibosses and the area boss, so the floor stays broad, flat
+// and open; nothing tall stands inside the rim. Boss mechanics aren't designed yet: ?tele only draws a
+// generic hostile circle and cone to check that the floor art stays quieter than warnings.
+// ?view=game (gameplay camera, same as arena-look.html) | angle | top.
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const Q = new URLSearchParams(location.search), VIEW = Q.get('view') || 'game';
+if (Q.has('clean')) document.body.classList.add('clean');
+document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.search === location.search || (!location.search && a.search === '?view=game')));
+
+const R = 14;          // dais floor radius (m); 8 players fit well outside a 7 m boss ring
+const RIM = 14.6;      // outer edge of the stone lip
+const BRIDGE_L = 13, BRIDGE_W = 4.2;
+
+// ---- helpers ----
+function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const rnd = mulberry32(11);
+const hash = (x, y) => { const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); };
+function vnoise(x, y) { const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+  const a = hash(xi, yi), b = hash(xi + 1, yi), c = hash(xi, yi + 1), d = hash(xi + 1, yi + 1); return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v; }
+const fbm = (x, y) => vnoise(x, y) * 0.55 + vnoise(x * 2.1, y * 2.1) * 0.3 + vnoise(x * 4.3, y * 4.3) * 0.15;
+const tex = (c, srgb = true) => { const t = new THREE.CanvasTexture(c); if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; };
+const canvas2d = (w, h = w) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return [c, c.getContext('2d')]; };
+const loadScript = src => new Promise(res => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = res; document.head.appendChild(s); });
+
+// ---- floor painter: radial ivory marble slabs in rings, two cobalt bands, gold hairlines, a compass star ----
+// Zones are [inner, outer, sectors, ring rows, kind]; the gold is kept thin and low-contrast on purpose.
+const ZONES = [[1.9, 5.4, 16, 2, 'ivory'], [5.4, 6.0, 0, 1, 'cobalt'], [6.0, 11.6, 32, 3, 'ivory'], [11.6, 12.4, 0, 1, 'cobalt'], [12.4, R, 48, 1, 'ivory']];
+function paintFloor(N) {
+  const [c, g] = canvas2d(N), [e, ge] = canvas2d(N), img = g.createImageData(N, N), d = img.data, S = N / (2 * R), grout = 0.03;
+  for (let py = 0; py < N; py++) for (let px = 0; px < N; px++) {
+    const x = (px + 0.5) / S - R, z = (py + 0.5) / S - R, r = Math.hypot(x, z), a = Math.atan2(z, x), o = (py * N + px) * 4;
+    let cr = 236, cg = 228, cb = 210, edge = 1;
+    const zn = ZONES.find(q => r >= q[0] && r < q[1]);
+    const n = fbm(x * 0.35, z * 0.35), fine = vnoise(x * 6, z * 6), vein = Math.abs(Math.sin(x * 0.9 + z * 0.4 + fbm(x * 0.6, z * 0.6) * 5));
+    if (zn && zn[4] === 'ivory') {
+      const [r0, r1, sec, rows] = zn, rowH = (r1 - r0) / rows, row = Math.floor((r - r0) / rowH), off = row % 2 ? 0.5 : 0;
+      const sa = (a / (Math.PI * 2) + 1) * sec + off, si = Math.floor(sa), fs = sa - si, arc = r * Math.PI * 2 / sec;
+      edge = Math.min(fs * arc, (1 - fs) * arc, (r - r0) - row * rowH, (row + 1) * rowH - (r - r0));
+      const sid = hash(si + row * 97, zn[0] * 13), v = (sid - 0.5) * 0.08 + (n - 0.5) * 0.12 + (fine - 0.5) * 0.03;
+      cr = (238 + sid * 6) * (1 + v); cg = (230 + sid * 3) * (1 + v); cb = (212 - sid * 8) * (1 + v);
+      if (vein > 0.985) { cr *= 0.93; cg *= 0.93; cb *= 0.95; }                    // faint marble vein
+    } else if (zn) {                                                                   // cobalt band
+      // muted slate-cobalt, not pure cobalt: on an ivory floor a saturated blue ring outshouts the warnings
+      const v = (n - 0.5) * 0.14; cr = 104 * (1 + v); cg = 124 * (1 + v); cb = 178 * (1 + v);
+      edge = Math.min(r - zn[0], zn[1] - r);
+    } else if (r < 1.9) { cr = 48; cg = 78; cb = 170; }                               // star medallion ground
+    if (edge < 0.12 && zn && zn[4] === 'ivory') { const f = 0.92 + edge / 0.12 * 0.08; cr *= f; cg *= f; cb *= f; }
+    if (edge < grout && zn && zn[4] === 'ivory') { cr = 168; cg = 160; cb = 150; }
+    if (r > R) { cr = 220; cg = 212; cb = 196; }
+    d[o] = Math.min(255, cr); d[o + 1] = Math.min(255, cg); d[o + 2] = Math.min(255, cb); d[o + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  ge.fillStyle = '#000'; ge.fillRect(0, 0, N, N);
+  for (const ctx of [g, ge]) { ctx.save(); ctx.translate(N / 2, N / 2); }
+  const both = f => { f(g, '#c99a4a'); f(ge, '#ffffff'); };
+  const ring = (rr, w) => both((ctx, col) => { ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath(); ctx.arc(0, 0, rr * S, 0, 7); ctx.stroke(); });
+  for (const [rr, w] of [[1.9, 7], [2.05, 2], [5.4, 4], [6.0, 4], [11.6, 5], [12.4, 5], [R - 0.05, 8]]) ring(rr, w);
+  both((ctx, col) => {                                                               // hour studs on the bands
+    ctx.fillStyle = col; ctx.strokeStyle = col;
+    for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2, x = Math.cos(a), y = Math.sin(a);
+      ctx.beginPath(); ctx.arc(x * 12.0 * S, y * 12.0 * S, (i % 3 ? 0.11 : 0.2) * S, 0, 7); ctx.fill();
+      ctx.beginPath(); ctx.arc(x * 5.7 * S, y * 5.7 * S, 0.09 * S, 0, 7); ctx.fill(); }
+    ctx.lineWidth = 3; for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2;           // quiet cross lines toward the bridges
+      ctx.beginPath(); ctx.moveTo(Math.cos(a) * 6.0 * S, Math.sin(a) * 6.0 * S); ctx.lineTo(Math.cos(a) * 11.6 * S, Math.sin(a) * 11.6 * S); ctx.stroke(); }
+    ctx.lineWidth = 3; for (let i = 0; i < 16; i++) {                                    // filigree arcs round the medallion
+      const a = i / 16 * Math.PI * 2, x = Math.cos(a) * 3.0 * S, y = Math.sin(a) * 3.0 * S;
+      ctx.beginPath(); ctx.arc(x, y, 0.55 * S, a + Math.PI * 0.6, a + Math.PI * 1.4); ctx.stroke();
+      ctx.beginPath(); ctx.arc(Math.cos(a + Math.PI / 16) * 4.6 * S, Math.sin(a + Math.PI / 16) * 4.6 * S, 0.07 * S, 0, 7); ctx.fill(); }
+    ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, 3.7 * S, 0, 7); ctx.stroke();
+    ctx.beginPath(); for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2 - Math.PI / 2, rr = i % 2 ? 0.42 : (i % 4 ? 1.05 : 1.75); ctx.lineTo(Math.cos(a) * rr * S, Math.sin(a) * rr * S); }
+    ctx.closePath(); ctx.fill();
+  });
+  for (let i = 0; i < 8; i++) {                                                        // small cobalt lozenges in the outer ring
+    const a = i / 8 * Math.PI * 2 + Math.PI / 8, x = Math.cos(a) * 9.0 * S, y = Math.sin(a) * 9.0 * S;
+    g.save(); g.translate(x, y); g.rotate(a); g.fillStyle = '#7286bf'; g.strokeStyle = '#c99a4a'; g.lineWidth = 3;
+    g.beginPath(); g.moveTo(0.7 * S, 0); g.lineTo(0, 0.32 * S); g.lineTo(-0.7 * S, 0); g.lineTo(0, -0.32 * S); g.closePath(); g.fill(); g.stroke(); g.restore();
+  }
+  g.fillStyle = '#9fd8ff'; g.beginPath(); g.arc(0, 0, 0.32 * S, 0, 7); g.fill();       // the blue gem at the heart
+  ge.fillStyle = '#ffffff'; ge.beginPath(); ge.arc(0, 0, 0.32 * S, 0, 7); ge.fill();
+  for (const ctx of [g, ge]) ctx.restore();
+  return { map: tex(c), glow: tex(e) };
+}
+
+function paintBanner(w = 128, h = 512) {
+  const [c, g] = canvas2d(w, h);
+  const grd = g.createLinearGradient(0, 0, 0, h); grd.addColorStop(0, '#1e3d9c'); grd.addColorStop(1, '#16307e'); g.fillStyle = grd;
+  g.beginPath(); g.moveTo(0, 0); g.lineTo(w, 0); g.lineTo(w, h * 0.9); g.lineTo(w / 2, h); g.lineTo(0, h * 0.9); g.closePath(); g.fill();
+  g.strokeStyle = '#e2b765'; g.lineWidth = 6; g.stroke();
+  g.fillStyle = '#e2b765'; g.fillRect(0, 0, w, 14);
+  g.save(); g.translate(w / 2, h * 0.38); g.beginPath();
+  for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2 - Math.PI / 2, rr = i % 2 ? 9 : 34; g.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); }
+  g.closePath(); g.fill(); g.lineWidth = 3; g.strokeStyle = '#e2b765'; g.beginPath(); g.arc(0, 0, 44, 0, 7); g.stroke(); g.restore();
+  return tex(c);
+}
+
+function paintCloud(N = 256) {
+  const [c, g] = canvas2d(N);
+  for (let i = 0; i < 26; i++) {
+    const x = N * (0.2 + rnd() * 0.6), y = N * (0.35 + rnd() * 0.35), rr = N * (0.1 + rnd() * 0.16);
+    const grd = g.createRadialGradient(x, y, 0, x, y, rr); grd.addColorStop(0, 'rgba(255,255,255,0.55)'); grd.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grd; g.fillRect(0, 0, N, N);
+  }
+  return tex(c);
+}
+
+// ---- renderer, scene, sky ----
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('view'), antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(44, 1, 0.1, 1200);
+window.THREE = THREE;
+
+// bright midday sky: deep cobalt zenith, pale blue horizon, warm white sun high at the back left
+// The sun sits high at the front left so the tall back spires throw their shadows away from the floor.
+const SUN = new THREE.Vector3(-0.42, 0.85, 0.32).normalize();
+scene.add(new THREE.Mesh(new THREE.SphereGeometry(600, 48, 24), new THREE.ShaderMaterial({
+  side: THREE.BackSide, depthWrite: false, fog: false, uniforms: { sun: { value: SUN } },
+  vertexShader: 'varying vec3 vD; void main(){ vD = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }',
+  fragmentShader: `varying vec3 vD; uniform vec3 sun;
+    void main(){ float h = vD.y, s = max(dot(vD, sun), 0.);
+      vec3 zen = vec3(0.16,0.34,0.78), mid = vec3(0.42,0.62,0.93), hor = vec3(0.86,0.92,0.99), low = vec3(0.78,0.86,0.97);
+      vec3 c = h > 0. ? mix(mix(hor, mid, smoothstep(0.,0.3,h)), zen, smoothstep(0.3,0.95,h)) : mix(hor, low, smoothstep(0.,-0.4,h));
+      c += vec3(1.0,0.93,0.8) * pow(s, 8.) * 0.35 + vec3(1.,0.97,0.9) * pow(s, 90.) * 0.7;
+      gl_FragColor = vec4(pow(c, vec3(2.2)), 1.); }`,
+})));
+scene.fog = new THREE.Fog(0xb8d2f4, 120, 520);
+
+scene.add(new THREE.HemisphereLight(0xd8e8ff, 0x8a7c66, 1.15));
+const sun = new THREE.DirectionalLight(0xfff0d8, 2.7); sun.position.copy(SUN).multiplyScalar(60); sun.castShadow = true;
+sun.shadow.mapSize.set(4096, 4096); Object.assign(sun.shadow.camera, { left: -34, right: 34, top: 34, bottom: -34, near: 1, far: 160 });
+sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03; scene.add(sun);
+const bounce = new THREE.DirectionalLight(0x9cc0ff, 0.5); bounce.position.set(14, 6, 18); scene.add(bounce);
+
+// ---- materials ----
+const ivoryM = new THREE.MeshStandardMaterial({ color: 0xece4d2, roughness: 0.62 });
+const ivoryDarkM = new THREE.MeshStandardMaterial({ color: 0xcfc4ad, roughness: 0.75 });
+const cobaltM = new THREE.MeshStandardMaterial({ color: 0x2445a8, roughness: 0.45, metalness: 0.15 });
+const goldM = new THREE.MeshStandardMaterial({ color: 0xe0b45e, roughness: 0.3, metalness: 0.85, emissive: 0x3a2508, emissiveIntensity: 0.25 });
+const glowBlue = new THREE.MeshBasicMaterial({ color: new THREE.Color(0x8fd6ff).multiplyScalar(2.2), toneMapped: false });
+function add(geo, mat, parent, pos, rot, shadow = true) { const m = new THREE.Mesh(geo, mat); m.castShadow = m.receiveShadow = shadow; if (pos) m.position.set(...pos); if (rot) m.rotation.set(...rot); parent.add(m); return m; }
+const root = new THREE.Group(); root.name = 'LB_ENV_SkywardSpire_Arena'; scene.add(root);
+const spin = [];   // [object, axis, speed]
+const sway = [];   // banners
+
+// ---- the dais: painted floor, gold-lipped rim, tiered ivory underside with cobalt bands and gears ----
+const floor = paintFloor(2048);
+const floorMesh = add(new THREE.CircleGeometry(R, 160), new THREE.MeshStandardMaterial({ map: floor.map, roughness: 0.55, emissive: 0xffd28a, emissiveMap: floor.glow, emissiveIntensity: 0.07 }), root, [0, 0, 0], [-Math.PI / 2, 0, 0], false);
+floorMesh.receiveShadow = true; floorMesh.name = 'Floor';
+add(new THREE.CylinderGeometry(RIM, RIM, 0.9, 160, 1, true), ivoryM, root, [0, -0.45, 0]);
+add(new THREE.RingGeometry(R, RIM, 160), ivoryDarkM, root, [0, 0.005, 0], [-Math.PI / 2, 0, 0]);
+add(new THREE.TorusGeometry(RIM, 0.09, 8, 160), goldM, root, [0, 0.02, 0], [Math.PI / 2, 0, 0]);
+add(new THREE.TorusGeometry(RIM + 0.02, 0.07, 8, 160), goldM, root, [0, -0.85, 0], [Math.PI / 2, 0, 0]);
+const tiers = [[RIM, RIM + 0.4, 0.5, -1.15, cobaltM], [RIM + 0.4, RIM - 0.2, 2.4, -2.6, ivoryM], [RIM - 0.2, RIM - 1.2, 0.5, -4.05, cobaltM], [RIM - 1.2, 9, 5, -6.8, ivoryDarkM], [9, 4.5, 6, -12.3, ivoryM], [4.5, 0.6, 7, -18.8, goldM]];
+for (const [rt, rb, h, y, m] of tiers) add(new THREE.CylinderGeometry(rt, rb, h, 64), m, root, [0, y, 0]);
+for (const y of [-1.4, -3.8, -9.3]) add(new THREE.TorusGeometry(y < -5 ? 10.8 : RIM + 0.25, 0.1, 6, 120), goldM, root, [0, y, 0], [Math.PI / 2, 0, 0]);
+// low balustrade on the rim, broken by the four bridge mouths: decorative, outside the playable floor
+const postG = new THREE.CylinderGeometry(0.13, 0.17, 0.75, 8), capG = new THREE.SphereGeometry(0.16, 10, 8);
+for (let i = 0; i < 96; i++) {
+  const a = i / 96 * Math.PI * 2, gap = Math.abs(Math.sin(2 * a)), near = Math.min(...[0, 1, 2, 3].map(k => Math.abs(((a - k * Math.PI / 2 + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI)));
+  if (near * RIM < BRIDGE_W / 2 + 0.4) continue;
+  const x = Math.cos(a) * (RIM - 0.25), z = Math.sin(a) * (RIM - 0.25);
+  add(postG, ivoryM, root, [x, 0.38, z]); add(capG, goldM, root, [x, 0.8, z]);
+}
+for (let k = 0; k < 4; k++) {   // rail segments between the bridge mouths
+  const a0 = k * Math.PI / 2 + (BRIDGE_W / 2 + 0.4) / RIM, a1 = (k + 1) * Math.PI / 2 - (BRIDGE_W / 2 + 0.4) / RIM;
+  const rail = add(new THREE.TorusGeometry(RIM - 0.25, 0.07, 6, 48, a1 - a0), goldM, root, [0, 0.72, 0], [Math.PI / 2, 0, 0]); rail.rotation.z = a0;
+}
+// big gold gears turning on the underside
+function gear(r, teeth, th) {
+  const grp = new THREE.Group();
+  add(new THREE.TorusGeometry(r, r * 0.12, 6, 48), goldM, grp);
+  const tg = new THREE.BoxGeometry(r * 0.22, r * 0.2, th);
+  for (let i = 0; i < teeth; i++) { const a = i / teeth * Math.PI * 2; const t = add(tg, goldM, grp, [Math.cos(a) * r * 1.12, Math.sin(a) * r * 1.12, 0], [0, 0, a]); }
+  for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; add(new THREE.BoxGeometry(r * 1.9, r * 0.08, th * 0.6), goldM, grp, [0, 0, 0], [0, 0, a]); }
+  add(new THREE.CylinderGeometry(r * 0.22, r * 0.22, th * 1.4, 16), cobaltM, grp, [0, 0, 0], [Math.PI / 2, 0, 0]);
+  return grp;
+}
+for (let i = 0; i < 8; i++) {
+  const a = i / 8 * Math.PI * 2 + Math.PI / 8, rr = i % 2 ? 1.6 : 2.3, gg = gear(rr, i % 2 ? 12 : 16, 0.35);
+  gg.position.set(Math.cos(a) * (RIM - 0.7), -3.0 - (i % 2) * 1.6, Math.sin(a) * (RIM - 0.7)); gg.lookAt(Math.cos(a) * 40, gg.position.y, Math.sin(a) * 40);
+  root.add(gg); spin.push([gg, 'z', (i % 2 ? -0.25 : 0.18)]);
+}
+
+// ---- four bridges in a cross, each ending in a round gear landing ----
+const bannerTex = paintBanner();
+const bannerM = new THREE.MeshStandardMaterial({ map: bannerTex, transparent: true, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.8 });
+function banner(parent, pos, rotY, w = 1.4, h = 5.6) {
+  const b = add(new THREE.PlaneGeometry(w, h, 1, 8), bannerM, parent, pos, [0, rotY, 0]); b.geometry.translate(0, -h / 2, 0);
+  add(new THREE.CylinderGeometry(0.06, 0.06, w + 0.4, 6), goldM, parent, [pos[0], pos[1] + 0.05, pos[2]], [0, rotY, Math.PI / 2]);
+  sway.push([b, rnd() * 6]); return b;
+}
+for (let k = 0; k < 4; k++) {
+  const br = new THREE.Group(); br.rotation.y = -k * Math.PI / 2; root.add(br); br.name = `Bridge_${k}`;
+  const x0 = RIM - 0.3, x1 = RIM + BRIDGE_L, mid = (x0 + x1) / 2, len = x1 - x0;
+  add(new THREE.BoxGeometry(len, 0.6, BRIDGE_W), ivoryM, br, [mid, -0.3, 0]);
+  add(new THREE.BoxGeometry(len, 0.35, BRIDGE_W + 0.3), cobaltM, br, [mid, -0.75, 0]);
+  for (const s of [-1, 1]) {
+    add(new THREE.BoxGeometry(len, 0.08, 0.1), goldM, br, [mid, 0.02, s * (BRIDGE_W / 2 - 0.05)]);
+    add(new THREE.BoxGeometry(len, 0.12, 0.12), goldM, br, [mid, 0.75, s * (BRIDGE_W / 2 - 0.1)]);
+    for (let i = 0; i <= 8; i++) add(postG, ivoryM, br, [x0 + i / 8 * len, 0.38, s * (BRIDGE_W / 2 - 0.1)]);
+  }
+  for (let i = 0; i < 3; i++) {                       // arches under the span
+    const ax = x0 + (i + 0.5) / 3 * len;
+    add(new THREE.TorusGeometry(1.6, 0.28, 6, 20, Math.PI), ivoryDarkM, br, [ax, -2.4, 0], [0, 0, 0]).scale.set(1, 1.2, 4.6);
+    add(new THREE.BoxGeometry(0.7, 6, 0.7), ivoryDarkM, br, [ax - len / 6, -4.0, 0]);
+  }
+  const land = new THREE.Group(); land.position.set(x1 + 2.4, 0, 0); br.add(land);
+  add(new THREE.CylinderGeometry(3.0, 2.2, 1.2, 40), ivoryM, land, [0, -0.6, 0]);
+  add(new THREE.CylinderGeometry(3.05, 3.05, 0.25, 40), cobaltM, land, [0, -1.3, 0]);
+  const lg = gear(2.6, 18, 0.3); lg.rotation.x = Math.PI / 2; lg.position.y = 0.05; land.add(lg); spin.push([lg, 'z', 0.12 * (k % 2 ? 1 : -1)]);
+  add(new THREE.CylinderGeometry(0.5, 0.7, 4.2, 8), ivoryM, land, [0, 2.1, 0]);
+  add(new THREE.ConeGeometry(0.55, 1.6, 8), cobaltM, land, [0, 5.0, 0]);
+  add(new THREE.SphereGeometry(0.22, 10, 8), goldM, land, [0, 5.9, 0]);
+  add(new THREE.OctahedronGeometry(0.3), glowBlue, land, [0, 3.4, 0], null, false);
+  add(new THREE.ConeGeometry(1.2, 9, 8), ivoryDarkM, land, [0, -6.2, 0], [Math.PI, 0, 0]);
+}
+
+// ---- spires around the rim (outside the floor) and far ones on floating islands ----
+function spire(parent, x, z, h, r, opts = {}) {
+  const t = new THREE.Group(); t.position.set(x, opts.y || 0, z); parent.add(t);
+  add(new THREE.CylinderGeometry(r * 1.25, r * 1.35, 1.2, 8), ivoryDarkM, t, [0, 0.6, 0]);
+  add(new THREE.CylinderGeometry(r, r * 1.1, h, 8), ivoryM, t, [0, h / 2 + 1.2, 0]);
+  for (const f of [0.35, 0.7, 1]) add(new THREE.CylinderGeometry(r * 1.12, r * 1.12, 0.3, 8), goldM, t, [0, 1.2 + h * f, 0]);
+  for (let i = 0; i < 4; i++) {                      // tall cobalt window panels
+    const a = i / 4 * Math.PI * 2 + Math.PI / 8;
+    add(new THREE.BoxGeometry(r * 0.55, h * 0.45, 0.08), cobaltM, t, [Math.cos(a) * r * 0.97, 1.2 + h * 0.5, Math.sin(a) * r * 0.97], [0, -a + Math.PI / 2, 0]);
+    add(new THREE.BoxGeometry(r * 0.1, h * 0.38, 0.1), glowBlue, t, [Math.cos(a) * r * 1.01, 1.2 + h * 0.5, Math.sin(a) * r * 1.01], [0, -a + Math.PI / 2, 0], false);
+  }
+  const top = 1.2 + h;
+  for (let i = 0; i < 4; i++) { const a = i / 4 * Math.PI * 2; add(new THREE.ConeGeometry(r * 0.28, r * 1.6, 6), ivoryM, t, [Math.cos(a) * r * 0.85, top + r * 0.8, Math.sin(a) * r * 0.85]); }
+  if (opts.dome) { add(new THREE.SphereGeometry(r * 0.95, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), cobaltM, t, [0, top, 0]); add(new THREE.ConeGeometry(r * 0.2, r * 1.6, 8), goldM, t, [0, top + r * 1.6, 0]); }
+  else { add(new THREE.ConeGeometry(r * 0.8, r * 4.2, 8), cobaltM, t, [0, top + r * 2.1, 0]); add(new THREE.ConeGeometry(r * 0.12, r * 1.4, 6), goldM, t, [0, top + r * 4.6, 0]); }
+  if (opts.banners) for (let i = 0; i < 2; i++) { const a = opts.face + (i ? 0.5 : -0.5); banner(t, [Math.cos(a) * r * 1.15, 1.2 + h * 0.9, Math.sin(a) * r * 1.15], -a + Math.PI / 2, r * 0.9, h * 0.5); }
+  return t;
+}
+// near ring: the four diagonals, tall at the back, short at the front so the gameplay camera never loses the floor
+for (const [deg, h] of [[-135, 18], [-45, 18], [45, 5], [135, 5]]) {
+  const a = deg * Math.PI / 180, d = RIM + 3.6;
+  const base = add(new THREE.CylinderGeometry(2.6, 1.4, 6, 10), ivoryDarkM, root, [Math.cos(a) * d, -3, Math.sin(a) * d]);
+  add(new THREE.BoxGeometry(3.6, 0.4, 1.6), ivoryM, root, [Math.cos(a) * (RIM + 1.4), -0.2, Math.sin(a) * (RIM + 1.4)], [0, -a, 0]);
+  spire(root, Math.cos(a) * d, Math.sin(a) * d, h, h > 10 ? 1.7 : 1.3, { banners: true, face: a + Math.PI, dome: h < 10 });
+}
+// far floating islands with spire clusters
+const far = new THREE.Group(); far.name = 'Skyline'; scene.add(far);
+const ISLANDS = [[-150, 120, -10], [-105, 95, 4], [-70, 130, -18], [-30, 105, 8], [-200, 110, -26], [165, 125, -14], [120, 100, 0], [200, 140, -30], [30, 140, -22], [75, 115, 12]];
+for (const [deg, dist, y] of ISLANDS) {
+  const a = deg * Math.PI / 180, x = Math.cos(a) * dist, z = Math.sin(a) * dist, s = 0.8 + rnd() * 0.9;
+  const isl = new THREE.Group(); isl.position.set(x, y, z); isl.scale.setScalar(s); far.add(isl);
+  add(new THREE.CylinderGeometry(9, 8, 2.5, 12), ivoryDarkM, isl, [0, -1.2, 0], null, false);
+  add(new THREE.ConeGeometry(8, 16, 10), new THREE.MeshStandardMaterial({ color: 0xe0d6c2, roughness: 0.9, emissive: 0x5a6a8a, emissiveIntensity: 0.35 }), isl, [0, -10.5, 0], [Math.PI, 0, 0], false);
+  const n = 2 + Math.floor(rnd() * 3);
+  for (let i = 0; i < n; i++) { const b = rnd() * 6.28, rr = i ? 3 + rnd() * 4 : 0; spire(isl, Math.cos(b) * rr, Math.sin(b) * rr, i ? 8 + rnd() * 10 : 18 + rnd() * 14, i ? 1.0 : 1.8, { dome: rnd() < 0.35 }); }
+  spin.push([isl, 'y', 0]); isl.userData.bob = rnd() * 6;
+}
+
+// ---- clouds: a soft sea far below plus drifting puffs ----
+const cloudTex = paintCloud();
+const clouds = [];
+for (let i = 0; i < 140; i++) {
+  const a = rnd() * Math.PI * 2, d = 30 + rnd() * 260, y = -26 - rnd() * 30 + (d > 150 ? rnd() * 40 : 0), s = 30 + rnd() * 60;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: cloudTex, color: 0xffffff, transparent: true, opacity: 0.75 + rnd() * 0.25, depthWrite: false, fog: true }));
+  sp.position.set(Math.cos(a) * d, y, Math.sin(a) * d); sp.scale.set(s, s * 0.55, 1); scene.add(sp); clouds.push([sp, a, d, 0.004 + rnd() * 0.006]);
+}
+// open sky far below: blue, paling toward the horizon; the puffs above supply the white
+const [sc, sg] = canvas2d(512), sgrd = sg.createRadialGradient(256, 256, 0, 256, 256, 256);
+sgrd.addColorStop(0, '#5f8fe0'); sgrd.addColorStop(0.55, '#86aeea'); sgrd.addColorStop(1, '#cfe0f8'); sg.fillStyle = sgrd; sg.fillRect(0, 0, 512, 512);
+add(new THREE.CircleGeometry(700, 48), new THREE.MeshBasicMaterial({ map: tex(sc), fog: false }), scene, [0, -70, 0], [-Math.PI / 2, 0, 0], false);
+
+// ---- generic warning shapes (?tele): not a boss mechanic, only a readability check against the floor ----
+if (Q.has('tele')) {
+  // On a bright floor an additive-looking coral wash vanishes, so the fill is a deeper red-orange and every
+  // shape gets a dark outer rim (the contrast comes from value, not just hue). Colours are linear: the output pass converts.
+  const teleShader = (shape) => new THREE.ShaderMaterial({ transparent: true, depthWrite: false, toneMapped: false, uniforms: { t: { value: 0 } },
+    vertexShader: 'varying vec2 vU; void main(){ vU = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }',
+    fragmentShader: `varying vec2 vU; uniform float t; void main(){ vec2 p = vU * 2. - 1.; float r = length(p), a = atan(p.y, p.x);
+      float hw = ${shape === 'cone' ? '0.5236' : '3.2'}; float da = abs(a);
+      if (r > 1. || da > hw) discard;
+      float edge = min(1. - r, ${shape === 'cone' ? '(hw - da) * r' : '1.'});
+      float rim = 1. - smoothstep(0.035, 0.07, edge), dark = 1. - smoothstep(0.0, 0.025, edge);
+      float stripe = step(0.5, fract((p.x - p.y) * 5. - t * 0.8)) * 0.1, pulse = 0.58 + 0.08 * sin(t * 6.);
+      vec3 col = mix(vec3(0.69, 0.035, 0.008), vec3(1.0, 0.26, 0.05), rim);
+      col = mix(col, vec3(0.09, 0.004, 0.002), dark);
+      gl_FragColor = vec4(col, max(max(rim, dark) * 0.95, pulse + stripe)); }` });
+  const teleC = teleShader('circle'), teleK = teleShader('cone');
+  add(new THREE.PlaneGeometry(9, 9), teleC, root, [-5.5, 0.03, -4], [-Math.PI / 2, 0, 0], false);
+  add(new THREE.PlaneGeometry(16, 16), teleK, root, [2, 0.03, 0], [-Math.PI / 2, 0, -Math.PI / 5], false);
+  window.__tele = [teleC, teleK];
+}
+
+// ---- the Vanguard for scale (characters session's model, loaded read-only) and a boss-sized stand-in ----
+const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: o.metal ? 0.4 : 0.75, metalness: o.metal ? 0.7 : 0, side: o.side || THREE.FrontSide });
+const Gl = (c, k) => new THREE.MeshBasicMaterial({ color: new THREE.Color(c).multiplyScalar(k), toneMapped: false });
+const hero = new THREE.Group(); hero.position.set(-3.5, 0, 6.5); hero.rotation.y = Math.PI * 0.8; scene.add(hero);
+await loadScript('../../vanguard-model.js');
+if (typeof window.buildVanguardModel === 'function') { const v = window.buildVanguardModel(M, Gl); const obj = v.root || v; obj.scale.setScalar(1.2); obj.traverse(o => { if (o.isMesh) o.castShadow = true; }); hero.add(obj); }
+else add(new THREE.CapsuleGeometry(0.35, 1, 4, 12), M(0x2050cc), hero, [0, 0.85, 0]);
+// faint ghost marking where a boss would stand (no design yet; it only shows scale)
+const ghost = add(new THREE.CylinderGeometry(1.6, 2.0, 4.2, 16), new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.18, depthWrite: false }), root, [0, 2.1, -1.5], null, false);
+if (!Q.has('ghost')) ghost.visible = false;
+
+// ---- post ----
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.3, 0.4, 0.98));
+composer.addPass(new OutputPass());
+
+function frame() {
+  const w = innerWidth, h = innerHeight; renderer.setSize(w, h); composer.setSize(w, h); camera.aspect = w / h;
+  if (VIEW === 'top') { camera.fov = 36; camera.position.set(0, 95, 0.01); camera.lookAt(0, 0, 0); }
+  else if (VIEW === 'angle') { camera.fov = 40; camera.position.set(-38, 30, 42); camera.lookAt(0, -3, -2); }
+  else { camera.fov = 44; camera.position.set(0, 29, 22.5); camera.lookAt(0, 0, 1.0); }
+  camera.updateProjectionMatrix();
+}
+addEventListener('resize', frame); frame();
+
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const dt = clock.getDelta(), t = clock.elapsedTime;
+  for (const [o, ax, s] of spin) { if (o.userData.bob !== undefined) o.position.y += Math.sin(t * 0.4 + o.userData.bob) * 0.01; else o.rotation[ax] += s * dt; }
+  for (const [b, ph] of sway) b.rotation.x = Math.sin(t * 1.1 + ph) * 0.06;
+  for (const c of clouds) { c[1] += c[3] * dt; c[0].position.x = Math.cos(c[1]) * c[2]; c[0].position.z = Math.sin(c[1]) * c[2]; }
+  if (window.__tele) for (const m of window.__tele) m.uniforms.t.value = t;
+  composer.render();
+});
+window.__ready = true;
+</script>
+</body>
+</html>
