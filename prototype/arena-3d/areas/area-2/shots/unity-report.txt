@@ -1,0 +1,2 @@
+Occlusion check (gameplay camera, 128 floor points): 0 blocked
+Stats: 89 mesh renderers, 22 materials, 145,124 triangles, 86 lights
