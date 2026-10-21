@@ -19,3 +19,7 @@ This is an independent repository. It does not deploy to GitHub Pages or change 
 ## Project overview
 
 The current planning draft is [raid-simulator-plan.md](raid-simulator-plan.md). Review the direction and agree on the first milestone together before implementation.
+
+## Mini-boss concept package
+
+[Nine mini-bosses: concept sheets and two-phase encounter designs](docs/mini-bosses/README.md). Design proposals for Skyward Spire, Brass Foundry and Verdant Chimes; balance is not yet playtested.
