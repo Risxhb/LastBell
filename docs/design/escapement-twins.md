@@ -1,6 +1,6 @@
 # Escapement Twins, The Two Who Agree — encounter specification
 
-Draft v0.1 · October 21, 2026 · Lane: mini-bosses / Brass Foundry · Source packet: Codex's nine mini-boss handoff, branch `docs/nine-mini-bosses-20261021` (commit `a2ab311`), `docs/mini-bosses/design.md` §6 and sheet `02-brass-foundry.png` (row 3).
+v0.2 (decisions accepted) · October 21, 2026 · Lane: mini-bosses / Brass Foundry · Source packet: Codex's nine mini-boss handoff, branch `docs/nine-mini-bosses-20261021` (commit `a2ab311`), `docs/mini-bosses/design.md` §6 and sheet `02-brass-foundry.png` (row 3).
 
 Status: **specification only, nothing here is implemented.** It is engine-independent and targets the Unity/C# production path. It follows the structure of the [Sylvara spec](https://github.com/Risxhb/collab/pull/50) and the [Bellkeeper spec](https://github.com/Risxhb/collab/pull/16), so all three can share one validator and one set of contract requests.
 
@@ -311,9 +311,11 @@ From the sheet, with gameplay constraints.
 | T7 | Audio-off and reduced-effects readability: the sender face, the target glyph, and cone 2's preview versus a live warning |
 | T8 | Melee and ranged clear times within roughly 15–20 % (packet target); tune recovery before HP |
 
-## 14. Human decisions needed
+## 14. Decisions
 
-| # | Decision | Recommendation |
+**October 21, 2026:** the user accepted every recommendation below ("go with your recommendations"). D1–D5 and D7 are decided as written. D6 stays open until the Brass Foundry arena's collision is measured; the 11.5 m placeholder stands until then. A Unity block-out of this spec is on branch `feature/escapement-twins`.
+
+| # | Decision | Decided |
 |---|---|---|
 | D1 | Body size: the packet's 3.5 m cap, or the art's proportions | **5.2 × 2.2 m stadium** (C3) |
 | D2 | Phase 1 pawls: add them to the model (M1), or drop the Phase 1 self-strike | **Add them**; the self-strike is the boss's identity and Phase 1 teaches it |
