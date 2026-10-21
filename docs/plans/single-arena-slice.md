@@ -2,7 +2,13 @@
 
 October 20, 2026. **Requested scope:** three minibosses and one final boss, all playable sequentially in **one arena**. This is the near-term complete-run milestone, extending the earlier one-encounter engineering increment. It does not claim implementation, final balance, new collaborator acknowledgment or a delivery date.
 
-Read [current design](../game-design.md), [architecture](../architecture.md) and [production plan](../../raid-simulator-plan.md). Boss names, timing/size/health proposals and intermission rules below are planning recommendations. Existing no-block/parry/iframe, cooldown-only attack, finite movement stamina and three-class/four-difficulty/solo–8 requirements remain.
+Read [current design](../game-design.md), [architecture](../architecture.md) and [production plan](../../raid-simulator-plan.md). Boss names, timing/size/health proposals and intermission rules below are planning recommendations. Approved class-specific Brace/resource/healing exceptions, no-parry/iframe, finite movement stamina and three-class/four-difficulty/solo–8 requirements remain.
+
+## October 21 status
+
+Draft [#42](https://github.com/Risxhb/collab/pull/42) implements a branch-local four-slot run with all three approved classes, practice/retry, HUD/icons and provisional Bellkeeper phases; the minibosses remain stand-ins. This is an adapter/reference target for foundation U3, not adopted shared contracts or complete slice acceptance. Current build-15 handoff reports 107/107 at `18e89ed`; the earlier 108/108 snapshot predates old-code removal. Human review remains open.
+
+The four-area/13-encounter [#44 reference](https://github.com/Risxhb/collab/issues/44) and [#47 boss concepts](https://github.com/Risxhb/collab/issues/47) are a separate campaign proposal. Preserve this one-arena slice and the accepted arena; reference delivery does not approve production expansion. Current class exceptions and controls are recorded in [game design](../game-design.md) and the #42 handoff. The old uniform slot/key proposal is superseded.
 
 ## 1. What the player plays
 
@@ -84,11 +90,13 @@ These are proposed responsibilities, not a second production rules implementatio
 
 **Between bosses:** proposed short 5–8-second clear/ready phase; show next boss name, clear old hazards, recover stamina/reset cooldowns and reposition standing players safely. In co-op require the shared ready boundary before start. No encounter advances while an unresolved downed player would be stranded.
 
-**Health policy proposal:** carry health across the run for the first test build, with no automatic intermission heal or healing ability. Healing remains a future decision. Tune damage/run length for this policy; record it as replaceable rather than a settled release rule.
+**Current health policy (Chzy18, October 21):** fresh runs start full. Health refills before every boss after the first. Potions carry between minibosses; health and potions both refill before the area final boss (Bellkeeper in this slice). Mending Chorus is approved immediate healing. The #42 potion amounts (five charges, +40 HP, 1 s lockout) remain prototype tuning. Encounter starts reset stamina, cooldowns and transient class setup; run down counts persist.
+
+**Superseded October 20 proposal:** carrying health across the run with no automatic intermission heal or healing ability is retained here as history, not an acceptance rule. Bellkeeper D2/D3 must be assessed under the current refill/healing policy.
 
 **Revive proposal for the slice:** no bleedout timer initially. Standing teammates may channel the provisional 3 s + 2 s per previous down of that player, within a defined tested interaction range; moving, taking a hit or releasing input cancels channel. Only one channel completes for a downed actor; propose restoring 25% max health. These numbers/rules require review and are not previously confirmed healing design. The down count persists across bosses and clears only on a fresh run. With nobody standing, immediately fail the run; no indefinite all-downed state.
 
-**Shop intermission:** after miniboss 3, show a simple in-arena “Intermission — shop arrives later” panel with Continue/Ready. No merchant, currency, purchases, healing or upgrade-choice implementation. Never advertise functional shopping.
+**Shop intermission:** after miniboss 3, show a simple in-arena “Intermission — shop arrives later” panel with Continue/Ready. No merchant, currency, purchases or upgrade-choice implementation; the approved pre-final health/potion refill still applies. Never advertise functional shopping.
 
 **Failure:** end attacks, show boss/attack cause and offer Retry Run or Practice. Retry starts encounter 1 with fresh health/stamina/cooldowns/RNG/run down counts. Retain selected class/difficulty; practice progress cannot become run progress.
 
@@ -117,7 +125,7 @@ For counts 1–8, use bounded marker counts/subgroups and explicit odd-count rul
 | **S1 — Four-slot run skeleton** | Codex #30 integrates shared RunDirector; foundation owns lifecycle rules; Claude #8 supplies four encounter definitions | Four named stand-ins can be defeated in order, intermission/ready works, victory occurs only after slot 4; failure/reset work at every slot |
 | **S2 — Three real minibosses** | Claude #8 authors schedules/identity/content; #6 supplies shared mechanics; #30 integrates | All three playable with distinct attack loops, finite-stamina safe paths and no leftover hazards/collision |
 | **S3 — Final Bellkeeper** | Claude #8 reconciles phases/reference; foundation/Codex integrate | All phases, combined patterns and clear recovery; repeated final fight and full run pass |
-| **S4 — Roster, difficulties, practice/revival** | Foundation shares rules; Codex #30 integrates three class kits/UI; Claude #8/#31 content and four-tier variants | Required roster without unapproved healing, four practice fights, per-player revive escalation, top-tier added abilities |
+| **S4 — Roster, difficulties, practice/revival** | Foundation shares rules; Codex #30 integrates three class kits/UI; Claude #8/#31 content and four-tier variants | Approved Vanguard/Chimesinger/Arcanist roster and class-specific healing, four practice fights, per-player revive escalation, top-tier added abilities |
 | **S5 — Co-op and slice acceptance** | Chzy18/Codex #7 networking; all lanes review | Every count 2–8 and full eight-player Internet/readability, down/disconnect/host-loss and complete Windows-run acceptance |
 | **S6 — Presentation polish** | Claude #31 content/viewer; #30 integration; humans review | Gameplay-camera boss identities, readable warnings, audio-off cues and measured representative performance |
 
@@ -129,7 +137,7 @@ Do not start new unassigned agents or duplicate lanes. This plan proposes work s
 
 - One arena, three distinct minibosses, one larger final boss, fixed order and honest future-shop intermission.
 - Actual cursor-aimed cooldown combat, finite stamina/jump/sprint/dodge, collision, no iframes, clear stun/knockback and full failure/practice handling.
-- Three starting classes and four difficulties tracked to acceptance; a staged one-class/one-tier build stays labeled partial. Third-class identity/support effects remain an explicit kit decision; no mandatory healing.
+- Three starting classes and four difficulties tracked to acceptance; a staged one-class/one-tier build stays labeled partial. Vanguard, Chimesinger and Arcanist follow #31/#36/#41; approved healing exists, but encounters require no particular class.
 - Run failure always restarts at encounter 1; practice can retry each encounter; revive counts persist correctly through all bosses.
 - Each encounter has reachable safe routes at all supported counts/tiers; final tier adds a boss-specific ability; no mandatory purchases/upgrades.
 - Fresh Windows checkout/build completes the entire run and returns to menu/retry; repeated runs have no stale hazards, actor state, assignment or event effects.

@@ -20,7 +20,7 @@ Shared C# rules must avoid Unity scene, rendering, input and transport dependenc
 
 Keep draft PR #27 as an experimental review source. Review its class harness, Vanguard 2.0 and browser arena separately for reusable rules, test cases, presentation ideas and asset references. Extract accepted behavior into the shared C# rules, with explicit differences and acceptance checks. Avoid maintaining a second authoritative JavaScript combat implementation as production code.
 
-Cursor aim, dodge/dash, jumping, limited sprint and movement stamina are now required. No block/parry, attack-resource spending or iframes; counters/Resonance/Reversal loops from the prototype are superseded. Preserve historical branches/evidence. Combo buffering, boss numbers/phases, finite-stamina Bell Sweep fairness and other explicit tuning remain contract/design work. Three starting classes, practice, per-player escalating revival and four difficulties replace old build/relic gates.
+Cursor aim, dodge/dash, jumping, limited sprint and movement stamina are required. No parry or iframes. The approved Vanguard Brace permits partial frontal mitigation/knockback prevention, Chimesinger uses Harmony/bells/echoes and instant healing, and Arcanist uses Ticks/seals/inscriptions/Anchor shield (#31/#36/#41). These scoped exceptions supersede the October 20 blanket no-block/no-resource/healing deferral; old Vanguard counter/Resonance/Reversal loops remain superseded. Preserve historical branches/evidence. Combo buffering, boss numbers/phases, finite-stamina Bell Sweep fairness and other explicit tuning remain contract/design work. Three starting classes, practice, per-player escalating revival and four difficulties replace old build/relic gates.
 
 ## Foundation handoff gates
 
@@ -31,7 +31,7 @@ U3, owned by foundation with networking and encounter review: publish a versione
 - Stable player/session IDs separate from connection IDs, attempt generations, 60 Hz tick and step ordering.
 - Movement/aim bounds and zero semantics, held Basic and consumed presses; stamina, jump/landing, sprint, no-iframe dodge, collision and buffering policy.
 - Authority-side action eligibility and results, retries, acknowledgments, expiry and duplicate rejection. A transport receipt or scheduled action does not mean combat activation succeeded.
-- Full actor/boss state and atomic checkpoints: RNG, cooldowns, stamina, jump/dodge, stun/knockback, down/revive timers and per-player run down counts, event IDs/watermarks and gap recovery. No obsolete attack-resource/guard state is required.
+- Full actor/boss state and atomic checkpoints: RNG, cooldowns, stamina, jump/dodge, stun/knockback, down/revive timers and per-player run down counts, event IDs/watermarks and gap recovery. Include approved class setup, charges, expiry, healing and mitigation state; obsolete Vanguard Resonance/guard-counter state is not required.
 - Shared hazard geometry, encounter context, lock/resolve timing, damage outcomes and truthful failure feedback.
 - Down/revive/disconnect assignments, host loss, practice versus fresh-run reset, three-miniboss/intermission/main-boss progression and roster lifecycle. Shop transactions/rewards/upgrades are deferred.
 
@@ -60,4 +60,4 @@ Before a PR is ready, its author and reviewer check:
 
 ## Current status
 
-The policy is approved direction. U0 editor/package selection, Unity builds, final U3 types and production integration are not completed by this document. The migration work remains on separate branches; main may still contain historical engine language. Follow this policy and current human decisions when those sources conflict.
+The policy is approved direction. The run-loop project already pins Unity 6000.6.6f1 / URP 17.6.0; independent clean-checkout Play Mode/Windows validation, reviewed U3 types and production integration remain separate gates. This document does not establish their completion. The migration work remains on separate branches; main may still contain historical engine language. Follow this policy and current human decisions when those sources conflict.

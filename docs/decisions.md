@@ -2,7 +2,18 @@
 
 For each decision, record the date, decision, reason, and relevant issue or pull request.
 
+## 2026-10-21 — Reconciled class, dodge and recovery decisions
+
+- **Decided:** no dodge/post-hit immunity; per-instance hit deduplication. Fresh runs start full, health refills before each subsequent boss, potions carry between minibosses, and both refill before the area final boss. Source: Chzy18's decision and #42 `359f5b3`, recorded in [wiki Updates](https://github.com/Risxhb/collab/wiki/Updates).
+- **Approved class exceptions:** [Vanguard #31](https://github.com/Risxhb/collab/issues/31#issuecomment-6306130658) Brace is partial frontal mitigation/knockback prevention; Opening is non-stacking. [Chimesinger #36](https://github.com/Risxhb/collab/issues/36) is DPS with Harmony/bells/echoes, instant self-inclusive ally healing and separate dash. [Arcanist #41](https://github.com/Risxhb/collab/issues/41) uses Ticks, independent seals/inscriptions and Anchor return/shield. Three-class roster is Vanguard/Chimesinger/Arcanist; Healer placeholder retired. All numerical balance remains prototype tuning.
+- **Supersedes:** October 20 blanket slot/resource/block/healing deferrals only where those approved exceptions apply, and carry-health/no-potion assumptions. No parry, iframes or old Vanguard counter/resource loops are restored.
+- **Scope/reference:** #44 delivers four-area/13-encounter reference; #47 delivers Aurelion, Crucivar, Sylvara and Bellkeeper concepts. Both remain review input; no production adoption/expansion or replacement of the current one-arena slice is inferred.
+- **Status:** #42 is draft; reported PF-02–PF-06 implementations and PF-07 first pass await human review. Latest handoff at `18e89ed` reports 107/107 (build 15), versus historical 108/108 before old-code removal. These author results do not establish independent runtime or human acceptance.
+- **Next:** use [playtest and decision queue](https://github.com/Risxhb/collab/wiki/Playtest-and-Decisions) for D1/D2/D4/D5/D6, meter depth and boss concepts. D3's no-immunity/potion policy is settled; numeric tuning remains open.
+
 ## 2026-10-20 — Boss-rush gameplay and revised delivery scope
+
+Historical record: uniform slot/no-block/no-resource/healing restrictions are superseded only by the October 21 approved exceptions above.
 
 - Follow-up scope: Risxhb requested a plan for a playable three-miniboss/final-boss sequence entirely in one arena. [Single-arena slice plan](plans/single-arena-slice.md) proposes the encounter roster, reusable scene, run-state flow, future-shop intermission, failure/practice behavior and staged gates. Names/numbers/new balancing policies are planning proposals, not implemented or human-approved balance.
 
