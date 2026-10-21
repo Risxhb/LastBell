@@ -12,6 +12,8 @@ The [verification entry point](../../tools/net-test/README.md) describes profile
 
 A separate [C# TCP loopback prototype](csharp-loopback-session.md) now executes host/client communication in real OS processes, including one host plus seven clients. Run `pwsh -NoProfile -File tools/net-test/socket-session/run.ps1` for that milestone. It retains explicit Unity/Internet/combat limitations and does not select the production transport.
 
+The [receiver limits](socket-receiver-limits.md) bound frame assembly and reads. Add `-ActionStream` to the socket command for [AP/AR ability confirmation checks](socket-ability-confirmations.md): real separate-process requests, withheld application receipts, retries, uncertain outcomes and departure cancellation. No combat eligibility/activation is inferred from scheduler Consumed.
+
 ## Review and integration order
 
 The current changes form a stacked dependency chain. Review/land from the bottom upward; this guide does not merge or retarget branches automatically. If a dependency is squash-merged, reconcile the next PR's base/history before merging it. The foundation must select which candidate behavior to adopt, rather than copying every lab into `Assets`.
@@ -26,6 +28,8 @@ The current changes form a stacked dependency chain. Review/land from the bottom
 | 6 | [#23](https://github.com/Risxhb/collab/pull/23), `tools/encounter-event-recovery` → previous | Event wire/chunks/checkpoint acknowledgment candidate | `tools/net-test/event-recovery/` |
 | 7 | `docs/network-integration-handoff` → previous | Unified verification and this integration map | `tools/net-test/verify.ps1`; this guide |
 | 8 | `prototype/csharp-loopback-session` → previous | Real-process loopback TCP session/input/event and lifecycle tests | `tools/net-test/socket-session/` |
+| 9 | [#28](https://github.com/Risxhb/collab/pull/28), `tools/socket-receiver-limits` → previous | Bounded receiver reads/assembly deadline and socket regressions | `tools/net-test/socket-session/` |
+| 10 | `prototype/socket-ability-confirmations` → previous | Optional real-process AP/AR scheduling/confirmation fixture | `tools/net-test/socket-session/SocketActions.cs` |
 
 Historical [Godot PR #14](https://github.com/Risxhb/collab/pull/14) is a reference, outside this Unity candidate chain. The [Unity migration plan](https://github.com/Risxhb/collab/blob/docs/2-5d-isometric-direction/docs/plans/unity-migration.md) assigns U0/project/packages and U1/combat to foundation, U3/contracts jointly, and U4/network/content binding to the existing lane owners.
 

@@ -8,7 +8,8 @@ using System.Text;
 namespace LastBell.Network.SocketPrototype
 {
     internal enum Op : byte { Hello = 1, Welcome = 2, Ready = 3, Start = 4, Input = 5,
-        Tick = 6, Events = 7, EventAck = 8, Reject = 9, Shutdown = 10, Quit = 11, StopInput = 12 }
+        Tick = 6, Events = 7, EventAck = 8, Reject = 9, Shutdown = 10, Quit = 11, StopInput = 12,
+        ActionRequest = 13, ActionReceipt = 14 }
     internal sealed class Message
     {
         public readonly Op Kind; public readonly byte[] Data;

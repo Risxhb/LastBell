@@ -10,6 +10,8 @@ This runs the five standalone networking suites in separate fresh PowerShell 7 p
 
 For actual TCP loopback traffic between separate host/client processes, use `pwsh -NoProfile -File tools/net-test/socket-session/run.ps1` separately. The [C# socket prototype](../../docs/testing/csharp-loopback-session.md) records its execution, permissions, scope and results. It is not included in the socket-free verifier above.
 
+Add `-ActionStream` to exercise the existing AP/AR request/confirmation candidates over those sockets, including deliberately withheld replies, identical-ID retries, unknown outcomes, duplicate/invalid receipts and pending-action removal on departure. See [socket ability confirmations](../../docs/testing/socket-ability-confirmations.md). This remains diagnostic scheduling, not combat activation.
+
 | Suite | Coverage | Report |
 | --- | --- | --- |
 | Session rules | 14 rule/input/event/capacity groups | `session-rules.json` |

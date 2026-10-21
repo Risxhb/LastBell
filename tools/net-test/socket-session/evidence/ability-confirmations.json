@@ -1,0 +1,876 @@
+{
+  "evidenceType": "csharp-loopback-action-confirmations",
+  "executedAtUtc": "2026-10-20T19:01:50.2561398-05:00",
+  "networkSocketsExecuted": true,
+  "separateProcessesExecuted": true,
+  "applicationReceiptsDeliberatelyWithheld": true,
+  "tcpPacketLossInjected": false,
+  "unityEditorExecuted": false,
+  "internetExecuted": false,
+  "combatValidated": false,
+  "bindAddress": "127.0.0.1",
+  "powershell": "7.6.5",
+  "runtime": ".NET 10.0.11",
+  "actionRunId": "20261021T000058806Z-9ef1b888",
+  "rawActionReportSha256": "6EE9EE82CC0046EAED1B13C32EEF4E1427AF64450BAC0D7D8F49EEF82C082676",
+  "actionCases": [
+    {
+      "name": "two-1",
+      "passed": true,
+      "playerProcessIds": [
+        37000,
+        39956
+      ],
+      "launchedProcesses": 2,
+      "listenerStopped": true,
+      "hostKilled": false,
+      "hostActions": {
+        "Enabled": true,
+        "Requests": 39,
+        "WithheldReceipts": 36,
+        "WithheldConsumedGuardReceipts": 2,
+        "Consumed": 3,
+        "DuplicateConsumptions": 0,
+        "InvalidReceipts": 0,
+        "Sent": 0,
+        "Confirmed": 0,
+        "Unknown": 0,
+        "ConsumptionKeys": [
+          "100/2/1",
+          "100/2/2",
+          "100/2/3"
+        ],
+        "FirstOutcome": null,
+        "SecondOutcome": null,
+        "ThirdOutcome": null,
+        "Attempts": {
+          "100/1": 4,
+          "100/2": 33,
+          "100/3": 2
+        }
+      },
+      "hostTicks": 180,
+      "wholeInputGuardCommands": 0,
+      "clients": [
+        {
+          "pid": 39956,
+          "connection": 100,
+          "playerId": 2,
+          "mode": "play",
+          "endReason": "graceful_host_shutdown",
+          "actions": {
+            "Enabled": true,
+            "Requests": 0,
+            "WithheldReceipts": 0,
+            "WithheldConsumedGuardReceipts": 0,
+            "Consumed": 0,
+            "DuplicateConsumptions": 0,
+            "InvalidReceipts": 2,
+            "Sent": 39,
+            "Confirmed": 2,
+            "Unknown": 1,
+            "ConsumptionKeys": [],
+            "FirstOutcome": "Consumed",
+            "SecondOutcome": "UnconfirmedTimeout",
+            "ThirdOutcome": "Consumed",
+            "Attempts": {}
+          },
+          "lastTick": 180,
+          "feedbackEffects": 18,
+          "passed": true
+        }
+      ],
+      "failures": []
+    },
+    {
+      "name": "eight-1",
+      "passed": true,
+      "playerProcessIds": [
+        45708,
+        13348,
+        43860,
+        42228,
+        44848,
+        6872,
+        36008,
+        43608
+      ],
+      "launchedProcesses": 14,
+      "listenerStopped": true,
+      "hostKilled": false,
+      "hostActions": {
+        "Enabled": true,
+        "Requests": 253,
+        "WithheldReceipts": 231,
+        "WithheldConsumedGuardReceipts": 14,
+        "Consumed": 21,
+        "DuplicateConsumptions": 0,
+        "InvalidReceipts": 0,
+        "Sent": 0,
+        "Confirmed": 0,
+        "Unknown": 0,
+        "ConsumptionKeys": [
+          "100/2/1",
+          "100/2/2",
+          "100/2/3",
+          "101/3/1",
+          "101/3/2",
+          "101/3/3",
+          "102/4/1",
+          "102/4/2",
+          "102/4/3",
+          "103/5/1",
+          "103/5/2",
+          "103/5/3",
+          "104/6/1",
+          "104/6/2",
+          "104/6/3",
+          "105/7/1",
+          "105/7/2",
+          "105/7/3",
+          "106/8/1",
+          "106/8/2",
+          "106/8/3"
+        ],
+        "FirstOutcome": null,
+        "SecondOutcome": null,
+        "ThirdOutcome": null,
+        "Attempts": {
+          "100/1": 4,
+          "101/1": 4,
+          "102/1": 4,
+          "103/1": 4,
+          "104/1": 4,
+          "105/1": 4,
+          "106/1": 4,
+          "101/2": 33,
+          "102/2": 33,
+          "103/2": 33,
+          "104/2": 33,
+          "105/2": 33,
+          "106/2": 12,
+          "100/2": 33,
+          "100/3": 2,
+          "101/3": 2,
+          "102/3": 2,
+          "103/3": 2,
+          "104/3": 2,
+          "105/3": 2,
+          "106/3": 2,
+          "106/4": 1
+        }
+      },
+      "hostTicks": 180,
+      "wholeInputGuardCommands": 0,
+      "clients": [
+        {
+          "pid": 13348,
+          "connection": 101,
+          "playerId": 3,
+          "mode": "play",
+          "endReason": "graceful_host_shutdown",
+          "actions": {
+            "Enabled": true,
+            "Requests": 0,
+            "WithheldReceipts": 0,
+            "WithheldConsumedGuardReceipts": 0,
+            "Consumed": 0,
+            "DuplicateConsumptions": 0,
+            "InvalidReceipts": 2,
+            "Sent": 39,
+            "Confirmed": 2,
+            "Unknown": 1,
+            "ConsumptionKeys": [],
+            "FirstOutcome": "Consumed",
+            "SecondOutcome": "UnconfirmedTimeout",
+            "ThirdOutcome": "Consumed",
+            "Attempts": {}
+          },
+          "lastTick": 180,
+          "feedbackEffects": 18,
+          "passed": true
+        },
+        {
+          "pid": 43860,
+          "connection": 100,
+          "playerId": 2,
+          "mode": "play",
+          "endReason": "graceful_host_shutdown",
+          "actions": {
+            "Enabled": true,
+            "Requests": 0,
+            "WithheldReceipts": 0,
+            "WithheldConsumedGuardReceipts": 0,
+            "Consumed": 0,
+            "DuplicateConsumptions": 0,
+            "InvalidReceipts": 2,
+            "Sent": 39,
+            "Confirmed": 2,
+            "Unknown": 1,
+            "ConsumptionKeys": [],
+            "FirstOutcome": "Consumed",
+            "SecondOutcome": "UnconfirmedTimeout",
+            "ThirdOutcome": "Consumed",
+            "Attempts": {}
+          },
+          "lastTick": 180,
+          "feedbackEffects": 18,
+          "passed": true
+        },
+        {
+          "pid": 42228,
+          "connection": 104,
+          "playerId": 6,
+          "mode": "play",
+          "endReason": "graceful_host_shutdown",
+          "actions": {
+            "Enabled": true,
+            "Requests": 0,
+            "WithheldReceipts": 0,
+            "WithheldConsumedGuardReceipts": 0,
+            "Consumed": 0,
+            "DuplicateConsumptions": 0,
+            "InvalidReceipts": 2,
+            "Sent": 39,
+            "Confirmed": 2,
+            "Unknown": 1,
+            "ConsumptionKeys": [],
+            "FirstOutcome": "Consumed",
+            "SecondOutcome": "UnconfirmedTimeout",
+            "ThirdOutcome": "Consumed",
+            "Attempts": {}
+          },
+          "lastTick": 180,
+          "feedbackEffects": 18,
+          "passed": true
+        },
+        {
+          "pid": 44848,
+          "connection": 102,
+          "playerId": 4,
+          "mode": "play",
+          "endReason": "graceful_host_shutdown",
+          "actions": {
+            "Enabled": true,
+            "Requests": 0,
+            "WithheldReceipts": 0,
+            "WithheldConsumedGuardReceipts": 0,
+            "Consumed": 0,
+            "DuplicateConsumptions": 0,
+            "InvalidReceipts": 2,
+            "Sent": 39,
+            "Confirmed": 2,
+            "Unknown": 1,
+            "ConsumptionKeys": [],
+            "FirstOutcome": "Consumed",
+            "SecondOutcome": "UnconfirmedTimeout",
+            "ThirdOutcome": "Consumed",
+            "Attempts": {}
+          },
+          "lastTick": 180,
+          "feedbackEffects": 18,
+          "passed": true
+        },
+        {
+          "pid": 6872,
+          "connection": 105,
+          "playerId": 7,
+          "mode": "play",
+          "endReason": "graceful_host_shutdown",
+          "actions": {
+            "Enabled": true,
+            "Requests": 0,
+            "WithheldReceipts": 0,
+            "WithheldConsumedGuardReceipts": 0,
+            "Consumed": 0,
+            "DuplicateConsumptions": 0,
+            "InvalidReceipts": 2,
+            "Sent": 39,
+            "Confirmed": 2,
+            "Unknown": 1,
+            "ConsumptionKeys": [],
+            "FirstOutcome": "Consumed",
+            "SecondOutcome": "UnconfirmedTimeout",
+            "ThirdOutcome": "Consumed",
+            "Attempts": {}
+          },
+          "lastTick": 180,
+          "feedbackEffects": 18,
+          "passed": true
+        },
+        {
+          "pid": 36008,
+          "connection": 103,
+          "playerId": 5,
+          "mode": "play",
+          "endReason": "graceful_host_shutdown",
+          "actions": {
+            "Enabled": true,
+            "Requests": 0,
+            "WithheldReceipts": 0,
+            "WithheldConsumedGuardReceipts": 0,
+            "Consumed": 0,
+            "DuplicateConsumptions": 0,
+            "InvalidReceipts": 2,
+            "Sent": 39,
+            "Confirmed": 2,
+            "Unknown": 1,
+            "ConsumptionKeys": [],
+            "FirstOutcome": "Consumed",
+            "SecondOutcome": "UnconfirmedTimeout",
+            "ThirdOutcome": "Consumed",
+            "Attempts": {}
+          },
+          "lastTick": 180,
+          "feedbackEffects": 18,
+          "passed": true
+        },
+        {
+          "pid": 43608,
+          "connection": 106,
+          "playerId": 8,
+          "mode": "disconnect",
+          "endReason": "client_disconnect",
+          "actions": {
+            "Enabled": true,
+            "Requests": 0,
+            "WithheldReceipts": 0,
+            "WithheldConsumedGuardReceipts": 0,
+            "Consumed": 0,
+            "DuplicateConsumptions": 0,
+            "InvalidReceipts": 2,
+            "Sent": 19,
+            "Confirmed": 2,
+            "Unknown": 0,
+            "ConsumptionKeys": [],
+            "FirstOutcome": "Consumed",
+            "SecondOutcome": "Pending",
+            "ThirdOutcome": "Consumed",
+            "Attempts": {}
+          },
+          "lastTick": 60,
+          "feedbackEffects": 5,
+          "passed": true
+        }
+      ],
+      "failures": []
+    },
+    {
+      "name": "hostloss-1",
+      "passed": true,
+      "playerProcessIds": [
+        33600,
+        4608
+      ],
+      "launchedProcesses": 2,
+      "listenerStopped": true,
+      "hostKilled": true,
+      "hostActions": null,
+      "hostTicks": null,
+      "wholeInputGuardCommands": null,
+      "clients": [
+        {
+          "pid": 4608,
+          "connection": 100,
+          "playerId": 2,
+          "mode": "expect-eof",
+          "endReason": "socket_reset",
+          "actions": {
+            "Enabled": true,
+            "Requests": 0,
+            "WithheldReceipts": 0,
+            "WithheldConsumedGuardReceipts": 0,
+            "Consumed": 0,
+            "DuplicateConsumptions": 0,
+            "InvalidReceipts": 0,
+            "Sent": 8,
+            "Confirmed": 1,
+            "Unknown": 0,
+            "ConsumptionKeys": [],
+            "FirstOutcome": "Consumed",
+            "SecondOutcome": "Pending",
+            "ThirdOutcome": "Pending",
+            "Attempts": {}
+          },
+          "lastTick": 30,
+          "feedbackEffects": 2,
+          "passed": true
+        }
+      ],
+      "failures": []
+    },
+    {
+      "name": "two-2",
+      "passed": true,
+      "playerProcessIds": [
+        49076,
+        41428
+      ],
+      "launchedProcesses": 2,
+      "listenerStopped": true,
+      "hostKilled": false,
+      "hostActions": {
+        "Enabled": true,
+        "Requests": 39,
+        "WithheldReceipts": 36,
+        "WithheldConsumedGuardReceipts": 2,
+        "Consumed": 3,
+        "DuplicateConsumptions": 0,
+        "InvalidReceipts": 0,
+        "Sent": 0,
+        "Confirmed": 0,
+        "Unknown": 0,
+        "ConsumptionKeys": [
+          "100/2/1",
+          "100/2/2",
+          "100/2/3"
+        ],
+        "FirstOutcome": null,
+        "SecondOutcome": null,
+        "ThirdOutcome": null,
+        "Attempts": {
+          "100/1": 4,
+          "100/2": 33,
+          "100/3": 2
+        }
+      },
+      "hostTicks": 180,
+      "wholeInputGuardCommands": 0,
+      "clients": [
+        {
+          "pid": 41428,
+          "connection": 100,
+          "playerId": 2,
+          "mode": "play",
+          "endReason": "graceful_host_shutdown",
+          "actions": {
+            "Enabled": true,
+            "Requests": 0,
+            "WithheldReceipts": 0,
+            "WithheldConsumedGuardReceipts": 0,
+            "Consumed": 0,
+            "DuplicateConsumptions": 0,
+            "InvalidReceipts": 2,
+            "Sent": 39,
+            "Confirmed": 2,
+            "Unknown": 1,
+            "ConsumptionKeys": [],
+            "FirstOutcome": "Consumed",
+            "SecondOutcome": "UnconfirmedTimeout",
+            "ThirdOutcome": "Consumed",
+            "Attempts": {}
+          },
+          "lastTick": 180,
+          "feedbackEffects": 18,
+          "passed": true
+        }
+      ],
+      "failures": []
+    },
+    {
+      "name": "eight-2",
+      "passed": true,
+      "playerProcessIds": [
+        38696,
+        16904,
+        18316,
+        6396,
+        40316,
+        10560,
+        37008,
+        42864
+      ],
+      "launchedProcesses": 14,
+      "listenerStopped": true,
+      "hostKilled": false,
+      "hostActions": {
+        "Enabled": true,
+        "Requests": 253,
+        "WithheldReceipts": 231,
+        "WithheldConsumedGuardReceipts": 14,
+        "Consumed": 21,
+        "DuplicateConsumptions": 0,
+        "InvalidReceipts": 0,
+        "Sent": 0,
+        "Confirmed": 0,
+        "Unknown": 0,
+        "ConsumptionKeys": [
+          "100/2/1",
+          "100/2/2",
+          "100/2/3",
+          "101/3/1",
+          "101/3/2",
+          "101/3/3",
+          "102/4/1",
+          "102/4/2",
+          "102/4/3",
+          "103/5/1",
+          "103/5/2",
+          "103/5/3",
+          "104/6/1",
+          "104/6/2",
+          "104/6/3",
+          "105/7/1",
+          "105/7/2",
+          "105/7/3",
+          "106/8/1",
+          "106/8/2",
+          "106/8/3"
+        ],
+        "FirstOutcome": null,
+        "SecondOutcome": null,
+        "ThirdOutcome": null,
+        "Attempts": {
+          "101/1": 4,
+          "102/1": 4,
+          "100/1": 4,
+          "103/1": 4,
+          "104/1": 4,
+          "105/1": 4,
+          "106/1": 4,
+          "100/2": 33,
+          "101/2": 33,
+          "102/2": 33,
+          "103/2": 33,
+          "104/2": 33,
+          "105/2": 12,
+          "106/2": 33,
+          "100/3": 2,
+          "101/3": 2,
+          "102/3": 2,
+          "103/3": 2,
+          "104/3": 2,
+          "105/3": 2,
+          "106/3": 2,
+          "105/4": 1
+        }
+      },
+      "hostTicks": 180,
+      "wholeInputGuardCommands": 0,
+      "clients": [
+        {
+          "pid": 16904,
+          "connection": 102,
+          "playerId": 4,
+          "mode": "play",
+          "endReason": "graceful_host_shutdown",
+          "actions": {
+            "Enabled": true,
+            "Requests": 0,
+            "WithheldReceipts": 0,
+            "WithheldConsumedGuardReceipts": 0,
+            "Consumed": 0,
+            "DuplicateConsumptions": 0,
+            "InvalidReceipts": 2,
+            "Sent": 39,
+            "Confirmed": 2,
+            "Unknown": 1,
+            "ConsumptionKeys": [],
+            "FirstOutcome": "Consumed",
+            "SecondOutcome": "UnconfirmedTimeout",
+            "ThirdOutcome": "Consumed",
+            "Attempts": {}
+          },
+          "lastTick": 180,
+          "feedbackEffects": 18,
+          "passed": true
+        },
+        {
+          "pid": 18316,
+          "connection": 100,
+          "playerId": 2,
+          "mode": "play",
+          "endReason": "graceful_host_shutdown",
+          "actions": {
+            "Enabled": true,
+            "Requests": 0,
+            "WithheldReceipts": 0,
+            "WithheldConsumedGuardReceipts": 0,
+            "Consumed": 0,
+            "DuplicateConsumptions": 0,
+            "InvalidReceipts": 2,
+            "Sent": 39,
+            "Confirmed": 2,
+            "Unknown": 1,
+            "ConsumptionKeys": [],
+            "FirstOutcome": "Consumed",
+            "SecondOutcome": "UnconfirmedTimeout",
+            "ThirdOutcome": "Consumed",
+            "Attempts": {}
+          },
+          "lastTick": 180,
+          "feedbackEffects": 18,
+          "passed": true
+        },
+        {
+          "pid": 6396,
+          "connection": 101,
+          "playerId": 3,
+          "mode": "play",
+          "endReason": "graceful_host_shutdown",
+          "actions": {
+            "Enabled": true,
+            "Requests": 0,
+            "WithheldReceipts": 0,
+            "WithheldConsumedGuardReceipts": 0,
+            "Consumed": 0,
+            "DuplicateConsumptions": 0,
+            "InvalidReceipts": 2,
+            "Sent": 39,
+            "Confirmed": 2,
+            "Unknown": 1,
+            "ConsumptionKeys": [],
+            "FirstOutcome": "Consumed",
+            "SecondOutcome": "UnconfirmedTimeout",
+            "ThirdOutcome": "Consumed",
+            "Attempts": {}
+          },
+          "lastTick": 180,
+          "feedbackEffects": 18,
+          "passed": true
+        },
+        {
+          "pid": 40316,
+          "connection": 104,
+          "playerId": 6,
+          "mode": "play",
+          "endReason": "graceful_host_shutdown",
+          "actions": {
+            "Enabled": true,
+            "Requests": 0,
+            "WithheldReceipts": 0,
+            "WithheldConsumedGuardReceipts": 0,
+            "Consumed": 0,
+            "DuplicateConsumptions": 0,
+            "InvalidReceipts": 2,
+            "Sent": 39,
+            "Confirmed": 2,
+            "Unknown": 1,
+            "ConsumptionKeys": [],
+            "FirstOutcome": "Consumed",
+            "SecondOutcome": "UnconfirmedTimeout",
+            "ThirdOutcome": "Consumed",
+            "Attempts": {}
+          },
+          "lastTick": 180,
+          "feedbackEffects": 18,
+          "passed": true
+        },
+        {
+          "pid": 10560,
+          "connection": 103,
+          "playerId": 5,
+          "mode": "play",
+          "endReason": "graceful_host_shutdown",
+          "actions": {
+            "Enabled": true,
+            "Requests": 0,
+            "WithheldReceipts": 0,
+            "WithheldConsumedGuardReceipts": 0,
+            "Consumed": 0,
+            "DuplicateConsumptions": 0,
+            "InvalidReceipts": 2,
+            "Sent": 39,
+            "Confirmed": 2,
+            "Unknown": 1,
+            "ConsumptionKeys": [],
+            "FirstOutcome": "Consumed",
+            "SecondOutcome": "UnconfirmedTimeout",
+            "ThirdOutcome": "Consumed",
+            "Attempts": {}
+          },
+          "lastTick": 180,
+          "feedbackEffects": 18,
+          "passed": true
+        },
+        {
+          "pid": 37008,
+          "connection": 106,
+          "playerId": 8,
+          "mode": "play",
+          "endReason": "graceful_host_shutdown",
+          "actions": {
+            "Enabled": true,
+            "Requests": 0,
+            "WithheldReceipts": 0,
+            "WithheldConsumedGuardReceipts": 0,
+            "Consumed": 0,
+            "DuplicateConsumptions": 0,
+            "InvalidReceipts": 2,
+            "Sent": 39,
+            "Confirmed": 2,
+            "Unknown": 1,
+            "ConsumptionKeys": [],
+            "FirstOutcome": "Consumed",
+            "SecondOutcome": "UnconfirmedTimeout",
+            "ThirdOutcome": "Consumed",
+            "Attempts": {}
+          },
+          "lastTick": 180,
+          "feedbackEffects": 18,
+          "passed": true
+        },
+        {
+          "pid": 42864,
+          "connection": 105,
+          "playerId": 7,
+          "mode": "disconnect",
+          "endReason": "client_disconnect",
+          "actions": {
+            "Enabled": true,
+            "Requests": 0,
+            "WithheldReceipts": 0,
+            "WithheldConsumedGuardReceipts": 0,
+            "Consumed": 0,
+            "DuplicateConsumptions": 0,
+            "InvalidReceipts": 2,
+            "Sent": 19,
+            "Confirmed": 2,
+            "Unknown": 0,
+            "ConsumptionKeys": [],
+            "FirstOutcome": "Consumed",
+            "SecondOutcome": "Pending",
+            "ThirdOutcome": "Consumed",
+            "Attempts": {}
+          },
+          "lastTick": 60,
+          "feedbackEffects": 5,
+          "passed": true
+        }
+      ],
+      "failures": []
+    },
+    {
+      "name": "hostloss-2",
+      "passed": true,
+      "playerProcessIds": [
+        41260,
+        49080
+      ],
+      "launchedProcesses": 2,
+      "listenerStopped": true,
+      "hostKilled": true,
+      "hostActions": null,
+      "hostTicks": null,
+      "wholeInputGuardCommands": null,
+      "clients": [
+        {
+          "pid": 49080,
+          "connection": 100,
+          "playerId": 2,
+          "mode": "expect-eof",
+          "endReason": "socket_eof",
+          "actions": {
+            "Enabled": true,
+            "Requests": 0,
+            "WithheldReceipts": 0,
+            "WithheldConsumedGuardReceipts": 0,
+            "Consumed": 0,
+            "DuplicateConsumptions": 0,
+            "InvalidReceipts": 2,
+            "Sent": 10,
+            "Confirmed": 1,
+            "Unknown": 0,
+            "ConsumptionKeys": [],
+            "FirstOutcome": "Consumed",
+            "SecondOutcome": "Pending",
+            "ThirdOutcome": "Pending",
+            "Attempts": {}
+          },
+          "lastTick": 33,
+          "feedbackEffects": 3,
+          "passed": true
+        }
+      ],
+      "failures": []
+    }
+  ],
+  "wholeInputRegressionRunId": "20261021T000209142Z-9bc7f3d8",
+  "rawWholeInputReportSha256": "FBD0CF37BAB731F3B8913E749983A081806E2D6E20994DFE5C66602DD1ACE76E",
+  "wholeInputRegressionCases": [
+    {
+      "name": "two-1",
+      "passed": true,
+      "listenerStopped": true,
+      "playerProcessIds": [
+        20804,
+        38732
+      ]
+    },
+    {
+      "name": "eight-1",
+      "passed": true,
+      "listenerStopped": true,
+      "playerProcessIds": [
+        1124,
+        45168,
+        40024,
+        40280,
+        47280,
+        41712,
+        48900,
+        37336
+      ]
+    },
+    {
+      "name": "hostloss-1",
+      "passed": true,
+      "listenerStopped": true,
+      "playerProcessIds": [
+        32832,
+        20804
+      ]
+    }
+  ],
+  "sourceSha256": [
+    {
+      "path": "tools/net-test/socket-session/SocketActions.cs",
+      "sha256": "4B52906AC0FF8E6609F122D0340949B9541D9A6D876271CD5FB47199EEB980BC"
+    },
+    {
+      "path": "tools/net-test/socket-session/SocketSession.cs",
+      "sha256": "52EE3CEB576B409A9D3ADC098527B55FD754EF0C2F9EC395740F7F2F0FC14FE3"
+    },
+    {
+      "path": "tools/net-test/socket-session/SocketWire.cs",
+      "sha256": "2017361A6CB54A5B2D44AB29B874BA111A52B11C56B5B548DE5B931E59EA154B"
+    },
+    {
+      "path": "tools/net-test/socket-session/run.ps1",
+      "sha256": "5E34FBCE8C0B3946BDFDBB17194EE645A7087DA6994CC9EC82AB740350A6F1EF"
+    },
+    {
+      "path": "tools/net-test/socket-session/worker.ps1",
+      "sha256": "A8A33AAA7B8DA305028BBD14B8F026116559E5C19DB3027BFD92FA154D8FFEC1"
+    },
+    {
+      "path": "tools/net-test/reliable-actions/ActionProtocol.cs",
+      "sha256": "E3D274F69C7F2A5ECFCE27299DA0EEE19F2E7EDCA41DA9580766DB29CAD1ADFB"
+    },
+    {
+      "path": "tools/net-test/reliable-actions/ReceiptCodec.cs",
+      "sha256": "5C7C86766372A0E03BC31A052B6A37A2B3E514A5354A334AB5E8E922EC282E78"
+    },
+    {
+      "path": "tools/net-test/event-recovery/EventWire.cs",
+      "sha256": "E1D104CAE92D839D2A8AE0D8D7140FC54B1986924873BBAFA853121F93B7FA45"
+    },
+    {
+      "path": "unity/Assets/LastBell/Network/Rules/EventStream.cs",
+      "sha256": "B785DCFCA8EEF6A94F8775D75280DBD392D577A36E6F889240E89EE06777165E"
+    },
+    {
+      "path": "unity/Assets/LastBell/Network/Rules/InputCodec.cs",
+      "sha256": "4B306D55C82479985C9C5DB76A28775F2F233BB4B6A987EC2B2458E2BC28C891"
+    },
+    {
+      "path": "unity/Assets/LastBell/Network/Rules/SessionRules.cs",
+      "sha256": "85BC22473E62A4311FC42BF6A7E2B15E040C48DAA4D9320897A54ADD8E28D5B0"
+    },
+    {
+      "path": "unity/Assets/LastBell/Network/Rules/SessionTypes.cs",
+      "sha256": "303463925EEC057F37D32388F4F8EEFF98687A70AC6AAC140E0FCE9BFAA82478"
+    }
+  ],
+  "passed": true
+}

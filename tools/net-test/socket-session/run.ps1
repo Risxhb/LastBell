@@ -1,6 +1,7 @@
 param(
     [ValidateSet('All','Two','Eight','HostLoss')][string]$Scenario = 'All',
     [ValidateRange(1,5)][int]$Repeat = 2,
+    [switch]$ActionStream,
     [string]$OutputDirectory = (Join-Path $PSScriptRoot 'results')
 )
 $ErrorActionPreference = 'Stop'
@@ -9,6 +10,7 @@ $runId = [DateTimeOffset]::UtcNow.ToString('yyyyMMddTHHmmssfffZ') + '-' + [Guid]
 $runDirectory = Join-Path ([IO.Path]::GetFullPath($OutputDirectory)) $runId
 New-Item -ItemType Directory -Path $runDirectory | Out-Null
 function Start-Worker([string]$Name,[string[]]$WorkerArguments) {
+    if ($ActionStream) { $WorkerArguments += '-ActionStream' }
     $info = [Diagnostics.ProcessStartInfo]::new()
     $info.FileName = $shellPath; $info.UseShellExecute = $false; $info.CreateNoWindow = $true
     $info.RedirectStandardOutput = $true; $info.RedirectStandardError = $true
@@ -81,10 +83,34 @@ foreach ($pass in 1..$Repeat) {
             $playerPids = @($hostWorker.Process.Id) + @($players | ForEach-Object { $_.Process.Id })
             if (@($playerPids | Sort-Object -Unique).Count -ne $remotes+1) { throw 'Players did not run in distinct processes' }
             if ($name -eq 'HostLoss') {
-                if ($reports[0].EndReason -ne 'socket_eof' -or $reports[0].LastTick -lt 30 -or $reports[0].Counter -lt 1) { throw 'Host loss not observed after live exchange' }
+                if ($reports[0].EndReason -notin @('socket_eof','socket_reset') -or $reports[0].LastTick -lt 30 -or $reports[0].Counter -lt 1) { throw 'Host loss not observed after live exchange' }
+                if ($ActionStream -and (-not $reports[0].Actions.Enabled -or $reports[0].Actions.Sent -lt 4 -or
+                    $reports[0].Actions.FirstOutcome -ne 'Consumed')) { throw 'Host loss before action retry/confirmation' }
             }
             else {
                 if ($hostReport.MaxRoster -ne $remotes+1 -or $hostReport.PhaseAfterShutdown -ne 'Closed' -or $hostReport.CompletedTicks -ne 180) { throw 'Host lifecycle/capacity mismatch' }
+                if ($ActionStream) {
+                    if (-not $hostReport.Actions.Enabled -or $hostReport.Actions.Consumed -ne 3*$remotes -or
+                        $hostReport.Actions.DuplicateConsumptions -ne 0 -or $hostReport.Actions.WithheldReceipts -lt 4*$remotes -or
+                        $hostReport.Actions.WithheldConsumedGuardReceipts -lt $remotes -or
+                        $hostReport.GuardCommands -ne 0) { throw 'Host action-stream invariants' }
+                    foreach ($client in $reports) {
+                        foreach ($id in 1..3) {
+                            $key = [string]$client.Connection + '/' + [string]$client.PlayerId + '/' + $id
+                            if (@($hostReport.Actions.ConsumptionKeys | Where-Object { $_ -eq $key }).Count -ne 1) { throw "Missing/repeated action: $key" }
+                        }
+                        $retryKey = [string]$client.Connection + '/1'
+                        if ($hostReport.Actions.Attempts.$retryKey -lt 4) { throw 'Guard retry not exercised' }
+                        if (-not $client.Actions.Enabled -or $client.Actions.FirstOutcome -ne 'Consumed' -or
+                            $client.Actions.ThirdOutcome -ne 'Consumed' -or $client.Actions.InvalidReceipts -ne 2) { throw 'Client receipt/retry invariants' }
+                        if ($client.Mode -eq 'play' -and ($client.Actions.SecondOutcome -ne 'UnconfirmedTimeout' -or
+                            $client.Actions.Confirmed -ne 2 -or $client.Actions.Unknown -ne 1)) { throw 'Uncertain result not retained' }
+                        if ($client.Mode -eq 'disconnect') {
+                            $pendingKey = [string]$client.Connection + '/4'
+                            if ($hostReport.Actions.Attempts.$pendingKey -ne 1) { throw 'Pending action before departure not received' }
+                        }
+                    }
+                }
                 foreach ($client in $reports) {
                     $mapping = @($hostReport.Peers | Where-Object ClientPid -eq $client.Pid)
                     if ($mapping.Count -ne 1 -or $mapping[0].PlayerId -ne $client.PlayerId -or $mapping[0].Connection -ne $client.Connection) { throw 'Socket-to-actor mapping mismatch' }
@@ -134,6 +160,7 @@ $summary = [ordered]@{
     evidenceType='csharp-loopback-tcp-separate-processes';executedAtUtc=[DateTimeOffset]::UtcNow.ToString('o');runId=$runId
     networkSocketsExecuted=$true;separateProcessesExecuted=$true;unityEditorExecuted=$false;internetExecuted=$false
     combatValidated=$false;productionTransportSelected=$false;bindAddress='127.0.0.1';scenario=$Scenario;repeat=$Repeat
+    actionStreamExecuted=[bool]$ActionStream;applicationReceiptsDeliberatelyWithheld=[bool]$ActionStream;tcpPacketLossInjected=$false
     powershell=$PSVersionTable.PSVersion.ToString();runtime=[Runtime.InteropServices.RuntimeInformation]::FrameworkDescription
     cases=@($cases.ToArray());passed=($failed.Count -eq 0)
 }

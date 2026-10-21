@@ -18,6 +18,7 @@ namespace LastBell.Network.SocketPrototype
     }
     public sealed class HostReport
     {
+        public SocketActionAudit Actions;
         public int Pid, Port, ExpectedRemotes, AcceptedRemotes, MaxRoster;
         public long CompletedTicks, InputAccepted, InputRejected, Commands, GuardCommands, EventsIssued;
         public long BytesRead, BytesWritten, DuplicateCommandTicks, UnknownActorCommands;
@@ -28,6 +29,7 @@ namespace LastBell.Network.SocketPrototype
     }
     public sealed class ClientReport
     {
+        public SocketActionAudit Actions;
         public int Pid, Port; public string Mode, EndReason;
         public ulong Connection; public long PlayerId, LastTick, LastProcessed, SentInputs, Counter, FeedbackEffects, DuplicateEffects;
         public long BytesRead, BytesWritten; public bool Passed; public string[] Failures;
@@ -45,11 +47,12 @@ namespace LastBell.Network.SocketPrototype
         { long value; counts.TryGetValue(key, out value); counts[key] = value + 1; }
         private static void Atomic(string path, params string[] lines)
         { File.WriteAllLines(path + ".tmp", lines); File.Move(path + ".tmp", path, true); }
-        public static HostReport Host(string directory, int expectedRemotes)
+        public static HostReport Host(string directory, int expectedRemotes, bool actionStream = false)
         {
             var report = new HostReport { Pid = Process.GetCurrentProcess().Id, ExpectedRemotes = expectedRemotes };
             var failures = new List<string>(); var all = new List<Remote>();
             var identity = Guid.NewGuid(); var session = new SessionRules(identity, 0);
+            var actions = actionStream ? new SocketActionHost(identity, 0) : null;
             var listener = new TcpListener(IPAddress.Loopback, 0); var clock = Stopwatch.StartNew();
             EventSender events = null; long eventCounter = 0, sequence = 0, nextEventSend = 0, startedAt = -1, drainAt = -1;
             bool stopSent = false, barrierPublished = false; ulong nextConnection = 100;
@@ -60,6 +63,7 @@ namespace LastBell.Network.SocketPrototype
                 if (peer.Dead) return;
                 peer.Dead = true; peer.Result.Disconnected = true; peer.Result.DisconnectReason = reason;
                 if (peer.Joined) { session.Disconnect(peer.Result.Connection); if (events != null) events.Remove(peer.Result.Connection); }
+                if (peer.Joined && actions != null) actions.Disconnect(peer.Result.Connection);
                 peer.Channel.Dispose();
             };
             try
@@ -98,6 +102,7 @@ namespace LastBell.Network.SocketPrototype
                                         else
                                         {
                                             peer.Joined = true; peer.Result.PlayerId = joined.PlayerId; peer.Result.ClientPid = pid;
+                                            if (actions != null) actions.Register(peer.Result.Connection, joined.PlayerId);
                                             report.AcceptedRemotes++; report.MaxRoster = Math.Max(report.MaxRoster, session.Snapshot().Players.Length);
                                         }
                                     }
@@ -117,6 +122,8 @@ namespace LastBell.Network.SocketPrototype
                                     if (!accepted.Ok) { report.InputRejected++; rejectCount(accepted.Reason); peer.Channel.Send(Op.Reject, Payload.Text(accepted.Reason)); }
                                     else { report.InputAccepted++; peer.Result.AcceptedSequence = input.Sequence; }
                                 }
+                                else if (message.Kind == Op.ActionRequest && actions != null && events != null)
+                                    actions.Receive(peer.Result.Connection, message.Data, clock.ElapsedMilliseconds, peer.Channel);
                                 else if (message.Kind == Op.EventAck && events != null)
                                 {
                                     RuleResult ack = events.ReceiveAck(message.Data, peer.Result.Connection);
@@ -141,6 +148,7 @@ namespace LastBell.Network.SocketPrototype
                             {
                                 RuleResult start = session.Control(0, new ControlRequest(identity, 0, ControlKind.Start), clock.ElapsedMilliseconds);
                                 if (!start.Ok) throw new InvalidOperationException("start: " + start.Reason);
+                                if (actions != null) actions.StartGeneration(session.Generation);
                                 events = new EventSender(identity, session.Generation);
                                 foreach (Remote peer in all.Where(p => p.Joined && !p.Dead))
                                 {
@@ -161,7 +169,7 @@ namespace LastBell.Network.SocketPrototype
                             {
                                 sequence++;
                                 var local = new InputRequest(identity, session.Generation, sequence, session.Tick + 1,
-                                    new PlanarMove(0.5, 0), true, false, false, sequence % 5 == 0);
+                                    new PlanarMove(0.5, 0), true, false, false, !actionStream && sequence % 5 == 0);
                                 if (!session.SubmitInput(0, local, clock.ElapsedMilliseconds).Ok) throw new InvalidOperationException("local input");
                             }
                             foreach (var command in session.Advance())
@@ -170,6 +178,7 @@ namespace LastBell.Network.SocketPrototype
                                 if (!commandKeys.Add(session.Tick + "/" + command.Key)) report.DuplicateCommandTicks++;
                                 if (command.Key != 1 && !all.Any(p => p.Joined && !p.Dead && p.Result.PlayerId == command.Key)) report.UnknownActorCommands++;
                             }
+                            if (actions != null) actions.Step(session.Tick);
                             if (session.Tick % 10 == 0)
                             { eventCounter++; events.Append(session.Tick, "socket_counter", BitConverter.GetBytes(eventCounter)); }
                             if (session.Tick == ActiveTicks)
@@ -230,14 +239,16 @@ namespace LastBell.Network.SocketPrototype
                 listener.Stop();
             }
             report.Peers = all.Where(p => p.Joined).Select(p => p.Result).ToArray();
+            report.Actions = actions == null ? new SocketActionAudit() : actions.Audit;
             report.Failures = failures.ToArray(); report.Passed = failures.Count == 0; return report;
         }
 
-        public static ClientReport Client(int port, Guid identity, string mode, bool injectChecks)
+        public static ClientReport Client(int port, Guid identity, string mode, bool injectChecks, bool actionStream = false)
         {
             var report = new ClientReport { Pid = Process.GetCurrentProcess().Id, Port = port, Mode = mode };
             var failures = new List<string>(); var timer = Stopwatch.StartNew(); Channel channel = null;
             EventReceiver receiver = null; int generation = 0; long sequence = 0, sentForTick = -1;
+            SocketActionClient actions = null;
             bool started = false, stopped = false, injected = false; var seen = new HashSet<long>();
             try
             {
@@ -266,17 +277,23 @@ namespace LastBell.Network.SocketPrototype
                         {
                             Payload.Read(message.Data, r => { generation = r.ReadInt32(); report.LastTick = r.ReadInt64(); });
                             receiver = new EventReceiver(identity, report.Connection, generation); started = true;
+                            if (actionStream) actions = new SocketActionClient(identity, generation, report.Connection);
                         }
                         else if (message.Kind == Op.Tick)
                         {
                             long tick = 0, processed = 0; Payload.Read(message.Data, r => { tick = r.ReadInt64(); processed = r.ReadInt64(); });
                             if (tick < report.LastTick || processed < report.LastProcessed) throw new InvalidDataException("tick/ack rollback");
                             report.LastTick = tick; report.LastProcessed = processed;
-                            if (mode == "disconnect" && tick >= 60) { channel.Send(Op.Quit, new byte[0]); report.EndReason = "client_disconnect"; break; }
+                            if (mode == "disconnect" && tick >= 60)
+                            {
+                                if (actions != null) actions.Depart(tick, timer.ElapsedMilliseconds, channel);
+                                channel.Send(Op.Quit, new byte[0]); report.EndReason = "client_disconnect"; break;
+                            }
+                            if (actions != null) actions.Tick(tick, timer.ElapsedMilliseconds);
                             if (!stopped && tick != sentForTick)
                             {
                                 sequence++; sentForTick = tick;
-                                var input = new InputRequest(identity, generation, sequence, tick + 3, new PlanarMove(0.5, 0.5), true, false, false, sequence % 5 == 0);
+                                var input = new InputRequest(identity, generation, sequence, tick + 3, new PlanarMove(0.5, 0.5), true, false, false, !actionStream && sequence % 5 == 0);
                                 byte[] packet = InputCodec.Encode(input);
                                 if (injectChecks && !injected)
                                 {
@@ -289,6 +306,7 @@ namespace LastBell.Network.SocketPrototype
                                 report.SentInputs++;
                             }
                         }
+                        else if (message.Kind == Op.ActionReceipt && actions != null) actions.Receive(message.Data);
                         else if (message.Kind == Op.Events && started)
                         {
                             RuleResult result = receiver.Receive(message.Data, 0, record =>
@@ -323,6 +341,7 @@ namespace LastBell.Network.SocketPrototype
                         else throw new InvalidDataException("unexpected server message");
                     }
                     if (channel.Closed && report.EndReason == null) report.EndReason = "socket_eof";
+                    if (actions != null && report.EndReason == null) actions.Poll(timer.ElapsedMilliseconds, channel);
                     Thread.Sleep(1);
                 }
                 string expected = mode == "capacity" ? "session_full" : mode == "wrong-room" ? "wrong_room" : mode == "disconnect" ? "client_disconnect" :
@@ -330,8 +349,17 @@ namespace LastBell.Network.SocketPrototype
                 if (report.EndReason != expected || report.DuplicateEffects != 0) failures.Add("unexpected end/result: " + report.EndReason + " expected " + expected);
                 if ((mode == "play" || mode == "disconnect") && (!started || report.SentInputs == 0 || report.FeedbackEffects == 0)) failures.Add("play not exercised");
             }
+            catch (IOException ex) when (mode == "expect-eof" && started &&
+                ex.InnerException is SocketException &&
+                (((SocketException)ex.InnerException).SocketErrorCode == SocketError.ConnectionReset ||
+                 ((SocketException)ex.InnerException).SocketErrorCode == SocketError.ConnectionAborted))
+            { report.EndReason = "socket_reset"; }
+            catch (SocketException ex) when (mode == "expect-eof" && started &&
+                (ex.SocketErrorCode == SocketError.ConnectionReset || ex.SocketErrorCode == SocketError.ConnectionAborted))
+            { report.EndReason = "socket_reset"; }
             catch (Exception ex) { failures.Add(ex.ToString()); }
             finally { if (channel != null) { report.BytesRead = channel.BytesRead; report.BytesWritten = channel.BytesWritten; channel.Dispose(); } }
+            report.Actions = actions == null ? new SocketActionAudit() : actions.Finish();
             report.Failures = failures.ToArray(); report.Passed = failures.Count == 0; return report;
         }
     }

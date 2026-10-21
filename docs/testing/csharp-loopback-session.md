@@ -52,7 +52,7 @@ The host is one process containing `SessionRules` and a diagnostic local actor. 
 4. The existing EV codec carries initial checkpoints, event batches and checkpoint/event acknowledgments. Its opaque sample state is a single counter. Fresh events use `socket_counter` and an eight-byte value, with `EventSender`/`EventReceiver` providing replay and deduplication. The candidate's global `PlayerId=0` event wrapper remains unchanged.
 5. StopInput ends generation before final draining; Shutdown reports final tick/counter. Client Quit retires that connection immediately. Host loss is detected from the actual socket closing, not a fabricated in-memory callback.
 
-The input policy here is **whole input on reliable ordered TCP**, one of the previously documented alternatives. AP/AR separate ability request/receipt traffic is not exercised through sockets by this prototype. This does not decide which policy/Unity transport should ship.
+The input policy here is **whole input on reliable ordered TCP**, one of the previously documented alternatives. The default mode does not exercise AP/AR requests/receipts. An explicit `-ActionStream` mode now does; see [socket ability confirmations](socket-ability-confirmations.md) for its separate evidence and scheduler-only scope. This does not decide which policy/Unity transport should ship.
 
 ## Stream framing and bounds
 
@@ -79,7 +79,7 @@ An early development probe exposed an incorrect exception-category filter: inval
 - **Real sockets/processes: yes. Unity editor, LAN/Internet, multiple machines, NAT/VPN or production package selection: no.** TCP loopback is a diagnostic transport choice only.
 - This is not a login/authentication or encrypted transport. The room GUID and PID are fixture/audit metadata, not credentials. Socket-to-actor association prevents a payload-selected peer mapping in this prototype; production authenticated identity/integrity remains U3 work.
 - No injected packet loss/RTT/retransmission delay, bandwidth/frame-time/heap benchmark, long wall-clock soak, GUI, controller or human responsiveness result is claimed. TCP head-of-line behavior needs separate testing.
-- No Unity combat, damage eligibility, real warning geometry/phase state, full combat checkpoint or AP/AR socket integration was implemented. The event state is a counter, and command consumption is not ability activation.
-- A disconnected actor does not rejoin a running encounter; retry/returning-build restoration and host migration remain unimplemented. The forced-loss case validates EOF in the executed environment; alternative reset/error behavior on other systems is not claimed to pass.
+- No Unity combat, damage eligibility, real warning geometry/phase state, full combat checkpoint was implemented. AP/AR socket integration is available only in the separately documented optional action mode. The event state is a counter, and command consumption is not ability activation.
+- A disconnected actor does not rejoin a running encounter; retry/returning-build restoration and host migration remain unimplemented. The historical recorded forced-loss cases validated EOF. The current harness additionally recognizes specific ConnectionReset/ConnectionAborted errors during forced host loss, exercised by the optional action-mode evidence; other socket errors still fail.
 
 Use this evidence as an additional transport/process milestone alongside the [offline integration handoff](network-integration-handoff.md). Foundation still owns editor/packages/shared wiring and U3 gameplay/state interfaces. Actual Unity host + seven clients and human Internet/readability gates remain open in #7.
