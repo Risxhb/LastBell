@@ -30,16 +30,16 @@ namespace LastBell.Run
         sealed class Bot : IInputSource
         {
             public Vector3 MoveWorld; public Vector3 Aim; public bool Sprint;
-            public bool[] press = new bool[5]; public bool[] hold = new bool[5]; public bool dash, jump;
+            public bool[] press = new bool[5]; public bool[] hold = new bool[5]; public bool dash, jump, potion;
             public PlayerInput Read(PlayerController who)
             {
-                var r = new PlayerInput { Aim = Aim, Sprint = Sprint, Dash = dash, Jump = jump,
+                var r = new PlayerInput { Aim = Aim, Sprint = Sprint, Dash = dash, Jump = jump, Potion = potion,
                     P0 = press[0], P1 = press[1], P2 = press[2], P3 = press[3], P4 = press[4],
                     H0 = hold[0] || press[0], H1 = hold[1], H2 = hold[2], H3 = hold[3] || press[3], H4 = hold[4] };
                 var cam = Camera.main; var fwd = cam ? Sim.Flat(cam.transform.forward).normalized : Vector3.forward;
                 var right = Vector3.Cross(Vector3.up, fwd);
                 r.Move = Vector2.ClampMagnitude(new Vector2(Vector3.Dot(MoveWorld, right), Vector3.Dot(MoveWorld, fwd)), 1);
-                for (int i = 0; i < 5; i++) press[i] = false; dash = jump = false;
+                for (int i = 0; i < 5; i++) press[i] = false; dash = jump = potion = false;
                 return r;
             }
             public void Clear() { MoveWorld = Vector3.zero; Sprint = false; for (int i = 0; i < 5; i++) { press[i] = hold[i] = false; } dash = jump = false; }
@@ -219,6 +219,14 @@ namespace LastBell.Run
             Check("Steel Rhythm hit 3 granted Opening", sawOpening);
             yield return VanguardShowcase();
             yield return VanguardKitChecks();
+            // potions: drink one in encounter 1; it must still be spent in encounter 2 while health is full again
+            yield return Until(() => d.World.Hazards.Count == 0, 6, "quiet for the potion check"); d.Boss.Halt();
+            yield return Until(() => d.Player.Stunned == 0, 2, "hit-stun over");   // drinking is blocked while stunned
+            d.Player.DebugSetHp(50); bot.potion = true; yield return Wait(0.1f);
+            Check("F potion heals +40 and spends one", d.Player.Hp == 90 && d.Player.Potions == PlayerController.MaxPotions - 1, $"hp {d.Player.Hp}, potions {d.Player.Potions}");
+            bot.potion = true; yield return Wait(0.1f);
+            Check("potion lockout: no second drink within 1 s", d.Player.Potions == PlayerController.MaxPotions - 1);
+            d.Player.DebugSetHp(37); d.Boss.BeginCombat();
             yield return KillDuringWindup("dial_warden");
             yield return Until(() => d.State == RunState.Intro && d.Encounter == 1, 6, "intro 2");
             Check("encounter 1 ended exactly once", d.EncounterEnds == 1 && d.EncountersCleared == 1);
@@ -226,6 +234,7 @@ namespace LastBell.Run
             Check("previous boss removed", FindObjectsByType<BossEncounter>().Length == 1);
             yield return Until(() => d.State == RunState.Combat, 4, "combat 2");
             Check("encounter 2 is the Pendulum Sentinel", d.Boss is PendulumSentinel);
+            Check("health refilled before miniboss 2; potions carried over", d.Player.Hp == PlayerController.MaxHp && d.Player.Potions == PlayerController.MaxPotions - 1, $"hp {d.Player.Hp}, potions {d.Player.Potions}");
             yield return LowPendulumCheck();
             yield return KillDuringWindup("pendulum_sentinel");
             yield return Until(() => d.State == RunState.Combat && d.Encounter == 2, 10, "combat 3");
@@ -236,13 +245,14 @@ namespace LastBell.Run
             yield return Until(() => d.State == RunState.Intermission, 6, "intermission");
             yield return Wait(1.5f);
             Check("intermission is free of hazards and bosses", d.World.Hazards.Count == 0 && d.Boss == null && !d.World.CombatActive);
-            int hpInter = d.Player.Hp;
+            int potInter = d.Player.Potions;
+            Check("potions still carried at the intermission", potInter == PlayerController.MaxPotions - 1, "potions " + potInter);
             yield return Shot("intermission");
             int starts1 = d.EncounterStarts;
             for (int i = 0; i < 4; i++) { d.RequestContinue(); d.RequestContinue(); d.RequestReady(); yield return null; }
             yield return Until(() => d.State == RunState.Combat, 4, "final combat");
             Check("repeated Continue starts exactly one final encounter", d.EncounterStarts == starts1 + 1 && d.Boss is BellkeeperEncounter);
-            Check("health carries into the final fight", d.Player.Hp == hpInter);
+            Check("health and potions refilled for the final boss", d.Player.Hp == PlayerController.MaxHp && d.Player.Potions == PlayerController.MaxPotions, $"hp {d.Player.Hp}, potions {d.Player.Potions}");
             d.Player.DebugSetHp(PlayerController.MaxHp);   // test setup: the rest of this run checks phases, not survival
             var bk = (BellkeeperEncounter)d.Boss;
             Check("Bellkeeper uses its model", bk.Presenter != null && bk.Presenter.HasModel);
@@ -348,7 +358,7 @@ namespace LastBell.Run
         void FreshRunChecks(string when)
         {
             var p = d.Player;
-            Check($"fresh run {when}: full health/stamina, encounter 1", p.Hp == PlayerController.MaxHp && Mathf.Approximately(p.Stamina, PlayerController.MaxStamina) && d.Encounter == 0 && d.EncountersCleared == 0);
+            Check($"fresh run {when}: full health/stamina/potions, encounter 1", p.Hp == PlayerController.MaxHp && p.Potions == PlayerController.MaxPotions && Mathf.Approximately(p.Stamina, PlayerController.MaxStamina) && d.Encounter == 0 && d.EncountersCleared == 0);
             bool cdsClear = true; for (int i = 0; i < p.Kit.SlotNames.Length; i++) cdsClear &= p.Kit.Cooldown01(i) <= 0;
             Check($"fresh run {when}: cooldowns and class state reset", cdsClear && string.IsNullOrEmpty(p.Kit.ClassState()) || (p.Kit is ChimesingerKit ck && ck.Harmony == 0 && !ck.Bell));
             Check($"fresh run {when}: no stale bosses, hazards or projectiles", FindObjectsByType<BossEncounter>().Length == 0 && d.World.Hazards.Count == 0 && d.World.Projectiles.Count == 0 && d.Boss == null);

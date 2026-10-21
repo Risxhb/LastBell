@@ -98,7 +98,7 @@ namespace LastBell.Run
                 {
                     var r = Panel(560, 150, h * 0.62f);
                     GUI.Label(new Rect(r.x, r.y + 10, r.width, 34), d.Mode == RunMode.Practice ? "PRACTICE — " + RunDirector.SlotNames[SlotIndex(d.Encounter)] : "PREPARATION", big);
-                    GUI.Label(new Rect(r.x + 20, r.y + 46, r.width - 40, 44), d.Mode == RunMode.Practice ? "Practice never advances the run." : "Three minibosses, an intermission, then the Bellkeeper. Health carries between fights. Move around freely.", mid);
+                    GUI.Label(new Rect(r.x + 20, r.y + 46, r.width - 40, 44), d.Mode == RunMode.Practice ? "Practice never advances the run." : "Three minibosses, an intermission, then the Bellkeeper. Health refills before each boss; potions carry over until the final boss refills them.", mid);
                     if (GUI.Button(new Rect(r.x + r.width / 2 - 110, r.y + 98, 220, 36), "READY  (Enter)", btn)) d.RequestReady();
                     break;
                 }
@@ -125,7 +125,7 @@ namespace LastBell.Run
                 {
                     var r = Panel(600, 190, h * 0.5f);
                     GUI.Label(new Rect(r.x, r.y + 10, r.width, 34), "INTERMISSION", big);
-                    GUI.Label(new Rect(r.x + 20, r.y + 48, r.width - 40, 80), "Combat has ended. A shop will stand here in a later build; nothing can be bought yet.\nHealth carries into the final fight. Cooldowns and stamina are refreshed.\nNext: THE BELLKEEPER", mid);
+                    GUI.Label(new Rect(r.x + 20, r.y + 48, r.width - 40, 80), "Combat has ended. A shop will stand here in a later build; nothing can be bought yet.\nHealth and potions are refilled for the final fight. Cooldowns and stamina are refreshed.\nNext: THE BELLKEEPER", mid);
                     if (GUI.Button(new Rect(r.x + r.width / 2 - 120, r.y + 140, 240, 36), "CONTINUE  (Enter)", btn)) d.RequestContinue();
                     break;
                 }
@@ -166,8 +166,8 @@ namespace LastBell.Run
             for (int i = 0; i < 4; i++)
                 if (GUI.Button(new Rect(r.x + 30 + i * 166, r.y + 300, 160, 36), names[i], btn)) d.StartPractice(RunDirector.Classes[menuClass], i);
             GUI.Label(new Rect(r.x + 30, r.y + 350, r.width - 60, 120),
-                "Controls: WASD move · mouse aims · 1 / LMB basic · 2 3 4 class actions · 6 Mending Chorus (Chimesinger) · 5 / RMB dash · Space jump · Shift sprint · Esc pause\n" +
-                "Movement stamina: sprint, jump and dash share one bar. No invincibility frames. Health carries across the run; retry restarts at the first miniboss.\n" +
+                "Controls: WASD move · mouse aims · 1 / LMB basic · 2 3 4 class actions · 6 Mending Chorus (Chimesinger) · 5 / RMB dash · F potion · Space jump · Shift sprint · Esc pause\n" +
+                "Movement stamina: sprint, jump and dash share one bar. No invincibility frames (dodging does not make you immune). F drinks a potion (+40 HP).\nHealth refills before each boss; potions carry over between minibosses and refill before the final boss. Retry restarts at the first miniboss.\n" +
                 "Minibosses are labelled stand-ins; the Bellkeeper uses its model. Dev keys in combat: F9 defeat boss, F8 next phase.", tiny);
             if (GUI.Button(new Rect(r.x + r.width - 130, r.y + r.height - 50, 100, 36), "Quit", btn)) Application.Quit();
         }
@@ -253,7 +253,7 @@ namespace LastBell.Run
             Bar(new Rect(x, y + 16, pw, 14), (float)p.Hp / PlayerController.MaxHp, new Color(0.96f, 0.79f, 0.41f));
             Bar(new Rect(x, y + 36, pw, 6), p.Stamina / PlayerController.MaxStamina, new Color(0.45f, 0.85f, 0.75f));
             GUI.Label(new Rect(x + pw - 160, y - 4, 160, 20), "stamina " + Mathf.RoundToInt(p.Stamina), small);
-            var k = p.Kit; int n = k.SlotNames.Length; float sw = (pw - (n) * 6 - 70) / n; int hover = -1;
+            var k = p.Kit; int n = k.SlotNames.Length; float sw = (pw - (n) * 6 - 140) / n; int hover = -1;
             for (int i = 0; i < n; i++)
             {
                 var r = new Rect(x + i * (sw + 6), y + 50, sw, 62);
@@ -270,11 +270,17 @@ namespace LastBell.Run
             GUI.Label(new Rect(dr.x, dr.y + 2, dr.width, 16), "[5 / RMB]", slot);
             GUI.Label(new Rect(dr.x, dr.y + 16, dr.width, 30), p.ClassName == "Chimesinger" ? "Harmonic Step" : "Dash", slot);
             GUI.Label(new Rect(dr.x, dr.y + 44, dr.width, 16), p.Stamina >= PlayerController.DashCost ? "ready" : "stamina", slot);
+            var pr = new Rect(dr.x + 70, y + 50, 64, 62);
+            Rect(pr, new Color(0.12f, 0.15f, 0.26f, 0.95f));
+            GUI.Label(new Rect(pr.x, pr.y + 2, pr.width, 16), "[F]", slot);
+            GUI.Label(new Rect(pr.x, pr.y + 16, pr.width, 30), "Potion", slot);
+            GUI.Label(new Rect(pr.x, pr.y + 40, pr.width, 20), new string('●', p.Potions) + new string('○', PlayerController.MaxPotions - p.Potions), slot);
             string cs = k.ClassState();
             if (!string.IsNullOrEmpty(cs)) GUI.Label(new Rect(x, y + 116, pw, 20), cs, small);
             string hint = d.State == RunState.Combat ? "WASD move · mouse aim · Space jump · Shift sprint · Tab damage meter · hover a skill for details" : "Abilities are off outside combat";
             GUI.Label(new Rect(x, y + 132, pw, 18), hint, tiny);
-            if (dr.Contains(Event.current.mousePosition)) Tooltip(x, y, "DASH  [5 / RMB]\nShort burst (3 m in 0.2 s) in the move direction. Costs 30 stamina; sprint and jump share the bar.\nNo invincibility: get out of the shape before it resolves. Cancels basic attacks and unreleased windups.");
+            if (pr.Contains(Event.current.mousePosition)) Tooltip(x, y, $"POTION  [F]\n+{PlayerController.PotionHeal} HP, 1 s between drinks. {p.Potions}/{PlayerController.MaxPotions} left.\nPotions carry over between minibosses; health and potions refill before the final boss.");
+            else if (dr.Contains(Event.current.mousePosition)) Tooltip(x, y, "DASH  [5 / RMB]\nShort burst (3 m in 0.2 s) in the move direction. Costs 30 stamina; sprint and jump share the bar.\nNo invincibility: get out of the shape before it resolves. Cancels basic attacks and unreleased windups.");
             else if (hover >= 0) Tooltip(x, y, k.Tooltip(hover));
             if (ShowMeter && d.World != null) Meter(Screen.width - 330, 150, d.World.EncounterMeter, "DAMAGE · this encounter", (d.World.Tick - d.World.SegmentStartTick) / 60f);
         }

@@ -10,7 +10,7 @@ namespace LastBell.Run
         public const int Slots = 5;   // 1 Basic, 2/3/4 class actions, 6 = Chimesinger's Mending Chorus
         public Vector2 Move;          // camera-relative WASD, x right / y up the screen
         public Vector3 Aim;           // cursor on the floor (world)
-        public bool Sprint, Jump, Dash;
+        public bool Sprint, Jump, Dash, Potion;
         public bool P0, P1, P2, P3, P4;   // pressed this tick
         public bool H0, H1, H2, H3, H4;   // held
         public bool Pressed(int i) => i switch { 0 => P0, 1 => P1, 2 => P2, 3 => P3, _ => P4 };
@@ -43,6 +43,7 @@ namespace LastBell.Run
             latched.P4 |= kb.digit6Key.wasPressedThisFrame;
             latched.Dash |= kb.digit5Key.wasPressedThisFrame || (m != null && m.rightButton.wasPressedThisFrame);
             latched.Jump |= kb.spaceKey.wasPressedThisFrame;
+            latched.Potion |= kb.fKey.wasPressedThisFrame;
         }
 
         public PlayerInput Read(PlayerController who)
@@ -79,6 +80,8 @@ namespace LastBell.Run
         public const float SprintCost = 25f, JumpCost = 20f, DashCost = 30f, Regen = 20f, RegenDelay = 0.75f;
         public const float DashDistance = 3f, JumpHeight = 0.8f;
         public const int DashTicks = 12, DashRecover = 4, JumpTicks = 36, KnockTicks = 9;
+        // Potions (F): 5 per refill, +40 HP each, 1 s between drinks (values from the earlier test fight).
+        public const int MaxPotions = 5, PotionHeal = 40, PotionLockout = 60;
 
         public string ClassName { get; private set; }
         public CombatWorld World { get; private set; }
@@ -90,6 +93,9 @@ namespace LastBell.Run
 
         public int Hp { get; private set; } = MaxHp;
         public float Stamina { get; private set; } = MaxStamina;
+        public int Potions { get; private set; } = MaxPotions;
+        public int PotionsDrunk { get; private set; }
+        int sincePotion = 999;
         public bool Down { get; private set; }
         public float Height { get; private set; }
         public bool Airborne => jumpTick >= 0;
@@ -116,14 +122,32 @@ namespace LastBell.Run
             return pc;
         }
 
-        // Fresh state between encounters: stamina and cooldowns reset, class setup cleared. Health carries over
-        // (single-arena plan §6 proposal; provisional, see handoff).
+        // Fresh state between encounters: stamina and cooldowns reset, class setup cleared. Health and potions are
+        // handled by RefreshHealth (the director calls it per the run's health policy).
         public void PrepareForEncounter(Vector3 pos, float yaw)
         {
             transform.SetPositionAndRotation(pos, Quaternion.Euler(0, yaw, 0));
             Stamina = MaxStamina; dashTick = 0; dashLock = 0; jumpTick = -1; Height = 0; stun = 0; knockTick = 0; sinceSpend = 999;
             Kit.ResetAll();
             Presenter.ResetPose();
+        }
+
+        // Health policy (Chzy18, Oct 21): full health before every boss after the first; potions carry over between
+        // minibosses; health AND potions refill before the area's final boss.
+        public void RefreshHealth(bool refillPotions)
+        {
+            if (Down) return;
+            Hp = MaxHp;
+            if (refillPotions) Potions = MaxPotions;
+        }
+
+        bool DrinkPotion()
+        {
+            if (Down || Potions == 0 || Hp >= MaxHp || sincePotion < PotionLockout) return false;
+            Potions--; PotionsDrunk++; sincePotion = 0;
+            Heal(PotionHeal);
+            World.BossFx.PotionHeal(transform);
+            return true;
         }
 
         public void Heal(int amount)
@@ -169,10 +193,11 @@ namespace LastBell.Run
         public void Step()
         {
             var inp = Input != null && MovementEnabled ? Input.Read(this) : default;
-            if (!AbilitiesEnabled) { inp.P0 = inp.P1 = inp.P2 = inp.P3 = inp.P4 = false; inp.H0 = inp.H1 = inp.H2 = inp.H3 = inp.H4 = false; inp.Dash = inp.Jump = false; }
+            if (!AbilitiesEnabled) { inp.P0 = inp.P1 = inp.P2 = inp.P3 = inp.P4 = false; inp.H0 = inp.H1 = inp.H2 = inp.H3 = inp.H4 = false; inp.Dash = inp.Jump = inp.Potion = false; }
             Last = inp;
             if (Down) { Presenter.Tick(this); return; }
-            sinceSpend++;
+            sinceSpend++; sincePotion++;
+            if (inp.Potion && stun == 0) DrinkPotion();   // usable while moving or mid-action, not while stunned
             if (sinceSpend > Sim.Ticks(RegenDelay)) Stamina = Mathf.Min(MaxStamina, Stamina + Regen * Sim.Dt);
 
             var cam = Camera.main;

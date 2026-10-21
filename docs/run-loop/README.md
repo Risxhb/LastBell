@@ -27,6 +27,7 @@ All of it runs in the one key-art arena: `Assets/LastBell/Run/RunArena.unity`, a
 | 6 | Chimesinger: Mending Chorus |
 | 5 / RMB | dash (Clockstep / Harmonic Step) |
 | Space / Shift | jump / sprint (shared movement stamina) |
+| F | drink a potion (+40 HP) |
 | Enter | Ready / Continue / Start run |
 | Tab | damage meter (this encounter) |
 | Esc | pause |
@@ -39,7 +40,8 @@ Gamepads aren't read: the user's rudder pedals register as a controller. UI clic
 
 - **Movement** (Game-Design delegated defaults): walk 6 m/s, sprint 9 m/s, dash 3 m in 0.2 s, jump about 0.8 m over 0.6 s. Stamina 100: sprint 25/s, jump 20, dash 30, regenerates 20/s after 0.75 s.
 - **No invincibility frames** anywhere. A hazard instance hits a player at most once, which replaces the old 0.75 s post-hit immunity. A hit causes 0.25 s stun and 1.5 m knockback (spec v0.2 §5).
-- **Between encounters:** health **carries over** (single-arena plan §6 proposal, provisional). Stamina, cooldowns and class state (Opening, Harmony, bells) reset, and the player returns to the start socket. The old test fight's potions are **not** in the run, since healing is deferred by the design and potions are an unapproved healing source.
+- **Health and potions (Chzy18, Oct 21):** health refills before every boss after the first. Potions (F: +40 HP, 1 s apart, 5 per refill) carry over between the minibosses, and both health and potions refill before the area's final boss (the Bellkeeper). A fresh run starts full. Stamina, cooldowns and class state (Opening, Harmony, bells) reset before each encounter.
+- **Dodging does not make you immune** (Chzy18, Oct 21; settles PF-01): a dash only avoids a hit by leaving the shape before it resolves.
 - **Defeat precedence:** if the player goes down on the same tick the boss dies, defeat wins (plan §10 / spec §4).
 - **Bellkeeper:** spec v0.2 Steady Ticking schedule. D1–D6 are applied provisionally: 6.5 m sweep, damage 30/25/30/15 (45 for the Final Toll sweep), phases at 70 % and 35 % queued to block boundaries.
 - **Boss HP is shortened for this test build:** minibosses 1500 / 1700 / 1700, Bellkeeper 3600. Design durations are 60–105 s and 3–4 min, so tuning is still open.
@@ -60,12 +62,12 @@ Gamepads aren't read: the user's rudder pedals register as a controller. UI clic
 ## Tests actually run (evidence in `run-loop-evidence/`, not committed)
 
 - **Windows player build:** succeeded seven times tonight (0 errors). The packaged exe launched and ran the full autotest each time.
-- **Autotest in the packaged build, final run (build 7): 84/84 passed, 0 errors logged.** Copy: [media/autotest-report-build7.txt](media/autotest-report-build7.txt). It covers:
+- **Autotest in the packaged build, latest run (build 9, with potions and the health policy): 88/88 passed, 0 errors logged.** Copy: [media/autotest-report-build9.txt](media/autotest-report-build9.txt). Build 7 (84/84) is kept for the media. It covers:
   - boot to menu in the arena
   - repeated Ready, Continue and Retry presses (each starts exactly one transition)
   - all four encounter slots, each started and ended exactly once
   - boss death during a windup on all four bosses (pending hazards cancelled in the same tick, no damage or resolve afterwards, boss collision off)
-  - intermission free of hazards; health carried into the final fight
+  - intermission free of hazards; a potion heals +40 with a 1 s lockout; health refills before miniboss 2 while the spent potion stays spent; health and potions both refill for the final boss
   - Bellkeeper phase 2 and 3 transitions with the PhaseShift and Defeat clips playing
   - victory after slot 4; retry after victory and after defeat both give a fresh run (HP/stamina full, cooldowns reset, no stale bosses, hazards or projectiles, one player)
   - real-hazard defeat with its cause; return to menu from pause leaves no run objects
@@ -95,11 +97,11 @@ Screens and videos: `run-loop-evidence/autotest-7/*.png` and `*.mp4` (vanguard_k
   Feel still needs a human playtest.
 - **PF-06** death recap: the last six hits with the killing blow marked.
 - **PF-07** first pass: a per-ability damage meter (damage, share, hits, largest hit, DPS) for the encounter (Tab) and the run (results). This is not Details! parity: no history segments, charts or damage-taken breakdown yet.
-- **PF-01** (dodge doesn't negate damage) is **not changed**. The current rules say no iframes, so a dash only helps if it carries you out of the shape before it resolves. The 3 m dash plus walking does that within the spec's windows. Whether dashing should grant immunity is a design decision for Risxhb/Chzy18.
+- **PF-01** (dodge doesn't negate damage): **settled by Chzy18 (Oct 21): dodging does not make you immune.** No change; a dash avoids a hit only by carrying you out of the shape before it resolves.
 
 ## Provisional decisions to review
 
-1. Health carries across encounters with no intermission heal, and potions are removed from the run.
+1. ~~Health policy~~: decided by Chzy18 (Oct 21). Health refills before each boss after the first; potions carry over between minibosses; both refill before the final boss.
 2. Boss HP is shortened for testing.
 3. Bellkeeper D1/D2 values are applied before review.
 4. Chimesinger tuning is entirely prototype: notes 16 dmg, Bellstrike 40 dmg with 2 charges and 6 s recharge, bell lasts 8 s, strength ×1.5 up to twice, Refrain 34 dmg with echoes worth 60 % (4 s cooldown), Crescendo 12 per Harmony + 50 bell + echoes (5 s cooldown), Chorus +30 HP within 6 m (15 s cooldown).
@@ -119,7 +121,7 @@ Screens and videos: `run-loop-evidence/autotest-7/*.png` and `*.mp4` (vanguard_k
 
 ## Next steps (highest priority first)
 
-1. **Human playtest** of this build: feel (PF-05), Brace (PF-02) and readability. Decide PF-01 dodge immunity, the health-between-fights policy and the Bellkeeper D1–D6.
+1. **Human playtest** of this build: feel (PF-05), Brace (PF-02) and readability. Decide the Bellkeeper D1–D6. (PF-01 and the health policy were settled on Oct 21.)
 2. Swap in the **fixed Chimesinger GLB** when the Chimesinger session delivers it, then add its Hit / Down / GetUp.
 3. Author the **three miniboss** models and schedules (encounter lane #8), replacing the stand-ins without changing the run flow.
 4. Tune boss HP and damage toward the design fight lengths, and run the escape checker on the miniboss schedules.

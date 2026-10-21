@@ -167,6 +167,7 @@ namespace LastBell.Run
             };
             World.Boss = Boss;
             World.CombatActive = false;
+            if (index > 0) Player.RefreshHealth(refillPotions: index == 3);   // health policy: see PlayerController.RefreshHealth
             Player.PrepareForEncounter(PlayerSocket, 180);
             Player.AbilitiesEnabled = false;
             Go(RunState.Intro);
