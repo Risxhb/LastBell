@@ -10,7 +10,7 @@ For each decision, record the date, decision, reason, and relevant issue or pull
 - Reason/source: Risxhb completed the design checklist and requested documentation/task updates and notification to Chzy18's agents. [Board #29](https://github.com/Risxhb/collab/issues/29); full [current design](game-design.md), [production plan](../raid-simulator-plan.md).
 - Supersedes: auto-target/Guard/parry/counter/resource/iframe rules; spectate-only knockouts; mandatory six upgrades and two-class/two-boss/12-relic/six-modifier slice. Older source references remain historical, not acceptance requirements.
 - Ownership: foundation #6; Chzy18/Codex arena #30 and network #7; Chzy18/Claude viewer #31, primary arena/content presentation and encounters #8. Existing Unity/style/solo + 2–8 decisions continue.
-- Status: direction recorded; docs/implementation review and separate runtime/human evidence still required. No acknowledgment on rewritten #30/#31 was present before the update.
+- Status: direction recorded; docs/implementation review and separate runtime/human evidence still required. Codex acknowledged original #30 during this update; its answered assignment is preserved and the design delta is a follow-up. Unanswered #31/#29 were rewritten; receipt of the new decisions remains unverified.
 
 ## 2026-10-20 — One Unity game with reusable C# rules
 
