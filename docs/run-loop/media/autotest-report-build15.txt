@@ -1,7 +1,6 @@
-RESULT: ALL PASSED · 108 passed, 0 failed · errors logged: 0
-      Last Bell autotest · 0.1.0 · Unity 6000.6.6f1 · NVIDIA GeForce RTX 5080 · 2026-10-21 02:34
+RESULT: ALL PASSED · 107 passed, 0 failed · errors logged: 0
+      Last Bell autotest · 0.1.0 · Unity 6000.6.6f1 · NVIDIA GeForce RTX 5080 · 2026-10-21 03:05
 PASS  boots into the menu in the arena scene
-PASS  old test controllers did not auto-spawn
       screenshot 01_menu.png
 PASS  Vanguard skill-bar icons load (5 incl. dash)  — 5/5
 PASS  Chimesinger skill-bar icons load (6 incl. dash)  — 6/6
@@ -143,93 +142,93 @@ PASS  no errors or exceptions logged  — 0 logged
 
 Director transitions:
   120: Menu -> Ready (enc 0, gen 1)
-  175: Ready -> Intro (enc 0, gen 2)
+  177: Ready -> Intro (enc 0, gen 2)
   encounter start miniboss.dial_warden
-  414: Intro -> Combat (enc 0, gen 3)
+  415: Intro -> Combat (enc 0, gen 3)
   encounter end miniboss.dial_warden defeated=True
-  3587: Combat -> Cleared (enc 0, gen 4)
-  3947: Cleared -> Intro (enc 1, gen 5)
+  3586: Combat -> Cleared (enc 0, gen 4)
+  3946: Cleared -> Intro (enc 1, gen 5)
   encounter start miniboss.pendulum_sentinel
   4186: Intro -> Combat (enc 1, gen 6)
   encounter end miniboss.pendulum_sentinel defeated=True
-  5002: Combat -> Cleared (enc 1, gen 7)
-  5360: Cleared -> Intro (enc 2, gen 8)
+  5014: Combat -> Cleared (enc 1, gen 7)
+  5374: Cleared -> Intro (enc 2, gen 8)
   encounter start miniboss.chimebound_oracle
-  5596: Intro -> Combat (enc 2, gen 9)
+  5614: Intro -> Combat (enc 2, gen 9)
   encounter end miniboss.chimebound_oracle defeated=True
-  5964: Combat -> Cleared (enc 2, gen 10)
-  6324: Cleared -> Intermission (enc 2, gen 11)
-  6505: Intermission -> Intro (enc 3, gen 12)
+  5981: Combat -> Cleared (enc 2, gen 10)
+  6341: Cleared -> Intermission (enc 2, gen 11)
+  6522: Intermission -> Intro (enc 3, gen 12)
   encounter start boss.bellkeeper
-  6740: Intro -> Combat (enc 3, gen 13)
+  6756: Intro -> Combat (enc 3, gen 13)
   encounter end boss.bellkeeper defeated=True
-  7928: Combat -> Cleared (enc 3, gen 14)
-  8108: Cleared -> Results (enc 3, gen 15)
-  8109: Results -> Ready (enc 0, gen 16)
-  8158: Ready -> Intro (enc 0, gen 17)
+  7944: Combat -> Cleared (enc 3, gen 14)
+  8124: Cleared -> Results (enc 3, gen 15)
+  8125: Results -> Ready (enc 0, gen 16)
+  8174: Ready -> Intro (enc 0, gen 17)
   encounter start miniboss.dial_warden
-  8397: Intro -> Combat (enc 0, gen 18)
+  8410: Intro -> Combat (enc 0, gen 18)
   encounter end miniboss.dial_warden defeated=False
-  8595: Combat -> Downed (enc 0, gen 19)
-  8787: Downed -> Results (enc 0, gen 20)
-  8788: Results -> Ready (enc 0, gen 21)
-  8791: Ready -> Intro (enc 0, gen 22)
+  8608: Combat -> Downed (enc 0, gen 19)
+  8800: Downed -> Results (enc 0, gen 20)
+  8801: Results -> Ready (enc 0, gen 21)
+  8804: Ready -> Intro (enc 0, gen 22)
   encounter start miniboss.dial_warden
-  9030: Intro -> Combat (enc 0, gen 23)
-  9211: Combat -> Menu (enc 0, gen 24)
-  9213: Menu -> Ready (enc 0, gen 25)
-  9258: Ready -> Intro (enc 0, gen 26)
+  9043: Intro -> Combat (enc 0, gen 23)
+  9224: Combat -> Menu (enc 0, gen 24)
+  9226: Menu -> Ready (enc 0, gen 25)
+  9270: Ready -> Intro (enc 0, gen 26)
   encounter start miniboss.dial_warden
-  9497: Intro -> Combat (enc 0, gen 27)
+  9510: Intro -> Combat (enc 0, gen 27)
   encounter end miniboss.dial_warden defeated=True
-  10933: Combat -> Cleared (enc 0, gen 28)
-  11293: Cleared -> Intro (enc 1, gen 29)
+  10947: Combat -> Cleared (enc 0, gen 28)
+  11307: Cleared -> Intro (enc 1, gen 29)
   encounter start miniboss.pendulum_sentinel
-  11533: Intro -> Combat (enc 1, gen 30)
+  11547: Intro -> Combat (enc 1, gen 30)
   encounter end miniboss.pendulum_sentinel defeated=True
-  11835: Combat -> Cleared (enc 1, gen 31)
-  12195: Cleared -> Intro (enc 2, gen 32)
+  11849: Combat -> Cleared (enc 1, gen 31)
+  12209: Cleared -> Intro (enc 2, gen 32)
   encounter start miniboss.chimebound_oracle
-  12435: Intro -> Combat (enc 2, gen 33)
+  12449: Intro -> Combat (enc 2, gen 33)
   encounter end miniboss.chimebound_oracle defeated=True
-  12737: Combat -> Cleared (enc 2, gen 34)
-  13096: Cleared -> Intermission (enc 2, gen 35)
-  13096: Intermission -> Intro (enc 3, gen 36)
+  12751: Combat -> Cleared (enc 2, gen 34)
+  13111: Cleared -> Intermission (enc 2, gen 35)
+  13111: Intermission -> Intro (enc 3, gen 36)
   encounter start boss.bellkeeper
-  13336: Intro -> Combat (enc 3, gen 37)
+  13351: Intro -> Combat (enc 3, gen 37)
   encounter end boss.bellkeeper defeated=True
-  13818: Combat -> Cleared (enc 3, gen 38)
-  14177: Cleared -> Results (enc 3, gen 39)
-  14177: Results -> Menu (enc 3, gen 40)
-  14178: Menu -> Ready (enc 0, gen 41)
-  14221: Ready -> Intro (enc 0, gen 42)
+  13834: Combat -> Cleared (enc 3, gen 38)
+  14193: Cleared -> Results (enc 3, gen 39)
+  14193: Results -> Menu (enc 3, gen 40)
+  14194: Menu -> Ready (enc 0, gen 41)
+  14236: Ready -> Intro (enc 0, gen 42)
   encounter start miniboss.dial_warden
-  14460: Intro -> Combat (enc 0, gen 43)
+  14476: Intro -> Combat (enc 0, gen 43)
   encounter end miniboss.dial_warden defeated=True
-  16093: Combat -> Cleared (enc 0, gen 44)
-  16453: Cleared -> Intro (enc 1, gen 45)
+  16107: Combat -> Cleared (enc 0, gen 44)
+  16467: Cleared -> Intro (enc 1, gen 45)
   encounter start miniboss.pendulum_sentinel
-  16693: Intro -> Combat (enc 1, gen 46)
+  16707: Intro -> Combat (enc 1, gen 46)
   encounter end miniboss.pendulum_sentinel defeated=True
-  16935: Combat -> Cleared (enc 1, gen 47)
-  17294: Cleared -> Intro (enc 2, gen 48)
+  16949: Combat -> Cleared (enc 1, gen 47)
+  17309: Cleared -> Intro (enc 2, gen 48)
   encounter start miniboss.chimebound_oracle
-  17534: Intro -> Combat (enc 2, gen 49)
+  17549: Intro -> Combat (enc 2, gen 49)
   encounter end miniboss.chimebound_oracle defeated=True
-  17776: Combat -> Cleared (enc 2, gen 50)
-  18136: Cleared -> Intermission (enc 2, gen 51)
-  18136: Intermission -> Intro (enc 3, gen 52)
+  17791: Combat -> Cleared (enc 2, gen 50)
+  18150: Cleared -> Intermission (enc 2, gen 51)
+  18150: Intermission -> Intro (enc 3, gen 52)
   encounter start boss.bellkeeper
-  18376: Intro -> Combat (enc 3, gen 53)
+  18390: Intro -> Combat (enc 3, gen 53)
   encounter end boss.bellkeeper defeated=True
-  18859: Combat -> Cleared (enc 3, gen 54)
-  19219: Cleared -> Results (enc 3, gen 55)
-  19219: Results -> Menu (enc 3, gen 56)
-  19220: Menu -> Ready (enc 3, gen 57)
-  19220: Ready -> Intro (enc 3, gen 58)
+  18872: Combat -> Cleared (enc 3, gen 54)
+  19231: Cleared -> Results (enc 3, gen 55)
+  19231: Results -> Menu (enc 3, gen 56)
+  19232: Menu -> Ready (enc 3, gen 57)
+  19232: Ready -> Intro (enc 3, gen 58)
   encounter start boss.bellkeeper
-  19460: Intro -> Combat (enc 3, gen 59)
+  19472: Intro -> Combat (enc 3, gen 59)
   encounter end boss.bellkeeper defeated=True
-  19582: Combat -> Cleared (enc 3, gen 60)
-  19942: Cleared -> Results (enc 3, gen 61)
-  19942: Results -> Ready (enc 3, gen 62)
+  19594: Combat -> Cleared (enc 3, gen 60)
+  19954: Cleared -> Results (enc 3, gen 61)
+  19954: Results -> Ready (enc 3, gen 62)

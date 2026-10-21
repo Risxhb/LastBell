@@ -195,7 +195,6 @@ namespace LastBell.Run
             d.InputOverride = bot;
             yield return Wait(1.0f);
             Check("boots into the menu in the arena scene", d.State == RunState.Menu && FindAnyObjectByType<LastBell.Arenas.KeyArtArena>() != null);
-            Check("old test controllers did not auto-spawn", FindAnyObjectByType<LastBell.Characters.VanguardTestController>() == null && FindAnyObjectByType<LastBell.Characters.BellkeeperTestController>() == null);
             yield return Shot("menu");
             foreach (var cls in RunDirector.Classes)
             {

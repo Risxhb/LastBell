@@ -45,7 +45,7 @@ Branch `feature/run-loop`. October 21, 2026 (overnight build). Status labels use
 | Hit | 0.30 s | no | hit-stun 15 ticks | — | **New tonight** |
 | Down | 0.80 s | no | down / defeat, held | buckle 0–0.35, fall to 0.85 | **New tonight**, rough |
 | GetUp | 0.90 s | no | run start (revive in future co-op) | kneel 0.45 | **New tonight**, rough |
-| Combo1–3, DashAttack, PendulumRush, ReversalRush, FinalHour, Guard, Counter | — | — | **superseded kit**; kept only for the old `VanguardTestController` scene | — | Legacy, not used by the run loop |
+| Combo1–3, DashAttack, PendulumRush, ReversalRush, FinalHour, Guard, Counter | — | — | **superseded kit**; still in the GLB but unused (the old `VanguardTestController` was removed Oct 21) | — | Legacy, not used by the run loop |
 
 Contact sheet: `run-loop-evidence/vanguard/kit-contact-sheet.png`.
 
