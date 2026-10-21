@@ -22,6 +22,7 @@ namespace LastBell.Run
         public static RunDirector Instance { get; private set; }
 
         public static readonly string[] SlotNames = { "Dial Warden", "Pendulum Sentinel", "Chimebound Oracle", "Intermission", "Bellkeeper" };
+        public static string SlotName(int i) => (i < 3 ? RunRoster.Name(i) : null) ?? SlotNames[i];   // with the loaded area's minibosses
         public static readonly string[] Classes = { "Vanguard", "Chimesinger", "Arcanist" };
         const int IntroTicks = 120, ClearTicks = 180, DownedTicks = 100;
         static readonly Vector3 PlayerSocket = new Vector3(0, 0, 6.5f), BossSocket = new Vector3(0, 0, -1.5f);
@@ -158,7 +159,8 @@ namespace LastBell.Run
             Encounter = index;
             World.ClearTransient();
             if (Boss) Destroy(Boss.gameObject);
-            Boss = index switch
+            // an area's own miniboss replaces the generic stand-in in its slot (RunRoster)
+            Boss = (index < 3 ? RunRoster.Spawn(index, World, BossSocket) : null) ?? index switch
             {
                 0 => BossEncounter.Spawn<DialWarden>(World, BossSocket, 0),
                 1 => BossEncounter.Spawn<PendulumSentinel>(World, BossSocket, 0),

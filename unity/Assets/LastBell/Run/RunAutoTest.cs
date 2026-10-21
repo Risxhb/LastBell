@@ -414,9 +414,95 @@ namespace LastBell.Run
             Check("practice retry repeats the same encounter", d.State == RunState.Ready && d.Encounter == 3 && d.Mode == RunMode.Practice);
             d.ReturnToMenu();
 
+            // ---------- Verdant Chimes miniboss 2 ----------
+            yield return SiltCarillonChecks();
+
             // ---------- report ----------
             Check("no errors or exceptions logged", errors == 0, errors + " logged");
             Finish();
+        }
+
+        // Silt Carillon stand-in (docs/design/silt-carillon.md): practice slot 2 with the Verdant Chimes roster forced
+        IEnumerator SiltCarillonChecks()
+        {
+            Check("other maps keep the Pendulum Sentinel in slot 2", RunDirector.SlotName(1) == "Pendulum Sentinel", RunDirector.SlotName(1));
+            RunRoster.Override = "verdant-chimes";
+            Check("Verdant Chimes slot 2 is the Silt Carillon", RunDirector.SlotName(1) == "Silt Carillon", RunDirector.SlotName(1));
+            // the practice section above ends in Ready, where ReturnToMenu is refused unless paused
+            if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); d.SetPaused(false); yield return null; }
+            Check("Silt Carillon practice accepted from the menu", d.State == RunState.Menu && d.StartPractice("Vanguard", 1), d.State.ToString());
+            d.RequestReady();
+            yield return Until(() => d.State == RunState.Combat, 4, "Silt Carillon combat");
+            var sc = d.Boss as SiltCarillon;
+            Check("practice slot 2 on Verdant Chimes spawns the Silt Carillon", sc != null, d.Boss ? d.Boss.Id : "no boss");
+            if (sc == null) { d.ReturnToMenu(); RunRoster.Override = null; yield break; }
+            Check("Silt Carillon starts in Clear Channels", sc.PhaseName == SiltCarillon.Phase1, sc.PhaseName);
+            IEnumerable<Hazard> Live(string prefix) => d.World.Hazards.Live.Where(h => h.Source.StartsWith(prefix));
+            void TopUp() { if (d.Player) d.Player.RefreshHealth(refillPotions: false); }
+
+            yield return Survive(6, () => Live("Spillway Note").Any());
+            var note = Live("Spillway Note").FirstOrDefault();
+            Check("Spillway Note: 2 m lane that locks 60 ticks before resolving", note != null && note.Width == 2f && note.ResolveAt == 108 && note.ResolveAt - note.LockAt == 60 && note.Kind == HazardKind.Strike,
+                note == null ? "none" : $"w {note.Width}, lock {note.LockAt}, resolve {note.ResolveAt}");
+
+            TopUp();
+            yield return Survive(12, () => Live("Silt Steps").Count() == 3);
+            var lanes = Live("Silt Steps").OrderBy(h => h.ResolveAt).ToArray();
+            Check("Silt Steps: three 1.5 m ground lanes resolving 84 ticks apart", lanes.Length == 3 && lanes.All(h => h.Width == 1.5f && h.Kind == HazardKind.Ground && h.Knockback == 0)
+                && lanes[0].ResolveAt == 108 && lanes[1].ResolveAt == 192 && lanes[2].ResolveAt == 276, string.Join(", ", lanes.Select(h => $"{h.Source}@{h.ResolveAt}")));
+            Check("Silt Steps lanes are 2 m apart centre to centre", lanes.Length == 3 && Mathf.Abs(Vector3.Distance(lanes[0].Origin, lanes[2].Origin) - 4f) < 0.05f && Mathf.Abs(Vector3.Distance(lanes[0].Origin, lanes[1].Origin) - 2f) < 0.05f);
+            Check("lane numerals show while lanes are pending", sc.NumeralsVisible);
+            yield return Shot("silt_carillon_steps");
+            yield return Survive(6, () => sc.ResolvedLanes.Count == 3);
+            Check("Silt Steps resolves I, II, III", sc.ResolvedLanes.SequenceEqual(new[] { 1, 2, 3 }), string.Join(",", sc.ResolvedLanes));
+            yield return Until(() => !sc.NumeralsVisible, 0.5f, "numerals cleared");
+            Check("numerals clear once every lane is spent", !sc.NumeralsVisible);
+
+            TopUp();
+            yield return Survive(10, () => Live("Bellback").Any());
+            var back = Live("Bellback").FirstOrDefault();
+            Check("Bellback: 110° rear cone to 5.3 m, no knockback", back != null && Mathf.Abs(Mathf.DeltaAngle(back.Yaw, sc.transform.eulerAngles.y + 180)) < 1f && Mathf.Approximately(back.Radius, 5.3f) && back.HalfAngle == 55f && back.Knockback == 0,
+                back == null ? "none" : $"yaw {back.Yaw} vs boss {sc.transform.eulerAngles.y}, r {back.Radius}");
+
+            // phase 2: queued at 50 %, the current attack finishes first, then a harmless transformation
+            sc.DebugSetHpFraction(0.45f);
+            TopUp();
+            yield return Survive(10, () => sc.Current == "transformation");
+            Check("50 % queues the transformation; no live hazard carries into it", sc.Current == "transformation" && !d.World.Hazards.Live.Any(h => h.ResolveAt - h.Age > 1), sc.Current);
+            yield return Survive(4, () => sc.PhaseName == SiltCarillon.Phase2);
+            Check("phase 2 Uneven Flow entered", sc.PhaseName == SiltCarillon.Phase2, sc.PhaseName);
+
+            yield return Survive(6, () => Live("Split Spillway").Count() == 2);
+            var split = Live("Split Spillway").ToArray();
+            Check("Split Spillway: two 1.5 m lanes around a 2.6 m corridor", split.Length == 2 && split.All(h => h.Width == 1.5f) && Mathf.Abs(Vector3.Distance(split[0].Origin, split[1].Origin) - 4.1f) < 0.05f && split[0].ResolveAt == 114);
+
+            TopUp();
+            yield return Survive(10, () => Live("Broken Steps").Count() == 3);
+            Check("Broken Steps announces its order", sc.LastOrder != null && sc.LastOrder.SequenceEqual(SiltCarillon.OrderP2) && sc.Current.Contains("I · III · II"), sc.Current);
+            yield return Shot("silt_carillon_broken_steps");
+            yield return Survive(7, () => sc.ResolvedLanes.Count == 3);
+            Check("Broken Steps resolves I, III, II", sc.ResolvedLanes.SequenceEqual(new[] { 1, 3, 2 }), string.Join(",", sc.ResolvedLanes));
+
+            TopUp();
+            yield return Survive(8, () => Live("Basin Toll").Any());
+            var toll = Live("Basin Toll").FirstOrDefault();
+            Check("Basin Toll: heavy ring 4.3–6.8 m around the boss", toll != null && toll.Shape == HazardShape.Ring && Mathf.Approximately(toll.Inner, 4.3f) && Mathf.Approximately(toll.Radius, 6.8f) && toll.Damage == 26 && toll.Kind == HazardKind.Ground);
+            yield return Shot("silt_carillon_basin_toll");
+
+            TopUp();
+            yield return Survive(8, () => Live("Bellback").Any());
+            Check("phase 2 keeps Bellback unchanged", Live("Bellback").Any(h => h.Damage == 18 && h.ResolveAt == 90));
+
+            yield return Survive(10, () => sc.Current.StartsWith("Split") || sc.Current.StartsWith("Broken"));
+            sc.DebugDefeat();
+            yield return null;
+            Check("Silt Carillon defeat clears hazards and numerals", d.World.Hazards.Count == 0 && !sc.NumeralsVisible);
+            yield return Until(() => d.State == RunState.Results, 6, "Silt Carillon practice results");
+            Check("Silt Carillon practice ends in a practice result", d.Mode == RunMode.Practice && d.EncountersCleared == 1);
+            Check("player survived the Silt Carillon patterns", d.Player != null && !d.Player.Down);
+            d.ReturnToMenu();
+            RunRoster.Override = null;
+            yield return null;
         }
 
         void FreshRunChecks(string when)
