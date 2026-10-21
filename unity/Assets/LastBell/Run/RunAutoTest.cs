@@ -14,7 +14,7 @@ namespace LastBell.Run
     // with exit code 0 (all checks passed) or 1. Dev hooks it uses are the same ones the HUD labels (F9/F8: defeat the
     // boss, set its HP fraction) plus DebugSetHp on the player to shorten the defeat path; all damage taken comes from
     // real hazards.
-    public sealed class RunAutoTest : MonoBehaviour
+    public sealed partial class RunAutoTest : MonoBehaviour
     {
         public static bool Requested => Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellAutotest", StringComparison.OrdinalIgnoreCase));
         static string OutDir
@@ -194,6 +194,7 @@ namespace LastBell.Run
             Note($"Last Bell autotest · {Application.version} · Unity {Application.unityVersion} · {SystemInfo.graphicsDeviceName} · {DateTime.Now:yyyy-MM-dd HH:mm}");
             d.InputOverride = bot;
             yield return Wait(1.0f);
+            if (AurelionOnly) { yield return AurelionChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
             Check("boots into the menu in the arena scene", d.State == RunState.Menu && FindAnyObjectByType<LastBell.Arenas.KeyArtArena>() != null);
             yield return Shot("menu");
             foreach (var cls in RunDirector.Classes)
@@ -378,6 +379,9 @@ namespace LastBell.Run
             d.RequestRetry();
             Check("practice retry repeats the same encounter", d.State == RunState.Ready && d.Encounter == 3 && d.Mode == RunMode.Practice);
             d.ReturnToMenu();
+
+            // ---------- area bosses (practice only for now) ----------
+            yield return AurelionChecks();
 
             // ---------- report ----------
             Check("no errors or exceptions logged", errors == 0, errors + " logged");

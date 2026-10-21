@@ -24,6 +24,9 @@ namespace LastBell.Run
             ["Pendulum Charge"] = "step sideways out of the lane", ["Low Pendulum"] = "JUMP over it or go around",
             ["Shattered Chime"] = "move: the marker follows you, then locks", ["Dividing Chime"] = "leave the cone",
             ["Bell Sweep"] = "leave the cone", ["Bell Sweep (Final Toll)"] = "leave the cone (heavy)", ["Hollow Toll"] = "inside the inner circle or outside the ring",
+            ["Meridian Cut"] = "cross his forward shoulder or stay beyond the tip", ["Zenith Pins"] = "move off your circle after it locks",
+            ["Processional Thrust"] = "step sideways, not along the lane", ["Crown Reversal"] = "leave his back: go to the flank",
+            ["Meridian Alignment"] = "ring I: stand close inside it or far outside", ["Meridian Alignment II"] = "ring II: move outward past it",
         };
 
         void Awake() { d = GetComponent<RunDirector>(); }
@@ -97,7 +100,7 @@ namespace LastBell.Run
                 case RunState.Ready:
                 {
                     var r = Panel(560, 150, h * 0.62f);
-                    GUI.Label(new Rect(r.x, r.y + 10, r.width, 34), d.Mode == RunMode.Practice ? "PRACTICE — " + RunDirector.SlotNames[SlotIndex(d.Encounter)] : "PREPARATION", big);
+                    GUI.Label(new Rect(r.x, r.y + 10, r.width, 34), d.Mode == RunMode.Practice ? "PRACTICE — " + RunDirector.PracticeName(d.Encounter) : "PREPARATION", big);
                     GUI.Label(new Rect(r.x + 20, r.y + 46, r.width - 40, 44), d.Mode == RunMode.Practice ? "Practice never advances the run." : "Three minibosses, an intermission, then the Bellkeeper. Health refills before each boss; potions carry over until the final boss refills them.", mid);
                     if (GUI.Button(new Rect(r.x + r.width / 2 - 110, r.y + 98, 220, 36), "READY  (Enter)", btn)) d.RequestReady();
                     break;
@@ -164,9 +167,9 @@ namespace LastBell.Run
             GUI.Label(new Rect(r.x + 30, r.y + 176, r.width - 60, 40), desc, tiny);
             if (GUI.Button(new Rect(r.x + r.width / 2 - 140, r.y + 222, 280, 40), "START RUN  (Enter)", btn)) d.StartRun(RunDirector.Classes[menuClass]);
             GUI.Label(new Rect(r.x + 30, r.y + 276, 300, 22), "Practice one encounter", small);
-            string[] names = { "Dial Warden", "Pendulum Sentinel", "Chimebound Oracle", "Bellkeeper" };
-            for (int i = 0; i < 4; i++)
-                if (GUI.Button(new Rect(r.x + 30 + i * 166, r.y + 300, 160, 36), names[i], btn)) d.StartPractice(RunDirector.Classes[menuClass], i);
+            string[] names = { "Dial Warden", "Pendulum Sentinel", "Chimebound Oracle", "Bellkeeper", "Aurelion" };
+            for (int i = 0; i < names.Length; i++)
+                if (GUI.Button(new Rect(r.x + 30 + i * 133, r.y + 300, 128, 36), names[i], btn)) d.StartPractice(RunDirector.Classes[menuClass], i);
             GUI.Label(new Rect(r.x + 30, r.y + 350, r.width - 60, 120),
                 "Controls: WASD move · mouse aims · 1 / LMB basic · 2 3 4 class actions · 6 Mending Chorus / Temporal Anchor · 5 / RMB dash · F potion · Space jump · Shift sprint · Esc pause\n" +
                 "Movement stamina: sprint, jump and dash share one bar. No invincibility frames (dodging does not make you immune). F drinks a potion (+40 HP).\nHealth refills before each boss; potions carry over between minibosses and refill before the final boss. Retry restarts at the first miniboss.\n" +
@@ -234,6 +237,7 @@ namespace LastBell.Run
             GUI.Label(new Rect(x, 44, bw, 28), b.DisplayName.ToUpper() + (b.Placeholder ? "  (stand-in)" : ""), big);
             Bar(new Rect(x, 74, bw, 14), (float)b.Hp / b.MaxHp, new Color(0.92f, 0.41f, 0.36f));
             if (b is BellkeeperEncounter) { Rect(new Rect(x + bw * 0.7f, 72, 2, 18), Color.white); Rect(new Rect(x + bw * 0.35f, 72, 2, 18), Color.white); }
+            if (b is AurelionEncounter) { Rect(new Rect(x + bw * 0.65f, 72, 2, 18), Color.white); Rect(new Rect(x + bw * 0.30f, 72, 2, 18), Color.white); }
             GUI.Label(new Rect(x, 90, 300, 20), b.PhaseName, small);
             GUI.Label(new Rect(x + bw - 140, 90, 140, 20), $"{b.Hp} / {b.MaxHp}", small);
             // what is coming, in words (audio-off readability)

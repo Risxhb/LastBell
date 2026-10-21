@@ -69,6 +69,7 @@ namespace LastBell.VFX
             public void Progress(float p) { mpb.SetFloat(PProgress, Mathf.Clamp01(p)); }
             public void Lock() { if (!locked) { locked = true; lockFlash = 1; } }
             public void Resolve() { flash = 0; }
+            public void Cancel() { if (flash < 0) flash = 0.1f; }   // fade out without the resolve flash
             public void Tint(Color fill, Color border) { mpb.SetColor(PFill, fill); mpb.SetColor(PBorder, border); }
         }
         static readonly int PFill = Shader.PropertyToID("_ColorFill"), PBorder = Shader.PropertyToID("_ColorBorder");

@@ -80,6 +80,8 @@ namespace LastBell.Run
         // dev / test hook: defeat now (goes through the same path as a killing blow)
         public void DebugDefeat() { if (!Dead) { Hp = 1; TakeHit(1, transform.position + Vector3.up * HitHeight); } }
         public void DebugSetHpFraction(float f) { if (!Dead) Hp = Mathf.Clamp(Mathf.RoundToInt(MaxHp * f), 1, MaxHp); }
+        // dev key F8: the HP fraction just inside the next phase (Bellkeeper thresholds 70 % / 35 % by default)
+        public virtual float NextPhaseFraction() => Hp > MaxHp * 0.7f ? 0.69f : 0.34f;
 
         void Die()
         {

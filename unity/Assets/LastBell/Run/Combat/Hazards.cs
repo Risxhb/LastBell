@@ -35,6 +35,7 @@ namespace LastBell.Run
 
         public int Age { get; internal set; }
         public bool Locked => Age >= LockAt;
+        public bool Cancelled { get; internal set; }   // withdrawn before resolving (e.g. its recipient went down)
         internal BellkeeperFx.Telegraph Tele;
         internal readonly HashSet<PlayerController> Hit = new HashSet<PlayerController>();
 
@@ -117,6 +118,7 @@ namespace LastBell.Run
             for (int i = live.Count - 1; i >= 0; i--)
             {
                 var h = live[i];
+                if (h.Cancelled) { live.RemoveAt(i); h.Tele.Cancel(); continue; }
                 if (h.Age < h.ResolveAt) continue;
                 live.RemoveAt(i);
                 h.Tele.Resolve(); Resolved++;
@@ -131,6 +133,9 @@ namespace LastBell.Run
             }
             foreach (var arena in arenas) if (arena) arena.quiet = live.Count > 0;
         }
+
+        // Withdraws one pending hazard: it is removed at the end of this step and never resolves or deals damage.
+        public void Cancel(Hazard h) { h.Cancelled = true; }
 
         // Cancels every pending hazard: none of them can resolve or deal damage afterwards.
         public void ClearAll()
