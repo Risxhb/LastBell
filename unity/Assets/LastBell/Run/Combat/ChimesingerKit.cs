@@ -23,7 +23,7 @@ namespace LastBell.Run
         const float ChorusRadius = 6f;
 
         enum Act { None, Note, Strike, Refrain, Cresc, Chorus }
-        int buffered = -1, bufferAge; const int BufferTicks = 9;   // PF-05 input buffer
+        int buffered = -1, bufferUntil; const int BufferTicks = 9;   // PF-05 input buffer
         Act act; int t;
         Vector3 aim;
         int noteCd, refrainCd, crescCd, chorusCd, charges = StrikeCharges, recharge;
@@ -67,7 +67,7 @@ namespace LastBell.Run
         public override void ResetAll()
         {
             act = Act.None; t = 0; noteCd = refrainCd = crescCd = chorusCd = 0; charges = StrikeCharges; recharge = 0;
-            Harmony = 0; ClearBell(); LastCrescendo = 0;
+            Harmony = 0; ClearBell(); LastCrescendo = 0; buffered = -1;
             MoveScale = 1; Velocity = Vector3.zero; FaceAim = false;
         }
 
@@ -88,8 +88,8 @@ namespace LastBell.Run
         public override void Step(PlayerInput inp)
         {
             Timers(); aim = inp.Aim; Velocity = Vector3.zero; MoveScale = 1; FaceAim = false;
-            for (int i = 1; i <= 3; i++) if (inp.Pressed(i)) { buffered = i; bufferAge = 0; }
-            if (buffered >= 0 && ++bufferAge > BufferTicks) buffered = -1;
+            for (int i = 1; i <= 3; i++) if (inp.Pressed(i)) { buffered = i; bufferUntil = W.Tick + BufferTicks; }
+            if (buffered >= 0 && W.Tick > bufferUntil) buffered = -1;   // absolute expiry: stunned or dashing ticks count too
             bool Want(int s) => inp.Pressed(s) || buffered == s;
             if (act == Act.None || act == Act.Chorus)
             {
