@@ -216,5 +216,6 @@ namespace LastBell.Run
 
         // test hooks
         public int Charges => charges;
+        public int EchoTotal { get { int e = 0; for (int i = 0; i < Echoes; i++) e += echo[i]; return e; } }   // stored echo damage (tests)
     }
 }

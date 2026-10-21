@@ -361,7 +361,8 @@ namespace LastBell.Run
             d.RequestReady();
             yield return Until(() => d.State == RunState.Combat, 4, "chimesinger combat");
             yield return ChimesingerChecks();
-            for (int e = 0; e < 4; e++)
+            yield return TickRegressions();   // ends encounter 1 with a real Resonant Note killing blow
+            for (int e = 1; e < 4; e++)
             {
                 if (e == 3) { yield return Until(() => d.State == RunState.Intermission, 8, "intermission (chimesinger)"); d.RequestContinue(); }
                 yield return Until(() => d.State == RunState.Combat, 8, "combat " + (e + 1));
@@ -642,6 +643,73 @@ namespace LastBell.Run
             Check("Crescendo spends Harmony and clears the bell", k.Harmony == 0 && !k.Bell);
             p.DebugSetHp(PlayerController.MaxHp);
             d.Boss.BeginCombat();
+        }
+
+        // Exact-tick regressions from the foundation review of PR #42 (risxhb/codex, Oct 21). The director is paused
+        // and the test steps the world itself, so every count below is in authoritative combat ticks.
+        bool StepUntil(Func<bool> cond, int max) { for (int i = 0; i < max && !cond(); i++) d.World.Step(); return cond(); }
+        void StepTicks(int n) { for (int i = 0; i < n; i++) d.World.Step(); }
+
+        IEnumerator TickRegressions()
+        {
+            var p = d.Player; var k = (ChimesingerKit)p.Kit; var w = d.World;
+            d.Boss.Halt(); yield return Until(() => p.Stunned == 0 && !p.Dashing, 2, "player free for the tick regressions");
+            d.SetPaused(true); bot.Clear();
+            w.ClearTransient(); p.DebugSetHp(PlayerController.MaxHp);
+            p.transform.position = d.Boss.transform.position + new Vector3(0, 0, 5f);
+            bot.Aim = d.Boss.transform.position;
+
+            // dash: 3 m over exactly 12 ticks, the activation tick included
+            StepTicks(120);   // stamina and dash lock recovered
+            var pos0 = p.transform.position;
+            bot.MoveWorld = Vector3.right; bot.dash = true; d.World.Step(); bot.MoveWorld = Vector3.zero;
+            int dashTicks = 1; while (p.Dashing && dashTicks < 40) { d.World.Step(); dashTicks++; }
+            float dashDist = Sim.Flat(p.transform.position - pos0).magnitude;
+            Check("dash moves 3 m over 12 ticks", dashTicks == PlayerController.DashTicks && Mathf.Abs(dashDist - PlayerController.DashDistance) < 0.01f, $"{dashDist:0.000} m in {dashTicks} ticks");
+
+            // capped bell: refreshes past strength 2 must not keep multiplying stored echoes
+            p.transform.position = d.Boss.transform.position + new Vector3(0, 0, 5f);
+            StepUntil(() => k.Charges == 2 && k.Cooldown01(2) <= 0, 900);
+            bot.press[1] = true; StepTicks(40);                                  // Bellstrike: bell rung
+            bot.press[2] = true; StepTicks(45);                                  // Refrain: one echo at strength 0
+            int echo0 = k.EchoTotal;
+            bot.press[1] = true; StepTicks(40);                                  // refresh: strength 1
+            int echo1 = k.EchoTotal;
+            StepUntil(() => k.Charges > 0, 400); bot.press[1] = true; StepTicks(40);   // refresh: strength 2
+            int echo2 = k.EchoTotal, strength2 = k.Strength;
+            StepUntil(() => k.Charges > 0, 400); bot.press[1] = true; StepTicks(40);   // refresh at the cap
+            int echo3 = k.EchoTotal;
+            Check("bell strengthens up to twice", k.Bell && strength2 == 2 && k.Strength == 2 && echo0 > 0 && echo1 > echo0 && echo2 > echo1, k.ClassState());
+            Check("refreshing a capped bell leaves stored echoes unchanged", echo3 == echo2, $"echo {echo0} -> {echo1} -> {echo2} -> {echo3}");
+            w.ClearTransient();
+
+            // input buffer: a press buffered during an action expires on absolute ticks, so it can't outlive a stun
+            StepUntil(() => k.Charges == 2 && k.Cooldown01(2) <= 0, 900);
+            bot.press[2] = true; d.World.Step();                                 // Refrain cast running
+            bot.press[1] = true; d.World.Step();                                 // Bellstrike buffered behind it
+            w.Hazards.Spawn(new Hazard { Source = "Test stun", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = p.transform.position, Radius = 1.5f, ResolveAt = 2, Damage = 5 });
+            StepUntil(() => p.Stunned > 0, 6);
+            int stunTicks = 0; while (p.Stunned > 0 && stunTicks < 60) { d.World.Step(); stunTicks++; }
+            int charges0 = k.Charges; StepTicks(40);
+            Check("buffered press expires during stun instead of firing on recovery", stunTicks > 9 && k.Charges == charges0 && charges0 == 2, $"stunned {stunTicks} ticks, charges {charges0} -> {k.Charges}");
+            p.DebugSetHp(PlayerController.MaxHp);
+
+            // a real projectile killing blow: no exception, and pending hazards and notes are cancelled in that tick
+            p.transform.position = d.Boss.transform.position + new Vector3(0, 0, 5f);
+            w.Hazards.Spawn(new Hazard { Source = "Test pending", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = d.Boss.transform.position + new Vector3(0, 0, -6f), Radius = 1f, ResolveAt = 600, Damage = 10 });
+            d.Boss.DebugSetHpFraction(0);   // 1 HP left
+            int resolved0 = w.Hazards.Resolved, inFlight = 0; string thrown = null;
+            bot.hold[0] = true;
+            try
+            {
+                for (int i = 0; i < 180 && !d.Boss.Dead; i++) { bot.press[0] = true; d.World.Step(); inFlight = Mathf.Max(inFlight, w.Projectiles.Count); }
+            }
+            catch (Exception e) { thrown = e.GetType().Name + ": " + e.Message; }
+            bot.Clear();
+            Check("Resonant Note killing blow kills the boss without an exception", thrown == null && d.Boss.Dead, thrown ?? $"dead {d.Boss.Dead}");
+            Check("projectile kill cancels pending hazards and notes in the same tick", w.Hazards.Count == 0 && w.Projectiles.Count == 0 && w.Hazards.Resolved == resolved0, $"hazards {w.Hazards.Count}, notes {w.Projectiles.Count} (max in flight {inFlight})");
+            d.SetPaused(false);
+            yield return Until(() => d.State != RunState.Combat, 2, "projectile kill ends encounter 1");
         }
 
         void Finish()
