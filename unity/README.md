@@ -10,4 +10,4 @@ Menu **Last Bell → Test Arena (Key Art)** opens `Assets/LastBell/Arenas/KeyArt
 - `Editor/KeyArtArenaBuilder.cs` adds everything glTF can't carry: the sunset sky (`Shaders/SunsetSky.shader`), fog, ambient light, the sun, lantern lights, HDR glow materials, the floor normal map, the sea of clouds (`Shaders/CloudBillboard.shader`), post-processing and the camera. The generated assets go in `KeyArt/Generated`.
 - `KeyArtArena.cs` runs the moving parts. Set `quiet` while a boss warning is up to dim the dial.
 
-The class-test harness (**Last Bell → Class Test Arena**) is separate and still builds its own plain floor.
+The playable game is the run loop: **Last Bell → Run Loop → Open Run Scene** (`Assets/LastBell/Run/RunArena.unity`, a copy of this arena with a `RunDirector`; the menu also offers the four area arenas). See `docs/run-loop/README.md`. The old Vanguard/Bellkeeper test controllers and the Unity class-test harness were removed on Oct 21; they live on in `feature/class-test-arena` history.

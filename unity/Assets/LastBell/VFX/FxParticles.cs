@@ -35,6 +35,8 @@ namespace LastBell.VFX
             return f;
         }
 
+        public void Clear() { count = 0; }
+
         public void Emit(Vector3 pos, Vector3 vel, float size, float life, float alpha = 1)
         {
             if (count >= ps.Length) return;   // full: the oldest keep playing, new ones are dropped

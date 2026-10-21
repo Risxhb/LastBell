@@ -343,6 +343,40 @@ def walk(t):
     })
     return ch
 
+def phase_shift(t):
+    # 1.5 s phase transition (run loop, HP 70 % / 35 %): the bell gathers (hunch, arms in), then rings out with arms
+    # flung wide and the halo spinning up, and settles back to its stance. No damage: presentation for the queued shift.
+    T = 0.75
+    g = key(t, [(0, 0), (T - 0.2, 1.0), (T, 1.0), (T + 0.1, -1.0), (T + 0.45, -0.7), (1.5, 0)])
+    ch = breath(t)
+    ch.update({
+        'hips_loc': (0, 0, key(t, [(0, 0), (T - .2, -0.3), (T + .1, 0.05), (1.5, 0)])),
+        'spine': (10 * g, 0, 0), 'chest': add(ch['chest'], (14 * g, 0, 0)), 'head': (2.5 + 12 * g, 0, 0),
+        'upperarm.R': (-30 * max(g, 0) - 60 * max(-g, 0), 70 * max(-g, 0), 0),
+        'upperarm.L': (-30 * max(g, 0) - 60 * max(-g, 0), -70 * max(-g, 0), 0),
+        'forearm.R': (-60 * max(g, 0), 0, 0), 'forearm.L': (-60 * max(g, 0), 0, 0),
+        'pendulum': (ring(t, T, -30, 1.5, 1.6), 0, 0),
+        'halo_loc': (0, 0, key(t, [(0, 0), (T, -0.1), (T + .15, 0.35), (1.5, 0)])),
+        'halo_spin': key(t, [(0, 0), (T, -20), (1.5, 160)]), 'halo_tilt': key(t, [(0, 0), (T + .1, -10), (1.5, 0)]),
+    })
+    return ch
+
+def defeat(t):
+    # 2.5 s, held on the last frame: the bell falters, then the machine sinks to its knees and slumps forward,
+    # halo dropping askew and the pendulum running down.
+    sag = key(t, [(0, 0), (0.5, 1.0), (2.5, 1.0)]); kneel = key(t, [(0, 0), (0.6, 0), (1.6, 1.0), (2.5, 1.0)])
+    slump = key(t, [(0, 0), (1.2, 0), (2.2, 1.0), (2.5, 1.0)])
+    ch = {
+        'hips_loc': (0, 0.05 + 0.2 * kneel, -0.3 * sag - 0.75 * kneel), 'hips': (6 * sag + 10 * kneel, 0, 0),
+        'spine': (10 * sag + 14 * slump, 0, 0), 'chest': (16 * sag + 18 * slump, 0, 4 * slump), 'neck': (8 * sag, 0, 0),
+        'head': (24 * sag + 16 * slump, 0, 6 * slump),
+        'upperarm.R': (-12 * sag + 25 * slump, -6, 0), 'upperarm.L': (-12 * sag + 25 * slump, 6, 0),
+        'forearm.R': (-25 * sag, 0, 0), 'forearm.L': (-25 * sag, 0, 0), 'hand.R': (15, 0, 0), 'hand.L': (15, 0, 0),
+        'pendulum': (0, ring(t, 0.2, 18, 1.2, 1.2), 0),
+        'halo_loc': (0, 0.05, -0.32 * sag - 0.5 * slump), 'halo_tilt': 14 * sag + 26 * slump, 'halo_spin': -10 * sag - 25 * slump,
+    }
+    return ch
+
 def bake_clip(name, seconds, fn, loop=False):
     frames = round(seconds * 30)
     act = bpy.data.actions.new(name); act.use_fake_user = True
@@ -358,7 +392,8 @@ def bake_clip(name, seconds, fn, loop=False):
 acts = [bake('Idle', 120, idle, True),
         bake_clip('BellSweep', 2.0, bell_sweep), bake_clip('HollowToll', 2.0, hollow_toll),
         bake_clip('PendulumCharge', 1.8, pendulum_charge), bake_clip('ShatteredChime', 2.6, shattered_chime),
-        bake_clip('Vulnerable', 2.0, vulnerable, loop=True), bake_clip('Walk', WALK_CYCLE, walk, loop=True)]
+        bake_clip('Vulnerable', 2.0, vulnerable, loop=True), bake_clip('Walk', WALK_CYCLE, walk, loop=True),
+        bake_clip('PhaseShift', 1.5, phase_shift), bake_clip('Defeat', 2.5, defeat)]
 print('CLIPS', [a.name for a in acts])
 arm.animation_data.action = acts[0]
 set_pose({})
