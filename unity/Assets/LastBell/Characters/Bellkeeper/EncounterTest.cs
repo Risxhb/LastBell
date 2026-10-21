@@ -9,9 +9,9 @@ namespace LastBell.Characters
     // Core/ClassTest and a future simulation); just enough to play the boss in the arena.
     //
     // PlayerVitals goes on the Vanguard test character at runtime: 100 HP, 5 potions (F, +40 HP each), 0.75 s of
-    // post-hit immunity like the browser prototype, and a push out of the boss's body. Its hits on the boss are read
-    // from the same buttons VanguardTestController uses (that script belongs to the characters session and has no hit
-    // events yet), with the prototype's ranges and arcs and its damage x10 against the boss's 1800 HP.
+    // post-hit immunity like the browser prototype, and a push out of the boss's body. Its hits on the boss come from
+    // VanguardTestController.OnHurtFrame (fired on the frame the blade connects, with the kit's reach, arc and damage);
+    // damage is x10 against the boss's 1800 HP, and reach is measured to the boss's body, not its centre.
     public sealed class PlayerVitals : MonoBehaviour
     {
         public const int MaxHp = 100, MaxPotions = 5, PotionHeal = 40;
@@ -25,17 +25,30 @@ namespace LastBell.Characters
         BellkeeperFx fx;
         float sinceHit = 99, sincePotion = 99;
 
-        // ---- Vanguard hit reading (prototype numbers: 1 m = 40 units, damage x10) ----
-        struct Swing { public float at, reach, arc; public int damage; }
-        readonly List<Swing> pending = new List<Swing>();
-        float busyUntil, t, lastDodge = -99, lastCombo = -99, finalHourReady;
-        int comboStep;
+        const int DamageScale = 10;
+        VanguardTestController vanguard;
 
-        public void Bind(BellkeeperTestController b, BellkeeperFx f) { boss = b; fx = f; }
+        public void Bind(BellkeeperTestController b, BellkeeperFx f)
+        {
+            boss = b; fx = f;
+            vanguard = GetComponent<VanguardTestController>();
+            if (vanguard) { vanguard.OnHurtFrame -= HurtFrame; vanguard.OnHurtFrame += HurtFrame; }
+        }
+        void OnDestroy() { if (vanguard) vanguard.OnHurtFrame -= HurtFrame; }
+
+        void HurtFrame(string action, Vector3 origin, Vector3 forward, float reach, float arcDeg, int damage)
+        {
+            if (Down || boss == null || boss.Dead) return;
+            var to = boss.transform.position - origin; to.y = 0; forward.y = 0;
+            if (to.magnitude > reach + BellkeeperTestController.BodyRadius) return;
+            if (arcDeg < 360 && Vector3.Angle(forward, to) > arcDeg / 2) return;
+            var contact = boss.transform.position - to.normalized * BellkeeperTestController.BodyRadius + Vector3.up * 2.2f;
+            boss.TakeHit(damage * DamageScale, contact);
+        }
 
         public void ResetVitals()
         {
-            Hp = MaxHp; Potions = MaxPotions; sinceHit = sincePotion = 99; pending.Clear(); finalHourReady = 0;
+            Hp = MaxHp; Potions = MaxPotions; sinceHit = sincePotion = 99;
             SetControllable(true); EncounterHud.ClearBanner();
         }
 
@@ -57,38 +70,9 @@ namespace LastBell.Characters
 
         void Update()
         {
-            float dt = Time.deltaTime; t += dt; sinceHit += dt; sincePotion += dt;
-            var kb = Keyboard.current; var mouse = Mouse.current;
-            if (Down) { pending.Clear(); return; }
-
+            float dt = Time.deltaTime; sinceHit += dt; sincePotion += dt;
+            var kb = Keyboard.current;
             if (kb != null && kb.fKey.wasPressedThisFrame) DrinkPotion();
-
-            if (boss != null && !boss.Dead && t >= busyUntil)
-            {
-                if (mouse != null && mouse.rightButton.wasPressedThisFrame) lastDodge = t;
-                if (mouse != null && mouse.leftButton.wasPressedThisFrame)
-                {
-                    if (t - lastDodge < 0.45f) Queue(0.12f, 0.45f, 170, 120, 30);                      // Dash Attack (lunge 4.5)
-                    else
-                    {
-                        comboStep = t - lastCombo < 0.7f && comboStep < 3 ? comboStep + 1 : 1; lastCombo = t;
-                        if (comboStep < 3) Queue(0.14f, 0.3f, 160, 110, 20); else Queue(0.2f, 0.45f, 175, 170, 40);
-                    }
-                }
-                else if (kb != null && kb.digit2Key.wasPressedThisFrame) Queue(0.35f, 0.7f, 170 + 160, 100, 90);   // Pendulum Rush travels ~4 m
-                else if (kb != null && kb.digit3Key.wasPressedThisFrame && t >= finalHourReady)
-                { Queue(0.45f, 1f, 270, 170, 180); finalHourReady = t + 6f; }                                       // Final Hour, 360-tick cooldown
-            }
-            for (int i = pending.Count - 1; i >= 0; i--)
-            {
-                if (t < pending[i].at) continue;
-                var s = pending[i]; pending.RemoveAt(i);
-                if (boss == null || boss.Dead) continue;
-                var to = boss.transform.position - transform.position; to.y = 0;
-                float reach = s.reach / 40f + BellkeeperTestController.BodyRadius;
-                if (to.magnitude <= reach && Vector3.Angle(transform.forward, to) <= s.arc / 2)
-                    boss.TakeHit(s.damage, boss.transform.position - to.normalized * BellkeeperTestController.BodyRadius + Vector3.up * 2.2f);
-            }
         }
 
         public bool DrinkPotion()
@@ -99,12 +83,6 @@ namespace LastBell.Characters
             EncounterHud.Float(transform.position + Vector3.up * 2.4f, "+" + healed, new Color(0.45f, 1f, 0.8f));
             fx?.PotionHeal(transform);
             return true;
-        }
-
-        void Queue(float delay, float busy, float reachUnits, float arcDeg, int damage)
-        {
-            pending.Add(new Swing { at = t + delay, reach = reachUnits, arc = arcDeg, damage = damage });
-            busyUntil = t + busy;
         }
 
         void LateUpdate()
