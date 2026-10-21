@@ -12,7 +12,8 @@ namespace LastBell.VFX
         public static bool NoFlashes, NoScreenshake;   // accessibility (§10)
 
         static readonly Color Coral = new Color(1.35f, 0.42f, 0.32f), Amber = new Color(2.2f, 1.45f, 0.65f),
-            Ink = new Color(0.063f, 0.094f, 0.145f), Gold = new Color(1.9f, 1.35f, 0.55f);
+            Ink = new Color(0.063f, 0.094f, 0.145f), Gold = new Color(1.9f, 1.35f, 0.55f),
+            Brass = new Color(0.76f, 0.55f, 0.27f), Teal = new Color(0.55f, 1.7f, 1.35f), Ivory = new Color(1.9f, 1.8f, 1.5f);
         static readonly int PShape = Shader.PropertyToID("_Shape"), PRadius = Shader.PropertyToID("_Radius"),
             PInner = Shader.PropertyToID("_Inner"), PHalf = Shader.PropertyToID("_HalfAngle"),
             PProgress = Shader.PropertyToID("_Progress"), PLock = Shader.PropertyToID("_Lock"),
@@ -26,7 +27,7 @@ namespace LastBell.VFX
 
         Material telegraphMat, addMat, alphaMat;
         Mesh cylinder;
-        FxParticles sparks, dust;
+        FxParticles sparks, dust, motes;
         readonly List<Telegraph> telegraphs = new List<Telegraph>();
         readonly List<Burst> bursts = new List<Burst>();
         readonly Stack<Burst> burstPool = new Stack<Burst>();
@@ -47,6 +48,7 @@ namespace LastBell.VFX
             cylinder = FxMeshes.Cylinder();
             sparks = MakeParticles("Sparks", addMat, 1, Gold, Amber, 0.6f);
             dust = MakeParticles("Dust", alphaMat, 1, new Color(0.30f, 0.24f, 0.36f), new Color(0.62f, 0.52f, 0.66f), 0f);
+            motes = MakeParticles("Motes", addMat, 1, Brass, Teal, 0f);
             for (int i = 0; i < 12; i++) burstPool.Push(NewBurst());   // warm pool: no instantiation mid-fight (§11)
             CameraShake.Ensure();
         }
@@ -260,6 +262,49 @@ namespace LastBell.VFX
             }, 0, Ink, Coral, Amber);
             Sparks(c + Vector3.up * 0.5f, Vector3.up * 0.8f, 26, 1.0f, 6, 0.16f, 0.5f);
             CameraShake.Shake(0.12f, 0.18f);
+        }
+
+        // A hit on the boss (impact table entry: melee on brass): gold sparks thrown back toward the attacker and a flash.
+        public void BossHit(Vector3 point)
+        {
+            sparks.Emit(point, Vector3.zero, 1.1f, 0.1f);
+            var back = Camera.main ? -Camera.main.transform.forward : Vector3.up;
+            Sparks(point, (back + Vector3.up * 0.5f).normalized, 12, 0.8f, 6, 0.12f, 0.35f);
+        }
+
+        // The player is hit by a boss attack: a coral burst at their chest and a shake.
+        public void PlayerHit(Vector3 feet)
+        {
+            var c = feet + Vector3.up * 1.0f;
+            Play(cylinder, false, addMat, new Vector3(feet.x, 0.06f, feet.z), 0, 0.25f, (b, u) =>
+            {
+                float rr = Mathf.Lerp(0.4f, 1.3f, Ease(u)); b.go.transform.localScale = new Vector3(rr, 1.6f * (1 - u), rr);
+                b.mpb.SetFloat(PDissolve, u); b.mpb.SetFloat(PIntensity, 0.8f);
+            }, 2, Ink, Coral, Amber);
+            Sparks(c, Vector3.up, 16, 1.2f, 5, 0.12f, 0.35f);
+            CameraShake.Shake(0.25f, 0.25f);
+        }
+
+        // Potion: rising teal-gold rings around the player and motes drifting up (heal language: pulses, never a filled disc).
+        public void PotionHeal(Transform who)
+        {
+            var p = who.position;
+            for (int k = 0; k < 3; k++)
+            {
+                float delay = k * 0.12f;
+                Play(cylinder, false, addMat, new Vector3(p.x, 0.05f, p.z), 0, 0.7f + delay, (b, u) =>
+                {
+                    float tt = Mathf.Clamp01((u * (0.7f + delay) - delay) / 0.7f);
+                    b.go.transform.position = new Vector3(who.position.x, 0.05f + 1.8f * Ease(tt), who.position.z);
+                    b.go.transform.localScale = new Vector3(0.75f - 0.2f * tt, 0.25f, 0.75f - 0.2f * tt);
+                    b.mpb.SetFloat(PDissolve, tt <= 0 ? 1 : tt * 0.9f); b.mpb.SetFloat(PIntensity, 0.9f);
+                }, 2, Brass, Teal, Ivory);
+            }
+            for (int i = 0; i < 18; i++)
+            {
+                var o = UnityEngine.Random.insideUnitCircle * 0.7f;
+                motes.Emit(p + new Vector3(o.x, UnityEngine.Random.Range(0.1f, 1.2f), o.y), Vector3.up * UnityEngine.Random.Range(1.2f, 2.4f), UnityEngine.Random.Range(0.12f, 0.22f), UnityEngine.Random.Range(0.6f, 1.0f));
+            }
         }
 
         void Update()

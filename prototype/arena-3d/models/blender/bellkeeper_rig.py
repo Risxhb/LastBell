@@ -183,12 +183,14 @@ def halo_rot(spin, tilt=0.0):
     return Q @ R(z=spin) @ Q.inverted() @ R(x=tilt)
 
 LEGS = {s: (Vector(B['thigh.' + s][0]), Vector(B['shin.' + s][0]), Vector(B['shin.' + s][1])) for s in 'LR'}
-def plant_feet():
-    # two-bone IK in armature space: the ankle stays at its rest point, the knee bends in the rest leg's plane
+def plant_feet(feet=None):
+    # two-bone IK in armature space: the ankle goes to its rest point (plus an optional (dy, dz, pitch) step offset
+    # per side for walking), the knee bends in the rest leg's plane
     for s, (h0, k0, a0) in LEGS.items():
         bpy.context.view_layer.update()
         th, sh, ft = pbs['thigh.' + s], pbs['shin.' + s], pbs['foot.' + s]
-        H = th.head.copy(); A = a0.copy()
+        dy, dz, pitch = (feet or {}).get(s, (0, 0, 0))
+        H = th.head.copy(); A = a0 + Vector((0, dy, dz))
         L1, L2 = (k0 - h0).length, (a0 - k0).length
         d = min((A - H).length, L1 + L2 - 1e-4); u = (A - H).normalized()
         pole = (k0 - h0) - (k0 - h0).project(a0 - h0)          # rest knee offset from the hip-ankle line
@@ -199,13 +201,13 @@ def plant_feet():
             r0 = pb.bone.matrix_local.to_3x3(); rest = (pb.bone.tail_local - pb.bone.head_local).normalized()
             pb.matrix = Matrix.Translation(a) @ (rest.rotation_difference(b - a).to_matrix() @ r0).to_4x4()
             bpy.context.view_layer.update()
-        ft.matrix = Matrix.Translation(A) @ ft.bone.matrix_local.to_3x3().to_4x4()
+        ft.matrix = Matrix.Translation(A) @ (R(x=pitch) @ ft.bone.matrix_local.to_3x3()).to_4x4()
 
 def pose_of(ch):
     # ch: bone -> (x, y, z) degrees, plus 'hips_loc', 'halo_spin', 'halo_tilt', 'halo_loc' extras
     p = {}
     for n, v in ch.items():
-        if n in ('hips_loc', 'halo_spin', 'halo_tilt', 'halo_loc'): continue
+        if n in ('hips_loc', 'halo_spin', 'halo_tilt', 'halo_loc', '_feet'): continue
         p[n] = {'rot': R(*v)}
     p.setdefault('hips', {})['loc'] = ch.get('hips_loc', (0, 0, 0))
     p['halo'] = {'rot': halo_rot(ch.get('halo_spin', 0), ch.get('halo_tilt', 0)), 'loc': ch.get('halo_loc', (0, 0, 0))}
@@ -317,12 +319,36 @@ def vulnerable(t):
         'halo_loc': (0, 0.05, -0.32 + 0.03 * math.sin(p + 1)), 'halo_tilt': 14, 'halo_spin': -10 + 2 * math.sin(p),
     }
 
+WALK_CYCLE, WALK_STRIDE = 1.6, 1.4   # s per two steps, m per step: Unity moves the boss at STRIDE / (CYCLE / 2) = 1.75 m/s
+def walk(t):
+    # a heavy, planted machine stride: each boot slides back under the body while planted, then swings forward with a
+    # low lift; the hips drop on each contact and sway over the standing leg; arms and pendulum swing against the legs.
+    ph = (t / WALK_CYCLE) % 1.0; p = 2 * math.pi * ph
+    def foot(q):
+        q %= 1.0
+        if q < 0.5: return (-WALK_STRIDE / 2 + WALK_STRIDE * q / 0.5, 0.0, 0.0)                 # planted, sliding back
+        u = (q - 0.5) / 0.5
+        return (WALK_STRIDE / 2 - WALK_STRIDE * smooth(u), 0.32 * math.sin(math.pi * u), -14 * math.sin(math.pi * u))
+    side = math.sin(p)                          # + while the left foot is planted
+    ch = breath(t)
+    ch.update({
+        '_feet': {'L': foot(ph), 'R': foot(ph + 0.5)},
+        'hips_loc': (0.07 * side, 0, -0.2 - 0.07 * math.cos(2 * p)),
+        'hips': (3, -2.5 * side, 5 * side), 'spine': (3, 1.5 * side, -3 * side),
+        'chest': add(ch['chest'], (4, 0, -5 * side)), 'head': (2.5, 0, 3 * side),
+        'upperarm.R': (-14 * side, 4, 0), 'upperarm.L': (14 * side, -4, 0),
+        'forearm.R': (-12 - 6 * side, 0, 0), 'forearm.L': (-12 + 6 * side, 0, 0),
+        'pendulum': (6 + 4 * math.sin(2 * p + 0.8), 9 * math.sin(p + 0.6), 0),
+        'halo_loc': (0, 0, 0.04 * math.sin(2 * p + 1.0)), 'halo_spin': 3 * math.sin(p + 1.2),
+    })
+    return ch
+
 def bake_clip(name, seconds, fn, loop=False):
     frames = round(seconds * 30)
     act = bpy.data.actions.new(name); act.use_fake_user = True
     arm.animation_data_create(); arm.animation_data.action = act
     for f in range(frames + 1):
-        set_pose(pose_of(fn(f / 30))); plant_feet()
+        ch = fn(f / 30); set_pose(pose_of(ch)); plant_feet(ch.get('_feet'))
         for pb in pbs:
             pb.keyframe_insert('rotation_quaternion', frame=f + 1, group=pb.name)
             pb.keyframe_insert('location', frame=f + 1, group=pb.name)
@@ -332,7 +358,7 @@ def bake_clip(name, seconds, fn, loop=False):
 acts = [bake('Idle', 120, idle, True),
         bake_clip('BellSweep', 2.0, bell_sweep), bake_clip('HollowToll', 2.0, hollow_toll),
         bake_clip('PendulumCharge', 1.8, pendulum_charge), bake_clip('ShatteredChime', 2.6, shattered_chime),
-        bake_clip('Vulnerable', 2.0, vulnerable, loop=True)]
+        bake_clip('Vulnerable', 2.0, vulnerable, loop=True), bake_clip('Walk', WALK_CYCLE, walk, loop=True)]
 print('CLIPS', [a.name for a in acts])
 arm.animation_data.action = acts[0]
 set_pose({})
