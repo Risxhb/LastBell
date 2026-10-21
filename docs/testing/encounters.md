@@ -1,8 +1,8 @@
 # Encounter test matrix — Bellkeeper
 
-Draft v0.2 · October 21, 2026 · Owner: `chzy18/claude` ([#8](https://github.com/Risxhb/collab/issues/8))
+Draft v0.3 · October 21, 2026 · Owner: `chzy18/claude` ([#8](https://github.com/Risxhb/collab/issues/8))
 
-This matrix covers the [Bellkeeper specification](../design/bellkeeper.md) v0.2. It replaces v0.1's Guard, immunity and upgrade rows, which the current design (#29, PR #33) made obsolete. Rows become C# tests or manual checklists once the shared contract (#6 U3) and the encounter implementation exist. **Nothing in this matrix has been run**, except the single-attack escape sampling in §3 (row T2).
+This matrix covers the [Bellkeeper specification](../design/bellkeeper.md) v0.3, which adds the Unfinished Hour (spec §3.1) at every tier. It replaces v0.1's Guard, immunity and upgrade rows, which the current design (#29, PR #33) made obsolete. Rows become C# tests or manual checklists once the shared contract (#6 U3) and the encounter implementation exist. **Nothing in this matrix has been run**, except the single-attack escape sampling in §3 (row T2).
 
 Two kinds of row, kept separate:
 
@@ -43,7 +43,7 @@ Browser and Godot prototypes validate only themselves, not Unity.
 |---|---|---|---|
 | T1 | S | Schedule generation per phase, block, tier and count | Matches spec §4 and §5.2; identical across two runs of a seed |
 | T2 | S | Single-attack escape check (spec §5.1). **Done for the spec:** `tools/encounter-escape/escape-check.ps1`, October 21 | Every window ≥ its tier minimum. The 8 m Sweep fails at the current 39 ticks; the 6.5 m Sweep passes. Production must re-run with shared constants |
-| T3 | S | Combined and sequential reachability: Block A/B/C, The Final Toll, Memory of Midnight overlaps, tier B double Sweep | A safe sequence exists from the worst start, at every count and tier |
+| T3 | S | Combined and sequential reachability: Block A/B/C, the echo steps, The Final Toll's March echo + Sweep pairing (union sampled in `results-2026-10-21-v0.3.md`), tier B double Sweep with an echo | A safe sequence exists from the worst start, at every count and tier |
 | T4 | S | Stamina rule: at most one required dodge per 2.25 s, and three in a row only after 5 s with none; simulated through Final Toll → Pursuit → Final Toll ×3 | Worst-case stamina never needs to go below 0; sprint and jump never required |
 | T5 | S | First Chime walk-only: every attack and sequence solvable with no dodge | Pass at the 0.60 s margin |
 | T6 | S | At most two damaging patterns warning at once (a Chime volley counts as one) | Validator rejects a deliberately broken schedule |
@@ -71,7 +71,7 @@ Browser and Godot prototypes validate only themselves, not Unity.
 | R2 | S | Dodging through a hazard at resolve | `hit`; dodge state recorded (no iframes) |
 | R3 | S | Every record has the spec §12 fields | Schema check passes |
 | R4 | S | The failure card is built from resolve-time data: move all actors after resolve, then render the card | The card shows resolve-time positions |
-| R5 | S | Memory of Midnight provenance | `source_attack_id` and recorded tick match the recorded Sweep |
+| R5 | S | Unfinished Hour provenance | `source_attack_id`, `source_instance_id` and recorded tick match the recorded Sweep, Toll or March; the echo resolves at the recorded world position, not the boss's current one |
 | R6 | S | Event dedup across repeated snapshots with 8 players | Each outcome is shown once per generation and event ID |
 | R7 | H | Testers explain each failure from the card (where safety was, why they were hit) | Matches the event log in most cases; mismatches are readability bugs |
 
@@ -110,7 +110,7 @@ K5 and K9 need the session lane (#7, currently on hold) and are reviewed there.
 
 | ID | Kind | Check | Pass |
 |---|---|---|---|
-| X1 | S | Practice start and retry mid-phase, mid-Final Toll, mid-Echo preview | Health, stamina, cooldowns, boss HP and position, phase, block index, RNG, assignments and memory mark all match a fresh practice start |
+| X1 | S | Practice start and retry mid-phase, mid-Final Toll, with an inactive memory outline and with an active echo | Health, stamina, cooldowns, boss HP and position, phase, block index, RNG, assignments and memory mark all match a fresh practice start |
 | X2 | S | Fresh run after a Bellkeeper defeat | Restarts at encounter 1; down counts cleared; the Bellkeeper seed is derived from run seed + encounter index |
 | X3 | S | Practice never unlocks run progress | Run state is unchanged after a practice clear |
 | X4 | S | Boss defeat with hazards pending | All cancelled; no damage after victory; no stale markers |
@@ -122,9 +122,9 @@ K5 and K9 need the session lane (#7, currently on hold) and are reviewed there.
 |---|---|---|---|
 | D1 | S | Window tables per tier (spec §5.2) loaded from data | Each tier ≥ its minimum; First Chime walk-only |
 | D2 | S | Striking Hour: Chime/Sweep overlap and no Pursuit between Final Tolls | T3 and T4 still pass |
-| D3 | S | Midnight Toll: Memory of Midnight records, shows and returns; one retained; one active | Validator rejects two active Echoes or an Echo without a recording |
+| D3 | S | Unfinished Hour at every tier: records per the spec §4 rotation, shows the inactive outline, activates, resolves once, erases; Midnight Toll's Borrowed Second pauses 60 ticks without resolving | Validator rejects two memories, an echo without a recording, an echo that follows the boss, or a resolve during the pause |
 | D4 | H | Players can tell the tiers apart by mechanics, not just damage | Notes per tier |
-| D5 | H | Memory mark vs live warning, including grayscale | Never mistaken for a live hazard |
+| D5 | H | Inactive memory outline vs active echo vs live warning, including grayscale and reduced effects | Never mistaken for a live hazard |
 
 ## 10. Eight-player density
 

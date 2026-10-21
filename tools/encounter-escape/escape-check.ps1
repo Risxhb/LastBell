@@ -26,7 +26,8 @@ param(
   [double]$SweepRadius = 8.0, [double]$SweepHalfDeg = 40.0,
   [double]$TollInner = 2.6, [double]$TollOuter = 6.8,
   [double]$LaneWidth = 2.2,
-  [double]$ChimeRadius = 1.4
+  [double]$ChimeRadius = 1.4,
+  [switch]$Pairing                 # also check the Final Toll's March echo + Bell Sweep union (slow, about a minute)
 )
 
 $code = @'
@@ -118,6 +119,48 @@ public static class Escape {
         }
         return string.Format("{0:F2}|{1}", w, at);
     }
+    // The Unfinished Hour replays a footprint at its recorded world position. The boss is elsewhere by then,
+    // so the recorded apex/centre has no body: players may stand inside the old body circle.
+    public static string SweepEcho() {
+        double half = SH*Math.PI/180, w = 0; string at = "";
+        foreach (double b in BossRadii()) for (int k = 0; k <= 18; k++) {
+            double dir = Math.PI*k/18;
+            double d = Worst((x,y) => SectorDist(x,y,b,0,dir,half,SR) <= M, b, 0, false, b, 0, SR+M+0.5);
+            if (d < 0) return "UNSOLVABLE at apex r=" + b + " dir=" + (k*10);
+            if (d > w) { w = d; at = string.Format("apex r={0:F1} m, facing {1} deg from the outward radial", b, k*10); }
+        }
+        return string.Format("{0:F2}|{1}", w, at);
+    }
+    public static string TollEcho() {
+        double w = 0; string at = "";
+        foreach (double b in BossRadii()) {
+            double d = Worst((x,y) => { double r = Math.Sqrt((x-b)*(x-b)+y*y); return r >= TI-M && r <= TO+M; }, b, 0, false, b, 0, TO+M+0.5);
+            if (d < 0) return "UNSOLVABLE at centre r=" + b;
+            if (d > w) { w = d; at = string.Format("centre r={0:F1} m", b); }
+        }
+        return string.Format("{0:F2}|{1}", w, at);
+    }
+    // Final Toll pairing: the remembered March lane (which ended where the boss now stands) and a live Bell Sweep
+    // from that same position, resolving on the same tick. Danger is the union; the boss body is present.
+    // Lane directions in 30-degree steps over 0..180 (mirror symmetry), cone directions in 30-degree steps over 360.
+    public static string Pairing() {
+        double half = SH*Math.PI/180, hw = LW/2 + M, w = 0; string at = "";
+        foreach (double b in BossRadii()) for (int k = 0; k <= 6; k++) for (int c = 0; c < 12; c++) {
+            double ldir = Math.PI*k/6, ux = Math.Cos(ldir), uy = Math.Sin(ldir), cdir = Math.PI*c/6;
+            // longest lane arriving at (b,0) whose start stays inside the boss bound
+            double L = 0; while (L < 2*Bmax) { double sx = b-(L+0.1)*ux, sy = -(L+0.1)*uy; if (sx*sx+sy*sy > Bmax*Bmax) break; L += 0.1; }
+            double sx0 = b-L*ux, sy0 = -L*uy;
+            Shape u = (x,y) => {
+                double lx = (x-sx0)*ux+(y-sy0)*uy, ly = -(x-sx0)*uy+(y-sy0)*ux;
+                if (Math.Abs(ly) <= hw && lx >= -M && lx <= L+M) return true;
+                return SectorDist(x,y,b,0,cdir,half,SR) <= M;
+            };
+            double d = Worst(u, b, 0, true, b, 0, Math.Max(L+hw, SR)+M+0.5);
+            if (d < 0) return "UNSOLVABLE at boss r=" + b + " lane=" + (k*30) + " cone=" + (c*30);
+            if (d > w) { w = d; at = string.Format("boss r={0:F1} m, lane {1:F1} m arriving at {2} deg, cone at {3} deg", b, L, k*30, c*30); }
+        }
+        return string.Format("{0:F2}|{1}", w, at);
+    }
 }
 '@
 Add-Type -TypeDefinition $code -Language CSharp
@@ -130,7 +173,10 @@ $results = [ordered]@{
   'Hollow Toll'      = [Escape]::Toll()
   'Pendulum Charge'  = [Escape]::Lane()
   'Shattered Chime'  = [Escape]::Chime()
+  'Bell Sweep echo (no body)'  = [Escape]::SweepEcho()
+  'Hollow Toll echo (no body)' = [Escape]::TollEcho()
 }
+if ($Pairing) { $results['March echo + Bell Sweep, same tick'] = [Escape]::Pairing() }
 
 # Movement sets: game-design defaults (#33) and the current Unity Vanguard test controller (#27).
 $sets = @(
