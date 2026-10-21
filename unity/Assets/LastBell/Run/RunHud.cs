@@ -24,6 +24,8 @@ namespace LastBell.Run
             ["Pendulum Charge"] = "step sideways out of the lane", ["Low Pendulum"] = "JUMP over it or go around",
             ["Shattered Chime"] = "move: the marker follows you, then locks", ["Dividing Chime"] = "leave the cone",
             ["Bell Sweep"] = "leave the cone", ["Bell Sweep (Final Toll)"] = "leave the cone (heavy)", ["Hollow Toll"] = "inside the inner circle or outside the ring",
+            [BellkeeperEncounter.March] = "step sideways out of the lane",
+            [BellkeeperEncounter.Echo] = "it repeats where it struck before, not where the boss stands",
         };
 
         void Awake() { d = GetComponent<RunDirector>(); }

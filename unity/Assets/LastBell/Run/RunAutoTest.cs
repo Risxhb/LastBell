@@ -266,19 +266,53 @@ namespace LastBell.Run
             fight = StartCoroutine(Fight(4.5f, VanguardRotation, 1.8f));
             yield return Wait(2.5f); yield return Shot("combat_bellkeeper"); yield return Wait(2.2f);
             StopCoroutine(fight); bot.Clear();
+            // The Unfinished Hour (spec v0.3 §3.1, §4.1): phase 1 records one footprint, then replays it alone
+            yield return Survive(8, () => bk.HasMemory);
+            Check("phase 1 records a footprint and shows its inactive outline", bk.HasMemory);
+            yield return Shot("bellkeeper_memory_outline");
+            d.Player.DebugSetHp(PlayerController.MaxHp);
+            yield return Survive(14, () => bk.LiveEcho != null);
+            var echo1 = bk.LiveEcho;
+            Check("phase 1 replays the memory as an isolated echo", echo1 != null && d.World.Hazards.Count == 1 && !bk.HasMemory,
+                $"echo {echo1 != null}, live hazards {d.World.Hazards.Count}");
+            Check("the echo warns for 90 ticks", echo1 != null && echo1.ResolveAt == 90 && echo1.LockAt == 0);
+            yield return Survive(1.0f); yield return Shot("bellkeeper_unfinished_hour");
+            yield return Survive(2, () => bk.EchoesResolved > 0);
+            Check("the echo resolves once and the memory is erased", bk.EchoesResolved == 1 && !bk.HasMemory && bk.LiveEcho == null);
+            yield return Survive(0.2f);
+            Check("the chest opens after the echo", d.Boss.Current == "recovery", d.Boss.Current);
+            d.Player.DebugSetHp(PlayerController.MaxHp);
             d.Boss.DebugSetHpFraction(0.69f);
-            yield return Survive(16, () => d.Boss.PhaseName == "The Dissonance");
-            Check("phase 2 queued and entered", d.Boss.PhaseName == "The Dissonance");
+            yield return Survive(16, () => d.Boss.PhaseName == BellkeeperEncounter.Phase2);
+            Check("phase 2 queued and entered", d.Boss.PhaseName == BellkeeperEncounter.Phase2);
             yield return null; yield return null;
             Check("Bellkeeper plays PhaseShift on the transition", bk.Presenter.CurrentClip == "PhaseShift", bk.Presenter.CurrentClip);
             yield return Survive(3f); yield return Shot("bellkeeper_phase2");
             d.Boss.DebugSetHpFraction(0.34f);
             d.Player.DebugSetHp(PlayerController.MaxHp);
-            yield return Survive(18, () => d.Boss.PhaseName == "The Final Toll");
-            Check("phase 3 queued and entered", d.Boss.PhaseName == "The Final Toll");
+            yield return Survive(22, () => d.Boss.PhaseName == BellkeeperEncounter.Phase3);
+            Check("phase 3 queued and entered", d.Boss.PhaseName == BellkeeperEncounter.Phase3);
             yield return Survive(2.5f); yield return Shot("bellkeeper_final_toll");
+            // spec v0.3 §4.3: the Final Toll remembers its own March and replays it with the paired Bell Sweep
+            d.Player.DebugSetHp(PlayerController.MaxHp);
+            yield return Survive(6, () => bk.LiveEcho != null);
+            var echo3 = bk.LiveEcho;
+            Check("the Final Toll replays its March lane", echo3 != null && echo3.Shape == HazardShape.Lane && echo3.Damage == 30);
+            Check("the echo stays where the March started, not on the boss",
+                echo3 != null && Sim.Flat(echo3.Origin - d.Boss.transform.position).magnitude > 1f,
+                echo3 == null ? "" : $"{Sim.Flat(echo3.Origin - d.Boss.transform.position).magnitude:0.0} m");
+            yield return Survive(1, () => bk.LastFinalSweep != null);
+            var sw = bk.LastFinalSweep;
+            Check("the paired Bell Sweep resolves on the same tick as the echo",
+                echo3 != null && sw != null && echo3.ResolveAt - echo3.Age == sw.ResolveAt - sw.Age,
+                echo3 == null || sw == null ? "" : $"echo {echo3.ResolveAt - echo3.Age}, sweep {sw.ResolveAt - sw.Age}");
+            Check("never more than two damaging patterns at once", d.World.Hazards.Count <= 2, d.World.Hazards.Count.ToString());
+            yield return Shot("bellkeeper_final_toll_pairing");
+            yield return Survive(2, () => bk.LiveEcho == null);
+            d.Player.DebugSetHp(PlayerController.MaxHp);
             yield return KillDuringWindup("bellkeeper", "bellkeeper_defeat");
             Check("Bellkeeper plays Defeat", bk.Presenter.CurrentClip == "Defeat", bk.Presenter.CurrentClip);
+            Check("defeat erases the memory and every hazard", !bk.HasMemory && bk.LiveEcho == null && d.World.Hazards.Count == 0);
             yield return Wait(1.0f); yield return Shot("bellkeeper_defeat");
             yield return Until(() => d.State == RunState.Results, 6, "results 1");
             Check("victory after the fourth encounter", d.Victory && d.EncountersCleared == 4 && d.EncounterStarts == 4 && d.EncounterEnds == 4,
