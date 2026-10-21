@@ -52,23 +52,40 @@ The numbers are the packet's Steady Ticking values. They are proposals, not bala
 - `BossEncounter.NextPhaseFraction` makes F8 work for bosses whose thresholds aren't 70/35.
 - Resolve effects are a partial of `BellkeeperFx` (`VFX/Boss/Crucivar/CrucivarFx.cs`): a brass slam ring, a slag splash, steam sectors and a strip stamp.
 
-## The model (`tools/crucivar/crucivar_build.py`, output `Characters/Crucivar/Resources/Characters/Crucivar.glb`)
+## The model (output `Characters/Crucivar/Resources/Characters/Crucivar.glb`)
 
-**Build command:**
+The game model is the **Meshy sculpt** ("Forge Sentinel", generated from the sheet's front, side and back views in `tools/crucivar/meshy-input/`), on a rigid rig. Two steps build it:
 ```
-blender -b -P tools/crucivar/crucivar_build.py -- unity/Assets/LastBell/Characters/Crucivar/Resources/Characters/Crucivar.glb [<render dir>]
+blender -b -P tools/crucivar/crucivar_meshy_prep.py -- <Meshy_AI_Forge_Sentinel_..._texture.glb> <work dir>
+blender -b <work dir>/crucivar_prep.blend -P tools/crucivar/crucivar_meshy_rig.py -- <work dir> unity/Assets/LastBell/Characters/Crucivar/Resources/Characters/Crucivar.glb [<render dir>]
 ```
 
-**Construction.** A rigid hard-surface build from the v1 sheet: about 57k triangles, 3.8 m to the chimney top. Every plate is parented to one bone, so it moves like a machine.
+**Prep (`crucivar_meshy_prep.py`):**
+- Scales the sculpt to 3.8 m with the feet at 0, centred on the torso.
+- Decimates it from 3.5M to 60k triangles.
+- Saves the 2K Meshy textures.
+- Builds an emissive mask from the molten-orange texels (belly windows, eyes, chimney mouths, crucible metal, joint glows).
+- Renders front, side, back and top views on a 0.25 m grid, which is where the joint positions come from.
 
-**Materials:** charcoal iron, hammered brass, aged brass, oxide-teal joints, scorched ceramic, molten shutters and amber eyes.
+**Rig (`crucivar_meshy_rig.py`):**
+- **Cutting.** Cuts the sculpt into rigid pieces by region, so each face belongs to one bone and the metal never stretches. Arm faces far from their own bone go back to the torso, so nothing flies off with a raised limb.
+- **Flywheel.** The sculpted flywheel is cut out as its own `Flywheel` node, so the real wheel spins.
+- **Code-driven parts.** The parts `CrucivarRig` drives are added on the sculpt's surface by raycast, in the sculpt's coppery palette:
+  - brass frames over the three sculpted belly windows,
+  - flank grilles with ember slots,
+  - the back exhaust,
+  - the pressure gauge,
+  - dark insulation tiles,
+  - an arched brass cage guard over the flywheel,
+  - shoulder fins,
+  - the crucible lip.
+- **Size.** About 79k triangles, with JPEG textures.
 
-**Parts:**
-- Front: the arched furnace-door face with a heavy brow, amber eye ports and a toothed grille, plus three belly windows behind hinged brass shutters.
-- Sides: a stacked brass pauldron on each shoulder, and shoulder-to-hip pistons.
-- Arms: the massive RIGHT hammer (a die block with corner plates and the foundry cross) and the smaller LEFT crucible with its spout.
-- Legs: short piston legs, with heel wheels for the Rail Ram windup.
-- Back: tanks, wrapped pipes, a ladder, a dark access plate, the toothed flywheel and its half-moon guard.
+**Shared code.** Both pipelines share `crucivar_common.py` (materials, armature builder, hard-surface helpers) and `crucivar_anim.py` (the clips and preview renders).
+
+**Fallback.** `crucivar_build.py` still builds the earlier scripted hard-surface model. It's a fallback with the same rig, clips and node names.
+
+**Meshy differences from the sheet:** two chimneys instead of one (kept, since it reads well), and a slightly different emblem on the hammer.
 
 **Clips:** Idle, Walk (compression walk with IK-planted feet), Diebreaker (three ratchet notches, then the slam on the resolve tick), HammerLodged, SlagCast, RailRam, ReleaseFrontBack, ReleaseSides, CastingCycle, Vulnerable, PhaseShift and Defeat. Defeat kneels, pours harmlessly into its own crucible and locks solid.
 
@@ -90,7 +107,7 @@ blender -b -P tools/crucivar/crucivar_build.py -- unity/Assets/LastBell/Characte
 
 ### Still open
 
-- The model is a scripted hard-surface build, not a sculpt. If you want the painted, sculpted look the Vanguard and Bellkeeper got, the Meshy route still applies. Use the sheet's front, side and back views plus this model's vent layout, and keep the node names above so `CrucivarRig` keeps working.
+- The rigid cut leaves visible seams at the shoulders and elbows when the arms swing wide. That reads as mechanical joints, but a hand-modelled joint cap would be cleaner.
 - No audio yet: pressure, ratchet, forge or cooling sounds.
 - No stagger system. Defeat is the only state that cancels a warning.
 - Difficulty tiers other than Steady Ticking, and the Midnight Toll "Second Press", aren't implemented.
