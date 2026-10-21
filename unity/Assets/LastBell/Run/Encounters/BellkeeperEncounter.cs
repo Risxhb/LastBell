@@ -303,10 +303,69 @@ namespace LastBell.Run
             else presenter.TickBoss("Idle");
         }
 
+        // ---------------- phase looks (spec v0.3 §4, sheet 04-bellkeeper-v1.png) ----------------
+        // Last Guardian: closed shell, compact rings. Broken Hour: shell halves parted, rings offset. Final Toll: chest
+        // fully open, rings spread, brighter core. The chest also opens for every punish window and on defeat. The clips
+        // keep the shell and ring offsets at rest, so this is layered on after the presenter evaluates each frame.
+        static readonly float[] ShellOpen = { 0, 14, 42 }, ShellPart = { 0, 0.06f, 0.12f }, PhaseGlow = { 1, 1.5f, 2.2f };
+        static readonly float[] RingOut = { 0, 0.18f, 0.4f }, RingUp = { 0, 0.04f, 0.2f }, RingTilt = { 0, 12, 25 }, BackRingUp = { 0, 0.1f, 0.25f };
+        const float PunishOpen = 50, DefeatOpen = 70;
+        Transform shellL, shellR, ringL, ringR, ringC; bool lookBound;
+        public float ShellAngle { get; private set; }       // tests: current chest opening, degrees
+        public float RingSpread { get; private set; }       // tests: current side-ring offset, metres
+        public bool PhaseRigFound => shellL && shellR && ringL && ringR && ringC;
+        float lookPhase;                                    // eased 0..2 between the phase looks
+
+        void BindLook()
+        {
+            lookBound = true;
+            if (!presenter || !presenter.Visual) return;
+            foreach (var t in presenter.Visual.GetComponentsInChildren<Transform>(true))
+            {
+                switch (t.name)
+                {
+                    case "shell.L": shellL = t; break;
+                    case "shell.R": shellR = t; break;
+                    case "ring.L": ringL = t; break;
+                    case "ring.R": ringR = t; break;
+                    case "ring.C": ringC = t; break;
+                }
+            }
+        }
+        static float Lerp3(float[] v, float p) => p <= 1 ? Mathf.Lerp(v[0], v[1], p) : Mathf.Lerp(v[1], v[2], p - 1);
+
+        void LateUpdate()
+        {
+            if (!lookBound) BindLook();
+            if (!PhaseRigFound) return;
+            float dt = Time.deltaTime;
+            lookPhase = Mathf.MoveTowards(lookPhase, phase - 1, dt / 0.8f);    // the change plays across the 1.5 s shift
+            float open = Dead ? DefeatOpen : Current == "recovery" ? Mathf.Max(PunishOpen, Lerp3(ShellOpen, lookPhase)) : Lerp3(ShellOpen, lookPhase);
+            ShellAngle = Mathf.MoveTowards(ShellAngle, open, dt * (open > ShellAngle ? 120 : 60));
+            RingSpread = Lerp3(RingOut, lookPhase);
+            Vector3 up = transform.up, fwd = transform.forward, right = transform.right, c = transform.position;
+            foreach (var shell in new[] { shellL, shellR })
+            {
+                // hinge at the bone head (the half's outer top corner): swing the inner edge forward and out
+                var hinge = shell.position; var toAxis = Vector3.ProjectOnPlane(c - hinge, up);
+                float s = Mathf.Sign(Vector3.Dot(Vector3.Cross(up, toAxis), fwd));
+                shell.RotateAround(hinge, up, s * ShellAngle);
+                shell.position += right * Mathf.Sign(Vector3.Dot(hinge - c, right)) * Lerp3(ShellPart, lookPhase);
+            }
+            foreach (var ring in new[] { ringL, ringR })
+            {
+                float side = Mathf.Sign(Vector3.Dot(ring.position - c, right));
+                ring.RotateAround(ring.position, fwd, -side * Lerp3(RingTilt, lookPhase));   // tops lean outward
+                ring.position += right * side * RingSpread + up * Lerp3(RingUp, lookPhase);
+            }
+            ringC.RotateAround(ringC.position, right, -0.4f * Lerp3(RingTilt, lookPhase));
+            ringC.position += up * Lerp3(BackRingUp, lookPhase);
+        }
+
         protected override void Update()
         {
             base.Update();
-            if (presenter) presenter.GlowLevel = glowLevel;
+            if (presenter) presenter.GlowLevel = glowLevel * Lerp3(PhaseGlow, lookPhase);
             if (Dead && presenter && presenter.Visual)
             {
                 // defeat: placeholder sink below the dial edge after the Defeat/Vulnerable pose

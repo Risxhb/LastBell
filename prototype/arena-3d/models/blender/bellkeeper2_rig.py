@@ -275,13 +275,13 @@ def pose_of(ch):
     # ch: bone -> (x, y, z) degrees, plus 'hips_loc', 'halo_spin', 'halo_tilt', 'halo_loc' extras
     p = {}
     for n, v in ch.items():
-        if n in ('hips_loc', 'halo_spin', 'halo_tilt', 'halo_loc', '_feet', 'rings', 'shell'): continue
+        if n in ('hips_loc', 'halo_spin', 'halo_tilt', 'halo_loc', '_feet', 'rings'): continue
         p[n] = {'rot': R(*v)}
     p.setdefault('hips', {})['loc'] = ch.get('hips_loc', (0, 0, 0))
     p['halo'] = {'rot': halo_rot(ch.get('halo_spin', 0), ch.get('halo_tilt', 0)), 'loc': ch.get('halo_loc', (0, 0, 0))}
-    # 'rings': (back, left, right) extra spins in degrees; 'shell': how far the chest halves swing open, in degrees
+    # 'rings': (back, left, right) extra spins in degrees. The chest shell halves stay at rest in every clip: the
+    # encounter opens them at runtime per phase and in punish windows (BellkeeperEncounter.PhaseLook).
     for n, d in zip(('ring.C', 'ring.L', 'ring.R'), ch.get('rings', (0, 0, 0))): p[n] = {'rot': ring_spin(d)}
-    a = ch.get('shell', 0); p['shell.R'] = {'rot': R(z=-a)}; p['shell.L'] = {'rot': R(z=a)}
     return p
 def add(*vs): return tuple(sum(c) for c in zip(*vs))
 
@@ -389,8 +389,8 @@ def vulnerable(t):
         'hand.R': (15, 0, 0), 'hand.L': (15, 0, 0),
         'pendulum': (0, 4 * math.sin(p), 0),
         'halo_loc': (0, 0.05, -0.2 + 0.03 * math.sin(p + 1)), 'halo_tilt': 6, 'halo_spin': -10 + 2 * math.sin(p),
-        # the punish window (spec v0.3 §3.1): the chest stands open and the clapper hangs exposed; rings out of step
-        'shell': 48 + 3 * math.sin(p), 'rings': (-8 + 3 * math.sin(p), 12, -15),
+        # the punish window (spec v0.3 §3.1): the encounter opens the chest; the rings fall out of step
+        'rings': (-8 + 3 * math.sin(p), 12, -15),
     }
 
 def echo_tell(t):
@@ -448,8 +448,7 @@ def phase_shift(t):
         'pendulum': (ring(t, T, -30, 1.5, 1.6), 0, 0),
         'halo_loc': (0, 0, key(t, [(0, 0), (T, -0.1), (T + .15, 0.35), (1.5, 0)])),
         'halo_spin': key(t, [(0, 0), (T, -20), (1.5, 160)]), 'halo_tilt': key(t, [(0, 0), (T + .1, -10), (1.5, 0)]),
-        # the shell cracks apart on the ring-out and settles back; the rings desynchronise
-        'shell': key(t, [(0, 0), (T, 0), (T + .1, 30), (T + .5, 18), (1.5, 0)]),
+        # the rings desynchronise on the ring-out
         'rings': (key(t, [(0, 0), (1.5, -60)]), key(t, [(0, 0), (1.5, 90)]), key(t, [(0, 0), (1.5, -45)])),
     })
     return ch
@@ -465,9 +464,8 @@ def defeat(t):
         'head': (24 * sag + 16 * slump, 0, 6 * slump),
         'upperarm.R': (-12 * sag + 25 * slump, -6, 0), 'upperarm.L': (-12 * sag + 25 * slump, 6, 0),
         'forearm.R': (-25 * sag, 0, 0), 'forearm.L': (-25 * sag, 0, 0), 'hand.R': (15, 0, 0), 'hand.L': (15, 0, 0),
-        # the chest opens, the clapper swings once, is caught, then released to hang still; the rings stop
+        # the clapper swings once, is caught, then released to hang still (the encounter opens the chest); the rings stop
         'pendulum': (key(t, [(0, 0), (0.3, -35), (0.7, -35), (1.0, 0)]) + ring(t, 1.0, 12, 1.0, 1.5), 0, 0),
-        'shell': key(t, [(0, 0), (0.4, 65), (2.5, 70)]),
         'rings': (key(t, [(0, 0), (0.8, -20), (2.5, -22)]), key(t, [(0, 0), (0.8, 15), (2.5, 16)]), key(t, [(0, 0), (0.8, -10), (2.5, -11)])),
         'halo_loc': (0, 0.05, -0.32 * sag - 0.5 * slump), 'halo_tilt': 14 * sag + 26 * slump, 'halo_spin': -10 * sag - 25 * slump,
     }

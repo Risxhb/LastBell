@@ -275,6 +275,7 @@ namespace LastBell.Run
             d.Player.DebugSetHp(PlayerController.MaxHp);   // test setup: the rest of this run checks phases, not survival
             var bk = (BellkeeperEncounter)d.Boss;
             Check("Bellkeeper uses its model", bk.Presenter != null && bk.Presenter.HasModel);
+            Check("Bellkeeper 2.0 rig has the shell halves and three rings", bk.PhaseRigFound);
             StartCoroutine(Capture("bellkeeper_fight", 300));
             fight = StartCoroutine(Fight(4.5f, VanguardRotation, 1.8f));
             yield return Wait(2.5f); yield return Shot("combat_bellkeeper"); yield return Wait(2.2f);
@@ -282,6 +283,7 @@ namespace LastBell.Run
             // The Unfinished Hour (spec v0.3 §3.1, §4.1): phase 1 records one footprint, then replays it alone
             yield return Survive(8, () => bk.HasMemory);
             Check("phase 1 records a footprint and shows its inactive outline", bk.HasMemory);
+            Check("Last Guardian look: shell closed, rings compact", bk.ShellAngle < 2 && bk.RingSpread < 0.01f, $"shell {bk.ShellAngle:0}°, rings {bk.RingSpread:0.00} m");
             yield return Shot("bellkeeper_memory_outline");
             d.Player.DebugSetHp(PlayerController.MaxHp);
             yield return Survive(14, () => bk.LiveEcho != null);
@@ -301,11 +303,13 @@ namespace LastBell.Run
             yield return null; yield return null;
             Check("Bellkeeper plays PhaseShift on the transition", bk.Presenter.CurrentClip == "PhaseShift", bk.Presenter.CurrentClip);
             yield return Survive(3f); yield return Shot("bellkeeper_phase2");
+            Check("Broken Hour look: shell parted, rings offset", bk.ShellAngle >= 10 && bk.RingSpread > 0.15f, $"shell {bk.ShellAngle:0}°, rings {bk.RingSpread:0.00} m");
             d.Boss.DebugSetHpFraction(0.34f);
             d.Player.DebugSetHp(PlayerController.MaxHp);
             yield return Survive(22, () => d.Boss.PhaseName == BellkeeperEncounter.Phase3);
             Check("phase 3 queued and entered", d.Boss.PhaseName == BellkeeperEncounter.Phase3);
             yield return Survive(2.5f); yield return Shot("bellkeeper_final_toll");
+            Check("Final Toll look: chest open, rings spread", bk.ShellAngle >= 38 && bk.RingSpread > 0.35f, $"shell {bk.ShellAngle:0}°, rings {bk.RingSpread:0.00} m");
             // spec v0.3 §4.3: the Final Toll remembers its own March and replays it with the paired Bell Sweep
             d.Player.DebugSetHp(PlayerController.MaxHp);
             yield return Survive(6, () => bk.LiveEcho != null);
@@ -327,6 +331,7 @@ namespace LastBell.Run
             Check("Bellkeeper plays Defeat", bk.Presenter.CurrentClip == "Defeat", bk.Presenter.CurrentClip);
             Check("defeat erases the memory and every hazard", !bk.HasMemory && bk.LiveEcho == null && d.World.Hazards.Count == 0);
             yield return Wait(1.0f); yield return Shot("bellkeeper_defeat");
+            Check("defeat opens the chest fully", bk.ShellAngle > 60, $"shell {bk.ShellAngle:0}°");
             yield return Until(() => d.State == RunState.Results, 6, "results 1");
             Check("victory after the fourth encounter", d.Victory && d.EncountersCleared == 4 && d.EncounterStarts == 4 && d.EncounterEnds == 4,
                 $"victory {d.Victory}, cleared {d.EncountersCleared}, starts {d.EncounterStarts}, ends {d.EncounterEnds}");
