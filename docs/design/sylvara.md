@@ -327,7 +327,7 @@ A playable graybox lives on [`feature/boss-sylvara`](https://github.com/Risxhb/c
 - **Code:** `unity/Assets/LastBell/Run/Encounters/SylvaraEncounter.cs`. It implements §3–§4 at Steady Ticking with D1–D6, including the phase loops, cooldown hold, targeting, the Bloom layout and the phase visuals (bells spreading, shoulder flowers, mask split).
 - **Shared change:** `Hazard.ActiveTicks` and `OnSpent` (R22). A hazard can stay open for an active period and hit anyone inside once. Existing hazards are unchanged (`ActiveTicks` 0).
 - **Body:** a labelled primitive stand-in with four root legs, split mask, three bells, tuning fork and back wheel. A `Resources/Characters/Sylvara.glb` model replaces it automatically when it exists.
-- **Arena:** the run loop's key-art arena (11.5 m), matching the spec's placeholder. Moving her to the Verdant Chimes scene (14 m, §5.2) is the next integration step.
+- **Arena:** her practice button loads the **Verdant Chimes** map (the run loop's map selector) and starts there with the chosen class. Combat bounds stay the run loop's shared 11.5 m on every map, the spec's placeholder. Opening them to the arena's 14 m is a run-loop-wide choice; §5.2 shows the timings hold on both.
 - **Autotest:** `-lastbellAutotest` now ends with a Sylvara section; `-lastbellSylvara` runs only that section. It checks:
   - all five attacks in the Phase 1 order
   - Bloom I → II → III, with 72-tick stagger and an 18-tick active period
