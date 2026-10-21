@@ -1,254 +1,381 @@
 # The Bellkeeper — encounter specification
 
-Draft v0.1 · October 20, 2026 · Owner: `chzy18/claude` ([#8](https://github.com/Risxhb/collab/issues/8)) · Reviewer: `risxhb/codex`; `chzy18/codex` for session-facing rules.
+Draft v0.2 · October 21, 2026 · Owner: `chzy18/claude` ([#8](https://github.com/Risxhb/collab/issues/8)) · Reviewer: `risxhb/codex`; `chzy18/codex` for session-facing rules.
 
-Status: **specification only.** Nothing here is implemented. It is engine-independent and written for the Unity/C# production path ([decisions](../decisions.md), [Unity migration plan in #13](https://github.com/Risxhb/collab/pull/13)). Shared geometry, requirement evaluation, RNG, reset and events belong to the foundation lane ([#6](https://github.com/Risxhb/collab/issues/6)). This document says what the encounter needs from them; it does not define private hit testing. Every number is an initial tunable value, not a balance claim.
+Status: **specification only, nothing here is implemented.** It is engine-independent and targets the Unity/C# production path.
 
-Companion documents: [prototype upgrades](prototype-upgrades.md) and [encounter test matrix](../testing/encounters.md).
+This revision replaces v0.1 (commit `f2f9713`), which assumed Guard, attack resources, post-hit immunity, upgrades and the legacy Godot arena. Those are superseded by the [current game design](https://github.com/Risxhb/collab/blob/docs/boss-rush-decisions/docs/game-design.md) ([#29](https://github.com/Risxhb/collab/issues/29), [PR #33](https://github.com/Risxhb/collab/pull/33)) and the [single-arena slice plan](https://github.com/Risxhb/collab/blob/docs/boss-rush-decisions/docs/plans/single-arena-slice.md).
 
-## 1. Baseline values this spec is built on
+The attack set and phase structure come from the supplied [Bellkeeper v1.0 reference](https://github.com/Risxhb/collab/blob/docs/bellkeeper-design-reference/reference/LAST-BELL-BELLKEEPER-BOSS-DESIGN-v1.0.md) (#17), which is preserved unchanged. Where this spec differs from v1.0, it says why. Every number is an initial tunable value.
 
-The spec reuses the legacy Godot reference behaviour (`feature/hazard-lock-timing`, `game/core/combat_simulation.gd`) so the C# port and this spec can be compared directly. If U1 changes any of these, re-run the escape checks in §4.
+Shared geometry, damage, RNG, reset, events, movement and stamina belong to the foundation lane ([#6](https://github.com/Risxhb/collab/issues/6)). This spec says what the encounter needs from them (§11); it never defines private hit testing.
 
-| Value | Legacy reference | Used here as |
+Companion documents:
+- [encounter test matrix](../testing/encounters.md)
+- [escape checker](../../tools/encounter-escape/escape-check.ps1)
+- [prototype upgrades](prototype-upgrades.md), now deferred reference only
+
+## 1. Where the Bellkeeper sits
+
+The Bellkeeper is the **final boss** of the run:
+
+**Dial Warden → Pendulum Sentinel → Chimebound Oracle → intermission → The Bellkeeper**
+
+All five stages are in one arena. Each miniboss teaches one part of the Bellkeeper's vocabulary first, so the final fight tests combination and execution rather than introducing new verbs (§9).
+
+## 2. Baseline values
+
+**Units are metres and seconds; the simulation runs at 60 Hz.** v0.1's legacy Godot units are retired. The v1.0 comparison on #8 drew 1 m = 40 legacy units for illustration only; nothing here should be converted back.
+
+| Value | Game-design defaults (#33) | Current Unity test (#27 `feature/class-test-arena`) | Used here |
+|---|---|---|---|
+| Walk | 6 m/s | 4.2 m/s (`VanguardTestController.RunSpeed`) | Both checked (§5); design defaults are the gate |
+| Sprint | 9 m/s | 6.5 m/s | Not assumed in any escape |
+| Dodge | 3 m over 0.20 s | 4.5 m, clip-length duration | Both checked; Unity dodge duration assumed 0.40 s |
+| Stamina | 100; dodge 30, jump 20, sprint 25/s; regenerates 20/s after 0.75 s | Not implemented in the test | Design values (§5.3) |
+| Invincibility | None, including dodge and post-hit | 0.75 s post-hit immunity in `PlayerVitals` | **None.** The Unity test conflicts with the design (§12, D3) |
+| Arena | Proposed 24 m Clockwork Dais | Key-art arena: player centres ≤ 11.5 m, boss centre ≤ 9.5 m from the centre | Unity test bounds |
+| Boss body | Real collision | 1.4 m radius | 1.4 m; player centres stay ≥ 1.7 m from the boss centre |
+| Player hit margin | — | 0.3 m (touching a border counts) | 0.3 m: danger shapes are expanded by it |
+| Player health | — | 100 HP | 100 HP (§8) |
+
+If the shared movement constants change in U1/U3, rerun `tools/encounter-escape/escape-check.ps1` with the new values and update §5. Request R21 asks for the constants to be published as shared data.
+
+## 3. Attack vocabulary
+
+Four attacks plus one signature sequence, from v1.0 §3. The shapes match the current Unity test, except for the recommended Bell Sweep radius (§5.2, decision D1).
+
+| ID | Attack | Shape | Tracking and lock | Resolve | Taught by |
+|---|---|---|---|---|---|
+| `bell_sweep` | **Bell Sweep** | Cone from the boss centre: **6.5 m recommended** (v1.0: 8 m), 80° wide | Boss turns toward the target for 18 ticks (0.30 s), then facing and cone lock | Lock + tier window (§5.2) | Dial Warden's Hand Sweep |
+| `hollow_toll` | **Hollow Toll** | Annulus 2.6–6.8 m around the boss's position **at warning** | Fixed at warning; never drifts | Warning + tier window | Dial Warden's Hollow Dial |
+| `pendulum_charge` | **Pendulum Charge** | Lane 2.2 m wide from the boss to the target's position + 2.75 m overshoot, clamped to the boss bound | Lane locks **at warning** | Warning + tier window; then the boss travels the lane in 18 ticks and ends at its far end | Pendulum Sentinel |
+| `shattered_chime` | **Shattered Chime** | Circles of radius 1.4 m, spawned on a marked player 24 ticks apart | Each marker follows its owner at 6 m/s for 30 ticks, then locks | Lock + tier window per marker | Chimebound Oracle |
+| `final_toll` | **The Final Toll** | Sequence: Charge → Toll at the new boss position → Chime → Bell Sweep → long recovery | Each step keeps its own lock rule | §4.3 | — |
+
+**Rules for every attack:**
+- **Damage geometry is the telegraph.** Hits are checked against authoritative shared geometry at the resolve tick, never against animation or VFX timing.
+- **Locks are final.** Once an attack locks, no random roll or retarget can move it.
+- **Moving boss.** Hollow Toll and Bell Sweep use the boss's position at the moment they warn. After a Pendulum Charge that position is the lane's end.
+- **No jump clearance.** None of the Bellkeeper's attacks can be avoided by jumping; jump state doesn't change resolution. Jump-clearable hazards belong to the Pendulum Sentinel's Low Pendulum (request R19).
+- **Two at once, at most.** No more than two damaging patterns can be warning at the same time. A Chime volley counts as one.
+
+## 4. Phases and timeline
+
+Phases are **HP-based**, as in v1.0 §4:
+
+| Phase | Name | Boss HP | Content |
+|---|---|---|---|
+| 1 | The First Toll | 100–70 % | Recognition |
+| 2 | The Dissonance | 70–35 % | Combination |
+| 3 | The Final Toll | 35–0 % | Execution |
+
+**Shared phase rules:**
+- **Queued transitions.** Crossing a threshold queues the transition until the active pattern or block finishes. No telegraph is ever interrupted by an unrelated lethal attack.
+- **Defeat.** Boss defeat immediately cancels pending hazards and markers, and no damage can land after victory. If the last standing player goes down on the same tick the boss dies, defeat wins. That's the single-arena plan's proposed tie rule, which foundation #6 must make deterministic.
+- **Seeded variation.** Variations are chosen by the seeded encounter RNG (R6) at block boundaries or documented target-acquisition points. If a sampled variation is invalid for current positions, the director picks a pre-validated fallback **before** the tell begins (v1.0 §5.3).
+- **No enrage.** The slice has no timed enrage, a change from v0.1. Fight length is tuned with boss HP (§8).
+
+### 4.1 Phase 1 — The First Toll (fixed order, loops)
+
+Bell Sweep → Hollow Toll → Pendulum Charge → Shattered Chime → recovery → repeat.
+
+Each attack also has its own short recovery (§5.4). After a full loop the boss walks back toward the centre, as the Unity test already does, so the next Hollow Toll has outer safe space.
+
+### 4.2 Phase 2 — The Dissonance (blocks, A → B → C → repeat)
+
+| Block | Sequence | Permitted variation | Gap inside the block |
+|---|---|---|---|
+| **A: Pursuit** | Pendulum Charge → Hollow Toll at the landing point | Target; left or right overshoot side | The Toll warns on the landing tick |
+| **B: Discord** | Shattered Chime → Bell Sweep | Marker owners (§6) | The Sweep warns when the last marker locks |
+| **C: Reversal** | Hollow Toll → Pendulum Charge | Mirrored charge path | The Charge warns when the Toll resolves |
+
+### 4.3 Phase 3 — The Final Toll
+
+The Final Toll → Pursuit (A) → The Final Toll → … until defeat.
+
+**Steady Ticking schedule** (ticks from the start of the sequence; design movement set, recommended 6.5 m Sweep):
+
+| Step | Warn | Lock | Resolve | Note |
+|---|---|---|---|---|
+| Pendulum Charge | 0 | 0 | 48 | The boss travels to the lane end over ticks 48–66 |
+| Hollow Toll | 66 | 66 | 138 | Centred on the landing point. The 72-tick window lets players walk out (needs 70) |
+| Shattered Chime ×1 per owner, then +24 | 138 / 162 / 186 | +30 | +78 (216 / 240 / 264) | 48 ticks after lock. Walk-only needs 45, so continuous movement solves it without dodging |
+| Bell Sweep | 240 | 258 | 309 | 51 ticks after lock; needs one dodge (48) |
+| Recovery | 309 | — | 429 | 2.0 s vulnerability window |
+
+Total: 7.15 s (v1.0 targets 6–8 s). This schedule costs **one dodge** for a worst-case player, which is what makes it repeatable on the stamina budget in §5.3.
+
+## 5. Fairness: escape, stamina, collision and hit-stun
+
+### 5.1 Method
+
+`tools/encounter-escape/escape-check.ps1` samples:
+- every boss position in the bound (radius 0–9.5 m, using the arena's symmetry)
+- every attack direction, in 10° steps
+- every reachable danger point on a 0.1 m grid (inside the arena, outside the boss body, inside the shape expanded by 0.3 m)
+
+For each danger point it measures the straight-line distance to the nearest safe point, using a 0.05 m boundary grid. It then converts the worst case into escape time:
+- **walk-only:** distance ÷ walk speed
+- **walk + one dodge:** the dodge distance at dodge speed, then the rest at walk speed
+
+The minimum window for a difficulty is that difficulty's **reaction margin** plus the escape time:
+
+| Tier | Reaction margin | Dodge allowed? |
 |---|---|---|
-| Tick rate | 60 Hz | All timings below are ticks; seconds are rounded for reading |
-| Baseline move speed | 250 units/s | `v = 4.1667` units/tick |
-| Arena | rect origin (60, 140), size 820 × 600; actor centres clamped 14 units inside | Playable centre region x ∈ [74, 866], y ∈ [154, 726] |
-| Boss position | fixed at (470, 360) | Origin of every boss-anchored hazard |
-| Collision | actor centre point; boundaries are dangerous | Unchanged |
-| Guard / immunity | 24-tick guard window, 180-tick cooldown; 45-tick immunity after a hit | Unchanged; upgrades in the companion doc reference these |
-| Health | 5 pips, ordinary hazard removes 1 | Unchanged |
+| First Chime | 0.60 s | No, walk-only must pass |
+| Steady Ticking | 0.45 s | One dodge per attack |
+| Striking Hour | 0.35 s | One dodge per attack |
+| Midnight Toll | 0.30 s | One dodge per attack |
 
-Boss health, damage scaling by party size and phase pacing by HP are foundation decisions. In v0.1 the timeline is **time-based**, not HP-gated, so every seed and party count produces the same schedule. HP gates can be added once kill times are measured.
+The window counts from **lock** for tracking attacks (the final footprint is known only then) and from **warning** for attacks fixed at warning.
 
-## 2. Attack vocabulary
+**Limits.** Travel is straight-line, with no routing around the boss body. There are no other players and no acceleration, and the dodge has constant speed. The grid sampling is accurate to about ±0.05 m. These checks are evidence for single attacks, not proof that every combination can be solved; §10 covers combinations.
 
-Original names. Each attack has one shape, one icon and one meaning at every party size. The solution may change with party size, but the visual meaning stays the same (plan §6).
+### 5.2 Results (run on October 21, 2026)
 
-| ID | Attack | Shape | Anchor and lock | Requirement | Default window |
+Worst-case escape distances:
+
+| Attack | d_max | Worst configuration |
+|---|---|---|
+| Bell Sweep, 8 m (v1.0) | **5.12 m** | Boss 4 m from centre, cone facing the wall: players can't run past its end, only out of its sides |
+| Bell Sweep, 6.5 m (recommended) | **3.84 m** | Boss 6 m from centre, facing the wall |
+| Bell Sweep, 8 m narrowed to 70° | 4.61 m | Boss 4 m from centre |
+| Hollow Toll | **4.25 m** | Boss 5 m from centre: outer safety cut off by the wall, so the inner pocket is the escape |
+| Pendulum Charge | 1.41 m | Any lane: sideways escape |
+| Shattered Chime | 1.71 m | From a marker's centre |
+
+Minimum window in ticks (design movement set: walk 6 m/s, dodge 3 m in 0.2 s), compared with the current Unity test and v1.0:
+
+| Attack | First Chime (walk) | Steady Ticking | Striking Hour | Midnight Toll | Current Unity / v1.0 |
 |---|---|---|---|---|---|
-| `bell_sweep` | **Bell Sweep** | Cone from the boss, radius 380, half-angle 36° (π/5) | `fixed`; direction aimed at a seeded living target at warning, ±0.15 rad seeded jitter | avoid | warn → resolve 90 |
-| `bell_sweep_tracking` | **Tracking Sweep** | Same cone | `follow_until_lock`, component `direction`; lock = warn + 45 | avoid | resolve = warn + 120 |
-| `hollow_toll` | **Hollow Toll** | Donut centred on the boss, inner 155, outer 380 | `fixed` | avoid | 90 |
-| `tolling_mark` | **Tolling Mark** (spread) | Circle radius 110 (tier A) / 100 (tier B) on each marked player | `follow_until_lock`; lock = resolve − 1 (see §8, request R3) | spread | 150 |
-| `lingering_mark` | **Lingering Mark** (solo spread) | Circle radius 110 on the solo player | `snapshot_at_lock`; lock = warn + 90 | avoid | resolve = warn + 160 |
-| `gathering_peal` | **Gathering Peal** (stack) | Circle radius 90 (tier A) / 100 (tier B) on each stack target | `follow_until_lock`; lock = resolve − 1 | stack | 210 |
-| `sanctuary_peal` | **Sanctuary Peal** (solo stack) | Circle radius 90 at a seeded shelter point, (330, 560) or (610, 560) | `fixed` | shelter (must be inside) | 210 |
-| `remembered_sweep` | **Remembered Sweep** (Echo) | Exact locked geometry of the retained Bell Sweep | `fixed` | avoid | 120 (Echo intro), 180 (combination) |
-| `final_hour` | **Final Hour** (enrage) | Circle radius 1000 centred on the boss (covers the arena) | `fixed` | guard | 90, repeating every 90 |
+| Bell Sweep 8 m, after lock | 88 | 61 | 55 | 52 | **39: fails every tier** |
+| Bell Sweep 6.5 m, after lock | 75 | 48 | 42 | 39 | 39 |
+| Hollow Toll, from warning | 79 | 52 | 46 | 43 | 66 |
+| Pendulum Charge, from warning | 51 | 33 | 27 | 24 | 48 |
+| Shattered Chime, after lock | 54 | 34 | 28 | 25 | 42 |
 
-**Requirement kinds** are evaluated by the shared core from the locked geometry and actor centres at the resolve tick:
+With the Unity test's slower walk (4.2 m/s) the dodge tiers barely change (Sweep 6.5 m: 48 / 42 / 39). Walk-only First Chime gets longer (Sweep 6.5 m: 91; Toll: 97). The script prints both sets.
 
-- **avoid:** every living player whose centre is inside fails.
-- **spread:** every living player inside a circle that is *not their own* fails ("stood in another player's mark"). The owner of the circle does not fail for being in it. One failure per player per resolve, even when several circles overlap them.
-- **stack:** for each stack, count living players inside. A player inside at least one stack whose count ≥ `min_players` succeeds. A player inside only under-filled stacks, or inside no stack, fails.
-- **shelter:** the solo player fails when *outside* the circle. It's a stack with `min_players: 1` at a fixed point; listed separately so the failure card can say "outside the sanctuary".
-- **guard:** every living player fails unless guard is active on the resolve tick. Position doesn't matter.
+**Finding.** v1.0's 0.95 s Bell Sweep (0.30 s tracking + 0.65 s after lock) is **not escapable at any difficulty** with the 8 m cone once arena walls are included. Not even a dodge at the Midnight Toll reaction margin is enough. A shield, parry or immunity can't be the fix (#29).
 
-All attacks are guardable in v0.1. As the contract already establishes, a guarded failure prevents damage but still records `mechanic_failed: true`. **Final Hour is the only mechanic where guarding *is* the solution**, and the failure card must say so explicitly. Guard cooldown (180) is longer than the Final Hour interval (90), so the enrage still wipes the party within a few repetitions.
+**Decision D1. Recommendation: shorten the cone to 6.5 m and keep 80°.** It keeps v1.0's 0.65 s post-lock window exactly at Midnight Toll, and it makes the Sweep and Hollow Toll similar in reach. The alternative is to keep 8 m and lengthen the post-lock window to 88 / 63 / 57 / 54 ticks. Narrowing to 70° barely helps (4.61 m).
 
-## 3. Timeline (Standard difficulty)
+**Proposed windows per tier** (ticks; includes a small margin over the minimum):
 
-Times are ticks from the encounter's first scheduling tick. `W` = warning, `L` = lock, `R` = resolve. A row with two attacks warns them in the same provider call. Teaching order follows plan §6: show alone → repeat with variation → combine → twist → execution test.
+| Attack | First Chime | Steady Ticking | Striking Hour | Midnight Toll |
+|---|---|---|---|---|
+| Bell Sweep, tracking then after lock (6.5 m) | 18 + 78 | 18 + 51 | 18 + 45 | 18 + 39 |
+| Hollow Toll, from warning | 84 | 66 | 60 | 54 |
+| Pendulum Charge, from warning | 54 | 48 | 42 | 36 |
+| Shattered Chime, follow then after lock | 30 + 57 | 30 + 42 | 30 + 36 | 30 + 30 |
+| Recovery after each attack | 72 (1.2 s) | 54 (0.9 s) | 42 (0.7 s) | 36 (0.6 s) |
+| Recovery after The Final Toll | 150 (2.5 s) | 120 (2.0 s) | 120 | 120 |
 
-### Phase 1 — Opening: cones and donuts (0:01–0:22)
+Combined sequences can use longer windows than these (for example §4.3), but never shorter.
 
-| # | W | Attack | L | R | Teaches |
-|---|---|---|---|---|---|
-| 1 | 60 | Bell Sweep | 60 | 150 | Read a wedge, step sideways |
-| 2 | 270 | Hollow Toll | 270 | 360 | The hole is safe; melee range (155) fits inside it |
-| 3 | 480 | Bell Sweep | 480 | 570 | Repeat |
-| 4 | 690 | Hollow Toll | 690 | 780 | Repeat |
-| 5 | 900 | Tracking Sweep | 945 | 1020 | Variation: it follows you until the lock cue, then commits |
-| 6 | 1110 / 1170 | Hollow Toll, then Bell Sweep | 1110 / 1170 | 1200 / 1260 | Combine: shelter in the hole, then leave the wedge |
+### 5.3 Stamina budget
 
-### Phase 2 — Assignment: spreads, then a stack (0:23–0:44)
+The design proposal is 100 stamina, 30 per dodge, regenerating at 20/s after 0.75 s without spending. Regaining one dodge's worth therefore takes 2.25 s.
 
-| # | W | Attack | L | R | Teaches |
-|---|---|---|---|---|---|
-| 7 | 1380 | Tolling Mark (solo: Lingering Mark) | per §2 | 1530 (solo 1540) | Personal responsibility |
-| 8 | 1620 | Hollow Toll | 1620 | 1710 | Regroup through a known shape |
-| 9 | 1800 | Gathering Peal (solo: Sanctuary Peal) | per §2 | 2010 | Regroup |
-| 10 | 2100 / 2190 | Tolling Mark, then Bell Sweep | per §2 / 2190 | 2250 / 2280 | Spread without spreading into the wedge |
-| 11 | 2400 | Gathering Peal (solo: Sanctuary Peal) | per §2 | 2610 | Regroup under pressure |
+**Rule: in any authored sequence, a worst-case player may need at most one dodge per 2.25 s.** They may also need at most three dodges in a row, provided the preceding 5 s required none. Sprinting and jumping are never required.
 
-### Phase 3 — Echo introduction (0:45–0:59)
+The validator checks this with the stamina model, starting each block from the worst-case stamina left by the previous one. §4.3's Final Toll needs one dodge (for the Sweep), so Final Toll → Pursuit → Final Toll stays within budget.
 
-| # | W | Attack | L | R | Teaches |
-|---|---|---|---|---|---|
-| 12 | 2700 | Bell Sweep, **recorded** | 2700 | 2790 | The bell remembers this one |
-| 13 | 2910 | Hollow Toll | 2910 | 3000 | Gap |
-| 14 | 3120 | **Remembered Sweep** (Echo of #12) | 3120 | 3240 | It comes back exactly where it was |
-| 15 | 3360 | Tracking Sweep, **recorded** | 3405 | 3480 | Where it locked is what's remembered |
+An earlier draft that gave every step its shortest window needed three dodges (Toll, Chime and Sweep, 90 stamina) and was **not** repeatable. That's why the Final Toll's Toll and Chime use walk-solvable windows.
 
-### Phase 4 — Combination (1:00–1:24)
+### 5.4 Collision, pinning, knockback and hit-stun
 
-| # | W | Attack | L | R | Teaches |
-|---|---|---|---|---|---|
-| 16 | 3600 | Remembered Sweep (Echo of #15) + Tolling Mark | 3600 / per §2 | 3780 | Plan routes around a remembered shape |
-| 17 | 3900 | Hollow Toll | 3900 | 3990 | Gap |
-| 18 | 4110 | Bell Sweep, **recorded** | 4110 | 4200 | |
-| 19 | 4380 / 4440 | Gathering Peal + Remembered Sweep (Echo of #18) | per §2 / 4440 | 4590 / 4590 | Stack outside the Echo |
-| 20 | 4800 / 4890 | Tolling Mark, then Hollow Toll | per §2 / 4890 | 4950 / 5010 | Spread, then commit to hole or outside |
+- **Boss body collision is real.** Its consequences:
+  - The Toll's inner safe pocket is a thin band, 1.7–2.3 m from the boss centre (body plus player radius, up to the expanded inner edge). The escape check accounts for this.
+  - The Charge's lane end is clamped to 9.5 m and players to 11.5 m, so a player can always stand between the boss and the wall (2.0 m gap, 1.7 m needed).
+- **Knockback** (proposal): 1.5 m away from the hazard's origin. That means sideways out of a lane, radially away from the boss for a cone or ring, and away from a Chime's centre. Knockback stops at the arena wall and the boss body, and deals no wall damage.
+- **Hit-stun** (proposal): 15 ticks (0.25 s) on any Bellkeeper hit.
+- **Anti-chain rule.** For any two hazards that can hit the same player, the later one's resolve must come at least `stun + escape` after the earlier one's. The escape is measured from every knocked-back position, using a dodge if the stamina rule allows one.
+  - In §4.3, the last Chime marker (264) can stun a player who then faces the already locked Sweep (309). That leaves 30 ticks after stun, against a 20-tick dodge escape: it passes with a dodge.
+  - The validator must check every such pair at every tier.
+- **One hit per attack instance.** A single hazard instance damages a player at most once (request R16). That replaces blanket post-hit immunity. Distinct instances, such as two different Chime markers, can each hit.
 
-### Phase 5 — Final sequence (1:30 until defeat or enrage)
+## 6. Party size (1–8)
 
-A repeating cycle with **150-tick spacing between warnings** instead of ~210. Each attack keeps its own warning window from §2. Only the gaps shrink, never the reaction windows. The cycle starts at tick 5400:
+**Tier** comes from the roster size at encounter start: **A** for 1–4, **B** for 5–8. It doesn't change mid-fight. Per-attack counts use the **standing, active** players at each warning (R7, R18). Party size is independent of difficulty: all four difficulty tiers apply at every count.
 
-`Bell Sweep → Hollow Toll → Tolling Mark + Remembered Sweep → Gathering Peal → Tracking Sweep (recorded) → Hollow Toll →` repeat. The first Remembered Sweep in each cycle echoes the last recorded sweep from the previous cycle (Phase 4 #18 for the first cycle).
+| Count | Tier | Bell Sweep | Pendulum Charge | Shattered Chime |
+|---|---|---|---|---|
+| 1 | A | 1 cone at the player | 1 lane at the player | 3 sequential markers on the player |
+| 2–4 | A | 1 cone at one seeded target, clearly marked before lock | 1 lane; targets rotate (below) | Every standing player gets 2 sequential markers |
+| 5–8 | B | **2 cones**, at targets from different subgroups; the second resolves 18 ticks after the first | 1 lane (one boss body); targets rotate | `ceil(n/2)` marked players with 2 markers each, alternating subgroups between volleys |
 
-### Enrage — Final Hour (4:00)
+Hollow Toll and The Final Toll's structure are the same at every count.
 
-At tick 14400, all pending warnings are cancelled (no Echo carries over), and Final Hour warns every 90 ticks until the party is defeated. Target kill time is about 3:00, leaving roughly a minute of Phase 5 slack. Boss HP is tuned by the foundation lane against this target.
+**Rules:**
+- **Subgroups (tier B).** Standing players sorted by stable player ID: even indexes are group 1, odd indexes are group 2. Odd counts put the extra player in group 1. Groups only spread targets apart; they don't change any requirement.
+- **Rotating charge target.** Round-robin through standing players by ID, starting from a seeded offset. Everyone gets charged in turn, which is v1.0's "predictable distributed target selection".
+- **Marked before lock.** Every targeted player is identifiable before lock (v1.0 §7.1). The HUD tag uses a shape, not colour alone.
+- **Floor capacity.** At 8 players, at most 8 markers are live at once: 72.6 m² of expanded marker area in a 415 m² arena. Overlapping markers each hit; spacing pressure is intended.
+- **Two cones in tier B** were not sampled together. The validator checks their union for every seed. If a seed fails, the stagger is widened, never the warning shortened.
+- **Duplicate classes.** No assignment depends on class, now or later. All-Vanguard, all-Arcanist and any mix must be able to clear. No mandatory healer.
+- **Revival is the only mandatory co-op interaction**, and it's never required to clear a mechanic.
 
-## 4. Baseline-speed escape checks
+v0.1's spread (Tolling Mark) and stack (Gathering Peal / Sanctuary Peal) mechanics are **not** part of the Bellkeeper baseline. They're listed as optional material in §9.
 
-Each attack must leave a reachable safe position for a player moving at baseline speed from **any** playable position:
-
-```
-reaction + ceil((d_max + margin) / v)  ≤  window
-```
-
-- `reaction = 30` ticks (0.5 s), provisional.
-- `margin = 2` units. Boundaries are dangerous, so the player must end strictly outside.
-- `v = 4.1667` units/tick.
-- `window` = resolve − lock for tracking and snapshot anchors (the final footprint is only known at lock), and resolve − warning for fixed anchors.
-
-The cone and donut `d_max` values come from sampling every playable centre (2–6 unit grid, 72 cone directions) against the legacy arena. They account for arena clipping, which is why the cone's worst case (into the top-left corner) is larger than the open-floor value.
-
-| Attack | `d_max` (units) | Travel (ticks) | Needed | Window | Margin |
-|---|---|---|---|---|---|
-| Bell Sweep (fixed) | 153.1, cone aimed at −130° | 38 | 68 | 90 | 22 |
-| Tracking Sweep | 153.1 | 38 | 68 | 75 (L → R) | 7 |
-| Hollow Toll | 131.2, below the boss at (470, 646) | 32 | 62 | 90 | 28 |
-| Lingering Mark (solo) | 110 (circle radius) | 27 | 57 | 70 (L → R) | 13 |
-| Tolling Mark, 8 players starting stacked in a corner | 317 (3 × 3 grid, 112 spacing) | 77 | 107 | 150 | 43 |
-| Gathering Peal, two players at opposite corners meeting | 398.5 (half the 977 diagonal, minus radius 90) | 97 | 127 | 210 | 83 |
-| Sanctuary Peal | 582.4 (672.4 to the farthest corner, minus radius 90) | 141 | 171 | 210 | 39 |
-| Remembered Sweep | 153.1 | 38 | 68 | 120 / 180 | 52 / 112 |
-
-**Sequential checks.** When two resolves are close, the second attack's escape starts from the first attack's safe region, not from anywhere in the arena. Rows 6, 10, 19 and 20 were checked this way:
-
-- **Row 6:** inside the donut hole, the cone's lateral escape is at most 93 units, which takes 23 ticks. That fits the 60-tick gap between resolves.
-- **Row 10:** the Bell Sweep resolves only 30 ticks after the spread, which is less than the 38 ticks a worst-case cone escape needs. So this is a *combined* check: players must choose spread positions outside the cone, which is warned 60 ticks before the spread resolves. Plenty of space qualifies, but the validator must confirm a valid spread placement outside the cone exists for every seed and count.
-- **Row 19:** the stack target can lead the group anywhere outside the Echo, which is fixed and previewed since tick 4200.
-- **Row 20:** from any spread position, reaching Hollow Toll safety takes at most 32 ticks. That fits the 60-tick gap, and the toll was warned 120 ticks earlier.
-
-The validator (§7) must repeat these checks for every scheduled pair, at every count.
-
-Tier B's double Bell Sweep (two cones at once) isn't in this table. The union of two cones depends on the two seeded directions, so it's left to the validator's combined check. If that check fails for some seeds, widen the jitter separation or lengthen the window.
-
-**Limits.** These are worst-case straight-line checks at baseline speed on the legacy arena. They assume no other hazard blocks the path, which is exactly what the sequential and combined checks in the validator must cover. They don't prove a solution exists for every combination of eight players' simultaneous constraints. §7 says what the validator does instead.
-
-## 5. Echo rules
-
-- **One retained attack.** Only Bell Sweep and Tracking Sweep instances flagged **recorded** are retained. A new recording replaces the previous one. The retained value is the *locked* world geometry (origin, direction, radius, half-angle) at its resolve tick, plus its attack ID.
-- **One active Echo.** Never schedule a Remembered Sweep while another is warning. The validator rejects this.
-- **Preview.** From the recorded sweep's resolve until its Echo resolves, the floor shows a **memory mark**: the same outline as a dotted, unfilled trace with the bell-memory glyph, at reduced contrast. It deals no damage. Per the art guide (§8.3, §11.2), it must never be mistakable for a live warning: no fill, no pulse, a different line style. Section 8 lists the contract request for presentation-only markers.
-- **Return.** The Echo warns with the full danger treatment on the exact retained geometry. Its resolved events carry `source_attack_id` = the recorded attack's ID, so the failure card can say "Echo of Bell Sweep (0:46)".
-- **Reset.** The retained attack and memory mark are encounter state. Reset and phase restore must clear or restore them together with RNG.
-- **Knockouts don't cancel an Echo.** It's world geometry with no target.
-
-## 6. Party-size policy (counts 1–8)
-
-**Tier** is fixed at attempt start from the roster size (tier A: 1–4, tier B: 5–8), so the visual vocabulary never changes mid-fight. **Per-mechanic counts** are derived from *living, active* players at each warning tick, clamped to the table below.
-
-| Count | Tier | Bell Sweep cones | Tolling Mark | Mark radius | Gathering Peal | Stack radius | Stack `min_players` | Subgroups |
-|---|---|---|---|---|---|---|---|---|
-| 1 | A | 1 | Lingering Mark on self | 110 | Sanctuary Peal shelter | 90 | 1 (shelter) | — |
-| 2 | A | 1 | 2 marked (all) | 110 | 1 stack | 90 | 2 | — |
-| 3 | A | 1 | 3 marked (all) | 110 | 1 stack | 90 | 3 | — |
-| 4 | A | 1 | 4 marked (all) | 110 | 1 stack | 90 | 4 | — |
-| 5 | B | 2 | 3 marked | 100 | 2 stacks | 100 | 2 | 3 / 2 |
-| 6 | B | 2 | 3 marked | 100 | 2 stacks | 100 | 3 | 3 / 3 |
-| 7 | B | 2 | 4 marked | 100 | 2 stacks | 100 | 3 | 4 / 3 |
-| 8 | B | 2 | 4 marked | 100 | 2 stacks | 100 | 4 | 4 / 4 |
-
-Rules behind the table:
-
-- **Tier B spreads** mark `ceil(n / 2)` players. Unmarked players must stay out of every mark, so the spread still involves the whole party.
-- **Tier B Bell Sweep** fires two cones in the same tick, aimed at two different seeded targets, one from each subgroup when possible. Hollow Toll and Echo are the same at every count.
-- **Odd counts.** Spreads round up. Stacks use `min_players = floor(n / 2)`, so the larger subgroup has one spare player who can join either stack.
-- **Subgroups (tier B).** Living roster sorted by stable player ID; index 0, 2, 4… → group 1, index 1, 3, 5… → group 2. Groups only choose stack and sweep targets so the two stacks start apart. Stack success is occupancy-based: any player counts toward any stack. The HUD should show group membership (shape tag, not colour alone).
-- **Duplicate classes.** No assignment depends on class in v0.1, and none may in future. Any party of duplicate Vanguards (or Arcanists) must be able to clear. A class-specific mechanic would need an alternative solution for parties without that class.
-- **Targeting.** Every seeded choice uses the independent encounter RNG stream (§8, R6), never combat RNG, and only ever picks living, active players.
-
-### Knockout and disconnect during a mechanic
-
-The session lane decides when a player becomes **inactive** (disconnected, or idle pending removal at the next encounter boundary, per plan §9). For targeting, the encounter treats inactive the same as knocked out.
+## 7. Down, revive and disconnect
 
 | Situation | Policy | Event |
 |---|---|---|
-| Tolling Mark target unavailable **before lock** | Reassign to a seeded living, unmarked player if `R − tick ≥ 107` (the spread escape need), else cancel that mark | `assignment_changed` with old/new player, or `cancelled: true`, reason |
-| Gathering Peal target unavailable before lock | Reassign within the same subgroup, else the other subgroup, if `R − tick ≥ 127`, else cancel that stack. A cancelled stack removes its requirement, so nobody fails for missing it | as above |
-| Tracking Sweep target unavailable before lock | Retarget the direction to a seeded living player. If none remain, lock the current direction (the cone stays valid world geometry) | as above |
-| Any target unavailable **after lock** | The hazard is world geometry and resolves normally | — |
-| Stack under-filled because of a knockout after lock | At resolve, `min_players = min(locked_min, floor(living / 2))` in tier B, `min(locked_min, living)` in tier A. The event records both values | `requirement` block in the resolved event |
-| Sanctuary Peal, Lingering Mark | Solo only; a solo knockout ends the attempt | — |
+| Sweep target downed or inactive **before lock** | Retarget to a seeded standing player. If none is left the run has already failed | `assignment_changed` (old, new, reason) |
+| Charge target | Chosen at warning from standing players; the lane locks at warning, so there's nothing to reassign | — |
+| Chime owner downed or inactive **before lock** | Cancel that marker. A following marker doesn't jump to another player | `assignment_changed` with `cancelled: true` |
+| Any hazard **after lock** | World geometry; resolves normally. It can hit revivers standing in it | — |
+| Downed player | Not targetable and not hit by resolving hazards. Holds no assignments | — |
+| Disconnect | The session layer marks the player inactive (R7); the encounter treats them as downed for targeting. Removal timing belongs to #7 | — |
 
-The legacy core currently **cancels** unlocked hazards whose target is unavailable. Reassignment needs provider-selected reassignment (§8, R4). Until that exists, these rows fall back to cancellation, and the test matrix records which behaviour ran.
+**Revive is a risk choice.** The proposed channel is 3 s + 2 s per previous down. That's longer than any recovery window, so a reviver has to choose a spot that stays safe through the next attack.
 
-## 7. Validator and timeline preview requirements
+**Decision D4:** should the encounter add a fixed extra recovery (proposal: +1.5 s at the end of a Phase 2 block) while any player is downed? It helps revives without changing the attack order, but it makes the fight easier for struggling groups. Recommendation: yes for First Chime and Steady Ticking, no for higher tiers.
 
-Production tools belong to the Unity implementation step of #8, after the C# contract (U3/A4) is reviewed. The validator checks authored Bellkeeper data, **for every party count 1–8 and a fixed seed set**, against these rules:
+**Practice vs fresh run:**
+- **Practice** starts the Bellkeeper directly: full health, the full stamina and cooldown reset, phase 1, and the encounter seed from the practice seed. It never unlocks run progress.
+- **Fresh run** resets everything at encounter 1. The Bellkeeper's encounter seed is derived from the run seed and the encounter index, so a run is reproducible end to end.
 
-1. **Timing.** `W ≤ L < R` per the contract, warnings on scheduling ticks, unique attack IDs, and no two Remembered Sweeps active at once. Every Echo needs a recorded sweep before it, with no intervening recording.
-2. **Escape.** Every attack meets §4 at baseline speed, using the cone/donut sampling method above.
-3. **Combined and sequential reachability.** For hazards that overlap in warning time, or that resolve within 120 ticks of each other, sample positions on a grid. Then confirm that for the worst start position there is a sequence of safe positions reachable within each window. For spreads and stacks, confirm a valid placement exists with the required pairwise separation, outside every simultaneous avoid shape.
-4. **Assignments.** Counts per §6, only living or active targets, subgroups non-empty, and every `min_players` satisfiable by the living count.
-5. **Reset.** Running the same seed twice produces identical schedules and assignments, including after a mid-fight reset.
+## 8. Damage, health and boss HP
 
-**Stated limits.** The validator samples a grid and uses straight-line travel. It is evidence for these authored patterns, not a general proof of solvability. It doesn't model player collisions, human reaction variance or network latency.
+v1.0 proposes 50 / 45 / 50 / 25 % of max HP, and about 80 % for The Final Toll's last strike. The Unity test uses those values plus five +40 HP potions.
 
-**Timeline preview.** A scrubbable view of the schedule per party count and seed, with mechanic toggles, overlaying exact geometry, lock moments and memory marks. Tool format and serialization are agreed with the foundation owner (#6).
+The current plan carries health across the whole run, with **no healing and no automatic intermission heal** (single-arena plan §6). At those percentages a player arrives at the final boss after three minibosses, and two Bellkeeper hits end the run.
 
-## 8. Requests to the shared C# contract (#6)
+**Decision D2. Proposal for Steady Ticking** (per hit, 100 HP):
 
-These were accepted in principle in #6 and are not yet implemented. The spec depends on them. Each item says what the encounter needs; the foundation owner decides how.
+| Attack | Damage |
+|---|---|
+| Bell Sweep | 30 |
+| Hollow Toll | 25 |
+| Pendulum Charge | 30 |
+| Shattered Chime, per marker | 15 |
+| Bell Sweep at the end of The Final Toll | 45 |
 
-| # | Need | Why |
+Scale ×0.7 on First Chime, ×1.0 on Striking Hour (difficulty there comes from mechanics) and ×1.2 on Midnight Toll.
+
+Alternatives:
+- keep v1.0's values and add a full refill at the intermission (a run-policy change)
+- keep v1.0's values and accept a very lethal finale
+
+The Unity test's potions are an unapproved healing system, since healing is deferred in #29 (D3).
+
+**Boss HP** sets fight length (target 3–4 min at Steady Ticking) and is the foundation's to tune. Proposal: `base × (1 + 0.6 × (n − 1))` for n players, applying to HP only and never to mechanics.
+
+## 9. Content classification and reuse
+
+| Encounter | Teaches (single-arena plan §3) | Feeds the Bellkeeper's |
 |---|---|---|
-| R1 | A **circle** shape kind (centre, radius) in shared geometry | Tolling Mark, Gathering Peal, Sanctuary Peal and Final Hour |
-| R2 | A per-hazard **requirement** (`avoid` · `spread` · `stack` · `shelter` · `guard`, with `min_players`), evaluated by the shared core | Group mechanics without private hit testing in encounter code |
-| R3 | Allow `lock_tick == resolve_tick` for `follow_until_lock` (or an equivalent `follow_until_resolve`) | Spreads and stacks should centre on the player at resolve. The `R − 1` workaround leaves up to 4.2 units of lag |
-| R4 | **Provider-selected reassignment.** On an unavailable target, the core asks the provider for a replacement or cancel before cancelling by default | §6 knockout and disconnect policy |
-| R5 | **Presentation-only markers** (memory marks) issued by the provider, never resolved, and cleared on reset or by ID | Echo preview without a fake hazard |
-| R6 | An independent, seeded **encounter RNG** stream, included in reset and checkpoint state | Targeting can't drift when combat actions change |
-| R7 | A session-provided **active** flag on roster entries | Disconnect handling without removing actors mid-fight |
-| R8 | Resolved-event additions, listed in §9 | Truthful failure card |
-| R9 | An `immunity_source` on `immune` outcomes (`hit_recovery` or an upgrade ID) | Overflow Bulwark ([upgrades](prototype-upgrades.md) §4) makes "immune" ambiguous otherwise |
+| Dial Warden | Hand Sweep (locked cone), Hollow Dial (ring) | Bell Sweep, Hollow Toll |
+| Pendulum Sentinel | Pendulum Charge (lane), Low Pendulum (jump-clearable bar) | Pendulum Charge; also sets the "only marked attacks can be jumped" rule |
+| Chimebound Oracle | Shattered Chime, Dividing Chime (cone after markers) | Shattered Chime, Block B (Discord) |
+| The Bellkeeper | Combines all four; Midnight Toll adds Memory of Midnight | — |
 
-## 9. Failure-card event requirements
+The minibosses should use the same shape families and the same escape-check method, with their own shorter windows checked by the script.
 
-The failure card must be built from **resolved historical state**, not current positions. Each `mechanic_resolved` event (or the group-resolution record it references) needs:
+**Material retired from v0.1, kept as optional ideas:**
+- **Tolling Mark (spread) and Gathering/Sanctuary Peal (stack/shelter):** candidates for the Chimebound Oracle or Striking Hour co-op assignments, not baseline. They would need the R2 requirement kinds.
+- **Tracking Sweep:** merged into Bell Sweep's 0.30 s tracking.
+- **Remembered Sweep (Echo):** becomes Memory of Midnight (§10.4).
+- **Final Hour (guard enrage):** removed, because there is no Guard. The slice has no enrage.
+- **Six upgrades:** deferred reference ([prototype-upgrades.md](prototype-upgrades.md)).
 
-- **Identity:** `schema_version`, `generation`, `event_id`, `player_id`. The shared core already has these.
-- **Attack:** `attack_id`, `attack_name`, plus the encounter's `pattern_id` (for example `tolling_mark`) and phase number.
-- **Time:** the authoritative `tick` and the elapsed fight time in seconds, so the card can say "0:23".
-- **Geometry as resolved:** shape kind, locked origin, direction, radii, angle, anchor mode, `lock_tick`, and `target_player_id` (the existing provenance fields, extended to circles).
-- **Requirement evaluation:**
-  - `kind`
-  - `min_players`, plus `locked_min` when the knockout cap applied
-  - `count_inside`
-  - the player IDs inside
-  - for spreads, the ID of the mark the player stood in
-  - a short reason code: `inside_avoid`, `in_other_mark`, `stack_underfilled`, `outside_stack`, `outside_shelter`, `not_guarding`
-- **Relevant positions:** the affected player's centre at resolve. For group requirements, the centres of every living player at resolve, so the card can draw the small arena diagram (plan §8). The legacy log keeps the latest 128 events; with eight players, positions should sit in one group-resolution record per hazard rather than repeating in every per-player event.
-- **Outcome:** `outcome` (avoided · guarded · immune · hit) and `mechanic_failed`, kept separate. Guarded and immune must never read as avoided.
-- **Echo provenance:** `source_attack_id` and the source's resolve tick.
-- **Assignment history:** any `assignment_changed` events for this hazard, linked by `attack_id`.
+## 10. Difficulty tiers
 
-Example failure card text the data must support: *"Gathering Peal (1:16): stack needed 3 players, yours had 2. You were guarding, so no damage was taken, but the mechanic failed."*
+Mechanics change, not just HP. Names are proposals for lore review.
 
-## 10. Visual notes for implementers
+| Tier | Bellkeeper changes |
+|---|---|
+| **1 — First Chime** | Walk-only windows (§5.2), longer recoveries. Phase 2 blocks get a 1.5 s pause between attacks. The Final Toll uses walk-only windows for every step. Solo Chime: 2 markers instead of 3 |
+| **2 — Steady Ticking** | The baseline described in §3–§8 |
+| **3 — Striking Hour** | Shorter windows and recoveries. Block B's Sweep warns while the second marker is still tracking (Chime and Sweep overlap). Tier B Chime owners are staggered by subgroup. Phase 3 drops the Pursuit block between Final Tolls (stamina rule still applies, §5.3) |
+| **4 — Midnight Toll** | Shortest windows (§5.2), plus **Memory of Midnight** |
 
-Follow the [art-direction guide](https://github.com/Risxhb/collab/blob/docs/2-5d-isometric-direction/reference/LAST-BELL-CLOCKWORK-FANTASY-ART-DIRECTION.md). It's adopted in #13, not yet on main.
+**Memory of Midnight** (the Echo, scoped to the top tier):
+- **Recording.** In each Phase 2 Block B, the Bell Sweep is **recorded**: its locked absolute footprint (position and facing) is stored. Only one is retained; a new recording replaces the old one.
+- **Memory mark.** From the recorded Sweep's resolve until its return, the floor shows a dotted, unfilled outline with a bell-memory glyph at low contrast. It deals no damage and must be distinguishable in grayscale (R5).
+- **Return.** In the next Block A, the remembered cone returns at its recorded footprint, warning together with the Hollow Toll and resolving 30 ticks after it. It has a 90-tick warning: the minimum after lock is 39–57 ticks, and its position has been previewed since recording. In Phase 3 it returns during The Final Toll's Chime step instead.
+- **Limits.** At most one Echo at a time, and it counts toward the two-pattern limit.
+- **Provenance.** Its events carry `source_attack_id` and the recorded tick.
 
-- **Bell Sweep and Tracking Sweep (§10.5, §12.1):** radial harmonic lines with a strong outer boundary. While tracking, show TRACKING with a moving edge; at lock, a hard "click" cue and a solid edge. The boss turns its resonator to the locked direction.
-- **Hollow Toll (§10.5):** a filled annulus with two solid boundaries and a visibly empty hole.
-- **Tolling Mark:** a bell-rim circle carrying the owner's shape tag. It must differ from friendly circles by line style and fill, not colour alone (§11.5).
-- **Gathering Peal and Sanctuary Peal:** a filled circle with an inward-pointing chevron ring and a count readout (`2/3`). Sanctuary Peal uses the same treatment, so solo and team read the same.
-- **Memory mark:** a dotted, unfilled outline with the bell-memory glyph at low contrast. It must stay distinguishable from live warnings in grayscale.
-- **Final Hour:** an arena-wide ring with a large guard icon. It's the only warning that says GUARD.
-- **Eight players (§9.5, §12.4):** reduce per-player mark decoration and keep every mark's boundary crisp. This is covered in the test matrix's density checks.
+## 11. Requests to the shared C# contract (#6)
+
+These update v0.1's R1–R9 and the R10–R15 from the [#8 comparison](https://github.com/Risxhb/collab/issues/8#issuecomment-6301563765). The foundation owner decides how to implement them.
+
+| # | Need | Status |
+|---|---|---|
+| R1 | Circle shape (centre, radius) in shared geometry | **Needed** (Shattered Chime) |
+| R2 | Per-hazard requirement evaluation | **Reduced:** the Bellkeeper only needs `avoid`. `spread`, `stack` and `shelter` only if the §9 optional mechanics are adopted. `guard` withdrawn |
+| R3 | `lock_tick == resolve_tick` for follow anchors | **Withdrawn**: Chime locks before resolve |
+| R4 | Provider-selected reassignment or cancellation before lock | **Needed** (§7) |
+| R5 | Presentation-only markers issued by the provider, never resolved | **Needed** (Memory of Midnight mark) |
+| R6 | Independent seeded encounter RNG in reset and checkpoint state | **Needed** |
+| R7 | Session-provided active/inactive flag | **Needed** |
+| R8 | Resolved-event fields | **Revised** (§12) |
+| R9 | `immunity_source` | **Withdrawn**: no immunity |
+| R10 | Lane/rectangle shape (origin, direction, length, half-width) | **Needed** (Charge; Sentinel bar with R19) |
+| R11 | Mutable boss position; boss-anchored hazards take the position at warning; included in reset and checkpoints | **Needed** |
+| R12 | HP-phase thresholds with queued transitions and a phase event; boss HP fraction in the provider context | **Needed** |
+| R13 | Per-hazard damage in HP (100-HP model, not 5 pips) | **Needed** |
+| R14 | Boss vulnerability/recovery state event | **Needed** |
+| R15 | `counterable` flag and `countered` outcome | **Withdrawn**: no counters |
+| R16 | One hit per attack instance per player, replacing blanket post-hit immunity | **New** |
+| R17 | Hit-stun and knockback on resolve (duration, direction rule, distance, stopping at walls and the boss body), recorded in the event | **New** |
+| R18 | Standing/downed/inactive state in the provider context; downed players hold no assignments and aren't hit | **New** |
+| R19 | Per-hazard height eligibility (`jump_clearable`, clearance height); default not clearable | **New** (Sentinel; Bellkeeper uses the default) |
+| R20 | Boss body collision as shared state (radius, push-out), including during charge travel | **New** |
+| R21 | Movement and stamina constants (walk, sprint, dodge distance and profile, stamina costs and regen, player radius, arena bounds) published as shared data | **New**, so the validator and the game use the same numbers |
+
+## 12. Resolved records and failure feedback
+
+Each resolved hazard record, or the group record it references, needs:
+
+- **Identity:** `schema_version`, `generation`, `event_id`, `player_id`, plus `encounter_id` (`bellkeeper`), `phase`, `difficulty`, `seed`.
+- **Attack:**
+  - `attack_id`
+  - `attack_instance_id` (used for R16 de-duplication)
+  - `attack_name`
+  - `pattern_id` or `block_id` (for example `P2_B_DISCORD`)
+  - the chosen variation
+- **Time:** the authoritative resolve tick and elapsed fight time.
+- **Geometry as resolved:**
+  - shape and locked origin
+  - facing or lane direction
+  - radii, length and width
+  - warning tick and lock tick
+  - target or owner player ID
+  - the boss position at warning
+- **Positions:** the affected player's centre at resolve, their jump and dodge state, and for co-op every standing player's centre, so the failure card can draw the arena diagram.
+- **Outcome:** `avoided` or `hit` only (no `guarded` or `immune`); `damage`; `hit_stun_ticks`; the knockback vector; `downed` if it caused a down.
+- **Assignment history:** linked `assignment_changed` events.
+- **Echo provenance:** `source_attack_id` and recorded tick, for Memory of Midnight.
+
+Recording dodge state matters even without iframes. It lets the card say "you dodged, but into the cone".
+
+Example card the data must support:
+
+> *"Bell Sweep (2:41, Phase 3, The Final Toll). The cone locked facing the north-east wall at 2:40.6. You were 1.2 m inside its left edge when it resolved. Dodge sideways past the edge after the facing locks."*
+
+## 13. Human decisions needed
+
+| # | Decision | Recommendation |
+|---|---|---|
+| D1 | Bell Sweep: 6.5 m at v1.0 timing, or 8 m with longer windows | 6.5 m (§5.2) |
+| D2 | Damage values with carry-over health and no healing | Lower values (§8) |
+| D3 | The Unity test's 0.75 s post-hit immunity and potions conflict with the design (no iframes, healing deferred) | Replace with per-instance dedup (R16); remove potions or label them as test-only. That's #27/#6's code, not this lane's |
+| D4 | Extra recovery while a player is downed | Yes on tiers 1–2 (§7) |
+| D5 | Where Memory of Midnight returns (§10) | As written |
+| D6 | Boss HP scaling with party size | `base × (1 + 0.6 × (n − 1))` (§8) |
+
+## 14. Visual notes
+
+Follow the [art-direction guide](https://github.com/Risxhb/collab/blob/docs/2-5d-isometric-direction/reference/LAST-BELL-CLOCKWORK-FANTASY-ART-DIRECTION.md) and the [spell-effects guidelines](https://github.com/Risxhb/collab/pull/34). Telegraphs are drawn from simulation shapes and triggered by simulation events.
+
+- **Bell Sweep:** radial harmonic lines with a strong edge. A tracking cue during the 0.30 s turn, then a hard lock cue; the boss's resonator faces the locked direction.
+- **Hollow Toll:** two solid boundaries and an empty hole. The thin inner pocket (§5.4) needs its own readability check at the gameplay camera.
+- **Pendulum Charge:** a lane with a direction chevron and a landing marker at the far end, so players can read where the next Toll will be.
+- **Shattered Chime:** a patterned circle carrying the owner's shape tag. A follow cue, a lock cue and a countdown ring.
+- **Memory mark:** dotted, unfilled, low contrast, with the memory glyph. Never mistakable for a live warning.
+- **Eight players:** shape tags on markers and cones, others' effects reduced (PR #34's focus rule), and every boundary crisp.

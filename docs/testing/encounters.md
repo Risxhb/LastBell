@@ -1,138 +1,145 @@
 # Encounter test matrix — Bellkeeper
 
-Draft v0.1 · October 20, 2026 · Owner: `chzy18/claude` ([#8](https://github.com/Risxhb/collab/issues/8))
+Draft v0.2 · October 21, 2026 · Owner: `chzy18/claude` ([#8](https://github.com/Risxhb/collab/issues/8))
 
-This matrix covers the [Bellkeeper specification](../design/bellkeeper.md) and [prototype upgrades](../design/prototype-upgrades.md). It's written before any Unity code exists. Each row says what to check, how, and what counts as a pass. Rows become C# tests or manual checklists once the shared contract (#6, U3/A4) and the encounter implementation exist. **Nothing in this matrix has been run.**
+This matrix covers the [Bellkeeper specification](../design/bellkeeper.md) v0.2. It replaces v0.1's Guard, immunity and upgrade rows, which the current design (#29, PR #33) made obsolete. Rows become C# tests or manual checklists once the shared contract (#6 U3) and the encounter implementation exist. **Nothing in this matrix has been run**, except the single-attack escape sampling in §3 (row T2).
 
-Every row is one of two kinds, kept separate as #8 requires:
+Two kinds of row, kept separate:
 
 - **Scripted (S):** an automated C# check with a fixed seed. Evidence is a test result in the PR.
-- **Human (H):** a person at the gameplay camera, a physical controller where noted, and the shipping visuals. Evidence is the tester's notes plus screenshots or a short capture. Scripted results never substitute for human rows.
+- **Human (H):** people at the gameplay camera, on shipping-like visuals, with a physical controller where noted. Evidence is tester notes plus captures. A scripted result never substitutes for a human row.
 
-Old Godot fixtures validate only the legacy reference. They're not evidence for Unity.
+Browser and Godot prototypes validate only themselves, not Unity.
 
-**Standard seed set:** seeds 1, 2, 3, 17, 404, 9001 at every party count 1–8, unless a row says otherwise.
+**Standard seed set:** 1, 2, 3, 17, 404, 9001, at every party count 1–8 **and** every difficulty tier, unless a row says otherwise. Counts and tiers are independent axes: run the full grid.
 
-## 1. Geometry edges
-
-| ID | Kind | Check | Pass |
-|---|---|---|---|
-| G1 | S | Actor centre exactly on each boundary: cone edge ray, cone arc, donut inner circle, donut outer circle, circle edge | Counted as inside for every shape (boundaries are dangerous) |
-| G2 | S | Centre 0.5 units outside each boundary above | Counted as outside |
-| G3 | S | Cone near-angle cases: ±1 microradian around the half-angle, and directions crossing ±π | Matches the shared tolerance; no wrap-around error |
-| G4 | S | Donut hole: centre at the boss and 154.5 units from it | Safe |
-| G5 | S | Hazard footprint reaching past the arena edge | Collision is unaffected; arena clamping only limits actor positions |
-| G6 | S | Floor mesh vs collision: sample 1,000 points per shape; compare the generated warning mesh's containment with the shared geometry | Disagreement only within the documented tessellation tolerance, and only at curved boundaries |
-| G7 | H | At the gameplay camera, stand on the visible edge of each warning and wait for resolve | Testers predict hit or safe correctly at least 9 times out of 10; record misreads |
-
-## 2. Tracking and lock cues
+## 1. Geometry and units
 
 | ID | Kind | Check | Pass |
 |---|---|---|---|
-| L1 | S | Tracking Sweep follows the target's post-movement position on each tick through `lock_tick`, inclusive; no change after | Direction is frozen from `lock_tick` onwards; collision uses the frozen value |
-| L2 | S | Lingering Mark (snapshot) samples once at lock | Origin equals the player centre on `lock_tick` |
-| L3 | S | Spreads and stacks with lock = resolve − 1 (until R3 lands) | Lag is at most 4.17 units; documented |
-| L4 | S | Fixed attacks keep their locked geometry from warning to resolve | Unchanged |
-| L5 | H | TRACKING → LOCKED transition is noticed without audio | Testers point to the moment it locked; muted and grayscale capture included |
-| L6 | H | Boss resonator faces the locked cone direction | Visual direction matches the floor cone within a glance |
+| G1 | S | Actor centre exactly on each expanded boundary: cone edges and arc, ring inner and outer, lane sides and ends, Chime circle | Counted as inside (touching counts) |
+| G2 | S | 0.05 m outside each boundary | Outside |
+| G3 | S | Cone angles near ±40° and directions crossing ±180° | No wrap-around error |
+| G4 | S | Toll inner pocket: player centre 1.7–2.3 m from the boss | Safe; boss-body push-out never moves the player into the ring |
+| G5 | S | Floor warning mesh vs shared geometry: 1,000 points per shape | Agreement within the documented tessellation tolerance |
+| G6 | S | Units: shared movement and shape constants match spec §2, or the spec has been re-run with the new values (R21) | No hard-coded copies in encounter code |
+| G7 | H | At the gameplay camera, stand on each visible edge and predict hit or safe | At least 9 of 10 predictions correct; misreads logged |
 
-## 3. Timeline and escape
-
-| ID | Kind | Check | Pass |
-|---|---|---|---|
-| T1 | S | Generate the full schedule for each count and seed | Matches spec §3 tick for tick; identical across two runs |
-| T2 | S | Escape check per attack (spec §4), using the sampling method | Every attack meets `reaction + travel ≤ window` with recorded margins |
-| T3 | S | Sequential and combined reachability for rows 6, 10, 16, 19, 20 and the Phase 5 cycle | A reachable safe sequence exists from the worst start, at every count |
-| T4 | S | Tier B double Bell Sweep across the seed set | The union of both cones leaves a reachable region; log any failing seed |
-| T5 | S | Echo rules: only one retained attack, one active Echo, every Echo preceded by a recording | Validator rejects a deliberately broken timeline (two Echoes; Echo with no recording) |
-| T6 | S | Enrage at 14400 cancels pending warnings and repeats Final Hour every 90 ticks | No Echo or assignment carries into the enrage |
-| T7 | H | A new player clears Phase 1 without explanation | Note which warnings were misunderstood |
-
-## 4. Requirements and outcomes
+## 2. Tracking, lock and the moving boss
 
 | ID | Kind | Check | Pass |
 |---|---|---|---|
-| R1 | S | Avoid: inside / outside / guarded inside / immune inside | `hit` / `avoided` / `guarded` with `mechanic_failed: true` / `immune` with `mechanic_failed: true` |
-| R2 | S | Spread: the owner alone in their own mark; another player inside; one player inside two marks | Owner succeeds; the intruder fails once, with `in_other_mark` and the mark owner's ID |
-| R3 | S | Stack: exactly `min_players`, one fewer, a player outside every stack, two stacks with uneven occupancy | Correct per-player success or failure, with the reason codes from spec §9 |
-| R4 | S | Shelter: inside and outside | `outside_shelter` on failure |
-| R5 | S | Final Hour: guarding and not guarding | Guarding succeeds; not guarding fails with `not_guarding` |
-| R6 | S | Outcome versus mechanic separation for every requirement kind | `outcome` and `mechanic_failed` are never conflated |
-| R7 | H | The failure card after each failure kind | Testers explain what resolved, where safety was, and whether guard helped, without developer help (plan §11) |
+| L1 | S | Bell Sweep tracks for 18 ticks, then facing and cone never change | Frozen from the lock tick |
+| L2 | S | Chime marker follows its owner at ≤ 6 m/s for 30 ticks, then stays | Frozen from lock; it never jumps |
+| L3 | S | Charge lane locked at warning; boss travels it and ends at its far end | Lane fixed; the end is clamped to the boss bound |
+| L4 | S | Hollow Toll after a Charge uses the landing position | The ring centre equals the boss position on its warning tick |
+| L5 | S | Seeded variation fallback: force an invalid sample | A pre-validated fallback is chosen before the tell; geometry never changes mid-warning |
+| L6 | H | Tracking-to-lock cue on the Sweep and Chime noticed with audio muted | Testers point to the lock moment |
+| L7 | H | After a Charge, testers predict where the next Toll is centred | Correct from the landing marker |
 
-## 5. Guard and immunity
-
-| ID | Kind | Check | Pass |
-|---|---|---|---|
-| D1 | S | Guard window boundaries: guard ending on the resolve tick (exclusive end) vs one tick later | Matches the contract's exclusive end-tick rule |
-| D2 | S | Two hazards resolving on the same tick, unguarded | One pip lost; the second is `immune` with `immunity_source: hit_recovery` |
-| D3 | S | Overflow Bulwark immunity during a hazard | `immune` with `immunity_source: overflow_bulwark` |
-| D4 | S | Bell-Timed Riposte fires when guard is active on any resolve tick, not just when the player is inside | Upgrade event logged; Technique empowered |
-| D5 | H | Guarded vs avoided feedback at the gameplay camera, with reduced effects on | Testers never describe a guarded failure as a dodge |
-
-## 6. Complete reset
+## 3. Escape, stamina and timing
 
 | ID | Kind | Check | Pass |
 |---|---|---|---|
-| X1 | S | Reset mid-tracking, mid-Echo-preview, mid-stack and during enrage; then rerun the seed | Snapshot, schedule, assignments, retained attack and RNG stream all match a fresh start |
-| X2 | S | Reset after a reassignment | No stale `assignment_changed` carries over; the generation increments |
-| X3 | S | Reset clears upgrade state (Riposte charge, Steady Stance timer, Echoing Strike pending repeat) | No upgrade event fires after reset from pre-reset state |
-| X4 | H | Restart takes under five seconds and leaves no stale warnings, memory marks or feedback | Stopwatch result recorded; screenshot after restart |
+| T1 | S | Schedule generation per phase, block, tier and count | Matches spec §4 and §5.2; identical across two runs of a seed |
+| T2 | S | Single-attack escape check (spec §5.1). **Done for the spec:** `tools/encounter-escape/escape-check.ps1`, October 21 | Every window ≥ its tier minimum. The 8 m Sweep fails at the current 39 ticks; the 6.5 m Sweep passes. Production must re-run with shared constants |
+| T3 | S | Combined and sequential reachability: Block A/B/C, The Final Toll, Memory of Midnight overlaps, tier B double Sweep | A safe sequence exists from the worst start, at every count and tier |
+| T4 | S | Stamina rule: at most one required dodge per 2.25 s, and three in a row only after 5 s with none; simulated through Final Toll → Pursuit → Final Toll ×3 | Worst-case stamina never needs to go below 0; sprint and jump never required |
+| T5 | S | First Chime walk-only: every attack and sequence solvable with no dodge | Pass at the 0.60 s margin |
+| T6 | S | At most two damaging patterns warning at once (a Chime volley counts as one) | Validator rejects a deliberately broken schedule |
+| T7 | S | Phase threshold crossed mid-pattern | Transition waits for the pattern or block to finish; no warning is interrupted |
+| T8 | H | New players clear Phase 1 at Steady Ticking without explanation | Misunderstood warnings logged |
+| T9 | H | Stamina feel: testers never feel forced into a dodge they couldn't afford | Notes per tier |
 
-## 7. Every party count
+## 4. Collision, knockback and hit-stun
 
-Run T1–T3 and R1–R6 at each count. The count-specific checks below are in addition.
+| ID | Kind | Check | Pass |
+|---|---|---|---|
+| C1 | S | Boss body push-out during idle, turns and charge travel | Players never overlap the body; never pushed out of bounds |
+| C2 | S | Charge landing near the wall with a player between the boss and the wall | The player fits (2.0 m gap); not pinned into the next Toll without an escape |
+| C3 | S | Knockback 1.5 m away from the origin, stopping at the wall and boss body | Correct direction per shape; no wall damage |
+| C4 | S | Anti-chain: hit by Chime marker 3, then the Final Toll Sweep (and every validator-flagged pair) | `stun + escape ≤ gap` from every knocked-back position |
+| C5 | S | Per-instance dedup: one hazard can't hit a player twice; two distinct markers can | Exactly one damage event per instance per player |
+| C6 | S | Jumping inside a Bellkeeper hazard | Still hit; jump state recorded in the event |
+| C7 | H | Hit-stun and knockback read as fair, not stun-locking | Notes; any chain feeling unavoidable is logged |
+
+## 5. Outcomes and records
+
+| ID | Kind | Check | Pass |
+|---|---|---|---|
+| R1 | S | Inside at resolve vs outside | `hit` with damage, stun and knockback / `avoided`. No `guarded` or `immune` outcome exists |
+| R2 | S | Dodging through a hazard at resolve | `hit`; dodge state recorded (no iframes) |
+| R3 | S | Every record has the spec §12 fields | Schema check passes |
+| R4 | S | The failure card is built from resolve-time data: move all actors after resolve, then render the card | The card shows resolve-time positions |
+| R5 | S | Memory of Midnight provenance | `source_attack_id` and recorded tick match the recorded Sweep |
+| R6 | S | Event dedup across repeated snapshots with 8 players | Each outcome is shown once per generation and event ID |
+| R7 | H | Testers explain each failure from the card (where safety was, why they were hit) | Matches the event log in most cases; mismatches are readability bugs |
+
+## 6. Party counts and assignments
+
+Run T1, T3 and R1–R3 at each count. These are in addition:
 
 | ID | Kind | Count | Check | Pass |
 |---|---|---|---|---|
-| C1 | S | 1 | Lingering Mark and Sanctuary Peal replace spread and stack | Solo variants scheduled; no team requirement appears |
-| C2 | S | 2–4 | Every living player is marked for Tolling Mark; one stack with `min_players = n` | Table in spec §6 |
-| C3 | S | 5, 7 | Odd counts: `ceil(n/2)` marks; stacks at `floor(n/2)`; subgroup sizes 3/2 and 4/3 | Matches the table; the spare player can satisfy either stack |
-| C4 | S | 6, 8 | Even tier B | Matches the table |
-| C5 | S | 2–8 | Duplicate-class rosters (all Vanguard, and later all Arcanist) | No assignment references class; clear is possible |
-| C6 | S | 5–8 | Tier is fixed at attempt start; knocking out players never switches tier mid-fight | Tier unchanged; per-mechanic counts follow living players |
-| C7 | H | 1, 2, 4, 8 | Play the full fight | Notes on fairness and readability per count (plan §11: fairness in smaller parties) |
+| P1 | S | 1 | One cone, one lane at the player; 3 sequential Chime markers (2 on First Chime) | Spec §6 and §10 |
+| P2 | S | 2–4 | One marked Sweep target; rotating Charge target; 2 markers per standing player | Every player is the Charge target within n Charges |
+| P3 | S | 5, 7 | Odd tier B: subgroups 3/2 and 4/3; `ceil(n/2)` Chime owners; two Sweeps from different subgroups | Matches the table |
+| P4 | S | 6, 8 | Even tier B | Matches the table |
+| P5 | S | 5–8 | Double Sweep union across the seed set | Reachable; any failing seed logged and the stagger widened |
+| P6 | S | 2–8 | Duplicate-class rosters | No class-dependent assignment; clear possible |
+| P7 | S | 5–8 | Tier fixed at start; downs don't change it | Counts follow standing players |
+| P8 | H | 1, 2, 4, 8 | Full fight per count at Steady Ticking | Fairness and readability notes per count |
 
-## 8. Knockout, disconnect and reassignment
-
-| ID | Kind | Check | Pass |
-|---|---|---|---|
-| K1 | S | Mark target knocked out before lock, with ≥ 107 ticks left | Reassigned to a living unmarked player; `assignment_changed` logged (needs R4; until then, cancellation is logged and the row records the fallback) |
-| K2 | S | Same, with < 107 ticks left | Mark cancelled; logged |
-| K3 | S | Stack target knocked out before lock (≥ 127 / < 127 ticks) | Reassigned within the subgroup / cancelled; nobody fails a cancelled stack |
-| K4 | S | Tracking Sweep target knocked out before lock; every other player is also down except one | Retargets; with no living target left, locks its current direction |
-| K5 | S | Knockout after lock under-fills a stack | `min_players` capped per spec §6; the event records `locked_min` and the capped value |
-| K6 | S | A player marked inactive by the session mid-mark | Treated as unavailable; never chosen for new targets |
-| K7 | S | Knocked-out players receive no resolutions | No events with their `player_id` after the knockout tick |
-| K8 | H | 8-player session: disconnect one player during a Tolling Mark | Remaining players understand the change from the visible cue and the failure card |
-
-Rows K6 and K8 need the session lane (#7) and are reviewed there.
-
-## 9. Eight-player effect density
+## 7. Down, revive and disconnect
 
 | ID | Kind | Check | Pass |
 |---|---|---|---|
-| E1 | S | Eight-actor fixture during Tolling Mark + Remembered Sweep (row 16) and Gathering Peal + Remembered Sweep (row 19) | Rendered capture produced; all mark boundaries drawn; nothing occludes a hazard edge |
-| E2 | H | The same fixtures at 100% and 50% screenshot size, plus grayscale | Testers find their own mark, the Echo region and a safe spot within about a second |
-| E3 | H | Reduced-effects setting on | Mechanic information is unchanged (art guide §12.4) |
-| E4 | H | Memory mark vs live warning | Nobody mistakes the memory mark for a live hazard, including in grayscale |
+| K1 | S | Sweep target downed before lock | Retargeted to a seeded standing player; `assignment_changed` |
+| K2 | S | Chime owner downed before lock | Marker cancelled, not moved; event logged |
+| K3 | S | Target downed after lock | Hazard resolves at its locked footprint; can hit others |
+| K4 | S | Downed players | Not targeted, not hit, hold no assignments |
+| K5 | S | Player marked inactive by the session mid-volley | Treated as downed for targeting |
+| K6 | S | Revive channel during a resolving hazard | A hit cancels the channel; channel time escalates per that player's downs |
+| K7 | S | D4 extra recovery (if adopted) | +1.5 s at the end of a Phase 2 block only while someone is downed, only on tiers 1–2 |
+| K8 | S | Last player downs on the same tick the boss dies | Defeat takes precedence, deterministically |
+| K9 | H | 8 players: one disconnects during a Chime volley | Others understand the cancelled marker from the visible cue and the card |
 
-## 10. Recorded outcomes
+K5 and K9 need the session lane (#7, currently on hold) and are reviewed there.
+
+## 8. Reset: practice vs fresh run
 
 | ID | Kind | Check | Pass |
 |---|---|---|---|
-| O1 | S | Every resolved event has the spec §9 fields for its requirement kind | Schema check passes; missing fields fail the test |
-| O2 | S | The failure card is built from event data, not live positions: move every actor after resolve, then render the card | The card still shows the resolve-time positions |
-| O3 | S | Echo provenance | The Echo event's `source_attack_id` and source tick match the recorded sweep |
-| O4 | S | Event deduplication across repeated snapshots (128-event window) with eight players | Each failure is shown once per `generation` and `event_id` |
-| O5 | H | Compare a tester's explanation of a failure with the event log | Matches in most observed failures; mismatches are logged as readability bugs |
+| X1 | S | Practice start and retry mid-phase, mid-Final Toll, mid-Echo preview | Health, stamina, cooldowns, boss HP and position, phase, block index, RNG, assignments and memory mark all match a fresh practice start |
+| X2 | S | Fresh run after a Bellkeeper defeat | Restarts at encounter 1; down counts cleared; the Bellkeeper seed is derived from run seed + encounter index |
+| X3 | S | Practice never unlocks run progress | Run state is unchanged after a practice clear |
+| X4 | S | Boss defeat with hazards pending | All cancelled; no damage after victory; no stale markers |
+| X5 | H | Retry under 5 s with no stale warnings, marks or feedback | Stopwatch result and screenshot |
+
+## 9. Difficulty tiers
+
+| ID | Kind | Check | Pass |
+|---|---|---|---|
+| D1 | S | Window tables per tier (spec §5.2) loaded from data | Each tier ≥ its minimum; First Chime walk-only |
+| D2 | S | Striking Hour: Chime/Sweep overlap and no Pursuit between Final Tolls | T3 and T4 still pass |
+| D3 | S | Midnight Toll: Memory of Midnight records, shows and returns; one retained; one active | Validator rejects two active Echoes or an Echo without a recording |
+| D4 | H | Players can tell the tiers apart by mechanics, not just damage | Notes per tier |
+| D5 | H | Memory mark vs live warning, including grayscale | Never mistaken for a live hazard |
+
+## 10. Eight-player density
+
+| ID | Kind | Check | Pass |
+|---|---|---|---|
+| E1 | S | 8-actor capture during Block B and The Final Toll's Chime step | All boundaries drawn; nothing occludes a hazard edge |
+| E2 | H | The same at 100 % and 50 % size, and in grayscale | Testers find their own markers, the cone and a safe spot within about a second |
+| E3 | H | Reduced-effects setting on | Mechanic information unchanged |
 
 ## Evidence template for PRs
 
 ```
-Seeds and counts run:
+Seeds, counts and tiers run:
 Scripted rows run (IDs) and results:
 Human rows run (IDs), testers, hardware, capture links:
 Rows not run and why:
-Unity editor and package versions:
+Unity editor/package versions; movement constants used:
 ```

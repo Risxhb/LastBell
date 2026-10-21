@@ -1,5 +1,9 @@
 # Prototype upgrades — first six
 
+> **Deferred, reference only (October 21, 2026).** The [current game design](https://github.com/Risxhb/collab/blob/docs/boss-rush-decisions/docs/game-design.md) (#29, PR #33) defers upgrades, removes Guard, attack resources and post-hit immunity, and retires the six-upgrade milestone gate. This document has no implementation or acceptance obligation.
+>
+> Several entries depend on mechanics that no longer exist: Bell-Timed Riposte (Guard), Overflow Bulwark and Close Quarters (resource), and Overflow Bulwark's immunity. If upgrades return, revisit these against the cooldown-only kit. The pipeline rules (trigger → eligibility → limit → effect → log, no recursion) still apply.
+
 Draft v0.1 · October 20, 2026 · Owner: `chzy18/claude` ([#8](https://github.com/Risxhb/collab/issues/8)) · Implementation owner: build system in [#6](https://github.com/Risxhb/collab/issues/6).
 
 Status: **design input only.** These are the six prototype upgrades for the first milestone (plan §12). They are Vanguard upgrades, because Vanguard is the only class in the first fight. They're written against the legacy reference kit, so the numbers can be compared after the C# port:
