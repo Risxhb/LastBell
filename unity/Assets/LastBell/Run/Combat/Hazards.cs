@@ -5,7 +5,9 @@ using UnityEngine;
 
 namespace LastBell.Run
 {
-    public enum HazardShape { Circle, Ring, Cone, Lane }
+    // Stadium = a ring (Inner..Radius) measured from a segment of half-length Segment along the hazard's right axis
+    // instead of from a point: the band around a stadium-shaped boss body (Escapement Twins spec ET-R1).
+    public enum HazardShape { Circle, Ring, Cone, Lane, Stadium }
 
     // Strike = a directed physical blow (Vanguard's Brace can mitigate it from the front).
     // Ground = an eruption under the player (Brace never helps). Bellkeeper spec v0.2 §3, Vanguard #31 Brace rule.
@@ -24,7 +26,8 @@ namespace LastBell.Run
         public Vector3 Origin;
         public float Yaw;
         public float Radius, Inner, HalfAngle;   // circle/ring/cone
-        public float Length, Width;              // lane
+        public float Length, Width;              // lane (a tracking lane may shorten while tracking; never past its spawn length)
+        public float Segment;                    // stadium
         public int LockAt, ResolveAt;
         public int Damage;
         public bool JumpClearable; public float ClearHeight = 0.35f;
@@ -51,6 +54,11 @@ namespace LastBell.Run
                     if (d > Radius + Margin) return false;
                     if (d < 0.6f) return true;
                     return Vector3.Angle(Sim.Dir(Yaw), v) <= HalfAngle + Mathf.Rad2Deg * Mathf.Atan2(Margin, d);
+                case HazardShape.Stadium:
+                {
+                    var l = Quaternion.Euler(0, -Yaw, 0) * v; l.x -= Mathf.Clamp(l.x, -Segment, Segment);
+                    float s = l.magnitude; return s >= Inner - Margin && s <= Radius + Margin;
+                }
                 default:
                 {
                     var l = Quaternion.Euler(0, -Yaw, 0) * v;
@@ -93,6 +101,7 @@ namespace LastBell.Run
                 case HazardShape.Circle: h.Tele = fx.Circle(h.Radius); break;
                 case HazardShape.Ring: h.Tele = fx.Ring(h.Inner, h.Radius); break;
                 case HazardShape.Cone: h.Tele = fx.Cone(h.Radius, h.HalfAngle); break;
+                case HazardShape.Stadium: h.Tele = fx.Stadium(h.Inner, h.Radius, h.Segment); break;
                 default: h.Tele = fx.Lane(h.Length, h.Width); break;
             }
             // jump-clearable bars read differently from everything else (teal, plus the HUD's JUMP label)
@@ -112,6 +121,7 @@ namespace LastBell.Run
                 h.Age++;
                 if (h.Age == h.LockAt) h.Tele.Lock();
                 h.Tele.Place(h.Origin, h.Yaw);
+                if (h.Shape == HazardShape.Lane) h.Tele.SetLength(h.Length);
                 h.Tele.Progress((float)h.Age / Mathf.Max(1, h.ResolveAt));
             }
             for (int i = live.Count - 1; i >= 0; i--)

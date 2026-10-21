@@ -139,6 +139,12 @@ namespace LastBell.Run
                 if (!h.Contains(pos) || h.ResolveAt - h.Age > 45) continue;
                 var away = Sim.Flat(pos - h.Origin); if (away.sqrMagnitude < 0.01f) away = Vector3.right; away.Normalize();
                 if (h.Shape == HazardShape.Lane) return h.PushDir(pos);
+                if (h.Shape == HazardShape.Stadium)
+                {
+                    var l = Quaternion.Euler(0, -h.Yaw, 0) * Sim.Flat(pos - h.Origin); var core = new Vector3(Mathf.Clamp(l.x, -h.Segment, h.Segment), 0, 0);
+                    var outward = Quaternion.Euler(0, h.Yaw, 0) * (l - core).normalized; float s = (l - core).magnitude;
+                    return s - h.Inner < h.Radius - s ? -outward : outward;
+                }
                 if (h.Shape == HazardShape.Ring) return Sim.Flat(pos - h.Origin).magnitude - h.Inner < h.Radius - Sim.Flat(pos - h.Origin).magnitude ? -away : away;
                 if (h.Shape == HazardShape.Cone) { var side = Vector3.Cross(Vector3.up, Sim.Dir(h.Yaw)); return (Vector3.Dot(away, side) >= 0 ? side : -side) * 0.8f + away * 0.6f; }
                 return away;
@@ -203,6 +209,14 @@ namespace LastBell.Run
                 Check($"{cls} skill-bar icons load ({slots} incl. dash)", found == slots, $"{found}/{slots}");
             }
             Check("potion icon loads", RunHud.Icon("potion") != null);
+
+            // -lastbellOnly twins: just the Escapement Twins block-out section (quick iteration)
+            if (OnlyTwins)
+            {
+                yield return TwinsChecks();
+                Check("no errors or exceptions logged", errors == 0, errors + " logged");
+                Finish(); yield break;
+            }
 
             // ---------- run 1: Vanguard, full victory, repeated presses ----------
             Check("StartRun accepted once", d.StartRun("Vanguard") && !d.StartRun("Vanguard"));
@@ -413,9 +427,125 @@ namespace LastBell.Run
             Check("practice retry repeats the same encounter", d.State == RunState.Ready && d.Encounter == 3 && d.Mode == RunMode.Practice);
             d.ReturnToMenu();
 
+            yield return TwinsChecks();
+
             // ---------- report ----------
             Check("no errors or exceptions logged", errors == 0, errors + " logged");
             Finish();
+        }
+
+        static bool OnlyTwins
+        {
+            get
+            {
+                var args = Environment.GetCommandLineArgs();
+                int i = Array.FindIndex(args, a => a.Equals("-lastbellOnly", StringComparison.OrdinalIgnoreCase));
+                return i >= 0 && i + 1 < args.Length && args[i + 1].Equals("twins", StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        // Escapement Twins block-out (docs/design/escapement-twins.md): stadium body, the self-strike, the queued 50 %
+        // transition, Deadbeat's corridor and Rebuttal Pair's one-cone-at-a-time rule, all from real hazards.
+        IEnumerator TwinsChecks()
+        {
+            // the menu is only reachable from results (or pause): finish whatever practice the earlier section left ready
+            if (d.State == RunState.Ready)
+            {
+                d.RequestReady();
+                yield return Until(() => d.State == RunState.Combat, 6, "leftover practice combat");
+                d.Boss?.DebugDefeat();
+                yield return Until(() => d.State == RunState.Results, 8, "leftover practice results");
+            }
+            if (d.State != RunState.Menu) d.ReturnToMenu();
+            yield return Until(() => d.State == RunState.Menu, 4, "menu before Twins practice");
+            yield return null;
+            Check("Twins practice accepted from the menu", d.StartPractice("Vanguard", RunDirector.PracticeEscapementTwins));
+            yield return Wait(0.3f);
+            d.RequestReady();
+            yield return Until(() => d.State == RunState.Combat, 6, "Twins practice combat");
+            var t = d.Boss as EscapementTwins;
+            Check("practice starts the Escapement Twins at the arena centre", t != null && Sim.Flat(t.transform.position).magnitude < 0.01f);
+            if (t == null) yield break;
+
+            // stadium body: a point inside the tower end is pushed out; a short swing at the tower end connects
+            var pushed = d.World.Constrain(t.transform.TransformPoint(new Vector3(2.0f, 0, 0.1f)), 0.3f);
+            Check("stadium body pushes players out at the tower ends", t.BodyDistance(pushed) >= 0.29f, $"body distance {t.BodyDistance(pushed):0.00}");
+            var endPos = t.transform.TransformPoint(new Vector3(3.1f, 0, 0));
+            int hp0 = t.Hp;
+            d.World.StrikeBoss(d.Player, endPos, -t.transform.right, 1.0f, 90, 1, "test");
+            Check("a 1 m swing at the tower end hits the body (not the centre circle)", t.Hp == hp0 - 1, $"boss hp {hp0} -> {t.Hp}");
+
+            // self-strike: stand on the bearing from the Sun tower through the Moon pawl, let the lane lock, sidestep
+            var sender = t.transform.TransformPoint(new Vector3(-EscapementTwins.TowerX, 0, 0));
+            var pawl = t.Pawl(false);
+            var u = Sim.Flat(pawl - sender).normalized;
+            var bait = pawl + u * 2.0f;
+            d.Player.PrepareForEncounter(bait, 0);
+            Check("bait spot is outside the body", t.BodyDistance(bait) > 0.4f, $"{t.BodyDistance(bait):0.00} m");
+            yield return Until(() => d.World.Hazards.Live.Any(h => h.Source == "Sun Verdict"), 3, "Sun Verdict warning");
+            var lane = d.World.Hazards.Live.FirstOrDefault(h => h.Source == "Sun Verdict");
+            if (lane == null) yield break;
+            yield return Until(() => lane.Locked, 2, "Sun Verdict lock");
+            yield return Shot("twins_verdict_bait");
+            var side = -Vector3.Cross(Vector3.up, Sim.Dir(lane.Yaw));
+            if (t.BodyDistance(d.Player.transform.position + side * 1.6f) < 0.3f) side = -side;
+            int php = d.Player.Hp; StartCoroutine(Capture("twins_self_strike", 330));
+            float w = 0; while (w < 0.45f) { bot.MoveWorld = side; w += Time.deltaTime; yield return null; }
+            bot.Clear();
+            yield return Until(() => t.Current == "jammed" || t.Current == "recovery", 3, "Verdict resolve");
+            Check("Verdict across the far pawl jams the boss", t.SelfStrikes == 1 && t.Current == "jammed", $"self-strikes {t.SelfStrikes}, now {t.Current}");
+            Check("a jammed cast recovers for 4.0 s", t.RecoveryTicks == EscapementTwins.JamRecovery, $"{t.RecoveryTicks} ticks");
+            Check("sidestepping after lock avoids the lane", d.Player.Hp == php, $"hp {php} -> {d.Player.Hp}");
+            Check("a lane aimed straight ahead from the Sun tower misses the Moon pawl",
+                !t.CrossesPawl(sender, t.transform.eulerAngles.y, pawl, t.PawlRadius) && t.CrossesPawl(sender, Sim.YawTo(sender, pawl, 0), pawl, t.PawlRadius));
+            yield return Wait(1.0f);
+            yield return Shot("twins_jammed");
+            yield return Survive(3.5f, () => t.Current == "Moon Rebuttal");
+            if (t.Current == "Moon Rebuttal") yield return Shot("twins_moon_rebuttal");
+            yield return Survive(9f, () => t.Current == "Common Measure");
+            if (t.Current == "Common Measure") { yield return Wait(0.8f); yield return Shot("twins_common_measure"); }
+
+            // queued 50 % transition: only after the current attack, with nothing warning
+            d.Player.DebugSetHp(PlayerController.MaxHp);
+            t.DebugSetHpFraction(0.49f);
+            yield return Survive(16f, () => t.Phase == 2);
+            Check("50 % queues one transition at an attack boundary, nothing warning", t.Phase == 2 && t.Current == "transition" && d.World.Hazards.Count == 0 && t.PhaseName == EscapementTwins.Phase2,
+                $"phase {t.Phase}, {t.Current}, {d.World.Hazards.Count} hazards");
+            yield return Wait(1.6f);
+            yield return Shot("twins_phase2");
+
+            // Deadbeat: stand in the central corridor in front of the ratchet and take nothing
+            yield return Survive(16f, () => t.Current == "Deadbeat");
+            if (t.Current == "Deadbeat")
+            {
+                d.Player.PrepareForEncounter(t.transform.position + t.transform.forward * 3.2f, t.transform.eulerAngles.y + 180);
+                int dh = d.Player.Hp; yield return Wait(0.5f); yield return Shot("twins_deadbeat_corridor");
+                yield return Until(() => t.Current != "Deadbeat", 4, "Deadbeat resolve");
+                Check("Deadbeat's central corridor is safe", d.Player.Hp == dh, $"hp {dh} -> {d.Player.Hp}");
+            }
+            else Check("Deadbeat came up in Phase 2", false, "now " + t.Current);
+
+            // Rebuttal Pair: cone 2 is an outline until cone 1 is spent; never two live cones
+            yield return Survive(30f, () => t.Current == "Rebuttal Pair");
+            bool sawSecond = false, overlap = false, shot = false;
+            while (t.Current == "Rebuttal Pair" && d.State == RunState.Combat)
+            {
+                var live = d.World.Hazards.Live;
+                bool one = live.Any(h => h.Source == "Rebuttal Pair (1)"), two = live.Any(h => h.Source == "Rebuttal Pair (2)");
+                if (two) sawSecond = true; if (one && two) overlap = true;
+                if (one && !shot && live[0].Age > 40) { shot = true; StartCoroutine(Shot("twins_rebuttal_pair_preview")); }
+                var esc = Escape(d.Player); bot.MoveWorld = esc;
+                yield return null;
+            }
+            bot.Clear();
+            Check("Rebuttal Pair: cone 2 goes live only after cone 1 resolves", sawSecond && !overlap, $"second {sawSecond}, overlap {overlap}");
+
+            // boss death during a windup cancels everything
+            d.Player.DebugSetHp(PlayerController.MaxHp);
+            yield return KillDuringWindup("Escapement Twins");
+            yield return Until(() => d.State == RunState.Results, 8, "Twins practice results");
+            Check("Twins practice clear ends in a practice result", d.Mode == RunMode.Practice && d.Victory);
+            d.ReturnToMenu(); yield return null;
         }
 
         void FreshRunChecks(string when)

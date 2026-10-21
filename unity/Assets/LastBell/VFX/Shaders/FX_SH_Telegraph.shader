@@ -8,7 +8,7 @@ Shader "LastBell/FX/Telegraph"
 {
     Properties
     {
-        [Enum(Circle,0,Annulus,1,Cone,2,Lane,3)] _Shape ("Shape", Float) = 0
+        [Enum(Circle,0,Annulus,1,Cone,2,Lane,3,Stadium,4)] _Shape ("Shape", Float) = 0
         _Radius ("Radius / outer radius / lane length", Float) = 2
         _Inner ("Inner radius / lane width", Float) = 1
         _HalfAngle ("Cone half-angle (deg)", Float) = 40
@@ -65,6 +65,12 @@ Shader "LastBell/FX/Telegraph"
                     d = max(r - _Radius, dot(q, float2(cos(a), -sin(a)))); u = r / _Radius;
                     float ray = abs(frac(ang / a * 3 + 0.5) - 0.5);
                     ident = step(ray, 0.04) * step(1.0, r);
+                }
+                else if (_Shape > 3.5)     // stadium band (Common Measure): annulus measured from a segment, _HalfAngle = half-length
+                {
+                    float2 q = float2(p.x - clamp(p.x, -_HalfAngle, _HalfAngle), p.y); float s = length(q);
+                    d = max(_Inner - s, s - _Radius); u = (s - _Inner) / max(0.01, _Radius - _Inner);
+                    ident = step(0.82, frac(s * 1.4 - _Time.y * 0.6));
                 }
                 else                       // lane (Pendulum Charge): chevrons pointing down the lane
                 {

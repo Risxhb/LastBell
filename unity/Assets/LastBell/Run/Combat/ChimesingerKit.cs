@@ -191,7 +191,7 @@ namespace LastBell.Run
                 var at = b.transform.position + Vector3.up * b.HitHeight;
                 // detonates every ringing bell anywhere in the arena: exactly once, here
                 dealt = Bell ? W.DamageBoss(dmg, at, full ? "Crescendo (full)" : "Crescendo") : 0;
-                if (!Bell && Sim.Flat(b.transform.position - P.transform.position).magnitude <= 6f + b.BodyRadius) dealt = W.DamageBoss(dmg, at, "Crescendo");
+                if (!Bell && Sim.Flat(b.Core(P.transform.position) - P.transform.position).magnitude <= 6f + b.BodyRadius) dealt = W.DamageBoss(dmg, at, "Crescendo");
                 W.Fx.Crescendo(b.transform.position, Bell, Echoes, full);
             }
             else W.Fx.Crescendo(P.transform.position + P.transform.forward * 2, false, 0, false);

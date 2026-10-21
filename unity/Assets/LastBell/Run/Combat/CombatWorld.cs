@@ -104,10 +104,13 @@ namespace LastBell.Run
         public int StrikeBoss(PlayerController from, Vector3 origin, Vector3 forward, float reach, float arcDeg, int damage, string ability)
         {
             var b = Boss; if (b == null || !b.Solid) return 0;
-            var to = Sim.Flat(b.transform.position - origin); forward = Sim.Flat(forward);
+            forward = Sim.Flat(forward);
+            // the part of the body the swing points at (the centre for a circular body)
+            var core = b.Core(origin + forward.normalized * Mathf.Max(0.5f, reach * 0.5f));
+            var to = Sim.Flat(core - origin);
             if (to.magnitude > reach + b.BodyRadius) return 0;
             if (arcDeg < 360 && to.magnitude > b.BodyRadius && Vector3.Angle(forward, to) > arcDeg / 2 + Mathf.Rad2Deg * Mathf.Atan2(b.BodyRadius, to.magnitude)) return 0;
-            var contact = b.transform.position - to.normalized * b.BodyRadius + Vector3.up * b.HitHeight;
+            var contact = core - to.normalized * b.BodyRadius + Vector3.up * b.HitHeight;
             return DamageBoss(damage, contact, ability);
         }
 
@@ -116,7 +119,11 @@ namespace LastBell.Run
         {
             contact = origin + Sim.Flat(forward).normalized * length;
             var b = Boss; if (b == null || !b.Solid) return 0;
-            var f = Sim.Flat(forward).normalized; var to = Sim.Flat(b.transform.position - origin);
+            var f = Sim.Flat(forward).normalized;
+            // nearest core point to the line (two refinements settle it for a segment body)
+            var core = b.transform.position;
+            for (int i = 0; i < 2; i++) core = b.Core(origin + f * Mathf.Max(0, Vector3.Dot(Sim.Flat(core - origin), f)));
+            var to = Sim.Flat(core - origin);
             float along = Vector3.Dot(to, f); float side = (to - f * along).magnitude;
             if (along < -b.BodyRadius || along > length + b.BodyRadius || side > width / 2 + b.BodyRadius) return 0;
             contact = origin + f * Mathf.Max(0, along - b.BodyRadius) + Vector3.up * b.HitHeight;
@@ -148,11 +155,12 @@ namespace LastBell.Run
             var b = Boss;
             if (b != null && b.Solid)
             {
-                var d = Sim.Flat(pos - b.transform.position); float min = b.BodyRadius + bodyRadius;
+                var core = b.Core(pos);
+                var d = Sim.Flat(pos - core); float min = b.BodyRadius + bodyRadius;
                 if (d.magnitude < min)
                 {
                     var n = d.sqrMagnitude > 1e-4f ? d.normalized : -b.transform.forward;
-                    var p = b.transform.position + n * min; pos.x = p.x; pos.z = p.z;
+                    var p = core + n * min; pos.x = p.x; pos.z = p.z;
                 }
             }
             return pos;
@@ -181,9 +189,10 @@ namespace LastBell.Run
                 p.Pos += step; p.Travelled += step.magnitude;
                 w.Fx.ProjectileHead(p.Pos, p.Color);
                 var b = w.Boss;
-                if (b != null && b.Solid && Sim.Flat(p.Pos - b.transform.position).magnitude <= b.BodyRadius + p.Radius)
+                if (b != null && b.Solid && Sim.Flat(p.Pos - b.Core(p.Pos)).magnitude <= b.BodyRadius + p.Radius)
                 {
-                    var contact = b.transform.position + Sim.Flat(p.Pos - b.transform.position).normalized * b.BodyRadius + Vector3.up * b.HitHeight;
+                    var core = b.Core(p.Pos);
+                    var contact = core + Sim.Flat(p.Pos - core).normalized * b.BodyRadius + Vector3.up * b.HitHeight;
                     int dealt = w.DamageBoss(p.Damage, contact, p.Ability);
                     w.Fx.NoteImpact(contact, p.Color);
                     p.OnHit?.Invoke(dealt, contact);

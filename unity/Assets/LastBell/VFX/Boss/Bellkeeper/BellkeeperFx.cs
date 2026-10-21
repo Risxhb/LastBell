@@ -68,6 +68,8 @@ namespace LastBell.VFX
             public void Place(Vector3 origin, float yaw) { go.transform.SetPositionAndRotation(new Vector3(origin.x, Floor, origin.z), Quaternion.Euler(0, yaw, 0)); }
             public void Progress(float p) { mpb.SetFloat(PProgress, Mathf.Clamp01(p)); }
             public void Lock() { if (!locked) { locked = true; lockFlash = 1; } }
+            // a tracking lane's current length (the quad was sized for its longest)
+            public void SetLength(float length) { mpb.SetFloat(PRadius, length); }
             public void Resolve() { flash = 0; }
             public void Tint(Color fill, Color border) { mpb.SetColor(PFill, fill); mpb.SetColor(PBorder, border); }
             // Unfinished Hour inactive outline: dashed, unfilled, low contrast. Presentation only, never resolves.
@@ -98,6 +100,8 @@ namespace LastBell.VFX
         public Telegraph Ring(float inner, float outer) => NewTelegraph(1, outer, inner, 0, FxMeshes.Quad(-Pad(outer), Pad(outer), -Pad(outer), Pad(outer)));
         public Telegraph Circle(float radius) => NewTelegraph(0, radius, 0, 0, FxMeshes.Quad(-Pad(radius), Pad(radius), -Pad(radius), Pad(radius)));
         public Telegraph Lane(float length, float width) => NewTelegraph(3, length, width, 0, FxMeshes.Quad(-width / 2 - 0.3f, width / 2 + 0.3f, -0.3f, length + 0.3f));
+        // band from inner to outer around a segment of half-length seg along x (the shader reads seg from _HalfAngle)
+        public Telegraph Stadium(float inner, float outer, float seg) => NewTelegraph(4, outer, inner, seg, FxMeshes.Quad(-seg - Pad(outer), seg + Pad(outer), -Pad(outer), Pad(outer)));
 
         // Immediate reset between runs: no telegraph, burst, trail or particle survives a retry.
         public void ResetAll()

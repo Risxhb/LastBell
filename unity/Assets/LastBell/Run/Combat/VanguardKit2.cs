@@ -198,10 +198,11 @@ namespace LastBell.Run
             if (!waveHit)
             {
                 var b = W.Boss;
-                if (b != null && b.Solid && Sim.Flat(b.transform.position - wavePos).magnitude <= b.BodyRadius + WaveWidth / 2)
+                if (b != null && b.Solid && Sim.Flat(b.Core(wavePos) - wavePos).magnitude <= b.BodyRadius + WaveWidth / 2)
                 {
                     waveHit = true;   // the shockwave hits once per cast
-                    W.DamageBoss(WaveDamage, b.transform.position - Sim.Flat(b.transform.position - wavePos).normalized * b.BodyRadius + Vector3.up * b.HitHeight, "LastWordWave");
+                    var core = b.Core(wavePos);
+                    W.DamageBoss(WaveDamage, core - Sim.Flat(core - wavePos).normalized * b.BodyRadius + Vector3.up * b.HitHeight, "LastWordWave");
                 }
             }
             if (waveTravel >= WaveRange) waveLive = false;

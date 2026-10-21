@@ -17,6 +17,9 @@ namespace LastBell.Run
         public int MaxHp { get; protected set; } = 1000;
         public int Hp { get; protected set; }
         public float BodyRadius { get; protected set; } = 1.3f;
+        // Stadium body (Escapement Twins spec §2.1): a core segment of this half-length along the boss's right axis,
+        // with BodyRadius around it. 0 = the usual circle.
+        public float BodySegment { get; protected set; }
         public float HitHeight { get; protected set; } = 1.4f;
         public float MarkHeight { get; protected set; } = 3.4f;
         public bool Dead { get; private set; }
@@ -79,7 +82,16 @@ namespace LastBell.Run
 
         // dev / test hook: defeat now (goes through the same path as a killing blow)
         public void DebugDefeat() { if (!Dead) { Hp = 1; TakeHit(1, transform.position + Vector3.up * HitHeight); } }
+        public virtual float NextPhaseFraction => Hp > MaxHp * 0.7f ? 0.69f : 0.34f;   // F8: just below the next threshold
         public void DebugSetHpFraction(float f) { if (!Dead) Hp = Mathf.Clamp(Mathf.RoundToInt(MaxHp * f), 1, MaxHp); }
+
+        // closest point of the body's core to p (the centre for a circular body); body distance = |p - Core| - BodyRadius
+        public Vector3 Core(Vector3 p)
+        {
+            var c = transform.position; if (BodySegment <= 0) return c;
+            var r = Sim.Flat(transform.right).normalized;
+            return c + r * Mathf.Clamp(Vector3.Dot(Sim.Flat(p - c), r), -BodySegment, BodySegment);
+        }
 
         void Die()
         {
