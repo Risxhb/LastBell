@@ -6,7 +6,7 @@ namespace LastBell.Characters.EditorTools
 {
     // Review captures for the Bellkeeper (Play mode, key-art arena), written to Temp/BellkeeperShots/:
     //   Capture Look Shots  - a few fixed angles of the boss, now
-    //   Record Attack Loop  - 10 s at a locked 30 fps of game time from the gameplay camera (seq_000.png ...), covering a
+    //   Record Attack Loop  - 14 s at a locked 30 fps of game time from the gameplay camera (seq_000.png ...), covering a
     //                         full Phase 1 loop of attacks
     static class BellkeeperShots
     {
@@ -68,23 +68,41 @@ namespace LastBell.Characters.EditorTools
         }
     }
 
-    // Play-mode helper for Record Attack Loop: locks game time to 30 fps (Time.captureFramerate) and renders every frame.
+    // Play-mode helper for Record Attack Loop: locks game time to 30 fps (Time.captureFramerate), holds the main camera
+    // on the arena's gameplay view (after the Vanguard's follow camera has moved it) and saves the Game view, HUD
+    // included, at the end of every frame.
+    [DefaultExecutionOrder(9000)]
     sealed class BellkeeperRecorder : MonoBehaviour
     {
         public string dir;
-        const int Fps = 30, Frames = 300;
-        int n; Camera cam;
+        const int Fps = 30, Frames = 420;
+        int n; PlayerVitals vitals;
         void Start()
         {
-            cam = BellkeeperShots.ShotCamera(); cam.fieldOfView = 40;   // the arena's gameplay camera, slightly tighter
-            cam.transform.position = new Vector3(0, 27, 21); cam.transform.LookAt(new Vector3(0, 0, 1));
             Time.captureFramerate = Fps;
             Object.FindAnyObjectByType<BellkeeperTestController>()?.RestartLoop();
+            // demo setup: stand the Vanguard off to one side so the boss has to walk, and drink below half health
+            vitals = Object.FindAnyObjectByType<PlayerVitals>();
+            if (vitals) { vitals.ResetVitals(); vitals.transform.position = new Vector3(4, 0, 8.5f); vitals.transform.rotation = Quaternion.Euler(0, 205, 0); }
+            StartCoroutine(Capture());
         }
         void LateUpdate()
         {
-            BellkeeperShots.Render(cam, 960, 600, Path.Combine(dir, $"seq_{n++:000}.png"));
-            if (n >= Frames) { Time.captureFramerate = 0; Destroy(cam.gameObject); Destroy(gameObject); Debug.Log($"Bellkeeper recorder: {n} frames in {dir}"); }
+            if (vitals && vitals.Hp > 0 && vitals.Hp <= PlayerVitals.MaxHp / 2) vitals.DrinkPotion();
+            var cam = Camera.main;
+            if (cam) { cam.fieldOfView = 40; cam.transform.position = new Vector3(0, 27, 21); cam.transform.LookAt(new Vector3(0, 0, 1)); }
+        }
+        System.Collections.IEnumerator Capture()
+        {
+            var eof = new WaitForEndOfFrame();
+            while (n < Frames)
+            {
+                yield return eof;
+                var tex = ScreenCapture.CaptureScreenshotAsTexture();
+                File.WriteAllBytes(Path.Combine(dir, $"seq_{n++:000}.png"), tex.EncodeToPNG());
+                Destroy(tex);
+            }
+            Time.captureFramerate = 0; Destroy(gameObject); Debug.Log($"Bellkeeper recorder: {n} frames in {dir}");
         }
     }
 }

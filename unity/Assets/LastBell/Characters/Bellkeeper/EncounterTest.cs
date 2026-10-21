@@ -36,7 +36,7 @@ namespace LastBell.Characters
         public void ResetVitals()
         {
             Hp = MaxHp; Potions = MaxPotions; sinceHit = sincePotion = 99; pending.Clear(); finalHourReady = 0;
-            SetControllable(true);
+            SetControllable(true); EncounterHud.ClearBanner();
         }
 
         // returns false when immunity ate the hit
@@ -61,13 +61,7 @@ namespace LastBell.Characters
             var kb = Keyboard.current; var mouse = Mouse.current;
             if (Down) { pending.Clear(); return; }
 
-            if (kb != null && kb.fKey.wasPressedThisFrame && Potions > 0 && Hp < MaxHp && sincePotion >= PotionLockout)
-            {
-                int healed = Mathf.Min(PotionHeal, MaxHp - Hp);
-                Hp += healed; Potions--; sincePotion = 0;
-                EncounterHud.Float(transform.position + Vector3.up * 2.4f, "+" + healed, new Color(0.45f, 1f, 0.8f));
-                fx?.PotionHeal(transform);
-            }
+            if (kb != null && kb.fKey.wasPressedThisFrame) DrinkPotion();
 
             if (boss != null && !boss.Dead && t >= busyUntil)
             {
@@ -95,6 +89,16 @@ namespace LastBell.Characters
                 if (to.magnitude <= reach && Vector3.Angle(transform.forward, to) <= s.arc / 2)
                     boss.TakeHit(s.damage, boss.transform.position - to.normalized * BellkeeperTestController.BodyRadius + Vector3.up * 2.2f);
             }
+        }
+
+        public bool DrinkPotion()
+        {
+            if (Down || Potions == 0 || Hp >= MaxHp || sincePotion < PotionLockout) return false;
+            int healed = Mathf.Min(PotionHeal, MaxHp - Hp);
+            Hp += healed; Potions--; sincePotion = 0;
+            EncounterHud.Float(transform.position + Vector3.up * 2.4f, "+" + healed, new Color(0.45f, 1f, 0.8f));
+            fx?.PotionHeal(transform);
+            return true;
         }
 
         void Queue(float delay, float busy, float reachUnits, float arcDeg, int damage)
