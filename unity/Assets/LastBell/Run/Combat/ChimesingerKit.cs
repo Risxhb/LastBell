@@ -160,7 +160,7 @@ namespace LastBell.Run
             bool refresh = dealt > 0 && Bell;
             if (dealt > 0)
             {
-                if (refresh) { Strength = Mathf.Min(MaxStrength, Strength + 1); for (int i = 0; i < Echoes; i++) echo[i] = Mathf.RoundToInt(echo[i] * StrengthStep); }
+                if (refresh && Strength < MaxStrength) { Strength++; for (int i = 0; i < Echoes; i++) echo[i] = Mathf.RoundToInt(echo[i] * StrengthStep); }
                 bellLeft = BellLife;
             }
             W.Fx.Bellstrike(P.transform.position + Vector3.up * 1.2f, contact, dealt > 0, refresh);
