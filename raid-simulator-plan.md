@@ -12,6 +12,8 @@ Death ends the run; co-op downed players can be revived with increasing duration
 
 ## Delivery stages
 
+The near-term complete-run target is now the [single-arena slice](docs/plans/single-arena-slice.md): three distinct minibosses, a future-shop intermission and the final Bellkeeper, sequentially in one reusable combat arena. First prove four encounter slots/start/clear/failure/victory, then replace stand-in fights with authored bosses. One-class/one-tier builds are internal increments, not full slice acceptance.
+
 | Stage | Deliverable | Evidence |
 | --- | --- | --- |
 | U0 | Pinned Unity editor/packages/pipeline and project/build | Clean checkout, minimal Play Mode and Windows build |

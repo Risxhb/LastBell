@@ -4,6 +4,8 @@ For each decision, record the date, decision, reason, and relevant issue or pull
 
 ## 2026-10-20 — Boss-rush gameplay and revised delivery scope
 
+- Follow-up scope: Risxhb requested a plan for a playable three-miniboss/final-boss sequence entirely in one arena. [Single-arena slice plan](plans/single-arena-slice.md) proposes the encounter roster, reusable scene, run-state flow, future-shop intermission, failure/practice behavior and staged gates. Names/numbers/new balancing policies are planning proposals, not implemented or human-approved balance.
+
 - Decision: Keep Last Bell; three minibosses, shop intermission, larger boss; handcrafted arenas and bosses only. Three fixed starting classes, Basic/secondary/dodge/optional fourth, cursor aim and cooldowns without attack-resource costs. No block/parry/iframes. Jump/sprint/dodge share movement stamina; enemy collision, brief hit-stun and authored knockbacks are required.
 - Failure: separate practice mode; run restart on solo defeat/party wipe, with co-op down/revive and increasing revive duration based on the downed player's own deaths. Interpretation/tuning defaults are explicit in the design document.
 - Difficulty: four clock/lore tiers, mechanics beyond HP and an extra boss ability/mechanic on the highest. Names remain proposals. Story, healing, progression/talents, shop functionality, upgrades and equipment switching are deferred.

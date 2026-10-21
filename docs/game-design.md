@@ -58,9 +58,11 @@ Exact HP/damage, phase structure, optional Echo, hit-stun duration, revive detai
 
 ## Scope and acceptance changes
 
+The subsequent requested playable-slice plan puts the complete three-miniboss/final-boss sequence in **one arena for now**. See [single-arena slice](plans/single-arena-slice.md) for proposed encounters, transitions, practice, staged implementation and acceptance. This changes the immediate complete-run milestone; first-class/first-fight work remains an engineering increment.
+
 - First engineering increment: one Unity arena, one class/boss teaching sequence, cursor aim, movement/stamina/no-iframe dodge, truthful damage/stun, full practice reset and Windows build. Training targets are testing fixtures, not normal mob content.
 - Starting roster target is three classes; implementation can still start with Vanguard.
-- Run content target is three miniboss encounters, intermission representing the future shop, then a larger boss. Classify existing bosses before assigning content; this does not promise four finished bosses in the first arena.
+- Run content target is three miniboss encounters, intermission representing the future shop, then a larger boss, all in one arena for the requested slice. Stand-in encounters prove the full flow first; authored bosses and complete acceptance follow the staged plan.
 - Shop purchases/weapons, upgrades/relics, talents/progression and healing are deferred. Retire mandatory six-upgrade, 12-relic/six-modifier and two-class/two-boss slice gates.
 - Practice, run reset, escalating per-player revival, four difficulties and solo/eight-player acceptance remain distinct delivery gates.
 

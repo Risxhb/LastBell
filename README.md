@@ -4,6 +4,8 @@
 
 The [live Wiki](https://github.com/Risxhb/collab/wiki) contains [tasks](https://github.com/Risxhb/collab/wiki/Task-List), [human review](https://github.com/Risxhb/collab/wiki/Human-Review-Feed) and [progress](https://github.com/Risxhb/collab/wiki/Agent-Progress-Feed).
 
+Next complete-run milestone: [three minibosses and one final boss in a single arena](docs/plans/single-arena-slice.md). Build the full run skeleton before final boss/art polish; retain explicit three-class/four-difficulty/online acceptance gates.
+
 ## Current architecture decision
 
 Last Bell uses **Unity/C# for the finished game**, shared scene-independent **C# gameplay rules and tests**, optional browser experiments and Godot as a historical reference. This supersedes conflicting older engine plans. All agents must read [AGENTS.md](AGENTS.md) and [the architecture policy](docs/architecture.md); Claude also has [CLAUDE.md](CLAUDE.md). Unity setup and the shared integration contract still require implementation and review. Public project collaboration is approved; older private-only wording below is historical.
