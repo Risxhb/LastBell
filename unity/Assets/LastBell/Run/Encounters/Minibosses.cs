@@ -5,7 +5,8 @@ namespace LastBell.Run
 {
     // The three miniboss slots from the single-arena plan (§3), as labelled STAND-INS: code-built silhouettes and
     // first-pass schedules that teach each lesson. Names, timings, damage and HP are provisional; the real encounters are
-    // encounter-lane content (#8) still to be authored. Each uses only the shared hazard shapes.
+    // encounter-lane content (#8) still to be authored. Each uses only the shared hazard shapes. The third slot, the
+    // Chimebound Oracle, follows its own spec and lives in ChimeboundOracle.cs.
 
     // 1 — Dial Warden: Hand Sweep (locked cone) and Hollow Dial (ring with inner/outer safety). Slow pivot, central.
     public sealed class DialWarden : BossEncounter
@@ -171,109 +172,5 @@ namespace LastBell.Run
             if (Dead && body) { body.localRotation = Quaternion.Slerp(body.localRotation, Quaternion.Euler(80, 0, 0), Time.deltaTime * 1.5f); body.localPosition = Vector3.MoveTowards(body.localPosition, new Vector3(0, -0.6f, 0), Time.deltaTime * 0.5f); }
         }
         protected override void OnDefeat() { glowTarget = 0.1f; W.BossFx.ChargeTrail(transform, false); }
-    }
-
-    // 3 — Chimebound Oracle: Shattered Chime (markers that follow you, then lock) and Dividing Chime (a cone after the
-    // markers). Small floating bell-cluster silhouette; drifts but never charges.
-    public sealed class ChimeboundOracle : BossEncounter
-    {
-        public override string Id => "miniboss.chimebound_oracle";
-        public override string DisplayName => "The Chimebound Oracle";
-        public override string Lesson => "Drag the markers somewhere harmless, then leave the cone";
-        const int MarkFollow = 30, MarkResolve = 78, MarkGap = 24, MarkDmg = 12, ConeLock = 18, ConeResolve = 69, ConeDmg = 20;
-        Transform cluster; readonly List<Transform> bells = new List<Transform>(); int loops; float spin = 1;
-
-        void Awake() { MaxHp = 1700; BodyRadius = 1.2f; HitHeight = 2.0f; MarkHeight = 4.2f; }
-
-        protected override void Build()
-        {
-            cluster = new GameObject("Cluster").transform; cluster.SetParent(transform, false); cluster.localPosition = new Vector3(0, 2.0f, 0);
-            Prim.Make(PrimitiveKind.Sphere, cluster, Vector3.zero, Vector3.one * 1.0f, new Color(0.25f, 0.2f, 0.45f), 0);
-            Prim.Make(PrimitiveKind.Sphere, cluster, new Vector3(0, 0.05f, 0.42f), Vector3.one * 0.3f, new Color(1f, 0.85f, 1.2f), 4f);   // facing
-            for (int i = 0; i < 5; i++)
-            {
-                var b = Prim.Make(PrimitiveKind.Cone, cluster, Vector3.zero, new Vector3(0.6f, 0.7f, 0.6f), new Color(0.9f, 0.72f, 0.32f), 0.5f, Quaternion.Euler(180, 0, 0));
-                bells.Add(b);
-            }
-        }
-
-        protected override IEnumerable<int> Script()
-        {
-            if (loops == 0) PhaseName = "Teaching";
-            foreach (var w in Chimes(3)) yield return w;
-            yield return loops == 0 ? 60 : 24;
-            if (loops == 0)
-            {
-                foreach (var w in DividingCone()) yield return w;
-                yield return 60;
-            }
-            else
-            {
-                // the cone warns when the last marker locks
-                var c = Chimes(3).GetEnumerator(); int t = 0; bool coneStarted = false; IEnumerator<int> cone = null; int coneWait = 0;
-                while (true)
-                {
-                    bool more = c.MoveNext(); int wv = more ? Mathf.Max(1, c.Current) : 1;
-                    for (int k = 0; k < wv; k++)
-                    {
-                        t++;
-                        if (!coneStarted && t >= 2 * MarkGap + MarkFollow) { coneStarted = true; cone = DividingCone().GetEnumerator(); }
-                        if (cone != null) { if (coneWait > 0) coneWait--; else if (cone.MoveNext()) coneWait = Mathf.Max(1, cone.Current) - 1; else cone = null; }
-                        yield return 1;
-                    }
-                    if (!more && cone == null) break;
-                }
-            }
-            foreach (var w in WalkTo(Vector3.zero, 2f, 90)) yield return w;
-            Current = "recovery"; glowTarget = 0.35f; spin = 0.2f; yield return 70; glowTarget = 1; spin = 1;
-            loops++; PhaseName = "Combined";
-        }
-
-        IEnumerable<int> Chimes(int count)
-        {
-            Current = "Shattered Chime";
-            for (int i = 0; i < count; i++)
-            {
-                var h = Marker("Shattered Chime", 1.4f, MarkFollow, MarkResolve, MarkDmg);
-                h.OnResolve = hz => W.BossFx.ChimeResolve(hz.Origin, hz.Radius);
-                for (int k = 0; k < (i < count - 1 ? MarkGap : MarkResolve); k++) { Windup(k / (float)MarkResolve); yield return 1; }
-            }
-            Release(0.6f);
-        }
-
-        IEnumerable<int> DividingCone()
-        {
-            Current = "Dividing Chime";
-            var h = Cone("Dividing Chime", 6.5f, 35f, ConeLock, ConeResolve, ConeDmg, true, 300);
-            h.OnResolve = hz => { W.BossFx.SweepResolve(hz.Origin, hz.Yaw, hz.Radius, hz.HalfAngle); Release(); };
-            for (int i = 0; i < ConeResolve; i++) { Windup(i / (float)ConeResolve); spin = 3; yield return 1; }
-            spin = 1; yield return 8;
-        }
-
-        protected override void StepAlways()
-        {
-            // slow drift around the dial centre, keeping some distance from the target
-            if (Current == "Shattered Chime" && DistToTarget() < 3.5f)
-            {
-                var away = Sim.Flat(transform.position - Target()).normalized;
-                var p = transform.position + away * 1.2f * Sim.Dt;
-                if (new Vector2(p.x, p.z).magnitude <= CombatWorld.BossBound - 1) transform.position = p;
-            }
-        }
-
-        protected override void Update()
-        {
-            base.Update();
-            if (!cluster) return;
-            float t = Time.time;
-            cluster.localPosition = new Vector3(0, Dead ? Mathf.MoveTowards(cluster.localPosition.y, 0.4f, Time.deltaTime) : 2.0f + 0.2f * Mathf.Sin(t * 1.4f), 0);
-            for (int i = 0; i < bells.Count; i++)
-            {
-                float a = t * spin * (Dead ? 0 : 1) + i * Mathf.PI * 2 / bells.Count;
-                bells[i].localPosition = new Vector3(Mathf.Cos(a) * 1.25f, 0.3f * Mathf.Sin(a * 2 + i), Mathf.Sin(a) * 1.25f);
-                Prim.SetGlow(bells[i].GetComponent<Renderer>(), new Color(1f, 0.75f, 0.35f) * 0.5f * glowLevel);
-            }
-        }
-        protected override void OnDefeat() { glowTarget = 0.05f; spin = 0; }
     }
 }

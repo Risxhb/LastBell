@@ -26,6 +26,10 @@ namespace LastBell.Run
             ["Bell Sweep"] = "leave the cone", ["Bell Sweep (Final Toll)"] = "leave the cone (heavy)", ["Hollow Toll"] = "inside the inner circle or outside the ring",
             [BellkeeperEncounter.March] = "step sideways out of the lane",
             [BellkeeperEncounter.Echo] = "it repeats where it struck before, not where the boss stands",
+            [ChimeboundOracle.Silent] = "stand in the silent sector (low bell, hollow circle) or beyond the ring",
+            [ChimeboundOracle.Passing] = "stand in the silent sector, then follow it one step when it moves",
+            [ChimeboundOracle.After] = "the old marks strike again: stay off them",
+            [ChimeboundOracle.Needle] = "sidestep the beam",
         };
 
         void Awake() { d = GetComponent<RunDirector>(); }

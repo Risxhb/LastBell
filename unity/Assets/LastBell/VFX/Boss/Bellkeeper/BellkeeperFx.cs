@@ -67,6 +67,8 @@ namespace LastBell.VFX
             internal bool locked;
             public void Place(Vector3 origin, float yaw) { go.transform.SetPositionAndRotation(new Vector3(origin.x, Floor, origin.z), Quaternion.Euler(0, yaw, 0)); }
             public void Progress(float p) { mpb.SetFloat(PProgress, Mathf.Clamp01(p)); }
+            // a lane that keeps its quad but changes length while it tracks (Unison Needle reaches the floor edge)
+            public void Size(float radius) { mpb.SetFloat(PRadius, radius); }
             public void Lock() { if (!locked) { locked = true; lockFlash = 1; } }
             public void Resolve() { flash = 0; }
             public void Tint(Color fill, Color border) { mpb.SetColor(PFill, fill); mpb.SetColor(PBorder, border); }
@@ -93,7 +95,8 @@ namespace LastBell.VFX
         public Telegraph Cone(float radius, float halfAngle)
         {
             float w = Pad(radius) * Mathf.Sin(Mathf.Min(90, halfAngle) * Mathf.Deg2Rad);
-            return NewTelegraph(2, radius, 0, halfAngle, FxMeshes.Quad(-w, w, -0.3f, Pad(radius)));
+            float back = halfAngle > 90 ? Pad(radius) : 0.3f;   // wider than a half-disc (sector attacks) reaches behind the apex
+            return NewTelegraph(2, radius, 0, halfAngle, FxMeshes.Quad(-w, w, -back, Pad(radius)));
         }
         public Telegraph Ring(float inner, float outer) => NewTelegraph(1, outer, inner, 0, FxMeshes.Quad(-Pad(outer), Pad(outer), -Pad(outer), Pad(outer)));
         public Telegraph Circle(float radius) => NewTelegraph(0, radius, 0, 0, FxMeshes.Quad(-Pad(radius), Pad(radius), -Pad(radius), Pad(radius)));

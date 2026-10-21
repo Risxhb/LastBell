@@ -32,6 +32,7 @@ namespace LastBell.Run
         public int Stun = 15;
         public Action<Hazard> Track;             // called every tick until locked (follow a target / the boss facing)
         public Action<Hazard> OnResolve;         // presentation of the resolve (effects), after the hit test
+        public Hazard Group;                     // hazards resolving as one attack event share the leader's hit set (R16, until hazard groups R23)
 
         public int Age { get; internal set; }
         public bool Locked => Age >= LockAt;
@@ -122,9 +123,10 @@ namespace LastBell.Run
                 h.Tele.Resolve(); Resolved++;
                 foreach (var p in w.Players)
                 {
-                    if (p.Down || h.Hit.Contains(p) || !h.Contains(p.transform.position)) continue;
+                    var once = (h.Group ?? h).Hit;
+                    if (p.Down || once.Contains(p) || !h.Contains(p.transform.position)) continue;
                     if (h.JumpClearable && p.Height >= h.ClearHeight) continue;   // the only height rule (R19)
-                    h.Hit.Add(p);
+                    once.Add(p);
                     p.ReceiveHit(h);
                 }
                 h.OnResolve?.Invoke(h);
