@@ -258,7 +258,7 @@ namespace LastBell.Arenas.EditorTools
             if (!assetPath.EndsWith("/KeyArt/FloorHeight.png")) return;
             var t = (TextureImporter)assetImporter;
             t.textureType = TextureImporterType.NormalMap; t.convertToNormalmap = true;
-            t.heightmapScale = 0.05f; t.normalmapFilter = TextureImporterNormalFilter.Sobel;
+            t.heightmapScale = 0.035f; t.normalmapFilter = TextureImporterNormalFilter.Sobel;
             t.maxTextureSize = 4096;
         }
     }

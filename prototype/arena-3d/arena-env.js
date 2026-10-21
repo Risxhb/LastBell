@@ -188,19 +188,32 @@ function glowSprite(size, color, opacity) {
   g.fillStyle = grd; g.fillRect(0, 0, 128, 128);
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex(c), color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); s.scale.setScalar(size); return s;
 }
-function lantern(x, z, h = 3.2) {
+// Lamp post after the key art: stone plinth, iron post with brass collars, scrolled brackets under a hexagonal
+// lantern (brass frame, warm glass, peaked roof, finial). Stands just outside the playable square.
+function lantern(x, z, h = 3.0) {
   const g = new THREE.Group(); g.name = "Lantern"; g.position.set(x, 0, z); world.add(g);
-  add(new THREE.CylinderGeometry(0.3, 0.38, 0.3, 8), ironM, g, [0, 0.15, 0]);
-  add(new THREE.CylinderGeometry(0.07, 0.09, h, 8), ironM, g, [0, h / 2, 0]);
-  add(new THREE.BoxGeometry(0.42, 0.06, 0.42), brassM, g, [0, h + 0.03, 0]);
-  add(new THREE.BoxGeometry(0.3, 0.46, 0.3), glassM, g, [0, h + 0.29, 0], null, false);
-  for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) add(new THREE.BoxGeometry(0.04, 0.5, 0.04), brassM, g, [sx * 0.17, h + 0.29, sz * 0.17]);
-  add(new THREE.ConeGeometry(0.32, 0.32, 4), brassM, g, [0, h + 0.68, 0], [0, Math.PI / 4, 0]);
-  add(new THREE.SphereGeometry(0.06, 8, 6), brassM, g, [0, h + 0.88, 0]);
-  const s = glowSprite(2.6, 0xffb35a, 0.75); s.position.set(0, h + 0.29, 0); g.add(s);
-  const l = new THREE.PointLight(0xffa850, 6, 8, 2); l.position.set(0, h + 0.2, 0); g.add(l);
+  add(new THREE.BoxGeometry(0.62, 0.32, 0.62), stoneM(0x6c5f8c), g, [0, 0.16, 0]);
+  add(new THREE.BoxGeometry(0.5, 0.1, 0.5), stoneM(0x9c8eb6), g, [0, 0.37, 0]);
+  add(new THREE.CylinderGeometry(0.17, 0.2, 0.34, 8), ironM, g, [0, 0.59, 0]);
+  add(new THREE.CylinderGeometry(0.065, 0.095, h - 0.76, 8), ironM, g, [0, 0.76 + (h - 0.76) / 2, 0]);
+  for (const [y, r] of [[0.8, 0.12], [h * 0.55, 0.085], [h - 0.12, 0.08]]) add(new THREE.TorusGeometry(r, 0.03, 6, 16), brassM, g, [0, y, 0], [Math.PI / 2, 0, 0]);
+  for (let i = 0; i < 4; i++) { // scrolled brackets
+    const k = new THREE.Group(); k.rotation.y = i * Math.PI / 2 + Math.PI / 4; k.position.y = h - 0.2; g.add(k);
+    add(new THREE.TorusGeometry(0.11, 0.022, 5, 12, Math.PI * 1.3), ironM, k, [0.12, 0.05, 0], [0, 0, -0.4]);
+  }
+  add(new THREE.CylinderGeometry(0.27, 0.2, 0.08, 6), brassM, g, [0, h + 0.02, 0]);
+  add(new THREE.CylinderGeometry(0.2, 0.17, 0.5, 6), glassM, g, [0, h + 0.31, 0], null, false);
+  for (let i = 0; i < 6; i++) { const t = i / 6 * Math.PI * 2 + Math.PI / 6; add(new THREE.BoxGeometry(0.035, 0.56, 0.035), brassM, g, [Math.cos(t) * 0.205, h + 0.31, Math.sin(t) * 0.205]); }
+  add(new THREE.CylinderGeometry(0.25, 0.25, 0.05, 6), brassM, g, [0, h + 0.6, 0]);
+  add(new THREE.ConeGeometry(0.3, 0.34, 6), brassM, g, [0, h + 0.8, 0]);
+  add(new THREE.SphereGeometry(0.07, 10, 8), brassM, g, [0, h + 1.0, 0]);
+  add(new THREE.ConeGeometry(0.025, 0.22, 6), brassM, g, [0, h + 1.15, 0]);
+  const sp = glowSprite(2.4, 0xffb35a, 0.7); sp.position.set(0, h + 0.31, 0); g.add(sp);
+  const l = new THREE.PointLight(0xffa850, 6, 8, 2); l.position.set(0, h + 0.25, 0); g.add(l);
 }
-for (const [x, z] of [[-E + 0.6, -E + 0.6], [E - 0.6, -E + 0.6], [-E + 0.6, E - 0.6], [E - 0.6, E - 0.6], [-2.8, E - 0.3], [2.8, E - 0.3], [-E + 0.3, 0], [E - 0.3, 0]]) lantern(x, z);
+const EDGE = E - 0.1; // just outside the playable square (±12.4 m), clear of the parapet's inner face
+const LANTERNS = [[-EDGE, -EDGE], [EDGE, -EDGE], [-EDGE, EDGE], [EDGE, EDGE], [-2.8, EDGE], [2.8, EDGE], [-EDGE, 0], [EDGE, 0]];
+for (const [x, z] of LANTERNS) lantern(x, z);
 
 // ---- banners: navy cloth with gold border and clock-compass emblem, on poles with a crossbar ----
 function bannerTexture() {
@@ -233,10 +246,30 @@ function banner(x, z, ry, h = 5.4) {
 }
 banner(-E - 0.2, -5.5, Math.PI / 2); banner(-E - 0.2, 5.5, Math.PI / 2); banner(-4.6, E + 0.2, 0); banner(4.6, E + 0.2, 0); banner(E + 0.2, -6, -Math.PI / 2);
 
-// ---- greenery tucked against the parapet ----
-const leafM = [stoneM(0x2f5a4c, { flatShading: true }), stoneM(0x3d6f52, { flatShading: true }), stoneM(0x284a48, { flatShading: true })];
-for (let i = 0; i < 26; i++) { const side = Math.floor(rnd() * 4), t = (rnd() * 2 - 1) * (E - 1), p = [[t, E - 0.2], [t, -E + 0.2], [E - 0.2, t], [-E + 0.2, t]][side];
-  for (let k = 0; k < 3; k++) { const s = 0.3 + rnd() * 0.35; add(new THREE.IcosahedronGeometry(s, 0), leafM[k % 3], world, [p[0] + (rnd() - 0.5) * 0.9, s * 0.6, p[1] + (rnd() - 0.5) * 0.5]); } }
+// ---- shrubs along the foot of the parapet: clustered leafy lobes, dark at the base, lighter on top ----
+const leafM = [stoneM(0x2b5247, { flatShading: true }), stoneM(0x3d7656, { flatShading: true }), stoneM(0x5f9562, { flatShading: true }), stoneM(0x284a48, { flatShading: true })];
+function shrub(x, z, s, seed) {
+  const r2 = mulberry32(seed), g = new THREE.Group(); g.name = "Bush"; g.position.set(x, 0, z); g.rotation.y = r2() * 6.28; g.scale.setScalar(s); world.add(g);
+  const lobes = 5 + Math.floor(r2() * 3);
+  for (let i = 0; i < lobes; i++) {
+    const top = i >= lobes - 2, r = top ? 0.24 + r2() * 0.08 : 0.3 + r2() * 0.12, geo = new THREE.IcosahedronGeometry(r, 1), p = geo.attributes.position;
+    for (let v = 0; v < p.count; v++) { const k = 0.88 + hash(p.getX(v) * 9 + seed, p.getZ(v) * 9 + i) * 0.24; p.setXYZ(v, p.getX(v) * k, p.getY(v) * k * 0.85, p.getZ(v) * k); }
+    geo.computeVertexNormals();
+    const a = i / lobes * Math.PI * 2, d = top ? 0.12 : 0.32;
+    add(geo, leafM[top ? 2 : [0, 1, 3][i % 3]], g, [Math.cos(a) * d, top ? 0.52 : 0.26 + r2() * 0.08, Math.sin(a) * d * 0.7]);
+  }
+}
+{ // one shrub per wall bay, skipping the stair, lanterns and banner poles
+  const keepOut = [...LANTERNS, [-E - 0.2, -5.5], [-E - 0.2, 5.5], [-4.6, E + 0.2], [4.6, E + 0.2], [E + 0.2, -6]];
+  let seed = 40;
+  for (let side = 0; side < 4; side++) for (let i = 0; i < 8; i++) {
+    const t = -WL + (i + 0.5) * (2 * WL / 8); if (side === 0 && Math.abs(t) < 2.7) continue;
+    const along = t + (hash(side, i) - 0.5) * 1.2, inset = E - 0.45;
+    const [x, z] = [[along, inset], [inset, -along], [-along, -inset], [-inset, along]][side];
+    if (keepOut.some(([kx, kz]) => Math.hypot(kx - x, kz - z) < 1.3) || hash(i, side + 7) < 0.15) continue;
+    shrub(x, z, 1.05 + hash(i + 3, side) * 0.4, seed++);
+  }
+}
 
 // ---- the world around: sea of clouds, distant sky islands with domes and a clock cathedral, floating debris ----
 const cloudTex = (() => { const [c, g] = canvas2d(256); for (let i = 0; i < 14; i++) { const x = 60 + Math.random() * 136, y = 80 + Math.random() * 96, r = 30 + Math.random() * 50;
@@ -371,9 +404,13 @@ bridge(root, [44 - 3, 26 - 6], [72 - 18, -92 + 20], -14.4, 2.6);
 bridge(root, [-90 + 9, 8 - 3], [-48 - 7, -42 + 3], -12.8, 2.4);
 hangingRock(-60, 26, -90, 1.4, 21); hangingRock(40, 30, -120, 1.6, 22); hangingRock(-110, 22, -30, 1.3, 23); hangingRock(110, 24, -60, 1.2, 24);
 
+// broken masonry drifting below the platform's edge (rough chunks, not cubes)
 const debris = [];
-for (let i = 0; i < 16; i++) { const a = rnd() * Math.PI * 2, r = E + 4 + rnd() * 10, s = 0.3 + rnd() * 0.9;
-  const m = add(new THREE.BoxGeometry(s, s * (0.7 + rnd() * 0.6), s), wallDarkM, root, [Math.cos(a) * r, -5 + rnd() * 6, Math.sin(a) * r], [rnd(), rnd() * 3, rnd()]); m.name = "Debris"; debris.push([m, m.position.y, rnd() * 6]); }
+for (let i = 0; i < 9; i++) { const a = rnd() * Math.PI * 2, r = E + 3.5 + rnd() * 6, sz = 0.5 + rnd() * 0.9;
+  const geo = new THREE.BoxGeometry(sz, sz * (0.6 + rnd() * 0.5), sz * (0.7 + rnd() * 0.4), 2, 2, 2), p = geo.attributes.position;
+  for (let v = 0; v < p.count; v++) { const x = p.getX(v), y = p.getY(v), z = p.getZ(v), k = 0.8 + hash(x * 7 + y * 3 + i, z * 5) * 0.35; p.setXYZ(v, x * k, y * (1.6 - k), z * k); } // same jitter for coincident corners, so faces stay closed
+  geo.computeVertexNormals();
+  const m = add(geo, rockM, root, [Math.cos(a) * r, -6 + rnd() * 4, Math.sin(a) * r], [rnd(), rnd() * 3, rnd()]); m.name = "Debris"; debris.push([m, m.position.y, rnd() * 6]); }
 
 function update(t, dt = 0, quiet = false) {
   for (const b of banners) { const p = b.geometry.attributes.position, base = b.userData.base;

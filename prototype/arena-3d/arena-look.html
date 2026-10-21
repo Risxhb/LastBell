@@ -110,7 +110,7 @@ addEventListener('resize', frame); frame();
 // ?export: write the solid arena (env.root, no lights or sprites) to a binary glTF for Unity, plus the floor's
 // height map (glTF has no bump maps; Unity turns it into a normal map). tools/export-arena-glb.mjs collects both
 // from window.__arenaExport through the DevTools protocol.
-if (Q.has('export')) {
+if (Q.has('export')) try {
   const { GLTFExporter } = await import('three/addons/exporters/GLTFExporter.js');
   const copy = env.root.clone(true), drop = [];
   copy.traverse(o => {
@@ -121,7 +121,7 @@ if (Q.has('export')) {
   const glb = await new GLTFExporter().parseAsync(copy, { binary: true, maxTextureSize: 4096 });
   const bytes = new Uint8Array(glb); let bin = ''; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
   window.__arenaExport = { glb: btoa(bin), bump: env.paving.bump.toDataURL('image/png').split(',')[1] };
-}
+} catch (e) { window.__arenaExport = { error: String(e && e.stack || e) }; }
 const clock = new THREE.Clock();
 renderer.setAnimationLoop(() => {
   const dt = clock.getDelta(); env.update(clock.elapsedTime, dt, Q.has('quiet'));

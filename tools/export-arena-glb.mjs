@@ -30,10 +30,13 @@ try {
   let ready = false;
   for (let i = 0; i < 240 && !ready; i++) { await sleep(500); ready = await evaluate('!!window.__arenaExport'); }
   if (!ready) throw new Error('export did not finish (check the page console)');
+  const err = await evaluate('window.__arenaExport.error || null'); if (err) throw new Error('page: ' + err);
   const read = async key => { const len = await evaluate(`window.__arenaExport.${key}.length`); let s = ''; for (let o = 0; o < len; o += 4e6) s += await evaluate(`window.__arenaExport.${key}.slice(${o}, ${o + 4e6})`); return Buffer.from(s, 'base64'); };
   mkdirSync(outDir, { recursive: true });
   const glb = await read('glb'), bump = await read('bump');
   writeFileSync(join(outDir, 'BellkeepersDais.glb'), glb); writeFileSync(join(outDir, 'FloorHeight.png'), bump);
   console.log(`BellkeepersDais.glb ${(glb.length / 1e6).toFixed(1)} MB, FloorHeight.png ${(bump.length / 1e6).toFixed(1)} MB -> ${outDir}`);
   ws.close();
-} finally { proc.kill(); await sleep(500); try { rmSync(profile, { recursive: true, force: true }); } catch {} }
+} finally { // Edge detaches its browser processes from the launcher, so stop every process using the export profile.
+  spawn('powershell', ['-NoProfile', '-Command', `Get-CimInstance Win32_Process -Filter "Name='msedge.exe'" | Where-Object { $_.CommandLine -match 'lb-export-profile' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`], { stdio: 'ignore' }).on('exit', () => {});
+  await sleep(2500); try { rmSync(profile, { recursive: true, force: true }); } catch {} }
