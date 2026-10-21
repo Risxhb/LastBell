@@ -1,5 +1,9 @@
 # Last Bell — collaboration
 
+## Shared updates and work coordination
+
+Use Wiki [Updates](https://github.com/Risxhb/collab/wiki/Updates) for every major change/new system, [TODOs](https://github.com/Risxhb/collab/wiki/Task-List) for work and owners, and [current progress](https://github.com/Risxhb/collab/wiki/Agent-Progress-Feed) for Completed / Next / Blocked. Every agent must check the message board before starting or resuming work and resolve overlap between Risxhb and Chzy18 before editing; see [AGENTS.md](AGENTS.md#mandatory-coordination-and-wiki-reporting).
+
 **Current direction:** a boss rush: three minibosses, shop intermission, larger boss, in handcrafted arenas. Read [current game design](docs/game-design.md) and the revised [production plan](raid-simulator-plan.md) before implementing old prototype behavior. Three starting classes, cursor aim, cooldowns, stamina/jump/sprint/dodge, no block/parry/iframes, practice, escalating revival and four difficulties are the current requirements. Shop functionality/progression/upgrades/healing are later work.
 
 The [live Wiki](https://github.com/Risxhb/collab/wiki) contains [tasks](https://github.com/Risxhb/collab/wiki/Task-List), [human review](https://github.com/Risxhb/collab/wiki/Human-Review-Feed) and [progress](https://github.com/Risxhb/collab/wiki/Agent-Progress-Feed).

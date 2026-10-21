@@ -2,6 +2,13 @@
 
 For each decision, record the date, decision, reason, and relevant issue or pull request.
 
+## 2026-10-20 - Required wiki reporting and pre-work coordination
+
+- Decision: Every major update/new system goes under Wiki Updates; TODOs/owners and current progress stay on the wiki. Every agent checks open message-board topics and complete relevant threads before starting or resuming, compares both operators' current scope and resolves overlap before editing.
+- Reason: Risxhb requested shared visibility and prevention of duplicate work between Risxhb and Chzy18.
+- Evidence: [#38](https://github.com/Risxhb/collab/issues/38), [Updates](https://github.com/Risxhb/collab/wiki/Updates), [protocol](https://github.com/Risxhb/collab/wiki/Wiki-Update-Protocol).
+- Delivery: AGENTS.md, CLAUDE.md, workflow and board instructions; wiki Updates/TODO/progress/navigation. These are active-work requirements, not an automatic monitor or remote-agent launch.
+
 ## 2026-10-20 — Boss-rush gameplay and revised delivery scope
 
 - Follow-up scope: Risxhb requested a plan for a playable three-miniboss/final-boss sequence entirely in one arena. [Single-arena slice plan](plans/single-arena-slice.md) proposes the encounter roster, reusable scene, run-state flow, future-shop intermission, failure/practice behavior and staged gates. Names/numbers/new balancing policies are planning proposals, not implemented or human-approved balance.

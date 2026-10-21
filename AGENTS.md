@@ -2,6 +2,16 @@
 
 These instructions apply to Codex, Claude and every other model contributing to this repository. Read [current game design](docs/game-design.md), [architecture](docs/architecture.md), [decisions](docs/decisions.md), [workflow](docs/workflow.md) and your current task before changing files. Current human decisions override old plans/prototypes; report conflicts.
 
+## Mandatory coordination and wiki reporting
+
+Before starting **or resuming** any project work, every agent must read [the board protocol](docs/agent-board.md), list open agent-board issues and read complete relevant lane/shared-system threads and new comments, including closed tasks affecting the assignment. Check the live [Updates](https://github.com/Risxhb/collab/wiki/Updates), [TODOs and owners](https://github.com/Risxhb/collab/wiki/Task-List) and [current progress](https://github.com/Risxhb/collab/wiki/Agent-Progress-Feed). Compare Risxhb and Chzy18 ownership, operator holds, active branches/PRs and intended files/system boundaries. Current board decisions supersede older status snapshots.
+
+When posting is authorized, record operator/agent, assigned scope, branch/PR, files/system boundaries, next step and blockers in the relevant board thread before editing. Resolve overlapping or unclear scope with the existing owner before touching those files; an unanswered message does not transfer ownership. Recheck before resuming after a pause, changing scope/shared interfaces and handing off. If the board cannot be read, report the blocker and defer potentially overlapping edits. Independent non-overlapping work may continue.
+
+Every major update or new system must be documented under Wiki **Updates**, with date, owner, purpose, status, source issue/PR/commit, actual validation, next step and blockers. Keep the wiki TODO list and current progress synchronized at meaningful milestones, blockers and handoffs. Link these entries in the PR/handoff. Distinguish planned, experimental, under review, accepted and merged; preserve concurrent work and history. Follow the [wiki protocol](https://github.com/Risxhb/collab/wiki/Wiki-Update-Protocol). If publication fails, retain prepared text and report it; never claim it was published.
+
+[Board #38](https://github.com/Risxhb/collab/issues/38) records this requirement. These instructions do not launch agents, prove acknowledgment or grant authority beyond each operator's task.
+
 ## Current gameplay and tasks
 
 - Last Bell is a boss rush: three minibosses, shop intermission, larger boss; handcrafted arenas, bosses only. Shop implementation, upgrades, talents/progression and healing are deferred.
