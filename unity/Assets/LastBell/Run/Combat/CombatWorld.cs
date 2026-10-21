@@ -175,17 +175,23 @@ namespace LastBell.Run
             public Vector3 Pos, Vel; public float Range, Travelled, Radius; public int Damage; public string Ability;
             public Action<int, Vector3> OnHit; public Color Color;
         }
-        readonly CombatWorld w; readonly List<Projectile> live = new List<Projectile>();
+        readonly CombatWorld w; readonly List<Projectile> live = new List<Projectile>(), batch = new List<Projectile>();
+        int clears;   // bumped by ClearAll, so a step can tell its batch was cancelled mid-dispatch
         public int Count => live.Count;
         public ProjectileSystem(CombatWorld world) { w = world; }
 
         public void Fire(Projectile p) { live.Add(p); }
 
+        // Steps a snapshot: a killing blow runs BossEncounter.Die -> ClearTransient -> ClearAll, which empties live (and
+        // cancels pending hazards on the same tick) mid-loop. A projectile leaves live before its hit is dispatched, and
+        // once the list has been cleared the rest of the batch goes with it.
         public void Step()
         {
-            for (int i = live.Count - 1; i >= 0; i--)
+            batch.Clear(); batch.AddRange(live);
+            int gen = clears;
+            for (int i = batch.Count - 1; i >= 0 && clears == gen; i--)
             {
-                var p = live[i]; var step = p.Vel * Sim.Dt;
+                var p = batch[i]; var step = p.Vel * Sim.Dt;
                 p.Pos += step; p.Travelled += step.magnitude;
                 w.Fx.ProjectileHead(p.Pos, p.Color);
                 var b = w.Boss;
@@ -193,14 +199,15 @@ namespace LastBell.Run
                 {
                     var core = b.Core(p.Pos);
                     var contact = core + Sim.Flat(p.Pos - core).normalized * b.BodyRadius + Vector3.up * b.HitHeight;
+                    live.Remove(p);
                     int dealt = w.DamageBoss(p.Damage, contact, p.Ability);
                     w.Fx.NoteImpact(contact, p.Color);
                     p.OnHit?.Invoke(dealt, contact);
-                    live.RemoveAt(i); continue;
+                    continue;
                 }
-                if (p.Travelled >= p.Range || new Vector2(p.Pos.x, p.Pos.z).magnitude > CombatWorld.PlayerBound + 2) live.RemoveAt(i);
+                if (p.Travelled >= p.Range || new Vector2(p.Pos.x, p.Pos.z).magnitude > CombatWorld.PlayerBound + 2) live.Remove(p);
             }
         }
-        public void ClearAll() { live.Clear(); }
+        public void ClearAll() { live.Clear(); clears++; }
     }
 }

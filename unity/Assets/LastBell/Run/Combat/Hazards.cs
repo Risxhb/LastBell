@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using LastBell.VFX;
 using UnityEngine;
 
@@ -139,7 +140,7 @@ namespace LastBell.Run
                 }
                 h.OnResolve?.Invoke(h);
             }
-            foreach (var arena in arenas) if (arena) arena.quiet = live.Count > 0;
+            SetQuiet(live.Count > 0);
         }
 
         // Cancels every pending hazard: none of them can resolve or deal damage afterwards.
@@ -147,10 +148,24 @@ namespace LastBell.Run
         {
             live.Clear();
             w.BossFx.ClearTelegraphs();
-            foreach (var arena in arenas) if (arena) arena.quiet = false;
+            SetQuiet(false);
         }
 
-        static LastBell.Arenas.KeyArtArena[] arenas = new LastBell.Arenas.KeyArtArena[0];
-        public static void FindArena() { arenas = UnityEngine.Object.FindObjectsByType<LastBell.Arenas.KeyArtArena>(); }
+        // Every arena script (the key-art dais and Areas 1-4) has a public bool "quiet" that dims its floor decoration while
+        // hazards are up (boss design §8.1). They share no base class, so they're found by that field.
+        static readonly List<(MonoBehaviour arena, FieldInfo quiet)> arenas = new List<(MonoBehaviour, FieldInfo)>();
+        public static void FindArena()
+        {
+            arenas.Clear();
+            foreach (var mb in UnityEngine.Object.FindObjectsByType<MonoBehaviour>(FindObjectsSortMode.None))
+            {
+                var ns = mb.GetType().Namespace ?? "";
+                if (!ns.StartsWith("LastBell.Arenas") && !ns.StartsWith("LastBell.Areas")) continue;
+                var f = mb.GetType().GetField("quiet", BindingFlags.Public | BindingFlags.Instance);
+                if (f != null && f.FieldType == typeof(bool)) arenas.Add((mb, f));
+            }
+        }
+        public static int ArenaCount => arenas.Count;
+        static void SetQuiet(bool q) { foreach (var (arena, f) in arenas) if (arena) f.SetValue(arena, q); }
     }
 }

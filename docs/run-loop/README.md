@@ -6,7 +6,23 @@
 
 Menu → **Preparation** (Ready) → **Dial Warden** → **Pendulum Sentinel** → **Chimebound Oracle** → **Intermission** (future-shop placeholder, Continue) → **The Bellkeeper** (three HP phases) → **Results** (victory or defeat, with death recap and damage meter) → **Retry Run** (fresh run at encounter 1) or **Main Menu**. There's also **Practice** for any single encounter, which never advances a run, and a **Pause** menu (Esc) with Resume / Restart / Main Menu.
 
-All of it runs in the one key-art arena: `Assets/LastBell/Run/RunArena.unity`, a copy of `KeyArtTestArena.unity` with a `RunDirector`. Three classes are selectable: **Vanguard** (approved four-slot kit), **Chimesinger** (approved DPS kit) and **Arcanist** (approved hard rotation, #41; added Oct 21 from the Arcanist session's handover).
+It runs on any of five maps (see [Maps](#maps)); the default is the key-art test map, `Assets/LastBell/Run/RunArena.unity`, a copy of `KeyArtTestArena.unity` with a `RunDirector`. Three classes are selectable: **Vanguard** (approved four-slot kit), **Chimesinger** (approved DPS kit) and **Arcanist** (approved hard rotation, #41; added Oct 21 from the Arcanist session's handover).
+
+## Maps
+
+The menu has a **Map** row (or press **[** / **]**) to pick which arena to test. Encounters, bounds and camera are identical on every map: all five arenas share the same layout convention (centre origin, entry to the south at +z, floor at y = 0, walkable radius of at least 13.5 m), and the run keeps its 11.5 m play bound everywhere.
+
+| Map | Source scene | Run scene |
+| --- | --- | --- |
+| **Test Map** (Bellkeeper's Dais, key art; boots here) | `Arenas/KeyArt/KeyArtTestArena.unity` | `Run/RunArena.unity` |
+| **Skyward Spire** (Area 1) | `Areas/Area1/SkywardSpire_Arena.unity` | `Run/Maps/Run_SkywardSpire.unity` |
+| **Brass Foundry** (Area 2) | `Areas/Area2/BrassFoundry_Arena.unity` (generated, not committed) | `Run/Maps/Run_BrassFoundry.unity` |
+| **Verdant Chimes** (Area 3) | `Areas/Area3/VerdantChimes_Arena.unity` | `Run/Maps/Run_VerdantChimes.unity` |
+| **Shattered Hour** (Area 4, final arena) | `Areas/Area4/ShatteredHour_FinalArena.unity` | `Run/Maps/Run_ShatteredHour.unity` |
+
+- The list lives in `Run/RunMaps.cs`. **Last Bell → Run Loop → Rebuild Run Scenes (all maps)** copies each source scene, hides the look-check props (`ScaleReference_Vanguard`, `TelegraphCheck`, `TelegraphTest`), adds a `RunDirector` and puts all five in the build settings. A missing source scene is generated with its area builder first.
+- Start on a given map from the command line: `LastBell.exe -lastbellMap brass-foundry` (ids: `test`, `skyward-spire`, `brass-foundry`, `verdant-chimes`, `shattered-hour`). This works with `-lastbellAutotest` too.
+- The arena art is owned by the four area sessions (Areas 1-4). After one of them rebuilds its arena, rerun Rebuild Run Scenes.
 
 ## Launch
 
@@ -29,6 +45,7 @@ All of it runs in the one key-art arena: `Assets/LastBell/Run/RunArena.unity`, a
 | Space / Shift | jump / sprint (shared movement stamina) |
 | F | drink a potion (+40 HP) |
 | Enter | Ready / Continue / Start run |
+| [ / ] | menu: previous / next map |
 | Tab | damage meter (this encounter) |
 | Esc | pause |
 | R / M | Retry / Main menu on the results screen |

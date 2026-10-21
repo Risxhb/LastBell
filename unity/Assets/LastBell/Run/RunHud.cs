@@ -14,8 +14,8 @@ namespace LastBell.Run
         public static void Float(Vector3 world, string text, Color c) { if (floats.Count < 80) floats.Add(new FloatText { pos = world, text = text, color = c }); }
         public static void ClearTransient() { floats.Clear(); }
 
-        RunDirector d; GUIStyle title, big, mid, small, tiny, num, box, btn, slot; Texture2D white;
-        int menuClass;
+        RunDirector d; GUIStyle title, big, mid, small, tiny, num, box, btn, mapBtn, slot; Texture2D white;
+        static int menuClass;   // static: survives the scene load when the menu switches map
         public static bool ShowMeter;   // Tab
 
         static readonly Dictionary<string, string> Hints = new Dictionary<string, string>
@@ -45,6 +45,11 @@ namespace LastBell.Run
                 else if (kb.mKey.wasPressedThisFrame) d.ReturnToMenu();
             }
             if (d.State == RunState.Menu && (kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame)) d.StartRun(RunDirector.Classes[menuClass]);
+            if (d.State == RunState.Menu && (kb.leftBracketKey.wasPressedThisFrame || kb.rightBracketKey.wasPressedThisFrame))
+            {
+                int n = RunMaps.All.Length, step = kb.rightBracketKey.wasPressedThisFrame ? 1 : n - 1;
+                d.SelectMap((Mathf.Max(0, RunMaps.Current) + step) % n);
+            }
         }
 
         void Styles()
@@ -60,6 +65,7 @@ namespace LastBell.Run
             num = new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
             box = new GUIStyle(GUI.skin.box);
             btn = new GUIStyle(GUI.skin.button) { fontSize = 16, fontStyle = FontStyle.Bold, fixedHeight = 36 };
+            mapBtn = new GUIStyle(btn) { fontSize = 13 };
             slot = new GUIStyle(GUI.skin.label) { fontSize = 11, alignment = TextAnchor.UpperCenter, wordWrap = true, fontStyle = FontStyle.Bold }; slot.normal.textColor = Color.white;
         }
 
@@ -141,6 +147,7 @@ namespace LastBell.Run
             }
             if (d.Paused) Pause();
             GUI.Label(new Rect(w - 330, h - 22, 320, 20), "dev: F9 defeat boss · F8 next phase · Esc pause", tiny);
+            GUI.Label(new Rect(14, h - 22, 320, 20), "map: " + RunMaps.CurrentName, tiny);
         }
 
         static int SlotIndex(int encounter) => encounter >= 3 ? 4 : encounter;
@@ -149,9 +156,9 @@ namespace LastBell.Run
         void Menu()
         {
             float w = Screen.width, h = Screen.height;
-            var r = Panel(720, 520);
+            var r = Panel(720, 600);
             GUI.Label(new Rect(r.x, r.y + 18, r.width, 54), "LAST BELL", title);
-            GUI.Label(new Rect(r.x, r.y + 72, r.width, 22), "Boss-rush test build · single arena run loop", mid);
+            GUI.Label(new Rect(r.x, r.y + 72, r.width, 22), "Boss-rush test build · pick a map and a class", mid);
             GUI.Label(new Rect(r.x + 30, r.y + 110, 200, 22), "Class", small);
             for (int i = 0; i < RunDirector.Classes.Length; i++)
             {
@@ -165,13 +172,21 @@ namespace LastBell.Run
                 ? "Bell staff. 1 Resonant Note (+Harmony) · 2 Bellstrike (2 charges, rings a bell) · 3 Harmonic Refrain (adds echoes) · 4 Crescendo (detonate) · 6 Mending Chorus (instant heal)."
                 : "Time magic. 1 Clockbolt (+Tick, max 3) · 2 Time Seal (2 charges, 6 s, ripe last 2 s) · 3 Arc Lance (3 Ticks: inscribes a seal) · 4 Convergence (detonate seals) · 6 Temporal Anchor (recast to return + shield).";
             GUI.Label(new Rect(r.x + 30, r.y + 176, r.width - 60, 40), desc, tiny);
-            if (GUI.Button(new Rect(r.x + r.width / 2 - 140, r.y + 222, 280, 40), "START RUN  (Enter)", btn)) d.StartRun(RunDirector.Classes[menuClass]);
-            GUI.Label(new Rect(r.x + 30, r.y + 276, 300, 22), "Practice one encounter", small);
+            int cur = RunMaps.Current;
+            GUI.Label(new Rect(r.x + 30, r.y + 216, r.width - 60, 22), "Map  ·  " + (cur >= 0 ? RunMaps.All[cur].Name + " — " + RunMaps.All[cur].Note : RunMaps.CurrentName) + "   ([ ] to switch)", small);
+            for (int i = 0; i < RunMaps.All.Length; i++)
+            {
+                var mr = new Rect(r.x + 30 + i * 133, r.y + 240, 127, 36);
+                bool on = cur == i;
+                if (GUI.Toggle(mr, on, (on ? "> " : "") + RunMaps.All[i].Name, mapBtn) && !on) d.SelectMap(i);
+            }
+            if (GUI.Button(new Rect(r.x + r.width / 2 - 140, r.y + 296, 280, 40), "START RUN  (Enter)", btn)) d.StartRun(RunDirector.Classes[menuClass]);
+            GUI.Label(new Rect(r.x + 30, r.y + 350, 300, 22), "Practice one encounter", small);
             string[] names = { "Dial Warden", "Pendulum Sentinel", "Chimebound Oracle", "Bellkeeper", "Escapement Twins" };
             float pw = (r.width - 60) / names.Length;
             for (int i = 0; i < names.Length; i++)
-                if (GUI.Button(new Rect(r.x + 30 + i * pw, r.y + 300, pw - 6, 36), names[i], btn)) d.StartPractice(RunDirector.Classes[menuClass], i == 4 ? RunDirector.PracticeEscapementTwins : i);
-            GUI.Label(new Rect(r.x + 30, r.y + 350, r.width - 60, 120),
+                if (GUI.Button(new Rect(r.x + 30 + i * pw, r.y + 374, pw - 6, 36), names[i], btn)) d.StartPractice(RunDirector.Classes[menuClass], i == 4 ? RunDirector.PracticeEscapementTwins : i);
+            GUI.Label(new Rect(r.x + 30, r.y + 424, r.width - 60, 120),
                 "Controls: WASD move · mouse aims · 1 / LMB basic · 2 3 4 class actions · 6 Mending Chorus / Temporal Anchor · 5 / RMB dash · F potion · Space jump · Shift sprint · Esc pause\n" +
                 "Movement stamina: sprint, jump and dash share one bar. No invincibility frames (dodging does not make you immune). F drinks a potion (+40 HP).\nHealth refills before each boss; potions carry over between minibosses and refill before the final boss. Retry restarts at the first miniboss.\n" +
                 "Minibosses are labelled stand-ins; the Bellkeeper uses its model. Arcanist kit numbers are prototype tuning. Dev keys in combat: F9 defeat boss, F8 next phase.", tiny);
