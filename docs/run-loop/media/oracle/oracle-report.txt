@@ -1,0 +1,38 @@
+Chimebound Oracle test: 26 passed, 0 failed
+      Chimebound Oracle test · 0.1.0 · Unity 6000.6.6f1 · 2026-10-21 13:49
+      ignored editor Exception: ArgumentOutOfRangeException: Index was out of range. Must be non-negative and less than the size of the collection.
+Parameter name: index
+PASS  practice starts the Oracle
+PASS  encounter is the Chimebound Oracle in phase 1  — Ordered Choir
+      screenshot 01_p1_shattered_chime.png
+      screenshot 02_p1_dividing_chime_alone.png
+      screenshot 03_p1_silent_fifth.png
+PASS  Silent Fifth: one 288° cone, 6.5 m, 144-tick warning, 26 damage, Ground
+PASS  Silent Fifth: four sectors hit, the silent one and beyond 6.5 m are safe
+PASS  Silent Fifth is cast from inside the 3 m leash  — 0.27 m
+      screenshot 04_p1_markers_then_cone.png
+PASS  Shattered Chime: 1.4 m markers, follow 30 + 48 after lock, 12 damage  — 6 markers
+PASS  markers come in threes, 24 ticks apart  — 24, 24
+PASS  Dividing Chime: 6.5 m, 70°, 18 tracking + 51 after lock, 20 damage
+PASS  combined loop: the cone warns at tick 110 of the volley  — 110
+PASS  anti-chain: the cone resolves ≥ 53 ticks after the last marker (15 stun + 38 escape)  — 53
+PASS  phase 2 is queued: no hazard is live during the iris transition  — phase shift, 0 live
+      screenshot 05_p2_iris_open.png
+      screenshot 06_p2_afterchime_repeat.png
+PASS  Afterchime repeats every original at its locked position  — 3 repeats / 3 originals
+PASS  the repeat warns 90 ticks, as one attack event (shared hit set)
+      screenshot 07_p2_unison_needle.png
+PASS  Unison Needle: 1.5 m beam, 48 tracking + 60 locked, 26 damage
+PASS  the Needle reaches the floor edge (no out-of-reach spot)  — 11.80 m from centre
+      screenshot 08_p2_passing_silence_beat2.png
+PASS  Passing Silence: the safe sector moves exactly one sector  — 72.0°
+PASS  beat 2 warns 120 ticks from beat 1's resolve tick  — beat 2 at +144
+PASS  Passing Silence beat 2: four sectors hit, the silent one and beyond 6.5 m are safe
+PASS  the boss never left the 3 m leash  — max 1.50 m
+PASS  never more than two damaging patterns at once (a marker volley counts as one)  — 2
+PASS  phase 2: one damaging pattern at a time  — 1
+PASS  one hit per attack event (no double hit on a sector border or repeat overlap)  — 2 hits: Dividing Chime ×1, Shattered Chime ×1
+PASS  two overlapping hazards in one group hit once  — took 5
+PASS  defeat cancels pending hazards and outlines
+PASS  nothing resolves after defeat
+PASS  no errors or exceptions in the log  — 0
