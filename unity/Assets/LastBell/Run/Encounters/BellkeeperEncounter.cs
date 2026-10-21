@@ -3,8 +3,9 @@ using UnityEngine;
 
 namespace LastBell.Run
 {
-    // The final boss. "Bellwarden" in the overnight request = this Bellkeeper: the Meshy source is
-    // Meshy_AI_Bellwarden_*.glb and it builds Resources/Characters/Bellkeeper.glb, so the runtime ID stays "bellkeeper".
+    // The final boss, shown with Bellkeeper 2.0 (Resources/Characters/Bellkeeper2.glb, from sheet 04-bellkeeper-v1.png,
+    // built by prototype/arena-3d/models/build-bellkeeper2.ps1). The first model, Bellkeeper.glb ("Bellwarden"), stays
+    // in the project; the runtime ID stays "boss.bellkeeper".
     // Schedule follows the encounter spec v0.3 (collab PR #16, docs/design/bellkeeper.md) at Steady Ticking: Codex's boss
     // packet (PR #46) for names and the Unfinished Hour, v0.2's numbers for everything else. Pending recommendations are
     // applied provisionally: D1 6.5 m Bell Sweep, D2 damage 30/25/30/15 (45 for the Final Toll's sweep), D7 echo damage =
@@ -41,7 +42,7 @@ namespace LastBell.Run
 
         protected override void Build()
         {
-            presenter = CharacterPresenter.Create(transform, "Bellkeeper", 5f, 0.55f, 0, host =>
+            presenter = CharacterPresenter.Create(transform, "Bellkeeper2", 5f, 0.2f, 0, host =>   // Meshy metal map is near 1: too dark without reflections
             {
                 Prim.Make(PrimitiveKind.Cone, host, new Vector3(0, 2.2f, 0), new Vector3(2.6f, 3.2f, 2.6f), new Color(0.6f, 0.45f, 0.2f));
                 Prim.Make(PrimitiveKind.Sphere, host, new Vector3(0, 4.1f, 0.2f), Vector3.one * 0.7f, new Color(0.95f, 0.92f, 0.85f), 1f);
@@ -178,7 +179,7 @@ namespace LastBell.Run
         IEnumerable<int> IsolatedEcho()
         {
             if (memory == null) yield break;
-            Current = Echo;
+            Current = Echo; presenter.PlayOnce("EchoTell", 1.53f);
             StartEcho();
             for (int i = 0; i < EchoWarning; i++) { Windup(i / (float)EchoWarning); yield return 1; }
             foreach (var w in Vulnerable(Recovery)) yield return w;
@@ -284,7 +285,7 @@ namespace LastBell.Run
                 yield return ChimeGap;
             }
             yield return 265 - 138 - 3 * ChimeGap;                             // echo activates at 265
-            Current = Echo; StartEcho();                                        // resolves 355
+            Current = Echo; StartEcho(); presenter.PlayOnce("EchoTell", 1.53f);   // resolves 355
             yield return 286 - 265;                                             // sweep warns at 286
             Current = "The Final Toll";
             presenter.PlayOnce("BellSweep", 2.03f);
