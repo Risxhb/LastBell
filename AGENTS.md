@@ -1,6 +1,14 @@
 # Last Bell: instructions for every coding agent
 
-These instructions apply to Codex, Claude and every other model contributing to this repository. Read [the architecture policy](docs/architecture.md), [decisions](docs/decisions.md), [workflow](docs/workflow.md) and your current lane issue before changing files. Follow direct human instructions and report conflicts with older plans.
+These instructions apply to Codex, Claude and every other model contributing to this repository. Read [current game design](docs/game-design.md), [architecture](docs/architecture.md), [decisions](docs/decisions.md), [workflow](docs/workflow.md) and your current task before changing files. Current human decisions override old plans/prototypes; report conflicts.
+
+## Current gameplay and tasks
+
+- Last Bell is a boss rush: three minibosses, shop intermission, larger boss; handcrafted arenas, bosses only. Shop implementation, upgrades, talents/progression and healing are deferred.
+- Three fixed starting classes; Basic, secondary, dodge and an optional fourth slot. Cursor-aim every ability; cooldowns without attack-resource costs. No auto-target, block/parry or iframes. Movement stamina covers jump, limited sprint and dodge/dash. Support enemy collision, brief hit-stun and knockback.
+- Practice is separate from the run. Solo defeat/party wipe restarts the run; co-op down/revive uses that player's own escalating down count. Four clock-themed difficulties; top tier adds a boss mechanic. Read explicit defaults/proposals and unresolved details in the design document.
+- Chzy18/Codex owns playable arena #30 and networking #7. Chzy18/Claude owns viewer #31, primarily authors handcrafted arena/character/environment content, and retains encounters #8. Coordinate scene/menu and shared-file seams with foundation #6.
+- Old Guard/Resonance/counter/iframe and six-upgrade/12-relic slice requirements are historical. Preserve useful evidence; do not port rejected mechanics as parity requirements.
 
 ## Required architecture
 
@@ -16,7 +24,7 @@ These instructions apply to Codex, Claude and every other model contributing to 
 - Networking, chzy18/codex (#7): session adapters, transport experiments and diagnostics against the agreed contract.
 - Encounters, chzy18/claude (#8): encounter content, authoring/validation and experimental character/environment work; coordinate adopted gameplay with foundation.
 - Pin Unity editor, compatible packages, render pipeline and Windows build prerequisites through U0. Agree the command/state/event/reset contract through U3 before production binding. Current diagnostic TCP is not a selected production transport.
-- PR #27 stays an experimental prototype pending review. This architecture decision does not adopt Vanguard 2.0, Dash, Bellkeeper v1.0 values or proposed balance changes automatically.
+- PR #27 stays experimental. Adopt only behavior matching current design; dash is required but its old iframes, counters and resource costs are rejected. Boss values, buffering and other balance details still require explicit review.
 
 ## Delivery and evidence
 

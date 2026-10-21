@@ -1,6 +1,6 @@
 # Last Bell architecture policy
 
-Approved by Risxhb on October 20, 2026. This policy supersedes conflicting historical engine plans. It records direction and adoption boundaries; Unity bootstrap and runtime integration still need implementation and validation.
+Approved by Risxhb on October 20, 2026. Read [current game design](game-design.md) for the newer boss-rush gameplay decisions, which supersede conflicting prototype/port requirements. This policy records architecture; Unity bootstrap and integration still need validation.
 
 ## One production game
 
@@ -20,7 +20,7 @@ Shared C# rules must avoid Unity scene, rendering, input and transport dependenc
 
 Keep draft PR #27 as an experimental review source. Review its class harness, Vanguard 2.0 and browser arena separately for reusable rules, test cases, presentation ideas and asset references. Extract accepted behavior into the shared C# rules, with explicit differences and acceptance checks. Avoid maintaining a second authoritative JavaScript combat implementation as production code.
 
-Dash, aim, combo buffering, counters, Resonance/Reversal, boss damage/phase changes and Bell Sweep fairness remain explicit design/contract decisions. Publishing this policy approves the architecture, not those individual proposals. Preserve useful historical branches and evidence.
+Cursor aim, dodge/dash, jumping, limited sprint and movement stamina are now required. No block/parry, attack-resource spending or iframes; counters/Resonance/Reversal loops from the prototype are superseded. Preserve historical branches/evidence. Combo buffering, boss numbers/phases, finite-stamina Bell Sweep fairness and other explicit tuning remain contract/design work. Three starting classes, practice, per-player escalating revival and four difficulties replace old build/relic gates.
 
 ## Foundation handoff gates
 
@@ -29,11 +29,11 @@ U0, owned by foundation: select and record the exact Unity editor, compatible re
 U3, owned by foundation with networking and encounter review: publish a versioned typed C# interface and representative fixtures covering:
 
 - Stable player/session IDs separate from connection IDs, attempt generations, 60 Hz tick and step ordering.
-- Movement bounds, aim/zero semantics, held Basic and consumed action press IDs; agree Dash and buffering only when their gameplay is adopted.
+- Movement/aim bounds and zero semantics, held Basic and consumed presses; stamina, jump/landing, sprint, no-iframe dodge, collision and buffering policy.
 - Authority-side action eligibility and results, retries, acknowledgments, expiry and duplicate rejection. A transport receipt or scheduled action does not mean combat activation succeeded.
-- Full actor/boss state and atomic snapshots/checkpoints, RNG, cooldowns and adopted kit state, event IDs/watermarks, deduplication and gap recovery.
+- Full actor/boss state and atomic checkpoints: RNG, cooldowns, stamina, jump/dodge, stun/knockback, down/revive timers and per-player run down counts, event IDs/watermarks and gap recovery. No obsolete attack-resource/guard state is required.
 - Shared hazard geometry, encounter context, lock/resolve timing, damage outcomes and truthful failure feedback.
-- Knockout/disconnect assignments, host loss, coordinated retry/reset, ready/reward boundaries and roster lifecycle.
+- Down/revive/disconnect assignments, host loss, practice versus fresh-run reset, three-miniboss/intermission/main-boss progression and roster lifecycle. Shop transactions/rewards/upgrades are deferred.
 
 The initial implementation should connect movement, the agreed action kit, damage and reset in one fight. Future fields may be staged; document unsupported behavior rather than claim the entire interface exists. Unity runtime and multiplayer acceptance remain separate gates.
 
@@ -42,8 +42,8 @@ The initial implementation should connect movement, the agreed action kit, damag
 | Lane | Next priority | Completion evidence |
 | --- | --- | --- |
 | Foundation #6 | Deliver U0 and a small U3 contract proposal, review the networking handoff in #24 and prototype adoption inputs in #25/#27 | Pinned project/build evidence and reviewed typed contract fixtures |
-| Networking #7 | Finish the currently authorized AP/AR socket experiment; map its APIs and gaps to the U3 proposal before binding | One-emission/receipt/unknown-outcome evidence, documented gaps; then a Unity adapter spike after U0/U3 |
-| Encounters #8 | Reconcile Bellkeeper proposals and list geometry/state/event requirements against U3; keep experimental visuals isolated | Reviewed spec and explicit outstanding design decisions, then shared-rule integration |
+| Chzy18/Codex #30/#7 | Finish or hand off AP/AR; deliver the revised solo Unity arena and viewer seam; map networking gaps to U3 | Actual Unity/Windows evidence for arena; diagnostic delivery results remain separately labeled |
+| Chzy18/Claude #31/#8 | Deliver model viewer and handcrafted arena content, reconcile Bellkeeper to no-iframe/cooldown/stamina design and propose four difficulty variants | Accurate model/import labels, Unity evidence, revised spec and finite-stamina escape checks |
 
 Existing ownership remains. Collaborators' operators control execution and priorities; request acknowledgment in lane threads. No automatic launch or acknowledgment is implied.
 
