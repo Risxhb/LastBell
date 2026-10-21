@@ -1,25 +1,27 @@
 # Area 1 — The Skyward Spire (look mockup)
 
-A quick three.js look mockup for Area 1, built from the first panel of `Reference/LAST-BELL-ARENA-ART-HANDOFF/artwork/a_wide_cinematic_concept_art_style_layout_poster.png`. It is not built on the Bellkeeper key art: that one is a square dais at sunset, while the Spire is a round ivory dais with four bridges under a blue daytime sky.
+A three.js look mockup for Area 1, built as close as possible to the first panel of `Reference/LAST-BELL-ARENA-ART-HANDOFF/artwork/a_wide_cinematic_concept_art_style_layout_poster.png`. It is not built on the Bellkeeper key art: that one is a square dais at sunset, while the Spire is a round ivory dais with four bridges under a blue daytime sky.
 
-Open `skyward-spire.html` through a local web server (the Vanguard model loads from `../../vanguard-model.js`). Views: `?view=game` (the same gameplay camera as `arena-look.html`), `?view=angle`, `?view=top`. Add `&tele` to draw a generic hostile circle and cone (a readability check, not a boss mechanic) and `&clean` to hide the tabs.
+Open `skyward-spire.html` through a local web server (the Vanguard model loads from `../../vanguard-model.js`). Views: `?view=game` (the same gameplay camera as `arena-look.html`), `?view=angle`, `?view=top`. Add `&tele` to draw a generic hostile circle and cone (a readability check, not a boss mechanic) and `&clean` to hide the tabs. `shots/spire-vs-reference.png` shows the mockup next to the reference.
 
 ## What's in it
 
 - Dais: 14 m radius, flat and open, with nothing tall inside the rim. One arena hosts 3 minibosses and the area boss, so the floor stays generic.
-- Floor: radial ivory marble slabs, two muted slate-cobalt bands, thin gold hairlines, and a cobalt compass medallion at the centre.
-- Four bridges in a cross, each ending at a gold gear landing with a small obelisk.
-- Spires stand on the diagonals: tall at the back, short domed ones at the front so the gameplay camera keeps the floor in view.
-- Below: a tiered underside with turning gears; floating spire islands and clouds all around.
+- Floor: painted in the page at 3072 px, with colour, bump, roughness/metal and glow layers. It has large cream flagstones, a gold compass medallion with scrollwork and a sapphire heart, and eight spokes with enamel lozenges. There are also four round star emblems, scattered sapphire studs, and a gold-framed cobalt panel border.
+- Rim: a curb, a parapet with gold coping, pinnacle posts, and a drum of gold-framed cobalt panels.
+- Bridges: four, with balustrades, a cobalt runner and gothic arches beneath. Each has a gatehouse at the mouth (no arch on the camera side) and a gear landing with a gate tower at the far end.
+- Towers: gothic, with square tiers, corner pinnacles, pointed cobalt windows, gold cornices, tall ribbed spires or domes, and star banners. They're tall at the back and short at the front, so the gameplay camera keeps the floor in view.
+- Below the dais: hanging columns, great gears and a tiered underside.
+- Around it: mid-distance spires on rocks, floating cathedral islands, upside-down towers and clouds. Gold and enamel reflect the sky through an environment map.
 
 ## Findings
 
-- On a bright ivory floor, a coral warning wash disappears. Warnings here need a deep red-orange fill with a dark outer rim, so they stand out by brightness, not just by colour. The `&tele` shapes use that.
-- Pure cobalt rings on ivory looked as loud as the warnings did, so the bands are toned down to slate-cobalt. Only the centre medallion stays saturated.
+- On a bright ivory floor, a coral warning wash disappears. Warnings here need a deep red-orange fill with a dark outer rim, so they stand out by brightness, not just by colour. The `&tele` shapes use that, and they still read over the detailed floor.
+- Fully metallic gold reflects the deep-blue sky overhead and turns olive. Gold here is part-metal with a warm glow.
 
 ## Gaps against the reference
 
-There is less gold ornament, fewer spires and no hanging banners off the rim yet. These get added in the Unity pass.
+The reference is painted and warmer, with heavier sculpted gold (filigree on the towers, ornate gate crowns). The shapes and layout match. The finer surface ornament comes with the Unity pass and modelled assets.
 
 ## Next
 
