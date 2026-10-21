@@ -6,7 +6,7 @@ Branch `feature/escapement-twins`, stacked on `feature/run-loop` (#42). Spec: [d
 
 ## How to play it
 
-Menu → **Practice one encounter → Escapement Twins**. It's practice-only (slot `RunDirector.PracticeEscapementTwins` = 23), not part of the run's sequence. Dev keys: **F8** drops it to 49 % (Phase 2 starts at the next attack boundary), **F9** defeats it.
+Menu → pick a map (**Brass Foundry** is its home floor) → **Practice one encounter → Escapement Twins**. From the command line, `-lastbellMap brass-foundry` opens that map directly. It's practice-only (slot `RunDirector.PracticeEscapementTwins` = 23), not part of the run's sequence. Dev keys: **F8** drops it to 49 % (Phase 2 starts at the next attack boundary), **F9** defeats it.
 
 ## What's in
 
@@ -28,7 +28,7 @@ Menu → **Practice one encounter → Escapement Twins**. It's practice-only (sl
 - Difficulty tiers: First Chime, Striking Hour, and Midnight Toll's Counter-Measure. The run loop has no difficulty setting.
 - Active-duration hazards (R22). Each hazard still resolves on one tick; the active period is only scheduled time.
 - Co-op: rotating targets and centroid turning are coded, but only solo has been run.
-- Audio, the real model and animation, and the Brass Foundry arena (it's on `feature/class-test-arena` `87ab12b`; this uses the key-art arena).
+- Audio, the real model and animation. The real Brass Foundry collision (spec D6) still needs measuring; the map selector already loads the Foundry arena.
 
 ## Tests
 
@@ -46,7 +46,7 @@ Twins only: `LastBell.exe -lastbellAutotest -lastbellOnly twins -lastbellOut <di
 - the practice result
 
 **Results (October 21, 2026):**
-- Twins-only run: 22/22.
-- Full autotest in the packaged player: **134/134**, with 0 errors logged ([report](media/autotest-report-twins.txt)).
-- Screenshots: [Verdict bait](media/twins-verdict-bait.png), [Common Measure](media/twins-common-measure.png).
+- Twins-only run on the Brass Foundry map: 28/28.
+- Full autotest in the packaged player: **156/156** (after merging the run loop's map selector), with 0 errors logged ([report](media/autotest-report-twins.txt)).
+- Screenshots: [Verdict bait](media/twins-verdict-bait.png), [Common Measure](media/twins-common-measure.png), [Deadbeat on Brass Foundry](media/twins-deadbeat-foundry.png).
 - A self-strike video is kept locally in `run-loop-evidence/twins-1/twins_self_strike.mp4` (not committed).

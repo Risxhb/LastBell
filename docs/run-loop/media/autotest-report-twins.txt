@@ -1,6 +1,11 @@
-RESULT: ALL PASSED · 134 passed, 0 failed · errors logged: 0
-      Last Bell autotest · 0.1.0 · Unity 6000.6.6f1 · NVIDIA GeForce RTX 5080 · 2026-10-21 14:01
-PASS  boots into the menu in the arena scene
+RESULT: ALL PASSED · 156 passed, 0 failed · errors logged: 0
+      Last Bell autotest · 0.1.0 · Unity 6000.6.6f1 · NVIDIA GeForce RTX 5080 · 2026-10-21 14:14
+PASS  boots into the menu on a run map (Test Map)
+PASS  map selectable: Test Map  — Assets/LastBell/Run/RunArena.unity
+PASS  map selectable: Skyward Spire  — Assets/LastBell/Run/Maps/Run_SkywardSpire.unity
+PASS  map selectable: Brass Foundry  — Assets/LastBell/Run/Maps/Run_BrassFoundry.unity
+PASS  map selectable: Verdant Chimes  — Assets/LastBell/Run/Maps/Run_VerdantChimes.unity
+PASS  map selectable: Shattered Hour  — Assets/LastBell/Run/Maps/Run_ShatteredHour.unity
       screenshot 01_menu.png
 PASS  Vanguard skill-bar icons load (5 incl. dash)  — 5/5
 PASS  Chimesinger skill-bar icons load (6 incl. dash)  — 6/6
@@ -11,7 +16,7 @@ PASS  StartRun accepted once
 PASS  repeated Ready starts exactly one encounter  — starts 1
 PASS  encounter 1 is the Dial Warden
       screenshot 03_combat_dial_warden.png
-PASS  Vanguard strikes damage the boss through the kit  — 1500 -> 940
+PASS  Vanguard strikes damage the boss through the kit  — 1500 -> 914
 PASS  Steel Rhythm hit 3 granted Opening
       clips seen: Run, SteelRhythm1, SteelRhythm2, SteelRhythm3, Idle, SunderingBlow, BraceRaise, BraceHold, BraceLower, LastWord
 PASS  Vanguard plays SteelRhythm1
@@ -24,7 +29,7 @@ PASS  Vanguard approved-kit clips need no placeholder
       video frames vanguard_kit: 330
 PASS  dash before release cancels Sundering Blow without cooldown
 PASS  Last Word cooldown is running  — 37.6 s left
-PASS  empowered Sundering Blow consumes Opening and cuts Last Word by 2 s  — ult 36.33 -> 33.73
+PASS  empowered Sundering Blow consumes Opening and cuts Last Word by 2 s  — ult 36.32 -> 33.72
 PASS  Brace: frontal strike reduced by 60 %  — took 8 of 20
 PASS  Brace: no knockback from a mitigated hit
 PASS  Brace absorption grants Opening
@@ -124,6 +129,12 @@ PASS  second Refrain fills the two-echo cap  — HARMONY 5/5   BELL 4.4s  streng
 PASS  full-sequence Crescendo out-damages early detonation  — full 196 vs early 50
 PASS  Crescendo resolves exactly once  — boss lost 196, crescendo 196
 PASS  Crescendo spends Harmony and clears the bell
+PASS  dash moves 3 m over 12 ticks  — 3.000 m in 12 ticks
+PASS  bell strengthens up to twice  — HARMONY 0/5   BELL 7.5s  strength ++  echoes 1/2
+PASS  refreshing a capped bell leaves stored echoes unchanged  — echo 20 -> 30 -> 45 -> 45
+PASS  buffered press expires during stun instead of firing on recovery  — stunned 15 ticks, charges 2 -> 2
+PASS  Resonant Note killing blow kills the boss without an exception  — dead True
+PASS  projectile kill cancels pending hazards and notes in the same tick  — hazards 0, notes 0 (max in flight 1)
       video frames chimesinger_rotation: 540
       screenshot 24_chimesinger_bellkeeper.png
 PASS  Chimesinger run reaches victory
@@ -151,26 +162,47 @@ PASS  Arcanist run reaches victory
 PASS  practice starts the chosen encounter
 PASS  practice clear ends in a practice result, not a run victory
 PASS  practice retry repeats the same encounter
+PASS  map Skyward Spire: loads into the menu with its arena  — arena scripts 1
+      screenshot 28_map_skyward-spire_menu.png
+      screenshot 29_map_skyward-spire_combat.png
+PASS  map Skyward Spire: Bellkeeper fight runs (boss takes damage, player stays on the floor)  — boss hp 3600 -> 3400
+PASS  map Brass Foundry: loads into the menu with its arena  — arena scripts 1
+      screenshot 30_map_brass-foundry_menu.png
+      screenshot 31_map_brass-foundry_combat.png
+PASS  map Brass Foundry: Bellkeeper fight runs (boss takes damage, player stays on the floor)  — boss hp 3600 -> 3400
+PASS  map Verdant Chimes: loads into the menu with its arena  — arena scripts 1
+      screenshot 32_map_verdant-chimes_menu.png
+      screenshot 33_map_verdant-chimes_combat.png
+PASS  map Verdant Chimes: Bellkeeper fight runs (boss takes damage, player stays on the floor)  — boss hp 3600 -> 3400
+PASS  map Shattered Hour: loads into the menu with its arena  — arena scripts 1
+      screenshot 34_map_shattered-hour_menu.png
+      screenshot 35_map_shattered-hour_combat.png
+PASS  map Shattered Hour: Bellkeeper fight runs (boss takes damage, player stays on the floor)  — boss hp 3600 -> 3400
+PASS  map Test Map: loads into the menu with its arena  — arena scripts 1
+      screenshot 36_map_test_menu.png
+      screenshot 37_map_test_combat.png
+PASS  map Test Map: Bellkeeper fight runs (boss takes damage, player stays on the floor)  — boss hp 3600 -> 3400
+PASS  map tour returns to the starting map
 PASS  Twins practice accepted from the menu
 PASS  practice starts the Escapement Twins at the arena centre
 PASS  stadium body pushes players out at the tower ends  — body distance 0.30
 PASS  a 1 m swing at the tower end hits the body (not the centre circle)  — boss hp 1800 -> 1799
 PASS  bait spot is outside the body  — 1.37 m
-      screenshot 28_twins_verdict_bait.png
+      screenshot 38_twins_verdict_bait.png
 PASS  Verdict across the far pawl jams the boss  — self-strikes 1, now jammed
 PASS  a jammed cast recovers for 4.0 s  — 240 ticks
 PASS  sidestepping after lock avoids the lane  — hp 100 -> 100
 PASS  a lane aimed straight ahead from the Sun tower misses the Moon pawl
-      screenshot 29_twins_jammed.png
+      screenshot 39_twins_jammed.png
       video frames twins_self_strike: 330
-      screenshot 30_twins_common_measure.png
+      screenshot 40_twins_common_measure.png
 PASS  50 % queues one transition at an attack boundary, nothing warning  — phase 2, transition, 0 hazards
-      screenshot 31_twins_phase2.png
-      screenshot 32_twins_deadbeat_corridor.png
+      screenshot 41_twins_phase2.png
+      screenshot 42_twins_deadbeat_corridor.png
 PASS  Deadbeat's central corridor is safe  — hp 100 -> 100
-      screenshot 33_twins_rebuttal_pair_preview.png
+      screenshot 43_twins_rebuttal_pair_preview.png
 PASS  Rebuttal Pair: cone 2 goes live only after cone 1 resolves  — second True, overlap False
-      screenshot 34_Escapement Twins_windup.png
+      screenshot 44_Escapement Twins_windup.png
 PASS  Escapement Twins: boss death cancels pending hazards  — 1 pending (Alternating Verdict (Sun)) -> 0
 PASS  Escapement Twins: defeated boss stops colliding
 PASS  Escapement Twins: no damage after boss death  — hp 100 -> 100
@@ -179,109 +211,143 @@ PASS  Twins practice clear ends in a practice result
 PASS  no errors or exceptions logged  — 0 logged
 
 Director transitions:
-  119: Menu -> Ready (enc 0, gen 1)
-  176: Ready -> Intro (enc 0, gen 2)
+  118: Menu -> Ready (enc 0, gen 1)
+  174: Ready -> Intro (enc 0, gen 2)
   encounter start miniboss.dial_warden
-  416: Intro -> Combat (enc 0, gen 3)
+  412: Intro -> Combat (enc 0, gen 3)
   encounter end miniboss.dial_warden defeated=True
-  3589: Combat -> Cleared (enc 0, gen 4)
-  3949: Cleared -> Intro (enc 1, gen 5)
+  3292: Combat -> Cleared (enc 0, gen 4)
+  3652: Cleared -> Intro (enc 1, gen 5)
   encounter start miniboss.pendulum_sentinel
-  4189: Intro -> Combat (enc 1, gen 6)
+  3891: Intro -> Combat (enc 1, gen 6)
   encounter end miniboss.pendulum_sentinel defeated=True
-  5018: Combat -> Cleared (enc 1, gen 7)
-  5378: Cleared -> Intro (enc 2, gen 8)
+  4718: Combat -> Cleared (enc 1, gen 7)
+  5078: Cleared -> Intro (enc 2, gen 8)
   encounter start miniboss.chimebound_oracle
-  5618: Intro -> Combat (enc 2, gen 9)
+  5318: Intro -> Combat (enc 2, gen 9)
   encounter end miniboss.chimebound_oracle defeated=True
-  5987: Combat -> Cleared (enc 2, gen 10)
-  6346: Cleared -> Intermission (enc 2, gen 11)
-  6527: Intermission -> Intro (enc 3, gen 12)
+  5685: Combat -> Cleared (enc 2, gen 10)
+  6045: Cleared -> Intermission (enc 2, gen 11)
+  6226: Intermission -> Intro (enc 3, gen 12)
   encounter start boss.bellkeeper
-  6762: Intro -> Combat (enc 3, gen 13)
+  6459: Intro -> Combat (enc 3, gen 13)
   encounter end boss.bellkeeper defeated=True
-  9853: Combat -> Cleared (enc 3, gen 14)
-  10033: Cleared -> Results (enc 3, gen 15)
-  10034: Results -> Ready (enc 0, gen 16)
-  10083: Ready -> Intro (enc 0, gen 17)
+  9543: Combat -> Cleared (enc 3, gen 14)
+  9723: Cleared -> Results (enc 3, gen 15)
+  9724: Results -> Ready (enc 0, gen 16)
+  9773: Ready -> Intro (enc 0, gen 17)
   encounter start miniboss.dial_warden
-  10322: Intro -> Combat (enc 0, gen 18)
+  10012: Intro -> Combat (enc 0, gen 18)
   encounter end miniboss.dial_warden defeated=False
-  10520: Combat -> Downed (enc 0, gen 19)
-  10711: Downed -> Results (enc 0, gen 20)
-  10712: Results -> Ready (enc 0, gen 21)
-  10715: Ready -> Intro (enc 0, gen 22)
+  10210: Combat -> Downed (enc 0, gen 19)
+  10400: Downed -> Results (enc 0, gen 20)
+  10401: Results -> Ready (enc 0, gen 21)
+  10404: Ready -> Intro (enc 0, gen 22)
   encounter start miniboss.dial_warden
-  10954: Intro -> Combat (enc 0, gen 23)
-  11135: Combat -> Menu (enc 0, gen 24)
-  11137: Menu -> Ready (enc 0, gen 25)
-  11182: Ready -> Intro (enc 0, gen 26)
+  10643: Intro -> Combat (enc 0, gen 23)
+  10824: Combat -> Menu (enc 0, gen 24)
+  10826: Menu -> Ready (enc 0, gen 25)
+  10869: Ready -> Intro (enc 0, gen 26)
   encounter start miniboss.dial_warden
-  11422: Intro -> Combat (enc 0, gen 27)
+  11108: Intro -> Combat (enc 0, gen 27)
   encounter end miniboss.dial_warden defeated=True
-  12859: Combat -> Cleared (enc 0, gen 28)
-  13219: Cleared -> Intro (enc 1, gen 29)
+  12343: Combat -> Cleared (enc 0, gen 28)
+  12605: Cleared -> Intro (enc 1, gen 29)
   encounter start miniboss.pendulum_sentinel
-  13459: Intro -> Combat (enc 1, gen 30)
+  12844: Intro -> Combat (enc 1, gen 30)
   encounter end miniboss.pendulum_sentinel defeated=True
-  13761: Combat -> Cleared (enc 1, gen 31)
-  14121: Cleared -> Intro (enc 2, gen 32)
+  13146: Combat -> Cleared (enc 1, gen 31)
+  13506: Cleared -> Intro (enc 2, gen 32)
   encounter start miniboss.chimebound_oracle
-  14361: Intro -> Combat (enc 2, gen 33)
+  13746: Intro -> Combat (enc 2, gen 33)
   encounter end miniboss.chimebound_oracle defeated=True
-  14663: Combat -> Cleared (enc 2, gen 34)
-  15022: Cleared -> Intermission (enc 2, gen 35)
-  15022: Intermission -> Intro (enc 3, gen 36)
+  14046: Combat -> Cleared (enc 2, gen 34)
+  14406: Cleared -> Intermission (enc 2, gen 35)
+  14406: Intermission -> Intro (enc 3, gen 36)
   encounter start boss.bellkeeper
-  15262: Intro -> Combat (enc 3, gen 37)
+  14646: Intro -> Combat (enc 3, gen 37)
   encounter end boss.bellkeeper defeated=True
-  15745: Combat -> Cleared (enc 3, gen 38)
-  16105: Cleared -> Results (enc 3, gen 39)
-  16105: Results -> Menu (enc 3, gen 40)
-  16106: Menu -> Ready (enc 0, gen 41)
-  16151: Ready -> Intro (enc 0, gen 42)
+  15128: Combat -> Cleared (enc 3, gen 38)
+  15488: Cleared -> Results (enc 3, gen 39)
+  15488: Results -> Menu (enc 3, gen 40)
+  15489: Menu -> Ready (enc 0, gen 41)
+  15532: Ready -> Intro (enc 0, gen 42)
   encounter start miniboss.dial_warden
-  16390: Intro -> Combat (enc 0, gen 43)
+  15772: Intro -> Combat (enc 0, gen 43)
   encounter end miniboss.dial_warden defeated=True
-  18023: Combat -> Cleared (enc 0, gen 44)
-  18383: Cleared -> Intro (enc 1, gen 45)
+  17401: Combat -> Cleared (enc 0, gen 44)
+  17761: Cleared -> Intro (enc 1, gen 45)
   encounter start miniboss.pendulum_sentinel
-  18623: Intro -> Combat (enc 1, gen 46)
+  18001: Intro -> Combat (enc 1, gen 46)
   encounter end miniboss.pendulum_sentinel defeated=True
-  18852: Combat -> Cleared (enc 1, gen 47)
-  19211: Cleared -> Intro (enc 2, gen 48)
+  18243: Combat -> Cleared (enc 1, gen 47)
+  18603: Cleared -> Intro (enc 2, gen 48)
   encounter start miniboss.chimebound_oracle
-  19451: Intro -> Combat (enc 2, gen 49)
+  18843: Intro -> Combat (enc 2, gen 49)
   encounter end miniboss.chimebound_oracle defeated=True
-  19693: Combat -> Cleared (enc 2, gen 50)
-  20053: Cleared -> Intermission (enc 2, gen 51)
-  20053: Intermission -> Intro (enc 3, gen 52)
+  19085: Combat -> Cleared (enc 2, gen 50)
+  19444: Cleared -> Intermission (enc 2, gen 51)
+  19444: Intermission -> Intro (enc 3, gen 52)
   encounter start boss.bellkeeper
-  20291: Intro -> Combat (enc 3, gen 53)
+  19684: Intro -> Combat (enc 3, gen 53)
   encounter end boss.bellkeeper defeated=True
-  20768: Combat -> Cleared (enc 3, gen 54)
-  21127: Cleared -> Results (enc 3, gen 55)
-  21127: Results -> Menu (enc 3, gen 56)
-  21128: Menu -> Ready (enc 3, gen 57)
-  21128: Ready -> Intro (enc 3, gen 58)
+  20167: Combat -> Cleared (enc 3, gen 54)
+  20527: Cleared -> Results (enc 3, gen 55)
+  20527: Results -> Menu (enc 3, gen 56)
+  20528: Menu -> Ready (enc 3, gen 57)
+  20528: Ready -> Intro (enc 3, gen 58)
   encounter start boss.bellkeeper
-  21368: Intro -> Combat (enc 3, gen 59)
+  20768: Intro -> Combat (enc 3, gen 59)
   encounter end boss.bellkeeper defeated=True
-  21490: Combat -> Cleared (enc 3, gen 60)
-  21850: Cleared -> Results (enc 3, gen 61)
-  21850: Results -> Ready (enc 3, gen 62)
-  21850: Ready -> Intro (enc 3, gen 63)
+  20890: Combat -> Cleared (enc 3, gen 60)
+  21250: Cleared -> Results (enc 3, gen 61)
+  21250: Results -> Ready (enc 3, gen 62)
+  21250: Ready -> Menu (enc 3, gen 63)
+  21432: Menu -> Ready (enc 3, gen 1)
+  21432: Ready -> Intro (enc 3, gen 2)
   encounter start boss.bellkeeper
-  22090: Intro -> Combat (enc 3, gen 64)
+  21672: Intro -> Combat (enc 3, gen 3)
   encounter end boss.bellkeeper defeated=True
-  22092: Combat -> Cleared (enc 3, gen 65)
-  22452: Cleared -> Results (enc 3, gen 66)
-  22452: Results -> Menu (enc 3, gen 67)
-  22454: Menu -> Ready (enc 23, gen 68)
-  22490: Ready -> Intro (enc 23, gen 69)
+  22154: Combat -> Cleared (enc 3, gen 4)
+  22514: Cleared -> Results (enc 3, gen 5)
+  22514: Results -> Menu (enc 3, gen 6)
+  22695: Menu -> Ready (enc 3, gen 1)
+  22695: Ready -> Intro (enc 3, gen 2)
+  encounter start boss.bellkeeper
+  22935: Intro -> Combat (enc 3, gen 3)
+  encounter end boss.bellkeeper defeated=True
+  23418: Combat -> Cleared (enc 3, gen 4)
+  23778: Cleared -> Results (enc 3, gen 5)
+  23778: Results -> Menu (enc 3, gen 6)
+  23959: Menu -> Ready (enc 3, gen 1)
+  23959: Ready -> Intro (enc 3, gen 2)
+  encounter start boss.bellkeeper
+  24199: Intro -> Combat (enc 3, gen 3)
+  encounter end boss.bellkeeper defeated=True
+  24681: Combat -> Cleared (enc 3, gen 4)
+  25041: Cleared -> Results (enc 3, gen 5)
+  25041: Results -> Menu (enc 3, gen 6)
+  25223: Menu -> Ready (enc 3, gen 1)
+  25223: Ready -> Intro (enc 3, gen 2)
+  encounter start boss.bellkeeper
+  25455: Intro -> Combat (enc 3, gen 3)
+  encounter end boss.bellkeeper defeated=True
+  25938: Combat -> Cleared (enc 3, gen 4)
+  26297: Cleared -> Results (enc 3, gen 5)
+  26297: Results -> Menu (enc 3, gen 6)
+  26478: Menu -> Ready (enc 3, gen 1)
+  26478: Ready -> Intro (enc 3, gen 2)
+  encounter start boss.bellkeeper
+  26718: Intro -> Combat (enc 3, gen 3)
+  encounter end boss.bellkeeper defeated=True
+  27199: Combat -> Cleared (enc 3, gen 4)
+  27559: Cleared -> Results (enc 3, gen 5)
+  27559: Results -> Menu (enc 3, gen 6)
+  27561: Menu -> Ready (enc 23, gen 7)
+  27597: Ready -> Intro (enc 23, gen 8)
   encounter start miniboss.escapement_twins
-  22730: Intro -> Combat (enc 23, gen 70)
+  27837: Intro -> Combat (enc 23, gen 9)
   encounter end miniboss.escapement_twins defeated=True
-  26491: Combat -> Cleared (enc 23, gen 71)
-  26650: Cleared -> Results (enc 23, gen 72)
-  26650: Results -> Menu (enc 23, gen 73)
+  33973: Combat -> Cleared (enc 23, gen 10)
+  34332: Cleared -> Results (enc 23, gen 11)
+  34332: Results -> Menu (enc 23, gen 12)
