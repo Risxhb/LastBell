@@ -1,0 +1,7 @@
+DIAGNOSTIC REPRODUCTION ONLY; passing means vulnerabilities reproduced, not gameplay acceptance.
+REPRODUCED: 13-increment dash | documented=3m/12ticks; actual=3.2500m/13ticks; stamina=70.00
+REPRODUCED: echo amplification past strength cap | seeded capped strength=2/echo=20; refreshed=30,45; capped expectation=20,20
+REPRODUCED: stale buffer activates after stun | elapsed=16 ticks; bufferAgeAfter15=1; actionAfterRecovery=Strike; TTL=9
+REPRODUCED: projectile killing blow collection invalidation | bossDead=True; remainingProjectiles=0; exception=ArgumentOutOfRangeException: Index was out of range. Must be non-negative and less than the size of the collection.
+Parameter name: index
+Reproduction checks not matching expected vulnerability: 0

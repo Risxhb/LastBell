@@ -1,0 +1,247 @@
+RESULT: FAILURES · 106 passed, 1 failed · errors logged: 1
+      Last Bell autotest · 0.1.0 · Unity 6000.6.6f1 · NVIDIA GeForce RTX 3060 · 2026-10-21 05:09
+PASS  boots into the menu in the arena scene
+      screenshot 01_menu.png
+PASS  Vanguard skill-bar icons load (5 incl. dash)  — 5/5
+PASS  Chimesinger skill-bar icons load (6 incl. dash)  — 6/6
+PASS  Arcanist skill-bar icons load (6 incl. dash)  — 6/6
+PASS  potion icon loads
+PASS  StartRun accepted once
+      screenshot 02_ready_vanguard.png
+PASS  repeated Ready starts exactly one encounter  — starts 1
+PASS  encounter 1 is the Dial Warden
+      screenshot 03_combat_dial_warden.png
+PASS  Vanguard strikes damage the boss through the kit  — 1500 -> 940
+PASS  Steel Rhythm hit 3 granted Opening
+      clips seen: Run, SteelRhythm1, SteelRhythm2, SteelRhythm3, Idle, SunderingBlow, BraceRaise, BraceHold, BraceLower, LastWord
+PASS  Vanguard plays SteelRhythm1
+PASS  Vanguard plays SteelRhythm2
+PASS  Vanguard plays SteelRhythm3
+PASS  Vanguard plays SunderingBlow
+PASS  Vanguard plays LastWord
+PASS  Vanguard plays the Brace set
+PASS  Vanguard approved-kit clips need no placeholder
+      video frames vanguard_kit: 330
+PASS  dash before release cancels Sundering Blow without cooldown
+PASS  Last Word cooldown is running  — 37.6 s left
+PASS  empowered Sundering Blow consumes Opening and cuts Last Word by 2 s  — ult 36.33 -> 33.72
+PASS  Brace: frontal strike reduced by 60 %  — took 8 of 20
+PASS  Brace: no knockback from a mitigated hit
+PASS  Brace absorption grants Opening
+PASS  Brace: rear strike bypasses  — took 20
+PASS  one hazard instance hits at most once
+PASS  F potion heals +40 and spends one  — hp 90, potions 4
+PASS  potion lockout: no second drink within 1 s
+      screenshot 04_dial_warden_windup.png
+PASS  dial_warden: boss death cancels pending hazards  — 1 pending (Hand Sweep) -> 0
+PASS  dial_warden: defeated boss stops colliding
+PASS  dial_warden: no damage after boss death  — hp 37 -> 37
+PASS  dial_warden: nothing resolved after boss death
+PASS  encounter 1 ended exactly once
+PASS  previous boss removed
+PASS  encounter 2 is the Pendulum Sentinel
+PASS  health refilled before miniboss 2; potions carried over  — hp 100, potions 4
+      screenshot 05_low_pendulum_jump_warning.png
+PASS  jumping through the Low Pendulum avoids it  — hp 78 -> 78
+      video frames low_pendulum_jump: 110
+      screenshot 06_pendulum_sentinel_windup.png
+PASS  pendulum_sentinel: boss death cancels pending hazards  — 1 pending (Pendulum Charge) -> 0
+PASS  pendulum_sentinel: defeated boss stops colliding
+PASS  pendulum_sentinel: no damage after boss death  — hp 78 -> 78
+PASS  pendulum_sentinel: nothing resolved after boss death
+PASS  encounter 3 is the Chimebound Oracle
+      screenshot 07_combat_oracle_markers.png
+      screenshot 08_chimebound_oracle_windup.png
+PASS  chimebound_oracle: boss death cancels pending hazards  — 1 pending (Dividing Chime) -> 0
+PASS  chimebound_oracle: defeated boss stops colliding
+PASS  chimebound_oracle: no damage after boss death  — hp 100 -> 100
+PASS  chimebound_oracle: nothing resolved after boss death
+PASS  intermission is free of hazards and bosses
+PASS  potions still carried at the intermission  — potions 4
+      screenshot 09_intermission.png
+PASS  repeated Continue starts exactly one final encounter
+PASS  health and potions refilled for the final boss  — hp 100, potions 5
+PASS  Bellkeeper uses its model
+      screenshot 10_combat_bellkeeper.png
+      video frames bellkeeper_fight: 300
+PASS  phase 2 queued and entered
+PASS  Bellkeeper plays PhaseShift on the transition  — PhaseShift
+      screenshot 11_bellkeeper_phase2.png
+PASS  phase 3 queued and entered
+      screenshot 12_bellkeeper_final_toll.png
+      screenshot 13_bellkeeper_windup.png
+PASS  bellkeeper: boss death cancels pending hazards  — 1 pending (Hollow Toll) -> 0
+PASS  bellkeeper: defeated boss stops colliding
+PASS  bellkeeper: no damage after boss death  — hp 100 -> 100
+PASS  bellkeeper: nothing resolved after boss death
+PASS  Bellkeeper plays Defeat  — Defeat
+      screenshot 14_bellkeeper_defeat.png
+PASS  victory after the fourth encounter  — victory True, cleared 4, starts 4, ends 4
+      screenshot 15_results_victory.png
+      video frames bellkeeper_defeat: 200
+PASS  repeated Retry starts exactly one fresh run  — runs +1, state Ready
+PASS  fresh run after victory: full health/stamina/potions, encounter 1
+PASS  fresh run after victory: cooldowns and class state reset
+PASS  fresh run after victory: no stale bosses, hazards or projectiles
+PASS  fresh run after victory: one player only
+PASS  Vanguard plays Down  — Down
+PASS  player goes down from a real hazard  — state Downed, cause Hand Sweep
+      screenshot 16_downed.png
+PASS  defeat result shows the cause  — Hand Sweep
+PASS  no hazards or attacks after defeat
+      screenshot 17_results_defeat.png
+PASS  retry after defeat starts one fresh run
+PASS  fresh run after defeat: full health/stamina/potions, encounter 1
+PASS  fresh run after defeat: cooldowns and class state reset
+PASS  fresh run after defeat: no stale bosses, hazards or projectiles
+PASS  fresh run after defeat: one player only
+      screenshot 18_paused.png
+PASS  return to menu leaves no run objects
+      screenshot 19_ready_chimesinger.png
+PASS  Bellstrike rings a bell on the boss  — HARMONY 0/5   BELL 7.7s  strength base  echoes 0/2
+PASS  Bellstrike spends one of two charges
+PASS  early Crescendo detonates and clears the bell  — damage 50
+PASS  Refrain on a ringing bell stores an echo  — HARMONY 3/5   BELL 5.9s  strength base  echoes 1/2
+PASS  Mending Chorus heals immediately and includes the caster  — hp 80
+PASS  healing keeps Harmony, bell and echoes  — HARMONY 3/5   BELL 5.8s  strength base  echoes 1/2
+PASS  Harmonic Step keeps Harmony, bell and echoes  — HARMONY 3/5   BELL 5.5s  strength base  echoes 1/2
+PASS  Bellstrike on an existing bell refreshes and strengthens it  — HARMONY 3/5   BELL 7.7s  strength +  echoes 1/2
+PASS  second Refrain fills the two-echo cap  — HARMONY 5/5   BELL 4.4s  strength +  echoes 2/2
+      screenshot 20_chimesinger_full_setup.png
+PASS  full-sequence Crescendo out-damages early detonation  — full 196 vs early 50
+PASS  Crescendo resolves exactly once  — boss lost 196, crescendo 196
+PASS  Crescendo spends Harmony and clears the bell
+      video frames chimesinger_rotation: 540
+      screenshot 21_chimesinger_bellkeeper.png
+PASS  Chimesinger run reaches victory
+      screenshot 22_ready_arcanist.png
+PASS  Arcanist uses its model
+PASS  Clockbolt builds Ticks and caps at 3  — TICKS ●●●
+PASS  Clockstep cancels an unfinished Arc Lance and keeps Ticks  — TICKS ●●●
+PASS  Time Seal places a seal and spends a charge  — TICKS ●●●   SEAL A 5.7s
+PASS  early Convergence detonates and clears seals  — damage 30
+PASS  three Clockbolts reach 3 Ticks  — TICKS ●●●   SEAL A 5.0s
+PASS  empowered Arc Lance spends Ticks and inscribes the oldest seal  — TICKS ○○○   SEAL A 4.6s +INSCRIBED
+      Seal A -> Seal B spacing: 1.52 s (must be < 2 s for a shared ripe window)
+PASS  Seal B is a separate seal on the same target  — TICKS ○○○   SEAL A 4.4s +INSCRIBED   SEAL B 5.9s
+PASS  second empowered Lance inscribes seal B  — TICKS ○○○   SEAL A 3.1s +INSCRIBED   SEAL B 4.6s +INSCRIBED
+PASS  the two-seal schedule fits inside the shared ripe window  — TICKS ○○○   SEAL A 0.5s RIPE +INSCRIBED   SEAL B 2.0s RIPE +INSCRIBED
+      screenshot 23_arcanist_two_ripe_seals.png
+PASS  perfect Convergence out-damages early detonation  — perfect 300 vs early 30
+PASS  Convergence resolves exactly once  — boss lost 300, convergence 300
+PASS  Temporal Anchor records the position
+PASS  recast returns to the anchor  — 0.00 m away
+PASS  Anchor shield absorbs the next hit  — hp 100 -> 100, shield 10
+      video frames arcanist_rotation: 480
+      screenshot 24_arcanist_bellkeeper.png
+PASS  Arcanist run reaches victory
+PASS  practice starts the chosen encounter
+PASS  practice clear ends in a practice result, not a run victory
+PASS  practice retry repeats the same encounter
+FAIL  no errors or exceptions logged  — 1 logged
+
+Director transitions:
+  93: Menu -> Ready (enc 0, gen 1)
+  134: Ready -> Intro (enc 0, gen 2)
+  encounter start miniboss.dial_warden
+  359: Intro -> Combat (enc 0, gen 3)
+  encounter end miniboss.dial_warden defeated=True
+  3513: Combat -> Cleared (enc 0, gen 4)
+  3871: Cleared -> Intro (enc 1, gen 5)
+  encounter start miniboss.pendulum_sentinel
+  4111: Intro -> Combat (enc 1, gen 6)
+  encounter end miniboss.pendulum_sentinel defeated=True
+  4928: Combat -> Cleared (enc 1, gen 7)
+  5282: Cleared -> Intro (enc 2, gen 8)
+  encounter start miniboss.chimebound_oracle
+  5521: Intro -> Combat (enc 2, gen 9)
+  encounter end miniboss.chimebound_oracle defeated=True
+  5886: Combat -> Cleared (enc 2, gen 10)
+  6244: Cleared -> Intermission (enc 2, gen 11)
+  6424: Intermission -> Intro (enc 3, gen 12)
+  encounter start boss.bellkeeper
+  6658: Intro -> Combat (enc 3, gen 13)
+  encounter end boss.bellkeeper defeated=True
+  7832: Combat -> Cleared (enc 3, gen 14)
+  8012: Cleared -> Results (enc 3, gen 15)
+  8013: Results -> Ready (enc 0, gen 16)
+  8049: Ready -> Intro (enc 0, gen 17)
+  encounter start miniboss.dial_warden
+  8287: Intro -> Combat (enc 0, gen 18)
+  encounter end miniboss.dial_warden defeated=False
+  8485: Combat -> Downed (enc 0, gen 19)
+  8674: Downed -> Results (enc 0, gen 20)
+  8675: Results -> Ready (enc 0, gen 21)
+  8678: Ready -> Intro (enc 0, gen 22)
+  encounter start miniboss.dial_warden
+  8916: Intro -> Combat (enc 0, gen 23)
+  9097: Combat -> Menu (enc 0, gen 24)
+  9099: Menu -> Ready (enc 0, gen 25)
+  9145: Ready -> Intro (enc 0, gen 26)
+  encounter start miniboss.dial_warden
+  9383: Intro -> Combat (enc 0, gen 27)
+  encounter end miniboss.dial_warden defeated=True
+  10797: Combat -> Cleared (enc 0, gen 28)
+  11156: Cleared -> Intro (enc 1, gen 29)
+  encounter start miniboss.pendulum_sentinel
+  11394: Intro -> Combat (enc 1, gen 30)
+  encounter end miniboss.pendulum_sentinel defeated=True
+  11696: Combat -> Cleared (enc 1, gen 31)
+  12055: Cleared -> Intro (enc 2, gen 32)
+  encounter start miniboss.chimebound_oracle
+  12294: Intro -> Combat (enc 2, gen 33)
+  encounter end miniboss.chimebound_oracle defeated=True
+  12594: Combat -> Cleared (enc 2, gen 34)
+  12952: Cleared -> Intermission (enc 2, gen 35)
+  12952: Intermission -> Intro (enc 3, gen 36)
+  encounter start boss.bellkeeper
+  13192: Intro -> Combat (enc 3, gen 37)
+  encounter end boss.bellkeeper defeated=True
+  13673: Combat -> Cleared (enc 3, gen 38)
+  14030: Cleared -> Results (enc 3, gen 39)
+  14030: Results -> Menu (enc 3, gen 40)
+  14031: Menu -> Ready (enc 0, gen 41)
+  14077: Ready -> Intro (enc 0, gen 42)
+  encounter start miniboss.dial_warden
+  14314: Intro -> Combat (enc 0, gen 43)
+  encounter end miniboss.dial_warden defeated=True
+  15931: Combat -> Cleared (enc 0, gen 44)
+  16290: Cleared -> Intro (enc 1, gen 45)
+  encounter start miniboss.pendulum_sentinel
+  16529: Intro -> Combat (enc 1, gen 46)
+  encounter end miniboss.pendulum_sentinel defeated=True
+  16770: Combat -> Cleared (enc 1, gen 47)
+  17127: Cleared -> Intro (enc 2, gen 48)
+  encounter start miniboss.chimebound_oracle
+  17365: Intro -> Combat (enc 2, gen 49)
+  encounter end miniboss.chimebound_oracle defeated=True
+  17606: Combat -> Cleared (enc 2, gen 50)
+  17964: Cleared -> Intermission (enc 2, gen 51)
+  17964: Intermission -> Intro (enc 3, gen 52)
+  encounter start boss.bellkeeper
+  18204: Intro -> Combat (enc 3, gen 53)
+  encounter end boss.bellkeeper defeated=True
+  18684: Combat -> Cleared (enc 3, gen 54)
+  19044: Cleared -> Results (enc 3, gen 55)
+  19044: Results -> Menu (enc 3, gen 56)
+  19045: Menu -> Ready (enc 3, gen 57)
+  19045: Ready -> Intro (enc 3, gen 58)
+  encounter start boss.bellkeeper
+  19285: Intro -> Combat (enc 3, gen 59)
+  encounter end boss.bellkeeper defeated=True
+  19408: Combat -> Cleared (enc 3, gen 60)
+  19768: Cleared -> Results (enc 3, gen 61)
+  19768: Results -> Ready (enc 3, gen 62)
+
+Errors:
+Exception: ArgumentOutOfRangeException: Index was out of range. Must be non-negative and less than the size of the collection.
+Parameter name: index
+System.Collections.Generic.List`1[T].get_Item (System.Int32 index) (at <c5ae8a4eeb824526b5df2932bc2395e0>:0)
+UnityEditor.Search.SearchDatabase+<EnumerateAll>d__78.MoveNext () (at <f0a9be5047ae4d02964cde5cebf79f70>:0)
+System.Linq.Enumerable.TryGetFirst[TSource] (System.Collections.Generic.IEnumerable`1[T] source, System.Boolean& found) (at <f1b392d8fe224ca2b1f9fab1000b77eb>:0)
+System.Linq.Enumerable.First[TSource] (System.Collections.Generic.IEnumerable`1[T] source) (at <f1b392d8fe224ca2b1f9fab1000b77eb>:0)
+UnityEditor.Search.SearchDatabase.GetDefaultSearchDatabase () (at <f0a9be5047ae4d02964cde5cebf79f70>:0)
+UnityEditor.Search.SearchInit.IndexationOnStartup () (at <f0a9be5047ae4d02964cde5cebf79f70>:0)
+UnityEditor.EditorApplication.Internal_CallDelayFunctions () (at <d751d9fe5106449e86315aaf0dfa88b7>:0)
+UnityEngine.StackTraceUtility:ExtractStringFromExceptionInternal(Object, String&, String&)
+

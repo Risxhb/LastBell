@@ -1,0 +1,42 @@
+{
+  "sourceCommit": "18e89ed264eb3ba2cd0f18b50dfb7eaacc6f3149",
+  "sourceBranch": "feature/run-loop",
+  "editor": "6000.6.6f1_d20c9ac777da",
+  "date": "2026-10-21",
+  "buildResult": "Succeeded",
+  "buildErrors": 0,
+  "buildWarnings": 0,
+  "playerPassed": 107,
+  "playerFailed": 0,
+  "playerErrors": 0,
+  "editorPassed": 106,
+  "editorFailed": 1,
+  "editorErrors": 1,
+  "diagnosticDefectsReproduced": 4,
+  "files": [
+    {
+      "name": "windows-build.log",
+      "sha256": "49bd7c4b83bb3677775639396c3334c819e71755679d33ecf40983b9fd281f1b"
+    },
+    {
+      "name": "player-visible.log",
+      "sha256": "e53f3a692b7c62dfb122e9876c99071813566a559f3169422f60e0f9dee35abd"
+    },
+    {
+      "name": "player-visible/autotest-report.txt",
+      "sha256": "cd557a10da21c33aad4a442b57dc486b9a2855f491863e3520b8a2953d3f1fe7"
+    },
+    {
+      "name": "editor-playmode.log",
+      "sha256": "651c70c246932bd4cc66922faf78be101887ec6dd7cd66c156056cafe286c6e6"
+    },
+    {
+      "name": "editor/autotest-report.txt",
+      "sha256": "533e0e2198ccd0f11e2ca92b6208b2716ce8e95422fcb09c666f0d4bd987386d"
+    },
+    {
+      "name": "review-probe.txt",
+      "sha256": "d0a84d3a1770888d6ca557f887bf6e690aa28a4c665b719ed3f15dbda74c38fb"
+    }
+  ]
+}
