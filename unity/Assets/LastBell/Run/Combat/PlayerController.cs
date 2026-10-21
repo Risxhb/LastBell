@@ -232,7 +232,7 @@ namespace LastBell.Run
                     Spend(DashCost);
                     dashDir = move.sqrMagnitude > 0.01f ? move.normalized : transform.forward;
                     transform.rotation = Quaternion.LookRotation(dashDir);
-                    dashTick = DashTicks;
+                    dashTick = DashTicks - 1;   // this activation tick is the first of the DashTicks steps (3 m over 12 ticks)
                     Kit.OnDash();
                     Presenter.Dash();
                     World.Fx.DashTrail(this);
