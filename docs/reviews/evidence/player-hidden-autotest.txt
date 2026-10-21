@@ -293,4 +293,3 @@ Error: ReadPixels was called to read pixels from system frame buffer, while not 
 Error: ReadPixels was called to read pixels from system frame buffer, while not inside drawing frame.
 
 Error: ReadPixels was called to read pixels from system frame buffer, while not inside drawing frame.
-
