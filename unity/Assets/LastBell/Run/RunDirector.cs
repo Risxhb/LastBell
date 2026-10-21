@@ -21,7 +21,8 @@ namespace LastBell.Run
     {
         public static RunDirector Instance { get; private set; }
 
-        public static readonly string[] SlotNames = { "Dial Warden", "Pendulum Sentinel", "Chimebound Oracle", "Intermission", "Bellkeeper" };
+        public static readonly string[] SlotNames = { "Dial Warden", "Pendulum Sentinel", "Chimebound Oracle", "Intermission", "Bellkeeper", "Sylvara" };
+        public const int SylvaraPractice = 4;                // practice-only: Verdant Chimes area boss (graybox), not part of the run
         public static readonly string[] Classes = { "Vanguard", "Chimesinger", "Arcanist" };
         const int IntroTicks = 120, ClearTicks = 180, DownedTicks = 100;
         static readonly Vector3 PlayerSocket = new Vector3(0, 0, 6.5f), BossSocket = new Vector3(0, 0, -1.5f);
@@ -76,7 +77,7 @@ namespace LastBell.Run
 
         // ---------------- requests (UI / keyboard / tests) ----------------
         public bool StartRun(string className) => Begin(RunMode.Run, className, 0);
-        public bool StartPractice(string className, int encounter) => Begin(RunMode.Practice, className, Mathf.Clamp(encounter, 0, 3));
+        public bool StartPractice(string className, int encounter) => Begin(RunMode.Practice, className, Mathf.Clamp(encounter, 0, SylvaraPractice));
 
         bool Begin(RunMode mode, string className, int encounter)
         {
@@ -163,11 +164,12 @@ namespace LastBell.Run
                 0 => BossEncounter.Spawn<DialWarden>(World, BossSocket, 0),
                 1 => BossEncounter.Spawn<PendulumSentinel>(World, BossSocket, 0),
                 2 => BossEncounter.Spawn<ChimeboundOracle>(World, BossSocket, 0),
+                SylvaraPractice => BossEncounter.Spawn<SylvaraEncounter>(World, BossSocket, 0),
                 _ => BossEncounter.Spawn<BellkeeperEncounter>(World, Vector3.zero, 0),
             };
             World.Boss = Boss;
             World.CombatActive = false;
-            if (index > 0) Player.RefreshHealth(refillPotions: index == 3);   // health policy: see PlayerController.RefreshHealth
+            if (index > 0) Player.RefreshHealth(refillPotions: index >= 3);   // Sylvara is an area final boss: full potions too (see PlayerController.RefreshHealth)
             Player.PrepareForEncounter(PlayerSocket, 180);
             Player.AbilitiesEnabled = false;
             Go(RunState.Intro);
@@ -212,7 +214,7 @@ namespace LastBell.Run
                     if (State == RunState.Combat && Boss && !Boss.Dead)
                     {
                         if (kb.f9Key.wasPressedThisFrame) Boss.DebugDefeat();
-                        if (kb.f8Key.wasPressedThisFrame) Boss.DebugSetHpFraction(Boss.Hp > Boss.MaxHp * 0.7f ? 0.69f : 0.34f);
+                        if (kb.f8Key.wasPressedThisFrame) Boss.DebugSetHpFraction(Boss is SylvaraEncounter ? (Boss.Hp > Boss.MaxHp * 0.65f ? 0.64f : 0.29f) : Boss.Hp > Boss.MaxHp * 0.7f ? 0.69f : 0.34f);
                     }
                 }
             }

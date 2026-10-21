@@ -196,6 +196,12 @@ namespace LastBell.Run
             yield return Wait(1.0f);
             Check("boots into the menu in the arena scene", d.State == RunState.Menu && FindAnyObjectByType<LastBell.Arenas.KeyArtArena>() != null);
             yield return Shot("menu");
+            if (OnlySylvara)
+            {
+                yield return SylvaraChecks();
+                Check("no errors or exceptions logged", errors == 0, errors + " logged");
+                Finish(); yield break;
+            }
             foreach (var cls in RunDirector.Classes)
             {
                 int slots = cls == "Vanguard" ? 5 : 6, found = 0;
@@ -378,6 +384,8 @@ namespace LastBell.Run
             d.RequestRetry();
             Check("practice retry repeats the same encounter", d.State == RunState.Ready && d.Encounter == 3 && d.Mode == RunMode.Practice);
             d.ReturnToMenu();
+
+            yield return SylvaraChecks();
 
             // ---------- report ----------
             Check("no errors or exceptions logged", errors == 0, errors + " logged");
@@ -608,6 +616,116 @@ namespace LastBell.Run
             Check("Crescendo spends Harmony and clears the bell", k.Harmony == 0 && !k.Bell);
             p.DebugSetHp(PlayerController.MaxHp);
             d.Boss.BeginCombat();
+        }
+
+        // ------------------------------------------------------------ Sylvara (graybox, docs/design/sylvara.md v0.1)
+        static bool OnlySylvara => Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellSylvara", StringComparison.OrdinalIgnoreCase));
+
+        IEnumerator SylvaraChecks()
+        {
+            // the practice section above leaves the director in Ready, where ReturnToMenu only works from the pause menu
+            if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }
+            d.StartPractice("Vanguard", RunDirector.SylvaraPractice);
+            d.RequestReady();
+            yield return Until(() => d.State == RunState.Combat, 4, "Sylvara practice combat");
+            var sy = d.Boss as SylvaraEncounter;
+            Check("Sylvara practice starts her encounter", sy != null && d.Mode == RunMode.Practice);
+            if (sy == null) yield break;
+            Check("Sylvara: full health and potions (area final boss)", d.Player.Hp == PlayerController.MaxHp && d.Player.Potions == PlayerController.MaxPotions);
+            d.Player.transform.position = new Vector3(0, 0, 3.2f); yield return Wait(0.4f);   // frame the body for the shot
+            yield return Shot("sylvara_body");
+
+            // watch the whole fight: hits per instance, hit rules, patterns live at once
+            var hitsPerInstance = new Dictionary<int, int>(); bool hitRules = true; int maxPatterns = 0, taken = 0;
+            Action<PlayerController, Hazard, int> onHit = (p, h, dmg) =>
+            {
+                hitsPerInstance[h.Id] = hitsPerInstance.TryGetValue(h.Id, out int n) ? n + 1 : 1;
+                hitRules &= h.Knockback == 0 && h.Stun == 9; taken += dmg;
+            };
+            d.World.PlayerHit += onHit;
+            bool watching = true;
+            IEnumerator Watch()
+            {
+                while (watching && d.World != null)
+                {
+                    int patterns = d.World.Hazards.Live.Select(h => h.Source.StartsWith("Threefold Bloom") ? "Threefold Bloom" : h.Source).Distinct().Count();
+                    maxPatterns = Mathf.Max(maxPatterns, patterns);
+                    if (d.Player && d.Player.Hp < 45) d.Player.DebugSetHp(PlayerController.MaxHp);   // keep the schedule running; damage is noted
+                    yield return null;
+                }
+            }
+            StartCoroutine(Watch());
+
+            // Phase 1: every attack once, and one full Bloom
+            bool bloomShot = false, rootShot = false;
+            float t0 = Time.time;
+            while (Time.time - t0 < 40f && d.State == RunState.Combat && !(sy.Order.Distinct().Count() >= 5 && sy.BloomsCompleted >= 1))
+            {
+                var sv = StartCoroutine(Survive(0.25f)); yield return Wait(0.25f); StopCoroutine(sv);
+                if (!rootShot && d.World.Hazards.Live.Count(h => h.Source == "Rootscript") >= 2) { rootShot = true; yield return Shot("sylvara_rootscript"); }
+                if (!bloomShot && d.World.Hazards.Live.Count(h => h.Source.StartsWith("Threefold Bloom")) >= 2) { bloomShot = true; yield return Shot("sylvara_bloom"); StartCoroutine(Capture("sylvara_bloom", 240)); }
+            }
+            bot.Clear();
+            Note("Sylvara phase 1 order: " + string.Join(" → ", sy.Order));
+            foreach (var id in new[] { "Pruning Arc", "Rootscript", "Seed of the Refrain", "Briar Procession", "Threefold Bloom" })
+                Check($"Sylvara phase 1 uses {id}", sy.Order.Contains(id));
+            var log = sy.BloomLog.Take(3).ToList();
+            bool ordered = log.Count == 3 && log[0].index == 0 && log[1].index == 1 && log[2].index == 2;
+            bool timing = ordered && log.All(e => e.spentTick - e.resolveTick == 17) && log[1].resolveTick - log[0].resolveTick == 72 && log[2].resolveTick - log[1].resolveTick == 72;
+            Check("Threefold Bloom resolves I → II → III", ordered, string.Join(", ", log.Select(e => e.index + 1)));
+            Check("Bloom flowers: 72-tick stagger, 18-tick active period (resolve tick + 17)", timing, string.Join(" | ", log.Select(e => $"{e.resolveTick}->{e.spentTick}")));
+
+            // stand in flower II through its whole active period: exactly one 13 HP hit, no knockback (test setup moves
+            // the player; the hit comes from the real hazard). Then walk into flower III during its active period: hit once.
+            yield return Until(() => d.World.Hazards.Live.Any(h => h.Source == "Threefold Bloom II" && h.ResolveAt - h.Age <= 4), 40, "next Bloom flower II about to open");
+            var f2 = d.World.Hazards.Live.FirstOrDefault(h => h.Source == "Threefold Bloom II");
+            if (f2 != null)
+            {
+                d.Player.DebugSetHp(PlayerController.MaxHp); bot.Clear();
+                d.Player.transform.position = f2.Origin; var at = f2.Origin;
+                int hits0 = hitsPerInstance.Count;
+                while (d.World.Hazards.Live.Contains(f2)) { bot.Clear(); yield return null; }
+                yield return Wait(0.1f);
+                Check("standing in a flower for its whole active period: hit exactly once for 13", hitsPerInstance.TryGetValue(f2.Id, out int n2) && n2 == 1 && d.Player.Hp == PlayerController.MaxHp - 13, $"hits {n2}, hp {d.Player.Hp}");
+                Check("no knockback: the player is still where the flower hit them", Sim.Flat(d.Player.transform.position - at).magnitude < 0.05f);
+                var f3 = d.World.Hazards.Live.FirstOrDefault(h => h.Source == "Threefold Bloom III");
+                if (f3 != null)
+                {
+                    yield return Until(() => f3.Age >= f3.ResolveAt + 6, 4, "flower III active");
+                    d.Player.DebugSetHp(PlayerController.MaxHp);
+                    d.Player.transform.position = f3.Origin;   // entering mid-activation
+                    while (d.World.Hazards.Live.Contains(f3)) yield return null;
+                    yield return Wait(0.1f);
+                    Check("entering a flower during its active period: hit once", hitsPerInstance.TryGetValue(f3.Id, out int n3) && n3 == 1, $"hits {n3}");
+                    yield return Wait(0.5f);
+                    d.Player.DebugSetHp(PlayerController.MaxHp);
+                    Check("a spent flower is safe: no further hits", hitsPerInstance.Count == hits0 + 2);
+                }
+            }
+
+            // phase transitions are queued to block boundaries
+            d.Boss.DebugSetHpFraction(0.64f);
+            yield return Until(() => sy.PhaseName == "Awakening Bloom", 25, "Sylvara phase 2");
+            Check("Sylvara enters Awakening Bloom below 65 %", sy.PhaseName == "Awakening Bloom");
+            yield return Wait(2f); yield return Shot("sylvara_phase2");
+            d.Boss.DebugSetHpFraction(0.29f);
+            float t1 = Time.time;
+            while (sy.PhaseName != "Hollow Refrain" && Time.time - t1 < 40f && d.State == RunState.Combat)
+            { var sv = StartCoroutine(Survive(0.25f)); yield return Wait(0.25f); StopCoroutine(sv); }
+            Check("Sylvara enters Hollow Refrain below 30 %", sy.PhaseName == "Hollow Refrain");
+            yield return Wait(2f); yield return Shot("sylvara_phase3");
+
+            watching = false; d.World.PlayerHit -= onHit;
+            Check("Sylvara: each hazard instance hits at most once (R16)", hitsPerInstance.Values.All(n => n == 1), $"{hitsPerInstance.Count} instances hit");
+            Check("Sylvara: hits stun 0.15 s with no knockback (D6)", hitRules);
+            Check("Sylvara: never more than one damaging pattern live (Steady Ticking)", maxPatterns <= 1, $"max {maxPatterns}");
+            Note($"Sylvara: bot took {taken} damage over the fight ({hitsPerInstance.Count} hits), healed by the test to keep the schedule running");
+
+            yield return KillDuringWindup("sylvara");
+            yield return Until(() => d.State == RunState.Results, 8, "Sylvara practice results");
+            Check("Sylvara practice clear ends in a practice result", d.Victory && d.Mode == RunMode.Practice);
+            Check("Sylvara: no Bloom props left after defeat", sy.PropCount == 0, sy.PropCount + " left");
+            d.ReturnToMenu(); yield return null;
         }
 
         void Finish()
