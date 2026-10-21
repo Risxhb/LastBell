@@ -60,7 +60,7 @@ Gamepads aren't read: the user's rudder pedals register as a controller. UI clic
 ## Tests actually run (evidence in `run-loop-evidence/`, not committed)
 
 - **Windows player build:** succeeded seven times tonight (0 errors). The packaged exe launched and ran the full autotest each time.
-- **Autotest in the packaged build:** see `autotest-7/autotest-report.txt` for the final run. It covers:
+- **Autotest in the packaged build, final run (build 7): 84/84 passed, 0 errors logged.** Copy: [media/autotest-report-build7.txt](media/autotest-report-build7.txt). It covers:
   - boot to menu in the arena
   - repeated Ready, Continue and Retry presses (each starts exactly one transition)
   - all four encounter slots, each started and ended exactly once
@@ -76,7 +76,7 @@ Gamepads aren't read: the user's rudder pedals register as a controller. UI clic
   - approved Vanguard clips actually playing
   - zero errors or exceptions in the player log
 - **Unity compilation:** clean apart from pre-existing obsolete-API warnings in other files.
-- **Editor Play Mode:** see the final section of this file for whether it was run and its result.
+- **Editor Play Mode** (same autotest, `RunBuild.PlayModeAutotest`, GUI editor launched from the command line): 83/84 passed. The only failure is the "no errors logged" check, tripped by one Unity-internal exception at editor startup (`UnityEditor.Search.SearchDatabase.EnumerateAll` during search indexing), not by game code. Report: `run-loop-evidence/editor-playmode/autotest-report.txt`.
 - **Not tested:** co-op or networking (on hold), gamepad, other resolutions, performance profiling, and human feel or readability review. The bot uses scripted input, not a human.
 
 Screens and videos: `run-loop-evidence/autotest-7/*.png` and `*.mp4` (vanguard_kit, low_pendulum_jump, bellkeeper_fight, bellkeeper_defeat, chimesinger_rotation). Contact sheets: `run-loop-evidence/vanguard/kit-contact-sheet.png`, `run-loop-evidence/bellkeeper-phase-defeat-sheet.png`.
@@ -126,6 +126,6 @@ Screens and videos: `run-loop-evidence/autotest-7/*.png` and `*.mp4` (vanguard_k
 5. An animation polish pass on the Vanguard ability clips (contact clearance, Down / GetUp), then the Arcanist (#41).
 6. Move the shared run/hazard code behind the foundation #6 contract (U3) when it lands.
 
-## Editor Play Mode check
+## Media
 
-See the final summary in the PR / wiki P-entry for the editor run result.
+Screenshots, videos and contact sheets from the gameplay camera are in [media/](media/): menu, Dial Warden combat, Low Pendulum JUMP warning, intermission, Bellkeeper Final Toll, victory and defeat results (with death recap and meter), Chimesinger full setup, plus vanguard_kit.mp4, chimesinger_rotation.mp4, low_pendulum_jump.mp4, bellkeeper_defeat.mp4.
