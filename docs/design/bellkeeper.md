@@ -1,8 +1,8 @@
 # The Bellkeeper — encounter specification
 
-Draft v0.3 · October 21, 2026 · Owner: `chzy18/claude` ([#8](https://github.com/Risxhb/collab/issues/8)) · Reviewer: `risxhb/codex`; `chzy18/codex` for session-facing rules.
+Draft v0.3.1 · October 21, 2026 · Owner: `chzy18/claude` ([#8](https://github.com/Risxhb/collab/issues/8)) · Reviewer: `risxhb/codex`; `chzy18/codex` for session-facing rules.
 
-Status: **specification only.** It is engine-independent and targets the Unity/C# production path. The Unity run loop ([PR #42](https://github.com/Risxhb/collab/pull/42), `BellkeeperEncounter.cs`) implements v0.2 at Steady Ticking; v0.3 is not implemented yet (§15).
+Status: **specification only; decisions D1–D9 made (§13).** It is engine-independent and targets the Unity/C# production path. The Unity run loop ([PR #42](https://github.com/Risxhb/collab/pull/42), `BellkeeperEncounter.cs`) implements v0.2 at Steady Ticking; v0.3 is not implemented yet (§15).
 
 **What v0.3 changes.** It takes the identity, model, phase names and the new signature mechanic from Codex's boss packet ([PR #46](https://github.com/Risxhb/collab/pull/46), board [#47](https://github.com/Risxhb/collab/issues/47), `docs/boss-model-review/`, Bellkeeper section, sheet `04-bellkeeper-v1.png`). It **keeps v0.2's numbers**: geometry, windows, damage, recoveries, hit-stun, knockback and party scaling stay what the spec and the Unity build already use. Where the packet proposed a different number, §2.1 lists both and says which one this spec uses. New numbers exist only where v0.2 had nothing (the Unfinished Hour schedule, §3.1) and are built from v0.2 values.
 
@@ -80,7 +80,7 @@ The packet (PR #46) proposed its own values. This spec uses the existing ones:
 | Hit-stun | ~0.15 s | **15 ticks (0.25 s)** plus 1.5 m knockback (§5.4) |
 | Chime targets | 1 solo, 2 for 2–4 players, 3 for 5–8 | v0.2 table (§6): 3 sequential markers solo; every player gets 2 at 2–4; `ceil(n/2)` players × 2 at 5–8 |
 | Boss HP | Measured DPS × 240 s (6000–9600 at an illustrative 40 DPS) | Unity test build 3600 (shortened); fight target 3–4 min at Steady Ticking; tuned by the foundation |
-| Party HP scaling | `1 + 0.7 × (n − 1)` | `1 + 0.6 × (n − 1)` (D6) |
+| Party HP scaling | `1 + 0.7 × (n − 1)` | `1 + 0.7 × (n − 1)` (D6: the packet's value adopted, for difficulty) |
 | Phase 3 sequence recovery | 3.5 s | 120 ticks (2.0 s) |
 
 ## 3. Attack vocabulary
@@ -298,7 +298,7 @@ Hollow Toll, the Unfinished Hour and The Final Toll's structure are the same at 
 
 **Revive is a risk choice.** The proposed channel is 3 s + 2 s per previous down. A reviver has to choose a spot that stays safe through the next attack, including a pending echo's outline.
 
-**Decision D4:** add a fixed extra recovery (+1.5 s at the end of a Phase 2 block) while any player is downed? Recommendation: yes for First Chime and Steady Ticking, no for higher tiers.
+**Downed recovery (D4, decided):** on First Chime only, the end of a Phase 2 block adds 1.5 s of recovery while any player is downed. Higher tiers never slow down for a down.
 
 **Practice vs fresh run:** practice starts the Bellkeeper directly with full health, stamina, phase 1, no memory and the practice seed, and never unlocks run progress. A fresh run resets everything at encounter 1; the Bellkeeper's seed comes from the run seed and the encounter index.
 
@@ -319,7 +319,7 @@ Scale ×0.7 on First Chime, ×1.0 on Striking Hour and ×1.2 on Midnight Toll.
 
 **Health between bosses** follows the run-loop decisions of October 21 (#42): health refills before each boss after the first, potions (+40 HP) carry over between minibosses, and health and potions both refill before the area's final boss. The packet asks that potions and healing stay with their current owner; this spec doesn't change them.
 
-**Boss HP** sets fight length (target 3–4 min at Steady Ticking; the packet's 240 s fits) and is the foundation's to tune from measured sustained DPS during movement, not a stationary dummy. The Unity test build uses 3600, shortened. Party scaling: `base × (1 + 0.6 × (n − 1))`, HP only, never mechanics (D6).
+**Boss HP** sets fight length (target 3–4 min at Steady Ticking; the packet's 240 s fits) and is the foundation's to tune from measured sustained DPS during movement, not a stationary dummy. The Unity test build uses 3600, shortened. Party scaling: `base × (1 + 0.7 × (n − 1))`, HP only, never mechanics (D6).
 
 ## 9. Content classification and reuse
 
@@ -391,19 +391,21 @@ Example card the data must support:
 
 > *"The Unfinished Hour (2:41, Phase 3). It replayed the Pendulum March lane from 2:36 at its original place, not where the Bellkeeper stood. You were 0.6 m inside the lane when it resolved. Step out of the dashed lane before the back ring turns."*
 
-## 13. Human decisions needed
+## 13. Decisions
 
-| # | Decision | Recommendation |
+Decided October 21, 2026. The user delegated D1–D9 with one direction: **the main boss fights are supposed to be hard.** Hard here means lethal mistakes and tight but always-escapable windows, never an unfair one: every window still passes the §5 escape check, and no change relies on invulnerability.
+
+| # | Decision | Decided |
 |---|---|---|
-| D1 | Bell Sweep: 6.5 m at v1.0 timing, or 8 m with longer windows | 6.5 m (the packet agrees) |
-| D2 | Damage values with the current health policy | v0.2 values (§8), not the packet's 14–18 |
-| D3 | Unity post-hit immunity and potions | Resolved in #42: no dodge immunity; potions kept with the refill rules in §8 |
-| D4 | Extra recovery while a player is downed | Yes on tiers 1–2 (§7) |
-| D5 | Unfinished Hour placement: every tier (packet) instead of tier 4 only (v0.2) | Every tier, as in §4 |
-| D6 | Boss HP scaling with party size | `base × (1 + 0.6 × (n − 1))`, not the packet's 0.7 |
-| D7 | Echo damage, and whether echo + Sweep can both hit on one tick (75 HP) | Source attack's damage; allow both hits, since the union is checked and each is avoidable |
-| D8 | Body collider vs the new model's wide legs | Keep 1.4 m; fit the legs to ≤ 1.6 m or fade them; never above 1.8 m without enlarging the Toll |
-| D9 | Arena: key-art slice arena now, Throne of the Final Toll later | Keep the slice bounds until the Throne has measured collision, then rerun §5 |
+| D1 | Bell Sweep: 6.5 m at v1.0 timing, or 8 m with longer windows | **6.5 m, 80°.** 8 m can't be escaped at the v1.0 timing; longer windows would make the fight easier, not harder |
+| D2 | Damage values with the current health policy | **v0.2 values (§8):** Sweep 30, Toll 25, March 30, Chime 15, Final Toll Sweep 45. The packet's 14–18 would let a player absorb six or more hits; at these values three or four mistakes end the run |
+| D3 | Unity post-hit immunity and potions | **Resolved (#42):** no dodge immunity; potions keep their refill rules (§8) |
+| D4 | Extra recovery while a player is downed | **First Chime only.** On Steady Ticking and above the schedule doesn't slow down for a down; reviving is a risk the team takes inside the normal windows |
+| D5 | Unfinished Hour placement | **Every tier** (§3.1, §4), with Borrowed Second added on Midnight Toll |
+| D6 | Boss HP scaling with party size | **`base × (1 + 0.7 × (n − 1))`** (the packet's value). Co-op fights last a little longer than solo instead of shorter |
+| D7 | Echo damage, and echo + Sweep both hitting on one tick | **Echo deals the recorded attack's damage; both may hit (75 HP).** The union is escape-checked (§5.2), so standing in both is a double mistake |
+| D8 | Body collider vs the new model's wide legs | **Keep the 1.4 m collider.** The new model's lower legs and feet must fit a 1.6 m-radius footprint (model brief, §14), and anything wider fades near the camera. Never above 1.8 m without enlarging the Toll |
+| D9 | Arena | **Key-art slice bounds now**; rerun §5 when the Throne of the Final Toll has measured collision |
 
 ## 14. Visual notes
 
