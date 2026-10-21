@@ -97,7 +97,7 @@ namespace LastBell.Run
                 case RunState.Ready:
                 {
                     var r = Panel(560, 150, h * 0.62f);
-                    GUI.Label(new Rect(r.x, r.y + 10, r.width, 34), d.Mode == RunMode.Practice ? "PRACTICE — " + RunDirector.SlotNames[SlotIndex(d.Encounter)] : "PREPARATION", big);
+                    GUI.Label(new Rect(r.x, r.y + 10, r.width, 34), d.Mode == RunMode.Practice ? "PRACTICE — " + SlotLabel(d.Encounter) : "PREPARATION", big);
                     GUI.Label(new Rect(r.x + 20, r.y + 46, r.width - 40, 44), d.Mode == RunMode.Practice ? "Practice never advances the run." : "Three minibosses, an intermission, then the Bellkeeper. Health refills before each boss; potions carry over until the final boss refills them.", mid);
                     if (GUI.Button(new Rect(r.x + r.width / 2 - 110, r.y + 98, 220, 36), "READY  (Enter)", btn)) d.RequestReady();
                     break;
@@ -142,6 +142,7 @@ namespace LastBell.Run
         }
 
         static int SlotIndex(int encounter) => encounter >= 3 ? 4 : encounter;
+        static string SlotLabel(int encounter) => encounter == RunDirector.PracticeCrucivar ? "Crucivar" : RunDirector.SlotNames[SlotIndex(encounter)];
 
         void Menu()
         {
@@ -164,9 +165,10 @@ namespace LastBell.Run
             GUI.Label(new Rect(r.x + 30, r.y + 176, r.width - 60, 40), desc, tiny);
             if (GUI.Button(new Rect(r.x + r.width / 2 - 140, r.y + 222, 280, 40), "START RUN  (Enter)", btn)) d.StartRun(RunDirector.Classes[menuClass]);
             GUI.Label(new Rect(r.x + 30, r.y + 276, 300, 22), "Practice one encounter", small);
-            string[] names = { "Dial Warden", "Pendulum Sentinel", "Chimebound Oracle", "Bellkeeper" };
-            for (int i = 0; i < 4; i++)
-                if (GUI.Button(new Rect(r.x + 30 + i * 166, r.y + 300, 160, 36), names[i], btn)) d.StartPractice(RunDirector.Classes[menuClass], i);
+            string[] names = { "Dial Warden", "Pendulum Sentinel", "Chimebound Oracle", "Bellkeeper", "Crucivar" };
+            float pw = (r.width - 60) / names.Length;
+            for (int i = 0; i < names.Length; i++)
+                if (GUI.Button(new Rect(r.x + 30 + i * pw, r.y + 300, pw - 6, 36), names[i], btn)) d.StartPractice(RunDirector.Classes[menuClass], i == names.Length - 1 ? RunDirector.PracticeCrucivar : i);
             GUI.Label(new Rect(r.x + 30, r.y + 350, r.width - 60, 120),
                 "Controls: WASD move · mouse aims · 1 / LMB basic · 2 3 4 class actions · 6 Mending Chorus / Temporal Anchor · 5 / RMB dash · F potion · Space jump · Shift sprint · Esc pause\n" +
                 "Movement stamina: sprint, jump and dash share one bar. No invincibility frames (dodging does not make you immune). F drinks a potion (+40 HP).\nHealth refills before each boss; potions carry over between minibosses and refill before the final boss. Retry restarts at the first miniboss.\n" +
@@ -180,7 +182,7 @@ namespace LastBell.Run
             GUI.Label(new Rect(r.x, r.y + 16, r.width, 50), d.Victory ? (d.Mode == RunMode.Practice ? "PRACTICE CLEARED" : "VICTORY") : "DEFEAT", title);
             var w = d.World;
             string lines = d.Victory ? (d.Mode == RunMode.Practice ? "Practice result only: the run is unchanged." : "The Bellkeeper is silenced. All four encounters cleared.")
-                                     : $"Downed by {d.DefeatCause} during {(d.Boss ? d.Boss.DisplayName : RunDirector.SlotNames[SlotIndex(d.Encounter)])}.";
+                                     : $"Downed by {d.DefeatCause} during {(d.Boss ? d.Boss.DisplayName : SlotLabel(d.Encounter))}.";
             lines += $"\n\nClass: {d.ClassName}   ·   Time in combat: {d.RunTicks / 60f / 60f:0}:{d.RunTicks / 60f % 60:00}   ·   Encounters cleared: {d.EncountersCleared}";
             if (w != null) lines += $"\nDamage dealt {w.DamageDealt}   ·   Damage taken {w.DamageTaken}";
             GUI.Label(new Rect(r.x + 20, r.y + 76, r.width - 40, 120), lines, mid);

@@ -76,7 +76,9 @@ namespace LastBell.Run
 
         // ---------------- requests (UI / keyboard / tests) ----------------
         public bool StartRun(string className) => Begin(RunMode.Run, className, 0);
-        public bool StartPractice(string className, int encounter) => Begin(RunMode.Practice, className, Mathf.Clamp(encounter, 0, 3));
+        // Practice-only boss slots after the run's four encounters (area bosses that aren't in the run yet).
+        public const int PracticeCrucivar = 4;
+        public bool StartPractice(string className, int encounter) => Begin(RunMode.Practice, className, Mathf.Clamp(encounter, 0, PracticeCrucivar));
 
         bool Begin(RunMode mode, string className, int encounter)
         {
@@ -163,6 +165,7 @@ namespace LastBell.Run
                 0 => BossEncounter.Spawn<DialWarden>(World, BossSocket, 0),
                 1 => BossEncounter.Spawn<PendulumSentinel>(World, BossSocket, 0),
                 2 => BossEncounter.Spawn<ChimeboundOracle>(World, BossSocket, 0),
+                PracticeCrucivar => BossEncounter.Spawn<CrucivarEncounter>(World, BossSocket, 0),
                 _ => BossEncounter.Spawn<BellkeeperEncounter>(World, Vector3.zero, 0),
             };
             World.Boss = Boss;
@@ -212,7 +215,7 @@ namespace LastBell.Run
                     if (State == RunState.Combat && Boss && !Boss.Dead)
                     {
                         if (kb.f9Key.wasPressedThisFrame) Boss.DebugDefeat();
-                        if (kb.f8Key.wasPressedThisFrame) Boss.DebugSetHpFraction(Boss.Hp > Boss.MaxHp * 0.7f ? 0.69f : 0.34f);
+                        if (kb.f8Key.wasPressedThisFrame) Boss.DebugSetHpFraction(Boss.NextPhaseFraction);
                     }
                 }
             }
