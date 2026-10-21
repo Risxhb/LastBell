@@ -1,0 +1,362 @@
+[
+  {
+    "file": "vanguard_steel_rhythm.png",
+    "size": [
+      256,
+      256
+    ],
+    "mode": "RGBA",
+    "alpha_extrema": [
+      0,
+      255
+    ],
+    "visible_bounds": [
+      42,
+      35,
+      222,
+      208
+    ],
+    "sha256": "72e836c63c7681ccd8b3ed4471fd39fbb5e93459f27a9e0d4dafd506752552ea",
+    "source_sha256": "fbde91ae5011af3d8d5d31d8cf6e1122bec87765cd11d088433798b791cd1ec1"
+  },
+  {
+    "file": "vanguard_sundering_blow.png",
+    "size": [
+      256,
+      256
+    ],
+    "mode": "RGBA",
+    "alpha_extrema": [
+      0,
+      255
+    ],
+    "visible_bounds": [
+      61,
+      31,
+      194,
+      225
+    ],
+    "sha256": "23248736fcac24c65aa9344ed45a6bf2bfbe74c3ba3914920d284745bf5b3304",
+    "source_sha256": "16dd91f44da4a0884b782567d6fac85442d3289efe725f032991a54e7b058096"
+  },
+  {
+    "file": "vanguard_last_word.png",
+    "size": [
+      256,
+      256
+    ],
+    "mode": "RGBA",
+    "alpha_extrema": [
+      0,
+      255
+    ],
+    "visible_bounds": [
+      33,
+      31,
+      222,
+      225
+    ],
+    "sha256": "b57b3204967311a4ffeea679c354e49cd37e881d90288466488bf705ffd12099",
+    "source_sha256": "dcecc0a39409959c45d9f86c515c6c68fbcbd183a0704237daa8e32f23280466"
+  },
+  {
+    "file": "vanguard_brace.png",
+    "size": [
+      256,
+      256
+    ],
+    "mode": "RGBA",
+    "alpha_extrema": [
+      0,
+      255
+    ],
+    "visible_bounds": [
+      47,
+      31,
+      211,
+      219
+    ],
+    "sha256": "0a89219c6e4161a4ba4487356fc70039be542f158703e036818c69c410b2fe64",
+    "source_sha256": "1730a1aca88d9576ed19e024256e4100ff47d281adb5f77ad24cbe47235cd99c"
+  },
+  {
+    "file": "vanguard_dash.png",
+    "size": [
+      256,
+      256
+    ],
+    "mode": "RGBA",
+    "alpha_extrema": [
+      0,
+      255
+    ],
+    "visible_bounds": [
+      37,
+      42,
+      214,
+      211
+    ],
+    "sha256": "c2a60d731a971889c5b3da0d93f1833b0ec27ef90fa35c3ef7c9a849f3eb2d19",
+    "source_sha256": "f226e4060b6457e6a976cfc20864fbc717d1586516673b29226899ceb80f236d"
+  },
+  {
+    "file": "chimesinger_resonant_note.png",
+    "size": [
+      256,
+      256
+    ],
+    "mode": "RGBA",
+    "alpha_extrema": [
+      0,
+      255
+    ],
+    "visible_bounds": [
+      39,
+      36,
+      222,
+      202
+    ],
+    "sha256": "ac3a85d0d98e404361939e1150ca9e3412210eb2b3dc9140d2e526c81d1e5a22",
+    "source_sha256": "4a8acde3f5495cd44d21c9d8f050ee4c517b9871baf471f3010e7257e9320885"
+  },
+  {
+    "file": "chimesinger_bellstrike.png",
+    "size": [
+      256,
+      256
+    ],
+    "mode": "RGBA",
+    "alpha_extrema": [
+      0,
+      255
+    ],
+    "visible_bounds": [
+      48,
+      35,
+      225,
+      221
+    ],
+    "sha256": "f087cb893d0d7cad98808eb7ea9129ec75a23932bc9ed4c793b6b965aa49b506",
+    "source_sha256": "d983c145885092cf8bed493b9afe6baadaf147ee77ede3b0cfe89c3411ff673a"
+  },
+  {
+    "file": "chimesinger_harmonic_refrain.png",
+    "size": [
+      256,
+      256
+    ],
+    "mode": "RGBA",
+    "alpha_extrema": [
+      0,
+      255
+    ],
+    "visible_bounds": [
+      55,
+      35,
+      209,
+      212
+    ],
+    "sha256": "9c0b790be59583d92ffa7dec51b87272a21d7334d76bce717e4302fe1570bf5d",
+    "source_sha256": "831eaa9ed5a29065bd5bdb6a56af9e83e71d2137a1f9f6a739f746f474175028"
+  },
+  {
+    "file": "chimesinger_crescendo.png",
+    "size": [
+      256,
+      256
+    ],
+    "mode": "RGBA",
+    "alpha_extrema": [
+      0,
+      255
+    ],
+    "visible_bounds": [
+      35,
+      31,
+      222,
+      224
+    ],
+    "sha256": "92b340cb1359d07562a70e7abfff731bca7578cb72cb692b9d5e81cdc60d2fd1",
+    "source_sha256": "3ce40582fc1f6f0189dc65dc67425f36ab6cf5aed520abd6c9a5f532e915dc39"
+  },
+  {
+    "file": "chimesinger_mending_chorus.png",
+    "size": [
+      256,
+      256
+    ],
+    "mode": "RGBA",
+    "alpha_extrema": [
+      0,
+      255
+    ],
+    "visible_bounds": [
+      31,
+      37,
+      225,
+      215
+    ],
+    "sha256": "76b703ff621674946cb35b7584ad2936cccebe610c2fc292c9da5eb390fdf5c4",
+    "source_sha256": "534f7bc54afd2e1535b3588df6b9da22a1ebd6066c4aca44e9dd2d0c6c20127f"
+  },
+  {
+    "file": "chimesinger_harmonic_step.png",
+    "size": [
+      256,
+      256
+    ],
+    "mode": "RGBA",
+    "alpha_extrema": [
+      0,
+      255
+    ],
+    "visible_bounds": [
+      32,
+      68,
+      225,
+      176
+    ],
+    "sha256": "76fd3ad353b6df07d9fbecc9ae71384408dd34f0a2e5c2db7d0bd6859c7a76c1",
+    "source_sha256": "557f11d917adf1572e589110541183045e029a6bbe3d87e31257c812d4d3586a"
+  },
+  {
+    "file": "potion.png",
+    "size": [
+      256,
+      256
+    ],
+    "mode": "RGBA",
+    "alpha_extrema": [
+      0,
+      255
+    ],
+    "visible_bounds": [
+      42,
+      35,
+      205,
+      218
+    ],
+    "sha256": "61af57b27ccbe6c19689ca60902d9188141ec91e074716b034aee291fdf8cd6b",
+    "source_sha256": "518f526096f860b57cb3d9cb9537331aee866f256ce5ae0440bec45009d5a5fe"
+  },
+  {
+    "file": "arcanist_clockbolt.png",
+    "size": [
+      256,
+      256
+    ],
+    "mode": "RGBA",
+    "alpha_extrema": [
+      0,
+      255
+    ],
+    "visible_bounds": [
+      39,
+      37,
+      225,
+      218
+    ],
+    "sha256": "4b11d11989ebfcda3973fb3696599292acdce4ab567569b992315c1e73bd3aa0",
+    "source_sha256": "f14e9ee06e51dbe79085cf0900afb7bbf3be257a91cc82b548e13b29ee8fac73"
+  },
+  {
+    "file": "arcanist_time_seal.png",
+    "size": [
+      256,
+      256
+    ],
+    "mode": "RGBA",
+    "alpha_extrema": [
+      0,
+      255
+    ],
+    "visible_bounds": [
+      41,
+      38,
+      222,
+      215
+    ],
+    "sha256": "3a5755ff9280160b1852b7a39da657ad4b2020e205ca760241272f3029c16372",
+    "source_sha256": "07a9e72b132ada67c981f51ad8eba97f8e8a74da8b5a7fd6e48aba558fb13d0a"
+  },
+  {
+    "file": "arcanist_arc_lance.png",
+    "size": [
+      256,
+      256
+    ],
+    "mode": "RGBA",
+    "alpha_extrema": [
+      0,
+      255
+    ],
+    "visible_bounds": [
+      31,
+      33,
+      225,
+      223
+    ],
+    "sha256": "b1462724b94589a1fc18be923dfc8bf78b9c39b336959d01820106295bd6ed4c",
+    "source_sha256": "529264a2fdbd4c21d670fa80a1a4de979682c9b75dcadbff98bac3f3074f94e9"
+  },
+  {
+    "file": "arcanist_convergence.png",
+    "size": [
+      256,
+      256
+    ],
+    "mode": "RGBA",
+    "alpha_extrema": [
+      0,
+      255
+    ],
+    "visible_bounds": [
+      33,
+      44,
+      225,
+      213
+    ],
+    "sha256": "c126de9bcd7bcfde5d23699d73b2c56b036626b9e8c200400c4e6d9a329a6eb8",
+    "source_sha256": "432ad74e1d840deed712c4802efac6594bb9b0a9db4d220cb73194541d7549f9"
+  },
+  {
+    "file": "arcanist_temporal_anchor.png",
+    "size": [
+      256,
+      256
+    ],
+    "mode": "RGBA",
+    "alpha_extrema": [
+      0,
+      255
+    ],
+    "visible_bounds": [
+      38,
+      33,
+      207,
+      222
+    ],
+    "sha256": "b86eedd4d75fada9d5d0c473b9cfe904331e1f61a9788098c660519083a919fa",
+    "source_sha256": "0226fb1c7aeecbbfdb8754b06f95e50d05aee6e9ddbfc8b470e916dd2d8df6f7"
+  },
+  {
+    "file": "arcanist_clockstep.png",
+    "size": [
+      256,
+      256
+    ],
+    "mode": "RGBA",
+    "alpha_extrema": [
+      0,
+      255
+    ],
+    "visible_bounds": [
+      35,
+      53,
+      225,
+      221
+    ],
+    "sha256": "068fb98d68d32d8a28156ea93794f2fe3af2a89ffc33d99132ce682f3c024b6e",
+    "source_sha256": "58a53eb10df182bc80ca33405bc2f5a198095fd6860123b7d7a68fee95590d2a"
+  }
+]
