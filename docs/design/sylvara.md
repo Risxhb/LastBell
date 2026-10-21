@@ -1,8 +1,8 @@
 # Sylvara, The Rootbound Choir — encounter specification
 
-Draft v0.1 · October 21, 2026 · Lane: Bosses / Sylvara ([#47](https://github.com/Risxhb/collab/issues/47)) · Source packet: [four-boss handoff, PR #46](https://github.com/Risxhb/collab/pull/46) (`handoff/four-boss-designs-20261021`, commit `d478b55`, `docs/boss-model-review/`).
+Draft v0.1.1 · October 21, 2026 · Lane: Bosses / Sylvara ([#47](https://github.com/Risxhb/collab/issues/47)) · Source packet: [four-boss handoff, PR #46](https://github.com/Risxhb/collab/pull/46) (`handoff/four-boss-designs-20261021`, commit `d478b55`, `docs/boss-model-review/`).
 
-Status: **specification only, nothing here is implemented.** It is engine-independent and targets the Unity/C# production path. It follows the structure and method of the [Bellkeeper spec v0.2](https://github.com/Risxhb/collab/blob/docs/bellkeeper-spec/docs/design/bellkeeper.md) ([PR #16](https://github.com/Risxhb/collab/pull/16)) so the two can share one validator and one set of contract requests.
+Status: **v0.1 specification, with D1–D6 adopted provisionally and a playable graybox (§15).** It is engine-independent and targets the Unity/C# production path. It follows the structure and method of the [Bellkeeper spec v0.2](https://github.com/Risxhb/collab/blob/docs/bellkeeper-spec/docs/design/bellkeeper.md) ([PR #16](https://github.com/Risxhb/collab/pull/16)) so the two can share one validator and one set of contract requests.
 
 Sylvara is the **area boss of Verdant Chimes**, one of the campaign's three area bosses ([#44](https://github.com/Risxhb/collab/issues/44)). She is not part of the current one-arena three-plus-one slice. The packet's abilities, geometry, timings, damage and phases are taken as given. This spec adds what the packet leaves open: ticks, schedules, targeting, party scaling, escape evidence and the decisions that still need a human.
 
@@ -170,6 +170,18 @@ Minimum window in ticks, counted after lock (Arc, Seed) or from warning (the oth
 - **Pruning Arc is the tightest.** At the prototype's 4.2 m/s walk, its 78 ticks after lock aren't enough to walk out (90 needed), so First Chime adds 18 ticks (§9). At Steady Ticking a 4.2 m/s player needs one dash for it.
 - **Bloom's "step into the spent flower" window** (54 ticks) is walk-solvable at Steady Ticking at 6 m/s (50 needed). At 4.2 m/s it needs a dash (37), or the player leaves by the chain's open ends instead.
 
+**On the real Verdant Chimes arena** (D7: 14.0 m playable radius, so player centres ≤ 13.7 m and boss centre ≤ 11.5 m), run with `-ArenaRadius 13.7 -ProcessionWidth 3.6`, the conclusions don't change:
+
+| Attack | d_max | First Chime, walk 6 / 4.2 | Steady Ticking | Midnight Toll |
+|---|---|---|---|---|
+| Pruning Arc | 3.91 m | 76 / **92** | 49 | 40 |
+| Rootscript (60°) | 2.40 m | 60 / 71 | 37 | 28 |
+| Seed of the Refrain | 1.81 m | 55 / 62 | 35 | 26 |
+| Briar Procession (3.6 m) | 2.11 m | 58 / 67 | 36 | 27 |
+| Threefold Bloom | 2.30 m | 59 / 69 | 37 | 28 |
+
+First Chime's Arc (96 ticks after lock, §9) still covers the 4.2 m/s walker (92). The graybox (§15) keeps the 11.5 m key-art arena until the Verdant Chimes scene is brought into the run loop.
+
 ### 5.3 Stamina budget
 
 Same rule as the Bellkeeper: a worst-case player may need **at most one dash per 2.25 s**, and at most three in a row after 5 s without one. Sprint and jump are never required.
@@ -293,14 +305,35 @@ From the packet and sheet, with gameplay constraints:
 | T6 | Stagger cancels the current warning truthfully, and no warning survives defeat or a practice reset |
 | T7 | Audio-off and reduced-effects readability; Phase 3 arcs are never mistaken for damage |
 
-## 14. Human decisions needed
+## 14. Decisions
 
-| # | Decision | Recommendation |
+The user left these to this lane on October 21, 2026, so D1–D6 are **adopted provisionally** and used by the graybox. They stay open to playtest feedback.
+
+| # | Decision | Status |
 |---|---|---|
-| D1 | Briar Procession lane width: 2.4 m (packet) with a 3.6 m body, or widen it to the body | **Widen to 3.6 m**, so the danger is what the body passes through (§5.4) |
-| D2 | Bloom stagger between flowers (the packet gives none) | **72 ticks (1.2 s)**; 90 on First Chime |
-| D3 | Bloom layout | **5 m ring around the boss, centres 4.2 m apart, chain toward a rotating target** |
-| D4 | Rootscript lane spread | **60°**, giving melee pockets just outside the body |
-| D5 | Targeting: Arc at the nearest player, Procession at the farthest with no repeat | As written (§6) |
-| D6 | Knockback | **None for Sylvara**; hit-stun 0.15 s only |
-| D7 | Verdant Chimes arena dimensions and collision | Needed before T1. This spec uses an 11.5 m placeholder circle |
+| D1 | Briar Procession lane width: 2.4 m (packet) with a 3.6 m body, or widen it to the body | **Adopted: 3.6 m**, so the danger is what the body passes through (§5.4) |
+| D2 | Bloom stagger between flowers (the packet gives none) | **Adopted: 72 ticks (1.2 s)**; 90 on First Chime |
+| D3 | Bloom layout | **Adopted: 5 m ring around the boss, centres 4.2 m apart, chain toward a rotating target** |
+| D4 | Rootscript lane spread | **Adopted: 60°**, giving melee pockets just outside the body |
+| D5 | Targeting: Arc at the nearest player, Procession at the farthest with no repeat | **Adopted** as written (§6) |
+| D6 | Knockback | **Adopted: none for Sylvara**; hit-stun 0.15 s only |
+| D7 | Verdant Chimes arena dimensions and collision | **Answered by the arena build** ([`feature/class-test-arena`](https://github.com/Risxhb/collab/tree/feature/class-test-arena) 184200b): flat, unobstructed floor with a 14.0 m playable radius. Escape results on it in §5.2 |
+
+## 15. Graybox in the run loop
+
+A playable graybox lives on [`feature/boss-sylvara`](https://github.com/Risxhb/collab/tree/feature/boss-sylvara), branched from the run loop ([PR #42](https://github.com/Risxhb/collab/pull/42)):
+
+- **Where to play it:** menu → *Practice one encounter* → **Sylvara (area 3)**. It's practice only, because she isn't part of the one-arena run. She starts at full health and potions, as an area final boss. F8 jumps to the next phase (65 % / 30 %); F9 defeats her.
+- **Code:** `unity/Assets/LastBell/Run/Encounters/SylvaraEncounter.cs`. It implements §3–§4 at Steady Ticking with D1–D6, including the phase loops, cooldown hold, targeting, the Bloom layout and the phase visuals (bells spreading, shoulder flowers, mask split).
+- **Shared change:** `Hazard.ActiveTicks` and `OnSpent` (R22). A hazard can stay open for an active period and hit anyone inside once. Existing hazards are unchanged (`ActiveTicks` 0).
+- **Body:** a labelled primitive stand-in with four root legs, split mask, three bells, tuning fork and back wheel. A `Resources/Characters/Sylvara.glb` model replaces it automatically when it exists.
+- **Arena:** the run loop's key-art arena (11.5 m), matching the spec's placeholder. Moving her to the Verdant Chimes scene (14 m, §5.2) is the next integration step.
+- **Autotest:** `-lastbellAutotest` now ends with a Sylvara section; `-lastbellSylvara` runs only that section. It checks:
+  - all five attacks in the Phase 1 order
+  - Bloom I → II → III, with 72-tick stagger and an 18-tick active period
+  - one hit per flower for 13 HP, including entering mid-activation, and spent flowers being safe
+  - no knockback
+  - never more than one damaging pattern live
+  - both queued phase transitions
+  - defeat cancelling every pending hazard and Bloom prop
+- **Not in the graybox yet:** other difficulty tiers (and so Antiphon), party sizes above 1, stagger (R24), and authored animation, VFX and audio.
