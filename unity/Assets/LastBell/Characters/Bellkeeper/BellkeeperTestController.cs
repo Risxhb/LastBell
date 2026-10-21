@@ -73,6 +73,7 @@ namespace LastBell.Characters
         static void AutoSpawn()
         {
             if (FindAnyObjectByType<LastBell.Arenas.KeyArtArena>() == null || FindAnyObjectByType<BellkeeperTestController>() != null) return;
+            if (FindAnyObjectByType<LastBell.Run.RunDirector>() != null) return;   // the run loop owns this scene
             var prefab = Resources.Load<GameObject>("Characters/Bellkeeper");
             if (prefab == null) { Debug.LogWarning("Bellkeeper test: Resources/Characters/Bellkeeper.glb not found"); return; }
             var go = Instantiate(prefab, Vector3.zero, Quaternion.identity);

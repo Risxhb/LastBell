@@ -586,6 +586,97 @@ SPRINT_FRAMES = round(MN / 1.3) if MOCAP else 16
 acts = [bake('Idle', 60, idle, True), bake('Run', RUN_FRAMES, run, True), bake('Sprint', SPRINT_FRAMES, sprint, True),
         bake('Dodge', 18, dodge, False), bake('Jump', 36, jump, False)]
 acts += [bake(name, frames, (lambda K: lambda f, t: move_pose(t, K))(K), False) for name, (frames, K) in KIT.items()]
+# ---------------- approved Vanguard kit (#31 handoff, Oct 20): Steel Rhythm / Sundering Blow / Last Word / Brace ----
+# Gameplay owns timing: Unity stretches each clip to the kit's tick durations (Run/Combat/VanguardKit2.cs). Normalized
+# release points match the kit: Sundering Blow releases at 20/42 = 0.48, Last Word at 48/84 = 0.57.
+# Hit / Down / GetUp are shared reactions for the run loop.
+BRACE_HELD = {'guard': 1, 'bash': 0.3, 'sweep': -55, 'abd': 35, 'raise': 0, 'elb': -30, 'wx': -10,
+              'drop': 0.11, 'lean': 6, 'spread': 4, 'back': 0.1, 'tw': 12}
+BRACE_REST = {'guard': 0, 'bash': 0, 'sweep': 0, 'abd': 8, 'raise': -18, 'elb': -35, 'wx': 0,
+              'drop': 0, 'lean': 0, 'spread': 0, 'back': 0, 'tw': 0}
+def brace_keys(pts):
+    # pts: [(t, w)] blend weight 0 (rest) .. 1 (braced) -> channel tables
+    return {c: [(t, BRACE_REST[c] + (BRACE_HELD[c] - BRACE_REST[c]) * w) for t, w in pts] for c in BRACE_HELD}
+KIT2 = {
+    'SteelRhythm1': KIT['Combo1'], 'SteelRhythm2': KIT['Combo2'], 'SteelRhythm3': KIT['Combo3'],
+    # heavy cursor-aimed overhead chop: sword up behind the head, step, chop to below horizontal, short hold
+    'SunderingBlow': (21, {
+        'tw': [(0, 0), (0.35, -25), (0.48, 15), (0.7, 12), (1, 0)], 'lean': [(0, 0), (0.35, -8), (0.48, 28), (0.75, 24), (1, 0)],
+        'drop': [(0, 0), (0.35, 0.04), (0.48, 0.16), (0.75, 0.14), (1, 0)],
+        'front': [(0, 0), (0.35, 0.05), (0.45, 0.35), (0.8, 0.33), (1, 0)], 'back': [(0, 0), (0.45, 0.2), (0.8, 0.2), (1, 0)],
+        'hy': [(0, 0), (0.48, -0.12), (0.8, -0.1), (1, 0)],
+        'sweep': [(0, 0), (0.35, -35), (0.48, 5), (0.75, 5), (1, 0)], 'abd': [(0, 8), (0.35, 30), (0.48, 20), (1, 8)],
+        'raise': [(0, -18), (0.35, -165), (0.48, -20), (0.6, 5), (0.8, 0), (1, -18)],
+        'elb': [(0, -35), (0.35, -70), (0.48, -5), (0.8, -10), (1, -35)], 'wx': [(0, 0), (0.35, -30), (0.48, 30), (0.8, 25), (1, 0)],
+        'sx': [(0, -12), (0.35, -40), (0.48, -10), (1, -12)], 'sy': [(0, -6), (0.48, -30), (1, -6)],
+        'cape': [(0, 0), (0.35, -6), (0.5, 20), (1, 0)]}),
+    # planted 0.8 s windup with the blade held high (a clock hand at twelve), slam into the floor, committed hold
+    'LastWord': (42, {
+        'raise': [(0, -18), (0.15, -120), (0.5, -175), (0.57, 15), (0.85, 10), (1, -18)],
+        'elb': [(0, -35), (0.15, -60), (0.5, -40), (0.57, -5), (0.85, -8), (1, -35)],
+        'abd': [(0, 8), (0.15, 20), (0.5, 15), (0.57, 12), (1, 8)], 'sweep': [(0, 0), (0.5, -10), (0.57, 0), (1, 0)],
+        'wx': [(0, 0), (0.5, -35), (0.57, 25), (0.85, 25), (1, 0)],
+        'lean': [(0, 0), (0.15, -6), (0.5, -12), (0.57, 38), (0.85, 34), (1, 0)],
+        'drop': [(0, 0), (0.15, 0.08), (0.5, 0.12), (0.57, 0.26), (0.85, 0.24), (1, 0)],
+        'spread': [(0, 0), (0.15, 8), (0.85, 8), (1, 0)],
+        'front': [(0, 0), (0.15, 0.2), (0.85, 0.2), (1, 0)], 'back': [(0, 0), (0.15, 0.25), (0.85, 0.25), (1, 0)],
+        'hy': [(0, 0), (0.5, 0.05), (0.57, -0.12), (0.85, -0.1), (1, 0)], 'tw': [(0, 0), (0.5, -8), (0.57, 0), (1, 0)],
+        'sx': [(0, -12), (0.5, -60), (0.57, -20), (1, -12)], 'sy': [(0, -6), (0.5, -35), (0.57, -20), (1, -6)],
+        'cape': [(0, 0), (0.5, -8), (0.6, 25), (0.85, 15), (1, 0)]}),
+    'BraceRaise': (6, brace_keys([(0, 0), (1, 1)])),
+    'BraceLower': (9, brace_keys([(0, 1), (1, 0)])),
+    # controlled shield impact: pushed back a little, shield pressed out, then settles (no parry flourish)
+    'BraceHit': (12, dict(brace_keys([(0, 1), (1, 1)]), **{
+        'bash': [(0, 0.3), (0.2, 0.65), (1, 0.3)], 'lean': [(0, 6), (0.2, -4), (1, 6)],
+        'hy': [(0, 0), (0.2, 0.09), (1, 0)], 'drop': [(0, 0.11), (0.2, 0.16), (1, 0.11)], 'cape': [(0, 0), (0.25, 12), (1, 0)]})),
+    # hit reaction: snap back and open up, recover
+    'Hit': (9, {'lean': [(0, 0), (0.3, -14), (1, 0)], 'tw': [(0, 0), (0.3, 12), (1, 0)], 'drop': [(0, 0), (0.3, 0.06), (1, 0)],
+                'hy': [(0, 0), (0.3, 0.08), (1, 0)], 'raise': [(0, -18), (0.3, -40), (1, -18)], 'abd': [(0, 8), (0.3, 30), (1, 8)],
+                'sx': [(0, -12), (0.3, -35), (1, -12)], 'sy': [(0, -6), (0.3, -25), (1, -6)], 'cape': [(0, 0), (0.3, -10), (0.6, 10), (1, 0)]}),
+}
+def brace_hold(f, t):
+    p = 2 * math.pi * t
+    K = brace_keys([(0, 1), (1, 1)])
+    K['drop'] = [(0, 0.11 + 0.015 * math.sin(p)), (1, 0.11 + 0.015 * math.sin(p))]
+    K['cape'] = [(0, 4 * math.sin(p)), (1, 4 * math.sin(p))]
+    return move_pose(t, K)
+UPPER = ('spine', 'chest', 'neck', 'head', 'upperarm.L', 'forearm.L', 'hand.L', 'upperarm.R', 'forearm.R', 'hand.R')
+def brace_walk(f, t):
+    # slow braced locomotion: a short-stride walk below the waist, the held Brace above it
+    if MOCAP:
+        i = int(round(t * MN)) % MN; legs = mocap_pose(MREST, MSMP[i], stride=0.45)
+    else:
+        legs, _ = gait(t, fwd=18, back=12, kick=40, comp=12, lean=4, flight=0.0, cape=6)
+    top = move_pose(0.5, brace_keys([(0, 1), (1, 1)]))
+    for n in UPPER:
+        if n in top: legs[n] = top[n]
+    return legs
+def down_pose(u, kneel=0.0):
+    # collapse onto the back: knees buckle first, then the body tips over backward and settles
+    buck = min(1.0, u / 0.35); fall = max(0.0, (u - 0.25) / 0.75)
+    s = stance(); del s['_ground']
+    hz = STANCE_HZ - 0.25 * buck - 0.48 * fall - 0.2 * kneel
+    s.update({
+        'hips': {'loc': (0, 0.42 * fall, hz), 'rot': Rzyx(x=10 * buck * (1 - fall) - 82 * fall + 20 * kneel)},
+        'spine': {'rot': Rzyx(x=8 * buck - 6 * fall + 10 * kneel)}, 'chest': {'rot': Rzyx(x=4 - 4 * fall, z=6 * fall)},
+        'head': {'rot': Rzyx(x=-12 * buck + 25 * fall, z=10 * fall)},
+        'upperarm.R': {'rot': Rzyx(x=-18 + 10 * fall, y=8 + 50 * fall)}, 'forearm.R': {'rot': Rzyx(x=-35 + 20 * fall)},
+        'upperarm.L': {'rot': Rzyx(x=-12 + 8 * fall, y=-6 - 45 * fall)}, 'forearm.L': {'rot': Rzyx(x=-30 + 15 * fall, z=10)},
+        'cape1': {'rot': Rzyx(x=4 + 30 * fall)}, 'cape2': {'rot': Rzyx(x=10 * fall)},
+    })
+    s.update(leg(-1, -6 - 20 * buck - 60 * fall - 40 * kneel, 18 + 50 * buck - 30 * fall + 70 * kneel, hip_pitch=0, flat=0, spread=4 + 6 * fall))
+    s.update(leg(1, -2 - 25 * buck - 55 * fall - 30 * kneel, 16 + 60 * buck - 45 * fall + 60 * kneel, hip_pitch=0, flat=0, spread=4 + 8 * fall))
+    return s
+def down(f, t): return down_pose(key(t, [(0, 0), (0.35, 0.35), (0.85, 1.0), (1, 1.0)]))
+def get_up(f, t):
+    # roll up to a kneel, then stand back into the guard stance
+    if t >= 0.999: return stance()
+    u = key(t, [(0, 1), (0.45, 0.3), (0.8, 0.0), (1, 0)]); kneel = key(t, [(0, 0), (0.45, 1), (0.8, 0.3), (1, 0)])
+    return down_pose(u, kneel)
+acts += [bake(name, frames, (lambda K: lambda f, t: move_pose(t, K))(K), False) for name, (frames, K) in KIT2.items()]
+acts += [bake('BraceHold', 30, brace_hold, True), bake('BraceWalk', RUN_FRAMES, brace_walk, True),
+         bake('Down', 24, down, False), bake('GetUp', 27, get_up, False)]
+print('KIT2', [a.name for a in acts])
 arm.animation_data.action = acts[0]
 set_pose({})
 bpy.ops.wm.save_as_mainfile(filepath=os.path.join(work, 'vanguard_rig.blend'))

@@ -78,6 +78,7 @@ namespace LastBell.Characters
         static void AutoSpawn()
         {
             if (FindAnyObjectByType<LastBell.Arenas.KeyArtArena>() == null || FindAnyObjectByType<VanguardTestController>() != null) return;
+            if (FindAnyObjectByType<LastBell.Run.RunDirector>() != null) return;   // the run loop owns this scene
             var prefab = Resources.Load<GameObject>("Characters/Vanguard");
             if (prefab == null) { Debug.LogWarning("Vanguard test: Resources/Characters/Vanguard.glb not found"); return; }
             var go = Instantiate(prefab, new Vector3(0, 0, 6), Quaternion.Euler(0, 180, 0));

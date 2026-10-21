@@ -1,0 +1,184 @@
+using System;
+using System.Collections.Generic;
+using LastBell.VFX;
+using UnityEngine;
+
+namespace LastBell.Run
+{
+    // 60 Hz combat clock shared by the run. Gameplay (movement, cooldowns, hits, hazards, encounter scripts) advances
+    // only in whole ticks; animation and effects read the resulting state and never decide outcomes.
+    public static class Sim
+    {
+        public const int Hz = 60;
+        public const float Dt = 1f / Hz;
+        public static int Ticks(float seconds) => Mathf.RoundToInt(seconds * Hz);
+        public static Vector3 Flat(Vector3 v) { v.y = 0; return v; }
+        public static float YawTo(Vector3 from, Vector3 to, float fallback)
+        {
+            var d = Flat(to - from); return d.sqrMagnitude < 1e-4f ? fallback : Quaternion.LookRotation(d).eulerAngles.y;
+        }
+        public static Vector3 Dir(float yaw) => Quaternion.Euler(0, yaw, 0) * Vector3.forward;
+    }
+
+    // Everything one encounter's combat touches: the players, the current boss, hazards, projectiles and effects.
+    // Owned by the RunDirector and rebuilt from scratch for every fresh run, so nothing survives a retry.
+    public sealed class CombatWorld
+    {
+        public const float PlayerBound = 11.5f;   // the dais floor the player can stand on (key-art arena)
+        public const float BossBound = 9.5f;      // boss positions and charge endpoints
+
+        public readonly List<PlayerController> Players = new List<PlayerController>();
+        public BossEncounter Boss;                // null between encounters; Solid is false once defeated
+        public readonly HazardSystem Hazards;
+        public readonly ProjectileSystem Projectiles;
+        public readonly BellkeeperFx BossFx;
+        public readonly PlayerFx Fx;
+        public readonly Transform Root;
+        public int Tick { get; private set; }
+        public bool CombatActive;                  // abilities, boss scripts and hazards only run while true
+
+        // statistics for the results screen
+        public int DamageDealt, DamageTaken;
+        public string LastDamageSource;
+
+        public event Action<PlayerController, Hazard, int> PlayerHit;   // tests and HUD listen
+
+        // The effect layers are created once by the director and reset between runs (re-creating them crashed the
+        // player natively in Mesh.set_colors on retry, see handoff).
+        public CombatWorld(Transform root, BellkeeperFx bossFx, PlayerFx fx)
+        {
+            Root = root;
+            BossFx = bossFx; Fx = fx;
+            BossFx.ResetAll(); Fx.ResetAll();
+            Hazards = new HazardSystem(this);
+            Projectiles = new ProjectileSystem(this);
+        }
+
+        public void Step()
+        {
+            Tick++;
+            foreach (var p in Players) p.Step();
+            if (!CombatActive) return;
+            if (Boss != null && !Boss.Dead) Boss.Step();
+            Projectiles.Step();
+            Hazards.Step();
+        }
+
+        // Clears everything an encounter can leave behind: hazards, projectiles, boss-owned effects. Called at every
+        // transition (defeat, victory, clear, retry), so nothing from one state leaks into the next.
+        public void ClearTransient()
+        {
+            Hazards.ClearAll();
+            Projectiles.ClearAll();
+            BossFx.ClearTelegraphs();
+            BossFx.ChargeTrail(Root, false);
+            foreach (var p in Players) p.Kit?.ClearTargetState();
+        }
+
+        public PlayerController NearestStanding(Vector3 from)
+        {
+            PlayerController best = null; float bd = float.MaxValue;
+            foreach (var p in Players)
+            {
+                if (p.Down) continue;
+                float d = Sim.Flat(p.transform.position - from).sqrMagnitude;
+                if (d < bd) { bd = d; best = p; }
+            }
+            return best;
+        }
+        public bool AnyStanding { get { foreach (var p in Players) if (!p.Down) return true; return false; } }
+
+        // A melee strike from a player: hits the boss if its body is within reach and inside the arc. Resolved on the
+        // kit's contact tick; returns the damage dealt (0 = miss).
+        public int StrikeBoss(PlayerController from, Vector3 origin, Vector3 forward, float reach, float arcDeg, int damage, string ability)
+        {
+            var b = Boss; if (b == null || !b.Solid) return 0;
+            var to = Sim.Flat(b.transform.position - origin); forward = Sim.Flat(forward);
+            if (to.magnitude > reach + b.BodyRadius) return 0;
+            if (arcDeg < 360 && to.magnitude > b.BodyRadius && Vector3.Angle(forward, to) > arcDeg / 2 + Mathf.Rad2Deg * Mathf.Atan2(b.BodyRadius, to.magnitude)) return 0;
+            var contact = b.transform.position - to.normalized * b.BodyRadius + Vector3.up * b.HitHeight;
+            return DamageBoss(damage, contact, ability);
+        }
+
+        // A straight line (beam / hitscan) of the given width.
+        public int LineBoss(Vector3 origin, Vector3 forward, float length, float width, int damage, string ability, out Vector3 contact)
+        {
+            contact = origin + Sim.Flat(forward).normalized * length;
+            var b = Boss; if (b == null || !b.Solid) return 0;
+            var f = Sim.Flat(forward).normalized; var to = Sim.Flat(b.transform.position - origin);
+            float along = Vector3.Dot(to, f); float side = (to - f * along).magnitude;
+            if (along < -b.BodyRadius || along > length + b.BodyRadius || side > width / 2 + b.BodyRadius) return 0;
+            contact = origin + f * Mathf.Max(0, along - b.BodyRadius) + Vector3.up * b.HitHeight;
+            return DamageBoss(damage, contact, ability);
+        }
+
+        public int DamageBoss(int damage, Vector3 contact, string ability)
+        {
+            var b = Boss; if (b == null || !b.Solid || damage <= 0) return 0;
+            int dealt = b.TakeHit(damage, contact);
+            DamageDealt += dealt;
+            return dealt;
+        }
+
+        internal void ReportPlayerHit(PlayerController p, Hazard h, int dmg)
+        {
+            DamageTaken += dmg; LastDamageSource = h.Source;
+            PlayerHit?.Invoke(p, h, dmg);
+        }
+
+        // Push a planar position back inside the floor and out of the boss body.
+        public Vector3 Constrain(Vector3 pos, float bodyRadius)
+        {
+            pos.y = 0;
+            var flat = new Vector2(pos.x, pos.z);
+            if (flat.magnitude > PlayerBound) { flat = flat.normalized * PlayerBound; pos.x = flat.x; pos.z = flat.y; }
+            var b = Boss;
+            if (b != null && b.Solid)
+            {
+                var d = Sim.Flat(pos - b.transform.position); float min = b.BodyRadius + bodyRadius;
+                if (d.magnitude < min)
+                {
+                    var n = d.sqrMagnitude > 1e-4f ? d.normalized : -b.transform.forward;
+                    var p = b.transform.position + n * min; pos.x = p.x; pos.z = p.z;
+                }
+            }
+            return pos;
+        }
+    }
+
+    // Player projectiles (Chimesinger's Resonant Note). Moved on the combat tick; a hit resolves exactly once.
+    public sealed class ProjectileSystem
+    {
+        public sealed class Projectile
+        {
+            public Vector3 Pos, Vel; public float Range, Travelled, Radius; public int Damage; public string Ability;
+            public Action<int, Vector3> OnHit; public Color Color;
+        }
+        readonly CombatWorld w; readonly List<Projectile> live = new List<Projectile>();
+        public int Count => live.Count;
+        public ProjectileSystem(CombatWorld world) { w = world; }
+
+        public void Fire(Projectile p) { live.Add(p); }
+
+        public void Step()
+        {
+            for (int i = live.Count - 1; i >= 0; i--)
+            {
+                var p = live[i]; var step = p.Vel * Sim.Dt;
+                p.Pos += step; p.Travelled += step.magnitude;
+                w.Fx.ProjectileHead(p.Pos, p.Color);
+                var b = w.Boss;
+                if (b != null && b.Solid && Sim.Flat(p.Pos - b.transform.position).magnitude <= b.BodyRadius + p.Radius)
+                {
+                    var contact = b.transform.position + Sim.Flat(p.Pos - b.transform.position).normalized * b.BodyRadius + Vector3.up * b.HitHeight;
+                    int dealt = w.DamageBoss(p.Damage, contact, p.Ability);
+                    w.Fx.NoteImpact(contact, p.Color);
+                    p.OnHit?.Invoke(dealt, contact);
+                    live.RemoveAt(i); continue;
+                }
+                if (p.Travelled >= p.Range || new Vector2(p.Pos.x, p.Pos.z).magnitude > CombatWorld.PlayerBound + 2) live.RemoveAt(i);
+            }
+        }
+        public void ClearAll() { live.Clear(); }
+    }
+}
