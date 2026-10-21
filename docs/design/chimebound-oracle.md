@@ -244,7 +244,15 @@ The fixed, reachable body and the three long recoveries (Silent Fifth 3.4 s, Aft
 
 ## 9. Changes for the Unity stand-in
 
-What `ChimeboundOracle` needs to match this spec:
+**Status: implemented** on branch `feature/oracle-standin`, which is stacked on `feature/run-loop`. The code is in `Encounters/ChimeboundOracle.cs`.
+- The focused acceptance test passes 26/26. To run it:
+  `Unity.exe -projectPath unity -executeMethod LastBell.Run.EditorTools.OracleTestTools.PlayModeTest -oracleTest -lastbellOut <dir>`
+- It has three stand-ins:
+  - The seeded encounter RNG (R6) is a fixed-seed `System.Random`.
+  - The hazard group is `Hazard.Group`, a shared hit set.
+  - Marker party scaling stays the run loop's (nearest player).
+
+The list below is what was needed:
 1. **HP phases** at 50 %, with a queued 90-tick iris transition.
 2. **Leash:** drift bound 3 m from the centre (now `BossBound − 1` = 8.5 m).
 3. **Combined loop:** start the Dividing Chime at tick 110 instead of 78.
