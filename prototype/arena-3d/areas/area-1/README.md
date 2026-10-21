@@ -26,3 +26,12 @@ The reference is painted and warmer, with heavier sculpted gold (filigree on the
 ## Next
 
 Once the look is approved, build the Unity scene at `unity/Assets/LastBell/Areas/Area1/SkywardSpire_Arena.unity` with the prefab root `LB_ENV_SkywardSpire_Arena`.
+
+## Update: rebuilt from the top-down reference, and the Unity scene
+
+The user's top-down picture (`reference-topdown.webp`) replaced the poster panel as the target. The current files are:
+- `skyward-spire-env.js`: the arena, shared by the look page and the Unity export
+- `skyward-spire.html`: the look page (`?view=game|top|angle`, `&overlay=0.5` lays the reference over the top view, `&tele` shows warning shapes)
+- `export-glb.mjs`: writes `unity/Assets/LastBell/Areas/Area1/SkywardSpire.glb`
+
+The Unity scene lives in `unity/Assets/LastBell/Areas/Area1/`; see its README. `shots/unity-vs-reference.png` compares the result with the reference. `skyward-spire-prompt.md` (image prompt) and `skyward-spire-unity-build-prompt.md` (the build brief this follows) are kept here.

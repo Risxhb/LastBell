@@ -3,20 +3,20 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Skyward Spire Mockup</title>
+<title>Skyward Spire</title>
 <style>
-html, body { margin: 0; height: 100%; overflow: hidden; background: #8fb8f0; }
-canvas { display: block; }
-#vig { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 50%, transparent 60%, #1a2a5a55 100%); }
-#tabs { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; gap: 8px; font-family: Georgia, serif; flex-wrap: wrap; justify-content: center; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #0e1424; }
+canvas { display: block; position: absolute; }
+#ref { position: absolute; pointer-events: none; display: none; }
+#tabs { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; gap: 8px; font-family: Georgia, serif; flex-wrap: wrap; justify-content: center; z-index: 2; }
 #tabs a { padding: 7px 14px; font-size: 15px; color: #f6efdc; text-decoration: none; background: #101a34e0; border: 1px solid #d6aa5a88; border-radius: 8px; }
 #tabs a.on { background: #d6aa5a; color: #101825; }
 body.clean #tabs { display: none; }
 </style>
 </head>
 <body>
-<canvas id="view"></canvas><div id="vig"></div>
-<div id="tabs"><a href="?view=game">Game camera</a><a href="?view=angle">Angle view</a><a href="?view=top">Top view</a><a href="?view=game&tele">Telegraph check</a></div>
+<canvas id="view"></canvas><img id="ref" src="reference-topdown.webp" alt="">
+<div id="tabs"><a href="?view=game">Game camera</a><a href="?view=top">Top view</a><a href="?view=top&overlay=0.5">Top + reference</a><a href="?view=angle">Angle</a><a href="?view=game&tele">Telegraph check</a></div>
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
@@ -24,563 +24,103 @@ body.clean #tabs { display: none; }
 } }
 </script>
 <script type="module">
-// Area 1 — The Skyward Spire. Look mockup from the first panel of
-// Reference/LAST-BELL-ARENA-ART-HANDOFF/artwork/a_wide_cinematic_concept_art_style_layout_poster.png:
-// a round ivory dais with a gold compass medallion, sapphire inlays and a cobalt-paneled border; four bridges
-// in a cross ending in gold gear landings; gothic ivory towers with cobalt glass and star banners; hanging
-// columns and great gears under the dais; floating cathedrals and clouds in an open blue sky.
-// One arena hosts 3 minibosses and the area boss, so the floor stays broad, flat and open; nothing tall stands
-// inside the rim. Boss mechanics aren't designed yet: ?tele only draws a generic hostile circle and cone to
-// check that the floor art stays quieter than warnings.
-// ?view=game (gameplay camera, same as arena-look.html) | angle | top.
+// Area 1 — The Skyward Spire, rebuilt from reference-topdown.webp. The arena lives in skyward-spire-env.js.
+// ?view=game (gameplay camera, same as index.html) | top (matches the reference framing, 850:742) | angle.
+// ?overlay=0.5 lays the reference over the top view for alignment. ?tele draws generic warning shapes
+// (readability check, not boss mechanics). ?export writes the solid arena to window.__arenaExport for
+// export-glb.mjs (Unity: Assets/LastBell/Areas/Area1/SkywardSpire.glb).
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
-const Q = new URLSearchParams(location.search), VIEW = Q.get('view') || 'game';
+const Q = new URLSearchParams(location.search), VIEW = Q.get('view') || 'game', OVERLAY = parseFloat(Q.get('overlay') || '0');
 if (Q.has('clean')) document.body.classList.add('clean');
-document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.search === location.search || (!location.search && a.search === '?view=game')));
-
-const R = 14;          // dais floor radius (m); 8 players fit well outside a 7 m boss ring
-const RIM = 14.8;      // outer edge of the curb and parapet
-const BRIDGE_L = 13, BRIDGE_W = 4.6;
-const TAU = Math.PI * 2;
-
-// ---- helpers ----
-function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
-const rnd = mulberry32(11);
-const hash = (x, y) => { const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); };
-function vnoise(x, y) { const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
-  const a = hash(xi, yi), b = hash(xi + 1, yi), c = hash(xi, yi + 1), d = hash(xi + 1, yi + 1); return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v; }
-const fbm = (x, y) => vnoise(x, y) * 0.55 + vnoise(x * 2.1, y * 2.1) * 0.3 + vnoise(x * 4.3, y * 4.3) * 0.15;
-const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
-const tex = (c, srgb = true) => { const t = new THREE.CanvasTexture(c); if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; };
-const canvas2d = (w, h = w) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return [c, c.getContext('2d')]; };
+document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.search === location.search));
 const loadScript = src => new Promise(res => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = res; document.head.appendChild(s); });
-const nearBridge = (a, halfW, r) => { for (let k = 0; k < 4; k++) { let d = Math.abs(((a - k * Math.PI / 2) % TAU + TAU + Math.PI) % TAU - Math.PI); if (d * r < halfW) return true; } return false; };
 
-// ---- floor painter ----
-// Four layers painted together: colour, height (bump), ORM (green = roughness, blue = metalness) and a glow mask.
-// Base: irregular cream flagstones (jittered Voronoi), a radial tile band and a cobalt-paneled border at the edge.
-// On top: gold inlay drawn as vector strokes (a dark outline first, then the gold), sapphire enamel studs and the
-// compass medallion. Gold is low-glow, so the floor stays below live warnings in brightness.
-function paintFloor(N) {
-  const S = N / (2 * R), C = 1.7;  // pixels per metre, flagstone cell size
-  const [c, g] = canvas2d(N), [hc, hg] = canvas2d(N), [oc, og] = canvas2d(N), [ec, eg] = canvas2d(N);
-  const img = g.createImageData(N, N), d = img.data, himg = hg.createImageData(N, N), hd = himg.data, oimg = og.createImageData(N, N), od = oimg.data;
-  const jit = (i, j) => [i + 0.15 + 0.7 * hash(i * 1.7, j * 3.1), j + 0.15 + 0.7 * hash(i * 5.3, j * 0.7)];
-  for (let py = 0; py < N; py++) for (let px = 0; px < N; px++) {
-    const x = (px + 0.5) / S - R, z = (py + 0.5) / S - R, r = Math.hypot(x, z), a = Math.atan2(z, x), o = (py * N + px) * 4;
-    const n = fbm(x * 0.3, z * 0.3), fine = vnoise(x * 5, z * 5);
-    let cr, cg, cb, h = 0.75, rough = 205, metal = 0, edge, sid;
-    if (r < 11.5) {                                                  // irregular flagstones
-      const gx = x / C, gz = z / C, ix = Math.floor(gx), iz = Math.floor(gz); let d1 = 9, d2 = 9, best = 0;
-      for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) { const [qx, qz] = jit(ix + i, iz + j), dd = (gx - qx) ** 2 + (gz - qz) ** 2;
-        if (dd < d1) { d2 = d1; d1 = dd; best = (ix + i) * 131 + (iz + j); } else if (dd < d2) d2 = dd; }
-      edge = (Math.sqrt(d2) - Math.sqrt(d1)) * C * 0.5; sid = hash(best, 7.7);
-    } else if (r < 12.7) {                                           // radial tile band
-      const sec = 72, sa = (a / TAU + 1) * sec, fs = sa - Math.floor(sa), arc = r * TAU / sec;
-      edge = Math.min(fs * arc, (1 - fs) * arc, r - 11.5, 12.7 - r); sid = hash(Math.floor(sa), 3.3);
-    } else if (r < 13.55) {                                          // cobalt panel border
-      const sec = 40, sa = (a / TAU + 1) * sec, fs = sa - Math.floor(sa), arc = r * TAU / sec;
-      edge = Math.min(fs * arc, (1 - fs) * arc, r - 12.7, 13.55 - r); sid = -1;
-    } else { const sec = 96, sa = (a / TAU + 1) * sec, fs = sa - Math.floor(sa), arc = r * TAU / sec; edge = Math.min(fs * arc, (1 - fs) * arc, r - 13.55, R - r); sid = hash(Math.floor(sa), 9.1); }
-    if (sid >= 0) {
-      const warm = hash(sid * 9, 2), v = (sid - 0.5) * 0.09 + (n - 0.5) * 0.14 + (fine - 0.5) * 0.04;
-      cr = (236 + warm * 8) * (1 + v); cg = (226 + warm * 2) * (1 + v); cb = (204 - warm * 14) * (1 + v);
-      const sun = 1 + (n - 0.5) * 0.06;                               // soft painterly light drift
-      cr *= sun; cg *= sun; cb *= sun;
-      if (edge < 0.12) { const t = 1 - smooth(0.025, 0.12, edge), f = 1 - t * 0.06; cr *= f; cg *= f; cb *= f * 1.01; h = 0.75 - t * 0.2; }
-      if (edge < 0.025) { cr = 200; cg = 188; cb = 166; h = 0.4; }
-      if (fine > 0.9) { cr *= 0.97; cg *= 0.96; cb *= 0.95; }
-    } else {                                                         // cobalt enamel panel
-      const v = (n - 0.5) * 0.12, t = smooth(0.0, 0.25, edge);
-      cr = (44 + 30 * t) * (1 + v); cg = (72 + 34 * t) * (1 + v); cb = (150 + 30 * t) * (1 + v); rough = 90; h = 0.7;
-      if (edge < 0.06) { cr = 200; cg = 150; cb = 70; metal = 230; rough = 95; h = 0.95; }   // gold frame
-    }
-    d[o] = Math.min(255, cr); d[o + 1] = Math.min(255, cg); d[o + 2] = Math.min(255, cb); d[o + 3] = 255;
-    const hv = Math.max(0, Math.min(255, h * 255)); hd[o] = hd[o + 1] = hd[o + 2] = hv; hd[o + 3] = 255;
-    od[o] = 255; od[o + 1] = rough; od[o + 2] = metal; od[o + 3] = 255;
-  }
-  g.putImageData(img, 0, 0); hg.putImageData(himg, 0, 0); og.putImageData(oimg, 0, 0);
-  eg.fillStyle = '#000'; eg.fillRect(0, 0, N, N);
-  const L = [g, hg, og, eg];
-  L.forEach(ctx => { ctx.save(); ctx.translate(N / 2, N / 2); ctx.scale(S, S); ctx.lineCap = 'round'; ctx.lineJoin = 'round'; });
-
-  // gold(fn, width, fill) and blue(fn): fn(ctx) builds a path in metres; gold is metal inlay, blue is enamel.
-  const GOLD = '#e3ae4e', GOLD_DK = '#9a6a2a', GOLD_LT = '#fbe2a0';
-  function gold(fn, w, fill = false) {
-    const st = (ctx, col, ww) => { ctx.strokeStyle = ctx.fillStyle = col; ctx.lineWidth = ww; fn(ctx); fill ? ctx.fill() : ctx.stroke(); if (fill && ww) ctx.stroke(); };
-    st(g, GOLD_DK, w + 0.022); st(g, GOLD, w); if (!fill) st(g, GOLD_LT, w * 0.3);
-    st(hg, '#fff', w + 0.02); st(og, 'rgb(255,95,150)', w + 0.02); st(eg, '#5a4220', w);
-  }
-  function blue(fn, glow = 0) {
-    g.fillStyle = '#2d4fa6'; fn(g); g.fill(); g.strokeStyle = GOLD_DK; g.lineWidth = 0.05; g.stroke();
-    hg.fillStyle = '#d0d0d0'; fn(hg); hg.fill(); og.fillStyle = 'rgb(255,70,30)'; fn(og); og.fill();
-    if (glow) { eg.fillStyle = `rgba(120,190,255,${glow})`; fn(eg); eg.fill(); }
-  }
-  const circ = (x, y, r) => ctx => { ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); };
-  const arc = (x, y, r, a0, a1) => ctx => { ctx.beginPath(); ctx.arc(x, y, r, a0, a1); };
-  const seg = (x0, y0, x1, y1) => ctx => { ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); };
-  const poly = pts => ctx => { ctx.beginPath(); pts.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); };
-  const P = (r, a) => [Math.cos(a) * r, Math.sin(a) * r];
-  const star = (r0, r1, n, rot = 0) => { const p = []; for (let i = 0; i < n * 2; i++) p.push(P(i % 2 ? r0 : r1, rot + i / (n * 2) * TAU)); return poly(p); };
-
-  // compass medallion: a beige field inside heavy gold rings, star points, scrollwork, a sapphire heart
-  gold(ctx => { ctx.beginPath(); ctx.arc(0, 0, 5.8, 0, TAU); ctx.arc(0, 0, 5.25, 0, TAU, true); }, 0.02, true);   // solid outer band
-  g.strokeStyle = GOLD_DK; g.lineWidth = 0.025;
-  for (let i = 0; i < 96; i++) { const a = i / 96 * TAU; g.beginPath(); g.moveTo(...P(5.3, a)); g.lineTo(...P(i % 4 ? 5.45 : 5.62, a)); g.stroke(); }
-  for (let i = 0; i < 24; i++) { const a = (i + 0.5) / 24 * TAU; blue(circ(...P(5.66, a), 0.06)); }
-  for (const [r, w] of [[5.1, 0.06], [4.35, 0.16], [2.2, 0.12], [1.42, 0.18]]) gold(circ(0, 0, r), w);
-  for (let i = 0; i < 72; i++) { const a = i / 72 * TAU, big = i % 6 === 0; gold(seg(...P(5.1, a), ...P(big ? 4.7 : 4.92, a)), big ? 0.07 : 0.035); }
-  for (let i = 0; i < 12; i++) { const a = i / 12 * TAU + TAU / 24; gold(arc(...P(4.85, a), 0.32, a + Math.PI * 0.55, a + Math.PI * 1.45), 0.05); gold(circ(...P(4.62, a), 0.06), 0.02, true); }
-  g.fillStyle = 'rgba(214,170,92,0.35)'; star(0.85, 3.0, 4, -Math.PI / 4)(g); g.fill();   // pale-gold diagonal points
-  gold(star(0.85, 3.0, 4, -Math.PI / 4), 0.07);
-  gold(star(0.95, 4.25, 4, -Math.PI / 2), 0.04, true);              // solid long cardinal points
-  for (let i = 0; i < 4; i++) { const a = i / 4 * TAU - Math.PI / 2; g.fillStyle = 'rgba(120,80,30,0.35)'; poly([[0, 0], P(4.25, a), P(0.95, a + Math.PI / 4)])(g); g.fill(); }  // shaded half of each point
-  for (let i = 0; i < 4; i++) { const a = i / 4 * TAU - Math.PI / 2; gold(seg(0, 0, ...P(4.2, a)), 0.035); gold(seg(0, 0, ...P(2.95, a + Math.PI / 4)), 0.03); }
-  for (let i = 0; i < 8; i++) {                                     // scrollwork curls between the points
-    const a = i / 8 * TAU - Math.PI / 2 + TAU / 16;
-    for (const s of [-1, 1]) gold(ctx => { ctx.beginPath(); const [x0, y0] = P(2.35, a + s * 0.05), [x1, y1] = P(3.3, a + s * 0.28), [x2, y2] = P(3.85, a + s * 0.12), [x3, y3] = P(3.55, a + s * 0.02);
-      ctx.moveTo(x0, y0); ctx.bezierCurveTo(x1, y1, x2, y2, x3, y3); }, 0.045);
-    gold(circ(...P(3.62, a), 0.11), 0.03); blue(circ(...P(3.62, a), 0.09));
-  }
-  blue(circ(0, 0, 1.36), 0.15);
-  gold(star(0.22, 1.12, 8, -Math.PI / 2), 0.03, true);
-  g.fillStyle = '#cfefff'; circ(0, 0, 0.22)(g); g.fill(); eg.fillStyle = '#bfe6ff'; circ(0, 0, 0.3)(eg); eg.fill();
-
-  // field: thin ring, eight spokes with enamel lozenges, four round star emblems, scattered sapphire studs
-  gold(circ(0, 0, 7.3), 0.07); gold(circ(0, 0, 11.5), 0.16); gold(circ(0, 0, 12.7), 0.12); gold(circ(0, 0, 13.55), 0.1); gold(circ(0, 0, R - 0.04), 0.1);
-  for (let i = 0; i < 24; i++) { const a = i / 24 * TAU; gold(arc(...P(7.62, a), 0.3, a + Math.PI * 0.6, a + Math.PI * 1.4), 0.04); }
-  for (let i = 0; i < 8; i++) {
-    const a = i / 8 * TAU;
-    gold(seg(...P(5.88, a), ...P(8.3, a)), 0.05); gold(seg(...P(9.1, a), ...P(11.4, a)), 0.05);
-    const loz = [P(9.2, a), P(8.7, a + 0.045), P(8.2, a), P(8.7, a - 0.045)]; blue(poly(loz)); gold(poly(loz), 0.05);
-  }
-  for (let i = 0; i < 4; i++) {
-    const a = i / 4 * TAU + Math.PI / 4, [x, y] = P(9.9, a);
-    gold(circ(x, y, 0.78), 0.1); blue(circ(x, y, 0.7), 0.08); gold(star(0.12, 0.55, 4, a), 0.02, true);
-    gold(circ(x, y, 0.95), 0.03);
-  }
-  const studs = [];
-  for (let k = 0; k < 400 && studs.length < 34; k++) {
-    const r = 6.1 + rnd() * 5.1, a = rnd() * TAU, [x, y] = P(r, a);
-    if (Math.abs(r - 7.3) < 0.6 || studs.some(([u, v]) => Math.hypot(u - x, v - y) < 1.6) || [0, 1, 2, 3].some(i => Math.hypot(...P(9.9, i / 4 * TAU + Math.PI / 4).map((q, j) => q - [x, y][j])) < 1.4)) continue;
-    studs.push([x, y]);
-    if (rnd() < 0.5) { blue(circ(x, y, 0.13)); gold(circ(x, y, 0.15), 0.03); }
-    else { const b = rnd() * TAU, q = [[x + Math.cos(b) * 0.24, y + Math.sin(b) * 0.24], [x - Math.sin(b) * 0.12, y + Math.cos(b) * 0.12], [x - Math.cos(b) * 0.24, y - Math.sin(b) * 0.24], [x + Math.sin(b) * 0.12, y - Math.cos(b) * 0.12]]; blue(poly(q)); gold(poly(q), 0.03); }
-  }
-  for (let i = 0; i < 40; i++) { const a = (i + 0.5) / 40 * TAU, [x, y] = P(13.12, a); gold(ctx => { ctx.beginPath(); for (let j = 0; j < 8; j++) { const [u, v] = P(j % 2 ? 0.06 : 0.22, a + j / 8 * TAU); ctx.lineTo(x + u, y + v); } ctx.closePath(); }, 0.01, true); }
-  for (let i = 0; i < 96; i++) { const a = i / 96 * TAU; gold(circ(...P(13.78, a + TAU / 192), 0.045), 0.01, true); }
-  L.forEach(ctx => ctx.restore());
-  return { map: tex(c), bump: tex(hc, false), orm: tex(oc, false), glow: tex(ec) };
-}
-
-// ---- banner and stone textures ----
-function paintBanner(w = 256, h = 1024) {
-  const [c, g] = canvas2d(w, h), tail = h * 0.86;
-  const grd = g.createLinearGradient(0, 0, w, 0); grd.addColorStop(0, '#163283'); grd.addColorStop(0.5, '#2448b0'); grd.addColorStop(1, '#163283');
-  const shape = () => { g.beginPath(); g.moveTo(0, 0); g.lineTo(w, 0); g.lineTo(w, h); g.lineTo(w / 2, tail); g.lineTo(0, h); g.closePath(); };
-  g.fillStyle = grd; shape(); g.fill();
-  for (let i = 0; i < 9; i++) { g.fillStyle = `rgba(0,0,30,${0.05 + (i % 2) * 0.06})`; g.fillRect(i * w / 9, 0, w / 18, h); }   // cloth folds
-  g.strokeStyle = '#e4b865'; g.lineWidth = 10; shape(); g.stroke();
-  g.lineWidth = 3; g.beginPath(); g.moveTo(18, 40); g.lineTo(18, h - 60); g.moveTo(w - 18, 40); g.lineTo(w - 18, h - 60); g.stroke();
-  g.fillStyle = '#e4b865'; g.fillRect(0, 0, w, 34); g.fillStyle = '#8a5d22'; for (let i = 0; i < 8; i++) g.fillRect(i * w / 8 + 10, 12, w / 16, 10);
-  const emblem = (cy, s) => {
-    g.save(); g.translate(w / 2, cy); g.scale(s, s); g.strokeStyle = g.fillStyle = '#ecc06c';
-    g.lineWidth = 6; g.beginPath(); g.arc(0, 0, 84, 0, TAU); g.stroke(); g.lineWidth = 2; g.beginPath(); g.arc(0, 0, 70, 0, TAU); g.stroke();
-    for (let i = 0; i < 16; i++) { const a = i / 16 * TAU; g.lineWidth = i % 2 ? 2 : 4; g.beginPath(); g.moveTo(Math.cos(a) * 26, Math.sin(a) * 26); g.lineTo(Math.cos(a) * (i % 2 ? 60 : 100), Math.sin(a) * (i % 2 ? 60 : 100)); g.stroke(); }
-    g.beginPath(); for (let i = 0; i < 8; i++) { const a = i / 8 * TAU - Math.PI / 2, rr = i % 2 ? 14 : 56; g.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); } g.closePath(); g.fill();
-    g.restore();
-  };
-  emblem(h * 0.3, 0.95); emblem(h * 0.62, 0.5);
-  g.fillStyle = '#e4b865'; for (let i = 0; i < 7; i++) { g.beginPath(); g.arc(w * (i + 0.5) / 7, h * 0.46, 4, 0, TAU); g.fill(); }
-  return tex(c);
-}
-function paintCloud(N = 256) {
-  const [c, g] = canvas2d(N);
-  for (let i = 0; i < 34; i++) {
-    const x = N * (0.18 + rnd() * 0.64), y = N * (0.3 + rnd() * 0.36), rr = N * (0.08 + rnd() * 0.16);
-    const grd = g.createRadialGradient(x, y - rr * 0.3, 0, x, y, rr); grd.addColorStop(0, 'rgba(255,255,255,0.7)'); grd.addColorStop(0.6, 'rgba(236,242,255,0.45)'); grd.addColorStop(1, 'rgba(214,226,250,0)');
-    g.fillStyle = grd; g.fillRect(0, 0, N, N);
-  }
-  return tex(c);
-}
-function paintBlocks(w = 512, h = 512, rows = 8, base = [240, 228, 202]) {   // ashlar blocks for walls and towers
-  const [c, g] = canvas2d(w, h); g.fillStyle = `rgb(${base})`; g.fillRect(0, 0, w, h);
-  const rh = h / rows;
-  for (let r = 0; r < rows; r++) { let x = (r % 2) * -40; while (x < w) { const bw = 60 + hash(x, r) * 70, v = (hash(r, x) - 0.5) * 18;
-    g.fillStyle = `rgb(${base[0] + v},${base[1] + v},${base[2] + v - 2})`; g.fillRect(x + 2, r * rh + 2, bw - 4, rh - 4); x += bw; } }
-  g.fillStyle = 'rgba(120,100,80,0.35)'; for (let r = 0; r <= rows; r++) g.fillRect(0, r * rh - 1, w, 2);
-  const t = tex(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
-}
-
-// ---- renderer, scene, sky ----
-const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('view'), antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: true });
+const canvas = document.getElementById('view');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(44, 1, 0.1, 1400);
+const camera = new THREE.PerspectiveCamera(44, 1, 0.1, 1600);
 window.THREE = THREE;
+await loadScript('skyward-spire-env.js?v=' + Date.now());   // never a stale cached copy
+const env = window.buildSkywardSpire(THREE, scene, { mergeGeometries, renderer, floorRes: 3072 });
 
-// The sun sits high at the front left so the tall back towers throw their shadows away from the floor.
-const SUN = new THREE.Vector3(-0.42, 0.85, 0.32).normalize();
-const skyMat = new THREE.ShaderMaterial({
-  side: THREE.BackSide, depthWrite: false, fog: false, uniforms: { sun: { value: SUN } },
-  vertexShader: 'varying vec3 vD; void main(){ vD = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }',
-  fragmentShader: `varying vec3 vD; uniform vec3 sun;
-    void main(){ float h = vD.y, s = max(dot(vD, sun), 0.);
-      vec3 zen = vec3(0.13,0.30,0.74), mid = vec3(0.36,0.58,0.92), hor = vec3(0.84,0.91,0.99), low = vec3(0.55,0.70,0.93);
-      vec3 c = h > 0. ? mix(mix(hor, mid, smoothstep(0.,0.28,h)), zen, smoothstep(0.28,0.95,h)) : mix(hor, low, smoothstep(0.,-0.5,h));
-      c += vec3(1.0,0.93,0.8) * pow(s, 8.) * 0.3 + vec3(1.,0.97,0.9) * pow(s, 90.) * 0.7;
-      gl_FragColor = vec4(pow(c, vec3(2.2)), 1.); }`,
-});
-scene.add(new THREE.Mesh(new THREE.SphereGeometry(800, 48, 24), skyMat));
-scene.fog = new THREE.Fog(0xb4cdf2, 140, 620);
-{ // image-based light from the same sky, so gold and enamel reflect blue sky and warm sun
-  const pm = new THREE.PMREMGenerator(renderer), es = new THREE.Scene();
-  es.add(new THREE.Mesh(new THREE.SphereGeometry(50, 32, 16), skyMat));
-  const warm = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.MeshBasicMaterial({ color: 0xfff1d0, side: THREE.DoubleSide }));
-  warm.position.set(0, -20, 0); warm.rotation.x = Math.PI / 2; es.add(warm);
-  scene.environment = pm.fromScene(es, 0.02).texture;
-}
-
-scene.add(new THREE.HemisphereLight(0xd8e8ff, 0x9a8a6c, 0.75));
-const sun = new THREE.DirectionalLight(0xffe8c4, 2.7); sun.position.copy(SUN).multiplyScalar(70); sun.castShadow = true;
-sun.shadow.mapSize.set(4096, 4096); Object.assign(sun.shadow.camera, { left: -40, right: 40, top: 40, bottom: -40, near: 1, far: 200 });
-sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.03; scene.add(sun);
-const bounce = new THREE.DirectionalLight(0x9cc0ff, 0.45); bounce.position.set(14, 6, 18); scene.add(bounce);
-
-// ---- materials ----
-const blockTex = paintBlocks(), blockTex2 = paintBlocks(512, 512, 6, [222, 206, 178]);
-const ivoryM = new THREE.MeshStandardMaterial({ color: 0xffffff, map: blockTex, roughness: 0.68, envMapIntensity: 0.6 });
-const ivoryPlainM = new THREE.MeshStandardMaterial({ color: 0xf0e2c4, roughness: 0.62, envMapIntensity: 0.6 });
-const ivoryDarkM = new THREE.MeshStandardMaterial({ color: 0xffffff, map: blockTex2, roughness: 0.75, envMapIntensity: 0.5 });
-const cobaltM = new THREE.MeshStandardMaterial({ color: 0x2547ad, roughness: 0.35, metalness: 0.2 });
-const glassM = new THREE.MeshStandardMaterial({ color: 0x1d3d9e, roughness: 0.15, metalness: 0.3, emissive: 0x2a5cd0, emissiveIntensity: 0.45 });
-const goldM = new THREE.MeshStandardMaterial({ color: 0xf2bd5a, roughness: 0.34, metalness: 0.6, emissive: 0x6a4210, emissiveIntensity: 0.35, envMapIntensity: 0.9 });
-const goldDkM = new THREE.MeshStandardMaterial({ color: 0xc8913c, roughness: 0.4, metalness: 0.6, emissive: 0x4a2c08, emissiveIntensity: 0.3 });
-const glowBlue = new THREE.MeshBasicMaterial({ color: new THREE.Color(0x8fd6ff).multiplyScalar(2.2), toneMapped: false });
-function add(geo, mat, parent, pos, rot, shadow = true) { const m = new THREE.Mesh(geo, mat); m.castShadow = m.receiveShadow = shadow; if (pos) m.position.set(...pos); if (rot) m.rotation.set(...rot); parent.add(m); return m; }
-const dummy = new THREE.Object3D();
-// n copies of geo around a circle of radius r at height y, each facing outward (+z out); skip = bridge mouth clearance
-function ringOf(geo, mat, parent, n, r, y, { phase = 0, skip = 0, scale = null, shadow = true } = {}) {
-  const ok = []; for (let i = 0; i < n; i++) { const a = (i + phase) / n * TAU; if (!skip || !nearBridge(a, skip, r)) ok.push(a); }
-  const im = new THREE.InstancedMesh(geo, mat, ok.length); im.castShadow = shadow; im.receiveShadow = true;
-  ok.forEach((a, i) => { dummy.position.set(Math.cos(a) * r, y, Math.sin(a) * r); dummy.rotation.set(0, Math.PI / 2 - a, 0); dummy.scale.set(...(scale || [1, 1, 1])); dummy.updateMatrix(); im.setMatrixAt(i, dummy.matrix); });
-  parent.add(im); return im;
-}
-const root = new THREE.Group(); root.name = 'LB_ENV_SkywardSpire_Arena'; scene.add(root);
-const spin = [], sway = [], bob = [];
-
-// ---- pointed-arch window (shape facing +z) ----
-const archCache = {};
-function archGeo(w, h, depth = 0) {
-  const k = `${w}|${h}|${depth}`; if (archCache[k]) return archCache[k];
-  const s = new THREE.Shape(), hw = w / 2, sh = Math.max(0, h - w * 0.8);
-  s.moveTo(-hw, 0); s.lineTo(-hw, sh); s.quadraticCurveTo(-hw, h - w * 0.15, 0, h); s.quadraticCurveTo(hw, h - w * 0.15, hw, sh); s.lineTo(hw, 0); s.closePath();
-  return archCache[k] = depth ? new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: false }) : new THREE.ShapeGeometry(s);
-}
-function window4(parent, w, h, y, half, n = 4) {   // gold-framed cobalt window on each face of a square tier
-  for (let k = 0; k < n; k++) {
-    const a = k / n * TAU, nx = Math.sin(a), nz = Math.cos(a);
-    add(archGeo(w + 0.16, h + 0.12, 0.04), goldM, parent, [nx * (half + 0.0), y - 0.06, nz * (half + 0.0)], [0, a, 0], false);
-    add(archGeo(w, h), glassM, parent, [nx * (half + 0.045), y, nz * (half + 0.045)], [0, a, 0], false);
-    add(new THREE.BoxGeometry(0.05, h * 0.9, 0.03), goldM, parent, [nx * (half + 0.06), y + h * 0.45, nz * (half + 0.06)], [0, a, 0], false);
-  }
-}
-
-// ---- banners ----
-const bannerTex = paintBanner();
-const bannerM = new THREE.MeshStandardMaterial({ map: bannerTex, transparent: true, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.75 });
-function banner(parent, pos, rotY, w = 1.4, h = 5.6) {
-  const pivot = new THREE.Group(); pivot.position.set(...pos); pivot.rotation.y = rotY; parent.add(pivot);
-  const b = add(new THREE.PlaneGeometry(w, h, 1, 10), bannerM, pivot); b.geometry.translate(0, -h / 2, 0);
-  add(new THREE.CylinderGeometry(0.06, 0.06, w + 0.5, 8), goldM, pivot, [0, 0.05, 0], [0, 0, Math.PI / 2]);
-  for (const s of [-1, 1]) add(new THREE.SphereGeometry(0.11, 8, 6), goldM, pivot, [s * (w / 2 + 0.25), 0.05, 0]);
-  sway.push([b, rnd() * 6]); return pivot;
-}
-
-// ---- gears ----
-function gear(r, teeth, th, spokes = 6) {
-  const grp = new THREE.Group();
-  add(new THREE.TorusGeometry(r, r * 0.1, 8, 64), goldM, grp);
-  add(new THREE.TorusGeometry(r * 0.78, r * 0.05, 6, 48), goldDkM, grp);
-  add(new THREE.TorusGeometry(r * 0.3, r * 0.06, 6, 24), goldM, grp);
-  const tg = new THREE.BoxGeometry(r * 0.2, r * 0.2, th), ti = new THREE.InstancedMesh(tg, goldM, teeth);
-  for (let i = 0; i < teeth; i++) { const a = i / teeth * TAU; dummy.position.set(Math.cos(a) * r * 1.12, Math.sin(a) * r * 1.12, 0); dummy.rotation.set(0, 0, a); dummy.scale.set(1, 1, 1); dummy.updateMatrix(); ti.setMatrixAt(i, dummy.matrix); }
-  ti.castShadow = true; grp.add(ti);
-  for (let i = 0; i < spokes; i++) { const a = i / spokes * TAU; const sp = add(new THREE.BoxGeometry(r * 0.5, r * 0.07, th * 0.5), goldDkM, grp, [Math.cos(a) * r * 0.54, Math.sin(a) * r * 0.54, 0], [0, 0, a]);
-    add(new THREE.SphereGeometry(r * 0.06, 8, 6), goldM, grp, [Math.cos(a) * r * 0.78, Math.sin(a) * r * 0.78, th * 0.3]); }
-  add(new THREE.CylinderGeometry(r * 0.2, r * 0.2, th * 1.4, 20), cobaltM, grp, [0, 0, 0], [Math.PI / 2, 0, 0]);
-  add(new THREE.SphereGeometry(r * 0.1, 10, 8), goldM, grp, [0, 0, th * 0.7]);
-  return grp;
-}
-
-// ---- gothic tower: square tiers with corner pinnacles, pointed cobalt windows, gold cornices, a tall spire ----
-function pinnacle(parent, x, y, z, h, w) {
-  add(new THREE.BoxGeometry(w, h, w), ivoryPlainM, parent, [x, y + h / 2, z]);
-  add(new THREE.BoxGeometry(w * 1.25, 0.08, w * 1.25), goldM, parent, [x, y + h, z]);
-  add(new THREE.ConeGeometry(w * 0.72, h * 0.9, 4), ivoryPlainM, parent, [x, y + h + h * 0.45, z], [0, Math.PI / 4, 0]);
-  add(new THREE.ConeGeometry(w * 0.16, h * 0.35, 6), goldM, parent, [x, y + h * 1.95, z]);
-}
-function gothicTower(parent, x, y, z, { h = 20, w = 3, tiers = 3, banners = 0, face = 0, spire = 1, detail = 1 } = {}) {
-  const t = new THREE.Group(); t.position.set(x, y, z); parent.add(t);
-  let cy = 0, cw = w;
-  add(new THREE.BoxGeometry(cw * 1.3, 1.0, cw * 1.3), ivoryDarkM, t, [0, 0.5, 0]);
-  add(new THREE.BoxGeometry(cw * 1.36, 0.14, cw * 1.36), goldM, t, [0, 1.0, 0]); cy = 1.05;
-  const th = (h - cy) / (tiers + 0.6);
-  for (let i = 0; i < tiers; i++) {
-    const hh = th * (i === 0 ? 1.4 : 1 - i * 0.12);
-    const body = add(new THREE.BoxGeometry(cw, hh, cw), ivoryM, t, [0, cy + hh / 2, 0]);
-    body.material = ivoryM;
-    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {                // corner buttresses
-      add(new THREE.BoxGeometry(cw * 0.18, hh, cw * 0.18), ivoryPlainM, t, [sx * cw / 2, cy + hh / 2, sz * cw / 2]);
-      if (detail) pinnacle(t, sx * cw / 2, cy + hh, sz * cw / 2, Math.min(1.6, hh * 0.22), cw * 0.16);
-    }
-    if (detail) window4(t, cw * 0.36, hh * 0.62, cy + hh * 0.18, cw / 2);
-    else for (let k = 0; k < 4; k++) { const a = k / 4 * TAU; add(new THREE.BoxGeometry(cw * 0.34, hh * 0.6, 0.06), glassM, t, [Math.sin(a) * cw / 2, cy + hh * 0.5, Math.cos(a) * cw / 2], [0, a, 0], false); }
-    add(new THREE.BoxGeometry(cw * 1.1, 0.18, cw * 1.1), goldM, t, [0, cy + hh, 0]);
-    add(new THREE.BoxGeometry(cw * 1.04, 0.1, cw * 1.04), goldDkM, t, [0, cy + hh * 0.08, 0]);
-    cy += hh + 0.09; cw *= 0.78;
-  }
-  if (spire === 1) {                                                     // tall square spire with gold ribs
-    const sh = th * 2.2;
-    add(new THREE.ConeGeometry(cw * 0.72, sh, 4), ivoryPlainM, t, [0, cy + sh / 2, 0], [0, Math.PI / 4, 0]);
-    for (let k = 0; k < 4; k++) { const a = k / 4 * TAU + Math.PI / 4; const rib = add(new THREE.CylinderGeometry(0.03, 0.06, sh * 1.0, 4), goldM, t, [Math.sin(a) * cw * 0.25, cy + sh / 2, Math.cos(a) * cw * 0.25]); rib.lookAt(t.position.x, t.position.y + cy + sh, t.position.z); rib.rotateX(Math.PI / 2); }
-    add(new THREE.CylinderGeometry(cw * 0.5, cw * 0.5, 0.2, 4), goldM, t, [0, cy + sh * 0.3, 0], [0, Math.PI / 4, 0]);
-    add(new THREE.ConeGeometry(0.1, 1.4, 6), goldM, t, [0, cy + sh + 0.6, 0]);
-    add(new THREE.OctahedronGeometry(0.22), goldM, t, [0, cy + sh + 0.1, 0]);
-  } else {                                                               // cobalt dome with a gold lantern
-    add(new THREE.SphereGeometry(cw * 0.62, 20, 12, 0, TAU, 0, Math.PI / 2), cobaltM, t, [0, cy, 0]);
-    add(new THREE.CylinderGeometry(cw * 0.14, cw * 0.18, cw * 0.5, 8), goldM, t, [0, cy + cw * 0.75, 0]);
-    add(new THREE.ConeGeometry(cw * 0.1, cw * 0.7, 8), goldM, t, [0, cy + cw * 1.3, 0]);
-  }
-  for (let i = 0; i < banners; i++) { const a = face + (banners > 1 ? (i ? 0.45 : -0.45) : 0); banner(t, [Math.sin(a) * w * 0.68, h * 0.62, Math.cos(a) * w * 0.68], a, w * 0.6, h * 0.42); }
-  return t;
-}
-// hanging column under a mass: ivory shaft, gold bands, cobalt panels, a pointed foot
-function hangingColumn(parent, x, y, z, len, r) {
-  const g = new THREE.Group(); g.position.set(x, y, z); parent.add(g);
-  add(new THREE.CylinderGeometry(r, r * 0.9, len, 8), ivoryM, g, [0, -len / 2, 0]);
-  for (const f of [0.08, 0.5, 0.92]) add(new THREE.CylinderGeometry(r * 1.12, r * 1.12, 0.18, 8), goldM, g, [0, -len * f, 0]);
-  for (let k = 0; k < 4; k++) { const a = k / 4 * TAU + Math.PI / 8; add(new THREE.BoxGeometry(r * 0.6, len * 0.32, 0.05), glassM, g, [Math.sin(a) * r * 0.98, -len * 0.3, Math.cos(a) * r * 0.98], [0, a, 0], false); }
-  add(new THREE.ConeGeometry(r * 0.9, r * 3.2, 8), ivoryPlainM, g, [0, -len - r * 1.6, 0], [Math.PI, 0, 0]);
-  add(new THREE.ConeGeometry(r * 0.15, r * 1.2, 6), goldM, g, [0, -len - r * 3.6, 0], [Math.PI, 0, 0]);
-  return g;
-}
-
-// ---- the dais floor ----
-const floor = paintFloor(3072);
-const floorMat = new THREE.MeshStandardMaterial({ map: floor.map, bumpMap: floor.bump, bumpScale: 2.2, roughnessMap: floor.orm, metalnessMap: floor.orm, roughness: 1, metalness: 1,
-  emissive: 0xffd8a0, emissiveMap: floor.glow, emissiveIntensity: 0.12, envMapIntensity: 0.9 });
-const floorMesh = add(new THREE.CircleGeometry(R, 180), floorMat, root, [0, 0, 0], [-Math.PI / 2, 0, 0], false);
-floorMesh.receiveShadow = true; floorMesh.name = 'Floor';
-
-// ---- curb, parapet and the outer drum ----
-add(new THREE.RingGeometry(R, RIM, 180), ivoryPlainM, root, [0, 0.16, 0], [-Math.PI / 2, 0, 0]);
-add(new THREE.CylinderGeometry(R, R, 0.16, 180, 1, true), ivoryDarkM, root, [0, 0.08, 0]);
-add(new THREE.TorusGeometry(R + 0.02, 0.06, 6, 180), goldM, root, [0, 0.16, 0], [Math.PI / 2, 0, 0]);
-// parapet: short wall segments with a gold coping, pinnacle posts, cobalt panels on the outside
-const segN = 160, segL = RIM * TAU / segN;
-ringOf(new THREE.BoxGeometry(segL * 1.02, 0.5, 0.34), ivoryPlainM, root, segN, RIM - 0.2, 0.41, { skip: BRIDGE_W / 2 + 0.3 });
-ringOf(new THREE.BoxGeometry(segL * 1.04, 0.08, 0.46), goldM, root, segN, RIM - 0.2, 0.7, { skip: BRIDGE_W / 2 + 0.3 });
-ringOf(new THREE.BoxGeometry(segL * 0.7, 0.28, 0.04), cobaltM, root, segN, RIM - 0.02, 0.42, { skip: BRIDGE_W / 2 + 0.3, phase: 0 });
-ringOf(new THREE.BoxGeometry(0.3, 0.9, 0.3), ivoryPlainM, root, 40, RIM - 0.2, 0.45, { skip: BRIDGE_W / 2 + 0.6, phase: 0.5 });
-ringOf(new THREE.ConeGeometry(0.2, 0.55, 4), goldM, root, 40, RIM - 0.2, 1.17, { skip: BRIDGE_W / 2 + 0.6, phase: 0.5 });
-ringOf(new THREE.SphereGeometry(0.1, 8, 6), goldM, root, 40, RIM - 0.2, 1.5, { skip: BRIDGE_W / 2 + 0.6, phase: 0.5 });
-// drum below the curb: ivory blocks, a band of gold-framed cobalt panels, heavy gold mouldings
-add(new THREE.CylinderGeometry(RIM, RIM, 2.4, 160, 1, true), ivoryM, root, [0, -1.05, 0]);
-for (const [y, r, t] of [[0.15, RIM + 0.06, 0.1], [-0.3, RIM + 0.12, 0.12], [-2.25, RIM + 0.14, 0.16]]) add(new THREE.TorusGeometry(r, t, 8, 180), goldM, root, [0, y, 0], [Math.PI / 2, 0, 0]);
-ringOf(new THREE.BoxGeometry(1.0, 1.25, 0.08), goldM, root, 64, RIM + 0.02, -1.25);
-ringOf(new THREE.BoxGeometry(0.82, 1.08, 0.1), cobaltM, root, 64, RIM + 0.05, -1.25);
-ringOf(new THREE.SphereGeometry(0.09, 8, 6), goldM, root, 64, RIM + 0.14, -1.25, { phase: 0.5 });
-// tiered underside
-const tiers = [[RIM + 0.4, RIM, 0.6, -2.55, ivoryDarkM], [RIM, RIM - 0.6, 2.2, -3.95, ivoryM], [RIM - 0.6, RIM - 1.0, 0.4, -5.25, goldDkM], [RIM - 1.0, 9.5, 4.5, -7.7, ivoryDarkM], [9.5, 5, 6, -12.95, ivoryM], [5, 1.0, 7, -19.45, ivoryDarkM]];
-for (const [rt, rb, h, y, m] of tiers) add(new THREE.CylinderGeometry(rt, rb, h, 72), m, root, [0, y, 0]);
-ringOf(new THREE.BoxGeometry(0.7, 1.6, 0.08), glassM, root, 32, RIM - 0.25, -4.0, { phase: 0.5, shadow: false });
-ringOf(new THREE.BoxGeometry(0.9, 1.8, 0.06), goldM, root, 32, RIM - 0.3, -4.05, { phase: 0.5, shadow: false });
-for (let i = 0; i < 20; i++) {                                         // columns hanging under the rim
-  const a = (i + 0.5) / 20 * TAU; if (nearBridge(a, 2.5, RIM)) continue;
-  const rr = RIM - 1.6 - (i % 3) * 1.4;
-  hangingColumn(root, Math.cos(a) * rr, -5.2, Math.sin(a) * rr, 4 + (i * 7 % 5) * 1.6, 0.55 + (i % 2) * 0.2);
-}
-hangingColumn(root, 0, -22.5, 0, 6, 1.0);
-for (let i = 0; i < 4; i++) {                                          // great gears under each bridge root
-  const a = i / 4 * TAU, gg = gear(2.6, 20, 0.4, 8);
-  gg.position.set(Math.cos(a) * (RIM - 0.5), -3.6, Math.sin(a) * (RIM - 0.5)); gg.lookAt(Math.cos(a + Math.PI / 2) * 50, -3.6, Math.sin(a + Math.PI / 2) * 50);
-  root.add(gg); spin.push([gg, 'z', i % 2 ? 0.15 : -0.15]);
-  for (const s of [-1, 1]) { const b = a + s * 0.42, sg = gear(1.5, 14, 0.3, 6); sg.position.set(Math.cos(b) * (RIM + 0.25), -2.9, Math.sin(b) * (RIM + 0.25)); sg.lookAt(Math.cos(b) * 60, -2.9, Math.sin(b) * 60); root.add(sg); spin.push([sg, 'z', 0.3 * s]); }
-}
-
-// ---- four bridges in a cross, each with a gatehouse at the rim and a gear landing at the far end ----
-const deckTex = paintBlocks(512, 128, 2, [238, 226, 200]); deckTex.repeat.set(6, 1);
-const deckM = new THREE.MeshStandardMaterial({ map: deckTex, roughness: 0.7, envMapIntensity: 0.6 });
-for (let k = 0; k < 4; k++) {
-  const br = new THREE.Group(); br.rotation.y = -k * Math.PI / 2; root.add(br); br.name = `Bridge_${k}`;
-  const x0 = R - 0.2, x1 = RIM + BRIDGE_L, mid = (x0 + x1) / 2, len = x1 - x0, hw = BRIDGE_W / 2;
-  add(new THREE.BoxGeometry(len, 0.5, BRIDGE_W), deckM, br, [mid, -0.25, 0]);
-  add(new THREE.BoxGeometry(len, 0.12, 1.1), cobaltM, br, [mid, 0.005, 0]).scale.y = 0.1;     // cobalt runner
-  for (let i = 0; i < 6; i++) add(new THREE.CylinderGeometry(0.26, 0.26, 0.03, 4), goldM, br, [x0 + 1.8 + i * (len - 3) / 5, 0.03, 0], [0, Math.PI / 4, 0]);
-  add(new THREE.BoxGeometry(len, 0.9, BRIDGE_W + 0.5), ivoryDarkM, br, [mid, -0.95, 0]);
-  add(new THREE.BoxGeometry(len, 0.14, BRIDGE_W + 0.62), goldM, br, [mid, -0.47, 0]);
-  add(new THREE.BoxGeometry(len, 0.1, BRIDGE_W + 0.56), goldDkM, br, [mid, -1.4, 0]);
-  for (const s of [-1, 1]) {
-    add(new THREE.BoxGeometry(len, 0.42, 0.26), ivoryPlainM, br, [mid, 0.21, s * (hw - 0.13)]);
-    add(new THREE.BoxGeometry(len, 0.08, 0.34), goldM, br, [mid, 0.44, s * (hw - 0.13)]);
-    const posts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.24, 1.0, 0.24), ivoryPlainM, 9), caps = new THREE.InstancedMesh(new THREE.ConeGeometry(0.17, 0.45, 4), goldM, 9);
-    for (let i = 0; i < 9; i++) { const px = x0 + 0.6 + i / 8 * (len - 1.2);
-      dummy.rotation.set(0, 0, 0); dummy.scale.set(1, 1, 1); dummy.position.set(px, 0.5, s * (hw - 0.13)); dummy.updateMatrix(); posts.setMatrixAt(i, dummy.matrix);
-      dummy.position.set(px, 1.22, s * (hw - 0.13)); dummy.rotation.y = Math.PI / 4; dummy.updateMatrix(); caps.setMatrixAt(i, dummy.matrix); }
-    posts.castShadow = caps.castShadow = true; br.add(posts, caps);
-    add(new THREE.BoxGeometry(len - 1, 0.06, 0.08), goldM, br, [mid, 0.92, s * (hw - 0.13)]);
-    for (let i = 0; i < 10; i++) add(new THREE.BoxGeometry(0.5, 0.6, 0.05), cobaltM, br, [x0 + 0.9 + i * (len - 1.8) / 9, -0.95, s * (hw + 0.27)]);
-  }
-  for (let i = 0; i < 3; i++) {                                        // gothic arches and piers under the span
-    const ax = x0 + (i + 0.5) / 3 * len;
-    const arch = add(new THREE.TorusGeometry(1.5, 0.3, 6, 24, Math.PI), ivoryDarkM, br, [ax, -2.6, 0]); arch.rotation.z = Math.PI; arch.scale.set(1, 1.3, 4.2);
-    add(new THREE.BoxGeometry(0.8, 9, 0.8), ivoryM, br, [ax - len / 6, -5.8, 0]);
-    add(new THREE.ConeGeometry(0.6, 2.4, 4), ivoryPlainM, br, [ax - len / 6, -11.5, 0], [Math.PI, Math.PI / 4, 0]);
-    for (const y of [-2, -6]) add(new THREE.BoxGeometry(0.95, 0.15, 0.95), goldM, br, [ax - len / 6, y, 0]);
-  }
-  // gatehouse pylons at the bridge mouth; the arch over it is left off on the camera-side bridge (k = 1, +z)
-  for (const s of [-1, 1]) {
-    const pz = s * (hw + 0.55), px = RIM + 0.4;
-    add(new THREE.BoxGeometry(1.1, 3.4, 1.1), ivoryM, br, [px, 1.7, pz]);
-    add(new THREE.BoxGeometry(1.3, 0.16, 1.3), goldM, br, [px, 3.4, pz]);
-    add(archGeo(0.45, 1.4), glassM, br, [px + 0.56, 1.3, pz], [0, Math.PI / 2, 0], false);
-    add(archGeo(0.6, 1.55, 0.03), goldM, br, [px + 0.55, 1.22, pz], [0, Math.PI / 2, 0], false);
-    pinnacle(br, px, 3.45, pz, 1.2, 0.7);
-    if (k !== 1) banner(br, [px + 0.62, 3.0, pz], Math.PI / 2, 0.9, 2.8);
-  }
-  if (k !== 1) {
-    const gate = add(new THREE.TorusGeometry(hw + 0.55, 0.22, 8, 32, Math.PI), ivoryPlainM, br, [RIM + 0.4, 3.4, 0], [0, Math.PI / 2, 0]);
-    add(new THREE.TorusGeometry(hw + 0.55, 0.08, 6, 32, Math.PI), goldM, br, [RIM + 0.55, 3.4, 0], [0, Math.PI / 2, 0]);
-    add(new THREE.OctahedronGeometry(0.35), goldM, br, [RIM + 0.4, 3.4 + hw + 0.75, 0]);
-  }
-  // landing: a round ivory drum topped with a great gold gear, a gate tower behind it
-  const land = new THREE.Group(); land.position.set(x1 + 2.6, 0, 0); br.add(land);
-  add(new THREE.CylinderGeometry(3.2, 2.6, 1.4, 48), ivoryM, land, [0, -0.7, 0]);
-  add(new THREE.CylinderGeometry(3.25, 3.25, 0.3, 48), cobaltM, land, [0, -1.45, 0]);
-  add(new THREE.CircleGeometry(3.2, 48), ivoryPlainM, land, [0, 0.01, 0], [-Math.PI / 2, 0, 0]);
-  const lg = gear(2.9, 24, 0.3, 8); lg.rotation.x = Math.PI / 2; lg.position.y = 0.12; land.add(lg); spin.push([lg, 'z', 0.1 * (k % 2 ? 1 : -1)]);
-  gothicTower(land, 1.6, 0, 0, { h: k === 1 ? 6 : 11, w: 1.6, tiers: 2, spire: k === 1 ? 0 : 1 });
-  hangingColumn(land, 0, -1.6, 0, 3.5, 1.2);
-}
-
-// ---- towers ringing the dais (all outside the rim) ----
-// Back two are the tallest; the side pair are mid height; the camera-side pair stay short with domes so the
-// gameplay camera never loses floor. Each stands on a buttressed plinth tied back to the drum.
-const RING = [[-135, 30, 3.6, 4, 2], [-45, 30, 3.6, 4, 2], [-100, 22, 2.6, 3, 1], [170, 12, 2.4, 2, 1], [10, 12, 2.4, 2, 1], [45, 7, 2.4, 2, 0], [135, 7, 2.4, 2, 0]];
-for (const [deg, h, w, tiersN, nb] of RING) {
-  if (!h) continue;
-  const a = deg * Math.PI / 180, d = RIM + w * 0.75 + (Math.sin(a) > -0.5 ? 2.6 : 1.2), x = Math.cos(a) * d, z = Math.sin(a) * d;
-  add(new THREE.CylinderGeometry(w * 0.9, w * 0.5, 7, 8), ivoryDarkM, root, [x, -3.5, z]);
-  add(new THREE.TorusGeometry(w * 0.9, 0.12, 6, 32), goldM, root, [x, 0, z], [Math.PI / 2, 0, 0]);
-  hangingColumn(root, x, -7, z, 5, w * 0.35);
-  const brace = add(new THREE.BoxGeometry(2.8, 0.6, w * 0.8), ivoryPlainM, root, [Math.cos(a) * (RIM + 0.8), -0.3, Math.sin(a) * (RIM + 0.8)], [0, -a, 0]);
-  gothicTower(root, x, 0, z, { h, w, tiers: tiersN, banners: nb, face: Math.PI / 2 - a - Math.PI, spire: h > 10 ? 1 : 0 });
-}
-
-// ---- mid-distance spires rising out of the clouds on their own rocks ----
-const MID = [[-160, 44, -6, 34], [-128, 52, -10, 42], [-105, 40, -4, 30], [-72, 48, -8, 46], [-48, 42, -3, 32], [-20, 50, -10, 38], [195, 50, -12, 30]];
-for (const [deg, dist, y, h] of MID) {
-  const a = deg * Math.PI / 180, x = Math.cos(a) * dist, z = Math.sin(a) * dist, w = 2.4 + rnd() * 1.4;
-  const base = new THREE.Group(); base.position.set(x, y, z); root.add(base); bob.push([base, rnd() * 6, y]);
-  add(new THREE.CylinderGeometry(w * 1.8, w * 1.4, 2.2, 10), ivoryDarkM, base, [0, -1.1, 0]);
-  add(new THREE.ConeGeometry(w * 1.5, w * 5, 9), ivoryDarkM, base, [0, -2.2 - w * 2.5, 0], [Math.PI, 0, 0]);
-  add(new THREE.TorusGeometry(w * 1.8, 0.15, 6, 32), goldM, base, [0, 0, 0], [Math.PI / 2, 0, 0]);
-  gothicTower(base, 0, 0, 0, { h, w, tiers: 4, banners: 2, face: Math.PI / 2 - a - Math.PI, detail: 1 });
-  for (const s of [-1, 1]) gothicTower(base, s * w * 1.25, 0, w * 0.4, { h: h * 0.45, w: w * 0.55, tiers: 2, spire: 1, detail: 0 });
-}
-
-// ---- far skyline: floating cathedral islands and upside-down towers ----
-const far = new THREE.Group(); far.name = 'Skyline'; scene.add(far);
-const ISLANDS = [[-150, 130, 0], [-112, 110, 10], [-80, 150, -8], [-40, 120, 14], [-10, 160, -4], [-195, 120, -16], [165, 135, -4], [130, 115, 8], [200, 150, -20], [35, 150, -12], [70, 125, 20], [-60, 200, 30], [-130, 190, 26], [10, 210, 30]];
-for (const [deg, dist, y] of ISLANDS) {
-  const a = deg * Math.PI / 180, s = 0.9 + rnd() * 0.9;
-  const isl = new THREE.Group(); isl.position.set(Math.cos(a) * dist, y, Math.sin(a) * dist); isl.scale.setScalar(s); far.add(isl); bob.push([isl, rnd() * 6, y]);
-  add(new THREE.CylinderGeometry(9, 8, 2.5, 12), ivoryDarkM, isl, [0, -1.2, 0], null, false);
-  add(new THREE.ConeGeometry(8, 16, 10), ivoryDarkM, isl, [0, -10.5, 0], [Math.PI, 0, 0], false);
-  const n = 3 + Math.floor(rnd() * 4);
-  for (let i = 0; i < n; i++) { const b = rnd() * TAU, rr = i ? 3 + rnd() * 4.5 : 0; gothicTower(isl, Math.cos(b) * rr, 0, Math.sin(b) * rr, { h: i ? 9 + rnd() * 12 : 26 + rnd() * 16, w: i ? 1.6 : 3.2, tiers: i ? 2 : 4, spire: rnd() < 0.75 ? 1 : 0, detail: 0, banners: i ? 0 : 1, face: rnd() * TAU }); }
-  for (let i = 0; i < 3; i++) { const b = rnd() * TAU; hangingColumn(isl, Math.cos(b) * 4, -3, Math.sin(b) * 4, 6 + rnd() * 6, 1); }
-}
-for (let i = 0; i < 10; i++) {                                         // loose upside-down towers drifting in the sky
-  const a = rnd() * TAU, d = 70 + rnd() * 120, y = 20 + rnd() * 40, g = new THREE.Group();
-  g.position.set(Math.cos(a) * d, y, Math.sin(a) * d); g.rotation.z = Math.PI; far.add(g); bob.push([g, rnd() * 6, y]);
-  gothicTower(g, 0, 0, 0, { h: 10 + rnd() * 10, w: 2, tiers: 2, detail: 0 });
-}
-
-// ---- clouds: deep banks below, puffs around the tower bases, wisps in the far sky ----
-const cloudTex = paintCloud(), cloudTex2 = paintCloud();
-const clouds = [];
-function puff(a, d, y, s, op) {
-  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: rnd() < 0.5 ? cloudTex : cloudTex2, color: 0xffffff, transparent: true, opacity: op, depthWrite: false, fog: true }));
-  sp.position.set(Math.cos(a) * d, y, Math.sin(a) * d); sp.scale.set(s, s * 0.55, 1); scene.add(sp); clouds.push([sp, a, d, 0.003 + rnd() * 0.005]);
-}
-for (let i = 0; i < 95; i++) puff(rnd() * TAU, 30 + rnd() * 260, -26 - rnd() * 34, 30 + rnd() * 60, 0.6 + rnd() * 0.3);
-for (let i = 0; i < 36; i++) puff(rnd() * TAU, 36 + rnd() * 30, -14 - rnd() * 10, 14 + rnd() * 18, 0.7);
-for (let i = 0; i < 50; i++) puff(rnd() * TAU, 180 + rnd() * 200, 10 + rnd() * 90, 50 + rnd() * 80, 0.6);
-const [sc, sg] = canvas2d(512), sgrd = sg.createRadialGradient(256, 256, 0, 256, 256, 256);
-sgrd.addColorStop(0, '#5d8ddf'); sgrd.addColorStop(0.55, '#86aeea'); sgrd.addColorStop(1, '#cfe0f8'); sg.fillStyle = sgrd; sg.fillRect(0, 0, 512, 512);
-add(new THREE.CircleGeometry(900, 48), new THREE.MeshBasicMaterial({ map: tex(sc), fog: false }), scene, [0, -80, 0], [-Math.PI / 2, 0, 0], false);
-
-// ---- generic warning shapes (?tele): not a boss mechanic, only a readability check against the floor ----
+// generic warning shapes: deep red-orange fill, dark outer rim (colours linear; the output pass converts)
+const tele = [];
 if (Q.has('tele')) {
-  // On a bright floor an additive-looking coral wash vanishes, so the fill is a deeper red-orange and every
-  // shape gets a dark outer rim (the contrast comes from value, not just hue). Colours are linear: the output pass converts.
-  const teleShader = (shape) => new THREE.ShaderMaterial({ transparent: true, depthWrite: false, toneMapped: false, uniforms: { t: { value: 0 } },
+  const mk = shape => new THREE.ShaderMaterial({ transparent: true, depthWrite: false, toneMapped: false, uniforms: { t: { value: 0 } },
     vertexShader: 'varying vec2 vU; void main(){ vU = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }',
     fragmentShader: `varying vec2 vU; uniform float t; void main(){ vec2 p = vU * 2. - 1.; float r = length(p), a = atan(p.y, p.x);
-      float hw = ${shape === 'cone' ? '0.5236' : '3.2'}; float da = abs(a);
-      if (r > 1. || da > hw) discard;
+      float hw = ${shape === 'cone' ? '0.5236' : '3.2'}; float da = abs(a); if (r > 1. || da > hw) discard;
       float edge = min(1. - r, ${shape === 'cone' ? '(hw - da) * r' : '1.'});
       float rim = 1. - smoothstep(0.035, 0.07, edge), dark = 1. - smoothstep(0.0, 0.025, edge);
       float stripe = step(0.5, fract((p.x - p.y) * 5. - t * 0.8)) * 0.1, pulse = 0.58 + 0.08 * sin(t * 6.);
-      vec3 col = mix(vec3(0.69, 0.035, 0.008), vec3(1.0, 0.26, 0.05), rim);
-      col = mix(col, vec3(0.09, 0.004, 0.002), dark);
+      vec3 col = mix(vec3(0.69, 0.035, 0.008), vec3(1.0, 0.26, 0.05), rim); col = mix(col, vec3(0.09, 0.004, 0.002), dark);
       gl_FragColor = vec4(col, max(max(rim, dark) * 0.95, pulse + stripe)); }` });
-  const teleC = teleShader('circle'), teleK = teleShader('cone');
-  add(new THREE.PlaneGeometry(9, 9), teleC, root, [-5.5, 0.03, -4], [-Math.PI / 2, 0, 0], false);
-  add(new THREE.PlaneGeometry(16, 16), teleK, root, [2, 0.03, 0], [-Math.PI / 2, 0, -Math.PI / 5], false);
-  window.__tele = [teleC, teleK];
+  for (const [shape, size, pos, rz] of [['circle', 9, [-5.5, 0.03, -4], 0], ['cone', 16, [2, 0.03, 0], -Math.PI / 5]]) {
+    const m = mk(shape); tele.push(m);
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(size, size), m); mesh.position.set(...pos); mesh.rotation.set(-Math.PI / 2, 0, rz); scene.add(mesh);
+  }
 }
 
-// ---- the Vanguard for scale (characters session's model, loaded read-only) ----
-const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: o.metal ? 0.4 : 0.75, metalness: o.metal ? 0.7 : 0, side: o.side || THREE.FrontSide });
-const Gl = (c, k) => new THREE.MeshBasicMaterial({ color: new THREE.Color(c).multiplyScalar(k), toneMapped: false });
-const hero = new THREE.Group(); hero.position.set(-3.5, 0, 6.5); hero.rotation.y = Math.PI * 0.8; scene.add(hero);
-await loadScript('../../vanguard-model.js');
-if (typeof window.buildVanguardModel === 'function') { const v = window.buildVanguardModel(M, Gl); const obj = v.root || v; obj.scale.setScalar(1.2); obj.traverse(o => { if (o.isMesh) o.castShadow = true; }); hero.add(obj); }
-else add(new THREE.CapsuleGeometry(0.35, 1, 4, 12), M(0x2050cc), hero, [0, 0.85, 0]);
+// the Vanguard for scale (characters session's model, loaded read-only)
+if (!Q.has('export')) {
+  const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: o.metal ? 0.4 : 0.75, metalness: o.metal ? 0.7 : 0, side: o.side || THREE.FrontSide });
+  const Gl = (c, k) => new THREE.MeshBasicMaterial({ color: new THREE.Color(c).multiplyScalar(k), toneMapped: false });
+  const hero = new THREE.Group(); hero.position.set(-3.5, 0, 6.5); hero.rotation.y = Math.PI * 0.8; scene.add(hero);
+  await loadScript('../../vanguard-model.js');
+  if (typeof window.buildVanguardModel === 'function') { const v = window.buildVanguardModel(M, Gl); const o = v.root || v; o.scale.setScalar(1.2); o.traverse(c => { if (c.isMesh) c.castShadow = true; }); hero.add(o); }
+}
 
-// ---- post ----
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
-composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.28, 0.4, 0.95));
+composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.25, 0.4, 0.95));
 composer.addPass(new OutputPass());
 
+// Top view: the reference is 850 x 742 with the plaza centre at (437, 325) and 16.3 px per metre on the floor.
+// A camera looking straight down at the reference's image centre gives the same framing.
+const REF_W = 850, REF_H = 742, PX_PER_M = 16.3, FOV_TOP = 8, TOP_TILT = 27 * Math.PI / 180;
+const TOP_H = 1.09 * (REF_H / 2) / PX_PER_M / Math.tan(FOV_TOP * Math.PI / 360);   // (distance; the painting's floor fills 55% of the width)
+const TOP_CX = (REF_W / 2 - 437) / PX_PER_M, TOP_CZ = (REF_H / 2 - 325) / PX_PER_M;
 function frame() {
-  const w = innerWidth, h = innerHeight; renderer.setSize(w, h); composer.setSize(w, h); camera.aspect = w / h;
-  if (VIEW === 'top') { camera.fov = 36; camera.position.set(0, 110, 0.01); camera.lookAt(0, 0, 0); }
-  else if (VIEW === 'angle') { camera.fov = 42; camera.position.set(-30, 30, 44); camera.lookAt(0, -2, -3); }
-  else { camera.fov = 44; camera.position.set(0, 29, 22.5); camera.lookAt(0, 0, 1.0); }
+  let w = innerWidth, h = innerHeight, left = 0, top = 0;
+  if (VIEW === 'top') { const s = Math.min(w / REF_W, h / REF_H); w = Math.floor(REF_W * s); h = Math.floor(REF_H * s); left = (innerWidth - w) / 2; top = (innerHeight - h) / 2; }
+  Object.assign(canvas.style, { left: left + 'px', top: top + 'px' });
+  renderer.setSize(w, h); composer.setSize(w, h); camera.aspect = w / h;
+  if (VIEW === 'top') {
+    // tipped 27° from the south, like the painting (its floor reads 0.89 high to wide): rooftops plus a sliver of the north buildings' south facades
+    camera.fov = FOV_TOP; camera.position.set(TOP_CX, TOP_H * Math.cos(TOP_TILT), TOP_CZ + TOP_H * Math.sin(TOP_TILT)); camera.up.set(0, 0, -1); camera.lookAt(TOP_CX, 0, TOP_CZ);
+    scene.fog.near = TOP_H + 45; scene.fog.far = TOP_H + 420;   // fog by depth below the floor, not distance from this high camera
+    const ref = document.getElementById('ref');
+    if (OVERLAY > 0) Object.assign(ref.style, { display: 'block', left: left + 'px', top: top + 'px', width: w + 'px', height: h + 'px', opacity: OVERLAY });
+  } else if (VIEW === 'angle') { camera.up.set(0, 1, 0); camera.fov = 42; camera.position.set(-34, 34, 46); camera.lookAt(0, -2, -2); }
+  else { camera.up.set(0, 1, 0); camera.fov = 44; camera.position.set(0, 29, 22.5); camera.lookAt(0, 0, 1.0); }
   camera.updateProjectionMatrix();
+  env.setOccludersVisible(VIEW !== 'game');
 }
 addEventListener('resize', frame); frame();
 
+if (Q.has('export')) try {
+  const { GLTFExporter } = await import('three/addons/exporters/GLTFExporter.js');
+  env.setOccludersVisible(true);
+  const glb = await new GLTFExporter().parseAsync(env.root, { binary: true, maxTextureSize: 4096 });
+  const bytes = new Uint8Array(glb); let bin = ''; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  window.__arenaExport = { glb: btoa(bin) };
+} catch (e) { window.__arenaExport = { error: String(e && e.stack || e) }; }
+
 const clock = new THREE.Clock();
+let lastW = 0, lastH = 0;
 renderer.setAnimationLoop(() => {
   const dt = clock.getDelta(), t = clock.elapsedTime;
-  if (renderer.domElement.width !== Math.floor(innerWidth * renderer.getPixelRatio())) frame();   // headless capture resizes late
-  for (const [o, ax, s] of spin) o.rotation[ax] += s * dt;
-  for (const [o, ph, y0] of bob) o.position.y = y0 + Math.sin(t * 0.35 + ph) * 0.6;
-  for (const [b, ph] of sway) b.rotation.x = Math.sin(t * 1.1 + ph) * 0.05;
-  for (const c of clouds) { c[1] += c[3] * dt; c[0].position.x = Math.cos(c[1]) * c[2]; c[0].position.z = Math.sin(c[1]) * c[2]; }
-  if (window.__tele) for (const m of window.__tele) m.uniforms.t.value = t;
+  if (innerWidth !== lastW || innerHeight !== lastH) { lastW = innerWidth; lastH = innerHeight; frame(); }   // headless capture resizes late
+  env.update(t, dt, false);
+  for (const m of tele) m.uniforms.t.value = t;
   composer.render();
 });
 window.__ready = true;
