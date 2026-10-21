@@ -14,3 +14,16 @@ Thumbs.db
 # Temporary files
 *.log
 *.tmp
+
+# Unity project (unity/): generated folders and IDE files
+unity/[Ll]ibrary/
+unity/[Tt]emp/
+unity/[Oo]bj/
+unity/[Ll]ogs/
+unity/[Bb]uild/
+unity/[Bb]uilds/
+unity/[Uu]ser[Ss]ettings/
+unity/MemoryCaptures/
+unity/*.csproj
+unity/*.sln
+unity/*.slnx

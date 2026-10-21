@@ -123,11 +123,13 @@ const stoneM = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughne
 const brassM = new THREE.MeshStandardMaterial({ color: 0xdcaa55, roughness: 0.35, metalness: 0.8, emissive: 0x3a2208, emissiveIntensity: 0.2 });
 const ironM = new THREE.MeshStandardMaterial({ color: 0x2a2440, roughness: 0.6, metalness: 0.5 });
 function add(geo, mat, parent, pos, rot, shadow = true) { const m = new THREE.Mesh(geo, mat); m.castShadow = m.receiveShadow = shadow; if (pos) m.position.set(...pos); if (rot) m.rotation.set(...rot); parent.add(m); return m; }
-const world = new THREE.Group(); scene.add(world);
+// root holds everything solid (exported to Unity as a .glb); the sky dome, cloud sprites and lights stay on the scene.
+const root = new THREE.Group(); root.name = "BellkeepersDais"; scene.add(root);
+const world = new THREE.Group(); world.name = "Platform"; root.add(world);
 
 // ---- platform: flagstone floor, brick sides, rocky underside ----
 const paving = paintPaving(3072, E + 1, 0.95, 3);
-const floor = add(new THREE.PlaneGeometry(2 * E + 2, 2 * E + 2), new THREE.MeshStandardMaterial({ map: tex(paving.map), bumpMap: tex(paving.bump, false), bumpScale: 4, roughness: 0.9 }), world, [0, 0, 0], [-Math.PI / 2, 0, 0]);
+const floor = add(new THREE.PlaneGeometry(2 * E + 2, 2 * E + 2), new THREE.MeshStandardMaterial({ map: tex(paving.map), bumpMap: tex(paving.bump, false), bumpScale: 4, roughness: 0.9 }), world, [0, 0, 0], [-Math.PI / 2, 0, 0]); floor.name = "Floor"; floor.material.name = "Paving";
 floor.castShadow = false;
 function brickTexture() {
   const [c, g] = canvas2d(1024, 512); g.fillStyle = '#3a3158'; g.fillRect(0, 0, 1024, 512);
@@ -146,14 +148,14 @@ const rock = add(new THREE.ConeGeometry(17, 16, 7, 3), stoneM(0x3b3058, { flatSh
 
 // ---- clock dial under the boss, raised brass rims, two faint engraved circles, meshing gears ----
 const dial = paintDial(2048, 'full');
-const dialFace = add(new THREE.CircleGeometry(DIAL_R, 128), new THREE.MeshStandardMaterial({ map: dial.map, emissiveMap: dial.glow, emissive: 0xffb860, emissiveIntensity: 0.28, roughness: 0.55, metalness: 0.15 }), world, [0, 0.012, 0], [-Math.PI / 2, 0, 0], false); dialFace.receiveShadow = true;
+const dialFace = add(new THREE.CircleGeometry(DIAL_R, 128), new THREE.MeshStandardMaterial({ map: dial.map, emissiveMap: dial.glow, emissive: 0xffb860, emissiveIntensity: 0.28, roughness: 0.55, metalness: 0.15 }), world, [0, 0.012, 0], [-Math.PI / 2, 0, 0], false); dialFace.receiveShadow = true; dialFace.name = "DialFace";
 add(new THREE.TorusGeometry(DIAL_R + 0.05, 0.09, 8, 160), brassM, world, [0, 0.03, 0], [Math.PI / 2, 0, 0]);
 add(new THREE.TorusGeometry(DIAL_R + 0.32, 0.05, 8, 160), brassM, world, [0, 0.02, 0], [Math.PI / 2, 0, 0]);
 const engraved = paintDial(1024, 'lines');
-const engravedFaces = [[-8.6, -8.4, 3.4], [8.9, 8.6, 3.0]].map(([x, z, r]) => add(new THREE.CircleGeometry(r, 96), new THREE.MeshStandardMaterial({ map: engraved.map, emissiveMap: engraved.glow, emissive: 0xffb860, emissiveIntensity: 0.18, transparent: true, opacity: 0.75, roughness: 0.5, depthWrite: false }), world, [x, 0.01, z], [-Math.PI / 2, 0, hash(x, z) * 6], false));
+const engravedFaces = [[-8.6, -8.4, 3.4], [8.9, 8.6, 3.0]].map(([x, z, r]) => add(new THREE.CircleGeometry(r, 96), new THREE.MeshStandardMaterial({ map: engraved.map, emissiveMap: engraved.glow, emissive: 0xffb860, emissiveIntensity: 0.18, transparent: true, opacity: 0.75, roughness: 0.5, depthWrite: false }), world, [x, 0.01, z], [-Math.PI / 2, 0, hash(x, z) * 6], false)); engravedFaces.forEach(m => { m.name = "EngravedCircle"; });
 const gears = [];
 for (const [x, z, r, n, dir] of [[3.6, 5.6, 0.8, 14, 1], [4.75, 5.15, 0.48, 9, -1]]) {
-  const gr = new THREE.Group(); gr.position.set(x, 0.05, z); world.add(gr); gears.push([gr, dir / r]);
+  const gr = new THREE.Group(); gr.name = dir > 0 ? "GearCW" : "GearCCW"; gr.userData.speed = 0.25 / r; gr.position.set(x, 0.05, z); world.add(gr); gears.push([gr, dir / r]);
   add(new THREE.TorusGeometry(r, 0.09, 8, 48), brassM, gr, [0, 0, 0], [Math.PI / 2, 0, 0]);
   for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2; add(new THREE.BoxGeometry(0.16, 0.1, 0.18), brassM, gr, [Math.cos(a) * (r + 0.1), 0, Math.sin(a) * (r + 0.1)], [0, -a, 0]); }
   add(new THREE.CylinderGeometry(r * 0.3, r * 0.3, 0.12, 16), brassM, gr);
@@ -180,14 +182,14 @@ for (let side = 0; side < 4; side++) {
 }
 
 // ---- lanterns: iron post, brass cage, glowing glass, a real warm light ----
-const glassM = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffc56a).multiplyScalar(2.4), toneMapped: false });
+const glassM = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffc56a).multiplyScalar(2.4), toneMapped: false }); glassM.name = "GlowLantern";
 function glowSprite(size, color, opacity) {
   const [c, g] = canvas2d(128); const grd = g.createRadialGradient(64, 64, 0, 64, 64, 64); grd.addColorStop(0, 'rgba(255,255,255,1)'); grd.addColorStop(0.3, 'rgba(255,255,255,0.35)'); grd.addColorStop(1, 'rgba(255,255,255,0)');
   g.fillStyle = grd; g.fillRect(0, 0, 128, 128);
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex(c), color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, fog: false })); s.scale.setScalar(size); return s;
 }
 function lantern(x, z, h = 3.2) {
-  const g = new THREE.Group(); g.position.set(x, 0, z); world.add(g);
+  const g = new THREE.Group(); g.name = "Lantern"; g.position.set(x, 0, z); world.add(g);
   add(new THREE.CylinderGeometry(0.3, 0.38, 0.3, 8), ironM, g, [0, 0.15, 0]);
   add(new THREE.CylinderGeometry(0.07, 0.09, h, 8), ironM, g, [0, h / 2, 0]);
   add(new THREE.BoxGeometry(0.42, 0.06, 0.42), brassM, g, [0, h + 0.03, 0]);
@@ -226,7 +228,7 @@ function banner(x, z, ry, h = 5.4) {
   add(new THREE.CylinderGeometry(0.05, 0.05, 1.9, 8), brassM, g, [0, h - 0.25, 0.12], [0, 0, Math.PI / 2]);
   for (const s of [-1, 1]) add(new THREE.SphereGeometry(0.08, 8, 6), brassM, g, [s * 0.97, h - 0.25, 0.12]);
   add(new THREE.ConeGeometry(0.12, 0.4, 6), brassM, g, [0, h + 0.2, 0]);
-  const geo = new THREE.PlaneGeometry(1.6, 4.0, 8, 20), b = add(geo, bannerMat, g, [0, h - 0.3 - 2.0, 0.14]);
+  const geo = new THREE.PlaneGeometry(1.6, 4.0, 8, 20), b = add(geo, bannerMat, g, [0, h - 0.3 - 2.0, 0.14]); b.name = "BannerCloth";
   b.userData.base = geo.attributes.position.array.slice(); banners.push(b);
 }
 banner(-E - 0.2, -5.5, Math.PI / 2); banner(-E - 0.2, 5.5, Math.PI / 2); banner(-4.6, E + 0.2, 0); banner(4.6, E + 0.2, 0); banner(E + 0.2, -6, -Math.PI / 2);
@@ -250,8 +252,8 @@ for (let i = 0; i < 24; i++) { const a = rnd() * Math.PI * 2, r = 34 + rnd() * 2
 const cityStone = stoneM(0x8576ad, { flatShading: true }), cityStoneDark = stoneM(0x54487e, { flatShading: true }), cityTrim = stoneM(0xa898c4);
 const domeM = new THREE.MeshStandardMaterial({ color: 0x31408f, roughness: 0.35, metalness: 0.35 });
 const roofM = stoneM(0x3b3a7c, { flatShading: true }), rockM = stoneM(0x4a3d6e, { flatShading: true });
-const warmM = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffb35e).multiplyScalar(1.5), toneMapped: false });
-const roseM = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffc879).multiplyScalar(1.9), toneMapped: false, side: THREE.DoubleSide });
+const warmM = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffb35e).multiplyScalar(1.5), toneMapped: false }); warmM.name = "GlowWindow";
+const roseM = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffc879).multiplyScalar(1.9), toneMapped: false, side: THREE.DoubleSide }); roseM.name = "GlowRose";
 const S0 = (geo, mat, parent, pos, rot) => add(geo, mat, parent, pos, rot, false);
 const archShape = (w, h) => { const s = new THREE.Shape(); s.moveTo(-w / 2, 0); s.lineTo(w / 2, 0); s.lineTo(w / 2, h - w * 0.6); s.quadraticCurveTo(w / 2, h - w * 0.1, 0, h); s.quadraticCurveTo(-w / 2, h - w * 0.1, -w / 2, h - w * 0.6); s.closePath(); return new THREE.ShapeGeometry(s); };
 function windowAt(parent, x, y, z, w, h, ry = 0, lit = true) { const m = S0(archShape(w, h), lit ? warmM : stoneM(0x231c40), parent, [x, y, z], [0, ry, 0]); return m; }
@@ -337,13 +339,13 @@ function bridge(parent, a, b, y, w = 2.6) {
   }
   return g;
 }
-function hangingRock(x, y, z, s, seed) { const g = new THREE.Group(); g.position.set(x, y, z); g.scale.setScalar(s); scene.add(g);
+function hangingRock(x, y, z, s, seed) { const g = new THREE.Group(); g.name = "HangingRock"; g.position.set(x, y, z); g.scale.setScalar(s); root.add(g);
   const r2 = mulberry32(seed); for (let i = 0; i < 4; i++) { const h = 6 + r2() * 10, w = 1 + r2() * 1.6;
     S0(new THREE.CylinderGeometry(w, w * 0.4, h, 6), rockM, g, [(r2() - 0.5) * 6, -h / 2, (r2() - 0.5) * 4], [0, r2() * 3, 0]); }
   S0(new THREE.BoxGeometry(8, 2, 6), rockM, g, [0, 0.5, 0]); return g; }
 
 // islands: [x, y, z, scale, builder]
-function islandAt(x, y, z, s, build) { const g = new THREE.Group(); g.position.set(x, y, z); g.scale.setScalar(s); g.lookAt(0, y, 0); scene.add(g); build(g); return g; }
+function islandAt(x, y, z, s, build) { const g = new THREE.Group(); g.name = "Island"; g.position.set(x, y, z); g.scale.setScalar(s); g.lookAt(0, y, 0); root.add(g); build(g); return g; }
 const CITY = [
   [72, -26, -92, 2.1, g => { rockIsland(g, 22, 34, 1); cathedral(g, 1); spire(g, -17, -10, 14, 2); spire(g, 18, -9, 16, 2.2); }],      // the clock cathedral, back right
   [-48, -12, -42, 1.3, g => { rockIsland(g, 7, 18, 2); rotunda(g, 0, 0, 1); }],                                                     // blue dome, back left
@@ -364,14 +366,14 @@ const CITY = [
 ];
 const islands = CITY.map(c => islandAt(...c));
 // bridges between neighbouring islands, at deck height
-bridge(scene, [-48 + 7, -42 + 4], [-12 - 5, -98 + 9], -12.4, 2.6);
-bridge(scene, [44 - 3, 26 - 6], [72 - 18, -92 + 20], -14.4, 2.6);
-bridge(scene, [-90 + 9, 8 - 3], [-48 - 7, -42 + 3], -12.8, 2.4);
+bridge(root, [-48 + 7, -42 + 4], [-12 - 5, -98 + 9], -12.4, 2.6);
+bridge(root, [44 - 3, 26 - 6], [72 - 18, -92 + 20], -14.4, 2.6);
+bridge(root, [-90 + 9, 8 - 3], [-48 - 7, -42 + 3], -12.8, 2.4);
 hangingRock(-60, 26, -90, 1.4, 21); hangingRock(40, 30, -120, 1.6, 22); hangingRock(-110, 22, -30, 1.3, 23); hangingRock(110, 24, -60, 1.2, 24);
 
 const debris = [];
 for (let i = 0; i < 16; i++) { const a = rnd() * Math.PI * 2, r = E + 4 + rnd() * 10, s = 0.3 + rnd() * 0.9;
-  const m = add(new THREE.BoxGeometry(s, s * (0.7 + rnd() * 0.6), s), wallDarkM, scene, [Math.cos(a) * r, -5 + rnd() * 6, Math.sin(a) * r], [rnd(), rnd() * 3, rnd()]); debris.push([m, m.position.y, rnd() * 6]); }
+  const m = add(new THREE.BoxGeometry(s, s * (0.7 + rnd() * 0.6), s), wallDarkM, root, [Math.cos(a) * r, -5 + rnd() * 6, Math.sin(a) * r], [rnd(), rnd() * 3, rnd()]); m.name = "Debris"; debris.push([m, m.position.y, rnd() * 6]); }
 
 function update(t, dt = 0, quiet = false) {
   for (const b of banners) { const p = b.geometry.attributes.position, base = b.userData.base;
@@ -383,6 +385,6 @@ function update(t, dt = 0, quiet = false) {
   dialFace.material.emissiveIntensity += ((quiet ? 0.08 : 0.28) - dialFace.material.emissiveIntensity) * k;
   for (const m of engravedFaces) m.material.opacity += ((quiet ? 0.3 : 0.75) - m.material.opacity) * k;
 }
-return { E, sun, update };
+return { E, sun, root, paving, update };
 };
 // </arena-env>
