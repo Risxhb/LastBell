@@ -1,0 +1,172 @@
+# Last Bell: design rules for new content
+
+**Read this before you design or change any boss, miniboss, attack, arena, class ability or game system.** These rules come from decisions Chzy18 has already made. They override anything older, including older wiki pages, old reference-sheet labels and earlier packets.
+
+Last updated October 21, 2026 by chzy18/claude. Each rule is marked:
+- **Settled:** decided. Don't change it and don't re-ask about it.
+- **Provisional:** current working value. Use it, but you can propose changes.
+
+## 0. How to use these rules
+
+1. **Settled rules win.** If a request, a collaborator's note, or an older doc conflicts with a settled rule, follow the rule. Say plainly in your output what conflicted and that you kept the rule. Don't silently drop the request, and don't silently adopt it either. *(Settled)*
+2. **New designs are proposals.** Label new bosses, attacks, lore and systems "proposal" until Chzy18 approves them. *(Settled)*
+3. **Don't invent mechanics nobody asked for.** That includes new resources, new defensive abilities, revive rules, upgrades and shops. If a design needs one, list it as an open question. *(Settled)*
+4. **Ask instead of guessing.** If something here doesn't cover your case, list it under "Open questions" in your output.
+
+## 1. What the game is
+
+- **Settled:** top-down co-op action **boss rush** with roguelite runs. Every enemy is a boss: no normal enemies or trash mobs.
+- **Settled:** design and tune for **co-op**, 1–8 players. Solo must still be possible, but don't sacrifice the co-op experience for it.
+- **Settled:** campaign of four areas, 13 encounters:
+  - Areas 1–3 each have **3 minibosses, then 1 area boss**, all in that area's one shared arena:
+    - Area 1: The Skyward Spire
+    - Area 2: The Brass Foundry
+    - Area 3: The Verdant Chimes
+  - Area 4, **The Shattered Hour**, has **one final boss** (the Bellkeeper) in its own arena, The Throne of the Final Toll.
+- **Settled:** run flow within an area is miniboss 1 → miniboss 2 → miniboss 3 → intermission (future shop, not functional yet) → area boss.
+- **Settled:** Unity URP is the engine. Gameplay rules live in shared C#, not in art or animation.
+
+## 2. Movement, dodging and getting hit
+
+- **Settled: no invincibility frames anywhere.**
+  - Dashing, dodging and jumping never make a player immune.
+  - A dash only avoids an attack by physically carrying you out of the shape before it resolves.
+  - There's no blanket immunity after being hit, and no "grace window" on a timed dodge.
+- **Settled:** each hazard instance can hit a given player **at most once**. This prevents multi-hit chains.
+- **Settled:** jumping is a real action and can clear low attacks, such as a jumpable bar. It isn't general immunity.
+- **Settled:** no block, parry, counter, auto-target or lock-on. Every ability aims at the mouse cursor.
+- **Provisional numbers:**
+  - Movement speeds: walk 6 m/s, sprint 9 m/s, dash 3 m in 0.2 s, jump about 0.8 m over 0.6 s.
+  - Stamina: 100 total. Sprint drains 25/s, a jump costs 20, a dash costs 30. It regenerates at 20/s after a 0.75 s pause.
+  - On hit: 0.25 s stun and about 1.5 m knockback. A boss may use no knockback if knockback would pin players against walls.
+  - Validate escape routes against **both** speeds: 4.2 m/s prototype walk and 6 m/s design walk.
+
+## 3. Health, potions and run resets
+
+- **Settled:** health refills **before every boss after the first**.
+- **Settled: potions do not reset between minibosses.**
+  - Potions you spend on miniboss 1 stay spent through miniboss 2 and 3.
+  - Health and potions **both** refill before the area's final boss.
+  - A fresh run starts full.
+- **Provisional:** 5 potions per refill, +40 HP each, 1 s between drinks, key F.
+- **Settled:** stamina, cooldowns and class state (such as Opening, Harmony, bells and seals) reset before each encounter.
+- **Settled:** if the player goes down on the same tick the boss dies, **defeat wins**.
+- **Sidelined, don't design around it:** Resonance Reclaim (earning back lost HP by playing well).
+
+## 4. Classes
+
+- **Settled:** three starting classes with approved kits (#31, #36, #41). Don't redesign them inside a boss or arena brief.
+  - **Vanguard:** melee sword and shield.
+    - Abilities: Steel Rhythm (3-hit basic), Sundering Blow, Last Word (heavy finisher, about 0.8 s windup), hold-to-Brace, Clockstep dash.
+  - **Chimesinger:** ranged sound-magic damage dealer with an immediate burst heal. This class replaced the old "Healer".
+    - Abilities: Resonant Note, Bellstrike, Harmonic Refrain, Crescendo, Mending Chorus (heal), Harmonic Step dash.
+  - **Arcanist:** ranged time magic with timed setup.
+    - Abilities: Clockbolt, Time Seal, Arc Lance, Convergence, Temporal Anchor, Clockstep dash.
+- **Settled:** the support class must keep **real damage output** as well as healing. A class that only heals is never acceptable.
+- **Settled:** no encounter may **require** a specific class, a healer, Brace or any one ability. Every party, including all duplicates of one class, must be able to clear.
+- **Settled:** Brace is **partial frontal mitigation** (about −60 %), not a block or immunity.
+  - It works on **Strike** hazards: cones, lanes, sweeps, bars.
+  - It never works on **Ground** hazards: rings, donuts, chime circles, ground eruptions.
+  - Tag every new attack as Strike or Ground.
+- **Settled:** phase changes don't clear player setup. Seals, bells and inscriptions persist and their timers keep running.
+- **Provisional:** all class damage numbers and cooldowns are prototype values.
+
+## 5. Bosses: encounter rules
+
+Each rule below is settled unless it says otherwise.
+
+- **Readable, learnable patterns over randomness.** Difficulty comes from learned sequences, not from guessing or from piles of HP.
+- **Telegraphs:**
+  - Every damaging attack has a ground telegraph built from the real hit shape, not painted art.
+  - Hostile telegraphs are coral or amber with crisp edges.
+  - Friendly effects never use those colours.
+  - Decorative floor art must never look like a hazard.
+- **Every attack needs a real escape route**, tested with finite stamina and no iframes, for melee and ranged players.
+- **At most two damaging patterns overlap,** and only after the route is checked.
+- **Punish windows:**
+  - Every boss has at least one **3–4 s major recovery**, long enough for Vanguard's heavy attack and the casters' stationary casts.
+  - Don't uniformly speed attacks up to make a fight harder.
+- **No enrage timers.** No soft-enrage that slowly fills the floor. Pools and zones always expire.
+- **Phases:**
+  - **Provisional:** area bosses have 3 HP phases, minibosses have 2.
+  - **Settled:**
+    - The boss stays targetable through a phase change.
+    - A transition waits until the current attack finishes, then plays a short harmless transformation.
+    - The boss never heals or gets a new health bar.
+    - Crossing two thresholds with one burst queues only one transition.
+- **The boss dying mid-windup** cancels all its pending hazards in that same tick.
+- **Difficulty tiers (provisional names):** First Chime, Steady Ticking, Striking Hour, Midnight Toll.
+  - Write your numbers for **Steady Ticking**, the baseline.
+  - The highest tier adds one named mechanic per boss, not just faster or harder-hitting attacks.
+- **Co-op scaling** comes from spreading targets and giving players spatial jobs, not just multiplying HP.
+- **Provisional encounter length:**
+  - Minibosses 60–150 s, area bosses about 3–4 min. This range is still being tuned.
+  - Test builds use shortened HP.
+  - Set HP from measured DPS, not by guessing.
+
+## 6. Bosses: look
+
+- **Settled:** ancient ceremonial clockwork guardians, heroic and intimidating, **not horror**.
+  - Bell, clock, pendulum and orrery motifs.
+  - Circular or vertical silhouettes. Heroes read as wedges.
+- **Settled:** at game-camera scale you can instantly see the head, core, active limb and facing.
+- **Settled:** palette is weathered brass, midnight-cobalt cavities, porcelain-ivory masks, and one resonant-gold core. **Coral only when attacking.**
+- **Settled:** a model sheet shows front, side, back and three-quarter views on one baseline, with scale against a 1.8 m human.
+  - State the height in the text. If the sheet's proportions disagree with your text, call it out.
+
+## 7. Arenas
+
+- **Settled:** follow the four-area art handoff (`docs/arena-references/LAST-BELL-ARENA-ART-HANDOFF/` on branch `handoff/four-area-arenas-20261021`) and the art direction doc (`docs/arena-references/LAST-BELL-CLOCKWORK-FANTASY-ART-DIRECTION.md`, same branch).
+- **Settled:** fixed high-oblique camera, about 50–60°.
+  - The playable floor stays **broad, flat and unobstructed** for up to 8 players.
+  - Tall architecture sits outside the playable area or fades when it blocks the view.
+- **Settled:** every arena shares the run layout:
+  - centre origin
+  - entry to the south (+z)
+  - floor at y = 0
+  - walkable radius at least 13.5 m
+  - the run's 11.5 m play bound
+- **Settled:** scenery is never a surprise lethal edge. Only gameplay code makes something dangerous.
+- **Settled:** the Bellkeeper key-art arena is the **test map** and may become a tutorial.
+
+## 8. Controls
+
+- **Settled:**
+  - Movement: WASD to move, the mouse to aim.
+  - Abilities: 1 basic (or LMB), then 2, 3 and 4.
+  - 5 or RMB dashes.
+  - 6 is the extra ability: Chimesinger's Mending Chorus, Arcanist's Temporal Anchor.
+  - Other keys: F potion, Space jump, Shift sprint.
+- **Settled:** don't use J/K/L/Q layouts. Gamepads aren't supported yet.
+
+## 9. Style hard rules (all content)
+
+- Original designs only. Windblown and Hades set the quality bar, but don't copy them.
+- Keep existing characters exactly on-model to their sheets.
+- No soot, rust realism, photorealism, gore, horror, neon bloom or comic outlines.
+- Ability and dash icons never show an invulnerability bubble.
+
+## 10. What every boss or arena brief should include
+
+1. Status line: "proposal" plus the sources you read, this file included.
+2. Identity and look, with height and scale.
+3. Attacks:
+   - shape and size
+   - Strike or Ground tag
+   - warning time
+   - damage at Steady Ticking
+   - escape route
+   - punish window
+4. Phase plan using the rules in §5.
+5. Highest-tier mechanic.
+6. **Conflicts:** anything in the request that broke a settled rule, and what you did instead.
+7. **Open questions** for Chzy18.
+
+## Where the details live
+
+- Wiki [Decisions and scope](https://github.com/Risxhb/collab/wiki/Decisions-and-Scope) and [Game design](https://github.com/Risxhb/collab/wiki/Game-Design).
+- Run loop rules: `docs/run-loop/README.md` on branch `feature/run-loop` ([PR #42](https://github.com/Risxhb/collab/pull/42)).
+- Bellkeeper spec: `docs/design/bellkeeper.md` on branch `docs/bellkeeper-spec` ([PR #16](https://github.com/Risxhb/collab/pull/16)).
+- Arena handoff: `docs/arena-references/LAST-BELL-ARENA-ART-HANDOFF/LAST-BELL-SHATTERED-HOUR-ARENA.md` on branch `handoff/four-area-arenas-20261021`.
+
+Keep this file current: when Chzy18 settles a new gameplay rule, add it here in the same change that records the decision.
