@@ -49,7 +49,18 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(44, 1, 0.1, 1600);
 window.THREE = THREE;
 await loadScript('skyward-spire-env.js?v=' + Date.now());   // never a stale cached copy
-const env = window.buildSkywardSpire(THREE, scene, { mergeGeometries, renderer, floorRes: 3072 });
+// ?nokit: the old code-built landmarks instead of the Blender-modelled ones (models/SkywardSpire_Buildings.glb)
+const KIT = !Q.has('nokit');
+const env = window.buildSkywardSpire(THREE, scene, { mergeGeometries, renderer, floorRes: 3072, kit: KIT });
+const kitOccluders = [];
+if (KIT && !Q.has('export')) {
+  const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
+  const gltf = await new GLTFLoader().loadAsync('models/SkywardSpire_Buildings.glb').catch(e => { console.error('kit', e); return null; });
+  if (gltf) {
+    gltf.scene.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; } if (o.name.startsWith('Occluder')) kitOccluders.push(o); });
+    env.root.add(gltf.scene);
+  }
+}
 
 // generic warning shapes: deep red-orange fill, dark outer rim (colours linear; the output pass converts)
 const tele = [];
@@ -102,7 +113,7 @@ function frame() {
   } else if (VIEW === 'angle') { camera.up.set(0, 1, 0); camera.fov = 42; camera.position.set(-34, 34, 46); camera.lookAt(0, -2, -2); }
   else { camera.up.set(0, 1, 0); camera.fov = 44; camera.position.set(0, 29, 22.5); camera.lookAt(0, 0, 1.0); }
   camera.updateProjectionMatrix();
-  env.setOccludersVisible(VIEW !== 'game');
+  env.setOccludersVisible(VIEW !== 'game'); kitOccluders.forEach(o => o.visible = VIEW !== 'game');
 }
 addEventListener('resize', frame); frame();
 

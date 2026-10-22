@@ -462,6 +462,7 @@ for (const [name, ang] of BRIDGE_DIRS) {
 // ================================================================================================
 // Gothic cathedral block: stacked tiers, windows on every face, corner pinnacles, flat roof with balustrade.
 function cathedral(parent, x, z, rotY, { w = 9, d = 6, tiers = [8, 6, 5], name = 'Cathedral' } = {}) {
+  if (opts.kit) { anchor(parent, x, z, Math.max(w, d) * 0.6); return grp(parent, null, 0, name); }   // modelled in Blender (blender/spire_buildings.py)
   const c = grp(parent, [x, 0, z], rotY, name);
   let y = -30, cw = w, cd = d;
   // below the floor line: one undercroft storey, then the mass splits into separate tower shafts falling into the
@@ -526,6 +527,7 @@ function cathedral(parent, x, z, rotY, { w = 9, d = 6, tiers = [8, 6, 5], name =
 }
 // Round belfry with a ribbed cobalt dome, gold lantern and needle spire.
 function domedBelfry(parent, x, z, { r = 3, tiers = [9, 6], domeMat = MAT.cobalt, spire = 5, name = 'Belfry' } = {}) {
+  if (opts.kit) { anchor(parent, x, z, r * 1.2); return grp(parent, null, 0, name); }   // modelled in Blender (blender/spire_buildings.py)
   const b = grp(parent, [x, 0, z], 0, name);
   for (let i = 0; i < 4; i++) roundTier(b, r * (0.96 - i * 0.06), 8, -8 * (i + 1), 5, i ? MAT.ivoryShade : MAT.ivory);   // storeys below the floor line
   add(new THREE.TorusGeometry(r * 1.16, 0.18, 6, 32), MAT.gold, b, [0, 0, 0], [Math.PI / 2, 0, 0]);
@@ -547,6 +549,7 @@ function domedBelfry(parent, x, z, { r = 3, tiers = [9, 6], domeMat = MAT.cobalt
 }
 // Round tower topped with an open gold-columned bell lantern and an armillary sphere.
 function armillaryTower(parent, x, z, { r = 2.2, h = 10, sphere = 1.6, name = 'ArmillaryTower' } = {}) {
+  if (opts.kit) { anchor(parent, x, z, r * 1.1); return grp(parent, null, 0, name); }   // modelled in Blender (blender/spire_buildings.py)
   const t = grp(parent, [x, 0, z], 0, name);
   for (let i = 0; i < 4; i++) roundTier(t, r * (0.95 - i * 0.06), 7.5, -7.5 * (i + 1), 6, MAT.ivoryShade);
   roundTier(t, r, h, 0, 6);
@@ -562,6 +565,7 @@ function armillaryTower(parent, x, z, { r = 2.2, h = 10, sphere = 1.6, name = 'A
 }
 // Rotunda: a colonnaded drum, ribbed dome and a ring of small domed turrets.
 function rotunda(parent, x, z, { r = 4, domeMat = MAT.gold, centre = MAT.cobalt, turrets = 6, name = 'Rotunda' } = {}) {
+  if (opts.kit) { anchor(parent, x, z, r * 1.15); return grp(parent, null, 0, name); }   // modelled in Blender (blender/spire_buildings.py)
   const t = grp(parent, [x, 0, z], 0, name);
   for (let i = 0; i < 3; i++) roundTier(t, r * (1.0 - i * 0.08), 7, -7 * (i + 1), 12, MAT.ivoryShade);
   add(new THREE.CylinderGeometry(r * 1.12, r * 1.12, 0.4, 32), MAT.ivoryPlain, t, [0, 0.2, 0]);
@@ -621,6 +625,7 @@ cathedral(B, 12.5, -33, -0.15, { w: 9, d: 6, tiers: [12, 7], name: 'Cathedral_NE
 for (const [x, z, h] of [[38, -31, 26], [35, -36, 19], [42, -27, 15]]) needle(B, x, z, h, 1.1);     // and in the far NE corner
 // needle spires: thin ivory shafts with gold bands and tall gold tips, clustered in every corner
 function needle(parent, x, z, h, w = 0.9) {
+  if (opts.kit) { anchor(parent, x, z, w * 1.4); return grp(parent, null, 0, 'Needle'); }   // modelled in Blender (blender/spire_buildings.py)
   const n = grp(parent, [x, 0, z], 0, 'Needle');
   for (let i = 0; i < 3; i++) roundTier(n, w * (0.92 - i * 0.07), 8, -8 * (i + 1), 6, MAT.ivoryShade);
   roundTier(n, w, h * 0.55, 0, 6);

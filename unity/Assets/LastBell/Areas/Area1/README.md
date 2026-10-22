@@ -41,3 +41,8 @@ Landmarks follow the reference by quadrant:
   - The cloud atlas blends every lobe's shading, so there are no disc rims.
   - The top-corner cathedrals are larger and split into separate tower shafts below the floor and spired belfries above.
   - Still open: from directly above, the corner buildings read as a facade, not a roofline; some spire tips end in a pale halo; and the stone and gold shading is flat.
+- **Modelled buildings:** the landmark buildings are now modelled in Blender. They have gold-framed lancets with quatrefoil tracery and stars, stepped buttresses, crocketed spires, ribbed domes, columned lanterns and armillary spheres.
+  - Source: `prototype/arena-3d/areas/area-1/blender/spire_buildings.py`.
+  - Rebuild: `blender -b -P spire_buildings.py -- <out.glb>`, then copy the result to `SkywardSpire_Buildings.glb` here. The builder places it under `Belfries/Buildings`.
+  - The env file skips its code-built versions while `kit` mode is on.
+  - Critic rounds: 6, then 6.5/10.

@@ -17,6 +17,7 @@ namespace LastBell.Areas.Area1.EditorTools
     public static class SkywardSpireBuilder
     {
         const string Dir = "Assets/LastBell/Areas/Area1", Gen = Dir + "/Generated", Prefabs = Dir + "/Prefabs", Captures = Dir + "/Captures";
+        const string KitPath = Dir + "/SkywardSpire_Buildings.glb"; // the landmarks, modelled in Blender (prototype/arena-3d/areas/area-1/blender/spire_buildings.py)
         const string GlbPath = Dir + "/SkywardSpire.glb", ScenePath = Dir + "/SkywardSpire_Arena.unity", PrefabPath = Prefabs + "/LB_ENV_SkywardSpire_Arena.prefab";
         const string VanguardPath = "Assets/LastBell/Characters/Vanguard/Resources/Characters/Vanguard.glb";
 
@@ -66,6 +67,13 @@ namespace LastBell.Areas.Area1.EditorTools
             rootT.SetParent(null, true);
             if (rootT.gameObject != inst) Object.DestroyImmediate(inst);
             var root = rootT.gameObject; root.name = "LB_ENV_SkywardSpire_Arena";
+            var kit = AssetDatabase.LoadAssetAtPath<GameObject>(KitPath);
+            if (kit)
+            {
+                var k = (GameObject)PrefabUtility.InstantiatePrefab(kit);
+                PrefabUtility.UnpackPrefabInstance(k, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
+                k.name = "Buildings"; k.transform.SetParent(Child(root.transform, "Belfries"), true);
+            }
             DressMaterials(root);
             UseSkyArchitecture(root);
             foreach (var r in root.GetComponentsInChildren<MeshRenderer>(true)) { r.shadowCastingMode = ShadowCastingMode.On; r.receiveShadows = true; }
