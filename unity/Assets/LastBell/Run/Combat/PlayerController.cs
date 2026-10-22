@@ -127,7 +127,7 @@ namespace LastBell.Run
         public void PrepareForEncounter(Vector3 pos, float yaw)
         {
             transform.SetPositionAndRotation(pos, Quaternion.Euler(0, yaw, 0));
-            Stamina = MaxStamina; dashTick = 0; dashLock = 0; jumpTick = -1; Height = 0; stun = 0; knockTick = 0; sinceSpend = 999;
+            Stamina = MaxStamina; dashTick = 0; dashLock = 0; jumpTick = -1; Height = 0; stun = 0; knockTick = 0; sinceSpend = 999; pullTick = 0;
             Kit.ResetAll();
             Presenter.ResetPose();
         }
@@ -159,12 +159,16 @@ namespace LastBell.Run
 
         // dev / test hook only
         public void DebugSetHp(int hp) { Hp = Mathf.Clamp(hp, 1, MaxHp); }
+        public void DebugRevive() { if (!Down) return; Down = false; Hp = MaxHp; Stamina = MaxStamina; Presenter.ResetPose(); }
 
-        public void ReceiveHit(Hazard h)
+        public void ReceiveHit(Hazard h) => ReceiveHit(h, h.Damage);
+
+        // damage: this player's share when the hazard is split (shared soak / line split), otherwise h.Damage
+        public void ReceiveHit(Hazard h, int damage)
         {
             if (Down) return;
             float mult = Kit.Mitigation(h, out bool noKnock);
-            int dmg = Mathf.RoundToInt(h.Damage * mult * World.DamageTakenScale);   // difficulty scales the hit once, here
+            int dmg = Mathf.RoundToInt(damage * mult * World.DamageTakenScale);   // difficulty scales the hit once, here
             if (mult >= 1) dmg = Mathf.Max(1, dmg);   // a shield can absorb a hit completely; nothing else can
             Hp = Mathf.Max(0, Hp - dmg);
             World.ReportPlayerHit(this, h, dmg);
@@ -189,9 +193,29 @@ namespace LastBell.Run
             if (Hp == 0) GoDown();
         }
 
+        // An empty shared soak (settled: it wipes the party). Not mitigated and not scaled by difficulty.
+        public void ForceDown(Hazard h)
+        {
+            if (Down) return;
+            int dmg = Hp; Hp = 0;
+            World.ReportPlayerHit(this, h, dmg);
+            RunHud.Float(transform.position + Vector3.up * 2.4f, "-" + dmg, new Color(1f, 0.42f, 0.36f));
+            GoDown();
+        }
+
+        // Forced movement with no damage, stun or interrupt (Crucivar's inhale). The player keeps control: the pull is
+        // added to their own movement for `ticks` ticks, then stops. Never a teleport.
+        public void Pull(Vector3 dir, float distance, int ticks)
+        {
+            if (Down || ticks <= 0) return;
+            pullDir = Sim.Flat(dir).normalized; pullSpeed = distance / ticks * Sim.Hz; pullTick = ticks;
+        }
+        public bool BeingPulled => pullTick > 0;
+        int pullTick; Vector3 pullDir; float pullSpeed;
+
         void GoDown()
         {
-            Down = true; stun = 0; dashTick = 0; jumpTick = -1; Height = 0;
+            Down = true; stun = 0; dashTick = 0; jumpTick = -1; Height = 0; pullTick = 0;
             Kit.Interrupt(); Kit.ClearTargetState();
             Presenter.Down();
         }
@@ -264,6 +288,7 @@ namespace LastBell.Run
                 }
             }
             if (!stepped) Kit.TickTimersOnly();
+            if (pullTick > 0) { pullTick--; vel += pullDir * pullSpeed; }
 
             var pos = World.Constrain(transform.position + vel * Sim.Dt, Radius);
             transform.position = pos;

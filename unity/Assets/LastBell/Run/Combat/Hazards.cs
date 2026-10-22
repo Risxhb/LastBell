@@ -6,7 +6,9 @@ using UnityEngine;
 
 namespace LastBell.Run
 {
-    public enum HazardShape { Circle, Ring, Cone, Lane }
+    // Tether: a player-to-player (or player-to-post) band check with no floor shape. Includes decides who is "inside"
+    // (partner distance outside the band) at resolve; presentation draws the chain.
+    public enum HazardShape { Circle, Ring, Cone, Lane, Tether }
 
     // Strike = a directed physical blow (Vanguard's Brace can mitigate it from the front).
     // Ground = an eruption under the player (Brace never helps). Bellkeeper spec v0.2 §3, Vanguard #31 Brace rule.
@@ -35,6 +37,13 @@ namespace LastBell.Run
         // > 0: a standing hazard (Crucivar's cooling slag). It deals this much per second to players inside while it
         // lives, with no knockback, and simply expires at ResolveAt (no resolve hit). Overlapping ones never multiply.
         public float BurnPerSecond;
+        // Shared soak / line split (settled rule §5). ShareTotal > 0: the players inside at resolve split ShareTotal evenly
+        // (missing players' shares fall on those inside; over-soaking lowers each share). ShareCount is the numeral shown
+        // on the telegraph. WipeIfEmpty: nobody inside downs every standing player (an empty soak wipes the party).
+        public int ShareTotal, ShareCount;
+        public bool WipeIfEmpty;
+        // per-player hit test, used instead of Contains when set (Tether needs it)
+        public Func<PlayerController, bool> Includes;
         public Action<Hazard> Track;            // called every tick until locked (follow a target / the boss facing)
         public Action<Hazard> OnResolve;         // presentation of the resolve (effects), after the hit test
         public Action<Hazard> OnSpent;           // the active period is over (same tick as OnResolve when ActiveTicks is 0)
@@ -46,8 +55,11 @@ namespace LastBell.Run
 
         public const float Margin = 0.3f;        // player body radius: touching the border counts
 
+        public bool Hits(PlayerController p) => Includes != null ? Includes(p) : Contains(p.transform.position);
+
         public bool Contains(Vector3 p)
         {
+            if (Shape == HazardShape.Tether) return false;
             var v = Sim.Flat(p - Origin); float d = v.magnitude;
             switch (Shape)
             {
@@ -101,6 +113,7 @@ namespace LastBell.Run
                 case HazardShape.Circle: h.Tele = fx.Circle(h.Radius); break;
                 case HazardShape.Ring: h.Tele = fx.Ring(h.Inner, h.Radius); break;
                 case HazardShape.Cone: h.Tele = fx.Cone(h.Radius, h.HalfAngle); break;
+                case HazardShape.Tether: h.Tele = fx.Circle(0.01f); h.Tele.Tint(Color.clear, Color.clear); break;   // the ability draws the chain
                 default: h.Tele = fx.Lane(h.Length, h.Width); break;
             }
             // jump-clearable bars read differently from everything else (teal, plus the HUD's JUMP label)
@@ -133,18 +146,37 @@ namespace LastBell.Run
                 if (h.BurnPerSecond > 0) continue;
                 if (last) { live.RemoveAt(i); h.Tele.Resolve(); }
                 if (first) Resolved++;
-                foreach (var p in w.Players)
-                {
-                    if (p.Down || h.Hit.Contains(p) || !h.Contains(p.transform.position)) continue;
-                    if (h.JumpClearable && p.Height >= h.ClearHeight) continue;   // the only height rule (R19)
-                    h.Hit.Add(p);
-                    p.ReceiveHit(h);
-                }
+                if (h.ShareTotal > 0) { if (first) ResolveShared(h); }
+                else
+                    foreach (var p in w.Players)
+                    {
+                        if (p.Down || h.Hit.Contains(p) || !h.Hits(p)) continue;
+                        if (h.JumpClearable && p.Height >= h.ClearHeight) continue;   // the only height rule (R19)
+                        h.Hit.Add(p);
+                        p.ReceiveHit(h);
+                    }
                 if (first) h.OnResolve?.Invoke(h);
                 if (last) h.OnSpent?.Invoke(h);
             }
             SetQuiet(live.Count > 0);
         }
+
+        // Shared soak / line split, once at resolve: the total is cut into one share per player inside. Empty with
+        // WipeIfEmpty downs every standing player; empty without it does nothing.
+        void ResolveShared(Hazard h)
+        {
+            var inside = new List<PlayerController>();
+            foreach (var p in w.Players)
+                if (!p.Down && !h.Hit.Contains(p) && h.Hits(p) && !(h.JumpClearable && p.Height >= h.ClearHeight)) inside.Add(p);
+            if (inside.Count == 0)
+            {
+                if (h.WipeIfEmpty) foreach (var p in w.Players.ToArray()) if (!p.Down) { h.Hit.Add(p); p.ForceDown(h); }
+                return;
+            }
+            int each = ShareOf(h, inside.Count);
+            foreach (var p in inside) { h.Hit.Add(p); p.ReceiveHit(h, each); }
+        }
+        public static int ShareOf(Hazard h, int inside) => inside <= 0 ? 0 : Mathf.CeilToInt(h.ShareTotal / (float)inside);
 
         // Standing hazards: each player burns at the highest rate of the locked ones they stand in (overlaps never add up),
         // in whole HP as the fraction accumulates. Leaving every pool drops the carried fraction.
@@ -155,7 +187,7 @@ namespace LastBell.Run
                 Hazard src = null;
                 if (!p.Down)
                     foreach (var h in live)
-                        if (h.BurnPerSecond > 0 && h.Locked && (src == null || h.BurnPerSecond > src.BurnPerSecond) && h.Contains(p.transform.position)) src = h;
+                        if (h.BurnPerSecond > 0 && h.Locked && (src == null || h.BurnPerSecond > src.BurnPerSecond) && h.Hits(p)) src = h;
                 if (src == null) { burn.Remove(p); continue; }
                 burn.TryGetValue(p, out float acc); acc += src.BurnPerSecond * Sim.Dt;
                 int dmg = Mathf.FloorToInt(acc); acc -= dmg; burn[p] = acc;
