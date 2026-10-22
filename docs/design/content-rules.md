@@ -2,7 +2,7 @@
 
 **Read this before you design or change any boss, miniboss, attack, arena, class ability or game system.** These rules come from decisions Chzy18 has already made. They override anything older, including older wiki pages, old reference-sheet labels and earlier packets.
 
-Last updated October 21, 2026 by chzy18/claude. Each rule is marked:
+Last updated October 21, 2026 by chzy18/claude. The latest additions are Chzy18's answers from the Rabbit and Steel study (`docs/research/rabbit-and-steel/rabbit-and-steel-boss-mechanics.md` §7 on branch `docs/rabbit-and-steel-study`). Each rule is marked:
 - **Settled:** decided. Don't change it and don't re-ask about it.
 - **Provisional:** current working value. Use it, but you can propose changes.
 
@@ -16,6 +16,7 @@ Last updated October 21, 2026 by chzy18/claude. Each rule is marked:
 ## 1. What the game is
 
 - **Settled:** top-down co-op action **boss rush** with roguelite runs. Every enemy is a boss: no normal enemies or trash mobs.
+  - **Settled:** parts the boss spawns count as part of the boss, not as trash mobs. One example is small bells whose hits also damage the boss.
 - **Settled:** design and tune for **co-op**, 1–8 players. Solo must still be possible, but don't sacrifice the co-op experience for it.
 - **Settled:** campaign of four areas, 13 encounters:
   - Areas 1–3 each have **3 minibosses, then 1 area boss**, all in that area's one shared arena:
@@ -35,6 +36,8 @@ Last updated October 21, 2026 by chzy18/claude. Each rule is marked:
 - **Settled:** each hazard instance can hit a given player **at most once**. This prevents multi-hit chains.
 - **Settled:** jumping is a real action and can clear low attacks, such as a jumpable bar. It isn't general immunity.
 - **Settled:** no block, parry, counter, auto-target or lock-on. Every ability aims at the mouse cursor.
+- **Settled:** bosses never teleport players. Players walk to their spots.
+- **Provisional:** a boss may apply a temporary slow or root, but only if every escape route still works at 4.2 m/s while it's active.
 - **Provisional numbers:**
   - Movement speeds: walk 6 m/s, sprint 9 m/s, dash 3 m in 0.2 s, jump about 0.8 m over 0.6 s.
   - Stamina: 100 total. Sprint drains 25/s, a jump costs 20, a dash costs 30. It regenerates at 20/s after a 0.75 s pause.
@@ -80,6 +83,10 @@ Each rule below is settled unless it says otherwise.
   - Every damaging attack has a ground telegraph built from the real hit shape, not painted art.
   - Hostile telegraphs are coral or amber with crisp edges.
   - Friendly effects never use those colours.
+  - **Provisional:** markers that show who a player is or which team they're on:
+    - ivory numerals over heads for order (I, II, III…)
+    - brass and cobalt rims for two teams
+    - They show identity only and never hurt. See `docs/research/rabbit-and-steel/marker-colours-mockup.svg` on branch `docs/rabbit-and-steel-study`.
   - Decorative floor art must never look like a hazard.
 - **Every attack needs a real escape route**, tested with finite stamina and no iframes, for melee and ranged players.
 - **At most two damaging patterns overlap,** and only after the route is checked.
@@ -94,11 +101,22 @@ Each rule below is settled unless it says otherwise.
     - A transition waits until the current attack finishes, then plays a short harmless transformation.
     - The boss never heals or gets a new health bar.
     - Crossing two thresholds with one burst queues only one transition.
+    - **Area bosses and the final boss** change into a **second form** partway through the fight. The change follows the rules above: a harmless transformation, no heal and the same health bar. Minibosses don't get a second form.
 - **The boss dying mid-windup** cancels all its pending hazards in that same tick.
 - **Difficulty tiers (provisional names):** First Chime, Steady Ticking, Striking Hour, Midnight Toll.
   - Write your numbers for **Steady Ticking**, the baseline.
   - The highest tier adds one named mechanic per boss, not just faster or harder-hitting attacks.
 - **Co-op scaling** comes from spreading targets and giving players spatial jobs, not just multiplying HP.
+- **Co-op mechanics:**
+  - **Settled:** every co-op attack states its **solo (1-player) behaviour** next to the attack, for example "solo: the line becomes a normal lane you dodge".
+  - **Settled: shared soaks** (a ring that needs N players inside):
+    - The damage is cut into N shares.
+    - Each player inside takes one share.
+    - Missing players' shares fall on whoever is inside.
+    - An **empty soak wipes the party**. Its escape route is "get in", so its telegraph must be impossible to miss: a loud chime and a large numeral. Introduce it before a boss relies on it.
+    - Tune the total so one player taking every share still survives from full HP.
+  - **Provisional:** a dash can break a player-to-player tether.
+  - **Provisional:** a mark passed between players skips players who are downed.
 - **Provisional encounter length:**
   - Minibosses 60–150 s, area bosses about 3–4 min. This range is still being tuned.
   - Test builds use shortened HP.
@@ -156,6 +174,7 @@ Each rule below is settled unless it says otherwise.
    - warning time
    - damage at Steady Ticking
    - escape route
+   - solo (1-player) behaviour, for co-op attacks
    - punish window
 4. Phase plan using the rules in §5.
 5. Highest-tier mechanic.
