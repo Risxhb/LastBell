@@ -27,12 +27,14 @@ namespace LastBell.Run
         public float Radius, Inner, HalfAngle;   // circle/ring/cone
         public float Length, Width;              // lane
         public int LockAt, ResolveAt;
+        public int ActiveTicks;                  // 0 or 1 = resolves on one tick; otherwise hits anyone inside for this many ticks from ResolveAt (R22)
         public int Damage;
         public bool JumpClearable; public float ClearHeight = 0.35f;
         public float Knockback = 1.5f;
         public int Stun = 15;
         public Action<Hazard> Track;             // called every tick until locked (follow a target / the boss facing)
         public Action<Hazard> OnResolve;         // presentation of the resolve (effects), after the hit test
+        public Action<Hazard> OnSpent;           // the active period is over (same tick as OnResolve when ActiveTicks is 0)
         public bool HitOnResolve = true;         // false: the owner deals the hits itself while the warning is up (a sweeping charge)
 
         public int Age { get; internal set; }
@@ -122,8 +124,9 @@ namespace LastBell.Run
                 var h = live[i];
                 if (h.Cancelled) { live.RemoveAt(i); h.Tele.Cancel(); continue; }
                 if (h.Age < h.ResolveAt) continue;
-                live.RemoveAt(i);
-                h.Tele.Resolve(); Resolved++;
+                bool first = h.Age == h.ResolveAt, last = h.Age >= h.ResolveAt + Mathf.Max(0, h.ActiveTicks - 1);
+                if (last) { live.RemoveAt(i); h.Tele.Resolve(); }
+                if (first) Resolved++;
                 if (h.HitOnResolve) foreach (var p in w.Players)
                 {
                     if (p.Down || h.Hit.Contains(p) || !h.Contains(p.transform.position)) continue;
@@ -131,7 +134,8 @@ namespace LastBell.Run
                     h.Hit.Add(p);
                     p.ReceiveHit(h);
                 }
-                h.OnResolve?.Invoke(h);
+                if (first) h.OnResolve?.Invoke(h);
+                if (last) h.OnSpent?.Invoke(h);
             }
             SetQuiet(live.Count > 0);
         }

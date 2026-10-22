@@ -82,7 +82,7 @@ Gamepads aren't read: the user's rudder pedals register as a controller. UI clic
 | Character | Model | Rig | Animation | VFX |
 | --- | --- | --- | --- | --- |
 | **Vanguard** | Rough production (Meshy multi-view, decimated to 40k tris) | Rough production (scripted armature, heat weights) | Rough production. **New tonight:** SteelRhythm1–3, SunderingBlow, LastWord, BraceRaise / Hold / Walk / Hit / Lower, Hit, Down, GetUp. No placeholders are needed in the run except Land | Rough production: slashes, Opening ring, Sundering split, Last Word windup / slam / shockwave, Brace disc |
-| **Chimesinger** | Rough production, **Unity copy is a stand-in** (pre-fix f84c4d5 export). The real export is owned by the Chimesinger animation-fixes session | Rough production | Approved-kit clips exist. **Placeholder:** Hit / Down / GetUp (procedural) until that session adds them | Rough production: note, bolt, bell mark with strength ring and echo pips, Refrain ripples, Crescendo burst, Chorus ring, note trail |
+| **Chimesinger** | Rough production: the fixed export (grip, attached bell strands, tear fixes, follow-through on the coat, sleeves, bells and banners); see the asset manifest | Rough production | Approved-kit clips exist. **Placeholder:** Hit / Down / GetUp (procedural) until that session adds them | Rough production: note, bolt, bell mark with strength ring and echo pips, Refrain ripples, Crescendo burst, Chorus ring, note trail |
 | **Arcanist** | Rough production (Meshy body plus astrolabe, from the Arcanist session) | Rough production (robe cloth chains, astrolabe orbit bone) | Approved-kit clips from the Arcanist session. **Placeholder:** Hit / Down / GetUp | Rough production: bolt, seal dials (ripe ring and inscribed gem as shapes), Lance (normal and empowered), Convergence (early and perfect), Anchor marker / return / shield, Clockstep afterimage |
 | **Bellkeeper** (= "Bellwarden") | Rough production (Meshy) | Rough production | Rough production. **New tonight:** PhaseShift, Defeat | Existing telegraphs and resolves; gold (non-danger) phase-shift and defeat bursts |
 | Minibosses ×3 | **Placeholder** (code-built) | none | none (scripted transforms) | shared telegraphs and resolves |
@@ -148,7 +148,7 @@ Screens and videos: `run-loop-evidence/autotest-7/*.png` and `*.mp4` (vanguard_k
 
 ## Known bugs and limits
 
-- The Chimesinger in Unity is the pre-grip-fix export. Its Hit, Down and GetUp are procedural tilts.
+- The Chimesinger's Hit, Down and GetUp are procedural tilts.
 - The Down / GetUp silhouettes are rough. Land is the tail of Jump.
 - The camera follows closely, so the player can sit behind a tall boss for a moment.
 - The minibosses have no art and no animation.
@@ -159,7 +159,7 @@ Screens and videos: `run-loop-evidence/autotest-7/*.png` and `*.mp4` (vanguard_k
 ## Next steps (highest priority first)
 
 1. **Human playtest** of this build: feel (PF-05), Brace (PF-02) and readability. Decide the Bellkeeper D1–D6. (PF-01 and the health policy were settled on Oct 21.)
-2. Swap in the **fixed Chimesinger GLB** when the Chimesinger session delivers it, then add its Hit / Down / GetUp.
+2. Add the Chimesinger's Hit / Down / GetUp clips. The fixed GLB is in.
 3. Author the **three miniboss** models and schedules (encounter lane #8), replacing the stand-ins without changing the run flow.
 4. Tune boss HP and damage toward the design fight lengths, and run the escape checker on the miniboss schedules.
 5. An animation polish pass on the Vanguard ability clips (contact clearance, Down / GetUp), and Hit / Down / GetUp for the Arcanist and the Chimesinger.

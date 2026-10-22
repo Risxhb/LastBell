@@ -24,12 +24,17 @@ namespace LastBell.Run
         IEnumerator AurelionChecks()
         {
             Note("---------- Aurelion, the Meridian Regent (practice) ----------");
-            AurelionRouteProofs();
-            yield return null;
-
             if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }   // the earlier practice section ends on Ready
-            d.StartPractice("Vanguard", RunDirector.PracticeAurelion);
-            Check("Aurelion practice: Ready names the boss", d.State == RunState.Ready && RunDirector.PracticeName(d.Encounter) == "Aurelion");
+            // his practice is fought in his own arena: from another map the button loads Skyward Spire first
+            int spire = RunMaps.IndexOf(RunDirector.AurelionMap);
+            Check("Aurelion practice accepted from the menu", d.StartPractice("Vanguard", RunDirector.AurelionPractice));
+            yield return Until(() => RunMaps.Current == spire && RunDirector.Instance && RunDirector.Instance.State == RunState.Ready, 30, "Skyward Spire loaded for Aurelion");
+            if (RunDirector.Instance != d) { directorLog.AddRange(d.Log); d = RunDirector.Instance; d.InputOverride = bot; bot.Clear(); }
+            if (d.Player) d.Player.Input = bot;   // the new scene built the player before the bot was attached
+            Check("Aurelion practice loads the Skyward Spire arena", RunMaps.Current == spire && HazardSystem.ArenaCount > 0, RunMaps.CurrentName);
+            Check("Aurelion practice: Ready names the boss", d.State == RunState.Ready && d.Mode == RunMode.Practice && RunDirector.PracticeName(d.Encounter) == "Aurelion");
+            AurelionRouteProofs();   // on this arena's floor bound
+            yield return null;
             d.RequestReady();
             yield return Until(() => d.State == RunState.Combat, 4, "Aurelion combat");
             var a = d.Boss as AurelionEncounter;

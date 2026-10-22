@@ -71,7 +71,7 @@ namespace LastBell.Run
             box = new GUIStyle(GUI.skin.box);
             btn = new GUIStyle(GUI.skin.button) { fontSize = 16, fontStyle = FontStyle.Bold, fixedHeight = 36 };
             mapBtn = new GUIStyle(btn) { fontSize = 13 };
-            practiceBtn = new GUIStyle(btn) { fontSize = 12, padding = new RectOffset(2, 2, 4, 4) };   // five boss names in one row
+            practiceBtn = new GUIStyle(btn) { fontSize = 11, padding = new RectOffset(2, 2, 4, 4) };   // six boss names in one row
             slot = new GUIStyle(GUI.skin.label) { fontSize = 11, alignment = TextAnchor.UpperCenter, wordWrap = true, fontStyle = FontStyle.Bold }; slot.normal.textColor = Color.white;
         }
 
@@ -156,7 +156,7 @@ namespace LastBell.Run
             GUI.Label(new Rect(14, h - 22, 420, 20), "map: " + RunMaps.CurrentName + "   ·   difficulty: " + RunDifficulty.Name(d.Difficulty), tiny);
         }
 
-        static int SlotIndex(int encounter) => encounter >= 3 ? 4 : encounter;
+        static int SlotIndex(int encounter) => encounter == RunDirector.AurelionPractice ? 6 : encounter == RunDirector.SylvaraPractice ? 5 : encounter >= 3 ? 4 : encounter;
 
         void Menu()
         {
@@ -195,13 +195,14 @@ namespace LastBell.Run
             }
             if (GUI.Button(new Rect(r.x + r.width / 2 - 140, r.y + 364, 280, 40), "START RUN  (Enter)", btn)) d.StartRun(RunDirector.Classes[menuClass]);
             GUI.Label(new Rect(r.x + 30, r.y + 418, 300, 22), "Practice one encounter", small);
-            string[] names = { "Dial Warden", "Pendulum Sentinel", "Chimebound Oracle", "Bellkeeper", "Aurelion" };
+            // the area bosses are fought in their own arenas: their buttons load that map first if another one is up
+            string[] names = { "Dial Warden", "Pendulum Sentinel", "Chimebound Oracle", "Bellkeeper", "Sylvara (area 3)", "Aurelion (area 1)" };
             for (int i = 0; i < names.Length; i++)
-                if (GUI.Button(new Rect(r.x + 30 + i * 133, r.y + 442, 127, 36), names[i], practiceBtn)) d.StartPractice(RunDirector.Classes[menuClass], i);
+                if (GUI.Button(new Rect(r.x + 30 + i * 110, r.y + 442, 106, 36), names[i], practiceBtn)) d.StartPractice(RunDirector.Classes[menuClass], i);
             GUI.Label(new Rect(r.x + 30, r.y + 492, r.width - 60, 120),
                 "Controls: WASD move · mouse aims · 1 / LMB basic · 2 3 4 class actions · 6 Mending Chorus / Temporal Anchor · 5 / RMB dash · F potion · Space jump · Shift sprint · Esc pause\n" +
                 "Movement stamina: sprint, jump and dash share one bar. No invincibility frames (dodging does not make you immune). F drinks a potion (+40 HP).\nHealth refills before each boss; potions carry over between minibosses and refill before the final boss. Retry restarts at the first miniboss.\n" +
-                "Minibosses are labelled stand-ins; the Bellkeeper and Aurelion (Skyward Spire area boss, practice only) use their models. Arcanist kit numbers are prototype tuning. Dev keys in combat: F9 defeat boss, F8 next phase.", tiny);
+                "Minibosses are labelled stand-ins; the Bellkeeper and Aurelion use their models; Sylvara and Aurelion are practice only. Arcanist kit numbers are prototype tuning. Dev keys in combat: F9 defeat boss, F8 next phase.", tiny);
             if (GUI.Button(new Rect(r.x + r.width - 130, r.y + r.height - 50, 100, 36), "Quit", btn)) Application.Quit();
         }
 

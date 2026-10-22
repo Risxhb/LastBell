@@ -57,23 +57,31 @@ Contact sheet: `run-loop-evidence/vanguard/kit-contact-sheet.png`.
 - Brace: translucent rune disc in front while raised. An absorbed hit gives a short disc flash and sparks; there's no invulnerability flash.
 - Dash: cyan trail.
 
-## Chimesinger — model: Rough production (stand-in export) · animation: Rough production / Placeholder · VFX: Rough production
+## Chimesinger — model: Rough production · animation: Rough production / Placeholder · VFX: Rough production
 
-- **Unity asset:** `unity/Assets/LastBell/Characters/Chimesinger/Resources/Characters/Chimesinger.glb`. This is a **stand-in**: the committed f84c4d5 `chimesinger.glb` re-exported to JPEG with Blender, with no rig or clip changes. The re-export dropped four unweighted leaf finger/thumb bones and resampled the clips to about 0.02 s shorter.
-- **Owner of the real asset:** the "Chimesinger animation fixes" session. It is reworking the grips, Bellstrike, Crescendo, Mending Chorus and staff clearance in `chimesinger_rig.py`, and will export the Unity JPEG GLB to the path above. That session also owns Hit / Down / GetUp, by agreement.
-- **Editable source:** `prototype/arena-3d/models/blender/chimesinger_prep.py` and `chimesinger_rig.py`, plus the Meshy body and staff uploads in `unity-session/prototype/arena-3d/models/upload/Meshy/`.
-- **Attachment points:** the staff is the `staff` bone under `hand.R`.
+- **Unity asset:** `unity/Assets/LastBell/Characters/Chimesinger/Resources/Characters/Chimesinger.glb`, the JPEG export of `chimesinger_rig.py` at unity-session 6c42645 (Oct 21). It includes:
+  - a per-finger grip solved against the shaft, with the staff rigid in the fist;
+  - bell strands joined to the sleeves;
+  - seam and weight fixes, so the coat no longer tears;
+  - follow-through: the coat panels, sleeves, bell strands and both staff banners are baked damped springs.
+- **Mesh QA:** `chimesinger_qa.py` finds 0 staff/body overlap in every clip, with at least 13 mm clearance.
+- **Owner:** the "Chimesinger animation fixes" session. By agreement it also owns Hit / Down / GetUp, which are not made yet.
+- **Editable source:** `prototype/arena-3d/models/blender/chimesinger_prep.py`, `chimesinger_rig.py`, `chimesinger_hands.py` and `chimesinger_qa.py`, plus the Meshy body and staff uploads in `unity-session/prototype/arena-3d/models/upload/Meshy/`. To rebuild, run `models/build-chimesinger.ps1`.
+- **Attachment points:**
+  - The staff is the `staff` bone under `hand.R`; its mesh is `ChimeStaff`.
+  - The two banners, `ChimeBannerA` and `ChimeBannerB`, ride the `bannerA` / `bannerB` hinge bones under `staff`.
+  - These are separate meshes, so code that hides or tints the staff should include the banners.
 
 | Clip | Length | Loop | Gameplay use (ticks) | Status |
 | --- | --- | --- | --- | --- |
-| Idle / Run / Sprint | 2.0 / 0.71 / 0.54 s | yes | locomotion | Rough production |
-| Dodge | 0.46 s | no | Harmonic Step (12 ticks) | Rough production |
+| Idle / Run / Sprint | 2.0 / 0.70 / 0.53 s | yes | locomotion | Rough production |
+| Dodge | 0.43 s | no | Harmonic Step (12 ticks) | Rough production |
 | Jump | 1.17 s | no | jump | Rough production |
-| ResonantNote | 0.38 s | no | 10-tick cast, projectile released at tick 6 | Rough production |
-| Bellstrike | 0.67 s | no | 18-tick cast, release at tick 10 | Rough production; rework pending in the Chimesinger session |
-| HarmonicRefrain | 0.71 s | no | 22-tick cast, wave at tick 12 | Rough production |
-| Crescendo | 1.0 s | no | 26-tick cast, detonation at tick 16 | Rough production; rework pending |
-| MendingChorus | 0.58 s | no | heal is instant on press; 36-tick flourish, movement allowed | Rough production; rework pending |
+| ResonantNote | 0.37 s | no | 10-tick cast, projectile released at tick 6 | Rough production; release at 0.45 of the clip |
+| Bellstrike | 0.97 s | no | 18-tick cast, release at tick 10 | Rough production; bell contact at 0.5 of the clip |
+| HarmonicRefrain | 0.70 s | no | 22-tick cast, wave at tick 12 | Rough production; release at 0.5 |
+| Crescendo | 0.97 s | no | 26-tick cast, detonation at tick 16 | Rough production; detonation at 0.53 of the clip, slightly ahead of tick 16 (0.62) |
+| MendingChorus | 0.57 s | no | heal is instant on press; 36-tick flourish, movement allowed | Rough production |
 | Hit / Down / GetUp | — | — | — | **Placeholder** (procedural tilt / fall) until the Chimesinger session adds clips |
 
 **VFX:**
