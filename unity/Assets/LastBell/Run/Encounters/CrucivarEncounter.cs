@@ -366,31 +366,31 @@ namespace LastBell.Run
             switch (ph)
             {
                 case 1:
-                    yield return Step(true, () => MouldWithPress(), "Mould Press", "Idle", g, slagRim: p1Loops++ > 0);
-                    yield return Step(false, Sweep.Run, "Anvil Sweep", "Idle", g);
-                    yield return Step(true, Bellows.Run, "Bellows Draw", "Idle", g);
-                    yield return Step(false, Spit.Run, "Slag Spit", "Idle", g);
-                    yield return Step(true, () => Casting.Run(4), "Great Casting", "Idle", g);
-                    yield return Step(false, Sweep.Run, "Anvil Sweep", "Idle", g);
+                    yield return Step(true, () => MouldWithPress(), "recovering", "Idle", g, slagRim: p1Loops++ > 0);
+                    yield return Step(false, Sweep.Run, "recovering", "Idle", g);
+                    yield return Step(true, Bellows.Run, "recovering", "Idle", g);
+                    yield return Step(false, Spit.Run, "recovering", "Idle", g);
+                    yield return Step(true, () => Casting.Run(4), "recovering", "Idle", g);
+                    yield return Step(false, Sweep.Run, "recovering", "Idle", g);
                     yield return Step(false, Chain.Run, "Gear Chain (furnace venting)", "Vulnerable", PunishV3, slagRim: true);
                     break;
                 case 2:
-                    yield return Step(false, Chain.Run, "Gear Chain", "Idle", g, slagRim: true);
-                    yield return Step(false, Spit.Run, "Slag Spit", "Idle", g);
-                    yield return Step(true, () => MouldWithPress(), "Mould Press", "Idle", g, slagRim: true);
-                    yield return Step(false, Sweep.Run, "Anvil Sweep", "Idle", g);
-                    yield return Step(true, Bellows.Run, "Bellows Draw", "Idle", g);
-                    yield return Step(false, Spit.Run, "Slag Spit", "Idle", g);
+                    yield return Step(false, Chain.Run, "recovering", "Idle", g, slagRim: true);
+                    yield return Step(false, Spit.Run, "recovering", "Idle", g);
+                    yield return Step(true, () => MouldWithPress(), "recovering", "Idle", g, slagRim: true);
+                    yield return Step(false, Sweep.Run, "recovering", "Idle", g);
+                    yield return Step(true, Bellows.Run, "recovering", "Idle", g);
+                    yield return Step(false, Spit.Run, "recovering", "Idle", g);
                     yield return Step(true, () => Casting.Run(8), "Great Casting (crucible cooling)", "Vulnerable", PunishV3);
                     break;
                 default:
                     yield return Step(true, () => Casting.Run(8, returnWave: true), "Great Casting (hammer lodged)", "HammerLodged", PunishV3);
-                    yield return Step(false, Chain.Run, "Gear Chain", "Idle", g, slagRim: true);
-                    yield return Step(false, Sweep.Run, "Anvil Sweep", "Idle", g);
-                    yield return Step(true, () => MouldWithPress(), "Mould Press", "Idle", g);
-                    yield return Step(false, Spit.Run, "Slag Spit", "Idle", g);
-                    yield return Step(true, Bellows.Run, "Bellows Draw", "Idle", g);
-                    yield return Step(false, Sweep.Run, "Anvil Sweep", "Idle", g);
+                    yield return Step(false, Chain.Run, "recovering", "Idle", g, slagRim: true);
+                    yield return Step(false, Sweep.Run, "recovering", "Idle", g);
+                    yield return Step(true, () => MouldWithPress(), "recovering", "Idle", g);
+                    yield return Step(false, Spit.Run, "recovering", "Idle", g);
+                    yield return Step(true, Bellows.Run, "recovering", "Idle", g);
+                    yield return Step(false, Sweep.Run, "recovering", "Idle", g);
                     break;
             }
         }
