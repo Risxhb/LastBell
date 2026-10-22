@@ -22,7 +22,7 @@ namespace LastBell.Run
             fins = new List<Part>();
         Part guard, flywheel, gauge; Transform lip, stream; Renderer streamR;
         float frontOpen, sideOpen, backOpen, finOpen, guardOpen, gaugeK, gaugeShown, pour, fly, shed, breathe;
-        bool fbTarget, ventsOn, pouring, shedding, dead;
+        bool fbTarget, ventsOn, ventsAll, pouring, shedding, dead;
         static readonly Color MoltenGlow = new Color(1f, 0.45f, 0.1f);
 
         public void Bind(Transform visual)
@@ -55,6 +55,8 @@ namespace LastBell.Run
         public void Pour(bool on) { pouring = on; }
         public void Gauge(float k) { gaugeK = k; }
         public void Vents(bool frontBack, bool on) { fbTarget = frontBack; ventsOn = on; }
+        // every vent at once (Bellows Draw's inhale): belly shutters, flank grilles and the back exhaust
+        public void VentsAll(bool on) { ventsAll = on; }
         public void BeginPhase(int phase)
         {
             if (phase >= 2 && !shedding)
@@ -71,7 +73,7 @@ namespace LastBell.Run
             }
             if (phase >= 3) { finOpen = 0.001f; guardOpen = 0.001f; }
         }
-        public void Shutdown() { dead = true; pouring = false; ventsOn = false; gaugeK = 0; }
+        public void Shutdown() { dead = true; pouring = false; ventsOn = false; ventsAll = false; gaugeK = 0; }
 
         // ---------------- per frame ----------------
         void LateUpdate()
@@ -80,9 +82,9 @@ namespace LastBell.Run
             breathe += dt;
             // vents: the selected pair opens wide, the idle shutters breathe slightly while the furnace is lit
             float idle = dead ? 0 : 0.08f + 0.06f * Mathf.Sin(breathe * 2.1f);
-            frontOpen = Mathf.MoveTowards(frontOpen, ventsOn && fbTarget ? 1 : idle, dt / 0.18f);
-            backOpen = Mathf.MoveTowards(backOpen, ventsOn && fbTarget ? 1 : 0, dt / 0.18f);
-            sideOpen = Mathf.MoveTowards(sideOpen, ventsOn && !fbTarget ? 1 : 0, dt / 0.18f);
+            frontOpen = Mathf.MoveTowards(frontOpen, ventsAll || ventsOn && fbTarget ? 1 : idle, dt / 0.18f);
+            backOpen = Mathf.MoveTowards(backOpen, ventsAll || ventsOn && fbTarget ? 1 : 0, dt / 0.18f);
+            sideOpen = Mathf.MoveTowards(sideOpen, ventsAll || ventsOn && !fbTarget ? 1 : 0, dt / 0.18f);
             foreach (var s in shutters) s.t.localRotation = s.rot * Quaternion.Euler(-75 * frontOpen, 0, 0);
             foreach (var s in back) s.t.localRotation = s.rot * Quaternion.Euler(70 * backOpen, 0, 0);
             for (int i = 0; i < flank.Count; i++) flank[i].t.localRotation = flank[i].rot * Quaternion.Euler(0, 0, (flank[i].t.name.EndsWith("L") ? -1 : 1) * 65 * sideOpen);
