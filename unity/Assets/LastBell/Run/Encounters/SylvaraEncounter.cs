@@ -39,6 +39,12 @@ namespace LastBell.Run
         readonly Dictionary<string, int> lastUse = new Dictionary<string, int>();
         readonly List<Transform> props = new List<Transform>();
         Transform maskL, maskR, bellRoot, shoulderFlowers;
+        // Verdant Chimes' sun sits behind her from the gameplay camera, so her camera-facing side is in shadow: a soft
+        // front light lifts it and a turquoise rim edges her silhouette. Both are presentation only, short-range and
+        // fixed in world offsets (the camera never turns), so they never paint a pool that reads as a floor warning.
+        Light frontLight, rimLight;
+        static readonly Vector3 FrontOffset = new Vector3(0, 3.0f, 2.6f), RimOffset = new Vector3(0, 5.2f, -2.4f);
+        const float FrontIntensity = 12f, RimIntensity = 18f;
         public int BloomsCompleted { get; private set; }
         public readonly List<string> Order = new List<string>();   // attack starts, for tests
         public readonly List<(int index, int resolveTick, int spentTick)> BloomLog = new List<(int, int, int)>();
@@ -92,6 +98,22 @@ namespace LastBell.Run
                 return host;
             });
             PhaseName = "Dormant Choir";
+            frontLight = MakeLight("Front Light", new Color(1f, 0.95f, 0.86f), FrontIntensity, 6.5f);
+            rimLight = MakeLight("Rim Light", new Color(0.55f, 1f, 0.92f), RimIntensity, 6.5f);
+            PlaceLights();
+        }
+
+        Light MakeLight(string name, Color c, float intensity, float range)
+        {
+            var l = new GameObject(name).AddComponent<Light>();
+            l.transform.SetParent(transform, false);
+            l.type = LightType.Point; l.color = c; l.intensity = intensity; l.range = range; l.shadows = LightShadows.None;
+            return l;
+        }
+        void PlaceLights()
+        {
+            if (frontLight) frontLight.transform.position = transform.position + FrontOffset;
+            if (rimLight) rimLight.transform.position = transform.position + RimOffset;
         }
 
         int PhaseFor() => Hp > MaxHp * 0.65f ? 1 : Hp > MaxHp * 0.30f ? 2 : 3;
@@ -350,6 +372,12 @@ namespace LastBell.Run
         protected override void Update()
         {
             base.Update();
+            PlaceLights();
+            if (Dead && frontLight)   // defeat: the lights settle down with the residual core
+            {
+                frontLight.intensity = Mathf.MoveTowards(frontLight.intensity, FrontIntensity * 0.5f, Time.deltaTime * 2f);
+                rimLight.intensity = Mathf.MoveTowards(rimLight.intensity, RimIntensity * 0.3f, Time.deltaTime * 3f);
+            }
             if (presenter) presenter.GlowLevel = glowLevel;
             // idle: bells sway independently, the mask stays still
             if (bellRoot && !Dead)
