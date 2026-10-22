@@ -69,6 +69,24 @@ Not a co-op mechanic: the same shapes for every N. The spatial job grows with N:
 
 ---
 
+## Build notes (Orrery Closing session)
+
+**State:** built and compile-checked (Roslyn). The Unity build and autotest are **not run yet** (see Blocked). Not human-approved.
+
+- Code: `Encounters/Aurelion/Abilities/OrreryClosing.cs`. Checks: `RunAutoTest.Aurelion.V2.OrreryClosing.cs`.
+- Two `Ground` instances spawned on one tick: `Orrery Closing rim` (Ring on the arena centre, 8.5–30 m) and `Orrery Closing crown` (Circle 3.6 m on the boss). Both have `LockAt 0` and `ResolveAt T(2.3 s)` (138, Easy 173). Each deals 40 damage with `Knockback 0` and `Stun 15`.
+- **Horizon:** the rim's `ActiveTicks = horizonTicks + 1` (the resolve tick plus 240, or 360 on Hard). `HorizonLive` is true while that rim instance is still in `HazardSystem.Live`, so boss death (`ClearAll`) ends it on the killing tick.
+- **Timing convention:** the same as the other bosses. A hazard spawned on tick T resolves on T + ResolveAt − 1, and `Run` returns on the next tick.
+- **Look:** `OrreryClosingFx` is presentation only. Dashed gold rings with clock ticks and a riding bead sit exactly on the rim's inner edge and on the crown edge. The rim ring descends from 3.5 m and the crown drops from halo height, both spinning up and landing on the resolve. While the Horizon is up, the rim telegraph is tinted a calmer coral with a pulsing border. In its last second the ring blinks faster and dims, then lifts away as the hazard expires. v1's `SpawnOrrery` is private to the encounter and draws both edges of a ring (the 30 m outer edge would sit off the map), so this ability has its own copy instead of a shared-file change.
+- **Clip:** `MeridianAlignment`, stretched to the warning. The punish clip `OpenChest` is played by the phase plan.
+
+### Open questions (calls made overnight)
+
+1. **Does the Horizon hit someone the rim already hit?** No. The brief makes the Horizon the rim's own `ActiveTicks`, and the one-hit-per-instance rule means anyone hit at the resolve (a ranged player who stayed out) is not hit again for walking back. A separate Horizon instance would let it hit them a second time.
+2. **The Horizon's end is shown by the shared telegraph's resolve flash.** `HazardSystem` calls `Tele.Resolve()` on the last active tick, and the ring lifting away tells players "safe now". If that flash reads as a hit, a shared change (`Tele.Expire()` for multi-tick hazards) is the fix.
+3. **Is a walk alone enough at 4.2 m/s?** No: the worst case is 7.96 m in 2.28 s from a 0.25 s reaction, so the walk needs about 2.15 s. The autotest records this case for information only, because the brief requires one dash at 4.2 m/s.
+4. **Should the crown follow the boss's feet if he is moved during the warning?** No: it is locked at the warning start, and the test moves him 3 m to prove it.
+
 ## How to build it (ability session)
 
 You are the session for this one ability. Work only on this ability. Your parent is the **Abilities** session (`abilities-aurelion`), which owns `feature/aurelion-abilities-v2` and integrates the five abilities.
