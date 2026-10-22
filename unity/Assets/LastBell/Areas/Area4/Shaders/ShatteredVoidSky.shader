@@ -5,7 +5,7 @@ Shader "LastBell/Area4/ShatteredVoidSky"
     Properties
     {
         _Base ("Base", Color) = (0.043, 0.031, 0.125, 1)
-        _Mid ("Mid", Color) = (0.075, 0.04, 0.17, 1)
+        _Mid ("Mid", Color) = (0.055, 0.03, 0.13, 1)
         _Nebula ("Nebula", Color) = (0.48, 0.31, 0.82, 1)
         _Wisp ("Wisp", Color) = (0.61, 0.53, 0.91, 1)
         _NebulaStrength ("Nebula strength", Float) = 0.8
