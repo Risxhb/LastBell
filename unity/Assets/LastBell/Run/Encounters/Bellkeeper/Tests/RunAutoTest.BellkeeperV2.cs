@@ -147,12 +147,20 @@ namespace LastBell.Run
             // the practice hook: each key loops that ability alone
             foreach (var id in BellkeeperAbilities.Ids)
             {
-                yield return BkStart(id);
+                // The Unfinished Hour is Hard only and its practice plays two Leaning Bells first (it replays the earlier one)
+                bool echo = id == BellkeeperAbilities.UnfinishedHour;
+                yield return BkStart(id, echo ? Difficulty.Hard : Difficulty.Medium);
                 if (bk == null) yield break;
-                var a = bk.Ability(id);
+                var a = bk.Ability(id); var lean = bk.Ability(BellkeeperAbilities.LeaningBell);
                 bk.BeginCombat();
-                int t = BkStepUntil(() => a.Casts > 0, 300);
-                bool alone = bk.Abilities.All(x => x == a || x.Casts == 0 || (a.Key == "unfinished_hour" && x.Key == "leaning_bell"));
+                if (echo && !lean.Built)
+                {
+                    int tl = BkStepUntil(() => lean.Casts >= 2, 900);
+                    Check($"v2 practice hook -lastbellAbility {a.Key}: plays its two Leaning Bells (the replay needs Leaning Bell built)", bk.PracticeAbility == a && tl >= 0, $"{lean.Casts} leans after {tl} ticks");
+                    continue;
+                }
+                int t = BkStepUntil(() => a.Casts > 0, echo ? 1500 : 300);
+                bool alone = bk.Abilities.All(x => x == a || x.Casts == 0 || (echo && x == lean));
                 Check($"v2 practice hook -lastbellAbility {a.Key}: fires {a.Name} alone", bk.PracticeAbility == a && t >= 0 && alone, $"cast after {t} ticks");
             }
 

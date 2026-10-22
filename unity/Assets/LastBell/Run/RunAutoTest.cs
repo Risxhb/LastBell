@@ -253,7 +253,11 @@ namespace LastBell.Run
             StopCoroutine(fight); bot.Clear();
             Check("Vanguard strikes damage the boss through the kit", d.Boss.Hp < bossHp0, $"{bossHp0} -> {d.Boss.Hp}");
             Check("Steel Rhythm hit 3 granted Opening", sawOpening);
+            // test setup: the kit checks below deal real damage; keep the boss above 70 % so it is still in Last Guardian
+            // afterwards (a slow frame let them push it into Broken Hour, failing the resume check by timing alone)
+            d.Boss.DebugSetHpFraction(0.95f);
             yield return VanguardShowcase();
+            d.Boss.DebugSetHpFraction(0.95f);
             yield return VanguardKitChecks();
             // potions: drink one mid-fight (heal and lockout), then the Bellkeeper resumes
             yield return Until(() => d.World.Hazards.Count == 0, 6, "quiet for the potion check"); d.Boss.Halt();
