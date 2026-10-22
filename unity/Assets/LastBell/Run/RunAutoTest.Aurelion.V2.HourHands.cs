@@ -29,7 +29,7 @@ namespace LastBell.Run
         // fresh combat (boss at the centre) and a clean spoke log hooked onto this world's hazard system
         IEnumerator HHSetup(int n, Difficulty level, Vector3[] at)
         {
-            if (V2Boss != null) hhOneHit &= V2OneHitPerInstance();
+            if (V2Boss != null && hhSpokes.Count > 0) hhOneHit &= V2OneHitPerInstance();   // the previous Hour Hands case
             yield return V2Setup(n, level, at, 2, Vector3.zero);
             hhSpawn.Clear(); hhLock.Clear(); hhResolve.Clear(); hhSpokes.Clear();
             if (V2Boss == null) yield break;
@@ -80,7 +80,7 @@ namespace LastBell.Run
 
         IEnumerator V2HourHands()
         {
-            hhOneHit = true;
+            hhOneHit = true; hhSpokes.Clear();
             int lockT = Sim.Ticks(HourHands.TrackS), resolveT = Sim.Ticks(HourHands.TrackS) + Sim.Ticks(HourHands.StrikeS);
 
             // ---- 1 + 6 (solo): ticks, shape, tracking, spoke II on spoke I's lock tick ----
