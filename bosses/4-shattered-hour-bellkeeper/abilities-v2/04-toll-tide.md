@@ -17,7 +17,7 @@ The Bellkeeper turns toward the **monumental cracked bell behind the north rim**
 
 ## Damage
 Tide 35, Heart Toll 35 at Medium; stun 15 ticks each.
-Knockback: **Tide pushes 1.5 m inward** (toward the centre), never into the wall (settled 1.5 m, direction chosen to avoid wall pins; see conflict 2 in ABILITIES.md). Heart Toll pushes 1.5 m outward from the boss.
+Knockback: **Tide pushes 1.5 m inward** (toward the centre), never into the wall (settled 1.5 m, direction chosen to avoid wall pins; see conflict 2 in ABILITIES.md). Heart Toll pushes 1.5 m outward from the boss. **Chzy18, 2026-10-22: inward push accepted for now (provisional; answers ABILITIES.md open question 4).**
 
 ## Escape route
 Be inside 6.7 m of the centre when the tide breaks, then outside 4.3 m of the boss when the Heart Toll rings: everyone ends in the band between.
