@@ -57,6 +57,9 @@ namespace LastBell.Run
         IEnumerator LanceRun(int beams, int volleys, bool cascade, params IEnumerator[] alongside)
         {
             LanceSpyOn(); lanceRecs.Clear(); lanceEnd = -1;
+            // the previous cast's volleys stay listed until the boss starts the new body next tick: clear them first so
+            // the scripted players never read a stale lock tick
+            L.Volleys.Clear(); L.SpawnTicks.Clear();
             V2Begin(LanceTimed(L.Run(beams, volleys, cascade)));
             var co = alongside.Select(StartCoroutine).ToList();
             float t = 0;
@@ -287,6 +290,7 @@ namespace LastBell.Run
                 yield return V2Setup(1, Difficulty.Medium, new[] { LPolar(0, 8) }, 2);
                 if (V2Boss == null) yield break;
                 LanceSpyOn(); lanceRecs.Clear();
+                L.Volleys.Clear(); L.SpawnTicks.Clear();
                 V2Begin(LanceTimed(L.Run(4, 2, false)));
                 yield return Until(() => L.Volleys.Count > 0 && V2W.Tick >= L.SpawnTicks[0] + 60, 10, "Lances: 1 s into volley 1");
                 var w = V2W; int liveBefore = w.Hazards.Live.Count(h => h.Source.StartsWith("Meridian Lances")), resolvedBefore = w.Hazards.Resolved, killTick = w.Tick;
