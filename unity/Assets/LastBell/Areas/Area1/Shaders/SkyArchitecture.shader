@@ -2,8 +2,8 @@
 // towers sink naturally into the cloud abyss:
 //   1. height fade: below _FadeTop the surface blends toward cloud colour (pale near the top, lavender-blue deeper),
 //      reaching _FadeMax by _FadeBottom;
-//   2. dissolve: between _VanishTop and _VanishY the surface breaks up with screen-space dither plus world-space noise,
-//      so the bottom edge reads as mist rather than a straight line (opaque, no sorting); the shadow and depth
+//   2. cut-off: between _VanishTop and _VanishY the surface ends along a world-space noise edge (no dither, which read as
+//      see-through glass); the stone is fully cloud-coloured by then, so the edge vanishes into the cloud. The shadow and depth
 //      passes clip the same way, so shadows and the soft clouds' depth test agree with what is drawn;
 //   3. aerial perspective: with distance from the arena centre and depth below the floor, colour drifts toward pale
 //      sky blue and loses contrast.
@@ -21,18 +21,18 @@ Shader "LastBell/SkyArchitecture"
         _Cutoff ("Alpha cutoff (0 = off)", Range(0, 1)) = 0
         [Enum(UnityEngine.Rendering.CullMode)] _Cull ("Cull", Float) = 2
 
-        _FadeTop ("Fade starts (world y)", Float) = -8
-        _FadeBottom ("Fade full (world y)", Float) = -30
-        _FadeMax ("Fade strength at bottom", Range(0, 1)) = 0.8
+        _FadeTop ("Fade starts (world y)", Float) = -10
+        _FadeBottom ("Fade full (world y)", Float) = -20
+        _FadeMax ("Fade strength at bottom", Range(0, 1)) = 1
         _CloudTop ("Cloud colour, upper", Color) = (0.95, 0.96, 0.985, 1)
         _CloudDeep ("Cloud colour, deep", Color) = (0.776, 0.831, 0.918, 1)
-        _VanishTop ("Dissolve starts (world y)", Float) = -33
-        _VanishY ("Gone by (world y)", Float) = -40
+        _VanishTop ("Dissolve starts (world y)", Float) = -18
+        _VanishY ("Gone by (world y)", Float) = -24
         _NoiseScale ("Dissolve noise scale", Float) = 0.35
         _AerialColor ("Aerial perspective colour", Color) = (0.81, 0.878, 0.96, 1)
-        _AerialStart ("Aerial starts (m from centre)", Float) = 35
+        _AerialStart ("Aerial starts (m from centre)", Float) = 24
         _AerialEnd ("Aerial full (m from centre)", Float) = 220
-        _AerialMax ("Aerial strength", Range(0, 1)) = 0.6
+        _AerialMax ("Aerial strength", Range(0, 1)) = 0.7
     }
 
     HLSLINCLUDE
@@ -101,7 +101,7 @@ Shader "LastBell/SkyArchitecture"
 
             half4 frag (Varyings i, bool front : SV_IsFrontFace) : SV_Target
             {
-                clip(VanishKeep(i.positionWS) - Bayer4(i.positionCS.xy) * 0.85 - 0.05);
+                clip(VanishKeep(i.positionWS) - 0.5);
                 ClipAlpha(i.uv);
                 float4 tex = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, i.uv) * _BaseColor;
 
@@ -127,7 +127,7 @@ Shader "LastBell/SkyArchitecture"
                 col = lerp(col, cloud, h * _FadeMax);
                 // 3. aerial perspective: distance from the centre plus depth below the floor
                 float a = saturate((length(i.positionWS.xz) - _AerialStart) / max(1, _AerialEnd - _AerialStart)) * _AerialMax
-                        + saturate(-i.positionWS.y / 70) * 0.15;
+                        + saturate(-i.positionWS.y / 40) * 0.3;   // lower = paler and bluer
                 col = lerp(col, _AerialColor.rgb, saturate(a));
                 col = MixFog(col, i.fogFactor);
                 return half4(col, 1);
@@ -188,7 +188,7 @@ Shader "LastBell/SkyArchitecture"
             }
             half4 frag (Varyings i) : SV_Target
             {
-                clip(VanishKeep(i.positionWS) - Bayer4(i.positionCS.xy) * 0.85 - 0.05); ClipAlpha(i.uv);
+                clip(VanishKeep(i.positionWS) - 0.5); ClipAlpha(i.uv);
                 return i.positionCS.z;
             }
             ENDHLSL

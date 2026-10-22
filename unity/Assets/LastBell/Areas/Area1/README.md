@@ -36,3 +36,8 @@ Landmarks follow the reference by quadrant:
 - The top-down view is tipped 27° from the south, as the painting is: its floor reads 0.89 high to wide. While that view is active it borrows a longer shadow range from the shared URP asset (the default is 50 m) and hands it back afterwards.
 - A critic agent rated the top-down capture against the reference over 5 rounds: 5 → 5 → 5 → 6 → 6/10. Floor layout scores 8/10, and the measured proportions match. The remaining gap is in the surrounding buildings (sculpted gothic detail, spire density), the depth fog and cloud masses, and painted texture.
 - Background pass (towers fading into cloud, more detail): 5 critic rounds scored 6 → 6.5 → 6.5 → 6 → 6/10, up from about 5 before. Floor 8, palette 7, buildings 6. Still open: the two top-corner cathedral blocks read as flat boxes, cloud puffs can still look like round discs, and the fade shows a faint line on some towers in close-ups.
+- Third pass (towers sink into cloud, corner buildings, cloud shapes): 5 critic rounds scored 6 → 6.5 → 6 → 6.5 → 6.5/10.
+  - Towers now blend fully to cloud colour, then end on a noise edge inside a ring of cloud puffs placed just outside each tower. No dither, so nothing reads as see-through glass.
+  - The cloud atlas blends every lobe's shading, so there are no disc rims.
+  - The top-corner cathedrals are larger and split into separate tower shafts below the floor and spired belfries above.
+  - Still open: from directly above, the corner buildings read as a facade, not a roofline; some spire tips end in a pale halo; and the stone and gold shading is flat.

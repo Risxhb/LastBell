@@ -208,12 +208,13 @@ function paintCloud(N = 256, seed = 1) {
 // ---- materials (named: Unity's builder keys off these names) ----
 const named = (m, name) => { m.name = name; return m; };
 const ivoryBlocks = paintBlocks(1024, 1024, 8, [244, 230, 200]), ivoryBlocks2 = paintBlocks(1024, 1024, 6, [230, 213, 184], 5);
+for (const t of [ivoryBlocks, ivoryBlocks2]) t.userData.mimeType = 'image/jpeg';   // opaque colour maps go to the glTF as JPEG (smaller file)
 const windowMat = (v, name) => { const map = paintWindow(v); return named(new THREE.MeshStandardMaterial({ map, emissiveMap: map, roughness: 0.3, metalness: 0.15, emissive: 0x2a3c7e, emissiveIntensity: 0.15, alphaTest: 0.5 }), name); };
 const MAT = {
   ivory: named(new THREE.MeshStandardMaterial({ color: 0xffffff, map: ivoryBlocks, roughness: 0.7 }), 'IvoryBlocks'),
   ivoryShade: named(new THREE.MeshStandardMaterial({ color: 0xffffff, map: ivoryBlocks2, roughness: 0.78 }), 'IvoryShade'),
   ivoryPlain: named(new THREE.MeshStandardMaterial({ color: 0xede3cc, roughness: 0.6 }), 'Ivory'),
-  gold: named(new THREE.MeshStandardMaterial({ color: 0xc6a35a, roughness: 0.34, metalness: 0.6, emissive: 0x3e2a0c, emissiveIntensity: 0.25 }), 'Gold'),
+  gold: named(new THREE.MeshStandardMaterial({ color: 0xd6bc82, roughness: 0.36, metalness: 0.55, emissive: 0x3e2a0c, emissiveIntensity: 0.25 }), 'Gold'),
   goldDark: named(new THREE.MeshStandardMaterial({ color: 0x9c7a3a, roughness: 0.45, metalness: 0.55, emissive: 0x2a1a06, emissiveIntensity: 0.25 }), 'GoldDark'),
   cobalt: named(new THREE.MeshStandardMaterial({ color: 0x2b3f8f, roughness: 0.3, metalness: 0.2 }), 'Cobalt'),
   windows: [windowMat(0, 'StarWindow'), windowMat(1, 'StarWindow2'), windowMat(2, 'StarWindow3')],
@@ -463,45 +464,62 @@ for (const [name, ang] of BRIDGE_DIRS) {
 function cathedral(parent, x, z, rotY, { w = 9, d = 6, tiers = [8, 6, 5], name = 'Cathedral' } = {}) {
   const c = grp(parent, [x, 0, z], rotY, name);
   let y = -30, cw = w, cd = d;
-  for (let i = 0; i < 3; i++) {                         // lower storeys falling away into the clouds
-    const y0 = -10 * (i + 1), bw = cw * (0.97 - i * 0.05), bd = cd * (0.97 - i * 0.05);   // taper inward so they tuck under the tiers above
-    add(new THREE.BoxGeometry(bw, 10, bd), i ? MAT.ivoryShade : MAT.ivory, c, [0, y0 + 5, 0]);
-    add(new THREE.BoxGeometry(bw * 1.03, 0.22, bd * 1.03), MAT.gold, c, [0, y0 + 9.9, 0]);
-    windowsOnBox(c, bw, bd, y0 + 1.6, 6.4, 'nesw');
-    for (const sx of [-1, 1]) for (const sz of [-1, 1]) add(new THREE.BoxGeometry(0.8, 10, 0.8), MAT.ivoryPlain, c, [sx * bw / 2, y0 + 5, sz * bd / 2]);
-  }
-  y = 0;
-  let pw = cw, pd = cd, py = 0;
-  for (let t = 0; t < tiers.length; t++) {
-    const h = tiers[t];
-    add(new THREE.BoxGeometry(cw, h, cd), MAT.ivory, c, [0, y + h / 2, 0]);
-    add(new THREE.BoxGeometry(cw * 1.06, 0.25, cd * 1.06), MAT.gold, c, [0, y + h, 0]);
-    add(new THREE.BoxGeometry(cw * 1.04, 0.14, cd * 1.04), MAT.goldDark, c, [0, y + 0.07, 0]);
-    add(new THREE.BoxGeometry(cw * 1.03, 0.12, cd * 1.03), MAT.gold, c, [0, y + h * 0.55, 0]);   // mid string-course
-    windowsOnBox(c, cw, cd, y + h * 0.12, h * 0.78, 'nesw');
-    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-      add(new THREE.BoxGeometry(0.5, h, 0.5), MAT.ivoryPlain, c, [sx * cw / 2, y + h / 2, sz * cd / 2]);
-      pinnacle(c, sx * cw / 2, y + h, sz * cd / 2, Math.min(2.2, h * 0.3), 0.42);
+  // below the floor line: one undercroft storey, then the mass splits into separate tower shafts falling into the
+  // cloud (the tilted top-down view shows these, so they must read as a cluster, not one windowed wall)
+  add(new THREE.BoxGeometry(cw * 0.97, 4, cd * 0.97), MAT.ivory, c, [0, -2, 0]);
+  add(new THREE.BoxGeometry(cw, 0.22, cd), MAT.gold, c, [0, -0.1, 0]);
+  windowsOnBox(c, cw * 0.97, cd * 0.97, -3.6, 3, 'nesw');
+  const shafts = w >= 14 ? [[-0.38, 0.17], [-0.13, 0.2], [0.13, 0.2], [0.38, 0.17]] : w >= 9 ? [[-0.33, 0.24], [0, 0.3], [0.33, 0.24]] : [[-0.22, 0.26], [0.22, 0.26]];
+  for (const [fx, fw] of shafts) {
+    const sw = cw * fw, sx = fx * cw;
+    for (let i = 0; i < 3; i++) {
+      const y0 = -4 - 8 * (i + 1), tw = sw * (1 - i * 0.07);
+      add(new THREE.BoxGeometry(tw, 8, tw), i ? MAT.ivoryShade : MAT.ivory, c, [sx, y0 + 4, 0]);
+      add(new THREE.BoxGeometry(tw * 1.08, 0.18, tw * 1.08), MAT.gold, c, [sx, y0 + 7.9, 0]);
+      const g = grp(c, [sx, 0, 0]); windowsOnBox(g, tw, tw, y0 + 1.2, 5.6, 'nesw', 1);
+      for (const px of [-1, 1]) for (const pz of [-1, 1]) add(new THREE.BoxGeometry(0.45, 8, 0.45), MAT.ivoryPlain, c, [sx + px * tw / 2, y0 + 4, pz * tw / 2]);
     }
-    for (let i = 1; i < Math.floor(cw / 2.2); i++) pinnacle(c, -cw / 2 + i * cw / Math.floor(cw / 2.2), y + h, cd / 2, 0.9, 0.22);
-    if (t > 0) for (const sx of [-1, 1]) for (const k of [-0.3, 0.3]) {   // flying buttresses: outer pier on the tier below, arm up to this wall
-      const ox = sx * (pw / 2 + 0.9), oz = k * pd, top = py + 1.6;
-      add(new THREE.BoxGeometry(0.7, top - py + 0.4, 0.7), MAT.ivoryPlain, c, [ox, py + (top - py) / 2, oz]);
-      pinnacle(c, ox, top, oz, 1.0, 0.36);
-      const ix = sx * cw / 2, iy = y + h * 0.55, dx = ix - ox, dy = iy - top, len = Math.hypot(dx, dy);
-      add(new THREE.BoxGeometry(len, 0.32, 0.4), MAT.ivoryPlain, c, [(ix + ox) / 2, (iy + top) / 2, oz], [0, 0, Math.atan2(dy, dx)]);
-    }
-    pw = cw; pd = cd; py = y + h;
-    y += h + 0.25; cw *= 0.72; cd *= 0.78;
+    add(new THREE.ConeGeometry(sw * 0.6, 5, 4), MAT.ivoryShade, c, [sx, -30.5, 0], [Math.PI, Math.PI / 4, 0]);   // pointed foot
   }
-  add(new THREE.ConeGeometry(Math.min(cw, cd) * 0.72, 7, 4), MAT.ivoryPlain, c, [0, y + 3.5, 0], [0, Math.PI / 4, 0]);
-  finial(c, [0, y + 7, 0], 1.6);
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {   // four needle spires round the central one on the roof
-    const nx = sx * pw * 0.42, nz = sz * pd * 0.42, nh = 3.5 + hash(nx + x, nz + z) * 2.5;
-    add(new THREE.CylinderGeometry(0.28, 0.32, 1.2, 8), MAT.ivoryPlain, c, [nx, y + 0.6, nz]);
-    add(new THREE.ConeGeometry(0.3, nh, 8), MAT.ivoryPlain, c, [nx, y + 1.2 + nh / 2, nz]);
-    add(new THREE.CylinderGeometry(0.33, 0.33, 0.1, 8), MAT.gold, c, [nx, y + 1.25, nz]);
-    add(new THREE.SphereGeometry(0.1, 8, 6), MAT.gold, c, [nx, y + 1.25 + nh, nz]);
+  // the hall: one windowed storey across the full footprint, a gold cornice and a pitched ridge roof
+  const h0 = tiers[0];
+  add(new THREE.BoxGeometry(cw, h0, cd), MAT.ivory, c, [0, h0 / 2, 0]);
+  add(new THREE.BoxGeometry(cw * 1.06, 0.25, cd * 1.06), MAT.gold, c, [0, h0, 0]);
+  add(new THREE.BoxGeometry(cw * 1.04, 0.14, cd * 1.04), MAT.goldDark, c, [0, 0.07, 0]);
+  add(new THREE.BoxGeometry(cw * 1.03, 0.12, cd * 1.03), MAT.gold, c, [0, h0 * 0.55, 0]);
+  windowsOnBox(c, cw, cd, h0 * 0.12, h0 * 0.78, 'nesw');
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    add(new THREE.BoxGeometry(0.6, h0, 0.6), MAT.ivoryPlain, c, [sx * cw / 2, h0 / 2, sz * cd / 2]);
+    pinnacle(c, sx * cw / 2, h0, sz * cd / 2, 2.2, 0.48);
+  }
+  for (let i = 1; i < Math.floor(cw / 2.2); i++) for (const sz of [-1, 1]) pinnacle(c, -cw / 2 + i * cw / Math.floor(cw / 2.2), h0, sz * cd / 2, 0.9, 0.22);
+  add(new THREE.CylinderGeometry(cd * 0.42, cd * 0.42, cw * 0.96, 3), MAT.ivoryShade, c, [0, h0 + cd * 0.21, 0], [0, 0, Math.PI / 2]);
+  add(new THREE.BoxGeometry(cw * 0.96, 0.12, 0.16), MAT.gold, c, [0, h0 + cd * 0.42, 0]);   // gilded ridge line
+
+  // above the roof: a cluster of slender square belfries with tall pointed spires (no more stacked boxes)
+  const n = w >= 14 ? 4 : w >= 9 ? 3 : 2, sw = Math.min(cw * (n === 4 ? 0.17 : 0.22), cd * 0.5), up = tiers.slice(1).reduce((s, v) => s + v, 0) || 8;
+  for (let k = 0; k < n; k++) {
+    const tx = n === 4 ? (k - 1.5) * cw * 0.25 : n === 3 ? (k - 1) * cw * 0.33 : (k - 0.5) * cw * 0.42, mid = (n === 3 && k === 1) || (n === 4 && (k === 1 || k === 2));
+    const th = up * (mid ? 1.15 : 0.75 + hash(tx + x, z) * 0.2), base = h0 + 0.25;
+    let ty = base, tw = sw;
+    for (const f of [0.55, 0.45]) {                                     // two storeys, the upper slightly narrower
+      const sh = th * f;
+      add(new THREE.BoxGeometry(tw, sh, tw), MAT.ivory, c, [tx, ty + sh / 2, 0]);
+      add(new THREE.BoxGeometry(tw * 1.1, 0.2, tw * 1.1), MAT.gold, c, [tx, ty + sh, 0]);
+      const g = grp(c, [tx, 0, 0]); windowsOnBox(g, tw, tw, ty + sh * 0.12, sh * 0.76, 'nesw', 1);
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) pinnacle(c, tx + sx * tw / 2, ty + sh, sz * tw / 2, Math.min(1.8, sh * 0.25), tw * 0.16);
+      ty += sh + 0.2; tw *= 0.86;
+    }
+    const sp = tw * (mid ? 4.2 : 3.4);                                   // tall four-sided spire with gold ribs and a finial
+    add(new THREE.ConeGeometry(tw * 0.72, sp, 4), MAT.ivoryPlain, c, [tx, ty + sp / 2, 0], [0, Math.PI / 4, 0]);
+    add(new THREE.CylinderGeometry(tw * 0.55, tw * 0.55, 0.16, 4), MAT.gold, c, [tx, ty + sp * 0.3, 0], [0, Math.PI / 4, 0]);
+    finial(c, [tx, ty + sp - 0.2, 0], mid ? 1.4 : 1.0);
+    for (const sz of [-1, 1]) {                                         // flying buttress from the hall's eaves up to the tower
+      const ox = tx, oz = sz * (cd / 2 + 0.2), top = h0 + 1.2, iz = sz * sw / 2, iy = base + th * 0.45;
+      const dz = iz - oz, dy = iy - top, len = Math.hypot(dz, dy);
+      add(new THREE.BoxGeometry(0.4, 0.34, len), MAT.ivoryPlain, c, [ox, (iy + top) / 2, (iz + oz) / 2], [Math.atan2(-dy, dz), 0, 0]);   // box z-axis along (dy, dz)
+      pinnacle(c, ox, top - 0.6, oz, 1.0, 0.34);
+    }
   }
   anchor(c, 0, 0, Math.max(w, d) * 0.6);
   return c;
@@ -572,12 +590,12 @@ function skybridge(parent, p0, p1, w = 1.6) {
 // Landmarks — positions in metres (x east, z south), read from the reference with 1 m = 16.3 px about (437, 325).
 const B = gBelfries;
 // NW: cathedral mass with windows facing the arena, crowned by an armillary sphere on the drum nearest the rim
-cathedral(B, -25, -23, 0.62, { w: 10, d: 7, tiers: [11, 7, 5], name: 'Cathedral_NW' });
-cathedral(B, -33, -9, 0.3, { w: 8, d: 7, tiers: [9, 6], name: 'Cathedral_NW2' });
+cathedral(B, -27, -24, 0.62, { w: 16, d: 8, tiers: [5, 18, 10], name: 'Cathedral_NW' });
+cathedral(B, -33, -9, 0.3, { w: 8, d: 5, tiers: [5, 12], name: 'Cathedral_NW2' });
 armillaryTower(B, -16.2, -15.2, { r: 2.4, h: 6, sphere: 1.9, name: 'Armillary_NW' });
 // NE: mirror with variation
-cathedral(B, 26, -24, -0.6, { w: 10, d: 7, tiers: [10, 8, 5], name: 'Cathedral_NE' });
-cathedral(B, 34, -11, -0.25, { w: 8, d: 7, tiers: [8, 6], name: 'Cathedral_NE2' });
+cathedral(B, 28, -25, -0.6, { w: 16, d: 8, tiers: [5, 18, 9], name: 'Cathedral_NE' });
+cathedral(B, 34, -11, -0.25, { w: 8, d: 5, tiers: [5, 12], name: 'Cathedral_NE2' });
 armillaryTower(B, 16.4, -15.0, { r: 2.4, h: 6, sphere: 1.9, name: 'Armillary_NE' });
 // W and E: tall round belfries with cobalt domes, just south of the side bridges
 domedBelfry(B, -23, 13.5, { r: 2.8, tiers: [10, 7], name: 'Belfry_W' });

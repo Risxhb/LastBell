@@ -234,7 +234,7 @@ namespace LastBell.Areas.Area1.EditorTools
                 m.SetVector("_SunDir", sunDir);
                 return SaveAsset(m, $"Cloud{name}{c}.mat");
             }).ToArray();
-            var sea = Layer("Sea", 0xfff8ec, 0x9fb4d8, 0.95f, 9); var waist = Layer("Waist", 0xfff8ec, 0xa9bcdd, 0.9f, 9f);
+            var sea = Layer("Sea", 0xfff8ec, 0x9fb4d8, 0.95f, 9); var waist = Layer("Waist", 0xfff8ec, 0xa9bcdd, 0.92f, 2.5f);   // short soft distance: collars stay visible right up to the stone
             var wisp = Layer("Wisp", 0xffffff, 0xdfe7f4, 0.38f, 3); var high = Layer("High", 0xffffff, 0xd8e2f2, 0.6f, 10);
             var quad = Resources.GetBuiltinResource<Mesh>("Quad.fbx");
             var rnd = new System.Random(21);
@@ -250,28 +250,32 @@ namespace LastBell.Areas.Area1.EditorTools
             for (int b = 0; b < 30; b++)                       // deep sea: big banks of 4–8 puffs, sky-blue gaps between banks
             {
                 float a = Rn() * Mathf.PI * 2, d = 24 + Rn() * 230, by = -46 - Rn() * 22, spread = 8 + Rn() * 14;
-                if (Mathf.PerlinNoise(Mathf.Cos(a) * d * 0.025f + 3.1f, Mathf.Sin(a) * d * 0.025f + 7.7f) < 0.5f) continue;   // noise-masked gaps: blue sky shows through
+                if (Mathf.PerlinNoise(Mathf.Cos(a) * d * 0.025f + 3.1f, Mathf.Sin(a) * d * 0.025f + 7.7f) < 0.68f) continue;   // noise-masked gaps: blue sky shows through
                 int n = 4 + rnd.Next(5);
                 for (int i = 0; i < n; i++)
                 {
                     float s = (26 + Rn() * 34) * (0.7f + Rn() * 0.8f);
-                    Puff("Cloud", sea, new Vector3(Mathf.Cos(a) * d + (Rn() - 0.5f) * spread * 2, by + (Rn() - 0.5f) * 6, Mathf.Sin(a) * d + (Rn() - 0.5f) * spread * 2), s * 1.4f, s * 0.75f);
+                    Puff("Cloud", sea, new Vector3(Mathf.Cos(a) * d + (Rn() - 0.5f) * spread * 2, by + (Rn() - 0.5f) * 6, Mathf.Sin(a) * d + (Rn() - 0.5f) * spread * 2), s * (1.6f + Rn() * 0.7f), s * 0.7f);   // wide flat banks, not discs
                 }
             }
             var anchors = root.GetComponentsInChildren<Transform>(true).Where(t => t.name.StartsWith("CloudAnchor")).ToArray();
-            foreach (var an in anchors)                        // waist band: each structure sinks into its own cluster
-            {
-                float r = Mathf.Max(0.8f, Mathf.Abs(an.lossyScale.x)); int n = Mathf.Clamp(Mathf.RoundToInt(1 + r * 1.4f), 2, 9);
-                for (int i = 0; i < n; i++)
-                {
-                    float a = (i + Rn() * 0.6f) / n * Mathf.PI * 2, d = r * (0.3f + Rn() * 0.7f), s = (6 + r * (2f + Rn() * 1.4f)) * (0.7f + Rn() * 0.6f);   // hugging the tower, in front of its fading shaft
-                    var p = an.position + new Vector3(Mathf.Cos(a) * d, 0, Mathf.Sin(a) * d); p.y = -9 - Rn() * 15;
-                    Puff("CloudWaist", waist, p, s * 1.35f, s * 0.8f);
-                }
+            foreach (var an in anchors)                        // cloud collars: each structure sinks into a ring of puffs
+            {                                                  // set just OUTSIDE its surface, in three uneven bands, so the
+                                                               // cloud sits in front of the fading stone (a puff centred inside the
+                                                               // tower would be faded away by the soft-depth test and show nothing)
+                float r = Mathf.Max(0.8f, Mathf.Abs(an.lossyScale.x)); int n = Mathf.Clamp(Mathf.RoundToInt(2 + r * 0.8f), 3, 7);
+                foreach (float band in new[] { -12f, -20f })   // the lower band sits where SkyArchitecture cuts the stone off
+                    for (int i = 0; i < n; i++)
+                    {
+                        if (Rn() < 0.25f) continue;   // ragged collars, sky between them
+                        float a = (i + Rn() * 0.7f) / n * Mathf.PI * 2, d = r * (1.05f + Rn() * 0.55f), s = (4 + r * (1.6f + Rn() * 1.2f)) * (0.75f + Rn() * 0.5f);
+                        var p = an.position + new Vector3(Mathf.Cos(a) * d, band + (Rn() - 0.5f) * 5, Mathf.Sin(a) * d);
+                        Puff("CloudWaist", waist, p, s * (1.5f + Rn() * 0.6f), s * 0.72f);
+                    }
             }
             for (int i = 0; i < 28; i++)                       // wisps: thin strands between the towers, outside the floor
             {
-                float a = Rn() * Mathf.PI * 2, d = 22 + Rn() * 40;
+                float a = Rn() * Mathf.PI * 2, d = 45 + Rn() * 40;   // well clear of the bridges in the gameplay view
                 Puff("Cloud", wisp, new Vector3(Mathf.Cos(a) * d, -4 - Rn() * 6, Mathf.Sin(a) * d), 26 + Rn() * 24, 5 + Rn() * 4);
             }
             for (int i = 0; i < 30; i++) { float a = Rn() * Mathf.PI * 2, d = 200 + Rn() * 200; Puff("Cloud", high, new Vector3(Mathf.Cos(a) * d, 20 + Rn() * 80, Mathf.Sin(a) * d), 80 + Rn() * 100, 40 + Rn() * 50); }
@@ -304,12 +308,13 @@ namespace LastBell.Areas.Area1.EditorTools
                     float seed = cell * 17.3f, baseY = 0.22f + (float)rnd.NextDouble() * 0.08f;
                     for (int y = 0; y < CH; y++) for (int x = 0; x < CW; x++)
                     {
-                        float u = (x + 0.5f) / CW, v = (y + 0.5f) / CH, field = 0, light = 0;
+                        float u = (x + 0.5f) / CW, v = (y + 0.5f) / CH, field = 0, light = 0, wsum = 0;
                         foreach (var b in blobs)           // the cell is 2:1, so measure u at double scale
                         {
                             float dx = (u - b.x) * 2, dy = v - b.y, d = Mathf.Sqrt(dx * dx + dy * dy) / b.z;
-                            if (d < 1.4f) { float f = 1 - d * d / 1.96f; if (f > field) { field = f; light = Mathf.Clamp01(0.55f + dy / b.z * 0.45f); } }
+                            if (d < 1.4f) { float f = 1 - d * d / 1.96f; field = Mathf.Max(field, f); float wgt = f * f; light += Mathf.Clamp01(0.55f + dy / b.z * 0.45f) * wgt; wsum += wgt; }
                         }
+                        light = wsum > 0 ? light / wsum : 0;   // weighted blend of every lobe: no seam where one lobe takes over from another
                         float n = Mathf.PerlinNoise(u * 6 + seed, v * 3 + seed) * 0.45f + Mathf.PerlinNoise(u * 15 + seed, v * 7.5f + seed) * 0.33f + Mathf.PerlinNoise(u * 38 + seed, v * 19 + seed) * 0.22f;
                         float dens = Mathf.SmoothStep(0, 1, Mathf.Clamp01((field + (n - 0.5f) * 0.85f - 0.1f) / 0.75f));   // wide, noise-eroded edge: no round rims
                         dens *= Mathf.SmoothStep(0, 1, Mathf.Clamp01((v - baseY) / 0.12f));           // flatter bottom

@@ -31,8 +31,8 @@ Material:
     m_Floats:
     - _Cell: 2
     - _FlipX: 0
-    - _Opacity: 0.9
-    - _SoftDistance: 9
+    - _Opacity: 0.92
+    - _SoftDistance: 2.5
     m_Colors:
     - _Lit: {r: 1, g: 0.972549, b: 0.9254902, a: 1}
     - _Rim: {r: 1, g: 0.93, b: 0.8, a: 1}

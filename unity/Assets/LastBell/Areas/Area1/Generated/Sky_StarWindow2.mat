@@ -24,28 +24,28 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _BaseMap:
-        m_Texture: {fileID: 9072189059158080921, guid: 01c758eb40c2149438d655b66ec5481a, type: 3}
+        m_Texture: {fileID: -3112187905955043861, guid: 01c758eb40c2149438d655b66ec5481a, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _EmissionMap:
-        m_Texture: {fileID: 9072189059158080921, guid: 01c758eb40c2149438d655b66ec5481a, type: 3}
+        m_Texture: {fileID: -3112187905955043861, guid: 01c758eb40c2149438d655b66ec5481a, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
     - _AerialEnd: 220
-    - _AerialMax: 0.6
-    - _AerialStart: 35
+    - _AerialMax: 0.7
+    - _AerialStart: 24
     - _Cull: 0
     - _Cutoff: 0.5
-    - _FadeBottom: -30
-    - _FadeMax: 0.8
-    - _FadeTop: -8
+    - _FadeBottom: -20
+    - _FadeMax: 1
+    - _FadeTop: -10
     - _Metallic: 0.15
     - _NoiseScale: 0.35
     - _Smoothness: 0.7
-    - _VanishTop: -33
-    - _VanishY: -40
+    - _VanishTop: -18
+    - _VanishY: -24
     m_Colors:
     - _AerialColor: {r: 0.81, g: 0.878, b: 0.96, a: 1}
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}

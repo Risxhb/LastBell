@@ -34,21 +34,21 @@ Material:
     m_Ints: []
     m_Floats:
     - _AerialEnd: 220
-    - _AerialMax: 0.6
-    - _AerialStart: 35
+    - _AerialMax: 0.7
+    - _AerialStart: 24
     - _Cull: 2
     - _Cutoff: 0
-    - _FadeBottom: -30
-    - _FadeMax: 0.8
-    - _FadeTop: -8
-    - _Metallic: 0.6
+    - _FadeBottom: -20
+    - _FadeMax: 1
+    - _FadeTop: -10
+    - _Metallic: 0.55
     - _NoiseScale: 0.35
-    - _Smoothness: 0.65999997
-    - _VanishTop: -33
-    - _VanishY: -40
+    - _Smoothness: 0.64
+    - _VanishTop: -18
+    - _VanishY: -24
     m_Colors:
     - _AerialColor: {r: 0.81, g: 0.878, b: 0.96, a: 1}
-    - _BaseColor: {r: 0.77647054, g: 0.6392156, b: 0.3529411, a: 1}
+    - _BaseColor: {r: 0.8392156, g: 0.73725486, b: 0.5098038, a: 1}
     - _CloudDeep: {r: 0.776, g: 0.831, b: 0.91800004, a: 1}
     - _CloudTop: {r: 0.95, g: 0.96, b: 0.98499995, a: 1}
     - _EmissionColor: {r: 0.048171826, g: 0.023153367, b: 0.0036765074, a: 1}

@@ -34,18 +34,18 @@ Material:
     m_Ints: []
     m_Floats:
     - _AerialEnd: 220
-    - _AerialMax: 0.6
-    - _AerialStart: 35
+    - _AerialMax: 0.7
+    - _AerialStart: 24
     - _Cull: 2
     - _Cutoff: 0
-    - _FadeBottom: -30
-    - _FadeMax: 0.8
-    - _FadeTop: -8
+    - _FadeBottom: -20
+    - _FadeMax: 1
+    - _FadeTop: -10
     - _Metallic: 0
     - _NoiseScale: 0.35
     - _Smoothness: 0.39999998
-    - _VanishTop: -33
-    - _VanishY: -40
+    - _VanishTop: -18
+    - _VanishY: -24
     m_Colors:
     - _AerialColor: {r: 0.81, g: 0.878, b: 0.96, a: 1}
     - _BaseColor: {r: 0.9294117, g: 0.890196, b: 0.79999995, a: 1}
