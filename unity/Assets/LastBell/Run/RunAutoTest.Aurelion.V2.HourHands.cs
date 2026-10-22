@@ -54,8 +54,8 @@ namespace LastBell.Run
         }
 
         // Stands still until a locked spoke it is inside is `delay` ticks past its lock, then walks sideways out of it at
-        // `speed` (no dash: stamina is never spent). Runs until the ability ends.
-        IEnumerator HHDodger(PlayerController p, int delay, float speed)
+        // `speed`, with one dash the same way when `dash`. Runs until the ability ends.
+        IEnumerator HHDodger(PlayerController p, int delay, float speed, bool dash)
         {
             var seen = new HashSet<Hazard>();
             while (V2Boss != null && V2Boss.TestBusy && p)
@@ -64,16 +64,18 @@ namespace LastBell.Run
                 {
                     if (h.Cancelled || seen.Contains(h) || !h.Locked || hhResolve.ContainsKey(h) || V2W.Tick - Get(hhLock, h) < delay) continue;
                     seen.Add(h);
-                    if (h.Contains(p.transform.position)) V2In(p).Go(HHSide(h, p.transform.position), speed);
+                    if (!h.Contains(p.transform.position)) continue;
+                    V2In(p).Go(HHSide(h, p.transform.position), speed);
+                    if (dash) V2In(p).Dash();
                 }
                 yield return null;
             }
         }
 
-        IEnumerator HHRunWithDodgers(IEnumerable<PlayerController> who, int delay, float speed)
+        IEnumerator HHRunWithDodgers(IEnumerable<PlayerController> who, int delay, float speed, bool dash = false)
         {
             V2Begin(V2Boss.Hands.Run());
-            var cs = who.Select(p => StartCoroutine(HHDodger(p, delay, speed))).ToList();
+            var cs = who.Select(p => StartCoroutine(HHDodger(p, delay, speed, dash))).ToList();
             yield return V2WaitIdle();
             foreach (var c in cs) StopCoroutine(c);
         }
@@ -150,23 +152,27 @@ namespace LastBell.Run
                 V2Check("N = 3 on three hours: three spokes", HHLive.Count == 3 && HHLive.Select(HHHour).Distinct().Count() == 3, HHDesc());
             }
 
-            // ---- 2: the escape route, 0.25 s after the lock, walking only ----
-            foreach (var speed in new[] { 4.2f, 6f })
+            // ---- 2: the escape route. Medium's window is 1.0 s, Hard's 0.7 s (v2.1 §2): walking 1.6 m at 4.2 m/s takes
+            // ~0.38 s, so on Hard a 0.25 s reaction needs the dash (escape table: dash 0.33 s, margin 0.37 s); a 0.1 s
+            // reaction still walks it. Only the dash cases spend stamina (one dash per spoke).
+            foreach (var (level, speed, react, dash) in new[] { (Difficulty.Medium, 4.2f, 0.25f, false), (Difficulty.Hard, 4.2f, 0.1f, false),
+                (Difficulty.Hard, 4.2f, 0.25f, true), (Difficulty.Hard, 6f, 0.25f, false) })
             {
-                yield return HHSetup(1, Difficulty.Hard, new[] { new Vector3(0, 0, 5) });
+                yield return HHSetup(1, level, new[] { new Vector3(0, 0, 5) });
                 if (V2Boss == null) yield break;
                 var p = V2Party[0];
                 float stamina = p.Stamina;
-                yield return HHRunWithDodgers(new[] { p }, Sim.Ticks(0.25f), speed);
-                V2Check($"solo at {speed} m/s: a 1.2 m sidestep 0.25 s after each lock dodges both hands (walk only)",
-                    !V2WasHit(p, "Hour Hands") && hhSpokes.Count == 2 && p.Stamina >= stamina - 0.01f, $"hits {V2HitsOn(p, "Hour Hands").Count()}, stamina {stamina:0}>{p.Stamina:0}; {HHDesc()}");
+                yield return HHRunWithDodgers(new[] { p }, Sim.Ticks(react), speed, dash);
+                V2Check($"{level} solo at {speed} m/s: a 1.2 m sidestep {react} s after each lock{(dash ? " with a dash" : " (walk only)")} dodges both hands",
+                    !V2WasHit(p, "Hour Hands") && hhSpokes.Count == 2 && (dash ? p.Stamina > 0 : p.Stamina >= stamina - 0.01f),
+                    $"hits {V2HitsOn(p, "Hour Hands").Count()}, stamina {stamina:0}>{p.Stamina:0}; {HHDesc()}");
             }
             foreach (var n in new[] { 2, 4 })
             {
                 yield return HHSetup(n, Difficulty.Hard, V2Ring(n, 6f));
                 if (V2Boss == null) yield break;
-                yield return HHRunWithDodgers(V2Party.ToList(), Sim.Ticks(0.25f), 4.2f);
-                V2Check($"N = {n} spread round him at 6 m: everyone sidesteps their own spoke at 4.2 m/s",
+                yield return HHRunWithDodgers(V2Party.ToList(), Sim.Ticks(0.25f), 4.2f, true);
+                V2Check($"Hard, N = {n} spread round him at 6 m: everyone sidesteps their own spoke (4.2 m/s + dash, 0.25 s reaction)",
                     V2Party.All(p => !V2WasHit(p, "Hour Hands")), $"hit: {V2Hits.Count(h => HHIs(h.H))}; {HHDesc()}");
             }
 
@@ -212,7 +218,7 @@ namespace LastBell.Run
                 var a = V2Party[0];
                 V2Begin(V2Boss.Hands.Run());
                 yield return Until(() => HHLive.Count == 2 && HHLive.All(h => h.Locked), 5, "Hour Hands: adjacent spokes lock");
-                yield return V2Ticks(Sim.Ticks(0.25f));
+                yield return V2Ticks(Sim.Ticks(0.1f));   // walks 1.6 m inside Hard's 0.7 s window
                 V2In(a).Go(new Vector3(1.6f, 0, 3));
                 yield return V2WaitIdle();
                 var hits = V2HitsOn(a, "Hour Hands").ToList();
@@ -226,7 +232,7 @@ namespace LastBell.Run
                 V2Begin(V2Boss.Hands.Run());
                 V2In(a).Go(new Vector3(0, 0, 6));                 // outward along the own hour while the spokes track
                 yield return Until(() => HHLive.Count == 2 && HHLive.All(h => h.Locked), 5, "Hour Hands: adjacent spokes lock");
-                yield return V2Ticks(Sim.Ticks(0.25f));
+                yield return V2Ticks(Sim.Ticks(0.1f));
                 V2In(a).Go(new Vector3(1.6f, 0, 6));
                 yield return V2WaitIdle();
                 V2Check("adjacent hours: stepping out to 6 m first opens the gap, the same sidestep is clean",
@@ -239,10 +245,21 @@ namespace LastBell.Run
                 yield return HHSetup(1, level, new[] { new Vector3(0, 0, 5) });
                 if (V2Boss == null) yield break;
                 yield return V2Fire(V2Boss.Hands.Run());
-                int wantLock = Sim.Ticks(HourHands.TrackS * (level == Difficulty.Easy ? 1.25f : 1)), wantRes = wantLock + Sim.Ticks(HourHands.StrikeS * (level == Difficulty.Easy ? 1.25f : 1));
+                int wantLock = Sim.Ticks(HourHands.TrackS * (level == Difficulty.Easy ? 1.25f : 1)),
+                    wantRes = wantLock + Sim.Ticks(HourHands.StrikeS * (level == Difficulty.Easy ? 1.25f : AurelionAbility.HardWindow));
                 var s = hhSpokes.FirstOrDefault();
-                V2Check($"{level}: track {wantLock} ticks, resolve at {wantRes} (Easy × 1.25 on track and window)",
+                V2Check($"{level}: track {wantLock} ticks, resolve at {wantRes} (Easy × 1.25 on track and window; Hard window × 0.7)",
                     s != null && s.LockAt == wantLock && s.ResolveAt == wantRes && Get(hhResolve, s) - Get(hhSpawn, s) == wantRes - 1, HHDesc());
+            }
+            // ---- Duration(): equals Run's real last-resolve offset (from the first spoke's spawn tick), solo and co-op ----
+            foreach (var (level, n) in new[] { (Difficulty.Medium, 1), (Difficulty.Hard, 1), (Difficulty.Hard, 2), (Difficulty.Easy, 2) })
+            {
+                yield return HHSetup(n, level, V2Ring(n, 3f));
+                if (V2Boss == null) yield break;
+                int want = V2Boss.Hands.Duration();
+                yield return V2Fire(V2Boss.Hands.Run());
+                int got = hhResolve.Count > 0 && hhSpawn.Count > 0 ? hhResolve.Values.Max() - hhSpawn.Values.Min() : -1;
+                V2Check($"{level}, N = {n}: Duration() = {want} matches the last spoke's resolve offset", got == want, $"measured {got}; {HHDesc()}");
             }
             Note("Hour Hands: Hard only in the fight itself — the phase plan check covers 'never runs' on Medium and 'runs inside the Horizon' on Hard");
 

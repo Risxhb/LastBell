@@ -6,7 +6,8 @@ namespace LastBell.Run
 {
     // 05 Hour Hands (aurelion.hour_hands), Hard only, brief abilities-v2/05-hour_hands.md (proposal).
     // Each standing player gets a 1.8 m × 28 m clock-hand spoke (Lane, Strike) from his feet through their hour: their
-    // angle round him snapped to 30°. A spoke tracks its player's hour for 1.5 s, locks, and resolves 1.0 s later.
+    // angle round him snapped to 30°. A spoke tracks its player's hour for 1.5 s, locks, and resolves 1.0 s later
+    // (0.7 s on Hard, v2.1 §2).
     // Players who end the track on the same hour share one spoke (the duplicates are withdrawn on the lock), so each is
     // hit once. Solo: spoke II spawns on spoke I's lock tick and tracks your new hour. Run returns on the tick the last
     // spoke resolves. The phase plan only calls it on Hard (practice fires it on any level; Easy stretches it by 1.25).
@@ -19,7 +20,7 @@ namespace LastBell.Run
         public const float Width = 1.8f, Length = 28f, HourDeg = 30f, TrackS = 1.5f, StrikeS = 1.0f;
         public const int Damage = 30;
         public int LockTicks => T(TrackS);
-        public int ResolveTicks => T(TrackS) + T(StrikeS);
+        public int ResolveTicks => T(TrackS) + Win(StrikeS);   // v2.1: the strike window is 0.7 s on Hard
 
         static readonly Color TrackFill = new Color(1.9f, 1.35f, 0.55f) * 0.35f, TrackBorder = new Color(1.9f, 1.35f, 0.55f);
         static readonly Color LockFill = new Color(1.35f, 0.42f, 0.32f), LockBorder = new Color(2.2f, 1.45f, 0.65f);
