@@ -183,7 +183,7 @@ namespace LastBell.Run
             if (GUI.Button(new Rect(r.x + r.width / 2 - 140, r.y + 364, 280, 40), "START RUN  (Enter)", btn)) d.StartRun(RunDirector.Classes[menuClass]);
             GUI.Label(new Rect(r.x + 30, r.y + 418, 300, 22), "Practice one boss", small);
             for (int i = 0; i < RunDirector.Bosses.Length; i++)
-                if (GUI.Button(new Rect(r.x + 30 + i * 133, r.y + 442, 127, 36), RunDirector.Bosses[i].Name, btn)) d.StartPractice(RunDirector.Classes[menuClass], i);   // a boss with its own arena loads it first
+                if (GUI.Button(new Rect(r.x + 30 + i * (r.width - 60) / RunDirector.Bosses.Length, r.y + 442, (r.width - 60) / RunDirector.Bosses.Length - 6, 36), RunDirector.Bosses[i].Name, btn)) d.StartPractice(RunDirector.Classes[menuClass], i);   // a boss with its own arena loads it first
             GUI.Label(new Rect(r.x + 30, r.y + 492, r.width - 60, 120),
                 "Controls: WASD move · mouse aims · 1 / LMB basic · 2 3 4 class actions · 6 Mending Chorus / Temporal Anchor · 5 / RMB dash · F potion · Space jump · Shift sprint · Esc pause\n" +
                 "Movement stamina: sprint, jump and dash share one bar. No invincibility frames (dodging does not make you immune). F drinks a potion (+40 HP).\nHealth refills before each boss; potions carry over between bosses and refill before the final boss. Retry restarts at the first boss.\n" +
