@@ -61,6 +61,7 @@ namespace LastBell.Run
         protected virtual void StepAlways() { }               // presentation-adjacent state on every tick
         protected virtual void OnDefeat() { }
         protected virtual void OnHurt() { }
+        protected virtual int Absorb(int damage) => damage;   // returns what gets through to HP
 
         public void BeginCombat() { script = Script().GetEnumerator(); wait = 0; }
         public void Halt() { script = null; Current = "idle"; }   // player defeat: stop attacking, keep standing
@@ -84,6 +85,8 @@ namespace LastBell.Run
         public int TakeHit(int damage, Vector3 contact)
         {
             if (Dead) return 0;
+            damage = Absorb(damage);   // a shield (Aurelion v4 Corona Shield) takes its share first
+            if (damage <= 0) { RunHud.Float(contact + Vector3.up * 0.5f, "absorbed", new Color(0.7f, 0.85f, 1f)); return 0; }
             int dealt = Mathf.Min(damage, Hp);
             Hp -= dealt;
             RunHud.Float(contact + Vector3.up * 0.5f, dealt.ToString(), new Color(1f, 0.86f, 0.45f));

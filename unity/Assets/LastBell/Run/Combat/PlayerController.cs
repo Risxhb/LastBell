@@ -190,6 +190,15 @@ namespace LastBell.Run
             if (Hp == 0) GoDown();
         }
 
+        // a party-wide wipe mechanic (Aurelion v4: an empty tower, Final Noon): down now, whatever the HP. Not a hit: no
+        // shield or mitigation applies, and it is reported as the defeat cause.
+        public void ForceDown(string cause)
+        {
+            if (Down) return;
+            Hp = 0; World.LastDamageSource = cause;
+            GoDown();
+        }
+
         void GoDown()
         {
             Down = true; stun = 0; dashTick = 0; jumpTick = -1; Height = 0;
