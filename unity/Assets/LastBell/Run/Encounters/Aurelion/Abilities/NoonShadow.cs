@@ -9,7 +9,8 @@ namespace LastBell.Run
     // with the mean within 1 m of the centre (2 players on opposite sides) it is the half holding the farthest player.
     // The side is picked and locked on the warning's first tick and resolves 3.8 s later (45, no knockback, 0.25 s stun).
     // Afternoon (afternoon = Phase 3, or always when solo): the other half warns on Noon's resolve tick and resolves
-    // 3.8 s after that. Easy stretches both windows by 1.25 (T). Returns on the tick the last half resolves.
+    // 3.8 s after that. Easy stretches both windows by 1.25, Hard shortens them to 2.66 s (x0.7, v2.1 §2: sprint from the
+    // far edge), through Win. Returns on the tick the last half resolves, Duration(afternoon) ticks after its first tick.
     // The cone reaches Rim + 0.5 m instead of the brief's 28 m: every point a player can stand on is covered either way
     // (players are held inside the round 13.9 m bound) and the light stays on the dais instead of spilling into the sky.
     // The cone's 0.6 m core and its 0.3 m margin make the line itself unsafe: step at least 0.3 m past it.
@@ -36,7 +37,7 @@ namespace LastBell.Run
             Say(Name);
             Halves.Clear(); LitYaws.Clear(); SpawnTicks.Clear(); ResolveTicks.Clear();
             bool twice = afternoon || N <= 1;
-            int window = T(WindowS);
+            int window = Win(WindowS);
             Glow(1.4f); Clip("MeridianAlignment", twice ? 2 * window : window);
 
             float yaw = PickYaw();
@@ -51,7 +52,7 @@ namespace LastBell.Run
 
         // ticks from Run's first tick to its last resolve tick (= when Run returns); the v2.1 plan lines pairs up with it.
         // CONTRACT: keep it equal to Run's real timing when the windows change.
-        public int Duration(bool afternoon) => (afternoon || N <= 1 ? 2 : 1) * (T(WindowS) - 1);
+        public int Duration(bool afternoon) => (afternoon || N <= 1 ? 2 : 1) * (Win(WindowS) - 1);
 
         // the half holding the standing players' mean; near the centre, the half holding the farthest player
         public float PickYaw()
