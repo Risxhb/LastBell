@@ -24,7 +24,7 @@ namespace LastBell.Run
         public override string DisplayName => "Crucivar, The Furnace Heart";
         public override string Lesson => "Cross behind the cooled strikes; punish the lodged hammer";
         public override bool Placeholder => !presenter || !presenter.HasModel;
-        public override float NextPhaseFraction => Hp > MaxHp * P2At ? P2At - 0.01f : P3At - 0.01f;
+        public override float NextPhaseFraction() => Hp > MaxHp * P2At ? P2At - 0.01f : P3At - 0.01f;
 
         const float P2At = 0.65f, P3At = 0.30f;
         const float DieRadius = 3f, DieForward = 2.9f, DieRight = 0.7f, SlagRadius = 1.4f, RamWidth = 2.6f, RamTravelMax = 8f,

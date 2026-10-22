@@ -7,29 +7,59 @@ using UnityEngine;
 
 namespace LastBell.Run.EditorTools
 {
-    // Last Bell > Run Loop: builds the run scene (a copy of the key-art arena with a RunDirector), the Resources
-    // materials the runtime needs in a player build, and the Windows player.
+    // Last Bell > Run Loop: builds one run scene per map (a copy of that arena's scene with a RunDirector; see RunMaps),
+    // the Resources materials the runtime needs in a player build, and the Windows player. The test map's run scene
+    // (RunArena.unity) is the first build scene, so the player boots there; the menu loads the others.
     //   Unity.exe -batchmode -projectPath unity -executeMethod LastBell.Run.EditorTools.RunBuild.BuildWindows -quit
     public static class RunBuild
     {
-        public const string ArenaScene = "Assets/LastBell/Arenas/KeyArt/KeyArtTestArena.unity";
-        public const string RunScene = "Assets/LastBell/Run/RunArena.unity";
+        public static string RunScene => RunMaps.All[0].RunScene;
         const string ResDir = "Assets/LastBell/Run/Resources/Run";
         public const string BuildPath = "Builds/Windows/LastBell.exe";
 
-        [MenuItem("Last Bell/Run Loop/Rebuild Run Scene", priority = 20)]
+        // Look-check props the area builders leave in their scenes; they don't belong in a fight.
+        static readonly string[] StripNames = { "ScaleReference_Vanguard", "TelegraphCheck", "TelegraphTest" };
+
+        // Arena scenes that are generated rather than committed (Area 2 ignores its ~47 MB scene and meshes) are built first.
+        static readonly System.Collections.Generic.Dictionary<string, System.Action> SourceBuilders = new System.Collections.Generic.Dictionary<string, System.Action>
+        {
+            ["skyward-spire"] = LastBell.Areas.Area1.EditorTools.SkywardSpireBuilder.Build,
+            ["brass-foundry"] = LastBell.Areas.Area2.EditorTools.BrassFoundryArenaBuilder.Build,
+            ["verdant-chimes"] = LastBell.Areas.Area3.EditorTools.VerdantChimesBuilder.Build,
+            ["shattered-hour"] = LastBell.Areas.Area4.EditorTools.ShatteredHourArenaBuilder.Build,
+        };
+
+        [MenuItem("Last Bell/Run Loop/Rebuild Run Scenes (all maps)", priority = 20)]
         public static void BuildScene()
         {
             EnsureMaterials();
-            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(RunScene) != null) AssetDatabase.DeleteAsset(RunScene);
-            AssetDatabase.CopyAsset(ArenaScene, RunScene);
-            var scene = EditorSceneManager.OpenScene(RunScene, OpenSceneMode.Single);
+            foreach (var map in RunMaps.All) BuildMapScene(map);
+            var runScenes = RunMaps.All.Select(m => m.RunScene).ToArray();
+            var others = EditorBuildSettings.scenes.Where(s => !runScenes.Contains(s.path));
+            EditorBuildSettings.scenes = runScenes.Select(p => new EditorBuildSettingsScene(p, true)).Concat(others).ToArray();
+            AssetDatabase.SaveAssets();
+            EditorSceneManager.OpenScene(RunScene, OpenSceneMode.Single);
+            Debug.Log("Last Bell: run scenes rebuilt: " + string.Join(", ", runScenes));
+        }
+
+        static void BuildMapScene(RunMaps.Map map)
+        {
+            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(map.SourceScene) == null && SourceBuilders.TryGetValue(map.Id, out var build))
+            {
+                Debug.Log($"Last Bell: generating {map.SourceScene} with its area builder");
+                build();
+            }
+            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(map.SourceScene) == null) { Debug.LogError("Last Bell: arena scene missing: " + map.SourceScene); return; }
+            Directory.CreateDirectory(Path.GetDirectoryName(map.RunScene));
+            AssetDatabase.Refresh();
+            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(map.RunScene) != null) AssetDatabase.DeleteAsset(map.RunScene);
+            AssetDatabase.CopyAsset(map.SourceScene, map.RunScene);
+            var scene = EditorSceneManager.OpenScene(map.RunScene, OpenSceneMode.Single);
+            foreach (var root in scene.GetRootGameObjects())
+                foreach (var t in root.GetComponentsInChildren<Transform>(true).Where(t => StripNames.Contains(t.name)))
+                    t.gameObject.SetActive(false);   // not destroyed: some sit inside prefab instances
             new GameObject("Run Director").AddComponent<RunDirector>();
             EditorSceneManager.SaveScene(scene);
-            var others = EditorBuildSettings.scenes.Where(s => s.path != RunScene);
-            EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(RunScene, true) }.Concat(others).ToArray();
-            AssetDatabase.SaveAssets();
-            Debug.Log("Last Bell: run scene rebuilt at " + RunScene);
         }
 
         [MenuItem("Last Bell/Run Loop/Open Run Scene", priority = 21)]
@@ -59,7 +89,7 @@ namespace LastBell.Run.EditorTools
             BuildScene();
             var opts = new BuildPlayerOptions
             {
-                scenes = new[] { RunScene },
+                scenes = RunMaps.All.Select(m => m.RunScene).ToArray(),
                 locationPathName = BuildPath,
                 target = BuildTarget.StandaloneWindows64,
                 options = BuildOptions.None,

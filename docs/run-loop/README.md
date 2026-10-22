@@ -6,7 +6,32 @@
 
 Menu → **Preparation** (Ready) → **Dial Warden** → **Pendulum Sentinel** → **Chimebound Oracle** → **Intermission** (future-shop placeholder, Continue) → **The Bellkeeper** (three HP phases) → **Results** (victory or defeat, with death recap and damage meter) → **Retry Run** (fresh run at encounter 1) or **Main Menu**. There's also **Practice** for any single encounter, which never advances a run, and a **Pause** menu (Esc) with Resume / Restart / Main Menu.
 
-All of it runs in the one key-art arena: `Assets/LastBell/Run/RunArena.unity`, a copy of `KeyArtTestArena.unity` with a `RunDirector`. Three classes are selectable: **Vanguard** (approved four-slot kit), **Chimesinger** (approved DPS kit) and **Arcanist** (approved hard rotation, #41; added Oct 21 from the Arcanist session's handover).
+It runs on any of five maps (see [Maps](#maps)); the default is the key-art test map, `Assets/LastBell/Run/RunArena.unity`, a copy of `KeyArtTestArena.unity` with a `RunDirector`. Three classes are selectable: **Vanguard** (approved four-slot kit), **Chimesinger** (approved DPS kit) and **Arcanist** (approved hard rotation, #41; added Oct 21 from the Arcanist session's handover).
+
+## Maps
+
+The menu has a **Map** row (or press **[** / **]**) to pick which arena to test. Encounters and camera are identical on every map: all five arenas share the same layout convention (centre origin, entry to the south at +z, floor at y = 0, walkable radius of at least 13.5 m). Each map has its own play bound just inside its wall (`Bound` in `RunMaps.cs`): the test map is a ±12.5 m square, the areas are circles of 13.9, 13.7, 13.5 and 13.0 m. Bosses stay inside 9.5 m on every map.
+
+| Map | Source scene | Run scene |
+| --- | --- | --- |
+| **Test Map** (Bellkeeper's Dais, key art; boots here) | `Arenas/KeyArt/KeyArtTestArena.unity` | `Run/RunArena.unity` |
+| **Skyward Spire** (Area 1) | `Areas/Area1/SkywardSpire_Arena.unity` | `Run/Maps/Run_SkywardSpire.unity` |
+| **Brass Foundry** (Area 2) | `Areas/Area2/BrassFoundry_Arena.unity` (generated, not committed) | `Run/Maps/Run_BrassFoundry.unity` |
+| **Verdant Chimes** (Area 3) | `Areas/Area3/VerdantChimes_Arena.unity` | `Run/Maps/Run_VerdantChimes.unity` |
+| **Shattered Hour** (Area 4, final arena) | `Areas/Area4/ShatteredHour_FinalArena.unity` | `Run/Maps/Run_ShatteredHour.unity` |
+
+- The list lives in `Run/RunMaps.cs`. **Last Bell → Run Loop → Rebuild Run Scenes (all maps)** copies each source scene, hides the look-check props (`ScaleReference_Vanguard`, `TelegraphCheck`, `TelegraphTest`), adds a `RunDirector` and puts all five in the build settings. A missing source scene is generated with its area builder first.
+- Start on a given map from the command line: `LastBell.exe -lastbellMap brass-foundry` (ids: `test`, `skyward-spire`, `brass-foundry`, `verdant-chimes`, `shattered-hour`). This works with `-lastbellAutotest` too.
+- The arena art is owned by the four area sessions (Areas 1-4). After one of them rebuilds its arena, rerun Rebuild Run Scenes.
+
+## Difficulty
+
+The menu has a **Difficulty** row: **Easy**, **Medium** or **Hard** (or press **D** to cycle). Chzy18 chose three levels on 2026-10-22, replacing the four provisional tiers. Medium is the baseline every boss is authored for.
+
+- The choice is remembered between sessions. `LastBell.exe -lastbellDifficulty hard` overrides it for one launch without saving. The autotest always starts on Medium and never saves.
+- A run or practice copies the level when it starts. It can't change mid-run, and a retry keeps it. The HUD footer, Ready panel and results screen show it.
+- **What it changes today:** only damage taken from boss attacks, ×0.6 on Easy and ×1.3 on Hard (`RunDifficulty.DamageTakenScale`). It's applied once, in `PlayerController.ReceiveHit`, so echoes that copy a recorded attack's damage aren't scaled twice. These values are provisional.
+- **Per-boss changes:** encounter code can read `CombatWorld.Difficulty` (or `RunDirector.Difficulty`), for example for longer Easy warnings or Hard's one named extra mechanic (design rules §5). Change a boss's own schedule there rather than stretching hazards centrally, so its movement stays in sync with its hit tests.
 
 ## Launch
 
@@ -29,6 +54,8 @@ All of it runs in the one key-art arena: `Assets/LastBell/Run/RunArena.unity`, a
 | Space / Shift | jump / sprint (shared movement stamina) |
 | F | drink a potion (+40 HP) |
 | Enter | Ready / Continue / Start run |
+| [ / ] | menu: previous / next map |
+| D | menu: next difficulty (Easy → Medium → Hard) |
 | Tab | damage meter (this encounter) |
 | Esc | pause |
 | R / M | Retry / Main menu on the results screen |

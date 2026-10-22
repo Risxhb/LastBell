@@ -35,7 +35,7 @@ namespace LastBell.Run
         enum Act { None, Bolt, Seal, Lance, Conv, Anchor, Return }
         Act act; int t; Vector3 aim; bool altHand;
         int boltCd, lanceCd, convCd, anchorCd, charges = SealCharges, recharge;
-        int buffered = -1, bufferAge; const int BufferTicks = 9;
+        int buffered = -1, bufferUntil; const int BufferTicks = 9;
         public int Ticks { get; private set; }
         public int LastConvergence { get; private set; }
         public bool LastLanceEmpowered { get; private set; }
@@ -114,8 +114,8 @@ namespace LastBell.Run
         public override void Step(PlayerInput inp)
         {
             Timers(); aim = inp.Aim; Velocity = Vector3.zero; MoveScale = 1; FaceAim = false;
-            for (int i = 1; i <= 4; i++) if (inp.Pressed(i)) { buffered = i; bufferAge = 0; }
-            if (buffered >= 0 && ++bufferAge > BufferTicks) buffered = -1;
+            for (int i = 1; i <= 4; i++) if (inp.Pressed(i)) { buffered = i; bufferUntil = W.Tick + BufferTicks; }
+            if (buffered >= 0 && W.Tick > bufferUntil) buffered = -1;   // absolute expiry: stunned or dashing ticks count too
             bool Want(int s) => inp.Pressed(s) || buffered == s;
             if (act == Act.None)
             {

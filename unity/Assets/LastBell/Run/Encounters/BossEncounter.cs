@@ -79,7 +79,7 @@ namespace LastBell.Run
 
         // dev / test hook: defeat now (goes through the same path as a killing blow)
         public void DebugDefeat() { if (!Dead) { Hp = 1; TakeHit(1, transform.position + Vector3.up * HitHeight); } }
-        public virtual float NextPhaseFraction => Hp > MaxHp * 0.7f ? 0.69f : 0.34f;   // F8: just below the next threshold
+        public virtual float NextPhaseFraction() => Hp > MaxHp * 0.7f ? 0.69f : 0.34f;   // F8: just below the next threshold
         public void DebugSetHpFraction(float f){ if (!Dead) Hp = Mathf.Clamp(Mathf.RoundToInt(MaxHp * f), 1, MaxHp); }
 
         void Die()

@@ -28,7 +28,7 @@ namespace LastBell.Run
         const float BraceReduction = 0.6f, BraceArc = 140, BraceMove = 0.35f;
 
         enum Act { None, Basic, Sunder, Ult, Brace }
-        int buffered = -1, bufferAge;   // PF-05: an ability pressed during another action fires as soon as it can (0.15 s)
+        int buffered = -1, bufferUntil;   // PF-05: an ability pressed during another action fires as soon as it can (0.15 s)
         const int BufferTicks = 9;
         Act act; int t;           // ticks into the current action
         int step;                 // basic: hit being played (0..2)
@@ -69,7 +69,7 @@ namespace LastBell.Run
         public override void ResetAll()
         {
             act = Act.None; t = 0; step = 0; queued = false; comboStep = 0; comboExpire = 0;
-            sunderCd = ultCd = braceCd = 0; opening = 0; waveLive = false;
+            sunderCd = ultCd = braceCd = 0; opening = 0; waveLive = false; buffered = -1;
             MoveScale = 1; Velocity = Vector3.zero; FaceAim = false;
             P.World.Fx.Opening(P, false); P.World.Fx.Shield(P, 0, false);
         }
@@ -90,8 +90,8 @@ namespace LastBell.Run
             Timers();
             aim = inp.Aim;
             Velocity = Vector3.zero; MoveScale = 1; FaceAim = false;
-            for (int i = 1; i <= 3; i++) if (inp.Pressed(i)) { buffered = i; bufferAge = 0; }
-            if (buffered >= 0 && ++bufferAge > BufferTicks) buffered = -1;
+            for (int i = 1; i <= 3; i++) if (inp.Pressed(i)) { buffered = i; bufferUntil = W.Tick + BufferTicks; }
+            if (buffered >= 0 && W.Tick > bufferUntil) buffered = -1;   // absolute expiry: stunned or dashing ticks count too
             switch (act)
             {
                 case Act.None: Idle(inp); break;

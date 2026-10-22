@@ -212,7 +212,7 @@ namespace LastBell.Run
             yield return Fight(4, () => false);
 
             // Phase 2: Casting Heat
-            boss.DebugSetHpFraction(boss.NextPhaseFraction);
+            boss.DebugSetHpFraction(boss.NextPhaseFraction());
             yield return Fight(15, () => boss.PhaseIndex == 2);
             Check("phase 2 starts below 65 %", boss.PhaseIndex == 2 && boss.PhaseName == "Casting Heat", boss.PhaseName);
             yield return Wait(1.0f);
@@ -241,7 +241,7 @@ namespace LastBell.Run
             yield return Fight(3, () => false);
 
             // Phase 3: Open Pressure
-            boss.DebugSetHpFraction(boss.NextPhaseFraction);
+            boss.DebugSetHpFraction(boss.NextPhaseFraction());
             yield return Fight(15, () => boss.PhaseIndex == 3);
             Check("phase 3 starts below 30 %", boss.PhaseIndex == 3 && boss.PhaseName == "Open Pressure", boss.PhaseName);
             yield return Wait(1.2f);
