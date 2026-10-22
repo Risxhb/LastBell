@@ -477,7 +477,8 @@ def secondary(pose):
             pose[f'sleeve.{n}'] = {'rot': delta(f'forearm.{n}').inverted() @ R(x=swing * 0.4)}
         if f'tassel.{n}' in pose: continue
         D = delta(f'forearm.{n}') @ pose[f'sleeve.{n}']['rot']        # the sleeve drape's world rotation (its parent)
-        pose[f'tassel.{n}'] = {'rot': D.inverted() @ R(x=swing)}; pose[f'tassel2.{n}'] = {'rot': R(x=swing * 0.5)}
+        out_ = -(1 if n == 'L' else -1) * pose.get('_bell_out', 8.0)       # hung a little outward, clear of the coat
+        pose[f'tassel.{n}'] = {'rot': D.inverted() @ R(y=out_) @ R(x=swing)}; pose[f'tassel2.{n}'] = {'rot': R(x=swing * 0.5)}
     for n in CLOTH:
         v = pose[n]; pb = pbs[n]; M = pb.bone.matrix_local.to_3x3()
         pb.rotation_quaternion = (M.inverted() @ v['rot'] @ M).to_quaternion()
@@ -505,7 +506,7 @@ DYN = {}
 for n in 'LR':
     DYN.update({f'skirtF.{n}': (2.2, 0.35, 15, 0), f'skirtF2.{n}': (1.7, 0.25, 22, 0),
                 f'skirtB.{n}': (2.2, 0.35, 15, 0), f'skirtB2.{n}': (1.7, 0.25, 22, 0),
-                f'sleeve.{n}': (1.6, 0.25, 15, 0), f'tassel.{n}': (1.2, 0.2, 30, 0), f'tassel2.{n}': (1.1, 0.18, 40, 0)})
+                f'sleeve.{n}': (1.6, 0.25, 15, 0), f'tassel.{n}': (1.8, 0.6, 12, 0), f'tassel2.{n}': (3.0, 0.8, 8, 0)})     # (heavy metal bells: well damped; the lower run follows the upper, no whip)
 for nm, _ in BANNERS: DYN[nm] = (2.0, 0.3, 20, 0)
 # a banner swings out, away from the shaft, freely; toward the shaft (the fist and forearm) and across the ring plane
 # (her head and arm in the two-handed swings) only a few degrees: (outward unit in the bone's rest frame, deg in, deg across)
@@ -532,6 +533,7 @@ def _breeze(n, ph):
 # Every substep each strand is pushed clear of both. The test points are real strand vertices (the bells sit up to
 # 5 cm off the bone line), skinned as blended between the strand's two bones.
 STRAND_GAP = 0.012
+COLL_STEP, COLL_SUB = math.radians(1.0), math.radians(2.5)
 PROF_H0, PROF_DH, PROF_NH, PROF_NT = -0.95, 0.03, 56, 72
 PANELS_C = [b for b in B if b.startswith('skirt')]
 PAN_C, PAN_Y0, PAN_L0, PAN_NL, PAN_DEPTH = 0.03, -0.06, -0.3, 20, 0.1
@@ -563,11 +565,25 @@ for _b in PANELS_C:
     _c = np.array([body.data.vertices[int(i)].co[:] for i in _ix]).mean(0) if len(_ix) else np.array((ad.bones[_b].head_local + ad.bones[_b].tail_local) / 2)
     _ol = ad.bones[_b].matrix_local.to_3x3().inverted() @ Vector((_c[0], _c[1] + 0.04, 0)).normalized()
     _ol = (_ol - Vector((0, 1, 0)) * _ol.y).normalized(); PAN_AX[_b] = (np.array(_ol), np.array(Vector((0, 1, 0)).cross(_ol)))
+# the coat yields to the strands' tops: a panel segment may not swing out past the top of a strand (where it hangs from
+# the sleeve hem and cannot move out of the way itself). Each panel segment's rest heightfield in its own frame, and the
+# strand points within STRAND_TOP of each strand's head (upper bone frame).
+STRAND_TOP = 0.12
+TOP_PTS = {}
+for _s in 'LR':
+    _l1 = STRAND_PTS[f'tassel.{_s}'][0]; TOP_PTS[f'tassel.{_s}'] = _l1[_l1[:, 1] < STRAND_TOP]
 def _dilate(H, fill):
     Hp = np.pad(H, 1, constant_values=fill); Hd = H.copy()
     for di in (-1, 0, 1):
         for dj in (-1, 0, 1): Hd = np.maximum(Hd, Hp[1 + di:1 + di + H.shape[0], 1 + dj:1 + dj + H.shape[1]])
     return Hd
+PAN_REST = {}
+for _b in PANELS_C:
+    _ix = np.nonzero(_dom0 == _b)[0]; o_, lat_ = PAN_AX[_b]
+    if not len(_ix): continue
+    _A = np.array(ad.bones[_b].matrix_local.inverted()); _l = np.array([body.data.vertices[int(i)].co[:] for i in _ix]) @ _A[:3, :3].T + _A[:3, 3]
+    _yi = np.clip(((_l[:, 1] - PAN_Y0) / PAN_C).astype(int), 0, PAN_NY - 1); _li = np.clip(((_l @ lat_ - PAN_L0) / PAN_C).astype(int), 0, PAN_NL - 1)
+    _H = np.full((PAN_NY, PAN_NL), -np.inf); np.maximum.at(_H, (_yi, _li), _l @ o_); PAN_REST[_b] = _dilate(_H, -np.inf)
 _COLL = []
 def _body_profile():
     """The posed body (without the arms, hands and strands): the radial profile of legs, hips and torso around the
@@ -619,7 +635,7 @@ def _follow(frames, loop, rec, base, bvh=None):
         hd = Ct.to_translation(); d = (Ct.to_3x3() @ Vector((0, 1, 0))).normalized()
         if g: d = (d * (1 - g) + DOWN * g).normalized()
         return hd, d, hd + d * L
-    st = {}
+    st = {}; last = {}            # last: the previous substep's loose bone matrices (the coat reads the strands' tops)
     for n in DYN_ORDER:
         (_, _, _, g), L = par[n]; _, _, tt = tgt(rec[0][n], g, L); st[n] = [tt.copy(), tt.copy()]
     def step(fa, fb):
@@ -642,9 +658,23 @@ def _follow(frames, loop, rec, base, bvh=None):
                     a_ = max(-math.sin(math.radians(din)), dn.dot(o)); b_ = max(-math.sin(math.radians(dac)), min(math.sin(math.radians(dac)), dn.dot(e2)))
                     dn = (d * math.sqrt(max(0.0, 1 - a_ * a_ - b_ * b_)) + o * a_ + e2 * b_).normalized()
                 q0 = hd + dn * L
+                if bvh is not None and n in PAN_REST and all(t_ in last for t_ in TOP_PTS):
+                    # the coat panel yields: rotate it in until no strand top sits under its outer surface
+                    o_, lat_ = PAN_AX[n]; H_ = PAN_REST[n]; R3 = Ct.to_3x3(); d0_ = (R3 @ Vector((0, 1, 0))).normalized()
+                    tops = np.concatenate([TOP_PTS[t_] @ np.array(last[t_])[:3, :3].T + np.array(last[t_])[:3, 3] for t_ in TOP_PTS if t_ in last])
+                    for _it in range(6):
+                        Rn = np.array(d0_.rotation_difference(dn).to_matrix() @ R3); lc = (tops - np.array(hd)) @ Rn
+                        ox = lc @ o_; yi = np.floor((lc[:, 1] - PAN_Y0) / PAN_C).astype(int); li = np.floor((lc @ lat_ - PAN_L0) / PAN_C).astype(int)
+                        ok = (yi >= 0) & (yi < PAN_NY) & (li >= 0) & (li < PAN_NL); Hc = np.full(len(lc), -np.inf); Hc[ok] = H_[yi[ok], li[ok]]
+                        deficit = np.where(np.isfinite(Hc) & (ox < Hc + STRAND_GAP) & (ox > Hc - PAN_DEPTH) & (lc[:, 1] > 0.3 * L), Hc + STRAND_GAP - ox, 0.0)
+                        if deficit.max() <= 0: break
+                        j = int(np.argmax(deficit)); stp = Vector(Rn @ o_) * (-deficit[j] * L / lc[j, 1])
+                        ang_ = math.atan2(stp.length, L)
+                        if ang_ > COLL_STEP * 2: stp *= COLL_STEP * 2 / ang_
+                        dn = (dn * L + stp).normalized()
                 if bvh is not None and n in STRAND_PTS:
                     T = bvh[fb] if a > 0.5 else bvh[fa]; R3 = Ct.to_3x3(); d0_ = (R3 @ Vector((0, 1, 0))).normalized()
-                    L1, L2, W1, W2 = STRAND_PTS[n]; hdn = np.array(hd)
+                    L1, L2, W1, W2 = STRAND_PTS[n]; hdn = np.array(hd); dn_start = dn.copy()
                     if L2 is not None:
                         C1 = np.array(cur[pn]); base1 = (L1 @ C1[:3, :3].T + C1[:3, 3]) * W1[:, None]; wf = np.maximum(W2, 0.3)
                     for _it in range(8):
@@ -653,13 +683,20 @@ def _follow(frames, loop, rec, base, bvh=None):
                         pts = hdn + rel if L2 is None else base1 + (hdn + rel) * W2[:, None]
                         pv, mag = _prof_push(T, pts)
                         if mag.max() <= 0: break
-                        kk = np.maximum(0.05, rel @ np.array(dn)); tp = pv * (L / kk / (1.0 if L2 is None else wf))[:, None]
-                        tl = np.linalg.norm(tp, axis=1); j = int(np.argmax(tl))
-                        dn = (dn * L + Vector(tp[j]) * min(1.0, 0.4 * L / max(tl[j], 1e-9))).normalized()
+                        # gentle: only points well down the bone steer it (one near its head would need a huge turn
+                        # for a small push and makes the strand thrash), by their average push, at most COLL_STEP a
+                        # pass and COLL_SUB a substep; the spring does the rest
+                        kk = rel @ np.array(dn); use = (kk > 0.3 * L) & (mag > 0)
+                        if not use.any(): break
+                        tp = pv[use] * (L / kk[use] / (1.0 if L2 is None else wf[use]))[:, None]
+                        stp = Vector(tp.mean(0)); ang_ = math.atan2(stp.length, L)
+                        if ang_ > COLL_STEP: stp *= COLL_STEP / ang_
+                        dn = (dn * L + stp).normalized()
+                        if dn_start.angle(dn, 0.0) > COLL_SUB: dn = dn_start.slerp(dn, COLL_SUB / dn_start.angle(dn)).normalized(); break
                 q = hd + dn * L; st[n] = [q, p + (q - q0)]          # (a push-out adds no velocity)
                 d0 = (Ct.to_3x3() @ Vector((0, 1, 0))).normalized()
                 Cn = Matrix.Translation(hd) @ d0.rotation_difference(dn).to_matrix().to_4x4() @ Ct.to_3x3().to_4x4()
-                cur[n] = Cn
+                cur[n] = Cn; last[n] = Cn
                 if s == SUB: out[n] = ((Pnew @ REL[n]).inverted() @ Cn).to_quaternion()
         return out
     if loop:
@@ -696,10 +733,13 @@ def bake(name, frames, fn, loop):
         rec.append({n: pbs[n].matrix.copy() for n in set(DYN_ORDER) | set(DYN_PAR.values())})
         base.append({n: pbs[n].rotation_quaternion.copy() for n in DYN_ORDER})
     _follow(frames, loop, rec, base)
-    # second pass with the body posed as keyed (coat panels included), so the strands collide with what is really there
-    bvh = []
-    for f in range(len(rec)): sc.frame_set(f + 1); bvh.append(_body_profile())
-    _follow(frames, loop, rec, base, bvh); BASE_BY_CLIP[name] = base
+    # then twice more with the body posed as keyed (coat panels included), so the strands collide with what is really
+    # there; the coat yields to the strands' tops in the same passes, so the second one collides with the yielded coat
+    for _pass in range(2):
+        bvh = []
+        for f in range(len(rec)): sc.frame_set(f + 1); bvh.append(_body_profile())
+        _follow(frames, loop, rec, base, bvh)
+    BASE_BY_CLIP[name] = base
     act.frame_range = (1, frames + (1 if loop else 0)); LG_BY_CLIP[name] = [round(v, 3) for v in LG_TRACE]
     return act
 
@@ -1188,7 +1228,7 @@ if MOCAP:
         pose = mocap_pose(MREST, MSMP[i], stride=1.3 if sprinting else 0.9, lean=24 if sprinting else 8)
         set_pose(dict(pose)); Dc = delta('hips').inverted() @ delta('chest')   # (a copy: secondary() fills in cloth for the arms-less pose)
         pose.update(run_arms(MPH[i], sprinting, Dc))
-        pose.update({'_flow': (32 if sprinting else 20) + 6 * math.sin(2 * p), '_swing': (30 if sprinting else 18) + 8 * math.sin(2 * p + 1.2)})
+        pose.update({'_flow': (16 if sprinting else 9) + 4 * math.sin(2 * p), '_swing': (14 if sprinting else 8) + 4 * math.sin(2 * p + 1.2), '_bell_out': 14.0})
         return pose
     run = lambda f, t: loco(t, False); sprint = lambda f, t: loco(t, True)
 else:
