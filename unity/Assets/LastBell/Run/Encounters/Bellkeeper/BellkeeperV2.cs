@@ -162,6 +162,7 @@ namespace LastBell.Run
                     // queued: the current attack has finished; only one transition however many thresholds were crossed
                     while (running.Count > 0 || W.Hazards.Count > 0) yield return 1;
                     phase = want; loop = 0;
+                    ForgetLeans();   // The Unfinished Hour remembers nothing across a phase change (05 brief)
                     PlanLog.Add((W.Tick, "phase " + phase));
                     foreach (var w in PhaseShift(phase == 2 ? Phase2 : Phase3)) yield return w;
                 }

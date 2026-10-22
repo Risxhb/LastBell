@@ -30,7 +30,9 @@ namespace LastBell.Run
         public int LastCastTick { get; private set; } = -1;          // World.Tick of the latest launch (tests)
         public bool Running => Boss != null && Boss.IsRunning(this);
 
-        internal void Bind(BellkeeperEncounter boss) { Boss = boss; }
+        internal void Bind(BellkeeperEncounter boss) { Boss = boss; OnBind(); }
+        // Once, when the encounter is built (after every ability is bound): subscribe to encounter events, e.g. LeanRemembered.
+        protected virtual void OnBind() { }
         internal void Launched() { Casts++; LastCastTick = W.Tick; }
 
         // Boss movement before the warning starts (run by the encounter's plan, not overlapped).
