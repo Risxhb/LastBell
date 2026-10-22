@@ -85,8 +85,6 @@ namespace LastBell.Run
                   uh.MemoryShown == null && uh.AfterImageShown && uh.Live == e);
             Check("The Unfinished Hour: starts only after the Leaning Bell is gone (at most two damaging patterns)",
                   !d.World.Hazards.Live.Contains(B) && BkPatternsLive() <= 2, $"{BkPatternsLive()} live");
-            BkStep(150);
-            yield return Shot("bk_unfinished_hour_warning");
             BkStepUntil(() => uh.Resolves > 0, 300);
             Check("The Unfinished Hour: resolves 3.5 s after the Leaning Bell's resolve", uh.LastResolveTick == leanResolved + 210,
                   $"lean {leanResolved}, echo {uh.LastResolveTick}");
@@ -219,7 +217,6 @@ namespace LastBell.Run
             Check($"The Unfinished Hour: escape from the far side of the remembered half at 4.2 m/s + one dash ({map})",
                   echo != null && UhHits(runner) == 0 && minSt >= 0 && warn == (testMap ? 264 : 210),
                   $"{dist:0.00} m route, warning {warn} ticks, stamina min {minSt:0}, hits {UhHits(runner)}");
-            if (testMap) yield return Shot("bk_unfinished_hour_test_map");
         }
 
         // Cross away from the current Leaning Bell into the remembered half, then cross back when it replays (05: "cross,
@@ -248,25 +245,33 @@ namespace LastBell.Run
                   $"hits {BkHitsOn(runner)}, second dash {before2:0} -> {after2:0}, stamina min {minSt:0}");
         }
 
-        // Real-time clip of the echo: a stand-in Leaning Bell on one half, then the remembered half replaying, with a
-        // scripted player who crosses and crosses back (steps out of whatever half is about to land).
+        // Real-time clip of the echo: a stand-in Leaning Bell on one half, then the remembered half replaying, with the
+        // camera's player and a scripted ally crossing, then crossing back (each steps out of a half about to land).
+        // Screenshots come from here: telegraphs only fade in while the game runs.
         IEnumerator UhClip()
         {
             yield return UhStart();
             if (bk == null) yield break;
-            BkPlace(d.Player, new Vector3(-3, 0, 6));
-            var p = BkAdd(new Vector3(-7, 0, 1)); var s = BkScript(p);
-            s.Steer = me =>
+            Func<PlayerController, Vector3> steer = me =>
             {
                 foreach (var h in d.World.Hazards.Live)
                     if (h.Shape == HazardShape.Cone && h.Contains(me.transform.position) && h.ResolveAt - h.Age < 150) return -Sim.Dir(h.Yaw);
                 return Vector3.zero;
             };
+            BkPlace(d.Player, new Vector3(-3, 0, 5)); BkScript(d.Player).Steer = steer;
+            var p = BkAdd(new Vector3(-7, 0, 1)); BkScript(p).Steer = steer;
             bk.RememberLean(UhHalf(90));
             UhLean(270, 210);
             d.SetPaused(false);
             StartCoroutine(Capture("bk_unfinished_hour", 9 * 60));
-            float t = 0; while (t < 9f) { BkTopUp(); t += Time.deltaTime; yield return null; }
+            float t = 0; bool memShot = false, echoShot = false;
+            while (t < 9f)
+            {
+                BkTopUp(); t += Time.deltaTime;
+                if (!memShot && t >= 1.5f) { memShot = true; yield return Shot("bk_unfinished_hour_memory_outline"); continue; }
+                if (!echoShot && t >= 5.8f) { echoShot = true; yield return Shot("bk_unfinished_hour_warning"); continue; }
+                yield return null;
+            }
             yield return null;
             d.SetPaused(true); bk.Halt(); d.World.ClearTransient();
         }

@@ -55,6 +55,7 @@ namespace LastBell.Run
         Transform afterImage, tilt; Renderer rim;
         readonly List<Material> mats = new List<Material>();
 
+        const float AfterImageOffset = 3f;
         static readonly Color Porcelain = new Color(0.92f, 0.89f, 0.81f), Coral = new Color(1.0f, 0.42f, 0.32f);
 
         protected override void OnBind()
@@ -166,7 +167,8 @@ namespace LastBell.Run
         {
             DestroyAfterImage();
             afterImage = new GameObject("Unfinished Hour after-image").transform;
-            afterImage.SetPositionAndRotation(new Vector3(at.x, 0, at.z), Quaternion.Euler(0, yaw, 0));
+            at = Sim.Flat(at) + Sim.Dir(yaw) * AfterImageOffset;   // over the remembered half, clear of the boss's own body
+            afterImage.SetPositionAndRotation(at, Quaternion.Euler(0, yaw, 0));
             tilt = new GameObject("tilt").transform; tilt.SetParent(afterImage, false);
             Keep(Prim.Make(PrimitiveKind.Cone, tilt, new Vector3(0, 1.7f, 0), new Vector3(3.4f, 3.4f, 3.4f), Porcelain, 0.35f));
             Keep(Prim.Make(PrimitiveKind.Sphere, tilt, new Vector3(0, 3.35f, 0), new Vector3(1.1f, 0.85f, 1.1f), Porcelain, 0.35f));
