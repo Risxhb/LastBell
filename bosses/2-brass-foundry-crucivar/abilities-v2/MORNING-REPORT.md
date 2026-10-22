@@ -1,6 +1,6 @@
 # Crucivar ability set v2: morning report
 
-# Update: ability set v3 (2026-10-22, after Chzy18's playtest)
+## Update: ability set v3 (2026-10-22, after Chzy18's playtest)
 
 Chzy18 found v2 "insane easy" and asked for "much much harder", with new abilities allowed. **v3 is built, tested and now the default** for "Crucivar (area 2)".
 - v2 stays reachable as `-lastbellAbilitySet v2`, and v1 as `v1`.
