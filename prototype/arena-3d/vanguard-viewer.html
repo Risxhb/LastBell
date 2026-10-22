@@ -83,7 +83,7 @@ new GLTFLoader().parse(bytes.buffer, '', gltf => {
   for (const v of Object.keys(views)) { const b = document.createElement('button'); b.textContent = v; b.onclick = () => setView(v); ui.appendChild(b); }
   const sp = document.createElement('button'); sp.textContent = 'Slow-mo'; sp.onclick = () => { sp.classList.toggle('on'); mixer.timeScale = sp.classList.contains('on') ? 0.25 : 1; }; ui.appendChild(sp);
   play('Idle');
-  status.textContent = 'Drag to orbit · scroll to zoom · keys 1–6 play animations';
+  status.textContent = 'Drag to orbit · scroll to zoom · keys 1–9 play the first nine';
 }, e => { status.textContent = 'Failed to load model: ' + e.message; console.error(e); });
 
 function play(name) {

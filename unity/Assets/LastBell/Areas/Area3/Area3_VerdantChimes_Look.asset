@@ -31,11 +31,27 @@ MonoBehaviour:
   ambientGround: {r: 0.07, g: 0.1, b: 0.1, a: 1}
   fillColor: {r: 0.19, g: 0.42, b: 0.41, a: 1}
   fillDirection: {x: 0.3, y: 0.45, z: -0.84}
-  fogColor: {r: 0.07, g: 0.235, b: 0.25, a: 1}
-  fogStart: 32
-  fogEnd: 140
+  fogColor: {r: 0.52, g: 0.72, b: 0.7, a: 1}
+  fogStart: 60
+  fogEnd: 220
+  cloudTop: -6
+  cloudBottom: -30
+  cloudPower: 1.6
+  cloudNoiseScale: 0.03
+  cloudWisp: 6
+  cloudThin: {r: 0.22, g: 0.48, b: 0.5, a: 1}
+  cloudThick: {r: 0.92, g: 0.99, b: 0.97, a: 1}
+  floorKeepRadius: 17
+  hazeColor: {r: 0.52, g: 0.72, b: 0.7, a: 1}
+  hazeStart: 35
+  hazeEnd: 120
+  hazeAmount: 0.62
+  windDirection: {x: 0.8, y: 0.35}
+  windStrength: 2.2
+  gustFrequency: 0.6
+  flowSpeed: 6.5
   outlineColor: {r: 0.047, g: 0.14, b: 0.133, a: 1}
   outlineOpacity: 0.75
   outlineThickness: 1.5
-  outlineFadeStart: 40
-  outlineFadeEnd: 110
+  outlineFadeStart: 30
+  outlineFadeEnd: 75

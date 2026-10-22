@@ -6,11 +6,12 @@ Area 1's shared arena: 3 minibosses and the area boss fight here. It is built fr
 - **Geometry:** `SkywardSpire.glb` holds all the solid geometry, materials and floor textures. It is exported from `skyward-spire-env.js` by `node prototype/arena-3d/areas/area-1/export-glb.mjs`, the same pipeline as the Bellkeeper's Dais. After changing the env file, re-export and then rebuild.
 - **Builder:** `Editor/SkywardSpireBuilder.cs` adds what glTF can't carry:
   - the day sky (`Shaders/SkywardSky.shader`), fog, ambient light, the sun and a reflection probe
-  - the cloud sea, using `Arenas/Shaders/CloudBillboard.shader`
+  - background materials swapped to `Shaders/SkyArchitecture.shader`, so towers, piers and the dais underside blend into cloud colour with depth, then dissolve deep inside the cloud
+  - layered soft clouds (`Shaders/SkyCloud.shader`, an 8-shape 1024² atlas): a deep sea with noise-cut sky gaps, a waist cluster round every `CloudAnchor` exported with the GLB, and thin wisps. Clouds fade against scene depth, so they wrap towers without straight edges; the camera requests the depth texture itself
   - floor and invisible-wall colliders, 8 spawn points, post-processing and the camera
   - a Vanguard for scale, and a hidden `Gameplay/TelegraphCheck` with placeholder warning shapes (not boss mechanics)
-- **Runtime:** `SkywardSpireArena.cs` sways the banners, turns the armillary rings, drifts the clouds and handles the views. Groups named `Occluder…` (camera-side towers) are hidden in the gameplay view. Set `quiet` while a warning is up to dim the floor's gold.
-- **Batch:** `Unity.exe -batchmode -projectPath unity -executeMethod LastBell.Areas.Area1.EditorTools.SkywardSpireBuilder.BatchBuildAndCapture` writes `Captures/topdown.png`, `gameplay.png` and `gameplay-telegraphs.png`.
+- **Runtime:** `SkywardSpireArena.cs` sways the banners, turns the armillary rings, drifts the clouds and handles the views. Groups named `Occluder…` (camera-side towers) are hidden in the gameplay view. Clouds breathe (±3% scale) and vary in opacity. Set `quiet` while a warning is up to dim the floor's gold.
+- **Batch:** `Unity.exe -batchmode -projectPath unity -executeMethod LastBell.Areas.Area1.EditorTools.SkywardSpireBuilder.BatchBuildAndCapture` writes `Captures/topdown.png`, `gameplay.png`, `gameplay-telegraphs.png` and `abyss-closeup.png`.
 
 ## Layout
 
@@ -34,3 +35,19 @@ Landmarks follow the reference by quadrant:
 
 - The top-down view is tipped 27° from the south, as the painting is: its floor reads 0.89 high to wide. While that view is active it borrows a longer shadow range from the shared URP asset (the default is 50 m) and hands it back afterwards.
 - A critic agent rated the top-down capture against the reference over 5 rounds: 5 → 5 → 5 → 6 → 6/10. Floor layout scores 8/10, and the measured proportions match. The remaining gap is in the surrounding buildings (sculpted gothic detail, spire density), the depth fog and cloud masses, and painted texture.
+- Background pass (towers fading into cloud, more detail): 5 critic rounds scored 6 → 6.5 → 6.5 → 6 → 6/10, up from about 5 before. Floor 8, palette 7, buildings 6. Still open: the two top-corner cathedral blocks read as flat boxes, cloud puffs can still look like round discs, and the fade shows a faint line on some towers in close-ups.
+- Third pass (towers sink into cloud, corner buildings, cloud shapes): 5 critic rounds scored 6 → 6.5 → 6 → 6.5 → 6.5/10.
+  - Towers now blend fully to cloud colour, then end on a noise edge inside a ring of cloud puffs placed just outside each tower. No dither, so nothing reads as see-through glass.
+  - The cloud atlas blends every lobe's shading, so there are no disc rims.
+  - The top-corner cathedrals are larger and split into separate tower shafts below the floor and spired belfries above.
+  - Still open: from directly above, the corner buildings read as a facade, not a roofline; some spire tips end in a pale halo; and the stone and gold shading is flat.
+- **Modelled buildings:** the landmark buildings are now modelled in Blender. They have gold-framed lancets with quatrefoil tracery and stars, stepped buttresses, crocketed spires, ribbed domes, columned lanterns and armillary spheres.
+  - Source: `prototype/arena-3d/areas/area-1/blender/spire_buildings.py`.
+  - Rebuild: `blender -b -P spire_buildings.py -- <out.glb>`, then copy the result to `SkywardSpire_Buildings.glb` here. The builder places it under `Belfries/Buildings`.
+  - The env file skips its code-built versions while `kit` mode is on.
+  - Critic rounds: 6, then 6.5/10.
+- **Everything but the floor is now modelled in Blender** (`prototype/arena-3d/areas/area-1/blender/spire_kit.py`, which reuses `spire_buildings.py`).
+  - It covers the curb and turned-baluster balustrade, the rim kiosks and gate pavilions, the drum wall with blind arcades, the underside, the north and south bridges (paving, balusters, domed posts, pier arches; the side bridges were dropped because the belfries stood in them), the hanging star banners, the kiosks on columns, the filler and far spires, the floating islands, the skybridges and the CloudAnchor empties.
+  - Rebuild: `blender -b -P spire_kit.py -- <out.glb>`, then copy the result to `SkywardSpire_Kit.glb` here. The builder places it under `Kit`, marked static apart from banners, armillary rings and occluders.
+  - `SkywardSpire.glb` now holds only the painted floor (the env file runs in kit mode).
+  - Repeated parts share one mesh, so 1.06 M triangles fit in a 50 MB file.

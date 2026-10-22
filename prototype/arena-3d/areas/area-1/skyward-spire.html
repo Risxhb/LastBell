@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skyward Spire</title>
+<style>
+html, body { margin: 0; height: 100%; overflow: hidden; background: #0e1424; }
+canvas { display: block; position: absolute; }
+#ref { position: absolute; pointer-events: none; display: none; }
+#tabs { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; gap: 8px; font-family: Georgia, serif; flex-wrap: wrap; justify-content: center; z-index: 2; }
+#tabs a { padding: 7px 14px; font-size: 15px; color: #f6efdc; text-decoration: none; background: #101a34e0; border: 1px solid #d6aa5a88; border-radius: 8px; }
+#tabs a.on { background: #d6aa5a; color: #101825; }
+body.clean #tabs { display: none; }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas><img id="ref" src="reference-topdown.webp" alt="">
+<div id="tabs"><a href="?view=game">Game camera</a><a href="?view=top">Top view</a><a href="?view=top&overlay=0.5">Top + reference</a><a href="?view=angle">Angle</a><a href="?view=game&tele">Telegraph check</a></div>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+// Area 1 — The Skyward Spire, rebuilt from reference-topdown.webp. The arena lives in skyward-spire-env.js.
+// ?view=game (gameplay camera, same as index.html) | top (matches the reference framing, 850:742) | angle.
+// ?overlay=0.5 lays the reference over the top view for alignment. ?tele draws generic warning shapes
+// (readability check, not boss mechanics). ?export writes the solid arena to window.__arenaExport for
+// export-glb.mjs (Unity: Assets/LastBell/Areas/Area1/SkywardSpire.glb).
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+const Q = new URLSearchParams(location.search), VIEW = Q.get('view') || 'game', OVERLAY = parseFloat(Q.get('overlay') || '0');
+if (Q.has('clean')) document.body.classList.add('clean');
+document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.search === location.search));
+const loadScript = src => new Promise(res => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = res; document.head.appendChild(s); });
+
+const canvas = document.getElementById('view');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(44, 1, 0.1, 1600);
+window.THREE = THREE;
+await loadScript('skyward-spire-env.js?v=' + Date.now());   // never a stale cached copy
+// ?nokit: the old code-built landmarks instead of the Blender-modelled ones (models/SkywardSpire_Kit.glb)
+const KIT = !Q.has('nokit');
+const env = window.buildSkywardSpire(THREE, scene, { mergeGeometries, renderer, floorRes: 3072, kit: KIT });
+const kitOccluders = [];
+if (KIT && !Q.has('export')) {
+  const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
+  const gltf = await new GLTFLoader().loadAsync('models/SkywardSpire_Kit.glb').catch(e => { console.error('kit', e); return null; });
+  if (gltf) {
+    gltf.scene.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; } if (o.name.startsWith('Occluder')) kitOccluders.push(o); });
+    env.root.add(gltf.scene);
+  }
+}
+
+// generic warning shapes: deep red-orange fill, dark outer rim (colours linear; the output pass converts)
+const tele = [];
+if (Q.has('tele')) {
+  const mk = shape => new THREE.ShaderMaterial({ transparent: true, depthWrite: false, toneMapped: false, uniforms: { t: { value: 0 } },
+    vertexShader: 'varying vec2 vU; void main(){ vU = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }',
+    fragmentShader: `varying vec2 vU; uniform float t; void main(){ vec2 p = vU * 2. - 1.; float r = length(p), a = atan(p.y, p.x);
+      float hw = ${shape === 'cone' ? '0.5236' : '3.2'}; float da = abs(a); if (r > 1. || da > hw) discard;
+      float edge = min(1. - r, ${shape === 'cone' ? '(hw - da) * r' : '1.'});
+      float rim = 1. - smoothstep(0.035, 0.07, edge), dark = 1. - smoothstep(0.0, 0.025, edge);
+      float stripe = step(0.5, fract((p.x - p.y) * 5. - t * 0.8)) * 0.1, pulse = 0.58 + 0.08 * sin(t * 6.);
+      vec3 col = mix(vec3(0.69, 0.035, 0.008), vec3(1.0, 0.26, 0.05), rim); col = mix(col, vec3(0.09, 0.004, 0.002), dark);
+      gl_FragColor = vec4(col, max(max(rim, dark) * 0.95, pulse + stripe)); }` });
+  for (const [shape, size, pos, rz] of [['circle', 9, [-5.5, 0.03, -4], 0], ['cone', 16, [2, 0.03, 0], -Math.PI / 5]]) {
+    const m = mk(shape); tele.push(m);
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(size, size), m); mesh.position.set(...pos); mesh.rotation.set(-Math.PI / 2, 0, rz); scene.add(mesh);
+  }
+}
+
+// the Vanguard for scale (characters session's model, loaded read-only)
+if (!Q.has('export')) {
+  const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: o.metal ? 0.4 : 0.75, metalness: o.metal ? 0.7 : 0, side: o.side || THREE.FrontSide });
+  const Gl = (c, k) => new THREE.MeshBasicMaterial({ color: new THREE.Color(c).multiplyScalar(k), toneMapped: false });
+  const hero = new THREE.Group(); hero.position.set(-3.5, 0, 6.5); hero.rotation.y = Math.PI * 0.8; scene.add(hero);
+  await loadScript('../../vanguard-model.js');
+  if (typeof window.buildVanguardModel === 'function') { const v = window.buildVanguardModel(M, Gl); const o = v.root || v; o.scale.setScalar(1.2); o.traverse(c => { if (c.isMesh) c.castShadow = true; }); hero.add(o); }
+}
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.25, 0.4, 0.95));
+composer.addPass(new OutputPass());
+
+// Top view: the reference is 850 x 742 with the plaza centre at (437, 325) and 16.3 px per metre on the floor.
+// A camera looking straight down at the reference's image centre gives the same framing.
+const REF_W = 850, REF_H = 742, PX_PER_M = 16.3, FOV_TOP = 8, TOP_TILT = 27 * Math.PI / 180;
+const TOP_H = 1.09 * (REF_H / 2) / PX_PER_M / Math.tan(FOV_TOP * Math.PI / 360);   // (distance; the painting's floor fills 55% of the width)
+const TOP_CX = (REF_W / 2 - 437) / PX_PER_M, TOP_CZ = (REF_H / 2 - 325) / PX_PER_M;
+function frame() {
+  let w = innerWidth, h = innerHeight, left = 0, top = 0;
+  if (VIEW === 'top') { const s = Math.min(w / REF_W, h / REF_H); w = Math.floor(REF_W * s); h = Math.floor(REF_H * s); left = (innerWidth - w) / 2; top = (innerHeight - h) / 2; }
+  Object.assign(canvas.style, { left: left + 'px', top: top + 'px' });
+  renderer.setSize(w, h); composer.setSize(w, h); camera.aspect = w / h;
+  if (VIEW === 'top') {
+    // tipped 27° from the south, like the painting (its floor reads 0.89 high to wide): rooftops plus a sliver of the north buildings' south facades
+    camera.fov = FOV_TOP; camera.position.set(TOP_CX, TOP_H * Math.cos(TOP_TILT), TOP_CZ + TOP_H * Math.sin(TOP_TILT)); camera.up.set(0, 0, -1); camera.lookAt(TOP_CX, 0, TOP_CZ);
+    scene.fog.near = TOP_H + 45; scene.fog.far = TOP_H + 420;   // fog by depth below the floor, not distance from this high camera
+    const ref = document.getElementById('ref');
+    if (OVERLAY > 0) Object.assign(ref.style, { display: 'block', left: left + 'px', top: top + 'px', width: w + 'px', height: h + 'px', opacity: OVERLAY });
+  } else if (VIEW === 'angle') { camera.up.set(0, 1, 0); camera.fov = 42; camera.position.set(-34, 34, 46); camera.lookAt(0, -2, -2); }
+  else { camera.up.set(0, 1, 0); camera.fov = 44; camera.position.set(0, 29, 22.5); camera.lookAt(0, 0, 1.0); }
+  camera.updateProjectionMatrix();
+  env.setOccludersVisible(VIEW !== 'game'); kitOccluders.forEach(o => o.visible = VIEW !== 'game');
+}
+addEventListener('resize', frame); frame();
+
+if (Q.has('export')) try {
+  const { GLTFExporter } = await import('three/addons/exporters/GLTFExporter.js');
+  env.setOccludersVisible(true);
+  const glb = await new GLTFExporter().parseAsync(env.root, { binary: true, maxTextureSize: 4096 });
+  const bytes = new Uint8Array(glb); let bin = ''; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  window.__arenaExport = { glb: btoa(bin) };
+} catch (e) { window.__arenaExport = { error: String(e && e.stack || e) }; }
+
+const clock = new THREE.Clock();
+let lastW = 0, lastH = 0;
+renderer.setAnimationLoop(() => {
+  const dt = clock.getDelta(), t = clock.elapsedTime;
+  if (innerWidth !== lastW || innerHeight !== lastH) { lastW = innerWidth; lastH = innerHeight; frame(); }   // headless capture resizes late
+  env.update(t, dt, false);
+  for (const m of tele) m.uniforms.t.value = t;
+  composer.render();
+});
+window.__ready = true;
+</script>
+</body>
+</html>

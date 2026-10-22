@@ -20,18 +20,48 @@ namespace LastBell.Areas.Area3
         [SerializeField] View view = View.Gameplay;
         [Tooltip("Hazards are up: floor decoration dims (boss design §8.1).")]
         public bool quiet;
+        [Tooltip("Keep the Scene and Game views repainting outside Play mode so water, clouds and motes move. Also turn on the Scene view's Always Refresh.")]
+        public bool animateInEditor = true;
+        [Tooltip("Where each waterfall lands (xz, impact height, sheet width). Filled by the builder; drives pool foam rings, thicker mist and rising motes.")]
+        public Vector4[] impacts = new Vector4[0];
+        [System.NonSerialized] public float timeOverride = -1; // the batch capture sets this for a deterministic motion strip
 
         // Gameplay camera: the prototype's (0, 29, 22.5) looking at (0, 0, 1), turned to Unity's north = +Z.
         static readonly Vector3 GamePos = new Vector3(0, 29, -22.5f), GameLook = new Vector3(0, 0, -1);
         static readonly Vector3 AnglePos = new Vector3(-34, 30, -40), AngleLook = new Vector3(1, -3, 2);
-        static readonly int DecoGlow = Shader.PropertyToID("_LB_DecoGlow");
+        static readonly int DecoGlow = Shader.PropertyToID("_LB_DecoGlow"), LbTime = Shader.PropertyToID("_LB_Time"),
+            Impacts = Shader.PropertyToID("_LB_Impacts"), ImpactCount = Shader.PropertyToID("_LB_ImpactCount");
+        static readonly Vector4[] impactBuffer = new Vector4[24];
 
         readonly List<(Transform t, Quaternion rest, float phase)> bells = new List<(Transform, Quaternion, float)>();
         Transform gear;
         float glow = 1;
         bool collected;
 
-        void OnEnable() { collected = false; ApplyView(); }
+        void OnEnable()
+        {
+            collected = false; ApplyView();
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.update += EditorPump;
+#endif
+        }
+
+        void OnDisable()
+        {
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.update -= EditorPump;
+#endif
+        }
+
+#if UNITY_EDITOR
+        // URP only advances time when a view repaints, so in Edit mode keep asking for frames while animateInEditor is on
+        void EditorPump()
+        {
+            if (Application.isPlaying || !animateInEditor || !this) return;
+            UnityEditor.EditorApplication.QueuePlayerLoopUpdate();
+            UnityEditor.SceneView.RepaintAll();
+        }
+#endif
 
         public void SetView(View v) { view = v; ApplyView(); }
 
@@ -53,7 +83,7 @@ namespace LastBell.Areas.Area3
             int i = 0;
             foreach (var t in arenaRoot.GetComponentsInChildren<Transform>(true))
             {
-                if (t.name == "Bell") bells.Add((t, t.localRotation, i++ * 1.9f));
+                if (t.name == "Bell" || System.Text.RegularExpressions.Regex.IsMatch(t.name, @"^Bell[_ .]\(?\d+\)?$")) bells.Add((t, t.localRotation, i++ * 1.9f));
                 else if (t.name == "MedallionGear") gear = t;
             }
         }
@@ -70,7 +100,11 @@ namespace LastBell.Areas.Area3
         public void Tick(float dt)
         {
             if (!collected) Collect();
-            float t = Application.isPlaying ? Time.time : (float)(System.DateTime.Now.TimeOfDay.TotalSeconds % 3600);
+            float t = timeOverride >= 0 ? timeOverride : Application.isPlaying ? Time.time : (float)(System.DateTime.Now.TimeOfDay.TotalSeconds % 3600);
+            Shader.SetGlobalFloat(LbTime, t);
+            int n = Mathf.Min(impacts.Length, impactBuffer.Length);
+            for (int k = 0; k < impactBuffer.Length; k++) impactBuffer[k] = k < n ? impacts[k] : Vector4.zero;
+            Shader.SetGlobalVectorArray(Impacts, impactBuffer); Shader.SetGlobalFloat(ImpactCount, n);
             glow = Mathf.MoveTowards(glow, quiet ? 0.35f : 1f, dt / 0.25f * 0.65f);
             Shader.SetGlobalFloat(DecoGlow, glow);
             foreach (var (b, rest, ph) in bells) b.localRotation = rest * Quaternion.Euler(Mathf.Sin(t * 0.6f + ph * 2) * 1.5f, 0, Mathf.Sin(t * 0.9f + ph) * 3f);
