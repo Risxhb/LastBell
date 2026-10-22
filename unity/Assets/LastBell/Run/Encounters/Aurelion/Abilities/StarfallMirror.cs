@@ -32,7 +32,12 @@ namespace LastBell.Run
         public readonly List<Star> Stars = new List<Star>();       // every star of the latest cast, star I first
         public int Casts { get; private set; }
 
-        public IEnumerable<int> Run()
+        // ticks from Run's first tick to the last star's resolve tick; the v2.1 plan lines pairs up with it.
+        // CONTRACT: keep it equal to Run's real timing when the windows change. fullWindow: v2.1 §3, paired with Meridian
+        // Lances the star keeps its full 1.1 s window on Hard (not yet used by Run: the Starfall session wires it).
+        public int Duration(bool fullWindow = false) => (Standing().Count <= 1 ? FollowTicks : 0) + ResolveTicks - 1;
+
+        public IEnumerable<int> Run(bool fullWindow = false)
         {
             Say(Name); Casts++; Stars.Clear();
             var party = Standing();

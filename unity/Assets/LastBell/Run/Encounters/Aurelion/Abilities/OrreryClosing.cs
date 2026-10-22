@@ -27,6 +27,10 @@ namespace LastBell.Run
 
         public bool HorizonLive => W != null && LastRim != null && LastHorizon > 0 && !LastRim.Cancelled && W.Hazards.Live.Contains(LastRim);
 
+        // ticks from Run's first tick to the rim/crown resolve tick (Run itself returns one tick later); the v2.1 plan
+        // lines pairs up with it. CONTRACT: keep it equal to the real timing when the windows change.
+        public int Duration() => T(WarnS) - 1;
+
         public IEnumerable<int> Run(int horizonTicks)
         {
             Say(Name);

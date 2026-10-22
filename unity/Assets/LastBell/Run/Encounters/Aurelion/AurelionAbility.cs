@@ -23,6 +23,10 @@ namespace LastBell.Run
         // Easy stretches every warning, track and window by 1.25 (ABILITIES.md §5); gaps and the punish stay as authored.
         public float WarnScale => W.Difficulty == Difficulty.Easy ? 1.25f : 1f;
         protected int T(float seconds) => Sim.Ticks(seconds * WarnScale);
+        // v2.1 §2: on Hard every lock-to-hit WINDOW is x0.7 (never below `floor`, e.g. Orrery's 2.0 s); tracks stay as on
+        // Medium (use T for them). Easy stretches windows like every warning (x1.25).
+        protected int Win(float seconds, float floor = 0) => Sim.Ticks(Hard ? Mathf.Max(seconds * HardWindow, floor) : seconds * WarnScale);
+        public const float HardWindow = 0.7f;
         protected bool Hard => W.Difficulty == Difficulty.Hard;
         protected bool Easy => W.Difficulty == Difficulty.Easy;
 
@@ -63,7 +67,7 @@ namespace LastBell.Run
         public static string SoloOverride;    // F6 / tests: the single ability to loop (null = command line)
         public static bool V1 => (SetOverride ?? Arg("-lastbellAbilitySet") ?? "v2").Equals("v1", StringComparison.OrdinalIgnoreCase);
         public static string Solo => SoloOverride ?? Arg("-lastbellAbility");
-        public static readonly string[] Ids = { "aurelion.meridian_lances", "aurelion.starfall_mirror", "aurelion.noon_shadow", "aurelion.orrery_closing", "aurelion.hour_hands" };
+        public static readonly string[] Ids = { "aurelion.meridian_lances", "aurelion.starfall_mirror", "aurelion.noon_shadow", "aurelion.orrery_closing", "aurelion.hour_hands", "aurelion.zenith_collapse" };
         public static bool Known(string id) => id != null && Ids.Contains(id);
     }
 }

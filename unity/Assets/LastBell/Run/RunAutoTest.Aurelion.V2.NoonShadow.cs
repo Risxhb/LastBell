@@ -15,6 +15,8 @@ namespace LastBell.Run
         const string NoonSrc = "Noon Shadow";
         static readonly Vector3 NoonBossAside = new Vector3(0, 0, -8);
         static bool NoonYaw(float got, float want) => Mathf.Abs(Mathf.DeltaAngle(got, want)) < 1f;
+        // the yaw from the centre to the mean of these placements: the lit half's axis whenever the mean is past 1 m
+        static float NoonMeanYaw(params Vector3[] at) { var m = Vector3.zero; foreach (var v in at) m += v; return Sim.YawTo(Vector3.zero, m / at.Length, 0); }
 
         IEnumerator V2NoonShadow()
         {
@@ -57,7 +59,7 @@ namespace LastBell.Run
                 var a = V2Boss.Noon;
                 yield return V2Fire(a.Run(false));
                 V2Check("N = 2: Noon only (no Afternoon outside Phase 3)", a.Halves.Count == 1, $"{a.Halves.Count} halves");
-                V2Check("N = 2 same side: that half is lit", a.LitYaws.Count > 0 && NoonYaw(a.LitYaws[0], 90), a.LitYaws.Count > 0 ? $"yaw {a.LitYaws[0]:0.0}" : "none");
+                V2Check("N = 2 same side: that half is lit (axis through the mean)", a.LitYaws.Count > 0 && NoonYaw(a.LitYaws[0], NoonMeanYaw(new Vector3(4.8f, 0, 0.6f), new Vector3(13.5f, 0, 0))), a.LitYaws.Count > 0 ? $"yaw {a.LitYaws[0]:0.0}" : "none");
                 V2Check("melee next to the boss who doesn't move is hit", V2WasHit(V2Party[0], NoonSrc));
                 V2Check("ranged on the rim (13.5 m) who doesn't move is hit", V2WasHit(V2Party[1], NoonSrc));
                 V2Check("one hit per instance", V2OneHitPerInstance());
@@ -95,7 +97,8 @@ namespace LastBell.Run
                 V2In(p).Go(new Vector3(-3, 0, 1));
                 yield return V2Ticks(Sim.Ticks(0.5f)); V2In(p).Dash();
                 yield return Until(() => a.Halves.Count >= 2 || V2Boss == null || !V2Boss.TestBusy, 10, "Noon Shadow: Afternoon");
-                bool aftWest = a.LitYaws.Count == 2 && NoonYaw(a.LitYaws[1], 270);
+                float noonWant = NoonMeanYaw(new Vector3(13.5f, 0, 1));
+                bool aftWest = a.LitYaws.Count == 2 && NoonYaw(a.LitYaws[0], noonWant) && NoonYaw(a.LitYaws[1], noonWant + 180);
                 yield return V2Ticks(Sim.Ticks(0.25f));
                 V2In(p).Go(new Vector3(3, 0, 1));
                 yield return V2WaitIdle();
@@ -118,7 +121,7 @@ namespace LastBell.Run
                 var a = V2Boss.Noon;
                 yield return V2Fire(a.Run(false));
                 int hit = V2Party.Take(3).Count(p => V2WasHit(p, NoonSrc));
-                V2Check("N = 4, 3 on one side: that side is lit", a.LitYaws.Count == 1 && NoonYaw(a.LitYaws[0], 90) && hit == 3 && !V2WasHit(V2Party[3], NoonSrc),
+                V2Check("N = 4, 3 on one side: that side is lit", a.LitYaws.Count == 1 && NoonYaw(a.LitYaws[0], NoonMeanYaw(new Vector3(5, 0, 2), new Vector3(6, 0, -2), new Vector3(4, 0, 0.5f), new Vector3(-10, 0, 0))) && hit == 3 && !V2WasHit(V2Party[3], NoonSrc),
                     $"{a.Halves.Count} halves, yaw {(a.LitYaws.Count > 0 ? a.LitYaws[0] : -1):0.0}, {hit}/3 majority hit");
             }
             {

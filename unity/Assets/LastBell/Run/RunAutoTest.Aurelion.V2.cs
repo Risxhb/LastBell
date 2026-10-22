@@ -147,6 +147,8 @@ namespace LastBell.Run
             {
                 // another encounter waiting on Ready (an earlier section): back to the menu first
                 if (d.State == RunState.Ready && !(d.Mode == RunMode.Practice && RunDirector.Bosses[d.Encounter].Name.StartsWith("Aurelion"))) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }
+                // a party member went down but the fight goes on (someone is still standing): stand them back up
+                if (d.State == RunState.Combat && d.Boss is AurelionEncounter rb && !rb.Dead && V2Main && V2Main.Down) V2Main.DebugRevive();
                 if (d.State == RunState.Combat && d.Boss is AurelionEncounter b && !b.Dead && V2Main && !V2Main.Down) { V2Boss = b; V2Hook(); yield break; }
                 if (d.State == RunState.Combat || d.State == RunState.Downed || d.State == RunState.Cleared) yield return Until(() => d.State == RunState.Results, 15, "Aurelion v2: results after a wipe/defeat");
                 if (d.State == RunState.Results) { V2Party.Clear(); v2Inputs.Clear(); d.InputOverride = v2MainInput; d.RequestRetry(); }
@@ -224,20 +226,29 @@ namespace LastBell.Run
             // Misalignment pairing, Noon Shadow + Starfall Mirror (Starfall 0.7 s into Noon): both resolve on the same tick,
             // and two edge runners on the lit side (13 m out) clear both by running straight across at 4.2 m/s after a
             // 0.25 s reaction, with one dash each (ABILITIES.md §6 "Pairing: Noon + Starfall (edge runner)")
-            yield return V2Setup(2, Difficulty.Medium, new[] { new Vector3(0, 0, 13f), new Vector3(3.5f, 0, 11f) }, 2);
+            // the boss stands off to the west, clear of both runs (his body would block the straight line)
+            yield return V2Setup(2, Difficulty.Medium, new[] { new Vector3(0, 0, 13f), new Vector3(3.5f, 0, 11f) }, 2, new Vector3(-6f, 0, -4f));
             if (V2Boss == null) yield break;
             {
                 V2Begin(V2Boss.NoonWithStarfall());
                 yield return V2Ticks(ReactTicks);
                 foreach (var p in V2Party) { V2In(p).Walk(Vector3.back, ProtoWalk); V2In(p).Dash(); }
-                yield return V2WaitIdle(15);
+                var lowest = V2Party.ToDictionary(p => p, p => p.Stamina);
+                float waited = 0;
+                while (V2Boss != null && V2Boss.TestBusy && waited < 15)
+                {
+                    foreach (var p in V2Party) lowest[p] = Mathf.Min(lowest[p], p.Stamina);
+                    waited += Time.deltaTime; yield return null;
+                }
                 foreach (var p in V2Party) V2In(p).Stop();
                 var noon = V2Spawned("Noon Shadow").FirstOrDefault(); var star = V2Spawned("Starfall Mirror").FirstOrDefault();
                 bool together = noon != null && star != null && noon.Tick + noon.H.ResolveAt == star.Tick + star.H.ResolveAt;
                 V2Check("Noon + Starfall: Starfall starts 0.7 s into Noon and both resolve on the same tick", together && star.Tick - noon.Tick == Sim.Ticks(AurelionEncounter.StarfallIntoNoon),
                     noon == null || star == null ? "missing spawn" : $"noon spawn {noon.Tick} resolve +{noon.H.ResolveAt}, star spawn {star.Tick} resolve +{star.H.ResolveAt}");
                 V2Check("Noon + Starfall: edge runners at 4.2 m/s with one dash clear both", V2Party.All(p => !V2WasHit(p)),
-                    string.Join(", ", V2Hits.Select(h => $"{h.P.name} by {h.Source}")) + $"; stamina {string.Join("/", V2Party.Select(p => p.Stamina.ToString("0")))}");
+                    string.Join(", ", V2Hits.Select(h => $"P{V2Party.IndexOf(h.P)} by {h.Source}")) + $"; lowest stamina {string.Join("/", V2Party.Select(p => lowest[p].ToString("0")))}");
+                V2Check("Noon + Starfall: each edge runner spends exactly one dash", V2Party.All(p => lowest[p] <= PlayerController.MaxStamina - PlayerController.DashCost + 1 && lowest[p] > PlayerController.MaxStamina - 2 * PlayerController.DashCost),
+                    string.Join("/", V2Party.Select(p => lowest[p].ToString("0"))));
             }
 
             // the full loop, phase by phase: the order of blocks, the transitions, the punish and the overlap cap

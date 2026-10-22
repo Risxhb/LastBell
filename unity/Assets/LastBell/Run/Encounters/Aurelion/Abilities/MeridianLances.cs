@@ -61,6 +61,15 @@ namespace LastBell.Run
             }
         }
 
+        // ticks from Run's first tick to its last resolve tick (= when Run returns); the v2.1 plan lines pairs up with it.
+        // CONTRACT: keep it equal to Run's real timing when the windows change.
+        public int Duration(int beams, int volleys, bool cascade)
+        {
+            int d = T(Track1S) + T(WindowS) - 1;
+            if (volleys > 1) d += cascade ? T(CascadeS) - 1 : T(Track2S) + T(WindowS) - 1;
+            return d;
+        }
+
         float AimAt(PlayerController p) => p ? Sim.YawTo(BossPos, p.transform.position, Body.eulerAngles.y) : Body.eulerAngles.y;
 
         // the shared aim of one volley: every half-lane reads it, and it turns once per tick while tracking

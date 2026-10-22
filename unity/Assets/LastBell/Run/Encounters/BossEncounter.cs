@@ -36,8 +36,21 @@ namespace LastBell.Run
             var go = new GameObject(typeof(T).Name);
             go.transform.SetParent(w.Root, false);
             go.transform.SetPositionAndRotation(pos, Quaternion.Euler(0, yaw, 0));
-            var b = go.AddComponent<T>(); b.W = w; b.Hp = b.MaxHp; b.Build();
+            var b = go.AddComponent<T>(); b.W = w;
+            if (TestHpScale != 1) b.MaxHp = Mathf.Max(1, Mathf.RoundToInt(b.MaxHp * TestHpScale));
+            b.Hp = b.MaxHp; b.Build();
             return b;
+        }
+
+        // Playtest switch: LastBell.exe -lastbellBossHp <fraction> scales every boss's health (e.g. 0.2 = 20 %), so all
+        // phases can be reached quickly. Phase thresholds are fractions of MaxHp, so the phase plan is unchanged.
+        public static readonly float TestHpScale = ReadHpScale();
+        static float ReadHpScale()
+        {
+            var args = Environment.GetCommandLineArgs();
+            int i = Array.FindIndex(args, a => a.Equals("-lastbellBossHp", StringComparison.OrdinalIgnoreCase));
+            return i >= 0 && i + 1 < args.Length && float.TryParse(args[i + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float f)
+                ? Mathf.Clamp(f, 0.01f, 1f) : 1f;
         }
 
         protected abstract void Build();                     // visuals (placeholder geometry or model)
