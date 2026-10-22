@@ -21,6 +21,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/asset-packs/Get-AssetP
 - again whenever `asset-packs.json` changes: after a `git pull`, a merge, or switching to a branch with different packs;
 - **before opening the Unity project.** If Unity opens first and finds a missing asset folder, it may create new `.meta` files with different GUIDs. If that happens, close Unity and run `setup-assets.cmd -Force`.
 
+**Moving files into a pack deletes them on pull.** When you pull or merge the commit that moves files into a pack, Git deletes them from your checkout, because that commit stops tracking them. Run `setup-assets.cmd` straight away, before opening Unity, to get them back from the pack.
+
 Rerunning is cheap. Packs already installed at the listed version are skipped (`[ok] … is already installed`).
 
 Options:
