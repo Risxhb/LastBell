@@ -6,6 +6,7 @@
 # needs exact aiming, so 'staff points here, forearm points there' is easier to author and to read back.
 import bpy, sys, os, math, collections, numpy as np
 from mathutils import Vector, Matrix, Euler, Quaternion
+from mathutils.bvhtree import BVHTree
 args = sys.argv[sys.argv.index('--') + 1:]
 work, out_glb = args[0], args[1]
 sc = bpy.context.scene; sc.render.fps = 30
@@ -522,7 +523,94 @@ BREEZE = {'skirt': 0.035, 'sleeve': 0.03, 'tassel': 0.045, 'banner': 0.07}
 def _breeze(n, ph):
     k = BREEZE[next(b for b in BREEZE if n.startswith(b))]; s = sum(map(ord, n)) * 0.37     # each part its own phase
     return Vector((math.sin(ph + s) + 0.4 * math.sin(2 * ph + 1.3 * s), 0.6 * math.sin(ph + 2.1 + s) + 0.3 * math.sin(3 * ph + s), 0)) * k
-def _follow(frames, loop, rec, base):
+# The bell strands also collide with her body (not the arms they hang from). Two colliders, rebuilt from the posed
+# mesh every frame:
+#  - legs, hips and torso: a radial profile around the hips' upright axis (farthest reach per 3 cm x 5 deg cell);
+#  - each coat panel segment: a heightfield in that bone's own frame (the panel's outward reach per 3 x 3 cm cell), so a
+#    strand stays on the panel's outer side even when the panel swings up. (A profile around the hips would call the
+#    space under a lifted panel solid.)
+# Every substep each strand is pushed clear of both. The test points are real strand vertices (the bells sit up to
+# 5 cm off the bone line), skinned as blended between the strand's two bones.
+STRAND_GAP = 0.012
+PROF_H0, PROF_DH, PROF_NH, PROF_NT = -0.95, 0.03, 56, 72
+PANELS_C = [b for b in B if b.startswith('skirt')]
+PAN_C, PAN_Y0, PAN_L0, PAN_NL, PAN_DEPTH = 0.03, -0.06, -0.3, 20, 0.1
+PAN_NY = int((max(ad.bones[b].length for b in PANELS_C) + 0.12) / PAN_C) + 1
+STRAND_PTS = {}
+_gname0 = {g.index: g.name for g in body.vertex_groups}
+_dom0 = np.array([_gname0[max(v.groups, key=lambda g: g.weight).group] if v.groups else '' for v in body.data.vertices])
+# per strand bone: (points in the upper bone's frame, points in the lower bone's frame or None, their weights). The upper
+# bone tests every strand point, carrying the lower part rigidly (points near the joint move only with it); the lower
+# bone tests the points it moves, skinned as blended between the two.
+for _s in 'LR':
+    _t1, _t2 = f'tassel.{_s}', f'tassel2.{_s}'; _g1, _g2 = body.vertex_groups[_t1].index, body.vertex_groups[_t2].index
+    _w = np.zeros((len(body.data.vertices), 2))
+    for _v in body.data.vertices:
+        for _g in _v.groups:
+            if _g.group == _g1: _w[_v.index, 0] = _g.weight
+            elif _g.group == _g2: _w[_v.index, 1] = _g.weight
+    _A1, _A2 = np.array(ad.bones[_t1].matrix_local.inverted()), np.array(ad.bones[_t2].matrix_local.inverted())
+    for _bn, _sel in ((_t1, _w.sum(1) > 0.5), (_t2, (_w.sum(1) > 0.5) & (_w[:, 1] >= 0.001))):
+        _idx = np.nonzero(_sel)[0]; _idx = _idx[np.argsort(-np.array([body.data.vertices[int(i)].co.z for i in _idx]))]
+        _idx = _idx[np.linspace(0, len(_idx) - 1, 96).astype(int)]
+        _co = np.array([body.data.vertices[int(i)].co[:] for i in _idx]); _ww = _w[_idx] / _w[_idx].sum(1, keepdims=True)
+        STRAND_PTS[_bn] = (_co @ _A1[:3, :3].T + _A1[:3, 3], (_co @ _A2[:3, :3].T + _A2[:3, 3]) if _bn == _t2 else None,
+                           _ww[:, 0], _ww[:, 1])
+# each coat panel segment's outward and lateral axes in its bone frame (rest): away from the hips' axis
+PAN_AX = {}
+for _b in PANELS_C:
+    _ix = np.nonzero(_dom0 == _b)[0]       # (a segment that owns no vertex outright: its bone's middle)
+    _c = np.array([body.data.vertices[int(i)].co[:] for i in _ix]).mean(0) if len(_ix) else np.array((ad.bones[_b].head_local + ad.bones[_b].tail_local) / 2)
+    _ol = ad.bones[_b].matrix_local.to_3x3().inverted() @ Vector((_c[0], _c[1] + 0.04, 0)).normalized()
+    _ol = (_ol - Vector((0, 1, 0)) * _ol.y).normalized(); PAN_AX[_b] = (np.array(_ol), np.array(Vector((0, 1, 0)).cross(_ol)))
+def _dilate(H, fill):
+    Hp = np.pad(H, 1, constant_values=fill); Hd = H.copy()
+    for di in (-1, 0, 1):
+        for dj in (-1, 0, 1): Hd = np.maximum(Hd, Hp[1 + di:1 + di + H.shape[0], 1 + dj:1 + dj + H.shape[1]])
+    return Hd
+_COLL = []
+def _body_profile():
+    """The posed body (without the arms, hands and strands): the radial profile of legs, hips and torso around the
+    hips' axis, and a heightfield per coat panel segment in its own frame."""
+    if not _COLL:
+        armish = ('tassel', 'sleeve', 'forearm', 'upperarm', 'hand') + tuple(f for f in hands.FINGERS) + ('thumb',)
+        _COLL.append(np.array([not str(d).startswith(armish + ('skirt',)) for d in _dom0]))
+        _COLL.append({b: _dom0 == b for b in PANELS_C})
+    dg = bpy.context.evaluated_depsgraph_get(); ev = body.evaluated_get(dg); m = ev.to_mesh()
+    ca = np.empty(len(m.vertices) * 3); m.vertices.foreach_get('co', ca); ev.to_mesh_clear(); ca = ca.reshape(-1, 3)
+    Mw = np.array(pbs['hips'].matrix); Mi = np.linalg.inv(Mw); c = ca[_COLL[0]]
+    l = c @ Mi[:3, :3].T + Mi[:3, 3]; r = np.hypot(l[:, 0], l[:, 2])
+    hi = np.clip(((l[:, 1] - PROF_H0) / PROF_DH).astype(int), 0, PROF_NH - 1)
+    ti = ((np.arctan2(l[:, 2], l[:, 0]) + math.pi) / (2 * math.pi) * PROF_NT).astype(int) % PROF_NT
+    R = np.zeros((PROF_NH, PROF_NT)); np.maximum.at(R, (hi, ti), r)
+    Rw = np.concatenate([R[:, -1:], R, R[:, :1]], 1); R = _dilate(Rw, 0.0)[:, 1:-1]       # (heading wraps around)
+    pans = []
+    for b in PANELS_C:
+        Mb = np.array(pbs[b].matrix); Mbi = np.linalg.inv(Mb); o, lat = PAN_AX[b]
+        l = ca[_COLL[1][b]] @ Mbi[:3, :3].T + Mbi[:3, 3]
+        yi = np.clip(((l[:, 1] - PAN_Y0) / PAN_C).astype(int), 0, PAN_NY - 1); li = np.clip(((l @ lat - PAN_L0) / PAN_C).astype(int), 0, PAN_NL - 1)
+        H = np.full((PAN_NY, PAN_NL), -np.inf); np.maximum.at(H, (yi, li), l @ o)
+        pans.append((Mbi, Mb[:3, :3] @ o, _dilate(H, -np.inf), o, lat))
+    return Mw, Mi, R, pans
+def _prof_push(prof, P):
+    """(k, 3) points -> (world pushes that put each STRAND_GAP clear of the body and the coat panels, their lengths)."""
+    Mw, Mi, R, pans = prof; out = np.zeros_like(P); best = np.zeros(len(P))
+    l = P @ Mi[:3, :3].T + Mi[:3, 3]; r = np.hypot(l[:, 0], l[:, 2])
+    hi = np.clip(((l[:, 1] - PROF_H0) / PROF_DH).astype(int), 0, PROF_NH - 1)
+    ti = ((np.arctan2(l[:, 2], l[:, 0]) + math.pi) / (2 * math.pi) * PROF_NT).astype(int) % PROF_NT
+    Rc = R[hi, ti]; mag = np.where((Rc > 0) & (r < Rc + STRAND_GAP), Rc + STRAND_GAP - r, 0.0)
+    if mag.max() > 0:
+        rd = np.stack([l[:, 0], np.zeros(len(l)), l[:, 2]], 1) / np.maximum(r, 1e-6)[:, None]
+        upd = mag > best; out[upd] = (rd @ Mw[:3, :3].T)[upd] * mag[upd, None]; best[upd] = mag[upd]
+    for Mbi, ow, H, o, lat in pans:
+        l = P @ Mbi[:3, :3].T + Mbi[:3, 3]; ox = l @ o
+        yi = np.floor((l[:, 1] - PAN_Y0) / PAN_C).astype(int); li = np.floor((l @ lat - PAN_L0) / PAN_C).astype(int)
+        ok = (yi >= 0) & (yi < PAN_NY) & (li >= 0) & (li < PAN_NL)
+        Hc = np.full(len(P), -np.inf); Hc[ok] = H[yi[ok], li[ok]]
+        mag = np.where(np.isfinite(Hc) & (ox < Hc + STRAND_GAP) & (ox > Hc - PAN_DEPTH), Hc + STRAND_GAP - ox, 0.0)
+        upd = mag > best; out[upd] = ow[None, :] * mag[upd, None]; best[upd] = mag[upd]
+    return out, best
+def _follow(frames, loop, rec, base, bvh=None):
     """rec[f][bone] = posed matrix (armature space) of each loose bone and its parent at frame f; base[f][bone] = the
     keyed target rotation. Keys the springs' rotations over the targets."""
     SUB = 8; h = 1.0 / sc.render.fps / SUB
@@ -553,7 +641,22 @@ def _follow(frames, loop, rec, base):
                     ol, din, dac = BAN_LIM[n]; o = Ct.to_3x3() @ ol; o = (o - d * d.dot(o)).normalized(); e2 = d.cross(o)
                     a_ = max(-math.sin(math.radians(din)), dn.dot(o)); b_ = max(-math.sin(math.radians(dac)), min(math.sin(math.radians(dac)), dn.dot(e2)))
                     dn = (d * math.sqrt(max(0.0, 1 - a_ * a_ - b_ * b_)) + o * a_ + e2 * b_).normalized()
-                q = hd + dn * L; st[n] = [q, p]
+                q0 = hd + dn * L
+                if bvh is not None and n in STRAND_PTS:
+                    T = bvh[fb] if a > 0.5 else bvh[fa]; R3 = Ct.to_3x3(); d0_ = (R3 @ Vector((0, 1, 0))).normalized()
+                    L1, L2, W1, W2 = STRAND_PTS[n]; hdn = np.array(hd)
+                    if L2 is not None:
+                        C1 = np.array(cur[pn]); base1 = (L1 @ C1[:3, :3].T + C1[:3, 3]) * W1[:, None]; wf = np.maximum(W2, 0.3)
+                    for _it in range(8):
+                        Rn = np.array(d0_.rotation_difference(dn).to_matrix() @ R3)
+                        rel = (L1 if L2 is None else L2) @ Rn.T
+                        pts = hdn + rel if L2 is None else base1 + (hdn + rel) * W2[:, None]
+                        pv, mag = _prof_push(T, pts)
+                        if mag.max() <= 0: break
+                        kk = np.maximum(0.05, rel @ np.array(dn)); tp = pv * (L / kk / (1.0 if L2 is None else wf))[:, None]
+                        tl = np.linalg.norm(tp, axis=1); j = int(np.argmax(tl))
+                        dn = (dn * L + Vector(tp[j]) * min(1.0, 0.4 * L / max(tl[j], 1e-9))).normalized()
+                q = hd + dn * L; st[n] = [q, p + (q - q0)]          # (a push-out adds no velocity)
                 d0 = (Ct.to_3x3() @ Vector((0, 1, 0))).normalized()
                 Cn = Matrix.Translation(hd) @ d0.rotation_difference(dn).to_matrix().to_4x4() @ Ct.to_3x3().to_4x4()
                 cur[n] = Cn
@@ -592,7 +695,11 @@ def bake(name, frames, fn, loop):
         bpy.context.view_layer.update()
         rec.append({n: pbs[n].matrix.copy() for n in set(DYN_ORDER) | set(DYN_PAR.values())})
         base.append({n: pbs[n].rotation_quaternion.copy() for n in DYN_ORDER})
-    _follow(frames, loop, rec, base); BASE_BY_CLIP[name] = base
+    _follow(frames, loop, rec, base)
+    # second pass with the body posed as keyed (coat panels included), so the strands collide with what is really there
+    bvh = []
+    for f in range(len(rec)): sc.frame_set(f + 1); bvh.append(_body_profile())
+    _follow(frames, loop, rec, base, bvh); BASE_BY_CLIP[name] = base
     act.frame_range = (1, frames + (1 if loop else 0)); LG_BY_CLIP[name] = [round(v, 3) for v in LG_TRACE]
     return act
 
