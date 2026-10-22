@@ -936,6 +936,86 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 208605463}
   m_Mesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1 &210537219
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 210537223}
+  - component: {fileID: 210537222}
+  - component: {fileID: 210537221}
+  - component: {fileID: 210537220}
+  m_Layer: 0
+  m_Name: Last Bell Main Menu
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &210537220
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 210537219}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3f4148a72650eeb47aa6c4773b9daf4a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LastBell.Menu.MenuMusic
+  DefaultVolume: 0.6
+--- !u!114 &210537221
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 210537219}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 22cd6567f6854110bd0a9b94489c1e41, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LastBell.Menu.MenuBattle
+  LoopSeconds: 36
+  CameraPosition: {x: 11, y: 24, z: 19}
+  CameraTarget: {x: 0, y: 1, z: 0}
+  OrbitDegreesPerSecond: 2
+  FieldOfView: 40
+  BossPosition: {x: 0, y: 0, z: -1.7}
+  VanguardPosition: {x: -1.6, y: 0, z: 1}
+  ArcanistPosition: {x: -5.2, y: 0, z: 4.3}
+  ChimesingerPosition: {x: 5, y: 0, z: 3.8}
+--- !u!114 &210537222
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 210537219}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ee4a88a9c2414811aa6036dba62b03a7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LastBell.Menu.MainMenu
+--- !u!4 &210537223
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 210537219}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &211113586
 GameObject:
   m_ObjectHideFlags: 0
@@ -13107,86 +13187,6 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2028107573}
   m_Mesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
---- !u!1 &2030384180
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 2030384184}
-  - component: {fileID: 2030384183}
-  - component: {fileID: 2030384182}
-  - component: {fileID: 2030384181}
-  m_Layer: 0
-  m_Name: Last Bell Main Menu
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &2030384181
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2030384180}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3f4148a72650eeb47aa6c4773b9daf4a, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LastBell.Menu.MenuMusic
-  DefaultVolume: 0.6
---- !u!114 &2030384182
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2030384180}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 22cd6567f6854110bd0a9b94489c1e41, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LastBell.Menu.MenuBattle
-  LoopSeconds: 36
-  CameraPosition: {x: 11, y: 24, z: 19}
-  CameraTarget: {x: 0, y: 1, z: 0}
-  OrbitDegreesPerSecond: 2
-  FieldOfView: 40
-  BossPosition: {x: 0, y: 0, z: -1.7}
-  VanguardPosition: {x: -1.6, y: 0, z: 1}
-  ArcanistPosition: {x: -5.2, y: 0, z: 4.3}
-  ChimesingerPosition: {x: 5, y: 0, z: 3.8}
---- !u!114 &2030384183
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2030384180}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ee4a88a9c2414811aa6036dba62b03a7, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::LastBell.Menu.MainMenu
---- !u!4 &2030384184
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2030384180}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2036940471
 GameObject:
   m_ObjectHideFlags: 0
@@ -14008,4 +14008,4 @@ SceneRoots:
   - {fileID: 1492001297}
   - {fileID: 1723857004}
   - {fileID: 736677060}
-  - {fileID: 2030384184}
+  - {fileID: 210537223}
