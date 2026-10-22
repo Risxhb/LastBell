@@ -11,21 +11,30 @@ namespace LastBell.Run
     //   No cheats: it sees exactly the telegraphs a player sees, and has no immunity.
     // - Rotation: a simple per-class priority list, OFF by default (AllyBot.Attacks): Chzy18 wants bots that do the
     //   mechanics without fighting, so they never shorten the fight.
+    // Test modes (Aurelion v3, HARDER-PROMPT §7; the run menu always uses Passive):
+    // - Reflex: reflex-perfect and memory-blind. It reacts on the tick any hostile shape appears (amber included, not at
+    //   lock), dashing and sprinting, enters any visible soak, drinks potions, and ignores numerals, marks and in/out cues.
+    // - Perfect: the assignment-follower. Reflex dodging plus perfect knowledge of Aurelion's memory mechanics: it walks
+    //   to the next Ecliptic Order anchor as soon as the previous strike lands and keeps its Zenith Mark's side.
+    public enum BotMode { Passive, Reflex, Perfect }
+
     public sealed class AllyBot : IInputSource
     {
         readonly int slot, of;            // this ally's index and the ally count (for its angle round the boss)
         readonly int reactTicks;
+        public readonly BotMode Mode;
+        public float? HoldRange;          // tests: keep this gap to the boss instead of the class's range (8.5 = a ranged player)
         public static bool Attacks = false;   // bots are mechanics dummies: they move, dodge and spread, but never attack or heal
         int tick, lastPress = -999, castHold;
         int[] cd = new int[5];
 
-        public AllyBot(int index, int count)
+        public AllyBot(int index, int count, BotMode mode = BotMode.Passive)
         {
-            slot = index; of = Mathf.Max(1, count);
-            reactTicks = 15 + (index * 7) % 10;   // 0.25-0.4 s
+            slot = index; of = Mathf.Max(1, count); Mode = mode;
+            reactTicks = mode == BotMode.Passive ? 15 + (index * 7) % 10 : 0;   // 0.25-0.4 s; test bots react on the first tick
         }
 
-        float Range(PlayerController me) => me.ClassName == "Vanguard" ? 0.9f : me.ClassName == "Chimesinger" ? 6.5f : 8.5f;
+        float Range(PlayerController me) => HoldRange ?? (me.ClassName == "Vanguard" ? 0.9f : me.ClassName == "Chimesinger" ? 6.5f : 8.5f);
 
         public PlayerInput Read(PlayerController me)
         {
@@ -37,22 +46,27 @@ namespace LastBell.Run
             var bpos = Sim.Flat(boss.transform.position);
             inp.Aim = bpos;
 
-            // 1) dodge: in a hazard that locked at least our reaction time ago -> nearest clear spot
+            // 1) dodge: in a hazard that locked at least our reaction time ago (test bots: from its first tick) -> nearest
+            // clear spot. A Perfect bot also heads for its memory job (next anchor, mark side) as soon as it is due.
             var live = w.Hazards.Live;
+            bad = Bad(me, boss);
             Hazard threat = null; int left = int.MaxValue;
             foreach (var h in live)
-                if (h.Age >= Mathf.Max(h.LockAt, 0) + reactTicks && h.Contains(pos) && h.ResolveAt - h.Age < left) { threat = h; left = h.ResolveAt - h.Age; }
+                if (h.Age >= (Mode == BotMode.Passive ? Mathf.Max(h.LockAt, 0) + reactTicks : 0) && Hits(h, me, pos) && h.ResolveAt - h.Age < left) { threat = h; left = h.ResolveAt - h.Age; }
+            int duty = Duty(me, boss);   // Perfect: ticks until its memory job (anchor / mark) resolves, or -1
+            if (threat == null && duty >= 0 && bad(pos)) left = duty;
             Vector3 move;
-            if (threat != null)
+            if (threat != null || (duty >= 0 && bad(pos)))
             {
-                move = NearestClear(pos, boss, live, out float need);
+                move = NearestClear(pos, boss, bad, out float need);
                 float t = left / (float)Sim.Hz;
                 if (move != Vector3.zero)
                 {
                     if (need / PlayerController.WalkSpeed > t - 0.1f)
                     {
                         if (need > 2.2f && me.Stamina > 20) inp.Sprint = true;
-                        if (!me.Dashing && me.Stamina >= PlayerController.DashCost && need / PlayerController.SprintSpeed > t - 0.15f) inp.Dash = true;
+                        // dash only when its 3 m landing is clear too (it overshoots a near spot into the next shape)
+                        if (!me.Dashing && me.Stamina >= PlayerController.DashCost && need / PlayerController.SprintSpeed > t - 0.15f && !bad(pos + move * 3f)) inp.Dash = true;
                     }
                 }
                 castHold = 0;
@@ -68,14 +82,14 @@ namespace LastBell.Run
                 var v = Sim.Flat(want - pos);
                 move = v.magnitude < 0.4f || castHold > 0 ? Vector3.zero : v.normalized;
                 // never walk into a live telegraph
-                if (move != Vector3.zero && Inside(live, pos + move * 0.4f) && !Inside(live, pos)) move = Vector3.zero;
+                if (move != Vector3.zero && bad(pos + move * 0.4f) && !bad(pos)) move = Vector3.zero;
                 if (castHold > 0) castHold--;
                 // 3) attack when in range (off: Chzy18 2026-10-22, "the bots are doing too much damage": they only do the
                 // mechanics). Set Attacks = true to bring the rotation back.
                 float gap = Sim.Flat(bpos - pos).magnitude - boss.BodyRadius;
                 if (Attacks && gap <= Range(me) + 1.5f) Attack(me, ref inp);
             }
-            if (me.Hp < 40 && me.Potions > 0 && tick % 30 == 0) inp.Potion = true;
+            if (me.Hp < (Mode == BotMode.Passive ? 40 : 70) && me.Potions > 0 && tick % 30 == 0) inp.Potion = true;   // test bots: before a Hard kill hit (65) could down them
             inp.Move = ToScreen(move);
             return inp;
         }
@@ -113,9 +127,46 @@ namespace LastBell.Run
             switch (s) { case 0: inp.P0 = inp.H0 = true; break; case 1: inp.P1 = true; break; case 2: inp.P2 = true; break; case 3: inp.P3 = true; break; default: inp.P4 = true; break; }
         }
 
-        static bool Inside(IReadOnlyList<Hazard> live, Vector3 p) { foreach (var h in live) if (h.Contains(p)) return true; return false; }
+        System.Func<Vector3, bool> bad;
+        static bool Hits(Hazard h, PlayerController me, Vector3 q) => h.Contains(q) && (h.Affects == null || h.Affects(me));
 
-        static Vector3 NearestClear(Vector3 pos, BossEncounter b, IReadOnlyList<Hazard> live, out float need)
+        // where this bot must not stand now: inside any shape that would hit it; a Perfect bot also avoids anywhere outside
+        // the next Ecliptic anchor's disc and the wrong side of its Zenith Mark (with a 0.35-0.4 m buffer)
+        System.Func<Vector3, bool> Bad(PlayerController me, BossEncounter boss)
+        {
+            var live = me.World.Hazards.Live;
+            var a = Mode == BotMode.Perfect ? boss as AurelionEncounter : null;
+            int k = a != null && a.Ecliptic != null ? a.Ecliptic.NextStrike(me.World.Tick) : -1;
+            var mine = a != null && a.Marks != null ? a.Marks.Current(me, me.World.Tick) : null;
+            if (k < 0 && mine == null) return q => { foreach (var h in live) if (Hits(h, me, q)) return true; return false; };
+            var bp = Sim.Flat(boss.transform.position);
+            Vector3 anchor = k >= 0 ? a.Ecliptic.Anchors[k] : Vector3.zero;
+            float disc = k >= 0 ? a.Ecliptic.SafeRadius - Hazard.Margin - 0.35f : 0;
+            return q =>
+            {
+                foreach (var h in live) if (Hits(h, me, q)) return true;
+                if (k >= 0 && Sim.Flat(q - anchor).magnitude > disc) return true;
+                if (mine != null)
+                {
+                    float d = Sim.Flat(q - bp).magnitude;
+                    if (mine.Mark == ZenithMarks.Mark.Shade ? d > ZenithMarks.ShadeR - Hazard.Margin - 0.4f : d < ZenithMarks.SunR + Hazard.Margin + 0.4f) return true;
+                }
+                return false;
+            };
+        }
+
+        // Perfect: ticks until its memory job (the next Ecliptic strike, its Zenith Mark) resolves; -1 = none
+        int Duty(PlayerController me, BossEncounter boss)
+        {
+            if (Mode != BotMode.Perfect || !(boss is AurelionEncounter a)) return -1;
+            int t = me.World.Tick, best = -1;
+            if (a.Ecliptic != null) { int k = a.Ecliptic.NextStrike(t); if (k >= 0) best = a.Ecliptic.StrikeAt(k) - t; }
+            var mk = a.Marks != null ? a.Marks.Current(me, t) : null;
+            if (mk != null) { int m = mk.ResolveTick - t; if (best < 0 || m < best) best = m; }
+            return best;
+        }
+
+        static Vector3 NearestClear(Vector3 pos, BossEncounter b, System.Func<Vector3, bool> bad, out float need)
         {
             var bp = b.transform.position;
             for (float r = 0.3f; r <= 14f; r += 0.3f)
@@ -124,7 +175,7 @@ namespace LastBell.Run
                     var dir = Sim.Dir(k * 15f); var q = pos + dir * r;
                     if (!CombatWorld.InPlayerBound(q, -0.2f)) continue;
                     if (Sim.Flat(q - bp).magnitude < b.BodyRadius + PlayerController.Radius + 0.1f) continue;
-                    if (Inside(live, q)) continue;
+                    if (bad(q)) continue;
                     need = r; return dir;
                 }
             need = 99; return Vector3.zero;

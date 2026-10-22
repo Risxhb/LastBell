@@ -31,6 +31,7 @@ namespace LastBell.Run
             if (V2Wants("aurelion.hour_hands")) yield return V2Section("Hour Hands", V2HourHands());
             if (V2Wants("aurelion.zenith_collapse")) yield return V2Section("Zenith Collapse", V2ZenithCollapse());
             if (V2Wants("aurelion.phase_plan")) yield return V2Section("phase plan", V2PhasePlan());
+            yield return AurelionV3Checks();   // ability set v3 (RunAutoTest.Aurelion.V3.cs)
             yield return V2Teardown();
             AurelionArgs.SetOverride = null; AurelionArgs.SoloOverride = null;
         }
@@ -221,7 +222,7 @@ namespace LastBell.Run
             // the six abilities are registered and bound
             yield return V2Setup(1);
             if (V2Boss == null) yield break;
-            V2Check("six abilities registered (v2.1 adds Zenith Collapse)", V2Boss.Abilities.Count == 6 && AurelionArgs.Ids.All(id => V2Boss.Abilities.Any(a => a.Id == id)),
+            V2Check("eight abilities registered (v2.1 adds Zenith Collapse, v3 Ecliptic Order and Zenith Marks)", V2Boss.Abilities.Count == 8 && AurelionArgs.Ids.All(id => V2Boss.Abilities.Any(a => a.Id == id)),
                 string.Join(", ", V2Boss.Abilities.Select(a => a.Id)));
 
             // Misalignment pairing, Noon Shadow + Starfall Mirror (Starfall 0.7 s into Noon): both resolve on the same tick,
@@ -332,7 +333,7 @@ namespace LastBell.Run
                 var a = V2Boss; int log0 = a.BlockLog.Count;
                 AurelionArgs.SoloOverride = id;
                 a.TestHold = false;
-                string want = id == "aurelion.meridian_lances" ? "Meridian Lances" : id == "aurelion.starfall_mirror" ? "Starfall Mirror" : id == "aurelion.noon_shadow" ? "Noon Shadow" : id == "aurelion.orrery_closing" ? "Orrery Closing" : id == "aurelion.zenith_collapse" ? "Zenith Collapse" : "Hour Hands";
+                string want = id == "aurelion.meridian_lances" ? "Meridian Lances" : id == "aurelion.starfall_mirror" ? "Starfall Mirror" : id == "aurelion.noon_shadow" ? "Noon Shadow" : id == "aurelion.orrery_closing" ? "Orrery Closing" : id == "aurelion.zenith_collapse" ? "Zenith Collapse" : id == "aurelion.ecliptic_order" ? "Ecliptic Order" : id == "aurelion.zenith_marks" ? "Zenith Marks + Meridian Lances" : "Hour Hands";
                 yield return V2Survive(40, () => a.BlockLog.Skip(log0).Count(b => b.block == want) >= 2);
                 var blocks = a.BlockLog.Skip(log0).Select(b => b.block).Where(b => b != "punish").ToList();
                 V2Check($"practice hook {id} repeats only that ability", blocks.Count >= 2 && blocks.All(b => b == want), string.Join(", ", blocks));

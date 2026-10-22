@@ -12,7 +12,18 @@ namespace LastBell.Run
         struct FloatText { public Vector3 pos; public string text; public Color color; public float age; }
         static readonly List<FloatText> floats = new List<FloatText>();
         public static void Float(Vector3 world, string text, Color c) { if (floats.Count < 80) floats.Add(new FloatText { pos = world, text = text, color = c }); }
-        public static void ClearTransient() { floats.Clear(); }
+        public static void ClearTransient() { floats.Clear(); labels.Clear(); }
+        // a world-space label that stays until its owner hides it (Aurelion v3: Ecliptic numerals, SUN / SHADE marks);
+        // with `follow`, Pos is an offset above that transform (a moving player)
+        public sealed class WorldLabel { public Vector3 Pos; public Transform Follow; public string Text; public Color Color; public int Size; public bool Hidden; public void Hide() => Hidden = true; }
+        static readonly List<WorldLabel> labels = new List<WorldLabel>();
+        public static WorldLabel Label(Vector3 world, string text, Color c, int size = 34, Transform follow = null)
+        {
+            labels.RemoveAll(l => l.Hidden);
+            var l = new WorldLabel { Pos = world, Text = text, Color = c, Size = size, Follow = follow };
+            if (labels.Count < 40) labels.Add(l);
+            return l;
+        }
 
         RunDirector d; GUIStyle title, big, mid, small, tiny, num, box, btn, mapBtn, slot; Texture2D white;
         static int menuClass;   // static: survives the scene load when the menu switches map
@@ -105,6 +116,7 @@ namespace LastBell.Run
             PlayerPanel();
             AllyPanel();
             Floats();
+            Labels();
             HazardLabels();
             switch (d.State)
             {
@@ -398,6 +410,23 @@ namespace LastBell.Run
                 var s = cam.WorldToScreenPoint(f.pos); if (s.z < 0) continue;
                 var c = f.color; c.a = 1 - Mathf.Clamp01((f.age - 0.5f) / 0.4f); num.normal.textColor = c;
                 GUI.Label(new Rect(s.x - 60, h - s.y - 14, 120, 28), f.text, num);
+            }
+        }
+
+        GUIStyle lab;
+        void Labels()
+        {
+            var cam = Camera.main; if (!cam) return; float h = Screen.height;
+            if (lab == null) lab = new GUIStyle(num);
+            foreach (var l in labels)
+            {
+                if (l.Hidden || (l.Follow == null && !ReferenceEquals(l.Follow, null))) continue;
+                var s = cam.WorldToScreenPoint(l.Follow ? l.Follow.position + l.Pos : l.Pos); if (s.z < 0) continue;
+                lab.fontSize = l.Size;
+                lab.normal.textColor = new Color(0, 0, 0, 0.75f);
+                GUI.Label(new Rect(s.x - 98, h - s.y - 28, 200, 60), l.Text, lab);
+                lab.normal.textColor = l.Color;
+                GUI.Label(new Rect(s.x - 100, h - s.y - 30, 200, 60), l.Text, lab);
             }
         }
 
