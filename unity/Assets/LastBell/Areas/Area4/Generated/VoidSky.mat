@@ -25,11 +25,11 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _NebulaStrength: 1
+    - _NebulaStrength: 0.8
     - _StarDensity: 0.9975
     m_Colors:
     - _Base: {r: 0.042999983, g: 0.031, b: 0.12499998, a: 1}
-    - _Mid: {r: 0.10999996, g: 0.059999965, b: 0.23999995, a: 1}
+    - _Mid: {r: 0.07499998, g: 0.04, b: 0.16999996, a: 1}
     - _Nebula: {r: 0.47999996, g: 0.30999997, b: 0.82, a: 1}
     - _Wisp: {r: 0.61, g: 0.53, b: 0.91, a: 1}
   m_BuildTextureStacks: []

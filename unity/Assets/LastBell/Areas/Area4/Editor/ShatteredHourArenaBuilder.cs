@@ -436,7 +436,7 @@ namespace LastBell.Areas.Area4.EditorTools
             var m = new Material(src) { name = src.name + "_Fade" }; MakeTransparent(m); return Save(m, m.name + ".mat");
         }
 
-        static Material mFloor, mStone, mStoneCap, mStoneDark, mDeck, mBrass, mBrassPolished, mIron, mBronze, mBronzePlain, mCrack, mGroove, mBellGlow, mFlame, mGlass,
+        static Material mIvory, mFloor, mStone, mStoneCap, mStoneDark, mDeck, mBrass, mBrassPolished, mIron, mBronze, mBronzePlain, mCrack, mGroove, mBellGlow, mFlame, mGlass,
             mRock, mRockLight, mBanner, mStation, mPedestal, mWindow, mWindowGlow, mVortex, mShaft, mCone, mSky;
         static Color floorEmission, bellGlow;
 
@@ -507,7 +507,7 @@ namespace LastBell.Areas.Area4.EditorTools
             for (int y = 0; y < N; y++) for (int x = 0; x < N; x++)
                 {
                     float m = TNoise(x / 64f, y / 64f, 8, 8), s = TNoise(x / 4f, y / 90f, 128, 9);
-                    var c = Color.Lerp(baseC, umber, Smooth(0.45f, 0.8f, m) * 0.55f) * (0.92f + 0.1f * s); c.a = 1; px[y * N + x] = C32(c);
+                    var c = Color.Lerp(baseC, umber, Smooth(0.45f, 0.8f, m) * 0.25f) * (0.95f + 0.06f * s); c.a = 1; px[y * N + x] = C32(c);
                 }
             return WritePng("BrassBreakup.png", px, N, N);
         }
@@ -531,12 +531,15 @@ namespace LastBell.Areas.Area4.EditorTools
             var lines = new List<(Vector2, float)[]>();
             (Vector2, float)[] Walk(Vector2 from, Vector2 to, float w0, float w1)
             {
-                var pts = new List<(Vector2, float)> { (from, w0) }; var p = from; float total = (to - from).magnitude;
-                for (int guard = 0; guard < 200 && (to - p).magnitude > 0.5f; guard++)
+                // irregular crack: the heading drifts and occasionally kinks hard, steps vary 0.12–0.55 m, width wanders 0.12–0.22 m
+                var pts = new List<(Vector2, float)> { (from, w0) }; var p = from; float total = (to - from).magnitude, drift = 0, seed = F() * 50;
+                for (int guard = 0; guard < 300 && (to - p).magnitude > 0.4f; guard++)
                 {
-                    var dir = (to - p).normalized; float ang = (F() * 2 - 1) * 35 * Mathf.Deg2Rad, step = 0.2f + F() * 0.25f;
+                    drift = drift * 0.6f + (F() * 2 - 1) * 0.5f; if (F() < 0.15f) drift += (F() < 0.5f ? 1 : -1) * 0.9f;
+                    var dir = (to - p).normalized; float ang = Mathf.Clamp(drift, -1.1f, 1.1f), step = 0.12f + F() * F() * 0.45f;
                     dir = new Vector2(dir.x * Mathf.Cos(ang) - dir.y * Mathf.Sin(ang), dir.x * Mathf.Sin(ang) + dir.y * Mathf.Cos(ang));
-                    p += dir * step; float f = 1 - (to - p).magnitude / total; pts.Add((p, Mathf.Clamp(Mathf.Lerp(w0, w1, f) * (0.8f + 0.4f * F()), 0.12f, 0.18f)));
+                    p += dir * step; float f = 1 - (to - p).magnitude / total, wn = VNoise(seed + f * 9, 0.5f, 21);
+                    pts.Add((p, Mathf.Lerp(w0, w1, f) * (0.75f + 0.55f * wn)));
                 }
                 pts.Add((to, w1)); return pts.ToArray();
             }
@@ -545,12 +548,12 @@ namespace LastBell.Areas.Area4.EditorTools
             var b = Walk(se * 3.2f + new Vector2(-0.1f, -0.25f), se * 12.3f, 0.17f, 0.12f);
             lines.Add(a); lines.Add(b);
             foreach (var main in new[] { a, b })
-                for (int k = 0; k < 0; k++) // no branch nubs
+                for (int k = 0; k < 2; k++) // two short hairline branches each, tapering to nothing
                 {
-                    var (p0, w) = main[2 + (int)(F() * (main.Length - 5))];
-                    var mdir = (main[main.Length - 1].Item1 - main[0].Item1).normalized; float side = F() < 0.5f ? 1 : -1;
-                    var dir = new Vector2(-mdir.y, mdir.x) * side * 0.8f + mdir * 0.6f; float len = 0.8f + F() * 0.7f;
-                    var br = Walk(p0, p0 + dir.normalized * len, 0.12f, 0.12f); for (int q = 0; q < br.Length; q++) br[q].Item2 = Mathf.Lerp(w * 0.5f, 0.03f, q / (br.Length - 1f));
+                    var (p0, w) = main[4 + (int)(F() * (main.Length - 9))];
+                    var mdir = (main[main.Length - 1].Item1 - main[0].Item1).normalized; float side = k == 0 ? 1 : -1;
+                    var dir = new Vector2(-mdir.y, mdir.x) * side * 0.7f + mdir * 0.7f; float len = 0.5f + F() * 0.5f;
+                    var br = Walk(p0, p0 + dir.normalized * len, 0.08f, 0.08f); for (int q = 0; q < br.Length; q++) br[q].Item2 = Mathf.Lerp(w * 0.45f, 0.015f, q / (br.Length - 1f));
                     lines.Add(br);
                 }
             return lines;
@@ -577,6 +580,7 @@ namespace LastBell.Areas.Area4.EditorTools
             {
                 var q = stack.Pop(); float limit = 1.9f + 0.6f * F();
                 if (q.width <= limit && q.height <= limit) { slabRects.Add(q); continue; }
+                if (Mathf.Min(q.width, q.height) <= 1.6f && Mathf.Max(q.width, q.height) <= 3.2f && F() < 0.4f) { slabRects.Add(q); continue; } // some long slabs
                 bool splitX = q.width > limit && (q.height <= limit || F() < q.width / (q.width + q.height));
                 float len = splitX ? q.width : q.height, cut = len < 3f ? len / 2 : Mathf.Clamp(len * (0.3f + 0.4f * F()), 1.5f, len - 1.5f);
                 if (splitX) { stack.Push(new Rect(q.xMin, q.yMin, cut, q.height)); stack.Push(new Rect(q.xMin + cut, q.yMin, q.width - cut, q.height)); }
@@ -782,7 +786,15 @@ namespace LastBell.Areas.Area4.EditorTools
                         float ra = i * Mathf.PI / 4 + Mathf.PI / 8; var c = new Vector2(Mathf.Cos(ra), Mathf.Sin(ra)) * 0.665f; var q = new Vector2(u, v) - c;
                         if (q.magnitude > 0.08f) continue;
                         float rot = -ra + Mathf.PI / 2; var lq = new Vector2(q.x * Mathf.Cos(rot) - q.y * Mathf.Sin(rot), q.x * Mathf.Sin(rot) + q.y * Mathf.Cos(rot)) / 0.06f;
-                        foreach (var (s0, s1) in runes[i]) I(Seg(lq, s0, s1) * 0.06f, 0.006f);
+                        // astronomical marks instead of runes: small bell, crescent, four-point star, ringed dot
+                        float L = lq.magnitude, gw = 0.1f;
+                        switch (i % 4)
+                        {
+                            case 0: if (lq.y > -0.3f) I(Mathf.Abs((lq - new Vector2(0, -0.3f)).magnitude - 0.7f) * 0.06f, gw * 0.06f); I(Seg(lq, new Vector2(-0.75f, -0.35f), new Vector2(0.75f, -0.35f)) * 0.06f, gw * 0.06f); I((lq - new Vector2(0, -0.55f)).magnitude * 0.06f, 0.15f * 0.06f); break;
+                            case 1: if ((lq - new Vector2(0.35f, 0.1f)).magnitude > 0.6f) I(Mathf.Abs(L - 0.7f) * 0.06f, gw * 1.6f * 0.06f); break;
+                            case 2: for (int s = 0; s < 4; s++) { float sa = s * Mathf.PI / 4, ln = s % 2 == 0 ? 0.85f : 0.45f; var e = new Vector2(Mathf.Cos(sa), Mathf.Sin(sa)) * ln; I(Seg(lq, -e, e) * 0.06f, gw * 0.06f); } break;
+                            default: I(Mathf.Abs(L - 0.65f) * 0.06f, gw * 0.06f); I(L * 0.06f, 0.18f * 0.06f); break;
+                        }
                     }
                     if (r > 0.44f && r < 0.53f)
                     {
@@ -920,7 +932,7 @@ namespace LastBell.Areas.Area4.EditorTools
         static void MakeMaterials()
         {
             var (alb, hgt, emi) = PaintFloor();
-            floorEmission = new Color(1f, 0.7f, 0.34f) * 1.7f;
+            floorEmission = new Color(1f, 0.72f, 0.36f) * 1.25f;
             mFloor = new Material(lit) { name = "Floor" };
             mFloor.SetTexture("_BaseMap", alb); mFloor.SetColor("_BaseColor", Color.white); mFloor.SetFloat("_Smoothness", 0.26f); mFloor.SetFloat("_Metallic", 0.05f);
             mFloor.SetTexture("_BumpMap", hgt); mFloor.SetFloat("_BumpScale", 1); mFloor.EnableKeyword("_NORMALMAP");
@@ -930,22 +942,22 @@ namespace LastBell.Areas.Area4.EditorTools
             var (stone, stoneN) = PaintStoneTrim(); var brassTex = PaintBrass(); var (strata, strataN) = PaintStrata();
             mStone = Lit("StoneTrim", Color.white, 0, 0.14f, map: stone, bump: stoneN);
             mStoneCap = Lit("StoneCap", new Color(1.12f, 1.12f, 1.15f), 0, 0.18f, map: stone, bump: stoneN, bumpScale: 0.6f);
-            mStoneDark = Lit("StoneDark", new Color(0.72f, 0.7f, 0.8f), 0, 0.12f, map: stone, bump: stoneN);
+            mStoneDark = Lit("StoneDark", new Color(0.55f, 0.53f, 0.62f), 0, 0.12f, map: stone, bump: stoneN);
             mDeck = Lit("DeckStone", new Color(1.2f, 1.22f, 1.3f), 0, 0.18f, map: stone, bump: stoneN, bumpScale: 0.7f);
             mBrass = Lit("AgedBrass", Hex(0xA8844A), 0.6f, 0.45f, map: brassTex);
             mBrassPolished = Lit("PolishedBrass", Hex(0xC9A25A), 0.7f, 0.45f, map: brassTex);
-            mIron = Lit("Iron", Hex(0x2A2440), 0.35f, 0.3f);
-            bellGlow = Hex(0xFFA850) * 1.5f;
-            mCrack = Lit("BellCrackGlow", Color.black, 0, 0.5f, new Color(1f, 0.52f, 0.16f) * 2.5f);
+            mIron = Lit("Iron", Hex(0x2A2440), 0.35f, 0.3f); mIvory = Lit("PorcelainIvory", Hex(0xF4E9D1, 0.85f), 0, 0.5f);
+            bellGlow = new Color(1f, 0.55f, 0.2f) * 1.1f;
+            mCrack = Lit("BellCrackGlow", Color.black, 0, 0.5f, new Color(1f, 0.55f, 0.18f) * 2.0f);
             mGroove = Lit("BellCrackGroove", Hex(0x3A2614), 0.3f, 0.2f);
             mBellGlow = Lit("BellInteriorGlow", Hex(0x2A1A0A), 0, 0.3f, bellGlow, dbl: true);
             { var gp = new Color32[4 * 64]; for (int y = 0; y < 64; y++) { float f = Mathf.Pow(1 - y / 63f, 2.2f); for (int x = 0; x < 4; x++) gp[y * 4 + x] = C32(new Color(f, f, f, 1)); }
               mBellGlow.SetTexture("_EmissionMap", WritePng("BellGlowGradient.png", gp, 4, 64)); } // bright at the lip, falling off inside
-            mFlame = Lit("LanternFlame", Color.black, 0, 0.5f, new Color(1f, 0.6f, 0.25f) * 3.0f);
-            mGlass = Lit("LanternGlass", Hex(0x2A1A10), 0, 0.8f, new Color(1f, 0.72f, 0.4f) * 0.9f);
-            mRock = Lit("VoidRock", Hex(0x2A2438), 0, 0.08f, map: strata, bump: strataN);
-            mRockLight = Lit("VoidRockLight", Hex(0x3A3450), 0, 0.08f, map: strata, bump: strataN);
-            mPedestal = Lit("Pedestal", Hex(0x23222F), 0, 0.25f, map: stone, bump: stoneN, bumpScale: 0.5f);
+            mFlame = Lit("LanternFlame", Color.black, 0, 0.5f, new Color(1f, 0.52f, 0.16f) * 2.0f);
+            mGlass = Lit("LanternGlass", Hex(0x2A1A10), 0, 0.8f, new Color(1f, 0.62f, 0.26f) * 0.65f);
+            mRock = Lit("VoidRock", Hex(0x1E1A2A), 0, 0.08f, map: strata, bump: strataN);
+            mRockLight = Lit("VoidRockLight", Hex(0x2C2640), 0, 0.08f, map: strata, bump: strataN);
+            mPedestal = Lit("Pedestal", Hex(0x23222F), 0, 0.25f);
             mWindow = Lit("DrumWindowDark", Hex(0x0E0A12), 0, 0.2f);
             mWindowGlow = Lit("DrumWindowGlow", Hex(0x0E0A12), 0, 0.2f, new Color(1f, 0.5f, 0.18f) * 0.15f);
             mBanner = Lit("CrimsonBanner", new Color(1.35f, 1.15f, 1.15f), 0, 0.15f, dbl: true, map: PaintBanner());
@@ -1252,7 +1264,7 @@ namespace LastBell.Areas.Area4.EditorTools
             for (int i = 0; i < 12; i++)
             {
                 float a = start + 15 + i * 30; if (a > t1 - 5) break;
-                Box(g, Polar(a, rad - band / 2 - 0.05f), new Vector3(band * (i % 3 == 0 ? 0.9f : 0.5f), 0.3f, band * 0.6f), mIron, new Vector3(0, 90 - a, 0), "NumeralPlate");
+                Box(g, Polar(a, rad - band / 2 - 0.05f), new Vector3(band * (i % 3 == 0 ? 0.5f : 0.3f), 0.28f, band * 0.5f), mIvory, new Vector3(0, 90 - a, 0), "NumeralPlate");
                 Box(g, Polar(a, rad - band / 2 - 0.05f, 0.16f), new Vector3(band * 0.16f, 0.04f, band * 0.5f), mBrassPolished, new Vector3(0, 90 - a, 0), "Numeral");
                 if (i % 3 == 0) Box(g, Polar(a + 1.6f, rad - band / 2 - 0.05f, 0.16f), new Vector3(band * 0.16f, 0.04f, band * 0.5f), mBrassPolished, new Vector3(0, 90 - a, 0), "Numeral");
             }
@@ -1315,11 +1327,11 @@ namespace LastBell.Areas.Area4.EditorTools
             Chain(chains, "Chain_BottomRight", new Vector3(-30, -2, 6), new Vector3(-16, -9, 30), 5, 1.2f, link);
             // hanging bells (small versions of the hero bell, with clapper and lip band)
             mBronzePlain = Lit("HangingBellBronze", Hex(0x6A5236), 0.55f, 0.32f, dbl: true);
-            var small = Lathe("HangingBell", Densify(BellProfile(0.32f), 2), 48); var hb = Group("HangingBells", g).transform; var band = Torus("HangingBellBand", 2.2f, 0.07f, 48, 6);
+            var lowLink = Torus("ChainLinkLow", 0.26f, 0.075f, 10, 5, 360, 0, new Vector3(1, 1, 1.55f)); var small = Lathe("HangingBell", Densify(BellProfile(0.32f), 2), 48); var hb = Group("HangingBells", g).transform; var band = Torus("HangingBellBand", 2.2f, 0.07f, 48, 6);
             foreach (var (deg, r, y) in new[] { (296f, 42f, -9f), (324f, 47f, -7f), (36f, 46f, -8f), (66f, 41f, -10f), (252f, 27f, -1f), (108f, 27f, 0f), (348f, 22f, 7f) })
             {
                 var pivot = Group("HangingBell", hb, P(deg, r, y + 30)).transform; swingers.Add(pivot);
-                Prim(PrimitiveType.Cylinder, pivot, new Vector3(0, -15, 0), new Vector3(0.12f, 15, 0.12f), mIron, default, "Rope");
+                Chain(pivot, "BellChain", new Vector3(0, -31f, 0), new Vector3(0, 0, 0), 0.01f, 0.9f, lowLink);
                 float sc = Rr(0.6f, 1.0f); var b = MeshGO("Bell", small, pivot, new Vector3(0, -30 - 2.7f * sc, 0), mBronzePlain); b.transform.localScale = Vector3.one * sc;
                 MeshGO("Band", band, b.transform, new Vector3(0, 0.05f, 0), mBrass);
                 Prim(PrimitiveType.Sphere, b.transform, new Vector3(0, 0.3f, 0), Vector3.one * 0.7f, mIron, default, "Clapper");
@@ -1414,7 +1426,7 @@ namespace LastBell.Areas.Area4.EditorTools
             // −45° tilt: the mouth turns toward the camera, so the gameplay frame shows the glowing lip and cracks
             var bell = Group("Bell", root, new Vector3(0, 1.9f, -16.5f), Quaternion.Euler(-45, 0, 0)).transform;
             var jag = new System.Random(8);
-            var gaps = Enumerable.Range(0, prof.Length).Select(j => gapHalf * (0.75f + 0.5f * (float)jag.NextDouble()) * (j <= lipIdx ? 1 + 0.35f * j / lipIdx : 1.3f)).ToArray();
+            var gaps = Enumerable.Range(0, prof.Length).Select(j => gapHalf * ((j % 3 == 0 ? 1.3f : 0.8f) + 0.35f * (float)jag.NextDouble()) * (j <= lipIdx ? 1 + 0.35f * j / lipIdx : 1.3f)).ToArray();
             MeshGO("Body", Lathe("BellBody", prof, 128, j => gaps[j]), bell, Vector3.zero, mBronze);
             var inner = prof.Skip(lipIdx + 2).Take(14).Select(p => new Vector2(p.x * 0.96f, p.y + 0.02f)).ToArray();
             MeshGO("InteriorGlow", Lathe("BellInterior", inner, 64), bell, Vector3.zero, mBellGlow).GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
@@ -1430,7 +1442,7 @@ namespace LastBell.Areas.Area4.EditorTools
                 }
             }
             // fine branching cracks from the break: a dark groove with a thinner emissive core, tapering toward the tips
-            void Crack(float ph, float y, float w0, int steps, int depth)
+            void Crack(float ph, float y, float w0, int steps, int depth, float side)
             {
                 Vector3 last = Vector3.zero;
                 for (int s = 0; s < steps; s++)
@@ -1439,14 +1451,14 @@ namespace LastBell.Areas.Area4.EditorTools
                     if (s > 0)
                     {
                         var d = p - last; float w = Mathf.Lerp(w0, 0.012f, s / (float)steps); var rot = Quaternion.LookRotation(d).eulerAngles;
-                        Box(bell, (p + last) / 2, new Vector3(w * 1.6f, w * 1.6f, d.magnitude + 0.02f), mGroove, rot, "Groove");
-                        Box(bell, (p + last) / 2 + p.normalized * 0.01f, new Vector3(w * 0.9f, w * 1.3f, d.magnitude + 0.02f), mCrack, rot, "Crack");
-                        if (depth > 0 && (s == steps / 3 || s == 2 * steps / 3)) Crack(ph + (jag.NextDouble() < 0.5 ? 0.1f : -0.1f), y, w * 0.7f, 5, depth - 1);
+                        Box(bell, (p + last) / 2, new Vector3(w * 1.4f, w * 1.4f, d.magnitude + 0.02f), mGroove, rot, "Groove");
+                        Box(bell, (p + last) / 2 + p.normalized * 0.01f, new Vector3(w * 0.55f, w * 1.2f, d.magnitude + 0.02f), mCrack, rot, "Crack");
+                        if (depth > 0 && s == steps / 2) Crack(ph + side * 0.12f, y, w * 0.7f, 4, depth - 1, side);
                     }
-                    last = p; y += 0.25f + (float)jag.NextDouble() * 0.25f; ph += ((float)jag.NextDouble() - 0.5f) * 0.3f; if (y > 7.6f) break;
+                    last = p; y += 0.3f + (float)jag.NextDouble() * 0.35f; ph += side * (0.02f + (float)jag.NextDouble() * 0.06f) + ((float)jag.NextDouble() - 0.5f) * 0.12f; if (y > 7.6f) break;
                 }
             }
-            for (int c = 0; c < 7; c++) Crack((c % 2 == 0 ? 1 : -1) * (gapHalf * 1.9f + (float)jag.NextDouble() * 0.4f), 0.2f + (float)jag.NextDouble() * 0.8f, 0.04f, 14, 2);
+            for (int c = 0; c < 7; c++) { float side = c % 2 == 0 ? 1 : -1; Crack(side * (gapHalf * 1.9f + c * 0.06f), 0.2f + c * 0.35f, 0.04f, 10, 1, side); }
             // two broken shards drifting off the gap
             var shard = MeshGO("Shard", Lathe("BellShard", prof.Skip(8).Take(24).ToArray(), 6, j => Mathf.PI - 0.22f - 0.05f * (j % 3)), bell, new Vector3(-6.2f, 2.2f, 2.6f), Quaternion.Euler(25, 35, -20), mBronze);
             shard.transform.localScale = Vector3.one * 0.75f;
@@ -1465,8 +1477,8 @@ namespace LastBell.Areas.Area4.EditorTools
                 Chain(root, x < 0 ? "BellChain_L" : "BellChain_R", bot, top, 0.01f, 0.8f, link);
             }
             // interior light (rakes the north stair) and a faint cone below the mouth
-            var lg = Group("InteriorLight", bell, new Vector3(0, -1.5f, 0)).AddComponent<Light>();
-            lg.type = LightType.Point; lg.color = Hex(0xFFB060); lg.range = 24; lg.intensity = 6; lg.shadows = LightShadows.None;
+            var lg = Group("InteriorLight", bell, new Vector3(0, -4.5f, 1.5f)).AddComponent<Light>();
+            lg.type = LightType.Point; lg.color = Hex(0xFFB060); lg.range = 24; lg.intensity = 4.5f; lg.shadows = LightShadows.None;
             var cone = MeshGO("LightCone", ConeShell(5.2f, 7.5f, 6), bell, new Vector3(0, -6, 0), mCone); cone.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
             // astrolabe behind the bell: band with degree scale, rete (eccentric rings + star pointers), hub and pointer
             var astro = Group("AstrolabePivot", root, new Vector3(0, 2, -30), Quaternion.Euler(90, 0, 0)).transform;
@@ -1474,6 +1486,7 @@ namespace LastBell.Areas.Area4.EditorTools
             MeshGO("NumeralRing", Torus("AstroNumeralRing", 9.6f, 0.22f, 192, 6), ring, Vector3.zero, mBrass);
             MeshGO("ReteA", Torus("AstroReteA", 6.2f, 0.12f, 128, 6), ring, new Vector3(1.8f, 0.05f, 0.6f), mBrassPolished);
             MeshGO("ReteB", Torus("AstroReteB", 4.0f, 0.1f, 96, 6), ring, new Vector3(-1.4f, 0.08f, -0.9f), mBrass);
+            for (int i = 0; i < 4; i++) MeshGO("ReteArm", Torus("AstroReteArm", 5.2f, 0.1f, 48, 6, 75, i * 90), ring, Polar(i * 90 + 200, 2.6f, 0.1f), mBrassPolished); // curved rete arms
             for (int i = 0; i < 4; i++) Box(ring, Polar(i * 90 + 20, 5.3f), new Vector3(0.5f, 0.45f, 8.0f), mBrass, new Vector3(0, 70 - i * 90, 0), "Spoke");
             var star = Pyramid("AstroStar", 0.18f, 0.9f, 3, 0);
             for (int i = 0; i < 9; i++) { float a = i * 40 + 13, rr = 3.5f + (i % 3) * 2.2f; MeshGO("Star", star, ring, Polar(a, rr, 0.15f), Quaternion.Euler(0, 90 - a, 0) * Quaternion.Euler(90, 0, 0), mBrassPolished); }
@@ -1501,7 +1514,7 @@ namespace LastBell.Areas.Area4.EditorTools
 
         static void BuildLighting(Transform g)
         {
-            var sun = Group("MoonLight", g).AddComponent<Light>(); sun.type = LightType.Directional; sun.color = Hex(0xE4DDF0); sun.intensity = 1.15f;
+            var sun = Group("MoonLight", g).AddComponent<Light>(); sun.type = LightType.Directional; sun.color = Hex(0xF2E6DA); sun.intensity = 1.2f;
             sun.shadows = LightShadows.Soft; sun.shadowStrength = 0.8f;
             var from = (Out(315) * Mathf.Cos(55 * Mathf.Deg2Rad) + Vector3.up * Mathf.Sin(55 * Mathf.Deg2Rad)).normalized;
             sun.transform.rotation = Quaternion.LookRotation(-from);
@@ -1513,8 +1526,8 @@ namespace LastBell.Areas.Area4.EditorTools
             RenderSettings.sun = sun;
             RenderSettings.skybox = mSky;
             RenderSettings.ambientMode = AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = Hex(0x6E4FC2, 0.4f); RenderSettings.ambientEquatorColor = Hex(0x2B2358, 0.6f); RenderSettings.ambientGroundColor = Hex(0x0E0A1E);
-            RenderSettings.fog = true; RenderSettings.fogMode = FogMode.ExponentialSquared; RenderSettings.fogDensity = 0.014f; RenderSettings.fogColor = Hex(0x3A2F6E);
+            RenderSettings.ambientSkyColor = Hex(0x6E4FC2, 0.3f); RenderSettings.ambientEquatorColor = Hex(0x2B2358, 0.45f); RenderSettings.ambientGroundColor = Hex(0x0E0A1E);
+            RenderSettings.fog = true; RenderSettings.fogMode = FogMode.ExponentialSquared; RenderSettings.fogDensity = 0.011f; RenderSettings.fogColor = Hex(0x2A2152);
             RenderSettings.defaultReflectionMode = DefaultReflectionMode.Skybox; RenderSettings.reflectionIntensity = 0.5f; // the large realtime probe below covers the set
             var vol = Group("GlobalVolume", g).AddComponent<Volume>(); vol.isGlobal = true; vol.sharedProfile = MakeProfile();
             var probe = Group("FloorReflectionProbe", g, new Vector3(0, 3, 0)).AddComponent<ReflectionProbe>();
