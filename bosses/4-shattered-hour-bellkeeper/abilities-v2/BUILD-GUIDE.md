@@ -73,3 +73,7 @@ BK_SESSION=bellkeeper-leaning-bell tools/bellkeeper-v2/build-and-test.sh leaning
 ```
 
 Run it with `run_in_background` (a build is several minutes; waiting for the lock can be longer). Evidence: `C:\Users\BS_Ch\Documents\Codex\last bell\bellkeeper-v2-evidence\<name>\` (`autotest-report.txt`, `player.log`, `build.log`, screenshots, MP4s). Before your first build, copy the Unity `Library` from the integration worktree to skip a full import (PowerShell: `robocopy "C:\Users\BS_Ch\Documents\Codex\last bell\bellkeeper-abilities-v2\unity\Library" "<your worktree>\unity\Library" /E /MT:8 /NFL /NDL /NP`), and run `setup-assets.cmd` from your worktree root (`powershell -NoProfile -ExecutionPolicy Bypass -File tools/asset-packs/Get-AssetPacks.ps1`, run with the worktree as the current folder).
+
+**After a build:** Unity re-serializes scene and settings files (`Run/Maps/*.unity`, `RunArena.unity`, `Run/Resources/Run/*.mat`, `Assets/Settings/*`, `ProjectSettings/*`). They aren't yours: `git checkout --` them before you commit; commit only your own files.
+
+First scaffold run (`abilities-1`, set v2 with all five stubs): build succeeded; 29 of 30 v2 checks passed, and the one failure was a test bug (fixed in the next commit).
