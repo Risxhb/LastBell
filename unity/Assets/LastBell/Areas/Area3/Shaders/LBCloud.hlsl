@@ -63,7 +63,7 @@ float3 lbcApply(float3 col, float3 posWS)
     float3 cloud = lerp(_LB_CloudThin.rgb, _LB_CloudThick.rgb, saturate(n * 0.8 + c * 0.4));
     col = lerp(col, cloud, c);
     float d = distance(posWS, _WorldSpaceCameraPos);
-    float h = smoothstep(_LB_HazeStart, _LB_HazeEnd, d) * _LB_HazeAmount * keep;
+    float h = smoothstep(_LB_HazeStart, _LB_HazeEnd, d) * _LB_HazeAmount * keep * lerp(0.55, 1, c);
     col = lerp(col, _LB_HazeColor.rgb, h); // aerial perspective lifts and cools distant shapes toward the horizon
     return col;
 }

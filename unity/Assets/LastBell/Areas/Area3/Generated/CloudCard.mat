@@ -25,8 +25,8 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _Brightness: 1.25
-    - _Opacity: 0.75
+    - _Brightness: 1.5
+    - _Opacity: 0.85
     - _SoftDistance: 4
     m_Colors:
     - _WarmTop: {r: 0.95, g: 0.86, b: 0.7, a: 1}

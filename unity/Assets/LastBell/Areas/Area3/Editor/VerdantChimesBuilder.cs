@@ -181,7 +181,7 @@ namespace LastBell.Areas.Area3.EditorTools
                         case "Mist": mats[i] = Simple("LastBell/Area3/Mist", "Mist"); transparentFx = true; break;
                         case "Pool": mats[i] = Simple("LastBell/Area3/Pool", "Pool"); transparentFx = true; break;
                         case "Stone": case "StoneDark": case "Deck": mats[i] = Lit(name, c, false); mats[i].SetFloat("_StoneDetail", 1); mats[i].EnableKeyword("_LB_STONEDETAIL"); break;
-                        case "Ivy": case "Canopy": case "CanopyDark": case "Grass": case "Fern": mats[i] = Lit(name, c, false); mats[i].SetFloat("_Sway", name.StartsWith("Canopy") ? 0.6f : 1f); break; // foliage moves on the shared wind
+                        case "Ivy": case "Canopy": case "CanopyDark": case "CanopyLeaf": case "Grass": case "Fern": mats[i] = Lit(name, c, false); mats[i].SetFloat("_Sway", name.StartsWith("Canopy") ? 0.6f : 1f); break; // foliage moves on the shared wind
                         default: mats[i] = Lit(name, c, hasVc && name != "Grass"); break;
                     }
                     if (transparentFx || name.StartsWith("Glow") || name == "Grass" || name == "Fern") { r.shadowCastingMode = ShadowCastingMode.Off; }
@@ -309,14 +309,14 @@ namespace LastBell.Areas.Area3.EditorTools
             foreach (var f in falls)
             {
                 for (int i = 0; i < 30; i++) spray.Add((f.lip + f.side * (Rn() - 0.5f) * f.width + Vector3.down * Rn() * 0.6f, f.outward * (0.6f + Rn()) + f.side * (Rn() - 0.5f) * 0.6f, 1.6f + Rn() * 1.8f, new Color(0.9f, 0.98f, 0.96f, 0.45f), none));
-                for (int i = 0; i < 40; i++) glints.Add((f.lip + f.side * (Rn() - 0.5f) * f.width * 0.85f + f.outward * 0.15f, f.outward, 0.7f + Rn() * 0.5f, new Color(1, 1, 1, 1f), new Vector2(f.height, f.arc)));
+                for (int i = 0; i < 40; i++) glints.Add((f.lip + f.side * (Rn() - 0.5f) * f.width * 0.85f + f.outward * 0.7f, f.outward, 0.7f + Rn() * 0.5f, new Color(1, 1, 1, 1f), new Vector2(f.height, f.arc)));
                 var hit = f.lip + f.outward * f.arc + Vector3.down * f.height;
                 if (imp.Count < 24) imp.Add(new Vector4(hit.x, hit.z, hit.y, f.width));
                 for (int i = 0; i < 48; i++) rising.Add((new Vector3(hit.x, Mathf.Max(hit.y, -30) + Rn() * 3, hit.z) + f.side * (Rn() - 0.5f) * f.width + f.outward * (Rn() - 0.3f) * 3, Vector3.up, 0.6f + Rn() * 0.5f, new Color(0.2f, 0.78f, 0.72f, 0.75f), none));
             }
             impacts = imp.ToArray();
             Field(parent, "Spray", Mat("SprayField", 2, false), spray, rnd);
-            Field(parent, "Glints", Mat("GlintsField", 3, true), glints, rnd);
+            var gm = Mat("GlintsField", 3, true); gm.renderQueue = 3010; Field(parent, "Glints", gm, glints, rnd);
             Field(parent, "RisingMist", Mat("RisingMistField", 4, false), rising, rnd);
             var lanterns = root.GetComponentsInChildren<Transform>(true).Where(t => t.name == "Lantern").Select(t => t.position).ToList();
             var motes = new List<(Vector3, Vector3, float, Color, Vector2)>();
@@ -342,11 +342,11 @@ namespace LastBell.Areas.Area3.EditorTools
                 int n = Mathf.Clamp(Mathf.RoundToInt(rad * 1.5f), 3, 6);
                 for (int k = 0; k < n; k++)
                 {
-                    float a = Rn() * Mathf.PI * 2, y = Mathf.Lerp(-27, -11, Mathf.Pow(Rn(), 1.6f));
+                    float a = Rn() * Mathf.PI * 2, y = Mathf.Lerp(-22, -7, Mathf.Pow(Rn(), 1.3f));
                     cards.Add((new Vector3(b.center.x + Mathf.Cos(a) * (rad * 0.8f + 1.5f), y, b.center.z + Mathf.Sin(a) * (rad * 0.8f + 1.5f)), Vector3.up, 8 + Rn() * 8, Color.white, none));
                 }
             }
-            var cm = SaveAsset(new Material(Shader.Find("LastBell/Area3/CloudCard")), "CloudCard.mat");
+            var cm = new Material(Shader.Find("LastBell/Area3/CloudCard")); cm.SetFloat("_Brightness", 1.5f); cm.SetFloat("_Opacity", 0.85f); cm = SaveAsset(cm, "CloudCard.mat");
             Field(parent, "CloudCards", cm, cards, rnd);
             var plumes = new List<(Vector3, Vector3, float, Color, Vector2)>();
             foreach (var f in falls) { var hit = f.lip + f.outward * f.arc; for (int k = 0; k < 5; k++) plumes.Add((new Vector3(hit.x, Mathf.Lerp(-30, -17, Rn()), hit.z) + f.side * (Rn() - 0.5f) * f.width + f.outward * Rn() * 2, Vector3.up, 5 + Rn() * 5, Color.white, none)); }
