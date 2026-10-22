@@ -444,7 +444,7 @@ namespace LastBell.Areas.Area4.EditorTools
             var m = new Material(src) { name = src.name + "_Fade" }; MakeTransparent(m); return Save(m, m.name + ".mat");
         }
 
-        static Material mAstroBrass, mIvory, mFloor, mStone, mStoneCap, mStoneDark, mDeck, mBrass, mBrassPolished, mIron, mBronze, mBronzePlain, mCrack, mGroove, mBellGlow, mFlame, mGlass,
+        static Material mRuinCap, mAstroBrass, mIvory, mFloor, mStone, mStoneCap, mStoneDark, mDeck, mBrass, mBrassPolished, mIron, mBronze, mBronzePlain, mCrack, mGroove, mBellGlow, mFlame, mGlass,
             mRock, mRockLight, mBanner, mStation, mPedestal, mWindow, mWindowGlow, mVortex, mShaft, mCone, mSky;
         static Color floorEmission, bellGlow;
 
@@ -520,6 +520,18 @@ namespace LastBell.Areas.Area4.EditorTools
             return WritePng("BrassBreakup.png", px, N, N);
         }
 
+        // Lantern pane glow: bright warm centre fading to a dim amber rim (the hand-modelled panes are UV'd 0..1 per face).
+        static Texture2D PaintPaneGlow()
+        {
+            const int N = 64; var px = new Color32[N * N];
+            for (int y = 0; y < N; y++) for (int x = 0; x < N; x++)
+                {
+                    float dx = (x + 0.5f) / N - 0.5f, dy = ((y + 0.5f) / N - 0.42f) * 0.8f, d = Mathf.Sqrt(dx * dx + dy * dy) * 2;
+                    var c = Color.Lerp(new Color(1f, 0.92f, 0.7f), new Color(0.45f, 0.2f, 0.06f), Smooth(0.1f, 0.95f, d)); c.a = 1; px[y * N + x] = C32(c);
+                }
+            return WritePng("LanternPaneGlow.png", px, N, N);
+        }
+
         static (Texture2D, Texture2D) PaintStrata()
         {
             const int N = 512; var alb = new Color32[N * N]; var hgt = new Color32[N * N];
@@ -552,16 +564,16 @@ namespace LastBell.Areas.Area4.EditorTools
                 pts.Add((to, w1)); return pts.ToArray();
             }
             Vector2 nw = new Vector2(-1, 1).normalized, se = -nw;
-            var a = Walk(nw * 12.3f, nw * 3.2f + new Vector2(0.25f, 0.1f), 0.12f, 0.17f);
-            var b = Walk(se * 3.2f + new Vector2(-0.1f, -0.25f), se * 12.3f, 0.17f, 0.12f);
+            var a = Walk(nw * 12.3f, nw * 3.2f + new Vector2(0.25f, 0.1f), 0.16f, 0.26f);
+            var b = Walk(se * 3.2f + new Vector2(-0.1f, -0.25f), se * 12.3f, 0.26f, 0.16f);
             lines.Add(a); lines.Add(b);
             foreach (var main in new[] { a, b })
-                for (int k = 0; k < 2; k++) // two short hairline branches each, tapering to nothing
+                for (int k = 0; k < 4; k++) // four tapering branches each, of varied length
                 {
                     var (p0, w) = main[4 + (int)(F() * (main.Length - 9))];
-                    var mdir = (main[main.Length - 1].Item1 - main[0].Item1).normalized; float side = k == 0 ? 1 : -1;
-                    var dir = new Vector2(-mdir.y, mdir.x) * side * 0.7f + mdir * 0.7f; float len = 0.5f + F() * 0.5f;
-                    var br = Walk(p0, p0 + dir.normalized * len, 0.08f, 0.08f); for (int q = 0; q < br.Length; q++) br[q].Item2 = Mathf.Lerp(w * 0.45f, 0.015f, q / (br.Length - 1f));
+                    var mdir = (main[main.Length - 1].Item1 - main[0].Item1).normalized; float side = k % 2 == 0 ? 1 : -1;
+                    var dir = new Vector2(-mdir.y, mdir.x) * side * 0.7f + mdir * 0.7f; float len = 0.8f + F() * 1.4f;
+                    var br = Walk(p0, p0 + dir.normalized * len, 0.08f, 0.08f); for (int q = 0; q < br.Length; q++) br[q].Item2 = Mathf.Lerp(w * 0.6f, 0.02f, q / (br.Length - 1f));
                     lines.Add(br);
                 }
             return lines;
@@ -660,7 +672,7 @@ namespace LastBell.Areas.Area4.EditorTools
                             edge = Mathf.Min(Mathf.Min(v - slab.yMin, slab.yMax - v), Mathf.Min(u - slab.xMin, slab.xMax - u)); edge = Mathf.Min(edge, Mathf.Abs(r - 7.5f)); id0 = si; id1 = 3;
                         }
                         float t = Hash(id0, id1, 7); c = Color.Lerp(c1, c2, 0.3f + 0.4f * t); if (Hash(id0, id1, 9) < 0.28f) c = Color.Lerp(c, cBlue, 0.85f);
-                        c *= 0.89f + 0.22f * Hash(id0, id1, 13);  // ±11 % per slab
+                        c *= 0.84f + 0.32f * Hash(id0, id1, 13); c = Color.Lerp(c, Hash(id0, id1, 17) < 0.5f ? Hex(0x2B2A40) : Hex(0x1E2A3A), 0.25f * Hash(id0, id1, 19));  // ±16 % value and a slight violet or teal hue shift per slab
                     }
                     c *= 0.9f * (0.92f + 0.16f * drift) * (0.95f + 0.1f * n); c *= 0.97f + 0.06f * fine;
                     float hh = 0.66f + 0.34f * Smooth(0.008f, 0.05f, edge) + (n - 0.5f) * 0.06f;
@@ -677,7 +689,7 @@ namespace LastBell.Areas.Area4.EditorTools
                         if (cov > ink) ink = cov; if (cov * e > em) em = cov * e;
                         if (hw >= 0.024f && d < hw * 0.3f) engr = Mathf.Max(engr, cov);
                     }
-                    foreach (var (rr, hw, al, e) in Rings) if (Mathf.Abs(r - rr) < hw + px) Ink(Mathf.Abs(r - rr), hw, al, e);
+                    foreach (var (rr, hw0, al, e) in Rings) { float hw = hw0 * 1.4f; if (Mathf.Abs(r - rr) < hw + px) Ink(Mathf.Abs(r - rr), hw, al, e); } // inlay 1.4x wider than the table, so it reads from the game camera
                     if (r < 0.34f) Ink(r, 0.32f, 1, 0.14f);
                     if (r > 1f && r < 2.6f)
                     {
@@ -749,7 +761,7 @@ namespace LastBell.Areas.Area4.EditorTools
                     else if (d > -0.05f) { float t = Mathf.Clamp01(-d / 0.05f); c = Color.Lerp(body, core, t * 0.35f); e = Mathf.Lerp(0.2f, 0.6f, t); hh = 0.05f; }
                     else { c = core; e = 1; hh = 0.02f; }
                     alb[o] = C32(c); hgt[o] = G32(hh);
-                    var ec = e >= 1 ? new Color(1, 0.86f, 0.6f) * 0.8f : new Color(gold.r * e, gold.g * e, gold.b * e); var old = emi[o];
+                    var ec = e >= 1 ? new Color(1, 0.7f, 0.38f) * 0.55f : new Color(gold.r * e, gold.g * e, gold.b * e); var old = emi[o];
                     emi[o] = C32(new Color(Mathf.Max(ec.r, old.r / 255f), Mathf.Max(ec.g, old.g / 255f), Mathf.Max(ec.b, old.b / 255f), 1));
                 }
             // tiny broken stone chips along the crack lips
@@ -897,7 +909,9 @@ namespace LastBell.Areas.Area4.EditorTools
                 {
                     float u = (x + 0.5f) / W, n = Fbm(u * 30, v * 10), streak = VNoise(u * 140, v * 3, 15);
                     var c = bronze * (0.78f + 0.4f * n) * (0.82f + 0.32f * streak); float h = 0.5f + 0.1f * n;
-                    if (inside) c *= Mathf.Lerp(0.42f, 0.16f, Mathf.Sqrt(depthIn));
+                    c *= 0.88f + 0.2f * Mathf.Sin(v * 21f + n * 2f); // broad cast-tone bands
+                    c = Color.Lerp(c, Hex(0x46506A), 0.32f * Mathf.Clamp01(Fbm(u * 7, v * 3) * 2.2f - 1.0f)); // verdigris-violet patina in the shadows
+                    if (inside) c *= Mathf.Lerp(0.42f, 0.12f, Mathf.Sqrt(depthIn));
                     float lipD = Mathf.Abs(j - lipIdx), brk = Mathf.Min(u, 1 - u);
                     if (lipD < 1.6f) c = Color.Lerp(c, worn, (1 - lipD / 1.6f) * 0.85f);
                     if (brk < 0.012f) { c = Color.Lerp(c, worn, (1 - brk / 0.012f) * 0.7f); h -= 0.1f; }
@@ -914,9 +928,9 @@ namespace LastBell.Areas.Area4.EditorTools
                     if (gf < 1) { c *= gf; h -= (1 - gf) * 0.45f; }
                     if (ce > 0) c = Color.Lerp(c, Hex(0x7A4A18), ce);
                     c.a = 1; alb[o] = C32(c); hgt[o] = G32(h);
-                    float glow = inside ? Mathf.Pow(Mathf.Clamp01(1 - depthIn * 2.0f), 1.8f) * 0.6f : 0; // warm glow just inside the lip, dark deeper in
-                    emi[o] = C32(new Color(Mathf.Max(ce, glow), Mathf.Max(ce * 0.66f, glow * 0.55f), Mathf.Max(ce * 0.31f, glow * 0.2f), 1));
-                    float mtl = inside ? 0.15f : 0.6f, sm = inside ? 0.12f : 0.36f + 0.1f * n; met[o] = C32(new Color(mtl, mtl, mtl, sm)); // matte, dark interior; metallic outside
+                    float glow = inside ? Mathf.Pow(Mathf.Clamp01(1 - depthIn * 3.2f), 2.0f) * 0.8f : 0; // warm glow just inside the lip, dark deeper in
+                    emi[o] = C32(new Color(Mathf.Max(ce, glow), Mathf.Max(ce * 0.66f, glow * 0.7f), Mathf.Max(ce * 0.31f, glow * 0.32f), 1));
+                    float mtl = inside ? 0.12f : 0.38f, sm = inside ? 0.1f : 0.26f + 0.1f * n; met[o] = C32(new Color(mtl, mtl, mtl, sm)); // matte, dark interior; metallic outside
                 }
             });
             return (WritePng("BellBronze.png", alb, W, Hh), WritePng("BellBronzeHeight.png", hgt, W, Hh), WritePng("BellCracks.png", emi, W, Hh), WritePng("BellMetal.png", met, W, Hh, true));
@@ -996,7 +1010,7 @@ namespace LastBell.Areas.Area4.EditorTools
             var (alb, hgt, emi) = PaintFloor();
             floorEmission = new Color(1f, 0.72f, 0.36f) * 1.25f;
             mFloor = new Material(lit) { name = "Floor" };
-            mFloor.SetTexture("_BaseMap", alb); mFloor.SetColor("_BaseColor", Color.white); mFloor.SetFloat("_Smoothness", 0.26f); mFloor.SetFloat("_Metallic", 0.05f);
+            mFloor.SetTexture("_BaseMap", alb); mFloor.SetColor("_BaseColor", new Color(0.68f, 0.72f, 0.84f)); mFloor.SetFloat("_Smoothness", 0.26f); mFloor.SetFloat("_Metallic", 0.05f); // darker cool slate so the floor sits under the bright void
             mFloor.SetTexture("_BumpMap", hgt); mFloor.SetFloat("_BumpScale", 1); mFloor.EnableKeyword("_NORMALMAP");
             mFloor.SetTexture("_EmissionMap", emi); mFloor.SetColor("_EmissionColor", floorEmission); mFloor.EnableKeyword("_EMISSION");
             mFloor.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive; Save(mFloor, "Floor.mat");
@@ -1007,10 +1021,10 @@ namespace LastBell.Areas.Area4.EditorTools
             if (blStone) stone = blStone; if (blStoneN) stoneN = blStoneN; if (blBrass) brassTex = blBrass;
             mStone = Lit("StoneTrim", Color.white, 0, 0.14f, map: stone, bump: stoneN);
             mStoneCap = Lit("StoneCap", new Color(1.12f, 1.12f, 1.15f), 0, 0.18f, map: stone, bump: stoneN, bumpScale: 0.6f);
-            mStoneDark = Lit("StoneDark", new Color(0.55f, 0.53f, 0.62f), 0, 0.12f, map: stone, bump: stoneN);
+            mStoneDark = Lit("StoneDark", new Color(0.55f, 0.53f, 0.62f), 0, 0.12f, map: stone, bump: stoneN); mRuinCap = Lit("RuinCap", new Color(0.74f, 0.72f, 0.82f), 0, 0.14f, map: stone, bump: stoneN);
             mDeck = Lit("DeckStone", new Color(1.2f, 1.22f, 1.3f), 0, 0.18f, map: stone, bump: stoneN, bumpScale: 0.7f);
             mBrass = Lit("AgedBrass", Hex(0xA8844A), 0.6f, 0.45f, map: brassTex);
-            mBrassPolished = Lit("PolishedBrass", Hex(0xC9A25A), 0.7f, 0.45f, map: brassTex); mAstroBrass = Lit("AstrolabeBrass", Hex(0xC38D46), 0.5f, 0.45f, Hex(0x2A1806), map: brassTex);
+            mBrassPolished = Lit("PolishedBrass", Hex(0xC9A25A), 0.7f, 0.45f, map: brassTex); mAstroBrass = Lit("AstrolabeBrass", Hex(0xC8904A), 0.42f, 0.45f, Hex(0x3A2208), map: brassTex);
             mIron = Lit("Iron", Hex(0x2A2440), 0.35f, 0.3f); mIvory = Lit("PorcelainIvory", Hex(0xF4E9D1, 0.85f), 0, 0.5f);
             bellGlow = new Color(1f, 0.55f, 0.2f) * 0.95f;
             mCrack = Lit("BellCrackGlow", Color.black, 0, 0.5f, new Color(1f, 0.55f, 0.18f) * 3.0f);
@@ -1019,7 +1033,7 @@ namespace LastBell.Areas.Area4.EditorTools
             { var gp = new Color32[4 * 64]; for (int y = 0; y < 64; y++) { float f = Mathf.Pow(1 - y / 63f, 2.2f); for (int x = 0; x < 4; x++) gp[y * 4 + x] = C32(new Color(f, f, f, 1)); }
               mBellGlow.SetTexture("_EmissionMap", WritePng("BellGlowGradient.png", gp, 4, 64)); } // bright at the lip, falling off inside
             mFlame = Lit("LanternFlame", Color.black, 0, 0.5f, new Color(1f, 0.52f, 0.16f) * 2.0f);
-            mGlass = Lit("LanternGlass", Hex(0x2A1A10), 0, 0.8f, new Color(1f, 0.62f, 0.26f) * 0.65f);
+            mGlass = Lit("LanternGlass", Hex(0x2A1A10), 0, 0.8f, new Color(1f, 0.66f, 0.3f) * 1.1f); mGlass.SetTexture("_EmissionMap", PaintPaneGlow());
             mRock = Lit("VoidRock", Hex(0x2C2842), 0, 0.08f, map: strata, bump: strataN);
             mRockLight = Lit("VoidRockLight", Hex(0x3A3454), 0, 0.08f, map: strata, bump: strataN);
             mPedestal = Lit("Pedestal", Hex(0x23222F), 0, 0.25f);
@@ -1033,6 +1047,8 @@ namespace LastBell.Areas.Area4.EditorTools
             mShaft = Save(new Material(Shader.Find("LastBell/Area4/ShatteredShaft")) { name = "LightShaft" }, "LightShaft.mat"); mShaft.SetFloat("_Alpha", 0.1f); mShaft.SetColor("_Color", new Color(1f, 0.6f, 0.26f));
             mCone = Save(new Material(Shader.Find("LastBell/Area4/ShatteredShaft")) { name = "BellCone" }, "BellCone.mat"); mCone.SetFloat("_Alpha", 0.03f); mCone.SetFloat("_Fade", 1);
             mSky = Save(new Material(Shader.Find("LastBell/Area4/ShatteredVoidSky")) { name = "VoidSky" }, "VoidSky.mat");
+            // brighter purple-magenta nebula, so the dark floor and rim stand against the void
+            mSky.SetColor("_Nebula", new Color(0.62f, 0.34f, 0.92f)); mSky.SetColor("_Wisp", new Color(0.78f, 0.55f, 0.98f)); mSky.SetFloat("_NebulaStrength", 0.6f);
         }
 
         static void BuildFloor(Transform arena)
@@ -1070,7 +1086,19 @@ namespace LastBell.Areas.Area4.EditorTools
             foreach (var d in new[] { 45f, 135f, 225f, 315f }) Gaps.Add((d, GapSt));
             var edges = Gaps.SelectMany(x => new[] { (Mathf.Repeat(x.center - x.half, 360), false), (Mathf.Repeat(x.center + x.half, 360), true) }).OrderBy(e => e.Item1).ToList();
             var walls = Group("Parapet", g).transform; var arcade = new GameObject("tmpArcade");
-            for (int i = 0; i < edges.Count; i++)
+            Mesh parapetModel = ModelMesh("Rim/Rim.fbx", "Parapet_Module"), drumModel = ModelMesh("Rim/Rim.fbx", "Drum_Bay"), spireModel = ModelMesh("Rim/Rim.fbx", "Rock_Spire");
+            if (parapetModel)  // Blender parapet: 7.5° modules (pivot at the arena centre) fill each run, stretched slightly to fit
+                for (int i = 0; i < edges.Count; i++)
+                {
+                    if (!edges[i].Item2) continue; float d0 = edges[i].Item1, d1 = edges[(i + 1) % edges.Count].Item1; if (d1 < d0) d1 += 360;
+                    int n = Mathf.Max(1, Mathf.RoundToInt((d1 - d0) / 7.5f)); float step = (d1 - d0) / n; var run = Group("Run_" + i, walls).transform;
+                    for (int k = 0; k < n; k++)
+                    {
+                        var m = MeshGO("Parapet", parapetModel, run, Vector3.zero, Facing(d0 + (k + 0.5f) * step), mStone, mStoneCap, mBrass, mStoneDark);
+                        m.transform.localScale = new Vector3(step / 7.5f, 1, 1);
+                    }
+                }
+            for (int i = 0; i < edges.Count && !parapetModel; i++)
             {
                 if (!edges[i].Item2) continue; float d0 = edges[i].Item1, d1 = edges[(i + 1) % edges.Count].Item1; if (d1 < d0) d1 += 360;
                 float t0 = Th(d1), t1 = Th(d0); var seg = Group("Run_" + i, walls).transform; bool south = (d0 + d1) / 2 > 100 && (d0 + d1) / 2 < 260;
@@ -1090,13 +1118,16 @@ namespace LastBell.Areas.Area4.EditorTools
                     Box(a, new Vector3(0, 0.15f, -0.01f), new Vector3(0.52f, 0.62f, 0.02f), mStoneDark, default, "Recess");
                 }
             }
-            MeshGO("BlindArcade", Combine(arcade, new[] { mStoneCap, mStoneDark }, "BlindArcade"), walls, Vector3.zero, Quaternion.identity, mStoneCap, mStoneDark);
+            if (arcade.transform.childCount > 0) MeshGO("BlindArcade", Combine(arcade, new[] { mStoneCap, mStoneDark }, "BlindArcade"), walls, Vector3.zero, Quaternion.identity, mStoneCap, mStoneDark);
+            else Object.DestroyImmediate(arcade);
             // drum: buttresses with set-offs and sloped caps, tracery windows (every third glows faintly), brass band with studs
             var drum = Group("Drum", g).transform;
-            MeshGO("DrumWall", ArcPrism("DrumWall", RimOut - 0.4f, RimOut, -4.4f, -0.45f, 0, 360, false, Trim, 2, false), drum, Vector3.zero, mStone);
-            MeshGO("DrumBand", Torus("DrumBand", RimOut + 0.04f, 0.09f, 192, 8), drum, new Vector3(0, -0.52f, 0), mBrass);
-            for (int i = 0; i < 48; i++) Box(drum, Polar(i * 7.5f, RimOut + 0.12f, -0.52f), new Vector3(0.12f, 0.22f, 0.08f), mBrassPolished, new Vector3(0, 90 - i * 7.5f, 0), "Stud");
-            for (int i = 0; i < 24; i++)
+            if (drumModel)
+                for (int i = 0; i < 24; i++) MeshGO("DrumBay_" + i, drumModel, drum, Vector3.zero, Facing(i * 15), mStone, mStoneCap, mBrass, mBrassPolished, i % 3 == 0 ? mWindowGlow : mWindow);
+            if (!drumModel) MeshGO("DrumWall", ArcPrism("DrumWall", RimOut - 0.4f, RimOut, -4.4f, -0.45f, 0, 360, false, Trim, 2, false), drum, Vector3.zero, mStone);
+            if (!drumModel) MeshGO("DrumBand", Torus("DrumBand", RimOut + 0.04f, 0.09f, 192, 8), drum, new Vector3(0, -0.52f, 0), mBrass);
+            for (int i = 0; i < 48 && !drumModel; i++) Box(drum, Polar(i * 7.5f, RimOut + 0.12f, -0.52f), new Vector3(0.12f, 0.22f, 0.08f), mBrassPolished, new Vector3(0, 90 - i * 7.5f, 0), "Stud");
+            for (int i = 0; i < 24 && !drumModel; i++)
             {
                 float deg = i * 15; var b = Group("Buttress_" + i, drum, P(deg, RimOut + 0.3f, -2.4f), Facing(deg)).transform;
                 Box(b, new Vector3(0, 0.3f, 0), new Vector3(0.9f, 3.4f, 0.6f), mStone);
@@ -1111,7 +1142,7 @@ namespace LastBell.Areas.Area4.EditorTools
                 Tracery(w, 1.0f, 0.9f, 0.05f, mBrass);
                 Box(w, new Vector3(0, -0.62f, 0.08f), new Vector3(1.2f, 0.1f, 0.2f), mStoneCap, default, "Sill");
             }
-            MeshGO("RockSpire", Spire("RockSpire", RimOut - 0.2f, 18, 18, 6, 0.16f), g, new Vector3(0, -4.4f, 0), mRock);
+            MeshGO("RockSpire", spireModel ? spireModel : Spire("RockSpire", RimOut - 0.2f, 18, 18, 6, 0.16f), g, new Vector3(0, -4.4f, 0), mRock);
             // pinnacles (three heights), in pairs either side of each gap, plus four between
             var pin = new Dictionary<int, Mesh>(); foreach (int h in new[] { 25, 35, 45 }) pin[h] = PinnacleMesh(h / 10f);
             var spots = new List<(float deg, int h)>();
@@ -1124,7 +1155,7 @@ namespace LastBell.Areas.Area4.EditorTools
                 float dd = Mathf.Repeat(deg, 360); if (dd > 100 && dd < 260) fadeTargets.Add(p);
             }
             // lanterns on the cap, outside each pinnacle pair; lights on every other one
-            var lan = LanternMesh(); var lans = Group("Lanterns", g).transform; int li = 0;
+            var lan = ModelMesh("Void/Void.fbx", "Lantern") ?? LanternMesh(); var lans = Group("Lanterns", g).transform; int li = 0;
             foreach (var (c, half) in Gaps)
                 foreach (var s in new[] { -1, 1 })
                 {
@@ -1191,6 +1222,13 @@ namespace LastBell.Areas.Area4.EditorTools
         static void BuildStations(Transform arena)
         {
             var g = Group("RitualStations", arena).transform;
+            var model = ModelMesh("Station/Station.fbx", "Rim_Station");
+            if (model)  // Blender station: one model per station, slots stone / cap / brass / polished / dial / pedestal
+            {
+                string[] names = { "NE", "SE", "SW", "NW" };
+                for (int i = 0; i < 4; i++) { float deg = 45 + i * 90; MeshGO("RitualStation_" + names[i], model, g, P(deg, 13.2f), Facing(deg), mStone, mStoneCap, mBrass, mBrassPolished, mStation, mPedestal); }
+                return;
+            }
             var dial = Disc("StationDial", 1.9f, 128, 1.9f);
             var ringA = Torus("StationRingOuter", 1.92f, 0.07f, 128, 10); var ringB = Torus("StationRingInner", 1.6f, 0.035f, 128, 8);
             var bulge = ArcPrism("StationBulge", 1.95f, 2.5f, -0.45f, RimH - 0.08f, -100, 100, true, Trim, 4);
@@ -1227,7 +1265,26 @@ namespace LastBell.Areas.Area4.EditorTools
 
         static void BuildEntrances(Transform arena)
         {
-            var g = Group("Entrances", arena).transform; var pinS = PinnacleMesh(2.4f); var post = SmallPostMesh(); var bannerBig = BannerMesh(1.3f, 4.0f); var bannerSmall = BannerMesh(0.95f, 3.2f);
+            var g = Group("Entrances", arena).transform;
+            const string EF = "Entrances/Entrances.fbx";
+            Mesh southM = ModelMesh(EF, "South_Approach"), gateM = ModelMesh(EF, "Gatehouse"), pylonM = ModelMesh(EF, "Pylon"), northM = ModelMesh(EF, "North_Stair"), bridgeM = ModelMesh(EF, "Bridge");
+            if (southM && gateM && pylonM && northM && bridgeM)  // Blender entrances, placed in each entrance's local frame
+            {
+                var se = Group("Entrance_South", g, Vector3.zero, Facing(180)).transform; float cy0 = RimOut + 2.7f;
+                MeshGO("SouthApproach", southM, se, Vector3.zero, Quaternion.identity, mDeck, mBrass, mStone, mStoneCap, mBrassPolished, mRock);
+                foreach (var x in new[] { -2.25f, 2.25f })
+                {
+                    var gh = MeshGO(x < 0 ? "Gatehouse_A" : "Gatehouse_B", gateM, se, new Vector3(x * 1.35f, 0, RimOut + 1.6f), Quaternion.identity, mStone, mBrass, mStoneCap, mBrassPolished, mBanner);
+                    fadeTargets.Add(gh);
+                    MeshGO("Pylon", pylonM, se, new Vector3(x * 1.55f, 0, cy0 + 5.5f), Quaternion.identity, mStone, mBrass, mStoneCap, mBrassPolished, mBanner);
+                }
+                var ne = Group("Stair_North", g, Vector3.zero, Facing(0)).transform;
+                MeshGO("NorthStair", northM, ne, Vector3.zero, Quaternion.identity, mDeck, mBrass, mPedestal, mBrassPolished, mStone, mStoneCap, mRock);
+                foreach (var (deg, label) in new[] { (90f, "Bridge_East"), (270f, "Bridge_West") })
+                    MeshGO("Bridge", bridgeM, Group(label, g, Vector3.zero, Facing(deg)).transform, Vector3.zero, Quaternion.identity, mDeck, mBrass, mStone, mStoneCap, mBrassPolished, mStoneDark, mRock, mBanner);
+                return;
+            }
+            var pinS = PinnacleMesh(2.4f); var post = SmallPostMesh(); var bannerBig = BannerMesh(1.3f, 4.0f); var bannerSmall = BannerMesh(0.95f, 3.2f);
             // South: grand stair down to a long causeway, flanked by gatehouses hung with crimson banners
             var s = Group("Entrance_South", g, Vector3.zero, Facing(180)).transform;
             for (int i = 0; i < 6; i++)
@@ -1345,11 +1402,18 @@ namespace LastBell.Areas.Area4.EditorTools
             return g;
         }
 
+        // A Blender clock ring (slots: band brass, polished, iron, ivory) under its own spin group, or null when missing.
+        static Transform RingModel(Transform pivot, string name, string model, Material band)
+        {
+            var m = ModelMesh("Rings/Rings.fbx", model); if (!m) return null;
+            var g = Group(name, pivot).transform; MeshGO(name + "Model", m, g, Vector3.zero, Quaternion.identity, band, mBrassPolished, mIron, mIvory); return g;
+        }
+
         static void BuildClockRings(Transform g)
         {
             void Spin(Transform t, float s) { spinners.Add(t); spinSpeeds.Add(s); }
-            var right = Group("RightPivot", g, P(76, 47, -12), Quaternion.Euler(72, -25, -10)).transform; Spin(ClockRing(right, "Right", 10, 1.4f, 290, 200, 3), -1.6f);
-            var low = Group("LowPivot", g, P(298, 50, -24), Quaternion.Euler(35, 40, 0)).transform; Spin(ClockRing(low, "Low", 8, 1.2f, 300, 30, 3), 2.2f);
+            var right = Group("RightPivot", g, P(76, 47, -12), Quaternion.Euler(72, -25, -10)).transform; Spin(RingModel(right, "Right", "Ring_Right", mBrass) ?? ClockRing(right, "Right", 10, 1.4f, 290, 200, 3), -1.6f);
+            var low = Group("LowPivot", g, P(298, 50, -24), Quaternion.Euler(35, 40, 0)).transform; Spin(RingModel(low, "Low", "Ring_Low", mBrass) ?? ClockRing(low, "Low", 8, 1.2f, 300, 30, 3), 2.2f);
         }
 
         static void BuildVoid(Transform arena)
@@ -1359,27 +1423,27 @@ namespace LastBell.Areas.Area4.EditorTools
             vortex.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
             bool CamSide(Vector3 p) => p.z > 12 && Mathf.Abs(p.x) < 22 && p.y > -14;
             // floating gothic arcades: three modules, fewer and larger, pushed back from the gameplay frame's top corners
-            var arcades = new[] { ArcadeMesh(2, 0), ArcadeMesh(3, 1), ArcadeMesh(4, 2) };
+            const string VF = "Void/Void.fbx"; var arcades = new[] { ModelMesh(VF, "Arcade_2") ?? ArcadeMesh(2, 0), ModelMesh(VF, "Arcade_3") ?? ArcadeMesh(3, 1), ModelMesh(VF, "Arcade_4") ?? ArcadeMesh(4, 2) };
             var ruins = Group("Ruins", g).transform;
             var places = new List<(float deg, float r, float y, int v, float s)> { (322, 60, -22, 2, 1.3f), (38, 61, -23, 2, 1.3f), (90, 38, -4, 1, 1.2f), (270, 38, -6, 1, 1.15f),
                 (240, 42, -14, 0, 1.0f), (120, 41, -16, 0, 1.0f), (0, 48, -12, 1, 1.25f), (200, 40, -22, 2, 0.9f), (160, 40, -24, 1, 0.9f), (345, 52, -8, 0, 1.0f) };
             foreach (var (deg, r, y, v, s) in places)
             {
                 var p = P(deg, r, y); if (CamSide(p)) continue;
-                var a = MeshGO("Arcade", arcades[v], ruins, p, Quaternion.LookRotation(-Out(deg)) * Quaternion.Euler(Rr(-18, 18), Rr(-20, 20), Rr(-10, 10)), mStoneDark, mBrass, mStoneCap);
+                var a = MeshGO("Arcade", arcades[v], ruins, p, Quaternion.LookRotation(-Out(deg)) * Quaternion.Euler(Rr(-18, 18), Rr(-20, 20), Rr(-10, 10)), mStoneDark, mBrass, mRuinCap);
                 a.transform.localScale = Vector3.one * s; bobbers.Add(a.transform);
             }
             // inverted spire chunks
-            var chunkMeshes = Enumerable.Range(0, 4).Select(i => Spire("FloatingSpire", Rr(1.2f, 2.6f), Rr(4, 10), 6 + i, 4, 0.25f)).ToArray();
+            var chunkMeshes = Enumerable.Range(0, 4).Select(i => ModelMesh(VF, "SpireChunk_" + i) ?? Spire("FloatingSpire", Rr(1.2f, 2.6f), Rr(4, 10), 6 + i, 4, 0.25f)).ToArray();
             var spires = Group("FloatingSpires", g).transform; var spireClusters = Enumerable.Range(0, 3).Select(i => Group("DebrisClusterSpires_" + i, spires).transform).ToArray(); foreach (var c in spireClusters) bobbers.Add(c);
             for (int i = 0; i < 24; i++)
             {
                 float deg = Rr(0, 360), r = Rr(20, 55); var p = P(deg, r, Rr(-30, 6)); if (CamSide(p)) continue;
-                var c = MeshGO("Spire", chunkMeshes[i % 4], spireClusters[i % 3], p, Quaternion.Euler(Rr(-12, 12), Rn() * 360, Rr(-12, 12)), mRock);
+                var c = MeshGO("Spire", chunkMeshes[i % 4], spireClusters[i % 3], p, Quaternion.Euler(Rr(-12, 12), Rn() * 360, Rr(-12, 12)), mRock, mStoneDark);
 
             }
             // debris in ten drifting clusters (one merged mesh each)
-            var rocks = Enumerable.Range(0, 8).Select(i => Rock("Rock", 0.25f)).ToArray(); var deb = Group("Debris", g).transform;
+            var rocks = Enumerable.Range(0, 8).Select(i => ModelMesh(VF, "Rock_" + (i % 6)) ?? Rock("Rock", 0.25f)).ToArray(); var deb = Group("Debris", g).transform;
             var clusters = Enumerable.Range(0, 10).Select(i => Group("DebrisCluster_" + i, deb).transform).ToArray(); foreach (var c in clusters) bobbers.Add(c);
             for (int i = 0; i < 120; i++)
             {
@@ -1389,7 +1453,7 @@ namespace LastBell.Areas.Area4.EditorTools
                 k.transform.localScale = Vector3.one * s;
             }
             // diagonal chains crossing the frame corners (oval links)
-            var link = Torus("ChainLink", 0.26f, 0.075f, 20, 8, 360, 0, new Vector3(1, 1, 1.55f));
+            var link = ModelMesh(VF, "Chain_Link") ?? Torus("ChainLink", 0.26f, 0.075f, 20, 8, 360, 0, new Vector3(1, 1, 1.55f));
             var chains = Group("Chains", g).transform;
             Chain(chains, "Chain_TopLeft", new Vector3(44, -3, -6), new Vector3(14, -5, -42), 8, 1.2f, link);
             Chain(chains, "Chain_TopRight", new Vector3(-44, -3, -6), new Vector3(-14, -5, -42), 8, 1.2f, link);
@@ -1397,12 +1461,14 @@ namespace LastBell.Areas.Area4.EditorTools
             Chain(chains, "Chain_BottomRight", new Vector3(-30, -2, 6), new Vector3(-16, -9, 30), 5, 1.2f, link);
             // hanging bells (small versions of the hero bell, with clapper and lip band)
             mBronzePlain = Lit("HangingBellBronze", Hex(0x6A5236), 0.55f, 0.32f, dbl: true);
-            var lowLink = Torus("ChainLinkLow", 0.26f, 0.075f, 10, 5, 360, 0, new Vector3(1, 1, 1.55f)); var small = Lathe("HangingBell", Densify(BellProfile(0.32f), 2), 48); var hb = Group("HangingBells", g).transform; var band = Torus("HangingBellBand", 2.2f, 0.07f, 48, 6);
-            foreach (var (deg, r, y) in new[] { (296f, 42f, -9f), (324f, 47f, -7f), (36f, 46f, -8f), (66f, 41f, -10f), (252f, 27f, -1f), (108f, 27f, 0f), (348f, 22f, 7f) })
+            var lowLink = ModelMesh(VF, "Chain_Link_Low") ?? Torus("ChainLinkLow", 0.26f, 0.075f, 10, 5, 360, 0, new Vector3(1, 1, 1.55f)); var hangM = ModelMesh(VF, "Hanging_Bell"); var small = Lathe("HangingBell", Densify(BellProfile(0.32f), 2), 48); var hb = Group("HangingBells", g).transform; var band = Torus("HangingBellBand", 2.2f, 0.07f, 48, 6);
+            foreach (var (deg, r, y) in new[] { (296f, 42f, -9f), (324f, 47f, -7f), (36f, 46f, -8f), (66f, 41f, -10f), (252f, 36f, -1f), (108f, 36f, 0f), (348f, 22f, 7f) })
             {
                 var pivot = Group("HangingBell", hb, P(deg, r, y + 30)).transform; swingers.Add(pivot);
                 Chain(pivot, "BellChain", new Vector3(0, -31f, 0), new Vector3(0, 0, 0), 0.01f, 0.9f, lowLink);
-                float sc = Rr(0.6f, 1.0f); var b = MeshGO("Bell", small, pivot, new Vector3(0, -30 - 2.7f * sc, 0), mBronzePlain); hangingBells.Add(b.GetComponent<MeshRenderer>()); MeshGO("Crown", Torus("HangingBellCrown", 0.4f, 0.12f, 16, 6), b.transform, new Vector3(0, 3.6f, 0), Quaternion.Euler(90, 0, 0), mBronzePlain); b.transform.localScale = Vector3.one * sc;
+                float sc = Rr(0.6f, 1.0f);
+                if (hangM) { var hbm = MeshGO("Bell", hangM, pivot, new Vector3(0, -30 - 2.7f * sc, 0), Quaternion.identity, mBronzePlain, mBrass, mBronzePlain, mIron); hbm.transform.localScale = Vector3.one * sc; hangingBells.Add(hbm.GetComponent<MeshRenderer>()); continue; }
+                var b = MeshGO("Bell", small, pivot, new Vector3(0, -30 - 2.7f * sc, 0), mBronzePlain); hangingBells.Add(b.GetComponent<MeshRenderer>()); MeshGO("Crown", Torus("HangingBellCrown", 0.4f, 0.12f, 16, 6), b.transform, new Vector3(0, 3.6f, 0), Quaternion.Euler(90, 0, 0), mBronzePlain); b.transform.localScale = Vector3.one * sc;
                 MeshGO("Band", band, b.transform, new Vector3(0, 0.05f, 0), mBrass);
                 Prim(PrimitiveType.Sphere, b.transform, new Vector3(0, 0.3f, 0), Vector3.one * 0.7f, mIron, default, "Clapper");
             }
@@ -1502,21 +1568,66 @@ namespace LastBell.Areas.Area4.EditorTools
             return mb.Build("BellBreakFaces");
         }
 
+        // Per-row half-angle of the bell's jagged break. blender/bell/bell.py uses the same formula, so the Blender
+        // model and the paint made here line up.
+        static float BellGap(int j, float gapHalf, int lipIdx)
+        {
+            float h = (j * 0.6180339887f) % 1f;
+            return gapHalf * ((j % 3 == 0 ? 1.3f : 0.8f) + 0.35f * h) * (j <= lipIdx ? 1 + 0.35f * j / lipIdx : 1.3f);
+        }
+
         static (Light, Transform) BuildBell(Transform root)
         {
             const float k = 5.5f / 6.9f, gapHalf = 15 * Mathf.Deg2Rad;  // mouth radius 5.5 m, height ≈ 8.3 m, 30° break
             var prof = Densify(BellProfile(k), 2); int lipIdx = 20; float[] bandY = { 0.12f, 2.72f, 6.08f };
-            var jag = new System.Random(8);
-            var gaps = Enumerable.Range(0, prof.Length).Select(j => gapHalf * ((j % 3 == 0 ? 1.3f : 0.8f) + 0.35f * (float)jag.NextDouble()) * (j <= lipIdx ? 1 + 0.35f * j / lipIdx : 1.3f)).ToArray();
+            var gaps = Enumerable.Range(0, prof.Length).Select(j => BellGap(j, gapHalf, lipIdx)).ToArray();
             var (bt, btN, crk, bmet) = PaintBell(prof, lipIdx, bandY, gaps);
-            var painted = Lit("HangingBellBronzePainted", new Color(1.1f, 1.08f, 1.05f), 0.55f, 0.32f, dbl: true, map: bt, bump: btN); foreach (var hr in hangingBells) hr.sharedMaterial = painted; // same profile, so the bell paint fits; no crack glow
-            mBronze = Lit("BellBronze", Color.white, 0.6f, 0.35f, new Color(1f, 0.62f, 0.28f) * 2.6f, dbl: true, map: bt, bump: btN); mBronze.SetTexture("_EmissionMap", crk); mBronze.SetTexture("_MetallicGlossMap", bmet); mBronze.EnableKeyword("_METALLICSPECGLOSSMAP"); mBronze.SetFloat("_Smoothness", 1f);
+            var painted = Lit("HangingBellBronzePainted", new Color(1.1f, 1.08f, 1.05f), 0.55f, 0.32f, dbl: true, map: bt, bump: btN); foreach (var hr in hangingBells) { var ms = hr.sharedMaterials; ms[0] = painted; hr.sharedMaterials = ms; } // same profile, so the bell paint fits; no crack glow
+            mBronze = Lit("BellBronze", new Color(0.92f, 0.8f, 0.64f), 0.6f, 0.35f, new Color(1f, 0.62f, 0.28f) * 2.6f, dbl: true, map: bt, bump: btN); mBronze.SetTexture("_EmissionMap", crk); mBronze.SetTexture("_MetallicGlossMap", bmet); mBronze.EnableKeyword("_METALLICSPECGLOSSMAP"); mBronze.SetFloat("_Smoothness", 1f);
             // −45° tilt: the mouth turns toward the camera, so the gameplay frame shows the glowing lip and cracks
             var bell = Group("Bell", root, new Vector3(0, 1.9f, -16.5f), Quaternion.Euler(-45, 0, 0)).transform;
+            const string BF = "Bell/Bell.fbx";
+            Mesh bodyM = ModelMesh(BF, "Bell_Body"), partsM = ModelMesh(BF, "Bell_Parts"), shardM = ModelMesh(BF, "Bell_Shard"), shard2M = ModelMesh(BF, "Bell_Shard2");
+            bool hand = bodyM && partsM && shardM && shard2M;
+            float topY = prof[0].y; GameObject shard;
+            if (hand)  // Blender bell: body (painted bronze) + parts (break walls, rim, bands, numerals, crown, yoke, clapper) + shards
+            {
+                MeshGO("Body", bodyM, bell, Vector3.zero, mBronze);
+                MeshGO("Parts", partsM, bell, Vector3.zero, Quaternion.identity, mBronzePlain, mBrass, mBrassPolished, mIron);
+                var shardMat = Lit("BellShard", new Color(1.05f, 0.86f, 0.62f), 0.3f, 0.3f, dbl: true, map: bt, bump: btN); var fracMat = Lit("BellFracture", Hex(0x5A3A18), 0.4f, 0.3f, new Color(1f, 0.62f, 0.28f) * 1.4f); // shards reuse the bell paint; the fracture rim glows faintly like the cracks
+                shard = MeshGO("Shard", shardM, bell, new Vector3(-6.2f, 2.2f, 2.6f), Quaternion.Euler(25, 35, -20), shardMat, fracMat); shard.transform.localScale = Vector3.one * 0.75f;
+                MeshGO("Shard2", shard2M, shard.transform, new Vector3(2.4f, -1.2f, 1.4f), Quaternion.Euler(-30, 60, 10), shardMat, fracMat);
+            }
+            else shard = ProceduralBellParts(bell, prof, lipIdx, bandY, gaps);
+            var link = ModelMesh("Void/Void.fbx", "Chain_Link") ?? Torus("BellChainLink", 0.26f, 0.075f, 20, 8, 360, 0, new Vector3(1, 1, 1.55f));
+            foreach (var x in new[] { -1.5f, 1.5f })
+            {
+                var top = bell.TransformPoint(new Vector3(x * 2.4f, topY + 40, 0)); var bot = bell.TransformPoint(new Vector3(x, topY + 1.6f, 0));
+                Chain(root, x < 0 ? "BellChain_L" : "BellChain_R", bot, top, 0.01f, 0.8f, link);
+            }
+            // interior light (rakes the north stair) and a faint cone below the mouth
+            var lg = Group("InteriorLight", bell, new Vector3(0, -5.5f, -1.5f)).AddComponent<Light>();
+            lg.type = LightType.Point; lg.color = Hex(0xFFB060); lg.range = 16; lg.intensity = 3f; lg.shadows = LightShadows.None;
+            var cone = MeshGO("LightCone", ConeShell(5.2f, 7.5f, 6), bell, new Vector3(0, -6, 0), mCone); cone.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
+            // astrolabe behind the bell
+            var astro = Group("AstrolabePivot", root, new Vector3(0, 2, -30), Quaternion.Euler(90, 0, 0)).transform;
+            var ring = RingModel(astro, "Astrolabe", "Astrolabe", mAstroBrass) ?? ProceduralAstrolabe(astro);
+            spinners.Add(ring); spinSpeeds.Add(1.5f);
+            var frags = Group("AstrolabeFragments", astro).transform; var fragM = ModelMesh("Rings/Rings.fbx", "Astro_Fragment");
+            for (int i = 0; i < 4; i++)
+            {
+                var pos = Polar(40 + i * 6, 14.3f + i * 0.5f, Rr(-0.6f, 0.6f)); var rot = new Vector3(Rr(-30, 30), Rr(0, 90), Rr(-30, 30));
+                var fr = fragM ? MeshGO("Fragment", fragM, frags, pos, Quaternion.Euler(rot), mBrass) : Box(frags, pos, new Vector3(Rr(0.5f, 1.0f), 0.24f, Rr(0.8f, 1.6f)), mBrass, rot, "Fragment");
+                bobbers.Add(fr.transform);
+            }
+            return (lg, shard.transform);
+        }
+
+        // Fallback when the Blender bell isn't present: the procedural bell parts.
+        static GameObject ProceduralBellParts(Transform bell, Vector2[] prof, int lipIdx, float[] bandY, float[] gaps)
+        {
             MeshGO("Body", Lathe("BellBody", prof, 128, j => gaps[j]), bell, Vector3.zero, mBronze);
             MeshGO("BreakFaces", BreakFaces(prof, lipIdx, gaps), bell, Vector3.zero, mBronzePlain); // wall thickness on both jagged edges of the break
-            var inner = prof.Skip(lipIdx + 2).Take(10).Select(p => new Vector2(p.x * 0.96f, p.y + 0.02f)).ToArray();
-
             // gold bands with raised numeral studs, broken at the gap (gap centred on +Z = Unity polar 90°)
             foreach (var y in bandY)
             {
@@ -1543,18 +1654,12 @@ namespace LastBell.Areas.Area4.EditorTools
             var clapper = new[] { new Vector2(0.09f, topY - 0.6f), new Vector2(0.11f, 2.6f), new Vector2(0.2f, 2.1f), new Vector2(0.42f, 1.6f), new Vector2(0.62f, 1.05f), new Vector2(0.58f, 0.6f), new Vector2(0.36f, 0.3f), new Vector2(0f, 0.22f) };
             MeshGO("Clapper", Lathe("BellClapper", clapper, 24), bell, Vector3.zero, mIron);
             MeshGO("ClapperCollar", Torus("ClapperCollar", 0.2f, 0.07f, 24, 8), bell, new Vector3(0, 2.15f, 0), mBrassPolished);
-            var link = Torus("BellChainLink", 0.26f, 0.075f, 20, 8, 360, 0, new Vector3(1, 1, 1.55f));
-            foreach (var x in new[] { -1.5f, 1.5f })
-            {
-                var top = bell.TransformPoint(new Vector3(x * 2.4f, topY + 40, 0)); var bot = bell.TransformPoint(new Vector3(x, topY + 1.6f, 0));
-                Chain(root, x < 0 ? "BellChain_L" : "BellChain_R", bot, top, 0.01f, 0.8f, link);
-            }
-            // interior light (rakes the north stair) and a faint cone below the mouth
-            var lg = Group("InteriorLight", bell, new Vector3(0, -5.5f, -1.5f)).AddComponent<Light>();
-            lg.type = LightType.Point; lg.color = Hex(0xFFB060); lg.range = 16; lg.intensity = 3f; lg.shadows = LightShadows.None;
-            var cone = MeshGO("LightCone", ConeShell(5.2f, 7.5f, 6), bell, new Vector3(0, -6, 0), mCone); cone.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
-            // astrolabe behind the bell: band with degree scale, rete (eccentric rings + star pointers), hub and pointer
-            var astro = Group("AstrolabePivot", root, new Vector3(0, 2, -30), Quaternion.Euler(90, 0, 0)).transform;
+            return shard;
+        }
+
+        // Fallback when the Blender astrolabe isn't present: the procedural ring, rete, spokes, stars, hub and pointer.
+        static Transform ProceduralAstrolabe(Transform astro)
+        {
             var ring = ClockRing(astro, "Astrolabe", 14, 2.4f, 290, 110, 0); foreach (var mr in ring.GetComponentsInChildren<MeshRenderer>()) if (mr.sharedMaterial == mBrass) mr.sharedMaterial = mAstroBrass;
             MeshGO("NumeralRing", Torus("AstroNumeralRing", 9.6f, 0.22f, 192, 6), ring, Vector3.zero, mBrass);
             MeshGO("ReteA", Torus("AstroReteA", 6.2f, 0.22f, 128, 6), ring, new Vector3(1.8f, 0.05f, 0.6f), mBrassPolished);
@@ -1565,10 +1670,7 @@ namespace LastBell.Areas.Area4.EditorTools
             for (int i = 0; i < 9; i++) { float a = i * 40 + 13, rr = 3.5f + (i % 3) * 2.2f; MeshGO("Star", star, ring, Polar(a, rr, 0.15f), Quaternion.Euler(0, 90 - a, 0) * Quaternion.Euler(90, 0, 0), mBrassPolished); }
             Prim(PrimitiveType.Cylinder, ring, Vector3.zero, new Vector3(3, 0.3f, 3), mBrassPolished, default, "Hub");
             Box(ring, Polar(60, 4.5f, 0.3f), new Vector3(0.3f, 0.12f, 9.2f), mIron, new Vector3(0, 30, 0), "Pointer");
-            spinners.Add(ring); spinSpeeds.Add(1.5f);
-            var frags = Group("AstrolabeFragments", astro).transform;
-            for (int i = 0; i < 4; i++) { var fr = Box(frags, Polar(40 + i * 6, 14.3f + i * 0.5f, Rr(-0.6f, 0.6f)), new Vector3(Rr(0.5f, 1.0f), 0.24f, Rr(0.8f, 1.6f)), mBrass, new Vector3(Rr(-30, 30), Rr(0, 90), Rr(-30, 30)), "Fragment"); bobbers.Add(fr.transform); }
-            return (lg, shard.transform);
+            return ring;
         }
 
         // Open cone shell (top radius r0 at y = h, bottom radius r1 at y = 0) with uv.y = 1 at the top, for the additive shaft.
@@ -1587,19 +1689,22 @@ namespace LastBell.Areas.Area4.EditorTools
 
         static void BuildLighting(Transform g)
         {
-            var sun = Group("MoonLight", g).AddComponent<Light>(); sun.type = LightType.Directional; sun.color = Hex(0xF2E6DA); sun.intensity = 1.2f;
+            var sun = Group("MoonLight", g).AddComponent<Light>(); sun.type = LightType.Directional; sun.color = Hex(0xF6DCC0); sun.intensity = 1.3f;
             sun.shadows = LightShadows.Soft; sun.shadowStrength = 0.8f;
             var from = (Out(315) * Mathf.Cos(55 * Mathf.Deg2Rad) + Vector3.up * Mathf.Sin(55 * Mathf.Deg2Rad)).normalized;
             sun.transform.rotation = Quaternion.LookRotation(-from);
             // cool fill from the camera side and a cool rim from behind, so dark architecture separates from the void
-            var fill = Group("CoolFill", g).AddComponent<Light>(); fill.type = LightType.Directional; fill.color = Hex(0x6F7CFF); fill.intensity = 0.45f; fill.shadows = LightShadows.None;
+            var fill = Group("CoolFill", g).AddComponent<Light>(); fill.type = LightType.Directional; fill.color = Hex(0x6F7CFF); fill.intensity = 0.4f; fill.shadows = LightShadows.None;
             fill.transform.rotation = Quaternion.LookRotation(-(Out(150) * 0.6f + Vector3.up * 0.8f).normalized);
-            var rim = Group("CoolRim", g).AddComponent<Light>(); rim.type = LightType.Directional; rim.color = Hex(0x8C9BFF); rim.intensity = 0.85f; rim.shadows = LightShadows.None;
+            var rim = Group("CoolRim", g).AddComponent<Light>(); rim.type = LightType.Directional; rim.color = Hex(0x9AA6FF); rim.intensity = 1.15f; rim.shadows = LightShadows.None;
             rim.transform.rotation = Quaternion.LookRotation(-(Out(10) * 0.85f + Vector3.up * 0.5f).normalized);
+            // warm key from the bell side: low amber light that rakes the floor and catches parapet tops and pinnacle faces
+            var warm = Group("WarmBellKey", g).AddComponent<Light>(); warm.type = LightType.Directional; warm.color = Hex(0xFFB46A); warm.intensity = 0.55f; warm.shadows = LightShadows.None;
+            warm.transform.rotation = Quaternion.LookRotation(-(Out(0) * 0.8f + Vector3.up * 0.45f).normalized);
             RenderSettings.sun = sun;
             RenderSettings.skybox = mSky;
             RenderSettings.ambientMode = AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = Hex(0x6E4FC2, 0.3f); RenderSettings.ambientEquatorColor = Hex(0x2B2358, 0.45f); RenderSettings.ambientGroundColor = Hex(0x0E0A1E);
+            RenderSettings.ambientSkyColor = Hex(0x5A3FA8, 0.3f); RenderSettings.ambientEquatorColor = Hex(0x231C4A, 0.45f); RenderSettings.ambientGroundColor = Hex(0x0E0A1E);
             RenderSettings.fog = true; RenderSettings.fogMode = FogMode.ExponentialSquared; RenderSettings.fogDensity = 0.013f; RenderSettings.fogColor = Hex(0x3B3270);
             RenderSettings.defaultReflectionMode = DefaultReflectionMode.Skybox; RenderSettings.reflectionIntensity = 0.5f; // the large realtime probe below covers the set
             var vol = Group("GlobalVolume", g).AddComponent<Volume>(); vol.isGlobal = true; vol.sharedProfile = MakeProfile();
