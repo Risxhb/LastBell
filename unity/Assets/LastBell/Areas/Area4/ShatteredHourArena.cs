@@ -96,7 +96,7 @@ namespace LastBell.Areas.Area4
                 if (!bobbers[i]) continue;
                 float period = 15 + 10 * Frac(i * 0.618f), ph = i * 2.39f;
                 bobbers[i].localPosition = bobBase[i] + Vector3.up * (0.4f * Mathf.Sin(t * Mathf.PI * 2 / period + ph));
-                bobbers[i].Rotate(0, (Frac(i * 0.37f) - 0.5f) * 6f * dt * m, 0, Space.Self);
+                if (!bobbers[i].name.StartsWith("DebrisCluster")) bobbers[i].Rotate(0, (Frac(i * 0.37f) - 0.5f) * 6f * dt * m, 0, Space.Self); // merged clusters only bob
             }
             for (int i = 0; i < swingBase.Length; i++)
                 if (swingers[i]) swingers[i].localRotation = swingBase[i] * Quaternion.Euler(0.7f * Mathf.Sin(t * 0.5f * m + i), 0, 0.5f * Mathf.Cos(t * 0.37f * m + i * 1.7f));
