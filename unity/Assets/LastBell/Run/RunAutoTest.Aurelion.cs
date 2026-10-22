@@ -34,6 +34,7 @@ namespace LastBell.Run
             yield return Until(() => d.State == RunState.Combat, 4, "Aurelion combat");
             var a = d.Boss as AurelionEncounter;
             Check("Aurelion practice starts the Aurelion encounter", a != null && d.Mode == RunMode.Practice && a.PhaseName == "Perfect Order");
+            Check("Aurelion uses its rigged model", a != null && a.Presenter != null && a.Presenter.HasModel);
             if (a == null) { d.ReturnToMenu(); yield break; }
 
             var taken = new Dictionary<string, int>();
@@ -86,6 +87,8 @@ namespace LastBell.Run
             Check("Aurelion: never more than two damaging patterns live", mon.MaxPatterns <= 2 && a.MaxLiveHazards <= 2, $"max patterns {mon.MaxPatterns}, max hazards {a.MaxLiveHazards}");
             Check("Aurelion: phase transformations deal and warn nothing", mon.HazardsDuringShift == 0, mon.HazardsDuringShift + " ticks");
             Check("Aurelion: hits use the short 0.15 s stun", mon.WrongStun == 0);
+            var wantClips = new[] { "Idle", "Walk", "MeridianCut", "ZenithPins", "ProcessionalThrust", "CrownReversal", "MeridianAlignment", "OpenChest", "PhaseShift" };
+            Check("Aurelion plays every fight clip", wantClips.All(mon.Clips.Contains), "missing: " + string.Join(", ", wantClips.Where(c => !mon.Clips.Contains(c))));
             int total = taken.Values.Sum();
             Note("dodge bot (4.2 m/s walk, 0.25 s reaction, dashes only when walking can't make it) damage taken: " + (total == 0 ? "none" : string.Join(", ", taken.Select(kv => $"{kv.Key} {kv.Value}"))));
             Note("dodge bot dashes by attack: " + string.Join(", ", botDashes.Select(kv => $"{kv.Key} {kv.Value}")));
@@ -155,6 +158,7 @@ namespace LastBell.Run
         {
             public int MaxPatterns, PinsAfterCut, BothLive, RingsTogether, HazardsDuringShift, WrongStun;
             public int EarlyReversal, MinBehindAtReversal = int.MaxValue;
+            public readonly HashSet<string> Clips = new HashSet<string>();
         }
         IEnumerator Monitor(AurelionEncounter a, AurelionMonitor m)
         {
@@ -169,6 +173,7 @@ namespace LastBell.Run
                 if (pin != null && cut != null) { m.BothLive++; if (pin.ResolveAt - pin.Age >= cut.ResolveAt - cut.Age) m.PinsAfterCut++; }
                 if (live.Any(h => h.Source == "Meridian Alignment") && live.Any(h => h.Source == "Meridian Alignment II")) m.RingsTogether++;
                 if (a.Current == "phase shift" && live.Count > 0) m.HazardsDuringShift++;
+                if (a.Presenter != null && !string.IsNullOrEmpty(a.Presenter.CurrentClip)) m.Clips.Add(a.Presenter.CurrentClip);
                 foreach (var h in live)
                 {
                     if (!seen.Add(h)) continue;

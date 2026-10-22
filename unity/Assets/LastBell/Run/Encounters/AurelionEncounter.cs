@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace LastBell.Run
 {
-    // Aurelion, the Meridian Regent: the Skyward Spire area boss. Graybox: code-built silhouette (4.2 m) and the
+    // Aurelion, the Meridian Regent: the Skyward Spire area boss. Meshy model rigged in Blender (4.2 m) and the
     // Steady Ticking schedule from the boss packet (bosses/1-skyward-spire-aurelion/BOSS.md, handoff PR #46). Every
     // number below starts from that packet and is a proposal, not tested balance. Times are converted at 60 Hz
     // ("track" = ticks the warning follows before it locks):
@@ -118,7 +118,7 @@ namespace LastBell.Run
         }
         IEnumerable<int> Cut()
         {
-            Current = "Meridian Cut"; CutHazard();
+            Current = "Meridian Cut"; CutHazard(); Clip("MeridianCut", CutWarn + CutRec);
             for (int i = 0; i < CutWarn; i++) { Windup(i / (float)CutWarn); yield return 1; }
             foreach (var w in Recover(CutRec)) yield return w;
         }
@@ -158,7 +158,7 @@ namespace LastBell.Run
         }
         IEnumerable<int> Pins()
         {
-            Current = "Zenith Pins"; TurnTowards(YawToTarget(), 9999);
+            Current = "Zenith Pins"; TurnTowards(YawToTarget(), 9999); Clip("ZenithPins", PinWarn + PinRec);
             PinVolley();
             for (int i = 0; i < PinWarn; i++) { Windup(i / (float)PinWarn); yield return 1; }
             pose = Pose.Neutral;
@@ -170,10 +170,10 @@ namespace LastBell.Run
         IEnumerable<int> PinsThenCut()
         {
             PinsCutCombos++;
-            Current = "Zenith Pins"; TurnTowards(YawToTarget(), 9999);
+            Current = "Zenith Pins"; TurnTowards(YawToTarget(), 9999); Clip("ZenithPins", PinWarn + PinRec);
             PinVolley();
             yield return PinTrack;
-            Current = "Meridian Cut"; CutHazard();
+            Current = "Meridian Cut"; CutHazard(); Clip("MeridianCut", CutWarn + CutRec);
             for (int i = 0; i < CutWarn; i++) { Windup(i / (float)CutWarn); yield return 1; }
             foreach (var w in Recover(CutRec)) yield return w;
         }
@@ -181,6 +181,7 @@ namespace LastBell.Run
         IEnumerable<int> Thrust()
         {
             Current = "Processional Thrust"; ThrustsStarted++; thrustReady = Age + ThrustCd; pose = Pose.Level;
+            Clip("ProcessionalThrust", ThrustWarn + ThrustTravel + ThrustRec);
             var start = transform.position; var target = Target();
             var dir = Sim.Flat(target - start); if (dir.sqrMagnitude < 1) dir = transform.forward; dir.Normalize();
             float travel = Mathf.Clamp(Sim.Flat(target - start).magnitude + 2f, 3f, ThrustMax);
@@ -226,6 +227,7 @@ namespace LastBell.Run
         IEnumerable<int> Reversal()
         {
             Current = "Crown Reversal"; ReversalsStarted++; revReady = Age + RevCd; pose = Pose.LookBack;
+            Clip("CrownReversal", RevWarn + RevRec);
             LastReversalBehindTicks = 0; foreach (var kv in behind) LastReversalBehindTicks = Mathf.Max(LastReversalBehindTicks, kv.Value);
             behind.Clear();
             var h = Tune(W.Hazards.Spawn(new Hazard
@@ -244,6 +246,7 @@ namespace LastBell.Run
         IEnumerable<int> Alignment()
         {
             Current = "Meridian Alignment"; AlignmentsStarted++; alignReady = Age + AlignCd; pose = Pose.Planted;
+            Clip("MeridianAlignment", AlignWarn1 + AlignWarn2);
             var at = transform.position;
             bool firstDone = false;
             var a = Tune(Ring("Meridian Alignment", at, AlignOuterIn, AlignOuterOut, AlignWarn1, AlignDmg));
@@ -255,7 +258,7 @@ namespace LastBell.Run
             b.OnResolve = hz => { W.BossFx.TollResolve(hz.Origin, hz.Inner, hz.Radius); Release(1.2f); };
             SpawnOrrery(b, -1);
             for (int i = 0; i < AlignWarn2; i++) { Windup(i / (float)AlignWarn2); yield return 1; }
-            Current = "open chest"; pose = Pose.Exposed; glowTarget = 0.3f;
+            Current = "open chest"; pose = Pose.Exposed; glowTarget = 0.3f; Clip("OpenChest", AlignRec);
             alignEndAge = Age;   // the last ring has just resolved
             yield return AlignRec;
             glowTarget = 1; pose = Pose.Neutral;
@@ -324,7 +327,7 @@ namespace LastBell.Run
         IEnumerable<int> PhaseShift()
         {
             Current = "phase shift"; SetPhase(phase == 2 ? "Misalignment" : "Exposed Meridian");
-            pose = Pose.Neutral; glowTarget = 2.5f;
+            pose = Pose.Neutral; glowTarget = 2.5f; Clip("PhaseShift", 90);
             for (int i = 0; i < 90; i++) { if (i == 45) { W.Fx.Crescendo(transform.position, true, 0, false); Release(1.2f); } yield return 1; }
             glowTarget = 1;
         }
@@ -338,10 +341,19 @@ namespace LastBell.Run
                 behind[p] = InRear(p.transform.position) ? t + 1 : 0;
             }
             MaxLiveHazards = Mathf.Max(MaxLiveHazards, W.Hazards.Count);
+            if (presenter) presenter.TickBoss(Current == "approach" || Current == "reposition" ? "Walk" : "Idle");
         }
         public int BehindTicks(PlayerController p) => behind.TryGetValue(p, out int t) ? t : 0;
 
-        // ---------------- graybox presentation (no model yet) ----------------
+        // ---------------- model: the Meshy Aurelion rigged in Blender (prototype/arena-3d/models/build-aurelion.ps1) ----------------
+        // Clips are authored so their strike frame sits at the attack's resolve time; PlayOnce stretches a clip to the
+        // given ticks, which keep the same proportions. Without the model the code-built stand-in below is used.
+        CharacterPresenter presenter;
+        public CharacterPresenter Presenter => presenter;
+        public override bool Placeholder => !presenter || !presenter.HasModel;
+        void Clip(string name, int ticks) { if (presenter) presenter.Action(name, ticks); }
+
+        // ---------------- stand-in presentation (used only when Resources/Characters/Aurelion is missing) ----------------
         enum Pose { Neutral, CutWindup, CutDone, Halo, Level, Thrust, LookBack, Planted, Exposed }
         Pose pose;
         Transform body, glaive, head, pendulum, shutterL, shutterR, shoulderL, banners;
@@ -353,7 +365,12 @@ namespace LastBell.Run
         protected override void Build()
         {
             PhaseName = "Perfect Order";
-            body = new GameObject("Body").transform; body.SetParent(transform, false);
+            presenter = CharacterPresenter.Create(transform, "Aurelion", 3f, 0.8f, 0, host => { BuildStandIn(host); return host; });
+        }
+
+        void BuildStandIn(Transform host)
+        {
+            body = new GameObject("Body").transform; body.SetParent(host, false);
             // legs: long, brass knee and hip joints
             foreach (float s in new[] { -1f, 1f })
             {
@@ -413,6 +430,7 @@ namespace LastBell.Run
         {
             base.Update();
             UpdateOrreries(Time.deltaTime);
+            if (presenter) presenter.GlowLevel = glowLevel;
             if (!body) return;
             float dt = Time.deltaTime;
             // one idle pendulum beat; it stops on defeat
@@ -458,7 +476,7 @@ namespace LastBell.Run
 
         protected override void OnDefeat()
         {
-            glowTarget = 0.1f; glowLevel = 2.5f; pose = Pose.Planted;
+            glowTarget = 0.1f; glowLevel = 2.5f; pose = Pose.Planted; Clip("Defeat", 150);
             W.Fx.Crescendo(transform.position, true, 2, true);
         }
     }

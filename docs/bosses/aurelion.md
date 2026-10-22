@@ -2,7 +2,19 @@
 
 The Skyward Spire area boss, built from Codex's four-boss handoff ([PR #46](https://github.com/Risxhb/collab/pull/46), board [#47](https://github.com/Risxhb/collab/issues/47)). The branch is `feature/boss-aurelion`, stacked on `feature/run-loop` ([PR #42](https://github.com/Risxhb/collab/pull/42)).
 
-Aurelion is a **practice-only slot** for now. Open the menu and pick **Practice one encounter → Aurelion**. The run itself is unchanged. The model is a code-built stand-in (`Placeholder`). The fight takes place in the shared test arena, not the Skyward Spire scene.
+Aurelion is a **practice-only slot** for now. Open the menu and pick **Practice one encounter → Aurelion**. The run itself is unchanged. The fight takes place in the shared test arena, not the Skyward Spire scene.
+
+## Model
+
+Aurelion uses Chzy18's Meshy model, made from the multi-view images in `prototype/arena-3d/models/upload/aurelion-{front,side,back}.png`. The images are cut from the model sheet by `tools/aurelion/aurelion_meshy_views.py`. The model is rigged and animated in Blender.
+
+- **Source:** `prototype/arena-3d/models/upload/Meshy/Meshy_AI_Aurelion_1022020536_texture.glb`. Meshy named it "Verdant Bellwarden"; it was renamed when it was copied in.
+- **Build:** `powershell -File prototype/arena-3d/models/build-aurelion.ps1`. It runs `blender/aurelion_prep.py` (scales him to 4.2 m with his head centred, and adds glow masks for the cobalt eyes and the chest pendulum), then `blender/aurelion_rig.py`. The output is `unity/Assets/LastBell/Characters/Aurelion/Resources/Characters/Aurelion.glb` (2.9 MB, about 15.6k triangles).
+- **Rig:** a humanoid chain plus five rigid bones. The glaive is in the right fist, and its direction is set absolutely, so arm swings never flip it; it slides up the shaft instead of going through the floor. There is also the chest pendulum, the halo, and the left and right halo arc pairs. The waist banners and the centre tabard are pinned to the hips.
+- **Clips:** Idle, Walk, MeridianCut, ZenithPins, ProcessionalThrust, CrownReversal, MeridianAlignment, OpenChest, PhaseShift and Defeat. Each attack clip has its strike frame at the attack's resolve time, and the encounter stretches the clip over the attack's warning plus recovery.
+- **Checking poses without Unity:** `tools/aurelion/pose_render.py` renders a clip at chosen times.
+
+The code-built figure is now only a fallback, used if the GLB is missing.
 
 ## What's implemented
 
@@ -49,7 +61,7 @@ Rules from the packet that the code follows:
   - `Hazard.HitOnResolve = false` lets the owner deal the hits itself while the warning is up. The Thrust uses this for its moving blade.
 - **`RunAutoTest`:** now a `partial` class. The Aurelion section is in `RunAutoTest.Aurelion.cs`. `-lastbellAurelionOnly` runs only that section.
 
-## Evidence: the autotest's Aurelion section (47 checks; full suite 153/153)
+## Evidence: the autotest's Aurelion section (49 checks; full suite 155/155)
 
 **Route proofs** use the real `Hazard.Contains` geometry with the player margin, the boss body and the floor bound. They allow 0.25 s of reaction after the lock. The 4.2 m/s rows are the prototype walk and the 6.0 m/s rows are the design walk.
 
@@ -95,10 +107,10 @@ Further checks:
 
 - **Stagger.** There is no boss stagger yet.
 - **Counterclock.** This is the extra Midnight Toll attack, and the run has no difficulty tiers yet.
-- **Model and media.** No authored model, animation or audio. The Skyward Spire arena (from `feature/class-test-arena`) is not used.
+- **Media.** No audio yet. The animation is a first Blender pass. The Phase 2 cracked shoulder and the Phase 3 opening chest shutters exist only on the fallback figure; the Meshy model would need extra parts for them. The Skyward Spire arena (from `feature/class-test-arena`) is not used.
 - **Two or more players.** Pins assign 1, 2 or 3 circles by party size, but the run only spawns one player.
 
-## Screenshots (autotest run 12, 153/153 passed)
+## Screenshots (autotest run 14, 155/155 passed)
 
 ![Phase 1](aurelion-shots/aurelion_phase1.png)
 ![Alignment ring I with the orrery rings](aurelion-shots/aurelion_alignment_ring1.png)
