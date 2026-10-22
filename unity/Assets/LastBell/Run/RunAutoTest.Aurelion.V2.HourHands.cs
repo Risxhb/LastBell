@@ -121,7 +121,9 @@ namespace LastBell.Run
             }
 
             // ---- 3: standing still, solo, is hit by both hands ----
-            yield return HHSetup(1, Difficulty.Hard, new[] { new Vector3(0, 0, 5) });
+            // At 3 m: spoke I's 1.5 m sideways knockback lands mid-tracking of spoke II, and beyond ~4.6 m that can leave the
+            // player between two hours (snapping to 30° is up to r·sin 15° off the centre line), outside spoke II's lane.
+            yield return HHSetup(1, Difficulty.Hard, new[] { new Vector3(0, 0, 3) });
             if (V2Boss == null) yield break;
             {
                 var p = V2Party[0];
