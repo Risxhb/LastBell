@@ -28,6 +28,12 @@ namespace LastBell.Run
         static Vector3 LPolar(float yaw, float r) => LanceBoss + Sim.Dir(yaw) * r;
         static float LLineDist(Vector3 p, Vector3 o, float yaw) => Mathf.Abs(Vector3.Cross(Sim.Dir(yaw), Sim.Flat(p - o)).y);
         static int LTk(Difficulty level, float s) => Sim.Ticks(s * (level == Difficulty.Easy ? 1.25f : 1f));
+        // v2.1 §2 expected ticks: tracks scale like every warning on Easy; on Hard the lock-to-hit window is x0.7 (the
+        // cascade floors at 2.0 s) and volley 2 tracks 1.2 s
+        static int LTrack1(Difficulty l) => LTk(l, 1.2f);
+        static int LTrack2(Difficulty l) => l == Difficulty.Hard ? Sim.Ticks(1.2f) : LTk(l, 1.0f);
+        static int LWindow(Difficulty l) => l == Difficulty.Hard ? Sim.Ticks(1.2f * 0.7f) : LTk(l, 1.2f);
+        static int LCascade(Difficulty l) => l == Difficulty.Hard ? Sim.Ticks(2.0f) : LTk(l, 2.2f);
         float LBody => V2Boss.BodyRadius + PlayerController.Radius + 0.05f;
         MeridianLances L => V2Boss.Lances;
 
@@ -92,8 +98,8 @@ namespace LastBell.Run
         }
 
         // Scripted dodger: reacts `react` ticks after a volley locks (at once for a cascade, which is shown locked) and
-        // walks to the nearest safe spot at `speed`.
-        IEnumerator LanceDodge(PlayerController p, int volley, int react = 15, float speed = 4.2f, float clear = 1.6f)
+        // walks to the nearest safe spot at `speed`; `dash` adds one dash toward it, `sprint` runs there (9 m/s, stamina).
+        IEnumerator LanceDodge(PlayerController p, int volley, int react = 15, float speed = 4.2f, float clear = 1.6f, bool dash = false, bool sprint = false)
         {
             float t = 0;
             while (L.Volleys.Count <= volley && t < 10) { t += Time.deltaTime; yield return null; }
@@ -102,13 +108,16 @@ namespace LastBell.Run
             var h = L.Volleys[volley][0];
             int go = L.SpawnTicks[volley] + Mathf.Max(0, h.LockAt - 1) + react, beams = L.Volleys[volley].Count / 2;
             while (V2W.Tick < go) yield return null;
-            V2In(p).Go(LSafeSpot(p.transform.position, h.Origin, h.Yaw, 180f / beams, clear), speed);
+            V2In(p).Go(LSafeSpot(p.transform.position, h.Origin, h.Yaw, 180f / beams, clear), sprint ? PlayerController.SprintSpeed : speed);
+            V2In(p).Sprint = sprint;
+            if (dash) V2In(p).Dash();
         }
-        IEnumerator LanceGoAt(PlayerController p, Func<int> tick, Vector3 to, float speed = 4.2f)
+        IEnumerator LanceGoAt(PlayerController p, Func<int> tick, Vector3 to, float speed = 4.2f, bool dash = false)
         {
             float t = 0;
             while ((tick() < 0 || V2W.Tick < tick()) && t < 10) { t += Time.deltaTime; yield return null; }
             V2In(p).Go(to, speed);
+            if (dash) V2In(p).Dash();
         }
 
         IEnumerable<V2HitRec> LHits(PlayerController p) => V2HitsOn(p, "Meridian Lances").Where(h => h.Tick >= lanceStart);
@@ -118,7 +127,8 @@ namespace LastBell.Run
             lanceRuns = 0; lanceBeamDoubles = 0; lanceSplitSets = 0; lanceBeam.Clear();
             var variants = new[] { (ph: 1, beams: 3, volleys: 1, cascade: false), (ph: 2, beams: 4, volleys: 2, cascade: false), (ph: 3, beams: 4, volleys: 2, cascade: true) };
 
-            // ---- 1 + 8: shape, spawn / lock / resolve ticks, at every level (Easy ×1.25 on every track and window, Hard unchanged)
+            // ---- 1 + 8: shape, spawn / lock / resolve ticks, at every level (Easy ×1.25 on every track and window; Hard
+            // (v2.1) ×0.7 on every lock-to-hit window, volley 2 tracks 1.2 s, the cascade floors at 2.0 s)
             foreach (var level in new[] { Difficulty.Medium, Difficulty.Easy, Difficulty.Hard })
                 foreach (var v in variants)
                 {
@@ -135,24 +145,30 @@ namespace LastBell.Run
                     V2Check($"{tag}: {v.beams} beams {spacing}° apart, each two 28 m × 2.2 m Strike lanes through his centre, 35 damage", shape && angles,
                         string.Join("; ", L.Volleys.Select(vol => vol.Count + " lanes: " + string.Join(",", vol.Select(h => h.Yaw.ToString("0.0"))))));
                     var r1 = LRec(0);
-                    V2Check($"{tag}: volley 1 tracks {LTk(level, 1.2f)} ticks, resolves {LTk(level, 1.2f)} after the lock ({LTk(level, 2.4f)} warned)",
-                        r1.Tracks == LTk(level, 1.2f) && r1.Resolve - r1.LastTrack == LTk(level, 1.2f) && r1.Resolve - r1.Spawn + 1 == LTk(level, 2.4f) && L.Volleys[0].All(h => lanceRecs[h].Resolve == r1.Resolve),
+                    V2Check($"{tag}: volley 1 tracks {LTrack1(level)} ticks, resolves {LWindow(level)} after the lock ({LTrack1(level) + LWindow(level)} warned)",
+                        r1.Tracks == LTrack1(level) && r1.Resolve - r1.LastTrack == LWindow(level) && r1.Resolve - r1.Spawn + 1 == LTrack1(level) + LWindow(level) && L.Volleys[0].All(h => lanceRecs[h].Resolve == r1.Resolve),
                         $"spawn {r1.Spawn}, tracked {r1.Tracks} (lock {r1.LastTrack}), resolve {r1.Resolve}");
                     if (v.volleys > 1)
                     {
                         var r2 = LRec(1);
                         V2Check($"{tag}: volley 2 warns on volley 1's resolve tick", r2.Spawn == r1.Resolve, $"v1 resolve {r1.Resolve}, v2 spawn {r2.Spawn}");
                         if (v.cascade)
-                            V2Check($"{tag}: cascade shows locked at once, rotated 22.5°, resolves {LTk(level, 2.2f)} ticks after it appears",
-                                r2.Tracks == 0 && r2.H.LockAt == 0 && r2.Resolve - r2.Spawn + 1 == LTk(level, 2.2f) && Mathf.Abs(Mathf.DeltaAngle(L.AimOf(1), L.AimOf(0) + 22.5f)) < 0.01f,
+                            V2Check($"{tag}: cascade shows locked at once, rotated 22.5°, resolves {LCascade(level)} ticks after it appears",
+                                r2.Tracks == 0 && r2.H.LockAt == 0 && r2.Resolve - r2.Spawn + 1 == LCascade(level) && Mathf.Abs(Mathf.DeltaAngle(L.AimOf(1), L.AimOf(0) + 22.5f)) < 0.01f,
                                 $"tracked {r2.Tracks}, spawn {r2.Spawn}, resolve {r2.Resolve}, aims {L.AimOf(0):0.0} > {L.AimOf(1):0.0}");
                         else
-                            V2Check($"{tag}: volley 2 tracks {LTk(level, 1.0f)} ticks, resolves {LTk(level, 1.2f)} after the lock ({LTk(level, 2.2f)} warned)",
-                                r2.Tracks == LTk(level, 1.0f) && r2.Resolve - r2.LastTrack == LTk(level, 1.2f) && r2.Resolve - r2.Spawn + 1 == LTk(level, 2.2f),
+                            V2Check($"{tag}: volley 2 tracks {LTrack2(level)} ticks, resolves {LWindow(level)} after the lock ({LTrack2(level) + LWindow(level)} warned)",
+                                r2.Tracks == LTrack2(level) && r2.Resolve - r2.LastTrack == LWindow(level) && r2.Resolve - r2.Spawn + 1 == LTrack2(level) + LWindow(level),
                                 $"spawn {r2.Spawn}, tracked {r2.Tracks} (lock {r2.LastTrack}), resolve {r2.Resolve}");
                     }
                     int lastResolve = L.Volleys.SelectMany(vol => vol).Max(h => lanceRecs[h].Resolve);
                     V2Check($"{tag}: Run returns on the last resolve tick", lanceEnd == lastResolve, $"end {lanceEnd}, last resolve {lastResolve}");
+                    int dur = L.Duration(v.beams, v.volleys, v.cascade);
+                    V2Check($"{tag}: Duration() equals the real offset from Run's first tick to its last resolve", lanceEnd - lanceStart == dur,
+                        $"Duration {dur}, real {lanceEnd - lanceStart} (start {lanceStart}, end {lanceEnd})");
+                    if (level == Difficulty.Hard)
+                        V2Check($"{tag}: Hard keeps every volley's total warning at 2 s or more", L.Volleys.All(vol => vol[0].ResolveAt >= Sim.Ticks(2.0f)),
+                            string.Join(", ", L.Volleys.Select(vol => vol[0].ResolveAt + " ticks")));
                     // the still player (6 m, on volley 1's line) is hit, scaled once by the level's damage-taken scale
                     var hit = LHits(V2Party[0]).FirstOrDefault();
                     int want = Mathf.RoundToInt(35 * RunDifficulty.DamageTakenScale(level));
@@ -254,6 +270,46 @@ namespace LastBell.Run
                 var hits = LHits(wedge).ToList();
                 V2Check("cascade: the same wedge player standing still is hit once, by the rotated volley", hits.Count == 1 && hits[0].Tick == LRec(1).Resolve,
                     string.Join(", ", hits.Select(h => "tick " + h.Tick)) + $" (v2 resolve {LRec(1).Resolve})");
+            }
+
+            // ---- 2, Hard (v2.1 §2): the 0.84 s window needs a dash or a sprint from the worst spots; same 0.25 s reaction
+            foreach (var v in variants.Take(2))
+                foreach (var how in new[] { "dash", "sprint" })
+                {
+                    bool dash = how == "dash", sprint = how == "sprint";
+                    yield return V2Setup(1, Difficulty.Hard, new[] { LPolar(0, 2) }, v.ph);
+                    if (V2Boss == null) yield break;
+                    var p = V2Party[0];
+                    V2Place(p, LPolar(0, LBody)); yield return V2Ticks(2);
+                    yield return LanceRun(v.beams, v.volleys, false, LanceDodge(p, 0, dash: dash, sprint: sprint), LanceDodge(p, 1, dash: dash, sprint: sprint));
+                    V2Check($"Hard escape, {v.beams} beams × {v.volleys}: against his body on the beam line, 4.2 m/s + {(dash ? "one dash" : "a sprint")} to the wedge is never hit (stamina spent)",
+                        !LHits(p).Any() && p.Stamina < PlayerController.MaxStamina, $"{LHits(p).Count()} hits, stamina {p.Stamina:0}, ended {Sim.Flat(p.transform.position - LanceBoss).magnitude:0.0} m out");
+
+                    yield return V2Setup(1, Difficulty.Hard, new[] { LPolar(0, 12) }, v.ph);
+                    if (V2Boss == null) yield break;
+                    p = V2Party[0];
+                    yield return LanceRun(v.beams, v.volleys, false, LanceDodge(p, 0, dash: dash, sprint: sprint), LanceDodge(p, 1, dash: dash, sprint: sprint));
+                    V2Check($"Hard escape, {v.beams} beams × {v.volleys}: at 12 m on volley 1's line, a sidestep with {(dash ? "one dash" : "a sprint")} is never hit",
+                        !LHits(p).Any() && p.Stamina < PlayerController.MaxStamina, $"{LHits(p).Count()} hits, stamina {p.Stamina:0}");
+                }
+            {
+                // walking alone is meant to be too slow (v2.1 §2). From his body with 4 beams the route is about 3 m (0.71 s + 0.25 s
+                // vs 0.84 s), but the walker is then right on the lane edge when it resolves, so this is reported, not asserted
+                yield return V2Setup(1, Difficulty.Hard, new[] { LPolar(0, 2) }, 2);
+                if (V2Boss == null) yield break;
+                var p = V2Party[0];
+                V2Place(p, LPolar(0, LBody)); yield return V2Ticks(2);
+                yield return LanceRun(4, 1, false, LanceDodge(p, 0));
+                Note($"Meridian Lances: Hard, walking alone at 4.2 m/s from his body (4 beams): {LHits(p).Count()} hit(s) (design intent: too slow)");
+            }
+            {
+                // Hard cascade (2.0 s, the floor): the wedge player at 12 m walks with one dash onto the old line
+                yield return V2Setup(2, Difficulty.Hard, new[] { LPolar(0, 12.5f), LPolar(22.5f, 12) }, 3);
+                if (V2Boss == null) yield break;
+                PlayerController far = V2Party[0], wedge = V2Party[1];
+                yield return LanceRun(4, 2, true, LanceDodge(far, 0, dash: true), LanceGoAt(wedge, () => L.SpawnTicks.Count > 1 ? L.SpawnTicks[1] + 15 : -1, LPolar(0, 12), 4.2f, true));
+                V2Check("Hard escape, cascade: the wedge player walks + dashes onto the old line and volley 1's target dashes aside; neither is hit",
+                    !LHits(wedge).Any() && !LHits(far).Any(), $"wedge player {LHits(wedge).Count()} hits, volley-1 target {LHits(far).Count()} hits");
             }
 
             // ---- 6: solo and N = 2 / 4 / 8: volley 1 through the farthest, volley 2 through the nearest
