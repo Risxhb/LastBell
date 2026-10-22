@@ -89,7 +89,7 @@ namespace LastBell.Run
         // hit is the whole ring at resolve. Driven by Cast() on combat ticks; Clear() on the break, cancel or defeat.
         sealed class TideFront
         {
-            static readonly Color Coral = new Color(1f, 0.42f, 0.32f), Amber = new Color(1f, 0.68f, 0.3f);
+            static readonly Color Coral = new Color(1f, 0.36f, 0.24f), Amber = new Color(1f, 0.56f, 0.18f);
             const int Arcs = 7;
             readonly GameObject root;
             readonly Transform band;
@@ -103,9 +103,9 @@ namespace LastBell.Run
                 this.inner = inner; this.outer = outer;
                 root = new GameObject("Toll Tide front");
                 root.transform.position = new Vector3(centre.x, 0.07f, centre.z);
-                band = Part("band", FxMeshes.Annulus(0.955f, 1f, 128), Amber, 2.6f, 0);
+                band = Part("band", FxMeshes.Annulus(0.955f, 1f, 128), Amber, 1.1f, 0);
                 for (int i = 0; i < Arcs; i++)
-                    arcs[i] = Part("arc", FxMeshes.Sector(0.9f, 0.945f, 9f + 4f * (i * 3 % 4), 16), Coral, 2.2f, ArcYaw(i, 0));
+                    arcs[i] = Part("arc", FxMeshes.Sector(0.9f, 0.945f, 9f + 4f * (i * 3 % 4), 16), Coral, 1.3f, ArcYaw(i, 0));
             }
             static float ArcYaw(int i, float clock) => i * (360f / Arcs) + 11f * (i % 3) + (i % 2 == 0 ? clock : -clock);
 

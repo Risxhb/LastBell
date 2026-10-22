@@ -170,9 +170,10 @@ namespace LastBell.Run
             TtStepTo(TtReact - 1);
             foreach (var (p, s) in new[] { (dash, sd), (noDash, sn), (six, s6) }) s.Goal = Sim.Flat(p.transform.position).normalized * 5.6f;
             sd.DashNext = true;
-            TtStepTo(tt.TideTicks - 1);
-            Check(L + "4.2 m/s plus one dash from the corner beats the tide (finite stamina)", TtHits(dash).Count == 0 && dash.Stamina < st0,
-                  $"{TtR(dash, Vector3.zero):0.00} m from the centre, stamina {st0:0} -> {dash.Stamina:0}");
+            float stMin = st0;   // stamina regenerates after 0.75 s, so the dash shows as the lowest value on the way in
+            while (TtAt < tt.TideTicks - 1) { BkStep(1); stMin = Mathf.Min(stMin, dash.Stamina); }
+            Check(L + "4.2 m/s plus one dash from the corner beats the tide (finite stamina)", TtHits(dash).Count == 0 && st0 - stMin >= PlayerController.DashCost - 1,
+                  $"{TtR(dash, Vector3.zero):0.00} m from the centre, stamina {st0:0} -> lowest {stMin:0}");
             Check(L + "6 m/s from the corner beats the tide without a dash", TtHits(six).Count == 0, $"{TtR(six, Vector3.zero):0.00} m");
             Check(L + "4.2 m/s without a dash is caught from the corner (as the escape table says)", TtHits(noDash).Count == 1, $"{TtR(noDash, Vector3.zero):0.00} m");
             Check(L + "a still player in the corner is hit", TtHits(d.Player, TollTideAbility.TideSource).Count == 1);
