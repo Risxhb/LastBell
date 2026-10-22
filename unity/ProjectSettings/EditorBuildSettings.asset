@@ -6,6 +6,9 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/LastBell/Menu/MainMenu.unity
+    guid: 2cc1f29a2c87aeb41a1989c8ef6eee37
+  - enabled: 1
     path: Assets/LastBell/Run/RunArena.unity
     guid: 697ad3ab9d736c042b5ce7c175ef2041
   - enabled: 1

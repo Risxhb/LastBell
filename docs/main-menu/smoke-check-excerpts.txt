@@ -1,0 +1,61 @@
+Partial smoke runs, Unity 6000.6.6f1, October 21, 2026. No final report; not a complete suite pass.
+
+Player-final-isolated
+[menu-test] PASS four real models
+[menu-test] PASS no combat authority in menu
+[menu-test] PASS supplied logo loaded
+[menu-test] PASS menu music plays and loops
+[menu-test] PASS exactly three main buttons
+[menu-test] PASS initial focus
+[menu-test] PASS keyboard right selects Settings
+[menu-test] PASS keyboard submit opens settings
+[menu-test] PASS settings traps primary input
+[menu-test] PASS fight continues behind settings
+[menu-test] PASS music slider changes live volume and persists
+[menu-test] PASS music slider can mute
+[menu-test] PASS Apply saves actual display and quality settings
+[menu-test] PASS resolution list opens
+[menu-test] PASS Escape closes settings and restores focus
+[menu-test] PASS gamepad submit opens settings
+[menu-test] PASS gamepad Back closes settings
+[menu-test] PASS mouse opens Settings
+[menu-test] PASS camera slowly orbits
+[menu-test] PASS bottom row fits (1920, 1080)
+[menu-test] PASS rendered capture menu-1920x1080.png
+[menu-test] PASS bottom row fits (2560, 1440)
+[menu-test] PASS rendered capture menu-2560x1440.png
+[menu-test] PASS bottom row fits (2560, 1080)
+[menu-test] PASS rendered capture menu-2560x1080.png
+[menu-test] PASS rendered capture settings.png
+[menu-test] PASS rendered capture party-spell-release.png
+[menu-test] PASS rendered capture orbit-072-degrees.png
+
+Editor-final-isolated
+[menu-test] PASS four real models
+[menu-test] PASS no combat authority in menu
+[menu-test] PASS supplied logo loaded
+[menu-test] PASS menu music plays and loops
+[menu-test] PASS exactly three main buttons
+[menu-test] PASS initial focus
+[menu-test] PASS keyboard right selects Settings
+[menu-test] PASS keyboard submit opens settings
+[menu-test] PASS settings traps primary input
+[menu-test] PASS fight continues behind settings
+[menu-test] PASS music slider changes live volume and persists
+[menu-test] PASS music slider can mute
+[menu-test] PASS Apply saves actual display and quality settings
+[menu-test] PASS resolution list opens
+[menu-test] PASS Escape closes settings and restores focus
+[menu-test] PASS gamepad submit opens settings
+[menu-test] PASS gamepad Back closes settings
+[menu-test] PASS mouse opens Settings
+[menu-test] PASS camera slowly orbits
+[menu-test] PASS bottom row fits (1920, 1080)
+[menu-test] PASS rendered capture menu-1920x1080.png
+[menu-test] PASS bottom row fits (2560, 1440)
+[menu-test] PASS rendered capture menu-2560x1440.png
+[menu-test] PASS bottom row fits (2560, 1080)
+[menu-test] PASS rendered capture menu-2560x1080.png
+[menu-test] PASS rendered capture settings.png
+[menu-test] PASS rendered capture party-spell-release.png
+[menu-test] PASS rendered capture orbit-072-degrees.png
