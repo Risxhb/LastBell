@@ -1,8 +1,8 @@
 Gameplay camera (frustum-culled, before batching)
-triangles: 401,938
-draw calls (renderer sub-meshes): 178
-renderers: 65
+triangles: 404,598
+draw calls (renderer sub-meshes): 187
+renderers: 67
 Whole scene
-triangles: 473,634
-draw calls: 194
+triangles: 476,294
+draw calls: 205
 lights: 12 (point 9, shadow-casting 1)
