@@ -1,4 +1,30 @@
 {
-  "schema": 1,
-  "packs": []
+    "schema":  1,
+    "packs":  [
+                  {
+                      "name":  "arena-assets",
+                      "version":  2,
+                      "file":  "arena-assets-v2.zip",
+                      "url":  "https://github.com/Risxhb/collab/releases/download/arena-assets-v2/arena-assets-v2.zip",
+                      "sha256":  "993ec3b4eacebcf44bc5b4804a13a05336a56efaf094d525a3b0ec69c0c28206",
+                      "size":  78317795,
+                      "extractTo":  ".",
+                      "paths":  [
+                                    "unity/Assets/LastBell/Areas/Area1/Captures/gameplay-telegraphs.png",
+                                    "unity/Assets/LastBell/Areas/Area1/Captures/gameplay.png",
+                                    "unity/Assets/LastBell/Areas/Area1/Captures/topdown.png",
+                                    "unity/Assets/LastBell/Areas/Area1/SkywardSpire.glb",
+                                    "unity/Assets/LastBell/Areas/Area3/Screenshots/unity-angle.png",
+                                    "unity/Assets/LastBell/Areas/Area3/Screenshots/unity-game.png",
+                                    "unity/Assets/LastBell/Areas/Area3/Screenshots/unity-readability.png",
+                                    "unity/Assets/LastBell/Areas/Area3/Screenshots/unity-top.png",
+                                    "unity/Assets/LastBell/Areas/Area3/Source/FloorAlbedo.png",
+                                    "unity/Assets/LastBell/Areas/Area3/Source/FloorHeight.png",
+                                    "unity/Assets/LastBell/Areas/Area3/Source/FloorMask.png",
+                                    "unity/Assets/LastBell/Areas/Area3/Source/VerdantChimes.glb",
+                                    "unity/Assets/LastBell/Arenas/KeyArt/BellkeepersDais.glb"
+                                ],
+                      "files":  26
+                  }
+              ]
 }
