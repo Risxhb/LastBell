@@ -103,9 +103,10 @@ Each rule below is settled unless it says otherwise.
     - Crossing two thresholds with one burst queues only one transition.
     - **Area bosses and the final boss** change into a **second form** partway through the fight. The change follows the rules above: a harmless transformation, no heal and the same health bar. Minibosses don't get a second form.
 - **The boss dying mid-windup** cancels all its pending hazards in that same tick.
-- **Difficulty tiers (provisional names):** First Chime, Steady Ticking, Striking Hour, Midnight Toll.
-  - Write your numbers for **Steady Ticking**, the baseline.
-  - The highest tier adds one named mechanic per boss, not just faster or harder-hitting attacks.
+- **Difficulty levels — Settled (Chzy18, 2026-10-22): three levels, Easy, Medium and Hard**, chosen on the run menu. This replaces the earlier four provisional tiers (First Chime, Steady Ticking, Striking Hour, Midnight Toll).
+  - Write your numbers for **Medium**, the baseline. Old "Steady Ticking" numbers count as Medium.
+  - The run copies the level at start; it can't change mid-run, and a retry keeps it. Encounter code reads it from `CombatWorld.Difficulty` (`feature/run-loop`).
+  - **Provisional:** in the current build the level only scales damage taken from boss attacks (Easy ×0.6, Hard ×1.3). Each boss may add its own per-level changes: Easy with longer warnings, Hard with **one named extra mechanic**, not just faster or harder-hitting attacks. Every level's windows must still pass the escape check.
 - **Co-op scaling** comes from spreading targets and giving players spatial jobs, not just multiplying HP.
 - **Co-op mechanics:**
   - **Settled:** every co-op attack states its **solo (1-player) behaviour** next to the attack, for example "solo: the line becomes a normal lane you dodge".
@@ -172,12 +173,12 @@ Each rule below is settled unless it says otherwise.
    - shape and size
    - Strike or Ground tag
    - warning time
-   - damage at Steady Ticking
+   - damage at Medium
    - escape route
    - solo (1-player) behaviour, for co-op attacks
    - punish window
 4. Phase plan using the rules in §5.
-5. Highest-tier mechanic.
+5. Hard mechanic (the one named extra mechanic on Hard).
 6. **Conflicts:** anything in the request that broke a settled rule, and what you did instead.
 7. **Open questions** for Chzy18.
 
