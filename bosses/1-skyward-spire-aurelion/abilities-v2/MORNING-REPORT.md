@@ -6,6 +6,27 @@ Branch: `feature/aurelion-abilities-v2` (integration). The tested head is local 
 
 **The draft PR into `feature/boss-aurelion` is not open yet, and GitHub is not up to date.** Since about 10:50 every push to Risxhb/collab fails with *"remote: Your account is suspended"* (HTTP 403). `origin/feature/aurelion-abilities-v2` stops at `3f3b54e`. The last few commits exist only in the local repo shared by all the worktrees under `last bell/`: the phase-plan test fixes and this report. Once the account works again, run `git push` from `last bell/aurelion-abilities` and open the PR.
 
+## Update: v2.1 (harder, after Chzy18's playtest)
+
+Spec: `ABILITIES-v2.1.md`. **State:** built, **autotested 398 passed, 0 failed, 0 errors** (integrated run 4 at local `4b8e7a3`; report `last bell/aurelion-logs/aurelion-integration/autotest-4/autotest-report.txt`). Escape check passes every case at Easy, Medium and Hard (`escape-check-v2.1-*.md`). Not human-approved.
+
+- **Zenith Collapse** (new, all levels):
+  - He walks to the arena centre, then a Ground annulus round him leaves a safe disc of 4.5 m at N ≤ 2 (5.0 m in Phase 3), 5.5 m at N 3–4 and 6.5 m at N ≥ 5.
+  - 45 damage. It resolves after 3.0 s (Hard 2.4 s, Easy 3.75 s).
+  - It's always paired with Meridian Lances, which resolve 0.3 s after it.
+  - Gold orrery rings slide in to the disc edge.
+- **Constant layering** on Medium and Hard (Easy keeps v2): two patterns in almost every block, 0.3 s gaps, the 3.5 s punish unchanged. Pairs are timed by resolve tick through each ability's `Duration()`.
+- **Hard windows ×0.7**, with these exceptions:
+  - Lances volley 2 tracks 1.2 s.
+  - The cascade and Orrery stop at the 2.0 s floor.
+  - Starfall keeps 1.1 s when paired with Lances.
+- Every Hard escape from the worst spot needs a dash or a sprint. The tightest margin is 0.35 s (own Starfall star, with a dash).
+- **Playtest:** `LastBell.exe -lastbellBossHp 0.2` (new switch: scales every boss's HP), then practice → "Aurelion (area 1)".
+- **Deviation from the spec:** he doesn't cast Starfall during the walk to the centre. It would make three patterns at the start of the Zenith pair, and he only walks once because he stays at the centre.
+- **Open (from the spec):**
+  - Should Medium also tighten?
+  - Is Zenith Collapse always at the centre too predictable?
+
 ## How to play it
 
 1. Build the Windows player as usual (`Last Bell > Build` or `RunBuild.BuildWindows`), or open `unity/` in the editor.
