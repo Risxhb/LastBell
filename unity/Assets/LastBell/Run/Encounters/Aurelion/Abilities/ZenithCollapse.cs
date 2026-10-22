@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 namespace LastBell.Run
@@ -9,8 +10,9 @@ namespace LastBell.Run
     // (N 3-4) or 6.5 m (N >= 5), 5.0 m at N <= 2 in Phase 3, outer 30 m (past the bound). Locked at once, resolves 3.0 s
     // later (Hard 2.4 s, Easy 3.75 s). 45 damage, no knockback, 0.25 s stun. The "come close" move: ranged must run in;
     // its layer partner, Meridian Lances (resolving 0.3 s after it), makes the disc deadly for anyone standing still.
-    // Run returns on the resolve tick. Look (stand-in): the shared coral annulus telegraph with its crisp inner edge;
-    // the inward-sliding orrery decor rings are not built yet.
+    // Run returns on the resolve tick. Look: the annulus is amber-coral with a bright amber inner edge, and three
+    // orrery rings slide in from the rim to that edge during the charge (ZenithCollapseFx); the disc itself stays
+    // bare floor, with nothing coral or gold inside it.
     public sealed class ZenithCollapse : AurelionAbility
     {
         public override string Id => "aurelion.zenith_collapse";
@@ -18,6 +20,8 @@ namespace LastBell.Run
 
         public const float Outer = 30f, WindowS = 3.0f, HardWindowS = 2.4f, StunS = 0.25f;
         public const int Damage = 45;
+        // amber-coral fill (warmer than the standard strike coral, so the signature reads at a glance) and a crisp amber edge
+        public static readonly Color Fill = new Color(1.0f, 0.50f, 0.26f), Edge = new Color(2.8f, 1.55f, 0.55f);
 
         public static float SafeRadius(int n, int phase) => n <= 2 ? (phase >= 3 ? 5.0f : 4.5f) : n <= 4 ? 5.5f : 6.5f;
         public int WindowTicks => Sim.Ticks(Hard ? HardWindowS : WindowS * WarnScale);
@@ -37,8 +41,103 @@ namespace LastBell.Run
                 Inner = SafeRadius(N, Phase), Radius = Outer, LockAt = 0, ResolveAt = win,
                 Damage = Damage, Knockback = 0, Stun = Sim.Ticks(StunS),
             });
+            Last.Tele?.Tint(Fill, Edge);
             Last.OnResolve = hz => { W.BossFx.TollResolve(hz.Origin, hz.Inner, Rim); Flare(1.4f); };
+            ZenithCollapseFx.Create(W, Last);
             for (int i = 0; i < win - 1; i++) { Glow(i / (float)win); yield return 1; }
+        }
+    }
+
+    // Presentation only. Three dashed gold orrery rings (the SpawnOrrery look: dashes, a riding bead) start spread over
+    // the outer band, the outermost on the rim, and slide inward, speeding up, so all three land on the safe disc's edge
+    // on the resolve tick and stack there as one bright line. They never cross the edge, so the disc stays bare floor.
+    // They counter-rotate and brighten as the sky falls, flash and sink on the resolve; a hazard cleared early (boss
+    // death, retry) just dims them.
+    public sealed class ZenithCollapseFx : MonoBehaviour
+    {
+        static readonly Color Gold = new Color(0.82f, 0.64f, 0.3f);
+        const int Rings = 3;
+        const float Spread = 2.6f;   // start radii: rim, rim - 2.6, rim - 5.2 m
+
+        sealed class Ring { public Transform Root, Bead; public Transform[] Segs; public float Start, Spin, Turn, R; }
+        readonly List<Ring> rings = new List<Ring>();
+        Material mat; Hazard h; CombatWorld w; float fade = -1;
+
+        // test evidence: the latest instance, its innermost ring radius now and the smallest any ring has reached
+        public static ZenithCollapseFx Latest { get; private set; }
+        public float Inner => h.Inner;
+        public float LeadRadius { get; private set; }
+        public float MinRadiusSeen { get; private set; } = float.MaxValue;
+
+        public static ZenithCollapseFx Create(CombatWorld world, Hazard hazard)
+        {
+            var go = new GameObject("Zenith Collapse fx"); go.transform.SetParent(world.Root, false);
+            go.transform.position = new Vector3(hazard.Origin.x, 0.05f, hazard.Origin.z);
+            var fx = go.AddComponent<ZenithCollapseFx>(); fx.w = world; fx.h = hazard; fx.mat = Prim.Material(Gold, 1f);
+            float rim = AurelionAbility.Rim;
+            int n = Mathf.CeilToInt(2 * Mathf.PI * rim / 0.9f);
+            for (int j = 0; j < Rings; j++)
+            {
+                var o = new Ring { Start = Mathf.Max(hazard.Inner + 0.5f, rim - j * Spread), Spin = j % 2 == 0 ? 1 : -1, Segs = new Transform[n] };
+                o.Root = new GameObject("Zenith orrery ring").transform; o.Root.SetParent(go.transform, false);
+                for (int k = 0; k < n; k++)
+                    fx.Share(o.Segs[k] = Prim.Make(PrimitiveKind.Cube, o.Root, Vector3.zero, Vector3.one, Gold, 0, Quaternion.Euler(0, k * 360f / n + 90, 0)));
+                o.Bead = Prim.Make(PrimitiveKind.Sphere, o.Root, Vector3.zero, Vector3.one * 0.3f, Gold);
+                fx.Share(o.Bead);
+                fx.rings.Add(o);
+                fx.Place(o, o.Start);
+            }
+            Latest = fx;
+            return fx;
+        }
+
+        void Share(Transform t) { var r = t.GetComponent<Renderer>(); Destroy(r.sharedMaterial); r.sharedMaterial = mat; }
+
+        void Place(Ring o, float r)
+        {
+            o.R = r;
+            int n = o.Segs.Length;
+            float len = 2 * Mathf.PI * r / n * 0.62f;
+            for (int k = 0; k < n; k++)
+            {
+                o.Segs[k].localPosition = Quaternion.Euler(0, k * 360f / n, 0) * new Vector3(0, 0, r);
+                o.Segs[k].localScale = new Vector3(len, 0.05f, 0.08f);
+            }
+            o.Bead.localPosition = Quaternion.Euler(0, o.Turn * 1.5f, 0) * new Vector3(0, 0.16f, r);
+            LeadRadius = Mathf.Min(LeadRadius == 0 ? float.MaxValue : LeadRadius, r);
+            MinRadiusSeen = Mathf.Min(MinRadiusSeen, r);
+        }
+
+        void Update()
+        {
+            float dt = Time.deltaTime;
+            bool live = w != null && w.Hazards.Live.Contains(h) && !h.Cancelled;
+            if (!live && fade < 0) fade = h.Age >= h.ResolveAt ? 1f : 0.4f;   // resolved: flash; cleared early: dim
+            if (fade >= 0)
+            {
+                fade -= dt * 1.6f;
+                mat.SetColor("_EmissionColor", Gold * Mathf.Max(0, fade) * 6f);
+                transform.position += Vector3.down * dt * 0.5f;
+                if (fade <= 0) Destroy(gameObject);
+                return;
+            }
+            float k = Mathf.Clamp01(h.Age / (float)Mathf.Max(1, h.ResolveAt));
+            float e = k * k;   // slow at first, then falling fast onto the edge
+            float edge = h.Inner + 0.06f;   // just outside the hit edge: the decor never enters the disc
+            LeadRadius = 0;
+            foreach (var o in rings)
+            {
+                o.Turn += o.Spin * Mathf.Lerp(10f, 110f, e) * dt;
+                o.Root.localRotation = Quaternion.Euler(0, o.Turn, 0);
+                Place(o, Mathf.Lerp(o.Start, edge, e));
+            }
+            mat.SetColor("_EmissionColor", Gold * (0.4f + 2.6f * e));
+        }
+
+        void OnDestroy()
+        {
+            if (mat) Destroy(mat);
+            if (Latest == this) Latest = null;
         }
     }
 }

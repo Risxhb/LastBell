@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace LastBell.Run
 {
-    // Zenith Collapse (aurelion.zenith_collapse, v2.1) checks, owned by the Abilities session; called once from
+    // Zenith Collapse (aurelion.zenith_collapse, v2.1) checks, owned by the Zenith Collapse session; called once from
     // AurelionV2Checks. Spec: abilities-v2/ABILITIES-v2.1.md §1 (and §3 for its Lances pairing).
     public sealed partial class RunAutoTest
     {
@@ -18,8 +18,16 @@ namespace LastBell.Run
                 if (V2Boss == null) yield break;
                 int dur = V2Boss.Zenith.Duration();
                 V2Begin(V2Boss.Zenith.Run());
+                // the look: orrery rings slide in from the rim and land on the disc's edge, never inside it
+                yield return V2Ticks(Sim.Ticks(secs) / 2);
+                var fx = ZenithCollapseFx.Latest; float mid = fx != null ? fx.LeadRadius : -1;
+                yield return V2Ticks(Sim.Ticks(secs) / 2 - 3);
+                float late = fx != null ? fx.LeadRadius : -1;
                 yield return V2WaitIdle(10);
                 var z = V2Spawned("Zenith Collapse").FirstOrDefault();
+                V2Check($"{level}: orrery rings slide inward (between the edge and the rim mid-charge, on the edge at the resolve) and never enter the disc",
+                    fx != null && mid > 4.5f && mid < AurelionAbility.Rim && late < mid && late <= 4.5f + 0.6f && fx.MinRadiusSeen >= 4.5f,
+                    fx == null ? "no fx" : $"lead {mid:0.00} m mid-charge, {late:0.00} m at the end, smallest {fx.MinRadiusSeen:0.00} m");
 
                 V2Check($"{level}: one annulus on the boss, 4.5 m solo to 30 m, Ground, 45, locked at once, resolves {secs} s after it appears",
                     z != null && V2Spawned("Zenith Collapse").Count() == 1 && z.H.Shape == HazardShape.Ring && z.H.Kind == HazardKind.Ground && Mathf.Approximately(z.H.Inner, 4.5f)
@@ -39,6 +47,22 @@ namespace LastBell.Run
             V2Check("standing still 5.0 m out (inside the 5.5 m disc, N = 4) is not hit", !V2WasHit(V2Party[2], "Zenith"));
             V2Check("standing still next to his body is safe from the Collapse itself", !V2WasHit(V2Party[3], "Zenith"));
             V2Check("one hit per instance", V2OneHitPerInstance());
+
+            // 6: the disc radius per party size, as a table (N 1-8, Phases 1 and 3)
+            {
+                var want = new[] { 4.5f, 4.5f, 5.5f, 5.5f, 6.5f, 6.5f, 6.5f, 6.5f };
+                bool ok = true; var got = new List<string>();
+                for (int n = 1; n <= 8; n++)
+                {
+                    float p1 = ZenithCollapse.SafeRadius(n, 1), p3 = ZenithCollapse.SafeRadius(n, 3);
+                    ok &= Mathf.Approximately(p1, want[n - 1]) && Mathf.Approximately(p3, n <= 2 ? 5.0f : want[n - 1]);
+                    got.Add($"{n}:{p1}/{p3}");
+                }
+                V2Check("safe disc: 4.5 m at N 1-2 (5.0 m in Phase 3), 5.5 m at N 3-4, 6.5 m at N 5-8", ok, string.Join(" ", got));
+                // practice: -lastbellAbility aurelion.zenith_collapse is accepted, and F6 (which steps through Ids) reaches it
+                V2Check("practice: aurelion.zenith_collapse is a known -lastbellAbility id and in the F6 cycle",
+                    AurelionArgs.Known("aurelion.zenith_collapse") && AurelionArgs.Ids.Contains("aurelion.zenith_collapse") && V2Boss?.Zenith.Id == "aurelion.zenith_collapse");
+            }
 
             // 6: the disc grows with the party: 4.5 m (N 1-2), 5.5 m (N 3-4), 6.5 m (N >= 5), 5.0 m at N <= 2 in Phase 3
             foreach (var (n, ph, want) in new[] { (2, 1, 4.5f), (2, 3, 5.0f), (8, 1, 6.5f) })
@@ -89,6 +113,22 @@ namespace LastBell.Run
                 V2Check($"{level} pair: the rim runner (sprint in, then a 4.2 m/s step into the beam gap) is never hit", !V2WasHit(V2Main),
                     string.Join(", ", V2HitsOn(V2Main).Select(h => h.Source)) + $"; ended at ({V2Main.transform.position.x:0.0},{V2Main.transform.position.z:0.0})");
                 V2Check($"{level} pair: a melee player standing still next to him is hit by the Lances", V2WasHit(V2Party[1], "Meridian Lances"));
+            }
+
+            // the pairing's second half: reaching the disc is not enough; a runner who stops on the beam line inside it
+            // (the beams aim at the farthest player, so at them) is hit by the Lances, and only by them
+            foreach (var level in new[] { Difficulty.Medium, Difficulty.Hard })
+            {
+                yield return V2Setup(1, level, new[] { new Vector3(0, 0, 13.4f) }, 1, Vector3.zero);
+                if (V2Boss == null) yield break;
+                V2Begin(V2Boss.ZenithBlock(3));
+                yield return V2Ticks(ReactTicks);
+                var inp = V2In(V2Main); inp.Sprint = true; inp.Go(new Vector3(0, 0, 3.0f), PlayerController.SprintSpeed);
+                while (V2Boss != null && V2Boss.TestBusy) { if (V2Main.transform.position.z < 3.4f) { inp.Sprint = false; inp.Stop(); } yield return null; }
+                inp.Stop();
+                V2Check($"{level} pair: a runner who reaches the disc but stands on a beam is hit by the Lances, not the Collapse",
+                    V2WasHit(V2Main, "Meridian Lances") && !V2WasHit(V2Main, "Zenith") && V2OneHitPerInstance(),
+                    string.Join(", ", V2HitsOn(V2Main).Select(h => h.Source)) + $"; ended at ({V2Main.transform.position.x:0.0},{V2Main.transform.position.z:0.0})");
             }
 
             // the block walks him to the arena centre before the telegraph appears
