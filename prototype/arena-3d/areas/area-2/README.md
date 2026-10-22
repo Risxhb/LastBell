@@ -108,7 +108,7 @@ Built from `BRASS-FOUNDRY-UNITY-PROMPT.md` and `ref-brass-foundry-topdown.webp` 
 - **Export:** one `.glb` per asset into `unity/Assets/LastBell/Areas/Area2/Models/`, about 80 k triangles in total.
   - Command: `blender -b --factory-startup -P area2_models.py -- <out_dir> [contact_sheet.png]`.
   - In Unity: **Last Bell > Area 2 – Build Models (Blender)**. The arena build also runs it automatically when `Models/` is missing and Blender is installed (`LASTBELL_BLENDER` overrides the path).
-  - `Models/` is git-ignored and about 3 MB, because the script rebuilds it.
+  - `Models/` (about 3 MB) is committed, so teammates without Blender get the models too. Re-run the script, or the menu item, after changing `area2_models.py`.
 - **Unity:** `BrassFoundryArenaBuilder` reads each model's mesh and slot names and appends the geometry into its batches, so draw calls stay low. Each asset is placed with the same layout data:
   - one even crown of teeth, with a molten slot glowing in every gap
   - a 9° wall module per segment
