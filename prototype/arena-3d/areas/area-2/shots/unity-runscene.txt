@@ -1,0 +1,2 @@
+Run scene: driver present, 5 MoltenFlow renderers, Run Director present
+Run scene lava flow check (gameplay view, clock 0 vs 1 s): channel 10.46/255 over 33326 px, floor 0.00/255 over 148978 px -> PASS (need channel > 4, floor < 0.5)
