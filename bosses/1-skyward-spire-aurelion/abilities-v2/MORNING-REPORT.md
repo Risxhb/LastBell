@@ -8,7 +8,7 @@ Branch: `feature/aurelion-abilities-v2` (integration). The tested head is local 
 
 ## Update: v2.1 (harder, after Chzy18's playtest)
 
-Spec: `ABILITIES-v2.1.md`. **State:** built, **autotested 398 passed, 0 failed, 0 errors** (integrated run 4 at local `4b8e7a3`; report `last bell/aurelion-logs/aurelion-integration/autotest-4/autotest-report.txt`). Escape check passes every case at Easy, Medium and Hard (`escape-check-v2.1-*.md`). Not human-approved.
+Spec: `ABILITIES-v2.1.md`. **State:** built, **autotested 405 passed, 0 failed, 0 errors** (integrated run 5 at local `492b757`, with Zenith Collapse's telegraph rings; report `last bell/aurelion-logs/aurelion-integration/autotest-5/autotest-report.txt`; run 4 at `4b8e7a3` was 398/0). Playtested once by Chzy18 (run 4 build, solo, Hard, 20 % HP): "still not hard enough solo, but let's table that for now". Escape check passes every case at Easy, Medium and Hard (`escape-check-v2.1-*.md`). Not human-approved.
 
 - **Zenith Collapse** (new, all levels):
   - He walks to the arena centre, then a Ground annulus round him leaves a safe disc of 4.5 m at N ≤ 2 (5.0 m in Phase 3), 5.5 m at N 3–4 and 6.5 m at N ≥ 5.
