@@ -40,6 +40,12 @@ Chzy18 found v2 "insane easy" and asked for "much much harder", with new abiliti
    - The phase plan doesn't walk the boss to the anvil before a filler.
 5. **Practice launchers** play the v3 version of each ability.
 
+**Quick playtests with low boss HP:**
+- `-lastbellBossHp <fraction>` scales every boss's health; for example 0.2 gives 1320 HP for v3.
+- This is Aurelion's shared commit 8864ddd, cherry-picked unchanged as ce9e2c7. It touches only `BossEncounter.cs`, and phase thresholds stay fractions, so the phase plan is unchanged.
+- Without the flag, health is unchanged.
+- `crucivar-playtest` has launchers for it: "Play Crucivar v3 (quick test, 20% HP).cmd" and "Play Crucivar v2 (quick test, 20% HP).cmd".
+
 Play-test it in the `crucivar-playtest` worktree. It is moved to 4116a52, has new launchers (`Play Crucivar v3.cmd`, `Practice - Anvil Sweep.cmd`, `Practice - Slag Spit.cmd`), and `HOW-TO-PLAY.md` is updated.
 
 ---
