@@ -104,7 +104,13 @@ namespace LastBell.Run
             int t = Sim.Ticks(PunishS);
             Current = "open chest"; pose = Pose.Exposed; glowTarget = 0.3f; Clip("OpenChest", t);
             int start = W.Tick;
-            for (int i = 0; i < t; i++) { if (W.Hazards.Count > 0) PunishHazardTicks++; yield return 1; }
+            // the script steps before the hazards each tick: one that ends on this very tick (a spoke resolving as the
+            // punish starts) is not live during the punish
+            for (int i = 0; i < t; i++)
+            {
+                foreach (var h in W.Hazards.Live) if (h.Age + 1 < h.ResolveAt + Mathf.Max(0, h.ActiveTicks - 1)) { PunishHazardTicks++; break; }
+                yield return 1;
+            }
             ShortestPunish = Mathf.Min(ShortestPunish, W.Tick - start);
             glowTarget = 1; pose = Pose.Neutral;
         }
