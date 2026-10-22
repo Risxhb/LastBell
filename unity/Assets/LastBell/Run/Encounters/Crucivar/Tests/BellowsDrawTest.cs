@@ -62,10 +62,11 @@ namespace LastBell.Run
             var wall = new Vector3(0, 0, 13.5f); var ranged = new Vector3(-10f, 0, -1.5f); var hug = new Vector3(0, 0, 0.6f);
             yield return t.Setup(4, Difficulty.Medium, new[] { wall, ranged, hug, Band });
             if (t.Boss == null) yield break;
-            var hugStart = t.Party[2].transform.position;
             t.Begin(t.Boss.Bellows.Run());
             yield return t.Until(() => t.WasHit(t.Party[2], "Bellows Blast"), 5, "blast lands on the hugger");
-            var pushed = Sim.Flat(t.Party[2].transform.position - hugStart).magnitude;
+            var hitAt = t.Party[2].transform.position;
+            yield return t.Seconds(0.6f);   // the knockback plays out over a few ticks after the hit
+            var pushed = Sim.Flat(t.Party[2].transform.position - hitAt).magnitude;
             yield return t.WaitIdle(); yield return t.Seconds(4.0f);
             t.Check("still at the wall: hit by the Slag Rim (30) and burned by the edge", t.HitsOn(t.Party[0], "Slag Rim").Count() == 1 && t.HitsOn(t.Party[0], "Slag Rim").First().Damage == 30
                 && t.WasHit(t.Party[0], "Slag Edge"), $"rim {t.HitsOn(t.Party[0], "Slag Rim").Sum(h => h.Damage)}, edge {t.HitsOn(t.Party[0], "Slag Edge").Sum(h => h.Damage)}");
