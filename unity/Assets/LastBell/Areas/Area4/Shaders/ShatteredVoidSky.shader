@@ -43,6 +43,8 @@ Shader "LastBell/Area4/ShatteredVoidSky"
                 float neb = fbm(d * 3 + float3(0, t * 0.01, t * 0.004));
                 float wisp = fbm(d * 7 - neb * 1.6 + float3(t * 0.006, 0, 0));
                 c += _Nebula.rgb * pow(neb, 3.2) * _NebulaStrength + _Wisp.rgb * pow(wisp, 4) * 0.9;
+                float north = smoothstep(0.35, 1, -d.z) * exp(-abs(d.y - 0.05) * 3.5), horizon = exp(-abs(d.y + 0.02) * 9);
+                c += (_Nebula.rgb * 0.55 + _Wisp.rgb * 0.25 * neb) * north * (0.5 + neb) + _Wisp.rgb * 0.12 * horizon;
                 float s = h3(floor(d * 420));
                 c += float3(1, 0.92, 0.97) * step(_StarDensity, s) * (0.6 + 0.4 * sin(t * 2 + s * 90));
                 return half4(c, 1);
