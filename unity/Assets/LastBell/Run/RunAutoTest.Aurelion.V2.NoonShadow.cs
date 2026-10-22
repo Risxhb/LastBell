@@ -87,6 +87,44 @@ namespace LastBell.Run
                     $"lowest stamina {minStamina:0.0}");
             }
 
+            // 3b · Hard (v2.1 §2): 2.66 s windows. From the far lit edge, walk + one dash (3.14 s) no longer makes it; a
+            // sprint (9 m/s, 25 stamina/s) does, with about 0.85 s to spare
+            yield return V2Setup(2, Difficulty.Hard, new[] { new Vector3(13.5f, 0, 1), new Vector3(13.5f, 0, -1) }, 1, NoonBossAside);
+            if (V2Boss == null) yield break;
+            {
+                var a = V2Boss.Noon; var dasher = V2Party[0]; var sprinter = V2Party[1];
+                V2Begin(a.Run(false));
+                yield return V2Ticks(Sim.Ticks(0.25f));
+                V2In(dasher).Go(new Vector3(-2, 0, 1));
+                V2In(sprinter).Sprint = true; V2In(sprinter).Go(new Vector3(-2, 0, -1), PlayerController.SprintSpeed);
+                yield return V2Ticks(Sim.Ticks(0.5f)); V2In(dasher).Dash();
+                float minStamina = PlayerController.MaxStamina;
+                while (V2Boss != null && V2Boss.TestBusy) { minStamina = Mathf.Min(minStamina, sprinter.Stamina); yield return null; }
+                V2Check("Hard: walk + one dash from the far edge is too slow (hit)", V2WasHit(dasher, NoonSrc), $"x {dasher.transform.position.x:0.00}");
+                V2Check("Hard: a sprint from the far edge crosses in time", !V2WasHit(sprinter, NoonSrc), $"x {sprinter.transform.position.x:0.00}");
+                V2Check("Hard: the sprint drains stamina but never runs dry", minStamina < PlayerController.MaxStamina - 20 && minStamina > 0, $"lowest stamina {minStamina:0.0}");
+            }
+
+            // 3c · Hard solo: two sprints 2.66 s apart, edge to the line for Noon, then the line back to the edge for
+            // Afternoon (about 15 m and 12 m). Finite stamina: the second sprint starts on what regen brought back.
+            yield return V2Setup(1, Difficulty.Hard, new[] { new Vector3(13.5f, 0, 1) }, 1, NoonBossAside);
+            if (V2Boss == null) yield break;
+            {
+                var a = V2Boss.Noon; var p = V2Party[0]; var inp = V2In(p);
+                V2Begin(a.Run(false));
+                yield return V2Ticks(Sim.Ticks(0.25f));
+                inp.Sprint = true; inp.Go(new Vector3(-1.5f, 0, 1), PlayerController.SprintSpeed);
+                float min1 = PlayerController.MaxStamina, min2 = PlayerController.MaxStamina, atAfternoon = 0;
+                while (a.Halves.Count < 2 && V2Boss != null && V2Boss.TestBusy) { min1 = Mathf.Min(min1, p.Stamina); yield return null; }
+                atAfternoon = p.Stamina;
+                inp.Stop(); yield return V2Ticks(Sim.Ticks(0.25f));
+                inp.Sprint = true; inp.Go(new Vector3(12, 0, 1), PlayerController.SprintSpeed);
+                while (V2Boss != null && V2Boss.TestBusy) { min2 = Mathf.Min(min2, p.Stamina); yield return null; }
+                V2Check("Hard solo: the edge runner sprints across for Noon and back for Afternoon, never hit", a.Halves.Count == 2 && !V2WasHit(p, NoonSrc), $"hits {V2HitsOn(p, NoonSrc).Count()}, x {p.transform.position.x:0.00}");
+                V2Check("Hard solo: both sprints spend stamina and it never runs out", min1 < PlayerController.MaxStamina - 20 && min2 < atAfternoon - 10 && min2 > 0,
+                    $"lowest {min1:0.0} on Noon, {atAfternoon:0.0} when Afternoon warned, lowest {min2:0.0} on Afternoon");
+            }
+
             // 4 · solo escape: the edge runner crosses with one dash, then walks back across for Afternoon
             yield return V2Setup(1, Difficulty.Medium, new[] { new Vector3(13.5f, 0, 1) }, 1, NoonBossAside);
             if (V2Boss == null) yield break;
@@ -161,16 +199,29 @@ namespace LastBell.Run
                 V2Check("the cancelled half never resolves or hits", a.ResolveTicks.Count == 0 && !V2WasHit(p, NoonSrc), $"resolves {a.ResolveTicks.Count}, hits {V2HitsOn(p, NoonSrc).Count()}");
             }
 
-            // 7 · Easy stretches both windows ×1.25 (285 ticks); Hard keeps Medium's 228 and the same 45
-            foreach (var level in new[] { Difficulty.Easy, Difficulty.Hard })
+            // 7 · Easy stretches both windows ×1.25 (285 ticks); Hard shortens them ×0.7 (160 ticks, v2.1 §2), same 45.
+            // Duration(afternoon) equals Run's real offset from its first tick to its last resolve, at every level.
+            foreach (var level in new[] { Difficulty.Easy, Difficulty.Medium, Difficulty.Hard })
             {
                 yield return V2Setup(1, level, new[] { new Vector3(6, 0, 0) }, 1, NoonBossAside);
                 if (V2Boss == null) yield break;
                 var a = V2Boss.Noon;
+                int dur = a.Duration(false);
                 yield return V2Fire(a.Run(false));
-                int want = Sim.Ticks(NoonShadow.WindowS * (level == Difficulty.Easy ? 1.25f : 1f));
+                int want = Sim.Ticks(NoonShadow.WindowS * (level == Difficulty.Easy ? 1.25f : level == Difficulty.Hard ? AurelionAbility.HardWindow : 1f));
                 V2Check($"{level}: Noon and Afternoon each warn {want} ticks", a.Halves.Count == 2 && a.Halves.All(h => h.ResolveAt == want && h.Damage == NoonShadow.Damage) && a.SpawnTicks[1] == a.ResolveTicks[0],
                     string.Join(", ", a.Halves.Select(h => $"{h.ResolveAt} ticks / {h.Damage}")));
+                int real = a.ResolveTicks.Count == 2 ? a.ResolveTicks[1] - a.SpawnTicks[0] : -1;
+                V2Check($"{level}: Duration (solo, two halves) = the real last-resolve offset", dur == real, $"Duration {dur}, real {real}");
+
+                // a single Noon (N = 2, no Afternoon)
+                yield return V2Setup(2, level, new[] { new Vector3(6, 0, 0.5f), new Vector3(6, 0, -0.5f) }, 1, NoonBossAside);
+                if (V2Boss == null) yield break;
+                a = V2Boss.Noon;
+                dur = a.Duration(false);
+                yield return V2Fire(a.Run(false));
+                real = a.ResolveTicks.Count == 1 ? a.ResolveTicks[0] - a.SpawnTicks[0] : -1;
+                V2Check($"{level}: Duration (N = 2, Noon only) = the real resolve offset", a.Halves.Count == 1 && dur == real, $"Duration {dur}, real {real}");
             }
         }
     }
