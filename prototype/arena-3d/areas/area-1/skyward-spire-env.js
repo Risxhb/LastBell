@@ -133,35 +133,66 @@ function paintFloor(N) {
   return { map, normal: tex(nc, false), orm: tex(oc, false), glow };
 }
 
-// ---- small textures: ashlar blocks, star window, banner, cloud ----
+// ---- small textures: ashlar blocks, tracery windows, banner, cloud ----
+// Ivory ashlar: running-bond blocks with per-block tint, soft grout shading, worn edges and the odd chip, fine grain.
 function paintBlocks(w, h, rows, base, seed = 1) {
-  const [c, g] = canvas2d(w, h); g.fillStyle = `rgb(${base})`; g.fillRect(0, 0, w, h);
-  const rh = h / rows;
-  for (let r = 0; r < rows; r++) { let x = (r % 2) * -w / 10; while (x < w) { const bw = w / 8 + hash(x + seed, r) * w / 7, v = (hash(r, x + seed) - 0.5) * 14;
-    g.fillStyle = `rgb(${base[0] + v},${base[1] + v},${base[2] + v - 2})`; g.fillRect(x + 1.5, r * rh + 1.5, bw - 3, rh - 3); x += bw; } }
-  g.fillStyle = 'rgba(150,128,100,0.32)'; for (let r = 0; r <= rows; r++) g.fillRect(0, r * rh - 1, w, 2);
+  const [c, g] = canvas2d(w, h), r2 = mulberry32(seed * 977); g.fillStyle = `rgb(${base.map(v => v - 34)})`; g.fillRect(0, 0, w, h);
+  const rh = h / rows, gap = Math.max(2, w / 340);
+  for (let r = 0; r < rows; r++) {
+    let x = (r % 2) * -w / 10;
+    while (x < w) {
+      const bw = w / 8 + hash(x + seed, r) * w / 7, v = (hash(r, x + seed) - 0.5) * 16, warm = (hash(x * 3, r + seed) - 0.5) * 6;
+      const x0 = x + gap, y0 = r * rh + gap, bw2 = bw - gap * 2, bh = rh - gap * 2;
+      g.fillStyle = `rgb(${base[0] + v + warm},${base[1] + v},${base[2] + v - warm})`; g.fillRect(x0, y0, bw2, bh);
+      const sh = g.createLinearGradient(0, y0, 0, y0 + bh);                         // lit top edge, worn darker base
+      sh.addColorStop(0, 'rgba(255,250,240,0.18)'); sh.addColorStop(0.15, 'rgba(255,250,240,0)'); sh.addColorStop(0.8, 'rgba(90,70,50,0)'); sh.addColorStop(1, 'rgba(90,70,50,0.16)');
+      g.fillStyle = sh; g.fillRect(x0, y0, bw2, bh);
+      for (let k = 0; k < 3; k++) if (r2() < 0.35) {                                  // chipped corners and edges
+        const ex = x0 + (r2() < 0.5 ? r2() * bw2 * 0.15 : bw2 - r2() * bw2 * 0.15), ey = y0 + (r2() < 0.5 ? 0 : bh);
+        g.fillStyle = 'rgba(110,90,70,0.28)'; g.beginPath(); g.ellipse(ex, ey, 2 + r2() * gap * 2.5, 1 + r2() * gap * 1.5, r2() * 3, 0, TAU); g.fill();
+      }
+      x += bw;
+    }
+  }
+  const img = g.getImageData(0, 0, w, h), d = img.data;                                // fine stone grain
+  for (let i = 0; i < d.length; i += 4) { const p = i / 4, n = (hash(p * 0.37, seed) - 0.5) * 10 + (vnoise((p % w) * 0.05, Math.floor(p / w) * 0.05) - 0.5) * 8; d[i] += n; d[i + 1] += n; d[i + 2] += n * 0.9; }
+  g.putImageData(img, 0, 0);
   const t = tex(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
 }
-function paintWindow(w = 128, h = 256) {     // pointed cobalt window, gold leading and a gold four-point star
-  const [c, g] = canvas2d(w, h); const sh = h - w * 0.8;
-  const arch = () => { g.beginPath(); g.moveTo(0, h); g.lineTo(0, h - sh); g.quadraticCurveTo(0, w * 0.15, w / 2, 0); g.quadraticCurveTo(w, w * 0.15, w, h - sh); g.lineTo(w, h); g.closePath(); };
-  const grd = g.createLinearGradient(0, 0, 0, h); grd.addColorStop(0, '#34468e'); grd.addColorStop(1, '#22306c'); g.fillStyle = grd; arch(); g.fill();
-  g.strokeStyle = '#e8bd68'; g.lineWidth = 8; arch(); g.stroke();
-  g.lineWidth = 2; g.beginPath(); g.moveTo(w / 2, 10); g.lineTo(w / 2, h); g.moveTo(0, h * 0.72); g.lineTo(w, h * 0.72); g.stroke();
-  g.fillStyle = '#f0c672'; g.save(); g.translate(w / 2, h * 0.45); g.beginPath();
-  for (let i = 0; i < 8; i++) { const a = i / 8 * TAU - Math.PI / 2, rr = i % 2 ? w * 0.08 : w * 0.3; g.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); } g.closePath(); g.fill(); g.restore();
+// Tall cobalt lancets with gold leading. Variant 0: two lights under a trefoil; 1: one tall light under a small rose;
+// 2: three stepped lights under a quatrefoil. Every variant carries a small gold star.
+function paintWindow(variant = 0, w = 256, h = 512) {
+  const [c, g] = canvas2d(w, h);
+  const lancet = (x0, x1, top, bot) => { const ww = x1 - x0, sh = top + ww * 0.8; g.beginPath(); g.moveTo(x0, bot); g.lineTo(x0, sh); g.quadraticCurveTo(x0, top + ww * 0.12, (x0 + x1) / 2, top); g.quadraticCurveTo(x1, top + ww * 0.12, x1, sh); g.lineTo(x1, bot); g.closePath(); };
+  const glass = g.createLinearGradient(0, 0, 0, h); glass.addColorStop(0, '#3a4c96'); glass.addColorStop(0.6, '#2a3a7c'); glass.addColorStop(1, '#1f2c66');
+  lancet(0, w, 0, h); g.fillStyle = glass; g.fill();
+  g.save(); lancet(0, w, 0, h); g.clip();                                             // diamond quarries
+  g.strokeStyle = 'rgba(232,189,104,0.35)'; g.lineWidth = 1.5;
+  for (let k = -h; k < w + h; k += 22) { g.beginPath(); g.moveTo(k, 0); g.lineTo(k + h * 0.5, h); g.stroke(); g.beginPath(); g.moveTo(k, h); g.lineTo(k + h * 0.5, 0); g.stroke(); }
+  g.restore();
+  g.strokeStyle = '#e3b964'; g.lineWidth = 7;
+  const circle = (x, y, r) => { g.beginPath(); g.arc(x, y, r, 0, TAU); g.stroke(); };
+  if (variant === 0) { lancet(w * 0.12, w * 0.48, h * 0.32, h * 0.97); g.stroke(); lancet(w * 0.52, w * 0.88, h * 0.32, h * 0.97); g.stroke(); for (const [x, y] of [[0.5, 0.13], [0.39, 0.21], [0.61, 0.21]]) circle(w * x, h * y, w * 0.09); }
+  else if (variant === 1) {
+    lancet(w * 0.18, w * 0.82, h * 0.3, h * 0.97); g.stroke(); circle(w * 0.5, h * 0.16, w * 0.16); g.lineWidth = 3;
+    for (let i = 0; i < 8; i++) { const a = i / 8 * TAU; g.beginPath(); g.moveTo(w * 0.5, h * 0.16); g.lineTo(w * 0.5 + Math.cos(a) * w * 0.16, h * 0.16 + Math.sin(a) * w * 0.16); g.stroke(); }
+  } else { lancet(w * 0.08, w * 0.34, h * 0.42, h * 0.97); g.stroke(); lancet(w * 0.37, w * 0.63, h * 0.34, h * 0.97); g.stroke(); lancet(w * 0.66, w * 0.92, h * 0.42, h * 0.97); g.stroke(); for (const [x, y] of [[0.5, 0.11], [0.5, 0.23], [0.41, 0.17], [0.59, 0.17]]) circle(w * x, h * y, w * 0.06); }
+  g.lineWidth = 12; lancet(0, w, 0, h); g.stroke();                                    // outer gold frame
+  g.fillStyle = '#efc872'; g.save(); g.translate(w / 2, h * (variant === 1 ? 0.55 : 0.62)); g.beginPath();
+  for (let i = 0; i < 8; i++) { const a = i / 8 * TAU - Math.PI / 2, rr = i % 2 ? w * 0.035 : w * 0.13; g.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); } g.closePath(); g.fill(); g.restore();
   return tex(c);
 }
-function paintBanner(w = 128, h = 512) {
+function paintBanner(w = 256, h = 1024) {
   const [c, g] = canvas2d(w, h);
   const grd = g.createLinearGradient(0, 0, w, 0); grd.addColorStop(0, '#1a3389'); grd.addColorStop(0.5, '#2547ad'); grd.addColorStop(1, '#1a3389');
   g.fillStyle = grd; g.fillRect(0, 0, w, h);
-  for (let i = 0; i < 6; i++) { g.fillStyle = `rgba(0,0,30,${0.04 + (i % 2) * 0.06})`; g.fillRect(i * w / 6, 0, w / 12, h); }
-  g.strokeStyle = '#e8bd68'; g.lineWidth = 9; g.strokeRect(4, 4, w - 8, h - 8); g.lineWidth = 2; g.strokeRect(14, 14, w - 28, h - 28);
+  for (let i = 0; i < 8; i++) { g.fillStyle = `rgba(0,0,30,${0.04 + (i % 2) * 0.06})`; g.fillRect(i * w / 8, 0, w / 16, h); }   // cloth folds
+  g.strokeStyle = '#e8bd68'; g.lineWidth = 16; g.strokeRect(8, 8, w - 16, h - 16); g.lineWidth = 3; g.strokeRect(28, 28, w - 56, h - 56);
+  g.fillStyle = '#e8bd68'; for (let y = 60; y < h - 40; y += 36) { g.beginPath(); g.arc(18, y, 3, 0, TAU); g.arc(w - 18, y, 3, 0, TAU); g.fill(); }
   g.fillStyle = '#f0c672'; g.save(); g.translate(w / 2, h * 0.36); g.beginPath();
-  for (let i = 0; i < 8; i++) { const a = i / 8 * TAU - Math.PI / 2, rr = i % 2 ? 9 : 40; g.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); } g.closePath(); g.fill();
-  g.lineWidth = 2.5; g.strokeStyle = '#f0c672'; g.beginPath(); g.arc(0, 0, 30, 0, TAU); g.stroke(); g.restore();
-  g.fillStyle = '#f0c672'; for (let i = 0; i < 3; i++) { g.beginPath(); g.arc(w * (0.3 + i * 0.2), h * 0.66, 4, 0, TAU); g.fill(); }
+  for (let i = 0; i < 8; i++) { const a = i / 8 * TAU - Math.PI / 2, rr = i % 2 ? 18 : 80; g.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); } g.closePath(); g.fill();
+  g.lineWidth = 5; g.strokeStyle = '#f0c672'; g.beginPath(); g.arc(0, 0, 60, 0, TAU); g.stroke(); g.lineWidth = 2; g.beginPath(); g.arc(0, 0, 70, 0, TAU); g.stroke(); g.restore();
+  g.fillStyle = '#f0c672'; for (let i = 0; i < 3; i++) { g.beginPath(); g.arc(w * (0.3 + i * 0.2), h * 0.66, 8, 0, TAU); g.fill(); }
   return tex(c);
 }
 function paintCloud(N = 256, seed = 1) {
@@ -176,7 +207,8 @@ function paintCloud(N = 256, seed = 1) {
 
 // ---- materials (named: Unity's builder keys off these names) ----
 const named = (m, name) => { m.name = name; return m; };
-const ivoryBlocks = paintBlocks(512, 512, 8, [240, 229, 205]), ivoryBlocks2 = paintBlocks(512, 512, 6, [222, 209, 184], 5);
+const ivoryBlocks = paintBlocks(1024, 1024, 8, [244, 230, 200]), ivoryBlocks2 = paintBlocks(1024, 1024, 6, [230, 213, 184], 5);
+const windowMat = (v, name) => { const map = paintWindow(v); return named(new THREE.MeshStandardMaterial({ map, emissiveMap: map, roughness: 0.3, metalness: 0.15, emissive: 0x2a3c7e, emissiveIntensity: 0.15, alphaTest: 0.5 }), name); };
 const MAT = {
   ivory: named(new THREE.MeshStandardMaterial({ color: 0xffffff, map: ivoryBlocks, roughness: 0.7 }), 'IvoryBlocks'),
   ivoryShade: named(new THREE.MeshStandardMaterial({ color: 0xffffff, map: ivoryBlocks2, roughness: 0.78 }), 'IvoryShade'),
@@ -184,17 +216,27 @@ const MAT = {
   gold: named(new THREE.MeshStandardMaterial({ color: 0xc6a35a, roughness: 0.34, metalness: 0.6, emissive: 0x3e2a0c, emissiveIntensity: 0.25 }), 'Gold'),
   goldDark: named(new THREE.MeshStandardMaterial({ color: 0x9c7a3a, roughness: 0.45, metalness: 0.55, emissive: 0x2a1a06, emissiveIntensity: 0.25 }), 'GoldDark'),
   cobalt: named(new THREE.MeshStandardMaterial({ color: 0x2b3f8f, roughness: 0.3, metalness: 0.2 }), 'Cobalt'),
-  window: named(new THREE.MeshStandardMaterial({ map: paintWindow(), roughness: 0.3, metalness: 0.15, emissive: 0x2a3c7e, emissiveIntensity: 0.15, transparent: false, alphaTest: 0.5 }), 'StarWindow'),
+  windows: [windowMat(0, 'StarWindow'), windowMat(1, 'StarWindow2'), windowMat(2, 'StarWindow3')],
   banner: named(new THREE.MeshStandardMaterial({ map: paintBanner(), side: THREE.DoubleSide, roughness: 0.75 }), 'Banner'),
   shadow: named(new THREE.MeshStandardMaterial({ color: 0x8a90a8, roughness: 0.9 }), 'ArchShadow'),
 };
-MAT.window.emissiveMap = MAT.window.map;
+MAT.window = MAT.windows[0];
+let winPick = 0;
+const nextWindow = () => MAT.windows[(winPick++ >> 2) % 3];   // runs of four calls share a design, so a storey stays consistent
 
 const root = new THREE.Group(); root.name = 'LB_ENV_SkywardSpire_Arena'; scene.add(root);
 const G = name => { const g = new THREE.Group(); g.name = name; root.add(g); return g; };
 const gFloor = G('Floor'), gRim = G('Rim'), gBridges = G('Bridges'), gBelfries = G('Belfries'), gSpires = G('Spires'), gAbyss = G('Abyss');
 function add(geo, mat, parent, pos, rot, scl) { const m = new THREE.Mesh(geo, mat); m.castShadow = m.receiveShadow = true; if (pos) m.position.set(...pos); if (rot) m.rotation.set(...rot); if (scl) m.scale.set(...scl); parent.add(m); return m; }
 const grp = (parent, pos, rotY = 0, name) => { const g = new THREE.Group(); if (pos) g.position.set(...pos); g.rotation.y = rotY; if (name) g.name = name; parent.add(g); return g; };
+// Cloud anchors: empty nodes (position = structure centre at floor level, scale = footprint radius). Unity's builder
+// gathers a waist-height cloud cluster round each one, where the SkyArchitecture shader dissolves the structure.
+const gAnchors = G('CloudAnchors');
+function anchor(parent, x, z, r) {
+  parent.updateMatrixWorld(true);
+  const p = new THREE.Vector3(x, 0, z).applyMatrix4(parent.matrixWorld), a = new THREE.Object3D();
+  a.name = 'CloudAnchor'; a.position.set(p.x, 0, p.z); a.scale.setScalar(r); gAnchors.add(a);
+}
 
 // ---- reusable shapes ----
 const archCache = {};
@@ -256,19 +298,32 @@ function pinnacle(parent, x, y, z, h, w, mat = MAT.ivoryPlain) {
   add(new THREE.BoxGeometry(w, h, w), mat, parent, [x, y + h / 2, z]);
   add(new THREE.BoxGeometry(w * 1.2, 0.07, w * 1.2), MAT.gold, parent, [x, y + h, z]);
   add(new THREE.ConeGeometry(w * 0.7, h * 0.9, 4), mat, parent, [x, y + h * 1.45, z], [0, Math.PI / 4, 0]);
+  for (let k = 0; k < 4; k++) {                    // crockets: little leaf knobs climbing the spirelet's edges
+    const a = k * Math.PI / 2, f = 0.35 + (k % 2) * 0.2;
+    add(new THREE.SphereGeometry(w * 0.11, 6, 4), mat, parent, [x + Math.cos(a) * w * 0.5 * (1 - f), y + h + h * 0.9 * f, z + Math.sin(a) * w * 0.5 * (1 - f)]);
+  }
   add(new THREE.SphereGeometry(w * 0.16, 8, 6), MAT.gold, parent, [x, y + h * 1.95, z]);
 }
 // windows on the four faces of a w x d box centred at (0, y, 0) in `parent`; faces listed as 'nesw'
 function windowsOnBox(parent, w, d, y, wh, faces = 'nesw', cols = 0) {
-  const ww = wh * 0.42;
+  const ww = wh * 0.34;   // tall lancets, about 2.2 : 1 with the frame
   for (const f of faces) {
-    const along = f === 'n' || f === 's' ? w : d, n = cols || Math.max(1, Math.floor(along / (ww * 3.4)));
+    const along = f === 'n' || f === 's' ? w : d, n = cols || Math.max(1, Math.floor(along / (ww * 2.5)));
+    const win = nextWindow();
     for (let i = 0; i < n; i++) {
       const t = (i + 0.5) / n - 0.5, off = t * along;
       const [px, pz, ry] = f === 's' ? [off, d / 2 + 0.03, 0] : f === 'n' ? [-off, -d / 2 - 0.03, Math.PI] : f === 'e' ? [w / 2 + 0.03, -off, Math.PI / 2] : [-w / 2 - 0.03, off, -Math.PI / 2];
-      add(archGeo(ww, wh), MAT.window, parent, [px, y, pz], [0, ry, 0]);
+      add(archGeo(ww, wh), win, parent, [px, y, pz], [0, ry, 0]);
       const fr = add(archGeo(ww * 1.22, wh * 1.07), MAT.gold, parent, [px * 0.999, y - wh * 0.035, pz * 0.999], [0, ry, 0]);
       fr.position.x -= Math.sin(ry) * 0.012; fr.position.z -= Math.cos(ry) * 0.012;
+      if (i < n - 1) {                             // blind arcade between this window and the next
+        const t2 = (i + 1) / n - 0.5, mid = (t + t2) / 2 * along;
+        const [bx, bz] = f === 's' ? [mid, d / 2 + 0.02] : f === 'n' ? [-mid, -d / 2 - 0.02] : f === 'e' ? [w / 2 + 0.02, -mid] : [-w / 2 - 0.02, mid];
+        add(archGeo(ww * 0.42, wh * 0.5), MAT.shadow, parent, [bx, y + wh * 0.12, bz], [0, ry, 0]);
+        const nx = Math.sin(ry), nz = Math.cos(ry);   // pilaster dividing the bays, capped in gold
+        add(new THREE.BoxGeometry(0.34, wh * 1.15, 0.3), MAT.ivoryPlain, parent, [bx + nx * 0.1, y + wh * 0.55, bz + nz * 0.1], [0, ry, 0]);
+        add(new THREE.BoxGeometry(0.42, 0.12, 0.36), MAT.gold, parent, [bx + nx * 0.1, y + wh * 1.13, bz + nz * 0.1], [0, ry, 0]);
+      }
     }
   }
 }
@@ -277,10 +332,10 @@ function roundTier(parent, r, h, y, nWin, mat = MAT.ivory) {
   add(new THREE.CylinderGeometry(r, r * 1.03, h, 24), mat, parent, [0, y + h / 2, 0]);
   add(new THREE.CylinderGeometry(r * 1.08, r * 1.08, 0.22, 24), MAT.gold, parent, [0, y + h, 0]);
   add(new THREE.CylinderGeometry(r * 1.05, r * 1.05, 0.14, 24), MAT.goldDark, parent, [0, y + 0.07, 0]);
-  const wh = h * 0.66, ww = Math.min(wh * 0.42, r * TAU / nWin * 0.55);
+  const wh = h * 0.72, ww = Math.min(wh * 0.32, r * TAU / nWin * 0.5), win = nextWindow();
   for (let i = 0; i < nWin; i++) {
     const a = i / nWin * TAU;
-    add(archGeo(ww, wh), MAT.window, parent, [Math.sin(a) * (r + 0.02), y + h * 0.16, Math.cos(a) * (r + 0.02)], [0, a, 0]);
+    add(archGeo(ww, wh), win, parent, [Math.sin(a) * (r + 0.02), y + h * 0.16, Math.cos(a) * (r + 0.02)], [0, a, 0]);
     add(archGeo(ww * 1.25, wh * 1.07), MAT.gold, parent, [Math.sin(a) * (r + 0.005), y + h * 0.16 - wh * 0.035, Math.cos(a) * (r + 0.005)], [0, a, 0]);
     add(new THREE.BoxGeometry(r * 0.16, h, r * 0.16), MAT.ivoryPlain, parent, [Math.sin(a + Math.PI / nWin) * r, y + h / 2, Math.cos(a + Math.PI / nWin) * r]);
   }
@@ -354,6 +409,7 @@ for (let i = 0; i < 16; i++) {                   // hanging pinnacles under the 
   add(new THREE.CylinderGeometry(0.46, 0.46, 0.14, 8), MAT.gold, gRim, [x, -7 - len, z]);
   add(new THREE.ConeGeometry(0.38, 2.2, 8), MAT.ivoryPlain, gRim, [x, -8.1 - len, z], [Math.PI, 0, 0]);
 }
+for (let i = 0; i < 12; i++) { const a = (i + 0.5) / 12 * TAU; anchor(gRim, Math.cos(a) * 10.5, Math.sin(a) * 10.5, 4.2); }   // the dais itself sinks into cloud
 
 // ================================================================================================
 // 3. Bridges: N, E, S (entry), W. Deck, side walls, banner posts both sides, cobalt plaques, arches below
@@ -396,6 +452,7 @@ for (const [name, ang] of BRIDGE_DIRS) {
     add(new THREE.BoxGeometry(0.9, 12, 0.9), MAT.ivory, br, [ax - len / 10, -7.6, 0]);
     add(new THREE.ConeGeometry(0.65, 3, 4), MAT.ivoryPlain, br, [ax - len / 10, -15.1, 0], [Math.PI, Math.PI / 4, 0]);
     for (const y of [-2.2, -6.5]) add(new THREE.BoxGeometry(1.05, 0.16, 1.05), MAT.gold, br, [ax - len / 10, y, 0]);
+    anchor(br, ax - len / 10, 0, 1.5);
   }
 }
 
@@ -414,21 +471,39 @@ function cathedral(parent, x, z, rotY, { w = 9, d = 6, tiers = [8, 6, 5], name =
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) add(new THREE.BoxGeometry(0.8, 10, 0.8), MAT.ivoryPlain, c, [sx * bw / 2, y0 + 5, sz * bd / 2]);
   }
   y = 0;
+  let pw = cw, pd = cd, py = 0;
   for (let t = 0; t < tiers.length; t++) {
     const h = tiers[t];
     add(new THREE.BoxGeometry(cw, h, cd), MAT.ivory, c, [0, y + h / 2, 0]);
     add(new THREE.BoxGeometry(cw * 1.06, 0.25, cd * 1.06), MAT.gold, c, [0, y + h, 0]);
     add(new THREE.BoxGeometry(cw * 1.04, 0.14, cd * 1.04), MAT.goldDark, c, [0, y + 0.07, 0]);
-    windowsOnBox(c, cw, cd, y + h * 0.14, h * 0.7, 'nesw');
+    add(new THREE.BoxGeometry(cw * 1.03, 0.12, cd * 1.03), MAT.gold, c, [0, y + h * 0.55, 0]);   // mid string-course
+    windowsOnBox(c, cw, cd, y + h * 0.12, h * 0.78, 'nesw');
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
       add(new THREE.BoxGeometry(0.5, h, 0.5), MAT.ivoryPlain, c, [sx * cw / 2, y + h / 2, sz * cd / 2]);
       pinnacle(c, sx * cw / 2, y + h, sz * cd / 2, Math.min(2.2, h * 0.3), 0.42);
     }
     for (let i = 1; i < Math.floor(cw / 2.2); i++) pinnacle(c, -cw / 2 + i * cw / Math.floor(cw / 2.2), y + h, cd / 2, 0.9, 0.22);
+    if (t > 0) for (const sx of [-1, 1]) for (const k of [-0.3, 0.3]) {   // flying buttresses: outer pier on the tier below, arm up to this wall
+      const ox = sx * (pw / 2 + 0.9), oz = k * pd, top = py + 1.6;
+      add(new THREE.BoxGeometry(0.7, top - py + 0.4, 0.7), MAT.ivoryPlain, c, [ox, py + (top - py) / 2, oz]);
+      pinnacle(c, ox, top, oz, 1.0, 0.36);
+      const ix = sx * cw / 2, iy = y + h * 0.55, dx = ix - ox, dy = iy - top, len = Math.hypot(dx, dy);
+      add(new THREE.BoxGeometry(len, 0.32, 0.4), MAT.ivoryPlain, c, [(ix + ox) / 2, (iy + top) / 2, oz], [0, 0, Math.atan2(dy, dx)]);
+    }
+    pw = cw; pd = cd; py = y + h;
     y += h + 0.25; cw *= 0.72; cd *= 0.78;
   }
   add(new THREE.ConeGeometry(Math.min(cw, cd) * 0.72, 7, 4), MAT.ivoryPlain, c, [0, y + 3.5, 0], [0, Math.PI / 4, 0]);
   finial(c, [0, y + 7, 0], 1.6);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {   // four needle spires round the central one on the roof
+    const nx = sx * pw * 0.42, nz = sz * pd * 0.42, nh = 3.5 + hash(nx + x, nz + z) * 2.5;
+    add(new THREE.CylinderGeometry(0.28, 0.32, 1.2, 8), MAT.ivoryPlain, c, [nx, y + 0.6, nz]);
+    add(new THREE.ConeGeometry(0.3, nh, 8), MAT.ivoryPlain, c, [nx, y + 1.2 + nh / 2, nz]);
+    add(new THREE.CylinderGeometry(0.33, 0.33, 0.1, 8), MAT.gold, c, [nx, y + 1.25, nz]);
+    add(new THREE.SphereGeometry(0.1, 8, 6), MAT.gold, c, [nx, y + 1.25 + nh, nz]);
+  }
+  anchor(c, 0, 0, Math.max(w, d) * 0.6);
   return c;
 }
 // Round belfry with a ribbed cobalt dome, gold lantern and needle spire.
@@ -437,7 +512,11 @@ function domedBelfry(parent, x, z, { r = 3, tiers = [9, 6], domeMat = MAT.cobalt
   for (let i = 0; i < 4; i++) roundTier(b, r * (0.96 - i * 0.06), 8, -8 * (i + 1), 5, i ? MAT.ivoryShade : MAT.ivory);   // storeys below the floor line
   add(new THREE.TorusGeometry(r * 1.16, 0.18, 6, 32), MAT.gold, b, [0, 0, 0], [Math.PI / 2, 0, 0]);
   let y = 0, cr = r;
-  for (const h of tiers) { roundTier(b, cr, h, y, 6); y += h + 0.22; cr *= 0.86; }
+  for (const h of tiers) {
+    roundTier(b, cr, h, y, 6);
+    for (let i = 0; i < 10; i++) { const a = (i + 0.5) / 10 * TAU; pinnacle(b, Math.cos(a) * cr * 1.06, y + h, Math.sin(a) * cr * 1.06, 0.7, 0.22); }   // pinnacle ring on every tier
+    y += h + 0.22; cr *= 0.86;
+  }
   for (let i = 0; i < 8; i++) { const a = i / 8 * TAU; pinnacle(b, Math.cos(a) * cr * 1.05, y - 0.2, Math.sin(a) * cr * 1.05, 1.0, 0.28); }
   ribbedDome(b, cr * 0.95, domeMat, MAT.gold, [0, y, 0], 12);
   const ly = y + cr * 0.92;
@@ -445,6 +524,7 @@ function domedBelfry(parent, x, z, { r = 3, tiers = [9, 6], domeMat = MAT.cobalt
   ribbedDome(b, cr * 0.26, MAT.gold, MAT.goldDark, [0, ly + cr * 0.5, 0], 8);
   add(new THREE.ConeGeometry(cr * 0.08, spire, 8), MAT.gold, b, [0, ly + cr * 0.75 + spire / 2, 0]);
   add(new THREE.SphereGeometry(cr * 0.1, 10, 8), MAT.gold, b, [0, ly + cr * 0.78, 0]);
+  anchor(b, 0, 0, r * 1.2);
   return b;
 }
 // Round tower topped with an open gold-columned bell lantern and an armillary sphere.
@@ -459,6 +539,7 @@ function armillaryTower(parent, x, z, { r = 2.2, h = 10, sphere = 1.6, name = 'A
   add(new THREE.CylinderGeometry(r * 0.95, r * 0.9, 0.35, 20), MAT.gold, t, [0, y + 2.65, 0]);
   for (let i = 0; i < 8; i++) { const a = i / 8 * TAU + 0.2; pinnacle(t, Math.cos(a) * r * 0.9, y + 2.8, Math.sin(a) * r * 0.9, 0.6, 0.18, MAT.ivoryPlain); }
   armillary(t, [0, y + 2.8, 0], sphere);
+  anchor(t, 0, 0, r * 1.1);
   return t;
 }
 // Rotunda: a colonnaded drum, ribbed dome and a ring of small domed turrets.
@@ -475,6 +556,7 @@ function rotunda(parent, x, z, { r = 4, domeMat = MAT.gold, centre = MAT.cobalt,
   ribbedDome(t, r * 0.25, centre, MAT.gold, [0, 4.0 + r * 0.78, 0], 8);
   finial(t, [0, 4.0 + r * 1.02, 0], 1.2);
   for (let i = 0; i < turrets; i++) { const a = i / turrets * TAU + 0.3; pavilion(t, Math.cos(a) * r * 1.02, Math.sin(a) * r * 1.02, 0.9).position.y = 0.4; }
+  anchor(t, 0, 0, r * 1.15);
   return t;
 }
 // Slender ivory skybridge with an arch beneath, from p0 to p1 (x, y, z)
@@ -490,20 +572,22 @@ function skybridge(parent, p0, p1, w = 1.6) {
 // Landmarks — positions in metres (x east, z south), read from the reference with 1 m = 16.3 px about (437, 325).
 const B = gBelfries;
 // NW: cathedral mass with windows facing the arena, crowned by an armillary sphere on the drum nearest the rim
-cathedral(B, -25, -23, 0.62, { w: 13, d: 8, tiers: [11, 7, 5], name: 'Cathedral_NW' });
+cathedral(B, -25, -23, 0.62, { w: 10, d: 7, tiers: [11, 7, 5], name: 'Cathedral_NW' });
 cathedral(B, -33, -9, 0.3, { w: 8, d: 7, tiers: [9, 6], name: 'Cathedral_NW2' });
 armillaryTower(B, -16.2, -15.2, { r: 2.4, h: 6, sphere: 1.9, name: 'Armillary_NW' });
 // NE: mirror with variation
-cathedral(B, 26, -24, -0.6, { w: 13, d: 8, tiers: [10, 8, 5], name: 'Cathedral_NE' });
+cathedral(B, 26, -24, -0.6, { w: 10, d: 7, tiers: [10, 8, 5], name: 'Cathedral_NE' });
 cathedral(B, 34, -11, -0.25, { w: 8, d: 7, tiers: [8, 6], name: 'Cathedral_NE2' });
 armillaryTower(B, 16.4, -15.0, { r: 2.4, h: 6, sphere: 1.9, name: 'Armillary_NE' });
 // W and E: tall round belfries with cobalt domes, just south of the side bridges
-domedBelfry(B, -23, 13.5, { r: 3.4, tiers: [10, 7], name: 'Belfry_W' });
-domedBelfry(B, 23, 13.5, { r: 3.4, tiers: [10, 7], name: 'Belfry_E' });
+domedBelfry(B, -23, 13.5, { r: 2.8, tiers: [10, 7], name: 'Belfry_W' });
+domedBelfry(B, 23, 13.5, { r: 2.8, tiers: [10, 7], name: 'Belfry_E' });
 // small gold-domed kiosks just outside the rim on the W and E arcs (north of the side bridges)
 for (const [x, z, s] of [[-17.2, -5.6, 1.6], [-19.6, -8.4, 1.3], [17.4, -5.6, 1.6], [19.8, -8.4, 1.3], [-17.6, 3.8, 1.3], [17.6, 3.8, 1.3]]) {
-  add(new THREE.CylinderGeometry(0.9 * s, 0.7 * s, 20, 12), MAT.ivoryShade, B, [x, -10, z]);
+  add(new THREE.CylinderGeometry(0.9 * s, 0.7 * s, 20, 16), MAT.ivoryShade, B, [x, -10, z]);
+  for (const y of [-3, -9, -15]) add(new THREE.CylinderGeometry(0.95 * s, 0.95 * s, 0.14, 16), MAT.gold, B, [x, y, z]);
   pavilion(B, x, z, s);
+  anchor(B, x, z, 1.2 * s);
 }
 // SW: armillary tower with its open bell lantern
 armillaryTower(B, -15.8, 15.2, { r: 2.3, h: 5, sphere: 1.7, name: 'Occluder_Armillary_SW' });
@@ -514,9 +598,9 @@ domedBelfry(B, 28, 16, { r: 2.2, tiers: [7, 5], domeMat: MAT.cobalt, spire: 4, n
 domedBelfry(B, -29, 16, { r: 2.0, tiers: [6, 4], domeMat: MAT.gold, spire: 3, name: 'Occluder_Belfry_SW' });
 // corner masses: extra cathedral wings so the top corners read as solid ivory architecture, as in the reference
 cathedral(B, -12.5, -33, 0.15, { w: 9, d: 6, tiers: [12, 7], name: 'Cathedral_NW3' });
-cathedral(B, -38, -31, 0.75, { w: 10, d: 8, tiers: [10, 6], name: 'Cathedral_NW4' });
+for (const [x, z, h] of [[-38, -31, 26], [-35, -36, 19], [-42, -27, 15]]) needle(B, x, z, h, 1.1);   // slender spire cluster in the far NW corner
 cathedral(B, 12.5, -33, -0.15, { w: 9, d: 6, tiers: [12, 7], name: 'Cathedral_NE3' });
-cathedral(B, 38, -31, -0.75, { w: 10, d: 8, tiers: [10, 6], name: 'Cathedral_NE4' });
+for (const [x, z, h] of [[38, -31, 26], [35, -36, 19], [42, -27, 15]]) needle(B, x, z, h, 1.1);     // and in the far NE corner
 // needle spires: thin ivory shafts with gold bands and tall gold tips, clustered in every corner
 function needle(parent, x, z, h, w = 0.9) {
   const n = grp(parent, [x, 0, z], 0, 'Needle');
@@ -529,11 +613,15 @@ function needle(parent, x, z, h, w = 0.9) {
   add(new THREE.CylinderGeometry(w * 0.72, w * 0.72, 0.12, 8), MAT.gold, n, [0, y + h * 0.06, 0]);
   add(new THREE.ConeGeometry(w * 0.12, h * 0.22, 6), MAT.gold, n, [0, y + h * 0.35 + h * 0.11, 0]);
   add(new THREE.SphereGeometry(w * 0.16, 8, 6), MAT.gold, n, [0, y + h * 0.35, 0]);
+  anchor(n, 0, 0, w * 1.4);
 }
 for (const [x, z, h] of [[-20, -28, 24], [-30, -18, 20], [-8.5, -25, 15], [-35, -26, 18], [-27, -34, 22], [-42, -14, 16],
   [20, -28, 24], [30, -18, 20], [8.5, -25, 15], [35, -26, 18], [27, -34, 22], [42, -14, 16], [-31, 0, 14], [31, 0, 14]]) needle(B, x, z, h);
 const southNeedles = grp(B, null, 0, 'Occluder_Needles_S');
 for (const [x, z, h] of [[-27, 11, 15], [-34, 22, 13], [-12, 21, 9], [-30, 31, 11], [27, 11, 15], [34, 22, 13], [12, 21, 9], [30, 31, 11], [-40, 6, 12], [40, 6, 12]]) needle(southNeedles, x, z, h);
+// short arched skybridges inside the corner clusters (top-left and right), as in the reference
+skybridge(B, [-36, 9, -28], [-28, 9, -21], 1.4);
+skybridge(B, [33, 7, -9], [31, 7, -1.5], 1.3);
 // mark camera-side groups so the gameplay view can hide them
 B.children.forEach(c => { if (c.name.startsWith('Occluder')) c.userData.occluder = true; });
 
@@ -541,26 +629,51 @@ B.children.forEach(c => { if (c.name.startsWith('Occluder')) c.userData.occluder
 // 5. Filler spires receding into the clouds, and the far skyline
 // ================================================================================================
 function spire(parent, x, z, top, w, kind) {
+  // No two alike: width, height, window count and banding vary; tops are a cone (0), gold dome (1), cobalt dome (2),
+  // a slender gold-tipped needle (3) or a broken stump with fallen-away blocks (4, sparingly, for rhythm).
   const s = grp(parent, [x, 0, z], rnd() * TAU, 'Spire');
-  const base = top - 14 - rnd() * 18, h = top - base - w * 3;
-  add(new THREE.CylinderGeometry(w * 0.7, w * 0.8, h, 8), MAT.ivory, s, [0, base + h / 2, 0]);
-  for (const f of [0.35, 0.7, 0.98]) add(new THREE.CylinderGeometry(w * 0.78, w * 0.78, 0.15, 8), MAT.gold, s, [0, base + h * f, 0]);
-  const y = base + h;
-  for (let i = 0; i < 4; i++) { const a = i / 4 * TAU; add(archGeo(w * 0.4, w * 1.6), MAT.window, s, [Math.sin(a) * w * 0.71, y - w * 2.2, Math.cos(a) * w * 0.71], [0, a, 0]); }
-  if (kind === 0) { add(new THREE.ConeGeometry(w * 0.72, w * 3, 8), MAT.ivoryPlain, s, [0, y + w * 1.5, 0]); add(new THREE.SphereGeometry(w * 0.12, 8, 6), MAT.gold, s, [0, y + w * 3.05, 0]); }
+  w *= 0.85 + rnd() * 0.3; top += (rnd() - 0.5) * 3;
+  if (kind < 3 && rnd() < 0.22) kind = rnd() < 0.7 ? 3 : 4;
+  const seg = 12, base = top - 14 - rnd() * 18, h = top - base - w * 3, y = base + h;
+  add(new THREE.CylinderGeometry(w * 0.7, w * 0.8, h, seg), MAT.ivory, s, [0, base + h / 2, 0]);
+  const bands = 2 + Math.floor(rnd() * 3);
+  for (let i = 1; i <= bands; i++) add(new THREE.CylinderGeometry(w * 0.78, w * 0.78, 0.15, seg), MAT.gold, s, [0, base + h * (i / bands) * 0.98, 0]);
+  const nw = 3 + Math.floor(rnd() * 4), win = nextWindow();
+  for (let i = 0; i < nw; i++) { const a = i / nw * TAU; add(archGeo(w * 0.42, w * 1.9), win, s, [Math.sin(a) * w * 0.71, y - w * 2.5, Math.cos(a) * w * 0.71], [0, a, 0]); }
+  if (kind === 0) { add(new THREE.ConeGeometry(w * 0.72, w * 3, seg), MAT.ivoryPlain, s, [0, y + w * 1.5, 0]); add(new THREE.SphereGeometry(w * 0.12, 8, 6), MAT.gold, s, [0, y + w * 3.05, 0]); }
   else if (kind === 1) { ribbedDome(s, w * 0.72, MAT.gold, MAT.goldDark, [0, y, 0], 8); finial(s, [0, y + w * 0.7, 0], w * 0.6); }
-  else { ribbedDome(s, w * 0.72, MAT.cobalt, MAT.gold, [0, y, 0], 8); add(new THREE.ConeGeometry(w * 0.08, w * 2, 6), MAT.gold, s, [0, y + w * 1.6, 0]); }
+  else if (kind === 2) { ribbedDome(s, w * 0.72, MAT.cobalt, MAT.gold, [0, y, 0], 8); add(new THREE.ConeGeometry(w * 0.08, w * 2, 6), MAT.gold, s, [0, y + w * 1.6, 0]); }
+  else if (kind === 3) { add(new THREE.ConeGeometry(w * 0.45, w * 6, seg), MAT.ivoryPlain, s, [0, y + w * 3, 0]); add(new THREE.CylinderGeometry(w * 0.5, w * 0.5, 0.12, seg), MAT.gold, s, [0, y + w * 1.2, 0]); add(new THREE.ConeGeometry(w * 0.07, w * 1.4, 6), MAT.gold, s, [0, y + w * 6.6, 0]); }
+  else for (let i = 0; i < 5; i++) { const a = rnd() * TAU, bs = w * (0.25 + rnd() * 0.3); add(new THREE.BoxGeometry(bs, bs * (1 + rnd()), bs), MAT.ivoryShade, s, [Math.cos(a) * w * 0.45, y + bs * 0.4, Math.sin(a) * w * 0.45], [rnd(), rnd(), rnd()]); }
+  anchor(s, 0, 0, w * 1.2);
 }
 // clusters between the landmarks (x, z, top height, width, kind 0 cone / 1 gold dome / 2 cobalt dome)
 const FILLER = [[-30, -30, 14, 1.6, 0], [-37, -20, 10, 1.4, 1], [-13, -28, 6, 1.2, 1], [-21, -31, 16, 1.5, 0], [13, -28, 6, 1.2, 1], [21, -31, 16, 1.5, 0], [30, -30, 14, 1.6, 0], [37, -20, 10, 1.4, 1],
   [-38, -3, 8, 1.6, 0], [-36, 4, 14, 1.4, 1], [38, -3, 8, 1.6, 0], [37, 4, 14, 1.4, 1], [-33, 11, 6, 1.4, 1], [33, 11, 6, 1.4, 1],
   [-9, 23, -6, 1.3, 1], [8, 22, -4, 1.3, 1], [12, 26, -7, 1.2, 0], [-12, 28, -9, 1.2, 0], [16, 33, -5, 1.4, 1], [-16, 33, -4, 1.4, 2], [31, 27, 3, 1.6, 0], [-31, 27, 2, 1.6, 0],
   [8, 32, -10, 1.2, 2], [-6, 34, -12, 1.1, 1], [-26, 34, -3, 1.4, 0], [26, 35, -2, 1.4, 0], [-10, -21, -6, 1.0, 1], [10, -21, -6, 1.0, 1], [-40, 18, 4, 1.5, 0], [40, 18, 4, 1.5, 0]];
-for (const [x, z, top, w, kind] of FILLER) spire(gSpires, x, z, top, w, kind);
+for (const [x, z, top, w, kind] of FILLER) if (top > -3) spire(gSpires, x, z, top, w, kind === 1 && top < 8 ? 3 : kind);   // low ones rise as pointed tips; ones buried in the fade are left out
 for (let i = 0; i < 40; i++) {                     // far ring, deep in the abyss
   const a = rnd() * TAU, d = 48 + rnd() * 60;
   spire(gAbyss, Math.cos(a) * d, Math.sin(a) * d, -6 - rnd() * 22 + (d > 80 ? 10 : 0), 1.4 + rnd() * 1.6, Math.floor(rnd() * 3));
 }
+// Distant skyline (110–200 m): floating cathedral islands, simple but many, left to the shader's aerial perspective
+// (pale and blue) so they add depth past the near ring without competing with it.
+function skylineIsland(x, z, y, s) {
+  const isl = grp(gAbyss, [x, y, z], rnd() * TAU, 'Island');
+  add(new THREE.CylinderGeometry(7 * s, 6 * s, 2 * s, 12), MAT.ivoryShade, isl, [0, -s, 0]);
+  add(new THREE.ConeGeometry(6 * s, 14 * s, 10), MAT.ivoryShade, isl, [0, -9 * s, 0], [Math.PI, 0, 0]);
+  add(new THREE.TorusGeometry(7 * s, 0.25 * s, 6, 24), MAT.gold, isl, [0, 0, 0], [Math.PI / 2, 0, 0]);
+  const n = 3 + Math.floor(rnd() * 3);
+  for (let i = 0; i < n; i++) {
+    const b = rnd() * TAU, rr = i ? 2 + rnd() * 3.5 * s : 0, ht = (i ? 8 + rnd() * 10 : 18 + rnd() * 12) * s, ww = (i ? 0.9 : 1.8) * s;
+    add(new THREE.CylinderGeometry(ww, ww * 1.1, ht, 10), MAT.ivory, isl, [Math.cos(b) * rr, ht / 2, Math.sin(b) * rr]);
+    add(new THREE.CylinderGeometry(ww * 1.1, ww * 1.1, 0.25 * s, 10), MAT.gold, isl, [Math.cos(b) * rr, ht * 0.7, Math.sin(b) * rr]);
+    if (rnd() < 0.6) add(new THREE.ConeGeometry(ww, ww * 4, 10), MAT.ivoryPlain, isl, [Math.cos(b) * rr, ht + ww * 2, Math.sin(b) * rr]);
+    else add(new THREE.SphereGeometry(ww, 12, 6, 0, TAU, 0, Math.PI / 2), rnd() < 0.5 ? MAT.cobalt : MAT.gold, isl, [Math.cos(b) * rr, ht, Math.sin(b) * rr]);
+  }
+}
+for (let i = 0; i < 18; i++) { const a = (i + rnd() * 0.6) / 18 * TAU, d = 110 + rnd() * 90; skylineIsland(Math.cos(a) * d, Math.sin(a) * d, -10 + rnd() * 30, 0.8 + rnd() * 0.7); }
 
 // ================================================================================================
 // Sky, clouds and lights (scene-only, not exported)

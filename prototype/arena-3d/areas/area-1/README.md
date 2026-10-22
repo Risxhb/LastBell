@@ -35,3 +35,13 @@ The user's top-down picture (`reference-topdown.webp`) replaced the poster panel
 - `export-glb.mjs`: writes `unity/Assets/LastBell/Areas/Area1/SkywardSpire.glb`
 
 The Unity scene lives in `unity/Assets/LastBell/Areas/Area1/`; see its README. `shots/unity-vs-reference.png` compares the result with the reference. `skyward-spire-prompt.md` (image prompt) and `skyward-spire-unity-build-prompt.md` (the build brief this follows) are kept here.
+
+## Background pass
+
+`skyward-spire-background-pass-prompt.md` is the brief.
+- **Textures:** ivory ashlar at 1024² with wear, three tracery window designs at 256×512, and the banner at 256×1024.
+- **Buildings:** crocketed pinnacles, mid string-courses, blind arcades, pilasters, flying buttresses, roof needle spires, and pinnacle rings on belfry tiers.
+- **Spires and skyline:** varied filler spires (some needle and broken tops), a distant skyline of floating islands, and two short skybridges.
+- **Clouds:** `CloudAnchor` nodes exported for Unity's cloud clusters.
+
+The fade and the soft clouds live in Unity's shaders. `shots/background-pass.png` compares reference, before and after.
