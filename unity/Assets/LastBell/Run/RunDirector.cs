@@ -27,12 +27,15 @@ namespace LastBell.Run
         // all. Map: the run map an entry's practice loads first (null = fight on the current map). Add a boss with one line.
         public sealed class BossEntry
         {
-            public readonly string Name; public readonly Func<CombatWorld, BossEncounter> Spawn; public readonly bool InRun; public readonly string Map;
-            public BossEntry(string name, Func<CombatWorld, BossEncounter> spawn, bool inRun = true, string map = null) { Name = name; Spawn = spawn; InRun = inRun; Map = map; }
+            public readonly string Name; public readonly Func<CombatWorld, BossEncounter> Spawn; public readonly bool InRun;
+            readonly string map; readonly Func<string> mapFn;
+            public string Map => mapFn != null ? mapFn() : map;   // mapFn: the map depends on a setting (the Bellkeeper's ability set)
+            public BossEntry(string name, Func<CombatWorld, BossEncounter> spawn, bool inRun = true, string map = null, Func<string> mapFn = null) { Name = name; Spawn = spawn; InRun = inRun; this.map = map; this.mapFn = mapFn; }
         }
         public static readonly BossEntry[] Bosses =
         {
-            new BossEntry("Bellkeeper", w => BossEncounter.Spawn<BellkeeperEncounter>(w, Vector3.zero, 0)),
+            // final boss: in the run on the selected map; ability set v2's practice is fought on the Throne (Shattered Hour)
+            new BossEntry("Bellkeeper", w => BossEncounter.Spawn<BellkeeperEncounter>(w, Vector3.zero, 0), mapFn: () => BellkeeperEncounter.PracticeMap),
             // Skyward Spire area boss: practice only, fought in his own arena
             new BossEntry("Aurelion (area 1)", w => BossEncounter.Spawn<AurelionEncounter>(w, new Vector3(0, 0, -1.5f), 0), inRun: false, map: AurelionMap),
             // Verdant Chimes area boss (graybox): practice only, fought in her own arena

@@ -45,9 +45,10 @@ namespace LastBell.Run
         protected virtual void StepAlways() { }               // presentation-adjacent state on every tick
         protected virtual void OnDefeat() { }
         protected virtual void OnHurt() { }
+        protected virtual void OnHalt() { }                   // the script was dropped (Halt): stop anything it started
 
         public void BeginCombat() { script = Script().GetEnumerator(); wait = 0; }
-        public void Halt() { script = null; Current = "idle"; }   // player defeat: stop attacking, keep standing
+        public void Halt() { script = null; Current = "idle"; OnHalt(); }   // player defeat: stop attacking, keep standing
 
         public void Step()
         {

@@ -210,6 +210,9 @@ namespace LastBell.Run
             d.InputOverride = bot;
             yield return Wait(1.0f);
             if (AurelionOnly) { yield return AurelionChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
+            if (BellkeeperV2Only) { yield return BellkeeperV2Checks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
+            // The run-loop checks below were written for the Bellkeeper's v0.3 set; they keep it (v1). Set v2 has its own section.
+            BellkeeperEncounter.SetOverride = BellkeeperEncounter.AbilitySet.V1;
             Check($"boots into the menu on a run map ({RunMaps.CurrentName})", d.State == RunState.Menu && RunMaps.Current >= 0);
             for (int i = 0; i < RunMaps.All.Length; i++)
                 Check($"map selectable: {RunMaps.All[i].Name}", RunMaps.InBuild(i), RunMaps.All[i].RunScene);
@@ -440,6 +443,9 @@ namespace LastBell.Run
                 d.ReturnToMenu();
             }
             Check("map tour returns to the starting map", RunMaps.Current == startMap);
+            // ---------- the Bellkeeper's ability set v2 (proposal) ----------
+            yield return BellkeeperV2Checks();
+            BellkeeperEncounter.SetOverride = BellkeeperEncounter.AbilitySet.V1;
             // ---------- area bosses (practice only for now) ----------
             yield return AurelionChecks();
 
