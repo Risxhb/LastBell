@@ -79,7 +79,7 @@ namespace LastBell.Run
             int t3 = d.World.Tick;
             BkRun(() => bk.PunishWindows >= 1, 60 * 40);
             log = BkLogSince(t3);
-            var p3 = log.Select(e => e.what).Take(5).ToArray();
+            var p3 = log.Select(e => e.what).Where(w => !w.StartsWith("phase")).Take(5).ToArray();
             Check("phase 3 runs Lean and Order, then the Final Toll (tide + Reflection), then the punish window",
                   p3.SequenceEqual(new[] { "launch leaning_bell", "launch striking_order", "launch toll_tide", "launch reflection", "punish" }), string.Join(" > ", p3));
             int tide = BkTickOf(log, "launch toll_tide"), mir = BkTickOf(log, "launch reflection");
