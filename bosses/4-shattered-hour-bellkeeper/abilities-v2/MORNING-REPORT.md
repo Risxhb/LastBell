@@ -1,4 +1,4 @@
-# The Bellkeeper — ability set v2: morning report (draft)
+# The Bellkeeper — ability set v2: morning report
 
 **Status:** designed, built and tested by autotest. **Not human-approved:** nothing is approved until Chzy18 plays it. Everything here is a proposal (`ABILITIES.md`).
 
@@ -22,7 +22,7 @@ unity\Builds\Windows\LastBell.exe
 
 | # | Ability | Ability session | State | Own checks | Evidence |
 |---|---|---|---|---|---|
-| 01 | Leaning Bell | Leaning Bell | _pending_ | _pending_ | |
+| 01 | Leaning Bell | Leaning Bell | merged | 44/44 | `bellkeeper-v2-evidence/leaning-bell-2` |
 | 02 | Striking Order | Striking Order | merged | 30/30 | `bellkeeper-v2-evidence/striking-order-1` |
 | 03 | Reflection of the Hour | Reflection of the Hour | merged | 47/47 | `bellkeeper-v2-evidence/reflection-1` |
 | 04 | The Last Toll Tide | The Last Toll Tide | merged | 77/77 | `bellkeeper-v2-evidence/toll-tide-2` |
@@ -36,7 +36,8 @@ Evidence folders are in `C:\Users\BS_Ch\Documents\Codex\last bell\` (outside git
 |---|---|---|
 | `abilities-1` | scaffold + 5 stubs, v2 section only | 29/30 (test bug, fixed) |
 | `abilities-full-1` | + Reflection, Toll Tide, Striking Order, Unfinished Hour | **427/429**. Two test bugs fixed in `e76b52d`: a timing-fragile v1 resume check, and my practice-hook check not allowing for The Unfinished Hour's Hard-only lead-in |
-| `abilities-full-2` | + fixes (+ Leaning Bell if merged in time) | _pending_ |
+| `abilities-full-2` | + those fixes | **429/429** |
+| `abilities-full-3` | + Leaning Bell: **all five abilities** | **474/474, 0 errors** (includes Hard: The Unfinished Hour replays a real Leaning Bell; max two damaging patterns over the whole plan) |
 
 ## Escape check
 
@@ -70,6 +71,18 @@ Evidence folders are in `C:\Users\BS_Ch\Documents\Codex\last bell\` (outside git
 
 ## Next
 
-- Merge Leaning Bell when it reports, then rerun the full autotest.
+- Nothing left to merge. All five abilities are complete (built and tested), and none is human-approved.
 - Push and open the draft PR into `feature/run-loop` once GitHub accepts pushes.
 - Chzy18 plays it.
+
+## Notes on the evidence
+
+- The latest full run's screenshots and clips are in `bellkeeper-v2-evidence/abilities-full-3/`: `38_…`–`48_bk_*.png` and `bk_*.mp4`. Each ability's own run folder has its clip too.
+- The screenshots show the pause menu over the floor, because the harness pauses the game to step it tick by tick. The clips are clean.
+- The `Error : EXCEPTION_ACCESS_VIOLATION` line in the build script's output comes from Blender crashing at the end of the frames-to-MP4 step, not from the game; the game exits normally. That step sometimes loses the last clip (`vanguard_kit` in run 2).
+
+## Extra open questions from the ability sessions
+
+- **Leaning Bell, direction of the dividing line:** the brief doesn't say. The session made it perpendicular to the line from the centre to the boss's target (the nearest standing player). The side with more standing players is hit; a tie goes to the target's side.
+- **Toll Tide on the square test map:** "bound + 2 m" doesn't reach the corners, so the outer radius there is the corner distance + 2 m.
+- **Striking Order:** with 3 players, I–IV go to them with the first player taking I and IV. Easy ring I comes at 3.75 s.
