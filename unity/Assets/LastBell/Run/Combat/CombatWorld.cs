@@ -36,6 +36,8 @@ namespace LastBell.Run
         public readonly Transform Root;
         public int Tick { get; private set; }
         public bool CombatActive;                  // abilities, boss scripts and hazards only run while true
+        public Difficulty Difficulty = Difficulty.Medium;   // fixed for the run (RunDirector); bosses may author per level
+        public float DamageTakenScale => RunDifficulty.DamageTakenScale(Difficulty);
 
         // statistics for the results screen
         public int DamageDealt, DamageTaken;
