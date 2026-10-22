@@ -28,7 +28,8 @@ namespace LastBell.Run
 
         // Casts Starfall Mirror once on the boss's script and plays the scripted moves; records spawn, lock and resolve
         // ticks of every circle (by wrapping its Track and OnResolve) and the tick Run returned.
-        IEnumerator SfRun(SfLog log, params SfMove[] moves)
+        IEnumerator SfRun(SfLog log, params SfMove[] moves) => SfRunBody(log, false, moves);
+        IEnumerator SfRunBody(SfLog log, bool fullWindow, params SfMove[] moves)
         {
             Action<Hazard> hook = h =>
             {
@@ -39,7 +40,7 @@ namespace LastBell.Run
                 var rs = h.OnResolve; h.OnResolve = hz => { t.Resolve = V2W.Tick; rs?.Invoke(hz); };
             };
             var w = V2W; w.Hazards.Spawned += hook;
-            V2Begin(SfTimed(V2Boss.Starfall.Run(), log));
+            V2Begin(SfTimed(V2Boss.Starfall.Run(fullWindow), log));
             var pending = moves.ToList(); float guard = 0;
             while (V2Boss != null && V2Boss.TestBusy && guard < 20)
             {
@@ -222,20 +223,54 @@ namespace LastBell.Run
                 V2Check("solo at 4.2 m/s: leave star I, then leave star II (each 0.25 s after its lock) takes no hit", SfHitCount(V2Party[0]) == 0, SfHitText());
             }
 
-            // ---- 9. Easy stretches follow and window by 1.25 (damage ×0.6); Hard keeps the timings (damage ×1.3) ----
-            foreach (var (level, lk, rs, dmg) in new[] {
-                (Difficulty.Easy, Sim.Ticks(StarfallMirror.FollowS * 1.25f), Sim.Ticks(StarfallMirror.FollowS * 1.25f) + Sim.Ticks(StarfallMirror.WindowS * 1.25f), 18),
-                (Difficulty.Hard, lockAt, resolveAt, 39) })
+            // ---- 9. Easy stretches follow and window by 1.25 (damage ×0.6). Hard (v2.1 §2) keeps the 2.0 s follow and cuts the
+            // window ×0.7 to 0.77 s (damage ×1.3); Run(fullWindow: true), the Lances pairing (v2.1 §3), keeps 1.1 s on Hard ----
+            int easyLock = Sim.Ticks(StarfallMirror.FollowS * 1.25f), hardResolve = lockAt + Sim.Ticks(StarfallMirror.WindowS * AurelionAbility.HardWindow);
+            foreach (var (level, full, lk, rs, dmg) in new[] {
+                (Difficulty.Easy, false, easyLock, easyLock + Sim.Ticks(StarfallMirror.WindowS * 1.25f), 18),
+                (Difficulty.Hard, false, lockAt, hardResolve, 39),
+                (Difficulty.Hard, true, lockAt, resolveAt, 39) })
             {
                 var at = new[] { new Vector3(-6, 0, 4), new Vector3(6, 0, 4) };
                 yield return V2Setup(2, level, at);
                 if (V2Boss == null) yield break;
                 var log = new SfLog();
-                yield return SfRun(log);
-                V2Check($"{level}: lock at {lk}, resolve at {rs}, radius 2.2 m", log.T.Count == 4 && log.T.Values.All(t => t.LockAge == lk && t.ResolveAge == rs) && log.T.Keys.All(h => Mathf.Approximately(h.Radius, 2.2f)),
+                yield return SfRunBody(log, full);
+                string name = level + (full ? " (full window, Lances pairing)" : "");
+                V2Check($"{name}: lock at {lk}, resolve at {rs}, radius 2.2 m", log.T.Count == 4 && log.T.Values.All(t => t.LockAge == lk && t.ResolveAge == rs) && log.T.Keys.All(h => Mathf.Approximately(h.Radius, 2.2f)),
                     string.Join("; ", log.T.Values.Select(t => $"lock {t.LockAge} resolve {t.ResolveAge}")));
-                V2Check($"{level}: a star hit deals {dmg}", V2Party.All(p => V2HitsOn(p, SfName).Count() == 1 && V2HitsOn(p, SfName).All(h => h.Damage == dmg)), SfHitText());
+                V2Check($"{name}: a star hit deals {dmg}", V2Party.All(p => V2HitsOn(p, SfName).Count() == 1 && V2HitsOn(p, SfName).All(h => h.Damage == dmg)), SfHitText());
             }
+
+            // ---- 9b. Hard escape (0.77 s window): 0.25 s after the lock, one dash + walk clears the star; walking alone at
+            // 4.2 m/s is too slow on purpose (v2.1 §2) ----
+            {
+                var at = new[] { new Vector3(-6, 0, 4), new Vector3(6, 0, 4) };
+                yield return V2Setup(2, Difficulty.Hard, at);
+                if (V2Boss == null) yield break;
+                var log = new SfLog();
+                yield return SfRun(log, new SfMove { Age = lockAt + stun, P = V2Party[0], To = new Vector3(-8.9f, 0, 4), Dash = true },
+                                        new SfMove { Age = lockAt + stun, P = V2Party[1], To = new Vector3(8.9f, 0, 4) });
+                var dasher = V2Party[0];
+                V2Check("Hard: walk + one dash at 4.2 m/s escapes the 0.77 s window", SfHitCount(dasher) == 0 && dasher.Stamina <= PlayerController.MaxStamina - PlayerController.DashCost + 5,
+                    SfHitText() + $" | dasher at {SfPos(dasher.transform.position)}, stamina {dasher.Stamina:0}");
+                V2Check("Hard: walking alone at 4.2 m/s is too slow (hit)", SfHitCount(V2Party[1]) == 1, SfHitText() + $" | walker at {SfPos(V2Party[1].transform.position)}");
+            }
+
+            // ---- 9c. Duration(fullWindow) equals Run's real last-resolve offset from its first tick (the v2.1 plan pairs with it) ----
+            foreach (var level in new[] { Difficulty.Easy, Difficulty.Medium, Difficulty.Hard })
+                foreach (int n in new[] { 1, 2 })
+                    foreach (bool full in level == Difficulty.Hard ? new[] { false, true } : new[] { false })
+                    {
+                        var at = new[] { new Vector3(-6, 0, 4), new Vector3(6, 0, 4) };
+                        yield return V2Setup(n, level, at);
+                        if (V2Boss == null) yield break;
+                        int want = Sf.Duration(full);
+                        var log = new SfLog();
+                        yield return SfRunBody(log, full);
+                        int real = log.T.Count > 0 ? log.T.Values.Max(t => t.Resolve) - log.Cast : -1;
+                        V2Check($"Duration({full}) = real last resolve, {level}, N = {n}", want == real && log.T.Values.All(t => t.Resolve >= 0), $"Duration {want}, real {real}");
+                    }
 
             // ---- 10. boss death mid-follow cancels every star and mirror in the killing tick (last: it ends the practice) ----
             {
