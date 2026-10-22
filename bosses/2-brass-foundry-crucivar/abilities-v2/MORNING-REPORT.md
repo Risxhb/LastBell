@@ -1,5 +1,49 @@
 # Crucivar ability set v2: morning report
 
+# Update: ability set v3 (2026-10-22, after Chzy18's playtest)
+
+Chzy18 found v2 "insane easy" and asked for "much much harder", with new abilities allowed. **v3 is built, tested and now the default** for "Crucivar (area 2)".
+- v2 stays reachable as `-lastbellAbilitySet v2`, and v1 as `v1`.
+- Spec: `ABILITIES-v3.md` plus `escape-v3-*.md` (17/17 escape cases pass on Medium). They're on `design/crucivar-abilities-v2` at 12602a7, local only.
+- That commit isn't merged here: the merge was blocked by a permission check. The code follows the spec as written.
+
+**Built (local commits 369f718 and 4116a52):**
+- **HP:** 6600 in v3.
+- **Phase plan v3:** 0.5 s gaps, layering from phase 1, and one 3.0 s punish per loop.
+- **Mould Press:** 25 per share; solo is I > II > III, 2.4 s apart (two moulds on Easy).
+- **Gear Chain:** 2.5 s warning, snap 40.
+- **Bellows Draw:** rim from 8.5 m for 40; blast r 5 landing at 2.4 s for 45; 2 m pull at 1.1–1.5 s; edge 15/s.
+- **The Great Casting:**
+  - pour 3.0 s, 100 split; solo gets two 50 pours;
+  - 8 spokes, r 1.5, 30 each;
+  - phase-3 return wave resolving 7.5–9.5 s (none on Easy).
+- **Second Press:** 35.
+- **New fillers:**
+  - **Anvil Sweep** (`crucivar.anvil_sweep`): 120° cone, 5.5 m, at the nearest player; 35, Strike.
+  - **Slag Spit** (`crucivar.slag_spit`): 2.5 m circle on the farthest 1/2/3 players; 30, Ground.
+
+**Tests at 4116a52:**
+
+| Suite | Result |
+|---|---|
+| Crucivar v2 + v3 (`-crucivarV2Test`) | **269/269** (v3 alone: 62/62) |
+| v1 | **28/28** |
+| Run loop | **171/173**, the same two older failures (editor noise and the Bellkeeper timing check) |
+
+**Build decisions (open questions):**
+1. **Bellows timing.** The blast is telegraphed from the cast and lands at 2.4 s. The pull runs 1.1–1.5 s, keeping the 0.9 s walk-out the v3 escape check assumes. The inhale warning starts at 0.1 s.
+2. **Return wave.** It is shown at 5.5 s so even its first stamp gets the 2.0 s warning floor. It resolves only after the inward wave's last ring (7.0 s), as the spec asks.
+3. **Spokes.** The inward march uses 8 spokes 22.5° off the pour. The return wave uses the 8 offset spokes, which include the pour channel.
+4. **Fillers.**
+   - Slag Spit pushes 1 m.
+   - Anvil Sweep's reach is measured from the boss centre.
+   - The phase plan doesn't walk the boss to the anvil before a filler.
+5. **Practice launchers** play the v3 version of each ability.
+
+Play-test it in the `crucivar-playtest` worktree. It is moved to 4116a52, has new launchers (`Play Crucivar v3.cmd`, `Practice - Anvil Sweep.cmd`, `Practice - Slag Spit.cmd`), and `HOW-TO-PLAY.md` is updated.
+
+---
+
 **Status:** designed, built and tested. **Not human-approved:** nothing here is approved until Chzy18 plays it.
 
 All five abilities are built and merged into the integration branch, and v2 is the default for the "Crucivar (area 2)" practice entry.
