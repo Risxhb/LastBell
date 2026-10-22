@@ -47,6 +47,7 @@ namespace LastBell.Run
         public Action<Hazard> Track;            // called every tick until locked (follow a target / the boss facing)
         public Action<Hazard> OnResolve;         // presentation of the resolve (effects), after the hit test
         public Action<Hazard> OnSpent;           // the active period is over (same tick as OnResolve when ActiveTicks is 0)
+        public Func<Vector3, Vector3> Push;      // knockback direction override (Second Press pushes toward the arena centre)
 
         public int Age { get; internal set; }
         public bool Locked => Age >= LockAt;
@@ -77,9 +78,10 @@ namespace LastBell.Run
             }
         }
 
-        // direction a hit pushes the player: away from the origin, or sideways out of a lane
+        // direction a hit pushes the player: Push when set, else away from the origin, or sideways out of a lane
         public Vector3 PushDir(Vector3 p)
         {
+            if (Push != null) { var o = Sim.Flat(Push(p)); if (o.sqrMagnitude > 1e-4f) return o.normalized; }
             if (Shape == HazardShape.Lane)
             {
                 var l = Quaternion.Euler(0, -Yaw, 0) * Sim.Flat(p - Origin);
