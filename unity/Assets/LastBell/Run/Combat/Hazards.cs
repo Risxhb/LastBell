@@ -27,6 +27,7 @@ namespace LastBell.Run
         public float Radius, Inner, HalfAngle;   // circle/ring/cone
         public float Length, Width;              // lane
         public int LockAt, ResolveAt;
+        public int ActiveTicks;                  // 0 or 1 = resolves on one tick; otherwise hits anyone inside for this many ticks from ResolveAt (R22)
         public int Damage;
         public bool JumpClearable; public float ClearHeight = 0.35f;
         public float Knockback = 1.5f;
@@ -36,6 +37,7 @@ namespace LastBell.Run
         public float BurnPerSecond;
         public Action<Hazard> Track;            // called every tick until locked (follow a target / the boss facing)
         public Action<Hazard> OnResolve;         // presentation of the resolve (effects), after the hit test
+        public Action<Hazard> OnSpent;           // the active period is over (same tick as OnResolve when ActiveTicks is 0)
 
         public int Age { get; internal set; }
         public bool Locked => Age >= LockAt;
@@ -126,9 +128,11 @@ namespace LastBell.Run
             {
                 var h = live[i];
                 if (h.Age < h.ResolveAt) continue;
-                live.RemoveAt(i);
-                if (h.BurnPerSecond > 0) { h.Tele.Expire(); h.OnResolve?.Invoke(h); continue; }   // cooled: harmless, no hit
-                h.Tele.Resolve(); Resolved++;
+                bool first = h.Age == h.ResolveAt, last = h.Age >= h.ResolveAt + Mathf.Max(0, h.ActiveTicks - 1);
+                if (last && h.BurnPerSecond > 0) { live.RemoveAt(i); h.Tele.Expire(); h.OnResolve?.Invoke(h); continue; }   // cooled slag: harmless, no hit
+                if (h.BurnPerSecond > 0) continue;
+                if (last) { live.RemoveAt(i); h.Tele.Resolve(); }
+                if (first) Resolved++;
                 foreach (var p in w.Players)
                 {
                     if (p.Down || h.Hit.Contains(p) || !h.Contains(p.transform.position)) continue;
@@ -136,12 +140,12 @@ namespace LastBell.Run
                     h.Hit.Add(p);
                     p.ReceiveHit(h);
                 }
-                h.OnResolve?.Invoke(h);
+                if (first) h.OnResolve?.Invoke(h);
+                if (last) h.OnSpent?.Invoke(h);
             }
             SetQuiet(live.Count > 0);
         }
 
-        // Cancels every pending hazard: none of them can resolve or deal damage afterwards.
         // Standing hazards: each player burns at the highest rate of the locked ones they stand in (overlaps never add up),
         // in whole HP as the fraction accumulates. Leaving every pool drops the carried fraction.
         void StepBurn()
@@ -159,6 +163,7 @@ namespace LastBell.Run
             }
         }
 
+        // Cancels every pending hazard: none of them can resolve or deal damage afterwards.
         public void ClearAll()
         {
             live.Clear(); burn.Clear();

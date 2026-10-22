@@ -188,7 +188,7 @@ namespace LastBell.Run
             yield return Wait(1.0f);
             Check("boots into the menu", d.State == RunState.Menu);
             yield return Shot("menu");
-            Check("practice starts", d.StartPractice("Vanguard", RunDirector.PracticeCrucivar));
+            Check("practice starts", d.StartPractice("Vanguard", RunDirector.CrucivarPractice));
             yield return Wait(0.3f); d.RequestReady();
             yield return Until(() => d.State == RunState.Combat, 6, "combat");
             boss = d.Boss as CrucivarEncounter;
