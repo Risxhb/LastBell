@@ -75,10 +75,11 @@ function L(name, color, o = {}) {
   return m;
 }
 const STONE = L('Stone', 0xb3ad9f), STONE_DK = L('StoneDark', 0x7d796e), MOSS = L('Moss', 0x4f7139), MOSS_DK = L('MossDark', 0x2f4f2c);
-const IVY = L('Ivy', 0x3c6232), CANOPY = L('Canopy', 0x2c4a2a), BARK = L('Bark', 0x4a3a2c), TIMBER = L('Timber', 0x5a4330);
+const IVY = L('Ivy', 0x3c6232), CANOPY = L('Canopy', 0x34552f), CANOPY_DK = L('CanopyDark', 0x1d3420), BARK = L('Bark', 0x4a3a2c), TIMBER = L('Timber', 0x5a4330);
 const BRASS = L('Brass', 0xb0893f, { metal: 1 }), BELL = L('Bell', 0xd2a24c, { metal: 1 }), BRASS_DK = L('BrassDark', 0x7a5e2c, { metal: 0.7 });
 const ROCK = L('Rock', 0xffffff, { vc: true }), FLOWER = L('Flower', 0xffffff, { vc: true });
 const GLOW_AMBER = new THREE.MeshBasicMaterial({ name: 'GlowAmber', color: new THREE.Color(0xffc477).multiplyScalar(2.2), toneMapped: false });
+const POOL_CHANNEL = new THREE.MeshBasicMaterial({ name: 'Pool', color: 0x2a8a88 });
 const GLOW_TEAL = new THREE.MeshBasicMaterial({ name: 'GlowTeal', color: new THREE.Color(0x6ff5df).multiplyScalar(1.8), toneMapped: false });
 
 // smooth normals across seams: average the normals of vertices that share a position
@@ -134,7 +135,7 @@ function arcadeShape(len, h, n, w, s, pointed = false) {
 const extrude = (shape, depth, bevel = 0.04) => { const g = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: bevel > 0, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 2, curveSegments: 16 }); g.translate(0, 0, -depth / 2); g.computeVertexNormals(); return g; };
 
 // ---- instanced foliage, collected as we go and built at the end (Unity gets them baked into single meshes) ----
-const ivyM = [], flowerM = [], tuftM = [], M4 = new THREE.Matrix4(), Q = new THREE.Quaternion(), E3 = new THREE.Euler(), V = new THREE.Vector3(), S = new THREE.Vector3();
+const ivyM = [], flowerM = [], tuftM = [], fernM = [], M4 = new THREE.Matrix4(), Q = new THREE.Quaternion(), E3 = new THREE.Euler(), V = new THREE.Vector3(), S = new THREE.Vector3();
 const pushM = (list, x, y, z, s, sy = s, ry = rnd() * 6, rx = 0) => { E3.set(rx, ry, 0); Q.setFromEuler(E3); M4.compose(V.set(x, y, z), Q, S.set(s, sy, s)); list.push(M4.clone()); };
 // a curtain of ivy hanging from (x, y, z) down `len` metres, pushed `out` along the face normal (nx, nz); white flowers dotted in
 // Leaves are flattened against the wall (thin along the face normal) and jittered, strands wobble and thin out as they
@@ -148,7 +149,7 @@ function ivyCurtain(x, y, z, len, nx = 0, nz = 0, width = 0.8, flowers = 0.12) {
     for (let d = 0.1; d < L2; d += 0.16) {
       const fall = d / L2, s = (0.2 - fall * 0.1) * (0.75 + rnd() * 0.5), wob = Math.sin(d * 1.7 + ph) * 0.1, lo = off + wob + (rnd() - 0.5) * 0.1, out = 0.06 + rnd() * 0.08;
       pushLeaf(x + tx * lo + nx * out, y - d, z + tz * lo + nz * out, s, nx, nz);
-      if (rnd() < 0.5) pushLeaf(x + tx * (lo + (rnd() - 0.5) * 0.18) + nx * out, y - d - 0.08, z + tz * (lo + (rnd() - 0.5) * 0.18) + nz * out, s * 0.8, nx, nz);
+      if (rnd() < 0.3) pushLeaf(x + tx * (lo + (rnd() - 0.5) * 0.18) + nx * out, y - d - 0.08, z + tz * (lo + (rnd() - 0.5) * 0.18) + nz * out, s * 0.8, nx, nz);
       if (rnd() < flowers) pushM(flowerM, x + tx * lo + nx * (out + 0.12), y - d, z + tz * lo + nz * (out + 0.12), 0.9 + rnd() * 0.5, undefined, rnd() * 6, -1.2);
     }
   }
@@ -280,7 +281,7 @@ const fallSpots = [];
     const a = (i + 0.5) / n * Math.PI * 2; if (nearExit(a, GAP)) continue;
     const sunk = rnd() < 0.12, h = sunk ? 0.32 : 0.5 + rnd() * 0.08, w = Math.PI * 2 * rad / n - 0.06;
     const b = block(rnd() < 0.6 ? STONE : STONE_DK, 0.8, h, w, Math.cos(a) * rad, h / 2 - 0.05, Math.sin(a) * rad, -a); b.rotation.z = (rnd() - 0.5) * 0.04;
-    if (rnd() < 0.6) mossMound(Math.cos(a) * rad, h, Math.sin(a) * rad, 0.3 + rnd() * 0.25, rnd() < 0.75 ? 5 : 0);
+    if (rnd() < 0.6) mossMound(Math.cos(a) * rad, h, Math.sin(a) * rad, 0.3 + rnd() * 0.25, rnd() < 0.75 ? 9 : 0); // lily clusters
     if (rnd() < 0.9) ivyCurtain(Math.cos(a) * (R + 0.85), h - 0.1, Math.sin(a) * (R + 0.85), 1 + rnd() * 5, Math.cos(a), Math.sin(a), 0.6, 0.15);
   }
   for (let i = 0; i < 40; i++) { const a = (i + rnd() * 0.6) / 40 * Math.PI * 2; if (nearExit(a, GAP + 0.04)) continue;
@@ -290,6 +291,7 @@ const fallSpots = [];
     ivyCurtain(Math.cos(a) * (R + 1.0), 0.2, Math.sin(a) * (R + 1.0), 2 + rnd() * 4.5, Math.cos(a), Math.sin(a), 1.0, 0.18); }
   // brass band along the curb's top outer edge, one arc per quadrant between the bridge gaps
   for (const e of EXITS) { const t0 = e + GAP, len = Math.PI / 2 - GAP * 2, band = add(new THREE.Mesh(new THREE.CylinderGeometry(R + 0.82, R + 0.82, 0.09, 96, 1, true, Math.PI / 2 - t0 - len, len), BRASS)); band.position.y = 0.38; }
+  for (let i = 0; i < 220; i++) { const a = rnd() * 6.28; if (nearExit(a, GAP)) continue; const d = rnd() < 0.5 ? PLAY_R + 0.45 + rnd() * 0.15 : R + 0.85 + rnd() * 0.3; E3.set(0, rnd() * 6, 0); Q.setFromEuler(E3); const sc = d < R ? 0.5 + rnd() * 0.3 : 0.7 + rnd() * 0.7; M4.compose(V.set(Math.cos(a) * d, d > R ? 0.45 : 0, Math.sin(a) * d), Q, S.set(sc, sc, sc)); fernM.push(M4.clone()); }
   // tufts of grass between the curb blocks, outside the playable radius
   for (let i = 0; i < 900; i++) { const a = rnd() * 6.28; if (nearExit(a, GAP)) continue; const d = PLAY_R + 0.12 + rnd() * 0.4; pushM(tuftM, Math.cos(a) * d, 0, Math.sin(a) * d, 0.6 + rnd() * 0.9, undefined, rnd() * 6, (rnd() - 0.5) * 0.6); }
 }
@@ -303,6 +305,19 @@ function lantern(parent, x, y, z) {
   add(new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.18, 12), BRASS_DK), g).position.y = 0.3;
   const core = add(new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 8), GLOW_AMBER), g); core.scale.y = 1.5; lanterns.push(core);
   return g;
+}
+
+// ---- crag detail: jutting ledges with moss, hanging roots and vines down the faces, optionally a ruined crown + tree ----
+function detailCrag(parent, x, top, z, rad, seed, noCrown = false) {
+  for (let k = 0; k < 2; k++) { const y = top - 3 - k * (3 + rnd() * 3), lg = add(new THREE.Mesh(rockify(new THREE.CylinderGeometry(rad * 1.2, rad * 0.85, 1.1, 18, 2), 0.35, 0.3, 0.2, seed + k), ROCK), parent); lg.position.set(x, y, z);
+    for (let m = 0; m < 3; m++) { const la = rnd() * 6.28; blob(rad * 0.3, rnd() < 0.5 ? MOSS : MOSS_DK, x + Math.cos(la) * rad, y + 0.5, z + Math.sin(la) * rad, 0.45, parent); } }
+  parent.updateMatrixWorld(true); const w = new THREE.Vector3(), w2 = new THREE.Vector3();
+  for (let m = 0; m < 3; m++) { const la = rnd() * 6.28, L = 3 + rnd() * 5, pts = []; for (let q = 0; q <= 5; q++) { const tq = q / 5; pts.push(new THREE.Vector3(x + Math.cos(la) * (rad * 0.95 + tq * 0.5), top - 0.3 - tq * L, z + Math.sin(la) * (rad * 0.95 + tq * 0.5) + Math.sin(tq * 5 + m) * 0.15)); }
+    add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 14, 0.1 + rnd() * 0.08, 6), BARK), parent);
+    parent.localToWorld(w.set(x + Math.cos(la + 0.6) * rad, top - 0.2, z + Math.sin(la + 0.6) * rad)); parent.localToWorld(w2.set(x + Math.cos(la + 0.6) * (rad + 1), top - 0.2, z + Math.sin(la + 0.6) * (rad + 1))); w2.sub(w);
+    ivyCurtain(w.x, w.y, w.z, 2 + rnd() * 4, w2.x, w2.z, 0.6, 0.1); }
+  if (!noCrown) { for (let m = 0; m < 3; m++) { const fb = block(STONE_DK, 0.8 + rnd() * 0.5, 0.7 + rnd() * 0.9, 0.7, x + (rnd() - 0.5) * rad, top + 0.4, z + (rnd() - 0.5) * rad, rnd() * 3, parent); fb.rotation.z = (rnd() - 0.5) * 0.5; }
+    tree(x + (rnd() - 0.5) * rad * 0.6, top + 0.2, z + (rnd() - 0.5) * rad * 0.6, 0.8 + rnd() * 0.3, parent); }
 }
 
 // ---- bridges: decks on arched piers, brass edge strips + centre line, parapets; the entry bridge (south) is long and formal ----
@@ -339,7 +354,8 @@ function bridge(a, entry) {
     for (const z of [-BRIDGE_W / 2 - 0.5, BRIDGE_W / 2 + 0.5]) { ivyCurtain(...new THREE.Vector3(x1 - 0.4 - 0.5, 6.0, z).applyAxisAngle(new THREE.Vector3(0, 1, 0), -a).toArray(), 4.5, ...(() => { const v = new THREE.Vector3(-1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), -a); return [v.x, v.z]; })(), 0.9, 0.2); }
     lantern(gate, -0.2, 3.1, 0);
     // a tower stub behind the gate, rising from the abyss
-    const t = add(new THREE.Mesh(rockify(new THREE.CylinderGeometry(2.6, 3.4, 34, 10, 26), 0.06, 0.3, 14, a), ROCK), g); t.position.set(x1 + 3.2, -14, 0);
+    const t = add(new THREE.Mesh(rockify(new THREE.CylinderGeometry(2.6, 3.4, 34, 24, 34), 0.3, 0.2, 14, a), ROCK), g); t.position.set(x1 + 3.2, -14, 0);
+    detailCrag(g, x1 + 3.2, 3.0, 0, 2.6, a * 7);
     // waterfalls off both sides of the bridge, from the arcade below the deck
     for (const z of [-hw - 0.4, hw + 0.4]) fallsBridge.push({ g, x: x0 + len * (0.35 + rnd() * 0.3), z, w: 2.6 + rnd() * 1.4 });
   } else {
@@ -360,7 +376,8 @@ function belfry(a, idx) {
   const isFront = front(a), rad = 17.2, baseY = isFront ? -1.2 : 0, chamberH = isFront ? 3.6 : 4.4, solidH = isFront ? 1.4 : 2.2;
   const g = add(new THREE.Group()); g.position.set(Math.cos(a) * rad, baseY, Math.sin(a) * rad); g.rotation.y = Math.atan2(-Math.cos(a), -Math.sin(a)); g.name = 'Belfry';
   // bastion: a rocky outcrop the tower stands on, bonded to the rim
-  const bas = add(new THREE.Mesh(rockify(new THREE.CylinderGeometry(3.4, 1.6, 18, 28, 18), 0.16, 0.3, 7.6, idx * 5), ROCK), g); bas.position.y = -9.05;
+  const bas = add(new THREE.Mesh(rockify(new THREE.CylinderGeometry(3.4, 1.6, 18, 28, 18), 0.3, 0.25, 7.6, idx * 5), ROCK), g); bas.position.y = -9.05;
+  detailCrag(g, 0, -0.2, 0, 3.2, idx * 3, true);
   const W = 3.2, wallT = 0.42;
   block(STONE_DK, W, solidH, W, 0, solidH / 2, 0, 0, g);
   // bell chamber: four pointed-arch faces
@@ -377,7 +394,8 @@ function belfry(a, idx) {
   // bell on a timber beam
   const beam = add(new THREE.Mesh(new THREE.BoxGeometry(W - 0.2, 0.22, 0.26), TIMBER), g); beam.position.y = solidH + chamberH - 0.35;
   const bellY = solidH + chamberH * 0.45 + (W * 0.56) * 0.62; // just under the arch crown
-  const rod = add(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, solidH + chamberH - 0.35 - bellY, 6), LANTERN_METAL), g); rod.position.y = (solidH + chamberH - 0.35 + bellY) / 2;
+  for (const sx of [-1, 1]) { const br = add(new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.3, 0.16), TIMBER), g); br.position.set(sx * (W / 2 - 0.65), solidH + chamberH - 0.8, 0); br.rotation.z = sx * 0.65; }
+  for (let y = bellY + 0.05, k = 0; y < solidH + chamberH - 0.4; y += 0.11, k++) { const link = add(new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.014, 5, 10), LANTERN_METAL), g); link.position.y = y; link.rotation.set(Math.PI / 2, k % 2 ? Math.PI / 2 : 0, 0); }
   const bell = add(new THREE.Group(), g); bell.position.y = bellY; bell.name = 'Bell';
   const bm = add(new THREE.Mesh(BELL_GEO, BELL), bell); const bs = isFront ? 1.45 : 1.7; bm.scale.set(bs, bs, bs); bm.castShadow = true;
   add(new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), BRASS_DK), bell).position.y = -bs * 0.95;
@@ -424,7 +442,7 @@ function sheet(x, yTop, z, w, h, faceX, faceZ, curve = 0) {
   node('FallLip', x, yTop, z).userData = { w };
   return m;
 }
-for (const f of fallSpots) sheet(Math.cos(f.a) * (R + 1.5), -0.15, Math.sin(f.a) * (R + 1.5), f.w + 1.5, 36, Math.cos(f.a), Math.sin(f.a), 3.2);
+for (const f of fallSpots) sheet(Math.cos(f.a) * (R + 1.5), -0.15, Math.sin(f.a) * (R + 1.5), f.w + 1.5, 36, Math.cos(f.a), Math.sin(f.a), 5);
 // broad falls pouring off each belfry bastion
 for (const a of DIAG) { const o = a + (rnd() < 0.5 ? 0.2 : -0.2); sheet(Math.cos(o) * (R + 2.6), front(a) ? -2.6 : -0.4, Math.sin(o) * (R + 2.6), 6 + rnd() * 3, 36, Math.cos(o), Math.sin(o), 3.5); }
 for (const f of fallsBridge) { const w = new THREE.Vector3(f.x, -0.9, f.z).applyEuler(f.g.rotation), nz = new THREE.Vector3(0, 0, Math.sign(f.z)).applyEuler(f.g.rotation); sheet(w.x, -0.9, w.z, f.w, 33, nz.x, nz.z, 1.6); }
@@ -434,8 +452,12 @@ function tree(x, y, z, s, parent = root) {
   const g = add(new THREE.Group(), parent); g.position.set(x, y, z); g.scale.setScalar(s);
   const curve = new THREE.CatmullRomCurve3([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0.3, 1.4, 0.1), new THREE.Vector3(-0.2, 2.6, 0.3), new THREE.Vector3(0.1, 3.4, 0)]);
   add(new THREE.Mesh(new THREE.TubeGeometry(curve, 24, 0.36, 10), BARK), g).castShadow = true;
-  for (let k = 0; k < 16; k++) { const a = rnd() * 6.28, r = Math.sqrt(rnd()) * 2.2; blob(0.8 + rnd() * 0.8, k % 4 ? CANOPY : MOSS_DK, Math.cos(a) * r, 2.9 + rnd() * 1.6 - r * 0.35, Math.sin(a) * r, 0.75, g); }
-  if (rnd() < 0.5) for (let k = 0; k < 5; k++) pushM(flowerM, x + (rnd() - 0.5) * 3 * s, y + (3.6 + rnd()) * s, z + (rnd() - 0.5) * 3 * s, 1.2 + rnd());
+  for (let k = 0; k < 20; k++) { const a = rnd() * 6.28, r = Math.sqrt(rnd()) * 2.3, layer = k / 20, y = 2.6 + layer * 1.9 - r * 0.3;
+    blob(0.75 + rnd() * 0.75 - layer * 0.25, layer < 0.4 ? CANOPY_DK : layer < 0.85 ? CANOPY : MOSS, Math.cos(a) * r * (1.1 - layer * 0.4), y, Math.sin(a) * r * (1.1 - layer * 0.4), 0.7, g); }
+  // leaf fringe and flowers in world space: trees can sit inside rotated, offset groups (aqueducts, islands)
+  g.updateMatrixWorld(true); const wv = new THREE.Vector3(), wq = new THREE.Vector3();
+  for (let k = 0; k < 36; k++) { const a = rnd() * 6.28, rr = 1.6 + rnd() * 1.2; g.localToWorld(wv.set(Math.cos(a) * rr, 2.6 + rnd() * 2, Math.sin(a) * rr)); g.localToWorld(wq.set(Math.cos(a) * (rr + 1), 2.6, Math.sin(a) * (rr + 1))); wq.sub(wv); pushLeaf(wv.x, wv.y, wv.z, (0.3 + rnd() * 0.25) * s, wq.x, wq.z); }
+  if (rnd() < 0.5) for (let k = 0; k < 5; k++) { g.localToWorld(wv.set((rnd() - 0.5) * 3, 3.6 + rnd(), (rnd() - 0.5) * 3)); pushM(flowerM, wv.x, wv.y, wv.z, 1.2 + rnd()); }
   return g;
 }
 function aqueduct(cx, cz, rotY, len, topY, bays, pour) {
@@ -448,9 +470,15 @@ function aqueduct(cx, cz, rotY, len, topY, bays, pour) {
       const cap = add(new THREE.Mesh(new THREE.BoxGeometry(bay + 0.3, 0.5, 2.9), STONE), g); cap.position.set(px + bay / 2, top + 0.25, 0);
       if (rnd() < 0.6) blob(1.1 + rnd() * 0.6, MOSS, px + bay / 2, top + 0.6, 0, 0.35, g);
       const wv = new THREE.Vector3(px + bay / 2, top, 1.3).applyAxisAngle(axis, rotY).add(g.position);
-      if (rnd() < 0.7) ivyCurtain(wv.x, wv.y, wv.z, 3 + rnd() * 6, nrm.x, nrm.z, 2.2, 0.1);
+      if (rnd() < 0.7) ivyCurtain(wv.x, wv.y, wv.z, 3 + rnd() * 6, nrm.x, nrm.z, 1.4, 0.1);
+      // keystones on both faces, a cornice under the cap, and a strip of water in the channel on top
+      const crown = top - h + 6.2 + bay * 0.32;
+      for (const fz of [-1.25, 1.25]) block(STONE, 0.55, 0.9, 0.3, px + bay / 2, crown, fz, 0, g);
+      block(STONE, bay + 0.25, 0.32, 3.1, px + bay / 2, top - 0.2, 0, 0, g);
+      const ch = add(new THREE.Mesh(new THREE.BoxGeometry(bay, 0.06, 1.1), POOL_CHANNEL), g); ch.position.set(px + bay / 2, top + 0.52, 0); ch.name = 'Channel';
       if (pour && rnd() < 0.55) sheet(wv.x + nrm.x * 0.3, top + 0.3, wv.z + nrm.z * 0.3, 4 + rnd() * 3, top + 40, nrm.x, nrm.z, 3); }
-    else { const stub = add(new THREE.Mesh(extrude(arcadeShape(bay * 0.35, h * 0.5, 1, bay * 0.2, 2.5), 2.4), STONE_DK), g); stub.position.set(px, topY - h, 0); }
+    else { const stub = add(new THREE.Mesh(extrude(arcadeShape(bay * 0.35, h * 0.5, 1, bay * 0.2, 2.5), 2.4), STONE_DK), g); stub.position.set(px, topY - h, 0);
+      for (let m = 0; m < 3; m++) { const fb = block(STONE_DK, 0.8 + rnd() * 0.6, 0.6 + rnd() * 0.4, 1.2 + rnd(), px + bay * (0.3 + rnd() * 0.5), topY - h + h * 0.5 - rnd() * 6, (rnd() - 0.5) * 1.5, rnd() * 3, g); fb.rotation.z = (rnd() - 0.5) * 1.2; fb.rotation.x = (rnd() - 0.5) * 0.8; } } // fallen blocks
   }
   for (let k = 0; k <= bays; k++) { const px = -len / 2 + k * bay; block(STONE_DK, 2.6, 50, 2.6, px, topY - h - 25, 0, 0, g); block(STONE, 3.2, 0.7, 3.2, px, topY - h + 0.15, 0, 0, g); block(STONE, 3.0, 0.5, 3.0, px, topY - h - 4, 0, 0, g); }
   if (rnd() < 0.6) tree(-len / 2 + rnd() * len * 0.8, topY + 0.5, 0, 0.9 + rnd() * 0.4, g);
@@ -463,12 +491,21 @@ for (const [deg, r, len, top, bays] of [[-90, 60, 36, -9, 6], [-50, 62, 30, -12,
 for (let i = 0; i < 26; i++) {
   const a = rnd() * Math.PI * 2, r = 36 + rnd() * 70; if (nearExit(a, 0.2) && r < 48) continue;
   const top = front(a) ? -16 + rnd() * 8 : -9 + rnd() * 10, rad = 2.5 + rnd() * 3, h = top + 70;
-  const p = { position: new THREE.Vector3(Math.cos(a) * r, 0, Math.sin(a) * r) }; let yT = top, rr = rad * 0.75;
-  for (let k = 0; k < 3; k++) { const sh = k === 2 ? 60 : 4 + rnd() * 7, rb = rr * (1.15 + rnd() * 0.2), ox = k ? (rnd() - 0.5) * rr * 0.4 : 0, oz = k ? (rnd() - 0.5) * rr * 0.4 : 0;
+  const p = { position: new THREE.Vector3(Math.cos(a) * r, 0, Math.sin(a) * r) }; let yT = top, rr = rad * 0.85;
+  for (let k = 0; k < 3; k++) { const sh = k === 2 ? 60 : 4 + rnd() * 7, rb = k === 0 ? rr * (0.8 + rnd() * 0.1) : rr * (1.15 + rnd() * 0.2), /* the crown overhangs the drum below */ ox = k ? (rnd() - 0.5) * rr * 0.4 : 0, oz = k ? (rnd() - 0.5) * rr * 0.4 : 0;
     const seg = add(new THREE.Mesh(rockify(new THREE.CylinderGeometry(rr, rb, sh, 24, Math.max(6, Math.round(sh))), 0.46, 0.14, sh / 2 - 1.5, i * 3.3 + k), ROCK)); seg.position.set(p.position.x + ox, yT - sh / 2, p.position.z + oz);
-    if (k > 0) for (let m = 0; m < 3; m++) { const la = rnd() * 6.28; blob(rr * 0.35, rnd() < 0.5 ? MOSS : MOSS_DK, seg.position.x + Math.cos(la) * rr * 0.9, yT, seg.position.z + Math.sin(la) * rr * 0.9, 0.45); }
+    if (k > 0) { for (let m = 0; m < 3; m++) { const la = rnd() * 6.28; blob(rr * 0.35, rnd() < 0.5 ? MOSS : MOSS_DK, seg.position.x + Math.cos(la) * rr * 0.9, yT, seg.position.z + Math.sin(la) * rr * 0.9, 0.45); }
+      const lg = add(new THREE.Mesh(rockify(new THREE.CylinderGeometry(rr * 1.25, rr * 0.9, 1.2, 18, 2), 0.35, 0.3, 0.2, i + k * 7), ROCK)); lg.position.set(seg.position.x, yT - 0.4, seg.position.z); } // jutting ledge
     yT -= sh; rr = rb * 1.05; }
   for (let m = 0; m < 4; m++) { const la = rnd() * 6.28, d2 = rnd() * rad * 0.4; blob(rad * (0.35 + rnd() * 0.2), MOSS, p.position.x + Math.cos(la) * d2, top + 0.1, p.position.z + Math.sin(la) * d2, 0.45); }
+  for (let m = 0; m < 2 + Math.floor(rnd() * 2); m++) { const la = rnd() * 6.28, rr0 = rad * 0.72; ivyCurtain(p.position.x + Math.cos(la) * rr0, top - 0.2, p.position.z + Math.sin(la) * rr0, 4 + rnd() * 8, Math.cos(la), Math.sin(la), 0.55, 0.05); }
+  for (let m = 0; m < 3; m++) { const la = rnd() * 6.28, r0 = rad * 0.75, L = 3 + rnd() * 6, pts = []; for (let q = 0; q <= 5; q++) { const tq = q / 5; pts.push(new THREE.Vector3(p.position.x + Math.cos(la) * (r0 + tq * 0.6 + Math.sin(tq * 6 + m) * 0.2), top - tq * L, p.position.z + Math.sin(la) * (r0 + tq * 0.6))); }
+    add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 16, 0.12 + rnd() * 0.1, 6), BARK)); } // hanging roots
+  const crownRoll = rnd();
+  if (crownRoll < 0.45) { const rg = add(new THREE.Group()); rg.position.set(p.position.x, top + 0.2, p.position.z); rg.rotation.y = rnd() * 6;   // a small ruin on top
+    block(STONE, 2.2, 1.6 + rnd() * 1.4, 0.45, 0, 1, -0.6, 0, rg); const ar = add(new THREE.Mesh(extrude(arcadeShape(2.2, 2.6, 1, 1.2, 1.3, true), 0.4), STONE), rg); ar.position.set(-1.1, 0, 0.6);
+    if (rnd() < 0.4) lantern(rg, 0, 2.2, 0.6); }
+  else if (crownRoll < 0.7) for (let m = 0; m < 4; m++) { const fb = block(STONE_DK, 0.7 + rnd() * 0.6, 0.6 + rnd() * 0.8, 0.7 + rnd() * 0.5, p.position.x + (rnd() - 0.5) * rad, top + 0.4, p.position.z + (rnd() - 0.5) * rad, rnd() * 3); fb.rotation.z = (rnd() - 0.5) * 0.6; } // broken crown
   if (rnd() < 0.7) tree(p.position.x, top + 0.3, p.position.z, 0.9 + rnd() * 0.7);
 }
 
@@ -492,9 +529,10 @@ for (const y of [-33, -27]) { const sea = add(new THREE.Mesh(new THREE.PlaneGeom
 const IVY_GEO = (() => { const g = new THREE.IcosahedronGeometry(1, 0), q = g.attributes.position; for (let i = 0; i < q.count; i++) { const x = q.getX(i), y = q.getY(i), z = q.getZ(i), k = 1 + (vnoise3(x * 2.5, y * 2.5, z * 2.5) - 0.5) * 0.5; q.setXYZ(i, x * k, y * k * 0.7, z * k); } return weldNormals(g); })(), TUFT_GEO = (() => { const g = new THREE.ConeGeometry(0.06, 0.4, 5); g.translate(0, 0.2, 0); return g; })();
 const FLOWER_GEO = (() => { const parts = []; for (let k = 0; k < 5; k++) { const a = k / 5 * Math.PI * 2, p = new THREE.CircleGeometry(0.05, 5); p.rotateX(-Math.PI / 2 + 0.35); p.scale(1, 1, 0.55); p.translate(0.055, 0.005, 0); p.rotateY(a); parts.push(tint(p, 0xf4f1e6)); }
   const c = new THREE.CircleGeometry(0.024, 6); c.rotateX(-Math.PI / 2); c.translate(0, 0.015, 0); parts.push(tint(c, 0xe8c54a)); return merge(parts); })();
-const TUFT = L('Grass', 0x5d8a3c);
+const TUFT = L('Grass', 0x5d8a3c), FERN = L('Fern', 0x4f7f3a);
+const FERN_GEO = (() => { const parts = []; for (let k = 0; k < 7; k++) { const f = new THREE.CircleGeometry(0.5, 6); f.scale(0.13, 1, 1); f.translate(0, 0.5, 0); f.rotateX(-0.9 - (k % 2) * 0.25); f.rotateY(k / 7 * Math.PI * 2); parts.push(f); } return merge(parts); })();
 const instanced = [];
-for (const [geo, mat, list, name] of [[IVY_GEO, IVY, ivyM, 'IvyLeaves'], [FLOWER_GEO, FLOWER, flowerM, 'Flowers'], [TUFT_GEO, TUFT, tuftM, 'GrassTufts']]) {
+for (const [geo, mat, list, name] of [[IVY_GEO, IVY, ivyM, 'IvyLeaves'], [FLOWER_GEO, FLOWER, flowerM, 'Flowers'], [TUFT_GEO, TUFT, tuftM, 'GrassTufts'], [FERN_GEO, FERN, fernM, 'Ferns']]) {
   const im = add(new THREE.InstancedMesh(geo, mat, list.length)); im.name = name; list.forEach((m, i) => im.setMatrixAt(i, m)); im.castShadow = name !== 'GrassTufts'; im.receiveShadow = true; instanced.push(im);
 }
 

@@ -65,7 +65,10 @@ namespace LastBell.Areas.Area3.EditorTools
             DressMaterials(arena);
             AddGlows(root.transform);
             AddLights(root.transform);
-            var fx = AddParticles(root.transform);
+            var falls = FindFalls(root.transform);
+            AddBackSheets(falls);
+            AddMistLayers(root.transform);
+            var fx = AddParticles(root.transform, falls, out var impacts);
             AddColliders(root.transform);
             MarkStatic(root);
 
@@ -88,6 +91,7 @@ namespace LastBell.Areas.Area3.EditorTools
             var so = new SerializedObject(driver);
             so.FindProperty("arenaRoot").objectReferenceValue = root.transform;
             so.FindProperty("viewCamera").objectReferenceValue = cam;
+            var ip = so.FindProperty("impacts"); ip.arraySize = impacts.Length; for (int i = 0; i < impacts.Length; i++) ip.GetArrayElementAtIndex(i).vector4Value = impacts[i];
             so.ApplyModifiedPropertiesWithoutUndo();
             driver.SetView(VerdantChimesArena.View.Gameplay);
 
@@ -168,7 +172,8 @@ namespace LastBell.Areas.Area3.EditorTools
                         case "Brass": case "Bell": mats[i] = Lit(name, c, false, 1); break;
                         case "BrassDark": mats[i] = Lit(name, c, false, 0.7f); break;
                         case "LanternMetal": mats[i] = Lit(name, c, false, 0.6f); break;
-                        case "Rock": case "Flower": mats[i] = Lit(name, Color.white, true); break;
+                        case "Rock": mats[i] = Lit(name, Color.white, true); break;
+                        case "Flower": mats[i] = Lit(name, Color.white, true); mats[i].SetFloat("_Sway", 1f); break;
                         case "Brick": mats[i] = Lit(name, Color.white, false, 0, brick); mats[i].SetTextureScale("_BaseMap", new Vector2(10, 1)); break;
                         case "GlowAmber": mats[i] = Glow(name, Hex(0xffc477) * 3.2f); break;
                         case "GlowTeal": mats[i] = Glow(name, Hex(0x6ff5df) * 2.6f); break;
@@ -176,9 +181,10 @@ namespace LastBell.Areas.Area3.EditorTools
                         case "Mist": mats[i] = Simple("LastBell/Area3/Mist", "Mist"); transparentFx = true; break;
                         case "Pool": mats[i] = Simple("LastBell/Area3/Pool", "Pool"); transparentFx = true; break;
                         case "Stone": case "StoneDark": case "Deck": mats[i] = Lit(name, c, false); mats[i].SetFloat("_StoneDetail", 1); mats[i].EnableKeyword("_LB_STONEDETAIL"); break;
+                        case "Ivy": case "Canopy": case "CanopyDark": case "Grass": case "Fern": mats[i] = Lit(name, c, false); mats[i].SetFloat("_Sway", name.StartsWith("Canopy") ? 0.6f : 1f); break; // foliage moves on the shared wind
                         default: mats[i] = Lit(name, c, hasVc && name != "Grass"); break;
                     }
-                    if (transparentFx || name.StartsWith("Glow") || name == "Grass") { r.shadowCastingMode = ShadowCastingMode.Off; }
+                    if (transparentFx || name.StartsWith("Glow") || name == "Grass" || name == "Fern") { r.shadowCastingMode = ShadowCastingMode.Off; }
                     if (transparentFx) { r.receiveShadows = false; r.gameObject.layer = 1; } // TransparentFX
                 }
                 r.sharedMaterials = mats;
@@ -213,9 +219,81 @@ namespace LastBell.Areas.Area3.EditorTools
             c.transform.SetParent(parent, false); c.transform.position = new Vector3(0, 1.2f, 0);
         }
 
-        // ---- particles (shader-driven quads; the Particle System module is disabled in this project): spray at every
-        // waterfall lip, turquoise motes over the rim, drifting white petals ----
-        static Transform AddParticles(Transform root)
+        // ---- waterfalls: each lip paired with its sheet, so glints, spray, impacts and the offset back sheet share one geometry ----
+        struct Fall { public Vector3 lip, outward, side; public float height, arc, width; public Renderer sheet; }
+        static List<Fall> FindFalls(Transform root)
+        {
+            var sheets = root.GetComponentsInChildren<Renderer>(true).Where(r => r.sharedMaterial && r.sharedMaterial.shader.name == "LastBell/Area3/Waterfall").ToList();
+            var falls = new List<Fall>();
+            foreach (var lip in root.GetComponentsInChildren<Transform>(true).Where(t => t.name == "FallLip"))
+            {
+                var p = lip.position; Renderer best = null; float bd = 8;
+                foreach (var s in sheets) { var c = s.bounds.center; float d = new Vector2(c.x - p.x, c.z - p.z).magnitude; if (d < bd && Mathf.Abs(s.bounds.max.y - p.y) < 3) { bd = d; best = s; } }
+                if (!best) continue;
+                var b = best.bounds; var o = new Vector3(b.center.x - p.x, 0, b.center.z - p.z);
+                var outward = o.sqrMagnitude > 0.04f ? o.normalized : new Vector3(p.x, 0, p.z).normalized;
+                var side = Vector3.Cross(Vector3.up, outward);
+                float width = Mathf.Clamp(Mathf.Abs(Vector3.Dot(b.size, new Vector3(Mathf.Abs(side.x), 0, Mathf.Abs(side.z)))), 2.5f, 10f);
+                falls.Add(new Fall { lip = p, outward = outward, side = side, height = Mathf.Max(8, p.y - b.min.y), arc = o.magnitude * 2, width = width, sheet = best });
+            }
+            return falls;
+        }
+
+        // a second, fainter sheet just behind each waterfall (depth instead of a flat panel)
+        static void AddBackSheets(List<Fall> falls)
+        {
+            var back = new Material(Shader.Find("LastBell/Area3/Waterfall")); back.SetFloat("_Opacity", 0.45f); back.SetFloat("_Seed", 3.7f); back.SetFloat("_Width", 6f);
+            back = SaveAsset(back, "WaterfallBack.mat");
+            foreach (var f in falls.GroupBy(f => f.sheet).Select(g => g.First()))
+            {
+                var go = Object.Instantiate(f.sheet.gameObject, f.sheet.transform.parent); go.name = "Waterfall Back";
+                go.transform.position = f.sheet.transform.position - f.outward * 0.5f; go.transform.rotation = f.sheet.transform.rotation;
+                go.GetComponent<Renderer>().sharedMaterial = back;
+            }
+        }
+
+        // ---- the sea of mist: six soft layers instead of the glb's two hard planes ----
+        static void AddMistLayers(Transform root)
+        {
+            foreach (var r in root.GetComponentsInChildren<Renderer>(true).Where(r => r.sharedMaterial && r.sharedMaterial.shader.name == "LastBell/Area3/Mist")) r.gameObject.SetActive(false);
+            string path = Gen + "/MistQuad.asset"; var quad = AssetDatabase.LoadAssetAtPath<Mesh>(path);
+            if (!quad)
+            {
+                quad = new Mesh { name = "MistQuad", vertices = new[] { new Vector3(-300, 0, -300), new Vector3(300, 0, -300), new Vector3(-300, 0, 300), new Vector3(300, 0, 300) }, triangles = new[] { 0, 2, 1, 1, 2, 3 } };
+                quad.RecalculateNormals(); quad.RecalculateBounds(); AssetDatabase.CreateAsset(quad, path);
+            }
+            var parent = new GameObject("Sea of Mist").transform;
+            float[] heights = { -10, -15, -20, -25, -30, -35 }, opacity = { 0.16f, 0.22f, 0.3f, 0.38f, 0.48f, 0.6f };
+            for (int i = 0; i < heights.Length; i++)
+            {
+                var m = new Material(Shader.Find("LastBell/Area3/Mist")); m.SetFloat("_Opacity", opacity[i]); m.SetFloat("_LayerSeed", i * 1.37f); m.SetFloat("_Speed", 0.6f + i * 0.25f);
+                m.renderQueue = 3000 - 20 - i; // upper layers draw after lower ones
+                m = SaveAsset(m, $"Mist{i}.mat");
+                var go = new GameObject($"Mist Layer {i}"); go.transform.SetParent(parent, false); go.transform.position = new Vector3(0, heights[i], 0); go.layer = 1;
+                go.AddComponent<MeshFilter>().sharedMesh = quad; var mr = go.AddComponent<MeshRenderer>(); mr.sharedMaterial = m; mr.shadowCastingMode = ShadowCastingMode.Off; mr.receiveShadows = false;
+            }
+        }
+
+        // shader-driven quad field (the Particle System module is disabled in this project); see ParticleField / CloudCard
+        static void Field(Transform parent, string name, Material mat, List<(Vector3 c, Vector3 dir, float size, Color col, Vector2 extra)> quads, System.Random rnd)
+        {
+            var v = new List<Vector3>(); var n = new List<Vector3>(); var uv = new List<Vector2>(); var uv2 = new List<Vector2>(); var uv3 = new List<Vector2>(); var col = new List<Color>(); var t = new List<int>();
+            foreach (var q in quads)
+            {
+                int k = v.Count; float seed = (float)rnd.NextDouble();
+                foreach (var c in new[] { Vector2.zero, Vector2.right, Vector2.up, Vector2.one }) { v.Add(q.c); n.Add(q.dir); uv.Add(c); uv2.Add(new Vector2(seed, q.size)); uv3.Add(q.extra); col.Add(q.col); }
+                t.AddRange(new[] { k, k + 2, k + 1, k + 1, k + 2, k + 3 });
+            }
+            var m = new Mesh { name = name, indexFormat = IndexFormat.UInt32 }; m.SetVertices(v); m.SetNormals(n); m.SetUVs(0, uv); m.SetUVs(1, uv2); m.SetUVs(2, uv3); m.SetColors(col); m.SetTriangles(t, 0);
+            m.bounds = new Bounds(Vector3.zero, Vector3.one * 600);
+            AssetDatabase.DeleteAsset(Gen + "/" + name + ".asset"); AssetDatabase.CreateAsset(m, Gen + "/" + name + ".asset");
+            var go = new GameObject(name); go.transform.SetParent(parent, false); go.AddComponent<MeshFilter>().sharedMesh = m;
+            var mr = go.AddComponent<MeshRenderer>(); mr.sharedMaterial = mat; mr.shadowCastingMode = ShadowCastingMode.Off; mr.receiveShadows = false;
+        }
+
+        // ---- particles: lip spray, glints riding the falls, mist rising from impacts, arena motes (warm near lanterns),
+        // petals, and cloud cards hugging every tower base. Returns the waterfall impact list for the runtime. ----
+        static Transform AddParticles(Transform root, List<Fall> falls, out Vector4[] impacts)
         {
             var parent = new GameObject("FX").transform;
             var rnd = new System.Random(9); float Rn() => (float)rnd.NextDouble();
@@ -225,34 +303,55 @@ namespace LastBell.Areas.Area3.EditorTools
                 m.SetFloat("_SrcBlend", additive ? (float)BlendMode.One : (float)BlendMode.SrcAlpha); m.SetFloat("_DstBlend", additive ? (float)BlendMode.One : (float)BlendMode.OneMinusSrcAlpha);
                 return SaveAsset(m, file + ".mat");
             }
-            void Field(string name, Material mat, List<(Vector3 c, Vector3 dir, float size, Color col)> quads)
+            var none = Vector2.zero;
+            var spray = new List<(Vector3, Vector3, float, Color, Vector2)>(); var glints = new List<(Vector3, Vector3, float, Color, Vector2)>(); var rising = new List<(Vector3, Vector3, float, Color, Vector2)>();
+            var imp = new List<Vector4>();
+            foreach (var f in falls)
             {
-                var v = new List<Vector3>(); var n = new List<Vector3>(); var uv = new List<Vector2>(); var uv2 = new List<Vector2>(); var col = new List<Color>(); var t = new List<int>();
-                foreach (var q in quads)
+                for (int i = 0; i < 30; i++) spray.Add((f.lip + f.side * (Rn() - 0.5f) * f.width + Vector3.down * Rn() * 0.6f, f.outward * (0.6f + Rn()) + f.side * (Rn() - 0.5f) * 0.6f, 1.6f + Rn() * 1.8f, new Color(0.9f, 0.98f, 0.96f, 0.45f), none));
+                for (int i = 0; i < 40; i++) glints.Add((f.lip + f.side * (Rn() - 0.5f) * f.width * 0.85f + f.outward * 0.15f, f.outward, 0.7f + Rn() * 0.5f, new Color(1, 1, 1, 1f), new Vector2(f.height, f.arc)));
+                var hit = f.lip + f.outward * f.arc + Vector3.down * f.height;
+                if (imp.Count < 24) imp.Add(new Vector4(hit.x, hit.z, hit.y, f.width));
+                for (int i = 0; i < 48; i++) rising.Add((new Vector3(hit.x, Mathf.Max(hit.y, -30) + Rn() * 3, hit.z) + f.side * (Rn() - 0.5f) * f.width + f.outward * (Rn() - 0.3f) * 3, Vector3.up, 0.6f + Rn() * 0.5f, new Color(0.2f, 0.78f, 0.72f, 0.75f), none));
+            }
+            impacts = imp.ToArray();
+            Field(parent, "Spray", Mat("SprayField", 2, false), spray, rnd);
+            Field(parent, "Glints", Mat("GlintsField", 3, true), glints, rnd);
+            Field(parent, "RisingMist", Mat("RisingMistField", 4, false), rising, rnd);
+            var lanterns = root.GetComponentsInChildren<Transform>(true).Where(t => t.name == "Lantern").Select(t => t.position).ToList();
+            var motes = new List<(Vector3, Vector3, float, Color, Vector2)>();
+            for (int i = 0; i < 300; i++)
+            {
+                float a = Rn() * Mathf.PI * 2, r = 13.2f + Rn() * 14; var p = new Vector3(Mathf.Cos(a) * r, 0.5f + Rn() * 6, Mathf.Sin(a) * r);
+                if (i % 3 == 0 && falls.Count > 0) { var f = falls[i % falls.Count]; p = f.lip + f.outward * (1 + Rn() * 3) + f.side * (Rn() - 0.5f) * f.width + Vector3.down * Rn() * 8; } // gather near the falls
+                bool warm = lanterns.Any(l => (l - p).sqrMagnitude < 9);                                                                          // lit by a lantern
+                motes.Add((p, Vector3.up, 0.12f + Rn() * 0.12f, warm ? new Color(1f, 0.82f, 0.5f, 0.9f) : new Color(0.55f, 1f, 0.9f, 0.9f), none));
+            }
+            Field(parent, "Motes", Mat("MotesField", 0, true), motes, rnd);
+            var petals = new List<(Vector3, Vector3, float, Color, Vector2)>();
+            for (int i = 0; i < 160; i++) petals.Add((new Vector3((Rn() - 0.5f) * 60, 12 + Rn() * 4, (Rn() - 0.5f) * 50), Vector3.up, 0.09f + Rn() * 0.06f, new Color(0.97f, 0.95f, 0.9f, 0.85f), none));
+            Field(parent, "Petals", Mat("PetalsField", 1, false), petals, rnd);
+            // cloud cards around the bases of everything tall outside the arena that reaches down into the cloud sea
+            var cards = new List<(Vector3, Vector3, float, Color, Vector2)>();
+            foreach (var r in root.GetComponentsInChildren<Renderer>(true))
+            {
+                if (cards.Count > 900 || !r.sharedMaterial || r.sharedMaterial.shader.name != "LastBell/Area3/CustomLit") continue;
+                var b = r.bounds; float d = new Vector2(b.center.x, b.center.z).magnitude;
+                if (d < 15.5f || b.min.y > -14 || b.max.y < -26 || b.size.y < 6) continue;
+                float rad = Mathf.Min(b.extents.x, b.extents.z);
+                int n = Mathf.Clamp(Mathf.RoundToInt(rad * 1.5f), 3, 6);
+                for (int k = 0; k < n; k++)
                 {
-                    int k = v.Count; float seed = Rn();
-                    foreach (var c in new[] { Vector2.zero, Vector2.right, Vector2.up, Vector2.one }) { v.Add(q.c); n.Add(q.dir); uv.Add(c); uv2.Add(new Vector2(seed, q.size)); col.Add(q.col); }
-                    t.AddRange(new[] { k, k + 2, k + 1, k + 1, k + 2, k + 3 });
+                    float a = Rn() * Mathf.PI * 2, y = Mathf.Lerp(-27, -11, Mathf.Pow(Rn(), 1.6f));
+                    cards.Add((new Vector3(b.center.x + Mathf.Cos(a) * (rad * 0.8f + 1.5f), y, b.center.z + Mathf.Sin(a) * (rad * 0.8f + 1.5f)), Vector3.up, 8 + Rn() * 8, Color.white, none));
                 }
-                var m = new Mesh { name = name, indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 }; m.SetVertices(v); m.SetNormals(n); m.SetUVs(0, uv); m.SetUVs(1, uv2); m.SetColors(col); m.SetTriangles(t, 0);
-                m.bounds = new Bounds(Vector3.zero, Vector3.one * 400);
-                AssetDatabase.DeleteAsset(Gen + "/" + name + ".asset"); AssetDatabase.CreateAsset(m, Gen + "/" + name + ".asset");
-                var go = new GameObject(name); go.transform.SetParent(parent, false); go.AddComponent<MeshFilter>().sharedMesh = m;
-                var mr = go.AddComponent<MeshRenderer>(); mr.sharedMaterial = mat; mr.shadowCastingMode = ShadowCastingMode.Off; mr.receiveShadows = false;
             }
-            var spray = new List<(Vector3, Vector3, float, Color)>();
-            foreach (var lip in root.GetComponentsInChildren<Transform>(true).Where(t => t.name == "FallLip"))
-            {
-                var outward = new Vector3(lip.position.x, 0, lip.position.z).normalized; var side = Vector3.Cross(Vector3.up, outward);
-                for (int i = 0; i < 30; i++) spray.Add((lip.position + side * (Rn() - 0.5f) * 5f + Vector3.down * Rn() * 0.6f, (outward * (0.6f + Rn()) + side * (Rn() - 0.5f) * 0.6f), 1.6f + Rn() * 1.8f, new Color(0.9f, 0.98f, 0.96f, 0.45f)));
-            }
-            Field("Spray", Mat("SprayField", 2, false), spray);
-            var motes = new List<(Vector3, Vector3, float, Color)>();
-            for (int i = 0; i < 260; i++) { float a = Rn() * Mathf.PI * 2, r = 13.2f + Rn() * 12; motes.Add((new Vector3(Mathf.Cos(a) * r, 0.5f + Rn() * 6, Mathf.Sin(a) * r), Vector3.up, 0.12f + Rn() * 0.12f, new Color(0.55f, 1f, 0.9f, 0.9f))); }
-            Field("Motes", Mat("MotesField", 0, true), motes);
-            var petals = new List<(Vector3, Vector3, float, Color)>();
-            for (int i = 0; i < 160; i++) petals.Add((new Vector3((Rn() - 0.5f) * 60, 12 + Rn() * 4, (Rn() - 0.5f) * 50), Vector3.up, 0.09f + Rn() * 0.06f, new Color(0.97f, 0.95f, 0.9f, 0.85f)));
-            Field("Petals", Mat("PetalsField", 1, false), petals);
+            var cm = SaveAsset(new Material(Shader.Find("LastBell/Area3/CloudCard")), "CloudCard.mat");
+            Field(parent, "CloudCards", cm, cards, rnd);
+            var plumes = new List<(Vector3, Vector3, float, Color, Vector2)>();
+            foreach (var f in falls) { var hit = f.lip + f.outward * f.arc; for (int k = 0; k < 5; k++) plumes.Add((new Vector3(hit.x, Mathf.Lerp(-30, -17, Rn()), hit.z) + f.side * (Rn() - 0.5f) * f.width + f.outward * Rn() * 2, Vector3.up, 5 + Rn() * 5, Color.white, none)); }
+            var pm = new Material(Shader.Find("LastBell/Area3/CloudCard")); pm.SetFloat("_Brightness", 1.6f); pm.SetFloat("_Opacity", 0.85f); pm = SaveAsset(pm, "PlumeCard.mat");
+            Field(parent, "SprayPlumes", pm, plumes, rnd);
             return parent;
         }
 
@@ -329,10 +428,13 @@ namespace LastBell.Areas.Area3.EditorTools
                 string shots = Path.GetFullPath(Path.Combine(Application.dataPath, "LastBell/Areas/Area3/Screenshots")); Directory.CreateDirectory(shots);
                 var driver = Object.FindFirstObjectByType<VerdantChimesArena>();
                 Object.FindFirstObjectByType<LookSettingsApplier>().Apply();
-                driver.Tick(1);
+                driver.timeOverride = 20; driver.Tick(1);
                 driver.SetView(VerdantChimesArena.View.Gameplay); Capture(Path.Combine(shots, "unity-game.png")); Capture(Path.Combine(shots, "unity-game.png"));
                 driver.SetView(VerdantChimesArena.View.Angle); Capture(Path.Combine(shots, "unity-angle.png"));
                 driver.SetView(VerdantChimesArena.View.Top); Capture(Path.Combine(shots, "unity-top.png"));
+                var cam = Camera.main; cam.fieldOfView = 45; cam.transform.position = new Vector3(-46, 12, -40); cam.transform.LookAt(new Vector3(8, -14, 24)); // low, across the towers into the mist
+                for (int k = 0; k < 4; k++) { driver.timeOverride = 20 + k * 0.5f; driver.Tick(1); Capture(Path.Combine(shots, $"unity-cloud-t{k}.png")); } // t = 0, 0.5, 1.0, 1.5 s
+                Object.FindFirstObjectByType<LookSettingsApplier>().Apply(); driver.timeOverride = 20; driver.Tick(1);
                 // readability: quiet on, a coral hostile telegraph, a teal friendly ring, eight player capsules
                 var test = ReviewProps(); driver.quiet = true; driver.Tick(1);
                 driver.SetView(VerdantChimesArena.View.Gameplay); Capture(Path.Combine(shots, "unity-readability.png"));
@@ -365,7 +467,7 @@ namespace LastBell.Areas.Area3.EditorTools
             Ring(new Vector3(7, 0, 2), 3.2f, 3.28f, dark); Ring(new Vector3(-2.5f, 0, -1), 2.4f, 2.48f, dark); Ring(new Vector3(2.5f, 0, -3), 1.85f, 1.92f, dark); Ring(new Vector3(-6, 0, -4), 2.45f, 2.52f, dark);
             Ring(new Vector3(7, 0, 2), 0, 3.2f, coral); Ring(new Vector3(7, 0, 2), 3.05f, 3.2f, rim);             // on the grey stone
             Ring(new Vector3(-2.5f, 0, -1), 0, 2.4f, coral); Ring(new Vector3(-2.5f, 0, -1), 2.25f, 2.4f, rim);   // overlapping the mosaic
-            Ring(new Vector3(2.5f, 0, -3), 0, 1.7f, new Color(0.62f, 1f, 0.94f, 0.12f)); Ring(new Vector3(2.5f, 0, -3), 1.7f, 1.85f, new Color(0.62f, 1f, 0.94f, 0.95f));                      // friendly ring on the mosaic
+            Ring(new Vector3(2.5f, 0, -3), 0, 1.7f, new Color(0.62f, 1f, 0.94f, 0.12f)); Ring(new Vector3(2.5f, 0, -3), 1.7f, 1.85f, new Color(0.85f, 1f, 0.95f, 1f));                      // friendly ring on the mosaic
             Ring(new Vector3(-6, 0, -4), 2.3f, 2.45f, new Color(0.3f, 0.95f, 0.85f, 0.95f));
             var cap = new Material(Shader.Find("Universal Render Pipeline/Lit")); cap.SetColor("_BaseColor", new Color(0.25f, 0.35f, 0.85f));
             for (int i = 0; i < 8; i++)
