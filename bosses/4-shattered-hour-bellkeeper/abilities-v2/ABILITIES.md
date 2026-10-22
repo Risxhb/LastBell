@@ -4,7 +4,7 @@
 
 **Sources read:** `AGENTS.md`; `gpt/08-design-rules.md` (settled rules win over everything here); `research/rabbit-and-steel-boss-mechanics.md` §3.0, §4, §5, §7; this boss's packet `BOSS.md` (identity, model and phase names kept); `gpt/02-visual-style-guide.md`, `gpt/04-bosses.md`, `gpt/05-arenas.md`; the current encounter (`unity/Assets/LastBell/Run/Encounters/BellkeeperEncounter.cs` on `feature/run-loop`), shared hazards (`Run/Combat/Hazards.cs`), map bounds (`Run/RunMaps.cs`); spec v0.3.1 (`collab/docs/design/bellkeeper.md`, PR #16) and its escape checker.
 
-**Escape check:** `tools/encounter-escape/bellkeeper-v2-escape-check.ps1`, results in `tools/encounter-escape/bellkeeper-v2-results.txt`. Every Medium window passes at 4.2 m/s and 6 m/s on the Throne of the Final Toll (circle, 13.0 m) and on the key-art test map (square, 12.5 m) — see §6.
+**Escape check:** `tools/encounter-escape/bellkeeper-v2-escape-check.ps1`, results in `tools/encounter-escape/bellkeeper-v2-results.md`. Every Medium window passes at 4.2 m/s and 6 m/s on the Throne of the Final Toll (circle, 13.0 m) and on the key-art test map (square, 12.5 m) — see §6.
 
 ## 1. Identity (kept)
 
@@ -83,7 +83,7 @@ Overlap count: Lean and Order = 2; Final Toll = tide + Reflection, then Heart To
 
 ## 6. Escape check results (Medium, reaction margin 0.6 s)
 
-From `bellkeeper-v2-results.txt` (worst case d_max; time needed = reaction + travel):
+From `bellkeeper-v2-results.md` (worst case d_max; time needed = reaction + travel):
 
 | Ability | Map | d_max | 4.2 m/s walk / +dash | 6 m/s walk / +dash | Window | Result |
 |---|---|---|---|---|---|---|
