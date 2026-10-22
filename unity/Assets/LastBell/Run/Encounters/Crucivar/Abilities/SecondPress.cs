@@ -16,7 +16,7 @@ namespace LastBell.Run
         public override string Id => "crucivar.second_press";
 
         public const float Warn = 2.0f, Radius = 2.2f, Knock = 1.5f, StunSeconds = 0.25f;
-        public const int Damage = 25;
+        public const int Damage = 25, DamageV3 = 35;   // v3: 35 (still Hard's only named mechanic)
         const float CrossWidth = 0.42f;
         static readonly Color CrossFill = new Color(0.95f, 0.40f, 0.28f), CrossBorder = new Color(2.3f, 1.25f, 0.45f);   // coral face, hot brass edge
 
@@ -39,7 +39,7 @@ namespace LastBell.Run
             var h = W.Hazards.Spawn(new Hazard
             {
                 Source = "Second Press", Shape = HazardShape.Circle, Kind = HazardKind.Strike, Origin = centre, Radius = Radius,
-                LockAt = 0, ResolveAt = warn, Damage = Damage, Knockback = Knock, Stun = Sim.Ticks(StunSeconds),
+                LockAt = 0, ResolveAt = warn, Damage = V3 ? DamageV3 : Damage, Knockback = Knock, Stun = Sim.Ticks(StunSeconds),
                 Push = p => -Flat(p),   // toward the arena centre, away from the slag edge
             });
             LastHazard = h;

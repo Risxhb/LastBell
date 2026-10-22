@@ -55,7 +55,8 @@ namespace LastBell.Run
         public int PhaseIndex => phase;
         public int Attacks { get; private set; }
 
-        void Awake() { MaxHp = 2500; BodyRadius = 1.7f; HitHeight = 2.0f; MarkHeight = 4.6f; }
+        // v3 uses the packet's 6600 (ABILITIES-v3.md); v1 and v2 keep the shortened 2500 test value
+        void Awake() { MaxHp = CrucivarArgs.V3 ? 6600 : 2500; BodyRadius = 1.7f; HitHeight = 2.0f; MarkHeight = 4.6f; }
 
         protected override void Build()
         {
@@ -293,7 +294,8 @@ namespace LastBell.Run
         {
             if (Mould != null) return;
             Mould = new MouldPress(); Chain = new GearChain(); Bellows = new BellowsDraw(); Casting = new GreatCasting(); Press = new SecondPress();
-            foreach (var a in new CrucivarAbility[] { Mould, Chain, Bellows, Casting, Press }) a.Bind(this, W);
+            Sweep = new AnvilSweep(); Spit = new SlagSpit();
+            foreach (var a in new CrucivarAbility[] { Mould, Chain, Bellows, Casting, Press, Sweep, Spit }) a.Bind(this, W);
         }
 
         public IEnumerable<int> WalkToAnvil()
@@ -344,14 +346,65 @@ namespace LastBell.Run
             }
         }
 
-        // one v2 ability on loop (-lastbellAbility <id>); its phase variant follows the HP phase
+        // ================ ability set v3 (abilities-v2/ABILITIES-v3.md, proposal): "much, much harder" ================
+        // HP 6600 (the packet's target), 0.5 s gaps, a filler (Anvil Sweep / Slag Spit, alternating) between abilities,
+        // layering from phase 1 after one lone Mould Press, one 3.0 s major punish per loop.
+        //   1 Sealed Furnace  [loop 1: Mould Press | later: Mould Press + Slag Rim] · Sweep · Bellows Draw · Spit ·
+        //                     Great Casting (pour + 4 spokes) · Sweep · Gear Chain + Slag Rim · 3.0 punish
+        //   2 Casting Heat    Gear Chain + Rim · Spit · Mould Press + Rim · Sweep · Bellows Draw · Spit ·
+        //                     Great Casting (pour + 8 spokes) · 3.0 punish
+        //   3 Open Pressure   Great Casting (8 spokes + return wave) · 3.0 punish · Gear Chain + Rim · Sweep ·
+        //                     Mould Press (Hard: + Second Press) · Spit · Bellows Draw · Sweep
+        public AnvilSweep Sweep { get; private set; }
+        public SlagSpit Spit { get; private set; }
+        public const float GapV3 = 0.5f, PunishV3 = 3.0f;
+        int p1Loops;
+
+        IEnumerable<IEnumerable<int>> PlanV3(int ph)
+        {
+            const float g = GapV3;
+            switch (ph)
+            {
+                case 1:
+                    yield return Step(true, () => MouldWithPress(), "Mould Press", "Idle", g, slagRim: p1Loops++ > 0);
+                    yield return Step(false, Sweep.Run, "Anvil Sweep", "Idle", g);
+                    yield return Step(true, Bellows.Run, "Bellows Draw", "Idle", g);
+                    yield return Step(false, Spit.Run, "Slag Spit", "Idle", g);
+                    yield return Step(true, () => Casting.Run(4), "Great Casting", "Idle", g);
+                    yield return Step(false, Sweep.Run, "Anvil Sweep", "Idle", g);
+                    yield return Step(false, Chain.Run, "Gear Chain (furnace venting)", "Vulnerable", PunishV3, slagRim: true);
+                    break;
+                case 2:
+                    yield return Step(false, Chain.Run, "Gear Chain", "Idle", g, slagRim: true);
+                    yield return Step(false, Spit.Run, "Slag Spit", "Idle", g);
+                    yield return Step(true, () => MouldWithPress(), "Mould Press", "Idle", g, slagRim: true);
+                    yield return Step(false, Sweep.Run, "Anvil Sweep", "Idle", g);
+                    yield return Step(true, Bellows.Run, "Bellows Draw", "Idle", g);
+                    yield return Step(false, Spit.Run, "Slag Spit", "Idle", g);
+                    yield return Step(true, () => Casting.Run(8), "Great Casting (crucible cooling)", "Vulnerable", PunishV3);
+                    break;
+                default:
+                    yield return Step(true, () => Casting.Run(8, returnWave: true), "Great Casting (hammer lodged)", "HammerLodged", PunishV3);
+                    yield return Step(false, Chain.Run, "Gear Chain", "Idle", g, slagRim: true);
+                    yield return Step(false, Sweep.Run, "Anvil Sweep", "Idle", g);
+                    yield return Step(true, () => MouldWithPress(), "Mould Press", "Idle", g);
+                    yield return Step(false, Spit.Run, "Slag Spit", "Idle", g);
+                    yield return Step(true, Bellows.Run, "Bellows Draw", "Idle", g);
+                    yield return Step(false, Sweep.Run, "Anvil Sweep", "Idle", g);
+                    break;
+            }
+        }
+
+        // one ability on loop (-lastbellAbility <id>); its phase variant follows the HP phase and the set
         IEnumerable<int> Solo(string id) => id switch
         {
             "crucivar.mould_press" => Step(true, () => MouldWithPress(), "Mould Press (hammer lifts)", "Idle", 2.0f),
             "crucivar.second_press" => Step(true, () => MouldWithPress(forcePress: true), "Second Press (hammer lifts)", "Idle", 2.0f),
             "crucivar.gear_chain" => Step(false, Chain.Run, "Gear Chain", "Idle", 1.5f),
             "crucivar.bellows_draw" => Step(true, Bellows.Run, "Bellows Draw (vents cooling)", "Vulnerable", 3.5f),
-            _ => Step(true, () => Casting.Run(phase == 1 ? 0 : phase == 2 ? 3 : 6), "Great Casting (cooling)", "Idle", 3.5f),
+            "crucivar.anvil_sweep" => Step(false, Sweep.Run, "Anvil Sweep", "Idle", 1.0f),
+            "crucivar.slag_spit" => Step(false, Spit.Run, "Slag Spit", "Idle", 1.0f),
+            _ => Step(true, () => CrucivarArgs.V3 ? Casting.Run(phase == 1 ? 4 : 8, returnWave: phase >= 3) : Casting.Run(phase == 1 ? 0 : phase == 2 ? 3 : 6), "Great Casting (cooling)", "Idle", 3.5f),
         };
 
         IEnumerable<int> V2Script()
@@ -369,7 +422,7 @@ namespace LastBell.Run
                     continue;
                 }
                 bool restart = false;
-                foreach (var step in solo != null ? new[] { Solo(solo) } : Plan(phase))
+                foreach (var step in solo != null ? new[] { Solo(solo) } : CrucivarArgs.V3 ? PlanV3(phase) : Plan(phase))
                 {
                     foreach (var w in step) yield return w;
                     // a transition waits for the current attack to finish; two thresholds in one burst queue one change

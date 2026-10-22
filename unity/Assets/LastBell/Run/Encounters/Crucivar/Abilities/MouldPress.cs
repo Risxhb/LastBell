@@ -16,8 +16,9 @@ namespace LastBell.Run
         public event Action<MouldResult> Resolved;
         public MouldResult Last { get; private set; }
 
-        public const float MouldRadius = 2.0f, Warning = 4.2f, SoloGap = 2.6f;
-        public const int SharePerPlayer = 20, StunTicks = 15;   // 0.25 s, no knockback
+        public const float MouldRadius = 2.0f, Warning = 4.2f, SoloGap = 2.6f, SoloGapV3 = 2.4f;
+        public const int SharePerPlayer = 20, SharePerPlayerV3 = 25, StunTicks = 15;   // 0.25 s, no knockback
+        // v3 (ABILITIES-v3.md): 25 per share; solo is I > II > III on adjacent bays 2.4 s apart (Easy keeps two moulds)
 
         // which pair the next cast uses: 0 = NE+SW, 1 = NW+SE (bay indices in CrucivarAbility order NE, SE, SW, NW)
         int cast;
@@ -37,10 +38,10 @@ namespace LastBell.Run
 
         // bays for a cast: two towers = the current pair; four = the current pair, then the other; solo = the current
         // pair's first bay, then the next pair's first bay (adjacent, 8.5 m apart)
-        public static int[] BaysFor(int pair, int towers, bool solo)
+        public static int[] BaysFor(int pair, int towers, bool solo, int soloCount = 2)
         {
             var a = Pairs[pair & 1]; var b = Pairs[(pair + 1) & 1];
-            if (solo) return new[] { a[0], b[0] };
+            if (solo) return soloCount >= 3 ? new[] { a[0], b[0], a[1] } : new[] { a[0], b[0] };   // NE > NW > SW: each adjacent to the last
             return towers <= 2 ? new[] { a[0], a[1] } : new[] { a[0], a[1], b[0], b[1] };
         }
 
@@ -49,11 +50,13 @@ namespace LastBell.Run
             Boss.SetCurrent("Mould Press");
             int n = Mathf.Max(1, Standing().Count);   // downed players don't count
             bool solo = n == 1;
-            var numerals = Numerals(n);
-            var bays = BaysFor(cast, numerals.Length, solo);
+            bool v3 = V3; int share = v3 ? SharePerPlayerV3 : SharePerPlayer;
+            int soloCount = solo && v3 && !Easy ? 3 : 2;
+            var numerals = solo ? Enumerable.Repeat(1, soloCount).ToArray() : Numerals(n);
+            var bays = BaysFor(cast, numerals.Length, solo, soloCount);
             cast++;
 
-            int warn = T(Warning), gap = T(SoloGap);
+            int warn = T(Warning), gap = T(v3 ? SoloGapV3 : SoloGap);
             var towers = new List<Hazard>();
             var centres = new List<Vector3>(); var nums = new List<int>(); var bayList = new List<int>(); var counts = new List<int>();
             for (int i = 0; i < numerals.Length; i++)
@@ -61,10 +64,10 @@ namespace LastBell.Run
                 int k = numerals[i];
                 var h = new Hazard
                 {
-                    Source = "Mould Press " + (solo ? (i == 0 ? "I" : "II") : k.ToString()),
+                    Source = "Mould Press " + (solo ? new[] { "I", "II", "III" }[i] : k.ToString()),
                     Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Bay(bays[i]), Radius = MouldRadius,
                     LockAt = 0, ResolveAt = warn + (solo ? gap * i : 0),
-                    Damage = SharePerPlayer * k, ShareTotal = SharePerPlayer * k, ShareCount = k, WipeIfEmpty = true,
+                    Damage = share * k, ShareTotal = share * k, ShareCount = k, WipeIfEmpty = true,
                     Knockback = 0, Stun = StunTicks,
                 };
                 int bay = bays[i];

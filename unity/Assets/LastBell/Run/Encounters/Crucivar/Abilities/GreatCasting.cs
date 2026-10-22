@@ -22,7 +22,102 @@ namespace LastBell.Run
         public Hazard Pour { get; private set; }
         public readonly List<Hazard> Stamps = new List<Hazard>();
 
-        public IEnumerable<int> Run(int spokes)
+        // v3 (ABILITIES-v3.md): the pour locks at 1.5 and resolves at 3.0 for a 100 split; solo gets two 50 pours, the
+        // second laid on the player's position as the first lands and resolving 2.0 s later. 8 spokes 22.5 deg off the
+        // pour, stamps r 1.5 on 13 / 11 / 9 / 7 / 5 m, 30 each (phase 1 uses every other spoke). Phase 3 adds an outward
+        // return wave on the 8 offset spokes (in line with the pour), resolving 7.5 .. 9.5 s inside-out; it is shown at
+        // 5.5 s so even its first stamp has the 2.0 s floor, and resolves only after the inward wave's last ring.
+        public const float PourResolveV3 = 3.0f, SoloSecondWarnV3 = 2.0f, StampRadiusV3 = 1.5f, SpokeOffsetV3 = 22.5f,
+            ReturnShowV3 = 5.5f, ReturnFirstV3 = 7.5f;
+        public const int PourTotalV3 = 100, PourSoloV3 = 50, StampDmgV3 = 30;
+        public static readonly float[] RingsV3 = { 13f, 11f, 9f, 7f, 5f };   // rim first
+
+        public IEnumerable<int> Run(int spokes, bool returnWave = false) => V3 ? RunV3(spokes, returnWave) : RunV2(spokes);
+
+        IEnumerable<int> RunV3(int spokes, bool returnWave)
+        {
+            Boss.SetCurrent("The Great Casting");
+            Stamps.Clear();
+            var origin = Flat(Boss.transform.position);
+            bool solo = W.Players.Count == 1;
+            var target = Farthest(origin);
+            int lockAt = T(PourLock), resolveAt = T(PourResolveV3), show = T(MarchShow);
+            int marchEnd = T(MarchFirst + MarchStep * (RingsV3.Length - 1));
+            int returnShow = T(ReturnShowV3), returnEnd = T(ReturnFirstV3 + MarchStep * (RingsV3.Length - 1));
+            int soloEnd = resolveAt + T(SoloSecondWarnV3);
+            int end = Mathf.Max(resolveAt, spokes > 0 ? (returnWave && !Easy ? returnEnd : marchEnd) : 0, solo ? soloEnd : 0);
+
+            var pour = Pour = new Hazard
+            {
+                Source = "Pour", Shape = HazardShape.Lane, Kind = HazardKind.Ground, Origin = origin, Width = PourWidth,
+                LockAt = lockAt, ResolveAt = resolveAt, Knockback = 1f, Yaw = Boss.transform.eulerAngles.y,
+            };
+            if (solo) pour.Damage = PourSoloV3;
+            else { pour.ShareTotal = PourTotalV3; pour.ShareCount = Standing().Count; }   // line split, never a wipe
+            Aim(pour, target);
+            pour.Track = h => { if (target == null || target.Down) target = Farthest(origin); Aim(h, target); };
+            pour.OnResolve = h =>
+            {
+                W.BossFx.StripStamp(h.Origin, h.Yaw, h.Length, h.Width); Boss.Flare(1f);
+                // solo: a second pour is laid on where the player stands now, locked, and lands 2.0 s later
+                if (solo && target != null && !target.Down)
+                {
+                    var second = new Hazard
+                    {
+                        Source = "Pour II", Shape = HazardShape.Lane, Kind = HazardKind.Ground, Origin = origin, Width = PourWidth,
+                        LockAt = 0, ResolveAt = T(SoloSecondWarnV3), Knockback = 1f, Damage = PourSoloV3, Yaw = h.Yaw,
+                    };
+                    Aim(second, target);
+                    second.OnResolve = s => { W.BossFx.StripStamp(s.Origin, s.Yaw, s.Length, s.Width); Boss.Flare(1f); };
+                    SecondPour = W.Hazards.Spawn(second);
+                }
+            };
+            SecondPour = null;
+            W.Hazards.Spawn(pour);
+
+            for (int i = 0; i < end; i++)
+            {
+                if (i == show && spokes > 0) MarchV3(origin, pour.Yaw, spokes, show);
+                if (i == returnShow && spokes > 0 && returnWave && !Easy) ReturnV3(origin, pour.Yaw, returnShow);
+                Boss.Glow(Mathf.Clamp01(i / (float)resolveAt));
+                yield return 1;
+            }
+        }
+        public Hazard SecondPour { get; private set; }
+
+        void MarchV3(Vector3 origin, float pourYaw, int spokes, int now)
+        {
+            int step = spokes >= 8 ? 1 : 2;
+            for (int ring = 0; ring < RingsV3.Length; ring++)
+            {
+                int at = T(MarchFirst + MarchStep * ring) - now;
+                for (int j = 0; j < 8; j += step) StampV3("Stamp " + (ring + 1), origin, pourYaw + SpokeOffsetV3 + 45f * j, RingsV3[ring], at);
+            }
+        }
+
+        // outward: the inner ring first, on the spokes the inward wave left empty (the pour channel among them)
+        void ReturnV3(Vector3 origin, float pourYaw, int now)
+        {
+            for (int k = 0; k < RingsV3.Length; k++)
+            {
+                int ring = RingsV3.Length - 1 - k;
+                int at = T(ReturnFirstV3 + MarchStep * k) - now;
+                for (int j = 0; j < 8; j++) StampV3("Return " + (k + 1), origin, pourYaw + 45f * j, RingsV3[ring], at);
+            }
+        }
+
+        void StampV3(string source, Vector3 origin, float yaw, float r, int at)
+        {
+            if (!StampCentre(origin, yaw, r, out var c)) return;
+            Stamps.Add(W.Hazards.Spawn(new Hazard
+            {
+                Source = source, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = c,
+                Radius = StampRadiusV3, LockAt = 0, ResolveAt = at, Damage = StampDmgV3, Knockback = 1f,
+                OnResolve = hz => W.BossFx.DiebreakerResolve(hz.Origin, hz.Radius),
+            }));
+        }
+
+        IEnumerable<int> RunV2(int spokes)
         {
             Boss.SetCurrent("The Great Casting");
             Stamps.Clear();

@@ -202,13 +202,14 @@ namespace LastBell.Run
             var tests = typeof(CrucivarAbilityTest).Assembly.GetTypes()
                 .Where(t => !t.IsAbstract && typeof(CrucivarAbilityTest).IsAssignableFrom(t))
                 .Select(t => (CrucivarAbilityTest)Activator.CreateInstance(t))
-                .Where(t => only == null || t.Id == only)
+                .Where(t => only == null || t.Id == only || t.Id.StartsWith(only + "_"))
                 .OrderBy(t => t.Order).ThenBy(t => t.Id).ToList();
             Note("tests: " + string.Join(", ", tests.Select(t => t.Id)));
             Check("found the requested tests", tests.Count > 0, only ?? "all");
             foreach (var t in tests)
             {
                 section = t.Id; int before = fail;
+                CrucivarArgs.SetOverride = t.Set;
                 Note($"---- {t.Id} ----");
                 var e = t.Run(this);
                 while (true)
@@ -240,6 +241,7 @@ namespace LastBell.Run
     {
         public abstract string Id { get; }
         public virtual int Order => 0;
+        public virtual string Set => "v2";   // the ability set this test runs under (CrucivarArgs.SetOverride)
         public abstract IEnumerator Run(CrucivarV2AutoTest t);
     }
 }

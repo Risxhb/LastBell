@@ -21,6 +21,8 @@ namespace LastBell.Run
         protected int T(float seconds) => Sim.Ticks(seconds * WarnScale);
         protected bool Hard => W.Difficulty == Difficulty.Hard;
         protected bool Easy => W.Difficulty == Difficulty.Easy;
+        // ability set v3 (ABILITIES-v3.md): every ability reads its numbers per cast, so tests can switch sets live
+        protected static bool V3 => CrucivarArgs.V3;
         protected List<PlayerController> Standing() => W.Players.FindAll(p => !p.Down);
         protected static Vector3 Flat(Vector3 v) => Sim.Flat(v);
 
@@ -42,7 +44,8 @@ namespace LastBell.Run
     }
 
     // Launch switches (practice only):
-    //   -lastbellAbilitySet v1|v2   v2 (default) is ability set v2; v1 is the original five attacks, kept for comparison
+    //   -lastbellAbilitySet v1|v2|v3   v3 (default) is the "much harder" set (ABILITIES-v3.md); v2 the first new set; v1 the
+    //                               original five attacks, kept for comparison
     //   -lastbellAbility <id>       fire one v2 ability on loop, e.g. crucivar.mould_press
     public static class CrucivarArgs
     {
@@ -53,9 +56,11 @@ namespace LastBell.Run
             return i >= 0 && i + 1 < a.Length ? a[i + 1] : null;
         }
         public static string SetOverride;   // tests force a set without a command line
-        public static bool V1 => (SetOverride ?? Arg("-lastbellAbilitySet") ?? "v2").Equals("v1", StringComparison.OrdinalIgnoreCase);
+        public static string Set => (SetOverride ?? Arg("-lastbellAbilitySet") ?? "v3").ToLowerInvariant();
+        public static bool V1 => Set == "v1";
+        public static bool V3 => Set != "v1" && Set != "v2";
         public static string Solo => Arg("-lastbellAbility");
-        public static readonly string[] Ids = { "crucivar.mould_press", "crucivar.gear_chain", "crucivar.bellows_draw", "crucivar.great_casting", "crucivar.second_press" };
+        public static readonly string[] Ids = { "crucivar.mould_press", "crucivar.gear_chain", "crucivar.bellows_draw", "crucivar.great_casting", "crucivar.second_press", "crucivar.anvil_sweep", "crucivar.slag_spit" };
         public static bool Known(string id) => id != null && Ids.Contains(id);
     }
 }

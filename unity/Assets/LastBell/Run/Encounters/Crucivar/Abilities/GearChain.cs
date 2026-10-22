@@ -17,6 +17,7 @@ namespace LastBell.Run
 
         public const int Damage = 28;
         public const float Warn = 3.0f, Stun = 0.25f;
+        public const int DamageV3 = 40; public const float WarnV3 = 2.5f;   // v3: 2.5 s, snap 40
         public float Min => Easy ? 5f : 6f;
         public float Max => Easy ? 11f : 10f;
 
@@ -45,7 +46,7 @@ namespace LastBell.Run
                 .Select(x => x.p).ToList();
             int n = order.Count;
             if (n == 0) yield break;
-            int warn = T(Warn);
+            int warn = T(V3 ? WarnV3 : Warn);
             for (int i = 0; i < n / 2; i++) links.Add(Clamp(order[i], order[n - 1 - i], warn));
             if (n % 2 == 1) links.Add(Clamp(order[n / 2], null, warn));
 
@@ -65,7 +66,7 @@ namespace LastBell.Run
             if (b == null) l.Post = RimPost(a.transform.position);
             l.Hazard = W.Hazards.Spawn(new Hazard
             {
-                Source = "Gear Chain", Shape = HazardShape.Tether, Kind = HazardKind.Ground, Damage = Damage,
+                Source = "Gear Chain", Shape = HazardShape.Tether, Kind = HazardKind.Ground, Damage = V3 ? DamageV3 : Damage,
                 Knockback = 0, Stun = Sim.Ticks(Stun), LockAt = warn, ResolveAt = warn, Origin = Mid(l),
                 Track = h => h.Origin = Mid(l),
                 Includes = p => l.Ended == null && (p == l.A || (l.B != null && p == l.B)) && !InBand(l),
