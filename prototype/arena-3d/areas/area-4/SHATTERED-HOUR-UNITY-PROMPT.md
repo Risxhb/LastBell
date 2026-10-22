@@ -41,7 +41,7 @@ Read the plan as a clock face: North at 12 (bell), East at 3, South at 6 (entran
 ### 1. Combat floor (the playable area)
 
 - A perfect circle of **radius R = 13.5 m**, flat and level at y = 0. Build it as a 128-segment disc mesh. It must stay completely unobstructed: no props, steps or bumps inside the circle.
-- **Collision:** a `MeshCollider` (or a flat box) for the floor on layer `ArenaFloor`, plus a boundary made of **64 thin box colliders** forming a ring at radius R, 3 m tall, on layer `ArenaBoundary`. Players can't leave the circle. The openings to the stairs and bridges are also closed by this boundary. The walkways are scenery until design says otherwise.
+- **Collision:** a `MeshCollider` (or a flat box) for the floor on layer `ArenaFloor`, plus a boundary made of **64 thin box colliders** forming a ring at radius R, 3 m tall, on layer `ArenaBoundary`. Players can't leave the circle. The openings to the stairs and bridges are also closed by this boundary. All walkways (south causeway, east and west bridges, north stair and landing) are scenery: players stay on the round floor (decided by Chzy18, 2026-10-21).
 - **Floor surface (painted texture, 4096² base map, plus a 2048² normal map and a 2048² emissive mask):**
   - Large, irregular, hand-painted flagstones (1.5–2.5 m slabs, loosely radial near the centre and freer further out). Colours: midnight cobalt-charcoal `#1E2433`–`#2A3142`, with slightly bluer slabs `#252D45` and very dark grout `#0E1018`. Add subtle wear, chips and faint hairline cracks. Keep it low contrast so telegraphs read on top.
   - **Engraved brass inlay** (thin, about 4–6 cm wide, colour `#B8904E`, emissive mask at **0.25** strength):

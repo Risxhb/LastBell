@@ -251,7 +251,7 @@ Refine and re-run the critic **up to 4 times, or until it scores 8/10 or higher*
   - any rule you bent and why
   - open questions
 
-## Open questions to raise (don't decide them)
+## Decided by Chzy18 (2026-10-21)
 
-- In `gpt/images/10-arena-shattered-hour.png` the walkable-footprint panel shows the south causeway as walkable. The current build keeps players on the round floor only. Ask the user which is right.
-- Whether the north landing should be reachable or stay scenery.
+- Players stay on the round floor. The south causeway, the east and west bridges and the north stair are scenery; the boundary colliders close every gap.
+- The north landing under the bell is scenery too. Nobody walks on it.
