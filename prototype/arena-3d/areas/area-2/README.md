@@ -42,4 +42,53 @@ Built from `BRASS-FOUNDRY-UNITY-PROMPT.md` and `ref-brass-foundry-topdown.webp` 
   ```
   It also writes `unity-report.txt`, an occlusion check. The gameplay camera must see all 128 floor sample points.
 - The playable floor is r ≤ 14, with a ring of boundary colliders at r 14.35. `BossSpawn` and `PlayerSpawn_1` to `PlayerSpawn_8` are under `Gameplay`. The floor uses the `ArenaFloor` layer if the project defines one; it doesn't yet, so the floor stays on Default.
-- A critic loop scored it 5.5 → 6.5 → 6.5 → 6.5 → 6.8 / 10. Open items: the rim blocks still read a little crate-like, the molten ring is a flat band, the city below needs glowing lava rivers, and the towers read as lids from above.
+- First build: a critic loop scored it 5.5 → 6.5 → 6.5 → 6.5 → 6.8 / 10.
+
+### Detail pass (`BRASS-FOUNDRY-DETAIL-PASS-PROMPT.md`)
+
+- **Flowing lava:** `Shaders/MoltenFlow.shader` (`LastBell/Area2/MoltenFlow`) is unlit, HDR, fog-aware and SRP Batcher compatible. It is used on the channel ring, the falls down the drum, and the city rivers and pools.
+  - **Flow:** two-phase flow-map blending, with noise stretched 2:1 along the flow and domain-warped. The flow is faster mid-stream than at the banks (parabolic profile).
+  - **Crust:** plates in two sizes break apart and re-form, with darker crusted banks and a hot mid-line. A noise generator measures crust coverage: 46%.
+  - **Life:** a ±8% pulse, popping bubbles and a 3 cm vertex undulation.
+  - **Quiet:** `_Quiet` dims emission to 60%.
+- **Clock:** time comes from the global `_LB_Area2Time`. `BrassFoundryArena` sets it from `Time.time` in Play mode. In edit mode it uses `EditorApplication.update` (30 fps), so the lava also flows in the Scene and Game views (turn on Always Refresh in the Scene view). The batch capture sets it directly.
+- **Driver:** `BrassFoundryArena` also lerps `quiet` over 0.25 s. It flickers the molten and lantern lights (±10%, de-synced), lets the glow curtain breathe, and flickers the furnace glow.
+- **Particles:** `Area2Particles.cs` is a small CPU particle emitter, since the project has no ParticleSystem module. It drives:
+  - embers rising from the channel
+  - heat haze, channel sparks and gate sparks
+  - steam vents on the outer wall
+  - chimney smoke
+  - smoke banks below
+  
+  None of it spawns over the floor.
+- **Textures:** all generated in code, with mipmaps and anisotropic filtering at 8.
+  - Floor 4096: albedo, height (imported at 2048), AO and smoothness maps.
+  - Two masonry variants at 2048.
+  - Iron plate (with rust streaks), deck planks and molten noise at 1024.
+  - Brass at 512, and a sky panorama at 2048 × 1024.
+  - A shared detail normal at 512.
+- **Texel density (px/m):** floor 146, rim 341, decks 171, masonry 1024, iron 512.
+- **Budget:**
+  - About 131 renderers before batching, 31 materials and 281 k triangles.
+  - 78 unshadowed point lights.
+  - 93.6 MB of textures (budget 120).
+- **Detail added:**
+  - **Rim:** single chamfered gear teeth with lava gaps between them.
+  - **Outer wall:** a three-tier terraced ring with buttresses, flanged pipes, furnace hatches, steam vents and catwalks.
+  - **Towers:** three stepped tiers with crenellations, a merlon crown, machinery boxes, dome dormers, varied window glow, and chimneys on the far pair.
+  - **Gantries:** pylons at r 26, truss undersides and end gatehouses.
+  - **Entry bridge:** a far arch.
+  - **Furnace gate:** a recessed furnace mouth with a gradient glow and halo, and a toothed gear emblem.
+  - **City below:** three depth layers with continuous lava ribbons and pools in the streets.
+  - **Atmosphere:** exp² fog.
+- **Checks in `unity-report.txt`:**
+  - The lava flow check compares the same gameplay frame at clock 0 and 1 s. The channel must change by more than 4/255 and the floor by less than 0.5/255. Result: 13.1 against 0.00.
+  - Occlusion: 0 of 128 points blocked.
+  - Stats and texel density.
+- **Run scene check:** `BatchVerifyRunScene` checks the run loop's `Run_BrassFoundry.unity` (after `RunBuild.BuildScene`): the driver and the lava materials are there, and the lava flows (13.3 against 0.00, in `unity-runscene.txt`).
+- **Critic loop:** 6.9 → 7.0 → 7.0 → 7.0 → 7.0 / 10. It did not reach 8. Open items:
+  - The rim teeth should be wedge-shaped and evenly spaced, so they read as one gear ring.
+  - The lava crust is still a little cellular, with too much yellow-white.
+  - The city rivers are too bright from the top view.
+  - The abyss needs more depth layers and a horizon glow.
+  - The lava ring should run unbroken past the corner towers.
