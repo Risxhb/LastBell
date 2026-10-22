@@ -77,13 +77,16 @@ namespace LastBell.Run
             }
 
             // ---- melee and ranged: one soaker at the mould's inner edge (next to the boss), one at the outer edge (8 m+) ----
-            yield return t.Setup(2, Difficulty.Hard, new[] { Along(1, 6f - 2.3f), Along(1, 6f + 2.3f) });
-            var melee = t.Party[0]; var ranged = t.Party[1];
+            // (a third player idles at the arena edge, r 13, outside every mould: the press is a small circle on one bay, so
+            // it threatens whoever soaked, melee or ranged, and never the rest of the arena)
+            yield return t.Setup(3, Difficulty.Hard, new[] { Along(1, 6f - 2.3f), Along(1, 6f + 2.3f), Along(3, 13f) });
+            var melee = t.Party[0]; var ranged = t.Party[1]; var edge = t.Party[2];
             float rr0 = R(ranged);
             yield return t.Fire(press.Run(Result(new[] { 1 }, CountAt(t, new[] { 1 }, t.Party))));
             t.Note($"melee soaker {Sim.Flat(melee.transform.position - t.Boss.transform.position).magnitude:0.0} m from the boss, ranged soaker {rr0:0.0} m from the centre");
             t.Check("melee soaker standing still is hit", t.HitsOn(melee, Src).Count() == 1);
             t.Check("ranged soaker standing still is hit", t.HitsOn(ranged, Src).Count() == 1);
+            t.Check("a player at the arena edge outside the moulds is not pressed", !t.WasHit(edge, Src), $"r {R(edge):0.0} m");
             yield return t.Seconds(0.4f);
             t.Check("the outer soaker is pushed inward, not toward the rim", R(ranged) < rr0 - 1f, $"{rr0:0.00} -> {R(ranged):0.00} m");
 
