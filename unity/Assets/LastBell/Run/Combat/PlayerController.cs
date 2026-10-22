@@ -164,7 +164,7 @@ namespace LastBell.Run
         {
             if (Down) return;
             float mult = Kit.Mitigation(h, out bool noKnock);
-            int dmg = Mathf.RoundToInt(h.Damage * mult);
+            int dmg = Mathf.RoundToInt(h.Damage * mult * World.DamageTakenScale);   // difficulty scales the hit once, here
             if (mult >= 1) dmg = Mathf.Max(1, dmg);   // a shield can absorb a hit completely; nothing else can
             Hp = Mathf.Max(0, Hp - dmg);
             World.ReportPlayerHit(this, h, dmg);
@@ -177,6 +177,16 @@ namespace LastBell.Run
                 dashTick = 0; Kit.Interrupt();
                 Presenter.Hit();
             }
+        }
+
+        // Standing-hazard damage (cooling slag): no knockback, stun or interrupt, and nothing mitigates it.
+        public void ReceiveBurn(Hazard h, int dmg)
+        {
+            if (Down || dmg <= 0) return;
+            Hp = Mathf.Max(0, Hp - dmg);
+            World.ReportPlayerHit(this, h, dmg);
+            RunHud.Float(transform.position + Vector3.up * 2.4f, "-" + dmg, new Color(1f, 0.6f, 0.25f));
+            if (Hp == 0) GoDown();
         }
 
         void GoDown()

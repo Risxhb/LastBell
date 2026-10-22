@@ -1,0 +1,5 @@
+Lava flow check (gameplay view, clock 0 vs 1 s): channel 10.39/255 over 33326 px, floor 0.00/255 over 148978 px -> PASS (need channel > 4, floor < 0.5)
+Molten crust coverage at the channel's default threshold: 46% (target 45–55%)
+Occlusion check (gameplay camera, 128 floor points): 0 blocked
+Stats: 115 mesh renderers (draw-call proxy, before batching), 32 materials, 827,380 triangles, 78 lights, 22 textures using 97.6 MB (largest: FloorSlate 21.4, FloorSlateHeight 10.7, FloorSlateMetallicGloss 10.7, MasonryCoursedHeight 10.7, MasonryLargeHeight 10.7, FloorSlateAO 5.4)
+Texel density (px/m): Brass 128, CityMasonry 512, DarkBrass 128, DeckPlanks 171, FoundryFloor 146, IronPlate 512, Masonry 1024, MasonryDark 1024, RimStone 341, RoofIron 512, StoneSolid 256

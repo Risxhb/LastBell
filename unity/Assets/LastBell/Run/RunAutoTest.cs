@@ -14,7 +14,7 @@ namespace LastBell.Run
     // with exit code 0 (all checks passed) or 1. Dev hooks it uses are the same ones the HUD labels (F9/F8: defeat the
     // boss, set its HP fraction) plus DebugSetHp on the player to shorten the defeat path; all damage taken comes from
     // real hazards.
-    public sealed class RunAutoTest : MonoBehaviour
+    public sealed partial class RunAutoTest : MonoBehaviour
     {
         public static bool Requested => Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellAutotest", StringComparison.OrdinalIgnoreCase));
         static string OutDir
@@ -111,6 +111,10 @@ namespace LastBell.Run
             Note($"video frames {name}: {frames}");
         }
         IEnumerator Wait(float s) { float t = 0; while (t < s) { t += Time.deltaTime; yield return null; } }
+        // test setup for fixed-length kit/rotation fights against the Bellkeeper: these check a class, not survival, so the
+        // player is topped up instead of being downed mid-check (the defeat path is tested on its own)
+        void KeepAlive() { if (d.Player && d.Player.Hp < 60) d.Player.DebugSetHp(PlayerController.MaxHp); }
+        IEnumerator WaitAlive(float s) { float t = 0; while (t < s) { KeepAlive(); t += Time.deltaTime; yield return null; } }
         bool Safe(Func<bool> c) { try { return c(); } catch (Exception) { return false; } }
         IEnumerator Until(Func<bool> cond, float timeout, string what)
         {
@@ -205,10 +209,17 @@ namespace LastBell.Run
             Note($"Last Bell autotest · {Application.version} · Unity {Application.unityVersion} · {SystemInfo.graphicsDeviceName} · {DateTime.Now:yyyy-MM-dd HH:mm}");
             d.InputOverride = bot;
             yield return Wait(1.0f);
+            if (AurelionOnly) { yield return AurelionChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
             Check($"boots into the menu on a run map ({RunMaps.CurrentName})", d.State == RunState.Menu && RunMaps.Current >= 0);
             for (int i = 0; i < RunMaps.All.Length; i++)
                 Check($"map selectable: {RunMaps.All[i].Name}", RunMaps.InBuild(i), RunMaps.All[i].RunScene);
             yield return Shot("menu");
+            if (OnlySylvara)
+            {
+                yield return SylvaraChecks();
+                Check("no errors or exceptions logged", errors == 0, errors + " logged");
+                Finish(); yield break;
+            }
             foreach (var cls in RunDirector.Classes)
             {
                 int slots = cls == "Vanguard" ? 5 : 6, found = 0;
@@ -216,6 +227,7 @@ namespace LastBell.Run
                 Check($"{cls} skill-bar icons load ({slots} incl. dash)", found == slots, $"{found}/{slots}");
             }
             Check("potion icon loads", RunHud.Icon("potion") != null);
+            yield return DifficultyChecks();
 
             // ---------- run 1: Vanguard, full victory, repeated presses ----------
             Check("StartRun accepted once", d.StartRun("Vanguard") && !d.StartRun("Vanguard"));
@@ -226,62 +238,40 @@ namespace LastBell.Run
             yield return Until(() => d.State == RunState.Combat, 4, "combat 1");
             yield return Wait(0.3f);
             Check("repeated Ready starts exactly one encounter", d.EncounterStarts == starts0 + 1 && d.Encounter == 0, $"starts {d.EncounterStarts - starts0}");
-            Check("encounter 1 is the Dial Warden", d.Boss is DialWarden);
+            Check("the run fights only real bosses: one fight, the Bellkeeper", RunDirector.RunOrder.Length == 1 && d.Boss is BellkeeperEncounter && !d.Boss.Placeholder);
+            Check("run starts at full health and potions", d.Player.Hp == PlayerController.MaxHp && d.Player.Potions == PlayerController.MaxPotions, $"hp {d.Player.Hp}, potions {d.Player.Potions}");
+            var bk = (BellkeeperEncounter)d.Boss;
             int bossHp0 = d.Boss.Hp;
             bool sawOpening = false; var vk = d.Player.Kit as VanguardKit2;
             float t0 = Time.time;
             var fight = StartCoroutine(Fight(7f, VanguardRotation, 1.6f));
             bool shot = false;
-            while (Time.time - t0 < 7f && d.State == RunState.Combat) { sawOpening |= vk.OpeningActive; if (Time.time - t0 > 3.5f && !shot) { shot = true; yield return Shot("combat_dial_warden"); } yield return null; }
+            while (Time.time - t0 < 7f && d.State == RunState.Combat) { KeepAlive(); sawOpening |= vk.OpeningActive; if (Time.time - t0 > 3.5f && !shot) { shot = true; yield return Shot("combat_vanguard_opening"); } yield return null; }
             StopCoroutine(fight); bot.Clear();
             Check("Vanguard strikes damage the boss through the kit", d.Boss.Hp < bossHp0, $"{bossHp0} -> {d.Boss.Hp}");
             Check("Steel Rhythm hit 3 granted Opening", sawOpening);
             yield return VanguardShowcase();
             yield return VanguardKitChecks();
-            // potions: drink one in encounter 1; it must still be spent in encounter 2 while health is full again
+            // potions: drink one mid-fight (heal and lockout), then the Bellkeeper resumes
             yield return Until(() => d.World.Hazards.Count == 0, 6, "quiet for the potion check"); d.Boss.Halt();
             yield return Until(() => d.Player.Stunned == 0, 2, "hit-stun over");   // drinking is blocked while stunned
             d.Player.DebugSetHp(50); bot.potion = true; yield return Wait(0.1f);
             Check("F potion heals +40 and spends one", d.Player.Hp == 90 && d.Player.Potions == PlayerController.MaxPotions - 1, $"hp {d.Player.Hp}, potions {d.Player.Potions}");
             bot.potion = true; yield return Wait(0.1f);
             Check("potion lockout: no second drink within 1 s", d.Player.Potions == PlayerController.MaxPotions - 1);
-            d.Player.DebugSetHp(37); d.Boss.BeginCombat();
-            yield return KillDuringWindup("dial_warden");
-            yield return Until(() => d.State == RunState.Intro && d.Encounter == 1, 6, "intro 2");
-            Check("encounter 1 ended exactly once", d.EncounterEnds == 1 && d.EncountersCleared == 1);
-            yield return null;   // Destroy lands at the end of the frame
-            Check("previous boss removed", FindObjectsByType<BossEncounter>().Length == 1);
-            yield return Until(() => d.State == RunState.Combat, 4, "combat 2");
-            Check("encounter 2 is the Pendulum Sentinel", d.Boss is PendulumSentinel);
-            Check("health refilled before miniboss 2; potions carried over", d.Player.Hp == PlayerController.MaxHp && d.Player.Potions == PlayerController.MaxPotions - 1, $"hp {d.Player.Hp}, potions {d.Player.Potions}");
-            yield return LowPendulumCheck();
-            yield return KillDuringWindup("pendulum_sentinel");
-            yield return Until(() => d.State == RunState.Combat && d.Encounter == 2, 10, "combat 3");
-            Check("encounter 3 is the Chimebound Oracle", d.Boss is ChimeboundOracle);
-            yield return Survive(2.2f);
-            yield return Shot("combat_oracle_markers");
-            yield return KillDuringWindup("chimebound_oracle");
-            yield return Until(() => d.State == RunState.Intermission, 6, "intermission");
-            yield return Wait(1.5f);
-            Check("intermission is free of hazards and bosses", d.World.Hazards.Count == 0 && d.Boss == null && !d.World.CombatActive);
-            int potInter = d.Player.Potions;
-            Check("potions still carried at the intermission", potInter == PlayerController.MaxPotions - 1, "potions " + potInter);
-            yield return Shot("intermission");
-            int starts1 = d.EncounterStarts;
-            for (int i = 0; i < 4; i++) { d.RequestContinue(); d.RequestContinue(); d.RequestReady(); yield return null; }
-            yield return Until(() => d.State == RunState.Combat, 4, "final combat");
-            Check("repeated Continue starts exactly one final encounter", d.EncounterStarts == starts1 + 1 && d.Boss is BellkeeperEncounter);
-            Check("health and potions refilled for the final boss", d.Player.Hp == PlayerController.MaxHp && d.Player.Potions == PlayerController.MaxPotions, $"hp {d.Player.Hp}, potions {d.Player.Potions}");
+            d.Boss.DebugSetHpFraction(0.95f); d.Boss.BeginCombat();   // test setup: phase 1 again after the kit checks
             d.Player.DebugSetHp(PlayerController.MaxHp);   // test setup: the rest of this run checks phases, not survival
-            var bk = (BellkeeperEncounter)d.Boss;
+            Check("Bellkeeper resumes in Last Guardian after the kit checks", d.Boss.PhaseName == BellkeeperEncounter.Phase1, d.Boss.PhaseName);
             Check("Bellkeeper uses its model", bk.Presenter != null && bk.Presenter.HasModel);
+            Check("Bellkeeper 2.0 rig has the shell halves and three rings", bk.PhaseRigFound);
             StartCoroutine(Capture("bellkeeper_fight", 300));
             fight = StartCoroutine(Fight(4.5f, VanguardRotation, 1.8f));
-            yield return Wait(2.5f); yield return Shot("combat_bellkeeper"); yield return Wait(2.2f);
+            yield return WaitAlive(2.5f); yield return Shot("combat_bellkeeper"); yield return WaitAlive(2.2f);
             StopCoroutine(fight); bot.Clear();
             // The Unfinished Hour (spec v0.3 §3.1, §4.1): phase 1 records one footprint, then replays it alone
             yield return Survive(8, () => bk.HasMemory);
             Check("phase 1 records a footprint and shows its inactive outline", bk.HasMemory);
+            Check("Last Guardian look: shell closed, rings compact", bk.ShellAngle < 2 && bk.RingSpread < 0.01f, $"shell {bk.ShellAngle:0}°, rings {bk.RingSpread:0.00} m");
             yield return Shot("bellkeeper_memory_outline");
             d.Player.DebugSetHp(PlayerController.MaxHp);
             yield return Survive(14, () => bk.LiveEcho != null);
@@ -301,11 +291,13 @@ namespace LastBell.Run
             yield return null; yield return null;
             Check("Bellkeeper plays PhaseShift on the transition", bk.Presenter.CurrentClip == "PhaseShift", bk.Presenter.CurrentClip);
             yield return Survive(3f); yield return Shot("bellkeeper_phase2");
+            Check("Broken Hour look: shell parted, rings offset", bk.ShellAngle >= 10 && bk.RingSpread > 0.15f, $"shell {bk.ShellAngle:0}°, rings {bk.RingSpread:0.00} m");
             d.Boss.DebugSetHpFraction(0.34f);
             d.Player.DebugSetHp(PlayerController.MaxHp);
             yield return Survive(22, () => d.Boss.PhaseName == BellkeeperEncounter.Phase3);
             Check("phase 3 queued and entered", d.Boss.PhaseName == BellkeeperEncounter.Phase3);
             yield return Survive(2.5f); yield return Shot("bellkeeper_final_toll");
+            Check("Final Toll look: chest open, rings spread", bk.ShellAngle >= 38 && bk.RingSpread > 0.35f, $"shell {bk.ShellAngle:0}°, rings {bk.RingSpread:0.00} m");
             // spec v0.3 §4.3: the Final Toll remembers its own March and replays it with the paired Bell Sweep
             d.Player.DebugSetHp(PlayerController.MaxHp);
             yield return Survive(6, () => bk.LiveEcho != null);
@@ -327,8 +319,9 @@ namespace LastBell.Run
             Check("Bellkeeper plays Defeat", bk.Presenter.CurrentClip == "Defeat", bk.Presenter.CurrentClip);
             Check("defeat erases the memory and every hazard", !bk.HasMemory && bk.LiveEcho == null && d.World.Hazards.Count == 0);
             yield return Wait(1.0f); yield return Shot("bellkeeper_defeat");
+            Check("defeat opens the chest fully", bk.ShellAngle > 60, $"shell {bk.ShellAngle:0}°");
             yield return Until(() => d.State == RunState.Results, 6, "results 1");
-            Check("victory after the fourth encounter", d.Victory && d.EncountersCleared == 4 && d.EncounterStarts == 4 && d.EncounterEnds == 4,
+            Check("victory after the Bellkeeper, the run's only encounter", d.Victory && d.EncountersCleared == 1 && d.EncounterStarts == 1 && d.EncounterEnds == 1,
                 $"victory {d.Victory}, cleared {d.EncountersCleared}, starts {d.EncounterStarts}, ends {d.EncounterEnds}");
             yield return Shot("results_victory");
 
@@ -374,21 +367,13 @@ namespace LastBell.Run
             d.RequestReady();
             yield return Until(() => d.State == RunState.Combat, 4, "chimesinger combat");
             yield return ChimesingerChecks();
-            yield return TickRegressions();   // ends encounter 1 with a real Resonant Note killing blow
-            for (int e = 1; e < 4; e++)
-            {
-                if (e == 3) { yield return Until(() => d.State == RunState.Intermission, 8, "intermission (chimesinger)"); d.RequestContinue(); }
-                yield return Until(() => d.State == RunState.Combat, 8, "combat " + (e + 1));
-                if (d.State != RunState.Combat) break;
-                chimeStep = 0; d.Player.DebugSetHp(PlayerController.MaxHp);
-                var f2 = StartCoroutine(Fight(e == 3 ? 4f : 2.5f, ChimeRotation, 6f));
-                yield return Wait(e == 3 ? 4f : 2.5f); StopCoroutine(f2); bot.Clear();
-                if (e == 3) yield return Shot("chimesinger_bellkeeper");
-                d.Boss.DebugDefeat();
-                yield return Until(() => d.State != RunState.Combat, 2, "boss defeated " + (e + 1));
-            }
+            chimeStep = 0; d.Player.DebugSetHp(PlayerController.MaxHp); d.Boss.BeginCombat();
+            var f2 = StartCoroutine(Fight(4f, ChimeRotation, 6f));
+            yield return WaitAlive(4f); StopCoroutine(f2); bot.Clear();
+            yield return Shot("chimesinger_bellkeeper");
+            yield return TickRegressions();   // ends the fight with a real Resonant Note killing blow
             yield return Until(() => d.State == RunState.Results, 8, "results 4");
-            Check("Chimesinger run reaches victory", d.Victory && d.EncountersCleared == 4);
+            Check("Chimesinger run reaches victory", d.Victory && d.EncountersCleared == 1);
             d.ReturnToMenu(); yield return null;
 
             // ---------- run 5: Arcanist rotation and full victory ----------
@@ -398,24 +383,21 @@ namespace LastBell.Run
             d.RequestReady();
             yield return Until(() => d.State == RunState.Combat, 4, "arcanist combat");
             yield return ArcanistChecks();
-            for (int e = 0; e < 4; e++)
+            if (d.State == RunState.Combat)
             {
-                if (e == 3) { yield return Until(() => d.State == RunState.Intermission, 8, "intermission (arcanist)"); d.RequestContinue(); }
-                yield return Until(() => d.State == RunState.Combat, 8, "arcanist combat " + (e + 1));
-                if (d.State != RunState.Combat) break;
-                d.Player.DebugSetHp(PlayerController.MaxHp);
-                var f3 = StartCoroutine(Fight(e == 3 ? 4f : 2f, ArcRotation, 6f));
-                yield return Wait(e == 3 ? 4f : 2f); StopCoroutine(f3); bot.Clear();
-                if (e == 3) yield return Shot("arcanist_bellkeeper");
+                d.Player.DebugSetHp(PlayerController.MaxHp); d.Boss.BeginCombat();
+                var f3 = StartCoroutine(Fight(4f, ArcRotation, 6f));
+                yield return WaitAlive(4f); StopCoroutine(f3); bot.Clear();
+                yield return Shot("arcanist_bellkeeper");
                 d.Boss.DebugDefeat();
-                yield return Until(() => d.State != RunState.Combat, 2, "arcanist boss defeated " + (e + 1));
+                yield return Until(() => d.State != RunState.Combat, 2, "arcanist boss defeated");
             }
             yield return Until(() => d.State == RunState.Results, 8, "results 5");
-            Check("Arcanist run reaches victory", d.Victory && d.EncountersCleared == 4);
+            Check("Arcanist run reaches victory", d.Victory && d.EncountersCleared == 1);
             d.ReturnToMenu(); yield return null;
 
             // ---------- practice ----------
-            d.StartPractice("Vanguard", 3);
+            d.StartPractice("Vanguard", 0);
             d.RequestReady();
             yield return Until(() => d.State == RunState.Combat, 4, "practice combat");
             Check("practice starts the chosen encounter", d.Boss is BellkeeperEncounter && d.Mode == RunMode.Practice);
@@ -424,7 +406,7 @@ namespace LastBell.Run
             yield return Until(() => d.State == RunState.Results, 6, "practice results");
             Check("practice clear ends in a practice result, not a run victory", d.Mode == RunMode.Practice && d.EncountersCleared == 1);
             d.RequestRetry();
-            Check("practice retry repeats the same encounter", d.State == RunState.Ready && d.Encounter == 3 && d.Mode == RunMode.Practice);
+            Check("practice retry repeats the same encounter", d.State == RunState.Ready && d.Encounter == 0 && d.Mode == RunMode.Practice);
             d.ReturnToMenu();
 
             // ---------- map tour: switch maps after fights have run (FX layers already exist), fight briefly on each ----------
@@ -441,19 +423,27 @@ namespace LastBell.Run
                 yield return Wait(1.5f);
                 Check($"map {map.Name}: loads into the menu with its arena", RunMaps.Current == m && d.State == RunState.Menu && HazardSystem.ArenaCount > 0, $"arena scripts {HazardSystem.ArenaCount}");
                 yield return Shot("map_" + map.Id + "_menu");
-                d.StartPractice("Vanguard", 3); d.RequestReady();
+                d.StartPractice("Vanguard", 0); d.RequestReady();
                 yield return Until(() => d.State == RunState.Combat, 4, map.Name + " practice combat");
                 int hp0 = d.Boss ? d.Boss.Hp : 0;
                 var fm = StartCoroutine(Fight(4f, VanguardRotation, 2.2f));
-                yield return Wait(4f); StopCoroutine(fm); bot.Clear();
+                yield return WaitAlive(4f); StopCoroutine(fm); bot.Clear();
                 yield return Shot("map_" + map.Id + "_combat");
                 Check($"map {map.Name}: Bellkeeper fight runs (boss takes damage, player stays on the floor)",
-                    d.Boss && d.Boss.Hp < hp0 && Sim.Flat(d.Player.transform.position).magnitude <= CombatWorld.PlayerBound + 0.01f, $"boss hp {hp0} -> {(d.Boss ? d.Boss.Hp : -1)}");
+                    d.Boss && d.Boss.Hp < hp0 && CombatWorld.InPlayerBound(d.Player.transform.position, 0.01f), $"boss hp {hp0} -> {(d.Boss ? d.Boss.Hp : -1)}");
+                bot.MoveWorld = Vector3.right; bot.Sprint = true; yield return Wait(3f); bot.Clear();
+                float reach = d.Player.transform.position.x;
+                Check($"map {map.Name}: player walks up to the wall (bound {map.Bound} m)", reach >= map.Bound - 0.3f && CombatWorld.InPlayerBound(d.Player.transform.position, 0.01f), $"reached x = {reach:0.00}");
+                yield return Shot("map_" + map.Id + "_wall");
                 d.Boss.DebugDefeat();
                 yield return Until(() => d.State == RunState.Results, 6, map.Name + " practice results");
                 d.ReturnToMenu();
             }
             Check("map tour returns to the starting map", RunMaps.Current == startMap);
+            // ---------- area bosses (practice only for now) ----------
+            yield return AurelionChecks();
+
+            yield return SylvaraChecks();
 
             // ---------- report ----------
             Check("no errors or exceptions logged", errors == 0, errors + " logged");
@@ -470,24 +460,33 @@ namespace LastBell.Run
             Check($"fresh run {when}: one player only", FindObjectsByType<PlayerController>().Length == 1);
         }
 
-        // Low Pendulum height rule: standing in the lane and jumping through the resolve avoids it
-        IEnumerator LowPendulumCheck()
+        // Difficulty row (Easy / Medium / Hard): menu-only selection, copied into the run, kept on retry, and scaling the
+        // damage a real hit deals once. Leaves the selection on Medium for the rest of the test.
+        IEnumerator DifficultyChecks()
         {
-            yield return Until(() => d.World.Hazards.Live.Any(h => h.JumpClearable), 14, "Low Pendulum warning");
-            var bar = d.World.Hazards.Live.FirstOrDefault(h => h.JumpClearable);
-            if (bar == null) yield break;
-            // put the player in the middle of the bar (test setup) and jump so the resolve tick lands mid-air
-            d.Player.transform.position = bar.Origin + Sim.Dir(bar.Yaw) * Mathf.Min(4f, bar.Length * 0.5f);
-            int hp0 = d.Player.Hp; bool jumped = false, capStarted = false;
-            yield return Shot("low_pendulum_jump_warning");
-            while (d.World.Hazards.Live.Contains(bar))
+            Check("difficulty starts at Medium in the autotest", RunDifficulty.Selected == Difficulty.Medium);
+            Check("difficulty damage scales 0.6 / 1 / 1.3",
+                  Mathf.Approximately(RunDifficulty.DamageTakenScale(Difficulty.Easy), 0.6f) && Mathf.Approximately(RunDifficulty.DamageTakenScale(Difficulty.Medium), 1f)
+                  && Mathf.Approximately(RunDifficulty.DamageTakenScale(Difficulty.Hard), 1.3f));
+            Check("difficulty can be chosen in the menu", d.SelectDifficulty(Difficulty.Easy) && RunDifficulty.Selected == Difficulty.Easy);
+            yield return Shot("menu_difficulty_easy");
+            foreach (var (level, expect) in new[] { (Difficulty.Easy, 30), (Difficulty.Medium, 50), (Difficulty.Hard, 65) })
             {
-                if (!capStarted && bar.ResolveAt - bar.Age <= 50) { capStarted = true; StartCoroutine(Capture("low_pendulum_jump", 110)); }
-                if (!jumped && bar.ResolveAt - bar.Age <= 16) { bot.jump = true; jumped = true; }
-                yield return null;
+                d.SelectDifficulty(level);
+                d.StartPractice("Vanguard", 0);
+                yield return Wait(0.3f);
+                string n = RunDifficulty.Name(level);
+                Check($"{n}: practice copies the menu difficulty", d.Difficulty == level && d.World != null && d.World.Difficulty == level);
+                Check($"{n}: difficulty can't change outside the menu", !d.SelectDifficulty(level == Difficulty.Hard ? Difficulty.Easy : Difficulty.Hard) && d.Difficulty == level);
+                var p = d.Player; int hp0 = p.Hp;
+                p.ReceiveHit(new Hazard { Source = "Difficulty probe", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Radius = 1, Origin = p.transform.position, Damage = 50, ResolveAt = 1 });
+                Check($"{n}: a 50-damage boss hit deals {expect}", hp0 - p.Hp == expect, $"{hp0} -> {p.Hp}");
+                d.SetPaused(true); d.RequestRetry(); yield return null;
+                Check($"{n}: retry keeps the level", d.Difficulty == level && d.World.Difficulty == level);
+                d.SetPaused(true); d.ReturnToMenu(); yield return null;
             }
-            yield return Wait(0.3f);
-            Check("jumping through the Low Pendulum avoids it", d.Player.Hp == hp0, $"hp {hp0} -> {d.Player.Hp}");
+            d.SelectDifficulty(Difficulty.Medium);
+            Check("difficulty back on Medium for the rest of the test", d.State == RunState.Menu && RunDifficulty.Selected == Difficulty.Medium);
         }
 
         // One readable rotation on camera: Steel Rhythm x3 -> empowered Sundering Blow -> Brace -> Last Word.
@@ -684,6 +683,125 @@ namespace LastBell.Run
             Check("Crescendo spends Harmony and clears the bell", k.Harmony == 0 && !k.Bell);
             p.DebugSetHp(PlayerController.MaxHp);
             d.Boss.BeginCombat();
+        }
+
+        // ------------------------------------------------------------ Sylvara (graybox, docs/design/sylvara.md v0.1)
+        static bool OnlySylvara => Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellSylvara", StringComparison.OrdinalIgnoreCase));
+
+        IEnumerator SylvaraChecks()
+        {
+            // the practice section above leaves the director in Ready, where ReturnToMenu only works from the pause menu
+            if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }
+            int verdant = RunMaps.IndexOf(RunDirector.SylvaraMap);
+            Check("Sylvara practice accepted from the menu", d.StartPractice("Vanguard", RunDirector.SylvaraPractice));
+            yield return Until(() => RunMaps.Current == verdant && RunDirector.Instance && RunDirector.Instance.State == RunState.Ready, 30, "Verdant Chimes loaded for Sylvara");
+            if (RunDirector.Instance != d) { directorLog.AddRange(d.Log); d = RunDirector.Instance; d.InputOverride = bot; bot.Clear(); }
+            if (d.Player) d.Player.Input = bot;   // the new scene built the player before the bot was attached
+            Check("Sylvara practice loads the Verdant Chimes arena", RunMaps.Current == verdant && HazardSystem.ArenaCount > 0, RunMaps.CurrentName);
+            Check("Sylvara practice keeps the chosen class across the map load", d.ClassName == "Vanguard" && d.Mode == RunMode.Practice && d.Encounter == RunDirector.SylvaraPractice);
+            d.RequestReady();
+            yield return Until(() => d.State == RunState.Combat, 4, "Sylvara practice combat");
+            var sy = d.Boss as SylvaraEncounter;
+            Check("Sylvara practice starts her encounter", sy != null && d.Mode == RunMode.Practice);
+            if (sy == null) yield break;
+            Check("Sylvara: full health and potions (area final boss)", d.Player.Hp == PlayerController.MaxHp && d.Player.Potions == PlayerController.MaxPotions);
+            var syPres = sy.Presenter; var syClips = new[] { "Idle", "Walk", "PruningArc", "Rootscript", "Seed", "Procession", "Bloom", "Vulnerable", "PhaseShift", "Defeat" };
+            Check("Sylvara uses her rigged model with all clips", syPres && syPres.HasModel && !sy.Placeholder && syClips.All(c => syPres.Has(c)), syPres ? string.Join(",", syClips.Where(c => !syPres.Has(c))) : "no presenter");
+            d.Player.transform.position = new Vector3(0, 0, 3.2f); yield return Wait(0.4f);   // frame the body for the shot
+            yield return Shot("sylvara_body");
+            StartCoroutine(Capture("sylvara_arc", 210));   // the first Pruning Arc on the model
+
+            // watch the whole fight: hits per instance, hit rules, patterns live at once
+            var hitsPerInstance = new Dictionary<int, int>(); bool hitRules = true; int maxPatterns = 0, taken = 0;
+            Action<PlayerController, Hazard, int> onHit = (p, h, dmg) =>
+            {
+                hitsPerInstance[h.Id] = hitsPerInstance.TryGetValue(h.Id, out int n) ? n + 1 : 1;
+                hitRules &= h.Knockback == 0 && h.Stun == 9; taken += dmg;
+            };
+            d.World.PlayerHit += onHit;
+            bool watching = true;
+            IEnumerator Watch()
+            {
+                while (watching && d.World != null)
+                {
+                    int patterns = d.World.Hazards.Live.Select(h => h.Source.StartsWith("Threefold Bloom") ? "Threefold Bloom" : h.Source).Distinct().Count();
+                    maxPatterns = Mathf.Max(maxPatterns, patterns);
+                    if (d.Player && d.Player.Hp < 45) d.Player.DebugSetHp(PlayerController.MaxHp);   // keep the schedule running; damage is noted
+                    yield return null;
+                }
+            }
+            StartCoroutine(Watch());
+
+            // Phase 1: every attack once, and one full Bloom
+            bool bloomShot = false, rootShot = false;
+            float t0 = Time.time;
+            while (Time.time - t0 < 40f && d.State == RunState.Combat && !(sy.Order.Distinct().Count() >= 5 && sy.BloomsCompleted >= 1))
+            {
+                var sv = StartCoroutine(Survive(0.25f)); yield return Wait(0.25f); StopCoroutine(sv);
+                if (!rootShot && d.World.Hazards.Live.Count(h => h.Source == "Rootscript") >= 2) { rootShot = true; yield return Shot("sylvara_rootscript"); }
+                if (!bloomShot && d.World.Hazards.Live.Count(h => h.Source.StartsWith("Threefold Bloom")) >= 2) { bloomShot = true; yield return Shot("sylvara_bloom"); StartCoroutine(Capture("sylvara_bloom", 240)); }
+            }
+            bot.Clear();
+            Note("Sylvara phase 1 order: " + string.Join(" → ", sy.Order));
+            foreach (var id in new[] { "Pruning Arc", "Rootscript", "Seed of the Refrain", "Briar Procession", "Threefold Bloom" })
+                Check($"Sylvara phase 1 uses {id}", sy.Order.Contains(id));
+            var log = sy.BloomLog.Take(3).ToList();
+            bool ordered = log.Count == 3 && log[0].index == 0 && log[1].index == 1 && log[2].index == 2;
+            bool timing = ordered && log.All(e => e.spentTick - e.resolveTick == 17) && log[1].resolveTick - log[0].resolveTick == 72 && log[2].resolveTick - log[1].resolveTick == 72;
+            Check("Threefold Bloom resolves I → II → III", ordered, string.Join(", ", log.Select(e => e.index + 1)));
+            Check("Bloom flowers: 72-tick stagger, 18-tick active period (resolve tick + 17)", timing, string.Join(" | ", log.Select(e => $"{e.resolveTick}->{e.spentTick}")));
+
+            // stand in flower II through its whole active period: exactly one 13 HP hit, no knockback (test setup moves
+            // the player; the hit comes from the real hazard). Then walk into flower III during its active period: hit once.
+            yield return Until(() => d.World.Hazards.Live.Any(h => h.Source == "Threefold Bloom II" && h.ResolveAt - h.Age <= 4), 40, "next Bloom flower II about to open");
+            var f2 = d.World.Hazards.Live.FirstOrDefault(h => h.Source == "Threefold Bloom II");
+            if (f2 != null)
+            {
+                d.Player.DebugSetHp(PlayerController.MaxHp); bot.Clear();
+                d.Player.transform.position = f2.Origin; var at = f2.Origin;
+                int hits0 = hitsPerInstance.Count;
+                while (d.World.Hazards.Live.Contains(f2)) { bot.Clear(); yield return null; }
+                yield return Wait(0.1f);
+                Check("standing in a flower for its whole active period: hit exactly once for 13", hitsPerInstance.TryGetValue(f2.Id, out int n2) && n2 == 1 && d.Player.Hp == PlayerController.MaxHp - 13, $"hits {n2}, hp {d.Player.Hp}");
+                Check("no knockback: the player is still where the flower hit them", Sim.Flat(d.Player.transform.position - at).magnitude < 0.05f);
+                var f3 = d.World.Hazards.Live.FirstOrDefault(h => h.Source == "Threefold Bloom III");
+                if (f3 != null)
+                {
+                    yield return Until(() => f3.Age >= f3.ResolveAt + 6, 4, "flower III active");
+                    d.Player.DebugSetHp(PlayerController.MaxHp);
+                    d.Player.transform.position = f3.Origin;   // entering mid-activation
+                    while (d.World.Hazards.Live.Contains(f3)) yield return null;
+                    yield return Wait(0.1f);
+                    Check("entering a flower during its active period: hit once", hitsPerInstance.TryGetValue(f3.Id, out int n3) && n3 == 1, $"hits {n3}");
+                    yield return Wait(0.5f);
+                    d.Player.DebugSetHp(PlayerController.MaxHp);
+                    Check("a spent flower is safe: no further hits", hitsPerInstance.Count == hits0 + 2);
+                }
+            }
+
+            // phase transitions are queued to block boundaries
+            d.Boss.DebugSetHpFraction(0.64f);
+            yield return Until(() => sy.PhaseName == "Awakening Bloom", 25, "Sylvara phase 2");
+            Check("Sylvara enters Awakening Bloom below 65 %", sy.PhaseName == "Awakening Bloom");
+            yield return Wait(2f); yield return Shot("sylvara_phase2");
+            d.Boss.DebugSetHpFraction(0.29f);
+            float t1 = Time.time;
+            while (sy.PhaseName != "Hollow Refrain" && Time.time - t1 < 40f && d.State == RunState.Combat)
+            { var sv = StartCoroutine(Survive(0.25f)); yield return Wait(0.25f); StopCoroutine(sv); }
+            Check("Sylvara enters Hollow Refrain below 30 %", sy.PhaseName == "Hollow Refrain");
+            yield return Wait(2f); yield return Shot("sylvara_phase3");
+
+            watching = false; d.World.PlayerHit -= onHit;
+            Check("Sylvara: each hazard instance hits at most once (R16)", hitsPerInstance.Values.All(n => n == 1), $"{hitsPerInstance.Count} instances hit");
+            Check("Sylvara: hits stun 0.15 s with no knockback (D6)", hitRules);
+            Check("Sylvara: never more than one damaging pattern live (Steady Ticking)", maxPatterns <= 1, $"max {maxPatterns}");
+            Note($"Sylvara: bot took {taken} damage over the fight ({hitsPerInstance.Count} hits), healed by the test to keep the schedule running");
+
+            yield return KillDuringWindup("sylvara");
+            yield return Until(() => d.State == RunState.Results, 8, "Sylvara practice results");
+            Check("Sylvara practice clear ends in a practice result", d.Victory && d.Mode == RunMode.Practice);
+            Check("Sylvara: no Bloom props left after defeat", sy.PropCount == 0, sy.PropCount + " left");
+            d.ReturnToMenu(); yield return null;
         }
 
         // Exact-tick regressions from the foundation review of PR #42 (risxhb/codex, Oct 21). The director is paused

@@ -1,16 +1,18 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
 namespace LastBell.Run
 {
-    public enum RunState { Menu, Ready, Intro, Combat, Cleared, Intermission, Downed, Results }
+    public enum RunState { Menu, Ready, Intro, Combat, Cleared, Downed, Results }
     public enum RunMode { Run, Practice }
 
-    // Run flow in the single arena (single-arena plan §5):
-    //   Menu -> Ready (preparation) -> [Intro -> Combat -> Cleared] x3 minibosses -> Intermission (future shop)
-    //   -> Intro -> Combat (Bellkeeper) -> Cleared -> Results (victory)
+    // Run flow in the single arena:
+    //   Menu -> Ready (preparation) -> [Intro -> Combat -> Cleared] for each boss in Bosses -> Results (victory)
+    // The stand-in minibosses (Dial Warden, Pendulum Sentinel, Chimebound Oracle) and the intermission were removed on
+    // 2026-10-22: the run and practice only offer real boss encounters, currently the Bellkeeper.
     //   any Combat -> Downed -> Results (defeat).  Results -> Retry (fresh run, encounter 1) or Menu.
     // Practice runs one chosen encounter with the same rules and never advances or unlocks the run.
     // Every transition goes through Go(), which bumps a generation number: timers and requests from an older state are
@@ -21,15 +23,39 @@ namespace LastBell.Run
     {
         public static RunDirector Instance { get; private set; }
 
-        public static readonly string[] SlotNames = { "Dial Warden", "Pendulum Sentinel", "Chimebound Oracle", "Intermission", "Bellkeeper" };
+        // Every real boss encounter, in run order. The run fights the entries with InRun set; the practice menu offers them
+        // all. Map: the run map an entry's practice loads first (null = fight on the current map). Add a boss with one line.
+        public sealed class BossEntry
+        {
+            public readonly string Name; public readonly Func<CombatWorld, BossEncounter> Spawn; public readonly bool InRun; public readonly string Map;
+            public BossEntry(string name, Func<CombatWorld, BossEncounter> spawn, bool inRun = true, string map = null) { Name = name; Spawn = spawn; InRun = inRun; Map = map; }
+        }
+        public static readonly BossEntry[] Bosses =
+        {
+            new BossEntry("Bellkeeper", w => BossEncounter.Spawn<BellkeeperEncounter>(w, Vector3.zero, 0)),
+            // Skyward Spire area boss: practice only, fought in his own arena
+            new BossEntry("Aurelion (area 1)", w => BossEncounter.Spawn<AurelionEncounter>(w, new Vector3(0, 0, -1.5f), 0), inRun: false, map: AurelionMap),
+            // Verdant Chimes area boss (graybox): practice only, fought in her own arena
+            new BossEntry("Sylvara (area 3)", w => BossEncounter.Spawn<SylvaraEncounter>(w, new Vector3(0, 0, -1.5f), 0), inRun: false, map: SylvaraMap),
+            // Brass Foundry area boss: practice only, fought in its own arena
+            new BossEntry("Crucivar (area 2)", w => BossEncounter.Spawn<CrucivarEncounter>(w, new Vector3(0, 0, -1.5f), 0), inRun: false, map: CrucivarMap),
+        };
+        public static readonly int[] RunOrder = Enumerable.Range(0, Bosses.Length).Where(i => Bosses[i].InRun).ToArray();
+        public static int SylvaraPractice => Array.FindIndex(Bosses, b => b.Map == SylvaraMap);
+        public const string SylvaraMap = "verdant-chimes";
+        public static int CrucivarPractice => Array.FindIndex(Bosses, b => b.Map == CrucivarMap);
+        public const string CrucivarMap = "brass-foundry";
+        public static int AurelionPractice => Array.FindIndex(Bosses, b => b.Map == AurelionMap);
+        public const string AurelionMap = "skyward-spire";
         public static readonly string[] Classes = { "Vanguard", "Chimesinger", "Arcanist" };
         const int IntroTicks = 120, ClearTicks = 180, DownedTicks = 100;
-        static readonly Vector3 PlayerSocket = new Vector3(0, 0, 6.5f), BossSocket = new Vector3(0, 0, -1.5f);
+        static readonly Vector3 PlayerSocket = new Vector3(0, 0, 6.5f);
 
         public RunState State { get; private set; } = RunState.Menu;
         public RunMode Mode { get; private set; }
         public string ClassName { get; private set; } = "Vanguard";
-        public int Encounter { get; private set; }          // 0..3 (3 = final boss)
+        public Difficulty Difficulty { get; private set; } = Difficulty.Medium;   // copied from the menu at run start
+        public int Encounter { get; private set; }          // index into Bosses (the last is the final boss)
         public int Generation { get; private set; }
         public int StateTicks { get; private set; }
         public bool Victory { get; private set; }
@@ -67,6 +93,8 @@ namespace LastBell.Run
             }
             cam = Camera.main;
             HazardSystem.FindArena();
+            int map = RunMaps.Current;
+            if (map >= 0) CombatWorld.SetPlayerBound(RunMaps.All[map].Bound, RunMaps.All[map].Square);
             if (!GetComponent<RunHud>()) gameObject.AddComponent<RunHud>();
             Application.targetFrameRate = 120;
             if (RunAutoTest.Requested) RunAutoTest.Launch();
@@ -84,13 +112,32 @@ namespace LastBell.Run
         }
 
         // ---------------- requests (UI / keyboard / tests) ----------------
-        public bool StartRun(string className) => Begin(RunMode.Run, className, 0);
-        public bool StartPractice(string className, int encounter) => Begin(RunMode.Practice, className, Mathf.Clamp(encounter, 0, 3));
+        public bool StartRun(string className) => Begin(RunMode.Run, className, RunOrder[0]);
+        // A boss with its own arena loads that map first; the new scene's director starts the practice (Start below).
+        public bool StartPractice(string className, int encounter)
+        {
+            encounter = Mathf.Clamp(encounter, 0, Bosses.Length - 1);
+            var map = Bosses[encounter].Map;
+            if (map != null && State == RunState.Menu)
+            {
+                int v = RunMaps.IndexOf(map);
+                if (v >= 0 && v != RunMaps.Current && RunMaps.InBuild(v)) { pendingPractice = (className, encounter); return SelectMap(v); }
+            }
+            return Begin(RunMode.Practice, className, encounter);
+        }
+        static (string cls, int enc)? pendingPractice;   // survives the scene load
+        void Start()
+        {
+            if (pendingPractice == null || Instance != this) return;
+            var (cls, enc) = pendingPractice.Value; pendingPractice = null;
+            Begin(RunMode.Practice, cls, enc);
+        }
 
         bool Begin(RunMode mode, string className, int encounter)
         {
             if (State != RunState.Menu) return false;
             Mode = mode; ClassName = Array.IndexOf(Classes, className) >= 0 ? className : "Vanguard";
+            Difficulty = RunDifficulty.Selected;
             BuildRun(encounter);
             Go(RunState.Ready);
             return true;
@@ -107,6 +154,15 @@ namespace LastBell.Run
             return true;
         }
 
+        // Menu only: the level the next run or practice starts at (remembered between sessions).
+        public bool SelectDifficulty(Difficulty level)
+        {
+            if (State != RunState.Menu) return false;
+            if (RunDifficulty.Selected != level) Log.Add($"{Time.frameCount}: difficulty {RunDifficulty.Name(level)}");
+            RunDifficulty.Selected = level;
+            return true;
+        }
+
         public bool RequestReady()
         {
             if (State != RunState.Ready || Paused) return false;
@@ -114,17 +170,10 @@ namespace LastBell.Run
             return true;
         }
 
-        public bool RequestContinue()
-        {
-            if (State != RunState.Intermission || Paused) return false;
-            BeginIntro(3);
-            return true;
-        }
-
         public bool RequestRetry()
         {
             if (State != RunState.Results && !Paused) return false;
-            var mode = Mode; var cls = ClassName; int enc = Mode == RunMode.Practice ? practiceEncounter : 0;
+            var mode = Mode; var cls = ClassName; int enc = Mode == RunMode.Practice ? practiceEncounter : RunOrder[0];
             Teardown();
             Mode = mode; ClassName = cls; BuildRun(enc); Go(RunState.Ready);
             return true;
@@ -162,7 +211,7 @@ namespace LastBell.Run
                 sharedPlayerFx = PlayerFx.Create(sharedFxRoot);
             }
             bossFx = sharedBossFx; playerFx = sharedPlayerFx;
-            World = new CombatWorld(scopeParent, bossFx, playerFx);
+            World = new CombatWorld(scopeParent, bossFx, playerFx) { Difficulty = Difficulty };   // a retry keeps the run's level
             Player = PlayerController.Spawn(World, ClassName, PlayerSocket, 180);
             Player.Input = InputOverride ?? new KeyboardMouseInput();
             Player.AbilitiesEnabled = false;
@@ -187,16 +236,13 @@ namespace LastBell.Run
             Encounter = index;
             World.ClearTransient();
             if (Boss) Destroy(Boss.gameObject);
-            Boss = index switch
-            {
-                0 => BossEncounter.Spawn<DialWarden>(World, BossSocket, 0),
-                1 => BossEncounter.Spawn<PendulumSentinel>(World, BossSocket, 0),
-                2 => BossEncounter.Spawn<ChimeboundOracle>(World, BossSocket, 0),
-                _ => BossEncounter.Spawn<BellkeeperEncounter>(World, Vector3.zero, 0),
-            };
+            Boss = Bosses[index].Spawn(World);
             World.Boss = Boss;
             World.CombatActive = false;
-            if (index > 0) Player.RefreshHealth(refillPotions: index == 3);   // health policy: see PlayerController.RefreshHealth
+            // health policy (see PlayerController.RefreshHealth): every run boss after the first refills health; the last
+            // also refills potions. A practice starts with a fresh player.
+            int pos = Array.IndexOf(RunOrder, index);
+            if (Mode == RunMode.Run && pos > 0) Player.RefreshHealth(refillPotions: pos == RunOrder.Length - 1);
             Player.PrepareForEncounter(PlayerSocket, 180);
             Player.AbilitiesEnabled = false;
             Go(RunState.Intro);
@@ -235,13 +281,12 @@ namespace LastBell.Run
                     if (kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame)
                     {
                         if (State == RunState.Ready) RequestReady();
-                        else if (State == RunState.Intermission) RequestContinue();
                     }
                     // dev shortcuts (labelled in the HUD): finish the current boss / jump it to its next phase
                     if (State == RunState.Combat && Boss && !Boss.Dead)
                     {
                         if (kb.f9Key.wasPressedThisFrame) Boss.DebugDefeat();
-                        if (kb.f8Key.wasPressedThisFrame) Boss.DebugSetHpFraction(Boss.Hp > Boss.MaxHp * 0.7f ? 0.69f : 0.34f);
+                        if (kb.f8Key.wasPressedThisFrame) Boss.DebugSetHpFraction(Boss is SylvaraEncounter ? (Boss.Hp > Boss.MaxHp * 0.65f ? 0.64f : 0.29f) : Boss.NextPhaseFraction());
                     }
                 }
             }
@@ -283,9 +328,8 @@ namespace LastBell.Run
                     {
                         if (Boss) { Destroy(Boss.gameObject); Boss = null; World.Boss = null; }
                         if (Mode == RunMode.Practice) { Victory = true; Go(RunState.Results); }
-                        else if (Encounter == 2) { Player.PrepareForEncounter(PlayerSocket, 180); Go(RunState.Intermission); }
-                        else if (Encounter == 3) { Victory = true; Go(RunState.Results); }
-                        else BeginIntro(Encounter + 1);
+                        else if (Array.IndexOf(RunOrder, Encounter) == RunOrder.Length - 1) { Victory = true; Go(RunState.Results); }
+                        else BeginIntro(RunOrder[Array.IndexOf(RunOrder, Encounter) + 1]);
                     }
                     break;
                 case RunState.Downed:
@@ -307,7 +351,7 @@ namespace LastBell.Run
             cam.fieldOfView = 44;
         }
 
-        // slot label for the progress track: 0..2 minibosses, 3 intermission, 4 final
-        public int ProgressSlot => State == RunState.Intermission ? 3 : Encounter >= 3 ? 4 : Encounter;
+        // slot on the progress track: one per boss
+        public int ProgressSlot => Math.Max(0, Array.IndexOf(RunOrder, Encounter));
     }
 }
