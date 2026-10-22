@@ -90,7 +90,7 @@ def M4(loc=(0, 0, 0), rz=0.0, rx=0.0, ry=0.0, s=(1, 1, 1)):
     return Matrix.Translation(Vector(loc)) @ Matrix.Rotation(rz, 4, 'Z') @ Matrix.Rotation(ry, 4, 'Y') @ Matrix.Rotation(rx, 4, 'X') @ Matrix.Diagonal((*s, 1))
 
 # ------------------------------------------------------------------ painting: the value plan in vertex colours
-def paint_bm(bm, zlo, zhi, base=1.0, top=1.1, bottom=0.66, moss=0.0, wear=0.12, var=0.06, key=0, grime=True):
+def paint_bm(bm, zlo, zhi, base=1.05, top=1.14, bottom=0.55, moss=0.0, wear=0.12, var=0.04, key=0, grime=True):
     """Darker toward the base of the assembly, lighter on up-facing planes, bevel/chip faces (not axis-aligned) lighter
     as worn edges, moss tint on up-facing ledges, and a little per-face variation."""
     lay = bm.loops.layers.float_color.get('Col') or bm.loops.layers.float_color.new('Col')
@@ -104,7 +104,7 @@ def paint_bm(bm, zlo, zhi, base=1.0, top=1.1, bottom=0.66, moss=0.0, wear=0.12, 
             v *= fv * edge * (1 + (top - 1) * max(0, n.z))
             c = [v, v, v]
             if moss > 0 and n.z > 0.45:
-                k = min(1, (n.z - 0.45) * 2.2) * moss * (0.6 + 0.4 * hsh(key, f.index % 31, 'm'))
+                k = min(1, (n.z - 0.45) * 2.2) * moss
                 c = [c[i] * (1 - k) + k * (0.56, 0.86, 0.44)[i] * v for i in range(3)]
             lp[lay] = (*[min(1.3, x) for x in c], 1.0)
 
@@ -118,7 +118,7 @@ class Asm:
         if mat4 is not None: src.transform(mat4)
         if paint is not None: paint_bm(src, *paint[0], **paint[1])
         me = bpy.data.meshes.new('tmp'); src.to_mesh(me); self.bm(mat).from_mesh(me); bpy.data.meshes.remove(me); src.free()
-    def stone(self, mat, size, loc, key, rz=0.0, rx=0.0, ry=0.0, zr=None, moss=0.0, bev=0.05, chips=1, top=1.1, bottom=0.7):
+    def stone(self, mat, size, loc, key, rz=0.0, rx=0.0, ry=0.0, zr=None, moss=0.0, bev=0.05, chips=1, top=1.14, bottom=0.55):
         bm = stone_bm(*size, key, bev, chips)
         bm.transform(M4(loc, rz, rx, ry))
         zlo, zhi = zr if zr else (loc[2] - size[2] / 2, loc[2] + size[2] / 2)
@@ -171,15 +171,19 @@ def drape(top, normal, length, wobble=0.15, kinks=6, phase=0.0):
     return pts, tuple(nrm)
 
 def moss_clump(asm, loc, r, key, flowers=4):
-    """A low cushion of moss (flattened, lumpy) with a few white lilies on it."""
-    bm = bmesh.new(); bmesh.ops.create_icosphere(bm, subdivisions=2, radius=1.0)
-    for v in bm.verts:
-        k = 1 + (hsh(key, round(v.co.x, 2), round(v.co.y, 2)) - 0.5) * 0.35; v.co *= k
-    bm.transform(M4(loc, hsh(key) * 6, s=(r * 1.3, r * 1.0, r * 0.42)))
-    paint_bm(bm, loc[2] - r * 0.4, loc[2] + r * 0.4, top=1.15, bottom=0.75, key=key, wear=0); asm.add('Moss', bm)
+    """A moss mat: a cluster of low, irregular lumps spreading over the surface (an uneven outline, not a disc), with
+    lilies in tight clusters on the tallest lump."""
+    for m in range(4):
+        bm = bmesh.new(); bmesh.ops.create_icosphere(bm, subdivisions=2, radius=1.0)
+        for v in bm.verts:
+            k = 1 + (hsh(key, m, round(v.co.x, 2), round(v.co.y, 2)) - 0.5) * 0.5; v.co *= k
+        a = hsh(key, m, 'a') * math.tau; d = r * 0.55 * (m > 0) * (0.6 + 0.4 * hsh(key, m, 'd')); rr = r * (0.7 if m == 0 else 0.45 + 0.2 * hsh(key, m))
+        c = (loc[0] + math.cos(a) * d, loc[1] + math.sin(a) * d, loc[2] - 0.04 * m)
+        bm.transform(M4(c, hsh(key, m) * 6, s=(rr * 1.4, rr * 1.0, rr * (0.45 if m == 0 else 0.3))))
+        paint_bm(bm, loc[2] - r * 0.4, loc[2] + r * 0.4, top=1.2, bottom=0.62, key=(key, m), wear=0, var=0.1); asm.add('Moss', bm)
     fl = bmesh.new(); lay = fl.loops.layers.float_color.new('Col')
     for k in range(flowers):
-        a = hsh(key, k) * math.tau; d = r * 0.7 * hsh(key, k, 'd'); c = Vector(loc) + Vector((math.cos(a) * d, math.sin(a) * d, r * 0.38))
+        a = hsh(key, k) * math.tau; d = r * 0.25 * hsh(key, k, 'd'); c = Vector(loc) + Vector((math.cos(a) * d, math.sin(a) * d, r * 0.3))
         for p in range(5):
             pa = p / 5 * math.tau
             vs = [fl.verts.new(c), fl.verts.new(c + Vector((math.cos(pa - 0.35), math.sin(pa - 0.35), 0.25)) * 0.09), fl.verts.new(c + Vector((math.cos(pa + 0.35), math.sin(pa + 0.35), 0.25)) * 0.09)]
@@ -288,11 +292,21 @@ def rock_lathe(rings, plan, twist_every=2, root=60.0, cap=True):
     bm.faces.new(prev[::-1]); bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     return bm
 
+def moss_cap(bm, zfrom):
+    """Moss over the top of a rock, thickest on up-facing faces, fading out below `zfrom` (tints the painted colours)."""
+    lay = bm.loops.layers.float_color['Col']
+    for f in bm.faces:
+        for lp in f.loops:
+            z = lp.vert.co.z
+            if z < zfrom: continue
+            k = min(1, (z - zfrom) / 2.5) * (0.35 + 0.65 * max(0, f.normal.z))
+            c = lp[lay]; lp[lay] = (c[0] * (1 - k) + 0.52 * k, c[1] * (1 - k) + 0.80 * k, c[2] * (1 - k) + 0.40 * k, 1)
+
 def spire_kit(i):
     """Kit spire i: the hand-drawn profile at unit radius, a buttress lobe leaning on it, moss on its ledges, a crown."""
     P = SPIRES[i]; asm = Asm(f'Spire{i}'); rad = 3.0
     rings = [(z, rx * rad, ry * rad, ox * rad, oy * rad) for z, rx, ry, ox, oy in P['rings']]
-    bm = rock_lathe(rings, PLAN[i:] + PLAN[:i]); paint_bm(bm, -16, 0, top=1.14, bottom=0.55, moss=0.95, key=('sp', i), wear=0.05); asm.add('Rock', bm)
+    bm = rock_lathe(rings, PLAN[i:] + PLAN[:i]); paint_bm(bm, -16, 0, top=1.16, bottom=0.42, moss=0.95, key=('sp', i), wear=0.05, var=0.0); moss_cap(bm, -5.0); asm.add('Rock', bm)
     (bx, by), br, bh = P['buttress']
     lobe = [(-bh * 0.45, br * 0.8, br * 0.7, 0, 0), (-bh * 0.5, br * 1.0, br * 0.85, 0, 0), (-bh * 0.8, br * 0.85, br * 0.75, 0.05, 0), (-bh, br * 1.0, br * 0.9, 0.1, 0.05)]
     lb = rock_lathe([(z, rx * rad, ry * rad, ox * rad, oy * rad) for z, rx, ry, ox, oy in lobe], PLAN[i + 3:] + PLAN[:i + 3], root=40)
@@ -353,9 +367,9 @@ def tree_kit(i):
     me = bpy.data.meshes.new_from_object(ob.evaluated_get(bpy.context.evaluated_depsgraph_get())); bpy.data.objects.remove(ob)
     bm = bmesh.new(); bm.from_mesh(me); bpy.data.meshes.remove(me); paint_bm(bm, 0, 3.5, top=1.0, bottom=0.7, key=('tr', i)); asm.add('Bark', bm)
     for ci, (cx, cy, cz, cr) in enumerate(D['clusters']):
-        core = bmesh.new(); bmesh.ops.create_icosphere(core, subdivisions=2, radius=cr * 0.72)
+        core = bmesh.new(); bmesh.ops.create_icosphere(core, subdivisions=2, radius=cr * 0.5)
         core.transform(M4((cx, cy, cz - cr * 0.1), s=(1, 1, 0.8))); paint_bm(core, cz - cr, cz + cr, top=1.2, bottom=0.6, key=('tc', i, ci), wear=0); asm.add('CanopyDark', core)
-        leaves = bmesh.new(); lay = leaves.loops.layers.float_color.new('Col'); N = int(70 * cr * cr)
+        leaves = bmesh.new(); lay = leaves.loops.layers.float_color.new('Col'); N = int(130 * cr * cr)
         for k in range(N):                                        # golden-spiral placement over the cluster
             y = 1 - 2 * (k + 0.5) / N; rr = math.sqrt(1 - y * y); th = k * 2.39996
             nrm = Vector((math.cos(th) * rr, math.sin(th) * rr, y * 0.85)).normalized()
@@ -424,8 +438,8 @@ def platform():
         p = (math.cos(a) * (R + 0.4), -math.sin(a) * (R + 0.4), h / 2 - 0.05)
         asm.stone('Stone' if v > 0.4 else 'StoneDark', (0.8, w, h), p, ('curb', i), rz=-a, rx=(hsh('cr', i) - 0.5) * 0.06, zr=zr, moss=0.5, chips=2, bev=0.06)
         if hsh('cm', i) < 0.55: moss_clump(asm, (p[0], p[1], h - 0.02), 0.32 + 0.2 * hsh('cmr', i), ('cm', i), flowers=4 if hsh('cf', i) < 0.7 else 0)
-        if hsh('ci', i) < 0.85:
-            ro = R + 0.85; ivy(asm, [drape((math.cos(a) * ro, -math.sin(a) * ro, h - 0.1), (math.cos(a), -math.sin(a), 0), 1.2 + 4.5 * hsh('cil', i), 0.14, 6, i)], key=('ci', i), flowers=0.08)
+        ro = R + 0.85; ox, oy = math.cos(a), -math.sin(a); tx, ty = -oy, ox
+        ivy(asm, [drape((ox * ro + tx * off, oy * ro + ty * off, h - 0.1), (ox, oy, 0), 1.5 + 5.5 * hsh('cil', i, off), 0.14, 7, i + off) for off in (-0.45, 0.0, 0.45) if hsh('ci', i, off) < 0.8], key=('ci', i), flowers=0.1)
     # brass band on the curb's outer top edge, one arc per quadrant, laid as short worn segments
     for e in EXITS:
         t0, t1 = e + GAP, e + math.pi / 2 - GAP; segs = 22
@@ -439,7 +453,7 @@ def platform():
         for i in range(m):
             a = (i + off) / m * math.tau; rr = R + 0.85 - c * 0.03; w = math.tau * rr / m - 0.05
             p = (math.cos(a) * (rr - 0.25), -math.sin(a) * (rr - 0.25), z)
-            asm.stone('Stone' if hsh('dr', c, i) > 0.3 else 'StoneDark', (0.5, w, 0.47), p, ('dr', c, i), rz=-a, zr=(-3.3, 0), chips=1, bev=0.04, moss=0.0)
+            asm.stone('StoneDark', (0.5, w, 0.47), p, ('dr', c, i), rz=-a, zr=(-3.6, 0.4), chips=1, bev=0.04, moss=0.0, bottom=0.42, top=1.05)
     obs = asm.build(ART)
     # arcade bays under the rim, between bridges and belfries (a collapsed bay now and then)
     arc = Asm('RimArcade'); segs = 24; rad = R + 1.15
@@ -557,7 +571,7 @@ def belfry(Bf, bell_src):
     asm.stone('StoneDark', (W + 0.45, W + 0.45, 0.35), at(0, 0, ztop + 0.17), ('co', Bf['idx']), rz, zr=zr, moss=0.6, top=1.15)
     merl = [(-1.3, -1.3, .9), (0, -1.35, .55), (1.3, -1.3, 1.0), (1.35, 0, .4), (1.3, 1.3, .75), (-1.3, 1.3, 1.1), (-1.35, .1, .5)]
     for m, (mx, my, mh) in enumerate(merl):
-        if front: mh *= 0.6
+        if front: mh *= 0.85
         if hsh('ml', Bf['idx'], m) < 0.25: continue                 # missing merlons
         asm.stone('Stone', (0.6, 0.6, mh), at(mx, my, ztop + 0.35 + mh / 2), ('m', Bf['idx'], m), rz + 0.12 * (hsh('mr', Bf['idx'], m) - 0.5), zr=zr, moss=0.8, chips=2)
     bz = 0.5 + solid + cham - 0.4
@@ -567,16 +581,16 @@ def belfry(Bf, bell_src):
         t = bmesh.new(); bmesh.ops.create_circle(t, segments=10, radius=0.055); e = bmesh.ops.extrude_edge_only(t, edges=t.edges[:])
         bmesh.ops.scale(t, vec=(0.7, 0.7, 1), verts=[g for g in e['geom'] if isinstance(g, bmesh.types.BMVert)])
         t.transform(M4(at(0, 0, bz - 0.15 - k * 0.1), rz + (k % 2) * math.pi / 2, rx=math.pi / 2)); paint_bm(t, 0, 1, grime=False, key=k); asm.add('LanternMetal', t)
-    for m in range(6):                                              # moss and lilies on the cornice
-        a = m / 6 * math.tau + 0.4
+    for m in range(9 if front else 6):                              # moss and lilies on the cornice
+        a = m / (9 if front else 6) * math.tau + 0.4
         moss_clump(asm, at(math.cos(a) * 1.75, math.sin(a) * 1.75, ztop + 0.38), 0.45, ('bmc', Bf['idx'], m), flowers=4)
     strands = []                                                    # ivy on the piers, not across the openings
     for f in range(4):
         fa = f * math.pi / 2; nx, ny = math.sin(fa), -math.cos(fa)
-        for off in (-1.3, 1.3):
+        for off in (-1.35, -0.75, 0.75, 1.35):
             p = at(nx * (W / 2 + 0.07) + ny * off * 0, ny * (W / 2 + 0.07) - nx * off * 0, 0)
             lx = nx * (W / 2 + 0.07) - ny * off; ly = ny * (W / 2 + 0.07) + nx * off
-            if hsh('bvi', Bf['idx'], f, off) < 0.75:
+            if hsh('bvi', Bf['idx'], f, off) < 0.85:
                 strands.append(drape(at(lx, ly, ztop + 0.2), (ca * nx - sa * ny, sa * nx + ca * ny, 0), 1.5 + (solid + cham) * hsh('bvl', Bf['idx'], f, off), 0.12, 7, f + off))
     ivy(asm, strands, key=('bvi', Bf['idx']), flowers=0.08)
     # a broken arch fragment flanking the tower along the rim
@@ -638,8 +652,8 @@ for S in L['spires']:
 print('TREES')
 for i, Tr in enumerate(L['trees']): instance(trees[i % 3], ART, T(Tr['p']), rz=hsh('tz', i) * math.tau, s=Tr['s'], name='Tree')
 for p in L['lanterns']: instance(lantern, ART, T(p), name='Lantern')
-for i in range(140):                                                # ferns along the rim, outside the playable radius
-    a = (i + hsh('fa', i) * 0.6) / 140 * math.tau
+for i in range(300):                                                # ferns along the rim, outside the playable radius
+    a = (i + hsh('fa', i) * 0.6) / 300 * math.tau
     if near_exit(a, GAP): continue
     d = PLAY_R + 0.45 + 0.12 * hsh('fd', i) if i % 2 else R + 0.95
     instance(fern, ART, Vector((math.cos(a) * d, -math.sin(a) * d, 0.0 if d < R else 0.45)), rz=hsh('fz', i) * math.tau, s=0.55 + 0.4 * hsh('fs', i), name='Fern')
