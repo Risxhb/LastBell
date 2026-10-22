@@ -148,27 +148,29 @@ for i in range(16):                                                             
     for k in range(4):
         b = k * math.pi / 2; me.box(0.12, 0.12, 0.12, (x + math.cos(b) * 0.25, y + math.sin(b) * 0.25, -7.8 - ln), MAT['ivory'], b)
 ob = me.to_object('Rim_Drum'); ob.parent = gRim
-# balustrade bays on the four arcs between the bridge mouths
-a0 = (GAP + 0.4) / RAIL; span = math.pi / 2 - 2 * a0; nb = round(span * RAIL / 0.75); L = span * RAIL / nb
+# Only the north and south bridges exist (the side ones ran through the belfries), so the rim is two arcs:
+# the east half and the west half, each running from the south mouth round to the north mouth.
+MOUTHS = (math.pi / 2, 3 * math.pi / 2)        # three angles: south, north
+a0 = (GAP + 0.4) / RAIL; span = math.pi - 2 * a0; nb = round(span * RAIL / 0.75); L = span * RAIL / nb
 bay = balustrade_bay_mesh(L * 1.01); bay.parent = gRim
 first = True
-for k in range(4):
+for m in MOUTHS:
     for i in range(nb):
-        a = k * math.pi / 2 + a0 + (i + 0.5) / nb * span
+        a = m + a0 + (i + 0.5) / nb * span
         if first: bay.matrix_world = at_angle(a, RAIL); first = False
         else: instance(bay, 'BalustradeBay', at_angle(a, RAIL), gRim)
-# kiosks: seven small ones on each arc, a larger pair at each bridge mouth
+# kiosks: thirteen small ones on each half, a larger pair at each bridge mouth
 kiosk = pavilion_mesh(); kiosk.parent = gRim; first = True
 def put_kiosk(x3, z3, s, parent=gRim):
     global first
     M = Matrix.Translation(B(x3, 0.05, z3)) @ Matrix.Diagonal((s, s, s, 1))
     if first: kiosk.matrix_world = M; first = False; return kiosk
     return instance(kiosk, 'Kiosk', M, parent)
-for k in range(4):
-    a0k, a1k = k * math.pi / 2 + (GAP + 2.6) / RAIL, (k + 1) * math.pi / 2 - (GAP + 2.6) / RAIL
-    for i in range(7):
-        a = a0k + (a1k - a0k) * i / 6; put_kiosk(math.cos(a) * RAIL, math.sin(a) * RAIL, 0.55)
-    a = k * math.pi / 2
+for m in MOUTHS:
+    a0k, a1k = m + (GAP + 2.6) / RAIL, m + math.pi - (GAP + 2.6) / RAIL
+    for i in range(13):
+        a = a0k + (a1k - a0k) * i / 12; put_kiosk(math.cos(a) * RAIL, math.sin(a) * RAIL, 0.55)
+    a = m
     for s in (-1, 1):
         lx, lz = RAIL + 0.2, s * (GAP + 0.55)
         put_kiosk(lx * math.cos(a) - lz * math.sin(a), lx * math.sin(a) + lz * math.cos(a), 0.95)
@@ -177,18 +179,18 @@ me = Mesh()
 me.box(1.6, BW + 1.6, 0.06, (R + 0.8, 0, 0.03), MAT['ivory'])
 for s in (-1, 1): me.box(1.6, 0.07, 0.07, (R + 0.8, s * (BW / 2 + 0.8), 0.06), MAT['gold'])
 me.box(0.07, BW + 1.6, 0.07, (LEDGE, 0, 0.06), MAT['gold'])
-gate = me.to_object('Threshold'); gate.parent = gRim; gate.matrix_world = rz(0)
-for k in (1, 2, 3): instance(gate, 'Threshold', rz(-k * math.pi / 2), gRim)
+gate = me.to_object('Threshold'); gate.parent = gRim; gate.matrix_world = rz(-MOUTHS[0])
+instance(gate, 'Threshold', rz(-MOUTHS[1]), gRim)
 # long star banners hanging over the drum either side of each bridge mouth
 gBan = group('Kit_RimBanners', gRim)
 rim_banner = banner_mesh(1.15, 4.2); rim_banner.parent = gBan; first_b = True
 rod = Mesh(); rod.cyl(0.05, 0.05, 1.5, (0, 0, 0), MAT['gold'], 8, M=Matrix.Rotation(math.pi / 2, 4, 'Y'))
 rod.sphere(0.08, (0.75, 0, 0), MAT['gold'], 8, 6); rod.sphere(0.08, (-0.75, 0, 0), MAT['gold'], 8, 6)
 rod_ob = rod.to_object('BannerRod'); rod_ob.parent = gBan; first_r = True
-for k in range(4):
+for m in MOUTHS:
     for s in (-1, 1):
         for off in (1.5, 3.4):
-            a = k * math.pi / 2 + s * (GAP + off) / LEDGE; F = at_angle(a, LEDGE + 0.12, -0.05)
+            a = m + s * (GAP + off) / LEDGE; F = at_angle(a, LEDGE + 0.12, -0.05)
             Mb = F @ Matrix.Rotation(0.5, 4, 'X')
             if first_b: rim_banner.matrix_world = Mb; first_b = False
             else: instance(rim_banner, 'BannerCloth', Mb, gBan)
@@ -223,17 +225,11 @@ for i in range(5):                                                              
     o = arch_outline(w_arch, 2.4, 8)
     for s in (-1, 1): me.tube([(ax + x, s * (BW / 2 + 0.1), -4.0 + z) for x, z in o[1:-1]], 0.24, MAT['ivory'], 5)
 bridge = me.to_object('Bridge'); bridge.parent = gBr
-plaq = Mesh()
-for px in (19.2, 28.5, 38):
-    plaq.box(1.5, 0.62, 0.03, (px, 0, 0.012), MAT['gold']); plaq.box(1.36, 0.48, 0.04, (px, 0, 0.018), MAT['cobalt'])
-    plaq.ngon([(px + x * 0.6, z * 0.6, 0.042) for x, z in star(0.06, 0.2)], MAT['gold'], out=(0, 0, 1))
-plaques = plaq.to_object('BridgePlaques'); plaques.parent = gBr
 br_banner = banner_mesh(2.5, 1.0); planar_uv(br_banner, 2, 0); br_banner.parent = gBr; firstbb = True   # long side along the bridge
-for name, ang in (('Bridge_E', 0), ('Bridge_S', math.pi / 2), ('Bridge_W', math.pi), ('Bridge_N', -math.pi / 2)):
+for name, ang in (('Bridge_S', math.pi / 2), ('Bridge_N', -math.pi / 2)):   # north and south only
     M = rz(-ang)
-    if name == 'Bridge_E': bridge.matrix_world = M; bridge.name = name; plaques.matrix_world = M
+    if name == 'Bridge_S': bridge.matrix_world = M; bridge.name = name
     else: instance(bridge, name, M, gBr)
-    if name == 'Bridge_W': instance(plaques, 'BridgePlaques', M, gBr)
     for s in (-1, 1):                                                                          # banners draped over the balustrade
         for px in posts:
             Mb = M @ Matrix.Translation((px + 1.6, -s * (hw + 0.02), 0.66)) @ face_matrix(0, 0, 0, -math.pi / 2 if s > 0 else math.pi / 2) @ \
@@ -328,7 +324,7 @@ gA = group('CloudAnchors')
 def anchor(x3, z3, r):
     e = bpy.data.objects.new('CloudAnchor', None); coll.objects.link(e); e.location = B(x3, 0, z3); e.scale = (r, r, r); e.parent = gA
 for i in range(12): a = (i + 0.5) / 12 * TAU; anchor(math.cos(a) * 10.5, math.sin(a) * 10.5, 4.2)    # the dais sinks into cloud
-for ang in (0, math.pi / 2, math.pi, -math.pi / 2):                                                    # bridge piers
+for ang in (math.pi / 2, -math.pi / 2):                                                    # bridge piers
     for i in range(5):
         px = x0 + (i + 0.5) / 5 * ln - ln / 10; anchor(px * math.cos(ang), px * math.sin(ang), 1.5)
 for x, z, s in KIOSKS: anchor(x, z, 1.2 * s)

@@ -170,13 +170,13 @@ namespace LastBell.Areas.Area1.EditorTools
             for (int i = 0; i < n; i++)
             {
                 float a = (i + 0.5f) / n * Mathf.PI * 2, x = Mathf.Cos(a) * Rail, z = Mathf.Sin(a) * Rail;
-                bool gap = false; for (int k = 0; k < 4; k++) { float d = Mathf.Abs(Mathf.DeltaAngle(a * Mathf.Rad2Deg, k * 90)) * Mathf.Deg2Rad; if (d * Rail < gapHalf) gap = true; }
+                bool gap = false; foreach (int k in new[] { 1, 3 }) { float d = Mathf.Abs(Mathf.DeltaAngle(a * Mathf.Rad2Deg, k * 90)) * Mathf.Deg2Rad; if (d * Rail < gapHalf) gap = true; }   // north and south bridges only
                 if (gap) continue;
                 var w = new GameObject("Wall").AddComponent<BoxCollider>(); w.transform.SetParent(parent, false);
                 w.transform.position = new Vector3(x, 1.5f, z); w.transform.rotation = Quaternion.Euler(0, 90 - a * Mathf.Rad2Deg, 0);
                 w.size = new Vector3(Rail * Mathf.PI * 2 / n * 1.05f, 3, 0.5f);
             }
-            for (int k = 0; k < 4; k++)
+            foreach (int k in new[] { 1, 3 })
             {
                 var b = new GameObject("BridgeMouth_" + "ESWN"[k]).transform; b.SetParent(parent, false); b.rotation = Quaternion.Euler(0, k * 90, 0);
                 float len = Ledge + 3 - Rail;
