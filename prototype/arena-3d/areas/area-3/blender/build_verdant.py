@@ -733,11 +733,13 @@ for S in L['spires']:
 print('TREES')
 for i, Tr in enumerate(L['trees']): instance(trees[i % 3], ART, T(Tr['p']), rz=hsh('tz', i) * math.tau, s=Tr['s'], name='Tree')
 for p in L['lanterns']: instance(lantern, ART, T(p), name='Lantern')
-for i in range(46):                                                 # bushes spilling over the outer curb (outside 14.6 m)
-    a = (i + 0.5 * hsh('ba', i)) / 46 * math.tau
-    if near_exit(a, GAP + 0.03): continue
-    d = R + 0.9 + 0.3 * hsh('bd', i); z = 0.25 + 0.2 * hsh('bz', i)
-    instance(bushes[i % 3], ART, Vector((math.cos(a) * d, -math.sin(a) * d, z)), rz=hsh('br', i) * math.tau, s=0.9 + 0.6 * hsh('bs', i), name='Bush')
+for g in range(14):                                                 # bush groups over the outer curb, bare stone between
+    ga = (g + 0.4 * hsh('ga', g)) / 14 * math.tau
+    for k in range(1 + int(hsh('gn', g) * 3.5)):                    # 1-4 bushes per group, one big and some small
+        a = ga + (k - 1) * 0.045 + (hsh('gk', g, k) - 0.5) * 0.03
+        if near_exit(a, GAP + 0.03): continue
+        big = k == 0; d = R + 0.85 + (0.35 if big else 0.15) * hsh('bd', g, k); z = 0.2 + 0.25 * hsh('bz', g, k)
+        instance(bushes[(g + k) % 3], ART, Vector((math.cos(a) * d, -math.sin(a) * d, z)), rz=hsh('br', g, k) * math.tau, s=(1.3 + 0.6 * hsh('bs', g, k)) if big else (0.55 + 0.4 * hsh('bs', g, k)), name='Bush')
 for Bd in L['bridges']:                                             # bushes on bridge parapets and at the bridge roots
     ux = Vector((math.cos(Bd['a']), -math.sin(Bd['a']), 0)); uy = Vector((math.sin(Bd['a']), math.cos(Bd['a']), 0))
     for j in range(int(Bd['len'] / 2.6)):
@@ -782,6 +784,13 @@ for o in uniq.values():
     k = 0.45 + 0.55 * ao.reshape(-1, 4)[:, :1]; c = col.reshape(-1, 4); c[:, :3] *= k
     me.color_attributes['Col'].data.foreach_set('color', c.ravel()); me.color_attributes.remove(me.color_attributes['AO'])
     me.color_attributes.active_color = me.color_attributes['Col']
+for o in uniq.values():                                             # rock: one colour per facet, crisp stylised planes
+    me = o.data
+    if not me.materials or me.materials[0].name != 'Rock': continue
+    n = len(me.loops); col = np.empty(n * 4, np.float32); me.color_attributes['Col'].data.foreach_get('color', col); c = col.reshape(-1, 4)
+    for p in me.polygons:
+        a, b = p.loop_start, p.loop_start + p.loop_total; c[a:b, :3] = c[a:b, :3].mean(axis=0)
+    me.color_attributes['Col'].data.foreach_set('color', c.ravel())
 print('AO BAKED', baked)
 scene.render.engine = 'BLENDER_EEVEE'
 for o in KIT.all_objects: o.hide_set(True)

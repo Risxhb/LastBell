@@ -58,6 +58,9 @@ float lbcCloudFactor(float3 posWS)
 float3 lbcApply(float3 col, float3 posWS)
 {
     float keep = (posWS.y > -1.0 && length(posWS.xz) < _LB_FloorKeepRadius) ? 0 : 1;
+    // value depth: below the floor, surfaces sink toward a dark teal (strongest around -10 m) before the cloud sea takes them
+    float sink = smoothstep(-0.5, -9.0, posWS.y) * (1 - smoothstep(-16.0, -26.0, posWS.y)) * keep;
+    col = lerp(col, col * float3(0.32, 0.48, 0.52), sink * 0.7);
     float c = lbcCloudFactor(posWS) * keep;
     float n = lbcDensity(posWS.xz, 0);
     float3 cloud = lerp(_LB_CloudThin.rgb, _LB_CloudThick.rgb, saturate(n * 0.8 + c * 0.4));
