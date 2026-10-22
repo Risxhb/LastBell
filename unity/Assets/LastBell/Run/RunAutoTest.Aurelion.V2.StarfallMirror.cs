@@ -254,6 +254,7 @@ namespace LastBell.Run
                 w.Hazards.Spawned -= hook;
                 V2Check("boss death mid-follow cancels every circle in the killing tick, and none hits later", liveBefore == 4 && liveAfter == 0 && !V2Hits.Any(h => h.Source.StartsWith(SfName)),
                     $"live before {liveBefore}, after {liveAfter}, hits {V2Hits.Count(h => h.Source.StartsWith(SfName))}");
+                yield return Until(() => d.State == RunState.Results, 10, "Aurelion v2: results after the Starfall death check");
             }
         }
     }
