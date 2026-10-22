@@ -1002,6 +1002,9 @@ namespace LastBell.Areas.Area4.EditorTools
             mFloor.globalIlluminationFlags = MaterialGlobalIlluminationFlags.RealtimeEmissive; Save(mFloor, "Floor.mat");
 
             var (stone, stoneN) = PaintStoneTrim(); var brassTex = PaintBrass(); var (strata, strataN) = PaintStrata();
+            // hand-made trim sheets from Blender (blender/common/trims.py) replace the C#-painted ones when present
+            var blStone = AssetDatabase.LoadAssetAtPath<Texture2D>(Dir + "/Models/Trims/StoneTrim_BL.png"); var blStoneN = AssetDatabase.LoadAssetAtPath<Texture2D>(Dir + "/Models/Trims/StoneTrim_BL_Height.png"); var blBrass = AssetDatabase.LoadAssetAtPath<Texture2D>(Dir + "/Models/Trims/BrassTrim_BL.png");
+            if (blStone) stone = blStone; if (blStoneN) stoneN = blStoneN; if (blBrass) brassTex = blBrass;
             mStone = Lit("StoneTrim", Color.white, 0, 0.14f, map: stone, bump: stoneN);
             mStoneCap = Lit("StoneCap", new Color(1.12f, 1.12f, 1.15f), 0, 0.18f, map: stone, bump: stoneN, bumpScale: 0.6f);
             mStoneDark = Lit("StoneDark", new Color(0.55f, 0.53f, 0.62f), 0, 0.12f, map: stone, bump: stoneN);
@@ -1134,8 +1137,12 @@ namespace LastBell.Areas.Area4.EditorTools
                 }
         }
 
+        // Mesh from a Blender-modelled FBX in Area4/Models (null when the model isn't there yet, so callers fall back).
+        static Mesh ModelMesh(string rel, string name) => AssetDatabase.LoadAllAssetsAtPath(Dir + "/Models/" + rel).OfType<Mesh>().FirstOrDefault(m => m.name == name);
+
         static Mesh PinnacleMesh(float h)
         {
+            var hand = ModelMesh("Pinnacle/Pinnacle.fbx", "Pinnacle_" + Mathf.RoundToInt(h * 10)); if (hand) return hand; // Blender model (slots: stone, brass, polished)
             var root = new GameObject("tmp"); var t = root.transform; float shaft = h - 2.2f;
             Box(t, new Vector3(0, 0.175f, 0), new Vector3(0.9f, 0.35f, 0.9f), mStone);
             Box(t, new Vector3(0, 0.41f, 0), new Vector3(0.74f, 0.12f, 0.74f), mStone);
@@ -1701,7 +1708,7 @@ namespace LastBell.Areas.Area4.EditorTools
     {
         void OnPreprocessTexture()
         {
-            if (!assetPath.StartsWith("Assets/LastBell/Areas/Area4/Generated/")) return;
+            if (!assetPath.StartsWith("Assets/LastBell/Areas/Area4/Generated/") && !assetPath.StartsWith("Assets/LastBell/Areas/Area4/Models/")) return;
             var t = (TextureImporter)assetImporter; t.maxTextureSize = 2048; t.mipmapEnabled = true; t.anisoLevel = 8;
             if (assetPath.EndsWith("FloorAlbedo.png")) t.maxTextureSize = 4096;
             float scale = assetPath.EndsWith("FloorHeight.png") ? 0.015f : assetPath.EndsWith("StoneTrimHeight.png") ? 0.05f : assetPath.EndsWith("RockStrataHeight.png") ? 0.04f : 0.03f;
@@ -1709,6 +1716,23 @@ namespace LastBell.Areas.Area4.EditorTools
             if (assetPath.EndsWith("Banner.png")) t.alphaIsTransparency = true;
             if (assetPath.EndsWith("BellMetal.png")) t.sRGBTexture = false;
             if (assetPath.Contains("StoneTrim") || assetPath.Contains("Brass") || assetPath.Contains("Strata")) t.wrapMode = TextureWrapMode.Repeat;
+        }
+    }
+}
+
+namespace LastBell.Areas.Area4.EditorTools
+{
+    // Import settings for the Blender-modelled FBX files in Area4/Models: metres, Y-up baked, our own materials,
+    // readable meshes (the builder merges static pieces), no animation or colliders.
+    sealed class ShatteredHourModelImport : AssetPostprocessor
+    {
+        void OnPreprocessModel()
+        {
+            if (!assetPath.StartsWith("Assets/LastBell/Areas/Area4/Models/")) return;
+            var m = (ModelImporter)assetImporter;
+            m.globalScale = 1; m.useFileScale = true; m.bakeAxisConversion = true; m.isReadable = true;
+            m.materialImportMode = ModelImporterMaterialImportMode.None; m.importNormals = ModelImporterNormals.Import;
+            m.importAnimation = false; m.animationType = ModelImporterAnimationType.None; m.addCollider = false; m.meshCompression = ModelImporterMeshCompression.Off;
         }
     }
 }
