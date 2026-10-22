@@ -412,17 +412,18 @@ south = bpy.data.objects.new('Occluder_Needles_S', None); bpy.context.collection
 for i, (x, z, h) in enumerate([(-27, 11, 15), (-34, 22, 13), (-12, 21, 9), (-30, 31, 11), (27, 11, 15), (34, 22, 13), (12, 21, 9), (30, 31, 11), (-40, 6, 12), (40, 6, 12), (-8, 26, 10), (8, 26, 10), (-20, 8, 11), (20, 8, 11)]):
     ob = needle(f'NeedleS_{i}', x, z, h); ob.parent = south
 
-# ---------------------------------------------------------------- export
-root = bpy.data.objects.new('SkywardSpire_Buildings', None); bpy.context.collection.objects.link(root)
-for ob in list(bpy.context.collection.objects):
-    if ob is not root and ob.parent is None: ob.parent = root
-tris = 0
-dg = bpy.context.evaluated_depsgraph_get()
-for ob in bpy.context.collection.objects:
-    if ob.type == 'MESH':
-        ev = ob.evaluated_get(dg); m = ev.to_mesh(); m.calc_loop_triangles(); tris += len(m.loop_triangles); ev.to_mesh_clear()
-print('TRIS', tris)
-if OUT_BLEND: bpy.ops.wm.save_as_mainfile(filepath=OUT_BLEND)
-bpy.ops.export_scene.gltf(filepath=OUT, export_format='GLB', export_apply=True, export_image_format='JPEG', export_image_quality=88,
-                          export_yup=True, export_materials='EXPORT')
-print('EXPORTED', OUT, os.path.getsize(OUT))
+# ---------------------------------------------------------------- export (only when run directly; spire_kit.py reuses the parts above)
+if __name__ == "__main__":
+    root = bpy.data.objects.new('SkywardSpire_Buildings', None); bpy.context.collection.objects.link(root)
+    for ob in list(bpy.context.collection.objects):
+        if ob is not root and ob.parent is None: ob.parent = root
+    tris = 0
+    dg = bpy.context.evaluated_depsgraph_get()
+    for ob in bpy.context.collection.objects:
+        if ob.type == 'MESH':
+            ev = ob.evaluated_get(dg); m = ev.to_mesh(); m.calc_loop_triangles(); tris += len(m.loop_triangles); ev.to_mesh_clear()
+    print('TRIS', tris)
+    if OUT_BLEND: bpy.ops.wm.save_as_mainfile(filepath=OUT_BLEND)
+    bpy.ops.export_scene.gltf(filepath=OUT, export_format='GLB', export_apply=True, export_image_format='JPEG', export_image_quality=88,
+                              export_yup=True, export_materials='EXPORT')
+    print('EXPORTED', OUT, os.path.getsize(OUT))

@@ -17,7 +17,7 @@ namespace LastBell.Areas.Area1.EditorTools
     public static class SkywardSpireBuilder
     {
         const string Dir = "Assets/LastBell/Areas/Area1", Gen = Dir + "/Generated", Prefabs = Dir + "/Prefabs", Captures = Dir + "/Captures";
-        const string KitPath = Dir + "/SkywardSpire_Buildings.glb"; // the landmarks, modelled in Blender (prototype/arena-3d/areas/area-1/blender/spire_buildings.py)
+        const string KitPath = Dir + "/SkywardSpire_Kit.glb"; // everything but the floor, modelled in Blender (prototype/arena-3d/areas/area-1/blender/spire_kit.py)
         const string GlbPath = Dir + "/SkywardSpire.glb", ScenePath = Dir + "/SkywardSpire_Arena.unity", PrefabPath = Prefabs + "/LB_ENV_SkywardSpire_Arena.prefab";
         const string VanguardPath = "Assets/LastBell/Characters/Vanguard/Resources/Characters/Vanguard.glb";
 
@@ -72,7 +72,10 @@ namespace LastBell.Areas.Area1.EditorTools
             {
                 var k = (GameObject)PrefabUtility.InstantiatePrefab(kit);
                 PrefabUtility.UnpackPrefabInstance(k, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
-                k.name = "Buildings"; k.transform.SetParent(Child(root.transform, "Belfries"), true);
+                k.name = "Kit"; k.transform.SetParent(root.transform, true);
+                foreach (var t in k.GetComponentsInChildren<Transform>(true))   // static except the moving parts
+                    if (!t.name.StartsWith("BannerCloth") && !t.name.StartsWith("ArmillaryRing") && !t.name.StartsWith("Occluder"))
+                        GameObjectUtility.SetStaticEditorFlags(t.gameObject, StaticEditorFlags.BatchingStatic);
             }
             DressMaterials(root);
             UseSkyArchitecture(root);
@@ -215,7 +218,7 @@ namespace LastBell.Areas.Area1.EditorTools
                         var em = src.HasProperty("emissiveTexture") ? src.GetTexture("emissiveTexture") : null;
                         if (em) m.SetTexture("_EmissionMap", em);
                         if (src.name.StartsWith("StarWindow")) m.SetFloat("_Cutoff", 0.5f);            // pointed-arch cut-outs
-                        if (src.name == "Banner" || src.name.StartsWith("StarWindow")) m.SetFloat("_Cull", 0);
+                        if (src.name.Contains("Banner") || src.name.StartsWith("StarWindow")) m.SetFloat("_Cull", 0);   // cloth and panes are seen from both sides
                         made[src] = m = SaveAsset(m, m.name + ".mat");
                     }
                     mats[i] = m; changed = true;

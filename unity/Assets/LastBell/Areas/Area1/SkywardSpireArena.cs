@@ -92,6 +92,8 @@ namespace LastBell.Areas.Area1
             foreach (var t in arenaRoot.GetComponentsInChildren<Transform>(true))
             {
                 if (t.name.StartsWith("Occluder")) { occluders.Add(t.gameObject); continue; }
+                if (t.name.StartsWith("BannerCloth")) { banners.Add((t, t.localRotation, (float)rnd.NextDouble() * 6)); continue; }   // Blender names copies "BannerCloth.001"
+                if (t.name.StartsWith("ArmillaryRing")) { rings.Add((t, (rings.Count % 2 == 0 ? 0.25f : -0.35f))); continue; }
                 switch (t.name)
                 {
                     case "BannerCloth": banners.Add((t, t.localRotation, (float)rnd.NextDouble() * 6)); break;

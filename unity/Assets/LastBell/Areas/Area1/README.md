@@ -46,3 +46,8 @@ Landmarks follow the reference by quadrant:
   - Rebuild: `blender -b -P spire_buildings.py -- <out.glb>`, then copy the result to `SkywardSpire_Buildings.glb` here. The builder places it under `Belfries/Buildings`.
   - The env file skips its code-built versions while `kit` mode is on.
   - Critic rounds: 6, then 6.5/10.
+- **Everything but the floor is now modelled in Blender** (`prototype/arena-3d/areas/area-1/blender/spire_kit.py`, which reuses `spire_buildings.py`).
+  - It covers the curb and turned-baluster balustrade, the rim kiosks and gate pavilions, the drum wall with blind arcades, the underside, the four bridges (paving, balusters, domed posts, pier arches), the hanging star banners, the kiosks on columns, the filler and far spires, the floating islands, the skybridges and the CloudAnchor empties.
+  - Rebuild: `blender -b -P spire_kit.py -- <out.glb>`, then copy the result to `SkywardSpire_Kit.glb` here. The builder places it under `Kit`, marked static apart from banners, armillary rings and occluders.
+  - `SkywardSpire.glb` now holds only the painted floor (the env file runs in kit mode).
+  - Repeated parts share one mesh, so 1.06 M triangles fit in a 50 MB file.

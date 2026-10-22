@@ -762,6 +762,9 @@ function mergeGroup(group) {
   // prune empty groups left behind
   const empty = []; group.traverse(o => { if (o !== group && !o.isMesh && o.children.length === 0 && o.name !== 'ArmillaryRing') empty.push(o); }); empty.forEach(o => o.parent && o.parent.remove(o));
 }
+// kit mode: everything but the painted floor is modelled in Blender (blender/spire_kit.py, models/SkywardSpire_Kit.glb),
+// cloud anchors included, so the code-built versions are dropped here
+if (opts.kit) for (const g of [gRim, gBridges, gBelfries, gSpires, gAbyss, gAnchors]) g.clear();
 // occluder groups merge on their own, so they stay separate nodes that can be hidden
 gBelfries.children.filter(c => c.userData.occluder).forEach(c => { mergeGroup(c); c.userData.occluder = true; occluders.push(c); });
 [gRim, gBridges, gBelfries, gSpires, gAbyss].forEach(mergeGroup);

@@ -49,13 +49,13 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(44, 1, 0.1, 1600);
 window.THREE = THREE;
 await loadScript('skyward-spire-env.js?v=' + Date.now());   // never a stale cached copy
-// ?nokit: the old code-built landmarks instead of the Blender-modelled ones (models/SkywardSpire_Buildings.glb)
+// ?nokit: the old code-built landmarks instead of the Blender-modelled ones (models/SkywardSpire_Kit.glb)
 const KIT = !Q.has('nokit');
 const env = window.buildSkywardSpire(THREE, scene, { mergeGeometries, renderer, floorRes: 3072, kit: KIT });
 const kitOccluders = [];
 if (KIT && !Q.has('export')) {
   const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
-  const gltf = await new GLTFLoader().loadAsync('models/SkywardSpire_Buildings.glb').catch(e => { console.error('kit', e); return null; });
+  const gltf = await new GLTFLoader().loadAsync('models/SkywardSpire_Kit.glb').catch(e => { console.error('kit', e); return null; });
   if (gltf) {
     gltf.scene.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; } if (o.name.startsWith('Occluder')) kitOccluders.push(o); });
     env.root.add(gltf.scene);
