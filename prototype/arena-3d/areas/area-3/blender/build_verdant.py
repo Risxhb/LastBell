@@ -148,6 +148,7 @@ def ivy(asm, strands, leaf_scale=1.0, flowers=0.06, key=0):
         for i in range(len(pts) - 1):
             a, b = Vector(pts[i]), Vector(pts[i + 1]); seg = b - a; Ls = seg.length; steps = max(1, int(Ls / 0.15))
             tangent = seg.normalized(); bi = tangent.cross(nrm).normalized()
+            steps = max(1, int(Ls / 0.1))
             for s in range(steps):
                 n += 1; r = hsh(key, n); p = a + seg * (s / steps); side = 1 if n % 2 else -1
                 t = (i + s / steps) / max(1, len(pts) - 1); sc = leaf_scale * (1.15 - 0.45 * t) * (0.8 + 0.4 * r)
@@ -169,6 +170,33 @@ def drape(top, normal, length, wobble=0.15, kinks=6, phase=0.0):
         t = k / kinks
         pts.append(tuple(Vector(top) + Vector((0, 0, -length * t)) + side * math.sin(t * 3.1 + phase) * wobble + nrm * 0.02 * math.sin(t * 5)))
     return pts, tuple(nrm)
+
+def moss_mat(asm, top_center, sx, sy, rz, key, drip=True, flowers=3):
+    """Moss grown on a stone's top face: an irregular outline inset from the edges, a thin cushion, and a flap that
+    spills over one edge and hangs down the face (so it reads as growing on that stone, not sitting on it)."""
+    bm = bmesh.new(); N = 14; pts = []
+    for k in range(N):
+        a = k / N * math.tau; r = 0.62 + 0.33 * hsh(key, k)
+        pts.append((math.cos(a) * sx / 2 * r, math.sin(a) * sy / 2 * r))
+    bot = [bm.verts.new((x, y, 0.0)) for x, y in pts]; topv = [bm.verts.new((x * 0.9, y * 0.9, 0.05 + 0.04 * hsh(key, i, 'h'))) for i, (x, y) in enumerate(pts)]
+    bm.faces.new(topv)
+    for i in range(N): bm.faces.new((bot[i], bot[(i + 1) % N], topv[(i + 1) % N], topv[i]))
+    if drip:                                                     # a flap over the +x edge, hanging 0.15-0.4 m down the face
+        side = 1 if hsh(key, 'side') > 0.5 else -1; w = sy * (0.35 + 0.3 * hsh(key, 'w')); hang = 0.15 + 0.25 * hsh(key, 'hang')
+        x0 = side * sx / 2 + side * 0.03
+        q = [bm.verts.new((x0, -w / 2, 0.04)), bm.verts.new((x0, w / 2, 0.04)), bm.verts.new((x0 + side * 0.02, w / 2 * 0.7, -hang)), bm.verts.new((x0 + side * 0.02, -w / 2 * 0.8, -hang * 0.8))]
+        bm.faces.new(q if side > 0 else q[::-1])
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces); bm.transform(M4(top_center, rz))
+    paint_bm(bm, top_center[2] - 0.4, top_center[2] + 0.1, top=1.2, bottom=0.7, key=key, wear=0, var=0.1); asm.add('Moss', bm)
+    if flowers:
+        fl = bmesh.new(); lay = fl.loops.layers.float_color.new('Col'); c0 = Vector(top_center) + Vector((0, 0, 0.08))
+        for k in range(flowers):
+            c = c0 + Vector(((hsh(key, k, 'fx') - 0.5) * sx * 0.4, (hsh(key, k, 'fy') - 0.5) * sy * 0.4, 0))
+            for p in range(5):
+                pa = p / 5 * math.tau
+                f = fl.faces.new([fl.verts.new(c), fl.verts.new(c + Vector((math.cos(pa - 0.35), math.sin(pa - 0.35), 0.25)) * 0.09), fl.verts.new(c + Vector((math.cos(pa + 0.35), math.sin(pa + 0.35), 0.25)) * 0.09)])
+                for lp in f.loops: lp[lay] = (1, 1, 1, 1)
+        asm.add('Flower', fl)
 
 def moss_clump(asm, loc, r, key, flowers=4):
     """A moss mat: a cluster of low, irregular lumps spreading over the surface (an uneven outline, not a disc), with
@@ -367,7 +395,7 @@ def tree_kit(i):
     me = bpy.data.meshes.new_from_object(ob.evaluated_get(bpy.context.evaluated_depsgraph_get())); bpy.data.objects.remove(ob)
     bm = bmesh.new(); bm.from_mesh(me); bpy.data.meshes.remove(me); paint_bm(bm, 0, 3.5, top=1.0, bottom=0.7, key=('tr', i)); asm.add('Bark', bm)
     for ci, (cx, cy, cz, cr) in enumerate(D['clusters']):
-        core = bmesh.new(); bmesh.ops.create_icosphere(core, subdivisions=2, radius=cr * 0.5)
+        core = bmesh.new(); bmesh.ops.create_icosphere(core, subdivisions=2, radius=cr * 0.38)
         core.transform(M4((cx, cy, cz - cr * 0.1), s=(1, 1, 0.8))); paint_bm(core, cz - cr, cz + cr, top=1.2, bottom=0.6, key=('tc', i, ci), wear=0); asm.add('CanopyDark', core)
         leaves = bmesh.new(); lay = leaves.loops.layers.float_color.new('Col'); N = int(130 * cr * cr)
         for k in range(N):                                        # golden-spiral placement over the cluster
@@ -377,7 +405,7 @@ def tree_kit(i):
             pos = Vector((cx, cy, cz)) + nrm * cr * (0.82 + 0.18 * hsh(i, ci, k))
             up = Vector((0, 0, 1)) if abs(nrm.z) < 0.9 else Vector((1, 0, 0)); right = up.cross(nrm).normalized(); upv = nrm.cross(right)
             rot = Matrix.Rotation(hsh(i, ci, k, 'r') * math.tau, 3, nrm); right, upv = rot @ right, rot @ upv
-            sc = 1.6 + 0.8 * hsh(i, ci, k, 's')
+            sc = 2.2 + 1.0 * hsh(i, ci, k, 's')
             vs = [leaves.verts.new(pos + (right * x + upv * yv + nrm * yv * 0.3) * sc) for x, yv in LEAFC]
             f = leaves.faces.new(vs); v = 0.55 + 0.6 * max(0, nrm.z * 0.5 + 0.5)        # lit tops, darker undersides
             for lp in f.loops: lp[lay] = (v, v, v, 1)
@@ -437,7 +465,7 @@ def platform():
         v = hsh('curb', i); sunk = v < 0.12; h = 0.32 if sunk else 0.5 + 0.08 * hsh('ch', i); w = math.tau * (R + 0.4) / n - 0.06
         p = (math.cos(a) * (R + 0.4), -math.sin(a) * (R + 0.4), h / 2 - 0.05)
         asm.stone('Stone' if v > 0.4 else 'StoneDark', (0.8, w, h), p, ('curb', i), rz=-a, rx=(hsh('cr', i) - 0.5) * 0.06, zr=zr, moss=0.5, chips=2, bev=0.06)
-        if hsh('cm', i) < 0.55: moss_clump(asm, (p[0], p[1], h - 0.02), 0.32 + 0.2 * hsh('cmr', i), ('cm', i), flowers=4 if hsh('cf', i) < 0.7 else 0)
+        if hsh('cm', i) < 0.6: moss_mat(asm, (p[0], p[1], h - 0.05), 0.8, w, -a, ('cm', i), flowers=3 if hsh('cf', i) < 0.7 else 0)
         ro = R + 0.85; ox, oy = math.cos(a), -math.sin(a); tx, ty = -oy, ox
         ivy(asm, [drape((ox * ro + tx * off, oy * ro + ty * off, h - 0.1), (ox, oy, 0), 1.5 + 5.5 * hsh('cil', i, off), 0.14, 7, i + off) for off in (-0.45, 0.0, 0.45) if hsh('ci', i, off) < 0.8], key=('ci', i), flowers=0.1)
     # brass band on the curb's outer top edge, one arc per quadrant, laid as short worn segments
@@ -463,6 +491,8 @@ def platform():
         if hsh('arc', i) < 0.15: continue
         span = math.tau * rad / segs; c = Vector((math.cos(a) * rad, -math.sin(a) * rad, -3.3)); rz = -a + math.pi / 2
         arcade_bay(arc, c, rz, span, 3.4, 0.6, ('rimarc', i), zr=(-9.5, -3.3), pier_w=0.6, depth=0.55, spring=2.6, top_wall=True, down=True)
+        o2 = Vector((math.cos(a), -math.sin(a), 0)); t2 = Vector((math.sin(a), math.cos(a), 0))
+        ivy(arc, [drape(c + o2 * 0.32 + t2 * (k - 1.5) * span * 0.28, tuple(o2), 1.5 + 3.0 * hsh('rai', i, k), 0.14, 7, k) for k in range(4) if hsh('ra', i, k) < 0.7], key=('rai', i), flowers=0.08)
     obs += arc.build(ART)
     # the rock root the platform stands on
     root = Asm('PlatformRoot')
@@ -509,7 +539,7 @@ def bridge(B):
             while xx < x1 - 0.6:
                 if hsh('pp', a, ly, j) > 0.15:
                     asm.stone('Stone', (1.2, 0.34, 0.48 + 0.08 * hsh('ph', a, j)), at(xx + 0.6, ly, 0.24), ('pp', a, ly, j), rz, zr=zr, moss=0.6, chips=2)
-                    if hsh('pm', a, ly, j) < 0.4: moss_clump(asm, at(xx + 0.6, ly, 0.5), 0.3, ('pm', a, ly, j), flowers=3)
+                    if hsh('pm', a, ly, j) < 0.5: moss_mat(asm, at(xx + 0.6, ly, 0.47), 1.2, 0.34, rz, ('pm', a, ly, j), flowers=2)
                 xx += 1.3; j += 1
         else:
             xx = x0 + 1.2; j = 0
@@ -569,11 +599,20 @@ def belfry(Bf, bell_src):
             asm.stone('StoneDark', (sx, sy, 0.5), at(cx * (W / 2 - sx / 2 + 0.06), cy * (W / 2 - sy / 2 + 0.06), 0.8 + zc * 1.0), ('q', Bf['idx'], zc, cx, cy), rz, zr=zr, chips=1, bev=0.06)
     ztop = 0.5 + solid + cham + 0.16
     asm.stone('StoneDark', (W + 0.45, W + 0.45, 0.35), at(0, 0, ztop + 0.17), ('co', Bf['idx']), rz, zr=zr, moss=0.6, top=1.15)
-    merl = [(-1.3, -1.3, .9), (0, -1.35, .55), (1.3, -1.3, 1.0), (1.35, 0, .4), (1.3, 1.3, .75), (-1.3, 1.3, 1.1), (-1.35, .1, .5)]
-    for m, (mx, my, mh) in enumerate(merl):
-        if front: mh *= 0.85
-        if hsh('ml', Bf['idx'], m) < 0.25: continue                 # missing merlons
-        asm.stone('Stone', (0.6, 0.6, mh), at(mx, my, ztop + 0.35 + mh / 2), ('m', Bf['idx'], m), rz + 0.12 * (hsh('mr', Bf['idx'], m) - 0.5), zr=zr, moss=0.8, chips=2)
+    pattern = [1.0, 0.65, 0.0, 0.4, 0.85, 0.3]                       # a broken parapet: heights per block along each side
+    for f in range(4):
+        fa = f * math.pi / 2; nx, ny = math.sin(fa), -math.cos(fa); tx, ty = -ny, nx
+        for b, ph in enumerate(pattern[f % 2:] + pattern[:f % 2]):
+            hh = ph * (0.85 if front else 1.25) * (0.8 + 0.4 * hsh('bc', Bf['idx'], f, b))
+            if hh < 0.15: continue
+            off = (b - 2.5) * 0.6; lx = nx * (W / 2 + 0.05) + tx * off; ly = ny * (W / 2 + 0.05) + ty * off
+            for course in range(1 if hh < 0.6 else 2):
+                ch = hh if hh < 0.6 else hh / 2
+                asm.stone('Stone', (0.58, 0.42, ch - 0.02), at(lx, ly, ztop + 0.35 + course * ch + ch / 2), ('bc', Bf['idx'], f, b, course), rz + fa, zr=zr, moss=0.85, chips=2)
+            if hh > 0.5 and hsh('bcm', Bf['idx'], f, b) < 0.5: moss_mat(asm, at(lx, ly, ztop + 0.35 + hh - 0.03), 0.58, 0.42, rz + fa, ('bcm', Bf['idx'], f, b), flowers=2)
+    if not front:                                                   # timber frame standing on the broken top
+        for cx, cy in ((-1, -1), (1, -1), (1, 1), (-1, 1)): asm.stone('Timber', (0.18, 0.18, 1.4), at(cx * 1.1, cy * 1.1, ztop + 1.05), ('tf', Bf['idx'], cx, cy), rz, zr=zr, bev=0.02, bottom=0.8)
+        for ang in (0, math.pi / 2): asm.stone('Timber', (2.5, 0.16, 0.16), at(0, 0, ztop + 1.7), ('tb', Bf['idx'], ang), rz + ang, zr=zr, bev=0.02, bottom=0.85)
     bz = 0.5 + solid + cham - 0.4
     asm.stone('Timber', (W - 0.5, 0.26, 0.26), at(0, 0, bz), ('beam', Bf['idx']), rz, zr=zr, bev=0.03, top=1.0, bottom=0.85)
     for sx in (-1, 1): asm.stone('Timber', (0.16, 0.16, 1.3), at(sx * (W / 2 - 0.75), 0, bz - 0.45), ('br', Bf['idx'], sx), rz, ry=sx * 0.65, zr=zr, bev=0.02)
@@ -657,6 +696,41 @@ for i in range(300):                                                # ferns alon
     if near_exit(a, GAP): continue
     d = PLAY_R + 0.45 + 0.12 * hsh('fd', i) if i % 2 else R + 0.95
     instance(fern, ART, Vector((math.cos(a) * d, -math.sin(a) * d, 0.0 if d < R else 0.45)), rz=hsh('fz', i) * math.tau, s=0.55 + 0.4 * hsh('fs', i), name='Fern')
+
+# ---- bake ambient occlusion into the vertex colours: crevices, joints and undersides darken the way they would with a
+# painted AO pass. Cycles on the GPU, one bake over every unique mesh, then multiplied into the painted 'Col'.
+import addon_utils, numpy as np
+addon_utils.enable('cycles'); scene.render.engine = 'CYCLES'
+try:
+    cp = bpy.context.preferences.addons['cycles'].preferences; cp.compute_device_type = 'OPTIX'; cp.refresh_devices()
+    for d in cp.devices: d.use = d.type != 'CPU'
+    scene.cycles.device = 'GPU'
+except Exception as e: print('GPU setup failed', e)
+scene.cycles.samples = 16; scene.render.bake.use_selected_to_active = False
+world = bpy.data.worlds.new('AOWorld'); scene.world = world
+try: world.light_settings.distance = 1.6
+except Exception: pass
+uniq = {}
+for o in list(ART.all_objects) + list(KIT.all_objects):
+    if o.type == 'MESH' and o.data.name not in uniq and 'Col' in o.data.color_attributes and len(o.data.polygons) > 0: uniq[o.data.name] = o
+KIT.hide_render = False
+for o in KIT.all_objects: o.hide_set(False); o.hide_render = False
+bpy.ops.object.select_all(action='DESELECT'); baked = 0
+for o in uniq.values():
+    me = o.data
+    ao = me.color_attributes.get('AO') or me.color_attributes.new('AO', 'FLOAT_COLOR', 'CORNER'); me.color_attributes.active_color = ao
+    o.select_set(True); baked += 1
+bpy.context.view_layer.objects.active = next(iter(uniq.values()))
+bpy.ops.object.bake(type='AO', target='VERTEX_COLORS', margin=0)
+for o in uniq.values():
+    me = o.data; n = len(me.loops); col = np.empty(n * 4, np.float32); ao = np.empty(n * 4, np.float32)
+    me.color_attributes['Col'].data.foreach_get('color', col); me.color_attributes['AO'].data.foreach_get('color', ao)
+    k = 0.45 + 0.55 * ao.reshape(-1, 4)[:, :1]; c = col.reshape(-1, 4); c[:, :3] *= k
+    me.color_attributes['Col'].data.foreach_set('color', c.ravel()); me.color_attributes.remove(me.color_attributes['AO'])
+    me.color_attributes.active_color = me.color_attributes['Col']
+print('AO BAKED', baked)
+scene.render.engine = 'BLENDER_EEVEE'
+for o in KIT.all_objects: o.hide_set(True)
 
 json.dump({k: list(v) for k, v in PALETTE.items()}, open(os.path.join(OUT, 'art_materials.json'), 'w'), indent=1)
 tris = 0
