@@ -60,7 +60,9 @@ namespace LastBell.Run
             t.Check("knockback 1.5 m toward the arena centre", Mathf.Abs((r0 - R(main)) - SecondPress.Knock) < 0.35f, $"{r0:0.00} -> {R(main):0.00} m");
             t.Check("one hit per instance", t.OneHitPerInstance());
 
-            // ---- the escape: leave the re-stamped mould from its centre once it appears (2.5 m), no dash ----
+            // ---- the escape: leave the re-stamped mould from its centre once it appears (2.5 m), no dash. The walk aims
+            // 3.0 m out: the scripted walker stops within one step (0.1 m at 6 m/s) of its target, so aiming at the edge
+            // itself could leave it on the border ----
             foreach (float speed in new[] { 4.2f, 6f })
             {
                 yield return t.Setup(1, Difficulty.Hard, new[] { CrucivarAbility.Bay(2) });
@@ -68,12 +70,12 @@ namespace LastBell.Run
                 t.Begin(press.Run(Result(new[] { 2 }, new[] { 1 })));
                 yield return t.Until(() => t.Spawned(Src).Any(), 6, "Second Press telegraph");
                 int from = t.W.Tick;
-                t.In(main).Go(Along(2, BayInward(2.6f)), speed);
+                t.In(main).Go(Along(2, BayInward(3.0f)), speed);
                 yield return t.Until(() => Sim.Flat(main.transform.position - CrucivarAbility.Bay(2)).magnitude > SecondPress.Radius + Hazard.Margin, 3, "out of the press");
                 float took = (t.W.Tick - from) / (float)Sim.Hz;
                 yield return t.WaitIdle();
                 t.In(main).Stop();
-                t.Check($"escape at {speed} m/s from the mould centre", !t.WasHit(main, Src), $"out after {took:0.00} s of 2.0 s, stamina {main.Stamina:0}/{PlayerController.MaxStamina}");
+                t.Check($"escape at {speed} m/s from the mould centre", !t.WasHit(main, Src), $"out after {took:0.00} s of 2.0 s, ended {Sim.Flat(main.transform.position - CrucivarAbility.Bay(2)).magnitude:0.00} m from the mould centre, stamina {main.Stamina:0}/{PlayerController.MaxStamina}");
             }
 
             // ---- melee and ranged: one soaker at the mould's inner edge (next to the boss), one at the outer edge (8 m+) ----
