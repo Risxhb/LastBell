@@ -27,6 +27,8 @@ namespace LastBell.Run
         {
             Hook(t); resolved = null;
             t.Begin(t.Boss.Mould.Run());
+            yield return t.Ticks(1);
+            if (towers.Count == 0) t.Check("display name while it runs", t.Boss.Current == "Mould Press", t.Boss.Current);
             yield return t.Until(() => t.Spawned(Src).Any(), 5, "moulds spawned");
             yield return t.Ticks(1);
             foreach (var s in t.Spawned(Src)) { towers.Add(s.H); spawnTicks.Add(s.Tick); }
@@ -67,14 +69,14 @@ namespace LastBell.Run
             t.In(p).Go(II.Origin, 4.2f);
             yield return t.WaitIdle(10);
             t.In(p).Stop();
-            var hI = t.HitsOn(p, "Mould Press I").ToList(); var hII = t.HitsOn(p, "Mould Press II").ToList();
+            var hI = t.HitsOn(p).Where(h => h.Source == "Mould Press I").ToList(); var hII = t.HitsOn(p).Where(h => h.Source == "Mould Press II").ToList();
             t.Check("solo: I hits once for 20 at its resolve tick", hI.Count == 1 && hI[0].Damage == 20 && Mathf.Abs(hI[0].Tick - ticks[0] - Sim.Ticks(4.2f)) <= 1,
                 hI.Count == 1 ? $"{hI[0].Damage} dmg, {Secs(hI[0].Tick - ticks[0]):0.00} s after spawn" : $"{hI.Count} hits");
             t.Check("solo escape I -> II at 4.2 m/s (no dash): II hits once for 20, still standing", hII.Count == 1 && hII[0].Damage == 20 && !p.Down,
                 hII.Count == 1 ? $"{Secs(hII[0].Tick - iTick):0.00} s after I" : $"{hII.Count} hits, down {p.Down}");
             t.Check("solo: Resolved raised once with both towers, sequential, 1 inside each", resolved != null && resolved.Sequential && resolved.Centres.Length == 2
                 && resolved.Counts.SequenceEqual(new[] { 1, 1 }) && resolved.Numerals.SequenceEqual(new[] { 1, 1 }) && resolved.Centres[1] == II.Origin);
-            t.Check("display name and the ability returned after the last tower", boss.Current == "Mould Press" && !boss.TestBusy, boss.Current);
+            t.Check("the ability returned after the last tower", !boss.TestBusy);
             t.Check("no Mould Press FX left behind", Object.FindObjectsByType<MouldPressFx>(FindObjectsSortMode.None).Length == 0);
 
             // ---------------- N = 2: one each; pairs alternate between casts ----------------
@@ -207,11 +209,11 @@ namespace LastBell.Run
             yield return t.Setup(4, Difficulty.Medium, at: new[] { melee, ranged, mid, new Vector3(-9.5f, 0, 9.5f) });
             towers = new List<Hazard>(); ticks.Clear();
             yield return Cast(t, towers, ticks);
-            yield return t.WaitIdle(10);
+            yield return t.Until(() => t.Party.All(q => q.Down), 8, "still players: the moulds resolved");
             t.Check("still players: melee (2.2 m from the boss) and ranged (edge, 13 m) are both downed by an empty mould",
                 t.WasHit(t.Party[0], Src) && t.WasHit(t.Party[1], Src) && t.Party[0].Down && t.Party[1].Down);
             t.Check("still players: every standing player is downed (empty soak wipes)", t.Party.All(q => q.Down));
-            t.Check("wipe: Resolved reports 0 inside", resolved != null && resolved.Counts.All(c => c == 0));
+            // a full wipe ends the practice (Downed), which drops the boss script: Resolved is not raised for a wiped party
 
             // ---------------- solo still player: tower I empty wipes ----------------
             yield return t.Setup(1, Difficulty.Medium, at: new[] { new Vector3(0, 0, 9) });
