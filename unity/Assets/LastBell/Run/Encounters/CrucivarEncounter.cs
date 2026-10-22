@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -62,11 +63,14 @@ namespace LastBell.Run
             rig = presenter.Visual.gameObject.AddComponent<CrucivarRig>();
             rig.Bind(presenter.Visual);
             PhaseName = "Sealed Furnace";
+            BindAbilities();
         }
 
         int PhaseFor() => Hp > MaxHp * P2At ? 1 : Hp > MaxHp * P3At ? 2 : 3;
 
-        protected override IEnumerable<int> Script()
+        protected override IEnumerable<int> Script() => CrucivarArgs.V1 ? V1Script() : V2Script();
+
+        IEnumerable<int> V1Script()
         {
             while (true)
             {
@@ -251,6 +255,138 @@ namespace LastBell.Run
             }
             rig.Pour(false);
             foreach (var w in Recover("Casting Cycle (cooling)", "Vulnerable", CastRec)) yield return w;
+        }
+
+        // ================ ability set v2 (abilities-v2/ABILITIES.md, proposal) ================
+        // Phase plan (Medium; Easy stretches the warnings inside each ability, never the recoveries):
+        //   1 Sealed Furnace  Mould Press > 2.0 · Bellows Draw > 3.5 major · Great Casting (pour only) > 2.0
+        //   65 %: second form "Casting Heat" (1.5 s, harmless, queued after the current attack, same HP bar)
+        //   2 Casting Heat    Gear Chain > 1.5 · Slag Rim + Mould Press > 2.0 · Slag Rim + Gear Chain > 1.5 ·
+        //                     Bellows Draw > 3.5 major · Great Casting (pour + 3 spokes) > 2.0
+        //   30 %: "Open Pressure" (1.5 s, harmless)
+        //   3 Open Pressure   Great Casting (full) > 3.5 major · Slag Rim + Gear Chain > 1.5 · Mould Press > 2.0 ·
+        //                     Bellows Draw > 2.0
+        // Hard adds Second Press after every Mould Press. The boss walks to the anvil (within 3 m of the centre, 1.4 m/s,
+        // at most 1.5 s) before Mould Press, Bellows Draw and the Great Casting.
+        public MouldPress Mould { get; private set; }
+        public GearChain Chain { get; private set; }
+        public BellowsDraw Bellows { get; private set; }
+        public GreatCasting Casting { get; private set; }
+        public SecondPress Press { get; private set; }
+        public CombatWorld World => W;
+        public bool SecondForm { get; private set; }
+        public int Transitions { get; private set; }
+        public void SetCurrent(string name) => Current = name;
+        public void Glow(float k) => Windup(k);
+        public void Flare(float f = 1) => Release(f);
+
+        // tests: hold the schedule and run only what TestRun hands over
+        public bool TestHold;
+        IEnumerable<int> testBody;
+        public void TestRun(IEnumerable<int> body) => testBody = body;
+        public bool TestBusy => testBody != null || testRunning;
+        bool testRunning;
+
+        const float AnvilRange = 3f, AnvilMaxWalk = 1.5f;
+
+        void BindAbilities()
+        {
+            if (Mould != null) return;
+            Mould = new MouldPress(); Chain = new GearChain(); Bellows = new BellowsDraw(); Casting = new GreatCasting(); Press = new SecondPress();
+            foreach (var a in new CrucivarAbility[] { Mould, Chain, Bellows, Casting, Press }) a.Bind(this, W);
+        }
+
+        public IEnumerable<int> WalkToAnvil()
+        {
+            var to = Sim.Flat(transform.position); if (to.magnitude <= AnvilRange) yield break;
+            var dest = to.normalized * (AnvilRange - 0.2f);
+            foreach (var w in WalkTo(dest, Walk, Sim.Ticks(AnvilMaxWalk))) yield return w;
+        }
+
+        public IEnumerable<int> MouldWithPress(bool forcePress = false)
+        {
+            foreach (var w in Mould.Run()) yield return w;
+            if ((forcePress || W.Difficulty == Difficulty.Hard) && Mould.Last != null)
+                foreach (var w in Press.Run(Mould.Last)) yield return w;
+        }
+
+        IEnumerable<int> Step(bool walk, Func<IEnumerable<int>> body, string recoverName, string clip, float recover, bool slagRim = false)
+        {
+            if (walk) foreach (var w in WalkToAnvil()) yield return w;
+            if (slagRim) Bellows.SlagRim();
+            Attacks++;
+            foreach (var w in body()) yield return w;
+            foreach (var w in Recover(recoverName, clip, Sim.Ticks(recover))) yield return w;
+        }
+
+        IEnumerable<IEnumerable<int>> Plan(int ph)
+        {
+            switch (ph)
+            {
+                case 1:
+                    yield return Step(true, () => MouldWithPress(), "Mould Press (hammer lifts)", "Idle", 2.0f);
+                    yield return Step(true, Bellows.Run, "Bellows Draw (vents cooling)", "Vulnerable", 3.5f);
+                    yield return Step(true, () => Casting.Run(0), "Great Casting (cooling)", "Idle", 2.0f);
+                    break;
+                case 2:
+                    yield return Step(false, Chain.Run, "Gear Chain", "Idle", 1.5f);
+                    yield return Step(true, () => MouldWithPress(), "Mould Press (hammer lifts)", "Idle", 2.0f, slagRim: true);
+                    yield return Step(false, Chain.Run, "Gear Chain", "Idle", 1.5f, slagRim: true);
+                    yield return Step(true, Bellows.Run, "Bellows Draw (vents cooling)", "Vulnerable", 3.5f);
+                    yield return Step(true, () => Casting.Run(3), "Great Casting (cooling)", "Idle", 2.0f);
+                    break;
+                default:
+                    yield return Step(true, () => Casting.Run(6), "Great Casting (hammer lodged)", "HammerLodged", 3.5f);
+                    yield return Step(false, Chain.Run, "Gear Chain", "Idle", 1.5f, slagRim: true);
+                    yield return Step(true, () => MouldWithPress(), "Mould Press (hammer lifts)", "Idle", 2.0f);
+                    yield return Step(true, Bellows.Run, "Bellows Draw (vents cooling)", "Idle", 2.0f);
+                    break;
+            }
+        }
+
+        // one v2 ability on loop (-lastbellAbility <id>); its phase variant follows the HP phase
+        IEnumerable<int> Solo(string id) => id switch
+        {
+            "crucivar.mould_press" => Step(true, () => MouldWithPress(), "Mould Press (hammer lifts)", "Idle", 2.0f),
+            "crucivar.second_press" => Step(true, () => MouldWithPress(forcePress: true), "Second Press (hammer lifts)", "Idle", 2.0f),
+            "crucivar.gear_chain" => Step(false, Chain.Run, "Gear Chain", "Idle", 1.5f),
+            "crucivar.bellows_draw" => Step(true, Bellows.Run, "Bellows Draw (vents cooling)", "Vulnerable", 3.5f),
+            _ => Step(true, () => Casting.Run(phase == 1 ? 0 : phase == 2 ? 3 : 6), "Great Casting (cooling)", "Idle", 3.5f),
+        };
+
+        IEnumerable<int> V2Script()
+        {
+            BindAbilities();
+            string solo = CrucivarArgs.Known(CrucivarArgs.Solo) ? CrucivarArgs.Solo : null;
+            while (true)
+            {
+                if (TestHold)
+                {
+                    if (testBody == null) { Current = "test hold"; yield return 1; continue; }
+                    var body = testBody; testRunning = true;
+                    foreach (var w in body) yield return w;
+                    testBody = null; testRunning = false;
+                    continue;
+                }
+                bool restart = false;
+                foreach (var step in solo != null ? new[] { Solo(solo) } : Plan(phase))
+                {
+                    foreach (var w in step) yield return w;
+                    // a transition waits for the current attack to finish; two thresholds in one burst queue one change
+                    int want = PhaseFor();
+                    if (want != phase) { phase = want; foreach (var w in V2Shift()) yield return w; restart = true; break; }
+                    if (TestHold) { restart = true; break; }
+                }
+                if (!restart) yield return 1;
+            }
+        }
+
+        // second form at 65 % (insulation falls, glow deepens), Open Pressure at 30 %: 1.5 s, harmless, no heal
+        IEnumerable<int> V2Shift()
+        {
+            Transitions++;
+            if (phase >= 2) SecondForm = true;
+            foreach (var w in PhaseShift()) yield return w;
         }
 
         // ---------------- presentation ----------------
