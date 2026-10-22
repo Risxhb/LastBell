@@ -109,7 +109,7 @@ namespace LastBell.Run
             return max;
         }
         // one ability = one pattern, except Bellows Draw whose rim and blast are two
-        static string Family(string src) => src.StartsWith("Mould") ? "Mould" : src.StartsWith("Gear") ? "Chain" : src.StartsWith("Pour") ? "Pour" :
+        static string Family(string src) => src.StartsWith("Slag") ? "slag" : src.StartsWith("Mould") ? "Mould" : src.StartsWith("Gear") ? "Chain" : src.StartsWith("Pour") ? "Pour" :
             src.StartsWith("Stamp") || src.StartsWith("March") ? "March" : src;
     }
 }
