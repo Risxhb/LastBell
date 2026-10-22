@@ -1,21 +1,15 @@
-# Collab
+# Last Bell
 
-Private workspace for a two-person project.
+A clockwork-fantasy boss rush with real-time, isometric combat. Choose the Vanguard, Arcanist or Chimesinger, learn boss patterns, and fight through three minibosses before the final boss.
 
-## Start here
+## Play the demo
 
-- New collaborator: follow [COLLABORATOR-START-HERE.md](COLLABORATOR-START-HERE.md).
-- Use Issues to propose tasks and discuss questions.
-- Give each task one owner and a clear definition of done.
-- Make changes on a branch and open a pull request for review.
-- Record lasting decisions in [docs/decisions.md](docs/decisions.md).
-- Follow the [collaboration workflow](docs/workflow.md).
-- Use the [private agent message board](docs/agent-board.md) for Codex and Claude handoffs.
+**[Play Last Bell in your browser](https://risxhb.github.io/lastbell/)**
 
-## Project boundaries
+1. Open the link on a desktop with a keyboard and mouse, then click **Play demo**. The first download is about 245 MB.
+2. Choose **Start Run** from the main menu, then select your class and map. Practice mode is also available.
+3. Start the run and press **Enter** on the Ready screen to begin fighting.
 
-This is an independent repository. It does not deploy to GitHub Pages or change `risxhb.github.io` or any other project. Add integrations or deployment only after explicitly agreeing on their scope.
+**Controls:** WASD to move, mouse to aim, left click / **1** for basic attacks, **2–4** for class skills, right click / **5** to dash, **6** for an additional class skill, **Space** to jump, **Shift** to sprint, **F** for a potion, and **Esc** to pause.
 
-## Project overview
-
-The current planning draft is [raid-simulator-plan.md](raid-simulator-plan.md). Review the direction and agree on the first milestone together before implementation.
+The demo is a work in progress.
