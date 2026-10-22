@@ -68,6 +68,8 @@ namespace LastBell.Run
             }
             cam = Camera.main;
             HazardSystem.FindArena();
+            int map = RunMaps.Current;
+            if (map >= 0) CombatWorld.SetPlayerBound(RunMaps.All[map].Bound, RunMaps.All[map].Square);
             if (!GetComponent<RunHud>()) gameObject.AddComponent<RunHud>();
             Application.targetFrameRate = 120;
             if (RunAutoTest.Requested) RunAutoTest.Launch();
