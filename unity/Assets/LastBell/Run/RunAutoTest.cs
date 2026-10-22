@@ -111,6 +111,10 @@ namespace LastBell.Run
             Note($"video frames {name}: {frames}");
         }
         IEnumerator Wait(float s) { float t = 0; while (t < s) { t += Time.deltaTime; yield return null; } }
+        // test setup for fixed-length kit/rotation fights against the Bellkeeper: these check a class, not survival, so the
+        // player is topped up instead of being downed mid-check (the defeat path is tested on its own)
+        void KeepAlive() { if (d.Player && d.Player.Hp < 60) d.Player.DebugSetHp(PlayerController.MaxHp); }
+        IEnumerator WaitAlive(float s) { float t = 0; while (t < s) { KeepAlive(); t += Time.deltaTime; yield return null; } }
         bool Safe(Func<bool> c) { try { return c(); } catch (Exception) { return false; } }
         IEnumerator Until(Func<bool> cond, float timeout, string what)
         {
@@ -227,59 +231,35 @@ namespace LastBell.Run
             yield return Until(() => d.State == RunState.Combat, 4, "combat 1");
             yield return Wait(0.3f);
             Check("repeated Ready starts exactly one encounter", d.EncounterStarts == starts0 + 1 && d.Encounter == 0, $"starts {d.EncounterStarts - starts0}");
-            Check("encounter 1 is the Dial Warden", d.Boss is DialWarden);
+            Check("the run offers only real bosses: one fight, the Bellkeeper", RunDirector.Bosses.Length == 1 && d.Boss is BellkeeperEncounter && !d.Boss.Placeholder);
+            Check("run starts at full health and potions", d.Player.Hp == PlayerController.MaxHp && d.Player.Potions == PlayerController.MaxPotions, $"hp {d.Player.Hp}, potions {d.Player.Potions}");
+            var bk = (BellkeeperEncounter)d.Boss;
             int bossHp0 = d.Boss.Hp;
             bool sawOpening = false; var vk = d.Player.Kit as VanguardKit2;
             float t0 = Time.time;
             var fight = StartCoroutine(Fight(7f, VanguardRotation, 1.6f));
             bool shot = false;
-            while (Time.time - t0 < 7f && d.State == RunState.Combat) { sawOpening |= vk.OpeningActive; if (Time.time - t0 > 3.5f && !shot) { shot = true; yield return Shot("combat_dial_warden"); } yield return null; }
+            while (Time.time - t0 < 7f && d.State == RunState.Combat) { KeepAlive(); sawOpening |= vk.OpeningActive; if (Time.time - t0 > 3.5f && !shot) { shot = true; yield return Shot("combat_vanguard_opening"); } yield return null; }
             StopCoroutine(fight); bot.Clear();
             Check("Vanguard strikes damage the boss through the kit", d.Boss.Hp < bossHp0, $"{bossHp0} -> {d.Boss.Hp}");
             Check("Steel Rhythm hit 3 granted Opening", sawOpening);
             yield return VanguardShowcase();
             yield return VanguardKitChecks();
-            // potions: drink one in encounter 1; it must still be spent in encounter 2 while health is full again
+            // potions: drink one mid-fight (heal and lockout), then the Bellkeeper resumes
             yield return Until(() => d.World.Hazards.Count == 0, 6, "quiet for the potion check"); d.Boss.Halt();
             yield return Until(() => d.Player.Stunned == 0, 2, "hit-stun over");   // drinking is blocked while stunned
             d.Player.DebugSetHp(50); bot.potion = true; yield return Wait(0.1f);
             Check("F potion heals +40 and spends one", d.Player.Hp == 90 && d.Player.Potions == PlayerController.MaxPotions - 1, $"hp {d.Player.Hp}, potions {d.Player.Potions}");
             bot.potion = true; yield return Wait(0.1f);
             Check("potion lockout: no second drink within 1 s", d.Player.Potions == PlayerController.MaxPotions - 1);
-            d.Player.DebugSetHp(37); d.Boss.BeginCombat();
-            yield return KillDuringWindup("dial_warden");
-            yield return Until(() => d.State == RunState.Intro && d.Encounter == 1, 6, "intro 2");
-            Check("encounter 1 ended exactly once", d.EncounterEnds == 1 && d.EncountersCleared == 1);
-            yield return null;   // Destroy lands at the end of the frame
-            Check("previous boss removed", FindObjectsByType<BossEncounter>().Length == 1);
-            yield return Until(() => d.State == RunState.Combat, 4, "combat 2");
-            Check("encounter 2 is the Pendulum Sentinel", d.Boss is PendulumSentinel);
-            Check("health refilled before miniboss 2; potions carried over", d.Player.Hp == PlayerController.MaxHp && d.Player.Potions == PlayerController.MaxPotions - 1, $"hp {d.Player.Hp}, potions {d.Player.Potions}");
-            yield return LowPendulumCheck();
-            yield return KillDuringWindup("pendulum_sentinel");
-            yield return Until(() => d.State == RunState.Combat && d.Encounter == 2, 10, "combat 3");
-            Check("encounter 3 is the Chimebound Oracle", d.Boss is ChimeboundOracle);
-            yield return Survive(2.2f);
-            yield return Shot("combat_oracle_markers");
-            yield return KillDuringWindup("chimebound_oracle");
-            yield return Until(() => d.State == RunState.Intermission, 6, "intermission");
-            yield return Wait(1.5f);
-            Check("intermission is free of hazards and bosses", d.World.Hazards.Count == 0 && d.Boss == null && !d.World.CombatActive);
-            int potInter = d.Player.Potions;
-            Check("potions still carried at the intermission", potInter == PlayerController.MaxPotions - 1, "potions " + potInter);
-            yield return Shot("intermission");
-            int starts1 = d.EncounterStarts;
-            for (int i = 0; i < 4; i++) { d.RequestContinue(); d.RequestContinue(); d.RequestReady(); yield return null; }
-            yield return Until(() => d.State == RunState.Combat, 4, "final combat");
-            Check("repeated Continue starts exactly one final encounter", d.EncounterStarts == starts1 + 1 && d.Boss is BellkeeperEncounter);
-            Check("health and potions refilled for the final boss", d.Player.Hp == PlayerController.MaxHp && d.Player.Potions == PlayerController.MaxPotions, $"hp {d.Player.Hp}, potions {d.Player.Potions}");
+            d.Boss.DebugSetHpFraction(0.95f); d.Boss.BeginCombat();   // test setup: phase 1 again after the kit checks
             d.Player.DebugSetHp(PlayerController.MaxHp);   // test setup: the rest of this run checks phases, not survival
-            var bk = (BellkeeperEncounter)d.Boss;
+            Check("Bellkeeper resumes in Last Guardian after the kit checks", d.Boss.PhaseName == BellkeeperEncounter.Phase1, d.Boss.PhaseName);
             Check("Bellkeeper uses its model", bk.Presenter != null && bk.Presenter.HasModel);
             Check("Bellkeeper 2.0 rig has the shell halves and three rings", bk.PhaseRigFound);
             StartCoroutine(Capture("bellkeeper_fight", 300));
             fight = StartCoroutine(Fight(4.5f, VanguardRotation, 1.8f));
-            yield return Wait(2.5f); yield return Shot("combat_bellkeeper"); yield return Wait(2.2f);
+            yield return WaitAlive(2.5f); yield return Shot("combat_bellkeeper"); yield return WaitAlive(2.2f);
             StopCoroutine(fight); bot.Clear();
             // The Unfinished Hour (spec v0.3 §3.1, §4.1): phase 1 records one footprint, then replays it alone
             yield return Survive(8, () => bk.HasMemory);
@@ -334,7 +314,7 @@ namespace LastBell.Run
             yield return Wait(1.0f); yield return Shot("bellkeeper_defeat");
             Check("defeat opens the chest fully", bk.ShellAngle > 60, $"shell {bk.ShellAngle:0}°");
             yield return Until(() => d.State == RunState.Results, 6, "results 1");
-            Check("victory after the fourth encounter", d.Victory && d.EncountersCleared == 4 && d.EncounterStarts == 4 && d.EncounterEnds == 4,
+            Check("victory after the Bellkeeper, the run's only encounter", d.Victory && d.EncountersCleared == 1 && d.EncounterStarts == 1 && d.EncounterEnds == 1,
                 $"victory {d.Victory}, cleared {d.EncountersCleared}, starts {d.EncounterStarts}, ends {d.EncounterEnds}");
             yield return Shot("results_victory");
 
@@ -380,21 +360,13 @@ namespace LastBell.Run
             d.RequestReady();
             yield return Until(() => d.State == RunState.Combat, 4, "chimesinger combat");
             yield return ChimesingerChecks();
-            yield return TickRegressions();   // ends encounter 1 with a real Resonant Note killing blow
-            for (int e = 1; e < 4; e++)
-            {
-                if (e == 3) { yield return Until(() => d.State == RunState.Intermission, 8, "intermission (chimesinger)"); d.RequestContinue(); }
-                yield return Until(() => d.State == RunState.Combat, 8, "combat " + (e + 1));
-                if (d.State != RunState.Combat) break;
-                chimeStep = 0; d.Player.DebugSetHp(PlayerController.MaxHp);
-                var f2 = StartCoroutine(Fight(e == 3 ? 4f : 2.5f, ChimeRotation, 6f));
-                yield return Wait(e == 3 ? 4f : 2.5f); StopCoroutine(f2); bot.Clear();
-                if (e == 3) yield return Shot("chimesinger_bellkeeper");
-                d.Boss.DebugDefeat();
-                yield return Until(() => d.State != RunState.Combat, 2, "boss defeated " + (e + 1));
-            }
+            chimeStep = 0; d.Player.DebugSetHp(PlayerController.MaxHp); d.Boss.BeginCombat();
+            var f2 = StartCoroutine(Fight(4f, ChimeRotation, 6f));
+            yield return WaitAlive(4f); StopCoroutine(f2); bot.Clear();
+            yield return Shot("chimesinger_bellkeeper");
+            yield return TickRegressions();   // ends the fight with a real Resonant Note killing blow
             yield return Until(() => d.State == RunState.Results, 8, "results 4");
-            Check("Chimesinger run reaches victory", d.Victory && d.EncountersCleared == 4);
+            Check("Chimesinger run reaches victory", d.Victory && d.EncountersCleared == 1);
             d.ReturnToMenu(); yield return null;
 
             // ---------- run 5: Arcanist rotation and full victory ----------
@@ -404,24 +376,21 @@ namespace LastBell.Run
             d.RequestReady();
             yield return Until(() => d.State == RunState.Combat, 4, "arcanist combat");
             yield return ArcanistChecks();
-            for (int e = 0; e < 4; e++)
+            if (d.State == RunState.Combat)
             {
-                if (e == 3) { yield return Until(() => d.State == RunState.Intermission, 8, "intermission (arcanist)"); d.RequestContinue(); }
-                yield return Until(() => d.State == RunState.Combat, 8, "arcanist combat " + (e + 1));
-                if (d.State != RunState.Combat) break;
-                d.Player.DebugSetHp(PlayerController.MaxHp);
-                var f3 = StartCoroutine(Fight(e == 3 ? 4f : 2f, ArcRotation, 6f));
-                yield return Wait(e == 3 ? 4f : 2f); StopCoroutine(f3); bot.Clear();
-                if (e == 3) yield return Shot("arcanist_bellkeeper");
+                d.Player.DebugSetHp(PlayerController.MaxHp); d.Boss.BeginCombat();
+                var f3 = StartCoroutine(Fight(4f, ArcRotation, 6f));
+                yield return WaitAlive(4f); StopCoroutine(f3); bot.Clear();
+                yield return Shot("arcanist_bellkeeper");
                 d.Boss.DebugDefeat();
-                yield return Until(() => d.State != RunState.Combat, 2, "arcanist boss defeated " + (e + 1));
+                yield return Until(() => d.State != RunState.Combat, 2, "arcanist boss defeated");
             }
             yield return Until(() => d.State == RunState.Results, 8, "results 5");
-            Check("Arcanist run reaches victory", d.Victory && d.EncountersCleared == 4);
+            Check("Arcanist run reaches victory", d.Victory && d.EncountersCleared == 1);
             d.ReturnToMenu(); yield return null;
 
             // ---------- practice ----------
-            d.StartPractice("Vanguard", 3);
+            d.StartPractice("Vanguard", 0);
             d.RequestReady();
             yield return Until(() => d.State == RunState.Combat, 4, "practice combat");
             Check("practice starts the chosen encounter", d.Boss is BellkeeperEncounter && d.Mode == RunMode.Practice);
@@ -430,7 +399,7 @@ namespace LastBell.Run
             yield return Until(() => d.State == RunState.Results, 6, "practice results");
             Check("practice clear ends in a practice result, not a run victory", d.Mode == RunMode.Practice && d.EncountersCleared == 1);
             d.RequestRetry();
-            Check("practice retry repeats the same encounter", d.State == RunState.Ready && d.Encounter == 3 && d.Mode == RunMode.Practice);
+            Check("practice retry repeats the same encounter", d.State == RunState.Ready && d.Encounter == 0 && d.Mode == RunMode.Practice);
             d.ReturnToMenu();
 
             // ---------- map tour: switch maps after fights have run (FX layers already exist), fight briefly on each ----------
@@ -447,11 +416,11 @@ namespace LastBell.Run
                 yield return Wait(1.5f);
                 Check($"map {map.Name}: loads into the menu with its arena", RunMaps.Current == m && d.State == RunState.Menu && HazardSystem.ArenaCount > 0, $"arena scripts {HazardSystem.ArenaCount}");
                 yield return Shot("map_" + map.Id + "_menu");
-                d.StartPractice("Vanguard", 3); d.RequestReady();
+                d.StartPractice("Vanguard", 0); d.RequestReady();
                 yield return Until(() => d.State == RunState.Combat, 4, map.Name + " practice combat");
                 int hp0 = d.Boss ? d.Boss.Hp : 0;
                 var fm = StartCoroutine(Fight(4f, VanguardRotation, 2.2f));
-                yield return Wait(4f); StopCoroutine(fm); bot.Clear();
+                yield return WaitAlive(4f); StopCoroutine(fm); bot.Clear();
                 yield return Shot("map_" + map.Id + "_combat");
                 Check($"map {map.Name}: Bellkeeper fight runs (boss takes damage, player stays on the floor)",
                     d.Boss && d.Boss.Hp < hp0 && CombatWorld.InPlayerBound(d.Player.transform.position, 0.01f), $"boss hp {hp0} -> {(d.Boss ? d.Boss.Hp : -1)}");
@@ -480,7 +449,6 @@ namespace LastBell.Run
             Check($"fresh run {when}: one player only", FindObjectsByType<PlayerController>().Length == 1);
         }
 
-        // Low Pendulum height rule: standing in the lane and jumping through the resolve avoids it
         // Difficulty row (Easy / Medium / Hard): menu-only selection, copied into the run, kept on retry, and scaling the
         // damage a real hit deals once. Leaves the selection on Medium for the rest of the test.
         IEnumerator DifficultyChecks()
@@ -508,25 +476,6 @@ namespace LastBell.Run
             }
             d.SelectDifficulty(Difficulty.Medium);
             Check("difficulty back on Medium for the rest of the test", d.State == RunState.Menu && RunDifficulty.Selected == Difficulty.Medium);
-        }
-
-        IEnumerator LowPendulumCheck()
-        {
-            yield return Until(() => d.World.Hazards.Live.Any(h => h.JumpClearable), 14, "Low Pendulum warning");
-            var bar = d.World.Hazards.Live.FirstOrDefault(h => h.JumpClearable);
-            if (bar == null) yield break;
-            // put the player in the middle of the bar (test setup) and jump so the resolve tick lands mid-air
-            d.Player.transform.position = bar.Origin + Sim.Dir(bar.Yaw) * Mathf.Min(4f, bar.Length * 0.5f);
-            int hp0 = d.Player.Hp; bool jumped = false, capStarted = false;
-            yield return Shot("low_pendulum_jump_warning");
-            while (d.World.Hazards.Live.Contains(bar))
-            {
-                if (!capStarted && bar.ResolveAt - bar.Age <= 50) { capStarted = true; StartCoroutine(Capture("low_pendulum_jump", 110)); }
-                if (!jumped && bar.ResolveAt - bar.Age <= 16) { bot.jump = true; jumped = true; }
-                yield return null;
-            }
-            yield return Wait(0.3f);
-            Check("jumping through the Low Pendulum avoids it", d.Player.Hp == hp0, $"hp {hp0} -> {d.Player.Hp}");
         }
 
         // One readable rotation on camera: Steel Rhythm x3 -> empowered Sundering Blow -> Brace -> Last Word.

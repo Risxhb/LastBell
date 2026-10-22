@@ -20,9 +20,7 @@ namespace LastBell.Run
 
         static readonly Dictionary<string, string> Hints = new Dictionary<string, string>
         {
-            ["Hand Sweep"] = "leave the cone", ["Hollow Dial"] = "stand inside the inner circle or outside the ring",
-            ["Pendulum Charge"] = "step sideways out of the lane", ["Low Pendulum"] = "JUMP over it or go around",
-            ["Shattered Chime"] = "move: the marker follows you, then locks", ["Dividing Chime"] = "leave the cone",
+            ["Shattered Chime"] = "move: the marker follows you, then locks",
             ["Bell Sweep"] = "leave the cone", ["Bell Sweep (Final Toll)"] = "leave the cone (heavy)", ["Hollow Toll"] = "inside the inner circle or outside the ring",
             [BellkeeperEncounter.March] = "step sideways out of the lane",
             [BellkeeperEncounter.Echo] = "it repeats where it struck before, not where the boss stands",
@@ -107,8 +105,8 @@ namespace LastBell.Run
                 case RunState.Ready:
                 {
                     var r = Panel(600, 178, h - 376);   // just above the player panel (h - 192)
-                    GUI.Label(new Rect(r.x, r.y + 10, r.width, 34), d.Mode == RunMode.Practice ? "PRACTICE — " + RunDirector.SlotNames[SlotIndex(d.Encounter)] : "PREPARATION", big);
-                    GUI.Label(new Rect(r.x + 20, r.y + 46, r.width - 40, 70), RunDifficulty.Name(d.Difficulty) + ". " + (d.Mode == RunMode.Practice ? "Practice never advances the run." : "Three minibosses, an intermission, then the Bellkeeper. Health refills before each boss; potions carry over until the final boss refills them."), mid);
+                    GUI.Label(new Rect(r.x, r.y + 10, r.width, 34), d.Mode == RunMode.Practice ? "PRACTICE — " + RunDirector.Bosses[d.Encounter].Name : "PREPARATION", big);
+                    GUI.Label(new Rect(r.x + 20, r.y + 46, r.width - 40, 70), RunDifficulty.Name(d.Difficulty) + ". " + (d.Mode == RunMode.Practice ? "Practice never advances the run." : RunDirector.Bosses.Length == 1 ? "One fight: the Bellkeeper." : $"{RunDirector.Bosses.Length} bosses in a row. Health refills before each boss; potions carry over until the final boss refills them."), mid);
                     if (GUI.Button(new Rect(r.x + r.width / 2 - 110, r.y + 126, 220, 36), "READY  (Enter)", btn)) d.RequestReady();
                     break;
                 }
@@ -116,7 +114,7 @@ namespace LastBell.Run
                     if (d.Boss != null)
                     {
                         var r = Panel(640, 116, h * 0.18f);
-                        string head = d.Mode == RunMode.Practice ? "Practice" : d.Encounter < 3 ? $"Miniboss {d.Encounter + 1} of 3" : "Final boss";
+                        string head = d.Mode == RunMode.Practice ? "Practice" : d.Encounter < RunDirector.LastBoss ? $"Boss {d.Encounter + 1} of {RunDirector.Bosses.Length}" : "Final boss";
                         GUI.Label(new Rect(r.x, r.y + 8, r.width, 26), head, mid);
                         GUI.Label(new Rect(r.x, r.y + 34, r.width, 36), d.Boss.DisplayName.ToUpper(), big);
                         GUI.Label(new Rect(r.x, r.y + 72, r.width, 24), d.Boss.Lesson + (d.Boss.Placeholder ? "   ·   [stand-in boss]" : ""), mid);
@@ -127,16 +125,8 @@ namespace LastBell.Run
                 {
                     var r = Panel(560, 84, h * 0.2f);
                     GUI.Label(new Rect(r.x, r.y + 8, r.width, 36), (d.Boss ? d.Boss.DisplayName : "Boss") + " falls silent", big);
-                    string next = d.Mode == RunMode.Practice ? "Practice complete" : d.Encounter == 2 ? "Next: Intermission" : d.Encounter == 3 ? "The last bell has rung" : "Next: " + RunDirector.SlotNames[d.Encounter + 1];
+                    string next = d.Mode == RunMode.Practice ? "Practice complete" : d.Encounter == RunDirector.LastBoss ? "The last bell has rung" : "Next: " + RunDirector.Bosses[d.Encounter + 1].Name;
                     GUI.Label(new Rect(r.x, r.y + 48, r.width, 26), "Combat over · " + next, mid);
-                    break;
-                }
-                case RunState.Intermission:
-                {
-                    var r = Panel(600, 190, h * 0.5f);
-                    GUI.Label(new Rect(r.x, r.y + 10, r.width, 34), "INTERMISSION", big);
-                    GUI.Label(new Rect(r.x + 20, r.y + 48, r.width - 40, 80), "Combat has ended. A shop will stand here in a later build; nothing can be bought yet.\nHealth and potions are refilled for the final fight. Cooldowns and stamina are refreshed.\nNext: THE BELLKEEPER", mid);
-                    if (GUI.Button(new Rect(r.x + r.width / 2 - 120, r.y + 140, 240, 36), "CONTINUE  (Enter)", btn)) d.RequestContinue();
                     break;
                 }
                 case RunState.Downed:
@@ -151,8 +141,6 @@ namespace LastBell.Run
             GUI.Label(new Rect(w - 330, h - 22, 320, 20), "dev: F9 defeat boss · F8 next phase · Esc pause", tiny);
             GUI.Label(new Rect(14, h - 22, 420, 20), "map: " + RunMaps.CurrentName + "   ·   difficulty: " + RunDifficulty.Name(d.Difficulty), tiny);
         }
-
-        static int SlotIndex(int encounter) => encounter >= 3 ? 4 : encounter;
 
         void Menu()
         {
@@ -190,14 +178,13 @@ namespace LastBell.Run
                 if (GUI.Toggle(dr, on, (on ? "> " : "") + RunDifficulty.Names[i], btn) && !on) d.SelectDifficulty((Difficulty)i);
             }
             if (GUI.Button(new Rect(r.x + r.width / 2 - 140, r.y + 364, 280, 40), "START RUN  (Enter)", btn)) d.StartRun(RunDirector.Classes[menuClass]);
-            GUI.Label(new Rect(r.x + 30, r.y + 418, 300, 22), "Practice one encounter", small);
-            string[] names = { "Dial Warden", "Pendulum Sentinel", "Chimebound Oracle", "Bellkeeper" };
-            for (int i = 0; i < 4; i++)
-                if (GUI.Button(new Rect(r.x + 30 + i * 166, r.y + 442, 160, 36), names[i], btn)) d.StartPractice(RunDirector.Classes[menuClass], i);
+            GUI.Label(new Rect(r.x + 30, r.y + 418, 300, 22), "Practice one boss", small);
+            for (int i = 0; i < RunDirector.Bosses.Length; i++)
+                if (GUI.Button(new Rect(r.x + 30 + i * 166, r.y + 442, 160, 36), RunDirector.Bosses[i].Name, btn)) d.StartPractice(RunDirector.Classes[menuClass], i);
             GUI.Label(new Rect(r.x + 30, r.y + 492, r.width - 60, 120),
                 "Controls: WASD move · mouse aims · 1 / LMB basic · 2 3 4 class actions · 6 Mending Chorus / Temporal Anchor · 5 / RMB dash · F potion · Space jump · Shift sprint · Esc pause\n" +
-                "Movement stamina: sprint, jump and dash share one bar. No invincibility frames (dodging does not make you immune). F drinks a potion (+40 HP).\nHealth refills before each boss; potions carry over between minibosses and refill before the final boss. Retry restarts at the first miniboss.\n" +
-                "Minibosses are labelled stand-ins; the Bellkeeper uses its model. Arcanist kit numbers are prototype tuning. Dev keys in combat: F9 defeat boss, F8 next phase.", tiny);
+                "Movement stamina: sprint, jump and dash share one bar. No invincibility frames (dodging does not make you immune). F drinks a potion (+40 HP).\nHealth refills before each boss; potions carry over between bosses and refill before the final boss. Retry restarts at the first boss.\n" +
+                "Only real boss encounters are offered (the stand-in minibosses were removed). Arcanist kit numbers are prototype tuning. Dev keys in combat: F9 defeat boss, F8 next phase.", tiny);
             if (GUI.Button(new Rect(r.x + r.width - 130, r.y + r.height - 50, 100, 36), "Quit", btn)) Application.Quit();
         }
 
@@ -206,8 +193,8 @@ namespace LastBell.Run
             var r = Panel(560, 300);
             GUI.Label(new Rect(r.x, r.y + 16, r.width, 50), d.Victory ? (d.Mode == RunMode.Practice ? "PRACTICE CLEARED" : "VICTORY") : "DEFEAT", title);
             var w = d.World;
-            string lines = d.Victory ? (d.Mode == RunMode.Practice ? "Practice result only: the run is unchanged." : "The Bellkeeper is silenced. All four encounters cleared.")
-                                     : $"Downed by {d.DefeatCause} during {(d.Boss ? d.Boss.DisplayName : RunDirector.SlotNames[SlotIndex(d.Encounter)])}.";
+            string lines = d.Victory ? (d.Mode == RunMode.Practice ? "Practice result only: the run is unchanged." : "The Bellkeeper is silenced. The run is cleared.")
+                                     : $"Downed by {d.DefeatCause} during {(d.Boss ? d.Boss.DisplayName : RunDirector.Bosses[d.Encounter].Name)}.";
             lines += $"\n\nClass: {d.ClassName}   ·   {RunDifficulty.Name(d.Difficulty)}   ·   Time in combat: {d.RunTicks / 60f / 60f:0}:{d.RunTicks / 60f % 60:00}   ·   Encounters cleared: {d.EncountersCleared}";
             if (w != null) lines += $"\nDamage dealt {w.DamageDealt}   ·   Damage taken {w.DamageTaken}";
             GUI.Label(new Rect(r.x + 20, r.y + 76, r.width - 40, 120), lines, mid);
@@ -243,13 +230,13 @@ namespace LastBell.Run
         {
             if (d.Mode == RunMode.Practice) { GUI.Label(new Rect(14, 12, 400, 22), "PRACTICE — does not advance the run", small); return; }
             float x = 14, y = 12;
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < RunDirector.Bosses.Length; i++)
             {
                 int cur = d.ProgressSlot; bool done = i < cur || (i == cur && d.State == RunState.Cleared) || (d.State == RunState.Results && d.Victory);
                 var c = done ? new Color(0.95f, 0.75f, 0.35f) : i == cur ? new Color(0.55f, 0.85f, 1f) : new Color(0.3f, 0.32f, 0.4f);
                 Rect(new Rect(x, y, 112, 26), new Color(0, 0, 0, 0.55f));
                 Rect(new Rect(x, y + 22, 112, 4), c);
-                GUI.Label(new Rect(x + 6, y + 3, 110, 20), (done ? "+ " : i == cur ? "> " : "") + RunDirector.SlotNames[i], tiny);
+                GUI.Label(new Rect(x + 6, y + 3, 110, 20), (done ? "+ " : i == cur ? "> " : "") + RunDirector.Bosses[i].Name, tiny);
                 x += 118;
             }
         }

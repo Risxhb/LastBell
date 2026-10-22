@@ -5,12 +5,13 @@ using UnityEngine.InputSystem;
 
 namespace LastBell.Run
 {
-    public enum RunState { Menu, Ready, Intro, Combat, Cleared, Intermission, Downed, Results }
+    public enum RunState { Menu, Ready, Intro, Combat, Cleared, Downed, Results }
     public enum RunMode { Run, Practice }
 
-    // Run flow in the single arena (single-arena plan §5):
-    //   Menu -> Ready (preparation) -> [Intro -> Combat -> Cleared] x3 minibosses -> Intermission (future shop)
-    //   -> Intro -> Combat (Bellkeeper) -> Cleared -> Results (victory)
+    // Run flow in the single arena:
+    //   Menu -> Ready (preparation) -> [Intro -> Combat -> Cleared] for each boss in Bosses -> Results (victory)
+    // The stand-in minibosses (Dial Warden, Pendulum Sentinel, Chimebound Oracle) and the intermission were removed on
+    // 2026-10-22: the run and practice only offer real boss encounters, currently the Bellkeeper.
     //   any Combat -> Downed -> Results (defeat).  Results -> Retry (fresh run, encounter 1) or Menu.
     // Practice runs one chosen encounter with the same rules and never advances or unlocks the run.
     // Every transition goes through Go(), which bumps a generation number: timers and requests from an older state are
@@ -21,16 +22,21 @@ namespace LastBell.Run
     {
         public static RunDirector Instance { get; private set; }
 
-        public static readonly string[] SlotNames = { "Dial Warden", "Pendulum Sentinel", "Chimebound Oracle", "Intermission", "Bellkeeper" };
+        // The bosses the run fights in order, and the practice menu offers. Add a real encounter here to put it in both.
+        public static readonly (string Name, Func<CombatWorld, BossEncounter> Spawn)[] Bosses =
+        {
+            ("Bellkeeper", w => BossEncounter.Spawn<BellkeeperEncounter>(w, Vector3.zero, 0)),
+        };
+        public static int LastBoss => Bosses.Length - 1;
         public static readonly string[] Classes = { "Vanguard", "Chimesinger", "Arcanist" };
         const int IntroTicks = 120, ClearTicks = 180, DownedTicks = 100;
-        static readonly Vector3 PlayerSocket = new Vector3(0, 0, 6.5f), BossSocket = new Vector3(0, 0, -1.5f);
+        static readonly Vector3 PlayerSocket = new Vector3(0, 0, 6.5f);
 
         public RunState State { get; private set; } = RunState.Menu;
         public RunMode Mode { get; private set; }
         public string ClassName { get; private set; } = "Vanguard";
         public Difficulty Difficulty { get; private set; } = Difficulty.Medium;   // copied from the menu at run start
-        public int Encounter { get; private set; }          // 0..3 (3 = final boss)
+        public int Encounter { get; private set; }          // index into Bosses (the last is the final boss)
         public int Generation { get; private set; }
         public int StateTicks { get; private set; }
         public bool Victory { get; private set; }
@@ -88,7 +94,7 @@ namespace LastBell.Run
 
         // ---------------- requests (UI / keyboard / tests) ----------------
         public bool StartRun(string className) => Begin(RunMode.Run, className, 0);
-        public bool StartPractice(string className, int encounter) => Begin(RunMode.Practice, className, Mathf.Clamp(encounter, 0, 3));
+        public bool StartPractice(string className, int encounter) => Begin(RunMode.Practice, className, Mathf.Clamp(encounter, 0, LastBoss));
 
         bool Begin(RunMode mode, string className, int encounter)
         {
@@ -124,13 +130,6 @@ namespace LastBell.Run
         {
             if (State != RunState.Ready || Paused) return false;
             BeginIntro(Encounter);
-            return true;
-        }
-
-        public bool RequestContinue()
-        {
-            if (State != RunState.Intermission || Paused) return false;
-            BeginIntro(3);
             return true;
         }
 
@@ -200,16 +199,10 @@ namespace LastBell.Run
             Encounter = index;
             World.ClearTransient();
             if (Boss) Destroy(Boss.gameObject);
-            Boss = index switch
-            {
-                0 => BossEncounter.Spawn<DialWarden>(World, BossSocket, 0),
-                1 => BossEncounter.Spawn<PendulumSentinel>(World, BossSocket, 0),
-                2 => BossEncounter.Spawn<ChimeboundOracle>(World, BossSocket, 0),
-                _ => BossEncounter.Spawn<BellkeeperEncounter>(World, Vector3.zero, 0),
-            };
+            Boss = Bosses[index].Spawn(World);
             World.Boss = Boss;
             World.CombatActive = false;
-            if (index > 0) Player.RefreshHealth(refillPotions: index == 3);   // health policy: see PlayerController.RefreshHealth
+            if (index > 0) Player.RefreshHealth(refillPotions: index == LastBoss);   // health policy: see PlayerController.RefreshHealth
             Player.PrepareForEncounter(PlayerSocket, 180);
             Player.AbilitiesEnabled = false;
             Go(RunState.Intro);
@@ -248,7 +241,6 @@ namespace LastBell.Run
                     if (kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame)
                     {
                         if (State == RunState.Ready) RequestReady();
-                        else if (State == RunState.Intermission) RequestContinue();
                     }
                     // dev shortcuts (labelled in the HUD): finish the current boss / jump it to its next phase
                     if (State == RunState.Combat && Boss && !Boss.Dead)
@@ -296,8 +288,7 @@ namespace LastBell.Run
                     {
                         if (Boss) { Destroy(Boss.gameObject); Boss = null; World.Boss = null; }
                         if (Mode == RunMode.Practice) { Victory = true; Go(RunState.Results); }
-                        else if (Encounter == 2) { Player.PrepareForEncounter(PlayerSocket, 180); Go(RunState.Intermission); }
-                        else if (Encounter == 3) { Victory = true; Go(RunState.Results); }
+                        else if (Encounter == LastBoss) { Victory = true; Go(RunState.Results); }
                         else BeginIntro(Encounter + 1);
                     }
                     break;
@@ -320,7 +311,7 @@ namespace LastBell.Run
             cam.fieldOfView = 44;
         }
 
-        // slot label for the progress track: 0..2 minibosses, 3 intermission, 4 final
-        public int ProgressSlot => State == RunState.Intermission ? 3 : Encounter >= 3 ? 4 : Encounter;
+        // slot on the progress track: one per boss
+        public int ProgressSlot => Encounter;
     }
 }
