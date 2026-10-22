@@ -55,6 +55,10 @@ namespace LastBell.Run
         public RunMode Mode { get; private set; }
         public string ClassName { get; private set; } = "Vanguard";
         public Difficulty Difficulty { get; private set; } = Difficulty.Medium;   // copied from the menu at run start
+        public int AllyCount { get; private set; }            // bot allies, copied from the menu at run start (RunParty); a retry keeps it
+        public readonly List<PlayerController> Allies = new List<PlayerController>();
+        // allies line up behind the player at the south entry, alternating left and right
+        static Vector3 AllySocket(int i) => PlayerSocket + new Vector3((i % 2 == 0 ? -1 : 1) * (1.6f + 1.6f * (i / 2)), 0, 1.2f);
         public int Encounter { get; private set; }          // index into Bosses (the last is the final boss)
         public int Generation { get; private set; }
         public int StateTicks { get; private set; }
@@ -138,6 +142,7 @@ namespace LastBell.Run
             if (State != RunState.Menu) return false;
             Mode = mode; ClassName = Array.IndexOf(Classes, className) >= 0 ? className : "Vanguard";
             Difficulty = RunDifficulty.Selected;
+            AllyCount = RunParty.Selected;
             BuildRun(encounter);
             Go(RunState.Ready);
             return true;
@@ -160,6 +165,16 @@ namespace LastBell.Run
             if (State != RunState.Menu) return false;
             if (RunDifficulty.Selected != level) Log.Add($"{Time.frameCount}: difficulty {RunDifficulty.Name(level)}");
             RunDifficulty.Selected = level;
+            return true;
+        }
+
+        // Menu only: how many bot allies the next run or practice brings (remembered between sessions).
+        public bool SelectAllies(int count)
+        {
+            if (State != RunState.Menu) return false;
+            count = Mathf.Clamp(count, 0, RunParty.MaxAllies);
+            if (RunParty.Selected != count) Log.Add($"{Time.frameCount}: allies {count}");
+            RunParty.Selected = count;
             return true;
         }
 
@@ -216,6 +231,15 @@ namespace LastBell.Run
             Player.Input = InputOverride ?? new KeyboardMouseInput();
             Player.AbilitiesEnabled = false;
             Player.Presenter.GetUp();
+            // bot allies (RunParty): classes spread across all three, standing in a row behind the player
+            Allies.Clear();
+            var allyClasses = RunParty.AllyClasses(ClassName, AllyCount);
+            for (int i = 0; i < allyClasses.Length; i++)
+            {
+                var a = PlayerController.Spawn(World, allyClasses[i], AllySocket(i), 180);
+                a.Input = new AllyBot(i, allyClasses.Length); a.AbilitiesEnabled = false; a.Presenter.GetUp();
+                Allies.Add(a);
+            }
             Encounter = startEncounter; practiceEncounter = startEncounter;
             RunTicks = 0; EncountersCleared = 0; Victory = false; DefeatCause = null;
             acc = 0;
@@ -226,6 +250,7 @@ namespace LastBell.Run
             if (World != null) World.ClearTransient();
             if (bossFx) bossFx.ResetAll(); if (playerFx) playerFx.ResetAll();
             if (scopeParent) Destroy(scopeParent.gameObject);
+            Allies.Clear();
             World = null; Player = null; Boss = null; scopeParent = null;
             RunHud.ClearTransient();
             Paused = false;
@@ -245,6 +270,11 @@ namespace LastBell.Run
             if (Mode == RunMode.Run && pos > 0) Player.RefreshHealth(refillPotions: pos == RunOrder.Length - 1);
             Player.PrepareForEncounter(PlayerSocket, 180);
             Player.AbilitiesEnabled = false;
+            for (int i = 0; i < Allies.Count; i++)
+            {
+                if (Mode == RunMode.Run && pos > 0) Allies[i].RefreshHealth(refillPotions: pos == RunOrder.Length - 1);
+                Allies[i].PrepareForEncounter(AllySocket(i), 180); Allies[i].AbilitiesEnabled = false;
+            }
             Go(RunState.Intro);
         }
 
@@ -255,6 +285,7 @@ namespace LastBell.Run
             World.CombatActive = true;
             World.BeginSegment();
             Player.AbilitiesEnabled = true;
+            foreach (var a in Allies) a.AbilitiesEnabled = true;
             Boss.BeginCombat();
             Go(RunState.Combat);
         }
@@ -265,6 +296,7 @@ namespace LastBell.Run
             Log.Add($"encounter end {Boss?.Id} defeated={bossDefeated}");
             World.CombatActive = false;
             Player.AbilitiesEnabled = false;
+            foreach (var a in Allies) a.AbilitiesEnabled = false;
             World.ClearTransient();
             if (!bossDefeated && Boss) Boss.Halt();
         }

@@ -53,6 +53,8 @@ namespace LastBell.Run
             }
             if (d.State == RunState.Menu && kb.dKey.wasPressedThisFrame)
                 d.SelectDifficulty((Difficulty)(((int)RunDifficulty.Selected + 1) % RunDifficulty.Names.Length));
+            if (d.State == RunState.Menu && kb.aKey.wasPressedThisFrame)
+                d.SelectAllies((RunParty.Selected + 1) % (RunParty.MaxAllies + 1));
         }
 
         void Styles()
@@ -101,6 +103,7 @@ namespace LastBell.Run
             Track();
             Boss();
             PlayerPanel();
+            AllyPanel();
             Floats();
             HazardLabels();
             switch (d.State)
@@ -173,12 +176,21 @@ namespace LastBell.Run
                 if (GUI.Toggle(mr, on, (on ? "> " : "") + RunMaps.All[i].Name, mapBtn) && !on) d.SelectMap(i);
             }
             var level = RunDifficulty.Selected;
-            GUI.Label(new Rect(r.x + 30, r.y + 286, r.width - 60, 22), "Difficulty  ·  " + RunDifficulty.Notes[(int)level] + "   (D to switch)", small);
+            GUI.Label(new Rect(r.x + 30, r.y + 286, 330, 22), "Difficulty  ·  " + RunDifficulty.Name(level) + "   (D)", small);
             for (int i = 0; i < RunDifficulty.Names.Length; i++)
             {
-                var dr = new Rect(r.x + 30 + i * 222, r.y + 310, 214, 36);
+                var dr = new Rect(r.x + 30 + i * 110, r.y + 310, 104, 36);
                 bool on = (int)level == i;
                 if (GUI.Toggle(dr, on, (on ? "> " : "") + RunDifficulty.Names[i], btn) && !on) d.SelectDifficulty((Difficulty)i);
+            }
+            // bot allies (RunParty): 0 = solo; classes spread across all three
+            int allies = RunParty.Selected;
+            GUI.Label(new Rect(r.x + 370, r.y + 286, 320, 22), "Allies (bots)  ·  " + (allies == 0 ? "solo" : allies + "   party of " + (allies + 1)) + "   (A)", small);
+            for (int i = 0; i <= RunParty.MaxAllies; i++)
+            {
+                var ar = new Rect(r.x + 370 + i * 40, r.y + 310, 36, 36);
+                bool on = allies == i;
+                if (GUI.Toggle(ar, on, i.ToString(), btn) && !on) d.SelectAllies(i);
             }
             if (GUI.Button(new Rect(r.x + r.width / 2 - 140, r.y + 364, 280, 40), "START RUN  (Enter)", btn)) d.StartRun(RunDirector.Classes[menuClass]);
             GUI.Label(new Rect(r.x + 30, r.y + 418, 300, 22), "Practice one boss", small);
@@ -299,6 +311,22 @@ namespace LastBell.Run
             Rect(new Rect(r.x, r.y + H - 16, W, 16), new Color(0, 0, 0, 0.55f));
             GUI.Label(new Rect(r.x, r.y + H - 16, W, 16), state, slot);
             return r;
+        }
+
+        // bot allies (RunParty): class and health, left edge
+        void AllyPanel()
+        {
+            if (d.Allies.Count == 0) return;
+            float x = 14, y = Screen.height * 0.35f;
+            Rect(new Rect(x - 4, y - 24, 196, 24 + d.Allies.Count * 30), new Color(0, 0, 0, 0.45f));
+            GUI.Label(new Rect(x, y - 22, 190, 20), "ALLIES (bots)", tiny);
+            for (int i = 0; i < d.Allies.Count; i++)
+            {
+                var a = d.Allies[i]; if (!a) continue;
+                float yy = y + i * 30;
+                GUI.Label(new Rect(x, yy, 190, 18), a.ClassName + (a.Down ? "   (down)" : "   " + a.Hp), tiny);
+                Bar(new Rect(x, yy + 17, 186, 7), a.Hp / (float)PlayerController.MaxHp, a.Down ? new Color(0.4f, 0.4f, 0.45f) : new Color(0.45f, 0.85f, 0.55f));
+            }
         }
 
         void PlayerPanel()
