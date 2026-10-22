@@ -9,11 +9,13 @@ namespace LastBell.Run
     // - Dodging: when it stands in a hazard that locked at least its reaction time ago (0.25-0.4 s, varied per bot),
     //   it heads for the nearest spot outside every live hazard, dashing or sprinting only when walking is too slow.
     //   No cheats: it sees exactly the telegraphs a player sees, and has no immunity.
-    // - Rotation: a simple per-class priority list; casters stop for their casts because the kits slow movement.
+    // - Rotation: a simple per-class priority list, OFF by default (AllyBot.Attacks): Chzy18 wants bots that do the
+    //   mechanics without fighting, so they never shorten the fight.
     public sealed class AllyBot : IInputSource
     {
         readonly int slot, of;            // this ally's index and the ally count (for its angle round the boss)
         readonly int reactTicks;
+        public static bool Attacks = false;   // bots are mechanics dummies: they move, dodge and spread, but never attack or heal
         int tick, lastPress = -999, castHold;
         int[] cd = new int[5];
 
@@ -68,9 +70,10 @@ namespace LastBell.Run
                 // never walk into a live telegraph
                 if (move != Vector3.zero && Inside(live, pos + move * 0.4f) && !Inside(live, pos)) move = Vector3.zero;
                 if (castHold > 0) castHold--;
-                // 3) attack when in range
+                // 3) attack when in range (off: Chzy18 2026-10-22, "the bots are doing too much damage": they only do the
+                // mechanics). Set Attacks = true to bring the rotation back.
                 float gap = Sim.Flat(bpos - pos).magnitude - boss.BodyRadius;
-                if (gap <= Range(me) + 1.5f) Attack(me, ref inp);
+                if (Attacks && gap <= Range(me) + 1.5f) Attack(me, ref inp);
             }
             if (me.Hp < 40 && me.Potions > 0 && tick % 30 == 0) inp.Potion = true;
             inp.Move = ToScreen(move);
