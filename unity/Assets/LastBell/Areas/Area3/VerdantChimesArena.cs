@@ -83,7 +83,7 @@ namespace LastBell.Areas.Area3
             int i = 0;
             foreach (var t in arenaRoot.GetComponentsInChildren<Transform>(true))
             {
-                if (t.name == "Bell") bells.Add((t, t.localRotation, i++ * 1.9f));
+                if (t.name == "Bell" || System.Text.RegularExpressions.Regex.IsMatch(t.name, @"^Bell[_ .]\(?\d+\)?$")) bells.Add((t, t.localRotation, i++ * 1.9f));
                 else if (t.name == "MedallionGear") gear = t;
             }
         }

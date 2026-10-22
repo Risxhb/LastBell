@@ -31,6 +31,9 @@ const nearExit = (a, tol) => EXITS.some(e => angDist(a, e) < tol);
 const nearDiag = (a, tol) => DIAG.some(e => angDist(a, e) < tol);
 
 const root = new THREE.Group(); root.name = 'LB_ENV_VerdantChimes_Arena'; scene.add(root);
+// every placement, in world coordinates, for the hand-modelled Blender kit (blender/build_verdant.py reads layout.json)
+const LAYOUT = { bridges: [], belfries: [], aqueducts: [], spires: [], trees: [], lanterns: [], falls: [] };
+const wpos = (o, x = 0, y = 0, z = 0) => { o.updateMatrixWorld(true); return o.localToWorld(new THREE.Vector3(x, y, z)).toArray().map(v => +v.toFixed(3)); };
 const add = (m, parent = root) => { parent.add(m); return m; };
 const node = (name, x, y, z, parent = root) => { const o = new THREE.Object3D(); o.name = name; o.position.set(x, y, z); parent.add(o); return o; };
 
@@ -311,6 +314,7 @@ function lantern(parent, x, y, z) {
 // ---- sculpted spire: an irregular lathe profile (bulges, overhanging ledges, a pinched waist, a flared crown), squashed
 // to an oval, leaning and twisted, so no two read as stacked cylinders; moss on every ledge ----
 function sculptedSpire(x, top, z, rad, h, seed, parent = root, invert = false) {
+  LAYOUT.spires.push({ p: wpos(parent, x, top, z), rad, h, invert, seed: +seed.toFixed(3), kind: parent === root ? 'spire' : invert ? 'bastion' : 'stub' });
   const pts = [], ledges = []; let y = 0, r0 = rad * (1.05 + rnd() * 0.2);
   pts.push(new THREE.Vector2(0.001, 0.3), new THREE.Vector2(r0 * 0.9, 0.1), new THREE.Vector2(r0, -0.6));     // crown lip
   while (y > -h) {
@@ -348,6 +352,7 @@ const fallsBridge = [];
 function bridge(a, entry) {
   const g = add(new THREE.Group()); g.rotation.y = -a; g.name = entry ? 'EntryBridge' : 'Bridge';
   const x0 = R + 0.3, len = entry ? 21 : 11.5, x1 = x0 + len, hw = BRIDGE_W / 2;
+  LAYOUT.bridges.push({ a: +a.toFixed(4), entry, x0, len });
   const deck = add(new THREE.Mesh(new THREE.BoxGeometry(len, 0.7, BRIDGE_W), DECK), g); deck.position.set(x0 + len / 2, -0.36, 0); deck.castShadow = deck.receiveShadow = true;
   for (let k = 0; k < len / 1.1; k++) { const sx = x0 + 0.55 + k * 1.1; add(new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.012, BRIDGE_W - 0.4), STONE_DK), g).position.set(sx, 0.0, 0); } // slab joints
   for (const z of [-hw + 0.18, hw - 0.18]) add(new THREE.Mesh(new THREE.BoxGeometry(len, 0.03, 0.12), BRASS), g).position.set(x0 + len / 2, 0.005, z);
@@ -396,6 +401,7 @@ const BELL_GEO = (() => { const pts = []; for (let i = 0; i <= 24; i++) { const 
   const g = new THREE.LatheGeometry(pts, 48); g.translate(0, -1, 0); return weldNormals(g); })();
 function belfry(a, idx) {
   const isFront = front(a), rad = 17.2, baseY = isFront ? -1.2 : 0, chamberH = isFront ? 3.6 : 4.4, solidH = isFront ? 1.4 : 2.2;
+  LAYOUT.belfries.push({ a: +a.toFixed(4), idx, front: isFront, p: [Math.cos(a) * rad, baseY, Math.sin(a) * rad].map(v => +v.toFixed(3)), rotY: +Math.atan2(-Math.cos(a), -Math.sin(a)).toFixed(4) });
   const g = add(new THREE.Group()); g.position.set(Math.cos(a) * rad, baseY, Math.sin(a) * rad); g.rotation.y = Math.atan2(-Math.cos(a), -Math.sin(a)); g.name = 'Belfry';
   // bastion: a rocky outcrop the tower stands on, bonded to the rim
   sculptedSpire(0, -0.1, 0, 3.3, 18, idx * 5 + 2, g, true);
@@ -472,6 +478,7 @@ for (const f of fallsBridge) { const w = new THREE.Vector3(f.x, -0.9, f.z).apply
 // ---- surroundings: aqueduct arcades on rock pillars, some pouring water; mossy spires with dark tree canopies ----
 function tree(x, y, z, s, parent = root) {
   const g = add(new THREE.Group(), parent); g.position.set(x, y, z); g.scale.setScalar(s);
+  LAYOUT.trees.push({ p: wpos(parent, x, y, z), s: +s.toFixed(3) });
   const curve = new THREE.CatmullRomCurve3([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0.3, 1.4, 0.1), new THREE.Vector3(-0.2, 2.6, 0.3), new THREE.Vector3(0.1, 3.4, 0)]);
   add(new THREE.Mesh(new THREE.TubeGeometry(curve, 24, 0.36, 10), BARK), g).castShadow = true;
   for (let k = 0; k < 5; k++) { const a = rnd() * 6.28, r = rnd() * 1.4; blob(0.9 + rnd() * 0.5, CANOPY_DK, Math.cos(a) * r, 2.9 + rnd() * 1.0, Math.sin(a) * r, 0.7, g); }
@@ -489,8 +496,9 @@ function aqueduct(cx, cz, rotY, len, topY, bays, pour) {
   const g = add(new THREE.Group()); g.position.set(cx, 0, cz); g.rotation.y = rotY; g.name = 'Aqueduct';
   const h = 8 + rnd() * 6, bay = len / bays, pointed = rnd() < 0.4, tier = rnd() < 0.45, axis = new THREE.Vector3(0, 1, 0), nrm = new THREE.Vector3(0, 0, 1).applyAxisAngle(axis, rotY);
   const fallen = new Set(); for (let k = 1; k < bays - 1; k++) if (rnd() < 0.28) fallen.add(k);   // collapsed spans (never the ends)
+  const rec = { c: [+cx.toFixed(3), +cz.toFixed(3)], rotY: +rotY.toFixed(4), len, topY, bays, h: +h.toFixed(3), pointed, tier, fallen: [...fallen], tops: [] }; LAYOUT.aqueducts.push(rec);
   for (let k = 0; k < bays; k++) {
-    const px = -len / 2 + k * bay, top = topY - (rnd() < 0.3 ? 1 + rnd() * 2.5 : 0);
+    const px = -len / 2 + k * bay, top = topY - (rnd() < 0.3 ? 1 + rnd() * 2.5 : 0); rec.tops.push(+top.toFixed(3));
     if (!fallen.has(k)) { const w = add(new THREE.Mesh(extrude(arcadeShape(bay + 0.02, h, 1, bay * (pointed ? 0.55 : 0.64), h * 0.56, pointed), 2.4), STONE_DK), g); w.position.set(px, top - h, 0);
       if (tier && rnd() < 0.8) { const up = add(new THREE.Mesh(extrude(arcadeShape(bay + 0.02, 3.4, 2, bay * 0.28, 1.6, pointed), 1.6), STONE), g); up.position.set(px, top + 0.5, 0); up.castShadow = true; } // second tier w.castShadow = w.receiveShadow = true;
       const cap = add(new THREE.Mesh(new THREE.BoxGeometry(bay + 0.3, 0.5, 2.9), STONE), g); cap.position.set(px + bay / 2, top + 0.25, 0);
@@ -601,5 +609,7 @@ function update(t, dt, quiet) {
   for (let i = 0; i < p.count; i++) { const s = motes.seed[i]; p.setXYZ(i, motes.base[i * 3] + Math.sin(t * 0.4 + s) * 0.8, motes.base[i * 3 + 1] + Math.sin(t * 0.7 + s * 2) * 0.5, motes.base[i * 3 + 2] + Math.cos(t * 0.35 + s) * 0.8); }
   p.needsUpdate = true; motes.pts.material.opacity = 0.8 * glow;
 }
-return { R, PLAY_R, root, sun, update, floor: floorPaint, instanced };
+root.updateMatrixWorld(true);
+root.traverse(o => { if (o.name === 'Lantern') LAYOUT.lanterns.push(wpos(o)); else if (o.name === 'FallLip') LAYOUT.falls.push({ p: wpos(o), w: o.userData.w }); });
+return { R, PLAY_R, root, sun, update, floor: floorPaint, instanced, layout: LAYOUT };
 };

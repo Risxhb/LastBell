@@ -39,6 +39,8 @@ try {
     const buf = await read(key); writeFileSync(join(outDir, file), buf); console.log(`${file} ${(buf.length / 1e6).toFixed(1)} MB`);
   }
   console.log(await evaluate('window.__arenaExport.stats'));
+  // placements for the Blender kit layout (blender/build_verdant.py)
+  writeFileSync(join(here, 'blender', 'layout.json'), await evaluate('window.__arenaExport.layout')); console.log('layout.json written');
   console.log('-> ' + outDir);
   ws.close();
 } finally { // Edge detaches its browser processes from the launcher, so stop every process using the export profile

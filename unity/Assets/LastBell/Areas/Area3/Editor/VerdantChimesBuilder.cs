@@ -17,6 +17,7 @@ namespace LastBell.Areas.Area3.EditorTools
     public static class VerdantChimesBuilder
     {
         const string Dir = "Assets/LastBell/Areas/Area3", Gen = Dir + "/Generated", Src = Dir + "/Source";
+        const string ArtPath = Src + "/VerdantChimes_Art.glb", ArtColorsPath = Src + "/art_materials.json";
         const string GlbPath = Src + "/VerdantChimes.glb", ScenePath = Dir + "/VerdantChimes_Arena.unity", LookPath = Dir + "/Area3_VerdantChimes_Look.asset";
         const string PrefabPath = Dir + "/LB_ENV_VerdantChimes_Arena.prefab";
         const float R = 14.6f, PlayR = 14f;
@@ -37,7 +38,7 @@ namespace LastBell.Areas.Area3.EditorTools
         }
 
         // glTFast renames repeated sibling names (FallLip, FallLip_1, ...), so match the base name plus an optional suffix
-        static bool IsNode(Transform t, string name) => t.name == name || System.Text.RegularExpressions.Regex.IsMatch(t.name, "^" + name + @"[_ ]\(?\d+\)?$");
+        static bool IsNode(Transform t, string name) => t.name == name || System.Text.RegularExpressions.Regex.IsMatch(t.name, "^" + name + @"[_ .]\(?\d+\)?$");
 
         static Color Hex(uint rgb, float k = 1) => new Color(((rgb >> 16) & 255) / 255f * k, ((rgb >> 8) & 255) / 255f * k, (rgb & 255) / 255f * k);
 
@@ -66,8 +67,22 @@ namespace LastBell.Areas.Area3.EditorTools
             var arena = (GameObject)PrefabUtility.InstantiatePrefab(prefab, root.transform); arena.name = "VerdantChimes (glb)";
             root.transform.rotation = Quaternion.Euler(0, 180, 0);
             DressMaterials(arena);
-            AddGlows(root.transform);
-            AddLights(root.transform);
+            // Hand-modelled environment (Blender kit, prototype/arena-3d/areas/area-3/blender/build_verdant.py): when present it
+            // replaces every solid procedural object; the procedural glb keeps the floor, water, mist, gear and markers.
+            var artPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(ArtPath); Transform lightsFrom = root.transform;
+            if (artPrefab)
+            {
+                foreach (var r in arena.GetComponentsInChildren<Renderer>(true))
+                {
+                    string mn = r.sharedMaterial ? r.sharedMaterial.name : "";
+                    bool keep = mn == "Floor" || mn == "Waterfall" || mn.StartsWith("Mist") || r.name.StartsWith("Pool") || r.GetComponentsInParent<Transform>(true).Any(p => p.name == "MedallionGear");
+                    if (!keep) r.enabled = false;
+                }
+                var art = (GameObject)PrefabUtility.InstantiatePrefab(artPrefab, root.transform); art.name = "VerdantChimes Art (Blender)";
+                DressMaterials(art, ArtPalette()); lightsFrom = art.transform;
+            }
+            AddGlows(lightsFrom);
+            AddLights(lightsFrom);
             var falls = FindFalls(root.transform);
             AddBackSheets(falls);
             AddMistLayers(root.transform);
@@ -126,7 +141,16 @@ namespace LastBell.Areas.Area3.EditorTools
             return result;
         }
 
-        static void DressMaterials(GameObject arena)
+        // base colours (sRGB) the Blender kit was painted with, written by build_verdant.py next to the glb
+        static Dictionary<string, Color> ArtPalette()
+        {
+            var d = new Dictionary<string, Color>(); if (!File.Exists(ArtColorsPath)) return d;
+            foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(File.ReadAllText(ArtColorsPath), @"""(\w+)"":\s*\[\s*([\d.]+),\s*([\d.]+),\s*([\d.]+)"))
+                d[m.Groups[1].Value] = new Color(float.Parse(m.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture), float.Parse(m.Groups[3].Value, System.Globalization.CultureInfo.InvariantCulture), float.Parse(m.Groups[4].Value, System.Globalization.CultureInfo.InvariantCulture));
+            return d;
+        }
+
+        static void DressMaterials(GameObject arena, Dictionary<string, Color> artPalette = null)
         {
             var lit = Shader.Find("LastBell/Area3/CustomLit");
             var colors = GlbColors(); var brick = AssetDatabase.LoadAllAssetsAtPath(GlbPath).OfType<Texture2D>().FirstOrDefault();
@@ -167,7 +191,18 @@ namespace LastBell.Areas.Area3.EditorTools
                 {
                     var src = mats[i]; if (!src) continue;
                     string name = src.name.Replace(" (Instance)", "");
+                    name = System.Text.RegularExpressions.Regex.Replace(name, @"\.\d+$", "");
                     Color lin = colors.TryGetValue(name, out var cc) ? cc : Color.white, c = new Color(Mathf.LinearToGammaSpace(lin.r), Mathf.LinearToGammaSpace(lin.g), Mathf.LinearToGammaSpace(lin.b), 1);
+                    if (artPalette != null)
+                    {
+                        // Blender kit: painted vertex colours carry the wear, grime and moss; the material holds the base colour
+                        c = artPalette.TryGetValue(name, out var ac) ? ac : Color.white;
+                        if (name == "GlowAmber") { mats[i] = Glow("Art" + name, Hex(0xffc477) * 3.2f); r.shadowCastingMode = ShadowCastingMode.Off; continue; }
+                        if (name == "Pool") { mats[i] = Simple("LastBell/Area3/Pool", "ArtPool"); /* own asset: re-saving Pool.mat would orphan the procedural water */ r.shadowCastingMode = ShadowCastingMode.Off; continue; }
+                        mats[i] = Lit("Art" + name, c, true, name == "Brass" || name == "Bell" ? 1 : name == "BrassDark" ? 0.7f : name == "LanternMetal" ? 0.6f : 0);
+                        if (name == "Ivy" || name == "CanopyLeaf" || name == "Flower" || name == "Fern") { mats[i].SetFloat("_Sway", name == "CanopyLeaf" ? 0.6f : 1f); mats[i].SetFloat("_Cull", 0); r.shadowCastingMode = name == "Fern" ? ShadowCastingMode.Off : ShadowCastingMode.On; }
+                        continue;
+                    }
                     bool transparentFx = false;
                     switch (name)
                     {
@@ -335,11 +370,12 @@ namespace LastBell.Areas.Area3.EditorTools
             for (int i = 0; i < 260; i++) petals.Add((new Vector3((Rn() - 0.5f) * 60, 12 + Rn() * 4, (Rn() - 0.5f) * 50), Vector3.up, 0.16f + Rn() * 0.1f, new Color(0.97f, 0.95f, 0.9f, 0.85f), none));
             Field(parent, "Petals", Mat("PetalsField", 1, false), petals, rnd);
             // cloud cards around the bases of everything tall outside the arena that reaches down into the cloud sea
-            var cards = new List<(Vector3, Vector3, float, Color, Vector2)>();
+            var cards = new List<(Vector3, Vector3, float, Color, Vector2)>(); var artT = root.Find("VerdantChimes Art (Blender)");
             foreach (var r in root.GetComponentsInChildren<Renderer>(true))
             {
-                if (cards.Count > 900 || !r.sharedMaterial || r.sharedMaterial.shader.name != "LastBell/Area3/CustomLit") continue;
-                var b = r.bounds; float d = new Vector2(b.center.x, b.center.z).magnitude;
+                if (cards.Count > 900 || !r.sharedMaterial || r.sharedMaterial.shader.name != "LastBell/Area3/CustomLit" || (artT && r.transform.IsChildOf(artT))) continue;
+                var mfb = r.GetComponent<MeshFilter>(); if (!mfb || !mfb.sharedMesh) continue;
+                var b = GeometryUtility.CalculateBounds(new[] { mfb.sharedMesh.bounds.min, mfb.sharedMesh.bounds.max, new Vector3(mfb.sharedMesh.bounds.min.x, mfb.sharedMesh.bounds.max.y, mfb.sharedMesh.bounds.min.z), new Vector3(mfb.sharedMesh.bounds.max.x, mfb.sharedMesh.bounds.min.y, mfb.sharedMesh.bounds.max.z) }, r.transform.localToWorldMatrix); float d = new Vector2(b.center.x, b.center.z).magnitude;
                 if (d < 15.5f || b.min.y > -14 || b.max.y < -26 || b.size.y < 6) continue;
                 float rad = Mathf.Min(b.extents.x, b.extents.z);
                 int n = Mathf.Clamp(Mathf.RoundToInt(rad * 1.5f), 3, 6);
@@ -379,7 +415,7 @@ namespace LastBell.Areas.Area3.EditorTools
 
         static void MarkStatic(GameObject root)
         {
-            var moving = new HashSet<Transform>(root.GetComponentsInChildren<Transform>(true).Where(t => t.name == "Bell" || t.name == "MedallionGear").SelectMany(t => t.GetComponentsInChildren<Transform>(true)));
+            var moving = new HashSet<Transform>(root.GetComponentsInChildren<Transform>(true).Where(t => IsNode(t, "Bell") || t.name == "MedallionGear").SelectMany(t => t.GetComponentsInChildren<Transform>(true)));
             foreach (var t in root.GetComponentsInChildren<Transform>(true)) if (!moving.Contains(t) && t.GetComponent<Renderer>()) GameObjectUtility.SetStaticEditorFlags(t.gameObject, StaticEditorFlags.BatchingStatic);
         }
 
