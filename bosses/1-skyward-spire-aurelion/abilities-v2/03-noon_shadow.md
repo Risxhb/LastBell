@@ -135,3 +135,15 @@ You are the session for this one ability. Work only on this ability. Your parent
 - **Usage:** if you run out of usage, the session pauses until the limit resets. Commit and push before every long step.
 - **Chzy18 is asleep.** Don't stop to ask questions: make the call, write it under "Open questions", and keep going.
 - **End with a short report:** Completed / Next / Blocked, with evidence such as test counts and screenshots.
+
+## Open questions (build session, 2026-10-22)
+
+State: **built** (`Encounters/Aurelion/Abilities/NoonShadow.cs`) and compile-checked. Not yet autotested in Unity, not human-approved.
+
+- **Cone radius:** built as Rim + 0.5 m (14.4 m), not 28 m. Hits are identical because players are held inside the round 13.9 m bound, and the light stays on the dais instead of spilling into the sky. Switch to 28 if the light should read as reaching past the edge.
+- **The line is unsafe.** The cone's 0.6 m core and 0.3 m margin mean a player must stand at least 0.3 m past the line. No one can stand exactly on it.
+- **Look (stand-in):** the amber/gold tint on the shared cone telegraph, plus a thin gold gnomon line (a presentation-only lane telegraph that never hits). The fill brightens toward the resolve through the telegraph's progress. Sun-ray hatching and the white-gold resolve flash across the half are **not built**, because they need a shader or VFX pass.
+- **Boss animation:** uses v1's `MeridianAlignment` clip as the "plant the glaive" pose. There is no dedicated clip yet.
+- **Timing convention:** each half resolves on the 228th tick counting its spawn tick, which is 227 ticks after the spawn tick. That matches the other v2 abilities. Afternoon spawns on Noon's resolve tick.
+- **Down players** are ignored when picking the side. With nobody standing, the side follows the boss's facing.
+- **Not covered here:** the Starfall pairing check ("the edge runner clears both"). The Starfall stub isn't in this branch, so it belongs to the Abilities session's integration tests.
