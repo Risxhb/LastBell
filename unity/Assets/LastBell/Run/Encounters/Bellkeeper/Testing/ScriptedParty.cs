@@ -79,9 +79,15 @@ namespace LastBell.Run
                     var pos = me.transform.position;
                     foreach (var h in w.Hazards.Live)
                     {
-                        if (!h.Contains(pos) || h.ResolveAt - h.Age > 60) continue;
+                        // react once the shape is final (locked) or close to resolving: a tide from the wall needs the whole warning
+                        if (!h.Contains(pos) || (!h.Locked && h.ResolveAt - h.Age > 150)) continue;
                         var away = Sim.Flat(pos - h.Origin); if (away.sqrMagnitude < 0.01f) away = Vector3.right;
-                        if (h.Shape == HazardShape.Ring) return Sim.Flat(pos - h.Origin).magnitude - h.Inner < h.Radius - Sim.Flat(pos - h.Origin).magnitude ? -away.normalized : away.normalized;
+                        if (h.Shape == HazardShape.Ring)
+                        {
+                            float r = away.magnitude;
+                            bool outsideIsWall = h.Radius >= CombatWorld.PlayerBound;   // a ring reaching the wall: the way out is in
+                            return outsideIsWall || r - h.Inner < h.Radius - r ? -away.normalized : away.normalized;
+                        }
                         if (h.Shape == HazardShape.Cone) return -Sim.Dir(h.Yaw);
                         if (h.Shape == HazardShape.Lane) return h.PushDir(pos);
                         return away.normalized;
