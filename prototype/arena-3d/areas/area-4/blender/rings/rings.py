@@ -30,7 +30,7 @@ def radial_box(name, theta, r, z, size, mat):  # size: (tangent, radial, height)
 def clock_ring(name, rad, w, arc, start, spokes, astro=False):
     t0, t1 = start, start + arc; parts = []
     # stepped profile, deepest at the rim: polished outer lip, main band, recessed dark (oxidised) inner step
-    d = 0.42 if astro else 0.24
+    d = 0.42 if astro else 0.38
     parts.append(band('lip', rad - 0.32, rad, -d, d, t0, t1, POL))
     parts.append(band('band', rad - w + 0.2, rad - 0.32, -d * 0.72, d * 0.72, t0, t1, BRASS))
     parts.append(band('inner_step', rad - w - 0.1, rad - w + 0.2, -d * 0.85, d * 0.85, t0, t1, IRON))
@@ -48,7 +48,12 @@ def clock_ring(name, rad, w, arc, start, spokes, astro=False):
         parts.append(radial_box('numeral', th, rad - w / 2 - 0.05, d * 0.8 + 0.02, (w * 0.16, w * 0.45, 0.06), POL))
         if i % 3 == 0: parts.append(radial_box('numeral', th + 1.6, rad - w / 2 - 0.05, d * 0.8 + 0.02, (w * 0.16, w * 0.45, 0.06), POL))
     for i in range(spokes):
-        th = start + (i + 0.5) * arc / spokes; parts.append(radial_box('spoke', th, (rad - w) / 2, 0, (0.42, rad - w, 0.4), BRASS))
+        th = start + (i + 0.5) * arc / spokes; parts += [radial_box('spoke', th, (rad - w) / 2, 0, (0.7, rad - w, 0.5), BRASS), radial_box('spoke_rib', th, (rad - w) / 2, 0.27, (0.22, rad - w, 0.08), POL)]
+    if not astro:   # jagged broken end: the band snaps off in three stepped, offset shards
+        for k in range(3):
+            th = t1 + 2.5 + k * 3.2
+            parts.append(radial_box('shard', th, rad - w / 2 + (k - 1) * 0.25, (k - 1) * 0.3, (0.9 - 0.2 * k, w * (0.85 - 0.2 * k), d * (1.6 - 0.3 * k)), BRASS))
+        parts.append(lb.cyl('hub', 0.7, 0.6, 16, (0, 0, -0.3), POL))
     if astro:
         parts.append(lb.torus('numeral_ring', 9.6, 0.22, (0, 0, 0), BRASS, seg=192, tube=6))
         parts.append(lb.torus('rete_a', 6.2, 0.22, (-1.8, 0.6, 0.05), POL, seg=128, tube=6))

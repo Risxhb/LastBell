@@ -159,6 +159,9 @@ def join(parts, name, order):
     while len(o.data.materials) < len(order): o.data.materials.append(None)
     for i, m in enumerate(order): o.data.materials[i] = m   # in place: clear() would reset every face to slot 0
     while len(o.data.materials) > len(order): o.data.materials.pop()
+    # Unity numbers FBX submeshes by first use, so sort faces by slot to keep its order equal to `order`
+    bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT')
+    bpy.ops.mesh.sort_elements(type='MATERIAL', elements={'FACE'}); bpy.ops.object.mode_set(mode='OBJECT')
     return o
 
 def cube_uv(o, size=2.4, keep_existing_uv=False):

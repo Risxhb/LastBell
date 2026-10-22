@@ -31,6 +31,11 @@ for i in range(24):
     parts.append(lb.box('tick', (0.05 if i % 6 else 0.09, L, 0.03), (math.sin(a) * rr, math.cos(a) * rr, 0.035), BRASS, (0, 0, -a)))
 for i in range(4):
     a = i * math.pi / 2 + math.pi / 4; parts.append(lb.box('glyph_plate', (0.22, 0.12, 0.03), (math.sin(a) * 1.05, math.cos(a) * 1.05, 0.035), POL, (0, 0, -a)))
+for i in range(12):   # hour numerals: one to three raised bars at each hour, read as I / II / III from the game camera
+    a = i / 12 * 2 * math.pi; n = i % 3 + 1
+    for k in range(n):
+        off = (k - (n - 1) / 2) * 0.07; rr = 0.86
+        parts.append(lb.box('numeral', (0.035, 0.16, 0.03), (math.sin(a) * rr + math.cos(a) * off, math.cos(a) * rr - math.sin(a) * off, 0.035), POL, (0, 0, -a)))
 
 # bent half-ring of blocks and cap around the outer half (±100° about +Y)
 rm = 2.225; Lb = rm * math.radians(200); bulge = []

@@ -4,8 +4,8 @@
 #                   brass-banded capitals, pointed arches with an inner order and spandrels, a moulded entablature
 #                   with string course and cornice, broken ends (3- and 4-arch variants) and a rock underside.
 #                   Arches face ±Y (Unity ±Z). Slots: 0 dark stone, 1 brass, 2 stone cap.
-#   Rock_0..5       faceted void rocks: subdivided, jittered, squashed, each with its own silhouette. Slot: 0 rock.
-#   SpireChunk_0..3 inverted broken spires with a squared block on top. Slots: 0 rock, 1 dark stone.
+#   Rock_0..5       convex-hull void rocks (20-40 planar facets, flat top, tapered keel). Slots: 0 rock, 1 lit top.
+#   SpireChunk_0..3 inverted broken spires with stepped rock ledges and a hull of dressed stone on top. Slots: 0 rock, 1 dark stone, 2 lit top.
 #   Chain_Link / Chain_Link_Low  oval forged link (long axis +Y = Unity +Z, length 1.04 m before builder scaling).
 #   Hanging_Bell    small cousin of the hero bell (same profile at 0.32 scale, painted-bronze UVs), crown, lip band,
 #                   clapper. Slots: 0 painted bronze, 1 brass, 2 bronze, 3 iron.
@@ -16,7 +16,11 @@ sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '
 
 out = sys.argv[sys.argv.index('--') + 1:][0]; here = os.path.dirname(os.path.abspath(__file__))
 lb.reset(); rnd = random.Random(23)
-DARK, BRASS, CAP, ROCK, IRON, GLASS, FLAME, PAINT, BRONZE = lb.slots(['StoneDark', 'Brass', 'StoneCap', 'Rock', 'Iron', 'Glass', 'Flame', 'BellPaint', 'Bronze'])
+DARK, BRASS, CAP, ROCK, IRON, GLASS, FLAME, PAINT, BRONZE, TOP = lb.slots(['StoneDark', 'Brass', 'StoneCap', 'Rock', 'Iron', 'Glass', 'Flame', 'BellPaint', 'Bronze', 'RockTop'])
+
+def top_slot(o, idx, nz=0.55):  # upward faces take the lit-top material, so rocks read lit from above and violet below
+    for poly in o.data.polygons:
+        if poly.normal.z > nz: poly.material_index = idx
 
 def B(name, size, loc, mat, rot=(0, 0, 0), bev=0.03):
     o = lb.box(name, size, loc, mat, rot)
@@ -60,7 +64,7 @@ for i in range(6):
         bm.verts.new((rr.uniform(-0.3, 0.3) * sx, rr.uniform(-0.25, 0.25) * sy, -0.7 - 0.35 * k - 0.2 * (i % 3)))
     bmesh.ops.convex_hull(bm, input=bm.verts); bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     bmesh.ops.dissolve_limit(bm, angle_limit=math.radians(4), verts=bm.verts, edges=bm.edges)
-    o = lb._obj('Rock_%d' % i, bm, ROCK); lb.bevel(o, 0.04, 1, 60); lb.cube_uv(o, 4.0); rocks.append(lb.finish(o))
+    o = lb._obj('Rock_%d' % i, bm, ROCK); o.data.materials.append(TOP); lb.bevel(o, 0.04, 1, 60); top_slot(o, 1); lb.cube_uv(o, 4.0); rocks.append(lb.finish(o))
 
 chunks = []
 for i in range(4):
@@ -81,7 +85,7 @@ for i in range(4):
     # one or two stepped ledges of dressed stone partway down, so the spire isn't a plain inverted pyramid
     ledges = [lb.cyl('ledge', r * 0.85 * (1 - 0.25 * k), 0.5, 7, (rnd.uniform(-0.15, 0.15), rnd.uniform(-0.15, 0.15), -d * (0.22 + 0.25 * k) - 0.25), ROCK, (rnd.uniform(-0.1, 0.1), rnd.uniform(-0.1, 0.1), 0.3 * k + 0.2 * i), r_top=r * 0.95 * (1 - 0.25 * k))
               for k in range(1 + i % 2)]
-    o = lb.join([sp, blk] + ledges, 'SpireChunk_%d' % i, [ROCK, DARK]); lb.cube_uv(o, 4.0); chunks.append(lb.finish(o))
+    o = lb.join([sp, blk] + ledges, 'SpireChunk_%d' % i, [ROCK, DARK, TOP]); top_slot(o, 2); lb.cube_uv(o, 4.0); chunks.append(lb.finish(o))
 
 link = lb.torus('Chain_Link', 0.26, 0.075, (0, 0, 0), IRON, seg=20, tube=8, scale=(1, 1.55, 1)); lb.cube_uv(link); lb.finish(link, flat=False)
 link_low = lb.torus('Chain_Link_Low', 0.26, 0.075, (0, 0, 0), IRON, seg=10, tube=5, scale=(1, 1.55, 1)); lb.cube_uv(link_low); lb.finish(link_low, flat=False)

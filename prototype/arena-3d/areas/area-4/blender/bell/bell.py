@@ -6,7 +6,7 @@
 #               (u across the covered angle, v = profile arc length). Slot: 0 painted bronze.
 #   Bell_Parts  wall faces on both jagged break edges, a thick worn lip rim, three gold bands with raised numeral
 #               studs (broken at the gap), cast crown loop, iron yoke and straps, lathed clapper with a brass collar.
-#               Slots: 0 bronze, 1 brass, 2 polished brass, 3 iron.
+#               Slots: 0 bronze, 1 brass, 2 polished brass, 3 iron, 4 fracture (break walls).
 #   Bell_Shard / Bell_Shard2  two thick broken pieces of wall placed and animated by the builder.
 #               Slots: 0 bronze, 1 fracture rim.
 # The break uses the same per-row gap formula as ShatteredHourArenaBuilder.BellGap, so geometry and paint agree.
@@ -15,7 +15,7 @@ sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '
 
 out = sys.argv[sys.argv.index('--') + 1:][0]; here = os.path.dirname(os.path.abspath(__file__))
 lb.reset()
-PAINT, BRONZE, BRASS, POL, IRON = lb.slots(['BellPaint', 'Bronze', 'Brass', 'Polished', 'Iron'])
+PAINT, BRONZE, BRASS, POL, IRON, FRAC = lb.slots(['BellPaint', 'Bronze', 'Brass', 'Polished', 'Iron', 'Fracture'])
 
 def bell_profile(k):
     p = [(0, 10.4), (1.6, 10.3), (2.7, 9.8), (3.3, 8.8), (3.5, 7.2), (3.6, 5.4), (3.95, 3.7), (4.6, 2.2), (5.6, 1.0), (6.6, 0.25), (6.9, 0), (6.7, -0.12),
@@ -50,7 +50,7 @@ for s in (1, -1):
         i0, i1 = K - 1 - j, K - 2 - j
         vs = [bm.verts.new(bpt(s * gap(jj), prof[jj][0], prof[jj][1])) for jj in (j, j + 1, i1, i0)]
         bm.faces.new(vs)
-bmesh.ops.recalc_face_normals(bm, faces=bm.faces); parts.append(lb._obj('break_faces', bm, BRONZE))
+bmesh.ops.recalc_face_normals(bm, faces=bm.faces); parts.append(lb._obj('break_faces', bm, FRAC))
 # lip rim, bands, numerals (Blender angle 90° = +Y = the break)
 lg = math.degrees(gap(LIP)) * 1.05
 parts.append(lb.torus('lip_rim', prof[LIP][0] + 0.02, 0.11, (0, 0, prof[LIP][1] - 0.03), BRONZE, seg=128, tube=8, arc=360 - 2 * lg, start=90 + lg))
@@ -67,7 +67,10 @@ for x in (-0.55, 0.55): o = lb.box('strap', (0.14, 0.4, 1.0), (x, 0, top + 1.0),
 clapper = [(0.09, top - 0.6), (0.11, 2.6), (0.2, 2.1), (0.42, 1.6), (0.62, 1.05), (0.58, 0.6), (0.36, 0.3), (0.0, 0.22)]
 cl = lb.lathe('clapper', clapper, 24, IRON); parts.append(cl)
 parts.append(lb.torus('collar', 0.2, 0.07, (0, 0, 2.15), POL, seg=24, tube=8))
-bp = lb.join(parts, 'Bell_Parts', [BRONZE, BRASS, POL, IRON]); lb.cube_uv(bp); lb.finish(bp)
+# clapper head: a forged ball with two raised bands and a teardrop tip, so it reads as cast iron rather than a blob
+parts += [lb.torus('clapper_band', 0.61, 0.06, (0, 0, 1.0), POL, seg=24, tube=6), lb.torus('clapper_band', 0.57, 0.05, (0, 0, 0.6), POL, seg=24, tube=6),
+          lb.cone('clapper_tip', 0.18, 0.35, 8, (0, 0, 0.25), IRON, (math.pi, 0, 0))]
+bp = lb.join(parts, 'Bell_Parts', [BRONZE, BRASS, POL, IRON, FRAC]); lb.cube_uv(bp); lb.finish(bp)
 
 # shards: a strip of outer wall with a chipped edge, given real thickness; the fracture rim is slot 1 (dark broken bronze)
 def shard(name, rows, seg, fn, jag):

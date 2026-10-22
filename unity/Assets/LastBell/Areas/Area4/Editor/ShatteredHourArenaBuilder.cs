@@ -444,7 +444,7 @@ namespace LastBell.Areas.Area4.EditorTools
             var m = new Material(src) { name = src.name + "_Fade" }; MakeTransparent(m); return Save(m, m.name + ".mat");
         }
 
-        static Material mRuinCap, mAstroBrass, mIvory, mFloor, mStone, mStoneCap, mStoneDark, mDeck, mBrass, mBrassPolished, mIron, mBronze, mBronzePlain, mCrack, mGroove, mBellGlow, mFlame, mGlass,
+        static Material mRockTop, mRuinCap, mAstroBrass, mIvory, mFloor, mStone, mStoneCap, mStoneDark, mDeck, mBrass, mBrassPolished, mIron, mBronze, mBronzePlain, mCrack, mGroove, mBellGlow, mFlame, mGlass,
             mRock, mRockLight, mBanner, mStation, mPedestal, mWindow, mWindowGlow, mVortex, mShaft, mCone, mSky;
         static Color floorEmission, bellGlow;
 
@@ -738,7 +738,7 @@ namespace LastBell.Areas.Area4.EditorTools
             }
             // the decorative fissure: signed distance to the crack edge, then charred lip, gold body, ivory core
             var sd = new float[N * N]; for (int i = 0; i < sd.Length; i++) sd[i] = 99;
-            int minX = N, minY = N, maxX = 0, maxY = 0; const float lip = 0.15f; var lines = Fissure();
+            int minX = N, minY = N, maxX = 0, maxY = 0; const float lip = 0.2f; var lines = Fissure();
             foreach (var line in lines)
                 for (int i = 0; i + 1 < line.Length; i++)
                 {
@@ -752,7 +752,7 @@ namespace LastBell.Areas.Area4.EditorTools
                             float d = (p - (a + ab * t)).magnitude - Mathf.Lerp(wa, wb, t) / 2; int o = y * N + x; if (o >= 0 && o < sd.Length && d < sd[o]) sd[o] = d;
                         }
                 }
-            Color lipC = Hex(0x0A0816), body = Hex(0x8A5A22), core = Hex(0xD9A050); // dark albedo: the colour comes from emission, so the lavender key light cannot tint it pink
+            Color lipC = Hex(0x0A0816), body = Hex(0x9A6420), core = Hex(0xE6AE3C); // dark albedo: the colour comes from emission, so the lavender key light cannot tint it pink
             for (int y = Mathf.Max(0, minY); y <= Mathf.Min(N - 1, maxY); y++) for (int x = Mathf.Max(0, minX); x <= Mathf.Min(N - 1, maxX); x++)
                 {
                     int o = y * N + x; float d = sd[o]; if (d > lip) continue;
@@ -761,7 +761,7 @@ namespace LastBell.Areas.Area4.EditorTools
                     else if (d > -0.05f) { float t = Mathf.Clamp01(-d / 0.05f); c = Color.Lerp(body, core, t * 0.35f); e = Mathf.Lerp(0.2f, 0.6f, t); hh = 0.05f; }
                     else { c = core; e = 1; hh = 0.02f; }
                     alb[o] = C32(c); hgt[o] = G32(hh);
-                    var ec = e >= 1 ? new Color(1, 0.7f, 0.38f) * 0.55f : new Color(gold.r * e, gold.g * e, gold.b * e); var old = emi[o];
+                    var ec = e >= 1 ? new Color(1, 0.74f, 0.3f) * 0.75f : new Color(gold.r * e, gold.g * e, gold.b * e); var old = emi[o];
                     emi[o] = C32(new Color(Mathf.Max(ec.r, old.r / 255f), Mathf.Max(ec.g, old.g / 255f), Mathf.Max(ec.b, old.b / 255f), 1));
                 }
             // tiny broken stone chips along the crack lips
@@ -1024,7 +1024,7 @@ namespace LastBell.Areas.Area4.EditorTools
             mStoneDark = Lit("StoneDark", new Color(0.55f, 0.53f, 0.62f), 0, 0.12f, map: stone, bump: stoneN); mRuinCap = Lit("RuinCap", new Color(0.74f, 0.72f, 0.82f), 0, 0.14f, map: stone, bump: stoneN);
             mDeck = Lit("DeckStone", new Color(1.2f, 1.22f, 1.3f), 0, 0.18f, map: stone, bump: stoneN, bumpScale: 0.7f);
             mBrass = Lit("AgedBrass", Hex(0xA8844A), 0.6f, 0.45f, map: brassTex);
-            mBrassPolished = Lit("PolishedBrass", Hex(0xC9A25A), 0.7f, 0.45f, map: brassTex); mAstroBrass = Lit("AstrolabeBrass", Hex(0xC8904A), 0.42f, 0.45f, Hex(0x3A2208), map: brassTex);
+            mBrassPolished = Lit("PolishedBrass", Hex(0xC9A25A), 0.7f, 0.45f, map: brassTex); mAstroBrass = Lit("AstrolabeBrass", Hex(0xD49A48), 0.15f, 0.45f, Hex(0x4A2C0C), map: brassTex);
             mIron = Lit("Iron", Hex(0x2A2440), 0.35f, 0.3f); mIvory = Lit("PorcelainIvory", Hex(0xF4E9D1, 0.85f), 0, 0.5f);
             bellGlow = new Color(1f, 0.55f, 0.2f) * 0.95f;
             mCrack = Lit("BellCrackGlow", Color.black, 0, 0.5f, new Color(1f, 0.55f, 0.18f) * 3.0f);
@@ -1034,7 +1034,7 @@ namespace LastBell.Areas.Area4.EditorTools
               mBellGlow.SetTexture("_EmissionMap", WritePng("BellGlowGradient.png", gp, 4, 64)); } // bright at the lip, falling off inside
             mFlame = Lit("LanternFlame", Color.black, 0, 0.5f, new Color(1f, 0.52f, 0.16f) * 2.0f);
             mGlass = Lit("LanternGlass", Hex(0x2A1A10), 0, 0.8f, new Color(1f, 0.66f, 0.3f) * 1.1f); mGlass.SetTexture("_EmissionMap", PaintPaneGlow());
-            mRock = Lit("VoidRock", Hex(0x2C2842), 0, 0.08f, map: strata, bump: strataN);
+            mRock = Lit("VoidRock", Hex(0x3A3258), 0, 0.08f, map: strata, bump: strataN); mRockTop = Lit("VoidRockTop", Hex(0x62588A), 0, 0.1f, map: strata, bump: strataN); // lit lavender tops over violet undersides
             mRockLight = Lit("VoidRockLight", Hex(0x3A3454), 0, 0.08f, map: strata, bump: strataN);
             mPedestal = Lit("Pedestal", Hex(0x23222F), 0, 0.25f);
             mWindow = Lit("DrumWindowDark", Hex(0x0E0A12), 0, 0.2f);
@@ -1438,8 +1438,8 @@ namespace LastBell.Areas.Area4.EditorTools
             var spires = Group("FloatingSpires", g).transform; var spireClusters = Enumerable.Range(0, 3).Select(i => Group("DebrisClusterSpires_" + i, spires).transform).ToArray(); foreach (var c in spireClusters) bobbers.Add(c);
             for (int i = 0; i < 24; i++)
             {
-                float deg = Rr(0, 360), r = Rr(20, 55); var p = P(deg, r, Rr(-30, 6)); if (CamSide(p)) continue;
-                var c = MeshGO("Spire", chunkMeshes[i % 4], spireClusters[i % 3], p, Quaternion.Euler(Rr(-12, 12), Rn() * 360, Rr(-12, 12)), mRock, mStoneDark);
+                float deg = Rr(0, 360), r = Rr(20, 55); var p = P(deg, r, Rr(-30, 6)); if (CamSide(p) || (r < 36 && Mathf.Abs(Mathf.DeltaAngle(deg, 90)) < 28) || (r < 36 && Mathf.Abs(Mathf.DeltaAngle(deg, 270)) < 28)) continue; // keep the bridge ends clear
+                var c = MeshGO("Spire", chunkMeshes[i % 4], spireClusters[i % 3], p, Quaternion.Euler(Rr(-12, 12), Rn() * 360, Rr(-12, 12)), mRock, mStoneDark, mRockTop);
 
             }
             // debris in ten drifting clusters (one merged mesh each)
@@ -1449,7 +1449,7 @@ namespace LastBell.Areas.Area4.EditorTools
             {
                 float deg = Rr(0, 360), r = 18 + Mathf.Pow(Rn(), 0.8f) * 52; var p = P(deg, r, Rr(-45, 12)); if (CamSide(p) && p.y > -6) continue;
                 float s = 0.55f + Mathf.Pow(Rn(), 2.2f) * 2.6f;
-                var k = MeshGO("Rock", rocks[i % 8], clusters[i % 10], p, Quaternion.Euler(Rn() * 360, Rn() * 360, Rn() * 360), Rn() < 0.3f ? mRockLight : mRock);
+                var k = MeshGO("Rock", rocks[i % 8], clusters[i % 10], p, Quaternion.Euler(Rr(-15, 15), Rn() * 360, Rr(-15, 15)), Rn() < 0.3f ? mRockLight : mRock, mRockTop); // upright, so the lit top faces up
                 k.transform.localScale = Vector3.one * s;
             }
             // diagonal chains crossing the frame corners (oval links)
@@ -1593,8 +1593,10 @@ namespace LastBell.Areas.Area4.EditorTools
             if (hand)  // Blender bell: body (painted bronze) + parts (break walls, rim, bands, numerals, crown, yoke, clapper) + shards
             {
                 MeshGO("Body", bodyM, bell, Vector3.zero, mBronze);
-                MeshGO("Parts", partsM, bell, Vector3.zero, Quaternion.identity, mBronzePlain, mBrass, mBrassPolished, mIron);
-                var shardMat = Lit("BellShard", new Color(1.05f, 0.86f, 0.62f), 0.3f, 0.3f, dbl: true, map: bt, bump: btN); var fracMat = Lit("BellFracture", Hex(0x5A3A18), 0.4f, 0.3f, new Color(1f, 0.62f, 0.28f) * 1.4f); // shards reuse the bell paint; the fracture rim glows faintly like the cracks
+                var fracMat = Lit("BellFracture", Hex(0x3A2614), 0.4f, 0.3f, new Color(1f, 0.62f, 0.24f) * 0.3f); // break walls and shard rims: dark worn bronze with a dull gold glow, like the cracks
+                var partsBronze = Lit("BellPartsBronze", new Color(1.0f, 0.82f, 0.6f), 0.35f, 0.32f, dbl: true, map: bt, bump: btN);
+                MeshGO("Parts", partsM, bell, Vector3.zero, Quaternion.identity, partsBronze, mBrass, mBrassPolished, mIron, fracMat);
+                var shardMat = Lit("BellShard", new Color(1.05f, 0.86f, 0.62f), 0.3f, 0.3f, dbl: true, map: bt, bump: btN); // shards reuse the bell paint; the fracture rim glows faintly like the cracks
                 shard = MeshGO("Shard", shardM, bell, new Vector3(-6.2f, 2.2f, 2.6f), Quaternion.Euler(25, 35, -20), shardMat, fracMat); shard.transform.localScale = Vector3.one * 0.75f;
                 MeshGO("Shard2", shard2M, shard.transform, new Vector3(2.4f, -1.2f, 1.4f), Quaternion.Euler(-30, 60, 10), shardMat, fracMat);
             }
