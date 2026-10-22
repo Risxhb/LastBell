@@ -222,6 +222,7 @@ namespace LastBell.Run
                 Check($"{cls} skill-bar icons load ({slots} incl. dash)", found == slots, $"{found}/{slots}");
             }
             Check("potion icon loads", RunHud.Icon("potion") != null);
+            yield return DifficultyChecks();
 
             // ---------- run 1: Vanguard, full victory, repeated presses ----------
             Check("StartRun accepted once", d.StartRun("Vanguard") && !d.StartRun("Vanguard"));
@@ -281,6 +282,7 @@ namespace LastBell.Run
             d.Player.DebugSetHp(PlayerController.MaxHp);   // test setup: the rest of this run checks phases, not survival
             var bk = (BellkeeperEncounter)d.Boss;
             Check("Bellkeeper uses its model", bk.Presenter != null && bk.Presenter.HasModel);
+            Check("Bellkeeper 2.0 rig has the shell halves and three rings", bk.PhaseRigFound);
             StartCoroutine(Capture("bellkeeper_fight", 300));
             fight = StartCoroutine(Fight(4.5f, VanguardRotation, 1.8f));
             yield return Wait(2.5f); yield return Shot("combat_bellkeeper"); yield return Wait(2.2f);
@@ -288,6 +290,7 @@ namespace LastBell.Run
             // The Unfinished Hour (spec v0.3 §3.1, §4.1): phase 1 records one footprint, then replays it alone
             yield return Survive(8, () => bk.HasMemory);
             Check("phase 1 records a footprint and shows its inactive outline", bk.HasMemory);
+            Check("Last Guardian look: shell closed, rings compact", bk.ShellAngle < 2 && bk.RingSpread < 0.01f, $"shell {bk.ShellAngle:0}°, rings {bk.RingSpread:0.00} m");
             yield return Shot("bellkeeper_memory_outline");
             d.Player.DebugSetHp(PlayerController.MaxHp);
             yield return Survive(14, () => bk.LiveEcho != null);
@@ -307,11 +310,13 @@ namespace LastBell.Run
             yield return null; yield return null;
             Check("Bellkeeper plays PhaseShift on the transition", bk.Presenter.CurrentClip == "PhaseShift", bk.Presenter.CurrentClip);
             yield return Survive(3f); yield return Shot("bellkeeper_phase2");
+            Check("Broken Hour look: shell parted, rings offset", bk.ShellAngle >= 10 && bk.RingSpread > 0.15f, $"shell {bk.ShellAngle:0}°, rings {bk.RingSpread:0.00} m");
             d.Boss.DebugSetHpFraction(0.34f);
             d.Player.DebugSetHp(PlayerController.MaxHp);
             yield return Survive(22, () => d.Boss.PhaseName == BellkeeperEncounter.Phase3);
             Check("phase 3 queued and entered", d.Boss.PhaseName == BellkeeperEncounter.Phase3);
             yield return Survive(2.5f); yield return Shot("bellkeeper_final_toll");
+            Check("Final Toll look: chest open, rings spread", bk.ShellAngle >= 38 && bk.RingSpread > 0.35f, $"shell {bk.ShellAngle:0}°, rings {bk.RingSpread:0.00} m");
             // spec v0.3 §4.3: the Final Toll remembers its own March and replays it with the paired Bell Sweep
             d.Player.DebugSetHp(PlayerController.MaxHp);
             yield return Survive(6, () => bk.LiveEcho != null);
@@ -333,6 +338,7 @@ namespace LastBell.Run
             Check("Bellkeeper plays Defeat", bk.Presenter.CurrentClip == "Defeat", bk.Presenter.CurrentClip);
             Check("defeat erases the memory and every hazard", !bk.HasMemory && bk.LiveEcho == null && d.World.Hazards.Count == 0);
             yield return Wait(1.0f); yield return Shot("bellkeeper_defeat");
+            Check("defeat opens the chest fully", bk.ShellAngle > 60, $"shell {bk.ShellAngle:0}°");
             yield return Until(() => d.State == RunState.Results, 6, "results 1");
             Check("victory after the fourth encounter", d.Victory && d.EncountersCleared == 4 && d.EncounterStarts == 4 && d.EncounterEnds == 4,
                 $"victory {d.Victory}, cleared {d.EncountersCleared}, starts {d.EncounterStarts}, ends {d.EncounterEnds}");
@@ -454,7 +460,11 @@ namespace LastBell.Run
                 yield return Wait(4f); StopCoroutine(fm); bot.Clear();
                 yield return Shot("map_" + map.Id + "_combat");
                 Check($"map {map.Name}: Bellkeeper fight runs (boss takes damage, player stays on the floor)",
-                    d.Boss && d.Boss.Hp < hp0 && Sim.Flat(d.Player.transform.position).magnitude <= CombatWorld.PlayerBound + 0.01f, $"boss hp {hp0} -> {(d.Boss ? d.Boss.Hp : -1)}");
+                    d.Boss && d.Boss.Hp < hp0 && CombatWorld.InPlayerBound(d.Player.transform.position, 0.01f), $"boss hp {hp0} -> {(d.Boss ? d.Boss.Hp : -1)}");
+                bot.MoveWorld = Vector3.right; bot.Sprint = true; yield return Wait(3f); bot.Clear();
+                float reach = d.Player.transform.position.x;
+                Check($"map {map.Name}: player walks up to the wall (bound {map.Bound} m)", reach >= map.Bound - 0.3f && CombatWorld.InPlayerBound(d.Player.transform.position, 0.01f), $"reached x = {reach:0.00}");
+                yield return Shot("map_" + map.Id + "_wall");
                 d.Boss.DebugDefeat();
                 yield return Until(() => d.State == RunState.Results, 6, map.Name + " practice results");
                 d.ReturnToMenu();
@@ -479,6 +489,35 @@ namespace LastBell.Run
         }
 
         // Low Pendulum height rule: standing in the lane and jumping through the resolve avoids it
+        // Difficulty row (Easy / Medium / Hard): menu-only selection, copied into the run, kept on retry, and scaling the
+        // damage a real hit deals once. Leaves the selection on Medium for the rest of the test.
+        IEnumerator DifficultyChecks()
+        {
+            Check("difficulty starts at Medium in the autotest", RunDifficulty.Selected == Difficulty.Medium);
+            Check("difficulty damage scales 0.6 / 1 / 1.3",
+                  Mathf.Approximately(RunDifficulty.DamageTakenScale(Difficulty.Easy), 0.6f) && Mathf.Approximately(RunDifficulty.DamageTakenScale(Difficulty.Medium), 1f)
+                  && Mathf.Approximately(RunDifficulty.DamageTakenScale(Difficulty.Hard), 1.3f));
+            Check("difficulty can be chosen in the menu", d.SelectDifficulty(Difficulty.Easy) && RunDifficulty.Selected == Difficulty.Easy);
+            yield return Shot("menu_difficulty_easy");
+            foreach (var (level, expect) in new[] { (Difficulty.Easy, 30), (Difficulty.Medium, 50), (Difficulty.Hard, 65) })
+            {
+                d.SelectDifficulty(level);
+                d.StartPractice("Vanguard", 0);
+                yield return Wait(0.3f);
+                string n = RunDifficulty.Name(level);
+                Check($"{n}: practice copies the menu difficulty", d.Difficulty == level && d.World != null && d.World.Difficulty == level);
+                Check($"{n}: difficulty can't change outside the menu", !d.SelectDifficulty(level == Difficulty.Hard ? Difficulty.Easy : Difficulty.Hard) && d.Difficulty == level);
+                var p = d.Player; int hp0 = p.Hp;
+                p.ReceiveHit(new Hazard { Source = "Difficulty probe", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Radius = 1, Origin = p.transform.position, Damage = 50, ResolveAt = 1 });
+                Check($"{n}: a 50-damage boss hit deals {expect}", hp0 - p.Hp == expect, $"{hp0} -> {p.Hp}");
+                d.SetPaused(true); d.RequestRetry(); yield return null;
+                Check($"{n}: retry keeps the level", d.Difficulty == level && d.World.Difficulty == level);
+                d.SetPaused(true); d.ReturnToMenu(); yield return null;
+            }
+            d.SelectDifficulty(Difficulty.Medium);
+            Check("difficulty back on Medium for the rest of the test", d.State == RunState.Menu && RunDifficulty.Selected == Difficulty.Medium);
+        }
+
         IEnumerator LowPendulumCheck()
         {
             yield return Until(() => d.World.Hazards.Live.Any(h => h.JumpClearable), 14, "Low Pendulum warning");

@@ -3,8 +3,9 @@ using UnityEngine;
 
 namespace LastBell.Run
 {
-    // The final boss. "Bellwarden" in the overnight request = this Bellkeeper: the Meshy source is
-    // Meshy_AI_Bellwarden_*.glb and it builds Resources/Characters/Bellkeeper.glb, so the runtime ID stays "bellkeeper".
+    // The final boss, shown with Bellkeeper 2.0 (Resources/Characters/Bellkeeper2.glb, from sheet 04-bellkeeper-v1.png,
+    // built by prototype/arena-3d/models/build-bellkeeper2.ps1). The first model, Bellkeeper.glb ("Bellwarden"), stays
+    // in the project; the runtime ID stays "boss.bellkeeper".
     // Schedule follows the encounter spec v0.3 (collab PR #16, docs/design/bellkeeper.md) at Steady Ticking: Codex's boss
     // packet (PR #46) for names and the Unfinished Hour, v0.2's numbers for everything else. Pending recommendations are
     // applied provisionally: D1 6.5 m Bell Sweep, D2 damage 30/25/30/15 (45 for the Final Toll's sweep), D7 echo damage =
@@ -41,7 +42,7 @@ namespace LastBell.Run
 
         protected override void Build()
         {
-            presenter = CharacterPresenter.Create(transform, "Bellkeeper", 5f, 0.55f, 0, host =>
+            presenter = CharacterPresenter.Create(transform, "Bellkeeper2", 5f, 0.2f, 0, host =>   // Meshy metal map is near 1: too dark without reflections
             {
                 Prim.Make(PrimitiveKind.Cone, host, new Vector3(0, 2.2f, 0), new Vector3(2.6f, 3.2f, 2.6f), new Color(0.6f, 0.45f, 0.2f));
                 Prim.Make(PrimitiveKind.Sphere, host, new Vector3(0, 4.1f, 0.2f), Vector3.one * 0.7f, new Color(0.95f, 0.92f, 0.85f), 1f);
@@ -178,7 +179,7 @@ namespace LastBell.Run
         IEnumerable<int> IsolatedEcho()
         {
             if (memory == null) yield break;
-            Current = Echo;
+            Current = Echo; presenter.PlayOnce("EchoTell", 1.53f);
             StartEcho();
             for (int i = 0; i < EchoWarning; i++) { Windup(i / (float)EchoWarning); yield return 1; }
             foreach (var w in Vulnerable(Recovery)) yield return w;
@@ -284,7 +285,7 @@ namespace LastBell.Run
                 yield return ChimeGap;
             }
             yield return 265 - 138 - 3 * ChimeGap;                             // echo activates at 265
-            Current = Echo; StartEcho();                                        // resolves 355
+            Current = Echo; StartEcho(); presenter.PlayOnce("EchoTell", 1.53f);   // resolves 355
             yield return 286 - 265;                                             // sweep warns at 286
             Current = "The Final Toll";
             presenter.PlayOnce("BellSweep", 2.03f);
@@ -302,10 +303,69 @@ namespace LastBell.Run
             else presenter.TickBoss("Idle");
         }
 
+        // ---------------- phase looks (spec v0.3 §4, sheet 04-bellkeeper-v1.png) ----------------
+        // Last Guardian: closed shell, compact rings. Broken Hour: shell halves parted, rings offset. Final Toll: chest
+        // fully open, rings spread, brighter core. The chest also opens for every punish window and on defeat. The clips
+        // keep the shell and ring offsets at rest, so this is layered on after the presenter evaluates each frame.
+        static readonly float[] ShellOpen = { 0, 14, 42 }, ShellPart = { 0, 0.06f, 0.12f }, PhaseGlow = { 1, 1.5f, 2.2f };
+        static readonly float[] RingOut = { 0, 0.18f, 0.4f }, RingUp = { 0, 0.04f, 0.2f }, RingTilt = { 0, 12, 25 }, BackRingUp = { 0, 0.1f, 0.25f };
+        const float PunishOpen = 50, DefeatOpen = 70;
+        Transform shellL, shellR, ringL, ringR, ringC; bool lookBound;
+        public float ShellAngle { get; private set; }       // tests: current chest opening, degrees
+        public float RingSpread { get; private set; }       // tests: current side-ring offset, metres
+        public bool PhaseRigFound => shellL && shellR && ringL && ringR && ringC;
+        float lookPhase;                                    // eased 0..2 between the phase looks
+
+        void BindLook()
+        {
+            lookBound = true;
+            if (!presenter || !presenter.Visual) return;
+            foreach (var t in presenter.Visual.GetComponentsInChildren<Transform>(true))
+            {
+                switch (t.name)
+                {
+                    case "shell.L": shellL = t; break;
+                    case "shell.R": shellR = t; break;
+                    case "ring.L": ringL = t; break;
+                    case "ring.R": ringR = t; break;
+                    case "ring.C": ringC = t; break;
+                }
+            }
+        }
+        static float Lerp3(float[] v, float p) => p <= 1 ? Mathf.Lerp(v[0], v[1], p) : Mathf.Lerp(v[1], v[2], p - 1);
+
+        void LateUpdate()
+        {
+            if (!lookBound) BindLook();
+            if (!PhaseRigFound) return;
+            float dt = Time.deltaTime;
+            lookPhase = Mathf.MoveTowards(lookPhase, phase - 1, dt / 0.8f);    // the change plays across the 1.5 s shift
+            float open = Dead ? DefeatOpen : Current == "recovery" ? Mathf.Max(PunishOpen, Lerp3(ShellOpen, lookPhase)) : Lerp3(ShellOpen, lookPhase);
+            ShellAngle = Mathf.MoveTowards(ShellAngle, open, dt * (open > ShellAngle ? 120 : 60));
+            RingSpread = Lerp3(RingOut, lookPhase);
+            Vector3 up = transform.up, fwd = transform.forward, right = transform.right, c = transform.position;
+            foreach (var shell in new[] { shellL, shellR })
+            {
+                // hinge at the bone head (the half's outer top corner): swing the inner edge forward and out
+                var hinge = shell.position; var toAxis = Vector3.ProjectOnPlane(c - hinge, up);
+                float s = Mathf.Sign(Vector3.Dot(Vector3.Cross(up, toAxis), fwd));
+                shell.RotateAround(hinge, up, s * ShellAngle);
+                shell.position += right * Mathf.Sign(Vector3.Dot(hinge - c, right)) * Lerp3(ShellPart, lookPhase);
+            }
+            foreach (var ring in new[] { ringL, ringR })
+            {
+                float side = Mathf.Sign(Vector3.Dot(ring.position - c, right));
+                ring.RotateAround(ring.position, fwd, -side * Lerp3(RingTilt, lookPhase));   // tops lean outward
+                ring.position += right * side * RingSpread + up * Lerp3(RingUp, lookPhase);
+            }
+            ringC.RotateAround(ringC.position, right, -0.4f * Lerp3(RingTilt, lookPhase));
+            ringC.position += up * Lerp3(BackRingUp, lookPhase);
+        }
+
         protected override void Update()
         {
             base.Update();
-            if (presenter) presenter.GlowLevel = glowLevel;
+            if (presenter) presenter.GlowLevel = glowLevel * Lerp3(PhaseGlow, lookPhase);
             if (Dead && presenter && presenter.Visual)
             {
                 // defeat: placeholder sink below the dial edge after the Defeat/Vulnerable pose

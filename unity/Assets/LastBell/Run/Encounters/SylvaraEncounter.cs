@@ -22,7 +22,8 @@ namespace LastBell.Run
         const float SeedRadius = 1.5f;
         const float ProcessionWidth = 3.6f, ProcessionTravel = 7f;
         const float BloomRadius = 2f, BloomRing = 5f, BloomSpacing = 4.2f;
-        const float Bound = 9f;   // her centre keeps a player width from the wall (spec §2)
+        // her centre keeps a player width between her body and the map's wall (spec §2): 11.4 m in Verdant Chimes
+        float Bound => CombatWorld.PlayerBound + Hazard.Margin - BodyRadius - 2 * Hazard.Margin;
         // timing (ticks, 60 Hz)
         const int ArcTrack = 18, ArcResolve = 96, ArcRecovery = 102, ArcCd = 300;
         const int RootResolve = 114, RootRetract = 12, RootRecovery = 120, RootCd = 600;
