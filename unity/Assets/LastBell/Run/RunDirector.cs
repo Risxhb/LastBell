@@ -29,6 +29,7 @@ namespace LastBell.Run
         public RunState State { get; private set; } = RunState.Menu;
         public RunMode Mode { get; private set; }
         public string ClassName { get; private set; } = "Vanguard";
+        public Difficulty Difficulty { get; private set; } = Difficulty.Medium;   // copied from the menu at run start
         public int Encounter { get; private set; }          // 0..3 (3 = final boss)
         public int Generation { get; private set; }
         public int StateTicks { get; private set; }
@@ -91,6 +92,7 @@ namespace LastBell.Run
         {
             if (State != RunState.Menu) return false;
             Mode = mode; ClassName = Array.IndexOf(Classes, className) >= 0 ? className : "Vanguard";
+            Difficulty = RunDifficulty.Selected;
             BuildRun(encounter);
             Go(RunState.Ready);
             return true;
@@ -104,6 +106,15 @@ namespace LastBell.Run
             if (!RunMaps.InBuild(index)) { Debug.LogError("Last Bell: map not in the build: " + RunMaps.All[index].RunScene + " (Last Bell > Run Loop > Rebuild Run Scenes)"); return false; }
             Log.Add($"{Time.frameCount}: load map {RunMaps.All[index].Id}");
             RunMaps.Load(index);
+            return true;
+        }
+
+        // Menu only: the level the next run or practice starts at (remembered between sessions).
+        public bool SelectDifficulty(Difficulty level)
+        {
+            if (State != RunState.Menu) return false;
+            if (RunDifficulty.Selected != level) Log.Add($"{Time.frameCount}: difficulty {RunDifficulty.Name(level)}");
+            RunDifficulty.Selected = level;
             return true;
         }
 
@@ -162,7 +173,7 @@ namespace LastBell.Run
                 sharedPlayerFx = PlayerFx.Create(sharedFxRoot);
             }
             bossFx = sharedBossFx; playerFx = sharedPlayerFx;
-            World = new CombatWorld(scopeParent, bossFx, playerFx);
+            World = new CombatWorld(scopeParent, bossFx, playerFx) { Difficulty = Difficulty };   // a retry keeps the run's level
             Player = PlayerController.Spawn(World, ClassName, PlayerSocket, 180);
             Player.Input = InputOverride ?? new KeyboardMouseInput();
             Player.AbilitiesEnabled = false;

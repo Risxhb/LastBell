@@ -216,6 +216,7 @@ namespace LastBell.Run
                 Check($"{cls} skill-bar icons load ({slots} incl. dash)", found == slots, $"{found}/{slots}");
             }
             Check("potion icon loads", RunHud.Icon("potion") != null);
+            yield return DifficultyChecks();
 
             // ---------- run 1: Vanguard, full victory, repeated presses ----------
             Check("StartRun accepted once", d.StartRun("Vanguard") && !d.StartRun("Vanguard"));
@@ -476,6 +477,35 @@ namespace LastBell.Run
         }
 
         // Low Pendulum height rule: standing in the lane and jumping through the resolve avoids it
+        // Difficulty row (Easy / Medium / Hard): menu-only selection, copied into the run, kept on retry, and scaling the
+        // damage a real hit deals once. Leaves the selection on Medium for the rest of the test.
+        IEnumerator DifficultyChecks()
+        {
+            Check("difficulty starts at Medium in the autotest", RunDifficulty.Selected == Difficulty.Medium);
+            Check("difficulty damage scales 0.6 / 1 / 1.3",
+                  Mathf.Approximately(RunDifficulty.DamageTakenScale(Difficulty.Easy), 0.6f) && Mathf.Approximately(RunDifficulty.DamageTakenScale(Difficulty.Medium), 1f)
+                  && Mathf.Approximately(RunDifficulty.DamageTakenScale(Difficulty.Hard), 1.3f));
+            Check("difficulty can be chosen in the menu", d.SelectDifficulty(Difficulty.Easy) && RunDifficulty.Selected == Difficulty.Easy);
+            yield return Shot("menu_difficulty_easy");
+            foreach (var (level, expect) in new[] { (Difficulty.Easy, 30), (Difficulty.Medium, 50), (Difficulty.Hard, 65) })
+            {
+                d.SelectDifficulty(level);
+                d.StartPractice("Vanguard", 0);
+                yield return Wait(0.3f);
+                string n = RunDifficulty.Name(level);
+                Check($"{n}: practice copies the menu difficulty", d.Difficulty == level && d.World != null && d.World.Difficulty == level);
+                Check($"{n}: difficulty can't change outside the menu", !d.SelectDifficulty(level == Difficulty.Hard ? Difficulty.Easy : Difficulty.Hard) && d.Difficulty == level);
+                var p = d.Player; int hp0 = p.Hp;
+                p.ReceiveHit(new Hazard { Source = "Difficulty probe", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Radius = 1, Origin = p.transform.position, Damage = 50, ResolveAt = 1 });
+                Check($"{n}: a 50-damage boss hit deals {expect}", hp0 - p.Hp == expect, $"{hp0} -> {p.Hp}");
+                d.SetPaused(true); d.RequestRetry(); yield return null;
+                Check($"{n}: retry keeps the level", d.Difficulty == level && d.World.Difficulty == level);
+                d.SetPaused(true); d.ReturnToMenu(); yield return null;
+            }
+            d.SelectDifficulty(Difficulty.Medium);
+            Check("difficulty back on Medium for the rest of the test", d.State == RunState.Menu && RunDifficulty.Selected == Difficulty.Medium);
+        }
+
         IEnumerator LowPendulumCheck()
         {
             yield return Until(() => d.World.Hazards.Live.Any(h => h.JumpClearable), 14, "Low Pendulum warning");

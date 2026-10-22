@@ -164,7 +164,7 @@ namespace LastBell.Run
         {
             if (Down) return;
             float mult = Kit.Mitigation(h, out bool noKnock);
-            int dmg = Mathf.RoundToInt(h.Damage * mult);
+            int dmg = Mathf.RoundToInt(h.Damage * mult * World.DamageTakenScale);   // difficulty scales the hit once, here
             if (mult >= 1) dmg = Mathf.Max(1, dmg);   // a shield can absorb a hit completely; nothing else can
             Hp = Mathf.Max(0, Hp - dmg);
             World.ReportPlayerHit(this, h, dmg);

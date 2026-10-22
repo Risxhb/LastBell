@@ -24,6 +24,15 @@ The menu has a **Map** row (or press **[** / **]**) to pick which arena to test.
 - Start on a given map from the command line: `LastBell.exe -lastbellMap brass-foundry` (ids: `test`, `skyward-spire`, `brass-foundry`, `verdant-chimes`, `shattered-hour`). This works with `-lastbellAutotest` too.
 - The arena art is owned by the four area sessions (Areas 1-4). After one of them rebuilds its arena, rerun Rebuild Run Scenes.
 
+## Difficulty
+
+The menu has a **Difficulty** row: **Easy**, **Medium** or **Hard** (or press **D** to cycle). Chzy18 chose three levels on 2026-10-22, replacing the four provisional tiers. Medium is the baseline every boss is authored for.
+
+- The choice is remembered between sessions. `LastBell.exe -lastbellDifficulty hard` overrides it for one launch without saving. The autotest always starts on Medium and never saves.
+- A run or practice copies the level when it starts. It can't change mid-run, and a retry keeps it. The HUD footer, Ready panel and results screen show it.
+- **What it changes today:** only damage taken from boss attacks, ×0.6 on Easy and ×1.3 on Hard (`RunDifficulty.DamageTakenScale`). It's applied once, in `PlayerController.ReceiveHit`, so echoes that copy a recorded attack's damage aren't scaled twice. These values are provisional.
+- **Per-boss changes:** encounter code can read `CombatWorld.Difficulty` (or `RunDirector.Difficulty`), for example for longer Easy warnings or Hard's one named extra mechanic (design rules §5). Change a boss's own schedule there rather than stretching hazards centrally, so its movement stays in sync with its hit tests.
+
 ## Launch
 
 - **Windows build:** `run-loop/unity/Builds/Windows/LastBell.exe` (not committed; about 425 MB). Double-click `Play Run Loop.cmd` in the repo root.
@@ -46,6 +55,7 @@ The menu has a **Map** row (or press **[** / **]**) to pick which arena to test.
 | F | drink a potion (+40 HP) |
 | Enter | Ready / Continue / Start run |
 | [ / ] | menu: previous / next map |
+| D | menu: next difficulty (Easy → Medium → Hard) |
 | Tab | damage meter (this encounter) |
 | Esc | pause |
 | R / M | Retry / Main menu on the results screen |

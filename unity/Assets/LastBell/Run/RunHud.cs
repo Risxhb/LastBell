@@ -50,6 +50,8 @@ namespace LastBell.Run
                 int n = RunMaps.All.Length, step = kb.rightBracketKey.wasPressedThisFrame ? 1 : n - 1;
                 d.SelectMap((Mathf.Max(0, RunMaps.Current) + step) % n);
             }
+            if (d.State == RunState.Menu && kb.dKey.wasPressedThisFrame)
+                d.SelectDifficulty((Difficulty)(((int)RunDifficulty.Selected + 1) % RunDifficulty.Names.Length));
         }
 
         void Styles()
@@ -104,10 +106,10 @@ namespace LastBell.Run
             {
                 case RunState.Ready:
                 {
-                    var r = Panel(560, 150, h * 0.62f);
+                    var r = Panel(600, 178, h - 376);   // just above the player panel (h - 192)
                     GUI.Label(new Rect(r.x, r.y + 10, r.width, 34), d.Mode == RunMode.Practice ? "PRACTICE — " + RunDirector.SlotNames[SlotIndex(d.Encounter)] : "PREPARATION", big);
-                    GUI.Label(new Rect(r.x + 20, r.y + 46, r.width - 40, 44), d.Mode == RunMode.Practice ? "Practice never advances the run." : "Three minibosses, an intermission, then the Bellkeeper. Health refills before each boss; potions carry over until the final boss refills them.", mid);
-                    if (GUI.Button(new Rect(r.x + r.width / 2 - 110, r.y + 98, 220, 36), "READY  (Enter)", btn)) d.RequestReady();
+                    GUI.Label(new Rect(r.x + 20, r.y + 46, r.width - 40, 70), RunDifficulty.Name(d.Difficulty) + ". " + (d.Mode == RunMode.Practice ? "Practice never advances the run." : "Three minibosses, an intermission, then the Bellkeeper. Health refills before each boss; potions carry over until the final boss refills them."), mid);
+                    if (GUI.Button(new Rect(r.x + r.width / 2 - 110, r.y + 126, 220, 36), "READY  (Enter)", btn)) d.RequestReady();
                     break;
                 }
                 case RunState.Intro:
@@ -147,7 +149,7 @@ namespace LastBell.Run
             }
             if (d.Paused) Pause();
             GUI.Label(new Rect(w - 330, h - 22, 320, 20), "dev: F9 defeat boss · F8 next phase · Esc pause", tiny);
-            GUI.Label(new Rect(14, h - 22, 320, 20), "map: " + RunMaps.CurrentName, tiny);
+            GUI.Label(new Rect(14, h - 22, 420, 20), "map: " + RunMaps.CurrentName + "   ·   difficulty: " + RunDifficulty.Name(d.Difficulty), tiny);
         }
 
         static int SlotIndex(int encounter) => encounter >= 3 ? 4 : encounter;
@@ -155,9 +157,9 @@ namespace LastBell.Run
         void Menu()
         {
             float w = Screen.width, h = Screen.height;
-            var r = Panel(720, 600);
+            var r = Panel(720, 680);
             GUI.Label(new Rect(r.x, r.y + 18, r.width, 54), "LAST BELL", title);
-            GUI.Label(new Rect(r.x, r.y + 72, r.width, 22), "Boss-rush test build · pick a map and a class", mid);
+            GUI.Label(new Rect(r.x, r.y + 72, r.width, 22), "Boss-rush test build · pick a class, a map and a difficulty", mid);
             GUI.Label(new Rect(r.x + 30, r.y + 110, 200, 22), "Class", small);
             for (int i = 0; i < RunDirector.Classes.Length; i++)
             {
@@ -179,12 +181,20 @@ namespace LastBell.Run
                 bool on = cur == i;
                 if (GUI.Toggle(mr, on, (on ? "> " : "") + RunMaps.All[i].Name, mapBtn) && !on) d.SelectMap(i);
             }
-            if (GUI.Button(new Rect(r.x + r.width / 2 - 140, r.y + 296, 280, 40), "START RUN  (Enter)", btn)) d.StartRun(RunDirector.Classes[menuClass]);
-            GUI.Label(new Rect(r.x + 30, r.y + 350, 300, 22), "Practice one encounter", small);
+            var level = RunDifficulty.Selected;
+            GUI.Label(new Rect(r.x + 30, r.y + 286, r.width - 60, 22), "Difficulty  ·  " + RunDifficulty.Notes[(int)level] + "   (D to switch)", small);
+            for (int i = 0; i < RunDifficulty.Names.Length; i++)
+            {
+                var dr = new Rect(r.x + 30 + i * 222, r.y + 310, 214, 36);
+                bool on = (int)level == i;
+                if (GUI.Toggle(dr, on, (on ? "> " : "") + RunDifficulty.Names[i], btn) && !on) d.SelectDifficulty((Difficulty)i);
+            }
+            if (GUI.Button(new Rect(r.x + r.width / 2 - 140, r.y + 364, 280, 40), "START RUN  (Enter)", btn)) d.StartRun(RunDirector.Classes[menuClass]);
+            GUI.Label(new Rect(r.x + 30, r.y + 418, 300, 22), "Practice one encounter", small);
             string[] names = { "Dial Warden", "Pendulum Sentinel", "Chimebound Oracle", "Bellkeeper" };
             for (int i = 0; i < 4; i++)
-                if (GUI.Button(new Rect(r.x + 30 + i * 166, r.y + 374, 160, 36), names[i], btn)) d.StartPractice(RunDirector.Classes[menuClass], i);
-            GUI.Label(new Rect(r.x + 30, r.y + 424, r.width - 60, 120),
+                if (GUI.Button(new Rect(r.x + 30 + i * 166, r.y + 442, 160, 36), names[i], btn)) d.StartPractice(RunDirector.Classes[menuClass], i);
+            GUI.Label(new Rect(r.x + 30, r.y + 492, r.width - 60, 120),
                 "Controls: WASD move · mouse aims · 1 / LMB basic · 2 3 4 class actions · 6 Mending Chorus / Temporal Anchor · 5 / RMB dash · F potion · Space jump · Shift sprint · Esc pause\n" +
                 "Movement stamina: sprint, jump and dash share one bar. No invincibility frames (dodging does not make you immune). F drinks a potion (+40 HP).\nHealth refills before each boss; potions carry over between minibosses and refill before the final boss. Retry restarts at the first miniboss.\n" +
                 "Minibosses are labelled stand-ins; the Bellkeeper uses its model. Arcanist kit numbers are prototype tuning. Dev keys in combat: F9 defeat boss, F8 next phase.", tiny);
@@ -198,7 +208,7 @@ namespace LastBell.Run
             var w = d.World;
             string lines = d.Victory ? (d.Mode == RunMode.Practice ? "Practice result only: the run is unchanged." : "The Bellkeeper is silenced. All four encounters cleared.")
                                      : $"Downed by {d.DefeatCause} during {(d.Boss ? d.Boss.DisplayName : RunDirector.SlotNames[SlotIndex(d.Encounter)])}.";
-            lines += $"\n\nClass: {d.ClassName}   ·   Time in combat: {d.RunTicks / 60f / 60f:0}:{d.RunTicks / 60f % 60:00}   ·   Encounters cleared: {d.EncountersCleared}";
+            lines += $"\n\nClass: {d.ClassName}   ·   {RunDifficulty.Name(d.Difficulty)}   ·   Time in combat: {d.RunTicks / 60f / 60f:0}:{d.RunTicks / 60f % 60:00}   ·   Encounters cleared: {d.EncountersCleared}";
             if (w != null) lines += $"\nDamage dealt {w.DamageDealt}   ·   Damage taken {w.DamageTaken}";
             GUI.Label(new Rect(r.x + 20, r.y + 76, r.width - 40, 120), lines, mid);
             if (w != null) Meter(r.x + r.width + 16, r.y, w.RunMeter, "DAMAGE · whole " + (d.Mode == RunMode.Practice ? "practice" : "run"), d.RunTicks / 60f);
