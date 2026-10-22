@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using LastBell.VFX;
 using UnityEngine;
 
 namespace LastBell.Run
