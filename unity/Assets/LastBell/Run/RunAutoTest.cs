@@ -209,6 +209,7 @@ namespace LastBell.Run
             Note($"Last Bell autotest · {Application.version} · Unity {Application.unityVersion} · {SystemInfo.graphicsDeviceName} · {DateTime.Now:yyyy-MM-dd HH:mm}");
             d.InputOverride = bot;
             yield return Wait(1.0f);
+            if (PartyOnly) { yield return PartyChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
             if (AurelionOnly) { yield return AurelionChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
             if (BellkeeperV2Only) { yield return BellkeeperV2Checks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
             if (BellkeeperUltimateOnly) { yield return BellkeeperUltimateChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
@@ -455,6 +456,7 @@ namespace LastBell.Run
             yield return BellkeeperUltimateChecks();
             BellkeeperEncounter.SetOverride = BellkeeperEncounter.AbilitySet.V1;
             // ---------- area bosses (practice only for now) ----------
+            yield return PartyChecks();
             yield return AurelionChecks();
 
             yield return SylvaraChecks();
