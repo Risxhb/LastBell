@@ -1,22 +1,85 @@
 using System.Collections.Generic;
+using UnityEngine;
 
 namespace LastBell.Run
 {
-    // 03 Noon Shadow (aurelion.noon_shadow), brief abilities-v2/03-noon_shadow.md. STUB: the Noon Shadow session fills
-    // this in.
-    // Contract: Run(afternoon) lights the half of the arena holding the players' mean (Noon), locked at once. With
-    // afternoon (Phase 3, everyone) or solo (always), the other half follows on Noon's resolve tick. Returns on the tick
-    // the last half resolves.
+    // 03 Noon Shadow (aurelion.noon_shadow), brief abilities-v2/03-noon_shadow.md (proposal).
+    // Run(afternoon) floods half the dais with noon light: a Ground cone from the arena centre, half-angle 90°, so the
+    // dividing line runs straight through the compass star. The lit half is the one holding the standing players' mean;
+    // with the mean within 1 m of the centre (2 players on opposite sides) it is the half holding the farthest player.
+    // The side is picked and locked on the warning's first tick and resolves 3.8 s later (45, no knockback, 0.25 s stun).
+    // Afternoon (afternoon = Phase 3, or always when solo): the other half warns on Noon's resolve tick and resolves
+    // 3.8 s after that. Easy stretches both windows by 1.25 (T). Returns on the tick the last half resolves.
+    // The cone reaches Rim + 0.5 m instead of the brief's 28 m: every point a player can stand on is covered either way
+    // (players are held inside the round 13.9 m bound) and the light stays on the dais instead of spilling into the sky.
+    // The cone's 0.6 m core and its 0.3 m margin make the line itself unsafe: step at least 0.3 m past it.
     public sealed class NoonShadow : AurelionAbility
     {
         public override string Id => "aurelion.noon_shadow";
         public override string Name => "Noon Shadow";
 
+        public const float WindowS = 3.8f, MeanDeadZone = 1f, ReachPastRim = 0.5f, LineWidth = 0.14f;
+        public const int Damage = 45, Stun = 15;   // 0.25 s stun, no knockback
+
+        static readonly Color NoonFill = new Color(1f, 0.6f, 0.26f), NoonBorder = new Color(2.4f, 1.75f, 0.7f);
+        static readonly Color Gnomon = new Color(1.9f, 1.45f, 0.55f);
+
+        // test evidence: the last run's halves (Noon, then Afternoon), the yaw each one lit, and their spawn / resolve ticks
+        public readonly List<Hazard> Halves = new List<Hazard>();
+        public readonly List<float> LitYaws = new List<float>();
+        public readonly List<int> SpawnTicks = new List<int>();
+        public readonly List<int> ResolveTicks = new List<int>();
+        public float Reach => Rim + ReachPastRim;
+
         public IEnumerable<int> Run(bool afternoon)
         {
             Say(Name);
-            yield return T(3.8f);
-            if (afternoon || N <= 1) yield return T(3.8f);
+            Halves.Clear(); LitYaws.Clear(); SpawnTicks.Clear(); ResolveTicks.Clear();
+            bool twice = afternoon || N <= 1;
+            int window = T(WindowS);
+            Glow(1.4f); Clip("MeridianAlignment", twice ? 2 * window : window);
+
+            float yaw = PickYaw();
+            Half(yaw, window);
+            yield return window - 1;                                  // Noon's resolve tick
+            if (!twice) yield break;
+
+            Say("Afternoon");
+            Half(yaw + 180f, window);
+            yield return window - 1;                                  // Afternoon's resolve tick
+        }
+
+        // the half holding the standing players' mean; near the centre, the half holding the farthest player
+        public float PickYaw()
+        {
+            var party = Standing();
+            if (party.Count == 0) return Body.eulerAngles.y;
+            var mean = Vector3.zero;
+            foreach (var p in party) mean += Sim.Flat(p.transform.position);
+            mean /= party.Count;
+            var to = mean - Centre;
+            if (to.magnitude < MeanDeadZone) to = Sim.Flat(Farthest(Centre).transform.position) - Centre;
+            return Mathf.Repeat(Sim.YawTo(Centre, Centre + to, Body.eulerAngles.y), 360f);
+        }
+
+        Hazard Half(float yaw, int resolveAt)
+        {
+            yaw = Mathf.Repeat(yaw, 360f);
+            var h = new Hazard
+            {
+                Source = Name, Shape = HazardShape.Cone, Kind = HazardKind.Ground,
+                Origin = Centre, Yaw = yaw, HalfAngle = 90f, Radius = Reach,
+                LockAt = 0, ResolveAt = resolveAt, Damage = Damage, Knockback = 0, Stun = Stun,
+            };
+            // the gnomon shadow: a crisp gold line across the whole dais, presentation only (not a hazard, never hits)
+            var line = W.BossFx.Lane(2 * Reach, LineWidth);
+            line.Place(Centre + Sim.Dir(yaw + 90f) * Reach, yaw - 90f);
+            line.Tint(Gnomon, Gnomon); line.Progress(1); line.Lock();
+            h.OnResolve = hz => { ResolveTicks.Add(W.Tick); line.Expire(); Flare(1.2f); };
+            Spawn(h);
+            h.Tele.Tint(NoonFill, NoonBorder);   // noon light: amber-gold, the warning fill brightens toward the resolve
+            Halves.Add(h); LitYaws.Add(yaw); SpawnTicks.Add(W.Tick);
+            return h;
         }
     }
 }

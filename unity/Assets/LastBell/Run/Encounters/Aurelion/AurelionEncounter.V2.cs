@@ -53,6 +53,8 @@ namespace LastBell.Run
         public bool SecondForm { get; private set; }
         public int Transitions { get; private set; }
         public int Punishes { get; private set; }
+        public int ShortestPunish { get; private set; } = int.MaxValue;   // test evidence, in ticks (measured on the script, not per frame)
+        public int PunishHazardTicks { get; private set; }               // test evidence: ticks of a punish with any hazard live
         public int Blocks { get; private set; }                    // phase-plan blocks started
         public int V2MaxLive { get; private set; }                 // test evidence: hazards live at once
         public void SetCurrent(string name) => Current = name;
@@ -101,7 +103,9 @@ namespace LastBell.Run
             Punishes++; BlockLog.Add((phase, "punish", W.Tick));
             int t = Sim.Ticks(PunishS);
             Current = "open chest"; pose = Pose.Exposed; glowTarget = 0.3f; Clip("OpenChest", t);
-            yield return t;
+            int start = W.Tick;
+            for (int i = 0; i < t; i++) { if (W.Hazards.Count > 0) PunishHazardTicks++; yield return 1; }
+            ShortestPunish = Mathf.Min(ShortestPunish, W.Tick - start);
             glowTarget = 1; pose = Pose.Neutral;
         }
         IEnumerable<int> WaitHorizon()
@@ -126,7 +130,7 @@ namespace LastBell.Run
             foreach (var w in Punish()) yield return w;
         }
 
-        IEnumerable<int> NoonWithStarfall() =>
+        public IEnumerable<int> NoonWithStarfall() =>
             Together(Noon.Run(false), Sim.Ticks(StarfallIntoNoon * Noon.WarnScale), Starfall.Run());
 
         IEnumerable<IEnumerable<int>> Plan(int ph)

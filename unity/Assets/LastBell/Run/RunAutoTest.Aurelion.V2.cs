@@ -125,7 +125,7 @@ namespace LastBell.Run
             while (V2Party.Count < players)
             {
                 var p = PlayerController.Spawn(V2W, "Vanguard", new Vector3(0, 0, 5), 180);
-                var s = new V2Input(); p.Input = s; v2Inputs[p] = s; p.AbilitiesEnabled = false; V2Party.Add(p);
+                var s = new V2Input(); p.Input = s; v2Inputs[p] = s; p.AbilitiesEnabled = true; V2Party.Add(p);
             }
             for (int i = 0; i < V2Party.Count; i++)
             {
@@ -134,7 +134,7 @@ namespace LastBell.Run
                 var pos = at != null && i < at.Length ? at[i] : new Vector3(0, 0, 5) + Sim.Dir(90 + 360f * i / Mathf.Max(1, players)) * (players > 1 ? 1.5f : 0);
                 p.PrepareForEncounter(new Vector3(pos.x, 0, pos.z), 180);
                 p.DebugSetHp(PlayerController.MaxHp);
-                p.AbilitiesEnabled = false;
+                p.AbilitiesEnabled = true;   // dash and jump need it; V2Input never presses an ability
                 V2In(p).Stop(); V2In(p).Aim = bp;
             }
             V2Hits.Clear(); V2Spawns.Clear();
@@ -221,6 +221,25 @@ namespace LastBell.Run
             V2Check("five abilities registered", V2Boss.Abilities.Count == 5 && AurelionArgs.Ids.All(id => V2Boss.Abilities.Any(a => a.Id == id)),
                 string.Join(", ", V2Boss.Abilities.Select(a => a.Id)));
 
+            // Misalignment pairing, Noon Shadow + Starfall Mirror (Starfall 0.7 s into Noon): both resolve on the same tick,
+            // and two edge runners on the lit side (13 m out) clear both by running straight across at 4.2 m/s after a
+            // 0.25 s reaction, with one dash each (ABILITIES.md §6 "Pairing: Noon + Starfall (edge runner)")
+            yield return V2Setup(2, Difficulty.Medium, new[] { new Vector3(0, 0, 13f), new Vector3(3.5f, 0, 11f) }, 2);
+            if (V2Boss == null) yield break;
+            {
+                V2Begin(V2Boss.NoonWithStarfall());
+                yield return V2Ticks(ReactTicks);
+                foreach (var p in V2Party) { V2In(p).Walk(Vector3.back, ProtoWalk); V2In(p).Dash(); }
+                yield return V2WaitIdle(15);
+                foreach (var p in V2Party) V2In(p).Stop();
+                var noon = V2Spawned("Noon Shadow").FirstOrDefault(); var star = V2Spawned("Starfall Mirror").FirstOrDefault();
+                bool together = noon != null && star != null && noon.Tick + noon.H.ResolveAt == star.Tick + star.H.ResolveAt;
+                V2Check("Noon + Starfall: Starfall starts 0.7 s into Noon and both resolve on the same tick", together && star.Tick - noon.Tick == Sim.Ticks(AurelionEncounter.StarfallIntoNoon),
+                    noon == null || star == null ? "missing spawn" : $"noon spawn {noon.Tick} resolve +{noon.H.ResolveAt}, star spawn {star.Tick} resolve +{star.H.ResolveAt}");
+                V2Check("Noon + Starfall: edge runners at 4.2 m/s with one dash clear both", V2Party.All(p => !V2WasHit(p)),
+                    string.Join(", ", V2Hits.Select(h => $"{h.P.name} by {h.Source}")) + $"; stamina {string.Join("/", V2Party.Select(p => p.Stamina.ToString("0")))}");
+            }
+
             // the full loop, phase by phase: the order of blocks, the transitions, the punish and the overlap cap
             foreach (var level in new[] { Difficulty.Medium, Difficulty.Hard })
             {
@@ -244,8 +263,8 @@ namespace LastBell.Run
                 V2Check($"{level}: Exposed Meridian runs Cascading Lances > Noon and Afternoon > Grand Orrery > punish",
                     V2Blocks(a, log0, 3).SequenceEqual(new[] { "Cascading Lances", "Noon and Afternoon", "Grand Orrery", "punish" }), string.Join(" > ", V2Blocks(a, log0, 3)));
                 StopCoroutine(watch);
-                V2Check($"{level}: the punish lasts 3.5 s with no hazard live", mon.Punishes > 0 && mon.HazardsInPunish == 0 && mon.ShortestPunish >= Sim.Ticks(AurelionEncounter.PunishS) - 1,
-                    $"{mon.Punishes} punishes, shortest {mon.ShortestPunish} ticks, hazard ticks inside {mon.HazardsInPunish}");
+                V2Check($"{level}: the punish lasts 3.5 s with no hazard live", a.Punishes > 0 && a.PunishHazardTicks == 0 && a.ShortestPunish >= Sim.Ticks(AurelionEncounter.PunishS),
+                    $"{a.Punishes} punishes, shortest {a.ShortestPunish} ticks, hazard ticks inside {a.PunishHazardTicks}");
                 V2Check($"{level}: transformations warn and deal nothing", mon.HazardsInShift == 0, mon.HazardsInShift + " ticks");
                 V2Check($"{level}: never more than two damaging patterns live", mon.MaxPatterns <= 2, $"max {mon.MaxPatterns} ({mon.MaxPatternsAt})");
                 V2Check($"{level}: Hour Hands {(level == Difficulty.Hard ? "runs inside the Horizon (Hard only)" : "never runs")}", level == Difficulty.Hard ? mon.HandsRuns >= 2 : mon.HandsRuns == 0, $"Hour Hands runs {mon.HandsRuns}");
