@@ -53,7 +53,7 @@ namespace LastBell.Areas.Area2.EditorTools
         static float Rnd(float a, float b) => a + (b - a) * Rnd();
 
         // materials
-        static Material mCityRoof, mFloor, mSlate, mRimStone, mMasonry, mMasonryDark, mCity, mIron, mPlank, mBrass, mDarkBrass, mChain, mRoof, mAbyss;
+        static Material mGapMolten, mStoneSolid, mCityRoof, mFloor, mSlate, mRimStone, mMasonry, mMasonryDark, mCity, mIron, mPlank, mBrass, mDarkBrass, mChain, mRoof, mAbyss;
         static Material mWindowWarm, mWindowHot, mFurnace, mHalo, mMolten, mRiver, mPool, mFall, mGlow, mGlowDim, mGlowCurtain, mUnderGlow, mEmber, mSpark, mHaze, mSmoke, mSteam;
         static Mesh lanternIron, lanternGlow;
 
@@ -70,6 +70,7 @@ namespace LastBell.Areas.Area2.EditorTools
             root = new GameObject("LB_ENV_BrassFoundry_Arena").transform;
 
             MakeMaterials();
+            LoadModels();
             BuildLanternMeshes();
             BuildFloor();
             BuildInlays();
@@ -282,6 +283,108 @@ namespace LastBell.Areas.Area2.EditorTools
             }
         }
 
+        // ================================================================== Blender models ==================================================================
+        // Hand-modelled assets from prototype/arena-3d/areas/area-2/blender/area2_models.py, exported one .glb per asset into
+        // Models/ (git-ignored; Last Bell > Area 2 – Build Models (Blender) regenerates them). Each asset's geometry is
+        // appended into the same per-group, per-material batches as the code geometry, with its material slots mapped by
+        // name onto this builder's URP materials. Without the models the builder falls back to the code-built versions.
+        const string ModelDir = Dir + "/Models";
+        sealed class ModelPart { public Vector3[] v, n; public Vector2[] uv; public int[][] tris; public string[] mats; public Matrix4x4 local; }
+        static readonly Dictionary<string, List<ModelPart>> models = new Dictionary<string, List<ModelPart>>();
+        static bool Modelled => models.Count > 0;
+
+        static string BlenderExe => System.Environment.GetEnvironmentVariable("LASTBELL_BLENDER") ?? @"C:\Program Files\Blender Foundation\Blender 5.2\blender.exe";
+
+        [MenuItem("Last Bell/Area 2 – Build Models (Blender)", priority = 22)]
+        public static void BuildModels()
+        {
+            string script = System.IO.Path.GetFullPath(System.IO.Path.Combine(Application.dataPath, "../../prototype/arena-3d/areas/area-2/blender/area2_models.py"));
+            string outDir = System.IO.Path.GetFullPath(ModelDir);
+            if (!File.Exists(BlenderExe)) { Debug.LogWarning("Area 2: Blender not found at " + BlenderExe + " (set LASTBELL_BLENDER)"); return; }
+            var psi = new System.Diagnostics.ProcessStartInfo(BlenderExe, $"-b --factory-startup -P \"{script}\" -- \"{outDir}\"") { UseShellExecute = false, CreateNoWindow = true };
+            using (var p = System.Diagnostics.Process.Start(psi)) p.WaitForExit();
+            AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+        }
+
+        static void LoadModels()
+        {
+            models.Clear();
+            if (!Directory.Exists(ModelDir) && File.Exists(BlenderExe)) BuildModels();
+            if (!Directory.Exists(ModelDir)) { Debug.LogWarning("Area 2: no Blender models in " + ModelDir + "; using the code-built geometry. Run Last Bell > Area 2 – Build Models (Blender)."); return; }
+            foreach (var file in Directory.GetFiles(ModelDir, "*.glb"))
+            {
+                var go = AssetDatabase.LoadAssetAtPath<GameObject>(file.Replace('\\', '/')); if (!go) continue;
+                var parts = new List<ModelPart>();
+                foreach (var mf in go.GetComponentsInChildren<MeshFilter>(true))
+                {
+                    var mesh = mf.sharedMesh; var mr = mf.GetComponent<MeshRenderer>(); if (!mesh || !mr) continue;
+                    parts.Add(new ModelPart
+                    {
+                        v = mesh.vertices, n = mesh.normals, uv = mesh.uv,
+                        tris = Enumerable.Range(0, mesh.subMeshCount).Select(s => mesh.GetTriangles(s)).ToArray(),
+                        mats = mr.sharedMaterials.Select(m => m ? m.name : "").ToArray(),
+                        local = go.transform.worldToLocalMatrix * mf.transform.localToWorldMatrix,
+                    });
+                }
+                if (parts.Count > 0) models[System.IO.Path.GetFileNameWithoutExtension(file)] = parts;
+            }
+            Debug.Log($"Area 2: {models.Count} Blender models loaded");
+        }
+
+        static Material MatFor(string slot)
+        {
+            switch (slot.Split(' ', '.')[0])
+            {
+                case "Stone": return mStoneSolid; case "Masonry": return mMasonry; case "MasonryDark": return mMasonryDark;
+                case "Iron": return mIron; case "Brass": return mBrass; case "DarkBrass": return mDarkBrass; case "Plank": return mPlank;
+                case "Roof": return mRoof; case "Chain": return mChain; case "City": return mCity; case "CityRoof": return mCityRoof;
+                case "Slate": return mSlate; case "Glow": return mGlow; case "GlowDim": return mGlowDim; case "GlowWarm": return mWindowWarm;
+                case "GlowHot": return mWindowHot; case "Furnace": return mFurnace; default: return mMasonryDark;
+            }
+        }
+
+        // Appends a model's geometry, transformed by m, into the batches of `group`. False when the model isn't loaded.
+        static bool Model(string group, string name, Matrix4x4 m)
+        {
+            if (!models.TryGetValue(name, out var parts)) return false;
+            foreach (var p in parts)
+            {
+                var M = m * p.local; var N = M.inverse.transpose; bool flip = M.determinant < 0;
+                for (int s = 0; s < p.tris.Length; s++)
+                {
+                    var g = G(group, MatFor(s < p.mats.Length ? p.mats[s] : "")); var map = new Dictionary<int, int>(); var tris = p.tris[s];
+                    for (int k = 0; k < tris.Length; k++)
+                    {
+                        int t = tris[flip ? k - k % 3 + (2 - k % 3) : k];
+                        if (!map.TryGetValue(t, out int ni))
+                        {
+                            ni = g.V.Count; map[t] = ni;
+                            g.V.Add(M.MultiplyPoint3x4(p.v[t])); g.N.Add(N.MultiplyVector(p.n.Length > t ? p.n[t] : Vector3.up).normalized); g.U.Add(p.uv.Length > t ? p.uv[t] : Vector2.zero);
+                        }
+                        g.T.Add(ni);
+                    }
+                }
+            }
+            return true;
+        }
+
+        // A standalone mesh (submesh per material slot) from a model, for objects that move on their own (lanterns).
+        static Mesh ModelMesh(string name, out Material[] mats)
+        {
+            mats = null; if (!models.TryGetValue(name, out var parts)) return null;
+            batchesBackup = new Dictionary<string, Dictionary<Material, Geo>>(batches); batches.Clear();
+            Model("__single", name, I);
+            var d = batches["__single"]; batches.Clear(); foreach (var kv in batchesBackup) batches[kv.Key] = kv.Value;
+            var mesh = new Mesh { name = name }; var V = new List<Vector3>(); var Nn = new List<Vector3>(); var U = new List<Vector2>(); var subs = new List<List<int>>();
+            foreach (var kv in d) { int o = V.Count; V.AddRange(kv.Value.V); Nn.AddRange(kv.Value.N); U.AddRange(kv.Value.U); subs.Add(kv.Value.T.Select(t => t + o).ToList()); }
+            mesh.SetVertices(V); mesh.SetNormals(Nn); mesh.SetUVs(0, U); mesh.subMeshCount = subs.Count;
+            for (int s = 0; s < subs.Count; s++) mesh.SetTriangles(subs[s], s);
+            mesh.RecalculateBounds(); mesh.RecalculateTangents();
+            mats = d.Keys.ToArray();
+            return SaveAsset(mesh, "Meshes/" + name + ".asset");
+        }
+        static Dictionary<string, Dictionary<Material, Geo>> batchesBackup;
+
         static void Chain(Vector3 A, Vector3 B, float sag = 0)
         {
             var g = G("Chains", mChain);
@@ -292,7 +395,7 @@ namespace LastBell.Areas.Area2.EditorTools
                 Vector3 S(float s) => Vector3.Lerp(A, B, s) + Vector3.down * Mathf.Sin(s * PI) * sag;
                 Vector3 dir = (S(t2) - S(t1)).normalized;
                 var q = Quaternion.FromToRotation(Vector3.up, dir) * Quaternion.Euler(0, i % 2 == 0 ? 0 : 90, 0);
-                Link(g, TRQ(S(t), q));
+                if (!Model("Chains", "SM_Area2_ChainLink", TRQ(S(t), q))) Link(g, TRQ(S(t), q));
             }
         }
 
@@ -454,6 +557,25 @@ namespace LastBell.Areas.Area2.EditorTools
                 if (ed < 0.014f) { cr = 28; cg = 25; cb = 24; h = 0.1f; }
                 if (fine > 0.85f) { cr *= 1.1f; cg *= 1.1f; cb *= 1.08f; }
                 float sootK = 1 - 0.25f * Smooth(0.55f, 0.8f, Fbm(X * 1.2f + 5, Y * 0.6f, P)); cr *= sootK; cg *= sootK; cb *= sootK;
+                int o = py * N + px; col[o] = C32(cr, cg, cb); hgt[o] = Grey(h);
+            }
+        }
+
+        // Tileable solid stone (4 m, no block grid) for the single-piece Blender rim teeth: mottled value, pitting, fine
+        // speckle, faint strata and a few hairline cracks.
+        static void PaintStone(int N, out Color32[] col, out Color32[] hgt)
+        {
+            col = new Color32[N * N]; hgt = new Color32[N * N]; const int P = 16;
+            for (int py = 0; py < N; py++) for (int px = 0; px < N; px++)
+            {
+                float X = px * 4f / N, Y = py * 4f / N;
+                float n = Fbm(X * 1.2f, Y * 1.2f, 5), m = Fbm(X * 4, Y * 4, P), fine = VNoise(X * 50, Y * 50, 200), pit = VNoise(X * 9 + 3, Y * 9, 36), strata = VNoise(X * 0.6f, Y * 6, 24);
+                float crack = Mathf.Abs(Fbm(X * 1.6f + 7, Y * 1.6f, 6) - 0.5f);
+                float v = (n - 0.5f) * 0.32f + (m - 0.5f) * 0.14f + (fine - 0.5f) * 0.1f + (strata - 0.5f) * 0.06f;
+                float cr = 70 * (1 + v), cg = 66 * (1 + v), cb = 63 * (1 + v), h = 0.6f + (m - 0.5f) * 0.3f + (n - 0.5f) * 0.2f;
+                if (pit < 0.0f) { float k = Smooth(0.1f, 0.04f, pit); cr *= 1 - 0.2f * k; cg *= 1 - 0.2f * k; cb *= 1 - 0.2f * k; h -= 0.18f * k; }
+                if (crack < 0.0f) { float k = 1 - crack / 0.006f; cr *= 1 - 0.3f * k; cg *= 1 - 0.3f * k; cb *= 1 - 0.3f * k; h -= 0.15f * k; }
+                if (fine > 0.86f) { cr *= 1.1f; cg *= 1.09f; cb *= 1.07f; }
                 int o = py * N + px; col[o] = C32(cr, cg, cb); hgt[o] = Grey(h);
             }
         }
@@ -640,6 +762,8 @@ namespace LastBell.Areas.Area2.EditorTools
             var masA = SaveTex("MasonryLarge", 2048, 2048, ac); var masAN = SaveTex("MasonryLargeHeight", 2048, 2048, ah, true, 0.1f);
             PaintMasonry(2048, 2, 1.0f, 0.5f, 31, out var bc, out var bh);
             var masB = SaveTex("MasonryCoursed", 2048, 2048, bc); var masBN = SaveTex("MasonryCoursedHeight", 2048, 2048, bh, true, 0.12f);
+            PaintStone(1024, out var sc, out var sh);
+            mStoneSolid = Lit("StoneSolid", SaveTex("StoneSolid", 1024, 1024, sc), SaveTex("StoneSolidHeight", 1024, 1024, sh, true, 0.05f), Hex(0x948A82), 0.05f, 0.26f, 4, 0.35f);
             PaintIron(1024, out var ic, out var ih);
             var ironA = SaveTex("IronPlate", 1024, 1024, ic); var ironN = SaveTex("IronPlateHeight", 1024, 1024, ih, true, 0.1f);
             PaintPlanks(1024, out var pc, out var ph);
@@ -663,14 +787,15 @@ namespace LastBell.Areas.Area2.EditorTools
             mIron = Lit("IronPlate", ironA, ironN, Color.white, 0.55f, 0.38f, 2, 1f, true);
             mPlank = Lit("DeckPlanks", plankA, plankN, Color.white, 0.2f, 0.22f, 0, 1f, true); mPlank.mainTextureScale = new Vector2(0.5f, 1 / 6f);
             texelDensity["DeckPlanks"] = Mathf.Min(1024 / 2f, 1024 / 6f);
-            mBrass = Lit("Brass", brassA, null, Hex(0x6B5023), 0.8f, 0.5f, 4);
+            mBrass = Lit("Brass", brassA, null, Hex(0x7A5A2C), 0.85f, 0.5f, 4);
             mDarkBrass = Lit("DarkBrass", brassA, null, Hex(0x4E3820), 0.8f, 0.34f, 4);
             mChain = Lit("ChainIron", null, null, Hex(0x2C2724), 0.75f, 0.42f, 0);
             mRoof = Lit("RoofIron", ironA, ironN, Hex(0x4A4442), 0.5f, 0.25f, 2, 1f, true);
             mAbyss = Lit("AbyssGround", null, null, Hex(0x0C0806), 0f, 0f, 0);
             mCityRoof = Lit("CityRoof", null, null, Hex(0x221C1A), 0.3f, 0.2f, 0);
             // flowing molten brass (Shaders/MoltenFlow.shader)
-            mMolten = Molten("MoltenChannel", moltenT, 0.35f, 0, new Vector2(16.75f, 18.65f), 2.3f, 0.5f, 0.3f, 0.03f, 2.2f); mMolten.SetFloat("_CorePeak", 3.6f);
+            mMolten = Molten("MoltenChannel", moltenT, 0.35f, 0, new Vector2(16.75f, 18.65f), 3.0f, 0.5f, 0.3f, 0.03f, 2.2f); mMolten.SetFloat("_CorePeak", 3.0f); mMolten.SetColor("_HotColor", Hex(0xFFB060));
+            mGapMolten = Molten("MoltenGap", moltenT, 0.15f, 0, new Vector2(14.95f, 16.8f), 2.3f, 0.45f, 0.12f, 0f, 2.0f, 0.6f); mGapMolten.SetFloat("_CorePeak", 3.2f);
             mRiver = Molten("MoltenRiver", moltenT, 0.1f, 1, new Vector2(0, 2f), 3f, 0.6f, 0.05f, 0f, 0.7f); mRiver.SetFloat("_CorePeak", 2.4f);
             mPool = Molten("MoltenPool", moltenT, 0.05f, 0, new Vector2(0, 7f), 2.5f, 0.6f, 0.4f, 0f, 0.8f, 0.5f); mPool.SetFloat("_CorePeak", 2.6f);
             mFall = Molten("MoltenFall", moltenT, -3f, 1, new Vector2(0, 1.2f), 2.5f, 0.2f, 0.15f, 0f, 3f, 0, 1, 30.4f);
@@ -680,7 +805,7 @@ namespace LastBell.Areas.Area2.EditorTools
             mGlowDim = Unlit("GlowGate", Hex(0xFF5A18, 0.32f)); glowMats.Add(mGlowDim);
             var furnace = new Color32[8 * 128];
             for (int y = 0; y < 128; y++) { float t = y / 127f; Color c = Color.Lerp(Hex(0xFFB060), Hex(0xC8461A), Smooth(0, 0.45f, t)); c = Color.Lerp(c, Hex(0x2A0A04), Smooth(0.4f, 1f, t)); for (int x = 0; x < 8; x++) furnace[y * 8 + x] = c; }
-            mFurnace = Unlit("FurnaceInterior", Hex(0xFFFFFF, 1.6f), SaveTex("FurnaceGradient", 8, 128, furnace, clamp: true)); mFurnace.mainTextureScale = new Vector2(1, 1 / 4.7f); glowMats.Add(mFurnace);
+            mFurnace = Unlit("FurnaceInterior", Hex(0xFFFFFF, 1.1f), SaveTex("FurnaceGradient", 8, 128, furnace, clamp: true)); mFurnace.mainTextureScale = new Vector2(1, 1 / 4.7f); glowMats.Add(mFurnace);
             mHalo = Particle("FurnaceHalo", dot, Hex(0xFF6A20) * new Color(1, 1, 1, 0.3f), true);
             mGlowCurtain = Particle("GlowCurtain", fade, Hex(0xFF7A26, 1.0f) * new Color(1, 1, 1, 0.5f), true);
             mGlowCurtain.mainTextureScale = new Vector2(1, 1 / 2.2f); mGlowCurtain.mainTextureOffset = new Vector2(0, 1.4f / 2.2f);
@@ -781,7 +906,8 @@ namespace LastBell.Areas.Area2.EditorTools
             foreach (var (a0, a1) in Arcs(14.2f, 0.1f))
             {
                 Sector(stone, I, 14.0f, 14.4f, a0, a1, 0, 0.25f);                          // inner curb
-                Sector(dbrass, I, 13.98f, 14.18f, a0, a1, 0.25f, 0.29f);                   // brass top strip
+                Lathe(brass, I, new[] { new Vector2(13.98f, 0.25f), new Vector2(14.01f, 0.285f), new Vector2(14.08f, 0.305f), new Vector2(14.15f, 0.285f), new Vector2(14.18f, 0.25f) }, Mathf.CeilToInt((a1 - a0) * 14.1f / 0.3f), a0, a1); // half-round brass curb
+                for (float a = a0 + 0.04f; a < a1; a += 1.0f / 14.1f) Box(iron, Radial(a), new Vector3(0.05f, 0.03f, 0.05f), new Vector3(0, 0.305f, 14.08f));
                 Sector(stoneD, I, 14.4f, 16.8f, a0, a1, -1.7f, 0.02f, inner: false);       // rim base; its outer face is the channel's inner wall
                 for (float a = a0 + 0.08f; a < a1; a += 0.62f / 16.8f * 2.2f)              // corbels down the channel wall
                     Box(stoneD, TR(Polar(a, 16.95f, -0.75f), YawOut(a)), new Vector3(0.35f, 0.5f, 0.45f));
@@ -789,6 +915,18 @@ namespace LastBell.Areas.Area2.EditorTools
             int n = 0;
             foreach (var (a0, a1) in Arcs(15.5f, 0.35f))
             {
+                if (Modelled) // one regular crown of identical Blender teeth, evenly spaced with lava in every gap
+                {
+                    float arc = (a1 - a0) * 15.5f; int cnt = Mathf.Max(1, Mathf.RoundToInt(arc / 2.75f));
+                    for (int j = 0; j < cnt; j++, n++)
+                    {
+                        Model("FurnaceRim", "SM_Area2_RimTooth_Big_" + "ABC"[n % 3], Radial(a0 + (a1 - a0) * (j + 0.5f) / cnt) * T(0, 0, 14.45f));
+                        // molten slot in the gap after this tooth, so every gap glows from above (outside the walkable floor)
+                        float ga = a0 + (a1 - a0) * (j + 1f) / cnt, hw = 0.42f / 15.8f;
+                        if (j < cnt - 1) Sector(G("FurnaceRim", mGapMolten), I, 14.95f, 16.8f, ga - hw, ga + hw, 0.035f, 0.035f, 3, inner: false, outer: false, ends: false);
+                    }
+                    continue;
+                }
                 const float BIG = 2.3f, SMALL = 1.3f, GAP = 1.0f;
                 float L = (a1 - a0) * 15.5f, unit = BIG + SMALL + 2 * GAP; int pairs = Mathf.Max(1, Mathf.RoundToInt(L / unit)); float k = L / (pairs * unit), s = 0;
                 for (int i = 0; i < pairs * 2; i++, n++)
@@ -797,6 +935,8 @@ namespace LastBell.Areas.Area2.EditorTools
                     float mid = a0 + (s + GAP * k / 2 + w / 2) / 15.5f; s += (nominal + GAP) * k;
                     float rIn = big ? 14.45f : 14.6f, depth = big ? 2.55f : 1.7f, h = (big ? 1.5f : 0.9f) * Rnd(0.88f, 1.12f), rc = rIn + depth / 2;
                     var m = Radial(mid);   // local +X tangential, +Z outward
+                    if (Model("FurnaceRim", "SM_Area2_RimTooth_" + (big ? "Big_" : "Small_") + "ABC"[(n / 2 + (big ? 0 : 1)) % 3],
+                        m * Matrix4x4.TRS(new Vector3(0, 0, rIn), Quaternion.identity, new Vector3(w / (big ? 2.3f : 1.3f), h / (big ? 1.5f : 0.9f), 1)))) continue;
                     { float kb = bevel; bevel = 0.14f; Box(stone, m, new Vector3(w, h, depth), new Vector3(0, h / 2, rc)); bevel = kb; }  // heavy chamfer, no lid
                     for (int r = 0; r < 4; r++) Box(G("FurnaceRim", mIron), m, new Vector3(0.07f, 0.07f, 0.03f), new Vector3(-w * 0.3f + r * w * 0.2f, h * 0.35f, rIn - 0.015f)); // low rivet row
                     if (big)
@@ -841,7 +981,7 @@ namespace LastBell.Areas.Area2.EditorTools
                 if (flicker) flickerLights.Add(l);
             }
             for (int i = 0; i < 16; i++) Point("Molten Uplight", Polar((i + 0.5f) / 16 * TAU, 17.6f, -0.8f), Hex(0xFF7A1F), 14f, 7, true);
-            for (int i = 0; i < 16; i++) Point("Rim Glow", Polar(i / 16f * TAU, 17.9f, 0.7f), Hex(0xFF8A30), 5f, 4.5f, true);
+            for (int i = 0; i < 16; i++) Point("Rim Glow", Polar(i / 16f * TAU, 17.3f, 0.5f), Hex(0xFF8A30), 9f, 4.5f, true);
             for (int i = 0; i < 8; i++) Point("Rim Bounce", Polar((i + 0.5f) / 8 * TAU, 15.6f, 1.6f), Hex(0xFF7A2A), 2.2f, 2.2f, false);
         }
 
@@ -860,6 +1000,14 @@ namespace LastBell.Areas.Area2.EditorTools
                 for (int i = 0; i < n; i++)
                 {
                     float b0 = a0 + (a1 - a0) * i / n, b1 = a0 + (a1 - a0) * (i + 1) / n, am = (b0 + b1) / 2;
+                    if (Modelled) // one 9° Blender module per segment: hatch / buttress / vent, tangentially fitted, height varied
+                    {
+                        float sy = Rnd(0.92f, 1.12f);
+                        Model("OuterWall", i % 3 == 0 ? "SM_Area2_Wall_Hatch" : i % 3 == 1 ? "SM_Area2_Wall_Buttress" : "SM_Area2_Wall_Vent",
+                            Matrix4x4.TRS(Vector3.zero, Quaternion.LookRotation(Polar(am, 1)), new Vector3((b1 - b0) / (9f * Mathf.Deg2Rad), sy, 1)));
+                        if (i % 3 == 2) steamVents.Add(Polar(am, 22f, (3.4f + 1.4f) * sy));
+                        continue;
+                    }
                     float h1 = Rnd(1.3f, 1.7f), h2 = h1 + Rnd(0.8f, 1.0f), h3 = h2 + Rnd(0.7f, 1.2f), e0 = b0 + 0.003f, e1 = b1 - 0.003f;
                     Sector(mas, I, 18.6f, 23.0f, e0, e1, -1.7f, h1, 6);                                  // tier 1
                     Sector(G("OuterWall", mDarkBrass), I, 18.5f, 18.85f, e0, e1, h1, h1 + 0.1f, 6);
@@ -878,7 +1026,7 @@ namespace LastBell.Areas.Area2.EditorTools
                     if (i % 3 == 1) steamVents.Add(Polar(am, 21.9f, h3 + 0.4f));
                 }
                 // buttresses every 15° and pipe runs with brass flanges between them, on the outer face
-                var bs = new List<float>(); for (float a = a0; a <= a1 + 1e-3f; a += 15 * Mathf.Deg2Rad) bs.Add(a);
+                var bs = new List<float>(); if (!Modelled) for (float a = a0; a <= a1 + 1e-3f; a += 15 * Mathf.Deg2Rad) bs.Add(a);
                 foreach (var a in bs)
                 {
                     var m = Radial(a);
@@ -929,6 +1077,12 @@ namespace LastBell.Areas.Area2.EditorTools
             {
                 float a = deg * Mathf.Deg2Rad; Vector3 c = Polar(a, Mathf.Sin(a) > 0 ? 21.5f : 20f); bool near = c.z > 0; float top = near ? 8f : 14f;
                 float t1 = top * 0.45f, t2 = top * 0.72f, t3 = top * 0.88f; var m = TR(c, YawOut(a));
+                if (Model("Towers", near ? "SM_Area2_Tower_Near" : "SM_Area2_Tower_Far", TRQ(c, Quaternion.LookRotation(Polar(a, 1)))))
+                {
+                    if (!near) smokeStacks.Add(c + Polar(a + PI, 3f) + Vector3.up * (t3 + 4.7f)); // the model's chimney faces the arena
+                    foreach (float off in new[] { -0.4f, 0.4f }) { float b = a + off; Chain(c + Polar(b, 2.4f, t3 + 0.1f), Polar(b, 28, -14), 0.8f); }
+                    continue;
+                }
                 Lathe(masD, m, new[] { new Vector2(3.6f, -28), new Vector2(3.6f, t1) }, 64);
                 Sector(roof, m, 3.25f, 3.95f, 0, TAU, t1, t1 + 0.42f, 64, ends: false, bottom: true); Sector(b2, m, 3.93f, 4.0f, 0, TAU, t1 + 0.05f, t1 + 0.37f, 64, ends: false);
                 Lathe(mas, m, new[] { new Vector2(3.05f, t1 + 0.42f), new Vector2(3.05f, t2) }, 64);
@@ -988,6 +1142,13 @@ namespace LastBell.Areas.Area2.EditorTools
         // Shared deck with girders, X truss and cross beams under it. Local frame: +X outward along the deck.
         static void Deck(Matrix4x4 m, float x0, float x1, float width, string group)
         {
+            if (Modelled) // 2 m Blender deck modules laid outward (the module's +Z runs along the deck's +X)
+            {
+                string name = width > 5 ? "SM_Area2_Deck_55" : "SM_Area2_Deck_45";
+                for (float x = x0; x < x1 - 0.01f; x += 2f)
+                    Model(group, name, m * Matrix4x4.TRS(new Vector3(x, 0, 0), Quaternion.LookRotation(Vector3.right), new Vector3(1, 1, Mathf.Min(2f, x1 - x) / 2f)));
+                return;
+            }
             var deck = G(group, mPlank); var iron = G(group, mIron); var brass = G(group, mBrass); float len = x1 - x0, cx = (x0 + x1) / 2;
             float keep = bevel; bevel = 0; Box(deck, m, new Vector3(len, 0.5f, width), new Vector3(cx, -0.25f, 0), true); bevel = keep;
             foreach (float s in new[] { -1f, 1f })
@@ -1021,6 +1182,7 @@ namespace LastBell.Areas.Area2.EditorTools
         // A bevelled block cluster with lit windows and a doorway the deck runs into (the outer end of a gantry).
         static void EndCluster(Matrix4x4 m, float x, float width, string group)
         {
+            if (Model(group, "SM_Area2_Gatehouse", m * TRQ(new Vector3(x, 0, 0), Quaternion.LookRotation(Vector3.right)))) return;
             var mas = G(group, mMasonryDark); var mas2 = G(group, mRimStone); var brass = G(group, mDarkBrass); var roof = G(group, mRoof); var glow = G(group, mGlow); var glowDim = G(group, mGlowDim);
             Box(mas, m, new Vector3(6, 16, width + 3), new Vector3(x + 3, -4, 0));
             Box(brass, m, new Vector3(6.3f, 0.3f, width + 3.3f), new Vector3(x + 3, 4.1f, 0));
@@ -1051,9 +1213,12 @@ namespace LastBell.Areas.Area2.EditorTools
                     Parapet(m, 18.9f, 33.5f, s * 2.62f, grp, s > 0);
                     // suspension pylon: tall square masonry with brass bands and a pyramid cap; two chains to the deck rail
                     var pm = m * T(26f, 0, s * 3.45f);
-                    Box(G(grp, mMasonryDark), pm, new Vector3(1.1f, 35, 1.1f), new Vector3(0, -10.5f, 0));
-                    foreach (float y in new[] { 0.6f, 6.6f }) Box(G(grp, mDarkBrass), pm, new Vector3(1.3f, 0.25f, 1.3f), new Vector3(0, y, 0));
-                    Lathe(G(grp, mRoof), pm * Matrix4x4.Rotate(Quaternion.Euler(0, 45, 0)), new[] { new Vector2(0.95f, 7f), new Vector2(0, 8.3f) }, 4);
+                    if (!Model(grp, "SM_Area2_Pylon", pm))
+                    {
+                        Box(G(grp, mMasonryDark), pm, new Vector3(1.1f, 35, 1.1f), new Vector3(0, -10.5f, 0));
+                        foreach (float y in new[] { 0.6f, 6.6f }) Box(G(grp, mDarkBrass), pm, new Vector3(1.3f, 0.25f, 1.3f), new Vector3(0, y, 0));
+                        Lathe(G(grp, mRoof), pm * Matrix4x4.Rotate(Quaternion.Euler(0, 45, 0)), new[] { new Vector2(0.95f, 7f), new Vector2(0, 8.3f) }, 4);
+                    }
                     Vector3 topP = m.MultiplyPoint3x4(new Vector3(26f, 6.9f, s * 3.45f));
                     Chain(topP, m.MultiplyPoint3x4(new Vector3(18.5f, 0.95f, s * 2.62f)), 0.35f);
                     Chain(topP, m.MultiplyPoint3x4(new Vector3(32.5f, 0.95f, s * 2.62f)), 0.35f);
@@ -1081,11 +1246,14 @@ namespace LastBell.Areas.Area2.EditorTools
                 Parapet(m, 21.5f, 40f, s * 2.1f, grp, s < 0);
                 // gate pillars, set out at r 17.2 so they never cover the floor from the gameplay camera
                 var pm = m * T(17.2f, 0, s * 2.85f);
-                Box(mas, pm, new Vector3(1.2f, 10f, 1.2f), new Vector3(0, -1f, 0));
-                Box(dbr, pm, new Vector3(1.45f, 0.22f, 1.45f), new Vector3(0, 4.1f, 0));
-                Box(iron, pm, new Vector3(0.7f, 0.12f, 0.7f), new Vector3(0, 4.27f, 0));
+                if (!Model(grp, "SM_Area2_GatePillar", pm * Matrix4x4.Rotate(Quaternion.LookRotation(Vector3.right)))) // model's window faces the arena (local -X)
+                {
+                    Box(mas, pm, new Vector3(1.2f, 10f, 1.2f), new Vector3(0, -1f, 0));
+                    Box(dbr, pm, new Vector3(1.45f, 0.22f, 1.45f), new Vector3(0, 4.1f, 0));
+                    Box(iron, pm, new Vector3(0.7f, 0.12f, 0.7f), new Vector3(0, 4.27f, 0));
+                    Box(glow, pm, new Vector3(0.06f, 0.9f, 0.3f), new Vector3(-0.62f, 2.3f, 0));
+                }
                 Lantern(Child(root, grp + "/Lanterns"), pm.MultiplyPoint3x4(new Vector3(0, 4.85f, 0)), 0.5f, false);
-                Box(glow, pm, new Vector3(0.06f, 0.9f, 0.3f), new Vector3(-0.62f, 2.3f, 0));
                 Chain(pm.MultiplyPoint3x4(new Vector3(0, 3.9f, 0)), m.MultiplyPoint3x4(new Vector3(21.6f, 0.4f, s * 2.1f)), 0.25f);
                 // far arch pillars
                 var am = m * T(33.5f, 0, s * 2.95f);
@@ -1107,6 +1275,11 @@ namespace LastBell.Areas.Area2.EditorTools
             var mas = G(grp, mRimStone); var masD = G(grp, mMasonryDark); var dbr = G(grp, mDarkBrass); var brass = G(grp, mBrass); var iron = G(grp, mIron); var roof = G(grp, mRoof); var glow = G(grp, mGlow); var glowDim = G(grp, mGlowDim); var dark = G(grp, mSlate);
             bevel = 0.07f;
             Deck(m, 14f, 32f, 4.5f, grp);
+            if (Model(grp, "SM_Area2_FurnaceGate", TRQ(Polar(PI * 1.5f, 19.5f), Quaternion.LookRotation(Polar(PI * 1.5f, 1)))))
+            {
+                foreach (float s in new[] { -1f, 1f }) { var pm = m * T(19.5f, 0, s * 3.25f); Chain(pm.MultiplyPoint3x4(new Vector3(0.3f, 6.9f, 0)), m.MultiplyPoint3x4(new Vector3(27f, 16f, s * 6f)), 0.5f); }
+                bevel = 0; return;
+            }
             foreach (float s in new[] { -1f, 1f })
             {
                 var pm = m * T(19.5f, 0, s * 3.25f);
@@ -1188,6 +1361,7 @@ namespace LastBell.Areas.Area2.EditorTools
                     float a = Rnd() * TAU, r = Rnd(r0, r1), w = Rnd(3, 9), d = Rnd(3, 9), top = Mathf.Lerp(t0, t1, Rnd()), yaw = Rnd(0, 90);
                     if (!Clear(Polar(a, r), Mathf.Max(w, d) * 0.72f)) continue;
                     var m = TR(Polar(a, r, 0), yaw); float h = top - GROUND;
+                    if (Model(grp, "SM_Area2_City_" + "ABCDEF"[i % 6], Matrix4x4.TRS(Polar(a, r, GROUND), Quaternion.Euler(0, yaw, 0), new Vector3(w / 6f, h / 12f, d / 6f)))) continue;
                     Box(city, m, new Vector3(w, h, d), new Vector3(0, GROUND + h / 2, 0));
                     if (Rnd() < 0.4f) Lathe(iron, m * Matrix4x4.Rotate(Quaternion.Euler(0, 45, 0)), new[] { new Vector2(Mathf.Min(w, d) * 0.7f, top), new Vector2(0, top + Rnd(1.5f, 3)) }, 4);
                     else
@@ -1235,12 +1409,19 @@ namespace LastBell.Areas.Area2.EditorTools
             Box(gg, I, new Vector3(0.85f, 1.35f, 0.85f));
             Mesh Make(Geo g, string name) { var m = new Mesh { name = name }; m.SetVertices(g.V); m.SetNormals(g.N); m.SetUVs(0, g.U); m.SetTriangles(g.T, 0); m.RecalculateBounds(); m.RecalculateTangents(); return SaveAsset(m, "Meshes/" + name + ".asset"); }
             lanternIron = Make(gi, "LanternIron"); lanternGlow = Make(gg, "LanternGlow");
+            lanternModel = ModelMesh("SM_Area2_Lantern", out lanternMats);
         }
+        static Mesh lanternModel; static Material[] lanternMats;
 
         static void Lantern(Transform parent, Vector3 pos, float scale, bool swing)
         {
             var go = new GameObject("CageLantern"); go.transform.SetParent(parent, false); go.transform.position = pos; go.transform.localScale = Vector3.one * scale;
-            foreach (var (mesh, mat) in new[] { (lanternIron, mIron), (lanternGlow, mGlow) })
+            if (lanternModel)
+            {
+                var c = new GameObject(lanternModel.name); c.transform.SetParent(go.transform, false);
+                c.AddComponent<MeshFilter>().sharedMesh = lanternModel; c.AddComponent<MeshRenderer>().sharedMaterials = lanternMats;
+            }
+            else foreach (var (mesh, mat) in new[] { (lanternIron, mIron), (lanternGlow, mGlow) })
             {
                 var c = new GameObject(mesh.name); c.transform.SetParent(go.transform, false);
                 c.AddComponent<MeshFilter>().sharedMesh = mesh; var mr = c.AddComponent<MeshRenderer>(); mr.sharedMaterial = mat;
@@ -1261,7 +1442,7 @@ namespace LastBell.Areas.Area2.EditorTools
             var sky = new Material(Shader.Find("Skybox/Panoramic")) { name = "FoundrySky" };
             sky.SetTexture("_MainTex", SaveTex("SkyPanorama", 2048, 1024, PaintSky(2048, 1024))); sky.SetFloat("_Mapping", 1); sky.SetFloat("_Exposure", 1f);
             RenderSettings.skybox = SaveAsset(sky, "Materials/FoundrySky.mat");
-            RenderSettings.fog = true; RenderSettings.fogMode = FogMode.ExponentialSquared; RenderSettings.fogColor = Hex(0x36302D); RenderSettings.fogDensity = 0.006f;
+            RenderSettings.fog = true; RenderSettings.fogMode = FogMode.ExponentialSquared; RenderSettings.fogColor = Hex(0x3A2622); RenderSettings.fogDensity = 0.006f;
             RenderSettings.ambientMode = AmbientMode.Trilight;
             RenderSettings.ambientSkyColor = Hex(0x4A4448, 1.0f); RenderSettings.ambientEquatorColor = Hex(0x3A2218, 0.9f); RenderSettings.ambientGroundColor = Hex(0xFF6A1A, 0.4f);
 

@@ -92,3 +92,40 @@ Built from `BRASS-FOUNDRY-UNITY-PROMPT.md` and `ref-brass-foundry-topdown.webp` 
   - The city rivers are too bright from the top view.
   - The abyss needs more depth layers and a horizon glow.
   - The lava ring should run unbroken past the corner towers.
+
+### Blender-modelled assets (`BRASS-FOUNDRY-BLENDER-MODELING-PROMPT.md`)
+
+- **Source:** `blender/area2_models.py`, for Blender 5.2. It models every environment asset with real geometry:
+  - **Rim teeth:** wedge-shaped gear teeth with a 45° chamfer, chiselled planar chips, a lighter capstone tier, and brass bands or rivets.
+  - **Towers:** two tiered towers with crenellations, machinery, recessed window slits with mullions, a ribbed dome with dormers and a finial, and a chimney on the far pair.
+  - **Furnace gate:** banded pillars, a lintel with a toothed cog, a riveted portcullis and a recessed furnace mouth.
+  - **Outer wall:** terraced modules with a hatch, a buttress or a steam vent, and flanged pipes.
+  - **Bridges:** plank deck modules with an iron truss, plus a suspension pylon, an end gatehouse and an entry gate pillar.
+  - **Props:** a cage lantern and an oval chain link.
+  - **City:** six foundry buildings, including sawtooth halls and stacks.
+
+  Material slots are named for this builder's URP materials (Stone, Masonry, Iron, Brass, Glow and so on). UVs are box-projected in metres to match the tiling textures.
+- **Export:** one `.glb` per asset into `unity/Assets/LastBell/Areas/Area2/Models/`, about 80 k triangles in total.
+  - Command: `blender -b --factory-startup -P area2_models.py -- <out_dir> [contact_sheet.png]`.
+  - In Unity: **Last Bell > Area 2 – Build Models (Blender)**. The arena build also runs it automatically when `Models/` is missing and Blender is installed (`LASTBELL_BLENDER` overrides the path).
+  - `Models/` is git-ignored and about 3 MB, because the script rebuilds it.
+- **Unity:** `BrassFoundryArenaBuilder` reads each model's mesh and slot names and appends the geometry into its batches, so draw calls stay low. Each asset is placed with the same layout data:
+  - one even crown of teeth, with a molten slot glowing in every gap
+  - a 9° wall module per segment
+  - 2 m deck modules
+  - towers at the diagonals
+  - city buildings scaled to their slots
+
+  Lanterns get a standalone mesh so they can sway. Without the models (no Blender), the builder logs one warning and falls back to the code-built geometry.
+- **Checks:**
+  - Lava flow: 10.4 against 0.00.
+  - Occlusion: 0 of 128 blocked.
+  - Budget: 827 k triangles, 115 renderers, 32 materials, 97.6 MB of textures and 78 lights.
+- **Critic loop:** 6.8 → 7.0 → 7.0 → 7.2 → 7.2 / 10. It did not reach 8. Open items:
+  - The teeth still read as boxy from the gameplay camera.
+  - The lava moat should be a wider, continuous band.
+  - The sky and fog need an orange underglow and depth haze.
+  - The floor inlays should be duller.
+  - The city skyline should be more varied.
+
+  No sculpt or texture bakes were made: the assets use the project's tiling textures.
