@@ -186,9 +186,10 @@ namespace LastBell.Run
             {
                 var pos = Sim.Flat(p.transform.position); var away = pos - boss;
                 if (away.magnitude > OrreryClosing.CrownRadius + Hazard.Margin + 0.2f) continue;
-                var dir = away.magnitude > 0.5f ? away.normalized : (Vector3.zero - boss).normalized;
-                var to = boss + dir * 4.4f;
-                if (to.magnitude > 7.8f) to = to.normalized * 7.8f;
+                // the nearest spot 4.4 m from him that is still inside the rim's safe floor (the body push can leave a
+                // player on his far side, where straight out would cross the rim)
+                var to = Enumerable.Range(0, 24).Select(k => boss + Sim.Dir(k * 15f) * 4.4f).Where(c => c.magnitude <= 7.8f)
+                    .OrderBy(c => (c - pos).sqrMagnitude).First();
                 V2In(p).Go(to, 4.2f); movers++;
             }
             yield return V2WaitIdle(10);
