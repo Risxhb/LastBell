@@ -26,7 +26,7 @@ Add these flags as needed:
 - `-lastbellAbility crucivar.mould_press` (or `crucivar.gear_chain`, `crucivar.bellows_draw`, `crucivar.great_casting`, `crucivar.second_press`) fires that one ability on loop.
 - `-lastbellDifficulty easy|medium|hard` sets the level.
 
-**Windows player:** PLAYER_BUILD_STATUS
+**Windows player:** built at 788c6cd (local build in `crucivar-abilities/unity/Builds/Windows`, not committed, not launch-tested). Run `Play Run Loop.cmd` in the `crucivar-abilities` folder, or the exe directly with flags:
 
     unity\Builds\Windows\LastBell.exe -screen-fullscreen 0 -screen-width 1600 -screen-height 900 [-lastbellAbilitySet v1] [-lastbellAbility <id>]
 
@@ -38,13 +38,23 @@ Then choose Practice → Crucivar (area 2). The map loads the Brass Foundry.
 |---|---|---|
 | Crucivar v2 (5 ability tests + phase plan) | `-crucivarV2Test` | **210 passed, 0 failed** |
 | Crucivar v1 (original attacks, `-lastbellAbilitySet v1` forced) | `-crucivarTest` | **28 passed, 0 failed** |
-| Full run loop | `-lastbellAutotest` | RUNLOOP_RESULT |
+| Full run loop | `-lastbellAutotest` | **171 passed, 2 failed**: the known editor-noise check, plus one older Bellkeeper check (see below) |
 
-**Known editor-only errors** (BUILD-PLAN.md, not gameplay): the run-loop suite fails only its "no errors or exceptions logged" check, because of two errors:
+The run loop has two failures, and neither comes from v2.
+
+**1. Known editor-only errors** (BUILD-PLAN.md, not gameplay). The "no errors or exceptions logged" check fails because of two errors:
 - `UnityEditor.Search` indexing on startup (`SearchDatabase.EnumerateAll` ArgumentOutOfRange);
 - `SkywardSpireArena.OnValidate` touching `Renderer.material` on a prefab.
 
-Both come from the copied Library or the editor. The same single failure appears on the baseline before any v2 work (172/173 at 09:30).
+Both come from the copied Library or the editor.
+
+**2. "Bellkeeper resumes in Last Guardian after the kit checks — Broken Hour".** This failure is older than v2, not a v2 regression.
+- **Where it shows up:**
+  - It passed once at 09:30 (172/173 baseline).
+  - It failed twice on the merged branch (13:00, 13:50).
+  - It also fails on **62acf88**, the current `feature/boss-crucivar`, before any v2 work, with identical damage numbers (3600 → 3084).
+- **Cause:** the test reads the Bellkeeper's phase name in the same frame it resets HP to 95 %. If the real-time Vanguard kit checks pushed the Bellkeeper under 70 % and its script reached a block boundary first, the name is still "Broken Hour". So it depends on frame timing.
+- **Owner:** this test belongs to the Bellkeeper and run-loop lane, and nothing in Crucivar touches it.
 
 **Each step, Crucivar suites** (v2 / v1):
 
@@ -150,7 +160,7 @@ New from the build:
 
 ## Completed / Next / Blocked
 
-**Completed:** COMPLETED_LINE
+**Completed:** all five abilities built, tested in their sessions and merged; phase plan + second form wired; v2 is the practice default, v1 behind `-lastbellAbilitySet v1`; Crucivar v2 210/210, v1 28/28; run loop 171/173, both failures older than v2; Windows player built; report + screenshots committed (local).
 
 **Next:**
 - Push `feature/crucivar-abilities-v2` and the ability branches `feature/crucivar-ability-mould_press` and `feature/crucivar-ability-second_press` (both local only).
