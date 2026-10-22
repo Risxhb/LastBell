@@ -121,7 +121,7 @@ The Bellkeeper remembers the half each Leaning Bell struck. On Hard, from phase 
 1. Should Bellkeeper practice (and the run's final fight) always load the Shattered Hour map? **Provisional: practice loads it** (`BossEntry.map = "shattered-hour"`); the run keeps the selected map, with the adaptive warning.
 2. Leaning Bell tie-break when the halves hold equal players: **provisional: the side of the boss's current target**.
 3. Reflection in phase 1 can be solved by "everyone on one side of the boss". Kept on purpose as the lesson phase 3 then tests inside the Toll Tide band.
-4. Tide knockback inward 1.5 m (conflict 2): is an inward push acceptable as the settled "about 1.5 m knockback"?
+4. Tide knockback inward 1.5 m (conflict 2): is an inward push acceptable as the settled "about 1.5 m knockback"? **Answered by Chzy18 (2026-10-22): yes for now — provisional.**
 5. The Throne's cracked bell is scenery; the tide's VFX starts at the rim. Should the great bell visibly ring (art task)?
 6. HP for test builds stays 3600 × (1 + 0.7 (N − 1)); real HP waits for measured DPS.
 7. Does Easy also shrink rings (−0.4 m), or only lengthen warnings? **Provisional: both.**

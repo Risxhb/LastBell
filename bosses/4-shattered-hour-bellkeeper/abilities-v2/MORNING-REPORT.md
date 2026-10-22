@@ -65,7 +65,7 @@ Evidence folders are in `C:\Users\BS_Ch\Documents\Codex\last bell\` (outside git
 
 ## Conflicts and open questions
 
-- Open questions 1–7: `ABILITIES.md` §10. Question 4 (the tide's inward push) was answered "yes for now" in the Toll Tide session. Recording it in `ABILITIES.md` is waiting for confirmation here, because the auto-mode safety check blocked my edit; the Toll Tide brief commit `c37a353` is not merged yet.
+- Open questions 1–7: `ABILITIES.md` §10. Question 4 (the tide's inward push) is answered: Chzy18 said "yes for now" (provisional), and it is recorded in `ABILITIES.md` and the Toll Tide brief.
 - Each ability session's own decisions are listed in its notes (`side-session-notes/.../*.md`). For example, Striking Order gives I–IV to 3 players with the first player taking I and IV.
 - **The Unity lock is a bottleneck.** With four boss trees on one PC, builds waited up to 3 hours. The lock is a plain retry loop, not a queue.
 
