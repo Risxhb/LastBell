@@ -11,7 +11,9 @@ namespace LastBell.Run
     // runs the same 2.0 + 1.1 s. Run returns on the tick the last star resolves; it never assumes it runs alone (the
     // phase plan starts it inside Noon Shadow, Orrery Closing and the Horizon).
     // Ticks (Medium) are counted from the cast, as hazard Age: lock 120, resolve 186; solo star II spawns at 120, locks
-    // at 240, resolves at 306. Easy stretches the follow and the window by 1.25; Hard keeps Medium's timings.
+    // at 240, resolves at 306. Easy stretches the follow and the window by 1.25. Hard (v2.1 §2) keeps the 2.0 s follow and
+    // cuts the window x0.7 to 0.77 s (resolve 166; solo 286), except Run(fullWindow: true), the Lances pairing (v2.1 §3),
+    // which keeps the full 1.1 s.
     public sealed class StarfallMirror : AurelionAbility
     {
         public override string Id => "aurelion.starfall_mirror";
@@ -25,7 +27,8 @@ namespace LastBell.Run
         public static float RadiusFor(int n) => n >= CrowdFrom ? RadiusCrowd : Radius;
         public static Vector3 Reflect(Vector3 p) => new Vector3(-p.x, 0, -p.z);   // through the arena centre (the compass star)
         public int FollowTicks => T(FollowS);
-        public int ResolveTicks => FollowTicks + T(WindowS);
+        public int WindowTicks(bool fullWindow = false) => fullWindow ? T(WindowS) : Win(WindowS);
+        public int ResolveTicks(bool fullWindow = false) => FollowTicks + WindowTicks(fullWindow);
 
         // one called star: its owner, the star on them and its reflection (test evidence and presentation)
         public sealed class Star { public PlayerController Who; public Hazard Main, Mirror; public int Index; }
@@ -34,14 +37,14 @@ namespace LastBell.Run
 
         // ticks from Run's first tick to the last star's resolve tick; the v2.1 plan lines pairs up with it.
         // CONTRACT: keep it equal to Run's real timing when the windows change. fullWindow: v2.1 §3, paired with Meridian
-        // Lances the star keeps its full 1.1 s window on Hard (not yet used by Run: the Starfall session wires it).
-        public int Duration(bool fullWindow = false) => (Standing().Count <= 1 ? FollowTicks : 0) + ResolveTicks - 1;
+        // Lances the star keeps its full 1.1 s window on Hard (Run and Duration both use WindowTicks).
+        public int Duration(bool fullWindow = false) => (Standing().Count <= 1 ? FollowTicks : 0) + ResolveTicks(fullWindow) - 1;
 
         public IEnumerable<int> Run(bool fullWindow = false)
         {
             Say(Name); Casts++; Stars.Clear();
             var party = Standing();
-            int follow = FollowTicks, resolve = ResolveTicks;
+            int follow = FollowTicks, resolve = ResolveTicks(fullWindow);
             float r = RadiusFor(party.Count);
             bool solo = party.Count <= 1;
             Clip("ZenithPins", solo ? follow + resolve : resolve);   // halo arcs tilt and point at every player
