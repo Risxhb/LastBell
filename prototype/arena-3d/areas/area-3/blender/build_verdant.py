@@ -320,6 +320,14 @@ def rock_lathe(rings, plan, twist_every=2, root=60.0, cap=True):
     bm.faces.new(prev[::-1]); bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     return bm
 
+def teal_base(bm, zlo, zhi):
+    """Rock bases sink toward a dark teal so the masses separate from the pale cloud and their tops read lighter."""
+    lay = bm.loops.layers.float_color['Col']
+    for f in bm.faces:
+        for lp in f.loops:
+            h = max(0.0, min(1.0, (lp.vert.co.z - zlo) / (zhi - zlo))); k = (1 - h) ** 1.5 * 0.55
+            c = lp[lay]; lp[lay] = (c[0] * (1 - k) + 0.20 * k, c[1] * (1 - k) + 0.33 * k, c[2] * (1 - k) + 0.36 * k, 1)
+
 def moss_cap(bm, zfrom):
     """Moss over the top of a rock, thickest on up-facing faces, fading out below `zfrom` (tints the painted colours)."""
     lay = bm.loops.layers.float_color['Col']
@@ -334,7 +342,7 @@ def spire_kit(i):
     """Kit spire i: the hand-drawn profile at unit radius, a buttress lobe leaning on it, moss on its ledges, a crown."""
     P = SPIRES[i]; asm = Asm(f'Spire{i}'); rad = 3.0
     rings = [(z, rx * rad, ry * rad, ox * rad, oy * rad) for z, rx, ry, ox, oy in P['rings']]
-    bm = rock_lathe(rings, PLAN[i:] + PLAN[:i]); paint_bm(bm, -16, 0, top=1.16, bottom=0.42, moss=0.95, key=('sp', i), wear=0.05, var=0.0); moss_cap(bm, -5.0); asm.add('Rock', bm)
+    bm = rock_lathe(rings, PLAN[i:] + PLAN[:i]); paint_bm(bm, -16, 0, top=1.16, bottom=0.42, moss=0.95, key=('sp', i), wear=0.05, var=0.0); teal_base(bm, -22, 0); moss_cap(bm, -5.0); asm.add('Rock', bm)
     (bx, by), br, bh = P['buttress']
     lobe = [(-bh * 0.45, br * 0.8, br * 0.7, 0, 0), (-bh * 0.5, br * 1.0, br * 0.85, 0, 0), (-bh * 0.8, br * 0.85, br * 0.75, 0.05, 0), (-bh, br * 1.0, br * 0.9, 0.1, 0.05)]
     lb = rock_lathe([(z, rx * rad, ry * rad, ox * rad, oy * rad) for z, rx, ry, ox, oy in lobe], PLAN[i + 3:] + PLAN[:i + 3], root=40)
@@ -367,7 +375,7 @@ BASTIONS = [
 def bastion_kit(i, rad):
     asm = Asm(f'Bastion{i}')
     bm = rock_lathe([(z, rx * rad, ry * rad, ox * rad, oy * rad) for z, rx, ry, ox, oy in BASTIONS[i]], PLAN[i * 2:] + PLAN[:i * 2], root=8)
-    paint_bm(bm, -14, 0, top=1.14, bottom=0.5, moss=0.95, key=('ba', i), wear=0.05); asm.add('Rock', bm)
+    paint_bm(bm, -14, 0, top=1.14, bottom=0.5, moss=0.95, key=('ba', i), wear=0.05); teal_base(bm, -14, 0); asm.add('Rock', bm)
     for m in range(5):
         a = m / 5 * math.tau + i
         moss_clump(asm, (math.cos(a) * rad * 0.8, math.sin(a) * rad * 0.75, 0.05), 0.7, ('bm', i, m), flowers=3)
@@ -413,6 +421,28 @@ def tree_kit(i):
     return asm.build(KIT)
 
 # ------------------------------------------------------------------ lantern, bell, small kit
+def bush_kit(i):
+    asm = Asm(f'Bush{i}'); clusters = [[(0, 0, 0.45, 0.6), (0.45, 0.15, 0.35, 0.45), (-0.4, -0.1, 0.3, 0.42)],
+                                     [(0, 0, 0.4, 0.55), (0.35, -0.3, 0.3, 0.4)],
+                                     [(0, 0, 0.5, 0.7), (-0.5, 0.2, 0.35, 0.45), (0.45, 0.3, 0.4, 0.5), (0.1, -0.5, 0.3, 0.4)]][i]
+    for ci, (cx, cy, cz, cr) in enumerate(clusters):
+        core = bmesh.new(); bmesh.ops.create_icosphere(core, subdivisions=1, radius=cr * 0.55); core.transform(M4((cx, cy, cz), s=(1, 1, 0.75)))
+        paint_bm(core, 0, cz + cr, top=1.1, bottom=0.5, key=('bc', i, ci), wear=0); asm.add('CanopyDark', core)
+        leaves = bmesh.new(); lay = leaves.loops.layers.float_color.new('Col'); N = int(160 * cr * cr) + 20
+        for k in range(N):
+            y = 1 - 2 * (k + 0.5) / N; rr = math.sqrt(max(0, 1 - y * y)); th = k * 2.39996
+            nrm = Vector((math.cos(th) * rr, math.sin(th) * rr, y * 0.8)).normalized()
+            if nrm.z < -0.4: continue
+            pos = Vector((cx, cy, cz)) + nrm * cr * (0.8 + 0.2 * hsh(i, ci, k))
+            up = Vector((0, 0, 1)) if abs(nrm.z) < 0.9 else Vector((1, 0, 0)); right = up.cross(nrm).normalized(); upv = nrm.cross(right)
+            rot = Matrix.Rotation(hsh(i, ci, k, 'r') * math.tau, 3, nrm); right, upv = rot @ right, rot @ upv
+            sc = 0.9 + 0.5 * hsh(i, ci, k, 's')
+            f = leaves.faces.new([leaves.verts.new(pos + (right * x + upv * yv + nrm * yv * 0.3) * sc) for x, yv in LEAFC])
+            v = 0.55 + 0.6 * max(0, nrm.z * 0.5 + 0.5)
+            for lp in f.loops: lp[lay] = (v, v, v, 1)
+        asm.add('CanopyLeaf', leaves)
+    return asm.build(KIT)
+
 def lantern_kit():
     asm = Asm('LanternKit')
     for k in range(6):
@@ -598,7 +628,9 @@ def belfry(Bf, bell_src):
             lng = (zc + (cx + cy) // 2) % 2 == 0; sx, sy = (0.9, 0.55) if lng else (0.55, 0.9)
             asm.stone('StoneDark', (sx, sy, 0.5), at(cx * (W / 2 - sx / 2 + 0.06), cy * (W / 2 - sy / 2 + 0.06), 0.8 + zc * 1.0), ('q', Bf['idx'], zc, cx, cy), rz, zr=zr, chips=1, bev=0.06)
     ztop = 0.5 + solid + cham + 0.16
-    asm.stone('StoneDark', (W + 0.45, W + 0.45, 0.35), at(0, 0, ztop + 0.17), ('co', Bf['idx']), rz, zr=zr, moss=0.6, top=1.15)
+    for f in range(4):                                              # cornice as a ring of four strips: the top stays open, so
+        fa = f * math.pi / 2; nx, ny = math.sin(fa), -math.cos(fa)   # the high camera looks down at the bell, rubble and moss
+        asm.stone('StoneDark', (W + 0.45, 0.62, 0.35), at(nx * (W / 2 - 0.08), ny * (W / 2 - 0.08), ztop + 0.17), ('co', Bf['idx'], f), rz + fa, zr=zr, moss=0.6, top=1.15)
     pattern = [1.0, 0.65, 0.0, 0.4, 0.85, 0.3]                       # a broken parapet: heights per block along each side
     for f in range(4):
         fa = f * math.pi / 2; nx, ny = math.sin(fa), -math.cos(fa); tx, ty = -ny, nx
@@ -610,6 +642,13 @@ def belfry(Bf, bell_src):
                 ch = hh if hh < 0.6 else hh / 2
                 asm.stone('Stone', (0.58, 0.42, ch - 0.02), at(lx, ly, ztop + 0.35 + course * ch + ch / 2), ('bc', Bf['idx'], f, b, course), rz + fa, zr=zr, moss=0.85, chips=2)
             if hh > 0.5 and hsh('bcm', Bf['idx'], f, b) < 0.5: moss_mat(asm, at(lx, ly, ztop + 0.35 + hh - 0.03), 0.58, 0.42, rz + fa, ('bcm', Bf['idx'], f, b), flowers=2)
+    # the chamber floor seen from above: rubble, a moss mat and shrubs instead of a flat square
+    zf = 0.5 + solid + 0.2
+    moss_mat(asm, at(0, 0, zf), W - 1.0, W - 1.0, rz, ('bfl', Bf['idx']), drip=False, flowers=6)
+    for m in range(5):
+        asm.stone('StoneDark', (0.5 + 0.3 * hsh('rb', Bf['idx'], m), 0.4 + 0.3 * hsh('rw', Bf['idx'], m), 0.3 + 0.2 * hsh('rh', Bf['idx'], m)),
+                  at((hsh('rx', Bf['idx'], m) - 0.5) * 2.0, (hsh('ry', Bf['idx'], m) - 0.5) * 2.0, zf + 0.15), ('rb', Bf['idx'], m), rz + m, rx=(hsh('rr', m) - 0.5) * 0.6, zr=zr, moss=0.8, chips=2)
+    bush_spots.append((at(0.6, -0.5, zf), at(-0.7, 0.6, zf)))
     if not front:                                                   # timber frame standing on the broken top
         for cx, cy in ((-1, -1), (1, -1), (1, 1), (-1, 1)): asm.stone('Timber', (0.18, 0.18, 1.4), at(cx * 1.1, cy * 1.1, ztop + 1.05), ('tf', Bf['idx'], cx, cy), rz, zr=zr, bev=0.02, bottom=0.8)
         for ang in (0, math.pi / 2): asm.stone('Timber', (2.5, 0.16, 0.16), at(0, 0, ztop + 1.7), ('tb', Bf['idx'], ang), rz + ang, zr=zr, bev=0.02, bottom=0.85)
@@ -671,10 +710,13 @@ def aqueduct(A):
 # ================================================================== build everything
 print('KIT'); spires = [spire_kit(i) for i in range(len(SPIRES))]
 bast = {}
-trees = [tree_kit(i) for i in range(3)]; lantern = lantern_kit(); bell = bell_kit(); fern = fern_kit()
+trees = [tree_kit(i) for i in range(3)]; bushes = [bush_kit(i) for i in range(3)]; lantern = lantern_kit(); bell = bell_kit(); fern = fern_kit()
 print('PLATFORM'); platform()
 print('BRIDGES'); [bridge(B) for B in L['bridges']]
+bush_spots = []
 print('BELFRIES'); [belfry(Bf, bell) for Bf in L['belfries']]
+for j, spots in enumerate(bush_spots):
+    for k, p in enumerate(spots): instance(bushes[(j + k) % 3], ART, Vector(p), rz=hsh('bfs', j, k) * math.tau, s=0.75, name='Bush')
 print('AQUEDUCTS'); [aqueduct(A) for A in L['aqueducts']]
 print('ROCKS')
 si = 0
@@ -691,6 +733,18 @@ for S in L['spires']:
 print('TREES')
 for i, Tr in enumerate(L['trees']): instance(trees[i % 3], ART, T(Tr['p']), rz=hsh('tz', i) * math.tau, s=Tr['s'], name='Tree')
 for p in L['lanterns']: instance(lantern, ART, T(p), name='Lantern')
+for i in range(46):                                                 # bushes spilling over the outer curb (outside 14.6 m)
+    a = (i + 0.5 * hsh('ba', i)) / 46 * math.tau
+    if near_exit(a, GAP + 0.03): continue
+    d = R + 0.9 + 0.3 * hsh('bd', i); z = 0.25 + 0.2 * hsh('bz', i)
+    instance(bushes[i % 3], ART, Vector((math.cos(a) * d, -math.sin(a) * d, z)), rz=hsh('br', i) * math.tau, s=0.9 + 0.6 * hsh('bs', i), name='Bush')
+for Bd in L['bridges']:                                             # bushes on bridge parapets and at the bridge roots
+    ux = Vector((math.cos(Bd['a']), -math.sin(Bd['a']), 0)); uy = Vector((math.sin(Bd['a']), math.cos(Bd['a']), 0))
+    for j in range(int(Bd['len'] / 2.6)):
+        for side in (-1, 1):
+            if hsh('bbb', Bd['a'], j, side) > 0.45: continue
+            p = ux * (Bd['x0'] + 1.3 + j * 2.6) + uy * side * (BRIDGE_W / 2 + 0.25); p.z = 0.35
+            instance(bushes[(j + side) % 3], ART, p, rz=hsh('bbr', j, side) * math.tau, s=0.7 + 0.4 * hsh('bbs', j, side), name='Bush')
 for i in range(300):                                                # ferns along the rim, outside the playable radius
     a = (i + hsh('fa', i) * 0.6) / 300 * math.tau
     if near_exit(a, GAP): continue
