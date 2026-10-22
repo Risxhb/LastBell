@@ -56,7 +56,8 @@ namespace LastBell.Run
         {
             var at = Sim.Flat(Boss.transform.position);
             if (at.magnitude <= CastRange) yield break;
-            foreach (var w in Boss.Walk(at.normalized * (CastRange - 0.2f), WalkSpeed, WalkCapTicks)) yield return w;
+            // Walk stops 0.3 m short of its destination, so aim 0.5 m inside the range
+            foreach (var w in Boss.Walk(at.normalized * (CastRange - 0.5f), WalkSpeed, WalkCapTicks)) yield return w;
         }
 
         public override IEnumerable<int> Cast()
