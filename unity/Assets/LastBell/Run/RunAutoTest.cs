@@ -714,8 +714,11 @@ namespace LastBell.Run
             Check("Sylvara practice starts her encounter", sy != null && d.Mode == RunMode.Practice);
             if (sy == null) yield break;
             Check("Sylvara: full health and potions (area final boss)", d.Player.Hp == PlayerController.MaxHp && d.Player.Potions == PlayerController.MaxPotions);
+            var syPres = sy.Presenter; var syClips = new[] { "Idle", "Walk", "PruningArc", "Rootscript", "Seed", "Procession", "Bloom", "Vulnerable", "PhaseShift", "Defeat" };
+            Check("Sylvara uses her rigged model with all clips", syPres && syPres.HasModel && !sy.Placeholder && syClips.All(c => syPres.Has(c)), syPres ? string.Join(",", syClips.Where(c => !syPres.Has(c))) : "no presenter");
             d.Player.transform.position = new Vector3(0, 0, 3.2f); yield return Wait(0.4f);   // frame the body for the shot
             yield return Shot("sylvara_body");
+            StartCoroutine(Capture("sylvara_arc", 210));   // the first Pruning Arc on the model
 
             // watch the whole fight: hits per instance, hit rules, patterns live at once
             var hitsPerInstance = new Dictionary<int, int>(); bool hitRules = true; int maxPatterns = 0, taken = 0;

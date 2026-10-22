@@ -1,4 +1,21 @@
 {
-  "schema": 1,
-  "packs": []
+    "schema":  1,
+    "packs":  [
+                  {
+                      "name":  "sylvara-assets",
+                      "version":  1,
+                      "file":  "sylvara-assets-v1.zip",
+                      "url":  "https://github.com/Risxhb/collab/releases/download/sylvara-assets-v1/sylvara-assets-v1.zip",
+                      "sha256":  "5056f1313c9bf609726cf5a7d9abcde6f9bf221e6c822687d7cd018af777f3c4",
+                      "size":  7320575,
+                      "extractTo":  ".",
+                      "paths":  [
+                                    "unity/Assets/LastBell/Characters/Sylvara/Resources/Characters/Sylvara.glb",
+                                    "prototype/arena-3d/models/upload/sylvara-front.png",
+                                    "prototype/arena-3d/models/upload/sylvara-side.png",
+                                    "prototype/arena-3d/models/upload/sylvara-back.png"
+                                ],
+                      "files":  5
+                  }
+              ]
 }

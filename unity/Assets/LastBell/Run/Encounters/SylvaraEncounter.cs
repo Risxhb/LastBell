@@ -51,7 +51,9 @@ namespace LastBell.Run
 
         protected override void Build()
         {
-            presenter = CharacterPresenter.Create(transform, "Sylvara", 2f, 1f, 0, host =>
+            // Resources/Characters/Sylvara.glb (Meshy, rigged by prototype/arena-3d/models/build-sylvara.ps1); the primitive
+            // body below is the fallback stand-in when the model is missing
+            presenter = CharacterPresenter.Create(transform, "Sylvara", 4f, 0.6f, 0, host =>
             {
                 // four planted root legs, splayed to the 1.8 m footprint
                 for (int i = 0; i < 4; i++)
@@ -341,6 +343,7 @@ namespace LastBell.Run
         {
             if (!presenter) return;
             if (Current == "approach" || Current == "reposition") presenter.TickBoss("Walk");
+            else if (Current == "recovery" || Current == "punish") presenter.TickBoss("Vulnerable");
             else presenter.TickBoss("Idle");
         }
 
@@ -352,12 +355,9 @@ namespace LastBell.Run
             if (bellRoot && !Dead)
                 for (int b = 0; b < bellRoot.childCount; b++)
                     bellRoot.GetChild(b).localRotation = Quaternion.Euler(Mathf.Sin(Time.time * (1.3f + b * 0.37f)) * 8f, 0, Mathf.Cos(Time.time * (1.1f + b * 0.29f)) * 6f);
-            if (Dead && presenter && presenter.Visual)
-            {
-                // defeat: the shrine settles into a seated pose
-
+            // defeat: the model's Defeat clip seats the shrine; the stand-in just settles lower
+            if (Dead && presenter && presenter.Visual && !presenter.HasModel)
                 presenter.Sink = Mathf.MoveTowards(presenter.Sink, 0.9f, Time.deltaTime * 0.6f);
-            }
         }
         protected override void OnDefeat()
         {

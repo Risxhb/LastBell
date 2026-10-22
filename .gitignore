@@ -29,3 +29,14 @@ unity/*.sln
 unity/*.slnx
 # Asset packs: downloaded and built ZIPs (see docs/asset-packs.md)
 /.asset-packs/
+
+# >>> asset packs (managed by tools/asset-packs; do not edit by hand)
+/unity/Assets/LastBell/Characters/Sylvara/Resources/Characters/Sylvara.glb
+/unity/Assets/LastBell/Characters/Sylvara/Resources/Characters/Sylvara.glb.meta
+/prototype/arena-3d/models/upload/sylvara-front.png
+/prototype/arena-3d/models/upload/sylvara-front.png.meta
+/prototype/arena-3d/models/upload/sylvara-side.png
+/prototype/arena-3d/models/upload/sylvara-side.png.meta
+/prototype/arena-3d/models/upload/sylvara-back.png
+/prototype/arena-3d/models/upload/sylvara-back.png.meta
+# <<< asset packs
