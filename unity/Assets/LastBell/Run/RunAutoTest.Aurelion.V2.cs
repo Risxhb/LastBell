@@ -29,6 +29,7 @@ namespace LastBell.Run
             if (V2Wants("aurelion.noon_shadow")) yield return V2Section("Noon Shadow", V2NoonShadow());
             if (V2Wants("aurelion.orrery_closing")) yield return V2Section("Orrery Closing", V2OrreryClosing());
             if (V2Wants("aurelion.hour_hands")) yield return V2Section("Hour Hands", V2HourHands());
+            if (V2Wants("aurelion.zenith_collapse")) yield return V2Section("Zenith Collapse", V2ZenithCollapse());
             if (V2Wants("aurelion.phase_plan")) yield return V2Section("phase plan", V2PhasePlan());
             yield return V2Teardown();
             AurelionArgs.SetOverride = null; AurelionArgs.SoloOverride = null;
@@ -217,10 +218,10 @@ namespace LastBell.Run
         // ================================================================ phase plan and the switches (owned by the Abilities session)
         IEnumerator V2PhasePlan()
         {
-            // the five abilities are registered and bound
+            // the six abilities are registered and bound
             yield return V2Setup(1);
             if (V2Boss == null) yield break;
-            V2Check("five abilities registered", V2Boss.Abilities.Count == 5 && AurelionArgs.Ids.All(id => V2Boss.Abilities.Any(a => a.Id == id)),
+            V2Check("six abilities registered (v2.1 adds Zenith Collapse)", V2Boss.Abilities.Count == 6 && AurelionArgs.Ids.All(id => V2Boss.Abilities.Any(a => a.Id == id)),
                 string.Join(", ", V2Boss.Abilities.Select(a => a.Id)));
 
             // Misalignment pairing, Noon Shadow + Starfall Mirror (Starfall 0.7 s into Noon): both resolve on the same tick,
@@ -252,28 +253,55 @@ namespace LastBell.Run
             }
 
             // the full loop, phase by phase: the order of blocks, the transitions, the punish and the overlap cap
-            foreach (var level in new[] { Difficulty.Medium, Difficulty.Hard })
+            // Easy keeps the v2 plan; Medium and Hard run v2.1's constant layering (ABILITIES-v2.1.md §3)
+            var planV2 = new[]
+            {
+                new[] { "Meridian Lances", "Starfall Mirror", "Noon Shadow", "Orrery Closing", "punish" },
+                new[] { "Meridian Lances", "Noon Shadow + Starfall Mirror", "Meridian Lances", "Orrery Closing + Horizon", "punish" },
+                new[] { "Cascading Lances", "Noon and Afternoon", "Grand Orrery", "punish" },
+            };
+            var planV21 = new[]
+            {
+                new[] { "Meridian Lances + Starfall Mirror", "Noon Shadow + Starfall Mirror", "Zenith Collapse + Meridian Lances", "Orrery Closing + Horizon", "punish" },
+                new[] { "Meridian Lances + Starfall Mirror", "Noon Shadow + Starfall Mirror", "Zenith Collapse + Meridian Lances", "Orrery Closing + Horizon", "punish" },
+                new[] { "Cascading Lances + Starfall Mirror", "Noon and Afternoon + Starfall Mirror", "Zenith Collapse + Meridian Lances", "Grand Orrery", "punish" },
+            };
+            foreach (var level in new[] { Difficulty.Easy, Difficulty.Medium, Difficulty.Hard })
             {
                 yield return V2Setup(1, level);
                 if (V2Boss == null) yield break;
                 var a = V2Boss; int log0 = a.BlockLog.Count, tr0 = a.Transitions;
+                var plan = level == Difficulty.Easy ? planV2 : planV21; string set = level == Difficulty.Easy ? "v2" : "v2.1";
                 var mon = new V2PlanMonitor(); var watch = StartCoroutine(V2PlanWatch(a, mon));
                 a.TestHold = false;
-                yield return V2Survive(80, () => a.BlockLog.Skip(log0).Count(b => b.block == "punish") >= 1);
-                V2Check($"{level}: Perfect Order runs Lances > Starfall > Noon > Orrery > punish",
-                    V2Blocks(a, log0, 1).SequenceEqual(new[] { "Meridian Lances", "Starfall Mirror", "Noon Shadow", "Orrery Closing", "punish" }), string.Join(" > ", V2Blocks(a, log0, 1)));
+                yield return V2Survive(90, () => a.BlockLog.Skip(log0).Count(b => b.block == "punish") >= 1);
+                V2Check($"{level}: Perfect Order runs the {set} order", V2Blocks(a, log0, 1).SequenceEqual(plan[0]), string.Join(" > ", V2Blocks(a, log0, 1)));
                 a.DebugSetHpFraction(a.NextPhaseFraction());
-                yield return V2Survive(80, () => a.Phase == 2 && a.BlockLog.Skip(log0).Count(b => b.phase == 2 && b.block == "punish") >= 1);
+                yield return V2Survive(90, () => a.Phase == 2 && a.BlockLog.Skip(log0).Count(b => b.phase == 2 && b.block == "punish") >= 1);
                 V2Check($"{level}: 65 % queues one transition into Misalignment, still form 1", a.Phase == 2 && a.Transitions == tr0 + 1 && !a.SecondForm && a.PhaseName == "Misalignment", $"phase {a.Phase}, transitions {a.Transitions - tr0}, second form {a.SecondForm}");
-                V2Check($"{level}: Misalignment runs Lances > Noon + Starfall > Lances > Orrery + Horizon > punish",
-                    V2Blocks(a, log0, 2).SequenceEqual(new[] { "Meridian Lances", "Noon Shadow + Starfall Mirror", "Meridian Lances", "Orrery Closing + Horizon", "punish" }), string.Join(" > ", V2Blocks(a, log0, 2)));
+                V2Check($"{level}: Misalignment runs the {set} order", V2Blocks(a, log0, 2).SequenceEqual(plan[1]), string.Join(" > ", V2Blocks(a, log0, 2)));
                 a.DebugSetHpFraction(a.NextPhaseFraction());
-                yield return V2Survive(80, () => a.Phase == 3 && a.BlockLog.Skip(log0).Count(b => b.phase == 3 && b.block == "punish") >= 1);
+                yield return V2Survive(90, () => a.Phase == 3 && a.BlockLog.Skip(log0).Count(b => b.phase == 3 && b.block == "punish") >= 1);
                 V2Check($"{level}: 30 % plays the second form (Exposed Meridian), same HP bar, no heal", a.Phase == 3 && a.SecondForm && a.Transitions == tr0 + 2 && a.PhaseName == "Exposed Meridian" && a.Hp <= a.MaxHp * AurelionEncounter.V2P3At,
                     $"phase {a.Phase}, second form {a.SecondForm}, hp {a.Hp}/{a.MaxHp}");
-                V2Check($"{level}: Exposed Meridian runs Cascading Lances > Noon and Afternoon > Grand Orrery > punish",
-                    V2Blocks(a, log0, 3).SequenceEqual(new[] { "Cascading Lances", "Noon and Afternoon", "Grand Orrery", "punish" }), string.Join(" > ", V2Blocks(a, log0, 3)));
+                V2Check($"{level}: Exposed Meridian runs the {set} order", V2Blocks(a, log0, 3).SequenceEqual(plan[2]), string.Join(" > ", V2Blocks(a, log0, 3)));
                 StopCoroutine(watch);
+                if (level != Difficulty.Easy)
+                {
+                    // Zenith Collapse is only cast with him at the arena centre, and its Lances resolve 0.3 s after it
+                    var zs = V2Spawned("Zenith Collapse").ToList();
+                    var offsets = zs.Select(z =>
+                    {
+                        var lane = V2Spawns.FirstOrDefault(s => s.Source.StartsWith("Meridian Lances") && s.Tick >= z.Tick - 300 && s.Tick <= z.Tick + z.H.ResolveAt && s.Tick + s.H.ResolveAt > z.Tick + z.H.ResolveAt - 60);
+                        return lane == null ? int.MinValue : (lane.Tick + lane.H.ResolveAt) - (z.Tick + z.H.ResolveAt);
+                    }).ToList();
+                    V2Check($"{level}: Zenith Collapse cast 3 times, each with him at the arena centre", zs.Count == 3 && zs.All(z => Sim.Flat(z.H.Origin).magnitude <= 0.35f),
+                        string.Join(", ", zs.Select(z => $"({z.H.Origin.x:0.0},{z.H.Origin.z:0.0}) r {z.H.Inner}")));
+                    V2Check($"{level}: each Zenith Collapse's Lances resolve 0.3 s after it", offsets.Count > 0 && offsets.All(o => o == Sim.Ticks(AurelionEncounter.LancesAfterZenith)),
+                        string.Join(", ", offsets.Select(o => o == int.MinValue ? "no lances" : o + " ticks")));
+                    V2Check($"{level}: Zenith Collapse safe disc 4.5 m solo, 5.0 m in Phase 3", zs.Count == 3 && Mathf.Approximately(zs[0].H.Inner, 4.5f) && Mathf.Approximately(zs[2].H.Inner, 5.0f),
+                        string.Join(", ", zs.Select(z => z.H.Inner.ToString("0.0"))));
+                }
                 V2Check($"{level}: the punish lasts 3.5 s with no hazard live", a.Punishes > 0 && a.PunishHazardTicks == 0 && a.ShortestPunish >= Sim.Ticks(AurelionEncounter.PunishS),
                     $"{a.Punishes} punishes, shortest {a.ShortestPunish} ticks, hazard ticks inside {a.PunishHazardTicks}");
                 V2Check($"{level}: transformations warn and deal nothing", mon.HazardsInShift == 0, mon.HazardsInShift + " ticks");
@@ -304,7 +332,7 @@ namespace LastBell.Run
                 var a = V2Boss; int log0 = a.BlockLog.Count;
                 AurelionArgs.SoloOverride = id;
                 a.TestHold = false;
-                string want = id == "aurelion.meridian_lances" ? "Meridian Lances" : id == "aurelion.starfall_mirror" ? "Starfall Mirror" : id == "aurelion.noon_shadow" ? "Noon Shadow" : id == "aurelion.orrery_closing" ? "Orrery Closing" : "Hour Hands";
+                string want = id == "aurelion.meridian_lances" ? "Meridian Lances" : id == "aurelion.starfall_mirror" ? "Starfall Mirror" : id == "aurelion.noon_shadow" ? "Noon Shadow" : id == "aurelion.orrery_closing" ? "Orrery Closing" : id == "aurelion.zenith_collapse" ? "Zenith Collapse" : "Hour Hands";
                 yield return V2Survive(40, () => a.BlockLog.Skip(log0).Count(b => b.block == want) >= 2);
                 var blocks = a.BlockLog.Skip(log0).Select(b => b.block).Where(b => b != "punish").ToList();
                 V2Check($"practice hook {id} repeats only that ability", blocks.Count >= 2 && blocks.All(b => b == want), string.Join(", ", blocks));
