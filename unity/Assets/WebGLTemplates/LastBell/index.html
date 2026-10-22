@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b101b">
+  <meta name="description" content="Play the Last Bell demo. Three classes, five arenas, and a clockwork boss rush — directly in your browser.">
+  <title>Last Bell · Play the demo</title>
+  <link rel="stylesheet" href="player.css">
+</head>
+<body>
+  <header><a class="title" href="./">LAST BELL</a><span>PLAYABLE DEMO</span><a href="https://github.com/Risxhb/collab">Project ↗</a></header>
+  <main>
+    <section id="player" aria-label="Last Bell game player">
+      <canvas id="unity-canvas" width="1280" height="720" tabindex="0" aria-label="Last Bell. Use a keyboard and mouse to play."></canvas>
+      <div id="cover">
+        <p class="eyebrow">THE HOUR IS YOURS TO BREAK</p>
+        <h1>LAST BELL</h1>
+        <p>A clockwork boss rush.</p>
+        <button id="play" type="button">Play demo</button>
+        <p id="status" role="status" aria-live="polite">First download: about 245 MB. Desktop keyboard and mouse recommended.</p>
+        <progress id="progress" max="1" value="0" aria-label="Loading game" hidden></progress>
+      </div>
+    </section>
+    <div class="toolbar"><span id="hint">Vanguard · Arcanist · Chimesinger</span><button id="fullscreen" type="button" disabled>Fullscreen</button></div>
+    <details><summary>Controls &amp; about this demo</summary><p>Choose Start Run from the game’s main menu, then select your class, map and difficulty. Practice mode is available.</p><p>Move with WASD, hold Shift to sprint and press Space to jump. Aim with the mouse. Use 1 / left click for your basic attack, 2–4 for class skills, 5 / right click to dash, 6 for Chimesinger’s heal, F for a potion and Escape to pause.</p><p>Work in progress. This is the Unity demo, including the animated main menu, music and settings. Browser performance may vary; the download includes all five maps.</p></details>
+  </main>
+  <footer>LAST BELL <span>WORK IN PROGRESS</span></footer>
+  <script>
+    const canvas = document.getElementById('unity-canvas');
+    const cover = document.getElementById('cover');
+    const play = document.getElementById('play');
+    const status = document.getElementById('status');
+    const progress = document.getElementById('progress');
+    const fullscreen = document.getElementById('fullscreen');
+    let instance;
+    let dataBlobUrl;
+    async function downloadData() {
+      const response = await fetch('Build/data-manifest.json', {cache: 'no-cache'});
+      if (!response.ok) throw new Error('Unable to download the game manifest.');
+      const manifest = await response.json();
+      const buffers = [];
+      let downloaded = 0;
+      for (const part of manifest.parts) {
+        const response = await fetch('Build/' + part.file);
+        if (!response.ok) throw new Error('A game download failed. Please retry.');
+        const reader = response.body.getReader();
+        const buffer = new Uint8Array(part.bytes);
+        let offset = 0;
+        for (;;) {
+          const {done, value} = await reader.read();
+          if (done) break;
+          buffer.set(value, offset);
+          offset += value.length;
+          downloaded += value.length;
+          progress.value = 0.8 * downloaded / manifest.totalBytes;
+          status.textContent = 'Downloading the demo… ' + Math.round(downloaded / manifest.totalBytes * 100) + '%';
+        }
+        if (offset !== part.bytes) throw new Error('The download was incomplete. Please retry.');
+        const hash = await crypto.subtle.digest('SHA-256', buffer);
+        const digest = Array.from(new Uint8Array(hash), b => b.toString(16).padStart(2, '0')).join('');
+        if (digest !== part.sha256) throw new Error('The download failed its integrity check. Please retry.');
+        buffers.push(buffer);
+      }
+      if (downloaded !== manifest.totalBytes) throw new Error('The game data is incomplete.');
+      dataBlobUrl = URL.createObjectURL(new Blob(buffers, {type: 'application/octet-stream'}));
+      return dataBlobUrl;
+    }
+    function fail(message) {
+      cover.hidden = false;
+      status.textContent = 'The game could not start. ' + message;
+      progress.hidden = true;
+      play.hidden = false;
+      play.disabled = false;
+      play.textContent = 'Reload and retry';
+      play.onclick = () => location.reload();
+    }
+    play.onclick = () => {
+      play.disabled = true;
+      play.hidden = true;
+      progress.hidden = false;
+      status.textContent = 'Downloading the demo…';
+      const loader = document.createElement('script');
+      loader.src = 'Build/{{{ LOADER_FILENAME }}}';
+      loader.onerror = () => fail('Please check your connection and try again.');
+      loader.onload = async () => { try { const dataUrl = await downloadData(); await createUnityInstance(canvas, {
+        dataUrl,
+        frameworkUrl: 'Build/{{{ FRAMEWORK_FILENAME }}}',
+        codeUrl: 'Build/{{{ CODE_FILENAME }}}',
+        streamingAssetsUrl: 'StreamingAssets',
+        companyName: {{{ JSON.stringify(COMPANY_NAME) }}},
+        productName: {{{ JSON.stringify(PRODUCT_NAME) }}},
+        productVersion: {{{ JSON.stringify(PRODUCT_VERSION) }}},
+        matchWebGLToCanvasSize: true,
+        devicePixelRatio: Math.min(window.devicePixelRatio || 1, 1.5),
+        cacheControl: url => url.startsWith('blob:') ? 'no-store' : 'must-revalidate',
+        showBanner: (message, type) => { if (type === 'error') fail(message); else console.warn(message); },
+        onQuit: () => location.reload()
+      }, value => {
+        progress.value = 0.8 + value * 0.2;
+        status.textContent = 'Preparing the main menu… ' + Math.round(value * 100) + '%';
+      }).then(game => {
+        instance = game;
+        cover.hidden = true;
+        fullscreen.disabled = false;
+        canvas.focus();
+        URL.revokeObjectURL(dataBlobUrl);
+        document.getElementById('hint').textContent = 'Click the game to focus · Escape to pause';
+      }); } catch (error) { if (dataBlobUrl) URL.revokeObjectURL(dataBlobUrl); fail(String(error)); } };
+      document.body.appendChild(loader);
+    };
+    fullscreen.onclick = () => { if (instance) { instance.SetFullscreen(1); canvas.focus(); } };
+    canvas.addEventListener('contextmenu', event => event.preventDefault());
+    canvas.addEventListener('pointerdown', () => canvas.focus());
+    canvas.addEventListener('keydown', event => {
+      if (['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Tab'].includes(event.code)) event.preventDefault();
+    });
+  </script>
+</body>
+</html>

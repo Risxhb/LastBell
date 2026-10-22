@@ -1,5 +1,9 @@
 # Collab
 
+## Last Bell playable demo
+
+[Play Last Bell in your browser](https://risxhb.github.io/lastbell/) — the Unity demo with its main menu, three classes, practice mode and five maps. [Build and deployment instructions](docs/main-menu/web-demo.md).
+
 Private workspace for a two-person project.
 
 ## Start here
@@ -24,7 +28,7 @@ It downloads each pack, checks its SHA-256, and extracts it into the repository 
 
 ## Project boundaries
 
-This is an independent repository. It does not deploy to GitHub Pages or change `risxhb.github.io` or any other project. Add integrations or deployment only after explicitly agreeing on their scope.
+This is an independent repository. On October 21, 2026, Risxhb authorized publishing the playable Unity demo at `risxhb.github.io/lastbell/`. Only that subdirectory is used; the existing root homepage and the other project's files remain intact. Further integrations require their own agreed scope.
 
 ## Project overview
 
