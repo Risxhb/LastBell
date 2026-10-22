@@ -325,7 +325,7 @@ def teal_base(bm, zlo, zhi):
     lay = bm.loops.layers.float_color['Col']
     for f in bm.faces:
         for lp in f.loops:
-            h = max(0.0, min(1.0, (lp.vert.co.z - zlo) / (zhi - zlo))); k = (1 - h) ** 1.5 * 0.55
+            h = max(0.0, min(1.0, (lp.vert.co.z - zlo) / (zhi - zlo))); k = (1 - h) ** 1.3 * 0.78
             c = lp[lay]; lp[lay] = (c[0] * (1 - k) + 0.20 * k, c[1] * (1 - k) + 0.33 * k, c[2] * (1 - k) + 0.36 * k, 1)
 
 def moss_cap(bm, zfrom):
@@ -336,7 +336,7 @@ def moss_cap(bm, zfrom):
             z = lp.vert.co.z
             if z < zfrom: continue
             k = min(1, (z - zfrom) / 2.5) * (0.35 + 0.65 * max(0, f.normal.z))
-            c = lp[lay]; lp[lay] = (c[0] * (1 - k) + 0.52 * k, c[1] * (1 - k) + 0.80 * k, c[2] * (1 - k) + 0.40 * k, 1)
+            c = lp[lay]; lp[lay] = (c[0] * (1 - k) + 0.62 * k, c[1] * (1 - k) + 0.95 * k, c[2] * (1 - k) + 0.46 * k, 1)
 
 def spire_kit(i):
     """Kit spire i: the hand-drawn profile at unit radius, a buttress lobe leaning on it, moss on its ledges, a crown."""
@@ -387,8 +387,8 @@ LEAFC = [(0, 0), (0.1, 0.06), (0.13, 0.2), (0.07, 0.34), (0, 0.4), (-0.07, 0.34)
 TREES = [
     dict(trunk=[(0, 0, 0), (0.25, 0.1, 1.3), (-0.15, 0.25, 2.5), (0.1, 0.0, 3.4)], width=0.34,
          clusters=[(0, 0, 4.2, 1.5), (1.3, 0.4, 3.7, 1.1), (-1.2, 0.5, 3.8, 1.15), (0.3, -1.2, 3.6, 1.05), (-0.4, 1.0, 4.6, 0.95), (0.9, -0.6, 4.5, 0.9)]),
-    dict(trunk=[(0, 0, 0), (0.5, 0.0, 1.0), (1.2, 0.1, 2.0), (1.6, 0.2, 2.8)], width=0.3,
-         clusters=[(1.7, 0.2, 3.5, 1.3), (2.6, 0.3, 3.0, 0.95), (0.9, -0.5, 3.2, 0.9), (1.4, 0.9, 3.9, 0.85), (2.2, -0.4, 3.8, 0.8)]),
+    dict(trunk=[(0, 0, 0), (0.8, 0.0, 0.9), (1.9, 0.1, 1.7), (2.9, 0.2, 2.2)], width=0.32,
+         clusters=[(3.0, 0.2, 2.9, 1.3), (3.9, 0.3, 2.5, 0.95), (2.2, -0.5, 2.7, 0.9), (2.7, 0.9, 3.3, 0.85), (3.6, -0.4, 3.2, 0.8)]),
     dict(trunk=[(0, 0, 0), (-0.1, 0.1, 0.8), (0.05, 0.0, 1.5)], width=0.22,
          clusters=[(0, 0, 2.0, 1.0), (0.7, 0.2, 1.7, 0.75), (-0.6, -0.3, 1.8, 0.7), (0.1, 0.6, 2.4, 0.6)]),
 ]
@@ -418,6 +418,7 @@ def tree_kit(i):
             f = leaves.faces.new(vs); v = 0.55 + 0.6 * max(0, nrm.z * 0.5 + 0.5)        # lit tops, darker undersides
             for lp in f.loops: lp[lay] = (v, v, v, 1)
         asm.add('CanopyLeaf', leaves)
+        ivy(asm, [drape((cx + math.cos(a) * cr * 0.8, cy + math.sin(a) * cr * 0.8, cz - cr * 0.3), (math.cos(a), math.sin(a), 0), 1.0 + 1.6 * hsh(i, ci, a), 0.1, 5, a) for a in (0.5, 2.6, 4.4)], key=('tv', i, ci), flowers=0.04)   # trailing vines
     return asm.build(KIT)
 
 # ------------------------------------------------------------------ lantern, bell, small kit
@@ -497,7 +498,7 @@ def platform():
         asm.stone('Stone' if v > 0.4 else 'StoneDark', (0.8, w, h), p, ('curb', i), rz=-a, rx=(hsh('cr', i) - 0.5) * 0.06, zr=zr, moss=0.5, chips=2, bev=0.06)
         if hsh('cm', i) < 0.6: moss_mat(asm, (p[0], p[1], h - 0.05), 0.8, w, -a, ('cm', i), flowers=3 if hsh('cf', i) < 0.7 else 0)
         ro = R + 0.85; ox, oy = math.cos(a), -math.sin(a); tx, ty = -oy, ox
-        ivy(asm, [drape((ox * ro + tx * off, oy * ro + ty * off, h - 0.1), (ox, oy, 0), 1.5 + 5.5 * hsh('cil', i, off), 0.14, 7, i + off) for off in (-0.45, 0.0, 0.45) if hsh('ci', i, off) < 0.8], key=('ci', i), flowers=0.1)
+        ivy(asm, [drape((ox * ro + tx * off, oy * ro + ty * off, h - 0.1), (ox, oy, 0), 2.5 + 6.0 * hsh('cil', i, off), 0.14, 8, i + off) for off in (-0.45, 0.0, 0.45) if hsh('ci', i, off) < 0.8], key=('ci', i), flowers=0.1)
     # brass band on the curb's outer top edge, one arc per quadrant, laid as short worn segments
     for e in EXITS:
         t0, t1 = e + GAP, e + math.pi / 2 - GAP; segs = 22
@@ -611,7 +612,8 @@ def belfry(Bf, bell_src):
     o = T(Bf['p']); rz = Bf['rotY']; asm = Asm(f"Belfry{Bf['idx']}"); zr = (o.z, o.z + solid + cham + 1.2)
     ca, sa = math.cos(rz), math.sin(rz)
     def at(lx, ly, lz): return (o.x + ca * lx - sa * ly, o.y + sa * lx + ca * ly, o.z + lz)
-    asm.stone('StoneDark', (W + 0.5, W + 0.5, 0.5), at(0, 0, 0.25), ('bp', Bf['idx']), rz, zr=zr, bev=0.08)
+    asm.stone('StoneDark', (W + 1.1, W + 1.1, 0.45), at(0, 0, 0.22), ('bp0', Bf['idx']), rz, zr=zr, bev=0.08, bottom=0.45)   # setback stages
+    asm.stone('StoneDark', (W + 0.6, W + 0.6, 0.4), at(0, 0, 0.62), ('bp', Bf['idx']), rz, zr=zr, bev=0.08)
     # shaft: solid base of coursed blocks, then four piers framing pointed arch openings
     z = 0.5; c = 0
     while z < 0.5 + solid - 0.05:
@@ -652,6 +654,8 @@ def belfry(Bf, bell_src):
     if not front:                                                   # timber frame standing on the broken top
         for cx, cy in ((-1, -1), (1, -1), (1, 1), (-1, 1)): asm.stone('Timber', (0.18, 0.18, 1.4), at(cx * 1.1, cy * 1.1, ztop + 1.05), ('tf', Bf['idx'], cx, cy), rz, zr=zr, bev=0.02, bottom=0.8)
         for ang in (0, math.pi / 2): asm.stone('Timber', (2.5, 0.16, 0.16), at(0, 0, ztop + 1.7), ('tb', Bf['idx'], ang), rz + ang, zr=zr, bev=0.02, bottom=0.85)
+        for k, (lx, ly, ry, rzz) in enumerate([(1.6, 0.4, 0.5, 0.3), (-1.4, -1.2, -0.6, 1.9)]):   # broken timbers jutting out of the crown
+            asm.stone('Timber', (2.0, 0.15, 0.15), at(lx, ly, ztop + 1.2), ('tj', Bf['idx'], k), rz + rzz, ry=ry, zr=zr, bev=0.02, bottom=0.8)
     bz = 0.5 + solid + cham - 0.4
     asm.stone('Timber', (W - 0.5, 0.26, 0.26), at(0, 0, bz), ('beam', Bf['idx']), rz, zr=zr, bev=0.03, top=1.0, bottom=0.85)
     for sx in (-1, 1): asm.stone('Timber', (0.16, 0.16, 1.3), at(sx * (W / 2 - 0.75), 0, bz - 0.45), ('br', Bf['idx'], sx), rz, ry=sx * 0.65, zr=zr, bev=0.02)
