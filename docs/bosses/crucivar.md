@@ -10,14 +10,14 @@ The numbers are the packet's Steady Ticking values. They are proposals, not bala
 
 ## How to play it
 
-- **In the run scene (key-art dais):** Practice, then **Crucivar** (the fifth practice button).
-- **In the Brass Foundry:** **Last Bell > Bosses > Crucivar in the Brass Foundry**. It builds the Area 2 arena if it's missing, adds a RunDirector, and saves `Areas/Area2/Generated/Crucivar_FoundryTest.unity` (git-ignored). Press Play, then Practice and **Crucivar**.
+- **In the test loop:** on the run menu, under "Practice one boss", click **Crucivar (area 2)**. It loads the Brass Foundry map first. Crucivar is a `RunDirector.Bosses` entry with `inRun: false, map: "brass-foundry"`, so it's practice-only and the run order is unchanged.
+- **From the editor:** **Last Bell > Bosses > Crucivar in the Brass Foundry** opens the run loop's Brass Foundry map, building the run scenes if they're missing. Press Play, then click **Crucivar (area 2)**.
 - **Dev keys:** F8 jumps to the next phase (65 % / 30 %). F9 defeats the boss.
 - **Autotest:**
   ```
   Unity.exe -projectPath unity -executeMethod LastBell.Run.EditorTools.CrucivarTestTools.PlayModeTest -crucivarTest -lastbellOut <dir>
   ```
-  It writes `crucivar-report.txt`, a screenshot per attack, and the frames of a Casting Cycle.
+  It writes `crucivar-report.txt` (28 checks), a screenshot per attack, and the frames of a Casting Cycle.
 
 ## The fight (`Run/Encounters/CrucivarEncounter.cs`)
 
@@ -111,4 +111,3 @@ blender -b <work dir>/crucivar_prep.blend -P tools/crucivar/crucivar_meshy_rig.p
 - No audio yet: pressure, ratchet, forge or cooling sounds.
 - No stagger system. Defeat is the only state that cancels a warning.
 - Difficulty tiers other than Steady Ticking, and the Midnight Toll "Second Press", aren't implemented.
-- The Brass Foundry map in the run (the `RunMaps` work on the run-loop branch) isn't on this branch yet. Practise in the Foundry through the editor menu above.
