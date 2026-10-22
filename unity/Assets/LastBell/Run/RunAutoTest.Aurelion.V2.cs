@@ -221,6 +221,25 @@ namespace LastBell.Run
             V2Check("five abilities registered", V2Boss.Abilities.Count == 5 && AurelionArgs.Ids.All(id => V2Boss.Abilities.Any(a => a.Id == id)),
                 string.Join(", ", V2Boss.Abilities.Select(a => a.Id)));
 
+            // Misalignment pairing, Noon Shadow + Starfall Mirror (Starfall 0.7 s into Noon): both resolve on the same tick,
+            // and two edge runners on the lit side (13 m out) clear both by running straight across at 4.2 m/s after a
+            // 0.25 s reaction, with one dash each (ABILITIES.md §6 "Pairing: Noon + Starfall (edge runner)")
+            yield return V2Setup(2, Difficulty.Medium, new[] { new Vector3(0, 0, 13f), new Vector3(3.5f, 0, 11f) }, 2);
+            if (V2Boss == null) yield break;
+            {
+                V2Begin(V2Boss.NoonWithStarfall());
+                yield return V2Ticks(ReactTicks);
+                foreach (var p in V2Party) { V2In(p).Walk(Vector3.back, ProtoWalk); V2In(p).Dash(); }
+                yield return V2WaitIdle(15);
+                foreach (var p in V2Party) V2In(p).Stop();
+                var noon = V2Spawned("Noon Shadow").FirstOrDefault(); var star = V2Spawned("Starfall Mirror").FirstOrDefault();
+                bool together = noon != null && star != null && noon.Tick + noon.H.ResolveAt == star.Tick + star.H.ResolveAt;
+                V2Check("Noon + Starfall: Starfall starts 0.7 s into Noon and both resolve on the same tick", together && star.Tick - noon.Tick == Sim.Ticks(AurelionEncounter.StarfallIntoNoon),
+                    noon == null || star == null ? "missing spawn" : $"noon spawn {noon.Tick} resolve +{noon.H.ResolveAt}, star spawn {star.Tick} resolve +{star.H.ResolveAt}");
+                V2Check("Noon + Starfall: edge runners at 4.2 m/s with one dash clear both", V2Party.All(p => !V2WasHit(p)),
+                    string.Join(", ", V2Hits.Select(h => $"{h.P.name} by {h.Source}")) + $"; stamina {string.Join("/", V2Party.Select(p => p.Stamina.ToString("0")))}");
+            }
+
             // the full loop, phase by phase: the order of blocks, the transitions, the punish and the overlap cap
             foreach (var level in new[] { Difficulty.Medium, Difficulty.Hard })
             {

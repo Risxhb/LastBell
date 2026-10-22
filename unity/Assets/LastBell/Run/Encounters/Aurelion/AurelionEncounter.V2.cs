@@ -126,7 +126,7 @@ namespace LastBell.Run
             foreach (var w in Punish()) yield return w;
         }
 
-        IEnumerable<int> NoonWithStarfall() =>
+        public IEnumerable<int> NoonWithStarfall() =>
             Together(Noon.Run(false), Sim.Ticks(StarfallIntoNoon * Noon.WarnScale), Starfall.Run());
 
         IEnumerable<IEnumerable<int>> Plan(int ph)
