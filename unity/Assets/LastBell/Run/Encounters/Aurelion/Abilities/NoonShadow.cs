@@ -49,6 +49,10 @@ namespace LastBell.Run
             yield return window - 1;                                  // Afternoon's resolve tick
         }
 
+        // ticks from Run's first tick to its last resolve tick (= when Run returns); the v2.1 plan lines pairs up with it.
+        // CONTRACT: keep it equal to Run's real timing when the windows change.
+        public int Duration(bool afternoon) => (afternoon || N <= 1 ? 2 : 1) * (T(WindowS) - 1);
+
         // the half holding the standing players' mean; near the centre, the half holding the farthest player
         public float PickYaw()
         {

@@ -31,6 +31,10 @@ namespace LastBell.Run
             return Mathf.Repeat(Mathf.Round(yaw / HourDeg) * HourDeg, 360f);
         }
 
+        // ticks from Run's first tick to the last spoke's resolve tick (= when Run returns).
+        // CONTRACT: keep it equal to Run's real timing when the windows change.
+        public int Duration() => Standing().Count <= 1 ? LockTicks - 1 + ResolveTicks - 1 : ResolveTicks - 1;
+
         public IEnumerable<int> Run()
         {
             Say(Name);

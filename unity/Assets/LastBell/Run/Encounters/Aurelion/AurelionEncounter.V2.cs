@@ -22,12 +22,13 @@ namespace LastBell.Run
     // (open question: drift toward the party?).
     public sealed partial class AurelionEncounter
     {
-        // ---- the five abilities: one marked registration line each (ability sessions own only their own line) ----
+        // ---- the six abilities: one marked registration line each (ability sessions own only their own line) ----
         public MeridianLances Lances { get; private set; }
         public StarfallMirror Starfall { get; private set; }
         public NoonShadow Noon { get; private set; }
         public OrreryClosing Closing { get; private set; }
         public HourHands Hands { get; private set; }
+        public ZenithCollapse Zenith { get; private set; }
         readonly List<AurelionAbility> abilities = new List<AurelionAbility>();
 
         void BindAbilities()
@@ -38,6 +39,7 @@ namespace LastBell.Run
             Noon = Register(new NoonShadow());            // [ability: noon_shadow]
             Closing = Register(new OrreryClosing());      // [ability: orrery_closing]
             Hands = Register(new HourHands());            // [ability: hour_hands]
+            Zenith = Register(new ZenithCollapse());      // [ability: zenith_collapse] (v2.1)
         }
         T Register<T>(T a) where T : AurelionAbility { a.Bind(this, W); abilities.Add(a); return a; }
         public IReadOnlyList<AurelionAbility> Abilities => abilities;
@@ -119,17 +121,19 @@ namespace LastBell.Run
             while (Closing.HorizonLive) { Current = "Horizon"; yield return 1; }
         }
 
-        // Orrery Closing, then (Phase 2+) the Horizon with Starfall inside, Hour Hands on Hard, then the punish.
-        // grand = Phase 3's Grand Orrery: Starfall is cast 0.8 s into the closing instead of at the Horizon's start.
-        public IEnumerable<int> OrreryBlock(int ph, bool grand)
+        // Orrery Closing, then (Phase 2+; v2.1 every phase) the Horizon with Starfall inside, Hour Hands on Hard (Phase 2+),
+        // then the punish. grand = Phase 3's Grand Orrery: Starfall is cast 0.8 s into the closing instead of at the
+        // Horizon's start.
+        public IEnumerable<int> OrreryBlock(int ph, bool grand, bool horizonAlways = false)
         {
             pose = Pose.Planted;
-            int horizon = ph >= 2 ? HorizonFor() : 0;
+            bool withHorizon = ph >= 2 || horizonAlways;
+            int horizon = withHorizon ? HorizonFor() : 0;
             if (grand) foreach (var w in Together(Closing.Run(horizon), Sim.Ticks(StarfallIntoOrrery * Starfall.WarnScale), Starfall.Run())) yield return w;
             else
             {
                 foreach (var w in Closing.Run(horizon)) yield return w;
-                if (ph >= 2) foreach (var w in Starfall.Run()) yield return w;
+                if (withHorizon) foreach (var w in Starfall.Run()) yield return w;
             }
             if (ph >= 2 && W.Difficulty == Difficulty.Hard) foreach (var w in Hands.Run()) yield return w;
             foreach (var w in WaitHorizon()) yield return w;
@@ -139,8 +143,65 @@ namespace LastBell.Run
         public IEnumerable<int> NoonWithStarfall() =>
             Together(Noon.Run(false), Sim.Ticks(StarfallIntoNoon * Noon.WarnScale), Starfall.Run());
 
+        // ================ v2.1 (abilities-v2/ABILITIES-v2.1.md, proposal): Medium and Hard; Easy keeps the v2 plan ================
+        //   1 Perfect Order     Lances (3) + Starfall > Noon + Starfall > Zenith Collapse + Lances (3) >
+        //                       Orrery Closing > Horizon + Starfall > punish 3.5
+        //   2 Misalignment      Lances (4, 2 volleys) + Starfall > Noon + Starfall > Zenith Collapse + Lances (3) >
+        //                       Orrery Closing > Horizon + Starfall (Hard: then Hour Hands) > punish 3.5
+        //   3 Exposed Meridian  Cascading Lances + Starfall > Noon and Afternoon + Starfall (on Afternoon) >
+        //                       Zenith Collapse + Lances (4) > Grand Orrery > Horizon (Hard: Hour Hands) > punish 3.5
+        // Gaps 0.3 s. Pairs are timed by resolve: Lances resolves 0.2 s before its Starfall (which keeps its full window on
+        // Hard), Starfall with Noon's (last) half, and Lances 0.3 s after Zenith Collapse. Before Zenith Collapse he walks
+        // to the arena centre (he never leaves it afterwards, so only the first one walks; the spec's Starfall during the
+        // walk is left out: it would make three patterns with the Collapse pair).
+        public bool V21 => W.Difficulty != Difficulty.Easy;
+        public const float GapV21 = 0.3f, LancesBeforeStar = 0.2f, LancesAfterZenith = 0.3f, CentreSpeed = 2.2f;
+
+        // a and b side by side, timed so b's last resolve lands bAfterA ticks after a's (either may start first)
+        public static IEnumerable<int> Paired(IEnumerable<int> a, int aResolve, IEnumerable<int> b, int bResolve, int bAfterA)
+        {
+            int d = aResolve + bAfterA - bResolve;
+            return d >= 0 ? Together(a, d, b) : Together(b, -d, a);
+        }
+        public IEnumerable<int> WalkToCentre() => WalkTo(Vector3.zero, CentreSpeed, Sim.Ticks(4.5f));
+        public IEnumerable<int> ZenithBlock(int beams)
+        {
+            foreach (var w in WalkToCentre()) yield return w;
+            foreach (var w in Paired(Zenith.Run(), Zenith.Duration(), Lances.Run(beams, 1, false), Lances.Duration(beams, 1, false), Sim.Ticks(LancesAfterZenith))) yield return w;
+        }
+        public IEnumerable<int> LancesWithStarfall(int beams, int volleys, bool cascade) =>
+            Paired(Lances.Run(beams, volleys, cascade), Lances.Duration(beams, volleys, cascade), Starfall.Run(true), Starfall.Duration(true), Sim.Ticks(LancesBeforeStar));
+        public IEnumerable<int> NoonWithStarfall21(bool afternoon) =>
+            Paired(Noon.Run(afternoon), Noon.Duration(afternoon), Starfall.Run(), Starfall.Duration(), 0);
+
+        IEnumerable<IEnumerable<int>> Plan21(int ph)
+        {
+            switch (ph)
+            {
+                case 1:
+                    yield return Block("Meridian Lances + Starfall Mirror", LancesWithStarfall(3, 1, false)); yield return V2Gap(GapV21);
+                    yield return Block("Noon Shadow + Starfall Mirror", NoonWithStarfall21(false)); yield return V2Gap(GapV21);
+                    yield return Block("Zenith Collapse + Meridian Lances", ZenithBlock(3)); yield return V2Gap(GapV21);
+                    yield return Block("Orrery Closing + Horizon", OrreryBlock(1, false, true));
+                    break;
+                case 2:
+                    yield return Block("Meridian Lances + Starfall Mirror", LancesWithStarfall(4, 2, false)); yield return V2Gap(GapV21);
+                    yield return Block("Noon Shadow + Starfall Mirror", NoonWithStarfall21(false)); yield return V2Gap(GapV21);
+                    yield return Block("Zenith Collapse + Meridian Lances", ZenithBlock(3)); yield return V2Gap(GapV21);
+                    yield return Block("Orrery Closing + Horizon", OrreryBlock(2, false));
+                    break;
+                default:
+                    yield return Block("Cascading Lances + Starfall Mirror", LancesWithStarfall(4, 2, true)); yield return V2Gap(GapV21);
+                    yield return Block("Noon and Afternoon + Starfall Mirror", NoonWithStarfall21(true)); yield return V2Gap(GapV21);
+                    yield return Block("Zenith Collapse + Meridian Lances", ZenithBlock(4)); yield return V2Gap(GapV21);
+                    yield return Block("Grand Orrery", OrreryBlock(3, true));
+                    break;
+            }
+        }
+
         IEnumerable<IEnumerable<int>> Plan(int ph)
         {
+            if (V21) { foreach (var b in Plan21(ph)) yield return b; yield break; }
             switch (ph)
             {
                 case 1:
@@ -172,6 +233,7 @@ namespace LastBell.Run
                 case "aurelion.starfall_mirror": return Block("Starfall Mirror", Starfall.Run());
                 case "aurelion.noon_shadow": return Block("Noon Shadow", Noon.Run(phase == 3));
                 case "aurelion.orrery_closing": return Block("Orrery Closing", OrreryBlock(phase, phase == 3));
+                case "aurelion.zenith_collapse": return Block("Zenith Collapse", ZenithSolo());
                 default: return Block("Hour Hands", Hands.Run());
             }
         }
@@ -182,6 +244,12 @@ namespace LastBell.Run
             phase = Mathf.Clamp(ph, 1, 3); SecondForm = phase >= 3;
             PhaseName = phase == 1 ? "Perfect Order" : phase == 2 ? "Misalignment" : "Exposed Meridian";
             DebugSetHpFraction(phase == 1 ? 0.9f : phase == 2 ? 0.5f : 0.2f);
+        }
+
+        IEnumerable<int> ZenithSolo()
+        {
+            foreach (var w in WalkToCentre()) yield return w;
+            foreach (var w in Zenith.Run()) yield return w;
         }
 
         int V2PhaseFor() => Hp > MaxHp * V2P2At ? 1 : Hp > MaxHp * V2P3At ? 2 : 3;
