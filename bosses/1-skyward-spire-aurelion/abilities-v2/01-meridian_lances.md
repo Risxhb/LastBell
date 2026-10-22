@@ -68,6 +68,22 @@ Not a co-op mechanic: the rule is positional. The aim uses the farthest and near
 
 **R&S source:** §4 block 14 (rays and lasers, cardinal crosses). §5: none directly (this is Aurelion's row).
 
+## Build notes (built and autotested, not human-approved)
+
+Code: `Encounters/Aurelion/Abilities/MeridianLances.cs`. Checks: `RunAutoTest.Aurelion.V2.MeridianLances.cs`.
+
+- **One hit per beam:** each beam is two `Lane` hazards (28 m × 2.2 m) from his centre with opposite yaws, so Brace sees every hit as coming from him. Both halves resolve on the same tick. Whichever half is tested first copies its hit set into the other half in its `OnResolve`, which runs before the other half's hit test. A player is therefore hit at most once per beam. Beams are separate instances, not merged per volley. Where two beams cross is inside his body, which players can't enter. No shared-system change was needed.
+- **Tracking:** all beams of a volley share one aim. It turns at most 2° per tick (120°/s) toward the nearest beam line to the target, since the lines repeat every 180/beams degrees. Origin follows his position until the lock.
+- **Tick convention:** this follows `HazardSystem`. A volley spawned on tick t tracks on ticks t…t+71, locks on t+71 and resolves on t+143. It is warned for 144 ticks (2.4 s), with exactly 72 ticks from the lock to the resolve. Volley 2 spawns on volley 1's resolve tick. `Run` returns on the last resolve tick.
+- **Look:** the shared telegraph is used with no new art. It shows dim before the lock, gives a lock flash, then a 0.2 s resolve flash. The boss plays the v1 `MeridianAlignment` clip as a stand-in for "glaive raised to the zenith". The HUD reads "Cascading Lances" for the Phase 3 variant.
+
+### Open questions (calls made overnight)
+
+1. **Cascade lock:** volley 2 of the cascade is locked from the moment it appears (`LockAt 0`) and resolves 2.2 s later. "1.2 s window" was read as the design figure for reaching the old line after volley 1 resolves. The alternative was to show it as guide lines for 1.0 s before snapping.
+2. **Cascade direction:** the cascade always rotates +22.5° (clockwise seen from above). Should it alternate or pick a random side?
+3. **No targets:** with no standing player, the aim falls back to his facing.
+4. **Turn-rate cap with 3 beams:** the 60° spacing means the aim never has to turn more than 30°. A player who crosses to a new wedge simply hands the aim to the next line.
+
 ---
 
 ## How to build it (ability session)
