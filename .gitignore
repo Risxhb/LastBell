@@ -27,3 +27,6 @@ unity/MemoryCaptures/
 unity/*.csproj
 unity/*.sln
 unity/*.slnx
+
+# Asset packs: downloaded and built ZIPs (see docs/asset-packs.md)
+/.asset-packs/

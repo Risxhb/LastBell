@@ -34,6 +34,14 @@ Verify `nameWithOwner` is `Risxhb/collab`, `isPrivate` is `true`, and the remote
 
 Alternative: use [GitHub Desktop](https://desktop.github.com/), sign in, choose **Clone a repository**, and select `Risxhb/collab`. No separate CLI is required for the human workflow.
 
+Then download the large asset packs (models, textures, media), which are not stored in Git. From the repository root, before opening Unity:
+
+```bat
+setup-assets.cmd
+```
+
+Run it again whenever `asset-packs.json` changes, for example after a pull or a branch switch. See [docs/asset-packs.md](docs/asset-packs.md).
+
 If Git needs your commit identity, set it for this repository using your own name and GitHub-verified email or GitHub-provided noreply address:
 
 ```sh
