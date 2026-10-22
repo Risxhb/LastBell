@@ -21,8 +21,27 @@ ob.data.vertices.foreach_set('co', co.ravel()); ob.data.update()
 bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT')
 bpy.ops.mesh.remove_doubles(threshold=0.0003); bpy.ops.object.mode_set(mode='OBJECT')
 ob.data.calc_loop_triangles(); tris = len(ob.data.loop_triangles)
-dec = ob.modifiers.new('dec', 'DECIMATE'); dec.ratio = min(1, TARGET_TRIS / tris); dec.use_collapse_triangulate = True
-bpy.ops.object.modifier_apply(modifier='dec')
+# Hands keep far more detail than the rest (they have to close into a fist around the staff): split them off past the
+# wrist cuff, decimate each part to its own budget, join back. The cuff hides the seam.
+co = np.empty(len(ob.data.vertices) * 3); ob.data.vertices.foreach_get('co', co); co = co.reshape(-1, 3)
+sel = np.zeros(len(co), bool)
+for s in (1, -1):
+    Wp = np.array([s * 0.41, -0.05, 1.03]); d = np.array([s * 0.53, -0.05, 0.935]) - Wp; Lh = np.linalg.norm(d); d /= Lh
+    rel = co - Wp; t = rel @ d; perp = np.linalg.norm(rel - np.outer(t, d), axis=1)
+    sel |= (t > 0.012) & (t < Lh + 0.04) & (perp < 0.07) & (co[:, 2] > 0.86)
+me = ob.data; me.vertices.foreach_set('select', sel)
+ev = np.empty(len(me.edges) * 2, np.int64); me.edges.foreach_get('vertices', ev); me.edges.foreach_set('select', sel[ev.reshape(-1, 2)].all(1))
+ps = np.array([all(sel[i] for i in p.vertices) for p in me.polygons]); me.polygons.foreach_set('select', ps)
+bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.separate(type='SELECTED'); bpy.ops.object.mode_set(mode='OBJECT')
+hands = [o for o in bpy.context.selected_objects if o is not ob][0]
+HAND_TRIS = 7000
+for o, budget in ((ob, TARGET_TRIS - HAND_TRIS), (hands, HAND_TRIS)):
+    o.data.calc_loop_triangles(); n = len(o.data.loop_triangles)
+    dm = o.modifiers.new('dec', 'DECIMATE'); dm.ratio = min(1, budget / n); dm.use_collapse_triangulate = True
+    bpy.context.view_layer.objects.active = o; bpy.ops.object.modifier_apply(modifier='dec')
+    print('PART_TRIS', o.name, n, '->', budget)
+bpy.ops.object.select_all(action='DESELECT'); hands.select_set(True); ob.select_set(True)
+bpy.context.view_layer.objects.active = ob; bpy.ops.object.join()
 ob.data.calc_loop_triangles(); print('TRIS', tris, '->', len(ob.data.loop_triangles))
 bpy.ops.object.shade_smooth()
 
