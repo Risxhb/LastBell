@@ -2,7 +2,7 @@
 
 **Read this before you design or change any boss, miniboss, attack, arena, class ability or game system.** These rules come from decisions Chzy18 has already made. They override anything older, including older wiki pages, old reference-sheet labels and earlier packets.
 
-Last updated October 21, 2026 by chzy18/claude. The latest additions are Chzy18's answers from the Rabbit and Steel study (`docs/research/rabbit-and-steel/rabbit-and-steel-boss-mechanics.md` §7 on branch `docs/rabbit-and-steel-study`). Each rule is marked:
+Last updated October 22, 2026 by chzy18/claude. The latest addition is the melee-and-ranged danger rule (§5). Before that came Chzy18's answers from the Rabbit and Steel study (`docs/research/rabbit-and-steel/rabbit-and-steel-boss-mechanics.md` §7 on branch `docs/rabbit-and-steel-study`). Each rule is marked:
 - **Settled:** decided. Don't change it and don't re-ask about it.
 - **Provisional:** current working value. Use it, but you can propose changes.
 
@@ -89,6 +89,18 @@ Each rule below is settled unless it says otherwise.
     - They show identity only and never hurt. See `docs/research/rabbit-and-steel/marker-colours-mockup.svg` on branch `docs/rabbit-and-steel-study`.
   - Decorative floor art must never look like a hazard.
 - **Every attack needs a real escape route**, tested with finite stamina and no iframes, for melee and ranged players.
+- **Melee and ranged must both be in danger** (Chzy18, 2026-10-22: "ranged is too easy right now"). This applies to all bosses and minibosses.
+  - **Most mechanics threaten both.** At least three quarters of a boss's core attacks must be dangerous to a player hugging the boss *and* to a player at long range (8 m or more, up to the arena edge).
+  - **Something punishes staying at range.** Every boss and miniboss has at least one attack that does this, for example:
+    - hazards anchored to the arena edge
+    - attacks that target the farthest player
+    - sweeps that come in from the edge
+    - temporary edge limits that push players inward
+    - a soak or safe zone near the boss
+  - **No permanently safe spot.** The outer ring and the area behind the boss are never safe for a whole phase. Ranged players must reposition several times per phase, and time their stationary casts around it.
+  - **Melee keeps close-range pressure:** body slams, point-blank rings, cleaves around the boss.
+  - Each attack's brief states how it threatens melee and how it threatens ranged. Tests check that a player standing still next to the boss and one standing still at long range both get hit.
+  - This is about danger, not class requirements: every class must be able to survive each mechanic by moving.
 - **At most two damaging patterns overlap,** and only after the route is checked.
 - **Punish windows:**
   - Every boss has at least one **3–4 s major recovery**, long enough for Vanguard's heavy attack and the casters' stationary casts.
@@ -144,7 +156,7 @@ Each rule below is settled unless it says otherwise.
   - entry to the south (+z)
   - floor at y = 0
   - walkable radius at least 13.5 m
-  - the run's 11.5 m play bound
+  - a play bound per arena, just inside that arena's wall, so players can walk up to it (Chzy18, Oct 21; it replaces the shared 11.5 m bound). Values are in `Run/RunMaps.cs` (`feature/run-loop`): test map ±12.5 m square, Skyward Spire 13.9 m, Brass Foundry 13.7 m, Verdant Chimes 13.5 m, Shattered Hour 13.0 m. Boss positions stay inside 9.5 m.
 - **Settled:** scenery is never a surprise lethal edge. Only gameplay code makes something dangerous.
 - **Settled:** the Bellkeeper key-art arena is the **test map** and may become a tutorial.
 
@@ -171,6 +183,7 @@ Each rule below is settled unless it says otherwise.
 2. Identity and look, with height and scale.
 3. Attacks:
    - shape and size
+   - melee threat and ranged threat
    - Strike or Ground tag
    - warning time
    - damage at Medium
