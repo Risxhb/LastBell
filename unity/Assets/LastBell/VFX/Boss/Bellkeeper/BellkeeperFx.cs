@@ -7,7 +7,7 @@ namespace LastBell.VFX
     // Presentation for the Bellkeeper's attacks (docs/design/spell-vfx-pipeline.md). The encounter timeline calls these
     // on its own ticks; nothing here decides timing, targets or hits. Telegraphs take their geometry from the numbers
     // the attack resolves with. Resolve effects use the boss danger palette (Deep Ink -> Ember Coral, amber/white edge).
-    public sealed class BellkeeperFx : MonoBehaviour
+    public sealed partial class BellkeeperFx : MonoBehaviour
     {
         public static bool NoFlashes, NoScreenshake;   // accessibility (§10)
 
@@ -69,7 +69,7 @@ namespace LastBell.VFX
             public void Progress(float p) { mpb.SetFloat(PProgress, Mathf.Clamp01(p)); }
             public void Lock() { if (!locked) { locked = true; lockFlash = 1; } }
             public void Resolve() { flash = 0; }
-            public void Cancel() { if (flash < 0) flash = 0.1f; }   // fade out without the resolve flash
+            public void Expire() { if (flash < 0) flash = 0.1f; }   // fades out with no damage flash (cooled slag)
             public void Tint(Color fill, Color border) { mpb.SetColor(PFill, fill); mpb.SetColor(PBorder, border); }
             // Unfinished Hour inactive outline: dashed, unfilled, low contrast. Presentation only, never resolves.
             public void Memory() { mpb.SetFloat(PMemory, 1); Tint(new Color(0.35f, 0.38f, 0.45f), new Color(0.95f, 0.9f, 0.78f)); maxFade = 0.55f; }

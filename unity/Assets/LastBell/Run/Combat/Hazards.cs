@@ -32,7 +32,10 @@ namespace LastBell.Run
         public bool JumpClearable; public float ClearHeight = 0.35f;
         public float Knockback = 1.5f;
         public int Stun = 15;
-        public Action<Hazard> Track;             // called every tick until locked (follow a target / the boss facing)
+        // > 0: a standing hazard (Crucivar's cooling slag). It deals this much per second to players inside while it
+        // lives, with no knockback, and simply expires at ResolveAt (no resolve hit). Overlapping ones never multiply.
+        public float BurnPerSecond;
+        public Action<Hazard> Track;            // called every tick until locked (follow a target / the boss facing)
         public Action<Hazard> OnResolve;         // presentation of the resolve (effects), after the hit test
         public Action<Hazard> OnSpent;           // the active period is over (same tick as OnResolve when ActiveTicks is 0)
         public bool HitOnResolve = true;         // false: the owner deals the hits itself while the warning is up (a sweeping charge)
@@ -89,6 +92,8 @@ namespace LastBell.Run
         public HazardSystem(CombatWorld world) { w = world; }
 
         static readonly Color JumpFill = new Color(0.30f, 0.85f, 0.95f), JumpBorder = new Color(0.55f, 1.6f, 1.8f);
+        static readonly Color SlagFill = new Color(0.95f, 0.36f, 0.08f), SlagBorder = new Color(2.4f, 1.2f, 0.35f);
+        readonly Dictionary<PlayerController, float> burn = new Dictionary<PlayerController, float>();
 
         public Hazard Spawn(Hazard h)
         {
@@ -102,6 +107,7 @@ namespace LastBell.Run
             }
             // jump-clearable bars read differently from everything else (teal, plus the HUD's JUMP label)
             if (h.JumpClearable) h.Tele.Tint(JumpFill, JumpBorder);
+            else if (h.BurnPerSecond > 0) h.Tele.Tint(SlagFill, SlagBorder);   // standing slag: molten, not the strike coral
             h.Tele.Place(h.Origin, h.Yaw);
             if (h.LockAt <= 0) h.Tele.Lock();
             live.Add(h);
@@ -119,12 +125,15 @@ namespace LastBell.Run
                 h.Tele.Place(h.Origin, h.Yaw);
                 h.Tele.Progress((float)h.Age / Mathf.Max(1, h.ResolveAt));
             }
+            StepBurn();
             for (int i = live.Count - 1; i >= 0; i--)
             {
                 var h = live[i];
-                if (h.Cancelled) { live.RemoveAt(i); h.Tele.Cancel(); continue; }
+                if (h.Cancelled) { live.RemoveAt(i); h.Tele.Expire(); continue; }   // withdrawn: fades with no damage flash
                 if (h.Age < h.ResolveAt) continue;
                 bool first = h.Age == h.ResolveAt, last = h.Age >= h.ResolveAt + Mathf.Max(0, h.ActiveTicks - 1);
+                if (last && h.BurnPerSecond > 0) { live.RemoveAt(i); h.Tele.Expire(); h.OnResolve?.Invoke(h); continue; }   // cooled slag: harmless, no hit
+                if (h.BurnPerSecond > 0) continue;
                 if (last) { live.RemoveAt(i); h.Tele.Resolve(); }
                 if (first) Resolved++;
                 if (h.HitOnResolve) foreach (var p in w.Players)
@@ -142,11 +151,27 @@ namespace LastBell.Run
 
         // Withdraws one pending hazard: it is removed at the end of this step and never resolves or deals damage.
         public void Cancel(Hazard h) { h.Cancelled = true; }
+        // Standing hazards: each player burns at the highest rate of the locked ones they stand in (overlaps never add up),
+        // in whole HP as the fraction accumulates. Leaving every pool drops the carried fraction.
+        void StepBurn()
+        {
+            foreach (var p in w.Players)
+            {
+                Hazard src = null;
+                if (!p.Down)
+                    foreach (var h in live)
+                        if (h.BurnPerSecond > 0 && h.Locked && (src == null || h.BurnPerSecond > src.BurnPerSecond) && h.Contains(p.transform.position)) src = h;
+                if (src == null) { burn.Remove(p); continue; }
+                burn.TryGetValue(p, out float acc); acc += src.BurnPerSecond * Sim.Dt;
+                int dmg = Mathf.FloorToInt(acc); acc -= dmg; burn[p] = acc;
+                if (dmg > 0) p.ReceiveBurn(src, dmg);
+            }
+        }
 
         // Cancels every pending hazard: none of them can resolve or deal damage afterwards.
         public void ClearAll()
         {
-            live.Clear();
+            live.Clear(); burn.Clear();
             w.BossFx.ClearTelegraphs();
             SetQuiet(false);
         }

@@ -32,7 +32,7 @@ namespace LastBell.Run
             if (RunDirector.Instance != d) { directorLog.AddRange(d.Log); d = RunDirector.Instance; d.InputOverride = bot; bot.Clear(); }
             if (d.Player) d.Player.Input = bot;   // the new scene built the player before the bot was attached
             Check("Aurelion practice loads the Skyward Spire arena", RunMaps.Current == spire && HazardSystem.ArenaCount > 0, RunMaps.CurrentName);
-            Check("Aurelion practice: Ready names the boss", d.State == RunState.Ready && d.Mode == RunMode.Practice && RunDirector.PracticeName(d.Encounter) == "Aurelion");
+            Check("Aurelion practice: Ready names the boss", d.State == RunState.Ready && d.Mode == RunMode.Practice && RunDirector.Bosses[d.Encounter].Name.StartsWith("Aurelion"));
             AurelionRouteProofs();   // on this arena's floor bound
             yield return null;
             d.RequestReady();

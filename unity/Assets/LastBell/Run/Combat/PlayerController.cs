@@ -179,6 +179,16 @@ namespace LastBell.Run
             }
         }
 
+        // Standing-hazard damage (cooling slag): no knockback, stun or interrupt, and nothing mitigates it.
+        public void ReceiveBurn(Hazard h, int dmg)
+        {
+            if (Down || dmg <= 0) return;
+            Hp = Mathf.Max(0, Hp - dmg);
+            World.ReportPlayerHit(this, h, dmg);
+            RunHud.Float(transform.position + Vector3.up * 2.4f, "-" + dmg, new Color(1f, 0.6f, 0.25f));
+            if (Hp == 0) GoDown();
+        }
+
         void GoDown()
         {
             Down = true; stun = 0; dashTick = 0; jumpTick = -1; Height = 0;
