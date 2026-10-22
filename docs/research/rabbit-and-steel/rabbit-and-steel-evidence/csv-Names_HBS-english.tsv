@@ -1,0 +1,96 @@
+key	level	English
+hbs_vanish	0	Vanish
+hbs_ghost	0	Ghost
+hbs_warcry	0	Warcry
+hbs_flutterstep	0	Flutterstep
+hbs_lucky	0	Rabbitluck
+hbs_stoneskin	0	Stoneskin
+hbs_graniteskin	0	Graniteskin
+hbs_dragonskin	0	Dragonskin
+hbs_feathercoat	0	Feathercoat
+hbs_super	0	Super
+hbs_elegy	0	Elegy
+hbs_haste	0	Haste
+hbs_smite	0	Smite
+hbs_counter	0	Counter
+hbs_blackstrike	0	Blackstrike
+hbs_stillness	0	Tranquility
+hbs_quickness	0	Quickness
+hbs_repeat	0	Repeat
+hbs_flowstr	0	Flow-Str
+hbs_flowdex	0	Flow-Dex
+hbs_flowint	0	Flow-Int
+hbs_flashstr	0	Flash-Str
+hbs_flashdex	0	Flash-Dex
+hbs_flashint	0	Flash-Int
+hbs_astra	0	Astra
+hbs_nova	0	Nova
+hbs_hex	0	Hex
+hbs_hex_super	0	Superhex
+hbs_hex_poison	0	Poisonhex
+hbs_hex_anti	0	Antihex
+hbs_snare	0	Snare
+hbs_snare2	0	Tri-Snare
+hbs_berserk	0	Berserk
+hbs_abyssrage	0	Abyssal Rage
+hbs_stickybomb	0	Sticky Bomb
+hbs_abyssflame	0	Abyssal Flame
+hbs_shadowcurse	0	Shadowcurse
+hbs_shadowcry	0	Shadowcry
+hbs_clarity	0	Alone No More
+hbs_friendship	0	A True Friend
+hbs_curse	0	Curse
+hbs_decay	0	Decay
+hbs_spark	0	Spark
+hbs_poison	0	Poison
+hbs_burn	0	Burn
+hbs_bleed	0	Bleed
+hbs_sap	0	Sap
+hbs_ghostflame	0	Ghostflame
+hbs_freeze	0	Freeze
+hbs_deepfreeze	0	Deep Freeze
+hbs_paint	0	Paint
+hbs_quickdraw	0	Quickdraw
+hbs_flashchr	0	Flash-Chr
+hbs_wavestrike	0	Wavestrike
+hbs_holyshield	0	Holy Shield
+hbs_vanishenemy	0	Vanish
+hbs_bubbleshield	0	Bubble Shield
+hbs_feathershield	0	Feather Shield
+hbs_flowershield	0	Thorn Shield
+hbs_gravity	0	Gravity
+hbs_gravity2	0	Gravity
+hbs_bind	0	Bind
+hbs_teleport	0	Teleport
+hbs_teleport2	0	Teleport-L
+hbs_teleport3	0	Teleport-S
+hbs_timestop	0	Timestop
+hbs_tailwind	0	Turbulent Winds
+hbs_tailwind2	0	Turbulent Winds
+hbs_tether	0	Tethered
+hbs_heavy	0	Heavy
+hbs_heavy2	0	Heavy
+hbs_heavyextra	0	Very Heavy
+hbs_heavyextra2	0	Very Heavy
+hbs_nodefense	0	No Invulnerability
+hbs_fieldlimit_0	0	Fieldlimit-P
+hbs_fieldlimit_1	0	Fieldlimit-B
+hbs_fieldlimit_2	0	Fieldlimit-R
+hbs_fieldlimit_3	0	Fieldlimit-Y
+hbs_fieldlimit_4	0	Fieldlimit-G
+hbs_fieldlimit2_0	0	Fieldlimit-P
+hbs_fieldlimit2_1	0	Fieldlimit-B
+hbs_fieldlimit2_2	0	Fieldlimit-R
+hbs_fieldlimit2_3	0	Fieldlimit-Y
+hbs_fieldlimit2_4	0	Fieldlimit-G
+hbs_order_0	0	First
+hbs_order_1	0	Second
+hbs_order_2	0	Third
+hbs_order_3	0	Fourth
+hbs_group_0	0	Group One
+hbs_group_1	0	Group Two
+hbs_group_2	0	Group Three
+hbs_group_3	0	Group Four
+hbs_targeted	0	Targeted
+hbs_lonely	0	????
+hbs_pursuit	0	In Pursuit!

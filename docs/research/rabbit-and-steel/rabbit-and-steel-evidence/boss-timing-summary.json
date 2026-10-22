@@ -1,0 +1,6381 @@
+{
+ "note": "telegraph_ms = spawnDelay - warningDelay (warningDelay missing = 0). Values are literals recovered from decompiled code; <expr> values (computed or difficulty-switched) are excluded from stats.",
+ "unresolved_adds": 0,
+ "difficulty_switched_delays": [
+  [
+   "warningDelay",
+   6000,
+   6000,
+   4000
+  ],
+  [
+   "warningDelay",
+   6000,
+   6000,
+   4000
+  ],
+  [
+   "warningDelay",
+   7500,
+   6000,
+   5500
+  ],
+  [
+   "warningDelay",
+   7500,
+   5500,
+   5500
+  ],
+  [
+   "spawnDelay",
+   4500,
+   4500,
+   5500
+  ],
+  [
+   "spawnDelay",
+   4000,
+   4000,
+   4000
+  ],
+  [
+   "spawnDelay",
+   4000,
+   4000,
+   3000
+  ],
+  [
+   "spawnDelay",
+   4000,
+   4000,
+   3000
+  ],
+  [
+   "spawnDelay",
+   4000,
+   4000,
+   3000
+  ],
+  [
+   "spawnDelay",
+   4000,
+   4000,
+   3000
+  ],
+  [
+   "spawnDelay",
+   5000,
+   5000,
+   6000
+  ],
+  [
+   "spawnDelay",
+   5000,
+   5000,
+   6000
+  ],
+  [
+   "spawnDelay",
+   6000,
+   4500,
+   4500
+  ],
+  [
+   "spawnDelay",
+   6000,
+   4500,
+   4500
+  ],
+  [
+   "spawnDelay",
+   6000,
+   4500,
+   4500
+  ],
+  [
+   "spawnDelay",
+   6000,
+   4500,
+   4500
+  ],
+  [
+   "spawnDelay",
+   6000,
+   4500,
+   4500
+  ],
+  [
+   "spawnDelay",
+   6000,
+   4500,
+   4500
+  ],
+  [
+   "spawnDelay",
+   6000,
+   4500,
+   4500
+  ],
+  [
+   "spawnDelay",
+   4000,
+   4000,
+   3000
+  ],
+  [
+   "spawnDelay",
+   4000,
+   4000,
+   3000
+  ],
+  [
+   "spawnDelay",
+   4000,
+   4000,
+   3000
+  ],
+  [
+   "spawnDelay",
+   4000,
+   4000,
+   3000
+  ],
+  [
+   "spawnDelay",
+   5000,
+   6000,
+   6000
+  ],
+  [
+   "spawnDelay",
+   5000,
+   6000,
+   6000
+  ],
+  [
+   "spawnDelay",
+   4000,
+   3000,
+   3000
+  ],
+  [
+   "warningDelay",
+   0.8,
+   0.8,
+   1.1
+  ],
+  [
+   "warningDelay",
+   5000,
+   5000,
+   4000
+  ],
+  [
+   "warningDelay",
+   5000,
+   5000,
+   4000
+  ],
+  [
+   "warningDelay",
+   5000,
+   5000,
+   4000
+  ],
+  [
+   "spawnDelay",
+   5000,
+   5000,
+   4000
+  ],
+  [
+   "spawnDelay",
+   1000,
+   3000,
+   3000
+  ],
+  [
+   "spawnDelay",
+   3000,
+   3000,
+   2000
+  ]
+ ],
+ "families": {
+  "bp_circle_spreads": {
+   "count": 224,
+   "bosses": 68,
+   "telegraph_ms": {
+    "n": 139,
+    "min": 2000,
+    "med": 3998,
+    "max": 6000
+   },
+   "radius": {
+    "n": 33,
+    "min": 140,
+    "med": 300,
+    "max": 450
+   },
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_prscircle": {
+   "count": 200,
+   "bosses": 42,
+   "telegraph_ms": {
+    "n": 121,
+    "min": 1000,
+    "med": 4350,
+    "max": 7000
+   },
+   "radius": {
+    "n": 136,
+    "min": 180,
+    "med": 600,
+    "max": 1000
+   },
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_colormatch": {
+   "count": 140,
+   "bosses": 35,
+   "telegraph_ms": {
+    "n": 107,
+    "min": 2500,
+    "med": 3999,
+    "max": 13500
+   },
+   "radius": {
+    "n": 127,
+    "min": 170,
+    "med": 250,
+    "max": 500
+   },
+   "width": {
+    "n": 3,
+    "min": 300,
+    "med": 300,
+    "max": 400
+   },
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_cardinal_r": {
+   "count": 126,
+   "bosses": 13,
+   "telegraph_ms": {
+    "n": 103,
+    "min": 2000,
+    "med": 4000,
+    "max": 8000
+   },
+   "radius": {
+    "n": 14,
+    "min": 250,
+    "med": 300,
+    "max": 300
+   },
+   "width": {
+    "n": 89,
+    "min": 280,
+    "med": 380,
+    "max": 400
+   },
+   "fanAngle": null,
+   "kbAmount": {
+    "n": 3,
+    "min": 600,
+    "med": 600,
+    "max": 600
+   }
+  },
+  "bp_ray_spinfast": {
+   "count": 88,
+   "bosses": 21,
+   "telegraph_ms": {
+    "n": 63,
+    "min": 2000,
+    "med": 4000,
+    "max": 7000
+   },
+   "radius": {
+    "n": 5,
+    "min": 250,
+    "med": 350,
+    "max": 350
+   },
+   "width": {
+    "n": 59,
+    "min": 150,
+    "med": 150,
+    "max": 350
+   },
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_line_spreads_h": {
+   "count": 81,
+   "bosses": 40,
+   "telegraph_ms": {
+    "n": 61,
+    "min": 500,
+    "med": 3500,
+    "max": 9000
+   },
+   "radius": null,
+   "width": {
+    "n": 50,
+    "min": 170,
+    "med": 210,
+    "max": 350
+   },
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_line_spreads_v": {
+   "count": 78,
+   "bosses": 35,
+   "telegraph_ms": {
+    "n": 60,
+    "min": 2000,
+    "med": 3500,
+    "max": 9000
+   },
+   "radius": null,
+   "width": {
+    "n": 46,
+    "min": 170,
+    "med": 220,
+    "max": 400
+   },
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_enrage": {
+   "count": 71,
+   "bosses": 64,
+   "telegraph_ms": {
+    "n": 37,
+    "min": 1000,
+    "med": 3000,
+    "max": 3450
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_colormatch2": {
+   "count": 71,
+   "bosses": 12,
+   "telegraph_ms": {
+    "n": 49,
+    "min": 2600,
+    "med": 4000,
+    "max": 9500
+   },
+   "radius": {
+    "n": 57,
+    "min": 150,
+    "med": 250,
+    "max": 450
+   },
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_dark_moon_summon_mult": {
+   "count": 70,
+   "bosses": 13,
+   "telegraph_ms": {
+    "n": 8,
+    "min": 1500,
+    "med": 2000,
+    "max": 3000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_water_moving_ball": {
+   "count": 65,
+   "bosses": 15,
+   "telegraph_ms": {
+    "n": 47,
+    "min": 1000,
+    "med": 2000,
+    "max": 4000
+   },
+   "radius": {
+    "n": 2,
+    "min": 500,
+    "med": 500,
+    "max": 500
+   },
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_cleave": {
+   "count": 63,
+   "bosses": 14,
+   "telegraph_ms": {
+    "n": 48,
+    "min": 2200,
+    "med": 4000,
+    "max": 5000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_thorns_fixed": {
+   "count": 58,
+   "bosses": 7,
+   "telegraph_ms": {
+    "n": 50,
+    "min": 3497,
+    "med": 4000,
+    "max": 13000
+   },
+   "radius": {
+    "n": 54,
+    "min": 600,
+    "med": 800,
+    "max": 1400
+   },
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_fire2_line_repeating": {
+   "count": 56,
+   "bosses": 11,
+   "telegraph_ms": {
+    "n": 46,
+    "min": 500,
+    "med": 800,
+    "max": 4000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_marching_bullet": {
+   "count": 54,
+   "bosses": 6,
+   "telegraph_ms": {
+    "n": 27,
+    "min": 2000,
+    "med": 3000,
+    "max": 4000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_prscircle_follow_bin": {
+   "count": 52,
+   "bosses": 29,
+   "telegraph_ms": {
+    "n": 40,
+    "min": 2000,
+    "med": 3997,
+    "max": 13500
+   },
+   "radius": {
+    "n": 42,
+    "min": 200,
+    "med": 300,
+    "max": 450
+   },
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_prsline_h": {
+   "count": 52,
+   "bosses": 21,
+   "telegraph_ms": {
+    "n": 40,
+    "min": 2500,
+    "med": 4000,
+    "max": 7000
+   },
+   "radius": null,
+   "width": {
+    "n": 33,
+    "min": 200,
+    "med": 450,
+    "max": 1100
+   },
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_prsline_v": {
+   "count": 51,
+   "bosses": 23,
+   "telegraph_ms": {
+    "n": 33,
+    "min": 2500,
+    "med": 4000,
+    "max": 8000
+   },
+   "radius": null,
+   "width": {
+    "n": 32,
+    "min": 200,
+    "med": 460,
+    "max": 1100
+   },
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_marching_bullet_repeating": {
+   "count": 49,
+   "bosses": 7,
+   "telegraph_ms": {
+    "n": 28,
+    "min": 2000,
+    "med": 3000,
+    "max": 6000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_cardinal_spinning": {
+   "count": 45,
+   "bosses": 8,
+   "telegraph_ms": {
+    "n": 41,
+    "min": 3500,
+    "med": 6000,
+    "max": 6250
+   },
+   "radius": null,
+   "width": {
+    "n": 41,
+    "min": 200,
+    "med": 240,
+    "max": 250
+   },
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_angel_circle_follow": {
+   "count": 44,
+   "bosses": 7,
+   "telegraph_ms": {
+    "n": 40,
+    "min": 2000,
+    "med": 3500,
+    "max": 5000
+   },
+   "radius": {
+    "n": 19,
+    "min": 150,
+    "med": 300,
+    "max": 550
+   },
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_tether": {
+   "count": 42,
+   "bosses": 15,
+   "telegraph_ms": {
+    "n": 31,
+    "min": 199,
+    "med": 2000,
+    "max": 5000
+   },
+   "radius": {
+    "n": 31,
+    "min": 150,
+    "med": 500,
+    "max": 750
+   },
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_knockback_line": {
+   "count": 41,
+   "bosses": 16,
+   "telegraph_ms": {
+    "n": 26,
+    "min": 2000,
+    "med": 3000,
+    "max": 3500
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": {
+    "n": 33,
+    "min": 320,
+    "med": 800,
+    "max": 1200
+   }
+  },
+  "bp_movementcheck": {
+   "count": 40,
+   "bosses": 15,
+   "telegraph_ms": {
+    "n": 20,
+    "min": 500,
+    "med": 3000,
+    "max": 6000
+   },
+   "radius": {
+    "n": 6,
+    "min": 125,
+    "med": 175,
+    "max": 225
+   },
+   "width": {
+    "n": 2,
+    "min": 300,
+    "med": 400,
+    "max": 400
+   },
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_thorns": {
+   "count": 40,
+   "bosses": 14,
+   "telegraph_ms": {
+    "n": 30,
+    "min": 3000,
+    "med": 4500,
+    "max": 6995
+   },
+   "radius": {
+    "n": 31,
+    "min": 400,
+    "med": 600,
+    "max": 800
+   },
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_knockback_circle": {
+   "count": 38,
+   "bosses": 18,
+   "telegraph_ms": {
+    "n": 29,
+    "min": 1000,
+    "med": 2500,
+    "max": 6000
+   },
+   "radius": {
+    "n": 29,
+    "min": 250,
+    "med": 250,
+    "max": 250
+   },
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": {
+    "n": 27,
+    "min": 400,
+    "med": 600,
+    "max": 900
+   }
+  },
+  "bp_light_targeted": {
+   "count": 35,
+   "bosses": 11,
+   "telegraph_ms": {
+    "n": 22,
+    "min": 2000,
+    "med": 3000,
+    "max": 13000
+   },
+   "radius": {
+    "n": 2,
+    "min": 700,
+    "med": 800,
+    "max": 800
+   },
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_move_position_synced": {
+   "count": 35,
+   "bosses": 19,
+   "telegraph_ms": {
+    "n": 4,
+    "min": 3000,
+    "med": 3000,
+    "max": 3000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_prscircle_follow": {
+   "count": 32,
+   "bosses": 17,
+   "telegraph_ms": {
+    "n": 19,
+    "min": 2997,
+    "med": 3400,
+    "max": 5000
+   },
+   "radius": {
+    "n": 18,
+    "min": 250,
+    "med": 350,
+    "max": 450
+   },
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_clockspot": {
+   "count": 32,
+   "bosses": 12,
+   "telegraph_ms": {
+    "n": 20,
+    "min": 2993,
+    "med": 5500,
+    "max": 7000
+   },
+   "radius": {
+    "n": 15,
+    "min": 150,
+    "med": 200,
+    "max": 200
+   },
+   "width": null,
+   "fanAngle": {
+    "n": 5,
+    "min": 40,
+    "med": 40,
+    "max": 70
+   },
+   "kbAmount": null
+  },
+  "bp_angel_circle": {
+   "count": 30,
+   "bosses": 7,
+   "telegraph_ms": {
+    "n": 15,
+    "min": 4000,
+    "med": 4000,
+    "max": 7500
+   },
+   "radius": {
+    "n": 9,
+    "min": 200,
+    "med": 250,
+    "max": 450
+   },
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_cleave_fixed": {
+   "count": 29,
+   "bosses": 7,
+   "telegraph_ms": {
+    "n": 19,
+    "min": 3000,
+    "med": 4000,
+    "max": 7200
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_ray_multi_h": {
+   "count": 26,
+   "bosses": 12,
+   "telegraph_ms": {
+    "n": 12,
+    "min": 800,
+    "med": 4000,
+    "max": 7400
+   },
+   "radius": null,
+   "width": {
+    "n": 21,
+    "min": 120,
+    "med": 210,
+    "max": 500
+   },
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_prsline_h_follow": {
+   "count": 24,
+   "bosses": 14,
+   "telegraph_ms": {
+    "n": 21,
+    "min": 1500,
+    "med": 3000,
+    "max": 6000
+   },
+   "radius": null,
+   "width": {
+    "n": 20,
+    "min": 200,
+    "med": 300,
+    "max": 420
+   },
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_dark_targeted": {
+   "count": 23,
+   "bosses": 12,
+   "telegraph_ms": {
+    "n": 10,
+    "min": 2700,
+    "med": 3000,
+    "max": 4996
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_bullet_enlarge": {
+   "count": 21,
+   "bosses": 8,
+   "telegraph_ms": {
+    "n": 14,
+    "min": 2050,
+    "med": 3000,
+    "max": 6000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": {
+    "n": 2,
+    "min": 500,
+    "med": 600,
+    "max": 600
+   }
+  },
+  "bp_prsline_v_follow": {
+   "count": 21,
+   "bosses": 13,
+   "telegraph_ms": {
+    "n": 18,
+    "min": 1500,
+    "med": 3500,
+    "max": 6000
+   },
+   "radius": null,
+   "width": {
+    "n": 20,
+    "min": 250,
+    "med": 300,
+    "max": 420
+   },
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_ray_multi_slice": {
+   "count": 20,
+   "bosses": 3,
+   "telegraph_ms": {
+    "n": 11,
+    "min": 50,
+    "med": 2000,
+    "max": 2998
+   },
+   "radius": null,
+   "width": {
+    "n": 9,
+    "min": 100,
+    "med": 150,
+    "max": 150
+   },
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_fieldlimit_rectangle_temporary": {
+   "count": 19,
+   "bosses": 11,
+   "telegraph_ms": {
+    "n": 12,
+    "min": 200,
+    "med": 1000,
+    "max": 2000
+   },
+   "radius": null,
+   "width": {
+    "n": 6,
+    "min": 250,
+    "med": 650,
+    "max": 650
+   },
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_delayed_prscircle": {
+   "count": 19,
+   "bosses": 2,
+   "telegraph_ms": null,
+   "radius": {
+    "n": 17,
+    "min": 200,
+    "med": 450,
+    "max": 650
+   },
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_dark2_line": {
+   "count": 18,
+   "bosses": 6,
+   "telegraph_ms": {
+    "n": 2,
+    "min": 5000,
+    "med": 5000,
+    "max": 5000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_thorns_bin": {
+   "count": 18,
+   "bosses": 5,
+   "telegraph_ms": {
+    "n": 11,
+    "min": 1000,
+    "med": 4000,
+    "max": 5000
+   },
+   "radius": {
+    "n": 14,
+    "min": 500,
+    "med": 700,
+    "max": 1000
+   },
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_cone_spreads": {
+   "count": 15,
+   "bosses": 9,
+   "telegraph_ms": {
+    "n": 6,
+    "min": 1000,
+    "med": 3873,
+    "max": 5500
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": {
+    "n": 2,
+    "min": 20,
+    "med": 20,
+    "max": 20
+   },
+   "kbAmount": null
+  },
+  "bp_fieldlimit_rectangle": {
+   "count": 15,
+   "bosses": 8,
+   "telegraph_ms": {
+    "n": 8,
+    "min": 1000,
+    "med": 2000,
+    "max": 2000
+   },
+   "radius": null,
+   "width": {
+    "n": 5,
+    "min": 650,
+    "med": 650,
+    "max": 1100
+   },
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_timestop": {
+   "count": 15,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 5,
+    "min": 4700,
+    "med": 4700,
+    "max": 4700
+   },
+   "radius": {
+    "n": 12,
+    "min": 300,
+    "med": 300,
+    "max": 300
+   },
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_bind_v": {
+   "count": 14,
+   "bosses": 9,
+   "telegraph_ms": {
+    "n": 10,
+    "min": 400,
+    "med": 3000,
+    "max": 4000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_ray_multi_v": {
+   "count": 14,
+   "bosses": 9,
+   "telegraph_ms": {
+    "n": 11,
+    "min": 2200,
+    "med": 3000,
+    "max": 4000
+   },
+   "radius": null,
+   "width": {
+    "n": 9,
+    "min": 180,
+    "med": 200,
+    "max": 210
+   },
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_depths_hound1_pounce": {
+   "count": 14,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 11,
+    "min": 500,
+    "med": 1800,
+    "max": 4000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_fire_aoe": {
+   "count": 13,
+   "bosses": 6,
+   "telegraph_ms": {
+    "n": 7,
+    "min": 1500,
+    "med": 3000,
+    "max": 3500
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_ray_spinning": {
+   "count": 13,
+   "bosses": 6,
+   "telegraph_ms": {
+    "n": 9,
+    "min": 3000,
+    "med": 5000,
+    "max": 7000
+   },
+   "radius": null,
+   "width": {
+    "n": 9,
+    "min": 180,
+    "med": 250,
+    "max": 500
+   },
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_delayed_rayspin": {
+   "count": 13,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": {
+    "n": 13,
+    "min": 150,
+    "med": 150,
+    "max": 150
+   },
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_enrage_deco": {
+   "count": 12,
+   "bosses": 12,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_cleave_enemy": {
+   "count": 12,
+   "bosses": 5,
+   "telegraph_ms": {
+    "n": 3,
+    "min": 4000,
+    "med": 4000,
+    "max": 4000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_colormatch3": {
+   "count": 11,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 9,
+    "min": 1500,
+    "med": 2500,
+    "max": 3000
+   },
+   "radius": {
+    "n": 8,
+    "min": 140,
+    "med": 140,
+    "max": 140
+   },
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_delayed_prsline_follow": {
+   "count": 10,
+   "bosses": 2,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": {
+    "n": 10,
+    "min": 250,
+    "med": 300,
+    "max": 450
+   },
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_enrage_single": {
+   "count": 9,
+   "bosses": 9,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_gravity_fall_temporary": {
+   "count": 9,
+   "bosses": 3,
+   "telegraph_ms": {
+    "n": 2,
+    "min": 3000,
+    "med": 4000,
+    "max": 4000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_depths_hound0_pounce": {
+   "count": 9,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 5,
+    "min": 2000,
+    "med": 2000,
+    "max": 4000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_showgroups": {
+   "count": 9,
+   "bosses": 7,
+   "telegraph_ms": {
+    "n": 2,
+    "min": 500,
+    "med": 4000,
+    "max": 4000
+   },
+   "radius": null,
+   "width": {
+    "n": 1,
+    "min": 250,
+    "med": 250,
+    "max": 250
+   },
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_summon_reset": {
+   "count": 9,
+   "bosses": 2,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_bind_h": {
+   "count": 8,
+   "bosses": 5,
+   "telegraph_ms": {
+    "n": 5,
+    "min": 400,
+    "med": 3000,
+    "max": 3000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_delayed_circle_spreads": {
+   "count": 8,
+   "bosses": 2,
+   "telegraph_ms": null,
+   "radius": {
+    "n": 2,
+    "min": 280,
+    "med": 400,
+    "max": 400
+   },
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_delayed_colormatch": {
+   "count": 8,
+   "bosses": 2,
+   "telegraph_ms": null,
+   "radius": {
+    "n": 8,
+    "min": 200,
+    "med": 250,
+    "max": 400
+   },
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_target_tether": {
+   "count": 8,
+   "bosses": 6,
+   "telegraph_ms": {
+    "n": 6,
+    "min": 2,
+    "med": 1000,
+    "max": 1000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_summon_butterfly_0": {
+   "count": 8,
+   "bosses": 4,
+   "telegraph_ms": {
+    "n": 6,
+    "min": 1000,
+    "med": 1500,
+    "max": 2000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": {
+    "n": 6,
+    "min": 20,
+    "med": 30,
+    "max": 30
+   },
+   "kbAmount": null
+  },
+  "bp_summon_butterfly_dialog": {
+   "count": 8,
+   "bosses": 2,
+   "telegraph_ms": {
+    "n": 7,
+    "min": 2000,
+    "med": 2000,
+    "max": 2500
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_bloom_moving_wave_multicolor": {
+   "count": 8,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 8,
+    "min": 1500,
+    "med": 1500,
+    "max": 1500
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_summon_aurumsword": {
+   "count": 7,
+   "bosses": 4,
+   "telegraph_ms": {
+    "n": 7,
+    "min": 2000,
+    "med": 2000,
+    "max": 3000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_showorder": {
+   "count": 7,
+   "bosses": 6,
+   "telegraph_ms": {
+    "n": 4,
+    "min": 1000,
+    "med": 1000,
+    "max": 2000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_tether_fixed": {
+   "count": 7,
+   "bosses": 5,
+   "telegraph_ms": {
+    "n": 2,
+    "min": 200,
+    "med": 3000,
+    "max": 3000
+   },
+   "radius": {
+    "n": 3,
+    "min": 450,
+    "med": 500,
+    "max": 600
+   },
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_delayed_bind": {
+   "count": 7,
+   "bosses": 2,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_playermirror_spread": {
+   "count": 7,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 7,
+    "min": 3000,
+    "med": 3999.5,
+    "max": 4000
+   },
+   "radius": {
+    "n": 1,
+    "min": 200,
+    "med": 200,
+    "max": 200
+   },
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_summon_invis": {
+   "count": 7,
+   "bosses": 4,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_pullin_line": {
+   "count": 7,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 5,
+    "min": 3000,
+    "med": 3000,
+    "max": 5000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": {
+    "n": 5,
+    "min": 400,
+    "med": 500,
+    "max": 800
+   }
+  },
+  "bp_displaynumbers": {
+   "count": 6,
+   "bosses": 3,
+   "telegraph_ms": {
+    "n": 1,
+    "min": 4000,
+    "med": 4000,
+    "max": 4000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_gem_pick": {
+   "count": 6,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 5,
+    "min": 4500,
+    "med": 4500,
+    "max": 4500
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_delayed_dark_moon_mult": {
+   "count": 6,
+   "bosses": 2,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_heavy_temporary": {
+   "count": 6,
+   "bosses": 2,
+   "telegraph_ms": {
+    "n": 1,
+    "min": 3400,
+    "med": 3400,
+    "max": 3400
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_tether_enemy": {
+   "count": 6,
+   "bosses": 4,
+   "telegraph_ms": {
+    "n": 3,
+    "min": 3000,
+    "med": 3000,
+    "max": 3000
+   },
+   "radius": {
+    "n": 4,
+    "min": 280,
+    "med": 350,
+    "max": 550
+   },
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_summon_butterfly_4": {
+   "count": 6,
+   "bosses": 4,
+   "telegraph_ms": {
+    "n": 4,
+    "min": 1000,
+    "med": 1500,
+    "max": 2000
+   },
+   "radius": {
+    "n": 3,
+    "min": 250,
+    "med": 300,
+    "max": 300
+   },
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_summon_butterfly_6": {
+   "count": 6,
+   "bosses": 3,
+   "telegraph_ms": {
+    "n": 6,
+    "min": 1000,
+    "med": 1500,
+    "max": 2000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_summon_jellycat": {
+   "count": 6,
+   "bosses": 4,
+   "telegraph_ms": {
+    "n": 6,
+    "min": 2000,
+    "med": 2000,
+    "max": 3000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_bullet_enlarge_follow_bin": {
+   "count": 6,
+   "bosses": 3,
+   "telegraph_ms": {
+    "n": 1,
+    "min": 3500,
+    "med": 3500,
+    "max": 3500
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_ray_single": {
+   "count": 6,
+   "bosses": 4,
+   "telegraph_ms": {
+    "n": 2,
+    "min": 2000,
+    "med": 2000,
+    "max": 2000
+   },
+   "radius": null,
+   "width": {
+    "n": 2,
+    "min": 100,
+    "med": 200,
+    "max": 200
+   },
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_rabbit_queen1_steel": {
+   "count": 6,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 1,
+    "min": 2000,
+    "med": 2000,
+    "max": 2000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_wolf_spawn_teleport": {
+   "count": 6,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 5,
+    "min": 2000,
+    "med": 2000,
+    "max": 2998
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_dark_moon_summon": {
+   "count": 5,
+   "bosses": 3,
+   "telegraph_ms": {
+    "n": 3,
+    "min": 2000,
+    "med": 2000,
+    "max": 2000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_delayed_target_circle": {
+   "count": 5,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_angel_circle_follow_bin": {
+   "count": 5,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 5,
+    "min": 6000,
+    "med": 9000,
+    "max": 9000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_depths_hound_faceoff": {
+   "count": 5,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 4,
+    "min": 3000,
+    "med": 3000,
+    "max": 3000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_dragon_mythril1": {
+   "count": 5,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_summon_fishpool": {
+   "count": 5,
+   "bosses": 4,
+   "telegraph_ms": {
+    "n": 3,
+    "min": 1000,
+    "med": 1000,
+    "max": 1000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_mouse_commander0_painsplit": {
+   "count": 5,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_heavy": {
+   "count": 5,
+   "bosses": 4,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_mouse_paladin1": {
+   "count": 5,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_mouse_paladin1_holyshield": {
+   "count": 5,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 4,
+    "min": 5000,
+    "med": 5000,
+    "max": 5000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_mouse_rosemage0_painsplit": {
+   "count": 5,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_bloom_circle_multicolor": {
+   "count": 5,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 4,
+    "min": 3000,
+    "med": 3000,
+    "max": 3000
+   },
+   "radius": {
+    "n": 4,
+    "min": 400,
+    "med": 620,
+    "max": 650
+   },
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_sanct_flower0_flowershield": {
+   "count": 5,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 4,
+    "min": 1000,
+    "med": 1000,
+    "max": 1000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_spelllock_bg": {
+   "count": 5,
+   "bosses": 5,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_spelllock_appear": {
+   "count": 5,
+   "bosses": 5,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_wolf_spawn_appear": {
+   "count": 5,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_wolf_spawn_disappear": {
+   "count": 5,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_wolf_steeltooth1": {
+   "count": 5,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_aurum_blackcat1": {
+   "count": 4,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_bird_valedictorian1": {
+   "count": 4,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_delayed_prscircle_follow": {
+   "count": 4,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": {
+    "n": 2,
+    "min": 250,
+    "med": 250,
+    "max": 250
+   },
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_fire_aoe_perm": {
+   "count": 4,
+   "bosses": 3,
+   "telegraph_ms": {
+    "n": 2,
+    "min": 3000,
+    "med": 3000,
+    "max": 3000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_depths_hound1": {
+   "count": 4,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_move_warning": {
+   "count": 4,
+   "bosses": 3,
+   "telegraph_ms": {
+    "n": 3,
+    "min": 2000,
+    "med": 3000,
+    "max": 3000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_deathwall_rectangle_temporary": {
+   "count": 4,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 4,
+    "min": 4000,
+    "med": 4000,
+    "max": 4000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_frog_idol1": {
+   "count": 4,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_heart_witch1": {
+   "count": 4,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_heart_witch1_magnus": {
+   "count": 4,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_rabbit_queen1": {
+   "count": 4,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_feathershield": {
+   "count": 4,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_sanct_owl1": {
+   "count": 4,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_pursuit": {
+   "count": 4,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_sanct_owl_faceoff": {
+   "count": 4,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 4,
+    "min": 1000,
+    "med": 1000,
+    "max": 1000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_marching_bullet_perm": {
+   "count": 4,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 4,
+    "min": 2000,
+    "med": 3000,
+    "max": 3000
+   },
+   "radius": {
+    "n": 2,
+    "min": 700,
+    "med": 700,
+    "max": 700
+   },
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_apply_hbs_synced": {
+   "count": 4,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_wolf_steeltooth_faceoff": {
+   "count": 4,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 4,
+    "min": 500,
+    "med": 500,
+    "max": 500
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_aurum_ghost_disappear": {
+   "count": 3,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_playermirror": {
+   "count": 3,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 3,
+    "min": 1000,
+    "med": 1000,
+    "max": 1000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_playermirror_colormatch_h": {
+   "count": 3,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 3,
+    "min": 3800,
+    "med": 3998,
+    "max": 4000
+   },
+   "radius": {
+    "n": 3,
+    "min": 220,
+    "med": 300,
+    "max": 350
+   },
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_angel_circle_mult": {
+   "count": 3,
+   "bosses": 3,
+   "telegraph_ms": {
+    "n": 1,
+    "min": 6000,
+    "med": 6000,
+    "max": 6000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_pullin_circle": {
+   "count": 3,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 2,
+    "min": 2000,
+    "med": 4000,
+    "max": 4000
+   },
+   "radius": {
+    "n": 2,
+    "min": 250,
+    "med": 250,
+    "max": 250
+   },
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": {
+    "n": 2,
+    "min": 400,
+    "med": 500,
+    "max": 500
+   }
+  },
+  "bp_cardinal_spinning_mult": {
+   "count": 3,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 3,
+    "min": 6000,
+    "med": 6000,
+    "max": 6000
+   },
+   "radius": null,
+   "width": {
+    "n": 3,
+    "min": 240,
+    "med": 240,
+    "max": 240
+   },
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_enrage_single_pos": {
+   "count": 3,
+   "bosses": 2,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_water_targeted": {
+   "count": 3,
+   "bosses": 2,
+   "telegraph_ms": {
+    "n": 1,
+    "min": 2994,
+    "med": 2994,
+    "max": 2994
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_heavyextra_temporary": {
+   "count": 3,
+   "bosses": 3,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_summon_butterfly_5": {
+   "count": 3,
+   "bosses": 2,
+   "telegraph_ms": {
+    "n": 2,
+    "min": 1000,
+    "med": 1500,
+    "max": 1500
+   },
+   "radius": {
+    "n": 2,
+    "min": 280,
+    "med": 380,
+    "max": 380
+   },
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_tailwind_permanent": {
+   "count": 3,
+   "bosses": 3,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_aurum_blackcat1_pt2": {
+   "count": 2,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_aurum_blackcat1_pt3": {
+   "count": 2,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_aurum_blackcat1_pt4": {
+   "count": 2,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_aurum_blackcat1_pt5": {
+   "count": 2,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_enrage_activate": {
+   "count": 2,
+   "bosses": 2,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_aurum_ghost_dialog": {
+   "count": 2,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 2,
+    "min": 2000,
+    "med": 2000,
+    "max": 2000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_playermirror_prscircle": {
+   "count": 2,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 2,
+    "min": 3997,
+    "med": 4000,
+    "max": 4000
+   },
+   "radius": {
+    "n": 2,
+    "min": 350,
+    "med": 500,
+    "max": 500
+   },
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_playermirror_colormatch_d": {
+   "count": 2,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 1,
+    "min": 3998,
+    "med": 3998,
+    "max": 3998
+   },
+   "radius": {
+    "n": 2,
+    "min": 250,
+    "med": 300,
+    "max": 300
+   },
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_bird_archon0_pt5": {
+   "count": 2,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_dark2_blast": {
+   "count": 2,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_gravity_pull": {
+   "count": 2,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_teleport_bin": {
+   "count": 2,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 2,
+    "min": 500,
+    "med": 500,
+    "max": 500
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_bird_valedictorian0_enrage": {
+   "count": 2,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_prsline_v_single": {
+   "count": 2,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_bird_valedictorian1_pt4": {
+   "count": 2,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_bird_valedictorian1_pt6": {
+   "count": 2,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_bird_valedictorian1_pt8": {
+   "count": 2,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_delayed_cone_spreads": {
+   "count": 2,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_delayed_line_spreads_h": {
+   "count": 2,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_delayed_line_spreads_v": {
+   "count": 2,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_delayed_prsline": {
+   "count": 2,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": {
+    "n": 2,
+    "min": 250,
+    "med": 250,
+    "max": 250
+   },
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_bird_whispering1_line": {
+   "count": 2,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 1,
+    "min": 3000,
+    "med": 3000,
+    "max": 3000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_gravity_pull_temporary": {
+   "count": 2,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 1,
+    "min": 4000,
+    "med": 4000,
+    "max": 4000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_dragon_mythril0_enrage": {
+   "count": 2,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_frog_idol0_enrage": {
+   "count": 2,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_heart_witch0_enrage": {
+   "count": 2,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_dark2_fan": {
+   "count": 2,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_ray_multi_cascading": {
+   "count": 2,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_light_cross": {
+   "count": 2,
+   "bosses": 2,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_mouse_paladin0_enrage": {
+   "count": 2,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_mouse_paladin1_pt8": {
+   "count": 2,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_ray_spinning_permanent": {
+   "count": 2,
+   "bosses": 2,
+   "telegraph_ms": {
+    "n": 2,
+    "min": 3000,
+    "med": 3000,
+    "max": 3000
+   },
+   "radius": null,
+   "width": {
+    "n": 1,
+    "min": 160,
+    "med": 160,
+    "max": 160
+   },
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_rabbit_queen0_enrage": {
+   "count": 2,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_sanct_flower0_enrage": {
+   "count": 2,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_sanct_owl0_pt2": {
+   "count": 2,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_water_fan_targeted": {
+   "count": 2,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 2,
+    "min": 1500,
+    "med": 2500,
+    "max": 2500
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": {
+    "n": 2,
+    "min": 30,
+    "med": 30,
+    "max": 30
+   },
+   "kbAmount": null
+  },
+  "bp_wolf_steeltooth0_enrage": {
+   "count": 2,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_tailwind": {
+   "count": 2,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 2,
+    "min": 500,
+    "med": 1000,
+    "max": 1000
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_aurum_blackcat0_pt2": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_aurum_blackcat0_pt3": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_aurum_blackcat0_pt4": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_aurum_blackcat1_enrage": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_aurum_ghost_appear": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_aurum_ghost0_pt2": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_aurum_ghost0_pt3": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_aurum_ghost0_pt4": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_aurum_ghost0_pt5": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_playermirror_colormatch_v": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 1,
+    "min": 3800,
+    "med": 3800,
+    "max": 3800
+   },
+   "radius": {
+    "n": 1,
+    "min": 350,
+    "med": 350,
+    "max": 350
+   },
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_aurum_ghost0_pt6": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_aurum_ghost0_pt7": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_aurum_ghost0_pt8": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_bird_archon0_pt2": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_gravity_fall": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_bird_valedictorian0_pt2": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_bird_valedictorian0_pt3": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_bird_valedictorian0_pt4": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_bird_valedictorian0_pt5": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_bird_valedictorian0_pt6": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_bird_valedictorian0_pt7": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_bird_valedictorian1_pt2_l": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_bird_valedictorian1_pt3": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_bird_valedictorian1_enrage": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_line_spreads_rays_h": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_depths_angel0_quickstart": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_depths_angel0_pt4": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_depths_angel0_pt5": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_depths_angel0_pt6": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_depths_angel0_pt7": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_depths_hound0_pt2": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_depths_hound0_pt3": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_depths_hound0_pt4": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_ray_multi_sun": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 1,
+    "min": 3000,
+    "med": 3000,
+    "max": 3000
+   },
+   "radius": null,
+   "width": {
+    "n": 1,
+    "min": 120,
+    "med": 120,
+    "max": 120
+   },
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_depths_hound1_pt2": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_depths_hound1_pt6": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_depths_hound1_pt3": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_depths_hound1_pt7": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_depths_hound1_pt4": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_depths_hound1_pt8": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_depths_hound1_pt5": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_depths_hound1_pt9": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_deathwall_rectangle": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_fire2_blast": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 1,
+    "min": 1500,
+    "med": 1500,
+    "max": 1500
+   },
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_dragon_mythril0_pt2": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_dragon_mythril0_pt3": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_dragon_mythril0_pt4": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_dragon_mythril1_pt2": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_dragon_mythril1_pt3": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_dragon_mythril1_pt4": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_dragon_mythril1_pt5": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_dragon_mythril1_pt6": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_dragon_mythril1_pt7": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_dragon_mythril1_pt8": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_dragon_mythril1_pt9": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_dragon_mythril1_enrage": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_dragon_ruby0_perm": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_dragon_ruby0_pt2": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_dragon_ruby0_pt3": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_dragon_ruby0_pt4": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_dragon_ruby0_pt5": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_dragon_ruby0_pt6": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_dragon_ruby0_pt7": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_frog_idol0_pt2": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_frog_idol0_pt3": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_frog_idol0_pt4": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_frog_idol0_pt5": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_frog_idol0_pt6": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_frog_idol0_pt7": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_frog_idol1_pt2": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_frog_idol1_pt3": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_frog_idol1_pt4": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_frog_idol1_pt5": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_frog_idol1_pt6": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_frog_idol1_pt7_h": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_frog_idol1_pt8": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_frog_idol1_pt9": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_frog_idol1_enrage": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_frog_painter0_pt2": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_frog_painter0_pt4": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_frog_painter0_pt7": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_frog_painter0_pt3_l": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_frog_painter0_pt5": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_frog_painter0_pt6": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_heart_witch0_pt4": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_heart_witch0_pt3": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_heart_witch0_pt2": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_heart_witch1_pt4": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_heart_witch1_pt7": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_heart_witch1_pt5": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_heart_witch1_pt6": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_heart_witch1_pt3": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_heart_witch1_pt8": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_heart_witch1_pt2": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_heart_witch1_pt9": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_heart_witch1_enrage": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_heart_witch1_magnus_activate": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_dark2_spiral": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_mouse_commander0_pt2": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_mouse_commander0_pt3": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_mouse_commander0_pt4": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_mouse_commander0_pt5": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_mouse_commander0_pt6": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_mouse_commander0_pt7": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_heavyextra": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_mouse_paladin0_pt2": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_mouse_paladin0_pt3": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_mouse_paladin1_pt2": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_mouse_paladin1_enrage_unlock": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_mouse_paladin1_pt3": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 1,
+    "min": 3500,
+    "med": 3500,
+    "max": 3500
+   },
+   "radius": {
+    "n": 1,
+    "min": 700,
+    "med": 700,
+    "max": 700
+   },
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_mouse_paladin1_pt4": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_mouse_paladin1_pt6": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_mouse_rosemage0_pt2": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_mouse_rosemage0_pt3": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_mouse_rosemage0_pt4": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_mouse_rosemage0_pt5": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_mouse_rosemage0_pt6": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_mouse_rosemage0_pt7": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_rabbit_queen0_pt2": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_rabbit_queen0_pt3": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_rabbit_queen0_pt4": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_rabbit_queen0_pt6": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_rabbit_queen0_pt5": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_rabbit_queen0_pt7": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_rabbit_queen1_pt2": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_rabbit_queen1_pt3": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_rabbit_queen1_pt4": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_rabbit_queen1_pt5": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_rabbit_queen1_pt6": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_rabbit_queen1_pt7": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_rabbit_queen1_pt8": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_rabbit_queen1_pt9": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_rabbit_queen1_enrage": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_rabbit_queen1_steel_activate": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_sanct_flower0_pt2": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_sanct_flower0_pt3": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_sanct_flower0_pt4": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_sanct_flower0_pt5": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_sanct_flower0_pt6": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_sanct_flower0_pt7": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_summon_butterfly_2": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 1,
+    "min": 1000,
+    "med": 1000,
+    "max": 1000
+   },
+   "radius": {
+    "n": 1,
+    "min": 250,
+    "med": 250,
+    "max": 250
+   },
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_summon_butterfly_1": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 1,
+    "min": 1000,
+    "med": 1000,
+    "max": 1000
+   },
+   "radius": {
+    "n": 1,
+    "min": 180,
+    "med": 180,
+    "max": 180
+   },
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_sanct_owl0_pt3": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_sanct_owl0_pt4": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_sanct_owl0_pt5": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_sanct_owl1_pt2": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_sanct_owl1_pt3": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_sanct_owl1_pt4": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_sanct_owl1_pt5": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_sanct_owl1_pt6": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_sanct_owl1_pt7": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_sanct_owl1_pt8": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_sanct_owl1_pt9": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_sanct_owl1_enrage_pt2": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_summon_butterfly_3": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": {
+    "n": 1,
+    "min": 1500,
+    "med": 1500,
+    "max": 1500
+   },
+   "radius": {
+    "n": 1,
+    "min": 300,
+    "med": 300,
+    "max": 300
+   },
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_summon_butterfly": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_wolf_snowfur0_pt2": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_wolf_disappear": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_wolf_snowfur0_pt3": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_wolf_snowfur0_pt4": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_wolf_snowfur0_pt5": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_wolf_snowfur0_pt6": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_wolf_snowfur0_pt7": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_wolf_steeltooth0_pt2": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_wolf_steeltooth0_pt3": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_wolf_steeltooth0_pt4": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_wolf_steeltooth1_pt2": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_wolf_steeltooth1_pt3": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_wolf_steeltooth1_pt6": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_wolf_steeltooth1_pt5": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_wolf_steeltooth1_pt8": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_wolf_steeltooth1_pt7": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_wolf_steeltooth1_pt4": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  },
+  "bp_wolf_steeltooth1_pt9": {
+   "count": 1,
+   "bosses": 1,
+   "telegraph_ms": null,
+   "radius": null,
+   "width": null,
+   "fanAngle": null,
+   "kbAmount": null
+  }
+ },
+ "bosses": {
+  "aurum_beast0": {
+   "telegraph_ms": {
+    "n": 6,
+    "min": 2000,
+    "med": 4000,
+    "max": 5000
+   },
+   "patterns": {
+    "bp_movementcheck": 3,
+    "bp_summon_aurumsword": 2,
+    "bp_circle_spreads": 2,
+    "bp_cleave": 2,
+    "bp_enrage": 1
+   }
+  },
+  "aurum_beast1": {
+   "telegraph_ms": {
+    "n": 11,
+    "min": 2000,
+    "med": 4000,
+    "max": 4800
+   },
+   "patterns": {
+    "bp_line_spreads_h": 3,
+    "bp_summon_aurumsword": 2,
+    "bp_colormatch": 2,
+    "bp_cleave_fixed": 2,
+    "bp_line_spreads_v": 1,
+    "bp_displaynumbers": 1,
+    "bp_enrage": 1
+   }
+  },
+  "aurum_blackcat0": {
+   "telegraph_ms": {
+    "n": 42,
+    "min": 1000,
+    "med": 3000,
+    "max": 4000
+   },
+   "patterns": {
+    "bp_marching_bullet_repeating": 12,
+    "bp_cleave": 11,
+    "bp_fire2_line_repeating": 5,
+    "bp_circle_spreads": 5,
+    "bp_aurum_blackcat1": 4,
+    "bp_knockback_line": 4,
+    "bp_line_spreads_v": 4,
+    "bp_line_spreads_h": 3,
+    "bp_movementcheck": 3,
+    "bp_prsline_h": 3,
+    "bp_marching_bullet": 2,
+    "bp_dark_moon_summon_mult": 2,
+    "bp_prsline_v": 2,
+    "bp_aurum_blackcat0_pt2": 1,
+    "bp_aurum_blackcat0_pt3": 1,
+    "bp_aurum_blackcat0_pt4": 1,
+    "bp_enrage_deco": 1,
+    "bp_enrage_single": 1,
+    "bp_prscircle_follow": 1,
+    "bp_fieldlimit_rectangle_temporary": 1,
+    "bp_bind_v": 1,
+    "bp_showorder": 1,
+    "bp_prscircle_follow_bin": 1,
+    "bp_bind_h": 1
+   }
+  },
+  "aurum_blackcat1": {
+   "telegraph_ms": {
+    "n": 94,
+    "min": 199,
+    "med": 4000,
+    "max": 5500
+   },
+   "patterns": {
+    "bp_cleave": 17,
+    "bp_prscircle": 15,
+    "bp_ray_spinfast": 9,
+    "bp_clockspot": 8,
+    "bp_colormatch2": 8,
+    "bp_gem_pick": 6,
+    "bp_fieldlimit_rectangle_temporary": 5,
+    "bp_circle_spreads": 5,
+    "bp_colormatch": 5,
+    "bp_fire2_line_repeating": 4,
+    "bp_delayed_prsline_follow": 4,
+    "bp_angel_circle": 4,
+    "bp_fire_aoe": 4,
+    "bp_thorns": 4,
+    "bp_light_targeted": 3,
+    "bp_movementcheck": 3,
+    "bp_delayed_colormatch": 3,
+    "bp_aurum_blackcat1_pt2": 2,
+    "bp_aurum_blackcat1_pt3": 2,
+    "bp_aurum_blackcat1_pt4": 2,
+    "bp_aurum_blackcat1_pt5": 2,
+    "bp_tether": 2,
+    "bp_water_moving_ball": 2,
+    "bp_delayed_circle_spreads": 2,
+    "bp_cleave_fixed": 2,
+    "bp_aurum_blackcat1_enrage": 1,
+    "bp_enrage_deco": 1,
+    "bp_enrage_activate": 1,
+    "bp_tether_fixed": 1,
+    "bp_bind_h": 1,
+    "bp_bind_v": 1,
+    "bp_delayed_prscircle": 1,
+    "bp_delayed_bind": 1,
+    "bp_delayed_dark_moon_mult": 1,
+    "bp_prscircle_follow_bin": 1,
+    "bp_knockback_circle": 1,
+    "bp_bullet_enlarge": 1,
+    "bp_knockback_line": 1,
+    "bp_heavy_temporary": 1,
+    "bp_prsline_h_follow": 1
+   }
+  },
+  "aurum_ghost0": {
+   "telegraph_ms": {
+    "n": 57,
+    "min": 1000,
+    "med": 3800,
+    "max": 6000
+   },
+   "patterns": {
+    "bp_playermirror_spread": 7,
+    "bp_colormatch": 6,
+    "bp_ray_multi_h": 5,
+    "bp_marching_bullet_repeating": 5,
+    "bp_cardinal_r": 5,
+    "bp_dark_moon_summon_mult": 4,
+    "bp_enrage": 4,
+    "bp_colormatch2": 4,
+    "bp_circle_spreads": 3,
+    "bp_aurum_ghost_disappear": 3,
+    "bp_knockback_circle": 3,
+    "bp_playermirror": 3,
+    "bp_playermirror_colormatch_h": 3,
+    "bp_aurum_ghost_dialog": 2,
+    "bp_playermirror_prscircle": 2,
+    "bp_playermirror_colormatch_d": 2,
+    "bp_dark_targeted": 2,
+    "bp_aurum_ghost_appear": 1,
+    "bp_aurum_ghost0_pt2": 1,
+    "bp_aurum_ghost0_pt3": 1,
+    "bp_ray_multi_v": 1,
+    "bp_aurum_ghost0_pt4": 1,
+    "bp_prscircle_follow_bin": 1,
+    "bp_aurum_ghost0_pt5": 1,
+    "bp_playermirror_colormatch_v": 1,
+    "bp_aurum_ghost0_pt6": 1,
+    "bp_prsline_h": 1,
+    "bp_aurum_ghost0_pt7": 1,
+    "bp_ray_spinning": 1,
+    "bp_bullet_enlarge": 1,
+    "bp_ray_spinfast": 1,
+    "bp_aurum_ghost0_pt8": 1
+   }
+  },
+  "aurum_whitecat0": {
+   "telegraph_ms": {
+    "n": 5,
+    "min": 3000,
+    "med": 3000,
+    "max": 5000
+   },
+   "patterns": {
+    "bp_cleave": 4,
+    "bp_summon_invis": 1,
+    "bp_circle_spreads": 1,
+    "bp_enrage": 1
+   }
+  },
+  "aurum_whitecat1": {
+   "telegraph_ms": null,
+   "patterns": {
+    "bp_summon_invis": 1,
+    "bp_circle_spreads": 1,
+    "bp_enrage": 1
+   }
+  },
+  "bird_archon0": {
+   "telegraph_ms": null,
+   "patterns": {
+    "bp_prscircle": 7,
+    "bp_bird_archon0_pt5": 2,
+    "bp_enrage": 2,
+    "bp_dark2_blast": 2,
+    "bp_bird_archon0_pt2": 1,
+    "bp_prscircle_follow": 1,
+    "bp_line_spreads_v": 1,
+    "bp_dark_moon_summon_mult": 1,
+    "bp_line_spreads_h": 1,
+    "bp_dark_targeted": 1
+   }
+  },
+  "bird_sophomore0": {
+   "telegraph_ms": null,
+   "patterns": {
+    "bp_dark_targeted": 1
+   }
+  },
+  "bird_sophomore1": {
+   "telegraph_ms": null,
+   "patterns": {
+    "bp_prscircle": 2,
+    "bp_dark_targeted": 1,
+    "bp_circle_spreads": 1,
+    "bp_move_position_synced": 1,
+    "bp_enrage": 1
+   }
+  },
+  "bird_sophomore2": {
+   "telegraph_ms": {
+    "n": 8,
+    "min": 2000,
+    "med": 3998,
+    "max": 4000
+   },
+   "patterns": {
+    "bp_circle_spreads": 3,
+    "bp_dark_targeted": 1,
+    "bp_line_spreads_h": 1,
+    "bp_line_spreads_v": 1,
+    "bp_bind_v": 1,
+    "bp_dark_moon_summon_mult": 1,
+    "bp_move_position_synced": 1,
+    "bp_enrage": 1
+   }
+  },
+  "bird_student0": {
+   "telegraph_ms": {
+    "n": 10,
+    "min": 500,
+    "med": 2000,
+    "max": 9000
+   },
+   "patterns": {
+    "bp_dark_targeted": 4,
+    "bp_prscircle": 4,
+    "bp_gravity_pull": 2,
+    "bp_teleport_bin": 2,
+    "bp_colormatch": 2,
+    "bp_circle_spreads": 1,
+    "bp_enrage": 1,
+    "bp_cone_spreads": 1,
+    "bp_prscircle_follow": 1
+   }
+  },
+  "bird_student1": {
+   "telegraph_ms": {
+    "n": 6,
+    "min": 1000,
+    "med": 3000,
+    "max": 4000
+   },
+   "patterns": {
+    "bp_fieldlimit_rectangle": 4,
+    "bp_circle_spreads": 2,
+    "bp_enrage": 2,
+    "bp_dark_moon_summon": 1,
+    "bp_dark_targeted": 1,
+    "bp_gravity_fall": 1,
+    "bp_dark_moon_summon_mult": 1,
+    "bp_prsline_h_follow": 1,
+    "bp_prsline_v": 1
+   }
+  },
+  "bird_valedictorian0": {
+   "telegraph_ms": {
+    "n": 39,
+    "min": 1500,
+    "med": 4000,
+    "max": 13500
+   },
+   "patterns": {
+    "bp_dark_moon_summon_mult": 23,
+    "bp_prscircle": 15,
+    "bp_colormatch": 10,
+    "bp_prscircle_follow_bin": 7,
+    "bp_gravity_fall_temporary": 6,
+    "bp_prsline_h": 5,
+    "bp_bird_valedictorian1": 4,
+    "bp_circle_spreads": 4,
+    "bp_prsline_v_follow": 4,
+    "bp_bind_v": 4,
+    "bp_prsline_h_follow": 3,
+    "bp_line_spreads_v": 3,
+    "bp_line_spreads_h": 3,
+    "bp_bird_valedictorian0_enrage": 2,
+    "bp_prsline_v": 2,
+    "bp_bind_h": 2,
+    "bp_prsline_v_single": 2,
+    "bp_bird_valedictorian0_pt2": 1,
+    "bp_bird_valedictorian0_pt3": 1,
+    "bp_bird_valedictorian0_pt4": 1,
+    "bp_bird_valedictorian0_pt5": 1,
+    "bp_bird_valedictorian0_pt6": 1,
+    "bp_bird_valedictorian0_pt7": 1,
+    "bp_enrage_deco": 1,
+    "bp_enrage_single": 1,
+    "bp_dark2_line": 1,
+    "bp_cone_spreads": 1,
+    "bp_dark_moon_summon": 1
+   }
+  },
+  "bird_valedictorian1": {
+   "telegraph_ms": {
+    "n": 70,
+    "min": 2700,
+    "med": 5000,
+    "max": 7000
+   },
+   "patterns": {
+    "bp_prscircle": 47,
+    "bp_circle_spreads": 20,
+    "bp_dark_moon_summon_mult": 19,
+    "bp_delayed_prscircle": 18,
+    "bp_timestop": 15,
+    "bp_delayed_rayspin": 13,
+    "bp_ray_spinfast": 9,
+    "bp_prscircle_follow": 7,
+    "bp_delayed_circle_spreads": 6,
+    "bp_dark_targeted": 6,
+    "bp_delayed_prsline_follow": 6,
+    "bp_delayed_bind": 6,
+    "bp_delayed_dark_moon_mult": 5,
+    "bp_delayed_colormatch": 5,
+    "bp_delayed_target_circle": 5,
+    "bp_prsline_v": 5,
+    "bp_dark2_line": 5,
+    "bp_delayed_prscircle_follow": 4,
+    "bp_displaynumbers": 4,
+    "bp_bird_valedictorian1_pt4": 2,
+    "bp_bird_valedictorian1_pt6": 2,
+    "bp_bird_valedictorian1_pt8": 2,
+    "bp_delayed_cone_spreads": 2,
+    "bp_prsline_h": 2,
+    "bp_colormatch": 2,
+    "bp_delayed_line_spreads_h": 2,
+    "bp_delayed_line_spreads_v": 2,
+    "bp_delayed_prsline": 2,
+    "bp_line_spreads_h": 2,
+    "bp_line_spreads_v": 2,
+    "bp_bird_valedictorian1_pt2_l": 1,
+    "bp_bird_valedictorian1_pt3": 1,
+    "bp_bird_valedictorian1_enrage": 1,
+    "bp_enrage": 1,
+    "bp_bind_v": 1,
+    "bp_ray_multi_h": 1
+   }
+  },
+  "bird_whispering0": {
+   "telegraph_ms": {
+    "n": 14,
+    "min": 2999,
+    "med": 3000,
+    "max": 3900
+   },
+   "patterns": {
+    "bp_bind_v": 3,
+    "bp_line_spreads_v": 3,
+    "bp_bind_h": 2,
+    "bp_circle_spreads": 2,
+    "bp_line_spreads_h": 2,
+    "bp_colormatch": 2,
+    "bp_bird_whispering1_line": 2,
+    "bp_move_position_synced": 2,
+    "bp_dark2_line": 1,
+    "bp_enrage": 1,
+    "bp_line_spreads_rays_h": 1,
+    "bp_prscircle_follow": 1
+   }
+  },
+  "bird_whispering1": {
+   "telegraph_ms": {
+    "n": 10,
+    "min": 3000,
+    "med": 3998,
+    "max": 4000
+   },
+   "patterns": {
+    "bp_move_position_synced": 2,
+    "bp_bind_h": 2,
+    "bp_prsline_h_follow": 2,
+    "bp_circle_spreads": 2,
+    "bp_colormatch": 2,
+    "bp_bind_v": 1,
+    "bp_prsline_v_follow": 1,
+    "bp_enrage": 1,
+    "bp_line_spreads_h": 1,
+    "bp_line_spreads_v": 1,
+    "bp_dark2_line": 1,
+    "bp_dark_moon_summon_mult": 1
+   }
+  },
+  "depths_angel0": {
+   "telegraph_ms": {
+    "n": 36,
+    "min": 2600,
+    "med": 5500,
+    "max": 9000
+   },
+   "patterns": {
+    "bp_angel_circle": 16,
+    "bp_cardinal_r": 7,
+    "bp_ray_spinning": 6,
+    "bp_angel_circle_follow_bin": 5,
+    "bp_prscircle": 5,
+    "bp_fire_aoe": 4,
+    "bp_angel_circle_follow": 3,
+    "bp_knockback_circle": 2,
+    "bp_line_spreads_h": 2,
+    "bp_line_spreads_v": 2,
+    "bp_fire_aoe_perm": 2,
+    "bp_clockspot": 2,
+    "bp_ray_spinfast": 2,
+    "bp_depths_angel0_quickstart": 1,
+    "bp_depths_angel0_pt4": 1,
+    "bp_depths_angel0_pt5": 1,
+    "bp_depths_angel0_pt6": 1,
+    "bp_depths_angel0_pt7": 1,
+    "bp_angel_circle_mult": 1,
+    "bp_circle_spreads": 1,
+    "bp_colormatch": 1
+   }
+  },
+  "depths_basilisk0": {
+   "telegraph_ms": {
+    "n": 13,
+    "min": 3000,
+    "med": 5000,
+    "max": 5000
+   },
+   "patterns": {
+    "bp_cardinal_spinning": 9,
+    "bp_circle_spreads": 2,
+    "bp_knockback_circle": 1,
+    "bp_enrage": 1
+   }
+  },
+  "depths_basilisk1": {
+   "telegraph_ms": {
+    "n": 11,
+    "min": 3000,
+    "med": 6000,
+    "max": 6000
+   },
+   "patterns": {
+    "bp_cardinal_spinning": 8,
+    "bp_ray_spinfast": 3,
+    "bp_circle_spreads": 1,
+    "bp_line_spreads_h": 1,
+    "bp_enrage": 1
+   }
+  },
+  "depths_beast0": {
+   "telegraph_ms": {
+    "n": 10,
+    "min": 1000,
+    "med": 3000,
+    "max": 3000
+   },
+   "patterns": {
+    "bp_bullet_enlarge": 4,
+    "bp_target_tether": 2,
+    "bp_knockback_circle": 2,
+    "bp_colormatch": 2,
+    "bp_enrage": 2,
+    "bp_circle_spreads": 1,
+    "bp_prscircle_follow": 1
+   }
+  },
+  "depths_beast1": {
+   "telegraph_ms": {
+    "n": 8,
+    "min": 1000,
+    "med": 3100,
+    "max": 3500
+   },
+   "patterns": {
+    "bp_angel_circle_follow": 2,
+    "bp_target_tether": 1,
+    "bp_circle_spreads": 1,
+    "bp_prsline_v_follow": 1,
+    "bp_line_spreads_h": 1,
+    "bp_prscircle_follow_bin": 1,
+    "bp_enrage": 1
+   }
+  },
+  "depths_hound0": {
+   "telegraph_ms": {
+    "n": 59,
+    "min": 1000,
+    "med": 4000,
+    "max": 6500
+   },
+   "patterns": {
+    "bp_angel_circle_follow": 15,
+    "bp_depths_hound0_pounce": 9,
+    "bp_cardinal_r": 8,
+    "bp_cardinal_spinning": 7,
+    "bp_circle_spreads": 5,
+    "bp_depths_hound1": 4,
+    "bp_line_spreads_v": 4,
+    "bp_line_spreads_h": 3,
+    "bp_pullin_circle": 3,
+    "bp_angel_circle": 3,
+    "bp_knockback_circle": 2,
+    "bp_gravity_pull_temporary": 2,
+    "bp_cone_spreads": 2,
+    "bp_depths_hound0_pt2": 1,
+    "bp_depths_hound0_pt3": 1,
+    "bp_depths_hound0_pt4": 1,
+    "bp_enrage_deco": 1,
+    "bp_enrage_single": 1,
+    "bp_target_tether": 1,
+    "bp_ray_multi_sun": 1,
+    "bp_showorder": 1,
+    "bp_gravity_fall_temporary": 1,
+    "bp_tether_enemy": 1,
+    "bp_move_warning": 1,
+    "bp_ray_spinfast": 1,
+    "bp_clockspot": 1
+   }
+  },
+  "depths_hound1": {
+   "telegraph_ms": {
+    "n": 79,
+    "min": 500,
+    "med": 3500,
+    "max": 6000
+   },
+   "patterns": {
+    "bp_depths_hound1_pounce": 14,
+    "bp_angel_circle_follow": 14,
+    "bp_circle_spreads": 9,
+    "bp_knockback_circle": 7,
+    "bp_pullin_line": 7,
+    "bp_cardinal_spinning": 6,
+    "bp_depths_hound_faceoff": 5,
+    "bp_line_spreads_v": 5,
+    "bp_deathwall_rectangle_temporary": 4,
+    "bp_cardinal_r": 3,
+    "bp_angel_circle": 3,
+    "bp_bullet_enlarge": 3,
+    "bp_cardinal_spinning_mult": 3,
+    "bp_gravity_fall_temporary": 2,
+    "bp_line_spreads_h": 2,
+    "bp_ray_multi_v": 2,
+    "bp_colormatch": 2,
+    "bp_depths_hound1_pt2": 1,
+    "bp_depths_hound1_pt6": 1,
+    "bp_depths_hound1_pt3": 1,
+    "bp_depths_hound1_pt7": 1,
+    "bp_depths_hound1_pt4": 1,
+    "bp_depths_hound1_pt8": 1,
+    "bp_depths_hound1_pt5": 1,
+    "bp_depths_hound1_pt9": 1,
+    "bp_deathwall_rectangle": 1,
+    "bp_enrage_deco": 1,
+    "bp_prscircle": 1,
+    "bp_ray_spinfast": 1,
+    "bp_fire_aoe": 1
+   }
+  },
+  "dragon_emerald0": {
+   "telegraph_ms": {
+    "n": 15,
+    "min": 3000,
+    "med": 4000,
+    "max": 8000
+   },
+   "patterns": {
+    "bp_cardinal_r": 7,
+    "bp_line_spreads_h": 3,
+    "bp_knockback_line": 1,
+    "bp_prscircle_follow_bin": 1,
+    "bp_line_spreads_v": 1,
+    "bp_fire2_line_repeating": 1,
+    "bp_enrage": 1
+   }
+  },
+  "dragon_emerald1": {
+   "telegraph_ms": {
+    "n": 10,
+    "min": 2000,
+    "med": 3000,
+    "max": 4000
+   },
+   "patterns": {
+    "bp_cardinal_r": 3,
+    "bp_fieldlimit_rectangle": 2,
+    "bp_tether": 2,
+    "bp_fire2_line_repeating": 1,
+    "bp_prscircle_follow_bin": 1,
+    "bp_enrage": 1
+   }
+  },
+  "dragon_gold0": {
+   "telegraph_ms": null,
+   "patterns": {
+    "bp_colormatch": 2,
+    "bp_circle_spreads": 1,
+    "bp_clockspot": 1,
+    "bp_move_position_synced": 1,
+    "bp_enrage": 1
+   }
+  },
+  "dragon_gold1": {
+   "telegraph_ms": null,
+   "patterns": {
+    "bp_line_spreads_h": 1,
+    "bp_line_spreads_v": 1,
+    "bp_ray_spinfast": 1,
+    "bp_enrage": 1
+   }
+  },
+  "dragon_granite0": {
+   "telegraph_ms": null,
+   "patterns": {
+    "bp_fire_aoe": 1,
+    "bp_knockback_circle": 1,
+    "bp_cone_spreads": 1
+   }
+  },
+  "dragon_granite1": {
+   "telegraph_ms": {
+    "n": 7,
+    "min": 1500,
+    "med": 2000,
+    "max": 2500
+   },
+   "patterns": {
+    "bp_fire_aoe": 2,
+    "bp_knockback_circle": 1,
+    "bp_fire2_blast": 1,
+    "bp_ray_spinfast": 1,
+    "bp_prscircle": 1,
+    "bp_enrage": 1
+   }
+  },
+  "dragon_granite2": {
+   "telegraph_ms": null,
+   "patterns": {
+    "bp_ray_spinfast": 2,
+    "bp_fire_aoe": 1,
+    "bp_knockback_circle": 1,
+    "bp_cone_spreads": 1,
+    "bp_clockspot": 1,
+    "bp_enrage": 1
+   }
+  },
+  "dragon_mythril0": {
+   "telegraph_ms": {
+    "n": 75,
+    "min": 1000,
+    "med": 3500,
+    "max": 7000
+   },
+   "patterns": {
+    "bp_cardinal_r": 36,
+    "bp_circle_spreads": 15,
+    "bp_colormatch": 8,
+    "bp_knockback_line": 8,
+    "bp_dragon_mythril1": 5,
+    "bp_prscircle": 5,
+    "bp_line_spreads_v": 4,
+    "bp_prscircle_follow": 3,
+    "bp_prsline_v_follow": 3,
+    "bp_dragon_mythril0_enrage": 2,
+    "bp_colormatch2": 2,
+    "bp_ray_spinfast": 2,
+    "bp_bullet_enlarge": 2,
+    "bp_cone_spreads": 2,
+    "bp_ray_spinning": 2,
+    "bp_clockspot": 2,
+    "bp_dragon_mythril0_pt2": 1,
+    "bp_dragon_mythril0_pt3": 1,
+    "bp_dragon_mythril0_pt4": 1,
+    "bp_enrage_deco": 1,
+    "bp_enrage_single": 1,
+    "bp_tether": 1,
+    "bp_showgroups": 1
+   }
+  },
+  "dragon_mythril1": {
+   "telegraph_ms": {
+    "n": 91,
+    "min": 2500,
+    "med": 4000,
+    "max": 6000
+   },
+   "patterns": {
+    "bp_cardinal_r": 32,
+    "bp_ray_spinfast": 25,
+    "bp_knockback_line": 10,
+    "bp_prscircle": 9,
+    "bp_circle_spreads": 8,
+    "bp_colormatch": 8,
+    "bp_line_spreads_v": 7,
+    "bp_clockspot": 7,
+    "bp_ray_multi_h": 6,
+    "bp_line_spreads_h": 6,
+    "bp_bullet_enlarge": 6,
+    "bp_enrage_single_pos": 2,
+    "bp_prscircle_follow_bin": 2,
+    "bp_prsline_h": 2,
+    "bp_knockback_circle": 2,
+    "bp_dragon_mythril1_pt2": 1,
+    "bp_dragon_mythril1_pt3": 1,
+    "bp_dragon_mythril1_pt4": 1,
+    "bp_dragon_mythril1_pt5": 1,
+    "bp_dragon_mythril1_pt6": 1,
+    "bp_dragon_mythril1_pt7": 1,
+    "bp_dragon_mythril1_pt8": 1,
+    "bp_dragon_mythril1_pt9": 1,
+    "bp_dragon_mythril1_enrage": 1,
+    "bp_enrage_deco": 1,
+    "bp_prscircle_follow": 1,
+    "bp_ray_spinning": 1,
+    "bp_prsline_h_follow": 1
+   }
+  },
+  "dragon_ruby0": {
+   "telegraph_ms": {
+    "n": 22,
+    "min": 3000,
+    "med": 5000,
+    "max": 7000
+   },
+   "patterns": {
+    "bp_ray_spinfast": 10,
+    "bp_circle_spreads": 8,
+    "bp_cone_spreads": 5,
+    "bp_colormatch": 5,
+    "bp_line_spreads_h": 3,
+    "bp_line_spreads_v": 3,
+    "bp_clockspot": 3,
+    "bp_ray_spinning": 2,
+    "bp_showgroups": 2,
+    "bp_showorder": 2,
+    "bp_tether": 2,
+    "bp_prsline_v": 2,
+    "bp_dragon_ruby0_perm": 1,
+    "bp_dragon_ruby0_pt2": 1,
+    "bp_dragon_ruby0_pt3": 1,
+    "bp_dragon_ruby0_pt4": 1,
+    "bp_dragon_ruby0_pt5": 1,
+    "bp_dragon_ruby0_pt6": 1,
+    "bp_dragon_ruby0_pt7": 1,
+    "bp_fire_aoe_perm": 1,
+    "bp_prscircle": 1,
+    "bp_prscircle_follow": 1,
+    "bp_prsline_h_follow": 1,
+    "bp_prscircle_follow_bin": 1
+   }
+  },
+  "dragon_silver0": {
+   "telegraph_ms": null,
+   "patterns": {
+    "bp_knockback_circle": 1,
+    "bp_prscircle_follow": 1,
+    "bp_prscircle_follow_bin": 1,
+    "bp_prscircle": 1,
+    "bp_enrage": 1
+   }
+  },
+  "dragon_silver1": {
+   "telegraph_ms": null,
+   "patterns": {
+    "bp_circle_spreads": 1,
+    "bp_prscircle_follow_bin": 1,
+    "bp_move_position_synced": 1,
+    "bp_enrage": 1
+   }
+  },
+  "frog_idol0": {
+   "telegraph_ms": {
+    "n": 37,
+    "min": 1500,
+    "med": 4000,
+    "max": 5000
+   },
+   "patterns": {
+    "bp_colormatch": 17,
+    "bp_water_moving_ball": 8,
+    "bp_prscircle": 8,
+    "bp_movementcheck": 7,
+    "bp_colormatch2": 6,
+    "bp_frog_idol1": 4,
+    "bp_circle_spreads": 4,
+    "bp_tether_enemy": 3,
+    "bp_tether": 3,
+    "bp_frog_idol0_enrage": 2,
+    "bp_prscircle_follow": 2,
+    "bp_frog_idol0_pt2": 1,
+    "bp_frog_idol0_pt3": 1,
+    "bp_frog_idol0_pt4": 1,
+    "bp_frog_idol0_pt5": 1,
+    "bp_frog_idol0_pt6": 1,
+    "bp_frog_idol0_pt7": 1,
+    "bp_enrage_deco": 1,
+    "bp_enrage_single": 1,
+    "bp_prsline_h": 1,
+    "bp_line_spreads_h": 1,
+    "bp_knockback_circle": 1,
+    "bp_move_warning": 1,
+    "bp_prscircle_follow_bin": 1
+   }
+  },
+  "frog_idol1": {
+   "telegraph_ms": {
+    "n": 47,
+    "min": 1500,
+    "med": 3000,
+    "max": 5000
+   },
+   "patterns": {
+    "bp_colormatch3": 11,
+    "bp_colormatch2": 10,
+    "bp_tether": 8,
+    "bp_prscircle_follow_bin": 8,
+    "bp_prscircle": 7,
+    "bp_circle_spreads": 7,
+    "bp_movementcheck": 5,
+    "bp_water_moving_ball": 5,
+    "bp_line_spreads_v": 4,
+    "bp_prsline_h_follow": 4,
+    "bp_line_spreads_h": 3,
+    "bp_prsline_v_follow": 2,
+    "bp_colormatch": 2,
+    "bp_frog_idol1_pt2": 1,
+    "bp_frog_idol1_pt3": 1,
+    "bp_frog_idol1_pt4": 1,
+    "bp_frog_idol1_pt5": 1,
+    "bp_frog_idol1_pt6": 1,
+    "bp_frog_idol1_pt7_h": 1,
+    "bp_frog_idol1_pt8": 1,
+    "bp_frog_idol1_pt9": 1,
+    "bp_frog_idol1_enrage": 1,
+    "bp_enrage_single_pos": 1,
+    "bp_water_targeted": 1,
+    "bp_thorns": 1,
+    "bp_prscircle_follow": 1
+   }
+  },
+  "frog_musician0": {
+   "telegraph_ms": {
+    "n": 13,
+    "min": 500,
+    "med": 3000,
+    "max": 6000
+   },
+   "patterns": {
+    "bp_water_moving_ball": 4,
+    "bp_movementcheck": 3,
+    "bp_circle_spreads": 2,
+    "bp_prscircle_follow_bin": 2,
+    "bp_prscircle": 1,
+    "bp_prsline_h_follow": 1,
+    "bp_prsline_v_follow": 1,
+    "bp_enrage": 1
+   }
+  },
+  "frog_musician1": {
+   "telegraph_ms": {
+    "n": 11,
+    "min": 2000,
+    "med": 3998,
+    "max": 4000
+   },
+   "patterns": {
+    "bp_water_moving_ball": 6,
+    "bp_circle_spreads": 2,
+    "bp_prscircle": 2,
+    "bp_movementcheck": 1,
+    "bp_enrage": 1
+   }
+  },
+  "frog_painter0": {
+   "telegraph_ms": {
+    "n": 33,
+    "min": 2000,
+    "med": 5000,
+    "max": 9500
+   },
+   "patterns": {
+    "bp_colormatch2": 12,
+    "bp_water_moving_ball": 9,
+    "bp_move_position_synced": 6,
+    "bp_prscircle": 6,
+    "bp_colormatch": 6,
+    "bp_circle_spreads": 4,
+    "bp_enrage": 2,
+    "bp_prsline_h_follow": 2,
+    "bp_prsline_v_follow": 2,
+    "bp_tether": 2,
+    "bp_water_targeted": 2,
+    "bp_frog_painter0_pt2": 1,
+    "bp_frog_painter0_pt4": 1,
+    "bp_frog_painter0_pt7": 1,
+    "bp_frog_painter0_pt3_l": 1,
+    "bp_frog_painter0_pt5": 1,
+    "bp_frog_painter0_pt6": 1,
+    "bp_prscircle_follow_bin": 1,
+    "bp_knockback_circle": 1,
+    "bp_line_spreads_h": 1,
+    "bp_movementcheck": 1
+   }
+  },
+  "frog_seamstress0": {
+   "telegraph_ms": {
+    "n": 17,
+    "min": 1700,
+    "med": 2998,
+    "max": 3000
+   },
+   "patterns": {
+    "bp_water_moving_ball": 6,
+    "bp_move_position_synced": 4,
+    "bp_colormatch": 3,
+    "bp_move_warning": 2,
+    "bp_tether_enemy": 1,
+    "bp_prscircle_follow_bin": 1,
+    "bp_enrage": 1
+   }
+  },
+  "frog_seamstress1": {
+   "telegraph_ms": {
+    "n": 8,
+    "min": 2000,
+    "med": 2999,
+    "max": 5000
+   },
+   "patterns": {
+    "bp_water_moving_ball": 6,
+    "bp_tether": 5,
+    "bp_colormatch2": 4,
+    "bp_prscircle": 1,
+    "bp_circle_spreads": 1,
+    "bp_prscircle_follow_bin": 1,
+    "bp_enrage": 1
+   }
+  },
+  "frog_songstress0": {
+   "telegraph_ms": {
+    "n": 9,
+    "min": 500,
+    "med": 2873,
+    "max": 4000
+   },
+   "patterns": {
+    "bp_circle_spreads": 4,
+    "bp_movementcheck": 3,
+    "bp_prscircle_follow_bin": 3,
+    "bp_prscircle": 1,
+    "bp_enrage": 1
+   }
+  },
+  "frog_songstress1": {
+   "telegraph_ms": {
+    "n": 7,
+    "min": 2000,
+    "med": 3960,
+    "max": 4000
+   },
+   "patterns": {
+    "bp_prscircle": 2,
+    "bp_tether": 2,
+    "bp_movementcheck": 1,
+    "bp_circle_spreads": 1,
+    "bp_prscircle_follow_bin": 1,
+    "bp_enrage": 1
+   }
+  },
+  "frog_tinkerer0": {
+   "telegraph_ms": null,
+   "patterns": {
+    "bp_water_moving_ball": 1,
+    "bp_move_position_synced": 1,
+    "bp_circle_spreads": 1
+   }
+  },
+  "frog_tinkerer1": {
+   "telegraph_ms": {
+    "n": 10,
+    "min": 1500,
+    "med": 3000,
+    "max": 3000
+   },
+   "patterns": {
+    "bp_movementcheck": 3,
+    "bp_circle_spreads": 2,
+    "bp_line_spreads_h": 2,
+    "bp_water_moving_ball": 1,
+    "bp_line_spreads_v": 1,
+    "bp_move_position_synced": 1,
+    "bp_enrage": 1
+   }
+  },
+  "frog_tinkerer2": {
+   "telegraph_ms": null,
+   "patterns": {
+    "bp_tether_fixed": 3,
+    "bp_water_moving_ball": 2,
+    "bp_showgroups": 1,
+    "bp_circle_spreads": 1,
+    "bp_move_position_synced": 1,
+    "bp_enrage": 1
+   }
+  },
+  "geode_butterfly0": {
+   "telegraph_ms": {
+    "n": 8,
+    "min": 1000,
+    "med": 3000,
+    "max": 5000
+   },
+   "patterns": {
+    "bp_summon_butterfly_4": 2,
+    "bp_summon_butterfly_6": 2,
+    "bp_colormatch": 2,
+    "bp_summon_reset": 1,
+    "bp_tether_fixed": 1,
+    "bp_light_targeted": 1,
+    "bp_summon_fishpool": 1,
+    "bp_enrage": 1
+   }
+  },
+  "geode_butterfly1": {
+   "telegraph_ms": {
+    "n": 12,
+    "min": 2000,
+    "med": 4000,
+    "max": 5000
+   },
+   "patterns": {
+    "bp_thorns": 4,
+    "bp_water_moving_ball": 3,
+    "bp_summon_jellycat": 2,
+    "bp_light_targeted": 1,
+    "bp_circle_spreads": 1,
+    "bp_line_spreads_h": 1,
+    "bp_enrage": 1
+   }
+  },
+  "geode_butterfly2": {
+   "telegraph_ms": {
+    "n": 9,
+    "min": 1000,
+    "med": 4000,
+    "max": 4000
+   },
+   "patterns": {
+    "bp_colormatch2": 6,
+    "bp_circle_spreads": 1,
+    "bp_summon_butterfly_4": 1,
+    "bp_light_targeted": 1,
+    "bp_summon_butterfly_0": 1,
+    "bp_enrage": 1
+   }
+  },
+  "geode_firefly0": {
+   "telegraph_ms": {
+    "n": 9,
+    "min": 3000,
+    "med": 3999,
+    "max": 6999
+   },
+   "patterns": {
+    "bp_prscircle": 2,
+    "bp_cleave": 2,
+    "bp_line_spreads_h": 2,
+    "bp_line_spreads_v": 2,
+    "bp_summon_invis": 1,
+    "bp_enrage": 1
+   }
+  },
+  "geode_firefly1": {
+   "telegraph_ms": {
+    "n": 10,
+    "min": 3000,
+    "med": 3000,
+    "max": 4000
+   },
+   "patterns": {
+    "bp_prsline_v": 3,
+    "bp_line_spreads_h": 3,
+    "bp_summon_aurumsword": 2,
+    "bp_line_spreads_v": 2,
+    "bp_enrage": 1
+   }
+  },
+  "geode_firefly2": {
+   "telegraph_ms": {
+    "n": 9,
+    "min": 3000,
+    "med": 3000,
+    "max": 4000
+   },
+   "patterns": {
+    "bp_cleave": 3,
+    "bp_prsline_h": 2,
+    "bp_dark_moon_summon_mult": 1,
+    "bp_line_spreads_v": 1,
+    "bp_prsline_v": 1,
+    "bp_summon_aurumsword": 1,
+    "bp_enrage": 1
+   }
+  },
+  "geode_moth0": {
+   "telegraph_ms": null,
+   "patterns": {
+    "bp_cardinal_r": 2,
+    "bp_cardinal_spinning": 2,
+    "bp_prscircle": 1,
+    "bp_circle_spreads": 1,
+    "bp_enrage": 1,
+    "bp_cleave": 1
+   }
+  },
+  "geode_moth1": {
+   "telegraph_ms": null,
+   "patterns": {
+    "bp_bullet_enlarge_follow_bin": 2,
+    "bp_target_tether": 1,
+    "bp_circle_spreads": 1,
+    "bp_thorns": 1,
+    "bp_prscircle_follow_bin": 1,
+    "bp_enrage": 1
+   }
+  },
+  "geode_moth2": {
+   "telegraph_ms": {
+    "n": 12,
+    "min": 3000,
+    "med": 4000,
+    "max": 6000
+   },
+   "patterns": {
+    "bp_prscircle": 4,
+    "bp_ray_spinfast": 4,
+    "bp_circle_spreads": 1,
+    "bp_angel_circle_mult": 1,
+    "bp_angel_circle": 1,
+    "bp_enrage": 1
+   }
+  },
+  "heart_witch0": {
+   "telegraph_ms": {
+    "n": 47,
+    "min": 2000,
+    "med": 3500,
+    "max": 6000
+   },
+   "patterns": {
+    "bp_angel_circle_follow": 8,
+    "bp_dark2_line": 8,
+    "bp_ray_spinfast": 6,
+    "bp_circle_spreads": 6,
+    "bp_heart_witch1": 4,
+    "bp_cardinal_r": 4,
+    "bp_colormatch": 4,
+    "bp_marching_bullet_repeating": 4,
+    "bp_dark_moon_summon": 3,
+    "bp_line_spreads_h": 3,
+    "bp_heart_witch0_enrage": 2,
+    "bp_cardinal_spinning": 2,
+    "bp_prscircle": 2,
+    "bp_movementcheck": 2,
+    "bp_bullet_enlarge": 2,
+    "bp_heart_witch0_pt4": 1,
+    "bp_heart_witch0_pt3": 1,
+    "bp_heart_witch0_pt2": 1,
+    "bp_enrage_deco": 1,
+    "bp_enrage_single": 1,
+    "bp_tether_fixed": 1,
+    "bp_dark_targeted": 1,
+    "bp_knockback_line": 1,
+    "bp_ray_spinning": 1,
+    "bp_thorns": 1,
+    "bp_line_spreads_v": 1,
+    "bp_ray_multi_slice": 1,
+    "bp_cleave": 1,
+    "bp_prsline_h": 1,
+    "bp_prsline_v": 1
+   }
+  },
+  "heart_witch1": {
+   "telegraph_ms": {
+    "n": 7,
+    "min": 3500,
+    "med": 4000,
+    "max": 6000
+   },
+   "patterns": {
+    "bp_circle_spreads": 10,
+    "bp_heart_witch1_magnus": 4,
+    "bp_dark_moon_summon_mult": 4,
+    "bp_bullet_enlarge_follow_bin": 3,
+    "bp_cleave": 3,
+    "bp_prscircle": 3,
+    "bp_cardinal_spinning": 3,
+    "bp_colormatch2": 3,
+    "bp_dark2_line": 2,
+    "bp_dark_targeted": 2,
+    "bp_dark2_fan": 2,
+    "bp_ray_multi_cascading": 2,
+    "bp_prsline_h": 2,
+    "bp_prsline_v": 2,
+    "bp_ray_spinfast": 2,
+    "bp_bullet_enlarge": 2,
+    "bp_heart_witch1_pt4": 1,
+    "bp_heart_witch1_pt7": 1,
+    "bp_heart_witch1_pt5": 1,
+    "bp_heart_witch1_pt6": 1,
+    "bp_heart_witch1_pt3": 1,
+    "bp_heart_witch1_pt8": 1,
+    "bp_heart_witch1_pt2": 1,
+    "bp_heart_witch1_pt9": 1,
+    "bp_heart_witch1_enrage": 1,
+    "bp_enrage_activate": 1,
+    "bp_heart_witch1_magnus_activate": 1,
+    "bp_dark2_spiral": 1,
+    "bp_angel_circle_follow": 1,
+    "bp_angel_circle_mult": 1,
+    "bp_fieldlimit_rectangle_temporary": 1,
+    "bp_angel_circle": 1,
+    "bp_ray_multi_slice": 1
+   }
+  },
+  "mouse_archer0": {
+   "telegraph_ms": {
+    "n": 8,
+    "min": 2995,
+    "med": 3000,
+    "max": 4000
+   },
+   "patterns": {
+    "bp_prsline_h": 3,
+    "bp_thorns": 1,
+    "bp_circle_spreads": 1,
+    "bp_line_spreads_h": 1,
+    "bp_ray_multi_h": 1,
+    "bp_enrage": 1
+   }
+  },
+  "mouse_archer1": {
+   "telegraph_ms": null,
+   "patterns": {
+    "bp_prsline_h": 2,
+    "bp_heavyextra_temporary": 1,
+    "bp_line_spreads_h": 1,
+    "bp_prsline_h_follow": 1,
+    "bp_enrage": 1
+   }
+  },
+  "mouse_axewielder0": {
+   "telegraph_ms": {
+    "n": 8,
+    "min": 2000,
+    "med": 3000,
+    "max": 3995
+   },
+   "patterns": {
+    "bp_prsline_v": 3,
+    "bp_tether": 1,
+    "bp_circle_spreads": 1,
+    "bp_line_spreads_v": 1,
+    "bp_ray_multi_v": 1,
+    "bp_enrage": 1
+   }
+  },
+  "mouse_axewielder1": {
+   "telegraph_ms": null,
+   "patterns": {
+    "bp_prsline_v": 2,
+    "bp_line_spreads_v": 1,
+    "bp_prsline_v_follow": 1,
+    "bp_enrage": 1
+   }
+  },
+  "mouse_cadet0": {
+   "telegraph_ms": null,
+   "patterns": {
+    "bp_move_position_synced": 1,
+    "bp_light_cross": 1
+   }
+  },
+  "mouse_cadet1": {
+   "telegraph_ms": null,
+   "patterns": {
+    "bp_ray_single": 2,
+    "bp_light_cross": 1,
+    "bp_prsline_v": 1,
+    "bp_prsline_h": 1,
+    "bp_move_position_synced": 1,
+    "bp_enrage": 1
+   }
+  },
+  "mouse_commander0": {
+   "telegraph_ms": {
+    "n": 24,
+    "min": 2500,
+    "med": 3000,
+    "max": 5000
+   },
+   "patterns": {
+    "bp_marching_bullet": 39,
+    "bp_mouse_commander0_painsplit": 5,
+    "bp_circle_spreads": 3,
+    "bp_prsline_h": 3,
+    "bp_colormatch": 3,
+    "bp_mouse_commander0_pt2": 1,
+    "bp_mouse_commander0_pt3": 1,
+    "bp_mouse_commander0_pt4": 1,
+    "bp_mouse_commander0_pt5": 1,
+    "bp_mouse_commander0_pt6": 1,
+    "bp_mouse_commander0_pt7": 1,
+    "bp_fieldlimit_rectangle_temporary": 1,
+    "bp_prscircle_follow_bin": 1,
+    "bp_prsline_v": 1
+   }
+  },
+  "mouse_medic0": {
+   "telegraph_ms": null,
+   "patterns": {
+    "bp_prscircle": 1
+   }
+  },
+  "mouse_medic1": {
+   "telegraph_ms": {
+    "n": 5,
+    "min": 3000,
+    "med": 3998,
+    "max": 4000
+   },
+   "patterns": {
+    "bp_thorns": 2,
+    "bp_move_position_synced": 1,
+    "bp_prscircle": 1,
+    "bp_thorns_fixed": 1,
+    "bp_light_targeted": 1,
+    "bp_enrage": 1
+   }
+  },
+  "mouse_medic2": {
+   "telegraph_ms": {
+    "n": 8,
+    "min": 2999.2,
+    "med": 3500,
+    "max": 4000
+   },
+   "patterns": {
+    "bp_prscircle_follow": 2,
+    "bp_circle_spreads": 2,
+    "bp_colormatch": 2,
+    "bp_heavy": 1,
+    "bp_line_spreads_h": 1,
+    "bp_line_spreads_v": 1,
+    "bp_heavyextra_temporary": 1,
+    "bp_move_position_synced": 1,
+    "bp_enrage": 1
+   }
+  },
+  "mouse_oakspear0": {
+   "telegraph_ms": {
+    "n": 9,
+    "min": 2000,
+    "med": 3000,
+    "max": 3998
+   },
+   "patterns": {
+    "bp_heavy": 2,
+    "bp_tether": 2,
+    "bp_prscircle_follow_bin": 2,
+    "bp_colormatch": 2,
+    "bp_ray_multi_h": 1,
+    "bp_heavyextra_temporary": 1,
+    "bp_line_spreads_h": 1,
+    "bp_line_spreads_v": 1,
+    "bp_enrage": 1
+   }
+  },
+  "mouse_oakspear1": {
+   "telegraph_ms": {
+    "n": 7,
+    "min": 2999,
+    "med": 3000,
+    "max": 3999
+   },
+   "patterns": {
+    "bp_colormatch": 3,
+    "bp_heavyextra": 1,
+    "bp_ray_multi_h": 1,
+    "bp_prsline_v_follow": 1,
+    "bp_bind_v": 1,
+    "bp_circle_spreads": 1,
+    "bp_line_spreads_v": 1,
+    "bp_enrage": 1
+   }
+  },
+  "mouse_paladin0": {
+   "telegraph_ms": {
+    "n": 99,
+    "min": 2000,
+    "med": 3500,
+    "max": 6000
+   },
+   "patterns": {
+    "bp_thorns_fixed": 14,
+    "bp_marching_bullet_repeating": 14,
+    "bp_prscircle": 13,
+    "bp_prsline_h": 10,
+    "bp_circle_spreads": 8,
+    "bp_prsline_v": 8,
+    "bp_light_targeted": 8,
+    "bp_marching_bullet": 7,
+    "bp_thorns": 6,
+    "bp_colormatch": 6,
+    "bp_mouse_paladin1": 5,
+    "bp_knockback_line": 5,
+    "bp_heavy_temporary": 5,
+    "bp_thorns_bin": 5,
+    "bp_prsline_h_follow": 4,
+    "bp_knockback_circle": 3,
+    "bp_mouse_paladin0_enrage": 2,
+    "bp_fieldlimit_rectangle_temporary": 2,
+    "bp_line_spreads_v": 2,
+    "bp_prsline_v_follow": 2,
+    "bp_mouse_paladin0_pt2": 1,
+    "bp_mouse_paladin0_pt3": 1,
+    "bp_enrage_deco": 1,
+    "bp_enrage_single": 1,
+    "bp_ray_multi_v": 1,
+    "bp_ray_multi_h": 1,
+    "bp_line_spreads_h": 1
+   }
+  },
+  "mouse_paladin1": {
+   "telegraph_ms": {
+    "n": 38,
+    "min": 1000,
+    "med": 3500,
+    "max": 7000
+   },
+   "patterns": {
+    "bp_marching_bullet_repeating": 8,
+    "bp_prsline_v": 6,
+    "bp_mouse_paladin1_holyshield": 5,
+    "bp_line_spreads_v": 4,
+    "bp_thorns": 4,
+    "bp_knockback_circle": 3,
+    "bp_line_spreads_h": 3,
+    "bp_ray_multi_v": 3,
+    "bp_prsline_h": 2,
+    "bp_circle_spreads": 2,
+    "bp_thorns_bin": 2,
+    "bp_mouse_paladin1_pt8": 2,
+    "bp_mouse_paladin1_pt2": 1,
+    "bp_mouse_paladin1_enrage_unlock": 1,
+    "bp_mouse_paladin1_pt3": 1,
+    "bp_prscircle": 1,
+    "bp_ray_multi_h": 1,
+    "bp_mouse_paladin1_pt4": 1,
+    "bp_thorns_fixed": 1,
+    "bp_light_targeted": 1,
+    "bp_ray_spinfast": 1,
+    "bp_mouse_paladin1_pt6": 1
+   }
+  },
+  "mouse_rosemage0": {
+   "telegraph_ms": {
+    "n": 41,
+    "min": 500,
+    "med": 4000,
+    "max": 13000
+   },
+   "patterns": {
+    "bp_thorns_fixed": 21,
+    "bp_light_targeted": 13,
+    "bp_thorns": 10,
+    "bp_thorns_bin": 9,
+    "bp_mouse_rosemage0_painsplit": 5,
+    "bp_prscircle": 4,
+    "bp_colormatch": 2,
+    "bp_prsline_v": 2,
+    "bp_mouse_rosemage0_pt2": 1,
+    "bp_mouse_rosemage0_pt3": 1,
+    "bp_mouse_rosemage0_pt4": 1,
+    "bp_mouse_rosemage0_pt5": 1,
+    "bp_mouse_rosemage0_pt6": 1,
+    "bp_mouse_rosemage0_pt7": 1,
+    "bp_fieldlimit_rectangle_temporary": 1,
+    "bp_circle_spreads": 1,
+    "bp_showgroups": 1,
+    "bp_prsline_h": 1,
+    "bp_prscircle_follow_bin": 1
+   }
+  },
+  "queens_axe0": {
+   "telegraph_ms": null,
+   "patterns": {
+    "bp_cleave_enemy": 1,
+    "bp_cleave": 1
+   }
+  },
+  "queens_harp0": {
+   "telegraph_ms": {
+    "n": 3,
+    "min": 3000,
+    "med": 3000,
+    "max": 5000
+   },
+   "patterns": {
+    "bp_circle_spreads": 3,
+    "bp_movementcheck": 2,
+    "bp_colormatch": 2,
+    "bp_ray_spinning_permanent": 1,
+    "bp_tether_enemy": 1
+   }
+  },
+  "queens_knife_l0": {
+   "telegraph_ms": null,
+   "patterns": {
+    "bp_fire2_line_repeating": 3,
+    "bp_knockback_line": 1,
+    "bp_fieldlimit_rectangle_temporary": 1,
+    "bp_prsline_v": 1,
+    "bp_line_spreads_h": 1,
+    "bp_marching_bullet": 1
+   }
+  },
+  "queens_knife_r0": {
+   "telegraph_ms": null,
+   "patterns": {
+    "bp_fire2_line_repeating": 3,
+    "bp_knockback_line": 1,
+    "bp_fieldlimit_rectangle_temporary": 1,
+    "bp_prsline_v": 1,
+    "bp_line_spreads_h": 1,
+    "bp_marching_bullet": 1
+   }
+  },
+  "queens_shield0": {
+   "telegraph_ms": null,
+   "patterns": {
+    "bp_heavy": 1,
+    "bp_prscircle": 1,
+    "bp_cleave_enemy": 1,
+    "bp_knockback_line": 1
+   }
+  },
+  "queens_spear0": {
+   "telegraph_ms": null,
+   "patterns": {
+    "bp_colormatch": 3,
+    "bp_ray_multi_h": 1,
+    "bp_prsline_h": 1
+   }
+  },
+  "queens_staff0": {
+   "telegraph_ms": null,
+   "patterns": {
+    "bp_cardinal_r": 2,
+    "bp_prscircle": 1,
+    "bp_dark_moon_summon_mult": 1,
+    "bp_circle_spreads": 1,
+    "bp_cleave": 1
+   }
+  },
+  "rabbit_queen0": {
+   "telegraph_ms": {
+    "n": 28,
+    "min": 2000,
+    "med": 3500,
+    "max": 5000
+   },
+   "patterns": {
+    "bp_dark_moon_summon_mult": 6,
+    "bp_circle_spreads": 6,
+    "bp_colormatch2": 6,
+    "bp_cardinal_r": 6,
+    "bp_prscircle": 5,
+    "bp_ray_spinfast": 5,
+    "bp_cleave_enemy": 5,
+    "bp_rabbit_queen1": 4,
+    "bp_water_moving_ball": 3,
+    "bp_prsline_h": 3,
+    "bp_rabbit_queen0_enrage": 2,
+    "bp_dark_targeted": 2,
+    "bp_clockspot": 2,
+    "bp_rabbit_queen0_pt2": 1,
+    "bp_rabbit_queen0_pt3": 1,
+    "bp_rabbit_queen0_pt4": 1,
+    "bp_rabbit_queen0_pt6": 1,
+    "bp_rabbit_queen0_pt5": 1,
+    "bp_rabbit_queen0_pt7": 1,
+    "bp_enrage_deco": 1,
+    "bp_enrage_single": 1,
+    "bp_prsline_v": 1,
+    "bp_prscircle_follow_bin": 1,
+    "bp_knockback_circle": 1,
+    "bp_cone_spreads": 1
+   }
+  },
+  "rabbit_queen1": {
+   "telegraph_ms": {
+    "n": 20,
+    "min": 2000,
+    "med": 4000,
+    "max": 4000
+   },
+   "patterns": {
+    "bp_cardinal_r": 11,
+    "bp_circle_spreads": 8,
+    "bp_dark_moon_summon_mult": 6,
+    "bp_rabbit_queen1_steel": 6,
+    "bp_water_moving_ball": 4,
+    "bp_fire2_line_repeating": 4,
+    "bp_cleave_fixed": 3,
+    "bp_prsline_h": 2,
+    "bp_colormatch": 2,
+    "bp_clockspot": 2,
+    "bp_colormatch2": 2,
+    "bp_prsline_v": 2,
+    "bp_marching_bullet_repeating": 2,
+    "bp_rabbit_queen1_pt2": 1,
+    "bp_rabbit_queen1_pt3": 1,
+    "bp_rabbit_queen1_pt4": 1,
+    "bp_rabbit_queen1_pt5": 1,
+    "bp_rabbit_queen1_pt6": 1,
+    "bp_rabbit_queen1_pt7": 1,
+    "bp_rabbit_queen1_pt8": 1,
+    "bp_rabbit_queen1_pt9": 1,
+    "bp_ray_spinfast": 1,
+    "bp_prscircle": 1,
+    "bp_rabbit_queen1_enrage": 1,
+    "bp_knockback_line": 1,
+    "bp_rabbit_queen1_steel_activate": 1
+   }
+  },
+  "sanct_capricorn0": {
+   "telegraph_ms": {
+    "n": 12,
+    "min": 1000,
+    "med": 3000,
+    "max": 4000
+   },
+   "patterns": {
+    "bp_water_moving_ball": 5,
+    "bp_tether": 3,
+    "bp_circle_spreads": 3,
+    "bp_summon_fishpool": 1,
+    "bp_enrage": 1
+   }
+  },
+  "sanct_capricorn1": {
+   "telegraph_ms": {
+    "n": 14,
+    "min": 1000,
+    "med": 4000,
+    "max": 6000
+   },
+   "patterns": {
+    "bp_colormatch2": 8,
+    "bp_line_spreads_h": 2,
+    "bp_summon_fishpool": 1,
+    "bp_prscircle_follow": 1,
+    "bp_line_spreads_v": 1,
+    "bp_enrage": 1
+   }
+  },
+  "sanct_flower0": {
+   "telegraph_ms": {
+    "n": 42,
+    "min": 1000,
+    "med": 3000,
+    "max": 4000
+   },
+   "patterns": {
+    "bp_thorns_fixed": 15,
+    "bp_summon_reset": 8,
+    "bp_tether": 6,
+    "bp_bloom_circle_multicolor": 5,
+    "bp_sanct_flower0_flowershield": 5,
+    "bp_summon_butterfly_0": 4,
+    "bp_summon_butterfly_dialog": 4,
+    "bp_light_targeted": 3,
+    "bp_sanct_flower0_enrage": 2,
+    "bp_summon_butterfly_4": 2,
+    "bp_summon_butterfly_6": 2,
+    "bp_sanct_flower0_pt2": 1,
+    "bp_sanct_flower0_pt3": 1,
+    "bp_sanct_flower0_pt4": 1,
+    "bp_sanct_flower0_pt5": 1,
+    "bp_sanct_flower0_pt6": 1,
+    "bp_sanct_flower0_pt7": 1,
+    "bp_thorns": 1,
+    "bp_summon_butterfly_2": 1,
+    "bp_summon_butterfly_1": 1,
+    "bp_showorder": 1
+   }
+  },
+  "sanct_owl0": {
+   "telegraph_ms": {
+    "n": 27,
+    "min": 1000,
+    "med": 3494,
+    "max": 4000
+   },
+   "patterns": {
+    "bp_colormatch": 7,
+    "bp_circle_spreads": 6,
+    "bp_feathershield": 4,
+    "bp_sanct_owl1": 4,
+    "bp_marching_bullet_repeating": 4,
+    "bp_line_spreads_h": 3,
+    "bp_line_spreads_v": 3,
+    "bp_sanct_owl0_pt2": 2,
+    "bp_summon_fishpool": 2,
+    "bp_summon_jellycat": 2,
+    "bp_thorns": 2,
+    "bp_prscircle_follow_bin": 1,
+    "bp_sanct_owl0_pt3": 1,
+    "bp_movementcheck": 1,
+    "bp_sanct_owl0_pt4": 1,
+    "bp_sanct_owl0_pt5": 1,
+    "bp_bind_v": 1
+   }
+  },
+  "sanct_owl1": {
+   "telegraph_ms": {
+    "n": 44,
+    "min": 1000,
+    "med": 2000,
+    "max": 6000
+   },
+   "patterns": {
+    "bp_bloom_moving_wave_multicolor": 8,
+    "bp_colormatch": 8,
+    "bp_circle_spreads": 5,
+    "bp_pursuit": 4,
+    "bp_sanct_owl_faceoff": 4,
+    "bp_summon_invis": 4,
+    "bp_summon_butterfly_dialog": 4,
+    "bp_marching_bullet": 4,
+    "bp_prscircle_follow_bin": 3,
+    "bp_line_spreads_h": 2,
+    "bp_summon_butterfly_6": 2,
+    "bp_summon_butterfly_5": 2,
+    "bp_sanct_owl1_pt2": 1,
+    "bp_sanct_owl1_pt3": 1,
+    "bp_sanct_owl1_pt4": 1,
+    "bp_sanct_owl1_pt5": 1,
+    "bp_sanct_owl1_pt6": 1,
+    "bp_sanct_owl1_pt7": 1,
+    "bp_sanct_owl1_pt8": 1,
+    "bp_sanct_owl1_pt9": 1,
+    "bp_sanct_owl1_enrage_pt2": 1,
+    "bp_ray_spinfast": 1,
+    "bp_summon_butterfly_3": 1,
+    "bp_summon_butterfly_0": 1
+   }
+  },
+  "sanct_saph0": {
+   "telegraph_ms": {
+    "n": 10,
+    "min": 2,
+    "med": 3000,
+    "max": 4000
+   },
+   "patterns": {
+    "bp_circle_spreads": 3,
+    "bp_target_tether": 2,
+    "bp_water_fan_targeted": 2,
+    "bp_summon_jellycat": 1,
+    "bp_prsline_h_follow": 1,
+    "bp_enrage": 1
+   }
+  },
+  "sanct_saph1": {
+   "telegraph_ms": {
+    "n": 10,
+    "min": 2000,
+    "med": 3000,
+    "max": 4000
+   },
+   "patterns": {
+    "bp_tether": 2,
+    "bp_showgroups": 2,
+    "bp_summon_butterfly_0": 2,
+    "bp_thorns": 2,
+    "bp_angel_circle": 2,
+    "bp_summon_jellycat": 1,
+    "bp_line_spreads_v": 1,
+    "bp_enrage": 1
+   }
+  },
+  "spelllock0": {
+   "telegraph_ms": {
+    "n": 8,
+    "min": 2000,
+    "med": 3000,
+    "max": 4500
+   },
+   "patterns": {
+    "bp_marching_bullet_perm": 4,
+    "bp_fieldlimit_rectangle": 4,
+    "bp_line_spreads_v": 2,
+    "bp_spelllock_bg": 1,
+    "bp_spelllock_appear": 1,
+    "bp_heavy": 1,
+    "bp_tether": 1,
+    "bp_angel_circle_follow": 1
+   }
+  },
+  "spelllock1": {
+   "telegraph_ms": {
+    "n": 13,
+    "min": 4580,
+    "med": 5000,
+    "max": 5000
+   },
+   "patterns": {
+    "bp_thorns_fixed": 4,
+    "bp_prsline_h": 3,
+    "bp_prsline_v": 2,
+    "bp_spelllock_bg": 1,
+    "bp_spelllock_appear": 1,
+    "bp_line_spreads_h": 1,
+    "bp_thorns": 1,
+    "bp_light_targeted": 1,
+    "bp_circle_spreads": 1
+   }
+  },
+  "spelllock2": {
+   "telegraph_ms": {
+    "n": 2,
+    "min": 1000,
+    "med": 3500,
+    "max": 3500
+   },
+   "patterns": {
+    "bp_spelllock_bg": 1,
+    "bp_spelllock_appear": 1,
+    "bp_target_tether": 1,
+    "bp_bullet_enlarge_follow_bin": 1,
+    "bp_cleave_enemy": 1
+   }
+  },
+  "spelllock3": {
+   "telegraph_ms": {
+    "n": 13,
+    "min": 500,
+    "med": 6000,
+    "max": 6000
+   },
+   "patterns": {
+    "bp_cardinal_spinning": 8,
+    "bp_line_spreads_h": 2,
+    "bp_spelllock_bg": 1,
+    "bp_spelllock_appear": 1,
+    "bp_ray_spinning_permanent": 1,
+    "bp_fire_aoe_perm": 1,
+    "bp_circle_spreads": 1
+   }
+  },
+  "spelllock4": {
+   "telegraph_ms": null,
+   "patterns": {
+    "bp_movementcheck": 2,
+    "bp_spelllock_bg": 1,
+    "bp_spelllock_appear": 1,
+    "bp_tether_fixed": 1,
+    "bp_summon_butterfly_4": 1,
+    "bp_summon_butterfly_5": 1
+   }
+  },
+  "toybox1": {
+   "telegraph_ms": null,
+   "patterns": {
+    "bp_dark_targeted": 1
+   }
+  },
+  "toybox3": {
+   "telegraph_ms": null,
+   "patterns": {
+    "bp_summon_butterfly": 1
+   }
+  },
+  "wolf_blackear0": {
+   "telegraph_ms": null,
+   "patterns": {
+    "bp_move_position_synced": 2,
+    "bp_prscircle": 1,
+    "bp_ray_single": 1
+   }
+  },
+  "wolf_blackear1": {
+   "telegraph_ms": {
+    "n": 9,
+    "min": 2000,
+    "med": 3000,
+    "max": 4000
+   },
+   "patterns": {
+    "bp_move_position_synced": 3,
+    "bp_fieldlimit_rectangle_temporary": 2,
+    "bp_prscircle_follow": 2,
+    "bp_circle_spreads": 2,
+    "bp_ray_single": 1,
+    "bp_fieldlimit_rectangle": 1,
+    "bp_cleave_fixed": 1,
+    "bp_prscircle": 1,
+    "bp_prsline_v": 1,
+    "bp_enrage": 1
+   }
+  },
+  "wolf_blackear2": {
+   "telegraph_ms": {
+    "n": 4,
+    "min": 2000,
+    "med": 3000,
+    "max": 3000
+   },
+   "patterns": {
+    "bp_move_position_synced": 4,
+    "bp_ray_single": 2,
+    "bp_tailwind_permanent": 1,
+    "bp_prsline_h_follow": 1,
+    "bp_prsline_v_follow": 1,
+    "bp_circle_spreads": 1,
+    "bp_enrage": 1,
+    "bp_prscircle": 1
+   }
+  },
+  "wolf_bluepaw0": {
+   "telegraph_ms": {
+    "n": 7,
+    "min": 1000,
+    "med": 4000,
+    "max": 4000
+   },
+   "patterns": {
+    "bp_fire2_line_repeating": 4,
+    "bp_knockback_line": 2,
+    "bp_fieldlimit_rectangle": 1,
+    "bp_thorns_bin": 1,
+    "bp_enrage": 1
+   }
+  },
+  "wolf_bluepaw1": {
+   "telegraph_ms": {
+    "n": 11,
+    "min": 1000,
+    "med": 2000,
+    "max": 4000
+   },
+   "patterns": {
+    "bp_fire2_line_repeating": 6,
+    "bp_thorns_fixed": 2,
+    "bp_light_targeted": 2,
+    "bp_fieldlimit_rectangle": 1,
+    "bp_colormatch": 1,
+    "bp_thorns_bin": 1,
+    "bp_enrage": 1
+   }
+  },
+  "wolf_greyeye0": {
+   "telegraph_ms": {
+    "n": 15,
+    "min": 2200,
+    "med": 3500,
+    "max": 7000
+   },
+   "patterns": {
+    "bp_line_spreads_h": 6,
+    "bp_prscircle": 4,
+    "bp_line_spreads_v": 4,
+    "bp_knockback_line": 1,
+    "bp_ray_multi_v": 1,
+    "bp_showgroups": 1,
+    "bp_ray_spinfast": 1,
+    "bp_tailwind_permanent": 1,
+    "bp_prsline_v": 1,
+    "bp_enrage": 1
+   }
+  },
+  "wolf_greyeye1": {
+   "telegraph_ms": {
+    "n": 11,
+    "min": 2999,
+    "med": 4000,
+    "max": 4000
+   },
+   "patterns": {
+    "bp_ray_multi_h": 2,
+    "bp_prscircle_follow_bin": 2,
+    "bp_prscircle_follow": 2,
+    "bp_cleave": 2,
+    "bp_knockback_line": 1,
+    "bp_ray_multi_v": 1,
+    "bp_tailwind_permanent": 1,
+    "bp_circle_spreads": 1,
+    "bp_clockspot": 1,
+    "bp_move_position_synced": 1,
+    "bp_enrage": 1
+   }
+  },
+  "wolf_redclaw0": {
+   "telegraph_ms": {
+    "n": 7,
+    "min": 1000,
+    "med": 3000,
+    "max": 3000
+   },
+   "patterns": {
+    "bp_line_spreads_v": 2,
+    "bp_prsline_h": 2,
+    "bp_fieldlimit_rectangle": 1,
+    "bp_prsline_v_follow": 1,
+    "bp_enrage": 1
+   }
+  },
+  "wolf_redclaw1": {
+   "telegraph_ms": {
+    "n": 2,
+    "min": 1000,
+    "med": 2500,
+    "max": 2500
+   },
+   "patterns": {
+    "bp_fieldlimit_rectangle": 1,
+    "bp_ray_multi_v": 1,
+    "bp_ray_multi_h": 1,
+    "bp_enrage": 1
+   }
+  },
+  "wolf_snowfur0": {
+   "telegraph_ms": {
+    "n": 19,
+    "min": 1000,
+    "med": 3000,
+    "max": 4000
+   },
+   "patterns": {
+    "bp_cleave": 8,
+    "bp_wolf_spawn_teleport": 6,
+    "bp_wolf_spawn_appear": 5,
+    "bp_wolf_spawn_disappear": 5,
+    "bp_prscircle": 4,
+    "bp_cleave_enemy": 4,
+    "bp_circle_spreads": 3,
+    "bp_ray_multi_v": 3,
+    "bp_prscircle_follow_bin": 2,
+    "bp_knockback_line": 2,
+    "bp_colormatch": 2,
+    "bp_wolf_snowfur0_pt2": 1,
+    "bp_wolf_disappear": 1,
+    "bp_wolf_snowfur0_pt3": 1,
+    "bp_wolf_snowfur0_pt4": 1,
+    "bp_wolf_snowfur0_pt5": 1,
+    "bp_wolf_snowfur0_pt6": 1,
+    "bp_wolf_snowfur0_pt7": 1,
+    "bp_cleave_fixed": 1,
+    "bp_showorder": 1,
+    "bp_showgroups": 1
+   }
+  },
+  "wolf_steeltooth0": {
+   "telegraph_ms": {
+    "n": 39,
+    "min": 500,
+    "med": 3500,
+    "max": 7000
+   },
+   "patterns": {
+    "bp_cleave_fixed": 14,
+    "bp_cleave": 7,
+    "bp_wolf_steeltooth1": 5,
+    "bp_knockback_circle": 5,
+    "bp_prscircle_follow": 4,
+    "bp_fieldlimit_rectangle_temporary": 3,
+    "bp_fire2_line_repeating": 3,
+    "bp_wolf_steeltooth0_enrage": 2,
+    "bp_prscircle": 2,
+    "bp_tailwind": 2,
+    "bp_circle_spreads": 2,
+    "bp_prscircle_follow_bin": 2,
+    "bp_clockspot": 2,
+    "bp_wolf_steeltooth0_pt2": 1,
+    "bp_wolf_steeltooth0_pt3": 1,
+    "bp_wolf_steeltooth0_pt4": 1,
+    "bp_enrage_deco": 1,
+    "bp_enrage_single": 1,
+    "bp_prsline_v_follow": 1,
+    "bp_cone_spreads": 1,
+    "bp_knockback_line": 1,
+    "bp_displaynumbers": 1
+   }
+  },
+  "wolf_steeltooth1": {
+   "telegraph_ms": {
+    "n": 59,
+    "min": 50,
+    "med": 850,
+    "max": 7400
+   },
+   "patterns": {
+    "bp_fire2_line_repeating": 22,
+    "bp_ray_multi_slice": 18,
+    "bp_prscircle": 6,
+    "bp_cleave_fixed": 6,
+    "bp_ray_multi_h": 5,
+    "bp_apply_hbs_synced": 4,
+    "bp_wolf_steeltooth_faceoff": 4,
+    "bp_circle_spreads": 4,
+    "bp_colormatch": 4,
+    "bp_wolf_steeltooth1_pt2": 1,
+    "bp_wolf_steeltooth1_pt3": 1,
+    "bp_wolf_steeltooth1_pt6": 1,
+    "bp_wolf_steeltooth1_pt5": 1,
+    "bp_wolf_steeltooth1_pt8": 1,
+    "bp_wolf_steeltooth1_pt7": 1,
+    "bp_wolf_steeltooth1_pt4": 1,
+    "bp_wolf_steeltooth1_pt9": 1,
+    "bp_line_spreads_h": 1,
+    "bp_prsline_h_follow": 1,
+    "bp_fieldlimit_rectangle_temporary": 1,
+    "bp_showorder": 1
+   }
+  }
+ }
+}

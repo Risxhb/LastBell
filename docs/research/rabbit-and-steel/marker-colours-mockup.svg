@@ -1,0 +1,26 @@
+<svg viewBox="0 0 680 410" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif">
+<title>Last Bell friendly marker colours (proposal)</title>
+<rect width="680" height="410" fill="#f4f1ea"/>
+<rect x="10" y="10" width="320" height="330" rx="12" fill="#1b2233"/>
+<rect x="350" y="10" width="320" height="330" rx="12" fill="#1b2233"/>
+<circle cx="170" cy="175" r="140" fill="#2a3348" stroke="#8a7346" stroke-width="2"/>
+<circle cx="510" cy="175" r="140" fill="#2a3348" stroke="#8a7346" stroke-width="2"/>
+<circle cx="170" cy="175" r="16" fill="#b08d4f"/><circle cx="170" cy="175" r="6" fill="#f2c94c"/>
+<circle cx="510" cy="175" r="16" fill="#b08d4f"/><circle cx="510" cy="175" r="6" fill="#f2c94c"/>
+<circle cx="95" cy="120" r="30" fill="#e8734a" fill-opacity="0.35" stroke="#e8734a" stroke-width="2"/>
+<circle cx="250" cy="130" r="30" fill="none" stroke="#e8734a" stroke-width="2" stroke-dasharray="5 4"/>
+<g fill="#e8e2d0"><path d="M95 112 l-8 16 h16 z"/><path d="M250 122 l-8 16 h16 z"/><path d="M110 250 l-8 16 h16 z"/><path d="M235 240 l-8 16 h16 z"/></g>
+<g font-family="Georgia, serif" font-size="15" text-anchor="middle" fill="#1b2233">
+<circle cx="95" cy="96" r="11" fill="#efe7d2"/><text x="95" y="101">I</text>
+<circle cx="250" cy="106" r="11" fill="#efe7d2"/><text x="250" y="111">II</text>
+<circle cx="110" cy="234" r="11" fill="#efe7d2"/><text x="110" y="239">III</text>
+<circle cx="235" cy="224" r="11" fill="#efe7d2"/><text x="235" y="229">IV</text>
+</g>
+<path d="M510 35 A140 140 0 0 0 510 315 Z" fill="#e8734a" fill-opacity="0.3" stroke="#e8734a" stroke-width="2"/>
+<line x1="510" y1="35" x2="510" y2="315" stroke="#e8734a" stroke-width="2"/>
+<g fill="#e8e2d0"><path d="M450 110 l-8 16 h16 z"/><path d="M445 240 l-8 16 h16 z"/><path d="M580 120 l-8 16 h16 z"/><path d="M590 230 l-8 16 h16 z"/></g>
+<g fill="none" stroke-width="3"><circle cx="450" cy="120" r="15" stroke="#d9a441"/><circle cx="445" cy="250" r="15" stroke="#d9a441"/><circle cx="580" cy="130" r="15" stroke="#4f7fd9"/><circle cx="590" cy="240" r="15" stroke="#4f7fd9"/></g>
+<text x="170" y="362" text-anchor="middle" font-size="13" fill="#2c2c2a">Striking Order: ivory numerals, coral rings</text>
+<text x="510" y="362" text-anchor="middle" font-size="13" fill="#2c2c2a">Two Bells: brass team vs cobalt team rims</text>
+<text x="340" y="392" text-anchor="middle" font-size="13" fill="#2c2c2a">Coral = hurts you.  Ivory, brass, cobalt = who you are.  Dashed ring = next to fall.</text>
+</svg>

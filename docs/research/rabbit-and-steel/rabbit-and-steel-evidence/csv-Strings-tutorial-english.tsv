@@ -1,0 +1,13 @@
+tut_movement	AVOID ATTACKS!
+tut_target	CHANGE TARGET
+tut_target2	TARGET CLOSEST
+tut_attack	HOW TO FIGHT
+tut_hitbox	YOUR HITBOX#(JUST THAT DOT!)
+tut_hitbox_e	ENEMY HITBOX#(THIS LARGE CIRCLE)
+tut_primary	PRIMARY ATTACK
+tut_secondary	SECONDARY ATTACK
+tut_offensive	SPECIAL (VERY POWERFUL)
+tut_defensive	DEFENSIVE (AVOID DAMAGE)
+tut_target_main	TARGET MAIN ENEMY
+tut_painshare	DEALING DAMAGE TO SUMMONED ENTITIES
+tut_painshare2	WILL ALSO DAMAGE MAIN ENEMY

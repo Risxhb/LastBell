@@ -1,0 +1,6 @@
+# Decompiled Rabbit and Steel code is local research evidence only. It is derived from the game's
+# binary, so keep it out of the public repo. The summaries (boss-*.json) are fine to keep.
+ghidra-decompiled/
+ghidra-annotated/
+rea-function-*.json
+ghidra-headless.log

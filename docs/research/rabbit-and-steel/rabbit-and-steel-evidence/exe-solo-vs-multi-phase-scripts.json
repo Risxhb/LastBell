@@ -1,0 +1,3641 @@
+{
+ "note": "Phase scripts that have a *_s twin. *_s scripts never call bpsw_2p/plnum/multiplayer and rarely call order/target helpers, so *_s is inferred to be the single-player version.",
+ "summary": {
+  "solo": 191,
+  "soloWithPlayerCountSwitch": 0,
+  "multi": 189,
+  "multiWithPlayerCountSwitch": 58,
+  "soloWithOrder": 24,
+  "multiWithOrder": 131
+ },
+ "rows": [
+  {
+   "script": "bp_aurum_blackcat0_pt2_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 6
+  },
+  {
+   "script": "bp_aurum_blackcat0_pt2",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 8
+  },
+  {
+   "script": "bp_aurum_blackcat0_pt3_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 10
+  },
+  {
+   "script": "bp_aurum_blackcat0_pt3",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 9
+  },
+  {
+   "script": "bp_aurum_blackcat0_pt4_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_aurum_blackcat0_pt4",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 10
+  },
+  {
+   "script": "bp_aurum_blackcat0_pt5_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 6
+  },
+  {
+   "script": "bp_aurum_blackcat0_pt5",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_fillgroups",
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 11
+  },
+  {
+   "script": "bp_aurum_blackcat0_pt6_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 6
+  },
+  {
+   "script": "bp_aurum_blackcat0_pt6",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_aurum_blackcat0_pt7_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 16
+  },
+  {
+   "script": "bp_aurum_blackcat0_pt7",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 17
+  },
+  {
+   "script": "bp_aurum_blackcat1_pt2_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 3
+  },
+  {
+   "script": "bp_aurum_blackcat1_pt2",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_aurum_blackcat1_pt3_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 2
+  },
+  {
+   "script": "bp_aurum_blackcat1_pt3",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_aurum_blackcat1_pt4_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 2
+  },
+  {
+   "script": "bp_aurum_blackcat1_pt4",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_aurum_blackcat1_pt5_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 3
+  },
+  {
+   "script": "bp_aurum_blackcat1_pt5",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 11
+  },
+  {
+   "script": "bp_aurum_ghost0_pt2_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 6
+  },
+  {
+   "script": "bp_aurum_ghost0_pt2",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 10
+  },
+  {
+   "script": "bp_aurum_ghost0_pt3_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 11
+  },
+  {
+   "script": "bp_aurum_ghost0_pt3",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 11
+  },
+  {
+   "script": "bp_aurum_ghost0_pt4_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 14
+  },
+  {
+   "script": "bp_aurum_ghost0_pt4",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 14
+  },
+  {
+   "script": "bp_aurum_ghost0_pt5_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 12
+  },
+  {
+   "script": "bp_aurum_ghost0_pt5",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 14
+  },
+  {
+   "script": "bp_aurum_ghost0_pt6_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 13
+  },
+  {
+   "script": "bp_aurum_ghost0_pt6",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 13
+  },
+  {
+   "script": "bp_aurum_ghost0_pt7_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 13
+  },
+  {
+   "script": "bp_aurum_ghost0_pt7",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 16
+  },
+  {
+   "script": "bp_aurum_ghost0_pt8_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 1
+  },
+  {
+   "script": "bp_aurum_ghost0_pt8",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 1
+  },
+  {
+   "script": "bp_bird_archon0_pt3_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 3
+  },
+  {
+   "script": "bp_bird_archon0_pt3",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 2
+  },
+  {
+   "script": "bp_bird_archon0_pt4_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 5
+  },
+  {
+   "script": "bp_bird_archon0_pt4",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 4
+  },
+  {
+   "script": "bp_bird_archon0_pt5_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 3
+  },
+  {
+   "script": "bp_bird_archon0_pt5",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 3
+  },
+  {
+   "script": "bp_bird_archon0_pt6_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 5
+  },
+  {
+   "script": "bp_bird_archon0_pt6",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 4
+  },
+  {
+   "script": "bp_bird_archon0_pt7_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 2
+  },
+  {
+   "script": "bp_bird_archon0_pt7",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 3
+  },
+  {
+   "script": "bp_bird_valedictorian0_pt2_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 6
+  },
+  {
+   "script": "bp_bird_valedictorian0_pt2",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 5
+  },
+  {
+   "script": "bp_bird_valedictorian0_pt3_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 5
+  },
+  {
+   "script": "bp_bird_valedictorian0_pt3",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 4
+  },
+  {
+   "script": "bp_bird_valedictorian0_pt4_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 5
+  },
+  {
+   "script": "bp_bird_valedictorian0_pt4",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 3
+  },
+  {
+   "script": "bp_bird_valedictorian0_pt5_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 3
+  },
+  {
+   "script": "bp_bird_valedictorian0_pt5",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 3
+  },
+  {
+   "script": "bp_bird_valedictorian0_pt6_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 4
+  },
+  {
+   "script": "bp_bird_valedictorian0_pt6",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_binary",
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 5
+  },
+  {
+   "script": "bp_bird_valedictorian0_pt7_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 4
+  },
+  {
+   "script": "bp_bird_valedictorian0_pt7",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_binary",
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 4
+  },
+  {
+   "script": "bp_bird_valedictorian1_pt2_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 2
+  },
+  {
+   "script": "bp_bird_valedictorian1_pt2",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_binary",
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 4
+  },
+  {
+   "script": "bp_bird_valedictorian1_pt3_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 10
+  },
+  {
+   "script": "bp_bird_valedictorian1_pt3",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_binary",
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 8
+  },
+  {
+   "script": "bp_bird_valedictorian1_pt4_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 3
+  },
+  {
+   "script": "bp_bird_valedictorian1_pt4",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_binary",
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 4
+  },
+  {
+   "script": "bp_bird_valedictorian1_pt5_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 9
+  },
+  {
+   "script": "bp_bird_valedictorian1_pt5",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_bird_valedictorian1_pt6_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 3
+  },
+  {
+   "script": "bp_bird_valedictorian1_pt6",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 2
+  },
+  {
+   "script": "bp_bird_valedictorian1_pt7_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 9
+  },
+  {
+   "script": "bp_bird_valedictorian1_pt7",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 12
+  },
+  {
+   "script": "bp_bird_valedictorian1_pt8_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 6
+  },
+  {
+   "script": "bp_bird_valedictorian1_pt8",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 4
+  },
+  {
+   "script": "bp_bird_valedictorian1_pt9_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 8
+  },
+  {
+   "script": "bp_bird_valedictorian1_pt9",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_binary",
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 9
+  },
+  {
+   "script": "bp_depths_angel0_pt2_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 4
+  },
+  {
+   "script": "bp_depths_angel0_pt2",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 4
+  },
+  {
+   "script": "bp_depths_angel0_pt3_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_depths_angel0_pt3",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 13
+  },
+  {
+   "script": "bp_depths_angel0_pt4_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 5
+  },
+  {
+   "script": "bp_depths_angel0_pt4",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_fourgroups",
+    "scrbp_order_twogroups",
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_depths_angel0_pt5_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 4
+  },
+  {
+   "script": "bp_depths_angel0_pt5",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_depths_angel0_pt6_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 8
+  },
+  {
+   "script": "bp_depths_angel0_pt6",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_chaos",
+    "scrbp_order_fourgroups"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 13
+  },
+  {
+   "script": "bp_depths_angel0_pt7_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_depths_angel0_pt7",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random",
+    "scrbp_order_fourgroups"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 8
+  },
+  {
+   "script": "bp_depths_hound0_pt2_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 10
+  },
+  {
+   "script": "bp_depths_hound0_pt2",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index",
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 12
+  },
+  {
+   "script": "bp_depths_hound0_pt3_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 5
+  },
+  {
+   "script": "bp_depths_hound0_pt3",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 18
+  },
+  {
+   "script": "bp_depths_hound0_pt4_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 6
+  },
+  {
+   "script": "bp_depths_hound0_pt4",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 10
+  },
+  {
+   "script": "bp_depths_hound0_pt5_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 16
+  },
+  {
+   "script": "bp_depths_hound0_pt5",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random",
+    "scrbp_order_save",
+    "scrbp_order_load"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 13
+  },
+  {
+   "script": "bp_depths_hound0_pt6_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 6
+  },
+  {
+   "script": "bp_depths_hound0_pt6",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 9
+  },
+  {
+   "script": "bp_depths_hound0_pt7_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_depths_hound0_pt7",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 8
+  },
+  {
+   "script": "bp_depths_hound1_pt2_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_depths_hound1_pt2",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 5
+  },
+  {
+   "script": "bp_depths_hound1_pt3_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 4
+  },
+  {
+   "script": "bp_depths_hound1_pt3",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 10
+  },
+  {
+   "script": "bp_depths_hound1_pt4_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 2
+  },
+  {
+   "script": "bp_depths_hound1_pt4",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random",
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 10
+  },
+  {
+   "script": "bp_depths_hound1_pt5_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 5
+  },
+  {
+   "script": "bp_depths_hound1_pt5",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 8
+  },
+  {
+   "script": "bp_depths_hound1_pt6_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 10
+  },
+  {
+   "script": "bp_depths_hound1_pt6",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 12
+  },
+  {
+   "script": "bp_depths_hound1_pt7_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 13
+  },
+  {
+   "script": "bp_depths_hound1_pt7",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 16
+  },
+  {
+   "script": "bp_depths_hound1_pt8_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 10
+  },
+  {
+   "script": "bp_depths_hound1_pt8",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random",
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 16
+  },
+  {
+   "script": "bp_depths_hound1_pt9_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 10
+  },
+  {
+   "script": "bp_depths_hound1_pt9",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 12
+  },
+  {
+   "script": "bp_dragon_mythril0_pt2_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 2
+  },
+  {
+   "script": "bp_dragon_mythril0_pt2",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 12
+  },
+  {
+   "script": "bp_dragon_mythril0_pt3_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 23
+  },
+  {
+   "script": "bp_dragon_mythril0_pt3",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index",
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 32
+  },
+  {
+   "script": "bp_dragon_mythril0_pt4_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 6
+  },
+  {
+   "script": "bp_dragon_mythril0_pt4",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 11
+  },
+  {
+   "script": "bp_dragon_mythril0_pt5_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 8
+  },
+  {
+   "script": "bp_dragon_mythril0_pt5",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 17
+  },
+  {
+   "script": "bp_dragon_mythril0_pt6_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 9
+  },
+  {
+   "script": "bp_dragon_mythril0_pt6",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 12
+  },
+  {
+   "script": "bp_dragon_mythril0_pt7_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 5
+  },
+  {
+   "script": "bp_dragon_mythril0_pt7",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 9
+  },
+  {
+   "script": "bp_dragon_mythril0_pt8_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_dragon_mythril0_pt8",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 6
+  },
+  {
+   "script": "bp_dragon_mythril1_pt2_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 1
+  },
+  {
+   "script": "bp_dragon_mythril1_pt2",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index",
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 8
+  },
+  {
+   "script": "bp_dragon_mythril1_pt3_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 12
+  },
+  {
+   "script": "bp_dragon_mythril1_pt3",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random",
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 19
+  },
+  {
+   "script": "bp_dragon_mythril1_pt4_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 3
+  },
+  {
+   "script": "bp_dragon_mythril1_pt4",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 8
+  },
+  {
+   "script": "bp_dragon_mythril1_pt5_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 25
+  },
+  {
+   "script": "bp_dragon_mythril1_pt5",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random",
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 25
+  },
+  {
+   "script": "bp_dragon_mythril1_pt6_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 4
+  },
+  {
+   "script": "bp_dragon_mythril1_pt6",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_dragon_mythril1_pt7_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 32
+  },
+  {
+   "script": "bp_dragon_mythril1_pt7",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 32
+  },
+  {
+   "script": "bp_dragon_mythril1_pt8_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 10
+  },
+  {
+   "script": "bp_dragon_mythril1_pt8",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 13
+  },
+  {
+   "script": "bp_dragon_mythril1_pt9_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 14
+  },
+  {
+   "script": "bp_dragon_mythril1_pt9",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 17
+  },
+  {
+   "script": "bp_dragon_ruby0_pt2_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 5
+  },
+  {
+   "script": "bp_dragon_ruby0_pt2",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 9
+  },
+  {
+   "script": "bp_dragon_ruby0_pt3_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 3
+  },
+  {
+   "script": "bp_dragon_ruby0_pt3",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 6
+  },
+  {
+   "script": "bp_dragon_ruby0_pt4_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 4
+  },
+  {
+   "script": "bp_dragon_ruby0_pt4",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 10
+  },
+  {
+   "script": "bp_dragon_ruby0_pt5_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 5
+  },
+  {
+   "script": "bp_dragon_ruby0_pt5",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 10
+  },
+  {
+   "script": "bp_dragon_ruby0_pt6_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 6
+  },
+  {
+   "script": "bp_dragon_ruby0_pt6",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 8
+  },
+  {
+   "script": "bp_dragon_ruby0_pt7_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 5
+  },
+  {
+   "script": "bp_dragon_ruby0_pt7",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_frog_idol0_pt2_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 8
+  },
+  {
+   "script": "bp_frog_idol0_pt2",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_frog_idol0_pt3_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 6
+  },
+  {
+   "script": "bp_frog_idol0_pt3",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random",
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 9
+  },
+  {
+   "script": "bp_frog_idol0_pt4_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 13
+  },
+  {
+   "script": "bp_frog_idol0_pt4",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random",
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 12
+  },
+  {
+   "script": "bp_frog_idol0_pt5_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 10
+  },
+  {
+   "script": "bp_frog_idol0_pt5",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random",
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 12
+  },
+  {
+   "script": "bp_frog_idol0_pt6_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 8
+  },
+  {
+   "script": "bp_frog_idol0_pt6",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 9
+  },
+  {
+   "script": "bp_frog_idol0_pt7_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 12
+  },
+  {
+   "script": "bp_frog_idol0_pt7",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 14
+  },
+  {
+   "script": "bp_frog_idol1_pt2_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 4
+  },
+  {
+   "script": "bp_frog_idol1_pt2",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 5
+  },
+  {
+   "script": "bp_frog_idol1_pt3_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 14
+  },
+  {
+   "script": "bp_frog_idol1_pt3",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_index",
+    "scrbp_target_different_index"
+   ],
+   "bpatt_add": 15
+  },
+  {
+   "script": "bp_frog_idol1_pt4_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 9
+  },
+  {
+   "script": "bp_frog_idol1_pt4",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 11
+  },
+  {
+   "script": "bp_frog_idol1_pt5_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 12
+  },
+  {
+   "script": "bp_frog_idol1_pt5",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 10
+  },
+  {
+   "script": "bp_frog_idol1_pt6_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 5
+  },
+  {
+   "script": "bp_frog_idol1_pt6",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_frog_idol1_pt7_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_frog_idol1_pt7",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 5
+  },
+  {
+   "script": "bp_frog_idol1_pt8_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_frog_idol1_pt8",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_chaos",
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 8
+  },
+  {
+   "script": "bp_frog_idol1_pt9_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 13
+  },
+  {
+   "script": "bp_frog_idol1_pt9",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random",
+    "scrbp_order_save",
+    "scrbp_order_load"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_binary",
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 9
+  },
+  {
+   "script": "bp_frog_painter0_pt2_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 5
+  },
+  {
+   "script": "bp_frog_painter0_pt2",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random",
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 5
+  },
+  {
+   "script": "bp_frog_painter0_pt3_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 8
+  },
+  {
+   "script": "bp_frog_painter0_pt3",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 8
+  },
+  {
+   "script": "bp_frog_painter0_pt4_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 12
+  },
+  {
+   "script": "bp_frog_painter0_pt4",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 11
+  },
+  {
+   "script": "bp_frog_painter0_pt5_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 10
+  },
+  {
+   "script": "bp_frog_painter0_pt5",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_chaos",
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 14
+  },
+  {
+   "script": "bp_frog_painter0_pt6_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 12
+  },
+  {
+   "script": "bp_frog_painter0_pt6",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 15
+  },
+  {
+   "script": "bp_frog_painter0_pt7_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 6
+  },
+  {
+   "script": "bp_frog_painter0_pt7",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 8
+  },
+  {
+   "script": "bp_heart_witch0_pt2_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 9
+  },
+  {
+   "script": "bp_heart_witch0_pt2",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 12
+  },
+  {
+   "script": "bp_heart_witch0_pt3_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 8
+  },
+  {
+   "script": "bp_heart_witch0_pt3",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 15
+  },
+  {
+   "script": "bp_heart_witch0_pt4_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 3
+  },
+  {
+   "script": "bp_heart_witch0_pt4",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random",
+    "scrbp_order_chaos",
+    "scrbp_order_tethergroups"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 8
+  },
+  {
+   "script": "bp_heart_witch0_pt5_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 6
+  },
+  {
+   "script": "bp_heart_witch0_pt5",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 8
+  },
+  {
+   "script": "bp_heart_witch0_pt6_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 8
+  },
+  {
+   "script": "bp_heart_witch0_pt6",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_fourgroups"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 9
+  },
+  {
+   "script": "bp_heart_witch0_pt7_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 9
+  },
+  {
+   "script": "bp_heart_witch0_pt7",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 12
+  },
+  {
+   "script": "bp_heart_witch1_pt2_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_heart_witch1_pt2",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 6
+  },
+  {
+   "script": "bp_heart_witch1_pt3_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_heart_witch1_pt3",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 8
+  },
+  {
+   "script": "bp_heart_witch1_pt4_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 5
+  },
+  {
+   "script": "bp_heart_witch1_pt4",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 5
+  },
+  {
+   "script": "bp_heart_witch1_pt5_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 5
+  },
+  {
+   "script": "bp_heart_witch1_pt5",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_heart_witch1_pt6_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 10
+  },
+  {
+   "script": "bp_heart_witch1_pt6",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 11
+  },
+  {
+   "script": "bp_heart_witch1_pt7_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_heart_witch1_pt7",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 9
+  },
+  {
+   "script": "bp_heart_witch1_pt8_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 4
+  },
+  {
+   "script": "bp_heart_witch1_pt8",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 5
+  },
+  {
+   "script": "bp_heart_witch1_pt9_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_heart_witch1_pt9",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 6
+  },
+  {
+   "script": "bp_mouse_commander0_pt2_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 6
+  },
+  {
+   "script": "bp_mouse_commander0_pt2",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 6
+  },
+  {
+   "script": "bp_mouse_commander0_pt3_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 6
+  },
+  {
+   "script": "bp_mouse_commander0_pt3",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_mouse_commander0_pt4_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_mouse_commander0_pt4",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_mouse_commander0_pt5_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 13
+  },
+  {
+   "script": "bp_mouse_commander0_pt5",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 13
+  },
+  {
+   "script": "bp_mouse_commander0_pt6_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 10
+  },
+  {
+   "script": "bp_mouse_commander0_pt6",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random",
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 8
+  },
+  {
+   "script": "bp_mouse_commander0_pt7_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 6
+  },
+  {
+   "script": "bp_mouse_commander0_pt7",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 10
+  },
+  {
+   "script": "bp_mouse_paladin0_pt2_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 36
+  },
+  {
+   "script": "bp_mouse_paladin0_pt2",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_tethergroups"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 34
+  },
+  {
+   "script": "bp_mouse_paladin0_pt3_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 12
+  },
+  {
+   "script": "bp_mouse_paladin0_pt3",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 16
+  },
+  {
+   "script": "bp_mouse_paladin0_pt4_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 6
+  },
+  {
+   "script": "bp_mouse_paladin0_pt5_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 14
+  },
+  {
+   "script": "bp_mouse_paladin0_pt5",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 12
+  },
+  {
+   "script": "bp_mouse_paladin0_pt6_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 17
+  },
+  {
+   "script": "bp_mouse_paladin0_pt6",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 22
+  },
+  {
+   "script": "bp_mouse_paladin0_pt7_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 13
+  },
+  {
+   "script": "bp_mouse_paladin0_pt7",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 15
+  },
+  {
+   "script": "bp_mouse_paladin0_pt8_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 23
+  },
+  {
+   "script": "bp_mouse_paladin0_pt8",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 16
+  },
+  {
+   "script": "bp_mouse_paladin1_pt2_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 2
+  },
+  {
+   "script": "bp_mouse_paladin1_pt2",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_tethergroups",
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_binary",
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 2
+  },
+  {
+   "script": "bp_mouse_paladin1_pt3_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 12
+  },
+  {
+   "script": "bp_mouse_paladin1_pt3",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 19
+  },
+  {
+   "script": "bp_mouse_paladin1_pt4_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 2
+  },
+  {
+   "script": "bp_mouse_paladin1_pt4",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 2
+  },
+  {
+   "script": "bp_mouse_paladin1_pt5_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 15
+  },
+  {
+   "script": "bp_mouse_paladin1_pt5",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_tethergroups"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 17
+  },
+  {
+   "script": "bp_mouse_paladin1_pt6_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 2
+  },
+  {
+   "script": "bp_mouse_paladin1_pt6",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random",
+    "scrbp_order_tethergroups"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 2
+  },
+  {
+   "script": "bp_mouse_paladin1_pt7_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 9
+  },
+  {
+   "script": "bp_mouse_paladin1_pt7",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_tethergroups",
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 9
+  },
+  {
+   "script": "bp_mouse_paladin1_pt8_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 2
+  },
+  {
+   "script": "bp_mouse_paladin1_pt8",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 2
+  },
+  {
+   "script": "bp_mouse_paladin1_pt9_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 9
+  },
+  {
+   "script": "bp_mouse_rosemage0_pt2_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 9
+  },
+  {
+   "script": "bp_mouse_rosemage0_pt2",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 10
+  },
+  {
+   "script": "bp_mouse_rosemage0_pt3_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 9
+  },
+  {
+   "script": "bp_mouse_rosemage0_pt3",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_tethergroups",
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 9
+  },
+  {
+   "script": "bp_mouse_rosemage0_pt4_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 6
+  },
+  {
+   "script": "bp_mouse_rosemage0_pt4",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_mouse_rosemage0_pt5_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 13
+  },
+  {
+   "script": "bp_mouse_rosemage0_pt5",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_tethergroups"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 12
+  },
+  {
+   "script": "bp_mouse_rosemage0_pt6_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 15
+  },
+  {
+   "script": "bp_mouse_rosemage0_pt6",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random",
+    "scrbp_order_tethergroups",
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 16
+  },
+  {
+   "script": "bp_mouse_rosemage0_pt7_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 11
+  },
+  {
+   "script": "bp_mouse_rosemage0_pt7",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 12
+  },
+  {
+   "script": "bp_rabbit_queen0_pt2_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 3
+  },
+  {
+   "script": "bp_rabbit_queen0_pt2",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 4
+  },
+  {
+   "script": "bp_rabbit_queen0_pt3_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 5
+  },
+  {
+   "script": "bp_rabbit_queen0_pt3",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_rabbit_queen0_pt4_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 9
+  },
+  {
+   "script": "bp_rabbit_queen0_pt4",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 10
+  },
+  {
+   "script": "bp_rabbit_queen0_pt5_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 6
+  },
+  {
+   "script": "bp_rabbit_queen0_pt5",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 6
+  },
+  {
+   "script": "bp_rabbit_queen0_pt6_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_rabbit_queen0_pt6",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 9
+  },
+  {
+   "script": "bp_rabbit_queen0_pt7_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 21
+  },
+  {
+   "script": "bp_rabbit_queen0_pt7",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 18
+  },
+  {
+   "script": "bp_rabbit_queen1_pt2_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 12
+  },
+  {
+   "script": "bp_rabbit_queen1_pt2",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 10
+  },
+  {
+   "script": "bp_rabbit_queen1_pt3_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 4
+  },
+  {
+   "script": "bp_rabbit_queen1_pt3",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index",
+    "scrbp_target_different_index"
+   ],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_rabbit_queen1_pt4_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 3
+  },
+  {
+   "script": "bp_rabbit_queen1_pt4",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 5
+  },
+  {
+   "script": "bp_rabbit_queen1_pt5_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_rabbit_queen1_pt5",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random",
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 10
+  },
+  {
+   "script": "bp_rabbit_queen1_pt6_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 11
+  },
+  {
+   "script": "bp_rabbit_queen1_pt6",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 8
+  },
+  {
+   "script": "bp_rabbit_queen1_pt7_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_rabbit_queen1_pt7",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 8
+  },
+  {
+   "script": "bp_rabbit_queen1_pt8_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 4
+  },
+  {
+   "script": "bp_rabbit_queen1_pt8",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 5
+  },
+  {
+   "script": "bp_rabbit_queen1_pt9_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 4
+  },
+  {
+   "script": "bp_rabbit_queen1_pt9",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 4
+  },
+  {
+   "script": "bp_sanct_flower0_pt2_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 4
+  },
+  {
+   "script": "bp_sanct_flower0_pt2",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_sanct_flower0_pt3_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 5
+  },
+  {
+   "script": "bp_sanct_flower0_pt3",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 10
+  },
+  {
+   "script": "bp_sanct_flower0_pt4_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 13
+  },
+  {
+   "script": "bp_sanct_flower0_pt4",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random",
+    "scrbp_order_fourgroups",
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 15
+  },
+  {
+   "script": "bp_sanct_flower0_pt5_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 10
+  },
+  {
+   "script": "bp_sanct_flower0_pt5",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_twogroups",
+    "scrbp_order_fourgroups"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 16
+  },
+  {
+   "script": "bp_sanct_flower0_pt6_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 4
+  },
+  {
+   "script": "bp_sanct_flower0_pt6",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 6
+  },
+  {
+   "script": "bp_sanct_flower0_pt7_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_sanct_flower0_pt7",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 8
+  },
+  {
+   "script": "bp_sanct_owl0_pt2_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 5
+  },
+  {
+   "script": "bp_sanct_owl0_pt2",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_fourgroups"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_sanct_owl0_pt3_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 6
+  },
+  {
+   "script": "bp_sanct_owl0_pt3",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_fourgroups",
+    "scrbp_order_twogroups"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 12
+  },
+  {
+   "script": "bp_sanct_owl0_pt4_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_fourgroups"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 6
+  },
+  {
+   "script": "bp_sanct_owl0_pt4",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_fourgroups",
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 11
+  },
+  {
+   "script": "bp_sanct_owl0_pt5_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 5
+  },
+  {
+   "script": "bp_sanct_owl0_pt5",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random",
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 14
+  },
+  {
+   "script": "bp_sanct_owl1_pt2_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_sanct_owl1_pt2",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 8
+  },
+  {
+   "script": "bp_sanct_owl1_pt3_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 3
+  },
+  {
+   "script": "bp_sanct_owl1_pt3",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 3
+  },
+  {
+   "script": "bp_sanct_owl1_pt4_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 6
+  },
+  {
+   "script": "bp_sanct_owl1_pt4",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index",
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 8
+  },
+  {
+   "script": "bp_sanct_owl1_pt5_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 2
+  },
+  {
+   "script": "bp_sanct_owl1_pt5",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random",
+    "scrbp_order_tethergroups"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 4
+  },
+  {
+   "script": "bp_sanct_owl1_pt6_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 6
+  },
+  {
+   "script": "bp_sanct_owl1_pt6",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 10
+  },
+  {
+   "script": "bp_sanct_owl1_pt7_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 2
+  },
+  {
+   "script": "bp_sanct_owl1_pt7",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random",
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 3
+  },
+  {
+   "script": "bp_sanct_owl1_pt8_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 10
+  },
+  {
+   "script": "bp_sanct_owl1_pt8",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 13
+  },
+  {
+   "script": "bp_sanct_owl1_pt9_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 2
+  },
+  {
+   "script": "bp_sanct_owl1_pt9",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_twogroups",
+    "scrbp_order_save",
+    "scrbp_order_chaos",
+    "scrbp_order_load"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_index",
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 4
+  },
+  {
+   "script": "bp_wolf_snowfur0_pt2_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 13
+  },
+  {
+   "script": "bp_wolf_snowfur0_pt2",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 11
+  },
+  {
+   "script": "bp_wolf_snowfur0_pt3_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_wolf_snowfur0_pt3",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 6
+  },
+  {
+   "script": "bp_wolf_snowfur0_pt4_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 5
+  },
+  {
+   "script": "bp_wolf_snowfur0_pt4",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 6
+  },
+  {
+   "script": "bp_wolf_snowfur0_pt5_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 8
+  },
+  {
+   "script": "bp_wolf_snowfur0_pt5",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 9
+  },
+  {
+   "script": "bp_wolf_snowfur0_pt6_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 3
+  },
+  {
+   "script": "bp_wolf_snowfur0_pt6",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_wolf_snowfur0_pt7_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 2
+  },
+  {
+   "script": "bp_wolf_snowfur0_pt7",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 8
+  },
+  {
+   "script": "bp_wolf_steeltooth0_pt2_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_wolf_steeltooth0_pt2",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 13
+  },
+  {
+   "script": "bp_wolf_steeltooth0_pt3_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 10
+  },
+  {
+   "script": "bp_wolf_steeltooth0_pt3",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 12
+  },
+  {
+   "script": "bp_wolf_steeltooth0_pt4_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 5
+  },
+  {
+   "script": "bp_wolf_steeltooth0_pt4",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 6
+  },
+  {
+   "script": "bp_wolf_steeltooth0_pt5_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 8
+  },
+  {
+   "script": "bp_wolf_steeltooth0_pt5",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 9
+  },
+  {
+   "script": "bp_wolf_steeltooth0_pt6_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_wolf_steeltooth0_pt6",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 9
+  },
+  {
+   "script": "bp_wolf_steeltooth0_pt7_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 8
+  },
+  {
+   "script": "bp_wolf_steeltooth0_pt7",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 10
+  },
+  {
+   "script": "bp_wolf_steeltooth0_pt8_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 11
+  },
+  {
+   "script": "bp_wolf_steeltooth0_pt8",
+   "solo": false,
+   "playerCountSwitch": true,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 8
+  },
+  {
+   "script": "bp_wolf_steeltooth1_pt2_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_wolf_steeltooth1_pt2",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [
+    "scrbp_target_random_index",
+    "scrbp_target_random_binary"
+   ],
+   "bpatt_add": 10
+  },
+  {
+   "script": "bp_wolf_steeltooth1_pt3_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 11
+  },
+  {
+   "script": "bp_wolf_steeltooth1_pt3",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 11
+  },
+  {
+   "script": "bp_wolf_steeltooth1_pt4_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 4
+  },
+  {
+   "script": "bp_wolf_steeltooth1_pt4",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_chaos"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 13
+  },
+  {
+   "script": "bp_wolf_steeltooth1_pt5_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 8
+  },
+  {
+   "script": "bp_wolf_steeltooth1_pt5",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 8
+  },
+  {
+   "script": "bp_wolf_steeltooth1_pt6_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 9
+  },
+  {
+   "script": "bp_wolf_steeltooth1_pt6",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 10
+  },
+  {
+   "script": "bp_wolf_steeltooth1_pt7_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 12
+  },
+  {
+   "script": "bp_wolf_steeltooth1_pt7",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [],
+   "bpatt_add": 13
+  },
+  {
+   "script": "bp_wolf_steeltooth1_pt8_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_wolf_steeltooth1_pt8",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 7
+  },
+  {
+   "script": "bp_wolf_steeltooth1_pt9_s",
+   "solo": true,
+   "playerCountSwitch": false,
+   "orderHelpers": [],
+   "targetHelpers": [
+    "scrbp_target_random_index"
+   ],
+   "bpatt_add": 15
+  },
+  {
+   "script": "bp_wolf_steeltooth1_pt9",
+   "solo": false,
+   "playerCountSwitch": false,
+   "orderHelpers": [
+    "scrbp_order_random"
+   ],
+   "targetHelpers": [],
+   "bpatt_add": 16
+  }
+ ]
+}

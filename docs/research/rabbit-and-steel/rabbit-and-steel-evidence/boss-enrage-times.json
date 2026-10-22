@@ -1,0 +1,285 @@
+{
+ "bp_aurum_beast0": [
+  "enrage_time(1.2)"
+ ],
+ "bp_aurum_beast1": [
+  "enrage_time(1.2)"
+ ],
+ "bp_aurum_blackcat0_enrage": [
+  "time(1000)",
+  "time_forever_after(2000)",
+  "time(3000)",
+  "time_repeating(3000,5000)"
+ ],
+ "bp_aurum_blackcat1_enrage": [
+  "time(<expr>)",
+  "time(1500)",
+  "time(7000)",
+  "time_repeating(8000,800)"
+ ],
+ "bp_aurum_whitecat0": [
+  "enrage_time(1.2)"
+ ],
+ "bp_aurum_whitecat1": [
+  "enrage_time(1.2)"
+ ],
+ "bp_bird_sophomore1": [
+  "enrage_time(<expr>)"
+ ],
+ "bp_bird_sophomore2": [
+  "enrage_time(1)"
+ ],
+ "bp_bird_student0": [
+  "enrage_time(1.2)"
+ ],
+ "bp_bird_student1": [
+  "enrage_time(false)"
+ ],
+ "bp_bird_student1_l": [
+  "enrage_time(1.2)"
+ ],
+ "bp_bird_valedictorian0_enrage": [
+  "time(1000)",
+  "time_forever_after(2000)",
+  "time(3000)",
+  "time_repeating(3000,5000)"
+ ],
+ "bp_bird_valedictorian1_enrage": [
+  "time(1000)"
+ ],
+ "bp_bird_whispering0": [
+  "enrage_time(1.2)"
+ ],
+ "bp_bird_whispering1": [
+  "enrage_time(1.2)"
+ ],
+ "bp_depths_basilisk0": [
+  "enrage_time(1.2)"
+ ],
+ "bp_depths_basilisk1": [
+  "enrage_time(1.2)"
+ ],
+ "bp_depths_beast0": [
+  "enrage_time(1.2)"
+ ],
+ "bp_depths_beast0_sl": [
+  "enrage_time(1500)"
+ ],
+ "bp_depths_beast1": [
+  "enrage_time(1.2)"
+ ],
+ "bp_depths_hound0_enrage": [
+  "time(<expr>)",
+  "time_forever_after(2000)",
+  "time(2000)",
+  "time_repeating(2000,5000)",
+  "time_repeating(5000,5000)"
+ ],
+ "bp_depths_hound1_enrage": [
+  "time(<expr>)",
+  "time(2000)",
+  "time(3000)",
+  "time(9000)",
+  "time(10000)",
+  "time(20000)",
+  "time_repeating(21000,800)"
+ ],
+ "bp_dragon_emerald0": [
+  "enrage_time(1.2)"
+ ],
+ "bp_dragon_emerald1": [
+  "enrage_time(1.2)"
+ ],
+ "bp_dragon_gold0": [
+  "enrage_time(0.25)"
+ ],
+ "bp_dragon_gold1": [
+  "enrage_time(false)"
+ ],
+ "bp_dragon_granite1": [
+  "enrage_time(1)"
+ ],
+ "bp_dragon_granite2": [
+  "enrage_time(1)"
+ ],
+ "bp_dragon_mythril0_enrage": [
+  "time(1000)",
+  "time_forever_after(2000)",
+  "time(3000)",
+  "time_repeating(3000,5000)"
+ ],
+ "bp_dragon_mythril1_enrage": [
+  "time(<expr>)",
+  "time(10000)",
+  "time_repeating(10200,6000)",
+  "time_repeating(14000,6000)",
+  "time_repeating(10000,6000)"
+ ],
+ "bp_dragon_silver0": [
+  "enrage_time(false)"
+ ],
+ "bp_dragon_silver1": [
+  "enrage_time(<expr>)"
+ ],
+ "bp_frog_idol0_enrage": [
+  "time(1000)",
+  "time_forever_after(2000)",
+  "time(3000)",
+  "time_repeating(3000,5000)",
+  "time_repeating(5000,5000)"
+ ],
+ "bp_frog_idol1_enrage": [
+  "time(2000)",
+  "time(4000)",
+  "time_repeating(4000,5000)"
+ ],
+ "bp_frog_musician0": [
+  "enrage_time(1.2)"
+ ],
+ "bp_frog_musician1": [
+  "enrage_time(1.2)"
+ ],
+ "bp_frog_seamstress0": [
+  "enrage_time(1.2)"
+ ],
+ "bp_frog_seamstress1_h": [
+  "enrage_time(1.2)"
+ ],
+ "bp_frog_songstress0": [
+  "enrage_time(1.2)"
+ ],
+ "bp_frog_songstress1": [
+  "enrage_time(1.2)"
+ ],
+ "bp_frog_tinkerer1": [
+  "enrage_time(1)"
+ ],
+ "bp_frog_tinkerer2": [
+  "enrage_time(false)"
+ ],
+ "bp_geode_butterfly0": [
+  "enrage_time(1)"
+ ],
+ "bp_geode_butterfly1": [
+  "enrage_time(1)"
+ ],
+ "bp_geode_butterfly2": [
+  "enrage_time(1)"
+ ],
+ "bp_geode_firefly0": [
+  "enrage_time(1)"
+ ],
+ "bp_geode_firefly1": [
+  "enrage_time(1)"
+ ],
+ "bp_geode_firefly2": [
+  "enrage_time(1)"
+ ],
+ "bp_geode_moth0": [
+  "enrage_time(gml_Script_math_deg_to_rad)"
+ ],
+ "bp_geode_moth1": [
+  "enrage_time(false)"
+ ],
+ "bp_geode_moth2": [
+  "enrage_time(1)"
+ ],
+ "bp_heart_witch0_enrage": [
+  "time(<expr>)",
+  "time(3000)",
+  "time_forever_after(2000)",
+  "time_repeating(3000,8000)"
+ ],
+ "bp_heart_witch1_enrage": [
+  "time_repeat_times(19000,d(<expr>/13.4/<expr>),d(4/5/5))"
+ ],
+ "bp_mouse_archer0": [
+  "enrage_time(1.2)"
+ ],
+ "bp_mouse_archer1": [
+  "enrage_time(2000)"
+ ],
+ "bp_mouse_axewielder0": [
+  "enrage_time(1.2)"
+ ],
+ "bp_mouse_axewielder1": [
+  "enrage_time(<expr>)"
+ ],
+ "bp_mouse_cadet1": [
+  "enrage_time(<expr>)"
+ ],
+ "bp_mouse_medic1": [
+  "enrage_time(1)"
+ ],
+ "bp_mouse_medic2": [
+  "enrage_time(1)"
+ ],
+ "bp_mouse_oakspear0": [
+  "enrage_time(1.2)"
+ ],
+ "bp_mouse_oakspear1": [
+  "enrage_time(1.2)"
+ ],
+ "bp_mouse_paladin0_enrage": [
+  "time(<expr>)",
+  "time(1000)",
+  "time_forever_after(2000)",
+  "time_repeating(2000,4000)",
+  "time(3000)",
+  "time_repeating(3000,5000)",
+  "time_repeating(10000,5000)"
+ ],
+ "bp_mouse_paladin1_enrage": [
+  "time(<expr>)",
+  "time(3000)",
+  "time(6000)",
+  "time(8000)"
+ ],
+ "bp_rabbit_queen0_enrage": [
+  "time(3000)",
+  "time_forever_after(2000)",
+  "time_repeating(3000,8000)"
+ ],
+ "bp_sanct_capricorn0": [
+  "enrage_time(1.2)"
+ ],
+ "bp_sanct_capricorn1": [
+  "enrage_time(1.2)"
+ ],
+ "bp_sanct_saph0": [
+  "enrage_time(1.2)"
+ ],
+ "bp_sanct_saph1": [
+  "enrage_time(1.2)"
+ ],
+ "bp_wolf_blackear1": [
+  "enrage_time(1)"
+ ],
+ "bp_wolf_blackear2": [
+  "enrage_time(1)"
+ ],
+ "bp_wolf_bluepaw0": [
+  "enrage_time(1.2)"
+ ],
+ "bp_wolf_bluepaw1": [
+  "enrage_time(1.2)"
+ ],
+ "bp_wolf_greyeye0": [
+  "enrage_time(1.2)"
+ ],
+ "bp_wolf_greyeye1": [
+  "enrage_time(1.2)"
+ ],
+ "bp_wolf_redclaw0": [
+  "enrage_time(1.2)"
+ ],
+ "bp_wolf_redclaw1": [
+  "enrage_time(1.2)"
+ ],
+ "bp_wolf_steeltooth0_enrage": [
+  "time(1000)",
+  "time_forever_after(2000)",
+  "time(3000)",
+  "time_repeating(3000,5000)"
+ ]
+}

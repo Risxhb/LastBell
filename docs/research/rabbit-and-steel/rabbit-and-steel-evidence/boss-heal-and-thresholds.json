@@ -1,0 +1,128 @@
+{
+ "bp_aurum_blackcat0": [
+  "health_threshold(<expr>)"
+ ],
+ "bp_aurum_blackcat0_enrage": [
+  "health_threshold(<expr>)"
+ ],
+ "bp_aurum_blackcat1": [
+  "boss_heal(0.6)"
+ ],
+ "bp_aurum_ghost0_pt2": [
+  "health_threshold(0.1)"
+ ],
+ "bp_aurum_ghost0_pt3": [
+  "boss_heal(1)"
+ ],
+ "bp_aurum_ghost0_pt4": [
+  "health_threshold(0.1)"
+ ],
+ "bp_aurum_ghost0_pt5": [
+  "boss_heal(1)"
+ ],
+ "bp_aurum_ghost0_pt6": [
+  "health_threshold(0.1)"
+ ],
+ "bp_aurum_ghost0_pt7": [
+  "boss_heal(d(0.5/0.6/0.7))"
+ ],
+ "bp_bird_valedictorian0": [
+  "health_threshold(<expr>)"
+ ],
+ "bp_bird_valedictorian0_enrage": [
+  "health_threshold(<expr>)"
+ ],
+ "bp_bird_valedictorian1": [
+  "boss_heal(0.7)"
+ ],
+ "bp_depths_hound0": [
+  "health_threshold(<expr>)"
+ ],
+ "bp_depths_hound0_enrage": [
+  "health_threshold(<expr>)"
+ ],
+ "bp_dragon_mythril0": [
+  "health_threshold(<expr>)"
+ ],
+ "bp_dragon_mythril0_enrage": [
+  "health_threshold(<expr>)"
+ ],
+ "bp_dragon_mythril1": [
+  "boss_heal(0.45)"
+ ],
+ "bp_frog_idol0": [
+  "health_threshold(<expr>)"
+ ],
+ "bp_frog_idol0_enrage": [
+  "health_threshold(<expr>)"
+ ],
+ "bp_frog_idol1": [
+  "boss_heal(0.7)"
+ ],
+ "bp_heart_witch0": [
+  "health_threshold(<expr>)"
+ ],
+ "bp_heart_witch0_enrage": [
+  "health_threshold(<expr>)"
+ ],
+ "bp_heart_witch1": [
+  "boss_heal(<expr>)"
+ ],
+ "bp_mouse_paladin0": [
+  "health_threshold(<expr>)"
+ ],
+ "bp_mouse_paladin0_enrage": [
+  "health_threshold(<expr>)"
+ ],
+ "bp_mouse_paladin1": [
+  "boss_heal(0.65)"
+ ],
+ "bp_mouse_paladin1_pt4": [
+  "boss_heal(-0.05)"
+ ],
+ "bp_mouse_paladin1_pt6": [
+  "boss_heal(-0.05)"
+ ],
+ "bp_mouse_paladin1_pt8": [
+  "boss_heal(-0.05)"
+ ],
+ "bp_mouse_rosemage0_painsplit": [
+  "boss_heal_even()"
+ ],
+ "bp_rabbit_queen0": [
+  "health_threshold(<expr>)"
+ ],
+ "bp_rabbit_queen0_enrage": [
+  "health_threshold(<expr>)"
+ ],
+ "bp_rabbit_queen1": [
+  "boss_heal(<expr>)"
+ ],
+ "bp_sanct_owl0_pt2": [
+  "health_threshold(0.4)"
+ ],
+ "bp_sanct_owl0_pt3": [
+  "health_threshold(0.4)"
+ ],
+ "bp_sanct_owl0_pt4": [
+  "health_threshold(0.4)"
+ ],
+ "bp_sanct_owl0_pt5": [
+  "health_threshold(0.4)"
+ ],
+ "bp_sanct_owl1_pt4": [
+  "boss_heal(-0.03)"
+ ],
+ "bp_sanct_owl1_pt6": [
+  "boss_heal(-0.03)"
+ ],
+ "bp_sanct_owl1_pt8": [
+  "boss_heal(-0.03)"
+ ],
+ "bp_wolf_steeltooth0": [
+  "health_threshold(<expr>)"
+ ],
+ "bp_wolf_steeltooth0_enrage": [
+  "health_threshold(<expr>)"
+ ]
+}

@@ -1,0 +1,111 @@
+variant	max_phase_script	has_solo_s	has_h	has_l	enrage_script_or_trigger	calls_enrage_time	calls_health_threshold	boss_heal	transform	coop_helpers
+aurum_beast0	1	y				y				set_painshare_ratio,order_random
+aurum_beast1	1	y				y				set_painshare_ratio,order_random,order_chaos,2p
+aurum_blackcat0	7	y			y		y			multiplayer,order_random,plnum,target_random_index,2p,order_fillgroups
+aurum_blackcat1	5	y			y			y	y	order_fourgroups,plnum,target_random_index,2p,order_random,teleport_all_order_x,teleport_all_order_y,make_number_warning,teleport_all_order_delayed_x,order_save,order_load,target_random_binary,order_tethergroups
+aurum_ghost0	8	y					y	y		order_random,target_random_index,order_chaos,target_random_binary,plnum
+aurum_whitecat0	1	y				y				2p,order_random
+aurum_whitecat1	1	y				y				order_random,2p
+bird_archon0	7	y	y							order_random,teleport_all_order_x,teleport_all_order_y,teleport_all_set_ext,teleport_all_alternating,teleport_all_random,target_random_binary,order_fourgroups,2p,target_random_index,teleport_all_order_xy
+bird_sophomore0	1									target_random_index
+bird_sophomore1	1	y				y				target_random_index,teleport_all_set_ext
+bird_sophomore2	1	y				y				target_random_index,plnum,target_random_binary,2p
+bird_student0	1	y				y				target_random_binary,plnum,target_random_index,teleport_all_set_ext,order_random
+bird_student1	1	y		y		y				order_twogroups,order_bifurcate,target_random_index
+bird_valedictorian0	7	y	y		y		y			multiplayer,order_random,teleport_all_set_ext,target_random_binary,order_chaos,order_twogroups,teleport_all_order_x,teleport_all_alternating,teleport_all_set,target_random_index
+bird_valedictorian1	9	y	y	y	y			y	y	target_random_binary,target_random_index,make_number_warning,order_random,order_chaos,teleport_all_order_delayed_y,teleport_all_delayed_norandom,teleport_all_delayed,plnum,teleport_all_order_delayed_x
+bird_whispering0	1	y				y				target_random_binary,target_random_index,order_twogroups,order_bifurcate,2p,plnum
+bird_whispering1	1	y				y				target_random_binary,teleport_all_set_ext,target_random_index,order_random,plnum
+depths_angel0	7	y	y							order_random,teleport_all_order_x,2p,target_random_index,order_fourgroups,teleport_all_order_y,order_twogroups,order_chaos,plnum
+depths_basilisk0	1	y				y				
+depths_basilisk1	1	y				y				order_random,target_random_binary
+depths_beast0	1	y		y		y				target_random_index,order_chaos
+depths_beast1	1	y				y				target_random_index,order_chaos,target_random_binary
+depths_hound0	7	y			y		y			multiplayer,target_random_index,target_random_binary,2p,order_random,order_chaos,order_save,order_load
+depths_hound1	9	y			y			y	y	target_random_index,order_chaos,order_random,2p,plnum,target_random_binary
+dragon_emerald0	1	y				y				order_random,target_random_binary,2p
+dragon_emerald1	1	y				y				target_random_index,order_random,plnum,target_random_binary
+dragon_gold0	1	y				y				target_random_index,2p,order_random
+dragon_gold1	1	y				y				target_random_binary
+dragon_granite0	1	y								target_random_binary
+dragon_granite1	1	y				y				target_random_binary
+dragon_granite2	1	y				y				target_random_binary
+dragon_mythril0	8	y			y		y			multiplayer,order_random,2p,target_random_index,target_random_binary,plnum
+dragon_mythril1	9	y			y			y	y	target_random_index,target_random_binary,order_random,order_chaos,2p
+dragon_ruby0	7	y							y	order_random,2p,target_random_index,target_random_binary
+dragon_silver0	1	y				y				target_random_binary,target_random_index
+dragon_silver1	1	y				y				target_random_index,target_random_binary
+frog_idol0	7	y			y		y			multiplayer,order_chaos,target_random_index,order_random,2p
+frog_idol1	9	y	y		y			y	y	2p,order_random,target_random_index,target_different_index,target_random_binary,order_chaos,order_save,order_load
+frog_musician0	1	y				y				target_random_index,order_random
+frog_musician1	1	y				y				order_random
+frog_painter0	7	y		y						order_chaos,order_random,2p
+frog_seamstress0	1	y				y				order_chaos,2p,target_random_binary,order_random
+frog_seamstress1	1	y	y			y				order_random,order_save,2p,plnum
+frog_songstress0	1	y				y				order_random
+frog_songstress1	1	y				y				target_random_index,order_random,plnum
+frog_tinkerer0	1	y								target_random_index,target_random_binary
+frog_tinkerer1	1	y				y				target_random_index,2p,order_random,order_twogroups
+frog_tinkerer2	1	y				y				order_random,2p,target_random_binary
+geode_butterfly0	1	y				y				set_painshare_ratio,target_random_index,order_random
+geode_butterfly1	1	y				y				set_painshare_ratio,2p,order_tethergroups,order_random,order_save,order_load
+geode_butterfly2	1	y				y				set_painshare_ratio,order_fourgroups,order_random
+geode_firefly0	1	y				y				order_random,2p
+geode_firefly1	1	y				y				set_painshare_ratio,target_random_index,order_twogroups,2p
+geode_firefly2	1	y				y				set_painshare_ratio,target_random_index,order_twogroups,2p,order_random
+geode_moth0	1	y				y				order_fourgroups
+geode_moth1	1	y				y				target_random_index,target_random_binary,plnum,order_tethergroups,order_random
+geode_moth2	1	y				y				plnum,order_chaos,order_fourgroups
+heart_witch0	7	y			y		y			multiplayer,order_random,target_random_index,order_chaos,order_tethergroups,2p,target_random_binary,order_fourgroups
+heart_witch1	9	y			y			y	y	target_random_binary,target_random_index,order_random,order_chaos
+mouse_archer0	1	y				y				order_random,plnum
+mouse_archer1	1	y				y				target_random_binary,target_random_index
+mouse_axewielder0	1	y				y				order_random,2p
+mouse_axewielder1	1	y				y				target_random_binary,target_random_index
+mouse_cadet0	1									target_random_index
+mouse_cadet1	1	y				y				target_random_index
+mouse_cadet2	1	y				y				
+mouse_commander0	7	y								order_random,order_chaos,2p
+mouse_medic0	1									
+mouse_medic1	1	y				y				order_random,target_random_index
+mouse_medic2	1	y				y				target_random_index,2p,order_twogroups,order_bifurcate,target_random_binary
+mouse_oakspear0	1	y				y				target_random_index,order_random,plnum,target_random_binary
+mouse_oakspear1	1	y				y				2p,order_random,target_random_index
+mouse_paladin0	8	y		y	y		y			multiplayer,order_tethergroups,bpatt_positions_target_y,order_random,bpatt_positions_target_x,2p,target_random_index
+mouse_paladin1	9	y			y			y	y	bpatt_positions_target_x,bpatt_positions_target_y,target_random_binary,target_random_index,order_tethergroups,order_random,2p
+mouse_rosemage0	7	y						y		order_random,order_tethergroups,2p,order_chaos
+queens_axe0	1	y								order_random,2p
+queens_harp0	1	y								order_random
+queens_shield0	1	y								
+queens_spear0	1	y								target_random_index,order_chaos
+queens_staff0	1	y								target_random_index,order_random
+rabbit_queen0	7	y			y		y			multiplayer,order_random,target_random_binary
+rabbit_queen1	9	y			y			y	y	target_random_index,target_different_index,2p,order_random,order_chaos
+sanct_capricorn0	1	y				y				set_painshare_ratio,order_twogroups,plnum,target_random_binary
+sanct_capricorn1	1	y				y				set_painshare_ratio,order_chaos,target_random_binary,target_random_index,order_fourgroups,plnum
+sanct_flower0	7	y			y					set_painshare_ratio,order_random,plnum,2p,order_fourgroups,order_chaos,order_twogroups,target_random_binary
+sanct_owl0	5	y					y			set_painshare_ratio,plnum,order_fourgroups,target_random_binary,order_chaos,order_twogroups,target_random_index,2p,order_random
+sanct_owl1	9	y			y			y	y	target_random_index,plnum,target_random_binary,order_random,2p,order_tethergroups,order_chaos,order_twogroups,order_save,order_load,set_painshare_ratio
+sanct_saph0	1	y				y				set_painshare_ratio,target_random_binary,target_random_index
+sanct_saph1	1	y				y				set_painshare_ratio,plnum,order_random,target_random_binary
+spelllock0	1	y								order_fourgroups,order_random,2p,target_random_binary
+spelllock1	1	y								teleport_all_order_x,teleport_all_order_y,order_fourgroups,target_random_binary
+spelllock2	1	y								order_random
+spelllock3	1	y								
+spelllock4	1	y								set_painshare_ratio,order_fourgroups
+toybox0	1									
+toybox1	1									target_random_index
+toybox2	1									
+toybox3	1									set_painshare_ratio
+wolf_blackear0	1									
+wolf_blackear1	1	y				y				target_random_index,2p,order_twogroups,order_chaos,plnum
+wolf_blackear2	1	y				y				target_random_index
+wolf_bluepaw0	1	y				y			y	order_random,order_save
+wolf_bluepaw1	1	y				y			y	order_random,order_save
+wolf_greyeye0	1	y				y				target_random_index,order_random,2p
+wolf_greyeye1	1	y				y				bpatt_positions_target_y,target_random_index,order_random
+wolf_redclaw0	1	y				y			y	target_random_index,order_random,order_save
+wolf_redclaw1	1	y				y			y	target_random_index,order_random,order_save
+wolf_snowfur0	7	y			y					order_random,2p
+wolf_steeltooth0	8	y			y		y			multiplayer,target_random_index,order_random,2p
+wolf_steeltooth1	9	y			y			y	y	target_random_index,order_random,target_random_binary,order_chaos

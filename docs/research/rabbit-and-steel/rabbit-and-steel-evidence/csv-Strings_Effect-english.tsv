@@ -1,0 +1,110 @@
+key	level	English
+eff_adventure_ready		GET READY...
+eff_adventure_begin		THE ADVENTURE BEGINS!
+eff_phase_start		PHASE START!
+eff_phase_break		PHASE BREAK!
+eff_once_more		ONCE MORE!
+eff_encounter		STEEL YOURSELF!
+eff_boss_battle		AREA BOSS AHEAD!
+eff_victory		VICTORY!!
+eff_defeat		PARTY DOWNED...
+eff_spelllock		SPELLLOCK
+eff_magnus_attack		MAGNUS ATTACK!!
+eff_reset		reset!!
+eff_proc		proc!
+eff_plus		+1
+eff_failed		failed!
+eff_shield		shielded!
+eff_broken		broken!
+eff_purchased		purchased!
+eff_remaining_health		remaining
+eff_cd_ready		ready!!
+eff_stockplus		stocked!!
+eff_backstab		backstab!!
+eff_toybox_select		selected!
+eff_clear_upgrades		upgrades cleared!
+eff_clear_items		items cleared!
+eff_transformed		transformed!!
+eff_disabled		disabled!!
+eff_level_up		level up!!
+eff_lacking_gold		not enough gold!!
+eff_health_full		health already full!!
+eff_store_opc		one per customer!!
+eff_store_upgrade_held		you have that upgrade!!
+eff_store_upgrade_locked		blocked by magicklock!!
+eff_map_not_host		only the host can change that!!
+eff_unlock_trinket		got trinket!!
+eff_unlock_other		unlocked!!
+eff_unlock_item		(new items will appear in future runs)
+eff_unlock_character		(new rabbit available in character select)
+eff_unlock_music		(new music available in the music room)
+eff_unlock_trinket_desc		(added to your trinket box)
+eff_toybox_inventory_full		inventory full!!
+eff_toybox_unlock		pick in a run to unlock!!
+eff_new_input		new ally!!
+eff_new_player		playerName has joined!!
+eff_loot_skipped		skipped!!
+eff_player_left		left...
+eff_player_ko		knocked out...
+eff_player_revive		revive!!
+eff_dps_report_0		damage dealt: 
+eff_dps_report_1		dps: 
+eff_knockback		pushed!!
+eff_shielded		shielded!!
+eff_teleport		teleported!!
+eff_pullin		pulled!!
+eff_knockback_warning		knockback
+eff_spread_warning		spread out!!
+eff_soak_warning		get in the circle!!
+eff_soak_warning_2		stand together!!
+eff_soak_warning_3		get in the line!!
+eff_aoe_warning		incoming attack!!
+eff_tele_warning		teleporting!!
+eff_moving		moving!!
+eff_pullin_warning		pull in
+eff_colormatch		match colors!!
+eff_colormatch2		follow this color!!
+eff_enrage		defeat your foe!!
+eff_enrage2		Defeat your foe!!
+eff_movement_stop		stop moving!!
+eff_movement_move		keep moving!!
+eff_thorns		stretch the tether!!
+eff_cleave		cleaving one side!!
+eff_steelyourself		defend yourself!!
+eff_numbermatch		match number!!
+eff_enrage_mouse		charName is charging an unavoidable attack!!  Defeat her army to break her shield!!
+eff_enrage_wolf		Time seems to slow...
+eff_enrage_wolf2		You're already gone...
+eff_enrage_rabbit		charName is charging an unavoidable attack!!  Be prepared to defend yourself!
+eff_enrage_interrupt		Interrupted!!
+eff_enrage_sanct		charName provokes the fury of the thorns!
+eff_enrage_depths0		The battlefield edges will deal extra damage!!  Watch out!!
+eff_enrage_depths1		The battlefield edges will instantly KO you!!  Watch out!!
+eff_enrage_depths2		charName is trying to pull you into the depths of hell!!
+netcomm_difficulty		The host set the difficulty to diffAm.
+netcomm_stagefirst		The host set the first destination to the stageName.
+netcomm_stagefirst_rand		The host set a random route.
+netcomm_playerlimit		The host has set a player limit of plNum.
+netcomm_enckey		The host has set the encounter to encKey. (hpAmount HP) (fightNumx)
+netcomm_stagefirst_rand_base		The host set a random route through the Kingdom.
+netcomm_stagefirst_rand_dlc		The host set a random route underground.
+netcomm_stagefirst_rand_true		The host set a random route through random stages.
+netcomm_stagefirst_rand_chaos		The host set a random, chaotic route through random stages.
+neterr_kicked		You were kicked from the lobby.
+neterr_disband		The lobby was disbanded.
+neterr_disconnect		You were disconnected from the lobby.
+neterr_giveup		The host restarted the run.
+neterr_lobbylist_failure		Unable to load lobbies.
+neterr_lobbylist_failure_single		Some lobbies were unable to be shown.
+neterr_lobbycreate		Failed to create lobby.
+neterr_lobbycreate_steam		No connection to Steam.  Failed to create lobby.
+neterr_lobby_already_in		Please leave your current lobby before joining another.
+neterr_lobbyjoin		Unable to join lobby.
+neterr_lobbyjoin_password		Incorrect password.  Unable to join lobby.
+neterr_lobbyjoin_full		That lobby is full.  Unable to join lobby.
+neterr_lobbyjoin_version		Incorrect online version.  Please update your game.
+neterr_lobbyjoin_toolate		Lobby has set off on a run.  Unable to join lobby until they return to character select.
+neterr_mod_error		Steam Workshop Error: errDesc
+modupload_creating		Creating modName Workshop item....
+modupload_updating		Updating modName....  compPercent%
+modupload_infograb		Getting new Workshop item info....

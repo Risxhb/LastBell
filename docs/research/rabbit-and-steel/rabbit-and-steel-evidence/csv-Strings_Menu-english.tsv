@@ -1,0 +1,321 @@
+key	level	English
+menu_back		BACK
+menu_return		RETURN
+menu_on		ON
+menu_off		OFF
+menumain_single_player		STORY MODE
+menumain_multi_player		START RUN
+menumain_demo		DEMO RUN
+menumain_extras		EXTRAS
+menumain_options		OPTIONS
+menumain_quit		QUIT
+menumain_single_player_sub		solve the mystery of the#moonlit city (single player)
+menumain_multi_player_sub		the classic raiding experience
+menuchar_tutorial		SHOW INTRO
+menuchar_difficulty		DIFFICULTY
+menuchar_difficulty_0		CUTE
+menuchar_difficulty_1		NORMAL
+menuchar_difficulty_2		HARD
+menuchar_difficulty_3		LUNAR
+menuchar_difficulty_0_desc		play without significant challenge
+menuchar_difficulty_1_desc		the standard dungeon raiding experience
+menuchar_difficulty_2_desc		enemies must be defeated within the timer
+menuchar_difficulty_3_desc		you'll need to know the fights to survive!
+menuchar_map		PLAN ROUTE
+menuchar_map_0		A route will be taken through the Kingdom at random. 
+menuchar_map_1		The Scholar's Nest will be visited first.
+menuchar_map_2		The King's Arsenal will be visited first.
+menuchar_map_3		The Red Darkhouse will be visited first.
+menuchar_map_4		The Churchmouse Streets will be visited first.
+menuchar_map_5		The Emerald Lakeside will be visited first.
+menuchar_map_6		The Darkhouse Depths will be visited first.
+menuchar_map_7		The Subterra Sanctum will be visited first.
+menuchar_map_8		Atelier Aurum will be visited first.
+menuchar_map_9		A route will be taken through the Extra stages at random. 
+menuchar_map_10		All stages will be mixed at random.
+menuchar_map_11		Enemies and stages will be mixed at random.
+menuchar_map_rand		A route will be taken at random.  (Bonus: start with xNum extra gold)
+menuchar_map_credits		??????
+menuchar_map_dlc_0		The Subterra Sanctum will be visited first.
+menuchar_map_dlc_1		The Darkhouse Depths will be visited first.
+menuchar_map_dlc_2		Atelier Aurum will be visited first.
+menuchar_map_rand_dlc		A route will be taken at random, underground.  (Bonus: start with xNum extra gold)
+menuchar_map_rand_true		A route will be taken at complete random. (All stages included.  Bonus: start with xNum extra gold)
+menuchar_map_rand_chaos		Characters, bosses and stages will be mixed randomly. (Bonus: start with xNum extra gold)
+menuchar_lobby_browse		BROWSE#LOBBIES
+menuchar_lobby_settings		LOBBY
+menuchar_lobby_0		OFFLINE
+menuchar_lobby_1		FRIENDS ONLY
+menuchar_lobby_2		PUBLIC
+menuchar_lobby_3		PRIVATE
+menuchar_lobby_0_desc		only local players
+menuchar_lobby_1_desc		lobby is open to steam friends
+menuchar_lobby_2_desc		lobby is open to everyone
+menuchar_lobby_3_desc		lobby is invite only
+menuchar_lobby_set_password		set password:
+menuchar_lobby_edit		click to edit lobby settings
+menuchar_embark		PREPARE
+menuchar_embark_sub		This will#open your lobby
+menuchar_presstojoin0		press
+menuchar_presstojoin1		to join...
+menuchar_chooseclass		choose your class...
+menuchar_choosecolor		choose your palette...
+menuchar_choosename		enter your name...
+menuchar_network		choosing class...
+menuchar_playernum		player plNum
+menulobby_title		LOBBY SETTINGS
+menulobby_name		name
+menulobby_desc		description
+menulobby_password_disable		no password
+menulobby_password_enable		password locked
+menulobby_playernum1		single player
+menulobby_playernum2		two players
+menulobby_playernum3		three players
+menulobby_playernum4		four players
+menuoptions_graphics		GRAPHICS
+menuoptions_fs_setting		DISPLAY
+menuoptions_fullscreen		FULLSCREEN
+menuoptions_windowed		WINDOWED
+menuoptions_borderlessfullscreen		BORDERLESS#FULLSCREEN
+menuoptions_resolution		RESOLUTION
+menuoptions_resolution_auto		AUTO
+menuoptions_vsync_on		VSYNC ON
+menuoptions_vsync_off		VSYNC OFF
+menuoptions_framerate		FRAMERATE
+menuoptions_framerate_uncapped		UNCAPPED
+menuoptions_apply		APPLY
+menuoptions_discard		DISCARD
+menuoptions_sound		SOUND
+menuoptions_volume_master		MASTER VOLUME
+menuoptions_volume_music		MUSIC VOLUME
+menuoptions_volume_sfx		SFX VOLUME
+menuoptions_other		OTHER
+menuoptions_screenshake_title		SCREENSHAKE
+menuoptions_screenshake		INTENSITY
+menuoptions_screenshake_0		NONE
+menuoptions_screenshake_1		REDUCED
+menuoptions_screenshake_2		NORMAL
+menuoptions_screenshake_network		NETWORK PLAYER#SCREENSHAKE
+menuoptions_framestop		HITSTOP
+menuoptions_charname		CHARACTER NAME DISPLAY
+menuoptions_charname_0		OFF
+menuoptions_charname_1		WHEN OUT#OF BATTLE
+menuoptions_charname_2		ON
+menuoptions_keybind		KEYBINDS/#NAME CHANGE
+menuoptions_language		CHANGE LANGUAGE
+menuoptions_moreoptions		MORE OPTIONS
+menuoptions_ui_alpha		HUD SETTINGS
+menuoptions_ui_alpha_0		ALWAYS#VISIBLE
+menuoptions_ui_alpha_1		ALWAYS SHOW#LOCAL HOTBARS
+menuoptions_ui_alpha_2		HIDE WHEN LOCAL#PLAYERS ARE CLOSE
+menuoptions_ui_alpha_3		HIDE WHEN ANYONE#IS CLOSE
+menuoptions_ui_alpha_4		PERMANENTLY HIDE
+menuoptions_ui_alpha_am		HUD ALPHA#WHEN HIDDEN
+menuoptions_minihb_showhide		SHOW MINI HOTBARS
+menuoptions_minihb_showhide_0		NEVER
+menuoptions_minihb_showhide_1		LOCAL PLAYERS
+menuoptions_minihb_showhide_2		ALWAYS
+menuoptions_minihb_disptype		POSITION
+menuoptions_minihb_disptype_0		ON LEFT
+menuoptions_minihb_disptype_1		ON RIGHT
+menuoptions_minihb_disptype_2		ON BOTTOM
+menuoptions_minihb_disptype_3		CLOSE CIRCLE
+menuoptions_minihb_disptype_4		FAR CIRCLE
+menuoptions_minihb_disptype_5		LEFT CROSS
+menuoptions_minihb_disptype_6		RIGHT CROSS
+menuoptions_minihb_disptype_7		FRONT
+menuoptions_minihb_disptype_8		BACK
+menuoptions_minihb_disptype_9		FRONT CROSS
+menuoptions_minihb_disptype_10		BACK CROSS
+menuoptions_minihb		MINI HOTBAR SETTINGS
+menuoptions_minihb_size		SIZE
+menuoptions_minihb_icon_alpha		ICON ALPHA
+menuoptions_minihb_charge_alpha		CHARGE ALPHA
+menuoptions_stage		BACKGROUND
+menuoptions_stage_darken		DARKEN BG
+menuoptions_stage_darken_1		DURING#BATTLE
+menuoptions_stage_darken_bar		DARKENING
+menuoptions_stage_saturation		SATURATION
+menuoptions_stage_border		SHOW BORDER
+menuoptions_visibility		VISIBILITY OPTIONS
+menuoptions_local_alpha		PLAYER EFFECT#VISIBILITY
+menuoptions_network_alpha		ONLINE EFFECT#VISIBILITY
+menuoptions_network_alpha_important		RAID EFFECT#VISIBILITY
+menuoptions_network_sfx		ONLINE PLAYER#SFX VOLUME
+menuoptions_visiblity_enemy		ENEMY ATTACK COLORS
+menuoptions_visiblity_enemy_0		DEFAULT
+menuoptions_visiblity_enemy_1		SATURATED
+menuoptions_visiblity_enemy_2		STAGE CONTRAST
+menuoptions_visiblity_enemy_3		MAGENTA STANDARD
+menuoptions_visiblity_enemy_4		BRIGHT & WHITE
+menuoptions_sfx_itemproc		ITEM PROC#VOLUME
+menuoptions_sfx_cdreset		CD RESET#VOLUME
+menuoptions_disable_title		DISABLE CONTROLLER TYPES
+menuoptions_disable_ps		PLAYSTATION#CONTROLLERS
+menuoptions_disable_xbox		XBOX#CONTROLLERS
+menuoptions_disable_keyboard		KEYBOARD#CONTROLS
+menuoptions_disable		DISABLE
+menuoptions_enable		ENABLE
+menuoptions_data_reset_story		RESET STORY DATA
+menuoptions_data_reset_story_dlc		RESET EXTRA STORY DATA
+menuoptions_data_reset_unlocks		RESET UNLOCK DATA
+menuoptions_data_reset_desc		HOLD TO RESET
+menuoptions_story_enable		STORY#EVENTS
+menuoptions_handheld_enable		HANDHELD#MODE
+menuoptions_text_size		TEXT SIZE
+menuoptions_text_size_0		NORMAL
+menuoptions_text_size_1		LARGE
+menuextras_credits		CREDITS
+menuextras_unlocks		unlock more!
+menuextras_bosskills		(you have defeated xNum Kingdom bosses#and yNum Extra bosses so far)
+menuextras_collection		COLLECTION
+menuextras_musicroom		MUSIC ROOM
+menuextras_artgallery		ART GALLERY
+menuextras_toybox		TOYBOX
+menuextras_mod_warning0		Warning!
+menuextras_mod_warning1		You have mods enabled!#Items/characters/achievements#will not be unlocked while#gameplay altering mods are active!
+menulanguage_selected		currently selected
+menulanguage_warning		warning:#changing language mid-run will restart the run
+menukey_main_menu		MAIN#MENU
+menukey_reset		RESET CONTROLLERS
+menuinp_none		NONE
+menuinp_up		UP
+menuinp_down		DOWN
+menuinp_left		LEFT
+menuinp_right		RIGHT
+menuinp_focus		CHANGE TARGET
+menuinp_defocus		NEAREST TARGET
+menuinp_primary		PRIMARY
+menuinp_secondary		SECONDARY
+menuinp_offensive		SPECIAL
+menuinp_defensive		DEFENSIVE
+menuinp_centermouse		CENTER#MOUSE
+menuinp_focus2		CHANGE#TARGET
+menuinp_defocus2		NEAREST#TARGET
+menuinp_confirm		CONFIRM
+menuinp_cancel		CANCEL
+menuinp_modifier		LOOT SELECT
+menuinp_modifier2		UPGRADE
+menuinp_npctalk		INTERACT
+menuinp_items		INVENTORY
+menuinp_pause		PAUSE
+menuinp_chat		CHAT/LOG
+menuinp_battle		BATTLE
+menuinp_menu		MENU
+menuinp_defaults		restore defaults
+menuinp_input_buffering		INPUT#BUFFERING
+menuinp_mouse		MOUSE (BATTLE)
+menuinp_mouse_movement		MOUSE#MOVEMENT
+menuinp_mouse_movement_1		DYNAMIC
+menuinp_mouse_movement_2		CLICKS#ONLY
+menuinp_mouse_movement_3		STATIC
+menuinp_mouse_sensitivity		SENSITIVITY
+menuinp_mouse_leftclick		L. CLICK
+menuinp_mouse_middleclick		M. CLICK
+menuinp_mouse_rightclick		R. CLICK
+menuinp_mouse_4click		MOUSE 4
+menuinp_mouse_5click		MOUSE 5
+menuinp_network_connected		CONNECTED...
+menuinp_disconnected		PRESS ANY BUTTON#TO JOIN...
+menuinp_hold_input		HOLD ATTACK#INPUT
+menuinp_controller_vibration		CONTROLLER#VIBRATION
+menugiveup_giveup_run		GIVE UP AND RESTART?
+menugiveup_giveup		RESTART
+menuquit_quit_game		QUIT GAME?
+menuquit_quit		QUIT
+menutitle_return_title		RETURN TO TITLE?
+menutitle_title		TO TITLE
+menuleave_leave_lobby		LEAVE LOBBY?
+menuleave_leave		LEAVE
+menudisband_disband_lobby		DISBAND LOBBY?
+menudisband_disband		DISBAND
+menumidrun_title1		ADVENTURE IN PROGRESS
+menumidrun_title2		BATTLE IN PROGRESS
+menumidrun_continue		CONTINUE
+menumidrun_restart		RESTART
+menumidrun_players		MANAGE PLAYERS
+menumidrun_leave_lobby		LEAVE LOBBY
+menumidrun_disband_lobby		DISBAND LOBBY
+menumidrun_main_menu		RETURN TO TITLE
+menumidrun_new_run		NEW RUN
+menuplayers_remove		select again to remove this rabbit
+menuplayers_remove_cl		select again to kick this client
+menuplayers_remove_ban		select again to prevent this user from rejoining the lobby until you reset the game
+menuplayers_remove_ban_forever		select again to prevent this user from ever joining one of your lobbies again
+menuplayers_remove_no		only hosts can remove other clients
+menuplayers_lobbyhost		lobby host
+menuplayers_spectator		spectating
+menuplayers_singlepl		you can't remove the only party member
+menuplayers_battlewarn		warning: rabbits removed during battle will linger until the end of the fight.
+menuplayers_lootwarn		warning: removing rabbits during loot rolling will skip loot for the remainder of players.
+menuplayers_removed		removed
+menuplayers_banned		banned
+menuplayer_waiting_on_host		please wait...
+menuplayer_failed		failed to remove player, please try again
+menull_public		public lobbies
+menull_friend		friend lobbies
+menull_filter		filter lobbies
+menull_destination		destination
+menull_difficulty		difficulty
+menull_players		minimum players
+menull_openings		minimum openings
+menull_password		password locked
+menull_discord		looking for allies?  join the discord!
+menull_nolobbies		no lobbies found!
+menull_refresh		refresh
+menull_modded		using mods
+menujoin_title		JOIN LOBBY
+menujoin_join		JOIN
+menujoin_password		enter password:
+menujoin_password_hide		hide password
+menujoin_password_show		show password
+menucl_itemsetdesc2		itemSetDesc is found in#chestType0 and chestType1 Treasurespheres.
+menucl_itemsetdesc3		itemSetDesc is found in#chestType0, chestType1 and chestType2 Treasurespheres.
+menucl_itemsettype0		Normal
+menucl_itemsettype1		Opal
+menucl_itemsettype2		Sapphire
+menucl_itemsettype3		Ruby
+menucl_itemsettype4		Garnet
+menucl_itemsettype5		Emerald
+menumr_style		music style
+menumr_waiting		transferring....
+menu_mapdeco_story		story event
+menu_mapdeco_story_dlc_unlock		extra mode story events won't appear#unless the base game's story is completed
+menu_mapdeco_story_clearboss		clear a run to#unlock more story events
+menu_mapdeco_story_disabled		story events are#disabled in options
+menuchar_difficulty_long_0		CUTE DIFFICULTY
+menuchar_difficulty_long_1		NORMAL DIFFICULTY
+menuchar_difficulty_long_2		HARD DIFFICULTY
+menuchar_difficulty_long_3		LUNAR DIFFICULTY
+menumod_title		MODS
+menumod_enable		Enable
+menumod_disable		Disable
+menumod_apply		Apply Changes
+menumod_discard		Discard Changes
+menumod_warning		warning:#changing mods mid-run#will restart the run
+menumod_notice		changing mods is not possible#while you are in a lobby
+menumod_unlock_enable		UNLOCKS/ACHIEVEMENTS
+menumod_sheet_animation		Animation
+menumod_sheet_ally		Ally
+menumod_sheet_enemy		Enemy
+menumod_sheet_item		Item
+menumod_sheet_hbs		Status Effect
+menumod_sheet_encounter		Encounter
+menumod_name		name
+menumod_desc		description
+menumod_changelog		change log
+menumod_thumbnail_info		thumbnail/file cannot be found#please insert a file named##thumbnail.png##into the mod folder#(1MB max size)
+menumod_thumbnail_info_dl		no thumbnail
+menumod_upload		UPLOAD
+menumod_update		UPDATE
+menumod_refresh		REFRESH INFO
+menumod_upload_hold		HOLD TO UPLOAD...
+menumod_update_hold		HOLD TO UPDATE...
+menumod_refresh_hold		HOLD TO REFRESH...
+menumod_link		View on#Steam Workshop...
+menumod_disclaimer		By submitting this item, you agree to the#Steam Workshop Terms of Service (click for details)
+menumod_disclaimer2		You have yet to agree to the#Steam Workshop Terms of Service.#Your item is hidden until you agree (click for details)
+menumod_upload_success		Upload successful!#Click on this to view the item on the Workshop.#You will need to set it to Visible before other's can use it.
+menumod_tag_header		tags
+menumod_enable_all		enable all
+menumod_disable_all		disable all

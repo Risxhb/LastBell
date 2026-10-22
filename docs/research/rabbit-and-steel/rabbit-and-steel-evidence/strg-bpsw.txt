@@ -1,0 +1,8 @@
+bpsw_2p
+bpsw_circlespr_default
+bpsw_conespr_default
+bpsw_d
+bpsw_enrage_time
+bpsw_multiplayer
+bpsw_plnum
+bpsw_story

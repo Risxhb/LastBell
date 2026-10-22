@@ -1,0 +1,161 @@
+{
+ "form": "FORM",
+ "total": 59567448,
+ "chunks": [
+  {
+   "tag": "GEN8",
+   "offset": 8,
+   "size": 224
+  },
+  {
+   "tag": "OPTN",
+   "offset": 240,
+   "size": 120
+  },
+  {
+   "tag": "LANG",
+   "offset": 368,
+   "size": 24
+  },
+  {
+   "tag": "EXTN",
+   "offset": 400,
+   "size": 12136
+  },
+  {
+   "tag": "SOND",
+   "offset": 12544,
+   "size": 13384
+  },
+  {
+   "tag": "AGRP",
+   "offset": 25936,
+   "size": 24
+  },
+  {
+   "tag": "SPRT",
+   "offset": 25968,
+   "size": 66056
+  },
+  {
+   "tag": "BGND",
+   "offset": 92032,
+   "size": 8
+  },
+  {
+   "tag": "PATH",
+   "offset": 92048,
+   "size": 8
+  },
+  {
+   "tag": "SCPT",
+   "offset": 92064,
+   "size": 118296
+  },
+  {
+   "tag": "GLOB",
+   "offset": 210368,
+   "size": 19016
+  },
+  {
+   "tag": "SHDR",
+   "offset": 229392,
+   "size": 12264
+  },
+  {
+   "tag": "FONT",
+   "offset": 241664,
+   "size": 28280
+  },
+  {
+   "tag": "TMLN",
+   "offset": 269952,
+   "size": 8
+  },
+  {
+   "tag": "OBJT",
+   "offset": 269968,
+   "size": 222440
+  },
+  {
+   "tag": "FEDS",
+   "offset": 492416,
+   "size": 8
+  },
+  {
+   "tag": "ACRV",
+   "offset": 492432,
+   "size": 8
+  },
+  {
+   "tag": "SEQN",
+   "offset": 492448,
+   "size": 8
+  },
+  {
+   "tag": "TAGS",
+   "offset": 492464,
+   "size": 40
+  },
+  {
+   "tag": "ROOM",
+   "offset": 492512,
+   "size": 14680
+  },
+  {
+   "tag": "UILR",
+   "offset": 507200,
+   "size": 8
+  },
+  {
+   "tag": "DAFL",
+   "offset": 507216,
+   "size": 8
+  },
+  {
+   "tag": "EMBI",
+   "offset": 507232,
+   "size": 24
+  },
+  {
+   "tag": "PSEM",
+   "offset": 507264,
+   "size": 8
+  },
+  {
+   "tag": "PSYS",
+   "offset": 507280,
+   "size": 8
+  },
+  {
+   "tag": "TPAG",
+   "offset": 507296,
+   "size": 60280
+  },
+  {
+   "tag": "TGIN",
+   "offset": 567584,
+   "size": 3576
+  },
+  {
+   "tag": "FEAT",
+   "offset": 571168,
+   "size": 104
+  },
+  {
+   "tag": "STRG",
+   "offset": 571280,
+   "size": 626536
+  },
+  {
+   "tag": "TXTR",
+   "offset": 1197824,
+   "size": 14080344
+  },
+  {
+   "tag": "AUDO",
+   "offset": 15278176,
+   "size": 44289264
+  }
+ ]
+}

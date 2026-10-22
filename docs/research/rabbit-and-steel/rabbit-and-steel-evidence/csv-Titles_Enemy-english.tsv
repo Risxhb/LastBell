@@ -1,0 +1,146 @@
+key	level	English
+en_training_dummy	0	Training Dummy
+en_training_dummy	1	Training Dummy
+en_bird_sophomore	0	Bella, the Seeker Crow
+en_bird_sophomore	1	Bella
+en_dragon_granite	0	Sohko, the Granite Dragon
+en_dragon_granite	1	Sohko
+en_mouse_cadet	0	Pin, the Blackshield Mouse
+en_mouse_cadet	1	Pin
+en_mouse_medic	0	Elta, the Woodcane Mouse
+en_mouse_medic	1	Elta
+en_wolf_blackear	0	Rem, the Sooteared Wolf
+en_wolf_blackear	1	Rem
+en_frog_tinkerer	0	Maxi, the Crafter Frog
+en_frog_tinkerer	1	Maxi
+en_bird_student	0	Menna, the Studious Crow
+en_bird_student	1	Menna
+en_bird_whispering	0	Azel, the Whispering Crow
+en_bird_whispering	1	Azel
+en_bird_archon	0	Saya, the Archon Crow
+en_bird_archon	1	Saya
+en_bird_valedictorian	0	Twili, the Valedictorian Crow
+en_bird_valedictorian	1	Twili
+en_dragon_ruby	0	Karsi, the Ruby Dragon
+en_dragon_ruby	1	Karsi
+en_dragon_silver	0	Kuu, the Silver Dragon
+en_dragon_silver	1	Kuu
+en_dragon_gold	0	Pi, the Golden Dragon
+en_dragon_gold	1	Pi
+en_dragon_emerald	0	Illie, the Emerald Dragon
+en_dragon_emerald	1	Illie
+en_dragon_mythril	0	Ranalie, the Mythril Dragon
+en_dragon_mythril	1	Ranalie
+en_frog_seamstress	0	Mav, the Seamstress Frog
+en_frog_seamstress	1	Mav
+en_frog_songstress	0	Lette, the Songstress Frog
+en_frog_songstress	1	Lette
+en_frog_musician	0	Jay, the Musician Frog
+en_frog_musician	1	Jay
+en_frog_painter	0	Blush, the Painter Frog
+en_frog_painter	1	Blush
+en_frog_idol	0	Avy, the Starry Frog
+en_frog_idol	1	Avy
+en_wolf_greyeye	0	Mink, the Greyeyed Wolf
+en_wolf_greyeye	1	Mink
+en_wolf_snowfur	0	Tassha, the Snowfur Wolf
+en_wolf_snowfur	1	Tassha
+en_wolf_bluepaw	0	Ran, the Bluepawed Wolf
+en_wolf_bluepaw	1	Ran
+en_wolf_redclaw	0	Xin, the Redclawed Wolf
+en_wolf_redclaw	1	Xin
+en_wolf_steeltooth	0	Merran, the Steeltooth Wolf
+en_wolf_steeltooth	1	Merran
+en_mouse_oakspear	0	Orn, the Oakspear Mouse
+en_mouse_oakspear	1	Orn
+en_mouse_axewielder	0	Aus, the Axewielder Mouse
+en_mouse_axewielder	1	Aus
+en_mouse_archer	0	Nimi, the Archer Mouse
+en_mouse_archer	1	Nimi
+en_mouse_rosemage	0	Meg, the Rosemage Mouse
+en_mouse_rosemage	1	Meg
+en_mouse_commander	0	Varo, the Commander Mouse
+en_mouse_commander	1	Varo
+en_mouse_paladin	0	Matti, the Paladin Mouse
+en_mouse_paladin	1	Matti
+en_queens_staff	0	The Queen's Staff
+en_queens_knife_l	0	The Queen's Left Knife
+en_queens_knife_r	0	The Queen's Right Knife
+en_queens_axe	0	The Queen's Axe
+en_queens_spear	0	The Queen's Spear
+en_queens_shield	0	The Queen's Shield
+en_queens_harp	0	The Queen's Harp
+en_rabbit_queen	0	Rabbit of the Moon, Shira
+en_rabbit_queen	1	Shira
+en_cat_shopkeeper	0	Asha, the Shopkeeper Cat
+en_cat_shopkeeper	1	Asha
+en_toybox_sphere	0	Extremely Large Treasuresphere
+en_toybox_sphere	1	Extremely Large Treasuresphere
+en_toybox_sphere_sm	0	Stubborn Treasuresphere
+en_toybox_sphere_sm	1	Stubborn Treasuresphere
+en_toybox_unknown	0	Mod Error
+en_toybox_unknown	1	Mod Error
+en_geode_butterfly	0	Plee, the Butterfly Fey
+en_geode_butterfly	1	Plee
+en_geode_moth	0	Whit, the Moth Fey
+en_geode_moth	1	Whit
+en_geode_firefly	0	Tap, the Firefly Fey
+en_geode_firefly	1	Tap
+en_depths_basilisk	0	Laiza, the Sly Basilisk
+en_depths_basilisk	1	Laiza
+en_depths_beast	0	Flamebeast Taurus
+en_depths_beast	1	Flamebeast
+en_depths_angel	0	Arinae, the Dying Ember
+en_depths_angel	1	Arinae
+en_depths_hound	0	Farrah, the Witch's Loyal Hound
+en_depths_hound	1	Farrah
+en_sanct_saph	0	Rih, the Sapphire Dragon
+en_sanct_saph	1	Rih
+en_sanct_capricorn	0	Seabeast Capricorn
+en_sanct_capricorn	1	Seabeast
+en_sanct_flower	0	Eternal Bloom
+en_sanct_flower	1	Eternal Bloom
+en_sanct_owl	0	Mell, the Witch's Loyal Messenger
+en_sanct_owl	1	Mell
+en_aurum_whitecat	0	Stella, the Stray Cat
+en_aurum_whitecat	1	Stella
+en_aurum_beast	0	Darkbeast Scorpio
+en_aurum_beast	1	Darkbeast
+en_aurum_ghost	0	Spell Manifest
+en_aurum_ghost	1	Spell Manifest
+en_aurum_blackcat	0	Asha, the Witch's Loyal Familiar
+en_aurum_blackcat	1	Asha
+en_darkhall_spelllock0	0	Spell Lock Tetrahedron
+en_darkhall_spelllock0	1	Spell Lock Tetrahedron
+en_darkhall_spelllock1	0	Spell Lock Hexahedron
+en_darkhall_spelllock1	1	Spell Lock Hexahedron
+en_darkhall_spelllock2	0	Spell Lock Octahedron
+en_darkhall_spelllock2	1	Spell Lock Octahedron
+en_darkhall_spelllock3	0	Spell Lock Dodecahedron
+en_darkhall_spelllock3	1	Spell Lock Dodecahedron
+en_darkhall_spelllock4	0	Spell Lock Icosahedron
+en_darkhall_spelllock4	1	Spell Lock Icosahedron
+en_heart_witch	0	The Witch of Sorrowed Heart
+en_heart_witch	1	The Witch
+en_spawn_butterfly0	0	Spirit Butterfly
+en_spawn_butterfly0	1	Spirit Butterfly
+en_spawn_butterfly1	0	Spirit Butterfly
+en_spawn_butterfly1	1	Spirit Butterfly
+en_spawn_butterfly2	0	Spirit Butterfly
+en_spawn_butterfly2	1	Spirit Butterfly
+en_rabbit_hero	0	Shira, the Hero Rabbit
+en_rabbit_hero	1	Shira
+en_mouse_army0	0	Pin, the Blackshield Mouse
+en_mouse_army0	1	Pin
+en_mouse_army1	0	Elta, the Woodcane Mouse
+en_mouse_army1	1	Elta
+en_mouse_army2	0	Aus, the Axewielder Mouse
+en_mouse_army2	1	Aus
+en_mouse_army3	0	Meg, the Rosemage Mouse
+en_mouse_army3	1	Meg
+en_mouse_army4	0	Nimi, the Archer Mouse
+en_mouse_army4	1	Nimi
+en_mouse_army5	0	Orn, the Oakspear Mouse
+en_mouse_army5	1	Orn
+en_mouse_army6	0	Varo, the Commander Mouse
+en_mouse_army6	1	Varo

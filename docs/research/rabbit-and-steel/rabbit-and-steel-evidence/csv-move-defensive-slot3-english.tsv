@@ -1,0 +1,15 @@
+mv_none_3	???
+mv_wizard_3	Erases projectiles around you, grants brief invulnerability, and places down a magic field that lasts [VAR0_SECONDS].#While standing in the field, g
+mv_assassin_3	[VANISH] from sight for [HBSL] and gain invulnerability and a momentary boost in speed.#Also erases nearby projectiles.
+mv_hblade_3	Grants a brief invulnerability and places down a dark field that lasts [VAR0_SECONDS].#While standing in the field, allies don't take damage.#The fi
+mv_dancer_3	Gain brief invulnerability, and grant all allies [WARCRY] for [HBSL].#Also erases nearby projectiles.
+mv_druid_3	Erases nearby projectiles, and grants self and nearby allies brief invulnerability and [FLUTTERSTEP] for [HBSL].
+mv_spsword_3	Gain brief invulnerability, erase projectiles in a radius around you, and deal [STR] damage to all enemies.#Additionally, applies [HEX] to all enem
+mv_sniper_3	Gain brief invulnerability and a small boost to your movement speed.#[SUPERCHARGES] your Primary.
+mv_bruiser_3	Gain brief invulnerability, jump [VAR0] rabbitleaps in the direction you're moving, and erase projectiles at your destination.#[CHARGES] your Prima
+mv_defender_3	Gain brief invulnerability and a large boost to your movement speed.#After [VAR0_SECONDS], you will stop in place and raise your shield, granting 
+mv_ancient_3	Commands your pet to jump to your side and defend you, erasing projectiles and granting you brief invulnerability.#Restores one usage of your Secon
+mv_hammer_3	Gain brief invulnerability and deal damage [VAR0_TIMES] to your left and right.#Does not have its own damage number, but instead uses your Secondary
+mv_pyro_3	Erase bullets in a radius around you, and gain brief invulnerability and a boost in movement speed.#Additionally, resets your Primary and [CHARGES] it
+mv_gunner_3	Gain brief invulnerability and erase bullets in a radius around you.#Resets your GCD when used.
+mv_shadow_3	Gain brief invulnerability, erase bullets, and deal [STR] damage in a radius around you [VAR0_TIMES].#Activates [SHACKLES].#Unlike most Defensives, 
