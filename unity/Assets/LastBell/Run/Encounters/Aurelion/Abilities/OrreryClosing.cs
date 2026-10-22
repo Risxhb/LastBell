@@ -6,7 +6,7 @@ namespace LastBell.Run
 {
     // 04 Orrery Closing (aurelion.orrery_closing), the signature, brief abilities-v2/04-orrery_closing.md (proposal).
     // Run(horizonTicks) closes the rim ring (8.5 m out from the arena centre, out past the bound) and the crown (3.6 m on
-    // the boss), both locked on the warning's first tick and resolving together 2.3 s later (Easy 2.9 s). Two separate
+    // the boss), both locked on the warning's first tick and resolving together 2.3 s later (Easy 2.9 s, Hard 2.0 s). Two separate
     // Ground instances, 40 damage each, no knockback, 0.25 s stun. It returns on the tick after they resolve.
     // horizonTicks > 0 (Phase 2+: 240, Hard 360) keeps the rim hitting for that long after the resolve (the Horizon,
     // Hazard.ActiveTicks): anyone who steps out is hit once (one hit per instance, so whoever the rim already hit is not
@@ -29,12 +29,15 @@ namespace LastBell.Run
 
         // ticks from Run's first tick to the rim/crown resolve tick (Run itself returns one tick later); the v2.1 plan
         // lines pairs up with it. CONTRACT: keep it equal to the real timing when the windows change.
-        public int Duration() => T(WarnS) - 1;
+        public int Duration() => Warn() - 1;
+        // the warning: 2.3 s, Easy 2.9 s, Hard x0.7 held at the 2.0 s floor (ABILITIES-v2.1.md §2)
+        public const float HardFloorS = 2.0f;
+        public int Warn() => Win(WarnS, HardFloorS);
 
         public IEnumerable<int> Run(int horizonTicks)
         {
             Say(Name);
-            int warn = T(WarnS);
+            int warn = Warn();
             LastHorizon = Mathf.Max(0, horizonTicks);
             Clip("MeridianAlignment", warn);
             var rim = Spawn(new Hazard

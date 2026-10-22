@@ -91,19 +91,24 @@ namespace LastBell.Run
         string OcHitsText(PlayerController p) { var hs = V2HitsOn(p).ToList(); return hs.Count == 0 ? "no hits" : string.Join(", ", hs.Select(h => $"{h.Source} @{h.Tick} ({h.Damage})")); }
 
         // check 2: the worst case. A player 13.5 m out behind a boss standing 6 m out reacts after 0.25 s and comes round
-        // his crown onto the safe floor (inside 8.2 m, outside 3.9 m of him): 7.96 m.
+        // his crown onto the safe floor (inside 8.2 m, outside 3.9 m of him): 7.96 m. Hard (2.0 s window, v2.1 §2): a sprint
+        // (9 m/s) or a 4.2 m/s walk with one dash.
         IEnumerator OcEscape()
         {
             var start = new Vector3(0, 0, -13.5f); var boss = new Vector3(0, 0, -6); var safe = new Vector3(4.3f, 0, -6.8f);
-            foreach (var (speed, dash, required) in new[] { (4.2f, true, true), (6f, false, true), (4.2f, false, false) })
+            foreach (var (level, speed, dash, sprint, required) in new[]
             {
-                yield return V2Setup(1, Difficulty.Medium, new[] { start }, 1, boss);
+                (Difficulty.Medium, 4.2f, true, false, true), (Difficulty.Medium, 6f, false, false, true), (Difficulty.Medium, 4.2f, false, false, false),
+                (Difficulty.Hard, 6f, false, true, true), (Difficulty.Hard, 4.2f, true, false, true),
+            })
+            {
+                yield return V2Setup(1, level, new[] { start }, 1, boss);
                 if (V2Boss == null) yield break;
                 var p = V2Party[0]; var inp = V2In(p);
                 float stamina0 = p.Stamina;
                 V2Begin(V2Boss.Closing.Run(0));
                 yield return V2Ticks(Sim.Ticks(0.25f));
-                inp.Go(safe, speed);
+                inp.Go(safe, speed); inp.Sprint = sprint;   // sprint: full stick at 6 m/s input runs at SprintSpeed (9 m/s)
                 if (dash) { yield return V2Ticks(1); inp.Dash(); }
                 int arrived = -1;
                 var w = V2W; float t = 0;
@@ -113,8 +118,9 @@ namespace LastBell.Run
                 int resolveTick = crown != null ? V2Spawned(OcCrown).First().Tick + crown.ResolveAt - 1 : -1;
                 bool hit = V2WasHit(p, "Orrery Closing");
                 string detail = $"route {Sim.Flat(safe - start).magnitude:0.00} m, arrived tick {arrived}, resolve {resolveTick}, margin {(arrived > 0 ? (resolveTick - arrived) * Sim.Dt : -1):0.00} s, stamina {stamina0:0}->{p.Stamina:0}; {OcHitsText(p)}";
-                string name = $"13.5 m behind a boss 6 m out: {speed} m/s walk{(dash ? " + one dash" : " only")}, reacting after 0.25 s, is not hit";
-                if (required) V2Check(name, !hit && arrived > 0 && (!dash || p.Stamina < stamina0), detail);
+                string move = sprint ? "sprint (9 m/s)" : $"{speed} m/s walk{(dash ? " + one dash" : " only")}";
+                string name = $"{level}: 13.5 m behind a boss 6 m out: {move}, reacting after 0.25 s, is not hit";
+                if (required) V2Check(name, !hit && arrived > 0 && (!dash && !sprint || p.Stamina < stamina0), detail);
                 else Note($"(info, the brief needs a dash at 4.2 m/s) {name}: {(hit ? "hit" : "not hit")}; {detail}");
                 inp.Stop();
             }
@@ -133,9 +139,11 @@ namespace LastBell.Run
             V2Begin(c.Run(horizon));
             yield return Until(() => V2Spawned(OcRim).Any(), 5, "Orrery Closing rim spawned");
             var rs = V2Spawned(OcRim).FirstOrDefault(); if (rs == null) yield break;
-            int warn = Sim.Ticks(OrreryClosing.WarnS * (level == Difficulty.Easy ? 1.25f : 1f));
-            V2Check($"{level}: warning {(level == Difficulty.Easy ? "2.9 s (x1.25)" : "2.3 s")}", rs.H.ResolveAt == warn, $"resolve at {rs.H.ResolveAt}, want {warn}");
+            // Medium 2.3 s, Easy x1.25 = 2.9 s, Hard x0.7 = 1.61 s held at the 2.0 s floor (v2.1 §2)
+            int warn = level == Difficulty.Easy ? Sim.Ticks(OrreryClosing.WarnS * 1.25f) : level == Difficulty.Hard ? Sim.Ticks(OrreryClosing.HardFloorS) : Sim.Ticks(OrreryClosing.WarnS);
+            V2Check($"{level}: warning {(level == Difficulty.Easy ? "2.9 s (x1.25)" : level == Difficulty.Hard ? "2.0 s (the floor)" : "2.3 s")}", rs.H.ResolveAt == warn && rs.H.LockAt == 0, $"resolve at {rs.H.ResolveAt}, want {warn}");
             int resolveTick = rs.Tick + rs.H.ResolveAt - 1, spentTick = -1;
+            V2Check($"{level}: Duration() is the resolve offset from Run's first tick", c.Duration() == resolveTick - rs.Tick && c.Duration() == warn - 1, $"Duration {c.Duration()}, resolve offset {resolveTick - rs.Tick}");
             rs.H.OnSpent += h => spentTick = V2W.Tick;
             yield return V2WaitIdle(10);
             V2Check($"{level}: the Horizon is live once Run returns", c.HorizonLive, $"tick {V2W.Tick}, resolve {resolveTick}");
