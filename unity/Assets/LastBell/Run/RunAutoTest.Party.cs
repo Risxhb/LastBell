@@ -4,8 +4,8 @@ using UnityEngine;
 
 namespace LastBell.Run
 {
-    // Bot allies (RunParty, menu "Allies"): a party of 8 spawns with the classes spread, the boss's HP scales with the
-    // party, and the bots fight and dodge on their own while the test player only dodges.
+    // Bot allies (RunParty, menu "Allies"): a party of 8 spawns with the classes spread; the bots are passive (they move,
+    // dodge and spread but never attack), so the boss keeps its solo HP and takes no damage from them.
     public sealed partial class RunAutoTest
     {
         static bool PartyOnly => System.Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellPartyOnly", System.StringComparison.OrdinalIgnoreCase));
@@ -31,11 +31,11 @@ namespace LastBell.Run
             Check("allies: the first allies are the classes the player didn't pick", d.Allies[0].ClassName == "Vanguard" && d.Allies[1].ClassName == "Chimesinger");
             d.RequestReady();
             yield return Until(() => d.State == RunState.Combat, 4, "party practice combat");
-            Check("allies: boss HP scales with the party (x 5.9 at 8 players)", d.Boss && Mathf.Abs(d.Boss.MaxHp - soloHp * 5.9f) <= 2, $"solo {soloHp}, party {d.Boss?.MaxHp}");
+            Check("allies: passive bots don't raise the boss's HP (only fighting players count)", d.Boss && d.Boss.MaxHp == soloHp, $"solo {soloHp}, party {d.Boss?.MaxHp}");
             int hp0 = d.Boss.Hp, dealt0 = d.World.DamageDealt;
-            // the test player only walks away and dodges; any boss damage comes from the bots
+            // the test player only walks away and dodges, and the bots only do the mechanics: nobody damages the boss
             yield return Survive(14f);
-            Check("allies: the bots damage the boss on their own", d.World.DamageDealt > dealt0 && (d.Boss == null || d.Boss.Hp < hp0), $"dealt {d.World.DamageDealt - dealt0}");
+            Check("allies: the bots never attack (mechanics only)", d.World.DamageDealt == dealt0 && d.Boss.Hp == hp0, $"dealt {d.World.DamageDealt - dealt0}");
             int standing = d.Allies.Count(a => a && !a.Down);
             Note($"allies after 14 s with the Bellkeeper: {standing} of 7 standing, HP " + string.Join(" ", d.Allies.Select(a => a.ClassName[0] + ":" + a.Hp)));
             Check("allies: most bots survive 14 s (they dodge)", standing >= 4, standing + " of 7");

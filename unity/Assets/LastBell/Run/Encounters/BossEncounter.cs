@@ -37,8 +37,9 @@ namespace LastBell.Run
             go.transform.SetParent(w.Root, false);
             go.transform.SetPositionAndRotation(pos, Quaternion.Euler(0, yaw, 0));
             var b = go.AddComponent<T>(); b.W = w;
-            // co-op HP: 1 + 0.7 x (players - 1), the packets' provisional formula until the Bellkeeper D6 decides
-            float party = 1 + 0.7f * Mathf.Max(0, w.Players.Count - 1);
+            // co-op HP: 1 + 0.7 x (fighting players - 1), the packets' provisional formula until the Bellkeeper D6 decides.
+            int fighters = 0; foreach (var p in w.Players) if (!(p.Input is AllyBot) || AllyBot.Attacks) fighters++;   // passive bots don't count
+            float party = 1 + 0.7f * Mathf.Max(0, fighters - 1);
             if (TestHpScale != 1 || party != 1) b.MaxHp = Mathf.Max(1, Mathf.RoundToInt(b.MaxHp * TestHpScale * party));
             b.Hp = b.MaxHp; b.Build();
             return b;
