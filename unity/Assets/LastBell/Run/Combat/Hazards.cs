@@ -100,6 +100,7 @@ namespace LastBell.Run
         public IReadOnlyList<Hazard> Live => live;
         public int Resolved { get; private set; }
         public HazardSystem(CombatWorld world) { w = world; }
+        public event Action<Hazard> Spawned;   // tests record exact spawn ticks
 
         static readonly Color JumpFill = new Color(0.30f, 0.85f, 0.95f), JumpBorder = new Color(0.55f, 1.6f, 1.8f);
         static readonly Color SlagFill = new Color(0.95f, 0.36f, 0.08f), SlagBorder = new Color(2.4f, 1.2f, 0.35f);
@@ -122,6 +123,7 @@ namespace LastBell.Run
             h.Tele.Place(h.Origin, h.Yaw);
             if (h.LockAt <= 0) h.Tele.Lock();
             live.Add(h);
+            Spawned?.Invoke(h);
             return h;
         }
 
