@@ -31,6 +31,7 @@ Material:
     - _HalfAngle: 40
     - _Inner: 1
     - _Lock: 0
+    - _Memory: 0
     - _Progress: 0
     - _Radius: 2
     - _Shape: 0

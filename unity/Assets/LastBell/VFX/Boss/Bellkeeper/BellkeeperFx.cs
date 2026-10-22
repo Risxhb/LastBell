@@ -63,7 +63,7 @@ namespace LastBell.VFX
         public sealed class Telegraph
         {
             internal GameObject go; internal MeshRenderer mr; internal MaterialPropertyBlock mpb = new MaterialPropertyBlock();
-            internal float flash = -1, lockFlash;
+            internal float flash = -1, lockFlash, maxFade = 1;
             internal bool locked;
             public void Place(Vector3 origin, float yaw) { go.transform.SetPositionAndRotation(new Vector3(origin.x, Floor, origin.z), Quaternion.Euler(0, yaw, 0)); }
             public void Progress(float p) { mpb.SetFloat(PProgress, Mathf.Clamp01(p)); }
@@ -71,8 +71,13 @@ namespace LastBell.VFX
             public void Resolve() { flash = 0; }
             public void Cancel() { if (flash < 0) flash = 0.1f; }   // fade out without the resolve flash
             public void Tint(Color fill, Color border) { mpb.SetColor(PFill, fill); mpb.SetColor(PBorder, border); }
+            // Unfinished Hour inactive outline: dashed, unfilled, low contrast. Presentation only, never resolves.
+            public void Memory() { mpb.SetFloat(PMemory, 1); Tint(new Color(0.35f, 0.38f, 0.45f), new Color(0.95f, 0.9f, 0.78f)); maxFade = 0.55f; }
+            // removed without a resolve flash (the memory turning into its live warning, or being erased)
+            public void Dismiss() { if (flash < 0) flash = 0.2f; }
         }
-        static readonly int PFill = Shader.PropertyToID("_ColorFill"), PBorder = Shader.PropertyToID("_ColorBorder");
+        static readonly int PFill = Shader.PropertyToID("_ColorFill"), PBorder = Shader.PropertyToID("_ColorBorder"),
+            PMemory = Shader.PropertyToID("_Memory");
 
         Telegraph NewTelegraph(int shape, float radius, float inner, float half, Mesh quad)
         {
@@ -114,7 +119,7 @@ namespace LastBell.VFX
             {
                 var t = telegraphs[i];
                 float fade = t.mpb.GetFloat(PFade);
-                if (t.flash < 0) fade = Mathf.MoveTowards(fade, 1, dt / 0.08f);
+                if (t.flash < 0) fade = Mathf.MoveTowards(fade, t.maxFade, dt / 0.08f);
                 t.lockFlash = Mathf.MoveTowards(t.lockFlash, 0, dt / 0.25f);
                 t.mpb.SetFloat(PLock, t.locked ? 0.5f + t.lockFlash : 0);
                 if (t.flash >= 0)

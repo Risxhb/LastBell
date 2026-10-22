@@ -21,6 +21,7 @@ Shader "LastBell/FX/Telegraph"
         [HDR] _ColorFlash ("Resolve (amber/white)", Color) = (3.0, 2.2, 1.3, 1)
         _ColorInk ("Deep Ink", Color) = (0.063, 0.094, 0.145, 1)
         _Border ("Border width (m)", Float) = 0.09
+        _Memory ("Inactive memory outline (dashed, unfilled)", Range(0, 1)) = 0
     }
     SubShader
     {
@@ -33,7 +34,7 @@ Shader "LastBell/FX/Telegraph"
             #pragma vertex vert
             #pragma fragment frag
             #include "UnityCG.cginc"
-            float _Shape, _Radius, _Inner, _HalfAngle, _Progress, _Lock, _Flash, _Fade, _Border;
+            float _Shape, _Radius, _Inner, _HalfAngle, _Progress, _Lock, _Flash, _Fade, _Border, _Memory;
             float4 _ColorFill, _ColorBorder, _ColorFlash, _ColorInk;
             struct appdata { float4 vertex : POSITION; };
             struct v2f { float4 pos : SV_POSITION; float2 p : TEXCOORD0; float3 world : TEXCOORD1; };
@@ -86,6 +87,9 @@ Shader "LastBell/FX/Telegraph"
                 float3 fill = lerp(_ColorInk.rgb, _ColorFill.rgb, 0.6 + 0.3 * timed + 0.08 * hatch);
                 float fillA = 0.40 + 0.22 * timed + 0.05 * hatch + 0.18 * ident;
                 fill += _ColorFill.rgb * ident * 0.6;
+                // Unfinished Hour memory (Bellkeeper spec v0.3 §3.1): no fill, a broken border, never read as live
+                fillA *= 1 - 0.9 * _Memory;
+                border *= lerp(1, step(0.5, frac((i.world.x - i.world.z) * 1.6)), _Memory);
                 float3 col = lerp(fill, _ColorBorder.rgb * (1 + 0.8 * _Lock), border);
                 float a = lerp(fillA, 0.95, border);
                 col = lerp(col, _ColorFlash.rgb, _Flash); a = lerp(a, 0.85, _Flash);
