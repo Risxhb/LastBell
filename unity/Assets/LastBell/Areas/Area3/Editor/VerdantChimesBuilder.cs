@@ -36,6 +36,9 @@ namespace LastBell.Areas.Area3.EditorTools
             Build(); EditorSceneManager.OpenScene(ScenePath);
         }
 
+        // glTFast renames repeated sibling names (FallLip, FallLip_1, ...), so match the base name plus an optional suffix
+        static bool IsNode(Transform t, string name) => t.name == name || System.Text.RegularExpressions.Regex.IsMatch(t.name, "^" + name + @"[_ ]\(?\d+\)?$");
+
         static Color Hex(uint rgb, float k = 1) => new Color(((rgb >> 16) & 255) / 255f * k, ((rgb >> 8) & 255) / 255f * k, (rgb & 255) / 255f * k);
 
         public static void Build()
@@ -197,7 +200,7 @@ namespace LastBell.Areas.Area3.EditorTools
             var m = new Material(Shader.Find("LastBell/Area3/GlowBillboard")); m.SetColor("_Color", Hex(0xffb868) * 1.6f); m.SetFloat("_Size", 1.9f);
             m = SaveAsset(m, "LanternGlow.mat");
             var quad = Resources.GetBuiltinResource<Mesh>("Quad.fbx");
-            foreach (var t in root.GetComponentsInChildren<Transform>(true).Where(t => t.name == "Lantern").ToArray())
+            foreach (var t in root.GetComponentsInChildren<Transform>(true).Where(t => IsNode(t, "Lantern")).ToArray())
             {
                 var g = new GameObject("Glow"); g.transform.SetParent(t, false);
                 g.AddComponent<MeshFilter>().sharedMesh = quad; var mr = g.AddComponent<MeshRenderer>(); mr.sharedMaterial = m;
@@ -209,7 +212,7 @@ namespace LastBell.Areas.Area3.EditorTools
         static void AddLights(Transform root)
         {
             var parent = new GameObject("Lights").transform; parent.SetParent(root.parent, false);
-            var lanterns = root.GetComponentsInChildren<Transform>(true).Where(t => t.name == "Lantern").OrderBy(t => t.position.magnitude).Take(4);
+            var lanterns = root.GetComponentsInChildren<Transform>(true).Where(t => IsNode(t, "Lantern")).OrderBy(t => t.position.magnitude).Take(4);
             foreach (var t in lanterns)
             {
                 var l = new GameObject("Lantern Light").AddComponent<Light>(); l.type = LightType.Point; l.color = Hex(0xffb466); l.intensity = 2.2f; l.range = 7;
@@ -225,7 +228,7 @@ namespace LastBell.Areas.Area3.EditorTools
         {
             var sheets = root.GetComponentsInChildren<Renderer>(true).Where(r => r.sharedMaterial && r.sharedMaterial.shader.name == "LastBell/Area3/Waterfall").ToList();
             var falls = new List<Fall>();
-            foreach (var lip in root.GetComponentsInChildren<Transform>(true).Where(t => t.name == "FallLip"))
+            foreach (var lip in root.GetComponentsInChildren<Transform>(true).Where(t => IsNode(t, "FallLip")))
             {
                 var p = lip.position; Renderer best = null; float bd = 8;
                 foreach (var s in sheets) { var c = s.bounds.center; float d = new Vector2(c.x - p.x, c.z - p.z).magnitude; if (d < bd && Mathf.Abs(s.bounds.max.y - p.y) < 3) { bd = d; best = s; } }
@@ -309,7 +312,7 @@ namespace LastBell.Areas.Area3.EditorTools
             foreach (var f in falls)
             {
                 for (int i = 0; i < 30; i++) spray.Add((f.lip + f.side * (Rn() - 0.5f) * f.width + Vector3.down * Rn() * 0.6f, f.outward * (0.6f + Rn()) + f.side * (Rn() - 0.5f) * 0.6f, 1.6f + Rn() * 1.8f, new Color(0.9f, 0.98f, 0.96f, 0.45f), none));
-                for (int i = 0; i < 40; i++) glints.Add((f.lip + f.side * (Rn() - 0.5f) * f.width * 0.85f + f.outward * 0.7f, f.outward, 0.7f + Rn() * 0.5f, new Color(1, 1, 1, 1f), new Vector2(f.height, f.arc)));
+                int gn = 12 + (int)(Rn() * 18); for (int i = 0; i < gn; i++) glints.Add((f.lip + f.side * (Rn() - 0.5f) * f.width * 0.85f + f.outward * 0.7f, f.outward, 0.3f + Rn() * 0.25f, new Color(1, 1, 1, 1f), new Vector2(f.height, f.arc)));
                 var hit = f.lip + f.outward * f.arc + Vector3.down * f.height;
                 if (imp.Count < 24) imp.Add(new Vector4(hit.x, hit.z, hit.y, f.width));
                 for (int i = 0; i < 48; i++) rising.Add((new Vector3(hit.x, Mathf.Max(hit.y, -30) + Rn() * 3, hit.z) + f.side * (Rn() - 0.5f) * f.width + f.outward * (Rn() - 0.3f) * 3, Vector3.up, 0.6f + Rn() * 0.5f, new Color(0.2f, 0.78f, 0.72f, 0.75f), none));
@@ -318,7 +321,7 @@ namespace LastBell.Areas.Area3.EditorTools
             Field(parent, "Spray", Mat("SprayField", 2, false), spray, rnd);
             var gm = Mat("GlintsField", 3, true); gm.renderQueue = 3010; Field(parent, "Glints", gm, glints, rnd);
             Field(parent, "RisingMist", Mat("RisingMistField", 4, false), rising, rnd);
-            var lanterns = root.GetComponentsInChildren<Transform>(true).Where(t => t.name == "Lantern").Select(t => t.position).ToList();
+            var lanterns = root.GetComponentsInChildren<Transform>(true).Where(t => IsNode(t, "Lantern")).Select(t => t.position).ToList();
             var motes = new List<(Vector3, Vector3, float, Color, Vector2)>();
             for (int i = 0; i < 300; i++)
             {
@@ -329,7 +332,7 @@ namespace LastBell.Areas.Area3.EditorTools
             }
             Field(parent, "Motes", Mat("MotesField", 0, true), motes, rnd);
             var petals = new List<(Vector3, Vector3, float, Color, Vector2)>();
-            for (int i = 0; i < 160; i++) petals.Add((new Vector3((Rn() - 0.5f) * 60, 12 + Rn() * 4, (Rn() - 0.5f) * 50), Vector3.up, 0.09f + Rn() * 0.06f, new Color(0.97f, 0.95f, 0.9f, 0.85f), none));
+            for (int i = 0; i < 260; i++) petals.Add((new Vector3((Rn() - 0.5f) * 60, 12 + Rn() * 4, (Rn() - 0.5f) * 50), Vector3.up, 0.16f + Rn() * 0.1f, new Color(0.97f, 0.95f, 0.9f, 0.85f), none));
             Field(parent, "Petals", Mat("PetalsField", 1, false), petals, rnd);
             // cloud cards around the bases of everything tall outside the arena that reaches down into the cloud sea
             var cards = new List<(Vector3, Vector3, float, Color, Vector2)>();
@@ -434,6 +437,8 @@ namespace LastBell.Areas.Area3.EditorTools
                 driver.SetView(VerdantChimesArena.View.Top); Capture(Path.Combine(shots, "unity-top.png"));
                 var cam = Camera.main; cam.fieldOfView = 45; cam.transform.position = new Vector3(-46, 12, -40); cam.transform.LookAt(new Vector3(8, -14, 24)); // low, across the towers into the mist
                 for (int k = 0; k < 4; k++) { driver.timeOverride = 20 + k * 0.5f; driver.Tick(1); Capture(Path.Combine(shots, $"unity-cloud-t{k}.png")); } // t = 0, 0.5, 1.0, 1.5 s
+                cam.transform.position = new Vector3(-21, -2, -14); cam.transform.LookAt(new Vector3(-12, -9, -12)); cam.fieldOfView = 50;
+                for (int k = 0; k < 4; k++) { driver.timeOverride = 20 + k * 0.5f; driver.Tick(1); Capture(Path.Combine(shots, $"unity-falls-t{k}.png")); }
                 Object.FindFirstObjectByType<LookSettingsApplier>().Apply(); driver.timeOverride = 20; driver.Tick(1);
                 // readability: quiet on, a coral hostile telegraph, a teal friendly ring, eight player capsules
                 var test = ReviewProps(); driver.quiet = true; driver.Tick(1);

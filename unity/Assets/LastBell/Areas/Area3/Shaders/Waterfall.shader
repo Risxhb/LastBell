@@ -46,13 +46,13 @@ Shader "LastBell/Area3/Waterfall"
                 // flow coordinate in metres travelled: world height scrolled at the flow speed, slightly faster lower down
                 float flow = i.w.y + t * _LB_FlowSpeed * (1 + fall * 0.35) + _Seed * 13.1;
                 float x = i.uv.x * _Width + sin(i.w.y * 0.35 + t * 1.3 + _Seed) * 0.35;   // sideways wobble
-                float s1 = lbcFbm(float2(x * 1.6, flow * 0.05));
-                float s2 = lbcFbm(float2(x * 3.1 + 7, flow * 0.09 + t * 0.4));
+                float s1 = lbcFbm(float2(x * 1.6, flow * 0.11));
+                float s2 = lbcFbm(float2(x * 3.1 + 7, flow * 0.2 + t * 0.4));
                 float s3 = lbcFbm(float2(x * 0.7 + 3, flow * 0.03));
                 float streak = smoothstep(0.42, 0.72, s1 * 0.5 + s2 * 0.3 + s3 * 0.2); // soft white streaks stretched along the fall
                 // foam clumps travelling down: thin, staggered per column and broken across the width, so they read as churning water, not ripples
                 float stag = lbcFbm(float2(x * 1.1, 1.7)) * 2.2;                                                   // continuous offset across the width (no column steps)
-                float band = smoothstep(0.7, 0.95, frac(flow / 5.0 + stag)) * smoothstep(0.5, 0.8, lbcFbm(float2(x * 0.9, flow * 0.06))) * 0.85; // foam bands every ~4 m travelling down
+                float bp = frac(flow / 7.0 + stag); float band = smoothstep(0.55, 0.85, bp) * smoothstep(1.0, 0.9, bp) * smoothstep(0.42, 0.72, lbcFbm(float2(x * 0.9, flow * 0.06))) * 1.1; // soft-edged on both sides (no sawtooth) // foam bands every ~4 m travelling down
                 float lipM = fall * 34;                                                                         // metres below the lip (sheets are ~34 m)
                 float lip = smoothstep(1.6, 0.2, lipM + (lbcNoise(float2(x * 3, t * 4)) - 0.5) * 0.8) * (0.75 + 0.25 * lbcNoise(float2(x * 5, t * 6))); // churning foam lip
                 float edge = smoothstep(0, 0.12, i.uv.x) * smoothstep(1, 0.88, i.uv.x);

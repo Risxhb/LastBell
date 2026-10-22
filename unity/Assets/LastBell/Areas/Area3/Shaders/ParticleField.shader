@@ -77,7 +77,8 @@ Shader "LastBell/Area3/ParticleField"
                     size *= 0.7 + life * 0.8;
                     a *= smoothstep(0, 0.15, life) * smoothstep(1, 0.6, life) * (0.35 + 0.65 * _LB_DecoGlow); add = 0;
                 }
-                float3 cv = TransformWorldToView(p); cv.xy += (v.uv - 0.5) * size;
+                float3 cv = TransformWorldToView(p); float2 stretch = _Mode > 2.5 && _Mode < 3.5 ? float2(0.45, 2.2) : float2(1, 1); // glints streak along the fall
+                cv.xy += (v.uv - 0.5) * size * stretch;
                 o.positionCS = TransformWViewToHClip(cv); o.uv = v.uv; o.color = float4(col, a); o.fog = ComputeFogFactor(o.positionCS.z); o.add = add;
                 return o;
             }

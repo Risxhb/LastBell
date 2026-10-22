@@ -155,7 +155,8 @@ function ivyCurtain(x, y, z, len, nx = 0, nz = 0, width = 0.8, flowers = 0.12) {
   }
 }
 // a mound of moss with flowers on top of a ledge
-function mossMound(x, y, z, r, flowers = 4) { for (let k = 0; k < 3; k++) { const a = rnd() * 6.28, d = rnd() * r * 0.6; blob(r * (0.5 + rnd() * 0.4), rnd() < 0.5 ? MOSS : MOSS_DK, x + Math.cos(a) * d, y, z + Math.sin(a) * d, 0.55); }
+function mossMound(x, y, z, r, flowers = 4) { blob(r * 0.55, MOSS_DK, x, y, z, 0.5);
+  for (let k = 0; k < 14; k++) { const a = rnd() * 6.28, d = rnd() * r; E3.set(-0.5 + rnd() * 0.6, rnd() * 6, (rnd() - 0.5) * 0.6); Q.setFromEuler(E3); const ls = 0.16 + rnd() * 0.12; M4.compose(V.set(x + Math.cos(a) * d, y + 0.1 + rnd() * r * 0.4, z + Math.sin(a) * d), Q, S.set(ls * 1.2, ls * 0.35, ls)); (rnd() < 0.5 ? leafLitM : ivyM).push(M4.clone()); }
   for (let k = 0; k < 4; k++) { const a = rnd() * 6.28; pushLeaf(x + Math.cos(a) * r * 0.8, y + 0.05, z + Math.sin(a) * r * 0.8, 0.16 + rnd() * 0.1, Math.cos(a), Math.sin(a)); } for (let i = 0; i < flowers; i++) { const a = rnd() * 6.28, d = rnd() * r * 0.8; pushM(flowerM, x + Math.cos(a) * d, y + r * 0.35, z + Math.sin(a) * d, 0.9 + rnd() * 0.6); } }
 
 // ---- floor painter: warm grey slab rings, turquoise mosaic, brass rings + cross + roundels + medallion. Writes three
@@ -309,12 +310,12 @@ function lantern(parent, x, y, z) {
 
 // ---- sculpted spire: an irregular lathe profile (bulges, overhanging ledges, a pinched waist, a flared crown), squashed
 // to an oval, leaning and twisted, so no two read as stacked cylinders; moss on every ledge ----
-function sculptedSpire(x, top, z, rad, h, seed) {
+function sculptedSpire(x, top, z, rad, h, seed, parent = root, invert = false) {
   const pts = [], ledges = []; let y = 0, r0 = rad * (1.05 + rnd() * 0.2);
   pts.push(new THREE.Vector2(0.001, 0.3), new THREE.Vector2(r0 * 0.9, 0.1), new THREE.Vector2(r0, -0.6));     // crown lip
   while (y > -h) {
     const step = 1.5 + rnd() * 3; y -= step;
-    let rr = rad * (0.65 + rnd() * 0.5) * (1 + Math.min(1, -y / 60) * 0.5);                                  // widens toward the base
+    let rr = rad * (0.65 + rnd() * 0.5) * (invert ? 1 - Math.min(1, -y / h) * 0.6 : 1 + Math.min(1, -y / 60) * 0.5); // widens toward the base (or narrows, for bastions)
     if (rnd() < 0.22 && y > -30) { pts.push(new THREE.Vector2(rr * 1.35, y + 0.3), new THREE.Vector2(rr * 1.3, y - 0.4)); ledges.push({ y: y + 0.3, r: rr * 1.3 }); } // overhanging ledge
     pts.push(new THREE.Vector2(rr, y));
   }
@@ -323,8 +324,8 @@ function sculptedSpire(x, top, z, rad, h, seed) {
   const geo = new THREE.LatheGeometry(pts, 26), sx = 0.8 + rnd() * 0.5, sz = 0.8 + rnd() * 0.5, lean = (rnd() - 0.5) * 0.12, tw = (rnd() - 0.5) * 0.05;
   const q = geo.attributes.position;
   for (let i = 0; i < q.count; i++) { const py = q.getY(i), c = Math.cos(py * tw), sn = Math.sin(py * tw); let px = q.getX(i) * sx, pz = q.getZ(i) * sz; [px, pz] = [px * c - pz * sn, px * sn + pz * c]; q.setXYZ(i, px - py * lean, py, pz); }
-  const m = add(new THREE.Mesh(rockify(geo, 0.3, 0.17, -6, seed), ROCK)); m.position.set(x, top, z); m.rotation.y = rnd() * 6;
-  for (const L of ledges) for (let k = 0; k < 3; k++) { const la = rnd() * 6.28; blob(rad * 0.4, rnd() < 0.5 ? MOSS : MOSS_DK, x + Math.cos(la) * L.r * sx - L.y * lean, top + L.y + 0.2, z + Math.sin(la) * L.r * sz, 0.4); }
+  const m = add(new THREE.Mesh(rockify(geo, 0.3, 0.17, -6, seed), ROCK), parent); m.position.set(x, top, z); m.rotation.y = rnd() * 6;
+  for (const L of ledges) for (let k = 0; k < 3; k++) { const la = rnd() * 6.28; blob(rad * 0.4, rnd() < 0.5 ? MOSS : MOSS_DK, x + Math.cos(la) * L.r * sx - L.y * lean, top + L.y + 0.2, z + Math.sin(la) * L.r * sz, 0.4, parent); }
   return m;
 }
 
@@ -375,14 +376,14 @@ function bridge(a, entry) {
     for (const z of [-BRIDGE_W / 2 - 0.5, BRIDGE_W / 2 + 0.5]) { ivyCurtain(...new THREE.Vector3(x1 - 0.4 - 0.5, 6.0, z).applyAxisAngle(new THREE.Vector3(0, 1, 0), -a).toArray(), 4.5, ...(() => { const v = new THREE.Vector3(-1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), -a); return [v.x, v.z]; })(), 0.9, 0.2); }
     lantern(gate, -0.2, 3.1, 0);
     // a tower stub behind the gate, rising from the abyss
-    const t = add(new THREE.Mesh(rockify(new THREE.CylinderGeometry(2.6, 3.4, 34, 24, 34), 0.3, 0.2, 14, a), ROCK), g); t.position.set(x1 + 3.2, -14, 0);
+    sculptedSpire(x1 + 3.2, 3.0, 0, 2.7, 34, a * 9, g);
     detailCrag(g, x1 + 3.2, 3.0, 0, 2.6, a * 7);
     // waterfalls off both sides of the bridge, from the arcade below the deck
     for (const z of [-hw - 0.4, hw + 0.4]) fallsBridge.push({ g, x: x0 + len * (0.35 + rnd() * 0.3), z, w: 2.6 + rnd() * 1.4 });
   } else {
     node('EntryPoint', 0, 0, R - 1.5);                                         // inner end of the entry bridge
     for (const z of [-hw - 0.2, hw + 0.2]) { block(STONE, 0.6, 1.4, 0.6, x0 + 0.3, 0.7, z, 0, g); add(new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.4, 4), BRASS), g).position.set(x0 + 0.3, 1.6, z); }
-    const far = add(new THREE.Mesh(rockify(new THREE.CylinderGeometry(4.5, 3, 30, 24, 20), 0.12, 0.25, 13.5, 4), ROCK), g); far.position.set(x1 + 3.5, -15.1, 0);
+    sculptedSpire(x1 + 3.5, -0.3, 0, 4.2, 30, 41, g, true);
   }
   return g;
 }
@@ -397,7 +398,7 @@ function belfry(a, idx) {
   const isFront = front(a), rad = 17.2, baseY = isFront ? -1.2 : 0, chamberH = isFront ? 3.6 : 4.4, solidH = isFront ? 1.4 : 2.2;
   const g = add(new THREE.Group()); g.position.set(Math.cos(a) * rad, baseY, Math.sin(a) * rad); g.rotation.y = Math.atan2(-Math.cos(a), -Math.sin(a)); g.name = 'Belfry';
   // bastion: a rocky outcrop the tower stands on, bonded to the rim
-  const bas = add(new THREE.Mesh(rockify(new THREE.CylinderGeometry(3.4, 1.6, 18, 28, 18), 0.3, 0.25, 7.6, idx * 5), ROCK), g); bas.position.y = -9.05;
+  sculptedSpire(0, -0.1, 0, 3.3, 18, idx * 5 + 2, g, true);
   detailCrag(g, 0, -0.2, 0, 3.2, idx * 3, true);
   const W = 3.2, wallT = 0.42;
   block(STONE_DK, W, solidH, W, 0, solidH / 2, 0, 0, g);
