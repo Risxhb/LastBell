@@ -56,7 +56,13 @@ namespace LastBell.Menu
             BuildUI();
             if (MenuSmokeTest.Requested) gameObject.AddComponent<MenuSmokeTest>();
         }
-        void Start() { if (StartButton) EventSystem.current.SetSelectedGameObject(StartButton.gameObject); }
+        void Start()
+        {
+            if (StartButton) EventSystem.current.SetSelectedGameObject(StartButton.gameObject);
+#if UNITY_WEBGL && !UNITY_EDITOR
+            Debug.Log("Last Bell browser: main menu opened.");
+#endif
+        }
         void BuildUI()
         {
             var canvas = new GameObject("Main menu canvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
@@ -93,6 +99,9 @@ namespace LastBell.Menu
             StartButton = Button("Start Run", bar.transform, new Vector2(-350, 0), new Vector2(320, 68), StartRun, true);
             SettingsButton = Button("Settings", bar.transform, Vector2.zero, new Vector2(320, 68), OpenSettings);
             ExitButton = Button("Exit", bar.transform, new Vector2(350, 0), new Vector2(320, 68), Exit);
+#if UNITY_WEBGL && !UNITY_EDITOR
+            ExitButton.GetComponentInChildren<Text>().text = "Restart Menu";
+#endif
             primary.AddRange(new[] { StartButton, SettingsButton, ExitButton });
             LinkHorizontal(primary);
             Text("VANGUARD  /  ARCANIST  /  CHIMESINGER", safeRoot, 13, new Color(0.73f, 0.73f, 0.78f), new Vector2(0.5f, 0.168f), new Vector2(900, 28));
@@ -137,6 +146,11 @@ namespace LastBell.Menu
             ModeControl.value = MenuSettings.DisplayMode; QualityControl.value = QualitySettings.GetQualityLevel();
             MusicVolumeControl.SetValueWithoutNotify(Music.Volume);
             status.text = "Music volume updates immediately.";
+#if UNITY_WEBGL && !UNITY_EDITOR
+            ModeControl.interactable = false;
+            ResolutionControl.interactable = false;
+            status.text = "Music is live. Use the page's Fullscreen button for display size.";
+#endif
             settings.SetActive(true); barGroup.interactable = false; barGroup.blocksRaycasts = false;
             EventSystem.current.SetSelectedGameObject(MusicVolumeControl.gameObject);
         }
@@ -158,6 +172,9 @@ namespace LastBell.Menu
         public void StartRun()
         {
             if (Loading || SettingsOpen) return;
+#if UNITY_WEBGL && !UNITY_EDITOR
+            Debug.Log("Last Bell browser: Start Run selected.");
+#endif
             Loading = true; barGroup.interactable = false; fade.raycastTarget = true;
             Music.FadeOut();
             StartButton.GetComponentInChildren<Text>().text = "Preparing…";
@@ -176,6 +193,8 @@ namespace LastBell.Menu
             if (Loading || SettingsOpen) return;
 #if UNITY_EDITOR
             UnityEditor.EditorApplication.isPlaying = false;
+#elif UNITY_WEBGL
+            SceneManager.LoadScene(ScenePath);
 #else
             Application.Quit();
 #endif
@@ -191,6 +210,9 @@ namespace LastBell.Menu
             }
             var keyboard = MenuSmokeTest.Requested ? MenuSmokeTest.TestKeyboard : Keyboard.current;
             var gamepad = MenuSmokeTest.Requested ? MenuSmokeTest.TestGamepad : Gamepad.current;
+#if UNITY_WEBGL && !UNITY_EDITOR
+            gamepad = null; // Browser play uses keyboard/mouse; peripheral gamepads must not drive the menu.
+#endif
             bool cancel = keyboard?.escapeKey.wasPressedThisFrame == true || gamepad?.buttonEast.wasPressedThisFrame == true;
             if (cancel && SettingsOpen)
             {

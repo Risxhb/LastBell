@@ -16,7 +16,10 @@ namespace LastBell.Menu
         {
             if (width < 640 || height < 360 || quality < 0 || quality >= QualitySettings.names.Length)
                 throw new ArgumentOutOfRangeException(nameof(width), "Unsupported display settings");
-            Screen.SetResolution(width, height, Mode(mode)); QualitySettings.SetQualityLevel(quality, true);
+#if !UNITY_WEBGL || UNITY_EDITOR
+            Screen.SetResolution(width, height, Mode(mode));
+#endif
+            QualitySettings.SetQualityLevel(quality, true);
             PlayerPrefs.SetInt(Prefix + "Width", width); PlayerPrefs.SetInt(Prefix + "Height", height);
             PlayerPrefs.SetInt(Prefix + "Mode", mode); PlayerPrefs.SetInt(Prefix + "Quality", quality); PlayerPrefs.Save();
         }
@@ -26,7 +29,9 @@ namespace LastBell.Menu
             int w = PlayerPrefs.GetInt(Prefix + "Width"), h = PlayerPrefs.GetInt(Prefix + "Height");
             // A saved resolution from a disconnected monitor should not create an inaccessible window.
             w = Mathf.Clamp(w, 640, Mathf.Max(640, Display.main.systemWidth)); h = Mathf.Clamp(h, 360, Mathf.Max(360, Display.main.systemHeight));
+#if !UNITY_WEBGL || UNITY_EDITOR
             Screen.SetResolution(w, h, Mode(PlayerPrefs.GetInt(Prefix + "Mode")));
+#endif
             QualitySettings.SetQualityLevel(Mathf.Clamp(PlayerPrefs.GetInt(Prefix + "Quality"), 0, QualitySettings.names.Length - 1), true);
         }
     }
