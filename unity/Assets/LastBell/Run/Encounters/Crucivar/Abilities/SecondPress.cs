@@ -5,8 +5,9 @@ using UnityEngine;
 namespace LastBell.Run
 {
     // 05 Second Press (crucivar.second_press), Hard only, brief 05-crucivar.second_press.md (proposal).
-    // Run(result) is called right after Mould Press resolves (on Hard, or from its practice hook). 2.0 s later the hammer
-    // re-stamps the fullest mould: an r 2.2 circle on that tower's centre, Strike, telegraph 2.0 s locked at 0, 25 damage,
+    // Run(result) is called right after Mould Press resolves (on Hard, or from its practice hook). The telegraph appears at
+    // once and the hammer re-stamps the fullest mould 2.0 s after the towers (6.2 s on the phase clock, while the phase-2
+    // slag edge still burns): an r 2.2 circle on that tower's centre, Strike, telegraph 2.0 s locked at 0, 25 damage,
     // 1.5 m knockback toward the arena centre (never out into the phase-2 slag edge), 0.25 s stun. Hard's x1.3 damage
     // taken applies in PlayerController like every hit. Solo (Sequential): it presses the last tower (II). Otherwise the
     // most players at resolve; ties go to the lowest numeral, then NE > SE > SW > NW. Returns once the press has resolved.
@@ -14,7 +15,7 @@ namespace LastBell.Run
     {
         public override string Id => "crucivar.second_press";
 
-        public const float Delay = 2.0f, Warn = 2.0f, Radius = 2.2f, Knock = 1.5f, StunSeconds = 0.25f;
+        public const float Warn = 2.0f, Radius = 2.2f, Knock = 1.5f, StunSeconds = 0.25f;
         public const int Damage = 25;
         const float CrossWidth = 0.42f;
         static readonly Color CrossFill = new Color(0.95f, 0.40f, 0.28f), CrossBorder = new Color(2.3f, 1.25f, 0.45f);   // coral face, hot brass edge
@@ -33,10 +34,7 @@ namespace LastBell.Run
             if (LastPick < 0) yield break;   // no tower resolved: nothing to press
             var centre = Flat(result.Centres[LastPick]);
 
-            // the hammer wrenches free of the first cast and lifts (no warning yet: the moulds just resolved)
-            int delay = Sim.Ticks(Delay);
-            for (int i = 0; i < delay; i++) { Boss.Glow(0.3f * i / delay); yield return 1; }
-
+            // the warning starts the moment the towers resolve; the hammer wrenches free and lifts during it
             int warn = T(Warn);
             var h = W.Hazards.Spawn(new Hazard
             {

@@ -52,9 +52,10 @@ namespace LastBell.Run
             t.Check("one press, on tower II's mould (SW)", t.Spawned(Src).Count() == 1 && sp != null && Sim.Flat(sp.H.Origin - CrucivarAbility.Bay(2)).magnitude < 0.01f);
             t.Check("shape: circle r 2.2, Strike, locked at 0", sp != null && sp.H.Shape == HazardShape.Circle && Mathf.Approximately(sp.H.Radius, 2.2f) && sp.H.Kind == HazardKind.Strike && sp.H.LockAt == 0);
             int delay = sp != null ? sp.Tick - press.StartTick : -1;
-            t.Check("telegraph appears 2.0 s after the towers resolve", Mathf.Abs(delay - Sim.Ticks(2.0f)) <= 1, $"{delay} ticks");
+            t.Check("telegraph appears the moment the towers resolve", delay >= 0 && delay <= 1, $"{delay} ticks");
             int warn = sp != null && hit != null ? hit.Tick - sp.Tick : -1;
-            t.Check("it lands 2.0 s after the telegraph", Mathf.Abs(warn - Sim.Ticks(2.0f)) <= 1, $"{warn} ticks");
+            t.Check("it lands 2.0 s after the towers resolve (6.2 s on the phase clock)", Mathf.Abs(warn - Sim.Ticks(2.0f)) <= 1 && Mathf.Abs(hit.Tick - press.StartTick - Sim.Ticks(2.0f)) <= 1,
+                hit != null ? $"telegraph {warn} ticks, towers to hit {hit.Tick - press.StartTick} ticks" : "not hit");
             t.Check("standing still in the mould is hit, Hard x1.3", hit != null && hit.Damage == Expected(Difficulty.Hard), hit != null ? $"{hit.Damage} (expected {Expected(Difficulty.Hard)})" : "not hit");
             yield return t.Seconds(0.4f);
             t.Check("knockback 1.5 m toward the arena centre", Mathf.Abs((r0 - R(main)) - SecondPress.Knock) < 0.35f, $"{r0:0.00} -> {R(main):0.00} m");
@@ -161,17 +162,17 @@ namespace LastBell.Run
                     ran == want, $"ran {ran}, towers {t.Boss.Mould.Last?.Centres?.Length ?? 0}");
             }
 
-            // ---- boss death cancels it: during the 2.0 s lift, and mid-telegraph ----
-            foreach (bool midTelegraph in new[] { false, true })
+            // ---- boss death cancels it: early in the telegraph, and just before it lands ----
+            foreach (float at in new[] { 0.3f, 1.6f })
             {
                 yield return t.Setup(1, Difficulty.Hard, new[] { CrucivarAbility.Bay(1) });
                 t.Begin(t.Boss.Press.Run(Result(new[] { 1 }, new[] { 1 })));
-                if (midTelegraph) { yield return t.Until(() => t.Spawned(Src).Any(), 6, "Second Press telegraph"); yield return t.Seconds(0.8f); }
-                else yield return t.Seconds(1.0f);
+                yield return t.Until(() => t.Spawned(Src).Any(), 6, "Second Press telegraph");
+                yield return t.Seconds(at);
                 t.KillBoss();
                 yield return t.Seconds(3.0f);
-                t.Check($"boss death {(midTelegraph ? "mid-telegraph" : "during the lift")} cancels the press",
-                    !t.WasHit(t.Main, Src) && !t.W.Hazards.Live.Any(h => h.Source == Src) && (midTelegraph || !t.Spawned(Src).Any()));
+                t.Check($"boss death {at:0.0} s into the telegraph cancels the press",
+                    !t.WasHit(t.Main, Src) && !t.W.Hazards.Live.Any(h => h.Source == Src));
             }
         }
 
