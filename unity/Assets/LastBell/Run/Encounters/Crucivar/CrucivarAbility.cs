@@ -36,7 +36,9 @@ namespace LastBell.Run
     // Mould Press's resolve, for Second Press: per tower its centre, numeral, bay index and the players inside at resolve.
     public sealed class MouldResult
     {
+        // arrays in resolve order; Sequential = the solo version (tower I, then II), where Second Press takes the last one
         public Vector3[] Centres; public int[] Numerals, Bays, Counts;
+        public bool Sequential;
     }
 
     // Launch switches (practice only):
