@@ -105,6 +105,19 @@ function Expand-PackZip([string]$ZipPath, [string]$Destination) {
     return $count
 }
 
+function Invoke-Native([scriptblock]$Command) {
+    # Windows PowerShell 5.1 turns a native tool's stderr into a terminating error under
+    # $ErrorActionPreference = 'Stop'. Run the tool with errors relaxed and return its exit code.
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & $Command 2>&1 | ForEach-Object { "$_" } | Write-Host
+        return $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previous
+    }
+}
+
 function Format-Size([long]$Bytes) {
     if ($Bytes -ge 1GB) { return '{0:N2} GB' -f ($Bytes / 1GB) }
     return '{0:N1} MB' -f ($Bytes / 1MB)

@@ -62,8 +62,12 @@ Write-Host "  $(Format-Size $size), sha256 $sha"
 $url = "https://github.com/$Repo/releases/download/$tag/$zipName"
 
 if ($Publish) {
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
     & gh release view $tag --repo $Repo *> $null
-    if ($LASTEXITCODE -eq 0) {
+    $exists = $LASTEXITCODE -eq 0
+    $ErrorActionPreference = $previous
+    if ($exists) {
         throw "Release $tag already exists on $Repo. Published versions are never replaced; use a new -Version."
     }
     $bt = [string][char]96
@@ -82,8 +86,8 @@ if ($Publish) {
     $notesFile = Join-Path $outDir "$tag-notes.md"
     [IO.File]::WriteAllText($notesFile, $body, (New-Object Text.UTF8Encoding $false))
     Write-Host "Publishing release $tag on $Repo ..."
-    & gh release create $tag $zipPath --repo $Repo --title "Asset pack: $Name v$Version" --notes-file $notesFile --target main
-    if ($LASTEXITCODE -ne 0) { throw "gh release create failed for $tag." }
+    $code = Invoke-Native { gh release create $tag $zipPath --repo $Repo --title "Asset pack: $Name v$Version" --notes-file $notesFile --target main }
+    if ($code -ne 0) { throw "gh release create failed for $tag." }
 } else {
     # A dry run leaves asset-packs.json and .gitignore alone, so nobody commits a URL that doesn't exist yet.
     Write-Host "Dry run: built $zipPath only. Re-run with -Publish to create release $tag and update asset-packs.json."
@@ -125,7 +129,9 @@ $text = $kept + "`n`n" + (@($begin) + $block + @($end) -join "`n") + "`n"
 [IO.File]::WriteAllText($ignorePath, $text, (New-Object Text.UTF8Encoding $false))
 Write-Host 'Updated .gitignore.'
 
-& git -C $root rm -r -q --cached --ignore-unmatch -- @($paths + ($paths | ForEach-Object { "$_.meta" }))
+$untrack = @($paths + ($paths | ForEach-Object { "$_.meta" }))
+$code = Invoke-Native { git -C $root rm -r -q --cached --ignore-unmatch -- $untrack }
+if ($code -ne 0) { throw 'git rm --cached failed; the release and manifest are done, so untrack the paths by hand.' }
 Write-Host ''
 Write-Host "Done. Commit asset-packs.json and .gitignore (and the index removals) on your branch."
 Write-Host "Download URL: $url"
