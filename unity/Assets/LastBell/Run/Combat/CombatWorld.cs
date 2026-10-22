@@ -24,7 +24,16 @@ namespace LastBell.Run
     // Owned by the RunDirector and rebuilt from scratch for every fresh run, so nothing survives a retry.
     public sealed class CombatWorld
     {
-        public const float PlayerBound = 11.5f;   // the dais floor the player can stand on (key-art arena)
+        // The floor the player can stand on: set per map from RunMaps (Map.Bound / Map.Square) when its director wakes.
+        // 11.5 m circle is the fallback for a scene that isn't a run map.
+        public static float PlayerBound { get; private set; } = 11.5f;
+        public static bool SquareBound { get; private set; }
+        public static void SetPlayerBound(float bound, bool square) { PlayerBound = bound; SquareBound = square; }
+        public static bool InPlayerBound(Vector3 pos, float margin = 0)
+        {
+            float b = PlayerBound + margin;
+            return SquareBound ? Mathf.Abs(pos.x) <= b && Mathf.Abs(pos.z) <= b : new Vector2(pos.x, pos.z).magnitude <= b;
+        }
         public const float BossBound = 9.5f;      // boss positions and charge endpoints
 
         public readonly List<PlayerController> Players = new List<PlayerController>();
@@ -145,8 +154,12 @@ namespace LastBell.Run
         public Vector3 Constrain(Vector3 pos, float bodyRadius)
         {
             pos.y = 0;
-            var flat = new Vector2(pos.x, pos.z);
-            if (flat.magnitude > PlayerBound) { flat = flat.normalized * PlayerBound; pos.x = flat.x; pos.z = flat.y; }
+            if (SquareBound) { pos.x = Mathf.Clamp(pos.x, -PlayerBound, PlayerBound); pos.z = Mathf.Clamp(pos.z, -PlayerBound, PlayerBound); }
+            else
+            {
+                var flat = new Vector2(pos.x, pos.z);
+                if (flat.magnitude > PlayerBound) { flat = flat.normalized * PlayerBound; pos.x = flat.x; pos.z = flat.y; }
+            }
             var b = Boss;
             if (b != null && b.Solid)
             {
@@ -198,7 +211,7 @@ namespace LastBell.Run
                     p.OnHit?.Invoke(dealt, contact);
                     continue;
                 }
-                if (p.Travelled >= p.Range || new Vector2(p.Pos.x, p.Pos.z).magnitude > CombatWorld.PlayerBound + 2) live.Remove(p);
+                if (p.Travelled >= p.Range || !CombatWorld.InPlayerBound(p.Pos, 2)) live.Remove(p);
             }
         }
         public void ClearAll() { live.Clear(); clears++; }

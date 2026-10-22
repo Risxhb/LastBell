@@ -10,7 +10,7 @@ It runs on any of five maps (see [Maps](#maps)); the default is the key-art test
 
 ## Maps
 
-The menu has a **Map** row (or press **[** / **]**) to pick which arena to test. Encounters, bounds and camera are identical on every map: all five arenas share the same layout convention (centre origin, entry to the south at +z, floor at y = 0, walkable radius of at least 13.5 m), and the run keeps its 11.5 m play bound everywhere.
+The menu has a **Map** row (or press **[** / **]**) to pick which arena to test. Encounters and camera are identical on every map: all five arenas share the same layout convention (centre origin, entry to the south at +z, floor at y = 0, walkable radius of at least 13.5 m). Each map has its own play bound just inside its wall (`Bound` in `RunMaps.cs`): the test map is a ±12.5 m square, the areas are circles of 13.9, 13.7, 13.5 and 13.0 m. Bosses stay inside 9.5 m on every map.
 
 | Map | Source scene | Run scene |
 | --- | --- | --- |

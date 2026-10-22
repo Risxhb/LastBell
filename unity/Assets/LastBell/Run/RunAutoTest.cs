@@ -454,7 +454,11 @@ namespace LastBell.Run
                 yield return Wait(4f); StopCoroutine(fm); bot.Clear();
                 yield return Shot("map_" + map.Id + "_combat");
                 Check($"map {map.Name}: Bellkeeper fight runs (boss takes damage, player stays on the floor)",
-                    d.Boss && d.Boss.Hp < hp0 && Sim.Flat(d.Player.transform.position).magnitude <= CombatWorld.PlayerBound + 0.01f, $"boss hp {hp0} -> {(d.Boss ? d.Boss.Hp : -1)}");
+                    d.Boss && d.Boss.Hp < hp0 && CombatWorld.InPlayerBound(d.Player.transform.position, 0.01f), $"boss hp {hp0} -> {(d.Boss ? d.Boss.Hp : -1)}");
+                bot.MoveWorld = Vector3.right; bot.Sprint = true; yield return Wait(3f); bot.Clear();
+                float reach = d.Player.transform.position.x;
+                Check($"map {map.Name}: player walks up to the wall (bound {map.Bound} m)", reach >= map.Bound - 0.3f && CombatWorld.InPlayerBound(d.Player.transform.position, 0.01f), $"reached x = {reach:0.00}");
+                yield return Shot("map_" + map.Id + "_wall");
                 d.Boss.DebugDefeat();
                 yield return Until(() => d.State == RunState.Results, 6, map.Name + " practice results");
                 d.ReturnToMenu();
