@@ -381,7 +381,9 @@ namespace LastBell.Run
             if (Player) cam.transform.rotation = Quaternion.LookRotation(-FollowOffset + Vector3.up);
             else cam.transform.rotation = Quaternion.LookRotation(look - MenuCamPos);
             cam.fieldOfView = 44;
+            if (ShotCamera.HasValue) { cam.transform.position = ShotCamera.Value.pos; cam.transform.rotation = Quaternion.LookRotation(ShotCamera.Value.look - ShotCamera.Value.pos); }
         }
+        public static (Vector3 pos, Vector3 look)? ShotCamera;   // autotest gallery: a fixed overhead view of the whole arena
 
         // slot on the progress track: one per boss
         public int ProgressSlot => Math.Max(0, Array.IndexOf(RunOrder, Encounter));

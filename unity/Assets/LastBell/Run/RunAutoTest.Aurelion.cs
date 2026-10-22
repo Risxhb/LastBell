@@ -23,6 +23,7 @@ namespace LastBell.Run
 
         IEnumerator AurelionChecks()
         {
+            if (AurelionGallery) { yield return AurelionGalleryShots(); yield break; }
             if (AurelionV3Only) { yield return AurelionV3Checks(); yield return V2Teardown(); yield break; }
             if (AurelionV2Only) { yield return AurelionV2Checks(); yield break; }
             AurelionArgs.SetOverride = "v1";   // this section checks the original five attacks; ability set v2 follows (RunAutoTest.Aurelion.V2.cs)
