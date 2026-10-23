@@ -96,7 +96,7 @@ At 70 %:
 - He rises above the compass star, still targetable (settled rule).
 - The dais goes dark except **4 light wells** (circles of 3.0 m), which orbit the centre at 6 m and 15°/s.
 - **Umbra:** standing outside every well for more than 1.0 s straight deals 15 each second. A chip, so it can't kill quickly.
-- **Corona Shield:** a shield worth **18 % of max HP**.
+- **Corona Shield:** a shield worth **5 % of max HP** (800 solo at full HP: about 32 damage per second while moving between wells; a ranged class does about 60 standing still). The first draft had 18 %, which no party could break in time.
   - If it isn't broken in **25 s**, **Total Eclipse** wipes the party (damage check, enrage exception).
   - If it is broken, the intermission ends at once and Misalignment starts.
 - **Also during it:** Meridian Lances (3 beams) every 6 s and Starfall Mirror. That's 3 patterns.
