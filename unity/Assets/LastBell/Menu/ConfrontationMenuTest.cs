@@ -18,6 +18,8 @@ namespace LastBell.Menu
     public sealed class ConfrontationMenuTest : MonoBehaviour
     {
         public static bool Requested=>Environment.GetCommandLineArgs().Contains("-lastbellConfrontationTest");
+        // Opt-in: framing captures and checks only, skipping scene transitions.
+        static bool CaptureOnly=>Environment.GetCommandLineArgs().Contains("-lastbellConfrontationCaptureOnly");
         static bool launched;
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         static void Prepare(){if(Requested)MenuAppearance.Selected=MenuStyle.Alternative;}
@@ -80,6 +82,7 @@ namespace LastBell.Menu
                 }
             }
             Check("music continuous across class changes",menu.Music.MenuSource==source&&source.isPlaying&&source.time>musicTime);
+            if(!CaptureOnly){
             menu.SelectClass(2);menu.BossRush();yield return SceneReady(()=>{var s=FindAnyObjectByType<HeroSelection>();return s&&s.Setup;});
             var selection=FindAnyObjectByType<HeroSelection>();Check("existing Boss Rush setup retains class",selection&&selection.Setup&&selection.Setup.Hero==RunDirector.Classes[2]);
             SceneManager.LoadScene(ConfrontationMenu.ScenePath);yield return SceneReady(()=>FindAnyObjectByType<ConfrontationMenu>()?.Hero!=null);
@@ -97,6 +100,7 @@ namespace LastBell.Menu
                 if(RunDirector.Instance){RunDirector.Instance.SetPaused(true);RunDirector.Instance.ReturnToMenu();}
                 yield return SceneReady(()=>FindAnyObjectByType<ConfrontationMenu>()?.Hero!=null);
             }
+            MenuFlowTest.SetResolution(1600,900);yield return new WaitForSecondsRealtime(1);
             menu=FindAnyObjectByType<ConfrontationMenu>();menu.OpenSettings();yield return Capture("alternative-settings.png");menu.UISettingsButton.onClick.Invoke();
             Check("alternative Settings has UI category",menu.UISettings.IsOpen&&menu.SettingsOpen&&!menu.StartButton.IsInteractable());
             yield return Capture("alternative-ui-settings.png");
@@ -115,6 +119,7 @@ namespace LastBell.Menu
             SceneManager.LoadScene(MainMenu.ScenePath);yield return SceneReady(()=>FindAnyObjectByType<ConfrontationMenu>()?.Hero!=null);
             Check("saved alternative overrides showcase startup scene",!FindAnyObjectByType<MainMenu>()&&SceneManager.sceneCount==1);
             Check("one persistent audio owner after navigation",FindObjectsByType<MenuMusic>(FindObjectsSortMode.None).Length==1);
+            }
             SavedHeroSelection.Current=originalHero;InputSystem.settings=oldSettings;InputSystem.RemoveDevice(keyboard);InputSystem.RemoveDevice(pad);Destroy(testSettings);
             Check("zero runtime errors",errors.Count==0);report.AddRange(errors);report.Add("RESULT "+(report.Count(s=>s.StartsWith("PASS ")))+" passed / "+failures+" failed");
             File.WriteAllLines(Path.Combine(output,"report.txt"),report);Application.logMessageReceived-=Log;

@@ -18,6 +18,7 @@ Shader "LastBell/MenuStormSky"
             #pragma fragment frag
             #include "UnityCG.cginc"
             float4 _Zenith,_Mid,_Horizon,_Low;
+            float _MenuStormFlash; // global, driven by ConfrontationWeather; 0 elsewhere
             struct V {float4 pos:SV_POSITION;float3 dir:TEXCOORD0;};
             V vert(float4 p:POSITION){V o;o.pos=UnityObjectToClipPos(p);o.dir=p.xyz;return o;}
             float hash(float2 p){return frac(sin(dot(p,float2(127.1,311.7)))*43758.5453);}
@@ -31,6 +32,8 @@ Shader "LastBell/MenuStormSky"
                 float n=fbm(p+fbm(p*.7)*2);float detail=fbm(p*2.3);
                 float clouds=smoothstep(.28,.78,n);
                 float3 c=lerp(base*.55,lerp(_Mid.rgb,_Horizon.rgb,detail),clouds*.8);
+                // Distant lightning lights cloud undersides only; brightness is capped by the driver.
+                c+=(_Mid.rgb*2.2+float3(.05,.04,.09))*clouds*saturate(1-h*1.4)*_MenuStormFlash;
                 c=lerp(_Low.rgb,c,smoothstep(-.1,.1,h));return float4(c,1);
             }
             ENDHLSL

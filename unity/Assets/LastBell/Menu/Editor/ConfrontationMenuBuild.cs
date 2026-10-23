@@ -114,6 +114,178 @@ namespace LastBell.Menu.EditorTools
             }
             EditorSceneManager.SaveScene(scene);AssetDatabase.SaveAssets();
         }
+        // Read-only inventory of visible scenery materials; does not save the scene.
+        public static void Inspect()
+        {
+            var scene=EditorSceneManager.OpenScene(ConfrontationMenu.ScenePath);
+            foreach(var r in scene.GetRootGameObjects().SelectMany(g=>g.GetComponentsInChildren<Renderer>(false)))
+                foreach(var m in r.sharedMaterials.Where(m=>m))
+                {
+                    string props=string.Join(" ",new[]{"_BaseColor","baseColorFactor","_EmissionColor","emissiveFactor","_Smoothness","roughnessFactor","_Metallic","metallicFactor"}.Where(m.HasProperty).Select(p=>p+"="+(p.Contains("Color")||p.Contains("Factor")&&!p.Contains("roughness")&&!p.Contains("metallic")?m.GetColor(p).ToString():m.GetFloat(p).ToString("0.00"))));
+                    Debug.Log($"INSPECT {PathOf(r.transform)} | {m.name} | {m.shader.name} | {AssetDatabase.GetAssetPath(m)} | {props} | b={r.bounds.center} s={r.bounds.size}");
+                }
+            foreach(var l in UnityEngine.Object.FindObjectsByType<Light>(FindObjectsSortMode.None))Debug.Log($"INSPECT LIGHT {l.name} {l.type} {l.transform.position} {l.color} i={l.intensity} r={l.range}");
+            foreach(var p in UnityEngine.Object.FindObjectsByType<ReflectionProbe>(FindObjectsSortMode.None))Debug.Log($"INSPECT PROBE {p.name} i={p.intensity}");
+            Debug.Log($"INSPECT FOG {RenderSettings.fogDensity} {RenderSettings.fogColor}");
+        }
+        // Art-direction refinement pass. Absolute values, so re-running is safe. Shared glTF materials
+        // are never edited: menu-only copies are created here and remapped in this scene alone.
+        public static void PolishPass()
+        {
+            var scene=EditorSceneManager.OpenScene(ConfrontationMenu.ScenePath);
+            var menu=UnityEngine.Object.FindAnyObjectByType<ConfrontationMenu>();
+            menu.CameraPosition=new Vector3(.6f,.75f,10.9f);menu.CameraTarget=new Vector3(-.6f,2.2f,-7);
+            menu.HeroPosition=new Vector3(1.45f,0,8.3f);menu.BossPosition=new Vector3(0,0,-15);
+            menu.Classes=new[]{
+                new ConfrontationMenu.Presentation{Class="Vanguard",Offset=new Vector3(.15f,0,0),Yaw=6,Scale=1},
+                new ConfrontationMenu.Presentation{Class="Chimesinger",Offset=new Vector3(.1f,0,.15f),Yaw=4,Scale=.97f},
+                new ConfrontationMenu.Presentation{Class="Arcanist",Offset=new Vector3(0,0,.15f),Yaw=4,Scale=1}};
+            EditorUtility.SetDirty(menu);
+            // 1. Damp stone instead of a mirror-bright graphic disc.
+            var dial=AssetDatabase.LoadAssetAtPath<Material>(Gen+"/WetDial.mat");dial.SetFloat("metallicFactor",.08f);dial.SetFloat("roughnessFactor",.42f);EditorUtility.SetDirty(dial);
+            var paving=AssetDatabase.LoadAssetAtPath<Material>(Gen+"/WetPaving.mat");paving.SetFloat("_Smoothness",.55f);paving.SetFloat("_Metallic",.05f);EditorUtility.SetDirty(paving);
+            foreach(var p in UnityEngine.Object.FindObjectsByType<ReflectionProbe>(FindObjectsSortMode.None))p.intensity=.45f;
+            // 2. Quieter windows and violet backlight so the boss separates from the tower wall.
+            var renderers=scene.GetRootGameObjects().SelectMany(g=>g.GetComponentsInChildren<Renderer>(true)).ToArray();
+            Remap(renderers,"GlowWindow","MenuWindowGlow",m=>m.SetColor("baseColorFactor",new Color(1.202f,.841f,.447f,1)*.42f),_=>true);
+            Remap(renderers,"GlowRose","MenuRoseGlow",m=>m.SetColor("baseColorFactor",new Color(1.339f,1.043f,.637f,1)*.3f),_=>true);
+            // 6. Darker damp gold only on the large dial rim ring in front of the camera.
+            var gold=renderers.Where(r=>PathOf(r.transform).StartsWith("Bellkeeper's Dais/Platform/")&&r.bounds.size.x>10)
+                .SelectMany(r=>r.sharedMaterials).FirstOrDefault(m=>m&&m.HasProperty("metallicFactor")&&m.GetFloat("metallicFactor")>.7f);
+            if(gold||AssetDatabase.LoadAssetAtPath<Material>(Gen+"/MenuDampGold.mat"))Remap(renderers,gold?gold.name:"","MenuDampGold",m=>{m.SetColor("baseColorFactor",new Color(.55f,.42f,.22f,1));m.SetFloat("roughnessFactor",.5f);m.SetFloat("metallicFactor",.6f);m.SetColor("emissiveFactor",new Color(.021f,.008f,.001f,1));},
+                r=>PathOf(r.transform).StartsWith("Bellkeeper's Dais/Platform/")&&r.bounds.size.x>10,gold);
+            foreach(var l in UnityEngine.Object.FindObjectsByType<Light>(FindObjectsSortMode.None))
+            {
+                if(l.name=="Bellwarden silhouette"){l.transform.position=new Vector3(0,6,-24);l.intensity=70;l.range=22;l.color=new Color(.55f,.42f,1);}
+                if(l.name=="Hero amber edge"){l.transform.position=new Vector3(-.4f,1.8f,6.4f);l.intensity=6;l.range=4.5f;}
+            }
+            RenderSettings.fogDensity=.02f;
+            EditorSceneManager.MarkSceneDirty(scene);EditorSceneManager.SaveScene(scene);AssetDatabase.SaveAssets();
+            Debug.Log("Confrontation polish pass applied"+(gold?" (rim "+gold.name+")":" (rim material not found)"));
+        }
+        // Second art-direction pass (AAA-bar critic). Re-runnable: generated objects are rebuilt each time and
+        // all values are absolute. Production Brass Foundry towers replace the flat key-art skyline; every material
+        // is a menu-only copy, so the gameplay arenas are unaffected.
+        const string Area2="Assets/LastBell/Areas/Area2";
+        public static void AaaPass()
+        {
+            var scene=EditorSceneManager.OpenScene(ConfrontationMenu.ScenePath);
+            var all=scene.GetRootGameObjects().SelectMany(g=>g.GetComponentsInChildren<Transform>(true)).ToArray();
+            T Find<T>(string name) where T:Component=>all.Where(t=>t&&t.name==name).Select(t=>t.GetComponent<T>()).FirstOrDefault(c=>c);
+            foreach(var name in new[]{"Confrontation skyline — production towers","Confrontation menu lanterns","Confrontation foreground framing","Bellwarden front fill"})
+                foreach(var t in all.Where(t=>t&&t.name==name).ToArray())UnityEngine.Object.DestroyImmediate(t.gameObject);
+            all=scene.GetRootGameObjects().SelectMany(g=>g.GetComponentsInChildren<Transform>(true)).ToArray();
+
+            // R1. Remove the flat key-art towers behind the boss; keep the plaza, lanterns, banners and debris.
+            foreach(var t in all.Where(t=>t.name=="Confrontation bell skyline"))t.gameObject.SetActive(false);
+            var dais=all.FirstOrDefault(t=>t.name=="Bellkeeper's Dais"&&t.parent==null);
+            foreach(Transform child in dais)
+                if(child.name.StartsWith("Island")){child.gameObject.SetActive(true);var b=GroupBounds(child);bool behind=b.center.z<-14;child.gameObject.SetActive(!behind);if(behind)Debug.Log("AAA: hid placeholder "+child.name+" "+b.center);}
+            var masonry=MenuCopy(Area2+"/Generated/Materials/MasonryDark.mat","MenuMasonry",m=>{m.SetColor("_BaseColor",new Color(.34f,.31f,.44f,1));m.SetFloat("_Smoothness",.12f);});
+            var roof=MenuCopy(Area2+"/Generated/Materials/RoofIron.mat","MenuRoofIron",m=>{m.SetColor("_BaseColor",new Color(.19f,.17f,.25f,1));m.SetFloat("_Smoothness",.3f);});
+            var brass=MenuCopy(Area2+"/Generated/Materials/DarkBrass.mat","MenuBrassDark",m=>m.SetColor("_BaseColor",new Color(.30f,.22f,.13f,1)));
+            var slit=MenuCopy(Area2+"/Generated/Materials/GlowWindow.mat","MenuWindowSlit",m=>{var c=new Color(1,.55f,.2f,1)*.6f;c.a=1;if(m.HasProperty("_BaseColor"))m.SetColor("_BaseColor",c);if(m.HasProperty("_Color"))m.SetColor("_Color",c);});
+            Material Slot(string slot){switch(slot.Split(' ','.')[0]){case "Roof":case "Iron":case "Chain":case "CityRoof":return roof;case "Brass":case "DarkBrass":return brass;
+                case "Glow":case "GlowDim":case "GlowWarm":case "GlowHot":case "Furnace":return slit;default:return masonry;}}
+            var skyline=new GameObject("Confrontation skyline — production towers").transform;
+            var center=new Vector3(0,0,-15);
+            // Tops land in the upper third; fog density sets ~47% (near pair) to ~76–90% (far ring) haze.
+            var towers=new[]{("SM_Area2_Tower_Far",new Vector3(-28,-1,-58),25f,1.5f),("SM_Area2_Tower_Far",new Vector3(-10,-3,-80),-30f,1.7f),("SM_Area2_Tower_Far",new Vector3(16,-1,-66),35f,1.6f),
+                ("SM_Area2_Tower_Far",new Vector3(32,0,-52),-18f,1.4f),("SM_Area2_Tower_Far",new Vector3(4,-5,-98),15f,1.8f),
+                ("SM_Area2_Tower_Near",new Vector3(-20,-4,-34),-40f,1.15f),("SM_Area2_Tower_Near",new Vector3(22,-4,-36),30f,1.15f)};
+            for(int i=0;i<towers.Length;i++)
+            {
+                var (model,pos,yaw,scale)=towers[i];
+                var go=Place(Area2+"/Models/"+model+".glb",skyline,model+" "+i,pos,Quaternion.LookRotation(center-pos)*Quaternion.Euler(0,yaw,0),scale);
+                foreach(var r in go.GetComponentsInChildren<Renderer>(true))
+                {r.sharedMaterials=r.sharedMaterials.Select(m=>Slot(m?m.name:"")).ToArray();r.shadowCastingMode=ShadowCastingMode.Off;r.receiveShadows=false;}
+                GameObjectUtility.SetStaticEditorFlags(go,StaticEditorFlags.BatchingStatic);
+                Debug.Log($"AAA: tower {go.name} bounds {GroupBounds(go.transform).min} .. {GroupBounds(go.transform).max}");
+            }
+
+            // R2. Fog-separated layers and a cloud floor between them.
+            RenderSettings.fogDensity=.016f;RenderSettings.fogColor=new Color(.11f,.09f,.19f);
+            var sky=AssetDatabase.LoadAssetAtPath<Material>(Gen+"/StormSky.mat");sky.SetColor("_Horizon",new Color(.30f,.20f,.40f));EditorUtility.SetDirty(sky);
+            foreach(var t in all.Where(t=>t.name=="Sea of Clouds"))t.gameObject.SetActive(true);
+            // From a 0.75 m camera the floor is seen at grazing angles, where gloss mirrors the whole sky.
+            foreach(var p in UnityEngine.Object.FindObjectsByType<ReflectionProbe>(FindObjectsSortMode.None))p.intensity=.25f;
+
+            // R3. Darker wet stone; numerals become damp gold instead of glowing ivory.
+            var paving=AssetDatabase.LoadAssetAtPath<Material>(Gen+"/WetPaving.mat");paving.SetColor("_BaseColor",new Color(.10f,.11f,.15f));paving.SetFloat("_Smoothness",.32f);EditorUtility.SetDirty(paving);
+            var dial=AssetDatabase.LoadAssetAtPath<Material>(Gen+"/WetDial.mat");dial.SetColor("emissiveFactor",new Color(.35f,.26f,.12f,1));dial.SetFloat("roughnessFactor",.62f);EditorUtility.SetDirty(dial);
+            // The pale "floor" is the platform body's white paving slots showing through the dial; darken a menu copy.
+            var body=scene.GetRootGameObjects().SelectMany(g=>g.GetComponentsInChildren<Renderer>(true)).Where(r=>PathOf(r.transform).EndsWith("Platform/Node-1")).ToArray();
+            var white=body.SelectMany(r=>r.sharedMaterials).FirstOrDefault(m=>m&&m.HasProperty("baseColorFactor")&&m.GetColor("baseColorFactor").r>.9f);
+            var wetStone=AssetDatabase.LoadAssetAtPath<Material>(Gen+"/MenuWetStone.mat");
+            if(white||wetStone)
+            {
+                wetStone=MenuCopy("","MenuWetStone",m=>{m.SetColor("baseColorFactor",new Color(.16f,.17f,.24f,1));m.SetFloat("roughnessFactor",.62f);m.SetFloat("metallicFactor",0);},white);
+                int swapped=0;foreach(var r in body){var mats=r.sharedMaterials;for(int i=0;i<mats.Length;i++)if(mats[i]&&mats[i]!=wetStone&&mats[i].HasProperty("baseColorFactor")&&mats[i].GetColor("baseColorFactor").r>.9f){mats[i]=wetStone;swapped++;}r.sharedMaterials=mats;}
+                Debug.Log("AAA: platform paving slots darkened: "+swapped);
+            }
+            var gold=AssetDatabase.LoadAssetAtPath<Material>(Gen+"/MenuDampGold.mat");if(gold){gold.SetColor("baseColorFactor",new Color(.30f,.22f,.12f,1));EditorUtility.SetDirty(gold);}
+
+            // R4. Hero as a backlit silhouette; keep the boss readable with its own fill.
+            var rim=Find<Light>("Hero cool rim");if(rim){rim.transform.position=new Vector3(3.5f,3,6.5f);rim.intensity=12;rim.range=6;}
+            var amber=Find<Light>("Hero amber edge");if(amber){amber.transform.position=new Vector3(-1.2f,1.6f,7.2f);}
+            RenderSettings.ambientSkyColor=new Color(.12f,.11f,.22f);RenderSettings.ambientEquatorColor=new Color(.08f,.08f,.14f);RenderSettings.ambientGroundColor=new Color(.05f,.05f,.08f);
+            var fill=new GameObject("Bellwarden front fill").AddComponent<Light>();fill.type=LightType.Point;fill.transform.position=new Vector3(1,4.5f,-9);fill.color=new Color(.75f,.7f,1);fill.intensity=14;fill.range=9;fill.shadows=LightShadows.None;
+            // Warm points stepping back toward the boss: copies of the plaza's own lantern.
+            var source=all.FirstOrDefault(t=>t.name=="Lantern"&&t.GetComponentInChildren<Renderer>(true));
+            var lanterns=new GameObject("Confrontation menu lanterns").transform;
+            if(source)foreach(var p in new[]{new Vector3(6,0,-3),new Vector3(8,0,-11),new Vector3(-7,0,-24)})
+            {
+                var copy=UnityEngine.Object.Instantiate(source.gameObject,lanterns);copy.name="Menu Lantern";copy.SetActive(true);
+                copy.transform.position=new Vector3(p.x,source.position.y,p.z);
+                var light=copy.GetComponentInChildren<Light>(true);
+                if(!light){var top=GroupBounds(copy.transform);light=new GameObject("Lantern Light").AddComponent<Light>();light.transform.SetParent(copy.transform,false);light.transform.position=new Vector3(p.x,top.max.y-.25f,p.z);}
+                light.type=LightType.Point;light.color=new Color(1,.48f,.16f);light.range=4;light.intensity=2.4f;light.shadows=LightShadows.None;
+            }
+
+            // R5. Out-of-focus dark rocks frame the lower corners.
+            var debris=all.FirstOrDefault(t=>t.name=="Debris"&&t.GetComponent<Renderer>());
+            var frame=new GameObject("Confrontation foreground framing").transform;
+            if(debris)
+            {
+                var dark=MenuCopy(AssetDatabase.GetAssetPath(debris.GetComponent<Renderer>().sharedMaterial),"MenuForegroundRock",m=>{if(m.HasProperty("baseColorFactor"))m.SetColor("baseColorFactor",new Color(.02f,.018f,.03f,1));if(m.HasProperty("roughnessFactor"))m.SetFloat("roughnessFactor",.9f);},debris.GetComponent<Renderer>().sharedMaterial);
+                foreach(var (pos,scale,yaw) in new[]{(new Vector3(3.3f,-.25f,9.5f),1.5f,20f),(new Vector3(2.5f,-.35f,10.1f),.9f,140f),(new Vector3(-2.5f,-.25f,9.7f),1.3f,75f)})
+                {
+                    var rock=UnityEngine.Object.Instantiate(debris.gameObject,frame);rock.name="Foreground rock";rock.transform.position=pos;rock.transform.rotation=Quaternion.Euler(0,yaw,0);rock.transform.localScale=Vector3.one*scale;
+                    foreach(var r in rock.GetComponentsInChildren<Renderer>()){r.sharedMaterial=dark;r.shadowCastingMode=ShadowCastingMode.Off;}
+                }
+            }
+            EditorSceneManager.MarkSceneDirty(scene);EditorSceneManager.SaveScene(scene);AssetDatabase.SaveAssets();
+            Debug.Log($"AAA pass applied: {towers.Length} towers, lanterns={(source?3:0)}, framing={(debris?3:0)}");
+        }
+        static Material MenuCopy(string sourcePath,string name,Action<Material> adjust,Material source=null)
+        {
+            var path=Gen+"/"+name+".mat";source=source??AssetDatabase.LoadAssetAtPath<Material>(sourcePath);
+            var copy=AssetDatabase.LoadAssetAtPath<Material>(path);
+            if(!copy){if(!source)throw new FileNotFoundException("Menu copy source missing: "+sourcePath);copy=new Material(source){name=name};AssetDatabase.CreateAsset(copy,path);}
+            else if(source)copy.CopyPropertiesFromMaterial(source);
+            adjust(copy);EditorUtility.SetDirty(copy);return copy;
+        }
+        static GameObject Place(string modelPath,Transform parent,string name,Vector3 pos,Quaternion rot,float scale)
+        {
+            var asset=AssetDatabase.LoadAssetAtPath<GameObject>(modelPath);if(!asset)throw new FileNotFoundException(modelPath);
+            var go=(GameObject)PrefabUtility.InstantiatePrefab(asset,parent);PrefabUtility.UnpackPrefabInstance(go,PrefabUnpackMode.Completely,InteractionMode.AutomatedAction);
+            go.name=name;go.transform.SetPositionAndRotation(pos,rot);go.transform.localScale=Vector3.one*scale;return go;
+        }
+        static void Remap(Renderer[] renderers,string sourceName,string copyName,Action<Material> adjust,Func<Renderer,bool> include,Material source=null)
+        {
+            var path=Gen+"/"+copyName+".mat";
+            source=source??(string.IsNullOrEmpty(sourceName)?null:renderers.SelectMany(r=>r.sharedMaterials).FirstOrDefault(m=>m&&m.name==sourceName));
+            var copy=AssetDatabase.LoadAssetAtPath<Material>(path);
+            if(!source&&!copy){Debug.LogWarning("Polish: "+sourceName+" not found");return;}
+            if(!copy){copy=new Material(source){name=copyName};AssetDatabase.CreateAsset(copy,path);}
+            else if(source&&source!=copy)copy.CopyPropertiesFromMaterial(source);
+            adjust(copy);EditorUtility.SetDirty(copy);
+            if(!source||source==copy)return;
+            int count=0;
+            foreach(var r in renderers.Where(include)){var mats=r.sharedMaterials;bool changed=false;for(int i=0;i<mats.Length;i++)if(mats[i]==source){mats[i]=copy;changed=true;}if(changed){r.sharedMaterials=mats;count++;}}
+            Debug.Log($"Polish: {sourceName} -> {copyName} on {count} renderers");
+        }
+        static string PathOf(Transform t)=>t.parent?PathOf(t.parent)+"/"+t.name:t.name;
         static Bounds GroupBounds(Transform root)
         {
             var renderers=root.GetComponentsInChildren<Renderer>(true);var b=new Bounds(root.position,Vector3.zero);foreach(var r in renderers)b.Encapsulate(r.bounds);return b;

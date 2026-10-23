@@ -19,11 +19,13 @@ namespace LastBell.Menu
             public Vector3 Offset;
             public float Yaw, Scale = 1;
         }
+        // Defaults match the saved scene; ConfrontationMenuBuild.PolishPass writes the same values.
         public Presentation[] Classes = {
-            new Presentation { Class="Vanguard" }, new Presentation { Class="Chimesinger", Offset=new Vector3(0,0,.15f) },
-            new Presentation { Class="Arcanist", Offset=new Vector3(0,0,.15f) } };
-        public Vector3 HeroPosition = new Vector3(1.45f,0,6.5f), BossPosition = new Vector3(0,0,-7);
-        public Vector3 CameraPosition = new Vector3(0,1.7f,10.5f), CameraTarget = new Vector3(-1,2.8f,-7);
+            new Presentation { Class="Vanguard", Offset=new Vector3(.15f,0,0), Yaw=6 }, new Presentation { Class="Chimesinger", Offset=new Vector3(.1f,0,.15f), Yaw=4, Scale=.97f },
+            new Presentation { Class="Arcanist", Offset=new Vector3(0,0,.15f), Yaw=4 } };
+        public Vector3 HeroPosition = new Vector3(1.45f,0,8.3f), BossPosition = new Vector3(0,0,-15);
+        public Vector3 CameraPosition = new Vector3(.6f,.75f,10.9f), CameraTarget = new Vector3(-.6f,2.2f,-7);
+        static readonly Color LogoIvory=new Color(.93f,.88f,.76f);
         public CharacterPresenter Hero { get; private set; }
         public CharacterPresenter Boss { get; private set; }
         public Transform BossWrapper { get; private set; }
@@ -38,7 +40,7 @@ namespace LastBell.Menu
         public int SelectedIndex => Array.IndexOf(RunDirector.Classes, SavedHeroSelection.Current);
         readonly List<CharacterPresenter> heroes = new List<CharacterPresenter>();
         Transform heroRoot;
-        RectTransform safe;
+        RectTransform safe, navigationRect;
         GameObject settings;
         CanvasGroup navigation;
         Text className, difficulty, message;
@@ -90,24 +92,27 @@ namespace LastBell.Menu
             Canvas.GetComponent<CanvasScaler>().matchWidthOrHeight=.5f;
             safe=MenuUI.Rect("Safe area",Canvas.transform,Vector2.zero,Vector2.one);
             gradient=new Texture2D(128,1,TextureFormat.RGBA32,false){wrapMode=TextureWrapMode.Clamp};
-            for(int i=0;i<128;i++)gradient.SetPixel(i,0,new Color(.008f,.008f,.022f,Mathf.SmoothStep(0,.985f,Mathf.Clamp01(i/127f*2.5f))));
+            // Steeper falloff keeps the right third dark enough for labels, including ultrawide.
+            for(int i=0;i<128;i++)gradient.SetPixel(i,0,new Color(.008f,.008f,.022f,Mathf.SmoothStep(0,.985f,Mathf.Clamp01(i/127f*2.3f))));
             gradient.Apply();gradientSprite=Sprite.Create(gradient,new Rect(0,0,128,1),Vector2.one*.5f);
-            var shade=MenuUI.Panel("Right contrast gradient",safe,new Vector2(.55f,0),Vector2.one,Color.white);shade.sprite=gradientSprite;
-            var panel=MenuUI.Rect("Right navigation",safe,new Vector2(.73f,.06f),new Vector2(.97f,.84f));navigation=panel.gameObject.AddComponent<CanvasGroup>();
+            var shade=MenuUI.Panel("Right contrast gradient",safe,new Vector2(.42f,0),Vector2.one,Color.white);shade.sprite=gradientSprite;
+            var panel=navigationRect=MenuUI.Rect("Right navigation",safe,new Vector2(.73f,.06f),new Vector2(.97f,.84f));navigation=panel.gameObject.AddComponent<CanvasGroup>();
             var logo=MenuUI.Panel("Last Bell logo",panel,new Vector2(-.1f,.73f),new Vector2(1.1f,1),Color.white);
             logo.sprite=Resources.Load<Sprite>("Menu/ConfrontationLogo");logo.preserveAspect=true;
-            StartButton=Nav("Start Run",panel,.51f,StartRun);RushButton=Nav("Boss Rush",panel,.40f,BossRush);
+            StartButton=Nav("Start Run",panel,.51f,StartRun,28);RushButton=Nav("Boss Rush",panel,.40f,BossRush);
             SettingsButton=Nav("Settings",panel,.29f,OpenSettings);ExitButton=Nav("Exit",panel,.18f,Exit);
 #if UNITY_WEBGL && !UNITY_EDITOR
             ExitButton.GetComponentInChildren<Text>().text="Return to Menu";
 #endif
-            MenuUI.Text("SELECT CLASS",panel,new Vector2(0,.69f),new Vector2(1,.73f),12,MenuUI.Gold);
-            className=MenuUI.Text(SavedHeroSelection.Current.ToUpperInvariant(),panel,new Vector2(.13f,.63f),new Vector2(.87f,.69f),19);
+            // Class picker keeps its approved place above Start Run, but reads as a secondary control.
+            MenuUI.Text("S E L E C T   C L A S S",panel,new Vector2(0,.69f),new Vector2(1,.73f),13,new Color(MenuUI.Gold.r,MenuUI.Gold.g,MenuUI.Gold.b,.72f));
+            className=MenuUI.Text(SavedHeroSelection.Current.ToUpperInvariant(),panel,new Vector2(.13f,.63f),new Vector2(.87f,.69f),17,new Color(LogoIvory.r,LogoIvory.g,LogoIvory.b,.86f));
             PreviousButton=ClassArrow(panel,false);Fit(PreviousButton,.02f,.63f,.13f,.69f);
             NextButton=ClassArrow(panel,true);Fit(NextButton,.87f,.63f,.98f,.69f);
-            var diff=Nav("Difficulty",panel,0,()=>{RunDifficulty.Selected=(Difficulty)(((int)RunDifficulty.Selected+1)%RunDifficulty.Names.Length);RefreshDifficulty();});
-            difficulty=diff.GetComponentInChildren<Text>();difficulty.fontSize=16;RefreshDifficulty();
-            MenuUI.Text("ALTERNATIVE MENU  /  WORK IN PROGRESS",safe,new Vector2(.69f,.018f),new Vector2(.985f,.05f),11,MenuUI.Gold);
+            var diff=Nav("Difficulty",panel,.06f,()=>{RunDifficulty.Selected=(Difficulty)(((int)RunDifficulty.Selected+1)%RunDifficulty.Names.Length);RefreshDifficulty();},16);
+            // Difficulty reads as a small gold caption under the stack, not a fifth primary action.
+            difficulty=diff.GetComponentInChildren<Text>();diff.GetComponent<ConfrontationNavFocus>().Rest=new Color(MenuUI.Gold.r,MenuUI.Gold.g,MenuUI.Gold.b,.75f);RefreshDifficulty();
+            MenuUI.Text("ALTERNATIVE MENU  /  WORK IN PROGRESS",safe,new Vector2(.69f,.016f),new Vector2(.985f,.052f),13,new Color(MenuUI.Gold.r,MenuUI.Gold.g,MenuUI.Gold.b,.8f));
             var buttons=new[]{PreviousButton,NextButton,StartButton,RushButton,SettingsButton,ExitButton,diff};
             for(int i=0;i<buttons.Length;i++)buttons[i].navigation=new Navigation{mode=Navigation.Mode.Explicit,selectOnDown=buttons[(i+1)%buttons.Length],selectOnUp=buttons[(i+buttons.Length-1)%buttons.Length],selectOnLeft=i==0||i==1?PreviousButton:null,selectOnRight=i==0||i==1?NextButton:null};
             BuildSettings();
@@ -120,14 +125,21 @@ namespace LastBell.Menu
             b.GetComponentInChildren<Text>().text="";
             var icon=MenuUI.Rect("Class arrow",b.transform,Vector2.zero,Vector2.one,new Vector2(2,4)).gameObject.AddComponent<ClassSelectionArrow>();
             icon.Next=next;icon.color=MenuUI.Ivory;icon.raycastTarget=false;
+            var focus=b.GetComponent<ConfrontationNavFocus>();focus.Label=null;focus.Underline.gameObject.SetActive(false);focus.Underline=null;focus.Marker.gameObject.SetActive(false);focus.Marker=null;focus.Icon=icon;
             return b;
         }
         static void Fit(Button b,float x,float y,float x2,float y2){var r=(RectTransform)b.transform;r.anchorMin=new Vector2(x,y);r.anchorMax=new Vector2(x2,y2);r.offsetMin=r.offsetMax=Vector2.zero;}
-        Button Nav(string label,Transform parent,float y,UnityEngine.Events.UnityAction action)
+        Button Nav(string label,Transform parent,float y,UnityEngine.Events.UnityAction action,int size=24)
         {
             var b=MenuUI.Button(label,parent,new Vector2(0,y),new Vector2(1,y+.09f),action);
             Destroy(b.GetComponent<Outline>());b.GetComponent<Image>().color=new Color(.06f,.045f,.02f,.12f);
-            var t=b.GetComponentInChildren<Text>();t.fontSize=30;t.resizeTextForBestFit=true;t.resizeTextMinSize=14;t.resizeTextMaxSize=30;
+            var t=b.GetComponentInChildren<Text>();t.fontSize=size;t.resizeTextForBestFit=true;t.resizeTextMinSize=13;t.resizeTextMaxSize=size;
+            // Replace the shared glyph marker with drawn focus cues: gold label, short underline and diamond.
+            var shared=b.GetComponent<MenuFocus>();if(shared){if(shared.Marker)Destroy(shared.Marker);Destroy(shared);}
+            var focus=b.gameObject.AddComponent<ConfrontationNavFocus>();focus.Label=t;
+            var line=MenuUI.Panel("Focus underline",b.transform,new Vector2(.5f,.1f),new Vector2(.5f,.1f),MenuUI.Gold);line.rectTransform.sizeDelta=new Vector2(64,2);focus.Underline=line;
+            var mark=MenuUI.Rect("Focus diamond",b.transform,new Vector2(.5f,.5f),new Vector2(.5f,.5f)).gameObject.AddComponent<FocusDiamond>();
+            mark.rectTransform.sizeDelta=new Vector2(12,20);mark.color=MenuUI.Gold;mark.raycastTarget=false;focus.Marker=mark;
             return b;
         }
         public void StartRun(){if(Loading||SettingsOpen)return;Loading=MenuLaunch.Normal(SavedHeroSelection.Current);if(!Loading)message.text="Run scenes unavailable in this build.";}
@@ -183,6 +195,8 @@ namespace LastBell.Menu
             if(Hero)Hero.Tick(null);if(Boss)Boss.TickBoss("Idle",.65f);
             if(!safe)return;
             var area=Screen.safeArea;safe.anchorMin=area.position/new Vector2(Screen.width,Screen.height);safe.anchorMax=(area.position+area.size)/new Vector2(Screen.width,Screen.height);
+            // Ultrawide: pull the column inward so it stays in the darkest negative space.
+            bool wide=View.aspect>2;navigationRect.anchorMin=new Vector2(wide?.76f:.73f,.06f);navigationRect.anchorMax=new Vector2(wide?.95f:.97f,.84f);
             // Keep vertical field of view, widen for 4:3; no moving cinematic camera behind UI.
             View.fieldOfView=Mathf.Clamp(42*Mathf.Max(1,1.77778f/View.aspect),42,62);
             if(Keyboard.current?.escapeKey.wasPressedThisFrame==true||Gamepad.current?.buttonEast.wasPressedThisFrame==true){if(UISettings&&UISettings.IsOpen)UISettings.Close();else if(SettingsOpen)CloseSettings();}
@@ -192,6 +206,49 @@ namespace LastBell.Menu
         {
             foreach(var p in heroes.Concat(new[]{Boss}))if(p)foreach(var r in p.GetComponentsInChildren<Renderer>(true))foreach(var m in r.sharedMaterials)if(m&&m.name.EndsWith("(Instance)"))Destroy(m);
             if(gradientSprite)Destroy(gradientSprite);if(gradient)Destroy(gradient);
+        }
+    }
+    // Focus cue for this menu only; the original menu keeps its shared MenuFocus marker.
+    public sealed class ConfrontationNavFocus : MonoBehaviour, ISelectHandler, IDeselectHandler, IPointerEnterHandler, IPointerExitHandler
+    {
+        public Text Label; public Graphic Underline, Marker, Icon;
+        // Unfocused labels use the logo's ivory at reduced alpha; focus is gold.
+        public Color Rest=new Color(.93f,.88f,.76f,.74f);
+        bool selected, hovered;
+        void OnEnable(){Refresh();}
+        void Start(){Refresh();}
+        void OnDisable(){hovered=false;}
+        public void OnSelect(BaseEventData data){selected=true;Refresh();}
+        public void OnDeselect(BaseEventData data){selected=false;Refresh();}
+        public void OnPointerEnter(PointerEventData data){hovered=true;Refresh();}
+        public void OnPointerExit(PointerEventData data){hovered=false;Refresh();}
+        void LateUpdate()
+        {
+            if(!Marker||!Marker.enabled||!Label)return;
+            // Sit just left of the rendered label, whatever best-fit size it chose.
+            // fontSizeUsedForBestFit is in screen pixels, so remove the canvas scale before comparing.
+            float scale=Label.canvas?Label.canvas.scaleFactor:1;
+            float fit=Label.cachedTextGenerator.fontSizeUsedForBestFit/Mathf.Max(1f,Label.fontSize*scale);
+            float half=Mathf.Min(Label.preferredWidth*Mathf.Clamp01(fit>0?fit:1),Label.rectTransform.rect.width)*.5f;
+            Marker.rectTransform.anchoredPosition=new Vector2(-half-20,0);
+        }
+        void Refresh()
+        {
+            bool on=selected||hovered;
+            if(Label)Label.color=on?MenuUI.Gold:Rest;
+            if(Underline)Underline.enabled=on;
+            if(Marker)Marker.enabled=on;
+            if(Icon)Icon.color=on?MenuUI.Gold:MenuUI.Ivory;
+        }
+    }
+    public sealed class FocusDiamond : MaskableGraphic
+    {
+        protected override void OnPopulateMesh(VertexHelper vertices)
+        {
+            vertices.Clear();var r=GetPixelAdjustedRect();var c=r.center;
+            vertices.AddVert(new Vector2(c.x,r.yMax),color,Vector2.zero);vertices.AddVert(new Vector2(r.xMax,c.y),color,Vector2.zero);
+            vertices.AddVert(new Vector2(c.x,r.yMin),color,Vector2.zero);vertices.AddVert(new Vector2(r.xMin,c.y),color,Vector2.zero);
+            vertices.AddTriangle(0,1,2);vertices.AddTriangle(0,2,3);
         }
     }
     // Canvas geometry keeps these controls visible in WebGL without relying on font glyphs.

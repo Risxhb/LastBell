@@ -98,18 +98,18 @@ Material:
     - baseColorTexture_texCoord: 0
     - emissiveExposureWeight: 0
     - emissiveTexture_texCoord: 0
-    - metallicFactor: 0.45
+    - metallicFactor: 0.08
     - metallicRoughnessTexture_texCoord: 0
     - normalTexture_scale: 1
     - normalTexture_texCoord: 0
     - occlusionTexture_strength: 1
     - occlusionTexture_texCoord: 0
-    - roughnessFactor: 0.16
+    - roughnessFactor: 0.62
     - transmissionFactor: 0
     m_Colors:
     - baseColorFactor: {r: 0.045, g: 0.055, b: 0.09, a: 1}
     - baseColorTexture_Rotation: {r: 0, g: 0, b: 0, a: 0}
-    - emissiveFactor: {r: 1, g: 0.47932017, b: 0.116970666, a: 1}
+    - emissiveFactor: {r: 0.35, g: 0.26, b: 0.12, a: 1}
     - emissiveTexture_Rotation: {r: 0, g: 0, b: 0, a: 0}
     - metallicRoughnessTexture_Rotation: {r: 0, g: 0, b: 0, a: 0}
     - normalTexture_Rotation: {r: 0, g: 0, b: 0, a: 0}
