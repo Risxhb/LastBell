@@ -11,8 +11,8 @@ namespace LastBell.Run
 
     // Run flow in the single arena:
     //   Menu -> Ready (preparation) -> [Intro -> Combat -> Cleared] for each boss in Bosses -> Results (victory)
-    // The stand-in minibosses (Dial Warden, Pendulum Sentinel, Chimebound Oracle) and the intermission were removed on
-    // 2026-10-22: the run and practice only offer real boss encounters, currently the Bellkeeper.
+    // Each fresh run shuffles Aurelion, Sylvara and Crucivar, then finishes with Bellkeeper.
+    // Removed stand-in minibosses and intermission remain absent. Practice fights only its selected boss.
     //   any Combat -> Downed -> Results (defeat).  Results -> Retry (fresh run, encounter 1) or Menu.
     // Practice runs one chosen encounter with the same rules and never advances or unlocks the run.
     // Every transition goes through Go(), which bumps a generation number: timers and requests from an older state are
@@ -23,24 +23,33 @@ namespace LastBell.Run
     {
         public static RunDirector Instance { get; private set; }
 
-        // Every real boss encounter, in run order. The run fights the entries with InRun set; the practice menu offers them
+        // Every real boss encounter. Each run shuffles eligible entries and appends Final; practice offers them
         // all. Map: the run map an entry's practice loads first (null = fight on the current map). Add a boss with one line.
         public sealed class BossEntry
         {
-            public readonly string Name; public readonly Func<CombatWorld, BossEncounter> Spawn; public readonly bool InRun; public readonly string Map;
-            public BossEntry(string name, Func<CombatWorld, BossEncounter> spawn, bool inRun = true, string map = null) { Name = name; Spawn = spawn; InRun = inRun; Map = map; }
+            public readonly string Name; public readonly Func<CombatWorld, BossEncounter> Spawn; public readonly bool InRun, Final; public readonly string Map;
+            public BossEntry(string name, Func<CombatWorld, BossEncounter> spawn, bool inRun = true, string map = null, bool final = false) { Name = name; Spawn = spawn; InRun = inRun; Map = map; Final = final; }
         }
         public static readonly BossEntry[] Bosses =
         {
-            new BossEntry("Bellkeeper", w => BossEncounter.Spawn<BellkeeperEncounter>(w, Vector3.zero, 0)),
-            // Skyward Spire area boss: practice only, fought in his own arena
-            new BossEntry("Aurelion (area 1)", w => BossEncounter.Spawn<AurelionEncounter>(w, new Vector3(0, 0, -1.5f), 0), inRun: false, map: AurelionMap),
-            // Verdant Chimes area boss (graybox): practice only, fought in her own arena
-            new BossEntry("Sylvara (area 3)", w => BossEncounter.Spawn<SylvaraEncounter>(w, new Vector3(0, 0, -1.5f), 0), inRun: false, map: SylvaraMap),
-            // Brass Foundry area boss: practice only, fought in its own arena
-            new BossEntry("Crucivar (area 2)", w => BossEncounter.Spawn<CrucivarEncounter>(w, new Vector3(0, 0, -1.5f), 0), inRun: false, map: CrucivarMap),
+            new BossEntry("Bellkeeper", w => BossEncounter.Spawn<BellkeeperEncounter>(w, Vector3.zero, 0), final: true),
+            // Skyward Spire area boss; authored practice map
+            new BossEntry("Aurelion (area 1)", w => BossEncounter.Spawn<AurelionEncounter>(w, new Vector3(0, 0, -1.5f), 0), map: AurelionMap),
+            // Verdant Chimes area boss (graybox); authored practice map
+            new BossEntry("Sylvara (area 3)", w => BossEncounter.Spawn<SylvaraEncounter>(w, new Vector3(0, 0, -1.5f), 0), map: SylvaraMap),
+            // Brass Foundry area boss; authored practice map
+            new BossEntry("Crucivar (area 2)", w => BossEncounter.Spawn<CrucivarEncounter>(w, new Vector3(0, 0, -1.5f), 0), map: CrucivarMap),
         };
-        public static readonly int[] RunOrder = Enumerable.Range(0, Bosses.Length).Where(i => Bosses[i].InRun).ToArray();
+        // Catalog eligibility is stable; each run owns its shuffled sequence, with final encounters appended.
+        public static readonly int[] RunOrder = Enumerable.Range(0, Bosses.Length).Where(i => Bosses[i].InRun).OrderBy(i => Bosses[i].Final).ToArray();
+        public static int[] CreateRunOrder(System.Random random = null)
+        {
+            random = random ?? new System.Random(Guid.NewGuid().GetHashCode());
+            var opening = RunOrder.Where(i => !Bosses[i].Final).ToArray();
+            for (int i = opening.Length - 1; i > 0; i--) { int j = random.Next(i + 1); int swap = opening[i]; opening[i] = opening[j]; opening[j] = swap; }
+            return opening.Concat(RunOrder.Where(i => Bosses[i].Final)).ToArray();
+        }
+        public int[] EncounterOrder { get; private set; } = (int[])RunOrder.Clone();
         public static int SylvaraPractice => Array.FindIndex(Bosses, b => b.Map == SylvaraMap);
         public const string SylvaraMap = "verdant-chimes";
         public static int CrucivarPractice => Array.FindIndex(Bosses, b => b.Map == CrucivarMap);
@@ -85,7 +94,7 @@ namespace LastBell.Run
         void Awake()
         {
             Instance = this;
-            if (!mapArgHandled)
+            if (!mapArgHandled && !LastBell.Menu.MenuLaunch.Pending)
             {
                 mapArgHandled = true;
                 int want = RunMaps.IndexOf(RunMaps.RequestedId ?? "");
@@ -107,12 +116,27 @@ namespace LastBell.Run
             Log.Add($"{Time.frameCount}: {State} -> {s} (enc {Encounter}, gen {Generation})");
             Debug.Log($"[run] {State} -> {s} · encounter {Encounter} · gen {Generation}");
             State = s;
+            LastBell.Menu.MenuMusic.OnRunState(this, s);
             KeyboardMouseInput.Blocked = s == RunState.Menu || s == RunState.Results;
             StateChanged?.Invoke(s);
         }
 
         // ---------------- requests (UI / keyboard / tests) ----------------
-        public bool StartRun(string className) => Begin(RunMode.Run, className, RunOrder[0]);
+        public bool StartRun(string className) => StartRun(className, CreateRunOrder());
+        public bool StartRun(string className, int[] order)
+        {
+            if (State != RunState.Menu || order == null || order.Length != RunOrder.Length ||
+                !order.OrderBy(i => i).SequenceEqual(RunOrder.OrderBy(i => i)) || !Bosses[order[order.Length - 1]].Final) return false;
+            EncounterOrder = (int[])order.Clone();
+            return Begin(RunMode.Run, className, EncounterOrder[0]);
+        }
+        // Explicit map/encounter test launch. Legacy practice still uses its authored default; this path never remaps.
+        public bool StartPracticeOnSelectedMap(string className, int encounter)
+        {
+            if (State != RunState.Menu || Array.IndexOf(Classes, className) < 0 ||
+                LastBell.Menu.TestRushSetup.Incompatibility(RunMaps.Current, encounter) != null) return false;
+            return Begin(RunMode.Practice, className, encounter);
+        }
         // A boss with its own arena loads that map first; the new scene's director starts the practice (Start below).
         public bool StartPractice(string className, int encounter)
         {
@@ -128,6 +152,7 @@ namespace LastBell.Run
         static (string cls, int enc)? pendingPractice;   // survives the scene load
         void Start()
         {
+            if (LastBell.Menu.MenuLaunch.Consume(this)) { pendingPractice = null; return; }
             if (pendingPractice == null || Instance != this) return;
             var (cls, enc) = pendingPractice.Value; pendingPractice = null;
             Begin(RunMode.Practice, cls, enc);
@@ -173,7 +198,7 @@ namespace LastBell.Run
         public bool RequestRetry()
         {
             if (State != RunState.Results && !Paused) return false;
-            var mode = Mode; var cls = ClassName; int enc = Mode == RunMode.Practice ? practiceEncounter : RunOrder[0];
+            var mode = Mode; var cls = ClassName; int enc = Mode == RunMode.Practice ? practiceEncounter : EncounterOrder[0];
             Teardown();
             Mode = mode; ClassName = cls; BuildRun(enc); Go(RunState.Ready);
             return true;
@@ -241,8 +266,8 @@ namespace LastBell.Run
             World.CombatActive = false;
             // health policy (see PlayerController.RefreshHealth): every run boss after the first refills health; the last
             // also refills potions. A practice starts with a fresh player.
-            int pos = Array.IndexOf(RunOrder, index);
-            if (Mode == RunMode.Run && pos > 0) Player.RefreshHealth(refillPotions: pos == RunOrder.Length - 1);
+            int pos = Array.IndexOf(EncounterOrder, index);
+            if (Mode == RunMode.Run && pos > 0) Player.RefreshHealth(refillPotions: pos == EncounterOrder.Length - 1);
             Player.PrepareForEncounter(PlayerSocket, 180);
             Player.AbilitiesEnabled = false;
             Go(RunState.Intro);
@@ -328,8 +353,8 @@ namespace LastBell.Run
                     {
                         if (Boss) { Destroy(Boss.gameObject); Boss = null; World.Boss = null; }
                         if (Mode == RunMode.Practice) { Victory = true; Go(RunState.Results); }
-                        else if (Array.IndexOf(RunOrder, Encounter) == RunOrder.Length - 1) { Victory = true; Go(RunState.Results); }
-                        else BeginIntro(RunOrder[Array.IndexOf(RunOrder, Encounter) + 1]);
+                        else if (Array.IndexOf(EncounterOrder, Encounter) == EncounterOrder.Length - 1) { Victory = true; Go(RunState.Results); }
+                        else BeginIntro(EncounterOrder[Array.IndexOf(EncounterOrder, Encounter) + 1]);
                     }
                     break;
                 case RunState.Downed:
@@ -352,6 +377,6 @@ namespace LastBell.Run
         }
 
         // slot on the progress track: one per boss
-        public int ProgressSlot => Math.Max(0, Array.IndexOf(RunOrder, Encounter));
+        public int ProgressSlot => Math.Max(0, Array.IndexOf(EncounterOrder, Encounter));
     }
 }

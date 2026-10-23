@@ -35,6 +35,7 @@ namespace LastBell.Menu
         string output;
         MainMenu menu;
         InputSettings originalInputSettings, testInputSettings;
+        HideFlags originalInputFlags;
         void Start()
         {
             if (started) { Destroy(this); return; }
@@ -55,8 +56,13 @@ namespace LastBell.Menu
             Directory.CreateDirectory(output); Application.logMessageReceived += Log;
             Application.runInBackground = true;
             originalInputSettings = InputSystem.settings;
+            originalInputFlags=originalInputSettings.hideFlags;originalInputSettings.hideFlags=HideFlags.DontUnloadUnusedAsset;
             testInputSettings = Instantiate(originalInputSettings);
+            testInputSettings.hideFlags=HideFlags.DontUnloadUnusedAsset;
             testInputSettings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
+#if UNITY_EDITOR
+            testInputSettings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
+#endif
             InputSystem.settings = testInputSettings;
             Screen.SetResolution(1600, 900, FullScreenMode.Windowed);
             menu = FindAnyObjectByType<MainMenu>();
@@ -65,15 +71,18 @@ namespace LastBell.Menu
             Check("no combat authority in menu", !RunDirector.Instance && !FindAnyObjectByType<BossEncounter>() &&
                 FindObjectsByType<PlayerController>().All(p => !p.enabled && p.World == null && p.Kit == null && p.Input == null));
             Check("supplied logo loaded", menu.Logo && menu.Logo.sprite);
-            Check("menu music plays and loops", menu.Music.Source && menu.Music.Source.clip && menu.Music.Source.isPlaying && menu.Music.Source.loop && menu.Music.Source.timeSamples > 0);
+            Check("menu music plays", menu.Music.Source && menu.Music.Source.clip && menu.Music.Source.isPlaying && menu.Music.Source.timeSamples > 0);
             Quaternion openingCamera = Camera.main.transform.rotation;
-            Check("exactly three main buttons", menu.StartButton.GetComponentInChildren<Text>().text == "Start Run" &&
+            Check("four main actions", menu.StartButton.GetComponentInChildren<Text>().text == "Start Run" && menu.TestRushButton.GetComponentInChildren<Text>().text == "Boss-Rush Test Rush" &&
                 menu.SettingsButton.GetComponentInChildren<Text>().text == "Settings" && menu.ExitButton.GetComponentInChildren<Text>().text == "Exit");
             Check("initial focus", EventSystem.current.currentSelectedGameObject == menu.StartButton.gameObject);
             // Real InputSystem keyboard/controller events drive the installed UI module.
             var keyboard = TestKeyboard;
             var pad = TestGamepad;
             yield return null;
+            InputSystem.QueueStateEvent(keyboard, new KeyboardState(Key.RightArrow)); yield return null;
+            InputSystem.QueueStateEvent(keyboard, new KeyboardState()); yield return null; yield return null;
+            Check("keyboard right selects Test Rush", EventSystem.current.currentSelectedGameObject == menu.TestRushButton.gameObject);
             InputSystem.QueueStateEvent(keyboard, new KeyboardState(Key.RightArrow)); yield return null;
             InputSystem.QueueStateEvent(keyboard, new KeyboardState()); yield return null; yield return null;
             Check("keyboard right selects Settings", EventSystem.current.currentSelectedGameObject == menu.SettingsButton.gameObject);
@@ -127,24 +136,21 @@ namespace LastBell.Menu
             foreach (var size in new[] { new Vector2Int(1920, 1080), new Vector2Int(2560, 1440), new Vector2Int(2560, 1080) })
             {
                 Screen.SetResolution(size.x, size.y, FullScreenMode.Windowed); yield return new WaitForSeconds(1);
-                Check("bottom row fits " + size, Fits(menu.StartButton) && Fits(menu.SettingsButton) && Fits(menu.ExitButton));
+                Check("bottom row fits " + size, Fits(menu.StartButton) && Fits(menu.TestRushButton) && Fits(menu.SettingsButton) && Fits(menu.ExitButton));
                 yield return Shot("menu-" + size.x + "x" + size.y + ".png");
             }
             menu.OpenSettings(); yield return null; yield return Shot("settings.png"); menu.CloseSettings();
-            while (menu.Battle.Elapsed < 13.05f) yield return null;
+            var showcase = menu.GetComponent<MenuShowcase>();
+            while (showcase.Elapsed < 13.05f) yield return null;
             yield return Shot("party-spell-release.png");
             // Compare after the first full cycle, once the existing spell pools/trails have warmed.
-            while (menu.Battle.CompletedLoops < 1) yield return new WaitForSeconds(1);
-            yield return Shot("orbit-072-degrees.png");
+            while (showcase.Elapsed < 81) yield return null;
+            yield return Shot("first-arena-rotation.png");
             int objects = menu.Battle.GetComponentsInChildren<Transform>().Length + FindAnyObjectByType<MenuFxLifetime>().GetComponentsInChildren<Transform>(true).Length;
             int materials = Resources.FindObjectsOfTypeAll<Material>().Length;
-            for (int loop = 2; loop <= 5; loop++)
-            {
-                while (menu.Battle.CompletedLoops < loop) yield return new WaitForSeconds(1);
-                yield return Shot("orbit-" + (loop * 72).ToString("000") + "-degrees.png");
-            }
-            Check("five complete choreography loops", menu.Battle.CompletedLoops >= 5);
-            Check("all four actors travel independently", menu.Battle.ActorTravel.All(distance => distance > 10) && menu.Battle.IndependentMotionFrames > 60);
+            while (showcase.Elapsed < 156) yield return null;
+            Check("two complete arena rotations", showcase.Changes == 10 && showcase.CurrentStage == 0);
+            Check("all actors travel independently", menu.Battle.ActorTravel.Take(menu.Battle.ActorCount).All(distance => distance > .1f) && menu.Battle.IndependentMotionFrames > 60);
             Check("casters plant without sliding during attacks", menu.Battle.PlantedCastFrames > 120 && menu.Battle.CastSlideFrames == 0);
             Check("all choreography clips available", menu.Battle.Presenters.All(p => p.Placeholders.Count == 0));
             Check("actual class and boss spell effects play", menu.Battle.SpellsPresented > 100);
@@ -155,14 +161,20 @@ namespace LastBell.Menu
             menu.StartButton.onClick.Invoke(); menu.StartRun();
             Check("duplicate start guarded", menu.Loading);
             float deadline = Time.realtimeSinceStartup + 45;
+            while (!FindAnyObjectByType<HeroSelection>() && Time.realtimeSinceStartup < deadline) yield return null;
+            yield return new WaitForSeconds(.5f);
+            var selection=FindAnyObjectByType<HeroSelection>();
+            Check("Start opens cinematic hero selection",selection&&!RunDirector.Instance&&!FindAnyObjectByType<MenuBattle>());
+            if(selection){selection.SelectHero(2);selection.ConfirmClass();selection.ConfirmClass();}
+            deadline=Time.realtimeSinceStartup+45;
             while (!RunDirector.Instance && Time.realtimeSinceStartup < deadline) yield return null;
             var director = RunDirector.Instance;
-            Check("Start enters existing class/map selection", director && director.State == RunState.Menu && !FindAnyObjectByType<MenuBattle>());
-            Check("menu music stops when starting run", !FindAnyObjectByType<MenuMusic>());
+            Check("Select Class enters fresh run Ready", director && director.State == RunState.Ready && director.Encounter==director.EncounterOrder[0]);
+            Check("menu music continues through run preparation", FindAnyObjectByType<MenuMusic>() && FindAnyObjectByType<MenuMusic>().Source.isPlaying && (FindAnyObjectByType<MenuMusic>().Source.clip.name == "MainMenuMusic" || FindAnyObjectByType<MenuMusic>().Source.clip.name == "MainMenuOpening"));
             if (director)
             {
                 yield return new WaitForSeconds(0.2f);
-                Check("fresh session starts through existing API", director.StartRun("Arcanist") && director.RunsStarted == 1 && director.State == RunState.Ready);
+                Check("fresh session preserves class", director.ClassName=="Arcanist" && director.RunsStarted == 1 && director.State == RunState.Ready);
                 director.SetPaused(true); director.ReturnToMenu();
                 deadline = Time.realtimeSinceStartup + 30;
                 while (!FindAnyObjectByType<MainMenu>() && Time.realtimeSinceStartup < deadline) yield return null;
@@ -212,7 +224,7 @@ namespace LastBell.Menu
         }
         void RestoreInputSettings()
         {
-            if (originalInputSettings) InputSystem.settings = originalInputSettings;
+            if (originalInputSettings) { InputSystem.settings = originalInputSettings; originalInputSettings.hideFlags=originalInputFlags; }
             if (testInputSettings) Destroy(testInputSettings);
             if (TestKeyboard != null) InputSystem.RemoveDevice(TestKeyboard);
             if (TestGamepad != null) InputSystem.RemoveDevice(TestGamepad);

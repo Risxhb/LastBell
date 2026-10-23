@@ -119,7 +119,7 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!1 &1617801759
+--- !u!1 &1057221752
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -127,8 +127,8 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1617801761}
-  - component: {fileID: 1617801760}
+  - component: {fileID: 1057221754}
+  - component: {fileID: 1057221753}
   m_Layer: 0
   m_Name: Run Director
   m_TagString: Untagged
@@ -136,13 +136,13 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1617801760
+--- !u!114 &1057221753
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1617801759}
+  m_GameObject: {fileID: 1057221752}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 10d11a6e5b5b7d143a8565c4b7ffccd7, type: 3}
@@ -151,13 +151,13 @@ MonoBehaviour:
   EncounterStarts: 0
   EncounterEnds: 0
   Transitions: 0
---- !u!4 &1617801761
+--- !u!4 &1057221754
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1617801759}
+  m_GameObject: {fileID: 1057221752}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -421,4 +421,4 @@ SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
   - {fileID: 4510568458065514395}
-  - {fileID: 1617801761}
+  - {fileID: 1057221754}
