@@ -19,7 +19,7 @@ namespace LastBell.Run
     public sealed partial class RunAutoTest
     {
         static bool BellkeeperUltimateOnly => Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellBellkeeperUltimate", StringComparison.OrdinalIgnoreCase));
-        static bool UltWants(string idOrPart) => BkFilter == null ? idOrPart != "bots" : BkFilter == BellkeeperAbilities.Normalize(idOrPart);
+        static bool UltWants(string idOrPart) => BkFilter == null ? !idOrPart.StartsWith("bots") : BkFilter == BellkeeperAbilities.Normalize(idOrPart);
 
         IEnumerator BellkeeperUltimateChecks()
         {
@@ -34,12 +34,14 @@ namespace LastBell.Run
             if (UltWants(UltimateMechanics.TollingHour) || UltWants(UltimateMechanics.ThirteenthHour) || UltWants(UltimateMechanics.AreaQuotes)) yield return UltTollingHourChecks();
             if (UltWants(UltimateMechanics.Fracture)) yield return UltFractureChecks();
             if (UltWants("plan")) yield return UltPlanChecks();
+            if (UltWants("bots_dps")) yield return UltDpsChecks();
             if (UltWants("bots")) yield return UltBotChecks();
+            if (UltWants("bots_video")) yield return UltDemoVideo();
             yield return UltLeave();
         }
 
         // ---------------- harness ----------------
-        IEnumerator UltStart(string ability = null, string segment = null)
+        IEnumerator UltStart(string ability = null, string segment = null, string cls = "Vanguard")
         {
             BellkeeperEncounter.SetOverride = BellkeeperEncounter.AbilitySet.Ultimate;
             BellkeeperEncounter.AbilityOverride = ability ?? "";
@@ -49,7 +51,7 @@ namespace LastBell.Run
             int m = RunMaps.IndexOf(BellkeeperEncounter.ThroneMap);
             bool switching = m != RunMaps.Current;
             if (switching) directorLog.AddRange(d.Log);
-            d.StartPractice("Vanguard", RunDirector.BellkeeperUltimatePractice);
+            d.StartPractice(cls, RunDirector.BellkeeperUltimatePractice);
             if (switching) yield return BkAdopt(m, RunState.Ready);
             d.RequestReady();
             yield return Until(() => d.State == RunState.Combat, 4, "Bellkeeper Ultimate combat");

@@ -114,7 +114,7 @@ namespace LastBell.Run
                 if (castHold > 0) castHold--;
             }
             float bossGap = Sim.Flat(bpos - pos).magnitude - boss.BodyRadius;
-            if (Attacks && bossGap <= Range(me) + 1.5f && !boss.Ult.IsStilled(me)) Attack(me, ref inp);
+            if (Attacks && bossGap <= Range(me) + 1.5f && (boss.Ult == null || !boss.Ult.IsStilled(me))) Attack(me, ref inp);
             if (move != Vector3.zero) move = AroundBoss(pos, move, boss);
             inp.Move = ToScreen(move);
             DebugLine = $"rules {rules.Count} first {(rules.Count > 0 ? rules[0].Why + " in " + (rules[0].Tick - now) : "-")} target {(hasTarget ? $"({target.x:0.0},{target.z:0.0})" : "-")} at ({pos.x:0.0},{pos.z:0.0})";
