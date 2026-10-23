@@ -10,17 +10,36 @@ namespace LastBell.Run
     public sealed partial class BellkeeperEncounter
     {
         // ---------------- set switch and practice hook ----------------
-        public enum AbilitySet { V1, V2 }
-        // Tests set these; otherwise the command line decides: -lastbellAbilitySet v1|v2 (default v2), -lastbellAbility <key>,
-        // -lastbellBots <N> (practice with N-1 scripted stand-in players beside you).
+        public enum AbilitySet { V1, V2, Ultimate }
+        // Tests set these; otherwise the command line decides: -lastbellAbilitySet v1|v2|ultimate (default v2),
+        // -lastbellUltimate (= ultimate), -lastbellAbility <key>, -lastbellBots <N> (practice with N-1 scripted stand-ins).
+        // The practice entry "Bellkeeper — Ultimate" spawns the Ultimate whatever the switches say (SpawnUltimate).
         public static AbilitySet? SetOverride;
         public static string AbilityOverride;
-        public static AbilitySet RequestedSet => SetOverride ?? (string.Equals(Arg("-lastbellAbilitySet")?.Trim(), "v1", StringComparison.OrdinalIgnoreCase) ? AbilitySet.V1 : AbilitySet.V2);
+        static bool spawningUltimate;
+        public static AbilitySet RequestedSet
+        {
+            get
+            {
+                if (SetOverride.HasValue) return SetOverride.Value;
+                if (spawningUltimate) return AbilitySet.Ultimate;
+                var s = Arg("-lastbellAbilitySet")?.Trim();
+                if (string.Equals(s, "ultimate", StringComparison.OrdinalIgnoreCase) || HasArg("-lastbellUltimate")) return AbilitySet.Ultimate;
+                return string.Equals(s, "v1", StringComparison.OrdinalIgnoreCase) ? AbilitySet.V1 : AbilitySet.V2;
+            }
+        }
+        public static BossEncounter SpawnUltimate(CombatWorld w)
+        {
+            spawningUltimate = true;
+            try { return Spawn<BellkeeperEncounter>(w, Vector3.zero, 0); }
+            finally { spawningUltimate = false; }
+        }
+        static bool HasArg(string name) => Array.Exists(Environment.GetCommandLineArgs(), x => x.Equals(name, StringComparison.OrdinalIgnoreCase));
         public static string RequestedAbility => BellkeeperAbilities.Normalize(AbilityOverride ?? Arg("-lastbellAbility"));
         public static int RequestedBots => int.TryParse(Arg("-lastbellBots"), out int n) ? Mathf.Clamp(n, 1, 8) : 1;
         // ABILITIES.md open question 1 (provisional): v2 practice is fought on the Throne of the Final Toll.
         public const string ThroneMap = "shattered-hour";
-        public static string PracticeMap => RequestedSet == AbilitySet.V2 ? ThroneMap : null;
+        public static string PracticeMap => RequestedSet != AbilitySet.V1 ? ThroneMap : null;
         static string Arg(string name)
         {
             var a = Environment.GetCommandLineArgs();
@@ -39,7 +58,8 @@ namespace LastBell.Run
         void BuildV2()
         {
             Set = RequestedSet;
-            if (Set != AbilitySet.V2) return;
+            if (Set == AbilitySet.V1) return;
+            if (Set == AbilitySet.Ultimate) { BuildUltimate(); return; }
             abilities = BellkeeperAbilities.CreateAll();
             foreach (var a in abilities) a.Bind(this);
             abLean = Ability(BellkeeperAbilities.LeaningBell); abOrder = Ability(BellkeeperAbilities.StrikingOrder);
@@ -94,6 +114,7 @@ namespace LastBell.Run
         public void Launch(BellkeeperAbility a)
         {
             if (a == null || Dead) return;
+            if (a is UltimateMechanic m) m.TakeCue();
             a.Launched();
             PlanLog.Add((W.Tick, "launch " + a.Key));
             var r = new Live { A = a, E = a.Cast().GetEnumerator() };
@@ -110,7 +131,8 @@ namespace LastBell.Run
         void StopAbilities()
         {
             running.Clear(); pendingEcho = false; EchoArmed = false;
-            foreach (var a in abilities) a.Cancel();
+            foreach (var a in abilities) { a.Cancel(); a.NextTuning = null; if (a is UltimateMechanic m) m.NextCue = null; }
+            Ult?.Reset(); UltPlanActive = false;
             ForgetLeans();
         }
         protected override void OnHalt() { StopAbilities(); }
@@ -123,12 +145,13 @@ namespace LastBell.Run
             IEnumerator<int> plan = null; int wait = 0;
             while (true)
             {
+                if (Set == AbilitySet.Ultimate) UltimateTick();
                 stepping.Clear(); stepping.AddRange(running);
                 if (pendingEcho) { pendingEcho = false; if (EchoArmed) Launch(abEcho); }
                 if (wait > 0) wait--;
                 else
                 {
-                    if (plan == null || !plan.MoveNext()) { plan = (PracticeAbility != null ? PracticeAbility.Practice() : PhasePlan()).GetEnumerator(); plan.MoveNext(); }
+                    if (plan == null || !plan.MoveNext()) { plan = (PracticeAbility != null ? PracticeAbility.Practice() : Set == AbilitySet.Ultimate ? UltimatePlan() : PhasePlan()).GetEnumerator(); plan.MoveNext(); }
                     wait = Mathf.Max(1, plan.Current) - 1;
                 }
                 foreach (var r in stepping) if (running.Contains(r) && !Advance(r)) running.Remove(r);
@@ -140,7 +163,7 @@ namespace LastBell.Run
         public const int BaseHp = 3600;
         void FitHpToParty()
         {
-            int n = Mathf.Max(1, W.Players.Count), want = Mathf.RoundToInt(BaseHp * (1 + 0.7f * (n - 1)));
+            int n = Mathf.Max(1, W.Players.Count), want = Mathf.RoundToInt((Set == AbilitySet.Ultimate ? UltimateBaseHp : BaseHp) * (1 + 0.7f * (n - 1)));
             if (want == MaxHp || Hp != MaxHp) return;
             MaxHp = want; Hp = want;
         }

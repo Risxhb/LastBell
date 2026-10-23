@@ -36,6 +36,8 @@ namespace LastBell.Run
         {
             // final boss: in the run on the selected map; ability set v2's practice is fought on the Throne (Shattered Hour)
             new BossEntry("Bellkeeper", w => BossEncounter.Spawn<BellkeeperEncounter>(w, Vector3.zero, 0), mapFn: () => BellkeeperEncounter.PracticeMap),
+            // the final boss's Ultimate (proposal, bosses/4-shattered-hour-bellkeeper/ultimate/): practice only, on the Throne
+            new BossEntry("Bellkeeper — Ultimate", BellkeeperEncounter.SpawnUltimate, inRun: false, map: BellkeeperEncounter.ThroneMap),
             // Skyward Spire area boss: practice only, fought in his own arena
             new BossEntry("Aurelion (area 1)", w => BossEncounter.Spawn<AurelionEncounter>(w, new Vector3(0, 0, -1.5f), 0), inRun: false, map: AurelionMap),
             // Verdant Chimes area boss (graybox): practice only, fought in her own arena
@@ -44,6 +46,7 @@ namespace LastBell.Run
             new BossEntry("Crucivar (area 2)", w => BossEncounter.Spawn<CrucivarEncounter>(w, new Vector3(0, 0, -1.5f), 0), inRun: false, map: CrucivarMap),
         };
         public static readonly int[] RunOrder = Enumerable.Range(0, Bosses.Length).Where(i => Bosses[i].InRun).ToArray();
+        public static int BellkeeperUltimatePractice => Array.FindIndex(Bosses, b => b.Name.EndsWith("Ultimate"));
         public static int SylvaraPractice => Array.FindIndex(Bosses, b => b.Map == SylvaraMap);
         public const string SylvaraMap = "verdant-chimes";
         public static int CrucivarPractice => Array.FindIndex(Bosses, b => b.Map == CrucivarMap);

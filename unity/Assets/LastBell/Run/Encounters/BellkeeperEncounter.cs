@@ -58,7 +58,7 @@ namespace LastBell.Run
 
         int PhaseFor() => Hp > MaxHp * 0.70f ? 1 : Hp > MaxHp * 0.35f ? 2 : 3;
 
-        protected override IEnumerable<int> Script() => Set == AbilitySet.V2 ? ScriptV2() : ScriptV1();
+        protected override IEnumerable<int> Script() => Set == AbilitySet.V1 ? ScriptV1() : ScriptV2();   // v2 and the Ultimate share the scheduler
 
         IEnumerable<int> ScriptV1()
         {
@@ -306,6 +306,7 @@ namespace LastBell.Run
 
         protected override void StepAlways()
         {
+            Ult?.Step();   // the Ultimate's statuses (Stilled roots) hold even while the script is halted
             if (!presenter) return;
             if (Current == "approach" || Current == "reposition") presenter.TickBoss("Walk");
             else presenter.TickBoss("Idle");
