@@ -155,11 +155,11 @@ namespace LastBell.Run
             foreach (var c in cands)
             {
                 if (!Valid(c, boss) || !AllOk(c, rules, 0, g1End)) continue;
-                float d = Sim.Flat(c - pos).magnitude;
+                float d = PathLen(pos, c, bp, boss.BodyRadius);
                 float score = d + (d > reach1 ? 100 + d : 0);                 // unreachable: only if nothing else works
                 if (t2 >= 0)
                 {
-                    float nd = 30; foreach (var q in next) nd = Mathf.Min(nd, Sim.Flat(q - c).magnitude);
+                    float nd = 30; foreach (var q in next) nd = Mathf.Min(nd, PathLen(c, q, bp, boss.BodyRadius));
                     float secs2 = (t2 - t1) / (float)Sim.Hz;
                     // the second hop's slack: a dash's gain if one is left, else a walking margin (no dash, no slack)
                     float slack = UseDash && me.Stamina >= PlayerController.DashCost ? 1.5f : -0.5f;
@@ -173,6 +173,18 @@ namespace LastBell.Run
             return found;
         }
         static bool AllOk(Vector3 q, List<BotDemand> rules, int from, int to) { for (int i = from; i < to; i++) if (!rules[i].Ok(q)) return false; return true; }
+        // walking distance from a to b round the boss's body (straight if the line clears it; else tangents + arc), so a
+        // spot straight across him is planned as the detour it is
+        static float PathLen(Vector3 a, Vector3 b, Vector3 bp, float body)
+        {
+            float r = body + PlayerController.Radius + 0.3f;
+            Vector3 pa = Sim.Flat(a - bp), pb = Sim.Flat(b - bp), ab = pb - pa;
+            float t = ab.sqrMagnitude < 1e-6f ? 0 : Mathf.Clamp01(-Vector3.Dot(pa, ab) / ab.sqrMagnitude);
+            if ((pa + ab * t).magnitude >= r) return ab.magnitude;
+            float da = Mathf.Max(pa.magnitude, r), db = Mathf.Max(pb.magnitude, r);
+            float arc = Vector3.Angle(pa, pb) * Mathf.Deg2Rad - Mathf.Acos(r / da) - Mathf.Acos(r / db);
+            return Mathf.Sqrt(da * da - r * r) + Mathf.Sqrt(db * db - r * r) + r * Mathf.Max(0, arc);
+        }
         static bool Valid(Vector3 q, BossEncounter boss) =>
             CombatWorld.InPlayerBound(q, -0.25f) && Sim.Flat(q - boss.transform.position).magnitude >= boss.BodyRadius + PlayerController.Radius + 0.05f;
         static float BurnCost(BossEncounter boss, Vector3 from, Vector3 to, bool canDash)
