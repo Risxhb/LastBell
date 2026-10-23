@@ -23,6 +23,7 @@ namespace LastBell.Run
         public override string Id => "aurelion.ecliptic_order";
         public override string Name => "Ecliptic Order";
 
+        public const float RevealV4S = 2.0f;   // v4: the numerals show 2.0 s (strike I still lands at 3.2 s)
         public const float AnchorRadius = 5f, RevealS = 2.5f, FirstS = 3.2f, StepS = 2.2f, LeadS = 0.35f, LeadEasyS = 1.0f;
         public const int Damage = 50, Stun = 15;
 
@@ -42,7 +43,7 @@ namespace LastBell.Run
         public int Casts { get; private set; }
 
         public float SafeRadius => N <= 2 ? 3.0f : N <= 4 ? 3.5f : 4.5f;
-        int Reveal => Easy ? int.MaxValue : T(RevealS);
+        int Reveal => Easy ? int.MaxValue : T(AurelionArgs.V4 ? RevealV4S : RevealS);
         int First => T(FirstS);
         int Step => T(StepS);
         int Lead => Sim.Ticks(Easy ? LeadEasyS : LeadS);

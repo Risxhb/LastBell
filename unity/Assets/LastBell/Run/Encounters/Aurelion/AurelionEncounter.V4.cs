@@ -15,7 +15,8 @@ namespace LastBell.Run
     //   40 %: second form
     //   3 Exposed Meridian 40-15 % Severance (25 s) > Cascading Lances + Starfall > Sunspots + Zenith Collapse >
     //                              Towers + Lances > Hour Hands (Hard) > punish
-    //   4 Last Light 15-0 %        the floor falls every 15 s (wipe at 120 s) beside a rotation of everything, no punish
+    //   4 Last Light 15-0 %        the floor falls every 15 s (wipe at 120 s) beside Lances, Starfall, Sunspots + Collapse,
+    //                              Marks + Lances, Hour Hands (Hard); no punish, no Towers or Ecliptic (their spots would burn)
     // Zenith Collapse grows every cast (Solar Hunger). Final Noon wipes the party at 7:00 (warned at 6:30). Sunspot pools
     // last until the phase ends.
     public sealed partial class AurelionEncounter
@@ -34,7 +35,7 @@ namespace LastBell.Run
             Light = Register(new LastLight());            // [ability: last_light] (v4)
         }
 
-        public const float V4P2At = 0.70f, V4P3At = 0.40f, V4P4At = 0.15f, EnrageS = 420f, EnrageWarnS = 390f;
+        public const float V4P2At = 0.70f, V4P3At = 0.40f, V4P4At = 0.15f, EnrageS = 390f, EnrageWarnS = 360f;   // Final Noon at 6:30
         public float[] PhaseMarks => AurelionArgs.V4 ? new[] { V4P2At, V4P3At, V4P4At } : new[] { V2P2At, V2P3At };
 
         // ---- fight-ending wipes, the Corona Shield, pools that last until the phase ends, the enrage clock ----
@@ -86,8 +87,8 @@ namespace LastBell.Run
         public IEnumerable<int> HungryCollapse()
         {
             int c = CollapseCasts++;
-            Zenith.HungerShrink = 0.5f * c;
-            Zenith.HungerBonus = Mathf.Min(25, 5 + 5 * c);
+            Zenith.HungerShrink = 0.75f * c;
+            Zenith.HungerBonus = Mathf.Min(25, 5 + 10 * c);
             Zenith.HungerFloor = 3.0f + 0.5f * Mathf.Max(0, (W.Players.FindAll(p => p && !p.Down).Count + 1) / 2 - 1);
             foreach (var w in Zenith.Run()) yield return w;
         }
@@ -99,31 +100,33 @@ namespace LastBell.Run
 
         IEnumerable<IEnumerable<int>> Plan4(int ph)
         {
-            float g = GapV21;
+            float g = 0.1f;   // almost no breathing room between blocks
             switch (ph)
             {
                 case 1:
-                    yield return Block("Meridian Lances + Starfall Mirror", LancesWithStarfall(3, 1, false)); yield return V2Gap(g);
-                    yield return Block("Meridian Towers", Towers.Run()); yield return V2Gap(g);
-                    yield return Block("Ecliptic Order", Ecliptic.Run(3)); yield return V2Gap(g);
+                    // hard from the pull (Chzy18 2026-10-22): every block paired, memory from the opener. The first towers come with
+                    // only Starfall (the settled rule: a fight-ending mechanic is shown once before the fight stacks on it)
+                    yield return Block("Ecliptic Order + Meridian Lances", Together(Ecliptic.Run(4), Sim.Ticks(1.9f), Lances.Run(3, 1, false))); yield return V2Gap(g);
+                    yield return Block("Meridian Towers + Starfall Mirror", Paired(Towers.Run(), Towers.Duration(), Starfall.Run(), Starfall.Duration(), Sim.Ticks(1.0f))); yield return V2Gap(g);
+                    yield return Block("Sunspots + Starfall Mirror", Together(Spots.Run(), Sim.Ticks(0.5f), Starfall.Run())); yield return V2Gap(g);
                     yield return Block("Zenith Collapse + Meridian Lances", CollapseWithLances(3)); yield return V2Gap(g);
-                    yield return Block("Sunspots", Spots.Run()); yield return V2Gap(g);
-                    yield return Block("Zenith Marks + Meridian Lances", MarksWithLances(1));
+                    yield return Block("Meridian Towers + Zenith Marks", TowersThenMark()); yield return V2Gap(g);
+                    yield return Block("Zenith Marks + Meridian Lances", MarksWithLances(2));
                     break;
                 case 2:
-                    yield return Block("Sunspots + Starfall Mirror", Together(Spots.Run(), Sim.Ticks(0.5f), Starfall.Run())); yield return V2Gap(g);
-                    yield return Block("Meridian Towers + Zenith Marks", TowersThenMark()); yield return V2Gap(g);
-                    yield return Block("Ecliptic Order + Meridian Lances", Together(Ecliptic.Run(4), Sim.Ticks(1.9f), Lances.Run(3, 1, false))); yield return V2Gap(g);
-                    yield return Block("Zenith Collapse + Meridian Lances", CollapseWithLances(3)); yield return V2Gap(g);
-                    yield return Block("Orrery Closing + Horizon", OrreryBlock(2, false));
+                    // the whole fight harder (Chzy18 2026-10-22): three patterns per block
+                    yield return Block("Sunspots + Starfall Mirror + Meridian Lances", Together(Together(Spots.Run(), Sim.Ticks(0.5f), Starfall.Run()), Sim.Ticks(2.0f), Lances.Run(3, 1, false))); yield return V2Gap(g);
+                    yield return Block("Meridian Towers + Zenith Marks + Starfall Mirror", Together(TowersThenMark(), Sim.Ticks(1.5f), Starfall.Run())); yield return V2Gap(g);
+                    yield return Block("Ecliptic Order + Meridian Lances + Starfall Mirror", Together(Together(Ecliptic.Run(4), Sim.Ticks(1.9f), Lances.Run(3, 1, false)), Sim.Ticks(5.0f), Starfall.Run())); yield return V2Gap(g);
+                    yield return Block("Zenith Collapse + Meridian Lances", CollapseWithLances(4)); yield return V2Gap(g);
+                    yield return Block("Orrery Closing + Horizon + Hour Hands", OrreryBlock(2, false));
                     break;
                 case 3:
                     yield return Block("Severance", Sever.Run()); yield return V2Gap(g);
-                    yield return Block("Cascading Lances + Starfall Mirror", LancesWithStarfall(4, 2, true)); yield return V2Gap(g);
+                    yield return Block("Cascading Lances + Starfall Mirror + Hour Hands", Together(LancesWithStarfall(4, 2, true), Sim.Ticks(1.0f), Hands.Run())); yield return V2Gap(g);
                     yield return Block("Sunspots + Zenith Collapse", SpotsThenCollapse()); yield return V2Gap(g);
-                    yield return Block("Meridian Towers + Meridian Lances", Paired(Towers.Run(), Towers.Duration(), Lances.Run(4, 1, false), Lances.Duration(4, 1, false), Sim.Ticks(1.0f))); yield return V2Gap(g);
-                    if (W.Difficulty == Difficulty.Hard) { yield return Block("Hour Hands", Hands.Run()); yield return V2Gap(g); }
-                    yield return Punish();
+                    yield return Block("Meridian Towers + Meridian Lances + Starfall Mirror", Together(Paired(Towers.Run(), Towers.Duration(), Lances.Run(4, 1, false), Lances.Duration(4, 1, false), Sim.Ticks(1.0f)), Sim.Ticks(2.0f), Starfall.Run())); yield return V2Gap(g);
+                    yield return Block("Zenith Marks + Meridian Lances", MarksWithLances(2));   // two-step, then the punish
                     break;
                 default:
                     yield return Block("Last Light", Together(Light.Run(), 0, LastLightRotation()));
@@ -138,10 +141,11 @@ namespace LastBell.Run
         IEnumerable<int> SpotsThenCollapse()
         {
             foreach (var w in WalkToCentre()) yield return w;
-            foreach (var w in Paired(Spots.Run(), Spots.Duration(), HungryCollapse(), Zenith.Duration(), Sim.Ticks(1.0f))) yield return w;
+            foreach (var w in Paired(Spots.Run(), Spots.Duration(), HungryCollapse(), Zenith.Duration(), Sim.Ticks(2.0f))) yield return w;   // 2 s: rim to his feet (8 m) after the last blast
         }
 
-        // Phase 4: everything, up to four patterns with the falling floor, no punish (the burn)
+        // Phase 4: up to four patterns with the falling floor, no punish (the burn). No Towers or Ecliptic Order here: their
+        // spots would land on floor that has already burned (a perfect player would have to stand in fire)
         IEnumerable<int> LastLightRotation()
         {
             while (true)
@@ -150,10 +154,9 @@ namespace LastBell.Run
                 yield return Sim.Ticks(GapV21);
                 foreach (var w in SpotsThenCollapse()) yield return w;
                 yield return Sim.Ticks(GapV21);
-                foreach (var w in TowersThenMark()) yield return w;
+                foreach (var w in Paired(Lances.Run(3, 1, false), Lances.Duration(3, 1, false), Marks.Run(), Marks.Duration(), 0)) yield return w;
                 yield return Sim.Ticks(GapV21);
-                var ecl = Ecliptic.Run(4);
-                foreach (var w in W.Difficulty == Difficulty.Hard ? Together(ecl, Sim.Ticks(2.5f), Hands.Run()) : ecl) yield return w;
+                foreach (var w in Together(Hands.Run(), Sim.Ticks(0.5f), Starfall.Run())) yield return w;   // Hour Hands on every level now
                 yield return Sim.Ticks(GapV21);
             }
         }

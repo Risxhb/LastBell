@@ -8,7 +8,7 @@ namespace LastBell.Run
     // each needs at least one player inside when it resolves. They resolve in numeral order 2.0 s apart,
     // the first 4.0 s after they appear (Easy 5.0 s, then 2.5 s). A tower's 15 damage (Medium) is split among the
     // players inside (one player taking it all survives from full). An EMPTY tower wipes the party (Total Eclipse; the
-    // fight-ending-wipe exception for Aurelion). Solo: 2 towers, N 2: 2, N 3-4: 3, N 5+: 4.
+    // fight-ending-wipe exception for Aurelion). Solo: 3 towers in a row, N 2: 2, N 3-4: 3, N 5+: 4.
     // Tower spots are authored (a 6.5 m ring round the centre, one of three layouts per cast); consecutive towers are at
     // least 120 degrees apart (11.3 m), so a soloist must run between them: edge to edge 6.0 m at most 6.4 m, 0.68 s
     // spare at 6 m/s walking in the 2.0 s step, 0.94 s at 4.2 m/s with dash + sprint.
@@ -41,7 +41,7 @@ namespace LastBell.Run
             return mine.ResolveTick >= tick ? mine : null;
         }
 
-        public static int CountFor(int n) => n <= 2 ? 2 : n <= 4 ? 3 : 4;
+        public static int CountFor(int n) => n == 1 ? 3 : n <= 2 ? 2 : n <= 4 ? 3 : 4;   // solo: three in a row
         int First => Sim.Ticks(Easy ? FirstEasyS : FirstS);
         int Step => Sim.Ticks(Easy ? StepEasyS : StepS);
 

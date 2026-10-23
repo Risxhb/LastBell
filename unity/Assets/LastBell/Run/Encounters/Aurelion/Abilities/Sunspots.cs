@@ -20,7 +20,7 @@ namespace LastBell.Run
 
         public const float Blast = 3.5f, Pool = 3.0f, PoolBurn = 20f, FirstS = 3.0f, StepS = 1.5f, LockS = 1.5f;
         public const int Damage = 50;
-        public const int PoolTicks = 60 * 120;   // "until the phase ends": the encounter cancels them at each phase change
+        public const int PoolTicks = 60 * 120;   // 2 minutes, across phase changes (v4 "hard from the start")
         static readonly Color Coral = new Color(1f, 0.45f, 0.35f);
         static readonly string[] Numerals = { "I", "II", "III", "IV", "V", "VI", "VII", "VIII" };
 
@@ -29,6 +29,10 @@ namespace LastBell.Run
         public readonly List<Hazard> Pools = new List<Hazard>(); // every pool still on the floor (cleared at phase end)
         public int Casts { get; private set; }
         public bool Chained { get; private set; }
+
+        // the sigil this player still carries (bots: walk it to the rim before it goes off), or null
+        public Spot NextFor(PlayerController who, int tick) => Spots.Find(s => s.Who == who && !s.Done && s.DetonateTick >= tick);
+        public const float RimDrop = 10.5f;   // where a carrier should be when its sigil goes off (metres from him)
 
         int First => T(FirstS);
         int Step => T(StepS);
@@ -101,7 +105,7 @@ namespace LastBell.Run
                 Source = Name + " scorch", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = s.Blast.Origin, Radius = Pool,
                 LockAt = 0, ResolveAt = PoolTicks, BurnPerSecond = PoolBurn, Knockback = 0,
             });
-            Pools.Add(s.Pool); Boss.PhasePools.Add(s.Pool);
+            Pools.Add(s.Pool);   // pools last their full 2 minutes, across phase changes: the floor fills from the start
         }
     }
 }

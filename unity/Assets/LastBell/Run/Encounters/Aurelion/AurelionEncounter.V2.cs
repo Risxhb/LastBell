@@ -144,7 +144,7 @@ namespace LastBell.Run
                 foreach (var w in Closing.Run(horizon)) yield return w;
                 if (withHorizon) foreach (var w in Starfall.Run()) yield return w;
             }
-            if (ph >= 2 && W.Difficulty == Difficulty.Hard) foreach (var w in Hands.Run()) yield return w;
+            if (ph >= 2 && (W.Difficulty == Difficulty.Hard || AurelionArgs.V4)) foreach (var w in Hands.Run()) yield return w;   // v4: every level
             foreach (var w in WaitHorizon()) yield return w;
             foreach (var w in Punish()) yield return w;
         }

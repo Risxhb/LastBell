@@ -47,10 +47,10 @@ namespace LastBell.Run
             var tw = V2Boss.Towers;
             V3Bot(V2Main, BotMode.Perfect);
             yield return V2Fire(tw.Run(), 20);
-            V2Check("solo: 2 numbered towers, 6.5 m out, at least 120 degrees apart, resolving 4.0 s and 6.0 s after they rise",
-                tw.Towers.Count == 2 && tw.Towers.All(t => Mathf.Abs(Sim.Flat(t.At).magnitude - 6.5f) < 0.01f) && Vector3.Distance(tw.Towers[0].At, tw.Towers[1].At) >= 11.2f
+            V2Check("solo: 3 numbered towers, 6.5 m out, at least 120 degrees apart, 2.0 s apart",
+                tw.Towers.Count == 3 && tw.Towers.All(t => Mathf.Abs(Sim.Flat(t.At).magnitude - 6.5f) < 0.01f) && Vector3.Distance(tw.Towers[0].At, tw.Towers[1].At) >= 11.2f
                 && tw.Towers[1].ResolveTick - tw.Towers[0].ResolveTick == Sim.Ticks(2f), $"{tw.Towers.Count} towers");
-            V2Check("solo: the perfect route stands in each tower in order; no wipe, two 15 chips", !tw.Failed && !V4Wiped && V2HitsOn(V2Main, "Meridian Towers").Count() == 2 && V2HitsOn(V2Main, "Meridian Towers").All(h => h.Damage == 15),
+            V2Check("solo: the perfect route stands in each tower in order; no wipe, three 15 chips", !tw.Failed && !V4Wiped && V2HitsOn(V2Main, "Meridian Towers").Count() == 3 && V2HitsOn(V2Main, "Meridian Towers").All(h => h.Damage == 15),
                 string.Join(", ", V2HitsOn(V2Main).Select(h => h.Source + " " + h.Damage)));
             V3Unbot();
 
@@ -81,9 +81,10 @@ namespace LastBell.Run
             V2Check("solo: two sigils on you, 1.5 s apart; the perfect route drops them apart and is never hit by a blast",
                 sp.Spots.Count == 2 && sp.Spots.All(s => s.Who == V2Main && s.Blast != null) && !V2WasHit(V2Main, "Sunspots") && !sp.Chained,
                 string.Join(", ", V2HitsOn(V2Main).Select(h => h.Source)));
-            V2Check("each detonation leaves a scorch pool (3.0 m, burning) that stays until the phase ends", sp.Spots.All(s => s.Pool != null && V2W.Hazards.Live.Contains(s.Pool) && s.Pool.BurnPerSecond > 0));
+            V2Check("each detonation leaves a scorch pool (3.0 m, burning) that lasts 2 minutes", sp.Spots.All(s => s.Pool != null && V2W.Hazards.Live.Contains(s.Pool) && s.Pool.BurnPerSecond > 0));
             V2Boss.ClearPhasePools(); yield return V2Ticks(3);
-            V2Check("a phase change clears the pools", sp.Spots.All(s => !V2W.Hazards.Live.Contains(s.Pool)));
+            V2Check("the pools survive a phase change (the floor fills from the start)", sp.Spots.All(s => V2W.Hazards.Live.Contains(s.Pool)));
+            foreach (var s in sp.Spots) V2W.Hazards.Cancel(s.Pool);
             V3Unbot();
 
             // the chain reaction: N = 3 has 2 carriers; all three stand together, still
@@ -105,7 +106,7 @@ namespace LastBell.Run
             V2Begin(ec.Run());
             yield return V2Ticks(10);
             int shield = V2Boss.ShieldHp;
-            V2Check("Corona Shield raised: 18 % of his max HP", shield == Mathf.RoundToInt(V2Boss.MaxHp * TotalEclipse.ShieldFraction), $"{shield} of {V2Boss.MaxHp}");
+            V2Check("Corona Shield raised: 5 % of his max HP", shield == Mathf.RoundToInt(V2Boss.MaxHp * TotalEclipse.ShieldFraction), $"{shield} of {V2Boss.MaxHp}");
             yield return V2Ticks(Sim.Ticks(8f));
             for (int i = 0; i < 400 && V2Boss.ShieldHp > 0; i++) V2Boss.TakeHit(50, V2Boss.transform.position + Vector3.up * 2);
             yield return V2WaitIdle(10);
@@ -188,7 +189,7 @@ namespace LastBell.Run
             yield return Until(() => ll.Fallen >= 7 || V2Main.Down, 140, "seven shadow sectors");
             bool aliveAt7 = !V2Main.Down;
             yield return Until(() => V4Wiped, 30, "Final Noon after the eighth sector");
-            V2Check("the floor falls one 45-degree sector every 15 s; the perfect route lives through seven", aliveAt7 && ll.Fallen == 8, $"{ll.Fallen} fallen, alive at 7 {aliveAt7}");
+            V2Check("the floor falls one 45-degree sector every 12 s; the perfect route lives through seven", aliveAt7 && ll.Fallen == 8, $"{ll.Fallen} fallen, alive at 7 {aliveAt7}");
             V2Check("the eighth sector ends the fight: Final Noon wipes the party", V4Wiped && V2Boss.WipeCause.StartsWith("Final Noon"), V2Boss.WipeCause ?? "no wipe");
             V3Unbot();
 
@@ -197,7 +198,7 @@ namespace LastBell.Run
             if (V2Boss == null) yield break;
             V2Boss.TestClock = true; V2Boss.DebugSetFightSeconds(AurelionEncounter.EnrageS - 1f);
             yield return Until(() => V4Wiped, 10, "the 7:00 enrage");
-            V2Check("Final Noon wipes the party at 7:00 (the hard enrage)", V4Wiped && V2Boss.WipeCause.Contains("enrage"), V2Boss.WipeCause ?? "no wipe");
+            V2Check("Final Noon wipes the party at 6:30 (the hard enrage)", V4Wiped && V2Boss.WipeCause.Contains("enrage"), V2Boss.WipeCause ?? "no wipe");
             if (V2Boss) V2Boss.TestClock = false;
         }
 
@@ -209,8 +210,8 @@ namespace LastBell.Run
             if (V2Boss == null) yield break;
             var radii = new List<float>(); var dmg = new List<int>();
             for (int i = 0; i < 4; i++) { yield return V3FireToppedUp(V2Boss.HungryCollapse(), 10); radii.Add(V2Boss.Zenith.Last.Inner); dmg.Add(V2Boss.Zenith.Last.Damage); }
-            V2Check("Solar Hunger: every Collapse shrinks its disc 0.5 m (to 3.0 m) and hits 5 harder (50 > 70)",
-                radii.SequenceEqual(new[] { 4.5f, 4.0f, 3.5f, 3.0f }) && dmg.SequenceEqual(new[] { 50, 55, 60, 65 }), $"radii {string.Join("/", radii)}, damage {string.Join("/", dmg)}");
+            V2Check("Solar Hunger: every Collapse shrinks its disc 0.75 m (to 3.0 m) and hits 10 harder (50 > 70)",
+                radii.SequenceEqual(new[] { 4.5f, 3.75f, 3.0f, 3.0f }) && dmg.SequenceEqual(new[] { 50, 60, 70, 70 }), $"radii {string.Join("/", radii)}, damage {string.Join("/", dmg)}");
 
             // the 70 % flow: the intermission plays once, then Misalignment
             yield return V2Setup(1, Difficulty.Medium, new[] { new Vector3(0, 0, 9f) }, 1, Vector3.zero);

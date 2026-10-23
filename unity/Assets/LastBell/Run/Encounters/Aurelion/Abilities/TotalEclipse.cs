@@ -6,7 +6,8 @@ namespace LastBell.Run
 {
     // v4 Total Eclipse (aurelion.total_eclipse), the intermission at 70 %, abilities-v4/ABILITIES-v4.md §3.4 (proposal).
     // Sources: Dimensius's Event Horizon (survive in the safe zones), Ansurek's intermission shield. He stays targetable.
-    //   - Corona Shield: absorbs ShieldFraction of his max HP (AurelionEncounter.Absorb). Break it within 25 s or Total
+    //   - Corona Shield: absorbs 5 % of his max HP (AurelionEncounter.Absorb): solo at full HP that is 800 in 25 s, 32 DPS while
+    //     moving between wells (a ranged class does about 60 standing, RunAutoTest V4Dps). Break it within 25 s or Total
     //     Eclipse wipes the party (the damage-check / enrage exception). Breaking it ends the intermission at once.
     //   - Light wells: 4 cobalt-rimmed circles of 3.0 m (6 of 2.5 m at N >= 5) orbit the centre at 6 m, 15 degrees/s.
     //     Umbra: a player outside every well for more than 1.0 s straight takes 15 every second after that (chip; it can't
@@ -17,7 +18,7 @@ namespace LastBell.Run
         public override string Id => "aurelion.total_eclipse";
         public override string Name => "Total Eclipse";
 
-        public const float ShieldFraction = 0.18f, LimitS = 25f, WellOrbit = 6f, WellSpin = 15f, UmbraGraceS = 1.0f;
+        public const float ShieldFraction = 0.05f, LimitS = 25f, WellOrbit = 6f, WellSpin = 15f, UmbraGraceS = 1.0f;
         public const int UmbraDamage = 15;
         static readonly Color WellFill = new Color(0.22f, 0.32f, 0.7f), WellRim = new Color(0.9f, 1.2f, 2.4f);
 

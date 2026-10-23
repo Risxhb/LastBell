@@ -17,6 +17,8 @@ namespace LastBell.Run
         static string banner; static Color bannerColor; static float bannerUntil;
         public static void Banner(string text, Color c, float seconds) { banner = text; bannerColor = c; bannerUntil = Time.unscaledTime + seconds; }
         public static string CurrentBanner => banner != null && Time.unscaledTime < bannerUntil ? banner : null;
+        // a narrated caption box (demo videos): a title and a line of explanation, until changed or cleared with null
+        public static string CaptionTitle, CaptionBody;
         // a world-space label that stays until its owner hides it (Aurelion v3: Ecliptic numerals, SUN / SHADE marks);
         // with `follow`, Pos is an offset above that transform (a moving player)
         public sealed class WorldLabel { public Vector3 Pos; public Transform Follow; public string Text; public Color Color; public int Size; public bool Hidden; public void Hide() => Hidden = true; }
@@ -119,7 +121,7 @@ namespace LastBell.Run
             Boss();
             PlayerPanel();
             AllyPanel();
-            BannerText();
+            BannerText(); CaptionText();
             Floats();
             Labels();
             HazardLabels();
@@ -420,6 +422,17 @@ namespace LastBell.Run
         }
 
         GUIStyle lab, ban;
+        GUIStyle capT, capB;
+        void CaptionText()
+        {
+            if (string.IsNullOrEmpty(CaptionTitle)) return;
+            if (capT == null) { capT = new GUIStyle(num) { fontSize = 28 }; capB = new GUIStyle(num) { fontSize = 20, wordWrap = true, fontStyle = FontStyle.Normal }; }
+            float w = Mathf.Min(1100, Screen.width - 40), x = (Screen.width - w) / 2, y = Screen.height - 330;
+            Rect(new Rect(x, y, w, 96), new Color(0.03f, 0.04f, 0.09f, 0.82f));
+            capT.normal.textColor = new Color(1f, 0.86f, 0.5f); GUI.Label(new Rect(x, y + 4, w, 36), CaptionTitle, capT);
+            capB.normal.textColor = new Color(0.93f, 0.95f, 1f); GUI.Label(new Rect(x + 16, y + 40, w - 32, 54), CaptionBody ?? "", capB);
+        }
+
         void BannerText()
         {
             var t = CurrentBanner; if (t == null) return;
