@@ -49,6 +49,12 @@ Written the way Ultimate guides are: what each mechanic wants from **you**, by y
 - Every P5 Leaning Bell uses the fissure as its line, and a toll lands inside its warning: **cross before the toll**. **Dash across** (4 HP, 30 stamina) rather than walk (14 HP). In the first loop you can also wait beside it for the flare and cross in the 1.5 s after; in the second only a dash makes that.
 - **Stilled with a NW or SE hand** (the fissure's ends): your hiding strip is the fissure itself. Hide **beside** it: about 7 m behind the boss, 1.65–1.9 m to either side of the crack (a thin strip: practise it). His body still covers you. On the crack, the burn and the flare take 93 of your 100 HP.
 
+## T2 area quotes (the final exam)
+- **Sundial (Spire):** whoever is farthest from the boss is the SUN. The sun stands 4–6 m from him and steps sideways out of the shadow wedge when it locks; everyone else stays off the boss→sun line.
+- **Bellows (Foundry):** stand 3–3.5 m from the boss centre (the brass ring). The push carries you 3 m out to about 6.3 m, inside the tide line. Hugging the boss takes the Forge Core; standing far takes the tide line.
+- **Root Hours (Verdant):** watch which circle appears first, stand just outside it where it meets a neighbour, and step into it right after it blooms. Rooted in a later circle = two or three blooms = dead.
+- Six tolls (72) come first: enter T2 above 72 HP, and drink between the tolls and the quotes.
+
 ## Phase cheat-sheet
 | Phase | Learn first | Then |
 |---|---|---|
