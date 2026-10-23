@@ -558,6 +558,15 @@ for _s in 'LR':
         _co = np.array([body.data.vertices[int(i)].co[:] for i in _idx]); _ww = _w[_idx] / _w[_idx].sum(1, keepdims=True)
         STRAND_PTS[_bn] = (_co @ _A1[:3, :3].T + _A1[:3, 3], (_co @ _A2[:3, :3].T + _A2[:3, 3]) if _bn == _t2 else None,
                            _ww[:, 0], _ww[:, 1])
+# the sleeve drapes collide too (points in the sleeve bone's frame). A sleeve already rests against her hip and belt
+# pouch when she stands, so a sleeve point may sit no deeper than it does in the standing pose (SLEEVE_BASE, filled in
+# before the clips are baked).
+SLEEVE_BASE = {}
+for _s in 'LR':
+    _sn = f'sleeve.{_s}'; _idx = np.nonzero(_dom0 == _sn)[0]
+    _idx = _idx[np.argsort(-np.array([body.data.vertices[int(i)].co.z for i in _idx]))]; _idx = _idx[np.linspace(0, len(_idx) - 1, 96).astype(int)]
+    _A = np.array(ad.bones[_sn].matrix_local.inverted()); _co = np.array([body.data.vertices[int(i)].co[:] for i in _idx])
+    STRAND_PTS[_sn] = (_co @ _A[:3, :3].T + _A[:3, 3], None, np.ones(len(_idx)), np.zeros(len(_idx)))
 # each coat panel segment's outward and lateral axes in its bone frame (rest): away from the hips' axis
 PAN_AX = {}
 for _b in PANELS_C:
@@ -682,6 +691,8 @@ def _follow(frames, loop, rec, base, bvh=None):
                         rel = (L1 if L2 is None else L2) @ Rn.T
                         pts = hdn + rel if L2 is None else base1 + (hdn + rel) * W2[:, None]
                         pv, mag = _prof_push(T, pts)
+                        if n in SLEEVE_BASE:
+                            m2 = np.maximum(0.0, mag - SLEEVE_BASE[n]); pv = pv * (m2 / np.maximum(mag, 1e-9))[:, None]; mag = m2
                         if mag.max() <= 0: break
                         # gentle: only points well down the bone steer it (one near its head would need a huge turn
                         # for a small push and makes the strand thrash), by their average push, at most COLL_STEP a
@@ -1238,6 +1249,12 @@ else:
 RUN_FRAMES, SPRINT_FRAMES = MN, round(MN / 1.3)
 if os.environ.get('CHIME_EXPLORE'):     # authoring: run a pose experiment with the rig set up, then stop
     exec(open(os.environ['CHIME_EXPLORE']).read()); raise SystemExit(0)
+# the sleeves' standing-pose depth in the body (see SLEEVE_BASE)
+set_pose(idle(0, 0.0)); bpy.context.view_layer.update(); _pf = _body_profile()
+for _s in 'LR':
+    _sn = f'sleeve.{_s}'; _M = np.array(pbs[_sn].matrix); _P = STRAND_PTS[_sn][0] @ _M[:3, :3].T + _M[:3, 3]
+    SLEEVE_BASE[_sn] = _prof_push(_pf, _P)[1] + 0.005
+print('SLEEVE_BASE', {k: round(float(v.max()) * 1000) for k, v in SLEEVE_BASE.items()}, 'mm deepest standing')
 acts = [bake('Idle', 60, idle, True), bake('Run', RUN_FRAMES, run, True), bake('Sprint', SPRINT_FRAMES, sprint, True),
         bake('Dodge', 14, dodge, False), bake('Jump', 36, jump, False)]
 acts += [bake(name, frames, K if callable(K) else kit_pose(K), False) for name, (frames, K) in KIT.items()]
