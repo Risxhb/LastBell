@@ -302,15 +302,33 @@ namespace LastBell.Run
             var clean = led.Authored();
             Check($"Ledger P4 practice N={n}: nothing recorded = the authored clean ledger", bk.Segment == BellkeeperEncounter.UltSegment.P4 && led.UsedAuthored && book != null
                   && book.Select(p => p.Source).SequenceEqual(LedSources) && LedgerShapes(book).SequenceEqual(LedgerShapes(clean)) && book[3].Prints.Count == (n == 1 ? 2 : n));
-            BkStep(Sim.Ticks(n == 1 ? 51 : 14));
+            // block 2: the replay launches 0.5 s after the Stopped Hour; read what it held right after its launch
+            BkStepUntil(() => UltLaunchTick("ult_ledger", tp4, 1) > 0, Sim.Ticks(25));
+            var held = led.Held.Select(p => p.Roman + " " + p.Source).ToList();
+            var stilled = bk.Mechanic<StoppedHour>().StilledPlayers.ToList();
+            var clocks1 = bk.Mechanic<PendulumClocks>().Strikes.ToList();
+            var clockHours = clocks1.Select(s => $"{s.Owner.name} {UltimateState.Roman[s.Hour]}→{UltimateState.StationNames[s.Station]} @{(s.Tick - tp4) / 60f:0.00}").ToList();
+            var where = new List<string>();
+            Action<PlayerController, Hazard, int> spy = (p, h, dmg) => { if (h.Source == LedgerMechanic.ReplaySource) where.Add($"{p.name} {(led.PageOf.TryGetValue(h.Id, out int pg) ? UltimateState.Roman[pg] : "?")}@{(d.World.Tick - tp4) / 60f:0.00} at ({p.transform.position.x:0.0},{p.transform.position.z:0.0}) hp {p.Hp}"); };
+            d.World.PlayerHit += spy;
+            BkStep(Sim.Ticks(51) - (d.World.Tick - tp4));
+            d.World.PlayerHit -= spy;
+            Note($"Ledger P4 N={n} block 1 clocks: {string.Join("; ", clockHours)} · ledger half NE · stilled in block 2: {string.Join(", ", stilled.Select(p => p.name + " " + UltimateState.StationNames[Math.Max(0, bk.Ult.StationOf(p))]))}");
+            if (where.Count > 0) Note($"Ledger P4 N={n} hits: {string.Join("; ", where)}");
             int r1 = UltLaunchTick("ult_ledger", tp4, 0), r2 = UltLaunchTick("ult_ledger", tp4, 1), r3 = UltLaunchTick("ult_ledger", tp4, 2), sh = UltLaunchTick("ult_stopped_hour", tp4, 0);
-            if (n == 1)
-            {
-                Check("Ledger P4: three replays per loop at 0, 0.5 after the Stopped Hour, and with the Hand", r1 == tp4 && r2 > 0 && r3 > r2 && r2 - sh == Sim.Ticks(0.5f), $"{(r1 - tp4) / 60f:0.0}, {(r2 - tp4) / 60f:0.0}, {(r3 - tp4) / 60f:0.0} s");
-                Check("Ledger P4: block 2's III lands on the Stopped Hour's resume (9.0 s)", r2 + Sim.Ticks(4 + 1.5f * 3) == sh + Sim.Ticks(9));
-            }
-            Check($"Ledger P4 N={n}: strat bots at 4.2 m/s clear the authored replay{(n == 1 ? "s (all three)" : "")} untouched", LedgerHits() == 0 && d.World.Players.All(p => !p.Down),
-                  string.Join(", ", bkHits.Where(h => h.Source == LedgerMechanic.ReplaySource).Select(h => $"{h.Player.name}@{(h.Tick - tp4) / 60f:0.00}")));
+            Check($"Ledger P4 N={n}: three replays per loop at 0, 0.5 after the Stopped Hour, and with the Hand", r1 == tp4 && r2 > 0 && r3 > r2 && r2 - sh == Sim.Ticks(0.5f), $"{(r1 - tp4) / 60f:0.0}, {(r2 - tp4) / 60f:0.0}, {(r3 - tp4) / 60f:0.0} s");
+            Check($"Ledger P4 N={n}: block 2's III lands on the Stopped Hour's resume (9.0 s)", r2 + Sim.Ticks(4 + 1.5f * 3) == sh + Sim.Ticks(9));
+            Check($"Ledger P4 N={n}: no reflections in stopped time (block 2 holds IV, the images, and nothing else)", held.Count == 1 && held[0] == "IV Reflection of the Hour", string.Join(", ", held));
+            // the one documented forced hit (replayed V, 60): block 2, a Stilled player whose station is opposite the ledger
+            // half hides inside V's half. Block 1's clock pairs lock between replayed strikes (7.75 / 10.75): nothing forced.
+            int opposite = (LedgerMechanic.AuthoredStation + 2) % 4;
+            string Page(BkHit h) => led.PageOf.TryGetValue(h.HazardId, out int pg) ? UltimateState.Roman[pg] : "?";
+            bool Forced(BkHit h) => Page(h) == "V" && h.Tick >= r2 && h.Tick <= r2 + Sim.Ticks(9) && stilled.Contains(h.Player) && bk.Ult.StationOf(h.Player) == opposite;
+            var hits = bkHits.Where(h => h.Source == LedgerMechanic.ReplaySource).ToList();
+            var unforced = hits.Where(h => !Forced(h)).ToList();
+            Check($"Ledger P4 N={n}: strat bots at 4.2 m/s survive all three replays; the only hits are the documented forced V (block 2, Stilled, opposite station; at most one each)",
+                  unforced.Count == 0 && hits.GroupBy(h => h.Player).All(g => g.Count() <= 1) && d.World.Players.All(p => !p.Down),
+                  hits.Count == 0 ? "untouched" : string.Join(", ", hits.Select(h => $"{h.Player.name} {Page(h)}@{(h.Tick - tp4) / 60f:0.00}{(Forced(h) ? " forced" : "")}")));
             LedgerUnbot();
         }
 

@@ -27,6 +27,9 @@ namespace LastBell.Run
     // centre; solo never counts) replay with radius x 1.5 ("the ink runs"), and Leaning Bells that struck opposite halves
     // (more than 90° apart) replay back to back: V moves to 0.75 s before I, so the line is crossed in 0.75 s. A clean
     // P1 replays exactly as recorded. Both stay solvable from memory (LEDGER.md proof; checked in code by Solve()).
+    // No reflections in stopped time: a replayed images page that would strike while anyone is Stilled (before the resume
+    // tick) is held and never strikes. In P4 block 2 the stop covers V and IV; a Stilled player whose station is opposite
+    // the ledger half must hide inside V's half, so V alone is the one documented forced hit (60, survivable from full).
     // Look: P1 the left hand writes on the air (clip WriteLedger) at each kept strike; P4 the halo spins backwards
     // (TurnLedger). Neither clip exists yet (rig list); the outlines, numerals and clock glyphs are code-built stand-ins.
     public sealed class LedgerMechanic : UltimateMechanic
@@ -83,6 +86,8 @@ namespace LastBell.Run
         public int MarksShown => marks.Count;                // live outlines and numerals (0 after a cancel)
         public bool SpreadImages { get; private set; }       // this replay: P1 images weren't clumped, they run x 1.5
         public bool SplitHalves { get; private set; }        // this replay: P1 halves were opposite, V strikes 0.75 s before I
+        public readonly List<Page> Held = new List<Page>();  // this replay: pages held by stopped time (images during a Stopped Hour)
+        public readonly Dictionary<int, int> PageOf = new Dictionary<int, int>();   // replayed hazard id -> its page numeral (tests, this encounter)
         public bool RouteExists { get; private set; }        // the current replay has a walking route (LEDGER.md proof)
         public float RouteLongestHop { get; private set; }
 
@@ -139,7 +144,7 @@ namespace LastBell.Run
         {
             Boss.ShowAttack(Name);
             Book = BookForReplay(out bool authored); UsedAuthored = authored;
-            steps.Clear(); routes.Clear(); grid = null;
+            steps.Clear(); routes.Clear(); frozen.Clear(); grid = null; Held.Clear();
             float at0 = Cue.At0(4f);
             // the messy-P1 costs (Ultimate session 2026-10-23): unclumped images run (radius x 1.5), and Leaning Bells that
             // struck opposite halves replay back to back (V 0.75 s before I, in the slot just before I's)
@@ -152,6 +157,7 @@ namespace LastBell.Run
                 float at = at0 + Spacing * k;
                 if (SplitHalves && page == leans[leans.Count - 1]) at = at0 + Spacing * (Book.Count - 1) - SplitGap;
                 int resolve = TickAt(at);
+                if (page.Source == ImageSource && TimeStoppedAt(resolve)) { Held.Add(page); continue; }   // no reflections in stopped time
                 var s = new Step { Page = page, ResolveTick = resolve, SpawnTick = Mathf.Max(LaunchTick, resolve - WarnTicks), Scale = SpreadImages && page.Source == ImageSource ? SpreadScale : 1f };
                 foreach (var f in page.Prints) s.Probes.Add(Copy(f, 1, s.Scale));
                 steps.Add(s);
@@ -170,7 +176,7 @@ namespace LastBell.Run
                     {
                         var h = Spawn(Copy(f, UltShapes.ResolveIn(s.ResolveTick - Now), s.Scale));
                         h.OnResolve = Resolved;
-                        s.Live.Add(h);
+                        s.Live.Add(h); PageOf[h.Id] = s.Page.Numeral;
                         ShowMark(f, s.Page.Numeral, null, s.ResolveTick + 1);
                     }
                 }
@@ -178,9 +184,16 @@ namespace LastBell.Run
                 yield return 1;
             }
             StepMarks();
-            steps.Clear(); routes.Clear();
+            steps.Clear(); routes.Clear(); frozen.Clear();
             yield return 30;   // the halo settles; nothing damaging
             ClearMarks();
+        }
+        // Time is stopped on `tick`: someone is Stilled then, before the resume tick (the Stopped Hour's window runs through
+        // its resume tick; time moves again on it).
+        bool TimeStoppedAt(int tick)
+        {
+            foreach (var kv in Ult.All) { var s = kv.Value; if (s.StillFrom >= 0 && tick >= s.StillFrom && tick < s.StillUntil - 1) return true; }
+            return false;
         }
         // P1's images were clumped: every mirrored image within ClumpRadius of their centre (one player can't scatter them)
         public static bool Clumped(Page images)
@@ -354,15 +367,48 @@ namespace LastBell.Run
             }
             if (steps.Count == 0) return;
             if (!routes.TryGetValue(p, out var route)) routes[p] = route = RouteFrom(Sim.Flat(p.transform.position));
+            // Stilled through some of the strikes: you dodge them where you freeze. When a hiding spot clear of every strike
+            // in the stop exists, those strikes are due at the stop tick, with the hiding rule (else they stay on their own
+            // ticks: the documented forced hit)
+            var freeze = Frozen(p);
             for (int k = 0; k < steps.Count; k++)
             {
                 var s = steps[k]; if (s.ResolveTick < Now) continue;
+                bool inStop = freeze.ok && Now <= freeze.stop && s.ResolveTick >= freeze.stop && s.ResolveTick <= freeze.resume;
                 into.Add(new BotDemand
                 {
-                    Tick = s.ResolveTick, Since = s.Page.Tick, Ok = q => !s.Hits(q, 0.15f), Hint = k < route.Length ? route[k] : Sim.Flat(p.transform.position),
-                    Memory = true, Why = "Ledger " + s.Page.Roman, From = this,
+                    Tick = inStop ? freeze.stop : s.ResolveTick, Since = s.Page.Tick, Ok = q => !s.Hits(q, 0.15f),
+                    Hint = inStop ? freeze.spot : k < route.Length ? route[k] : Sim.Flat(p.transform.position),
+                    Memory = true, Why = "Ledger " + s.Page.Roman + (inStop ? " (frozen)" : ""), From = this,
                 });
             }
+        }
+        // p's Stopped Hour freeze over this replay: (stop, resume) and a hiding spot clear of every strike in it, if one exists.
+        // Checked with the Stopped Hour's own hiding rule (its Demands), once per player per replay.
+        readonly Dictionary<PlayerController, (bool ok, int stop, int resume, Vector3 spot)> frozen = new Dictionary<PlayerController, (bool, int, int, Vector3)>();
+        (bool ok, int stop, int resume, Vector3 spot) Frozen(PlayerController p)
+        {
+            if (frozen.TryGetValue(p, out var f)) return f;
+            f = (false, -1, -1, Vector3.zero);
+            var sh = Boss.Mechanic<StoppedHour>();
+            if (sh != null && sh.Running && sh.StopTick >= Now && sh.StilledPlayers.Contains(p) && grid != null)
+            {
+                var hide = new List<BotDemand>(); sh.Demands(p, hide);
+                var rule = hide.FirstOrDefault(x => x.Tick == sh.StopTick && x.Ok != null);
+                var inStop = steps.Where(s => s.ResolveTick >= sh.StopTick && s.ResolveTick <= sh.ResumeTick).ToList();
+                if (rule.Ok != null && inStop.Count > 0)
+                {
+                    float best = float.PositiveInfinity; var at = Sim.Flat(rule.Hint); bool any = false; Vector3 pick = at;
+                    foreach (var q in grid)
+                    {
+                        if (!rule.Ok(q) || inStop.Any(s => s.Hits(q, SafePad))) continue;
+                        float d2 = Sim.Flat(q - at).sqrMagnitude; if (d2 < best) { best = d2; pick = q; any = true; }
+                    }
+                    f = (any, sh.StopTick, sh.ResumeTick, pick);
+                }
+            }
+            if (sh != null && sh.Running && sh.StopTick >= 0) frozen[p] = f;   // known once the hourglass is up
+            return f;
         }
         // the ledger half: toward clock III's station once the clocks have assigned it, else the authored NE station
         public Vector3 LedgerHalf()
@@ -417,7 +463,7 @@ namespace LastBell.Run
             if (recording) { recording = false; Ult.Recording = false; }
             if (subscribed) { Ult.FootprintRecorded -= OnPrint; subscribed = false; }
             take = null;
-            steps.Clear(); routes.Clear(); grid = null;
+            steps.Clear(); routes.Clear(); frozen.Clear(); grid = null;
             ClearMarks();
             base.Cancel();
         }
