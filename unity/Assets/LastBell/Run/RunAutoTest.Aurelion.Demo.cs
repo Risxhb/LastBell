@@ -98,6 +98,12 @@ namespace LastBell.Run
             if (b == null) yield break;
             Note($"demo: party of {d.World.Players.Count} ({string.Join(", ", d.World.Players.Select(p => p.ClassName))}), boss HP {b.MaxHp}");
             if (DemoRecord) { demoRecording = true; StartCoroutine(DemoRecorder("aurelion_v4_demo")); }
+            d.World.PlayerHit += (p, h, dmg) =>
+            {
+                if (p.Hp > 0 || b.WipeCause != null) return;
+                string blk = b.BlockLog.Count > 0 ? b.BlockLog[b.BlockLog.Count - 1].block : "?";
+                Note($"demo death @{b.FightTicks / (float)Sim.Hz:0.0}s: {p.ClassName} by {h.Source} {dmg} in [{blk}], potions left {p.Potions} | {(p.Input as AllyBot)?.DebugLine}");
+            };
             string last = ""; float t = 0;
             while (t < 480 && d.State == RunState.Combat)
             {
@@ -114,7 +120,9 @@ namespace LastBell.Run
             int secs = b.FightTicks / Sim.Hz;
             RunHud.CaptionTitle = b.Dead ? "AURELION DEFEATED" : "THE PARTY FELL";
             RunHud.CaptionBody = $"{secs / 60}:{secs % 60:00}  ·  {d.World.Players.Count(p => !p.Down)} of {d.World.Players.Count} standing";
-            Note($"demo end @{b.FightTicks / (float)Sim.Hz:0.0}s: {(b.Dead ? "boss defeated" : "party down: " + (b.WipeCause ?? d.World.LastDamageSource))}; standing {d.World.Players.Count(p => !p.Down)} of {d.World.Players.Count}");
+            Note($"demo end @{b.FightTicks / (float)Sim.Hz:0.0}s: {(b.Dead ? "boss defeated" : "party down: " + (b.WipeCause ?? d.World.LastDamageSource) + $", boss at {b.Hp} of {b.MaxHp}")}; standing {d.World.Players.Count(p => !p.Down)} of {d.World.Players.Count}");
+            if (b.Telemetry) foreach (var s in b.Telemetry.Summary()) Note("demo telemetry: " + s);
+            foreach (var g in b.Telemetry.Rows.Where(r => r.Kind == "hit").GroupBy(r => r.Player)) Note($"demo hits {g.Key}: " + string.Join(", ", g.GroupBy(r => r.Source).Select(s => $"{s.Key} {s.Count()}x{s.Sum(r => r.Value):0}")));
             Check("demo: the fight ran to an end", d.State != RunState.Combat, d.State.ToString());
             t = 0; while (t < 5) { t += Time.deltaTime; yield return null; }
             demoRecording = false; yield return null; yield return null;

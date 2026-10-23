@@ -20,7 +20,7 @@ namespace LastBell.Run
 
         public const float Blast = 3.5f, Pool = 3.0f, PoolBurn = 20f, FirstS = 3.0f, StepS = 1.5f, LockS = 1.5f;
         public const int Damage = 50;
-        public const int PoolTicks = 60 * 120;   // 2 minutes, across phase changes (v4 "hard from the start")
+        public const int PoolTicks = 60 * 75;   // 75 s, across phase changes (v4 "hard from the start")
         static readonly Color Coral = new Color(1f, 0.45f, 0.35f);
         static readonly string[] Numerals = { "I", "II", "III", "IV", "V", "VI", "VII", "VIII" };
 
@@ -105,7 +105,7 @@ namespace LastBell.Run
                 Source = Name + " scorch", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = s.Blast.Origin, Radius = Pool,
                 LockAt = 0, ResolveAt = PoolTicks, BurnPerSecond = PoolBurn, Knockback = 0,
             });
-            Pools.Add(s.Pool);   // pools last their full 2 minutes, across phase changes: the floor fills from the start
+            Pools.Add(s.Pool);   // pools last their full 75 s, across phase changes: the floor fills from the start
         }
     }
 }

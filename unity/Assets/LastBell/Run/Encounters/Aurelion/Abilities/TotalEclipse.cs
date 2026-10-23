@@ -6,11 +6,11 @@ namespace LastBell.Run
 {
     // v4 Total Eclipse (aurelion.total_eclipse), the intermission at 70 %, abilities-v4/ABILITIES-v4.md §3.4 (proposal).
     // Sources: Dimensius's Event Horizon (survive in the safe zones), Ansurek's intermission shield. He stays targetable.
-    //   - Corona Shield: absorbs 5 % of his max HP (AurelionEncounter.Absorb): solo at full HP that is 800 in 25 s, 32 DPS while
+    //   - Corona Shield: absorbs 3.5 % of his max HP (AurelionEncounter.Absorb): solo at full HP that is 490 in 25 s, 20 DPS while
     //     moving between wells (a ranged class does about 60 standing, RunAutoTest V4Dps). Break it within 25 s or Total
     //     Eclipse wipes the party (the damage-check / enrage exception). Breaking it ends the intermission at once.
-    //   - Light wells: 4 cobalt-rimmed circles of 3.0 m (6 of 2.5 m at N >= 5) orbit the centre at 6 m, 15 degrees/s.
-    //     Umbra: a player outside every well for more than 1.0 s straight takes 15 every second after that (chip; it can't
+    //   - Light wells: 4 cobalt-rimmed circles of 3.5 m (6 of 3.0 m at N >= 5) orbit the centre at 6 m, 15 degrees/s.
+    //     Umbra: a player outside every well for more than 2.0 s straight takes 10 every second after that (chip; it can't
     //     kill fast, it drains potions).
     //   - Meanwhile Meridian Lances (3 beams) every 6 s and Starfall Mirror after 2 s: with the Umbra, three patterns.
     public sealed class TotalEclipse : AurelionAbility
@@ -18,11 +18,11 @@ namespace LastBell.Run
         public override string Id => "aurelion.total_eclipse";
         public override string Name => "Total Eclipse";
 
-        public const float ShieldFraction = 0.05f, LimitS = 25f, WellOrbit = 6f, WellSpin = 15f, UmbraGraceS = 1.0f;
-        public const int UmbraDamage = 15;
+        public const float ShieldFraction = 0.035f, LimitS = 25f, WellOrbit = 6f, WellSpin = 15f, UmbraGraceS = 2.0f;
+        public const int UmbraDamage = 10;
         static readonly Color WellFill = new Color(0.22f, 0.32f, 0.7f), WellRim = new Color(0.9f, 1.2f, 2.4f);
 
-        public float WellRadius => N >= 5 ? 2.5f : 3.0f;
+        public float WellRadius => N >= 5 ? 3.0f : 3.5f;   // a star (2.5 m with its edge) on you must not fill the whole well
         public int WellCount => N >= 5 ? 6 : 4;
         public readonly List<Vector3> Wells = new List<Vector3>();   // current well centres (tests, bots)
         public bool Active { get; private set; }
@@ -64,7 +64,7 @@ namespace LastBell.Run
         IEnumerable<int> Schedule()
         {
             yield return Sim.Ticks(2f);
-            foreach (var w in AurelionEncounter.Together(Boss.Starfall.Run(), Sim.Ticks(1f), Boss.Lances.Run(3, 1, false))) yield return w;
+            foreach (var w in AurelionEncounter.Together(Boss.Starfall.Run(true), Sim.Ticks(1f), Boss.Lances.Run(3, 1, false))) yield return w;
             while (true)
             {
                 yield return Sim.Ticks(2.5f);

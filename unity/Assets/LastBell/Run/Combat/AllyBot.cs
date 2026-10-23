@@ -55,13 +55,16 @@ namespace LastBell.Run
             Hazard threat = null; int left = int.MaxValue;
             foreach (var h in live)
                 if (h.Age >= (Mode == BotMode.Passive ? Mathf.Max(h.LockAt, 0) + reactTicks : 0) && Hits(h, me, pos) && h.ResolveAt - h.Age < left) { threat = h; left = h.ResolveAt - h.Age; }
-            int duty = Duty(me, boss);   // Perfect: ticks until its memory job (anchor / mark) resolves, or -1
+            int duty = Duty(me, boss);   // ticks until its job resolves, or -1
+            if (threat != null && !bad(pos)) threat = null;   // a shape that lands after its job: not in the way yet
+            // dodge whatever lands first: shapes landing more than 0.5 s after it are not in the way yet (Perfect / Reflex only)
+            if (threat != null && Mode != BotMode.Passive) bad = Bad(me, boss, false, w.Tick + left);
             if (threat == null && duty >= 0 && bad(pos)) left = duty;
             Vector3 move;
             if (threat != null || (duty >= 0 && bad(pos)))
             {
                 move = NearestClear(pos, boss, bad, out float need);
-                if (move == Vector3.zero && need > 90) { bad = Bad(me, boss, true); move = NearestClear(pos, boss, bad, out need); }   // no clean spot: take the burn
+                if (move == Vector3.zero && need > 90) { bad = Bad(me, boss, true, threat != null ? w.Tick + left : int.MaxValue); move = NearestClear(pos, boss, bad, out need, false); }   // no clean spot: take the burn
                 float t = left / (float)Sim.Hz;
                 if (move != Vector3.zero)
                 {
@@ -93,6 +96,8 @@ namespace LastBell.Run
                 if (Attacks && gap <= Range(me) + 1.5f) Attack(me, ref inp);
             }
             if (me.Hp < (Mode == BotMode.Passive ? 40 : 70) && me.Potions > 0 && tick % 30 == 0) inp.Potion = true;   // test bots: before a Hard kill hit (65) could down them
+            // walk round his body, not into it: a straight line across the centre would pin the bot against him
+            if (move != Vector3.zero) move = AroundBoss(pos, move, boss);
             DebugLine = $"duty {duty} threat {threat?.Source ?? "-"} bad {bad(pos)} move ({move.x:0.0},{move.z:0.0}) at ({pos.x:0.0},{pos.z:0.0})";
             inp.Move = ToScreen(move);
             return inp;
@@ -137,7 +142,7 @@ namespace LastBell.Run
         // where this bot must not stand now: inside any shape that would hit it; a Perfect bot also avoids anywhere outside
         // the next Ecliptic anchor's disc and the wrong side of its Zenith Mark (with a 0.35-0.4 m buffer); v4 jobs: its
         // Meridian Tower, a light well during Total Eclipse, its Severance side (and clear of the line's next 2 s of sweep)
-        System.Func<Vector3, bool> Bad(PlayerController me, BossEncounter boss, bool allowBurn = false)
+        System.Func<Vector3, bool> Bad(PlayerController me, BossEncounter boss, bool allowBurn = false, int soonest = int.MaxValue)
         {
             var live = me.World.Hazards.Live;
             // visible jobs (a tower, a light well, a Severance side) for every bot, the allies included; the memory jobs (the
@@ -148,7 +153,7 @@ namespace LastBell.Run
             var mine = memory && a != null && a.Marks != null ? a.Marks.Current(me, tick) : null;
             var tower = a != null && a.Towers != null ? a.Towers.NextFor(me, tick) : null;
             bool wells = a != null && a.Eclipse != null && a.Eclipse.Active;
-            int side = a != null && a.Sever != null && a.Sever.Active ? a.Sever.Assigned(me) : 0;
+            int side = a != null && a.Sever != null && a.Sever.Active ? (a.Sever.Splitting ? a.Sever.Planned(me) : a.Sever.Assigned(me)) : 0;   // the call while splitting, then the locked side
             var spot = a != null && a.Spots != null ? a.Spots.NextFor(me, tick) : null;   // a Sunspot on me: take it to the rim
             // timed jobs one at a time: only the one that lands first counts now (a tower then a mark, a ring then a mark), or
             // the two zones can leave no ground that satisfies both and the bot freezes
@@ -161,14 +166,21 @@ namespace LastBell.Run
             if (mine != null && mine.ResolveTick > due) mine = null;
             if (tower != null && tower.ResolveTick > due) tower = null;
             if (spot != null && spot.DetonateTick > due) spot = null;
-            if (k < 0 && mine == null && tower == null && spot == null && !wells && side == 0) return q => { foreach (var h in live) if (Hits(h, me, q)) return true; return false; };
+            if (k < 0 && mine == null && tower == null && spot == null && !wells && side == 0 && soonest == int.MaxValue) return q => { foreach (var h in live) if (Hits(h, me, q)) return true; return false; };
             var bp = Sim.Flat(boss.transform.position);
             Vector3 anchor = k >= 0 ? a.Ecliptic.Anchors[k] : Vector3.zero;
-            float disc = k >= 0 ? a.Ecliptic.SafeRadius - Hazard.Margin - 0.35f : 0;
+            float disc = k >= 0 ? a.Ecliptic.SafeRadius - Hazard.Margin - 0.2f : 0;
+            // while a timed job is due, a shape that lands after it is not in the way yet: hold the job, dodge it afterwards
+            int first = Mathf.Min(due, soonest);   // the job or the threat that lands first
+            int ignoreAfter = first == int.MaxValue ? int.MaxValue : first + 30;
             return q =>
             {
                 // allowBurn (no clean spot left): with a place to be (a tower, a ring, a well, a mark), a burning pool is a cost
-                foreach (var h in live) if (Hits(h, me, q) && !(allowBurn && h.BurnPerSecond > 0 && (tower != null || k >= 0 || wells || mine != null))) return true;
+                foreach (var h in live)
+                {
+                    if (h.BurnPerSecond <= 0 && tick + (h.ResolveAt - h.Age) > ignoreAfter) continue;
+                    if (Hits(h, me, q) && !(allowBurn && h.BurnPerSecond > 0 && (tower != null || k >= 0 || wells || mine != null || spot != null))) return true;
+                }
                 if (k >= 0 && Sim.Flat(q - anchor).magnitude > disc) return true;
                 if (mine != null)
                 {
@@ -178,6 +190,7 @@ namespace LastBell.Run
                 if (tower != null && Sim.Flat(q - tower.At).magnitude > tower.H.Radius - 0.4f) return true;
                 if (wells && !a.Eclipse.InWell(q)) return true;
                 if (spot != null && Sim.Flat(q - bp).magnitude < Sunspots.RimDrop) return true;
+                if (spot != null && a.Spots.Spots.Exists(o => o.Who != me && o.Who && !o.Who.Down && !o.Done && Sim.Flat(o.Who.transform.position - q).magnitude < 4.5f)) return true;   // carriers keep apart
                 if (side != 0 && (a.Sever.SideOfAt(q, a.Sever.LineYaw) != side || a.Sever.SideOfAt(q, a.Sever.LineYaw + 8f) != side || a.Sever.DistToLine(q) < 1.0f)) return true;
                 return false;
             };
@@ -201,16 +214,39 @@ namespace LastBell.Run
             return best;
         }
 
-        static Vector3 NearestClear(Vector3 pos, BossEncounter b, System.Func<Vector3, bool> bad, out float need)
+        static bool ThroughBurn(Vector3 from, Vector3 to, BossEncounter b)
+        {
+            var w = (b as AurelionEncounter)?.World; if (w == null) return false;
+            foreach (var h in w.Hazards.Live)
+            {
+                if (h.BurnPerSecond <= 0 || h.Contains(from)) continue;   // already standing in it: leaving is fine
+                for (int i = 1; i < 6; i++) if (h.Contains(Vector3.Lerp(from, to, i / 6f))) return true;
+            }
+            return false;
+        }
+
+        static Vector3 AroundBoss(Vector3 pos, Vector3 move, BossEncounter b)
+        {
+            var bp = Sim.Flat(b.transform.position); var to = Sim.Flat(pos - bp);
+            float clear = b.BodyRadius + PlayerController.Radius + 0.35f;
+            if (to.magnitude > clear + 1.5f) return move;
+            var ahead = Sim.Flat(pos + move.normalized * 0.8f) - bp;
+            if (ahead.magnitude >= clear && Vector3.Dot(move, to) >= -0.2f) return move;
+            // heading into him: go round on the side the move already leans to (tangent), drifting outward a little
+            var tan = Vector3.Cross(Vector3.up, to.normalized); if (Vector3.Dot(tan, move) < 0) tan = -tan;
+            return (tan + to.normalized * 0.25f).normalized * move.magnitude;
+        }
+
+        static Vector3 NearestClear(Vector3 pos, BossEncounter b, System.Func<Vector3, bool> bad, out float need, bool avoidBurn = true)
         {
             var bp = b.transform.position;
-            for (float r = 0.3f; r <= 28f; r += r < 8f ? 0.3f : 0.6f)   // the whole arena: a tower can be 20 m away
-                for (int k = 0; k < 24; k++)
+            for (float r = 0.2f; r <= 28f; r += r < 8f ? 0.2f : 0.5f)   // the whole arena: a tower can be 20 m away
+                for (int k = 0; k < 48; k++)
                 {
-                    var dir = Sim.Dir(k * 15f); var q = pos + dir * r;
+                    var dir = Sim.Dir(k * 7.5f); var q = pos + dir * r;
                     if (!CombatWorld.InPlayerBound(q, -0.2f)) continue;
                     if (Sim.Flat(q - bp).magnitude < b.BodyRadius + PlayerController.Radius + 0.1f) continue;
-                    if (bad(q)) continue;
+                    if (bad(q) || (avoidBurn && ThroughBurn(pos, q, b))) continue;   // go round burning pools, not through them
                     need = r; return dir;
                 }
             need = 99; return Vector3.zero;

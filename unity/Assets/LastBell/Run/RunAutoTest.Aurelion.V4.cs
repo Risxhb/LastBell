@@ -50,7 +50,7 @@ namespace LastBell.Run
             V2Check("solo: 3 numbered towers, 6.5 m out, at least 120 degrees apart, 2.0 s apart",
                 tw.Towers.Count == 3 && tw.Towers.All(t => Mathf.Abs(Sim.Flat(t.At).magnitude - 6.5f) < 0.01f) && Vector3.Distance(tw.Towers[0].At, tw.Towers[1].At) >= 11.2f
                 && tw.Towers[1].ResolveTick - tw.Towers[0].ResolveTick == Sim.Ticks(2f), $"{tw.Towers.Count} towers");
-            V2Check("solo: the perfect route stands in each tower in order; no wipe, three 15 chips", !tw.Failed && !V4Wiped && V2HitsOn(V2Main, "Meridian Towers").Count() == 3 && V2HitsOn(V2Main, "Meridian Towers").All(h => h.Damage == 15),
+            V2Check("solo: the perfect route stands in each tower in order; no wipe, three 6 chips", !tw.Failed && !V4Wiped && V2HitsOn(V2Main, "Meridian Towers").Count() == 3 && V2HitsOn(V2Main, "Meridian Towers").All(h => h.Damage == MeridianTowers.Damage),
                 string.Join(", ", V2HitsOn(V2Main).Select(h => h.Source + " " + h.Damage)));
             V3Unbot();
 
@@ -81,7 +81,7 @@ namespace LastBell.Run
             V2Check("solo: two sigils on you, 1.5 s apart; the perfect route drops them apart and is never hit by a blast",
                 sp.Spots.Count == 2 && sp.Spots.All(s => s.Who == V2Main && s.Blast != null) && !V2WasHit(V2Main, "Sunspots") && !sp.Chained,
                 string.Join(", ", V2HitsOn(V2Main).Select(h => h.Source)));
-            V2Check("each detonation leaves a scorch pool (3.0 m, burning) that lasts 2 minutes", sp.Spots.All(s => s.Pool != null && V2W.Hazards.Live.Contains(s.Pool) && s.Pool.BurnPerSecond > 0));
+            V2Check("each detonation leaves a scorch pool (3.0 m, burning) that lasts 75 s", sp.Spots.All(s => s.Pool != null && V2W.Hazards.Live.Contains(s.Pool) && s.Pool.BurnPerSecond > 0));
             V2Boss.ClearPhasePools(); yield return V2Ticks(3);
             V2Check("the pools survive a phase change (the floor fills from the start)", sp.Spots.All(s => V2W.Hazards.Live.Contains(s.Pool)));
             foreach (var s in sp.Spots) V2W.Hazards.Cancel(s.Pool);
@@ -106,12 +106,12 @@ namespace LastBell.Run
             V2Begin(ec.Run());
             yield return V2Ticks(10);
             int shield = V2Boss.ShieldHp;
-            V2Check("Corona Shield raised: 5 % of his max HP", shield == Mathf.RoundToInt(V2Boss.MaxHp * TotalEclipse.ShieldFraction), $"{shield} of {V2Boss.MaxHp}");
+            V2Check("Corona Shield raised: 3.5 % of his max HP", shield == Mathf.RoundToInt(V2Boss.MaxHp * TotalEclipse.ShieldFraction), $"{shield} of {V2Boss.MaxHp}");
             yield return V2Ticks(Sim.Ticks(8f));
             for (int i = 0; i < 400 && V2Boss.ShieldHp > 0; i++) V2Boss.TakeHit(50, V2Boss.transform.position + Vector3.up * 2);
             yield return V2WaitIdle(10);
             V2Check("breaking the shield ends the intermission early, no wipe", ec.Broken && !V4Wiped && (V2W.Tick - start) < Sim.Ticks(TotalEclipse.LimitS), $"{(V2W.Tick - start) / (float)Sim.Hz:0.0} s");
-            V2Check("the perfect route keeps to the moving light wells: no Umbra hit", !V2WasHit(V2Main, "Umbra"), string.Join(", ", V2HitsOn(V2Main).Select(h => h.Source)));
+            V2Check("the perfect route keeps to the moving light wells: at most one Umbra tick (a star can push you out)", V2HitsOn(V2Main, "Umbra").Count() <= 1, string.Join(", ", V2HitsOn(V2Main).Select(h => h.Source)));
             V3Unbot();
 
             // held: nobody breaks it, Total Eclipse wipes at 25 s; standing still in the dark takes Umbra
@@ -210,8 +210,8 @@ namespace LastBell.Run
             if (V2Boss == null) yield break;
             var radii = new List<float>(); var dmg = new List<int>();
             for (int i = 0; i < 4; i++) { yield return V3FireToppedUp(V2Boss.HungryCollapse(), 10); radii.Add(V2Boss.Zenith.Last.Inner); dmg.Add(V2Boss.Zenith.Last.Damage); }
-            V2Check("Solar Hunger: every Collapse shrinks its disc 0.75 m (to 3.0 m) and hits 10 harder (50 > 70)",
-                radii.SequenceEqual(new[] { 4.5f, 3.75f, 3.0f, 3.0f }) && dmg.SequenceEqual(new[] { 50, 60, 70, 70 }), $"radii {string.Join("/", radii)}, damage {string.Join("/", dmg)}");
+            V2Check("Solar Hunger: every Collapse shrinks its disc 0.5 m (to 3.0 m) and hits 5 harder (50 > 60)",
+                radii.SequenceEqual(new[] { 4.5f, 4.0f, 3.5f, 3.0f }) && dmg.SequenceEqual(new[] { 50, 55, 60, 60 }), $"radii {string.Join("/", radii)}, damage {string.Join("/", dmg)}");
 
             // the 70 % flow: the intermission plays once, then Misalignment
             yield return V2Setup(1, Difficulty.Medium, new[] { new Vector3(0, 0, 9f) }, 1, Vector3.zero);
@@ -236,8 +236,16 @@ namespace LastBell.Run
                 yield return V2Setup(1, level, new[] { new Vector3(0, 0, 9f) }, 1, Vector3.zero);
                 if (V2Boss == null) yield break;
                 V2Main.RefreshHealth(true);   // V2Setup restores HP, not potions
+                V2Boss.DebugResetFight();
                 V3Bot(V2Main, BotMode.Perfect);
-                var lost = new List<string>();
+                var detail = new List<string>();
+                Action<PlayerController, Hazard, int> onHit = (p, h, dmg) =>
+                {
+                    if (p != V2Main || h.BurnPerSecond > 0) return;
+                    string blk = V2Boss.BlockLog.Count > 0 ? V2Boss.BlockLog[V2Boss.BlockLog.Count - 1].block : "?";
+                    detail.Add($"{h.Source} {dmg} in [{blk}] hp {p.Hp} | {(p.Input as AllyBot)?.DebugLine}");
+                };
+                V2W.PlayerHit += onHit;
                 for (int ph = 1; ph <= 3 && !V2Main.Down && !V4Wiped; ph++)
                 {
                     V2Boss.DebugSetPhase(ph);
@@ -245,6 +253,8 @@ namespace LastBell.Run
                     yield return Until(() => V2Boss == null || !V2Boss.TestBusy || V2Main.Down || d.State != RunState.Combat, 240, $"v4 phase {ph} plan");
                     V2Boss?.ClearPhasePools();
                 }
+                V2W.PlayerHit -= onHit;
+                foreach (var s in detail) Note($"v4 {level} perfect hit: {s}");
                 Note($"v4 {level} perfect route, Phases 1-3: down {V2Main.Down}, wipe {V2Boss?.WipeCause}, potions {V2Main.PotionsDrunk}; hits: {V3HitList()}");
                 V2Check($"{level}: the perfect route survives Phases 1-3 (every block) without a wipe", !V2Main.Down && !V4Wiped, V2Boss?.WipeCause ?? V3HitList());
                 V3Unbot();

@@ -51,7 +51,7 @@ namespace LastBell.Run
         int pinRotation;
 
         // HP = measured sustained DPS x 150 s (packet). First autotest measurement: Vanguard ~90 DPS while dodging -> 13 500.
-        void Awake() { MaxHp = AurelionArgs.V4 ? 16000 : 13500; BodyRadius = 1.1f;   // v4: about 6:00 for a solo ranged player (Arcanist 60 DPS, RunAutoTest V4Dps)
+        void Awake() { MaxHp = AurelionArgs.V4 ? 11000 : 13500; BodyRadius = 1.1f;   // v4: measured in the 4-bot demo (party ~128 DPS while dodging) so a perfect party kills him at about 5:00 of the 6:30 enrage
             HitHeight = 2.6f; MarkHeight = 5.2f; }
 
         int PhaseFor() => Hp > MaxHp * 0.65f ? 1 : Hp > MaxHp * 0.30f ? 2 : 3;

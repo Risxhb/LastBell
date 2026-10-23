@@ -20,6 +20,10 @@ namespace LastBell.Run
         public override string Name => "Severance";
 
         public const float LengthS = 25f, TurnDeg = 90f, EmptySideS = 0.5f;
+        public const float SplitS = 3f;
+        public bool Splitting { get; private set; }               // the 3 s before the sides lock
+        readonly Dictionary<PlayerController, int> planned = new Dictionary<PlayerController, int>();
+        public int Planned(PlayerController p) => planned.TryGetValue(p, out int s) ? s : 0;   // -1 Day, +1 Night, 0 free (solo)
         public const int Damage = 50;
         static readonly Color Gold = new Color(2.2f, 1.7f, 0.6f), NightFill = new Color(0.42f, 0.22f, 0.7f), NightRim = new Color(0.9f, 0.55f, 1.8f);
         static readonly float[] StartYaws = { 0f, 60f, 120f };
@@ -41,10 +45,17 @@ namespace LastBell.Run
             Say(Name);
             Active = true; Crossings = 0; side.Clear();
             float yaw0 = StartYaws[Casts++ % StartYaws.Length]; LineYaw = yaw0;
-            RunHud.Banner("SEVERANCE — DAY AND NIGHT", new Color(0.85f, 0.7f, 1f), 2f);
+            var line = W.BossFx.Lane(2 * (Rim + 0.5f), 0.16f); line.Tint(Gold, Gold); line.Progress(1);
+            var night = W.BossFx.Cone(Rim + 0.5f, 90f); night.Tint(NightFill, NightRim); night.Progress(0.2f);
+            line.Place(Centre - Sim.Dir(LineYaw) * (Rim + 0.5f), LineYaw); night.Place(Centre, LineYaw - 90f);
+            // 3 s to split before the sides lock: co-op, half the party is called Day and half Night (party order, alternating)
+            Splitting = true; planned.Clear();
+            var party = Standing();
+            for (int i = 0; i < party.Count; i++) planned[party[i]] = party.Count == 1 ? 0 : i % 2 == 0 ? -1 : 1;
+            RunHud.Banner(party.Count > 1 ? "SEVERANCE — SPLIT: DAY AND NIGHT" : "SEVERANCE — DAY AND NIGHT", new Color(0.85f, 0.7f, 1f), SplitS);
+            for (int t = 0; t < Sim.Ticks(SplitS); t++) yield return 1;
+            Splitting = false; line.Lock(); night.Progress(0.35f);
             foreach (var p in Standing()) { int s = SideOf(p.transform.position); side[p] = s == 0 ? 1 : s; }
-            var line = W.BossFx.Lane(2 * (Rim + 0.5f), 0.16f); line.Tint(Gold, Gold); line.Progress(1); line.Lock();
-            var night = W.BossFx.Cone(Rim + 0.5f, 90f); night.Tint(NightFill, NightRim); night.Progress(0.35f);
             Glow(1.6f); Flare(1.2f);
 
             var side2 = Patterns().GetEnumerator(); int wait = 0; bool on = true;
@@ -73,11 +84,11 @@ namespace LastBell.Run
         IEnumerable<int> Patterns()
         {
             yield return Sim.Ticks(2f);
-            foreach (var w in Boss.Starfall.Run()) yield return w;
+            foreach (var w in Boss.Starfall.Run(true)) yield return w;
             yield return Sim.Ticks(1f);
             foreach (var w in Boss.Lances.Run(4, 1, false)) yield return w;
             yield return Sim.Ticks(1.5f);
-            foreach (var w in Boss.Starfall.Run()) yield return w;
+            foreach (var w in Boss.Starfall.Run(true)) yield return w;
             yield return Sim.Ticks(1f);
             foreach (var w in Boss.Lances.Run(4, 1, false)) yield return w;
         }
