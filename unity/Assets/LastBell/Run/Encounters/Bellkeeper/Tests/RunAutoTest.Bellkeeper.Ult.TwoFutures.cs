@@ -96,7 +96,7 @@ namespace LastBell.Run
                                     var q = tf.HintFor(me, k, iFirst);
                                     if (tf.PartsOf(order[k]).Any(h => h.Contains(q))) { worst = 99; where = $"hint {k} inside its step, P{phase} seed {seed}"; }
                                     if (k == 5 && Sim.Flat(q - tf.Anchor).magnitude < TollTideAbility.TollRadius + 0.3f) lastOut = false;
-                                    if (phase == 5 && Mathf.Abs(Vector3.Dot(q, UltimateState.FissureNormal)) <= 1.05f) fissureOk = false;
+                                    if (phase == 5 && (FractureOfTime.InFlare(q) || Mathf.Abs(Vector3.Dot(q, UltimateState.FissureNormal)) < 1.65f)) fissureOk = false;
                                     if (phase == 5 && k == 1) { float r = Sim.Flat(q - tf.Anchor).magnitude; if (r < TwoFutures.ClockMin || r > TwoFutures.ClockMax) clockOk = false; }
                                     // the pockets of consecutive steps don't overlap: standing still for two steps fails
                                     if (k > 0)
@@ -115,7 +115,7 @@ namespace LastBell.Run
                 Check("Two Futures: no guide spot can be held through the next step (each step's spot is inside the next one's shapes)", gaps, $"band gaps ≥ {minGap:0.0} m");
                 Check("Two Futures: the route ends beyond the Heart Toll (r 4 m + margin)", lastOut);
                 Check("Two Futures P5: step 2 (with the clock pair) has its spot 3.8-7.4 m from the boss on every clock line", clockOk);
-                Check("Two Futures P5: no guide spot stands in the fissure (crossing it is allowed)", fissureOk);
+                Check("Two Futures P5: no guide spot stands in the fissure or its toll flare (≥ 1.65 m off the axis; crossing is allowed)", fissureOk);
             }
 
             // ---------- timing: trace, verdict, interleaved steps, coral lead, own Heart Toll ----------
