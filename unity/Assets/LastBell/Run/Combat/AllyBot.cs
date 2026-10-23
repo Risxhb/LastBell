@@ -25,6 +25,7 @@ namespace LastBell.Run
         public readonly BotMode Mode;
         public float? HoldRange;          // tests: keep this gap to the boss instead of the class's range (8.5 = a ranged player)
         public static bool Attacks = false;   // bots are mechanics dummies: they move, dodge and spread, but never attack or heal
+        public static BotMode AllyMode = BotMode.Passive;   // the mode the director gives menu allies (demos: Perfect)
         int tick, lastPress = -999, castHold;
         int[] cd = new int[5];
 

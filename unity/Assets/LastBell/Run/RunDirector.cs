@@ -237,7 +237,7 @@ namespace LastBell.Run
             for (int i = 0; i < allyClasses.Length; i++)
             {
                 var a = PlayerController.Spawn(World, allyClasses[i], AllySocket(i), 180);
-                a.Input = new AllyBot(i, allyClasses.Length); a.AbilitiesEnabled = false; a.Presenter.GetUp();
+                a.Input = new AllyBot(i, allyClasses.Length, AllyBot.AllyMode); a.AbilitiesEnabled = false; a.Presenter.GetUp();
                 Allies.Add(a);
             }
             Encounter = startEncounter; practiceEncounter = startEncounter;

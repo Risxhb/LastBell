@@ -24,6 +24,7 @@ namespace LastBell.Run
         IEnumerator AurelionChecks()
         {
             if (AurelionGallery) { yield return AurelionGalleryShots(); yield break; }
+            if (AurelionDemo) { yield return AurelionDemoFight(); yield break; }
             if (AurelionV4Live) { yield return AurelionV4LiveFight(); yield break; }
             if (AurelionV4Only) { yield return AurelionV4Checks(); yield return V2Teardown(); yield break; }
             if (AurelionV3Only) { yield return AurelionV3Checks(); yield return V2Teardown(); yield break; }
