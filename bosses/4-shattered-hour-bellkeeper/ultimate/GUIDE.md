@@ -21,7 +21,7 @@ Written the way Ultimate guides are: what each mechanic wants from **you**, by y
 1. The cracked-hourglass glyph tells you you'll be Stilled in 5 s.
 2. Go to your hiding strip: directly behind the boss from **your clock station**, within a step of the line. When he's paired with a Heart Toll, stand beyond 4.3 m.
 3. Free players: deal damage during the stop. Scan the lanes: if a Stilled ally isn't hidden, step into their lane between them and the station (you take 60 instead of their 999).
-- **Solo:** you're always Stilled. Hide every time.
+- **Solo:** you're always Stilled. Hide every time. In P3 and P5 the resume also brings Reflection, whose solo image lands on your own frozen spot: 40 you can't avoid. Enter those resumes above 40 HP (drink before the hourglass).
 
 ## The Ledger (P1 → P4)
 - **P1:** decide what you record. Make both Leaning Bells strike the **same** half (stand together on that half at the cast), and keep Reflection images clumped on one side.
