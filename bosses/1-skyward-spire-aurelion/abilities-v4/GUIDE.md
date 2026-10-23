@@ -2,14 +2,14 @@
 
 A player's guide to the current v4 fight on every difficulty.
 
-**Proven beatable:** four perfect bots killed him on Hard at full HP in **5:06**, all standing. The video `aurelion-v4-win.mp4` shows that fight with captions.
+**Proven beatable:** four perfect bots killed him on Hard at full HP in **4:55** (3 of 4 standing), in Last Light with one slice of floor to spare. (The video `aurelion-v4-win.mp4` shows the earlier 5:06 version.)
 
 **Numbers:**
 - Damage is quoted for Medium. Hard is ×1.3, Easy ×0.6.
 - Light hits: 30 (39 on Hard).
 - Heavy hits: 50 (65 on Hard).
 - You have 100 HP and 5 potions (+40 each, 1 s apart, key F).
-- His HP: 11,000 solo, scaled up for a party.
+- His HP: 10,000 solo, scaled up for a party.
 
 ## The five rules that win the fight
 
@@ -17,7 +17,7 @@ A player's guide to the current v4 fight on every difficulty.
 2. **Know where to be before the red appears.** Ecliptic Order, SUN/SHADE and Sunspots show their red shape only 0.35 s before they hit. Read the cue early and move early.
 3. **Do the job that lands first.** When two things are up (a tower and a mark, a ring and a star), stand for the one that lands first, then move for the next.
 4. **Walk around him, never into him.** His body blocks you; a straight line across the centre gets you stuck.
-5. **The clock: Final Noon at 6:30.** Gold warning at 6:00. Punish every open chest; a perfect group kills him around 5:00.
+5. **Two clocks.** Last Light (below 20 %) fills the floor and makes him stronger every slice; Final Noon at 6:30 is the hard stop. Punish every open chest and save cooldowns for Last Light.
 
 ## Every ability
 
@@ -44,10 +44,10 @@ A player's guide to the current v4 fight on every difficulty.
 
 | Ability | Wipe if… | How to beat it |
 |---|---|---|
-| **Meridian Towers** | a tower is empty when it lands | **Solo:** three in a row, 2.0 s apart (I → II → III), each about 11 m away. Leave a tower the moment it lands. **Co-op:** towers are assigned when they rise (players 1 and 4 → I, 2 → II, 3 → III). If a tower's player dies, the **nearest** player takes it. Each soak is a 6 chip. |
-| **Total Eclipse** (intermission at 70 %) | his **Corona Shield** (gold number on his bar, 3.5 % of his HP) isn't broken in 25 s | Stay inside the **blue light wells** (3.5 m, orbiting slowly) and attack the whole time. Out of a well for over 2 s, you burn 10 a second. |
-| **Severance** (Phase 3) | co-op: one half of the arena has nobody in it | A gold line appears and the game calls **"SPLIT"**. You have 3 s: odd players go Day, even players go Night. Then the line locks and turns 90° over 25 s. **Crossing it, or letting it sweep over you, is a heavy hit.** Stay mid-radius, ahead of it. Co-op ends in the **Reunion** tower at the centre (4.5 m): everyone in. |
-| **Last Light** (Phase 4, below 15 %) | the 8th slice of floor falls (96 s into Phase 4) | A 45° slice burns for good every 12 s (3 s warning), in a fixed order: 0°, 180°, 90°, 270°, then the diagonals. Sunspot pools are cleared as it starts. Keep to lit floor and use everything you have. |
+| **Meridian Towers** | a tower is **not held** when it lands | Each tower shows **dots: exactly that many players must stand in it**. A gold ring fills while enough players are inside, and you need **1.5 s** of filling before it lands (it rises 5.0 s early). **No damage when done right.** Extra players in a tower take a **heavy hit**. **Solo:** three towers of one, 2.5 s apart (I → II → III). Fill each, then leave for the next before it lands. **Co-op:** towers land together and their dots add up to the party (4 players: 2+2 or 1+3). Assigned when they rise in party order; stay out of towers that aren't yours. |
+| **Total Eclipse** (intermission at 70 %) | his **Corona Shield** (gold number on his bar) isn't broken in **25 s** | The shield is **700 per fighting player** (2,800 for 4), so it takes the whole party about 22 s. Stay inside the **blue light wells** (3.5 m, orbiting slowly) and attack non-stop. Out of a well for over 2 s, you burn 10 a second. |
+| **Severance** (Phase 3) | co-op: one half has nobody in it | A gold line appears and the game calls **"SPLIT"**. You have 3 s: odd players go Day, even players go Night. Then it locks and **sweeps fast: 135° one way in 10 s, then "THE LINE TURNS BACK" (1.5 s warning) and 135° back** (about 3.3 m/s at the rim). Crossing it, or letting it sweep over you, is a heavy hit. Run ahead of it, and be ready to reverse. Co-op ends in the **Reunion** tower (4.5 m at the centre): everyone in. |
+| **Last Light** (Phase 4, below 20 %) | the 8th slice falls (88 s into Phase 4) | **The soft enrage.** A 45° slice burns for good every **12 s** (every **10 s** from the 5th), with a 3 s warning, in a fixed order: 0°, 180°, 90°, 270°, then the diagonals. **Every fallen slice makes all his attacks 10 % stronger** ("THE LIGHT WANES"). Kill him before the room is gone. |
 
 ## Phase by phase
 
@@ -83,7 +83,7 @@ Order:
 
 - Hold the job that lands first; dodge stars after your tower or ring.
 
-### Phase 3: Exposed Meridian (40–15 %), the second form
+### Phase 3: Exposed Meridian (40–20 %), the second form
 
 Order:
 1. **Severance** (split, then 25 s, then Reunion)
@@ -95,7 +95,7 @@ Order:
 
 - **Sunspots + Collapse:** drop at the edge. The Collapse lands 2.5 s after the last blast, which is enough time to run back to his feet.
 
-### Phase 4: Last Light (15–0 %), the burn
+### Phase 4: Last Light (20–0 %), the soft enrage
 
 - Lances + Starfall › SUN/SHADE + Lances › Hour Hands + Starfall, on loop, while the floor falls.
 - No punish window. Burn him down.
@@ -103,7 +103,7 @@ Order:
 
 ## Potions and damage
 
-- A perfect group still takes chips throughout: about 170 from towers across the party, plus a few Starfalls and pool ticks.
+- A perfect group still takes some damage: a few Starfalls and Lances, pool ticks, and in Last Light every hit grows 10 % per fallen slice.
 - **Drink in the punish windows** (3.5 s, "PUNISH WINDOW": his chest is open and nothing is coming), or in the 2.0 s numeral reveal of Ecliptic Order.
 - Drink below 70 HP on Hard; a heavy hit is 65.
 
@@ -111,7 +111,7 @@ Order:
 
 | Job | Rule |
 |---|---|
-| Towers | Players 1 and 4 → I, 2 → II, 3 → III. The nearest player covers a dead player's tower. |
+| Towers | Dots tell you how many: towers land together, assigned in party order (4 players: 1–2 → tower 1, 3–4 → tower 2, or 1 → tower 1, 2–4 → tower 2). Never stand in a tower that isn't yours. |
 | Severance | Players 1 and 3 Day, 2 and 4 Night (the game calls it). Both pairs meet in Reunion. |
 | Sunspot carriers | Rotate automatically; walk to the edge, 4.5 m apart. |
 | Corona Shield | Everyone attacks from the wells; use the biggest burst here. |
@@ -120,7 +120,7 @@ Order:
 
 | Wipe | Fix |
 |---|---|
-| "Total Eclipse — tower II was empty" | Leave tower I the moment it lands, or cover a dead player's tower. |
+| "Total Eclipse — tower II was not held" | Fill each tower early (1.5 s) and move on; co-op, get the dot count right and stay out of other towers. |
 | "Solar Flare" | Sunspot carriers stood within 3.5 m of each other: spread at the edge. |
 | "Total Eclipse — the Corona Shield held" | Attack from inside the wells; don't stop to reposition. |
 | "Severance — the Day half fell" | Split during the 3 s warning, as called. |
