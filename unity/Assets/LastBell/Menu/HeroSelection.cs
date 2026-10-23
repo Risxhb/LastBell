@@ -147,7 +147,7 @@ namespace LastBell.Menu
         }
         public void CloseSetup(){Setup=null;foreach(var node in hiddenUi)if(node)node.SetActive(true);hiddenUi.Clear();if(skills)skills.SetActive(true);if(movementCaption)movementCaption.SetActive(true);SelectButton.gameObject.SetActive(true);EventSystem.current.SetSelectedGameObject(SelectButton.gameObject);}
         public void Back()
-        {if(Loading)return;if(SelectedIndex>=0){SelectedIndex=-1;if(skills){skills.SetActive(false);Destroy(skills);}if(movementCaption)Destroy(movementCaption);selectedBackdrop.SetActive(false);SelectButton.gameObject.SetActive(false);instructions.gameObject.SetActive(true);heading.text=TestRush?"BOSS-RUSH TEST RUSH  /  CHOOSE YOUR HERO":"LAST BELL  /  CHOOSE YOUR HERO";LinkNavigation();EventSystem.current.SetSelectedGameObject(HeroButtons[0].gameObject);return;}SceneManager.LoadScene(MainMenu.ScenePath);}
+        {if(Loading)return;if(SelectedIndex>=0){SelectedIndex=-1;if(skills){skills.SetActive(false);Destroy(skills);}if(movementCaption)Destroy(movementCaption);selectedBackdrop.SetActive(false);SelectButton.gameObject.SetActive(false);instructions.gameObject.SetActive(true);heading.text=TestRush?"BOSS-RUSH TEST RUSH  /  CHOOSE YOUR HERO":"LAST BELL  /  CHOOSE YOUR HERO";LinkNavigation();EventSystem.current.SetSelectedGameObject(HeroButtons[0].gameObject);return;}SceneManager.LoadScene(MenuAppearance.ScenePath);}
         void LateUpdate()
         {
             if(!View||Presenters.Count==0)return;
@@ -202,3 +202,4 @@ namespace LastBell.Menu
         }
     }
 }
+

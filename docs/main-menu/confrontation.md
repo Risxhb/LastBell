@@ -49,3 +49,7 @@ Completed: separate animated 3D menu, all existing class models/Idle clips and s
 Next: human visual/listening playtest; richer production environment materials, atmospheric recordings and waterfall/cloth assets can be considered in the existing content lane.
 
 Blocked: no alternate-menu playback blocker. Full Editor zero-error acceptance is limited by the existing Skyward Spire prefab `OnValidate` errors on randomized run entry. No source upload, wiki publication, PR or live-site deployment was requested or performed.
+
+## Saved active menu — follow-up
+
+The user subsequently requested that the active menu remain exclusive until changed. This is now configured under **Settings > UI > Main Menu** in both menus, with Alternative Confrontation currently selected. The choice persists across gameplay/selection exits and application restarts. [Implementation and final 106-check/restart evidence](menu-preference.md). The first build scene is retained, with saved-choice startup routing and both scenes available; this supersedes the earlier preview-only return behavior above.

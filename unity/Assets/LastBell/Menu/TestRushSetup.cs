@@ -82,6 +82,7 @@ namespace LastBell.Menu
             foreach(var b in ownedPanel.GetComponentsInChildren<Button>())b.interactable=false;
         }
         public void Close(){if(Loading)return;selection.CloseSetup();Destroy(ownedPanel);}
-        void MainMenu(){if(Loading)return;UnityEngine.SceneManagement.SceneManager.LoadScene(LastBell.Menu.MainMenu.ScenePath);}
+        void MainMenu(){if(Loading)return;UnityEngine.SceneManagement.SceneManager.LoadScene(LastBell.Menu.MenuAppearance.ScenePath);}
     }
 }
+

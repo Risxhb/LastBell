@@ -19,6 +19,8 @@ namespace LastBell.Menu
     {
         public static bool Requested=>Environment.GetCommandLineArgs().Contains("-lastbellConfrontationTest");
         static bool launched;
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        static void Prepare(){if(Requested)MenuAppearance.Selected=MenuStyle.Alternative;}
         readonly List<string> report=new List<string>(),errors=new List<string>();
         int failures;
         string output,originalHero;
@@ -85,17 +87,33 @@ namespace LastBell.Menu
             menu.StartRun();yield return SceneReady(()=>RunDirector.Instance&&RunDirector.Instance.State==RunState.Ready);
             Check("Start Run retains selected class",RunDirector.Instance&&RunDirector.Instance.ClassName==RunDirector.Classes[2]&&!MenuLaunch.Pending);
             Check("preview actors unloaded",!FindAnyObjectByType<ConfrontationMenu>()&&!GameObject.Find("Bellwarden presentation — exact 2x"));
-            if(RunDirector.Instance){RunDirector.Instance.SetPaused(true);RunDirector.Instance.ReturnToMenu();}yield return SceneReady(()=>FindAnyObjectByType<MainMenu>()?.StartButton!=null);
-            var original=FindAnyObjectByType<MainMenu>();Check("original menu remains usable",original&&original.StartButton.IsInteractable());
-            if(original){original.OpenSettings();Check("original Settings usable",original.SettingsOpen);original.CloseSettings();}
+            if(RunDirector.Instance){RunDirector.Instance.SetPaused(true);RunDirector.Instance.ReturnToMenu();}yield return SceneReady(()=>FindAnyObjectByType<ConfrontationMenu>()?.Hero!=null);
+            Check("gameplay returns only to selected alternative",MenuAppearance.Selected==MenuStyle.Alternative&&!FindAnyObjectByType<MainMenu>()&&SceneManager.sceneCount==1);
             for(int i=0;i<2;i++)
             {
                 SceneManager.LoadScene(ConfrontationMenu.ScenePath);yield return SceneReady(()=>FindAnyObjectByType<ConfrontationMenu>()?.Hero!=null);
                 menu=FindAnyObjectByType<ConfrontationMenu>();menu.SelectClass(i);menu.StartRun();yield return SceneReady(()=>RunDirector.Instance&&RunDirector.Instance.State==RunState.Ready);
                 Check("run uses selected class "+RunDirector.Classes[i],RunDirector.Instance&&RunDirector.Instance.ClassName==RunDirector.Classes[i]);
                 if(RunDirector.Instance){RunDirector.Instance.SetPaused(true);RunDirector.Instance.ReturnToMenu();}
-                yield return SceneReady(()=>FindAnyObjectByType<MainMenu>()?.StartButton!=null);
+                yield return SceneReady(()=>FindAnyObjectByType<ConfrontationMenu>()?.Hero!=null);
             }
+            menu=FindAnyObjectByType<ConfrontationMenu>();menu.OpenSettings();yield return Capture("alternative-settings.png");menu.UISettingsButton.onClick.Invoke();
+            Check("alternative Settings has UI category",menu.UISettings.IsOpen&&menu.SettingsOpen&&!menu.StartButton.IsInteractable());
+            yield return Capture("alternative-ui-settings.png");
+            yield return Press(Key.Escape);Check("UI Escape returns to Settings",menu.SettingsOpen&&!menu.UISettings.IsOpen);
+            menu.UISettingsButton.onClick.Invoke();menu.UISettings.ShowcaseButton.onClick.Invoke();
+            yield return SceneReady(()=>FindAnyObjectByType<MainMenu>()?.StartButton!=null);
+            var original=FindAnyObjectByType<MainMenu>();Check("UI switches and saves showcase",original&&MenuAppearance.Selected==MenuStyle.Showcase&&!FindAnyObjectByType<ConfrontationMenu>()&&SceneManager.sceneCount==1);
+            original.OpenSettings();original.UISettingsButton.onClick.Invoke();Check("showcase Settings has UI category",original.UISettings.IsOpen&&original.SettingsOpen);
+            yield return Capture("showcase-ui-settings.png");
+            original.UISettings.BackButton.onClick.Invoke();original.CloseSettings();Check("original Settings remain usable",!original.SettingsOpen&&original.StartButton.IsInteractable());
+            SceneManager.LoadScene(ConfrontationMenu.ScenePath);yield return SceneReady(()=>FindAnyObjectByType<MainMenu>()?.StartButton!=null);
+            original=FindAnyObjectByType<MainMenu>();Check("saved showcase overrides alternate startup scene",original&&!FindAnyObjectByType<ConfrontationMenu>());
+            original.OpenSettings();original.UISettingsButton.onClick.Invoke();original.UISettings.AlternativeButton.onClick.Invoke();
+            yield return SceneReady(()=>FindAnyObjectByType<ConfrontationMenu>()?.Hero!=null);
+            Check("UI switches and saves alternative",MenuAppearance.Selected==MenuStyle.Alternative&&!FindAnyObjectByType<MainMenu>()&&SceneManager.sceneCount==1);
+            SceneManager.LoadScene(MainMenu.ScenePath);yield return SceneReady(()=>FindAnyObjectByType<ConfrontationMenu>()?.Hero!=null);
+            Check("saved alternative overrides showcase startup scene",!FindAnyObjectByType<MainMenu>()&&SceneManager.sceneCount==1);
             Check("one persistent audio owner after navigation",FindObjectsByType<MenuMusic>(FindObjectsSortMode.None).Length==1);
             SavedHeroSelection.Current=originalHero;InputSystem.settings=oldSettings;InputSystem.RemoveDevice(keyboard);InputSystem.RemoveDevice(pad);Destroy(testSettings);
             Check("zero runtime errors",errors.Count==0);report.AddRange(errors);report.Add("RESULT "+(report.Count(s=>s.StartsWith("PASS ")))+" passed / "+failures+" failed");

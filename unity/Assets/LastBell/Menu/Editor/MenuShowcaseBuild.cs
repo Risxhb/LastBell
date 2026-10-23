@@ -75,7 +75,7 @@ namespace LastBell.Menu.EditorTools
             var output = Environment.GetEnvironmentVariable("LASTBELL_SHOWCASE_OUTPUT") ?? "E:/Collab/builds/menu-showcase-current/LastBell.exe";
             Directory.CreateDirectory(Path.GetDirectoryName(output));
             var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions {
-                scenes = new[] { MainMenu.ScenePath, HeroSelection.ScenePath }.Concat(RunMaps.All.Select(m => m.RunScene)).ToArray(),
+                scenes = MenuAppearance.BuildScenes,
                 locationPathName = output, target = BuildTarget.StandaloneWindows64, options = BuildOptions.Development });
             Debug.Log($"Showcase build: {report.summary.result}, {report.summary.totalErrors} errors/{report.summary.totalWarnings} warnings");
             if (Application.isBatchMode) EditorApplication.Exit(report.summary.result == BuildResult.Succeeded ? 0 : 1);

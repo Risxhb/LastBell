@@ -15,7 +15,9 @@ namespace LastBell.Menu
     public sealed class MainMenu : MonoBehaviour
     {
         public const string ScenePath = "Assets/LastBell/Menu/ShowcaseMainMenu.unity";
-        public bool SettingsOpen => settings && settings.activeSelf;
+        public bool SettingsOpen => (settings && settings.activeSelf) || (UISettings && UISettings.IsOpen);
+        public Button UISettingsButton { get; private set; }
+        public MenuAppearancePanel UISettings { get; private set; }
         public bool Loading { get; private set; }
         public Button StartButton { get; private set; }
         public Button TestRushButton { get; private set; }
@@ -45,6 +47,7 @@ namespace LastBell.Menu
 
         void Awake()
         {
+            if(!MenuAppearance.Enter(MenuStyle.Showcase,gameObject))return;
             MenuLaunch.Clear();
             MenuReturnBridge.TestSession=false;
             if(MapPreviewCapture.Requested){MapPreviewCapture.Launch();return;}
@@ -124,16 +127,18 @@ namespace LastBell.Menu
             ModeControl = Dropdown("Display mode", panel.transform, 0.58f, new[] { "Windowed", "Borderless" });
             ResolutionControl = Dropdown("Resolution", panel.transform, 0.46f, new string[0]);
             QualityControl = Dropdown("Quality", panel.transform, 0.34f, QualitySettings.names);
-            status = Text("Music volume updates immediately.", panel.transform, 13, Gold, new Vector2(0.5f, 0.23f), new Vector2(640, 35));
+            status = Text("Music volume updates immediately.", panel.transform, 13, Gold, new Vector2(0.5f, 0.26f), new Vector2(640, 30));
+            UISettingsButton = Button("UI",panel.transform,new Vector2(0,-220),new Vector2(592,38),OpenUISettings);
+            UISettings=MenuAppearancePanel.Create(root,()=>{settings.SetActive(true);EventSystem.current.SetSelectedGameObject(UISettingsButton.gameObject);});
             ApplyButton = Button("Apply", panel.transform, new Vector2(-158, -285), new Vector2(276, 54), ApplySettings, true);
             CloseButton = Button("Back", panel.transform, new Vector2(158, -285), new Vector2(276, 54), CloseSettings);
             // Explicit circular focus order traps keyboard/gamepad navigation inside the modal.
-            Selectable[] order = { MusicVolumeControl, ModeControl, ResolutionControl, QualityControl, ApplyButton, CloseButton };
+            Selectable[] order = { MusicVolumeControl, ModeControl, ResolutionControl, QualityControl, UISettingsButton, ApplyButton, CloseButton };
             for (int i = 0; i < order.Length; i++)
             {
                 var navigation = new Navigation { mode = Navigation.Mode.Explicit,
                     selectOnUp = order[(i + order.Length - 1) % order.Length], selectOnDown = order[(i + 1) % order.Length],
-                    selectOnLeft = i == 4 ? CloseButton : null, selectOnRight = i == 5 ? ApplyButton : null };
+                    selectOnLeft = order[i] == ApplyButton ? CloseButton : null, selectOnRight = order[i] == CloseButton ? ApplyButton : null };
                 order[i].navigation = navigation;
             }
             settings.SetActive(false);
@@ -156,12 +161,14 @@ namespace LastBell.Menu
         }
         public void CloseSettings()
         {
+            if(UISettings)UISettings.Hide();
             // Legacy Dropdown owns its temporary list; close it before hiding the parent.
             ModeControl.Hide(); ResolutionControl.Hide(); QualityControl.Hide();
             settings.SetActive(false); barGroup.interactable = true; barGroup.blocksRaycasts = true;
             PlayerPrefs.Save();
             EventSystem.current.SetSelectedGameObject(SettingsButton.gameObject);
         }
+        public void OpenUISettings(){if(Loading||!SettingsOpen)return;settings.SetActive(false);UISettings.Open();}
         public void ApplySettings()
         {
             if (!SettingsOpen || resolutions == null || resolutions.Length == 0) return;
@@ -194,7 +201,7 @@ namespace LastBell.Menu
 #if UNITY_EDITOR
             UnityEditor.EditorApplication.isPlaying = false;
 #elif UNITY_WEBGL
-            SceneManager.LoadScene(ScenePath);
+            SceneManager.LoadScene(MenuAppearance.ScenePath);
 #else
             Application.Quit();
 #endif
@@ -216,6 +223,7 @@ namespace LastBell.Menu
             bool cancel = keyboard?.escapeKey.wasPressedThisFrame == true || gamepad?.buttonEast.wasPressedThisFrame == true;
             if (cancel && SettingsOpen)
             {
+                if(UISettings&&UISettings.IsOpen){UISettings.Close();return;}
                 // First Back closes an open dropdown; the next closes the settings modal.
                 if (!DropdownOpen(ModeControl) && !DropdownOpen(ResolutionControl) && !DropdownOpen(QualityControl)) CloseSettings();
             }
@@ -347,7 +355,7 @@ namespace LastBell.Menu
         {
             yield return null;bool setup=returnToSetup;returnToSetup=false;MenuLaunch.Clear();
             if(setup){HeroSelection.TestRush=true;HeroSelection.ResumeSetup=true;}
-            SceneManager.LoadSceneAsync(setup?HeroSelection.ScenePath:MainMenu.ScenePath);
+            SceneManager.LoadSceneAsync(setup?HeroSelection.ScenePath:MenuAppearance.ScenePath);
         }
         void OnDestroy() { if (observed) observed.StateChanged -= OnState; if (active == this) active = null; }
     }

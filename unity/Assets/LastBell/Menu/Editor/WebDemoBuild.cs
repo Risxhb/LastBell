@@ -16,7 +16,7 @@ namespace LastBell.Menu.EditorTools
         [MenuItem("Last Bell/Main Menu/Build Browser Demo", priority = 33)]
         public static void Build()
         {
-            var scenes = new[] { MainMenu.ScenePath, HeroSelection.ScenePath }.Concat(RunMaps.All.Select(m => m.RunScene)).ToArray();
+            var scenes = MenuAppearance.BuildScenes;
             foreach (var scene in scenes)
                 if (!File.Exists(scene)) throw new FileNotFoundException("Required demo scene is missing: " + scene + ". Prepare generated maps first; see docs/main-menu/web-demo.md.", scene);
             if (!BuildPipeline.IsBuildTargetSupported(BuildTargetGroup.WebGL, BuildTarget.WebGL))

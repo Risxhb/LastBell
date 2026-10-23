@@ -30,7 +30,9 @@ namespace LastBell.Menu
         public Camera View { get; private set; }
         public Button StartButton, RushButton, SettingsButton, ExitButton, PreviousButton, NextButton;
         public bool Loading { get; private set; }
-        public bool SettingsOpen => settings && settings.activeSelf;
+        public bool SettingsOpen => (settings && settings.activeSelf) || (UISettings && UISettings.IsOpen);
+        public Button UISettingsButton {get;private set;}
+        public MenuAppearancePanel UISettings {get;private set;}
         public MenuMusic Music { get; private set; }
         public Canvas Canvas { get; private set; }
         public int SelectedIndex => Array.IndexOf(RunDirector.Classes, SavedHeroSelection.Current);
@@ -43,6 +45,7 @@ namespace LastBell.Menu
         Button settingsBack;
         Texture2D gradient;
         Sprite gradientSprite;
+        void Awake(){MenuAppearance.Enter(MenuStyle.Alternative,gameObject);}
         void Start()
         {
             MenuLaunch.Clear(); MenuReturnBridge.TestSession=false;
@@ -133,7 +136,7 @@ namespace LastBell.Menu
 #if UNITY_EDITOR
             UnityEditor.EditorApplication.isPlaying=false;
 #elif UNITY_WEBGL
-            SceneManager.LoadScene(MainMenu.ScenePath);
+            SceneManager.LoadScene(MenuAppearance.ScenePath);
 #else
             Application.Quit();
 #endif
@@ -153,17 +156,20 @@ namespace LastBell.Menu
             display=Nav(mode==0?"Windowed":"Borderless",panel,.53f,()=>{mode=1-mode;display.GetComponentInChildren<Text>().text=mode==0?"Windowed":"Borderless";});
             res=Nav(modes[resolution].x+" × "+modes[resolution].y,panel,.39f,()=>{resolution=(resolution+1)%modes.Length;res.GetComponentInChildren<Text>().text=modes[resolution].x+" × "+modes[resolution].y;});
             q=Nav("Quality: "+QualitySettings.names[quality],panel,.25f,()=>{quality=(quality+1)%QualitySettings.names.Length;q.GetComponentInChildren<Text>().text="Quality: "+QualitySettings.names[quality];});
-            var apply=Nav("Apply",panel,.10f,()=>MenuSettings.Apply(modes[resolution].x,modes[resolution].y,mode,quality));
-            settingsBack=Nav("Back",panel,-.02f,CloseSettings);
+            UISettingsButton=Nav("UI",panel,.13f,OpenUISettings);
+            UISettings=MenuAppearancePanel.Create(safe,()=>{settings.SetActive(true);EventSystem.current.SetSelectedGameObject(UISettingsButton.gameObject);});
+            var apply=Nav("Apply",panel,.025f,()=>MenuSettings.Apply(modes[resolution].x,modes[resolution].y,mode,quality));
+            settingsBack=Nav("Back",panel,-.08f,CloseSettings);
 #if UNITY_WEBGL && !UNITY_EDITOR
             display.interactable=res.interactable=false;res.GetComponentInChildren<Text>().text="Use browser fullscreen";
 #endif
-            Selectable[] order={slider,display,res,q,apply,settingsBack};
+            Selectable[] order={slider,display,res,q,UISettingsButton,apply,settingsBack};
             for(int i=0;i<order.Length;i++)order[i].navigation=new Navigation{mode=Navigation.Mode.Explicit,selectOnUp=order[(i+order.Length-1)%order.Length],selectOnDown=order[(i+1)%order.Length]};
             settings.SetActive(false);
         }
         public void OpenSettings(){if(Loading)return;settings.SetActive(true);navigation.interactable=navigation.blocksRaycasts=false;EventSystem.current.SetSelectedGameObject(settingsBack.gameObject);}
-        public void CloseSettings(){settings.SetActive(false);navigation.interactable=navigation.blocksRaycasts=true;EventSystem.current.SetSelectedGameObject(SettingsButton.gameObject);}
+        public void OpenUISettings(){if(Loading||!SettingsOpen)return;settings.SetActive(false);UISettings.Open();}
+        public void CloseSettings(){if(UISettings)UISettings.Hide();settings.SetActive(false);navigation.interactable=navigation.blocksRaycasts=true;EventSystem.current.SetSelectedGameObject(SettingsButton.gameObject);}
         void Update()
         {
             if(Hero)Hero.Tick(null);if(Boss)Boss.TickBoss("Idle",.65f);
@@ -171,7 +177,7 @@ namespace LastBell.Menu
             var area=Screen.safeArea;safe.anchorMin=area.position/new Vector2(Screen.width,Screen.height);safe.anchorMax=(area.position+area.size)/new Vector2(Screen.width,Screen.height);
             // Keep vertical field of view, widen for 4:3; no moving cinematic camera behind UI.
             View.fieldOfView=Mathf.Clamp(42*Mathf.Max(1,1.77778f/View.aspect),42,62);
-            if(Keyboard.current?.escapeKey.wasPressedThisFrame==true||Gamepad.current?.buttonEast.wasPressedThisFrame==true){if(SettingsOpen)CloseSettings();}
+            if(Keyboard.current?.escapeKey.wasPressedThisFrame==true||Gamepad.current?.buttonEast.wasPressedThisFrame==true){if(UISettings&&UISettings.IsOpen)UISettings.Close();else if(SettingsOpen)CloseSettings();}
             if(Loading)navigation.interactable=false;
         }
         void OnDestroy()

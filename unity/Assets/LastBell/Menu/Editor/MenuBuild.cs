@@ -48,7 +48,7 @@ namespace LastBell.Menu.EditorTools
         [MenuItem("Last Bell/Main Menu/Build Windows Player", priority = 32)]
         public static void BuildWindows()
         {
-            var scenes = new[] { MainMenu.ScenePath,HeroSelection.ScenePath }.Concat(RunMaps.All.Select(m => m.RunScene)).ToArray();
+            var scenes = MenuAppearance.BuildScenes;
             foreach (var path in scenes) if (!File.Exists(path)) throw new FileNotFoundException("Build the existing run scenes first", path);
             var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions { scenes = scenes, locationPathName = PlayerPath,
                 target = BuildTarget.StandaloneWindows64, options = BuildOptions.None });
@@ -57,7 +57,7 @@ namespace LastBell.Menu.EditorTools
         }
         public static void BuildLocalDevelopment()
         {
-            var scenes=new[]{MainMenu.ScenePath,HeroSelection.ScenePath}.Concat(RunMaps.All.Select(m=>m.RunScene)).ToArray();
+            var scenes=MenuAppearance.BuildScenes;
             foreach(var path in scenes)if(!File.Exists(path))throw new FileNotFoundException("Required current scene is missing; do not regenerate over local edits",path);
             const string pathOut="E:/Collab/builds/menu-flow-20261022/LastBell.exe";Directory.CreateDirectory(Path.GetDirectoryName(pathOut));
             var report=BuildPipeline.BuildPlayer(new BuildPlayerOptions{scenes=scenes,locationPathName=pathOut,target=BuildTarget.StandaloneWindows64,options=BuildOptions.Development});

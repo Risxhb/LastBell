@@ -119,16 +119,22 @@ namespace LastBell.Menu.EditorTools
             var renderers=root.GetComponentsInChildren<Renderer>(true);var b=new Bounds(root.position,Vector3.zero);foreach(var r in renderers)b.Encapsulate(r.bounds);return b;
         }
         [MenuItem("Last Bell/Alternative Menu/Preview in Play Mode")]
-        public static void Preview(){Open();EditorApplication.isPlaying=true;}
+        public static void Preview(){Open();MenuAppearance.Selected=MenuStyle.Alternative;EditorApplication.isPlaying=true;}
         public static void ValidatePlayMode(){ConfigureLogo();EditorSceneManager.OpenScene(ConfrontationMenu.ScenePath);EditorApplication.playModeStateChanged+=FocusGame;EditorApplication.isPlaying=true;}
         static void ConfigureLogo()
         {
             AssetDatabase.Refresh();
+            ConfigureMenus();
             var importer=AssetImporter.GetAtPath("Assets/LastBell/Menu/Resources/Menu/ConfrontationLogo.png") as TextureImporter;
             if(!importer)throw new FileNotFoundException("ConfrontationLogo.png is required.");
             if(importer.textureType==TextureImporterType.Sprite&&importer.alphaIsTransparency)return;
             importer.textureType=TextureImporterType.Sprite;importer.spriteImportMode=SpriteImportMode.Single;importer.alphaIsTransparency=true;
             importer.mipmapEnabled=false;importer.maxTextureSize=2048;importer.textureCompression=TextureImporterCompression.Uncompressed;importer.SaveAndReimport();
+        }
+        public static void ConfigureMenus()
+        {
+            if(!EditorBuildSettings.scenes.Any(s=>s.path==ConfrontationMenu.ScenePath&&s.enabled))
+                EditorBuildSettings.scenes=EditorBuildSettings.scenes.Where(s=>s.path!=ConfrontationMenu.ScenePath).Concat(new[]{new EditorBuildSettingsScene(ConfrontationMenu.ScenePath,true)}).ToArray();
         }
         static void FocusGame(PlayModeStateChange state)
         {
@@ -140,7 +146,7 @@ namespace LastBell.Menu.EditorTools
             ConfigureLogo();
             if(!File.Exists(ConfrontationMenu.ScenePath))Prepare();
             var output="E:/Collab/builds/confrontation-menu/LastBell.exe";Directory.CreateDirectory(Path.GetDirectoryName(output));
-            var report=BuildPipeline.BuildPlayer(new BuildPlayerOptions{scenes=new[]{ConfrontationMenu.ScenePath,MainMenu.ScenePath,HeroSelection.ScenePath}.Concat(RunMaps.All.Select(m=>m.RunScene)).ToArray(),locationPathName=output,target=BuildTarget.StandaloneWindows64,options=BuildOptions.Development});
+            var report=BuildPipeline.BuildPlayer(new BuildPlayerOptions{scenes=MenuAppearance.BuildScenes,locationPathName=output,target=BuildTarget.StandaloneWindows64,options=BuildOptions.Development});
             Debug.Log($"Confrontation build: {report.summary.result}, {report.summary.totalErrors} errors/{report.summary.totalWarnings} warnings");
             if(Application.isBatchMode)EditorApplication.Exit(report.summary.result==BuildResult.Succeeded?0:1);
         }
