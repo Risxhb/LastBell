@@ -63,14 +63,15 @@ namespace LastBell.Run
         public override IEnumerable<int> Cast()
         {
             Boss.ShowAttack(Name);
-            WarningTicks = WarningTicksFor(Level);
+            WarningTicks = Tuning?.WarnTicks ?? WarningTicksFor(Level);
             LeanDir = PickSide(out int hit, out int safe); CountHit = hit; CountSafe = safe;
+            if (Tuning?.Dir is Vector3 forced && Sim.Flat(forced).sqrMagnitude > 0.01f) LeanDir = Sim.Flat(forced).normalized;   // Ultimate: a station, the fissure
             float yaw = Quaternion.LookRotation(LeanDir).eulerAngles.y;
 
             var half = Spawn(new Hazard
             {
                 Source = Name, Shape = HazardShape.Cone, Kind = HazardKind.Strike, Origin = Vector3.zero, Yaw = yaw,
-                Radius = Reach, HalfAngle = 90, LockAt = 0, ResolveAt = WarningTicks, Damage = Damage,
+                Radius = Reach, HalfAngle = 90, LockAt = 0, ResolveAt = WarningTicks, Damage = Tuning?.Damage ?? Damage,
                 Knockback = Knockback, Stun = StunTicks,
             });
             Half = half;

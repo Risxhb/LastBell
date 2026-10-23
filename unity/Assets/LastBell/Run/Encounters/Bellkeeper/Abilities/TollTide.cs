@@ -32,13 +32,19 @@ namespace LastBell.Run
 
         public override IEnumerable<int> Cast()
         {
-            int tide = TideTicks, toll = TollTicks;
+            int tide = Tuning?.WarnTicks ?? TideTicks, toll = Tuning?.SecondTicks ?? TollTicks;
             Boss.ShowAttack(Name);
+            if (Tuning != null && Tuning.SecondOnly)
+            {
+                // Bellkeeper Ultimate: the Heart Toll alone, warning from this tick and ringing `toll` ticks later
+                foreach (var w in HeartToll(toll)) yield return w;
+                yield break;
+            }
             if (Boss.Presenter) Boss.Presenter.PlayOnce("ShatteredChime", tide / (float)Sim.Hz);
             Tide = Spawn(new Hazard
             {
                 Source = TideSource, Shape = HazardShape.Ring, Kind = HazardKind.Ground, Origin = Vector3.zero,
-                Inner = TideInner, Radius = TideOuter, LockAt = 0, ResolveAt = tide, Damage = TideDamage,
+                Inner = TideInner, Radius = TideOuter, LockAt = 0, ResolveAt = tide, Damage = Tuning?.Damage ?? TideDamage,
                 Knockback = -Push,   // toward the centre, never into the wall
             });
             Tide.OnResolve = h =>
@@ -60,11 +66,16 @@ namespace LastBell.Run
 
             // tick tide-1: the tide breaks after the boss steps; the Heart Toll warns on this same tick and keeps its full
             // warning (ResolveAt counts the spawn tick, so it rings `toll` ticks later)
+            foreach (var w in HeartToll(toll)) yield return w;
+        }
+
+        IEnumerable<int> HeartToll(int toll)
+        {
             var at = Boss.transform.position;
             Toll = Spawn(new Hazard
             {
                 Source = TollSource, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = new Vector3(at.x, 0, at.z),
-                Radius = TollRadius, LockAt = 0, ResolveAt = toll + 1, Damage = TollDamage, Knockback = Push,
+                Radius = TollRadius, LockAt = 0, ResolveAt = toll + 1, Damage = Tuning?.SecondDamage ?? TollDamage, Knockback = Push,
             });
             Toll.OnResolve = h =>
             {

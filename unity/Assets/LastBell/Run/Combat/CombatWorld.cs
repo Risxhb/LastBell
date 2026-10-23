@@ -65,6 +65,13 @@ namespace LastBell.Run
 
         public event Action<PlayerController, Hazard, int> PlayerHit;   // tests and HUD listen
 
+        // Damage attribution: the player whose step (or projectile) is dealing damage right now, the damage each player
+        // has dealt in this world, and an encounter hook that scales one player's damage to the boss (the Bellkeeper
+        // Ultimate's Cracked Hour sets a player's to 0 for 20 s). Null hook = everyone deals full damage.
+        public PlayerController Actor { get; internal set; }
+        public Func<PlayerController, float> DealtScale;
+        public readonly Dictionary<PlayerController, int> DealtBy = new Dictionary<PlayerController, int>();
+
         // The effect layers are created once by the director and reset between runs (re-creating them crashed the
         // player natively in Mesh.set_colors on retry, see handoff).
         public CombatWorld(Transform root, BellkeeperFx bossFx, PlayerFx fx)
@@ -79,7 +86,8 @@ namespace LastBell.Run
         public void Step()
         {
             Tick++;
-            foreach (var p in Players) p.Step();
+            foreach (var p in Players) { Actor = p; p.Step(); }
+            Actor = null;
             if (!CombatActive) return;
             if (Boss != null && !Boss.Dead) Boss.Step();
             Projectiles.Step();
@@ -137,8 +145,10 @@ namespace LastBell.Run
         public int DamageBoss(int damage, Vector3 contact, string ability)
         {
             var b = Boss; if (b == null || !b.Solid || damage <= 0) return 0;
+            if (Actor != null && DealtScale != null) { damage = Mathf.RoundToInt(damage * Mathf.Max(0, DealtScale(Actor))); if (damage <= 0) return 0; }
             int dealt = b.TakeHit(damage, contact);
             DamageDealt += dealt;
+            if (Actor != null && dealt > 0) { DealtBy.TryGetValue(Actor, out int had); DealtBy[Actor] = had + dealt; }
             if (dealt > 0) { Add(RunMeter, ability, dealt); Add(EncounterMeter, ability, dealt); }
             return dealt;
         }
@@ -181,13 +191,14 @@ namespace LastBell.Run
         {
             public Vector3 Pos, Vel; public float Range, Travelled, Radius; public int Damage; public string Ability;
             public Action<int, Vector3> OnHit; public Color Color;
+            public PlayerController Owner;   // who fired it (damage attribution); Fire fills it from the world's Actor
         }
         readonly CombatWorld w; readonly List<Projectile> live = new List<Projectile>(), batch = new List<Projectile>();
         int clears;   // bumped by ClearAll, so a step can tell its batch was cancelled mid-dispatch
         public int Count => live.Count;
         public ProjectileSystem(CombatWorld world) { w = world; }
 
-        public void Fire(Projectile p) { live.Add(p); }
+        public void Fire(Projectile p) { if (p.Owner == null) p.Owner = w.Actor; live.Add(p); }
 
         // Steps a snapshot: a killing blow runs BossEncounter.Die -> ClearTransient -> ClearAll, which empties live (and
         // cancels pending hazards on the same tick) mid-loop. A projectile leaves live before its hit is dispatched, and
@@ -206,7 +217,9 @@ namespace LastBell.Run
                 {
                     var contact = b.transform.position + Sim.Flat(p.Pos - b.transform.position).normalized * b.BodyRadius + Vector3.up * b.HitHeight;
                     live.Remove(p);
+                    w.Actor = p.Owner;
                     int dealt = w.DamageBoss(p.Damage, contact, p.Ability);
+                    w.Actor = null;
                     w.Fx.NoteImpact(contact, p.Color);
                     p.OnHit?.Invoke(dealt, contact);
                     continue;

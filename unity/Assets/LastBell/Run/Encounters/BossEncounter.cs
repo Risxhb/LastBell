@@ -23,6 +23,8 @@ namespace LastBell.Run
         public bool Solid => !Dead && W != null;
         public string PhaseName { get; protected set; } = "";
         public string Current { get; protected set; } = "";   // attack in progress, for the HUD / tests
+        public virtual string HudLine => null;         // extra boss-bar line (e.g. a push timer); null = none
+        public virtual float[] HudMarks => null;       // phase thresholds drawn on the boss bar (fractions); null = the HUD's defaults
         public event Action<BossEncounter> Defeated;
         public event Action<BossEncounter, string> PhaseChanged;
 
@@ -69,7 +71,8 @@ namespace LastBell.Run
         public int TakeHit(int damage, Vector3 contact)
         {
             if (Dead) return 0;
-            int dealt = Mathf.Min(damage, Hp);
+            int floor = ignoreFloor ? 0 : Mathf.Clamp(HpFloor, 0, Hp);
+            int dealt = Mathf.Min(damage, Hp - floor);
             Hp -= dealt;
             RunHud.Float(contact + Vector3.up * 0.5f, dealt.ToString(), new Color(1f, 0.86f, 0.45f));
             W.BossFx.BossHit(contact); glowLevel = Mathf.Max(glowLevel, 2f);
@@ -79,7 +82,11 @@ namespace LastBell.Run
         }
 
         // dev / test hook: defeat now (goes through the same path as a killing blow)
-        public void DebugDefeat() { if (!Dead) { Hp = 1; TakeHit(1, transform.position + Vector3.up * HitHeight); } }
+        public void DebugDefeat() { if (!Dead) { Hp = 1; ignoreFloor = true; TakeHit(1, transform.position + Vector3.up * HitHeight); ignoreFloor = false; } }
+        // Damage can't take Hp below this until the boss lowers it (the Bellkeeper Ultimate holds each phase's threshold
+        // until its transition, so a phase can't be skipped). 0 = no floor. DebugDefeat ignores it.
+        protected virtual int HpFloor => 0;
+        bool ignoreFloor;
         public virtual float NextPhaseFraction() => Hp > MaxHp * 0.7f ? 0.69f : 0.34f;   // F8: just below the next threshold
         public void DebugSetHpFraction(float f){ if (!Dead) Hp = Mathf.Clamp(Mathf.RoundToInt(MaxHp * f), 1, MaxHp); }
 

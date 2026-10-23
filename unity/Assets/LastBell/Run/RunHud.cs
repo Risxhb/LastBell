@@ -250,12 +250,16 @@ namespace LastBell.Run
             float w = Screen.width, bw = Mathf.Min(720, w * 0.55f), x = w / 2 - bw / 2;
             GUI.Label(new Rect(x, 44, bw, 28), b.DisplayName.ToUpper() + (b.Placeholder ? "  (stand-in)" : ""), big);
             Bar(new Rect(x, 74, bw, 14), (float)b.Hp / b.MaxHp, new Color(0.92f, 0.41f, 0.36f));
-            if (b is BellkeeperEncounter) { Rect(new Rect(x + bw * 0.7f, 72, 2, 18), Color.white); Rect(new Rect(x + bw * 0.35f, 72, 2, 18), Color.white); }
+            if (b.HudMarks != null) foreach (var f in b.HudMarks) Rect(new Rect(x + bw * f, 72, 2, 18), Color.white);
+            else if (b is BellkeeperEncounter) { Rect(new Rect(x + bw * 0.7f, 72, 2, 18), Color.white); Rect(new Rect(x + bw * 0.35f, 72, 2, 18), Color.white); }
             if (b is AurelionEncounter) { Rect(new Rect(x + bw * 0.65f, 72, 2, 18), Color.white); Rect(new Rect(x + bw * 0.30f, 72, 2, 18), Color.white); }
             GUI.Label(new Rect(x, 90, 300, 20), b.PhaseName, small);
             GUI.Label(new Rect(x + bw - 140, 90, 140, 20), $"{b.Hp} / {b.MaxHp}", small);
+            float yy = 112;
+            var extra = b.HudLine;
+            if (!string.IsNullOrEmpty(extra)) { GUI.Label(new Rect(x, yy, bw, 22), extra, small); yy += 20; }
             // what is coming, in words (audio-off readability)
-            var hz = d.World.Hazards.Live; var seen = new HashSet<string>(); float yy = 112;
+            var hz = d.World.Hazards.Live; var seen = new HashSet<string>();
             foreach (var hzd in hz)
             {
                 if (!seen.Add(hzd.Source)) continue;

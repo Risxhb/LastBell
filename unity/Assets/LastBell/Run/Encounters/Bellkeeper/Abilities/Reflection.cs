@@ -50,7 +50,7 @@ namespace LastBell.Run
             Boss.ShowAttack(Name);
             if (Boss.Presenter) Boss.Presenter.PlayOnce("EchoTell", 1.53f);
             ClearImages();
-            int warn = WarnTicks, lockAt = LockAtTicks, standing = StandingCount;
+            int warn = Tuning?.WarnTicks ?? WarnTicks, lockAt = Mathf.Max(0, warn - LockBeforeTicks), standing = StandingCount;
             float radius = RadiusFor(standing);
             foreach (var p in W.Players.ToArray())
             {
@@ -74,7 +74,7 @@ namespace LastBell.Run
             img.H = Spawn(new Hazard
             {
                 Source = Name, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Radius = radius,
-                Origin = Where(img), LockAt = lockAt, ResolveAt = warn, Damage = Damage, Knockback = 1.5f, Stun = 15,
+                Origin = Where(img), LockAt = lockAt, ResolveAt = warn, Damage = Tuning?.Damage ?? Damage, Knockback = 1.5f, Stun = 15,
                 Track = hz => { if (img.P && !img.P.Down) hz.Origin = Where(img); },
                 OnResolve = hz =>
                 {

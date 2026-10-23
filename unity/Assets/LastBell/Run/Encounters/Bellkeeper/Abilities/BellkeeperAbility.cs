@@ -30,10 +30,21 @@ namespace LastBell.Run
         public int LastCastTick { get; private set; } = -1;          // World.Tick of the latest launch (tests)
         public bool Running => Boss != null && Boss.IsRunning(this);
 
+        // Bellkeeper Ultimate: one cast's tuning, set by the plan just before Launch (NextTuning) and held for that cast
+        // (Tuning). Null = the ability's own per-level numbers (v2 never sets it).
+        public sealed class CastTuning
+        {
+            public int? WarnTicks, SecondTicks, Damage, SecondDamage;
+            public Vector3? Dir;          // Leaning Bell: the hit half's direction (a station, the fissure's normal)
+            public bool SecondOnly;       // Toll Tide: the Heart Toll alone (no tide)
+        }
+        public CastTuning NextTuning;
+        public CastTuning Tuning { get; private set; }
+
         internal void Bind(BellkeeperEncounter boss) { Boss = boss; OnBind(); }
         // Once, when the encounter is built (after every ability is bound): subscribe to encounter events, e.g. LeanRemembered.
         protected virtual void OnBind() { }
-        internal void Launched() { Casts++; LastCastTick = W.Tick; }
+        internal void Launched() { Casts++; LastCastTick = W.Tick; Tuning = NextTuning; NextTuning = null; }
 
         // Boss movement before the warning starts (run by the encounter's plan, not overlapped).
         public virtual IEnumerable<int> Setup() { yield break; }
@@ -51,7 +62,7 @@ namespace LastBell.Run
         // made itself (numerals, after-images). Its hazards are already gone or about to be cleared by the encounter.
         public virtual void Cancel() { Spawned.Clear(); }
 
-        protected Hazard Spawn(Hazard h) { W.Hazards.Spawn(h); Spawned.Add(h); return h; }
+        protected Hazard Spawn(Hazard h) { W.Hazards.Spawn(h); Spawned.Add(h); Boss.NotifySpawned(this, h); return h; }
         protected int StandingCount { get { int n = 0; foreach (var p in W.Players) if (!p.Down) n++; return n; } }
     }
 
@@ -73,6 +84,7 @@ namespace LastBell.Run
             if (string.IsNullOrWhiteSpace(key)) return null;
             var k = key.Trim().ToLowerInvariant().Replace('-', '_').Replace(' ', '_');
             if (k.StartsWith("bellkeeper.")) k = k.Substring("bellkeeper.".Length);
+            if (k.StartsWith("ultimate.")) k = "ult_" + k.Substring("ultimate.".Length);   // ULTIMATE.md ids: ultimate.ledger = ult_ledger
             if (int.TryParse(k, out int n) && n >= 1 && n <= Ids.Length) k = Ids[n - 1].Substring("bellkeeper.".Length);
             if (k.StartsWith("the_")) k = k.Substring(4);
             if (k == "reflection_of_the_hour") k = "reflection";
