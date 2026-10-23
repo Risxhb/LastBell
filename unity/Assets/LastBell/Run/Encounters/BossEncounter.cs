@@ -23,6 +23,7 @@ namespace LastBell.Run
         public bool Solid => !Dead && W != null;
         public string PhaseName { get; protected set; } = "";
         public string Current { get; protected set; } = "";   // attack in progress, for the HUD / tests
+        public virtual string HudExtra => null;          // an extra boss-bar line (Aurelion v4: enrage clock, shield)
         public event Action<BossEncounter> Defeated;
         public event Action<BossEncounter, string> PhaseChanged;
 

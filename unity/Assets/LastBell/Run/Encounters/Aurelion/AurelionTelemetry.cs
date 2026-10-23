@@ -24,7 +24,7 @@ namespace LastBell.Run
         public void Bind(AurelionEncounter b, CombatWorld world)
         {
             boss = b; w = world; startTick = w.Tick;
-            set = AurelionArgs.V1 ? "v1" : AurelionArgs.V3 ? "v3" : "v2.1";
+            set = AurelionArgs.V1 ? "v1" : AurelionArgs.V4 ? "v4" : AurelionArgs.V3 ? "v3" : "v2.1";
             w.PlayerHit += OnHit;
             w.Hazards.Resolving += OnResolving;
             boss.PhaseChanged += OnPhase;

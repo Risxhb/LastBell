@@ -44,6 +44,7 @@ namespace LastBell.Run
             Zenith = Register(new ZenithCollapse());      // [ability: zenith_collapse] (v2.1)
             Ecliptic = Register(new EclipticOrder());     // [ability: ecliptic_order] (v3)
             Marks = Register(new ZenithMarks());          // [ability: zenith_marks] (v3)
+            BindV4();                                     // v4 abilities (AurelionEncounter.V4.cs)
         }
         T Register<T>(T a) where T : AurelionAbility { a.Bind(this, W); abilities.Add(a); return a; }
         public IReadOnlyList<AurelionAbility> Abilities => abilities;
@@ -259,6 +260,7 @@ namespace LastBell.Run
 
         IEnumerable<IEnumerable<int>> Plan(int ph)
         {
+            if (AurelionArgs.V4) { foreach (var b in Plan4(ph)) yield return b; yield break; }
             if (AurelionArgs.V3) { foreach (var b in Plan3(ph)) yield return b; yield break; }
             if (V21) { foreach (var b in Plan21(ph)) yield return b; yield break; }
             switch (ph)
@@ -295,6 +297,11 @@ namespace LastBell.Run
                 case "aurelion.zenith_collapse": return Block("Zenith Collapse", ZenithSolo());
                 case "aurelion.ecliptic_order": return Block("Ecliptic Order", Ecliptic.Run(phase == 1 ? 3 : 4));
                 case "aurelion.zenith_marks": return Block("Zenith Marks + Meridian Lances", MarksWithLances(phase));
+                case "aurelion.meridian_towers": return Block("Meridian Towers", Towers.Run());
+                case "aurelion.sunspots": return Block("Sunspots", Spots.Run());
+                case "aurelion.total_eclipse": return Block("Total Eclipse", Eclipse.Run());
+                case "aurelion.severance": return Block("Severance", Sever.Run());
+                case "aurelion.last_light": return Block("Last Light", Together(Light.Run(), 0, LastLightRotation()));
                 default: return Block("Hour Hands", Hands.Run());
             }
         }
@@ -302,6 +309,7 @@ namespace LastBell.Run
         // test hook: put him in a phase (and its form) without a transition, with HP inside that phase
         public void DebugSetPhase(int ph)
         {
+            if (AurelionArgs.V4) { DebugSetPhaseV4(ph); return; }
             phase = Mathf.Clamp(ph, 1, 3); SecondForm = phase >= 3;
             SetPhase(phase == 1 ? "Perfect Order" : phase == 2 ? "Misalignment" : "Exposed Meridian");   // fires PhaseChanged (telemetry)
             DebugSetHpFraction(phase == 1 ? 0.9f : phase == 2 ? 0.5f : 0.2f);

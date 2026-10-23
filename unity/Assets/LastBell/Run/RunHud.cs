@@ -12,7 +12,11 @@ namespace LastBell.Run
         struct FloatText { public Vector3 pos; public string text; public Color color; public float age; }
         static readonly List<FloatText> floats = new List<FloatText>();
         public static void Float(Vector3 world, string text, Color c) { if (floats.Count < 80) floats.Add(new FloatText { pos = world, text = text, color = c }); }
-        public static void ClearTransient() { floats.Clear(); labels.Clear(); }
+        public static void ClearTransient() { floats.Clear(); labels.Clear(); banner = null; }
+        // a big centre-screen call (Aurelion v4: wipes, the enrage warning) for `seconds` of real time
+        static string banner; static Color bannerColor; static float bannerUntil;
+        public static void Banner(string text, Color c, float seconds) { banner = text; bannerColor = c; bannerUntil = Time.unscaledTime + seconds; }
+        public static string CurrentBanner => banner != null && Time.unscaledTime < bannerUntil ? banner : null;
         // a world-space label that stays until its owner hides it (Aurelion v3: Ecliptic numerals, SUN / SHADE marks);
         // with `follow`, Pos is an offset above that transform (a moving player)
         public sealed class WorldLabel { public Vector3 Pos; public Transform Follow; public string Text; public Color Color; public int Size; public bool Hidden; public void Hide() => Hidden = true; }
@@ -115,6 +119,7 @@ namespace LastBell.Run
             Boss();
             PlayerPanel();
             AllyPanel();
+            BannerText();
             Floats();
             Labels();
             HazardLabels();
@@ -275,9 +280,10 @@ namespace LastBell.Run
             GUI.Label(new Rect(x, 44, bw, 28), b.DisplayName.ToUpper() + (b.Placeholder ? "  (stand-in)" : ""), big);
             Bar(new Rect(x, 74, bw, 14), (float)b.Hp / b.MaxHp, new Color(0.92f, 0.41f, 0.36f));
             if (b is BellkeeperEncounter) { Rect(new Rect(x + bw * 0.7f, 72, 2, 18), Color.white); Rect(new Rect(x + bw * 0.35f, 72, 2, 18), Color.white); }
-            if (b is AurelionEncounter) { Rect(new Rect(x + bw * 0.65f, 72, 2, 18), Color.white); Rect(new Rect(x + bw * 0.30f, 72, 2, 18), Color.white); }
+            if (b is AurelionEncounter ae) foreach (var f in ae.PhaseMarks) Rect(new Rect(x + bw * f, 72, 2, 18), Color.white);
             GUI.Label(new Rect(x, 90, 300, 20), b.PhaseName, small);
             GUI.Label(new Rect(x + bw - 140, 90, 140, 20), $"{b.Hp} / {b.MaxHp}", small);
+            if (b.HudExtra != null) GUI.Label(new Rect(x + bw / 2 - 160, 90, 320, 20), b.HudExtra, small);
             // what is coming, in words (audio-off readability)
             var hz = d.World.Hazards.Live; var seen = new HashSet<string>(); float yy = 112;
             foreach (var hzd in hz)
@@ -413,7 +419,14 @@ namespace LastBell.Run
             }
         }
 
-        GUIStyle lab;
+        GUIStyle lab, ban;
+        void BannerText()
+        {
+            var t = CurrentBanner; if (t == null) return;
+            if (ban == null) ban = new GUIStyle(num) { fontSize = 46 };
+            ban.normal.textColor = new Color(0, 0, 0, 0.8f); GUI.Label(new Rect(3, Screen.height * 0.3f + 3, Screen.width, 70), t, ban);
+            ban.normal.textColor = bannerColor; GUI.Label(new Rect(0, Screen.height * 0.3f, Screen.width, 70), t, ban);
+        }
         void Labels()
         {
             var cam = Camera.main; if (!cam) return; float h = Screen.height;

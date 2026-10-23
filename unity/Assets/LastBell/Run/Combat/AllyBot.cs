@@ -128,17 +128,24 @@ namespace LastBell.Run
         }
 
         System.Func<Vector3, bool> bad;
-        static bool Hits(Hazard h, PlayerController me, Vector3 q) => h.Contains(q) && (h.Affects == null || h.Affects(me));
+        static bool Hits(Hazard h, PlayerController me, Vector3 q) => !h.Soak && h.Contains(q) && (h.Affects == null || h.Affects(me));
 
         // where this bot must not stand now: inside any shape that would hit it; a Perfect bot also avoids anywhere outside
-        // the next Ecliptic anchor's disc and the wrong side of its Zenith Mark (with a 0.35-0.4 m buffer)
+        // the next Ecliptic anchor's disc and the wrong side of its Zenith Mark (with a 0.35-0.4 m buffer); v4 jobs: its
+        // Meridian Tower, a light well during Total Eclipse, its Severance side (and clear of the line's next 2 s of sweep)
         System.Func<Vector3, bool> Bad(PlayerController me, BossEncounter boss)
         {
             var live = me.World.Hazards.Live;
-            var a = Mode == BotMode.Perfect ? boss as AurelionEncounter : null;
-            int k = a != null && a.Ecliptic != null ? a.Ecliptic.NextStrike(me.World.Tick) : -1;
-            var mine = a != null && a.Marks != null ? a.Marks.Current(me, me.World.Tick) : null;
-            if (k < 0 && mine == null) return q => { foreach (var h in live) if (Hits(h, me, q)) return true; return false; };
+            // visible jobs (a tower, a light well, a Severance side) for every bot, the allies included; the memory jobs (the
+            // Ecliptic order, a Zenith Mark) only for Perfect
+            var a = boss as AurelionEncounter; bool memory = Mode == BotMode.Perfect;
+            int tick = me.World.Tick;
+            int k = memory && a != null && a.Ecliptic != null ? a.Ecliptic.NextStrike(tick) : -1;
+            var mine = memory && a != null && a.Marks != null ? a.Marks.Current(me, tick) : null;
+            var tower = a != null && a.Towers != null ? a.Towers.NextFor(me, tick) : null;
+            bool wells = a != null && a.Eclipse != null && a.Eclipse.Active;
+            int side = a != null && a.Sever != null && a.Sever.Active ? a.Sever.Assigned(me) : 0;
+            if (k < 0 && mine == null && tower == null && !wells && side == 0) return q => { foreach (var h in live) if (Hits(h, me, q)) return true; return false; };
             var bp = Sim.Flat(boss.transform.position);
             Vector3 anchor = k >= 0 ? a.Ecliptic.Anchors[k] : Vector3.zero;
             float disc = k >= 0 ? a.Ecliptic.SafeRadius - Hazard.Margin - 0.35f : 0;
@@ -151,18 +158,26 @@ namespace LastBell.Run
                     float d = Sim.Flat(q - bp).magnitude;
                     if (mine.Mark == ZenithMarks.Mark.Shade ? d > ZenithMarks.ShadeR - Hazard.Margin - 0.4f : d < ZenithMarks.SunR + Hazard.Margin + 0.4f) return true;
                 }
+                if (tower != null && Sim.Flat(q - tower.At).magnitude > tower.H.Radius - 0.4f) return true;
+                if (wells && !a.Eclipse.InWell(q)) return true;
+                if (side != 0 && (a.Sever.SideOfAt(q, a.Sever.LineYaw) != side || a.Sever.SideOfAt(q, a.Sever.LineYaw + 8f) != side || a.Sever.DistToLine(q) < 1.0f)) return true;
                 return false;
             };
         }
 
-        // Perfect: ticks until its memory job (the next Ecliptic strike, its Zenith Mark) resolves; -1 = none
+        // ticks until its job (Perfect: the next Ecliptic strike, its Zenith Mark; everyone: its tower) resolves; standing jobs (a
+        // light well, a Severance side) count as due now; -1 = none
         int Duty(PlayerController me, BossEncounter boss)
         {
-            if (Mode != BotMode.Perfect || !(boss is AurelionEncounter a)) return -1;
+            if (!(boss is AurelionEncounter a)) return -1;
+            bool memory = Mode == BotMode.Perfect;
             int t = me.World.Tick, best = -1;
-            if (a.Ecliptic != null) { int k = a.Ecliptic.NextStrike(t); if (k >= 0) best = a.Ecliptic.StrikeAt(k) - t; }
-            var mk = a.Marks != null ? a.Marks.Current(me, t) : null;
+            if (memory && a.Ecliptic != null) { int k = a.Ecliptic.NextStrike(t); if (k >= 0) best = a.Ecliptic.StrikeAt(k) - t; }
+            var mk = memory && a.Marks != null ? a.Marks.Current(me, t) : null;
             if (mk != null) { int m = mk.ResolveTick - t; if (best < 0 || m < best) best = m; }
+            var tw = a.Towers != null ? a.Towers.NextFor(me, t) : null;
+            if (tw != null) { int m = tw.ResolveTick - t; if (best < 0 || m < best) best = m; }
+            if ((a.Eclipse != null && a.Eclipse.Active) || (a.Sever != null && a.Sever.Active)) best = best < 0 ? 20 : Mathf.Min(best, 20);
             return best;
         }
 

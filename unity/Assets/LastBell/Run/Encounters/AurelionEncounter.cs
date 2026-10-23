@@ -51,14 +51,15 @@ namespace LastBell.Run
         int pinRotation;
 
         // HP = measured sustained DPS x 150 s (packet). First autotest measurement: Vanguard ~90 DPS while dodging -> 13 500.
-        void Awake() { MaxHp = 13500;BodyRadius = 1.1f; HitHeight = 2.6f; MarkHeight = 5.2f; }
+        void Awake() { MaxHp = AurelionArgs.V4 ? 16000 : 13500; BodyRadius = 1.1f;   // v4: about 6:00 for a solo ranged player (Arcanist 60 DPS, RunAutoTest V4Dps)
+            HitHeight = 2.6f; MarkHeight = 5.2f; }
 
         int PhaseFor() => Hp > MaxHp * 0.65f ? 1 : Hp > MaxHp * 0.30f ? 2 : 3;
         public void DebugReadyThrust() { thrustReady = 0; }   // test hook: the next pass may choose the Thrust
-        public override float NextPhaseFraction() => Hp > MaxHp * 0.65f ? 0.64f : 0.29f;
+        public override float NextPhaseFraction() => AurelionArgs.V4 ? V4NextPhaseFraction() : Hp > MaxHp * 0.65f ? 0.64f : 0.29f;
         bool Ready(int at) => Age >= at;
 
-        protected override IEnumerable<int> Script() => AurelionArgs.V1 ? V1Script() : V2Script();
+        protected override IEnumerable<int> Script() => AurelionArgs.V1 ? V1Script() : AurelionArgs.V4 ? V4Script() : V2Script();
 
         // ability set v1 (the packet's five attacks), kept for comparison behind -lastbellAbilitySet v1; v2 is in Aurelion/AurelionEncounter.V2.cs
         IEnumerable<int> V1Script()
@@ -344,6 +345,7 @@ namespace LastBell.Run
                 behind[p] = InRear(p.transform.position) ? t + 1 : 0;
             }
             MaxLiveHazards = Mathf.Max(MaxLiveHazards, W.Hazards.Count);
+            V4Clock();
             if (presenter) presenter.TickBoss(Current == "approach" || Current == "reposition" ? "Walk" : "Idle");
         }
         public int BehindTicks(PlayerController p) => behind.TryGetValue(p, out int t) ? t : 0;

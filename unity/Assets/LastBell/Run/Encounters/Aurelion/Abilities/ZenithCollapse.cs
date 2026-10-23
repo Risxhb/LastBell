@@ -29,6 +29,10 @@ namespace LastBell.Run
         public int Duration() => WindowTicks - 1;
 
         public Hazard Last { get; private set; }   // test evidence
+        // v4 Solar Hunger (abilities-v4 §3.3): the encounter sets these before each cast. Every Collapse in the fight is
+        // hungrier: the safe disc shrinks (never below HungerFloor) and the hit grows. 0 = v2.1 / v3 behaviour.
+        public float HungerShrink; public int HungerBonus; public float HungerFloor = 3.0f;
+        public float CurrentSafe => HungerShrink > 0 ? Mathf.Max(HungerFloor, SafeRadius(N, Phase) - HungerShrink) : SafeRadius(N, Phase);
 
         public IEnumerable<int> Run()
         {
@@ -38,8 +42,8 @@ namespace LastBell.Run
             Last = Spawn(new Hazard
             {
                 Source = Name, Shape = HazardShape.Ring, Kind = HazardKind.Ground, Origin = BossPos,
-                Inner = SafeRadius(N, Phase), Radius = Outer, LockAt = 0, ResolveAt = win,
-                Damage = Damage, Knockback = 0, Stun = Sim.Ticks(StunS),
+                Inner = CurrentSafe, Radius = Outer, LockAt = 0, ResolveAt = win,
+                Damage = Damage + HungerBonus, Knockback = 0, Stun = Sim.Ticks(StunS),
             });
             Last.Tele?.Tint(Fill, Edge);
             Last.OnResolve = hz => { W.BossFx.TollResolve(hz.Origin, hz.Inner, Rim); Flare(1.4f); };

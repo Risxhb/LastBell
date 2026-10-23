@@ -32,6 +32,7 @@ namespace LastBell.Run
             if (V2Wants("aurelion.zenith_collapse")) yield return V2Section("Zenith Collapse", V2ZenithCollapse());
             if (V2Wants("aurelion.phase_plan")) yield return V2Section("phase plan", V2PhasePlan());
             yield return AurelionV3Checks();   // ability set v3 (RunAutoTest.Aurelion.V3.cs)
+            yield return AurelionV4Checks();   // ability set v4 (RunAutoTest.Aurelion.V4.cs)
             yield return V2Teardown();
             AurelionArgs.SetOverride = null; AurelionArgs.SoloOverride = null;
         }
@@ -222,7 +223,7 @@ namespace LastBell.Run
             // the six abilities are registered and bound
             yield return V2Setup(1);
             if (V2Boss == null) yield break;
-            V2Check("eight abilities registered (v2.1 adds Zenith Collapse, v3 Ecliptic Order and Zenith Marks)", V2Boss.Abilities.Count == 8 && AurelionArgs.Ids.All(id => V2Boss.Abilities.Any(a => a.Id == id)),
+            V2Check("13 abilities registered (v2.1 adds Zenith Collapse, v3 Ecliptic Order and Zenith Marks, v4 five more)", V2Boss.Abilities.Count == 13 && AurelionArgs.Ids.All(id => V2Boss.Abilities.Any(a => a.Id == id)),
                 string.Join(", ", V2Boss.Abilities.Select(a => a.Id)));
 
             // Misalignment pairing, Noon Shadow + Starfall Mirror (Starfall 0.7 s into Noon): both resolve on the same tick,
@@ -326,7 +327,7 @@ namespace LastBell.Run
             }
 
             // the practice hook: -lastbellAbility <id> (and F6) loops one ability on its own
-            foreach (var id in AurelionArgs.Ids)
+            foreach (var id in AurelionArgs.Ids.Take(8))   // v2-v3 abilities; the v4 ones are checked in RunAutoTest.Aurelion.V4.cs
             {
                 yield return V2Setup(1);
                 if (V2Boss == null) yield break;
