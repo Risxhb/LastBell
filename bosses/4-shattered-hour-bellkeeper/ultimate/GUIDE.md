@@ -21,7 +21,7 @@ Written the way Ultimate guides are: what each mechanic wants from **you**, by y
 1. The cracked-hourglass glyph tells you you'll be Stilled in 5 s.
 2. Go to your hiding strip: directly behind the boss from **your clock station**, within a step of the line. When he's paired with a Heart Toll, stand beyond 4.3 m.
 3. Free players: deal damage during the stop. Scan the lanes: if a Stilled ally isn't hidden, step into their lane between them and the station (you take 60 instead of their 999).
-- **Solo:** you're always Stilled. Hide every time.
+- **Solo:** you're always Stilled. Hide every time. In P3 and P5 the resume also brings Reflection, whose solo image lands on your own frozen spot: 40 you can't avoid. Enter those resumes above 40 HP (drink before the hourglass).
 
 ## The Ledger (P1 → P4)
 - **P1:** decide what you record. The ledger half is the side of **clock III's station**: Leaning Bell V leans there anyway. At Leaning Bell I's cast (5 s), everyone stands together about 5 m out on that half, so it falls there too. At Reflection's lock (17 s), everyone whose clock isn't striking then clumps on one spot (that striker's spot), so the images clump.
@@ -46,7 +46,9 @@ Written the way Ultimate guides are: what each mechanic wants from **you**, by y
 - **P5:** the great bell counts I…XIII, one toll every 6 s. XIII ends the attempt. Burn: P5 is 15 % of the bar in 78 s.
 
 ## Fracture of Time (P5)
-- Every P5 Leaning Bell uses the fissure as its line. **Dash across** (4 HP, 30 stamina) rather than walk (14 HP). The stamina trace allows one crossing per loop with room to spare.
+- **Never stand in the fissure** (30/s). It **flares on every toll** of the great bell (every 6 s from P5 start, in time with the numerals): be 1.5 m clear of its line on each toll.
+- Every P5 Leaning Bell uses the fissure as its line, and a toll lands inside its warning: **cross before the toll**. **Dash across** (4 HP, 30 stamina) rather than walk (14 HP). In the first loop you can also wait beside it for the flare and cross in the 1.5 s after; in the second only a dash makes that.
+- **Stilled with a NW or SE hand** (the fissure's ends): your hiding strip is the fissure itself. Hide **beside** it: about 7 m behind the boss, 1.65–1.9 m to either side of the crack (a thin strip: practise it). His body still covers you. On the crack, the burn and the flare take 93 of your 100 HP.
 
 ## Phase cheat-sheet
 | Phase | Learn first | Then |
