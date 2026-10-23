@@ -43,6 +43,8 @@ namespace LastBell.Menu
             public bool Projectile; public float Radius; public Color Color;
         }
         readonly List<Actor> actors = new List<Actor>();
+        readonly List<Actor> partyPool = new List<Actor>();
+        readonly Dictionary<string, Actor> bossPool = new Dictionary<string, Actor>();
         readonly List<Effect> effects = new List<Effect>();
         readonly List<Material> ownedMaterials = new List<Material>();
         float previous = -0.01f;
@@ -55,7 +57,7 @@ namespace LastBell.Menu
         void Start()
         {
             view = Camera.main;
-            SpawnParty();
+            CreateCastPool();
             previousNoShake = BellkeeperFx.NoScreenshake; BellkeeperFx.NoScreenshake = true;
             spellFx = MenuFxLifetime.Acquire();
             spellFx.Player.Shield(actors[1].Pose, 0, false);
@@ -82,38 +84,52 @@ namespace LastBell.Menu
                 mote.transform.localScale = Vector3.one * (0.025f + i % 3 * 0.012f);
             }
         }
-        void SpawnParty()
+        void CreateCastPool()
         {
-            Spawn(BossResource, BossPosition, true);
-            Spawn("Vanguard", VanguardPosition);
-            Spawn("Arcanist", ArcanistPosition);
-            Spawn("Chimesinger", ChimesingerPosition);
+            // Model imports, material instances and animation graphs are prepared once.
+            // A 15-second wipe never pays the cost of instantiating an eight-player cast.
+            foreach (string resource in new[] { "Bellkeeper2", "Aurelion", "Crucivar", "Sylvara" })
+                bossPool.Add(resource, Spawn(resource, BossPosition, true));
             string[] classes = { "Vanguard", "Arcanist", "Chimesinger" };
-            for (int i = 3; i < PartySize; i++)
+            for (int i = 0; i < 8; i++) partyPool.Add(Spawn(classes[i % 3], Vector3.zero));
+            ActivateCast();
+        }
+        void ActivateCast()
+        {
+            foreach (var a in bossPool.Values) a.Root.gameObject.SetActive(false);
+            foreach (var a in partyPool) a.Root.gameObject.SetActive(false);
+            actors.Clear();
+            var boss = bossPool[BossResource];
+            ResetActor(boss, BossPosition); actors.Add(boss);
+            for (int i = 0; i < PartySize; i++)
             {
                 float angle = (i - 3) * 2.39996f + StageIndex;
-                Spawn(classes[(i + StageIndex) % 3], P(Mathf.Cos(angle) * 7, Mathf.Sin(angle) * 7));
+                var home = i == 0 ? VanguardPosition : i == 1 ? ArcanistPosition : i == 2 ? ChimesingerPosition
+                    : P(Mathf.Cos(angle) * 7, Mathf.Sin(angle) * 7);
+                ResetActor(partyPool[i], home); actors.Add(partyPool[i]);
             }
+        }
+        static void ResetActor(Actor actor, Vector3 home)
+        {
+            actor.Home = home; actor.PlantedUntil = 0; actor.Root.SetPositionAndRotation(home, Quaternion.identity);
+            actor.Presenter.Locomotion = 0; actor.Presenter.ResetPose(); actor.Root.gameObject.SetActive(true);
         }
         public void SetStage(int index, string boss, int partySize)
         {
             StageIndex = index; BossResource = boss; PartySize = Mathf.Clamp(partySize, 3, 8);
-            // Release graphs and presenter-owned material instances before replacing the cast.
+            // The cast is reused; only short-lived trail renderers own per-cue materials.
             foreach (var a in actors)
             {
-                a.Root.gameObject.SetActive(false);
-                foreach (var renderer in a.Root.GetComponentsInChildren<Renderer>(true))
-                    foreach (var material in renderer.sharedMaterials)
-                        if (material && (renderer is TrailRenderer || material.name.EndsWith("(Instance)", StringComparison.Ordinal))) Destroy(material);
-                Destroy(a.Root.gameObject);
+                foreach (var trail in a.Root.GetComponentsInChildren<TrailRenderer>(true))
+                { if (trail.sharedMaterial) Destroy(trail.sharedMaterial); trail.gameObject.SetActive(false); Destroy(trail.gameObject); }
             }
             actors.Clear(); Array.Clear(ActorTravel, 0, ActorTravel.Length);
             if (spellFx) { spellFx.Player.ResetAll(); spellFx.Boss.ResetAll(); }
             foreach (var e in effects) { e.Start = -100; e.Line.enabled = false; }
             previous = -0.01f; Elapsed = 0; CompletedLoops = 0;
-            if (view) SpawnParty(); // Before Start, the fields alone configure the first cast.
+            if (partyPool.Count > 0) ActivateCast(); // Before Start, fields configure the first cast.
         }
-        void Spawn(string resource, Vector3 home, bool boss = false)
+        Actor Spawn(string resource, Vector3 home, bool boss = false)
         {
             var root = new GameObject(resource + " (menu only)").transform; root.SetParent(transform, false); root.position = home;
             var presenter = boss ? CharacterPresenter.Create(root, resource, 5, 0.2f, 0, null) : CharacterPresenter.ForPlayer(root, resource);
@@ -121,7 +137,8 @@ namespace LastBell.Menu
             // have no World, Kit or Input, and are never stepped: only their Transform is read by the VFX.
             var pose = boss ? null : root.gameObject.AddComponent<PlayerController>();
             if (pose) { pose.enabled = false; pose.MovementEnabled = false; }
-            actors.Add(new Actor { Root = root, Presenter = presenter, Home = home, Pose = pose });
+            root.gameObject.SetActive(false);
+            return new Actor { Root = root, Presenter = presenter, Home = home, Pose = pose };
         }
         void Update()
         {
@@ -351,7 +368,7 @@ namespace LastBell.Menu
             if (spellFx) spellFx.Release();
             foreach (var material in ownedMaterials) if (material) Destroy(material);
             // CharacterPresenter owns PlayableGraphs but its runtime material instances need releasing with this scene.
-            foreach (var renderer in GetComponentsInChildren<Renderer>())
+            foreach (var renderer in GetComponentsInChildren<Renderer>(true))
                 if (!(renderer is LineRenderer)) foreach (var material in renderer.sharedMaterials)
                     if (material && (renderer is TrailRenderer || material.name.EndsWith("(Instance)", StringComparison.Ordinal))) Destroy(material);
         }

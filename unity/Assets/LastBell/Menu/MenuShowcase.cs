@@ -29,6 +29,7 @@ namespace LastBell.Menu
         public bool Wiping => building && building.gameObject.activeSelf;
         public bool CoversScreen => Wiping && Mathf.Abs(building.anchoredPosition.x) <= (building.sizeDelta.x - canvasRect.rect.width) * .5f;
         MenuBattle battle;
+        float startedAt = -1;
         RectTransform building, canvasRect;
         void Start()
         {
@@ -42,7 +43,10 @@ namespace LastBell.Menu
         }
         void Update()
         {
-            Elapsed += Time.unscaledDeltaTime;
+            // Start after all scene Start callbacks (including cast preparation), so
+            // cold asset loading is not counted as time already spent on the menu.
+            if (startedAt < 0) { startedAt = Time.realtimeSinceStartup; return; }
+            Elapsed = Time.realtimeSinceStartup - startedAt;
             float next = (Changes + 1) * StageSeconds;
             float distance = Elapsed - next;
             bool leaving = Elapsed - Changes * StageSeconds < WipeHalfSeconds && Changes > 0;

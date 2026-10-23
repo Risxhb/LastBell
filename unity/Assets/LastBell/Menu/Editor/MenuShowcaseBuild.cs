@@ -72,7 +72,7 @@ namespace LastBell.Menu.EditorTools
         }
         public static void BuildWindows()
         {
-            var output = Environment.GetEnvironmentVariable("LASTBELL_SHOWCASE_OUTPUT") ?? "E:/Collab/builds/menu-showcase-20261022/LastBell.exe";
+            var output = Environment.GetEnvironmentVariable("LASTBELL_SHOWCASE_OUTPUT") ?? "E:/Collab/builds/menu-showcase-current/LastBell.exe";
             Directory.CreateDirectory(Path.GetDirectoryName(output));
             var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions {
                 scenes = new[] { MainMenu.ScenePath, HeroSelection.ScenePath }.Concat(RunMaps.All.Select(m => m.RunScene)).ToArray(),
