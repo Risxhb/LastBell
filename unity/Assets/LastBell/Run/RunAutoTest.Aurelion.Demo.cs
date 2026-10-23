@@ -127,7 +127,7 @@ namespace LastBell.Run
             t = 0; while (t < 5) { t += Time.deltaTime; yield return null; }
             demoRecording = false; yield return null; yield return null;
             RunHud.CaptionTitle = null;
-            AllyBot.AllyMode = BotMode.Passive; AllyBot.Attacks = false;
+            AllyBot.AllyMode = BotMode.Perfect; AllyBot.Attacks = false;   // back to the menu defaults
             d.SelectAllies(0);
             d.InputOverride = bot;
         }

@@ -26,7 +26,7 @@ namespace LastBell.Run
         public string DebugLine;          // tests: what it decided last tick
         public float? HoldRange;          // tests: keep this gap to the boss instead of the class's range (8.5 = a ranged player)
         public static bool Attacks = false;   // bots are mechanics dummies: they move, dodge and spread, but never attack or heal
-        public static BotMode AllyMode = BotMode.Passive;   // the mode the director gives menu allies (demos: Perfect)
+        public static BotMode AllyMode = BotMode.Perfect;   // menu allies do every mechanic, memory ones included (Chzy18: "do the mechanics"); still no attacks
         int tick, lastPress = -999, castHold;
         int[] cd = new int[5];
 
