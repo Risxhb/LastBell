@@ -97,11 +97,13 @@ namespace LastBell.Run
         T Mech<T>() where T : UltimateMechanic => (T)Mechanics.First(m => m is T);
         public T Mechanic<T>() where T : UltimateMechanic => Mechanics.OfType<T>().FirstOrDefault();
 
-        // the Ultimate tuning of the reworked v2 moves (ULTIMATE.md §4)
-        public static BellkeeperAbility.CastTuning LeanTuning(Vector3? dir = null, int warn = UltShapes.LeanTicks) => new BellkeeperAbility.CastTuning { WarnTicks = warn, Damage = UltShapes.LeanDamage, Dir = dir };
-        public static BellkeeperAbility.CastTuning TideTuning() => new BellkeeperAbility.CastTuning { WarnTicks = UltShapes.TideTicks, SecondTicks = UltShapes.HeartTicks, Damage = UltShapes.StandardDamage, SecondDamage = UltShapes.StandardDamage };
+        // the Ultimate tuning of the reworked v2 moves (ULTIMATE.md §4). `warn` = ticks from launch to the strike: the v2
+        // moves spawn on their launch tick with ResolveAt = their warning, which strikes one tick early, so the warnings
+        // go through UltShapes.ResolveIn (the Heart Toll's ResolveAt already counts its spawn tick).
+        public static BellkeeperAbility.CastTuning LeanTuning(Vector3? dir = null, int warn = UltShapes.LeanTicks) => new BellkeeperAbility.CastTuning { WarnTicks = UltShapes.ResolveIn(warn), Damage = UltShapes.LeanDamage, Dir = dir };
+        public static BellkeeperAbility.CastTuning TideTuning() => new BellkeeperAbility.CastTuning { WarnTicks = UltShapes.ResolveIn(UltShapes.TideTicks), SecondTicks = UltShapes.HeartTicks, Damage = UltShapes.StandardDamage, SecondDamage = UltShapes.StandardDamage };
         public static BellkeeperAbility.CastTuning HeartTuning(int warn = UltShapes.HeartTicks) => new BellkeeperAbility.CastTuning { SecondOnly = true, SecondTicks = warn, SecondDamage = UltShapes.StandardDamage };
-        public static BellkeeperAbility.CastTuning MirrorTuning(int warn = 240) => new BellkeeperAbility.CastTuning { WarnTicks = warn, Damage = UltShapes.StandardDamage };
+        public static BellkeeperAbility.CastTuning MirrorTuning(int warn = 240) => new BellkeeperAbility.CastTuning { WarnTicks = UltShapes.ResolveIn(warn), Damage = UltShapes.StandardDamage };
 
         // Launch helpers for the plan and for mechanics that call other moves (the Conductor's Hand, Backwards Bell).
         public bool UltLaunch(UltimateMechanic m, UltCue cue = null)

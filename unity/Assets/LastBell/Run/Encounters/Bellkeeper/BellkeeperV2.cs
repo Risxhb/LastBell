@@ -151,13 +151,18 @@ namespace LastBell.Run
                 if (wait > 0) wait--;
                 else
                 {
-                    if (plan == null || !plan.MoveNext()) { plan = (PracticeAbility != null ? PracticeAbility.Practice() : Set == AbilitySet.Ultimate ? UltimatePlan() : PhasePlan()).GetEnumerator(); plan.MoveNext(); }
+                    if (plan == null || !plan.MoveNext()) { plan = (ManualPlan ? IdlePlan() : PracticeAbility != null ? PracticeAbility.Practice() : Set == AbilitySet.Ultimate ? UltimatePlan() : PhasePlan()).GetEnumerator(); plan.MoveNext(); }
                     wait = Mathf.Max(1, plan.Current) - 1;
                 }
                 foreach (var r in stepping) if (running.Contains(r) && !Advance(r)) running.Remove(r);
                 yield return 1;
             }
         }
+
+        // Tests: with ManualPlan set before BeginCombat(), the scheduler runs (launched moves advance every tick) but no
+        // plan launches anything: the test launches moves itself (Launch / UltLaunch / UltMove).
+        public bool ManualPlan;
+        static IEnumerable<int> IdlePlan() { while (true) yield return 60; }
 
         // spec v0.3.1 D6: boss HP scales with the party; damage never does. Only while the boss is untouched.
         public const int BaseHp = 3600;
