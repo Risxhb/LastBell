@@ -98,9 +98,13 @@ Each entry: ID, inspiration (technique, not copy), look, rule, shape/tag, telegr
 
 ### 3.8 Fracture of Time — `ultimate.fracture`
 - **Inspiration:** the arena handoff's gold fissure "unless explicitly activated" (our own).
-- **Look:** in P5 the **gold fissure** cracks open and glows coral along its length.
-- **Rule:** the fissure (a 1.4 m-wide lane across the whole floor through the centre at its art angle) **burns 30/s** for all of P5 (Ground, persistent). Every P5 Leaning Bell uses the fissure as its line, so reaching the safe half means **crossing the burning fissure** — dash across (≈ 0.1 s inside) or walk (≈ 0.4 s, 12 damage). Not a party split: everyone crosses to the same side.
-- **Escape:** dash 30 stamina per crossing; the P5 stamina trace allows it (§7).
+- **Look:** in P5 the **gold fissure** cracks open (1.0 s, outline only), then glows amber along its length (a live hazard); on each toll of the great bell it **flares** coral. Stand-in: an amber lane telegraph over the decorative fissure and a coral flare lane; no new boss clip.
+- **Rule:** the fissure (a 1.4 m-wide lane across the whole floor through the centre at its art angle, NW ↔ SE) **burns 30/s** for all of P5 (Ground, persistent). Every P5 Leaning Bell uses the fissure as its line, so reaching the safe half means **crossing the burning fissure**: dash across (≈ 0.13 s inside, 4 damage) or walk (≈ 0.48 s at 4.2 m/s, 14 damage). Not a party split: everyone crosses to the same side.
+- **Hardening (Fracture session, 2026-10-23, proposal): the fissure flares on every toll of the great bell**, the Thirteenth Hour's beat: 6, 12 … 72 s after P5 start (none at XIII). Each flare is a **2.4 m lane along the whole fissure, 60 (heavy), Ground, coral for 1.2 s**. On the P5 timeline as built (35 s loop):
+  - Each Leaning Bell across the fissure has a toll inside its warning (loop 1: 2.0 s into its 3.5 s; loop 2: 3.0 s in). So you **cross before the toll**. In loop 1 you can also cross in the 1.5 s right after it; in loop 2 the 0.5 s after it needs a dash.
+  - Each Stopped Hour stop holds a toll (24 s, 60 s). A **Stilled player whose station is NW or SE** (the fissure's own ends, so their hiding strip *is* the fissure) must hide **beside** it: 6.6–7.5 m behind the boss and 1.65–1.9 m off the fissure's axis (the Stopped Hour session's hardened chain, which the boss's 1.4 m body still stops there). On the axis the burn (about 1 s before the toll) and the flare cost 93 of 100 HP; the flare's knockback then throws you off the crack.
+- **N:** identical for 1/2/4/8. **Melee / ranged:** the lane runs from the boss's body to both walls, so still melee and still ranged on it both burn and both take the flare.
+- **Escape:** a dash costs 30 stamina per crossing. Walking also works from ≤ 7 m out, or from the far wall in loop 1; from the far wall in loop 2 you need the dash. Tested with the strat bot at 4.2 m/s (and 6 m/s), N = 1/2/4/8 (`RunAutoTest.Bellkeeper.Ult.Fracture.cs`).
 
 ## 4. Reworked v2 vocabulary (Ultimate tuning)
 
