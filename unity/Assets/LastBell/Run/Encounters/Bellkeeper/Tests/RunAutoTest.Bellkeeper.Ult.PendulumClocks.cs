@@ -208,15 +208,30 @@ namespace LastBell.Run
                 Check("clocks N = 8: two strikers per hour, every player one hour, hands at right angles (never the same hand); a lean on any hour spares both",
                       ss.Count == 8 && ss.Select(s => s.Owner).Distinct().Count() == 8 && rightAngles && safe);
             }
-            yield return ClkStart(8, ClkCue("pairs", 8, ClkPairs));
-            if (bk == null) yield break;
-            ss = clk.Strikes.ToList();
-            Check("clocks pairs N = 8: four strikers per pair tick on four different hands (LeanDirAt null: no half spares all four)",
-                  ss.GroupBy(s => s.Tick).All(g => g.Count() == 4 && g.Select(s => s.Station).Distinct().Count() == 4 && !clk.LeanDirAt(g.Key).HasValue));
+            foreach (int n in new[] { 5, 6, 8 })
+            {
+                yield return ClkStart(n, ClkCue("pairs", n, ClkPairs));
+                if (bk == null) yield break;
+                ss = clk.Strikes.ToList();
+                bool ok = ss.Count == n && ss.Select(s => s.Owner).Distinct().Count() == n; var info = new List<string>();
+                foreach (var g in ss.GroupBy(s => s.Tick))
+                {
+                    var hands = g.Select(s => s.Station).Distinct().ToList(); var dir = clk.LeanDirAt(g.Key);
+                    bool twoAdjacent = hands.Count == 2 && ClkMod4(hands[0] - hands[1]) % 2 == 1;
+                    bool withinHour = g.GroupBy(s => s.Hour).All(h => h.Count() == 1 || ClkMod4(h.First().Station - h.Last().Station) % 2 == 1);
+                    bool sides = g.GroupBy(s => s.Station).All(h => h.Count() == 1 ? h.First().Side == 0 : h.Select(s => s.Side).OrderBy(x => x).SequenceEqual(new[] { -1, 1 }));
+                    bool safe = dir.HasValue && g.All(s => Vector3.Dot(clk.Hint(s), dir.Value) < -1f);
+                    ok &= twoAdjacent && withinHour && sides && safe;
+                    info.Add($"{string.Join("+", g.Select(s => UltimateState.StationNames[s.Station] + (s.Side > 0 ? "+" : s.Side < 0 ? "-" : "")))} lean {(dir.HasValue ? dir.Value.ToString() : "null")}");
+                }
+                Check($"clocks pairs N = {n}: a pair tick holds only two adjacent hands (shared hands side by side, right angles within an hour); the bisector lean spares every striker",
+                      ok, string.Join("; ", info));
+            }
 
             // ---------------- 6. the intended route: strat bots at 4.2 m/s, finite stamina, N = 1 / 2 / 4 / 8 ----------------
             foreach (var (n, variant, start) in new[] { (1, "singles", new Vector3(0, 0, 12.2f)), (1, "pairs", new Vector3(0, 0, 2.2f)), (2, "singles", new Vector3(0, 0, 6)), (2, "pairs", new Vector3(-11, 0, 0)),
-                                                        (4, "singles", new Vector3(0, 0, 6)), (4, "pairs", new Vector3(0, 0, 12)), (8, "singles", new Vector3(0, 0, 2.2f)), (8, "pairs", new Vector3(0, 0, 6)) })
+                                                        (4, "singles", new Vector3(0, 0, 6)), (4, "pairs", new Vector3(0, 0, 12)), (5, "pairs", new Vector3(0, 0, 6)), (6, "pairs", new Vector3(0, 0, 2.2f)),
+                                                        (8, "singles", new Vector3(0, 0, 2.2f)), (8, "pairs", new Vector3(0, 0, 6)) })
             {
                 yield return ClkStart(n, ClkCue(variant, 11 + n, variant == "pairs" ? ClkPairs : ClkSingles), start);
                 if (bk == null) yield break;
@@ -227,6 +242,27 @@ namespace LastBell.Run
                 Check($"route N = {n} {variant}: strat bots at 4.2 m/s (finite stamina) strike the boss every hour and never strike each other",
                       ss.All(s => s.Resolved) && bad.Count == 0 && ClkAllHits() == 0 && clkParty.All(p => !p.Down),
                       bad.Count > 0 ? string.Join(", ", bad) + " · " + bots[0].DebugLine : $"min stamina {low}");
+            }
+
+            // the pairing rule with shared hands: a Leaning Bell (Ultimate tuning, 3.5 s) on the first pair tick, leaning by LeanDirAt
+            foreach (int n in new[] { 5, 6, 8 })
+            {
+                yield return ClkStart(n, ClkCue("pairs", 30 + n, ClkPairs));
+                if (bk == null) yield break;
+                var bots = ClkDrive();
+                ss = clk.Strikes.ToList();
+                int pairTick = ss[0].Tick; var dir = clk.LeanDirAt(pairTick); bool leaned = false;
+                ClkRun(after: () =>
+                {
+                    if (d.World.Tick == pairTick - UltShapes.LeanTicks && dir.HasValue)
+                        leaned = bk.UltMove(bk.UltLean, BellkeeperEncounter.LeanTuning(dir.Value));
+                });
+                UltStepAliveUntil(() => !bk.UltLean.Running, 300);
+                var bad = ss.Where(s => s.Cracked || s.Struck.Count > 0).Select(s => $"{UltimateState.Roman[s.Hour]} {UltimateState.StationNames[s.Station]}{(s.Side != 0 ? (s.Side > 0 ? "+" : "-") : "")}{(s.Cracked ? " cracked" : "")}{(s.Struck.Count > 0 ? " struck" : "")}").ToList();
+                int leanHits = bkHits.Count(h => h.Source == UltShapes.LeanSource);
+                Check($"pairing N = {n} pairs: a Leaning Bell on the pair tick leans along the bisector; all four strikers and everyone else are spared, every hour strikes the boss",
+                      leaned && leanHits == 0 && bad.Count == 0 && ClkAllHits() == 0 && clkParty.All(p => !p.Down),
+                      $"lean {(dir.HasValue ? dir.Value.ToString() : "null")} launched {leaned}, lean hits {leanHits}" + (bad.Count > 0 ? " · " + string.Join(", ", bad) : "") + " · " + bots[0].DebugLine);
             }
 
             // ---------------- 7. still players are threatened (N = 4: two strat bots, a still melee hugging the boss, a still ranged at 10 m) ----------------

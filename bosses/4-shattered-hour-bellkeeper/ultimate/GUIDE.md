@@ -15,6 +15,7 @@ Written the way Ultimate guides are: what each mechanic wants from **you**, by y
 4. Everyone else: never stand on the station side of the boss for the current hour's line.
 - **Solo:** you have all four. They go round the compass, so walk a circle about 5 m out, arriving at each spot 1.5 s early.
 - **N = 8:** each hour has two strikers whose hands are at right angles; they take two adjacent sides of the boss. Agree on a clockwise priority.
+- **Pairs with 5 or more players:** a pair tick uses only two adjacent hands, each held by two strikers (one from each hour). The two on one hand stand **side by side**, one on each side of the line through the boss (agree that the earlier hour, I or III, always takes the same side). Each stands 10–30° off the line and 4.4–6.6 m from his centre. That keeps them at least 1.5 m apart and outside each other's cone, and both cones still cross his body. A Leaning Bell on that tick leans along the bisector of the two hands, so all four strikers are on the safe half.
 - **With Leaning Bell:** the bell leans **toward the station**, so your spot is already on the safe half. Stay at least 3.8 m out.
 
 ## The Stopped Hour

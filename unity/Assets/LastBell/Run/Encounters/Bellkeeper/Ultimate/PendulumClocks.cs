@@ -17,10 +17,11 @@ namespace LastBell.Run
     // nothing for 20 s); anyone else inside takes 60. So the striker stands on the far side of the boss from the station,
     // within 7.4 m of his centre, with nobody between.
     // Hands: a seeded start station and turning direction; hour k's first hand is start + k·turn (solo circles the boss).
-    // Players five to eight are each a second striker on one hour, hand at right angles to the first (never the same hand;
-    // the four hands of a pair tick are all different). Paired hours (I+II, III+IV) are adjacent stations, so a Leaning Bell
-    // resolving with them leans toward both (LeanDirAt); at N >= 5 a pair tick holds all four hands, so no half is safe
-    // for every striker and LeanDirAt returns null there (open question in the report).
+    // Players five to eight are each a second striker on one hour, hand at right angles to the first (never the same hand
+    // within an hour). Paired hours (I+II, III+IV) use adjacent stations, so a Leaning Bell resolving with them leans toward
+    // both (LeanDirAt, the bisector). With five or more in pairs, II (IV) takes the same two hands as I (III), swapped: a pair
+    // tick holds only two adjacent hands, each held twice by two strikers side by side (Side ±1: 10-30° each side of the
+    // line, at least ≈ 1.5 m apart), so the bisector lean spares all four (Ultimate session, 2026-10-23).
     // Hardened (proposal, recorded in the report): a striker who is down when their hour comes still cracks it.
     public sealed class PendulumClocks : UltimateMechanic
     {
@@ -33,6 +34,10 @@ namespace LastBell.Run
         public const int SoloPairGap = 120;                                   // solo "pairs": II and IV 2.0 s after I and III
         // the bot's clock spot, inside the guide's (3.8-7.4 m from the boss, on the line through him)
         public const float SpotMin = 4.4f, SpotMax = 6.6f, SpotHint = 5.2f, SpotArc = 20f;
+        // two strikers on one hand (pairs, 5+ players): each takes one half, 10-30° off the line, 4.4-6.6 m out (at least 20° =
+        // ≈ 1.5 m apart; worst pair 6.6 m at +10° / 4.4 m at -10°: 38° off the cone's axis, outside its 25° + margin, and both
+        // cones still cross the boss's body)
+        public const float SharedMin = 4.4f, SharedMax = 6.6f, SharedHint = 5.2f, SharedArcIn = 10f, SharedArcOut = 30f;
         public const string Source = "Pendulum Clock", CrackSource = "Cracked Hour";
 
         // One clock hour of one player.
@@ -42,6 +47,7 @@ namespace LastBell.Run
             public int Hour;            // 1..4 (I..IV)
             public int Station;         // 0..3, UltimateState.StationDir
             public int Tick;            // world tick it strikes
+            public int Side;            // 0 = alone on its hand; ±1 = shares it this tick: which half of the clock spot (side by side)
             public Hazard Cone;         // live from DrawTick
             public bool Resolved, StruckBoss, Cracked;
             public readonly List<PlayerController> Struck = new List<PlayerController>();
@@ -71,11 +77,13 @@ namespace LastBell.Run
         }
 
         // Leaning Bell pairing rule (§3.1): the direction a Leaning Bell resolving on worldTick must lean (toward the striking
-        // hour's station(s), summed and normalised); null if no clock strikes on that tick, or if the hands cancel out.
+        // hour's station(s): each hand once, summed and normalised = the bisector of a pair); null if no clock strikes on that
+        // tick, or if the hands cancel out.
         public Vector3? LeanDirAt(int worldTick)
         {
-            var sum = Vector3.zero; bool any = false;
-            foreach (var s in strikes) if (s.Tick == worldTick) { sum += UltimateState.StationDir(s.Station); any = true; }
+            var sum = Vector3.zero; bool any = false; int seen = 0;
+            foreach (var s in strikes)
+                if (s.Tick == worldTick && (seen & (1 << s.Station)) == 0) { seen |= 1 << s.Station; sum += UltimateState.StationDir(s.Station); any = true; }
             if (!any || sum.magnitude < 0.3f) return null;
             return sum.normalized;
         }
@@ -105,14 +113,21 @@ namespace LastBell.Run
             for (int i = party.Count - 1; i > 0; i--) { int j = rng.Next(i + 1); (party[i], party[j]) = (party[j], party[i]); }   // seeded roles
             StartStation = rng.Next(4); Turn = rng.Next(2) == 0 ? 1 : -1;
             var at = HourTicksFor(party.Count);
+            bool shareHands = Cue.Variant == "pairs" && party.Count >= 5;
             for (int k = 0; k < 4; k++)
             {
-                int first = Mod4(StartStation + Turn * k);
+                int first = Mod4(StartStation + Turn * k), second = Mod4(first + (k % 2 == 0 ? -Turn : Turn));   // right angles
+                // pairs with five or more: II (IV) takes the same two adjacent hands as I (III), swapped, so a pair tick holds
+                // only two hands, each twice (the two strikers of a hand stand side by side) and a Leaning Bell can spare all four
+                if (shareHands && k % 2 == 1) { int a = Mod4(StartStation + Turn * (k - 1)); first = Mod4(a - Turn); second = a; }
                 strikes.Add(new Strike { Owner = party[k % Mathf.Min(4, party.Count)], Hour = k + 1, Station = first, Tick = at[k] });
-                int extra = 4 + k;   // a second striker on hour k, hand at right angles (I and III one way, II and IV the other)
-                if (extra < party.Count) strikes.Add(new Strike { Owner = party[extra], Hour = k + 1, Station = Mod4(first + (k % 2 == 0 ? -Turn : Turn)), Tick = at[k] });
+                int extra = 4 + k;   // players five to eight: a second striker on hour k
+                if (extra < party.Count) strikes.Add(new Strike { Owner = party[extra], Hour = k + 1, Station = second, Tick = at[k] });
             }
             strikes.Sort((a, b) => a.Tick != b.Tick ? a.Tick.CompareTo(b.Tick) : a.Hour.CompareTo(b.Hour));
+            // a hand held twice on one tick: the earlier hour's striker takes the +side half of the clock spot, the later the -side
+            foreach (var g in strikes.GroupBy(s => (s.Tick, s.Station)).Where(g => g.Count() == 2))
+            { var two = g.OrderBy(s => s.Hour).ToList(); two[0].Side = 1; two[1].Side = -1; }
             foreach (var p in party) ShowNext(p);
         }
         static int Mod4(int i) => ((i % 4) + 4) % 4;
@@ -228,12 +243,19 @@ namespace LastBell.Run
             float lim = CombatWorld.PlayerBound - 0.8f;
             return q.magnitude > lim ? q.normalized * lim : q;
         }
-        public bool InSpot(Vector3 q, int station)
+        // A striker's clock spot: the whole spot on the line (Side 0), or its own half when it shares the hand this tick.
+        float ArcFrom(Strike s) => s.Side == 0 ? -SpotArc : s.Side > 0 ? SharedArcIn : -SharedArcOut;
+        float ArcTo(Strike s) => s.Side == 0 ? SpotArc : s.Side > 0 ? SharedArcOut : -SharedArcIn;
+        float RMin(Strike s) => s.Side == 0 ? SpotMin : SharedMin;
+        float RMax(Strike s) => s.Side == 0 ? SpotMax : SharedMax;
+        public Vector3 Hint(Strike s) => s.Side == 0 ? Spot(s.Station) : Spot(s.Station, SharedHint, s.Side * (SharedArcIn + SharedArcOut) / 2);
+        public bool InSpot(Vector3 q, Strike s)
         {
             var bp = Sim.Flat(Boss.transform.position);
             var v = Sim.Flat(q - bp); float d = v.magnitude;
-            if (d < SpotMin || d > SpotMax) return false;
-            return Vector3.Angle(Sim.Flat(bp - UltimateState.Station(station)), v) <= SpotArc && StrikesFrom(q, station, bp, Boss.BodyRadius, 0.3f);
+            if (d < RMin(s) || d > RMax(s)) return false;
+            float a = Vector3.SignedAngle(Sim.Flat(bp - UltimateState.Station(s.Station)), v, Vector3.up);
+            return a >= ArcFrom(s) && a <= ArcTo(s) && StrikesFrom(q, s.Station, bp, Boss.BodyRadius, 0.3f);
         }
         // Where a striker's cone can be: the live cone (tracking or locked) and, until it locks, any clock spot it may still take.
         bool InAnyCone(Strike s, Vector3 q)
@@ -243,8 +265,8 @@ namespace LastBell.Run
             if (s.predTick != Now)
             {
                 s.predTick = Now; s.pred.Clear();
-                foreach (float r in new[] { SpotMin, SpotHint, SpotMax })
-                    foreach (float a in new[] { -SpotArc, 0, SpotArc })
+                foreach (float r in new[] { RMin(s), (RMin(s) + RMax(s)) / 2, RMax(s) })
+                    foreach (float a in new[] { ArcFrom(s), (ArcFrom(s) + ArcTo(s)) / 2, ArcTo(s) })
                     {
                         var o = Spot(s.Station, r, a);
                         s.pred.Add((o, YawToward(o, UltimateState.Station(s.Station))));
@@ -267,7 +289,7 @@ namespace LastBell.Run
                 if (s.Owner == p)
                     into.Add(new BotDemand
                     {
-                        Tick = Mathf.Max(Now, s.LockTick), Since = LaunchTick, Ok = q => InSpot(q, st.Station), Hint = Spot(s.Station),
+                        Tick = Mathf.Max(Now, s.LockTick), Since = LaunchTick, Ok = q => InSpot(q, st), Hint = Hint(s),
                         Memory = true, Why = $"clock {UltimateState.Roman[s.Hour]} {UltimateState.StationNames[s.Station]}", From = this,
                     });
                 else if (s.Owner && !s.Owner.Down)
