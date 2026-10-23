@@ -17,7 +17,7 @@ namespace LastBell.Run
     // Foundry · The Bellows (the Foundry's furnace breath): from the Spire's fall the boss's chest draws breath. Coral: the
     //   forge core (r 2.6 on the boss, 60) and the tide line (a ring from 7.0 m on the boss out past the wall, 60). Ivory: the
     //   bellows' reach (r 7.0). 0.2 s before At[1] the core fires and the bellows blows everyone within 7 m exactly 3.0 m
-    //   straight out from the boss (1 damage, the floor of any hit; stunned 0.25 s); on At[1] the tide line strikes. So:
+    //   straight out from the boss (a pure shove: 0 damage; stunned 0.25 s); on At[1] the tide line strikes. So:
     //   stand 2.9-3.7 m from the boss centre (a brass guide ring shows the band) and land at 5.9-6.7 m, inside the tide line.
     //   Hugging melee is in the core, ranged is in the tide.
     // Verdant · The Root Hours (the Verdant chimes' roots): three root circles r 11.4 on hour marks 7 m out, four hours apart

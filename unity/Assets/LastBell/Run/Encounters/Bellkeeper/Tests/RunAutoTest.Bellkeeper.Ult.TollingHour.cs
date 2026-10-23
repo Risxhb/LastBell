@@ -13,7 +13,7 @@ namespace LastBell.Run
     {
         TollingHour uTh; ThirteenthHour uXiii; AreaQuotes uQ;
         static readonly string[] UqSources = { AreaQuotes.SpireSource, AreaQuotes.CoreSource, AreaQuotes.BellowsSource, AreaQuotes.TideSource, AreaQuotes.BloomSource };
-        // the quotes' damaging hits (the Bellows itself is the push: its 1-damage hit is the intended route)
+        // the quotes' damaging hits (the Bellows itself is the push: a 0-damage shove, the intended route)
         static readonly string[] UqDamaging = { AreaQuotes.SpireSource, AreaQuotes.CoreSource, AreaQuotes.TideSource, AreaQuotes.BloomSource };
 
         // practice from a phase, the plan running, one tick stepped (the segment has begun)
@@ -218,8 +218,8 @@ namespace LastBell.Run
                   $"core {string.Join(",", core.Select(h => h.Tick - qt))} tide {string.Join(",", tide.Select(h => h.Tick - qt))}");
             Check("Foundry (Bellows): a still hugging melee is burned by the core (60), a still ranged player by the tide line (60)",
                   core.Count(h => h.Player == mel) == 1 && core.First(h => h.Player == mel).Damage == 60 && tide.Count(h => h.Player == off) == 1 && tide.First(h => h.Player == off).Damage == 60);
-            Check("Foundry (Bellows): from the band (3.3 m) the player is blown exactly 3 m out and lands inside the tide line",
-                  blow.Count == 1 && Mathf.Abs(UqR(me, uQ.ForgeOrigin) - 6.3f) < 0.12f && !core.Any(h => h.Player == me) && !tide.Any(h => h.Player == me), $"r {UqR(me, uQ.ForgeOrigin):0.00} m");
+            Check("Foundry (Bellows): from the band (3.3 m) the player is blown exactly 3 m out (0 damage: a pure shove) and lands inside the tide line",
+                  blow.Count == 1 && blow[0].Damage == 0 && Mathf.Abs(UqR(me, uQ.ForgeOrigin) - 6.3f) < 0.12f && !core.Any(h => h.Player == me) && !tide.Any(h => h.Player == me), $"r {UqR(me, uQ.ForgeOrigin):0.00} m, push damage {(blow.Count > 0 ? blow[0].Damage : -1)}");
             // Verdant: hugging melee (in all three), ranged near the wall, a player at 9 m
             BkPlace(me, new Vector3(0, 0, 12.5f)); BkPlace(mel, UqHug(Vector3.left)); BkPlace(off, new Vector3(9, 0, 0));
             UqTo(qt + Sim.Ticks(12) - 30, true);
