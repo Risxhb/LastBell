@@ -15,25 +15,8 @@ namespace LastBell.Menu.EditorTools
         public static void BuildScene()
         {
             ConfigureMedia();
-            // Save a copy before editing: never regenerate the source arena, maps, materials or pending assets.
-            var scene = EditorSceneManager.OpenScene(RunMaps.All[0].SourceScene);
-            if (!EditorSceneManager.SaveScene(scene, MainMenu.ScenePath, true)) throw new IOException("Could not create main menu scene");
-            scene = EditorSceneManager.OpenScene(MainMenu.ScenePath);
-            foreach (var root in scene.GetRootGameObjects())
-            {
-                foreach (var behaviour in root.GetComponentsInChildren<MonoBehaviour>(true))
-                    if (behaviour && (behaviour.GetType().Name == "KeyArtArena" || behaviour is RunDirector || behaviour is RunHud))
-                        Object.DestroyImmediate(behaviour);
-                foreach (var t in root.GetComponentsInChildren<Transform>(true))
-                    if (t.name == "ScaleReference_Vanguard" || t.name == "TelegraphCheck" || t.name == "TelegraphTest") t.gameObject.SetActive(false);
-            }
-            var menu = new GameObject("Last Bell Main Menu");
-            menu.AddComponent<MainMenu>(); menu.AddComponent<MenuBattle>(); menu.AddComponent<MenuMusic>();
-            EditorSceneManager.SaveScene(scene);
-            var existing = EditorBuildSettings.scenes.Where(s => s.path != MainMenu.ScenePath).ToArray();
-            EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(MainMenu.ScenePath, true) }.Concat(existing).ToArray();
-            AssetDatabase.SaveAssets();
-            Debug.Log("Last Bell: main menu created; existing run scenes and settings preserved.");
+            if (!File.Exists(MainMenu.ScenePath)) MenuShowcaseBuild.Prepare();
+            else EditorSceneManager.OpenScene(MainMenu.ScenePath);
         }
         static void ConfigureMedia()
         {

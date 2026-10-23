@@ -22,10 +22,15 @@ namespace LastBell.Menu
             var move = map.AddAction("Navigate", InputActionType.Value); move.expectedControlType = "Vector2";
             move.AddCompositeBinding("2DVector").With("Up", "<Keyboard>/upArrow").With("Down", "<Keyboard>/downArrow")
                 .With("Left", "<Keyboard>/leftArrow").With("Right", "<Keyboard>/rightArrow");
+#if !UNITY_WEBGL || UNITY_EDITOR
             move.AddBinding("<Gamepad>/dpad"); move.AddBinding("<Gamepad>/leftStick").WithProcessor("stickDeadzone(min=0.3,max=1)");
+#endif
             var submit = map.AddAction("Submit", InputActionType.Button, "<Keyboard>/enter");
-            submit.AddBinding("<Keyboard>/numpadEnter"); submit.AddBinding("<Gamepad>/buttonSouth");
-            var cancel = map.AddAction("Cancel", InputActionType.Button, "<Keyboard>/escape"); cancel.AddBinding("<Gamepad>/buttonEast");
+            submit.AddBinding("<Keyboard>/numpadEnter");
+            var cancel = map.AddAction("Cancel", InputActionType.Button, "<Keyboard>/escape");
+#if !UNITY_WEBGL || UNITY_EDITOR
+            submit.AddBinding("<Gamepad>/buttonSouth"); cancel.AddBinding("<Gamepad>/buttonEast");
+#endif
             module.actionsAsset = asset;
             if (MenuSmokeTest.Requested || MenuFlowTest.Requested) asset.devices = MenuSmokeTest.TestDevices;
             module.point = Reference(point); module.leftClick = Reference(click); module.scrollWheel = Reference(scroll);

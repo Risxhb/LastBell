@@ -100,6 +100,9 @@ namespace LastBell.Menu
             TestRushButton = Button("Boss-Rush Test Rush", bar.transform, new Vector2(-185, 0), new Vector2(350, 68), () => OpenSelection(true));
             SettingsButton = Button("Settings", bar.transform, new Vector2(185, 0), new Vector2(330, 68), OpenSettings);
             ExitButton = Button("Exit", bar.transform, new Vector2(555, 0), new Vector2(330, 68), Exit);
+#if UNITY_WEBGL && !UNITY_EDITOR
+            ExitButton.GetComponentInChildren<Text>().text = "Restart Menu";
+#endif
             primary.AddRange(new[] { StartButton, TestRushButton, SettingsButton, ExitButton });
             LinkHorizontal(primary);
             Text("VANGUARD  /  ARCANIST  /  CHIMESINGER", safeRoot, 13, new Color(0.73f, 0.73f, 0.78f), new Vector2(0.5f, 0.168f), new Vector2(900, 28));
@@ -144,6 +147,10 @@ namespace LastBell.Menu
             ModeControl.value = MenuSettings.DisplayMode; QualityControl.value = QualitySettings.GetQualityLevel();
             MusicVolumeControl.SetValueWithoutNotify(Music.Volume);
             status.text = "Music volume updates immediately.";
+#if UNITY_WEBGL && !UNITY_EDITOR
+            ModeControl.interactable = false; ResolutionControl.interactable = false;
+            status.text = "Music is live. Use the page's Fullscreen button for display size.";
+#endif
             settings.SetActive(true); barGroup.interactable = false; barGroup.blocksRaycasts = false;
             EventSystem.current.SetSelectedGameObject(MusicVolumeControl.gameObject);
         }
@@ -186,6 +193,8 @@ namespace LastBell.Menu
             if (Loading || SettingsOpen) return;
 #if UNITY_EDITOR
             UnityEditor.EditorApplication.isPlaying = false;
+#elif UNITY_WEBGL
+            SceneManager.LoadScene(ScenePath);
 #else
             Application.Quit();
 #endif
@@ -201,6 +210,9 @@ namespace LastBell.Menu
             }
             var keyboard = MenuSmokeTest.Requested || MenuFlowTest.Requested ? MenuSmokeTest.TestKeyboard : Keyboard.current;
             var gamepad = MenuSmokeTest.Requested || MenuFlowTest.Requested ? MenuSmokeTest.TestGamepad : Gamepad.current;
+#if UNITY_WEBGL && !UNITY_EDITOR
+            gamepad = null;
+#endif
             bool cancel = keyboard?.escapeKey.wasPressedThisFrame == true || gamepad?.buttonEast.wasPressedThisFrame == true;
             if (cancel && SettingsOpen)
             {
