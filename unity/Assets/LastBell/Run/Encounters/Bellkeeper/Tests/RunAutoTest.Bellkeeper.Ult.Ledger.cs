@@ -33,6 +33,7 @@ namespace LastBell.Run
             yield return LedgerMessyChecks();
             yield return LedgerP4PracticeChecks(1);
             yield return LedgerP4PracticeChecks(8);
+            yield return LedgerPageOnceChecks();
             yield return LedgerCancelChecks();
             yield return LedgerPracticeHookChecks();
             BellkeeperEncounter.PushTimersOn = true;
@@ -295,6 +296,9 @@ namespace LastBell.Run
             UltimateParty.Fill(d.World, n);
             LedgerBots(i => Sim.Dir(360f * i / n + 20) * 7f);
             bkHits.Clear();
+            var where = new List<(int tick, string what)>();
+            Action<PlayerController, Hazard, int> spy = (p, h, dmg) => { if (h.Source == LedgerMechanic.ReplaySource) where.Add((d.World.Tick, $"{p.name} {(led.PageOf.TryGetValue(h.Id, out int pg) ? UltimateState.Roman[pg] : "?")} at ({p.transform.position.x:0.0},{p.transform.position.z:0.0}) hp {p.Hp} · {(p.Input as UltimateBot)?.DebugLine}")); };
+            d.World.PlayerHit += spy;
             bk.BeginCombat(); BkStep(1);
             int tp4 = UltTick0();
             BkStepUntil(() => led.Casts > 0, 5);
@@ -308,13 +312,10 @@ namespace LastBell.Run
             var stilled = bk.Mechanic<StoppedHour>().StilledPlayers.ToList();
             var clocks1 = bk.Mechanic<PendulumClocks>().Strikes.ToList();
             var clockHours = clocks1.Select(s => $"{s.Owner.name} {UltimateState.Roman[s.Hour]}→{UltimateState.StationNames[s.Station]} @{(s.Tick - tp4) / 60f:0.00}").ToList();
-            var where = new List<string>();
-            Action<PlayerController, Hazard, int> spy = (p, h, dmg) => { if (h.Source == LedgerMechanic.ReplaySource) where.Add($"{p.name} {(led.PageOf.TryGetValue(h.Id, out int pg) ? UltimateState.Roman[pg] : "?")}@{(d.World.Tick - tp4) / 60f:0.00} at ({p.transform.position.x:0.0},{p.transform.position.z:0.0}) hp {p.Hp}"); };
-            d.World.PlayerHit += spy;
             BkStep(Sim.Ticks(51) - (d.World.Tick - tp4));
             d.World.PlayerHit -= spy;
             Note($"Ledger P4 N={n} block 1 clocks: {string.Join("; ", clockHours)} · ledger half NE · stilled in block 2: {string.Join(", ", stilled.Select(p => p.name + " " + UltimateState.StationNames[Math.Max(0, bk.Ult.StationOf(p))]))}");
-            if (where.Count > 0) Note($"Ledger P4 N={n} hits: {string.Join("; ", where)}");
+            if (where.Count > 0) Note($"Ledger P4 N={n} hits: {string.Join("; ", where.Select(w => $"@{(w.tick - tp4) / 60f:0.00} {w.what}"))}");
             int r1 = UltLaunchTick("ult_ledger", tp4, 0), r2 = UltLaunchTick("ult_ledger", tp4, 1), r3 = UltLaunchTick("ult_ledger", tp4, 2), sh = UltLaunchTick("ult_stopped_hour", tp4, 0);
             Check($"Ledger P4 N={n}: three replays per loop at 0, 0.5 after the Stopped Hour, and with the Hand", r1 == tp4 && r2 > 0 && r3 > r2 && r2 - sh == Sim.Ticks(0.5f), $"{(r1 - tp4) / 60f:0.0}, {(r2 - tp4) / 60f:0.0}, {(r3 - tp4) / 60f:0.0} s");
             Check($"Ledger P4 N={n}: block 2's III lands on the Stopped Hour's resume (9.0 s)", r2 + Sim.Ticks(4 + 1.5f * 3) == sh + Sim.Ticks(9));
@@ -330,6 +331,23 @@ namespace LastBell.Run
                   unforced.Count == 0 && hits.GroupBy(h => h.Player).All(g => g.Count() <= 1) && d.World.Players.All(p => !p.Down),
                   hits.Count == 0 ? "untouched" : string.Join(", ", hits.Select(h => $"{h.Player.name} {Page(h)}@{(h.Tick - tp4) / 60f:0.00}{(Forced(h) ? " forced" : "")}")));
             LedgerUnbot();
+        }
+
+        // ---------------- one page is one strike: a player inside several overlapping images is hit once ----------------
+        IEnumerator LedgerPageOnceChecks()
+        {
+            yield return LedgerStartHeld(8);
+            if (bk == null) yield break;
+            var ps = d.World.Players;
+            for (int i = 0; i < ps.Count; i++) { ps[i].DebugSetHp(PlayerController.MaxHp); BkPlace(ps[i], i == 0 ? LedDir1 * 5.5f : Sim.Dir(LedYaw1 + 180 - 40 + 10 * i) * 5.5f); }
+            bkHits.Clear();
+            bk.UltLaunch(led, led.DefaultCue());   // authored, N = 8: eight images 10° apart, overlapping
+            var img = led.Upcoming.First(s => s.Page.Numeral == 4);
+            int inside = img.Probes.Count(h => h.Contains(ps[0].transform.position));
+            UltStepAliveUntil(() => d.World.Tick > img.ResolveTick, Sim.Ticks(10));
+            int got = bkHits.Count(h => h.Player == ps[0] && led.PageOf.TryGetValue(h.HazardId, out int pg) && pg == 4);
+            Check("Ledger: one page is one strike (inside several overlapping images = one 60 hit)", inside >= 2 && got == 1, $"inside {inside} images, hit {got}×");
+            UltStepAliveUntil(() => !led.Running, Sim.Ticks(10));
         }
 
         // ---------------- boss death and halt cancel everything (outlines and numerals included) ----------------

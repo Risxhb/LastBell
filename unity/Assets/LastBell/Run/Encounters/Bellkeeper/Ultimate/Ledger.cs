@@ -179,6 +179,22 @@ namespace LastBell.Run
                         s.Live.Add(h); PageOf[h.Id] = s.Page.Numeral;
                         ShowMark(f, s.Page.Numeral, null, s.ResolveTick + 1);
                     }
+                    // one page is one strike: overlapping images hit a player once (60), not once per image
+                    if (s.Live.Count > 1)
+                    {
+                        var page = s;
+                        foreach (var h in page.Live) h.HitOnResolve = false;
+                        page.Live[0].OnResolve = hz =>
+                        {
+                            foreach (var p in W.Players.ToArray())
+                            {
+                                if (p.Down) continue;
+                                var by = page.Live.FirstOrDefault(x => x.Contains(p.transform.position));
+                                if (by != null && by.Hit.Add(p)) p.ReceiveHit(by);
+                            }
+                            Resolved(hz);
+                        };
+                    }
                 }
                 StepMarks();
                 yield return 1;
