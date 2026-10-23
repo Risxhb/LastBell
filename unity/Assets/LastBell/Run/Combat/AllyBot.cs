@@ -25,7 +25,9 @@ namespace LastBell.Run
         public readonly BotMode Mode;
         public string DebugLine;          // tests: what it decided last tick
         public float? HoldRange;          // tests: keep this gap to the boss instead of the class's range (8.5 = a ranged player)
-        public static bool Attacks = false;   // bots are mechanics dummies: they move, dodge and spread, but never attack or heal
+        // bots are mechanics dummies by default: they move, dodge and spread, but never attack or heal. Launch switch
+        // -lastbellAllyAttack turns their class rotation on (the boss then scales his HP for them, BossEncounter.Spawn).
+        public static bool Attacks = System.Array.Exists(System.Environment.GetCommandLineArgs(), a => a.Equals("-lastbellAllyAttack", System.StringComparison.OrdinalIgnoreCase));
         public static BotMode AllyMode = BotMode.Perfect;   // menu allies do every mechanic, memory ones included (Chzy18: "do the mechanics"); still no attacks
         int tick, lastPress = -999, castHold;
         int[] cd = new int[5];
