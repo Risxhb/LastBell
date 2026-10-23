@@ -10,7 +10,7 @@ namespace LastBell.Run
     // The left hand rises and shows 1-4 fingers; the right pendulum hand swings left or right. Together they are a phrase:
     //   fingers = move 1: 1 Leaning Bell, 2 Toll Tide, 3 Reflection, 4 Stopped Hour
     //   swing   = move 2: left = Heart Toll, right = the first move's footprint again, rewound ("backwards")
-    // The phrase shows on the launch tick; each move's real telegraph appears only TellTicks (2.0 s) before it resolves,
+    // The phrase shows on the launch tick; each move's real telegraph appears only TellTicks (1.5 s) before it resolves,
     // shorter than the moves need on their own, so the phrase is how you get there in time.
     //
     // Cue (set by the plan, BellkeeperUltimate.cs): launch = the phrase. At[0] = move 1 resolves, At[1] = move 2 resolves
@@ -18,7 +18,7 @@ namespace LastBell.Run
     // practice: "phrase:3R"). The phrase per loop (§7): the four finger counts in a seeded order per phase, one per loop;
     // the swing from Cue.Seed. Identical for any N (Reflection images are per player, as always).
     //
-    // Build decisions (report): every move is built here from UltShapes (2.0 s ResolveAt) so it can overlap anything;
+    // Build decisions (report): every move is built here from UltShapes (1.5 s ResolveAt) so it can overlap anything;
     // move 4 launches the real Stopped Hour mechanic with stop = At[0] - 2.0 s and resume = At[0] (its glyph shows with
     // the phrase, 5 s before the stop), and is skipped (logged) if that mechanic is still running.
     // - Leaning Bell: the hit half is fixed by the phrase, on the half that holds the party (direction from the centre to
@@ -26,14 +26,17 @@ namespace LastBell.Run
     //   the party's majority (as the plan's Leaning Bells). So the reader always has to cross: 13.4 m in 7.0 s.
     // - Reflection: one mirrored image per standing player (2·boss − player), tracking until 1.0 s before it strikes;
     //   solo adds an image locked on your own spot. Gather on one side before the telegraph.
-    // - Backwards copies: the same footprints again (Leaning half, tide ring, the images' locked spots, the Stopped
-    //   Hour's chain lanes as plain lanes that no longer stop at the boss's body), 40 damage, with ivory rewind marks.
+    // - Right swing = Backwards Bell's rule, "a rewound copy strikes everywhere its original did not", through its
+    //   RewindOf (40, its arrows): the other Leaning half; the disc inside the tide (huggers too); the Reflection images
+    //   again (invert: false); the Stopped Hour's chain lanes as the same lanes, no longer stopped by the boss's body.
     public sealed class ConductorsHand : UltimateMechanic
     {
         public override string Id => UltimateMechanics.ConductorsHand;
         public override string Name => "The Conductor's Hand";
 
-        public const int TellTicks = 120;            // real telegraphs: 2.0 s before each resolve
+        public const int TellTicks = 90;             // real telegraphs: 1.5 s before each resolve
+        public const int StopLeadTicks = 120;        // move 4: the Stopped Hour stops 2.0 s before time resumes on move 1
+        public const float NearLine = 2.0f, NearTideEdge = 4.6f;   // 1R / 2R: where a reader waits to step across in time
         public const int ImageLockBefore = 60;       // Reflection images lock 1.0 s before they strike
         public const int RecoveryTicks = 30;
         public const float HeartClear = TollTideAbility.TollRadius + Hazard.Margin + 0.2f;   // the guide's 4.3 m+ band edge (4.5)
@@ -76,10 +79,9 @@ namespace LastBell.Run
         public readonly List<Hazard> First = new List<Hazard>(), Second = new List<Hazard>();
         public string StoppedChoice { get; private set; } = "";
         public bool PhraseShown => fx != null && fx.Alive;
-        public int RewindMarks => fx != null ? fx.Marks : 0;
 
         PhraseFx fx;
-        Hazard leanProbe, tideProbe;
+        Hazard leanProbe, tideProbe, leanBack, tideBack;   // move 1's shapes and their rewinds, known from the phrase
         readonly List<Hazard> stopLanes = new List<Hazard>();
         bool capturing;
         int partySize;
@@ -104,14 +106,16 @@ namespace LastBell.Run
             LeanDir = PickLean();
             leanProbe = UltShapes.LeaningHalf(W, LeanDir, UltShapes.ResolveIn(TellTicks));
             tideProbe = UltShapes.Tide(W, UltShapes.ResolveIn(TellTicks));
+            leanBack = BackwardsBell.Rewound(leanProbe, 1, UltShapes.StandardDamage, true);
+            tideBack = BackwardsBell.Rewound(tideProbe, 1, UltShapes.StandardDamage, true);
             Boss.PlanLog.Add((Now, $"hand phrase {Phrase}"));
 
             if (Fingers == 4)
             {
-                // the Stopped Hour: its glyph shows with the phrase, the stop starts 2.0 s before move 1, time resumes on move 1
+                // the Stopped Hour: its glyph shows with the phrase, the stop starts StopLeadTicks before move 1, time resumes on move 1
                 var stopped = Boss.Mechanic<StoppedHour>();
                 capturing = true;
-                var cue = new UltCue { Variant = "lash", At = new[] { Mathf.Max(0, t1 - TellTicks) / (float)Sim.Hz, t1 / (float)Sim.Hz }, Phase = Cue.Phase, Seed = Cue.Seed };
+                var cue = new UltCue { Variant = "lash", At = new[] { Mathf.Max(0, t1 - StopLeadTicks) / (float)Sim.Hz, t1 / (float)Sim.Hz }, Phase = Cue.Phase, Seed = Cue.Seed };
                 StoppedChoice = stopped != null && Boss.UltLaunch(stopped, cue) ? "launched" : "skipped (busy)";
                 Boss.PlanLog.Add((Now, "hand stopped_hour " + StoppedChoice));
             }
@@ -187,35 +191,22 @@ namespace LastBell.Run
                 if (Boss.Presenter) Boss.Presenter.PlayOnce("HollowToll", R / (float)Sim.Hz);
                 return;
             }
-            // the first move again, rewound: the same footprint(s), with ivory rewind marks
-            int dmg = UltShapes.StandardDamage;
+            // the first move again, rewound (Backwards Bell's rule: it strikes everywhere the original did not)
             switch (Fingers)
             {
-                case 1:
-                    Second.Add(Spawn(UltShapes.LeaningHalf(W, LeanDir, R, dmg, RewindPrefix + UltShapes.LeanSource)));
-                    fx?.Mark(LeanDir * 6.5f);
-                    break;
-                case 2:
-                    Second.Add(Spawn(UltShapes.Tide(W, R, dmg, RewindPrefix + UltShapes.TideSource)));
-                    for (int k = 0; k < 4; k++) fx?.Mark(UltimateState.StationDir(k) * 9.5f);
-                    break;
-                case 3:
-                    foreach (var img in First.ToArray())
-                    {
-                        Second.Add(Spawn(Image(img.Origin, img.Radius, R, 0, RewindPrefix + ImageSource, null)));
-                        fx?.Mark(img.Origin);
-                    }
-                    break;
-                case 4:
-                    foreach (var lane in StopLanesNow())
-                    {
-                        lane.ResolveAt = R;
-                        Second.Add(Spawn(lane));
-                        fx?.Mark(lane.Origin + Sim.Dir(lane.Yaw) * 4f);
-                    }
-                    break;
+                case 1: Back(leanProbe, true, R); break;                  // the other half
+                case 2: Back(tideProbe, true, R); break;                  // the disc inside the tide
+                case 3: foreach (var img in First.ToArray()) Back(img, false, R); break;   // the images again
+                case 4: foreach (var lane in StopLanesNow()) Back(lane, false, R); break;  // the chains again, past the boss
             }
             if (Boss.Presenter) Boss.Presenter.PlayOnce("ReverseToll", R / (float)Sim.Hz);
+        }
+        // a rewound copy resolving on SecondAt, through Backwards Bell's RewindOf (its hazard, its arrows); our own copy if absent
+        void Back(Hazard shape, bool invert, int resolveAt)
+        {
+            var bb = Boss.Mechanic<BackwardsBell>();
+            var h = bb != null ? bb.RewindOf(shape, SecondAt, invert) : Spawn(BackwardsBell.Rewound(shape, resolveAt, UltShapes.StandardDamage, invert));
+            if (h != null) Second.Add(h);
         }
 
         Hazard Image(Vector3 at, float radius, int resolveAt, int lockAt, string source, System.Action<Hazard> track)
@@ -229,14 +220,14 @@ namespace LastBell.Run
             return h;
         }
 
-        // The Stopped Hour's chain lanes as plain lanes (they no longer stop at the boss's body). If the Stopped Hour drew
+        // The Stopped Hour's chain lanes (their rewinds no longer stop at the boss's body). If the Stopped Hour drew
         // none (skipped, or not built yet), a lane from each standing player's station (Ult.StationOf, else a seeded one)
         // through where they stand.
         List<Hazard> StopLanesNow()
         {
             var lanes = new List<Hazard>();
             foreach (var l in stopLanes)
-                if (!l.Cancelled) lanes.Add(PlainLane(l.Origin, l.Yaw, l.Length, l.Width));
+                if (!l.Cancelled) lanes.Add(l);   // rewound as the same lane (a plain lane: no first-body stop)
             if (lanes.Count > 0) return lanes;
             int i = 0;
             foreach (var p in W.Players)
@@ -252,7 +243,7 @@ namespace LastBell.Run
         }
         static Hazard PlainLane(Vector3 origin, float yaw, float length, float width) => new Hazard
         {
-            Source = RewindPrefix + "Chain", Shape = HazardShape.Lane, Kind = HazardKind.Strike, Origin = Sim.Flat(origin), Yaw = yaw,
+            Source = "Chain", Shape = HazardShape.Lane, Kind = HazardKind.Strike, Origin = Sim.Flat(origin), Yaw = yaw,
             Length = length, Width = width, LockAt = 0, ResolveAt = 1, Damage = UltShapes.StandardDamage, Knockback = 1.5f, Stun = 15,
         };
 
@@ -269,10 +260,14 @@ namespace LastBell.Run
                 switch (Fingers)
                 {
                     case 1:
-                        into.Add(new BotDemand { Tick = FirstAt, Since = since, Ok = q => Clear(leanProbe, q), Hint = SafeHalfHint(pos), Memory = true, Why = "phrase: Leaning Bell", From = this });
+                        // right swing: the other half strikes 1.5 s later, so wait near the line
+                        into.Add(new BotDemand { Tick = FirstAt, Since = since, Ok = q => Clear(leanProbe, q) && (!SwingRight || Vector3.Dot(q, LeanDir) >= -NearLine),
+                            Hint = SafeHalfHint(pos, SwingRight ? 1.2f : 2.5f), Memory = true, Why = "phrase: Leaning Bell", From = this });
                         break;
                     case 2:
-                        into.Add(new BotDemand { Tick = FirstAt, Since = since, Ok = q => Clear(tideProbe, q), Hint = tideHint, Memory = true, Why = "phrase: Toll Tide", From = this });
+                        // right swing: the disc inside the tide strikes 1.5 s later, so wait near the tide's edge
+                        into.Add(new BotDemand { Tick = FirstAt, Since = since, Ok = q => Clear(tideProbe, q) && (!SwingRight || q.magnitude >= NearTideEdge),
+                            Hint = SwingRight ? Dir(pos) * 5.8f : tideHint, Memory = true, Why = "phrase: Toll Tide", From = this });
                         break;
                     case 3:
                         // gather on the party's side (co-op); clear of the images once drawn (solo: your own spot's image too)
@@ -292,10 +287,12 @@ namespace LastBell.Run
             switch (Fingers)
             {
                 case 1:
-                    into.Add(new BotDemand { Tick = SecondAt, Since = since, Ok = q => Clear(leanProbe, q), Hint = SafeHalfHint(pos), Memory = true, Why = "phrase: rewound Leaning Bell", From = this });
+                    into.Add(new BotDemand { Tick = SecondAt, Since = since, Ok = q => Clear(leanBack, q), Hint = pos + LeanDir * (Mathf.Max(0, -Vector3.Dot(pos, LeanDir)) + 1.4f),
+                        Memory = true, Why = "phrase: rewound Leaning Bell (the other half)", From = this });
                     break;
                 case 2:
-                    into.Add(new BotDemand { Tick = SecondAt, Since = since, Ok = q => Clear(tideProbe, q), Hint = tideHint, Memory = true, Why = "phrase: rewound Toll Tide", From = this });
+                    into.Add(new BotDemand { Tick = SecondAt, Since = since, Ok = q => Clear(tideBack, q), Hint = Dir(pos) * 8.2f,
+                        Memory = true, Why = "phrase: rewound Toll Tide (the inner disc)", From = this });
                     break;
                 case 3:
                     into.Add(new BotDemand { Tick = SecondAt, Since = since,
@@ -317,10 +314,11 @@ namespace LastBell.Run
             return true;
         }
         // the reader's spot for a Leaning half: across the line, at least 2.5 m into the safe half
-        Vector3 SafeHalfHint(Vector3 pos)
+        static Vector3 Dir(Vector3 pos) => pos.sqrMagnitude > 0.01f ? Sim.Flat(pos).normalized : Vector3.forward;
+        Vector3 SafeHalfHint(Vector3 pos, float depth)
         {
             float s = Vector3.Dot(pos, LeanDir);
-            var q = pos - LeanDir * (Mathf.Max(0, s) + 2.5f);
+            var q = pos - LeanDir * (s + depth);
             float b = CombatWorld.PlayerBound - 0.8f; if (q.magnitude > b) q = q.normalized * b;
             return q;
         }
@@ -334,20 +332,18 @@ namespace LastBell.Run
         }
 
         // ---------------- presentation (stand-in until the rig clip ConductPhrase exists) ----------------
-        // Above the boss, readable at the game camera: on the screen-left, the conducting hand rises with 1-4 oversized
+        // By the boss, readable at the game camera: on the screen-left, the conducting hand rises with 1-4 oversized
         // fingers lit gold (folded fingers stay dark brass); on the screen-right, the pendulum hand (brass rod, ivory bob)
         // swings out to the screen-left or screen-right and holds there. For a Leaning Bell phrase the hand leans toward
-        // the hit half. Rewind marks: ivory double chevrons on each rewound footprint, turning backwards. Never coral.
+        // the hit half (low and in front of him, facing the camera). Rewound copies carry Backwards Bell's arrows. Never coral.
         sealed class PhraseFx
         {
             static Material brass, gold, ivory, dark;
             readonly GameObject root;
             readonly Transform hand, rod, bob;
-            readonly List<Transform> marks = new List<Transform>();
             readonly bool right;
             const float HandHeight = 1.2f, Side = 2.3f, Front = 3.6f, RodLength = 1.7f, PivotHeight = 3.0f, SwingDeg = 42f;   // low and in front of the boss: on screen when he is at the top edge
             public bool Alive => root;
-            public int Marks => marks.Count(m => m);
 
             PhraseFx(CombatWorld w, int fingers, bool right)
             {
@@ -410,27 +406,12 @@ namespace LastBell.Run
                 var tip = pivot + down * RodLength;
                 rod.position = (pivot + tip) / 2; rod.rotation = Quaternion.FromToRotation(Vector3.up, -down);
                 bob.position = tip;
-                foreach (var m in marks) if (m) m.Rotate(0, -90f * Sim.Dt, 0, Space.World);   // turning backwards
             }
 
-            // ivory double chevron on the floor (an identity mark on a rewound footprint, never a hazard)
-            public void Mark(Vector3 at)
-            {
-                if (!root) return;
-                var m = new GameObject("rewind mark").transform; m.SetParent(root.transform, false);
-                m.position = new Vector3(at.x, 0.09f, at.z);
-                for (int i = 0; i < 2; i++)
-                {
-                    var c = Part(PrimitiveKind.Cone, m, new Vector3(0.38f * i - 0.19f, 0, 0), new Vector3(0.5f, 0.32f, 0.04f), ivory);
-                    c.localRotation = Quaternion.Euler(90, 0, 90);   // flat on the floor, pointing anticlockwise
-                }
-                marks.Add(m);
-            }
 
             public void Clear()
             {
                 if (root) Object.Destroy(root);
-                marks.Clear();
             }
         }
     }
