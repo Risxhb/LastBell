@@ -1,0 +1,108 @@
+PASS perspective fixed camera
+PASS exact uniform double boss scale
+PASS authored boss and idle
+PASS alternate logo sprite with alpha
+PASS no gameplay authority
+PASS single music owner
+PASS keyboard moves to Boss Rush
+PASS controller moves to Settings
+PASS keyboard opens settings
+PASS settings focus returns
+PASS actual requested resolution (1600, 900)
+PASS selected class (1600, 900) 0
+PASS one active hero
+PASS idle bones animate 0
+FRAME 1600x900 hero=(0.20, 0.62, 2.65) boss=(0.46, 0.58, 27.56)
+PASS hero left / boss middle
+PASS navigation fits screen
+PASS selected class (1600, 900) 1
+PASS one active hero
+PASS idle bones animate 1
+FRAME 1600x900 hero=(0.18, 0.63, 2.50) boss=(0.46, 0.58, 27.56)
+PASS hero left / boss middle
+PASS navigation fits screen
+PASS selected class (1600, 900) 2
+PASS one active hero
+PASS idle bones animate 2
+FRAME 1600x900 hero=(0.18, 0.63, 2.50) boss=(0.46, 0.58, 27.56)
+PASS hero left / boss middle
+PASS navigation fits screen
+PASS actual requested resolution (1280, 720)
+PASS selected class (1280, 720) 0
+PASS one active hero
+PASS idle bones animate 0
+FRAME 1280x720 hero=(0.20, 0.62, 2.65) boss=(0.46, 0.58, 27.56)
+PASS hero left / boss middle
+PASS navigation fits screen
+PASS selected class (1280, 720) 1
+PASS one active hero
+PASS idle bones animate 1
+FRAME 1280x720 hero=(0.18, 0.63, 2.50) boss=(0.46, 0.58, 27.56)
+PASS hero left / boss middle
+PASS navigation fits screen
+PASS selected class (1280, 720) 2
+PASS one active hero
+PASS idle bones animate 2
+FRAME 1280x720 hero=(0.18, 0.63, 2.50) boss=(0.46, 0.58, 27.56)
+PASS hero left / boss middle
+PASS navigation fits screen
+PASS actual requested resolution (2560, 1080)
+PASS selected class (2560, 1080) 0
+PASS one active hero
+PASS idle bones animate 0
+FRAME 2560x1080 hero=(0.27, 0.62, 2.65) boss=(0.47, 0.58, 27.56)
+PASS hero left / boss middle
+PASS navigation fits screen
+PASS selected class (2560, 1080) 1
+PASS one active hero
+PASS idle bones animate 1
+FRAME 2560x1080 hero=(0.26, 0.63, 2.50) boss=(0.47, 0.58, 27.56)
+PASS hero left / boss middle
+PASS navigation fits screen
+PASS selected class (2560, 1080) 2
+PASS one active hero
+PASS idle bones animate 2
+FRAME 2560x1080 hero=(0.26, 0.63, 2.50) boss=(0.47, 0.58, 27.56)
+PASS hero left / boss middle
+PASS navigation fits screen
+PASS actual requested resolution (1024, 768)
+PASS selected class (1024, 768) 0
+PASS one active hero
+PASS idle bones animate 0
+FRAME 1024x768 hero=(0.21, 0.58, 2.65) boss=(0.46, 0.56, 27.56)
+PASS hero left / boss middle
+PASS navigation fits screen
+PASS selected class (1024, 768) 1
+PASS one active hero
+PASS idle bones animate 1
+FRAME 1024x768 hero=(0.19, 0.59, 2.50) boss=(0.46, 0.56, 27.56)
+PASS hero left / boss middle
+PASS navigation fits screen
+PASS selected class (1024, 768) 2
+PASS one active hero
+PASS idle bones animate 2
+FRAME 1024x768 hero=(0.19, 0.59, 2.50) boss=(0.46, 0.56, 27.56)
+PASS hero left / boss middle
+PASS navigation fits screen
+PASS music continuous across class changes
+PASS scene transition completed
+PASS existing Boss Rush setup retains class
+PASS scene transition completed
+PASS class restored on scene return
+PASS scene transition completed
+PASS Start Run retains selected class
+PASS preview actors unloaded
+PASS scene transition completed
+PASS original menu remains usable
+PASS original Settings usable
+PASS scene transition completed
+PASS scene transition completed
+PASS run uses selected class Vanguard
+PASS scene transition completed
+PASS scene transition completed
+PASS scene transition completed
+PASS run uses selected class Chimesinger
+PASS scene transition completed
+PASS one persistent audio owner after navigation
+PASS zero runtime errors
+RESULT 95 passed / 0 failed

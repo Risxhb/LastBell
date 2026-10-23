@@ -91,6 +91,7 @@ namespace LastBell.Menu
         public void SelectHero(int i)
         {
             if(Loading||i<0||i>=HeroButtons.Length)return;SelectedIndex=i;heading.text=RunDirector.Classes[i].ToUpperInvariant()+"  /  CHOOSE YOUR HERO";
+            SavedHeroSelection.Current=RunDirector.Classes[i];
             DisplayKit=KitFor(RunDirector.Classes[i]);selectedBackdrop.SetActive(true);BuildSkills();SelectButton.gameObject.SetActive(true);instructions.gameObject.SetActive(false);
             LinkNavigation();
             EventSystem.current.SetSelectedGameObject(HeroButtons[i].gameObject);

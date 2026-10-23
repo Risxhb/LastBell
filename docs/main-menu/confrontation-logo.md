@@ -1,0 +1,9 @@
+# Alternative menu logo
+
+Generated with the built-in imagegen tool on October 23, 2026, using the user's cropped logo reference. PNG: `unity/Assets/LastBell/Menu/Resources/Menu/ConfrontationLogo.png`, 1870 × 841, RGBA with transparent alpha. Imported as a single UI Sprite, no mipmaps, uncompressed. Only ConfrontationMenu loads it; the existing menu's logo is preserved.
+
+Final generation prompt:
+
+Recreate ONLY the logo in this reference as a pristine transparent game UI logo. Match the exact reference design and restrained flat simplicity. Exact text LAST BELL in elegant thin classical high-contrast Roman serif capitals, plain solid warm ivory with absolutely NO outline, NO bevel, NO drop shadow, NO grain, NO distressed texture, NO 3D gold edging. LAST on the left and BELL on the right; the slim central bell separates these words. Simple flat solid ivory church bell silhouette with ivory clapper, inside one extremely thin muted antique-gold circle. Above the circle: one matching slender gold arc and a thin north-pointing small four-point star. Below the circle: small four-point star and a long needle finial; small delicate stars at east and west. This must look like the actual attached original reference, not a shiny ornamented interpretation. Fine vector-like monoline gold strokes. Clean smooth opaque interiors and impeccably antialiased edges, absolutely no noisy fringe pixels or white speckles around any of the shapes. Blank transparent alpha background, transparent inside ring too, no black rectangle, no scenery, no checkerboard. Wide horizontal layout matching source proportions with modest transparent margin. Output logo only.
+
+The final asset is the second generated variant. A generated raster is an approximation of the reference; it is not an exact vector redraw.
