@@ -295,8 +295,8 @@ namespace LastBell.Run
         IEnumerable<int> P4Loop()
         {
             SegmentLoops++;
-            // (1) with clocks in pairs
-            foreach (var w in Timeline(13, At(0, mLedger, C(4, "replay", 4)), At(0, mClocks, C(4, "pairs", 7, 10)))) yield return w;
+            // (1) with clocks in pairs, striking 7.75 and 10.75 so they lock between replayed strikes (V at 5.5 would force a 60)
+            foreach (var w in Timeline(13, At(0, mLedger, C(4, "replay", 4)), At(0, mClocks, C(4, "pairs", 7.75f, 10.75f)))) yield return w;
             foreach (var w in UltPunish()) yield return w;
             // (2) with a Stopped Hour whose resume (9.0) lands on Ledger III (the 4th replayed strike: 0.5 + 4 + 3 x 1.5 = 9.0 s)
             foreach (var w in Timeline(14, At(0, mStopped, C(4, "lash", 5, 9)), At(0.5f, mLedger, C(4, "replay", 4)))) yield return w;
