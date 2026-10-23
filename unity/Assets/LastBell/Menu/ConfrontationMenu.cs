@@ -103,8 +103,8 @@ namespace LastBell.Menu
 #endif
             MenuUI.Text("SELECT CLASS",panel,new Vector2(0,.69f),new Vector2(1,.73f),12,MenuUI.Gold);
             className=MenuUI.Text(SavedHeroSelection.Current.ToUpperInvariant(),panel,new Vector2(.13f,.63f),new Vector2(.87f,.69f),19);
-            PreviousButton=Nav("‹",panel,.63f,()=>SelectClass(SelectedIndex-1));Fit(PreviousButton,.02f,.63f,.13f,.69f);
-            NextButton=Nav("›",panel,.63f,()=>SelectClass(SelectedIndex+1));Fit(NextButton,.87f,.63f,.98f,.69f);
+            PreviousButton=ClassArrow(panel,false);Fit(PreviousButton,.02f,.63f,.13f,.69f);
+            NextButton=ClassArrow(panel,true);Fit(NextButton,.87f,.63f,.98f,.69f);
             var diff=Nav("Difficulty",panel,0,()=>{RunDifficulty.Selected=(Difficulty)(((int)RunDifficulty.Selected+1)%RunDifficulty.Names.Length);RefreshDifficulty();});
             difficulty=diff.GetComponentInChildren<Text>();difficulty.fontSize=16;RefreshDifficulty();
             MenuUI.Text("ALTERNATIVE MENU  /  WORK IN PROGRESS",safe,new Vector2(.69f,.018f),new Vector2(.985f,.05f),11,MenuUI.Gold);
@@ -114,6 +114,14 @@ namespace LastBell.Menu
             message=MenuUI.Text("",safe,new Vector2(.70f,.01f),new Vector2(.99f,.08f),14,MenuUI.Gold);
         }
         void RefreshDifficulty(){difficulty.text="Difficulty: "+RunDifficulty.Name(RunDifficulty.Selected);}
+        Button ClassArrow(Transform parent,bool next)
+        {
+            var b=Nav(next?"Next class":"Previous class",parent,.63f,()=>SelectClass(SelectedIndex+(next?1:-1)));
+            b.GetComponentInChildren<Text>().text="";
+            var icon=MenuUI.Rect("Class arrow",b.transform,Vector2.zero,Vector2.one,new Vector2(2,4)).gameObject.AddComponent<ClassSelectionArrow>();
+            icon.Next=next;icon.color=MenuUI.Ivory;icon.raycastTarget=false;
+            return b;
+        }
         static void Fit(Button b,float x,float y,float x2,float y2){var r=(RectTransform)b.transform;r.anchorMin=new Vector2(x,y);r.anchorMax=new Vector2(x2,y2);r.offsetMin=r.offsetMax=Vector2.zero;}
         Button Nav(string label,Transform parent,float y,UnityEngine.Events.UnityAction action)
         {
@@ -184,6 +192,28 @@ namespace LastBell.Menu
         {
             foreach(var p in heroes.Concat(new[]{Boss}))if(p)foreach(var r in p.GetComponentsInChildren<Renderer>(true))foreach(var m in r.sharedMaterials)if(m&&m.name.EndsWith("(Instance)"))Destroy(m);
             if(gradientSprite)Destroy(gradientSprite);if(gradient)Destroy(gradient);
+        }
+    }
+    // Canvas geometry keeps these controls visible in WebGL without relying on font glyphs.
+    public sealed class ClassSelectionArrow : MaskableGraphic
+    {
+        public bool Next;
+        protected override void OnPopulateMesh(VertexHelper vertices)
+        {
+            vertices.Clear();var rect=GetPixelAdjustedRect();float size=Mathf.Min(rect.width,rect.height)*.75f;
+            float direction=Next?1:-1;var center=rect.center;
+            var top=center+new Vector2(-.25f*direction,.5f)*size;
+            var tip=center+new Vector2(.3f*direction,0)*size;
+            var bottom=center+new Vector2(-.25f*direction,-.5f)*size;
+            Stroke(vertices,top,tip,Mathf.Max(2,size*.14f));Stroke(vertices,tip,bottom,Mathf.Max(2,size*.14f));
+        }
+        void Stroke(VertexHelper vertices,Vector2 start,Vector2 end,float width)
+        {
+            Vector2 delta=(end-start).normalized;var normal=new Vector2(-delta.y,delta.x)*width*.5f;
+            int i=vertices.currentVertCount;
+            vertices.AddVert(start+normal,color,Vector2.zero);vertices.AddVert(start-normal,color,Vector2.zero);
+            vertices.AddVert(end-normal,color,Vector2.zero);vertices.AddVert(end+normal,color,Vector2.zero);
+            vertices.AddTriangle(i,i+1,i+2);vertices.AddTriangle(i,i+2,i+3);
         }
     }
 }
