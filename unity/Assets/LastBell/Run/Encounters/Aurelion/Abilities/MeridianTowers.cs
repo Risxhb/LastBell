@@ -6,15 +6,13 @@ namespace LastBell.Run
 {
     // v4 Meridian Towers (aurelion.meridian_towers), abilities-v4/ABILITIES-v4.md §3.1 (proposal; tower redesign, Chzy18
     // 2026-10-23: "just one person has to be in it", "no unavoidable damage"). Source: FFXIV towers with a soak count.
-    // Each tower shows how many players it needs (ivory dots; solo towers show their order numeral). A tower OPENS 3.0 s
-    // before it lands; while open, a gold ring fills whenever at least that many players stand inside, and stops (not
-    // resets) when they don't. It needs 1.5 s of filling (Easy: open 3.75 s, same 1.5 s).
-    //   - Filled when it lands: no damage at all. Players beyond the count take a heavy hit (50): the extras, farthest
+    // Each tower shows how many players it needs (ivory dots; solo towers show their order numeral). It counts whoever is
+    // inside at the moment it lands (Chzy18 2026-10-23: no hold timer). Towers rise 5.0 s before they land.
+    //   - Enough inside when it lands: no damage at all. Players beyond the count take a heavy hit (50): the extras, farthest
     //     from its centre first, so a party can't just pile into one.
-    //   - Not filled: Total Eclipse, the party wipes (the fight-ending-wipe exception; telegraph: the big cobalt column,
-    //     the dots and the ring).
-    //   - Solo: 3 towers of one, in order, 2.5 s apart (first 5.0 s after they rise): fill each early and leave before it
-    //     lands. Co-op: 2-3 towers that land together, their counts adding up to the party (N 2: 1+1, N 4: 2+2 or 1+3,
+    //   - Too few: Total Eclipse, the party wipes (the fight-ending-wipe exception; telegraph: the big cobalt column and
+    //     the dots).
+    //   - Solo: 3 towers of one, in order, 2.5 s apart (first 5.0 s after they rise): be in each as it lands, then run to the next. Co-op: 2-3 towers that land together, their counts adding up to the party (N 2: 1+1, N 4: 2+2 or 1+3,
     //     N 8: 3+3+2), assigned when they rise in party order. A tower whose players have all gone down goes dark (no wipe).
     // Spots: a 6.5 m ring round the centre, one of three authored layouts per cast, towers at least 120 degrees apart.
     public sealed class MeridianTowers : AurelionAbility
@@ -23,28 +21,22 @@ namespace LastBell.Run
         public override string Name => "Meridian Towers";
 
         public const float Radius = 2.5f, Ring = 6.5f, FirstS = 5.0f, StepS = 2.5f, FirstEasyS = 6.0f, StepEasyS = 3.0f;
-        public const float OpenS = 5.0f, OpenEasyS = 6.0f, HoldS = 1.5f;   // open from the moment they rise (solo: later towers open on rise too)
         public const float ReunionR = 4.5f;
         public const int ExtraDamage = 50;
         static readonly Color Ivory = new Color(1f, 0.96f, 0.86f), CobaltFill = new Color(0.18f, 0.28f, 0.62f), CobaltRim = new Color(0.6f, 0.9f, 2.2f);
-        static readonly Color GoldFill = new Color(0.6f, 0.45f, 0.15f), GoldRim = new Color(2.2f, 1.7f, 0.6f);
         static readonly string[] Numerals = { "I", "II", "III", "IV" };
         // authored layouts (yaw round the centre): consecutive >= 120 degrees
         static readonly float[][] Layouts = { new[] { 0f, 135f, 270f, 45f }, new[] { 90f, 210f, 330f, 150f }, new[] { 180f, 300f, 60f, 240f } };
 
         public sealed class Tower
         {
-            public Vector3 At; public Hazard H; public int Index, ResolveTick, Need, Held;
+            public Vector3 At; public Hazard H; public int Index, ResolveTick, Need;
             public readonly List<PlayerController> In = new List<PlayerController>(), Owners = new List<PlayerController>();
-            internal LastBell.VFX.BellkeeperFx.Telegraph Fill;
             public bool Resolved;
         }
         public readonly List<Tower> Towers = new List<Tower>();   // test evidence: the last cast
         public int Casts { get; private set; }
-        public bool Failed { get; private set; }                 // the last cast had a tower not held (party wiped)
-        public int HoldTicks => Sim.Ticks(HoldS);
-        int OpenTicks => Sim.Ticks(Easy ? OpenEasyS : OpenS);
-        public bool IsOpen(Tower t, int tick) => !t.Resolved && tick >= t.ResolveTick - OpenTicks + 1;
+        public bool Failed { get; private set; }                 // the last cast had a tower short of players (party wiped)
 
         // the counts per party size (co-op towers land together); N 4 alternates 2+2 and 1+3
         public static int[] NeedsFor(int n, int cast)
@@ -62,14 +54,14 @@ namespace LastBell.Run
             }
         }
 
-        // the tower this player should be in now (bots, tests): solo, the next one not yet filled; co-op, its own tower
-        // while unfilled (assigned when they rise); Reunion, the one tower
+        // the tower this player should be in now (bots, tests): solo, the next one to land; co-op, its own tower (assigned
+        // when they rise); Reunion, the one tower
         public Tower NextFor(PlayerController who, int tick)
         {
             if (Towers.Count == 0 || !who || who.Down) return null;
             var party = Standing();
             if (Towers.Count == 1) return Towers.Find(t => t.ResolveTick >= tick);
-            if (party.Count == 1) return Towers.Find(t => t.ResolveTick >= tick && t.Held < HoldTicks);
+            if (party.Count == 1) return Towers.Find(t => t.ResolveTick >= tick);
             return Towers.Find(t => t.ResolveTick >= tick && t.Owners.Contains(who));
         }
         // inside a tower that is not this player's (co-op): an extra, and a heavy hit when it lands
@@ -109,24 +101,12 @@ namespace LastBell.Run
                 h.OnResolve = hz => Resolve(tower);
                 t.H = Spawn(h);
                 t.H.Tele?.Tint(CobaltFill, CobaltRim);           // a soak, not a hazard: cobalt, "get in"
-                t.Fill = W.BossFx.Ring(Radius - 0.3f, Radius); t.Fill.Place(t.At, 0); t.Fill.Tint(GoldFill, GoldRim); t.Fill.Progress(0);
                 labels.Add(RunHud.Label(t.At + Vector3.up * 0.4f, solo ? Numerals[k] : Dots(t.Need), Ivory, solo ? 54 : 46));
                 Towers.Add(t);
             }
             int last = Duration();
             for (int i = 0; i <= last; i++)
             {
-                foreach (var t in Towers)
-                {
-                    if (t.Resolved) continue;
-                    if (IsOpen(t, W.Tick))
-                    {
-                        int inside = 0;
-                        foreach (var p in W.Players) if (p && !p.Down && t.H.Contains(p.transform.position)) inside++;
-                        if (inside >= t.Need && t.Held < HoldTicks) t.Held++;
-                    }
-                    t.Fill.Progress(t.Held / (float)HoldTicks);
-                }
                 for (int k = 0; k < Towers.Count; k++) if (Towers[k].Resolved) labels[k].Hide();
                 if (i < last) yield return 1;
             }
@@ -167,20 +147,20 @@ namespace LastBell.Run
         void Resolve(Tower t)
         {
             t.Resolved = true;
-            t.Fill?.Expire();
             t.In.Clear();
             foreach (var p in W.Players) if (p && !p.Down && t.H.Contains(p.transform.position)) t.In.Add(p);
-            bool anyOwner = t.Owners.Count == 0 || t.Owners.Exists(p => p && !p.Down);
-            if (!anyOwner) return;   // its players all went down: the tower goes dark
-            if (t.Held < HoldTicks)
+            // co-op: a player who went down since it rose lowers its count (the tower goes dark with its soaker)
+            int need = t.Owners.Count == 0 ? t.Need : Mathf.Min(t.Need, t.Owners.Count(p => p && !p.Down));
+            if (need == 0) return;
+            if (t.In.Count < need)
             {
                 Failed = true;
                 string which = Towers.Count > 1 && Standing().Count == 1 ? "tower " + Numerals[t.Index] : "a tower";
-                Boss.Wipe($"Total Eclipse — {which} was not held ({t.Need} needed)");
+                Boss.Wipe($"Total Eclipse — {which} was short ({t.In.Count} of {need})");
                 return;
             }
             // extras: players beyond the count, the farthest from its centre first
-            var extra = t.In.OrderBy(p => Sim.Flat(p.transform.position - t.At).sqrMagnitude).Skip(t.Need).ToList();
+            var extra = t.In.OrderBy(p => Sim.Flat(p.transform.position - t.At).sqrMagnitude).Skip(need).ToList();
             foreach (var p in extra)
                 p.ReceiveHit(new Hazard { Source = Name, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = t.At, Damage = ExtraDamage, Knockback = 0, Stun = 15 });
             W.BossFx.ChimeResolve(t.At, Radius);

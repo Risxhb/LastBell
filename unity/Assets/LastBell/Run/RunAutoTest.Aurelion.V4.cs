@@ -50,7 +50,7 @@ namespace LastBell.Run
             V2Check("solo: 3 numbered towers, 6.5 m out, at least 120 degrees apart, 2.5 s apart",
                 tw.Towers.Count == 3 && tw.Towers.All(t => Mathf.Abs(Sim.Flat(t.At).magnitude - 6.5f) < 0.01f) && Vector3.Distance(tw.Towers[0].At, tw.Towers[1].At) >= 11.2f
                 && tw.Towers[1].ResolveTick - tw.Towers[0].ResolveTick == Sim.Ticks(2.5f), $"{tw.Towers.Count} towers");
-            V2Check("solo: the perfect route fills each tower (1.5 s) in order and leaves; no wipe, no damage", !tw.Failed && !V4Wiped && !V2WasHit(V2Main, "Meridian Towers") && tw.Towers.All(t => t.Held >= tw.HoldTicks),
+            V2Check("solo: the perfect route is in each tower as it lands, in order; no wipe, no damage", !tw.Failed && !V4Wiped && !V2WasHit(V2Main, "Meridian Towers") && tw.Towers.All(t => t.Resolved && t.In.Count >= 1),
                 string.Join(", ", V2HitsOn(V2Main).Select(h => h.Source + " " + h.Damage)));
             V3Unbot();
 
@@ -59,14 +59,14 @@ namespace LastBell.Run
             if (V2Boss == null) yield break;
             yield return V4Bots(BotMode.Perfect);
             yield return V2Fire(V2Boss.Towers.Run(), 20);
-            V2Check("N = 4: 2 towers whose counts add up to 4, both filled together, no wipe, no extras hit", V2Boss.Towers.Towers.Count == 2 && V2Boss.Towers.Towers.Sum(t => t.Need) == 4 && V2Boss.Towers.Towers.All(t => t.Held >= V2Boss.Towers.HoldTicks && t.ResolveTick == V2Boss.Towers.Towers[0].ResolveTick) && !V2Boss.Towers.Failed && !V4Wiped && !V2Party.Any(p => V2WasHit(p, "Meridian Towers")), $"in: {string.Join("/", V2Boss.Towers.Towers.Select(t => t.In.Count))}");
+            V2Check("N = 4: 2 towers whose counts add up to 4, both full as they land together, no wipe, no extras hit", V2Boss.Towers.Towers.Count == 2 && V2Boss.Towers.Towers.Sum(t => t.Need) == 4 && V2Boss.Towers.Towers.All(t => t.In.Count == t.Need && t.ResolveTick == V2Boss.Towers.Towers[0].ResolveTick) && !V2Boss.Towers.Failed && !V4Wiped && !V2Party.Any(p => V2WasHit(p, "Meridian Towers")), $"in: {string.Join("/", V2Boss.Towers.Towers.Select(t => t.In.Count))}");
             V3Unbot();
 
             // the wipe: nobody goes to tower I
             yield return V2Setup(1, Difficulty.Medium, new[] { new Vector3(0, 0, -12f) }, 1, Vector3.zero);
             if (V2Boss == null) yield break;
             yield return V4FireUntilWipe(V2Boss.Towers.Run());
-            V2Check("a tower not held wipes the party (Total Eclipse), even solo", V2Boss.Towers.Failed && V4Wiped && V2Main.Down && V2Boss.WipeCause.StartsWith("Total Eclipse"), V2Boss.WipeCause ?? "no wipe");
+            V2Check("a tower short of players wipes the party (Total Eclipse), even solo", V2Boss.Towers.Failed && V4Wiped && V2Main.Down && V2Boss.WipeCause.StartsWith("Total Eclipse"), V2Boss.WipeCause ?? "no wipe");
         }
 
         // ================================================================ Sunspots
