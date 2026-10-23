@@ -731,7 +731,8 @@ def _follow(frames, loop, rec, base, bvh=None):
             pbs[n].rotation_quaternion = q; pbs[n].keyframe_insert('rotation_quaternion', frame=f + 1, group=n)
 LG_TRACE, LG_BY_CLIP = [], {}      # left hand on the staff (0..1) per baked frame, for chimesinger_qa.py
 BASE_BY_CLIP = {}                  # the loose bones' target rotations per baked frame (the contact pass falls back to them)
-def bake(name, frames, fn, loop):
+def bake(name, frames, fn, loop, still=()):
+    """still: loose bones (name prefixes) that keep their hanging targets in this clip, with no follow-through."""
     act = bpy.data.actions.new(name); act.use_fake_user = True
     arm.animation_data_create(); arm.animation_data.action = act
     LG_TRACE.clear(); rec, base = [], []
@@ -750,6 +751,9 @@ def bake(name, frames, fn, loop):
         bvh = []
         for f in range(len(rec)): sc.frame_set(f + 1); bvh.append(_body_profile())
         _follow(frames, loop, rec, base, bvh)
+    for n in [b for b in DYN_ORDER if b.startswith(tuple(still))] if still else []:
+        for f, bq in enumerate(base):
+            pbs[n].rotation_quaternion = bq[n]; pbs[n].keyframe_insert('rotation_quaternion', frame=f + 1, group=n)
     BASE_BY_CLIP[name] = base
     act.frame_range = (1, frames + (1 if loop else 0)); LG_BY_CLIP[name] = [round(v, 3) for v in LG_TRACE]
     return act
@@ -1255,7 +1259,8 @@ for _s in 'LR':
     _sn = f'sleeve.{_s}'; _M = np.array(pbs[_sn].matrix); _P = STRAND_PTS[_sn][0] @ _M[:3, :3].T + _M[:3, 3]
     SLEEVE_BASE[_sn] = _prof_push(_pf, _P)[1] + 0.005
 print('SLEEVE_BASE', {k: round(float(v.max()) * 1000) for k, v in SLEEVE_BASE.items()}, 'mm deepest standing')
-acts = [bake('Idle', 60, idle, True), bake('Run', RUN_FRAMES, run, True), bake('Sprint', SPRINT_FRAMES, sprint, True),
+# (standing: the sleeves and bells hang still)
+acts = [bake('Idle', 60, idle, True, still=('sleeve', 'tassel')), bake('Run', RUN_FRAMES, run, True), bake('Sprint', SPRINT_FRAMES, sprint, True),
         bake('Dodge', 14, dodge, False), bake('Jump', 36, jump, False)]
 acts += [bake(name, frames, K if callable(K) else kit_pose(K), False) for name, (frames, K) in KIT.items()]
 # ---------------- contact pass: the follow-through never swings a loose part into the staff or its banners ----------
