@@ -29,7 +29,7 @@ Written the way Ultimate guides are: what each mechanic wants from **you**, by y
 - **P4:** the replay comes **VI → I**, 1.5 s apart. Memorise P1's order as six words (e.g. "West, band, centre, clump, West, centre") and recite it backwards. For two opposite halves in a row: stand 1 m on the safe side of the line for the first, then step 2 m across.
 
 ## Backwards Bell (P2)
-- Blocks are A, B, C, then rewinds **C, B, A**. The spot you just left is usually the next one struck. Move to where **A** was safe while **C** resolves, then shuffle by 2 m per beat.
+- A, B, C strike, then the rewinds C, B, A, and **each rewind strikes everywhere its original didn't**. Right after A lands, walk onto **A's** half and stay inside 6.4 m. After C, step out past 7.4 m (the tide's copy is the inner disc). Then walk straight in to within 3.6 m of the boss (the Heart Toll's copy is everything outside it). Hold that half for A's copy, or step to your clock spot: it's on that half. Each rewind is 40.
 
 ## Two Futures (P3, P5)
 - Futures I (ivory) and II (brass) each show three steps. Memorise each as three hour marks (e.g. "I: 3, 6, 10 · II: 12, 9, 7").
