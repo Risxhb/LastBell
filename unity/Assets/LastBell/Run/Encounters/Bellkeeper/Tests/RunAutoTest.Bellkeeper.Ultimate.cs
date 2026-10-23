@@ -79,6 +79,9 @@ namespace LastBell.Run
             return -1;
         }
         int UltTick0() => bk.SegmentStartTick;
+        // Runs the scheduler with no plan (bk.ManualPlan): moves you launch afterwards advance every tick, as in the fight.
+        // Without this, a halted boss only runs a launched move's first tick.
+        void UltManual() { bk.ManualPlan = true; bk.BeginCombat(); BkStep(1); }
         // world tick of the n-th (0-based) "launch <key>" in the plan log at or after `from`, or -1
         int UltLaunchTick(string key, int from, int n = 0)
         {
@@ -168,6 +171,7 @@ namespace LastBell.Run
             if (bk == null) yield break;
             ult = bk.Ult; me = d.Player;
             // the ledger recorder: a resolved Leaning Bell is stored as it struck and copies exactly
+            UltManual();
             ult.Recording = true;
             BkPlace(me, new Vector3(0, 0, 6));
             bk.UltMove(bk.UltLean, BellkeeperEncounter.LeanTuning(Vector3.left));
