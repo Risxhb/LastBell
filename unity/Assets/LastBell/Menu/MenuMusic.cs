@@ -13,6 +13,7 @@ namespace LastBell.Menu
         float bossMix, envelope;
         bool inCombat, menuPaused;
         bool openingTrack;
+        bool openingPlaybackObserved;
         public bool PlayingOpening => openingTrack;
         public AudioSource Source => inCombat ? boss : menu;
         public float Volume => PlayerPrefs.GetFloat(VolumeKey, DefaultVolume);
@@ -71,7 +72,8 @@ namespace LastBell.Menu
             if (active != this) return;
             // The opening song is prepended once per application session. Arena wipes and
             // selection/preparation never replace or restart this persistent source.
-            if (openingTrack && !menuPaused && !menu.isPlaying && menu.clip && menu.clip.loadState == AudioDataLoadState.Loaded)
+            if (openingTrack && menu.isPlaying) openingPlaybackObserved = true;
+            if (openingTrack && openingPlaybackObserved && !menuPaused && !menu.isPlaying && menu.clip)
             {
                 openingTrack = false; menu.clip = Resources.Load<AudioClip>("Menu/MainMenuMusic");
                 menu.loop = true; if (menu.clip) menu.Play();

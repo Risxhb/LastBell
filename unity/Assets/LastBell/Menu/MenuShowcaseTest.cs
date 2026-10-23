@@ -73,7 +73,13 @@ namespace LastBell.Menu
             }
             Check("eight-player party included", show.Stages.Any(s => s.PartySize == 8));
             // Seek the genuine opening clip to its end to exercise normal playlist advancement.
-            if (music.PlayingOpening) { source.time = Mathf.Max(0, source.clip.length - .5f); yield return new WaitForSecondsRealtime(2); }
+            if (music.PlayingOpening)
+            {
+                source.time = Mathf.Max(0, source.clip.length - .5f);
+                float trackDeadline = Time.realtimeSinceStartup + 15;
+                while ((music.PlayingOpening || !source.isPlaying) && Time.realtimeSinceStartup < trackDeadline) yield return null;
+            }
+            report.Add("PLAYLIST opening=" + music.PlayingOpening + " clip=" + source.clip.name + " state=" + source.clip.loadState + " playing=" + source.isPlaying + " time=" + source.time);
             Check("existing looping playlist resumes after opening", !music.PlayingOpening && source.clip.name == "MainMenuMusic" && source.loop && source.isPlaying);
             menu.OpenSelection(false); Check("showcase stops on navigation", !show.enabled && !menu.Battle.enabled);
             float deadline = Time.realtimeSinceStartup + 45;
