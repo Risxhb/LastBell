@@ -21,7 +21,7 @@ namespace LastBell.Run
             handSpawns.Clear();
             // launched by hand: the scheduler runs with no plan; a segment start is plan-driven (BeginCombat by the check)
             if (bk != null) { if (segment == null) UltManual(); else bk.ManualPlan = false; }
-            if (bk != null && bk != handSub) { handSub = bk; bk.HazardSpawned += (a, h) => { if (a == hand) handSpawns.Add((d.World.Tick, h)); }; }
+            if (bk != null && bk != handSub) { handSub = bk; bk.HazardSpawned += (a, h) => { if (a == hand || (a is BackwardsBell && hand != null && hand.Running)) handSpawns.Add((d.World.Tick, h)); }; }
         }
         UltCue HandCue(string phrase, float a = 7f, float b = 8.5f, int phase = 2) => new UltCue { Variant = "phrase:" + phrase, At = new[] { a, b }, Phase = phase, Seed = 3 };
         // hits on p from this cast's own hazards
@@ -52,7 +52,7 @@ namespace LastBell.Run
             Check("Hand: phrase variants parse (phrase:3R), the bare plan variant doesn't",
                   ConductorsHand.TryParse("phrase:3R", out int pf, out bool pr) && pf == 3 && pr && !ConductorsHand.TryParse("phrase", out _, out _) && !ConductorsHand.TryParse("phrase:5L", out _, out _));
 
-            // ---- spawn and resolve ticks, for every phrase: the phrase on the launch tick, real telegraphs only 2.0 s before ----
+            // ---- spawn and resolve ticks, for every phrase: the phrase on the launch tick, real telegraphs only 1.5 s before ----
             foreach (var ph in HandPhrases)
             {
                 yield return HandStart();
@@ -69,18 +69,23 @@ namespace LastBell.Run
                 bool firstOk = ph[0] == '4' ? hand.First.Count == 0 : hand.First.Count > 0 && res.Where(x => hand.First.Contains(x.h)).All(x => x.tick == t1 - ConductorsHand.TellTicks && x.at == t1);
                 bool secondOk = hand.Second.Count > 0 && res.Where(x => hand.Second.Contains(x.h)).All(x => x.tick == t2 - ConductorsHand.TellTicks && x.at == t2);
                 bool nothingEarly = res.All(x => x.tick >= t1 - ConductorsHand.TellTicks);
-                Check($"Hand {ph} ({hand.Reading}): phrase on the launch tick; move 1 drawn 2.0 s before 7.0 s, move 2 2.0 s before 8.5 s; nothing earlier",
+                Check($"Hand {ph} ({hand.Reading}): phrase on the launch tick; move 1 drawn 1.5 s before 7.0 s, move 2 1.5 s before 8.5 s; nothing earlier",
                       shown && firstOk && secondOk && nothingEarly && stopOk,
                       $"spawns {string.Join(" ", res.Select(x => $"{x.h.Source}@{(x.tick - L) / 60f:0.00}->{(x.at - L) / 60f:0.00}"))}{(ph[0] == '4' ? " · stopped " + hand.StoppedChoice + " " + stopped.Cue : "")}");
                 bool rewound = ph[1] == 'R' ? hand.Second.All(h => h.Source.StartsWith(ConductorsHand.RewindPrefix)) : hand.Second.Count == 1 && hand.Second[0].Source == UltShapes.HeartSource;
-                Check($"Hand {ph}: the swing names move 2 ({(ph[1] == 'R' ? "the first move's footprint again" : "Heart Toll")})", rewound, string.Join(", ", hand.Second.Select(h => h.Source)));
+                Check($"Hand {ph}: the swing names move 2 ({(ph[1] == 'R' ? "the first move rewound" : "Heart Toll")})", rewound, string.Join(", ", hand.Second.Select(h => h.Source)));
                 if (ph[1] == 'R' && ph[0] != '4')
                 {
-                    bool same = ph[0] == '3' ? hand.Second.Count == hand.First.Count && hand.Second.Zip(hand.First, (a, b) => Sim.Flat(a.Origin - b.Origin).magnitude < 0.01f).All(x => x)
-                              : hand.Second[0].Shape == hand.First[0].Shape && Mathf.Abs(Mathf.DeltaAngle(hand.Second[0].Yaw, hand.First[0].Yaw)) < 0.1f && hand.Second[0].Inner == hand.First[0].Inner;
-                    Check($"Hand {ph}: the rewound copy is the first footprint exactly, 40 damage", same && hand.Second.All(h => h.Damage == UltShapes.StandardDamage));
+                    // Backwards Bell's rule: the copy strikes everywhere the original did not (Reflection images: the same spots)
+                    Hazard s0 = hand.Second[0], f0 = hand.First[0];
+                    bool ok = ph[0] == '3' ? hand.Second.Count == hand.First.Count && hand.Second.Zip(hand.First, (a, b) => Sim.Flat(a.Origin - b.Origin).magnitude < 0.01f && a.Radius == b.Radius).All(x => x)
+                            : ph[0] == '1' ? s0.Shape == HazardShape.Cone && Mathf.Abs(Mathf.DeltaAngle(s0.Yaw, f0.Yaw + 180f)) < 0.1f && Mathf.Approximately(s0.HalfAngle, 90f)
+                            : s0.Shape == HazardShape.Circle && Mathf.Approximately(s0.Radius, f0.Inner) && s0.Origin.magnitude < 0.01f;
+                    string want = ph[0] == '1' ? "the other half" : ph[0] == '2' ? "the disc inside the tide" : "the same images";
+                    Check($"Hand {ph}: the rewound copy is {want}, 40 damage", ok && hand.Second.All(h => h.Damage == UltShapes.StandardDamage),
+                          $"{s0.Shape} yaw {s0.Yaw:0} r {s0.Radius:0.0} vs {f0.Shape} yaw {f0.Yaw:0}");
                 }
-                Check($"Hand {ph}: presentation clears after move 2 (phrase and rewind marks)", !hand.PhraseShown && hand.RewindMarks == 0);
+                Check($"Hand {ph}: presentation clears after move 2", !hand.PhraseShown);
             }
 
             // ---- the intended route (GUIDE: read the phrase, go at once) at 4.2 m/s, finite stamina, N = 1/2/4/8, every phrase ----
@@ -96,14 +101,19 @@ namespace LastBell.Run
                     for (int i = 0; i < n; i++) { var b = UltimateParty.Drive(party[i], i, n); b.Speed = 4.2f; b.Attacks = false; bots.Add(b); }
                     bk.UltLaunch(hand, HandCue(ph));
                     int L0 = hand.LastCastTick, end = d.World.Tick + Sim.Ticks(8.5f) + 3; string why = null;
-                    var trace = new List<string>();
+                    var trace = party.Select(_ => new List<string>()).ToList();   // per player: position and plan once a second
                     while (d.World.Tick < end)
                     {
                         int before = bkHits.Count;
                         BkStep(1);
                         foreach (var p in party) minStamina = Mathf.Min(minStamina, p.Stamina);
-                        if ((d.World.Tick - L0) % 60 == 0) trace.Add($"{(d.World.Tick - L0) / 60}s({party[0].transform.position.x:0.0},{party[0].transform.position.z:0.0})");
-                        if (why == null && bkHits.Count > before) { var hb = bkHits[before]; int k = party.IndexOf(hb.Player); why = $"@{(hb.Tick - L0) / 60f:0.00}s p{k} at ({hb.Player.transform.position.x:0.0},{hb.Player.transform.position.z:0.0}) bot: {(k >= 0 ? bots[k].DebugLine : "-")} trace {string.Join(" ", trace)}"; }
+                        if ((d.World.Tick - L0) % 60 == 0)
+                            for (int i = 0; i < n; i++) trace[i].Add($"{(d.World.Tick - L0) / 60}s({party[i].transform.position.x:0.0},{party[i].transform.position.z:0.0}) [{bots[i].DebugLine}]");
+                        if (why == null && bkHits.Count > before)
+                        {
+                            var hb = bkHits[before]; int k = party.IndexOf(hb.Player);
+                            why = $"@{(hb.Tick - L0) / 60f:0.00}s p{k} at ({hb.Player.transform.position.x:0.0},{hb.Player.transform.position.z:0.0}) · {(k >= 0 ? string.Join(" | ", trace[k]) : "-")}";
+                        }
                     }
                     routes++;
                     int hits = party.Sum(p => HandHitsOn(p));
@@ -115,7 +125,7 @@ namespace LastBell.Run
                   routeFails == 0, $"{routes - routeFails}/{routes} clean, stamina min {minStamina:0}{(failed.Count > 0 ? " · " + string.Join("; ", failed.Take(6)) : "")}");
             Check("Hand: its own moves never one-shot, wipe or crack (that's the Stopped Hour's chains alone)", lethalHits == 0 && !wiped && !cracked, $"lethal {lethalHits}, wipe {wiped}, cracked {cracked}");
 
-            // ---- without the phrase: the 2.0 s telegraph alone is too short for the Leaning Bell from the far wall ----
+            // ---- without the phrase: the 1.5 s telegraph alone is too short for the Leaning Bell from the far wall ----
             foreach (var ph in new[] { "1L", "1R" })
             {
                 yield return HandStart();
@@ -124,10 +134,10 @@ namespace LastBell.Run
                 bk.UltLaunch(hand, HandCue(ph));
                 int L = hand.LastCastTick;
                 // a player who ignores the phrase and reacts 0.6 s (the escape proof's reaction) after the real telegraph
-                BkStep(Sim.Ticks(5f) + 36);
+                BkStep(Sim.Ticks(5.5f) + 36);
                 var miss = UltimateParty.Drive(d.Player, 0, 1, UltimateBot.Skill.Miss); miss.Speed = 4.2f; miss.Attacks = false;
-                BkStep(Sim.Ticks(3.5f) + 3);
-                Check($"Hand {ph}: ignoring the phrase fails the Leaning Bell from the far wall (2.0 s telegraph, 0.6 s reaction)", HandHitsOn(d.Player, hand.First) == 1,
+                BkStep(Sim.Ticks(3f) + 3);
+                Check($"Hand {ph}: ignoring the phrase fails the Leaning Bell from the far wall (1.5 s telegraph, 0.6 s reaction)", HandHitsOn(d.Player, hand.First) == 1,
                       $"hits {HandHitsOn(d.Player, hand.First)}, ended at z {d.Player.transform.position.z:0.0}");
             }
 
@@ -147,10 +157,10 @@ namespace LastBell.Run
                     got.Add(HandHitsOn(d.Player) > 0 || bkHits.Any(x => x.Player == d.Player));
                 }
                 threat.Add($"{ph}: melee {(got[0] ? "hit" : "safe")}, ranged {(got[1] ? "hit" : "safe")}");
-                bool wantMelee = ph != "2R";   // Toll Tide + its rewound tide never reach a player hugging the boss (recorded)
-                if (ph[0] != '4' && (!got[1] || (wantMelee && !got[0]))) threatOk = false;   // 4x: the Stopped Hour's own rules decide (noted)
+                // every phrase threatens both (2R: the rewound tide is the inner disc)
+                if (!got[0] || !got[1]) threatOk = false;
             }
-            Check("Hand: phrases 1-3 hit a still ranged player, and all but 2R also a still melee player (4x noted)", threatOk, string.Join(" · ", threat));
+            Check("Hand: every phrase hits a still melee player and a still ranged player (10 m)", threatOk, string.Join(" · ", threat));
 
             // ---- boss death mid-phrase cancels everything ----
             foreach (var ph in new[] { "3R", "4R" })
@@ -186,7 +196,7 @@ namespace LastBell.Run
             Check("Hand in P4: block 3 (after two replays and punishes), moves at 7.0 and 9.5 s", hand.Casts == 1 && hand.Cue.Phase == 4 && hand.SecondAt - hand.LastCastTick == Sim.Ticks(9.5f),
                   $"at {(hand.LastCastTick - tp4) / 60f:0.0}s {hand.Cue}");
             UltStepAlive(Sim.Ticks(9.6f));
-            Check("Hand in P4: move 2 drawn 2.0 s before 9.5 s", handSpawns.Where(s => hand.Second.Contains(s.h)).All(s => s.tick == hand.SecondAt - ConductorsHand.TellTicks) && hand.Second.Count > 0);
+            Check("Hand in P4: move 2 drawn 1.5 s before 9.5 s", handSpawns.Where(s => hand.Second.Contains(s.h)).All(s => s.tick == hand.SecondAt - ConductorsHand.TellTicks) && hand.Second.Count > 0);
             yield return HandStart("P5");
             if (bk == null) yield break;
             BkPlace(d.Player, UltimateState.FissureNormal * -6f);
