@@ -319,6 +319,7 @@ namespace LastBell.Run
         {
             Source = source, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Vector3.zero, Radius = 99,
             LockAt = 0, ResolveAt = resolveAt, Damage = damage, Knockback = 0, Stun = 0,
+            Hidden = true,   // no arena-wide coral flash: the great bell's own effects show it
         };
         // ticks for ResolveAt so a hazard spawned now resolves `ticksFromNow` ticks later (a hazard resolves on its spawn tick
         // + ResolveAt − 1, because it ages on its spawn tick)
