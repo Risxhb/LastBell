@@ -387,6 +387,9 @@ namespace LastBell.Run
             // in the stop exists, those strikes are due at the stop tick, with the hiding rule (else they stay on their own
             // ticks: the documented forced hit)
             var freeze = Frozen(p);
+            // no clean hiding spot: the forced hit is coming, so be above it when you freeze (potions are locked while Stilled)
+            if (freeze.forced && Now <= freeze.stop)
+                into.Add(new BotDemand { Tick = freeze.stop, Since = LaunchTick, MinHp = ReplayDamage + 1, Memory = true, Why = "Ledger: forced hit in the stop, drink first", From = this });
             for (int k = 0; k < steps.Count; k++)
             {
                 var s = steps[k]; if (s.ResolveTick < Now) continue;
@@ -401,11 +404,12 @@ namespace LastBell.Run
         }
         // p's Stopped Hour freeze over this replay: (stop, resume) and a hiding spot clear of every strike in it, if one exists.
         // Checked with the Stopped Hour's own hiding rule (its Demands), once per player per replay.
-        readonly Dictionary<PlayerController, (bool ok, int stop, int resume, Vector3 spot)> frozen = new Dictionary<PlayerController, (bool, int, int, Vector3)>();
-        (bool ok, int stop, int resume, Vector3 spot) Frozen(PlayerController p)
+        readonly Dictionary<PlayerController, (bool ok, bool forced, int stop, int resume, Vector3 spot)> frozen = new Dictionary<PlayerController, (bool, bool, int, int, Vector3)>();
+        public readonly List<(int replay, PlayerController player)> ForcedLog = new List<(int, PlayerController)>();   // Stilled with no clean spot (tests)
+        (bool ok, bool forced, int stop, int resume, Vector3 spot) Frozen(PlayerController p)
         {
             if (frozen.TryGetValue(p, out var f)) return f;
-            f = (false, -1, -1, Vector3.zero);
+            f = (false, false, -1, -1, Vector3.zero);
             var sh = Boss.Mechanic<StoppedHour>();
             if (sh != null && sh.Running && sh.StopTick >= Now && sh.StilledPlayers.Contains(p) && grid != null)
             {
@@ -420,7 +424,8 @@ namespace LastBell.Run
                         if (!rule.Ok(q) || inStop.Any(s => s.Hits(q, SafePad))) continue;
                         float d2 = Sim.Flat(q - at).sqrMagnitude; if (d2 < best) { best = d2; pick = q; any = true; }
                     }
-                    f = (any, sh.StopTick, sh.ResumeTick, pick);
+                    f = (any, !any, sh.StopTick, sh.ResumeTick, pick);
+                    if (!any) ForcedLog.Add((LaunchTick, p));
                 }
             }
             if (sh != null && sh.Running && sh.StopTick >= 0) frozen[p] = f;   // known once the hourglass is up

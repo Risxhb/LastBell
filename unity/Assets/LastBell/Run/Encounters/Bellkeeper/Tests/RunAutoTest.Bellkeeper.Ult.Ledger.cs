@@ -324,10 +324,11 @@ namespace LastBell.Run
             // half hides inside V's half. Block 1's clock pairs lock between replayed strikes (7.75 / 10.75): nothing forced.
             int opposite = (LedgerMechanic.AuthoredStation + 2) % 4;
             string Page(BkHit h) => led.PageOf.TryGetValue(h.HazardId, out int pg) ? UltimateState.Roman[pg] : "?";
-            bool Forced(BkHit h) => Page(h) == "V" && h.Tick >= r2 && h.Tick <= r2 + Sim.Ticks(9) && stilled.Contains(h.Player) && bk.Ult.StationOf(h.Player) == opposite;
+            bool Forced(BkHit h) => Page(h) == "V" && h.Tick >= r2 && h.Tick <= r2 + Sim.Ticks(9) && led.ForcedLog.Any(x => x.replay == r2 && x.player == h.Player);
+            Note($"Ledger P4 N={n} block 2: no clean hiding spot (forced V) for {string.Join(", ", led.ForcedLog.Where(x => x.replay == r2).Select(x => x.player.name + " " + UltimateState.StationNames[Math.Max(0, bk.Ult.StationOf(x.player))]))}; opposite station = {UltimateState.StationNames[opposite]}");
             var hits = bkHits.Where(h => h.Source == LedgerMechanic.ReplaySource).ToList();
             var unforced = hits.Where(h => !Forced(h)).ToList();
-            Check($"Ledger P4 N={n}: strat bots at 4.2 m/s survive all three replays; the only hits are the documented forced V (block 2, Stilled, opposite station; at most one each)",
+            Check($"Ledger P4 N={n}: strat bots at 4.2 m/s survive all three replays; the only hits are the documented forced V (block 2, Stilled with no clean hiding spot; at most one each)",
                   unforced.Count == 0 && hits.GroupBy(h => h.Player).All(g => g.Count() <= 1) && d.World.Players.All(p => !p.Down),
                   hits.Count == 0 ? "untouched" : string.Join(", ", hits.Select(h => $"{h.Player.name} {Page(h)}@{(h.Tick - tp4) / 60f:0.00}{(Forced(h) ? " forced" : "")}")));
             LedgerUnbot();
