@@ -269,15 +269,16 @@ namespace LastBell.Run
                 switch (Fingers)
                 {
                     case 1:
-                        into.Add(new BotDemand { Tick = FirstAt, Since = since, Ok = q => !leanProbe.Contains(q), Hint = SafeHalfHint(pos), Memory = true, Why = "phrase: Leaning Bell", From = this });
+                        into.Add(new BotDemand { Tick = FirstAt, Since = since, Ok = q => Clear(leanProbe, q), Hint = SafeHalfHint(pos), Memory = true, Why = "phrase: Leaning Bell", From = this });
                         break;
                     case 2:
-                        into.Add(new BotDemand { Tick = FirstAt, Since = since, Ok = q => !tideProbe.Contains(q), Hint = tideHint, Memory = true, Why = "phrase: Toll Tide", From = this });
+                        into.Add(new BotDemand { Tick = FirstAt, Since = since, Ok = q => Clear(tideProbe, q), Hint = tideHint, Memory = true, Why = "phrase: Toll Tide", From = this });
                         break;
                     case 3:
-                        if (partySize >= 2)
-                            into.Add(new BotDemand { Tick = FirstAt, Since = since, Ok = q => Vector3.Dot(Sim.Flat(q - Boss.transform.position), LeanDir) >= GatherDepth,
-                                Hint = bp + LeanDir * 5f, Memory = true, Why = "phrase: Reflection (gather)", From = this });
+                        // gather on the party's side (co-op); clear of the images once drawn (solo: your own spot's image too)
+                        into.Add(new BotDemand { Tick = FirstAt, Since = since,
+                            Ok = q => First.All(h => Clear(h, q)) && (partySize < 2 || Vector3.Dot(Sim.Flat(q - Boss.transform.position), LeanDir) >= GatherDepth),
+                            Hint = partySize < 2 ? pos : bp + LeanDir * 5f, Memory = true, Why = "phrase: Reflection (gather)", From = this });
                         break;
                 }
             }
@@ -291,21 +292,29 @@ namespace LastBell.Run
             switch (Fingers)
             {
                 case 1:
-                    into.Add(new BotDemand { Tick = SecondAt, Since = since, Ok = q => !leanProbe.Contains(q), Hint = SafeHalfHint(pos), Memory = true, Why = "phrase: rewound Leaning Bell", From = this });
+                    into.Add(new BotDemand { Tick = SecondAt, Since = since, Ok = q => Clear(leanProbe, q), Hint = SafeHalfHint(pos), Memory = true, Why = "phrase: rewound Leaning Bell", From = this });
                     break;
                 case 2:
-                    into.Add(new BotDemand { Tick = SecondAt, Since = since, Ok = q => !tideProbe.Contains(q), Hint = tideHint, Memory = true, Why = "phrase: rewound Toll Tide", From = this });
+                    into.Add(new BotDemand { Tick = SecondAt, Since = since, Ok = q => Clear(tideProbe, q), Hint = tideHint, Memory = true, Why = "phrase: rewound Toll Tide", From = this });
                     break;
                 case 3:
                     into.Add(new BotDemand { Tick = SecondAt, Since = since,
-                        Ok = q => First.All(h => !h.Contains(q)) && (partySize < 2 || Vector3.Dot(Sim.Flat(q - Boss.transform.position), LeanDir) >= GatherDepth),
+                        Ok = q => First.All(h => Clear(h, q)) && (partySize < 2 || Vector3.Dot(Sim.Flat(q - Boss.transform.position), LeanDir) >= GatherDepth),
                         Hint = partySize < 2 ? pos : bp + LeanDir * 5f, Memory = true, Why = "phrase: rewound Reflection", From = this });
                     break;
                 case 4:
-                    into.Add(new BotDemand { Tick = SecondAt, Since = since, Ok = q => stopLanes.All(l => l.Cancelled || !PlainLane(l.Origin, l.Yaw, l.Length, l.Width).Contains(q)),
+                    into.Add(new BotDemand { Tick = SecondAt, Since = since, Ok = q => Second.Count > 0 ? Second.All(l => Clear(l, q)) : stopLanes.All(l => l.Cancelled || Clear(PlainLane(l.Origin, l.Yaw, l.Length, l.Width), q)),
                         Hint = pos, Memory = true, Why = "phrase: rewound chains", From = this });
                     break;
             }
+        }
+        // outside h with a 0.3 m step to spare (the bot stops up to 0.08 m short of a target on a shape's edge)
+        const float ClearMargin = 0.3f;
+        static bool Clear(Hazard h, Vector3 q)
+        {
+            if (h.Contains(q)) return false;
+            for (int k = 0; k < 8; k++) if (h.Contains(q + Sim.Dir(45 * k) * ClearMargin)) return false;
+            return true;
         }
         // the reader's spot for a Leaning half: across the line, at least 2.5 m into the safe half
         Vector3 SafeHalfHint(Vector3 pos)
@@ -336,7 +345,7 @@ namespace LastBell.Run
             readonly Transform hand, rod, bob;
             readonly List<Transform> marks = new List<Transform>();
             readonly bool right;
-            const float HandHeight = 6.4f, Side = 2.7f, RodLength = 2.4f, PivotHeight = 8.2f, SwingDeg = 42f;
+            const float HandHeight = 1.2f, Side = 2.3f, Front = 3.6f, RodLength = 1.7f, PivotHeight = 3.0f, SwingDeg = 42f;   // low and in front of the boss: on screen when he is at the top edge
             public bool Alive => root;
             public int Marks => marks.Count(m => m);
 
@@ -380,11 +389,14 @@ namespace LastBell.Run
                 var cam = Camera.main;
                 var fwd = cam ? Sim.Flat(cam.transform.forward).normalized : Vector3.back; if (fwd.sqrMagnitude < 0.5f) fwd = Vector3.back;
                 var scr = Vector3.Cross(Vector3.up, fwd);   // screen right, on the floor
-                var face = Quaternion.LookRotation(-fwd);
+                // billboard toward the camera: fingers point screen-up, the pendulum swings in the screen plane
+                var camUp = cam ? cam.transform.up : Vector3.up;
+                var camRight = cam ? cam.transform.right : scr;
+                var face = cam ? Quaternion.LookRotation(-cam.transform.forward, camUp) : Quaternion.LookRotation(-fwd);
                 boss = Sim.Flat(boss);
                 // the hand rises over 0.5 s and holds; a Leaning Bell phrase leans it toward the hit half
                 float rise = Mathf.SmoothStep(0, 1, Mathf.Clamp01(tick / 30f));
-                var at = boss - scr * Side + Vector3.up * Mathf.Lerp(3.2f, HandHeight, rise);
+                var at = boss - fwd * Front - scr * Side + Vector3.up * Mathf.Lerp(0.4f, HandHeight, rise);
                 var tilt = Quaternion.identity;
                 if (lean.sqrMagnitude > 0.5f) { at += lean * 1.4f * rise; tilt = Quaternion.AngleAxis(24f * rise, Vector3.Cross(Vector3.up, lean)); }
                 hand.SetPositionAndRotation(at, tilt * face);
@@ -392,9 +404,9 @@ namespace LastBell.Run
                 // the pendulum swings out from 0.3 s, eases over 0.5 s, then holds with a faint tremble
                 float u = Mathf.SmoothStep(0, 1, Mathf.Clamp01((tick - 18) / 30f));
                 float deg = (right ? 1 : -1) * SwingDeg * u + 2f * Mathf.Sin(tick * 0.21f) * u;
-                var pivot = boss + scr * Side + Vector3.up * PivotHeight;
+                var pivot = boss - fwd * Front + scr * Side + Vector3.up * PivotHeight;
                 float a = deg * Mathf.Deg2Rad;
-                var down = -Vector3.up * Mathf.Cos(a) + scr * Mathf.Sin(a);
+                var down = -camUp * Mathf.Cos(a) + camRight * Mathf.Sin(a);
                 var tip = pivot + down * RodLength;
                 rod.position = (pivot + tip) / 2; rod.rotation = Quaternion.FromToRotation(Vector3.up, -down);
                 bob.position = tip;

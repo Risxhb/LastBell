@@ -19,6 +19,8 @@ namespace LastBell.Run
             yield return UltStart(null, segment);
             hand = bk != null ? bk.Mechanic<ConductorsHand>() : null;
             handSpawns.Clear();
+            // launched by hand: the scheduler runs with no plan; a segment start is plan-driven (BeginCombat by the check)
+            if (bk != null) { if (segment == null) UltManual(); else bk.ManualPlan = false; }
             if (bk != null && bk != handSub) { handSub = bk; bk.HazardSpawned += (a, h) => { if (a == hand) handSpawns.Add((d.World.Tick, h)); }; }
         }
         UltCue HandCue(string phrase, float a = 7f, float b = 8.5f, int phase = 2) => new UltCue { Variant = "phrase:" + phrase, At = new[] { a, b }, Phase = phase, Seed = 3 };
@@ -90,15 +92,24 @@ namespace LastBell.Run
                     yield return HandStart();
                     if (bk == null) yield break;
                     var party = HandParty(n);
-                    for (int i = 0; i < n; i++) { var b = UltimateParty.Drive(party[i], i, n); b.Speed = 4.2f; b.Attacks = false; }
+                    var bots = new List<UltimateBot>();
+                    for (int i = 0; i < n; i++) { var b = UltimateParty.Drive(party[i], i, n); b.Speed = 4.2f; b.Attacks = false; bots.Add(b); }
                     bk.UltLaunch(hand, HandCue(ph));
-                    int end = d.World.Tick + Sim.Ticks(8.5f) + 3;
-                    while (d.World.Tick < end) { BkStep(1); foreach (var p in party) minStamina = Mathf.Min(minStamina, p.Stamina); }
+                    int L0 = hand.LastCastTick, end = d.World.Tick + Sim.Ticks(8.5f) + 3; string why = null;
+                    var trace = new List<string>();
+                    while (d.World.Tick < end)
+                    {
+                        int before = bkHits.Count;
+                        BkStep(1);
+                        foreach (var p in party) minStamina = Mathf.Min(minStamina, p.Stamina);
+                        if ((d.World.Tick - L0) % 60 == 0) trace.Add($"{(d.World.Tick - L0) / 60}s({party[0].transform.position.x:0.0},{party[0].transform.position.z:0.0})");
+                        if (why == null && bkHits.Count > before) { var hb = bkHits[before]; int k = party.IndexOf(hb.Player); why = $"@{(hb.Tick - L0) / 60f:0.00}s p{k} at ({hb.Player.transform.position.x:0.0},{hb.Player.transform.position.z:0.0}) bot: {(k >= 0 ? bots[k].DebugLine : "-")} trace {string.Join(" ", trace)}"; }
+                    }
                     routes++;
                     int hits = party.Sum(p => HandHitsOn(p));
                     lethalHits += bkHits.Count(x => x.Damage >= UltimateState.Lethal && handSpawns.Any(s => s.h.Id == x.HazardId));
                     cracked |= bk.Ult.CrackedCount > 0; wiped |= bk.Ult.Wipes > 0;
-                    if (hits > 0 || party.Any(p => p.Down)) { routeFails++; failed.Add($"N{n} {ph}: {hits} hits{(party.Any(p => p.Down) ? ", down" : "")} [{bkHits.FirstOrDefault().Source}]"); }
+                    if (hits > 0 || party.Any(p => p.Down)) { routeFails++; failed.Add($"N{n} {ph}: {hits} hits{(party.Any(p => p.Down) ? ", down" : "")} [{bkHits.FirstOrDefault().Source}]"); Note($"  route N{n} {ph}: {why}"); }
                 }
             Check("Hand: the phrase-reading route clears every phrase from the far wall at 4.2 m/s with finite stamina, N = 1/2/4/8 (strat bots)",
                   routeFails == 0, $"{routes - routeFails}/{routes} clean, stamina min {minStamina:0}{(failed.Count > 0 ? " · " + string.Join("; ", failed.Take(6)) : "")}");
@@ -188,7 +199,7 @@ namespace LastBell.Run
             yield return UltStart(UltimateMechanics.ConductorsHand);
             if (bk == null) yield break;
             hand = bk.Mechanic<ConductorsHand>();
-            bk.BeginCombat();
+            bk.ManualPlan = false; bk.BeginCombat();
             var seen = new List<string>();
             for (int i = 0; i < Sim.Ticks(24f) && seen.Count < 2; i++) { UltStepAlive(1); if (hand.Running && (seen.Count == 0 || hand.Casts > seen.Count) && hand.Phrase != "") seen.Add(hand.Phrase); }
             Check("Hand practice hook: loops, one phrase after another (1L, then 2R)", bk.PracticeAbility == hand && seen.Count == 2 && seen[0] == "1L" && seen[1] == "2R", string.Join(" ", seen));
