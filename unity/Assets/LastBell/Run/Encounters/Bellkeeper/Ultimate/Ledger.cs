@@ -23,6 +23,10 @@ namespace LastBell.Run
     // Hardened beyond §3.3 (Chzy18 2026-10-23, "add and replace abilities as you see fit"): coral 1.2 s instead of 1.5 s.
     // The strikes stay 1.5 s apart, so a party that pre-positions from memory loses nothing; a party that only reacts
     // to coral gets 5.0 m + one dash instead of 6.3 m + one dash per strike.
+    // A messy P1 costs (Ultimate session, 2026-10-23): images that weren't clumped (some image more than 4 m from their
+    // centre; solo never counts) replay with radius x 1.5 ("the ink runs"), and Leaning Bells that struck opposite halves
+    // (more than 90° apart) replay back to back: V moves to 0.75 s before I, so the line is crossed in 0.75 s. A clean
+    // P1 replays exactly as recorded. Both stay solvable from memory (LEDGER.md proof; checked in code by Solve()).
     // Look: P1 the left hand writes on the air (clip WriteLedger) at each kept strike; P4 the halo spins backwards
     // (TurnLedger). Neither clip exists yet (rig list); the outlines, numerals and clock glyphs are code-built stand-ins.
     public sealed class LedgerMechanic : UltimateMechanic
@@ -34,6 +38,7 @@ namespace LastBell.Run
         public const int Pages = 6, ReplayDamage = UltShapes.HeavyDamage;
         public const int WarnTicks = 72;                      // coral 1.2 s before each replayed strike (hardened from 1.5 s)
         public const float Spacing = 1.5f;                    // replayed strikes VI -> I, 1.5 s apart
+        public const float SplitGap = 0.75f, SpreadScale = 1.5f, ClumpRadius = 4f;   // messy-P1 costs (see Replay)
         public const int OutlineTicks = 120;                  // a kept P1 footprint shows for 2 s
         public const float RecordWindow = 40f;                // the recorder gives up this long after "record" (P1 never needs it)
         public const float WalkSpeed = 4.2f, HopSeconds = 1.5f, ShortHop = 2.5f;   // the escape proof's numbers (LEDGER.md)
@@ -47,13 +52,14 @@ namespace LastBell.Run
             public int Numeral;                                // 1..6 = I..VI
             public string Source;
             public int Tick;                                   // world tick it resolved in P1 (authored ledger: its replay's launch)
+            public int Party = 1;                              // standing players when it was recorded (images: one per player)
             public readonly List<UltimateState.Footprint> Prints = new List<UltimateState.Footprint>();
             public string Roman => UltimateState.Roman[Numeral];
         }
         // One replayed strike, for the bots and tests: resolves on ResolveTick; Probes = the shapes it will strike (unspawned).
         public sealed class Step
         {
-            public Page Page; public int ResolveTick, SpawnTick; public bool Spawned;
+            public Page Page; public int ResolveTick, SpawnTick; public bool Spawned; public float Scale = 1f;
             public readonly List<Hazard> Probes = new List<Hazard>();
             public readonly List<Hazard> Live = new List<Hazard>();
             public bool Hits(Vector3 q, float pad = 0)
@@ -75,6 +81,8 @@ namespace LastBell.Run
         public IReadOnlyList<Step> Upcoming => steps;        // the current replay's strikes, VI first
         public bool IsRecording => recording;
         public int MarksShown => marks.Count;                // live outlines and numerals (0 after a cancel)
+        public bool SpreadImages { get; private set; }       // this replay: P1 images weren't clumped, they run x 1.5
+        public bool SplitHalves { get; private set; }        // this replay: P1 halves were opposite, V strikes 0.75 s before I
         public bool RouteExists { get; private set; }        // the current replay has a walking route (LEDGER.md proof)
         public float RouteLongestHop { get; private set; }
 
@@ -111,7 +119,7 @@ namespace LastBell.Run
             if (page == null)
             {
                 if (take.Count >= Pages) return;
-                page = new Page { Numeral = take.Count + 1, Source = f.Source, Tick = f.Tick };
+                page = new Page { Numeral = take.Count + 1, Source = f.Source, Tick = f.Tick, Party = Mathf.Max(1, StandingCount) };
                 take.Add(page);
                 if (Boss.Presenter) Boss.Presenter.PlayOnce("WriteLedger", 0.9f);
             }
@@ -133,14 +141,22 @@ namespace LastBell.Run
             Book = BookForReplay(out bool authored); UsedAuthored = authored;
             steps.Clear(); routes.Clear(); grid = null;
             float at0 = Cue.At0(4f);
+            // the messy-P1 costs (Ultimate session 2026-10-23): unclumped images run (radius x 1.5), and Leaning Bells that
+            // struck opposite halves replay back to back (V 0.75 s before I, in the slot just before I's)
+            SpreadImages = !Clumped(Book.FirstOrDefault(p => p.Source == ImageSource));
+            var leans = Book.Where(p => p.Source == UltShapes.LeanSource).ToList();
+            SplitHalves = leans.Count >= 2 && Vector3.Angle(Sim.Dir(leans[0].Prints[0].Yaw), Sim.Dir(leans[leans.Count - 1].Prints[0].Yaw)) > 90f;
             for (int k = 0; k < Book.Count; k++)
             {
                 var page = Book[Book.Count - 1 - k];   // VI first
-                int resolve = TickAt(at0 + Spacing * k);
-                var s = new Step { Page = page, ResolveTick = resolve, SpawnTick = Mathf.Max(LaunchTick, resolve - WarnTicks) };
-                foreach (var f in page.Prints) s.Probes.Add(Copy(f, 1));
+                float at = at0 + Spacing * k;
+                if (SplitHalves && page == leans[leans.Count - 1]) at = at0 + Spacing * (Book.Count - 1) - SplitGap;
+                int resolve = TickAt(at);
+                var s = new Step { Page = page, ResolveTick = resolve, SpawnTick = Mathf.Max(LaunchTick, resolve - WarnTicks), Scale = SpreadImages && page.Source == ImageSource ? SpreadScale : 1f };
+                foreach (var f in page.Prints) s.Probes.Add(Copy(f, 1, s.Scale));
                 steps.Add(s);
             }
+            steps.Sort((a, b) => a.ResolveTick.CompareTo(b.ResolveTick));
             if (Boss.Presenter) Boss.Presenter.PlayOnce("TurnLedger", Mathf.Max(1, steps[steps.Count - 1].ResolveTick - Now) / (float)Sim.Hz);
             Solve();
             int end = steps[steps.Count - 1].ResolveTick;
@@ -152,7 +168,7 @@ namespace LastBell.Run
                     s.Spawned = true;
                     foreach (var f in s.Page.Prints)
                     {
-                        var h = Spawn(Copy(f, UltShapes.ResolveIn(s.ResolveTick - Now)));
+                        var h = Spawn(Copy(f, UltShapes.ResolveIn(s.ResolveTick - Now), s.Scale));
                         h.OnResolve = Resolved;
                         s.Live.Add(h);
                         ShowMark(f, s.Page.Numeral, null, s.ResolveTick + 1);
@@ -166,10 +182,19 @@ namespace LastBell.Run
             yield return 30;   // the halo settles; nothing damaging
             ClearMarks();
         }
-        // a live copy of a recorded footprint: same shape and place, the replay's damage, the move's own push
-        static Hazard Copy(UltimateState.Footprint f, int resolveAt)
+        // P1's images were clumped: every mirrored image within ClumpRadius of their centre (one player can't scatter them)
+        public static bool Clumped(Page images)
+        {
+            if (images == null || images.Party <= 1 || images.Prints.Count <= 1) return true;
+            var c = Vector3.zero; foreach (var f in images.Prints) c += Sim.Flat(f.Origin); c /= images.Prints.Count;
+            return images.Prints.All(f => Sim.Flat(f.Origin - c).magnitude <= ClumpRadius);
+        }
+        // a live copy of a recorded footprint: same shape and place (an unclumped image runs: radius x scale), the
+        // replay's damage, the move's own push
+        static Hazard Copy(UltimateState.Footprint f, int resolveAt, float scale = 1f)
         {
             var h = f.ToHazard(ReplaySource, resolveAt, ReplayDamage);
+            if (h.Shape == HazardShape.Circle) h.Radius *= scale;
             h.Knockback = f.Source == UltShapes.TideSource ? -TollTideAbility.Push : 1.5f;   // the tide still pushes inward
             h.Stun = 15;
             return h;
@@ -210,7 +235,7 @@ namespace LastBell.Run
             var book = new List<Page>();
             void Add(string source, params Hazard[] hs)
             {
-                var p = new Page { Numeral = book.Count + 1, Source = source, Tick = tick };
+                var p = new Page { Numeral = book.Count + 1, Source = source, Tick = tick, Party = n };
                 foreach (var h in hs) p.Prints.Add(UltimateState.Footprint.Of(h, tick, UltimateState.Roman[p.Numeral]));
                 book.Add(p);
             }
@@ -234,7 +259,7 @@ namespace LastBell.Run
 
         // ---------------- the escape proof in code: a walking route through the replay ----------------
         // Grid 0.6 m over the floor (clear of the boss's body). A spot is safe for a strike if it is 0.25 m clear of every
-        // footprint. Consecutive spots may be at most HopSeconds x WalkSpeed apart (6.3 m in 1.5 s at 4.2 m/s, no dash);
+        // footprint. Consecutive spots may be at most (gap − 0.1 s) x WalkSpeed apart (5.9 m in 1.5 s, 2.7 m in 0.75 s, no dash);
         // hops over ShortHop (2.5 m) cost extra, so the route prefers the guide's short steps. Solved once per replay,
         // backwards; each player's route starts from where they stand.
         List<Vector3> grid; List<int>[] safe, reach; float[][] togo; int[][] nextOf;
@@ -251,7 +276,7 @@ namespace LastBell.Run
                     var q = new Vector3(x, 0, z);
                     if (CombatWorld.InPlayerBound(q, -0.4f) && Sim.Flat(q - bp).magnitude >= body) grid.Add(q);
                 }
-            int n = steps.Count, g = grid.Count; float hop = HopSeconds * WalkSpeed, hop2 = hop * hop;
+            int n = steps.Count, g = grid.Count;
             safe = new List<int>[n]; reach = new List<int>[n]; togo = new float[n][]; nextOf = new int[n][];
             for (int k = 0; k < n; k++)
             {
@@ -264,6 +289,8 @@ namespace LastBell.Run
             foreach (var i in safe[n - 1]) { togo[n - 1][i] = 0; reach[n - 1].Add(i); }
             for (int k = n - 2; k >= 0; k--)
             {
+                // this hop's walking budget: the time to the next strike (1.5 s, or 0.75 s for split halves) less 0.1 s, at 4.2 m/s
+                float hop = Mathf.Max(0, (steps[k + 1].ResolveTick - steps[k].ResolveTick) / (float)Sim.Hz - 0.1f) * WalkSpeed, hop2 = hop * hop;
                 foreach (var i in safe[k])
                 {
                     float best = float.PositiveInfinity; int arg = -1; var a = grid[i];
