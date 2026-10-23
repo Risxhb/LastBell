@@ -94,7 +94,7 @@ namespace LastBell.Run
             {
                 var to = Sim.Flat(target - pos); float dist = to.magnitude;
                 float left = rules.Count > 0 ? (rules[0].Tick - now) / (float)Sim.Hz : 9;
-                if (dist > 0.08f)
+                if (dist > 0.02f)
                 {
                     move = to / dist * Mathf.Clamp01(dist / (Speed * Sim.Dt)) * Mathf.Clamp01(Speed / PlayerController.WalkSpeed);
                     if (UseDash && !me.Dashing && me.Stamina >= PlayerController.DashCost && dist > 1.2f && dist / Speed > left - 0.25f) { inp.Dash = true; move = to / dist; }
