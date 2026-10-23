@@ -25,8 +25,10 @@ Written the way Ultimate guides are: what each mechanic wants from **you**, by y
 - **Solo:** you're always Stilled. Hide every time. In P3 and P5 the resume also brings Reflection, whose solo image lands on your own frozen spot: 40 you can't avoid. Enter those resumes above 40 HP (drink before the hourglass).
 
 ## The Ledger (P1 → P4)
-- **P1:** decide what you record. Make both Leaning Bells strike the **same** half (stand together on that half at the cast), and keep Reflection images clumped on one side.
-- **P4:** the replay comes **VI → I**, 1.5 s apart. Memorise P1's order as six words (e.g. "West, band, centre, clump, West, centre") and recite it backwards. For two opposite halves in a row: stand 1 m on the safe side of the line for the first, then step 2 m across.
+- **P1:** decide what you record. The ledger half is the side of **clock III's station**: Leaning Bell V leans there anyway. At Leaning Bell I's cast (5 s), everyone stands together about 5 m out on that half, so it falls there too. At Reflection's lock (17 s), everyone whose clock isn't striking then clumps on one spot (that striker's spot), so the images clump.
+- **A messy P1 costs:** if the two halves fell on opposite sides, P4 plays them **back to back, 0.75 s apart** (V moves to just before I). If the images were scattered (any image more than 4 m from their centre), they replay **half again as wide**.
+- **P4:** the replay comes **VI → I**, 1.5 s apart, each coral only **1.2 s** before it strikes. Memorise P1's order as six words (e.g. "West, band, centre, clump, West, centre") and recite it backwards. For opposite halves back to back: stand 1 m on the safe side of the line for V, then step 2 m across for I.
+- **P4 block 2 (Stopped Hour resumes on III):** if your clock station is on the side **opposite** the ledger half, your hiding strip is inside replayed V (on a clean ledger; a split ledger moves V after the stop). Take the 60 to avoid the lash, so **enter above 60 HP** (potion before the hourglass). No reflections in stopped time: the images page (IV) does not replay during the stop.
 
 ## Backwards Bell (P2)
 - A, B, C strike, then the rewinds C, B, A, and **each rewind strikes everywhere its original didn't**. Right after A lands, walk onto **A's** half and stay inside 6.4 m. After C, step out past 7.4 m (the tide's copy is the inner disc). Then walk straight in to within 3.6 m of the boss (the Heart Toll's copy is everything outside it). Hold that half for A's copy, or step to your clock spot: it's on that half. Each rewind is 40.

@@ -33,6 +33,7 @@ namespace LastBell.Run
             yield return LedgerMessyChecks();
             yield return LedgerP4PracticeChecks(1);
             yield return LedgerP4PracticeChecks(8);
+            yield return LedgerPageOnceChecks();
             yield return LedgerCancelChecks();
             yield return LedgerPracticeHookChecks();
             BellkeeperEncounter.PushTimersOn = true;
@@ -102,15 +103,18 @@ namespace LastBell.Run
             int t0 = d.World.Tick;
             bk.UltLaunch(led, new UltCue { Variant = "replay", At = new[] { at0 } });
             ledStillArea = LedgerStillArea();
+            ledSteps = led.Upcoming.ToList();
             BkStepUntil(() => !led.Running, Sim.Ticks(at0 + 10));
             return t0;
         }
         // the gate, measured: floor area (m²) safe from V, IV and III at once (where a player frozen from V to III, as the
         // Stopped Hour does in P4 block 2, can stand), outside the boss's body
         float ledStillArea;
+        List<LedgerMechanic.Step> ledSteps = new List<LedgerMechanic.Step>();
+        LedgerMechanic.Step LedStep(int numeral) => ledSteps.FirstOrDefault(s => s.Page.Numeral == numeral);
         float LedgerStillArea()
         {
-            var s = led.Upcoming; if (s.Count < 4) return 0;
+            var s = led.Upcoming.OrderByDescending(x => x.Page.Numeral).ToList(); if (s.Count < 4) return 0;
             int n = 0; const float g = 0.5f;
             for (float x = -13; x <= 13; x += g) for (float z = -13; z <= 13; z += g)
             {
@@ -221,6 +225,8 @@ namespace LastBell.Run
             LedgerBots(i => n == 1 ? LedDir1 * 12f : Sim.Dir(360f * i / n + 20) * 8f);
             LedgerReplay();
             Note($"Ledger N={n} clean: {ledStillArea:0} m² safe from V, IV and III at once (a Stilled spot in P4 block 2)");
+            Check($"Ledger N={n}: a clean P1 replays exactly (no running images, halves 1.5 s apart)", !led.SpreadImages && !led.SplitHalves && LedStep(1) != null
+                  && LedStep(1).ResolveTick - LedStep(5).ResolveTick == Sim.Ticks(4 * LedgerMechanic.Spacing) && LedStep(4).Scale == 1f);
             Check($"Ledger N={n}: the strat bots (4.2 m/s, memory) clear a clean replay untouched", LedgerHits() == 0 && d.World.Players.All(p => !p.Down),
                   string.Join(", ", bkHits.Where(h => h.Source == LedgerMechanic.ReplaySource).Select(h => $"{h.Player.name}@{h.Tick}")));
             LedgerUnbot();
@@ -244,20 +250,37 @@ namespace LastBell.Run
             LedgerBots(i => Sim.Dir(360f * i / 4 + 110) * 8f);
             LedgerReplay();
             Check("Ledger strat: the bots' own P1 records a P4 they clear (some P1 play always records a solvable P4)",
-                  led.RouteExists && LedgerHits() == 0 && d.World.Players.All(p => !p.Down), $"route {led.RouteExists}, hop {led.RouteLongestHop:0.0} m, {LedgerHits()} hits");
+                  led.RouteExists && LedgerHits() == 0 && d.World.Players.All(p => !p.Down) && !led.SpreadImages && !led.SplitHalves,
+                  $"route {led.RouteExists}, hop {led.RouteLongestHop:0.0} m, {LedgerHits()} hits, spread {led.SpreadImages}, split {led.SplitHalves}");
             LedgerUnbot();
         }
 
-        // ---------------- a messy P1: opposite halves, images spread ----------------
+        // ---------------- a messy P1 costs: opposite halves replay 0.75 s apart, scattered images run x 1.5; still survivable from memory ----------------
         IEnumerator LedgerMessyChecks()
         {
-            yield return LedgerStartHeld(4);
-            if (bk == null) yield break;
-            LedgerRecord(LedDir1, -LedDir1, (i, t) => t >= 900 && t <= 1140 ? Sim.Dir(LedYaw1 + 45 + 90 * i) * 6f : (Vector3?)(Sim.Dir(LedYaw1 + 90 + 20 * i) * 5f));
-            bkHits.Clear();
-            LedgerBots(i => Sim.Dir(360f * i / 4 + 20) * 8f);
-            LedgerReplay();
-            Note($"Ledger messy P1 (opposite halves, images spread): route {(led.RouteExists ? $"exists, longest hop {led.RouteLongestHop:0.0} m" : "none")}; strat bots took {LedgerHits()} replay hits; {ledStillArea:0} m² safe from V, IV and III at once");
+            foreach (int n in new[] { 4, 1, 8 })
+            {
+                yield return LedgerStartHeld(n);
+                if (bk == null) yield break;
+                LedgerRecord(LedDir1, -LedDir1, (i, t) => t >= 900 && t <= 1140 ? Sim.Dir(LedYaw1 + 45 + 360f / n * i) * 6f : (Vector3?)(Sim.Dir(LedYaw1 + 90 + 20 * i) * 5f));
+                var pages = led.Recorded;
+                bkHits.Clear();
+                LedgerBots(i => Sim.Dir(360f * i / n + 20) * 8f);
+                LedgerReplay();
+                var v = LedStep(5); var one = LedStep(1); var img = LedStep(4);
+                Note($"Ledger messy P1 N={n} (opposite halves, images scattered): route {(led.RouteExists ? $"exists, longest hop {led.RouteLongestHop:0.0} m" : "none")}; {ledStillArea:0} m² safe from V, IV and III at once");
+                Check($"Ledger messy N={n}: opposite halves replay back to back (V 0.75 s before I, nothing else moves)",
+                      led.SplitHalves && v != null && one != null && one.ResolveTick - v.ResolveTick == Sim.Ticks(LedgerMechanic.SplitGap)
+                      && LedStep(6).ResolveTick + Sim.Ticks(5 * LedgerMechanic.Spacing) == one.ResolveTick && LedStep(3).ResolveTick - LedStep(6).ResolveTick == Sim.Ticks(3 * LedgerMechanic.Spacing),
+                      v == null ? "-" : $"V {(v.ResolveTick - LedStep(6).ResolveTick) / 60f:0.00} s, I {(one.ResolveTick - LedStep(6).ResolveTick) / 60f:0.00} s after VI");
+                bool spreadOk = n == 1 ? !led.SpreadImages && img.Scale == 1f
+                                       : led.SpreadImages && img.Probes.Zip(pages[3].Prints, (h, f) => Mathf.Abs(h.Radius - f.Radius * LedgerMechanic.SpreadScale) < 1e-3f && (h.Origin - f.Origin).sqrMagnitude < 1e-6f).All(x => x);
+                Check($"Ledger messy N={n}: {(n == 1 ? "solo images never count as scattered" : "scattered images replay where they were, radius x 1.5")}", spreadOk, $"spread {led.SpreadImages}");
+                Check($"Ledger messy N={n}: still survivable from memory (a walking route exists; strat bots at 4.2 m/s take no hits)",
+                      led.RouteExists && LedgerHits() == 0 && d.World.Players.All(p => !p.Down),
+                      $"route {led.RouteExists}, longest hop {led.RouteLongestHop:0.0} m, hits {string.Join(", ", bkHits.Where(h => h.Source == LedgerMechanic.ReplaySource).Select(h => $"{h.Player.name}@{(h.Tick - LedStep(6).ResolveTick) / 60f + 4:0.00}"))}");
+                LedgerUnbot();
+            }
             float coralOnly = LedgerMechanic.WarnTicks / 60f * LedgerMechanic.WalkSpeed + PlayerController.DashDistance;
             Check("Ledger: without memory, coral alone (1.2 s at 4.2 m/s + one dash) can't cross a replayed half from its far wall",
                   CombatWorld.PlayerBound + Hazard.Margin > coralOnly + 0.5f, $"{CombatWorld.PlayerBound + Hazard.Margin:0.0} m needed, {coralOnly:0.0} m possible");
@@ -273,6 +296,9 @@ namespace LastBell.Run
             UltimateParty.Fill(d.World, n);
             LedgerBots(i => Sim.Dir(360f * i / n + 20) * 7f);
             bkHits.Clear();
+            var where = new List<(int tick, string what)>();
+            Action<PlayerController, Hazard, int> spy = (p, h, dmg) => { if (h.Source == LedgerMechanic.ReplaySource) where.Add((d.World.Tick, $"{p.name} {(led.PageOf.TryGetValue(h.Id, out int pg) ? UltimateState.Roman[pg] : "?")} at ({p.transform.position.x:0.0},{p.transform.position.z:0.0}) hp {p.Hp} · {(p.Input as UltimateBot)?.DebugLine}")); };
+            d.World.PlayerHit += spy;
             bk.BeginCombat(); BkStep(1);
             int tp4 = UltTick0();
             BkStepUntil(() => led.Casts > 0, 5);
@@ -280,16 +306,49 @@ namespace LastBell.Run
             var clean = led.Authored();
             Check($"Ledger P4 practice N={n}: nothing recorded = the authored clean ledger", bk.Segment == BellkeeperEncounter.UltSegment.P4 && led.UsedAuthored && book != null
                   && book.Select(p => p.Source).SequenceEqual(LedSources) && LedgerShapes(book).SequenceEqual(LedgerShapes(clean)) && book[3].Prints.Count == (n == 1 ? 2 : n));
-            BkStep(Sim.Ticks(n == 1 ? 51 : 14));
+            // block 2: the replay launches 0.5 s after the Stopped Hour; read what it held right after its launch
+            BkStepUntil(() => UltLaunchTick("ult_ledger", tp4, 1) > 0, Sim.Ticks(25));
+            var held = led.Held.Select(p => p.Roman + " " + p.Source).ToList();
+            var stilled = bk.Mechanic<StoppedHour>().StilledPlayers.ToList();
+            var clocks1 = bk.Mechanic<PendulumClocks>().Strikes.ToList();
+            var clockHours = clocks1.Select(s => $"{s.Owner.name} {UltimateState.Roman[s.Hour]}→{UltimateState.StationNames[s.Station]} @{(s.Tick - tp4) / 60f:0.00}").ToList();
+            BkStep(Sim.Ticks(51) - (d.World.Tick - tp4));
+            d.World.PlayerHit -= spy;
+            Note($"Ledger P4 N={n} block 1 clocks: {string.Join("; ", clockHours)} · ledger half NE · stilled in block 2: {string.Join(", ", stilled.Select(p => p.name + " " + UltimateState.StationNames[Math.Max(0, bk.Ult.StationOf(p))]))}");
+            if (where.Count > 0) Note($"Ledger P4 N={n} hits: {string.Join("; ", where.Select(w => $"@{(w.tick - tp4) / 60f:0.00} {w.what}"))}");
             int r1 = UltLaunchTick("ult_ledger", tp4, 0), r2 = UltLaunchTick("ult_ledger", tp4, 1), r3 = UltLaunchTick("ult_ledger", tp4, 2), sh = UltLaunchTick("ult_stopped_hour", tp4, 0);
-            if (n == 1)
-            {
-                Check("Ledger P4: three replays per loop at 0, 0.5 after the Stopped Hour, and with the Hand", r1 == tp4 && r2 > 0 && r3 > r2 && r2 - sh == Sim.Ticks(0.5f), $"{(r1 - tp4) / 60f:0.0}, {(r2 - tp4) / 60f:0.0}, {(r3 - tp4) / 60f:0.0} s");
-                Check("Ledger P4: block 2's III lands on the Stopped Hour's resume (9.0 s)", r2 + Sim.Ticks(4 + 1.5f * 3) == sh + Sim.Ticks(9));
-            }
-            Check($"Ledger P4 N={n}: strat bots at 4.2 m/s clear the authored replay{(n == 1 ? "s (all three)" : "")} untouched", LedgerHits() == 0 && d.World.Players.All(p => !p.Down),
-                  string.Join(", ", bkHits.Where(h => h.Source == LedgerMechanic.ReplaySource).Select(h => $"{h.Player.name}@{(h.Tick - tp4) / 60f:0.00}")));
+            Check($"Ledger P4 N={n}: three replays per loop at 0, 0.5 after the Stopped Hour, and with the Hand", r1 == tp4 && r2 > 0 && r3 > r2 && r2 - sh == Sim.Ticks(0.5f), $"{(r1 - tp4) / 60f:0.0}, {(r2 - tp4) / 60f:0.0}, {(r3 - tp4) / 60f:0.0} s");
+            Check($"Ledger P4 N={n}: block 2's III lands on the Stopped Hour's resume (9.0 s)", r2 + Sim.Ticks(4 + 1.5f * 3) == sh + Sim.Ticks(9));
+            Check($"Ledger P4 N={n}: no reflections in stopped time (block 2 holds IV, the images, and nothing else)", held.Count == 1 && held[0] == "IV Reflection of the Hour", string.Join(", ", held));
+            // the one documented forced hit (replayed V, 60): block 2, a Stilled player whose station is opposite the ledger
+            // half hides inside V's half. Block 1's clock pairs lock between replayed strikes (7.75 / 10.75): nothing forced.
+            int opposite = (LedgerMechanic.AuthoredStation + 2) % 4;
+            string Page(BkHit h) => led.PageOf.TryGetValue(h.HazardId, out int pg) ? UltimateState.Roman[pg] : "?";
+            bool Forced(BkHit h) => Page(h) == "V" && h.Tick >= r2 && h.Tick <= r2 + Sim.Ticks(9) && led.ForcedLog.Any(x => x.replay == r2 && x.player == h.Player);
+            Note($"Ledger P4 N={n} block 2: no clean hiding spot (forced V) for {string.Join(", ", led.ForcedLog.Where(x => x.replay == r2).Select(x => x.player.name + " " + UltimateState.StationNames[Math.Max(0, bk.Ult.StationOf(x.player))]))}; opposite station = {UltimateState.StationNames[opposite]}");
+            var hits = bkHits.Where(h => h.Source == LedgerMechanic.ReplaySource).ToList();
+            var unforced = hits.Where(h => !Forced(h)).ToList();
+            Check($"Ledger P4 N={n}: strat bots at 4.2 m/s survive all three replays; the only hits are the documented forced V (block 2, Stilled with no clean hiding spot; at most one each)",
+                  unforced.Count == 0 && hits.GroupBy(h => h.Player).All(g => g.Count() <= 1) && d.World.Players.All(p => !p.Down),
+                  hits.Count == 0 ? "untouched" : string.Join(", ", hits.Select(h => $"{h.Player.name} {Page(h)}@{(h.Tick - tp4) / 60f:0.00}{(Forced(h) ? " forced" : "")}")));
             LedgerUnbot();
+        }
+
+        // ---------------- one page is one strike: a player inside several overlapping images is hit once ----------------
+        IEnumerator LedgerPageOnceChecks()
+        {
+            yield return LedgerStartHeld(8);
+            if (bk == null) yield break;
+            var ps = d.World.Players;
+            for (int i = 0; i < ps.Count; i++) { ps[i].DebugSetHp(PlayerController.MaxHp); BkPlace(ps[i], i == 0 ? LedDir1 * 5.5f : Sim.Dir(LedYaw1 + 180 - 40 + 10 * i) * 5.5f); }
+            bkHits.Clear();
+            bk.UltLaunch(led, led.DefaultCue());   // authored, N = 8: eight images 10° apart, overlapping
+            var img = led.Upcoming.First(s => s.Page.Numeral == 4);
+            int inside = img.Probes.Count(h => h.Contains(ps[0].transform.position));
+            UltStepAliveUntil(() => d.World.Tick > img.ResolveTick, Sim.Ticks(10));
+            int got = bkHits.Count(h => h.Player == ps[0] && led.PageOf.TryGetValue(h.HazardId, out int pg) && pg == 4);
+            Check("Ledger: one page is one strike (inside several overlapping images = one 60 hit)", inside >= 2 && got == 1, $"inside {inside} images, hit {got}×");
+            UltStepAliveUntil(() => !led.Running, Sim.Ticks(10));
         }
 
         // ---------------- boss death and halt cancel everything (outlines and numerals included) ----------------
