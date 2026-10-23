@@ -38,6 +38,7 @@ namespace LastBell.Run
         public const float Reach = 15f, ConeHalf = 30f;
         public const string Source = "Two Futures";
         const float MaxAnchor = 1.5f;                             // the dial's anchor stays this close to the centre
+        public const float FissureOffset = 1.78f;                 // P5 spots on a NW / SE clock line: this far off the fissure axis
         // P5 step 2 strikes with a clock pair: its striker stands 3.8-7.4 m from the boss (Pendulum Clocks, §3.1)
         public const float ClockMin = 3.8f, ClockMax = 7.4f;
 
@@ -297,7 +298,7 @@ namespace LastBell.Run
 
         // P5: each player walks the bands along their own clock line (the far side of the boss from their clock station:
         // the clock spot and the Stopped Hour hiding strip), so step 2's clock strike and the stop after are met on it.
-        float[] RayRadii(int[] order)
+        float[] RayRadii(int[] order, bool besideFissure)
         {
             var cand = new List<float>[6];
             for (int k = 0; k < 6; k++)
@@ -306,7 +307,9 @@ namespace LastBell.Run
                 for (float r = f.Lo + 0.2f; r <= f.Hi - 0.2f + 1e-3f; r += 0.1f)
                     if ((k != 1 || (r >= ClockMin + 0.1f && r <= ClockMax - 0.1f)) && (k < 5 || r >= TollTideAbility.TollRadius + 0.6f)) cand[k].Add(r);
             }
-            return Chain(cand, (a, b) => Mathf.Abs(a - b), out _);
+            // beside the fissure the spots sit FissureOffset off the line, so a radial change costs a little more
+            System.Func<float, float> along = r => besideFissure ? Mathf.Sqrt(Mathf.Max(0, r * r - FissureOffset * FissureOffset)) : r;
+            return Chain(cand, (a, b) => Mathf.Abs(along(a) - along(b)), out _);
         }
         (int station, Vector3 dir, float[][] r) RayOf(PlayerController p)
         {
@@ -315,17 +318,18 @@ namespace LastBell.Run
             Vector3 dir;
             if (st >= 0) dir = -UltimateState.StationDir(st);
             else { int i = Mathf.Max(0, W.Players.IndexOf(p)), n = Mathf.Max(1, W.Players.Count); dir = Sim.Dir(360f * i / n + 20f); }
-            c = (st, dir, new[] { RayRadii(OrderIFirst), RayRadii(OrderIIFirst) });
+            bool beside = Mathf.Abs(Vector3.Dot(dir, UltimateState.FissureNormal)) < 0.35f;
+            c = (st, dir, new[] { RayRadii(OrderIFirst, beside), RayRadii(OrderIIFirst, beside) });
             rays[p] = c; return c;
         }
         Vector3 OnRay(Vector3 dir, float r)
         {
             var q = Anchor + dir * r;
-            // a clock line along the fissure (NW / SE): stand just beside it (the fissure is a 1.4 m lane through the
-            // centre), at the same distance from the boss
+            // a clock line along the fissure (NW / SE): stand beside it, clear of the 6 s toll flares (FractureOfTime.InFlare,
+            // 1.5 m; the Stopped Hour's P5 strip is 1.65-1.9 m off the axis), at the same distance from the boss
             var nrm = UltimateState.FissureNormal;
             if (Mathf.Abs(Vector3.Dot(dir, nrm)) < 0.35f)
-                for (int i = 0; i < 4; i++) { float s = Vector3.Dot(q, nrm); q += nrm * ((s >= 0 ? 1.3f : -1.3f) - s); q = Anchor + Sim.Flat(q - Anchor).normalized * r; }
+                for (int i = 0; i < 6; i++) { float s = Vector3.Dot(q, nrm); q += nrm * ((s >= 0 ? FissureOffset : -FissureOffset) - s); q = Anchor + Sim.Flat(q - Anchor).normalized * r; }
             return q;
         }
 
