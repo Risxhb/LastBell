@@ -8,7 +8,7 @@ namespace LastBell.Run
     // L'ura's Severance (two dimensions; crossing kills, an empty side wipes), adapted: no one-shots, the line moves.
     //   - A gold meridian line splits the dais through the centre; the far half is Night (violet), the near half Day.
     //     Each player's side is where they stand when it lands.
-    //   - The line turns 90 degrees over 25 s, so both halves sweep round the arena: keep moving ahead of it.
+    //   - The line travels 270 degrees in 20 s (forward 135, then back 135 from 10 s, warned 1.5 s ahead): keep moving ahead of it.
     //   - Crossing the line (by moving, or by letting it sweep over you) is a heavy hit (50) every time.
     //   - Co-op (N >= 2): if every standing player is on one side for 0.5 s, the other half falls: the party wipes.
     //   - Patterns during it: Starfall Mirror at 2 s and 14 s, Meridian Lances (4 beams) at 8 s and 20 s (with the line,
@@ -19,7 +19,13 @@ namespace LastBell.Run
         public override string Id => "aurelion.severance";
         public override string Name => "Severance";
 
-        public const float LengthS = 25f, TurnDeg = 90f, EmptySideS = 0.5f;
+        // Chzy18 2026-10-23 "Severance should move a lot faster": 270 degrees of travel in 20 s (13.5 degrees/s, about 3.3 m/s
+        // at the rim), turning back once at 10 s (warned 1.5 s ahead)
+        public const float LengthS = 20f, TurnDeg = 270f, EmptySideS = 0.5f, BackWarnS = 1.5f;
+        float yaw0; int lineTick;
+        // the line's yaw `t` seconds into the sweep: forward for the first half, then back the same way
+        public float YawAt(float t) { t = Mathf.Clamp(t, 0, LengthS); float w = TurnDeg / LengthS, half = LengthS / 2; return yaw0 + (t <= half ? w * t : w * half - w * (t - half)); }
+        public float YawIn(float seconds) => Splitting ? LineYaw : YawAt(lineTick / (float)Sim.Hz + seconds);   // bots: where it will be
         public const float SplitS = 3f;
         public bool Splitting { get; private set; }               // the 3 s before the sides lock
         readonly Dictionary<PlayerController, int> planned = new Dictionary<PlayerController, int>();
@@ -44,7 +50,7 @@ namespace LastBell.Run
         {
             Say(Name);
             Active = true; Crossings = 0; side.Clear();
-            float yaw0 = StartYaws[Casts++ % StartYaws.Length]; LineYaw = yaw0;
+            yaw0 = StartYaws[Casts++ % StartYaws.Length]; LineYaw = yaw0; lineTick = 0;
             var line = W.BossFx.Lane(2 * (Rim + 0.5f), 0.16f); line.Tint(Gold, Gold); line.Progress(1);
             var night = W.BossFx.Cone(Rim + 0.5f, 90f); night.Tint(NightFill, NightRim); night.Progress(0.2f);
             line.Place(Centre - Sim.Dir(LineYaw) * (Rim + 0.5f), LineYaw); night.Place(Centre, LineYaw - 90f);
@@ -62,7 +68,8 @@ namespace LastBell.Run
             int len = Sim.Ticks(LengthS), empty = 0;
             for (int t = 0; t < len; t++)
             {
-                LineYaw = yaw0 + TurnDeg * t / len;
+                lineTick = t; LineYaw = YawAt(t / (float)Sim.Hz);
+                if (t == Sim.Ticks(LengthS / 2 - BackWarnS)) RunHud.Banner("THE LINE TURNS BACK", new Color(1f, 0.85f, 0.5f), BackWarnS);
                 line.Place(Centre - Sim.Dir(LineYaw) * (Rim + 0.5f), LineYaw);
                 night.Place(Centre, LineYaw - 90f);
                 Cross();

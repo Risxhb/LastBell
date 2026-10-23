@@ -6,7 +6,7 @@ namespace LastBell.Run
 {
     // v4 Total Eclipse (aurelion.total_eclipse), the intermission at 70 %, abilities-v4/ABILITIES-v4.md §3.4 (proposal).
     // Sources: Dimensius's Event Horizon (survive in the safe zones), Ansurek's intermission shield. He stays targetable.
-    //   - Corona Shield: absorbs 3.5 % of his max HP (AurelionEncounter.Absorb): solo at full HP that is 490 in 25 s, 20 DPS while
+    //   - Corona Shield: absorbs 700 per fighting player (AurelionEncounter.Absorb): solo that is 700 in 25 s, 28 DPS while
     //     moving between wells (a ranged class does about 60 standing, RunAutoTest V4Dps). Break it within 25 s or Total
     //     Eclipse wipes the party (the damage-check / enrage exception). Breaking it ends the intermission at once.
     //   - Light wells: 4 cobalt-rimmed circles of 3.5 m (6 of 3.0 m at N >= 5) orbit the centre at 6 m, 15 degrees/s.
@@ -18,10 +18,14 @@ namespace LastBell.Run
         public override string Id => "aurelion.total_eclipse";
         public override string Name => "Total Eclipse";
 
-        public const float ShieldFraction = 0.035f, LimitS = 25f, WellOrbit = 6f, WellSpin = 15f, UmbraGraceS = 2.0f;
+        public const int ShieldPerFighter = 700;   // Chzy18 2026-10-23: sized by party, not HP (groups broke 3.5 % of HP in ~10 s)
+        public const float LimitS = 25f, WellOrbit = 6f, WellSpin = 15f, UmbraGraceS = 2.0f;
         public const int UmbraDamage = 10;
         static readonly Color WellFill = new Color(0.22f, 0.32f, 0.7f), WellRim = new Color(0.9f, 1.2f, 2.4f);
 
+        // 700 per fighting player (players, and bot allies only when they attack): about 22 s for a party of 4 at the damage the
+        // perfect bots deal while dodging, 28 damage per second solo
+        public int ShieldFor() { int f = 0; foreach (var p in W.Players) if (p && !p.Down && (!(p.Input is AllyBot) || AllyBot.Attacks)) f++; return ShieldPerFighter * Mathf.Max(1, f); }
         public float WellRadius => N >= 5 ? 3.0f : 3.5f;   // a star (2.5 m with its edge) on you must not fill the whole well
         public int WellCount => N >= 5 ? 6 : 4;
         public readonly List<Vector3> Wells = new List<Vector3>();   // current well centres (tests, bots)
@@ -36,7 +40,7 @@ namespace LastBell.Run
         {
             Say(Name);
             Active = true; Broken = false; UmbraHits = 0; dark.Clear();
-            Boss.RaiseShield(Mathf.RoundToInt(Boss.MaxHp * ShieldFraction));
+            Boss.RaiseShield(ShieldFor());
             RunHud.Banner("TOTAL ECLIPSE — BREAK THE CORONA", new Color(1f, 0.85f, 0.5f), 2.5f);
             Glow(2f); Flare(1.5f);
             var rings = new List<BellkeeperFx.Telegraph>();

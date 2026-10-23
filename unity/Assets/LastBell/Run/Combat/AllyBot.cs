@@ -101,6 +101,8 @@ namespace LastBell.Run
             // walk round his body, not into it: a straight line across the centre would pin the bot against him
             if (move != Vector3.zero) move = AroundBoss(pos, move, boss);
             DebugLine = $"duty {duty} threat {threat?.Source ?? "-"} bad {bad(pos)} move ({move.x:0.0},{move.z:0.0}) at ({pos.x:0.0},{pos.z:0.0})";
+            var dtw = (boss as AurelionEncounter)?.Towers?.NextFor(me, w.Tick);
+            if (dtw != null) { var c = dtw.At + (pos - dtw.At).normalized * 1.0f; DebugLine += $" | tower spot ok {!bad(c)} covered by [{string.Join("/", System.Linq.Enumerable.Select(System.Linq.Enumerable.Where(live, h => h.Contains(c)), h => h.Source + (h.BurnPerSecond > 0 ? "(burn)" : "")))}]"; }
             inp.Move = ToScreen(move);
             return inp;
         }
@@ -190,10 +192,11 @@ namespace LastBell.Run
                     if (mine.Mark == ZenithMarks.Mark.Shade ? d > ZenithMarks.ShadeR - Hazard.Margin - 0.4f : d < ZenithMarks.SunR + Hazard.Margin + 0.4f) return true;
                 }
                 if (tower != null && Sim.Flat(q - tower.At).magnitude > tower.H.Radius - 0.4f) return true;
+                if (a != null && a.Towers != null && a.Towers.InOtherTower(me, q, tick)) return true;   // co-op: an extra in someone else's tower is hit
                 if (wells && !a.Eclipse.InWell(q)) return true;
                 if (spot != null && Sim.Flat(q - bp).magnitude < Sunspots.RimDrop) return true;
                 if (spot != null && a.Spots.Spots.Exists(o => o.Who != me && o.Who && !o.Who.Down && !o.Done && Sim.Flat(o.Who.transform.position - q).magnitude < 4.5f)) return true;   // carriers keep apart
-                if (side != 0 && (a.Sever.SideOfAt(q, a.Sever.LineYaw) != side || a.Sever.SideOfAt(q, a.Sever.LineYaw + 8f) != side || a.Sever.DistToLine(q) < 1.0f)) return true;
+                if (side != 0 && (a.Sever.SideOfAt(q, a.Sever.LineYaw) != side || a.Sever.SideOfAt(q, a.Sever.YawIn(0.6f)) != side || a.Sever.SideOfAt(q, a.Sever.YawIn(1.2f)) != side || a.Sever.DistToLine(q) < 1.0f)) return true;
                 return false;
             };
         }

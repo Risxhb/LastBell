@@ -42,7 +42,14 @@ namespace LastBell.Run
         protected int N => Math.Max(1, Standing().Count);
         protected PlayerController Farthest(Vector3 from) => Standing().OrderByDescending(p => Sim.Flat(p.transform.position - from).sqrMagnitude).FirstOrDefault();
         protected PlayerController Nearest(Vector3 from) => Standing().OrderBy(p => Sim.Flat(p.transform.position - from).sqrMagnitude).FirstOrDefault();
-        protected Hazard Spawn(Hazard h) { if (string.IsNullOrEmpty(h.Source) || h.Source == "Hazard") h.Source = Name; if (AurelionArgs.V3 || AurelionArgs.V4) h.Damage = V3Tier(h.Damage); return Boss.Track(W.Hazards.Spawn(h)); }
+        protected Hazard Spawn(Hazard h)
+        {
+            if (string.IsNullOrEmpty(h.Source) || h.Source == "Hazard") h.Source = Name;
+            if (AurelionArgs.V3 || AurelionArgs.V4) h.Damage = V3Tier(h.Damage);
+            // v4 Last Light, the soft enrage: every fallen slice makes his attacks 10 % stronger
+            if (AurelionArgs.V4 && Boss.Light != null && Boss.Phase >= 4 && h.Damage > 0) h.Damage = Mathf.RoundToInt(h.Damage * Boss.Light.DamageScale);
+            return Boss.Track(W.Hazards.Spawn(h));
+        }
         protected void Say(string current) => Boss.SetCurrent(current);
         protected void Glow(float k) => Boss.Glow(k);
         protected void Flare(float f = 1) => Boss.Flare(f);

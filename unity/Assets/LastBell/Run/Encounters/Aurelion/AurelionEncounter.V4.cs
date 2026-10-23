@@ -35,7 +35,7 @@ namespace LastBell.Run
             Light = Register(new LastLight());            // [ability: last_light] (v4)
         }
 
-        public const float V4P2At = 0.70f, V4P3At = 0.40f, V4P4At = 0.15f, EnrageS = 390f, EnrageWarnS = 360f;   // Final Noon at 6:30
+        public const float V4P2At = 0.70f, V4P3At = 0.40f, V4P4At = 0.20f, EnrageS = 390f, EnrageWarnS = 360f;   // Final Noon at 6:30
         public float[] PhaseMarks => AurelionArgs.V4 ? new[] { V4P2At, V4P3At, V4P4At } : new[] { V2P2At, V2P3At };
 
         // ---- fight-ending wipes, the Corona Shield, pools that last until the phase ends, the enrage clock ----
@@ -120,7 +120,7 @@ namespace LastBell.Run
                 case 2:
                     // the whole fight harder (Chzy18 2026-10-22): three patterns per block
                     yield return Block("Sunspots + Starfall Mirror + Meridian Lances", Together(Together(Spots.Run(), Sim.Ticks(0.5f), Starfall.Run(true)), Sim.Ticks(2.0f), Lances.Run(3, 1, false))); yield return V2Gap(g);
-                    yield return Block("Meridian Towers + Zenith Marks + Starfall Mirror", Together(TowersThenMark(), Sim.Ticks(1.5f), Starfall.Run(true))); yield return V2Gap(g);
+                    yield return Block("Meridian Towers + Zenith Marks + Starfall Mirror", Paired(TowersThenMark(), Towers.Duration(), Starfall.Run(true), Starfall.Duration(true), Sim.Ticks(1.0f))); yield return V2Gap(g);
                     // co-op: no Starfall here (everyone shares the ring, so 4 stars and 4 mirrors would land on it: impossible, not hard)
                     if (Party == 1) yield return Block("Ecliptic Order + Meridian Lances + Starfall Mirror", Together(EclipticWithLances(), Sim.Ticks(5.0f), Starfall.Run(true)));
                     else yield return Block("Ecliptic Order + Meridian Lances", EclipticWithLances());
@@ -132,7 +132,7 @@ namespace LastBell.Run
                     yield return Block("Severance", Sever.Run()); yield return V2Gap(g);
                     yield return Block("Cascading Lances + Starfall Mirror + Hour Hands", Together(LancesWithStarfall(4, 2, true), Sim.Ticks(1.0f), Hands.Run())); yield return V2Gap(g);
                     yield return Block("Sunspots + Zenith Collapse", SpotsThenCollapse()); yield return V2Gap(g);
-                    yield return Block("Meridian Towers + Meridian Lances + Starfall Mirror", Together(Paired(Towers.Run(), Towers.Duration(), Lances.Run(4, 1, false), Lances.Duration(4, 1, false), Sim.Ticks(1.0f)), Sim.Ticks(2.0f), Starfall.Run(true))); yield return V2Gap(g);
+                    yield return Block("Meridian Towers + Meridian Lances + Starfall Mirror", Paired(Paired(Towers.Run(), Towers.Duration(), Lances.Run(4, 1, false), Lances.Duration(4, 1, false), Sim.Ticks(1.0f)), Towers.Duration(), Starfall.Run(true), Starfall.Duration(true), Sim.Ticks(1.6f))); yield return V2Gap(g);
                     yield return Block("Zenith Marks + Meridian Lances", MarksWithLances(2));   // two-step, then the punish
                     break;
                 default:
