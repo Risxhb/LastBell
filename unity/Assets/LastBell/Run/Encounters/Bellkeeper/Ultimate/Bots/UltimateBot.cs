@@ -167,7 +167,7 @@ namespace LastBell.Run
                 }
                 // later rules still in view: a small pull toward satisfying them too
                 for (int i = g2End; i < rules.Count; i++) if (!rules[i].Ok(c)) score += 0.8f;
-                score += BurnCost(boss, pos, c);
+                score += BurnCost(boss, pos, c, UseDash && me.Stamina >= PlayerController.DashCost);
                 if (score < bestScore) { bestScore = score; best = c; found = true; }
             }
             return found;
@@ -175,14 +175,14 @@ namespace LastBell.Run
         static bool AllOk(Vector3 q, List<BotDemand> rules, int from, int to) { for (int i = from; i < to; i++) if (!rules[i].Ok(q)) return false; return true; }
         static bool Valid(Vector3 q, BossEncounter boss) =>
             CombatWorld.InPlayerBound(q, -0.25f) && Sim.Flat(q - boss.transform.position).magnitude >= boss.BodyRadius + PlayerController.Radius + 0.05f;
-        static float BurnCost(BossEncounter boss, Vector3 from, Vector3 to)
+        static float BurnCost(BossEncounter boss, Vector3 from, Vector3 to, bool canDash)
         {
             float cost = 0; var w = (boss as BellkeeperEncounter)?.World; if (w == null) return 0;
             foreach (var h in w.Hazards.Live)
             {
                 if (h.BurnPerSecond <= 0 || !h.Locked) continue;
                 if (h.Contains(to)) cost += 40;
-                for (int i = 1; i < 6; i++) if (h.Contains(Vector3.Lerp(from, to, i / 6f))) { cost += 1.5f; break; }
+                for (int i = 1; i < 6; i++) if (h.Contains(Vector3.Lerp(from, to, i / 6f))) { cost += canDash ? 2.5f : 8f; break; }   // a crossing: ~4 HP dashed, ~14 HP walked (GUIDE.md), so a walk is worth a long way round
             }
             return cost;
         }
