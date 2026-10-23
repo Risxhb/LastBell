@@ -20,6 +20,8 @@ namespace LastBell.Menu
         readonly List<string> errors=new List<string>();
         string output;InputSettings originalInput,testInput;
         HideFlags originalInputFlags;
+        MenuStyle originalMenuStyle;
+        bool menuPreferenceCaptured;
         public static void Install()
         {
             if(installed || !Environment.GetCommandLineArgs().Contains("-lastbellFlowStage")) return;
@@ -30,6 +32,8 @@ namespace LastBell.Menu
         {
             var args=Environment.GetCommandLineArgs();int stage=int.Parse(args[Array.IndexOf(args,"-lastbellFlowStage")+1]);
             int outputAt=Array.IndexOf(args,"-lastbellOut");output=outputAt>=0&&outputAt+1<args.Length?args[outputAt+1]:"E:/Collab/build-evidence/menu-flow-20261022";Directory.CreateDirectory(output);
+            originalMenuStyle=MenuAppearance.Selected;menuPreferenceCaptured=true;
+            MenuAppearance.Selected=MenuStyle.Showcase; // This diagnostic's fixture; restore the user's choice on exit.
             Application.logMessageReceived+=Log;originalInput=InputSystem.settings;originalInputFlags=originalInput.hideFlags;originalInput.hideFlags=HideFlags.DontUnloadUnusedAsset;
             testInput=Instantiate(originalInput);testInput.hideFlags=HideFlags.DontUnloadUnusedAsset;testInput.backgroundBehavior=InputSettings.BackgroundBehavior.IgnoreFocus;InputSystem.settings=testInput;
 #if UNITY_EDITOR
@@ -54,7 +58,7 @@ namespace LastBell.Menu
             for(int i=0;i<2;i++)
             {
                 var menuSource=menu.Music.Source;int menuSample=menuSource.timeSamples;
-                menu.OpenSelection(i==1); yield return new WaitForSeconds(2);
+                menu.OpenSelection(i==1); yield return SceneReady(()=>{var view=FindAnyObjectByType<HeroSelection>();return view&&view.HeroButtons!=null;});
                 var selection=FindAnyObjectByType<HeroSelection>();
                 Check("selection path "+i,selection && HeroSelection.TestRush==(i==1));
                 MusicCheck("hero selection "+i,"MainMenuMusic");
@@ -130,7 +134,7 @@ namespace LastBell.Menu
                         selection.Back();
                     }
                 }
-                if(selection) selection.Back(); yield return new WaitForSeconds(2); menu=FindAnyObjectByType<MainMenu>();
+                if(selection) selection.Back(); yield return SceneReady(()=>{var main=FindAnyObjectByType<MainMenu>();return main&&main.StartButton&&!main.Loading;}); menu=FindAnyObjectByType<MainMenu>();
                 Check("Back returns to main menu "+i,menu && !FindAnyObjectByType<HeroSelection>());
             }
             if(stage>=5)
@@ -141,9 +145,9 @@ namespace LastBell.Menu
                 var original=RunDifficulty.Selected;
                 for(int hero=0;hero<RunDirector.Classes.Length;hero++)
                 {
-                    menu.OpenSelection(false);yield return new WaitForSeconds(2);var s=FindAnyObjectByType<HeroSelection>();
+                    menu.OpenSelection(false);yield return SceneReady(()=>{var view=FindAnyObjectByType<HeroSelection>();return view&&view.HeroButtons!=null;});var s=FindAnyObjectByType<HeroSelection>();
                     RunDifficulty.Selected=(Difficulty)hero;s.SelectHero(hero);s.ConfirmClass();s.ConfirmClass();
-                    yield return new WaitForSeconds(2);var d=RunDirector.Instance;
+                    yield return SceneReady(()=>RunDirector.Instance&&RunDirector.Instance.State==RunState.Ready);var d=RunDirector.Instance;
                     Check("normal launch class/difficulty "+hero,d&&d.ClassName==RunDirector.Classes[hero]&&d.Difficulty==(Difficulty)hero&&d.Player.Presenter.HasModel);
                     Check("fresh Ready and authoritative first boss "+hero,d&&d.State==RunState.Ready&&d.Encounter==d.EncounterOrder[0]&&d.Mode==RunMode.Run&&d.RunsStarted==1&&d.RunTicks==0);
                     Check("launch consumed once "+hero,!MenuLaunch.Pending&&d&&d.RunsStarted==1);
@@ -153,7 +157,7 @@ namespace LastBell.Menu
                         var order=(int[])d.EncounterOrder.Clone();
                         Check("normal session has four bosses and final Bellkeeper "+hero,order.Length==4&&order.Distinct().Count()==4&&RunDirector.Bosses[order.Last()].Final);
                         Check("normal initial map matches first boss "+hero,RunMaps.All[RunMaps.Current].Id==(RunDirector.Bosses[order[0]].Map??"test"));
-                        d.RequestReady();d.RequestReady();MusicCheck("normal Intro "+hero,"MainMenuMusic");yield return new WaitForSeconds(2.5f);Check("intro starts one encounter "+hero,d.State==RunState.Combat&&d.EncounterStarts==1);
+                        d.RequestReady();d.RequestReady();MusicCheck("normal Intro "+hero,ExpectedMusic(order[0]));yield return new WaitForSeconds(2.5f);Check("intro starts one encounter "+hero,d.State==RunState.Combat&&d.EncounterStarts==1);
                         for(int slot=0;slot<order.Length;slot++)
                         {
                             Check("normal sequence slot "+hero+"/"+slot,d.State==RunState.Combat&&d.Encounter==order[slot]&&d.ProgressSlot==slot&&d.EncounterStarts==slot+1);
@@ -162,9 +166,9 @@ namespace LastBell.Menu
                         }
                         Check("normal victory only after final Bellkeeper "+hero,d.State==RunState.Results&&d.Victory&&d.EncountersCleared==4&&d.EncounterEnds==4&&d.Boss==null);
                         Check("normal retry preserves randomized order "+hero,d.RequestRetry()&&d.State==RunState.Ready&&d.Encounter==order[0]&&d.EncounterOrder.SequenceEqual(order)&&d.EncountersCleared==0&&d.RunsStarted==2);
-                        MusicCheck("normal retry "+hero,"MainMenuMusic");d.SetPaused(true);d.ReturnToMenu();
+                        MusicCheck("normal retry "+hero,ExpectedMusic(order.Last()));d.SetPaused(true);d.ReturnToMenu();
                     }
-                    yield return new WaitForSeconds(2);menu=FindAnyObjectByType<MainMenu>();Check("normal return cleans selection "+hero,menu&&!FindAnyObjectByType<HeroSelection>());
+                    yield return SceneReady(()=>{var main=FindAnyObjectByType<MainMenu>();return main&&main.StartButton&&!main.Loading;});menu=FindAnyObjectByType<MainMenu>();Check("normal return cleans selection "+hero,menu&&!FindAnyObjectByType<HeroSelection>());
                 }
                 RunDifficulty.Selected=original;
             }
@@ -183,7 +187,7 @@ namespace LastBell.Menu
                     if(d)
                     {
                         MusicCheck("test Ready "+tag,"MainMenuMusic");
-                        d.RequestReady();MusicCheck("test Intro "+tag,"MainMenuMusic");yield return new WaitForSeconds(4.5f);
+                        d.RequestReady();MusicCheck("test Intro "+tag,ExpectedMusic(enc));yield return new WaitForSeconds(4.5f);
                         Check("test encounter starts once "+tag,d.EncounterStarts==1&&d.Boss&&d.State==RunState.Combat);
                         var expected = ExpectedMusic(enc);
                         MusicCheck("test combat "+tag,expected);
@@ -195,7 +199,7 @@ namespace LastBell.Menu
                         if(enc==0)yield return Shot("test-map-"+RunMaps.All[map].Id+".png");
                         d.SetPaused(true);Check("retry accepted "+tag,d.RequestRetry());yield return null;
                         Check("retry keeps setup "+tag,d.State==RunState.Ready&&d.Encounter==enc&&RunMaps.Current==map&&d.Difficulty==(Difficulty)hero&&d.ClassName==RunDirector.Classes[hero]&&d.RunsStarted==2);
-                        MusicCheck("retry preparation "+tag,"MainMenuMusic");
+                        MusicCheck("retry preparation "+tag,expected);
                         d.SetPaused(true);MenuReturnBridge.Return(true);MenuReturnBridge.Return(true);yield return SceneReady(()=>{var heroView=FindAnyObjectByType<HeroSelection>();return heroView&&heroView.Setup;});
                         selection=FindAnyObjectByType<HeroSelection>();
                         Check("return restores test setup "+tag,selection&&selection.Setup&&selection.Setup.MapIndex==map&&selection.Setup.EncounterIndex==enc&&selection.Setup.Hero==RunDirector.Classes[hero]);
@@ -212,12 +216,15 @@ namespace LastBell.Menu
             report.Add($"RESULT: {report.Count(s=>s.StartsWith("PASS"))} passed, {failed} failed");
             File.WriteAllLines(Path.Combine(output,"stage"+stage+".txt"),report);
             Application.logMessageReceived-=Log;
+            RestoreMenuPreference();
 #if UNITY_EDITOR
             UnityEditor.EditorApplication.Exit(failed==0?0:1);
 #else
             Application.Quit(failed==0?0:1);
 #endif
         }
+        void RestoreMenuPreference(){if(menuPreferenceCaptured){MenuAppearance.Selected=originalMenuStyle;menuPreferenceCaptured=false;}}
+        void OnDestroy(){RestoreMenuPreference();}
         IEnumerator SceneReady(Func<bool> ready)
         {
             float deadline=Time.realtimeSinceStartup+30;
@@ -245,8 +252,10 @@ namespace LastBell.Menu
         void MusicCheck(string label,string clip)
         {
             var owners=FindObjectsByType<MenuMusic>();var music=owners.Length==1?owners[0]:null;
-            bool opening=clip=="MainMenuMusic"&&music&&music.PlayingOpening;
-            Check("music "+label,music&&music.Source&&music.Source.clip&&music.Source.clip.name==(opening?"MainMenuOpening":clip)&&music.Source.isPlaying&&(opening?!music.Source.loop:music.Source.loop));
+            bool menuTrack=clip=="MainMenuMusic";
+            Check("music "+label,music&&music.Source&&music.Source.clip&&
+                (menuTrack?music.Source==music.MenuSource:music.Source.clip.name==clip)&&
+                music.Source.isPlaying&&(menuTrack?!music.Source.loop:music.Source.loop));
         }
         IEnumerator Press(Key key)
         {InputSystem.QueueStateEvent(MenuSmokeTest.TestKeyboard,new KeyboardState(key));yield return null;yield return null;InputSystem.QueueStateEvent(MenuSmokeTest.TestKeyboard,new KeyboardState());yield return null;yield return null;}

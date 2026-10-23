@@ -23,6 +23,10 @@ namespace LastBell.Menu
         public Button TestRushButton { get; private set; }
         public Button SettingsButton { get; private set; }
         public Button ExitButton { get; private set; }
+        public Button MusicPlayButton { get; private set; }
+        public Button MusicPauseButton { get; private set; }
+        public Button MusicNextButton { get; private set; }
+        Text musicTrack;
         public Button CloseButton { get; private set; }
         public Button ApplyButton { get; private set; }
         public Dropdown ResolutionControl { get; private set; }
@@ -110,9 +114,32 @@ namespace LastBell.Menu
             LinkHorizontal(primary);
             Text("VANGUARD  /  ARCANIST  /  CHIMESINGER", safeRoot, 13, new Color(0.73f, 0.73f, 0.78f), new Vector2(0.5f, 0.168f), new Vector2(900, 28));
             Text("LAST BELL  /  WORK IN PROGRESS", safeRoot, 11, new Color(0.6f, 0.61f, 0.69f), new Vector2(0.5f, 0.016f), new Vector2(900, 24));
+            BuildMusicControls();
             BuildSettings(safeRoot);
             fade = Image("Scene transition", root, new Color(Ink.r, Ink.g, Ink.b, 0));
             Bounds(fade.rectTransform, Vector2.zero, Vector2.one); fade.raycastTarget = false;
+        }
+        void BuildMusicControls()
+        {
+            var panel = Image("Music player", safeRoot, new Color(.025f, .035f, .06f, .9f));
+            var rect = panel.rectTransform;
+            rect.anchorMin = rect.anchorMax = new Vector2(1, 0); rect.pivot = new Vector2(1, 0);
+            rect.anchoredPosition = new Vector2(-28, 128); rect.sizeDelta = new Vector2(300, 88);
+            musicTrack = Text(Music.TrackTitle, rect, 16, Gold, new Vector2(.5f, .78f), new Vector2(280, 26));
+            MusicPlayButton = Button("Play", rect, new Vector2(-96, -16), new Vector2(86, 34), () => Music.ResumeTrack());
+            MusicPauseButton = Button("Pause", rect, new Vector2(0, -16), new Vector2(86, 34), () => Music.PauseTrack());
+            MusicNextButton = Button("Next", rect, new Vector2(96, -16), new Vector2(86, 34), () => Music.NextTrack());
+            foreach (var button in new[] { MusicPlayButton, MusicPauseButton, MusicNextButton })
+                button.GetComponentInChildren<Text>().fontSize = 18;
+            LinkHorizontal(new[] { MusicPlayButton, MusicPauseButton, MusicNextButton });
+            foreach (var button in primary)
+            {
+                var navigation = button.navigation; navigation.selectOnUp = MusicPlayButton; button.navigation = navigation;
+            }
+            foreach (var button in new[] { MusicPlayButton, MusicPauseButton, MusicNextButton })
+            {
+                var navigation = button.navigation; navigation.selectOnDown = ExitButton; button.navigation = navigation;
+            }
         }
         void BuildSettings(Transform root)
         {
@@ -209,6 +236,8 @@ namespace LastBell.Menu
         void Update()
         {
             if (!safeRoot) return;
+            musicTrack.text = Music.TrackTitle + (Music.UserPaused ? "  /  PAUSED" : "  /  PLAYING");
+            MusicPlayButton.interactable = MusicPauseButton.interactable = MusicNextButton.interactable = !Loading && !SettingsOpen;
             if (Screen.safeArea != lastSafe)
             {
                 lastSafe = Screen.safeArea;

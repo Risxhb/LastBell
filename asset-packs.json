@@ -1,21 +1,37 @@
 {
-    "schema":  1,
-    "packs":  [
-                  {
-                      "name":  "sylvara-assets",
-                      "version":  1,
-                      "file":  "sylvara-assets-v1.zip",
-                      "url":  "https://github.com/Risxhb/collab/releases/download/sylvara-assets-v1/sylvara-assets-v1.zip",
-                      "sha256":  "5056f1313c9bf609726cf5a7d9abcde6f9bf221e6c822687d7cd018af777f3c4",
-                      "size":  7320575,
-                      "extractTo":  ".",
-                      "paths":  [
-                                    "unity/Assets/LastBell/Characters/Sylvara/Resources/Characters/Sylvara.glb",
-                                    "prototype/arena-3d/models/upload/sylvara-front.png",
-                                    "prototype/arena-3d/models/upload/sylvara-side.png",
-                                    "prototype/arena-3d/models/upload/sylvara-back.png"
-                                ],
-                      "files":  5
-                  }
-              ]
+  "schema": 1,
+  "packs": [
+    {
+      "name": "current-player-assets",
+      "version": 1,
+      "file": "current-player-assets-v1.zip",
+      "url": "https://github.com/Risxhb/collab/releases/download/current-player-assets-v1/current-player-assets-v1.zip",
+      "sha256": "af7d454d489fd6efbdb54f94898a3f74bb25cf46b793def159ecfbab8e0d3080",
+      "size": 43806372,
+      "extractTo": ".",
+      "paths": [
+        "unity/Assets/LastBell/Areas/Area2/Generated",
+        "unity/Assets/LastBell/Areas/Area2/BrassFoundry_Arena.unity",
+        "unity/Assets/LastBell/Run/Maps/Run_BrassFoundry.unity",
+        "unity/Assets/LastBell/Menu/Resources/Menu/MainMenu2.wav"
+      ],
+      "files": 210
+    },
+    {
+      "name": "sylvara-assets",
+      "version": 1,
+      "file": "sylvara-assets-v1.zip",
+      "url": "https://github.com/Risxhb/collab/releases/download/sylvara-assets-v1/sylvara-assets-v1.zip",
+      "sha256": "5056f1313c9bf609726cf5a7d9abcde6f9bf221e6c822687d7cd018af777f3c4",
+      "size": 7320575,
+      "extractTo": ".",
+      "paths": [
+        "unity/Assets/LastBell/Characters/Sylvara/Resources/Characters/Sylvara.glb",
+        "prototype/arena-3d/models/upload/sylvara-front.png",
+        "prototype/arena-3d/models/upload/sylvara-side.png",
+        "prototype/arena-3d/models/upload/sylvara-back.png"
+      ],
+      "files": 5
+    }
+  ]
 }

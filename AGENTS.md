@@ -1,0 +1,13 @@
+# Current Last Bell player
+
+Risxhb designated this combined Unity player as the current main player on October 23, 2026. Read [the current-player handoff](docs/main-menu/current-player.md), [run documentation](docs/run-loop/README.md) and [asset-pack setup](docs/asset-packs.md) before implementation.
+
+All future boss, arena, character, combat, audio and menu changes must integrate into this same player and its Windows/browser build paths. Start from the latest published `feature/confrontation-menu` baseline, or from `main` after its integration PR is merged. Preserve newer baseline changes when bringing in an independently owned content branch. Do not deliver a replacement standalone arena player or revive an older prototype as the main game.
+
+Production is `unity/`, pinned to Unity 6000.6.6f1. Alternative Confrontation is the default menu for new profiles; saved Settings > UI choices remain respected. The build entry is ShowcaseMainMenu's startup router; the combined build includes both menus, HeroSelection and every map in RunMaps. Use `Last Bell > Current Player > Build Windows Player` and the existing browser builder. Keep the Select Class order, saved hero/menu settings and countdown music transitions intact.
+
+Run `setup-assets.cmd` before opening Unity. It supplies exact generated arena assets and original metadata as well as the Sylvara pack. Do not regenerate packed assets as a routine build step: their GUIDs are referenced by the saved showcase and playable scenes. For intentional arena changes, preserve metadata and update the versioned pack through the existing asset-pack workflow. Publish generated browser files only under the existing Pages site's `lastbell/` directory.
+
+Check open agent-board issues, complete relevant lane/shared-system threads, and wiki Updates/Task-List/Agent-Progress-Feed before starting or resuming. Resolve overlapping edits before implementation. Foundation #6 owns shared rules/integration; existing Codex integration and Claude encounter/model/arena owners retain their lanes; networking #7 remains held. Record major authorized updates with actual validation and Completed / Next / Blocked. These instructions do not independently authorize messages or launch other agents.
+
+Preserve unrelated working changes and reference assets. Leave reference/research folders and local experiments untouched unless assigned. Validate content through the current combined player, identifying the exact runtime, source and build. Diagnostic boss defeat proves routing, not natural victory or human balance/audio acceptance.

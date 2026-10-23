@@ -96,20 +96,20 @@ namespace LastBell.Menu
             var panel=MenuUI.Rect("Right navigation",safe,new Vector2(.73f,.06f),new Vector2(.97f,.84f));navigation=panel.gameObject.AddComponent<CanvasGroup>();
             var logo=MenuUI.Panel("Last Bell logo",panel,new Vector2(-.1f,.73f),new Vector2(1.1f,1),Color.white);
             logo.sprite=Resources.Load<Sprite>("Menu/ConfrontationLogo");logo.preserveAspect=true;
-            StartButton=Nav("Start Run",panel,.57f,StartRun);RushButton=Nav("Boss Rush",panel,.46f,BossRush);
-            SettingsButton=Nav("Settings",panel,.35f,OpenSettings);ExitButton=Nav("Exit",panel,.24f,Exit);
+            StartButton=Nav("Start Run",panel,.51f,StartRun);RushButton=Nav("Boss Rush",panel,.40f,BossRush);
+            SettingsButton=Nav("Settings",panel,.29f,OpenSettings);ExitButton=Nav("Exit",panel,.18f,Exit);
 #if UNITY_WEBGL && !UNITY_EDITOR
             ExitButton.GetComponentInChildren<Text>().text="Return to Menu";
 #endif
-            MenuUI.Text("SELECTED CLASS",panel,new Vector2(0,.13f),new Vector2(1,.17f),12,MenuUI.Gold);
-            className=MenuUI.Text(SavedHeroSelection.Current.ToUpperInvariant(),panel,new Vector2(.13f,.07f),new Vector2(.87f,.13f),19);
-            PreviousButton=Nav("‹",panel,.07f,()=>SelectClass(SelectedIndex-1));Fit(PreviousButton,.02f,.07f,.13f,.13f);
-            NextButton=Nav("›",panel,.07f,()=>SelectClass(SelectedIndex+1));Fit(NextButton,.87f,.07f,.98f,.13f);
+            MenuUI.Text("SELECT CLASS",panel,new Vector2(0,.69f),new Vector2(1,.73f),12,MenuUI.Gold);
+            className=MenuUI.Text(SavedHeroSelection.Current.ToUpperInvariant(),panel,new Vector2(.13f,.63f),new Vector2(.87f,.69f),19);
+            PreviousButton=Nav("‹",panel,.63f,()=>SelectClass(SelectedIndex-1));Fit(PreviousButton,.02f,.63f,.13f,.69f);
+            NextButton=Nav("›",panel,.63f,()=>SelectClass(SelectedIndex+1));Fit(NextButton,.87f,.63f,.98f,.69f);
             var diff=Nav("Difficulty",panel,0,()=>{RunDifficulty.Selected=(Difficulty)(((int)RunDifficulty.Selected+1)%RunDifficulty.Names.Length);RefreshDifficulty();});
             difficulty=diff.GetComponentInChildren<Text>();difficulty.fontSize=16;RefreshDifficulty();
             MenuUI.Text("ALTERNATIVE MENU  /  WORK IN PROGRESS",safe,new Vector2(.69f,.018f),new Vector2(.985f,.05f),11,MenuUI.Gold);
-            var buttons=new[]{StartButton,RushButton,SettingsButton,ExitButton,PreviousButton,NextButton,diff};
-            for(int i=0;i<buttons.Length;i++)buttons[i].navigation=new Navigation{mode=Navigation.Mode.Explicit,selectOnDown=buttons[(i+1)%buttons.Length],selectOnUp=buttons[(i+buttons.Length-1)%buttons.Length],selectOnLeft=i==4||i==5?PreviousButton:null,selectOnRight=i==4||i==5?NextButton:null};
+            var buttons=new[]{PreviousButton,NextButton,StartButton,RushButton,SettingsButton,ExitButton,diff};
+            for(int i=0;i<buttons.Length;i++)buttons[i].navigation=new Navigation{mode=Navigation.Mode.Explicit,selectOnDown=buttons[(i+1)%buttons.Length],selectOnUp=buttons[(i+buttons.Length-1)%buttons.Length],selectOnLeft=i==0||i==1?PreviousButton:null,selectOnRight=i==0||i==1?NextButton:null};
             BuildSettings();
             message=MenuUI.Text("",safe,new Vector2(.70f,.01f),new Vector2(.99f,.08f),14,MenuUI.Gold);
         }

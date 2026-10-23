@@ -67,6 +67,7 @@ namespace LastBell.Run
         public int Encounter { get; private set; }          // index into Bosses (the last is the final boss)
         public int Generation { get; private set; }
         public int StateTicks { get; private set; }
+        public float IntroProgress => Mathf.Clamp01((float)StateTicks / IntroTicks);
         public bool Victory { get; private set; }
         public string DefeatCause { get; private set; }
         public int RunTicks { get; private set; }

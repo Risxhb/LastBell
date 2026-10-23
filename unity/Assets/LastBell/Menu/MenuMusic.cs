@@ -9,12 +9,20 @@ namespace LastBell.Menu
         const string VolumeKey = "LastBell.Menu.MusicVolume";
         static MenuMusic active;
         [Range(0, 1)] public float DefaultVolume = 0.6f;
-        AudioSource menu, boss;
-        float bossMix, envelope;
+        AudioSource menu, boss, previousBoss;
+        float menuMix = 1, bossMix, previousMix, envelope;
+        float fromMenu, fromBoss, fromPrevious, transition = 1;
+        RunDirector countdown;
         bool inCombat, menuPaused;
-        bool openingTrack;
-        bool openingPlaybackObserved;
-        public bool PlayingOpening => openingTrack;
+        static readonly string[] MenuTracks = { "MainMenu2", "MainMenuOpening", "MainMenuMusic" };
+        static readonly string[] MenuTitles = { "MAIN MENU 2", "MAIN MENU 3", "MAIN MENU 1" };
+        bool playbackObserved, trackStarted;
+        int trackIndex;
+        public bool PlayingOpening => trackIndex == 0;
+        public bool UserPaused { get; private set; }
+        public int TrackIndex => trackIndex;
+        public string TrackTitle => MenuTitles[trackIndex];
+        public AudioSource MenuSource => menu;
         public AudioSource Source => inCombat ? boss : menu;
         public float Volume => PlayerPrefs.GetFloat(VolumeKey, DefaultVolume);
         public static MenuMusic Ensure()
@@ -28,12 +36,24 @@ namespace LastBell.Menu
             if (GetComponent<MainMenu>()) { Ensure(); Destroy(this); return; }
             if (active && active != this) { Destroy(gameObject); return; }
             active = this; DontDestroyOnLoad(gameObject);
-            menu = MakeSource(); boss = MakeSource();
-            menu.clip = Resources.Load<AudioClip>("Menu/MainMenuOpening");
-            openingTrack = menu.clip;
-            if (!openingTrack) menu.clip = Resources.Load<AudioClip>("Menu/MainMenuMusic");
-            menu.loop = !openingTrack;
-            if (menu.clip) menu.Play();
+            menu = MakeSource(); boss = MakeSource(); previousBoss = MakeSource();
+            SelectTrack(0);
+        }
+        void SelectTrack(int index)
+        {
+            trackIndex = index;
+            menu.Stop(); menu.clip = Resources.Load<AudioClip>("Menu/" + MenuTracks[trackIndex]);
+            menu.loop = false; playbackObserved = false; trackStarted = false;
+            if (!menu.clip) { Debug.LogError("Missing menu track: " + MenuTracks[trackIndex]); return; }
+            if (!UserPaused && !menuPaused) { menu.Play(); trackStarted = true; }
+        }
+        public void NextTrack() => SelectTrack((trackIndex + 1) % MenuTracks.Length);
+        public void PauseTrack() { UserPaused = true; menu.Pause(); }
+        public void ResumeTrack()
+        {
+            UserPaused = false;
+            if (menuPaused || !menu.clip) return;
+            if (trackStarted) menu.UnPause(); else { menu.Play(); trackStarted = true; }
         }
         AudioSource MakeSource()
         {
@@ -52,42 +72,84 @@ namespace LastBell.Menu
         public static void OnRunState(RunDirector director, RunState state)
         {
             var music = Ensure();
-            if (state == RunState.Menu || state == RunState.Ready || state == RunState.Intro) music.PlayMenu();
+            if (state == RunState.Menu) music.PlayMenu();
+            else if (state == RunState.Ready && music.countdown) music.BeginFade(true);
+            else if (state == RunState.Intro) music.BeginBoss(director);
             else if (state == RunState.Combat)
             {
-                var track = TrackFor(director.Boss);
-                var clip = track == null ? null : Resources.Load<AudioClip>("Menu/BossMusic/" + track);
-                if (!clip) { Debug.LogWarning("No boss music for " + director.Boss); return; }
-                music.boss.Stop(); music.boss.clip = clip; music.boss.Play(); music.inCombat = true;
+                if (!music.inCombat) music.BeginBoss(director);
+                if (music.inCombat) music.AdvanceFade(1);
             }
+        }
+        void BeginBoss(RunDirector director)
+        {
+            var track = TrackFor(director.Boss);
+            var clip = track == null ? null : Resources.Load<AudioClip>("Menu/BossMusic/" + track);
+            if (!clip) { Debug.LogWarning("No boss music for " + director.Boss); return; }
+            // Keep the outgoing boss source running while the new fight fades in. For a rapid
+            // interrupted countdown, retain the louder source and reuse the quieter channel.
+            if (previousMix > bossMix)
+            {
+                var source = boss; boss = previousBoss; previousBoss = source;
+                float mix = bossMix; bossMix = previousMix; previousMix = mix;
+            }
+            previousBoss.Stop();
+            var incoming = previousBoss; previousBoss = boss; boss = incoming;
+            previousMix += bossMix; bossMix = 0;
+            boss.volume = 0; boss.clip = clip; boss.Play();
+            BeginFade(true, director);
+        }
+        void BeginFade(bool toBoss, RunDirector intro = null)
+        {
+            inCombat = toBoss; countdown = intro; transition = 0;
+            fromMenu = menuMix; fromBoss = bossMix; fromPrevious = previousMix;
+            ApplyVolume();
+        }
+        void AdvanceFade(float progress)
+        {
+            transition = Mathf.Clamp01(progress);
+            menuMix = Mathf.Lerp(fromMenu, inCombat ? 0 : 1, transition);
+            bossMix = Mathf.Lerp(fromBoss, inCombat ? 1 : 0, transition);
+            previousMix = Mathf.Lerp(fromPrevious, 0, transition);
+            if (transition == 1)
+            {
+                countdown = null; previousBoss.Stop();
+                if (inCombat) { menu.Pause(); menuPaused = true; }
+                else { boss.Stop(); menuPaused = false; }
+            }
+            ApplyVolume();
         }
         public void PlayMenu()
         {
             if (!menu) return;
-            inCombat = false;
-            if (menuPaused) { menu.UnPause(); menuPaused = false; }
+            if (inCombat)
+            {
+                menuPaused = false;
+                NextTrack(); // A genuine menu return starts one of the three tracks from its beginning.
+                BeginFade(false);
+            }
+            else if (menuPaused) { menuPaused = false; if (!UserPaused) ResumeTrack(); }
         }
-        void Update()
+        void LateUpdate()
         {
             if (active != this) return;
-            // The opening song is prepended once per application session. Arena wipes and
-            // selection/preparation never replace or restart this persistent source.
-            if (openingTrack && menu.isPlaying) openingPlaybackObserved = true;
-            if (openingTrack && openingPlaybackObserved && !menuPaused && !menu.isPlaying && menu.clip)
-            {
-                openingTrack = false; menu.clip = Resources.Load<AudioClip>("Menu/MainMenuMusic");
-                menu.loop = true; if (menu.clip) menu.Play();
-            }
+            // Manual pause and combat suspension are distinct from a naturally finished track.
+            // Arena changes never touch the persistent source or this playlist cursor.
+            if (menu.isPlaying) playbackObserved = true;
+            if (playbackObserved && !menuPaused && !UserPaused && !menu.isPlaying && menu.clip) NextTrack();
             envelope = Mathf.MoveTowards(envelope, 1, Time.unscaledDeltaTime / .8f);
-            bossMix = Mathf.MoveTowards(bossMix, inCombat ? 1 : 0, Time.unscaledDeltaTime / .45f);
+            // Follow the authoritative countdown after RunDirector.Update, including pause and
+            // slow frames. Combat's state notification completes the fade on the zero tick.
+            if (transition < 1)
+                AdvanceFade(countdown && countdown.State == RunState.Intro
+                    ? countdown.IntroProgress : Mathf.MoveTowards(transition, 1, Time.unscaledDeltaTime / .45f));
             ApplyVolume();
-            if (bossMix == 1 && !menuPaused) { menu.Pause(); menuPaused = true; }
-            if (!inCombat && bossMix == 0 && boss.isPlaying) boss.Stop();
         }
         void ApplyVolume()
         {
-            if (menu) menu.volume = Volume * envelope * (1 - bossMix);
+            if (menu) menu.volume = Volume * envelope * menuMix;
             if (boss) boss.volume = Volume * envelope * bossMix;
+            if (previousBoss) previousBoss.volume = Volume * envelope * previousMix;
         }
         public void SetVolume(float value)
         {

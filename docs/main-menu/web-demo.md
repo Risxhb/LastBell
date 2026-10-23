@@ -1,6 +1,6 @@
 # Last Bell browser demo
 
-The browser demo uses the existing Unity game: `MainMenu.unity` first, then every scene in `RunMaps.All`. No JavaScript combat implementation is involved.
+The browser demo builds the [current main player](current-player.md): both menus, HeroSelection and every scene in `RunMaps.All`. ShowcaseMainMenu is the startup router; new profiles default to Alternative Confrontation and saved menu choices remain respected. No JavaScript combat implementation is involved.
 
 Public address: https://risxhb.github.io/lastbell/
 
@@ -8,7 +8,7 @@ Public address: https://risxhb.github.io/lastbell/
 
 Use Unity **6000.6.6f1**, including its matching **Web Build Support** module. Work in a separate checkout so Web-target imports and settings do not alter a developer's current Windows project.
 
-Brass Foundry's scene, generated assets and run scene are intentionally ignored by Git. For an exact copy of an existing local demo, copy `Assets/LastBell/Areas/Area2/Generated/` (with its `.meta`), `BrassFoundry_Arena.unity` (with its `.meta`) and `Assets/LastBell/Run/Maps/Run_BrassFoundry.unity` (with its `.meta`) into the isolated project's matching locations. Otherwise prepare the maps with the existing `Last Bell > Run Loop > Rebuild Run Scenes (all maps)` command in the isolated checkout before the Web build. Do not commit generated map files or replace another developer's scenes.
+Run `setup-assets.cmd` before opening the isolated Unity checkout. The current-player asset pack supplies the exact ignored Brass Foundry generated assets, source scene and run scene with their original metadata. This preserves the GUIDs referenced by the saved showcase. Rebuild authoring scenes only for an intentional arena change, then update the versioned pack and validate the combined player. Do not replace another developer's scenes during publication.
 
 Run `Last Bell > Main Menu > Build Browser Demo`, or invoke Unity with:
 

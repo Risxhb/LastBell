@@ -14,7 +14,7 @@ namespace LastBell.Menu
         const string Key="LastBell.Menu.Style";
         public static MenuStyle Selected
         {
-            get=>PlayerPrefs.GetInt(Key,0)==1?MenuStyle.Alternative:MenuStyle.Showcase;
+            get=>PlayerPrefs.GetInt(Key,1)==1?MenuStyle.Alternative:MenuStyle.Showcase;
             set {PlayerPrefs.SetInt(Key,value==MenuStyle.Alternative?1:0);PlayerPrefs.Save();}
         }
         public static string PathFor(MenuStyle style)=>style==MenuStyle.Alternative?ConfrontationMenu.ScenePath:MainMenu.ScenePath;
@@ -27,7 +27,7 @@ namespace LastBell.Menu
             var args=Environment.GetCommandLineArgs();
             if(RunAutoTest.Requested||MapPreviewCapture.Requested)return true;
             if(args.Contains("-lastbellMenuTest")||args.Contains("-lastbellFlowStage")||args.Contains("-lastbellShowcaseTest"))return true;
-            if(!PlayerPrefs.HasKey(Key))Selected=presented;
+            if(!PlayerPrefs.HasKey(Key))Selected=MenuStyle.Alternative;
             if(Selected==presented)return true;
             if(!Available(Selected)){Debug.LogWarning("Saved menu style is unavailable in this build.");return true;}
             owner.SetActive(false);

@@ -31,9 +31,25 @@ namespace LastBell.Menu
             yield return new WaitForSecondsRealtime(2);
             var menu = FindAnyObjectByType<MainMenu>(); var show = menu.GetComponent<MenuShowcase>(); var music = menu.Music; var source = music.Source;
             Check("single combined main menu is current scene", SceneManager.GetActiveScene().path == MainMenu.ScenePath && SceneManager.sceneCount == 1);
-            Check("opening song plays first", music.PlayingOpening && source.clip.name == "MainMenuOpening" && source.isPlaying && source.time > 0);
+            Check("opening song plays first", music.PlayingOpening && source.clip.name == "MainMenu2" && source.isPlaying && source.time > 0);
             Check("all catalog stages embedded", show.Stages.Length == RunMaps.All.Length && show.Stages.Select(s => s.Name).SequenceEqual(RunMaps.All.Select(m => m.Name)));
             Check("original menu environment preserved inactive", GameObject.Find("Original menu environment (preserved, inactive)") == null);
+            Check("music controls present and keyboard reachable", menu.MusicPlayButton && menu.MusicPauseButton && menu.MusicNextButton && menu.ExitButton.navigation.selectOnUp == menu.MusicPlayButton);
+            menu.MusicPauseButton.onClick.Invoke(); float pausedAt = source.time;
+            yield return new WaitForSecondsRealtime(.4f);
+            Check("pause holds playback position", music.UserPaused && !source.isPlaying && Mathf.Abs(source.time - pausedAt) < .05f);
+            menu.MusicNextButton.onClick.Invoke(); yield return null;
+            Check("next while paused selects mainmenu3 without autoplay", music.TrackIndex == 1 && source.clip.name == "MainMenuOpening" && music.UserPaused && !source.isPlaying);
+            menu.MusicPlayButton.onClick.Invoke(); yield return new WaitForSecondsRealtime(.3f);
+            Check("play starts newly selected song", !music.UserPaused && source.isPlaying && source.time > 0);
+            menu.MusicNextButton.onClick.Invoke(); yield return new WaitForSecondsRealtime(.3f);
+            Check("next cycles to existing menu song", music.TrackIndex == 2 && source.clip.name == "MainMenuMusic" && source.isPlaying);
+            menu.MusicNextButton.onClick.Invoke(); yield return new WaitForSecondsRealtime(.3f);
+            Check("next wraps to mainmenu2", music.TrackIndex == 0 && source.clip.name == "MainMenu2" && source.isPlaying);
+            Check("no building transition geometry", !GameObject.Find("Passing clocktower facade") && !GameObject.Find("Foreground architecture wipe"));
+            var rotation = Camera.main.transform.rotation;
+            yield return new WaitForSecondsRealtime(.5f);
+            Check("faster camera orbit is active", Mathf.Abs(menu.Battle.OrbitDegreesPerSecond - 1.2f) < .01f && Quaternion.Angle(rotation, Camera.main.transform.rotation) > .4f);
             int materials = 0, objects = 0; float previousSample = source.time; int previousChanges = 0;
             for (int visit = 0; visit <= 10; visit++)
             {
@@ -59,28 +75,42 @@ namespace LastBell.Menu
                     Check("bounded objects after second full rotation", FindObjectsByType<Transform>().Length <= objects + 8);
                     break;
                 }
-                while (show.Elapsed < (visit + 1) * 15 - .05f) yield return null;
-                // The facade is in front of the battle and below the menu, with no raycast targets.
-                Check("building covers background " + visit, show.CoversScreen);
+                while (show.Elapsed < (visit + 1) * 15 - .01f) yield return null;
+                // The arena fades through midnight beneath the stable interactive menu.
+                Check("fade covers background " + visit, show.CoversScreen);
                 var eventData = new PointerEventData(EventSystem.current) { position = menu.SettingsButton.transform.position };
                 var hits = new List<RaycastResult>(); EventSystem.current.RaycastAll(eventData, hits);
-                Check("menu raycast survives wipe " + visit, hits.Count > 0 && hits[0].gameObject.transform.IsChildOf(menu.SettingsButton.transform));
+                Check("menu raycast survives fade " + visit, hits.Count > 0 && hits[0].gameObject.transform.IsChildOf(menu.SettingsButton.transform));
                 ExecuteEvents.Execute(menu.SettingsButton.gameObject, eventData, ExecuteEvents.pointerClickHandler);
-                Check("settings usable during wipe " + visit, menu.SettingsOpen);
-                if (visit == 0) { yield return Shot("building-wipe-settings.png"); }
-                menu.CloseSettings(); previousChanges = show.Changes;
-                while (show.Changes == previousChanges) yield return null;
+                Check("settings usable during fade " + visit, menu.SettingsOpen);
+                if (visit == 0) { yield return Shot("arena-fade-settings.png"); }
+                menu.CloseSettings(); previousChanges = visit + 1;
+                while (show.Changes < previousChanges) yield return null;
             }
             Check("eight-player party included", show.Stages.Any(s => s.PartySize == 8));
-            // Seek the genuine opening clip to its end to exercise normal playlist advancement.
-            if (music.PlayingOpening)
+            // Manual pause must survive a scheduled arena change without auto-advancing.
+            menu.MusicPauseButton.onClick.Invoke();
+            yield return new WaitForSecondsRealtime(.2f); // Let the DSP thread apply the requested pause.
+            int pausedIndex = music.TrackIndex, heldSample = source.timeSamples;
+            float heldTime = source.time;
+            report.Add("PAUSE start index=" + pausedIndex + " paused=" + music.UserPaused + " playing=" + source.isPlaying + " sample=" + heldSample + " time=" + heldTime);
+            int heldChanges = show.Changes;
+            while (show.Changes == heldChanges) yield return null;
+            yield return new WaitForSecondsRealtime(.7f);
+            report.Add("PAUSE after index=" + music.TrackIndex + " paused=" + music.UserPaused + " playing=" + source.isPlaying + " sample=" + source.timeSamples + " time=" + source.time);
+            Check("pause survives arena transition", music.UserPaused && !source.isPlaying && music.TrackIndex == pausedIndex && source.timeSamples == heldSample);
+            menu.MusicPlayButton.onClick.Invoke(); yield return new WaitForSecondsRealtime(1);
+            report.Add("RESUME sample=" + source.timeSamples + " time=" + source.time + " playing=" + source.isPlaying);
+            Check("resume continues after transition", source.isPlaying && source.timeSamples > heldSample);
+            for (int track = 0; track < 3; track++)
             {
-                source.time = Mathf.Max(0, source.clip.length - .5f);
+                int expected = (music.TrackIndex + 1) % 3;
+                source.time = Mathf.Max(0, source.clip.length - .3f);
                 float trackDeadline = Time.realtimeSinceStartup + 15;
-                while ((music.PlayingOpening || !source.isPlaying) && Time.realtimeSinceStartup < trackDeadline) yield return null;
+                while ((music.TrackIndex != expected || !source.isPlaying) && Time.realtimeSinceStartup < trackDeadline) yield return null;
+                Check("automatic playlist advancement " + track, music.TrackIndex == expected && !source.loop && source.isPlaying);
             }
-            report.Add("PLAYLIST opening=" + music.PlayingOpening + " clip=" + source.clip.name + " state=" + source.clip.loadState + " playing=" + source.isPlaying + " time=" + source.time);
-            Check("existing looping playlist resumes after opening", !music.PlayingOpening && source.clip.name == "MainMenuMusic" && source.loop && source.isPlaying);
+            report.Add("PLAYLIST index=" + music.TrackIndex + " clip=" + source.clip.name + " playing=" + source.isPlaying);
             menu.OpenSelection(false); Check("showcase stops on navigation", !show.enabled && !menu.Battle.enabled);
             float deadline = Time.realtimeSinceStartup + 45;
             while (!FindAnyObjectByType<HeroSelection>() && Time.realtimeSinceStartup < deadline) yield return null;

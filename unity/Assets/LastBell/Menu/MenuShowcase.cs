@@ -8,7 +8,7 @@ namespace LastBell.Menu
     // All environments belong to one menu scene. Rotation creates no gameplay or music owners.
     public sealed class MenuShowcase : MonoBehaviour
     {
-        public const float StageSeconds = 15, WipeHalfSeconds = .8f;
+        public const float StageSeconds = 15, WipeHalfSeconds = .55f;
         [Serializable] public sealed class Stage
         {
             public string Name, Boss;
@@ -26,19 +26,19 @@ namespace LastBell.Menu
         public float Elapsed { get; private set; }
         public float LastChangeTime { get; private set; }
         public bool LastChangeCovered { get; private set; }
-        public bool Wiping => building && building.gameObject.activeSelf;
-        public bool CoversScreen => Wiping && Mathf.Abs(building.anchoredPosition.x) <= (building.sizeDelta.x - canvasRect.rect.width) * .5f;
+        public bool Wiping => veil && veil.color.a > 0;
+        public bool CoversScreen => veil && veil.color.a >= .99f;
         MenuBattle battle;
         float startedAt = -1;
-        RectTransform building, canvasRect;
+        Image veil;
         void Start()
         {
             battle = GetComponent<MenuBattle>();
             if (Stages == null || Stages.Length != RunMaps.All.Length)
             { Debug.LogError("Menu showcase environments are missing. Run Prepare Showcase Scene."); enabled = false; return; }
-            BuildWipe();
+            BuildFade();
             battle.CameraPosition = new Vector3(0, 29, 24); battle.CameraTarget = new Vector3(0, 1, 0);
-            battle.FieldOfView = 44; battle.OrbitDegreesPerSecond = .35f;
+            battle.FieldOfView = 44; battle.OrbitDegreesPerSecond = 1.2f;
             Activate(0); MenuShowcaseTest.Install();
         }
         void Update()
@@ -51,13 +51,9 @@ namespace LastBell.Menu
             float distance = Elapsed - next;
             bool leaving = Elapsed - Changes * StageSeconds < WipeHalfSeconds && Changes > 0;
             bool entering = distance >= -WipeHalfSeconds;
-            building.gameObject.SetActive(entering || leaving);
-            float width = canvasRect.rect.width, height = canvasRect.rect.height;
-            building.sizeDelta = new Vector2(width * 1.5f, height * 1.18f);
-            float travel = width * 1.3f;
-            float x = entering ? Mathf.Lerp(-travel, 0, Mathf.Clamp01(1 + distance / WipeHalfSeconds))
-                : Mathf.Lerp(0, travel, Mathf.Clamp01((Elapsed - Changes * StageSeconds) / WipeHalfSeconds));
-            building.anchoredPosition = new Vector2(x, 0);
+            float alpha = entering ? Mathf.Clamp01(1 + distance / WipeHalfSeconds)
+                : leaving ? 1 - Mathf.Clamp01((Elapsed - Changes * StageSeconds) / WipeHalfSeconds) : 0;
+            veil.color = new Color(.008f, .012f, .025f, Mathf.SmoothStep(0, 1, alpha));
             if (Elapsed >= next)
             {
                 LastChangeCovered = CoversScreen; LastChangeTime = Elapsed;
@@ -76,41 +72,22 @@ namespace LastBell.Menu
             if (Camera.main) Camera.main.backgroundColor = stage.Background;
             battle.SetStage(index, stage.Boss, stage.PartySize);
         }
-        void BuildWipe()
+        void BuildFade()
         {
-            var root = new GameObject("Foreground architecture wipe", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler));
+            var root = new GameObject("Arena dissolve canvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler));
             root.transform.SetParent(transform, false);
             var canvas = root.GetComponent<Canvas>(); canvas.renderMode = RenderMode.ScreenSpaceOverlay; canvas.sortingOrder = -10;
             var scaler = root.GetComponent<CanvasScaler>(); scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920, 1080); scaler.matchWidthOrHeight = 1;
-            canvasRect = (RectTransform)root.transform;
-            building = Panel("Passing clocktower facade", root.transform, new Color(.035f,.048f,.075f), new Vector2(.5f,.5f), Vector2.zero, Vector2.zero);
-            // Full-height masonry occludes the arena at every aspect ratio; the menu renders above it.
-            for (int i = 0; i < 12; i++)
-            {
-                float x = (i + .5f) / 12;
-                Panel("Stone pier", building, new Color(.065f,.075f,.095f), new Vector2(x,.5f), Vector2.zero, new Vector2(34,1800));
-                Panel("Brass edge", building, new Color(.26f,.19f,.105f), new Vector2(x,.5f), new Vector2(-18,0), new Vector2(4,1800));
-                for (int row = 0; row < 4; row++)
-                {
-                    var window = Panel("Recessed lancet window", building, new Color(.012f,.02f,.04f), new Vector2(x,.18f + row * .21f), new Vector2(66,0), new Vector2(58,130));
-                    Panel("Warm glass", window, new Color(.43f,.29f,.12f), new Vector2(.5f,.5f), Vector2.zero, new Vector2(35,104));
-                    Panel("Window mullion", window, new Color(.055f,.06f,.08f), new Vector2(.5f,.5f), Vector2.zero, new Vector2(6,110));
-                }
-            }
-            for (int row = 0; row < 5; row++)
-                Panel("Projecting cornice", building, new Color(.12f,.125f,.14f), new Vector2(.5f,row * .235f + .035f), Vector2.zero, new Vector2(9000,18));
-            building.gameObject.SetActive(false);
-        }
-        static RectTransform Panel(string name, Transform parent, Color color, Vector2 anchor, Vector2 position, Vector2 size)
-        {
-            var go = new GameObject(name, typeof(RectTransform), typeof(Image)); go.transform.SetParent(parent, false);
-            var rect = (RectTransform)go.transform; rect.anchorMin = rect.anchorMax = anchor; rect.anchoredPosition = position; rect.sizeDelta = size;
-            var image = go.GetComponent<Image>(); image.color = color; image.raycastTarget = false; return rect;
+            var go = new GameObject("Arena fade through midnight", typeof(RectTransform), typeof(Image));
+            go.transform.SetParent(root.transform, false);
+            var rect = (RectTransform)go.transform; rect.anchorMin = Vector2.zero; rect.anchorMax = Vector2.one;
+            rect.offsetMin = rect.offsetMax = Vector2.zero;
+            veil = go.GetComponent<Image>(); veil.color = Color.clear; veil.raycastTarget = false;
         }
         public void Stop()
         {
-            enabled = false; if (building) building.gameObject.SetActive(false);
+            enabled = false; if (veil) veil.color = Color.clear;
             if (battle) battle.enabled = false;
         }
     }

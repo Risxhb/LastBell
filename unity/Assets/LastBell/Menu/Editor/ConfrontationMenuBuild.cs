@@ -141,11 +141,14 @@ namespace LastBell.Menu.EditorTools
             if(state!=PlayModeStateChange.EnteredPlayMode)return;EditorApplication.playModeStateChanged-=FocusGame;
             var game=EditorWindow.GetWindow(typeof(EditorWindow).Assembly.GetType("UnityEditor.GameView"));game.Show();game.Focus();
         }
+        [MenuItem("Last Bell/Current Player/Build Windows Player")]
         public static void BuildWindows()
         {
             ConfigureLogo();
             if(!File.Exists(ConfrontationMenu.ScenePath))Prepare();
-            var output="E:/Collab/builds/confrontation-menu/LastBell.exe";Directory.CreateDirectory(Path.GetDirectoryName(output));
+            var output=Environment.GetEnvironmentVariable("LASTBELL_WINDOWS_OUTPUT");
+            if(string.IsNullOrEmpty(output))output="Builds/Player/LastBell.exe";
+            Directory.CreateDirectory(Path.GetDirectoryName(output));
             var report=BuildPipeline.BuildPlayer(new BuildPlayerOptions{scenes=MenuAppearance.BuildScenes,locationPathName=output,target=BuildTarget.StandaloneWindows64,options=BuildOptions.Development});
             Debug.Log($"Confrontation build: {report.summary.result}, {report.summary.totalErrors} errors/{report.summary.totalWarnings} warnings");
             if(Application.isBatchMode)EditorApplication.Exit(report.summary.result==BuildResult.Succeeded?0:1);

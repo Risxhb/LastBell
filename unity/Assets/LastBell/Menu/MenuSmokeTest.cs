@@ -170,7 +170,7 @@ namespace LastBell.Menu
             while (!RunDirector.Instance && Time.realtimeSinceStartup < deadline) yield return null;
             var director = RunDirector.Instance;
             Check("Select Class enters fresh run Ready", director && director.State == RunState.Ready && director.Encounter==director.EncounterOrder[0]);
-            Check("menu music continues through run preparation", FindAnyObjectByType<MenuMusic>() && FindAnyObjectByType<MenuMusic>().Source.isPlaying && (FindAnyObjectByType<MenuMusic>().Source.clip.name == "MainMenuMusic" || FindAnyObjectByType<MenuMusic>().Source.clip.name == "MainMenuOpening"));
+            Check("menu music continues through run preparation", FindAnyObjectByType<MenuMusic>() && FindAnyObjectByType<MenuMusic>().Source.isPlaying && FindAnyObjectByType<MenuMusic>().Source == FindAnyObjectByType<MenuMusic>().MenuSource);
             if (director)
             {
                 yield return new WaitForSeconds(0.2f);
