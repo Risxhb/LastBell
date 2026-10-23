@@ -216,7 +216,13 @@ New from the build:
 - Push `feature/crucivar-abilities-v2` and the ability branches `feature/crucivar-ability-mould_press` and `feature/crucivar-ability-second_press` (both local only).
 - Open the draft PR into `feature/boss-crucivar`.
 - Chzy18 plays it: Practice → Crucivar (area 2) on each level.
-- Then a look pass (the Great Casting floor channels, the mould fill) and audio hooks.
+- Then a look pass (the Great Casting floor channels, the mould fill) and audio hooks. The look pass follows the telegraph style Chzy18 approved on Oct 23 (`Reference/Telegraph-Style/`, Brass Foundry sheet; settled in `gpt/08-design-rules.md` §5):
+  - the area motif goes inside the shape, with a plain continuous hit outline;
+  - one outward-fill countdown over a fixed outline for every shape (rings included), then a short flash on resolve;
+  - the perimeter lava dims to dark red-brown during warnings;
+  - friendly guides (the Gear Chain rings, the mould numerals) are thin, dotted and unfilled.
+
+  Today's telegraphs are the shared coral renderer plus stand-ins, so none of this is applied yet.
 
 **Blocked:**
 - **The GitHub account is suspended** (`remote: Your account is suspended`, HTTP 403 on every push since about 10:25). Nothing can be pushed and no PR can be opened until it's restored.
