@@ -53,8 +53,6 @@ namespace LastBell.Run
             public readonly List<PlayerController> Struck = new List<PlayerController>();
             public int DrawTick => Tick - DrawTicks;
             public int LockTick => Tick - LockBefore;
-            internal int predTick = -1;
-            internal readonly List<(Vector3 origin, float yaw)> pred = new List<(Vector3, float)>();
         }
         readonly List<Strike> strikes = new List<Strike>();
         public IReadOnlyList<Strike> Strikes => strikes;     // this cast's hours (tests)
@@ -243,42 +241,35 @@ namespace LastBell.Run
             float lim = CombatWorld.PlayerBound - 0.8f;
             return q.magnitude > lim ? q.normalized * lim : q;
         }
-        // A striker's clock spot: the whole spot on the line (Side 0), or its own half when it shares the hand this tick.
-        float ArcFrom(Strike s) => s.Side == 0 ? -SpotArc : s.Side > 0 ? SharedArcIn : -SharedArcOut;
-        float ArcTo(Strike s) => s.Side == 0 ? SpotArc : s.Side > 0 ? SharedArcOut : -SharedArcIn;
-        float RMin(Strike s) => s.Side == 0 ? SpotMin : SharedMin;
-        float RMax(Strike s) => s.Side == 0 ? SpotMax : SharedMax;
+        // The guide's spot for a striker (the bot's Hint): on the line (Side 0), or its own half 20° off it when it shares the hand.
         public Vector3 Hint(Strike s) => s.Side == 0 ? Spot(s.Station) : Spot(s.Station, SharedHint, s.Side * (SharedArcIn + SharedArcOut) / 2);
-        public bool InSpot(Vector3 q, Strike s)
+        // The real rule for a striker standing at q, with the bot's margins: the cone toward the station crosses the boss's body
+        // (0.5 m / 5° of slack; at least the guide's 3.8 m from his centre: closer, the walk between two spots has to bend round
+        // his body), a striker sharing its hand keeps at least 10° onto its own side of the line, and no other standing player
+        // is inside the cone now.
+        public const float StrikeSlack = 0.5f, StrikeClear = 2.4f;
+        public bool StrikeOk(Vector3 q, Strike s)
         {
             var bp = Sim.Flat(Boss.transform.position);
-            var v = Sim.Flat(q - bp); float d = v.magnitude;
-            if (d < RMin(s) || d > RMax(s)) return false;
-            float a = Vector3.SignedAngle(Sim.Flat(bp - UltimateState.Station(s.Station)), v, Vector3.up);
-            return a >= ArcFrom(s) && a <= ArcTo(s) && StrikesFrom(q, s.Station, bp, Boss.BodyRadius, 0.3f);
+            var v = Sim.Flat(q - bp);
+            if (v.magnitude < Boss.BodyRadius + StrikeClear || !StrikesFrom(q, s.Station, bp, Boss.BodyRadius, StrikeSlack)) return false;
+            if (s.Side != 0 && Vector3.SignedAngle(Sim.Flat(bp - UltimateState.Station(s.Station)), v, Vector3.up) * s.Side < SharedArcIn) return false;
+            float yaw = YawToward(Sim.Flat(q), UltimateState.Station(s.Station));
+            foreach (var p in W.Players)
+                if (p != s.Owner && !p.Down && InCone(Sim.Flat(q), yaw, p.transform.position)) return false;
+            return true;
         }
-        // Where a striker's cone can be: the live cone (tracking or locked) and, until it locks, any clock spot it may still take.
+        // Where a striker's cone is: the live cone (tracking, then locked) once drawn; before that, the cone from its guide spot.
         bool InAnyCone(Strike s, Vector3 q)
         {
-            if (s.Cone != null && !s.Cone.Cancelled && s.Cone.Contains(q)) return true;
-            if (s.Cone != null && s.Cone.Locked) return false;
-            if (s.predTick != Now)
-            {
-                s.predTick = Now; s.pred.Clear();
-                foreach (float r in new[] { RMin(s), (RMin(s) + RMax(s)) / 2, RMax(s) })
-                    foreach (float a in new[] { ArcFrom(s), (ArcFrom(s) + ArcTo(s)) / 2, ArcTo(s) })
-                    {
-                        var o = Spot(s.Station, r, a);
-                        s.pred.Add((o, YawToward(o, UltimateState.Station(s.Station))));
-                    }
-            }
-            foreach (var (o, yaw) in s.pred) if (InCone(o, yaw, q)) return true;
-            return false;
+            if (s.Cone != null) return !s.Cone.Cancelled && s.Cone.Contains(q);
+            var o = Hint(s);
+            return InCone(o, YawToward(o, UltimateState.Station(s.Station)), q);
         }
 
         // ---------------- the strat (GUIDE.md) ----------------
-        // At your hour be on your clock spot when your cone locks (far side of the boss from your station, 3.8-7.4 m, the cone
-        // through his body); at every other striker's hour stay out of their cone.
+        // At your hour, when your cone locks, stand where the cone toward your station crosses the boss's body with no ally
+        // inside it (Hint: the guide's clock spot, far side 3.8-7.4 m); at every other striker's hour stay out of their cone.
         public override void Demands(PlayerController p, List<BotDemand> into)
         {
             if (!Running || p.Down) return;
@@ -287,11 +278,14 @@ namespace LastBell.Run
                 if (s.Resolved || s.Tick < Now) continue;
                 var st = s;
                 if (s.Owner == p)
+                {
+                    if (Now > s.LockTick) continue;   // the cone stopped tracking: the striker is free until the strike
                     into.Add(new BotDemand
                     {
-                        Tick = Mathf.Max(Now, s.LockTick), Since = LaunchTick, Ok = q => InSpot(q, st), Hint = Hint(s),
+                        Tick = s.LockTick, Since = LaunchTick, Ok = q => StrikeOk(q, st), Hint = Hint(s),
                         Memory = true, Why = $"clock {UltimateState.Roman[s.Hour]} {UltimateState.StationNames[s.Station]}", From = this,
                     });
+                }
                 else if (s.Owner && !s.Owner.Down)
                     into.Add(new BotDemand
                     {
