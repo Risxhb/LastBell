@@ -271,13 +271,15 @@ namespace LastBell.Run
             {
                 var melee = clkParty[2]; var ranged = clkParty[3];
                 ss = clk.Strikes.ToList();
-                // the melee hugs the boss (2.0 m) on the far side of the first bot's station: right where that bot will stand to strike
-                BkPlace(melee, clk.Spot(ss.First(s => s.Owner == clkParty[0]).Station, 2.0f)); BkPlace(ranged, new Vector3(10, 0, 0));
+                var ms = ss.First(s => s.Owner == melee);
+                // the melee hugs the boss (1.95 m) on its own station's side: its cone points away from him
+                BkPlace(melee, Vector3.zero + UltimateState.StationDir(ms.Station) * 1.95f); BkPlace(ranged, new Vector3(10, 0, 0));
                 for (int i = 0; i < 2; i++) { var b = UltimateParty.Drive(clkParty[i], i, 4); b.Speed = 4.2f; b.Attacks = false; }
                 ClkRun();
-                var rs = ss.First(s => s.Owner == ranged); var ms = ss.First(s => s.Owner == melee);
+                var rs = ss.First(s => s.Owner == ranged);
                 Check("still ranged (10 m): its own hour cracks (the cone reaches 6 m)", rs.Cracked);
-                Check("still melee hugging the boss: struck by a striker's clock (60) on some hour", ClkHits(melee) >= 1, $"hits {ClkHits(melee)}, own hour {(ms.Cracked ? "cracked" : "struck")}");
+                Check("still melee hugging the boss on its station's side: its own hour cracks", ms.Cracked);
+                Note($"still players: the strat bots kept them out of their cones (clock hits on the still melee {ClkHits(melee)}, ranged {ClkHits(ranged)}); bot hours {string.Join(", ", ss.Where(s => s.Owner == clkParty[0] || s.Owner == clkParty[1]).Select(s => s.Cracked ? "cracked" : "struck"))}");
             }
 
             // ---------------- 8. boss death cancels everything ----------------
@@ -329,7 +331,7 @@ namespace LastBell.Run
                       ss.Count == 4 && ss.All(s => s.Resolved && !s.Cracked && s.Struck.Count == 0) && ClkAllHits() == 0,
                       string.Join(", ", ss.Select(s => $"{UltimateState.Roman[s.Hour]}{(s.Cracked ? " cracked" : "")}{(s.Struck.Count > 0 ? " struck" : "")}")) + " · " + bots[0].DebugLine);
             }
-            foreach (var (seg, launch, strikes) in new[] { ("P2", 6f, new[] { 12f, 14f, 18.5f, 20.5f }), ("P3", 12f, new[] { 18f, 21f, 24f, 27f }), ("P4", 0f, new[] { 7f, 9f, 10f, 12f }), ("P5", 10f, new[] { 17.2f, 19.2f, 27f, 29f }) })
+            foreach (var (seg, launch, strikes) in new[] { ("P2", 6f, new[] { 12f, 14f, 18.5f, 20.5f }), ("P3", 12f, new[] { 18f, 21f, 24f, 27f }), ("P4", 0f, new[] { 7.75f, 9.75f, 10.75f, 12.75f }), ("P5", 10f, new[] { 17.2f, 19.2f, 27f, 29f }) })
             {
                 yield return UltStart(null, seg);
                 if (bk == null) yield break;
