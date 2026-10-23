@@ -169,3 +169,16 @@ Built from the isolated copy because a concurrent session's in-progress TempoTyr
 - Vanguard's glowing sword still crosses the boss's censer arm at 4:3 and 21:9.
 - No AAA score is claimed from a self-assessment; that needs human review.
 - **Not attempted (needs new authored art):** a purpose-built bell-cathedral skyline with aqueducts/waterfalls, higher-fidelity hero models and wet shaders, volumetric light/fog, authored storm VFX, a licensed display serif and UI ornament set, and a boss idle "moment".
+
+### Publication — October 23, 2026
+
+Risxhb authorized pushing the source and publishing the browser demo.
+
+- **Source:** `af626e7` pushed to `feature/confrontation-menu`; this adds to the open PR #72 and does not merge it. Only this menu work was committed; other sessions' uncommitted work was left out.
+- **WebGL:** built from a clean worktree of `af626e7` plus the existing asset packs. Unity 6000.6.6f1 Web build: **0 errors / 46 warnings**. Package: 13 files / 380,947,880 bytes, six SHA-256-verified data parts, gzip intact, every file under 100 MiB ([inventory](validation/confrontation-aaa-web-package-20261023.json)).
+- **Local browser check:**
+  - Worked: the fresh profile opened Alternative, the drawn arrows and focus diamond rendered, next class worked, Settings opened, and Start Run → Preparation with the selected class → pause → Main Menu returned with the class kept. No console errors.
+  - Not verified in the browser: Settings → UI. Input through the embedded test pane was unreliable for both this build and the previous live build, so UI switching rests on the Windows suite.
+- **Pages:** `Risxhb/risxhb.github.io` commit `3ba7430`, deployment **built**. Only `lastbell/` changed; all 360 unrelated site files were preserved. The live manifest, six part lengths and HTML/loader/framework/WASM match the build ([live verification](validation/confrontation-aaa-public-package-20261023.json)). The public page renders the refined menu:
+
+![Live demo](media/confrontation-aaa-live-web.jpg)
