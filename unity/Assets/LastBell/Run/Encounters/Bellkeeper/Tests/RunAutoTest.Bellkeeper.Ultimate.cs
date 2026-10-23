@@ -37,6 +37,7 @@ namespace LastBell.Run
             if (UltWants("bots_dps")) yield return UltDpsChecks();
             if (UltWants("bots")) yield return UltBotChecks();
             if (UltWants("bots_video")) yield return UltDemoVideo();
+            if (UltWants("bots_attempts")) yield return UltAttempts();
             yield return UltLeave();
         }
 

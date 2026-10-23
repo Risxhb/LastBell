@@ -18,6 +18,7 @@ namespace LastBell.Run
         public float Speed = PlayerController.WalkSpeed;   // planning and walking speed, m/s (4.2 = the escape-proof speed)
         public bool Attacks = true, UseDash = true;
         public int ReactExtra = 15;                         // Late: 0.25 s
+        public float UptimePull = 0.3f;                     // score per metre out of reach while a rule holds it (uptime vs travel)
         public float HoldGap = -1;                          // gap to the boss when idle (-1 = the class's range)
         public int Slot, Of = 1;                            // this bot's angle round the boss when idle
         public string DebugLine;
@@ -48,6 +49,7 @@ namespace LastBell.Run
             {
                 if (!h.HitOnResolve && h.BurnPerSecond <= 0) continue;   // first-body lanes etc.: their mechanic's Demands say what to do
                 if (h.BurnPerSecond > 0) continue;                       // standing burns: a cost in scoring, not a rule
+                if (h.Hidden) continue;                                  // an unavoidable raidwide: nothing to dodge (potions handle it)
                 int spawn = now - h.Age + 1, at = now + (h.ResolveAt - h.Age);
                 var hz = h;
                 demands.Add(new BotDemand { Tick = at, Since = spawn, Ok = q => !hz.Contains(q), Hint = pos, Why = h.Source });
@@ -76,7 +78,7 @@ namespace LastBell.Run
 
             // ---- potions: a MinHp rule, or low ----
             int needHp = 0; foreach (var d in demands) needHp = Mathf.Max(needHp, d.MinHp);
-            if (me.Hp < PlayerController.MaxHp && me.Potions > 0 && me.Stunned == 0 && (me.Hp < needHp || me.Hp < 55)) inp.Potion = tick % 4 == 0;
+            if (me.Hp < PlayerController.MaxHp && me.Potions > 0 && me.Stunned == 0 && (me.Hp < needHp || me.Hp < 55 || (FreezeSoon(boss, me, now) && me.Hp < 90))) inp.Potion = tick % 4 == 0;   // potions are locked while Stilled: top up under the hourglass
 
             // ---- plan a spot (every 4 ticks, or at once when the current spot breaks a rule) ----
             var rules = new List<BotDemand>(); foreach (var d in demands) if (d.Ok != null) rules.Add(d);
@@ -114,7 +116,9 @@ namespace LastBell.Run
                 if (castHold > 0) castHold--;
             }
             float bossGap = Sim.Flat(bpos - pos).magnitude - boss.BodyRadius;
-            if (Attacks && bossGap <= Range(me) + 1.5f && (boss.Ult == null || !boss.Ult.IsStilled(me))) Attack(me, ref inp);
+            // no swings while walking to a spot or just before a rule: lunges and casts would carry it off its spot
+            bool positioning = hasTarget && (Sim.Flat(target - pos).magnitude > 0.5f || (rules.Count > 0 && rules[0].Tick - now < 30));
+            if (Attacks && !positioning && bossGap <= Range(me) + 1.5f && (boss.Ult == null || !boss.Ult.IsStilled(me))) Attack(me, ref inp);
             if (move != Vector3.zero) move = AroundBoss(pos, move, boss);
             inp.Move = ToScreen(move);
             DebugLine = $"rules {rules.Count} first {(rules.Count > 0 ? rules[0].Why + " in " + (rules[0].Tick - now) : "-")} target {(hasTarget ? $"({target.x:0.0},{target.z:0.0})" : "-")} at ({pos.x:0.0},{pos.z:0.0})";
@@ -168,6 +172,8 @@ namespace LastBell.Run
                 // later rules still in view: a small pull toward satisfying them too
                 for (int i = g2End; i < rules.Count; i++) if (!rules[i].Ok(c)) score += 0.8f;
                 score += BurnCost(boss, pos, c, UseDash && me.Stamina >= PlayerController.DashCost);
+                // uptime: among spots that keep the rules, prefer ones in reach of the boss (a melee player weaves in)
+                if (Attacks) score += UptimePull * Mathf.Max(0, Sim.Flat(c - bp).magnitude - boss.BodyRadius - Range(me));
                 if (score < bestScore) { bestScore = score; best = c; found = true; }
             }
             return found;
@@ -204,6 +210,14 @@ namespace LastBell.Run
         {
             bool In(Vector3 q) { foreach (var h in w.Hazards.Live) if (h.BurnPerSecond > 0 && h.Locked && h.Contains(q)) return true; return false; }
             return !In(pos) && In(pos + dir * 0.6f) && !In(pos + dir * (PlayerController.DashDistance - 0.25f));
+        }
+
+        // this player's hourglass is up: it will be Stilled soon
+        static bool FreezeSoon(BellkeeperEncounter boss, PlayerController me, int now)
+        {
+            if (boss.Ult == null) return false;
+            var s = boss.Ult.Of(me);
+            return s.HourglassFrom >= 0 && now >= s.HourglassFrom && now < s.StillFrom;
         }
 
         float Range(PlayerController me) => me.ClassName == "Vanguard" ? 0.9f : me.ClassName == "Chimesinger" ? 6.0f : 7.5f;
