@@ -44,7 +44,7 @@ A player's guide to the current v4 fight on every difficulty.
 
 | Ability | Wipe if… | How to beat it |
 |---|---|---|
-| **Meridian Towers** | a tower is **not held** when it lands | Each tower shows **dots: exactly that many players must stand in it**. A gold ring fills while enough players are inside, and you need **1.5 s** of filling before it lands (it rises 5.0 s early). **No damage when done right.** Extra players in a tower take a **heavy hit**. **Solo:** three towers of one, 2.5 s apart (I → II → III). Fill each, then leave for the next before it lands. **Co-op:** towers land together and their dots add up to the party (4 players: 2+2 or 1+3). Assigned when they rise in party order; stay out of towers that aren't yours. |
+| **Meridian Towers** | a tower is **short of players** when it lands | Each tower shows **dots: exactly that many players must be inside it at the moment it lands** (it rises 5.0 s early). **No damage when done right.** Extra players in a tower take a **heavy hit**. **Solo:** three towers of one, 2.5 s apart (I → II → III): be in each as it lands, then run to the next. **Co-op:** towers land together and their dots add up to the party (4 players: 2+2 or 1+3). Assigned when they rise in party order; stay out of towers that aren't yours. |
 | **Total Eclipse** (intermission at 70 %) | his **Corona Shield** (gold number on his bar) isn't broken in **25 s** | The shield is **700 per fighting player** (2,800 for 4), so it takes the whole party about 22 s. Stay inside the **blue light wells** (3.5 m, orbiting slowly) and attack non-stop. Out of a well for over 2 s, you burn 10 a second. |
 | **Severance** (Phase 3) | co-op: one half has nobody in it | A gold line appears and the game calls **"SPLIT"**. You have 3 s: odd players go Day, even players go Night. Then it locks and **sweeps fast: 135° one way in 10 s, then "THE LINE TURNS BACK" (1.5 s warning) and 135° back** (about 3.3 m/s at the rim). Crossing it, or letting it sweep over you, is a heavy hit. Run ahead of it, and be ready to reverse. Co-op ends in the **Reunion** tower (4.5 m at the centre): everyone in. |
 | **Last Light** (Phase 4, below 20 %) | the 8th slice falls (88 s into Phase 4) | **The soft enrage.** A 45° slice burns for good every **12 s** (every **10 s** from the 5th), with a 3 s warning, in a fixed order: 0°, 180°, 90°, 270°, then the diagonals. **Every fallen slice makes all his attacks 10 % stronger** ("THE LIGHT WANES"). Kill him before the room is gone. |
@@ -120,7 +120,7 @@ Order:
 
 | Wipe | Fix |
 |---|---|
-| "Total Eclipse — tower II was not held" | Fill each tower early (1.5 s) and move on; co-op, get the dot count right and stay out of other towers. |
+| "Total Eclipse — tower II was short" | Be inside as it lands, then run; co-op, get the dot count right and stay out of other towers. |
 | "Solar Flare" | Sunspot carriers stood within 3.5 m of each other: spread at the edge. |
 | "Total Eclipse — the Corona Shield held" | Attack from inside the wells; don't stop to reposition. |
 | "Severance — the Day half fell" | Split during the 3 s warning, as called. |
