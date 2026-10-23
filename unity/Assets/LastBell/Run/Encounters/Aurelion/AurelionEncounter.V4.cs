@@ -112,7 +112,7 @@ namespace LastBell.Run
                     break;
                 case 2:
                     yield return Block("Sunspots + Starfall Mirror", Together(Spots.Run(), Sim.Ticks(0.5f), Starfall.Run())); yield return V2Gap(g);
-                    yield return Block("Meridian Towers + Zenith Marks", Paired(Towers.Run(), Towers.Duration(), Marks.Run(), Marks.Duration(), 0)); yield return V2Gap(g);
+                    yield return Block("Meridian Towers + Zenith Marks", TowersThenMark()); yield return V2Gap(g);
                     yield return Block("Ecliptic Order + Meridian Lances", Together(Ecliptic.Run(4), Sim.Ticks(1.9f), Lances.Run(3, 1, false))); yield return V2Gap(g);
                     yield return Block("Zenith Collapse + Meridian Lances", CollapseWithLances(3)); yield return V2Gap(g);
                     yield return Block("Orrery Closing + Horizon", OrreryBlock(2, false));
@@ -131,6 +131,10 @@ namespace LastBell.Run
             }
         }
 
+        // Towers + Zenith Marks: the mark resolves 1.5 s after the last tower (on the same tick, a SUN mark beside tower
+        // II left a 0.5 m sliver). The conflict stays: your tower may sit in the wrong zone, so you finish it and run.
+        public IEnumerable<int> TowersThenMark() => Paired(Towers.Run(), Towers.Duration(), Marks.Run(), Marks.Duration(), Sim.Ticks(1.5f));
+
         IEnumerable<int> SpotsThenCollapse()
         {
             foreach (var w in WalkToCentre()) yield return w;
@@ -146,7 +150,7 @@ namespace LastBell.Run
                 yield return Sim.Ticks(GapV21);
                 foreach (var w in SpotsThenCollapse()) yield return w;
                 yield return Sim.Ticks(GapV21);
-                foreach (var w in Paired(Towers.Run(), Towers.Duration(), Marks.Run(), Marks.Duration(), 0)) yield return w;
+                foreach (var w in TowersThenMark()) yield return w;
                 yield return Sim.Ticks(GapV21);
                 var ecl = Ecliptic.Run(4);
                 foreach (var w in W.Difficulty == Difficulty.Hard ? Together(ecl, Sim.Ticks(2.5f), Hands.Run()) : ecl) yield return w;
