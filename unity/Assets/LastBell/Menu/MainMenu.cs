@@ -14,10 +14,11 @@ namespace LastBell.Menu
 {
     public sealed class MainMenu : MonoBehaviour
     {
-        public const string ScenePath = "Assets/LastBell/Menu/MainMenu.unity";
+        public const string ScenePath = "Assets/LastBell/Menu/ShowcaseMainMenu.unity";
         public bool SettingsOpen => settings && settings.activeSelf;
         public bool Loading { get; private set; }
         public Button StartButton { get; private set; }
+        public Button TestRushButton { get; private set; }
         public Button SettingsButton { get; private set; }
         public Button ExitButton { get; private set; }
         public Button CloseButton { get; private set; }
@@ -44,17 +45,22 @@ namespace LastBell.Menu
 
         void Awake()
         {
+            MenuLaunch.Clear();
+            MenuReturnBridge.TestSession=false;
+            if(MapPreviewCapture.Requested){MapPreviewCapture.Launch();return;}
             // Existing run diagnostics retain their own entry point and never run underneath a menu overlay.
             if (RunAutoTest.Requested) { SceneManager.LoadScene(RunMaps.All[0].RunScene); return; }
-            if (MenuSmokeTest.Requested) MenuSmokeTest.PrepareInput();
+            if (MenuSmokeTest.Requested || MenuFlowTest.Requested) MenuSmokeTest.PrepareInput();
             MenuSettings.Restore();
-            Music = GetComponent<MenuMusic>();
-            if (!Music) Music = gameObject.AddComponent<MenuMusic>();
+            Music = MenuMusic.Ensure();
+            Music.PlayMenu();
             font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             Battle = GetComponent<MenuBattle>();
             if (!Battle) Battle = gameObject.AddComponent<MenuBattle>();
+            if (!GetComponent<MenuShowcase>()) gameObject.AddComponent<MenuShowcase>();
             BuildUI();
             if (MenuSmokeTest.Requested) gameObject.AddComponent<MenuSmokeTest>();
+            MenuFlowTest.Install();
         }
         void Start() { if (StartButton) EventSystem.current.SetSelectedGameObject(StartButton.gameObject); }
         void BuildUI()
@@ -88,12 +94,13 @@ namespace LastBell.Menu
             Text("THE HOUR IS YOURS TO BREAK", safeRoot, 14, Gold, new Vector2(0.5f, 0.705f), new Vector2(850, 30));
             bar = Rect("Bottom navigation", safeRoot).gameObject;
             Bounds((RectTransform)bar.transform, new Vector2(0.5f, 0.065f), new Vector2(0.5f, 0.065f));
-            ((RectTransform)bar.transform).sizeDelta = new Vector2(1040, 80);
+            ((RectTransform)bar.transform).sizeDelta = new Vector2(1520, 80);
             barGroup = bar.AddComponent<CanvasGroup>();
-            StartButton = Button("Start Run", bar.transform, new Vector2(-350, 0), new Vector2(320, 68), StartRun, true);
-            SettingsButton = Button("Settings", bar.transform, Vector2.zero, new Vector2(320, 68), OpenSettings);
-            ExitButton = Button("Exit", bar.transform, new Vector2(350, 0), new Vector2(320, 68), Exit);
-            primary.AddRange(new[] { StartButton, SettingsButton, ExitButton });
+            StartButton = Button("Start Run", bar.transform, new Vector2(-555, 0), new Vector2(330, 68), StartRun, true);
+            TestRushButton = Button("Boss-Rush Test Rush", bar.transform, new Vector2(-185, 0), new Vector2(350, 68), () => OpenSelection(true));
+            SettingsButton = Button("Settings", bar.transform, new Vector2(185, 0), new Vector2(330, 68), OpenSettings);
+            ExitButton = Button("Exit", bar.transform, new Vector2(555, 0), new Vector2(330, 68), Exit);
+            primary.AddRange(new[] { StartButton, TestRushButton, SettingsButton, ExitButton });
             LinkHorizontal(primary);
             Text("VANGUARD  /  ARCANIST  /  CHIMESINGER", safeRoot, 13, new Color(0.73f, 0.73f, 0.78f), new Vector2(0.5f, 0.168f), new Vector2(900, 28));
             Text("LAST BELL  /  WORK IN PROGRESS", safeRoot, 11, new Color(0.6f, 0.61f, 0.69f), new Vector2(0.5f, 0.016f), new Vector2(900, 24));
@@ -156,10 +163,14 @@ namespace LastBell.Menu
             status.text = "Display settings saved.";
         }
         public void StartRun()
+        { OpenSelection(false); }
+        public void OpenSelection(bool testRush)
         {
             if (Loading || SettingsOpen) return;
             Loading = true; barGroup.interactable = false; fade.raycastTarget = true;
-            Music.FadeOut();
+            var showcase = GetComponent<MenuShowcase>(); if (showcase) showcase.Stop();
+            HeroSelection.TestRush = testRush;
+            HeroSelection.ResumeSetup = false;
             StartButton.GetComponentInChildren<Text>().text = "Preparing…";
             StartCoroutine(EnterRun());
         }
@@ -167,8 +178,7 @@ namespace LastBell.Menu
         {
             for (float t = 0; t < 0.4f; t += Time.unscaledDeltaTime)
             { fade.color = new Color(Ink.r, Ink.g, Ink.b, Mathf.Clamp01(t / 0.4f)); yield return null; }
-            MenuReturnBridge.Ensure();
-            var load = SceneManager.LoadSceneAsync(RunMaps.All[0].RunScene);
+            var load = SceneManager.LoadSceneAsync(HeroSelection.ScenePath);
             while (!load.isDone) yield return null;
         }
         public void Exit()
@@ -189,8 +199,8 @@ namespace LastBell.Menu
                 safeRoot.anchorMin = lastSafe.position / new Vector2(Screen.width, Screen.height);
                 safeRoot.anchorMax = (lastSafe.position + lastSafe.size) / new Vector2(Screen.width, Screen.height);
             }
-            var keyboard = MenuSmokeTest.Requested ? MenuSmokeTest.TestKeyboard : Keyboard.current;
-            var gamepad = MenuSmokeTest.Requested ? MenuSmokeTest.TestGamepad : Gamepad.current;
+            var keyboard = MenuSmokeTest.Requested || MenuFlowTest.Requested ? MenuSmokeTest.TestKeyboard : Keyboard.current;
+            var gamepad = MenuSmokeTest.Requested || MenuFlowTest.Requested ? MenuSmokeTest.TestGamepad : Gamepad.current;
             bool cancel = keyboard?.escapeKey.wasPressedThisFrame == true || gamepad?.buttonEast.wasPressedThisFrame == true;
             if (cancel && SettingsOpen)
             {
@@ -226,7 +236,7 @@ namespace LastBell.Menu
         }
         Slider VolumeSlider(Transform parent, float y)
         {
-            var label = Text("Main Menu Music", parent, 18, Ivory, new Vector2(0.25f, y), new Vector2(220, 44)); label.alignment = TextAnchor.MiddleLeft;
+            var label = Text("Music Volume", parent, 18, Ivory, new Vector2(0.25f, y), new Vector2(220, 44)); label.alignment = TextAnchor.MiddleLeft;
             var background = Image("Main menu music volume", parent, new Color(0.1f, 0.12f, 0.18f));
             Place(background.rectTransform, new Vector2(0.66f, y), new Vector2(320, 48)); background.raycastTarget = true;
             var track = Rect("Volume track", background.transform); Bounds(track, new Vector2(0.05f, 0.43f), new Vector2(0.78f, 0.57f));
@@ -296,6 +306,8 @@ namespace LastBell.Menu
     // Only installed after entering the run from this menu. Direct run-scene diagnostics stay untouched.
     public sealed class MenuReturnBridge : MonoBehaviour
     {
+        public static bool TestSession;
+        static bool returnToSetup;
         static MenuReturnBridge active;
         RunDirector observed;
         public static void Ensure()
@@ -303,6 +315,13 @@ namespace LastBell.Menu
             if (active) return;
             var go = new GameObject("Main menu return routing"); DontDestroyOnLoad(go); active = go.AddComponent<MenuReturnBridge>();
         }
+        public static bool Return(bool setup)
+        {
+            if(!RunDirector.Instance||RunDirector.Instance.State==RunState.Menu)return false;returnToSetup=setup&&TestSession;
+            if(RunDirector.Instance.ReturnToMenu())return true;returnToSetup=false;return false;
+        }
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetSession(){TestSession=false;returnToSetup=false;active=null;}
         void Update()
         {
             if (observed == RunDirector.Instance) return;
@@ -313,7 +332,11 @@ namespace LastBell.Menu
         void OnState(RunState state)
         { if (state == RunState.Menu) StartCoroutine(Return()); }
         IEnumerator Return()
-        { yield return null; SceneManager.LoadSceneAsync(MainMenu.ScenePath); }
+        {
+            yield return null;bool setup=returnToSetup;returnToSetup=false;MenuLaunch.Clear();
+            if(setup){HeroSelection.TestRush=true;HeroSelection.ResumeSetup=true;}
+            SceneManager.LoadSceneAsync(setup?HeroSelection.ScenePath:MainMenu.ScenePath);
+        }
         void OnDestroy() { if (observed) observed.StateChanged -= OnState; if (active == this) active = null; }
     }
 }

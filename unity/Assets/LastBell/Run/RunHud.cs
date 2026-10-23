@@ -109,7 +109,7 @@ namespace LastBell.Run
                 {
                     var r = Panel(600, 178, h - 376);   // just above the player panel (h - 192)
                     GUI.Label(new Rect(r.x, r.y + 10, r.width, 34), d.Mode == RunMode.Practice ? "PRACTICE — " + RunDirector.Bosses[d.Encounter].Name : "PREPARATION", big);
-                    GUI.Label(new Rect(r.x + 20, r.y + 46, r.width - 40, 70), RunDifficulty.Name(d.Difficulty) + ". " + (d.Mode == RunMode.Practice ? "Practice never advances the run." : RunDirector.RunOrder.Length == 1 ? "One fight: the Bellkeeper." : $"{RunDirector.RunOrder.Length} bosses in a row. Health refills before each boss; potions carry over until the final boss refills them."), mid);
+                    GUI.Label(new Rect(r.x + 20, r.y + 46, r.width - 40, 70), RunDifficulty.Name(d.Difficulty) + ". " + (d.Mode == RunMode.Practice ? "Practice never advances the run." : d.EncounterOrder.Length == 1 ? "One fight: the Bellkeeper." : $"{d.EncounterOrder.Length} bosses in a row. Health refills before each boss; potions carry over until the final boss refills them."), mid);
                     if (GUI.Button(new Rect(r.x + r.width / 2 - 110, r.y + 126, 220, 36), "READY  (Enter)", btn)) d.RequestReady();
                     break;
                 }
@@ -117,7 +117,7 @@ namespace LastBell.Run
                     if (d.Boss != null)
                     {
                         var r = Panel(640, 116, h * 0.18f);
-                        string head = d.Mode == RunMode.Practice ? "Practice" : d.ProgressSlot < RunDirector.RunOrder.Length - 1 ? $"Boss {d.ProgressSlot + 1} of {RunDirector.RunOrder.Length}" : "Final boss";
+                        string head = d.Mode == RunMode.Practice ? "Practice" : d.ProgressSlot < d.EncounterOrder.Length - 1 ? $"Boss {d.ProgressSlot + 1} of {d.EncounterOrder.Length}" : "Final boss";
                         GUI.Label(new Rect(r.x, r.y + 8, r.width, 26), head, mid);
                         GUI.Label(new Rect(r.x, r.y + 34, r.width, 36), d.Boss.DisplayName.ToUpper(), big);
                         GUI.Label(new Rect(r.x, r.y + 72, r.width, 24), d.Boss.Lesson + (d.Boss.Placeholder ? "   ·   [stand-in boss]" : ""), mid);
@@ -128,7 +128,7 @@ namespace LastBell.Run
                 {
                     var r = Panel(560, 84, h * 0.2f);
                     GUI.Label(new Rect(r.x, r.y + 8, r.width, 36), (d.Boss ? d.Boss.DisplayName : "Boss") + " falls silent", big);
-                    string next = d.Mode == RunMode.Practice ? "Practice complete" : d.ProgressSlot == RunDirector.RunOrder.Length - 1 ? "The last bell has rung" : "Next: " + RunDirector.Bosses[RunDirector.RunOrder[d.ProgressSlot + 1]].Name;
+                    string next = d.Mode == RunMode.Practice ? "Practice complete" : d.ProgressSlot == d.EncounterOrder.Length - 1 ? "The last bell has rung" : "Next: " + RunDirector.Bosses[d.EncounterOrder[d.ProgressSlot + 1]].Name;
                     GUI.Label(new Rect(r.x, r.y + 48, r.width, 26), "Combat over · " + next, mid);
                     break;
                 }
@@ -193,7 +193,7 @@ namespace LastBell.Run
 
         void Results()
         {
-            var r = Panel(560, 300);
+            var r = Panel(560, LastBell.Menu.MenuReturnBridge.TestSession ? 330 : 300);
             GUI.Label(new Rect(r.x, r.y + 16, r.width, 50), d.Victory ? (d.Mode == RunMode.Practice ? "PRACTICE CLEARED" : "VICTORY") : "DEFEAT", title);
             var w = d.World;
             string lines = d.Victory ? (d.Mode == RunMode.Practice ? "Practice result only: the run is unchanged." : "The Bellkeeper is silenced. The run is cleared.")
@@ -218,28 +218,30 @@ namespace LastBell.Run
             }
             if (GUI.Button(new Rect(r.x + 40, r.y + 230, 220, 40), d.Mode == RunMode.Practice ? "RETRY PRACTICE  (R)" : "RETRY RUN  (R)", btn)) d.RequestRetry();
             if (GUI.Button(new Rect(r.x + r.width - 260, r.y + 230, 220, 40), "MAIN MENU  (M)", btn)) d.ReturnToMenu();
+            if(LastBell.Menu.MenuReturnBridge.TestSession && GUI.Button(new Rect(r.x+170,r.y+278,220,36),"TEST SETUP",btn)) LastBell.Menu.MenuReturnBridge.Return(true);
         }
 
         void Pause()
         {
-            var r = Panel(420, 220);
+            var r = Panel(420, LastBell.Menu.MenuReturnBridge.TestSession ? 270 : 220);
             GUI.Label(new Rect(r.x, r.y + 14, r.width, 34), "PAUSED", big);
             if (GUI.Button(new Rect(r.x + 90, r.y + 60, 240, 36), "RESUME  (Esc)", btn)) d.SetPaused(false);
             if (GUI.Button(new Rect(r.x + 90, r.y + 106, 240, 36), d.Mode == RunMode.Practice ? "RESTART PRACTICE" : "RESTART RUN", btn)) d.RequestRetry();
             if (GUI.Button(new Rect(r.x + 90, r.y + 152, 240, 36), "MAIN MENU", btn)) d.ReturnToMenu();
+            if(LastBell.Menu.MenuReturnBridge.TestSession && GUI.Button(new Rect(r.x+90,r.y+198,240,36),"TEST SETUP",btn)) LastBell.Menu.MenuReturnBridge.Return(true);
         }
 
         void Track()
         {
             if (d.Mode == RunMode.Practice) { GUI.Label(new Rect(14, 12, 400, 22), "PRACTICE — does not advance the run", small); return; }
             float x = 14, y = 12;
-            for (int i = 0; i < RunDirector.RunOrder.Length; i++)
+            for (int i = 0; i < d.EncounterOrder.Length; i++)
             {
                 int cur = d.ProgressSlot; bool done = i < cur || (i == cur && d.State == RunState.Cleared) || (d.State == RunState.Results && d.Victory);
                 var c = done ? new Color(0.95f, 0.75f, 0.35f) : i == cur ? new Color(0.55f, 0.85f, 1f) : new Color(0.3f, 0.32f, 0.4f);
                 Rect(new Rect(x, y, 112, 26), new Color(0, 0, 0, 0.55f));
                 Rect(new Rect(x, y + 22, 112, 4), c);
-                GUI.Label(new Rect(x + 6, y + 3, 110, 20), (done ? "+ " : i == cur ? "> " : "") + RunDirector.Bosses[RunDirector.RunOrder[i]].Name, tiny);
+                GUI.Label(new Rect(x + 6, y + 3, 110, 20), (done ? "+ " : i == cur ? "> " : "") + RunDirector.Bosses[d.EncounterOrder[i]].Name, tiny);
                 x += 118;
             }
         }

@@ -18,13 +18,17 @@ namespace LastBell.Menu
         public Vector3 VanguardPosition = new Vector3(-1.6f, 0, 1);
         public Vector3 ArcanistPosition = new Vector3(-5.2f, 0, 4.3f);
         public Vector3 ChimesingerPosition = new Vector3(5, 0, 3.8f);
+        public string BossResource = "Bellkeeper2";
+        public int PartySize = 3;
+        public int StageIndex;
+        public bool DriveCamera = true;
         public int CompletedLoops { get; private set; }
         public float Elapsed { get; private set; }
         public int ActorCount => actors.Count;
         public int EffectCount => effects.Count;
         public bool AllModelsPresent => actors.TrueForAll(a => a.Presenter.HasModel);
         public IReadOnlyList<CharacterPresenter> Presenters => actors.ConvertAll(a => a.Presenter);
-        public readonly float[] ActorTravel = new float[4];
+        public readonly float[] ActorTravel = new float[9];
         public int IndependentMotionFrames { get; private set; }
         public int PlantedCastFrames { get; private set; }
         public int CastSlideFrames { get; private set; }
@@ -51,10 +55,7 @@ namespace LastBell.Menu
         void Start()
         {
             view = Camera.main;
-            Spawn("Bellkeeper2", BossPosition, true);
-            Spawn("Vanguard", VanguardPosition);
-            Spawn("Arcanist", ArcanistPosition);
-            Spawn("Chimesinger", ChimesingerPosition);
+            SpawnParty();
             previousNoShake = BellkeeperFx.NoScreenshake; BellkeeperFx.NoScreenshake = true;
             spellFx = MenuFxLifetime.Acquire();
             spellFx.Player.Shield(actors[1].Pose, 0, false);
@@ -81,6 +82,37 @@ namespace LastBell.Menu
                 mote.transform.localScale = Vector3.one * (0.025f + i % 3 * 0.012f);
             }
         }
+        void SpawnParty()
+        {
+            Spawn(BossResource, BossPosition, true);
+            Spawn("Vanguard", VanguardPosition);
+            Spawn("Arcanist", ArcanistPosition);
+            Spawn("Chimesinger", ChimesingerPosition);
+            string[] classes = { "Vanguard", "Arcanist", "Chimesinger" };
+            for (int i = 3; i < PartySize; i++)
+            {
+                float angle = (i - 3) * 2.39996f + StageIndex;
+                Spawn(classes[(i + StageIndex) % 3], P(Mathf.Cos(angle) * 7, Mathf.Sin(angle) * 7));
+            }
+        }
+        public void SetStage(int index, string boss, int partySize)
+        {
+            StageIndex = index; BossResource = boss; PartySize = Mathf.Clamp(partySize, 3, 8);
+            // Release graphs and presenter-owned material instances before replacing the cast.
+            foreach (var a in actors)
+            {
+                a.Root.gameObject.SetActive(false);
+                foreach (var renderer in a.Root.GetComponentsInChildren<Renderer>(true))
+                    foreach (var material in renderer.sharedMaterials)
+                        if (material && (renderer is TrailRenderer || material.name.EndsWith("(Instance)", StringComparison.Ordinal))) Destroy(material);
+                Destroy(a.Root.gameObject);
+            }
+            actors.Clear(); Array.Clear(ActorTravel, 0, ActorTravel.Length);
+            if (spellFx) { spellFx.Player.ResetAll(); spellFx.Boss.ResetAll(); }
+            foreach (var e in effects) { e.Start = -100; e.Line.enabled = false; }
+            previous = -0.01f; Elapsed = 0; CompletedLoops = 0;
+            if (view) SpawnParty(); // Before Start, the fields alone configure the first cast.
+        }
         void Spawn(string resource, Vector3 home, bool boss = false)
         {
             var root = new GameObject(resource + " (menu only)").transform; root.SetParent(transform, false); root.position = home;
@@ -93,7 +125,7 @@ namespace LastBell.Menu
         }
         void Update()
         {
-            if (actors.Count != 4) return;
+            if (actors.Count < 4) return;
             Elapsed += Time.deltaTime;
             float t = Mathf.Repeat(Elapsed, LoopSeconds) / LoopSeconds * 36;
             int loops = Mathf.FloorToInt(Elapsed / LoopSeconds);
@@ -105,8 +137,9 @@ namespace LastBell.Menu
             for (int i = 0; i < actors.Count; i++)
             {
                 var a = actors[i]; Vector3 old = a.Root.position;
+                int route = (i - 1 + 3) % 3;
                 Vector3 desired = i == 0 ? BossPosition + Track(RouteTimes, RouteOffsets, t)
-                    : Track(PartyTimes[i - 1], PartyPositions[i - 1], t) + a.Home - PartyPositions[i - 1][0];
+                    : Track(PartyTimes[route], PartyPositions[route], Mathf.Repeat(t + (i > 3 ? i * 1.7f : 0), 36)) + a.Home - PartyPositions[route][0];
                 desired = Vector3.ClampMagnitude(desired, 11.2f); desired.y = 0;
                 bool planted = Elapsed < a.PlantedUntil;
                 float moveSpeed = i == 0 ? (t >= 18.4f && t < 19.2f ? 12 : 3.2f) : i == 1 ? (t >= 7.8f && t < 8.3f ? 12 : 6) : 4.8f;
@@ -125,6 +158,19 @@ namespace LastBell.Menu
                 if (i == 0) a.Presenter.TickBoss(speed > 0.15f ? "Walk" : "Idle", Mathf.Max(0.2f, speed / 1.75f)); else a.Presenter.Tick(null);
             }
             if (independent) IndependentMotionFrames++;
+            for (int i = 4; i < actors.Count; i++)
+            {
+                float beat = 1 + (i - 4) * .7f;
+                foreach (float at in new[] { beat, beat + 4, beat + 8, beat + 12, beat + 18, beat + 24, beat + 29 })
+                    if (Crossed(t, at))
+                    {
+                        var a = actors[i]; string role = a.Root.name;
+                        string clip = role.StartsWith("Vanguard") ? "SunderingBlow" : role.StartsWith("Arcanist") ? "ArcLance" : "Bellstrike";
+                        a.PlantedUntil = Elapsed + .65f;
+                        a.Root.LookAt(new Vector3(actors[0].Root.position.x, 0, actors[0].Root.position.z));
+                        a.Presenter.PlayOnce(clip, .65f); Bolt(i, role.StartsWith("Arcanist") ? Teal : Gold); SpellsPresented++;
+                    }
+            }
             // Attack releases are separated from animation cues so bolts/impacts match contact poses.
             Cue(t, 0.5f, 1, "SteelRhythm1", 0.5f); Cue(t, 1.1f, 1, "SteelRhythm2", 0.5f);
             Cue(t, 1.8f, 1, "SteelRhythm3", 0.7f); Cue(t, 3, 1, "SunderingBlow", 0.85f);
@@ -216,6 +262,13 @@ namespace LastBell.Menu
             if (Crossed(t, 5.6f)) { fx.Refrain(chime, 9, 32, true); SpellsPresented++; }
             if (Crossed(t, 12.9f) || Crossed(t, 30.8f)) { fx.Crescendo(target.position, true, 2, true); SpellsPresented++; }
             if (Crossed(t, 17)) { fx.Chorus(chime.transform.position, 5); SpellsPresented++; }
+            if (BossResource != "Bellkeeper2")
+            {
+                // Presentation cues only; use the authored model's own attack vocabulary.
+                if (Crossed(t, 8.4f) || Crossed(t, 15.8f) || Crossed(t, 20.5f))
+                { Ring(target.position, BossResource == "Crucivar" ? 6 : 8, BossResource == "Sylvara" ? new Color(.4f, 1, .65f) : Gold, .8f); SpellsPresented++; }
+                return;
+            }
             if (Crossed(t, 8.4f)) { bossFx.SweepResolve(target.position, target.eulerAngles.y, 6.5f, 40); SpellsPresented++; }
             if (Crossed(t, 15.8f)) { bossFx.TollResolve(target.position, 2.6f, 6.8f); SpellsPresented++; }
             if (Crossed(t, 17.8f)) bossFx.ChargeTrail(target, true);
@@ -229,6 +282,13 @@ namespace LastBell.Menu
         {
             if (!Crossed(t, at)) return;
             var a = actors[actor];
+            if (actor == 0 && BossResource != "Bellkeeper2")
+            {
+                if (BossResource == "Aurelion") clip = clip == "BellSweep" ? "MeridianCut" : clip == "HollowToll" ? "ZenithPins" : "ProcessionalThrust";
+                else if (BossResource == "Sylvara") clip = clip == "BellSweep" ? "PruningArc" : clip == "HollowToll" ? "Rootscript" : "Bloom";
+                else clip = clip == "BellSweep" ? "Diebreaker" : clip == "HollowToll" ? "SlagCast" : "RailRam";
+                if (!a.Presenter.Has(clip)) clip = "Idle";
+            }
             if (clip != "Dodge" && clip != "PendulumCharge") a.PlantedUntil = Mathf.Max(a.PlantedUntil, Elapsed + duration);
             if (actor > 0 && clip != "Dodge")
             {
@@ -280,7 +340,7 @@ namespace LastBell.Menu
         }
         void LateUpdate()
         {
-            if (!view) return;
+            if (!view || !DriveCamera) return;
             view.orthographic = false; view.fieldOfView = FieldOfView;
             Vector3 position = CameraTarget + Quaternion.Euler(0, Elapsed * OrbitDegreesPerSecond, 0) * (CameraPosition - CameraTarget);
             view.transform.SetPositionAndRotation(position, Quaternion.LookRotation(CameraTarget - position));
@@ -293,7 +353,7 @@ namespace LastBell.Menu
             // CharacterPresenter owns PlayableGraphs but its runtime material instances need releasing with this scene.
             foreach (var renderer in GetComponentsInChildren<Renderer>())
                 if (!(renderer is LineRenderer)) foreach (var material in renderer.sharedMaterials)
-                    if (material && material.name.EndsWith("(Instance)", StringComparison.Ordinal)) Destroy(material);
+                    if (material && (renderer is TrailRenderer || material.name.EndsWith("(Instance)", StringComparison.Ordinal))) Destroy(material);
         }
     }
 }

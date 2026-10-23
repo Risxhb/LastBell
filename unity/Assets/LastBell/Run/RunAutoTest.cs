@@ -203,6 +203,17 @@ namespace LastBell.Run
             Check($"{label}: nothing resolved after boss death", d.World == null || d.World.Hazards.Resolved == resolved0);
         }
 
+        IEnumerator AdvanceToFinal()
+        {
+            while (d.State == RunState.Combat && d.ProgressSlot < d.EncounterOrder.Length - 1)
+            {
+                int slot = d.ProgressSlot;d.Boss.DebugDefeat();
+                yield return Until(() => d.State == RunState.Combat && d.ProgressSlot == slot + 1, 8, "random run advances slot " + slot);
+                if (d.Player) d.Player.DebugSetHp(PlayerController.MaxHp);
+            }
+            Check("final encounter is Bellkeeper",d.Boss is BellkeeperEncounter && d.ProgressSlot == d.EncounterOrder.Length - 1);
+        }
+
         // ------------------------------------------------------------ the scenario
         IEnumerator Main()
         {
@@ -237,9 +248,10 @@ namespace LastBell.Run
             for (int i = 0; i < 4; i++) { d.RequestReady(); d.RequestReady(); yield return null; }
             yield return Until(() => d.State == RunState.Combat, 4, "combat 1");
             yield return Wait(0.3f);
-            Check("repeated Ready starts exactly one encounter", d.EncounterStarts == starts0 + 1 && d.Encounter == 0, $"starts {d.EncounterStarts - starts0}");
-            Check("the run fights only real bosses: one fight, the Bellkeeper", RunDirector.RunOrder.Length == 1 && d.Boss is BellkeeperEncounter && !d.Boss.Placeholder);
+            Check("repeated Ready starts exactly one encounter", d.EncounterStarts == starts0 + 1 && d.Encounter == d.EncounterOrder[0], $"starts {d.EncounterStarts - starts0}");
+            Check("run contains all four real bosses with Bellkeeper last", d.EncounterOrder.Length == 4 && d.EncounterOrder.Distinct().Count() == 4 && RunDirector.Bosses[d.EncounterOrder.Last()].Final && !d.Boss.Placeholder);
             Check("run starts at full health and potions", d.Player.Hp == PlayerController.MaxHp && d.Player.Potions == PlayerController.MaxPotions, $"hp {d.Player.Hp}, potions {d.Player.Potions}");
+            yield return AdvanceToFinal();
             var bk = (BellkeeperEncounter)d.Boss;
             int bossHp0 = d.Boss.Hp;
             bool sawOpening = false; var vk = d.Player.Kit as VanguardKit2;
@@ -321,7 +333,7 @@ namespace LastBell.Run
             yield return Wait(1.0f); yield return Shot("bellkeeper_defeat");
             Check("defeat opens the chest fully", bk.ShellAngle > 60, $"shell {bk.ShellAngle:0}°");
             yield return Until(() => d.State == RunState.Results, 6, "results 1");
-            Check("victory after the Bellkeeper, the run's only encounter", d.Victory && d.EncountersCleared == 1 && d.EncounterStarts == 1 && d.EncounterEnds == 1,
+            Check("victory after all four bosses, Bellkeeper last", d.Victory && d.EncountersCleared == 4 && d.EncounterStarts == 4 && d.EncounterEnds == 4,
                 $"victory {d.Victory}, cleared {d.EncountersCleared}, starts {d.EncounterStarts}, ends {d.EncounterEnds}");
             yield return Shot("results_victory");
 
@@ -329,7 +341,7 @@ namespace LastBell.Run
             int runs0 = d.RunsStarted;
             for (int i = 0; i < 4; i++) { d.RequestRetry(); d.RequestRetry(); yield return null; }
             yield return Wait(0.5f);
-            Check("repeated Retry starts exactly one fresh run", d.RunsStarted == runs0 + 1 && d.State == RunState.Ready && d.Encounter == 0, $"runs +{d.RunsStarted - runs0}, state {d.State}");
+            Check("repeated Retry starts exactly one fresh run", d.RunsStarted == runs0 + 1 && d.State == RunState.Ready && d.Encounter == d.EncounterOrder[0], $"runs +{d.RunsStarted - runs0}, state {d.State}");
             FreshRunChecks("after victory");
 
             // ---------- run 2: defeat path ----------
@@ -366,6 +378,7 @@ namespace LastBell.Run
             yield return Wait(0.4f); yield return Shot("ready_chimesinger");
             d.RequestReady();
             yield return Until(() => d.State == RunState.Combat, 4, "chimesinger combat");
+            yield return AdvanceToFinal();
             yield return ChimesingerChecks();
             chimeStep = 0; d.Player.DebugSetHp(PlayerController.MaxHp); d.Boss.BeginCombat();
             var f2 = StartCoroutine(Fight(4f, ChimeRotation, 6f));
@@ -373,7 +386,7 @@ namespace LastBell.Run
             yield return Shot("chimesinger_bellkeeper");
             yield return TickRegressions();   // ends the fight with a real Resonant Note killing blow
             yield return Until(() => d.State == RunState.Results, 8, "results 4");
-            Check("Chimesinger run reaches victory", d.Victory && d.EncountersCleared == 1);
+            Check("Chimesinger run reaches victory", d.Victory && d.EncountersCleared == 4);
             d.ReturnToMenu(); yield return null;
 
             // ---------- run 5: Arcanist rotation and full victory ----------
@@ -382,6 +395,7 @@ namespace LastBell.Run
             Check("Arcanist uses its model", d.Player.Presenter.HasModel);
             d.RequestReady();
             yield return Until(() => d.State == RunState.Combat, 4, "arcanist combat");
+            yield return AdvanceToFinal();
             yield return ArcanistChecks();
             if (d.State == RunState.Combat)
             {
@@ -393,7 +407,7 @@ namespace LastBell.Run
                 yield return Until(() => d.State != RunState.Combat, 2, "arcanist boss defeated");
             }
             yield return Until(() => d.State == RunState.Results, 8, "results 5");
-            Check("Arcanist run reaches victory", d.Victory && d.EncountersCleared == 1);
+            Check("Arcanist run reaches victory", d.Victory && d.EncountersCleared == 4);
             d.ReturnToMenu(); yield return null;
 
             // ---------- practice ----------
@@ -453,7 +467,7 @@ namespace LastBell.Run
         void FreshRunChecks(string when)
         {
             var p = d.Player;
-            Check($"fresh run {when}: full health/stamina/potions, encounter 1", p.Hp == PlayerController.MaxHp && p.Potions == PlayerController.MaxPotions && Mathf.Approximately(p.Stamina, PlayerController.MaxStamina) && d.Encounter == 0 && d.EncountersCleared == 0);
+            Check($"fresh run {when}: full health/stamina/potions, encounter 1", p.Hp == PlayerController.MaxHp && p.Potions == PlayerController.MaxPotions && Mathf.Approximately(p.Stamina, PlayerController.MaxStamina) && d.Encounter == d.EncounterOrder[0] && d.EncountersCleared == 0);
             bool cdsClear = true; for (int i = 0; i < p.Kit.SlotNames.Length; i++) cdsClear &= p.Kit.Cooldown01(i) <= 0;
             Check($"fresh run {when}: cooldowns and class state reset", cdsClear && string.IsNullOrEmpty(p.Kit.ClassState()) || (p.Kit is ChimesingerKit ck && ck.Harmony == 0 && !ck.Bell));
             Check($"fresh run {when}: no stale bosses, hazards or projectiles", FindObjectsByType<BossEncounter>().Length == 0 && d.World.Hazards.Count == 0 && d.World.Projectiles.Count == 0 && d.Boss == null);

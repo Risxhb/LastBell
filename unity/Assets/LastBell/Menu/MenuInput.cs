@@ -27,7 +27,7 @@ namespace LastBell.Menu
             submit.AddBinding("<Keyboard>/numpadEnter"); submit.AddBinding("<Gamepad>/buttonSouth");
             var cancel = map.AddAction("Cancel", InputActionType.Button, "<Keyboard>/escape"); cancel.AddBinding("<Gamepad>/buttonEast");
             module.actionsAsset = asset;
-            if (MenuSmokeTest.Requested) asset.devices = MenuSmokeTest.TestDevices;
+            if (MenuSmokeTest.Requested || MenuFlowTest.Requested) asset.devices = MenuSmokeTest.TestDevices;
             module.point = Reference(point); module.leftClick = Reference(click); module.scrollWheel = Reference(scroll);
             module.move = Reference(move); module.submit = Reference(submit); module.cancel = Reference(cancel);
             module.enabled = true; asset.Enable();
