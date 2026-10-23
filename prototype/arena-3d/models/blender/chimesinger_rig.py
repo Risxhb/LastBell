@@ -1203,6 +1203,7 @@ MOCAP = load_mocap(args[2]) if len(args) > 2 and os.path.exists(args[2]) else No
 # by 5 cm on every frame of the mocap stride (searched against the mesh-level overlap / clearance check)
 RUN_R = {False: ((-1.0, -0.489, -0.747), (-0.733, -0.893, -0.433), (0.332, -0.913, 0.132)),
          True: ((-0.961, -0.258, -0.655), (-0.756, -0.907, -0.386), (0.553, -0.967, 0.166))}
+LOCO_L_OUT = tuple(float(v) for v in os.environ.get('CHIME_LOUT', '0.40,0.55').split(','))   # free arm's outward lean (upper, fore)
 def run_arms(s, sprinting, Dc):
     # Staff carried level at her right side, bell end forward, steady (a few degrees of bob).
     # Free left arm: a runner's swing in the sagittal plane, opposite the legs (s < 0 = right foot forward = left arm
@@ -1214,11 +1215,12 @@ def run_arms(s, sprinting, Dc):
     # the staff rocks with the stride (counter to the right leg) and bobs on each footfall
     sw, bob = (0.16, 0.06) if sprinting else (0.12, 0.05)
     out, _, _ = arm_R(w((ru[0], ru[1] + 0.08 * s, ru[2])), w((rf[0], rf[1] + sw * 0.6 * s, rf[2] + bob * abs(s))), w((sd[0], sd[1] + sw * s, sd[2])))
-    amp = 38 if sprinting else 30
+    amp = 32 if sprinting else 26
     ph = math.radians(-amp * s)                                   # upper arm pitch, + = forward
-    bend = math.radians((85 if sprinting else 75) + 15 * max(0.0, -s))
-    lu = (0.14, -math.sin(ph), -math.cos(ph))
-    lf = (0.14, -math.sin(ph + bend), -math.cos(ph + bend))
+    bend = math.radians((70 if sprinting else 62) + 8 * max(0.0, -s))     # (folds little: the hand stays out at her side, off the robe)
+    # (held out from her side: the wide sleeve and the bell strand under it swing clear of the robe)
+    lu = (LOCO_L_OUT[0], -math.sin(ph), -math.cos(ph))
+    lf = (LOCO_L_OUT[1], -math.sin(ph + bend), -math.cos(ph + bend))
     al, _, _ = arm_dirs('L', w(lu), w(lf))
     out.update(al); out.update(fist('R', 1.0)); out.update(fist('L', 0.45)); out['staff'] = staff_pose(); return out
 if MOCAP:
