@@ -44,7 +44,9 @@ Written the way Ultimate guides are: what each mechanic wants from **you**, by y
 - **P5:** the great bell counts I…XIII, one toll every 6 s. XIII ends the attempt. Burn: P5 is 15 % of the bar in 78 s.
 
 ## Fracture of Time (P5)
-- Every P5 Leaning Bell uses the fissure as its line. **Dash across** (4 HP, 30 stamina) rather than walk (14 HP). The stamina trace allows one crossing per loop with room to spare.
+- **Never stand in the fissure** (30/s). It **flares on every toll** of the great bell (every 6 s from P5 start, in time with the numerals): be 1.5 m clear of its line on each toll.
+- Every P5 Leaning Bell uses the fissure as its line, and a toll lands inside its warning: **cross before the toll**. **Dash across** (4 HP, 30 stamina) rather than walk (14 HP). In the first loop you can also wait beside it for the flare and cross in the 1.5 s after; in the second only a dash makes that.
+- **Stilled with a NW or SE hand** (the fissure's ends): your hiding strip is the fissure itself. Hide **beside** it: about 7 m behind the boss, 1.65–1.9 m to either side of the crack (a thin strip: practise it). His body still covers you. On the crack, the burn and the flare take 93 of your 100 HP.
 
 ## Phase cheat-sheet
 | Phase | Learn first | Then |

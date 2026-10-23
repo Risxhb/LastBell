@@ -98,6 +98,8 @@ namespace LastBell.Run
                 {
                     move = to / dist * Mathf.Clamp01(dist / (Speed * Sim.Dt)) * Mathf.Clamp01(Speed / PlayerController.WalkSpeed);
                     if (UseDash && !me.Dashing && me.Stamina >= PlayerController.DashCost && dist > 1.2f && dist / Speed > left - 0.25f) { inp.Dash = true; move = to / dist; }
+                    // a standing burn across the path (the P5 fissure): dash over it when one dash clears it (GUIDE.md)
+                    else if (UseDash && !me.Dashing && me.Stamina >= PlayerController.DashCost && dist > 1.2f && DashesOverBurn(w, pos, to / dist)) { inp.Dash = true; move = to / dist; }
                 }
                 castHold = 0;
             }
@@ -159,7 +161,9 @@ namespace LastBell.Run
                 {
                     float nd = 30; foreach (var q in next) nd = Mathf.Min(nd, Sim.Flat(q - c).magnitude);
                     float secs2 = (t2 - t1) / (float)Sim.Hz;
-                    score += 0.6f * nd + (nd > Speed * secs2 + 1.5f ? 20 : 0);
+                    // the second hop's slack: a dash's gain if one is left, else a walking margin (no dash, no slack)
+                    float slack = UseDash && me.Stamina >= PlayerController.DashCost ? 1.5f : -0.5f;
+                    score += 0.6f * nd + (nd > Speed * secs2 + slack ? 20 : 0);
                 }
                 // later rules still in view: a small pull toward satisfying them too
                 for (int i = g2End; i < rules.Count; i++) if (!rules[i].Ok(c)) score += 0.8f;
@@ -181,6 +185,13 @@ namespace LastBell.Run
                 for (int i = 1; i < 6; i++) if (h.Contains(Vector3.Lerp(from, to, i / 6f))) { cost += 1.5f; break; }
             }
             return cost;
+        }
+
+        // about to step into a locked burn that one dash (3 m) carries it out of
+        static bool DashesOverBurn(CombatWorld w, Vector3 pos, Vector3 dir)
+        {
+            bool In(Vector3 q) { foreach (var h in w.Hazards.Live) if (h.BurnPerSecond > 0 && h.Locked && h.Contains(q)) return true; return false; }
+            return !In(pos) && In(pos + dir * 0.6f) && !In(pos + dir * (PlayerController.DashDistance - 0.25f));
         }
 
         float Range(PlayerController me) => me.ClassName == "Vanguard" ? 0.9f : me.ClassName == "Chimesinger" ? 6.0f : 7.5f;
