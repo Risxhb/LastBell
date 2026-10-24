@@ -170,38 +170,15 @@ namespace LastBell.Run
         {
             Note("---------- Ultimate Part 5: recorded attempts ----------");
             int savedHp = BellkeeperEncounter.UltimateBaseHp;
-            BellkeeperEncounter.UltimateBaseHp = 5000000;
-            var solo = new float[HpSegments.Length]; var party = new float[HpSegments.Length];
-            for (int s = 0; s < HpSegments.Length; s++)
-            {
-                yield return UltRun($"DPS solo {HpSegments[s]}", 1, UltimateBot.Skill.Perfect, HpSegments[s].ToString(), 40, pushOn: false);
-                solo[s] = ultLast == null ? 0 : ultLast.Dealt / (ultLast.Ticks / 60f);
-                yield return UltRun($"DPS party {HpSegments[s]}", 4, UltimateBot.Skill.Perfect, HpSegments[s].ToString(), 40, pushOn: false);
-                party[s] = ultLast == null ? 0 : ultLast.Dealt / (ultLast.Ticks / 60f);
-            }
-            float scale = 1 + 0.7f * 3;
-            // the bar that gives each phase its target length, averaged over phases, solo and party (party HP x scale)
-            float hSolo = HpSegments.Select((s, i) => solo[i] * TargetSeconds[i] / BarShare[i]).Average();
-            float hParty = HpSegments.Select((s, i) => party[i] * TargetSeconds[i] / BarShare[i] / scale).Average();
-            float h = (hSolo + hParty) / 2;
-            // the hard enrage must leave room: P5 at perfect DPS within 60 s of its 78 s
-            float p5 = Mathf.Max(h * BarShare[4] / Mathf.Max(1, solo[4]), h * scale * BarShare[4] / Mathf.Max(1, party[4]));
-            if (p5 > 60) h *= 60 / p5;
-            BellkeeperEncounter.UltimateBaseHp = Mathf.RoundToInt(h / 100) * 100;
-            // push: the slower of solo and party at perfect DPS, + 30 %
-            var push = (float[])BellkeeperEncounter.PushSeconds.Clone();
-            int[] segIdx = { 0, 2, 3, 5, 6 };
-            for (int i = 0; i < 4; i++)
-            {
-                float t = Mathf.Max(h * BarShare[i] / Mathf.Max(1, solo[i]), h * scale * BarShare[i] / Mathf.Max(1, party[i]));
-                push[segIdx[i]] = Mathf.Ceil(t * 1.3f / 5) * 5;
-            }
-            BellkeeperEncounter.PushSeconds = push;
-            Note("DPS solo: " + string.Join("  ", HpSegments.Select((s, i) => $"{s} {solo[i]:0}")) + " · party of 4: " + string.Join("  ", HpSegments.Select((s, i) => $"{s} {party[i]:0}")));
-            Note($"provisional UltimateBaseHp {BellkeeperEncounter.UltimateBaseHp} · push P1 {push[0]} P2 {push[2]} P3 {push[3]} P4 {push[5]} · P5 enrage {push[6]}");
+            // Provisional numbers from part5-attempts-1's stepped DPS measure (party of 4: P1 187, P2 224, P3 158, P4 122,
+            // P5 102): the bar is capped so the party's P5 fits the 78 s enrage (13000 x 3.1 x 15 % / 102 = 59 s); push = the
+            // party's perfect phase time x ~1.3. Solo HP is the same base (no solo tuning yet).
+            BellkeeperEncounter.UltimateBaseHp = 13000;
+            BellkeeperEncounter.PushSeconds = new float[] { 45, 0, 70, 70, 0, 90, 78 };
+            Note($"provisional UltimateBaseHp {BellkeeperEncounter.UltimateBaseHp} · push P1 45 P2 70 P3 70 P4 90 · P5 enrage 78");
             yield return UltRecordAttempt("party4_perfect", 4, UltimateBot.Skill.Perfect);
-            yield return UltRecordAttempt("solo_perfect", 1, UltimateBot.Skill.Perfect);
             yield return UltRecordAttempt("party4_late", 4, UltimateBot.Skill.Late);
+            yield return UltRecordAttempt("solo_perfect", 1, UltimateBot.Skill.Perfect);
             BellkeeperEncounter.UltimateBaseHp = savedHp;
             BellkeeperEncounter.PushSeconds = new float[] { 130, 0, 150, 130, 0, 130, 78 };
         }
@@ -213,21 +190,22 @@ namespace LastBell.Run
             var bots = UltimateParty.Fill(d.World, n, skill, n > 1 ? PartyClasses : new[] { "Vanguard" });
             foreach (var b in bots) b.Speed = PlayerController.WalkSpeed;
             var cdir = System.IO.Path.Combine(dir, "attempt_" + name); System.IO.Directory.CreateDirectory(cdir);
+            var boss = bk;
             bk.BeginCombat(); d.SetPaused(false);
             Time.captureFramerate = 30;
             int frame = 0, tail = -1, max = 30 * 60 * 16;
+            bool killed = false; string seg = "P1", cause = null; float hpLeft = 1;
             while (frame < max && (tail < 0 || tail-- > 0))
             {
                 yield return new WaitForEndOfFrame();
                 var tex = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
                 tex.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0); tex.Apply();
                 System.IO.File.WriteAllBytes(System.IO.Path.Combine(cdir, $"{frame++:00000}.jpg"), tex.EncodeToJPG(80)); Destroy(tex);
-                if (tail < 0 && d.State != RunState.Combat) tail = 30 * 4;   // keep 4 s of the outcome screen
+                if (boss) { killed |= boss.Dead; seg = boss.Segment.ToString(); hpLeft = boss.Hp / (float)boss.MaxHp; if (boss.Ult.WipeCause != null) cause = boss.Ult.WipeCause; }
+                if (tail < 0 && d.State != RunState.Combat) { tail = 30 * 4; if (!killed) cause = cause ?? d.DefeatCause; }   // keep 4 s of the outcome screen
             }
             Time.captureFramerate = 0;
-            var b0 = bk;
-            string outcome = b0 != null && b0.Dead ? "KILL" : $"WIPE ({(b0 != null ? b0.Ult.WipeCause ?? d.DefeatCause : d.DefeatCause)})";
-            Note($"attempt {name}: {outcome} after {frame / 30f / 60f:0}:{frame / 30f % 60:00} recorded · reached {(b0 != null ? b0.Segment.ToString() : "?")} · boss {(b0 != null ? b0.Hp / (float)b0.MaxHp : 0):P1} left · frames {frame}");
+            Note($"attempt {name}: {(killed ? "KILL" : "WIPE (" + cause + ")")} after {frame / 30 / 60}:{frame / 30 % 60:00} recorded · reached {seg} · boss {hpLeft:P1} left · frames {frame}");
             d.SetPaused(true);
         }
 
