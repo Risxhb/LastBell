@@ -15,10 +15,10 @@ namespace LastBell.Run
     //
     //   Threefold Severance  1 left cleave (x < +2.5 m in the boss frame), 2 right cleave (x > -2.5), 3 overhead front
     //                        band (|x| < 3.5, ahead of his back plate). Opening 9 beats (6 and 8 failed far-start route checks), 4 beats between impacts,
-    //                        recovery 6 beats. Position and facing locked before the first preview; he never swivels.
-    //   Sundering Wake       3 m lane to a distant player (+2.6 m thrust reach), 6-beat warning, travel 0.45 s (hit when the blade arrives),
-    //                        then a separate 2.2 m eruption lane on the same path, 5-beat warning, resolves once.
-    //   Hollow Crown         ring outside a 4 m pocket (8 beats), then a 5.5 m circle under him (4 beats more).
+    //                        recovery 5/6 beats (Haste/Normal). Position and facing locked before the first preview; he never swivels.
+    //   Sundering Wake       3 m lane to a distant player (+2.6 m thrust reach), 5/6-beat warning, travel 0.45 s (hit when the blade arrives),
+    //                        then a separate 2.2 m eruption lane on the same path, 4/5-beat warning, resolves once.
+    //   Hollow Crown         ring outside a 4 m pocket (7/8 beats), then a 5.5 m circle under him (4 beats more).
     //   Closing Rush         announced, non-damaging: after 1.5 s with the pursuit target beyond 9 m.
     //   Broken Cadence       below 20% HP (once, queued to a block boundary): every Haste passage opens with
     //                        Sundering Wake -> Threefold Severance, fissure always erupting >= 8 beats before strike 1.
@@ -34,18 +34,46 @@ namespace LastBell.Run
         public const float CentreGate = 1.5f;                     // combo/crown start only this close to the arena centre
         public const float OwnBound = 8.5f;                     // charge / rush endpoints: >= 2 m wall corridor behind the body
         public const float SevSide = 2.5f, SevBand = 3.5f, SevReach = 30f;
-        public const float SevOpenBeats = 9, SevGapBeats = 4, SevRecoverBeats = 6;
-        public const float WakeWidth = 3f, FissureWidth = 2.2f, WakeWarnBeats = 6, FissureWarnBeats = 5, WakeRecoverBeats = 4,
+        // Windows in beats as (Haste, Normal). Haste casts faster twice over: every beat is shorter (165 vs 123.75 BPM)
+        // AND most indicators get fewer beats from placement to activation. Severance's opening and gaps stay equal in
+        // beats because the whole-route checks need them (Haste is still 25% shorter in seconds).
+        public static readonly (float H, float N) SevOpen = (9, 9), SevGap = (4, 4), SevRecover = (5, 6),
+            WakeWarn = (5, 6), FissureWarn = (4, 5), WakeRecover = (3, 4),
+            CrownRing = (7, 8), CrownInnerWarn = (4, 4), CrownRecover = (6, 8), RushTell = (2, 3);
+        public static float Of((float H, float N) w, Tempo t) => t == Tempo.Haste ? w.H : w.N;
+        public const float WakeWidth = 3f, FissureWidth = 2.2f,
             WakeOvershoot = 2f, WakeMaxTravel = 15f, WakeMinTravel = 4f, WakeReach = 2.6f;   // reach: greatsword thrust beyond the body
         public const int WakeTravelTicks = 27;
-        public const float CrownPocket = 4f, CrownInner = 5.5f, CrownRingBeats = 8, CrownInnerBeats = 4, CrownRecoverBeats = 8;
-        public const float FightDist = 4.5f, RushDist = 9f, RushHysteresis = 1.5f, RushSpeed = 16f, RushTellBeats = 3;
+        public const float CrownPocket = 4f, CrownInner = 5.5f;
+        public const float FightDist = 4.5f, RushDist = 9f, RushHysteresis = 1.5f, RushSpeed = 16f;
         public const int RushSustainTicks = 90, RushCooldownTicks = 8 * Sim.Hz, PursuitMaxTicks = 75;
         public const float HasteWalk = 3.4f, NormalWalk = 2.6f;
         public const float FrenzyAt = 0.2f;
         public const int FrenzyTellTicks = 90;
         public const int SevDmg1 = 26, SevDmg2 = 26, SevDmg3 = 30, WakeDmg = 24, FissureDmg = 16, RingDmg = 22, InnerDmg = 22;
         public const int FissureLeadBeats = 8;                  // chain: eruption at least this many beats before strike 1
+
+        // this boss's live-warning palette (HDR): saturated red-orange strikes, hot amber eruption, ivory stop markers
+        public static readonly Color LiveFill = new Color(1.25f, 0.30f, 0.12f), LiveBorder = new Color(2.2f, 0.75f, 0.25f),
+            EruptFill = new Color(1.4f, 1.0f, 0.2f), EruptBorder = new Color(2.6f, 2.0f, 0.5f),
+            MarkerFill = new Color(0.9f, 0.88f, 0.80f), MarkerBorder = new Color(2.0f, 1.95f, 1.75f);
+        // flash: resolve-flash strength for this telegraph (floor-sized strikes stay low so the next warning stays readable)
+        Hazard Live(Hazard h, bool eruption = false, float flash = 0.5f)
+        {
+            W.Hazards.Spawn(h);
+            h.Tele.Tint(eruption ? EruptFill : LiveFill, eruption ? EruptBorder : LiveBorder);
+            h.Tele.FlashScale = flash; h.Tele.SpentFast = true;   // a spent strike never outshines the next live one
+            return h;
+        }
+        static readonly Color RimIvory = new Color(1.6f, 1.5f, 1.25f), RimBrass = new Color(1.5f, 1.05f, 0.45f), RimAmber = new Color(2.0f, 1.1f, 0.3f);
+        // solid ivory ring + centre pip: "he stops here" (presentation only, never a hazard)
+        (BellkeeperFx.Telegraph ring, BellkeeperFx.Telegraph pip) StopMarker(Vector3 at)
+        {
+            var ring = W.BossFx.Ring(BodyRadius - 0.18f, BodyRadius); ring.Tint(MarkerFill, MarkerBorder); ring.Lock(); ring.Place(at, 0);
+            var pip = W.BossFx.Circle(0.28f); pip.Tint(MarkerFill, MarkerBorder); pip.Lock(); pip.Place(at, 0);
+            return (ring, pip);
+        }
+        public TempoTyrantFx Fx { get; private set; }
 
         public readonly TempoClock Clock = new TempoClock();
         public TempoTyrantRig Rig { get; private set; }
@@ -84,6 +112,7 @@ namespace LastBell.Run
             Rig = TempoTyrantRig.Create(transform);
             Audio = gameObject.AddComponent<TempoTyrantAudio>(); Audio.Bind(this);
             gameObject.AddComponent<TempoTyrantHud>().Bind(this);
+            Fx = gameObject.AddComponent<TempoTyrantFx>();
             Clock.Reset();
             PhaseName = "Haste";
         }
@@ -91,6 +120,7 @@ namespace LastBell.Run
         public static bool ArenaCentred(Vector3 p) => new Vector2(p.x, p.z).magnitude <= CentreGate + 0.05f;
         float Walk => Clock.State == Tempo.Haste ? HasteWalk : NormalWalk;
         int Beats(float b) => Clock.TicksFor(b);
+        int Beats((float H, float N) w) => Clock.TicksFor(Of(w, Clock.State));
 
         // ---------------- script ----------------
         protected override IEnumerable<int> Script()
@@ -152,10 +182,10 @@ namespace LastBell.Run
             FrenzyPending = false; Frenzy = true; FrenzyTriggers++;
             Current = "Broken Cadence (tell)"; Announcement = "BROKEN CADENCE";
             Rig.Pose(TyrantPose.Frenzy); Rig.Frenzy = true;
-            W.Fx.Crescendo(transform.position, true, 1, false);
+            Fx.Rim(transform.position, BodyRadius + 1.2f, RimAmber);
             Log("frenzy");
-            for (int i = 0; i < FrenzyTellTicks; i++) { Windup(i / (float)FrenzyTellTicks); yield return 1; }
-            Release(1.2f); Announcement = "";
+            for (int i = 0; i < FrenzyTellTicks; i++) { Windup(0.45f * i / FrenzyTellTicks); yield return 1; }
+            Release(0.5f); Announcement = "";
             if (Clock.State == Tempo.Haste) ChainDue = true;   // queued once; never double-enqueued by the next commit
             PhaseName = "Broken Cadence · " + Clock.State; SetPhase(PhaseName);
         }
@@ -220,21 +250,21 @@ namespace LastBell.Run
         IEnumerable<int> ClosingRush(PlayerController t)
         {
             Current = "Closing Rush (announced)"; Announcement = "CLOSING RUSH"; Rig.Pose(TyrantPose.Rush);
-            int tell = Beats(RushTellBeats);
-            var endMarker = W.BossFx.Circle(BodyRadius); endMarker.Memory();
+            int tell = Beats(RushTell);
+            var endMarker = StopMarker(RushEndpoint(t));
             for (int i = 0; i < tell; i++)
             {
-                if (!t || t.Down || !W.Players.Contains(t)) { RushCancels++; endMarker.Dismiss(); Announcement = ""; Current = "rush cancelled"; rushReadyAt = Age + Sim.Hz; yield break; }
+                if (!t || t.Down || !W.Players.Contains(t)) { RushCancels++; endMarker.ring.Dismiss(); endMarker.pip.Dismiss(); Announcement = ""; Current = "rush cancelled"; rushReadyAt = Age + Sim.Hz; yield break; }
                 TurnTowards(Sim.YawTo(transform.position, t.transform.position, transform.eulerAngles.y), 360);
-                endMarker.Place(RushEndpoint(t), 0);
+                var e = RushEndpoint(t); endMarker.ring.Place(e, 0); endMarker.pip.Place(e, 0);
                 yield return 1;
             }
             var start = transform.position; var end = RushEndpoint(t);
-            endMarker.Place(end, 0);
+            endMarker.ring.Place(end, 0); endMarker.pip.Place(end, 0);
             int travel = Mathf.Max(1, Mathf.CeilToInt(Vector3.Distance(start, end) / RushSpeed * Sim.Hz));
             Current = "Closing Rush"; Rushes++;
             for (int i = 1; i <= travel; i++) { transform.position = Vector3.Lerp(start, end, i / (float)travel); yield return 1; }
-            endMarker.Dismiss(); Announcement = ""; rushReadyAt = Age + RushCooldownTicks; farTicks = 0;
+            endMarker.ring.Dismiss(); endMarker.pip.Dismiss(); Announcement = ""; rushReadyAt = Age + RushCooldownTicks; farTicks = 0;
             Rig.Pose(TyrantPose.Idle);
             yield return Beats(1);
         }
@@ -280,7 +310,7 @@ namespace LastBell.Run
             float yaw = YawToTarget();
             transform.rotation = Quaternion.Euler(0, yaw, 0);
             LockedYaw = yaw; LockedPos = Sim.Flat(transform.position);
-            int open = openingTicks > 0 ? openingTicks : Beats(SevOpenBeats), gap = Beats(SevGapBeats);
+            int open = openingTicks > 0 ? openingTicks : Beats(SevOpen), gap = Beats(SevGap);
             int[] resolveAt = { open, open + gap, open + 2 * gap };
             // previews: the full 1-2-3 sequence from the start; only the imminent strike is a live (filled) warning
             var previews = new BellkeeperFx.Telegraph[3];
@@ -302,20 +332,20 @@ namespace LastBell.Run
                 int n = k + 1;
                 h.OnResolve = hz =>
                 {
-                    W.BossFx.SweepResolve(LockedPos, yaw + (n == 1 ? -90 : n == 2 ? 90 : 0), 6.5f, n == 3 ? 20 : 80);
+                    if (n == 3) Fx.Streak(LockedPos, yaw, 1.0f, 9f); else Fx.Arc(LockedPos, yaw, n == 1 ? -1 : 1);
                     Release(1.2f); CameraShake.Shake(0.12f, 0.2f);
                     if (n == 1) LastStrike1ResolveAge = Age;
                 };
                 if (previews[k] != null) { previews[k].Dismiss(); previews[k] = null; }
-                W.Hazards.Spawn(h); SeveranceStrikes.Add(h);
-                for (int i = 0; i < Numbers.Count; i++) Numbers[i] = (Numbers[i].at, Numbers[i].number, i == k);
+                Live(h, false, 0.25f); SeveranceStrikes.Add(h);
+                for (int i = 0; i < Numbers.Count; i++) Numbers[i] = (Numbers[i].at, Numbers[i].number, Numbers[i].number == k + 1);
                 Rig.Pose(k == 0 ? TyrantPose.SlashLeft : k == 1 ? TyrantPose.SlashRight : TyrantPose.Overhead, h.ResolveAt);
                 for (; age < resolveAt[k]; age++) { Windup((age - start) / (float)h.ResolveAt); yield return 1; }
                 Numbers.RemoveAll(x => x.number == n);
             }
             Numbers.Clear();
             Current = "Threefold Severance (recovery)"; Rig.Pose(TyrantPose.Recover);
-            glowTarget = 0.5f; yield return Beats(SevRecoverBeats); glowTarget = 1;
+            glowTarget = 0.5f; yield return Beats(SevRecover); glowTarget = 1;
         }
 
         // ---------------- Sundering Wake ----------------
@@ -351,12 +381,12 @@ namespace LastBell.Run
             var (start, end, yaw) = WakePath(target ? target.transform.position : transform.position + transform.forward * 6);
             transform.rotation = Quaternion.Euler(0, yaw, 0);
             float travelLen = Vector3.Distance(start, end);
-            int warn = Beats(WakeWarnBeats);
+            int warn = Beats(WakeWarn);
             var h = new Hazard { Source = "Sundering Wake (charge)", Shape = HazardShape.Lane, Kind = HazardKind.Strike, Origin = start, Yaw = yaw,
                 Length = travelLen + BodyRadius + WakeReach, Width = WakeWidth, LockAt = 0, ResolveAt = warn + WakeTravelTicks, Damage = WakeDmg, Knockback = 2f,
                 HitOnResolve = false };
-            LastWake = W.Hazards.Spawn(h);
-            var endMarker = W.BossFx.Circle(BodyRadius); endMarker.Memory(); endMarker.Place(end, 0);   // the endpoint he stops on
+            LastWake = Live(h);
+            var endMarker = StopMarker(end);   // where he stops (the lane runs on by his body and 2.6 m thrust reach)
             Rig.Pose(TyrantPose.ThrustWindup, warn);
             for (int i = 0; i < warn; i++) { Windup(i / (float)warn); yield return 1; }
             Rig.Pose(TyrantPose.Thrust); Release(); W.BossFx.ChargeTrail(transform, true);
@@ -373,19 +403,20 @@ namespace LastBell.Run
                 }
                 yield return 1;
             }
-            W.BossFx.ChargeTrail(transform, false); W.BossFx.ChargeLand(transform.position); endMarker.Dismiss();
+            W.BossFx.ChargeTrail(transform, false); Fx.Rim(transform.position, BodyRadius + 0.2f, RimBrass * 0.6f); CameraShake.Shake(0.1f, 0.15f);
+            endMarker.ring.Dismiss(); endMarker.pip.Dismiss();
             // the delayed wake: a separate hazard instance with its own warning; it erupts exactly once
-            int fissureWarn = Beats(FissureWarnBeats);
+            int fissureWarn = Beats(FissureWarn);
             var f = new Hazard { Source = "Sundering Wake (eruption)", Shape = HazardShape.Lane, Kind = HazardKind.Ground, Origin = start, Yaw = yaw,
                 Length = travelLen, Width = FissureWidth, LockAt = 0, ResolveAt = fissureWarn, Damage = FissureDmg, Knockback = 1f };
-            f.OnResolve = hz => { FissureEruptions++; W.BossFx.StripStamp(hz.Origin, hz.Yaw, hz.Length, hz.Width); Rig.Fissure(false); };
-            LastFissure = W.Hazards.Spawn(f);
+            f.OnResolve = hz => { FissureEruptions++; Fx.Streak(hz.Origin, hz.Yaw, 0, hz.Length, RimAmber, hz.Width * 0.5f); Rig.Fissure(false); };
+            LastFissure = Live(f, true);
             LastFissureResolveAge = Age + fissureWarn;
             Rig.Fissure(true, start, end);
             Rig.Pose(TyrantPose.Recover);
             if (inChain) yield break;   // the chain schedules the Severance around the pending eruption
             Current = "Sundering Wake (recovery)";
-            int rec = Mathf.Max(Beats(WakeRecoverBeats), fissureWarn + 1);   // the block ends after its eruption: no overlap
+            int rec = Mathf.Max(Beats(WakeRecover), fissureWarn + 1);   // the block ends after its eruption: no overlap
             glowTarget = 0.5f; yield return rec; glowTarget = 1;
         }
 
@@ -395,24 +426,29 @@ namespace LastBell.Run
             foreach (var w in CentreUp()) yield return w;
             Current = "Hollow Crown"; Rig.Pose(TyrantPose.RingCast);
             var c = Sim.Flat(transform.position);
-            int ringT = Beats(CrownRingBeats), innerT = Beats(CrownInnerBeats);
+            int ringT = Beats(CrownRing), innerT = Beats(CrownInnerWarn);
             var ring = new Hazard { Source = "Hollow Crown (outer ring)", Shape = HazardShape.Ring, Kind = HazardKind.Ground, Origin = c, Inner = CrownPocket,
                 Radius = SevReach, LockAt = 0, ResolveAt = ringT, Damage = RingDmg, Knockback = 1f, ClipRadius = CombatWorld.PlayerBound + PlayerController.Radius };
-            ring.OnResolve = hz => { W.BossFx.TollResolve(hz.Origin, hz.Inner, Mathf.Min(hz.Radius, CombatWorld.PlayerBound + 2)); Release(1); };
-            LastRing = W.Hazards.Spawn(ring);
+            ring.OnResolve = hz => { Fx.Rim(hz.Origin, hz.Inner, RimIvory); Release(1); };
+            LastRing = Live(ring, false, 0.25f);
             var innerPreview = W.BossFx.Circle(CrownInner); innerPreview.Memory(); innerPreview.Place(c, 0);
-            Numbers.Clear(); Numbers.Add((c + new Vector3(0, 0, CrownPocket + 3.5f), 1, true)); Numbers.Add((c + new Vector3(0, 0, -2.6f), 2, false));
+            // "1" east or west of him (whichever side is farther from the nearest player), never north/south where it
+            // would stack on "(2)"; "(2)" sits just south of his body
+            var near = W.NearestStanding(c); float sideX = near && near.transform.position.x > c.x ? -1 : 1;
+            var label1 = c + Vector3.right * sideX * Mathf.Min(CrownPocket + 3.5f, CombatWorld.PlayerBound - 1.5f - Mathf.Abs(c.x));
+            var label2 = c + new Vector3(0, 0, 1.2f);
+            Numbers.Clear(); Numbers.Add((label1, 1, true)); Numbers.Add((label2, 2, false));
             for (int i = 0; i < ringT; i++) { Windup(i / (float)ringT); yield return 1; }
-            innerPreview.Dismiss(); Numbers.Clear(); Numbers.Add((c + new Vector3(0, 0, -2.6f), 2, true));
+            innerPreview.Dismiss(); Numbers.Clear(); Numbers.Add((label2, 2, true));
             Rig.Pose(TyrantPose.GroundStrike, innerT);
             var inner = new Hazard { Source = "Hollow Crown (inner circle)", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = c, Radius = CrownInner,
                 LockAt = 0, ResolveAt = innerT, Damage = InnerDmg, Knockback = 1.5f };
-            inner.OnResolve = hz => { W.BossFx.ChimeResolve(hz.Origin, hz.Radius); Release(1.4f); CameraShake.Shake(0.15f, 0.25f); };
-            LastInner = W.Hazards.Spawn(inner);
+            inner.OnResolve = hz => { Fx.Rim(hz.Origin, hz.Radius, RimIvory); Release(1.0f); CameraShake.Shake(0.15f, 0.25f); };
+            LastInner = Live(inner, false, 0.5f);
             for (int i = 0; i < innerT; i++) { Windup(i / (float)innerT); yield return 1; }
             Numbers.Clear();
             Current = "Hollow Crown (recovery)"; Rig.Pose(TyrantPose.Recover);
-            glowTarget = 0.5f; yield return Beats(CrownRecoverBeats); glowTarget = 1;
+            glowTarget = 0.5f; yield return Beats(CrownRecover); glowTarget = 1;
         }
 
         // ---------------- Broken Cadence chain ----------------
@@ -424,7 +460,7 @@ namespace LastBell.Run
             foreach (var w in CentreUp()) yield return w;
             // full opening, lengthened when needed so the eruption lands >= FissureLeadBeats before strike 1;
             // nothing is shortened. The fissure is spent before any route between slash safe regions is needed.
-            int open = Mathf.Max(Beats(SevOpenBeats), eruptAge - Age + Beats(FissureLeadBeats));
+            int open = Mathf.Max(Beats(SevOpen), eruptAge - Age + Beats(FissureLeadBeats));
             foreach (var w in Severance(open, false)) yield return w;
         }
 
@@ -446,7 +482,7 @@ namespace LastBell.Run
 
         protected override void OnDefeat()
         {
-            Numbers.Clear(); Announcement = "";
+            Numbers.Clear(); Announcement = ""; PhaseName = "Defeated";
             Rig.Fissure(false); Rig.Pose(TyrantPose.Defeat);
             if (Audio) Audio.StopAll();
             W.Fx.Crescendo(transform.position, true, 2, true);

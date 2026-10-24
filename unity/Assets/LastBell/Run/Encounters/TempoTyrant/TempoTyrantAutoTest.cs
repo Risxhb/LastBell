@@ -122,8 +122,10 @@ namespace LastBell.Run
             else bot.MoveWorld = Vector3.zero;
         }
 
+        int perfFrames; float perfTime;
         void Observe()
         {
+            if (d != null && d.State == RunState.Combat && !d.Paused) { perfFrames++; perfTime += Time.unscaledDeltaTime; }
             var w = d?.World; if (w == null) return;
             foreach (var h in w.Hazards.Live)
                 if (!seen.ContainsKey(h.Id))
@@ -162,8 +164,9 @@ namespace LastBell.Run
             Check("arena present with separate frame/rod/weight/escapement", arena && arena.Frame && arena.Rod && arena.Weight && arena.Escapement && arena.Weight.parent == arena.Rod);
             Check("exactly one physical rod", arena && arena.GetComponentsInChildren<Transform>(true).Count(t => t.name == "Rod") == 1);
             Check("arena bound is the 25 m floor", Mathf.Approximately(CombatWorld.PlayerBound, 12.5f) && !CombatWorld.SquareBound);
-            float a0 = arena ? arena.RodAngle : 0; yield return new WaitForSeconds(0.2f);
-            Check("readiness previews the metronome (non-damaging)", arena && arena.Preview && Mathf.Abs(arena.RodAngle - a0) > 0.5f && d.World.Hazards.Count == 0);
+            float minA = 999, maxA = -999;
+            for (float t = 0; t < 1.0f; t += Time.deltaTime) { if (arena) { minA = Mathf.Min(minA, arena.RodAngle); maxA = Mathf.Max(maxA, arena.RodAngle); } yield return null; }
+            Check("readiness previews the metronome (non-damaging)", arena && arena.Preview && maxA - minA > 5f && d.World.Hazards.Count == 0, $"swing range {maxA - minA:0.0} deg");
             // menu preview image for the Test Rush map tile (960x540, the same view MapPreviewCapture uses)
             if (Application.isEditor)
             {
@@ -186,12 +189,31 @@ namespace LastBell.Run
             yield return Shot("gameplay_start_haste");
             Check("fight starts in Haste at beat 0", boss.Clock.State == Tempo.Haste && boss.Clock.Beat < 1 && boss.Clock.Commits == 0);
             Check("stand-in is labelled", boss.Placeholder && boss.Rig && boss.Rig.name.Contains("STAND-IN"));
-            Check("music status reported (no fabricated track)", boss.Audio && (boss.Audio.Music != TempoTyrantAudio.MusicStatus.Paired || Resources.Load<AudioClip>("Menu/BossMusic/" + TempoTyrantAudio.SlowTrack)), boss.Audio ? boss.Audio.StatusText : "");
-            Note(boss.Audio.StatusText);
+            TempoTyrantHud.ShowDiagnostics = false;   // clean captures; the report carries the numbers
+            Check("music: By My Measure paired with its 0.75x version", boss.Audio && boss.Audio.Music == TempoTyrantAudio.MusicStatus.Paired, boss.Audio ? boss.Audio.StatusText : "");
+            var music = FindAnyObjectByType<LastBell.Menu.MenuMusic>();
+            yield return Wait(1.0f);
+            Check("music: Haste plays the 165 BPM version, beat-locked to the clock", music && music.Source && music.Source.clip && music.Source.clip.name == TempoTyrantAudio.HasteTrack && music.Source.isPlaying &&
+                boss.Audio.MusicLocked && Mathf.Abs(boss.Audio.LastMusicError) < TempoTyrantAudio.ResyncTolerance, boss.Audio.StatusText);
+            Check("Haste indicators: fewer beats AND shorter seconds than Normal", HasteShorter(), HasteTable());
+            Note(HasteTable());
+            var arenaNow = FindAnyObjectByType<MetronomeCourtArena>();
+            Check("metronome reaches the gameplay frame: rod-shadow spot light with shadows + rim lantern chase", arenaNow && arenaNow.RodShadowLight && arenaNow.RodShadowLight.shadows != LightShadows.None && arenaNow.LanternCount >= 8,
+                arenaNow ? $"lanterns {arenaNow.LanternCount}" : "");
+            int shadowFrames = 0, sampled = 0;
+            for (float t = 0; t < 1.5f; t += Time.deltaTime, sampled++)
+            {
+                if (arenaNow && arenaNow.RodShadowOnFloor && new Vector2(arenaNow.RodShadowTip.x, arenaNow.RodShadowTip.z).magnitude <= MetronomeCourtArena.FloorRadius + 0.01f) shadowFrames++;
+                yield return null;
+            }
+            // the projected shadow sweeps across the dial through the middle of each swing and runs past the floor edge at the
+            // extremes (a sweeping beam), so it must be on the floor for part of every swing, not all of it
+            Check("rod shadow sweeps across the dial on every swing", sampled > 0 && shadowFrames >= Mathf.Max(1, sampled * 0.25f), $"{shadowFrames}/{sampled} frames on the floor");
+            Check("world lighting in its Haste (warm) state", arenaNow && arenaNow.TempoBlend > 0.9f, arenaNow ? $"blend {arenaNow.TempoBlend:0.00}" : "");
             yield return BossCloseups("haste");
 
             // ---------------- Threefold Severance (Haste) ----------------
-            yield return Severance("haste", 160f);
+            yield return Severance("haste", 165f);
 
             // ---------------- tempo change (Haste -> Normal) ----------------
             goal = new Vector3(0, 0, 7);
@@ -204,11 +226,16 @@ namespace LastBell.Run
             }
             Check("no hazard live during the three accented transition ticks", transitionFrames > 0 && transitionHazardFrames == 0, $"{transitionHazardFrames}/{transitionFrames} frames");
             Check("music rate derived from tempo (0.75 outside Haste)", Mathf.Approximately(boss.Clock.MusicRate, 0.75f));
+            yield return Wait(0.6f);
+            var arenaN = FindAnyObjectByType<MetronomeCourtArena>();
+            Check("world lighting follows tempo into its Normal (cool) state", arenaN && arenaN.TempoBlend < 0.1f, arenaN ? $"blend {arenaN.TempoBlend:0.00}" : "");
+            Check("music: Normal swaps to the 0.75x version at the same beat, still locked", music && music.Source.clip && music.Source.clip.name == TempoTyrantAudio.SlowTrack && music.Source.isPlaying &&
+                boss.Audio.MusicSwaps >= 1 && Mathf.Abs(boss.Audio.LastMusicError) < TempoTyrantAudio.ResyncTolerance, boss.Audio.StatusText);
             yield return Wait(0.4f);
             yield return Shot("gameplay_normal_tempo");
             yield return BossCloseups("normal");
             boss.ForcedNext = "Severance";
-            yield return Severance("normal", 120f);
+            yield return Severance("normal", 123.75f);
 
             // ---------------- Sundering Wake ----------------
             yield return Wake();
@@ -231,6 +258,7 @@ namespace LastBell.Run
             // ---------------- whole-route feasibility (authoritative geometry) ----------------
             Routes();
 
+            Note($"performance: {perfFrames} combat frames, average {(perfTime > 0 ? perfFrames / perfTime : 0):0.0} fps at {Screen.width}x{Screen.height}");
             Check("no errors or exceptions logged", errors == 0, $"{errors}");
             Finish();
         }
@@ -264,6 +292,8 @@ namespace LastBell.Run
             Check($"Severance {tag}: telegraphs are clipped to the floor", boss.SeveranceStrikes[0].ClipRadius > 0 && boss.SeveranceStrikes[0].ClipRadius <= CombatWorld.PlayerBound + 0.5f);
             int beforeStrikes = boss.SeveranceStrikes.Count;
             yield return Until(() => boss.SeveranceStrikes.Count >= 2, 10, "strike 2 live"); yield return Wait(0.05f);
+            Check($"Severance {tag}: strike 2 is the boxed number once strike 1 is spent", boss.Numbers.Count(x => x.imminent) == 1 && boss.Numbers.First(x => x.imminent).number == 2,
+                string.Join(",", boss.Numbers.Select(x => x.number + (x.imminent ? "*" : ""))));
             yield return Shot($"severance_{tag}_strike2_imminent");
             yield return Until(() => boss.SeveranceStrikes.Count >= 3, 10, "strike 3 live"); yield return Wait(0.05f);
             yield return Shot($"severance_{tag}_strike3_imminent");
@@ -276,10 +306,11 @@ namespace LastBell.Run
             var last3 = sev.Skip(Mathf.Max(0, sev.Count - 3)).ToList();
             if (last3.Count == 3)
             {
-                int gap = TempoClock.TicksFor(TempoTyrantEncounter.SevGapBeats, bpm), open = TempoClock.TicksFor(TempoTyrantEncounter.SevOpenBeats, bpm);
+                var tp = bpm >= 140 ? Tempo.Haste : Tempo.Normal; float gapB = TempoTyrantEncounter.Of(TempoTyrantEncounter.SevGap, tp), openB = TempoTyrantEncounter.Of(TempoTyrantEncounter.SevOpen, tp);
+                int gap = TempoClock.TicksFor(gapB, bpm), open = TempoClock.TicksFor(openB, bpm);
                 int g1 = last3[1].Resolve - last3[0].Resolve, g2 = last3[2].Resolve - last3[1].Resolve;
-                Check($"Severance {tag}: impacts {TempoTyrantEncounter.SevGapBeats} beats apart at {bpm} BPM", g1 == gap && g2 == gap, $"{g1}, {g2} ticks (expected {gap})");
-                Check($"Severance {tag}: opening warning {TempoTyrantEncounter.SevOpenBeats} beats", last3[0].Resolve - last3[0].Spawn + 1 == open, $"{last3[0].Resolve - last3[0].Spawn + 1} ticks (expected {open})");
+                Check($"Severance {tag}: impacts {gapB} beats apart at {bpm} BPM", g1 == gap && g2 == gap, $"{g1}, {g2} ticks (expected {gap})");
+                Check($"Severance {tag}: opening warning {openB} beats", last3[0].Resolve - last3[0].Spawn + 1 == open, $"{last3[0].Resolve - last3[0].Spawn + 1} ticks (expected {open})");
                 Check($"Severance {tag}: tempo fixed for the whole block", last3.All(s => Mathf.Approximately(s.Bpm, bpm)));
             }
             Check($"Severance {tag}: position and facing locked during the combo", comboDrift == 0, $"max drift {comboDriftMax:0.000}");
@@ -299,7 +330,7 @@ namespace LastBell.Run
             int wakeStart = d.World.Tick; var lane = boss.LastWake;
             yield return Wait(0.2f);
             yield return Shot("wake_warning_path_endpoint");
-            int warnTicks = boss.Clock.TicksFor(TempoTyrantEncounter.WakeWarnBeats);
+            int warnTicks = boss.Clock.TicksFor(TempoTyrantEncounter.Of(TempoTyrantEncounter.WakeWarn, boss.Clock.State));
             yield return Until(() => boss.Rig.Current == TyrantPose.Thrust, 6, "Wake travel");
             yield return Shot("wake_travel");
             yield return Until(() => boss.LastFissure != null && boss.LastFissure != lane && d.World.Hazards.Live.Contains(boss.LastFissure), 4, "fissure warning");
@@ -351,7 +382,7 @@ namespace LastBell.Run
                 string.Join(", ", mine.Select(h => h.source)));
             var ring = seen.Values.LastOrDefault(s => s.Source.Contains("outer ring")); var inner = seen.Values.LastOrDefault(s => s.Source.Contains("inner circle"));
             if (ring != null && inner != null)
-                Check("Crown: separate warnings, ring then circle", inner.Spawn >= ring.Resolve && inner.Resolve - ring.Resolve == TempoClock.TicksFor(TempoTyrantEncounter.CrownInnerBeats, inner.Bpm),
+                Check("Crown: separate warnings, ring then circle", inner.Spawn >= ring.Resolve && inner.Resolve - ring.Resolve == TempoClock.TicksFor(TempoTyrantEncounter.Of(TempoTyrantEncounter.CrownInnerWarn, inner.Tempo), inner.Bpm),
                     $"ring {ring.Resolve}, inner {inner.Spawn}->{inner.Resolve}");
             Check("Crown: pocket fits a player outside the boss body", TempoTyrantEncounter.CrownPocket - Hazard.Margin > 1.4f + PlayerController.Radius + 1f);
         }
@@ -435,7 +466,7 @@ namespace LastBell.Run
                 $"eruption {boss.LastFissureResolveAge}, strike 1 {boss.LastStrike1ResolveAge}");
             if (!Quick)
             {
-                yield return Until(() => boss.ChainsRun > chains + 1, 75, "chain on the next Haste passage");
+                yield return Until(() => boss.ChainsRun > chains + 1, 150, "chain on the next Haste passage");
                 Check("frenzy triggered exactly once", boss.FrenzyTriggers == 1);
                 var log = boss.BlockLog.Where(l => l.EndsWith("Broken Cadence chain")).ToList();
                 Check("chains only in Haste, once per passage", log.Count == boss.ChainsRun && log.All(l => l.Contains(" Haste ")), string.Join(" | ", log));
@@ -453,11 +484,16 @@ namespace LastBell.Run
             Check("pause freezes tempo, tick and hazards", boss.Clock.Beat == beat && d.World.Tick == tick && d.World.Hazards.Live.Select(h => h.Age).SequenceEqual(ages));
             var srcs = boss.Audio.GetComponents<AudioSource>();
             Check("pause silences scheduled metronome ticks", srcs.All(s => !s.isPlaying));
+            var mus = FindAnyObjectByType<LastBell.Menu.MenuMusic>();
+            Check("pause pauses this fight's music", mus && mus.Source && !mus.Source.isPlaying);
             yield return Shot("paused");
             int scheduled = boss.Audio.TicksScheduled;
             d.SetPaused(false);
             yield return null; yield return null;
-            Check("resume does not burst ticks or damage", d.World.Tick - tick <= 8 && boss.Audio.TicksScheduled - scheduled <= 1 && d.Player.Hp >= hp - 40, $"ticks +{d.World.Tick - tick}, scheduled +{boss.Audio.TicksScheduled - scheduled}");
+            Check("resume does not burst ticks or damage", d.World.Tick - tick <= 13 &&   // two resume frames at the director's 0.1 s/frame cap (6 ticks) + 1
+                 boss.Audio.TicksScheduled - scheduled <= 1 && d.Player.Hp >= hp - 40, $"ticks +{d.World.Tick - tick}, scheduled +{boss.Audio.TicksScheduled - scheduled}");
+            yield return Wait(0.3f);
+            Check("resume resumes the music beat-locked", mus && mus.Source.isPlaying && Mathf.Abs(boss.Audio.LastMusicError) < TempoTyrantAudio.ResyncTolerance, boss.Audio.StatusText);
         }
 
         IEnumerator DefeatAndRetry()
@@ -515,7 +551,7 @@ namespace LastBell.Run
         {
             float bound = CombatWorld.PlayerBound;
             var bosses = new[] { Vector3.zero, new Vector3(1.5f, 0, 0), new Vector3(0, 0, 1.5f), new Vector3(-1.06f, 0, -1.06f), new Vector3(1.06f, 0, 1.06f) };
-            foreach (float bpm in new[] { 160f, 120f })
+            foreach (float bpm in new[] { 165f, 123.75f })
             {
                 int starts = 0, ok = 0; float worst = float.MaxValue; string worstAt = "";
                 foreach (var b in bosses)
@@ -540,16 +576,34 @@ namespace LastBell.Run
             // The fissure always shows its full 5-beat warning from the moment the charge ends (players react from then),
             // and strike 1 resolves >= 8 beats after the eruption (the opening is lengthened to guarantee it).
             int cs = 0, cok = 0; float cw = float.MaxValue;
-            foreach (var split in new[] { (TempoTyrantEncounter.FissureWarnBeats, (float)TempoTyrantEncounter.FissureLeadBeats) })
+            foreach (var split in new[] { (TempoTyrantEncounter.FissureWarn.H, (float)TempoTyrantEncounter.FissureLeadBeats) })
                 foreach (var from in new[] { new Vector3(0, 0, 8), new Vector3(8, 0, 0), new Vector3(-6, 0, -6), new Vector3(5, 0, -7) })
                     foreach (int y in new[] { 0, 90, 200, 315 })
                     {
                         var end = Sim.Flat(-from).normalized * 1.5f;
-                        var r = TempoTyrantRoutes.Chain(from, end, y, 160f, PlayerController.WalkSpeed, bound, split.Item1, split.Item2);
+                        var r = TempoTyrantRoutes.Chain(from, end, y, 165f, PlayerController.WalkSpeed, bound, split.Item1, split.Item2);
                         cs += r.Starts; cok += r.Feasible; cw = Mathf.Min(cw, r.WorstSlack);
                         foreach (var f in r.Failures.Take(2)) Note("route failure: " + f);
                     }
-            Check("routes: Broken Cadence chain (fissure then 1-2-3) at 160 BPM, walking", cok == cs, $"{cok}/{cs}, worst slack {cw:0.00} s");
+            Check("routes: Broken Cadence chain (fissure then 1-2-3) at 165 BPM, walking", cok == cs, $"{cok}/{cs}, worst slack {cw:0.00} s");
+        }
+
+        static readonly (string name, (float H, float N) w)[] Windows =
+        {
+            ("Severance opening", TempoTyrantEncounter.SevOpen), ("Severance gap", TempoTyrantEncounter.SevGap), ("Wake warning", TempoTyrantEncounter.WakeWarn),
+            ("fissure warning", TempoTyrantEncounter.FissureWarn), ("Crown ring", TempoTyrantEncounter.CrownRing), ("Crown inner", TempoTyrantEncounter.CrownInnerWarn),
+            ("rush tell", TempoTyrantEncounter.RushTell),
+        };
+        static bool HasteShorter()
+        {
+            var c = new TempoClock();
+            return Windows.All(x => x.w.H <= x.w.N && TempoClock.TicksFor(x.w.H, c.HasteBpm) < TempoClock.TicksFor(x.w.N, c.NormalBpm)) &&
+                   Windows.Count(x => x.w.H < x.w.N) >= 4;
+        }
+        static string HasteTable()
+        {
+            var c = new TempoClock();
+            return "windows Haste/Normal: " + string.Join("; ", Windows.Select(x => $"{x.name} {x.w.H}/{x.w.N} beats = {TempoClock.TicksFor(x.w.H, c.HasteBpm) / 60f:0.00}/{TempoClock.TicksFor(x.w.N, c.NormalBpm) / 60f:0.00} s"));
         }
 
         void Finish()

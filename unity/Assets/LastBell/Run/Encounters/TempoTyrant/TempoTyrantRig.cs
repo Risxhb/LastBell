@@ -19,7 +19,7 @@ namespace LastBell.Run
         public const float Height = 3.5f;
         static readonly Color Ivory = new Color(0.86f, 0.82f, 0.72f), Brass = new Color(0.72f, 0.53f, 0.26f),
             Joint = new Color(0.11f, 0.11f, 0.13f), Tabard = new Color(0.09f, 0.10f, 0.13f), Steel = new Color(0.80f, 0.80f, 0.78f),
-            Grip = new Color(0.20f, 0.13f, 0.08f);
+            Grip = new Color(0.20f, 0.13f, 0.08f), EdgeDark = new Color(0.30f, 0.30f, 0.32f);
         public static readonly Color TealSeam = new Color(0.25f, 1.0f, 0.85f), AmberSeam = new Color(1.0f, 0.62f, 0.18f);
 
         static readonly Dictionary<int, Material> cache = new Dictionary<int, Material>();
@@ -32,8 +32,10 @@ namespace LastBell.Run
         public Transform Sword { get; private set; }
         public Transform BladeTip { get; private set; }
 
-        Transform arms, fissure; Renderer fissureR;
-        readonly List<Renderer> seams = new List<Renderer>();
+        Transform arms, fissure;
+        readonly List<Transform> crackSegs = new List<Transform>(); readonly List<Renderer> crackRs = new List<Renderer>();
+        static readonly Color FissureGlow = new Color(1.0f, 0.82f, 0.25f);
+        readonly List<Renderer> seams = new List<Renderer>(), visor = new List<Renderer>();
         MaterialPropertyBlock mpb;
         int poseTicks, poseLength; float pulse, frenzyAmount, walkPhase;
         Quaternion armsRot = Quaternion.identity, swordRot = Quaternion.Euler(130, 0, 0);
@@ -45,6 +47,8 @@ namespace LastBell.Run
             if (cache.TryGetValue(key, out var m) && m) return m;
             m = Prim.Material(c, glow ? 2f : 0);
             m.name = "TempoTyrant_" + key;
+            bool metal = c == Brass || c == Steel || c == EdgeDark;
+            m.SetFloat("_Smoothness", glow ? 0.2f : metal ? 0.5f : 0.25f); m.SetFloat("_Metallic", metal ? 0.75f : 0.05f);
             cache[key] = m; return m;
         }
 
@@ -86,10 +90,12 @@ namespace LastBell.Run
             Part(PrimitiveKind.Cube, b, new Vector3(0, 1.55f, 0), new Vector3(0.95f, 0.30f, 0.60f), Joint, name: "Hips");
             for (int s = -1; s <= 1; s += 2)
             {
-                Part(PrimitiveKind.Cube, b, new Vector3(0.21f * s, 1.20f, 0.32f), new Vector3(0.38f, 0.75f, 0.04f), Tabard, name: "TabardFront");
+                Part(PrimitiveKind.Cube, b, new Vector3(0.12f * s, 1.05f, 0.33f), new Vector3(0.22f, 1.05f, 0.04f), Tabard, name: "TabardFront");
                 Part(PrimitiveKind.Cube, b, new Vector3(0.21f * s, 1.20f, -0.32f), new Vector3(0.38f, 0.70f, 0.04f), Tabard, name: "TabardBack");
             }
             Part(PrimitiveKind.Cube, b, new Vector3(0, 1.72f, 0.31f), new Vector3(0.98f, 0.07f, 0.04f), Brass, name: "BeltTrim");
+            Part(PrimitiveKind.Cube, b, new Vector3(0, 0.56f, 0.33f), new Vector3(0.32f, 0.32f, 0.04f), Tabard, euler: new Vector3(0, 0, 45), name: "TabardTip");
+            Part(PrimitiveKind.Cube, b, new Vector3(0, 1.30f, 0.355f), new Vector3(0.04f, 0.70f, 0.01f), Brass, name: "TabardStripe");
             // torso: tapered ivory cuirass, brass trim, seams; the backplate stays clean
             Part(PrimitiveKind.Cube, b, new Vector3(0, 2.05f, 0), new Vector3(0.95f, 0.60f, 0.66f), Ivory, name: "Fauld");
             Part(PrimitiveKind.Cube, b, new Vector3(0, 2.50f, 0), new Vector3(1.22f, 0.62f, 0.78f), Ivory, name: "Cuirass");
@@ -99,14 +105,21 @@ namespace LastBell.Run
                 Part(PrimitiveKind.Cube, b, new Vector3(0.38f * s, 2.50f, 0.395f), new Vector3(0.04f, 0.46f, 0.02f), TealSeam, true, name: "ChestSeam");
             Part(PrimitiveKind.Cylinder, b, new Vector3(0, 2.86f, 0), new Vector3(0.36f, 0.08f, 0.36f), Joint, name: "Gorget");
             // narrow closed helmet with a glowing visor slit and brass crest ridge
-            Part(PrimitiveKind.Capsule, b, new Vector3(0, 3.17f, 0.02f), new Vector3(0.40f, 0.62f, 0.46f), Ivory, name: "Helmet");
-            Part(PrimitiveKind.Cube, b, new Vector3(0, 3.24f, 0.225f), new Vector3(0.24f, 0.035f, 0.03f), TealSeam, true, name: "Visor");
-            Part(PrimitiveKind.Cube, b, new Vector3(0, 3.40f, -0.01f), new Vector3(0.06f, 0.16f, 0.48f), Brass, name: "Crest");
+            Part(PrimitiveKind.Cube, b, new Vector3(0, 3.15f, 0.0f), new Vector3(0.36f, 0.56f, 0.44f), Ivory, name: "Helmet");
+            Part(PrimitiveKind.Cube, b, new Vector3(0, 3.30f, 0.20f), new Vector3(0.38f, 0.16f, 0.16f), Ivory, euler: new Vector3(-35, 0, 0), name: "Brow");
+            Part(PrimitiveKind.Cube, b, new Vector3(0, 2.98f, 0.21f), new Vector3(0.30f, 0.18f, 0.12f), Ivory, euler: new Vector3(25, 0, 0), name: "Bevor");
+            visor.Add(Part(PrimitiveKind.Cube, b, new Vector3(0, 3.18f, 0.225f), new Vector3(0.26f, 0.04f, 0.03f), TealSeam, true, name: "Visor").GetComponent<Renderer>());
+            Part(PrimitiveKind.Cube, b, new Vector3(0, 3.48f, -0.02f), new Vector3(0.06f, 0.18f, 0.52f), Brass, name: "Crest");
+            Part(PrimitiveKind.Cube, b, new Vector3(0, 3.70f, -0.12f), new Vector3(0.08f, 0.5f, 0.42f), Tabard, euler: new Vector3(-20, 0, 0), name: "CrestPlume");   // facing reads from above
+            Part(PrimitiveKind.Cube, b, new Vector3(0, 1.30f, -0.345f), new Vector3(0.40f, 0.42f, 0.02f), Ivory, name: "BackTabardPlate");
             // pauldrons
             for (int s = -1; s <= 1; s += 2)
             {
-                Part(PrimitiveKind.Sphere, b, new Vector3(0.80f * s, 2.72f, 0), new Vector3(0.72f, 0.48f, 0.74f), Ivory, name: "Pauldron");
-                Part(PrimitiveKind.Cube, b, new Vector3(0.84f * s, 2.62f, 0), new Vector3(0.50f, 0.05f, 0.70f), Brass, name: "PauldronTrim");
+                // three plates stacked inward and tilted down ~25-45 degrees: a sloped shoulder, not wings
+                for (int k = 0; k < 2; k++)
+                    Part(PrimitiveKind.Cube, b, new Vector3((0.70f + 0.1f * k) * s, 2.82f - 0.2f * k, 0), new Vector3(0.6f - 0.1f * k, 0.15f, 0.78f - 0.06f * k), Ivory,
+                        euler: new Vector3(0, 0, -(25 + 10 * k) * s), name: "PauldronPlate");
+                Part(PrimitiveKind.Cube, b, new Vector3(0.92f * s, 2.50f, 0), new Vector3(0.30f, 0.05f, 0.70f), Brass, euler: new Vector3(0, 0, -45 * s), name: "PauldronTrim");
             }
             // arms + greatsword: one pivot between the shoulders so both hands stay on the grip in every pose
             arms = new GameObject("ArmsPivot").transform; arms.SetParent(b, false); arms.localPosition = new Vector3(0, 2.55f, 0.05f);
@@ -114,9 +127,9 @@ namespace LastBell.Run
             for (int s = -1; s <= 1; s += 2)
             {
                 var sh = new Vector3(0.78f * s, 0.05f, 0); var hand = gripAt + new Vector3(0.06f * s, 0.10f * (s > 0 ? 1 : -1), 0);
-                var mid = (sh + hand) / 2; var dir = hand - sh;
-                var arm = Part(PrimitiveKind.Cube, arms, mid, new Vector3(0.24f, dir.magnitude, 0.26f), Joint, name: "Arm");
-                arm.localRotation = Quaternion.FromToRotation(Vector3.up, dir.normalized);
+                var dir = hand - sh; var rot = Quaternion.FromToRotation(Vector3.up, dir.normalized);
+                var upper = Part(PrimitiveKind.Cube, arms, sh + dir * 0.28f, new Vector3(0.24f, dir.magnitude * 0.56f, 0.26f), Joint, name: "UpperArm"); upper.localRotation = rot;
+                var vamb = Part(PrimitiveKind.Cube, arms, sh + dir * 0.74f, new Vector3(0.28f, dir.magnitude * 0.42f, 0.30f), Ivory, name: "Vambrace"); vamb.localRotation = rot;
                 Part(PrimitiveKind.Cube, arms, hand, new Vector3(0.22f, 0.22f, 0.24f), Brass, name: "Gauntlet");
             }
             Sword = new GameObject("Greatsword").transform; Sword.SetParent(arms, false); Sword.localPosition = gripAt;
@@ -125,16 +138,17 @@ namespace LastBell.Run
             Part(PrimitiveKind.Cylinder, Sword, new Vector3(0, 0, 0), new Vector3(0.09f, 0.32f, 0.09f), Grip, name: "Grip");
             Part(PrimitiveKind.Sphere, Sword, new Vector3(0, -0.38f, 0), new Vector3(0.17f, 0.17f, 0.17f), Brass, name: "Pommel");
             Part(PrimitiveKind.Cube, Sword, new Vector3(0, 0.36f, 0), new Vector3(0.78f, 0.10f, 0.14f), Brass, name: "Crossguard");
-            Part(PrimitiveKind.Cube, Sword, new Vector3(0, 1.62f, 0), new Vector3(0.30f, 2.40f, 0.06f), Steel, name: "Blade");
+            Part(PrimitiveKind.Cube, Sword, new Vector3(0, 1.62f, 0), new Vector3(0.42f, 2.40f, 0.06f), Steel, name: "Blade");
+            for (int e = -1; e <= 1; e += 2) Part(PrimitiveKind.Cube, Sword, new Vector3(0.21f * e, 1.62f, 0), new Vector3(0.04f, 2.40f, 0.065f), EdgeDark, name: "BladeEdge");
             Part(PrimitiveKind.Cube, Sword, new Vector3(0, 1.45f, 0.032f), new Vector3(0.06f, 1.9f, 0.01f), TealSeam, true, name: "Fuller");
             Part(PrimitiveKind.Cube, Sword, new Vector3(0, 1.45f, -0.032f), new Vector3(0.06f, 1.9f, 0.01f), TealSeam, true, name: "FullerBack");
-            var tip = Part(PrimitiveKind.Cube, Sword, new Vector3(0, 2.93f, 0), new Vector3(0.212f, 0.212f, 0.058f), Steel, false, new Vector3(0, 0, 45), "Tip");
+            var tip = Part(PrimitiveKind.Cube, Sword, new Vector3(0, 2.86f, 0), new Vector3(0.297f, 0.297f, 0.058f), Steel, false, new Vector3(0, 0, 45), "Tip");
             BladeTip = tip;
             // world-space fissure glow for Sundering Wake (hidden until a charge ends)
             fissure = new GameObject("Wake fissure (cosmetic)").transform;
             fissure.SetParent(transform.parent ? transform.parent.parent : null, false);
-            var crack = Part(PrimitiveKind.Cube, fissure, new Vector3(0, 0.03f, 0.5f), new Vector3(0.22f, 0.05f, 1f), AmberSeam, false, name: "Crack");
-            fissureR = crack.GetComponent<Renderer>(); fissureR.sharedMaterial = Mat(AmberSeam, true);
+            for (int k = 0; k < 12; k++) crackSegs.Add(Part(PrimitiveKind.Cube, fissure, Vector3.zero, Vector3.one, FissureGlow, false, name: "CrackSegment"));
+            foreach (var c in crackSegs) { var r = c.GetComponent<Renderer>(); r.sharedMaterial = Mat(FissureGlow, true); crackRs.Add(r); }
             fissure.gameObject.SetActive(false);
             ApplyPose(true);
         }
@@ -147,7 +161,7 @@ namespace LastBell.Run
             Current = p; poseTicks = 0; poseLength = Mathf.Max(0, ticks);
         }
         public void Step() { poseTicks++; if (Current == TyrantPose.Walk || Current == TyrantPose.Rush) walkPhase += Sim.Dt * (Haste ? 9f : 7f); }
-        public void Tick(bool accent) { pulse = accent ? 1.6f : 0.7f; }
+        public void Tick(bool accent) { pulse = accent ? 1.5f : 1f; }
         public void Fissure(bool on, Vector3 from = default, Vector3 to = default)
         {
             if (!fissure) return;
@@ -155,7 +169,16 @@ namespace LastBell.Run
             if (!on) return;
             var d = Sim.Flat(to - from); float len = Mathf.Max(0.1f, d.magnitude);
             fissure.SetPositionAndRotation(Sim.Flat(from), Quaternion.LookRotation(d.sqrMagnitude > 1e-4f ? d.normalized : Vector3.forward));
-            fissure.localScale = new Vector3(1, 1, len);
+            fissure.localScale = Vector3.one;
+            // zigzag: alternate +-0.35 m across the path, one segment per vertex pair
+            int n = crackSegs.Count; var pts = new Vector3[n + 1];
+            for (int i = 0; i <= n; i++) pts[i] = new Vector3(i == 0 || i == n ? 0 : (i % 2 == 0 ? 0.35f : -0.35f) * (0.6f + 0.4f * Mathf.Sin(i * 2.3f)), 0.04f, len * i / n);
+            for (int i = 0; i < n; i++)
+            {
+                var a = pts[i]; var b = pts[i + 1]; var seg = b - a;
+                crackSegs[i].localPosition = (a + b) / 2; crackSegs[i].localRotation = Quaternion.LookRotation(seg.normalized);
+                crackSegs[i].localScale = new Vector3(0.16f, 0.05f, seg.magnitude + 0.08f);
+            }
         }
 
         void OnDestroy() { if (fissure) Destroy(fissure.gameObject); }
@@ -201,15 +224,18 @@ namespace LastBell.Run
         {
             if (Body == null || mpb == null) return;   // a script reload drops the code-built state
             ApplyPose(false);
-            pulse = Mathf.MoveTowards(pulse, 0, Time.deltaTime * 4f);
+            pulse = Mathf.MoveTowards(pulse, 0, Time.deltaTime * 6f);
             frenzyAmount = Mathf.MoveTowards(frenzyAmount, Frenzy ? 1 : 0, Time.deltaTime);
-            var c = (Haste ? AmberSeam : TealSeam) * ((Haste ? 2.2f : 0.9f) + 0.6f * Glow + pulse + 1.2f * frenzyAmount);
+            float tempoK = Haste ? 0.7f + 2.2f * pulse : 0.55f + 0.35f * Mathf.Sin(Time.time * Mathf.PI);   // Haste strobe / Normal 0.5 Hz breath
+            var c = (Haste ? AmberSeam : TealSeam) * (tempoK + 0.35f * Glow + 1.0f * frenzyAmount);
             mpb.SetColor(PEmission, c); mpb.SetColor(PBase, Haste ? AmberSeam : TealSeam);
-            foreach (var r in seams) if (r) r.SetPropertyBlock(mpb);
-            if (fissureR && fissure.gameObject.activeSelf)
+            foreach (var r in seams) if (r && !visor.Contains(r)) r.SetPropertyBlock(mpb);
+            mpb.SetColor(PEmission, (Haste ? AmberSeam : TealSeam) * (Haste ? 2.4f + 1.5f * pulse : 0.9f));
+            foreach (var r in visor) if (r) r.SetPropertyBlock(mpb);
+            if (fissure && fissure.gameObject.activeSelf)
             {
-                mpb.SetColor(PEmission, AmberSeam * (2.5f + Mathf.Sin(Time.time * 18) * 0.8f)); mpb.SetColor(PBase, AmberSeam);
-                fissureR.SetPropertyBlock(mpb);
+                mpb.SetColor(PEmission, FissureGlow * (2.2f + Mathf.Sin(Time.time * 18) * 0.7f)); mpb.SetColor(PBase, FissureGlow);
+                foreach (var r in crackRs) if (r) r.SetPropertyBlock(mpb);
             }
         }
     }

@@ -20,6 +20,7 @@ namespace LastBell.Run
         }
 
         public const float Reaction = 0.3f;
+        static Tempo TempoOf(float bpm) => bpm >= 140 ? Tempo.Haste : Tempo.Normal;
         static float BodyR => 1.4f + PlayerController.Radius;   // TempoTyrant body + player body (CombatWorld.Constrain)
 
         // path length from a to b avoiding the boss body circle (centre c, radius r)
@@ -136,7 +137,7 @@ namespace LastBell.Run
             for (int n = 1; n <= 3; n++)
             {
                 var h = TempoTyrantEncounter.SeveranceStrike(n, boss, yaw, 1.4f);
-                float beats = n == 1 ? TempoTyrantEncounter.SevOpenBeats : TempoTyrantEncounter.SevGapBeats;
+                float beats = TempoTyrantEncounter.Of(n == 1 ? TempoTyrantEncounter.SevOpen : TempoTyrantEncounter.SevGap, TempoOf(bpm));
                 stages.Add((h, TempoClock.TicksFor(beats, bpm) / (float)Sim.Hz));
             }
             return Sequence($"Severance boss {boss} yaw {yaw:0} @{bpm:0}", boss, stages, speed, bound);
@@ -148,8 +149,8 @@ namespace LastBell.Run
             var inner = new Hazard { Shape = HazardShape.Circle, Origin = boss, Radius = TempoTyrantEncounter.CrownInner };
             var stages = new List<(Hazard, float)>
             {
-                (ring, TempoClock.TicksFor(TempoTyrantEncounter.CrownRingBeats, bpm) / (float)Sim.Hz),
-                (inner, TempoClock.TicksFor(TempoTyrantEncounter.CrownInnerBeats, bpm) / (float)Sim.Hz),
+                (ring, TempoClock.TicksFor(TempoTyrantEncounter.Of(TempoTyrantEncounter.CrownRing, TempoOf(bpm)), bpm) / (float)Sim.Hz),
+                (inner, TempoClock.TicksFor(TempoTyrantEncounter.Of(TempoTyrantEncounter.CrownInnerWarn, TempoOf(bpm)), bpm) / (float)Sim.Hz),
             };
             return Sequence($"Hollow Crown boss {boss} @{bpm:0}", boss, stages, speed, bound);
         }
@@ -164,7 +165,7 @@ namespace LastBell.Run
             for (int n = 1; n <= 3; n++)
             {
                 var h = TempoTyrantEncounter.SeveranceStrike(n, boss, yaw, 1.4f);
-                float beats = n == 1 ? leadBeats : TempoTyrantEncounter.SevGapBeats;
+                float beats = n == 1 ? leadBeats : TempoTyrantEncounter.Of(TempoTyrantEncounter.SevGap, TempoOf(bpm));
                 stages.Add((h, TempoClock.TicksFor(beats, bpm) / (float)Sim.Hz));
             }
             return Sequence($"Chain fissure {chargeStart}->{boss} yaw {yaw:0} @{bpm:0} ({fissureBeats}+{leadBeats} beats)", boss, stages, speed, bound, 2f);

@@ -248,7 +248,7 @@ namespace LastBell.Menu
             }
             File.WriteAllBytes(Path.Combine(output,file),t.EncodeToPNG());Destroy(t);
         }
-        static string ExpectedMusic(int encounter) => new[]{"The Unfinished Hour","Crown of the Meridian","Where the Last Flower Falls","Pressure Beneath the Brass","The Tempo Tyrant"}[encounter];
+        static string ExpectedMusic(int encounter) => new[]{"The Unfinished Hour","Crown of the Meridian","Where the Last Flower Falls","Pressure Beneath the Brass","By My Measure"}[encounter];
         void MusicCheck(string label,string clip)
         {
             var owners=FindObjectsByType<MenuMusic>();var music=owners.Length==1?owners[0]:null;

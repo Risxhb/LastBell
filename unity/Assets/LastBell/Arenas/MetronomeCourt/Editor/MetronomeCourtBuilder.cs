@@ -5,6 +5,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 namespace LastBell.Arenas.MetronomeCourt.EditorTools
 {
@@ -47,6 +48,20 @@ namespace LastBell.Arenas.MetronomeCourt.EditorTools
             cam.fieldOfView = 44; cam.nearClipPlane = 0.3f; cam.farClipPlane = 400;
             camGo.transform.SetPositionAndRotation(new Vector3(0, 29, 22.5f), Quaternion.LookRotation(new Vector3(0, 1, 1) - new Vector3(0, 29, 22.5f)));
             camGo.AddComponent<AudioListener>();
+            var camData = camGo.AddComponent<UniversalAdditionalCameraData>();
+            camData.renderPostProcessing = true; camData.antialiasing = AntialiasingMode.SubpixelMorphologicalAntiAliasing;
+
+            // post-processing, as the area builders do: ACES, bloom, navy vignette, slight desaturation
+            var volume = new GameObject("Post").AddComponent<Volume>(); volume.isGlobal = true;
+            string profilePath = Path.GetDirectoryName(path).Replace("\\", "/") + "/MetronomeCourtPost.asset";
+            AssetDatabase.DeleteAsset(profilePath);
+            var profile = ScriptableObject.CreateInstance<VolumeProfile>(); AssetDatabase.CreateAsset(profile, profilePath);
+            profile.Add<Tonemapping>(true).mode.Override(TonemappingMode.ACES);
+            var bloom = profile.Add<Bloom>(true); bloom.threshold.Override(1.0f); bloom.intensity.Override(0.5f); bloom.scatter.Override(0.65f);
+            var vig = profile.Add<Vignette>(true); vig.intensity.Override(0.28f); vig.color.Override(new Color(0.04f, 0.06f, 0.12f));
+            var ca = profile.Add<ColorAdjustments>(true); ca.contrast.Override(10f); ca.saturation.Override(-8f); ca.postExposure.Override(0.15f);
+            foreach (var c in profile.components) { c.hideFlags = HideFlags.HideInInspector | HideFlags.HideInHierarchy; AssetDatabase.AddObjectToAsset(c, profile); }
+            AssetDatabase.SaveAssets(); volume.sharedProfile = profile;
 
             var sun = new GameObject("Key light (dusk)").AddComponent<Light>();
             sun.type = LightType.Directional; sun.color = new Color(1f, 0.86f, 0.70f); sun.intensity = 1.25f; sun.shadows = LightShadows.Soft;
@@ -60,7 +75,7 @@ namespace LastBell.Arenas.MetronomeCourt.EditorTools
             RenderSettings.ambientEquatorColor = new Color(0.30f, 0.30f, 0.34f);
             RenderSettings.ambientGroundColor = new Color(0.10f, 0.10f, 0.13f);
             RenderSettings.fog = true; RenderSettings.fogMode = FogMode.Linear;
-            RenderSettings.fogColor = new Color(0.10f, 0.13f, 0.19f); RenderSettings.fogStartDistance = 45; RenderSettings.fogEndDistance = 140;
+            RenderSettings.fogColor = new Color(0.12f, 0.16f, 0.22f); RenderSettings.fogStartDistance = 15; RenderSettings.fogEndDistance = 105;
             RenderSettings.skybox = null;
 
             new GameObject("Metronome Court").AddComponent<MetronomeCourtArena>();

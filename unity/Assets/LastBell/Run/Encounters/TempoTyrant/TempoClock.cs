@@ -15,7 +15,7 @@ namespace LastBell.Run
     public sealed class TempoClock
     {
         // Tunable first-pass values (docs/metronome-arena/tempo-tyrant.md). Damage never depends on tempo.
-        public float HasteBpm = 160f, NormalBpm = 120f;
+        public float HasteBpm = 165f, NormalBpm = 123.75f;   // = the supplied track's warped grid (By My Measure) and 0.75x
         public int HasteTicks = 12 * Sim.Hz, NormalTicks = 16 * Sim.Hz;
         public const int TransitionBeats = 3;
 
