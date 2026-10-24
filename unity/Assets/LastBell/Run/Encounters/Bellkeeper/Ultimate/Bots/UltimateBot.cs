@@ -118,7 +118,15 @@ namespace LastBell.Run
             float bossGap = Sim.Flat(bpos - pos).magnitude - boss.BodyRadius;
             // no swings while walking to a spot or just before a rule: lunges and casts would carry it off its spot
             bool positioning = hasTarget && (Sim.Flat(target - pos).magnitude > 0.5f || (rules.Count > 0 && rules[0].Tick - now < 30));
-            if (Attacks && !positioning && bossGap <= Range(me) + 1.5f && (boss.Ult == null || !boss.Ult.IsStilled(me))) Attack(me, ref inp);
+            for (int i = 0; i < cd.Length; i++) if (cd[i] > 0) cd[i]--;
+            bool stilled = boss.Ult != null && boss.Ult.IsStilled(me);
+            // Chimesinger: Mending Chorus (burst heal round the caster) when it would top up a hurt ally or two (potions run out in P5)
+            if (Attacks && me.ClassName == "Chimesinger" && !stilled && cd[4] == 0 && tick - lastPress >= 6)
+            {
+                int hurt = 0; foreach (var p in w.Players) if (!p.Down && p.Hp < 65 && Sim.Flat(p.transform.position - pos).magnitude < 5.5f) hurt++;
+                if (hurt >= 2 || (hurt == 1 && me.Hp < 65)) { inp.P4 = true; cd[4] = 900; lastPress = tick; }
+            }
+            if (Attacks && !positioning && bossGap <= Range(me) + 1.5f && (boss.Ult == null || !boss.Ult.IsStilled(me))) Attack(me, ref inp, rules.Count == 0 || rules[0].Tick - now > 90);
             if (move != Vector3.zero) move = AroundBoss(pos, move, boss);
             inp.Move = ToScreen(move);
             DebugLine = $"rules {rules.Count} first {(rules.Count > 0 ? rules[0].Why + " in " + (rules[0].Tick - now) : "-")} target {(hasTarget ? $"({target.x:0.0},{target.z:0.0})" : "-")} at ({pos.x:0.0},{pos.z:0.0})";
@@ -133,6 +141,7 @@ namespace LastBell.Run
 
         // Candidate spots: rings round the arena centre and the boss, every rule's hint, and here.
         readonly List<Vector3> cands = new List<Vector3>(), next = new List<Vector3>();
+        readonly List<(int tick, List<Vector3> pts)> later = new List<(int, List<Vector3>)>();
         bool Plan(PlayerController me, BellkeeperEncounter boss, Vector3 pos, List<BotDemand> rules, int now, out Vector3 best)
         {
             cands.Clear(); cands.Add(pos);
@@ -155,6 +164,19 @@ namespace LastBell.Run
 
             next.Clear();
             if (t2 >= 0) foreach (var c in cands) if (Valid(c, boss) && AllOk(c, rules, g1End, g2End)) next.Add(c);
+            // further groups (up to three more): a spot that leaves one of them out of reach in time is penalised, so a
+            // later hide or clock spot pulls the bot early enough (a two-group horizon arrived late to Stopped Hour hides)
+            later.Clear();
+            for (int gs = g2End, k = 0; gs < rules.Count && k < 3; k++)
+            {
+                int tg = rules[gs].Tick, ge = gs;
+                while (ge < rules.Count && rules[ge].Tick <= tg + 6) ge++;
+                var pts = new List<Vector3>();
+                for (int i = 0; i < cands.Count; i += 3) if (Valid(cands[i], boss) && AllOk(cands[i], rules, gs, ge)) pts.Add(cands[i]);
+                if (pts.Count > 40) { int stride = pts.Count / 40 + 1; var few = new List<Vector3>(); for (int i = 0; i < pts.Count; i += stride) few.Add(pts[i]); pts = few; }
+                if (pts.Count > 0) later.Add((tg, pts));
+                gs = ge;
+            }
             float bestScore = float.MaxValue; best = pos; bool found = false;
             foreach (var c in cands)
             {
@@ -168,6 +190,12 @@ namespace LastBell.Run
                     // the second hop's slack: a dash's gain if one is left, else a walking margin (no dash, no slack)
                     float slack = UseDash && me.Stamina >= PlayerController.DashCost ? 1.5f : -0.5f;
                     score += 0.6f * nd + (nd > Speed * secs2 + slack ? 20 : 0);
+                }
+                float dashGain = UseDash && me.Stamina >= PlayerController.DashCost ? PlayerController.DashDistance : 0;
+                foreach (var (tg, pts) in later)
+                {
+                    float nd = 30; foreach (var q in pts) nd = Mathf.Min(nd, PathLen(c, q, bp, boss.BodyRadius));
+                    if (nd > Speed * (tg - t1) / (float)Sim.Hz + dashGain) score += 25;
                 }
                 // later rules still in view: a small pull toward satisfying them too
                 for (int i = g2End; i < rules.Count; i++) if (!rules[i].Ok(c)) score += 0.8f;
@@ -222,9 +250,8 @@ namespace LastBell.Run
 
         float Range(PlayerController me) => me.ClassName == "Vanguard" ? 0.9f : me.ClassName == "Chimesinger" ? 6.0f : 7.5f;
 
-        void Attack(PlayerController me, ref PlayerInput inp)
+        void Attack(PlayerController me, ref PlayerInput inp, bool longCastOk)
         {
-            for (int i = 0; i < cd.Length; i++) if (cd[i] > 0) cd[i]--;
             if (tick - lastPress < 6) return;
             int s;
             switch (me.ClassName)
@@ -236,7 +263,7 @@ namespace LastBell.Run
                     if (cd[3] == 0) { s = 3; cd[3] = 480; } else if (cd[2] == 0) { s = 2; cd[2] = 300; } else if (cd[1] == 0) { s = 1; cd[1] = 150; } else s = 0;
                     break;
                 default:   // Arcanist
-                    if (cd[1] == 0) { s = 1; cd[1] = 360; } else if (cd[2] == 0) { s = 2; cd[2] = 200; castHold = 50; } else if (cd[3] == 0) { s = 3; cd[3] = 420; } else s = 0;
+                    if (cd[1] == 0) { s = 1; cd[1] = 360; } else if (cd[2] == 0 && longCastOk) { s = 2; cd[2] = 200; castHold = 50; } else if (cd[3] == 0) { s = 3; cd[3] = 420; } else s = 0;   // Arc Lance roots the caster: not with a rule close
                     break;
             }
             lastPress = tick;
