@@ -121,25 +121,47 @@ namespace LastBell.Run
         }
 
         // ---------------- clears and wipes ----------------
+        // Which fights run (parallel batches split them over several game instances): -lastbellBotRuns p1,p2,p4,p8,c1,late1,
+        // late4,miss1,miss4,v2 (default: all). Tuning sweeps: -lastbellUltHp N and -lastbellUltPush P1,P2,P3,P4,P5 (seconds).
+        static string ArgOf(string name)
+        {
+            var a = Environment.GetCommandLineArgs(); int i = Array.FindIndex(a, x => x.Equals(name, StringComparison.OrdinalIgnoreCase));
+            return i >= 0 && i + 1 < a.Length ? a[i + 1] : null;
+        }
+        static bool BotRun(string id) { var s = ArgOf("-lastbellBotRuns"); return s == null || s.Split(',').Any(x => x.Trim().Equals(id, StringComparison.OrdinalIgnoreCase)); }
+        static void ApplyTuning(int hp, float[] push)
+        {
+            BellkeeperEncounter.UltimateBaseHp = int.TryParse(ArgOf("-lastbellUltHp"), out int h) ? h : hp;
+            var p = ArgOf("-lastbellUltPush")?.Split(',').Select(x => float.TryParse(x, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float v) ? v : -1).ToArray();
+            BellkeeperEncounter.PushSeconds = p != null && p.Length == 5 && p.All(v => v > 0) ? new[] { p[0], 0, p[1], p[2], 0, p[3], p[4] } : push;
+        }
+
         IEnumerator UltBotChecks()
         {
             Note("---------- Ultimate Part 5: strat bots on the Ultimate entry ----------");
             int savedHp = BellkeeperEncounter.UltimateBaseHp;
-            BellkeeperEncounter.UltimateBaseHp = 10000;   // provisional (live-attempts-1: the first kill)
-            BellkeeperEncounter.PushSeconds = new float[] { 45, 0, 85, 80, 0, 105, 78 };
+            ApplyTuning(10000, new float[] { 45, 0, 85, 80, 0, 105, 78 });   // provisional (live-attempts-1: the first kill)
+            var ps = BellkeeperEncounter.PushSeconds;
+            Note($"tuning: UltimateBaseHp {BellkeeperEncounter.UltimateBaseHp} · push P1 {ps[0]} P2 {ps[2]} P3 {ps[3]} P4 {ps[5]} · P5 enrage {ps[6]}");
             var fights = new List<UltFight>();
-            foreach (var n2 in new[] { 2, 8 }) { yield return UltRun($"PERFECT party of {n2}", n2, UltimateBot.Skill.Perfect); fights.Add(ultLast); Check($"Part 5: a perfect party of {n2} clears the Ultimate", ultLast != null && ultLast.Killed, ultLast?.ToString()); }
-            yield return UltRun("PERFECT solo (Vanguard)", 1, UltimateBot.Skill.Perfect); fights.Add(ultLast);
-            Check("Part 5: a perfect solo bot clears the Ultimate", ultLast != null && ultLast.Killed, ultLast?.ToString());
-            yield return UltRun("PERFECT party of 4 (V C A V)", 4, UltimateBot.Skill.Perfect); fights.Add(ultLast);
-            Check("Part 5: a perfect party of 4 clears the Ultimate", ultLast != null && ultLast.Killed, ultLast?.ToString());
-            yield return UltRun("PERFECT solo (Chimesinger)", 1, UltimateBot.Skill.Perfect, cls0: "Chimesinger"); fights.Add(ultLast);
-            Note("(no class required: solo Chimesinger " + (ultLast != null && ultLast.Killed ? "clears" : "does not clear") + ")");
-            foreach (var (skill, n, what) in new[] { (UltimateBot.Skill.Late, 1, "LATE +0.25 s solo"), (UltimateBot.Skill.Late, 4, "LATE +0.25 s party of 4"),
-                                                     (UltimateBot.Skill.Miss, 1, "MISS one assignment per phase, solo"), (UltimateBot.Skill.Miss, 4, "MISS one assignment per phase, party of 4") })
+            var runs = new (string id, string label, int n, UltimateBot.Skill skill, string cls, bool mustWin)[]
             {
-                yield return UltRun(what, n, skill); fights.Add(ultLast);
-                Check($"Part 5: imperfect bots wipe ({what})", ultLast != null && !ultLast.Killed, ultLast?.ToString());
+                ("p1", "PERFECT solo (Vanguard)", 1, UltimateBot.Skill.Perfect, "Vanguard", true),
+                ("p2", "PERFECT party of 2", 2, UltimateBot.Skill.Perfect, "Vanguard", true),
+                ("p4", "PERFECT party of 4 (V C A V)", 4, UltimateBot.Skill.Perfect, "Vanguard", true),
+                ("p8", "PERFECT party of 8", 8, UltimateBot.Skill.Perfect, "Vanguard", true),
+                ("c1", "PERFECT solo (Chimesinger)", 1, UltimateBot.Skill.Perfect, "Chimesinger", true),
+                ("late1", "LATE +0.25 s solo", 1, UltimateBot.Skill.Late, "Vanguard", false),
+                ("late4", "LATE +0.25 s party of 4", 4, UltimateBot.Skill.Late, "Vanguard", false),
+                ("miss1", "MISS one assignment per phase, solo", 1, UltimateBot.Skill.Miss, "Vanguard", false),
+                ("miss4", "MISS one assignment per phase, party of 4", 4, UltimateBot.Skill.Miss, "Vanguard", false),
+            };
+            foreach (var r in runs)
+            {
+                if (!BotRun(r.id)) continue;
+                yield return UltRun(r.label, r.n, r.skill, cls0: r.cls); fights.Add(ultLast);
+                if (r.mustWin) Check($"Part 5: {r.label} clears the Ultimate", ultLast != null && ultLast.Killed, ultLast?.ToString());
+                else Check($"Part 5: imperfect bots wipe ({r.label})", ultLast != null && !ultLast.Killed, ultLast?.ToString());
             }
             // decision density per phase (personal reads + forced repositions, per player per 10 s) vs v2
             foreach (var f in fights.Where(x => x != null && x.Label.StartsWith("PERFECT")))
@@ -155,7 +177,7 @@ namespace LastBell.Run
                 Note($"decision density ({f.Label}), per player per 10 s: " + string.Join("  ", parts));
             }
             // v2 reference: the same bot on the v2 fight (Medium), 120 s
-            yield return BkStart(null);
+            if (BotRun("v2")) yield return BkStart(null); else bk = null;
             if (bk != null)
             {
                 var vb = UltimateParty.Drive(d.Player, 0, 1); vb.Speed = PlayerController.WalkSpeed;
