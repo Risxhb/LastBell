@@ -246,8 +246,8 @@ namespace LastBell.Run
                 }));
                 var hint = sh.HintFor(d.Player) ?? Vector3.zero;
                 float off = Mathf.Abs(Vector3.Dot(Sim.Flat(hint), UltimateState.FissureNormal));
-                Check($"Stopped Hour P5, {UltimateState.StationNames[s]} hand: hides {off:0.00} m off the burning fissure and survives (no burn, no lash, no Heart Toll)",
-                      !d.Player.Down && off >= StoppedHour.FissureClear && BkHitsOn(d.Player, "Fissure probe") == 0 && BkHitsOn(d.Player, sh.Name) == 0 && BkHitsOn(d.Player, UltShapes.HeartSource) == 0 && sh.FormationOk,
+                Check($"Stopped Hour P5, {UltimateState.StationNames[s]} hand: hides {off:0.00} m off the burning fissure and survives (no burn while frozen, no lash, no Heart Toll)",
+                      !d.Player.Down && off >= StoppedHour.FissureClear && !bkHits.Any(h => h.Player == d.Player && h.Source == "Fissure probe" && h.Tick >= sh.StopTick) && BkHitsOn(d.Player, sh.Name) == 0 && BkHitsOn(d.Player, UltShapes.HeartSource) == 0 && sh.FormationOk,
                       $"{ShLashes(sh)} · {string.Join(", ", bkHits.Select(h => h.Source + " " + h.Damage))}");
             }
 
@@ -336,19 +336,25 @@ namespace LastBell.Run
             }
             // solo P3 through the real plan (part5-attempts-3: the perfect solo bot was lashed at the first P3 resume): frozen
             // 23-27 s through clocks III (24) and IV (27), Reflection on the resume; the hiding spot hugs the boss
-            foreach (float speed in new[] { 4.2f, 6f })
+            // (4.2 m/s without attacks: the escape proof; 6 m/s with attacks, loops 1 and 2: as the bot clears play it)
+            foreach (var (speed, attacks, loops) in new[] { (4.2f, false, 1), (6f, true, 2) })
             {
                 yield return UltStart(null, "P3");
                 if (bk == null) yield break;
                 ShHook(); sh = bk.Mechanic<StoppedHour>(); var clocks = bk.Mechanic<PendulumClocks>();
-                var sb = UltimateParty.Drive(d.Player, 0, 1); sb.Speed = speed; sb.Attacks = false;
+                var sb = UltimateParty.Drive(d.Player, 0, 1); sb.Speed = speed; sb.Attacks = attacks;
                 bk.ManualPlan = false; bk.BeginCombat(); ShStep(2);
                 int tp = UltTick0();
-                ShStep(tp + Sim.Ticks(27.3f) - d.World.Tick);
-                var frozen = clocks.Strikes.Where(k => k.Owner == d.Player && k.Tick >= sh.StopTick && k.Tick <= sh.ResumeTick).ToList();
-                Check($"plan P3 solo at {speed} m/s: survives the first resume (lash stopped by the boss), and the clocks struck while frozen reach the boss",
-                      sh.Lashes.Count == 1 && sh.Lashes[0].Boss && !d.Player.Down && frozen.Count == 2 && frozen.All(k => k.Resolved && k.StruckBoss && !k.Cracked) && sh.FormationOk,
-                      $"{ShLashes(sh)} · {ShSpots(sh)} · frozen clocks {string.Join(", ", frozen.Select(k => $"{UltimateState.Roman[k.Hour]} {UltimateState.StationNames[k.Station]} {(k.StruckBoss ? "boss" : k.Cracked ? "cracked" : "-")}"))} · hp {d.Player.Hp} · {sb.DebugLine}");
+                for (int loop = 0; loop < loops; loop++)
+                {
+                    // P3 loops every 31.5 s (28 s + the 3.5 s punish); the resume is 27 s into each
+                    ShStep(tp + Sim.Ticks(31.5f * loop + 27.3f) - d.World.Tick, attacks);
+                    var frozen = clocks.Strikes.Where(k => k.Owner == d.Player && k.Tick >= sh.StopTick && k.Tick <= sh.ResumeTick).ToList();
+                    Check($"plan P3 solo at {speed} m/s{(attacks ? " attacking" : "")}, loop {loop + 1}: survives the resume (lash stopped by the boss), and both clocks struck while frozen reach the boss",
+                          sh.Lashes.Count == loop + 1 && sh.Lashes[loop].Boss && !d.Player.Down && frozen.Count == 2 && frozen.All(k => k.Resolved && k.StruckBoss && !k.Cracked) && sh.FormationOk
+                          && bk.Segment == BellkeeperEncounter.UltSegment.P3,
+                          $"{ShLashes(sh)} · {ShSpots(sh)} · frozen clocks {string.Join(", ", frozen.Select(k => $"{UltimateState.Roman[k.Hour]} {UltimateState.StationNames[k.Station]} {(k.StruckBoss ? "boss" : k.Cracked ? "cracked" : "-")} from ({(k.Cone != null ? k.Cone.Origin.x : 0):0.00},{(k.Cone != null ? k.Cone.Origin.z : 0):0.00})"))} · hp {d.Player.Hp} · {bk.Segment} · {sb.DebugLine}");
+                }
                 d.Player.Input = bot;
             }
             yield return UltStart(null, "P4");
