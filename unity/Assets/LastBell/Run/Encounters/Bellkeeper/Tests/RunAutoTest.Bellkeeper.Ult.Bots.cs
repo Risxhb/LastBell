@@ -124,7 +124,11 @@ namespace LastBell.Run
         IEnumerator UltBotChecks()
         {
             Note("---------- Ultimate Part 5: strat bots on the Ultimate entry ----------");
+            int savedHp = BellkeeperEncounter.UltimateBaseHp;
+            BellkeeperEncounter.UltimateBaseHp = 10000;   // provisional (live-attempts-1: the first kill)
+            BellkeeperEncounter.PushSeconds = new float[] { 45, 0, 85, 80, 0, 105, 78 };
             var fights = new List<UltFight>();
+            foreach (var n2 in new[] { 2, 8 }) { yield return UltRun($"PERFECT party of {n2}", n2, UltimateBot.Skill.Perfect); fights.Add(ultLast); Check($"Part 5: a perfect party of {n2} clears the Ultimate", ultLast != null && ultLast.Killed, ultLast?.ToString()); }
             yield return UltRun("PERFECT solo (Vanguard)", 1, UltimateBot.Skill.Perfect); fights.Add(ultLast);
             Check("Part 5: a perfect solo bot clears the Ultimate", ultLast != null && ultLast.Killed, ultLast?.ToString());
             yield return UltRun("PERFECT party of 4 (V C A V)", 4, UltimateBot.Skill.Perfect); fights.Add(ultLast);
@@ -144,7 +148,7 @@ namespace LastBell.Run
                 for (int i = 0; i < f.Segments.Count; i++)
                 {
                     var seg = f.Segments[i].seg; int len = (i + 1 < f.Segments.Count ? f.Segments[i + 1].tick : f.Ticks) - f.Segments[i].tick;
-                    int n = f.Label.Contains("4") ? 4 : 1;
+                    int n = f.Label.Contains("of 8") ? 8 : f.Label.Contains("of 4") ? 4 : f.Label.Contains("of 2") ? 2 : 1;
                     f.Decisions.TryGetValue(seg, out int dec);
                     parts.Add($"{seg} {dec / (float)n / Mathf.Max(1, len / 600f):0.0}");
                 }
@@ -160,6 +164,8 @@ namespace LastBell.Run
                 Note($"decision density (v2 Medium, solo strat bot, 120 s): {vb.Decisions / Mathf.Max(1, (d.World.Tick - t0) / 600f):0.0} per 10 s");
                 d.Player.Input = bot;
             }
+            BellkeeperEncounter.UltimateBaseHp = savedHp;
+            BellkeeperEncounter.PushSeconds = new float[] { 130, 0, 150, 130, 0, 130, 78 };
         }
 
         // ---------------- recorded full attempts (Chzy18: "I would like to see the boss attempts") ----------------
