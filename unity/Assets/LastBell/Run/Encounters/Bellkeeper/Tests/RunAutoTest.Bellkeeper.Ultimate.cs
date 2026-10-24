@@ -72,7 +72,7 @@ namespace LastBell.Run
         {
             BellkeeperEncounter.PhaseOverride = null;
             BellkeeperEncounter.PushTimersOn = true;
-            BellkeeperEncounter.PushSeconds = new float[] { 130, 0, 150, 130, 0, 130, 78 };
+            BellkeeperEncounter.PushSeconds = (float[])BellkeeperEncounter.DefaultPush.Clone();
             yield return BkLeave();
         }
         // step, keeping every standing player at full health (checks of timing, not of survival)
@@ -302,7 +302,7 @@ namespace LastBell.Run
             bk.BeginCombat(); UltStepAlive(2); t0 = UltTick0();
             UltStepAliveUntil(() => bk.Ult.Wipes > 0 || d.Player.Down, Sim.Ticks(4));
             Check("P5 hard enrage: the party is wiped at the enrage (78 s; here shortened to 2 s)", d.Player.Down && (bk.Mechanic<ThirteenthHour>().Built || (bk.Ult.WipeCause == "The Thirteenth Hour" && bk.PlanLog.Any(e => e.what.StartsWith("wipe") && e.tick - t0 == Sim.Ticks(2 + BellkeeperEncounter.EnrageGrace)))));
-            BellkeeperEncounter.PushSeconds = new float[] { 130, 0, 150, 130, 0, 130, 78 };
+            BellkeeperEncounter.PushSeconds = (float[])BellkeeperEncounter.DefaultPush.Clone();
             BellkeeperEncounter.PushTimersOn = true;
 
             // the strat bot's basics: it leaves a Leaning Bell at the 4.2 m/s proof speed, from the hit half's wall

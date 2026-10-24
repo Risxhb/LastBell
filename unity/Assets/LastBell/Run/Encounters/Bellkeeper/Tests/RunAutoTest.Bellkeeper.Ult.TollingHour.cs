@@ -146,7 +146,7 @@ namespace LastBell.Run
                 BkStep(1);
                 Check("Thirteenth Hour: a shortened enrage (2.6 s) still counts XII then wipes on XIII exactly", none && bk.Ult.Wipes >= 1 && d.Player.Down && bk.PlanLog.First(e => e.what.StartsWith("wipe")).tick == t0 + Sim.Ticks(2.6f), $"count {uXiii.Count}");
             }
-            BellkeeperEncounter.PushSeconds = new float[] { 130, 0, 150, 130, 0, 130, 78 };
+            BellkeeperEncounter.PushSeconds = (float[])BellkeeperEncounter.DefaultPush.Clone();
         }
 
         // boss death stops the count: no more tolls, no XIII

@@ -145,7 +145,7 @@ namespace LastBell.Run
         {
             Note("---------- Ultimate Part 5: strat bots on the Ultimate entry ----------");
             int savedHp = BellkeeperEncounter.UltimateBaseHp;
-            ApplyTuning(10000, new float[] { 45, 0, 85, 80, 0, 105, 78 });   // provisional (live-attempts-1: the first kill)
+            ApplyTuning(BellkeeperEncounter.DefaultBaseHp, (float[])BellkeeperEncounter.DefaultPush.Clone());   // the defaults (Part 5); sweeps override
             var ps = BellkeeperEncounter.PushSeconds;
             Note($"tuning: UltimateBaseHp {BellkeeperEncounter.UltimateBaseHp} · push P1 {ps[0]} P2 {ps[2]} P3 {ps[3]} P4 {ps[5]} · P5 enrage {ps[6]}");
             var fights = new List<UltFight>();
@@ -192,7 +192,7 @@ namespace LastBell.Run
                 d.Player.Input = bot;
             }
             BellkeeperEncounter.UltimateBaseHp = savedHp;
-            BellkeeperEncounter.PushSeconds = new float[] { 130, 0, 150, 130, 0, 130, 78 };
+            BellkeeperEncounter.PushSeconds = (float[])BellkeeperEncounter.DefaultPush.Clone();
         }
 
         // ---------------- recorded full attempts (Chzy18: "I would like to see the boss attempts") ----------------
@@ -215,7 +215,7 @@ namespace LastBell.Run
             yield return UltRecordAttempt("party4_late", 4, UltimateBot.Skill.Late);
             yield return UltRecordAttempt("solo_perfect", 1, UltimateBot.Skill.Perfect);
             BellkeeperEncounter.UltimateBaseHp = savedHp;
-            BellkeeperEncounter.PushSeconds = new float[] { 130, 0, 150, 130, 0, 130, 78 };
+            BellkeeperEncounter.PushSeconds = (float[])BellkeeperEncounter.DefaultPush.Clone();
         }
 
         // -lastbellTestAbility bots_watch: the same three attempts, live and smooth (no frame capture, real game time), for watching

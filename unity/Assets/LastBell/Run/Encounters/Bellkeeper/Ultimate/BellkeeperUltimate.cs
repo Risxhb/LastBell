@@ -21,7 +21,9 @@ namespace LastBell.Run
     {
         public UltimateState Ult { get; private set; }
         // Placeholder until the bots measure DPS (ULTIMATE.md §9, Part 5): HP per phase = measured DPS x target length.
-        public static int UltimateBaseHp = 30000;
+        public static int UltimateBaseHp = DefaultBaseHp;
+        // Set from the Part 5 bot sweeps (clears-par-6: perfect party of 4 kills 3/4 in ~6:10, party of 8 1/1, solo Chimesinger 1/1)
+        public const int DefaultBaseHp = 12000;
         // solo gets a smaller bar: one player carries every clock and every Stilled hide and deals far less per head (Part 5:
         // solo DPS ~38 vs ~47 per player in a party of 4); -lastbellUltSolo overrides
         public static float UltimateSoloScale = float.TryParse(Arg("-lastbellUltSolo"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float ss) ? ss : 0.65f;
@@ -33,7 +35,8 @@ namespace LastBell.Run
         static readonly float[] SegFloor = { 0.85f, 0.55f, 0.55f, 0.35f, 0.15f, 0.15f, 0f };   // HP floor while it runs
         static readonly float[] SegEnd = { 0.85f, -1, 0.55f, 0.35f, -1, 0.15f, 0f };          // HP that ends it (-1 = timed)
         static readonly int[] SegLook = { 1, 1, 2, 3, 3, 3, 3 };                               // phase look: shell closed / parted / open chest
-        public static float[] PushSeconds = { 130, 0, 150, 130, 0, 130, 78 };                   // push timer / enrage per segment, 0 = none
+        public static readonly float[] DefaultPush = { 54, 0, 100, 95, 0, 125, 78 };   // Part 5 (clears-par-6); P5 = the hard enrage
+        public static float[] PushSeconds = (float[])DefaultPush.Clone();                   // push timer / enrage per segment, 0 = none
         public const float EnrageGrace = 0.5f;
         public static bool PushTimersOn = true;                                                 // tests switch them off for long checks
 
