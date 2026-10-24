@@ -199,6 +199,38 @@ namespace LastBell.Run
                            string.Join(", ", bkHits.Select(h => h.Player.name + ":" + h.Source)) + " · players " + string.Join(" ", d.World.Players.Select(p => $"{(stilledNow.Contains(p) ? "*" : "")}{p.name}({p.transform.position.x:0.0},{p.transform.position.z:0.0})")) + " · images " + string.Join(" ", shWatch.Where(w => w.by == "reflection").Select(w => $"({w.h.Origin.x:0.0},{w.h.Origin.z:0.0})")));
             }
 
+            // the Conductor's Hand phrase 4 (Stopped Hour, 2.0 s stop) at N = 8, party clumped on the +Z far wall: every
+            // Stilled player gets a spot (all four stations in the Heart Toll band) and the route works
+            yield return UltStart();
+            if (bk == null) yield break;
+            ShHook(); sh = bk.Mechanic<StoppedHour>(); bkHits.Clear();
+            BkPlace(d.Player, new Vector3(11.8f * Mathf.Sin(-18 * Mathf.Deg2Rad), 0, 11.8f * Mathf.Cos(-18 * Mathf.Deg2Rad)));
+            for (int i = 1; i < 8; i++) { float a = (-18 + 36f * i / 7) * Mathf.Deg2Rad; BkAdd(new Vector3(11.8f * Mathf.Sin(a), 0, 11.8f * Mathf.Cos(a)), RunDirector.Classes[i % RunDirector.Classes.Length]); }
+            ShBots();
+            ShRun(sh, new UltCue { Variant = "lash", Phase = 2, At = new[] { 5f, 7f }, Seed = 3 }, heart: true);
+            {
+                var hand = sh.StilledPlayers.ToList();
+                Check("Stopped Hour N = 8, Conductor's Hand phrase 4 (2.0 s stop, party on the far wall, + Heart Toll): a full formation, every Stilled player hides",
+                      hand.Count == 4 && sh.FormationOk && hand.All(p => !p.Down) && sh.Lashes.Count == 4 && sh.Lashes.All(l => l.Boss) && bkHits.Count(h => h.Source == sh.Name) == 0
+                      && !bkHits.Any(h => hand.Contains(h.Player) && h.Source == UltShapes.HeartSource),
+                      $"{ShLashes(sh)} · {ShSpots(sh)} · hits {string.Join(", ", bkHits.Select(h => (hand.Contains(h.Player) ? "*" : "") + h.Player.name + ":" + h.Source + " " + h.Damage))}");
+            }
+
+            // N = 8 with clock hands only on SE and NW (two Stilled on each of two opposite stations), Heart Toll band
+            yield return UltStart();
+            if (bk == null) yield break;
+            ShHook(); sh = bk.Mechanic<StoppedHour>(); bkHits.Clear();
+            for (int i = 1; i < 8; i++) BkAdd(Sim.Dir(360f * i / 8 + 10) * 7f, RunDirector.Classes[i % RunDirector.Classes.Length]);
+            ShBots();
+            ShRun(sh, new UltCue { Variant = "lash", Phase = 2, At = new[] { 5f, 9f }, Seed = 5 }, heart: true,
+                  pre: () => { for (int i = 0; i < d.World.Players.Count; i++) bk.Ult.SetClock(d.World.Players[i], 1 + i % 4, i % 2 == 0 ? 1 : 3, d.World.Tick + 9999); });
+            {
+                var two = sh.StilledPlayers.ToList();
+                Check("Stopped Hour N = 8, hands only SE / NW (two Stilled per opposite station, + Heart Toll): a full formation, every Stilled player hides",
+                      two.Count == 4 && sh.FormationOk && two.All(p => !p.Down) && sh.Lashes.All(l => l.Boss) && bkHits.Count(h => h.Source == sh.Name) == 0,
+                      $"{ShLashes(sh)} · {ShSpots(sh)}");
+            }
+
             // P5 with an NW / SE hand: the hiding line lies on the burning fissure, so the spot keeps 1.35 m off it
             foreach (int s in new[] { 1, 3 })
             {

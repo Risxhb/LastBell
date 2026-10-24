@@ -166,56 +166,102 @@ namespace LastBell.Run
         // The guide's hiding spots as one call-out (a formation): each Stilled player behind the boss from their station,
         // in the phase's distance band, out of every other Stilled player's lane, and (resume with Reflection) where no
         // reflected image lands on another Stilled player. The call-out: everyone steps the same way round the boss off their
-        // line (clockwise or counter-clockwise), which keeps opposite stations out of each other's chains; each player then
-        // takes the nearest spot that fits the ones already placed. Both directions are tried; then without that rule; then
-        // without the image rule (the formation is reported incomplete if anything had to be dropped).
+        // line (clockwise or counter-clockwise), which keeps opposite stations out of each other's chains. The spots are
+        // searched depth-first, nearest first, placing players round-robin over the stations (the most crowded station,
+        // then its opposite, then the others): placing one at a time without backtracking boxes later players out once all
+        // four stations are Stilled in the Heart Toll band (found by the Conductor's Hand: N = 8, phrase 4). Both directions
+        // are tried, then neither; then without the image rule. If nothing fits, each player still gets their own nearest
+        // hidden spot (the formation is reported incomplete).
+        const int LayoutBudget = 20000;
         void Formation()
         {
             var tiers = new[] { (1, true), (-1, true), (0, true), (1, false), (-1, false), (0, false) };
-            Vector3[] bestHints = null; float bestTotal = float.MaxValue; int bestTier = -1;
-            for (int t = 0; t < tiers.Length; t++)
+            Vector3[] hints = null; int tier = -1;
+            for (int t = 0; t < tiers.Length && hints == null; t++)
             {
-                if (!tiers[t].Item2 && (!mirrorResume || bestHints != null)) break;   // a layout keeping the image rule beats any without
-                if (TryLayout(tiers[t].Item1, tiers[t].Item2, out var hints, out float total) && total < bestTotal) { bestHints = hints; bestTotal = total; bestTier = t; }
+                if (!tiers[t].Item2 && !mirrorResume) break;   // no images on this resume: the image rule is moot
+                if (TryLayout(tiers[t].Item1, tiers[t].Item2, out var h)) { hints = h; tier = t; }
             }
-            bool clean = bestHints != null && (!mirrorResume || bestTier < 3);
-            if (bestHints == null) { TryLayout(0, false, out bestHints, out _); clean = false; }
+            bool clean = hints != null && (!mirrorResume || tier < 3);
+            if (hints == null) hints = OwnSpots();
             for (int i = 0; i < stilled.Count; i++)
             {
-                stilled[i].Hint = bestHints[i];
-                stilled[i].HintOk = clean && Hidden(stilled[i].Station, bestHints[i], 0.25f);
+                stilled[i].Hint = hints[i];
+                stilled[i].HintOk = clean && Hidden(stilled[i].Station, hints[i], 0.25f);
                 if (!stilled[i].HintOk) Boss.PlanLog.Add((Now, "stopped hour: no clean spot for " + stilled[i].P.name));
             }
         }
-        bool TryLayout(int sign, bool images, out Vector3[] hints, out float total)
+        // every hidden spot in the band for one Stilled player, nearest (and least sideways) first
+        List<Vector3> Candidates(Stilled s, int sign)
         {
-            var bp = BossPos;
+            var bp = BossPos; var back = -UltimateState.StationDir(s.Station);
+            var list = new List<(float score, Vector3 q)>();
+            for (float d = minD; d <= maxD + 1e-3f; d += 0.2f)
+                for (float a = sign > 0 ? 0 : -39; a <= (sign < 0 ? 0 : 39); a += 1.5f)
+                {
+                    var q = bp + Quaternion.Euler(0, a, 0) * back * d;
+                    if (!CombatWorld.InPlayerBound(q, -0.6f) || !Hidden(s.Station, q, 0.25f) || !OffFissure(q)) continue;
+                    list.Add((Flat(q - s.P.transform.position) + 0.05f * Mathf.Abs(a), q));
+                }
+            return list.OrderBy(c => c.score).Select(c => c.q).ToList();
+        }
+        // round-robin over stations: the most crowded first, then its opposite, then the other two
+        List<int> SearchOrder()
+        {
+            var by = new Dictionary<int, Queue<int>>();
+            for (int i = 0; i < stilled.Count; i++) { if (!by.ContainsKey(stilled[i].Station)) by[stilled[i].Station] = new Queue<int>(); by[stilled[i].Station].Enqueue(i); }
+            var order = new List<int>();
+            if (by.Count == 0) return order;
+            int k0 = by.OrderByDescending(kv => kv.Value.Count).ThenBy(kv => kv.Key).First().Key;
+            var pref = new[] { k0, (k0 + 2) % 4, (k0 + 1) % 4, (k0 + 3) % 4 }.Where(by.ContainsKey).ToArray();
+            while (order.Count < stilled.Count) foreach (var k in pref) if (by[k].Count > 0) order.Add(by[k].Dequeue());
+            return order;
+        }
+        bool TryLayout(int sign, bool images, out Vector3[] hints)
+        {
+            var order = SearchOrder();
+            var cands = order.Select(i => Candidates(stilled[i], sign)).ToList();
+            var pick = new Vector3[order.Count];
             float img = ImageRadius() + Hazard.Margin + 0.2f;
-            hints = new Vector3[stilled.Count]; total = 0; bool all = true;
+            int nodes = 0;
+            bool Fits(int k, Vector3 q)
+            {
+                var s = stilled[order[k]];
+                for (int j = 0; j < k; j++)
+                {
+                    var o = stilled[order[j]]; var oh = pick[j];
+                    if (Flat(q - oh) < 1f || Shadows(o.Station, oh, q, 0.35f) || Shadows(s.Station, q, oh, 0.35f)) return false;
+                    if (images && mirrorResume && (Flat(Mirror(q) - oh) < img || Flat(Mirror(oh) - q) < img)) return false;
+                }
+                return true;
+            }
+            bool Place(int k)
+            {
+                if (k == order.Count) return true;
+                foreach (var q in cands[k])
+                {
+                    if (++nodes > LayoutBudget) return false;
+                    if (!Fits(k, q)) continue;
+                    pick[k] = q;
+                    if (Place(k + 1)) return true;
+                }
+                return false;
+            }
+            bool ok = Place(0);
+            hints = new Vector3[stilled.Count];
+            for (int k = 0; k < order.Count; k++) hints[order[k]] = pick[k];
+            return ok;
+        }
+        // fallback: each Stilled player's own nearest hidden spot, ignoring the others
+        Vector3[] OwnSpots()
+        {
+            var hints = new Vector3[stilled.Count];
             for (int i = 0; i < stilled.Count; i++)
             {
-                var s = stilled[i];
-                var back = -UltimateState.StationDir(s.Station);
-                Vector3 best = bp + back * Mathf.Max(minD, 3f); float bestScore = float.MaxValue; bool found = false;
-                for (float d = minD; d <= maxD + 1e-3f; d += 0.2f)
-                    for (float a = sign > 0 ? 0 : -39; a <= (sign < 0 ? 0 : 39); a += 1.5f)
-                    {
-                        var q = bp + Quaternion.Euler(0, a, 0) * back * d;
-                        if (!CombatWorld.InPlayerBound(q, -0.6f) || !Hidden(s.Station, q, 0.25f) || !OffFissure(q)) continue;
-                        bool ok = true;
-                        for (int j = 0; j < i && ok; j++)
-                        {
-                            var o = stilled[j]; var oh = hints[j];
-                            if (Flat(q - oh) < 1f || Shadows(o.Station, oh, q, 0.35f) || Shadows(s.Station, q, oh, 0.35f)) ok = false;
-                            else if (images && mirrorResume && (Flat(Mirror(q) - oh) < img || Flat(Mirror(oh) - q) < img)) ok = false;
-                        }
-                        if (!ok) continue;
-                        float score = Flat(q - s.P.transform.position) + 0.05f * Mathf.Abs(a);
-                        if (score < bestScore) { bestScore = score; best = q; found = true; }
-                    }
-                hints[i] = best; total += found ? bestScore : 100; all &= found;
+                var c = Candidates(stilled[i], 0);
+                hints[i] = c.Count > 0 ? c[0] : BossPos - UltimateState.StationDir(stilled[i].Station) * Mathf.Max(minD, 3f);
             }
-            return all;
+            return hints;
         }
 
         // ---------------- the lash ----------------
@@ -338,13 +384,14 @@ namespace LastBell.Run
         {
             if (Flat(q - s.Hint) > 0.5f || !Hidden(s.Station, q, 0.15f)) return false;
             float d = Flat(q - BossPos); if (d < minD - 0.15f || d > maxD + 0.3f || !OffFissure(q)) return false;
+            if (!s.HintOk) return true;   // incomplete formation: at least hide from your own chain (never an empty rule)
             float img = ImageRadius() + Hazard.Margin + 0.1f;
             foreach (var o in stilled)
             {
                 if (o == s || o.P.Down) continue;
                 var at = Flat(o.P.transform.position - o.Hint) <= 1f ? o.P.transform.position : o.Hint;
                 if (Shadows(o.Station, at, q, 0.2f) || Shadows(s.Station, q, at, 0.2f)) return false;
-                if (mirrorResume && s.HintOk && (Flat(Mirror(q) - at) < img || Flat(Mirror(at) - q) < img)) return false;
+                if (mirrorResume && (Flat(Mirror(q) - at) < img || Flat(Mirror(at) - q) < img)) return false;
             }
             return true;
         }
