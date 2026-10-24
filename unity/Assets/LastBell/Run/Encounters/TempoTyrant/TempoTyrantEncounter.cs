@@ -34,12 +34,13 @@ namespace LastBell.Run
         public const float CentreGate = 1.5f;                     // combo/crown start only this close to the arena centre
         public const float OwnBound = 8.5f;                     // charge / rush endpoints: >= 2 m wall corridor behind the body
         public const float SevSide = 2.5f, SevBand = 3.5f, SevReach = 30f;
-        // Windows in beats as (Haste, Normal). Haste casts faster twice over: every beat is shorter (165 vs 123.75 BPM)
-        // AND most indicators get fewer beats from placement to activation. Severance's opening and gaps stay equal in
-        // beats because the whole-route checks need them (Haste is still 25% shorter in seconds).
-        public static readonly (float H, float N) SevOpen = (9, 9), SevGap = (4, 4), SevRecover = (5, 6),
-            WakeWarn = (5, 6), FissureWarn = (4, 5), WakeRecover = (3, 4),
-            CrownRing = (7, 8), CrownInnerWarn = (4, 4), CrownRecover = (6, 8), RushTell = (2, 3);
+        // Windows in beats as (Haste, Normal). Normal is the former Haste pace (165 BPM, the song as written). Haste is a
+        // savage tier: every beat is 25% shorter (220 BPM) AND indicators, windups and combos get fewer beats from
+        // placement to activation. Normal stays walkable; Haste needs sprint and pre-positioning (route checks prove both
+        // remain survivable, without dashes or immunity).
+        public static readonly (float H, float N) SevOpen = (9, 9), SevGap = (4, 4), SevRecover = (3, 5),
+            WakeWarn = (4, 5), FissureWarn = (3, 4), WakeRecover = (2, 3),
+            CrownRing = (6, 7), CrownInnerWarn = (3, 4), CrownRecover = (4, 6), RushTell = (2, 2);
         public static float Of((float H, float N) w, Tempo t) => t == Tempo.Haste ? w.H : w.N;
         public const float WakeWidth = 3f, FissureWidth = 2.2f,
             WakeOvershoot = 2f, WakeMaxTravel = 15f, WakeMinTravel = 4f, WakeReach = 2.6f;   // reach: greatsword thrust beyond the body
@@ -47,7 +48,7 @@ namespace LastBell.Run
         public const float CrownPocket = 4f, CrownInner = 5.5f;
         public const float FightDist = 4.5f, RushDist = 9f, RushHysteresis = 1.5f, RushSpeed = 16f;
         public const int RushSustainTicks = 90, RushCooldownTicks = 8 * Sim.Hz, PursuitMaxTicks = 75;
-        public const float HasteWalk = 3.4f, NormalWalk = 2.6f;
+        public const float HasteWalk = 4.2f, NormalWalk = 3.4f;
         public const float FrenzyAt = 0.2f;
         public const int FrenzyTellTicks = 90;
         public const int SevDmg1 = 26, SevDmg2 = 26, SevDmg3 = 30, WakeDmg = 24, FissureDmg = 16, RingDmg = 22, InnerDmg = 22;
@@ -265,6 +266,7 @@ namespace LastBell.Run
             Current = "Closing Rush"; Rushes++;
             for (int i = 1; i <= travel; i++) { transform.position = Vector3.Lerp(start, end, i / (float)travel); yield return 1; }
             endMarker.ring.Dismiss(); endMarker.pip.Dismiss(); Announcement = ""; rushReadyAt = Age + RushCooldownTicks; farTicks = 0;
+            Current = "Closing Rush (stopped)";
             Rig.Pose(TyrantPose.Idle);
             yield return Beats(1);
         }

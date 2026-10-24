@@ -20,7 +20,7 @@ namespace LastBell.Run
         }
 
         public const float Reaction = 0.3f;
-        static Tempo TempoOf(float bpm) => bpm >= 140 ? Tempo.Haste : Tempo.Normal;
+        static Tempo TempoOf(float bpm) => bpm >= 190 ? Tempo.Haste : Tempo.Normal;
         static float BodyR => 1.4f + PlayerController.Radius;   // TempoTyrant body + player body (CombatWorld.Constrain)
 
         // path length from a to b avoiding the boss body circle (centre c, radius r)

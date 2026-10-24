@@ -24,9 +24,10 @@ namespace LastBell.Run
     public sealed class TempoTyrantAudio : MonoBehaviour
     {
         public enum MusicStatus { MissingMusic, MissingSlowVersion, Paired }
-        public const string HasteTrack = "By My Measure", SlowTrack = "By My Measure (75)";
+        // Haste = the 1.33x version (220 BPM grid); Normal = the song as written (warped onto an exact 165 BPM grid)
+        public const string HasteTrack = "By My Measure (Haste)", SlowTrack = "By My Measure";
         // measured grids of the prepared files (warp_wsola.py output): first beat offset and BPM
-        public const float HasteGridBpm = 165f, HasteFirstBeat = 0.1403f, SlowGridBpm = 123.75f, SlowFirstBeat = 0.1870f;
+        public const float HasteGridBpm = 220f, HasteFirstBeat = 0.1052f, SlowGridBpm = 165f, SlowFirstBeat = 0.1403f;
         public const float ResyncTolerance = 0.05f;
 
         static AudioClip hasteTick, normalTick, accentTick;
@@ -43,7 +44,7 @@ namespace LastBell.Run
         public int MusicResyncs { get; private set; }
         public float LastMusicError { get; private set; }   // seconds, playing position minus clock-derived position
         public bool MusicLocked => aligned;
-        public string StatusText => Music == MusicStatus.Paired ? $"music: By My Measure {(aligned ? "locked" : "waiting")} · err {LastMusicError * 1000:0} ms · swaps {MusicSwaps}" :
+        public string StatusText => Music == MusicStatus.Paired ? $"music: By My Measure {(boss && boss.Clock.State == Tempo.Haste ? "1.33x" : "1.0x")} {(aligned ? "locked" : "waiting")} · err {LastMusicError * 1000:0} ms · swaps {MusicSwaps}" :
             Music == MusicStatus.MissingSlowVersion ? "music: slow version missing (no pitch-preserving stretch; stays 1.0x)" : "music: MISSING (ticks only)";
 
         public void Bind(TempoTyrantEncounter owner)

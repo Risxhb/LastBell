@@ -190,10 +190,10 @@ namespace LastBell.Run
             Check("fight starts in Haste at beat 0", boss.Clock.State == Tempo.Haste && boss.Clock.Beat < 1 && boss.Clock.Commits == 0);
             Check("stand-in is labelled", boss.Placeholder && boss.Rig && boss.Rig.name.Contains("STAND-IN"));
             TempoTyrantHud.ShowDiagnostics = false;   // clean captures; the report carries the numbers
-            Check("music: By My Measure paired with its 0.75x version", boss.Audio && boss.Audio.Music == TempoTyrantAudio.MusicStatus.Paired, boss.Audio ? boss.Audio.StatusText : "");
+            Check("music: By My Measure paired with its 1.33x Haste version", boss.Audio && boss.Audio.Music == TempoTyrantAudio.MusicStatus.Paired, boss.Audio ? boss.Audio.StatusText : "");
             var music = FindAnyObjectByType<LastBell.Menu.MenuMusic>();
             yield return Wait(1.0f);
-            Check("music: Haste plays the 165 BPM version, beat-locked to the clock", music && music.Source && music.Source.clip && music.Source.clip.name == TempoTyrantAudio.HasteTrack && music.Source.isPlaying &&
+            Check("music: Haste plays the 1.33x (220 BPM) version, beat-locked to the clock", music && music.Source && music.Source.clip && music.Source.clip.name == TempoTyrantAudio.HasteTrack && music.Source.isPlaying &&
                 boss.Audio.MusicLocked && Mathf.Abs(boss.Audio.LastMusicError) < TempoTyrantAudio.ResyncTolerance, boss.Audio.StatusText);
             Check("Haste indicators: fewer beats AND shorter seconds than Normal", HasteShorter(), HasteTable());
             Note(HasteTable());
@@ -213,7 +213,7 @@ namespace LastBell.Run
             yield return BossCloseups("haste");
 
             // ---------------- Threefold Severance (Haste) ----------------
-            yield return Severance("haste", 165f);
+            yield return Severance("haste", 220f);
 
             // ---------------- tempo change (Haste -> Normal) ----------------
             goal = new Vector3(0, 0, 7);
@@ -225,17 +225,17 @@ namespace LastBell.Run
                 Note($"actual Haste passage {c.stateTicks / 60f:0.00} s (nominal 12 s; extra = rest of the block + 3 transition ticks)");
             }
             Check("no hazard live during the three accented transition ticks", transitionFrames > 0 && transitionHazardFrames == 0, $"{transitionHazardFrames}/{transitionFrames} frames");
-            Check("music rate derived from tempo (0.75 outside Haste)", Mathf.Approximately(boss.Clock.MusicRate, 0.75f));
+            Check("music rate derived from tempo (1.0 outside Haste, 1.33 in Haste)", Mathf.Approximately(boss.Clock.MusicRate, 1f) && Mathf.Approximately(boss.Clock.HasteBpm / boss.Clock.NormalBpm, 4f / 3f));
             yield return Wait(0.6f);
             var arenaN = FindAnyObjectByType<MetronomeCourtArena>();
             Check("world lighting follows tempo into its Normal (cool) state", arenaN && arenaN.TempoBlend < 0.1f, arenaN ? $"blend {arenaN.TempoBlend:0.00}" : "");
-            Check("music: Normal swaps to the 0.75x version at the same beat, still locked", music && music.Source.clip && music.Source.clip.name == TempoTyrantAudio.SlowTrack && music.Source.isPlaying &&
+            Check("music: Normal swaps to the song as written (1.0x) at the same beat, still locked", music && music.Source.clip && music.Source.clip.name == TempoTyrantAudio.SlowTrack && music.Source.isPlaying &&
                 boss.Audio.MusicSwaps >= 1 && Mathf.Abs(boss.Audio.LastMusicError) < TempoTyrantAudio.ResyncTolerance, boss.Audio.StatusText);
             yield return Wait(0.4f);
             yield return Shot("gameplay_normal_tempo");
             yield return BossCloseups("normal");
             boss.ForcedNext = "Severance";
-            yield return Severance("normal", 123.75f);
+            yield return Severance("normal", 165f);
 
             // ---------------- Sundering Wake ----------------
             yield return Wake();
@@ -306,7 +306,7 @@ namespace LastBell.Run
             var last3 = sev.Skip(Mathf.Max(0, sev.Count - 3)).ToList();
             if (last3.Count == 3)
             {
-                var tp = bpm >= 140 ? Tempo.Haste : Tempo.Normal; float gapB = TempoTyrantEncounter.Of(TempoTyrantEncounter.SevGap, tp), openB = TempoTyrantEncounter.Of(TempoTyrantEncounter.SevOpen, tp);
+                var tp = bpm >= 190 ? Tempo.Haste : Tempo.Normal; float gapB = TempoTyrantEncounter.Of(TempoTyrantEncounter.SevGap, tp), openB = TempoTyrantEncounter.Of(TempoTyrantEncounter.SevOpen, tp);
                 int gap = TempoClock.TicksFor(gapB, bpm), open = TempoClock.TicksFor(openB, bpm);
                 int g1 = last3[1].Resolve - last3[0].Resolve, g2 = last3[2].Resolve - last3[1].Resolve;
                 Check($"Severance {tag}: impacts {gapB} beats apart at {bpm} BPM", g1 == gap && g2 == gap, $"{g1}, {g2} ticks (expected {gap})");
@@ -419,7 +419,7 @@ namespace LastBell.Run
             int hp = d.Player.Hp, rushes = boss.Rushes, rushHits = hits.Count;
             yield return Until(() => boss.Current == "Closing Rush (announced)", 40, "closing rush tell");
             yield return Shot("closing_rush_tell");
-            yield return Until(() => boss.Rushes > rushes && boss.Current != "Closing Rush", 6, "rush travel");
+            yield return Until(() => boss.Rushes > rushes && boss.Current != "Closing Rush", 6, "rush travel");   // "Closing Rush (stopped)" once he lands
             Check("closing rush announced and non-damaging", boss.Rushes > rushes && hits.Skip(rushHits).All(h => !h.source.Contains("Rush")));
             Check("rush stops at fighting distance inside the bound", new Vector2(boss.transform.position.x, boss.transform.position.z).magnitude <= TempoTyrantEncounter.OwnBound + 0.05f &&
                 Sim.Flat(d.Player.transform.position - boss.transform.position).magnitude <= TempoTyrantEncounter.FightDist + 1.5f,
@@ -551,26 +551,27 @@ namespace LastBell.Run
         {
             float bound = CombatWorld.PlayerBound;
             var bosses = new[] { Vector3.zero, new Vector3(1.5f, 0, 0), new Vector3(0, 0, 1.5f), new Vector3(-1.06f, 0, -1.06f), new Vector3(1.06f, 0, 1.06f) };
-            foreach (float bpm in new[] { 165f, 123.75f })
+            foreach (float bpm in new[] { 220f, 165f })
             {
+                bool haste = bpm >= 190; float speed = haste ? PlayerController.SprintSpeed : PlayerController.WalkSpeed; string how = haste ? "sprinting" : "walking";
                 int starts = 0, ok = 0; float worst = float.MaxValue; string worstAt = "";
                 foreach (var b in bosses)
                     for (int y = 0; y < 360; y += 45)
                     {
-                        var r = TempoTyrantRoutes.Severance(b, y, bpm, PlayerController.WalkSpeed, bound);
+                        var r = TempoTyrantRoutes.Severance(b, y, bpm, speed, bound);
                         starts += r.Starts; ok += r.Feasible; if (r.WorstSlack < worst) { worst = r.WorstSlack; worstAt = r.ToString(); }
                         foreach (var f in r.Failures.Take(2)) Note("route failure: " + f);
                     }
-                Check($"routes: Threefold Severance at {bpm} BPM, walking, from every sampled legal start", ok == starts, $"{ok}/{starts}, worst slack {worst:0.00} s");
+                Check($"routes: Threefold Severance at {bpm} BPM, {how}, from every sampled legal start", ok == starts, $"{ok}/{starts}, worst slack {worst:0.00} s");
                 Note("worst: " + worstAt);
                 starts = 0; ok = 0; worst = float.MaxValue;
                 foreach (var b in bosses)
                 {
-                    var r = TempoTyrantRoutes.Crown(b, bpm, PlayerController.WalkSpeed, bound);
+                    var r = TempoTyrantRoutes.Crown(b, bpm, speed, bound);
                     starts += r.Starts; ok += r.Feasible; worst = Mathf.Min(worst, r.WorstSlack);
                     foreach (var f in r.Failures.Take(2)) Note("route failure: " + f);
                 }
-                Check($"routes: Hollow Crown in then out at {bpm} BPM, walking", ok == starts, $"{ok}/{starts}, worst slack {worst:0.00} s");
+                Check($"routes: Hollow Crown in then out at {bpm} BPM, {how}", ok == starts, $"{ok}/{starts}, worst slack {worst:0.00} s");
             }
             // chain: charges ending near the centre from several directions; fissure lane up during the opening.
             // The fissure always shows its full 5-beat warning from the moment the charge ends (players react from then),
@@ -581,11 +582,11 @@ namespace LastBell.Run
                     foreach (int y in new[] { 0, 90, 200, 315 })
                     {
                         var end = Sim.Flat(-from).normalized * 1.5f;
-                        var r = TempoTyrantRoutes.Chain(from, end, y, 165f, PlayerController.WalkSpeed, bound, split.Item1, split.Item2);
+                        var r = TempoTyrantRoutes.Chain(from, end, y, 220f, PlayerController.SprintSpeed, bound, split.Item1, split.Item2);
                         cs += r.Starts; cok += r.Feasible; cw = Mathf.Min(cw, r.WorstSlack);
                         foreach (var f in r.Failures.Take(2)) Note("route failure: " + f);
                     }
-            Check("routes: Broken Cadence chain (fissure then 1-2-3) at 165 BPM, walking", cok == cs, $"{cok}/{cs}, worst slack {cw:0.00} s");
+            Check("routes: Broken Cadence chain (fissure then 1-2-3) at 220 BPM, sprinting", cok == cs, $"{cok}/{cs}, worst slack {cw:0.00} s");
         }
 
         static readonly (string name, (float H, float N) w)[] Windows =

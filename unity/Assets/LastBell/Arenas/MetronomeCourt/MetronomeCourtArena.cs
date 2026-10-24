@@ -514,7 +514,7 @@ namespace LastBell.Arenas.MetronomeCourt
             {
                 // readiness / menu preview: non-damaging Haste ticking, frozen while paused
                 Preview = true; haste = true;
-                if (d == null || !d.Paused) previewBeat += Time.deltaTime * 165 / 60.0;
+                if (d == null || !d.Paused) previewBeat += Time.deltaTime * 220 / 60.0;   // previews the opening Haste tempo
                 phase = Mathf.Cos((float)(previewBeat % 2.0) * Mathf.PI);
                 beat = (int)System.Math.Floor(previewBeat);
                 if (boss && boss.Dead) phase = 0;

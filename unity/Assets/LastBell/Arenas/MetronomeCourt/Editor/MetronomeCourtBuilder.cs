@@ -103,8 +103,9 @@ namespace LastBell.Arenas.MetronomeCourt.EditorTools
             if (AssetDatabase.LoadAssetAtPath<SceneAsset>(map.SourceScene) == null) Build();
             Directory.CreateDirectory(Path.GetDirectoryName(map.RunScene));
             AssetDatabase.Refresh();
-            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(map.RunScene) != null) AssetDatabase.DeleteAsset(map.RunScene);
-            AssetDatabase.CopyAsset(map.SourceScene, map.RunScene);
+            // overwrite in place (never delete + copy) so the run scene keeps its GUID and the build settings stay valid
+            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(map.RunScene) != null) { File.Copy(map.SourceScene, map.RunScene, true); AssetDatabase.ImportAsset(map.RunScene, ImportAssetOptions.ForceUpdate); }
+            else AssetDatabase.CopyAsset(map.SourceScene, map.RunScene);
             var scene = EditorSceneManager.OpenScene(map.RunScene, OpenSceneMode.Single);
             new GameObject("Run Director").AddComponent<RunDirector>();
             EditorSceneManager.SaveScene(scene);
