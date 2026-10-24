@@ -3,6 +3,8 @@
 Written the way Ultimate guides are: what each mechanic wants from **you**, by your marker. The same strats drive the perfect bots (Part 5). All numbers are Medium; see `ULTIMATE.md` for the rules and `tools/encounter-escape/bellkeeper-ultimate-results.md` for the proof.
 
 ## Universal habits
+- **Stations** are the Throne's four diagonal rim dials: NE, SE, SW, NW (your clock hand points at one).
+- **Potions:** five, nothing else heals except the Chimesinger's Mending Chorus. Drink before T2's six tolls (73+ HP) and under the hourglass (you can't drink while Stilled).
 - **Read your own clock first** (numeral = when, brass hand = which rim station). Everything else in the phase is solved around it.
 - **Potions are the healing.** Drink before Tolling Hour chains and before T2's six tolls (you need 73+ HP).
 - **The boss's body is a shield.** Stopped Hour lanes and your own clock line both pass through him.
@@ -40,11 +42,11 @@ Written the way Ultimate guides are: what each mechanic wants from **you**, by y
 
 ## The Conductor's Hand
 - **Fingers** = first move: 1 Leaning Bell, 2 Toll Tide, 3 Reflection, 4 Stopped Hour. **Pendulum swing** = second: left = Heart Toll, right = the first move again, backwards.
-- The real telegraph comes only 2 s before. Start moving when you read the phrase, not when you see coral.
+- The real telegraph comes only 1.5 s before. Start moving when you read the phrase, not when you see coral. A right swing replays the first move inverted (it strikes where the original did not), as Backwards Bell does.
 
 ## Tolling Hour and the Thirteenth Hour
 - Count tolls; drink between chains, not during a clock hour.
-- **P5:** the great bell counts I…XIII, one toll every 6 s. XIII ends the attempt. Burn: P5 is 15 % of the bar in 78 s.
+- **P5:** the great bell counts I…XIII, one 4-damage toll every 6 s; XIII (78 s) ends the attempt. The fissure flares (2.4 m, 60) on every toll: stay 1.65 m or more off its line. Burn: P5 is 15 % of the bar in 78 s.
 
 ## Fracture of Time (P5)
 - **Never stand in the fissure** (30/s). It **flares on every toll** of the great bell (every 6 s from P5 start, in time with the numerals): be 1.5 m clear of its line on each toll.
