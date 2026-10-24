@@ -46,6 +46,9 @@ namespace LastBell.Run
             BellkeeperEncounter.PushTimersOn = pushOn;
             var classes = PartyClasses.Skip(1).ToArray();
             var bots = UltimateParty.Fill(d.World, n, skill, n > 1 ? new[] { cls0 }.Concat(classes).ToArray() : new[] { cls0 });
+            // the seed also turns the party's starting spots round the boss
+            var turn = Quaternion.Euler(0, (BellkeeperEncounter.SeedOffset * 47) % 360, 0);
+            foreach (var p in d.World.Players) BkPlace(p, turn * p.transform.position);
             foreach (var b in bots) b.Speed = PlayerController.WalkSpeed;
             var f = new UltFight { Label = label };
             var down = new HashSet<PlayerController>();

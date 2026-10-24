@@ -212,7 +212,10 @@ namespace LastBell.Run
         (float, Action) At(float t, UltimateMechanic m, UltCue cue) => (t, () => UltLaunch(m, cue));
         (float, Action) At(float t, BellkeeperAbility a, Func<BellkeeperAbility.CastTuning> tune) => (t, () => UltMove(a, tune()));
         UltCue C(int phaseNo, string variant, params float[] at) => new UltCue { Phase = phaseNo, Variant = variant, At = at, Seed = Seed() };
-        int Seed() => Mathf.Abs((int)Segment * 7919 + SegmentLoops * 104729 + W.Players.Count * 31);
+        int Seed() => Mathf.Abs((int)Segment * 7919 + SegmentLoops * 104729 + W.Players.Count * 31 + SeedOffset * 15485863);
+        // -lastbellSeed N: shifts every seeded choice of the attempt (clock hands, futures, phrases, Stilled half ...), so
+        // batches of bot clears play different attempts (0 = the default timeline)
+        public static int SeedOffset = int.TryParse(Arg("-lastbellSeed"), out int s) ? s : 0;
 
         IEnumerable<int> UltPunish(int ticks = PunishTicks)
         {

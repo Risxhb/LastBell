@@ -11,7 +11,7 @@
 #
 #   Each instance gets its own small window (960x540), evidence folder <B>/bellkeeper-ultimate-evidence/<name>/<label>
 #   and player.log. An instance needs about 1 GB of RAM: one is started only while at least BK_MIN_FREE_MB (default
-#   3000) MB are free; otherwise it waits for the running ones. BK_SESSION = lock owner, BK_TIMEOUT = per-instance game
+#   1500) MB are free; otherwise it waits for the running ones. BK_SESSION = lock owner, BK_TIMEOUT = per-instance game
 #   timeout (default 6000 s), BK_SKIP_BUILD=1 reuses the last build, BK_KEEP_BUILD=1 keeps unity/Builds afterwards.
 set -u
 NAME=${1:?usage: parallel-runs.sh <name> "<label>|<args>" ...}; shift
@@ -45,12 +45,12 @@ free_mb() { powershell -NoProfile -Command "[int]((Get-CimInstance Win32_Operati
 pids=(); labels=()
 for spec in "$@"; do
   label=${spec%%|*}; args=${spec#*|}; O="$ROOT/$label"; mkdir -p "$O"
-  while [ "$(free_mb)" -lt "${BK_MIN_FREE_MB:-3000}" ] && [ ${#pids[@]} -gt 0 ]; do
+  while [ "$(free_mb)" -lt "${BK_MIN_FREE_MB:-1500}" ] && [ ${#pids[@]} -gt 0 ]; do
     echo "$(date +%H:%M:%S) $label waits: $(free_mb) MB free"; wait -n; sleep 5
   done
   # shellcheck disable=SC2086
   timeout "${BK_TIMEOUT:-6000}" "$EXE" -screen-width 960 -screen-height 540 -screen-fullscreen 0 \
-    -lastbellAutotest -lastbellOut "$(cygpath -w "$O")" -logFile "$(cygpath -w "$O")\\player.log" $args > /dev/null 2>&1 &
+    -job-worker-count 1 -lastbellAutotest -lastbellOut "$(cygpath -w "$O")" -logFile "$(cygpath -w "$O")\\player.log" $args > /dev/null 2>&1 &
   pids+=($!); labels+=("$label")
   echo "$(date +%H:%M:%S) started $label (pid $!, $(free_mb) MB free): $args"
   sleep 20   # stagger the start-up loads
