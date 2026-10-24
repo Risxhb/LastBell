@@ -276,10 +276,14 @@ namespace LastBell.Run
             if (Mode == RunMode.Run && pos > 0) Player.RefreshHealth(refillPotions: pos == RunOrder.Length - 1);
             Player.PrepareForEncounter(PlayerSocket, 180);
             Player.AbilitiesEnabled = false;
+            // the Bellkeeper Ultimate's menu allies are its Perfect strat bots (GUIDE.md: mechanics and attacks); elsewhere AllyBot
+            bool ultimate = Boss is BellkeeperEncounter bk && bk.Set == BellkeeperEncounter.AbilitySet.Ultimate;
             for (int i = 0; i < Allies.Count; i++)
             {
                 if (Mode == RunMode.Run && pos > 0) Allies[i].RefreshHealth(refillPotions: pos == RunOrder.Length - 1);
                 Allies[i].PrepareForEncounter(AllySocket(i), 180); Allies[i].AbilitiesEnabled = false;
+                if (ultimate) UltimateParty.Drive(Allies[i], i + 1, Allies.Count + 1);
+                else if (!(Allies[i].Input is AllyBot)) Allies[i].Input = new AllyBot(i, Allies.Count);
             }
             Go(RunState.Intro);
         }

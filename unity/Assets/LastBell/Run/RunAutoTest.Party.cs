@@ -16,14 +16,14 @@ namespace LastBell.Run
             if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }
             // solo baseline for the HP check
             Check("allies: selectable from the menu", d.SelectAllies(0) && RunParty.Selected == 0);
-            d.StartPractice("Arcanist", 0); d.RequestReady();
+            d.StartPractice("Arcanist", 0); yield return PartyLoaded("solo"); d.RequestReady();
             yield return Until(() => d.State == RunState.Combat, 4, "solo practice combat");
             int soloHp = d.Boss ? d.Boss.MaxHp : 0;
             Check("allies: solo practice has one player", d.World.Players.Count == 1 && d.Allies.Count == 0);
             d.SetPaused(true); d.ReturnToMenu(); yield return null;
 
             Check("allies: 7 selected", d.SelectAllies(7) && RunParty.Selected == 7);
-            d.StartPractice("Arcanist", 0);
+            d.StartPractice("Arcanist", 0); yield return PartyLoaded("party of 8");
             Check("allies: a party of 8 spawns", d.World.Players.Count == 8 && d.Allies.Count == 7, $"{d.World.Players.Count} players");
             var classes = d.World.Players.GroupBy(p => p.ClassName).ToDictionary(g => g.Key, g => g.Count());
             Check("allies: classes spread across all three (no class more than 3 of 8)", classes.Count == 3 && classes.Values.Max() <= 3,
@@ -42,7 +42,25 @@ namespace LastBell.Run
             if (d.Boss && !d.Boss.Dead) d.Boss.DebugDefeat();
             yield return Until(() => d.State == RunState.Results, 8, "party practice results");
             d.ReturnToMenu(); yield return null;
+            // the Ultimate: menu allies are its Perfect strat bots, which also attack
+            Check("allies: 3 selected for the Ultimate", d.SelectAllies(3) && RunParty.Selected == 3);
+            d.StartPractice("Arcanist", 1); yield return PartyLoaded("Ultimate party of 4"); d.RequestReady();
+            yield return Until(() => d.State == RunState.Combat, 4, "Ultimate party combat");
+            Check("allies: the Ultimate drives menu allies with its strat bot", d.Allies.Count == 3 && d.Allies.All(a => a.Input is UltimateBot),
+                string.Join(",", d.Allies.Select(a => a.Input?.GetType().Name)));
+            yield return Survive(6f);
+            if (d.Boss && !d.Boss.Dead) d.Boss.DebugDefeat();
+            yield return Until(() => d.State == RunState.Results, 8, "Ultimate party results");
+            d.ReturnToMenu(); yield return null;
             Check("allies: back to solo for the rest of the test", d.SelectAllies(0) && RunParty.Selected == 0);
+        }
+
+        // a practice may load its boss's map, which builds a new director: follow it and re-attach the test bot
+        IEnumerator PartyLoaded(string label)
+        {
+            yield return Until(() => RunDirector.Instance && RunDirector.Instance.State == RunState.Ready, 30, label + " practice loaded");
+            if (RunDirector.Instance != d) { directorLog.AddRange(d.Log); d = RunDirector.Instance; d.InputOverride = bot; bot.Clear(); }
+            if (d.Player) d.Player.Input = bot;
         }
     }
 }
