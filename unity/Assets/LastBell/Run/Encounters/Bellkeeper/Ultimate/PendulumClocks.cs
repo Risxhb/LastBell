@@ -280,6 +280,9 @@ namespace LastBell.Run
                 if (s.Owner == p)
                 {
                     if (Now > s.LockTick) continue;   // the cone stopped tracking: the striker is free until the strike
+                    // Stilled at the strike: the Stopped Hour's hiding spot already makes this clock cross the boss (it may be
+                    // closer than the guide's 3.8 m: solo P3 strikes III and IV frozen, hugging the boss)
+                    if (Ult.IsStilled(p, s.Tick)) continue;
                     into.Add(new BotDemand
                     {
                         Tick = s.LockTick, Since = LaunchTick, Ok = q => StrikeOk(q, st), Hint = Hint(s),

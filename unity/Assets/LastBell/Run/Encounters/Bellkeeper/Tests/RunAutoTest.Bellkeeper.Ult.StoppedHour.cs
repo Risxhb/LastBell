@@ -334,6 +334,23 @@ namespace LastBell.Run
                       la == ts + Sim.Ticks(launchAt) && lash == la + Sim.Ticks(9) && partners.Contains(lash) && heartToo,
                       $"launch {(la - ts) / 60f:0.00} · lash {(lash - ts) / 60f:0.00} · {partner} {string.Join("/", partners.Select(t => ((t - ts) / 60f).ToString("0.00")))}");
             }
+            // solo P3 through the real plan (part5-attempts-3: the perfect solo bot was lashed at the first P3 resume): frozen
+            // 23-27 s through clocks III (24) and IV (27), Reflection on the resume; the hiding spot hugs the boss
+            foreach (float speed in new[] { 4.2f, 6f })
+            {
+                yield return UltStart(null, "P3");
+                if (bk == null) yield break;
+                ShHook(); sh = bk.Mechanic<StoppedHour>(); var clocks = bk.Mechanic<PendulumClocks>();
+                var sb = UltimateParty.Drive(d.Player, 0, 1); sb.Speed = speed; sb.Attacks = false;
+                bk.ManualPlan = false; bk.BeginCombat(); ShStep(2);
+                int tp = UltTick0();
+                ShStep(tp + Sim.Ticks(27.3f) - d.World.Tick);
+                var frozen = clocks.Strikes.Where(k => k.Owner == d.Player && k.Tick >= sh.StopTick && k.Tick <= sh.ResumeTick).ToList();
+                Check($"plan P3 solo at {speed} m/s: survives the first resume (lash stopped by the boss), and the clocks struck while frozen reach the boss",
+                      sh.Lashes.Count == 1 && sh.Lashes[0].Boss && !d.Player.Down && frozen.Count == 2 && frozen.All(k => k.Resolved && k.StruckBoss && !k.Cracked) && sh.FormationOk,
+                      $"{ShLashes(sh)} · {ShSpots(sh)} · frozen clocks {string.Join(", ", frozen.Select(k => $"{UltimateState.Roman[k.Hour]} {UltimateState.StationNames[k.Station]} {(k.StruckBoss ? "boss" : k.Cracked ? "cracked" : "-")}"))} · hp {d.Player.Hp} · {sb.DebugLine}");
+                d.Player.Input = bot;
+            }
             yield return UltStart(null, "P4");
             if (bk == null) yield break;
             ShHook(); sh = bk.Mechanic<StoppedHour>(); ShBots();
