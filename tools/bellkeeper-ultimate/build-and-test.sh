@@ -10,7 +10,7 @@
 #                   Nothing extra = the full run-loop autotest (every check, ~20 min).
 #   BK_SESSION      lock owner written into owner.txt (default: <name>)
 #   BK_SKIP_BUILD=1 run the last build again without rebuilding
-#   BK_TIMEOUT      game timeout in seconds (default 2400; the recorded Part 5 attempts need ~5400)
+#   BK_TIMEOUT      game timeout in seconds (default 6000: the full Ultimate section with every mechanic built runs past 40 min)
 #
 # The worktree is the one this script lives in. The lock is <B>/.unity-build-lock (mkdir is atomic); it waits 60 s
 # between tries, breaks a lock older than 45 min only when no Unity.exe / LastBell.exe is running, and always removes
@@ -42,7 +42,7 @@ if [ "${BK_SKIP_BUILD:-0}" != "1" ]; then
   grep -E "error CS|Last Bell build" "$O/build.log" | sort -u | head -30
   grep -q "Last Bell build: Succeeded" "$O/build.log" || { echo "BUILD FAILED"; exit 1; }
 fi
-timeout ${BK_TIMEOUT:-2400} "$WT/unity/Builds/Windows/LastBell.exe" -screen-width 1600 -screen-height 900 -screen-fullscreen 0 \
+timeout ${BK_TIMEOUT:-6000} "$WT/unity/Builds/Windows/LastBell.exe" -screen-width 1600 -screen-height 900 -screen-fullscreen 0 \
   -lastbellAutotest -lastbellOut "$(cygpath -w "$O")" -logFile "$(cygpath -w "$O")\\player.log" "$@" > /dev/null 2>&1
 echo game-exit=$?
 head -1 "$O/autotest-report.txt" 2>/dev/null || echo "NO REPORT"
