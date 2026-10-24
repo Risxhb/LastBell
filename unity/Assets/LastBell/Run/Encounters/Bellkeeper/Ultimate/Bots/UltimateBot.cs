@@ -117,7 +117,8 @@ namespace LastBell.Run
             }
             float bossGap = Sim.Flat(bpos - pos).magnitude - boss.BodyRadius;
             // no swings while walking to a spot or just before a rule: lunges and casts would carry it off its spot
-            bool positioning = hasTarget && (Sim.Flat(target - pos).magnitude > 0.5f || (rules.Count > 0 && rules[0].Tick - now < 30));
+            // (a memory spot, e.g. a Stopped Hour hiding spot that also aims frozen clocks, is held still for its last 1.5 s)
+            bool positioning = hasTarget && (Sim.Flat(target - pos).magnitude > 0.5f || (rules.Count > 0 && rules[0].Tick - now < (rules[0].Memory ? 90 : 30)));
             for (int i = 0; i < cd.Length; i++) if (cd[i] > 0) cd[i]--;
             bool stilled = boss.Ult != null && boss.Ult.IsStilled(me);
             // Chimesinger: Mending Chorus (burst heal round the caster) when it would top up a hurt ally or two (potions run out in P5)
@@ -127,7 +128,7 @@ namespace LastBell.Run
                 if (hurt >= 2 || (hurt == 1 && me.Hp < 65)) { inp.P4 = true; cd[4] = 900; lastPress = tick; }
             }
             if (Attacks && !positioning && bossGap <= Range(me) + 1.5f && (boss.Ult == null || !boss.Ult.IsStilled(me))) Attack(me, ref inp, rules.Count == 0 || rules[0].Tick - now > 90);
-            if (move != Vector3.zero) move = AroundBoss(pos, move, boss);
+            if (move != Vector3.zero) move = AroundBoss(pos, move, boss, hasTarget ? target : (Vector3?)null);
             inp.Move = ToScreen(move);
             DebugLine = $"rules {rules.Count} first {(rules.Count > 0 ? rules[0].Why + " in " + (rules[0].Tick - now) : "-")} target {(hasTarget ? $"({target.x:0.0},{target.z:0.0})" : "-")} at ({pos.x:0.0},{pos.z:0.0})";
             return inp;
@@ -270,11 +271,19 @@ namespace LastBell.Run
             switch (s) { case 0: inp.P0 = inp.H0 = true; break; case 1: inp.P1 = true; break; case 2: inp.P2 = true; break; default: inp.P3 = true; break; }
         }
 
-        static Vector3 AroundBoss(Vector3 pos, Vector3 move, BossEncounter b)
+        static Vector3 AroundBoss(Vector3 pos, Vector3 move, BossEncounter b, Vector3? target = null)
         {
             var bp = Sim.Flat(b.transform.position); var to = Sim.Flat(pos - bp);
             float clear = b.BodyRadius + PlayerController.Radius + 0.3f;
             if (to.magnitude > clear + 1.5f) return move;
+            // walking to a spot: only steer round him when the straight walk would cross his body's clearance (otherwise
+            // any inward step within 3.5 m was turned into an orbit, and spots hugging the boss were never reached)
+            if (target.HasValue)
+            {
+                var a = Sim.Flat(pos); var ab = Sim.Flat(target.Value) - a; float l2 = ab.sqrMagnitude;
+                float t = l2 < 1e-4f ? 0 : Mathf.Clamp01(Vector3.Dot(bp - a, ab) / l2);
+                if (Sim.Flat(a + ab * t - bp).magnitude >= clear) return move;
+            }
             var ahead = Sim.Flat(pos + move.normalized * 0.8f) - bp;
             if (ahead.magnitude >= clear && Vector3.Dot(move, to) >= -0.2f) return move;
             var tan = Vector3.Cross(Vector3.up, to.normalized); if (Vector3.Dot(tan, move) < 0) tan = -tan;
