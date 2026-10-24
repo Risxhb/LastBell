@@ -1,0 +1,270 @@
+using System.Collections.Generic;
+using UnityEngine;
+
+namespace LastBell.Run
+{
+    // Escapement Relay (`bellkeeper.ult_escapement_relay`), Bellkeeper Ultimate v2 — proposal, card 01 (cards-v2), built
+    // 2026-10-24 as the playable P1 slice, not human-approved.
+    // Four brass plates lie on the floor (N/E/S/W, r 7 m) and the escapement's hour hand turns on the boss. Every 3 s the
+    // hand ticks 90° clockwise and the beat resolves on the plate it points at. Each player holds an hour numeral (I..IV,
+    // party order) and every beat a duty from its place in the cycle, (hour − 1 + beat) mod 4:
+    //   SOAK    stand on the plate the hand points at
+    //   CHAIN   hold the pendulum chain: ≥ 9 m from the boss on the far half (away from the hand)
+    //   WEIGHT  stand on a counterweight ✕ 4 m out, 90° left (L) or right (R) of the hand
+    // The cycle is SOAK → WEIGHT L → CHAIN → WEIGHT R → SOAK: each player works one spoke of the dial (plate r 7, ✕ r 4, chain
+    // r 10.2 on the same line) while the plates turn past, so no hop is longer than 6.2 m, yet nobody can stand still for a
+    // beat and the debt lines (ChimeDebts) cut across the spokes. (Card 01 had SOAK → WEIGHT R → WEIGHT L → CHAIN, whose
+    // soak-to-✕ hop crosses the boss: ~12 m in 3 s, which the first Unity bot run could not make; changed 2026-10-24.)
+    // Nothing is unavoidable: a perfect beat costs nobody HP. Fails, on the beat tick: plate empty = WIPE; more players on
+    // the plate than soakers = 60 to each on it; a chain holder short or on the near half = the pendulum swings through the
+    // plate (a 999 lane from the boss over it); a ✕ empty = a 120° cone on that side, 999.
+    // Party sizes: K = min(players, 4) duties, cycle SOAK, WEIGHT L, CHAIN (trio), SOAK, CHAIN (duo), SOAK every beat (solo).
+    // 5-8 players: players 5-8 take hours I..IV again and share that hour's duty with its first holder (two soakers).
+    // Cue: At[0] = the first beat (s after launch), then one every BeatSeconds until StopAfterBeat(). The beat number (so
+    // the hand and the duties) carries over between casts and starts at 2 on a fresh fight (as in the P1 paper simulation, cards-v2/p1-example.html).
+    public sealed class EscapementRelay : UltimateMechanic
+    {
+        public override string Id => UltimateMechanics.EscapementRelay;
+        public override string Name => "Escapement Relay";
+
+        public const string Source = "Escapement Relay";
+        public const float BeatSeconds = 3f, PlateRadius = 7f, PlateSize = 1.6f, OnPlate = 1.8f, ChainMin = 9f, ChainHint = 10.2f,
+            WeightRadius = 4f, WeightSize = 1.2f;
+        public const int OverSoakDamage = 60, FirstBeat = 2;
+        public static readonly string[] DutyNames = { "SOAK", "CHAIN", "WEIGHT L", "WEIGHT R" };
+
+        public int Beat { get; private set; } = FirstBeat;   // the next beat to resolve
+        public int NextBeatTick { get; private set; } = -1;
+        public int Beats { get; private set; }               // resolved this fight (tests)
+        public int BeatsClean { get; private set; }
+        public readonly List<string> Fails = new List<string>();
+        bool stop;
+
+        public override UltCue DefaultCue() => new UltCue { Variant = "practice", At = new[] { 4f } };
+        public void StopAfterBeat() => stop = true;
+
+        // ---------------- the rule ----------------
+        // plan angle (0 = north, clockwise on screen) to a world direction: north is −Z, east is −X
+        public static Vector3 PlanDir(float a) { a *= Mathf.Deg2Rad; return new Vector3(-Mathf.Sin(a), 0, -Mathf.Cos(a)); }
+        public static float HandAngle(int beat) => 90f * beat;
+        public static Vector3 Plate(int beat) => PlanDir(HandAngle(beat)) * PlateRadius;
+        public static Vector3 Weight(int beat, int duty) => PlanDir(HandAngle(beat) + (duty == 2 ? -90 : 90)) * WeightRadius;
+        public static Vector3 ChainSpot(int beat) => PlanDir(HandAngle(beat) + 180) * ChainHint;
+        public int Duties => Mathf.Clamp(Party, 1, 4);
+        public int HourOf(PlayerController p) { int i = W.Players.IndexOf(p); return i < 0 ? 0 : i % 4 + 1; }
+        static readonly int[][] Cycle = { new[] { 0 }, new[] { 0, 1 }, new[] { 0, 2, 1 }, new[] { 0, 2, 1, 3 } };
+        public int DutyOf(PlayerController p, int beat) { int h = HourOf(p), k = Duties; return h == 0 ? -1 : Cycle[k - 1][(((h - 1 + beat) % k) + k) % k]; }
+        public static bool ChainOk(Vector3 q, int beat) => Sim.Flat(q).magnitude >= ChainMin && Vector3.Dot(Sim.Flat(q), PlanDir(HandAngle(beat))) <= 0;
+        public bool Holds(PlayerController p, int beat)
+        {
+            var q = Sim.Flat(p.transform.position);
+            switch (DutyOf(p, beat))
+            {
+                case 0: return (q - Plate(beat)).magnitude <= OnPlate;
+                case 1: return ChainOk(q, beat);
+                case 2: case 3: return (q - Weight(beat, DutyOf(p, beat))).magnitude <= WeightSize;
+            }
+            return true;
+        }
+
+        // ---------------- cast ----------------
+        public override IEnumerable<int> Cast()
+        {
+            Boss.ShowAttack(Name);
+            stop = false;
+            Build();
+            NextBeatTick = TickAt(Cue.At0(BeatSeconds));
+            ShowBeat(true);
+            while (true)
+            {
+                while (Now < NextBeatTick) { Present(); yield return 1; }
+                Resolve(Beat);
+                Beat++; Beats++;
+                NextBeatTick += Sim.Ticks(BeatSeconds);
+                if (stop) break;
+                ShowBeat(false);
+                Present();
+                yield return 1;
+            }
+            NextBeatTick = -1;
+            ClearNotes();
+            Teardown();
+        }
+
+        void Resolve(int b)
+        {
+            var players = W.Players; int k = Duties; bool clean = true;
+            var plate = Plate(b); int soakers = 0, onPlate = 0;
+            foreach (var p in players)
+            {
+                if (p.Down) continue;
+                if (DutyOf(p, b) == 0) soakers++;
+                if ((Sim.Flat(p.transform.position) - plate).magnitude <= OnPlate) onPlate++;
+            }
+            Boss.Face(Quaternion.LookRotation(PlanDir(HandAngle(b))).eulerAngles.y);
+            W.BossFx.ChimeResolve(plate, PlateSize);
+            if (onPlate == 0) { Fail(b, "empty plate"); Ult.Wipe("The escapement skips (empty plate)"); return; }
+            if (onPlate > Mathf.Max(1, soakers))
+            {
+                clean = false; Fail(b, "too many on the plate");
+                Spawn(new Hazard { Source = Source + ": crowded plate", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = plate, Radius = OnPlate, LockAt = 0, ResolveAt = UltShapes.ResolveIn(0), Damage = OverSoakDamage });
+            }
+            if (k >= 2)
+            {
+                bool chain = false, any = false;
+                foreach (var p in players) if (!p.Down && DutyOf(p, b) == 1) { any = true; chain |= ChainOk(p.transform.position, b); }
+                bool chainFail = false;
+                foreach (var p in players) if (!p.Down && DutyOf(p, b) == 1 && !ChainOk(p.transform.position, b)) chainFail = true;
+                if (!any || !chain || chainFail)
+                {
+                    clean = false; Fail(b, "short chain");
+                    var dir = PlanDir(HandAngle(b));
+                    var h = Spawn(new Hazard { Source = Source + ": the pendulum swings", Shape = HazardShape.Lane, Kind = HazardKind.Strike, Origin = Vector3.zero, Yaw = Quaternion.LookRotation(dir).eulerAngles.y, Length = 13f, Width = 2.6f, LockAt = 0, ResolveAt = UltShapes.ResolveIn(0), Damage = UltimateState.Lethal });
+                    h.OnResolve = hz => W.BossFx.SweepResolve(Vector3.zero, hz.Yaw, 13f, 12f);
+                }
+            }
+            for (int duty = 2; duty < k; duty++)
+            {
+                var spot = Weight(b, duty); bool held = false;
+                foreach (var p in players) if (!p.Down && (Sim.Flat(p.transform.position) - spot).magnitude <= WeightSize) held = true;
+                if (held) continue;
+                clean = false; Fail(b, duty == 2 ? "empty weight L" : "empty weight R");
+                var dir = Sim.Flat(spot).normalized;
+                var h = Spawn(new Hazard { Source = Source + ": the bell tips", Shape = HazardShape.Cone, Kind = HazardKind.Strike, Origin = Vector3.zero, Yaw = Quaternion.LookRotation(dir).eulerAngles.y, Radius = 13f, HalfAngle = 60, LockAt = 0, ResolveAt = UltShapes.ResolveIn(0), Damage = UltimateState.Lethal });
+                h.OnResolve = hz => W.BossFx.SweepResolve(hz.Origin, hz.Yaw, hz.Radius, hz.HalfAngle);
+            }
+            if (clean) BeatsClean++;
+        }
+        void Fail(int b, string why) { Fails.Add($"beat {b}: {why}"); Boss.PlanLog.Add((Now, "relay fail " + why)); }
+
+        // The guide: be on your duty spot on the next beat. The hand shows the next plate from the previous beat on, so
+        // the rule is known one beat ahead (the rotation is learnable, but the bot reads it like a player watching the hand).
+        public override void Demands(PlayerController p, List<BotDemand> into)
+        {
+            if (!Running || NextBeatTick < 0 || p.Down) return;
+            int b = Beat, d = DutyOf(p, b); if (d < 0) return;
+            int tick = NextBeatTick, since = tick - Sim.Ticks(BeatSeconds);
+            var plate = Plate(b); int slot = W.Players.IndexOf(p) / 4;   // the 2nd holder of an hour stands beside the 1st
+            BotDemand r = new BotDemand { Tick = tick, Since = since, From = this, Why = $"relay beat {b}: {DutyNames[d]}" };
+            switch (d)
+            {
+                case 0:
+                    var side = Vector3.Cross(Vector3.up, PlanDir(HandAngle(b))) * (Party > 4 ? (slot == 0 ? -0.55f : 0.55f) : 0);
+                    r.Hint = plate + side; var c = r.Hint; float tol = Party > 4 ? 0.6f : 1.2f;
+                    r.Ok = q => (Sim.Flat(q) - c).magnitude <= tol; break;
+                case 1:
+                    r.Hint = ChainSpot(b); int bb = b;
+                    r.Ok = q => Sim.Flat(q).magnitude >= ChainMin + 0.4f && Vector3.Dot(Sim.Flat(q), PlanDir(HandAngle(bb))) <= -1f && (Sim.Flat(q) - plate).magnitude > OnPlate + 0.5f; break;
+                default:
+                    var w = Weight(b, d); r.Hint = w;
+                    r.Ok = q => (Sim.Flat(q) - w).magnitude <= WeightSize - 0.35f; break;
+            }
+            into.Add(r);
+            // everyone who isn't soaking keeps off the plate
+            if (d != 0) into.Add(new BotDemand { Tick = tick, Since = since, From = this, Hint = r.Hint, Why = "relay: off the plate", Ok = q => (Sim.Flat(q) - plate).magnitude > OnPlate + 0.5f });
+        }
+
+        // the HUD line for the run's own player: the next beat and their duty
+        public string HudText(PlayerController p)
+        {
+            if (!Running || NextBeatTick < 0 || p == null) return null;
+            float left = (NextBeatTick - Now) / (float)Sim.Hz; int d = DutyOf(p, Beat); if (d < 0) return null;
+            return $"beat in {Mathf.Max(0, left):0.0}s · you ({UltimateState.Roman[HourOf(p)]}): {DutyNames[d]} · then {DutyNames[DutyOf(p, Beat + 1)]}";
+        }
+
+        // ---------------- presentation (stand-ins: brass plates, the hour hand, ivory ✕ and the 9 m chain line) ----------------
+        Transform root, pivot; readonly Renderer[] plates = new Renderer[4];
+        readonly List<Transform> chains = new List<Transform>();
+        static Material brassDim, brassHot, ivory, coralM, brassM;
+        float shownYaw;
+
+        void Build()
+        {
+            if (root) return;
+            if (!brassDim)
+            {
+                brassDim = Prim.Material(new Color(0.42f, 0.33f, 0.16f), 0.15f); brassHot = Prim.Material(new Color(0.95f, 0.74f, 0.36f), 1.4f);
+                ivory = Prim.Material(new Color(0.95f, 0.92f, 0.84f), 1.2f); coralM = Prim.Material(new Color(1f, 0.25f, 0.2f), 1.4f);
+                brassM = Prim.Material(new Color(0.82f, 0.64f, 0.3f), 0.9f);
+            }
+            root = new GameObject("Escapement Relay (stand-in)").transform; root.SetParent(W.Root, false);
+            for (int i = 0; i < 4; i++)
+            {
+                var t = Prim.Make(PrimitiveKind.Cylinder, root, PlanDir(90 * i) * PlateRadius + Vector3.up * 0.03f, new Vector3(PlateSize * 2, 0.02f, PlateSize * 2), Color.white);
+                plates[i] = t.GetComponent<Renderer>(); plates[i].sharedMaterial = brassDim;
+            }
+            pivot = new GameObject("hand").transform; pivot.SetParent(root, false); pivot.localPosition = Vector3.zero;
+            Mat(Prim.Make(PrimitiveKind.Cube, pivot, new Vector3(0, 0.6f, 3.6f), new Vector3(0.32f, 0.1f, 5.2f), Color.white), brassM);
+            Mat(Prim.Make(PrimitiveKind.Cone, pivot, new Vector3(0, 0.6f, 6.4f), new Vector3(0.7f, 0.5f, 0.7f), Color.white, 0, Quaternion.Euler(90, 0, 0)), brassM);
+            foreach (float side in new[] { -1f, 1f })   // the counterweight ✕ (pivot-local: x = 90° right of the hand)
+                for (int s = -1; s <= 1; s += 2)
+                    Mat(Prim.Make(PrimitiveKind.Cube, pivot, new Vector3(side * WeightRadius, 0.05f, 0), new Vector3(0.16f, 0.03f, 1.9f), Color.white, 0, Quaternion.Euler(0, 45 * s, 0)), ivory);
+            for (int k = -5; k <= 5; k++)   // the chain line: 9 m on the far half
+            {
+                float a = (180 + 11 * k) * Mathf.Deg2Rad;
+                Mat(Prim.Make(PrimitiveKind.Cube, pivot, new Vector3(Mathf.Sin(a) * ChainMin, 0.04f, Mathf.Cos(a) * ChainMin), new Vector3(1.0f, 0.02f, 0.12f), Color.white, 0, Quaternion.Euler(0, 11 * k, 0)), ivory);
+            }
+        }
+        static void Mat(Transform t, Material m) { t.GetComponent<Renderer>().sharedMaterial = m; }
+
+        void ShowBeat(bool snap)
+        {
+            int lit = ((Beat % 4) + 4) % 4;
+            for (int i = 0; i < 4; i++) if (plates[i]) plates[i].sharedMaterial = i == lit ? brassHot : brassDim;
+            if (snap && pivot) { shownYaw = Quaternion.LookRotation(PlanDir(HandAngle(Beat))).eulerAngles.y; pivot.rotation = Quaternion.Euler(0, shownYaw, 0); }
+        }
+
+        void Present()
+        {
+            if (!pivot) return;
+            float want = Quaternion.LookRotation(PlanDir(HandAngle(Beat))).eulerAngles.y;
+            shownYaw = Mathf.MoveTowardsAngle(shownYaw, want, 720 * Sim.Dt);   // the tick: a quick 90° snap
+            pivot.rotation = Quaternion.Euler(0, shownYaw, 0);
+            // chains to this beat's holders (brass when long enough on the far half, coral when not)
+            int n = 0;
+            foreach (var p in W.Players)
+            {
+                if (p.Down || DutyOf(p, Beat) != 1) continue;
+                if (chains.Count <= n) chains.Add(Prim.Make(PrimitiveKind.Cube, root, Vector3.zero, Vector3.one, Color.white));
+                var c = chains[n++]; c.gameObject.SetActive(true);
+                var q = Sim.Flat(p.transform.position); float len = q.magnitude;
+                c.position = q * 0.5f + Vector3.up * 0.9f; c.rotation = Quaternion.LookRotation(len > 0.01f ? q : Vector3.forward); c.localScale = new Vector3(0.08f, 0.08f, len);
+                Mat(c, ChainOk(q, Beat) ? brassM : coralM);
+            }
+            for (int i = n; i < chains.Count; i++) chains[i].gameObject.SetActive(false);
+            // the numeral and duty over each head
+            foreach (var p in W.Players)
+            {
+                var s = Ult.Of(p);
+                int d = DutyOf(p, Beat);
+                s.Note = p.Down || d < 0 ? null : $"{UltimateState.Roman[HourOf(p)]} {DutyNames[d]}";
+            }
+        }
+        void ClearNotes() { foreach (var p in W.Players) Ult.Of(p).Note = null; }
+        void Teardown()
+        {
+            if (root) Object.Destroy(root.gameObject);
+            root = pivot = null; chains.Clear();
+            for (int i = 0; i < 4; i++) plates[i] = null;
+        }
+
+        // -lastbellAbility ult_escapement_relay: the relay alone, 20 beats, then 4 s off
+        public override IEnumerable<int> Practice()
+        {
+            Boss.Launch(this);
+            for (int i = 0; i < Sim.Ticks(4 + BeatSeconds * 20) && Running; i++) yield return 1;
+            StopAfterBeat();
+            while (Running) yield return 1;
+            yield return 240;
+        }
+
+        public override void Cancel()
+        {
+            base.Cancel();
+            Teardown(); NextBeatTick = -1; stop = false;
+            if (Boss?.Ult != null) foreach (var kv in Ult.All) kv.Value.Note = null;
+        }
+        // a new fight starts the beat count over (the encounter calls Cancel on restart too, but keeps counters for tests)
+        public void ResetBeats() { Beat = FirstBeat; Beats = 0; BeatsClean = 0; Fails.Clear(); }
+    }
+}

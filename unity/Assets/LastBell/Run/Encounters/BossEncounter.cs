@@ -65,6 +65,7 @@ namespace LastBell.Run
                 script = Script().GetEnumerator();
                 if (!script.MoveNext()) { script = null; return; }
             }
+            if (script == null) return;   // the step itself halted or defeated the boss (a wipe, the Ultimate slice ending)
             wait = Mathf.Max(1, script.Current) - 1;
         }
 

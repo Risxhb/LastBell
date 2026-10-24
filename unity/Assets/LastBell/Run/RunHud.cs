@@ -27,6 +27,7 @@ namespace LastBell.Run
             ["Meridian Alignment"] = "ring I: stand close inside it or far outside", ["Meridian Alignment II"] = "ring II: hug him or get outside it",
             [BellkeeperEncounter.March] = "step sideways out of the lane",
             [BellkeeperEncounter.Echo] = "it repeats where it struck before, not where the boss stands",
+            [ChimeDebts.Source] = "a paid debt detonates: be outside the ring", [ChimeDebts.Source + " line"] = "and outside its line to the boss",
         };
 
         void Awake() { d = GetComponent<RunDirector>(); }
@@ -269,7 +270,7 @@ namespace LastBell.Run
             GUI.Label(new Rect(x + bw - 140, 90, 140, 20), $"{b.Hp} / {b.MaxHp}", small);
             float yy = 112;
             var extra = b.HudLine;
-            if (!string.IsNullOrEmpty(extra)) { GUI.Label(new Rect(x, yy, bw, 22), extra, small); yy += 20; }
+            if (!string.IsNullOrEmpty(extra)) foreach (var line in extra.Split('\n')) { GUI.Label(new Rect(x, yy, bw, 22), line, small); yy += 20; }
             // what is coming, in words (audio-off readability)
             var hz = d.World.Hazards.Live; var seen = new HashSet<string>();
             foreach (var hzd in hz)

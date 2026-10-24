@@ -45,7 +45,7 @@ namespace LastBell.Run
         public int SegmentLoops { get; private set; }
         public bool UltPlanActive { get; private set; }
         public int SecondsInSegment => SegmentStartTick < 0 ? 0 : (W.Tick - SegmentStartTick) / Sim.Hz;
-        public float PushLeft => SegmentStartTick < 0 || PushSeconds[(int)Segment] <= 0 ? -1 : PushSeconds[(int)Segment] - (W.Tick - SegmentStartTick) / (float)Sim.Hz;
+        public float PushLeft => SegmentStartTick < 0 || PushFor(Segment) <= 0 ? -1 : PushFor(Segment) - (W.Tick - SegmentStartTick) / (float)Sim.Hz;
         public readonly List<(int tick, UltSegment seg)> SegmentLog = new List<(int, UltSegment)>();
         bool pushFired;
 
@@ -74,6 +74,7 @@ namespace LastBell.Run
         LeaningBellAbility uLean; ReflectionAbility uMirror; TollTideAbility uTide;
         PendulumClocks mClocks; StoppedHour mStopped; LedgerMechanic mLedger; BackwardsBell mBackwards; TwoFutures mFutures;
         ConductorsHand mHand; TollingHour mTolling; ThirteenthHour mThirteenth; AreaQuotes mQuotes; FractureOfTime mFracture;
+        EscapementRelay mRelay; ChimeDebts mDebts;
         public IReadOnlyList<UltimateMechanic> Mechanics { get; private set; } = Array.Empty<UltimateMechanic>();
 
         void BuildUltimate()
@@ -87,6 +88,7 @@ namespace LastBell.Run
             mClocks = Mech<PendulumClocks>(); mStopped = Mech<StoppedHour>(); mLedger = Mech<LedgerMechanic>(); mBackwards = Mech<BackwardsBell>();
             mFutures = Mech<TwoFutures>(); mHand = Mech<ConductorsHand>(); mTolling = Mech<TollingHour>(); mThirteenth = Mech<ThirteenthHour>();
             mQuotes = Mech<AreaQuotes>(); mFracture = Mech<FractureOfTime>();
+            mRelay = Mech<EscapementRelay>(); mDebts = Mech<ChimeDebts>();
             // one tuning (ULTIMATE.md §2): Easy x0.6 / Hard x1.3 don't apply to the Ultimate
             if (W.Difficulty != Difficulty.Medium) { Debug.Log($"Bellkeeper Ultimate: one tuning; the run's {RunDifficulty.Name(W.Difficulty)} becomes Medium for this fight"); W.Difficulty = Difficulty.Medium; }
             W.DealtScale = p => Ult != null && Ult.IsCracked(p) ? 0f : 1f;
@@ -136,7 +138,7 @@ namespace LastBell.Run
         void UltimateTick()
         {
             if (!UltPlanActive || Dead || SegmentStartTick < 0 || pushFired || !PushTimersOn) return;
-            float push = PushSeconds[(int)Segment]; if (push <= 0) return;
+            float push = PushFor(Segment); if (push <= 0) return;
             float grace = Segment == UltSegment.P5 ? EnrageGrace : 0;
             if (W.Tick - SegmentStartTick < Sim.Ticks(push + grace)) return;
             if (Segment != UltSegment.P5 && Hp <= Mathf.RoundToInt(MaxHp * SegEnd[(int)Segment])) return;   // reached in time
@@ -150,7 +152,7 @@ namespace LastBell.Run
         IEnumerable<int> UltimatePlan()
         {
             UltPlanActive = true; pushFired = false;
-            Ult.ResetAll();
+            Ult.ResetAll(); mRelay.ResetBeats();
             FitHpToParty();
             var start = IsPractice && RequestedSegment.HasValue ? RequestedSegment.Value : UltSegment.P1;
             if (start != UltSegment.P1) { Hp = Mathf.RoundToInt(MaxHp * SegStart[(int)start]); PlanLog.Add((W.Tick, "practice from " + start)); }
@@ -161,6 +163,8 @@ namespace LastBell.Run
                 foreach (var w in RunSegment(s)) yield return w;
                 // the transition waits for the current moves to finish (rules: no transition mid-telegraph)
                 while (running.Count > 0 || W.Hazards.Count > 0) yield return 1;
+                // v2 slice: only P1 is rebuilt so far; clearing it ends the attempt (a win) instead of falling into v1's T1
+                if (UltV2 && s == UltSegment.P1) { PlanLog.Add((W.Tick, "v2 slice: P1 cleared")); DebugDefeat(); while (true) yield return 60; }
             }
             while (true) yield return 60;   // P5 never ends by itself: the boss dies or the Thirteenth Hour wipes
         }
@@ -179,6 +183,10 @@ namespace LastBell.Run
         {
             switch (s)
             {
+                case UltSegment.P1 when UltV2:
+                    do { foreach (var w in P1V2Loop()) yield return w; } while (!Reached(s) || SegmentLoops < V2P1MinLoops);
+                    mRelay.StopAfterBeat();
+                    break;
                 case UltSegment.P1: do { foreach (var w in P1Loop()) yield return w; } while (!Reached(s)); break;
                 case UltSegment.T1: foreach (var w in T1()) yield return w; break;
                 case UltSegment.P2: do { foreach (var w in P2Loop()) yield return w; } while (!Reached(s)); break;
@@ -251,6 +259,26 @@ namespace LastBell.Run
             foreach (var w in Timeline(27, events.ToArray())) yield return w;
             foreach (var w in UltPunish()) yield return w;
             yield return 30;
+        }
+
+        // ---------------- v2 (ULTIMATE-PROMPT-v2.md, proposal): the P1 slice ----------------
+        // On by default; -lastbellUltV1 plays the v1 fight (and the v1 tests set it). Only P1 is rebuilt: a v2 attempt from
+        // P1 ends (as a win) when P1 is cleared. Practice from a later phase still plays v1 there.
+        public static bool UltV2 => V2Override ?? !HasArg("-lastbellUltV1");
+        public static bool? V2Override;
+        public const int V2P1MinLoops = 2;          // P1 shows two debt rounds before it can end (72 s), whatever the DPS
+        public const float V2P1Push = 150;          // the P1 push (cards-v2 timeline: P1 0-150 s)
+        float PushFor(UltSegment s) => UltV2 && s == UltSegment.P1 ? V2P1Push : PushSeconds[(int)s];
+        public EscapementRelay UltRelay => mRelay;
+
+        // v2 P1 Last Guardian (loop 36 s = 12 beats): the Escapement Relay runs through the whole phase (first beat 6 s
+        // after the pull, then every 3 s); each loop one round of Chime Debts is paid on beats 18, 21, 24, 27 (hours I..IV)
+        // and detonates 8 s later. No boss attacks: every job is the relay and the debts, and attacking happens during them.
+        IEnumerable<int> P1V2Loop()
+        {
+            SegmentLoops++;
+            if (!IsRunning(mRelay)) UltLaunch(mRelay, C(1, "p1", 6));
+            foreach (var w in Timeline(36, At(12, mDebts, C(1, "p1", 6, 9, 12, 15)))) yield return w;
         }
 
         // §5.2 T1 The Hour Stops (25 s): the Stopped Hour alone, twice (glyph 0, stop 5-9, lash 9), then a punish.
@@ -348,7 +376,8 @@ namespace LastBell.Run
                 if (Set != AbilitySet.Ultimate || !UltPlanActive || SegmentStartTick < 0) return null;
                 float left = PushLeft;
                 string push = left < 0 ? "" : Segment == UltSegment.P5 ? $"   ·   XIII in {Mathf.Max(0, left):0}s" : $"   ·   push {Mathf.Max(0, left) / 60:0}:{Mathf.Max(0, left) % 60:00}";
-                return "ULTIMATE · " + SegmentNames[(int)Segment] + push;
+                var relay = mRelay != null && W.Players.Count > 0 ? mRelay.HudText(W.Players[0]) : null;
+                return "ULTIMATE · " + SegmentNames[(int)Segment] + push + (relay != null ? "\n" + relay : "");
             }
         }
         public override float[] HudMarks => Set == AbilitySet.Ultimate ? new[] { 0.85f, 0.55f, 0.35f, 0.15f } : null;

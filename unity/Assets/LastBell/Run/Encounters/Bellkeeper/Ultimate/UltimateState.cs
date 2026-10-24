@@ -39,6 +39,7 @@ namespace LastBell.Run
             public int HourglassFrom = -1;  // the cracked-hourglass glyph shows from this tick until StillFrom
             public int CrackedUntil = -1;
             public string Note;            // extra glyph text (a mechanic's own marker), null = none
+            public string DebtNote;        // v2 Chime Debts: the debt timer (shown after Note)
             public Transform Glyph;        // the world glyph above the head (built on demand)
         }
         readonly Dictionary<PlayerController, Status> status = new Dictionary<PlayerController, Status>();
@@ -227,7 +228,7 @@ namespace LastBell.Run
             bool clock = s.Hour > 0 && (s.StrikeTick < 0 || tick <= s.StrikeTick);
             bool glass = s.HourglassFrom >= 0 && tick >= s.HourglassFrom && tick < s.StillUntil;
             bool cracked = tick < s.CrackedUntil;
-            bool any = clock || glass || cracked || s.Note != null;
+            bool any = clock || glass || cracked || s.Note != null || s.DebtNote != null;
             if (s.Glyph) s.Glyph.gameObject.SetActive(any && !p.Down);
             if (!any || p.Down) return null;
             if (!s.Glyph) s.Glyph = BuildGlyph(p);
@@ -246,6 +247,7 @@ namespace LastBell.Run
             if (glass) parts.Add(tick >= s.StillFrom ? "STILLED" : "HOURGLASS");
             if (cracked) parts.Add("CRACKED");
             if (s.Note != null) parts.Add(s.Note);
+            if (s.DebtNote != null) parts.Add(s.DebtNote);
             return string.Join(" · ", parts);
         }
         static Transform BuildGlyph(PlayerController p)

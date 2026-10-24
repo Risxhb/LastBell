@@ -83,13 +83,16 @@ namespace LastBell.Run
         public const string PendulumClocks = "bellkeeper.ult_pendulum_clocks", StoppedHour = "bellkeeper.ult_stopped_hour",
             Ledger = "bellkeeper.ult_ledger", BackwardsBell = "bellkeeper.ult_backwards_bell", TwoFutures = "bellkeeper.ult_two_futures",
             ConductorsHand = "bellkeeper.ult_conductors_hand", TollingHour = "bellkeeper.ult_tolling_hour",
-            ThirteenthHour = "bellkeeper.ult_thirteenth_hour", AreaQuotes = "bellkeeper.ult_area_quotes", Fracture = "bellkeeper.ult_fracture";
-        public static readonly string[] Ids = { PendulumClocks, StoppedHour, Ledger, BackwardsBell, TwoFutures, ConductorsHand, TollingHour, ThirteenthHour, AreaQuotes, Fracture };
+            ThirteenthHour = "bellkeeper.ult_thirteenth_hour", AreaQuotes = "bellkeeper.ult_area_quotes", Fracture = "bellkeeper.ult_fracture",
+            // v2 (ULTIMATE-PROMPT-v2.md, cards-v2): the P1 slice
+            EscapementRelay = "bellkeeper.ult_escapement_relay", ChimeDebts = "bellkeeper.ult_chime_debts";
+        public static readonly string[] Ids = { PendulumClocks, StoppedHour, Ledger, BackwardsBell, TwoFutures, ConductorsHand, TollingHour, ThirteenthHour, AreaQuotes, Fracture, EscapementRelay, ChimeDebts };
 
         public static UltimateMechanic[] CreateAll() => new UltimateMechanic[]
         {
             new PendulumClocks(), new StoppedHour(), new LedgerMechanic(), new BackwardsBell(), new TwoFutures(),
             new ConductorsHand(), new TollingHour(), new ThirteenthHour(), new AreaQuotes(), new FractureOfTime(),
+            new EscapementRelay(), new ChimeDebts(),
         };
     }
 }

@@ -24,6 +24,8 @@ namespace LastBell.Run
         IEnumerator BellkeeperUltimateChecks()
         {
             Note("---------- Bellkeeper Ultimate (proposal) ----------");
+            // the v1 checks play the v1 fight; the v2 slice checks play v2
+            BellkeeperEncounter.V2Override = BkFilter != null && BkFilter.StartsWith("bots_p1v2");
             if (UltWants("scaffold")) yield return UltScaffoldChecks();
             if (UltWants(UltimateMechanics.PendulumClocks)) yield return UltPendulumClocksChecks();
             if (UltWants(UltimateMechanics.StoppedHour)) yield return UltStoppedHourChecks();
@@ -39,6 +41,8 @@ namespace LastBell.Run
             if (UltWants("bots_video")) yield return UltDemoVideo();
             if (UltWants("bots_attempts")) yield return UltAttempts();
             if (UltWants("bots_watch")) yield return UltWatchAttempts();
+            if (UltWants("bots_p1v2")) yield return UltP1V2Checks();
+            if (UltWants("bots_p1v2_video")) yield return UltP1V2Video();
             yield return UltLeave();
         }
 
@@ -72,6 +76,7 @@ namespace LastBell.Run
         {
             BellkeeperEncounter.PhaseOverride = null;
             BellkeeperEncounter.PushTimersOn = true;
+            BellkeeperEncounter.V2Override = null;
             BellkeeperEncounter.PushSeconds = (float[])BellkeeperEncounter.DefaultPush.Clone();
             yield return BkLeave();
         }
@@ -114,8 +119,8 @@ namespace LastBell.Run
             yield return UltStart();
             if (bk == null) yield break;
             var keys = bk.Abilities.Select(a => a.Key).ToList();
-            Check("Ultimate: builds the reworked v2 moves and the ten mechanics, unique keys",
-                  keys.Count == 13 && keys.Distinct().Count() == 13 && keys.Contains("leaning_bell") && keys.Contains("toll_tide") && keys.Contains("reflection")
+            Check("Ultimate: builds the reworked v2 moves and the twelve mechanics (ten v1, two v2), unique keys",
+                  keys.Count == 15 && keys.Distinct().Count() == 15 && keys.Contains("leaning_bell") && keys.Contains("toll_tide") && keys.Contains("reflection")
                   && !keys.Contains("striking_order") && UltimateMechanics.Ids.All(id => keys.Contains(BellkeeperAbilities.Normalize(id))), string.Join(", ", keys));
             Note("Ultimate mechanics built: " + string.Join(", ", bk.Mechanics.Select(m => m.Key + (m.Built ? "" : " (stub)"))));
             Check("Ultimate: one tuning (the world runs at Medium)", d.World.Difficulty == Difficulty.Medium);
