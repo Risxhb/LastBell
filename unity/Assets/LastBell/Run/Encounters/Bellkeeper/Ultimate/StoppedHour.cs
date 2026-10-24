@@ -36,6 +36,7 @@ namespace LastBell.Run
         public const float HeartClear = 4.6f;          // Heart Toll r 4 + body margin 0.3 + 0.3: the guide's "beyond 4.3 m"
         public const float ClockMax = 7.2f;            // a clock struck from the hiding spot still reaches the boss (7.4 m)
         public const float LashMin = 3.9f, AloneMin = 2.2f, AloneMax = 9f;
+        public const float HugMin = 1.85f;             // two own clock strikes while frozen: hugging the boss (body 1.4 + 0.45)
         public override UltCue DefaultCue() => new UltCue { Variant = "alone", At = new[] { 5f, 9f } };
 
         // tests: force every Stilled player's station (-1 = the rule)
@@ -44,6 +45,7 @@ namespace LastBell.Run
         sealed class Stilled
         {
             public PlayerController P; public int Station; public Vector3 Hint; public bool HintOk;
+            public readonly List<int> Frozen = new List<int>(); public float Lo; public int Ready;   // own clock strikes while frozen (stations); nearest allowed spot; in place by (a frozen strike locks its cone first)
             public Hazard Lane; public BellkeeperFx.Telegraph Chain; public Transform Needle; public string Note;
         }
         readonly List<Stilled> stilled = new List<Stilled>();
@@ -137,9 +139,18 @@ namespace LastBell.Run
             // images up on each other), so there the Stilled come from two adjacent stations.
             int[] spread = mirrorResume ? new[] { 0, 1, 0, 1 } : new[] { 0, 2, 1, 3 };
             var station = new Dictionary<PlayerController, int>();
+            var clocks = Boss.Mechanic<PendulumClocks>();
+            bool clocksLive = clocks != null && clocks.Running && clocks.Strikes != null;
             foreach (var p in order)
             {
+                // the hand as it will point when time resumes: the station of the player's last clock strike at or before the
+                // resume (solo hands turn every hour), else the hand now; shown on the glyph from the hourglass
                 int st = ForceStation >= 0 ? ForceStation : Ult.StationOf(p);
+                if (ForceStation < 0 && clocksLive)
+                {
+                    var last = clocks.Strikes.Where(s => s.Owner == p && s.Tick <= resumeTick).OrderBy(s => s.Tick).LastOrDefault();
+                    if (last != null) st = last.Station;
+                }
                 station[p] = st < 0 ? -1 : ((st % 4) + 4) % 4;
             }
             var window = Enumerable.Range(0, count).Select(i => order[(start + i) % order.Count]).ToList();
@@ -158,7 +169,13 @@ namespace LastBell.Run
             {
                 int st = station[p];
                 if (st < 0) st = (baseStation + spread[free++ % 4]) % 4;
-                stilled.Add(new Stilled { P = p, Station = st });
+                var s = new Stilled { P = p, Station = st, Lo = minD, Ready = stopTick };
+                // the player's own clock strikes while frozen must still reach the boss from the hiding spot; two of them
+                // (solo P3: III at the stop's middle, IV on the resume) only fit hugging the boss
+                if (clocksLive)
+                    foreach (var k in clocks.Strikes.Where(x => x.Owner == p && x.Tick >= stopTick && x.Tick <= resumeTick)) { s.Frozen.Add(k.Station); s.Ready = Mathf.Min(s.Ready, k.LockTick); }
+                if (s.Frozen.Count >= 2) s.Lo = Mathf.Min(minD, HugMin);
+                stilled.Add(s);
             }
             stops++;
         }
@@ -196,11 +213,11 @@ namespace LastBell.Run
         {
             var bp = BossPos; var back = -UltimateState.StationDir(s.Station);
             var list = new List<(float score, Vector3 q)>();
-            for (float d = minD; d <= maxD + 1e-3f; d += 0.2f)
+            for (float d = s.Lo; d <= maxD + 1e-3f; d += 0.2f)
                 for (float a = sign > 0 ? 0 : -39; a <= (sign < 0 ? 0 : 39); a += 1.5f)
                 {
                     var q = bp + Quaternion.Euler(0, a, 0) * back * d;
-                    if (!CombatWorld.InPlayerBound(q, -0.6f) || !Hidden(s.Station, q, 0.25f) || !OffFissure(q)) continue;
+                    if (!CombatWorld.InPlayerBound(q, -0.6f) || !Hidden(s.Station, q, 0.25f) || !OffFissure(q) || !ClocksReach(s, q, 0.1f)) continue;
                     list.Add((Flat(q - s.P.transform.position) + 0.05f * Mathf.Abs(a), q));
                 }
             return list.OrderBy(c => c.score).Select(c => c.q).ToList();
@@ -328,6 +345,13 @@ namespace LastBell.Run
             var dir = v / len; var to = Sim.Flat(b.transform.position - from); float a = Vector3.Dot(to, dir), side = (to - dir * a).magnitude;
             return side <= b.BodyRadius - margin && a < len - b.BodyRadius * 0.5f;
         }
+        // every clock this Stilled player strikes while frozen still crosses the boss's body from q (Pendulum Clocks' own test)
+        bool ClocksReach(Stilled s, Vector3 q, float slack)
+        {
+            foreach (var st in s.Frozen)
+                if (!PendulumClocks.StrikesFrom(q, st, BossPos, Boss.BodyRadius, slack)) return false;
+            return true;
+        }
         // a body at `body` would be struck by the chain from `station` to a player at `target` before the boss stops it
         bool Shadows(int station, Vector3 target, Vector3 body, float margin)
         {
@@ -344,11 +368,11 @@ namespace LastBell.Run
             var mine = Find(p);
             if (mine != null)
             {
-                if (Now > stopTick || p.Down) return;
+                if (Now > mine.Ready || p.Down) return;
                 // be on the hiding strip behind the boss from your station by the stop (from the glyph: a read)
                 into.Add(new BotDemand
                 {
-                    Tick = stopTick, Since = LaunchTick, Hint = mine.Hint, Memory = true, From = this,
+                    Tick = mine.Ready, Since = LaunchTick, Hint = mine.Hint, Memory = true, From = this,
                     Why = "Stopped Hour: hide from " + UltimateState.StationNames[mine.Station],
                     Ok = q => StilledOk(mine, q),
                 });
@@ -383,7 +407,7 @@ namespace LastBell.Run
         bool StilledOk(Stilled s, Vector3 q)
         {
             if (Flat(q - s.Hint) > 0.5f || !Hidden(s.Station, q, 0.15f)) return false;
-            float d = Flat(q - BossPos); if (d < minD - 0.15f || d > maxD + 0.3f || !OffFissure(q)) return false;
+            float d = Flat(q - BossPos); if (d < s.Lo - 0.15f || d > maxD + 0.3f || !OffFissure(q) || !ClocksReach(s, q, 0.05f)) return false;
             if (!s.HintOk) return true;   // incomplete formation: at least hide from your own chain (never an empty rule)
             float img = ImageRadius() + Hazard.Margin + 0.1f;
             foreach (var o in stilled)
