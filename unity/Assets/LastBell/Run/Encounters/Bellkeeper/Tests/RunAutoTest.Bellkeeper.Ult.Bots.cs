@@ -208,9 +208,8 @@ namespace LastBell.Run
             // party's perfect phase time x ~1.3. Solo HP is the same base (no solo tuning yet).
             // part5-attempts-2: both parties wiped to the P2 push at ~58 % (real P2 party DPS ~154, 69 % of the stepped measure),
             // so run 3 scales HP to that and gives each push ~1.4x the party's expected phase time.
-            BellkeeperEncounter.UltimateBaseHp = 10000;
-            BellkeeperEncounter.PushSeconds = new float[] { 45, 0, 85, 80, 0, 105, 78 };
-            Note($"provisional UltimateBaseHp {BellkeeperEncounter.UltimateBaseHp} · push P1 45 P2 85 P3 80 P4 105 · P5 enrage 78");
+            ApplyTuning(BellkeeperEncounter.DefaultBaseHp, (float[])BellkeeperEncounter.DefaultPush.Clone());
+            Note($"tuning UltimateBaseHp {BellkeeperEncounter.UltimateBaseHp} · push {string.Join("/", BellkeeperEncounter.PushSeconds)} · seed {BellkeeperEncounter.SeedOffset}");
             yield return UltRecordAttempt("party4_perfect", 4, UltimateBot.Skill.Perfect);
             yield return UltRecordAttempt("party4_late", 4, UltimateBot.Skill.Late);
             yield return UltRecordAttempt("solo_perfect", 1, UltimateBot.Skill.Perfect);
