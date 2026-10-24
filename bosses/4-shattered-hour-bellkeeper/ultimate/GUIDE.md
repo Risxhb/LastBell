@@ -6,7 +6,6 @@ Written the way Ultimate guides are: what each mechanic wants from **you**, by y
 - **Stations** are the Throne's four diagonal rim dials: NE, SE, SW, NW (your clock hand points at one).
 - **Potions:** five, nothing else heals except the Chimesinger's Mending Chorus. Drink before T2's six tolls (73+ HP) and under the hourglass (you can't drink while Stilled).
 - **Read your own clock first** (numeral = when, brass hand = which rim station). Everything else in the phase is solved around it.
-- **Potions are the healing.** Drink before Tolling Hour chains and before T2's six tolls (you need 73+ HP).
 - **The boss's body is a shield.** Stopped Hour lanes and your own clock line both pass through him.
 - Default spots: **clock spot** = 4–7 m from the boss on the side **away** from your station; **hiding strip** = the same line, right behind the body (±1 m); **band** = 4.3–6.7 m (after a Toll Tide).
 
