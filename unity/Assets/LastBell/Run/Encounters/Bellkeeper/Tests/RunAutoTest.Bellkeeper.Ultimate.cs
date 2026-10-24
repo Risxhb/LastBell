@@ -259,7 +259,7 @@ namespace LastBell.Run
             Check("plan: P4 replays the Ledger three times, then P5", bk.Segment == BellkeeperEncounter.UltSegment.P5 && UltLaunchTick("ult_ledger", tp4, 2) > 0);
             UltStepAlive(3);
             Check("plan: P5 lights the fissure and starts the Thirteenth Hour", bk.Mechanic<FractureOfTime>().Running && bk.Mechanic<ThirteenthHour>().Running);
-            Check("plan: the boss never healed and stayed on one bar", bk.Hp <= Mathf.RoundToInt(bk.MaxHp * 0.15f) && bk.MaxHp == BellkeeperEncounter.UltimateBaseHp);
+            Check("plan: the boss never healed and stayed on one bar", bk.Hp <= Mathf.RoundToInt(bk.MaxHp * 0.15f) && bk.MaxHp == Mathf.RoundToInt(BellkeeperEncounter.UltimateBaseHp * BellkeeperEncounter.UltimateSoloScale));
             bk.DebugDefeat();
             Check("plan: death in P5 cancels everything", d.World.Hazards.Count == 0 && !bk.Mechanics.Any(m => m.Running) && bk.Dead);
 

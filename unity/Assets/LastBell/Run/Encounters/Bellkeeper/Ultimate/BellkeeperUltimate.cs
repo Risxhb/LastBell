@@ -22,6 +22,9 @@ namespace LastBell.Run
         public UltimateState Ult { get; private set; }
         // Placeholder until the bots measure DPS (ULTIMATE.md §9, Part 5): HP per phase = measured DPS x target length.
         public static int UltimateBaseHp = 30000;
+        // solo gets a smaller bar: one player carries every clock and every Stilled hide and deals far less per head (Part 5:
+        // solo DPS ~38 vs ~47 per player in a party of 4); -lastbellUltSolo overrides
+        public static float UltimateSoloScale = float.TryParse(Arg("-lastbellUltSolo"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float ss) ? ss : 0.65f;
 
         public enum UltSegment { P1, T1, P2, P3, T2, P4, P5 }
         public static readonly string[] SegmentNames =

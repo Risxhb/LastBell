@@ -83,6 +83,8 @@ namespace LastBell.Run
             ultLast = f;
             Note(f.ToString());
             foreach (var l in f.DeathLines.Take(6)) Note("   " + l);
+            Note("   plan: " + string.Join(" · ", bk.PlanLog.Where(e => e.what.StartsWith("segment") || e.what.StartsWith("wipe") || e.what.StartsWith("second") || e.what.StartsWith("cracked"))
+                .Select(e => $"{e.what}@{(e.tick - t0) / 60f:0.0}s")) + $" · max HP {bk.MaxHp}");
             BellkeeperEncounter.PushTimersOn = true;
         }
 
