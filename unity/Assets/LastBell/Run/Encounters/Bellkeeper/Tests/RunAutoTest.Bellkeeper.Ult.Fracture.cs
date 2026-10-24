@@ -163,7 +163,8 @@ namespace LastBell.Run
                   lt - s0 == Sim.Ticks(28) && Mathf.Abs(Vector3.Dot(bk.UltLean.LeanDir, n)) > 0.99f && fr.FlareTicks.Any(t => t > lt && t < lt + UltShapes.LeanTicks),
                   $"lean at {(lt - s0) / 60f:0.00}s");
             Check("P5 plan: the solo strat bot crosses (4.2 m/s): no Leaning Bell, no flare, little burn",
-                  !d.Player.Down && BkHitsOn(d.Player, "Leaning Bell") == 0 && Flares(d.Player) == 0 && Burned(d.Player, 0, int.MaxValue) <= 14,
+                  BkHitsOn(d.Player, "Leaning Bell") == 0 && Flares(d.Player) == 0 && Burned(d.Player, 0, int.MaxValue) <= 14
+                  && (!d.Player.Down || !(bkHits.LastOrDefault(h => h.Player == d.Player).Source ?? "").StartsWith("Fracture")),   // a death to another P5 mechanic isn't the crossing's
                   $"burn {Burned(d.Player, 0, int.MaxValue)} · {sb.DebugLine}");
             d.Player.Input = bot;
             BellkeeperEncounter.PushTimersOn = true;

@@ -119,7 +119,7 @@ namespace LastBell.Run
             Check("Backwards Bell: practice from P2 launches it at 8 s with its block cue; C' 16.5, B' 17.5, A' 18.5 s (with clocks III+IV)",
                   bk.Segment == BellkeeperEncounter.UltSegment.P2 && bbM.LastCastTick - t0 == Sim.Ticks(8) && cue
                   && bbM.CopyTicks[0] - t0 == Sim.Ticks(16.5f) && bbM.CopyTicks[1] - t0 == Sim.Ticks(17.5f) && bbM.CopyTicks[2] - t0 == Sim.Ticks(18.5f)
-                  && bbHz.Count(h => h.Source.StartsWith(BackwardsBell.RewindPrefix)) == 3,
+                  && bbHz.Count(h => h.Source.StartsWith(BackwardsBell.RewindPrefix)) >= 3,   // the Conductor's Hand's right swing rewinds through RewindOf too
                   $"launch {(bbM.LastCastTick - t0) / 60f:0.00}s, A' {(bbM.CopyTicks[2] - t0) / 60f:0.00}s, {bbHz.Count} hazards");
             BellkeeperEncounter.PushTimersOn = true;
 

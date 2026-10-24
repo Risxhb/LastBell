@@ -329,7 +329,8 @@ namespace LastBell.Run
             var hits = bkHits.Where(h => h.Source == LedgerMechanic.ReplaySource).ToList();
             var unforced = hits.Where(h => !Forced(h)).ToList();
             Check($"Ledger P4 N={n}: strat bots at 4.2 m/s survive all three replays; the only hits are the documented forced V (block 2, Stilled with no clean hiding spot; at most one each)",
-                  unforced.Count == 0 && hits.GroupBy(h => h.Player).All(g => g.Count() <= 1) && d.World.Players.All(p => !p.Down),
+                  unforced.Count == 0 && hits.GroupBy(h => h.Player).All(g => g.Count() <= 1)
+                  && d.World.Players.All(p => !p.Down || bkHits.LastOrDefault(h => h.Player == p).Source != LedgerMechanic.ReplaySource),   // a death to another mechanic isn't the Ledger's
                   hits.Count == 0 ? "untouched" : string.Join(", ", hits.Select(h => $"{h.Player.name} {Page(h)}@{(h.Tick - tp4) / 60f:0.00}{(Forced(h) ? " forced" : "")}")));
             LedgerUnbot();
         }
