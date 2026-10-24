@@ -185,29 +185,42 @@ namespace LastBell.Run
             BellkeeperEncounter.PushSeconds = new float[] { 130, 0, 150, 130, 0, 130, 78 };
         }
 
+        // -lastbellTestAbility bots_watch: the same three attempts, live and smooth (no frame capture, real game time), for watching
+        IEnumerator UltWatchAttempts()
+        {
+            watchOnly = true;
+            yield return UltAttempts();
+            watchOnly = false;
+        }
+        bool watchOnly;
+
         IEnumerator UltRecordAttempt(string name, int n, UltimateBot.Skill skill)
         {
             yield return UltStart();
             if (bk == null) yield break;
             var bots = UltimateParty.Fill(d.World, n, skill, n > 1 ? PartyClasses : new[] { "Vanguard" });
             foreach (var b in bots) b.Speed = PlayerController.WalkSpeed;
-            var cdir = System.IO.Path.Combine(dir, "attempt_" + name); System.IO.Directory.CreateDirectory(cdir);
+            var cdir = System.IO.Path.Combine(dir, "attempt_" + name); if (!watchOnly) System.IO.Directory.CreateDirectory(cdir);
             var boss = bk;
             bk.BeginCombat(); d.SetPaused(false);
-            Time.captureFramerate = 30;
-            int frame = 0, tail = -1, max = 30 * 60 * 16;
+            if (!watchOnly) Time.captureFramerate = 30;
+            int frame = 0, tail = -1, max = watchOnly ? int.MaxValue : 30 * 60 * 16; float t0 = Time.unscaledTime;
             bool killed = false; string seg = "P1", cause = null; float hpLeft = 1;
             while (frame < max && (tail < 0 || tail-- > 0))
             {
                 yield return new WaitForEndOfFrame();
-                var tex = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
-                tex.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0); tex.Apply();
-                System.IO.File.WriteAllBytes(System.IO.Path.Combine(cdir, $"{frame++:00000}.jpg"), tex.EncodeToJPG(80)); Destroy(tex);
+                if (watchOnly) frame++;
+                else
+                {
+                    var tex = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
+                    tex.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0); tex.Apply();
+                    System.IO.File.WriteAllBytes(System.IO.Path.Combine(cdir, $"{frame++:00000}.jpg"), tex.EncodeToJPG(80)); Destroy(tex);
+                }
                 if (boss) { killed |= boss.Dead; seg = boss.Segment.ToString(); hpLeft = boss.Hp / (float)boss.MaxHp; if (boss.Ult.WipeCause != null) cause = boss.Ult.WipeCause; }
-                if (tail < 0 && d.State != RunState.Combat) { tail = 30 * 4; if (!killed) cause = cause ?? d.DefeatCause; }   // keep 4 s of the outcome screen
+                if (tail < 0 && d.State != RunState.Combat) { tail = watchOnly ? 480 : 30 * 4; if (!killed) cause = cause ?? d.DefeatCause; }   // keep 4 s of the outcome screen
             }
             Time.captureFramerate = 0;
-            Note($"attempt {name}: {(killed ? "KILL" : "WIPE (" + cause + ")")} after {frame / 30 / 60}:{frame / 30 % 60:00} recorded · reached {seg} · boss {hpLeft:P1} left · frames {frame}");
+            Note($"attempt {name}: {(killed ? "KILL" : "WIPE (" + cause + ")")} after {(watchOnly ? (int)(Time.unscaledTime - t0) : frame / 30) / 60}:{(watchOnly ? (int)(Time.unscaledTime - t0) : frame / 30) % 60:00} {(watchOnly ? "watched" : "recorded")} · reached {seg} · boss {hpLeft:P1} left · frames {frame}");
             d.SetPaused(true);
         }
 
