@@ -36,7 +36,7 @@ namespace LastBell.Run
         public const float HeartClear = 4.6f;          // Heart Toll r 4 + body margin 0.3 + 0.3: the guide's "beyond 4.3 m"
         public const float ClockMax = 7.2f;            // a clock struck from the hiding spot still reaches the boss (7.4 m)
         public const float LashMin = 3.9f, AloneMin = 2.2f, AloneMax = 9f;
-        public const float HugMin = 1.85f;             // two own clock strikes while frozen: hugging the boss (body 1.4 + 0.45)
+        public const float HugMin = 2.2f;              // two own clock strikes while frozen: hugging the boss (outside the bots' 2.0 m body clearance)
         public override UltCue DefaultCue() => new UltCue { Variant = "alone", At = new[] { 5f, 9f } };
 
         // tests: force every Stilled player's station (-1 = the rule)
@@ -218,7 +218,10 @@ namespace LastBell.Run
                 {
                     var q = bp + Quaternion.Euler(0, a, 0) * back * d;
                     if (!CombatWorld.InPlayerBound(q, -0.6f) || !Hidden(s.Station, q, 0.25f) || !OffFissure(q) || !ClocksReach(s, q, 0.1f)) continue;
-                    list.Add((Flat(q - s.P.transform.position) + 0.05f * Mathf.Abs(a), q));
+                    float score = Flat(q - s.P.transform.position) + 0.05f * Mathf.Abs(a);
+                    // own clocks striking while frozen: the region is small, so prefer its middle (margin on the cones and the hiding)
+                    if (s.Frozen.Count > 0) score -= 2f * Margin(s, q);
+                    list.Add((score, q));
                 }
             return list.OrderBy(c => c.score).Select(c => c.q).ToList();
         }
@@ -345,6 +348,18 @@ namespace LastBell.Run
             var dir = v / len; var to = Sim.Flat(b.transform.position - from); float a = Vector3.Dot(to, dir), side = (to - dir * a).magnitude;
             return side <= b.BodyRadius - margin && a < len - b.BodyRadius * 0.5f;
         }
+        // how much slack q has on every own frozen clock strike and on the hiding, in steps of 0.1 up to 1 (a pushed or
+        // lunging player still strikes and hides)
+        float Margin(Stilled s, Vector3 q)
+        {
+            float m = 0;
+            for (float k = 0.2f; k <= 1.0f + 1e-3f; k += 0.1f)
+            {
+                if (!ClocksReach(s, q, k) || !Hidden(s.Station, q, 0.25f + k * 0.5f)) break;
+                m = k;
+            }
+            return m;
+        }
         // every clock this Stilled player strikes while frozen still crosses the boss's body from q (Pendulum Clocks' own test)
         bool ClocksReach(Stilled s, Vector3 q, float slack)
         {
@@ -368,14 +383,19 @@ namespace LastBell.Run
             var mine = Find(p);
             if (mine != null)
             {
-                if (Now > mine.Ready || p.Down) return;
-                // be on the hiding strip behind the boss from your station by the stop (from the glyph: a read)
-                into.Add(new BotDemand
+                if (Now > stopTick || p.Down) return;
+                // be on the hiding strip behind the boss from your station by the stop (from the glyph: a read); with own
+                // clocks striking while frozen, already by the first one's cone lock, and stay there until the stop
+                foreach (int due in mine.Ready < stopTick ? new[] { mine.Ready, stopTick } : new[] { stopTick })
                 {
-                    Tick = mine.Ready, Since = LaunchTick, Hint = mine.Hint, Memory = true, From = this,
-                    Why = "Stopped Hour: hide from " + UltimateState.StationNames[mine.Station],
-                    Ok = q => StilledOk(mine, q),
-                });
+                    if (Now > due) continue;
+                    into.Add(new BotDemand
+                    {
+                        Tick = due, Since = LaunchTick, Hint = mine.Hint, Memory = true, From = this,
+                        Why = "Stopped Hour: hide from " + UltimateState.StationNames[mine.Station],
+                        Ok = q => StilledOk(mine, q),
+                    });
+                }
                 return;
             }
             if (p.Down) return;
