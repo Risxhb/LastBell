@@ -195,10 +195,11 @@ namespace LastBell.Run
                 foreach (var (tg, pts) in later)
                 {
                     float nd = 30; foreach (var q in pts) nd = Mathf.Min(nd, PathLen(c, q, bp, boss.BodyRadius));
-                    if (nd > Speed * (tg - t1) / (float)Sim.Hz + dashGain) score += 25;
+                    if (nd > Speed * (tg - t1) / (float)Sim.Hz + dashGain) score += 8;   // a soft pull: never worth standing in a live shape
                 }
                 // later rules still in view: a small pull toward satisfying them too
-                for (int i = g2End; i < rules.Count; i++) if (!rules[i].Ok(c)) score += 0.8f;
+                // (a visible coral shape due soon costs far more than a memory rule seconds away)
+                for (int i = g2End; i < rules.Count; i++) if (!rules[i].Ok(c)) score += rules[i].Memory ? 0.8f : rules[i].Tick - t1 < 45 ? 12f : 3f;
                 score += BurnCost(boss, pos, c, UseDash && me.Stamina >= PlayerController.DashCost);
                 // uptime: among spots that keep the rules, prefer ones in reach of the boss (a melee player weaves in)
                 if (Attacks) score += UptimePull * Mathf.Max(0, Sim.Flat(c - bp).magnitude - boss.BodyRadius - Range(me));
