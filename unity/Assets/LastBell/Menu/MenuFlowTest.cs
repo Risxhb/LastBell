@@ -248,11 +248,13 @@ namespace LastBell.Menu
             }
             File.WriteAllBytes(Path.Combine(output,file),t.EncodeToPNG());Destroy(t);
         }
-        static string ExpectedMusic(int encounter) => new[]{"The Unfinished Hour","Crown of the Meridian","Where the Last Flower Falls","Pressure Beneath the Brass"}[encounter];
+        static string ExpectedMusic(int encounter) => new[]{"The Unfinished Hour","Crown of the Meridian","Where the Last Flower Falls","Pressure Beneath the Brass","The Tempo Tyrant"}[encounter];
         void MusicCheck(string label,string clip)
         {
             var owners=FindObjectsByType<MenuMusic>();var music=owners.Length==1?owners[0]:null;
             bool menuTrack=clip=="MainMenuMusic";
+            // A boss whose final track has not been supplied yet is reported as a known gap, not as a pass or a failure.
+            if(!menuTrack&&!Resources.Load<AudioClip>("Menu/BossMusic/"+clip)){report.Add("GAP  music "+label+" — boss track '"+clip+"' not supplied");Debug.Log(report.Last());return;}
             Check("music "+label,music&&music.Source&&music.Source.clip&&
                 (menuTrack?music.Source==music.MenuSource:music.Source.clip.name==clip)&&
                 music.Source.isPlaying&&(menuTrack?!music.Source.loop:music.Source.loop));

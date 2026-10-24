@@ -32,7 +32,7 @@ namespace LastBell.Menu
             var menu = FindAnyObjectByType<MainMenu>(); var show = menu.GetComponent<MenuShowcase>(); var music = menu.Music; var source = music.Source;
             Check("single combined main menu is current scene", SceneManager.GetActiveScene().path == MainMenu.ScenePath && SceneManager.sceneCount == 1);
             Check("opening song plays first", music.PlayingOpening && source.clip.name == "MainMenu2" && source.isPlaying && source.time > 0);
-            Check("all catalog stages embedded", show.Stages.Length == RunMaps.All.Length && show.Stages.Select(s => s.Name).SequenceEqual(RunMaps.All.Select(m => m.Name)));
+            Check("all catalog stages embedded", show.Stages.Length == RunMaps.Showcased.Length && show.Stages.Select(s => s.Name).SequenceEqual(RunMaps.Showcased.Select(m => m.Name)));
             Check("original menu environment preserved inactive", GameObject.Find("Original menu environment (preserved, inactive)") == null);
             Check("music controls present and keyboard reachable", menu.MusicPlayButton && menu.MusicPauseButton && menu.MusicNextButton && menu.ExitButton.navigation.selectOnUp == menu.MusicPlayButton);
             menu.MusicPauseButton.onClick.Invoke(); float pausedAt = source.time;

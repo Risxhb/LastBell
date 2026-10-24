@@ -16,6 +16,7 @@ namespace LastBell.Run
             public string Id, Name, Note, SourceScene, RunScene;
             public float Bound;     // how far the player's centre may go from the arena centre: just inside that arena's wall
             public bool Square;     // Bound is a half-width on x and z (the key-art dais) rather than a radius
+            public bool InShowcase = true;   // false: playable/practice map that is not one of the menu showcase stages
         }
 
         public static readonly Map[] All =
@@ -35,7 +36,15 @@ namespace LastBell.Run
             new Map { Id = "shattered-hour", Name = "Shattered Hour", Note = "Area 4 · final arena",
                 SourceScene = "Assets/LastBell/Areas/Area4/ShatteredHour_FinalArena.unity", RunScene = "Assets/LastBell/Run/Maps/Run_ShatteredHour.unity",
                 Bound = 13.0f },                       // boundary wall at 13.65 m (inner face 13.5)
+            // The Tempo Tyrant's arena (practice entry only; not a run slot or menu showcase stage). Code-built floor
+            // disc 13.1 m, parapet inner face at 13.29 m: bound 12.5 m keeps the player's body inside the floor edge.
+            new Map { Id = "metronome-court", Name = "Metronome Court", Note = "Tempo Tyrant arena",
+                SourceScene = "Assets/LastBell/Arenas/MetronomeCourt/MetronomeCourt_Arena.unity", RunScene = "Assets/LastBell/Run/Maps/Run_MetronomeCourt.unity",
+                Bound = 12.5f, InShowcase = false },
         };
+
+        // the maps embedded as stages in the menu showcase (all original arenas; new practice-only arenas opt out)
+        public static Map[] Showcased => System.Array.FindAll(All, m => m.InShowcase);
 
         // index of the map whose run scene is loaded, or -1 (e.g. an arena scene opened directly in the editor)
         public static int Current

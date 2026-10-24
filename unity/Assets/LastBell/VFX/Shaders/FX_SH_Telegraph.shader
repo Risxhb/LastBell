@@ -22,6 +22,8 @@ Shader "LastBell/FX/Telegraph"
         _ColorInk ("Deep Ink", Color) = (0.063, 0.094, 0.145, 1)
         _Border ("Border width (m)", Float) = 0.09
         _Memory ("Inactive memory outline (dashed, unfilled)", Range(0, 1)) = 0
+        _ClipRadius ("Floor clip radius (0 = off)", Float) = 0
+        _ClipCentre ("Floor clip centre (world xz)", Vector) = (0, 0, 0, 0)
     }
     SubShader
     {
@@ -34,7 +36,7 @@ Shader "LastBell/FX/Telegraph"
             #pragma vertex vert
             #pragma fragment frag
             #include "UnityCG.cginc"
-            float _Shape, _Radius, _Inner, _HalfAngle, _Progress, _Lock, _Flash, _Fade, _Border, _Memory;
+            float _Shape, _Radius, _Inner, _HalfAngle, _Progress, _Lock, _Flash, _Fade, _Border, _Memory, _ClipRadius; float4 _ClipCentre;
             float4 _ColorFill, _ColorBorder, _ColorFlash, _ColorInk;
             struct appdata { float4 vertex : POSITION; };
             struct v2f { float4 pos : SV_POSITION; float2 p : TEXCOORD0; float3 world : TEXCOORD1; };
@@ -80,6 +82,8 @@ Shader "LastBell/FX/Telegraph"
                 float aa = fwidth(d) * 1.2;
                 float inside = 1 - smoothstep(-aa, aa * 0.5, d);       // the boundary itself counts as inside
                 if (inside <= 0) discard;
+                // optional: the warning stops at the arena floor edge (the hit test cannot reach past the floor either)
+                if (_ClipRadius > 0 && length(i.world.xz - _ClipCentre.xy) > _ClipRadius) discard;
                 float border = inside * smoothstep(-_Border - aa, -_Border, d);   // 1 in the band just inside the edge
                 float timed = step(u, _Progress);
                 float hatch = step(0.5, frac((i.world.x + i.world.z) * 1.2));

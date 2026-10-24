@@ -34,7 +34,7 @@ namespace LastBell.Menu
         void Start()
         {
             battle = GetComponent<MenuBattle>();
-            if (Stages == null || Stages.Length != RunMaps.All.Length)
+            if (Stages == null || Stages.Length != RunMaps.Showcased.Length)
             { Debug.LogError("Menu showcase environments are missing. Run Prepare Showcase Scene."); enabled = false; return; }
             BuildFade();
             battle.CameraPosition = new Vector3(0, 29, 24); battle.CameraTarget = new Vector3(0, 1, 0);

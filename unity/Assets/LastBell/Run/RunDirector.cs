@@ -39,6 +39,9 @@ namespace LastBell.Run
             new BossEntry("Sylvara (area 3)", w => BossEncounter.Spawn<SylvaraEncounter>(w, new Vector3(0, 0, -1.5f), 0), map: SylvaraMap),
             // Brass Foundry area boss; authored practice map
             new BossEntry("Crucivar (area 2)", w => BossEncounter.Spawn<CrucivarEncounter>(w, new Vector3(0, 0, -1.5f), 0), map: CrucivarMap),
+            // Metronome Court miniboss: explicit Practice entry only (inRun: false), so shuffled run slots are unchanged.
+            // Run integration point for later review: set inRun to true here (docs/metronome-arena/tempo-tyrant.md).
+            new BossEntry("Tempo Tyrant (practice)", w => BossEncounter.Spawn<TempoTyrantEncounter>(w, new Vector3(0, 0, -2f), 0), inRun: false, map: TempoTyrantMap),
         };
         // Catalog eligibility is stable; each run owns its shuffled sequence, with final encounters appended.
         public static readonly int[] RunOrder = Enumerable.Range(0, Bosses.Length).Where(i => Bosses[i].InRun).OrderBy(i => Bosses[i].Final).ToArray();
@@ -56,6 +59,8 @@ namespace LastBell.Run
         public const string CrucivarMap = "brass-foundry";
         public static int AurelionPractice => Array.FindIndex(Bosses, b => b.Map == AurelionMap);
         public const string AurelionMap = "skyward-spire";
+        public static int TempoTyrantPractice => Array.FindIndex(Bosses, b => b.Map == TempoTyrantMap);
+        public const string TempoTyrantMap = "metronome-court";
         public static readonly string[] Classes = { "Vanguard", "Chimesinger", "Arcanist" };
         const int IntroTicks = 120, ClearTicks = 180, DownedTicks = 100;
         static readonly Vector3 PlayerSocket = new Vector3(0, 0, 6.5f);

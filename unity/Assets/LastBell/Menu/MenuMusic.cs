@@ -67,6 +67,7 @@ namespace LastBell.Menu
             if (encounter is CrucivarEncounter) return "Pressure Beneath the Brass";
             if (encounter is BellkeeperEncounter) return "The Unfinished Hour";
             if (encounter is SylvaraEncounter) return "Where the Last Flower Falls";
+            if (encounter is TempoTyrantEncounter) return TempoTyrantAudio.HasteTrack;   // not supplied yet: missing-music status
             return null;
         }
         public static void OnRunState(RunDirector director, RunState state)

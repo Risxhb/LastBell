@@ -31,15 +31,16 @@ namespace LastBell.Menu.EditorTools
                 if (root != menu.gameObject && root != camera.gameObject && root != legacy) root.transform.SetParent(legacy.transform, true);
             legacy.SetActive(false);
             var showcase = menu.gameObject.AddComponent<MenuShowcase>();
-            showcase.Stages = new MenuShowcase.Stage[RunMaps.All.Length];
+            var stages = RunMaps.Showcased;
+            showcase.Stages = new MenuShowcase.Stage[stages.Length];
             string[] bosses = { "Bellkeeper2", "Aurelion", "Crucivar", "Sylvara", "Bellkeeper2" };
             int[] sizes = { 3, 4, 5, 6, 8 };
-            for (int i = 0; i < RunMaps.All.Length; i++)
+            for (int i = 0; i < stages.Length; i++)
             {
-                var source = EditorSceneManager.OpenScene(RunMaps.All[i].SourceScene, OpenSceneMode.Additive);
+                var source = EditorSceneManager.OpenScene(stages[i].SourceScene, OpenSceneMode.Additive);
                 SceneManager.SetActiveScene(source);
                 var sourceCamera = source.GetRootGameObjects().SelectMany(r => r.GetComponentsInChildren<Camera>(true)).FirstOrDefault();
-                var stage = new MenuShowcase.Stage { Name = RunMaps.All[i].Name, Boss = bosses[i], PartySize = sizes[i],
+                var stage = new MenuShowcase.Stage { Name = stages[i].Name, Boss = bosses[i], PartySize = sizes[i],
                     Ambient = RenderSettings.ambientLight, AmbientIntensity = RenderSettings.ambientIntensity,
                     Fog = RenderSettings.fogColor, FogEnabled = RenderSettings.fog, FogMode = RenderSettings.fogMode,
                     FogStart = RenderSettings.fogStartDistance, FogEnd = RenderSettings.fogEndDistance, Skybox = RenderSettings.skybox,
