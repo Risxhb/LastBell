@@ -5,7 +5,7 @@ namespace LastBell.Run
 {
     // The Thirteenth Hour (`bellkeeper.ult_thirteenth_hour`), Bellkeeper Ultimate — proposal, built 2026-10-23, not
     // human-approved. Design: ultimate/ULTIMATE.md §3.7, §5.7. P5's hard enrage: the great bell beyond the north rim counts
-    // I..XIII on the void sky, one toll every 6 s; I..XII are 6-damage raidwides (UltShapes.Raidwide), and XIII ends the
+    // I..XIII on the void sky, one toll every 6 s; I..XII are 4-damage raidwides (UltShapes.Raidwide), and XIII ends the
     // attempt (Ult.Wipe("The Thirteenth Hour"): lethal to every standing player).
     // Cue: P5 start (plan). At[0] = XIII, seconds after launch (78 = PushSeconds[P5]); toll k rings at k/13 of it, so a
     // shortened enrage (tests) keeps the count. XIII lands exactly on TickAt(At[0]), 0.5 s before the plan's fallback wipe.
@@ -18,7 +18,7 @@ namespace LastBell.Run
         public override string Name => "The Thirteenth Hour";
 
         public const string Source = "The Thirteenth Hour";
-        public const int Hours = 13, TollDamage = 6;
+        public const int Hours = 13, TollDamage = 4;   // 6 in the design; 4 after Part 5 (perfect parties died of attrition in P5 with every potion spent)
         public const float DefaultEnrage = 78f;
 
         public int Count { get; private set; }                         // tolls rung so far: 0 .. 13 (HUD)

@@ -123,7 +123,7 @@ namespace LastBell.Run
             UqTo(enrage - 1, true);
             bool noneYet = !bk.PlanLog.Any(e => e.what == "wipe " + ThirteenthHour.Source);
             Check("Thirteenth Hour: I..XII toll every 6 s, 6 each, and nothing wipes before XIII", noneYet && uXiii.Count == 12 && uXiii.Numeral == "XII"
-                  && tolls.SequenceEqual(Enumerable.Range(1, 12).Select(k => Sim.Ticks(6 * k))) && UqHits(null, ThirteenthHour.Source).All(h => h.Damage == 6),
+                  && tolls.SequenceEqual(Enumerable.Range(1, 12).Select(k => Sim.Ticks(6 * k))) && UqHits(null, ThirteenthHour.Source).All(h => h.Damage == ThirteenthHour.TollDamage),
                   $"count {uXiii.Count}, tolls at {string.Join(",", tolls.Select(t => t / 60f))}");
             BkStep(1);
             bk.HazardSpawned -= rec;
