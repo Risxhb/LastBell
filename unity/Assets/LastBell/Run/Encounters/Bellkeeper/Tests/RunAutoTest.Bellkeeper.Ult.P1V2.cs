@@ -28,7 +28,7 @@ namespace LastBell.Run
             {
                 int start = -1;
                 System.Action<UltFight> trace = null;
-                if (r.label == "v2 P1 party4 perfect")   // where each bot is around beats 9-11 (24-33 s)
+                if (false)   // where each bot is around beats 9-11 (24-33 s)
                     trace = f =>
                     {
                         if (start < 0) start = d.World.Tick;
@@ -42,7 +42,7 @@ namespace LastBell.Run
                 var relay = bk.UltRelay;
                 int taken = bkHits.Sum(h => h.Damage);
                 var debts = bk.Mechanic<ChimeDebts>();
-                Note($"   relay beats {relay.BeatsClean}/{relay.Beats} clean · debts detonated {debts.Detonated} · damage taken {taken} ({string.Join(", ", bkHits.GroupBy(h => h.Source).Select(g => g.Key + " " + g.Sum(h => h.Damage)))})" +
+                Note($"   relay beats {relay.BeatsClean}/{relay.Beats} clean · debts detonated {debts.Detonated} erased {debts.Erased} · rewinds {relay.Reversals} · damage taken {taken} ({string.Join(", ", bkHits.GroupBy(h => h.Source).Select(g => g.Key + " " + g.Sum(h => h.Damage)))})" +
                      (relay.Fails.Count > 0 ? " · fails: " + string.Join("; ", relay.Fails.Take(5)) : ""));
                 Note("   dealt: " + string.Join(", ", d.World.Players.Select(p => $"{p.ClassName} {(d.World.DealtBy.TryGetValue(p, out int v) ? v : 0)}")));
                 if (r.must)
@@ -50,7 +50,7 @@ namespace LastBell.Run
                     Check($"{r.label}: clears P1", ultLast.Killed, ultLast.ToString());
                     Check($"{r.label}: 0 damage taken, 0 potions", taken == 0 && ultLast.Potions == 0, $"damage {taken}, potions {ultLast.Potions}");
                     Check($"{r.label}: every relay beat clean", relay.Beats > 20 && relay.BeatsClean == relay.Beats, $"{relay.BeatsClean}/{relay.Beats}");
-                    Check($"{r.label}: two debt rounds detonated", debts.Detonated >= 8, debts.Detonated.ToString());
+                    Check($"{r.label}: two debt rounds resolved", debts.Detonated + debts.Erased >= 8, $"{debts.Detonated} detonated, {debts.Erased} erased");
                 }
             }
         }

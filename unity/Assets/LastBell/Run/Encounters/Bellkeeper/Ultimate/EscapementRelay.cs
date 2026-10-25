@@ -5,7 +5,7 @@ namespace LastBell.Run
 {
     // Escapement Relay (`bellkeeper.ult_escapement_relay`), Bellkeeper Ultimate v2 — proposal, card 01 (cards-v2), built
     // 2026-10-24 as the playable P1 slice, not human-approved.
-    // Four brass plates lie on the floor (N/E/S/W, r 7 m) and the escapement's hour hand turns on the boss. Every 3 s the
+    // Four brass plates lie on the floor (N/E/S/W, r 7 m) and the escapement's hour hand turns on the boss. Every 2.5 s the
     // hand ticks 90° clockwise and the beat resolves on the plate it points at. Each player holds an hour numeral (I..IV,
     // party order) and every beat a duty from its place in the cycle, (hour − 1 + beat) mod 4:
     //   SOAK    stand on the plate the hand points at
@@ -28,17 +28,44 @@ namespace LastBell.Run
         public override string Name => "Escapement Relay";
 
         public const string Source = "Escapement Relay";
-        public const float BeatSeconds = 3f, PlateRadius = 7f, PlateSize = 1.6f, OnPlate = 1.8f, ChainMin = 9f, ChainHint = 10.2f,
+        public const float BeatSeconds = 2.5f, PlateRadius = 7f, PlateSize = 1.6f, OnPlate = 1.8f, ChainMin = 9f, ChainHint = 10.2f,
             WeightRadius = 3.2f, WeightSize = 1.2f;
         public const int OverSoakDamage = 60, FirstBeat = 2;
         public static readonly string[] DutyNames = { "SOAK", "CHAIN", "WEIGHT L", "WEIGHT R" };
 
+        // Beat is the dial position of the next beat (its hand angle and duties). It steps +1 per beat, or −1 while the
+        // escapement runs back: after each run of Runs[i] beats the hand reverses ("REWIND"), and everyone retraces their
+        // route beat by beat (each hop is one they just made, backwards). The HUD warns a beat ahead.
         public int Beat { get; private set; } = FirstBeat;   // the next beat to resolve
+        public int LastBeat { get; private set; } = FirstBeat - 1;   // the dial position of the beat that just resolved
+        public int Dir { get; private set; } = 1;
+        static readonly int[] Runs = { 7, 4, 6, 3, 8, 5 };
+        int runIndex, runLeft = Runs[0];
+        public int Reversals { get; private set; }
         public int NextBeatTick { get; private set; } = -1;
         public int Beats { get; private set; }               // resolved this fight (tests)
         public int BeatsClean { get; private set; }
         public readonly List<string> Fails = new List<string>();
         bool stop;
+
+        // the dial position k beats after the next one (0 = Beat), following the rewind schedule
+        public int BeatAhead(int k)
+        {
+            int b = Beat, dir = Dir, left = runLeft, idx = runIndex;
+            for (int i = 0; i < k; i++)
+            {
+                if (--left == 0) { dir = -dir; idx = (idx + 1) % Runs.Length; left = Runs[idx]; }
+                b += dir;
+            }
+            return b;
+        }
+        public bool RewindAfterNext => runLeft == 1;   // the beat after the next one turns back
+        void Advance()
+        {
+            LastBeat = Beat;
+            if (--runLeft == 0) { Dir = -Dir; runIndex = (runIndex + 1) % Runs.Length; runLeft = Runs[runIndex]; Reversals++; Boss.PlanLog.Add((Now, "relay rewind")); }
+            Beat += Dir;
+        }
 
         public override UltCue DefaultCue() => new UltCue { Variant = "practice", At = new[] { 4f } };
         public void StopAfterBeat() => stop = true;
@@ -79,7 +106,7 @@ namespace LastBell.Run
             {
                 while (Now < NextBeatTick) { Present(); yield return 1; }
                 Resolve(Beat);
-                Beat++; Beats++;
+                Advance(); Beats++;
                 NextBeatTick += Sim.Ticks(BeatSeconds);
                 if (stop) break;
                 ShowBeat(false);
@@ -169,7 +196,7 @@ namespace LastBell.Run
         {
             if (!Running || NextBeatTick < 0 || p == null) return null;
             float left = (NextBeatTick - Now) / (float)Sim.Hz; int d = DutyOf(p, Beat); if (d < 0) return null;
-            return $"beat in {Mathf.Max(0, left):0.0}s · you ({UltimateState.Roman[HourOf(p)]}): {DutyNames[d]} · then {DutyNames[DutyOf(p, Beat + 1)]}";
+            return $"beat in {Mathf.Max(0, left):0.0}s · you ({UltimateState.Roman[HourOf(p)]}): {DutyNames[d]} · then {DutyNames[DutyOf(p, BeatAhead(1))]}" + (RewindAfterNext ? "   ·   REWIND after this beat" : Dir < 0 ? "   ·   rewinding" : "");
         }
 
         // ---------------- presentation (stand-ins: brass plates, the hour hand, ivory ✕ and the 9 m chain line) ----------------
@@ -265,6 +292,6 @@ namespace LastBell.Run
             if (Boss?.Ult != null) foreach (var kv in Ult.All) kv.Value.Note = null;
         }
         // a new fight starts the beat count over (the encounter calls Cancel on restart too, but keeps counters for tests)
-        public void ResetBeats() { Beat = FirstBeat; Beats = 0; BeatsClean = 0; Fails.Clear(); }
+        public void ResetBeats() { Beat = FirstBeat; LastBeat = FirstBeat - 1; Dir = 1; runIndex = 0; runLeft = Runs[0]; Reversals = 0; Beats = 0; BeatsClean = 0; Fails.Clear(); }
     }
 }

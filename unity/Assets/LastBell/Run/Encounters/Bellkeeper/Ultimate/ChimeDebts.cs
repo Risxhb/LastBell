@@ -6,12 +6,14 @@ namespace LastBell.Run
 {
     // Chime Debts (`bellkeeper.ult_chime_debts`), Bellkeeper Ultimate v2 — proposal, card 02 as changed for P1, built
     // 2026-10-24, not human-approved. Each player's debt comes due on their next relay SOAK beat after the round opens (the
-    // timer shows over the head): on that tick a porcelain debt ring (r 2.5 m) is left on the plate they soak. 6 s later
-    // (two beats, on the beat) it detonates: the ring and a 2 m chime line toward the boss, stopping 4 m short of him, 999
-    // each (a one-shot: the dead player's next duty goes empty, so one missed debt costs the run). Until 1.5 s before, ring
-    // and line are ivory memory outlines; then they become the live coral telegraph. Nothing is unavoidable: every route
-    // holds a clear spot on the beat (the debt ring sits where that beat's chain holder would stand, so they step round it). (Card 02 paid on a numeral and dealt 60; a debt paid on a ✕ beside the boss closed
-    // the crossing lane round him, so P1 pays on the plate, and 60 did not cost the run.)
+    // timer shows over the head): on that tick a porcelain debt ring (r 2.5 m) is left on the plate they soak. Two beats
+    // later, on the beat, it detonates: the ring and a 2 m chime line toward the boss, stopping 4 m short of him, 999 each
+    // (a one-shot: the dead player's next duty goes empty, so one missed debt costs the run). Ring and line show as ivory
+    // outlines for 2 s only; then they are a memory until they strike (no coral telegraph). Nothing is unavoidable: every
+    // beat holds a clear spot (the ring sits where that beat's chain holder would stand, so they step round it), and a relay
+    // REWIND that brings the dial back onto the beat a debt was paid on erases it (its owner would be soaking on the ring).
+    // (Card 02 paid on a numeral, dealt 60 and stayed visible; a debt paid on a ✕ beside the boss closed the crossing lane
+    // round him, 60 did not cost the run, and a visible ring was dodged by bots that skipped the memory.)
     // Cue: At[0] = the round opens (s after launch). Without a running relay (practice): At = pay times of hours I..IV.
     // 5-8 players: both holders of an hour soak together, so they pay together.
     public sealed class ChimeDebts : UltimateMechanic
@@ -20,17 +22,20 @@ namespace LastBell.Run
         public override string Name => "Chime Debts";
 
         public const string Source = "Chime Debt";
-        public const float RingRadius = 2.5f, LineWidth = 2f, DetonateSeconds = 6f, LiveSeconds = 1.5f, TimerShown = 6f,
+        public const float RingRadius = 2.5f, LineWidth = 2f, ShownSeconds = 2f, TimerShown = 6f,
             LineStop = 4f;   // the chime line stops 4 m from the boss: the ring round him (the relay's ✕ at 3.2 m) stays a lane for crossing
+        public const int DetonateBeats = 2;
+        public static float DetonateSeconds => DetonateBeats * EscapementRelay.BeatSeconds;
         public const int Damage = UltimateState.Lethal;   // card 02 had 60 (two hits kill); lethal since 2026-10-24: a 60 hit did not cost the run
 
         sealed class Debt
         {
-            public PlayerController Owner; public int PayTick, DetTick; public bool Paid, Live, Done;
+            public PlayerController Owner; public int PayTick, DetTick; public bool Paid, Done, Erased;
             public Hazard Ring, Line; public BellkeeperFx.Telegraph RingOutline, LineOutline;
         }
         readonly List<Debt> debts = new List<Debt>();
         public int Detonated { get; private set; }
+        public int Erased { get; private set; }
 
         public override UltCue DefaultCue() => new UltCue { Variant = "practice", At = new[] { 6f, 9, 12, 15 } };
 
@@ -42,19 +47,20 @@ namespace LastBell.Run
             var relay = Boss.UltRelay;
             foreach (var p in W.Players)
             {
-                int pay = -1;
+                int pay = -1; bool erased = false;
                 if (relay != null && relay.Running && relay.NextBeatTick >= 0)
                 {
-                    // the first relay beat at or after the round opens on which this player soaks
+                    // the first relay beat at or after the round opens on which this player soaks; a rewind that brings the
+                    // dial back onto that beat when the debt falls due erases it (its owner would be soaking on the ring)
                     int open = TickAt(Cue.At0(0)), beatTicks = Sim.Ticks(EscapementRelay.BeatSeconds);
-                    for (int k = 0; k < 8 && pay < 0; k++)
+                    for (int k = 0; k < 12 && pay < 0; k++)
                     {
                         int t = relay.NextBeatTick + k * beatTicks;
-                        if (t >= open && relay.DutyOf(p, relay.Beat + k) == 0) pay = t;
+                        if (t >= open && relay.DutyOf(p, relay.BeatAhead(k)) == 0) { pay = t; erased = relay.BeatAhead(k + DetonateBeats) == relay.BeatAhead(k); }
                     }
                 }
                 else { int h = Hour(p); if (h >= 1 && h <= at.Length) pay = TickAt(at[h - 1]); }
-                if (pay >= 0) debts.Add(new Debt { Owner = p, PayTick = pay, DetTick = pay + Sim.Ticks(DetonateSeconds) });
+                if (pay >= 0) debts.Add(new Debt { Owner = p, PayTick = pay, DetTick = pay + Sim.Ticks(DetonateSeconds), Erased = erased });
             }
             while (true)
             {
@@ -63,8 +69,13 @@ namespace LastBell.Run
                 {
                     if (d.Done) continue; open = true;
                     if (!d.Paid && Now >= d.PayTick) Pay(d);
-                    if (d.Paid && !d.Live && Now >= d.DetTick - Sim.Ticks(LiveSeconds)) GoLive(d);
-                    if (d.Live && Now >= d.DetTick) { d.Done = true; Detonated++; }
+                    if (d.Paid && d.RingOutline != null && Now >= d.PayTick + Sim.Ticks(ShownSeconds)) Fade(d);   // from here on it is a memory
+                    if (d.Paid && Now >= d.DetTick)
+                    {
+                        d.Done = true; Fade(d);
+                        if (d.Erased) { Erased++; W.BossFx.ChimeResolve(d.Ring.Origin, 0.8f); Boss.PlanLog.Add((Now, "debt erased by the rewind")); }
+                        else Detonated++;
+                    }
                 }
                 Notes();
                 if (!open) break;
@@ -80,31 +91,28 @@ namespace LastBell.Run
             d.Paid = true;
             if (d.Owner.Down) { d.Done = true; return; }
             var at = Sim.Flat(d.Owner.transform.position);
-            d.Ring = new Hazard { Source = Source, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = at, Radius = RingRadius, LockAt = 0, Damage = Damage };
+            int left = d.DetTick - Now;
+            d.Ring = new Hazard { Source = Source, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = at, Radius = RingRadius, LockAt = 0, ResolveAt = UltShapes.ResolveIn(left), Damage = Damage, Hidden = true };
             var toBoss = Sim.Flat(Boss.transform.position) - at; float len = Mathf.Max(0.5f, toBoss.magnitude - LineStop);
-            d.Line = new Hazard { Source = Source + " line", Shape = HazardShape.Lane, Kind = HazardKind.Ground, Origin = at, Yaw = Quaternion.LookRotation(toBoss.sqrMagnitude > 1e-4f ? toBoss : Vector3.forward).eulerAngles.y, Length = len, Width = LineWidth, LockAt = 0, Damage = Damage };
+            d.Line = new Hazard { Source = Source + " line", Shape = HazardShape.Lane, Kind = HazardKind.Ground, Origin = at, Yaw = Quaternion.LookRotation(toBoss.sqrMagnitude > 1e-4f ? toBoss : Vector3.forward).eulerAngles.y, Length = len, Width = LineWidth, LockAt = 0, ResolveAt = UltShapes.ResolveIn(left), Damage = Damage, Hidden = true };
             d.RingOutline = Ult.Outline(UltimateState.Footprint.Of(d.Ring, Now));
             d.LineOutline = Ult.Outline(UltimateState.Footprint.Of(d.Line, Now));
             W.BossFx.ChimeResolve(at, 1.2f);
-            Boss.PlanLog.Add((Now, $"debt {UltimateState.Roman[Hour(d.Owner)]} paid"));
-        }
-        void GoLive(Debt d)
-        {
-            d.Live = true;
-            d.RingOutline?.Dismiss(); d.LineOutline?.Dismiss(); d.RingOutline = d.LineOutline = null;
-            int left = d.DetTick - Now;
-            d.Ring.ResolveAt = UltShapes.ResolveIn(left); d.Line.ResolveAt = UltShapes.ResolveIn(left);
+            Boss.PlanLog.Add((Now, $"debt {UltimateState.Roman[Hour(d.Owner)]} paid" + (d.Erased ? " (a rewind will erase it)" : "")));
+            if (d.Erased) return;
+            // no floor telegraph after the first 2 s: the ring and its line are memories until they strike
             var ring = Spawn(d.Ring); Spawn(d.Line);
             ring.OnResolve = hz => { W.BossFx.ChimeResolve(hz.Origin, hz.Radius); W.BossFx.TollResolve(hz.Origin, 0.4f, hz.Radius); };
         }
+        void Fade(Debt d) { d.RingOutline?.Dismiss(); d.LineOutline?.Dismiss(); d.RingOutline = d.LineOutline = null; }
 
-        // the guide: never be inside a paid debt's ring or line when it detonates (a memory until it turns coral)
+        // the guide: never be inside a paid debt's ring or line when it detonates (a memory: it shows for 2 s only)
         public override void Demands(PlayerController p, List<BotDemand> into)
         {
             if (!Running) return;
             foreach (var d in debts)
             {
-                if (!d.Paid || d.Done || d.Ring == null || d.Live) continue;   // live: the hazard itself is the rule
+                if (!d.Paid || d.Done || d.Ring == null || d.Erased) continue;
                 var ring = d.Ring; var line = d.Line;
                 into.Add(new BotDemand
                 {
