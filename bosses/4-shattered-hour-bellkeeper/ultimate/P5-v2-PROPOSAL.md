@@ -82,6 +82,6 @@ run.
 1. **Solo and duo.** Plate and INVERTED name an hour. With fewer than 4 players, does one player take every hour, or
    do the hours fold onto who's there (as in P1–P4)? Is this still "no phase changes"?
 2. The enrage is now tight (a perfect kill at about 47 s, XIII at 48.5 s). Is that right once real players have mechanics in hand?
-4. The transitions use 50-damage bullets and shards. Do potions refill before P5? (Rule: potions carry between
+3. The transitions use 50-damage bullets and shards. Do potions refill before P5? (Rule: potions carry between
    minibosses; P5 is inside one fight.)
-5. Unity: none of this is built yet. P4 (`GearFloor.cs`) is the latest built phase.
+4. Unity: none of this is built yet. P4 (`GearFloor.cs`) is the latest built phase.
