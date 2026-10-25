@@ -56,14 +56,43 @@ namespace LastBell.Run
             }
         }
 
-        // watch = live in the window at real speed (no capture): the full P1 attempt plus 4 s of the outcome
-        IEnumerator UltP1V2Video(bool watch = false, UltimateBot.Skill skill = UltimateBot.Skill.Perfect, string label = "perfect")
+        // -lastbellTestAbility bots_p2v2: P2 Broken Hour from its practice start, and a full v2 attempt (P1 then P2)
+        IEnumerator UltP2V2Checks()
         {
-            yield return UltStart(null, "P1");
+            Note("---------- Ultimate v2 · P2 Broken Hour (proposal) ----------");
+            var runs = new (string label, int n, UltimateBot.Skill skill, string seg, bool must)[]
+            {
+                ("v2 P2 party4 perfect", 4, UltimateBot.Skill.Perfect, "P2", true),
+                ("v2 P1+P2 party4 perfect", 4, UltimateBot.Skill.Perfect, "P1", true),
+                ("v2 P2 party8 perfect", 8, UltimateBot.Skill.Perfect, "P2", false),
+                ("v2 P2 trio perfect", 3, UltimateBot.Skill.Perfect, "P2", false),
+                ("v2 P2 party4 late", 4, UltimateBot.Skill.Late, "P2", false),
+                ("v2 P2 party4 miss", 4, UltimateBot.Skill.Miss, "P2", false),
+            };
+            foreach (var r in runs)
+            {
+                yield return UltRun(r.label, r.n, r.skill, r.seg, 330, "Vanguard");
+                if (ultLast == null || bk == null) continue;
+                var bh = bk.UltBroken; int taken = bkHits.Sum(h => h.Damage);
+                Note($"   broken hour {bh.BeatsClean}/{bh.Beats} clean · passes {bh.Passes} · damage taken {taken} ({string.Join(", ", bkHits.GroupBy(h => h.Source).Select(g => g.Key + " " + g.Sum(h => h.Damage)))})" + (bh.Fails.Count > 0 ? " · fails: " + string.Join("; ", bh.Fails.Take(5)) : ""));
+                Note("   dealt: " + string.Join(", ", d.World.Players.Select(p => $"{p.ClassName} {(d.World.DealtBy.TryGetValue(p, out int v) ? v : 0)}")));
+                if (r.must)
+                {
+                    Check($"{r.label}: clears", ultLast.Killed, ultLast.ToString());
+                    Check($"{r.label}: 0 damage taken, 0 potions", taken == 0 && ultLast.Potions == 0, $"damage {taken}, potions {ultLast.Potions}");
+                    Check($"{r.label}: every Broken Hour beat clean", bh.Beats >= 20 && bh.BeatsClean == bh.Beats, $"{bh.BeatsClean}/{bh.Beats}");
+                }
+            }
+        }
+
+        // watch = live in the window at real speed (no capture): the full P1 attempt plus 4 s of the outcome
+        IEnumerator UltP1V2Video(bool watch = false, UltimateBot.Skill skill = UltimateBot.Skill.Perfect, string label = "perfect", string seg = "P1")
+        {
+            yield return UltStart(null, seg);
             if (bk == null) yield break;
             var bots = UltimateParty.Fill(d.World, 4, skill, PartyClasses);
             foreach (var b in bots) b.Speed = PlayerController.WalkSpeed;
-            var cdir = System.IO.Path.Combine(dir, "clip_p1v2"); if (!watch) System.IO.Directory.CreateDirectory(cdir);
+            var cdir = System.IO.Path.Combine(dir, "clip_" + seg.ToLowerInvariant() + "v2"); if (!watch) System.IO.Directory.CreateDirectory(cdir);
             bkHits.Clear();
             // the whole dial from above, north up (the game's chase camera shows only a corner of it)
             var game = Camera.main; Camera over = null;
@@ -95,16 +124,18 @@ namespace LastBell.Run
             if (over) Destroy(over.gameObject);
             if (game) game.enabled = true;
             var relay = boss.UltRelay;
-            Note($"{(watch ? "watched" : "clip")} p1v2 {label}: {(boss.Dead ? "CLEAR" : "WIPE (" + (boss.Ult.WipeCause ?? d.World.LastDamageSource) + ")")} after {Time.unscaledTime - t0:0}s · relay {relay.BeatsClean}/{relay.Beats} clean · debts detonated {boss.Mechanic<ChimeDebts>().Detonated} · damage taken {bkHits.Sum(h => h.Damage)}");
+            var broken = boss.UltBroken;
+            Note($"broken hour {broken.BeatsClean}/{broken.Beats} clean · passes {broken.Passes}" + (broken.Fails.Count > 0 ? " · fails: " + string.Join("; ", broken.Fails.Take(4)) : ""));
+            Note($"{(watch ? "watched" : "clip")} {seg.ToLowerInvariant()}v2 {label}: {(boss.Dead ? "CLEAR" : "WIPE (" + (boss.Ult.WipeCause ?? d.World.LastDamageSource) + ")")} after {Time.unscaledTime - t0:0}s · relay {relay.BeatsClean}/{relay.Beats} clean · debts detonated {boss.Mechanic<ChimeDebts>().Detonated} · damage taken {bkHits.Sum(h => h.Damage)}");
             d.SetPaused(true); if (!boss.Dead) boss.Halt();
         }
 
         // -lastbellTestAbility bots_p1v2_watch: three live attempts in the window: perfect, Miss (forgets the first debts), Late
-        IEnumerator UltP1V2Watch()
+        IEnumerator UltP1V2Watch(string seg = "P1")
         {
-            yield return UltP1V2Video(true, UltimateBot.Skill.Perfect, "perfect");
-            yield return UltP1V2Video(true, UltimateBot.Skill.Miss, "miss");
-            yield return UltP1V2Video(true, UltimateBot.Skill.Late, "late");
+            yield return UltP1V2Video(true, UltimateBot.Skill.Perfect, "perfect", seg);
+            yield return UltP1V2Video(true, UltimateBot.Skill.Miss, "miss", seg);
+            yield return UltP1V2Video(true, UltimateBot.Skill.Late, "late", seg);
         }
     }
 }
