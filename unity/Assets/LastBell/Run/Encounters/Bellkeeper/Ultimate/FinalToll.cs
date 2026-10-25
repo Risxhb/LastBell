@@ -445,7 +445,7 @@ namespace LastBell.Run
             float t = T; int k = Cur(t) + 1, h = HourOf(p);
             if (k >= 13) return $"XIII in {NextAt(k) - t:0.0}s: kill the boss or the hour completes";
             string job = Has(k, 0) && Soaker(k) == h ? "you SOAK the plate" : Has(k, 2) && InvHour(k) == h ? "you are INVERTED: stand inside the slam" : Has(k, 2) ? "stay out of the slam" : "dodge";
-            return $"toll {UltimateState.Roman[k]} in {NextAt(k) - t:0.0}s · you ({UltimateState.Roman[h + 1]}): through gap {UltimateState.Roman[h + 1]} · {job} · hits ring the bell: x2";
+            return $"toll {UltimateState.Roman[k]} in {NextAt(k) - t:0.0}s · you ({UltimateState.Roman[h + 1]}): through gap {UltimateState.Roman[h + 1]} · {job} · hits ring the bell: x{BellkeeperEncounter.V2P5Resonance:0.##}";
         }
 
         public override void Cancel() { base.Cancel(); bullets.Clear(); debts.Clear(); Teardown(); }
