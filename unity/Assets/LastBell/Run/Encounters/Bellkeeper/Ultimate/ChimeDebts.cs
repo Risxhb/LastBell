@@ -6,12 +6,13 @@ namespace LastBell.Run
 {
     // Chime Debts (`bellkeeper.ult_chime_debts`), Bellkeeper Ultimate v2 — proposal, card 02 as changed for P1, built
     // 2026-10-24, not human-approved. Each player's debt comes due on their next relay SOAK beat after the round opens (the
-    // timer shows over the head): on that tick a porcelain debt ring (r 2.5 m) is left on the plate they soak. Two beats
+    // timer shows over the head): on that tick a porcelain debt ring (r 3.6 m) is left on the plate they soak. One beat
     // later, on the beat, it detonates: the ring and a 2 m chime line toward the boss, stopping 4 m short of him, 999 each
     // (a one-shot: the dead player's next duty goes empty, so one missed debt costs the run). Ring and line show as ivory
-    // outlines for 2 s only; then they are a memory until they strike (no coral telegraph). Nothing is unavoidable: every
-    // beat holds a clear spot (the ring sits where that beat's chain holder would stand, so they step round it), and a relay
-    // REWIND that brings the dial back onto the beat a debt was paid on erases it (its owner would be soaking on the ring).
+    // outlines for 1.5 s only; then they are a memory until they strike (no coral telegraph). On that beat the ring covers
+    // the counterweight ✕ on its side of the dial all but its boss side: the weight holder there must stand on the inner
+    // edge of the ✕ (r 2.0-3.1), so forgetting the debt kills them. Nothing is unavoidable: every other duty spot is clear.
+    // (A relay REWIND that brought the dial back onto the beat a debt was paid on would erase it; at one beat it can't.)
     // (Card 02 paid on a numeral, dealt 60 and stayed visible; a debt paid on a ✕ beside the boss closed the crossing lane
     // round him, 60 did not cost the run, and a visible ring was dodged by bots that skipped the memory.)
     // Cue: At[0] = the round opens (s after launch). Without a running relay (practice): At = pay times of hours I..IV.
@@ -22,9 +23,10 @@ namespace LastBell.Run
         public override string Name => "Chime Debts";
 
         public const string Source = "Chime Debt";
-        public const float RingRadius = 2.5f, LineWidth = 2f, ShownSeconds = 2f, TimerShown = 6f,
+        public const float RingRadius = 3.6f,   // on its beat it covers the ✕ beside it (r 3.2) all but its boss side: forget it and that weight holder dies
+            LineWidth = 2f, ShownSeconds = 1.5f, TimerShown = 6f,
             LineStop = 4f;   // the chime line stops 4 m from the boss: the ring round him (the relay's ✕ at 3.2 m) stays a lane for crossing
-        public const int DetonateBeats = 2;
+        public const int DetonateBeats = 1;
         public static float DetonateSeconds => DetonateBeats * EscapementRelay.BeatSeconds;
         public const int Damage = UltimateState.Lethal;   // card 02 had 60 (two hits kill); lethal since 2026-10-24: a 60 hit did not cost the run
 
@@ -36,6 +38,7 @@ namespace LastBell.Run
         readonly List<Debt> debts = new List<Debt>();
         public int Detonated { get; private set; }
         public int Erased { get; private set; }
+        public static bool LogDetonations;   // tests: who stood where at each detonation
 
         public override UltCue DefaultCue() => new UltCue { Variant = "practice", At = new[] { 6f, 9, 12, 15 } };
 
@@ -74,7 +77,13 @@ namespace LastBell.Run
                     {
                         d.Done = true; Fade(d);
                         if (d.Erased) { Erased++; W.BossFx.ChimeResolve(d.Ring.Origin, 0.8f); Boss.PlanLog.Add((Now, "debt erased by the rewind")); }
-                        else Detonated++;
+                        else
+                        {
+                            Detonated++;
+                            if (LogDetonations)
+                                Debug.Log($"[debt] {UltimateState.Roman[Hour(d.Owner)]} at ({d.Ring.Origin.x:0.0},{d.Ring.Origin.z:0.0}) detonates · " + string.Join(" · ", W.Players.ConvertAll(p =>
+                                    $"{UltimateState.Roman[Hour(p)]} ({p.transform.position.x:0.0},{p.transform.position.z:0.0}){(d.Ring.Contains(p.transform.position) || d.Line.Contains(p.transform.position) ? " IN" : "")}")));
+                        }
                     }
                 }
                 Notes();
@@ -91,6 +100,8 @@ namespace LastBell.Run
             d.Paid = true;
             if (d.Owner.Down) { d.Done = true; return; }
             var at = Sim.Flat(d.Owner.transform.position);
+            // the ring is the plate's own: centred on the plate, wherever on it the owner stands (so the ✕ beside it always keeps its inner edge clear)
+            for (int i = 0; i < 4; i++) { var plate = EscapementRelay.PlanDir(90 * i) * EscapementRelay.PlateRadius; if ((plate - at).magnitude <= EscapementRelay.OnPlate + 0.5f) at = plate; }
             int left = d.DetTick - Now;
             d.Ring = new Hazard { Source = Source, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = at, Radius = RingRadius, LockAt = 0, ResolveAt = UltShapes.ResolveIn(left), Damage = Damage, Hidden = true };
             var toBoss = Sim.Flat(Boss.transform.position) - at; float len = Mathf.Max(0.5f, toBoss.magnitude - LineStop);
@@ -117,7 +128,7 @@ namespace LastBell.Run
                 into.Add(new BotDemand
                 {
                     Tick = d.DetTick, Since = d.PayTick, Memory = true, From = this, Why = "debt " + UltimateState.Roman[Hour(d.Owner)],
-                    Hint = ring.Origin + Sim.Flat(ring.Origin).normalized * (RingRadius + 1f),
+                    Hint = Sim.Flat(ring.Origin).normalized * 2.6f,   // the safe inner edge of the ✕ the ring covers
                     Ok = q => !ring.Contains(q) && !line.Contains(q),
                 });
             }

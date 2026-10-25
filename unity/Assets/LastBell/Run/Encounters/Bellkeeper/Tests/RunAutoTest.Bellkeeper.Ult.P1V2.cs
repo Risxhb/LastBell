@@ -24,6 +24,7 @@ namespace LastBell.Run
                 ("v2 P1 party4 late", 4, UltimateBot.Skill.Late, false),
                 ("v2 P1 party4 miss", 4, UltimateBot.Skill.Miss, false),
             };
+            ChimeDebts.LogDetonations = true;
             foreach (var r in runs)
             {
                 int start = -1;
