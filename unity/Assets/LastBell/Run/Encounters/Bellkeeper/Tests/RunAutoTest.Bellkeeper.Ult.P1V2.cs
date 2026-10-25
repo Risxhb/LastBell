@@ -127,6 +127,37 @@ namespace LastBell.Run
                     Check($"{r.label}: 0 damage taken, 0 potions", taken == 0 && ultLast.Potions == 0, $"damage {taken}, potions {ultLast.Potions}");
                 }
             }
+            BellkeeperEncounter.V2StopAfterP4 = false;
+        }
+
+        // -lastbellTestAbility bots_p5v2: P5 Final Toll from its practice start (sizes and skills), and the full v2 fight
+        IEnumerator UltP5V2Checks()
+        {
+            Note("---------- Ultimate v2 · P5 Final Toll (proposal) ----------");
+            var runs = new (string label, int n, UltimateBot.Skill skill, string seg, bool must)[]
+            {
+                ("v2 P5 party4 perfect", 4, UltimateBot.Skill.Perfect, "P5", true),
+                ("v2 P1-P5 party4 perfect", 4, UltimateBot.Skill.Perfect, "P1", false),
+                ("v2 P5 party8 perfect", 8, UltimateBot.Skill.Perfect, "P5", false),
+                ("v2 P5 trio perfect", 3, UltimateBot.Skill.Perfect, "P5", false),
+                ("v2 P5 party4 late", 4, UltimateBot.Skill.Late, "P5", false),
+                ("v2 P5 party4 miss", 4, UltimateBot.Skill.Miss, "P5", false),
+            };
+            foreach (var r in runs)
+            {
+                FinalToll.Log = r.seg == "P5";
+                yield return UltRun(r.label, r.n, r.skill, r.seg, 600, "Vanguard");
+                FinalToll.Log = false;
+                if (ultLast == null || bk == null) continue;
+                var ft = bk.UltFinal; int taken = bkHits.Sum(h => h.Damage);
+                Note($"   final toll tolls {ft.Tolls} · damage taken {taken} ({string.Join(", ", bkHits.GroupBy(h => h.Source).Select(g => g.Key + " " + g.Sum(h => h.Damage)))})" + (ft.Fails.Count > 0 ? " · " + string.Join("; ", ft.Fails.Take(8)) : ""));
+                Note("   dealt: " + string.Join(", ", d.World.Players.Select(p => $"{p.ClassName} {(d.World.DealtBy.TryGetValue(p, out int v) ? v : 0)}")));
+                if (r.must)
+                {
+                    Check($"{r.label}: kills before XIII", ultLast.Killed, ultLast.ToString());
+                    Check($"{r.label}: 0 damage taken, 0 potions", taken == 0 && ultLast.Potions == 0, $"damage {taken}, potions {ultLast.Potions}");
+                }
+            }
         }
 
         // -lastbellTestAbility bots_p4v2: P4 The Gear Floor from its practice start (sizes and skills), and the full v2 attempt
@@ -142,6 +173,7 @@ namespace LastBell.Run
                 ("v2 P4 party4 late", 4, UltimateBot.Skill.Late, "P4", false),
                 ("v2 P4 party4 miss", 4, UltimateBot.Skill.Miss, "P4", false),
             };
+            BellkeeperEncounter.V2StopAfterP4 = true;
             foreach (var r in runs)
             {
                 GearFloor.Log = r.seg == "P4";

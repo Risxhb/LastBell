@@ -82,6 +82,7 @@ namespace LastBell.Run
         public int TakeHit(int damage, Vector3 contact)
         {
             if (Dead) return 0;
+            damage = Mathf.RoundToInt(damage * DamageTakenScale);
             int floor = ignoreFloor ? 0 : Mathf.Clamp(HpFloor, 0, Hp);
             int dealt = Mathf.Min(damage, Hp - floor);
             Hp -= dealt;
@@ -97,6 +98,8 @@ namespace LastBell.Run
         // Damage can't take Hp below this until the boss lowers it (the Bellkeeper Ultimate holds each phase's threshold
         // until its transition, so a phase can't be skipped). 0 = no floor. DebugDefeat ignores it.
         protected virtual int HpFloor => 0;
+        // multiplies every hit this boss takes (the Bellkeeper Ultimate's P5: inside the great bell every hit rings it, x2)
+        protected virtual float DamageTakenScale => 1f;
         bool ignoreFloor;
         public virtual float NextPhaseFraction() => Hp > MaxHp * 0.7f ? 0.69f : 0.34f;   // F8: just below the next threshold
         public void DebugSetHpFraction(float f){ if (!Dead) Hp = Mathf.Clamp(Mathf.RoundToInt(MaxHp * f), 1, MaxHp); }

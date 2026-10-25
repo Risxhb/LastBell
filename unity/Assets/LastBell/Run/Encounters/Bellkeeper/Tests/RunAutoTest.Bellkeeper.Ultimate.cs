@@ -25,7 +25,7 @@ namespace LastBell.Run
         {
             Note("---------- Bellkeeper Ultimate (proposal) ----------");
             // the v1 checks play the v1 fight; the v2 slice checks play v2
-            BellkeeperEncounter.V2Override = BkFilter != null && (BkFilter.StartsWith("bots_p1v2") || BkFilter.StartsWith("bots_p2v2") || BkFilter.StartsWith("bots_p3v2") || BkFilter.StartsWith("bots_p4v2"));
+            BellkeeperEncounter.V2Override = BkFilter != null && (BkFilter.StartsWith("bots_p1v2") || BkFilter.StartsWith("bots_p2v2") || BkFilter.StartsWith("bots_p3v2") || BkFilter.StartsWith("bots_p4v2") || BkFilter.StartsWith("bots_p5v2"));
             if (UltWants("scaffold")) yield return UltScaffoldChecks();
             if (UltWants(UltimateMechanics.PendulumClocks)) yield return UltPendulumClocksChecks();
             if (UltWants(UltimateMechanics.StoppedHour)) yield return UltStoppedHourChecks();
@@ -51,6 +51,9 @@ namespace LastBell.Run
             if (UltWants("bots_p4v2")) yield return UltP4V2Checks();
             if (UltWants("bots_p4v2_video")) yield return UltP1V2Video(false, UltimateBot.Skill.Perfect, "perfect", "P4");
             if (UltWants("bots_p4v2_watch")) yield return UltP1V2Watch("P4");
+            if (UltWants("bots_p5v2")) yield return UltP5V2Checks();
+            if (UltWants("bots_p5v2_video")) yield return UltP1V2Video(false, UltimateBot.Skill.Perfect, "perfect", "P5");
+            if (UltWants("bots_p5v2_watch")) yield return UltP1V2Watch("P5");
             if (UltWants("bots_p3v2_video")) yield return UltP1V2Video(false, UltimateBot.Skill.Perfect, "perfect", "P3");
             if (UltWants("bots_p3v2_watch")) yield return UltP1V2Watch("P3");
             if (UltWants("bots_p2v2_video")) yield return UltP1V2Video(false, UltimateBot.Skill.Perfect, "perfect", "P2");
@@ -131,8 +134,8 @@ namespace LastBell.Run
             yield return UltStart();
             if (bk == null) yield break;
             var keys = bk.Abilities.Select(a => a.Key).ToList();
-            Check("Ultimate: builds the reworked v2 moves and the fifteen mechanics (ten v1, five v2), unique keys",
-                  keys.Count == 18 && keys.Distinct().Count() == 18 && keys.Contains("leaning_bell") && keys.Contains("toll_tide") && keys.Contains("reflection")
+            Check("Ultimate: builds the reworked v2 moves and the sixteen mechanics (ten v1, six v2), unique keys",
+                  keys.Count == 19 && keys.Distinct().Count() == 19 && keys.Contains("leaning_bell") && keys.Contains("toll_tide") && keys.Contains("reflection")
                   && !keys.Contains("striking_order") && UltimateMechanics.Ids.All(id => keys.Contains(BellkeeperAbilities.Normalize(id))), string.Join(", ", keys));
             Note("Ultimate mechanics built: " + string.Join(", ", bk.Mechanics.Select(m => m.Key + (m.Built ? "" : " (stub)"))));
             Check("Ultimate: one tuning (the world runs at Medium)", d.World.Difficulty == Difficulty.Medium);

@@ -74,7 +74,7 @@ namespace LastBell.Run
         LeaningBellAbility uLean; ReflectionAbility uMirror; TollTideAbility uTide;
         PendulumClocks mClocks; StoppedHour mStopped; LedgerMechanic mLedger; BackwardsBell mBackwards; TwoFutures mFutures;
         ConductorsHand mHand; TollingHour mTolling; ThirteenthHour mThirteenth; AreaQuotes mQuotes; FractureOfTime mFracture;
-        EscapementRelay mRelay; ChimeDebts mDebts; BrokenHour mBroken; OpenHour mOpen; GearFloor mGear;
+        EscapementRelay mRelay; ChimeDebts mDebts; BrokenHour mBroken; OpenHour mOpen; GearFloor mGear; FinalToll mFinal;
         public IReadOnlyList<UltimateMechanic> Mechanics { get; private set; } = Array.Empty<UltimateMechanic>();
 
         void BuildUltimate()
@@ -88,7 +88,7 @@ namespace LastBell.Run
             mClocks = Mech<PendulumClocks>(); mStopped = Mech<StoppedHour>(); mLedger = Mech<LedgerMechanic>(); mBackwards = Mech<BackwardsBell>();
             mFutures = Mech<TwoFutures>(); mHand = Mech<ConductorsHand>(); mTolling = Mech<TollingHour>(); mThirteenth = Mech<ThirteenthHour>();
             mQuotes = Mech<AreaQuotes>(); mFracture = Mech<FractureOfTime>();
-            mRelay = Mech<EscapementRelay>(); mDebts = Mech<ChimeDebts>(); mBroken = Mech<BrokenHour>(); mOpen = Mech<OpenHour>(); mGear = Mech<GearFloor>();
+            mRelay = Mech<EscapementRelay>(); mDebts = Mech<ChimeDebts>(); mBroken = Mech<BrokenHour>(); mOpen = Mech<OpenHour>(); mGear = Mech<GearFloor>(); mFinal = Mech<FinalToll>();
             // one tuning (ULTIMATE.md §2): Easy x0.6 / Hard x1.3 don't apply to the Ultimate
             if (W.Difficulty != Difficulty.Medium) { Debug.Log($"Bellkeeper Ultimate: one tuning; the run's {RunDifficulty.Name(W.Difficulty)} becomes Medium for this fight"); W.Difficulty = Difficulty.Medium; }
             W.DealtScale = p => Ult != null && Ult.IsCracked(p) ? 0f : 1f;
@@ -150,13 +150,13 @@ namespace LastBell.Run
         // v2: P2 is 15 % of the bar like P1 (85 % -> 70 %); the v1 numbers otherwise
         static float EndOf(UltSegment s) => UltV2 && s == UltSegment.P2 ? V2P2End : UltV2 && s == UltSegment.P3 ? V2P3End : UltV2 && s == UltSegment.P4 ? V2P4End : SegEnd[(int)s];
         static float FloorOf(UltSegment s) => UltV2 && s == UltSegment.P2 ? V2P2End : UltV2 && s == UltSegment.P3 ? V2P3End : UltV2 && s == UltSegment.P4 ? V2P4End : SegFloor[(int)s];
-        static float StartOf(UltSegment s) => UltV2 && s == UltSegment.P3 ? V2P2End : UltV2 && s == UltSegment.P4 ? V2P3End : SegStart[(int)s];
+        static float StartOf(UltSegment s) => UltV2 && s == UltSegment.P3 ? V2P2End : UltV2 && s == UltSegment.P4 ? V2P3End : UltV2 && s == UltSegment.P5 ? V2P4End : SegStart[(int)s];
 
         // ---------------- the plan ----------------
         IEnumerable<int> UltimatePlan()
         {
             UltPlanActive = true; pushFired = false;
-            Ult.ResetAll(); mRelay.ResetBeats(); mBroken.ResetBeats(); mOpen.ResetCounts(); mGear.ResetCounts();
+            Ult.ResetAll(); mRelay.ResetBeats(); mBroken.ResetBeats(); mOpen.ResetCounts(); mGear.ResetCounts(); mFinal.ResetCounts();
             FitHpToParty();
             var start = IsPractice && RequestedSegment.HasValue ? RequestedSegment.Value : UltSegment.P1;
             if (start != UltSegment.P1) { Hp = Mathf.RoundToInt(MaxHp * StartOf(start)); PlanLog.Add((W.Tick, "practice from " + start)); }
@@ -168,8 +168,8 @@ namespace LastBell.Run
                 foreach (var w in RunSegment(s)) yield return w;
                 // the transition waits for the current moves to finish (rules: no transition mid-telegraph)
                 while (running.Count > 0 || W.Hazards.Count > 0) yield return 1;
-                // v2 slice: P1-P4 are rebuilt; clearing P4 ends the attempt (a win) instead of falling into v1's P5
-                if (UltV2 && s == UltSegment.P4) { PlanLog.Add((W.Tick, "v2 slice: P4 cleared")); DebugDefeat(); while (true) yield return 60; }
+                // tests of P4 alone: clearing P4 ends the attempt (a win) instead of going on into P5
+                if (UltV2 && s == UltSegment.P4 && V2StopAfterP4) { PlanLog.Add((W.Tick, "v2: P4 cleared")); DebugDefeat(); while (true) yield return 60; }
             }
             while (true) yield return 60;   // P5 never ends by itself: the boss dies or the Thirteenth Hour wipes
         }
@@ -202,6 +202,9 @@ namespace LastBell.Run
                     while (!Reached(s) || SecondsInSegment < V2P4MinSeconds) yield return 30;
                     mGear.StopAfterSlam();
                     break;
+                case UltSegment.P5 when UltV2:
+                    UltLaunch(mFinal, C(5, "p5"));   // Final Toll: the boss dies, or toll XIII wipes (the mechanic does it)
+                    while (true) yield return 60;
                 case UltSegment.P3 when UltV2:
                     UltLaunch(mOpen, C(3, "p3"));   // the 60 s bullet-hell pattern, repeated
                     while (!Reached(s) || SecondsInSegment < V2P3MinSeconds) yield return 30;
@@ -288,11 +291,16 @@ namespace LastBell.Run
         public static bool? V2Override;
         public const int V2P1MinLoops = 2;          // P1 shows two debt rounds before it can end (72 s), whatever the DPS
         public const float V2P1Push = 150;          // the P1 push (cards-v2 timeline: P1 0-150 s)
-        float PushFor(UltSegment s) => UltV2 && s == UltSegment.P1 ? V2P1Push : UltV2 && s == UltSegment.P2 ? V2P2Push : UltV2 && s == UltSegment.P3 ? V2P3Push : UltV2 && s == UltSegment.P4 ? V2P4Push : PushSeconds[(int)s];
+        float PushFor(UltSegment s) => UltV2 && s == UltSegment.P1 ? V2P1Push : UltV2 && s == UltSegment.P2 ? V2P2Push : UltV2 && s == UltSegment.P3 ? V2P3Push : UltV2 && s == UltSegment.P4 ? V2P4Push : UltV2 && s == UltSegment.P5 ? 0 : PushSeconds[(int)s];
         public const float V2P2End = 0.70f, V2P2Push = 150, V2P2MinSeconds = 60;   // P2: 15 % of the bar, at least 60 s (20 beats), push 150 s
         public const float V2P3End = 0.55f, V2P3Push = 150, V2P3MinSeconds = 60;   // P3: 70 -> 55 %, at least one 60 s pattern, push 150 s
         public const float V2P4End = 0.35f, V2P4Push = 180, V2P4MinSeconds = 60;   // P4: 55 -> 35 %, at least 8 slams, push 180 s
         public GearFloor UltGear => mGear;
+        public FinalToll UltFinal => mFinal;
+        public static bool V2StopAfterP4;   // tests: P4 checks end at P4
+        // P5 Final Toll (proposal, Chzy18 25 Oct: "Bell resonates x2"): inside the great bell every hit on the boss counts double
+        public const float V2P5Resonance = 2.3f;
+        protected override float DamageTakenScale => Set == AbilitySet.Ultimate && UltV2 && Segment == UltSegment.P5 && mFinal != null && mFinal.Running ? V2P5Resonance : 1f;
         // P4's gear cores are extra bodies: solid, and a hit on one damages the boss
         public override int ExtraBodies => Set == AbilitySet.Ultimate && mGear != null && mGear.Running ? 4 : 0;
         public override void ExtraBody(int i, out Vector3 center, out float radius) { center = GearFloor.Core(i); radius = GearFloor.HubR; }
@@ -409,6 +417,7 @@ namespace LastBell.Run
                 if (relay == null && mBroken != null && W.Players.Count > 0) relay = mBroken.HudText(W.Players[0]);
                 if (relay == null && mOpen != null && W.Players.Count > 0) relay = mOpen.HudText(W.Players[0]);
                 if (relay == null && mGear != null && W.Players.Count > 0) relay = mGear.HudText(W.Players[0]);
+                if (relay == null && mFinal != null && W.Players.Count > 0) relay = mFinal.HudText(W.Players[0]);
                 return "ULTIMATE · " + SegmentNames[(int)Segment] + push + (relay != null ? "\n" + relay : "");
             }
         }
@@ -424,6 +433,7 @@ namespace LastBell.Run
             mBroken?.DrawGui(cam);
             mOpen?.DrawGui(cam);
             mGear?.DrawGui(cam);
+            mFinal?.DrawGui(cam);
             if (glyphStyle == null) glyphStyle = new GUIStyle(GUI.skin.label) { fontSize = 15, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = new Color(0.96f, 0.93f, 0.84f) } };
             foreach (var p in W.Players)
             {
