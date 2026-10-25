@@ -43,6 +43,21 @@ namespace LastBell.Run
             inp.Aim = bpos + Vector3.up * 0.1f;
             int now = w.Tick, react = Mode == Skill.Late ? ReactExtra : 0;
 
+            // v2 P3 (The Open Hour, bullet hell): the mechanic steers (a short route search against every predicted bullet);
+            // the bot only adds basic attacks from range (no lunges or casts that would carry it into a bullet)
+            if (boss.Mechanics != null)
+                foreach (var m in boss.Mechanics)
+                    if (m is OpenHour oh && oh.Running && oh.Steer(me, Mode, out var vel))
+                    {
+                        inp.Move = ToScreen(vel / PlayerController.WalkSpeed);
+                        inp.Sprint = vel.magnitude > PlayerController.WalkSpeed + 0.1f;
+                        float gap = Sim.Flat(bpos - pos).magnitude - boss.BodyRadius;
+                        if (Attacks && me.ClassName != "Vanguard" && gap <= Range(me) + 1f && tick - lastPress >= 6) { inp.P0 = inp.H0 = true; lastPress = tick; }
+                        if (me.Potions > 0 && me.Hp < 55 && me.Hp < PlayerController.MaxHp) inp.Potion = tick % 4 == 0;
+                        DebugLine = $"open hour: {oh.JobOf(me)} v ({vel.x:0.0},{vel.z:0.0}) at ({pos.x:0.0},{pos.z:0.0})";
+                        return inp;
+                    }
+
             // ---- gather the rules ----
             demands.Clear();
             foreach (var h in w.Hazards.Live)

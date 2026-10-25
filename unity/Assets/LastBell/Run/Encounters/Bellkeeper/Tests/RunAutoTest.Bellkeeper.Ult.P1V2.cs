@@ -94,6 +94,41 @@ namespace LastBell.Run
             }
         }
 
+        IEnumerator UltP3V2Dbg()
+        {
+            OpenHour.LogSteer = true;
+            yield return UltRun("v2 P3 party8 perfect", 8, UltimateBot.Skill.Perfect, "P3", 120, "Vanguard");
+            OpenHour.LogSteer = false;
+        }
+
+        // -lastbellTestAbility bots_p3v2: P3 The Open Hour from its practice start (party sizes and skills), and the full v2 attempt
+        IEnumerator UltP3V2Checks()
+        {
+            Note("---------- Ultimate v2 · P3 The Open Hour (proposal) ----------");
+            var runs = new (string label, int n, UltimateBot.Skill skill, string seg, bool must)[]
+            {
+                ("v2 P3 party4 perfect", 4, UltimateBot.Skill.Perfect, "P3", true),
+                ("v2 P1-P3 party4 perfect", 4, UltimateBot.Skill.Perfect, "P1", false),
+                ("v2 P3 party8 perfect", 8, UltimateBot.Skill.Perfect, "P3", false),
+                ("v2 P3 trio perfect", 3, UltimateBot.Skill.Perfect, "P3", false),
+                ("v2 P3 party4 late", 4, UltimateBot.Skill.Late, "P3", false),
+                ("v2 P3 party4 miss", 4, UltimateBot.Skill.Miss, "P3", false),
+            };
+            foreach (var r in runs)
+            {
+                yield return UltRun(r.label, r.n, r.skill, r.seg, 420, "Vanguard");
+                if (ultLast == null || bk == null) continue;
+                var oh = bk.UltOpen; int taken = bkHits.Sum(h => h.Damage);
+                Note($"   open hour plates {oh.BeatsClean}/{oh.Beats} · damage taken {taken} ({string.Join(", ", bkHits.GroupBy(h => h.Source).Select(g => g.Key + " " + g.Sum(h => h.Damage)))})" + (oh.Fails.Count > 0 ? " · " + string.Join("; ", oh.Fails.Take(6)) : ""));
+                Note("   dealt: " + string.Join(", ", d.World.Players.Select(p => $"{p.ClassName} {(d.World.DealtBy.TryGetValue(p, out int v) ? v : 0)}")));
+                if (r.must)
+                {
+                    Check($"{r.label}: clears", ultLast.Killed, ultLast.ToString());
+                    Check($"{r.label}: 0 damage taken, 0 potions", taken == 0 && ultLast.Potions == 0, $"damage {taken}, potions {ultLast.Potions}");
+                }
+            }
+        }
+
         // watch = live in the window at real speed (no capture): the full P1 attempt plus 4 s of the outcome
         IEnumerator UltP1V2Video(bool watch = false, UltimateBot.Skill skill = UltimateBot.Skill.Perfect, string label = "perfect", string seg = "P1")
         {
