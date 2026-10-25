@@ -4,7 +4,7 @@ using UnityEngine;
 namespace LastBell.Run
 {
     // Escapement Relay (`bellkeeper.ult_escapement_relay`), Bellkeeper Ultimate v2 — proposal, card 01 (cards-v2), built
-    // 2026-10-24 as the playable P1 slice, not human-approved.
+    // 2026-10-24 as the playable P1 slice; P1 approved for now by Chzy18 2026-10-24 (ultimate/P1-v2-LOCKED.md).
     // Four brass plates lie on the floor (N/E/S/W, r 7 m) and the escapement's hour hand turns on the boss. Every 2.5 s the
     // hand ticks 90° clockwise and the beat resolves on the plate it points at. Each player holds an hour numeral (I..IV,
     // party order) and every beat a duty from its place in the cycle, (hour − 1 + beat) mod 4:

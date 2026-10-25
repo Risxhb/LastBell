@@ -5,7 +5,7 @@ using UnityEngine;
 namespace LastBell.Run
 {
     // Chime Debts (`bellkeeper.ult_chime_debts`), Bellkeeper Ultimate v2 — proposal, card 02 as changed for P1, built
-    // 2026-10-24, not human-approved. Each player's debt comes due on their next relay SOAK beat after the round opens (the
+    // 2026-10-24; P1 approved for now by Chzy18 2026-10-24 (ultimate/P1-v2-LOCKED.md). Each player's debt comes due on their next relay SOAK beat after the round opens (the
     // timer shows over the head): on that tick a porcelain debt ring (r 3.6 m) is left on the plate they soak. One beat
     // later, on the beat, it detonates: the ring and a 2 m chime line toward the boss, stopping 4 m short of him, 999 each
     // (a one-shot: the dead player's next duty goes empty, so one missed debt costs the run). Ring and line show as ivory
