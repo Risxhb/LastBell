@@ -10,15 +10,16 @@ namespace LastBell.Run
     // party order) and every beat a duty from its place in the cycle, (hour − 1 + beat) mod 4:
     //   SOAK    stand on the plate the hand points at
     //   CHAIN   hold the pendulum chain: ≥ 9 m from the boss on the far half (away from the hand)
-    //   WEIGHT  stand on a counterweight ✕ 3.2 m out (in melee reach), 90° left (L) or right (R) of the hand
-    // The cycle is card 01's, SOAK → WEIGHT R → WEIGHT L → CHAIN → SOAK, so each player travels round the dial with the
+    //   TICK / TOCK  stand on a counterweight ✕ 3.2 m out (in melee reach), 90° clockwise (TICK) or anticlockwise (TOCK) of the hand
+    // The cycle is card 01's, SOAK → TICK → TOCK → CHAIN → SOAK (TICK = the ✕ 90° clockwise of the hand, TOCK = 90° anticlockwise;
+    // renamed from WEIGHT R / L 2026-10-25, Chzy18: "it sounds like left and right but they aren't always in that position"), so each player travels round the dial with the
     // hand: two short hops (✕ to ✕ beside the boss, ✕ out to the chain) and two long ones (plate across the boss to the far
     // ✕, ~11 m; chain round to the next plate, ~12 m) that need a sprint. Nobody can stand still for a beat. (A spoke-only
     // cycle was tried on 2026-10-24 and rejected by Chzy18: players just went back and forth.)
     // Nothing is unavoidable: a perfect beat costs nobody HP. Fails, on the beat tick: plate empty = WIPE; more players on
     // the plate than soakers = 60 to each on it; a chain holder short or on the near half = the pendulum swings through the
     // plate (a 999 lane from the boss over it); a ✕ empty = a 120° cone on that side, 999.
-    // Party sizes: K = min(players, 4) duties; trio SOAK → WEIGHT L → CHAIN, duo SOAK → CHAIN, solo SOAK every beat.
+    // Party sizes: K = min(players, 4) duties; trio SOAK → TOCK → CHAIN, duo SOAK → CHAIN, solo SOAK every beat.
     // 5-8 players: players 5-8 take hours I..IV again and share that hour's duty with its first holder (two soakers).
     // Cue: At[0] = the first beat (s after launch), then one every BeatSeconds until StopAfterBeat(). The beat number (so
     // the hand and the duties) carries over between casts and starts at 2 on a fresh fight (as in the P1 paper simulation, cards-v2/p1-example.html).
@@ -29,9 +30,9 @@ namespace LastBell.Run
 
         public const string Source = "Escapement Relay";
         public const float BeatSeconds = 2.5f, PlateRadius = 7f, PlateSize = 1.6f, OnPlate = 1.8f, ChainMin = 9f, ChainHint = 10.2f,
-            WeightRadius = 3.2f, WeightSize = 1.2f;
+            WeightRadius = 3.2f, WeightSize = 1.6f;   // what counts as on a ✕: the whole drawn ✕ and its ring (was 1.2, smaller than the drawing)
         public const int OverSoakDamage = 60, FirstBeat = 2;
-        public static readonly string[] DutyNames = { "SOAK", "CHAIN", "WEIGHT L", "WEIGHT R" };
+        public static readonly string[] DutyNames = { "SOAK", "CHAIN", "TOCK", "TICK" };
 
         // Beat is the dial position of the next beat (its hand angle and duties). It steps +1 per beat, or −1 while the
         // escapement runs back: after each run of Runs[i] beats the hand reverses ("REWIND"), and everyone retraces their
@@ -155,7 +156,7 @@ namespace LastBell.Run
                 var spot = Weight(b, duty); bool held = false;
                 foreach (var p in players) if (!p.Down && (Sim.Flat(p.transform.position) - spot).magnitude <= WeightSize) held = true;
                 if (held) continue;
-                clean = false; Fail(b, duty == 2 ? "empty weight L" : "empty weight R");
+                clean = false; Fail(b, duty == 2 ? "empty TOCK ✕" : "empty TICK ✕");
                 var dir = Sim.Flat(spot).normalized;
                 var h = Spawn(new Hazard { Source = Source + ": the bell tips", Shape = HazardShape.Cone, Kind = HazardKind.Strike, Origin = Vector3.zero, Yaw = Quaternion.LookRotation(dir).eulerAngles.y, Radius = 13f, HalfAngle = 60, LockAt = 0, ResolveAt = UltShapes.ResolveIn(0), Damage = UltimateState.Lethal });
                 h.OnResolve = hz => W.BossFx.SweepResolve(hz.Origin, hz.Yaw, hz.Radius, hz.HalfAngle);
@@ -234,7 +235,9 @@ namespace LastBell.Run
             Mat(Prim.Make(PrimitiveKind.Cone, pivot, new Vector3(0, 4.2f, 6.4f), new Vector3(1.1f, 0.9f, 1.1f), Color.white, 0, Quaternion.Euler(90, 0, 0)), brassM);
             foreach (float side in new[] { -1f, 1f })   // the counterweight ✕ (pivot-local: x = 90° right of the hand), 2.6 m wide
                 for (int s = -1; s <= 1; s += 2)
-                    Mat(Prim.Make(PrimitiveKind.Cube, pivot, new Vector3(side * WeightRadius, 0.06f, 0), new Vector3(0.32f, 0.03f, 2.6f), Color.white, 0, Quaternion.Euler(0, 45 * s, 0)), ivory);
+                    Mat(Prim.Make(PrimitiveKind.Cube, pivot, new Vector3(side * WeightRadius, 0.06f, 0), new Vector3(0.32f, 0.03f, 2.2f), Color.white, 0, Quaternion.Euler(0, 45 * s, 0)), ivory);
+            foreach (float side in new[] { -1f, 1f })   // ...and a ring showing exactly where it counts
+                Mat(Prim.Make(PrimitiveKind.Cylinder, pivot, new Vector3(side * WeightRadius, 0.04f, 0), new Vector3(WeightSize * 2, 0.01f, WeightSize * 2), Color.white), brassDim);
             for (int k = -7; k <= 7; k++)   // the chain zone: a band from 9 m to the edge on the far half
             {
                 float deg = 180 + 12 * k, a = deg * Mathf.Deg2Rad, mid = (ChainMin + 11.5f) / 2;
@@ -300,8 +303,8 @@ namespace LastBell.Run
             }
             Label(cam, Plate(Beat), 0.3f, "PLATE", DutyColors[0], spotStyle);
             if (Duties >= 2) Label(cam, ChainSpot(Beat), 0.3f, "CHAIN", DutyColors[1], spotStyle);
-            if (Duties >= 3) Label(cam, Weight(Beat, 2) + Sim.Flat(Weight(Beat, 2)).normalized * 1.4f, 0.3f, "L", DutyColors[2], spotStyle);
-            if (Duties >= 4) Label(cam, Weight(Beat, 3) + Sim.Flat(Weight(Beat, 3)).normalized * 1.4f, 0.3f, "R", DutyColors[3], spotStyle);
+            if (Duties >= 3) Label(cam, Weight(Beat, 2), 1.0f, "TOCK", DutyColors[2], spotStyle);
+            if (Duties >= 4) Label(cam, Weight(Beat, 3), 1.0f, "TICK", DutyColors[3], spotStyle);
             for (int i = 0; i < W.Players.Count; i++)
             {
                 var p = W.Players[i]; int d = DutyOf(p, Beat); if (p.Down || d < 0) continue;
