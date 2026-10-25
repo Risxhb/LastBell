@@ -16,7 +16,7 @@ namespace LastBell.Run
         public enum Skill { Perfect, Late, Miss }
         public Skill Mode = Skill.Perfect;
         public float Speed = PlayerController.WalkSpeed;   // planning and walking speed, m/s (4.2 = the escape-proof speed)
-        public bool Attacks = true, UseDash = true;
+        public bool Attacks = true, UseDash = true, UseSprint = true;
         public int ReactExtra = 15;                         // Late: 0.25 s
         public float UptimePull = 0.3f;                     // score per metre out of reach while a rule holds it (uptime vs travel)
         public float HoldGap = -1;                          // gap to the boss when idle (-1 = the class's range)
@@ -99,7 +99,9 @@ namespace LastBell.Run
                 if (dist > 0.02f)
                 {
                     move = to / dist * Mathf.Clamp01(dist / (Speed * Sim.Dt)) * Mathf.Clamp01(Speed / PlayerController.WalkSpeed);
-                    if (UseDash && !me.Dashing && me.Stamina >= PlayerController.DashCost && dist > 1.2f && dist / Speed > left - 0.25f) { inp.Dash = true; move = to / dist; }
+                    // sprint when walking would arrive with under 0.6 s to spare (the relay's long hops), like a player holding Shift
+                    if (UseSprint && Speed >= PlayerController.WalkSpeed && me.Stamina > 15 && dist > 1.5f && dist / Speed > left - 0.6f) inp.Sprint = true;
+                    if (UseDash && !me.Dashing && me.Stamina >= PlayerController.DashCost && dist > 1.2f && dist / (inp.Sprint ? PlayerController.SprintSpeed : Speed) > left - 0.25f) { inp.Dash = true; move = to / dist; }
                     // a standing burn across the path (the P5 fissure): dash over it when one dash clears it (GUIDE.md)
                     else if (UseDash && !me.Dashing && me.Stamina >= PlayerController.DashCost && dist > 1.2f && DashesOverBurn(w, pos, to / dist)) { inp.Dash = true; move = to / dist; }
                 }
@@ -118,7 +120,8 @@ namespace LastBell.Run
             float bossGap = Sim.Flat(bpos - pos).magnitude - boss.BodyRadius;
             // no swings while walking to a spot or just before a rule: lunges and casts would carry it off its spot
             // (a memory spot, e.g. a Stopped Hour hiding spot that also aims frozen clocks, is held still for its last 1.5 s)
-            bool positioning = hasTarget && (Sim.Flat(target - pos).magnitude > 0.5f || (rules.Count > 0 && rules[0].Tick - now < (rules[0].Memory ? 90 : 30)));
+            // (a Vanguard's lunges carry it about a metre: no swings in the last 1.25 s before any rule)
+            bool positioning = hasTarget && (Sim.Flat(target - pos).magnitude > 0.5f || (rules.Count > 0 && rules[0].Tick - now < (rules[0].Memory ? 90 : me.ClassName == "Vanguard" ? 75 : 30)));
             for (int i = 0; i < cd.Length; i++) if (cd[i] > 0) cd[i]--;
             bool stilled = boss.Ult != null && boss.Ult.IsStilled(me);
             // Chimesinger: Mending Chorus (burst heal round the caster) when it would top up a hurt ally or two (potions run out in P5)
@@ -161,7 +164,7 @@ namespace LastBell.Run
             while (g1End < rules.Count && rules[g1End].Tick <= t1 + 6) g1End++;
             int t2 = g1End < rules.Count ? rules[g1End].Tick : -1, g2End = g1End;
             while (g2End < rules.Count && rules[g2End].Tick <= t2 + 6) g2End++;
-            float secs1 = Mathf.Max(0.05f, (t1 - now) / (float)Sim.Hz), reach1 = Speed * secs1 + (UseDash && me.Stamina >= PlayerController.DashCost ? PlayerController.DashDistance : 0);
+            float secs1 = Mathf.Max(0.05f, (t1 - now) / (float)Sim.Hz), reach1 = (UseSprint && me.Stamina > 15 && Speed >= PlayerController.WalkSpeed ? PlayerController.SprintSpeed : Speed) * secs1 + (UseDash && me.Stamina >= PlayerController.DashCost ? PlayerController.DashDistance : 0);
 
             next.Clear();
             if (t2 >= 0) foreach (var c in cands) if (Valid(c, boss) && AllOk(c, rules, g1End, g2End)) next.Add(c);

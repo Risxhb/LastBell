@@ -10,15 +10,15 @@ namespace LastBell.Run
     // party order) and every beat a duty from its place in the cycle, (hour − 1 + beat) mod 4:
     //   SOAK    stand on the plate the hand points at
     //   CHAIN   hold the pendulum chain: ≥ 9 m from the boss on the far half (away from the hand)
-    //   WEIGHT  stand on a counterweight ✕ 4 m out, 90° left (L) or right (R) of the hand
-    // The cycle is SOAK → WEIGHT L → CHAIN → WEIGHT R → SOAK: each player works one spoke of the dial (plate r 7, ✕ r 4, chain
-    // r 10.2 on the same line) while the plates turn past, so no hop is longer than 6.2 m, yet nobody can stand still for a
-    // beat and the debt lines (ChimeDebts) cut across the spokes. (Card 01 had SOAK → WEIGHT R → WEIGHT L → CHAIN, whose
-    // soak-to-✕ hop crosses the boss: ~12 m in 3 s, which the first Unity bot run could not make; changed 2026-10-24.)
+    //   WEIGHT  stand on a counterweight ✕ 3.2 m out (in melee reach), 90° left (L) or right (R) of the hand
+    // The cycle is card 01's, SOAK → WEIGHT R → WEIGHT L → CHAIN → SOAK, so each player travels round the dial with the
+    // hand: two short hops (✕ to ✕ beside the boss, ✕ out to the chain) and two long ones (plate across the boss to the far
+    // ✕, ~11 m; chain round to the next plate, ~12 m) that need a sprint. Nobody can stand still for a beat. (A spoke-only
+    // cycle was tried on 2026-10-24 and rejected by Chzy18: players just went back and forth.)
     // Nothing is unavoidable: a perfect beat costs nobody HP. Fails, on the beat tick: plate empty = WIPE; more players on
     // the plate than soakers = 60 to each on it; a chain holder short or on the near half = the pendulum swings through the
     // plate (a 999 lane from the boss over it); a ✕ empty = a 120° cone on that side, 999.
-    // Party sizes: K = min(players, 4) duties, cycle SOAK, WEIGHT L, CHAIN (trio), SOAK, CHAIN (duo), SOAK every beat (solo).
+    // Party sizes: K = min(players, 4) duties; trio SOAK → WEIGHT L → CHAIN, duo SOAK → CHAIN, solo SOAK every beat.
     // 5-8 players: players 5-8 take hours I..IV again and share that hour's duty with its first holder (two soakers).
     // Cue: At[0] = the first beat (s after launch), then one every BeatSeconds until StopAfterBeat(). The beat number (so
     // the hand and the duties) carries over between casts and starts at 2 on a fresh fight (as in the P1 paper simulation, cards-v2/p1-example.html).
@@ -29,7 +29,7 @@ namespace LastBell.Run
 
         public const string Source = "Escapement Relay";
         public const float BeatSeconds = 3f, PlateRadius = 7f, PlateSize = 1.6f, OnPlate = 1.8f, ChainMin = 9f, ChainHint = 10.2f,
-            WeightRadius = 4f, WeightSize = 1.2f;
+            WeightRadius = 3.2f, WeightSize = 1.2f;
         public const int OverSoakDamage = 60, FirstBeat = 2;
         public static readonly string[] DutyNames = { "SOAK", "CHAIN", "WEIGHT L", "WEIGHT R" };
 
@@ -52,7 +52,7 @@ namespace LastBell.Run
         public static Vector3 ChainSpot(int beat) => PlanDir(HandAngle(beat) + 180) * ChainHint;
         public int Duties => Mathf.Clamp(Party, 1, 4);
         public int HourOf(PlayerController p) { int i = W.Players.IndexOf(p); return i < 0 ? 0 : i % 4 + 1; }
-        static readonly int[][] Cycle = { new[] { 0 }, new[] { 0, 1 }, new[] { 0, 2, 1 }, new[] { 0, 2, 1, 3 } };
+        static readonly int[][] Cycle = { new[] { 0 }, new[] { 0, 1 }, new[] { 0, 2, 1 }, new[] { 0, 3, 2, 1 } };
         public int DutyOf(PlayerController p, int beat) { int h = HourOf(p), k = Duties; return h == 0 ? -1 : Cycle[k - 1][(((h - 1 + beat) % k) + k) % k]; }
         public static bool ChainOk(Vector3 q, int beat) => Sim.Flat(q).magnitude >= ChainMin && Vector3.Dot(Sim.Flat(q), PlanDir(HandAngle(beat))) <= 0;
         public bool Holds(PlayerController p, int beat)

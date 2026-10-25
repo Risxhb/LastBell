@@ -38,7 +38,7 @@ namespace LastBell.Run
         // One stepped fight: n strat bots of `skill` (the run's player is bot 0), from `segment` (null = P1), until the boss
         // dies, the party is down, or capSeconds pass.
         IEnumerator UltRun(string label, int n, UltimateBot.Skill skill, string segment = null, float capSeconds = 1200, string cls0 = "Vanguard",
-                           Action<UltFight> perSecond = null, bool pushOn = true)
+                           Action<UltFight> perSecond = null /* every 0.25 s */, bool pushOn = true)
         {
             ultLast = null;
             yield return UltStart(null, segment, cls0);
@@ -72,7 +72,7 @@ namespace LastBell.Run
                             var last = bkHits.LastOrDefault(h => h.Player == p);
                             f.DeathLines.Add($"{p.name} down at {(d.World.Tick - t0) / 60f:0.0}s in {bk.Segment} by {last.Source} ({last.Damage}) · {(p.Input as UltimateBot)?.DebugLine}");
                         }
-                    if (perSecond != null && (d.World.Tick - t0) % 60 == 0) perSecond(f);
+                    if (perSecond != null && (d.World.Tick - t0) % 15 == 0) perSecond(f);
                 }
                 yield return null;
             }
