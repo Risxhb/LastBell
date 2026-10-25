@@ -25,9 +25,9 @@ The review covers the **v1** Ultimate (the build Codex inspected on 24 Oct). Sin
 
 ## New requirements from 2026-10-25 (08-design-rules §1, §5) that change v2 work
 1. **Only fight.** The Ultimate is the only Bellkeeper fight; keep it practice-only until Chzy18 decides the run ending.
-2. **Soloable to the normal standard.** In v2 so far:
+2. **Soloable to the normal standard, without changing the phases** (Chzy18, 2026-10-25: "I don't want it to change the phases to be able to solo"). Solo plays the same mechanics. The only levers are numbers that change no mechanic: boss HP scaled by party size and, if needed, each phase's push timer. The small-party behaviour the phases already have stays as it is (P1 solo soaks every beat; partner rules such as chains and INVERTED passing don't apply without a partner). In v2 so far:
    - P1 solo soaks every beat but hits the 150 s push for lack of damage.
    - P2 solo was not run (the trio clears).
    - P3 solo was not run, and the trio dies to its own echoes.
-   - Needs solo/duo tuning per phase: HP, push and, where needed, simpler solo assignments.
+   - Needs solo/duo tuning per phase: HP and push only (no simpler solo assignments).
 3. **Easy/Medium/Hard.** Medium is the v2 baseline. Easy and Hard need defining. The proposal is to change timings and margins (beat length, gap widths, bullet density, echo delay), not one-shot rules.
