@@ -212,7 +212,7 @@ namespace LastBell.Run
             var boss = bk;
             bk.BeginCombat(); d.SetPaused(false);
             if (!watch) Time.captureFramerate = 30;
-            int frame = 0, max = watch ? int.MaxValue : 30 * 58; float t0 = Time.unscaledTime, tail = -1;
+            int frame = 0, max = watch ? int.MaxValue : 30 * (seg == "P4" ? 230 : seg == "P5" ? 72 : 58);   /* P4 runs on through both transitions and P5 */ float t0 = Time.unscaledTime, tail = -1;
             while (frame < max)
             {
                 yield return new WaitForEndOfFrame();
