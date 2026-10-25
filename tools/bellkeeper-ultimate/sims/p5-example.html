@@ -181,12 +181,30 @@ const T2={name:'T · P4 → P5 · The Train Runs Wild',end:15.5,
 //             One per toll for I-VI (in that order), two per toll for VII-IX, all four for X-XII.
 //   ECHO      from toll X a second ring follows 1 s behind the first, every gap 45° further round (same hours)
 //   BULLETS   from toll IV, P3's Mainspring is back: three spiral arms fire from the boss between sound rings (50 a bullet).
+//   THE ECHO BELLKEEPER  toll IX on: a ghost Bellkeeper strikes its own clapper lane through itself, 6.5 m out across the boss from
+//             each toll's plate (it moves after every toll).
+//             The two share one bar, and only the one that RANG LAST takes damage (IX echo, X boss, XI echo, XII boss).
+//   LAST STAND  toll XIII shatters the bell: only four platforms stay (one per hour, 3.8 m out; shown from XII). Off your
+//             own platform is the fall (999); bell shards drop on the platforms (shown 1 s, 999). Every hit counts x4 for
+//             10 s; if the boss still stands at the end, the bell falls on you (WIPE).
 const TT=[0,4,8,12,16,20,24,27.5,31,34.5,38,41.5,45,48.5], ROMAN=['','I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII','XIII'], KN=['PLATE','DEBTS','INVERTED','HAMMER'];
-const T3={name:'P5 · Final Toll',end:50,
-  side:`<h3>Final Toll: inside the great bell</h3><p>The bell tolls, and <b>keeps speeding up</b>: every 4 s (I–VI), then 3.5 s (VII–XII). <b>XIII is the end</b>: kill the boss before it or the hour completes (WIPE).</p><p>Every toll:</p><p>🔔 <b>Clapper</b>: a 3 m lane straight across the bell at a random angle, shown 1.6 s before (999 on the toll).</p><p>🔊 <b>Sound ring</b>: rushes in from the rim to the boss with gaps I–IV; your gap moves 60° each toll. Through <i>your</i> gap only (another's: 999).</p><p>🔊🔊 <b>The echo</b>: from toll X a second ring (blue) follows <b>0.8 s behind</b> the first, every gap 45° further round. Thread your gap, then step to your next one.</p><p>🔁 <b>Callbacks</b> that <b>stack</b>: one a toll for I–VI (plate → debts → INVERTED → hammer), <b>two</b> a toll for VII–IX, <b>all four</b> for X–XII. The plate lies by the soaker's last gap and the INVERTED half is centred on the INVERTED hour's gap: the rings lead you to your job. Standing on the lit plate pays any debt (P1).</p><p>🌀 <b>Mainspring</b>: from toll IV, P3's three spiral arms fire from the boss between sound rings (50 a bullet).</p>`,
-  mistakes:[['','inject a mistake…'],['gap','toll III: II takes I’s gap'],['debt','toll VII: III forgets its debt and stays'],['inv','toll VII: the INVERTED player stays out of the slam']],
+const T3={name:'P5 · Final Toll',end:59,
+  side:`<h3>Final Toll: inside the great bell</h3><p>The bell tolls, and <b>keeps speeding up</b>: every 4 s (I–VI), then 3.5 s (VII–XII). <b>XIII shatters the bell</b> into the last stand (below).</p><p>Every toll:</p><p>🔔 <b>Clapper</b>: a 3 m lane straight across the bell at a random angle, shown 1.6 s before (999 on the toll).</p><p>🔊 <b>Sound ring</b>: rushes in from the rim to the boss with gaps I–IV; your gap moves 60° each toll. Through <i>your</i> gap only (another's: 999).</p><p>🔊🔊 <b>The echo</b>: from toll X a second ring (blue) follows <b>0.8 s behind</b> the first, every gap 45° further round. Thread your gap, then step to your next one.</p><p>🔁 <b>Callbacks</b> that <b>stack</b>: one a toll for I–VI (plate → debts → INVERTED → hammer), <b>two</b> a toll for VII–IX, <b>all four</b> for X–XII. The plate lies by the soaker's last gap and the INVERTED half is centred on the INVERTED hour's gap: the rings lead you to your job. Standing on the lit plate pays any debt (P1).</p><p>🌀 <b>Mainspring</b>: from toll IV, P3's three spiral arms fire from the boss between sound rings (50 a bullet).</p><p>👥 <b>The Echo Bellkeeper</b>: from toll IX a ghost Bellkeeper (blue) strikes its own lane, and moves after every toll. Only the one that <b>rang last</b> takes damage (gold <b>LIVE</b>): swap every toll.</p><p>💥 <b>Last Stand</b>: XIII shatters the bell. Be on <b>your</b> platform (shown from XII), dodge the falling shards, and finish it in <b>10 s</b> at <b>×4</b> damage, or the bell falls on you (WIPE).</p>`,
+  mistakes:[['','inject a mistake…'],['gap','toll III: II takes I’s gap'],['debt','toll VII: III forgets its debt and stays'],['inv','toll VII: the INVERTED player stays out of the slam'],['plat','XIII: II runs to the wrong platform']],
   init(F){ F.hp=100; F.tolls=0; F.debts=[]; F.nextArm=16; this._F=F; },
   cur(t){ let k=0; while(k<13&&TT[k+1]<=t) k++; return k; },   // tolls already rung
+  STAND:10, ER:1.0,
+  echoPos(F,k){ return dir(this.plateA(Math.min(12,Math.max(9,k)))+180).map(v=>v*6.5); },   // it rings toll k from across the boss from that toll's plate
+  echoAt(F,t){ return this.echoPos(F,Math.min(12,this.cur(t)+1)); },   // after each toll it moves to where it rings next
+  echoOn(t){ return t>=TT[9]&&t<TT[13]; },
+  live(F,t){ const c=this.cur(t); return t>=TT[13]?'boss':c>=9&&c%2===1?'echo':'boss'; },   // the one that rang last
+  liveBody(F,t){ return this.live(F,t)==='echo'?{c:this.echoAt(F,t),r:this.ER}:{c:[0,0],r:BOSS_R}; },
+  // the echo's clapper: its own lane through itself, turned until it misses the plate
+  echoLaneA(F,k){ let a=hash(k,F.seed+21)%180; if(this.kinds(k).includes(0)){ const pl=sub(dir(this.plateA(k)).map(v=>v*5.5),this.echoPos(F,k)); for(let n=0;n<26;n++){ const d=dir(a); if(Math.abs(d[0]*pl[1]-d[1]*pl[0])>1.5+PR+1.8) break; a=(a+7)%180; } } return a; },
+  echoLaneHit(F,k,q,m=0){ if(k<9||k>12) return false; const d=dir(this.echoLaneA(F,k)), r=sub(q,this.echoPos(F,k)); return Math.abs(d[0]*r[1]-d[1]*r[0])<1.5+PR+m; },
+  platC(h){ return dir(45+90*h).map(v=>v*3.9); }, PLAT:1.8,
+  shard(F,n){ const h=n%4, c=this.platC(h), a=hash(n,F.seed+31)%360, r=0.7+(hash(n,F.seed+37)%100)/100*0.5; return {at:TT[13]+0.9+0.75*n, p:add(c,dir(a),r), h}; },
+  shardHit(F,q,tq,m=0){ for(let n=0;n<13;n++){ const sh=this.shard(F,n); if(Math.abs(tq-sh.at)<1/60*0.7+0.001&&dist(q,sh.p)<0.9+PR+m) return true; } return false; },
   // the clapper: a random angle, turned until its lane misses the plate (when there is one)
   laneA(F,k){ let a=hash(k,F.seed+3)%180; if(k>=1&&k<13&&this.kinds(k).includes(0)){ const pl=dir(this.plateA(k)).map(v=>v*5.5); for(let n=0;n<26;n++){ const d=dir(a); if(Math.abs(d[0]*pl[1]-d[1]*pl[0])>1.5+PR+1.8) break; a=(a+7)%180; } } return a; },
   // where hour h last passed a ring before toll k (the echo's gap when that toll had one)
@@ -212,11 +230,17 @@ const T3={name:'P5 · Final Toll',end:50,
   armA:t=>35*t,
   firing(F,t){ const k=this.cur(t); return t>=16&&this.ringR(F,t)<0&&this.ring2R(F,t)<0&&k<13&&TT[k+1]-t>0.8; },   // between the sound ring and 0.8 s before the next toll
   step(F,t,nt){
-    F.hp-=(nt-t)*F.pl.filter(p=>!p.dead).length*100/(4*47); if(F.hp<=0&&!F.won){ F.hp=0; F.won=true; say(F,'<b>'+nt.toFixed(1)+' s: THE LAST BELL · the Bellkeeper falls</b>'); return; }
+    // damage: each player in reach of the LIVE body chips it (melee 1.2 m, ranged 6 m from its surface); x4 in the last stand
+    { const b=this.liveBody(F,nt); let n=0; for(const p of F.pl){ if(p.dead) continue; const reach=dist(p.p,b.c)-b.r-PR; if(reach<=((p.i===0||p.i===3)?1.2:6)) n++; }
+      F.hp-=(nt-t)*n*(nt>=TT[13]?4:1)*100/(4*55); }
+    if(F.hp<=0&&!F.won){ F.hp=0; F.won=true; say(F,'<b>'+nt.toFixed(1)+' s: THE LAST BELL · the Bellkeeper falls</b>'); return; }
     while(F.nextArm<=nt){ if(this.firing(F,F.nextArm)) for(let j=0;j<3;j++){ const d=dir(this.armA(F.nextArm)+120*j); F.bul.push({p:d.map(v=>v*BOSS_R),v:d.map(v=>v*3.5),what:'a spiral bullet'}); } F.nextArm+=0.45; }
     const k=this.cur(nt);
     if(k>=1&&k>F.tolls){ F.tolls=k;
-      if(k>=13){ F.wiped='XIII: the hour completes (hard enrage)'; say(F,'<span class="bad">XIII · the hour completes</span>'); return; }
+      if(k>=13){ say(F,'<b>XIII</b>: the bell shatters · LAST STAND'); F.debts=[];
+        for(const p of F.pl) if(!p.dead&&dist(p.p,this.platC(p.i))>this.PLAT) hurt(F,p,LETHAL,dist(p.p,this.platC(p.i))>this.PLAT&&[0,1,2,3].some(h=>dist(p.p,this.platC(h))<=this.PLAT)?'another hour\'s platform':'the fall');
+        return; }
+      for(const p of F.pl) if(!p.dead&&this.echoLaneHit(F,k,p.p)) hurt(F,p,LETHAL,'the echo\'s clapper');
       const ks=this.kinds(k);
       for(const p of F.pl) if(!p.dead&&this.laneHit(F,k,p.p)) hurt(F,p,LETHAL,'the clapper');
       const onPlate=q=>this.kinds(k).includes(0)&&dist(q,dir(this.plateA(k)).map(v=>v*5.5))<1.6;   // the plate pays debts (P1)
@@ -228,6 +252,10 @@ const T3={name:'P5 · Final Toll',end:50,
       if(ks.includes(1)) for(const p of F.pl) if(!p.dead) F.debts.push({p:p.p.slice(),at:k+1,owner:p.i});
       say(F,`<b>toll ${ROMAN[k]}</b>: ${ks.map(x=>KN[x]).join(' + ')} ✓`);
     }
+    if(nt>=TT[13]){ for(let n=0;n<13;n++){ const sh=this.shard(F,n); if(t<sh.at&&nt>=sh.at) for(const p of F.pl) if(!p.dead&&dist(p.p,sh.p)<0.9+PR) hurt(F,p,LETHAL,'a falling shard'); }
+      for(const p of F.pl) if(!p.dead&&t>=TT[13]&&dist(p.p,this.platC(p.i))>this.PLAT) hurt(F,p,LETHAL,'the fall');
+      if(nt>=TT[13]+this.STAND&&!F.won){ F.wiped='the last stand: the bell falls'; say(F,'<span class="bad">the bell falls: WIPE</span>'); }
+      return; }
     for(const p of F.pl) if(!p.dead){ const kk=this.cur(nt), h=this.ringHit(F,p,p.p,nt); if(h&&p.ringHit!==kk){ p.ringHit=kk; hurt(F,p,h===2?LETHAL:50,h===2?'another\'s gap':'the sound ring'); }
       const h2=this.ring2Hit(F,p,p.p,nt); if(h2&&p.ring2Hit!==kk){ p.ring2Hit=kk; hurt(F,p,h2===2?LETHAL:50,h2===2?'another\'s echo gap':'the echo ring'); } }
   },
@@ -235,13 +263,21 @@ const T3={name:'P5 · Final Toll',end:50,
     const k=this.cur(tq); if(k>F.tolls&&k<13&&this.kinds(k).includes(3)){ const c=dir(hash(k,F.seed+9)%360).map(v=>v*9); for(let j=0;j<12;j++) out.push(add(c,dir(30*j+7*k),4*(tq-TT[k]))); }
     return out; },
   danger(F,p,q,tq,dtS){
-    const k=this.cur(tq+dtS*0.7); if(k>=1&&k<13&&Math.abs(tq-TT[k])<dtS*0.7){ const ks=this.kinds(k); if(this.laneHit(F,k,q)) return 2;
+    if(tq>=TT[13]-0.02){ if(dist(q,this.platC(p.i))>this.PLAT-0.25) return 2; for(let n=0;n<13;n++){ const sh=this.shard(F,n); if(Math.abs(tq-sh.at)<dtS*0.7&&dist(q,sh.p)<0.9+PR+0.25) return 2; } return 0; }
+    const k=this.cur(tq+dtS*0.7); if(k>=1&&k<13&&Math.abs(tq-TT[k])<dtS*0.7){ const ks=this.kinds(k); if(this.laneHit(F,k,q)||this.echoLaneHit(F,k,q)) return 2;
       const onPl=ks.includes(0)&&dist(q,dir(this.plateA(k)).map(v=>v*5.5))<1.3;
       if(!onPl&&F.debts.some(d=>d.at===k&&dist(q,d.p)<2+PR+0.25)) return 2;
       if(ks.includes(2)){ const d=this.invDir(k); const far=dot(q,d)>0.9, near=dot(q,d)<-0.9; if(p.i===this.invHour(k)?!far:!near) return 2; }
       if(ks.includes(0)&&this.soaker(k)===p.i&&dist(q,dir(this.plateA(k)).map(v=>v*5.5))>1.3) return 2; }
     return this.ringHit(F,p,q,tq,0.15,true)||this.ring2Hit(F,p,q,tq,0.15); },
   goal(F,p){ const t=F.t, c=this.cur(t), k=c+1, ks=this.kinds(Math.min(k,12)), left=TT[Math.min(k,13)]-t;
+    const myPlat=F.mistake==='plat'&&p.i===1?this.platC(2):this.platC(p.i);
+    if(t>=TT[13]){ // the last stand: stay on your platform, off the next shards, as close to the boss as it allows
+      let to=add(myPlat,myPlat.map(v=>-v/len(myPlat)),(p.i===0||p.i===3)?1.1:0.4);
+      // the next shards on my platform: the spot on it nearest that wish, clear of them
+      const due=[]; for(let n=0;n<13;n++){ const sh=this.shard(F,n); if(sh.h===p.i&&sh.at>t-0.05&&sh.at-t<1.3) due.push(sh.p); }
+      if(due.length){ let best=null,bd=1e9; for(const r of [0,0.5,0.9,1.25,1.45]) for(let j=0;j<(r?16:1);j++){ const c4=add(myPlat,dir(22.5*j),r); if(due.some(q=>dist(c4,q)<0.9+PR+0.35)) continue; const d=dist(c4,to); if(d<bd){bd=d;best=c4;} } if(best) to=best; }
+      return {to,why:'platform '+H[p.i]}; }
     if(F.mistake==='debt'&&p.i===2&&k===7) return {to:p.p,why:'forgets its debt',raw:[0,0]};
     const R2=this.ring2V(F,t), myR=len(p.p), R1=this.ringR(F,t);
     if(R2>BOSS_R+0.3&&R2>myR-1.2&&!(R1>0&&R1>myR-1.2)&&(R2-myR)/5<2.4){ { const j=this.gap2Centres(c).findIndex((x,jj)=>this.gap2Hour(c,jj)===p.i); return {to:dir(this.gap2Centres(c)[j]).map(v=>v*Math.max(2.5,Math.min(10.5,myR))),why:'echo gap '+H[p.i]}; } }
@@ -249,17 +285,26 @@ const T3={name:'P5 · Final Toll',end:50,
     const side=dir(this.invAng(k)+90);
     // the nearest spot to 'to' that is out of the clapper's lane and the debts due, inside the arena, and passes need()
     const laneD=dir(this.laneA(F,k)), need0=()=>true;
-    const clear=(to,need=need0)=>{ for(let n=0;n<=7;n++) for(let a=0;a<(n?12:1);a++){ const cc=add(to,dir(30*a+15*n),n*0.9); if(len(cc)<10.5&&len(cc)>2.6&&need(cc)&&(k>=13||Math.abs(laneD[0]*cc[1]-laneD[1]*cc[0])>1.5+PR+0.6)&&F.debts.every(db=>db.at!==k||dist(cc,db.p)>2+PR+0.6)) return cc; } return to; };
+    const clear=(to,need=need0)=>{ for(let n=0;n<=7;n++) for(let a=0;a<(n?12:1);a++){ const cc=add(to,dir(30*a+15*n),n*0.9); if(len(cc)<10.5&&len(cc)>2.6&&need(cc)&&(k>=13||Math.abs(laneD[0]*cc[1]-laneD[1]*cc[0])>1.5+PR+0.6)&&!this.echoLaneHit(F,k,cc,0.6)&&F.debts.every(db=>db.at!==k||dist(cc,db.p)>2+PR+0.6)) return cc; } return to; };
+    if(k===13) return {to:myPlat,why:'→ platform '+H[F.mistake==='plat'&&p.i===1?2:p.i]};
     if(ks.includes(0)&&this.soaker(k)===p.i&&left<2.6) return {to:dir(this.plateA(k)).map(v=>v*5.5),why:'SOAK'};
     if(ks.includes(2)){ const d=this.invDir(k);
       if(p.i===this.invHour(k)&&!(F.mistake==='inv'&&k===7)) return {to:clear(d.map(v=>v*5),cc=>dot(cc,d)>1.4),why:'INVERTED'}; const o=dot(p.p,d), st=o>-1.6?add(p.p,d,-(o+1.8)):p.p.slice(), r=len(st), st2=r<2.8?st.map(v=>v*2.8/Math.max(r,1e-3)):r>10?st.map(v=>v*10/r):st; return {to:clear(st2,cc=>dot(cc,d)<-1.4),why:'out of the slam'}; }   // the nearest spot out of the half, not the far side
+    const nextLive=k>=9&&k<=12&&k%2===1?'echo':this.live(F,t);   // swap to the body that rings next as its toll lands
+    if(nextLive==='echo'){ const E=this.echoPos(F,k), a=angOf(E)+(p.i%2?100:-100)+(p.i<2?-20:20), lr=(p.i===0||p.i===3)?this.ER+PR+0.7:4.5;
+      return {to:clear(add(E,dir(a),lr)),why:(p.i===0||p.i===3?'melee':'ranged')+' → ECHO'}; }
     const a=this.laneA(F,k)+90+(p.i%2?0:180)+(p.i<2?-25:25), lr=(p.i===0||p.i===3)?2.8:5.2;
-    return {to:clear(dir(a).map(v=>v*lr)),why:p.i===0||p.i===3?'melee':'ranged'}; },
+    return {to:clear(dir(a).map(v=>v*lr)),why:(p.i===0||p.i===3?'melee':'ranged')+(k>=9?' → BOSS':'')}; },
   draw(g,F,P,S){ const t=F.t, c=this.cur(t), k=c+1, kc=Math.min(k,12), ks=this.kinds(kc), left=TT[Math.min(k,13)]-t;
     const grd=g.createRadialGradient(...P(0,0),2*S,...P(0,0),R_ARENA*S); grd.addColorStop(0,'#3a2c18'); grd.addColorStop(1,'#1c1610');
     g.fillStyle=grd; g.beginPath(); g.arc(...P(0,0),R_ARENA*S,0,7); g.fill(); g.strokeStyle=k>=10?'#ff9a6b':'#c99a4b'; g.lineWidth=6; g.stroke();
     if(k<13&&(left<1.6||(c>=1&&t-TT[c]<0.25))){ const kk=left<1.6?k:c, d=dir(this.laneA(F,kk)), n=[-d[1],d[0]]; const q4=[add(d.map(v=>v*12),n,1.5),add(d.map(v=>v*12),n,-1.5),add(d.map(v=>-v*12),n,-1.5),add(d.map(v=>-v*12),n,1.5)];
       g.fillStyle=left<1.6?`rgba(255,106,77,${0.2+0.5*(1-left/1.6)})`:'rgba(255,240,200,.7)'; g.beginPath(); q4.forEach((q,i)=>i?g.lineTo(...P(...q)):g.moveTo(...P(...q))); g.closePath(); g.fill(); }
+    if(t>=TT[13]){ g.fillStyle='#05070d'; g.beginPath(); g.arc(...P(0,0),R_ARENA*S,0,7); g.fill(); }
+    if(t>=TT[12]){ for(let h=0;h<4;h++){ const c4=this.platC(h); g.fillStyle=t>=TT[13]?'#3a2c18':'rgba(255,210,122,.18)'; g.beginPath(); g.arc(...P(...c4),this.PLAT*S,0,7); g.fill(); g.strokeStyle=t>=TT[13]?'#c99a4b':(Math.floor(t*4)%2?'#ffd27a':'#c99a4b'); g.lineWidth=3; g.stroke(); g.fillStyle='#ffd27a'; g.font='bold 14px Segoe UI'; g.textAlign='center'; g.fillText(H[h],...P(...add(c4,dir(45+90*h),2.2))); } }
+    if(t>=TT[13]) for(let n=0;n<13;n++){ const sh=this.shard(F,n); if(t<sh.at&&sh.at-t<1.0){ g.fillStyle=`rgba(255,106,77,${0.25+0.5*(1-(sh.at-t))})`; g.beginPath(); g.arc(...P(...sh.p),0.9*S,0,7); g.fill(); } }
+    if(k>=9&&k<13&&(left<1.6||(c>=9&&t-TT[c]<0.25))){ const kk=left<1.6?k:c, d=dir(this.echoLaneA(F,kk)), n=[-d[1],d[0]], E=this.echoPos(F,kk); const q4=[add(add(E,d,14),n,1.5),add(add(E,d,14),n,-1.5),add(add(E,d,-14),n,-1.5),add(add(E,d,-14),n,1.5)];
+      g.save(); g.beginPath(); g.arc(...P(0,0),R_ARENA*S,0,7); g.clip(); g.fillStyle=left<1.6?`rgba(120,200,255,${0.2+0.45*(1-left/1.6)})`:'rgba(220,240,255,.7)'; g.beginPath(); q4.forEach((q,i)=>i?g.lineTo(...P(...q)):g.moveTo(...P(...q))); g.closePath(); g.fill(); g.restore(); }
     if(k<13&&ks.includes(2)){ const d=this.invDir(k), ang=Math.atan2(-d[1],d[0]); g.fillStyle=left<1.2?'rgba(255,106,77,.35)':'rgba(182,124,255,.12)'; g.beginPath(); g.moveTo(...P(0,0)); g.arc(...P(0,0),R_ARENA*S,ang-Math.PI/2,ang+Math.PI/2); g.closePath(); g.fill(); g.fillStyle='#c9a2ff'; g.font='bold 14px Segoe UI'; g.textAlign='center'; g.fillText(H[this.invHour(k)]+' INVERTED: inside the slam',...P(...d.map(v=>v*8))); }
     if(k<13&&ks.includes(0)){ const pl=dir(this.plateA(k)).map(v=>v*5.5); g.fillStyle='#e3b45f'; g.beginPath(); g.arc(...P(...pl),1.6*S,0,7); g.fill(); g.fillStyle='#10162a'; g.font='bold 12px Segoe UI'; g.textAlign='center'; g.fillText(H[this.soaker(k)]+' SOAK',...P(...pl)); }
     if(k<13&&ks.includes(3)&&left<1.6){ const cc=dir(hash(k,F.seed+9)%360).map(v=>v*9); g.strokeStyle='#ffd27a'; g.lineWidth=3; g.beginPath(); g.arc(...P(...cc),(0.6+0.6*(1-left/1.6))*S,0,7); g.stroke(); }
@@ -271,8 +316,13 @@ const T3={name:'P5 · Final Toll',end:50,
       for(let a=0;a<360;a+=2){ if(cs.some(x=>angDiff(a+1,x)<this.GAP))continue; g.beginPath(); g.moveTo(...P(...dir(a).map(v=>v*R))); g.lineTo(...P(...dir(a+2).map(v=>v*R))); g.stroke(); }
       cs.forEach((x,j)=>{ g.fillStyle='#ffd27a'; g.font='bold 15px Segoe UI'; g.textAlign='center'; g.fillText(H[this.gapHour(c,j)],...P(...dir(x).map(v=>v*(R+0.9)))); }); }
     else if(k<13){ const cs=this.gapCentres(k); cs.forEach((x,j)=>{ g.fillStyle='rgba(255,210,122,.5)'; g.font='bold 13px Segoe UI'; g.textAlign='center'; g.fillText(H[this.gapHour(k,j)],...P(...dir(x).map(v=>v*11.1))); }); }
+    // the two Bellkeepers and which one is LIVE
+    if(this.echoOn(t)){ const E=this.echoAt(F,t), lv=this.live(F,t); g.fillStyle='rgba(120,190,255,.45)'; g.beginPath(); g.arc(...P(...E),this.ER*S,0,7); g.fill(); g.strokeStyle=lv==='echo'?'#ffd27a':'#9fe0ff'; g.lineWidth=lv==='echo'?5:2; g.stroke();
+      g.font='bold 14px Segoe UI'; g.textAlign='center'; g.fillStyle=lv==='echo'?'#ffd27a':'#9fe0ff'; g.fillText(lv==='echo'?'ECHO · LIVE':'echo',...P(E[0],E[1]+1.6)); g.fillStyle=lv==='boss'?'#ffd27a':'rgba(239,230,207,.6)'; g.fillText(lv==='boss'?'BOSS · LIVE':'boss',...P(0,2.3)); }
+    if(t>=TT[13]){ g.fillStyle='#ffd27a'; g.font='bold 14px Segoe UI'; g.textAlign='center'; g.fillText('BOSS · ×4',...P(0,2.3)); }
     g.fillStyle=k>=10?'#ff6a4d':'#ffd27a'; g.font='bold 22px Segoe UI'; g.textAlign='center';
-    g.fillText(k>=13?`XIII in ${left.toFixed(1)}s · THE HOUR COMPLETES`:`toll ${ROMAN[k]} in ${left.toFixed(1)}s · ${ks.map(x=>KN[x]).join(' + ')}${t>=16?' · MAINSPRING':''}`,...P(0,-11.85)); }
+    if(t>=TT[13]){ g.fillText(`LAST STAND · ${Math.max(0,TT[13]+this.STAND-t).toFixed(1)}s · hits ×4 · stay on your platform`,...P(0,-11.85)); return; }
+    g.fillText(k>=13?`XIII in ${left.toFixed(1)}s · THE BELL SHATTERS: get to your platform`:`toll ${ROMAN[k]} in ${left.toFixed(1)}s · ${ks.map(x=>KN[x]).join(' + ')}${t>=16?' · MAINSPRING':''}`,...P(0,-11.85)); }
 };
 
 const SCENES=[T1,T2,T3];
@@ -294,7 +344,7 @@ function draw(){
  for(const p of F.pl){ const [px,py]=P(...p.p); if(p.dead){g.fillStyle='#444';g.beginPath();g.arc(px,py,10,0,7);g.fill();continue;}
   g.fillStyle=col[p.i]; g.beginPath(); g.arc(px,py,PR*S,0,7); g.fill(); g.strokeStyle='#0b0f1c'; g.lineWidth=2; g.stroke(); g.fillStyle='#0b0f1c'; g.font='bold 11px Segoe UI'; g.textAlign='center'; g.fillText(cls[p.i],px,py+4);
   g.font='bold 12px Segoe UI'; g.fillStyle='#efe6cf'; g.fillText(H[p.i]+' '+(p.job||''),px,py-16); if(p.hp<100){g.fillStyle='#ff6a4d';g.fillText(p.hp+' hp',px,py+26);} }
- if(F.hp!==undefined){ g.fillStyle='#2a2030'; g.fillRect(CX-200,14,400,14); g.fillStyle='#ff6a4d'; g.fillRect(CX-200,14,400*F.hp/100*1,14); g.strokeStyle='#c99a4b'; g.strokeRect(CX-200,14,400,14); g.fillStyle='#efe6cf'; g.font='bold 12px Segoe UI'; g.textAlign='center'; g.fillText('Bellkeeper '+(F.hp*0.35).toFixed(1)+' %  ·  kill before XIII',CX,25); }
+ if(F.hp!==undefined){ g.fillStyle='#2a2030'; g.fillRect(CX-200,14,400,14); g.fillStyle='#ff6a4d'; g.fillRect(CX-200,14,400*F.hp/100*1,14); g.strokeStyle='#c99a4b'; g.strokeRect(CX-200,14,400,14); g.fillStyle='#efe6cf'; g.font='bold 12px Segoe UI'; g.textAlign='center'; g.fillText('Bellkeeper '+(F.hp*0.35).toFixed(1)+' %  ·  '+(F.t>=TT[13]?'LAST STAND':'break it in the last stand'),CX,25); }
  if(F.won){ const f=Math.min(1,(performance.now()%2000)/2000); g.strokeStyle='rgba(255,226,160,'+(1-f)+')'; g.lineWidth=8; g.beginPath(); g.arc(CX,CY,(1.4+10*f)*S,0,7); g.stroke(); g.fillStyle='rgba(16,22,42,.8)'; g.fillRect(0,CY-46,cv.width,92); g.fillStyle='#ffd27a'; g.font='bold 30px Segoe UI'; g.textAlign='center'; g.fillText('THE LAST BELL',CX,CY-6); g.font='bold 16px Segoe UI'; g.fillStyle='#efe6cf'; g.fillText('the Bellkeeper falls · the great bell cracks open',CX,CY+22); }
  if(F.wiped){ g.fillStyle='rgba(16,22,42,.85)'; g.fillRect(0,CY-40,cv.width,80); g.fillStyle='#ff6a4d'; g.font='bold 24px Segoe UI'; g.textAlign='center'; g.fillText('WIPE — '+F.wiped,CX,CY+9); }
  document.getElementById('clock').textContent=`t ${Math.min(F.t,F.scene.end).toFixed(1)} s · hits ${F.hits} · deaths ${F.deaths}${(F.t>=F.scene.end||F.won)&&!F.wiped?(F.hits?' · done: mistakes':' · done: clean, 0 damage'):''}`;

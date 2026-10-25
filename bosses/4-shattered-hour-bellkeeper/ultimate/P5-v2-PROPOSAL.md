@@ -30,8 +30,8 @@ bell falls over the arena, and P5 is fought inside it. Every earlier phase comes
 ## P5 · Final Toll (inside the great bell)
 
 The bell tolls every 4 s for tolls I–VI, then every 3.5 s for VII–XII. From toll X the **echo** doubles every toll (see
-below). **Toll XIII (48.5 s) is the hard enrage**: if the boss is still alive, the hour completes (WIPE). In the mockup,
-a perfect party of 4 kills it at about 47 s, after toll XII, so there is no spare toll.
+below). **Toll XIII (48.5 s) shatters the bell** into the Last Stand (below), a 10 s burn to finish it. In the mockup,
+a perfect party of 4 kills it about 6 s into the Last Stand.
 
 Every toll brings the same things.
 
@@ -62,11 +62,30 @@ Every toll brings the same things.
 **Mainspring (P3 returns).** From toll IV, the boss fires P3's three spiral arms between sound rings, stopping 0.8 s
 before each toll (50 per bullet).
 
+**The Echo Bellkeeper** (Chzy18, 25 Oct: "a mix of 2 and 3"). From toll IX, a ghost Bellkeeper (blue) stands 6.5 m
+out, across the boss from that toll's plate, and moves after every toll. It strikes its own clapper lane through itself
+(999 on the toll, shown 1.6 s before, always misses the plate). The two share one bar, and **only the one that rang last
+takes damage** (gold LIVE): the echo after IX and XI, the boss after X and XII. So the party swaps targets every toll,
+and melee have to cross the bell to do it.
+
+**Last Stand.** Toll XIII doesn't wipe. It **shatters the bell**:
+- Only four platforms stay, one per hour, 3.9 m from the boss and 1.8 m across. They are shown from toll XII.
+- Off your own platform at XIII, or at any point after, is the fall (999). Another hour's platform doesn't count.
+- Bell shards drop on the platforms, never at their centre, so there is always room. Each is shown 1 s before and kills
+  (999).
+- **Every hit counts ×4 for 10 s.** If the boss is still standing at the end, the bell falls on you (WIPE).
+
+In the mockup, a perfect party reaches XIII with the boss at about 40 % and breaks the bell about 6 s into the last
+stand, with 4 s to spare. One death in the last stand makes it very tight.
+
 The kill: the boss dies, and the great bell cracks open ("THE LAST BELL").
 
-**Mockup result:** 15 perfect runs. 12 kill the boss with 0 damage, 2 kill it but take one 50-damage hit, and 1 loses a
-player to a debt on toll XII. Every scripted mistake (wrong gap, forgotten debt, INVERTED player stays out) wipes the
-run.
+**Mockup result (with the Echo and the Last Stand):** in 10 random starts, all 10 kill the boss in the last stand (8
+with 0 damage, 2 with one 50-damage hit). In the 5 test starts, 4 are clean kills, and 1 loses a melee player to the
+echo's clapper on toll XI. Every scripted mistake wipes, including the new one, "XIII: II runs to the wrong platform".
+
+**Unity:** P5 in Unity is still the earlier version (no echo, no last stand, a flat ×2.3 resonance). Building this
+version replaces the flat resonance.
 
 ## Design rules check (gpt/08)
 
