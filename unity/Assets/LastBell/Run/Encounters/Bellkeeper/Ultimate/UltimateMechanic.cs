@@ -39,6 +39,12 @@ namespace LastBell.Run
         // The perfect bot's strat for player p: what it must satisfy and when. Add nothing when the mechanic asks nothing of p.
         public virtual void Demands(PlayerController p, List<BotDemand> into) { }
 
+        // v2 phases the position rules can't express (bullet hell, a moving floor): the mechanic steers bot p itself. vel is
+        // the bot's own walking velocity (world, m/s; the floor may add to it). Return false to leave the bot to Demands.
+        public virtual bool Steer(PlayerController p, UltimateBot.Skill skill, out Vector3 vel) { vel = default; return false; }
+        // ...and what a steered bot attacks: aim point, and whether its whole kit is safe (else basic attacks from range only)
+        public virtual bool AttackTarget(PlayerController p, out Vector3 aim, out float reach, out bool fullKit) { aim = default; reach = 0; fullKit = false; return false; }
+
         // -lastbellAbility ult_<id>: the default practice loop (Setup, Cast with the default cue, 2 s gap). Override when
         // the mechanic needs partners (e.g. a recorded P1 before a replay).
         public override IEnumerable<int> Practice()
@@ -85,14 +91,14 @@ namespace LastBell.Run
             ConductorsHand = "bellkeeper.ult_conductors_hand", TollingHour = "bellkeeper.ult_tolling_hour",
             ThirteenthHour = "bellkeeper.ult_thirteenth_hour", AreaQuotes = "bellkeeper.ult_area_quotes", Fracture = "bellkeeper.ult_fracture",
             // v2 (ULTIMATE-PROMPT-v2.md, cards-v2): the P1 slice
-            EscapementRelay = "bellkeeper.ult_escapement_relay", ChimeDebts = "bellkeeper.ult_chime_debts", BrokenHour = "bellkeeper.ult_broken_hour", OpenHour = "bellkeeper.ult_open_hour";
-        public static readonly string[] Ids = { PendulumClocks, StoppedHour, Ledger, BackwardsBell, TwoFutures, ConductorsHand, TollingHour, ThirteenthHour, AreaQuotes, Fracture, EscapementRelay, ChimeDebts, BrokenHour, OpenHour };
+            EscapementRelay = "bellkeeper.ult_escapement_relay", ChimeDebts = "bellkeeper.ult_chime_debts", BrokenHour = "bellkeeper.ult_broken_hour", OpenHour = "bellkeeper.ult_open_hour", GearFloor = "bellkeeper.ult_gear_floor";
+        public static readonly string[] Ids = { PendulumClocks, StoppedHour, Ledger, BackwardsBell, TwoFutures, ConductorsHand, TollingHour, ThirteenthHour, AreaQuotes, Fracture, EscapementRelay, ChimeDebts, BrokenHour, OpenHour, GearFloor };
 
         public static UltimateMechanic[] CreateAll() => new UltimateMechanic[]
         {
             new PendulumClocks(), new StoppedHour(), new LedgerMechanic(), new BackwardsBell(), new TwoFutures(),
             new ConductorsHand(), new TollingHour(), new ThirteenthHour(), new AreaQuotes(), new FractureOfTime(),
-            new EscapementRelay(), new ChimeDebts(), new BrokenHour(), new OpenHour(),
+            new EscapementRelay(), new ChimeDebts(), new BrokenHour(), new OpenHour(), new GearFloor(),
         };
     }
 }

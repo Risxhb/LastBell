@@ -201,7 +201,7 @@ namespace LastBell.Run
         public string JobOf(PlayerController p) => plans.TryGetValue(p, out var pl) ? pl.Job : null;
 
         // A velocity for bot p (world, m/s). skill: Late re-plans 0.25 s behind; Miss walks in to attack during a rewind.
-        public bool Steer(PlayerController p, UltimateBot.Skill skill, out Vector3 vel)
+        public override bool Steer(PlayerController p, UltimateBot.Skill skill, out Vector3 vel)
         {
             vel = Vector3.zero;
             if (!Running || p.Down) return false;

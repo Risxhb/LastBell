@@ -123,10 +123,19 @@ namespace LastBell.Run
         public int StrikeBoss(PlayerController from, Vector3 origin, Vector3 forward, float reach, float arcDeg, int damage, string ability)
         {
             var b = Boss; if (b == null || !b.Solid) return 0;
-            var to = Sim.Flat(b.transform.position - origin); forward = Sim.Flat(forward);
-            if (to.magnitude > reach + b.BodyRadius) return 0;
-            if (arcDeg < 360 && to.magnitude > b.BodyRadius && Vector3.Angle(forward, to) > arcDeg / 2 + Mathf.Rad2Deg * Mathf.Atan2(b.BodyRadius, to.magnitude)) return 0;
-            var contact = b.transform.position - to.normalized * b.BodyRadius + Vector3.up * b.HitHeight;
+            forward = Sim.Flat(forward);
+            // the nearest body in reach and in the arc (the boss, or an extra body he offers: same bar)
+            bool found = false; Vector3 contact = default; float bestD = float.MaxValue;
+            for (int i = 0; i < b.BodyCount; i++)
+            {
+                b.Body(i, out var c, out float r); if (r <= 0) continue;
+                var to = Sim.Flat(c - origin);
+                if (to.magnitude > reach + r) continue;
+                if (arcDeg < 360 && to.magnitude > r && Vector3.Angle(forward, to) > arcDeg / 2 + Mathf.Rad2Deg * Mathf.Atan2(r, to.magnitude)) continue;
+                if (to.magnitude >= bestD) continue;
+                bestD = to.magnitude; found = true; contact = c - to.normalized * r + Vector3.up * b.HitHeight;
+            }
+            if (!found) return 0;
             return DamageBoss(damage, contact, ability);
         }
 
@@ -135,10 +144,16 @@ namespace LastBell.Run
         {
             contact = origin + Sim.Flat(forward).normalized * length;
             var b = Boss; if (b == null || !b.Solid) return 0;
-            var f = Sim.Flat(forward).normalized; var to = Sim.Flat(b.transform.position - origin);
-            float along = Vector3.Dot(to, f); float side = (to - f * along).magnitude;
-            if (along < -b.BodyRadius || along > length + b.BodyRadius || side > width / 2 + b.BodyRadius) return 0;
-            contact = origin + f * Mathf.Max(0, along - b.BodyRadius) + Vector3.up * b.HitHeight;
+            var f = Sim.Flat(forward).normalized; bool found = false; float bestAlong = float.MaxValue;
+            for (int i = 0; i < b.BodyCount; i++)   // the first body along the line (the boss or an extra body)
+            {
+                b.Body(i, out var c, out float r); if (r <= 0) continue;
+                var to = Sim.Flat(c - origin);
+                float along = Vector3.Dot(to, f); float side = (to - f * along).magnitude;
+                if (along < -r || along > length + r || side > width / 2 + r || along >= bestAlong) continue;
+                bestAlong = along; found = true; contact = origin + f * Mathf.Max(0, along - r) + Vector3.up * b.HitHeight;
+            }
+            if (!found) return 0;
             return DamageBoss(damage, contact, ability);
         }
 
@@ -172,14 +187,16 @@ namespace LastBell.Run
             }
             var b = Boss;
             if (b != null && b.Solid)
-            {
-                var d = Sim.Flat(pos - b.transform.position); float min = b.BodyRadius + bodyRadius;
-                if (d.magnitude < min)
+                for (int i = 0; i < b.BodyCount; i++)   // the boss's body and any extra bodies are solid
                 {
-                    var n = d.sqrMagnitude > 1e-4f ? d.normalized : -b.transform.forward;
-                    var p = b.transform.position + n * min; pos.x = p.x; pos.z = p.z;
+                    b.Body(i, out var c, out float r); if (r <= 0) continue;
+                    var d = Sim.Flat(pos - c); float min = r + bodyRadius;
+                    if (d.magnitude < min)
+                    {
+                        var n = d.sqrMagnitude > 1e-4f ? d.normalized : -b.transform.forward;
+                        var p = c + n * min; pos.x = p.x; pos.z = p.z;
+                    }
                 }
-            }
             return pos;
         }
     }
@@ -212,10 +229,12 @@ namespace LastBell.Run
                 var p = batch[i]; var step = p.Vel * Sim.Dt;
                 p.Pos += step; p.Travelled += step.magnitude;
                 w.Fx.ProjectileHead(p.Pos, p.Color);
-                var b = w.Boss;
-                if (b != null && b.Solid && Sim.Flat(p.Pos - b.transform.position).magnitude <= b.BodyRadius + p.Radius)
+                var b = w.Boss; int hitBody = -1; Vector3 hc = default; float hr = 0;
+                if (b != null && b.Solid)
+                    for (int bi = 0; bi < b.BodyCount && hitBody < 0; bi++) { b.Body(bi, out hc, out hr); if (hr > 0 && Sim.Flat(p.Pos - hc).magnitude <= hr + p.Radius) hitBody = bi; }
+                if (hitBody >= 0)
                 {
-                    var contact = b.transform.position + Sim.Flat(p.Pos - b.transform.position).normalized * b.BodyRadius + Vector3.up * b.HitHeight;
+                    var contact = hc + Sim.Flat(p.Pos - hc).normalized * hr + Vector3.up * b.HitHeight;
                     live.Remove(p);
                     w.Actor = p.Owner;
                     int dealt = w.DamageBoss(p.Damage, contact, p.Ability);

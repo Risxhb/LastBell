@@ -24,6 +24,16 @@ namespace LastBell.Run
         public string PhaseName { get; protected set; } = "";
         public string Current { get; protected set; } = "";   // attack in progress, for the HUD / tests
         public virtual string HudLine => null;         // extra boss-bar line (e.g. a push timer); null = none
+        // Extra hit bodies (the Bellkeeper Ultimate's P4 gear cores): solid like the body, and a player hit on one counts as
+        // a hit on the boss (the same bar). Body 0 is always the boss itself; other bosses offer none.
+        public virtual int ExtraBodies => 0;
+        public virtual void ExtraBody(int i, out Vector3 center, out float radius) { center = transform.position; radius = 0; }
+        public int BodyCount => 1 + ExtraBodies;
+        public void Body(int i, out Vector3 center, out float radius)
+        {
+            if (i == 0) { center = transform.position; radius = BodyRadius; }
+            else ExtraBody(i - 1, out center, out radius);
+        }
         public virtual float[] HudMarks => null;       // phase thresholds drawn on the boss bar (fractions); null = the HUD's defaults
         public event Action<BossEncounter> Defeated;
         public event Action<BossEncounter, string> PhaseChanged;

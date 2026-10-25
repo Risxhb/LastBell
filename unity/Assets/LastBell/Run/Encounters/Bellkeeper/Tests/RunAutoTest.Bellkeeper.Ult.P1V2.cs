@@ -129,6 +129,36 @@ namespace LastBell.Run
             }
         }
 
+        // -lastbellTestAbility bots_p4v2: P4 The Gear Floor from its practice start (sizes and skills), and the full v2 attempt
+        IEnumerator UltP4V2Checks()
+        {
+            Note("---------- Ultimate v2 · P4 The Gear Floor (proposal) ----------");
+            var runs = new (string label, int n, UltimateBot.Skill skill, string seg, bool must)[]
+            {
+                ("v2 P4 party4 perfect", 4, UltimateBot.Skill.Perfect, "P4", true),
+                ("v2 P1-P4 party4 perfect", 4, UltimateBot.Skill.Perfect, "P1", false),
+                ("v2 P4 party8 perfect", 8, UltimateBot.Skill.Perfect, "P4", false),
+                ("v2 P4 trio perfect", 3, UltimateBot.Skill.Perfect, "P4", false),
+                ("v2 P4 party4 late", 4, UltimateBot.Skill.Late, "P4", false),
+                ("v2 P4 party4 miss", 4, UltimateBot.Skill.Miss, "P4", false),
+            };
+            foreach (var r in runs)
+            {
+                GearFloor.Log = r.seg == "P4";
+                yield return UltRun(r.label, r.n, r.skill, r.seg, 480, "Vanguard");
+                GearFloor.Log = false;
+                if (ultLast == null || bk == null) continue;
+                var gf = bk.UltGear; int taken = bkHits.Sum(h => h.Damage);
+                Note($"   gear floor slams {gf.Slams} · jams {gf.Jams} · damage taken {taken} ({string.Join(", ", bkHits.GroupBy(h => h.Source).Select(g => g.Key + " " + g.Sum(h => h.Damage)))})" + (gf.Fails.Count > 0 ? " · " + string.Join("; ", gf.Fails.Take(6)) : ""));
+                Note("   dealt: " + string.Join(", ", d.World.Players.Select(p => $"{p.ClassName} {(d.World.DealtBy.TryGetValue(p, out int v) ? v : 0)}")));
+                if (r.must)
+                {
+                    Check($"{r.label}: clears", ultLast.Killed, ultLast.ToString());
+                    Check($"{r.label}: 0 damage taken, 0 potions", taken == 0 && ultLast.Potions == 0, $"damage {taken}, potions {ultLast.Potions}");
+                }
+            }
+        }
+
         // watch = live in the window at real speed (no capture): the full P1 attempt plus 4 s of the outcome
         IEnumerator UltP1V2Video(bool watch = false, UltimateBot.Skill skill = UltimateBot.Skill.Perfect, string label = "perfect", string seg = "P1")
         {

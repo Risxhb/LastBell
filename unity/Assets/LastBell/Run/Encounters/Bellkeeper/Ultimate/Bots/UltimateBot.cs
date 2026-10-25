@@ -47,14 +47,24 @@ namespace LastBell.Run
             // the bot only adds basic attacks from range (no lunges or casts that would carry it into a bullet)
             if (boss.Mechanics != null)
                 foreach (var m in boss.Mechanics)
-                    if (m is OpenHour oh && oh.Running && oh.Steer(me, Mode, out var vel))
+                    if (m.Running && m.Steer(me, Mode, out var vel))
                     {
                         inp.Move = ToScreen(vel / PlayerController.WalkSpeed);
                         inp.Sprint = vel.magnitude > PlayerController.WalkSpeed + 0.1f;
-                        float gap = Sim.Flat(bpos - pos).magnitude - boss.BodyRadius;
-                        if (Attacks && me.ClassName != "Vanguard" && gap <= Range(me) + 1f && tick - lastPress >= 6) { inp.P0 = inp.H0 = true; lastPress = tick; }
+                        for (int i = 0; i < cd.Length; i++) if (cd[i] > 0) cd[i]--;
+                        if (m.AttackTarget(me, out var aim, out float reach, out bool full))
+                        {
+                            // the phase names a target (P4: the nearest gear core or the boss) and whether the whole kit is safe
+                            inp.Aim = aim + Vector3.up * 0.1f;
+                            if (Attacks && reach <= Range(me) + 0.6f) { if (full) Attack(me, ref inp, false); else if (tick - lastPress >= 6) { inp.P0 = inp.H0 = true; lastPress = tick; } }
+                        }
+                        else
+                        {
+                            float gap = Sim.Flat(bpos - pos).magnitude - boss.BodyRadius;
+                            if (Attacks && me.ClassName != "Vanguard" && gap <= Range(me) + 1f && tick - lastPress >= 6) { inp.P0 = inp.H0 = true; lastPress = tick; }
+                        }
                         if (me.Potions > 0 && me.Hp < 55 && me.Hp < PlayerController.MaxHp) inp.Potion = tick % 4 == 0;
-                        DebugLine = $"open hour: {oh.JobOf(me)} v ({vel.x:0.0},{vel.z:0.0}) at ({pos.x:0.0},{pos.z:0.0})";
+                        DebugLine = $"{m.Name}: v ({vel.x:0.0},{vel.z:0.0}) at ({pos.x:0.0},{pos.z:0.0})";
                         return inp;
                     }
 
