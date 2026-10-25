@@ -19,6 +19,13 @@ namespace LastBell.Run
     // Melee parks against its core, where the floor barely moves. 5-8 players: two per gear. Below 4: only gears with a
     // player assigned must be held.
     // Bots steer (Steer) with the simulation's route search, the floor's drift included.
+    // The two transitions live here too (proposal, sims/p5-example.html, Chzy18 25 Oct "the entire fight put together"):
+    //   THE FLOOR BREAKS (cue "break", P3 -> P4): 15 s before the gears turn (P4 time runs from -15). P3's spiral arms fire
+    //     twice as fast; the floor cracks along the gear outlines and falls in two waves (-9 s: beyond 9 m off the gears,
+    //     -5 s: everything off the gears); at -3 s the gears lock: each player's first gear must be held or the train jams.
+    //   THE TRAIN RUNS WILD (GoWild(), P4 -> P5): after the last slam, 15 s: the gears speed up x1 -> x2.2, a single hammer
+    //     slams every 2.5 s (shown 1.5 s, 12 shards), then the outer gears tear loose N, E, S, W at 9, 10.5, 12, 13.5 s (anyone
+    //     on one goes with it; each sprays 5 shards); everyone ends on the centre gear and the great bell falls (P5).
     public sealed class GearFloor : UltimateMechanic
     {
         public override string Id => UltimateMechanics.GearFloor;
@@ -30,9 +37,12 @@ namespace LastBell.Run
         const int Flip = 3, Shards = 16, ShardDamage = 50;
         static readonly string[] GN = { "N", "E", "S", "W", "CENTRE" };
 
-        sealed class Shard { public Vector3 P, V; public bool Gone; }
+        sealed class Shard { public Vector3 P, V; public bool Gone; public string What = "a hammer shard"; }
         readonly List<Shard> shards = new List<Shard>();
-        int t0, slams, seed; bool stop;
+        int t0, slams, seed; bool stop, goWild, wild, breakMode, locked; float settle, wildAt, nextArm; int wildSlams;
+        readonly bool[] launched = new bool[4];
+        public const float BreakLen = 15f, WildLen = 15f;
+        public bool CoreGone(int g) => launched[g];
         readonly float[] spin = new float[5];
         public int Slams => slams;
         public int Jams { get; private set; }
@@ -40,6 +50,7 @@ namespace LastBell.Run
 
         public override UltCue DefaultCue() => new UltCue { Variant = "practice" };
         public void StopAfterSlam() => stop = true;
+        public void GoWild() => goWild = true;   // after the next slam: The Train Runs Wild, then the cast ends
 
         // ---------------- geometry and the rule (world coordinates; angles via the plan dial) ----------------
         float T => (Now - t0) / (float)Sim.Hz;
@@ -49,11 +60,14 @@ namespace LastBell.Run
         public static Vector3 Core(int g) => GearCentre(g);
         static Vector3 MeshPoint(int g) => Dir(90f * g) * C_R;
         int SpinSign(float t) => (Mathf.FloorToInt(t / Slam) / Flip) % 2 == 1 ? -1 : 1;
-        float Omega(int g, float t) => SpinSign(t) * (g == 4 ? W0 : -W0 * C_R / O_R);
-        static int GearAt(Vector3 q)
+        float SpeedK(float t) => t < 0 ? 0 : wild ? 1 + 1.2f * Mathf.Min(1, (t - wildAt) / 12f) : 1;   // locked in the break, faster and faster in the wild
+        float Omega(int g, float t) => SpeedK(t) * SpinSign(t) * (g == 4 ? W0 : -W0 * C_R / O_R);
+        float LaunchAt(int g) => wildAt + 9 + 1.5f * g;
+        bool FloorGone(Vector3 q, float t) => t >= settle || (breakMode && t < 0 && (t >= -5 || (t >= -9 && Sim.Flat(q).magnitude > 9)));
+        int GearAt(Vector3 q)
         {
             int best = -1; float bd = 9;
-            for (int i = 0; i < 5; i++) { float d = (Sim.Flat(q) - GearCentre(i)).magnitude / GearR(i); if (d <= 1 && d < bd) { bd = d; best = i; } }
+            for (int i = 0; i < 5; i++) { if (i < 4 && launched[i]) continue; float d = (Sim.Flat(q) - GearCentre(i)).magnitude / GearR(i); if (d <= 1 && d < bd) { bd = d; best = i; } }
             return best;
         }
         Vector3 FloorVel(Vector3 q, float t)
@@ -92,11 +106,12 @@ namespace LastBell.Run
         // what kills a grounded player at q at time t ("" = nothing)
         string Deadly(Vector3 q, float t)
         {
-            if (GearAt(q) < 0) return t < Settle ? "" : "the pit";   // the floor is still whole for the first Settle seconds
+            if (GearAt(q) < 0) return FloorGone(q, t) ? "the pit" : "";   // the floor is still whole at first (Settle, or the break's waves)
             for (int i = 0; i < 4; i++)
             {
+                if (launched[i]) continue;
                 var (a, b) = Pawl(i); if (SegDist(q, a, b) < PR + 0.15f) return "a pawl";
-                if (t >= Settle && Biting(i, t) && (Sim.Flat(q) - MeshPoint(i)).magnitude < BiteR + PR) return "the teeth";
+                if (t >= settle && !wild && Biting(i, t) && (Sim.Flat(q) - MeshPoint(i)).magnitude < BiteR + PR) return "the teeth";
             }
             return "";
         }
@@ -106,7 +121,9 @@ namespace LastBell.Run
         public override IEnumerable<int> Cast()
         {
             Boss.ShowAttack(Name);
-            stop = false; t0 = Now; slams = 0; seed = Cue.Seed % 997; shards.Clear(); plans.Clear();
+            stop = false; goWild = false; wild = false; locked = false; wildSlams = 0; for (int g = 0; g < 4; g++) launched[g] = false;
+            breakMode = Cue.Variant == "break"; settle = breakMode ? 0 : Settle; nextArm = -BreakLen + 0.5f;
+            t0 = Now + (breakMode ? Sim.Ticks(BreakLen) : 0); slams = 0; seed = Cue.Seed % 997; shards.Clear(); plans.Clear();
             for (int i = 0; i < 5; i++) spin[i] = 0;
             Build();
             var telegraphs = new List<Hazard>();
@@ -127,12 +144,61 @@ namespace LastBell.Run
                 foreach (var p in W.Players)
                 {
                     if (p.Down) continue; var q = Sim.Flat(p.transform.position);
-                    foreach (var s in shards) if (!s.Gone && (q - s.P).magnitude < PR + BR) { s.Gone = true; Hit(p, ShardDamage, "a hammer shard"); }
+                    foreach (var s in shards) if (!s.Gone && (q - s.P).magnitude < PR + BR) { s.Gone = true; Hit(p, ShardDamage, s.What); }
                 }
                 shards.RemoveAll(s => s.Gone || s.P.magnitude > 12.5f);
+                // THE FLOOR BREAKS: P3's spiral arms (twice as fast) until the gears lock; the lock
+                if (breakMode && t < 0)
+                {
+                    while (nextArm <= nt && nextArm < -3) { for (int j = 0; j < 3; j++) { var d = Dir(40 * (nextArm + BreakLen) + 120 * j); shards.Add(new Shard { P = d * Boss.BodyRadius, V = d * 4f, What = "a spiral bullet" }); } nextArm += 0.38f; }
+                    if (t < -9 && nt >= -9) Boss.PlanLog.Add((Now, "the floor breaks: wave 1"));
+                    if (t < -5 && nt >= -5) { Boss.PlanLog.Add((Now, "the floor breaks: wave 2")); CameraShake.Shake(0.2f, 0.4f); }
+                    if (!locked && nt >= -3)
+                    {
+                        locked = true; Boss.PlanLog.Add((Now, "the gears lock"));
+                        for (int g = 0; g < 4; g++)
+                        {
+                            bool assigned = false, held = false;
+                            foreach (var p in W.Players) { if (p.Down) continue; if ((HourOf(p) + 2) % 4 == g) assigned = true; if (GearAt(p.transform.position) == g) held = true; }
+                            if (assigned && !held) { Jams++; Fails.Add($"the lock: gear {GN[g]} empty"); Ult.Wipe($"The gear train jams (gear {GN[g]} empty)"); break; }
+                        }
+                        if (Boss.Ult.WipeCause != null) break;
+                    }
+                }
+                // THE TRAIN RUNS WILD
+                if (wild)
+                {
+                    float tw = nt - wildAt;
+                    int ws = Mathf.FloorToInt(tw / 2.5f);
+                    if (ws >= 1 && ws <= 3 && ws > wildSlams)
+                    {
+                        wildSlams = ws; int sg = WildSlamGear(ws);
+                        if (!launched[sg])
+                        {
+                            foreach (var p in W.Players) if (!p.Down && Grounded(p) && GearAt(p.transform.position) == sg) Hit(p, UltimateState.Lethal, "the hammer");
+                            for (int j = 0; j < 12; j++) shards.Add(new Shard { P = GearCentre(sg), V = Dir(30 * j + 7 * ws) * ShardSpeed });
+                            W.BossFx.TollResolve(GearCentre(sg), 0.5f, O_R); CameraShake.Shake(0.15f, 0.25f);
+                        }
+                    }
+                    if (wildTele == null && ws < 3 && tw >= 2.5f * (ws + 1) - 1.5f)
+                    {
+                        int sg = WildSlamGear(ws + 1); float left2 = 2.5f * (ws + 1) - tw;
+                        wildTele = Spawn(new Hazard { Source = Source + ": the hammer", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = GearCentre(sg), Radius = O_R, LockAt = 0, ResolveAt = UltShapes.ResolveIn(Mathf.Max(1, Sim.Ticks(left2))), Damage = 0, Knockback = 0, Stun = 0, HitOnResolve = false });
+                    }
+                    if (wildTele != null && wildTele.Age >= wildTele.ResolveAt) wildTele = null;
+                    for (int g = 0; g < 4; g++)
+                        if (!launched[g] && nt >= LaunchAt(g))
+                        {
+                            foreach (var p in W.Players) if (!p.Down && GearAt(p.transform.position) == g) Hit(p, UltimateState.Lethal, $"gear {GN[g]} (it tore loose)");
+                            launched[g] = true; Boss.PlanLog.Add((Now, $"gear {GN[g]} tears loose"));
+                            for (int j = -2; j <= 2; j++) shards.Add(new Shard { P = GearCentre(g), V = Dir(90f * g + 180 + 24 * j) * 5f });
+                            CameraShake.Shake(0.25f, 0.35f);
+                        }
+                    if (tw >= WildLen) { Boss.PlanLog.Add((Now, "the great bell falls")); W.BossFx.TollResolve(Vector3.zero, 1f, 11.5f); CameraShake.Shake(0.4f, 0.7f); break; }
+                }
                 // the hammer: telegraph, then the slam
                 int k = Mathf.FloorToInt(nt / Slam) + 1;
-                if (telegraphs.Count == 0 && Revealed(k, nt))
+                if (!wild && k >= 1 && telegraphs.Count == 0 && Revealed(k, nt))
                     foreach (var g in SlamGears(k))
                     {
                         int left = Mathf.Max(1, Sim.Ticks(k * Slam - t));
@@ -141,7 +207,7 @@ namespace LastBell.Run
                         telegraphs.Add(h);
                     }
                 int ks = Mathf.FloorToInt(nt / Slam);
-                if (ks >= 1 && ks > slams)
+                if (!wild && ks >= 1 && ks > slams)
                 {
                     slams = ks; telegraphs.Clear();
                     var ss = SlamGears(ks);
@@ -162,15 +228,18 @@ namespace LastBell.Run
                     }
                     Boss.PlanLog.Add((Now, $"gear slam {ks} {string.Join("+", ss.ConvertAll(g => GN[g]))}"));
                     if (stop) break;
+                    if (goWild) { wild = true; goWild = false; wildAt = nt; Boss.PlanLog.Add((Now, "the train runs wild")); }
                 }
                 if (Log && (Now - t0) % 30 == 0) foreach (var p in W.Players) if (!p.Down) Debug.Log($"[gear floor] {t:0.0}s {UltimateState.Roman[HourOf(p) + 1]} at ({p.transform.position.x:0.0},{p.transform.position.z:0.0}) h{p.Height:0.00}{(p.Dashing ? " dash" : "")} gear {GearAt(p.transform.position)} target {TargetOf(p, k, t)} job {JobOf(p)}");
                 if (Boss.Ult.WipeCause != null) break;
                 Present(nt);
                 yield return 1;
             }
-            shards.Clear();
+            shards.Clear(); wildTele = null;
             Teardown();
         }
+        Hazard wildTele;
+        int WildSlamGear(int j) { for (int n = 0; n < 4; n++) { int g = SlamGear(100 + j + 7 * n); if (!launched[g]) return g; } return SlamGear(100 + j); }
 
         void Hit(PlayerController p, int dmg, string what)
         {
@@ -187,9 +256,17 @@ namespace LastBell.Run
 
         Vector3 GoalOf(PlayerController p, float t, out string job, out int k)
         {
-            k = Mathf.FloorToInt(t / Slam) + 1; int tg = TargetOf(p, k, t), cur = GearAt(p.transform.position);
+            k = Mathf.Max(1, Mathf.FloorToInt(t / Slam) + 1); int tg = TargetOf(p, k, t), cur = GearAt(p.transform.position);
             job = "→ " + GN[tg];
             int i = W.Players.IndexOf(p);
+            if (wild)
+            {
+                // ride my gear until it is hammered or about to tear loose, then cross to the centre gear and stay there
+                float tw = t - wildAt; int ws = Mathf.FloorToInt(tw / 2.5f) + 1;
+                bool hammered = cur >= 0 && cur < 4 && ws <= 3 && 2.5f * ws - tw < 1.5f && WildSlamGear(ws) == cur;
+                if (cur >= 0 && cur < 4 && !hammered && tw < 6.5f && tw < LaunchAt(cur) - wildAt - 3) tg = cur; else tg = 4;
+                job = tg == 4 ? "→ CENTRE" : "ride " + GN[tg];
+            }
             Vector3 Park(int g) => g == 4
                 ? Dir(45 + 90 * (i % 4) + spin[4] + (i >= 4 ? 30 : 0)) * 2.3f
                 : GearCentre(g) + Dir(90f * g + 180 + (SpinSign(t) > 0 ? 35 : -35) + (i >= 4 ? 70 : 0)) * (Melee(p) ? HubR + PR + 0.5f : 2.6f);
@@ -234,14 +311,14 @@ namespace LastBell.Run
                 float d = (q - Sim.Flat(c)).magnitude - r - PR;
                 if (d < reach) { reach = d; aim = c; }
             }
-            float t = T; int k = Mathf.FloorToInt(t / Slam) + 1;
-            fullKit = GearAt(q) == TargetOf(p, k, t) && k * Slam - t > Warn + 1.5f;   // settled on its gear, the hammer far off
+            float t = T; int k = Mathf.Max(1, Mathf.FloorToInt(t / Slam) + 1);
+            fullKit = !wild && t >= 0 && GearAt(q) == TargetOf(p, k, t) && k * Slam - t > Warn + 1.5f;   // settled on its gear, the hammer far off
             // still travelling, or about to hop: no swings (the Vanguard's basic roots it and lunges it into the core)
             // casts slow you below the floor's drift: a basic attack needs 0.5 s of drift clear of every mesh and pawl, the whole kit 1.5 s
             int clearSteps = 30; var dq = q;
             for (int s = 0; s <= 30; s++) { bool hit = false; for (int g = 0; g < 4; g++) { if ((dq - MeshPoint(g)).magnitude < BiteR + PR + 0.3f) hit = true; var (pa, pb) = Pawl(g); if (SegDist(dq, pa, pb) < PR + 0.5f) hit = true; } if (hit) { clearSteps = s; break; } dq += FloorVel(dq, t + s * 0.05f) * 0.05f; }
             if (clearSteps < 30) fullKit = false;
-            if (clearSteps < 10 || GearAt(q) != TargetOf(p, k, t) || (plans.TryGetValue(p, out var pl) && (q - Sim.Flat(pl.Goal)).magnitude > 1.0f)) { reach = 99; fullKit = false; }
+            if (clearSteps < 10 || (!wild && GearAt(q) != TargetOf(p, k, t)) || (plans.TryGetValue(p, out var pl) && (q - Sim.Flat(pl.Goal)).magnitude > 1.0f)) { reach = 99; fullKit = false; }
             return true;
         }
 
@@ -249,12 +326,15 @@ namespace LastBell.Run
         Vector3 Search(PlayerController p, Vector3 pos, float t, Vector3 goal, int k)
         {
             const float Leg = 0.2f; const int Legs = 3, Samples = 4, BeamW = 10; float dtS = Leg / Samples; int N = Legs * Samples;
-            float slamT = k * Slam; var ss = SlamGears(k); bool revealed = Revealed(k, t + Leg * Legs);
+            k = Mathf.Max(1, k); float slamT = wild ? float.MaxValue : k * Slam; var ss = SlamGears(k); bool revealed = !wild && Revealed(k, t + Leg * Legs);
+            float tw0 = t - wildAt; int wsN = Mathf.FloorToInt(tw0 / 2.5f) + 1; float wSlamT = wild && wsN <= 3 ? wildAt + 2.5f * wsN : float.MaxValue; int wSlamG = wild && wsN <= 3 ? WildSlamGear(wsN) : -1;
             for (int s = 0; s < N; s++)
             {
                 float tq = t + (s + 1) * dtS; var arr = pred[s] ?? (pred[s] = new List<Vector3>()); arr.Clear();
                 foreach (var sh in shards) arr.Add(sh.P + sh.V * (tq - t));
                 if (tq > slamT) foreach (var g in ss) for (int j = 0; j < Shards; j++) arr.Add(GearCentre(g) + Dir(360f / Shards * j + 11 * k) * ShardSpeed * (tq - slamT));
+                if (tq > wSlamT && wSlamG >= 0) for (int j = 0; j < 12; j++) arr.Add(GearCentre(wSlamG) + Dir(30 * j + 7 * wsN) * ShardSpeed * (tq - wSlamT));
+                if (wild) for (int g = 0; g < 4; g++) { float la = LaunchAt(g); if (!launched[g] && tq > la) for (int j = -2; j <= 2; j++) arr.Add(GearCentre(g) + Dir(90f * g + 180 + 24 * j) * 5f * (tq - la)); }
             }
             var bossP = Sim.Flat(Boss.transform.position); string why = ""; float ms = p.Kit != null ? p.Kit.MoveScale : 1f;
             bool Dead(Vector3 q, int s, ref float risk)
@@ -262,16 +342,17 @@ namespace LastBell.Run
                 float tq = t + (s + 1) * dtS;
                 if (Deadly(q, tq) != "") { why = "deadly " + Deadly(q, tq); return true; }
                 { float c = (q - bossP).magnitude - Boss.BodyRadius - PR; if (c < -0.05f) { why = "boss"; return true; } if (c < 0.4f) risk += (0.4f - c) * 2; }   // the boss is solid, not deadly
-                bool inside = false; for (int g = 0; g < 5; g++) if ((q - GearCentre(g)).magnitude <= GearR(g) - 0.25f) inside = true;
-                if (!inside && tq >= Settle - 0.1f) { why = "off gear"; return true; }
-                for (int g = 0; g < 4; g++) { float c = (q - GearCentre(g)).magnitude - HubR - PR; if (c < -0.1f) { why = "core"; return true; } if (c < 0.3f) risk += (0.3f - c) * 1.5f; }   // the core is solid, not deadly: only a route through it is out
+                bool inside = false; for (int g = 0; g < 5; g++) if ((g == 4 || (!launched[g] && !(wild && tq >= LaunchAt(g) - 0.25f))) && (q - GearCentre(g)).magnitude <= GearR(g) - 0.25f) inside = true;
+                if (!inside && FloorGone(q, tq + 0.1f)) { why = "off gear"; return true; }
+                if (wSlamG >= 0 && tq >= wSlamT - dtS * 0.5f && tq < wSlamT + dtS * 0.5f && GearAt(q) == wSlamG) { why = "slam"; return true; }
+                for (int g = 0; g < 4; g++) { if (launched[g]) continue; float c = (q - GearCentre(g)).magnitude - HubR - PR; if (c < -0.1f) { why = "core"; return true; } if (c < 0.3f) risk += (0.3f - c) * 1.5f; }   // the core is solid, not deadly: only a route through it is out
                 if (revealed && tq >= slamT - dtS * 0.5f && tq < slamT + dtS * 0.5f && ss.Contains(GearAt(q))) { why = "slam"; return true; }
                 float mc = 9; foreach (var b in pred[s]) { float c = (q - b).magnitude - PR - BR; if (c < mc) mc = c; }
                 if (mc < 0.12f) { why = "shard"; return true; } if (mc < 0.5f) risk += (0.5f - mc) * 2;
-                for (int g = 0; g < 4; g++) { float depth = BiteR + PR + 0.1f - (q - MeshPoint(g)).magnitude; if (depth > 0 && BiteWithin(g, tq - 0.08f, depth / 3f + 0.15f)) { why = "teeth"; return true; } }   // inside a mesh only if it can get out before the bite
+                for (int g = 0; g < 4; g++) { float depth = BiteR + PR + 0.1f - (q - MeshPoint(g)).magnitude; if (tq >= settle && !wild && depth > 0 && BiteWithin(g, tq - 0.08f, depth / 3f + 0.15f)) { why = "teeth"; return true; } }   // inside a mesh only if it can get out before the bite
                 int gq = GearAt(q);
                 if (gq >= 0 && gq < 4) { float edge = O_R - (q - GearCentre(gq)).magnitude; if (edge < 0.6f && (q - MeshPoint(gq)).magnitude > 1.4f) risk += (0.6f - edge) * 3; }
-                for (int g = 0; g < 4; g++) { var (a, b) = Pawl(g); float c = SegDist(q, a, b) - PR; if (c < 0.8f) risk += (0.8f - c) * 2; }
+                for (int g = 0; g < 4; g++) { if (launched[g]) continue; var (a, b) = Pawl(g); float c = SegDist(q, a, b) - PR; if (c < 0.8f) risk += (0.8f - c) * 2; }
                 return false;
             }
             var dirs = new List<Vector3>(); for (int j = 0; j < 16; j++) dirs.Add(Dir(22.5f * j));
@@ -303,7 +384,7 @@ namespace LastBell.Run
         }
 
         // ---------------- presentation (stand-ins) ----------------
-        Transform root, mySpot, pit; readonly Transform[] pivots = new Transform[5]; readonly Renderer[] gearR = new Renderer[5], meshR = new Renderer[4];
+        Transform root, mySpot, pit, floorIn; readonly List<Transform>[] gearParts = { new List<Transform>(), new List<Transform>(), new List<Transform>(), new List<Transform>() }; readonly Transform[] pivots = new Transform[5]; readonly Renderer[] gearR = new Renderer[5], meshR = new Renderer[4];
         readonly List<Transform> pool = new List<Transform>();
         static Material pitM, gearM, centreM, toothM, coreM, pawlM, meshDim, meshWarn, meshBite, hotM, shardM, spotM;
         void Build()
@@ -320,19 +401,21 @@ namespace LastBell.Run
             }
             root = new GameObject("The Gear Floor (stand-in)").transform; root.SetParent(W.Root, false);
             pit = Prim.Make(PrimitiveKind.Cylinder, root, new Vector3(0, 0.02f, 0), new Vector3(23.6f, 0.01f, 23.6f), Color.white); Mat(pit, pitM);
+            floorIn = Prim.Make(PrimitiveKind.Cylinder, root, new Vector3(0, 0.03f, 0), new Vector3(18f, 0.01f, 18f), Color.white); Mat(floorIn, centreM); floorIn.gameObject.SetActive(false);
             for (int g = 0; g < 5; g++)
             {
                 var c = GearCentre(g); float r = GearR(g);
                 var disc = Prim.Make(PrimitiveKind.Cylinder, root, c + Vector3.up * 0.05f, new Vector3(r * 2, 0.02f, r * 2), Color.white); Mat(disc, g == 4 ? centreM : gearM); gearR[g] = disc.GetComponent<Renderer>();
                 var pv = new GameObject("gear " + GN[g]).transform; pv.SetParent(root, false); pv.position = c; pivots[g] = pv;
+                if (g < 4) { gearParts[g].Add(disc); gearParts[g].Add(pv); }
                 int teeth = g == 4 ? 12 : 18;
                 for (int j = 0; j < teeth; j++) { float a = 360f / teeth * j; Mat(Prim.Make(PrimitiveKind.Cube, pv, Dir(a) * (r - 0.15f) + Vector3.up * 0.09f, new Vector3(0.45f, 0.08f, 0.3f), Color.white, 0, Quaternion.Euler(0, a, 0)), toothM); }
                 for (int j = 0; j < 4; j++) { float a = 90f * j; Mat(Prim.Make(PrimitiveKind.Cube, pv, Dir(a) * (r * 0.5f) + Vector3.up * 0.08f, new Vector3(0.18f, 0.04f, r * 0.9f), Color.white, 0, Quaternion.Euler(0, a, 0)), toothM); }
                 if (g < 4)
                 {
-                    Mat(Prim.Make(PrimitiveKind.Cylinder, root, c + Vector3.up * 0.6f, new Vector3(HubR * 2, 0.6f, HubR * 2), Color.white), coreM);
+                    var core = Prim.Make(PrimitiveKind.Cylinder, root, c + Vector3.up * 0.6f, new Vector3(HubR * 2, 0.6f, HubR * 2), Color.white); Mat(core, coreM); gearParts[g].Add(core);
                     var (a2, b2) = Pawl(g); var mid = (a2 + b2) * 0.5f;
-                    Mat(Prim.Make(PrimitiveKind.Cube, root, mid + Vector3.up * 0.25f, new Vector3(0.35f, 0.5f, (b2 - a2).magnitude), Color.white, 0, Quaternion.LookRotation(b2 - a2)), pawlM);
+                    var pawl = Prim.Make(PrimitiveKind.Cube, root, mid + Vector3.up * 0.25f, new Vector3(0.35f, 0.5f, (b2 - a2).magnitude), Color.white, 0, Quaternion.LookRotation(b2 - a2)); Mat(pawl, pawlM); gearParts[g].Add(pawl);
                     var m = Prim.Make(PrimitiveKind.Cylinder, root, MeshPoint(g) + Vector3.up * 0.1f, new Vector3(BiteR * 2, 0.02f, BiteR * 2), Color.white); Mat(m, meshDim); meshR[g] = m.GetComponent<Renderer>();
                 }
             }
@@ -344,9 +427,18 @@ namespace LastBell.Run
         {
             if (!root) return;
             for (int g = 0; g < 5; g++) if (pivots[g]) pivots[g].rotation = Quaternion.Euler(0, -spin[g], 0);
-            if (pit) pit.gameObject.SetActive(t >= Settle || Mathf.FloorToInt(t * 6) % 2 == 0 && t > Settle - 1.5f);   // the floor flickers out, then the pit
-            int k = Mathf.FloorToInt(t / Slam) + 1; var ss = Revealed(k, t) ? SlamGears(k) : new List<int>();
-            for (int g = 0; g < 4; g++) if (gearR[g]) gearR[g].sharedMaterial = ss.Contains(g) ? hotM : gearM;
+            if (breakMode && t < 0)
+            {
+                // the floor breaks in two waves: the cracks flash first
+                bool flash = ((t > -11 && t < -9) || (t > -7 && t < -5)) && Mathf.FloorToInt(t * 6) % 2 == 0;
+                if (pit) pit.gameObject.SetActive(t >= -9); if (floorIn) floorIn.gameObject.SetActive(t >= -9 && t < -5);
+                for (int g = 0; g < 4; g++) if (gearR[g]) gearR[g].sharedMaterial = flash ? hotM : gearM;
+            }
+            else { if (pit) pit.gameObject.SetActive(t >= settle || Mathf.FloorToInt(t * 6) % 2 == 0 && t > settle - 1.5f); if (floorIn) floorIn.gameObject.SetActive(false); }   // the floor flickers out, then the pit
+            for (int g = 0; g < 4; g++) { bool flashCore = wild && !launched[g] && t > LaunchAt(g) - 2 && Mathf.FloorToInt(t * 6) % 2 == 0; foreach (var x in gearParts[g]) if (x) x.gameObject.SetActive(!launched[g] && !(flashCore && x == gearParts[g][2])); }
+            int k = Mathf.FloorToInt(t / Slam) + 1; var ss = !wild && k >= 1 && Revealed(k, t) ? SlamGears(k) : new List<int>();
+            if (wild) { float tw = t - wildAt; int ws = Mathf.FloorToInt(tw / 2.5f) + 1; if (ws <= 3 && 2.5f * ws - tw < 1.5f) ss.Add(WildSlamGear(ws)); }
+            if (!(breakMode && t < 0)) for (int g = 0; g < 4; g++) if (gearR[g]) gearR[g].sharedMaterial = ss.Contains(g) ? hotM : gearM;
             for (int g = 0; g < 4; g++)
             {
                 float ph = ((t + g * BiteEvery / 4) % BiteEvery + BiteEvery) % BiteEvery, soon = BiteEvery - ph;
@@ -365,7 +457,7 @@ namespace LastBell.Run
         void Teardown()
         {
             if (root) Object.Destroy(root.gameObject);
-            root = mySpot = pit = null; pool.Clear(); plans.Clear();
+            root = mySpot = pit = floorIn = null; pool.Clear(); plans.Clear(); foreach (var l in gearParts) l.Clear();
             for (int i = 0; i < 5; i++) { pivots[i] = null; gearR[i] = null; } for (int i = 0; i < 4; i++) meshR[i] = null;
         }
 
@@ -378,7 +470,7 @@ namespace LastBell.Run
                 nameStyle = new GUIStyle(GUI.skin.label) { fontSize = 16, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
                 midStyle = new GUIStyle(nameStyle) { fontSize = 24 }; bigStyle = new GUIStyle(nameStyle) { fontSize = 34 };
             }
-            float t = T; int k = Mathf.FloorToInt(t / Slam) + 1; float left = k * Slam - t;
+            float t = T; int k = Mathf.Max(1, Mathf.FloorToInt(t / Slam) + 1); float left = k * Slam - t;
             for (int g = 0; g < 4; g++) Label(cam, GearCentre(g) + Dir(90f * g + 90) * 3.0f, 0.3f, GN[g], new Color(0.97f, 0.95f, 0.88f), midStyle);
             for (int g = 0; g < 4; g++) Label(cam, GearCentre(g), 1.5f, "CORE", new Color(1f, 0.85f, 0.45f), nameStyle);
             for (int i = 0; i < W.Players.Count; i++)
@@ -386,6 +478,18 @@ namespace LastBell.Run
                 var p = W.Players[i]; if (p.Down) continue;
                 int tg = TargetOf(p, k, t);
                 Label(cam, p.transform.position, 2.9f, (i == 0 ? "YOU " : "") + UltimateState.Roman[HourOf(p) + 1] + "  → " + GN[tg], tg == 4 ? new Color(1f, 0.82f, 0.48f) : Color.white, nameStyle);
+            }
+            if (breakMode && t < 0)
+            {
+                string bt = t < -9 ? $"the floor cracks · the outer floor falls in {-9 - t:0.0}s" : t < -5 ? $"everything but the gears falls in {-5 - t:0.0}s" : t < -3 ? $"the gears lock in {-3 - t:0.0}s: be on YOUR gear" : $"the gears turn in {-t:0.0}s";
+                bigStyle.normal.textColor = t < -5 ? new Color(1f, 0.85f, 0.55f) : new Color(1f, 0.42f, 0.3f);
+                GUI.Label(new Rect(0, Screen.height * 0.17f, Screen.width, 50), "THE FLOOR BREAKS · " + bt, bigStyle); return;
+            }
+            if (wild)
+            {
+                float tw = t - wildAt; string wt = tw < 9 ? $"the gears run wild x{SpeedK(t):0.0} · the hammer every 2.5 s" : tw < WildLen ? "the gears tear loose: get to the CENTRE" : "";
+                bigStyle.normal.textColor = new Color(1f, 0.42f, 0.3f);
+                GUI.Label(new Rect(0, Screen.height * 0.17f, Screen.width, 50), "THE TRAIN RUNS WILD · " + wt, bigStyle); return;
             }
             var ss = SlamGears(k);
             string text = Revealed(k, t) ? $"HAMMER → {string.Join(" + ", ss.ConvertAll(g => GN[g]))} in {left:0.0}s" : $"hammer in {left:0.0}s · gear unknown" + (k % 3 == 0 ? " · TWO gears" : "");
@@ -404,7 +508,9 @@ namespace LastBell.Run
         {
             if (!Running || p == null) return null;
             float t = T; int k = Mathf.FloorToInt(t / Slam) + 1;
-            if (t < Settle) return $"the floor falls in {Settle - t:0.0}s · get onto gear {GN[TargetOf(p, k, t)]}";
+            if (breakMode && t < 0) return $"the floor breaks · get onto gear {GN[(HourOf(p) + 2) % 4]} and dodge the spiral";
+            if (wild) return "the train runs wild · ride your gear, then get to the CENTRE before it tears loose";
+            if (t < settle) return $"the floor falls in {settle - t:0.0}s · get onto gear {GN[TargetOf(p, k, t)]}";
             return $"slam {k} in {k * Slam - t:0.0}s · you ({UltimateState.Roman[HourOf(p) + 1]}): gear {GN[TargetOf(p, k, t)]} · hit the cores to hurt the boss";
         }
 

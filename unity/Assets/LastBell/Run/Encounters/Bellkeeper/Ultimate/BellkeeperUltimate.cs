@@ -198,9 +198,10 @@ namespace LastBell.Run
                     mBroken.StopAfterBeat();
                     break;
                 case UltSegment.P4 when UltV2:
-                    UltLaunch(mGear, C(4, "p4"));   // the gear floor: a slam every 7.5 s
-                    while (!Reached(s) || SecondsInSegment < V2P4MinSeconds) yield return 30;
-                    mGear.StopAfterSlam();
+                    UltLaunch(mGear, C(4, "break"));   // The Floor Breaks (15 s), then the gear floor: a slam every 7.5 s
+                    while (!Reached(s) || SecondsInSegment < V2P4MinSeconds + GearFloor.BreakLen) yield return 30;
+                    mGear.GoWild();                     // The Train Runs Wild (15 s after the next slam), then the great bell falls
+                    while (mGear.Running) yield return 1;
                     break;
                 case UltSegment.P5 when UltV2:
                     UltLaunch(mFinal, C(5, "p5"));   // Final Toll: the boss dies, or toll XIII wipes (the mechanic does it)
@@ -306,7 +307,7 @@ namespace LastBell.Run
         public override int ExtraBodies => Set != AbilitySet.Ultimate ? 0 : mGear != null && mGear.Running ? 4 : mFinal != null && mFinal.EchoBody(out _, out _) ? 1 : 0;
         public override void ExtraBody(int i, out Vector3 center, out float radius)
         {
-            if (mGear != null && mGear.Running) { center = GearFloor.Core(i); radius = GearFloor.HubR; return; }
+            if (mGear != null && mGear.Running) { center = GearFloor.Core(i); radius = mGear.CoreGone(i) ? 0 : GearFloor.HubR; return; }
             if (mFinal != null && mFinal.EchoBody(out center, out radius)) return;
             center = transform.position; radius = 0;
         }
