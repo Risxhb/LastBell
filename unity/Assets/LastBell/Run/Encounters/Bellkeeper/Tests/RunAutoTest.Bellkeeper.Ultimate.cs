@@ -43,6 +43,7 @@ namespace LastBell.Run
             if (UltWants("bots_watch")) yield return UltWatchAttempts();
             if (UltWants("bots_p1v2")) yield return UltP1V2Checks();
             if (UltWants("bots_p1v2_video")) yield return UltP1V2Video();
+            if (UltWants("bots_p1v2_watch")) yield return UltP1V2Watch();
             yield return UltLeave();
         }
 

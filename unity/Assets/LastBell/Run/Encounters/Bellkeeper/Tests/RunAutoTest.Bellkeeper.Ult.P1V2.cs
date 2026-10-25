@@ -56,13 +56,14 @@ namespace LastBell.Run
             }
         }
 
-        IEnumerator UltP1V2Video()
+        // watch = live in the window at real speed (no capture): the full P1 attempt plus 4 s of the outcome
+        IEnumerator UltP1V2Video(bool watch = false, UltimateBot.Skill skill = UltimateBot.Skill.Perfect, string label = "perfect")
         {
             yield return UltStart(null, "P1");
             if (bk == null) yield break;
-            var bots = UltimateParty.Fill(d.World, 4, UltimateBot.Skill.Perfect, PartyClasses);
+            var bots = UltimateParty.Fill(d.World, 4, skill, PartyClasses);
             foreach (var b in bots) b.Speed = PlayerController.WalkSpeed;
-            var cdir = System.IO.Path.Combine(dir, "clip_p1v2"); System.IO.Directory.CreateDirectory(cdir);
+            var cdir = System.IO.Path.Combine(dir, "clip_p1v2"); if (!watch) System.IO.Directory.CreateDirectory(cdir);
             bkHits.Clear();
             // the whole dial from above, north up (the game's chase camera shows only a corner of it)
             var game = Camera.main; Camera over = null;
@@ -73,22 +74,37 @@ namespace LastBell.Run
                 over.transform.SetPositionAndRotation(new Vector3(0, 27f, 9f), Quaternion.LookRotation(new Vector3(0, -27f, -9f)));
                 game.enabled = false;
             }
+            var boss = bk;
             bk.BeginCombat(); d.SetPaused(false);
-            Time.captureFramerate = 30;
-            int frame = 0, max = 30 * 58;
-            while (frame < max && d.State == RunState.Combat)
+            if (!watch) Time.captureFramerate = 30;
+            int frame = 0, max = watch ? int.MaxValue : 30 * 58; float t0 = Time.unscaledTime, tail = -1;
+            while (frame < max)
             {
                 yield return new WaitForEndOfFrame();
-                var tex = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
-                tex.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0); tex.Apply();
-                System.IO.File.WriteAllBytes(System.IO.Path.Combine(cdir, $"{frame++:00000}.jpg"), tex.EncodeToJPG(82)); Destroy(tex);
+                if (watch) frame++;
+                else
+                {
+                    var tex = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
+                    tex.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0); tex.Apply();
+                    System.IO.File.WriteAllBytes(System.IO.Path.Combine(cdir, $"{frame++:00000}.jpg"), tex.EncodeToJPG(82)); Destroy(tex);
+                }
+                if (d.State != RunState.Combat) { if (!watch) break; if (tail < 0) tail = Time.unscaledTime; if (Time.unscaledTime - tail > 4) break; }
+                if (watch && Time.unscaledTime - t0 > 200) break;
             }
             Time.captureFramerate = 0;
             if (over) Destroy(over.gameObject);
             if (game) game.enabled = true;
-            var relay = bk.UltRelay;
-            Note($"clip p1v2: {frame} frames · relay {relay.BeatsClean}/{relay.Beats} clean · debts detonated {bk.Mechanic<ChimeDebts>().Detonated} · damage taken {bkHits.Sum(h => h.Damage)}");
-            d.SetPaused(true); bk.Halt();
+            var relay = boss.UltRelay;
+            Note($"{(watch ? "watched" : "clip")} p1v2 {label}: {(boss.Dead ? "CLEAR" : "WIPE (" + (boss.Ult.WipeCause ?? d.World.LastDamageSource) + ")")} after {Time.unscaledTime - t0:0}s · relay {relay.BeatsClean}/{relay.Beats} clean · debts detonated {boss.Mechanic<ChimeDebts>().Detonated} · damage taken {bkHits.Sum(h => h.Damage)}");
+            d.SetPaused(true); if (!boss.Dead) boss.Halt();
+        }
+
+        // -lastbellTestAbility bots_p1v2_watch: three live attempts in the window: perfect, Miss (forgets the first debts), Late
+        IEnumerator UltP1V2Watch()
+        {
+            yield return UltP1V2Video(true, UltimateBot.Skill.Perfect, "perfect");
+            yield return UltP1V2Video(true, UltimateBot.Skill.Miss, "miss");
+            yield return UltP1V2Video(true, UltimateBot.Skill.Late, "late");
         }
     }
 }

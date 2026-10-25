@@ -388,6 +388,7 @@ namespace LastBell.Run
         {
             if (Set != AbilitySet.Ultimate || Ult == null || W == null || Dead) return;
             var cam = Camera.main; if (!cam) return;
+            mRelay?.DrawGui(cam);
             if (glyphStyle == null) glyphStyle = new GUIStyle(GUI.skin.label) { fontSize = 15, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = new Color(0.96f, 0.93f, 0.84f) } };
             foreach (var p in W.Players)
             {

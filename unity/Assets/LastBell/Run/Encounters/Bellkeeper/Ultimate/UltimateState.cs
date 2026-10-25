@@ -228,7 +228,7 @@ namespace LastBell.Run
             bool clock = s.Hour > 0 && (s.StrikeTick < 0 || tick <= s.StrikeTick);
             bool glass = s.HourglassFrom >= 0 && tick >= s.HourglassFrom && tick < s.StillUntil;
             bool cracked = tick < s.CrackedUntil;
-            bool any = clock || glass || cracked || s.Note != null || s.DebtNote != null;
+            bool any = clock || glass || cracked || s.Note != null;   // v2 duty and debt labels are drawn by the relay (EscapementRelay.DrawGui)
             if (s.Glyph) s.Glyph.gameObject.SetActive(any && !p.Down);
             if (!any || p.Down) return null;
             if (!s.Glyph) s.Glyph = BuildGlyph(p);
@@ -247,7 +247,6 @@ namespace LastBell.Run
             if (glass) parts.Add(tick >= s.StillFrom ? "STILLED" : "HOURGLASS");
             if (cracked) parts.Add("CRACKED");
             if (s.Note != null) parts.Add(s.Note);
-            if (s.DebtNote != null) parts.Add(s.DebtNote);
             return string.Join(" · ", parts);
         }
         static Transform BuildGlyph(PlayerController p)

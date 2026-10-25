@@ -33,7 +33,7 @@ namespace LastBell.Run
         sealed class Debt
         {
             public PlayerController Owner; public int PayTick, DetTick; public bool Paid, Done, Erased;
-            public Hazard Ring, Line; public BellkeeperFx.Telegraph RingOutline, LineOutline;
+            public Hazard Ring, Line; public BellkeeperFx.Telegraph RingOutline, LineOutline; public Transform Flash;
         }
         readonly List<Debt> debts = new List<Debt>();
         public int Detonated { get; private set; }
@@ -108,6 +108,7 @@ namespace LastBell.Run
             d.Line = new Hazard { Source = Source + " line", Shape = HazardShape.Lane, Kind = HazardKind.Ground, Origin = at, Yaw = Quaternion.LookRotation(toBoss.sqrMagnitude > 1e-4f ? toBoss : Vector3.forward).eulerAngles.y, Length = len, Width = LineWidth, LockAt = 0, ResolveAt = UltShapes.ResolveIn(left), Damage = Damage, Hidden = true };
             d.RingOutline = Ult.Outline(UltimateState.Footprint.Of(d.Ring, Now));
             d.LineOutline = Ult.Outline(UltimateState.Footprint.Of(d.Line, Now));
+            d.Flash = FlashRing(d.Ring.Origin, d.Line);
             W.BossFx.ChimeResolve(at, 1.2f);
             Boss.PlanLog.Add((Now, $"debt {UltimateState.Roman[Hour(d.Owner)]} paid" + (d.Erased ? " (a rewind will erase it)" : "")));
             if (d.Erased) return;
@@ -115,7 +116,24 @@ namespace LastBell.Run
             var ring = Spawn(d.Ring); Spawn(d.Line);
             ring.OnResolve = hz => { W.BossFx.ChimeResolve(hz.Origin, hz.Radius); W.BossFx.TollResolve(hz.Origin, 0.4f, hz.Radius); };
         }
-        void Fade(Debt d) { d.RingOutline?.Dismiss(); d.LineOutline?.Dismiss(); d.RingOutline = d.LineOutline = null; }
+        void Fade(Debt d) { d.RingOutline?.Dismiss(); d.LineOutline?.Dismiss(); d.RingOutline = d.LineOutline = null; if (d.Flash) Object.Destroy(d.Flash.gameObject); d.Flash = null; }
+
+        // the 1.5 s look of a paid debt: a bright porcelain ring of segments round the plate and a bar along its chime line
+        static Material porcelain;
+        Transform FlashRing(Vector3 at, Hazard line)
+        {
+            if (!porcelain) porcelain = Prim.Material(new Color(1f, 0.93f, 0.8f), 3f);
+            var root = new GameObject("Chime Debt (stand-in)").transform; root.SetParent(W.Root, false); root.position = new Vector3(at.x, 0, at.z);
+            for (int i = 0; i < 28; i++)
+            {
+                float deg = 360f * i / 28, a = deg * Mathf.Deg2Rad;
+                Seg(Prim.Make(PrimitiveKind.Cube, root, new Vector3(Mathf.Sin(a) * RingRadius, 0.08f, Mathf.Cos(a) * RingRadius), new Vector3(0.6f, 0.05f, 0.22f), Color.white, 0, Quaternion.Euler(0, deg, 0)));
+            }
+            var bar = Prim.Make(PrimitiveKind.Cube, root, Vector3.zero, new Vector3(LineWidth, 0.04f, line.Length), Color.white);
+            bar.rotation = Quaternion.Euler(0, line.Yaw, 0); bar.position = new Vector3(at.x, 0.07f, at.z) + Sim.Dir(line.Yaw) * line.Length * 0.5f; Seg(bar);
+            return root;
+        }
+        static void Seg(Transform t) { var r = t.GetComponent<Renderer>(); r.sharedMaterial = porcelain; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; }
 
         // the guide: never be inside a paid debt's ring or line when it detonates (a memory: it shows for 2 s only)
         public override void Demands(PlayerController p, List<BotDemand> into)
@@ -146,7 +164,7 @@ namespace LastBell.Run
         void ClearNotes() { foreach (var d in debts) if (d.Owner) Ult.Of(d.Owner).DebtNote = null; }
         void Clear()
         {
-            foreach (var d in debts) { d.RingOutline?.Dismiss(); d.LineOutline?.Dismiss(); }
+            foreach (var d in debts) Fade(d);
             ClearNotes(); debts.Clear();
         }
 
