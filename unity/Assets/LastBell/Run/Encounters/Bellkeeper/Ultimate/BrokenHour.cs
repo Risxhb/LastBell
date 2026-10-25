@@ -6,7 +6,7 @@ namespace LastBell.Run
 {
     // Broken Hour (`bellkeeper.ult_broken_hour`), Bellkeeper Ultimate v2 P2 — proposal: the plates from P1 with the Gear
     // Train (card 03) and the Inverted Bell (card 04) on one beat. Built 2026-10-24 from the browser simulation Chzy18 asked
-    // to see in Unity (tools/bellkeeper-ultimate/sims/p2*); not human-approved.
+    // to see in Unity (tools/bellkeeper-ultimate/sims/p2*); P2 approved for now by Chzy18 2026-10-24 (ultimate/P2-v2-LOCKED.md).
     // Every 3 s the hand ticks 90° to the next plate (P1's dial, with P1's rewinds) and three rules resolve on that tick:
     //   PLATE      the next hour in turn (I, II, III, IV, ...) soaks the lit plate. Empty = WIPE; anyone else on it = 60.
     //   SLAM       the bell slams the half away from the plate. Everyone must be on the plate's half, except the INVERTED
