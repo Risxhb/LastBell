@@ -154,7 +154,7 @@ namespace LastBell.Run
                 Note("   dealt: " + string.Join(", ", d.World.Players.Select(p => $"{p.ClassName} {(d.World.DealtBy.TryGetValue(p, out int v) ? v : 0)}")));
                 if (r.must)
                 {
-                    Check($"{r.label}: kills before XIII", ultLast.Killed, ultLast.ToString());
+                    Check($"{r.label}: kills (by the end of the last stand)", ultLast.Killed, ultLast.ToString());
                     Check($"{r.label}: 0 damage taken, 0 potions", taken == 0 && ultLast.Potions == 0, $"damage {taken}, potions {ultLast.Potions}");
                 }
             }

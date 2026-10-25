@@ -298,12 +298,18 @@ namespace LastBell.Run
         public GearFloor UltGear => mGear;
         public FinalToll UltFinal => mFinal;
         public static bool V2StopAfterP4;   // tests: P4 checks end at P4
-        // P5 Final Toll (proposal, Chzy18 25 Oct: "Bell resonates x2"): inside the great bell every hit on the boss counts double
-        public const float V2P5Resonance = 2.3f;
-        protected override float DamageTakenScale => Set == AbilitySet.Ultimate && UltV2 && Segment == UltSegment.P5 && mFinal != null && mFinal.Running ? V2P5Resonance : 1f;
+        // P5 Final Toll (proposal, Chzy18 25 Oct: "Bell resonates x2", then "a mix of 2 and 3"): inside the bell hits ring it
+        // (x V2P5Resonance), from toll IX only the Bellkeeper that rang last takes damage, and the last stand counts x4
+        public const float V2P5Resonance = 1.25f;
+        protected override float DamageTakenScale(Vector3 contact) => Set == AbilitySet.Ultimate && UltV2 && Segment == UltSegment.P5 && mFinal != null && mFinal.Running ? mFinal.DamageScale(contact) : 1f;
         // P4's gear cores are extra bodies: solid, and a hit on one damages the boss
-        public override int ExtraBodies => Set == AbilitySet.Ultimate && mGear != null && mGear.Running ? 4 : 0;
-        public override void ExtraBody(int i, out Vector3 center, out float radius) { center = GearFloor.Core(i); radius = GearFloor.HubR; }
+        public override int ExtraBodies => Set != AbilitySet.Ultimate ? 0 : mGear != null && mGear.Running ? 4 : mFinal != null && mFinal.EchoBody(out _, out _) ? 1 : 0;
+        public override void ExtraBody(int i, out Vector3 center, out float radius)
+        {
+            if (mGear != null && mGear.Running) { center = GearFloor.Core(i); radius = GearFloor.HubR; return; }
+            if (mFinal != null && mFinal.EchoBody(out center, out radius)) return;
+            center = transform.position; radius = 0;
+        }
         public OpenHour UltOpen => mOpen;
         public BrokenHour UltBroken => mBroken;
         public EscapementRelay UltRelay => mRelay;

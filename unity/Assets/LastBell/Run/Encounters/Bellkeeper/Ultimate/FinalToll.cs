@@ -20,6 +20,12 @@ namespace LastBell.Run
     //             point near the rim, marked 1.6 s before). One a toll for I-VI, two for VII-IX, all four for X-XII.
     //   RESONANCE inside the bell every hit on the boss counts double (BellkeeperEncounter.V2P5Resonance)
     //   MAINSPRING from toll IV, P3's three spiral arms fire between sound rings, stopping 0.8 s before each toll (50).
+    //   THE ECHO BELLKEEPER toll IX on: a ghost Bellkeeper (an extra body, r 1) 6.5 m out across the boss from each toll's
+    //             plate (it moves after every toll) strikes its own clapper lane through itself. Only the one that RANG LAST
+    //             takes damage (IX echo, X boss, XI echo, XII boss).
+    //   LAST STAND toll XIII shatters the bell: four platforms (one per hour, 3.4 m out, r 1.9, touching the boss; shown from XII). Off your
+    //             own platform is the fall (999); 13 bell shards drop on them (off-centre, shown 1 s, 999). Hits count x4 for
+    //             10 s; then the bell falls (WIPE).
     // Hours are W.Players index % 4 (5-8 players: two per hour). An hour with nobody in it asks nothing (no plate that toll;
     // nobody may stand in the INVERTED half). Bots steer (Steer) with the simulation's route search.
     public sealed class FinalToll : UltimateMechanic
@@ -31,7 +37,8 @@ namespace LastBell.Run
         public static readonly float[] TollAt = { 0, 4, 8, 12, 16, 20, 24, 27.5f, 31, 34.5f, 38, 41.5f, 45, 48.5f };
         public const float RingStart = 11.6f, RingSpeed = 5f, GapHalf = 16f, RingHalf = 0.3f, LaneHalf = 1.5f, LaneShow = 1.6f,
             PlateR = 5.5f, PlateSize = 1.6f, DebtR = 2f, EchoDelay = 0.8f, ArmEvery = 0.45f, ArmSpeed = 3.5f, ArmTurn = 35f,
-            ShardSpeed = 4f, BR = 0.22f, PR = 0.45f, Bound = 11.1f;
+            ShardSpeed = 4f, BR = 0.22f, PR = 0.45f, Bound = 11.1f, Stand = 10f, StandScale = 4f, EchoOut = 6.5f, EchoRad = 1f,
+            PlatOut = 3.4f, PlatR = 1.9f, ShardR = 0.9f;   // each platform reaches the boss, so a melee lunge ends on it
         const int BulletDamage = 50, RingDamage = 50;
         static readonly string[] KN = { "PLATE", "DEBTS", "INVERTED", "HAMMER" };
 
@@ -89,6 +96,32 @@ namespace LastBell.Run
         }
         bool Firing(float t) { int k = Cur(t); return t >= TollAt[4] && k < 13 && RingR(t) < 0 && EchoR(t) < 0 && TollAt[k + 1] - t > 0.8f; }
         static float ArmAng(float t) => ArmTurn * t;
+        // the Echo Bellkeeper
+        static bool EchoOn(float t) => t >= TollAt[9] && t < TollAt[13];
+        Vector3 EchoPos(int k) => Dir(PlateAng(Mathf.Clamp(k, 9, 12)) + 180) * EchoOut;   // where it rings toll k
+        Vector3 EchoAt(float t) => EchoPos(Mathf.Min(12, Cur(t) + 1));                     // it moves after every toll
+        static bool EchoLive(float t) { int c = Cur(t); return t < TollAt[13] && c >= 9 && c % 2 == 1; }   // the one that rang last
+        float EchoLaneAng(int k)
+        {
+            float a = Hash(k, 21) % 180;
+            if (Has(k, 0)) { var pl = PlatePos(k) - EchoPos(k); for (int n = 0; n < 26; n++) { if (Mathf.Abs(Cross(Dir(a), pl)) > LaneHalf + PR + 1.8f) break; a = (a + 7) % 180; } }
+            return a;
+        }
+        bool InEchoLane(int k, Vector3 q, float margin = 0) => k >= 9 && k <= 12 && Mathf.Abs(Cross(Dir(EchoLaneAng(k)), Sim.Flat(q) - EchoPos(k))) < LaneHalf + PR + margin;
+        public bool EchoBody(out Vector3 c, out float r) { c = Running ? EchoAt(T) : Vector3.zero; r = EchoRad; return Running && EchoOn(T); }
+        // the last stand
+        static bool Standing(float t) => t >= TollAt[13];
+        static Vector3 PlatC(int h) => Dir(45 + 90 * h) * PlatOut;
+        (Vector3 p, float at, int h) Shard(int n) { float a = Hash(n, 31) % 360, r = 0.7f + Hash(n, 37) % 100 / 100f * 0.5f; return (PlatC(n % 4) + Dir(a) * r, TollAt[13] + 0.9f + 0.75f * n, n % 4); }
+        const int ShardCount = 13;
+        // how much a hit at 'contact' counts (BellkeeperEncounter.DamageTakenScale)
+        public float DamageScale(Vector3 contact)
+        {
+            float t = T; if (Standing(t)) return StandScale;
+            if (!EchoOn(t)) return BellkeeperEncounter.V2P5Resonance;
+            bool atEcho = (Sim.Flat(contact) - EchoAt(t)).magnitude < Sim.Flat(contact).magnitude;
+            return atEcho == EchoLive(t) ? BellkeeperEncounter.V2P5Resonance : 0;
+        }
         int HourOf(PlayerController p) { int i = W.Players.IndexOf(p); return i < 0 ? -1 : i % 4; }
         bool HourPresent(int h) { foreach (var p in W.Players) if (!p.Down && HourOf(p) == h) return true; return false; }
         bool OnPlate(int k, Vector3 q, float slack = 0) => Has(k, 0) && HourPresent(Soaker(k)) && (Sim.Flat(q) - PlatePos(k)).magnitude < PlateSize + slack;
@@ -100,7 +133,7 @@ namespace LastBell.Run
             Boss.ShowAttack(Name);
             t0 = Now; tolls = 0; seed = Cue.Seed % 997; nextArm = TollAt[4]; bullets.Clear(); debts.Clear(); plans.Clear(); ringHits.Clear();
             Build();
-            Hazard lane = null, half = null, mark = null;
+            Hazard lane = null, half = null, mark = null, eLane = null; var shardTele = new bool[ShardCount]; var shardDone = new bool[ShardCount];
             while (true)
             {
                 float t = T, nt = t + Sim.Dt; int c = Cur(t), k = c + 1;
@@ -127,6 +160,11 @@ namespace LastBell.Run
                         lane = Spawn(new Hazard { Source = Source + ": the clapper", Shape = HazardShape.Lane, Kind = HazardKind.Strike, Origin = -Sim.Dir(yaw) * 12f, Yaw = yaw, Length = 24, Width = LaneHalf * 2, LockAt = 0, ResolveAt = UltShapes.ResolveIn(Mathf.Max(1, Sim.Ticks(left))), Damage = 0, Knockback = 0, Stun = 0, HitOnResolve = false });
                         lane.OnResolve = hz => { W.BossFx.TollResolve(Vector3.zero, 0.6f, 11f); CameraShake.Shake(0.2f, 0.3f); };
                     }
+                    if (eLane == null && k >= 9 && k <= 12 && left <= LaneShow)
+                    {
+                        float yaw = EchoLaneAng(k) + 180;
+                        eLane = Spawn(new Hazard { Source = Source + ": the echo's clapper", Shape = HazardShape.Lane, Kind = HazardKind.Strike, Origin = EchoPos(k) - Sim.Dir(yaw) * 14f, Yaw = yaw, Length = 28, Width = LaneHalf * 2, LockAt = 0, ResolveAt = UltShapes.ResolveIn(Mathf.Max(1, Sim.Ticks(left))), Damage = 0, Knockback = 0, Stun = 0, HitOnResolve = false });
+                    }
                     if (half == null && Has(k, 2))
                         half = Spawn(new Hazard { Source = Source + ": INVERTED", Shape = HazardShape.Cone, Kind = HazardKind.Ground, Origin = Vector3.zero, Yaw = InvAng(k) + 180, HalfAngle = 90, Radius = 11.6f, LockAt = 0, ResolveAt = UltShapes.ResolveIn(Mathf.Max(1, Sim.Ticks(left))), Damage = 0, Knockback = 0, Stun = 0, HitOnResolve = false });
                     if (mark == null && Has(k, 3) && left <= LaneShow)
@@ -136,10 +174,22 @@ namespace LastBell.Run
                 int kn = Cur(nt);
                 if (kn >= 1 && kn > tolls)
                 {
-                    tolls = kn; lane = half = mark = null;
-                    if (kn >= 13) { Fails.Add("XIII"); Boss.PlanLog.Add((Now, "final toll XIII")); Ult.Wipe("The Thirteenth Hour"); break; }
-                    Toll(kn);
+                    tolls = kn; lane = half = mark = eLane = null;
+                    if (kn >= 13) { Boss.PlanLog.Add((Now, "final toll XIII: the last stand")); debts.Clear(); bullets.Clear(); CameraShake.Shake(0.35f, 0.6f); W.BossFx.TollResolve(Vector3.zero, 1f, 11.5f); }
+                    else Toll(kn);
                     if (Boss.Ult.WipeCause != null) break;
+                }
+                // the last stand: the fall, the shards, the end
+                if (Standing(nt))
+                {
+                    foreach (var p in W.Players) if (!p.Down && p.Height < 0.05f && !p.Dashing && (Sim.Flat(p.transform.position) - PlatC(HourOf(p))).magnitude > PlatR) Hit(p, UltimateState.Lethal, "the fall");
+                    for (int n = 0; n < ShardCount; n++)
+                    {
+                        var sh = Shard(n);
+                        if (!shardTele[n] && nt >= sh.at - 1f) { shardTele[n] = true; Spawn(new Hazard { Source = Source + ": a falling shard", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = sh.p, Radius = ShardR, LockAt = 0, ResolveAt = UltShapes.ResolveIn(Mathf.Max(1, Sim.Ticks(sh.at - t))), Damage = 0, Knockback = 0, Stun = 0, HitOnResolve = false }); }
+                        if (!shardDone[n] && nt >= sh.at) { shardDone[n] = true; foreach (var p in W.Players) if (!p.Down && (Sim.Flat(p.transform.position) - sh.p).magnitude < ShardR + PR) Hit(p, UltimateState.Lethal, "a falling shard"); }
+                    }
+                    if (nt >= TollAt[13] + Stand) { Fails.Add("the bell falls"); Ult.Wipe("The bell falls"); break; }
                 }
                 // the rings
                 foreach (var p in W.Players)
@@ -166,6 +216,7 @@ namespace LastBell.Run
             var ks = Kinds(k);
             Boss.PlanLog.Add((Now, $"final toll {UltimateState.Roman[Mathf.Min(k, 12)]} {string.Join("+", System.Array.ConvertAll(ks, x => KN[x]))}"));
             foreach (var p in W.Players) if (!p.Down && InLane(k, p.transform.position)) Hit(p, UltimateState.Lethal, "the clapper");
+            foreach (var p in W.Players) if (!p.Down && InEchoLane(k, p.transform.position)) Hit(p, UltimateState.Lethal, "the echo's clapper");
             foreach (var d in debts)
                 if (d.At == k)
                     foreach (var p in W.Players)
@@ -215,7 +266,7 @@ namespace LastBell.Run
                 {
                     var c = to + Dir(30 * a + 15 * n) * (n * 0.9f); float r = c.magnitude;
                     if (r > 10.5f || r < 2.6f || (need != null && !need(c))) continue;
-                    if (k < 13 && InLane(k, c, 0.6f)) continue;
+                    if (k < 13 && (InLane(k, c, 0.6f) || InEchoLane(k, c, 0.6f))) continue;
                     bool ok = true; foreach (var d in debts) if (d.At == k && (c - d.P).magnitude <= DebtR + PR + 0.6f) ok = false;
                     if (ok) return c;
                 }
@@ -227,10 +278,30 @@ namespace LastBell.Run
             int c = Cur(t), k = c + 1, h = HourOf(p), i = W.Players.IndexOf(p); float left = NextAt(k) - t;
             var pos = Sim.Flat(p.transform.position); float myR = pos.magnitude;
             if (skill == UltimateBot.Skill.Miss && k == 7 && h == 2) { job = "forgets its debt"; return pos; }
+            var plat = PlatC(h);
+            if (Standing(t))
+            {
+                // the last stand: on my platform, as near the boss as it allows (melee at its inner edge), clear of the next shards
+                var want = plat - plat.normalized * (Melee(p) ? 1.2f : 0.4f);
+                var due = new List<Vector3>(); for (int n = 0; n < ShardCount; n++) { var sh = Shard(n); if (sh.h == h && sh.at > t - 0.05f && sh.at - t < 1.3f) due.Add(sh.p); }
+                if (due.Count > 0)
+                {
+                    Vector3 best = want; float bd = float.MaxValue; bool found = false;
+                    foreach (float r in new[] { 0f, 0.5f, 0.9f, 1.25f, 1.45f })
+                        for (int j = 0; j < (r == 0 ? 1 : 16); j++)
+                        {
+                            var c4 = plat + Dir(22.5f * j) * r; bool hit = false; foreach (var q in due) if ((c4 - q).magnitude < ShardR + PR + 0.35f) hit = true;
+                            if (hit) continue; float dd = (c4 - want).magnitude; if (dd < bd) { bd = dd; best = c4; found = true; }
+                        }
+                    if (found) want = best;
+                }
+                job = "platform " + UltimateState.Roman[h + 1]; return want;
+            }
             // the rings: line up with my gap at my radius before the next one reaches me (the echo once the first has passed)
             float R1 = RingR(t), R2 = EchoV(t);
             if (R1 > 0 && R1 > myR - 1.2f && (R1 - myR) / RingSpeed < 2.4f) { job = "gap " + UltimateState.Roman[h + 1]; return Dir(GapOf(c, h, false)) * Mathf.Clamp(myR, 3.4f, 10.5f); }
             if (R2 > Boss.BodyRadius + 0.3f && R2 > myR - 1.2f && (R2 - myR) / RingSpeed < 2.4f) { job = "echo gap " + UltimateState.Roman[h + 1]; return Dir(GapOf(c, h, true)) * Mathf.Clamp(myR, 3.4f, 10.5f); }
+            if (k >= 13) { job = "→ platform " + UltimateState.Roman[h + 1]; return plat - plat.normalized * 0.4f; }
             if (k < 13 && Has(k, 0) && Soaker(k) == h && left < 2.6f) { job = "SOAK"; return PlatePos(k); }
             if (k < 13 && Has(k, 2))
             {
@@ -240,8 +311,13 @@ namespace LastBell.Run
                 if (r < 2.8f) st = st * (2.8f / Mathf.Max(r, 1e-3f)); else if (r > 10f) st = st * (10f / r);
                 job = "out of the slam"; return Clear(k, st, q => Vector3.Dot(q, d) < -1.4f);
             }
+            if (k >= 9 && k <= 12 && k % 2 == 1)   // the echo rings next: be at it as it does
+            {
+                var E = EchoPos(k); float ea = AngOf(E) + (i % 2 == 1 ? 100 : -100) + ((i % 4) < 2 ? -20 : 20) + (i >= 4 ? 30 : 0);
+                job = (Melee(p) ? "melee" : "ranged") + " → ECHO"; return Clear(k, E + Dir(ea) * (Melee(p) ? EchoRad + PR + 0.7f : 4.5f), null);
+            }
             float a = (k < 13 ? LaneAng(k) : 0) + 90 + (i % 2 == 1 ? 0 : 180) + ((i % 4) < 2 ? -25 : 25) + (i >= 4 ? 40 : 0);
-            job = Melee(p) ? "melee" : "ranged";
+            job = (Melee(p) ? "melee" : "ranged") + (k >= 9 ? " → BOSS" : "");
             return Clear(k, Dir(a) * (Melee(p) ? 3.1f : 5.2f), null);
         }
 
@@ -262,13 +338,15 @@ namespace LastBell.Run
             if (!Running) return false;
             var q = Sim.Flat(p.transform.position); float t = T; int k = Cur(t) + 1;
             reach = q.magnitude - Boss.BodyRadius - PR;
-            float left = NextAt(k) - t, R1 = RingR(t), R2 = EchoV(t), myR = q.magnitude;
+            if (EchoOn(t) && EchoLive(t)) { var E = EchoAt(t); aim = E + Vector3.up * 1.2f; reach = (q - E).magnitude - EchoRad - PR; }
+            bool shardSoon = false; if (t > TollAt[13] - 1.5f) { int hh = HourOf(p); for (int n = 0; n < ShardCount; n++) { var sh = Shard(n); if (sh.h == hh && sh.at > t - 0.05f && sh.at - t < 1.4f) shardSoon = true; } }
+            float left = Standing(t) ? 99 : NextAt(k) - t, R1 = RingR(t), R2 = EchoV(t), myR = q.magnitude;
             bool ringSoon = (R1 > 0 && R1 > myR - 1.2f && (R1 - myR) / RingSpeed < 0.7f) || (R2 > 0 && R2 > myR - 1.2f && (R2 - myR) / RingSpeed < 0.7f);
             bool settled = plans.TryGetValue(p, out var pl) && (q - Sim.Flat(pl.Goal)).magnitude < (Melee(p) ? 1.5f : 3f);
             // casts slow you (the Vanguard's basic roots it): ranged swing on the move, melee once near its spot; never with a ring
             // or the toll close (the route search counts the slowdown)
             float nearB = 9; foreach (var b in bullets) nearB = Mathf.Min(nearB, (b.P - q).magnitude);
-            if (!settled || ringSoon || left < (Melee(p) ? 1.3f : 0.6f) || (Melee(p) && nearB < 2.2f)) reach = 99;   // nor a lunge into a bullet   // the Vanguard's combo lunges: not into the lane
+            if (!settled || ringSoon || left < (Melee(p) ? 1.3f : 0.6f) || (Melee(p) && (nearB < 2.2f || shardSoon))) reach = 99;   // nor a lunge into a bullet or under a shard   // the Vanguard's combo lunges: not into the lane
             fullKit = settled && !ringSoon && left > 1.6f;
             return true;
         }
@@ -291,10 +369,17 @@ namespace LastBell.Run
                 float tq = t + (s + 1) * dtS, r = q.magnitude;
                 if (r > Bound) return 2;
                 float cb = r - Boss.BodyRadius - PR; if (cb < -0.05f) return 2; if (cb < 0.4f) risk += (0.4f - cb) * 2;
+                if (tq >= TollAt[13] - 0.02f)   // on my platform from XIII on, off the shards as they land
+                {
+                    if ((q - PlatC(hour)).magnitude > PlatR - 0.25f) return 2;
+                    for (int n = 0; n < ShardCount; n++) { var sh = Shard(n); if (Mathf.Abs(tq - sh.at) < dtS * 0.7f && (q - sh.p).magnitude < ShardR + PR + 0.25f) return 2; }
+                    return 0;
+                }
+                if (EchoOn(tq)) { float ce = (q - EchoAt(tq)).magnitude - EchoRad - PR; if (ce < -0.05f) return 2; }
                 int k = Cur(tq + dtS * 0.7f);
                 if (k >= 1 && k < 13 && Mathf.Abs(tq - TollAt[k]) < dtS * 0.7f)
                 {
-                    if (InLane(k, q)) return 2;
+                    if (InLane(k, q) || InEchoLane(k, q)) return 2;
                     bool onPl = OnPlate(k, q, -0.3f);
                     if (!onPl) foreach (var d in debts) if (d.At == k && (q - d.P).magnitude < DebtR + PR + 0.25f) return 2;
                     if (Has(k, 2)) { float o = Vector3.Dot(q, Dir(InvAng(k))); if (hour == InvHour(k) ? o <= 0.9f : o >= -0.9f) return 2; }
@@ -343,8 +428,8 @@ namespace LastBell.Run
         }
 
         // ---------------- presentation (stand-ins) ----------------
-        Transform root, plate, mySpot; readonly List<Transform> pool = new List<Transform>(), ring1 = new List<Transform>(), ring2 = new List<Transform>();
-        static Material bellM, ringM, echoM, plateM, bulletM, spotM;
+        Transform root, plate, mySpot, echo, echoLive, floor; readonly Transform[] plats = new Transform[4]; readonly List<Transform> pool = new List<Transform>(), ring1 = new List<Transform>(), ring2 = new List<Transform>();
+        static Material bellM, ringM, echoM, plateM, bulletM, spotM, ghostM, liveM, pitM, platM;
         const int RingPieces = 90;
         void Build()
         {
@@ -354,9 +439,17 @@ namespace LastBell.Run
                 bellM = Prim.Material(new Color(0.24f, 0.17f, 0.09f), 0.15f); ringM = Prim.Material(new Color(1f, 0.88f, 0.62f), 2.4f);
                 echoM = Prim.Material(new Color(0.62f, 0.88f, 1f), 2.4f); plateM = Prim.Material(new Color(0.89f, 0.7f, 0.37f), 1.2f);
                 bulletM = Prim.Material(new Color(1f, 0.8f, 0.4f), 2.2f); spotM = Prim.Material(new Color(0.3f, 1f, 0.85f), 2.5f);
+                ghostM = Prim.Material(new Color(0.45f, 0.72f, 1f), 1.6f); liveM = Prim.Material(new Color(1f, 0.82f, 0.4f), 2.6f);
+                pitM = Prim.Material(new Color(0.02f, 0.02f, 0.05f), 0f); platM = Prim.Material(new Color(0.42f, 0.31f, 0.16f), 0.5f);
             }
             root = new GameObject("Final Toll (stand-in)").transform; root.SetParent(W.Root, false);
-            Mat(Prim.Make(PrimitiveKind.Cylinder, root, new Vector3(0, 0.02f, 0), new Vector3(23.4f, 0.01f, 23.4f), Color.white), bellM);
+            floor = Prim.Make(PrimitiveKind.Cylinder, root, new Vector3(0, 0.02f, 0), new Vector3(23.4f, 0.01f, 23.4f), Color.white); Mat(floor, bellM);
+            echo = new GameObject("the Echo Bellkeeper").transform; echo.SetParent(root, false);
+            Mat(Prim.Make(PrimitiveKind.Cylinder, echo, new Vector3(0, 1.4f, 0), new Vector3(EchoRad * 2, 1.4f, EchoRad * 2), Color.white), ghostM);
+            Mat(Prim.Make(PrimitiveKind.Sphere, echo, new Vector3(0, 3.1f, 0), Vector3.one * 1.3f, Color.white), ghostM);
+            echoLive = Prim.Make(PrimitiveKind.Cylinder, echo, new Vector3(0, 0.05f, 0), new Vector3(EchoRad * 2 + 0.7f, 0.02f, EchoRad * 2 + 0.7f), Color.white); Mat(echoLive, liveM);
+            echo.gameObject.SetActive(false);
+            for (int h = 0; h < 4; h++) { plats[h] = Prim.Make(PrimitiveKind.Cylinder, root, PlatC(h) + Vector3.up * 0.06f, new Vector3(PlatR * 2, 0.04f, PlatR * 2), Color.white); Mat(plats[h], platM); plats[h].gameObject.SetActive(false); }
             for (int j = 0; j < RingPieces; j++)
             {
                 var a = Prim.Make(PrimitiveKind.Cube, root, Vector3.zero, new Vector3(0.6f, 0.18f, 0.45f), Color.white); Mat(a, ringM); a.gameObject.SetActive(false); ring1.Add(a);
@@ -385,6 +478,9 @@ namespace LastBell.Run
             if (!root) return;
             int c = Cur(t), k = c + 1;
             DrawRing(ring1, RingR(t), c, false); DrawRing(ring2, EchoR(t), c, true);
+            bool eo = EchoOn(t); echo.gameObject.SetActive(eo); if (eo) { echo.position = EchoAt(t); echoLive.gameObject.SetActive(EchoLive(t)); }
+            bool st = Standing(t); floor.GetComponent<Renderer>().sharedMaterial = st ? pitM : bellM;
+            for (int h = 0; h < 4; h++) { bool show = t >= TollAt[12]; plats[h].gameObject.SetActive(show && (st || Mathf.FloorToInt(t * 4) % 2 == 0)); }
             bool showPlate = k < 13 && Has(k, 0) && HourPresent(Soaker(k));
             plate.gameObject.SetActive(showPlate); if (showPlate) plate.position = PlatePos(k) + Vector3.up * 0.04f;
             int n = 0;
@@ -400,7 +496,7 @@ namespace LastBell.Run
         void Teardown()
         {
             if (root) Object.Destroy(root.gameObject);
-            root = plate = mySpot = null; pool.Clear(); ring1.Clear(); ring2.Clear(); plans.Clear();
+            root = plate = mySpot = echo = echoLive = floor = null; for (int h = 0; h < 4; h++) plats[h] = null; pool.Clear(); ring1.Clear(); ring2.Clear(); plans.Clear();
         }
 
         static GUIStyle nameStyle, bigStyle, midStyle;
@@ -421,6 +517,8 @@ namespace LastBell.Run
                 else if (k < 13) Label(cam, Dir(GapCentre(k, j)) * 11.0f, 0.4f, UltimateState.Roman[GapHour(k, j) + 1], new Color(1f, 0.85f, 0.5f, 0.6f), nameStyle);
                 if (R2 > 0) Label(cam, Dir(GapCentre(c, j) + 45) * (R2 + 0.9f), 0.4f, UltimateState.Roman[GapHour(c, j) + 1], new Color(0.65f, 0.9f, 1f), midStyle);
             }
+            if (EchoOn(t)) { Label(cam, EchoAt(t), 4.2f, EchoLive(t) ? "ECHO · LIVE" : "echo", EchoLive(t) ? new Color(1f, 0.85f, 0.45f) : new Color(0.65f, 0.85f, 1f), midStyle); Label(cam, Vector3.zero, 4.6f, EchoLive(t) ? "boss" : "BOSS · LIVE", EchoLive(t) ? new Color(0.9f, 0.88f, 0.8f, 0.7f) : new Color(1f, 0.85f, 0.45f), midStyle); }
+            if (t >= TollAt[12]) for (int h = 0; h < 4; h++) Label(cam, PlatC(h) + PlatC(h).normalized * 2.3f, 0.4f, "platform " + UltimateState.Roman[h + 1], new Color(1f, 0.85f, 0.5f), nameStyle);
             if (k < 13 && Has(k, 0) && HourPresent(Soaker(k))) Label(cam, PlatePos(k), 0.6f, UltimateState.Roman[Soaker(k) + 1] + " SOAK", new Color(1f, 0.85f, 0.5f), nameStyle);
             if (k < 13 && Has(k, 2)) Label(cam, Dir(InvAng(k)) * 8f, 0.6f, UltimateState.Roman[InvHour(k) + 1] + " INVERTED: inside", new Color(0.8f, 0.65f, 1f), nameStyle);
             for (int i = 0; i < W.Players.Count; i++)
@@ -428,7 +526,7 @@ namespace LastBell.Run
                 var p = W.Players[i]; if (p.Down) continue;
                 Label(cam, p.transform.position, 2.9f, (i == 0 ? "YOU " : "") + UltimateState.Roman[HourOf(p) + 1] + (JobOf(p) != null ? "  · " + JobOf(p) : ""), Color.white, nameStyle);
             }
-            string text = k >= 13 ? $"XIII in {left:0.0}s · THE HOUR COMPLETES" : $"toll {UltimateState.Roman[k]} in {left:0.0}s · {string.Join(" + ", System.Array.ConvertAll(Kinds(k), x => KN[x]))}" + (Echoes(k) ? " · ECHO" : "") + (t >= TollAt[4] ? " · MAINSPRING" : "");
+            string text = Standing(t) ? $"LAST STAND · {TollAt[13] + Stand - t:0.0}s · hits x{StandScale:0} · stay on your platform" : k >= 13 ? $"XIII in {left:0.0}s · THE BELL SHATTERS: get to your platform" : $"toll {UltimateState.Roman[k]} in {left:0.0}s · {string.Join(" + ", System.Array.ConvertAll(Kinds(k), x => KN[x]))}" + (Echoes(k) ? " · ECHO" : "") + (t >= TollAt[4] ? " · MAINSPRING" : "");
             bigStyle.normal.textColor = k >= 10 ? new Color(1f, 0.42f, 0.3f) : new Color(1f, 0.85f, 0.55f);
             GUI.Label(new Rect(0, Screen.height * 0.17f, Screen.width, 50), text, bigStyle);
         }
@@ -443,7 +541,8 @@ namespace LastBell.Run
         {
             if (!Running || p == null) return null;
             float t = T; int k = Cur(t) + 1, h = HourOf(p);
-            if (k >= 13) return $"XIII in {NextAt(k) - t:0.0}s: kill the boss or the hour completes";
+            if (Standing(t)) return $"LAST STAND {TollAt[13] + Stand - t:0.0}s · stay on platform {UltimateState.Roman[h + 1]} · dodge the shards · every hit x{StandScale:0}";
+            if (k >= 13) return $"XIII in {NextAt(k) - t:0.0}s: the bell shatters · get to platform {UltimateState.Roman[h + 1]}";
             string job = Has(k, 0) && Soaker(k) == h ? "you SOAK the plate" : Has(k, 2) && InvHour(k) == h ? "you are INVERTED: stand inside the slam" : Has(k, 2) ? "stay out of the slam" : "dodge";
             return $"toll {UltimateState.Roman[k]} in {NextAt(k) - t:0.0}s · you ({UltimateState.Roman[h + 1]}): through gap {UltimateState.Roman[h + 1]} · {job} · hits ring the bell: x{BellkeeperEncounter.V2P5Resonance:0.##}";
         }
