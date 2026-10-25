@@ -29,41 +29,44 @@ bell falls over the arena, and P5 is fought inside it. Every earlier phase comes
 
 ## P5 · Final Toll (inside the great bell)
 
-The bell tolls, and it **speeds up**: every 4 s for tolls I–VI, every 3.5 s for VII–IX, and every 3 s for X–XII.
-**Toll XIII (46.5 s) is the hard enrage**: if the boss is still alive, the hour completes (WIPE). In the mockup, a perfect
-party of 4 kills it at about 42.5 s, between tolls XI and XII.
+The bell tolls every 4 s for tolls I–VI, then every 3.5 s for VII–XII. From toll X the **echo** doubles every toll (see
+below). **Toll XIII (48.5 s) is the hard enrage**: if the boss is still alive, the hour completes (WIPE). In the mockup,
+a perfect party of 4 kills it at about 47 s, after toll XII, so there is no spare toll.
 
-Every toll brings the same three things.
+Every toll brings the same things.
 
 1. **Clapper.** The boss strikes a 3 m lane straight across the bell, at a random angle. It is shown 1.6 s before and
-   kills only on the toll (999). Walking across it while it is telegraphed is fine.
+   kills only on the toll (999). Walking across it while it is telegraphed is fine. The lane always misses the plate.
 2. **Sound ring.** A ring rushes inward from the rim at 5 m/s, all the way to the boss, so hugging the boss doesn't skip
    it.
    - It has four gaps marked I–IV. Pass through your own gap only: another hour's gap is 999, the ring itself is 50.
    - Each hour's gap moves 60° per toll, so you keep relocating around the boss.
-3. **Callbacks, which stack.**
+3. **The echo** (tolls X–XII). A second ring (blue) follows 0.8 s behind the first, with every gap 45° further round.
+   You thread your gap, then step to your next one.
+4. **Callbacks, which stack.**
    - **Tolls I–VI:** one callback per toll, in turn: plate → debts → INVERTED → hammer.
    - **Tolls VII–IX:** two per toll (INVERTED + plate, hammer + debts, plate + INVERTED).
    - **Tolls X–XII:** all four on every toll.
 
+   **The rings lead you to your job.** The plate lies by the soaker's last gap, and the INVERTED half is centred on the
+   INVERTED hour's last gap. The two neighbouring hours sit on the half's edge and only need to step out of it.
+
    The four callbacks:
-   - **Plate** (P1/P2): the next hour soaks the lit plate (5.5 m from the boss), or WIPE. The plate is always square to
-     the clapper's lane, on the side away from the debts.
+   - **Plate** (P1/P2): the next hour soaks the lit plate (5.5 m from the boss, 20° clear of the INVERTED half), or WIPE.
      - **Standing on the lit plate pays any debt** (as in P1). This keeps the all-four tolls fair.
    - **Debts** (P1): a 2 m ring under every player that detonates on the next toll (999).
-   - **INVERTED** (P2): the far half slams. The INVERTED hour must be in it and everyone else out (999). The half always
-     opens on the side where that hour's ring gap was, so you come out of your gap straight into your half.
+   - **INVERTED** (P2): the half slams. The INVERTED hour must be in it and everyone else out (999).
    - **Hammer** (P4): a ring of 12 shards bursts from a random point near the rim (50). The burst point is marked 1.6 s
      before.
 
 **Mainspring (P3 returns).** From toll IV, the boss fires P3's three spiral arms between sound rings, stopping 0.8 s
-before each toll (50 per bullet). As the tolls speed up, the gaps between rings shrink, so the bullet windows get shorter
-but fall closer to the tolls.
+before each toll (50 per bullet).
 
 The kill: the boss dies, and the great bell cracks open ("THE LAST BELL").
 
-**Mockup result:** perfect bots kill the boss cleanly in 19 of 20 random starts. In the other one they still kill it but
-take one 50-damage hit. Every scripted mistake (wrong gap, forgotten debt, INVERTED player stays out) wipes the run.
+**Mockup result:** 15 perfect runs. 12 kill the boss with 0 damage, 2 kill it but take one 50-damage hit, and 1 loses a
+player to a debt on toll XII. Every scripted mistake (wrong gap, forgotten debt, INVERTED player stays out) wipes the
+run.
 
 ## Design rules check (gpt/08)
 
@@ -78,8 +81,7 @@ take one 50-damage hit. Every scripted mistake (wrong gap, forgotten debt, INVER
 
 1. **Solo and duo.** Plate and INVERTED name an hour. With fewer than 4 players, does one player take every hour, or
    do the hours fold onto who's there (as in P1–P4)? Is this still "no phase changes"?
-2. Is XIII at 46.5 s (a perfect kill at about 42.5 s, one toll of slack) the right enrage window?
-3. Is the X–XII "all four" stretch too much to read? A lighter option is three callbacks per toll.
+2. The enrage is now tight (a perfect kill at about 47 s, XIII at 48.5 s). Is that right once real players have mechanics in hand?
 4. The transitions use 50-damage bullets and shards. Do potions refill before P5? (Rule: potions carry between
    minibosses; P5 is inside one fight.)
 5. Unity: none of this is built yet. P4 (`GearFloor.cs`) is the latest built phase.
