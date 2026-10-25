@@ -82,12 +82,16 @@ namespace LastBell.Run
             Note("---------- Aurelion v4 demo: 4 perfect bots, Hard ----------");
             AurelionArgs.SetOverride = null; AurelionArgs.SoloOverride = null;
             if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }
-            d.SelectDifficulty(Difficulty.Hard);
-            d.SelectAllies(3);
+            // -lastbellDemoClass, -lastbellDemoLevel, -lastbellDemoAllies: the solo reference runs (Codex proposal 1) use the same fight
+            string cls = AurelionArgs.Arg("-lastbellDemoClass") ?? "Arcanist";
+            var level = Enum.TryParse(AurelionArgs.Arg("-lastbellDemoLevel") ?? "Hard", true, out Difficulty lv) ? lv : Difficulty.Hard;
+            int allies = int.TryParse(AurelionArgs.Arg("-lastbellDemoAllies") ?? "3", out int na) ? Mathf.Clamp(na, 0, 7) : 3;
+            d.SelectDifficulty(level);
+            d.SelectAllies(allies);
             AllyBot.AllyMode = BotMode.Perfect; AllyBot.Attacks = true;
-            var me = new AllyBot(3, 4, BotMode.Perfect);
+            var me = allies == 0 ? new AllyBot(0, 1, BotMode.Perfect) : new AllyBot(allies, allies + 1, BotMode.Perfect);
             d.InputOverride = me;
-            d.StartPractice("Arcanist", RunDirector.AurelionPractice);
+            d.StartPractice(cls, RunDirector.AurelionPractice);
             int spire = RunMaps.IndexOf(RunDirector.AurelionMap);
             yield return Until(() => RunMaps.Current == spire && RunDirector.Instance && RunDirector.Instance.State == RunState.Ready, 30, "Skyward Spire practice ready");
             if (RunDirector.Instance != d) { directorLog.AddRange(d.Log); d = RunDirector.Instance; }
@@ -104,10 +108,17 @@ namespace LastBell.Run
                 string blk = b.BlockLog.Count > 0 ? b.BlockLog[b.BlockLog.Count - 1].block : "?";
                 Note($"demo death @{b.FightTicks / (float)Sim.Hz:0.0}s: {p.ClassName} by {h.Source} {dmg} in [{blk}], potions left {p.Potions} | {(p.Input as AllyBot)?.DebugLine}");
             };
+            // the two damage windows (Codex proposal 1): Corona Shield (25 s) and Last Light (88 s)
+            int eclT0 = -1, eclMax = 0, p4T0 = -1, p4Hp0 = 0; bool eclDone = false;
+            bool fast = Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellDemoFast", StringComparison.OrdinalIgnoreCase)) && !DemoRecord;
+            if (fast) Time.timeScale = 4;   // measurement runs (no recording) at 4x
             string last = ""; float t = 0;
             while (t < 480 && d.State == RunState.Combat)
             {
                 DemoCaption(b);
+                if (!eclDone && b.Eclipse.Active && eclT0 < 0) { eclT0 = d.World.Tick; eclMax = b.ShieldMax; }
+                if (!eclDone && eclT0 >= 0 && !b.Eclipse.Active) { eclDone = true; Note($"demo window Corona: {eclMax - b.ShieldHp} of {eclMax} in {(d.World.Tick - eclT0) / (float)Sim.Hz:0.0} s (limit 25 s), {(b.Eclipse.Broken ? "broken" : "held")}"); }
+                if (p4T0 < 0 && b.Phase >= 4) { p4T0 = d.World.Tick; p4Hp0 = b.Hp; }
                 if (b.Towers.Towers.Exists(tw => tw.ResolveTick >= d.World.Tick) && d.World.Tick % 15 == 0)
                     foreach (var p in d.World.Players)
                     {
@@ -117,6 +128,9 @@ namespace LastBell.Run
                 if (b.PhaseName != last) { last = b.PhaseName; Note($"demo @{b.FightTicks / (float)Sim.Hz:0.0}s: {last}"); }
                 t += Time.deltaTime; yield return null;
             }
+            if (p4T0 >= 0) Note($"demo window Last Light: {p4Hp0 - b.Hp} of {p4Hp0} in {(d.World.Tick - p4T0) / (float)Sim.Hz:0.0} s (floor deadline 88 s), {b.Light.Fallen} slices fallen");
+            Note($"demo damage dealt: {d.World.DamageDealt} by the party; player {d.Player?.ClassName}");
+            Time.timeScale = 1;
             int secs = b.FightTicks / Sim.Hz;
             RunHud.CaptionTitle = b.Dead ? "AURELION DEFEATED" : "THE PARTY FELL";
             RunHud.CaptionBody = $"{secs / 60}:{secs % 60:00}  ·  {d.World.Players.Count(p => !p.Down)} of {d.World.Players.Count} standing";

@@ -30,7 +30,6 @@ namespace LastBell.Run
         public static bool Attacks = System.Array.Exists(System.Environment.GetCommandLineArgs(), a => a.Equals("-lastbellAllyAttack", System.StringComparison.OrdinalIgnoreCase));
         public static BotMode AllyMode = BotMode.Perfect;   // menu allies do every mechanic, memory ones included (Chzy18: "do the mechanics"); still no attacks
         int tick, lastPress = -999, castHold;
-        int[] cd = new int[5];
 
         public AllyBot(int index, int count, BotMode mode = BotMode.Passive)
         {
@@ -85,6 +84,16 @@ namespace LastBell.Run
                 float ang = 360f * slot / of + 30f;
                 float dist = boss.BodyRadius + Range(me);
                 want = bpos + Sim.Dir(ang) * dist;
+                // Total Eclipse: hold the edge of the nearest light well closest to him (melee still reaches from there)
+                if (boss is AurelionEncounter ae && ae.Eclipse != null && ae.Eclipse.Active && ae.Eclipse.Wells.Count > 0)
+                {
+                    float best = float.MaxValue;
+                    foreach (var c in ae.Eclipse.Wells)
+                    {
+                        var edge = c + Sim.Flat(bpos - c).normalized * (ae.Eclipse.WellRadius - 0.5f);
+                        float d = Sim.Flat(edge - pos).sqrMagnitude; if (d < best) { best = d; want = edge; }
+                    }
+                }
                 var flat = new Vector2(want.x, want.z); float lim = CombatWorld.PlayerBound - 0.8f;
                 if (flat.magnitude > lim) { flat = flat.normalized * lim; want = new Vector3(flat.x, 0, flat.y); }
                 var v = Sim.Flat(want - pos);
@@ -96,6 +105,8 @@ namespace LastBell.Run
                 // mechanics). Set Attacks = true to bring the rotation back.
                 float gap = Sim.Flat(bpos - pos).magnitude - boss.BodyRadius;
                 if (Attacks && gap <= Range(me) + 1.5f) Attack(me, ref inp);
+                // Vanguard's Last Word reaches 8 m with its wave: use it from range too
+                else if (Attacks && me.ClassName == "Vanguard" && gap <= 7.5f && me.Kit.Cooldown01(2) <= 0.001f && tick - lastPress >= 6) { inp.P2 = true; lastPress = tick; }
             }
             if (me.Hp < (Mode == BotMode.Passive ? 40 : 70) && me.Potions > 0 && tick % 30 == 0) inp.Potion = true;   // test bots: before a Hard kill hit (65) could down them
             // walk round his body, not into it: a straight line across the centre would pin the bot against him
@@ -109,29 +120,30 @@ namespace LastBell.Run
 
         void Attack(PlayerController me, ref PlayerInput inp)
         {
-            for (int i = 0; i < cd.Length; i++) if (cd[i] > 0) cd[i]--;
             if (tick - lastPress < 6) return;
+            // the kit's own cooldowns (the reference policy; a private counter only ticked while attacking)
+            System.Func<int, bool> ready = slot => me.Kit.Cooldown01(slot) <= 0.001f;
             int s = -1;
             switch (me.ClassName)
             {
                 case "Vanguard":
-                    if (cd[2] == 0) { s = 2; cd[2] = 600; }          // Last Word
-                    else if (cd[1] == 0) { s = 1; cd[1] = 240; }     // Sundering Blow
+                    if (ready(2)) s = 2;                             // Last Word (its wave also reaches 8 m)
+                    else if (ready(1)) s = 1;                        // Sundering Blow
                     else s = 0;                                      // Steel Rhythm
                     break;
                 case "Chimesinger":
                     bool hurt = false;
                     foreach (var p in me.World.Players) if (!p.Down && p.Hp < 70 && Sim.Flat(p.transform.position - me.transform.position).magnitude < 6f) hurt = true;
-                    if (hurt && cd[4] == 0) { s = 4; cd[4] = 900; }   // Mending Chorus
-                    else if (cd[3] == 0) { s = 3; cd[3] = 480; }      // Crescendo
-                    else if (cd[2] == 0) { s = 2; cd[2] = 300; }      // Harmonic Refrain
-                    else if (cd[1] == 0) { s = 1; cd[1] = 150; }      // Bellstrike
+                    if (hurt && ready(4)) s = 4;                    // Mending Chorus
+                    else if (ready(3)) s = 3;                        // Crescendo
+                    else if (ready(2)) s = 2;                        // Harmonic Refrain
+                    else if (ready(1)) s = 1;                        // Bellstrike
                     else s = 0;                                       // Resonant Note
                     break;
                 default:   // Arcanist
-                    if (cd[1] == 0) { s = 1; cd[1] = 360; }           // Time Seal
-                    else if (cd[2] == 0) { s = 2; cd[2] = 200; castHold = 50; }   // Arc Lance (stand still for the cast)
-                    else if (cd[3] == 0) { s = 3; cd[3] = 420; }      // Convergence
+                    if (ready(1)) s = 1;                             // Time Seal
+                    else if (ready(2)) { s = 2; castHold = 50; }     // Arc Lance (stand still for the cast)
+                    else if (ready(3)) s = 3;                        // Convergence
                     else s = 0;                                       // Clockbolt
                     break;
             }
