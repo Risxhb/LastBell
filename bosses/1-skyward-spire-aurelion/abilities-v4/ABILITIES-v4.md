@@ -32,178 +32,172 @@ Sources:
 
 The designs below are original adaptations, not copies.
 
+
+> **This section matches the runtime** (`boss-aurelion`, branch `feature/aurelion-v3`, revision 038571a; aligned 2026-10-25 from the Codex solo study, proposal 3). Code is the source of truth; nothing was retuned to match older text. Everything below is still a **proposal** for Chzy18's approval. The older draft numbers (2 solo towers with shared damage, a 5 % shield, 15 % Last Light, the 7:00 enrage, a 120 s floor, a 25 s Severance with a solo swap) are retired.
+
 ## 2. Fight outline
 
-| Phase | HP | Target length (solo, Medium) | Max patterns at once | Theme |
-|---|---|---|---|---|
-| 1 Perfect Order | 100–70 % | 90 s | 2 | Each new mechanic introduced alone, then paired |
-| Intermission: Total Eclipse | at 70 % | 25 s | 3 | Light wells, a damage shield (wipe if not broken) |
-| 2 Misalignment | 70–40 % | 90 s | 3 | Sunspots + towers + marks, conflicts |
-| 3 Exposed Meridian (second form) | 40–15 % | 90 s | 3 | Severance: Day and Night |
-| 4 Last Light | 15–0 % | ≤ 150 s | 4 | Everything; the floor fills; hard enrage |
+| Phase | HP | Theme |
+|---|---|---|
+| 1 Perfect Order | 100–70 % | Paired from the pull; memory from the opener |
+| Intermission: Total Eclipse | at 70 % | Moving light wells and the Corona Shield (wipe if not broken in 25 s) |
+| 2 Misalignment | 70–40 % | Three patterns per block |
+| 3 Exposed Meridian (second form) | 40–20 % | Severance: Day and Night |
+| 4 Last Light | 20–0 % | **The soft enrage:** the floor falls and he hits harder every slice |
 
-**Hard enrage:** at **7:00** from the pull, or when Last Light's floor is full, whichever comes first, **Final Noon** wipes the party. It's announced at 6:30 with a gold countdown.
-
-**Boss HP:** set so a party at **expected damage** reaches 0 % at about **6:00**. That gives 1 minute of slack for deaths, potions and repositioning.
-
-**Co-op HP:** stays `1 + 0.7 × (N − 1)`. Co-op difficulty comes from jobs that scale with N, not from HP.
-
-**Transitions:** as settled. They wait for the current block, are harmless, keep the same health bar and never heal.
-
-## 3. New mechanics
-
-### 3.1 Meridian Towers: fight-ending wipe, introduced alone in Phase 1
-
-- **Look:** numbered brass columns of light (I, II…) with a loud chime and a big ivory numeral, cobalt rim. It must be impossible to miss.
-- **Rule:**
-  - Each tower needs ≥ 1 player inside at its resolve (≥ 2 players at N ≥ 6).
-  - **Empty tower = Total Eclipse, the party wipes.**
-  - Damage: 60 (Medium), split among the players inside.
-  - One player taking it all survives from full (60 < 100; 78 on Hard).
-- **Timing:** towers resolve in numeral order, 2.0 s apart, first at 4.0 s after they appear (Easy 5.0, then 2.5 apart).
-- **Solo:** 2 towers, ≥ 9 m apart: stand in I, then run to II.
-- **N = 2:** 2 towers. **N = 4:** 3. **N = 8:** 4 towers of 2.
-- **Why it's hard:**
-  - The route must also dodge whatever is paired with it.
-  - In co-op, the assignment is who takes which tower.
-  - A tower soaker can't also be the far-side SUN player.
-
-### 3.2 Sunspots: staggered detonations, floor fill, chain reaction = wipe
-
-- **Look:** a coral sun sigil grows on the marked player, with a numeral for its order.
-- **Rule:**
-  - Marked players (solo: you, twice) detonate in numeral order, **1.5 s apart**, at their own position.
-  - Each detonation is a Ground circle of 3.5 m: a heavy hit (50) to anyone inside.
-  - It leaves a **scorch pool** of 3.0 m that burns 20/s and lasts **until the end of the phase** (floor fill, enrage exception).
-- **Chain reaction (wipe):** if a detonation catches a player whose own Sunspot hasn't gone off yet, it sets it off early and the party wipes ("Solar Flare").
-- **Solo:** you carry two in a row: drop I, move ≥ 4 m, drop II.
-- **Co-op:** N ≥ 2 → ⌈N/2⌉ marked per cast, numerals I.. in order.
-- **Why it's hard:**
-  - **placement:** the pools stay, so drop them at the rim, not on the paths you'll need for towers and Ecliptic discs
-  - **staggering:** keep apart from other carriers until yours is gone
-  - the floor shrinks every cast
-
-### 3.3 Solar Hunger: scaling pressure on Zenith Collapse
-
-- Every Zenith Collapse in the fight is hungrier than the last:
-  - its safe disc shrinks 0.5 m per cast (solo 4.5 → 3.0 floor; co-op from the N table, never below 3.0 + 0.5 × ⌈N/2⌉)
-  - its damage rises +5 per cast (50 → 70 cap)
-- **Phase 4 only:** "Devour". After the Collapse resolves, he pulls everyone 2 m toward him over 1 s. A forced move (the rules allow it with a checked route), never a teleport.
-
-### 3.4 Total Eclipse intermission: light wells and a damage check
-
-At 70 %:
-- He rises above the compass star, still targetable (settled rule).
-- The dais goes dark except **4 light wells** (circles of 3.0 m), which orbit the centre at 6 m and 15°/s.
-- **Umbra:** standing outside every well for more than 1.0 s straight deals 15 each second. A chip, so it can't kill quickly.
-- **Corona Shield:** a shield worth **5 % of max HP** (800 solo at full HP: about 32 damage per second while moving between wells; a ranged class does about 60 standing still). The first draft had 18 %, which no party could break in time.
-  - If it isn't broken in **25 s**, **Total Eclipse** wipes the party (damage check, enrage exception).
-  - If it is broken, the intermission ends at once and Misalignment starts.
-- **Also during it:** Meridian Lances (3 beams) every 6 s and Starfall Mirror. That's 3 patterns.
-- **Solo:** the same, with the shield sized for solo expected damage.
-- **N ≥ 5:** 6 wells of 2.5 m. Wells are never more than 2 per player, so spreading matters.
-
-### 3.5 Severance: Day and Night, Phase 3
-
-- **Look:** at the start of the second form, a gold meridian line splits the dais. One half is lit Day, the other is violet Night.
-- **Rule:**
-  - Your side when it lands is your side for 25 s.
-  - **Crossing the line is a heavy hit** (50, and once more each time you cross back).
-  - **An empty side at any moment ends the fight** (the half "falls", wipe).
-  - Mechanics fire per side: Day gets Starfall Mirror, Night gets Ecliptic Order.
-  - **The line rotates** 90° over the 25 s, so both halves sweep round the arena. You must keep moving round in front of it without crossing.
-- **Solo:** you're assigned the side you stand in. The empty-side rule never applies solo; instead, at 12 s the sides **swap mechanics**.
-- **Co-op:** the party must split. Severance ends with a **Reunion** tower at the centre that every player must stand in.
-
-### 3.6 Last Light: Phase 4, floor fill and the hard enrage
-
-- **The floor fills:** every 15 s a **shadow sector** (a 45° wedge from the centre to the rim, Ground) darkens permanently. It burns 25/s.
-  - Sectors go round the clock in an authored order.
-  - After 8 sectors the whole floor is gone = Final Noon wipe. That's 120 s after Phase 4 starts.
-- **Rotation:** Lances (Cascading) + Starfall › Sunspots + Zenith Collapse (with Devour) › Towers + Zenith Marks › Ecliptic Order + Hour Hands (Hard) … on loop, up to 4 patterns live.
-- **Why it's hard:** every mechanic now has less floor to solve on, and Sunspot pools from earlier phases are gone (they clear at each phase end). The sectors aren't.
-
-## 4. Existing mechanics in v4
-
-| Mechanic | v4 role |
+| Setting | Value |
 |---|---|
-| Meridian Lances | Paired filler; Cascading in P3–P4 |
-| Starfall Mirror | Paired; the Day mechanic in Severance |
-| Zenith Collapse | With Solar Hunger |
-| Ecliptic Order | 4 anchors from P2. **Co-op:** numerals go **over players' heads** (I..N, Limit Cut). Each player's strike is a beam through them at their turn, so you must stand where your beam misses the others. The solo anchor version stays. |
-| Zenith Marks | P2 and P4; two-step from P2 |
-| Orrery Closing + Horizon | P2 only (Horizon + Sunspots = the floor shrinks from both sides) |
-| Hour Hands | Hard named mechanic, P3–P4 |
+| Boss HP | **10,000** solo. Co-op `1 + 0.7 × (fighters − 1)`; fighters are players, plus bot allies only when they attack (`-lastbellAllyAttack`). |
+| Final Noon (hard enrage) | Wipe at **390 s (6:30)** from the pull, warned at 6:00 |
+| Last Light floor deadline | **88 s** after Phase 4 starts |
+| Gaps between blocks | 0.1 s |
+| Punish windows | 3.5 s, at the end of Phases 1, 2 and 3 (none in Phase 4) |
+| Transitions | As settled: wait for the block, harmless, same health bar, no heal |
+
+## 3. Mechanics (runtime values; Medium damage, Hard ×1.3, Easy ×0.6)
+
+### 3.1 Meridian Towers (`MeridianTowers.cs`): fight-ending wipe
+
+- **Dots** on each tower say exactly how many players it needs. A tower **counts whoever is inside at the moment it lands**: no hold timer.
+- Towers rise **5.0 s** before they land (Easy 6.0).
+- **Enough inside:** no damage. **Too few:** Total Eclipse, the party wipes. **Extras** (beyond the count, farthest from the centre first) take a heavy hit (50).
+- **Solo:** **three towers of one**, landing in order at 5.0, 7.5 and 10.0 s (Easy 6, 9, 12). Correct soaks deal no damage.
+- **Co-op:** 2–3 towers that land together, their counts adding up to the party, assigned in party order when they rise.
+
+| Party | Towers |
+|---|---|
+| 2 | 1 + 1 |
+| 3 | 1 + 2 |
+| 4 | 2 + 2, then 1 + 3 (alternating) |
+| 5 | 2 + 3 |
+| 6 | 3 + 3 |
+| 7 | 2 + 2 + 3 |
+| 8 | 3 + 3 + 2 |
+
+- If a tower's assigned player goes down after it rises, its count drops by one; a tower whose players are all down goes dark.
+- Layout: a 6.5 m ring round the centre, three authored layouts, towers ≥ 120° apart, radius 2.5 m.
+
+### 3.2 Sunspots (`Sunspots.cs`): staggered blasts, pools, chain = wipe
+
+- **Solo:** two sigils on you (I, II). **Co-op:** ⌈N/2⌉ carriers, rotating.
+- Blasts land 1.5 s apart, the first 3.0 s after the cast. Each locks on its carrier 1.5 s before it lands.
+- **Blast:** 3.5 m Ground circle, 50.
+- **Pool:** 3.0 m, burns 20/s, lasts **75 s across phase changes**. Pools are cleared when Last Light starts.
+- **Chain:** a blast catching a *different* carrier with an unlanded sigil is a **Solar Flare, a wipe**. Your own second sigil never chains.
+
+### 3.3 Solar Hunger (Zenith Collapse)
+
+- Each Collapse in the fight: the disc shrinks **0.5 m**, and the hit goes **50, 55, then 60** (cap; 78 on Hard).
+- Floor: 3.0 m + 0.5 m × (⌈N/2⌉ − 1).
+- Collapse + Lances uses 3 beams, landing 1.2 s after the Collapse.
+
+### 3.4 Total Eclipse intermission (`TotalEclipse.cs`)
+
+- **Corona Shield:** **700 per fighting player** (700 solo). If it isn't broken within **25 s**, the party wipes. Breaking it ends the intermission at once.
+- **Shelter:** several **moving light wells** (no spherical shield model):
+
+| Party | Wells |
+|---|---|
+| 1–4 players | 4 wells of 3.5 m |
+| 5–8 players | 6 wells of 3.0 m |
+
+  The wells orbit 6 m from the centre at 15°/s. **Umbra:** outside every well for over 2 s deals 10 per second.
+- Lances (3 beams) and Starfall keep falling meanwhile.
+
+### 3.5 Severance (`Severance.cs`), Phase 3
+
+1. **3 s split.** The line shows and the game calls SPLIT. Co-op players are told Day and Night alternately in party order.
+2. **20 s sweep.** The sides lock; the line travels **270°**: 135° one way in 10 s, then "THE LINE TURNS BACK" (1.5 s warning) and 135° back (about 3.3 m/s at the rim).
+3. **Crossing** the line, or letting it sweep over you, is a heavy hit (50), every time.
+4. **Common partner schedule** for every party size: Starfall, Lances (4 beams), Starfall, Lances.
+5. **Co-op only:** all standing players on one side for 0.5 s = wipe, then the **Reunion** tower (4.5 m at the centre: empty = wipe, anyone outside takes 50).
+6. **Solo:** no assigned side, no empty-side check, no Reunion and no swap branch. Your side is tracked and crossings still hit.
+
+### 3.6 Last Light (`LastLight.cs`), Phase 4: the soft enrage
+
+- Starts at **20 % HP**. A 45° slice burns for good (25/s) after a 3 s warning. Slices fall at 12, 24, 36, 48, then 58, 68, 78, **88 s**.
+- Order: 0°, 180°, 90°, 270°, 45°, 225°, 135°, 315°.
+- **Every fallen slice adds +10 % to all his attacks.** The 8th slice is Final Noon, a wipe.
+- **Rotation:** Cascading Lances + Starfall › Zenith Marks + Lances › Hour Hands + Starfall, on loop.
+- **Kept out of Phase 4:** Towers, Ecliptic Order, Zenith Collapse and Sunspots. Their spots would land on burned floor.
+- Top-down masks: `masks/`.
+
+## 4. Other mechanics in v4
+
+| Mechanic | Runtime |
+|---|---|
+| Ecliptic Order | **4 rings from Phase 1** on a 5 m circle. Numerals show **2.0 s** (Easy: stay lit). Strike I lands at 3.2 s, then every 2.2 s, everywhere except the ring. Coral shows 0.35 s ahead (Easy 1.0). Ring 3.0 m (3.5 at N ≤ 4, 4.5 above). Damage 50. Paired Lances land 0.2 s before ring II. Co-op: no Starfall in this pairing. |
+| Zenith Marks | **SHADE** ≤ 5.5 m from him, **SUN** ≥ 8.5 m. Shown 3.0 s ahead (Easy 4.0). Solo alternates, SUN first. Two-step in the last block of Phases 1 and 3. With towers it lands 1.5 s after the last tower. Damage 50. |
+| Meridian Lances | 30 (punish tier); Cascading in Phase 3 and Phase 4 |
+| Starfall Mirror | 30; v4 always uses the full 1.1 s window. In tower pairings it lands after the towers. |
+| Orrery Closing + Horizon | Phase 2, with Starfall and Hour Hands |
+| Hour Hands | **Every level** from Phase 2 (was Hard only) |
 | Noon Shadow | Cut |
 
-## 5. Phase plans (Medium seconds; Easy stretches warnings ×1.25, never the gaps)
+## 5. Phase plans (runtime)
 
-Each line is one block.
+**Phase 1:**
+1. Ecliptic + Lances
+2. Towers + Starfall
+3. Sunspots + Starfall
+4. Collapse + Lances
+5. Towers + Marks
+6. two-step Marks + Lances
+7. punish
 
-**Phase 1, Perfect Order (introductions, 2 patterns max):**
-1. Lances (3) + Starfall
-2. **Meridian Towers (alone)**
-3. Ecliptic Order (3)
-4. Zenith Collapse + Lances
-5. **Sunspots (alone, pools)**
-6. Zenith Marks + Lances
-7. Punish 3.5 s
+**Intermission:** Total Eclipse.
 
-**Intermission:** Total Eclipse, ≤ 25 s.
+**Phase 2:**
+1. Sunspots + Starfall + Lances
+2. Towers + Marks + Starfall
+3. Ecliptic + Lances (+ Starfall solo)
+4. Collapse + Lances
+5. Orrery + Horizon + Starfall + Hour Hands
+6. punish
 
-**Phase 2, Misalignment (3 patterns):**
-1. Sunspots + Starfall
-2. Towers + Zenith Marks (conflict: your tower may be in the wrong zone; co-op swaps)
-3. Ecliptic (4) + Lances
-4. Zenith Collapse + Lances + Sunspot pools still live
-5. Orrery + Horizon + Starfall
-6. Punish 3.5 s
+**Phase 3:**
+1. Severance (split, sweep, Reunion in co-op)
+2. Cascading Lances + Starfall + Hour Hands
+3. Sunspots + Collapse (2.5 s after the last blast)
+4. Towers + Lances + Starfall
+5. two-step Marks + Lances
+6. punish
 
-**Phase 3, Exposed Meridian (3 patterns):**
-1. **Severance** (25 s, per-side mechanics, Reunion tower)
-2. Cascading Lances + Starfall
-3. Sunspots + Zenith Collapse
-4. Towers + Ecliptic (co-op beams)
-5. Hour Hands (Hard)
-6. Punish 3.5 s
-
-**Phase 4, Last Light (4 patterns, floor fill, enrage):** the rotation in §3.6 until he dies or the floor is full. No punish window here; it's the burn. That breaks the "a 3–4 s punish per boss" rule only for this phase; the boss still has punishes in Phases 1–3.
+**Phase 4:** the Last Light rotation, with no punish.
 
 ## 6. Damage and lethality
 
-| Tier | Medium | Hard (×1.3) | Easy (×0.6) | Mechanics |
+| Tier | Medium | Hard | Easy | Mechanics |
 |---|---|---|---|---|
 | Punish | 30 | 39 | 18 | Lances, Starfall, Hour Hands |
-| Kill | 50 | 65 | 30 | everything else |
-| Burns | 20/s or 25/s | ×1.3 | ×0.6 | Umbra, scorch pools, shadow sectors |
-| Wipe | the party goes down | | | empty tower, Solar Flare chain, unbroken Corona Shield, empty Severance side, Final Noon |
+| Kill | 50 | 65 | 30 | Ecliptic, Marks, Sunspots, Severance crossing, tower extras, Orrery; Collapse 50–60 |
+| Burns | 20 or 25/s; Umbra 10/s | ×1.3 | ×0.6 | pools, slices, Umbra |
+| Last Light | +10 % per fallen slice, on all of the above | | | |
+| Wipe | the party goes down | | | a tower short, Solar Flare, unbroken Corona, empty Severance side (co-op), empty Reunion, the 8th slice, 390 s |
 
-With 300 effective HP, that's about 4–5 heavy mistakes per fight before wipes are even counted.
+## 7. Evidence
 
-## 7. Tests (Milestone gates)
+- **Unity autotest v4:** 28/28, covering every mechanic and wipe, the enrage, the 70 % flow, the solo perfect route through Phases 1–3 on Medium and Hard, and the memory-blind bot dying.
+- **Unity demo:** four perfect attacking bots win at full HP on Hard in 4:55, 3 of 4 standing, with one slice of floor to spare.
+- **Codex headless solo study** (2026-10-25, `deliveries/.../aurelion-solo-20261025/REPORT.md`):
+  - Arcanist and Chimesinger clear solo on Easy, Medium and Hard: 72/72 with a guarded input policy.
+  - Vanguard: **not yet demonstrated**, 0/180 across five bot policies. That's not proof of impossibility.
+  - No unavoidable two-body requirement in the solo branches.
 
-- **Perfect route survives** every block at every level, for N = 1, 2, 4 and 8, using `AllyBot` Perfect: assignment-follower for towers, Sunspots, sides and marks.
-- **Every wipe fires when it should:** a test leaves a tower empty, chains a Sunspot, keeps the shield up and empties a side.
-- **The memory-blind reflex bot goes down in Phase 1**, on every level except Easy.
-- **Escape check** for every new shape and every 3–4-pattern overlap, at 4.2 and 6 m/s, with the loop stamina.
-- **Fight length:** with `AllyBot.Attacks` on (expected damage), a solo ranged bot reaches 0 % in 5–7 min.
-- **The enrage fires** at 7:00.
+## 8. New systems (shared code kept small)
 
-## 8. New systems needed (shared code is small and kept separate)
-
-| System | How |
+| System | Where |
 |---|---|
-| Party wipe | `AurelionEncounter.Wipe(reason)` downs every player, with a big banner |
-| Damage shield | A small `BossEncounter` hook (`virtual int Absorb(int)`) |
-| Persistent pools | Existing `Hazard.BurnPerSecond` (Crucivar's slag), cleared at phase end |
-| Per-player marks | Existing `Hazard.Affects` |
-| Side tracking (Severance) | Per tick in the ability |
-| Shared towers | `HitOnResolve = false`, damage split in OnResolve |
-| Fight timer and enrage banner | HUD |
+| Party wipe | `PlayerController.ForceDown`, `AurelionEncounter.Wipe` |
+| Damage shield | `BossEncounter.Absorb` |
+| Per-player marks | `Hazard.Affects` |
+| Stand-in rings | `Hazard.Soak` |
+| Enrage clock, banner, captions | `RunHud` |
+| Persistent pools | `Hazard.BurnPerSecond` |
 
 ## 9. Open questions
 
-1. Can Phase 4 drop the punish window (it's the burn), or keep a short one?
-2. Severance solo: is "swap mechanics at 12 s" enough, or should solo also have a no-cross rule against a moving line (current design: yes, both)?
-3. Easy: keep every wipe, or make Easy's wipes a heavy hit instead?
-4. Should the 7:00 enrage scale with N, or stay fixed?
+1. **Vanguard solo reference:** which successful input route is the reference per level? In progress in the Aurelion session (Codex proposal 1). Don't infer a melee damage ceiling from failed bot policies.
+2. Are the measured solo clear times the desired experience, given co-op first?
+3. Should Phase 4 keep no punish window?
+4. Easy: keep every wipe, or turn Easy's wipes into heavy hits?

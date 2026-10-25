@@ -45,8 +45,8 @@ A player's guide to the current v4 fight on every difficulty.
 | Ability | Wipe if… | How to beat it |
 |---|---|---|
 | **Meridian Towers** | a tower is **short of players** when it lands | Each tower shows **dots: exactly that many players must be inside it at the moment it lands** (it rises 5.0 s early). **No damage when done right.** Extra players in a tower take a **heavy hit**. **Solo:** three towers of one, 2.5 s apart (I → II → III): be in each as it lands, then run to the next. **Co-op:** towers land together and their dots add up to the party (4 players: 2+2 or 1+3). Assigned when they rise in party order; stay out of towers that aren't yours. |
-| **Total Eclipse** (intermission at 70 %) | his **Corona Shield** (gold number on his bar) isn't broken in **25 s** | The shield is **700 per fighting player** (2,800 for 4), so it takes the whole party about 22 s. Stay inside the **blue light wells** (3.5 m, orbiting slowly) and attack non-stop. Out of a well for over 2 s, you burn 10 a second. |
-| **Severance** (Phase 3) | co-op: one half has nobody in it | A gold line appears and the game calls **"SPLIT"**. You have 3 s: odd players go Day, even players go Night. Then it locks and **sweeps fast: 135° one way in 10 s, then "THE LINE TURNS BACK" (1.5 s warning) and 135° back** (about 3.3 m/s at the rim). Crossing it, or letting it sweep over you, is a heavy hit. Run ahead of it, and be ready to reverse. Co-op ends in the **Reunion** tower (4.5 m at the centre): everyone in. |
+| **Total Eclipse** (intermission at 70 %) | his **Corona Shield** (gold number on his bar) isn't broken in **25 s** | The shield is **700 per fighting player** (700 solo, 2,800 for 4), so it takes the whole party about 22 s. Stay inside the **blue light wells** (3.5 m, orbiting slowly) and attack non-stop. Out of a well for over 2 s, you burn 10 a second. |
+| **Severance** (Phase 3) | co-op: one half has nobody in it | A gold line appears and the game calls **"SPLIT"**. You have 3 s: odd players go Day, even players go Night. Then it locks and **sweeps fast: 135° one way in 10 s, then "THE LINE TURNS BACK" (1.5 s warning) and 135° back** (about 3.3 m/s at the rim). Crossing it, or letting it sweep over you, is a heavy hit. Run ahead of it, and be ready to reverse. Co-op ends in the **Reunion** tower (4.5 m at the centre): everyone in. **Solo:** no side is assigned and there is no Reunion, but crossings still hit. |
 | **Last Light** (Phase 4, below 20 %) | the 8th slice falls (88 s into Phase 4) | **The soft enrage.** A 45° slice burns for good every **12 s** (every **10 s** from the 5th), with a 3 s warning, in a fixed order: 0°, 180°, 90°, 270°, then the diagonals. **Every fallen slice makes all his attacks 10 % stronger** ("THE LIGHT WANES"). Kill him before the room is gone. |
 
 ## Phase by phase
@@ -86,7 +86,7 @@ Order:
 ### Phase 3: Exposed Meridian (40–20 %), the second form
 
 Order:
-1. **Severance** (split, then 25 s, then Reunion)
+1. **Severance** (3 s split, then a 20 s sweep that turns back at 10 s; Reunion in co-op)
 2. Cascading Lances + Starfall + Hour Hands
 3. Sunspots + Collapse
 4. Towers + Lances + Starfall
