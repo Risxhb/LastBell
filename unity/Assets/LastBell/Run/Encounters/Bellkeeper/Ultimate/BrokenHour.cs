@@ -17,7 +17,8 @@ namespace LastBell.Run
     // holder between beats. It jumps on touch (within 1.5 m) to a player who doesn't hold it, then can't move again for 1 s.
     // The wrong holders on a beat = WIPE. Party sizes: players 5-8 take hours I..IV again (two per hour: two soakers, two
     // INVERTED, their own chains); below 4, the hours that exist rotate and missing partners mean no chain / no INVERTED.
-    // Whoever receives INVERTED keeps it until the beat (it can't be passed on twice). Below 4 players it is dealt each beat.
+    // Whoever receives INVERTED keeps it until the beat (it can't be passed on twice). Below 4 players it is dealt each beat;
+    // with 5-8 each group of four passes its own, and the two soakers share the plate 1.6 m apart.
     // The perfect bots' strat is a party plan per beat (the simulation's solver): a spot for everyone, and the meeting
     // point and time for the touch. The run's own player gets the same plan as a practice beam (EscapementRelay.ShowMySpot).
     public sealed class BrokenHour : UltimateMechanic
@@ -149,8 +150,10 @@ namespace LastBell.Run
                 foreach (var to in players)
                 {
                     if (to == from || to.Down || inverted.Contains(to) || Locked(to)) continue;
+                    if (players.IndexOf(to) / 4 != players.IndexOf(from) / 4) continue;   // 5-8 players: each group of four passes its own INVERTED
                     if ((Sim.Flat(to.transform.position) - Sim.Flat(from.transform.position)).magnitude > Touch) continue;
                     inverted.Remove(from); inverted.Add(to); settled.Add(to); Passes++;
+                    if (LogSolver) Debug.Log($"[broken hour] pass {players.IndexOf(from)} -> {players.IndexOf(to)} at beat {Beats + 1} ({(NextBeatTick - Now) / (float)Sim.Hz:0.00} s before it)");
                     lockUntil[from] = lockUntil[to] = Now + Sim.Ticks(PassLock);
                     W.BossFx.ChimeResolve((from.transform.position + to.transform.position) * 0.5f, 0.8f);
                     Boss.PlanLog.Add((Now, $"inverted {UltimateState.Roman[HourOf(from) + 1]} -> {UltimateState.Roman[HourOf(to) + 1]}"));
@@ -177,7 +180,7 @@ namespace LastBell.Run
             // the right INVERTED holders
             bool right = true;
             foreach (var p in W.Players) if (!p.Down && (HourOf(p) == ih) != inverted.Contains(p)) right = false;
-            if (!right) { Fail("wrong INVERTED holder"); Ult.Wipe("The bell rings inverted (wrong holder)"); return; }
+            if (!right) { Debug.Log($"[broken hour] wrong holder on beat {Beats + 1}: holds " + string.Join(",", Holders()) + " · should " + string.Join(",", W.Players.FindAll(q => !q.Down && HourOf(q) == ih).ConvertAll(q => W.Players.IndexOf(q)))); Fail("wrong INVERTED holder"); Ult.Wipe("The bell rings inverted (wrong holder)"); return; }
             // the slam
             foreach (var p in W.Players)
             {
@@ -205,6 +208,7 @@ namespace LastBell.Run
                 }
             if (clean) BeatsClean++;
         }
+        List<int> Holders() { var l = new List<int>(); foreach (var q in inverted) l.Add(W.Players.IndexOf(q)); l.Sort(); return l; }
         string Roman(PlayerController p) => UltimateState.Roman[HourOf(p) + 1];
         void Fail(string why) { Fails.Add($"beat {Beats + 1}: {why}"); Boss.PlanLog.Add((Now, "broken hour fail " + why)); }
         void Hit(PlayerController p, int dmg, string what)
@@ -232,44 +236,77 @@ namespace LastBell.Run
             }
             int v = Beat, sh = SoakHour(count), ih = InvHour(count), left = NextBeatTick - now;
             float secs = left / (float)Sim.Hz, walk = Mathf.Max(0.5f, secs - 0.4f) * PlayerController.WalkSpeed;
-            var done = new List<(Vector3 a, Vector3 b)>(); var taken = new List<Vector3>();
-            for (int g = 0; g * 4 < W.Players.Count; g++)
+            // groups of four are planned one after another (each avoids the chains and spots already planned). With two
+            // groups, if one finds no plan: plan them the other way round, then with tighter margins (chains 0.6 m apart)
+            int groups = (W.Players.Count + 3) / 4;
+            int[][] orders = groups == 2 ? new[] { new[] { 0, 1 }, new[] { 1, 0 } } : new[] { new[] { 0 } };
+            bool solved = false;
+            for (int attempt = 0; attempt < orders.Length * 2 && !solved; attempt++)
             {
-                var grp = new PlayerController[4];
-                for (int k = 0; k < 4; k++) { int i = g * 4 + k; grp[k] = i < W.Players.Count && !W.Players[i].Down ? W.Players[i] : null; }
-                if (System.Array.IndexOf(grp, null) >= 0 || Hours < 4) { SimplePlan(grp, v, sh, ih); continue; }
-                if (!SolveGroup(grp, v, sh, ih, now, secs, walk, done, taken)) { Debug.LogWarning($"Broken Hour: no party plan for beat {Beats + 1} (group {g}); simple spots"); SimplePlan(grp, v, sh, ih); }
+                gapMin = attempt < orders.Length ? 1f : 0.6f; spaceMin = attempt < orders.Length ? 2.5f : 2.1f;
+                plan.Clear(); solved = true;
+                var done = new List<(Vector3 a, Vector3 b)>(); var taken = new List<Vector3>();
+                foreach (int g in orders[attempt % orders.Length])
+                {
+                    var grp = new PlayerController[4];
+                    for (int k = 0; k < 4; k++) { int i = g * 4 + k; grp[k] = i < W.Players.Count && !W.Players[i].Down ? W.Players[i] : null; }
+                    if (System.Array.IndexOf(grp, null) >= 0 || Hours < 4) { SimplePlan(grp, v, sh, ih); continue; }
+                    if (!SolveGroup(grp, g, v, sh, ih, now, secs, walk, done, taken)) { solved = false; break; }
+                }
+            }
+            gapMin = 1f; spaceMin = 2.5f;
+            if (!solved)
+            {
+                Debug.LogWarning($"Broken Hour: no party plan for beat {Beats + 1}; simple spots");
+                plan.Clear();
+                for (int g = 0; g < groups; g++)
+                {
+                    var grp = new PlayerController[4];
+                    for (int k = 0; k < 4; k++) { int i = g * 4 + k; grp[k] = i < W.Players.Count && !W.Players[i].Down ? W.Players[i] : null; }
+                    SimplePlan(grp, v, sh, ih);
+                }
             }
         }
+        float gapMin = 1f, spaceMin = 2.5f;
+        public static bool LogSolver;   // tests: why a beat found no plan, and every pass
 
-        bool SolveGroup(PlayerController[] grp, int v, int sh, int ih, int now, float secs, float walk, List<(Vector3 a, Vector3 b)> done, List<Vector3> taken)
+        bool SolveGroup(PlayerController[] grp, int g, int v, int sh, int ih, int now, float secs, float walk, List<(Vector3 a, Vector3 b)> done, List<Vector3> taken)
         {
-            var pl = Plate(v); var cur = new Vector3[4];
+            // 5-8 players: the two soakers stand 0.8 m either side of the plate's centre, so their chains don't start at one point
+            Vector3 plateC = Plate(v), pl = plateC + (W.Players.Count > 4 ? Vector3.Cross(Vector3.up, HandDir(v)) * (g == 0 ? -0.8f : 0.8f) : Vector3.zero); var cur = new Vector3[4];
             for (int k = 0; k < 4; k++) cur[k] = Sim.Flat(grp[k].transform.position);
             int s = sh, h = ih, x = -1;
             for (int k = 0; k < 4; k++) if (inverted.Contains(grp[k]) && k != h) x = k;      // this group's holder who must pass to h
             int ya = (s + 1) % 4, yb = (s + 3) % 4;
-            var near = new List<Vector3>(); foreach (var q in grid) if (Vector3.Dot(q, HandDir(v)) > SolveMargin && (q - pl).magnitude > OnPlate + 0.6f && FarFrom(q, taken)) near.Add(q);
+            // 5-8 players: each group keeps to its own side of the line through the plate and the boss, so the groups' chains never meet
+            var sideDir = Vector3.Cross(Vector3.up, HandDir(v)) * (g == 0 ? -1f : 1f); bool split = W.Players.Count > 4;
+            bool OwnSide(Vector3 q) => !split || Vector3.Dot(q, sideDir) >= 0.8f;
+            int nH = 0, nPair = 0, nGap = 0, nSpace = 0, nMeet = 0;
+            var near = new List<Vector3>(); foreach (var q in grid) if (Vector3.Dot(q, HandDir(v)) > SolveMargin && (q - plateC).magnitude > OnPlate + 0.6f && FarFrom(q, taken) && OwnSide(q)) near.Add(q);
             float bestScore = float.MaxValue; Vector3 bh = default, ba = default, bb = default, bm = default; float btm = 0; bool found = false;
             foreach (var ph in fine)
             {
-                if (Vector3.Dot(ph, HandDir(v)) > -SolveMargin || !FarFrom(ph, taken)) continue; float dph = (ph - pl).magnitude;
+                if (Vector3.Dot(ph, HandDir(v)) > -SolveMargin || !FarFrom(ph, taken) || !OwnSide(ph)) continue; float dph = (ph - pl).magnitude;
                 if (dph < ChainMin + ChainSlack || dph > ChainMax - ChainSlack) continue;
+                nH++;
                 if (x < 0 && (cur[h] - ph).magnitude > walk) continue;
                 foreach (var pa in near)
                 {
-                    if (!Near(pa, v) || (pa - pl).magnitude <= OnPlate + 0.6f || (cur[ya] - pa).magnitude > walk) continue;
+                    if (!Near(pa, v) || (pa - plateC).magnitude <= OnPlate + 0.6f || (cur[ya] - pa).magnitude > walk) continue;
                     foreach (var pb in near)
                     {
-                        if (!Near(pb, v) || (pb - pl).magnitude <= OnPlate + 0.6f || (cur[yb] - pb).magnitude > walk) continue;
+                        if (!Near(pb, v) || (pb - plateC).magnitude <= OnPlate + 0.6f || (cur[yb] - pb).magnitude > walk) continue;
                         float dab = (pa - pb).magnitude; if (dab < ChainMin + ChainSlack || dab > ChainMax - ChainSlack) continue;
-                        if (SegGap(pl, ph, pa, pb) < 1f) continue;   // chains at least 1 m apart: a bot's 0.25 m slack can't make them cross
+                        nPair++;
+                        if (SegGap(pl, ph, pa, pb) < gapMin) continue;   // chains at least 1 m apart: a bot's 0.25 m slack can't make them cross
                         bool bad = false;
-                        foreach (var (ca, cb) in done) if (SegGap(pl, ph, ca, cb) < 1f || SegGap(pa, pb, ca, cb) < 1f) { bad = true; break; }
+                        foreach (var (ca, cb) in done) if (SegGap(pl, ph, ca, cb) < gapMin || SegGap(pa, pb, ca, cb) < gapMin) { bad = true; break; }
+                        if (!bad) nGap++;
                         if (bad) continue;
                         var P = new Vector3[4]; P[s] = pl; P[h] = ph; P[ya] = pa; P[yb] = pb;
                         // spots at least 2.5 m apart (no stray touches), except across the plate
-                        for (int i = 0; i < 4 && !bad; i++) for (int j = i + 1; j < 4; j++) if ((P[i] - P[j]).magnitude < 2.5f) { bad = true; break; }
+                        for (int i = 0; i < 4 && !bad; i++) for (int j = i + 1; j < 4; j++) if ((P[i] - P[j]).magnitude < spaceMin) { bad = true; break; }
+                        if (!bad) nSpace++;
                         if (bad) continue;
                         float mcost = 0, tm = 0; Vector3 m = default;
                         if (x >= 0)
@@ -284,6 +321,7 @@ namespace LastBell.Run
                                 float c = tx + th + (mm - P[x]).magnitude + (mm - P[h]).magnitude;
                                 if (c < mb) { mb = c; m = mm; tm = t; ok = true; }
                             }
+                            if (ok) nMeet++;
                             if (!ok) continue; mcost = mb;
                         }
                         float travel = 0; for (int i = 0; i < 4; i++) if (i != x && i != h) travel += (cur[i] - P[i]).magnitude;
@@ -292,14 +330,14 @@ namespace LastBell.Run
                     }
                 }
             }
-            if (!found) return false;
+            if (!found) { if (LogSolver) Debug.Log($"[broken hour] group {g} beat {Beats + 1}: no plan · holder spots {nH} · near {near.Count} · pairs {nPair} · clear chains {nGap} · spaced {nSpace} · meets {nMeet} · gap {gapMin} · passer {x}"); return false; }
             plan[grp[s]] = new Step { Spot = pl }; plan[grp[h]] = new Step { Spot = bh }; plan[grp[ya]] = new Step { Spot = ba }; plan[grp[yb]] = new Step { Spot = bb };
             if (x >= 0) { int mt = now + Sim.Ticks(btm); plan[grp[x]].Meet = bm; plan[grp[x]].MeetTick = mt; plan[grp[h]].Meet = bm; plan[grp[h]].MeetTick = mt; }
             done.Add((pl, bh)); done.Add((ba, bb)); taken.Add(bh); taken.Add(ba); taken.Add(bb);
             return true;
         }
 
-        static bool FarFrom(Vector3 q, List<Vector3> taken) { foreach (var t in taken) if ((q - t).magnitude < 2.5f) return false; return true; }
+        static bool FarFrom(Vector3 q, List<Vector3> taken) { foreach (var t in taken) if ((q - t).magnitude < 2.5f) return false; return true; }   // (between groups always 2.5 m: a stray touch can't pass across groups anyway)
 
         // no full group (or a small party): the plate, the slam halves and the chains as plain spots
         void SimplePlan(PlayerController[] grp, int v, int sh, int ih)

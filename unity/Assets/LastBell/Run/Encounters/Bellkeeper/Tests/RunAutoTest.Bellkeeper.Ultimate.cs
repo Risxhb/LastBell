@@ -45,6 +45,7 @@ namespace LastBell.Run
             if (UltWants("bots_p1v2_video")) yield return UltP1V2Video();
             if (UltWants("bots_p1v2_watch")) yield return UltP1V2Watch();
             if (UltWants("bots_p2v2")) yield return UltP2V2Checks();
+            if (UltWants("bots_p2v2_8")) yield return UltP2V2Eight();
             if (UltWants("bots_p2v2_video")) yield return UltP1V2Video(false, UltimateBot.Skill.Perfect, "perfect", "P2");
             if (UltWants("bots_p2v2_watch")) yield return UltP1V2Watch("P2");
             yield return UltLeave();

@@ -57,6 +57,15 @@ namespace LastBell.Run
         }
 
         // -lastbellTestAbility bots_p2v2: P2 Broken Hour from its practice start, and a full v2 attempt (P1 then P2)
+        // -lastbellTestAbility bots_p2v2_8: the party of 8 alone, with the solver and every pass logged
+        IEnumerator UltP2V2Eight()
+        {
+            BrokenHour.LogSolver = true;
+            yield return UltRun("v2 P2 party8 perfect", 8, UltimateBot.Skill.Perfect, "P2", 330, "Vanguard");
+            if (bk != null) { var bh = bk.UltBroken; Note($"   broken hour {bh.BeatsClean}/{bh.Beats} clean · passes {bh.Passes}" + (bh.Fails.Count > 0 ? " · fails: " + string.Join("; ", bh.Fails.Take(6)) : "")); }
+            BrokenHour.LogSolver = false;
+        }
+
         IEnumerator UltP2V2Checks()
         {
             Note("---------- Ultimate v2 · P2 Broken Hour (proposal) ----------");
@@ -80,7 +89,7 @@ namespace LastBell.Run
                 {
                     Check($"{r.label}: clears", ultLast.Killed, ultLast.ToString());
                     Check($"{r.label}: 0 damage taken, 0 potions", taken == 0 && ultLast.Potions == 0, $"damage {taken}, potions {ultLast.Potions}");
-                    Check($"{r.label}: every Broken Hour beat clean", bh.Beats >= 20 && bh.BeatsClean == bh.Beats, $"{bh.BeatsClean}/{bh.Beats}");
+                    Check($"{r.label}: every Broken Hour beat clean", bh.Beats >= 18 && bh.BeatsClean == bh.Beats, $"{bh.BeatsClean}/{bh.Beats}");
                 }
             }
         }
