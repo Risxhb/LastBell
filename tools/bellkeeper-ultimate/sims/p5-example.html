@@ -202,7 +202,7 @@ const T3={name:'P5 · Final Toll',end:59,
   // the echo's clapper: its own lane through itself, turned until it misses the plate
   echoLaneA(F,k){ let a=hash(k,F.seed+21)%180; if(this.kinds(k).includes(0)){ const pl=sub(dir(this.plateA(k)).map(v=>v*5.5),this.echoPos(F,k)); for(let n=0;n<26;n++){ const d=dir(a); if(Math.abs(d[0]*pl[1]-d[1]*pl[0])>1.5+PR+1.8) break; a=(a+7)%180; } } return a; },
   echoLaneHit(F,k,q,m=0){ if(k<9||k>12) return false; const d=dir(this.echoLaneA(F,k)), r=sub(q,this.echoPos(F,k)); return Math.abs(d[0]*r[1]-d[1]*r[0])<1.5+PR+m; },
-  platC(h){ return dir(45+90*h).map(v=>v*3.9); }, PLAT:1.8,
+  platC(h){ return dir(45+90*h).map(v=>v*3.4); }, PLAT:1.9,   // touching the boss, so a melee lunge ends on it
   shard(F,n){ const h=n%4, c=this.platC(h), a=hash(n,F.seed+31)%360, r=0.7+(hash(n,F.seed+37)%100)/100*0.5; return {at:TT[13]+0.9+0.75*n, p:add(c,dir(a),r), h}; },
   shardHit(F,q,tq,m=0){ for(let n=0;n<13;n++){ const sh=this.shard(F,n); if(Math.abs(tq-sh.at)<1/60*0.7+0.001&&dist(q,sh.p)<0.9+PR+m) return true; } return false; },
   // the clapper: a random angle, turned until its lane misses the plate (when there is one)

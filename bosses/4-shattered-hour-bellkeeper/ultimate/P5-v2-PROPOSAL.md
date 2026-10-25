@@ -69,7 +69,7 @@ takes damage** (gold LIVE): the echo after IX and XI, the boss after X and XII. 
 and melee have to cross the bell to do it.
 
 **Last Stand.** Toll XIII doesn't wipe. It **shatters the bell**:
-- Only four platforms stay, one per hour, 3.9 m from the boss and 1.8 m across. They are shown from toll XII.
+- Only four platforms stay, one per hour. Each is 1.9 m in radius, 3.4 m from the boss, and touches it, so a melee lunge ends on the platform. They are shown from toll XII.
 - Off your own platform at XIII, or at any point after, is the fall (999). Another hour's platform doesn't count.
 - Bell shards drop on the platforms, never at their centre, so there is always room. Each is shown 1 s before and kills
   (999).
@@ -84,8 +84,8 @@ The kill: the boss dies, and the great bell cracks open ("THE LAST BELL").
 with 0 damage, 2 with one 50-damage hit). In the 5 test starts, 4 are clean kills, and 1 loses a melee player to the
 echo's clapper on toll XI. Every scripted mistake wipes, including the new one, "XIII: II runs to the wrong platform".
 
-**Unity:** P5 in Unity is still the earlier version (no echo, no last stand, a flat ×2.3 resonance). Building this
-version replaces the flat resonance.
+**Unity:** built (`FinalToll.cs`). Hits count ×1.25 inside the bell before XIII, then ×4 in the Last Stand. Perfect bots kill in the
+Last Stand (party of 4, trio and P1–P5 with 0 deaths; party of 8 with 1); the slow-reacting bots wipe when the bell falls.
 
 ## Design rules check (gpt/08)
 
