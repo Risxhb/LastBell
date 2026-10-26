@@ -36,14 +36,15 @@ namespace LastBell.Run
             new Map { Id = "shattered-hour", Name = "Shattered Hour", Note = "Area 4 · final arena",
                 SourceScene = "Assets/LastBell/Areas/Area4/ShatteredHour_FinalArena.unity", RunScene = "Assets/LastBell/Run/Maps/Run_ShatteredHour.unity",
                 Bound = 13.0f },                       // boundary wall at 13.65 m (inner face 13.5)
-            // The Tempo Tyrant's arena (practice entry only; not a run slot or menu showcase stage). Code-built floor
-            // disc 13.1 m, parapet inner face at 13.29 m: bound 12.5 m keeps the player's body inside the floor edge.
+            // The Tempo Tyrant's arena (practice entry only; not a run slot). Showcase stage 5, added incrementally by
+            // MenuShowcaseBuild.AddStage. Code-built floor disc 13.1 m, parapet inner face at 13.29 m: bound 12.5 m keeps the
+            // player's body inside the floor edge.
             new Map { Id = "metronome-court", Name = "Metronome Court", Note = "Tempo Tyrant arena",
                 SourceScene = "Assets/LastBell/Arenas/MetronomeCourt/MetronomeCourt_Arena.unity", RunScene = "Assets/LastBell/Run/Maps/Run_MetronomeCourt.unity",
-                Bound = 12.5f, InShowcase = false },
+                Bound = 12.5f },
         };
 
-        // the maps embedded as stages in the menu showcase (all original arenas; new practice-only arenas opt out)
+        // the maps embedded as stages in the menu showcase, in MenuShowcase.Stages order (a new arena opts out until it is added)
         public static Map[] Showcased => System.Array.FindAll(All, m => m.InShowcase);
 
         // index of the map whose run scene is loaded, or -1 (e.g. an arena scene opened directly in the editor)

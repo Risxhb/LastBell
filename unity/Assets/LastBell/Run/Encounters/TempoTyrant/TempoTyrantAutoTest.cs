@@ -47,6 +47,29 @@ namespace LastBell.Run
             }
         }
 
+        // Spiral Slices bot: walks to the centre of the current safe slice at ChaseRadius (during the spiral), or of the
+        // nearest slice in the safe parity (every-other phase). Idle bots never move.
+        sealed class ChaseBot : IInputSource
+        {
+            public const float ChaseRadius = 5f;
+            public Func<TempoTyrantEncounter> Boss;
+            public PlayerInput Read(PlayerController who)
+            {
+                var r = new PlayerInput { Aim = who.transform.position + who.transform.forward };
+                var b = Boss(); if (!b) return r;
+                int target = -1, mine = TempoTyrantEncounter.SliceOf(who.transform.position);
+                if (b.SafeSlice >= 0) target = b.SafeSlice;
+                else if (b.AltSafeParity >= 0) target = mine % 2 == b.AltSafeParity ? mine : TempoTyrantEncounter.Wrap(mine + 1);
+                if (target < 0) return r;
+                var goal = Sim.Dir(TempoTyrantEncounter.SliceYaw(target)) * ChaseRadius;
+                var to = Sim.Flat(goal - who.transform.position); if (to.magnitude < 0.2f) return r;
+                var cam = Camera.main; var fwd = cam ? Sim.Flat(cam.transform.forward).normalized : Vector3.forward;
+                var right = Vector3.Cross(Vector3.up, fwd);
+                r.Move = Vector2.ClampMagnitude(new Vector2(Vector3.Dot(to.normalized, right), Vector3.Dot(to.normalized, fwd)), 1);
+                return r;
+            }
+        }
+
         sealed class Seen { public Hazard H; public string Source; public int Spawn, Resolve; public Tempo Tempo; public float Bpm; }
 
         RunDirector d; readonly Bot bot = new Bot();
@@ -148,8 +171,8 @@ namespace LastBell.Run
             int map = RunMaps.IndexOf(RunDirector.TempoTyrantMap), enc = RunDirector.TempoTyrantPractice;
             Check("practice entry registered", enc >= 0 && RunDirector.Bosses[enc].Name.StartsWith("Tempo Tyrant") && !RunDirector.Bosses[enc].InRun);
             Check("run order unchanged (4 run bosses, Tyrant excluded)", RunDirector.RunOrder.Length == 4 && !RunDirector.RunOrder.Contains(enc));
-            Check("Metronome Court map registered and in build", map >= 0 && RunMaps.InBuild(map) && !RunMaps.All[map].InShowcase);
-            Check("showcase stages unchanged (5 original arenas)", RunMaps.Showcased.Length == 5);
+            Check("Metronome Court map registered and in build", map >= 0 && RunMaps.InBuild(map) && RunMaps.All[map].InShowcase);
+            Check("showcase stages: 5 original arenas + Metronome Court last", RunMaps.Showcased.Length == 6 && RunMaps.Showcased[5].Id == "metronome-court");
             // a player build boots into the menu router: load the arena's run scene directly
             float boot = 0; while (RunDirector.Instance == null && boot < 4) { boot += Time.deltaTime; yield return null; }
             if (RunDirector.Instance == null) UnityEngine.SceneManagement.SceneManager.LoadScene(RunMaps.All[map].RunScene);
@@ -198,18 +221,25 @@ namespace LastBell.Run
             Check("Haste indicators: fewer beats AND shorter seconds than Normal", HasteShorter(), HasteTable());
             Note(HasteTable());
             var arenaNow = FindAnyObjectByType<MetronomeCourtArena>();
-            Check("metronome reaches the gameplay frame: rod-shadow spot light with shadows + rim lantern chase", arenaNow && arenaNow.RodShadowLight && arenaNow.RodShadowLight.shadows != LightShadows.None && arenaNow.LanternCount >= 8,
+            Check("metronome reaches the gameplay frame: tempo-tinted spot light + rim lantern chase", arenaNow && arenaNow.TempoSpotLight && Near(arenaNow.TempoSpotLight.color, MetronomeCourtArena.HasteLightTint) && arenaNow.LanternCount >= 8,
                 arenaNow ? $"lanterns {arenaNow.LanternCount}" : "");
-            int shadowFrames = 0, sampled = 0;
-            for (float t = 0; t < 1.5f; t += Time.deltaTime, sampled++)
-            {
-                if (arenaNow && arenaNow.RodShadowOnFloor && new Vector2(arenaNow.RodShadowTip.x, arenaNow.RodShadowTip.z).magnitude <= MetronomeCourtArena.FloorRadius + 0.01f) shadowFrames++;
-                yield return null;
-            }
-            // the projected shadow sweeps across the dial through the middle of each swing and runs past the floor edge at the
-            // extremes (a sweeping beam), so it must be on the floor for part of every swing, not all of it
-            Check("rod shadow sweeps across the dial on every swing", sampled > 0 && shadowFrames >= Mathf.Max(1, sampled * 0.25f), $"{shadowFrames}/{sampled} frames on the floor");
+            // Risxhb: no metronome shadow on the arena floor; the lighting alone signals Haste/Normal
+            Check("metronome casts no shadow on the arena floor", arenaNow && arenaNow.TempoSpotLight.shadows == LightShadows.None && !arenaNow.transform.Find("Rod shadow (projected)"),
+                arenaNow ? $"spot shadows {arenaNow.TempoSpotLight.shadows}" : "");
             Check("world lighting in its Haste (warm) state", arenaNow && arenaNow.TempoBlend > 0.9f, arenaNow ? $"blend {arenaNow.TempoBlend:0.00}" : "");
+            // asset F: lighting carries the tempo read anywhere on the court (rim light + beat pulse), dusk sky, fog off the court
+            Check("tempo rim light: shadowless, tinted pale gold in Haste", arenaNow && arenaNow.TempoRimLight && arenaNow.TempoRimLight.shadows == LightShadows.None && Near(arenaNow.TempoRimLight.color, MetronomeCourtArena.HasteLightTint),
+                arenaNow && arenaNow.TempoRimLight ? $"rim {arenaNow.TempoRimLight.intensity:0.00}" : "");
+            float gearA0 = arenaNow ? arenaNow.GearAngle : 0;   // sampled before the 1.5 s window below
+            float pulseMin = 1, pulseMax = 0;
+            for (float t = 0; t < 1.5f; t += Time.deltaTime) { if (arenaNow) { pulseMin = Mathf.Min(pulseMin, arenaNow.BeatPulse); pulseMax = Mathf.Max(pulseMax, arenaNow.BeatPulse); } yield return null; }
+            Check("metronome weight sits low in Haste (asset A)", arenaNow && arenaNow.WeightHeight < MetronomeCourtArena.WeightHaste + 0.4f, arenaNow ? $"weight {arenaNow.WeightHeight:0.00}" : "");
+            Check("lights pulse on the beat", pulseMax - pulseMin > 0.5f, $"pulse {pulseMin:0.00}..{pulseMax:0.00}");
+            Check("court floor: stone grain detail + reflection probe rendered (asset B)", MetronomeCourtArena.FloorDetailReady && arenaNow && arenaNow.ProbeRendered, "");
+            Check("ambience: sky gears turn, broken masonry drifts in the void (asset E)", arenaNow && arenaNow.GearCount >= 3 && arenaNow.DrifterCount >= 10 && arenaNow.GearAngle - gearA0 > 0.5f,
+                arenaNow ? $"gears {arenaNow.GearCount}, drifters {arenaNow.DrifterCount}, turned {arenaNow.GearAngle - gearA0:0.0} deg" : "");
+            Check("dusk sky shown and fog starts beyond the court", arenaNow && arenaNow.SkyActive && Camera.main && Camera.main.clearFlags == CameraClearFlags.Skybox && RenderSettings.fogStartDistance >= MetronomeCourtArena.FogStart && arenaNow.LanternPoolCount >= 4,
+                $"fog {RenderSettings.fogStartDistance:0}-{RenderSettings.fogEndDistance:0}, pools {(arenaNow ? arenaNow.LanternPoolCount : 0)}");
             yield return BossCloseups("haste");
 
             // ---------------- Threefold Severance (Haste) ----------------
@@ -229,6 +259,8 @@ namespace LastBell.Run
             yield return Wait(0.6f);
             var arenaN = FindAnyObjectByType<MetronomeCourtArena>();
             Check("world lighting follows tempo into its Normal (cool) state", arenaN && arenaN.TempoBlend < 0.1f, arenaN ? $"blend {arenaN.TempoBlend:0.00}" : "");
+            Check("metronome weight sits high in Normal (asset A: the weight is the tempo)", arenaN && arenaN.WeightHeight > MetronomeCourtArena.WeightNormal - 0.4f, arenaN ? $"weight {arenaN.WeightHeight:0.00}" : "");
+            Check("tempo lights turn cool blue in Normal", arenaN && arenaN.TempoRimLight && Near(arenaN.TempoRimLight.color, MetronomeCourtArena.NormalLightTint, 0.2f) && Near(arenaN.TempoSpotLight.color, MetronomeCourtArena.NormalLightTint, 0.2f), "");
             Check("music: Normal swaps to the song as written (1.0x) at the same beat, still locked", music && music.Source.clip && music.Source.clip.name == TempoTyrantAudio.SlowTrack && music.Source.isPlaying &&
                 boss.Audio.MusicSwaps >= 1 && Mathf.Abs(boss.Audio.LastMusicError) < TempoTyrantAudio.ResyncTolerance, boss.Audio.StatusText);
             yield return Wait(0.4f);
@@ -242,6 +274,13 @@ namespace LastBell.Run
 
             // ---------------- Hollow Crown ----------------
             yield return Crown();
+
+            // ---------------- Spiral Slices (replaced Stop-Time) ----------------
+            yield return SpiralSlices("first", null);
+
+            // ---------------- Mirrored Wake (Haste only) ----------------
+            yield return MirroredWake();
+            yield return SpiralSlices("after mirrored wake", Tempo.Haste);
 
             // ---------------- pursuit, closing rush, target invalidation, party counts ----------------
             yield return Pursuit();
@@ -288,11 +327,12 @@ namespace LastBell.Run
             var s1 = TempoTyrantEncounter.SeveranceStrike(1, bp, yaw, boss.BodyRadius); var s2 = TempoTyrantEncounter.SeveranceStrike(2, bp, yaw, boss.BodyRadius); var s3 = TempoTyrantEncounter.SeveranceStrike(3, bp, yaw, boss.BodyRadius);
             Check($"Severance {tag}: 1 left cleave leaves the boss's right safe", s1.Contains(bp - right * 5) && !s1.Contains(bp + right * 5) && s1.Contains(bp - fwd * 5 - right * 2));
             Check($"Severance {tag}: 2 right cleave mirrors it", s2.Contains(bp + right * 5) && !s2.Contains(bp - right * 5));
-            Check($"Severance {tag}: 3 overhead hits the centre, flanks safe", s3.Contains(bp + fwd * 6) && !s3.Contains(bp - right * 4.5f + fwd * 4) && !s3.Contains(bp + right * 4.5f + fwd * 4));
+            Check($"Severance {tag}: 3 overhead takes his whole front half, behind him safe", s3.Contains(bp + fwd * 6) && s3.Contains(bp - right * 9f + fwd * 1) && s3.Contains(bp + right * 9f + fwd * 1) &&
+                !s3.Contains(bp - fwd * 1.5f) && !s3.Contains(bp - fwd * 4 - right * 6) && !s3.Contains(bp - fwd * 4 + right * 6));
             Check($"Severance {tag}: telegraphs are clipped to the floor", boss.SeveranceStrikes[0].ClipRadius > 0 && boss.SeveranceStrikes[0].ClipRadius <= CombatWorld.PlayerBound + 0.5f);
             int beforeStrikes = boss.SeveranceStrikes.Count;
             yield return Until(() => boss.SeveranceStrikes.Count >= 2, 10, "strike 2 live"); yield return Wait(0.05f);
-            Check($"Severance {tag}: strike 2 is the boxed number once strike 1 is spent", boss.Numbers.Count(x => x.imminent) == 1 && boss.Numbers.First(x => x.imminent).number == 2,
+            Check($"Severance {tag}: strike 2 is the large (imminent) number once strike 1 is spent", boss.Numbers.Count(x => x.imminent) == 1 && boss.Numbers.First(x => x.imminent).number == 2,
                 string.Join(",", boss.Numbers.Select(x => x.number + (x.imminent ? "*" : ""))));
             yield return Shot($"severance_{tag}_strike2_imminent");
             yield return Until(() => boss.SeveranceStrikes.Count >= 3, 10, "strike 3 live"); yield return Wait(0.05f);
@@ -325,9 +365,9 @@ namespace LastBell.Run
             var far = d.World.Constrain(new Vector3(0, 0, 11.5f), PlayerController.Radius);
             d.Player.transform.position = far; goal = far;
             boss.ForcedNext = "Wake";
-            int startHits = hits.Count, eruptions0 = boss.FissureEruptions;
+            int startHits = hits.Count, eruptions0 = boss.FissureEruptions, mirrors0 = boss.MirrorPreviews + boss.MirrorEruptions;
             yield return Until(() => boss.Current == "Sundering Wake", 20, "Wake");
-            int wakeStart = d.World.Tick; var lane = boss.LastWake;
+            int wakeStart = d.World.Tick; var lane = boss.LastWake; var wakeTempo = boss.Clock.State;
             yield return Wait(0.2f);
             yield return Shot("wake_warning_path_endpoint");
             int warnTicks = boss.Clock.TicksFor(TempoTyrantEncounter.Of(TempoTyrantEncounter.WakeWarn, boss.Clock.State));
@@ -355,6 +395,9 @@ namespace LastBell.Run
             var erupt = mine.Where(h => h.source == "Sundering Wake (eruption)").ToList();
             Check("Wake: eruption hits a player standing in the wake once", buddy != null && erupt.Count(h => h.who == buddy) == 1, $"{erupt.Count} eruption hits");
             Check("Wake: endpoint inside the boss bound", new Vector2(boss.transform.position.x, boss.transform.position.z).magnitude <= TempoTyrantEncounter.OwnBound + 0.05f);
+            if (wakeTempo == Tempo.Normal)
+                Check("Wake (Normal): no mirrored fissure outside Haste", boss.LastMirror == null && boss.MirrorPreviews + boss.MirrorEruptions == mirrors0);
+            else Note("Wake ran in Haste here; the Normal no-mirror rule is covered only if a later Normal Wake runs");
             RemoveExtras();
             yield return Until(() => boss.Current == "between blocks" || boss.Current.StartsWith("pursuit") || boss.Current.StartsWith("Closing"), 10, "Wake block ends");
             Check("Wake: no lingering hazards after the block", !d.World.Hazards.Live.Any(h => h.Source.StartsWith("Sundering Wake")));
@@ -385,6 +428,114 @@ namespace LastBell.Run
                 Check("Crown: separate warnings, ring then circle", inner.Spawn >= ring.Resolve && inner.Resolve - ring.Resolve == TempoClock.TicksFor(TempoTyrantEncounter.Of(TempoTyrantEncounter.CrownInnerWarn, inner.Tempo), inner.Bpm),
                     $"ring {ring.Resolve}, inner {inner.Spawn}->{inner.Resolve}");
             Check("Crown: pocket fits a player outside the boss body", TempoTyrantEncounter.CrownPocket - Hazard.Margin > 1.4f + PlayerController.Radius + 1f);
+        }
+
+        // Spiral Slices with a chaser and an idle player. The chaser (a roster bot, nearest the centre) follows the safe
+        // slice and takes no damage; the bot player stands still in one slice and is hit by every spiral pulse whose safe
+        // slice isn't its own, plus exactly one of the two every-other sets. want: wait for a boundary in this tempo first.
+        IEnumerator SpiralSlices(string tag, Tempo? want)
+        {
+            keepAlive = true; RemoveExtras(); goal = null;
+            yield return Until(() => boss.Current == "between blocks" && (want == null || (boss.Clock.State == want && !boss.Clock.Pending)), want == null ? 30 : 60, "boundary before Spiral Slices " + tag);
+            // the idle bot player stands mid-slice 3 (105 deg) at 9 m; the chaser starts mid-slice 8 at 4 m (nearest)
+            var idleAt = Sim.Dir(TempoTyrantEncounter.SliceYaw(3)) * 9f;
+            d.Player.transform.position = d.World.Constrain(idleAt, PlayerController.Radius);
+            var chaser = AddExtra(Sim.Dir(TempoTyrantEncounter.SliceYaw(8)) * 4f); chaser.Input = new ChaseBot { Boss = () => boss };
+            boss.ForcedNext = "Slices";
+            int startHits = hits.Count, logStart = boss.SliceLog.Count, blocks = boss.SliceBlocks;
+            yield return Until(() => boss.SlicesActive, 25, "Spiral Slices " + tag);
+            if (!boss.SlicesActive) { RemoveExtras(); yield break; }
+            var tempo = boss.Clock.State; int dir = boss.SpiralDir;
+            {
+                // route: one slice to the next at the chase radius (5 m) inside one step, walking; and across the floor
+                // (12.5 m rim to the far side's 5 m) inside indicate + first warning, sprinting
+                float chord = 2 * ChaseBot.ChaseRadius * Mathf.Sin(TempoTyrantEncounter.SliceHalf * Mathf.Deg2Rad);   // slice centre to slice centre
+                float stepS = TempoClock.TicksFor(TempoTyrantEncounter.Of(TempoTyrantEncounter.SliceStep, tempo), boss.Clock.Bpm) / (float)Sim.Hz;
+                float openS = TempoClock.TicksFor(TempoTyrantEncounter.Of(TempoTyrantEncounter.SliceIndicate, tempo) + TempoTyrantEncounter.Of(TempoTyrantEncounter.SliceFirst, tempo), boss.Clock.Bpm) / (float)Sim.Hz;
+                Check($"Spiral Slices {tag}: routes: chase walkable, opening reachable sprinting", chord / stepS <= PlayerController.WalkSpeed * 0.9f && (12.5f + 5f) / openS <= PlayerController.SprintSpeed * 0.95f,
+                    $"chase {chord / stepS:0.0} m/s (walk {PlayerController.WalkSpeed}), opening {(12.5f + 5f) / openS:0.0} m/s (sprint {PlayerController.SprintSpeed})");
+            }
+            Check($"Spiral Slices {tag}: boss conducts from the arena centre", TempoTyrantEncounter.ArenaCentred(boss.transform.position));
+            Check($"Spiral Slices {tag}: whole floor indicated before any slice is live", !d.World.Hazards.Live.Any(h => h.Source.StartsWith("Spiral")));
+            yield return Wait(0.15f);
+            yield return Shot($"slices_{tag.Replace(' ', '_')}_indicate");
+            yield return Until(() => boss.SafeSlice >= 0, 6, "first slice goes");
+            yield return Wait(0.1f);
+            var live = d.World.Hazards.Live.Where(h => h.Source == "Spiral Slices").ToList();
+            Check($"Spiral Slices {tag}: 11 slices live, the first safe slice is the nearest player's", live.Count == 11 && boss.SafeSlice == 8 &&
+                live.All(h => Mathf.Abs(Mathf.DeltaAngle(h.Yaw, TempoTyrantEncounter.SliceYaw(8))) > 1f), $"{live.Count} live, safe {boss.SafeSlice}");
+            yield return Shot($"slices_{tag.Replace(' ', '_')}_spiral_start");
+            yield return Until(() => boss.SliceLog.Count - logStart >= 5, 10, "mid spiral");
+            yield return Shot($"slices_{tag.Replace(' ', '_')}_spiral_mid");
+            yield return Until(() => boss.AltSafeParity >= 0, 15, "every-other phase");
+            yield return Wait(0.2f);
+            yield return Shot($"slices_{tag.Replace(' ', '_')}_every_other");
+            yield return Until(() => !boss.SlicesActive, 10, "Spiral Slices end");
+            yield return Wait(0.2f);
+            var log = boss.SliceLog.Skip(logStart).ToList();
+            var spiral = log.Where(l => l.parity < 0).ToList(); var alt = log.Where(l => l.parity >= 0).ToList();
+            bool steps = spiral.Count == TempoTyrantEncounter.SpiralSteps &&
+                spiral.Zip(spiral.Skip(1), (a, b) => TempoTyrantEncounter.Wrap(a.safe + dir) == b.safe).All(x => x);
+            Check($"Spiral Slices {tag} ({tempo}, {(dir > 0 ? "right" : "left")}): the safe slice moves one slice per step", steps, string.Join(" ", spiral.Select(l => l.safe)));
+            int stepTicks = TempoClock.TicksFor(TempoTyrantEncounter.Of(TempoTyrantEncounter.SliceStep, tempo), tempo == Tempo.Haste ? boss.Clock.HasteBpm : boss.Clock.NormalBpm);
+            Check($"Spiral Slices {tag}: steps are {TempoTyrantEncounter.Of(TempoTyrantEncounter.SliceStep, tempo)} beats apart",
+                spiral.Zip(spiral.Skip(1), (a, b) => b.tick - a.tick).All(t => Mathf.Abs(t - stepTicks) <= 1), string.Join(",", spiral.Zip(spiral.Skip(1), (a, b) => b.tick - a.tick)));
+            int lastSafe = spiral.Count > 0 ? spiral[spiral.Count - 1].safe : -1;
+            Check($"Spiral Slices {tag}: every other slice, the set holding the spiral's last slice first, then the other",
+                alt.Count == 2 && alt[0].parity == lastSafe % 2 && alt[1].parity == 1 - alt[0].parity, string.Join(" ", alt.Select(a => a.parity)));
+            var all = hits.Skip(startHits).ToList();
+            var chased = all.Where(h => h.who == chaser).ToList();
+            Check($"Spiral Slices {tag}: a player chasing the safe slice takes no damage", chased.Count == 0, string.Join(", ", chased.Select(h => h.source)));
+            int idleSlice = TempoTyrantEncounter.SliceOf(d.Player.transform.position);
+            int wantSpiral = spiral.Count(l => l.safe != idleSlice);
+            var idle = all.Where(h => h.who == d.Player).ToList();
+            int gotSpiral = idle.Count(h => h.source == "Spiral Slices"), gotAlt = idle.Count(h => h.source.StartsWith("Every Other"));
+            Check($"Spiral Slices {tag}: standing still is hit by every pulse that isn't safe for it, once each", gotSpiral == wantSpiral && gotAlt == 1,
+                $"spiral {gotSpiral}/{wantSpiral}, every-other {gotAlt}/1");
+            Check($"Spiral Slices {tag}: a spiral hit never stuns", idle.Where(h => h.source == "Spiral Slices").Count() == 0 || d.Player.Stunned == 0);
+            Check($"Spiral Slices {tag}: no lingering slice hazards", !d.World.Hazards.Live.Any(h => h.Source.StartsWith("Spiral") || h.Source.StartsWith("Every Other")));
+            RemoveExtras();
+        }
+
+        // Haste: the fissure gets a mirror image (x -> -x). A roster player standing only in the mirror lane is hit once by
+        // the mirrored eruption and never by the real one; both erupt on the same tick.
+        IEnumerator MirroredWake()
+        {
+            keepAlive = true; RemoveExtras();
+            yield return Until(() => boss.Current == "between blocks" && boss.Clock.State == Tempo.Haste && !boss.Clock.Pending, 60, "Haste boundary before Mirrored Wake");
+            var spot = d.World.Constrain(new Vector3(7.5f, 0, 7.5f), PlayerController.Radius);
+            d.Player.transform.position = spot; goal = spot;
+            boss.ForcedNext = "Wake";
+            int previews0 = boss.MirrorPreviews, mErupt0 = boss.MirrorEruptions, fErupt0 = boss.FissureEruptions, startHits = hits.Count;
+            yield return Until(() => boss.Current == "Sundering Wake", 20, "Mirrored Wake");
+            var tempo = boss.Clock.State;
+            yield return Wait(0.15f);
+            Check("Mirrored Wake: dashed mirror preview shown during the charge warning", tempo == Tempo.Haste && boss.MirrorPreviews == previews0 + 1,
+                $"tempo {tempo}, previews +{boss.MirrorPreviews - previews0}, skips {boss.MirrorSkips}");
+            yield return Shot("mirrored_wake_preview");
+            yield return Until(() => boss.LastMirror != null && d.World.Hazards.Live.Contains(boss.LastMirror), 4, "mirrored eruption warning");
+            var f = boss.LastFissure; var m = boss.LastMirror;
+            if (f == null || m == null) { Check("Mirrored Wake: mirror lane spawned", false); RemoveExtras(); yield break; }
+            Check("Mirrored Wake: mirror is the fissure reflected across the north-south line", Mathf.Abs(m.Origin.x + f.Origin.x) < 1e-3f && Mathf.Abs(m.Origin.z - f.Origin.z) < 1e-3f &&
+                Mathf.Abs(Mathf.DeltaAngle(m.Yaw, -f.Yaw)) < 0.01f && Mathf.Approximately(m.Length, f.Length) && Mathf.Approximately(m.Width, f.Width) && m.ResolveAt == f.ResolveAt,
+                $"fissure {f.Origin} yaw {f.Yaw:0.0}, mirror {m.Origin} yaw {m.Yaw:0.0}");
+            var mid = m.Origin + Sim.Dir(m.Yaw) * (m.Length * 0.6f);
+            var buddy = AddExtra(mid);
+            Note($"mirror-lane player at {buddy.transform.position}: in mirror {m.Contains(buddy.transform.position)}, in fissure {f.Contains(buddy.transform.position)}");
+            yield return Wait(0.1f);
+            yield return Shot("mirrored_wake_live");
+            yield return Until(() => boss.MirrorEruptions > mErupt0 && boss.FissureEruptions > fErupt0, 6, "both eruptions");
+            yield return Wait(0.4f);
+            var bh = hits.Skip(startHits).Where(h => h.who == buddy).ToList();
+            Check("Mirrored Wake: a player in the mirror lane is hit once by it, never by the real fissure",
+                bh.Count(h => h.source == "Sundering Wake (mirrored eruption)") == 1 && bh.Count(h => h.source == "Sundering Wake (eruption)") == 0, string.Join(", ", bh.Select(h => h.source)));
+            if (seen.TryGetValue(f.Id, out var sf) && seen.TryGetValue(m.Id, out var sm))
+                Check("Mirrored Wake: both lanes go live and erupt on the same ticks", sf.Spawn == sm.Spawn && sf.Resolve == sm.Resolve, $"fissure {sf.Spawn}->{sf.Resolve}, mirror {sm.Spawn}->{sm.Resolve}");
+            Check("Mirrored Wake: each lane erupts exactly once", boss.MirrorEruptions == mErupt0 + 1 && boss.FissureEruptions == fErupt0 + 1);
+            RemoveExtras();
+            yield return Until(() => boss.Current == "between blocks" || boss.Current.StartsWith("pursuit") || boss.Current.StartsWith("Closing"), 10, "Mirrored Wake block ends");
+            Check("Mirrored Wake: no lingering hazards after the block", !d.World.Hazards.Live.Any(h => h.Source.StartsWith("Sundering Wake")));
+            goal = null;
         }
 
         PlayerController AddExtra(Vector3 at)
@@ -482,16 +633,14 @@ namespace LastBell.Run
             d.SetPaused(true);
             yield return new WaitForSeconds(1.5f);
             Check("pause freezes tempo, tick and hazards", boss.Clock.Beat == beat && d.World.Tick == tick && d.World.Hazards.Live.Select(h => h.Age).SequenceEqual(ages));
-            var srcs = boss.Audio.GetComponents<AudioSource>();
-            Check("pause silences scheduled metronome ticks", srcs.All(s => !s.isPlaying));
+            Check("no metronome tick or tempo-change sound sources on the boss", boss.GetComponentsInChildren<AudioSource>().Length == 0);
             var mus = FindAnyObjectByType<LastBell.Menu.MenuMusic>();
             Check("pause pauses this fight's music", mus && mus.Source && !mus.Source.isPlaying);
             yield return Shot("paused");
-            int scheduled = boss.Audio.TicksScheduled;
             d.SetPaused(false);
             yield return null; yield return null;
             Check("resume does not burst ticks or damage", d.World.Tick - tick <= 13 &&   // two resume frames at the director's 0.1 s/frame cap (6 ticks) + 1
-                 boss.Audio.TicksScheduled - scheduled <= 1 && d.Player.Hp >= hp - 40, $"ticks +{d.World.Tick - tick}, scheduled +{boss.Audio.TicksScheduled - scheduled}");
+                 d.Player.Hp >= hp - 40, $"ticks +{d.World.Tick - tick}");
             yield return Wait(0.3f);
             Check("resume resumes the music beat-locked", mus && mus.Source.isPlaying && Mathf.Abs(boss.Audio.LastMusicError) < TempoTyrantAudio.ResyncTolerance, boss.Audio.StatusText);
         }
@@ -507,7 +656,6 @@ namespace LastBell.Run
             yield return new WaitForSeconds(1.2f);
             yield return Shot("defeat");
             Check("no damage after defeat", hits.Count == hitsBefore);
-            Check("defeat stops metronome tick audio", boss.Audio.GetComponents<AudioSource>().All(s => !s.isPlaying));
             yield return Until(() => d.State == RunState.Results, 8, "practice results");
             Check("practice ends in a practice result", d.State == RunState.Results && d.Victory && d.Mode == RunMode.Practice);
 
@@ -582,18 +730,35 @@ namespace LastBell.Run
                     foreach (int y in new[] { 0, 90, 200, 315 })
                     {
                         var end = Sim.Flat(-from).normalized * 1.5f;
-                        var r = TempoTyrantRoutes.Chain(from, end, y, 220f, PlayerController.SprintSpeed, bound, split.Item1, split.Item2);
+                        var r = TempoTyrantRoutes.Chain(from, end, y, 220f, PlayerController.SprintSpeed, bound, split.Item1, split.Item2, mirrored: true);
                         cs += r.Starts; cok += r.Feasible; cw = Mathf.Min(cw, r.WorstSlack);
                         foreach (var f in r.Failures.Take(2)) Note("route failure: " + f);
                     }
-            Check("routes: Broken Cadence chain (fissure then 1-2-3) at 220 BPM, sprinting", cok == cs, $"{cok}/{cs}, worst slack {cw:0.00} s");
+            Check("routes: Broken Cadence chain (fissure + mirror, then 1-2-3) at 220 BPM, sprinting", cok == cs, $"{cok}/{cs}, worst slack {cw:0.00} s");
+            // Mirrored Wake alone: charges in every 15-degree direction (short and long), off both lanes within the
+            // 3-beat fissure warning, walking, counting none of the earlier preview time
+            int ms = 0, mok = 0, mskip = 0; float mw = float.MaxValue;
+            for (int yaw = 0; yaw < 360; yaw += 15)
+            {
+                if (!TempoTyrantEncounter.MirrorUseful(yaw)) { mskip++; continue; }
+                foreach (float travel in new[] { TempoTyrantEncounter.WakeMinTravel, 10f })
+                {
+                    var start = Sim.Dir(yaw + 180) * 1.0f;
+                    var end = TempoTyrantEncounter.ClampInside(start, start + Sim.Dir(yaw) * travel, TempoTyrantEncounter.OwnBound);
+                    var r = TempoTyrantRoutes.MirroredWake(start, end, 220f, PlayerController.WalkSpeed, bound);
+                    ms += r.Starts; mok += r.Feasible; mw = Mathf.Min(mw, r.WorstSlack);
+                    foreach (var fl in r.Failures.Take(2)) Note("route failure: " + fl);
+                }
+            }
+            Check("routes: Mirrored Wake, off both lanes within the fissure warning alone, walking", mok == ms, $"{mok}/{ms}, worst slack {mw:0.00} s, {mskip} near-axis directions skip the mirror");
         }
 
         static readonly (string name, (float H, float N) w)[] Windows =
         {
             ("Severance opening", TempoTyrantEncounter.SevOpen), ("Severance gap", TempoTyrantEncounter.SevGap), ("Wake warning", TempoTyrantEncounter.WakeWarn),
             ("fissure warning", TempoTyrantEncounter.FissureWarn), ("Crown ring", TempoTyrantEncounter.CrownRing), ("Crown inner", TempoTyrantEncounter.CrownInnerWarn),
-            ("rush tell", TempoTyrantEncounter.RushTell),
+            ("rush tell", TempoTyrantEncounter.RushTell), ("slice indicate", TempoTyrantEncounter.SliceIndicate), ("first slice", TempoTyrantEncounter.SliceFirst),
+            ("spiral step", TempoTyrantEncounter.SliceStep), ("every-other 1", TempoTyrantEncounter.AltWarn), ("every-other 2", TempoTyrantEncounter.AltGap),
         };
         static bool HasteShorter()
         {
@@ -624,5 +789,6 @@ namespace LastBell.Run
             Application.Quit(fail == 0 ? 0 : 1);
 #endif
         }
+        static bool Near(Color a, Color b, float tol = 0.03f) => Mathf.Abs(a.r - b.r) + Mathf.Abs(a.g - b.g) + Mathf.Abs(a.b - b.b) < tol;
     }
 }

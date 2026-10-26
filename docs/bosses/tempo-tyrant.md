@@ -18,7 +18,7 @@ Main menu → **Boss Rush** (the existing Test Rush setup) → map **Metronome C
 | Encounter | `unity/Assets/LastBell/Run/Encounters/TempoTyrant/TempoTyrantEncounter.cs` |
 | Tempo state | `.../TempoTyrant/TempoClock.cs` |
 | Stand-in body and poses | `.../TempoTyrant/TempoTyrantRig.cs` |
-| Ticks and music adapter | `.../TempoTyrant/TempoTyrantAudio.cs` |
+| Music adapter (no ticks since October 24, 2026) | `.../TempoTyrant/TempoTyrantAudio.cs` |
 | Strike effects (sword arc, rims, streaks) | `.../TempoTyrant/TempoTyrantFx.cs` |
 | Music preparation tools | workspace `tools/tempo-tyrant/` (`analyse_tempo.py`, `beat_track.py`, `warp_wsola.py`, `stretch_wsola.py`; numpy only) |
 | Music files | `Menu/Resources/Menu/BossMusic/By My Measure.wav` (Normal, 165 BPM grid) and `By My Measure (Haste).wav` (1.33×, 220 BPM grid) |
@@ -116,12 +116,44 @@ One `TempoClock` per fight, advanced only on the 60 Hz combat tick. `Time.timeSc
 | --- | --- | --- | --- |
 | Threefold Severance 1, left cleave | lane slab x < +2.5 m (boss frame), clipped to the floor; ≈63% of the floor from the centre | opening **9** | 26 |
 | Threefold Severance 2, right cleave | x > −2.5 m | +4 | 26 |
-| Threefold Severance 3, overhead | front band \|x\| < 3.5 m from his back plate | +4, then 3/5 recovery | 30 |
+| Threefold Severance 3, overhead | **his entire front half**: everything ahead of his centre line (changed October 24, 2026 at Risxhb's request; was a 7 m front band). Only the area behind him is safe | +4, then 3/5 recovery | 30 |
 | Sundering Wake, charge | 3 m lane to the farthest player, travel ≤15 m clamped to 8.5 m, +2.6 m thrust reach | 4/5 warning, 0.45 s travel; hit when the blade arrives | 24 |
 | Sundering Wake, eruption | 2.2 m lane on the travelled path (yellow, with a jagged crack); separate hazard and ID | 3/4 warning, resolves once | 16 |
 | Hollow Crown, ring | everything outside a 4 m pocket around him | 6/7 | 22 |
 | Hollow Crown, inner | 5.5 m circle under him | +3/+4, then 4/6 recovery | 22 |
 | Closing Rush | announced (text, plus a solid ivory stop ring and pip), **no damage** | 2-beat tell after 1.5 s with the pursuit target beyond 9 m; 8 s cooldown | — |
+| Sundering Wake, mirrored eruption (**Haste only**) | the eruption lane reflected across the arena's north-south line (left/right on screen) | dashed preview from the start of the charge warning; goes live and erupts on the same ticks as the real fissure | 16 |
+| Spiral Slices, spiral | the floor's 12 wedge slices (30° each, between the brass hour spokes). 11 pulse each step; the one safe slice moves one slice right (clockwise) or left (anticlockwise) per step | whole floor dashed for 4/5 beats; first pulse after 4/5 more; then 9 more pulses 2/2 beats apart | 12 per pulse, no stun or knockback |
+| Spiral Slices, every other | 6 alternate slices from the centre, then the other 6 | 4/5, then +3/+4; 2/3 recovery | 18 |
+
+### Harder mechanics added October 24, 2026
+
+Risxhb asked for harder boss mechanics, starting with the Tempo Tyrant. Both come from the Rabbit and Steel research page (workspace `docs/research/rabbit-and-steel-boss-mechanics.html`): *movement check* (`movementcheck`) and *player mirror* (`playermirror`).
+
+**Stop-Time** was removed on October 24, 2026 at Risxhb's request. Its place in the rotation is taken by Spiral Slices (below). The rotation is now Severance, Wake, Crown, Spiral Slices, Severance, Crown, Wake, Spiral Slices.
+
+**Spiral Slices** (added October 24, 2026; Risxhb's design, using the arena's floor slices):
+- He walks to the centre. The floor's 12 wedge slices, between the brass hour spokes, are the attack.
+- **The whole floor is indicated:** every slice is shown dashed. The announcement says **SPIRAL RIGHT >>>** or **<<< SPIRAL LEFT**.
+- **The first slice goes:** the outlines clear, and every slice except one goes live. The safe slice is the one under the player nearest the centre, so the opening is always reachable.
+- **The chase:** after each pulse the safe slice moves one slice in the announced direction. Right is clockwise on screen, left is anticlockwise. There are 10 pulses, 2 beats apart in both tempos. Players run round the floor to stay in the gap. The direction alternates on each use.
+- Each pulse hits once per player, for 12, with no stun or knockback, so one hit never stalls the chase. Standing on a spoke counts as being in both slices, as with any hazard edge. Near the boss the slices are too thin to stand in, so the chase happens out on the floor.
+- **Every other slice:** then, from the centre, 6 alternate slices go live: the set that holds the spiral's last safe slice. The other 6 are shown dashed and follow 3/4 beats later. Each hits for 18.
+- **Routes:** chasing slice-centre to slice-centre at 5 m needs 4.75 m/s at 220 BPM (walking is 6 m/s). Reaching the first safe slice from the far rim needs 8.0 m/s at 220 BPM (sprinting is 9 m/s).
+- **Validation:** separate player `builds/tempo-slices-20261024/run1/LastBell.exe`, 0 errors / 46 warnings. Acceptance run **133 / 133**, zero runtime errors, about 113 fps at 2560×1440 (evidence in `build-evidence/tempo-slices-20261024/run1/test/`). It ran twice, both times in **Haste**: once spiralling right and once left. A bot chasing the safe slice took no damage. A player standing still was hit once by every pulse that wasn't safe for it (9/9) and once by the every-other phase. The boss has no audio source left. The Normal tempo, human feel and difficulty haven't been checked.
+
+**Mirrored Wake** (Haste only, including the Broken Cadence chain):
+- During the charge warning, a dashed outline shows the fissure's mirror image (x → −x) and the HUD announces MIRRORED WAKE.
+- When the real fissure goes live, the mirror goes live with it and both erupt on the same tick. Each is its own hazard, so standing where they cross means two hits.
+- It is skipped when the reflected lane would point within 20° of the real one (a charge almost straight north or south), because the two would overlap.
+- A player standing where the mirror lands has the whole charge warning plus travel to read the preview. The route check proves that the 3-beat fissure warning alone, at walking speed, is enough to clear both lanes.
+
+**Validation (October 24, 2026):** Windows player `builds/tempo-stoptime-20261024/LastBell.exe` (separate folder, built with `MetronomeCourtBuilder.BuildWindowsPlayer`; 0 errors / 46 warnings). Acceptance run: **125 / 125, zero runtime errors**, about 112 fps at 2560×1440. Evidence: `build-evidence/tempo-stoptime-20261024/player2/`.
+- **Stop-Time,** run twice: checks land on their own metronome beats (within one tick), after a 4-beat count-in. A bot that follows the score takes no damage; a bot that stands still fails exactly the MOVE checks; a bot that never stops fails exactly the STOP checks; misses cause no stun. Both runs happened in **Haste**, so the Normal score is checked only by its definition, not in play.
+- **Mirrored Wake:** the dashed preview appears during the charge warning; the mirror is the exact reflection; a player in the mirror lane is hit once by it and never by the real fissure; both lanes erupt on the same tick. In Normal there is no mirror.
+- **Routes:** chain with mirror 2264/2264 (worst slack 0.31 s); Mirrored Wake alone, walking, 10263/10263 (0.18 s; 2 of 24 directions skip the mirror). The earlier Severance and Crown routes are unchanged.
+- **Severance strike 3 as a full front half** (later the same day): separate player `builds/tempo-severance-half-20261024/LastBell.exe`, 0 errors / 46 warnings; acceptance **125 / 125**, zero runtime errors (`build-evidence/tempo-severance-half-20261024/player/`). Every Severance route still passes: 220 BPM sprinting 9352/9352 (worst slack 0.25 s), 165 BPM walking 9352/9352 (0.11 s), and the frenzy chain 2264/2264 (0.31 s). The safe route was already to be behind his left flank by strike 3, so the margins didn't shrink.
+- **Open:** the dashed mirror preview is faint in captures. Brightening it is a candidate fix. The run used the HUD before the UI polish session's restyle. Human feel and difficulty are not checked.
 
 - **Severance lock:** before the first preview the boss re-centres (within 1.5 m of the arena centre) and faces the nearest player. Position and facing then stay locked; the test measured 0.000 drift. All three strikes preview from the start. **Imminent:** a saturated red-orange fill and a white numeral on an orange box. **Upcoming:** a dashed, unfilled outline and a bracketed numeral on a dark pill. **Spent:** drops at once to a faint ivory, sorts under live warnings and is gone in 0.15 s. On impact a short sword-arc ribbon shows the blade path, without flooding the floor. Each strike is its own hazard, so one player can take one hit per strike, and three separate strikes can each hit.
 - **Pursuit:** the target is the farthest standing player (ties go to the lowest roster index). The current target is kept while it stays beyond 7.5 m (hysteresis). If the target goes down during a rush tell, the rush cancels and the boss reselects at the next boundary. Pursuit walks for at most 1.25 s per boundary, so one distant player cannot drag him indefinitely.
@@ -135,7 +167,7 @@ One `TempoClock` per fight, advanced only on the 60 Hz combat tick. `Time.timeSc
 | `HasteTicks` / `NormalTicks` | 720 / 960 (12 s / 16 s) | nominal; actual passages are longer, see below |
 | `TransitionBeats` | 3 | accented ticks; commit on the last |
 | `SevOpen` / `SevGap` / `SevRecover` (Haste, Normal) | (9,9) / (4,4) / (3,5) beats | route checks set the floor |
-| `SevSide` / `SevBand` | 2.5 m / 3.5 m half-widths | ≈63% of the floor per cleave from the centre |
+| `SevSide` | 2.5 m half-width | ≈63% of the floor per cleave from the centre. `SevBand` (3.5 m) is no longer used: strike 3 covers the whole front half |
 | `CentreGate` | 1.5 m | Severance, Crown and Wake start this close to the centre |
 | `WakeWidth` / `FissureWidth` / `WakeReach` | 3 / 2.2 / 2.6 m | `WakeWarn` (4,5), `FissureWarn` (3,4), `WakeRecover` (2,3), travel 27 ticks |
 | `CrownPocket` / `CrownInner` | 4 / 5.5 m | `CrownRing` (6,7), `CrownInnerWarn` (3,4), `CrownRecover` (4,6) |
@@ -143,6 +175,11 @@ One `TempoClock` per fight, advanced only on the 60 Hz combat tick. `Time.timeSc
 | `FightDist` / `RushDist` / hysteresis | 4.5 / 9 / 1.5 m | rush after 90 ticks far, 8 s cooldown, 16 m/s |
 | `HasteWalk` / `NormalWalk` | 4.2 / 3.4 m/s | |
 | `FrenzyAt` / `FissureLeadBeats` | strictly < 20% / 8 | |
+| `MirrorMinAngle` | 20° | skip the mirror when it would nearly coincide with the real fissure |
+| `SliceCount` / `SliceHalf` / `SpiralSteps` | 12 / 15° / 10 | slices are on the floor's hour spokes (spoke i at i·30°) |
+| `SliceIndicate` / `SliceFirst` / `SliceStep` | (4,5) / (4,5) / (2,2) beats | whole-floor indication, first pulse, then one pulse per step |
+| `AltWarn` / `AltGap` / `SliceRecover` | (4,5) / (3,4) / (2,3) beats | every other slice |
+| `SpiralDmg` / `AltDmg` | 12 / 18 | spiral pulses: no knockback or stun |
 | `MaxHp` | 2600 | shortened-test-HP convention of the other minibosses |
 | Damage | 26/26/30, 24, 16, 22/22 | identical in both tempos; Easy/Hard scale via `RunDifficulty` |
 
@@ -165,12 +202,8 @@ Triggers once, the first block boundary after HP is **strictly below** 20%. It p
   - resyncs if the error exceeds 50 ms;
   - pauses and resumes with the game pause.
   - It never uses `AudioSource.pitch` and no mixer effects.
-- **Ticks:** generated click clips. Each is scheduled on the DSP clock about 0.12 s before the beat from the clock's live phase, so drift does not accumulate.
-  - Haste ticks are higher and sharper; Normal ticks are deeper.
-  - The three transition ticks are accented.
-  - While the song plays, plain ticks are quiet (22%) and accents stay full.
-  - Pause stops them and nothing is replayed. Defeat, retry and menu return stop them.
-- **Still open:** human listening, to check whether the 1.33× Haste version sounds driving rather than smeared. The song also has its own baked-in pulse; quiet ticks are layered over it.
+- **No metronome ticks or tempo-change sound** (removed October 24, 2026 at Risxhb's request). The song carries the pulse. The tempo change is still shown: the HUD's SHIFT n / 3, the lantern flash and the metronome.
+- **Still open:** human listening, to check whether the 1.33× Haste version sounds driving rather than smeared.
 
 ## Validation
 
@@ -194,7 +227,7 @@ What the final acceptance run measures (deterministic, from the live hazards):
 - **Music:** By My Measure is paired with its 0.75× version. Haste plays the 165 BPM version beat-locked to the clock (error 0 ms). Normal swaps to the 123.75 BPM version at the same beat and stays locked (error < 50 ms). Pause pauses it, and resume restores the lock.
 - **Haste windows:** every indicator is shorter in seconds than in Normal, and four have fewer beats. See the table under Tempo.
 - **Severance timing:** at 165 BPM impacts are exactly **87 ticks** apart with a **196-tick** opening; at 123.75 BPM, 116 apart with a 262-tick opening. Tempo stays fixed per block, and position and facing don't drift.
-- **Severance geometry and hits:** three distinct strikes hit once each; strike 1 leaves the boss's right safe, 2 mirrors it, 3 leaves the flanks safe; telegraphs are clipped to the floor.
+- **Severance geometry and hits:** three distinct strikes hit once each; strike 1 leaves the boss's right safe, 2 mirrors it, 3 leaves the flanks safe (before October 24; strike 3 now takes his whole front half); telegraphs are clipped to the floor.
 - **Severance number:** after strike 1 resolves, strike 2 is the boxed number.
 - **Transitions:** no hazard is live during the transition ticks, and music rate is 0.75 outside Haste.
 - **Wake:** the charge hits once, when the blade arrives. The eruption is a separate hazard that erupts once and hits a player in the wake once. The endpoint stays in bounds and nothing lingers.

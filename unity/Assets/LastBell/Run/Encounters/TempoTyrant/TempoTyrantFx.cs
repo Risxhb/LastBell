@@ -15,7 +15,8 @@ namespace LastBell.Run
         static readonly int PMode = Shader.PropertyToID("_Mode"), PLow = Shader.PropertyToID("_ColorLow"), PHigh = Shader.PropertyToID("_ColorHigh"),
             PEdge = Shader.PropertyToID("_ColorEdge"), PProgress = Shader.PropertyToID("_Progress"), PWidth = Shader.PropertyToID("_Width"),
             PTail = Shader.PropertyToID("_Tail"), PDissolve = Shader.PropertyToID("_Dissolve"), PIntensity = Shader.PropertyToID("_Intensity");
-        readonly Ribbon[] pool = new Ribbon[5]; int next;
+        readonly Ribbon[] pool = new Ribbon[7];   // room for the frenzy tell's paired rims
+        int next;
         MaterialPropertyBlock mpb;
         public int Played { get; private set; }
 
@@ -80,7 +81,7 @@ namespace LastBell.Run
         }
 
         // a thin ring pulse on the floor (Crown edges, charge landing, frenzy tell): 0.15-0.25 s, never a lingering bowl
-        public void Rim(Vector3 centre, float radius, Color colour)
+        public void Rim(Vector3 centre, float radius, Color colour, float life = 0.22f)
         {
             var r = Take(); const int seg = 48; float width = 0.16f;
             var v = new Vector3[(seg + 1) * 2]; var uv = new Vector2[v.Length]; var tri = new int[seg * 6];
@@ -91,7 +92,7 @@ namespace LastBell.Run
                 uv[i * 2] = new Vector2(u, 0); uv[i * 2 + 1] = new Vector2(u, 1);
                 if (i < seg) { int b = i * 2, t = i * 6; tri[t] = b; tri[t + 1] = b + 1; tri[t + 2] = b + 2; tri[t + 3] = b + 1; tri[t + 4] = b + 3; tri[t + 5] = b + 2; }
             }
-            Play(r, centre, v, uv, tri, colour, 0.22f, ring: true);
+            Play(r, centre, v, uv, tri, colour, life, ring: true);
         }
 
         void Play(Ribbon r, Vector3 at, Vector3[] v, Vector2[] uv, int[] tri, Color high, float life, bool ring = false)

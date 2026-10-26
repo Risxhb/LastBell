@@ -79,7 +79,11 @@ namespace LastBell.Run
         // Exact on a 0.6 m grid: computed backwards, a point is "viable" for stage k when it is safe from hazard k and
         // (unless last) some point viable for stage k+1 is reachable from it within that stage's time minus reaction.
         // A start is feasible when a stage-0-viable point is reachable in the first window.
-        public static Result Sequence(string name, Vector3 boss, IList<(Hazard h, float seconds)> stages, float speed, float bound, float startStep = 1.5f)
+        public static Result Sequence(string name, Vector3 boss, IList<(Hazard h, float seconds)> stages, float speed, float bound, float startStep = 1.5f) =>
+            Sequence(name, boss, stages.Select(st => ((System.Func<Vector3, bool>)st.h.Contains, st.seconds)).ToList(), speed, bound, startStep);
+
+        // A stage can be several hazards resolving together (the fissure and its mirror): unsafe if any contains the point.
+        public static Result Sequence(string name, Vector3 boss, IList<(System.Func<Vector3, bool> h, float seconds)> stages, float speed, float bound, float startStep = 1.5f)
         {
             var r = new Result { Name = name };
             var pts = new List<Vector3>();
@@ -93,11 +97,11 @@ namespace LastBell.Run
             for (int k = stages.Count - 1; k >= 0; k--)
             {
                 if (k == 0) after0 = next;
-                var cur = new bool[n]; var h = stages[k].h;
+                var cur = new bool[n]; var hit = stages[k].h;
                 float budget = k + 1 < stages.Count ? (stages[k + 1].seconds - Reaction) * speed : 0;
                 for (int i = 0; i < n; i++)
                 {
-                    if (h.Contains(pts[i])) continue;
+                    if (hit(pts[i])) continue;
                     if (next == null) { cur[i] = true; continue; }
                     for (int j = 0; j < n && !cur[i]; j++)
                         if (next[j] && PathLength(pts[i], pts[j], boss, BodyR) <= budget) cur[i] = true;
@@ -110,7 +114,7 @@ namespace LastBell.Run
                 r.Starts++;
                 float best = float.MinValue;
                 // the start itself can be the stage-0 position (no move needed) when it is safe and continues
-                if (!stages[0].h.Contains(s0))
+                if (!stages[0].h(s0))
                 {
                     bool cont = after0 == null;
                     float b1 = stages.Count > 1 ? (stages[1].seconds - Reaction) * speed : 0;
@@ -157,18 +161,41 @@ namespace LastBell.Run
 
         // The chain: after the charge the fissure is warning while the Severance opening runs. Stage 0 = be off the
         // fissure when it erupts (fissureBeats after the 1-2-3 preview appears), then strike 1 leadBeats later.
-        public static Result Chain(Vector3 chargeStart, Vector3 boss, float yaw, float bpm, float speed, float bound, float fissureBeats, float leadBeats)
+        // mirrored: in Haste the fissure has a reflected twin (TempoTyrantEncounter.MirrorLane) erupting on the same tick
+        public static Result Chain(Vector3 chargeStart, Vector3 boss, float yaw, float bpm, float speed, float bound, float fissureBeats, float leadBeats, bool mirrored = false)
         {
-            var dir = Sim.Flat(boss - chargeStart); float len = dir.magnitude;
-            var fissure = new Hazard { Shape = HazardShape.Lane, Origin = chargeStart, Yaw = Sim.YawTo(chargeStart, boss, 0), Length = len, Width = TempoTyrantEncounter.FissureWidth };
-            var stages = new List<(Hazard, float)> { (fissure, TempoClock.TicksFor(fissureBeats, bpm) / (float)Sim.Hz) };
+            var fissures = Fissures(chargeStart, boss, mirrored);
+            var stages = new List<(System.Func<Vector3, bool>, float)> { ((System.Func<Vector3, bool>)(p => fissures.Any(f => f.Contains(p))), TempoClock.TicksFor(fissureBeats, bpm) / (float)Sim.Hz) };
             for (int n = 1; n <= 3; n++)
             {
                 var h = TempoTyrantEncounter.SeveranceStrike(n, boss, yaw, 1.4f);
                 float beats = n == 1 ? leadBeats : TempoTyrantEncounter.Of(TempoTyrantEncounter.SevGap, TempoOf(bpm));
-                stages.Add((h, TempoClock.TicksFor(beats, bpm) / (float)Sim.Hz));
+                stages.Add(((System.Func<Vector3, bool>)h.Contains, TempoClock.TicksFor(beats, bpm) / (float)Sim.Hz));
             }
-            return Sequence($"Chain fissure {chargeStart}->{boss} yaw {yaw:0} @{bpm:0} ({fissureBeats}+{leadBeats} beats)", boss, stages, speed, bound, 2f);
+            return Sequence($"Chain fissure{(fissures.Count > 1 ? "+mirror" : "")} {chargeStart}->{boss} yaw {yaw:0} @{bpm:0} ({fissureBeats}+{leadBeats} beats)", boss, stages, speed, bound, 2f);
+        }
+
+        // the fissure lane from a charge, plus its mirror when requested and not skipped (same rule as the encounter)
+        public static List<Hazard> Fissures(Vector3 chargeStart, Vector3 chargeEnd, bool mirrored)
+        {
+            float len = Sim.Flat(chargeEnd - chargeStart).magnitude, yaw = Sim.YawTo(chargeStart, chargeEnd, 0);
+            var list = new List<Hazard> { new Hazard { Shape = HazardShape.Lane, Origin = chargeStart, Yaw = yaw, Length = len, Width = TempoTyrantEncounter.FissureWidth } };
+            if (mirrored && TempoTyrantEncounter.MirrorUseful(yaw))
+            {
+                var (o, y) = TempoTyrantEncounter.MirrorLane(chargeStart, yaw);
+                list.Add(new Hazard { Shape = HazardShape.Lane, Origin = o, Yaw = y, Length = len, Width = TempoTyrantEncounter.FissureWidth });
+            }
+            return list;
+        }
+
+        // Mirrored Wake on its own: after the charge ends, every start must get off both lanes within the fissure
+        // warning alone (the dashed mirror preview, shown since the charge warning began, is not counted).
+        public static Result MirroredWake(Vector3 chargeStart, Vector3 chargeEnd, float bpm, float speed, float bound)
+        {
+            var fissures = Fissures(chargeStart, chargeEnd, true);
+            float secs = TempoClock.TicksFor(TempoTyrantEncounter.Of(TempoTyrantEncounter.FissureWarn, TempoOf(bpm)), bpm) / (float)Sim.Hz;
+            var stages = new List<(System.Func<Vector3, bool>, float)> { ((System.Func<Vector3, bool>)(p => fissures.Any(f => f.Contains(p))), secs) };
+            return Sequence($"Mirrored Wake {chargeStart}->{chargeEnd} @{bpm:0}", chargeEnd, stages, speed, bound);
         }
     }
 }

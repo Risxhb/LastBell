@@ -83,8 +83,19 @@ namespace LastBell.Menu
             }
             Check("music continuous across class changes",menu.Music.MenuSource==source&&source.isPlaying&&source.time>musicTime);
             if(!CaptureOnly){
-            menu.SelectClass(2);menu.BossRush();yield return SceneReady(()=>{var s=FindAnyObjectByType<HeroSelection>();return s&&s.Setup;});
-            var selection=FindAnyObjectByType<HeroSelection>();Check("existing Boss Rush setup retains class",selection&&selection.Setup&&selection.Setup.Hero==RunDirector.Classes[2]);
+            // Boss Rush lives on this menu: arena step, boss step, Back returns to the menu with the stage restored.
+            menu.SelectClass(2);menu.BossRush();yield return null;
+            Check("Boss Rush opens on the main menu",menu.Rush&&menu.Rush.Hero==RunDirector.Classes[2]&&!menu.Rush.BossStep&&!FindAnyObjectByType<HeroSelection>());
+            float liveUntil=Time.realtimeSinceStartup+15;while(menu.Rush&&!menu.Rush.LiveBackdrop&&Time.realtimeSinceStartup<liveUntil)yield return null;
+            Check("Boss Rush shows the live arena backdrop",menu.Rush&&menu.Rush.LiveBackdrop&&menu.StageHidden&&!menu.View.enabled);
+            yield return new WaitForSecondsRealtime(1);yield return Capture("boss-rush-arena.png");
+            menu.Rush.Continue();yield return null;
+            Check("Continue opens the boss step",menu.Rush.BossStep&&menu.Rush.EncounterButtons[0].gameObject.activeInHierarchy&&!menu.Rush.MapButtons[0].gameObject.activeInHierarchy);
+            yield return Capture("boss-rush-boss.png");
+            yield return Press(Key.Escape);Check("Escape returns to the arena step",menu.Rush&&!menu.Rush.BossStep);
+            yield return Press(Key.Escape);yield return new WaitForSecondsRealtime(1.5f);
+            Check("Boss Rush Back restores the menu stage",!menu.Rush&&!menu.StageHidden&&menu.View.enabled&&menu.RushButton.IsInteractable()&&EventSystem.current.currentSelectedGameObject==menu.RushButton.gameObject);
+            Check("backdrop scene unloaded",SceneManager.sceneCount==1);
             SceneManager.LoadScene(ConfrontationMenu.ScenePath);yield return SceneReady(()=>FindAnyObjectByType<ConfrontationMenu>()?.Hero!=null);
             menu=FindAnyObjectByType<ConfrontationMenu>();Check("class restored on scene return",menu.Hero&&SavedHeroSelection.Current==RunDirector.Classes[2]);
             menu.StartRun();yield return SceneReady(()=>RunDirector.Instance&&RunDirector.Instance.State==RunState.Ready);
@@ -101,23 +112,17 @@ namespace LastBell.Menu
                 yield return SceneReady(()=>FindAnyObjectByType<ConfrontationMenu>()?.Hero!=null);
             }
             MenuFlowTest.SetResolution(1600,900);yield return new WaitForSecondsRealtime(1);
-            menu=FindAnyObjectByType<ConfrontationMenu>();menu.OpenSettings();yield return Capture("alternative-settings.png");menu.UISettingsButton.onClick.Invoke();
-            Check("alternative Settings has UI category",menu.UISettings.IsOpen&&menu.SettingsOpen&&!menu.StartButton.IsInteractable());
-            yield return Capture("alternative-ui-settings.png");
-            yield return Press(Key.Escape);Check("UI Escape returns to Settings",menu.SettingsOpen&&!menu.UISettings.IsOpen);
-            menu.UISettingsButton.onClick.Invoke();menu.UISettings.ShowcaseButton.onClick.Invoke();
-            yield return SceneReady(()=>FindAnyObjectByType<MainMenu>()?.StartButton!=null);
-            var original=FindAnyObjectByType<MainMenu>();Check("UI switches and saves showcase",original&&MenuAppearance.Selected==MenuStyle.Showcase&&!FindAnyObjectByType<ConfrontationMenu>()&&SceneManager.sceneCount==1);
-            original.OpenSettings();original.UISettingsButton.onClick.Invoke();Check("showcase Settings has UI category",original.UISettings.IsOpen&&original.SettingsOpen);
-            yield return Capture("showcase-ui-settings.png");
-            original.UISettings.BackButton.onClick.Invoke();original.CloseSettings();Check("original Settings remain usable",!original.SettingsOpen&&original.StartButton.IsInteractable());
-            SceneManager.LoadScene(ConfrontationMenu.ScenePath);yield return SceneReady(()=>FindAnyObjectByType<MainMenu>()?.StartButton!=null);
-            original=FindAnyObjectByType<MainMenu>();Check("saved showcase overrides alternate startup scene",original&&!FindAnyObjectByType<ConfrontationMenu>());
-            original.OpenSettings();original.UISettingsButton.onClick.Invoke();original.UISettings.AlternativeButton.onClick.Invoke();
-            yield return SceneReady(()=>FindAnyObjectByType<ConfrontationMenu>()?.Hero!=null);
-            Check("UI switches and saves alternative",MenuAppearance.Selected==MenuStyle.Alternative&&!FindAnyObjectByType<MainMenu>()&&SceneManager.sceneCount==1);
+            menu=FindAnyObjectByType<ConfrontationMenu>();menu.OpenSettings();yield return Capture("alternative-settings.png");
+            Check("settings open on music volume, menu blocked",menu.SettingsOpen&&EventSystem.current.currentSelectedGameObject==menu.MusicVolumeControl.gameObject&&!menu.StartButton.IsInteractable());
+            Check("settings has no interface option",menu.GetComponentsInChildren<Text>(true).All(t=>t.text!="UI"&&t.text!="Interface"));
+            yield return Press(Key.Escape);Check("Escape closes settings",!menu.SettingsOpen&&menu.StartButton.IsInteractable());
+            // mini music player
+            menu.MusicPauseButton.onClick.Invoke();Check("music player pauses",menu.Music.UserPaused);
+            menu.MusicPlayButton.onClick.Invoke();Check("music player plays",!menu.Music.UserPaused);
+            var title=menu.Music.TrackTitle;menu.MusicNextButton.onClick.Invoke();Check("music player skips",menu.Music.TrackTitle!=title);
+            // the old Showcase menu is never presented: its startup scene routes here
             SceneManager.LoadScene(MainMenu.ScenePath);yield return SceneReady(()=>FindAnyObjectByType<ConfrontationMenu>()?.Hero!=null);
-            Check("saved alternative overrides showcase startup scene",!FindAnyObjectByType<MainMenu>()&&SceneManager.sceneCount==1);
+            Check("startup routes to the only main menu",!FindAnyObjectByType<MainMenu>()&&SceneManager.sceneCount==1&&MenuAppearance.Selected==MenuStyle.Alternative);
             Check("one persistent audio owner after navigation",FindObjectsByType<MenuMusic>(FindObjectsSortMode.None).Length==1);
             }
             SavedHeroSelection.Current=originalHero;InputSystem.settings=oldSettings;InputSystem.RemoveDevice(keyboard);InputSystem.RemoveDevice(pad);Destroy(testSettings);

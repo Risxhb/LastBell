@@ -8,25 +8,27 @@ namespace LastBell.Menu
 {
     public enum MenuStyle { Showcase, Alternative }
 
-    // A saved application preference, independent of which scene a launcher opens first.
+    // The Confrontation ("Alternative") menu is the only main menu (Risxhb, October 24, 2026). The Showcase scene stays in
+    // the build as the startup router and as Boss Rush's live arena backdrop, but its menu UI is never presented.
     public static class MenuAppearance
     {
         const string Key="LastBell.Menu.Style";
         public static MenuStyle Selected
         {
-            get=>PlayerPrefs.GetInt(Key,1)==1?MenuStyle.Alternative:MenuStyle.Showcase;
-            set {PlayerPrefs.SetInt(Key,value==MenuStyle.Alternative?1:0);PlayerPrefs.Save();}
+            get=>MenuStyle.Alternative;
+            set {PlayerPrefs.SetInt(Key,1);PlayerPrefs.Save();}
         }
         public static string PathFor(MenuStyle style)=>style==MenuStyle.Alternative?ConfrontationMenu.ScenePath:MainMenu.ScenePath;
         public static string ScenePath=>PathFor(Selected);
-        public static string[] BuildScenes=>new[]{MainMenu.ScenePath,ConfrontationMenu.ScenePath,HeroSelection.ScenePath}.Concat(RunMaps.All.Select(m=>m.RunScene)).ToArray();
+        // HeroSelection (old character select) is retired and no longer built.
+        public static string[] BuildScenes=>new[]{MainMenu.ScenePath,ConfrontationMenu.ScenePath}.Concat(RunMaps.All.Select(m=>m.RunScene)).ToArray();
         public static bool Available(MenuStyle style)=>Application.CanStreamedLevelBeLoaded(PathFor(style));
         public static bool Enter(MenuStyle presented,GameObject owner)
         {
             // Old opt-in diagnostics explicitly exercise the showcase, without replacing the user's saved choice.
             var args=Environment.GetCommandLineArgs();
             if(RunAutoTest.Requested||MapPreviewCapture.Requested)return true;
-            if(args.Contains("-lastbellMenuTest")||args.Contains("-lastbellFlowStage")||args.Contains("-lastbellShowcaseTest"))return true;
+            if(args.Contains("-lastbellMenuTest")||args.Contains("-lastbellShowcaseTest"))return true;
             if(!PlayerPrefs.HasKey(Key))Selected=MenuStyle.Alternative;
             if(Selected==presented)return true;
             if(!Available(Selected)){Debug.LogWarning("Saved menu style is unavailable in this build.");return true;}

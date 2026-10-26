@@ -14,6 +14,7 @@ namespace LastBell.Menu
         public Vector3 CameraTarget = new Vector3(0, 1, 0);
         [Range(0.25f, 5)] public float OrbitDegreesPerSecond = 2;
         [Range(25, 60)] public float FieldOfView = 40;
+        public Vector2 ScreenOffsetDegrees;   // yaw, pitch applied after looking at CameraTarget (per-stage framing)
         public Vector3 BossPosition = new Vector3(0, 0, -1.7f);
         public Vector3 VanguardPosition = new Vector3(-1.6f, 0, 1);
         public Vector3 ArcanistPosition = new Vector3(-5.2f, 0, 4.3f);
@@ -359,8 +360,15 @@ namespace LastBell.Menu
         {
             if (!view || !DriveCamera) return;
             view.orthographic = false; view.fieldOfView = FieldOfView;
-            Vector3 position = CameraTarget + Quaternion.Euler(0, Elapsed * OrbitDegreesPerSecond, 0) * (CameraPosition - CameraTarget);
-            view.transform.SetPositionAndRotation(position, Quaternion.LookRotation(CameraTarget - position));
+            OrbitPose(Elapsed * OrbitDegreesPerSecond, out var position, out var rotation);
+            view.transform.SetPositionAndRotation(position, rotation);
+        }
+        // The camera pose at a given orbit angle (also used by tests to check framing around the full orbit).
+        public void OrbitPose(float degrees, out Vector3 position, out Quaternion rotation)
+        {
+            position = CameraTarget + Quaternion.Euler(0, degrees, 0) * (CameraPosition - CameraTarget);
+            rotation = Quaternion.LookRotation(CameraTarget - position);
+            if (ScreenOffsetDegrees != Vector2.zero) rotation *= Quaternion.Euler(ScreenOffsetDegrees.y, ScreenOffsetDegrees.x, 0);
         }
         void OnDestroy()
         {

@@ -42,6 +42,8 @@ namespace LastBell.Run
             // Metronome Court miniboss: explicit Practice entry only (inRun: false), so shuffled run slots are unchanged.
             // Run integration point for later review: set inRun to true here (docs/metronome-arena/tempo-tyrant.md).
             new BossEntry("Tempo Tyrant (practice)", w => BossEncounter.Spawn<TempoTyrantEncounter>(w, new Vector3(0, 0, -2f), 0), inRun: false, map: TempoTyrantMap),
+            // Metronome Court miniboss, practice only like the Tyrant (docs/bosses/chimebound-oracle.md)
+            new BossEntry("Chimebound Oracle (practice)", w => BossEncounter.Spawn<ChimeboundOracleEncounter>(w, new Vector3(0, 0, -2f), 0), inRun: false, map: TempoTyrantMap),
         };
         // Catalog eligibility is stable; each run owns its shuffled sequence, with final encounters appended.
         public static readonly int[] RunOrder = Enumerable.Range(0, Bosses.Length).Where(i => Bosses[i].InRun).OrderBy(i => Bosses[i].Final).ToArray();
@@ -61,8 +63,12 @@ namespace LastBell.Run
         public const string AurelionMap = "skyward-spire";
         public static int TempoTyrantPractice => Array.FindIndex(Bosses, b => b.Map == TempoTyrantMap);
         public const string TempoTyrantMap = "metronome-court";
+        public static int ChimeboundOraclePractice => Array.FindIndex(Bosses, b => b.Name.StartsWith("Chimebound Oracle"));
         public static readonly string[] Classes = { "Vanguard", "Chimesinger", "Arcanist" };
         const int IntroTicks = 120, ClearTicks = 180, DownedTicks = 100;
+        public const int PracticeAutoReadyTicks = 45;   // 0.75 s in the arena before a practice fight starts
+        // Automated suites (every one writes to -lastbellOut) drive Ready themselves, so they keep the manual start.
+        public static bool AutoReady = !Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellOut", StringComparison.OrdinalIgnoreCase));
         static readonly Vector3 PlayerSocket = new Vector3(0, 0, 6.5f);
 
         public RunState State { get; private set; } = RunState.Menu;
@@ -334,6 +340,8 @@ namespace LastBell.Run
             StateTicks++;
             if (State == RunState.Combat || State == RunState.Cleared || State == RunState.Downed) RunTicks++;
             if (gen != Generation) return;
+            // practice has no preparation card: it starts by itself after a short beat (tests keep the manual Ready)
+            if (State == RunState.Ready && Mode == RunMode.Practice && AutoReady && StateTicks >= PracticeAutoReadyTicks) { RequestReady(); return; }
             switch (State)
             {
                 case RunState.Intro:

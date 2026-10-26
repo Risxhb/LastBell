@@ -36,9 +36,10 @@ namespace LastBell.Run
         public float MusicRate => Bpm / NormalBpm;            // 1.0 in Normal (the song as written), 1.33 in Haste
         public Tempo Next => State == Tempo.Haste ? Tempo.Normal : Tempo.Haste;
 
-        public void Reset()
+        // start: the opening tempo (the Tempo Tyrant opens in Haste; the Chimebound Oracle opens in Normal)
+        public void Reset(Tempo start = Tempo.Haste)
         {
-            State = Tempo.Haste; Beat = 0; StateAge = 0; Commits = 0; Transitioning = false; TransitionTick = 0;
+            State = start; Beat = 0; StateAge = 0; Commits = 0; Transitioning = false; TransitionTick = 0;
             LastBeatIndex = -1; LastBeatAccented = false; History.Clear();
         }
 
