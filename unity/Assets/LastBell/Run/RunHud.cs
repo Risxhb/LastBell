@@ -149,10 +149,11 @@ namespace LastBell.Run
             GUI.Label(new Rect(14, h - 22, 420, 20), "map: " + RunMaps.CurrentName + "   ·   difficulty: " + RunDifficulty.Name(d.Difficulty), tiny);
         }
 
+        static readonly string[] UltStarts = { "P1", "P2", "P3", "P4", "P5" };
         void Menu()
         {
             float w = Screen.width, h = Screen.height;
-            var r = Panel(720, 680);
+            var r = Panel(720, 730);
             GUI.Label(new Rect(r.x, r.y + 18, r.width, 54), "LAST BELL", title);
             GUI.Label(new Rect(r.x, r.y + 72, r.width, 22), "Boss-rush test build · pick a class, a map and a difficulty", mid);
             GUI.Label(new Rect(r.x + 30, r.y + 110, 200, 22), "Class", small);
@@ -197,7 +198,16 @@ namespace LastBell.Run
             GUI.Label(new Rect(r.x + 30, r.y + 418, 300, 22), "Practice one boss", small);
             for (int i = 0; i < RunDirector.Bosses.Length; i++)
                 if (GUI.Button(new Rect(r.x + 30 + i * (r.width - 60) / RunDirector.Bosses.Length, r.y + 442, (r.width - 60) / RunDirector.Bosses.Length - 6, 36), RunDirector.Bosses[i].Name, btn)) d.StartPractice(RunDirector.Classes[menuClass], i);   // a boss with its own arena loads it first
-            GUI.Label(new Rect(r.x + 30, r.y + 492, r.width - 60, 120),
+            // the Bellkeeper Ultimate's practice start (proposal playtests, Chzy18 25 Oct): which phase "Bellkeeper — Ultimate" opens on
+            GUI.Label(new Rect(r.x + 30, r.y + 488, 330, 22), "Ultimate practice starts at", small);
+            for (int i = 0; i < UltStarts.Length; i++)
+            {
+                var pr = new Rect(r.x + 250 + i * 88, r.y + 484, 82, 30);
+                bool on = (BellkeeperEncounter.PhaseOverride ?? "P1") == UltStarts[i];
+                if (GUI.Toggle(pr, on, (on ? "> " : "") + UltStarts[i], mapBtn) && !on) BellkeeperEncounter.PhaseOverride = UltStarts[i] == "P1" ? null : UltStarts[i];
+            }
+            GUI.Label(new Rect(r.x + 30, r.y + 520, r.width - 60, 22), "P4 opens with The Floor Breaks; P4 ends with The Train Runs Wild into P5.", tiny);
+            GUI.Label(new Rect(r.x + 30, r.y + 544, r.width - 60, 120),
                 "Controls: WASD move · mouse aims · 1 / LMB basic · 2 3 4 class actions · 6 Mending Chorus / Temporal Anchor · 5 / RMB dash · F potion · Space jump · Shift sprint · Esc pause\n" +
                 "Movement stamina: sprint, jump and dash share one bar. No invincibility frames (dodging does not make you immune). F drinks a potion (+40 HP).\nHealth refills before each boss; potions carry over between bosses and refill before the final boss. Retry restarts at the first boss.\n" +
                 "Only real boss encounters are offered (the stand-in minibosses were removed); Sylvara is practice only, in Verdant Chimes. Arcanist kit numbers are prototype tuning. Dev keys in combat: F9 defeat boss, F8 next phase.", tiny);
