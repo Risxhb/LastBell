@@ -401,7 +401,7 @@ namespace LastBell.Run
                 meshBite = Prim.Material(new Color(1f, 0.2f, 0.15f), 2.5f); hotM = Prim.Material(new Color(1f, 0.35f, 0.25f), 1.4f);
                 shardM = Prim.Material(new Color(1f, 0.8f, 0.4f), 2.2f); spotM = Prim.Material(new Color(0.3f, 1f, 0.85f), 2.5f);
             }
-            root = new GameObject("The Gear Floor (stand-in)").transform; root.SetParent(W.Root, false);
+            root = new GameObject("The Gear Floor").transform; root.SetParent(W.Root, false);
             pit = Prim.Make(PrimitiveKind.Cylinder, root, new Vector3(0, 0.02f, 0), new Vector3(23.6f, 0.01f, 23.6f), Color.white); Mat(pit, pitM);
             floorIn = Prim.Make(PrimitiveKind.Cylinder, root, new Vector3(0, 0.03f, 0), new Vector3(18f, 0.01f, 18f), Color.white); Mat(floorIn, centreM); floorIn.gameObject.SetActive(false);
             for (int g = 0; g < 5; g++)
@@ -410,6 +410,18 @@ namespace LastBell.Run
                 var disc = Prim.Make(PrimitiveKind.Cylinder, root, c + Vector3.up * 0.05f, new Vector3(r * 2, 0.02f, r * 2), Color.white); Mat(disc, g == 4 ? centreM : gearM); gearR[g] = disc.GetComponent<Renderer>();
                 var pv = new GameObject("gear " + GN[g]).transform; pv.SetParent(root, false); pv.position = c; pivots[g] = pv;
                 if (g < 4) { gearParts[g].Add(disc); gearParts[g].Add(pv); }
+                if (Model(g == 4 ? "GF_CentreGear" : "GF_OuterGear", pv, c + Vector3.up * ModelLift, Quaternion.identity) != null)
+                {
+                    models = true; disc.position = c + Vector3.up * (ModelLift + 0.05f);   // the hammered-gear coral sits on the model's face
+                    if (g < 4)
+                    {
+                        gearParts[g].Add(Model("GF_Core", root, c + Vector3.up * ModelLift, Quaternion.identity));
+                        var (pa, pb) = Pawl(g); gearParts[g].Add(Model("GF_Pawl", root, pa + Vector3.up * ModelLift, Quaternion.FromToRotation(Vector3.left, (pb - pa).normalized)));
+                        var mm = Prim.Make(PrimitiveKind.Cylinder, root, MeshPoint(g) + Vector3.up * 0.13f, new Vector3((BiteR + PR) * 2, 0.02f, (BiteR + PR) * 2), Color.white); Mat(mm, meshDim); meshR[g] = mm.GetComponent<Renderer>();
+                        for (int j = 0; j < CountdownPieces; j++) { var cd = Prim.Make(PrimitiveKind.Cube, root, Vector3.zero, new Vector3(0.28f, 0.06f, 0.16f), Color.white); Mat(cd, meshWarn); countdown[g].Add(cd); }
+                    }
+                    continue;
+                }
                 int teeth = g == 4 ? 12 : 18;
                 for (int j = 0; j < teeth; j++) { float a = 360f / teeth * j; Mat(Prim.Make(PrimitiveKind.Cube, pv, Dir(a) * (r - 0.15f) + Vector3.up * 0.09f, new Vector3(0.45f, 0.08f, 0.3f), Color.white, 0, Quaternion.Euler(0, a, 0)), toothM); }
                 for (int j = 0; j < 4; j++) { float a = 90f * j; Mat(Prim.Make(PrimitiveKind.Cube, pv, Dir(a) * (r * 0.5f) + Vector3.up * 0.08f, new Vector3(0.18f, 0.04f, r * 0.9f), Color.white, 0, Quaternion.Euler(0, a, 0)), toothM); }
@@ -424,6 +436,25 @@ namespace LastBell.Run
             }
             mySpot = new GameObject("my spot").transform; mySpot.SetParent(root, false);
             Mat(Prim.Make(PrimitiveKind.Cylinder, mySpot, new Vector3(0, 1.6f, 0), new Vector3(0.12f, 1.6f, 0.12f), Color.white), spotM);
+            for (int i = 0; i < 2; i++) { hammers[i] = Model("GF_Hammer", root, Vector3.zero, Quaternion.identity); if (hammers[i]) hammers[i].gameObject.SetActive(false); }
+        }
+        bool models; readonly Transform[] hammers = new Transform[2];
+        const float ModelLift = 0.07f;   // gear tops at 0.1 m, clear of the pit disc (0.02) and the arena floor
+        static Transform Model(string name, Transform parent, Vector3 pos, Quaternion rot)
+        {
+            var prefab = Resources.Load<GameObject>("Ultimate/" + name); if (prefab == null) return null;
+            var t = Object.Instantiate(prefab, parent, false).transform; t.name = name; t.position = pos; t.rotation = rot;
+            foreach (var r in t.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+            return t;
+        }
+        // the bell-hammer over a gear: hovers high when the slam is shown, sinks, drops in the last 0.25 s, rests, lifts away
+        void PlaceHammer(int i, int gear, float left)
+        {
+            var hm = hammers[i]; if (!hm) return;
+            if (gear < 0 || left > Warn + 0.01f || left < -0.6f) { hm.gameObject.SetActive(false); return; }
+            hm.gameObject.SetActive(true);
+            float h = left > 0.25f ? Mathf.Lerp(4.0f, 9.0f, (left - 0.25f) / Warn) : left > 0 ? 4.0f * (left / 0.25f) : Mathf.Lerp(0, 6f, -left / 0.6f);
+            hm.position = GearCentre(gear) + Vector3.up * h;
         }
         static void Mat(Transform t, Material m) { var r = t.GetComponent<Renderer>(); r.sharedMaterial = m; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; }
         void Present(float t)
@@ -446,7 +477,7 @@ namespace LastBell.Run
             {
                 float ph = ((t + g * BiteEvery / 4) % BiteEvery + BiteEvery) % BiteEvery, soon = BiteEvery - ph;
                 bool biteOn = t >= settle && !wild;
-                if (meshR[g]) meshR[g].sharedMaterial = !biteOn ? meshDim : ph < BiteLen ? meshBite : soon < 1.0f ? meshWarn : meshDim;
+                if (meshR[g]) { meshR[g].sharedMaterial = !biteOn ? meshDim : ph < BiteLen ? meshBite : soon < 1.0f ? meshWarn : meshDim; if (models) meshR[g].enabled = biteOn && (ph < BiteLen || soon < 1.0f); }
                 float kr = BiteR + PR, cr = kr + 2.2f * Mathf.Clamp01((soon - 0.0f) / (BiteEvery - BiteLen));   // closes on the zone as the bite comes
                 for (int j = 0; j < countdown[g].Count; j++)
                 {
@@ -455,11 +486,19 @@ namespace LastBell.Run
                     x.GetComponent<Renderer>().sharedMaterial = soon < 1.0f ? meshWarn : meshDim;
                 }
             }
+            if (models) for (int g = 0; g < 5; g++) if (gearR[g]) gearR[g].enabled = gearR[g].sharedMaterial == hotM;
+            {
+                int hk = Mathf.FloorToInt(t / Slam) + 1; List<int> hs = !wild && hk >= 1 ? SlamGears(hk) : new List<int>(); float hl = hk * Slam - t;
+                int last = Mathf.FloorToInt(t / Slam); if (!wild && last >= 1 && t - last * Slam < 0.6f) { hs = SlamGears(last); hl = last * Slam - t; }
+                if (wild) { float tw = t - wildAt; int ws = Mathf.FloorToInt(tw / 2.5f) + 1; hs = new List<int>(); if (ws <= 3) { hs.Add(WildSlamGear(ws)); hl = Mathf.Min(1.5f, 2.5f * ws - tw); if (2.5f * ws - tw > 1.5f) hs.Clear(); } }
+                for (int i = 0; i < 2; i++) PlaceHammer(i, i < hs.Count ? hs[i] : -1, hl);
+            }
             int n = 0;
             foreach (var s in shards)
             {
-                if (pool.Count <= n) { var tr = Prim.Make(PrimitiveKind.Sphere, root, Vector3.zero, Vector3.one * BR * 2.2f, Color.white); Mat(tr, shardM); pool.Add(tr); }
+                if (pool.Count <= n) { var tr = Model("GF_Shard", root, Vector3.zero, Quaternion.identity); if (!tr) { tr = Prim.Make(PrimitiveKind.Sphere, root, Vector3.zero, Vector3.one * BR * 2.2f, Color.white); Mat(tr, shardM); } pool.Add(tr); }
                 var b = pool[n++]; b.gameObject.SetActive(true); b.position = new Vector3(s.P.x, 0.9f, s.P.z);
+                if (s.V.sqrMagnitude > 1e-4f) b.rotation = Quaternion.FromToRotation(Vector3.left, s.V.normalized);
             }
             for (int i = n; i < pool.Count; i++) pool[i].gameObject.SetActive(false);
             var me = W.Players.Count > 0 ? W.Players[0] : null;
@@ -468,7 +507,7 @@ namespace LastBell.Run
         void Teardown()
         {
             if (root) Object.Destroy(root.gameObject);
-            root = mySpot = pit = floorIn = null; pool.Clear(); plans.Clear(); foreach (var l in gearParts) l.Clear(); foreach (var l in countdown) l.Clear();
+            root = mySpot = pit = floorIn = null; hammers[0] = hammers[1] = null; models = false; pool.Clear(); plans.Clear(); foreach (var l in gearParts) l.Clear(); foreach (var l in countdown) l.Clear();
             for (int i = 0; i < 5; i++) { pivots[i] = null; gearR[i] = null; } for (int i = 0; i < 4; i++) meshR[i] = null;
         }
 
