@@ -30,6 +30,7 @@ namespace LastBell.Run
         public static bool Attacks = System.Array.Exists(System.Environment.GetCommandLineArgs(), a => a.Equals("-lastbellAllyAttack", System.StringComparison.OrdinalIgnoreCase));
         public static BotMode AllyMode = BotMode.Perfect;   // menu allies do every mechanic, memory ones included (Chzy18: "do the mechanics"); still no attacks
         int tick, lastPress = -999, castHold;
+        int pendingSlot = -1, pendingUntil;
 
         public AllyBot(int index, int count, BotMode mode = BotMode.Passive)
         {
@@ -123,6 +124,9 @@ namespace LastBell.Run
             if (tick - lastPress < 6) return;
             // the kit's own cooldowns (the reference policy; a private counter only ticked while attacking)
             System.Func<int, bool> ready = slot => me.Kit.Cooldown01(slot) <= 0.001f;
+            // a pressed ability's cooldown starts on release: wait for it (up to 1.5 s) instead of pressing again and restarting the cast
+            if (pendingSlot > 0 && tick < pendingUntil && ready(pendingSlot)) return;
+            pendingSlot = -1;
             int s = -1;
             switch (me.ClassName)
             {
@@ -148,6 +152,7 @@ namespace LastBell.Run
                     break;
             }
             if (s < 0) return;
+            if (s > 0) { pendingSlot = s; pendingUntil = tick + 90; }
             lastPress = tick;
             switch (s) { case 0: inp.P0 = inp.H0 = true; break; case 1: inp.P1 = true; break; case 2: inp.P2 = true; break; case 3: inp.P3 = true; break; default: inp.P4 = true; break; }
         }
