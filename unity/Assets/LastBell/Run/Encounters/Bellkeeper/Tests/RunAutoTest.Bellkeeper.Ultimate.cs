@@ -294,7 +294,8 @@ namespace LastBell.Run
             // a real attempt ignores the practice phase: a run with the Ultimate set starts at P1
             BellkeeperEncounter.SetOverride = BellkeeperEncounter.AbilitySet.Ultimate; BellkeeperEncounter.PhaseOverride = "P4";
             if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }
-            d.StartRun("Vanguard", new[] { 0 }); d.RequestReady();   // the Bellkeeper alone (runs now open on a shuffled boss)
+            { var ord = RunDirector.CreateRunOrder().ToList(); ord.Remove(0); ord.Insert(0, 0); d.StartRun("Vanguard", ord.ToArray()); }   // runs open on a shuffled boss: put the Bellkeeper first
+            d.RequestReady();
             yield return Until(() => d.State == RunState.Combat, 4, "Ultimate run combat");
             bk = d.Boss as BellkeeperEncounter;
             yield return null; yield return null;
