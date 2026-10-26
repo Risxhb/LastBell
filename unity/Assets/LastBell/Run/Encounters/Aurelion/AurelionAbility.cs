@@ -48,7 +48,8 @@ namespace LastBell.Run
     }
 
     // Launch switches (practice only):
-    //   -lastbellAbilitySet v1|v2   v2 (default) is ability set v2; v1 is the original five attacks, kept for comparison
+    //   -lastbellAbilitySet v1|v2   v1 (default) is the original five attacks; v2 is the ability set Chzy18 is still building
+    //                               (a concept run). Risxhb, October 26, 2026: the player defaults to v1 until v2 is done.
     //   -lastbellAbility <id>       fire one v2 ability on its own, on loop, e.g. aurelion.noon_shadow
     // In practice F6 cycles the same single-ability loop: off > each ability in turn > off.
     public static class AurelionArgs
@@ -61,7 +62,7 @@ namespace LastBell.Run
         }
         public static string SetOverride;     // tests force a set without a command line
         public static string SoloOverride;    // F6 / tests: the single ability to loop (null = command line)
-        public static bool V1 => (SetOverride ?? Arg("-lastbellAbilitySet") ?? "v2").Equals("v1", StringComparison.OrdinalIgnoreCase);
+        public static bool V1 => !(SetOverride ?? Arg("-lastbellAbilitySet") ?? "v1").Equals("v2", StringComparison.OrdinalIgnoreCase);
         public static string Solo => SoloOverride ?? Arg("-lastbellAbility");
         public static readonly string[] Ids = { "aurelion.meridian_lances", "aurelion.starfall_mirror", "aurelion.noon_shadow", "aurelion.orrery_closing", "aurelion.hour_hands" };
         public static bool Known(string id) => id != null && Ids.Contains(id);
