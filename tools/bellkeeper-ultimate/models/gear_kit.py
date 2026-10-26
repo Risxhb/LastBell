@@ -147,8 +147,13 @@ def shard(dst):
 
 KIT = [('GF_OuterGear', outer_gear), ('GF_CentreGear', centre_gear), ('GF_Core', core), ('GF_Pawl', pawl),
        ('GF_Hammer', hammer), ('GF_Shard', shard)]
+TEX = {'GF_OuterGear': 2048, 'GF_CentreGear': 2048, 'GF_Core': 1024, 'GF_Pawl': 512, 'GF_Hammer': 1024, 'GF_Shard': 256}
+exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'texture_bake.py'), encoding='utf-8').read())
+BAKE = '--nobake' not in sys.argv
 for name, build in KIT:
-    reset(); build(name); export(name)
+    reset(); build(name)
+    if BAKE: paint_and_bake(bpy.data.objects[name], TEX[name])
+    export(name)
 
 if PREVIEW:
     # the whole floor laid out as in the game (N/E/S/W at 7.2 m), from the gameplay camera's angle
