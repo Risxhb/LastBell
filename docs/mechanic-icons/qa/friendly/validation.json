@@ -1,0 +1,602 @@
+﻿[
+    {
+        "id":  "order_i",
+        "source":  {
+                       "width":  1295,
+                       "height":  1214,
+                       "alphaMin":  0,
+                       "alphaMax":  255,
+                       "transparentPixels":  1188170,
+                       "opaquePixels":  215,
+                       "partialPixels":  383745,
+                       "bounds":  [
+                                      0,
+                                      68,
+                                      1232,
+                                      1214
+                                  ],
+                       "borderPixels":  112,
+                       "saturatedWarmScreenPixels":  75281
+                   },
+        "cleanup":  {
+                        "file":  "friendly_order_i.png",
+                        "sourceHasAlpha":  true,
+                        "sourceTranslucentPixels":  1571915,
+                        "keyedPixels":  1571915,
+                        "borderPixels":  0,
+                        "clipped":  false,
+                        "glyphBox":  [
+                                         1232,
+                                         1146
+                                     ],
+                        "scale":  0.16
+                    },
+        "export":  {
+                       "width":  256,
+                       "height":  256,
+                       "alphaMin":  0,
+                       "alphaMax":  255,
+                       "transparentPixels":  56163,
+                       "opaquePixels":  581,
+                       "partialPixels":  8792,
+                       "bounds":  [
+                                      79,
+                                      44,
+                                      188,
+                                      218
+                                  ],
+                       "borderPixels":  0,
+                       "saturatedWarmScreenPixels":  1879
+                   }
+    },
+    {
+        "id":  "order_ii",
+        "source":  {
+                       "width":  1263,
+                       "height":  1245,
+                       "alphaMin":  0,
+                       "alphaMax":  255,
+                       "transparentPixels":  1157401,
+                       "opaquePixels":  571,
+                       "partialPixels":  414463,
+                       "bounds":  [
+                                      66,
+                                      53,
+                                      1200,
+                                      1245
+                                  ],
+                       "borderPixels":  40,
+                       "saturatedWarmScreenPixels":  96942
+                   },
+        "cleanup":  {
+                        "file":  "friendly_order_ii.png",
+                        "sourceHasAlpha":  true,
+                        "sourceTranslucentPixels":  1571864,
+                        "keyedPixels":  1571864,
+                        "borderPixels":  0,
+                        "clipped":  false,
+                        "glyphBox":  [
+                                         1134,
+                                         1192
+                                     ],
+                        "scale":  0.16
+                    },
+        "export":  {
+                       "width":  256,
+                       "height":  256,
+                       "alphaMin":  0,
+                       "alphaMax":  255,
+                       "transparentPixels":  54496,
+                       "opaquePixels":  889,
+                       "partialPixels":  10151,
+                       "bounds":  [
+                                      59,
+                                      49,
+                                      196,
+                                      222
+                                  ],
+                       "borderPixels":  0,
+                       "saturatedWarmScreenPixels":  2750
+                   }
+    },
+    {
+        "id":  "order_iii",
+        "source":  {
+                       "width":  1292,
+                       "height":  1217,
+                       "alphaMin":  0,
+                       "alphaMax":  255,
+                       "transparentPixels":  902913,
+                       "opaquePixels":  694,
+                       "partialPixels":  668757,
+                       "bounds":  [
+                                      0,
+                                      21,
+                                      1276,
+                                      1217
+                                  ],
+                       "borderPixels":  192,
+                       "saturatedWarmScreenPixels":  165095
+                   },
+        "cleanup":  {
+                        "file":  "friendly_order_iii.png",
+                        "sourceHasAlpha":  true,
+                        "sourceTranslucentPixels":  1571670,
+                        "keyedPixels":  1571670,
+                        "borderPixels":  0,
+                        "clipped":  false,
+                        "glyphBox":  [
+                                         1276,
+                                         1196
+                                     ],
+                        "scale":  0.15
+                    },
+        "export":  {
+                       "width":  256,
+                       "height":  256,
+                       "alphaMin":  0,
+                       "alphaMax":  255,
+                       "transparentPixels":  50052,
+                       "opaquePixels":  1312,
+                       "partialPixels":  14172,
+                       "bounds":  [
+                                      31,
+                                      54,
+                                      224,
+                                      217
+                                  ],
+                       "borderPixels":  0,
+                       "saturatedWarmScreenPixels":  3926
+                   }
+    },
+    {
+        "id":  "order_iv",
+        "source":  {
+                       "width":  1374,
+                       "height":  1145,
+                       "alphaMin":  0,
+                       "alphaMax":  255,
+                       "transparentPixels":  1201276,
+                       "opaquePixels":  855,
+                       "partialPixels":  371099,
+                       "bounds":  [
+                                      19,
+                                      32,
+                                      1344,
+                                      1119
+                                  ],
+                       "borderPixels":  0,
+                       "saturatedWarmScreenPixels":  93979
+                   },
+        "cleanup":  {
+                        "file":  "friendly_order_iv.png",
+                        "sourceHasAlpha":  true,
+                        "sourceTranslucentPixels":  1572375,
+                        "keyedPixels":  1572375,
+                        "borderPixels":  0,
+                        "clipped":  false,
+                        "glyphBox":  [
+                                         1325,
+                                         1087
+                                     ],
+                        "scale":  0.15
+                    },
+        "export":  {
+                       "width":  256,
+                       "height":  256,
+                       "alphaMin":  0,
+                       "alphaMax":  255,
+                       "transparentPixels":  57534,
+                       "opaquePixels":  806,
+                       "partialPixels":  7196,
+                       "bounds":  [
+                                      51,
+                                      70,
+                                      212,
+                                      180
+                                  ],
+                       "borderPixels":  0,
+                       "saturatedWarmScreenPixels":  1746
+                   }
+    },
+    {
+        "id":  "order_v",
+        "source":  {
+                       "width":  1312,
+                       "height":  1199,
+                       "alphaMin":  0,
+                       "alphaMax":  255,
+                       "transparentPixels":  1148903,
+                       "opaquePixels":  200,
+                       "partialPixels":  423985,
+                       "bounds":  [
+                                      23,
+                                      22,
+                                      1216,
+                                      1148
+                                  ],
+                       "borderPixels":  0,
+                       "saturatedWarmScreenPixels":  97574
+                   },
+        "cleanup":  {
+                        "file":  "friendly_order_v.png",
+                        "sourceHasAlpha":  true,
+                        "sourceTranslucentPixels":  1572888,
+                        "keyedPixels":  1572888,
+                        "borderPixels":  0,
+                        "clipped":  false,
+                        "glyphBox":  [
+                                         1193,
+                                         1126
+                                     ],
+                        "scale":  0.16
+                    },
+        "export":  {
+                       "width":  256,
+                       "height":  256,
+                       "alphaMin":  0,
+                       "alphaMax":  255,
+                       "transparentPixels":  54302,
+                       "opaquePixels":  740,
+                       "partialPixels":  10494,
+                       "bounds":  [
+                                      31,
+                                      39,
+                                      214,
+                                      201
+                                  ],
+                       "borderPixels":  0,
+                       "saturatedWarmScreenPixels":  2501
+                   }
+    },
+    {
+        "id":  "order_vi",
+        "source":  {
+                       "width":  1254,
+                       "height":  1254,
+                       "alphaMin":  0,
+                       "alphaMax":  255,
+                       "transparentPixels":  1135791,
+                       "opaquePixels":  699,
+                       "partialPixels":  436026,
+                       "bounds":  [
+                                      57,
+                                      0,
+                                      1234,
+                                      1254
+                                  ],
+                       "borderPixels":  24,
+                       "saturatedWarmScreenPixels":  96332
+                   },
+        "cleanup":  {
+                        "file":  "friendly_order_vi.png",
+                        "sourceHasAlpha":  true,
+                        "sourceTranslucentPixels":  1571817,
+                        "keyedPixels":  1571817,
+                        "borderPixels":  0,
+                        "clipped":  false,
+                        "glyphBox":  [
+                                         1177,
+                                         1254
+                                     ],
+                        "scale":  0.15
+                    },
+        "export":  {
+                       "width":  256,
+                       "height":  256,
+                       "alphaMin":  0,
+                       "alphaMax":  255,
+                       "transparentPixels":  55354,
+                       "opaquePixels":  827,
+                       "partialPixels":  9355,
+                       "bounds":  [
+                                      41,
+                                      31,
+                                      217,
+                                      210
+                                  ],
+                       "borderPixels":  0,
+                       "saturatedWarmScreenPixels":  2139
+                   }
+    },
+    {
+        "id":  "order_vii",
+        "source":  {
+                       "width":  1254,
+                       "height":  1254,
+                       "alphaMin":  0,
+                       "alphaMax":  255,
+                       "transparentPixels":  1099104,
+                       "opaquePixels":  1524,
+                       "partialPixels":  471888,
+                       "bounds":  [
+                                      29,
+                                      21,
+                                      1224,
+                                      1199
+                                  ],
+                       "borderPixels":  0,
+                       "saturatedWarmScreenPixels":  76955
+                   },
+        "cleanup":  {
+                        "file":  "friendly_order_vii-v2.png",
+                        "sourceHasAlpha":  true,
+                        "sourceTranslucentPixels":  1570992,
+                        "keyedPixels":  1570992,
+                        "borderPixels":  0,
+                        "clipped":  false,
+                        "glyphBox":  [
+                                         1195,
+                                         1178
+                                     ],
+                        "scale":  0.16
+                    },
+        "export":  {
+                       "width":  256,
+                       "height":  256,
+                       "alphaMin":  0,
+                       "alphaMax":  255,
+                       "transparentPixels":  53192,
+                       "opaquePixels":  1076,
+                       "partialPixels":  11268,
+                       "bounds":  [
+                                      31,
+                                      71,
+                                      225,
+                                      216
+                                  ],
+                       "borderPixels":  0,
+                       "saturatedWarmScreenPixels":  1797
+                   }
+    },
+    {
+        "id":  "order_viii",
+        "source":  {
+                       "width":  1254,
+                       "height":  1254,
+                       "alphaMin":  0,
+                       "alphaMax":  255,
+                       "transparentPixels":  1021718,
+                       "opaquePixels":  1322,
+                       "partialPixels":  549476,
+                       "bounds":  [
+                                      0,
+                                      21,
+                                      1236,
+                                      1230
+                                  ],
+                       "borderPixels":  5,
+                       "saturatedWarmScreenPixels":  133764
+                   },
+        "cleanup":  {
+                        "file":  "friendly_order_viii.png",
+                        "sourceHasAlpha":  true,
+                        "sourceTranslucentPixels":  1571194,
+                        "keyedPixels":  1571194,
+                        "borderPixels":  0,
+                        "clipped":  false,
+                        "glyphBox":  [
+                                         1236,
+                                         1209
+                                     ],
+                        "scale":  0.16
+                    },
+        "export":  {
+                       "width":  256,
+                       "height":  256,
+                       "alphaMin":  0,
+                       "alphaMax":  255,
+                       "transparentPixels":  52165,
+                       "opaquePixels":  1225,
+                       "partialPixels":  12146,
+                       "bounds":  [
+                                      34,
+                                      43,
+                                      224,
+                                      210
+                                  ],
+                       "borderPixels":  0,
+                       "saturatedWarmScreenPixels":  3403
+                   }
+    },
+    {
+        "id":  "team_brass",
+        "source":  {
+                       "width":  1254,
+                       "height":  1254,
+                       "alphaMin":  0,
+                       "alphaMax":  255,
+                       "transparentPixels":  1346410,
+                       "opaquePixels":  1109,
+                       "partialPixels":  224997,
+                       "bounds":  [
+                                      33,
+                                      69,
+                                      1238,
+                                      1254
+                                  ],
+                       "borderPixels":  16,
+                       "saturatedWarmScreenPixels":  5951
+                   },
+        "cleanup":  {
+                        "file":  "friendly_team_brass-v2.png",
+                        "sourceHasAlpha":  true,
+                        "sourceTranslucentPixels":  1571407,
+                        "keyedPixels":  1571407,
+                        "borderPixels":  0,
+                        "clipped":  false,
+                        "glyphBox":  [
+                                         1205,
+                                         1185
+                                     ],
+                        "scale":  0.16
+                    },
+        "export":  {
+                       "width":  256,
+                       "height":  256,
+                       "alphaMin":  0,
+                       "alphaMax":  255,
+                       "transparentPixels":  59596,
+                       "opaquePixels":  900,
+                       "partialPixels":  5040,
+                       "bounds":  [
+                                      42,
+                                      37,
+                                      212,
+                                      212
+                                  ],
+                       "borderPixels":  0,
+                       "saturatedWarmScreenPixels":  232
+                   }
+    },
+    {
+        "id":  "team_cobalt",
+        "source":  {
+                       "width":  1374,
+                       "height":  1145,
+                       "alphaMin":  0,
+                       "alphaMax":  255,
+                       "transparentPixels":  1132268,
+                       "opaquePixels":  935,
+                       "partialPixels":  440027,
+                       "bounds":  [
+                                      66,
+                                      20,
+                                      1318,
+                                      1097
+                                  ],
+                       "borderPixels":  0,
+                       "saturatedWarmScreenPixels":  67015
+                   },
+        "cleanup":  {
+                        "file":  "friendly_team_cobalt.png",
+                        "sourceHasAlpha":  true,
+                        "sourceTranslucentPixels":  1572295,
+                        "keyedPixels":  1572295,
+                        "borderPixels":  0,
+                        "clipped":  false,
+                        "glyphBox":  [
+                                         1252,
+                                         1077
+                                     ],
+                        "scale":  0.15
+                    },
+        "export":  {
+                       "width":  256,
+                       "height":  256,
+                       "alphaMin":  0,
+                       "alphaMax":  255,
+                       "transparentPixels":  54844,
+                       "opaquePixels":  772,
+                       "partialPixels":  9920,
+                       "bounds":  [
+                                      32,
+                                      48,
+                                      222,
+                                      211
+                                  ],
+                       "borderPixels":  0,
+                       "saturatedWarmScreenPixels":  1755
+                   }
+    },
+    {
+        "id":  "carried_mark",
+        "source":  {
+                       "width":  1254,
+                       "height":  1254,
+                       "alphaMin":  0,
+                       "alphaMax":  255,
+                       "transparentPixels":  982327,
+                       "opaquePixels":  1278,
+                       "partialPixels":  588911,
+                       "bounds":  [
+                                      29,
+                                      25,
+                                      1226,
+                                      1198
+                                  ],
+                       "borderPixels":  0,
+                       "saturatedWarmScreenPixels":  162820
+                   },
+        "cleanup":  {
+                        "file":  "friendly_carried_mark.png",
+                        "sourceHasAlpha":  true,
+                        "sourceTranslucentPixels":  1571238,
+                        "keyedPixels":  1571238,
+                        "borderPixels":  0,
+                        "clipped":  false,
+                        "glyphBox":  [
+                                         1197,
+                                         1173
+                                     ],
+                        "scale":  0.16
+                    },
+        "export":  {
+                       "width":  256,
+                       "height":  256,
+                       "alphaMin":  0,
+                       "alphaMax":  255,
+                       "transparentPixels":  49961,
+                       "opaquePixels":  887,
+                       "partialPixels":  14688,
+                       "bounds":  [
+                                      60,
+                                      41,
+                                      208,
+                                      219
+                                  ],
+                       "borderPixels":  0,
+                       "saturatedWarmScreenPixels":  4038
+                   }
+    },
+    {
+        "id":  "tether_partner",
+        "source":  {
+                       "width":  1312,
+                       "height":  1199,
+                       "alphaMin":  0,
+                       "alphaMax":  255,
+                       "transparentPixels":  1075636,
+                       "opaquePixels":  407,
+                       "partialPixels":  497045,
+                       "bounds":  [
+                                      53,
+                                      203,
+                                      1296,
+                                      1144
+                                  ],
+                       "borderPixels":  0,
+                       "saturatedWarmScreenPixels":  125907
+                   },
+        "cleanup":  {
+                        "file":  "friendly_tether_partner.png",
+                        "sourceHasAlpha":  true,
+                        "sourceTranslucentPixels":  1572681,
+                        "keyedPixels":  1572681,
+                        "borderPixels":  0,
+                        "clipped":  false,
+                        "glyphBox":  [
+                                         1243,
+                                         941
+                                     ],
+                        "scale":  0.16
+                    },
+        "export":  {
+                       "width":  256,
+                       "height":  256,
+                       "alphaMin":  0,
+                       "alphaMax":  255,
+                       "transparentPixels":  53340,
+                       "opaquePixels":  562,
+                       "partialPixels":  11634,
+                       "bounds":  [
+                                      34,
+                                      61,
+                                      216,
+                                      163
+                                  ],
+                       "borderPixels":  0,
+                       "saturatedWarmScreenPixels":  3083
+                   }
+    }
+]

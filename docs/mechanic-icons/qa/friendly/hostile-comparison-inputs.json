@@ -1,0 +1,82 @@
+﻿[
+    {
+        "sha256":  "B431519A96C55602DCB4D4F8CFE38396D024DDF57B506478F69828D7AF5E3CEF",
+        "id":  "spread",
+        "state":  "present"
+    },
+    {
+        "sha256":  "63A6A705B8C30920757EE2F3D5199DF54FF438DF17B661EB6619241F469040C5",
+        "id":  "soak_tower",
+        "state":  "present"
+    },
+    {
+        "sha256":  "86092A49768EEF6608BA32A3EB2ED14C937850EC11AABFDDAAD2F4BFA0353E5F",
+        "id":  "line_stack",
+        "state":  "present"
+    },
+    {
+        "sha256":  "E70E886929B83D613998CFE82875E844744AAA563A9C91B1F8EF316BF7C71873",
+        "id":  "stretch_tether",
+        "state":  "present"
+    },
+    {
+        "sha256":  "2C3C41016C5891885DB3660A3FBD70E8E5D8BAD82F6179F519B5DA17B5C344DD",
+        "id":  "pass_the_mark",
+        "state":  "present"
+    },
+    {
+        "sha256":  "CB73404BC5AD1C90BC9B09E976EEEF7B8C4DA2DB177265FED47C85A8316566D3",
+        "id":  "movement_stop",
+        "state":  "present"
+    },
+    {
+        "sha256":  "D62FED7D580748DA684AEB11292B06550C0A121E8898A830DD1489730826EB03",
+        "id":  "movement_move",
+        "state":  "present"
+    },
+    {
+        "sha256":  "353A429FD52695441234E2DAB4E53054932C608A3A4ADB6A93DD6DEA66C4A9E4",
+        "id":  "one_side_cleave",
+        "state":  "present"
+    },
+    {
+        "sha256":  "CC21AC9EE83462FA856C9A70A8670A03072EB1AFEDFD32057AFB06CC4C201A9B",
+        "id":  "player_mirror",
+        "state":  "present"
+    },
+    {
+        "sha256":  "F8788DC443A8D835316087ED4D287E0DD3894C899CF5C4D9CB245BFEBFDD1D17",
+        "id":  "pull",
+        "state":  "present"
+    },
+    {
+        "sha256":  "F597E08C5F5302C6BC9D4911A06922C22687A0648291A36F82C418105A0671C3",
+        "id":  "shrinking_edge",
+        "state":  "present"
+    },
+    {
+        "sha256":  "D56787BE43B57B5F74D900A343078AD9C6FECF975A3485901C51A1389CF26E06",
+        "id":  "cone",
+        "state":  "present"
+    },
+    {
+        "sha256":  "DD502A5269E529D55D4C3E094E10D844F82C7700A6DD607189ABAE339EAE5BC9",
+        "id":  "ring",
+        "state":  "present"
+    },
+    {
+        "sha256":  "6EFB40AE2B6223BD02446764443FDD953F6BA5D51E60CA416736EE12EC302287",
+        "id":  "lane",
+        "state":  "present"
+    },
+    {
+        "sha256":  "6652561DE80164C9915187AD5D43A6BC5D4AF6F8D5A1C92C77290FBE570A6A20",
+        "id":  "delayed_circle",
+        "state":  "present"
+    },
+    {
+        "sha256":  "CC6DD52E7ABE458E374DDC581640E7FE3A5B4609C1469AED27F4EA0FE6DCC474",
+        "id":  "low_bar",
+        "state":  "present"
+    }
+]
