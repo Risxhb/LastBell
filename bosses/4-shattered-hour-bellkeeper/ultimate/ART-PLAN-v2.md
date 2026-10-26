@@ -52,6 +52,7 @@ with real models and effects in the house style (`gpt/02-visual-style-guide.md`,
    - one icon per mechanic for the HUD hint line.
 
 ## Decided (Chzy18, 26 Oct)
-- **Job glyphs:** made with the ChatGPT art project. The prompts are in   (18 icons, saved to ). The words stay beside them at first.
+- **Job glyphs:** made with the ChatGPT art project. The prompts are in `CHATGPT-PROMPTS-2026-10-26-ULTIMATE-GLYPHS.md`
+  (18 icons, saved to `Reference/Ultimate-Glyphs/`). The words stay beside them at first.
 - **Camera exception:** a short 1–2 s camera pull-back and return is allowed for the stage transitions (the great bell
   falling, the bell shattering). Gameplay otherwise keeps the fixed camera.
