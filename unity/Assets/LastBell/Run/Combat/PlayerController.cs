@@ -168,6 +168,7 @@ namespace LastBell.Run
             if (mult >= 1 && h.Damage > 0) dmg = Mathf.Max(1, dmg);   // a shield can absorb a hit completely; nothing else can (a 0-damage hazard is a push only)
             Hp = Mathf.Max(0, Hp - dmg);
             World.ReportPlayerHit(this, h, dmg);
+            if (World.Players.Count > 0 && World.Players[0] == this) Debug.Log($"[hit] you: {h.Source} -{dmg} at ({transform.position.x:0.0},{transform.position.z:0.0}) hp {Hp}");   // playtests: what hit the player
             RunHud.Float(transform.position + Vector3.up * 2.4f, "-" + dmg, mult < 1 ? new Color(0.6f, 0.9f, 1f) : new Color(1f, 0.42f, 0.36f));
             World.BossFx.PlayerHit(transform.position);
             if (Hp == 0) { GoDown(); return; }

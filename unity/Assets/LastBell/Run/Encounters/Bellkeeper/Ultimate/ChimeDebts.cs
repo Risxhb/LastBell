@@ -23,6 +23,7 @@ namespace LastBell.Run
         public override string Name => "Chime Debts";
 
         public const string Source = "Chime Debt";
+        public const float WarnSeconds = 1.2f;
         public const float RingRadius = 3.6f,   // on its beat it covers the ✕ beside it (r 3.2) all but its boss side: forget it and that weight holder dies
             LineWidth = 2f, ShownSeconds = 1.5f, TimerShown = 6f,
             LineStop = 4f;   // the chime line stops 4 m from the boss: the ring round him (the relay's ✕ at 3.2 m) stays a lane for crossing
@@ -32,7 +33,7 @@ namespace LastBell.Run
 
         sealed class Debt
         {
-            public PlayerController Owner; public int PayTick, DetTick; public bool Paid, Done, Erased;
+            public PlayerController Owner; public int PayTick, DetTick; public bool Paid, Done, Erased, Warned;
             public Hazard Ring, Line; public BellkeeperFx.Telegraph RingOutline, LineOutline; public Transform Flash;
         }
         readonly List<Debt> debts = new List<Debt>();
@@ -73,6 +74,14 @@ namespace LastBell.Run
                     if (d.Done) continue; open = true;
                     if (!d.Paid && Now >= d.PayTick) Pay(d);
                     if (d.Paid && d.RingOutline != null && Now >= d.PayTick + Sim.Ticks(ShownSeconds)) Fade(d);   // from here on it is a memory
+                    // ...until the last WarnSeconds: then the blast shows red again (Chzy18 playtest 25 Oct: a hidden ring over the
+                    // TOCK ✕ read as an unfair swipe), so the TOCK holder can see the safe inner edge
+                    if (d.Paid && !d.Warned && !d.Erased && Now >= d.DetTick - Sim.Ticks(WarnSeconds))
+                    {
+                        d.Warned = true; int left = Mathf.Max(1, d.DetTick - Now);
+                        Spawn(new Hazard { Source = Source + " (warning)", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = d.Ring.Origin, Radius = d.Ring.Radius, LockAt = 0, ResolveAt = UltShapes.ResolveIn(left), Damage = 0, Knockback = 0, Stun = 0, HitOnResolve = false });
+                        Spawn(new Hazard { Source = Source + " (warning)", Shape = HazardShape.Lane, Kind = HazardKind.Ground, Origin = d.Line.Origin, Yaw = d.Line.Yaw, Length = d.Line.Length, Width = d.Line.Width, LockAt = 0, ResolveAt = UltShapes.ResolveIn(left), Damage = 0, Knockback = 0, Stun = 0, HitOnResolve = false });
+                    }
                     if (d.Paid && Now >= d.DetTick)
                     {
                         d.Done = true; Fade(d);
