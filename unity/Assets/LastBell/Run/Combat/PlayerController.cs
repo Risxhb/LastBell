@@ -159,6 +159,7 @@ namespace LastBell.Run
 
         // dev / test hook only
         public void DebugSetHp(int hp) { Hp = Mathf.Clamp(hp, 1, MaxHp); }
+        public void DebugRevive() { if (!Down) return; Down = false; Hp = MaxHp; Stamina = MaxStamina; Presenter.ResetPose(); }
 
         public void ReceiveHit(Hazard h)
         {

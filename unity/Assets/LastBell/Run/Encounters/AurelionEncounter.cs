@@ -22,7 +22,7 @@ namespace LastBell.Run
     // 30–0 % Exposed Meridian (Alignment, then after full recovery a Thrust). Transitions queue to attack boundaries and
     // a burst through two thresholds plays one transition. At most two damaging patterns are ever live (Pins + Cut).
     // Not in this graybox: the Midnight Toll tier's Counterclock, boss stagger, the authored model and audio.
-    public sealed class AurelionEncounter : BossEncounter
+    public sealed partial class AurelionEncounter : BossEncounter
     {
         public override string Id => "boss.aurelion";
         public override string DisplayName => "Aurelion, the Meridian Regent";
@@ -58,7 +58,10 @@ namespace LastBell.Run
         public override float NextPhaseFraction() => Hp > MaxHp * 0.65f ? 0.64f : 0.29f;
         bool Ready(int at) => Age >= at;
 
-        protected override IEnumerable<int> Script()
+        protected override IEnumerable<int> Script() => AurelionArgs.V1 ? V1Script() : V2Script();
+
+        // ability set v1 (the packet's five attacks), kept for comparison behind -lastbellAbilitySet v1; v2 is in Aurelion/AurelionEncounter.V2.cs
+        IEnumerable<int> V1Script()
         {
             int want = PhaseFor();
             if (want > phase)
@@ -366,6 +369,7 @@ namespace LastBell.Run
         {
             PhaseName = "Perfect Order";
             presenter = CharacterPresenter.Create(transform, "Aurelion", 3f, 0.8f, 0, host => { BuildStandIn(host); return host; });
+            BindAbilities();
         }
 
         void BuildStandIn(Transform host)
@@ -430,6 +434,7 @@ namespace LastBell.Run
         {
             base.Update();
             UpdateOrreries(Time.deltaTime);
+            V2DevKeys();
             if (presenter) presenter.GlowLevel = glowLevel;
             if (!body) return;
             float dt = Time.deltaTime;
