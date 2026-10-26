@@ -39,7 +39,9 @@ namespace LastBell.Run
         public Action<Hazard> OnResolve;         // presentation of the resolve (effects), after the hit test
         public Action<Hazard> OnSpent;           // the active period is over (same tick as OnResolve when ActiveTicks is 0)
         public float ClipRadius;                 // > 0: the telegraph is drawn only over the floor disc of this radius (presentation)
+        public Func<PlayerController, bool> Affects;   // null = everyone; else only these players can be hit (per-player marks)
         public bool HitOnResolve = true;         // false: the owner deals the hits itself while the warning is up (a sweeping charge)
+        public bool Soak;                        // a ring to stand IN (a tower), not a shape to leave: bots and the HUD read it
 
         public int Age { get; internal set; }
         public bool Locked => Age >= LockAt;
@@ -91,6 +93,8 @@ namespace LastBell.Run
         public IReadOnlyList<Hazard> Live => live;
         public int Resolved { get; private set; }
         public HazardSystem(CombatWorld world) { w = world; }
+        public event Action<Hazard> Spawned;   // tests record exact spawn ticks
+        public event Action<Hazard> Resolving;   // the first resolve tick, before the hit test (telemetry: escape margins)
 
         static readonly Color JumpFill = new Color(0.30f, 0.85f, 0.95f), JumpBorder = new Color(0.55f, 1.6f, 1.8f);
         static readonly Color SlagFill = new Color(0.95f, 0.36f, 0.08f), SlagBorder = new Color(2.4f, 1.2f, 0.35f);
@@ -113,6 +117,7 @@ namespace LastBell.Run
             h.Tele.Place(h.Origin, h.Yaw);
             if (h.LockAt <= 0) h.Tele.Lock();
             live.Add(h);
+            Spawned?.Invoke(h);
             return h;
         }
 
@@ -138,9 +143,11 @@ namespace LastBell.Run
                 if (h.BurnPerSecond > 0) continue;
                 if (last) { live.RemoveAt(i); h.Tele.Resolve(); }
                 if (first) Resolved++;
+                if (first) Resolving?.Invoke(h);
                 if (h.HitOnResolve) foreach (var p in w.Players)
                 {
                     if (p.Down || h.Hit.Contains(p) || !h.Contains(p.transform.position)) continue;
+                    if (h.Affects != null && !h.Affects(p)) continue;
                     if (h.JumpClearable && p.Height >= h.ClearHeight) continue;   // the only height rule (R19)
                     h.Hit.Add(p);
                     p.ReceiveHit(h);

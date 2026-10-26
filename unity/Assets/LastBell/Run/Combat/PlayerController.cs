@@ -159,6 +159,7 @@ namespace LastBell.Run
 
         // dev / test hook only
         public void DebugSetHp(int hp) { Hp = Mathf.Clamp(hp, 1, MaxHp); }
+        public void DebugRevive() { if (!Down) return; Down = false; Hp = MaxHp; Stamina = MaxStamina; Presenter.ResetPose(); }
 
         public void ReceiveHit(Hazard h)
         {
@@ -187,6 +188,15 @@ namespace LastBell.Run
             World.ReportPlayerHit(this, h, dmg);
             RunHud.Float(transform.position + Vector3.up * 2.4f, "-" + dmg, new Color(1f, 0.6f, 0.25f));
             if (Hp == 0) GoDown();
+        }
+
+        // a party-wide wipe mechanic (Aurelion v4: an empty tower, Final Noon): down now, whatever the HP. Not a hit: no
+        // shield or mitigation applies, and it is reported as the defeat cause.
+        public void ForceDown(string cause)
+        {
+            if (Down) return;
+            Hp = 0; World.LastDamageSource = cause;
+            GoDown();
         }
 
         void GoDown()

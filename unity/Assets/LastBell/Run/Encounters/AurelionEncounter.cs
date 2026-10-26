@@ -22,7 +22,7 @@ namespace LastBell.Run
     // 30–0 % Exposed Meridian (Alignment, then after full recovery a Thrust). Transitions queue to attack boundaries and
     // a burst through two thresholds plays one transition. At most two damaging patterns are ever live (Pins + Cut).
     // Not in this graybox: the Midnight Toll tier's Counterclock, boss stagger, the authored model and audio.
-    public sealed class AurelionEncounter : BossEncounter
+    public sealed partial class AurelionEncounter : BossEncounter
     {
         public override string Id => "boss.aurelion";
         public override string DisplayName => "Aurelion, the Meridian Regent";
@@ -51,14 +51,18 @@ namespace LastBell.Run
         int pinRotation;
 
         // HP = measured sustained DPS x 150 s (packet). First autotest measurement: Vanguard ~90 DPS while dodging -> 13 500.
-        void Awake() { MaxHp = 13500;BodyRadius = 1.1f; HitHeight = 2.6f; MarkHeight = 5.2f; }
+        void Awake() { MaxHp = AurelionArgs.V4 ? 10000 : 13500; BodyRadius = 1.1f;   // v4: measured in the 4-bot demo (party ~128 DPS while dodging) so a perfect party kills him in Last Light with 1-2 slices of floor to spare
+            HitHeight = 2.6f; MarkHeight = 5.2f; }
 
         int PhaseFor() => Hp > MaxHp * 0.65f ? 1 : Hp > MaxHp * 0.30f ? 2 : 3;
         public void DebugReadyThrust() { thrustReady = 0; }   // test hook: the next pass may choose the Thrust
-        public override float NextPhaseFraction() => Hp > MaxHp * 0.65f ? 0.64f : 0.29f;
+        public override float NextPhaseFraction() => AurelionArgs.V4 ? V4NextPhaseFraction() : Hp > MaxHp * 0.65f ? 0.64f : 0.29f;
         bool Ready(int at) => Age >= at;
 
-        protected override IEnumerable<int> Script()
+        protected override IEnumerable<int> Script() => AurelionArgs.V1 ? V1Script() : AurelionArgs.V4 ? V4Script() : V2Script();
+
+        // ability set v1 (the packet's five attacks), kept for comparison behind -lastbellAbilitySet v1; v2 is in Aurelion/AurelionEncounter.V2.cs
+        IEnumerable<int> V1Script()
         {
             int want = PhaseFor();
             if (want > phase)
@@ -341,6 +345,7 @@ namespace LastBell.Run
                 behind[p] = InRear(p.transform.position) ? t + 1 : 0;
             }
             MaxLiveHazards = Mathf.Max(MaxLiveHazards, W.Hazards.Count);
+            V4Clock();
             if (presenter) presenter.TickBoss(Current == "approach" || Current == "reposition" ? "Walk" : "Idle");
         }
         public int BehindTicks(PlayerController p) => behind.TryGetValue(p, out int t) ? t : 0;
@@ -366,6 +371,7 @@ namespace LastBell.Run
         {
             PhaseName = "Perfect Order";
             presenter = CharacterPresenter.Create(transform, "Aurelion", 3f, 0.8f, 0, host => { BuildStandIn(host); return host; });
+            BindAbilities();
         }
 
         void BuildStandIn(Transform host)
@@ -430,6 +436,7 @@ namespace LastBell.Run
         {
             base.Update();
             UpdateOrreries(Time.deltaTime);
+            V2DevKeys();
             if (presenter) presenter.GlowLevel = glowLevel;
             if (!body) return;
             float dt = Time.deltaTime;
