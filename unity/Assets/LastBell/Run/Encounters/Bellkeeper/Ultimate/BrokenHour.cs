@@ -444,7 +444,13 @@ namespace LastBell.Run
         {
             int sh = SoakHour(count), ih = InvHour(count), h = HourOf(p);
             if (h == sh) { c = EscapementRelay.DutyColors[0]; return "SOAK"; }
-            if (h == ih) { c = new Color(0.78f, 0.6f, 1f); return "INVERTED"; }
+            if (h == ih)
+            {
+                // say whether it has arrived (Chzy18 playtest 25 Oct: "it says I'm inverted but I'm still dying")
+                if (inverted.Contains(p)) { c = new Color(0.78f, 0.6f, 1f); return "INVERTED ✓ → stand in the SLAM"; }
+                string from = ""; foreach (var q in inverted) if (!q.Down) { from = UltimateState.Roman[HourOf(q) + 1]; break; }
+                c = new Color(1f, 0.45f, 0.4f); return "GET INVERTED: touch " + (from == "" ? "its holder" : from) + " (meet at the beam)";
+            }
             if (inverted.Contains(p)) { c = new Color(1f, 0.62f, 0.42f); return "PASS → " + UltimateState.Roman[ih + 1]; }
             c = EscapementRelay.DutyColors[2]; return "SAFE";
         }
