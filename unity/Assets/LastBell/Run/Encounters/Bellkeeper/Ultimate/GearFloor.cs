@@ -14,7 +14,7 @@ namespace LastBell.Run
     // Every 7.5 s the HAMMER slams a random outer gear (shown 2.5 s before; every third slam two gears): anyone on it 999,
     // and it throws a ring of 16 brass shards (50, two kill). Each player belongs to a gear that moves two places round
     // after every slam (so most slams everyone crosses through the centre); the player whose gear is hammered waits on the
-    // centre. A gear left without its player at a slam jams the train: WIPE. Every third slam the gears reverse.
+    // centre. A gear without ITS OWN player at a slam jams the train: WIPE (anyone else on it doesn't count). Every third slam the gears reverse.
     // Each outer gear's hub is a CORE (BellkeeperEncounter.ExtraBodies): solid, and a hit on it damages the boss (one bar).
     // Melee parks against its core, where the floor barely moves. 5-8 players: two per gear. Below 4: only gears with a
     // player assigned must be held.
@@ -159,7 +159,7 @@ namespace LastBell.Run
                         for (int g = 0; g < 4; g++)
                         {
                             bool assigned = false, held = false;
-                            foreach (var p in W.Players) { if (p.Down) continue; if ((HourOf(p) + 2) % 4 == g) assigned = true; if (GearAt(p.transform.position) == g) held = true; }
+                            foreach (var p in W.Players) { if (p.Down || (HourOf(p) + 2) % 4 != g) continue; assigned = true; if (GearAt(p.transform.position) == g) held = true; }
                             if (assigned && !held) { Jams++; Fails.Add($"the lock: gear {GN[g]} empty"); Ult.Wipe($"The gear train jams (gear {GN[g]} empty)"); break; }
                         }
                         if (Boss.Ult.WipeCause != null) break;
@@ -213,18 +213,19 @@ namespace LastBell.Run
                     var ss = SlamGears(ks);
                     foreach (var p in W.Players) if (!p.Down && Grounded(p) && ss.Contains(GearAt(p.transform.position))) Hit(p, UltimateState.Lethal, "the hammer");
                     foreach (var g in ss) for (int j = 0; j < Shards; j++) shards.Add(new Shard { P = GearCentre(g), V = Dir(360f / Shards * j + 11 * ks) * ShardSpeed });
-                    // the train jams if a gear with a player assigned is left empty
+                    // the train jams if a gear is not held by its own player (Chzy18 25 Oct "force it": anyone else on it doesn't
+                    // count, so the two-place rotation is the rule, not just the bots' strat)
                     for (int g = 0; g < 4; g++)
                     {
                         if (ss.Contains(g)) continue;
-                        bool assigned = false, held = false;
+                        bool assigned = false, held = false; string who = "";
                         foreach (var p in W.Players)
                         {
-                            if (p.Down) continue;
-                            if (((HourOf(p) + 2 * ks) % 4 + 4) % 4 == g) assigned = true;
+                            if (p.Down || ((HourOf(p) + 2 * ks) % 4 + 4) % 4 != g) continue;
+                            assigned = true; who = UltimateState.Roman[HourOf(p) + 1];
                             if (GearAt(p.transform.position) == g) held = true;
                         }
-                        if (assigned && !held) { Jams++; Fails.Add($"slam {ks}: gear {GN[g]} empty"); Ult.Wipe($"The gear train jams (gear {GN[g]} empty)"); break; }
+                        if (assigned && !held) { Jams++; Fails.Add($"slam {ks}: gear {GN[g]} without {who}"); Ult.Wipe($"The gear train jams (gear {GN[g]} needs {who})"); break; }
                     }
                     Boss.PlanLog.Add((Now, $"gear slam {ks} {string.Join("+", ss.ConvertAll(g => GN[g]))}"));
                     if (stop) break;
