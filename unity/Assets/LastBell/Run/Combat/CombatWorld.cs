@@ -65,6 +65,13 @@ namespace LastBell.Run
 
         public event Action<PlayerController, Hazard, int> PlayerHit;   // tests and HUD listen
 
+        // Damage attribution: the player whose step (or projectile) is dealing damage right now, the damage each player
+        // has dealt in this world, and an encounter hook that scales one player's damage to the boss (the Bellkeeper
+        // Ultimate's Cracked Hour sets a player's to 0 for 20 s). Null hook = everyone deals full damage.
+        public PlayerController Actor { get; internal set; }
+        public Func<PlayerController, float> DealtScale;
+        public readonly Dictionary<PlayerController, int> DealtBy = new Dictionary<PlayerController, int>();
+
         // The effect layers are created once by the director and reset between runs (re-creating them crashed the
         // player natively in Mesh.set_colors on retry, see handoff).
         public CombatWorld(Transform root, BellkeeperFx bossFx, PlayerFx fx)
@@ -79,7 +86,8 @@ namespace LastBell.Run
         public void Step()
         {
             Tick++;
-            foreach (var p in Players) p.Step();
+            foreach (var p in Players) { Actor = p; p.Step(); }
+            Actor = null;
             if (!CombatActive) return;
             if (Boss != null && !Boss.Dead) Boss.Step();
             Projectiles.Step();
@@ -115,10 +123,19 @@ namespace LastBell.Run
         public int StrikeBoss(PlayerController from, Vector3 origin, Vector3 forward, float reach, float arcDeg, int damage, string ability)
         {
             var b = Boss; if (b == null || !b.Solid) return 0;
-            var to = Sim.Flat(b.transform.position - origin); forward = Sim.Flat(forward);
-            if (to.magnitude > reach + b.BodyRadius) return 0;
-            if (arcDeg < 360 && to.magnitude > b.BodyRadius && Vector3.Angle(forward, to) > arcDeg / 2 + Mathf.Rad2Deg * Mathf.Atan2(b.BodyRadius, to.magnitude)) return 0;
-            var contact = b.transform.position - to.normalized * b.BodyRadius + Vector3.up * b.HitHeight;
+            forward = Sim.Flat(forward);
+            // the nearest body in reach and in the arc (the boss, or an extra body he offers: same bar)
+            bool found = false; Vector3 contact = default; float bestD = float.MaxValue;
+            for (int i = 0; i < b.BodyCount; i++)
+            {
+                b.Body(i, out var c, out float r); if (r <= 0) continue;
+                var to = Sim.Flat(c - origin);
+                if (to.magnitude > reach + r) continue;
+                if (arcDeg < 360 && to.magnitude > r && Vector3.Angle(forward, to) > arcDeg / 2 + Mathf.Rad2Deg * Mathf.Atan2(r, to.magnitude)) continue;
+                if (to.magnitude >= bestD) continue;
+                bestD = to.magnitude; found = true; contact = c - to.normalized * r + Vector3.up * b.HitHeight;
+            }
+            if (!found) return 0;
             return DamageBoss(damage, contact, ability);
         }
 
@@ -127,18 +144,26 @@ namespace LastBell.Run
         {
             contact = origin + Sim.Flat(forward).normalized * length;
             var b = Boss; if (b == null || !b.Solid) return 0;
-            var f = Sim.Flat(forward).normalized; var to = Sim.Flat(b.transform.position - origin);
-            float along = Vector3.Dot(to, f); float side = (to - f * along).magnitude;
-            if (along < -b.BodyRadius || along > length + b.BodyRadius || side > width / 2 + b.BodyRadius) return 0;
-            contact = origin + f * Mathf.Max(0, along - b.BodyRadius) + Vector3.up * b.HitHeight;
+            var f = Sim.Flat(forward).normalized; bool found = false; float bestAlong = float.MaxValue;
+            for (int i = 0; i < b.BodyCount; i++)   // the first body along the line (the boss or an extra body)
+            {
+                b.Body(i, out var c, out float r); if (r <= 0) continue;
+                var to = Sim.Flat(c - origin);
+                float along = Vector3.Dot(to, f); float side = (to - f * along).magnitude;
+                if (along < -r || along > length + r || side > width / 2 + r || along >= bestAlong) continue;
+                bestAlong = along; found = true; contact = origin + f * Mathf.Max(0, along - r) + Vector3.up * b.HitHeight;
+            }
+            if (!found) return 0;
             return DamageBoss(damage, contact, ability);
         }
 
         public int DamageBoss(int damage, Vector3 contact, string ability)
         {
             var b = Boss; if (b == null || !b.Solid || damage <= 0) return 0;
+            if (Actor != null && DealtScale != null) { damage = Mathf.RoundToInt(damage * Mathf.Max(0, DealtScale(Actor))); if (damage <= 0) return 0; }
             int dealt = b.TakeHit(damage, contact);
             DamageDealt += dealt;
+            if (Actor != null && dealt > 0) { DealtBy.TryGetValue(Actor, out int had); DealtBy[Actor] = had + dealt; }
             if (dealt > 0) { Add(RunMeter, ability, dealt); Add(EncounterMeter, ability, dealt); }
             return dealt;
         }
@@ -162,14 +187,16 @@ namespace LastBell.Run
             }
             var b = Boss;
             if (b != null && b.Solid)
-            {
-                var d = Sim.Flat(pos - b.transform.position); float min = b.BodyRadius + bodyRadius;
-                if (d.magnitude < min)
+                for (int i = 0; i < b.BodyCount; i++)   // the boss's body and any extra bodies are solid
                 {
-                    var n = d.sqrMagnitude > 1e-4f ? d.normalized : -b.transform.forward;
-                    var p = b.transform.position + n * min; pos.x = p.x; pos.z = p.z;
+                    b.Body(i, out var c, out float r); if (r <= 0) continue;
+                    var d = Sim.Flat(pos - c); float min = r + bodyRadius;
+                    if (d.magnitude < min)
+                    {
+                        var n = d.sqrMagnitude > 1e-4f ? d.normalized : -b.transform.forward;
+                        var p = c + n * min; pos.x = p.x; pos.z = p.z;
+                    }
                 }
-            }
             return pos;
         }
     }
@@ -181,13 +208,14 @@ namespace LastBell.Run
         {
             public Vector3 Pos, Vel; public float Range, Travelled, Radius; public int Damage; public string Ability;
             public Action<int, Vector3> OnHit; public Color Color;
+            public PlayerController Owner;   // who fired it (damage attribution); Fire fills it from the world's Actor
         }
         readonly CombatWorld w; readonly List<Projectile> live = new List<Projectile>(), batch = new List<Projectile>();
         int clears;   // bumped by ClearAll, so a step can tell its batch was cancelled mid-dispatch
         public int Count => live.Count;
         public ProjectileSystem(CombatWorld world) { w = world; }
 
-        public void Fire(Projectile p) { live.Add(p); }
+        public void Fire(Projectile p) { if (p.Owner == null) p.Owner = w.Actor; live.Add(p); }
 
         // Steps a snapshot: a killing blow runs BossEncounter.Die -> ClearTransient -> ClearAll, which empties live (and
         // cancels pending hazards on the same tick) mid-loop. A projectile leaves live before its hit is dispatched, and
@@ -201,12 +229,16 @@ namespace LastBell.Run
                 var p = batch[i]; var step = p.Vel * Sim.Dt;
                 p.Pos += step; p.Travelled += step.magnitude;
                 w.Fx.ProjectileHead(p.Pos, p.Color);
-                var b = w.Boss;
-                if (b != null && b.Solid && Sim.Flat(p.Pos - b.transform.position).magnitude <= b.BodyRadius + p.Radius)
+                var b = w.Boss; int hitBody = -1; Vector3 hc = default; float hr = 0;
+                if (b != null && b.Solid)
+                    for (int bi = 0; bi < b.BodyCount && hitBody < 0; bi++) { b.Body(bi, out hc, out hr); if (hr > 0 && Sim.Flat(p.Pos - hc).magnitude <= hr + p.Radius) hitBody = bi; }
+                if (hitBody >= 0)
                 {
-                    var contact = b.transform.position + Sim.Flat(p.Pos - b.transform.position).normalized * b.BodyRadius + Vector3.up * b.HitHeight;
+                    var contact = hc + Sim.Flat(p.Pos - hc).normalized * hr + Vector3.up * b.HitHeight;
                     live.Remove(p);
+                    w.Actor = p.Owner;
                     int dealt = w.DamageBoss(p.Damage, contact, p.Ability);
+                    w.Actor = null;
                     w.Fx.NoteImpact(contact, p.Color);
                     p.OnHit?.Invoke(dealt, contact);
                     continue;

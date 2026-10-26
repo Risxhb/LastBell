@@ -1,0 +1,70 @@
+# The Bellkeeper — Ultimate: strat guide (intended solutions, proposal)
+
+Written the way Ultimate guides are: what each mechanic wants from **you**, by your marker. The same strats drive the perfect bots (Part 5). All numbers are Medium; see `ULTIMATE.md` for the rules and `tools/encounter-escape/bellkeeper-ultimate-results.md` for the proof.
+
+## Universal habits
+- **Stations** are the Throne's four diagonal rim dials: NE, SE, SW, NW (your clock hand points at one).
+- **Potions:** five, nothing else heals except the Chimesinger's Mending Chorus. Drink before T2's six tolls (73+ HP) and under the hourglass (you can't drink while Stilled).
+- **Read your own clock first** (numeral = when, brass hand = which rim station). Everything else in the phase is solved around it.
+- **The boss's body is a shield.** Stopped Hour lanes and your own clock line both pass through him.
+- Default spots: **clock spot** = 4–7 m from the boss on the side **away** from your station; **hiding strip** = the same line, right behind the body (±1 m); **band** = 4.3–6.7 m (after a Toll Tide).
+
+## Pendulum Clocks
+1. At assignment: note your numeral and station. Stay loose until 3 s before your hour.
+2. When your cone draws, go to the clock spot: far side of the boss from your station, 3.8–7.4 m from his centre, on the line through him. Your cone must cross his body.
+3. Look past the boss along your line: nobody may stand there. Call your hour if needed ("II East").
+4. Everyone else: never stand on the station side of the boss for the current hour's line.
+- **Solo:** you have all four. They go round the compass, so walk a circle about 5 m out, arriving at each spot 1.5 s early.
+- **N = 8:** each hour has two strikers whose hands are at right angles; they take two adjacent sides of the boss. Agree on a clockwise priority.
+- **Pairs with 5 or more players:** a pair tick uses only two adjacent hands, each held by two strikers (one from each hour). The two on one hand stand **side by side**, one on each side of the line through the boss (agree that the earlier hour, I or III, always takes the same side). Each stands 10–30° off the line and 4.4–6.6 m from his centre. That keeps them at least 1.5 m apart and outside each other's cone, and both cones still cross his body. A Leaning Bell on that tick leans along the bisector of the two hands, so all four strikers are on the safe half.
+- **With Leaning Bell:** the bell leans **toward the station**, so your spot is already on the safe half. Stay at least 3.8 m out.
+
+## The Stopped Hour
+1. The cracked-hourglass glyph tells you you'll be Stilled in 5 s.
+2. Go to your hiding strip: directly behind the boss from **your clock station**, within a step of the line. When he's paired with a Heart Toll, stand beyond 4.3 m.
+3. Free players: deal damage during the stop. Scan the lanes: if a Stilled ally isn't hidden, step into their lane between them and the station (you take 60 instead of their 999).
+- **Solo:** you're always Stilled. Hide every time. In P3 and P5 the resume also brings Reflection, whose solo image lands on your own frozen spot: 40 you can't avoid. Enter those resumes above 40 HP (drink before the hourglass).
+
+## The Ledger (P1 → P4)
+- **P1:** decide what you record. The ledger half is the side of **clock III's station**: Leaning Bell V leans there anyway. At Leaning Bell I's cast (5 s), everyone stands together about 5 m out on that half, so it falls there too. At Reflection's lock (17 s), everyone whose clock isn't striking then clumps on one spot (that striker's spot), so the images clump.
+- **A messy P1 costs:** if the two halves fell on opposite sides, P4 plays them **back to back, 0.75 s apart** (V moves to just before I). If the images were scattered (any image more than 4 m from their centre), they replay **half again as wide**.
+- **P4:** the replay comes **VI → I**, 1.5 s apart, each coral only **1.2 s** before it strikes. Memorise P1's order as six words (e.g. "West, band, centre, clump, West, centre") and recite it backwards. For opposite halves back to back: stand 1 m on the safe side of the line for V, then step 2 m across for I.
+- **P4 block 2 (Stopped Hour resumes on III):** if your clock station is on the side **opposite** the ledger half, your hiding strip is inside replayed V (on a clean ledger; a split ledger moves V after the stop). Take the 60 to avoid the lash, so **enter above 60 HP** (potion before the hourglass). No reflections in stopped time: the images page (IV) does not replay during the stop.
+
+## Backwards Bell (P2)
+- A, B, C strike, then the rewinds C, B, A, and **each rewind strikes everywhere its original didn't**. Right after A lands, walk onto **A's** half and stay inside 6.4 m. After C, step out past 7.4 m (the tide's copy is the inner disc). Then walk straight in to within 3.6 m of the boss (the Heart Toll's copy is everything outside it). Hold that half for A's copy, or step to your clock spot: it's on that half. Each rewind is 40.
+
+## Two Futures (P3, P5)
+- Futures I (ivory) and II (brass) each show three steps. Memorise each as three hour marks (e.g. "I: 3, 6, 10 · II: 12, 9, 7").
+- The halo stops on the future that plays first; then they **interleave**: first-1, second-1, first-2, second-2, first-3, second-3. Walk your hour-mark path; every step is at most 2.5 m from the last.
+- The last step lands with a **Heart Toll**: finish that path at least 4.3 m from the boss.
+
+## The Conductor's Hand
+- **Fingers** = first move: 1 Leaning Bell, 2 Toll Tide, 3 Reflection, 4 Stopped Hour. **Pendulum swing** = second: left = Heart Toll, right = the first move again, backwards.
+- The real telegraph comes only 1.5 s before. Start moving when you read the phrase, not when you see coral. A right swing replays the first move inverted (it strikes where the original did not), as Backwards Bell does.
+
+## Tolling Hour and the Thirteenth Hour
+- Count tolls; drink between chains, not during a clock hour.
+- **P5:** the great bell counts I…XIII, one 4-damage toll every 6 s; XIII (78 s) ends the attempt. The fissure flares (2.4 m, 60) on every toll: stay 1.65 m or more off its line. Burn: P5 is 15 % of the bar in 78 s.
+
+## Fracture of Time (P5)
+- **Never stand in the fissure** (30/s). It **flares on every toll** of the great bell (every 6 s from P5 start, in time with the numerals): be 1.5 m clear of its line on each toll.
+- Every P5 Leaning Bell uses the fissure as its line, and a toll lands inside its warning: **cross before the toll**. **Dash across** (4 HP, 30 stamina) rather than walk (14 HP). In the first loop you can also wait beside it for the flare and cross in the 1.5 s after; in the second only a dash makes that.
+- **Stilled with a NW or SE hand** (the fissure's ends): your hiding strip is the fissure itself. Hide **beside** it: about 7 m behind the boss, 1.65–1.9 m to either side of the crack (a thin strip: practise it). His body still covers you. On the crack, the burn and the flare take 93 of your 100 HP.
+
+## T2 area quotes (the final exam)
+- **Sundial (Spire):** whoever is farthest from the boss is the SUN. The sun stands 4–6 m from him and steps sideways out of the shadow wedge when it locks; everyone else stays off the boss→sun line.
+- **Bellows (Foundry):** stand 3–3.5 m from the boss centre (the brass ring). The push carries you 3 m out to about 6.3 m, inside the tide line. Hugging the boss takes the Forge Core; standing far takes the tide line.
+- **Root Hours (Verdant):** watch which circle appears first, stand just outside it where it meets a neighbour, and step into it right after it blooms. Rooted in a later circle = two or three blooms = dead.
+- Six tolls (72) come first: enter T2 above 72 HP, and drink between the tolls and the quotes.
+
+## Phase cheat-sheet
+| Phase | Learn first | Then |
+|---|---|---|
+| P1 | Clocks one at a time; record a clean Ledger | Clock + Leaning Bell on one tick |
+| T1 | Hide from your station | — |
+| P2 | Rewind order C-B-A | Clock pairs with rewinds; the Hand phrase |
+| P3 | Futures memory | Resume tick = Stilled lash + images + clock IV |
+| T2 | Potion to 73+ | Three area quotes |
+| P4 | Your own Ledger, backwards | With pairs, Stopped Hour, the Hand |
+| P5 | Fissure crossing | Everything; beat XIII |

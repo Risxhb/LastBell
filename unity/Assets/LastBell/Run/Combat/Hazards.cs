@@ -40,6 +40,7 @@ namespace LastBell.Run
         public Action<Hazard> OnSpent;           // the active period is over (same tick as OnResolve when ActiveTicks is 0)
         public float ClipRadius;                 // > 0: the telegraph is drawn only over the floor disc of this radius (presentation)
         public bool HitOnResolve = true;         // false: the owner deals the hits itself while the warning is up (a sweeping charge)
+        public bool Hidden;                      // no floor telegraph (an arena-wide raidwide the boss shows with its own effects)
 
         public int Age { get; internal set; }
         public bool Locked => Age >= LockAt;
@@ -112,6 +113,7 @@ namespace LastBell.Run
             if (h.ClipRadius > 0) h.Tele.Clip(Vector3.zero, h.ClipRadius);
             h.Tele.Place(h.Origin, h.Yaw);
             if (h.LockAt <= 0) h.Tele.Lock();
+            if (h.Hidden) h.Tele.Hide();
             live.Add(h);
             return h;
         }

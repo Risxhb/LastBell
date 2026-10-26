@@ -46,9 +46,11 @@ namespace LastBell.Run
             ["Meridian Alignment"] = "ring I: stand close inside it or far outside", ["Meridian Alignment II"] = "ring II: hug him or get outside it",
             [BellkeeperEncounter.March] = "step sideways out of the lane",
             [BellkeeperEncounter.Echo] = "it repeats where it struck before, not where the boss stands",
+            [ChimeDebts.Source] = "a paid debt detonates: be outside the ring", [ChimeDebts.Source + " line"] = "and outside its line to the boss",
         };
         // Phase ticks only for bosses that change phase, at their real thresholds (fraction of max HP).
         static float[] PhaseTicks(BossEncounter b) =>
+            b.HudMarks != null ? b.HudMarks :   // an encounter's own thresholds (the Bellkeeper Ultimate: its five phases)
             b is BellkeeperEncounter ? new[] { 0.70f, 0.35f } :
             b is AurelionEncounter || b is CrucivarEncounter || b is SylvaraEncounter ? new[] { 0.65f, 0.30f } :
             b is TempoTyrantEncounter ? new[] { TempoTyrantEncounter.FrenzyAt } :
@@ -619,6 +621,9 @@ namespace LastBell.Run
             // phase line (no HP numbers; the Tempo Tyrant shows its tempo in its own HUD)
             float yy = rowsY;
             if (!(b is TempoTyrantEncounter)) T(x + 10, yy, bw * 0.65f, rowH, b.PhaseName, row15, BA(UiTheme.Ivory));
+            // an encounter's own lines under it (the Bellkeeper Ultimate: segment, push timer and the player's job this beat)
+            var extra = b.HudLine;
+            if (!string.IsNullOrEmpty(extra)) foreach (var line in extra.Split('\n')) { yy += rowH; T(x + 10, yy, bw, rowH, line, row15, BA(UiTheme.Ivory)); }
 
             // attack-name warning rows removed (Risxhb, October 24, 2026): telegraphs on the floor carry the warning
         }

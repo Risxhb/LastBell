@@ -44,6 +44,8 @@ namespace LastBell.Run
             new BossEntry("Tempo Tyrant (practice)", w => BossEncounter.Spawn<TempoTyrantEncounter>(w, new Vector3(0, 0, -2f), 0), inRun: false, map: TempoTyrantMap),
             // Metronome Court miniboss, practice only like the Tyrant (docs/bosses/chimebound-oracle.md)
             new BossEntry("Chimebound Oracle (practice)", w => BossEncounter.Spawn<ChimeboundOracleEncounter>(w, new Vector3(0, 0, -2f), 0), inRun: false, map: TempoTyrantMap),
+            // appended last so every other entry keeps its index; the final boss's Ultimate (WIP proposal, bosses/4-shattered-hour-bellkeeper/ultimate/): practice only, on the Throne
+            new BossEntry("Bellkeeper — Ultimate", BellkeeperEncounter.SpawnUltimate, inRun: false, map: BellkeeperEncounter.ThroneMap),
         };
         // Catalog eligibility is stable; each run owns its shuffled sequence, with final encounters appended.
         public static readonly int[] RunOrder = Enumerable.Range(0, Bosses.Length).Where(i => Bosses[i].InRun).OrderBy(i => Bosses[i].Final).ToArray();
@@ -54,6 +56,7 @@ namespace LastBell.Run
             for (int i = opening.Length - 1; i > 0; i--) { int j = random.Next(i + 1); int swap = opening[i]; opening[i] = opening[j]; opening[j] = swap; }
             return opening.Concat(RunOrder.Where(i => Bosses[i].Final)).ToArray();
         }
+        public static int BellkeeperUltimatePractice => Array.FindIndex(Bosses, b => b.Name.EndsWith("Ultimate"));
         public int[] EncounterOrder { get; private set; } = (int[])RunOrder.Clone();
         public static int SylvaraPractice => Array.FindIndex(Bosses, b => b.Map == SylvaraMap);
         public const string SylvaraMap = "verdant-chimes";
@@ -75,6 +78,10 @@ namespace LastBell.Run
         public RunMode Mode { get; private set; }
         public string ClassName { get; private set; } = "Vanguard";
         public Difficulty Difficulty { get; private set; } = Difficulty.Medium;   // copied from the menu at run start
+        public int AllyCount { get; private set; }            // bot allies, copied from the menu at run start (RunParty); a retry keeps it
+        public readonly List<PlayerController> Allies = new List<PlayerController>();
+        // allies line up behind the player at the south entry, alternating left and right
+        static Vector3 AllySocket(int i) => PlayerSocket + new Vector3((i % 2 == 0 ? -1 : 1) * (1.6f + 1.6f * (i / 2)), 0, 1.2f);
         public int Encounter { get; private set; }          // index into Bosses (the last is the final boss)
         public int Generation { get; private set; }
         public int StateTicks { get; private set; }
@@ -175,6 +182,7 @@ namespace LastBell.Run
             if (State != RunState.Menu) return false;
             Mode = mode; ClassName = Array.IndexOf(Classes, className) >= 0 ? className : "Vanguard";
             Difficulty = RunDifficulty.Selected;
+            AllyCount = RunParty.Selected;
             BuildRun(encounter);
             Go(RunState.Ready);
             return true;
@@ -197,6 +205,16 @@ namespace LastBell.Run
             if (State != RunState.Menu) return false;
             if (RunDifficulty.Selected != level) Log.Add($"{Time.frameCount}: difficulty {RunDifficulty.Name(level)}");
             RunDifficulty.Selected = level;
+            return true;
+        }
+
+        // Menu only: how many bot allies the next run or practice brings (remembered between sessions).
+        public bool SelectAllies(int count)
+        {
+            if (State != RunState.Menu) return false;
+            count = Mathf.Clamp(count, 0, RunParty.MaxAllies);
+            if (RunParty.Selected != count) Log.Add($"{Time.frameCount}: allies {count}");
+            RunParty.Selected = count;
             return true;
         }
 
@@ -253,6 +271,15 @@ namespace LastBell.Run
             Player.Input = InputOverride ?? new KeyboardMouseInput();
             Player.AbilitiesEnabled = false;
             Player.Presenter.GetUp();
+            // bot allies (RunParty): classes spread across all three, standing in a row behind the player
+            Allies.Clear();
+            var allyClasses = RunParty.AllyClasses(ClassName, AllyCount);
+            for (int i = 0; i < allyClasses.Length; i++)
+            {
+                var a = PlayerController.Spawn(World, allyClasses[i], AllySocket(i), 180);
+                a.Input = new AllyBot(i, allyClasses.Length); a.AbilitiesEnabled = false; a.Presenter.GetUp();
+                Allies.Add(a);
+            }
             Encounter = startEncounter; practiceEncounter = startEncounter;
             RunTicks = 0; EncountersCleared = 0; Victory = false; DefeatCause = null;
             acc = 0;
@@ -263,6 +290,7 @@ namespace LastBell.Run
             if (World != null) World.ClearTransient();
             if (bossFx) bossFx.ResetAll(); if (playerFx) playerFx.ResetAll();
             if (scopeParent) Destroy(scopeParent.gameObject);
+            Allies.Clear();
             World = null; Player = null; Boss = null; scopeParent = null;
             RunHud.ClearTransient();
             Paused = false;
@@ -282,6 +310,15 @@ namespace LastBell.Run
             if (Mode == RunMode.Run && pos > 0) Player.RefreshHealth(refillPotions: pos == EncounterOrder.Length - 1);
             Player.PrepareForEncounter(PlayerSocket, 180);
             Player.AbilitiesEnabled = false;
+            // the Bellkeeper Ultimate's menu allies are its Perfect strat bots (GUIDE.md: mechanics and attacks); elsewhere AllyBot
+            bool ultimate = Boss is BellkeeperEncounter bk && bk.Set == BellkeeperEncounter.AbilitySet.Ultimate;
+            for (int i = 0; i < Allies.Count; i++)
+            {
+                if (Mode == RunMode.Run && pos > 0) Allies[i].RefreshHealth(refillPotions: pos == RunOrder.Length - 1);
+                Allies[i].PrepareForEncounter(AllySocket(i), 180); Allies[i].AbilitiesEnabled = false;
+                if (ultimate) UltimateParty.Drive(Allies[i], i + 1, Allies.Count + 1);
+                else if (!(Allies[i].Input is AllyBot)) Allies[i].Input = new AllyBot(i, Allies.Count);
+            }
             Go(RunState.Intro);
         }
 
@@ -292,6 +329,7 @@ namespace LastBell.Run
             World.CombatActive = true;
             World.BeginSegment();
             Player.AbilitiesEnabled = true;
+            foreach (var a in Allies) a.AbilitiesEnabled = true;
             Boss.BeginCombat();
             Go(RunState.Combat);
         }
@@ -302,6 +340,7 @@ namespace LastBell.Run
             Log.Add($"encounter end {Boss?.Id} defeated={bossDefeated}");
             World.CombatActive = false;
             Player.AbilitiesEnabled = false;
+            foreach (var a in Allies) a.AbilitiesEnabled = false;
             World.ClearTransient();
             if (!bossDefeated && Boss) Boss.Halt();
         }
@@ -377,15 +416,19 @@ namespace LastBell.Run
             }
         }
 
+        // 0..1: the camera eases up and back from the player (the Ultimate's stage transitions, Chzy18 26 Oct: a 1-2 s pull-back
+        // is an allowed exception to the fixed gameplay camera). Mechanics set it; 0 = the normal view.
+        public static float CameraPull;
         void LateUpdate()
         {
             if (!cam) cam = Camera.main; if (!cam) return;
             cam.orthographic = false;   // some arenas' own top-down view key (C) switches the camera to orthographic
             Vector3 target, look;
-            if (Player) { target = Player.transform.position + FollowOffset; look = Player.transform.position + Vector3.up; }
+            float pull = Mathf.SmoothStep(0, 1, Mathf.Clamp01(CameraPull)); var offset = FollowOffset * (1 + 1.1f * pull) + Vector3.up * 10f * pull;
+            if (Player) { target = Player.transform.position + offset; look = Player.transform.position + Vector3.up; }
             else { target = MenuCamPos; look = new Vector3(0, 0, 1); }
             cam.transform.position = Vector3.SmoothDamp(cam.transform.position, target, ref camVel, 0.12f);
-            if (Player) cam.transform.rotation = Quaternion.LookRotation(-FollowOffset + Vector3.up);
+            if (Player) cam.transform.rotation = Quaternion.LookRotation(-offset + Vector3.up);
             else cam.transform.rotation = Quaternion.LookRotation(look - MenuCamPos);
             cam.fieldOfView = 44;
         }

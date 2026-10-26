@@ -220,7 +220,12 @@ namespace LastBell.Run
             Note($"Last Bell autotest · {Application.version} · Unity {Application.unityVersion} · {SystemInfo.graphicsDeviceName} · {DateTime.Now:yyyy-MM-dd HH:mm}");
             d.InputOverride = bot;
             yield return Wait(1.0f);
+            if (PartyOnly) { yield return PartyChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
             if (AurelionOnly) { yield return AurelionChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
+            if (BellkeeperV2Only) { yield return BellkeeperV2Checks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
+            if (BellkeeperUltimateOnly) { yield return BellkeeperUltimateChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
+            // The run-loop checks below were written for the Bellkeeper's v0.3 set; they keep it (v1). Set v2 has its own section.
+            BellkeeperEncounter.SetOverride = BellkeeperEncounter.AbilitySet.V1;
             Check($"boots into the menu on a run map ({RunMaps.CurrentName})", d.State == RunState.Menu && RunMaps.Current >= 0);
             for (int i = 0; i < RunMaps.All.Length; i++)
                 Check($"map selectable: {RunMaps.All[i].Name}", RunMaps.InBuild(i), RunMaps.All[i].RunScene);
@@ -262,7 +267,11 @@ namespace LastBell.Run
             StopCoroutine(fight); bot.Clear();
             Check("Vanguard strikes damage the boss through the kit", d.Boss.Hp < bossHp0, $"{bossHp0} -> {d.Boss.Hp}");
             Check("Steel Rhythm hit 3 granted Opening", sawOpening);
+            // test setup: the kit checks below deal real damage; keep the boss above 70 % so it is still in Last Guardian
+            // afterwards (a slow frame let them push it into Broken Hour, failing the resume check by timing alone)
+            d.Boss.DebugSetHpFraction(0.95f);
             yield return VanguardShowcase();
+            d.Boss.DebugSetHpFraction(0.95f);
             yield return VanguardKitChecks();
             // potions: drink one mid-fight (heal and lockout), then the Bellkeeper resumes
             yield return Until(() => d.World.Hazards.Count == 0, 6, "quiet for the potion check"); d.Boss.Halt();
@@ -454,7 +463,14 @@ namespace LastBell.Run
                 d.ReturnToMenu();
             }
             Check("map tour returns to the starting map", RunMaps.Current == startMap);
+            // ---------- the Bellkeeper's ability set v2 (proposal) ----------
+            yield return BellkeeperV2Checks();
+            BellkeeperEncounter.SetOverride = BellkeeperEncounter.AbilitySet.V1;
+            // ---------- the Bellkeeper Ultimate (proposal) ----------
+            yield return BellkeeperUltimateChecks();
+            BellkeeperEncounter.SetOverride = BellkeeperEncounter.AbilitySet.V1;
             // ---------- area bosses (practice only for now) ----------
+            yield return PartyChecks();
             yield return AurelionChecks();
 
             yield return SylvaraChecks();

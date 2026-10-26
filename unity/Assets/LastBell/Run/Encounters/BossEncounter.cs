@@ -23,6 +23,18 @@ namespace LastBell.Run
         public bool Solid => !Dead && W != null;
         public string PhaseName { get; protected set; } = "";
         public string Current { get; protected set; } = "";   // attack in progress, for the HUD / tests
+        public virtual string HudLine => null;         // extra boss-bar line (e.g. a push timer); null = none
+        // Extra hit bodies (the Bellkeeper Ultimate's P4 gear cores): solid like the body, and a player hit on one counts as
+        // a hit on the boss (the same bar). Body 0 is always the boss itself; other bosses offer none.
+        public virtual int ExtraBodies => 0;
+        public virtual void ExtraBody(int i, out Vector3 center, out float radius) { center = transform.position; radius = 0; }
+        public int BodyCount => 1 + ExtraBodies;
+        public void Body(int i, out Vector3 center, out float radius)
+        {
+            if (i == 0) { center = transform.position; radius = BodyRadius; }
+            else ExtraBody(i - 1, out center, out radius);
+        }
+        public virtual float[] HudMarks => null;       // phase thresholds drawn on the boss bar (fractions); null = the HUD's defaults
         public event Action<BossEncounter> Defeated;
         public event Action<BossEncounter, string> PhaseChanged;
 
@@ -45,9 +57,10 @@ namespace LastBell.Run
         protected virtual void StepAlways() { }               // presentation-adjacent state on every tick
         protected virtual void OnDefeat() { }
         protected virtual void OnHurt() { }
+        protected virtual void OnHalt() { }                   // the script was dropped (Halt): stop anything it started
 
         public void BeginCombat() { script = Script().GetEnumerator(); wait = 0; }
-        public void Halt() { script = null; Current = "idle"; }   // player defeat: stop attacking, keep standing
+        public void Halt() { script = null; Current = "idle"; OnHalt(); }   // player defeat: stop attacking, keep standing
 
         public void Step()
         {
@@ -62,13 +75,16 @@ namespace LastBell.Run
                 script = Script().GetEnumerator();
                 if (!script.MoveNext()) { script = null; return; }
             }
+            if (script == null) return;   // the step itself halted or defeated the boss (a wipe, the Ultimate slice ending)
             wait = Mathf.Max(1, script.Current) - 1;
         }
 
         public int TakeHit(int damage, Vector3 contact)
         {
             if (Dead) return 0;
-            int dealt = Mathf.Min(damage, Hp);
+            damage = Mathf.RoundToInt(damage * DamageTakenScale(contact)); if (damage <= 0) return 0;
+            int floor = ignoreFloor ? 0 : Mathf.Clamp(HpFloor, 0, Hp);
+            int dealt = Mathf.Min(damage, Hp - floor);
             Hp -= dealt;
             RunHud.Float(contact + Vector3.up * 0.5f, dealt.ToString(), new Color(1f, 0.86f, 0.45f));
             W.BossFx.BossHit(contact); glowLevel = Mathf.Max(glowLevel, 2f);
@@ -78,7 +94,14 @@ namespace LastBell.Run
         }
 
         // dev / test hook: defeat now (goes through the same path as a killing blow)
-        public void DebugDefeat() { if (!Dead) { Hp = 1; TakeHit(1, transform.position + Vector3.up * HitHeight); } }
+        public void DebugDefeat() { if (!Dead) { Hp = 1; ignoreFloor = true; TakeHit(1, transform.position + Vector3.up * HitHeight); ignoreFloor = false; } }
+        // Damage can't take Hp below this until the boss lowers it (the Bellkeeper Ultimate holds each phase's threshold
+        // until its transition, so a phase can't be skipped). 0 = no floor. DebugDefeat ignores it.
+        protected virtual int HpFloor => 0;
+        // multiplies every hit this boss takes, by where it lands (the Bellkeeper Ultimate's P5: the bell resonates, only the
+        // Bellkeeper that rang last takes damage, x4 in the last stand)
+        protected virtual float DamageTakenScale(Vector3 contact) => 1f;
+        bool ignoreFloor;
         public virtual float NextPhaseFraction() => Hp > MaxHp * 0.7f ? 0.69f : 0.34f;   // F8: just below the next threshold
         public void DebugSetHpFraction(float f){ if (!Dead) Hp = Mathf.Clamp(Mathf.RoundToInt(MaxHp * f), 1, MaxHp); }
 

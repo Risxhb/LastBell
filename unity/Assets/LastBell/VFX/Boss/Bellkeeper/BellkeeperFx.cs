@@ -82,6 +82,8 @@ namespace LastBell.VFX
             public void Dismiss() { if (flash < 0) flash = 0.2f; }
             // draw only over the floor disc (radius 0 = no clip); presentation only, the hazard owns the hit test
             public void Clip(Vector3 centre, float radius) { mpb.SetFloat(PClipRadius, radius); mpb.SetVector(PClipCentre, new Vector4(centre.x, centre.z, 0, 0)); }
+            // never drawn (a hazard with Hidden set); it still ages and is cleaned up like any telegraph
+            public void Hide() { go.SetActive(false); }
         }
         static readonly int PFill = Shader.PropertyToID("_ColorFill"), PBorder = Shader.PropertyToID("_ColorBorder"),
             PMemory = Shader.PropertyToID("_Memory"), PClipRadius = Shader.PropertyToID("_ClipRadius"), PClipCentre = Shader.PropertyToID("_ClipCentre");

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -11,7 +12,10 @@ namespace LastBell.Run
     // applied provisionally: D1 6.5 m Bell Sweep, D2 damage 30/25/30/15 (45 for the Final Toll's sweep), D7 echo damage =
     // the recorded attack's, HP-phase thresholds 70 % / 35 % queued to block boundaries, two damaging patterns at most.
     // Boss HP is shortened for the test build (see handoff).
-    public sealed class BellkeeperEncounter : BossEncounter
+    // Two ability sets (2026-10-22): v2 (proposal, bosses/4-shattered-hour-bellkeeper/abilities-v2/ABILITIES.md) is the
+    // default; its moves live in Bellkeeper/Abilities/, one file each, and this class only schedules them (BellkeeperV2.cs).
+    // `-lastbellAbilitySet v1` keeps the v0.3 set below for comparison; `-lastbellAbility <key>` loops one v2 move alone.
+    public sealed partial class BellkeeperEncounter : BossEncounter
     {
         public override string Id => "boss.bellkeeper";
         public override string DisplayName => "The Bellkeeper";
@@ -49,11 +53,14 @@ namespace LastBell.Run
                 return host;
             });
             PhaseName = Phase1;
+            BuildV2();
         }
 
         int PhaseFor() => Hp > MaxHp * 0.70f ? 1 : Hp > MaxHp * 0.35f ? 2 : 3;
 
-        protected override IEnumerable<int> Script()
+        protected override IEnumerable<int> Script() => Set == AbilitySet.V1 ? ScriptV1() : ScriptV2();   // v2 and the Ultimate share the scheduler
+
+        IEnumerable<int> ScriptV1()
         {
             while (true)
             {
@@ -106,6 +113,7 @@ namespace LastBell.Run
         IEnumerable<int> PhaseShift(string name)
         {
             Forget();   // a memory recorded in the previous phase never carries over
+            ForgetLeans();
             Current = "phase shift"; SetPhase(name);
             presenter.PlayOnce("PhaseShift", 1.5f);
             glowTarget = 3f;
@@ -298,6 +306,7 @@ namespace LastBell.Run
 
         protected override void StepAlways()
         {
+            Ult?.Step();   // the Ultimate's statuses (Stilled roots) hold even while the script is halted
             if (!presenter) return;
             if (Current == "approach" || Current == "reposition") presenter.TickBoss("Walk");
             else presenter.TickBoss("Idle");
@@ -377,11 +386,12 @@ namespace LastBell.Run
         protected override void OnDefeat()
         {
             Forget(); LiveEcho = null;   // the killing tick already cancelled live hazards; the memory goes with them
+            StopAbilities();
             glowTarget = 0.1f; glowLevel = 3f;
             presenter.PlayOnce("Defeat", 2.5f);
             W.Fx.Crescendo(transform.position, true, 2, true);   // gold release burst; coral is reserved for danger
         }
-        void OnDestroy() { Forget(); }   // retry / practice restart: no outline survives the encounter
+        void OnDestroy() { Forget(); StopAbilities(); }   // retry / practice restart: no outline survives the encounter
         public CharacterPresenter Presenter => presenter;
     }
 }
