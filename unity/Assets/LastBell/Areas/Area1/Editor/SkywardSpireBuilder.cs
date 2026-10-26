@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEditor;
@@ -16,6 +17,7 @@ namespace LastBell.Areas.Area1.EditorTools
     public static class SkywardSpireBuilder
     {
         const string Dir = "Assets/LastBell/Areas/Area1", Gen = Dir + "/Generated", Prefabs = Dir + "/Prefabs", Captures = Dir + "/Captures";
+        const string KitPath = Dir + "/SkywardSpire_Kit.glb"; // everything but the floor, modelled in Blender (prototype/arena-3d/areas/area-1/blender/spire_kit.py)
         const string GlbPath = Dir + "/SkywardSpire.glb", ScenePath = Dir + "/SkywardSpire_Arena.unity", PrefabPath = Prefabs + "/LB_ENV_SkywardSpire_Arena.prefab";
         const string VanguardPath = "Assets/LastBell/Characters/Vanguard/Resources/Characters/Vanguard.glb";
 
@@ -52,7 +54,7 @@ namespace LastBell.Areas.Area1.EditorTools
             RenderSettings.fog = true; RenderSettings.fogMode = FogMode.Linear; RenderSettings.fogColor = Hex(0xcfe0f5);
             RenderSettings.fogStartDistance = 70; RenderSettings.fogEndDistance = 420;
             RenderSettings.ambientMode = AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = Hex(0xf4ead8, 0.55f); RenderSettings.ambientEquatorColor = Hex(0xc8d4e8, 0.45f); RenderSettings.ambientGroundColor = Hex(0xb9ac92, 0.4f);
+            RenderSettings.ambientSkyColor = Hex(0xf6ead4, 0.62f); RenderSettings.ambientEquatorColor = Hex(0xc8d4e8, 0.6f); RenderSettings.ambientGroundColor = Hex(0xb4c4e0, 0.55f); // cool blue fill keeps shaded ivory from going olive
             RenderSettings.defaultReflectionMode = DefaultReflectionMode.Skybox; RenderSettings.reflectionIntensity = 0.35f; // a full-strength sky sheen lifts the lapis toward lavender
 
             // The arena: unpack the glTF instance so Lighting/Gameplay can live under the same root.
@@ -65,21 +67,32 @@ namespace LastBell.Areas.Area1.EditorTools
             rootT.SetParent(null, true);
             if (rootT.gameObject != inst) Object.DestroyImmediate(inst);
             var root = rootT.gameObject; root.name = "LB_ENV_SkywardSpire_Arena";
+            var kit = AssetDatabase.LoadAssetAtPath<GameObject>(KitPath);
+            if (kit)
+            {
+                var k = (GameObject)PrefabUtility.InstantiatePrefab(kit);
+                PrefabUtility.UnpackPrefabInstance(k, PrefabUnpackMode.Completely, InteractionMode.AutomatedAction);
+                k.name = "Kit"; k.transform.SetParent(root.transform, true);
+                foreach (var t in k.GetComponentsInChildren<Transform>(true))   // static except the moving parts
+                    if (!t.name.StartsWith("BannerCloth") && !t.name.StartsWith("ArmillaryRing") && !t.name.StartsWith("Occluder"))
+                        GameObjectUtility.SetStaticEditorFlags(t.gameObject, StaticEditorFlags.BatchingStatic);
+            }
             DressMaterials(root);
+            UseSkyArchitecture(root);
             foreach (var r in root.GetComponentsInChildren<MeshRenderer>(true)) { r.shadowCastingMode = ShadowCastingMode.On; r.receiveShadows = true; }
             foreach (var t in root.GetComponentsInChildren<Transform>(true).Where(t => t.parent && (t.parent.name == "Rim" || t.parent.name == "Bridges" || t.parent.name == "Floor" || t.parent.name == "Spires" || t.parent.name == "Abyss")))
                 GameObjectUtility.SetStaticEditorFlags(t.gameObject, StaticEditorFlags.BatchingStatic | StaticEditorFlags.OccluderStatic | StaticEditorFlags.OccludeeStatic);
 
             // Lighting: high sun in the north-west (shadows fall to the lower right, as in the reference), cool fill, probe.
             var lighting = Child(root.transform, "Lighting");
-            var sun = NewLight("Sun", LightType.Directional, Hex(0xfff6ec), 1.7f, FromThree(-0.5f, 0.82f, -0.28f), lighting);
+            var sun = NewLight("Sun", LightType.Directional, Hex(0xfff0d8), 1.8f, FromThree(-0.5f, 0.82f, -0.28f), lighting);
             sun.shadows = LightShadows.Soft; sun.shadowStrength = 0.8f; RenderSettings.sun = sun;
             NewLight("Fill", LightType.Directional, Hex(0xa9c6ff), 0.4f, FromThree(20, 10, 25), lighting);
             var probe = new GameObject("Reflection Probe").AddComponent<ReflectionProbe>(); probe.transform.SetParent(lighting, false);
             probe.transform.localPosition = new Vector3(0, 6, 0); probe.mode = ReflectionProbeMode.Realtime; probe.refreshMode = ReflectionProbeRefreshMode.OnAwake;
             probe.size = new Vector3(120, 80, 120); probe.resolution = 256; probe.boxProjection = false; probe.intensity = 0.5f;
 
-            BuildClouds(Child(root.transform, "Abyss"));
+            BuildClouds(root.transform, Child(root.transform, "Abyss"));
 
             // Gameplay: floor collider, invisible walls on the balustrade line and at the bridge ends, spawn points.
             var gameplay = Child(root.transform, "Gameplay");
@@ -111,6 +124,7 @@ namespace LastBell.Areas.Area1.EditorTools
             var cam = camGo.AddComponent<Camera>(); cam.nearClipPlane = 0.3f; cam.farClipPlane = 1600; cam.clearFlags = CameraClearFlags.Skybox;
             var camData = camGo.AddComponent<UniversalAdditionalCameraData>();
             camData.renderPostProcessing = true; camData.antialiasing = AntialiasingMode.SubpixelMorphologicalAntiAliasing; camData.antialiasingQuality = AntialiasingQuality.High;
+            camData.requiresDepthOption = CameraOverrideOption.On; // SkyCloud fades against scene depth (per camera; shared URP assets untouched)
             camGo.AddComponent<AudioListener>();
 
             var driver = root.AddComponent<SkywardSpireArena>();
@@ -145,7 +159,7 @@ namespace LastBell.Areas.Area1.EditorTools
         {
             foreach (var r in arena.GetComponentsInChildren<Renderer>(true))
                 foreach (var m in r.sharedMaterials)
-                    if (m && m.name == "StarWindow" && m.HasProperty("emissiveFactor")) m.SetColor("emissiveFactor", Hex(0x2a50c0) * 0.6f);
+                    if (m && m.name.StartsWith("StarWindow") && m.HasProperty("emissiveFactor")) m.SetColor("emissiveFactor", Hex(0x2a50c0) * 0.6f);
         }
 
         // Invisible walls: short box segments on the balustrade line with gaps at the four bridge mouths,
@@ -156,13 +170,13 @@ namespace LastBell.Areas.Area1.EditorTools
             for (int i = 0; i < n; i++)
             {
                 float a = (i + 0.5f) / n * Mathf.PI * 2, x = Mathf.Cos(a) * Rail, z = Mathf.Sin(a) * Rail;
-                bool gap = false; for (int k = 0; k < 4; k++) { float d = Mathf.Abs(Mathf.DeltaAngle(a * Mathf.Rad2Deg, k * 90)) * Mathf.Deg2Rad; if (d * Rail < gapHalf) gap = true; }
+                bool gap = false; foreach (int k in new[] { 1, 3 }) { float d = Mathf.Abs(Mathf.DeltaAngle(a * Mathf.Rad2Deg, k * 90)) * Mathf.Deg2Rad; if (d * Rail < gapHalf) gap = true; }   // north and south bridges only
                 if (gap) continue;
                 var w = new GameObject("Wall").AddComponent<BoxCollider>(); w.transform.SetParent(parent, false);
                 w.transform.position = new Vector3(x, 1.5f, z); w.transform.rotation = Quaternion.Euler(0, 90 - a * Mathf.Rad2Deg, 0);
                 w.size = new Vector3(Rail * Mathf.PI * 2 / n * 1.05f, 3, 0.5f);
             }
-            for (int k = 0; k < 4; k++)
+            foreach (int k in new[] { 1, 3 })
             {
                 var b = new GameObject("BridgeMouth_" + "ESWN"[k]).transform; b.SetParent(parent, false); b.rotation = Quaternion.Euler(0, k * 90, 0);
                 float len = Ledge + 3 - Rail;
@@ -176,61 +190,155 @@ namespace LastBell.Areas.Area1.EditorTools
             }
         }
 
-        // Billboard puffs (Arenas/Shaders/CloudBillboard): a cloud sea with sky between banks, puffs round the tower bases,
-        // a few high far clouds. Same counts as skyward-spire-env.js.
-        static void BuildClouds(Transform abyss)
+        // Every background material becomes a SkyArchitecture copy (same map, tiling, colour, metal, smoothness, emission),
+        // so towers, piers and the dais underside fade and dissolve into the clouds. Floor and bridge decks keep glTF ones.
+        static void UseSkyArchitecture(GameObject arena)
+        {
+            var shader = Shader.Find("LastBell/SkyArchitecture");
+            var made = new Dictionary<Material, Material>();
+            foreach (var r in arena.GetComponentsInChildren<MeshRenderer>(true))
+            {
+                var mats = r.sharedMaterials; bool changed = false;
+                for (int i = 0; i < mats.Length; i++)
+                {
+                    var src = mats[i]; if (!src || src.name == "Floor" || src.name == "BridgeDeck") continue;
+                    if (!made.TryGetValue(src, out var m))
+                    {
+                        m = new Material(shader) { name = "Sky_" + src.name };
+                        var tex = src.HasProperty("baseColorTexture") ? src.GetTexture("baseColorTexture") : null;
+                        if (tex)
+                        {
+                            m.SetTexture("_BaseMap", tex);
+                            if (src.HasProperty("baseColorTexture_ST")) { var st = src.GetVector("baseColorTexture_ST"); m.SetTextureScale("_BaseMap", new Vector2(st.x, st.y)); m.SetTextureOffset("_BaseMap", new Vector2(st.z, st.w)); }
+                        }
+                        if (src.HasProperty("baseColorFactor")) m.SetColor("_BaseColor", src.GetColor("baseColorFactor"));
+                        if (src.HasProperty("metallicFactor")) m.SetFloat("_Metallic", src.GetFloat("metallicFactor"));
+                        if (src.HasProperty("roughnessFactor")) m.SetFloat("_Smoothness", 1 - src.GetFloat("roughnessFactor"));
+                        if (src.HasProperty("emissiveFactor")) m.SetColor("_EmissionColor", src.GetColor("emissiveFactor"));
+                        var em = src.HasProperty("emissiveTexture") ? src.GetTexture("emissiveTexture") : null;
+                        if (em) m.SetTexture("_EmissionMap", em);
+                        if (src.name.StartsWith("StarWindow")) m.SetFloat("_Cutoff", 0.5f);            // pointed-arch cut-outs
+                        if (src.name.Contains("Banner") || src.name.StartsWith("StarWindow")) m.SetFloat("_Cull", 0);   // cloth and panes are seen from both sides
+                        made[src] = m = SaveAsset(m, m.name + ".mat");
+                    }
+                    mats[i] = m; changed = true;
+                }
+                if (changed) r.sharedMaterials = mats;
+            }
+        }
+
+        // Layered soft cumulus (Shaders/SkyCloud: an 8-shape atlas, lit tops, lavender undersides, soft where they meet
+        // geometry). Three layers: a deep cloud sea with sky-blue gaps between banks; a waist band clustered round every
+        // tower, pier and the dais drum at the height where SkyArchitecture dissolves it (positions from the CloudAnchor
+        // nodes exported with the GLB; node scale = footprint radius); and thin wisps between the towers. Waist puffs stay
+        // with their tower (they only breathe); sea, wisp and high puffs drift.
+        static void BuildClouds(Transform root, Transform abyss)
         {
             var parent = Child(abyss, "Clouds");
-            var puff = CloudTexture();
-            var shader = Shader.Find("LastBell/CloudBillboard");
-            var tints = new[] { 0xffffffu, 0xffffffu, 0xf4f7fdu, 0xb9cbe6u }.Select((c, i) =>
+            var atlas = CloudAtlas();
+            var shader = Shader.Find("LastBell/SkyCloud");
+            var sunDir = FromThree(-0.5f, 0.82f, -0.28f).normalized;
+            Material[] Layer(string name, uint lit, uint shade, float opacity, float soft) => Enumerable.Range(0, 16).Select(c =>   // 8 shapes x mirrored
             {
-                var m = new Material(shader); m.SetTexture("_MainTex", puff); m.SetColor("_Tint", Hex(c)); m.SetFloat("_Opacity", 0.9f);
-                return SaveAsset(m, $"SkyCloud{i}.mat");
+                var m = new Material(shader); m.SetTexture("_MainTex", atlas); m.SetFloat("_Cell", c % 8); m.SetFloat("_FlipX", c / 8);
+                m.SetColor("_Lit", Hex(lit)); m.SetColor("_Shade", Hex(shade)); m.SetFloat("_Opacity", opacity); m.SetFloat("_SoftDistance", soft);
+                m.SetVector("_SunDir", sunDir);
+                return SaveAsset(m, $"Cloud{name}{c}.mat");
             }).ToArray();
+            var sea = Layer("Sea", 0xfff8ec, 0x9fb4d8, 0.95f, 9); var waist = Layer("Waist", 0xfff8ec, 0xa9bcdd, 0.92f, 2.5f);   // short soft distance: collars stay visible right up to the stone
+            var wisp = Layer("Wisp", 0xffffff, 0xdfe7f4, 0.38f, 3); var high = Layer("High", 0xffffff, 0xd8e2f2, 0.6f, 10);
             var quad = Resources.GetBuiltinResource<Mesh>("Quad.fbx");
             var rnd = new System.Random(21);
             float Rn() => (float)rnd.NextDouble();
-            void Puff(int i, float a, float d, float y, float size)
+            void Puff(string name, Material[] mats, Vector3 pos, float w, float h)
             {
-                var go = new GameObject("Cloud"); go.transform.SetParent(parent, false);
-                go.transform.position = new Vector3(Mathf.Cos(a) * d, y, Mathf.Sin(a) * d); go.transform.localScale = new Vector3(size * 1.25f, size * 0.75f, 1);
+                var go = new GameObject(name); go.transform.SetParent(parent, false);
+                go.transform.position = pos; go.transform.localScale = new Vector3(w, h, 1);
                 go.AddComponent<MeshFilter>().sharedMesh = quad;
-                var mr = go.AddComponent<MeshRenderer>(); mr.sharedMaterial = tints[i % tints.Length];
+                var mr = go.AddComponent<MeshRenderer>(); mr.sharedMaterial = mats[rnd.Next(mats.Length)];
                 mr.shadowCastingMode = ShadowCastingMode.Off; mr.receiveShadows = false;
             }
-            for (int i = 0; i < 90; i++) Puff(i, Rn() * Mathf.PI * 2, 24 + Rn() * 200, -28 - Rn() * 30, 16 + Rn() * 30);
-            for (int i = 0; i < 70; i++) Puff(i + 1, Rn() * Mathf.PI * 2, 20 + Rn() * 34, -14 - Rn() * 16, 9 + Rn() * 12);
-            for (int i = 0; i < 30; i++) Puff(i + 2, Rn() * Mathf.PI * 2, 200 + Rn() * 200, 20 + Rn() * 80, 60 + Rn() * 80);
-            for (int i = 0; i < 90; i++) Puff(i + 3, Mathf.PI * (0.1f + Rn() * 0.8f), 20 + Rn() * 45, -12 - Rn() * 18, 14 + Rn() * 18); // dense banks gathered on the south side, as in the reference
-            for (int i = 0; i < 60; i++) Puff(i, Rn() * Mathf.PI * 2, 19 + Rn() * 22, -10 - Rn() * 10, 10 + Rn() * 10);              // cumulus hiding the tower bases
-            // the far blue below the clouds
-            var sea = GameObject.CreatePrimitive(PrimitiveType.Quad); sea.name = "SkyBelow"; Object.DestroyImmediate(sea.GetComponent<Collider>());
-            sea.transform.SetParent(abyss, false); sea.transform.position = new Vector3(0, -75, 0); sea.transform.rotation = Quaternion.Euler(90, 0, 0); sea.transform.localScale = Vector3.one * 1800;
-            var seaMat = new Material(Shader.Find("Universal Render Pipeline/Unlit")); seaMat.SetColor("_BaseColor", Hex(0x4f8fd6));
-            sea.GetComponent<MeshRenderer>().sharedMaterial = SaveAsset(seaMat, "SkyBelow.mat");
-            sea.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
+            for (int b = 0; b < 30; b++)                       // deep sea: big banks of 4–8 puffs, sky-blue gaps between banks
+            {
+                float a = Rn() * Mathf.PI * 2, d = 24 + Rn() * 230, by = -46 - Rn() * 22, spread = 8 + Rn() * 14;
+                if (Mathf.PerlinNoise(Mathf.Cos(a) * d * 0.025f + 3.1f, Mathf.Sin(a) * d * 0.025f + 7.7f) < 0.68f) continue;   // noise-masked gaps: blue sky shows through
+                int n = 4 + rnd.Next(5);
+                for (int i = 0; i < n; i++)
+                {
+                    float s = (26 + Rn() * 34) * (0.7f + Rn() * 0.8f);
+                    Puff("Cloud", sea, new Vector3(Mathf.Cos(a) * d + (Rn() - 0.5f) * spread * 2, by + (Rn() - 0.5f) * 6, Mathf.Sin(a) * d + (Rn() - 0.5f) * spread * 2), s * (1.6f + Rn() * 0.7f), s * 0.7f);   // wide flat banks, not discs
+                }
+            }
+            var anchors = root.GetComponentsInChildren<Transform>(true).Where(t => t.name.StartsWith("CloudAnchor")).ToArray();
+            foreach (var an in anchors)                        // cloud collars: each structure sinks into a ring of puffs
+            {                                                  // set just OUTSIDE its surface, in three uneven bands, so the
+                                                               // cloud sits in front of the fading stone (a puff centred inside the
+                                                               // tower would be faded away by the soft-depth test and show nothing)
+                float r = Mathf.Max(0.8f, Mathf.Abs(an.lossyScale.x)); int n = Mathf.Clamp(Mathf.RoundToInt(2 + r * 0.8f), 3, 7);
+                foreach (float band in new[] { -12f, -20f })   // the lower band sits where SkyArchitecture cuts the stone off
+                    for (int i = 0; i < n; i++)
+                    {
+                        if (Rn() < 0.25f) continue;   // ragged collars, sky between them
+                        float a = (i + Rn() * 0.7f) / n * Mathf.PI * 2, d = r * (1.05f + Rn() * 0.55f), s = (4 + r * (1.6f + Rn() * 1.2f)) * (0.75f + Rn() * 0.5f);
+                        var p = an.position + new Vector3(Mathf.Cos(a) * d, band + (Rn() - 0.5f) * 5, Mathf.Sin(a) * d);
+                        Puff("CloudWaist", waist, p, s * (1.5f + Rn() * 0.6f), s * 0.72f);
+                    }
+            }
+            for (int i = 0; i < 28; i++)                       // wisps: thin strands between the towers, outside the floor
+            {
+                float a = Rn() * Mathf.PI * 2, d = 45 + Rn() * 40;   // well clear of the bridges in the gameplay view
+                Puff("Cloud", wisp, new Vector3(Mathf.Cos(a) * d, -4 - Rn() * 6, Mathf.Sin(a) * d), 26 + Rn() * 24, 5 + Rn() * 4);
+            }
+            for (int i = 0; i < 30; i++) { float a = Rn() * Mathf.PI * 2, d = 200 + Rn() * 200; Puff("Cloud", high, new Vector3(Mathf.Cos(a) * d, 20 + Rn() * 80, Mathf.Sin(a) * d), 80 + Rn() * 100, 40 + Rn() * 50); }
+            // deep sky beneath it all
+            var below = GameObject.CreatePrimitive(PrimitiveType.Quad); below.name = "SkyBelow"; Object.DestroyImmediate(below.GetComponent<Collider>());
+            below.transform.SetParent(abyss, false); below.transform.position = new Vector3(0, -80, 0); below.transform.rotation = Quaternion.Euler(90, 0, 0); below.transform.localScale = Vector3.one * 1800;
+            var seaMat = new Material(Shader.Find("Universal Render Pipeline/Unlit")); seaMat.SetColor("_BaseColor", Hex(0x4c9ae0));
+            below.GetComponent<MeshRenderer>().sharedMaterial = SaveAsset(seaMat, "SkyBelow.mat");
+            below.GetComponent<MeshRenderer>().shadowCastingMode = ShadowCastingMode.Off;
+            Debug.Log($"Area 1 clouds: {parent.childCount} puffs round {anchors.Length} anchors");
         }
 
-        static Texture2D CloudTexture()
+        // 2 x 4 atlas (1024²) of cumulus shapes in 512 x 256 cells: billowy domed tops, flatter bottoms, fbm-broken edges.
+        // Red = baked light (domes lit from above, darker toward the flat base); alpha = density. Row 0 is the bottom row.
+        static Texture2D CloudAtlas()
         {
-            string path = Gen + "/SkyCloudPuff.png";
+            string path = Gen + "/SkyCloudAtlas.png";
             if (!File.Exists(path))
             {
-                const int N = 256; var px = new Color[N * N]; var rnd = new System.Random(3);
-                var blobs = Enumerable.Range(0, 18).Select(_ => new Vector3(50 + (float)rnd.NextDouble() * 156, 76 + (float)rnd.NextDouble() * 96, 26 + (float)rnd.NextDouble() * 44)).ToArray();
-                for (int y = 0; y < N; y++) for (int x = 0; x < N; x++)
+                const int N = 1024, CW = 512, CH = 256; var px = new Color[N * N]; var rnd = new System.Random(9);
+                for (int cell = 0; cell < 8; cell++)
                 {
-                    float a = 0;
-                    foreach (var b in blobs) { float d = Vector2.Distance(new Vector2(x, y), new Vector2(b.x, b.y)) / b.z; if (d < 1) a = a + (1 - a) * 0.6f * (1 - d * d); }
-                    float shade = Mathf.Lerp(0.86f, 1f, y / (float)N); // undersides a touch bluer-grey
-                    px[y * N + x] = new Color(shade, shade + 0.03f * (1 - shade), 1, a);
+                    int cx = (cell % 2) * CW, cy = (cell / 2) * CH, nb = 5 + rnd.Next(4);   // few, large lobes: cumulus heads, not scallops
+                    var blobs = new Vector3[nb];
+                    for (int b = 0; b < nb; b++)
+                    {
+                        float bx = 0.24f + (float)rnd.NextDouble() * 0.52f, r = 0.17f + (float)rnd.NextDouble() * 0.12f;
+                        blobs[b] = new Vector3(bx, 0.3f + r * 0.6f + (float)rnd.NextDouble() * 0.28f * (1 - Mathf.Abs(bx - 0.5f) * 2), r);
+                    }
+                    float seed = cell * 17.3f, baseY = 0.22f + (float)rnd.NextDouble() * 0.08f;
+                    for (int y = 0; y < CH; y++) for (int x = 0; x < CW; x++)
+                    {
+                        float u = (x + 0.5f) / CW, v = (y + 0.5f) / CH, field = 0, light = 0, wsum = 0;
+                        foreach (var b in blobs)           // the cell is 2:1, so measure u at double scale
+                        {
+                            float dx = (u - b.x) * 2, dy = v - b.y, d = Mathf.Sqrt(dx * dx + dy * dy) / b.z;
+                            if (d < 1.4f) { float f = 1 - d * d / 1.96f; field = Mathf.Max(field, f); float wgt = f * f; light += Mathf.Clamp01(0.55f + dy / b.z * 0.45f) * wgt; wsum += wgt; }
+                        }
+                        light = wsum > 0 ? light / wsum : 0;   // weighted blend of every lobe: no seam where one lobe takes over from another
+                        float n = Mathf.PerlinNoise(u * 6 + seed, v * 3 + seed) * 0.45f + Mathf.PerlinNoise(u * 15 + seed, v * 7.5f + seed) * 0.33f + Mathf.PerlinNoise(u * 38 + seed, v * 19 + seed) * 0.22f;
+                        float dens = Mathf.SmoothStep(0, 1, Mathf.Clamp01((field + (n - 0.5f) * 0.85f - 0.1f) / 0.75f));   // wide, noise-eroded edge: no round rims
+                        dens *= Mathf.SmoothStep(0, 1, Mathf.Clamp01((v - baseY) / 0.12f));           // flatter bottom
+                        dens *= Mathf.Clamp01(Mathf.Min(u, 1 - u) * 12) * Mathf.Clamp01((1 - v) * 10);  // never touch the cell edge
+                        float lit = Mathf.Clamp01(light * 0.85f + v * 0.35f - 0.12f + (n - 0.5f) * 0.2f);   // stronger dome shading: bright heads, shadowed bellies
+                        px[(cy + y) * N + cx + x] = new Color(lit, lit, lit, dens);
+                    }
                 }
                 var tex = new Texture2D(N, N, TextureFormat.RGBA32, false); tex.SetPixels(px); tex.Apply();
                 File.WriteAllBytes(path, tex.EncodeToPNG()); Object.DestroyImmediate(tex);
                 AssetDatabase.ImportAsset(path);
                 var imp = (TextureImporter)AssetImporter.GetAtPath(path);
-                imp.alphaIsTransparency = true; imp.wrapMode = TextureWrapMode.Clamp; imp.SaveAndReimport();
+                imp.alphaIsTransparency = true; imp.wrapMode = TextureWrapMode.Clamp; imp.mipmapEnabled = true; imp.SaveAndReimport();
             }
             return AssetDatabase.LoadAssetAtPath<Texture2D>(path);
         }
@@ -323,6 +431,7 @@ namespace LastBell.Areas.Area1.EditorTools
                 driver.SetView(SkywardSpireArena.View.Gameplay);
                 Capture(Path.Combine(dir, "gameplay.png"));
                 if (tele) { tele.gameObject.SetActive(true); Capture(Path.Combine(dir, "gameplay-telegraphs.png")); tele.gameObject.SetActive(false); }
+                driver.SetView(SkywardSpireArena.View.AbyssCloseup); Capture(Path.Combine(dir, "abyss-closeup.png"));
             }
             finally { SkywardSpireArena.UseLongShadows(false); driver.SetView(SkywardSpireArena.View.Gameplay); }
         }

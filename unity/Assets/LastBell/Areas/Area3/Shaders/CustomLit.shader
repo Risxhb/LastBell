@@ -20,6 +20,7 @@ Shader "LastBell/Area3/CustomLit"
         _GlowStrength ("Glow Strength", Float) = 0.6
         _Metal ("Brass Glint", Range(0, 1)) = 0
         [Toggle(_LB_STONEDETAIL)] _StoneDetail ("Cut Stone Detail", Float) = 0
+        _Sway ("Wind Sway", Range(0, 2)) = 0
         [Enum(UnityEngine.Rendering.CullMode)] _Cull ("Cull", Float) = 2
     }
     SubShader
@@ -30,7 +31,7 @@ Shader "LastBell/Area3/CustomLit"
         #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
         CBUFFER_START(UnityPerMaterial)
             float4 _BaseColor; float4 _BaseMap_ST; float _BumpScale; float4 _GlowColor; float _GlowStrength; float _Metal;
-            float _UseVertexColor; float _UseNormalMap; float _UseMask; float _Cull; float _StoneDetail;
+            float _UseVertexColor; float _UseNormalMap; float _UseMask; float _Cull; float _StoneDetail; float _Sway;
         CBUFFER_END
         ENDHLSL
 
@@ -54,6 +55,7 @@ Shader "LastBell/Area3/CustomLit"
             #pragma multi_compile_fog
             #pragma multi_compile_instancing
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+            #include "LBCloud.hlsl"
 
             TEXTURE2D(_BaseMap); SAMPLER(sampler_BaseMap);
             TEXTURE2D(_BumpMap); SAMPLER(sampler_BumpMap);
@@ -78,7 +80,8 @@ Shader "LastBell/Area3/CustomLit"
                 UNITY_SETUP_INSTANCE_ID(v); UNITY_TRANSFER_INSTANCE_ID(v, o);
                 VertexPositionInputs p = GetVertexPositionInputs(v.positionOS.xyz);
                 VertexNormalInputs n = GetVertexNormalInputs(v.normalOS, v.tangentOS);
-                o.positionCS = p.positionCS; o.positionWS = p.positionWS; o.normalWS = n.normalWS;
+                float3 w = p.positionWS + lbcSway(p.positionWS) * _Sway; // foliage moves on the shared wind
+                o.positionCS = _Sway > 0 ? TransformWorldToHClip(w) : p.positionCS; o.positionWS = w; o.normalWS = n.normalWS;
                 o.tangentWS = float4(n.tangentWS, v.tangentOS.w * GetOddNegativeScale());
                 o.uv = TRANSFORM_TEX(v.uv, _BaseMap); o.color = v.color; o.fogCoord = ComputeFogFactor(p.positionCS.z);
                 return o;
@@ -119,10 +122,11 @@ Shader "LastBell/Area3/CustomLit"
                     mask = SAMPLE_TEXTURE2D(_MaskMap, sampler_MaskMap, i.uv);
                 #endif
                 #if defined(_LB_MASKMAP)
-                    // while hazards are up the floor brass dims ~40% and the mosaic (mask alpha < 0.8) greys, so telegraphs win
+                    // while hazards are up the floor brass dims ~40% and the mosaic (mask alpha < 0.8) loses a little saturation;
+                    // it stays turquoise so the quiet state itself never reads as a hazard (the grout glow halves below)
                     float q = saturate((_LB_DecoGlow - 0.35) / 0.65), mos = step(mask.a, 0.8);
                     albedo *= lerp(1, 0.6, mask.g * (1 - q));
-                    float lum = dot(albedo, float3(0.3, 0.59, 0.11)); albedo = lerp(albedo, lum.xxx * 0.8, mos * (1 - q) * 0.7);
+                    float lum = dot(albedo, float3(0.3, 0.59, 0.11)); albedo = lerp(albedo, lum.xxx, mos * (1 - q) * 0.2);
                 #endif
                 float metal = saturate(_Metal + mask.g * 0.22);
                 float3 V = normalize(GetWorldSpaceViewDir(i.positionWS));
@@ -162,7 +166,8 @@ Shader "LastBell/Area3/CustomLit"
                 float back = saturate(dot(-ml.direction, V) * 0.5 + 0.5);
                 col += _LB_BackLightTint.rgb * rim * (0.35 + back * 0.65) * _LB_BacklightStr * (0.55 + 0.45 * albedo);
                 // emissive mosaic grout, dimmed while hazards are up
-                col += _GlowColor.rgb * mask.b * _GlowStrength * saturate((_LB_DecoGlow - 0.35) / 0.65); // fully off while hazards are up
+                col += _GlowColor.rgb * mask.b * _GlowStrength * lerp(0.5, 1, saturate((_LB_DecoGlow - 0.35) / 0.65)); // halves while hazards are up; fully off would turn the mosaic charcoal
+                col = lbcApply(col, i.positionWS); // sink into the cloud sea + aerial haze (floor excluded)
                 col = MixFog(col, i.fogCoord);
                 return half4(col, 1);
             }

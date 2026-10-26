@@ -20,6 +20,7 @@ Shader "LastBell/Area3/GlowBillboard"
             #pragma vertex vert
             #pragma fragment frag
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "LBCloud.hlsl"
             CBUFFER_START(UnityPerMaterial)
                 float4 _Color; float _Size, _Pulse;
             CBUFFER_END
@@ -29,7 +30,7 @@ Shader "LastBell/Area3/GlowBillboard"
             Vt vert(A v)
             {
                 Vt o; float3 c = TransformObjectToWorld(float3(0, 0, 0)), cv = TransformWorldToView(c);
-                float ph = dot(c, float3(1.7, 0.3, 2.9)), s = _Size * (1 + sin(_Time.y * 2.1 + ph) * _Pulse) * (0.6 + 0.4 * _LB_DecoGlow);
+                float ph = dot(c, float3(1.7, 0.3, 2.9)), s = _Size * (1 + sin(_LB_Time * 2.1 + ph) * _Pulse) * (0.6 + 0.4 * _LB_DecoGlow);
                 cv.xy += (v.uv - 0.5) * s; o.positionCS = TransformWViewToHClip(cv); o.uv = v.uv; return o;
             }
             half4 frag(Vt i) : SV_Target

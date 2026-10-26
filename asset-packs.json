@@ -32,6 +32,19 @@
         "prototype/arena-3d/models/upload/sylvara-back.png"
       ],
       "files": 5
+    },
+    {
+      "name": "verdant-chimes-art",
+      "version": 1,
+      "file": "verdant-chimes-art-v1.zip",
+      "url": "https://github.com/Risxhb/collab/releases/download/verdant-chimes-art-v1/verdant-chimes-art-v1.zip",
+      "sha256": "b46e3ea72820d56406062ba47000c7a91a81cdb3cc8823ffeebef94afad944b7",
+      "size": 31813644,
+      "extractTo": ".",
+      "paths": [
+        "unity/Assets/LastBell/Areas/Area3/Source/VerdantChimes_Art.glb"
+      ],
+      "files": 2
     }
   ]
 }
