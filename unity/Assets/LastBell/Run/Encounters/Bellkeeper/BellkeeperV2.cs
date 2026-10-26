@@ -25,7 +25,8 @@ namespace LastBell.Run
                 if (spawningUltimate) return AbilitySet.Ultimate;
                 var s = Arg("-lastbellAbilitySet")?.Trim();
                 if (string.Equals(s, "ultimate", StringComparison.OrdinalIgnoreCase) || HasArg("-lastbellUltimate")) return AbilitySet.Ultimate;
-                return string.Equals(s, "v1", StringComparison.OrdinalIgnoreCase) ? AbilitySet.V1 : AbilitySet.V2;
+                // the normal Bellkeeper stays v1 (the v2 attack set is retired); v2 only by asking for it explicitly. The Ultimate is its own set.
+                return string.Equals(s, "v2", StringComparison.OrdinalIgnoreCase) ? AbilitySet.V2 : AbilitySet.V1;
             }
         }
         public static BossEncounter SpawnUltimate(CombatWorld w)
