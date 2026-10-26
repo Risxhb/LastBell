@@ -437,8 +437,30 @@ namespace LastBell.Run
             mySpot = new GameObject("my spot").transform; mySpot.SetParent(root, false);
             Mat(Prim.Make(PrimitiveKind.Cylinder, mySpot, new Vector3(0, 1.6f, 0), new Vector3(0.12f, 1.6f, 0.12f), Color.white), spotM);
             for (int i = 0; i < 2; i++) { hammers[i] = Model("GF_Hammer", root, Vector3.zero, Quaternion.identity); if (hammers[i]) hammers[i].gameObject.SetActive(false); }
+            for (int g = 0; g < 4; g++) { partBase[g].Clear(); foreach (var x in gearParts[g]) partBase[g].Add(x ? (x.position, x.rotation) : (Vector3.zero, Quaternion.identity)); }
+            tiles.Clear();
+            if (breakMode && models)
+            {
+                var fl = Model("FB_Floor", root, Vector3.zero, Quaternion.identity);
+                if (fl)
+                {
+                    if (!crackM) crackM = Prim.Material(new Color(1f, 0.5f, 0.38f), 1.4f);
+                    foreach (var r in fl.GetComponentsInChildren<Renderer>())
+                    {
+                        var c = Sim.Flat(r.transform.position); bool onGear = false; for (int g = 0; g < 5; g++) if ((c - GearCentre(g)).magnitude < GearR(g) - 0.4f) onGear = true;
+                        float wave = !onGear && c.magnitude > 9 ? -9f : -5f;   // the two waves: the outer floor first, then everything left
+                        tiles.Add(new Tile { T = r.transform, R = r, Mat = r.sharedMaterial, Base = r.transform.position, Rot = r.transform.rotation, At = wave + Random.Range(0f, 0.45f), Spin = Random.onUnitSphere * Random.Range(60f, 160f) });
+                    }
+                }
+            }
+            bell = Model("GB_GreatBell", root, Vector3.up * 60, Quaternion.identity); if (bell) bell.gameObject.SetActive(false);
         }
         bool models; readonly Transform[] hammers = new Transform[2];
+        sealed class Tile { public Transform T; public Renderer R; public Material Mat; public Vector3 Base, Spin; public Quaternion Rot; public float At; }
+        readonly List<Tile> tiles = new List<Tile>();
+        readonly List<(Vector3 p, Quaternion r)>[] partBase = { new List<(Vector3, Quaternion)>(), new List<(Vector3, Quaternion)>(), new List<(Vector3, Quaternion)>(), new List<(Vector3, Quaternion)>() };
+        Transform bell; static Material crackM;
+        public const float BellFallAt = 12.2f;   // s into the wild: the great bell drops, landing as the wild ends (WildLen)
         const float ModelLift = 0.07f;   // gear tops at 0.1 m, clear of the pit disc (0.02) and the arena floor
         static Transform Model(string name, Transform parent, Vector3 pos, Quaternion rot)
         {
@@ -469,7 +491,43 @@ namespace LastBell.Run
                 for (int g = 0; g < 4; g++) if (gearR[g]) gearR[g].sharedMaterial = flash ? hotM : gearM;
             }
             else { if (pit) pit.gameObject.SetActive(t >= settle || Mathf.FloorToInt(t * 6) % 2 == 0 && t > settle - 1.5f); if (floorIn) floorIn.gameObject.SetActive(false); }   // the floor flickers out, then the pit
-            for (int g = 0; g < 4; g++) { bool flashCore = wild && !launched[g] && t > LaunchAt(g) - 2 && Mathf.FloorToInt(t * 6) % 2 == 0; foreach (var x in gearParts[g]) if (x) x.gameObject.SetActive(!launched[g] && !(flashCore && x == gearParts[g][2])); }
+            if (tiles.Count > 0)
+            {
+                if (pit) pit.gameObject.SetActive(true); if (floorIn) floorIn.gameObject.SetActive(false);
+                bool flick = Mathf.FloorToInt(t * 8) % 2 == 0;
+                foreach (var ti in tiles)
+                {
+                    if (!ti.T) continue; float tf = t - ti.At;
+                    if (tf < 0) { ti.T.gameObject.SetActive(true); ti.T.position = ti.Base; ti.T.rotation = ti.Rot; ti.R.sharedMaterial = tf > -2f && flick ? crackM : ti.Mat; continue; }   // the cracks glow first
+                    if (tf > 1.1f) { ti.T.gameObject.SetActive(false); continue; }
+                    ti.R.sharedMaterial = ti.Mat;
+                    ti.T.position = ti.Base + Vector3.down * (0.4f * tf + 7f * tf * tf); ti.T.rotation = Quaternion.Euler(ti.Spin * tf) * ti.Rot;
+                    ti.T.localScale = Vector3.one * Mathf.Lerp(1f, 0.55f, tf / 1.1f);
+                }
+            }
+            for (int g = 0; g < 4; g++)
+            {
+                bool flashCore = wild && !launched[g] && t > LaunchAt(g) - 2 && Mathf.FloorToInt(t * 6) % 2 == 0;
+                float fly = wild && launched[g] ? t - LaunchAt(g) : -1;   // tearing loose: thrown outward, tumbling, for 1.4 s
+                for (int j = 0; j < gearParts[g].Count; j++)
+                {
+                    var x = gearParts[g][j]; if (!x) continue;
+                    bool show = (!launched[g] || fly < 1.4f) && !(flashCore && j == 2); x.gameObject.SetActive(show);
+                    if (fly >= 0 && fly < 1.4f && j < partBase[g].Count)
+                    {
+                        var (bp, br) = partBase[g][j]; var outw = Dir(90f * g);
+                        x.position = bp + outw * (5f * fly + 6f * fly * fly) + Vector3.up * (3f * fly - 2.5f * fly * fly);
+                        x.rotation = Quaternion.AngleAxis(140f * fly, Vector3.Cross(Vector3.up, outw)) * br;
+                    }
+                }
+            }
+            if (wild && bell)
+            {
+                float tw = t - wildAt, fb = (tw - BellFallAt) / (WildLen - BellFallAt);
+                bell.gameObject.SetActive(fb > 0);
+                if (fb > 0) bell.position = Vector3.up * (60f * (1 - Mathf.Clamp01(fb) * Mathf.Clamp01(fb)));   // it falls, faster and faster
+                RunDirector.CameraPull = Mathf.Clamp01((tw - (BellFallAt - 0.6f)) / 0.8f);
+            }
             int k = Mathf.FloorToInt(t / Slam) + 1; var ss = !wild && k >= 1 && Revealed(k, t) ? SlamGears(k) : new List<int>();
             if (wild) { float tw = t - wildAt; int ws = Mathf.FloorToInt(tw / 2.5f) + 1; if (ws <= 3 && 2.5f * ws - tw < 1.5f) ss.Add(WildSlamGear(ws)); }
             if (!(breakMode && t < 0)) for (int g = 0; g < 4; g++) if (gearR[g]) gearR[g].sharedMaterial = ss.Contains(g) ? hotM : gearM;
@@ -507,7 +565,7 @@ namespace LastBell.Run
         void Teardown()
         {
             if (root) Object.Destroy(root.gameObject);
-            root = mySpot = pit = floorIn = null; hammers[0] = hammers[1] = null; models = false; pool.Clear(); plans.Clear(); foreach (var l in gearParts) l.Clear(); foreach (var l in countdown) l.Clear();
+            root = mySpot = pit = floorIn = null; hammers[0] = hammers[1] = null; models = false; bell = null; tiles.Clear(); pool.Clear(); plans.Clear(); foreach (var l in gearParts) l.Clear(); foreach (var l in countdown) l.Clear();
             for (int i = 0; i < 5; i++) { pivots[i] = null; gearR[i] = null; } for (int i = 0; i < 4; i++) meshR[i] = null;
         }
 
@@ -521,8 +579,8 @@ namespace LastBell.Run
                 midStyle = new GUIStyle(nameStyle) { fontSize = 24 }; bigStyle = new GUIStyle(nameStyle) { fontSize = 34 };
             }
             float t = T; int k = Mathf.Max(1, Mathf.FloorToInt(t / Slam) + 1); float left = k * Slam - t;
-            for (int g = 0; g < 4; g++) Label(cam, GearCentre(g) + Dir(90f * g + 90) * 3.0f, 0.3f, GN[g], new Color(0.97f, 0.95f, 0.88f), midStyle);
-            for (int g = 0; g < 4; g++) Label(cam, GearCentre(g), 1.5f, "CORE", new Color(1f, 0.85f, 0.45f), nameStyle);
+            for (int g = 0; g < 4; g++) if (!launched[g]) Label(cam, GearCentre(g) + Dir(90f * g + 90) * 3.0f, 0.3f, GN[g], new Color(0.97f, 0.95f, 0.88f), midStyle);
+            for (int g = 0; g < 4; g++) if (!launched[g]) Label(cam, GearCentre(g), 1.5f, "CORE", new Color(1f, 0.85f, 0.45f), nameStyle);
             for (int i = 0; i < W.Players.Count; i++)
             {
                 var p = W.Players[i]; if (p.Down) continue;
@@ -564,7 +622,7 @@ namespace LastBell.Run
             return $"slam {k} in {k * Slam - t:0.0}s · you ({UltimateState.Roman[HourOf(p) + 1]}): gear {GN[TargetOf(p, k, t)]} · hit the cores to hurt the boss";
         }
 
-        public override void Cancel() { base.Cancel(); shards.Clear(); Teardown(); stop = false; }
+        public override void Cancel() { base.Cancel(); shards.Clear(); Teardown(); stop = false; RunDirector.CameraPull = 0; }
         public void ResetCounts() { Jams = 0; Fails.Clear(); }
     }
 }

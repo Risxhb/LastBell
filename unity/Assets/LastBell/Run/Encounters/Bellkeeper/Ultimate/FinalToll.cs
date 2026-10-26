@@ -428,7 +428,7 @@ namespace LastBell.Run
         }
 
         // ---------------- presentation (stand-ins) ----------------
-        Transform root, plate, mySpot, echo, echoLive, floor; readonly Transform[] plats = new Transform[4]; readonly List<Transform> pool = new List<Transform>(), ring1 = new List<Transform>(), ring2 = new List<Transform>();
+        Transform root, plate, mySpot, echo, echoLive, floor, bellModel; readonly Transform[] plats = new Transform[4]; readonly List<Transform> pool = new List<Transform>(), ring1 = new List<Transform>(), ring2 = new List<Transform>();
         static Material bellM, ringM, echoM, plateM, bulletM, spotM, ghostM, liveM, pitM, platM;
         const int RingPieces = 90;
         void Build()
@@ -444,6 +444,8 @@ namespace LastBell.Run
             }
             root = new GameObject("Final Toll (stand-in)").transform; root.SetParent(W.Root, false);
             floor = Prim.Make(PrimitiveKind.Cylinder, root, new Vector3(0, 0.02f, 0), new Vector3(23.4f, 0.01f, 23.4f), Color.white); Mat(floor, bellM);
+            var prefab = Resources.Load<GameObject>("Ultimate/GB_GreatBell");
+            if (prefab) { bellModel = Object.Instantiate(prefab, root, false).transform; bellModel.name = "the great bell"; var dome = bellModel.Find("Dome"); if (dome) dome.gameObject.SetActive(false); }
             echo = new GameObject("the Echo Bellkeeper").transform; echo.SetParent(root, false);
             Mat(Prim.Make(PrimitiveKind.Cylinder, echo, new Vector3(0, 1.4f, 0), new Vector3(EchoRad * 2, 1.4f, EchoRad * 2), Color.white), ghostM);
             Mat(Prim.Make(PrimitiveKind.Sphere, echo, new Vector3(0, 3.1f, 0), Vector3.one * 1.3f, Color.white), ghostM);
@@ -478,6 +480,8 @@ namespace LastBell.Run
             if (!root) return;
             int c = Cur(t), k = c + 1;
             DrawRing(ring1, RingR(t), c, false); DrawRing(ring2, EchoR(t), c, true);
+            RunDirector.CameraPull = Mathf.Clamp01(1 - t / 1.4f);   // back in from the bell's fall
+            if (bellModel) bellModel.gameObject.SetActive(!Standing(t));   // XIII shatters it
             bool eo = EchoOn(t); echo.gameObject.SetActive(eo); if (eo) { echo.position = EchoAt(t); echoLive.gameObject.SetActive(EchoLive(t)); }
             bool st = Standing(t); floor.GetComponent<Renderer>().sharedMaterial = st ? pitM : bellM;
             for (int h = 0; h < 4; h++) { bool show = t >= TollAt[12]; plats[h].gameObject.SetActive(show && (st || Mathf.FloorToInt(t * 4) % 2 == 0)); }
@@ -496,7 +500,8 @@ namespace LastBell.Run
         void Teardown()
         {
             if (root) Object.Destroy(root.gameObject);
-            root = plate = mySpot = echo = echoLive = floor = null; for (int h = 0; h < 4; h++) plats[h] = null; pool.Clear(); ring1.Clear(); ring2.Clear(); plans.Clear();
+            RunDirector.CameraPull = 0;
+            root = plate = mySpot = echo = echoLive = floor = bellModel = null; for (int h = 0; h < 4; h++) plats[h] = null; pool.Clear(); ring1.Clear(); ring2.Clear(); plans.Clear();
         }
 
         static GUIStyle nameStyle, bigStyle, midStyle;

@@ -380,15 +380,19 @@ namespace LastBell.Run
             }
         }
 
+        // 0..1: the camera eases up and back from the player (the Ultimate's stage transitions, Chzy18 26 Oct: a 1-2 s pull-back
+        // is an allowed exception to the fixed gameplay camera). Mechanics set it; 0 = the normal view.
+        public static float CameraPull;
         void LateUpdate()
         {
             if (!cam) cam = Camera.main; if (!cam) return;
             cam.orthographic = false;   // some arenas' own top-down view key (C) switches the camera to orthographic
             Vector3 target, look;
-            if (Player) { target = Player.transform.position + FollowOffset; look = Player.transform.position + Vector3.up; }
+            float pull = Mathf.SmoothStep(0, 1, Mathf.Clamp01(CameraPull)); var offset = FollowOffset * (1 + 1.1f * pull) + Vector3.up * 10f * pull;
+            if (Player) { target = Player.transform.position + offset; look = Player.transform.position + Vector3.up; }
             else { target = MenuCamPos; look = new Vector3(0, 0, 1); }
             cam.transform.position = Vector3.SmoothDamp(cam.transform.position, target, ref camVel, 0.12f);
-            if (Player) cam.transform.rotation = Quaternion.LookRotation(-FollowOffset + Vector3.up);
+            if (Player) cam.transform.rotation = Quaternion.LookRotation(-offset + Vector3.up);
             else cam.transform.rotation = Quaternion.LookRotation(look - MenuCamPos);
             cam.fieldOfView = 44;
         }
