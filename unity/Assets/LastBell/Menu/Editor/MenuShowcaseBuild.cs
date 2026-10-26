@@ -83,7 +83,20 @@ namespace LastBell.Menu.EditorTools
         // they are. Run again to refresh that arena's copy in place (e.g. after its art changes). The map must already be
         // InShowcase, and its position in RunMaps.Showcased must be the next stage index (TestRushSetup.ShowcaseStage
         // relies on the two orders matching).
-        public static void AddStage(string mapId)
+        // Re-copies the four area arenas after their art changes (new Blender models, regenerated Area 4 assets), keeping
+        // each stage's cast, party size and camera. Batch:
+        // Unity.exe -batchmode -projectPath unity -executeMethod LastBell.Menu.EditorTools.MenuShowcaseBuild.RefreshAreaStages
+        [MenuItem("Last Bell/Main Menu/Refresh Area Showcase Stages", priority = 37)]
+        public static void RefreshAreaStages()
+        {
+            foreach (var id in new[] { "skyward-spire", "brass-foundry", "verdant-chimes", "shattered-hour" }) AddStage(id, keepCasting: true);
+            IsolateCopiedScenery();
+            if (Application.isBatchMode) EditorApplication.Exit(0);
+        }
+
+        public static void AddStage(string mapId) => AddStage(mapId, keepCasting: false);
+
+        public static void AddStage(string mapId, bool keepCasting)
         {
             AssetDatabase.Refresh();
             int mapIndex = RunMaps.IndexOf(mapId);
@@ -115,6 +128,14 @@ namespace LastBell.Menu.EditorTools
                 FogStart = RenderSettings.fogStartDistance, FogEnd = RenderSettings.fogEndDistance, Skybox = RenderSettings.skybox,
                 Background = sourceCamera ? sourceCamera.backgroundColor : Color.black };
             ConfigureStage(mapId, stage);
+            if (keepCasting && existing >= 0)
+            {
+                // Only the arena copy and its lighting change; who is on stage and how the camera moves stay as authored.
+                var old = showcase.Stages[existing];
+                stage.Boss = old.Boss; stage.PartySize = old.PartySize; stage.CustomCamera = old.CustomCamera;
+                stage.CameraTarget = old.CameraTarget; stage.CameraPosition = old.CameraPosition; stage.FieldOfView = old.FieldOfView;
+                stage.OrbitDegreesPerSecond = old.OrbitDegreesPerSecond; stage.ScreenOffsetDegrees = old.ScreenOffsetDegrees;
+            }
             var group = new GameObject("Showcase environment - " + stage.Name);
             SceneManager.MoveGameObjectToScene(group, scene); group.SetActive(false); group.transform.SetParent(menu.transform, false);
             foreach (var root in source.GetRootGameObjects())
