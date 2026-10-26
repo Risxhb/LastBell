@@ -119,7 +119,8 @@ namespace LastBell.Menu
             // mini music player
             menu.MusicPauseButton.onClick.Invoke();Check("music player pauses",menu.Music.UserPaused);
             menu.MusicPlayButton.onClick.Invoke();Check("music player plays",!menu.Music.UserPaused);
-            var title=menu.Music.TrackTitle;menu.MusicNextButton.onClick.Invoke();Check("music player skips",menu.Music.TrackTitle!=title);
+            if(MenuMusic.TrackCount>1){var title=menu.Music.TrackTitle;menu.MusicNextButton.onClick.Invoke();Check("music player skips",menu.Music.TrackTitle!=title);}
+            else Check("single menu song loops with no skip button",!menu.MusicNextButton.gameObject.activeSelf&&menu.Music.MenuSource.loop&&menu.Music.MenuSource.clip&&menu.Music.MenuSource.clip.name=="BittersweetDawn");
             // the old Showcase menu is never presented: its startup scene routes here
             SceneManager.LoadScene(MainMenu.ScenePath);yield return SceneReady(()=>FindAnyObjectByType<ConfrontationMenu>()?.Hero!=null);
             Check("startup routes to the only main menu",!FindAnyObjectByType<MainMenu>()&&SceneManager.sceneCount==1&&MenuAppearance.Selected==MenuStyle.Alternative);

@@ -262,7 +262,7 @@ namespace LastBell.Menu
             if(!menuTrack&&!Resources.Load<AudioClip>("Menu/BossMusic/"+clip)){report.Add("GAP  music "+label+" — boss track '"+clip+"' not supplied");Debug.Log(report.Last());return;}
             Check("music "+label,music&&music.Source&&music.Source.clip&&
                 (menuTrack?music.Source==music.MenuSource:music.Source.clip.name==clip)&&
-                music.Source.isPlaying&&(menuTrack?!music.Source.loop:music.Source.loop));
+                music.Source.isPlaying&&(menuTrack?music.Source.loop==(MenuMusic.TrackCount==1):music.Source.loop));
         }
         IEnumerator Press(Key key)
         {InputSystem.QueueStateEvent(MenuSmokeTest.TestKeyboard,new KeyboardState(key));yield return null;yield return null;InputSystem.QueueStateEvent(MenuSmokeTest.TestKeyboard,new KeyboardState());yield return null;yield return null;}

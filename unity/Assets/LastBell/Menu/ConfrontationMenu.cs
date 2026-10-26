@@ -141,7 +141,9 @@ namespace LastBell.Menu
             BuildMusicPlayer();
             var stack=new Selectable[]{PreviousButton,NextButton,StartButton,RushButton,SettingsButton,ExitButton,diff,MusicPlayButton};
             for(int i=0;i<stack.Length;i++)stack[i].navigation=new Navigation{mode=Navigation.Mode.Explicit,selectOnDown=stack[(i+1)%stack.Length],selectOnUp=stack[(i+stack.Length-1)%stack.Length],selectOnLeft=i==0||i==1?PreviousButton:null,selectOnRight=i==0||i==1?NextButton:i==stack.Length-1?MusicPauseButton:null};
-            MusicPauseButton.navigation=new Navigation{mode=Navigation.Mode.Explicit,selectOnLeft=MusicPlayButton,selectOnRight=MusicNextButton,selectOnUp=diff,selectOnDown=PreviousButton};
+            // One menu song (Bittersweet Dawn, October 26, 2026): no skip button; Pause wraps right to Play.
+            bool skip=MenuMusic.TrackCount>1;MusicNextButton.gameObject.SetActive(skip);
+            MusicPauseButton.navigation=new Navigation{mode=Navigation.Mode.Explicit,selectOnLeft=MusicPlayButton,selectOnRight=skip?MusicNextButton:MusicPlayButton,selectOnUp=diff,selectOnDown=PreviousButton};
             MusicNextButton.navigation=new Navigation{mode=Navigation.Mode.Explicit,selectOnLeft=MusicPauseButton,selectOnRight=MusicPlayButton,selectOnUp=diff,selectOnDown=PreviousButton};
             BuildSettings();
             message=MenuUI.Text("",safe,new Vector2(.70f,.074f),new Vector2(.99f,.106f),14,MenuUI.Gold);

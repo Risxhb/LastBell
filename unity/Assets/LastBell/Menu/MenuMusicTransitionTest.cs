@@ -107,7 +107,7 @@ namespace LastBell.Menu
             d.SetPaused(true); Check("return during countdown accepted", MenuReturnBridge.Return(false));
             yield return Until(() => !RunDirector.Instance && (FindAnyObjectByType<ConfrontationMenu>()?.StartButton || FindAnyObjectByType<MainMenu>()?.StartButton), 45, "main menu return");
             yield return new WaitForSecondsRealtime(.7f);
-            Check("main menu starts next playlist track", music.Source == menu && IsMenuTrack(menu) && menu.isPlaying && music.TrackIndex == (previousIndex + 1) % 3 && menu.time < 8 && Close(menu.volume, music.Volume));
+            Check("main menu starts next playlist track", music.Source == menu && IsMenuTrack(menu) && menu.isPlaying && music.TrackIndex == (previousIndex + 1) % MenuMusic.TrackCount && menu.time < 8 && Close(menu.volume, music.Volume));
             Check("menu return stops both boss sources", music.GetComponents<AudioSource>().Where(s => s != menu).All(s => !s.isPlaying && s.volume == 0));
             Check("single persistent owner and three reusable sources", FindObjectsByType<MenuMusic>().Length == 1 && music.GetComponents<AudioSource>().Length == 3);
             // Return to gameplay once more to check defeat and a same-boss retry.
@@ -141,7 +141,7 @@ namespace LastBell.Menu
             Check("zero runtime errors", errors.Count == 0);
             Finish(hadVolume, savedVolume);
         }
-        static bool IsMenuTrack(AudioSource source) => source.clip && new[] { "MainMenu2", "MainMenuOpening", "MainMenuMusic" }.Contains(source.clip.name);
+        static bool IsMenuTrack(AudioSource source) => source.clip && new[] { "BittersweetDawn", "MainMenu2", "MainMenuOpening", "MainMenuMusic" }.Contains(source.clip.name);
         static bool Close(float a, float b) => Mathf.Abs(a - b) < .015f;
         IEnumerator Until(Func<bool> ready, float seconds, string name)
         {
