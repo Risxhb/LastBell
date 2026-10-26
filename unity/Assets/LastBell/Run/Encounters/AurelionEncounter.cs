@@ -56,6 +56,7 @@ namespace LastBell.Run
 
         int PhaseFor() => Hp > MaxHp * 0.65f ? 1 : Hp > MaxHp * 0.30f ? 2 : 3;
         public void DebugReadyThrust() { thrustReady = 0; }   // test hook: the next pass may choose the Thrust
+        protected override bool PartyScaled => true;   // v4 was tuned with the co-op HP formula (4 perfect bots: 31,000 HP)
         public override float NextPhaseFraction() => AurelionArgs.V4 ? V4NextPhaseFraction() : Hp > MaxHp * 0.65f ? 0.64f : 0.29f;
         bool Ready(int at) => Age >= at;
 

@@ -31,6 +31,7 @@ namespace LastBell.Run
         public static BotMode AllyMode = BotMode.Perfect;   // menu allies do every mechanic, memory ones included (Chzy18: "do the mechanics"); still no attacks
         int tick, lastPress = -999, castHold;
         int pendingSlot = -1, pendingUntil;
+        readonly int[] skipUntil = new int[6];
 
         public AllyBot(int index, int count, BotMode mode = BotMode.Passive)
         {
@@ -123,9 +124,14 @@ namespace LastBell.Run
         {
             if (tick - lastPress < 6) return;
             // the kit's own cooldowns (the reference policy; a private counter only ticked while attacking)
-            System.Func<int, bool> ready = slot => me.Kit.Cooldown01(slot) <= 0.001f;
-            // a pressed ability's cooldown starts on release: wait for it (up to 1.5 s) instead of pressing again and restarting the cast
-            if (pendingSlot > 0 && tick < pendingUntil && ready(pendingSlot)) return;
+            System.Func<int, bool> ready = slot => me.Kit.Cooldown01(slot) <= 0.001f && tick >= skipUntil[slot];
+            // a pressed ability's cooldown starts on release: wait for it (up to 1.5 s) instead of pressing again and restarting the
+            // cast; if it never started (the cast didn't take: no target, a missing condition), skip that ability for 8 s
+            if (pendingSlot > 0 && me.Kit.Cooldown01(pendingSlot) <= 0.001f)
+            {
+                if (tick < pendingUntil) return;
+                skipUntil[pendingSlot] = tick + 480;
+            }
             pendingSlot = -1;
             int s = -1;
             switch (me.ClassName)
