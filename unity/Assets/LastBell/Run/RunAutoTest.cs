@@ -463,9 +463,7 @@ namespace LastBell.Run
                 d.ReturnToMenu();
             }
             Check("map tour returns to the starting map", RunMaps.Current == startMap);
-            // ---------- the Bellkeeper's ability set v2 (proposal) ----------
-            yield return BellkeeperV2Checks();
-            BellkeeperEncounter.SetOverride = BellkeeperEncounter.AbilitySet.V1;
+            // (the retired normal-Bellkeeper v2 set is no longer checked here; -lastbellBellkeeperV2 still runs its section)
             // ---------- the Bellkeeper Ultimate (proposal) ----------
             yield return BellkeeperUltimateChecks();
             BellkeeperEncounter.SetOverride = BellkeeperEncounter.AbilitySet.V1;

@@ -28,7 +28,9 @@ namespace LastBell.Run
             return r;
         }
 
-        static bool Persist => !RunAutoTest.Requested;
+        // not saved between sessions (integration with the Azure branch, 26 Oct): a saved count leaked bot allies into other
+        // bosses' tests on a machine that had once played with allies. Only -lastbellAllies or the session's own choice sets it.
+        static bool Persist => false;
 
         static void Load()
         {

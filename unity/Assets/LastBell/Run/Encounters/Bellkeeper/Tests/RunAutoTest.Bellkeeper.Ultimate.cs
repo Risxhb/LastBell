@@ -122,7 +122,7 @@ namespace LastBell.Run
             Check("Ultimate: a separate practice entry \"Bellkeeper — Ultimate\" on the Throne, not in the run",
                   ue > 0 && RunDirector.Bosses[ue].Name == "Bellkeeper — Ultimate" && !RunDirector.Bosses[ue].InRun && RunDirector.Bosses[ue].Map == BellkeeperEncounter.ThroneMap
                   && !RunDirector.RunOrder.Contains(ue), ue < 0 ? "missing" : RunDirector.Bosses[ue].Map);
-            Check("Ultimate: the normal Bellkeeper entry still defaults to v2", BellkeeperEncounter.RequestedSet == BellkeeperEncounter.AbilitySet.V2 && RunDirector.Bosses[0].Map == BellkeeperEncounter.ThroneMap);
+            Check("Ultimate: the normal Bellkeeper entry stays v1 (the v2 set is retired)", BellkeeperEncounter.RequestedSet == BellkeeperEncounter.AbilitySet.V1 && RunDirector.Bosses[0].Name == "Bellkeeper");
             Check("Ultimate: ids map to keys (ultimate.ledger = ult_ledger)",
                   BellkeeperAbilities.Normalize("ultimate.ledger") == "ult_ledger" && BellkeeperAbilities.Normalize("bellkeeper.ult_pendulum_clocks") == "ult_pendulum_clocks"
                   && BellkeeperAbilities.Normalize("ult-two-futures") == "ult_two_futures");
@@ -294,7 +294,7 @@ namespace LastBell.Run
             // a real attempt ignores the practice phase: a run with the Ultimate set starts at P1
             BellkeeperEncounter.SetOverride = BellkeeperEncounter.AbilitySet.Ultimate; BellkeeperEncounter.PhaseOverride = "P4";
             if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }
-            d.StartRun("Vanguard"); d.RequestReady();
+            d.StartRun("Vanguard", new[] { 0 }); d.RequestReady();   // the Bellkeeper alone (runs now open on a shuffled boss)
             yield return Until(() => d.State == RunState.Combat, 4, "Ultimate run combat");
             bk = d.Boss as BellkeeperEncounter;
             yield return null; yield return null;

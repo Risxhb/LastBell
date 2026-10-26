@@ -44,7 +44,7 @@ namespace LastBell.Run
             d.ReturnToMenu(); yield return null;
             // the Ultimate: menu allies are its Perfect strat bots, which also attack
             Check("allies: 3 selected for the Ultimate", d.SelectAllies(3) && RunParty.Selected == 3);
-            d.StartPractice("Arcanist", 1); yield return PartyLoaded("Ultimate party of 4"); d.RequestReady();
+            d.StartPractice("Arcanist", RunDirector.BellkeeperUltimatePractice); yield return PartyLoaded("Ultimate party of 4"); d.RequestReady();
             yield return Until(() => d.State == RunState.Combat, 4, "Ultimate party combat");
             Check("allies: the Ultimate drives menu allies with its strat bot", d.Allies.Count == 3 && d.Allies.All(a => a.Input is UltimateBot),
                 string.Join(",", d.Allies.Select(a => a.Input?.GetType().Name)));
