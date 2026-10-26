@@ -419,7 +419,7 @@ namespace LastBell.Run
                     var (a2, b2) = Pawl(g); var mid = (a2 + b2) * 0.5f;
                     var pawl = Prim.Make(PrimitiveKind.Cube, root, mid + Vector3.up * 0.25f, new Vector3(0.35f, 0.5f, (b2 - a2).magnitude), Color.white, 0, Quaternion.LookRotation(b2 - a2)); Mat(pawl, pawlM); gearParts[g].Add(pawl);
                     var m = Prim.Make(PrimitiveKind.Cylinder, root, MeshPoint(g) + Vector3.up * 0.1f, new Vector3((BiteR + PR) * 2, 0.02f, (BiteR + PR) * 2), Color.white); Mat(m, meshDim); meshR[g] = m.GetComponent<Renderer>();   // the true kill zone (a body overlapping the bite)
-                    for (int j = 0; j < CountdownPieces; j++) { var c = Prim.Make(PrimitiveKind.Cube, root, Vector3.zero, new Vector3(0.28f, 0.06f, 0.16f), Color.white); Mat(c, meshWarn); countdown[g].Add(c); }
+                    for (int j = 0; j < CountdownPieces; j++) { var cd = Prim.Make(PrimitiveKind.Cube, root, Vector3.zero, new Vector3(0.28f, 0.06f, 0.16f), Color.white); Mat(cd, meshWarn); countdown[g].Add(cd); }
                 }
             }
             mySpot = new GameObject("my spot").transform; mySpot.SetParent(root, false);
