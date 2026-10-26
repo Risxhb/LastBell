@@ -385,6 +385,7 @@ namespace LastBell.Run
         }
 
         // ---------------- presentation (stand-ins) ----------------
+        const int CountdownPieces = 20; readonly List<Transform>[] countdown = { new List<Transform>(), new List<Transform>(), new List<Transform>(), new List<Transform>() };
         Transform root, mySpot, pit, floorIn; readonly List<Transform>[] gearParts = { new List<Transform>(), new List<Transform>(), new List<Transform>(), new List<Transform>() }; readonly Transform[] pivots = new Transform[5]; readonly Renderer[] gearR = new Renderer[5], meshR = new Renderer[4];
         readonly List<Transform> pool = new List<Transform>();
         static Material pitM, gearM, centreM, toothM, coreM, pawlM, meshDim, meshWarn, meshBite, hotM, shardM, spotM;
@@ -417,7 +418,8 @@ namespace LastBell.Run
                     var core = Prim.Make(PrimitiveKind.Cylinder, root, c + Vector3.up * 0.6f, new Vector3(HubR * 2, 0.6f, HubR * 2), Color.white); Mat(core, coreM); gearParts[g].Add(core);
                     var (a2, b2) = Pawl(g); var mid = (a2 + b2) * 0.5f;
                     var pawl = Prim.Make(PrimitiveKind.Cube, root, mid + Vector3.up * 0.25f, new Vector3(0.35f, 0.5f, (b2 - a2).magnitude), Color.white, 0, Quaternion.LookRotation(b2 - a2)); Mat(pawl, pawlM); gearParts[g].Add(pawl);
-                    var m = Prim.Make(PrimitiveKind.Cylinder, root, MeshPoint(g) + Vector3.up * 0.1f, new Vector3(BiteR * 2, 0.02f, BiteR * 2), Color.white); Mat(m, meshDim); meshR[g] = m.GetComponent<Renderer>();
+                    var m = Prim.Make(PrimitiveKind.Cylinder, root, MeshPoint(g) + Vector3.up * 0.1f, new Vector3((BiteR + PR) * 2, 0.02f, (BiteR + PR) * 2), Color.white); Mat(m, meshDim); meshR[g] = m.GetComponent<Renderer>();   // the true kill zone (a body overlapping the bite)
+                    for (int j = 0; j < CountdownPieces; j++) { var c = Prim.Make(PrimitiveKind.Cube, root, Vector3.zero, new Vector3(0.28f, 0.06f, 0.16f), Color.white); Mat(c, meshWarn); countdown[g].Add(c); }
                 }
             }
             mySpot = new GameObject("my spot").transform; mySpot.SetParent(root, false);
@@ -443,7 +445,15 @@ namespace LastBell.Run
             for (int g = 0; g < 4; g++)
             {
                 float ph = ((t + g * BiteEvery / 4) % BiteEvery + BiteEvery) % BiteEvery, soon = BiteEvery - ph;
-                if (meshR[g]) meshR[g].sharedMaterial = ph < BiteLen ? meshBite : soon < 0.5f ? meshWarn : meshDim;
+                bool biteOn = t >= settle && !wild;
+                if (meshR[g]) meshR[g].sharedMaterial = !biteOn ? meshDim : ph < BiteLen ? meshBite : soon < 1.0f ? meshWarn : meshDim;
+                float kr = BiteR + PR, cr = kr + 2.2f * Mathf.Clamp01((soon - 0.0f) / (BiteEvery - BiteLen));   // closes on the zone as the bite comes
+                for (int j = 0; j < countdown[g].Count; j++)
+                {
+                    var x = countdown[g][j]; bool show = biteOn && !launched[g] && ph >= BiteLen; x.gameObject.SetActive(show); if (!show) continue;
+                    float a = 360f / CountdownPieces * j; var d = Dir(a); x.position = MeshPoint(g) + d * cr + Vector3.up * 0.14f; x.rotation = Quaternion.LookRotation(d);
+                    x.GetComponent<Renderer>().sharedMaterial = soon < 1.0f ? meshWarn : meshDim;
+                }
             }
             int n = 0;
             foreach (var s in shards)
@@ -458,7 +468,7 @@ namespace LastBell.Run
         void Teardown()
         {
             if (root) Object.Destroy(root.gameObject);
-            root = mySpot = pit = floorIn = null; pool.Clear(); plans.Clear(); foreach (var l in gearParts) l.Clear();
+            root = mySpot = pit = floorIn = null; pool.Clear(); plans.Clear(); foreach (var l in gearParts) l.Clear(); foreach (var l in countdown) l.Clear();
             for (int i = 0; i < 5; i++) { pivots[i] = null; gearR[i] = null; } for (int i = 0; i < 4; i++) meshR[i] = null;
         }
 
