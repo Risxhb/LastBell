@@ -238,6 +238,8 @@ namespace LastBell.Run
                 Check($"{cls} skill-bar icons load ({slots} incl. dash)", found == slots, $"{found}/{slots}");
             }
             Check("potion icon loads", RunHud.Icon("potion") != null);
+            BossAttackIconChecks();
+            MechanicIconChecks();
             yield return DifficultyChecks();
 
             // ---------- run 1: Vanguard, full victory, repeated presses ----------
@@ -360,6 +362,7 @@ namespace LastBell.Run
             Check("defeat result shows the cause", !d.Victory && !string.IsNullOrEmpty(d.DefeatCause), d.DefeatCause);
             Check("no hazards or attacks after defeat", d.World.Hazards.Count == 0 && !d.World.CombatActive);
             yield return Shot("results_defeat");
+            yield return DeathRecapIconChecks("defeat");
             runs0 = d.RunsStarted;
             for (int i = 0; i < 3; i++) { d.RequestRetry(); yield return null; }
             Check("retry after defeat starts one fresh run", d.RunsStarted == runs0 + 1 && d.State == RunState.Ready);
@@ -416,6 +419,7 @@ namespace LastBell.Run
             yield return Until(() => d.State == RunState.Combat, 4, "practice combat");
             Check("practice starts the chosen encounter", d.Boss is BellkeeperEncounter && d.Mode == RunMode.Practice);
             yield return Wait(1f);
+            yield return MechanicIconInGameChecks();
             d.Boss.DebugDefeat();
             yield return Until(() => d.State == RunState.Results, 6, "practice results");
             Check("practice clear ends in a practice result, not a run victory", d.Mode == RunMode.Practice && d.EncountersCleared == 1);

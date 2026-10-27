@@ -53,6 +53,7 @@ namespace LastBell.Run
         public string LastDamageSource;
         // PF-06 death recap and PF-07 meter (first pass): every resolved hit, once, from the authoritative tick
         public readonly List<(int tick, string source, int damage, int hpAfter)> TakenLog = new List<(int, string, int, int)>();
+        public readonly List<string> TakenAttackIds = new List<string>();   // parallel to TakenLog: the boss attack ID, or null (BossAttackIcons)
         public sealed class MeterRow { public string Ability; public int Damage, Hits, Largest; }
         public readonly Dictionary<string, MeterRow> RunMeter = new Dictionary<string, MeterRow>(), EncounterMeter = new Dictionary<string, MeterRow>();
         public int SegmentStartTick { get; private set; }
@@ -147,6 +148,7 @@ namespace LastBell.Run
         {
             DamageTaken += dmg; LastDamageSource = h.Source;
             TakenLog.Add((Tick, h.Source, dmg, p.Hp));
+            TakenAttackIds.Add(BossAttackIcons.Resolve(h, Boss)?.id);
             PlayerHit?.Invoke(p, h, dmg);
         }
 

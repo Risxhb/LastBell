@@ -209,6 +209,8 @@ namespace LastBell.Run
                 PlayerPanel();
                 Floats();
                 HazardLabels();
+                PlayerMarks();
+                if (ShowMechanicGallery) MechanicGallery();
                 switch (d.State)
                 {
                     case RunState.Ready: ReadyCard(); break;
@@ -330,7 +332,10 @@ namespace LastBell.Run
             var r = Card(w, pad + 44 + 8 + 26 + pad, 270, false, UiTheme.Danger);
             float y = r.y + pad;
             T(r.x, y, w, 44, UiTheme.Spaced("Down"), display36); y += 52;
-            string a = "Struck by ", cause = d.DefeatCause ?? "?";
+            // a catalogued boss attack shows its 64 px icon, with the attack name and boss beside it (BossAttackIcons)
+            var wd = d.World; var ka = wd != null && wd.TakenLog.Count > 0 ? TakenAttack(wd, wd.TakenLog.Count - 1) : null; var ki = BossAttackIcons.Icon(ka);
+            if (ki != null) GUI.DrawTexture(S(r.x + pad, r.y + pad + 8, 64, 64), ki, ScaleMode.ScaleToFit, true);
+            string a = "Struck by ", cause = ka != null ? ka.Label : d.DefeatCause ?? "?";
             float wa = Wv(bodyL, a), wc = Wv(bodyL, cause), x = r.x + w / 2 - (wa + wc) / 2;
             T(x, y, wa + 2, 26, a, bodyL, UiTheme.Ivory);
             T(x + wa, y, wc + 2, 26, cause, bodyL, UiTheme.Gold);
@@ -523,20 +528,51 @@ namespace LastBell.Run
                 ColumnHead(rx, yy, SW, "Death recap"); yy += 42;
                 T(rx, yy, SW, 18, "last hits taken, oldest first", micro, UiTheme.IvoryMicro); yy += 26;
                 const float numW = 150;   // damage, hp, time
-                int last = w.TakenLog[w.TakenLog.Count - 1].tick;
+                int last = w.TakenLog[w.TakenLog.Count - 1].tick, hover = -1;
+                var mouse = Event.current.mousePosition;
                 for (int i = from; i < w.TakenLog.Count; i++)
                 {
                     var e = w.TakenLog[i]; bool fatal = i == w.TakenLog.Count - 1;
-                    float rh = fatal ? 46 : 28, ty = yy + (fatal ? 18 : 0);
+                    // a catalogued boss attack shows its icon (40 px on the killing blow, 22 px otherwise) and "Attack · Boss";
+                    // the name always sits beside the icon, because several icons look alike at small sizes (BossAttackIcons)
+                    var at = TakenAttack(w, i); var icon = BossAttackIcons.Icon(at);
+                    float rh = fatal ? (icon != null ? 62 : 46) : 28, ty = yy + (fatal ? 18 : 0), ic = fatal ? 40 : 22, lx = rx;
                     if (fatal) { F(rx - 12, yy + 2, SW + 12, rh - 4, A(UiTheme.Danger, 0.10f)); F(rx - 12, yy + 2, 4, rh - 4, UiTheme.Danger); T(rx, yy + 2, SW, 16, "KILLING BLOW", micro, UiTheme.Danger); }
-                    T(rx, ty, SW - numW - 8, 26, Ellipsize(small13, e.source, SW - numW - 8), small13, fatal ? UiTheme.Ivory : UiTheme.IvoryBody);
+                    if (icon != null) { GUI.DrawTexture(S(rx, ty + (fatal ? 0 : 2), ic, ic), icon, ScaleMode.ScaleToFit, true); lx = rx + ic + 8; }
+                    string what = at != null ? at.Label : e.source;
+                    T(lx, ty, SW - numW - 8 - (lx - rx), 26, Ellipsize(small13, what, SW - numW - 8 - (lx - rx)), small13, fatal ? UiTheme.Ivory : UiTheme.IvoryBody);
                     T(rx + SW - numW, ty, 44, 26, "-" + e.damage, small13R, fatal ? UiTheme.Danger : UiTheme.IvoryBody);
                     T(rx + SW - numW + 46, ty, 54, 26, "hp " + e.hpAfter, small13R, UiTheme.IvoryMuted);
                     T(rx + SW - numW + 100, ty, 50, 26, $"{(e.tick - last) / 60f:0.0}s", small13R, UiTheme.IvoryMuted);
                     if (!fatal) F(rx, yy + rh - 1, SW, 1, A(UiTheme.Ivory, 0.08f));
+                    if (at != null && S(rx - 12, yy, SW + 12, rh).Contains(mouse)) hover = i;
                     yy += rh;
                 }
+                if (hover < 0 && PinRecapTooltip) hover = w.TakenLog.Count - 1;
+                var ha = hover >= 0 ? TakenAttack(w, hover) : null;
+                if (ha != null) AttackTooltip(rx, yy + 12, SW, ha, $"Hit you for {w.TakenLog[hover].damage} (hp {w.TakenLog[hover].hpAfter} after){(hover == w.TakenLog.Count - 1 ? ": the killing blow." : ".")}");
             }
+        }
+
+        // Boss attack icons in the recap (BossAttackIcons): the attack ID recorded per hit, parallel to TakenLog.
+        // PinRecapTooltip shows the killing blow's details without a mouse (autotest screenshots).
+        public static bool PinRecapTooltip;
+        static BossAttackIcons.Attack TakenAttack(CombatWorld w, int i) => i < w.TakenAttackIds.Count ? BossAttackIcons.Get(w.TakenAttackIds[i]) : null;
+
+        // Boss attack details (virtual units): the 64 px icon with the attack name, boss and tag beside it, then its shape.
+        void AttackTooltip(float x, float y, float width, BossAttackIcons.Attack a, string line)
+        {
+            const float pad = UiTheme.G2, ic = 64;
+            string body = a.shape + (string.IsNullOrEmpty(line) ? "" : "\n" + line);
+            float tw = width - 2 * pad - ic - 12, bh = Hv(descSt, body, tw), h = Mathf.Max(ic + 2 * pad, pad + 22 + 20 + bh + pad);
+            UiTheme.Frame(S(x, y, width, h), UiTheme.InkDeep, true, true);
+            F(x, y, 3, h, UiTheme.Gold);
+            var icon = BossAttackIcons.Icon(a);
+            if (icon != null) GUI.DrawTexture(S(x + pad, y + pad, ic, ic), icon, ScaleMode.ScaleToFit, true);
+            float tx = x + pad + ic + 12;
+            T(tx, y + pad, tw, 22, a.name.ToUpper(), heading);
+            T(tx, y + pad + 22, tw, 20, $"{a.bossName}   ·   {a.tag}", eyebrow);
+            T(tx, y + pad + 44, tw, bh + 4, body, descSt);
         }
 
         void Pause()
@@ -620,7 +656,28 @@ namespace LastBell.Run
             float yy = rowsY;
             if (!(b is TempoTyrantEncounter)) T(x + 10, yy, bw * 0.65f, rowH, b.PhaseName, row15, BA(UiTheme.Ivory));
 
-            // attack-name warning rows removed (Risxhb, October 24, 2026): telegraphs on the floor carry the warning
+            // attack-name warning rows removed (Risxhb, October 24, 2026): telegraphs on the floor carry the warning.
+            // Exception (Chzy18, October 24, 2026): a hazard tagged with a hostile mechanic (Hazard.MechanicId) gets one row with
+            // the mechanic's 22 px icon and name, after the attack's own icon and name when it has one. Untagged hazards stay
+            // floor-only, so this panel is unchanged until an encounter tags a mechanic. docs/run-loop/mechanic-icons.md
+            var seen = new HashSet<string>(); yy += rowH + 4;
+            foreach (var hzd in d.World.Hazards.Live)
+            {
+                var m = MechanicIcons.Get(hzd.MechanicId); if (m == null) continue;
+                var at = BossAttackIcons.Resolve(hzd, b);
+                if (!seen.Add((at?.id ?? hzd.Source) + "|" + m.id)) continue;
+                float lx = x + 10;
+                var ai = BossAttackIcons.Icon(at);
+                if (ai != null) { GUI.DrawTexture(S(lx, yy + 1, 22, 22), ai, ScaleMode.ScaleToFit, true); lx += 28; }
+                string what = (at != null ? $"{at.name}  ({at.bossName})" : hzd.Source).ToUpper();
+                T(lx, yy, Wv(row15, what) + 4, rowH, what, row15, BA(UiTheme.Ivory)); lx += Wv(row15, what) + 12;
+                var mi = MechanicIcons.Icon(m);
+                if (mi != null) { GUI.DrawTexture(S(lx, yy + 1, 22, 22), mi, ScaleMode.ScaleToFit, true); lx += 28; }
+                Hints.TryGetValue(hzd.Source, out var hint);
+                string mname = m.name.ToUpper() + (string.IsNullOrEmpty(hint) ? "" : " — " + hint);
+                T(lx, yy, Wv(row15, mname) + 4, rowH, mname, row15, BA(UiTheme.GoldBright));
+                yy += rowH;
+            }
         }
 
         // Skill bar icons by Codex (#43 / PR #45): Resources/Run/Icons/<file>.png, 256 px. Slot order = the kit's slots,
@@ -882,6 +939,53 @@ namespace LastBell.Run
                 var s = cam.WorldToScreenPoint(mid); if (s.z < 0) continue;
                 UiTheme.Fill(new Rect(s.x - UiTheme.V(36), h - s.y - UiTheme.V(14), UiTheme.V(72), UiTheme.V(28)), UiTheme.InkStrip);
                 UiTheme.Label(new Rect(s.x - UiTheme.V(60), h - s.y - UiTheme.V(15), UiTheme.V(120), UiTheme.V(30)), "JUMP", floatSt, UiTheme.Calm);
+            }
+        }
+
+        // Mechanic markers over players' heads (PlayerController.Marks, MechanicIcons): 40 px icons side by side, each with its
+        // name on a strip under it, because several look alike at this size. Placement approved by Chzy18 on October 24, 2026;
+        // see docs/run-loop/mechanic-icons.md. Nothing is drawn until an encounter assigns a mark.
+        void PlayerMarks()
+        {
+            var cam = Camera.main; if (!cam) return; float h = Screen.height, sz = UiTheme.V(40), gap = UiTheme.V(48);
+            foreach (var p in d.World.Players)
+            {
+                if (p == null || p.Down || p.Marks.Count == 0) continue;
+                var s = cam.WorldToScreenPoint(p.transform.position + Vector3.up * 2.6f); if (s.z < 0) continue;
+                float x0 = s.x - (p.Marks.Count * (sz + gap) - gap) / 2, y0 = h - s.y - sz - UiTheme.V(20);
+                for (int i = 0; i < p.Marks.Count; i++)
+                {
+                    var m = MechanicIcons.Get(p.Marks[i]); if (m == null) continue;
+                    var r = new Rect(x0 + i * (sz + gap), y0, sz, sz);
+                    var t = MechanicIcons.Icon(m); if (t != null) GUI.DrawTexture(r, t, ScaleMode.ScaleToFit, true);
+                    float nw = slotName.CalcSize(new GUIContent(m.name)).x;
+                    UiTheme.Fill(new Rect(r.center.x - nw / 2 - UiTheme.V(4), r.yMax + UiTheme.V(1), nw + UiTheme.V(8), UiTheme.V(17)), UiTheme.InkStrip);
+                    UiTheme.Label(new Rect(r.center.x - UiTheme.V(60), r.yMax + UiTheme.V(1), UiTheme.V(120), UiTheme.V(17)), m.name, slotName);
+                }
+            }
+        }
+
+        // Test and review aid (autotest screenshot, no key binding): every catalogued mechanic icon at HUD size (64 px) with
+        // its name, friendly markers first, then hostile mechanics.
+        public static bool ShowMechanicGallery;
+        void MechanicGallery()
+        {
+            const float ic = 64, CW = 128, CH = 96; const int perRow = 8; var all = MechanicIcons.All;
+            int friendly = 0; foreach (var m in all) if (m.Friendly) friendly++;
+            int rows = (friendly + perRow - 1) / perRow + (all.Count - friendly + perRow - 1) / perRow;   // each set starts a new row
+            float pw = perRow * CW + 32, ph = rows * CH + 56, px = UiTheme.VirtualWidth / 2 - pw / 2, py = 150;
+            UiTheme.Frame(S(px, py, pw, ph), UiTheme.InkDeep, true, true);
+            F(px, py, pw, 3, UiTheme.Gold);
+            T(px + 16, py + 12, pw - 32, 22, UiTheme.Spaced("Mechanic icons") + "   ·   friendly markers, then hostile mechanics   ·   64 px", eyebrow);
+            int col = 0; float y = py + 44; string set = null;
+            foreach (var m in all)
+            {
+                if (set != null && m.set != set || col == perRow) { col = 0; y += CH; }
+                set = m.set;
+                float cx = px + 16 + col * CW;
+                var t = MechanicIcons.Icon(m); if (t != null) GUI.DrawTexture(S(cx + (CW - ic) / 2, y, ic, ic), t, ScaleMode.ScaleToFit, true);
+                T(cx, y + ic + 4, CW, 22, m.name, slotName);
+                col++;
             }
         }
     }
