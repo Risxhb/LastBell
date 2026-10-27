@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Linq;
 using UnityEngine;
@@ -33,18 +34,19 @@ namespace LastBell.Run
             var jet = t.Spawned("Furnace Spin").First().H;
             t.Check("Furnace Spin: the jets turned while live", Mathf.Abs(Mathf.DeltaAngle(jet.Yaw, t.Spawned("Furnace Spin").First().H.Yaw)) >= 0 && jet.Age > jet.ResolveAt);
             t.Check("Furnace Spin: every jet reaches the wall", t.Spawned("Furnace Spin").All(x => Mathf.Abs((Sim.Flat(x.H.Origin) + Sim.Dir(x.H.Yaw) * x.H.Length).magnitude - (CrucivarAbility.Rim + Hazard.Margin)) < 0.05f));
-            var front = t.Spawns.First(x => x.Source == "Hammerfall I").H; var back = t.Spawns.First(x => x.Source == "Hammerfall II").H;
-            var edge = Sim.Dir(front.Yaw) * (CrucivarAbility.Rim - 0.2f); var behind = Sim.Dir(back.Yaw) * (CrucivarAbility.Rim - 0.2f);
-            t.Check("Hammerfall: the cleaves reach the wall (no out-ranging)", front.Contains(edge) && back.Contains(behind) && !front.Contains(behind) && !back.Contains(edge));
+            var q = new[] { "Anvil Quake I", "Anvil Quake II", "Anvil Quake III" }.Select(n => t.Spawns.First(x => x.Source == n).H).ToArray();
+            var o = Sim.Flat(q[0].Origin); var wallPt = Vector3.right * (CrucivarAbility.Rim - 0.2f);
+            bool Only(int i, Vector3 p) => Enumerable.Range(0, 3).All(k => q[k].Contains(p) == (k == i));
+            t.Check("Anvil Quake: inner / middle / outer bands, the outer one reaching the wall", Only(0, o + Vector3.forward * 2f) && Only(1, o + Vector3.forward * 6.5f) && Only(2, wallPt) && Only(2, -wallPt));
             t.Check("Backdraft lands at 8.0 s", R("Backdraft") >= 479 && R("Backdraft") <= 482, $"{R("Backdraft")}");
             var pours = t.Spawned("Pour ").Where(x => !x.Source.Contains("Channel")).OrderBy(x => x.H.ResolveAt + x.Tick).ToList();
             t.Check("Casting Order: pours I-IV, 0.5 s apart from 10.5 s", pours.Count == 4 && pours.Select(x => x.Tick - c0 + x.H.ResolveAt).SequenceEqual(new[] { 630, 660, 690, 720 }.Select(v => v + (pours[0].Tick - c0 + pours[0].H.ResolveAt - 630))),
                 string.Join("/", pours.Select(x => x.Tick - c0 + x.H.ResolveAt)));
             t.Check("each pour leaves a burning channel", t.Spawned("Pour Channel").Count() == pours.Count);
-            t.Check("Hammerfall: front half, back half, slam at 11.5 / 12.3 / 13.0 s", new[] { "Hammerfall I", "Hammerfall II", "Hammerfall III" }.All(n => t.Spawns.Count(x => x.Source == n) == 1),
-                $"{R("Hammerfall I")}/{R("Hammerfall II")}/{R("Hammerfall III")}");
+            t.Check("Anvil Quake: rings at 12.4 / 13.2 / 14.0 s, after the last pour", Math.Abs(R("Anvil Quake I") - 744) <= 2 && Math.Abs(R("Anvil Quake II") - 792) <= 2 && Math.Abs(R("Anvil Quake III") - 840) <= 2 && R("Anvil Quake I") > pours.Max(x => x.Tick - c0 + x.H.ResolveAt),
+                $"{R("Anvil Quake I")}/{R("Anvil Quake II")}/{R("Anvil Quake III")}");
             t.Check("peak of live patterns is three or more", peak >= 3, $"peak {peak}");
-            t.Check("still players get hit (brands on each other, jets, blast, hammer)", t.Hits.Count > 0, $"{t.Hits.Count} hits");
+            t.Check("still players get hit (brands on each other, jets, blast, quake)", t.Hits.Count > 0, $"{t.Hits.Count} hits");
             int pools = t.W.Hazards.Live.Count(h => h.Source == "Brand Pool");
             t.Check("brand pools outlast the loop", pools == 8, $"{pools} live");
             t.Boss.Rite.ClearPools();

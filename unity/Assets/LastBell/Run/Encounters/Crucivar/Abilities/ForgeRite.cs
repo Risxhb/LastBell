@@ -14,8 +14,9 @@ namespace LastBell.Run
     //   8.5  Casting Order      pours I-IV (2.6 m lanes to the wall) through each numbered player, locking 1.5 s before they
     //                           land 0.5 s apart at 10.5-12.0 s, 30 each; each leaves a channel burning 20/s for 10 s.
     //                           Even loops hide the numerals and replay the same order. Solo: you are I, II and III.
-    //  10.0  Hammerfall         front half of the arena to the wall at 1.5 s, back half at 2.3 s (cross the line in 0.8 s),
-    //                           point-blank slam (4.5 m) at 3.0 s, 40 each, Strike, all shown at once (Chzy18 10-27: no out-ranging)
+    //  11.0  Anvil Quake        inner circle (0-4 m) at 1.4 s, middle band (4-9 m) at 2.2 s, outer band (9 m to the wall) at
+    //                           3.0 s, 40 each, Strike, all shown at once; lands after the last pour (Chzy18 10-27 replaced
+    //                           the Hammerfall cleave, which came down right after the pours and could be out-ranged)
     //  13.5  Ember Brand        again
     //  17.5  punish window      3.0 s (the encounter plays it)
     public sealed class ForgeRite : CrucivarAbility
@@ -31,8 +32,8 @@ namespace LastBell.Run
         public const int BlastDmg = 45;
         public const float PourWidth = 2.6f, PourLead = 2.0f, PourGap = 0.5f, PourLockBefore = 1.5f, ChannelLife = 10f, ChannelBurn = 20f;
         public const int PourDmg = 30;
-        public const float CleaveHalf = 90f, CleaveFront = 1.5f, CleaveBack = 2.3f, SlamAt = 3.0f, SlamRadius = 4.5f;
-        public const int HammerDmg = 40;
+        public const float QuakeFirst = 1.4f, QuakeGap = 0.8f, QuakeInner = 4f, QuakeMiddle = 9f;
+        public const int QuakeDmg = 40;
 
         int loops;
         public int Loops => loops;
@@ -56,8 +57,8 @@ namespace LastBell.Run
             foreach (var w in Backdraft()) { t += w; yield return w; }
             foreach (var w in Until(8.5f)) yield return w;
             Boss.SetCurrent("Casting Order"); CastingOrder();
-            foreach (var w in Until(10.0f)) yield return w;
-            Boss.SetCurrent("Hammerfall"); Hammerfall();
+            foreach (var w in Until(11.0f)) yield return w;
+            Boss.SetCurrent("Anvil Quake"); AnvilQuake();
             foreach (var w in Until(13.5f)) yield return w;
             Boss.SetCurrent("Ember Brand"); EmberBrand();
             foreach (var w in Until(17.5f)) yield return w;
@@ -193,27 +194,31 @@ namespace LastBell.Run
             h.Length = GreatCasting.RayToCircle(h.Origin, Sim.Dir(h.Yaw), Rim + Hazard.Margin, out float t) ? t : Rim * 2;
         }
 
-        // ---------------- Hammerfall ----------------
-        void Hammerfall()
+        // ---------------- Anvil Quake ----------------
+        // three bands from the anvil out to the wall, all shown at once, landing inner -> middle -> outer: step into a band
+        // that has already gone off (in toward the boss once the inner ring has landed)
+        void AnvilQuake()
         {
             Boss.Rig.Pour(false);
             var origin = Flat(Boss.transform.position);
-            var near = W.NearestStanding(origin);
-            float yaw = near != null ? Sim.YawTo(origin, near.transform.position, Boss.transform.eulerAngles.y) : Boss.transform.eulerAngles.y;
-            Boss.transform.rotation = Quaternion.Euler(0, yaw, 0);
-            Spawn("Hammerfall I", HazardShape.Cone, yaw, T(CleaveFront));
-            Spawn("Hammerfall II", HazardShape.Cone, yaw + 180f, T(CleaveBack));
-            Spawn("Hammerfall III", HazardShape.Circle, yaw, T(SlamAt));
-            Boss.Presenter.PlayOnce("Diebreaker", T(SlamAt) / (float)Sim.Hz);
+            float wall = Rim + origin.magnitude + Hazard.Margin;
+            Spawn("Anvil Quake I", HazardShape.Circle, 0, QuakeInner, T(QuakeFirst));
+            Spawn("Anvil Quake II", HazardShape.Ring, QuakeInner, QuakeMiddle, T(QuakeFirst + QuakeGap));
+            Spawn("Anvil Quake III", HazardShape.Ring, QuakeMiddle, wall, T(QuakeFirst + 2 * QuakeGap));   // reaches the wall: no out-ranging
+            Boss.Presenter.PlayOnce("Diebreaker", T(QuakeFirst) / (float)Sim.Hz);
 
-            void Spawn(string name, HazardShape shape, float y, int at)
+            void Spawn(string name, HazardShape shape, float inner, float outer, int at)
             {
                 var h = W.Hazards.Spawn(new Hazard
                 {
-                    Source = name, Shape = shape, Kind = HazardKind.Strike, Origin = origin, Yaw = y, Radius = shape == HazardShape.Cone ? Rim + origin.magnitude + Hazard.Margin : SlamRadius,   // a half cleave reaches the wall
-                    HalfAngle = CleaveHalf, LockAt = 0, ResolveAt = at, Damage = HammerDmg, Knockback = 1.5f,
+                    Source = name, Shape = shape, Kind = HazardKind.Strike, Origin = origin, Inner = inner, Radius = outer,
+                    LockAt = 0, ResolveAt = at, Damage = QuakeDmg, Knockback = 1f,
                 });
-                h.OnResolve = hz => { W.BossFx.DiebreakerResolve(hz.Origin + Sim.Dir(hz.Yaw) * (shape == HazardShape.Cone ? 3f : 0f), 2.5f); Boss.Flare(1f); };
+                h.OnResolve = hz =>
+                {
+                    if (hz.Shape == HazardShape.Circle) W.BossFx.DiebreakerResolve(hz.Origin, hz.Radius); else W.BossFx.BellowsBlast(hz.Origin, hz.Radius);
+                    Boss.Flare(1f);
+                };
             }
         }
     }
