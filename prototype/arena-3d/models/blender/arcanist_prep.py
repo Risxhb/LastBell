@@ -30,7 +30,22 @@ def decimate(o, budget, merge=0.0003):
     bpy.ops.object.modifier_apply(modifier='dec'); bpy.ops.object.shade_smooth()
     o.data.calc_loop_triangles(); return n, len(o.data.loop_triangles)
 
-n0, n1 = decimate(ob, TARGET_TRIS); print('TRIS', n0, '->', n1)
+# The face and hair get their own, much larger budget: decimated together with the body they lose the eyes, nose and
+# hair strands. Split them off above the collar line, decimate each part, join back (the collar hides the seam).
+HEAD_TRIS = 40000
+bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT')
+bpy.ops.mesh.remove_doubles(threshold=0.0003); bpy.ops.object.mode_set(mode='OBJECT')
+co = verts(ob); sel = (co[:, 2] > 1.46) & (np.hypot(co[:, 0], co[:, 1] + 0.05) < 0.24)
+me = ob.data; me.vertices.foreach_set('select', sel)
+ev = np.empty(len(me.edges) * 2, np.int64); me.edges.foreach_get('vertices', ev); me.edges.foreach_set('select', sel[ev.reshape(-1, 2)].all(1))
+me.polygons.foreach_set('select', np.array([all(sel[i] for i in p.vertices) for p in me.polygons]))
+bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.separate(type='SELECTED'); bpy.ops.object.mode_set(mode='OBJECT')
+head = [o for o in bpy.context.scene.objects if o.type == 'MESH' and o is not ob][0]
+for o, budget in ((ob, TARGET_TRIS - HEAD_TRIS), (head, HEAD_TRIS)):
+    n0, n1 = decimate(o, budget); print('TRIS', o.name, n0, '->', n1)
+bpy.ops.object.select_all(action='DESELECT'); head.select_set(True); ob.select_set(True)
+bpy.context.view_layer.objects.active = ob; bpy.ops.object.join()
+ob.data.calc_loop_triangles(); print('TRIS total', len(ob.data.loop_triangles))
 
 def shrink(node, size, name):
     # save a downscaled PNG and repoint the node at it, so the exporter doesn't ship the packed original
@@ -49,7 +64,7 @@ def shrink_all(o, prefix, sizes):
         if key in imgs: out[key] = shrink(imgs[key], size, prefix + '_' + name)
     return nt, out
 
-nt, tex = shrink_all(ob, 'arcanist', {'Image_0': (2048, 'basecolor'), 'Image_1': (1024, 'orm'), 'Image_2': (2048, 'normal')})
+nt, tex = shrink_all(ob, 'arcanist', {'Image_0': (4096, 'basecolor'), 'Image_1': (1024, 'orm'), 'Image_2': (2048, 'normal')})
 bsdf = nt.nodes['Principled BSDF']
 
 def glow(base, mask_fn, name, strength):
