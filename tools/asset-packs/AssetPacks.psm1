@@ -67,7 +67,10 @@ function Get-PackFiles([string]$RepoRoot, [string[]]$Paths) {
 }
 
 function Get-Sha256([string]$Path) {
-    return (Get-FileHash -Algorithm SHA256 -LiteralPath $Path).Hash.ToLowerInvariant()
+    $stream = [IO.File]::OpenRead([IO.Path]::GetFullPath($Path))
+    $hash = [Security.Cryptography.SHA256]::Create()
+    try { return ([BitConverter]::ToString($hash.ComputeHash($stream))).Replace('-', '').ToLowerInvariant() }
+    finally { $stream.Dispose(); $hash.Dispose() }
 }
 
 function New-PackZip([string]$RepoRoot, [string[]]$Files, [string]$ZipPath) {
@@ -121,6 +124,132 @@ function Invoke-Native([scriptblock]$Command) {
 function Format-Size([long]$Bytes) {
     if ($Bytes -ge 1GB) { return '{0:N2} GB' -f ($Bytes / 1GB) }
     return '{0:N1} MB' -f ($Bytes / 1MB)
+}
+
+function Get-AzureSource($Pack) {
+    if ($Pack.PSObject.Properties['source'] -and $Pack.source) { return $Pack.source }
+    return $null
+}
+
+function Get-AzExecutable {
+    $command = Get-Command az -ErrorAction SilentlyContinue
+    if ($command) { return $command.Source }
+    $standardPath = Join-Path ${env:ProgramFiles} 'Microsoft SDKs\Azure\CLI2\wbin\az.cmd'
+    if (Test-Path $standardPath -PathType Leaf) { return $standardPath }
+    throw 'Azure CLI is missing. Install Azure CLI and its azure-devops extension before using the private asset feed.'
+}
+
+function Get-AssetPat {
+    if ($env:AZURE_DEVOPS_EXT_PAT) { return $env:AZURE_DEVOPS_EXT_PAT.Trim() }
+    $path = Join-Path $env:USERPROFILE '.lastbell\ado-pat.txt'
+    if (Test-Path $path -PathType Leaf) { return [IO.File]::ReadAllText($path).Trim() }
+    return ''
+}
+
+function Get-SafeAzError([string[]]$Lines, [string]$Pat) {
+    $line = @($Lines | Where-Object { $_ -match 'TF400813|(?i)ERROR|(?i)error:' } | Select-Object -First 1)
+    if (-not $line) { $line = @($Lines | Where-Object { $_.Trim() } | Select-Object -Last 1) }
+    if (-not $line) { return 'Azure CLI returned an error without details.' }
+    $safe = [string]$line[0]
+    if ($Pat) { $safe = $safe.Replace($Pat, '[redacted]') }
+    $safe = [regex]::Replace($safe, '(?i)(authorization\s*[:=]\s*(?:basic|bearer)\s+)\S+', '$1[redacted]')
+    $safe = [regex]::Replace($safe, '(?i)((?:token|pat|sig|password)\s*[:=]\s*)\S+', '$1[redacted]')
+    if ($safe.Length -gt 500) { $safe = $safe.Substring(0, 500) + '...' }
+    return $safe
+}
+
+function Invoke-AzArtifact([string[]]$Arguments) {
+    $az = Get-AzExecutable
+    $pat = Get-AssetPat
+    $oldPat = $env:AZURE_DEVOPS_EXT_PAT
+    $oldConfig = $env:AZURE_CONFIG_DIR
+    $oldExtensions = $env:AZURE_EXTENSION_DIR
+    $cleanConfig = $null
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        if ($pat) {
+            # Azure CLI favors an existing az login identity over AZURE_DEVOPS_EXT_PAT.
+            # A fresh profile makes the PAT authoritative without changing the user's login.
+            $cleanConfig = Join-Path ([IO.Path]::GetTempPath()) ("lastbell-az-" + [guid]::NewGuid().ToString('N'))
+            [void](New-Item -ItemType Directory -Path $cleanConfig)
+            $env:AZURE_CONFIG_DIR = $cleanConfig
+            $env:AZURE_DEVOPS_EXT_PAT = $pat
+            if (-not $oldExtensions) {
+                $extensions = Join-Path $env:USERPROFILE '.azure\cliextensions'
+                if (Test-Path $extensions -PathType Container) { $env:AZURE_EXTENSION_DIR = $extensions }
+            }
+        } else {
+            & $az account show --output none --only-show-errors *> $null
+            if ($LASTEXITCODE -ne 0) {
+                throw 'Azure sign-in missing. Personal Microsoft accounts should use a Packaging PAT in AZURE_DEVOPS_EXT_PAT or %USERPROFILE%\.lastbell\ado-pat.txt.'
+            }
+        }
+        $lines = @(& $az @Arguments 2>&1 | ForEach-Object { [string]$_ })
+        $code = $LASTEXITCODE
+        if ($code -ne 0) {
+            $detail = Get-SafeAzError $lines $pat
+            if ($detail -match 'TF400813') {
+                throw "Azure DevOps rejected the CLI identity (TF400813). For a personal Microsoft account, use a Packaging PAT; this script gives it a clean Azure profile. Azure CLI: $detail"
+            }
+            throw "Azure CLI failed (exit $code). Azure CLI: $detail"
+        }
+    } finally {
+        $ErrorActionPreference = $previous
+        $env:AZURE_DEVOPS_EXT_PAT = $oldPat
+        $env:AZURE_CONFIG_DIR = $oldConfig
+        $env:AZURE_EXTENSION_DIR = $oldExtensions
+        if ($cleanConfig) {
+            $resolved = [IO.Path]::GetFullPath($cleanConfig)
+            $tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
+            if ($resolved.StartsWith($tempRoot + 'lastbell-az-', [StringComparison]::OrdinalIgnoreCase)) {
+                Remove-Item -LiteralPath $resolved -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+}
+
+function Invoke-UniversalDownload($Source, [string]$FileName, [string]$Destination) {
+    if ($Source.type -ne 'azure-universal') { throw "Unsupported asset source: $($Source.type)" }
+    if ($env:LAST_BELL_ASSET_STORE_DIR) {
+        [void](New-Item -ItemType Directory -Force $Destination)
+        $local = Join-Path $env:LAST_BELL_ASSET_STORE_DIR "$($Source.package)/$($Source.packageVersion)/$FileName"
+        Copy-Item -LiteralPath $local -Destination (Join-Path $Destination $FileName) -ErrorAction Stop
+        return
+    }
+    [void](New-Item -ItemType Directory -Force $Destination)
+    $args = @('artifacts','universal','download','--organization',$Source.organization,'--project',$Source.project,
+        '--scope','project','--feed',$Source.feed,'--name',$Source.package,'--version',$Source.packageVersion,
+        '--path',$Destination,'--file-filter',$FileName,'--only-show-errors','--output','none')
+    Invoke-AzArtifact $args
+    if (-not (Test-Path (Join-Path $Destination $FileName))) {
+        throw "Azure Artifacts download returned no $FileName for $($Source.package) $($Source.packageVersion)."
+    }
+}
+
+function Invoke-UniversalPublish($Source, [string]$Directory) {
+    if ($env:LAST_BELL_ASSET_STORE_DIR) {
+        $target = Join-Path $env:LAST_BELL_ASSET_STORE_DIR "$($Source.package)/$($Source.packageVersion)"
+        if (Test-Path $target) { throw "Package version already exists: $($Source.package) $($Source.packageVersion)." }
+        [void](New-Item -ItemType Directory -Force $target)
+        Get-ChildItem -LiteralPath $Directory -Filter '*.zip' -File | Copy-Item -Destination $target
+        return
+    }
+    $args = @('artifacts','universal','publish','--organization',$Source.organization,'--project',$Source.project,
+        '--scope','project','--feed',$Source.feed,'--name',$Source.package,'--version',$Source.packageVersion,
+        '--path',$Directory,'--only-show-errors','--output','none')
+    Invoke-AzArtifact $args
+}
+
+function New-UniversalSource([string]$Name, [int]$Version, [string]$Feed) {
+    return [pscustomobject][ordered]@{
+        type = 'azure-universal'
+        organization = 'https://dev.azure.com/ChzandZum'
+        project = 'Last Bell'
+        feed = $Feed
+        package = $Name
+        packageVersion = "$Version.0.0"
+    }
 }
 
 Export-ModuleMember -Function *
