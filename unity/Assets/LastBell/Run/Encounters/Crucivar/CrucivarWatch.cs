@@ -199,7 +199,7 @@ namespace LastBell.Run
                     if (hit) cost += 100f;
                     continue;
                 }
-                if (Inside(h, test, 0.45f)) cost += toLand < 1.2f || live > 0 ? 100f : 45f;
+                if (Inside(h, test, 0.45f)) cost += toLand < 1.2f || live > 0 ? 100f : 30f + 70f * Mathf.Clamp01(1f - (toLand - 1.2f) / 2f);   // sooner = worse, so they stand where the later hit lands
             }
             return cost;
         }
