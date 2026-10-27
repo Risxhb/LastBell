@@ -104,6 +104,12 @@ namespace LastBell.Run
                         if (!me.Dashing && me.Stamina >= PlayerController.DashCost && need / PlayerController.SprintSpeed > t - 0.15f && !bad(pos + move * 3f)) inp.Dash = true;
                     }
                 }
+                // casters: the basic casts on the move (0.55-0.6 speed), so keep it going while repositioning (following a
+                // turning well, a far job) when nothing lands yet or the slower walk still has time to spare
+                if (Attacks && me.ClassName != "Vanguard" && !inp.Dash && !me.Kit.Acting && tick - lastPress >= 6 && me.Kit.Cooldown01(0) <= 0.001f
+                    && Sim.Flat(bpos - pos).magnitude - boss.BodyRadius <= Range(me) + 1.85f
+                    && (threat == null || move == Vector3.zero || need / (PlayerController.WalkSpeed * 0.55f) < t - 0.3f))
+                { inp.P0 = inp.H0 = true; lastPress = tick; }
                 castHold = 0;
             }
             else
