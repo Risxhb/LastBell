@@ -208,12 +208,12 @@ Each rule below is settled unless it says otherwise.
   This applies to every game, Rabbit and Steel and Windblown included. Keep such research evidence **local and gitignored**. Only our own written analysis (mechanic descriptions, timings in our own words and numbers, design proposals) may be committed.
 - **Settled:** research folders are never pushed without Chzy18 reviewing them first, even when pushing is otherwise allowed.
 - **Settled:** large binaries (GLB, big textures, video) go in asset packs, not git (`docs/asset-packs.md`).
-- **Settled (Chzy18, 2026-10-25): the repository is on Azure DevOps, and GitHub is retired.**
-  - The repo is https://dev.azure.com/ChzandZum/_git/Last%20Bell (project "Last Bell").
+- **Settled (Risx, 2026-10-26): GitHub is not retired. The repository lives on both GitHub and Azure DevOps.** This replaces the 2026-10-25 note that GitHub was retired.
+  - GitHub: https://github.com/Risxhb/LastBell (remote `origin`). Work is still pushed there, and it hosts the web demo. Asset packs download from its Releases.
+  - Azure DevOps: https://dev.azure.com/ChzandZum/_git/Last%20Bell (project "Last Bell", remote `azure`). Push there once a piece of work is finished and tested.
   - The main branch is Risx's `feature/confrontation-menu`.
-  - Local repos have a remote named `azure`, and it's their default push target.
-  - Don't push or post to GitHub (`origin`). Asset packs still download from GitHub Releases until they're moved.
-- **Settled (Chzy18, 2026-10-23): push rarely, in bigger batches.**
+  - The lane board and the Azure wiki get major, finalized updates only.
+- **Settled (Chzy18, 2026-10-23): push to Azure rarely, in bigger batches.**
   - Commit locally as often as you like.
   - Push only when a piece of work is finished and tested, or when Chzy18 asks. That's at most about one push per lane per day, and never a push per commit.
   - Use one branch and one Azure PR per boss or feature into `feature/confrontation-menu`, not one per ability or sub-task. Combine sub-task branches locally first.
