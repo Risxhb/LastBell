@@ -1,0 +1,76 @@
+{
+  "url": "https://risxhb.github.io/lastbell/",
+  "release": "3ba7430b966f8e01e21afd26d474c9a9c390bb82",
+  "cacheBustingQuery": true,
+  "manifestMatches": true,
+  "dataPartsHeadVerified": [
+    {
+      "file": "data-268fcc5caadabadc641015396aa77d77bfc4edebdaa679e1357ad92ab6a316e1.bin",
+      "status": 200,
+      "bytes": 67108864,
+      "sha256": "268fcc5caadabadc641015396aa77d77bfc4edebdaa679e1357ad92ab6a316e1"
+    },
+    {
+      "file": "data-644301fac24d911f139921edddcc44dfc83073e88d024008570cec48946a5c2c.bin",
+      "status": 200,
+      "bytes": 67108864,
+      "sha256": "644301fac24d911f139921edddcc44dfc83073e88d024008570cec48946a5c2c"
+    },
+    {
+      "file": "data-f8908203965c8fd838183fb746a35b3c437270521489e7550ed3bc5bbfc12586.bin",
+      "status": 200,
+      "bytes": 67108864,
+      "sha256": "f8908203965c8fd838183fb746a35b3c437270521489e7550ed3bc5bbfc12586"
+    },
+    {
+      "file": "data-e67ce14350ab62f5d217af657d703de8a0e0250d96a40fbd9ebc50aec7f937ab.bin",
+      "status": 200,
+      "bytes": 67108864,
+      "sha256": "e67ce14350ab62f5d217af657d703de8a0e0250d96a40fbd9ebc50aec7f937ab"
+    },
+    {
+      "file": "data-7fd898a5c4498ab554f328729cb066472da281f2c3a181977b703498cb1d3cce.bin",
+      "status": 200,
+      "bytes": 67108864,
+      "sha256": "7fd898a5c4498ab554f328729cb066472da281f2c3a181977b703498cb1d3cce"
+    },
+    {
+      "file": "data-4faba3e4f70c13af14ae6ebb181bb66591250c6d9492a2a9fad1d938aa2d9e8e.bin",
+      "status": 200,
+      "bytes": 35640641,
+      "sha256": "4faba3e4f70c13af14ae6ebb181bb66591250c6d9492a2a9fad1d938aa2d9e8e"
+    }
+  ],
+  "filesVerified": [
+    {
+      "file": "index.html",
+      "bytes": 6706,
+      "sha256": "d2e20e972a819c98780adb2aec89ecbad23a41f89694b5f5e8ec7b3a825d4083",
+      "verification": "text matches with Git LF normalization"
+    },
+    {
+      "file": "player.css",
+      "bytes": 2337,
+      "sha256": "a27edbbc7a30b7963a1cd0b92881c565c4d4718c6b4e64cbd0f00433bfe2b5e7",
+      "verification": "text matches with Git LF normalization"
+    },
+    {
+      "file": "Build/lastbell.loader.js",
+      "bytes": 48779,
+      "sha256": "b4639c9ac8002c3e15b589bc29e24464f4fa23c387933cbe25545f1c8e4bf97f",
+      "verification": "text matches with Git LF normalization"
+    },
+    {
+      "file": "Build/lastbell.framework.js.unityweb",
+      "bytes": 75049,
+      "sha256": "db56611d0510640f32f41cf2fa1c3213ca7818c91274f7fb0bfc5b779057c3cd",
+      "verification": "byte-for-byte"
+    },
+    {
+      "file": "Build/lastbell.wasm.unityweb",
+      "bytes": 9628447,
+      "sha256": "d06e6b91b817666fc60f3523ed5a04e89c0d8e6c91e873e90c2e17f16f7a8316",
+      "verification": "byte-for-byte"
+    }
+  ]
+}

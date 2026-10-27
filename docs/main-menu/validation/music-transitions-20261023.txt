@@ -1,0 +1,84 @@
+PASS initial menu
+PASS menu starts a supported track
+PASS playlist track plays 0
+PASS playlist track plays 1
+PASS playlist track plays 2
+PASS launch run
+PASS run preparation
+PASS initial preparation retains menu playback
+PASS countdown 0
+PASS correct incoming boss track 0
+PASS partial fade 0
+PASS partial fade follows countdown 0
+PASS menu fades while still playing
+PASS paused countdown freezes fade but music continues
+PASS mute covers all fade sources
+PASS volume change retains fade proportions
+PASS fade tracks every sampled countdown tick 0
+PASS full boss volume exactly at combat entry 0
+PASS outgoing sources silent at zero 0
+PASS boss clear 0
+PASS boss track continues through clear 0
+PASS next boss countdown 0
+PASS countdown 1
+PASS correct incoming boss track 1
+PASS previous boss still plays at next countdown 1
+PASS partial fade 1
+PASS partial fade follows countdown 1
+PASS fade tracks every sampled countdown tick 1
+PASS full boss volume exactly at combat entry 1
+PASS outgoing sources silent at zero 1
+PASS boss clear 1
+PASS boss track continues through clear 1
+PASS next boss countdown 1
+PASS countdown 2
+PASS correct incoming boss track 2
+PASS previous boss still plays at next countdown 2
+PASS partial fade 2
+PASS partial fade follows countdown 2
+PASS fade tracks every sampled countdown tick 2
+PASS full boss volume exactly at combat entry 2
+PASS outgoing sources silent at zero 2
+PASS boss clear 2
+PASS boss track continues through clear 2
+PASS next boss countdown 2
+PASS countdown 3
+PASS correct incoming boss track 3
+PASS previous boss still plays at next countdown 3
+PASS partial fade 3
+PASS partial fade follows countdown 3
+PASS fade tracks every sampled countdown tick 3
+PASS full boss volume exactly at combat entry 3
+PASS outgoing sources silent at zero 3
+PASS boss clear 3
+PASS boss track continues through clear 3
+PASS victory results
+PASS victory results retain final boss track
+PASS retry accepted
+PASS retry preparation retains previous boss
+PASS retry countdown
+PASS retry crossfades from previous boss
+PASS return during countdown accepted
+PASS main menu return
+PASS main menu starts next playlist track
+PASS menu return stops both boss sources
+PASS single persistent owner and three reusable sources
+PASS launch defeat check
+PASS defeat preparation
+PASS defeat combat
+PASS downed
+PASS downed retains boss track
+PASS defeat results
+PASS defeat results retain boss track
+PASS defeat retry retains boss track
+PASS same boss retry begins silent incoming track
+PASS interrupted retry countdown
+PASS retry during countdown accepted
+PASS interrupted countdown settles on boss music in preparation
+PASS retry combat
+PASS final return
+PASS manual menu pause remains available
+PASS manual next preserves pause
+PASS manual menu resume remains available
+PASS zero runtime errors
+RESULT 83 passed / 0 failed

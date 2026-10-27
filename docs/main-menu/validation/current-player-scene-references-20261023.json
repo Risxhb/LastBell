@@ -1,0 +1,42 @@
+[
+  {
+    "scene": "unity/Assets/LastBell/Menu/ShowcaseMainMenu.unity",
+    "references": 284,
+    "missing": []
+  },
+  {
+    "scene": "unity/Assets/LastBell/Menu/ConfrontationMainMenu.unity",
+    "references": 14,
+    "missing": []
+  },
+  {
+    "scene": "unity/Assets/LastBell/Menu/HeroSelection.unity",
+    "references": 15,
+    "missing": []
+  },
+  {
+    "scene": "unity/Assets/LastBell/Run/RunArena.unity",
+    "references": 16,
+    "missing": []
+  },
+  {
+    "scene": "unity/Assets/LastBell/Run/Maps/Run_SkywardSpire.unity",
+    "references": 3,
+    "missing": []
+  },
+  {
+    "scene": "unity/Assets/LastBell/Run/Maps/Run_BrassFoundry.unity",
+    "references": 87,
+    "missing": []
+  },
+  {
+    "scene": "unity/Assets/LastBell/Run/Maps/Run_VerdantChimes.unity",
+    "references": 18,
+    "missing": []
+  },
+  {
+    "scene": "unity/Assets/LastBell/Run/Maps/Run_ShatteredHour.unity",
+    "references": 11,
+    "missing": []
+  }
+]

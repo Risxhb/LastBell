@@ -2,6 +2,8 @@
 
 Unity **6000.6.6f1** (Unity 6.6) with URP. In Unity Hub: **Add → Add project from disk** → pick this `unity` folder.
 
+Run `setup-assets.cmd` from the repository root before opening Unity. The [current main player](../docs/main-menu/current-player.md) is the combined menu/run build; future boss and arena changes must integrate there. Use **Last Bell → Current Player → Build Windows Player**, then the repository's `Play Last Bell.cmd`. New profiles use Alternative Confrontation; saved menu choices are respected. The direct arena scenes below remain authoring/diagnostic tools.
+
 ## Key-art test arena
 
 Menu **Last Bell → Test Arena (Key Art)** opens `Assets/LastBell/Arenas/KeyArt/KeyArtTestArena.unity`. It's the Bellkeeper's Dais from the browser prototype (`prototype/arena-3d/arena-env.js`): the floating platform, clock dial, parapet, lanterns, banners and the sky city. Press Play to see the banners, gears and rubble move. **C** switches between the gameplay camera and the key-art angle.

@@ -33,6 +33,7 @@ namespace LastBell.Run.EditorTools
             ["brass-foundry"] = LastBell.Areas.Area2.EditorTools.BrassFoundryArenaBuilder.Build,
             ["verdant-chimes"] = LastBell.Areas.Area3.EditorTools.VerdantChimesBuilder.Build,
             ["shattered-hour"] = LastBell.Areas.Area4.EditorTools.ShatteredHourArenaBuilder.Build,
+            ["metronome-court"] = LastBell.Arenas.MetronomeCourt.EditorTools.MetronomeCourtBuilder.Build,
         };
 
         [MenuItem("Last Bell/Run Loop/Rebuild Run Scenes (all maps)", priority = 20)]

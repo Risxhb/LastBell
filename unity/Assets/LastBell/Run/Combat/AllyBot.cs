@@ -156,6 +156,8 @@ namespace LastBell.Run
 
         void Attack(PlayerController me, ref PlayerInput inp)
         {
+            // Arcanist: keep Disintegrate held on him until its channel ends, unless something is about to land here
+            if (me.Kit is ArcanistKit ak && ak.BeamActive) { if (Clear(me, 30)) inp.H1 = true; return; }
             if (tick - lastPress < 6) return;
             // the kit's own cooldowns (the reference policy; a private counter only ticked while attacking)
             System.Func<int, bool> ready = slot => me.Kit.Cooldown01(slot) <= 0.001f && tick >= skipUntil[slot];
@@ -191,21 +193,21 @@ namespace LastBell.Run
                     else if (c.Bell && c.Charges > 0 && (c.Strength < 2 || c.BellLeft < 90)) s = 1;                  // Bellstrike strengthens it
                     else if (ready(0)) s = 0;                                                                        // Resonant Note
                     break;
-                default:   // Arcanist
+                default:   // Arcanist (Risx's glyph kit, 27 Oct): Disintegrate builds glyphs, Comet and Sigil spend them, Surge spends all
                     if (me.Kit.Acting || !(me.Kit is ArcanistKit a)) return;
-                    bool sealed_ = a.Seals.Count > 0, ripe = sealed_;   // every seal ripe when Convergence releases
-                    int soonest = int.MaxValue; bool raw = false;
-                    foreach (var seal in a.Seals) { if (seal.Left > 129 || seal.Left <= 9) ripe = false; soonest = Mathf.Min(soonest, seal.Left); if (!seal.Inscribed) raw = true; }
-                    if (sealed_ && ready(3) && ((ripe && (a.Seals.Count >= 2 || a.Charges == 0)) || soonest < 20)) s = 3;   // Convergence
-                    else if (a.Ticks >= 3 && ready(2) && (raw || !sealed_)) { s = 2; castHold = 50; }                       // Arc Lance (stand still for the cast)
-                    else if (a.Charges > 0 && ((!sealed_ && a.Charges == 2) || (a.Seals.Count == 1 && a.Seals[0].Inscribed && a.Seals[0].Left > 240))) s = 1;   // Time Seal
-                    else if (ready(0)) s = 0;                                                                        // Clockbolt
+                    bool fed = a.Glyphs > 0 || a.Surging;
+                    if (ready(4) && !a.Surging && a.Glyphs >= 2 && (ready(3) || ready(2))) s = 4;               // Arcane Surge: runes free and twice as fast
+                    else if (ready(3) && fed) s = 3;                                                            // Arcane Comet (lands 3 s later)
+                    else if (ready(2) && fed) s = 2;                                                            // Rune Sigil
+                    else if (ready(1) && a.Glyphs < ArcanistKit.MaxGlyphs && Clear(me, 150)) s = 1;               // Disintegrate: held below until its 3 steps end
+                    else if (ready(0)) s = 0;                                                                   // Magic Missile tap
                     break;
             }
             if (s < 0) return;
             if (s > 0) { pendingSlot = s; pendingUntil = tick + 90; }
             lastPress = tick;
-            switch (s) { case 0: inp.P0 = inp.H0 = true; break; case 1: inp.P1 = true; break; case 2: inp.P2 = true; break; case 3: inp.P3 = true; break; default: inp.P4 = true; break; }
+            if (s == 0 && me.Kit is ArcanistKit) { inp.P0 = true; return; }   // a tap, not a held volley
+            switch (s) { case 0: inp.P0 = inp.H0 = true; break; case 1: inp.P1 = inp.H1 = true; break; case 2: inp.P2 = true; break; case 3: inp.P3 = true; break; default: inp.P4 = true; break; }
         }
 
         System.Func<Vector3, bool> bad;

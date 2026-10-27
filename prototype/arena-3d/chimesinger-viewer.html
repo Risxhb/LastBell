@@ -61,8 +61,16 @@ floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
 const composer = new EffectComposer(renderer); composer.addPass(new RenderPass(scene, camera));
 composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.55, 0.4, 0.85)); composer.addPass(new OutputPass());
 
-const views = { Close: [2.6, 1.7, 3.6], 'Top-down': [0, 7.5, 6.5] };
-const setView = v => { camera.position.set(...views[v]); controls.target.set(0, v === 'Close' ? 0.95 : 0.6, 0); };
+const views = { Close: [2.6, 1.7, 3.6], 'Top-down': [0, 7.5, 6.5], 'Right hand': [0.35, 0.18, 0.45], 'Left hand': [-0.35, 0.18, 0.45] };
+// hand views follow the fist (bones 'hand.R' / 'hand.L', named handR / handL by three.js) so the grip can be inspected in motion
+const HAND_BONE = { 'Right hand': 'handR', 'Left hand': 'handL' };
+let follow = null, followPrev = new THREE.Vector3();
+const setView = v => {
+  follow = HAND_BONE[v] && model ? model.getObjectByName(HAND_BONE[v]) : null;
+  if (follow) { follow.getWorldPosition(followPrev); controls.target.copy(followPrev); camera.position.copy(followPrev).add(new THREE.Vector3(...views[v])); return; }
+  camera.position.set(...views[v]); controls.target.set(0, v === 'Close' ? 0.95 : 0.6, 0);
+};
+let model;
 setView('Close');
 
 const status = document.getElementById('status'), ui = document.getElementById('ui');
@@ -71,9 +79,9 @@ const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
 // clip order for the buttons; number keys 1-9 play the first nine
 const ORDER = ['Idle', 'Run', 'Sprint', 'ResonantNote', 'Bellstrike', 'HarmonicRefrain', 'Crescendo', 'MendingChorus', 'Dodge', 'Jump'];
 const LABEL = { ResonantNote: 'Resonant Note', HarmonicRefrain: 'Harmonic Refrain', MendingChorus: 'Mending Chorus', Dodge: 'Harmonic Step' };
-let mixer, actions = {}, current, moving = false;
+let mixer, actions = {}, current, moving = false, paused = false, speed = 1;
 new GLTFLoader().parse(bytes.buffer, '', gltf => {
-  const model = gltf.scene; model.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  model = gltf.scene; model.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   scene.add(model); mixer = new THREE.AnimationMixer(model);
   for (const clip of gltf.animations) actions[clip.name] = mixer.clipAction(clip);
   const loops = new Set(['Idle', 'Run', 'Sprint']);
@@ -82,7 +90,14 @@ new GLTFLoader().parse(bytes.buffer, '', gltf => {
   const order = ORDER.filter(n => actions[n]);
   for (const n of order) { const b = document.createElement('button'); b.textContent = LABEL[n] || n; b.dataset.anim = n; b.onclick = () => { if (loops.has(n)) moving = n !== 'Idle' && n; play(n); }; ui.appendChild(b); }
   for (const v of Object.keys(views)) { const b = document.createElement('button'); b.textContent = v; b.onclick = () => setView(v); ui.appendChild(b); }
-  const sp = document.createElement('button'); sp.textContent = 'Slow-mo'; sp.onclick = () => { sp.classList.toggle('on'); mixer.timeScale = sp.classList.contains('on') ? 0.25 : 1; }; ui.appendChild(sp);
+  const sp = document.createElement('button'); sp.textContent = 'Slow-mo'; sp.onclick = () => { sp.classList.toggle('on'); speed = sp.classList.contains('on') ? 0.25 : 1; if (!paused) mixer.timeScale = speed; }; ui.appendChild(sp);
+  // pause and single-frame step (30 fps clips) for checking contact frames up close
+  const pb = document.createElement('button'); pb.textContent = 'Pause'; pb.onclick = () => { paused = !paused; pb.classList.toggle('on', paused); mixer.timeScale = paused ? 0 : speed; }; ui.appendChild(pb);
+  for (const [label, d] of [['◀ Frame', -1], ['Frame ▶', 1]]) {
+    const b = document.createElement('button'); b.textContent = label;
+    b.onclick = () => { if (!paused) pb.onclick(); if (current) { const c = current.getClip(); current.time = Math.min(c.duration, Math.max(0, current.time + d / 30)); mixer.update(0); } };
+    ui.appendChild(b);
+  }
   play('Idle');
   status.textContent = 'Drag to orbit · scroll to zoom · keys 1–9 play animations';
 }, e => { status.textContent = 'Failed to load model: ' + e.message; console.error(e); });
@@ -103,6 +118,11 @@ renderer.setAnimationLoop(() => {
   const speed = current && current === actions.Run ? 1.6 : current && current === actions.Sprint ? 2.8 : 0;
   // texture +V runs toward -Z on the rotated floor; the model faces +Z, so tiles must slide toward -Z (behind her)
   floorTex.offset.y -= dt * speed * (mixer ? mixer.timeScale : 1);
+  if (follow) {   // carry the camera along with the fist
+    const p = follow.getWorldPosition(new THREE.Vector3()); const d = p.clone().sub(followPrev);
+    camera.position.add(d); controls.target.add(d); followPrev.copy(p);
+  }
+  if (current) status.textContent = (LABEL[current.getClip().name] || current.getClip().name) + ' · frame ' + (Math.round(current.time * 30) + 1) + ' / ' + (Math.round(current.getClip().duration * 30) + 1);
   controls.update(); composer.render();
 });
 </script>

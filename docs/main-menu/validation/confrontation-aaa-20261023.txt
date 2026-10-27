@@ -1,0 +1,131 @@
+Confrontation menu AAA-bar pass — final Windows player, 2026-10-23
+Player: E:/Collab/builds/confrontation-aaa-20261023/LastBell.exe (Unity 6000.6.6f1, 0 errors/46 warnings)
+
+PASS perspective fixed camera
+PASS exact uniform double boss scale
+PASS authored boss and idle
+PASS alternate logo sprite with alpha
+PASS no gameplay authority
+PASS single music owner
+PASS keyboard moves to Boss Rush
+PASS controller moves to Settings
+PASS keyboard opens settings
+PASS settings focus returns
+PASS actual requested resolution (1600, 900)
+PASS selected class (1600, 900) 0
+PASS one active hero
+PASS idle bones animate 0
+FRAME 1600x900 hero=(0.17, 0.73, 2.57) boss=(0.47, 0.56, 26.06)
+PASS hero left / boss middle
+PASS navigation fits screen
+PASS selected class (1600, 900) 1
+PASS one active hero
+PASS idle bones animate 1
+FRAME 1600x900 hero=(0.16, 0.74, 2.43) boss=(0.47, 0.56, 26.06)
+PASS hero left / boss middle
+PASS navigation fits screen
+PASS selected class (1600, 900) 2
+PASS one active hero
+PASS idle bones animate 2
+FRAME 1600x900 hero=(0.20, 0.74, 2.43) boss=(0.47, 0.56, 26.06)
+PASS hero left / boss middle
+PASS navigation fits screen
+PASS actual requested resolution (1280, 720)
+PASS selected class (1280, 720) 0
+PASS one active hero
+PASS idle bones animate 0
+FRAME 1280x720 hero=(0.17, 0.73, 2.57) boss=(0.47, 0.56, 26.06)
+PASS hero left / boss middle
+PASS navigation fits screen
+PASS selected class (1280, 720) 1
+PASS one active hero
+PASS idle bones animate 1
+FRAME 1280x720 hero=(0.16, 0.74, 2.43) boss=(0.47, 0.56, 26.06)
+PASS hero left / boss middle
+PASS navigation fits screen
+PASS selected class (1280, 720) 2
+PASS one active hero
+PASS idle bones animate 2
+FRAME 1280x720 hero=(0.20, 0.74, 2.43) boss=(0.47, 0.56, 26.06)
+PASS hero left / boss middle
+PASS navigation fits screen
+PASS actual requested resolution (2560, 1080)
+PASS selected class (2560, 1080) 0
+PASS one active hero
+PASS idle bones animate 0
+FRAME 2560x1080 hero=(0.25, 0.73, 2.57) boss=(0.48, 0.56, 26.06)
+PASS hero left / boss middle
+PASS navigation fits screen
+PASS selected class (2560, 1080) 1
+PASS one active hero
+PASS idle bones animate 1
+FRAME 2560x1080 hero=(0.25, 0.74, 2.43) boss=(0.48, 0.56, 26.06)
+PASS hero left / boss middle
+PASS navigation fits screen
+PASS selected class (2560, 1080) 2
+PASS one active hero
+PASS idle bones animate 2
+FRAME 2560x1080 hero=(0.27, 0.74, 2.43) boss=(0.48, 0.56, 26.06)
+PASS hero left / boss middle
+PASS navigation fits screen
+PASS actual requested resolution (1024, 768)
+PASS selected class (1024, 768) 0
+PASS one active hero
+PASS idle bones animate 0
+FRAME 1024x768 hero=(0.18, 0.66, 2.57) boss=(0.47, 0.54, 26.06)
+PASS hero left / boss middle
+PASS navigation fits screen
+PASS selected class (1024, 768) 1
+PASS one active hero
+PASS idle bones animate 1
+FRAME 1024x768 hero=(0.18, 0.68, 2.43) boss=(0.47, 0.54, 26.06)
+PASS hero left / boss middle
+PASS navigation fits screen
+PASS selected class (1024, 768) 2
+PASS one active hero
+PASS idle bones animate 2
+FRAME 1024x768 hero=(0.21, 0.68, 2.43) boss=(0.47, 0.54, 26.06)
+PASS hero left / boss middle
+PASS navigation fits screen
+PASS music continuous across class changes
+PASS scene transition completed
+PASS existing Boss Rush setup retains class
+PASS scene transition completed
+PASS class restored on scene return
+PASS scene transition completed
+PASS Start Run retains selected class
+PASS preview actors unloaded
+PASS scene transition completed
+PASS gameplay returns only to selected alternative
+PASS scene transition completed
+PASS scene transition completed
+PASS run uses selected class Vanguard
+PASS scene transition completed
+PASS scene transition completed
+PASS scene transition completed
+PASS run uses selected class Chimesinger
+PASS scene transition completed
+PASS alternative Settings has UI category
+PASS UI Escape returns to Settings
+PASS scene transition completed
+PASS UI switches and saves showcase
+PASS showcase Settings has UI category
+PASS original Settings remain usable
+PASS scene transition completed
+PASS saved showcase overrides alternate startup scene
+PASS scene transition completed
+PASS UI switches and saves alternative
+PASS scene transition completed
+PASS saved alternative overrides showcase startup scene
+PASS one persistent audio owner after navigation
+PASS zero runtime errors
+RESULT 106 passed / 0 failed
+
+== Editor Play Mode (isolated copy of the same source) ==
+RESULT 106 passed / 0 failed
+
+== Luminance ==
+before floor=0.528 bossTorso=0.261 floor/torso=2.03 rimBand=0.399 behindNav21x9=0.054 upperLeftSky=0.137
+pass1  floor=0.415 bossTorso=0.293 floor/torso=1.42 rimBand=0.270 behindNav21x9=0.037 upperLeftSky=0.105
+pass2  floor=0.283 bossTorso=0.307 floor/torso=0.92 rimBand=0.203 behindNav21x9=0.032 upperLeftSky=0.129
+pass2 sky-top luminance across 6 captures: 0.096 0.097 0.093 0.093 0.092 0.092

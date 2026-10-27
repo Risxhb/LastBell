@@ -1,0 +1,1 @@
+PASS new profile defaults to alternative; scene=Assets/LastBell/Menu/ConfrontationMainMenu.unity; style=Alternative

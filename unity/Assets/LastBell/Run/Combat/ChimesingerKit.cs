@@ -37,7 +37,7 @@ namespace LastBell.Run
         public int LastCrescendo { get; private set; }
 
         public override string[] SlotNames => new[] { "Resonant Note", "Bellstrike", "Harmonic Refrain", "Crescendo", "Mending Chorus" };
-        public override string[] SlotKeys => new[] { "1 / LMB", "2", "3", "4", "6" };
+        public override string[] SlotKeys => new[] { "LMB", "2", "3", "4", "5" };
         public override float Cooldown01(int s) => s switch
         {
             0 => noteCd / (float)NoteCd, 1 => charges > 0 ? 0 : recharge / (float)StrikeRecharge,
@@ -54,11 +54,11 @@ namespace LastBell.Run
         static string Sec(int ticks) => (ticks / (float)Sim.Hz).ToString("0.0") + "s";
         public override string Tooltip(int s) => s switch
         {
-            0 => "RESONANT NOTE  [1 / LMB, hold to repeat]\nRanged sound bolt toward the cursor. +1 HARMONY on hit (max 5).",
+            0 => "RESONANT NOTE  [LMB, hold to repeat]\nRanged sound bolt toward the cursor. +1 HARMONY on hit (max 5).",
             1 => "BELLSTRIKE  [2]\nStrong aimed hit that rings a BELL on the target for 8 s. 2 charges, 6 s recharge each.\nOn a ringing bell: refreshes it and STRENGTHENS stored echoes (x1.5, up to twice).",
             2 => "HARMONIC REFRAIN  [3]\nDamaging sound wave in a cone. Hitting a ringing bell stores an ECHO worth 60% of the wave.\nMax 2 echoes per bell. Cooldown 4 s.",
             3 => "CRESCENDO  [4]\nSpends all HARMONY and detonates the bell and its echoes. Cooldown 5 s.\nEarly detonation pays out now; the full sequence pays far more.",
-            _ => "MENDING CHORUS  [6]\nInstant burst heal for you and allies within 6 m: +30 HP, capped. No lingering zone. Cooldown 15 s.\nHealing and dashing never clear Harmony, bells or echoes.",
+            _ => "MENDING CHORUS  [5]\nInstant burst heal for you and allies within 6 m: +30 HP, capped. No lingering zone. Cooldown 15 s.\nHealing and dashing never clear Harmony, bells or echoes.",
         };
         public override string ClassState()
         {

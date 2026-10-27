@@ -65,6 +65,11 @@ namespace LastBell.VFX
             internal GameObject go; internal MeshRenderer mr; internal MaterialPropertyBlock mpb = new MaterialPropertyBlock();
             internal float flash = -1, lockFlash, maxFade = 1;
             internal bool locked;
+            public float FlashScale = 1;   // per-telegraph resolve-flash strength (1 = shared default); presentation only
+            // opt-in: on resolve the fill drops at once to a faint desaturated ivory and clears within 0.15 s, and the
+            // telegraph sorts under live ones, so a spent area never looks more dangerous than the next live warning
+            public bool SpentFast;
+            internal bool spentTinted;
             public void Place(Vector3 origin, float yaw) { go.transform.SetPositionAndRotation(new Vector3(origin.x, Floor, origin.z), Quaternion.Euler(0, yaw, 0)); }
             public void Progress(float p) { mpb.SetFloat(PProgress, Mathf.Clamp01(p)); }
             public void Lock() { if (!locked) { locked = true; lockFlash = 1; } }
@@ -75,9 +80,11 @@ namespace LastBell.VFX
             public void Memory() { mpb.SetFloat(PMemory, 1); Tint(new Color(0.35f, 0.38f, 0.45f), new Color(0.95f, 0.9f, 0.78f)); maxFade = 0.55f; }
             // removed without a resolve flash (the memory turning into its live warning, or being erased)
             public void Dismiss() { if (flash < 0) flash = 0.2f; }
+            // draw only over the floor disc (radius 0 = no clip); presentation only, the hazard owns the hit test
+            public void Clip(Vector3 centre, float radius) { mpb.SetFloat(PClipRadius, radius); mpb.SetVector(PClipCentre, new Vector4(centre.x, centre.z, 0, 0)); }
         }
         static readonly int PFill = Shader.PropertyToID("_ColorFill"), PBorder = Shader.PropertyToID("_ColorBorder"),
-            PMemory = Shader.PropertyToID("_Memory");
+            PMemory = Shader.PropertyToID("_Memory"), PClipRadius = Shader.PropertyToID("_ClipRadius"), PClipCentre = Shader.PropertyToID("_ClipCentre");
 
         Telegraph NewTelegraph(int shape, float radius, float inner, float half, Mesh quad)
         {
@@ -122,11 +129,20 @@ namespace LastBell.VFX
                 if (t.flash < 0) fade = Mathf.MoveTowards(fade, t.maxFade, dt / 0.08f);
                 t.lockFlash = Mathf.MoveTowards(t.lockFlash, 0, dt / 0.25f);
                 t.mpb.SetFloat(PLock, t.locked ? 0.5f + t.lockFlash : 0);
+                if (t.flash >= 0 && t.SpentFast)
+                {
+                    t.flash += dt;
+                    if (!t.spentTinted) { t.spentTinted = true; t.Tint(new Color(0.55f, 0.52f, 0.46f), new Color(1.1f, 1.05f, 0.95f)); t.mr.sortingOrder = -1; }
+                    t.mpb.SetFloat(PFlash, 0);
+                    fade = Mathf.Clamp01(0.25f * (1 - t.flash / 0.15f));
+                    if (t.flash > 0.15f) { Destroy(t.go.GetComponent<MeshFilter>().sharedMesh); Destroy(t.go); telegraphs.RemoveAt(i); continue; }
+                    t.mpb.SetFloat(PFade, fade); t.mr.SetPropertyBlock(t.mpb); continue;
+                }
                 if (t.flash >= 0)
                 {
                     // one short flash on the resolve tick, then clear within 0.2 s so the next warning is visible (§7.4)
                     t.flash += dt;
-                    t.mpb.SetFloat(PFlash, NoFlashes ? 0.35f : Mathf.Clamp01(1 - t.flash / 0.12f));
+                    t.mpb.SetFloat(PFlash, (NoFlashes ? 0.35f : Mathf.Clamp01(1 - t.flash / 0.12f)) * t.FlashScale);
                     fade = Mathf.Clamp01(1 - (t.flash - 0.05f) / 0.15f);
                     if (t.flash > 0.2f) { Destroy(t.go.GetComponent<MeshFilter>().sharedMesh); Destroy(t.go); telegraphs.RemoveAt(i); continue; }
                 }

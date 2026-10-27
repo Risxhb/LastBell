@@ -152,7 +152,6 @@ namespace LastBell.Run
             d.ReturnToMenu();
             yield return null;
             AurelionArgs.SetOverride = null;
-            yield return AurelionV2Checks();
         }
 
         // evidence: the orrery rings late in each Alignment warning (first Alignment of the fight only)

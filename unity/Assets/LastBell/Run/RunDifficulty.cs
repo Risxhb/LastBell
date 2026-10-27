@@ -44,7 +44,7 @@ namespace LastBell.Run
         }
 
         // the autotest starts at Medium and never overwrites the player's saved choice
-        static bool Persist => !RunAutoTest.Requested;
+        static bool Persist => !RunAutoTest.Requested && !LastBell.Menu.MenuFlowTest.Requested && !LastBell.Menu.MenuSmokeTest.Requested;
 
         static void Load()
         {

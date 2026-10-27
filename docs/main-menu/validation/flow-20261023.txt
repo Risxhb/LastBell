@@ -1,0 +1,590 @@
+PASS menu is first build scene
+PASS four primary actions
+PASS keyboard focus starts at Start Run
+PASS explicit navigation reaches test setup
+PASS keyboard right selects Test Rush
+PASS keyboard right selects Settings
+PASS keyboard submit opens Settings
+PASS keyboard Escape closes Settings
+PASS settings and music preserved
+PASS settings Back restores focus
+PASS selection path 0
+PASS music hero selection 0
+PASS menu music survives scene without restart 0
+PASS all three real idle models
+PASS decorative heroes have no combat controllers
+PASS one camera listener and event system
+PASS rendered header text hero-group-normal.png
+PASS clicking 3D hero 0 selects it
+INPUT click=(421.33, 529.00) UI= picked=0 mouse enabled=True keyboard enabled=True
+PASS clicking 3D hero 1 selects it
+INPUT click=(953.51, 559.33) UI= picked=1 mouse enabled=True keyboard enabled=True
+PASS clicking 3D hero 2 selects it
+INPUT click=(1492.21, 537.11) UI= picked=2 mouse enabled=True keyboard enabled=True
+PASS keyboard chooses Chimesinger
+FOCUS Chimesinger
+PASS no missing scripts hero scene
+PASS no error or unsupported materials hero scene
+PASS select hero 0
+PASS select hero 1
+PASS select hero 2
+PASS actual render resolution (1280, 720)
+FRAME 0 (1280, 720) bounds=Center: (2.56, 0.85, 0.45), Extents: (0.73, 1.02, 0.94) camera=(2.55, 1.26, 4.58) aspect=1.777778
+PASS full body 0 (1280, 720)
+PASS movement icon sourced from HUD 0
+PASS implemented skills 0
+PASS skill descriptions fit 0 (1280, 720)
+PASS rendered header text selected-Vanguard-1280x720.png
+PASS rendered skill text selected-Vanguard-1280x720.png
+FRAME 1 (1280, 720) bounds=Center: (0.10, 0.93, -0.20), Extents: (0.54, 1.08, 0.50) camera=(0.10, 1.37, 4.19) aspect=1.777778
+PASS full body 1 (1280, 720)
+PASS movement icon sourced from HUD 1
+PASS implemented skills 1
+PASS skill descriptions fit 1 (1280, 720)
+PASS rendered header text selected-Chimesinger-1280x720.png
+PASS rendered skill text selected-Chimesinger-1280x720.png
+FRAME 2 (1280, 720) bounds=Center: (-2.46, 0.85, 0.04), Extents: (0.61, 1.00, 0.44) camera=(-2.48, 1.27, 4.23) aspect=1.777778
+PASS full body 2 (1280, 720)
+PASS movement icon sourced from HUD 2
+PASS implemented skills 2
+PASS skill descriptions fit 2 (1280, 720)
+PASS rendered header text selected-Arcanist-1280x720.png
+PASS rendered skill text selected-Arcanist-1280x720.png
+PASS actual render resolution (1920, 1080)
+FRAME 0 (1920, 1080) bounds=Center: (2.55, 0.85, 0.42), Extents: (0.73, 1.02, 1.01) camera=(2.55, 1.26, 4.52) aspect=1.777778
+PASS full body 0 (1920, 1080)
+PASS movement icon sourced from HUD 0
+PASS implemented skills 0
+PASS skill descriptions fit 0 (1920, 1080)
+PASS rendered header text selected-Vanguard-1920x1080.png
+PASS rendered skill text selected-Vanguard-1920x1080.png
+FRAME 1 (1920, 1080) bounds=Center: (0.10, 0.93, -0.21), Extents: (0.53, 1.08, 0.52) camera=(0.12, 1.37, 4.19) aspect=1.777778
+PASS full body 1 (1920, 1080)
+PASS movement icon sourced from HUD 1
+PASS implemented skills 1
+PASS skill descriptions fit 1 (1920, 1080)
+PASS rendered header text selected-Chimesinger-1920x1080.png
+PASS rendered skill text selected-Chimesinger-1920x1080.png
+FRAME 2 (1920, 1080) bounds=Center: (-2.48, 0.85, 0.05), Extents: (0.61, 1.00, 0.44) camera=(-2.50, 1.27, 4.23) aspect=1.777778
+PASS full body 2 (1920, 1080)
+PASS movement icon sourced from HUD 2
+PASS implemented skills 2
+PASS skill descriptions fit 2 (1920, 1080)
+PASS rendered header text selected-Arcanist-1920x1080.png
+PASS rendered skill text selected-Arcanist-1920x1080.png
+PASS actual render resolution (2560, 1080)
+FRAME 0 (2560, 1080) bounds=Center: (2.55, 0.85, 0.45), Extents: (0.73, 1.02, 0.98) camera=(2.56, 1.25, 4.54) aspect=2.37037
+PASS full body 0 (2560, 1080)
+PASS movement icon sourced from HUD 0
+PASS implemented skills 0
+PASS skill descriptions fit 0 (2560, 1080)
+PASS rendered header text selected-Vanguard-2560x1080.png
+PASS rendered skill text selected-Vanguard-2560x1080.png
+FRAME 1 (2560, 1080) bounds=Center: (0.14, 0.92, -0.21), Extents: (0.53, 1.07, 0.50) camera=(0.12, 1.36, 4.16) aspect=2.37037
+PASS full body 1 (2560, 1080)
+PASS movement icon sourced from HUD 1
+PASS implemented skills 1
+PASS skill descriptions fit 1 (2560, 1080)
+PASS rendered header text selected-Chimesinger-2560x1080.png
+PASS rendered skill text selected-Chimesinger-2560x1080.png
+FRAME 2 (2560, 1080) bounds=Center: (-2.47, 0.85, 0.07), Extents: (0.61, 0.99, 0.46) camera=(-2.47, 1.26, 4.23) aspect=2.37037
+PASS full body 2 (2560, 1080)
+PASS movement icon sourced from HUD 2
+PASS implemented skills 2
+PASS skill descriptions fit 2 (2560, 1080)
+PASS rendered header text selected-Arcanist-2560x1080.png
+PASS rendered skill text selected-Arcanist-2560x1080.png
+PASS rapid switching finishes on latest hero
+PASS Back restores group
+PASS Back returns to main menu 0
+PASS selection path 1
+PASS music hero selection 1
+PASS menu music survives scene without restart 1
+PASS all three real idle models
+PASS decorative heroes have no combat controllers
+PASS one camera listener and event system
+PASS rendered header text hero-group-test.png
+PASS clicking 3D hero 0 selects it
+INPUT click=(620.94, 525.44) UI= picked=0 mouse enabled=True keyboard enabled=True
+PASS clicking 3D hero 1 selects it
+INPUT click=(1272.34, 562.26) UI= picked=1 mouse enabled=True keyboard enabled=True
+PASS clicking 3D hero 2 selects it
+INPUT click=(1920.40, 535.25) UI= picked=2 mouse enabled=True keyboard enabled=True
+PASS keyboard chooses Chimesinger
+FOCUS Chimesinger
+PASS no missing scripts hero scene
+PASS no error or unsupported materials hero scene
+PASS select hero 0
+PASS select hero 1
+PASS select hero 2
+PASS actual render resolution (1280, 720)
+FRAME 0 (1280, 720) bounds=Center: (2.56, 0.85, 0.46), Extents: (0.73, 1.02, 0.93) camera=(2.56, 1.26, 4.59) aspect=1.777778
+PASS full body 0 (1280, 720)
+PASS movement icon sourced from HUD 0
+PASS implemented skills 0
+PASS skill descriptions fit 0 (1280, 720)
+FRAME 1 (1280, 720) bounds=Center: (0.10, 0.93, -0.21), Extents: (0.53, 1.08, 0.51) camera=(0.10, 1.37, 4.19) aspect=1.777778
+PASS full body 1 (1280, 720)
+PASS movement icon sourced from HUD 1
+PASS implemented skills 1
+PASS skill descriptions fit 1 (1280, 720)
+FRAME 2 (1280, 720) bounds=Center: (-2.47, 0.85, 0.05), Extents: (0.61, 1.00, 0.44) camera=(-2.47, 1.27, 4.23) aspect=1.777778
+PASS full body 2 (1280, 720)
+PASS movement icon sourced from HUD 2
+PASS implemented skills 2
+PASS skill descriptions fit 2 (1280, 720)
+PASS actual render resolution (1920, 1080)
+FRAME 0 (1920, 1080) bounds=Center: (2.55, 0.85, 0.42), Extents: (0.73, 1.02, 1.01) camera=(2.55, 1.26, 4.52) aspect=1.777778
+PASS full body 0 (1920, 1080)
+PASS movement icon sourced from HUD 0
+PASS implemented skills 0
+PASS skill descriptions fit 0 (1920, 1080)
+FRAME 1 (1920, 1080) bounds=Center: (0.10, 0.93, -0.21), Extents: (0.53, 1.08, 0.52) camera=(0.12, 1.37, 4.18) aspect=1.777778
+PASS full body 1 (1920, 1080)
+PASS movement icon sourced from HUD 1
+PASS implemented skills 1
+PASS skill descriptions fit 1 (1920, 1080)
+FRAME 2 (1920, 1080) bounds=Center: (-2.49, 0.85, 0.05), Extents: (0.60, 1.00, 0.45) camera=(-2.49, 1.27, 4.23) aspect=1.777778
+PASS full body 2 (1920, 1080)
+PASS movement icon sourced from HUD 2
+PASS implemented skills 2
+PASS skill descriptions fit 2 (1920, 1080)
+PASS actual render resolution (2560, 1080)
+FRAME 0 (2560, 1080) bounds=Center: (2.55, 0.85, 0.46), Extents: (0.73, 1.02, 0.98) camera=(2.56, 1.25, 4.54) aspect=2.37037
+PASS full body 0 (2560, 1080)
+PASS movement icon sourced from HUD 0
+PASS implemented skills 0
+PASS skill descriptions fit 0 (2560, 1080)
+FRAME 1 (2560, 1080) bounds=Center: (0.14, 0.92, -0.21), Extents: (0.54, 1.07, 0.51) camera=(0.12, 1.36, 4.16) aspect=2.37037
+PASS full body 1 (2560, 1080)
+PASS movement icon sourced from HUD 1
+PASS implemented skills 1
+PASS skill descriptions fit 1 (2560, 1080)
+FRAME 2 (2560, 1080) bounds=Center: (-2.48, 0.85, 0.07), Extents: (0.60, 0.99, 0.46) camera=(-2.47, 1.26, 4.23) aspect=2.37037
+PASS full body 2 (2560, 1080)
+PASS movement icon sourced from HUD 2
+PASS implemented skills 2
+PASS skill descriptions fit 2 (2560, 1080)
+PASS rapid switching finishes on latest hero
+PASS Back restores group
+PASS dedicated setup opens
+PASS music test setup
+PASS setup excludes background hero controls
+PASS setup keyboard changes map
+PASS setup focus stays in active panel UpArrow
+PASS setup focus stays in active panel RightArrow
+PASS setup focus stays in active panel DownArrow
+PASS setup focus stays in active panel LeftArrow
+PASS current preview 0
+PASS setup summary 0/0
+PASS setup summary 0/1
+PASS setup summary 0/2
+PASS setup summary 0/3
+PASS current preview 1
+PASS setup summary 1/0
+PASS setup summary 1/1
+PASS setup summary 1/2
+PASS setup summary 1/3
+PASS current preview 2
+PASS setup summary 2/0
+PASS setup summary 2/1
+PASS setup summary 2/2
+PASS setup summary 2/3
+PASS current preview 3
+PASS setup summary 3/0
+PASS setup summary 3/1
+PASS setup summary 3/2
+PASS setup summary 3/3
+PASS current preview 4
+PASS setup summary 4/0
+PASS setup summary 4/1
+PASS setup summary 4/2
+PASS setup summary 4/3
+PASS invalid selection rejected
+PASS setup Back restores selected hero
+PASS setup restores hero controls
+PASS Back returns to main menu 1
+PASS all sampled orders contain each boss once and Bellkeeper last
+PASS opening sequence is randomized
+PASS normal launch class/difficulty 0
+PASS fresh Ready and authoritative first boss 0
+PASS launch consumed once 0
+PASS music normal Ready 0
+PASS normal session has four bosses and final Bellkeeper 0
+PASS normal initial map matches first boss 0
+PASS music normal Intro 0
+PASS intro starts one encounter 0
+PASS normal sequence slot 0/0
+PASS music normal combat 0/0
+PASS normal sequence slot 0/1
+PASS music normal combat 0/1
+PASS normal sequence slot 0/2
+PASS music normal combat 0/2
+PASS normal sequence slot 0/3
+PASS music normal combat 0/3
+PASS normal victory only after final Bellkeeper 0
+PASS normal retry preserves randomized order 0
+PASS music normal retry 0
+PASS normal return cleans selection 0
+PASS normal launch class/difficulty 1
+PASS fresh Ready and authoritative first boss 1
+PASS launch consumed once 1
+PASS music normal Ready 1
+PASS normal session has four bosses and final Bellkeeper 1
+PASS normal initial map matches first boss 1
+PASS music normal Intro 1
+PASS intro starts one encounter 1
+PASS normal sequence slot 1/0
+PASS music normal combat 1/0
+PASS normal sequence slot 1/1
+PASS music normal combat 1/1
+PASS normal sequence slot 1/2
+PASS music normal combat 1/2
+PASS normal sequence slot 1/3
+PASS music normal combat 1/3
+PASS normal victory only after final Bellkeeper 1
+PASS normal retry preserves randomized order 1
+PASS music normal retry 1
+PASS normal return cleans selection 1
+PASS normal launch class/difficulty 2
+PASS fresh Ready and authoritative first boss 2
+PASS launch consumed once 2
+PASS music normal Ready 2
+PASS normal session has four bosses and final Bellkeeper 2
+PASS normal initial map matches first boss 2
+PASS music normal Intro 2
+PASS intro starts one encounter 2
+PASS normal sequence slot 2/0
+PASS music normal combat 2/0
+PASS normal sequence slot 2/1
+PASS music normal combat 2/1
+PASS normal sequence slot 2/2
+PASS music normal combat 2/2
+PASS normal sequence slot 2/3
+PASS music normal combat 2/3
+PASS normal victory only after final Bellkeeper 2
+PASS normal retry preserves randomized order 2
+PASS music normal retry 2
+PASS normal return cleans selection 2
+PASS test honors map and encounter 0/0
+PASS test honors hero and difficulty 0/0
+PASS music test Ready 0/0
+PASS music test Intro 0/0
+PASS test encounter starts once 0/0
+PASS music test combat 0/0
+PASS boss music respects mute 0/0
+PASS boss music respects volume 0/0
+PASS no missing scripts test 0/0
+PASS no error or unsupported materials test 0/0
+PASS retry accepted 0/0
+PASS retry keeps setup 0/0
+PASS music retry preparation 0/0
+PASS return restores test setup 0/0
+PASS test transition cleanup 0/0
+PASS test returns to main menu 0/0
+PASS test honors map and encounter 0/1
+PASS test honors hero and difficulty 0/1
+PASS music test Ready 0/1
+PASS music test Intro 0/1
+PASS test encounter starts once 0/1
+PASS music test combat 0/1
+PASS boss music respects mute 0/1
+PASS boss music respects volume 0/1
+PASS no missing scripts test 0/1
+PASS no error or unsupported materials test 0/1
+PASS retry accepted 0/1
+PASS retry keeps setup 0/1
+PASS music retry preparation 0/1
+PASS return restores test setup 0/1
+PASS test transition cleanup 0/1
+PASS test returns to main menu 0/1
+PASS test honors map and encounter 0/2
+PASS test honors hero and difficulty 0/2
+PASS music test Ready 0/2
+PASS music test Intro 0/2
+PASS test encounter starts once 0/2
+PASS music test combat 0/2
+PASS boss music respects mute 0/2
+PASS boss music respects volume 0/2
+PASS no missing scripts test 0/2
+PASS no error or unsupported materials test 0/2
+PASS retry accepted 0/2
+PASS retry keeps setup 0/2
+PASS music retry preparation 0/2
+PASS return restores test setup 0/2
+PASS test transition cleanup 0/2
+PASS test returns to main menu 0/2
+PASS test honors map and encounter 0/3
+PASS test honors hero and difficulty 0/3
+PASS music test Ready 0/3
+PASS music test Intro 0/3
+PASS test encounter starts once 0/3
+PASS music test combat 0/3
+PASS boss music respects mute 0/3
+PASS boss music respects volume 0/3
+PASS no missing scripts test 0/3
+PASS no error or unsupported materials test 0/3
+PASS retry accepted 0/3
+PASS retry keeps setup 0/3
+PASS music retry preparation 0/3
+PASS return restores test setup 0/3
+PASS test transition cleanup 0/3
+PASS test returns to main menu 0/3
+PASS test honors map and encounter 1/0
+PASS test honors hero and difficulty 1/0
+PASS music test Ready 1/0
+PASS music test Intro 1/0
+PASS test encounter starts once 1/0
+PASS music test combat 1/0
+PASS boss music respects mute 1/0
+PASS boss music respects volume 1/0
+PASS no missing scripts test 1/0
+PASS no error or unsupported materials test 1/0
+PASS retry accepted 1/0
+PASS retry keeps setup 1/0
+PASS music retry preparation 1/0
+PASS return restores test setup 1/0
+PASS test transition cleanup 1/0
+PASS test returns to main menu 1/0
+PASS test honors map and encounter 1/1
+PASS test honors hero and difficulty 1/1
+PASS music test Ready 1/1
+PASS music test Intro 1/1
+PASS test encounter starts once 1/1
+PASS music test combat 1/1
+PASS boss music respects mute 1/1
+PASS boss music respects volume 1/1
+PASS no missing scripts test 1/1
+PASS no error or unsupported materials test 1/1
+PASS retry accepted 1/1
+PASS retry keeps setup 1/1
+PASS music retry preparation 1/1
+PASS return restores test setup 1/1
+PASS test transition cleanup 1/1
+PASS test returns to main menu 1/1
+PASS test honors map and encounter 1/2
+PASS test honors hero and difficulty 1/2
+PASS music test Ready 1/2
+PASS music test Intro 1/2
+PASS test encounter starts once 1/2
+PASS music test combat 1/2
+PASS boss music respects mute 1/2
+PASS boss music respects volume 1/2
+PASS no missing scripts test 1/2
+PASS no error or unsupported materials test 1/2
+PASS retry accepted 1/2
+PASS retry keeps setup 1/2
+PASS music retry preparation 1/2
+PASS return restores test setup 1/2
+PASS test transition cleanup 1/2
+PASS test returns to main menu 1/2
+PASS test honors map and encounter 1/3
+PASS test honors hero and difficulty 1/3
+PASS music test Ready 1/3
+PASS music test Intro 1/3
+PASS test encounter starts once 1/3
+PASS music test combat 1/3
+PASS boss music respects mute 1/3
+PASS boss music respects volume 1/3
+PASS no missing scripts test 1/3
+PASS no error or unsupported materials test 1/3
+PASS retry accepted 1/3
+PASS retry keeps setup 1/3
+PASS music retry preparation 1/3
+PASS return restores test setup 1/3
+PASS test transition cleanup 1/3
+PASS test returns to main menu 1/3
+PASS test honors map and encounter 2/0
+PASS test honors hero and difficulty 2/0
+PASS music test Ready 2/0
+PASS music test Intro 2/0
+PASS test encounter starts once 2/0
+PASS music test combat 2/0
+PASS boss music respects mute 2/0
+PASS boss music respects volume 2/0
+PASS no missing scripts test 2/0
+PASS no error or unsupported materials test 2/0
+PASS retry accepted 2/0
+PASS retry keeps setup 2/0
+PASS music retry preparation 2/0
+PASS return restores test setup 2/0
+PASS test transition cleanup 2/0
+PASS test returns to main menu 2/0
+PASS test honors map and encounter 2/1
+PASS test honors hero and difficulty 2/1
+PASS music test Ready 2/1
+PASS music test Intro 2/1
+PASS test encounter starts once 2/1
+PASS music test combat 2/1
+PASS boss music respects mute 2/1
+PASS boss music respects volume 2/1
+PASS no missing scripts test 2/1
+PASS no error or unsupported materials test 2/1
+PASS retry accepted 2/1
+PASS retry keeps setup 2/1
+PASS music retry preparation 2/1
+PASS return restores test setup 2/1
+PASS test transition cleanup 2/1
+PASS test returns to main menu 2/1
+PASS test honors map and encounter 2/2
+PASS test honors hero and difficulty 2/2
+PASS music test Ready 2/2
+PASS music test Intro 2/2
+PASS test encounter starts once 2/2
+PASS music test combat 2/2
+PASS boss music respects mute 2/2
+PASS boss music respects volume 2/2
+PASS no missing scripts test 2/2
+PASS no error or unsupported materials test 2/2
+PASS retry accepted 2/2
+PASS retry keeps setup 2/2
+PASS music retry preparation 2/2
+PASS return restores test setup 2/2
+PASS test transition cleanup 2/2
+PASS test returns to main menu 2/2
+PASS test honors map and encounter 2/3
+PASS test honors hero and difficulty 2/3
+PASS music test Ready 2/3
+PASS music test Intro 2/3
+PASS test encounter starts once 2/3
+PASS music test combat 2/3
+PASS boss music respects mute 2/3
+PASS boss music respects volume 2/3
+PASS no missing scripts test 2/3
+PASS no error or unsupported materials test 2/3
+PASS retry accepted 2/3
+PASS retry keeps setup 2/3
+PASS music retry preparation 2/3
+PASS return restores test setup 2/3
+PASS test transition cleanup 2/3
+PASS test returns to main menu 2/3
+PASS test honors map and encounter 3/0
+PASS test honors hero and difficulty 3/0
+PASS music test Ready 3/0
+PASS music test Intro 3/0
+PASS test encounter starts once 3/0
+PASS music test combat 3/0
+PASS boss music respects mute 3/0
+PASS boss music respects volume 3/0
+PASS no missing scripts test 3/0
+PASS no error or unsupported materials test 3/0
+PASS retry accepted 3/0
+PASS retry keeps setup 3/0
+PASS music retry preparation 3/0
+PASS return restores test setup 3/0
+PASS test transition cleanup 3/0
+PASS test returns to main menu 3/0
+PASS test honors map and encounter 3/1
+PASS test honors hero and difficulty 3/1
+PASS music test Ready 3/1
+PASS music test Intro 3/1
+PASS test encounter starts once 3/1
+PASS music test combat 3/1
+PASS boss music respects mute 3/1
+PASS boss music respects volume 3/1
+PASS no missing scripts test 3/1
+PASS no error or unsupported materials test 3/1
+PASS retry accepted 3/1
+PASS retry keeps setup 3/1
+PASS music retry preparation 3/1
+PASS return restores test setup 3/1
+PASS test transition cleanup 3/1
+PASS test returns to main menu 3/1
+PASS test honors map and encounter 3/2
+PASS test honors hero and difficulty 3/2
+PASS music test Ready 3/2
+PASS music test Intro 3/2
+PASS test encounter starts once 3/2
+PASS music test combat 3/2
+PASS boss music respects mute 3/2
+PASS boss music respects volume 3/2
+PASS no missing scripts test 3/2
+PASS no error or unsupported materials test 3/2
+PASS retry accepted 3/2
+PASS retry keeps setup 3/2
+PASS music retry preparation 3/2
+PASS return restores test setup 3/2
+PASS test transition cleanup 3/2
+PASS test returns to main menu 3/2
+PASS test honors map and encounter 3/3
+PASS test honors hero and difficulty 3/3
+PASS music test Ready 3/3
+PASS music test Intro 3/3
+PASS test encounter starts once 3/3
+PASS music test combat 3/3
+PASS boss music respects mute 3/3
+PASS boss music respects volume 3/3
+PASS no missing scripts test 3/3
+PASS no error or unsupported materials test 3/3
+PASS retry accepted 3/3
+PASS retry keeps setup 3/3
+PASS music retry preparation 3/3
+PASS return restores test setup 3/3
+PASS test transition cleanup 3/3
+PASS test returns to main menu 3/3
+PASS test honors map and encounter 4/0
+PASS test honors hero and difficulty 4/0
+PASS music test Ready 4/0
+PASS music test Intro 4/0
+PASS test encounter starts once 4/0
+PASS music test combat 4/0
+PASS boss music respects mute 4/0
+PASS boss music respects volume 4/0
+PASS no missing scripts test 4/0
+PASS no error or unsupported materials test 4/0
+PASS retry accepted 4/0
+PASS retry keeps setup 4/0
+PASS music retry preparation 4/0
+PASS return restores test setup 4/0
+PASS test transition cleanup 4/0
+PASS test returns to main menu 4/0
+PASS test honors map and encounter 4/1
+PASS test honors hero and difficulty 4/1
+PASS music test Ready 4/1
+PASS music test Intro 4/1
+PASS test encounter starts once 4/1
+PASS music test combat 4/1
+PASS boss music respects mute 4/1
+PASS boss music respects volume 4/1
+PASS no missing scripts test 4/1
+PASS no error or unsupported materials test 4/1
+PASS retry accepted 4/1
+PASS retry keeps setup 4/1
+PASS music retry preparation 4/1
+PASS return restores test setup 4/1
+PASS test transition cleanup 4/1
+PASS test returns to main menu 4/1
+PASS test honors map and encounter 4/2
+PASS test honors hero and difficulty 4/2
+PASS music test Ready 4/2
+PASS music test Intro 4/2
+PASS test encounter starts once 4/2
+PASS music test combat 4/2
+PASS boss music respects mute 4/2
+PASS boss music respects volume 4/2
+PASS no missing scripts test 4/2
+PASS no error or unsupported materials test 4/2
+PASS retry accepted 4/2
+PASS retry keeps setup 4/2
+PASS music retry preparation 4/2
+PASS return restores test setup 4/2
+PASS test transition cleanup 4/2
+PASS test returns to main menu 4/2
+PASS test honors map and encounter 4/3
+PASS test honors hero and difficulty 4/3
+PASS music test Ready 4/3
+PASS music test Intro 4/3
+PASS test encounter starts once 4/3
+PASS music test combat 4/3
+PASS boss music respects mute 4/3
+PASS boss music respects volume 4/3
+PASS no missing scripts test 4/3
+PASS no error or unsupported materials test 4/3
+PASS retry accepted 4/3
+PASS retry keeps setup 4/3
+PASS music retry preparation 4/3
+PASS return restores test setup 4/3
+PASS test transition cleanup 4/3
+PASS test returns to main menu 4/3
+PASS zero runtime errors
+RESULT: 563 passed, 0 failed

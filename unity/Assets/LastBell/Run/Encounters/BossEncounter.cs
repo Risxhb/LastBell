@@ -45,6 +45,7 @@ namespace LastBell.Run
             float party = b.PartyScaled ? 1 + 0.7f * Mathf.Max(0, fighters - 1) : 1;
             if (TestHpScale != 1 || party != 1) b.MaxHp = Mathf.Max(1, Mathf.RoundToInt(b.MaxHp * TestHpScale * party));
             b.Hp = b.MaxHp; b.Build();
+            SimSmoother.Attach(go);   // drawn between ticks like the player
             return b;
         }
 
@@ -85,7 +86,7 @@ namespace LastBell.Run
             wait = Mathf.Max(1, script.Current) - 1;
         }
 
-        public int TakeHit(int damage, Vector3 contact)
+        public int TakeHit(int damage, Vector3 contact, bool hitFx = true)
         {
             if (Dead) return 0;
             damage = Absorb(damage);   // a shield (Aurelion v4 Corona Shield) takes its share first
@@ -93,7 +94,8 @@ namespace LastBell.Run
             int dealt = Mathf.Min(damage, Hp);
             Hp -= dealt;
             RunHud.Float(contact + Vector3.up * 0.5f, dealt.ToString(), new Color(1f, 0.86f, 0.45f));
-            W.BossFx.BossHit(contact); glowLevel = Mathf.Max(glowLevel, 2f);
+            if (hitFx) W.BossFx.BossHit(contact);   // abilities with their own impact effect skip the shared flash
+            glowLevel = Mathf.Max(glowLevel, 2f);
             OnHurt();
             if (Hp <= 0) Die();
             return dealt;
