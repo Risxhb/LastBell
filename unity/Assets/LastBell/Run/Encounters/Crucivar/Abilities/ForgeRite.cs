@@ -47,6 +47,9 @@ namespace LastBell.Run
         {
             loops++;
             int t = 0;
+            // he spawns 1.5 m off centre; Forge Rite is built round the arena centre so the jets, pours and quake are
+            // the same on every side (Chzy18 10-27: the jets were uneven and some sides could still be followed)
+            Boss.transform.position = Vector3.zero;
             IEnumerable<int> Until(float s) { int at = T(s); if (at > t) { yield return at - t; t = at; } }
 
             Boss.SetCurrent("Ember Brand"); EmberBrand();

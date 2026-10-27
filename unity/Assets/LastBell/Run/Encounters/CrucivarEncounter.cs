@@ -442,6 +442,7 @@ namespace LastBell.Run
         IEnumerable<int> V4Script()
         {
             BindAbilities();
+            if (!TestHold) foreach (var w in WalkTo(Vector3.zero, Walk)) yield return w;   // Forge Rite is built round the arena centre
             while (true)
             {
                 if (TestHold)

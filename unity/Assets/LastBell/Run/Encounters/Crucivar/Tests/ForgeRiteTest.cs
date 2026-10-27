@@ -34,6 +34,9 @@ namespace LastBell.Run
             var jet = t.Spawned("Furnace Spin").First().H;
             t.Check("Furnace Spin: the jets turned while live", Mathf.Abs(Mathf.DeltaAngle(jet.Yaw, t.Spawned("Furnace Spin").First().H.Yaw)) >= 0 && jet.Age > jet.ResolveAt);
             t.Check("Furnace Spin: every jet reaches the wall", t.Spawned("Furnace Spin").All(x => Mathf.Abs((Sim.Flat(x.H.Origin) + Sim.Dir(x.H.Yaw) * x.H.Length).magnitude - (CrucivarAbility.Rim + Hazard.Margin)) < 0.05f));
+            var jets = t.Spawned("Furnace Spin").Select(x => x.H).ToList();
+            t.Check("Furnace Spin: from the arena centre, every jet the same length", jets.All(x => Sim.Flat(x.Origin).magnitude < 0.05f) && jets.Max(x => x.Length) - jets.Min(x => x.Length) < 0.05f,
+                string.Join("/", jets.Select(x => $"{Sim.Flat(x.Origin).magnitude:0.00}:{x.Length:0.0}")));
             var q = new[] { "Anvil Quake I", "Anvil Quake II", "Anvil Quake III" }.Select(n => t.Spawns.First(x => x.Source == n).H).ToArray();
             var o = Sim.Flat(q[0].Origin); var wallPt = Vector3.right * (CrucivarAbility.Rim - 0.2f);
             bool Only(int i, Vector3 p) => Enumerable.Range(0, 3).All(k => q[k].Contains(p) == (k == i));
