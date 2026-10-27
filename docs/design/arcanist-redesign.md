@@ -1,12 +1,13 @@
 # Arcanist redesign: design
 
-Status: **agreed concept, October 26, 2026** (Risxhb with risxhb/claude). Nothing is built yet. Every number is a starting value to tune in play. The current kit (`unity/Assets/LastBell/Run/Combat/ArcanistKit.cs`: Clockbolt, Time Seal, Arc Lance, Convergence, Temporal Anchor) stays in the game until this one replaces it.
+Status: **built, October 26, 2026** (Risxhb with risxhb/claude), in `unity/Assets/LastBell/Run/Combat/ArcanistKit.cs` and `PlayerFx.Arcanist.cs`. Revised the same day after the first playtest: the Astral Orb pet is gone, replaced by the **glyph** core mechanic and **Arcane Surge** (see [Core mechanic: glyphs](#core-mechanic-glyphs)). Every number is a starting value to tune in play.
 
 ## Identity
 
 - **Role:** ranged glass cannon. No defensive ability; survival comes from Blink and positioning.
 - **Theme:** pure arcane wizard. Runes, glyphs, astral light. The time-magic theme is dropped.
-- **Signature prop:** the astrolabe floating at his right shoulder (`orbit` bone). Its orb becomes a weapon (Astral Orb), and its rings act as a lens for Disintegrate.
+- **Signature prop:** the astrolabe floating at his right shoulder (`orbit` bone). Its rings act as a lens for Disintegrate, and Arcane Surge pulls the glyphs into it.
+- **Rotation:** channel Disintegrate on the boss to carve glyphs, spend them on full-power Rune Sigils and Arcane Comets, or cash them all into Arcane Surge. Missiles fill the gaps.
 - **Damage:** lower than the current kit (open playtest note PF-08: too much damage). Basic attack range goes up slightly (open range complaint).
 
 ## Colour
@@ -18,7 +19,8 @@ Every spell is violet, so each one uses its own shade and brightness:
 | Magic Missile | Pale lilac body, white-hot tip |
 | Disintegrate | Deep ultraviolet core with a near-black sheath; magenta-violet erosion edges on the ash |
 | Rune Sigil | Mid violet lines, gold-white when armed |
-| Astral Orb shots | Silver-white with a violet edge (starlight) |
+| Glyphs | Rune violet with a gold edge, orbiting his waist |
+| Arcane Surge | The same violet with gold accents ("the glyphs, released") |
 | Arcane Comet | Violet body with a white core and a long trail; violet-white impact |
 | Blink | Violet motes and shards |
 
@@ -29,10 +31,10 @@ Player effects never use filled glowing floor discs, so they can't be mistaken f
 | Slot | Key | Ability | Role |
 |---|---|---|---|
 | Basic | LMB | Magic Missile | Constant damage |
-| 2 | 2 | Disintegrate | Steered beam he channels |
-| 3 | 3 | Rune Sigil | Short-delay skill shot |
-| 4 | 4 | Astral Orb | 8 s of automatic fire |
-| 5 | 5 | Arcane Comet | Long-delay skill shot, the big hit |
+| 2 | 2 (hold) | Disintegrate | Steered beam he channels; **builds glyphs** |
+| 3 | 3 | Rune Sigil | Short-delay skill shot (0.8 s); **spends 1 glyph** |
+| 4 | 4 | Arcane Comet | Long-delay skill shot (3 s), the big hit; **spends 1 glyph** |
+| 5 | 5 | Arcane Surge | Empowerment; **spends every glyph** |
 | Dodge | RMB | Blink | Shared dash rules, teleport look |
 
 **Controls:** WASD moves, so the mouse buttons carry the basic attack and dodge, and the number keys carry the spells. The basic attack is **left mouse only** (tap and hold), the dodge is **right mouse only**, and the spells are **2, 3, 4, 5**. Key 1 and key 6 are unused. Spells aim at the mouse cursor when the key is pressed.
@@ -41,11 +43,11 @@ Player effects never use filled glowing floor discs, so they can't be mistaken f
 
 **Rules**
 - **Tap LMB:** fires one missile straight at the aim point. It can miss. About 10 damage, repeating about every 0.25 s while tapping.
-- **Hold LMB:** summons missiles one at a time, about 0.25 s apart, up to 3. Once all three are summoned they wait. Release fires them 0.05 s apart.
-- **Charged missiles home** on the boss and always hit. About 13 damage each.
+- **Hold LMB:** summons missiles one at a time, about 0.25 s apart, up to 3 (5 in Surge, 0.17 s apart). Once all are summoned they wait. Release fires them 0.05 s apart.
+- **Charged missiles fly straight at the cursor** (changed after the playtest; they used to home). They can miss. About 13 damage each.
 - He moves at about 50% speed while charging. A dash cancels the charge, and the summoned missiles are lost.
 - Range: about 18 m (current Clockbolt is 15 m).
-- Tapping and charging both come to about 40 damage a second. Tapping rewards aim; charging lands every hit while he dodges.
+- Tapping and charging both come to about 40 damage a second. In Surge a tap fires two missiles side by side.
 
 **Animation:** reuse the alternating-hand Clockbolt / Clockbolt2 clips for taps. Charging needs a held pose with the casting hand raised and drawn back.
 
@@ -54,7 +56,7 @@ Player effects never use filled glowing floor discs, so they can't be mistaken f
 | Stage | Look |
 |---|---|
 | Charge | Each missile appears as a lilac dart hovering in a fan behind his shoulder, near the astrolabe. A glyph ring at the casting hand fills in thirds, one per missile. |
-| Release | The glyph flashes. Charged missiles burst outward, then curve in toward the boss in an arc. A tap fires one dart straight from the hand. |
+| Release | The glyph flashes. Charged missiles leave their spots in the fan and fly straight at the cursor, a little spread. A tap fires one dart straight from the hand. In Surge the darts have gold edges. |
 | Missile | White-hot arrowhead tip, lilac body, a short ribbon trail shedding a few sparkles, a slight weave in flight. Small and sharp. |
 | Contact | A small starburst, a few rune shards, one thin ring. The three charged hits land about 0.05 s apart. |
 | Cancel | The hovering darts collapse inward and the glyph cracks. No release flash. |
@@ -64,7 +66,8 @@ Player effects never use filled glowing floor discs, so they can't be mistaken f
 **Rules**
 - Press 2 to start. He channels a beam for about 2 s; releasing 2 early ends it. It turns toward the cursor at a capped turn speed.
 - He moves at about 20% speed while channelling. A dash cancels it.
-- Damage builds in 3 steps the longer the beam is held.
+- Damage builds in 3 steps the longer the beam is held (8, 12, 16 per hit, every 1/6 s).
+- **Each step completed while the beam is hitting the boss carves a glyph** (max 3). A full channel on the boss gives all 3; a dash that breaks the beam keeps the glyphs already carved.
 - Cooldown about 8 s.
 
 **Animation** (new clips; the start of the existing ArcLance clip can stand in for the windup)
@@ -87,7 +90,8 @@ Player effects never use filled glowing floor discs, so they can't be mistaken f
 ### Rune Sigil (3)
 
 **Rules**
-- Placed at the cursor. The rune is drawn on the floor stroke by stroke, then arms after about 0.6 s and explodes.
+- Placed at the cursor. The rune is drawn on the floor stroke by stroke, then arms and explodes **0.8 s** after it is placed (0.4 s in Surge).
+- **Spends one glyph** for full damage (55). Cast without a glyph, the rune is drawn faint and deals 35% (19). Free in Surge.
 - Damages the boss if the boss is inside it when it explodes. Small radius (about 2.5 m), so it is a skill shot.
 - Cooldown about 6 s.
 
@@ -102,31 +106,38 @@ Player effects never use filled glowing floor discs, so they can't be mistaken f
 | Explosion | A short column of violet light, rune pieces thrown outward, one thin ring. |
 | Ending | Burnt rune lines fade from the floor. |
 
-### Astral Orb (4)
+### Core mechanic: glyphs
+
+- Disintegrate is the builder: every damage step that hits the boss carves one glyph, up to 3. They stay until spent (no decay).
+- Rune Sigil and Arcane Comet each spend one glyph for full power. Without one they still cast but deal 35% and draw a faint rune, so a missed build is visible and costs damage.
+- Arcane Surge spends all of them at once.
+- **Look:** a faint socket ring at his waist (0.75 m) with three sockets; each glyph is a small violet rune standing at its socket, turning with the ring (faster with more glyphs). Gaining one: a spark races back along the beam and the glyph draws itself. Spending one: it arcs into the rune's centre and lands with a gold flash. At 3 the glyphs pulse together. Prompt: E7 in [arcanist-fx-prompts.md](arcanist-fx-prompts.md).
+
+### Arcane Surge (5)
 
 **Rules**
-- Charge-up about 0.75 s. He moves at about 50% speed while it charges. A dash cancels it without spending the cooldown.
-- Active for 8 s. The orb floats above his shoulder and fires a bolt at the boss every 1 s (8 shots), about 8 damage each. It fires on its own while he does anything else.
-- Cooldown 10 s from the cast (80% uptime). If it should feel like a big moment instead, raise the cooldown to about 15 s.
+- Needs at least one glyph. A 0.3 s cast (release at 0.17 s); a dash before the release cancels it for free and keeps the glyphs.
+- Spends every glyph for **2 s of Surge per glyph** (2, 4 or 6 s). Cooldown 15 s.
+- While surging: the missile charge summons 5, taps fire two, and Rune Sigil and Arcane Comet cost no glyph and arm or fall twice as fast (0.4 s and 1.5 s).
 
-**Animation:** he raises his free hand to the astrolabe and opens it, releasing the orb. The start of the current TimeSeal clip can stand in.
+**Animation:** the ArcaneSurge clip if present, otherwise the old AstralOrb release clip stands in (he raises his free hand to the astrolabe and opens it).
 
-**Effect**
+**Effect** (prompt E8)
 
 | Stage | Look |
 |---|---|
-| Charge | The astrolabe rings spin faster and spread apart. Motes are drawn into the orb as it brightens; a thin ring tightens around it to show progress. |
-| Release | The rings flash and the orb lifts free with a small burst of light. The empty rings keep turning slowly at his shoulder. |
-| Active | The orb floats with two thin rings crossing around it. Before each shot it contracts slightly, then pulses and fires. |
-| Bolt | Small, round, silver-white with a violet edge. Tiny trail. |
-| Impact | A tiny star-shaped burst, no ring, so 8 shots don't clutter the boss. |
-| Last 1.5 s | The orb flickers and its rings slow. |
-| Ending | The orb drifts back into the astrolabe and the rings settle. |
+| Cast | The glyphs are pulled into the astrolabe; a ring tightens on it. |
+| Release | A gold-violet column through him and a double shockwave on the floor, both larger with each glyph spent. |
+| Active | A gold dashed ring at his feet, a gold chest ring that empties as the timer, a crown of the spent glyphs above his head, a faint rim of light, rising motes. Empowered missiles have gold edges. |
+| Last second | Everything flickers. |
+| End | The rings and crown fold inward to a small glint. |
+| Cancel | The glyphs snap back to their sockets. |
 
-### Arcane Comet (5)
+### Arcane Comet (4)
 
 **Rules**
-- Marks a spot at the cursor. The mark stays where it was placed. The comet lands about **2 s** later, so the player has to predict where the boss will be.
+- Marks a spot at the cursor. The mark stays where it was placed. The comet lands **3 s** later (1.5 s in Surge), so the player has to predict where the boss will be.
+- **Spends one glyph** for full damage (90, bullseye 180). Without a glyph it deals 35%. Free in Surge.
 - Bigger radius than the Rune Sigil (about 4 m) and his biggest single hit. The inner third of the radius (the bullseye) deals double damage, rewarding precise timing.
 - Cooldown about 18 s.
 - The Rune Sigil is the quick, small skill shot; the Comet is the slow, big one.
@@ -137,9 +148,9 @@ Player effects never use filled glowing floor discs, so they can't be mistaken f
 
 | Stage | Look |
 |---|---|
-| Mark | A thin violet crosshair ring with a small bullseye ring at the cursor. Lines only, no filled disc. |
-| Descent | The comet is visible high in the sky from the cast, falling at a steep angle with a long violet trail. Its approach is the timer. The mark's outer ring closes in toward the bullseye as it falls. |
-| Impact | A white flash at the core, a shockwave ring along the floor, rock and crystal shards thrown outward, a short real-light pulse (gone by about 0.3 s). |
+| Mark | A large rune drawn on the floor over the whole fall (its outer ring is the timer), faint without a glyph. A ground shadow tightens as the comet nears. |
+| Descent | The comet starts high out of view and streaks in across the screen in the last part of the fall: a big burning rock (charred faceted stone with molten violet cracks and a hot leading face), violet flames streaming off its back edge, a fire plume and tail, embers and a smoke trail. |
+| Impact | The meteor bursts, not the rune: the rune is snuffed to ash over about 0.12 s, while flame tongues and a fire bloom burst out of the crater, the meteor's own charred fragments are thrown out (landing within about 5 m), thin pale shockwaves race out, smoke rolls up, and a short real-light pulse fires. |
 | Aftermath | A cracked crater mark with glowing violet seams that erode away over about 1.5 s; a few embers rise. |
 
 ### Blink (dodge, RMB)
@@ -171,6 +182,6 @@ Use the layered method from the Ashen Covenant spell guide (Priest v002):
 ## Open items
 
 - All numbers are starting values to tune against the bosses, including against PF-08.
-- New clips needed: Missile charge hold, Disintegrate start/hold/end/broken, Rune Sigil draw, Astral Orb release, Comet call, Blink departure/arrival. Stand-in clips are named above.
+- Clips built (in `Arcanist.glb`): missile charge/volley, Disintegrate start/hold/end/broken, Rune Sigil draw, Comet call, BlinkIn. An ArcaneSurge clip is still to make; the AstralOrb clip stands in.
 - Check Disintegrate's dark-violet sheath against dark arenas (Shattered Hour), and the lilac missiles against Verdant Chimes.
 - Controls: the shared input (`KeyboardMouseInput` in `PlayerController.cs`) was changed for every class on October 26 to match the table above (basic LMB only, dash RMB only, slot 5 on 5).

@@ -25,7 +25,7 @@ namespace LastBell.Run
             ["MissileCharge"] = new[] { "MissileCharge", "TimeSeal" }, ["MissileVolley"] = new[] { "MissileVolley", "Clockbolt" },
             ["DisintegrateStart"] = new[] { "DisintegrateStart", "ArcLance" }, ["DisintegrateHold"] = new[] { "DisintegrateHold", "ArcLance" },
             ["DisintegrateEnd"] = new[] { "DisintegrateEnd", "Clockbolt" }, ["RuneSigil"] = new[] { "RuneSigil", "TimeSeal" },
-            ["AstralOrb"] = new[] { "AstralOrb", "TemporalAnchor" }, ["ArcaneComet"] = new[] { "ArcaneComet", "Convergence" },
+            ["AstralOrb"] = new[] { "AstralOrb", "TemporalAnchor" }, ["ArcaneSurge"] = new[] { "ArcaneSurge", "AstralOrb", "TemporalAnchor" }, ["ArcaneComet"] = new[] { "ArcaneComet", "Convergence" },
             ["BlinkIn"] = new[] { "BlinkIn", "AnchorReturn" },
         };
         static readonly HashSet<string> Looping = new HashSet<string> { "Idle", "Run", "Sprint", "Walk", "Vulnerable", "BraceHold", "BraceWalk", "Guard", "Float" };

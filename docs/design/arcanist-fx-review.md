@@ -150,3 +150,86 @@ At Risxhb's request, three clear bugs were fixed after round 3 and checked in fr
 - **Disintegrate grey core:** the alpha-blended dark layers now use render queue 3058, before the additive light (3060), so the bright core always draws on top.
 - **Missile impact size:** the ring is now 0.9 m across (was 1.8 m), with six 0.3 m rays starting from a small centre gap.
 - **Blink arrival pop:** the body is hidden on the arrival tick itself, so it is never drawn before the rebuild; the astrolabe pulse waits until the band passes his shoulder.
+
+## Glyphs, Arcane Surge and the explosion pass (October 26–27)
+
+After the playtest the Astral Orb pet was replaced by the **glyph** core mechanic and **Arcane Surge** (design: [arcanist-redesign.md](arcanist-redesign.md), prompts E7 and E8 in [arcanist-fx-prompts.md](arcanist-fx-prompts.md)). Each effect had 3 rounds with a fresh independent critic, then one round of small post-review fixes without a further critique. Captures: `build-evidence/arcanist-20261026/r15` (round 1) to `r17` (round 3), final `r19`.
+
+| Effect | Round 1 | Round 2 | Round 3 |
+|---|---|---|---|
+| E7 Glyphs | 7.0 | 7.4 | **8.0** |
+| E8 Arcane Surge | 6.5 | 7.0 | **7.4** |
+
+Then one refinement pass on the explosions (critic before and after, `r16` and `r19`):
+
+| Effect | Before | After |
+|---|---|---|
+| Rune Sigil explosion and ending | 6.0 | **7.0** |
+| Arcane Comet impact and aftermath | 6.5 | **6.8** |
+
+### E7 Glyphs: 8.0
+
+**Pros**
+- Counting works at gameplay distance: 1, 2 and 3 glyphs make different shapes around him and can be counted in well under half a second.
+- Gain is the best beat: a gold spark races back down the beam, then a flash ring and the glyph appear; three gains in one channel read as three beats.
+- Spend reads as cause and effect: the glyph keeps its rune shape on a short arc into the rune's centre and lands with a small gold flash.
+- Weak and powered runes are clearly different (faint grey-violet, no glyph band or hexagram, smaller explosion).
+
+**Cons (round 3)**
+- The gold edge on the held glyphs is still hard to see; they bloom towards white-violet.
+- The "full" pulse at 3 glyphs is subtle at gameplay distance.
+- The weak rune is very faint at gameplay distance.
+- The landing flash was too big (round 3); reduced afterwards.
+
+### E8 Arcane Surge: 7.4
+
+**Pros**
+- The release is the biggest moment in the kit: a column and two thin floor rings, over quickly.
+- The active state reads as powered up: a six-glyph crown, two rings, a violet sheen on his body (a baked shell of his pose refreshed every 0.1 s).
+- Empowered spells read as gold: gold missiles and trails, Sigil runes drawn in gold.
+- Every stage is authored in order, and a cancelled cast never shows the release.
+
+**Cons (round 3)**
+- The timer ring was hard to read at gameplay distance; afterwards it was widened to 1 m, brightened, and its head mote enlarged (not re-scored).
+- The column was magenta; afterwards it became rune violet with gold erosion edges and a 0.3 s life (not re-scored).
+- The cancel snap-back was slow and left the glyphs behind during the dash; afterwards it snaps in 0.09 s with a gold tick per socket, and the astrolabe point no longer comes from his hidden body (not re-scored).
+- The crown sat high and the end pulse was plain white; both changed afterwards (crown at 2.0 m, violet-gold end ring).
+
+### Rune Sigil explosion: 7.0 (was 6.0)
+
+**Pros:** a real snap on the detonation frame (white-hot core, flash, real light), a column that tears into vertical slivers instead of sinking, lines-only floor rings, the rune left on the floor burning down, and a weak variant that is obviously smaller.
+**Cons:** the thrown rune pieces are small and barely travel at gameplay distance; the column's first two frames still look like a smooth tube; two or three rings where one would do; the burnt lines are faint and gone after about 0.6 s.
+
+### Arcane Comet impact and aftermath: 6.8 (was 6.5)
+
+**Pros:** the shockwave is the clearest "big hit" read (bluer violet now, no longer pink); violet faceted crystals; punchy shake; the whole scar fades cleanly about 1.2 s after impact.
+**Cons:** the brightest moment is the meteor just before contact, so contact itself feels dimmer; the crater base is too faint under the boss; several rings stacked for about 0.15 s can look like a ring telegraph; the crystals smear in flight and rest on the floor too long; almost no rising embers.
+
+### Arcane Comet, the meteor itself: 6.0 (was 4.5)
+
+Three critic rounds on the comet body and its fall (`r19` → `r22` → `r24`), then small post-review fixes (`r25`).
+
+| Round | Score | Main change before it |
+|---|---|---|
+| 1 | 4.5 | (the playtest comet: a 4.4 m soft shell from the side of the view) |
+| 2 | 5.5 | a solid lumpy rock with a glowing rim, a flame shell, a tapering tail, a tightening ground shadow with a rim pulse, a fall that speeds up |
+| 3 | 6.0 | no seam (the shader gained a `_Cull` option; solid bodies draw front faces only), a white-hot core, a path at the mark's own depth (it no longer shrinks away), a shadow drawn over the floor runes |
+
+**Pros:** unmistakably a big object from the sky (the designer's main ask); a steep diagonal entry that speeds up into a slam; lands exactly on the mark and hands off cleanly to the impact; stays in the violet palette.
+**Cons:** the body still reads more like a matte jelly ball than a burning rock; the tail and embers were faint (lengthened, brightened and enlarged afterwards, not re-scored); the shadow is mostly hidden by the armed gold rune; at the test camera the boss sits at the very top of the screen, so the meteor is on the gameplay screen for only about 0.25 s (longer in the close view and when the boss stands lower on screen).
+**After round 3 (not re-scored):** removed the vertical violet streak above the impact (two critics read it as a leftover pillar); brighter core (2.2 m, led slightly along the fall); 10 m tail at 1.6× brightness with a 5 m hot inner line; larger embers.
+
+### Arcane Comet as a burning meteor, and the impact: 7.3 (was 6.0)
+
+Designer asks (Oct 27): the rock read as a glossy jelly ball rather than a burning meteor, and the rune circle should not be the thing that explodes. Three critic rounds (`r31` → `r32` → `r34`), then post-review fixes (`r35`).
+
+| Round | Score | Main change before it |
+|---|---|---|
+| 1 | 6.0 | the shader gained a **Rock** mode (`_Mode 9`: charred stone lit per facet, molten cracks from 3D Voronoi cell borders, a hot face toward `_HeatDir`, erosion); the rock is faceted and flat-shaded; the smooth glowing shells are gone; the rune no longer detonates (`RuneDetonate` removed) but is snuffed to ash; the meteor bursts into its own charred fragments; a smoke trail |
+| 2 | 6.4 | flame licks on the rock, darker smoke, the rune's armed colour is a dim violet (no gold flare at landing), a flame-tongue burst at impact, smoke wisps from fragments, a stronger ground shadow |
+| 3 | 7.3 | soft flames rooted on the rock's on-screen outline (sides and back only) so they stream away from the stone, a 6 m fire plume, the straight beam tail at a third of its strength, the rune snuffed over 0.12 s, thin pale shockwaves that don't match the rune ring, a fire bloom and embers at impact |
+
+**Verdicts (round 3):** burning rock: mostly yes (the jelly read is gone); meteor bursts, rune snuffed: yes.
+**Pros:** a massive dark rock with molten seams and violet fire; unmistakable scale; the fragments are visibly the meteor breaking; the rune hands the moment to the burst; good shadow build-up; a brief, clean flash.
+**Cons:** the flat facets and even seams can still read as an obsidian geode; smoke was too faint to see; the burst reads more as arcane energy than fire; the fragments were too big and flew too far; a short trail with few embers; the rock vanished about 1 m above the floor.
+**After round 3 (not re-scored):** stronger smoke in the fall and at impact; softer, mottled facet shading and a smaller hot cap; 8 smaller fragments (0.3–0.5 m) landing within about 5 m, with shorter, dimmer streaks; the rock now follows its path until its base reaches the floor.

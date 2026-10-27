@@ -41,6 +41,7 @@ namespace LastBell.Run
 
         readonly Bot bot = new Bot();
         string outDir, only; Camera close; RenderTexture rt; Texture2D grab, grabClose;
+        PlayerController watch; string stateLog;   // when set, Record writes his HP / dash state for every frame
         Func<Vector3> closeTarget; Vector3 closeOffset;
 
         IEnumerator Start()
@@ -64,7 +65,7 @@ namespace LastBell.Run
 
             IEnumerator Reset()
             {
-                bot.Clear(); d.Boss.Halt(); d.World.ClearTransient(); p.DebugSetHp(PlayerController.MaxHp);
+                bot.Clear(); d.Boss.Halt(); d.World.ClearTransient(); p.DebugSetHp(PlayerController.MaxHp); k.ResetAll();
                 var b = d.Boss.transform.position; var cm = Camera.main;
                 // stand between the camera and the boss, a little to the side, so the gameplay view shows both
                 var back = cm ? -Sim.Flat(cm.transform.forward).normalized : Vector3.back; var side = Vector3.Cross(Vector3.up, -back);
@@ -106,33 +107,57 @@ namespace LastBell.Run
                 }
                 if (Want("disintegrate_broken"))
                 {
-                    yield return Reset(); while (k.Cooldown01(1) > 0) yield return null;
+                    yield return Reset();
                     FocusMid(); var rec = StartCoroutine(Record("disintegrate_broken", 45));
                     bot.press[1] = true; bot.hold[1] = true; yield return Frames(30);
                     bot.dash = true; bot.MoveWorld = Vector3.left; yield return Frames(4); bot.hold[1] = false; bot.Clear(); yield return rec;
                 }
                 if (Want("rune_sigil"))
                 {
-                    yield return Reset(); FocusBoss(); var rec = StartCoroutine(Record("rune_sigil", 48));
+                    yield return Reset(); k.DebugSetGlyphs(1); yield return Frames(12);
+                    FocusBoss(); var rec = StartCoroutine(Record("rune_sigil", 54));
                     bot.press[2] = true; yield return rec;
                 }
-                if (Want("astral_orb"))
+                if (Want("glyph_build"))
                 {
-                    yield return Reset(); FocusMe(); var rec = StartCoroutine(Record("astral_orb", 105));
-                    bot.press[3] = true; yield return Frames(60); FocusMid(); yield return rec;
-                    // the end of its 8 s: the last 1.5 s flicker and the return (the orb ends about 262 frames after the cast)
-                    FocusMe(); yield return Frames(105); yield return Record("astral_orb_end", 70);
+                    // a full Disintegrate on the boss: a glyph carved at each step, then the three glyphs orbiting him
+                    yield return Reset(); FocusMid(); var rec = StartCoroutine(Record("glyph_build", 96));
+                    bot.press[1] = true; bot.hold[1] = true; yield return Frames(84); bot.hold[1] = false; yield return rec;
+                    FocusMe(); closeOffset = new Vector3(2.2f, 1.4f, 3.0f); yield return Record("glyphs_idle", 45);
                 }
-                if (Want("astral_orb_cancel"))
+                if (Want("rune_sigil_weak"))
                 {
-                    yield return Reset(); while (k.Cooldown01(3) > 0 || k.OrbActive) yield return null;
-                    FocusMe(); var rec = StartCoroutine(Record("astral_orb_cancel", 30));
-                    bot.press[3] = true; yield return Frames(12); bot.dash = true; bot.MoveWorld = Vector3.right; yield return Frames(4); bot.Clear(); yield return rec;
+                    yield return Reset(); FocusBoss(); var rec = StartCoroutine(Record("rune_sigil_weak", 54));
+                    bot.press[2] = true; yield return rec;
                 }
                 if (Want("arcane_comet"))
                 {
-                    yield return Reset(); FocusBoss(); var rec = StartCoroutine(Record("arcane_comet", 96));
+                    yield return Reset(); k.DebugSetGlyphs(1); yield return Frames(12);
+                    FocusBoss(); var rec = StartCoroutine(Record("arcane_comet", 165));   // through the whole aftermath
+                    bot.press[3] = true; yield return rec;
+                }
+                if (Want("arcane_comet_weak"))
+                {
+                    yield return Reset(); FocusBoss(); var rec = StartCoroutine(Record("arcane_comet_weak", 60));
+                    bot.press[3] = true; yield return rec;
+                }
+                if (Want("surge"))
+                {
+                    // 3 glyphs: the cast pulls them in, the release, then a 5-missile volley and a fast sigil while
+                    // empowered, then the last second flickering and the fold at the end of its 6 s
+                    yield return Reset(); k.DebugSetGlyphs(3); yield return Frames(15);
+                    FocusMe(); closeOffset = new Vector3(3.2f, 2.0f, 4.2f); var rec = StartCoroutine(Record("surge", 40));
                     bot.press[4] = true; yield return rec;
+                    FocusMid(); rec = StartCoroutine(Record("surge_active", 90));
+                    bot.press[0] = true; bot.hold[0] = true; yield return Frames(30); bot.hold[0] = false; yield return Frames(20);
+                    bot.press[2] = true; yield return rec;
+                    yield return Frames(25); FocusMe(); closeOffset = new Vector3(3.2f, 2.0f, 4.2f); yield return Record("surge_end", 45);
+                }
+                if (Want("surge_cancel"))
+                {
+                    yield return Reset(); k.DebugSetGlyphs(3); yield return Frames(15);
+                    FocusMe(); closeOffset = new Vector3(3.2f, 2.0f, 4.2f); var rec = StartCoroutine(Record("surge_cancel", 30));
+                    bot.press[4] = true; yield return Frames(3); bot.dash = true; bot.MoveWorld = Vector3.right; yield return Frames(4); bot.Clear(); yield return rec;
                 }
                 if (Want("blink_blocked"))
                 {
@@ -143,6 +168,18 @@ namespace LastBell.Run
                     d.World.Hazards.Spawn(new Hazard { Source = "Showcase strike", Shape = HazardShape.Circle, Kind = HazardKind.Strike, Origin = p.transform.position, Radius = 2.5f, ResolveAt = 6, Damage = 5 });
                     yield return Frames(2); bot.dash = true; bot.MoveWorld = Vector3.right; yield return Frames(6); bot.Clear(); yield return rec;
                     p.DebugSetHp(PlayerController.MaxHp);
+                }
+                if (Want("blink_hit"))
+                {
+                    // no invincibility on Blink: a 25-damage strike resolves 4 ticks into the dash and must land
+                    yield return Reset(); FocusMe(); closeOffset = new Vector3(3.5f, 2.2f, 4.5f);
+                    watch = p; stateLog = Path.Combine(outDir, "blink_hit_state.csv"); File.WriteAllText(stateLog, "frame,hp,dashing,hidden,stunned\n");
+                    var rec = StartCoroutine(Record("blink_hit", 30));
+                    yield return Frames(3);
+                    d.World.Hazards.Spawn(new Hazard { Source = "Test strike during Blink", Shape = HazardShape.Circle, Kind = HazardKind.Strike, Origin = p.transform.position, Radius = 3f, ResolveAt = 8, Damage = 25 });
+                    yield return Frames(2); bot.dash = true; bot.MoveWorld = Vector3.right; yield return Frames(8); bot.Clear(); yield return rec;
+                    Log($"blink_hit: hp after {p.Hp} (started at {PlayerController.MaxHp}); the hit landed during the dash, no invincibility");
+                    watch = null; p.DebugSetHp(PlayerController.MaxHp);
                 }
                 if (Want("blink"))
                 {
@@ -171,6 +208,7 @@ namespace LastBell.Run
                 if (grab == null || grab.width != Screen.width || grab.height != Screen.height) grab = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
                 grab.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0); grab.Apply(false);
                 File.WriteAllBytes(Path.Combine(dir, $"g_{i:000}.png"), grab.EncodeToPNG());
+                if (watch && stateLog != null) File.AppendAllText(stateLog, $"{i},{watch.Hp},{watch.Dashing},{watch.Presenter.Hidden},{watch.Stunned}\n");
                 if (close && closeTarget != null)
                 {
                     var t = closeTarget(); var cam = main ? main.transform : null;

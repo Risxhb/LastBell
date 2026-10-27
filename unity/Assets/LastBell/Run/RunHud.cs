@@ -629,7 +629,7 @@ namespace LastBell.Run
         {
             ["Vanguard"] = new[] { "vanguard_steel_rhythm", "vanguard_sundering_blow", "vanguard_last_word", "vanguard_brace", "vanguard_dash" },
             ["Chimesinger"] = new[] { "chimesinger_resonant_note", "chimesinger_bellstrike", "chimesinger_harmonic_refrain", "chimesinger_crescendo", "chimesinger_mending_chorus", "chimesinger_harmonic_step" },
-            ["Arcanist"] = new[] { "arcanist_clockbolt", "arcanist_time_seal", "arcanist_arc_lance", "arcanist_convergence", "arcanist_temporal_anchor", "arcanist_clockstep" },
+            ["Arcanist"] = new[] { "arcanist_magic_missile", "arcanist_disintegrate", "arcanist_rune_sigil", "arcanist_comet", "arcanist_arcane_surge", "arcanist_blink" },
         };
         static readonly Dictionary<string, Texture2D> icons = new Dictionary<string, Texture2D>();
         public static Texture2D Icon(string file)
