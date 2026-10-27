@@ -2,7 +2,7 @@
 
 A player's guide to the current v4 fight on every difficulty.
 
-**Proven beatable:** four perfect bots killed him on Hard at full HP in **2:32** (4 of 4 standing). Solo bots killed him on every level as Vanguard (Easy 3:44, Medium 4:38, Hard 4:35) and Chimesinger (3:59, 3:48, 3:53), and as Arcanist on Easy (2:47) and Medium (3:02); see **Playing solo**. (The video `aurelion-v4-win.mp4` shows an earlier 5:06 version.)
+**Proven beatable:** four perfect bots killed him on Hard at full HP in **2:16** (4 of 4 standing). Solo bots killed him on every level with every class: Vanguard (Easy 3:44, Medium 4:38, Hard 4:35), Chimesinger (3:40, 3:34, 3:26) and Arcanist (2:18, 2:40, 2:34); see **Playing solo**. (The video `aurelion-v4-win.mp4` shows an earlier 5:06 version.)
 
 **Numbers:**
 - Damage is quoted for Medium. Hard is ×1.3, Easy ×0.6.
@@ -120,15 +120,15 @@ Everything above applies; these are the solo differences.
 - Towers: keep swinging and leave late; walk around him, not through him.
 - Sunspots: you lose damage walking to the edge. Drop them and come straight back.
 
-**Ranged (Chimesinger, Arcanist):** cast from inside the wells and the safe rings. You can keep casting while you wait for a tower, so stand in it early.
+**Ranged (Chimesinger, Arcanist):** cast from inside the wells and the safe rings, and keep your basic going while you follow a turning well (it casts on the move). You can keep casting while you wait for a tower, so stand in it early.
 
 **Reference clears (perfect solo bots, Unity):**
 
 | | Easy | Medium | Hard |
 |---|---|---|---|
 | Vanguard | 3:44, Corona in 21.1 s | 4:38, 19.3 s | 4:35, 18.3 s |
-| Chimesinger | 3:59, 13.2 s | 3:48, 18.6 s | 3:53, 19.4 s |
-| Arcanist | 2:47, 18.1 s | 3:02, 13.2 s | not yet: the bot fails the Corona Shield (under investigation) |
+| Chimesinger | 3:40, 16.7 s | 3:34, 18.3 s | 3:26, 18.1 s |
+| Arcanist | 2:18, 12.3 s | 2:40, 11.2 s | 2:34, 11.2 s |
 
 All of them ended with 1 to 4 slices fallen in Last Light, well before the 8th.
 
