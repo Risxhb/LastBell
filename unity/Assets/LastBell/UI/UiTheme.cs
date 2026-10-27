@@ -56,7 +56,9 @@ namespace LastBell
         // IMGUI (combat HUD). Lay out in virtual 1080p units and convert with V()/R(); styles from Style() are
         // already sized for the current screen, so text renders crisp (no GUI.matrix scaling).
         // =====================================================================================================
-        public static float Scale => Mathf.Clamp(Screen.height / 1080f, 0.70f, 2f);
+        // no high floor: the virtual canvas is always 1080 tall, so a short window (a browser page) must scale below
+        // 0.7 or bottom-anchored HUD falls off the screen; text sizes keep their own 9 px minimum
+        public static float Scale => Mathf.Clamp(Screen.height / 1080f, 0.35f, 2f);
         public static float V(float v) => v * Scale;
         public static Rect R(float x, float y, float w, float h) { float s = Scale; return new Rect(x * s, y * s, w * s, h * s); }
         public static float VirtualWidth => Screen.width / Scale;      // the virtual canvas is VirtualWidth x 1080

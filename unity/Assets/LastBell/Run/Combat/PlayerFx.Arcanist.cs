@@ -74,7 +74,7 @@ namespace LastBell.Run
             arcTrailMat = new Material(sh); arcTrailMat.SetFloat(PMode, MBeam); arcTrailMat.SetFloat(PWidth, 0.35f); arcTrailMat.SetColor(PLow, ArcLilac); arcTrailMat.SetColor(PHigh, HotWhite);
             arcTrailMat.SetVector(PFlow, new Vector4(2.5f, 0, 1.2f, 0.4f)); arcTrailMat.SetFloat(PIntensity, 0.85f);
             silverTrailMat = new Material(arcTrailMat); silverTrailMat.SetColor(PLow, StarEdge); silverTrailMat.SetColor(PHigh, StarSilver);
-            var tmp = GameObject.CreatePrimitive(PrimitiveType.Sphere); sphereMesh = tmp.GetComponent<MeshFilter>().sharedMesh; Destroy(tmp);
+            sphereMesh = UvSphere(18, 28);   // built in code: CreatePrimitive drags in a SphereCollider, which Web builds strip
             dartMesh = CrossedDart(0.2f, 0.62f); shardMesh = CrossedDart(0.12f, 0.42f); beamMesh = AxisQuad(0, 1, 1); billboard = AxisQuad(-0.5f, 0.5f, 1);
             taperMesh = Taper(); helixMesh = Helix(16f, 24, 0.012f); colShell = TaperedTube(1.2f, 0.8f, 3f, 48);
             arcLights = new Light[3]; lightLeft = new float[3]; lightLife = new float[3]; lightPeak = new float[3];
@@ -89,6 +89,26 @@ namespace LastBell.Run
             var m = new Material(sh); m.SetFloat(PMode, MDot); m.SetColor(PLow, low); m.SetColor(PHigh, high); m.SetFloat(PNoiseAmt, 0); return m;
         }
 
+        // a sphere of radius 0.5 (like Unity's primitive) with normals and UVs
+        static Mesh UvSphere(int lat, int lon)
+        {
+            var v = new Vector3[(lat + 1) * (lon + 1)]; var n = new Vector3[v.Length]; var uv = new Vector2[v.Length]; var t = new int[lat * lon * 6];
+            for (int i = 0; i <= lat; i++)
+                for (int j = 0; j <= lon; j++)
+                {
+                    float th = Mathf.PI * i / lat, ph = 2 * Mathf.PI * j / lon; int k = i * (lon + 1) + j;
+                    n[k] = new Vector3(Mathf.Sin(th) * Mathf.Cos(ph), Mathf.Cos(th), Mathf.Sin(th) * Mathf.Sin(ph)); v[k] = n[k] * 0.5f;
+                    uv[k] = new Vector2((float)j / lon, 1 - (float)i / lat);
+                }
+            int q = 0;
+            for (int i = 0; i < lat; i++)
+                for (int j = 0; j < lon; j++)
+                {
+                    int a0 = i * (lon + 1) + j, b0 = a0 + lon + 1;
+                    t[q++] = a0; t[q++] = a0 + 1; t[q++] = b0; t[q++] = a0 + 1; t[q++] = b0 + 1; t[q++] = b0;
+                }
+            var m = new Mesh { name = "FX_MS_Sphere", vertices = v, normals = n, uv = uv, triangles = t }; m.RecalculateBounds(); return m;
+        }
         // a flat quad in local XZ: U along +Z from z0 to z1 (scaled by len), V across X (width 1)
         static Mesh AxisQuad(float z0, float z1, float len)
         {
