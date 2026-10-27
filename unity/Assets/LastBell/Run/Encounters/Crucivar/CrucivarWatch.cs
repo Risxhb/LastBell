@@ -91,6 +91,7 @@ namespace LastBell.Run
                     w.PlayerHit += (p, h, dmg) => { var b = bots.FirstOrDefault(x => x.P == p); if (b != null) { b.Hits++; b.Damage += dmg; } };
                 }
                 fights++; fightStart = Time.time;
+                int logged = 0;
                 while (d.State == RunState.Combat)
                 {
                     foreach (var b in bots)
@@ -98,8 +99,22 @@ namespace LastBell.Run
                         b.P.AbilitiesEnabled = true;
                         if (b.P.Hp < 40) { b.Downs++; b.P.DebugSetHp(PlayerController.MaxHp); }   // keep the show going, count it
                     }
+                    // pace the fight so every phase shows at least two whole loops: 65 % after loop 2, 30 % after loop 4,
+                    // the kill after loop 6 (the bots' damage alone would end it in half a minute)
+                    if (d.Boss is CrucivarEncounter cb && cb.Rite != null && !cb.Dead)
+                    {
+                        int done = cb.Rite.Loops - (cb.Current.StartsWith("Forge Rite") || cb.Current == "Vulnerable" ? 0 : 1);
+                        float floor = done < 2 ? 0.66f : done < 4 ? 0.31f : done < 6 ? 0.02f : 0f;
+                        if (cb.Hp < cb.MaxHp * floor) cb.DebugSetHpFraction(floor);
+                        if (cb.Rite.Loops != logged)
+                        {
+                            logged = cb.Rite.Loops;
+                            Debug.Log($"[watch] fight {fights} loop {logged} · boss {cb.Hp}/{cb.MaxHp} · " + string.Join(" · ", bots.Select(b => $"{b.Name} {b.Hits} hits/{b.Damage} dmg/{b.Downs} downs")));
+                        }
+                    }
                     yield return null;
                 }
+                Debug.Log($"[watch] fight {fights} over after {Time.time - fightStart:0}s · " + string.Join(" · ", bots.Select(b => $"{b.Name} {b.Hits} hits/{b.Damage} dmg/{b.Downs} downs")));
                 foreach (var b in bots.Skip(1)) if (b.P) { w.Players.Remove(b.P); Destroy(b.P.gameObject); }
                 while (d.State != RunState.Results) yield return null;
                 yield return new WaitForSeconds(1f);
