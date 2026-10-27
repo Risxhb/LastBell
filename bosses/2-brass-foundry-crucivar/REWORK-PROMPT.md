@@ -41,16 +41,15 @@ You are reworking **Crucivar, the Furnace Heart**, the Brass Foundry's area boss
 ## Difficulty target
 
 - **At or above Aurelion v4 on every level** (Easy, Medium, Hard). Easy may only lengthen warnings and lower damage. It never removes the phase structure.
-- **Before Phase 1 is accepted, ask Chzy18 to grant Crucivar the same exceptions as Aurelion:**
+- **Allowed for every boss since 2026-10-26** (Chzy18 removed the old caps; see `gpt/08-design-rules.md` §5):
   - three or more overlapping damaging patterns;
   - enrage plus scaling pressure (a hard enrage, mechanics that grow every cast, a floor that fills);
-  - a failed mechanic may end the fight for the whole party, even solo;
-  - 5–7 min with 4 phases plus an intermission.
+  - a failed mechanic may end the fight for the whole party, even solo (with an impossible-to-miss telegraph, introduced first).
 
-  Without that grant, the settled limits apply: at most two overlaps, no enrage, only an empty soak wipes. In that case say plainly that "Aurelion-level" can't be met. Once granted, record it in `gpt/08-design-rules.md` the way Aurelion's was recorded.
-- **Still settled, whatever is granted:**
+  Use them; Aurelion v4 does.
+- **Still settled:**
   - no iframes, no grace windows, no post-hit immunity;
-  - no one-shots on avoidable hits (heavy hits only), unless Chzy18 grants Ultimate-style rules;
+  - no one-shots on avoidable hits (heavy hits only);
   - one hit per hazard instance;
   - no teleporting players;
   - no class required, and every party (all duplicates included) can clear;
