@@ -56,7 +56,7 @@ namespace LastBell.Run
         public int Attacks { get; private set; }
 
         // v3 uses the packet's 6600 (ABILITIES-v3.md); v1 and v2 keep the shortened 2500 test value
-        void Awake() { MaxHp = CrucivarArgs.V3 ? 6600 : 2500; BodyRadius = 1.7f; HitHeight = 2.0f; MarkHeight = 4.6f; }
+        void Awake() { MaxHp = CrucivarArgs.V3 || CrucivarArgs.V4 ? 6600 : 2500; BodyRadius = 1.7f; HitHeight = 2.0f; MarkHeight = 4.6f; }
 
         protected override void Build()
         {
@@ -69,7 +69,7 @@ namespace LastBell.Run
 
         int PhaseFor() => Hp > MaxHp * P2At ? 1 : Hp > MaxHp * P3At ? 2 : 3;
 
-        protected override IEnumerable<int> Script() => CrucivarArgs.V1 ? V1Script() : V2Script();
+        protected override IEnumerable<int> Script() => CrucivarArgs.V1 ? V1Script() : CrucivarArgs.V4 ? V4Script() : V2Script();
 
         IEnumerable<int> V1Script()
         {
@@ -294,8 +294,8 @@ namespace LastBell.Run
         {
             if (Mould != null) return;
             Mould = new MouldPress(); Chain = new GearChain(); Bellows = new BellowsDraw(); Casting = new GreatCasting(); Press = new SecondPress();
-            Sweep = new AnvilSweep(); Spit = new SlagSpit();
-            foreach (var a in new CrucivarAbility[] { Mould, Chain, Bellows, Casting, Press, Sweep, Spit }) a.Bind(this, W);
+            Sweep = new AnvilSweep(); Spit = new SlagSpit(); Rite = new ForgeRite();
+            foreach (var a in new CrucivarAbility[] { Mould, Chain, Bellows, Casting, Press, Sweep, Spit, Rite }) a.Bind(this, W);
         }
 
         public IEnumerable<int> WalkToAnvil()
@@ -431,6 +431,32 @@ namespace LastBell.Run
                     if (TestHold) { restart = true; break; }
                 }
                 if (!restart) yield return 1;
+            }
+        }
+
+        // ================ ability set v4 (rework, REWORK-PROMPT.md): Phase 1 "Forge Rite" prototype ================
+        // Only Phase 1 is designed so far, so Forge Rite loops at every HP. The 65 % and 30 % transitions still play
+        // (harmless, no heal) and end the phase: every Ember Brand pool clears.
+        public ForgeRite Rite { get; private set; }
+
+        IEnumerable<int> V4Script()
+        {
+            BindAbilities();
+            while (true)
+            {
+                if (TestHold)
+                {
+                    if (testBody == null) { Current = "test hold"; yield return 1; continue; }
+                    var body = testBody; testRunning = true;
+                    foreach (var w in body) yield return w;
+                    testBody = null; testRunning = false;
+                    continue;
+                }
+                Attacks++;
+                foreach (var w in Rite.Loop()) yield return w;
+                foreach (var w in Recover("Forge Rite (vents cooling)", "Vulnerable", Sim.Ticks(ForgeRite.Punish))) yield return w;
+                int want = PhaseFor();
+                if (want != phase) { phase = want; Rite.ClearPools(); foreach (var w in V2Shift()) yield return w; }
             }
         }
 

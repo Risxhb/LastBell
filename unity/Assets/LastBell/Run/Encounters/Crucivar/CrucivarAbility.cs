@@ -44,7 +44,8 @@ namespace LastBell.Run
     }
 
     // Launch switches (practice only):
-    //   -lastbellAbilitySet v1|v2|v3   v3 (default) is the "much harder" set (ABILITIES-v3.md); v2 the first new set; v1 the
+    //   -lastbellAbilitySet v1|v2|v3|v4   v3 (default) is the "much harder" set (ABILITIES-v3.md); v4 is the Forge Rite Phase 1
+    //                               prototype of the rework (REWORK-PROMPT.md); v2 the first new set; v1 the
     //                               original five attacks, kept for comparison
     //   -lastbellAbility <id>       fire one v2 ability on loop, e.g. crucivar.mould_press
     public static class CrucivarArgs
@@ -58,7 +59,8 @@ namespace LastBell.Run
         public static string SetOverride;   // tests force a set without a command line
         public static string Set => (SetOverride ?? Arg("-lastbellAbilitySet") ?? "v3").ToLowerInvariant();
         public static bool V1 => Set == "v1";
-        public static bool V3 => Set != "v1" && Set != "v2";
+        public static bool V3 => Set == "v3";
+        public static bool V4 => Set == "v4";   // Phase 1 "Forge Rite" prototype (2026-10-26)
         public static string Solo => Arg("-lastbellAbility");
         public static readonly string[] Ids = { "crucivar.mould_press", "crucivar.gear_chain", "crucivar.bellows_draw", "crucivar.great_casting", "crucivar.second_press", "crucivar.anvil_sweep", "crucivar.slag_spit" };
         public static bool Known(string id) => id != null && Ids.Contains(id);
