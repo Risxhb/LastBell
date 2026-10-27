@@ -39,6 +39,7 @@ namespace LastBell.Run
         public readonly List<Hazard> Pools = new List<Hazard>();
         public List<PlayerController> Order { get; private set; } = new List<PlayerController>();
         public bool NumeralsShown { get; private set; }
+        bool hideNext;   // shown, hidden, shown, ... per Casting Order (not per loop count, which the encounter may have advanced)
 
         // one loop without the punish window (the encounter adds it)
         public IEnumerable<int> Loop()
@@ -144,7 +145,8 @@ namespace LastBell.Run
         void CastingOrder()
         {
             var standing = Standing();
-            bool memory = loops % 2 == 0 && Order.Count > 0;
+            bool memory = hideNext && Order.Count > 0;
+            hideNext = !memory;
             if (!memory)
             {
                 // a fixed shuffle per phase visit: rotate the party list by the loop number (readable, learnable)

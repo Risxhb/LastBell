@@ -37,7 +37,7 @@ namespace LastBell.Run
             t.Check("Casting Order: pours I-IV, 0.5 s apart from 10.5 s", pours.Count == 4 && pours.Select(x => x.Tick - c0 + x.H.ResolveAt).SequenceEqual(new[] { 630, 660, 690, 720 }.Select(v => v + (pours[0].Tick - c0 + pours[0].H.ResolveAt - 630))),
                 string.Join("/", pours.Select(x => x.Tick - c0 + x.H.ResolveAt)));
             t.Check("each pour leaves a burning channel", t.Spawned("Pour Channel").Count() == pours.Count);
-            t.Check("Hammerfall: front, back, slam at 11.5 / 12.2 / 12.9 s", new[] { "Hammerfall I", "Hammerfall II", "Hammerfall III" }.All(n => t.Spawned(n).Count() == 1),
+            t.Check("Hammerfall: front, back, slam at 11.5 / 12.2 / 12.9 s", new[] { "Hammerfall I", "Hammerfall II", "Hammerfall III" }.All(n => t.Spawns.Count(x => x.Source == n) == 1),
                 $"{R("Hammerfall I")}/{R("Hammerfall II")}/{R("Hammerfall III")}");
             t.Check("peak of live patterns is three or more", peak >= 3, $"peak {peak}");
             t.Check("still players get hit (brands on each other, jets, blast, hammer)", t.Hits.Count > 0, $"{t.Hits.Count} hits");
@@ -52,7 +52,7 @@ namespace LastBell.Run
             var order1 = t.Boss.Rite.Order.ToList();
             t.Begin(t.Boss.Rite.Loop());
             yield return t.Ticks(Sim.Ticks(9));
-            t.Check("loop 2 hides the numerals and replays the same order", !t.Boss.Rite.NumeralsShown && t.Boss.Rite.Order.SequenceEqual(order1));
+            t.Check("loop 2 hides the numerals and replays the same order", !t.Boss.Rite.NumeralsShown && t.Boss.Rite.Order.SequenceEqual(order1), $"shown {t.Boss.Rite.NumeralsShown}, loops {t.Boss.Rite.Loops}");
             yield return t.Shot("v4_forge_rite");
             int hits = t.Hits.Count;
             t.KillBoss();
