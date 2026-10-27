@@ -112,8 +112,9 @@ namespace LastBell.Run
             int eclT0 = -1, eclSec = -1, eclMax = 0, eclLeft = 0, p4T0 = -1, p4Hp0 = 0; bool eclDone = false;
             bool fast = Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellDemoFast", StringComparison.OrdinalIgnoreCase)) && !DemoRecord;
             if (fast) Time.timeScale = 4;   // measurement runs (no recording) at 4x
-            string last = ""; float t = 0;
-            while (t < 480 && d.State == RunState.Combat)
+            // fight time, not frame time: big parties at 4x fall behind the frame clock (an 8-player run stopped at 4:27 of fight)
+            string last = ""; float t0 = Time.realtimeSinceStartup;
+            while (b.FightTicks < 480 * Sim.Hz && Time.realtimeSinceStartup - t0 < 1800 && d.State == RunState.Combat)
             {
                 DemoCaption(b);
                 if (!eclDone && b.Eclipse.Active) eclLeft = b.ShieldHp;
@@ -130,7 +131,7 @@ namespace LastBell.Run
                         Note($"towers @{b.FightTicks / (float)Sim.Hz:0.0}s {p.ClassName}: tower {(tw == null ? "-" : tw.Index + " at " + Sim.Flat(tw.At))} | {(p.Input as AllyBot)?.DebugLine}");
                     }
                 if (b.PhaseName != last) { last = b.PhaseName; Note($"demo @{b.FightTicks / (float)Sim.Hz:0.0}s: {last}"); }
-                t += Time.deltaTime; yield return null;
+                yield return null;
             }
             if (!eclDone && eclT0 >= 0) Note($"demo window Corona: {eclMax - eclLeft} of {eclMax} in {(d.World.Tick - eclT0) / (float)Sim.Hz:0.0} s (limit 25 s), held");
             if (p4T0 >= 0) Note($"demo window Last Light: {p4Hp0 - b.Hp} of {p4Hp0} in {(d.World.Tick - p4T0) / (float)Sim.Hz:0.0} s (floor deadline 88 s), {b.Light.Fallen} slices fallen");
@@ -143,7 +144,7 @@ namespace LastBell.Run
             if (b.Telemetry) foreach (var s in b.Telemetry.Summary()) Note("demo telemetry: " + s);
             foreach (var g in b.Telemetry.Rows.Where(r => r.Kind == "hit").GroupBy(r => r.Player)) Note($"demo hits {g.Key}: " + string.Join(", ", g.GroupBy(r => r.Source).Select(s => $"{s.Key} {s.Count()}x{s.Sum(r => r.Value):0}")));
             Check("demo: the fight ran to an end", d.State != RunState.Combat, d.State.ToString());
-            t = 0; while (t < 5) { t += Time.deltaTime; yield return null; }
+            float t = 0; while (t < 5) { t += Time.deltaTime; yield return null; }
             demoRecording = false; yield return null; yield return null;
             RunHud.CaptionTitle = null;
             AllyBot.AllyMode = BotMode.Perfect; AllyBot.Attacks = false;   // back to the menu defaults

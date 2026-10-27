@@ -51,12 +51,15 @@ namespace LastBell.Run
         int pinRotation;
 
         // HP = measured sustained DPS x 150 s (packet). First autotest measurement: Vanguard ~90 DPS while dodging -> 13 500.
-        void Awake() { MaxHp = AurelionArgs.V4 ? 10000 : 13500; BodyRadius = 1.1f;   // v4: measured in the 4-bot demo (party ~128 DPS while dodging) so a perfect party kills him in Last Light with 1-2 slices of floor to spare
+        void Awake() { MaxHp = AurelionArgs.V4 ? 12000 : 13500; BodyRadius = 1.1f;   // v4: Chzy18 2026-10-27 "beef up the health" (5-7 min target); was 10 000 (solo Vanguard 4:35, Arcanist 2:34 on Hard)
             HitHeight = 2.6f; MarkHeight = 5.2f; }
 
         int PhaseFor() => Hp > MaxHp * 0.65f ? 1 : Hp > MaxHp * 0.30f ? 2 : 3;
         public void DebugReadyThrust() { thrustReady = 0; }   // test hook: the next pass may choose the Thrust
-        protected override bool PartyScaled => true;   // v4 was tuned with the co-op HP formula (4 perfect bots: 31,000 HP)
+        protected override bool PartyScaled => true;   // v4 is tuned with the co-op HP formula
+        // 2026-10-27: 1.25 per extra fighter (was 0.7: 4 perfect bots cleared 31 000 HP in about 2:10, 8 in 2:15; 1.7 ran 4 bots
+        // into the 6:30 enrage): 4 players 57 000, 8 players 117 000
+        protected override float PartyStep => AurelionArgs.V4 ? 1.25f : 0.7f;
         public override float NextPhaseFraction() => AurelionArgs.V4 ? V4NextPhaseFraction() : Hp > MaxHp * 0.65f ? 0.64f : 0.29f;
         bool Ready(int at) => Age >= at;
 

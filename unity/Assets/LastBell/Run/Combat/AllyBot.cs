@@ -156,8 +156,9 @@ namespace LastBell.Run
 
         void Attack(PlayerController me, ref PlayerInput inp)
         {
-            // Arcanist: keep Disintegrate held on him until its channel ends, unless something is about to land here
-            if (me.Kit is ArcanistKit ak && ak.BeamActive) { if (Clear(me, 30)) inp.H1 = true; return; }
+            // Arcanist: keep Disintegrate held on him until its channel ends, unless something is about to land here or it's
+            // standing where it mustn't (a burning pool, off its job): the beam slows it to 0.2, so let go and walk
+            if (me.Kit is ArcanistKit ak && ak.BeamActive) { if (Clear(me, 30) && (bad == null || !bad(me.transform.position))) inp.H1 = true; return; }
             if (tick - lastPress < 6) return;
             // the kit's own cooldowns (the reference policy; a private counter only ticked while attacking)
             System.Func<int, bool> ready = slot => me.Kit.Cooldown01(slot) <= 0.001f && tick >= skipUntil[slot];
