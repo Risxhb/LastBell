@@ -923,7 +923,7 @@ namespace LastBell.Run
         void Labels()
         {
             var cam = Camera.main; if (!cam) return; float h = Screen.height;
-            if (lab == null) lab = new GUIStyle(num);
+            if (lab == null) lab = new GUIStyle(num) { wordWrap = false, clipping = TextClipping.Overflow };   // "SUNSPOT I  II" stays on one line
             // keep labels out of the boss block, the demo caption and the screen edges (Aurelion readability A1/A3/A4): a
             // label pushed inward keeps a thin leader back to the spot it names
             float top = d.Boss != null ? UiTheme.V(165) : 16, bottom = string.IsNullOrEmpty(CaptionTitle) ? h - UiTheme.V(150) : h - 340;
@@ -931,10 +931,10 @@ namespace LastBell.Run
             {
                 if (l.Hidden || (l.Follow == null && !ReferenceEquals(l.Follow, null))) continue;
                 var s = cam.WorldToScreenPoint(l.Follow ? l.Follow.position + l.Pos : l.Pos); if (s.z < 0) continue;
-                lab.fontSize = l.Size;
+                lab.fontSize = l.Size; float wide = Mathf.Max(200, lab.CalcSize(new GUIContent(l.Text)).x + 8);
                 float half = l.Size * 0.6f;
                 var at = new Vector2(s.x, h - s.y);
-                var c = new Vector2(Mathf.Clamp(at.x, 110, Screen.width - 110), Mathf.Clamp(at.y, top + half, Mathf.Max(top + half, bottom - half)));
+                var c = new Vector2(Mathf.Clamp(at.x, wide / 2 + 10, Screen.width - wide / 2 - 10), Mathf.Clamp(at.y, top + half, Mathf.Max(top + half, bottom - half)));
                 if ((c - at).sqrMagnitude > 36)
                 {
                     var dir = (at - c).normalized;
@@ -942,9 +942,9 @@ namespace LastBell.Run
                     UiTheme.Fill(new Rect(at.x - 3, at.y - 3, 6, 6), l.Color);
                 }
                 lab.normal.textColor = new Color(0, 0, 0, 0.75f);
-                GUI.Label(new Rect(c.x - 98, c.y - 28, 200, 60), l.Text, lab);
+                GUI.Label(new Rect(c.x - wide / 2 + 2, c.y - 28, wide, 60), l.Text, lab);
                 lab.normal.textColor = l.Color;
-                GUI.Label(new Rect(c.x - 100, c.y - 30, 200, 60), l.Text, lab);
+                GUI.Label(new Rect(c.x - wide / 2, c.y - 30, wide, 60), l.Text, lab);
             }
         }
 
