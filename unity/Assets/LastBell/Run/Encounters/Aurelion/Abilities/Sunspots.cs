@@ -21,7 +21,8 @@ namespace LastBell.Run
         public const float Blast = 3.5f, Pool = 3.0f, PoolBurn = 20f, FirstS = 3.0f, StepS = 1.5f, LockS = 1.5f;
         public const int Damage = 50;
         public const int PoolTicks = 60 * 75;   // 75 s, across phase changes (v4 "hard from the start")
-        static readonly Color Coral = new Color(1f, 0.45f, 0.35f);
+        // the carrier label is identity text (ivory, audit F05): only the blast circle and pools wear the hostile palette
+        static readonly Color Ivory = new Color(1f, 0.96f, 0.86f);
         static readonly string[] Numerals = { "I", "II", "III", "IV", "V", "VI", "VII", "VIII" };
 
         public sealed class Spot { public PlayerController Who; public int Index, DetonateTick; public Hazard Blast, Pool; public bool Done; }
@@ -53,7 +54,7 @@ namespace LastBell.Run
             int start = W.Tick;
             for (int k = 0; k < Spots.Count; k++) Spots[k].DetonateTick = start + First + k * Step - 1;
             var labels = new Dictionary<PlayerController, RunHud.WorldLabel>();
-            foreach (var s in Spots) if (!labels.ContainsKey(s.Who)) labels[s.Who] = RunHud.Label(Vector3.up * 2.4f, "", Coral, 30, s.Who.transform);
+            foreach (var s in Spots) if (!labels.ContainsKey(s.Who)) labels[s.Who] = RunHud.Label(Vector3.up * 2.4f, "", Ivory, 30, s.Who.transform);
             Glow(1.2f);
 
             int t = 0;

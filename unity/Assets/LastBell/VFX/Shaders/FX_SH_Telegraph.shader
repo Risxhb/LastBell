@@ -24,7 +24,8 @@ Shader "LastBell/FX/Telegraph"
         _Memory ("Inactive memory outline (dashed, unfilled)", Range(0, 1)) = 0
         _ClipRadius ("Floor clip radius (0 = off)", Float) = 0
         _ClipCentre ("Floor clip centre (world xz)", Vector) = (0, 0, 0, 0)
-        [Enum(PerShape,0,SkywardSpire,1)] _Motif ("Area motif (Telegraph-Style v2)", Float) = 0
+        [Enum(PerShape,0,SkywardSpire,1,None,2)] _Motif ("Area motif (Telegraph-Style v2)", Float) = 0
+        _HoleCount ("Cut-out discs (_Holes: world xz + radius)", Float) = 0
     }
     SubShader
     {
@@ -37,7 +38,7 @@ Shader "LastBell/FX/Telegraph"
             #pragma vertex vert
             #pragma fragment frag
             #include "UnityCG.cginc"
-            float _Shape, _Radius, _Inner, _HalfAngle, _Progress, _Lock, _Flash, _Fade, _Border, _Memory, _ClipRadius, _Motif; float4 _ClipCentre;
+            float _Shape, _Radius, _Inner, _HalfAngle, _Progress, _Lock, _Flash, _Fade, _Border, _Memory, _ClipRadius, _Motif, _HoleCount; float4 _ClipCentre; float4 _Holes[6];
             float4 _ColorFill, _ColorBorder, _ColorFlash, _ColorInk;
             struct appdata { float4 vertex : POSITION; };
             struct v2f { float4 pos : SV_POSITION; float2 p : TEXCOORD0; float3 world : TEXCOORD1; };
@@ -103,13 +104,21 @@ Shader "LastBell/FX/Telegraph"
             {
                 float d, u, ident; shape(i.p, d, u, ident);
                 if (_Motif > 0.5) ident = skyward(i.p);
+                if (_Motif > 1.5) ident = 0;
+                // optional cut-out discs (Aurelion's Umbra: the floor outside every light well); their edges are true boundaries
+                for (int k = 0; k < 6; k++) if (k < _HoleCount) d = max(d, _Holes[k].z - length(i.world.xz - _Holes[k].xy));
                 float aa = fwidth(d) * 1.2;
                 float inside = 1 - smoothstep(-aa, aa * 0.5, d);       // the boundary itself counts as inside
                 if (inside <= 0) discard;
                 // optional: the warning stops at the arena floor edge (the hit test cannot reach past the floor either)
                 if (_ClipRadius > 0 && length(i.world.xz - _ClipCentre.xy) > _ClipRadius) discard;
-                float border = inside * smoothstep(-_Border - aa, -_Border, d);   // 1 in the band just inside the edge
-                ident *= 1 - border * step(0.5, _Motif);                 // an area motif never breaks the plain outline
+                // area motifs (Telegraph-Style v2, audit F02): a wider contour over a quiet ink under-stroke, so the true edge
+                // holds on the ivory floor and over other fills; dashed memory / friendly outlines keep the thin default
+                float area = step(0.5, _Motif) * (1 - step(0.5, _Memory));
+                float bw = lerp(_Border, 0.15, area);
+                float border = inside * smoothstep(-bw - aa, -bw, d);   // 1 in the band just inside the edge
+                float under = area * inside * smoothstep(-bw - 0.1 - aa, -bw - 0.1, d) * (1 - border);
+                ident *= (1 - border * step(0.5, _Motif)) * (1 - under);   // an area motif never breaks the plain outline
                 float timed = step(u, _Progress);
                 float hatch = step(0.5, frac((i.world.x + i.world.z) * 1.2));
                 // fill: ink under coral so it reads on bright floors; the timed part is brighter
@@ -119,6 +128,7 @@ Shader "LastBell/FX/Telegraph"
                 // Unfinished Hour memory (Bellkeeper spec v0.3 §3.1): no fill, a broken border, never read as live
                 fillA *= 1 - 0.9 * _Memory;
                 border *= lerp(1, step(0.5, frac((i.world.x - i.world.z) * 1.6)), _Memory);
+                fill = lerp(fill, _ColorInk.rgb, 0.75 * under); fillA = lerp(fillA, 0.8, under);
                 float3 col = lerp(fill, _ColorBorder.rgb * (1 + 0.8 * _Lock), border);
                 float a = lerp(fillA, 0.95, border);
                 col = lerp(col, _ColorFlash.rgb, _Flash); a = lerp(a, 0.85, _Flash);

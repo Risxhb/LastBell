@@ -23,7 +23,7 @@ namespace LastBell.Run
         public const float Radius = 2.5f, Ring = 6.5f, FirstS = 5.0f, StepS = 2.5f, FirstEasyS = 6.0f, StepEasyS = 3.0f;
         public const float ReunionR = 4.5f;
         public const int ExtraDamage = 50;
-        static readonly Color Ivory = new Color(1f, 0.96f, 0.86f), CobaltFill = new Color(0.18f, 0.28f, 0.62f), CobaltRim = new Color(0.6f, 0.9f, 2.2f);
+        static readonly Color Ivory = new Color(1f, 0.96f, 0.86f), CobaltRim = new Color(0.6f, 0.9f, 2.2f);
         static readonly string[] Numerals = { "I", "II", "III", "IV" };
         // authored layouts (yaw round the centre): consecutive >= 120 degrees
         static readonly float[][] Layouts = { new[] { 0f, 135f, 270f, 45f }, new[] { 90f, 210f, 330f, 150f }, new[] { 180f, 300f, 60f, 240f } };
@@ -100,7 +100,8 @@ namespace LastBell.Run
                 };
                 h.OnResolve = hz => Resolve(tower);
                 t.H = Spawn(h);
-                t.H.Tele?.Tint(CobaltFill, CobaltRim); t.H.Tele?.Motif(0);   // a soak, not a hazard: cobalt, "get in" (no Skyward rays: those mean "get out")
+                // a soak, not a hazard: a thin dotted unfilled cobalt outline, "get in" (no Skyward rays or coral fill: those mean "get out")
+                if (t.H.Tele != null) { t.H.Tele.Motif(0); t.H.Tele.Friendly(CobaltRim); t.H.Tele.Order = 2; }
                 labels.Add(RunHud.Label(t.At + Vector3.up * 0.4f, solo ? Numerals[k] : Dots(t.Need), Ivory, solo ? 54 : 46));
                 Towers.Add(t);
             }
@@ -134,7 +135,7 @@ namespace LastBell.Run
                     if (p && !p.Down && !t.In.Contains(p)) p.ReceiveHit(new Hazard { Source = "Reunion", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = p.transform.position, Damage = 50, Knockback = 0, Stun = 15 });
                 W.BossFx.ChimeResolve(Centre, ReunionR);
             };
-            t.H = Spawn(h); t.H.Tele?.Tint(CobaltFill, CobaltRim); t.H.Tele?.Motif(0);
+            t.H = Spawn(h); if (t.H.Tele != null) { t.H.Tele.Motif(0); t.H.Tele.Friendly(CobaltRim); t.H.Tele.Order = 2; }
             var label = RunHud.Label(Centre + Vector3.up * 0.4f, "REUNION", Ivory, 44);
             Towers.Add(t);
             yield return at - 1;

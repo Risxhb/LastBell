@@ -74,7 +74,7 @@ namespace LastBell.Run
         static readonly Color CalmFill = new Color(0.78f, 0.36f, 0.30f), CalmBorder = new Color(1.6f, 0.75f, 0.45f);
         const float RimStartY = 3.5f, CrownStartY = 3.4f;
 
-        sealed class Ring { public Hazard H; public Transform Root, Bead; public Material Mat; public float Spin, Turn, R, StartY, Fade = -1; }
+        sealed class Ring { public Hazard H; public Transform Root, Bead; public Material Mat; public float Spin, Turn, R, StartY, Fade = -1; public LastBell.VFX.BellkeeperFx.Telegraph Edge; }
         readonly List<Ring> rings = new List<Ring>();
         CombatWorld w; int horizon;
 
@@ -116,7 +116,7 @@ namespace LastBell.Run
                 var h = o.H;
                 bool live = w != null && w.Hazards.Live.Contains(h) && !h.Cancelled;
                 bool resolved = h.Age >= h.ResolveAt;
-                if (!live && o.Fade < 0) o.Fade = resolved ? 1f : 0.4f;   // resolved / expired: flash; cleared early: dim
+                if (!live && o.Fade < 0) { o.Fade = resolved ? 1f : 0.4f; o.Edge?.Expire(); o.Edge = null; }   // resolved / expired: flash; cleared early: dim
                 if (o.Fade >= 0)
                 {
                     o.Fade -= dt * 1.6f;
@@ -145,6 +145,10 @@ namespace LastBell.Run
                     o.Root.position = new Vector3(p.x, 0.05f, p.z);
                     o.Mat.SetColor("_EmissionColor", Gold * (0.6f + 1.8f * pulse) * Mathf.Lerp(0.35f, 1f, dim));
                     if (h.Tele != null) h.Tele.Tint(CalmFill * Mathf.Lerp(0.55f, 1f, dim), CalmBorder * (0.6f + 0.8f * pulse));
+                    // readability A5: the usable inside edge stays a continuous stroke above every transient fill (Hour Hands,
+                    // stars, pools) for the whole Horizon; presentation only, the rim hazard owns the hit
+                    if (o.Edge == null && h.Shape == HazardShape.Ring) { o.Edge = w.BossFx.Ring(h.Inner, h.Inner + 0.22f); o.Edge.Motif(2); o.Edge.Progress(1); o.Edge.Order = 4; o.Edge.Place(h.Origin, 0); }
+                    o.Edge?.Tint(CalmBorder, CalmBorder * (0.8f + 0.6f * pulse));
                 }
                 o.Root.rotation = Quaternion.Euler(0, o.Turn, 0);
                 o.Bead.localPosition = Quaternion.Euler(0, o.Turn * 2.5f, 0) * new Vector3(0, 0.18f, o.R);
@@ -154,7 +158,7 @@ namespace LastBell.Run
 
         void OnDestroy()
         {
-            foreach (var o in rings) if (o.Mat) Destroy(o.Mat);
+            foreach (var o in rings) { if (o.Mat) Destroy(o.Mat); o.Edge?.Expire(); }
         }
     }
 }

@@ -48,8 +48,17 @@ namespace LastBell.Run
             if (AurelionArgs.V3 || AurelionArgs.V4) h.Damage = V3Tier(h.Damage);
             // v4 Last Light, the soft enrage: every fallen slice makes his attacks 10 % stronger
             if (AurelionArgs.V4 && Boss.Light != null && Boss.Phase >= 4 && h.Damage > 0) h.Damage = Mathf.RoundToInt(h.Damage * Boss.Light.DamageScale);
+            if (h.BurnPerSecond > 0) h.FillToLock = true;   // a burn counts down to its lock, then holds: no slow fake countdown
             Boss.Track(W.Hazards.Spawn(h));
-            h.Tele?.Motif(SkywardMotif);
+            if (h.Tele != null)
+            {
+                h.Tele.Motif(SkywardMotif);
+                // draw order (readability A2/A4): standing burns under everything, tracking warnings in the middle, a
+                // locked footprint over them (it is the one that will hit)
+                if (h.BurnPerSecond > 0) h.Tele.Order = -1;
+                else if (h.Locked) h.Tele.Order = 1;
+                else h.Tele.LockOnTop = true;
+            }
             return h;
         }
         // every Aurelion warning wears the Skyward Spire motif (light rays, orbital arcs, sun bars) over the shared plain

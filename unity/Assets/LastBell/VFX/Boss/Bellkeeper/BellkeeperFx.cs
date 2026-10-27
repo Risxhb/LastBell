@@ -72,12 +72,21 @@ namespace LastBell.VFX
             internal bool spentTinted;
             public void Place(Vector3 origin, float yaw) { go.transform.SetPositionAndRotation(new Vector3(origin.x, Floor, origin.z), Quaternion.Euler(0, yaw, 0)); }
             public void Progress(float p) { mpb.SetFloat(PProgress, Mathf.Clamp01(p)); }
-            public void Lock() { if (!locked) { locked = true; lockFlash = 1; } }
+            public void Lock() { if (!locked) { locked = true; lockFlash = 1; if (LockOnTop && mr.sortingOrder < 1) mr.sortingOrder = 1; } }
             public void Resolve() { flash = 0; }
             public void Expire() { if (flash < 0) flash = 0.1f; }   // fades out with no damage flash (cooled slag)
             public void Tint(Color fill, Color border) { mpb.SetColor(PFill, fill); mpb.SetColor(PBorder, border); }
             // area motif inside the shape (Reference/Telegraph-Style v2): 0 = the per-shape Bellkeeper identity, 1 = Skyward Spire
             public void Motif(int area) { mpb.SetFloat(PMotif, area); }
+            // a nonhostile goal (get in / stand here): thin, dotted and unfilled in its own identity colour (Telegraph-Style v2)
+            public void Friendly(Color rim) { mpb.SetFloat(PMemory, 1); Tint(rim * 0.35f, rim); maxFade = 1; }
+            // cut-out discs (x, z, radius in world metres, up to 6): the shape minus them; presentation only
+            public void Holes(Vector4[] holes, int count) { if (holeBuf == null) holeBuf = new Vector4[6]; for (int k = 0; k < 6; k++) holeBuf[k] = k < count ? holes[k] : Vector4.zero; mpb.SetVectorArray(PHoles, holeBuf); mpb.SetFloat(PHoleCount, Mathf.Min(count, 6)); }
+            Vector4[] holeBuf;
+            // draw order among telegraphs (higher draws over lower): a persistent edge or a locked strike over tracking fills
+            public int Order { get => mr.sortingOrder; set => mr.sortingOrder = value; }
+            // opt-in: on its lock the telegraph moves above unlocked ones (Aurelion, readability A4: locked edges first)
+            public bool LockOnTop;
             // Unfinished Hour inactive outline: dashed, unfilled, low contrast. Presentation only, never resolves.
             public void Memory() { mpb.SetFloat(PMemory, 1); Tint(new Color(0.35f, 0.38f, 0.45f), new Color(0.95f, 0.9f, 0.78f)); maxFade = 0.55f; }
             // removed without a resolve flash (the memory turning into its live warning, or being erased)
@@ -87,7 +96,7 @@ namespace LastBell.VFX
         }
         static readonly int PFill = Shader.PropertyToID("_ColorFill"), PBorder = Shader.PropertyToID("_ColorBorder"),
             PMemory = Shader.PropertyToID("_Memory"), PClipRadius = Shader.PropertyToID("_ClipRadius"), PClipCentre = Shader.PropertyToID("_ClipCentre"),
-            PMotif = Shader.PropertyToID("_Motif");
+            PMotif = Shader.PropertyToID("_Motif"), PHoles = Shader.PropertyToID("_Holes"), PHoleCount = Shader.PropertyToID("_HoleCount");
 
         Telegraph NewTelegraph(int shape, float radius, float inner, float half, Mesh quad)
         {

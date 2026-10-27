@@ -31,7 +31,7 @@ namespace LastBell.Run
         public static readonly float[][] Orders3 = { new[] { 0f, 120f, 240f }, new[] { 90f, 330f, 210f }, new[] { 30f, 270f, 150f } };
         public static readonly float[][] Orders4 = { new[] { 0f, 180f, 60f, 240f }, new[] { 90f, 270f, 30f, 210f }, new[] { 315f, 135f, 15f, 195f } };
 
-        static readonly Color Ivory = new Color(1f, 0.96f, 0.86f), BrassFill = new Color(0.55f, 0.42f, 0.18f), BrassRim = new Color(1.4f, 1.1f, 0.5f);
+        static readonly Color Ivory = new Color(1f, 0.96f, 0.86f), BrassRim = new Color(1.4f, 1.1f, 0.5f);
         static readonly string[] Numerals = { "I", "II", "III", "IV", "V", "VI", "VII", "VIII" };
 
         // test evidence: the last cast's anchors (firing order), its strikes, and the ticks of reveal / hide / each strike
@@ -73,7 +73,8 @@ namespace LastBell.Run
             float r = SafeRadius;
             for (int k = 0; k < count; k++)
             {
-                var rim = W.BossFx.Ring(r - 0.12f, r); rim.Place(Anchors[k], 0); rim.Tint(BrassFill, BrassRim); rim.Progress(1); rims.Add(rim);
+                // friendly grammar (Telegraph-Style v2, audit F05): thin, dotted, unfilled brass on the safe disc's true edge
+                var rim = W.BossFx.Circle(r); rim.Place(Anchors[k], 0); rim.Motif(0); rim.Friendly(BrassRim); rim.Progress(1); rim.Order = 2; rims.Add(rim);
                 labels.Add(RunHud.Label(Anchors[k] + Vector3.up * 0.3f, Numerals[k], Ivory, 46));
             }
             Glow(1.2f); Clip("MeridianAlignment", StrikeTick(count - 1));

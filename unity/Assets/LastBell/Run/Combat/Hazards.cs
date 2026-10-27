@@ -39,6 +39,7 @@ namespace LastBell.Run
         public Action<Hazard> OnResolve;         // presentation of the resolve (effects), after the hit test
         public Action<Hazard> OnSpent;           // the active period is over (same tick as OnResolve when ActiveTicks is 0)
         public float ClipRadius;                 // > 0: the telegraph is drawn only over the floor disc of this radius (presentation)
+        public bool FillToLock;                  // presentation: the timing fill counts down to LockAt, then holds full (a burn's live state)
         public Func<PlayerController, bool> Affects;   // null = everyone; else only these players can be hit (per-player marks)
         public bool HitOnResolve = true;         // false: the owner deals the hits itself while the warning is up (a sweeping charge)
         public bool Soak;                        // a ring to stand IN (a tower), not a shape to leave: bots and the HUD read it
@@ -130,7 +131,7 @@ namespace LastBell.Run
                 h.Age++;
                 if (h.Age == h.LockAt) h.Tele.Lock();
                 h.Tele.Place(h.Origin, h.Yaw);
-                h.Tele.Progress((float)h.Age / Mathf.Max(1, h.ResolveAt));
+                h.Tele.Progress(h.FillToLock ? (h.LockAt > 0 ? (float)h.Age / h.LockAt : 1) : (float)h.Age / Mathf.Max(1, h.ResolveAt));
             }
             StepBurn();
             for (int i = live.Count - 1; i >= 0; i--)
