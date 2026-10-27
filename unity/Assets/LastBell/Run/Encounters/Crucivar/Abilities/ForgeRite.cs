@@ -8,14 +8,14 @@ namespace LastBell.Run
     // 20.5 s, Medium numbers; Easy stretches every warning by 1.25. Up to three things are live at once (pools included).
     //   0.0  Ember Brand        3 m brand follows each player, lands 3.5 s: 30 Ground to OTHER players inside; leaves a 2 m
     //                           slag pool (20/s) under the carrier that lasts until the phase ends (ClearPools)
-    //   2.0  Furnace Spin       four 10 m flame jets (1.8 m wide) shown 1.5 s, then sweep round the boss for 4 s at 40 deg/s,
+    //   2.0  Furnace Spin       four flame jets to the wall (1.8 m wide) shown 1.5 s, then sweep round the boss for 4 s at 40 deg/s,
     //                           30 each, once per jet; the turn direction flips every loop
     //   5.0  Backdraft          5 m blast round the boss at 3.0 s (45, 1.5 m push); everyone pulled 2 m inward at 1.6-2.0 s
     //   8.5  Casting Order      pours I-IV (2.6 m lanes to the wall) through each numbered player, locking 1.5 s before they
     //                           land 0.5 s apart at 10.5-12.0 s, 30 each; each leaves a channel burning 20/s for 10 s.
     //                           Even loops hide the numerals and replay the same order. Solo: you are I, II and III.
-    //  10.0  Hammerfall         front cleave (120 deg, 6.5 m) at 1.5 s, back cleave at 2.2 s, point-blank slam (4.5 m) at
-    //                           2.9 s, 35 each, Strike, all shown at once
+    //  10.0  Hammerfall         front half of the arena to the wall at 1.5 s, back half at 2.3 s (cross the line in 0.8 s),
+    //                           point-blank slam (4.5 m) at 3.0 s, 40 each, Strike, all shown at once (Chzy18 10-27: no out-ranging)
     //  13.5  Ember Brand        again
     //  17.5  punish window      3.0 s (the encounter plays it)
     public sealed class ForgeRite : CrucivarAbility
@@ -25,14 +25,14 @@ namespace LastBell.Run
         public const float LoopLength = 20.5f, Punish = 3.0f;
         public const float BrandRadius = 3f, BrandLand = 3.5f, PoolRadius = 2f, PoolBurn = 20f;
         public const int BrandDmg = 30;
-        public const float JetLength = 10f, JetWidth = 1.8f, JetShow = 1.5f, JetSweep = 4f, JetTurnDeg = 40f;
+        public const float JetWidth = 1.8f, JetShow = 1.5f, JetSweep = 4f, JetTurnDeg = 40f;
         public const int JetDmg = 30;
         public const float BlastRadius = 5f, BlastAt = 3f, PullFrom = 1.6f, PullTo = 2.0f, PullDist = 2f;
         public const int BlastDmg = 45;
         public const float PourWidth = 2.6f, PourLead = 2.0f, PourGap = 0.5f, PourLockBefore = 1.5f, ChannelLife = 10f, ChannelBurn = 20f;
         public const int PourDmg = 30;
-        public const float CleaveReach = 6.5f, CleaveHalf = 50f, SlamRadius = 4.5f;
-        public const int HammerDmg = 35;
+        public const float CleaveHalf = 90f, CleaveFront = 1.5f, CleaveBack = 2.3f, SlamAt = 3.0f, SlamRadius = 4.5f;
+        public const int HammerDmg = 40;
 
         int loops;
         public int Loops => loops;
@@ -107,10 +107,11 @@ namespace LastBell.Run
                 var h = new Hazard
                 {
                     Source = "Furnace Spin", Shape = HazardShape.Lane, Kind = HazardKind.Strike, Origin = origin, Yaw = baseYaw + 90f * k,
-                    Length = JetLength, Width = JetWidth, ResolveAt = show, ActiveTicks = sweep, LockAt = show + sweep + 1,
+                    Width = JetWidth, ResolveAt = show, ActiveTicks = sweep, LockAt = show + sweep + 1,
                     Damage = JetDmg, Knockback = 1f,
                 };
-                h.Track = hz => { if (hz.Age >= hz.ResolveAt) hz.Yaw += dir * JetTurnDeg * Sim.Dt; };   // turns only once it is live
+                ToWall(h);
+                h.Track = hz => { if (hz.Age >= hz.ResolveAt) hz.Yaw += dir * JetTurnDeg * Sim.Dt; ToWall(hz); };   // turns only once it is live, always reaches the wall
                 W.Hazards.Spawn(h);
             }
             Boss.Rig.VentsAll(true);
@@ -182,6 +183,9 @@ namespace LastBell.Run
             Boss.Rig.Pour(true);
         }
 
+        // a lane from the boss that always ends at the arena wall
+        static void ToWall(Hazard h) => h.Length = GreatCasting.RayToCircle(h.Origin, Sim.Dir(h.Yaw), Rim + Hazard.Margin, out float t) ? t : Rim * 2;
+
         void Aim(Hazard h, PlayerController target)
         {
             var d = Flat(target.transform.position - h.Origin);
@@ -197,16 +201,16 @@ namespace LastBell.Run
             var near = W.NearestStanding(origin);
             float yaw = near != null ? Sim.YawTo(origin, near.transform.position, Boss.transform.eulerAngles.y) : Boss.transform.eulerAngles.y;
             Boss.transform.rotation = Quaternion.Euler(0, yaw, 0);
-            Spawn("Hammerfall I", HazardShape.Cone, yaw, T(1.5f));
-            Spawn("Hammerfall II", HazardShape.Cone, yaw + 180f, T(2.2f));
-            Spawn("Hammerfall III", HazardShape.Circle, yaw, T(2.9f));
-            Boss.Presenter.PlayOnce("Diebreaker", T(2.9f) / (float)Sim.Hz);
+            Spawn("Hammerfall I", HazardShape.Cone, yaw, T(CleaveFront));
+            Spawn("Hammerfall II", HazardShape.Cone, yaw + 180f, T(CleaveBack));
+            Spawn("Hammerfall III", HazardShape.Circle, yaw, T(SlamAt));
+            Boss.Presenter.PlayOnce("Diebreaker", T(SlamAt) / (float)Sim.Hz);
 
             void Spawn(string name, HazardShape shape, float y, int at)
             {
                 var h = W.Hazards.Spawn(new Hazard
                 {
-                    Source = name, Shape = shape, Kind = HazardKind.Strike, Origin = origin, Yaw = y, Radius = shape == HazardShape.Cone ? CleaveReach : SlamRadius,
+                    Source = name, Shape = shape, Kind = HazardKind.Strike, Origin = origin, Yaw = y, Radius = shape == HazardShape.Cone ? Rim + origin.magnitude + Hazard.Margin : SlamRadius,   // a half cleave reaches the wall
                     HalfAngle = CleaveHalf, LockAt = 0, ResolveAt = at, Damage = HammerDmg, Knockback = 1.5f,
                 });
                 h.OnResolve = hz => { W.BossFx.DiebreakerResolve(hz.Origin + Sim.Dir(hz.Yaw) * (shape == HazardShape.Cone ? 3f : 0f), 2.5f); Boss.Flare(1f); };

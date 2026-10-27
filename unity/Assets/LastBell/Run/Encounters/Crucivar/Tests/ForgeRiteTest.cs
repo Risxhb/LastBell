@@ -32,12 +32,16 @@ namespace LastBell.Run
             t.Check("Furnace Spin: four jets live from 3.5 s for 4 s", t.Spawned("Furnace Spin").Count() == 4 && t.Spawned("Furnace Spin").All(x => x.H.ActiveTicks == 240), $"{t.Spawned("Furnace Spin").Count()}");
             var jet = t.Spawned("Furnace Spin").First().H;
             t.Check("Furnace Spin: the jets turned while live", Mathf.Abs(Mathf.DeltaAngle(jet.Yaw, t.Spawned("Furnace Spin").First().H.Yaw)) >= 0 && jet.Age > jet.ResolveAt);
+            t.Check("Furnace Spin: every jet reaches the wall", t.Spawned("Furnace Spin").All(x => Mathf.Abs((Sim.Flat(x.H.Origin) + Sim.Dir(x.H.Yaw) * x.H.Length).magnitude - (CrucivarAbility.Rim + Hazard.Margin)) < 0.05f));
+            var front = t.Spawns.First(x => x.Source == "Hammerfall I").H; var back = t.Spawns.First(x => x.Source == "Hammerfall II").H;
+            var edge = Sim.Dir(front.Yaw) * (CrucivarAbility.Rim - 0.2f); var behind = Sim.Dir(back.Yaw) * (CrucivarAbility.Rim - 0.2f);
+            t.Check("Hammerfall: the cleaves reach the wall (no out-ranging)", front.Contains(edge) && back.Contains(behind) && !front.Contains(behind) && !back.Contains(edge));
             t.Check("Backdraft lands at 8.0 s", R("Backdraft") >= 479 && R("Backdraft") <= 482, $"{R("Backdraft")}");
             var pours = t.Spawned("Pour ").Where(x => !x.Source.Contains("Channel")).OrderBy(x => x.H.ResolveAt + x.Tick).ToList();
             t.Check("Casting Order: pours I-IV, 0.5 s apart from 10.5 s", pours.Count == 4 && pours.Select(x => x.Tick - c0 + x.H.ResolveAt).SequenceEqual(new[] { 630, 660, 690, 720 }.Select(v => v + (pours[0].Tick - c0 + pours[0].H.ResolveAt - 630))),
                 string.Join("/", pours.Select(x => x.Tick - c0 + x.H.ResolveAt)));
             t.Check("each pour leaves a burning channel", t.Spawned("Pour Channel").Count() == pours.Count);
-            t.Check("Hammerfall: front, back, slam at 11.5 / 12.2 / 12.9 s", new[] { "Hammerfall I", "Hammerfall II", "Hammerfall III" }.All(n => t.Spawns.Count(x => x.Source == n) == 1),
+            t.Check("Hammerfall: front half, back half, slam at 11.5 / 12.3 / 13.0 s", new[] { "Hammerfall I", "Hammerfall II", "Hammerfall III" }.All(n => t.Spawns.Count(x => x.Source == n) == 1),
                 $"{R("Hammerfall I")}/{R("Hammerfall II")}/{R("Hammerfall III")}");
             t.Check("peak of live patterns is three or more", peak >= 3, $"peak {peak}");
             t.Check("still players get hit (brands on each other, jets, blast, hammer)", t.Hits.Count > 0, $"{t.Hits.Count} hits");
