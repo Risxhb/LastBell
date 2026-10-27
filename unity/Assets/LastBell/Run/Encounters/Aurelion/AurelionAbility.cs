@@ -48,8 +48,14 @@ namespace LastBell.Run
             if (AurelionArgs.V3 || AurelionArgs.V4) h.Damage = V3Tier(h.Damage);
             // v4 Last Light, the soft enrage: every fallen slice makes his attacks 10 % stronger
             if (AurelionArgs.V4 && Boss.Light != null && Boss.Phase >= 4 && h.Damage > 0) h.Damage = Mathf.RoundToInt(h.Damage * Boss.Light.DamageScale);
-            return Boss.Track(W.Hazards.Spawn(h));
+            Boss.Track(W.Hazards.Spawn(h));
+            h.Tele?.Motif(SkywardMotif);
+            return h;
         }
+        // every Aurelion warning wears the Skyward Spire motif (light rays, orbital arcs, sun bars) over the shared plain
+        // outline, outward-fill countdown and resolve flash (Reference/Telegraph-Style v2, gpt/08-design-rules.md §5).
+        // Cues that are not "get out" warnings (Meridian Towers' cobalt soaks) set their own look after Spawn.
+        public const int SkywardMotif = 1;
         protected void Say(string current) => Boss.SetCurrent(current);
         protected void Glow(float k) => Boss.Glow(k);
         protected void Flare(float f = 1) => Boss.Flare(f);

@@ -22,8 +22,6 @@ namespace LastBell.Run
         public int LockTicks => T(TrackS);
         public int ResolveTicks => T(TrackS) + Win(StrikeS);   // v2.1: the strike window is 0.7 s on Hard
 
-        static readonly Color TrackFill = new Color(1.9f, 1.35f, 0.55f) * 0.35f, TrackBorder = new Color(1.9f, 1.35f, 0.55f);
-        static readonly Color LockFill = new Color(1.35f, 0.42f, 0.32f), LockBorder = new Color(2.2f, 1.45f, 0.65f);
 
         // the hour (yaw snapped to 30°) of `at` round `centre`; on top of him it keeps `fallback`
         public static float HourOf(Vector3 centre, Vector3 at, float fallback)
@@ -79,11 +77,9 @@ namespace LastBell.Run
                 x.Origin = BossPos;
                 if (target && !target.Down) x.Yaw = HourOf(x.Origin, target.transform.position, x.Yaw);
             };
-            h = Spawn(h);
-            h.Tele.Tint(TrackFill, TrackBorder);
-            bool snapped = false;
-            h.Track += x => { if (!snapped && x.Age + 1 >= x.LockAt) { snapped = true; x.Tele.Tint(LockFill, LockBorder); } };
-            return h;
+            // Telegraph style: the standard coral spoke from the start (a thin gold line would read as a friendly effect);
+            // the shared lock flash marks the lock
+            return Spawn(h);
         }
     }
 }

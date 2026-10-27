@@ -70,6 +70,7 @@ namespace LastBell.Run
     sealed class OrreryClosingFx : MonoBehaviour
     {
         static readonly Color Gold = new Color(0.82f, 0.64f, 0.3f);
+        const float EdgeInset = 0.3f;   // telegraph style: decor rings sit inside the hazard, continuous, never on the outline
         static readonly Color CalmFill = new Color(0.78f, 0.36f, 0.30f), CalmBorder = new Color(1.6f, 0.75f, 0.45f);
         const float RimStartY = 3.5f, CrownStartY = 3.4f;
 
@@ -81,8 +82,8 @@ namespace LastBell.Run
         {
             var go = new GameObject("Orrery Closing fx"); go.transform.SetParent(world.Root, false);
             var fx = go.AddComponent<OrreryClosingFx>(); fx.w = world; fx.horizon = horizonTicks;
-            fx.Add(rim, rim.Inner, 1, RimStartY);
-            fx.Add(crown, crown.Radius, -1.6f, CrownStartY);
+            fx.Add(rim, rim.Inner + EdgeInset, 1, RimStartY);       // just inside each hazard, clear of its plain outline
+            fx.Add(crown, crown.Radius - EdgeInset, -1.6f, CrownStartY);
         }
 
         void Add(Hazard h, float r, float spin, float startY)
@@ -94,7 +95,7 @@ namespace LastBell.Run
             for (int k = 0; k < n; k++)
             {
                 float ang = k * 360f / n;
-                Share(Prim.Make(PrimitiveKind.Cube, o.Root, Quaternion.Euler(0, ang, 0) * new Vector3(0, 0, r), new Vector3(2 * Mathf.PI * r / n * 0.62f, 0.05f, 0.07f), Gold, 0, Quaternion.Euler(0, ang + 90, 0)), o.Mat);
+                Share(Prim.Make(PrimitiveKind.Cube, o.Root, Quaternion.Euler(0, ang, 0) * new Vector3(0, 0, r), new Vector3(2 * Mathf.PI * r / n * 1.02f, 0.05f, 0.07f), Gold, 0, Quaternion.Euler(0, ang + 90, 0)), o.Mat);
             }
             // clock ticks just inside the edge (the rim's point out into the danger, the crown's point in)
             float side = h.Shape == HazardShape.Ring ? 0.25f : -0.25f;

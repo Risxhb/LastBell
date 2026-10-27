@@ -100,7 +100,7 @@ namespace LastBell.Run
                 };
                 h.OnResolve = hz => Resolve(tower);
                 t.H = Spawn(h);
-                t.H.Tele?.Tint(CobaltFill, CobaltRim);           // a soak, not a hazard: cobalt, "get in"
+                t.H.Tele?.Tint(CobaltFill, CobaltRim); t.H.Tele?.Motif(0);   // a soak, not a hazard: cobalt, "get in" (no Skyward rays: those mean "get out")
                 labels.Add(RunHud.Label(t.At + Vector3.up * 0.4f, solo ? Numerals[k] : Dots(t.Need), Ivory, solo ? 54 : 46));
                 Towers.Add(t);
             }
@@ -134,7 +134,7 @@ namespace LastBell.Run
                     if (p && !p.Down && !t.In.Contains(p)) p.ReceiveHit(new Hazard { Source = "Reunion", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = p.transform.position, Damage = 50, Knockback = 0, Stun = 15 });
                 W.BossFx.ChimeResolve(Centre, ReunionR);
             };
-            t.H = Spawn(h); t.H.Tele?.Tint(CobaltFill, CobaltRim);
+            t.H = Spawn(h); t.H.Tele?.Tint(CobaltFill, CobaltRim); t.H.Tele?.Motif(0);
             var label = RunHud.Label(Centre + Vector3.up * 0.4f, "REUNION", Ivory, 44);
             Towers.Add(t);
             yield return at - 1;
