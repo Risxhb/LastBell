@@ -2,14 +2,15 @@
 
 A player's guide to the current v4 fight on every difficulty.
 
-**Proven beatable:** four perfect bots killed him on Hard at full HP in **2:16** (4 of 4 standing). Solo bots killed him on every level with every class: Vanguard (Easy 3:44, Medium 4:38, Hard 4:35), Chimesinger (3:40, 3:34, 3:26) and Arcanist (2:18, 2:40, 2:34); see **Playing solo**. (The video `aurelion-v4-win.mp4` shows an earlier 5:06 version.)
+**Proven beatable:** four perfect bots killed him at full HP in **5:00** on Medium (4 of 4 standing) and **5:45** on Hard (3 of 4); eight killed him on Hard in **5:04** (8 of 8). Solo bots killed him on every level with every class: Vanguard (Easy 4:17, Medium 5:48, Hard 5:32), Chimesinger (4:13, 4:00, 4:06) and Arcanist (4:36, 4:37, 4:33), using Risx's controls and Arcanist glyph kit (27 Oct); see **Playing solo**. (The video `aurelion-v4-win.mp4` shows an earlier 5:06 version.)
 
 **Numbers:**
 - Damage is quoted for Medium. Hard is ×1.3, Easy ×0.6.
 - Light hits: 30 (39 on Hard).
 - Heavy hits: 50 (65 on Hard).
 - You have 100 HP and 5 potions (+40 each, 1 s apart, key F).
-- His HP: 10,000 solo, scaled up for a party.
+- His HP: 12,000 solo, +1.25 x 12,000 for each extra fighter (4 players 57,000, 8 players 117,000). Aim: a 5-7 minute fight.
+- In Last Light no hit lands above 90, however many slices have fallen.
 
 ## The five rules that win the fight
 
@@ -107,7 +108,7 @@ Everything above applies; these are the solo differences.
 
 | | Solo |
 |---|---|
-| His HP | 10,000 |
+| His HP | 12,000 |
 | Towers | three towers of one, landing 5.0, 7.5 and 10.0 s after they rise (Easy 6, 9 and 12 s) |
 | Corona Shield | 700 in 25 s |
 | Severance | no side is called and there is no Reunion; crossing the line still hits |
@@ -126,11 +127,11 @@ Everything above applies; these are the solo differences.
 
 | | Easy | Medium | Hard |
 |---|---|---|---|
-| Vanguard | 3:44, Corona in 21.1 s | 4:38, 19.3 s | 4:35, 18.3 s |
-| Chimesinger | 3:40, 16.7 s | 3:34, 18.3 s | 3:26, 18.1 s |
-| Arcanist | 2:18, 12.3 s | 2:40, 11.2 s | 2:34, 11.2 s |
+| Vanguard | 4:17, Corona in 17.8 s | 5:48, 17.2 s | 5:32, 14.7 s |
+| Chimesinger | 4:13, 14.1 s | 4:00, 17.8 s | 4:06, 18.1 s |
+| Arcanist (glyph kit) | 4:36, 23.6 s | 4:37, 20.0 s | 4:33, 12.6 s |
 
-All of them ended with 1 to 4 slices fallen in Last Light, well before the 8th.
+All of them ended with 2 to 6 slices fallen in Last Light, well before the 8th.
 
 
 ## Potions and damage
