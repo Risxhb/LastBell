@@ -114,6 +114,17 @@ namespace LastBell.Menu
             MenuFlowTest.SetResolution(1600,900);yield return new WaitForSecondsRealtime(1);
             menu=FindAnyObjectByType<ConfrontationMenu>();menu.OpenSettings();yield return Capture("alternative-settings.png");
             Check("settings open on music volume, menu blocked",menu.SettingsOpen&&EventSystem.current.currentSelectedGameObject==menu.MusicVolumeControl.gameObject&&!menu.StartButton.IsInteractable());
+            Check("frame settings: VSync and FPS cap rows present",menu.VSyncControl&&menu.FrameCapControl&&menu.VSyncControl.gameObject.activeInHierarchy&&menu.FrameCapControl.gameObject.activeInHierarchy);
+            {
+                var resText=menu.ResolutionDropdown?menu.ResolutionDropdown.GetComponentInChildren<Text>().text:"";
+                menu.ResolutionDropdown.onClick.Invoke();yield return null;yield return null;
+                var sel=EventSystem.current.currentSelectedGameObject;
+                Check("resolution dropdown opens a themed list with every resolution, focused on the current one",menu.ResolutionListOpen&&menu.ResolutionItems.Length==MenuSettings.Resolutions.Length&&sel&&menu.ResolutionItems.Any(b=>b.gameObject==sel)&&sel.GetComponentInChildren<Text>().text==resText);
+                yield return Capture("settings-resolution-dropdown.png");
+                yield return Press(Key.Escape);
+                Check("Escape closes the resolution list only, focus back on the row, value unchanged",!menu.ResolutionListOpen&&menu.SettingsOpen&&EventSystem.current.currentSelectedGameObject==menu.ResolutionDropdown.gameObject&&menu.ResolutionDropdown.GetComponentInChildren<Text>().text==resText);
+            }
+            if(!PlayerPrefs.HasKey("LastBell.Menu.VSync"))Check("frame settings default: VSync off, 120 FPS cap",!MenuSettings.VSync&&MenuSettings.FrameCap==120&&QualitySettings.vSyncCount==0&&Application.targetFrameRate==120);
             Check("settings has no interface option",menu.GetComponentsInChildren<Text>(true).All(t=>t.text!="UI"&&t.text!="Interface"));
             yield return Press(Key.Escape);Check("Escape closes settings",!menu.SettingsOpen&&menu.StartButton.IsInteractable());
             // mini music player

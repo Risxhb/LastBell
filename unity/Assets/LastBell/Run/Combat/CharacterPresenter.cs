@@ -20,6 +20,13 @@ namespace LastBell.Run
             ["BraceHold"] = new[] { "BraceHold", "Guard" }, ["BraceWalk"] = new[] { "BraceWalk", "BraceHold", "Guard" },
             ["BraceRaise"] = new[] { "BraceRaise" }, ["BraceLower"] = new[] { "BraceLower" }, ["BraceHit"] = new[] { "BraceHit" },
             ["PhaseShift"] = new[] { "PhaseShift", "Vulnerable" }, ["Defeat"] = new[] { "Defeat", "Vulnerable" },
+            // Arcanist arcane kit: the new clips first, then the closest clip of the earlier kit
+            ["MissileTap"] = new[] { "MissileTap", "Clockbolt" }, ["MissileTap2"] = new[] { "MissileTap2", "Clockbolt2" },
+            ["MissileCharge"] = new[] { "MissileCharge", "TimeSeal" }, ["MissileVolley"] = new[] { "MissileVolley", "Clockbolt" },
+            ["DisintegrateStart"] = new[] { "DisintegrateStart", "ArcLance" }, ["DisintegrateHold"] = new[] { "DisintegrateHold", "ArcLance" },
+            ["DisintegrateEnd"] = new[] { "DisintegrateEnd", "Clockbolt" }, ["RuneSigil"] = new[] { "RuneSigil", "TimeSeal" },
+            ["AstralOrb"] = new[] { "AstralOrb", "TemporalAnchor" }, ["ArcaneComet"] = new[] { "ArcaneComet", "Convergence" },
+            ["BlinkIn"] = new[] { "BlinkIn", "AnchorReturn" },
         };
         static readonly HashSet<string> Looping = new HashSet<string> { "Idle", "Run", "Sprint", "Walk", "Vulnerable", "BraceHold", "BraceWalk", "Guard", "Float" };
 
@@ -43,14 +50,14 @@ namespace LastBell.Run
         public float GlowLevel = 1;
 
         public static CharacterPresenter ForPlayer(Transform parent, string className) =>
-            Create(parent, className, className == "Chimesinger" ? 2f : 2.5f, 1f, 0, PlaceholderBody(className));   // astrolabe / rune glow restored like the Vanguard's
+            Create(parent, className, className == "Chimesinger" ? 2f : 2.5f, 1f, 0, PlaceholderBody(className), className == "Arcanist");   // astrolabe / rune glow restored like the Vanguard's
 
-        public static CharacterPresenter Create(Transform parent, string resource, float glowBoost, float metalScale, float yawOffset, System.Func<Transform, Transform> placeholder)
+        public static CharacterPresenter Create(Transform parent, string resource, float glowBoost, float metalScale, float yawOffset, System.Func<Transform, Transform> placeholder, bool castLayers = false)
         {
             var host = new GameObject("Visual"); host.transform.SetParent(parent, false);
             host.transform.localRotation = Quaternion.Euler(0, yawOffset, 0);
             var p = host.AddComponent<CharacterPresenter>();
-            p.Visual = host.transform; p.yaw = yawOffset;
+            p.Visual = host.transform; p.yaw = yawOffset; p.layered = castLayers;
             var prefab = Resources.Load<GameObject>("Characters/" + resource);
             if (prefab != null)
             {
@@ -61,7 +68,7 @@ namespace LastBell.Run
             else
             {
                 if (placeholder != null) placeholder(host.transform);
-                p.clips = new AnimationClip[0];
+                p.clips = new AnimationClip[0]; p.layered = false;
                 Debug.LogWarning($"Last Bell: Resources/Characters/{resource} missing, using a placeholder body");
             }
             return p;
@@ -89,8 +96,8 @@ namespace LastBell.Run
                 var c = AnimationClipPlayable.Create(graph, clips[i]); c.SetApplyFootIK(false);
                 graph.Connect(c, 0, mixer, i);
             }
-            AnimationPlayableOutput.Create(graph, "Presenter", animator).SetSourcePlayable(mixer);
             times = new float[clips.Length]; weights = new float[clips.Length]; speeds = new float[clips.Length];
+            if (layered) BuildCastLayers(animator); else AnimationPlayableOutput.Create(graph, "Presenter", animator).SetSourcePlayable(mixer);
             graph.Play();
             SetLoop(idleClip);
         }
@@ -138,9 +145,9 @@ namespace LastBell.Run
         }
         public void BraceHit() { if (!Action("BraceHit", 12)) flinch = 0.4f; }
         public void Hit() { if (!PlayOnce("Hit", 0.3f)) flinch = 1; }
-        public void Down() { downTarget = 1; if (PlayOnce("Down", 0.8f)) { downTarget = 0; oneShotLeft = 9999; } }
+        public void Down() { EndOverlay(); downTarget = 1; if (PlayOnce("Down", 0.8f)) { downTarget = 0; oneShotLeft = 9999; } }
         public void GetUp() { downTarget = 0; if (!PlayOnce("GetUp", 0.9f)) { downAmount = 1; } }
-        public void ResetPose() { downTarget = downAmount = 0; flinch = 0; brace = 0; oneShotLeft = 0; GlowLevel = 1; SetLoop(idleClip); }
+        public void ResetPose() { downTarget = downAmount = 0; flinch = 0; brace = 0; oneShotLeft = 0; GlowLevel = 1; SetLoop(idleClip); EndOverlay(); SetHidden(false); }
         public void SetIdleClip(string name) { idleClip = name; if (oneShotLeft <= 0) SetLoop(name); }
 
         // called on the combat tick by its owner; picks the locomotion loop when no one-shot is playing
@@ -174,12 +181,97 @@ namespace LastBell.Run
                 if (weights[i] <= 0) continue;
                 float len = clips[i].length;
                 times[i] += dt * (speeds[i] <= 0 ? 1 : speeds[i]);
-                float t = Looping.Contains(clips[i].name) ? Mathf.Repeat(times[i], len) : Mathf.Min(times[i], len);
+                // named loops, plus any clip whose name ends in "Loop" (the Dial Warden's held poses: SkyLoop, HandLoop ...)
+                float t = Looping.Contains(clips[i].name) || clips[i].name.EndsWith("Loop") ? Mathf.Repeat(times[i], len) : Mathf.Min(times[i], len);
                 mixer.GetInput(i).SetTime(t);
             }
             float sum = 0; foreach (var w in weights) sum += w;
             for (int i = 0; i < clips.Length; i++) mixer.SetInputWeight(i, sum > 0 ? weights[i] / sum : 0);
+            if (layered) UpdateCastLayers(dt);
             graph.Evaluate(0);
+        }
+
+        // ---------------------------------------------------------------- cast layers (opt-in, the Arcanist)
+        // A cast clip plays on two extra layers: an upper-body copy (spine, arms, head and the astrolabe's orbit bone)
+        // that always shows, and a full-body copy that shows only while he stands still. So a cast keeps its planted
+        // legs when he is still, and his legs keep walking when he moves. The base layer (locomotion, one-shots like the
+        // dash) is unchanged. Overlay() starts a cast clip; EndOverlay() blends it out.
+        bool layered;
+        AnimationLayerMixerPlayable layers; AnimationMixerPlayable fullMix, upperMix;
+        float[] ovTimes, ovWeights; int ov = -1; float ovLeft, ovSpeed, ovW, stillW = 1; bool ovLoop;
+        Renderer[] renderers; bool hidden;
+        public bool Overlaying => ov >= 0 && ovLeft > 0;
+        public string OverlayClip => Overlaying ? clips[ov].name : "-";
+
+        void BuildCastLayers(Animator animator)
+        {
+            fullMix = AnimationMixerPlayable.Create(graph, clips.Length); upperMix = AnimationMixerPlayable.Create(graph, clips.Length);
+            for (int i = 0; i < clips.Length; i++)
+            {
+                var a = AnimationClipPlayable.Create(graph, clips[i]); a.SetApplyFootIK(false); graph.Connect(a, 0, fullMix, i);
+                var b = AnimationClipPlayable.Create(graph, clips[i]); b.SetApplyFootIK(false); graph.Connect(b, 0, upperMix, i);
+            }
+            layers = AnimationLayerMixerPlayable.Create(graph, 3);
+            graph.Connect(mixer, 0, layers, 0); graph.Connect(fullMix, 0, layers, 1); graph.Connect(upperMix, 0, layers, 2);
+            layers.SetInputWeight(0, 1); layers.SetInputWeight(1, 0); layers.SetInputWeight(2, 0);
+            var mask = new AvatarMask(); mask.AddTransformPath(animator.transform, true);
+            int upper = 0;
+            for (int i = 0; i < mask.transformCount; i++)
+            {
+                var path = mask.GetTransformPath(i); bool on = false;
+                foreach (var seg in path.Split('/')) if (seg == "spine" || seg == "orbit") { on = true; break; }
+                mask.SetTransformActive(i, on); if (on) upper++;
+            }
+            layers.SetLayerMaskFromAvatarMask(2, mask);
+            if (upper == 0) Debug.LogWarning("Last Bell: cast layers found no spine/orbit bones; casts play full-body");
+            ovTimes = new float[clips.Length]; ovWeights = new float[clips.Length];
+            AnimationPlayableOutput.Create(graph, "Presenter", animator).SetSourcePlayable(layers);
+            renderers = GetComponentsInChildren<Renderer>(true);
+        }
+
+        // Plays a cast clip stretched to `seconds` (loop: one cycle per `seconds`; hold: stays on the last frame until
+        // EndOverlay or the next cast). Without cast layers it falls back to a full-body one-shot.
+        public bool Overlay(string semantic, float seconds, bool loop = false, bool hold = false)
+        {
+            if (!layered) return PlayOnce(semantic, seconds);
+            int i = Resolve(semantic);
+            if (i < 0) { NotePlaceholder(semantic); return false; }
+            ov = i; ovTimes[i] = 0; ovLoop = loop; ovSpeed = clips[i].length / Mathf.Max(0.05f, seconds);
+            ovLeft = loop || hold ? float.MaxValue : seconds;
+            return true;
+        }
+        public void EndOverlay() { ovLeft = 0; }
+
+        public void SetHidden(bool on)
+        {
+            if (renderers == null) renderers = GetComponentsInChildren<Renderer>(true);
+            hidden = on; foreach (var r in renderers) if (r) r.enabled = !on;
+        }
+        public bool Hidden => hidden;
+
+        void UpdateCastLayers(float dt)
+        {
+            if (ovLeft > 0 && ovLeft < float.MaxValue) ovLeft -= dt;
+            bool on = ov >= 0 && ovLeft > 0;
+            ovW = Mathf.MoveTowards(ovW, on ? 1 : 0, dt / 0.08f);
+            stillW = Mathf.MoveTowards(stillW, Locomotion > 0.3f ? 0 : 1, dt / 0.15f);
+            float sum = 0;
+            for (int i = 0; i < clips.Length; i++)
+            {
+                ovWeights[i] = Mathf.MoveTowards(ovWeights[i], i == ov ? 1 : 0, dt / 0.08f);
+                if (ovWeights[i] <= 0) continue;
+                sum += ovWeights[i];
+                float len = clips[i].length;
+                if (i == ov) ovTimes[i] += dt * ovSpeed;
+                float t = i == ov && ovLoop ? Mathf.Repeat(ovTimes[i], len) : Mathf.Min(ovTimes[i], len);
+                fullMix.GetInput(i).SetTime(t); upperMix.GetInput(i).SetTime(t);
+            }
+            for (int i = 0; i < clips.Length; i++)
+            {
+                float w = sum > 0 ? ovWeights[i] / sum : 0;
+                fullMix.SetInputWeight(i, w); upperMix.SetInputWeight(i, w);
+            }
+            layers.SetInputWeight(1, ovW * stillW); layers.SetInputWeight(2, ovW);
         }
 
         public string CurrentClip => current >= 0 && clips != null && current < clips.Length ? clips[current].name : "-";

@@ -14,10 +14,11 @@ namespace LastBell.Menu
         float fromMenu, fromBoss, fromPrevious, transition = 1;
         RunDirector countdown;
         bool inCombat, menuPaused;
-        // Risxhb, October 26, 2026: Bittersweet Dawn is the only menu song and loops. The earlier three-song playlist was
-        // { "MainMenu2", "MainMenuOpening", "MainMenuMusic" }; with more than one track, Next cycles and each song plays once.
-        static readonly string[] MenuTracks = { "BittersweetDawn" };
-        static readonly string[] MenuTitles = { "BITTERSWEET DAWN" };
+        // Risxhb, October 26, 2026: Bittersweet Dawn opens the menu, The Hero Rises is the second song; the two alternate
+        // (each plays once, then the next; Next skips). The earlier playlist was { "MainMenu2", "MainMenuOpening",
+        // "MainMenuMusic" }. With a single track it loops and the Confrontation menu hides its skip button.
+        static readonly string[] MenuTracks = { "BittersweetDawn", "TheHeroRises" };
+        static readonly string[] MenuTitles = { "BITTERSWEET DAWN", "THE HERO RISES" };
         public static int TrackCount => MenuTracks.Length;
         bool playbackObserved, trackStarted;
         int trackIndex;

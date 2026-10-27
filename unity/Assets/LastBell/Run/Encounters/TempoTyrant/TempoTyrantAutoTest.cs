@@ -157,7 +157,9 @@ namespace LastBell.Run
             if (boss && boss.Clock.Transitioning) { transitionFrames++; if (w.Hazards.Count > 0) transitionHazardFrames++; }
             if (boss && boss.Current == "Threefold Severance" && boss.SeveranceStrikes.Count > 0)
             {
-                float drift = Sim.Flat(boss.transform.position - boss.LockedPos).magnitude + Mathf.Abs(Mathf.DeltaAngle(boss.transform.eulerAngles.y, boss.LockedYaw)) * 0.01f;
+                // the sim pose: the drawn pose trails it by up to one tick (SimSmoother), e.g. right after the dash in
+                var simPos = SimSmoother.SimPosition(boss.transform); var simYaw = SimSmoother.SimRotation(boss.transform).eulerAngles.y;
+                float drift = Sim.Flat(simPos - boss.LockedPos).magnitude + Mathf.Abs(Mathf.DeltaAngle(simYaw, boss.LockedYaw)) * 0.01f;
                 comboDriftMax = Mathf.Max(comboDriftMax, drift); if (drift > 0.01f) comboDrift++;
             }
         }

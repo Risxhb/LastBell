@@ -235,6 +235,27 @@ namespace LastBell.Menu
             battle.DriveCamera=false;
             foreach(int angle in new[]{0,90,180,270})
             {battle.OrbitPose(angle,out var pos,out var rot);cam.transform.SetPositionAndRotation(pos,rot);yield return Shot("metronome-court-orbit-"+angle+".png");}
+            // -lastbellOrbitFlicker: 40 frames of the orbit (0.1 degrees apart), as-is and with 4x MSAA, for
+            // tools/chimebound-oracle/flicker_map.py (October 26, 2026 floor shimmer check).
+            if(Environment.GetCommandLineArgs().Contains("-lastbellOrbitFlicker"))
+            {
+                var urp=UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline as UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset;int msaa=urp?urp.msaaSampleCount:1;
+                // SSAO pass (October 26, 2026): the radial streaks may be screen-space AO at the orbit's ~46 m distance
+                var ssao=Resources.FindObjectsOfTypeAll<UnityEngine.Rendering.Universal.ScriptableRendererFeature>().Where(f=>f&&f.name.Contains("AmbientOcclusion")).ToArray();
+                foreach(var (tag,samples) in new[]{("orbit-flicker",msaa),("orbit-flicker-msaa4",4),("orbit-flicker-nossao",msaa)})
+                {
+                    foreach(var f in ssao)f.SetActive(tag!="orbit-flicker-nossao");
+                    if(urp)urp.msaaSampleCount=samples;var sub=System.IO.Path.Combine(output,tag);System.IO.Directory.CreateDirectory(sub);yield return null;
+                    for(int f=0;f<40;f++)
+                    {
+                        battle.OrbitPose(30+f*.1f,out var pos,out var rot);cam.transform.SetPositionAndRotation(pos,rot);
+                        yield return new WaitForEndOfFrame();var tex=new Texture2D(Screen.width,Screen.height,TextureFormat.RGB24,false);
+                        tex.ReadPixels(new Rect(0,0,Screen.width,Screen.height),0,0);tex.Apply();System.IO.File.WriteAllBytes(System.IO.Path.Combine(sub,$"{f:000}.png"),tex.EncodeToPNG());Destroy(tex);
+                    }
+                }
+                if(urp)urp.msaaSampleCount=msaa;foreach(var f in ssao)f.SetActive(true);
+                Debug.Log($"orbit flicker: {ssao.Length} SSAO feature(s) toggled for the no-SSAO pass");
+            }
             battle.DriveCamera=true;
         }
         IEnumerator Shot(string file)

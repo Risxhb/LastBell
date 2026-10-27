@@ -52,7 +52,7 @@ namespace LastBell.Run
             b is BellkeeperEncounter ? new[] { 0.70f, 0.35f } :
             b is AurelionEncounter || b is CrucivarEncounter || b is SylvaraEncounter ? new[] { 0.65f, 0.30f } :
             b is TempoTyrantEncounter ? new[] { TempoTyrantEncounter.FrenzyAt } :
-            b is ChimeboundOracleEncounter ? new[] { 0.5f } : null;
+            b is ChimeboundOracleEncounter || b is DialWardenEncounter ? new[] { 0.5f } : null;
         float hitFlash;
 
         void Awake() { d = GetComponent<RunDirector>(); }
@@ -344,7 +344,7 @@ namespace LastBell.Run
             Dim();
             const float W = 720, pad = UiTheme.G3, inner = W - 2 * pad, colGap = 12, rowGap = 8;
             const string controlText =
-                "Controls: WASD move · mouse aims · 1 / LMB basic · 2 3 4 class actions · 6 Mending Chorus / Temporal Anchor · 5 / RMB dash · F potion · Space jump · Shift sprint · Esc pause\n" +
+                "Controls: WASD move · mouse aims · LMB basic · 2 3 4 class actions · 5 Mending Chorus / Temporal Anchor · RMB dash · F potion · Space jump · Shift sprint · Esc pause\n" +
                 "Movement stamina: sprint, jump and dash share one bar. No invincibility frames (dodging does not make you immune). F drinks a potion (+40 HP).\nHealth refills before each boss; potions carry over between bosses and refill before the final boss. Retry restarts at the first boss.\n" +
                 "Only real boss encounters are offered (the stand-in minibosses were removed); Sylvara is practice only, in Verdant Chimes. Arcanist kit numbers are prototype tuning. Dev keys in combat: F9 defeat boss, F8 next phase.";
             const int perRow = 3;
@@ -661,13 +661,11 @@ namespace LastBell.Run
             playerFlash = Mathf.MoveTowards(playerFlash, 0, Time.unscaledDeltaTime / 0.18f);
             if (d == null || d.State != RunState.Combat) return;
             var kb = Keyboard.current; var mouse = Mouse.current;
-            if (kb != null && kb.digit1Key.wasPressedThisFrame) preferMouseBasic = false;
             if (mouse != null && mouse.leftButton.wasPressedThisFrame) preferMouseBasic = true;
-            if (kb != null && kb.digit5Key.wasPressedThisFrame) preferMouseDash = false;
             if (mouse != null && mouse.rightButton.wasPressedThisFrame) preferMouseDash = true;
         }
 
-        // "1 / LMB" -> the binding for the current input; "4 hold" -> "4" plus the hold glyph
+        // "1 / LMB" -> the binding for the current input (current bindings have one key each); "4 hold" -> "4" plus the hold glyph
         static string KeyFor(string binding, bool preferMouse, out bool hold)
         {
             hold = binding.EndsWith(" hold"); if (hold) binding = binding.Substring(0, binding.Length - 5);
@@ -779,8 +777,8 @@ namespace LastBell.Run
                 if (r.Contains(Event.current.mousePosition)) hover = i;
             }
             bool dashReady = p.Stamina >= PlayerController.DashCost;
-            var dr = Tile(bx + n * (TileW + gap), by, KeyFor("5 / RMB", preferMouseDash, out _), false, SlotIcon(p.ClassName, n),
-                          p.ClassName == "Chimesinger" ? "Harmonic Step" : p.ClassName == "Arcanist" ? "Clockstep" : "Dash",
+            var dr = Tile(bx + n * (TileW + gap), by, KeyFor("RMB", preferMouseDash, out _), false, SlotIcon(p.ClassName, n),
+                          p.ClassName == "Chimesinger" ? "Harmonic Step" : p.ClassName == "Arcanist" ? "Blink" : "Dash",
                           dashReady ? "" : "stamina", 0, off);
             var pr = Tile(bx + (n + 1) * (TileW + gap), by, "F", false, Icon("potion"), "Potion",
                           p.Potions == 0 ? "no potions" : "", 0, off, p.Potions == 0 ? null : new string('●', p.Potions) + new string('○', PlayerController.MaxPotions - p.Potions));
@@ -808,7 +806,7 @@ namespace LastBell.Run
             bool showTip = over >= 0 && !attacking && Time.unscaledTime - tipSince >= TipDelay;
             if (!showTip) { }
             else if (pr.Contains(Event.current.mousePosition)) Tooltip(x, top, $"POTION  [F]\n+{PlayerController.PotionHeal} HP, 1 s between drinks. {p.Potions}/{PlayerController.MaxPotions} left.\nPotions carry over between minibosses; health and potions refill before the final boss.");
-            else if (dr.Contains(Event.current.mousePosition)) Tooltip(x, top, "DASH  [5 / RMB]\nShort burst (3 m in 0.2 s) in the move direction. Costs 30 stamina; sprint and jump share the bar.\nNo invincibility: get out of the shape before it resolves. Cancels basic attacks and unreleased windups.");
+            else if (dr.Contains(Event.current.mousePosition)) Tooltip(x, top, "DASH  [RMB]\nShort burst (3 m in 0.2 s) in the move direction. Costs 30 stamina; sprint and jump share the bar.\nNo invincibility: get out of the shape before it resolves. Cancels basic attacks and unreleased windups.");
             else if (hover >= 0) Tooltip(x, top, k.Tooltip(hover));
             if (ShowMeter && d.World != null) Meter(Right - MeterW, 260, d.World.EncounterMeter, "DAMAGE · this encounter", (d.World.Tick - d.World.SegmentStartTick) / 60f);
         }

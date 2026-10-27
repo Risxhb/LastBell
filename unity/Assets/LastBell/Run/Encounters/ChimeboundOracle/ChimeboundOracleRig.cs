@@ -5,12 +5,23 @@ namespace LastBell.Run
 {
     public enum OraclePose { Idle, Walk, StaffRaise, FloorStrike, ArmsSpread, Point, ClapperWindup, ClapperSwing, RingMetronome, Recover, Defeat }
 
-    // Labelled code-built stand-in for the Chimebound Oracle until a real model and rig exist: a hooded robe, a brass
-    // bell staff, a hanging clapper on the right arm and a ring of small bells round the waist. Each pose is a target
-    // the parts ease toward, so the tells read from silhouette (staff up = lanes, staff down = wells, arms wide = soak
-    // chain, arm out = mark, clapper back = cone). Presentation only: nothing here decides an outcome.
+    // The Chimebound Oracle's body. Normally Chzy18's Meshy model (a cobalt sphere with an eye-lens inside a gold wheel
+    // of five bells), rigged in Blender by prototype/arena-3d/models/blender/chimebound_oracle_rig.py and loaded from
+    // Resources/Characters/ChimeboundOracle through CharacterPresenter. Each pose plays an entry clip stretched to the
+    // pose's build-up time, then a held loop (staff raise = the wheel spins, floor strike = he drops onto the floor,
+    // arms spread = bells pushed out and shaking, point = top bell thrown at the target, clapper = rear back and lunge).
+    // If the model is missing, the labelled code-built stand-in below is used instead: a hooded robe, a brass bell
+    // staff, a hanging clapper on the right arm and a ring of small bells round the waist. Presentation only: nothing
+    // here decides an outcome.
     public sealed class ChimeboundOracleRig : MonoBehaviour
     {
+        public const string Resource = "ChimeboundOracle";
+        CharacterPresenter presenter;
+        public CharacterPresenter Presenter => presenter;
+        public bool HasModel => presenter != null && presenter.HasModel;
+        Light eye;
+        string heldLoop = "Idle";
+
         public const float Height = 3.6f;
         static readonly Color Robe = new Color(0.16f, 0.15f, 0.22f), RobeTrim = new Color(0.62f, 0.48f, 0.24f), Brass = new Color(0.78f, 0.60f, 0.30f),
             Hood = new Color(0.10f, 0.10f, 0.15f), Iron = new Color(0.22f, 0.22f, 0.25f);
@@ -33,9 +44,57 @@ namespace LastBell.Run
 
         public static ChimeboundOracleRig Create(Transform parent)
         {
-            var go = new GameObject("Chimebound Oracle (STAND-IN, labelled placeholder)");
+            var go = new GameObject("Chimebound Oracle");
             go.transform.SetParent(parent, false);
-            var r = go.AddComponent<ChimeboundOracleRig>(); r.Build(); return r;
+            var r = go.AddComponent<ChimeboundOracleRig>();
+            r.presenter = CharacterPresenter.Create(go.transform, Resource, 2.5f, 0.9f, 0, null);
+            if (r.presenter.HasModel) r.BuildModelExtras();
+            else
+            {
+                DestroyImmediate(r.presenter.gameObject); r.presenter = null;
+                go.name = "Chimebound Oracle (STAND-IN, labelled placeholder)";
+                r.Build();
+            }
+            return r;
+        }
+
+        // the eye-lens glows with the tempo (cold rune light, warm in Haste); Glow > 1 during windups brightens it
+        void BuildModelExtras()
+        {
+            Body = presenter.Visual;
+            var l = new GameObject("EyeGlow"); l.transform.SetParent(presenter.Visual, false);
+            l.transform.localPosition = new Vector3(0, 2.2f, 1.35f);
+            eye = l.AddComponent<Light>(); eye.type = LightType.Point; eye.range = 4.5f; eye.intensity = 2.5f; eye.shadows = LightShadows.None;
+            eye.color = RuneGlow;
+        }
+
+        // pose -> (entry clip, held loop). The entry is stretched to the pose's build-up ticks.
+        static (string entry, string loop) Clips(OraclePose p)
+        {
+            switch (p)
+            {
+                case OraclePose.Walk: return (null, "Walk");
+                case OraclePose.StaffRaise: return ("StaffRaise", "LanesLoop");
+                case OraclePose.FloorStrike: return ("FloorStrike", "Idle");
+                case OraclePose.ArmsSpread: return ("ArmsSpread", "ChainLoop");
+                case OraclePose.Point: return ("Point", "PointLoop");
+                case OraclePose.ClapperWindup: return ("ClapperWindup", "WindLoop");
+                case OraclePose.ClapperSwing: return ("ClapperSwing", "Idle");
+                case OraclePose.RingMetronome: return ("RingMetronome", "TollLoop");
+                case OraclePose.Recover: return ("Recover", "Idle");
+                case OraclePose.Defeat: return ("Defeat", "Defeat");
+                default: return (null, "Idle");
+            }
+        }
+
+        void PoseModel(OraclePose p)
+        {
+            var (entry, loop) = Clips(p); heldLoop = loop;
+            if (entry == null) { presenter.TickBoss(loop); return; }
+            if (p == OraclePose.ClapperSwing) presenter.PlayOnce(entry, 0.4f, 0.3f);          // the hit has already landed: start near the strike frame
+            else if (p == OraclePose.Recover) presenter.PlayOnce(entry, 0.6f);
+            else if (p == OraclePose.Defeat) presenter.PlayOnce(entry, 2.5f);
+            else presenter.Action(entry, poseLength);
         }
 
         Transform Part(PrimitiveKind k, Transform parent, Vector3 pos, Vector3 scale, Color c, float glow = 0, Vector3? euler = null, string name = null)
@@ -93,6 +152,7 @@ namespace LastBell.Run
         {
             if (Current == p && p != OraclePose.ClapperSwing && p != OraclePose.FloorStrike) return;
             Current = p; poseTicks = 0; poseLength = Mathf.Max(1, ticks);
+            if (HasModel) { PoseModel(p); return; }
             switch (p)
             {
                 case OraclePose.StaffRaise: lTarget = Quaternion.Euler(0, 0, -165); rTarget = Quaternion.Euler(-20, 0, 25); staffTarget = Quaternion.identity; bodyDipTarget = 0; break;
@@ -113,10 +173,21 @@ namespace LastBell.Run
         {
             poseTicks++;
             if (Current == OraclePose.Walk) walkPhase += 0.22f;
+            if (HasModel) presenter.TickBoss(heldLoop);
         }
 
         void Update()
         {
+            if (HasModel)
+            {
+                presenter.GlowLevel = Glow;
+                if (eye)
+                {
+                    eye.color = Color.Lerp(eye.color, Haste ? HasteGlow : RuneGlow, 1 - Mathf.Exp(-Time.deltaTime * 4f));
+                    eye.intensity = 2.5f + 3.5f * Mathf.Max(0, Glow - 1);
+                }
+                return;
+            }
             float k = 1 - Mathf.Exp(-Time.deltaTime * (Current == OraclePose.ClapperSwing || Current == OraclePose.FloorStrike ? 26f : 8f));
             if (leftArm) leftArm.localRotation = Quaternion.Slerp(leftArm.localRotation, lTarget, k);
             if (rightArm) rightArm.localRotation = Quaternion.Slerp(rightArm.localRotation, rTarget, k);

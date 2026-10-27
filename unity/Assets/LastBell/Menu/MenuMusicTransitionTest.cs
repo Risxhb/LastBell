@@ -141,7 +141,7 @@ namespace LastBell.Menu
             Check("zero runtime errors", errors.Count == 0);
             Finish(hadVolume, savedVolume);
         }
-        static bool IsMenuTrack(AudioSource source) => source.clip && new[] { "BittersweetDawn", "MainMenu2", "MainMenuOpening", "MainMenuMusic" }.Contains(source.clip.name);
+        static bool IsMenuTrack(AudioSource source) => source.clip && new[] { "BittersweetDawn", "TheHeroRises", "MainMenu2", "MainMenuOpening", "MainMenuMusic" }.Contains(source.clip.name);
         static bool Close(float a, float b) => Mathf.Abs(a - b) < .015f;
         IEnumerator Until(Func<bool> ready, float seconds, string name)
         {

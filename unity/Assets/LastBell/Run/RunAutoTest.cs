@@ -585,66 +585,99 @@ namespace LastBell.Run
             d.Boss.BeginCombat();
         }
 
-        static int ArcRotation(int f) => f % 150 == 10 ? 1 : f % 150 == 100 ? 2 : f % 300 == 140 ? 3 : f % 10 == 0 ? 0 : -1;
+        // taps every 10 ticks, with a Rune Sigil, an Astral Orb and an Arcane Comet mixed in
+        static int ArcRotation(int f) => f % 400 == 20 ? 3 : f % 360 == 60 ? 2 : f % 1100 == 200 ? 4 : f % 10 == 0 ? 0 : -1;
 
-        // #41 sequence: Seal A -> three Clockbolts -> empowered Lance -> Seal B -> three Clockbolts -> empowered Lance ->
-        // Convergence in the shared ripe window. Plus early detonation, Tick cap, dash-cancelled Lance and the Anchor.
+        int MeterHits(string ability) => d.World.EncounterMeter.TryGetValue(ability, out var r) ? r.Hits : 0;
+        int MeterDamage(string ability) => d.World.EncounterMeter.TryGetValue(ability, out var r) ? r.Damage : 0;
+
+        // Arcane kit (docs/design/arcanist-redesign.md): Magic Missile tap and 3-missile homing charge, Disintegrate's
+        // channel (steps, turn cap, early release, dash refund), Rune Sigil, Astral Orb (refund, 8 shots), Arcane Comet
+        // (bullseye) and Blink (body hidden for the dash, shown again where it ends).
         IEnumerator ArcanistChecks()
         {
             var p = d.Player; var k = (ArcanistKit)p.Kit; var w = d.World;
             d.Boss.Halt(); yield return Wait(0.3f); w.ClearTransient();
-            p.transform.position = d.Boss.transform.position + new Vector3(0, 0, 6f);
-            bot.Aim = d.Boss.transform.position;
-            // Tick cap
-            for (int i = 0; i < 5; i++) { bot.press[0] = true; yield return Wait(0.36f); }
-            Check("Clockbolt builds Ticks and caps at 3", k.Ticks == 3, k.ClassState());
-            // dash cancels an unfinished Lance: nothing spent, Ticks kept
-            bot.press[2] = true; yield return Wait(0.08f); bot.dash = true; bot.MoveWorld = Vector3.right; yield return Wait(0.3f); bot.Clear();
-            Check("Clockstep cancels an unfinished Arc Lance and keeps Ticks", k.Ticks == 3 && k.Cooldown01(2) <= 0, k.ClassState());
-            p.transform.position = d.Boss.transform.position + new Vector3(0, 0, 6f); bot.Aim = d.Boss.transform.position;
-            // early detonation: one fresh seal, no inscription
-            bot.press[1] = true; yield return Wait(0.4f);
-            Check("Time Seal places a seal and spends a charge", k.Seals.Count == 1 && k.Charges == 1, k.ClassState());
-            bot.press[3] = true; yield return Wait(0.5f);
-            int early = k.LastConvergence;
-            Check("early Convergence detonates and clears seals", early > 0 && k.Seals.Count == 0, "damage " + early);
-            yield return Until(() => k.Cooldown01(3) <= 0 && k.Charges == 2, 7, "Convergence and both seal charges ready");
-            // full sequence
-            StartCoroutine(Capture("arcanist_rotation", 480));
-            bot.Aim = d.Boss.transform.position;
-            float seq0 = Time.time;
-            bot.press[1] = true; yield return Wait(0.25f);                                      // Seal A
-            for (int i = 0; i < 3; i++) { bot.press[0] = true; yield return Wait(0.27f); }      // three Clockbolts
-            yield return Until(() => k.Ticks == 3, 0.4f, "3 Ticks after three Clockbolts");
-            Check("three Clockbolts reach 3 Ticks", k.Ticks == 3, k.ClassState());
-            bot.press[2] = true; yield return Wait(0.38f);                                      // empowered Lance
-            Check("empowered Arc Lance spends Ticks and inscribes the oldest seal", k.LastLanceEmpowered && k.Ticks == 0 && k.Seals.Count == 1 && k.Seals[0].Inscribed, k.ClassState());
-            bot.press[1] = true; yield return Wait(0.25f);                                      // Seal B, < 2 s after A
-            Note($"Seal A -> Seal B spacing: {(Time.time - seq0) - 0.25f:0.00} s (must be < 2 s for a shared ripe window)");
-            Check("Seal B is a separate seal on the same target", k.Seals.Count == 2 && !k.Seals[1].Inscribed, k.ClassState());
-            for (int i = 0; i < 3; i++) { bot.press[0] = true; yield return Wait(0.27f); }
-            bot.press[2] = true; yield return Wait(0.38f);
-            Check("second empowered Lance inscribes seal B", k.Seals.Count == 2 && k.Seals[0].Inscribed && k.Seals[1].Inscribed, k.ClassState());
-            yield return Until(() => k.Seals.Count == 2 && k.Seals[0].Ripe && k.Seals[1].Ripe, 5, "both seals ripe together");
-            Check("the two-seal schedule fits inside the shared ripe window", k.Seals.Count == 2 && k.Seals[1].Ripe, k.ClassState());
-            yield return Shot("arcanist_two_ripe_seals");
-            int bossHp = d.Boss.Hp;
-            bot.press[3] = true; yield return Wait(0.5f);
-            int full = k.LastConvergence;
-            Check("perfect Convergence out-damages early detonation", full > early * 4, $"perfect {full} vs early {early}");
-            Check("Convergence resolves exactly once", bossHp - d.Boss.Hp == full, $"boss lost {bossHp - d.Boss.Hp}, convergence {full}");
-            // Temporal Anchor: place, move, recast -> back at the anchor with a shield that absorbs a hit
-            yield return Wait(0.3f);
-            var anchorAt = p.transform.position;
-            bot.press[4] = true; yield return Wait(0.35f);
-            Check("Temporal Anchor records the position", k.AnchorSet);
-            bot.MoveWorld = Vector3.left; yield return Wait(0.6f); bot.Clear();
-            bot.press[4] = true; yield return Wait(0.25f);
-            Check("recast returns to the anchor", Sim.Flat(p.transform.position - anchorAt).magnitude < 0.5f, $"{Sim.Flat(p.transform.position - anchorAt).magnitude:0.00} m away");
-            int hp0 = p.Hp;
-            w.Hazards.Spawn(new Hazard { Source = "Test strike", Shape = HazardShape.Circle, Kind = HazardKind.Strike, Origin = p.transform.position, Radius = 1.5f, ResolveAt = 6, Damage = 20 });
-            yield return Wait(0.3f);
-            Check("Anchor shield absorbs the next hit", p.Hp == hp0 && k.ShieldHp == 10, $"hp {hp0} -> {p.Hp}, shield {k.ShieldHp}");
+            var boss = d.Boss.transform.position;
+            p.transform.position = boss + new Vector3(0, 0, 6f + d.Boss.BodyRadius);
+            bot.Aim = boss;
+            // ---- Magic Missile: tap
+            int tap0 = MeterHits("Magic Missile");
+            bot.press[0] = true; yield return Wait(0.5f);
+            Check("Magic Missile tap fires one straight missile that hits", MeterHits("Magic Missile") == tap0 + 1, $"hits {MeterHits("Magic Missile") - tap0}");
+            Check("a tap does not start a charge", !k.Charging);
+            // ---- charge 3, release: all three home in and hit
+            int ch0 = MeterHits("Magic Missile (charged)");
+            bot.press[0] = true; bot.hold[0] = true; yield return Wait(0.95f);
+            Check("holding LMB summons 3 missiles", k.Charging && k.Missiles == 3, k.ClassState());
+            yield return Shot("arcanist_missile_charge");
+            bot.hold[0] = false; yield return Wait(1.4f);
+            Check("releasing fires the charged volley; all 3 hit", k.LastVolley == 3 && MeterHits("Magic Missile (charged)") == ch0 + 3, $"volley {k.LastVolley}, hits {MeterHits("Magic Missile (charged)") - ch0}");
+            // homing: released while aiming 90 degrees away from the boss, the missiles still turn in and hit
+            var side = p.transform.position + Vector3.right * 6;
+            bot.Aim = side; bot.press[0] = true; bot.hold[0] = true; yield return Wait(0.95f);
+            bot.hold[0] = false; yield return Wait(1.6f);
+            Check("charged missiles home on the boss even when aimed away", MeterHits("Magic Missile (charged)") == ch0 + 6, $"hits {MeterHits("Magic Missile (charged)") - ch0 - 3} of 3");
+            bot.Aim = boss;
+            // dash during a charge drops it
+            bot.press[0] = true; bot.hold[0] = true; yield return Wait(0.6f);
+            bot.dash = true; bot.MoveWorld = Vector3.right; yield return Wait(0.05f);
+            Check("Blink drops a missile charge", !k.Charging && k.Missiles == 0, k.ClassState());
+            Check("Blink hides the body during the dash", p.Presenter.Hidden && k.Blinking);
+            var blinkFrom = p.transform.position;
+            yield return Wait(0.4f); bot.Clear();
+            Check("Blink shows the body again where the dash ends", !p.Presenter.Hidden && !k.Blinking);
+            p.transform.position = boss + new Vector3(0, 0, 6f + d.Boss.BodyRadius); bot.Aim = boss; yield return Wait(0.3f);
+            // ---- Disintegrate: a dash during the windup refunds it
+            bot.press[1] = true; bot.hold[1] = true; yield return Wait(0.12f);
+            bot.dash = true; yield return Wait(0.3f); bot.hold[1] = false;
+            Check("dashing during the Disintegrate windup refunds it", !k.BeamActive && k.Cooldown01(1) <= 0, k.SlotState(1));
+            p.transform.position = boss + new Vector3(0, 0, 6f + d.Boss.BodyRadius); bot.Aim = boss; yield return Wait(0.3f);
+            // full channel: 13 damage ticks, 3 steps
+            int dis0 = MeterDamage("Disintegrate"); bool sawStep3 = false;
+            StartCoroutine(Capture("arcanist_disintegrate", 180));
+            bot.press[1] = true; bot.hold[1] = true;
+            float tt = 0; bool shotBeam = false;
+            while (tt < 2.8f) { sawStep3 |= k.BeamActive && k.BeamStep == 3; if (sawStep3 && !shotBeam) { shotBeam = true; yield return Shot("arcanist_disintegrate_step3"); } tt += Time.deltaTime; yield return null; }
+            bot.hold[1] = false; yield return Wait(0.3f);
+            Check("Disintegrate channels for 2 s through 3 damage steps", sawStep3 && !k.BeamActive);
+            Check("a full Disintegrate deals 4x8 + 4x12 + 5x16 = 160", MeterDamage("Disintegrate") - dis0 == 160 && k.BeamDamage == 160, $"dealt {MeterDamage("Disintegrate") - dis0}");
+            Check("Disintegrate cooldown starts when the beam ends", k.Cooldown01(1) > 0.85f, k.SlotState(1));
+            // ---- Rune Sigil: drawn, armed, explodes on the boss
+            int sig0 = MeterDamage("Rune Sigil");
+            bot.Aim = boss; bot.press[2] = true; yield return Wait(0.45f);
+            Check("Rune Sigil is placed at the cursor and drawing", k.Sigils.Count == 1 && Sim.Flat(k.Sigils[0].Pos - boss).magnitude < 0.3f);
+            yield return Shot("arcanist_rune_sigil");
+            yield return Wait(0.7f);
+            Check("Rune Sigil explodes after 0.6 s for 55 on the boss inside it", k.Sigils.Count == 0 && MeterDamage("Rune Sigil") - sig0 == 55, $"dealt {MeterDamage("Rune Sigil") - sig0}");
+            // ---- Astral Orb: a dash in the charge refunds; then 8 shots over 8 s
+            bot.press[3] = true; yield return Wait(0.3f);
+            bot.dash = true; bot.MoveWorld = Vector3.left; yield return Wait(0.35f); bot.Clear();
+            Check("dashing during the Astral Orb charge cancels it for free", !k.OrbActive && k.Cooldown01(3) <= 0, k.SlotState(3));
+            p.transform.position = boss + new Vector3(0, 0, 6f + d.Boss.BodyRadius); bot.Aim = boss; yield return Wait(0.2f);
+            int orb0 = MeterHits("Astral Orb");
+            bot.press[3] = true; yield return Wait(1.0f);
+            Check("Astral Orb releases after its 0.75 s charge", k.OrbActive, k.SlotState(3));
+            yield return Wait(1.6f); yield return Shot("arcanist_astral_orb");
+            // ---- Arcane Comet while the orb fights: a 2 s fall, bullseye on a still boss
+            int com0 = MeterDamage("Arcane Comet (bullseye)");
+            bot.Aim = boss; bot.press[4] = true; yield return Wait(0.3f);
+            Check("Arcane Comet marks the cursor and starts falling", k.Comets.Count == 1 && Sim.Flat(k.Comets[0].Pos - boss).magnitude < 0.3f);
+            yield return Wait(1.0f); yield return Shot("arcanist_comet_falling");
+            yield return Until(() => k.Comets.Count == 0, 1.5f, "comet lands");
+            yield return Wait(0.05f); yield return Shot("arcanist_comet_impact");
+            Check("Arcane Comet lands 2 s after the mark; a bullseye deals 180", k.LastComet == 180 && k.LastCometBullseye && MeterDamage("Arcane Comet (bullseye)") - com0 == 180, $"comet {k.LastComet}, bullseye {k.LastCometBullseye}");
+            yield return Until(() => !k.OrbActive, 8, "orb ends");
+            Check("Astral Orb fires 8 homing shots over 8 s, then returns", !k.OrbActive && k.OrbShots == 8 && MeterHits("Astral Orb") - orb0 == 8, $"shots {k.OrbShots}, hits {MeterHits("Astral Orb") - orb0}");
+            // ---- Disintegrate turn cap and early release
+            yield return Until(() => k.Cooldown01(1) <= 0, 9, "Disintegrate ready");
+            bot.Aim = boss; bot.press[1] = true; bot.hold[1] = true; yield return Wait(0.6f);
+            var dir0 = k.BeamDir; int tick0 = w.Tick;
+            bot.Aim = p.transform.position + Vector3.Cross(Vector3.up, dir0) * 8; yield return Wait(0.2f);
+            float turned = Vector3.Angle(dir0, k.BeamDir); int ticks = w.Tick - tick0;
+            Check("Disintegrate turns toward the cursor at 1.5° per tick at most", k.BeamActive && turned <= ticks * 1.5f + 0.5f && turned >= (ticks - 2) * 1.5f, $"{turned:0.0}° in {ticks} ticks");
+            bot.hold[1] = false; yield return Wait(0.1f);
+            Check("releasing 2 ends the beam early", !k.BeamActive && k.Cooldown01(1) > 0.9f);
             p.DebugSetHp(PlayerController.MaxHp);
             d.Boss.BeginCombat();
         }

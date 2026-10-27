@@ -35,7 +35,7 @@ namespace LastBell.Run
         public override string Id => "boss.chimebound-oracle";
         public override string DisplayName => "The Chimebound Oracle";
         public override string Lesson => "";        // no ability text: players learn from the tells
-        public override bool Placeholder => true;
+        public override bool Placeholder => Rig == null || !Rig.HasModel;   // the Meshy model, unless Resources/Characters/ChimeboundOracle is missing
         public override float NextPhaseFraction() => 0.49f;
 
         // ---------------- tunables ----------------
