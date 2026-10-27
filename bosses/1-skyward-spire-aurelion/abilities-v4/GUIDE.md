@@ -2,7 +2,7 @@
 
 A player's guide to the current v4 fight on every difficulty.
 
-**Proven beatable:** four perfect bots killed him on Hard at full HP in **4:55** (3 of 4 standing), in Last Light with one slice of floor to spare. (The video `aurelion-v4-win.mp4` shows the earlier 5:06 version.)
+**Proven beatable:** four perfect bots killed him on Hard at full HP in **2:32** (4 of 4 standing). Solo bots killed him on every level as Vanguard (Easy 3:44, Medium 4:38, Hard 4:35) and Chimesinger (3:59, 3:48, 3:53), and as Arcanist on Easy (2:47) and Medium (3:02); see **Playing solo**. (The video `aurelion-v4-win.mp4` shows an earlier 5:06 version.)
 
 **Numbers:**
 - Damage is quoted for Medium. Hard is ×1.3, Easy ×0.6.
@@ -78,7 +78,7 @@ Order:
 2. Towers + Marks + Starfall
 3. Ecliptic + Lances (+ Starfall solo)
 4. Collapse + Lances
-5. Orrery + Horizon + Hour Hands
+5. Orrery + Horizon, then Starfall, then Hour Hands
 6. punish
 
 - Hold the job that lands first; dodge stars after your tower or ring.
@@ -100,6 +100,38 @@ Order:
 - Lances + Starfall › SUN/SHADE + Lances › Hour Hands + Starfall, on loop, while the floor falls.
 - No punish window. Burn him down.
 - Drift toward the diagonals; they burn last.
+
+## Playing solo
+
+Everything above applies; these are the solo differences.
+
+| | Solo |
+|---|---|
+| His HP | 10,000 |
+| Towers | three towers of one, landing 5.0, 7.5 and 10.0 s after they rise (Easy 6, 9 and 12 s) |
+| Corona Shield | 700 in 25 s |
+| Severance | no side is called and there is no Reunion; crossing the line still hits |
+| Last Light | starts at 20 %; the 8th slice falls 88 s in, Final Noon at 6:30 |
+
+**Melee (Vanguard):**
+- Every swing roots you. Don't start a Sunder or Last Word when a shape is about to land on you; a basic is the safe filler.
+- Eclipse: attack from the **inner edge** of a well, the side nearest him, and drift with it as it turns.
+- Ecliptic Order: stand on the **inner edge** of the safe ring so he is in reach.
+- Towers: keep swinging and leave late; walk around him, not through him.
+- Sunspots: you lose damage walking to the edge. Drop them and come straight back.
+
+**Ranged (Chimesinger, Arcanist):** cast from inside the wells and the safe rings. You can keep casting while you wait for a tower, so stand in it early.
+
+**Reference clears (perfect solo bots, Unity):**
+
+| | Easy | Medium | Hard |
+|---|---|---|---|
+| Vanguard | 3:44, Corona in 21.1 s | 4:38, 19.3 s | 4:35, 18.3 s |
+| Chimesinger | 3:59, 13.2 s | 3:48, 18.6 s | 3:53, 19.4 s |
+| Arcanist | 2:47, 18.1 s | 3:02, 13.2 s | not yet: the bot fails the Corona Shield (under investigation) |
+
+All of them ended with 1 to 4 slices fallen in Last Light, well before the 8th.
+
 
 ## Potions and damage
 
