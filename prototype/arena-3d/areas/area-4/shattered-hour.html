@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shattered Hour Mockup</title>
+<style>
+html, body { margin: 0; height: 100%; overflow: hidden; background: #150f2e; }
+canvas { display: block; }
+#vig { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 50%, transparent 55%, #0a061c99 100%); }
+#tabs { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; gap: 8px; font-family: Georgia, serif; }
+#tabs a { padding: 7px 14px; font-size: 15px; color: #f3ead6; text-decoration: none; background: #0d1422e0; border: 1px solid #c38d4688; border-radius: 8px; }
+#tabs a.on { background: #c38d46; color: #101825; }
+body.clean #tabs { display: none; }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas><div id="vig"></div>
+<div id="tabs"><a href="?view=game">Game camera</a><a href="?view=cine">Establishing</a></div>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+// Area 4 mockup: The Shattered Hour, arena "The Throne of the Final Toll"
+// (Reference/LAST-BELL-ARENA-ART-HANDOFF/LAST-BELL-SHATTERED-HOUR-ARENA.md, image a_dramatic_high_detail_...png).
+// A round cobalt-and-slate clock floor floating in a violet cosmic void, a decorative gold fissure across it, four
+// ritual stations on the rim, and a giant cracked bell behind and above. Broken cathedral pillars, hanging bells,
+// chains and turning clock rings stay outside the playable circle. The fissure and stations are decoration only;
+// no boss or mechanics are implied. ?view=game uses the gameplay camera from index.html; ?view=cine is a wide shot.
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const Q = new URLSearchParams(location.search), VIEW = Q.get('view') || 'game';
+if (Q.has('clean')) document.body.classList.add('clean');
+document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.search === `?view=${VIEW}`));
+
+const R = 13.5;           // radius of the playable floor (collision circle); players fit inside ±12.9 m
+// ---- helpers ----
+function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const rnd = mulberry32(41);
+const hash = (x, y) => { const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); };
+function vnoise(x, y) { const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+  const a = hash(xi, yi), b = hash(xi + 1, yi), c = hash(xi, yi + 1), d = hash(xi + 1, yi + 1); return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v; }
+const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const tex = (c, srgb = true) => { const t = new THREE.CanvasTexture(c); if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; };
+const canvas2d = (w, h = w) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return [c, c.getContext('2d')]; };
+
+// ---- floor painter: concentric bands of slate slabs and cobalt dial rings, restrained gold engraving, the fissure ----
+// Returns colour + emissive mask covering world [-H, H]. Only the fissure core glows strongly; rings glow faintly.
+function paintFloor(N, H) {
+  const [map, mc] = canvas2d(N), [glow, gc] = canvas2d(N), img = mc.createImageData(N, N), d = img.data;
+  // [inner, outer, kind, slabs around, radial splits]
+  const BANDS = [[0, 1.4, 'cobalt', 1, 1], [1.4, 3.4, 'slate', 8, 1], [3.4, 4.6, 'cobalt', 1, 1], [4.6, 7.6, 'slate', 16, 2],
+    [7.6, 9.6, 'cobalt', 1, 1], [9.6, 12.5, 'slate', 28, 2], [12.5, R + 0.2, 'rim', 48, 1]];
+  const LX = 0.55, LZ = -0.83, grout = 0.03, bev = 0.1;
+  for (let py = 0; py < N; py++) for (let px = 0; px < N; px++) {
+    const x = -H + (px + 0.5) / N * 2 * H, z = -H + (py + 0.5) / N * 2 * H, r = Math.hypot(x, z), o = (py * N + px) * 4;
+    let bi = BANDS.findIndex(b => r < b[1]); if (bi < 0) bi = BANDS.length - 1;
+    const [r0, r1, kind, n, split] = BANDS[bi], a = Math.atan2(z, x) + Math.PI;
+    const ring = split > 1 && r > (r0 + r1) / 2 ? 1 : 0, rr0 = ring ? (r0 + r1) / 2 : r0, rr1 = split > 1 && !ring ? (r0 + r1) / 2 : r1;
+    const seg = 2 * Math.PI / n, aa = a + ring * seg * 0.5, k = Math.floor(aa / seg), fa = aa - k * seg;
+    const sid = hash(bi * 13 + ring * 7, k), noise = vnoise(x * 0.6, z * 0.6), fine = vnoise(x * 6, z * 6);
+    let cr, cg, cb, edge;
+    if (kind === 'cobalt') { edge = Math.min(r - r0, r1 - r); const v = (noise - 0.5) * 0.22 + (fine - 0.5) * 0.06; cr = 30 * (1 + v); cg = 40 * (1 + v); cb = 86 * (1 + v); }
+    else {
+      edge = n > 1 ? Math.min(r - rr0, rr1 - r, fa * r, (seg - fa) * r) : Math.min(r - rr0, rr1 - r);
+      const v = (sid - 0.5) * 0.24 + (noise - 0.5) * 0.24 + (fine - 0.5) * 0.08, t = hash(k, bi);
+      if (kind === 'rim') { cr = 46 * (1 + v); cg = 50 * (1 + v); cb = 70 * (1 + v); }
+      else { cr = (84 + t * 12) * (1 + v); cg = (90 + t * 10) * (1 + v); cb = (116 + t * 8) * (1 + v); }
+      if (edge < bev) { const s = 1 - smooth(grout, bev, edge), f = 1 + ((x / r) * LX + (z / r) * LZ) * 0.2 * s; cr *= f; cg *= f; cb *= f; }
+      if (fine > 0.88) { cr *= 1.07; cg *= 1.07; cb *= 1.06; }
+    }
+    if (edge < grout) { cr = 14; cg = 16; cb = 30; }
+    d[o] = Math.min(255, cr); d[o + 1] = Math.min(255, cg); d[o + 2] = Math.min(255, cb); d[o + 3] = 255;
+  }
+  mc.putImageData(img, 0, 0);
+  gc.fillStyle = '#000'; gc.fillRect(0, 0, N, N);
+  const S = N / (2 * H), P = v => (v + H) * S;
+  const both = fn => { fn(mc, false); fn(gc, true); };
+  // engraved brass rings at the band edges (quiet: decoration must stay below live telegraphs)
+  both((g, isGlow) => {
+    g.strokeStyle = isGlow ? 'rgba(255,190,110,0.18)' : 'rgba(196,152,80,0.8)';
+    for (const r of [1.4, 3.4, 4.6, 7.6, 9.6, 12.5]) { g.lineWidth = (r === 7.6 || r === 9.6 ? 0.07 : 0.045) * S; g.beginPath(); g.arc(P(0), P(0), r * S, 0, Math.PI * 2); g.stroke(); }
+  });
+  // roman numerals on the cobalt ring, ticks on the inner ring and the rim
+  const NUM = ['XII', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI'];
+  both((g, isGlow) => {
+    g.fillStyle = isGlow ? 'rgba(255,190,110,0.14)' : 'rgba(206,164,92,0.85)'; g.strokeStyle = g.fillStyle;
+    g.font = `${Math.round(1.05 * S)}px Georgia, serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+    for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2 - Math.PI / 2; g.save(); g.translate(P(Math.cos(a) * 8.6), P(Math.sin(a) * 8.6)); g.rotate(a + Math.PI / 2); g.fillText(NUM[i], 0, 0); g.restore(); }
+    for (let i = 0; i < 60; i++) { const a = i / 60 * Math.PI * 2, l = i % 5 ? 0.3 : 0.6; g.lineWidth = (i % 5 ? 0.04 : 0.07) * S; g.beginPath(); g.moveTo(P(Math.cos(a) * (4.0 - l / 2)), P(Math.sin(a) * (4.0 - l / 2))); g.lineTo(P(Math.cos(a) * (4.0 + l / 2)), P(Math.sin(a) * (4.0 + l / 2))); g.stroke(); }
+    for (let i = 0; i < 48; i++) { const a = i / 48 * Math.PI * 2; g.lineWidth = 0.05 * S; g.beginPath(); g.moveTo(P(Math.cos(a) * 12.7), P(Math.sin(a) * 12.7)); g.lineTo(P(Math.cos(a) * (i % 4 ? 13.0 : 13.3)), P(Math.sin(a) * (i % 4 ? 13.0 : 13.3))); g.stroke(); }
+    // eight-point rosette at the centre
+    g.beginPath(); for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2, l = i % 2 ? 0.35 : (i % 4 ? 0.85 : 1.25); g.lineTo(P(Math.cos(a) * l), P(Math.sin(a) * l)); } g.closePath();
+    if (isGlow) g.fill(); else { g.lineWidth = 0.05 * S; g.stroke(); }
+  });
+  // the fracture of time: a jagged crack corner to corner, charred lips, gold body, ivory core
+  const fr = mulberry32(9), path = [];
+  for (let t = 0; t <= 1.0001; t += 0.025) { const bx = -5.2 + t * 9.6, bz = -(R + 0.5) + t * (2 * R + 1); path.push([bx + Math.sin(t * 11) * 0.6 + (fr() - 0.5) * 0.7, bz]); }
+  const branches = [];
+  for (const i of [9, 17, 26, 33]) { const [x0, z0] = path[i], b = [[x0, z0]]; let a = (fr() > 0.5 ? 0 : Math.PI) + (fr() - 0.5) * 0.8, x = x0, z = z0; for (let s = 0; s < 6; s++) { a += (fr() - 0.5) * 0.9; x += Math.cos(a) * 0.5; z += Math.sin(a) * 0.5; b.push([x, z]); } branches.push(b); }
+  const stroke = (g, pts, w, col) => { g.strokeStyle = col; g.lineWidth = w * S; g.lineJoin = g.lineCap = 'round'; g.beginPath(); pts.forEach(([x, z], i) => i ? g.lineTo(P(x), P(z)) : g.moveTo(P(x), P(z))); g.stroke(); };
+  stroke(mc, path, 0.42, 'rgba(10,8,22,0.9)'); branches.forEach(b => stroke(mc, b, 0.2, 'rgba(10,8,22,0.85)'));
+  stroke(mc, path, 0.16, '#e2a650'); branches.forEach(b => stroke(mc, b, 0.07, '#d8983e'));
+  stroke(mc, path, 0.05, '#fff2d0');
+  stroke(gc, path, 0.2, 'rgba(255,170,70,0.85)'); branches.forEach(b => stroke(gc, b, 0.08, 'rgba(255,170,70,0.7)'));
+  stroke(gc, path, 0.06, '#fff4dc');
+  return { map, glow };
+}
+
+// ---- small station dial: dark disc, brass rings, rune ticks (dim; must not read as a safe/danger zone) ----
+function paintStation(N) {
+  const [c, g] = canvas2d(N), S = N / 2; g.fillStyle = '#1a2142'; g.fillRect(0, 0, N, N);
+  g.translate(S, S); g.strokeStyle = '#b88a48'; g.fillStyle = '#b88a48';
+  for (const [r, w] of [[0.94, 0.03], [0.74, 0.02], [0.5, 0.025], [0.18, 0.02]]) { g.lineWidth = w * S; g.beginPath(); g.arc(0, 0, r * S, 0, Math.PI * 2); g.stroke(); }
+  for (let i = 0; i < 24; i++) { const a = i / 24 * Math.PI * 2; g.lineWidth = 0.015 * S; g.beginPath(); g.moveTo(Math.cos(a) * 0.76 * S, Math.sin(a) * 0.76 * S); g.lineTo(Math.cos(a) * (i % 2 ? 0.84 : 0.92) * S, Math.sin(a) * (i % 2 ? 0.84 : 0.92) * S); g.stroke(); }
+  for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; g.beginPath(); g.arc(Math.cos(a) * 0.62 * S, Math.sin(a) * 0.62 * S, 0.035 * S, 0, Math.PI * 2); g.fill(); }
+  return c;
+}
+
+// ---- renderer, scene, camera ----
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('view'), antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1;
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x2b1d5c, 0.0085);
+const camera = new THREE.PerspectiveCamera(44, 1, 0.1, 1200);
+
+const stoneM = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.9, metalness: 0, flatShading: true, ...o });
+const brassM = new THREE.MeshStandardMaterial({ color: 0xc8954a, roughness: 0.38, metalness: 0.8, emissive: 0x2a1606, emissiveIntensity: 0.3 });
+const bronzeM = new THREE.MeshStandardMaterial({ color: 0xb08850, roughness: 0.42, metalness: 0.7, emissive: 0x3a2410, emissiveIntensity: 0.55, side: THREE.DoubleSide });
+const ironM = new THREE.MeshStandardMaterial({ color: 0x241f36, roughness: 0.55, metalness: 0.6 });
+const goldGlow = k => new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffb85a).multiplyScalar(k), toneMapped: false });
+function add(geo, mat, parent, pos, rot, shadow = true) { const m = new THREE.Mesh(geo, mat); m.castShadow = m.receiveShadow = shadow; if (pos) m.position.set(...pos); if (rot) m.rotation.set(...rot); parent.add(m); return m; }
+// prefab-style roots, named as the Unity handoff suggests
+const arena = new THREE.Group(); arena.name = 'LB_ENV_ShatteredHour_Arena'; scene.add(arena);
+const bellRoot = new THREE.Group(); bellRoot.name = 'LB_ENV_FinalToll_BrokenBell'; scene.add(bellRoot);
+const anim = [];
+
+// ---- the void: indigo-violet nebula dome with stars, and a slow vortex far below ----
+const dome = new THREE.Mesh(new THREE.SphereGeometry(600, 48, 32), new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false, uniforms: { t: { value: 0 } },
+  vertexShader: 'varying vec3 vD; void main(){ vD = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }',
+  fragmentShader: `varying vec3 vD; uniform float t;
+    float h(vec3 p){ return fract(sin(dot(p, vec3(127.1,311.7,74.7)))*43758.5453); }
+    float n(vec3 p){ vec3 i=floor(p), f=fract(p); f=f*f*(3.-2.*f);
+      return mix(mix(mix(h(i),h(i+vec3(1,0,0)),f.x),mix(h(i+vec3(0,1,0)),h(i+vec3(1,1,0)),f.x),f.y),
+                 mix(mix(h(i+vec3(0,0,1)),h(i+vec3(1,0,1)),f.x),mix(h(i+vec3(0,1,1)),h(i+vec3(1,1,1)),f.x),f.y),f.z); }
+    float fbm(vec3 p){ float a=.5, s=0.; for(int i=0;i<5;i++){ s+=a*n(p); p*=2.03; a*=.5; } return s; }
+    void main(){ vec3 d = normalize(vD); float y = d.y;
+      vec3 deep = vec3(.02,.015,.07), mid = vec3(.12,.06,.28), hi = vec3(.62,.34,.95);
+      vec3 c = mix(deep, mid, smoothstep(-.9, .05, y)); c = mix(c, deep*1.4, smoothstep(.15, .9, y));
+      float neb = fbm(d*3. + vec3(0., t*.01, 0.)), wisp = fbm(d*7. - neb*1.6);
+      c += hi * pow(neb, 3.5) * 1.4 + vec3(.3,.2,.75) * pow(wisp, 4.) * 1.1;
+      float s = h(floor(d*420.)); c += vec3(1.,.9,.95) * step(.9975, s) * (.6 + .4*sin(t*2.+s*90.));
+      gl_FragColor = vec4(c, 1.); }` }));
+scene.add(dome);
+const vortex = new THREE.Mesh(new THREE.CircleGeometry(160, 96), new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: { t: { value: 0 } },
+  vertexShader: 'varying vec2 vU; void main(){ vU = position.xy / 160.; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }',
+  fragmentShader: `varying vec2 vU; uniform float t;
+    float h(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
+    float n(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f); return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x),f.y); }
+    void main(){ float r = length(vU), a = atan(vU.y, vU.x);
+      float sw = a + 2.6/(r+.08) - t*.06;
+      float arms = n(vec2(sw*3., r*9.)) * .7 + n(vec2(sw*7., r*20.)) * .3;
+      float core = smoothstep(.22, 0., r);
+      vec3 c = mix(vec3(.32,.16,.62), vec3(.45,.55,1.), arms) * arms * 1.1 + vec3(.6,.55,1.) * core * 0.6;
+      gl_FragColor = vec4(c, smoothstep(1., .45, r) * (.55 + core)); }` }));
+vortex.rotation.x = -Math.PI / 2; vortex.position.y = -75; scene.add(vortex);
+
+// ---- platform: painted clock floor (exact collision circle), dark banded drum, jagged rock underside ----
+const H = R + 0.4, fp = paintFloor(2048, H);
+const floorM = new THREE.MeshStandardMaterial({ map: tex(fp.map), emissiveMap: tex(fp.glow), emissive: 0xffc078, emissiveIntensity: 1.1, roughness: 0.82, metalness: 0.05 });
+const floorGeo = new THREE.CircleGeometry(R, 128); { const uv = floorGeo.attributes.uv, p = floorGeo.attributes.position; for (let i = 0; i < p.count; i++) uv.setXY(i, (p.getX(i) + H) / (2 * H), 1 - (-p.getY(i) + H) / (2 * H)); }
+const floor = add(floorGeo, floorM, arena, [0, 0, 0], [-Math.PI / 2, 0, 0]); floor.name = 'Floor'; floor.castShadow = false;
+add(new THREE.TorusGeometry(R, 0.1, 8, 160), brassM, arena, [0, 0.02, 0], [Math.PI / 2, 0, 0]).name = 'BoundaryRim';
+add(new THREE.CylinderGeometry(R + 0.3, R + 0.15, 1.6, 96, 1, true), stoneM(0x2a2a44, { flatShading: false }), arena, [0, -0.8, 0]);
+add(new THREE.TorusGeometry(R + 0.32, 0.12, 6, 160), brassM, arena, [0, -0.35, 0], [Math.PI / 2, 0, 0]);
+{ const rock = add(new THREE.ConeGeometry(R + 0.2, 18, 11, 4), stoneM(0x262036), arena, [0, -10.6, 0], [Math.PI, 0.2, 0]);
+  const p = rock.geometry.attributes.position; for (let i = 0; i < p.count; i++) { const y = p.getY(i); if (y > -8.9 && y < 8.9) { const k = 0.75 + rnd() * 0.4; p.setX(i, p.getX(i) * k); p.setZ(i, p.getZ(i) * k); } } rock.geometry.computeVertexNormals(); }
+// the fissure leaks a little light down the drum where it exits the rim
+for (const [x, z] of [[-4.7, -R], [4.3, R]]) { const a = Math.atan2(z, x); add(new THREE.BoxGeometry(0.14, 1.5, 0.05), goldGlow(1.6), arena, [Math.cos(a) * (R + 0.31), -0.75, Math.sin(a) * (R + 0.31)], [0, -a + Math.PI / 2, 0], false); }
+
+// ---- broken low parapet around the rim (kept under 0.6 m so it never hides players) ----
+const wallM = stoneM(0x3b3a58), capM = stoneM(0x55546f);
+const OPEN = [Math.PI / 2, -Math.PI / 2, 0, Math.PI, Math.PI / 4, 3 * Math.PI / 4, -Math.PI / 4, -3 * Math.PI / 4]; // bridges + stations
+const near = (a, list, w) => list.some(b => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b))) < w);
+for (let i = 0; i < 72; i++) {
+  const a = i / 72 * Math.PI * 2; if (near(a, OPEN, 0.13) || hash(i, 3) < 0.18) continue;
+  const h = 0.32 + hash(i, 5) * 0.22, rr = R + 0.62;
+  add(new THREE.BoxGeometry(1.08, h, 0.5), wallM, arena, [Math.cos(a) * rr, h / 2, Math.sin(a) * rr], [0, -a + Math.PI / 2, 0]);
+  if (i % 6 === 0) { add(new THREE.BoxGeometry(0.62, 0.85, 0.62), capM, arena, [Math.cos(a) * rr, 0.42, Math.sin(a) * rr], [0, -a, 0]);
+    add(new THREE.CylinderGeometry(0.07, 0.07, 0.22, 6), new THREE.MeshStandardMaterial({ color: 0xe8dcc0 }), arena, [Math.cos(a) * rr, 0.96, Math.sin(a) * rr]);
+    add(new THREE.SphereGeometry(0.06, 6, 4), goldGlow(3), arena, [Math.cos(a) * rr, 1.12, Math.sin(a) * rr], null, false); }
+}
+// rubble chunks broken off the rim
+for (let i = 0; i < 40; i++) { const a = rnd() * Math.PI * 2, rr = R + 1 + rnd() * 2.5, s = 0.25 + rnd() * 0.5;
+  add(new THREE.DodecahedronGeometry(s, 0), wallM, arena, [Math.cos(a) * rr, -0.4 - rnd() * 2.5, Math.sin(a) * rr], [rnd() * 3, rnd() * 3, rnd() * 3]); }
+
+// ---- four peripheral ritual stations on the diagonals, joined to the rim by short bridges (decoration only) ----
+const stationTex = tex(paintStation(512));
+for (let i = 0; i < 4; i++) {
+  const a = Math.PI / 4 + i * Math.PI / 2, rs = R + 4.4, sx = Math.cos(a) * rs, sz = Math.sin(a) * rs, g = new THREE.Group(); g.name = `RitualStation_${i + 1}`; arena.add(g);
+  add(new THREE.BoxGeometry(2.2, 0.5, 3.0), stoneM(0x45445e), g, [Math.cos(a) * (R + 1.6), -0.27, Math.sin(a) * (R + 1.6)], [0, -a + Math.PI / 2, 0]);
+  add(new THREE.CylinderGeometry(2.5, 2.2, 1.2, 32), stoneM(0x2c2b45, { flatShading: false }), g, [sx, -0.62, sz]);
+  add(new THREE.CylinderGeometry(1.4, 0.2, 5, 7), stoneM(0x262036), g, [sx, -3.7, sz], [Math.PI, 0, 0]);
+  add(new THREE.CircleGeometry(2.3, 64), new THREE.MeshStandardMaterial({ map: stationTex, emissiveMap: stationTex, emissive: 0xffb060, emissiveIntensity: 0.08, roughness: 0.6 }), g, [sx, 0.005, sz], [-Math.PI / 2, 0, a]);
+  add(new THREE.TorusGeometry(2.4, 0.09, 8, 80), brassM, g, [sx, 0.03, sz], [Math.PI / 2, 0, 0]);
+  // a dormant upright dial frame at the back of each station, with three candles
+  const back = new THREE.Group(); back.position.set(Math.cos(a) * (rs + 1.8), 0, Math.sin(a) * (rs + 1.8)); back.rotation.y = -a + Math.PI / 2; g.add(back);
+  add(new THREE.TorusGeometry(1.1, 0.1, 6, 40), brassM, back, [0, 1.5, 0]);
+  add(new THREE.TorusGeometry(0.75, 0.05, 6, 40), brassM, back, [0, 1.5, 0]);
+  add(new THREE.BoxGeometry(0.14, 1.0, 0.14), ironM, back, [0, 0.45, 0]);
+  for (const cx of [-1.6, 1.6, 0]) { const cz = cx ? -0.2 : 0.55, cy = cx ? 0 : 0;
+    add(new THREE.CylinderGeometry(0.08, 0.08, 0.35 + Math.abs(cx) * 0.1, 6), new THREE.MeshStandardMaterial({ color: 0xe8dcc0 }), back, [cx, cy + 0.2, cz]);
+    add(new THREE.SphereGeometry(0.07, 6, 4), goldGlow(3), back, [cx, cy + 0.48, cz], null, false); }
+}
+
+// ---- cardinal walkways: east/west and front run off into ruin; the back one climbs toward the bell ----
+for (const a of [0, Math.PI, Math.PI / 2, -Math.PI / 2]) {
+  const g = new THREE.Group(); g.rotation.y = -a; arena.add(g); const back = a === -Math.PI / 2, len = back ? 7.5 : 6;
+  add(new THREE.BoxGeometry(len, 0.6, 3.4), stoneM(0x45445e), g, [R + len / 2 + 0.2, -0.3, 0]);
+  add(new THREE.BoxGeometry(len, 0.15, 3.0), stoneM(0x5a5e7a), g, [R + len / 2 + 0.2, 0.01, 0]);
+  for (const s of [-1, 1]) add(new THREE.BoxGeometry(len, 0.4, 0.3), wallM, g, [R + len / 2 + 0.2, 0.2, s * 1.65]);
+  add(new THREE.BoxGeometry(2.4, 6, 2.4), stoneM(0x262036), g, [R + len - 0.6, -3.6, 0]);
+  if (back) for (let s = 0; s < 4; s++) add(new THREE.BoxGeometry(1.2, 0.4 + s * 0.4, 3.0 - s * 0.3), stoneM(0x3b3a58), g, [R + len + 0.6 + s * 1.2, (0.4 + s * 0.4) / 2, 0]);
+  else add(new THREE.DodecahedronGeometry(0.9, 0), wallM, g, [R + len + 1.4, -1.2, 0.6], [1, 2, 0]);
+}
+
+// ---- the broken bell: monumental cracked bronze bell behind and above, tilted toward the floor, lit from inside ----
+const BELL = [[0, 10.4], [1.6, 10.3], [2.7, 9.8], [3.3, 8.8], [3.5, 7.2], [3.6, 5.4], [3.95, 3.7], [4.6, 2.2], [5.6, 1.0], [6.6, 0.25], [6.9, 0], [6.7, -0.12],
+  [6.0, 0.15], [5.0, 0.9], [4.1, 2.1], [3.45, 3.7], [3.1, 5.6], [2.95, 7.4], [2.6, 8.9], [1.6, 9.5], [0, 9.65]].map(([x, y]) => new THREE.Vector2(x, y));
+function bellMesh(gap, mat) { return new THREE.Mesh(new THREE.LatheGeometry(BELL, 64, gap / 2, Math.PI * 2 - gap), mat); }
+// Lathe angle phi puts a point at (sin phi, cos phi) * r, so phi = 0 faces the camera (+z). GAP is where the missing wedge faces.
+const GAP = 0.5, GAPW = 0.55;
+const bell = new THREE.Group(); bell.position.set(0, 2.0, -23); bell.rotation.x = -0.38; bell.scale.setScalar(1.45); bellRoot.add(bell);
+const bellBody = bellMesh(GAPW, bronzeM); bellBody.rotation.y = GAP; bellBody.castShadow = true; bell.add(bellBody);
+{ // gold bands around the waist and lip, the broken shard drifting away from the gap, glowing cracks
+  for (const [r, y] of [[6.75, 0.15], [4.05, 3.4], [3.55, 7.6]]) { const g = new THREE.Group(); g.rotation.y = GAP - (Math.PI / 2 + GAPW / 2); g.position.y = y; bell.add(g);
+    add(new THREE.TorusGeometry(r, 0.14, 6, 64, Math.PI * 2 - GAPW), brassM, g, null, [Math.PI / 2, 0, 0]); }
+  const shard = new THREE.Mesh(new THREE.LatheGeometry(BELL.slice(4, 17), 8, -0.22, 0.44), bronzeM); shard.scale.setScalar(0.7); shard.position.set(Math.sin(GAP + 0.6) * 5.5, -2.5, Math.cos(GAP + 0.6) * 5.5); shard.rotation.set(0.6, GAP + 0.5, -0.5); bell.add(shard);
+  const crackM = goldGlow(3.0);
+  for (let c = 0; c < 9; c++) { let a = GAP + (rnd() < 0.5 ? -1 : 1) * (GAPW / 2 + rnd() * 0.9), y = 0.4 + rnd() * 2; const pts = [];
+    for (let s = 0; s < 7; s++) { y += 0.6 + rnd() * 0.6; a += (rnd() - 0.5) * 0.25; const pr = BELL.slice(0, 11).reduce((p, q) => Math.abs(q.y - y) < Math.abs(p.y - y) ? q : p).x + 0.03; pts.push(new THREE.Vector3(Math.sin(a) * pr, y, Math.cos(a) * pr)); }
+    bell.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 24, 0.05, 4), crackM)); }
+  // crown loop and chains rising out of frame
+  add(new THREE.TorusGeometry(1.3, 0.35, 8, 24), bronzeM, bell, [0, 11.2, 0]);
+  for (const s of [-1, 1]) add(new THREE.CylinderGeometry(0.16, 0.16, 60, 6), ironM, bell, [s * 0.9, 41, 0], [0, 0, s * 0.05]);
+  // light inside: an emissive inner shell, a warm point light, a soft shaft spilling down into the void
+  const inner = new THREE.Mesh(new THREE.ConeGeometry(5.6, 8, 32, 1, true), new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffa850).multiplyScalar(1.6), side: THREE.BackSide, toneMapped: false })); inner.position.y = 4.4; bell.add(inner);
+  const glowL = new THREE.PointLight(0xffb060, 220, 50, 1.8); glowL.position.set(0, -1, 0); bell.add(glowL);
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(6.4, 12, 40, 32, 1, true), new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+    vertexShader: 'varying float vY; varying vec3 vN, vV; void main(){ vY = uv.y; vec4 w = modelViewMatrix*vec4(position,1.); vN = normalize(normalMatrix*normal); vV = normalize(-w.xyz); gl_Position = projectionMatrix*w; }',
+    fragmentShader: 'varying float vY; varying vec3 vN, vV; void main(){ float f = pow(abs(dot(vN, vV)), 1.5); gl_FragColor = vec4(vec3(1., .7, .35) * .1 * f * vY * vY, 1.); }' }));
+  shaft.position.y = -20; bell.add(shaft);
+}
+// bell drift: a slow breath of motion
+anim.push(t => { bell.rotation.z = Math.sin(t * 0.25) * 0.025; bell.position.y = 3.0 + Math.sin(t * 0.4) * 0.25; });
+
+// ---- suspended choir architecture: ruined gothic pillars and arches, banners, glowing slits (back and sides only) ----
+const pillarM = stoneM(0x2f2c48), pillarHiM = stoneM(0x4a4766);
+const bannerTex = (() => { const [c, g] = canvas2d(128, 384); g.fillStyle = '#1b1f4a'; g.fillRect(0, 0, 128, 384);
+  g.strokeStyle = '#c99a50'; g.fillStyle = '#c99a50'; g.lineWidth = 5; g.strokeRect(8, 8, 112, 330);
+  g.beginPath(); g.arc(64, 120, 28, 0, Math.PI * 2); g.stroke(); g.beginPath(); g.arc(64, 120, 6, 0, Math.PI * 2); g.fill();
+  for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; g.beginPath(); g.moveTo(64 + Math.cos(a) * 34, 120 + Math.sin(a) * 34); g.lineTo(64 + Math.cos(a) * 46, 120 + Math.sin(a) * 46); g.stroke(); }
+  g.beginPath(); g.arc(64, 230, 22, Math.PI * 0.2, Math.PI * 1.8); g.stroke();
+  g.clearRect(0, 344, 128, 40); g.fillStyle = '#1b1f4a'; g.beginPath(); g.moveTo(0, 344); g.lineTo(128, 344); g.lineTo(64, 384); g.fill(); return tex(c); })();
+const bannerM = new THREE.MeshStandardMaterial({ map: bannerTex, side: THREE.DoubleSide, roughness: 0.85, transparent: true, alphaTest: 0.5 });
+const PILLARS = [];
+for (let i = 0; i < 11; i++) {
+  const a = -Math.PI / 2 + (i - 5) / 11 * Math.PI * 1.5, rr = 29 + hash(i, 1) * 5; // spread across the back half and the sides
+  const x = Math.cos(a) * rr, z = Math.sin(a) * rr; if (z > 6) continue;
+  const broken = hash(i, 2) < 0.35, top = broken ? 4 + hash(i, 4) * 10 : 34, bottom = -38 - hash(i, 6) * 10, h = top - bottom;
+  const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = -a + Math.PI / 2; arena.add(g); PILLARS.push([x, z, top, broken, a]);
+  add(new THREE.BoxGeometry(2.2, h, 2.2), pillarM, g, [0, bottom + h / 2, 0]);
+  for (const s of [-1, 1]) add(new THREE.BoxGeometry(0.5, h, 0.9), pillarHiM, g, [s * 1.25, bottom + h / 2, 0]);
+  for (let y = bottom + 6; y < top - 1; y += 9) add(new THREE.BoxGeometry(2.8, 0.6, 2.8), pillarHiM, g, [0, y, 0]);
+  add(new THREE.BoxGeometry(0.12, Math.min(h - 6, 24), 0.05), goldGlow(1.3 + hash(i, 9)), g, [0, Math.max(bottom + 3, top - 26) + Math.min(h - 6, 24) / 2, 1.13], null, false);
+  if (broken) for (let k = 0; k < 4; k++) add(new THREE.BoxGeometry(0.7 + rnd(), 0.6 + rnd() * 1.5, 0.7 + rnd()), pillarM, g, [(rnd() - 0.5) * 1.6, top + 0.3, (rnd() - 0.5) * 1.6], [rnd() * 0.4, rnd(), rnd() * 0.4]);
+  if (hash(i, 7) > 0.45) { const b = add(new THREE.PlaneGeometry(1.6, 4.8), bannerM, g, [0, Math.min(top, 14) - 4, 1.25], null, false); b.userData.sway = rnd() * 6; anim.push(t => { b.rotation.x = Math.sin(t * 0.8 + b.userData.sway) * 0.05; }); }
+}
+// arches spanning neighbouring whole pillars
+for (let i = 0; i + 1 < PILLARS.length; i++) {
+  const [x0, z0, t0, b0] = PILLARS[i], [x1, z1, t1, b1] = PILLARS[i + 1]; if (b0 || b1) continue;
+  const mx = (x0 + x1) / 2, mz = (z0 + z1) / 2, span = Math.hypot(x1 - x0, z1 - z0), a = Math.atan2(z1 - z0, x1 - x0);
+  const arch = add(new THREE.TorusGeometry(span / 2, 0.55, 6, 20, Math.PI), pillarHiM, arena, [mx, 16, mz], [0, -a, 0]);
+  add(new THREE.BoxGeometry(span, 1.2, 1.4), pillarM, arena, [mx, 16 + span / 2 + 0.6, mz], [0, -a, 0]);
+  arch.castShadow = false;
+}
+
+// ---- hanging bells on chains around the abyss ----
+for (let i = 0; i < 12; i++) {
+  const a = -Math.PI / 2 + (i / 11 - 0.5) * Math.PI * 1.7, rr = 18 + rnd() * 12, x = Math.cos(a) * rr, z = Math.sin(a) * rr; if (z > 9) continue;
+  const s = 0.22 + rnd() * 0.18, y = 3 + rnd() * 12, g = new THREE.Group(); g.position.set(x, y + 60 * 0.5, z); arena.add(g);
+  add(new THREE.CylinderGeometry(0.08, 0.08, 60, 5), ironM, g, [0, 0, 0], null, false);
+  const b = bellMesh(0, bronzeM); b.scale.setScalar(s * 0.85); b.position.y = -30 - 10.4 * s; b.castShadow = true; g.add(b);
+  add(new THREE.TorusGeometry(6.8 * s, 0.03 + s * 0.1, 5, 32), brassM, g, [0, -30 - 10.4 * s + 0.1, 0], [Math.PI / 2, 0, 0]);
+  const ph = rnd() * 6; anim.push(t => { g.rotation.z = Math.sin(t * 0.5 + ph) * 0.012; g.rotation.x = Math.cos(t * 0.37 + ph) * 0.01; });
+}
+
+// ---- fractured clock rings turning in the void ----
+function clockRing(r, w, ticks, arc = Math.PI * 2) {
+  const g = new THREE.Group();
+  add(new THREE.TorusGeometry(r, w, 6, 128, arc), brassM, g, null, null, false);
+  add(new THREE.TorusGeometry(r - w * 3, w * 0.45, 5, 128, arc), brassM, g, null, null, false);
+  for (let i = 0; i < ticks; i++) { const a = i / ticks * Math.PI * 2; if (a > arc) break; add(new THREE.BoxGeometry(w * (i % 5 ? 1.2 : 2.2), w * 4, w * 1.2), brassM, g, [Math.cos(a) * (r - w * 1.5), Math.sin(a) * (r - w * 1.5), 0], [0, 0, a + Math.PI / 2], false); }
+  return g;
+}
+const rings = [
+  [clockRing(21, 0.28, 60), [0, -3.5, 0], [Math.PI / 2, 0, 0], 0.02],             // girdle around the platform, below the floor
+  [clockRing(15, 0.32, 60, Math.PI * 1.6), [0, 10, -34], [0.15, 0, 0.4], -0.03],   // broken ring framing the bell
+  [clockRing(10.5, 0.22, 48), [-6, 13, -31], [0.35, 0.3, 0], 0.05],
+  [clockRing(9, 0.2, 36, Math.PI * 1.3), [-31, 6, -10], [0.2, 1.2, 0.3], 0.04],
+  [clockRing(11, 0.22, 60), [32, 2, -14], [-0.1, -1.0, 0.2], -0.035],
+  [clockRing(6, 0.16, 24, Math.PI * 1.5), [24, -10, 14], [1.1, 0.4, 0], 0.06],
+];
+for (const [g, p, rot, sp] of rings) { g.position.set(...p); g.rotation.set(...rot); arena.add(g); const inner = g; anim.push(t => { inner.rotation.z = rot[2] + t * sp; }); }
+
+// ---- floating debris and golden light shafts ----
+const debrisM = stoneM(0x2a2540), debrisHiM = stoneM(0x45405e);
+for (let i = 0; i < 230; i++) {
+  const a = rnd() * Math.PI * 2, rr = 17 + Math.pow(rnd(), 0.8) * 60, y = -45 + rnd() * 60, s = 0.25 + Math.pow(rnd(), 3) * 2.6;
+  if (Math.sin(a) * rr > 12 && y > -6) continue; // keep the camera side of the platform clear
+  const m = add(new THREE.DodecahedronGeometry(s, 0), rnd() < 0.3 ? debrisHiM : debrisM, arena, [Math.cos(a) * rr, y, Math.sin(a) * rr], [rnd() * 3, rnd() * 3, rnd() * 3], s > 1);
+  const ph = rnd() * 6, y0 = y, spin = (rnd() - 0.5) * 0.2; anim.push(t => { m.position.y = y0 + Math.sin(t * 0.3 + ph) * 0.4; m.rotation.y += spin * 0.016; });
+}
+const shaftM = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+  vertexShader: 'varying vec2 vU; void main(){ vU = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }',
+  fragmentShader: 'varying vec2 vU; void main(){ float x = 1. - abs(vU.x*2.-1.); gl_FragColor = vec4(vec3(1., .72, .38) * .16 * x*x * smoothstep(0., .4, vU.y) * smoothstep(1., .7, vU.y), 1.); }' });
+for (const [x, z, w] of [[-20, -20, 3], [18, -24, 2.5], [-28, 2, 2], [27, -4, 2.2]]) { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, 90), shaftM); m.position.set(x, -10, z); m.lookAt(0, -10, 30); scene.add(m); }
+
+// ---- lights: cool violet ambience, warm key from the bell side, cobalt fill ----
+scene.add(new THREE.HemisphereLight(0x8c7ae0, 0x1a1030, 0.85));
+const key = new THREE.DirectionalLight(0xffcf96, 2.0); key.position.set(-8, 30, -22); key.castShadow = true;
+key.shadow.mapSize.set(4096, 4096); Object.assign(key.shadow.camera, { left: -24, right: 24, top: 24, bottom: -24, near: 1, far: 90 }); key.shadow.bias = -0.0004; scene.add(key);
+const fill = new THREE.DirectionalLight(0x6f7cff, 0.7); fill.position.set(18, 14, 24); scene.add(fill);
+
+// ---- a Vanguard for scale (characters session's model, loaded read-only) ----
+window.THREE = THREE;
+const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: o.metal ? 0.4 : 0.75, metalness: o.metal ? 0.7 : 0, side: o.side || THREE.FrontSide });
+const Gl = (c, k) => new THREE.MeshBasicMaterial({ color: new THREE.Color(c).multiplyScalar(k), toneMapped: false });
+const hero = new THREE.Group(); hero.position.set(-4.5, 0, 4.2); hero.rotation.y = Math.PI * 0.85; scene.add(hero);
+await new Promise(res => { const s = document.createElement('script'); s.src = '../../vanguard-model.js'; s.onload = res; s.onerror = res; document.head.appendChild(s); });
+if (typeof window.buildVanguardModel === 'function') { const v = window.buildVanguardModel(M, Gl); const obj = v.root || v; obj.scale.setScalar(1.2); obj.traverse(o => { if (o.isMesh) o.castShadow = true; }); hero.add(obj); }
+else { const c = new THREE.Mesh(new THREE.CapsuleGeometry(0.35, 1, 4, 12), M(0x2050cc)); c.position.y = 0.85; hero.add(c); }
+
+// ---- post ----
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.5, 0.5, 0.92));
+composer.addPass(new OutputPass());
+function frame() {
+  const w = innerWidth, h = innerHeight; renderer.setSize(w, h); composer.setSize(w, h); camera.aspect = w / h;
+  if (VIEW === 'cine') { camera.fov = 48; camera.position.set(0, 25, 36); camera.lookAt(0, 3, -8); }
+  else { camera.fov = 44; camera.position.set(0, 29, 22.5); camera.lookAt(0, 0, 1.0); } // same as the game camera in index.html
+  camera.updateProjectionMatrix();
+}
+addEventListener('resize', frame); frame();
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const tt = clock.getElapsedTime();
+  dome.material.uniforms.t.value = tt; vortex.material.uniforms.t.value = tt;
+  for (const f of anim) f(tt);
+  composer.render();
+});
+</script>
+</body>
+</html>

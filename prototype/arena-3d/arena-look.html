@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dais Look Study</title>
+<style>
+html, body { margin: 0; height: 100%; overflow: hidden; background: #2a2552; }
+canvas { display: block; }
+#vig { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 50%, transparent 55%, #140f2e88 100%); }
+#tabs { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; gap: 8px; font-family: Georgia, serif; }
+#tabs a { padding: 7px 14px; font-size: 15px; color: #f3ead6; text-decoration: none; background: #0d1422e0; border: 1px solid #c38d4688; border-radius: 8px; }
+#tabs a.on { background: #c38d46; color: #101825; }
+body.clean #tabs { display: none; }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas><div id="vig"></div>
+<div id="tabs"><a href="?view=keyart">Key art angle</a><a href="?view=game">Game camera</a></div>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+// Look study: the Bellkeeper's Dais rebuilt from Reference/LAST-BELL-KEY-ART-ARENA.png. A floating square
+// stone platform over a violet sea of clouds at sunset: worn lavender flagstones, a large indigo clock dial
+// with gold numerals under the boss, a broken stone parapet, warm lanterns, navy banners with gold clock
+// emblems, floating debris and domed sky islands. ?view=keyart copies the key art's three-quarter angle;
+// ?view=game uses the gameplay camera. The arena itself lives in arena-env.js (shared with index.html).
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const Q = new URLSearchParams(location.search), VIEW = Q.get('view') || 'keyart';
+if (Q.has('clean')) document.body.classList.add('clean');
+document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.search === `?view=${VIEW}`));
+const tex = (c, srgb = true) => { const t = new THREE.CanvasTexture(c); if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; };
+const canvas2d = (w, h = w) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return [c, c.getContext('2d')]; };
+const loadScript = src => new Promise(res => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = res; document.head.appendChild(s); });
+
+// ---- renderer, scene, the arena ----
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('view'), antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.12;
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 900);
+window.THREE = THREE;
+await loadScript('arena-env.js');
+const env = window.buildArenaEnv(THREE, scene, { noClouds: Q.has('noclouds') });
+
+// Matte backdrop: painted pieces of the key art's city (arena-backdrop-data.js) on cards in two rings around the
+// platform, every card facing the middle, edges feathered into the sky. The far ring makes the skyline for the
+// key-art view; the near, lower ring fills the edges of the steep gameplay view. ?matte turns this on (off by default; the 3D city replaces it).
+const BACKDROP = Q.has('matte');
+if (BACKDROP) {
+  await loadScript('arena-backdrop-data.js');
+  const src = window.ARENA_BACKDROP || {}, pieces = {};
+  for (const [k, url] of Object.entries(src)) {
+    const img = new Image(); img.src = url; await img.decode().catch(() => {}); if (!img.width) continue;
+    const w = img.width, h = img.height, [c, g] = canvas2d(w, h), [m, mg] = canvas2d(w, h);
+    g.drawImage(img, 0, 0);
+    let grd = mg.createLinearGradient(0, 0, w, 0); grd.addColorStop(0, 'rgba(0,0,0,0)'); grd.addColorStop(0.24, '#000'); grd.addColorStop(0.76, '#000'); grd.addColorStop(1, 'rgba(0,0,0,0)');
+    mg.fillStyle = grd; mg.fillRect(0, 0, w, h); mg.globalCompositeOperation = 'destination-in';
+    grd = mg.createLinearGradient(0, 0, 0, h); grd.addColorStop(0, 'rgba(0,0,0,0)'); grd.addColorStop(0.18, '#000'); grd.addColorStop(0.6, '#000'); grd.addColorStop(1, 'rgba(0,0,0,0)');
+    mg.fillStyle = grd; mg.fillRect(0, 0, w, h);
+    g.globalCompositeOperation = 'destination-in'; g.drawImage(m, 0, 0);
+    pieces[k] = { map: tex(c), aspect: h / w };
+  }
+  // [piece, angle in degrees (0 = +x, 90 = +z toward the camera), radius, height of the card centre, width, mirrored]
+  const LAYOUT = [
+    ['city', -50, 170, -18, 165, false], ['cathedral', -95, 175, -12, 105, false], ['isle', -140, 165, -22, 120, true],
+    ['city', 175, 170, -20, 160, true], ['isle', 130, 160, -26, 115, false], ['cathedral', 75, 170, -24, 100, true],
+    ['isle', 25, 165, -22, 120, false], ['cathedral', -10, 175, -16, 100, false],
+    ['isle', -60, 62, -34, 52, false], ['cathedral', -120, 66, -36, 46, true], ['isle', 180, 64, -36, 54, true],
+    ['cathedral', 0, 66, -36, 46, false], ['isle', 140, 60, -40, 50, false], ['isle', 40, 60, -40, 50, true],
+  ];
+  for (const [k, deg, r, y, w, flip] of LAYOUT) {
+    const p = pieces[k]; if (!p) continue; const a = deg * Math.PI / 180, near = r < 100;
+    const card = new THREE.Mesh(new THREE.PlaneGeometry(1, p.aspect), new THREE.MeshBasicMaterial({ map: p.map, transparent: true, depthWrite: false, fog: false, toneMapped: false, side: THREE.DoubleSide }));
+    card.position.set(Math.cos(a) * r, y, Math.sin(a) * r); card.scale.set(flip ? -w : w, w, 1);
+    card.lookAt(0, near ? 18 : y + 8, 0); card.renderOrder = near ? -1 : -2; scene.add(card);
+  }
+}
+
+// ---- the Vanguard for scale (characters session's model, loaded read-only) ----
+const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: o.metal ? 0.4 : 0.75, metalness: o.metal ? 0.7 : 0, side: o.side || THREE.FrontSide });
+const Gl = (c, k) => new THREE.MeshBasicMaterial({ color: new THREE.Color(c).multiplyScalar(k), toneMapped: false });
+const hero = new THREE.Group(); hero.position.set(-4.5, 0, 4.8); hero.rotation.y = Math.PI * 0.78; scene.add(hero);
+await new Promise(res => { const s = document.createElement('script'); s.src = 'vanguard-model.js'; s.onload = res; s.onerror = res; document.head.appendChild(s); });
+if (typeof window.buildVanguardModel === 'function') { const v = window.buildVanguardModel(M, Gl); const obj = v.root || v; obj.scale.setScalar(1.2); obj.traverse(o => { if (o.isMesh) o.castShadow = true; }); hero.add(obj); }
+else { const c = new THREE.Mesh(new THREE.CapsuleGeometry(0.35, 1, 4, 12), M(0x2050cc)); c.position.y = 0.85; hero.add(c); }
+
+// ---- post ----
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.4, 0.45, 0.97));
+composer.addPass(new OutputPass());
+
+function frame() {
+  const w = innerWidth, h = innerHeight; renderer.setSize(w, h); composer.setSize(w, h); camera.aspect = w / h;
+  if (VIEW === "game") { camera.fov = 44; camera.position.set(0, 29, 22.5); camera.lookAt(0, 0, 1.0); }
+  else { camera.fov = 42; camera.position.set(-23, 16.5, 25); camera.lookAt(2.5, 0.5, -4); }
+  camera.updateProjectionMatrix();
+}
+addEventListener('resize', frame); frame();
+// ?export: write the solid arena (env.root, no lights or sprites) to a binary glTF for Unity, plus the floor's
+// height map (glTF has no bump maps; Unity turns it into a normal map). tools/export-arena-glb.mjs collects both
+// from window.__arenaExport through the DevTools protocol.
+if (Q.has('export')) try {
+  const { GLTFExporter } = await import('three/addons/exporters/GLTFExporter.js');
+  const copy = env.root.clone(true), drop = [];
+  copy.traverse(o => {
+    if (o.isLight || o.isSprite) drop.push(o);
+    else if (o.isMesh && o.material && o.material.flatShading) { o.geometry = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone(); o.geometry.computeVertexNormals(); }
+  });
+  drop.forEach(o => o.parent.remove(o));
+  const glb = await new GLTFExporter().parseAsync(copy, { binary: true, maxTextureSize: 4096 });
+  const bytes = new Uint8Array(glb); let bin = ''; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  window.__arenaExport = { glb: btoa(bin), bump: env.paving.bump.toDataURL('image/png').split(',')[1] };
+} catch (e) { window.__arenaExport = { error: String(e && e.stack || e) }; }
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const dt = clock.getDelta(); env.update(clock.elapsedTime, dt, Q.has('quiet'));
+  composer.render();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verdant Chimes Arena</title>
+<style>
+html, body { margin: 0; height: 100%; overflow: hidden; background: #0e3338; }
+canvas { display: block; }
+#tabs { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; gap: 8px; font-family: Georgia, serif; }
+#tabs a { padding: 7px 14px; font-size: 15px; color: #e6f3ea; text-decoration: none; background: #0b1c1ce0; border: 1px solid #5fd8c888; border-radius: 8px; }
+#tabs a.on { background: #5fd8c8; color: #0b1c1c; }
+body.clean #tabs { display: none; }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div id="tabs"><a href="?view=game">Game camera</a><a href="?view=angle">Angle view</a><a href="?view=top">Top view</a></div>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+// Preview and Unity export of the Verdant Chimes arena (verdant-arena.js). ?view=game|angle|top, ?quiet, ?rings, ?clean.
+// ?export: bakes instanced foliage into plain meshes, swaps every material for a named MeshStandard/MeshBasic stand-in
+// (the Unity builder remaps them by name to LastBell/Area3 shaders), drops preview-only objects, and leaves
+// window.__arenaExport = { glb, floorMap, floorHeight, floorMask } for export-glb.mjs to collect.
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+
+const Q = new URLSearchParams(location.search), VIEW = Q.get('view') || 'game', EXPORT = Q.has('export');
+if (Q.has('clean') || EXPORT) document.body.classList.add('clean');
+document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.search === `?view=${VIEW}`));
+const loadScript = src => new Promise(res => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = res; document.head.appendChild(s); });
+
+const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('view'), antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1;
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(44, 1, 0.1, 900);
+await loadScript('verdant-arena.js');
+const env = window.buildVerdantArena(THREE, scene, { floorRes: EXPORT ? 4096 : 2048 });
+
+if (EXPORT) {
+  try {
+    const { GLTFExporter } = await import('three/addons/exporters/GLTFExporter.js');
+    const root = env.root;
+    // instanced foliage -> one merged mesh per kind
+    for (const im of env.instanced) {
+      const src = im.geometry, n = src.attributes.position.count, M = new THREE.Matrix4(), N3 = new THREE.Matrix3(), idx = src.index;
+      const pos = new Float32Array(n * 3 * im.count), nor = new Float32Array(n * 3 * im.count), col = src.attributes.color ? new Float32Array(n * 3 * im.count) : null, v = new THREE.Vector3();
+      for (let i = 0; i < im.count; i++) { im.getMatrixAt(i, M); N3.getNormalMatrix(M);
+        for (let k = 0; k < n; k++) { v.fromBufferAttribute(src.attributes.position, k).applyMatrix4(M); pos.set([v.x, v.y, v.z], (i * n + k) * 3);
+          v.fromBufferAttribute(src.attributes.normal, k).applyMatrix3(N3).normalize(); nor.set([v.x, v.y, v.z], (i * n + k) * 3);
+          if (col) col.set([src.attributes.color.getX(k), src.attributes.color.getY(k), src.attributes.color.getZ(k)], (i * n + k) * 3); } }
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); if (col) g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      if (idx) { const ni = idx.count, ia = new Uint32Array(ni * im.count); for (let i = 0; i < im.count; i++) for (let k = 0; k < ni; k++) ia[i * ni + k] = idx.getX(k) + i * n; g.setIndex(new THREE.BufferAttribute(ia, 1)); }
+      const m = new THREE.Mesh(g, im.material); m.name = im.name; im.parent.add(m); im.parent.remove(im);
+    }
+    const drop = [];
+    root.traverse(o => { if (o.userData.previewOnly || o.isLight || o.isSprite || o.isPoints) drop.push(o); });
+    drop.forEach(o => o.parent && o.parent.remove(o));
+    const swapped = new Map();
+    root.traverse(o => {
+      if (!o.isMesh) return; const m = o.material;
+      if (!swapped.has(m)) {
+        let s;
+        if (m.isShaderMaterial || m.isMeshBasicMaterial) s = new THREE.MeshBasicMaterial({ name: m.name, color: m.color ? m.color.clone() : 0xffffff, side: m.side });
+        else s = new THREE.MeshStandardMaterial({ name: m.name, color: m.color.clone(), map: m.map || null, vertexColors: m.vertexColors, roughness: 1, metalness: m.userData.metal ? 1 : 0, side: m.side });
+        if (m.name === 'Floor') s.map = null; // the floor gets its 4K textures in Unity, not through the glb
+        swapped.set(m, s);
+      }
+      o.material = swapped.get(m);
+    });
+    // stats: triangles per named mesh group, so the Unity budget (§10: <= 1.5 M in view) can be checked
+    const tri = {}; let total = 0; root.traverse(o => { if (!o.isMesh) return; const t = (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3, k = (o.material.name || 'none'); tri[k] = (tri[k] || 0) + t; total += t; });
+    const stats = 'total ' + Math.round(total) + ' tris; ' + Object.entries(tri).sort((a, b) => b[1] - a[1]).map(([k, v]) => k + ' ' + Math.round(v)).join(', ');
+    const glb = await new GLTFExporter().parseAsync(root, { binary: true, maxTextureSize: 2048 });
+    const b64 = buf => { const bytes = new Uint8Array(buf); let bin = ''; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(bin); };
+    const png = c => c.toDataURL('image/png').split(',')[1];
+    window.__arenaExport = { glb: b64(glb), floorMap: png(env.floor.map), floorHeight: png(env.floor.bump), floorMask: png(env.floor.mask), stats, layout: JSON.stringify(env.layout) };
+  } catch (e) { window.__arenaExport = { error: String(e && e.stack || e) }; }
+} else {
+  if (Q.has('rings')) { const ring = new THREE.Mesh(new THREE.RingGeometry(env.PLAY_R - 0.06, env.PLAY_R, 128).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6 })); ring.position.y = 0.04; scene.add(ring); }
+  // the Vanguard for scale (characters session's model, loaded read-only)
+  const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: o.metal ? 0.4 : 0.75, metalness: o.metal ? 0.7 : 0, side: o.side || THREE.FrontSide });
+  const Gl = (c, k) => new THREE.MeshBasicMaterial({ color: new THREE.Color(c).multiplyScalar(k), toneMapped: false });
+  window.THREE = THREE; await loadScript('../../vanguard-model.js');
+  if (typeof window.buildVanguardModel === 'function') { const v = window.buildVanguardModel(M, Gl), obj = v.root || v; obj.scale.setScalar(1.2); obj.traverse(o => { if (o.isMesh) o.castShadow = true; }); const hero = new THREE.Group(); hero.position.set(-3.5, 0, 6); hero.rotation.y = Math.PI * 0.8; hero.add(obj); scene.add(hero); }
+
+  // frame: MSAA -> depth/normal outlines on lit surfaces -> bloom -> tonemap -> light grade (same chain as verdant-look.html)
+  const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(innerWidth, innerHeight, { samples: 4, type: THREE.HalfFloatType }));
+  composer.addPass(new RenderPass(scene, camera));
+  const normalTarget = new THREE.WebGLRenderTarget(innerWidth, innerHeight, { depthTexture: new THREE.DepthTexture(innerWidth, innerHeight), type: THREE.HalfFloatType });
+  const normalMat = new THREE.MeshNormalMaterial();
+  const outline = new ShaderPass({
+    uniforms: { tDiffuse: { value: null }, tNormal: { value: null }, tDepth: { value: null }, res: { value: new THREE.Vector2(1, 1) }, near: { value: 0.1 }, far: { value: 900 }, ink: { value: new THREE.Color(0x0c2422) } },
+    vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }',
+    fragmentShader: `uniform sampler2D tDiffuse, tNormal, tDepth; uniform vec2 res; uniform float near, far; uniform vec3 ink; varying vec2 vUv;
+      float lin(vec2 uv){ float z = texture2D(tDepth, uv).x * 2. - 1.; return 2. * near * far / (far + near - z * (far - near)); }
+      vec3 nrm(vec2 uv){ return texture2D(tNormal, uv).xyz * 2. - 1.; }
+      void main(){ vec4 c = texture2D(tDiffuse, vUv); vec2 px = 1. / res; float D = lin(vUv); vec3 N = nrm(vUv); float dd = 0., nd = 0.;
+        vec2 o[4]; o[0] = vec2(px.x, 0.); o[1] = vec2(-px.x, 0.); o[2] = vec2(0., px.y); o[3] = vec2(0., -px.y);
+        for (int i = 0; i < 4; i++) { dd = max(dd, abs(lin(vUv + o[i]) - D)); nd = max(nd, 1. - dot(N, nrm(vUv + o[i]))); }
+        float e = max(smoothstep(0.03 * D, 0.06 * D, dd), smoothstep(0.25, 0.55, nd) * step(0.01, length(N))) * (1. - smoothstep(40., 110., D));
+        gl_FragColor = vec4(mix(c.rgb, ink * 0.6 + c.rgb * 0.3, e * 0.65), c.a); }`,
+  });
+  composer.addPass(outline); outline.uniforms.tNormal.value = normalTarget.texture; outline.uniforms.tDepth.value = normalTarget.depthTexture;
+  composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.45, 0.5, 0.92));
+  composer.addPass(new OutputPass());
+  const grade = new ShaderPass({
+    uniforms: { tDiffuse: { value: null } },
+    vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }',
+    fragmentShader: `uniform sampler2D tDiffuse; varying vec2 vUv;
+      void main(){ vec3 c = texture2D(tDiffuse, vUv).rgb; float l = dot(c, vec3(0.299, 0.587, 0.114));
+        c = mix(c, c * vec3(0.86, 1.02, 1.04), (1. - l) * 0.4); c = mix(c, c * vec3(1.07, 1.02, 0.9), smoothstep(0.4, 1.0, l) * 0.35);
+        c = mix(vec3(l), c, 1.06); c = (c - 0.5) * 1.05 + 0.5; c *= mix(0.8, 1.0, smoothstep(1.05, 0.4, length((vUv - 0.5) * vec2(1.15, 1.0))));
+        gl_FragColor = vec4(c, 1.); }`,
+  });
+  composer.addPass(grade);
+  let skip = null;
+  function renderNormals() {
+    if (!skip) { skip = []; scene.traverse(o => { if ((o.isMesh || o.isPoints || o.isSprite) && !(o.material && o.material.isMeshToonMaterial)) skip.push(o); }); }
+    const was = skip.map(o => o.visible); skip.forEach(o => o.visible = false);
+    const fog = scene.fog, bg = scene.background; scene.fog = null; scene.background = null; scene.overrideMaterial = normalMat;
+    renderer.setRenderTarget(normalTarget); renderer.setClearColor(0x000000, 0); renderer.clear(); renderer.render(scene, camera);
+    renderer.setRenderTarget(null); scene.overrideMaterial = null; scene.fog = fog; scene.background = bg; skip.forEach((o, i) => o.visible = was[i]);
+  }
+  function frame() {
+    const w = innerWidth, h = innerHeight, pr = renderer.getPixelRatio(); renderer.setSize(w, h); composer.setSize(w, h); normalTarget.setSize(w * pr, h * pr); outline.uniforms.res.value.set(w * pr, h * pr); camera.aspect = w / h;
+    if (VIEW === 'angle') { camera.fov = 40; camera.position.set(-34, 30, 40); camera.lookAt(1, -3, -2); }
+    else if (VIEW === 'top') { camera.fov = 40; camera.position.set(0, 92, 0.01); camera.lookAt(0, 0, 0); }
+    else { camera.fov = 44; camera.position.set(0, 29, 22.5); camera.lookAt(0, 0, 1.0); }
+    camera.updateProjectionMatrix();
+  }
+  addEventListener('resize', frame); frame();
+  const clock = new THREE.Clock(); let lw = innerWidth, lh = innerHeight;
+  renderer.setAnimationLoop(() => { if (innerWidth !== lw || innerHeight !== lh) { lw = innerWidth; lh = innerHeight; frame(); }
+    const dt = clock.getDelta(); env.update(clock.elapsedTime, dt, Q.has('quiet')); renderNormals(); composer.render(); });
+}
+</script>
+</body>
+</html>

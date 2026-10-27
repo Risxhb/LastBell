@@ -1,0 +1,145 @@
+PASS single combined main menu is current scene
+PASS opening song plays first
+PASS all catalog stages embedded
+PASS original menu environment preserved inactive
+PASS stage order 0 Test Map
+PASS one visible environment 0
+PASS party and boss 0
+ACTIVITY 0 choreography=9.601748 travel=3.162277,8.180908,6.926974,6.603206
+PASS active movement and skills 0
+PASS one camera listener and event system 0
+PASS presentation has no combat authority 0
+PASS same uninterrupted music source 0
+PASS building covers background 0
+PASS menu raycast survives wipe 0
+PASS settings usable during wipe 0
+PASS stage order 1 Skyward Spire
+PASS one visible environment 1
+PASS party and boss 1
+ACTIVITY 1 choreography=5.999085 travel=2.583376,2.718523,3.838445,3.44093,9.287252
+PASS active movement and skills 1
+PASS one camera listener and event system 1
+PASS presentation has no combat authority 1
+PASS same uninterrupted music source 1
+PASS 15-second covered swap 1
+PASS building covers background 1
+PASS menu raycast survives wipe 1
+PASS settings usable during wipe 1
+PASS stage order 2 Brass Foundry
+PASS one visible environment 2
+PASS party and boss 2
+ACTIVITY 2 choreography=5.999095 travel=2.583394,2.718537,3.808779,3.44093,13.69544,8.960505
+PASS active movement and skills 2
+PASS one camera listener and event system 2
+PASS presentation has no combat authority 2
+PASS same uninterrupted music source 2
+PASS 15-second covered swap 2
+PASS building covers background 2
+PASS menu raycast survives wipe 2
+PASS settings usable during wipe 2
+PASS stage order 3 Verdant Chimes
+PASS one visible environment 3
+PASS party and boss 3
+ACTIVITY 3 choreography=6.004138 travel=2.592004,2.726105,3.810607,3.440931,13.69542,10.38589,10.35836
+PASS active movement and skills 3
+PASS one camera listener and event system 3
+PASS presentation has no combat authority 3
+PASS same uninterrupted music source 3
+PASS 15-second covered swap 3
+PASS building covers background 3
+PASS menu raycast survives wipe 3
+PASS settings usable during wipe 3
+PASS stage order 4 Shattered Hour
+PASS one visible environment 4
+PASS party and boss 4
+ACTIVITY 4 choreography=5.996415 travel=2.578799,2.7145,3.810863,3.44093,13.69542,10.39962,10.35836,8.904552,7.836634
+PASS active movement and skills 4
+PASS one camera listener and event system 4
+PASS presentation has no combat authority 4
+PASS same uninterrupted music source 4
+PASS 15-second covered swap 4
+PASS building covers background 4
+PASS menu raycast survives wipe 4
+PASS settings usable during wipe 4
+PASS stage order 5 Test Map
+PASS one visible environment 5
+PASS party and boss 5
+ACTIVITY 5 choreography=5.996872 travel=2.579582,2.71519,3.810803,3.44093
+PASS active movement and skills 5
+PASS one camera listener and event system 5
+PASS presentation has no combat authority 5
+PASS same uninterrupted music source 5
+PASS 15-second covered swap 5
+PASS building covers background 5
+PASS menu raycast survives wipe 5
+PASS settings usable during wipe 5
+PASS stage order 6 Skyward Spire
+PASS one visible environment 6
+PASS party and boss 6
+ACTIVITY 6 choreography=5.998331 travel=2.582083,2.717386,3.824844,3.44093,9.28739
+PASS active movement and skills 6
+PASS one camera listener and event system 6
+PASS presentation has no combat authority 6
+PASS same uninterrupted music source 6
+PASS 15-second covered swap 6
+PASS building covers background 6
+PASS menu raycast survives wipe 6
+PASS settings usable during wipe 6
+PASS stage order 7 Brass Foundry
+PASS one visible environment 7
+PASS party and boss 7
+ACTIVITY 7 choreography=6.002685 travel=2.589529,2.723929,3.811682,3.44093,13.69544,8.961901
+PASS active movement and skills 7
+PASS one camera listener and event system 7
+PASS presentation has no combat authority 7
+PASS same uninterrupted music source 7
+PASS 15-second covered swap 7
+PASS building covers background 7
+PASS menu raycast survives wipe 7
+PASS settings usable during wipe 7
+PASS stage order 8 Verdant Chimes
+PASS one visible environment 8
+PASS party and boss 8
+ACTIVITY 8 choreography=5.998947 travel=2.583141,2.718315,3.821665,3.44093,13.69544,10.38957,10.35836
+PASS active movement and skills 8
+PASS one camera listener and event system 8
+PASS presentation has no combat authority 8
+PASS same uninterrupted music source 8
+PASS 15-second covered swap 8
+PASS building covers background 8
+PASS menu raycast survives wipe 8
+PASS settings usable during wipe 8
+PASS stage order 9 Shattered Hour
+PASS one visible environment 9
+PASS party and boss 9
+ACTIVITY 9 choreography=5.997734 travel=2.581061,2.716489,3.818944,3.440929,13.69543,10.401,10.35837,8.904554,7.842978
+PASS active movement and skills 9
+PASS one camera listener and event system 9
+PASS presentation has no combat authority 9
+PASS same uninterrupted music source 9
+PASS 15-second covered swap 9
+PASS building covers background 9
+PASS menu raycast survives wipe 9
+PASS settings usable during wipe 9
+PASS stage order 10 Test Map
+PASS one visible environment 10
+PASS party and boss 10
+ACTIVITY 10 choreography=5.997079 travel=2.579938,2.715501,3.833636,3.44093
+PASS active movement and skills 10
+PASS one camera listener and event system 10
+PASS presentation has no combat authority 10
+PASS same uninterrupted music source 10
+PASS 15-second covered swap 10
+MATERIALS first=392 second=392
+PASS bounded materials after second full rotation
+PASS bounded objects after second full rotation
+PASS eight-player party included
+PLAYLIST opening=False clip=MainMenuMusic state=Loading playing=True time=0
+PASS existing looping playlist resumes after opening
+PASS showcase stops on navigation
+PASS selection cleans up showcase
+PASS selection preserves music
+PASS return starts clean first arena
+PASS return preserves music source
+PASS zero runtime errors
+RESULT: 131 passed / 0 failed

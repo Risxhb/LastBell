@@ -1,0 +1,1979 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Last Bell — Bellkeeper's Dais</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Alegreya+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --cobalt: #17263F; --slate: #314C69; --brass: #C38D46; --gold: #F6C968; --ivory: #F4E9D1;
+  --violet: #655491; --teal: #55C9CE; --coral: #EB685D; --ink: #101825; --lavender: #A8A4D1;
+  --panel: rgba(16, 24, 37, 0.82); --panel-edge: rgba(195, 141, 70, 0.55);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--ink); color: var(--ivory); overflow: hidden;
+  font-family: 'Alegreya Sans', system-ui, sans-serif; user-select: none; }
+canvas#view { display: block; position: fixed; inset: 0; width: 100vw; height: 100vh; }
+.hidden { display: none !important; }
+.cinzel { font-family: 'Cinzel', serif; letter-spacing: 0.06em; }
+
+/* ---------- Boss frame ---------- */
+#bossFrame { position: fixed; top: 18px; left: 50%; transform: translateX(-50%); width: min(720px, 70vw); text-align: center; pointer-events: none; }
+#bossName { font-family: 'Cinzel', serif; font-weight: 700; font-size: 22px; letter-spacing: 0.22em; color: var(--ivory); text-shadow: 0 2px 8px #000a; }
+#bossBar { position: relative; height: 16px; margin-top: 6px; border: 2px solid var(--brass); border-radius: 3px; background: #0b111c; box-shadow: 0 0 0 1px #0008, 0 4px 14px #0007; overflow: hidden; }
+#bossHp { position: absolute; inset: 0; width: 100%; background: linear-gradient(180deg, #f08a6b, #b8463d); transition: width 0.12s; }
+#bossHpLag { position: absolute; inset: 0; width: 100%; background: #f6c96855; transition: width 0.8s 0.25s; }
+#bossBar .tick { position: absolute; top: 0; bottom: 0; width: 1px; background: #0006; }
+#bossMeta { display: flex; justify-content: space-between; margin-top: 5px; font-size: 14px; color: #d9cdb4; text-shadow: 0 1px 3px #000; }
+#phasePips span { display: inline-block; min-width: 26px; padding: 0 4px; margin: 0 2px; border: 1px solid #c38d4666; border-radius: 2px; font-family: 'Cinzel', serif; font-size: 12px; color: #c38d4699; }
+#phasePips span.on { background: #c38d46; color: var(--ink); border-color: var(--gold); }
+#phasePips span.done { color: #f6c968; border-color: #f6c96899; }
+#castLine { margin-top: 8px; height: 22px; font-family: 'Cinzel', serif; font-size: 15px; letter-spacing: 0.1em; color: var(--coral); text-shadow: 0 1px 6px #000; }
+
+/* ---------- Player frame ---------- */
+#playerFrame { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; align-items: flex-end; gap: 18px; pointer-events: none; }
+#vitals { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; padding-bottom: 6px; }
+.pipRow { display: flex; gap: 5px; align-items: center; }
+.pipRow label { font-size: 13px; color: #cbbf a6; color: #cdbfa3; margin-right: 6px; text-transform: uppercase; letter-spacing: 0.12em; }
+.pip { width: 18px; height: 18px; transform: rotate(45deg); border: 2px solid #c38d46; background: #0d1420; box-shadow: 0 2px 6px #0008; }
+.pip.hp.on { background: radial-gradient(circle at 35% 35%, #ff9b8b, #c8463c); }
+.pip.res { width: 14px; height: 14px; border-radius: 50%; transform: none; }
+.pip.res.on { background: radial-gradient(circle at 35% 35%, #c9fbff, #39a6b5); box-shadow: 0 0 10px #55c9ce88; }
+.pip.shield { border-color: #a8e3ff; background: #a8e3ff55; }
+#actions { display: flex; gap: 10px; }
+.slot { position: relative; width: 74px; height: 74px; border: 2px solid var(--brass); border-radius: 10px; background: radial-gradient(circle at 50% 30%, #243858, #101825); box-shadow: 0 6px 18px #000a, inset 0 0 0 1px #f6c96822; overflow: hidden; }
+.slot svg { position: absolute; inset: 9px; width: 52px; height: 52px; }
+.slot .cd { position: absolute; inset: 0; background: conic-gradient(#0b111cdd var(--a, 0deg), transparent 0); }
+.slot .cdText { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 700; color: #fff; text-shadow: 0 2px 4px #000; }
+.slot .key { position: absolute; left: 4px; bottom: 2px; font-size: 11px; color: var(--gold); text-shadow: 0 1px 2px #000; }
+.slot .cost { position: absolute; right: 5px; top: 3px; font-size: 11px; color: #9fe9ee; text-shadow: 0 1px 2px #000; }
+.slot.ready { border-color: var(--gold); }
+.slot.blocked { border-color: #7a5f3e; filter: saturate(0.5) brightness(0.75); }
+.slot.flash { animation: slotFlash 0.25s; }
+.slot.reversal { border-color: #ffe08a; box-shadow: 0 0 18px #f6c968cc, 0 6px 18px #000a; }
+.slot.reversal::after { content: "REVERSAL"; position: absolute; left: 0; right: 0; bottom: 14px; text-align: center; font-size: 10px; letter-spacing: 0.12em; color: #ffe08a; text-shadow: 0 1px 3px #000; }
+.slot.dash .cost { color: #bfe9ff; font-size: 13px; font-weight: 700; }
+@keyframes slotFlash { from { box-shadow: 0 0 0 4px #f6c968cc, 0 6px 18px #000a; } }
+.slot .name { position: absolute; left: 0; right: 0; top: -20px; text-align: center; font-size: 12px; color: #d8cdb7; white-space: nowrap; }
+#actionNames { display: flex; gap: 10px; position: absolute; top: -22px; }
+#targetTag { position: absolute; top: -48px; left: 0; right: 0; text-align: center; font-size: 13px; color: #8ff0b8; }
+
+/* ---------- Side panels ---------- */
+#meter { position: fixed; right: 18px; top: 18px; width: 220px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 8px; font-size: 14px; line-height: 1.45; }
+#meter h3 { margin: 0 0 4px; font-family: 'Cinzel', serif; font-size: 13px; letter-spacing: 0.14em; color: var(--gold); font-weight: 500; }
+#meter .row { display: flex; justify-content: space-between; color: #d9cfbb; }
+#meter .row b { color: #fff; }
+#hint { position: fixed; left: 18px; top: 18px; padding: 8px 12px; background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 8px; font-size: 13px; line-height: 1.5; color: #cfc4ad; }
+#hint b { color: var(--gold); font-weight: 500; }
+#card { position: fixed; left: 18px; bottom: 20px; width: 340px; padding: 12px 14px; background: var(--panel); border: 1px solid var(--panel-edge); border-left: 4px solid var(--coral); border-radius: 8px; font-size: 15px; line-height: 1.4; transition: opacity 0.4s; }
+#card.good { border-left-color: var(--teal); }
+#card.warn { border-left-color: var(--gold); }
+#card .title { font-family: 'Cinzel', serif; font-size: 14px; letter-spacing: 0.08em; color: var(--gold); margin-bottom: 3px; }
+#card svg { float: right; margin: 0 0 4px 8px; }
+
+/* ---------- Floating text ---------- */
+#floaters { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+.float { position: absolute; transform: translate(-50%, -50%); font-weight: 700; font-size: 20px; text-shadow: 0 2px 4px #000, 0 0 10px #0008; white-space: nowrap; animation: rise 0.95s ease-out forwards; }
+.float.small { font-size: 15px; font-weight: 500; }
+.float.big { font-size: 30px; font-family: 'Cinzel', serif; }
+@keyframes rise { from { opacity: 1; margin-top: 0; } 70% { opacity: 1; } to { opacity: 0; margin-top: -46px; } }
+#guardCall { position: fixed; left: 50%; top: 38%; transform: translate(-50%, -50%); font-family: 'Cinzel', serif; font-size: 64px; font-weight: 700; letter-spacing: 0.3em; color: var(--ivory); text-shadow: 0 0 24px #eb685d, 0 4px 10px #000; pointer-events: none; }
+#guardCall svg { display: block; margin: 0 auto 6px; }
+#playerTag { position: fixed; transform: translate(-50%, 0); pointer-events: none; display: flex; gap: 3px; }
+#playerTag i { width: 8px; height: 8px; border-radius: 50%; background: #55c9ce; box-shadow: 0 0 6px #55c9ce; }
+#playerTag i.off { background: #1a2638; box-shadow: none; border: 1px solid #55c9ce55; }
+#castBar { position: fixed; width: 90px; height: 7px; transform: translate(-50%, 0); border: 1px solid var(--gold); background: #0b111c; pointer-events: none; }
+#castBar div { height: 100%; background: linear-gradient(90deg, #c38d46, #f6c968); }
+
+/* ---------- Screens ---------- */
+.screen { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: linear-gradient(180deg, #10182500, #101825cc 70%); }
+#select { align-items: flex-end; padding-bottom: 6vh; background: linear-gradient(180deg, #10182500 40%, #101825ee); }
+#select .wrap { text-align: center; width: min(1100px, 94vw); }
+#select h1 { margin: 0; font-family: 'Cinzel', serif; font-size: 44px; letter-spacing: 0.3em; color: var(--ivory); text-shadow: 0 0 30px #f6c96855, 0 4px 12px #000; }
+#select .sub { margin: 4px 0 22px; color: var(--lavender); letter-spacing: 0.18em; font-size: 15px; text-transform: uppercase; }
+#cards { display: flex; gap: 16px; justify-content: center; }
+.classCard { flex: 1; max-width: 340px; padding: 14px 16px 16px; text-align: left; background: var(--panel); border: 1px solid #c38d4655; border-radius: 10px; cursor: pointer; transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s; }
+.classCard:hover, .classCard.sel { transform: translateY(-4px); border-color: var(--gold); box-shadow: 0 10px 30px #000a, 0 0 0 1px #f6c96855; }
+.classCard h2 { margin: 0; font-family: 'Cinzel', serif; font-size: 22px; letter-spacing: 0.12em; }
+.classCard .role { color: var(--gold); font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; }
+.classCard p { margin: 8px 0; font-size: 15px; color: #d9cfbb; line-height: 1.35; }
+.classCard ul { margin: 0; padding-left: 18px; font-size: 14px; color: #bfb5a0; line-height: 1.45; }
+.classCard .swatches { display: flex; gap: 5px; margin-top: 10px; }
+.classCard .swatches i { width: 22px; height: 8px; border-radius: 2px; }
+.btn { display: inline-block; margin-top: 18px; padding: 10px 34px; font-family: 'Cinzel', serif; font-size: 17px; letter-spacing: 0.2em; color: var(--ink); background: linear-gradient(180deg, #f6c968, #c38d46); border: none; border-radius: 6px; cursor: pointer; box-shadow: 0 6px 20px #000a; }
+.btn:hover { filter: brightness(1.1); }
+.btn.ghost { background: transparent; color: var(--ivory); border: 1px solid #c38d46aa; }
+.panel { width: min(520px, 92vw); padding: 22px 26px; background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 12px; box-shadow: 0 20px 60px #000c; }
+.panel h2 { margin: 0 0 10px; font-family: 'Cinzel', serif; letter-spacing: 0.2em; font-size: 24px; text-align: center; }
+.panel .opt { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid #ffffff10; font-size: 16px; }
+.panel .opt span { color: #cfc4ad; }
+.panel select, .panel button.tog { font: inherit; font-size: 15px; color: var(--ivory); background: #1b2740; border: 1px solid #c38d4688; border-radius: 5px; padding: 3px 8px; cursor: pointer; }
+.panel .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+#result .big { font-family: 'Cinzel', serif; font-size: 40px; letter-spacing: 0.2em; text-align: center; }
+#result .why { margin: 12px 0; font-size: 16px; line-height: 1.45; color: #ddd2bc; }
+#result .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; font-size: 15px; color: #cfc4ad; }
+#result .stats b { color: #fff; }
+#intro { pointer-events: none; background: none; }
+#intro div { font-family: 'Cinzel', serif; font-size: 54px; letter-spacing: 0.3em; text-shadow: 0 0 40px #f6c968aa, 0 4px 12px #000; animation: introFade 2.2s forwards; }
+@keyframes introFade { 0% { opacity: 0; letter-spacing: 0.6em; } 30% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; letter-spacing: 0.3em; } }
+#loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; font-family: 'Cinzel', serif; letter-spacing: 0.3em; color: var(--gold); background: var(--ink); }
+@media (max-width: 900px) { #card { bottom: 120px; width: min(340px, calc(100vw - 36px)); } #meter, #hint { display: none; } .classCard ul, .classCard p { display: none; } #select h1 { font-size: 30px; } #cards { gap: 8px; } .slot { width: 58px; height: 58px; } .slot svg { inset: 7px; width: 40px; height: 40px; } }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div id="loading">THE BELL STIRS…</div>
+
+<div id="floaters"></div>
+<div id="playerTag" class="hidden"></div>
+<div id="castBar" class="hidden"><div></div></div>
+<div id="guardCall" class="hidden"><svg width="90" height="90" viewBox="0 0 90 90"><path d="M45 6 L78 18 V44 C78 64 63 78 45 86 C27 78 12 64 12 44 V18 Z" fill="#eb685d33" stroke="#f4e9d1" stroke-width="5"/></svg>GUARD</div>
+
+<div id="hud" class="hidden">
+  <div id="bossFrame">
+    <div id="bossName">THE BELLKEEPER</div>
+    <div id="bossBar"><div id="bossHpLag"></div><div id="bossHp"></div></div>
+    <div id="bossMeta"><span id="phasePips"></span><span id="fightTime">0:00</span></div>
+    <div id="castLine"></div>
+  </div>
+  <div id="hint"><b>WASD</b> move · <b>Esc</b> menu · <b>R</b> restart<br><b>1</b>/LMB basic · <b>2</b>/RMB technique · <b>3</b> signature · <b>4</b> guard · <b>5</b> dash · mouse aims<span id="healerHint"><br><b>6</b> heal target · hold <b>Shift</b> self</span></div>
+  <div id="meter"><h3>RECORD</h3><div id="meterBody"></div></div>
+  <div id="card" style="opacity:0"></div>
+  <div id="playerFrame">
+    <div id="vitals"><div class="pipRow" id="hpRow"></div><div class="pipRow" id="resRow"></div></div>
+    <div style="position:relative"><div id="targetTag"></div><div id="actions"></div></div>
+  </div>
+</div>
+
+<div id="select" class="screen hidden">
+  <div class="wrap">
+    <h1>LAST BELL</h1>
+    <div class="sub">Choose a warden · The Bellkeeper's Dais</div>
+    <div id="cards"></div>
+    <button class="btn" id="beginBtn">ENTER THE DAIS</button>
+  </div>
+</div>
+
+<div id="pause" class="screen hidden">
+  <div class="panel">
+    <h2>PAUSED</h2>
+    <div class="opt"><span>Encounter</span><select id="optEnc"><option value="v1">Bellkeeper v1.0 (HP phases)</option><option value="v01">v0.1 timeline (4:00 enrage)</option></select></div>
+    <div class="opt"><span>Boss health</span><select id="optHp"><option value="standard">Standard (≈3 min)</option><option value="short">Short (≈1 min)</option><option value="infinite">Training (infinite)</option></select></div>
+    <div class="opt"><span>Start at</span><select id="optPhase"><option value="0">Phase I</option><option value="1">Phase II</option><option value="2">Phase III (v1.0: The Final Toll)</option><option value="3">Phase IV (v0.1 only)</option><option value="4">Phase V (v0.1 only)</option><option value="5">Enrage (v0.1 only)</option></select></div>
+    <div class="opt"><span>Invulnerable</span><button class="tog" id="optInv">Off</button></div>
+    <div class="opt"><span>On knockout</span><select id="optKo"><option value="end">Attempt ends</option><option value="respawn">Respawn (practice)</option></select></div>
+    <div class="opt"><span>Training ally (Healer)</span><button class="tog" id="optAlly">On</button></div>
+    <div class="opt"><span>Range rings</span><button class="tog" id="optRings">Off</button></div>
+    <div class="opt"><span>Pendulum Strikes (counter practice)</span><button class="tog" id="optStrikes">On</button></div>
+    <div class="opt"><span>Mouse aim</span><button class="tog" id="optAim">On</button></div>
+    <div class="opt"><span>Sound</span><button class="tog" id="optSound">On</button></div>
+    <div class="row" style="margin-top:16px"><button class="btn" id="resumeBtn">RESUME</button><button class="btn ghost" id="restartBtn">RESTART</button><button class="btn ghost" id="classBtn">CHANGE WARDEN</button></div>
+  </div>
+</div>
+
+<div id="result" class="screen hidden">
+  <div class="panel">
+    <div class="big" id="resultTitle">DEFEATED</div>
+    <div class="why" id="resultWhy"></div>
+    <div class="stats" id="resultStats"></div>
+    <div class="row" style="margin-top:16px"><button class="btn" id="retryBtn">TRY AGAIN [R]</button><button class="btn ghost" id="resultClassBtn">CHANGE WARDEN</button></div>
+  </div>
+</div>
+
+<div id="intro" class="screen hidden"><div>THE BELLKEEPER</div></div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+/* =====================================================================
+   RULES — a JS mirror of unity/Assets/LastBell/Core/ClassTest (kits,
+   cadence, cast, guard, Healer) plus the Bellkeeper v0.1 solo timeline
+   (docs/design/bellkeeper.md). 60 Hz ticks, legacy arena units.
+   ===================================================================== */
+const TICK = 60, SPEED = 250, IMMUNE = 45, CADENCE = 18, CANCEL_MOVE = 0.2;
+let MAXHP = 5; // 5 pips (v0.1 timeline) or 10 (Bellkeeper v1.0: hits cost a share of max HP); set by each Sim
+// Playable square of the key-art dais (arena-env.js): ±12.4 m around the boss, inside the parapet. Sized so 8 players
+// can stand outside the Hollow Toll ring (see arena-size.html).
+const ARENA = { x0: -26, y0: -136, x1: 966, y1: 856 }, INSET = 14;
+// BOSS is the boss's current position (Bellkeeper v1.0 Pendulum Charge moves it). ORIGIN is the fixed arena reference for drawing.
+const ORIGIN = { x: 470, y: 360 }, BOSS = { x: 470, y: 360 }, BOSS_BODY = 56, SPAWN = { x: 470, y: 680 };
+const BOSS_HP = { standard: 1800, short: 600, infinite: Infinity };
+const PHASE_START = [0, 1320, 2640, 3540, 5340, 14340];
+const ENRAGE = 14400;
+
+const KITS = {
+  vanguard: {
+    id: 'vanguard', name: 'Vanguard', role: 'Clockwork Duelist · close range',
+    identity: 'A hooded sword-and-shield duelist. Build Resonance with combos, counter the bell\'s strikes, then punish with Reversal Rush and Final Hour.',
+    resource: 'Resonance', cap: 6, start: 0, color: 0x2050cc, swatch: ['#2050cc', '#1b2343', '#d9a64c', '#5fe3ff'],
+    slots: [
+      { name: 'Clockblade Combo', range: 175, dmg: 2, cd: 0, res: +1, icon: 'strike', desc: 'Three directional hits, the third sweeps wide' },
+      { name: 'Pendulum Rush', range: 170, dmg: 9, cd: 0, res: -3, icon: 'stored', desc: 'Shield charge; Reversal Rush after a combo or counter' },
+      { name: 'Final Hour', range: 270, dmg: 18, cd: 360, icon: 'breaker', desc: 'Wide clock-hand arc, bonus vs marked' },
+      { name: 'Resonant Guard', guard: true, window: 15, cd: 180, icon: 'brace', desc: 'Counter the bell\'s strikes for Resonance' },
+    ],
+  },
+  arcanist: {
+    id: 'arcanist', name: 'Arcanist', role: 'Keeper of Instruments · ranged',
+    identity: 'A celestial scholar with floating lenses. Spend Energy on the move, or root yourself for a big Resonant Cast and risk the floor.',
+    resource: 'Energy', cap: 6, start: 0, color: 0x7c62c9, swatch: ['#655491', '#55C9CE', '#F4E9D1', '#2a2350'],
+    slots: [
+      { name: 'Spark', range: 420, dmg: 2, cd: 24, res: +1, icon: 'spark', desc: '+1 Energy' },
+      { name: 'Arc Lance', range: 460, dmg: 8, cd: 48, res: -3, icon: 'lance', desc: 'Spend 3 Energy' },
+      { name: 'Resonant Cast', range: 460, dmg: 24, cd: 360, cast: 60, cancelCd: 60, icon: 'cast', desc: '1 s rooted cast' },
+      { name: 'Ward Step', guard: true, window: 24, cd: 180, blink: 110, icon: 'step', desc: 'Guard + blink' },
+    ],
+  },
+  healer: {
+    id: 'healer', name: 'Healer', role: 'Chime Warden · support',
+    identity: 'An ivory chime-bearer with a tuning-fork staff. Gleam to restore Focus, Mend and ward your ally, and keep the party standing through the toll.',
+    resource: 'Focus', cap: 6, start: 6, color: 0xe8dcc0, swatch: ['#F4E9D1', '#F6C968', '#55C9CE', '#C38D46'],
+    slots: [
+      { name: 'Gleam', range: 420, dmg: 2, cd: 36, icon: 'gleam', desc: 'Every 3rd hit +1 Focus' },
+      { name: 'Mend', range: 360, cd: 180, res: -2, cast: 30, cancelCd: 60, support: true, icon: 'mend', desc: 'Heal 1, then 1 at 3 s and 6 s' },
+      { name: 'Sanctuary', range: 180, cd: 1200, res: -5, support: true, icon: 'sanctuary', desc: 'Heal 3 to everyone near you' },
+      { name: 'Purifying Ward', guard: true, window: 0, cd: 360, cost: 1, range: 360, icon: 'ward', desc: 'Shield 1 hit, cleanse Chill' },
+    ],
+  },
+};
+const CLASS_ORDER = ['vanguard', 'arcanist', 'healer'];
+// Mirrors DashRules / VanguardRules in unity/Assets/LastBell/Core/ClassTest/VanguardKit.cs (provisional tuning).
+const DASH = { charges: 2, recharge: 72, duration: 12, distance: 150, iframes: 10, buffer: 9 };
+const VG = {
+  combo: [
+    { startup: 5, total: 16, dmg: 2, range: 160, arcDeg: 110, lunge: 1.4 },
+    { startup: 5, total: 16, dmg: 2, range: 160, arcDeg: 110, lunge: 1.4 },
+    { startup: 8, total: 26, dmg: 4, range: 175, arcDeg: 170, lunge: 1.0 },
+  ],
+  dashAttack: { startup: 6, total: 20, dmg: 3, range: 170, arcDeg: 120, lunge: 4.5 },
+  comboWindow: 24, dashAttackWindow: 6, cap: 6,
+  rushCost: 3, rushStartup: 4, rushTravel: 14, rushTotal: 30, rushSpeed: 11, rushStop: 70, rushHitRange: 110, rushArcDeg: 160,
+  rushDmg: 9, reversalDmg: 15, shockwave: 140,
+  finalStartup: 18, finalTotal: 48, finalCancelAfter: 30, finalDmg: 18, finalMarkBonus: 9, finalRange: 270, finalArcDeg: 220,
+  reversalTicks: 150, markTicks: 240, assistDeg: 30, assistRange: 40, contact: 40,
+};
+const HEAL = { hotInterval: 180, hotDuration: 360, area: 3, shieldDur: 240, regen: 180, hitsPerFocus: 3, chill: 300, chillSpeed: 0.65 };
+
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+function clampArena(p) {
+  p.x = clamp(p.x, ARENA.x0 + INSET, ARENA.x1 - INSET);
+  p.y = clamp(p.y, ARENA.y0 + INSET, ARENA.y1 - INSET);
+  const d = dist(p, BOSS);
+  if (d < BOSS_BODY) { const k = BOSS_BODY / Math.max(d, 0.001); p.x = BOSS.x + (p.x - BOSS.x) * k; p.y = BOSS.y + (p.y - BOSS.y) * k; }
+  return p;
+}
+function angDiff(a, b) { let d = (a - b) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; return d; }
+function contains(h, p) {
+  const dx = p.x - h.ox, dy = p.y - h.oy, d = Math.hypot(dx, dy);
+  if (h.kind === 'circle') return d <= h.r;
+  if (h.kind === 'lane') { const c = Math.cos(h.dir), s = Math.sin(h.dir), along = dx * c + dy * s, perp = -dx * s + dy * c; return along >= -h.inner && along <= h.len && Math.abs(perp) <= h.inner; } // inner = half width
+  if (d > h.r) return false;
+  if (h.kind === 'donut') return d >= h.inner;
+  if (d === 0) return true;
+  return Math.abs(angDiff(Math.atan2(dy, dx), h.dir)) <= h.half;
+}
+
+const ATTACKS = {
+  sweep:     { name: 'Bell Sweep', kind: 'cone', r: 380, half: Math.PI / 5, req: 'avoid', win: 90 },
+  tracking:  { name: 'Tracking Sweep', kind: 'cone', r: 380, half: Math.PI / 5, req: 'avoid', lock: 45, win: 120, track: true },
+  toll:      { name: 'Hollow Toll', kind: 'donut', r: 380, inner: 155, req: 'avoid', win: 90 },
+  lingering: { name: 'Lingering Mark', kind: 'circle', r: 110, req: 'avoid', lock: 90, win: 160, follow: true },
+  sanctuary: { name: 'Sanctuary Peal', kind: 'circle', r: 90, req: 'shelter', win: 210 },
+  echo:      { name: 'Remembered Sweep', kind: 'cone', req: 'avoid' },
+  final:     { name: 'Final Hour', kind: 'circle', r: 1000, req: 'guard', win: 90 },
+  // Proposed counterable strike (Vanguard redesign §5): avoid it, or catch it with Resonant Guard.
+  strike:    { name: 'Pendulum Strike', kind: 'circle', r: 80, req: 'avoid', win: 60, counterable: true },
+};
+
+// Bellkeeper v1.0 attack set (boss design reference §3). Metres convert at 1 m = 40 arena units (the drawing
+// scale); seconds at 60 ticks. Damage is in pips of a 10-pip bar, so 5 = the doc's ~50 % of max HP.
+const V1_OPEN_DELAY = 90, V1_PHASE_HP = [0.70, 0.35];
+const V1 = {
+  sweep:  { name: 'Bell Sweep', kind: 'cone', r: 320, half: 40 * Math.PI / 180, win: 57, lock: 18, dmg: 5, recover: 48 },     // 80° x 8 m, 0.95 s, tracks 0.30 s
+  toll:   { name: 'Hollow Toll', kind: 'donut', r: 272, inner: 104, win: 66, dmg: 4, recover: 48 },                            // 2.6–6.8 m, 1.10 s, ~45 %
+  charge: { name: 'Pendulum Charge', kind: 'lane', halfWidth: 44, win: 48, dmg: 5, travel: 18, overshoot: 110, sideOffset: 70, wallMargin: 70, recover: 48 }, // 2.2 m lane, 0.80 s
+  chime:  { name: 'Shattered Chime', kind: 'circle', r: 56, win: 72, lock: 30, dmg: 2, count: 3, spacing: 24, recover: 42 },     // 1.4 m markers, 1.20 s, ~25 % each
+  decisiveDmg: 8, strikeDmg: 3,                                                                                                 // Final Toll last strike ~80 %
+};
+const V1_PHASE_NAMES = ['The First Toll', 'The Dissonance', 'The Final Toll'];
+const V1_IMPROVE = {
+  sweep: 'Once the boss locks its facing, move beyond either edge of the cone (or past its reach) before the strike.',
+  toll: 'Step into the hollow centre or beyond the outer ring — note where the boss is standing now, not where it started.',
+  charge: 'Dodge sideways out of the lane, not backwards along it, then track where the boss lands.',
+  chimeMarker: 'Each chime follows you briefly, then locks. Keep moving after it locks so the next marker lands somewhere else.',
+  strike: 'Step out of the Pendulum Strike circle — or, as the Vanguard, Guard just before it lands to counter.',
+};
+
+// Solo Bellkeeper timeline (spec §3, count = 1). [warnTick, attack, extra]
+// withStrikes adds five Pendulum Strikes in the timeline's quiet gaps (practice option; not in the v0.1 spec).
+function buildSchedule(withStrikes) {
+  const s = [
+    [60, 'sweep'], [270, 'toll'], [480, 'sweep'], [690, 'toll'], [900, 'tracking'], [1110, 'toll'], [1170, 'sweep'],
+    [1380, 'lingering'], [1620, 'toll'], [1800, 'sanctuary'], [2100, 'lingering'], [2190, 'sweep'], [2400, 'sanctuary'],
+    [2700, 'sweep', { record: true }], [2910, 'toll'], [3120, 'echo', { win: 120 }], [3360, 'tracking', { record: true }],
+    [3600, 'echo', { win: 180 }], [3600, 'lingering'], [3900, 'toll'], [4110, 'sweep', { record: true }],
+    [4380, 'sanctuary'], [4440, 'echo', { win: 150 }], [4800, 'lingering'], [4890, 'toll'],
+    ...(withStrikes ? [[1290, "strike"], [2630, "strike"], [3270, "strike"], [4000, "strike"], [5300, "strike"]] : []),
+  ];
+  const cycle = ['sweep', 'toll', 'lingering+echo', 'sanctuary', 'tracking*', 'toll'];
+  for (let t = 5400, i = 0; t < ENRAGE; t += 150, i++) {
+    const a = cycle[i % cycle.length];
+    if (a === 'lingering+echo') { s.push([t, 'echo', { win: 180 }]); s.push([t, 'lingering']); }
+    else if (a === 'tracking*') s.push([t, 'tracking', { record: true }]);
+    else s.push([t, a]);
+  }
+  return s.sort((a, b) => a[0] - b[0]);
+}
+const SCHEDULE = buildSchedule(false);
+function phaseOf(tick) { if (tick >= ENRAGE) return 5; let p = 0; for (let i = 0; i < 5; i++) if (tick >= PHASE_START[i]) p = i; return p; }
+
+function makeActor(id, pos) {
+  return { id, x: pos.x, y: pos.y, px: pos.x, py: pos.y, hp: MAXHP, res: 0, ready: [0, 0, 0, 0], guardUntil: 0, immuneUntil: 0,
+    attackUntil: 0, castUntil: 0, castSlot: 0, castTarget: 0, koAt: 0, shield: 0, shieldUntil: 0, hotNext: 0, hotUntil: 0,
+    chillUntil: 0, moving: 0, mx: 0, my: 0, lastAction: -999, lastSlot: 0,
+    face: -Math.PI / 2, dashCharges: DASH.charges, dashRechargeAt: 0, dashUntil: 0, dashIfr: 0, ddx: 0, ddy: 0, bufDash: 0, lastDashEnd: 0,
+    vAction: null, vStart: 0, vHit: 0, vEnd: 0, vStep: 0, comboNext: 0, comboExpire: 0, reversalUntil: 0, rushEmp: false, rdx: 0, rdy: 0, bufB: 0, bufT: 0, bufS: 0, dashAtkQ: false };
+}
+
+class Sim {
+  constructor(classId, opts) {
+    this.kit = KITS[classId]; this.opts = opts;
+    this.enc = opts.encounter === 'v01' ? 'v01' : 'v1'; MAXHP = this.enc === 'v1' ? 10 : 5; this.hpScale = MAXHP / 5;
+    BOSS.x = ORIGIN.x; BOSS.y = ORIGIN.y;
+    this.rng = mulberry32(opts.seed || 7);
+    this.tick = opts.encounter === 'v01' ? PHASE_START[opts.phase || 0] : 0;
+    this.startTick = this.tick;
+    this.p = makeActor(1, SPAWN); this.p.res = this.kit.start;
+    this.hasAlly = this.kit.id === 'healer' && opts.ally;
+    this.ally = this.hasAlly ? makeActor(2, { x: 560, y: 590 }) : null;
+    this.bossMax = BOSS_HP[opts.hp]; this.bossHp = this.bossMax;
+    this.hazards = []; this.memory = null; this.nextId = 1; this.retained = null;
+    this.schedule = buildSchedule(opts.strikes !== false); this.markUntil = 0;
+    this.schedIndex = this.schedule.findIndex(e => e[0] > this.tick); if (this.schedIndex < 0) this.schedIndex = this.schedule.length;
+    this.fx = []; this.outcome = 'playing'; this.gleamHits = 0;
+    this.stats = { dmg: 0, bySlot: [0, 0, 0], hits: 0, guarded: 0, avoided: 0, failed: 0, healed: 0, firstHit: 0, countered: 0, dodged: 0 };
+    this.lastFailure = null; this.koReason = null;
+    if (this.enc === 'v1') this.initV1();
+  }
+  get actors() { return this.ally ? [this.p, this.ally] : [this.p]; }
+  alive(a) { return a && a.hp > 0; }
+  emit(e) { e.tick = this.tick; this.fx.push(e); }
+
+  step(cmd) {
+    if (this.outcome !== 'playing') return;
+    this.tick++;
+    for (const a of this.actors) { a.px = a.x; a.py = a.y; }
+    if (this.kit.id === 'healer') this.stepSupport();
+    if (this.alive(this.p)) {
+      if (this.kit.id === 'healer') this.stepHealer(cmd); else if (this.kit.id === 'vanguard') this.stepVanguard(cmd); else this.stepFighter(cmd);
+    } else if (this.opts.ko === 'respawn' && this.tick - this.p.koAt >= 120) {
+      Object.assign(this.p, makeActor(1, SPAWN)); this.p.res = this.kit.start; this.emit({ type: 'respawn', who: 1 });
+    }
+    if (this.ally) this.stepAlly();
+    this.stepEncounter();
+    if (this.bossHp <= 0) { this.outcome = 'victory'; this.hazards = []; this.memory = null; this.emit({ type: 'victory' }); return; }
+    const anyAlive = this.alive(this.p) || (this.opts.ko === 'respawn');
+    if (!anyAlive) { this.outcome = 'defeat'; this.emit({ type: 'defeat' }); }
+  }
+
+  move(a, mx, my, mult) {
+    let len = Math.hypot(mx, my); if (!isFinite(len)) { mx = my = 0; len = 0; }
+    if (len > 1) { mx /= len; my /= len; len = 1; }
+    const sp = SPEED / TICK * mult * (this.tick < a.chillUntil ? HEAL.chillSpeed : 1);
+    a.x += mx * sp; a.y += my * sp; clampArena(a);
+    a.mx = mx; a.my = my; a.moving = len;
+    return len;
+  }
+
+  // ---- Vanguard / Arcanist: mirrors TrainingSim.StepPlayer ----
+  stepFighter(cmd) {
+    const p = this.p, k = this.kit;
+    let mx = cmd.mx, my = cmd.my, len = Math.hypot(mx, my); if (len > 1) { mx /= len; my /= len; len = 1; }
+    const guardReady = this.tick >= p.ready[3];
+    const dashStart = this.wantsDash(cmd);
+    if (p.castUntil && (len > CANCEL_MOVE || dashStart || (cmd.g && guardReady))) {
+      p.ready[p.castSlot] = this.tick + k.slots[p.castSlot].cancelCd; p.castUntil = 0; p.attackUntil = this.tick;
+      this.emit({ type: 'cancel', slot: p.castSlot });
+    }
+    this.updateFacing(cmd, mx, my);
+    if (dashStart) this.startDash(mx, my);
+    if (!this.dashMotion()) { if (!p.castUntil) this.move(p, mx, my, 1); else p.moving = 0; }
+    if (cmd.g && guardReady) {
+      const gd = k.slots[3];
+      p.guardUntil = this.tick + gd.window; p.ready[3] = this.tick + gd.cd;
+      const from = { x: p.x, y: p.y };
+      if (gd.blink && len > 0.01) { p.x += mx / len * gd.blink; p.y += my / len * gd.blink; clampArena(p); }
+      this.emit({ type: 'guard', slot: 3, from, to: { x: p.x, y: p.y } });
+    } else if (cmd.gp && !guardReady) this.emit({ type: 'blocked', slot: 3, why: 'cooling down' });
+    if (p.castUntil && this.tick >= p.castUntil) {
+      p.castUntil = 0; const d = k.slots[p.castSlot];
+      if (dist(p, BOSS) <= d.range) this.damage(p.castSlot, d.dmg); else this.emit({ type: 'blocked', slot: p.castSlot, why: 'fizzled' });
+    }
+    for (const s of [2, 1, 0]) {
+      if (!cmd.held[s]) continue;
+      const why = this.tryAttack(s);
+      if (!why) break;
+      if (cmd.pressed[s]) this.emit({ type: 'blocked', slot: s, why });
+    }
+  }
+  tryAttack(s) {
+    const p = this.p, d = this.kit.slots[s];
+    if (p.castUntil) return 'casting';
+    if (this.tick < p.ready[s]) return 'cooling down';
+    if (this.tick < p.attackUntil) return 'cadence';
+    if (d.res < 0 && p.res < -d.res) return 'need ' + (-d.res) + ' ' + this.kit.resource;
+    if (dist(p, BOSS) > d.range) return 'out of range';
+    p.ready[s] = this.tick + d.cd; p.res = clamp(p.res + (d.res || 0), 0, this.kit.cap);
+    p.lastAction = this.tick; p.lastSlot = s;
+    if (d.cast) { p.castUntil = this.tick + d.cast; p.castSlot = s; p.attackUntil = p.castUntil; this.emit({ type: 'cast', slot: s, until: p.castUntil }); return null; }
+    p.attackUntil = this.tick + CADENCE;
+    this.damage(s, d.dmg);
+    return null;
+  }
+  damage(s, amount, who = 1) {
+    if (this.kit.id === 'healer' && who === 1 && s === 0 && ++this.gleamHits % HEAL.hitsPerFocus === 0) this.focus(1);
+    if (!this.stats.firstHit) this.stats.firstHit = this.tick;
+    this.stats.dmg += amount; if (who === 1) this.stats.bySlot[s] += amount;
+    if (isFinite(this.bossHp)) this.bossHp = Math.max(0, this.bossHp - amount);
+    this.emit({ type: 'hit', slot: s, dmg: amount, who });
+  }
+
+  // ---- Universal Clockstep Dash + Vanguard 2.0: mirrors VanguardKit.cs ----
+  updateFacing(cmd, mx, my) { const p = this.p; if (cmd.ax || cmd.ay) p.face = Math.atan2(cmd.ay, cmd.ax); else if (Math.hypot(mx, my) > 0.2) p.face = Math.atan2(my, mx); }
+  softAssist(range) { const p = this.p; if (dist(p, BOSS) > range + VG.assistRange) return; const a = Math.atan2(BOSS.y - p.y, BOSS.x - p.x); if (Math.abs(angDiff(a, p.face)) <= VG.assistDeg * Math.PI / 180) p.face = a; }
+  inArc(range, arcDeg) { const p = this.p, d = dist(p, BOSS); if (d > range) return false; if (d <= VG.contact) return true; return Math.abs(angDiff(Math.atan2(BOSS.y - p.y, BOSS.x - p.x), p.face)) <= arcDeg * Math.PI / 360; }
+  dashAllowed() { const p = this.p; if (this.kit.id !== 'vanguard' || !p.vAction) return true; if (p.vAction === 'final') return this.tick >= p.vStart + VG.finalCancelAfter; return this.tick > p.vHit; }
+  wantsDash(cmd) {
+    const p = this.p;
+    if (p.dashCharges < DASH.charges && this.tick >= p.dashRechargeAt) { p.dashCharges++; if (p.dashCharges < DASH.charges) p.dashRechargeAt = this.tick + DASH.recharge; }
+    if (cmd.dp) p.bufDash = this.tick;
+    if (!p.bufDash || this.tick - p.bufDash > DASH.buffer) return false;
+    if (p.dashCharges <= 0 || this.tick < p.dashUntil || !this.dashAllowed()) return false;
+    p.bufDash = 0; return true;
+  }
+  startDash(mx, my) {
+    const p = this.p, len = Math.hypot(mx, my);
+    const dx = len > 0.1 ? mx / len : Math.cos(p.face), dy = len > 0.1 ? my / len : Math.sin(p.face);
+    if (p.dashCharges === DASH.charges) p.dashRechargeAt = this.tick + DASH.recharge;
+    p.dashCharges--; p.ddx = dx; p.ddy = dy; p.dashUntil = this.tick + DASH.duration; p.dashIfr = this.tick + DASH.iframes;
+    p.face = Math.atan2(dy, dx); p.lastDashEnd = p.dashUntil; if (this.kit.id === 'vanguard') p.vAction = null;
+    this.emit({ type: 'dash', from: { x: p.x, y: p.y }, dx, dy });
+  }
+  dashMotion() { const p = this.p; if (this.tick >= p.dashUntil) return false; const sp = DASH.distance / DASH.duration; p.x += p.ddx * sp; p.y += p.ddy * sp; clampArena(p); p.moving = 1; p.mx = p.ddx; p.my = p.ddy; return true; }
+  pend(buf, held) { return held || (buf > 0 && this.tick - buf <= DASH.buffer); }
+  stepVanguard(cmd) {
+    const p = this.p, k = this.kit;
+    let mx = cmd.mx, my = cmd.my; const len = Math.hypot(mx, my); if (len > 1) { mx /= len; my /= len; }
+    if (cmd.pressed[0]) p.bufB = this.tick; if (cmd.pressed[1]) p.bufT = this.tick; if (cmd.pressed[2]) p.bufS = this.tick;
+    if (cmd.g && this.tick >= p.ready[3]) { p.guardUntil = this.tick + k.slots[3].window; p.ready[3] = this.tick + k.slots[3].cd; this.emit({ type: 'guard', slot: 3, from: { x: p.x, y: p.y }, to: { x: p.x, y: p.y } }); }
+    else if (cmd.gp && this.tick < p.ready[3]) this.emit({ type: 'blocked', slot: 3, why: 'cooling down' });
+    if (this.wantsDash(cmd)) this.startDash(mx, my);
+    if (this.dashMotion()) { if (cmd.pressed[0]) p.dashAtkQ = true; return; }
+    if (!p.vAction) { this.updateFacing(cmd, mx, my); this.move(p, mx, my, 1); } else { p.moving = 0; this.advanceV(cmd); }
+    if (!p.vAction) this.tryStartV(cmd);
+  }
+  beginV(a, hitAfter, total) { const p = this.p; p.vAction = a; p.vStart = this.tick; p.vHit = this.tick + hitAfter; p.vEnd = this.tick + total; p.lastAction = this.tick; }
+  tryStartV(cmd) {
+    const p = this.p, t = this.tick, h = cmd.held;
+    const sig = this.pend(p.bufS, h[2]), tech = this.pend(p.bufT, h[1]), basic = this.pend(p.bufB, h[0]) || p.dashAtkQ;
+    if (sig) {
+      if (t >= p.ready[2]) { p.bufS = 0; this.updateFacing(cmd, 0, 0); this.softAssist(VG.finalRange); p.ready[2] = t + this.kit.slots[2].cd; this.beginV('final', VG.finalStartup, VG.finalTotal); p.comboNext = 0; p.lastSlot = 2; this.emit({ type: 'finalStart' }); return; }
+      if (cmd.pressed[2]) this.emit({ type: 'blocked', slot: 2, why: 'cooling down' });
+    }
+    if (tech) {
+      if (p.res >= VG.rushCost) {
+        p.bufT = 0; this.updateFacing(cmd, 0, 0); this.softAssist(VG.rushHitRange + VG.rushSpeed * VG.rushTravel);
+        p.res -= VG.rushCost; p.rushEmp = t < p.reversalUntil; if (p.rushEmp) p.reversalUntil = 0;
+        p.rdx = Math.cos(p.face); p.rdy = Math.sin(p.face);
+        this.beginV('rush', VG.rushStartup + VG.rushTravel, VG.rushTotal); p.comboNext = 0; p.lastSlot = 1;
+        this.emit({ type: 'rushStart', empowered: p.rushEmp, from: { x: p.x, y: p.y } }); return;
+      }
+      if (cmd.pressed[1]) this.emit({ type: 'blocked', slot: 1, why: 'need 3 Resonance' });
+    }
+    if (basic) {
+      p.bufB = 0; this.updateFacing(cmd, 0, 0); p.lastSlot = 0;
+      if (p.dashAtkQ || (p.lastDashEnd > 0 && t <= p.lastDashEnd + VG.dashAttackWindow)) {
+        p.lastDashEnd = 0; p.dashAtkQ = false; this.softAssist(VG.dashAttack.range); this.beginV('dashAttack', VG.dashAttack.startup, VG.dashAttack.total); return;
+      }
+      const step = t <= p.comboExpire ? p.comboNext : 0, hit = VG.combo[step];
+      this.softAssist(hit.range); this.beginV('hit' + (step + 1), hit.startup, hit.total); p.vStep = step;
+    }
+  }
+  advanceV(cmd) {
+    const p = this.p, t = this.tick, toBoss = dist(p, BOSS);
+    if (p.vAction === 'dashAttack' || p.vAction.startsWith('hit')) {
+      const hit = p.vAction === 'dashAttack' ? VG.dashAttack : VG.combo[p.vStep];
+      if (t < p.vHit && toBoss > VG.rushStop) { p.x += Math.cos(p.face) * hit.lunge; p.y += Math.sin(p.face) * hit.lunge; clampArena(p); }
+      if (t === p.vHit) this.resolveVHit(hit);
+    } else if (p.vAction === 'rush') {
+      const e = t - p.vStart;
+      if (e < VG.rushStartup) { if (cmd.ax || cmd.ay) { p.face = Math.atan2(cmd.ay, cmd.ax); p.rdx = Math.cos(p.face); p.rdy = Math.sin(p.face); } }
+      else if (e < VG.rushStartup + VG.rushTravel && toBoss > VG.rushStop) { p.x += p.rdx * VG.rushSpeed; p.y += p.rdy * VG.rushSpeed; clampArena(p); p.moving = 1; }
+      if (t === p.vHit) this.resolveRush();
+    } else if (p.vAction === 'final' && t === p.vHit) this.resolveFinal();
+    if (p.vAction && t >= p.vEnd) p.vAction = null;
+  }
+  gainRes(n) { this.p.res = clamp(this.p.res + n, 0, VG.cap); }
+  resolveVHit(hit) {
+    const p = this.p, dashAtk = p.vAction === 'dashAttack', step = dashAtk ? 3 : p.vStep;
+    if (dashAtk) p.comboNext = 0; else { p.comboNext = (p.vStep + 1) % 3; p.comboExpire = p.vEnd + VG.comboWindow; }
+    const landed = this.inArc(hit.range, hit.arcDeg);
+    this.emit({ type: 'vswing', step, landed });
+    if (!landed) { this.emit({ type: 'blocked', slot: 0, why: 'missed' }); return; }
+    this.damage(0, hit.dmg); this.gainRes(1);
+    if (p.vAction === 'hit3') { p.reversalUntil = this.tick + VG.reversalTicks; this.emit({ type: 'reversal', why: 'combo' }); }
+  }
+  resolveRush() {
+    const p = this.p, d = dist(p, BOSS), strike = this.inArc(VG.rushHitRange, VG.rushArcDeg);
+    if (p.rushEmp) {
+      if (strike || d <= VG.shockwave) { this.damage(1, VG.reversalDmg); this.markUntil = this.tick + VG.markTicks; this.emit({ type: 'rushHit', empowered: true }); }
+      else this.emit({ type: 'blocked', slot: 1, why: 'missed' });
+    } else if (strike) { this.damage(1, VG.rushDmg); this.emit({ type: 'rushHit', empowered: false }); }
+    else this.emit({ type: 'blocked', slot: 1, why: 'missed' });
+  }
+  resolveFinal() {
+    if (!this.inArc(VG.finalRange, VG.finalArcDeg)) { this.emit({ type: 'blocked', slot: 2, why: 'missed' }); this.emit({ type: 'finalHit', landed: false }); return; }
+    const marked = this.tick < this.markUntil; if (marked) this.markUntil = 0;
+    this.damage(2, VG.finalDmg + (marked ? VG.finalMarkBonus : 0)); this.emit({ type: 'finalHit', landed: true, marked });
+  }
+
+  // ---- Healer: mirrors Healer.cs ----
+  focus(d) { const b = this.p.res; this.p.res = clamp(b + d, 0, this.kit.cap); if (this.p.res !== b) this.emit({ type: 'focus', amount: this.p.res - b }); }
+  pickTarget(id, range) {
+    let best = null;
+    for (const a of this.actors) {
+      if (!this.alive(a) || dist(this.p, a) > range || (id && id !== a.id)) continue;
+      if (!best || a.hp < best.hp) best = a;
+    }
+    return best;
+  }
+  heal(a, n, src) { if (!this.alive(a)) return; n *= this.hpScale; const actual = Math.min(n, MAXHP - a.hp); a.hp += actual; this.stats.healed += actual; this.emit({ type: 'heal', who: a.id, amount: actual, over: n - actual, src }); }
+  stepSupport() {
+    if (this.alive(this.p) && this.tick % HEAL.regen === 0) this.focus(1);
+    for (const a of this.actors) {
+      if (!this.alive(a)) { a.shield = a.shieldUntil = a.hotNext = a.hotUntil = a.chillUntil = 0; continue; }
+      if (a.shieldUntil && this.tick >= a.shieldUntil) { a.shield = a.shieldUntil = 0; }
+      if (a.chillUntil && this.tick >= a.chillUntil) a.chillUntil = 0;
+      if (a.hotNext && this.tick >= a.hotNext && this.tick <= a.hotUntil) { this.heal(a, 1, 'mendTick'); a.hotNext += HEAL.hotInterval; }
+      if (a.hotUntil && this.tick >= a.hotUntil) a.hotNext = a.hotUntil = 0;
+    }
+  }
+  cancelMend(why) {
+    const p = this.p; if (!p.castUntil) return;
+    p.castUntil = 0; p.ready[1] = this.tick + this.kit.slots[1].cancelCd; p.attackUntil = this.tick; p.castTarget = 0;
+    this.emit({ type: 'cancel', slot: 1, why });
+  }
+  stepHealer(cmd) {
+    const p = this.p, k = this.kit, ward = k.slots[3];
+    let mx = cmd.mx, my = cmd.my, len = Math.hypot(mx, my); if (len > 1) { mx /= len; my /= len; len = 1; }
+    const wardTarget = this.pickTarget(cmd.target, ward.range);
+    const dashStart = this.wantsDash(cmd);
+    if (p.castUntil && (len > CANCEL_MOVE || dashStart || (cmd.g && this.tick >= p.ready[3] && p.res >= ward.cost && wardTarget))) this.cancelMend('interrupted');
+    this.updateFacing(cmd, mx, my);
+    if (dashStart) this.startDash(mx, my);
+    if (!this.dashMotion()) { if (!p.castUntil) this.move(p, mx, my, 1); else p.moving = 0; }
+    if (cmd.g) {
+      const why = this.tick < p.ready[3] ? 'cooling down' : p.res < ward.cost ? 'need Focus' : !wardTarget ? 'no target in range' : null;
+      if (!why) {
+        this.focus(-ward.cost); p.ready[3] = this.tick + ward.cd;
+        wardTarget.shield = 1; wardTarget.shieldUntil = this.tick + HEAL.shieldDur;
+        const cleansed = wardTarget.chillUntil > this.tick; if (cleansed) wardTarget.chillUntil = 0;
+        p.lastAction = this.tick; p.lastSlot = 3;
+        this.emit({ type: 'ward', who: wardTarget.id, cleansed });
+      } else if (cmd.gp) this.emit({ type: 'blocked', slot: 3, why });
+    }
+    if (p.castUntil) {
+      const t = this.pickTarget(p.castTarget, k.slots[1].range);
+      if (!t) this.cancelMend('target out of range');
+      else if (this.tick >= p.castUntil) {
+        p.castUntil = 0; this.heal(t, 1, 'mend');
+        t.hotNext = this.tick + HEAL.hotInterval; t.hotUntil = this.tick + HEAL.hotDuration;
+        this.emit({ type: 'mendDone', who: t.id }); p.castTarget = 0;
+      }
+    }
+    for (const s of [2, 1, 0]) {
+      if (!cmd.held[s]) continue;
+      const why = s === 0 ? this.tryAttack(0) : this.trySupport(s, cmd.target);
+      if (!why) break;
+      if (cmd.pressed[s]) this.emit({ type: 'blocked', slot: s, why });
+    }
+  }
+  trySupport(s, target) {
+    const p = this.p, d = this.kit.slots[s];
+    if (p.castUntil) return 'casting';
+    if (this.tick < p.ready[s]) return 'cooling down';
+    if (this.tick < p.attackUntil) return 'cadence';
+    if (p.res < -d.res) return 'need ' + (-d.res) + ' Focus';
+    const t = s === 2 ? p : this.pickTarget(target, d.range);
+    if (!t) return 'no target in range';
+    this.focus(d.res); p.ready[s] = this.tick + d.cd; p.attackUntil = this.tick + Math.max(CADENCE, d.cast || 0);
+    p.lastAction = this.tick; p.lastSlot = s;
+    if (s === 1) { p.castSlot = 1; p.castUntil = this.tick + d.cast; p.castTarget = t.id; this.emit({ type: 'cast', slot: 1, until: p.castUntil, who: t.id }); }
+    else { for (const a of this.actors) if (this.alive(a) && dist(p, a) <= d.range) this.heal(a, HEAL.area, 'sanctuary'); this.emit({ type: 'sanctuary' }); }
+    return null;
+  }
+
+  // ---- Training ally: walks to the nearest point that satisfies every pending hazard, then attacks ----
+  stepAlly() {
+    const a = this.ally; if (!this.alive(a)) return;
+    let goal = { x: a.x, y: a.y };
+    const react = this.hazards.filter(h => this.tick - h.W >= 22);
+    const ok = q => react.every(h => h.req === 'shelter' ? contains(h, q) : h.req === 'guard' ? true : !contains(h, q));
+    if (!ok(goal)) {
+      let best = null, bd = 1e9;
+      for (let r = 30; r <= 420 && !best; r += 30)
+        for (let i = 0; i < 24; i++) {
+          const q = clampArena({ x: a.x + Math.cos(i / 24 * Math.PI * 2) * r, y: a.y + Math.sin(i / 24 * Math.PI * 2) * r });
+          if (ok(q)) { const d = dist(q, a) + Math.abs(dist(q, BOSS) - 130) * 0.3; if (d < bd) { bd = d; best = q; } }
+        }
+      if (best) goal = best;
+    } else if (!react.length && dist(a, BOSS) > 150) {
+      const ang = Math.atan2(a.y - BOSS.y, a.x - BOSS.x); goal = { x: BOSS.x + Math.cos(ang) * 120, y: BOSS.y + Math.sin(ang) * 120 };
+    }
+    const dx = goal.x - a.x, dy = goal.y - a.y, d = Math.hypot(dx, dy);
+    if (d > 3) this.move(a, dx / d, dy / d, 0.92); else a.moving = 0;
+    if (dist(a, BOSS) <= 155 && this.tick >= a.ready[0]) { a.ready[0] = this.tick + 30; a.lastAction = this.tick; this.damage(0, 3, 2); }
+  }
+
+  // ---- Bellkeeper v1.0 Encounter Director (reference/LAST-BELL-BELLKEEPER-BOSS-DESIGN-v1.0.md §3–§5) ----
+  // HP-based phases, authored pattern blocks, seeded variation chosen at block boundaries, queued phase
+  // transitions, recovery windows after attacks. Geometry locks before resolution and never changes after.
+  initV1() {
+    this.phase = 0; this.queue = []; this.nextAt = this.tick + V1_OPEN_DELAY; this.block = 0; this.lastSide = 1;
+    this.vulnerableUntil = 0; this.vulnerableExtended = false; this.bossMove = null; this.pending = []; this.phaseReached = 0;
+    this.phaseFloor = clamp(this.opts.phase || 0, 0, 2);
+    if (isFinite(this.bossMax) && this.phaseFloor > 0) this.bossHp = Math.round(this.bossMax * V1_PHASE_HP[this.phaseFloor - 1]);
+    this.phase = this.hpPhase(); this.phaseReached = this.phase;
+  }
+  hpPhase() {
+    const frac = isFinite(this.bossMax) ? this.bossHp / this.bossMax : 1;
+    return Math.max(this.phaseFloor, frac > V1_PHASE_HP[0] ? 0 : frac > V1_PHASE_HP[1] ? 1 : 2);
+  }
+  get vulnerable() { return this.tick < this.vulnerableUntil; }
+  buildPatternV1() {
+    const rec = (n, ext) => ({ recover: n, extended: !!ext }), side = () => (this.rng() < 0.5 ? -1 : 1);
+    if (this.phase === 0) // The First Toll: the four verbs separately, fixed order, then a recovery window
+      return [{ a: 'sweep' }, { a: 'toll' }, { a: 'charge' }, { a: 'chime' }, ...(this.opts.strikes ? [{ a: 'strike' }] : []), rec(54)];
+    if (this.phase === 1) { // The Dissonance: blocks A (Pursuit) -> B (Discord) -> C (Reversal)
+      const b = this.block++ % 3;
+      if (b === 0) { this.lastSide = side(); return [{ a: 'charge', side: this.lastSide, after: 6, block: 'A' }, { a: 'toll', after: 0 }, rec(48)]; }
+      if (b === 1) return [{ a: 'chime', after: 6, block: 'B' }, { a: 'sweep', after: 0 }, ...(this.opts.strikes ? [{ a: 'strike', after: 0 }] : []), rec(48)];
+      return [{ a: 'toll', after: 6, block: 'C' }, { a: 'charge', side: -this.lastSide, after: 0 }, rec(48)];
+    }
+    // The Final Toll (signature) alternating with a shorter Pursuit block
+    if (this.block++ % 2 === 0) return [{ a: 'charge', after: 4, block: 'FINAL_TOLL' }, { a: 'toll', after: 4 }, { a: 'chime', after: 4 }, { a: 'sweep', dmg: V1.decisiveDmg, decisive: true, after: 0 }, rec(120, true)];
+    return [{ a: 'charge', side: side(), after: 6, block: 'A' }, { a: 'toll', after: 0 }, rec(48)];
+  }
+  directorV1() {
+    const t = this.tick;
+    if (this.bossMove) { // Pendulum Charge travel
+      const m = this.bossMove, k = Math.min(1, (t - m.t0) / m.dur);
+      BOSS.x = m.from.x + (m.to.x - m.from.x) * k; BOSS.y = m.from.y + (m.to.y - m.from.y) * k;
+      for (const a of this.actors) if (this.alive(a)) clampArena(a);
+      if (k >= 1) this.bossMove = null;
+    }
+    for (let i = this.pending.length - 1; i >= 0; i--) if (t >= this.pending[i].at) { const p = this.pending.splice(i, 1)[0]; this.spawnV1(p.a, p.step); }
+    if (t < this.nextAt || this.bossMove) return;
+    if (!this.queue.length) {
+      if (this.hazards.length || this.pending.length) return; // transitions wait until the active pattern has fully resolved
+      const ph = this.hpPhase();
+      if (ph > this.phase) { this.phase = ph; this.block = 0; this.phaseReached = Math.max(this.phaseReached, ph); this.emit({ type: 'phase', phase: ph }); this.nextAt = t + 60; return; }
+      this.queue = this.buildPatternV1();
+    }
+    const step = this.queue.shift();
+    if (step.recover) { this.vulnerableUntil = t + step.recover; this.vulnerableExtended = step.extended; this.nextAt = t + step.recover; this.emit({ type: 'vulnerable', ticks: step.recover, extended: step.extended }); return; }
+    const end = this.spawnV1(step.a, step);
+    const after = step.after != null ? step.after : (V1[step.a] || ATTACKS[step.a]).recover || 30;
+    this.nextAt = end + after;
+    if (after >= 30) this.vulnerableUntil = this.nextAt; // ordinary recovery interval after a lone attack
+  }
+  spawnV1(id, step = {}) {
+    const t = this.tick, tg = this.target();
+    if (id === 'strike') { this.spawn('strike', {}); const h = this.hazards[this.hazards.length - 1]; if (h) h.dmg = V1.strikeDmg; return h ? h.R : t; }
+    if (id === 'chime') { // solo: sequential delayed markers on the player
+      for (let i = 1; i < V1.chime.count; i++) this.pending.push({ at: t + i * V1.chime.spacing, a: 'chimeMarker', step });
+      this.spawnV1('chimeMarker', step);
+      return t + (V1.chime.count - 1) * V1.chime.spacing + V1.chime.win;
+    }
+    const A = id === 'chimeMarker' ? V1.chime : V1[id];
+    const h = { id: this.nextId++, attack: id, name: A.name, kind: A.kind, req: 'avoid', r: A.r || 0, inner: A.inner || 0, half: A.half || 0,
+      ox: BOSS.x, oy: BOSS.y, dir: 0, W: t, L: t, R: t + A.win, locked: true, dmg: step.dmg || A.dmg, decisive: !!step.decisive, block: step.block || null };
+    if (id === 'sweep') { h.dir = Math.atan2(tg.y - BOSS.y, tg.x - BOSS.x); h.L = t + A.lock; h.locked = false; h.track = true; }
+    if (id === 'chimeMarker') { h.ox = tg.x; h.oy = tg.y; h.L = t + A.lock; h.locked = false; h.follow = true; }
+    if (id === 'charge') {
+      // target location locks at the warning; Phase 2 variations offset the approach left/right of the target
+      const base = Math.atan2(tg.y - BOSS.y, tg.x - BOSS.x), sd = step.side || 0;
+      const aim = { x: tg.x - Math.sin(base) * sd * A.sideOffset, y: tg.y + Math.cos(base) * sd * A.sideOffset };
+      h.dir = Math.atan2(aim.y - BOSS.y, aim.x - BOSS.x);
+      const want = Math.hypot(aim.x - BOSS.x, aim.y - BOSS.y) + A.overshoot, c = Math.cos(h.dir), s = Math.sin(h.dir), m = A.wallMargin;
+      let lim = want; // stop before the arena wall
+      if (c > 1e-6) lim = Math.min(lim, (ARENA.x1 - m - BOSS.x) / c); if (c < -1e-6) lim = Math.min(lim, (ARENA.x0 + m - BOSS.x) / c);
+      if (s > 1e-6) lim = Math.min(lim, (ARENA.y1 - m - BOSS.y) / s); if (s < -1e-6) lim = Math.min(lim, (ARENA.y0 + m - BOSS.y) / s);
+      h.len = Math.max(0, lim); h.inner = A.halfWidth; h.end = { x: BOSS.x + c * h.len, y: BOSS.y + s * h.len }; h.side = sd;
+    }
+    this.hazards.push(h);
+    this.emit({ type: 'warn', id: h.id, attack: id, h });
+    return h.R + (id === 'charge' ? A.travel : 0);
+  }
+
+  // ---- Encounter ----
+  stepEncounter() {
+    const t = this.tick;
+    if (this.enc === 'v1') this.directorV1();
+    else {
+      if (t === ENRAGE) { this.hazards = []; this.memory = null; this.emit({ type: 'enrage' }); }
+      if (t >= ENRAGE && (t - ENRAGE) % 90 === 0) this.spawn('final', {});
+      while (this.schedIndex < this.schedule.length && this.schedule[this.schedIndex][0] <= t) {
+        const e = this.schedule[this.schedIndex++];
+        if (e[0] === t && t < ENRAGE) this.spawn(e[1], e[2] || {});
+      }
+    }
+    for (const h of this.hazards) if (!h.locked) {
+      if (h.track) h.dir = Math.atan2(this.p.y - h.oy, this.p.x - h.ox);
+      if (h.follow) { h.ox = this.p.x; h.oy = this.p.y; }
+      if (t >= h.L) { h.locked = true; this.emit({ type: 'lock', id: h.id }); }
+    }
+    const due = this.hazards.filter(h => t >= h.R);
+    this.hazards = this.hazards.filter(h => t < h.R);
+    for (const h of due) this.resolve(h);
+    if (this.memory && this.memory.until && t >= this.memory.until) this.memory = null;
+  }
+  target() { return this.alive(this.p) ? this.p : this.ally && this.alive(this.ally) ? this.ally : this.p; }
+  spawn(id, extra) {
+    const A = ATTACKS[id], t = this.tick, tg = this.target();
+    const h = { id: this.nextId++, attack: id, name: A.name, kind: A.kind, req: A.req, r: A.r, inner: A.inner || 0, half: A.half || 0,
+      ox: BOSS.x, oy: BOSS.y, dir: 0, W: t, L: t, R: t + (extra.win || A.win), locked: true, record: !!extra.record };
+    if (id === 'sweep') h.dir = Math.atan2(tg.y - BOSS.y, tg.x - BOSS.x) + (this.rng() * 0.3 - 0.15);
+    if (id === 'tracking') { h.dir = Math.atan2(tg.y - BOSS.y, tg.x - BOSS.x); h.L = t + A.lock; h.locked = false; h.track = true; }
+    if (id === 'lingering') { h.ox = tg.x; h.oy = tg.y; h.L = t + A.lock; h.locked = false; h.follow = true; }
+    if (id === 'sanctuary') { const right = this.rng() < 0.5; h.ox = right ? 610 : 330; h.oy = 560; }
+    if (id === 'strike') { h.ox = tg.x; h.oy = tg.y; h.counterable = true; }
+    if (id === 'echo') {
+      if (!this.retained) return; // nothing recorded yet (practice start); skip
+      Object.assign(h, { kind: 'cone', r: this.retained.r, half: this.retained.half, dir: this.retained.dir, ox: this.retained.ox, oy: this.retained.oy, echoOf: this.retained });
+      if (this.memory) this.memory.until = h.R;
+    }
+    this.hazards.push(h);
+    this.emit({ type: 'warn', id: h.id, attack: id, h });
+  }
+  resolve(h) {
+    if (h.attack === 'charge' && h.end) { this.bossMove = { from: { x: h.ox, y: h.oy }, to: h.end, t0: this.tick, dur: V1.charge.travel }; this.emit({ type: 'chargeGo', h }); }
+    this.emit({ type: 'resolve', id: h.id, h });
+    if (h.record) { this.retained = { r: h.r, half: h.half, dir: h.dir, ox: h.ox, oy: h.oy, name: h.name, at: h.R }; this.memory = { ...this.retained, until: 0 }; }
+    for (const a of this.actors) {
+      if (!this.alive(a)) continue;
+      const inside = contains(h, a);
+      if (a === this.p && this.kit.id === 'vanguard' && h.counterable && inside && this.tick < a.guardUntil) { // precision counter
+        this.gainRes(1); a.reversalUntil = this.tick + VG.reversalTicks; this.stats.countered++;
+        this.emit({ type: 'outcome', who: a.id, outcome: 'countered', h, failed: false }); this.emit({ type: 'counter' }); this.emit({ type: 'reversal', why: 'counter' });
+        continue;
+      }
+      const failed = h.req === 'shelter' ? !inside : h.req === 'guard' ? this.tick >= a.guardUntil : inside;
+      let outcome = 'avoided';
+      if (failed) {
+        if (h.req !== 'guard' && this.tick < a.guardUntil) outcome = 'guarded';
+        else if (h.req === 'guard' && this.tick < a.guardUntil) outcome = 'guarded';
+        else if (h.req !== 'guard' && this.tick < a.dashIfr) outcome = 'dodged'; // i-frames prevent damage; positioning still failed; never saves the enrage
+        else if (this.tick < a.immuneUntil) outcome = 'immune';
+        else if (this.opts.inv) outcome = 'invulnerable';
+        else if (a.shield > 0 && this.tick < a.shieldUntil) { a.shield--; a.immuneUntil = this.tick + IMMUNE; outcome = 'shielded'; }
+        else {
+          a.hp = Math.max(0, a.hp - (h.dmg || 1)); a.immuneUntil = this.tick + IMMUNE; outcome = 'hit';
+          if (this.kit.id === 'healer') a.chillUntil = this.tick + HEAL.chill;
+          if (a === this.p && this.kit.id === 'healer') this.cancelMend('damage');
+          if (a === this.p && a.castUntil) { a.castUntil = 0; }
+        }
+      } else if (h.req === 'guard') outcome = 'guarded';
+      if (a === this.p) {
+        if (outcome === 'avoided') this.stats.avoided++; else { this.stats.failed++; if (outcome === 'guarded') this.stats.guarded++; if (outcome === 'hit') this.stats.hits++; if (outcome === 'dodged') this.stats.dodged++; }
+        if (outcome !== 'avoided') this.lastFailure = { h, outcome, tick: this.tick };
+      }
+      this.emit({ type: 'outcome', who: a.id, outcome, h, failed });
+      if (a.hp <= 0 && outcome === 'hit') {
+        a.koAt = this.tick; a.castUntil = 0; a.shield = 0; a.hotUntil = a.hotNext = 0;
+        if (a === this.p) this.koReason = { h, tick: this.tick };
+        this.emit({ type: 'ko', who: a.id });
+      }
+    }
+  }
+}
+
+/* =====================================================================
+   PRESENTATION
+   ===================================================================== */
+const S = 1 / 40;                       // world units per combat unit
+const W = (x, y, h = 0) => new THREE.Vector3((x - ORIGIN.x) * S, h, (y - ORIGIN.y) * S);
+const yawToward = (dx, dy) => Math.atan2(dx, dy); // plane delta -> model yaw (model faces +Z)
+
+const canvas = document.getElementById('view');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
+const scene = new THREE.Scene(); // fog, sky and the key light come from arena-env.js
+const camera = new THREE.PerspectiveCamera(44, 1, 0.1, 900);
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.42, 0.4, 0.9);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+// ---- Lights: the sunset sun, sky fill and bounce come from arena-env.js; characters keep a teal rim (art bible §6.1) ----
+const rim = new THREE.DirectionalLight(0x7fe3ff, 1.1); rim.position.set(6, 6, -14); scene.add(rim);
+const bellGlow = new THREE.PointLight(0xffb85a, 6, 9, 1.8); bellGlow.position.set(0, 2.2, 0); scene.add(bellGlow);
+
+// ---- Toon materials: 3 broad tone bands, coloured shadows ----
+const ramp = new THREE.DataTexture(new Uint8Array([70, 70, 70, 255, 150, 150, 150, 255, 255, 255, 255, 255]), 3, 1, THREE.RGBAFormat);
+ramp.minFilter = ramp.magFilter = THREE.NearestFilter; ramp.needsUpdate = true;
+const matCache = new Map();
+function M(color, o = {}) {
+  const k = color + JSON.stringify(o);
+  if (!o.unique && matCache.has(k)) return matCache.get(k);
+  const m = new THREE.MeshToonMaterial({ color, gradientMap: ramp, ...('emissive' in o ? { emissive: o.emissive, emissiveIntensity: o.ei ?? 1 } : {}), side: o.side ?? THREE.FrontSide, transparent: !!o.opacity, opacity: o.opacity ?? 1 });
+  if (!o.unique) matCache.set(k, m);
+  return m;
+}
+const G = (color, k = 1.6) => new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(k), toneMapped: true });
+const ADD = (color, k = 1.5, opacity = 1) => new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(k), transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+function mesh(geo, mat, parent, pos, rot, scale) {
+  const m = new THREE.Mesh(geo, mat); m.castShadow = true; m.receiveShadow = true;
+  if (pos) m.position.set(...pos); if (rot) m.rotation.set(...rot); if (scale) (typeof scale === 'number' ? m.scale.setScalar(scale) : m.scale.set(...scale));
+  if (parent) parent.add(m); return m;
+}
+function group(parent, pos) { const g = new THREE.Group(); if (pos) g.position.set(...pos); if (parent) parent.add(g); return g; }
+function bellGeo(r, h, seg = 32) {
+  const pts = [];
+  for (let i = 0; i <= 14; i++) {
+    const t = i / 14;
+    const rr = r * (0.42 + 0.58 * Math.pow(t, 2.2)) + (t > 0.9 ? r * 0.12 * (t - 0.9) / 0.1 : 0);
+    pts.push(new THREE.Vector2(t === 0 ? 0.001 : rr, h * (1 - t)));
+  }
+  return new THREE.LatheGeometry(pts, seg);
+}
+const C = { cobalt: 0x17263F, slate: 0x314C69, brass: 0xC38D46, gold: 0xF6C968, ivory: 0xF4E9D1, violet: 0x655491, teal: 0x55C9CE, coral: 0xEB685D, ink: 0x101825, lavender: 0xA8A4D1 };
+
+/* ---------- Environment: the Bellkeeper's Dais from the key art (arena-env.js, shared with arena-look.html) ---------- */
+window.THREE = THREE;
+await new Promise(res => { const sc = document.createElement('script'); sc.src = 'arena-env.js'; sc.onload = res; sc.onerror = res; document.head.appendChild(sc); });
+const arenaEnv = window.buildArenaEnv ? window.buildArenaEnv(THREE, scene, { sunIntensity: 2.3 }) : { update() {} };
+// drifting motes (kept above the play plane; dimmed during hazards)
+const moteGeo = new THREE.BufferGeometry(); const moteN = 160, motePos = new Float32Array(moteN * 3);
+for (let i = 0; i < moteN; i++) { motePos[i * 3] = (Math.random() - 0.5) * 40; motePos[i * 3 + 1] = 2 + Math.random() * 10; motePos[i * 3 + 2] = (Math.random() - 0.5) * 30 - 2; }
+moteGeo.setAttribute('position', new THREE.BufferAttribute(motePos, 3));
+const motes = new THREE.Points(moteGeo, new THREE.PointsMaterial({ color: 0xffd98a, size: 0.09, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false }));
+scene.add(motes);
+
+/* ---------- Characters (procedural, art bible §9) ---------- */
+function blobShadow(parent, r) {
+  const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+  const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(10,12,30,0.55)'); gr.addColorStop(1, 'rgba(10,12,30,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(r * 2, r * 2), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false }));
+  m.rotation.x = -Math.PI / 2; m.position.y = 0.012; parent.add(m); return m;
+}
+function limb(parent, pos, len, r, mat) { const pivot = group(parent, pos); mesh(new THREE.CapsuleGeometry(r, len, 4, 10), mat, pivot, [0, -len / 2 - r * 0.5, 0]); return pivot; }
+
+function buildVanguard(palette = {}) {
+  const P = { enamel: 0x2a56a8, dark: 0x1a2f5c, trim: C.brass, cloth: C.ivory, glow: C.gold, ...palette };
+  const root = new THREE.Group(), body = group(root);
+  const enamel = M(P.enamel), dark = M(P.dark), trim = M(P.trim), cloth = M(P.cloth);
+  const legL = limb(body, [-0.13, 0.46, 0], 0.22, 0.095, dark), legR = limb(body, [0.13, 0.46, 0], 0.22, 0.095, dark);
+  mesh(new THREE.BoxGeometry(0.17, 0.1, 0.24), trim, legL, [0, -0.4, 0.03]); mesh(new THREE.BoxGeometry(0.17, 0.1, 0.24), trim, legR, [0, -0.4, 0.03]);
+  const skirt = mesh(new THREE.CylinderGeometry(0.2, 0.34, 0.32, 10, 1, true), M(P.cloth, { side: THREE.DoubleSide }), body, [0, 0.52, 0]);
+  const torso = group(body, [0, 0.82, 0]);
+  mesh(new THREE.SphereGeometry(0.31, 16, 12), enamel, torso, [0, 0, 0], null, [1.12, 1.05, 0.82]);
+  mesh(new THREE.TorusGeometry(0.27, 0.035, 6, 24), trim, torso, [0, -0.17, 0], [Math.PI / 2, 0, 0], [1.1, 0.85, 1]);
+  const emblem = mesh(bellGeo(0.06, 0.12, 12), G(P.glow, 2.2), torso, [0, 0.02, 0.26], [Math.PI / 2, 0, 0]);
+  for (const s of [-1, 1]) {
+    mesh(new THREE.SphereGeometry(0.17, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), trim, torso, [s * 0.33, 0.13, 0], [0, 0, s * -0.35], [1.25, 1, 1.1]);
+  }
+  const head = group(body, [0, 1.2, 0]);
+  mesh(new THREE.SphereGeometry(0.17, 16, 12), enamel, head);
+  mesh(new THREE.SphereGeometry(0.135, 14, 10, -Math.PI / 2, Math.PI, 0.5, 1.6), cloth, head, [0, -0.02, 0.06]);
+  mesh(new THREE.BoxGeometry(0.035, 0.12, 0.3), trim, head, [0, 0.17, -0.02]);
+  mesh(new THREE.BoxGeometry(0.1, 0.018, 0.02), G(P.glow, 2), head, [0, 0.0, 0.18]);
+  const cape = group(torso, [0, 0.16, -0.2]);
+  const capeMesh = mesh(new THREE.PlaneGeometry(0.5, 0.62, 1, 4), M(P.dark, { side: THREE.DoubleSide }), cape, [0, -0.31, 0]);
+  const armL = limb(torso, [-0.38, 0.1, 0], 0.2, 0.075, enamel), armR = limb(torso, [0.38, 0.1, 0], 0.2, 0.075, enamel);
+  // semicircular brass guard plate (left)
+  const shield = group(armL, [-0.06, -0.32, 0.12]);
+  mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.05, 24, 1, false, 0, Math.PI), trim, shield, [0, 0, 0], [0, Math.PI / 2, Math.PI / 2]);
+  mesh(new THREE.TorusGeometry(0.34, 0.025, 6, 24, Math.PI), cloth, shield, [0.03, 0, 0], [0, Math.PI / 2, 0]);
+  mesh(bellGeo(0.06, 0.1, 10), G(P.glow, 2), shield, [0.04, 0.12, 0], [0, 0, -Math.PI / 2]);
+  // clock-hand blade (right)
+  const sword = group(armR, [0, -0.36, 0.04]);
+  const bladeShape = new THREE.Shape(); bladeShape.moveTo(0, 0); bladeShape.lineTo(0.07, 0.18); bladeShape.lineTo(0.03, 0.9); bladeShape.lineTo(0, 1.02); bladeShape.lineTo(-0.03, 0.9); bladeShape.lineTo(-0.07, 0.18); bladeShape.closePath();
+  const bladeGeo = new THREE.ExtrudeGeometry(bladeShape, { depth: 0.025, bevelEnabled: true, bevelThickness: 0.01, bevelSize: 0.01, bevelSegments: 1 });
+  bladeGeo.translate(0, 0, -0.0125);
+  const blade = mesh(bladeGeo, M(0xe6c47e), sword, [0, 0.08, 0], [Math.PI / 2, 0, 0]);
+  mesh(new THREE.TorusGeometry(0.07, 0.02, 6, 16), trim, sword, [0, 0, 0.3], [0, 0, 0]);
+  const edge = mesh(new THREE.BoxGeometry(0.01, 0.012, 0.72), G(P.glow, 2.4), sword, [0, 0.03, 0.62]);
+  mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.2, 8), dark, sword, [0, 0, -0.05], [Math.PI / 2, 0, 0]);
+  blobShadow(root, 0.5);
+  return { root, body, torso, head, legL, legR, armL, armR, cape: capeMesh, weapon: sword, glow: [emblem, edge], kind: 'vanguard', height: 1.45 };
+}
+
+// <vanguard-model> — source of truth; copied into index.html and mockup.html by sync-model.ps1.
+// Vanguard baseline from reference/LAST-BELL-VANGUARD-MOCKUP.png: blue hood with cyan eyes, faceted
+// gold-over-navy armour, layered pauldrons, cyan diamond runes, blue tabards and cape, crystal cyan
+// sword with gold crossguard, gold-rimmed heater shield with a glowing spiral rune.
+// Needs THREE plus the page's M(color, opts) lit-material factory and G(color, k) glow factory.
+// Faces +Z, feet at y = 0, about 1.5 units tall. The sword arm is the character's right (-X).
+function facetGeo(geo) { const g = geo.index ? geo.toNonIndexed() : geo; g.computeVertexNormals(); return g; }
+const VANGUARD_RUNE_TEX = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d');
+  g.translate(128, 128); g.lineCap = 'square'; g.lineJoin = 'miter';
+  const spiral = [[0, 0], [22, 0], [22, 22], [-30, 22], [-30, -34], [46, -34], [46, 50], [-62, 50], [-62, -66], [70, -66]];
+  for (const [w, a] of [[30, 0.25], [18, 0.6], [9, 1]]) { g.strokeStyle = `rgba(190,248,255,${a})`; g.lineWidth = w; g.beginPath(); spiral.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.stroke(); }
+  g.fillStyle = '#e8fcff'; g.beginPath(); g.moveTo(58, 74); g.lineTo(84, 74); g.lineTo(71, 50); g.closePath(); g.fill();
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+})();
+function buildVanguardModel(M, G, palette = {}) {
+  const P = { cloth: 0x2050cc, clothDark: 0x163891, navy: 0x1b2343, navy2: 0x283258, gold: 0xd9a64c, goldDark: 0xa9772f, glow: 0x5fe3ff, face: 0x04060d, ...palette };
+  const DS = THREE.DoubleSide;
+  const cloth = M(P.cloth, { side: DS }), clothD = M(P.clothDark, { side: DS }), navy = M(P.navy), navy2 = M(P.navy2);
+  const gold = M(P.gold, { metal: 1 }), goldD = M(P.goldDark, { metal: 1 }), glow = G(P.glow, 2.6), glowSoft = G(P.glow, 1.6);
+  const mk = (geo, mat, parent, pos, rot, scale) => { const m = new THREE.Mesh(geo, mat); m.castShadow = true; m.receiveShadow = true; if (pos) m.position.set(...pos); if (rot) m.rotation.set(...rot); if (scale) m.scale.set(...scale); parent.add(m); return m; };
+  const grp = (parent, x = 0, y = 0, z = 0) => { const g = new THREE.Group(); g.position.set(x, y, z); parent.add(g); return g; };
+  const F = facetGeo;
+  const root = new THREE.Group(), body = grp(root);
+
+  // ---- legs: navy thigh, gold knee, faceted gold greave, navy boot with gold toe ----
+  const leg = side => {
+    const hip = grp(body, side * 0.13, 0.62, 0);
+    mk(F(new THREE.CylinderGeometry(0.11, 0.094, 0.3, 6)), navy, hip, [0, -0.16, 0]);
+    mk(F(new THREE.BoxGeometry(0.14, 0.17, 0.05)), gold, hip, [side * 0.01, -0.1, 0.1], [-0.12, 0, side * 0.08]);
+    mk(F(new THREE.OctahedronGeometry(0.095)), gold, hip, [0, -0.33, 0.06], null, [1.05, 0.9, 0.85]);
+    mk(F(new THREE.CylinderGeometry(0.105, 0.078, 0.26, 5)), gold, hip, [0, -0.47, 0.012]);
+    mk(F(new THREE.BoxGeometry(0.04, 0.2, 0.03)), goldD, hip, [0, -0.46, 0.105]);
+    mk(F(new THREE.BoxGeometry(0.16, 0.09, 0.27)), navy, hip, [0, -0.595, 0.04]);
+    mk(F(new THREE.ConeGeometry(0.08, 0.11, 4)), gold, hip, [0, -0.595, 0.185], [Math.PI / 2, Math.PI / 4, 0]);
+    return hip;
+  };
+  const legL = leg(1), legR = leg(-1);
+
+  // ---- hips: belt with glowing buckle, gold faulds, blue tabards front and back ----
+  mk(F(new THREE.CylinderGeometry(0.205, 0.2, 0.075, 8)), navy2, body, [0, 0.665, 0]);
+  mk(F(new THREE.OctahedronGeometry(0.055)), gold, body, [0, 0.665, 0.2], null, [1, 1, 0.5]);
+  mk(F(new THREE.OctahedronGeometry(0.028)), glow, body, [0, 0.665, 0.225], null, [1, 1, 0.5]);
+  for (const s of [-1, 1]) mk(F(new THREE.BoxGeometry(0.14, 0.17, 0.2)), gold, body, [s * 0.2, 0.56, 0], [0, 0, s * 0.35]);
+  const tabardShape = (w, h) => { const t = new THREE.Shape(); t.moveTo(-w, 0); t.lineTo(w, 0); t.lineTo(w * 0.8, -h * 0.85); t.lineTo(0, -h); t.lineTo(-w * 0.8, -h * 0.85); t.closePath(); return t; };
+  for (const [z, ry] of [[0.17, 0], [-0.16, Math.PI]]) {
+    const tg = grp(body, 0, 0.64, z); tg.rotation.set(0.08 * (z > 0 ? 1 : -1), ry, 0);
+    mk(F(new THREE.ExtrudeGeometry(tabardShape(0.13, 0.36), { depth: 0.012, bevelEnabled: false })), gold, tg, [0, 0.005, -0.004]);
+    mk(F(new THREE.ExtrudeGeometry(tabardShape(0.11, 0.32), { depth: 0.012, bevelEnabled: false })), cloth, tg, [0, -0.005, 0.006]);
+  }
+
+  // ---- torso: navy core, faceted gold breastplate, cyan diamond emblem ----
+  const torso = grp(body, 0, 0.68, 0);
+  mk(F(new THREE.CylinderGeometry(0.235, 0.19, 0.42, 6)), navy, torso, [0, 0.2, 0], null, [1, 1, 0.78]);
+  mk(F(new THREE.CylinderGeometry(0.275, 0.205, 0.35, 6, 1, false, -Math.PI / 2, Math.PI)), gold, torso, [0, 0.24, 0.01], null, [1, 1, 0.9]);
+  mk(F(new THREE.BoxGeometry(0.2, 0.06, 0.06)), goldD, torso, [0, 0.03, 0.14]);
+  mk(F(new THREE.OctahedronGeometry(0.075)), goldD, torso, [0, 0.27, 0.235], null, [1, 1.15, 0.45]);
+  mk(F(new THREE.OctahedronGeometry(0.048)), glow, torso, [0, 0.27, 0.258], null, [1, 1.15, 0.4]);
+  // high cowl / scarf over the shoulders
+  mk(F(new THREE.CylinderGeometry(0.12, 0.25, 0.15, 7)), clothD, torso, [0, 0.44, -0.01]);
+
+  // ---- pauldrons: three stacked faceted gold plates per side ----
+  for (const s of [-1, 1]) {
+    const pg = grp(torso, s * 0.3, 0.39, 0); pg.rotation.z = s * -0.45; pg.scale.setScalar(1.12);
+    [[0.19, 0, 0], [0.165, 0.05, -0.07], [0.14, 0.09, -0.13]].forEach(([r, dx, dy], i) => {
+      mk(F(new THREE.SphereGeometry(r, 6, 3, 0, Math.PI * 2, 0, Math.PI / 2)), i === 1 ? goldD : gold, pg, [s * dx, dy, 0], null, [1.15, 0.75, 1.1]);
+    });
+    mk(F(new THREE.ConeGeometry(0.035, 0.1, 4)), gold, pg, [s * 0.05, 0.12, 0], [0, 0, s * -0.5]);
+  }
+
+  // ---- arms: navy sleeve, gold elbow, flared faceted gauntlet ----
+  const arm = side => {
+    const sh = grp(torso, side * 0.335, 0.31, 0);
+    mk(F(new THREE.CylinderGeometry(0.09, 0.078, 0.22, 6)), navy, sh, [0, -0.12, 0]);
+    mk(F(new THREE.OctahedronGeometry(0.078)), gold, sh, [0, -0.25, 0.01]);
+    mk(F(new THREE.CylinderGeometry(0.118, 0.082, 0.18, 6)), gold, sh, [0, -0.34, 0]);
+    mk(F(new THREE.BoxGeometry(0.105, 0.09, 0.115)), navy2, sh, [0, -0.45, 0.01]);
+    return sh;
+  };
+  const armR = arm(-1), armL = arm(1);
+
+  // ---- hood: faceted blue hood open at the front, void face, slanted glowing eyes ----
+  const head = grp(torso, 0, 0.6, 0.01);
+  mk(F(new THREE.SphereGeometry(0.19, 8, 6, Math.PI / 2 + 0.6, Math.PI * 2 - 1.2, 0, Math.PI * 0.84)), cloth, head, [0, 0, 0], null, [1.05, 1.08, 1.12]);
+  mk(F(new THREE.ConeGeometry(0.075, 0.16, 6)), cloth, head, [0, 0.07, -0.18], [-2.1, 0, 0]);
+  mk(new THREE.SphereGeometry(0.135, 10, 8), M(P.face), head, [0, -0.01, 0.035], null, [1, 1.05, 0.8]);
+  for (const s of [-1, 1]) mk(new THREE.BoxGeometry(0.055, 0.017, 0.01), glow, head, [s * 0.048, 0.0, 0.142], [0, s * 0.25, s * 0.28]);
+
+  // ---- cape: long, faceted, angular hem ----
+  const capeGeo = new THREE.PlaneGeometry(0.7, 1.0, 8, 6);
+  const cp = capeGeo.attributes.position;
+  for (let i = 0; i < cp.count; i++) {
+    const x = cp.getX(i), y = cp.getY(i), t = (0.5 - y);           // 0 top .. 1 bottom
+    const hem = Math.abs(y + 0.5) < 1e-3 ? (Math.round((x + 0.35) / 0.0875) % 2 ? -0.08 : 0.02) : 0;
+    cp.setXYZ(i, x * (0.72 + t * 0.6), y + hem, -Math.pow(Math.max(0, t), 1.5) * 0.28 - x * x * 0.5 + Math.sin(x * 17) * 0.065 * Math.min(1, t * 1.6));
+  }
+  capeGeo.translate(0, -0.5, 0);
+  const cape = mk(F(capeGeo), M(P.capeTone ?? 0x14306f, { side: DS }), torso, [0, 0.43, -0.19]);
+
+  // ---- sword: crystal cyan blade with rune strips, angular gold crossguard ----
+  const sword = grp(armR, 0, -0.47, 0.03);
+  const bs = new THREE.Shape(); bs.moveTo(0, 0); bs.lineTo(0.055, 0.07); bs.lineTo(0.048, 0.82); bs.lineTo(0, 0.96); bs.lineTo(-0.048, 0.82); bs.lineTo(-0.055, 0.07); bs.closePath();
+  const bladeGeo = F(new THREE.ExtrudeGeometry(bs, { depth: 0.016, bevelEnabled: true, bevelThickness: 0.012, bevelSize: 0.012, bevelSegments: 1 })); bladeGeo.translate(0, 0, -0.008);
+  const blade = mk(bladeGeo, M(0x3aa8ff, { emissive: 0x1a78d6, ei: 1.15 }), sword, [0, 0, 0.12], [Math.PI / 2, 0, 0]);
+  const runes = [];
+  for (let i = 0; i < 4; i++) runes.push(mk(new THREE.BoxGeometry(0.018, 0.018, 0.09), glow, sword, [0, 0.022, 0.26 + i * 0.17]));
+  mk(F(new THREE.BoxGeometry(0.008, 0.03, 0.8)), glowSoft, sword, [0, 0, 0.55]);
+  for (const s of [-1, 1]) mk(F(new THREE.BoxGeometry(0.16, 0.05, 0.05)), gold, sword, [s * 0.09, 0, 0.11], [0, 0, s * 0.25]);
+  mk(F(new THREE.OctahedronGeometry(0.045)), gold, sword, [0, 0, 0.11]);
+  mk(F(new THREE.OctahedronGeometry(0.022)), glow, sword, [0, 0.03, 0.11]);
+  mk(F(new THREE.CylinderGeometry(0.022, 0.022, 0.14, 6)), navy2, sword, [0, 0, 0.03], [Math.PI / 2, 0, 0]);
+  mk(F(new THREE.OctahedronGeometry(0.03)), gold, sword, [0, 0, -0.05]);
+
+  // ---- shield: gold-rimmed heater shield, navy face, glowing spiral rune ----
+  const shield = grp(armL, 0.08, -0.4, 0.1); shield.rotation.set(0, 0.55, 0);
+  const heater = k => { const s = new THREE.Shape(); s.moveTo(-0.27 * k, 0.32 * k); s.lineTo(0.27 * k, 0.32 * k); s.lineTo(0.29 * k, 0.06 * k); s.quadraticCurveTo(0.26 * k, -0.26 * k, 0, -0.44 * k); s.quadraticCurveTo(-0.26 * k, -0.26 * k, -0.29 * k, 0.06 * k); s.closePath(); return s; };
+  mk(F(new THREE.ExtrudeGeometry(heater(1), { depth: 0.04, bevelEnabled: true, bevelThickness: 0.02, bevelSize: 0.02, bevelSegments: 1, curveSegments: 4 })), gold, shield, [0, 0, -0.02]);
+  mk(F(new THREE.ExtrudeGeometry(heater(0.84), { depth: 0.02, bevelEnabled: true, bevelThickness: 0.01, bevelSize: 0.01, bevelSegments: 1, curveSegments: 4 })), navy, shield, [0, 0.005, 0.035]);
+  const rune = mk(new THREE.PlaneGeometry(0.36, 0.36), new THREE.MeshBasicMaterial({ map: VANGUARD_RUNE_TEX, color: new THREE.Color(P.glow).multiplyScalar(2.2), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }), shield, [0, -0.02, 0.07]);
+  rune.castShadow = false;
+  for (const [x, y] of [[-0.2, 0.24], [0.2, 0.24], [0, -0.33]]) mk(F(new THREE.OctahedronGeometry(0.025)), goldD, shield, [x, y, 0.06]);
+
+  return { root, body, torso, head, legL, legR, armL, armR, cape, weapon: sword, shield, glow: [blade, rune, ...runes], kind: 'vanguard', height: 1.5 };
+}
+// </vanguard-model>
+function buildVanguardV(palette) { const v = buildVanguardModel(M, G, palette); blobShadow(v.root, 0.5); return v; }
+
+function buildArcanist() {
+  const root = new THREE.Group(), body = group(root);
+  const robe = M(C.violet), robeDark = M(0x3d3270), teal = M(C.teal), ivory = M(C.ivory), gold = M(C.brass);
+  const legL = limb(body, [-0.08, 0.4, 0], 0.16, 0.07, robeDark), legR = limb(body, [0.08, 0.4, 0], 0.16, 0.07, robeDark);
+  mesh(new THREE.CylinderGeometry(0.14, 0.34, 0.85, 12, 1, true), M(C.violet, { side: THREE.DoubleSide }), body, [0, 0.5, 0]);
+  mesh(new THREE.TorusGeometry(0.33, 0.03, 6, 24), teal, body, [0, 0.1, 0], [Math.PI / 2, 0, 0]);
+  const tails = group(body, [0, 0.8, -0.12]);
+  const tailL = mesh(new THREE.PlaneGeometry(0.14, 0.9, 1, 4), M(0x4a3d86, { side: THREE.DoubleSide }), tails, [-0.09, -0.45, 0], [0.12, 0, 0.06]);
+  const tailR = mesh(new THREE.PlaneGeometry(0.14, 0.9, 1, 4), M(C.teal, { side: THREE.DoubleSide }), tails, [0.09, -0.45, 0], [0.12, 0, -0.06]);
+  const torso = group(body, [0, 0.98, 0]);
+  mesh(new THREE.CylinderGeometry(0.16, 0.14, 0.34, 12), robe, torso);
+  mesh(new THREE.BoxGeometry(0.06, 0.3, 0.05), ivory, torso, [0, 0, 0.14]);
+  // tall flared collar
+  mesh(new THREE.CylinderGeometry(0.25, 0.15, 0.3, 14, 1, true, Math.PI * 0.25, Math.PI * 1.5), M(C.teal, { side: THREE.DoubleSide }), torso, [0, 0.26, -0.02]);
+  const head = group(body, [0, 1.33, 0]);
+  mesh(new THREE.SphereGeometry(0.13, 14, 12), ivory, head);
+  mesh(new THREE.SphereGeometry(0.145, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), M(0x2a2350), head, [0, 0.01, -0.02]);
+  mesh(new THREE.TorusGeometry(0.135, 0.016, 6, 24), gold, head, [0, 0.04, 0], [Math.PI / 2 - 0.15, 0, 0]);
+  mesh(new THREE.OctahedronGeometry(0.03), G(C.teal, 2.4), head, [0, 0.07, 0.14]);
+  const armL = limb(torso, [-0.2, 0.1, 0], 0.22, 0.055, robe), armR = limb(torso, [0.2, 0.1, 0], 0.22, 0.055, robe);
+  for (const a of [armL, armR]) mesh(new THREE.ConeGeometry(0.1, 0.2, 10, 1, true), M(C.violet, { side: THREE.DoubleSide }), a, [0, -0.3, 0], [Math.PI, 0, 0]);
+  // floating astrolabe behind the right shoulder
+  const device = group(body, [0.32, 1.45, -0.28]);
+  const dRing = mesh(new THREE.TorusGeometry(0.26, 0.022, 8, 40), gold, device);
+  const dRing2 = mesh(new THREE.TorusGeometry(0.2, 0.012, 6, 36), teal, device, null, [Math.PI / 2, 0, 0]);
+  const dc = document.createElement('canvas'); dc.width = dc.height = 256; const g = dc.getContext('2d');
+  g.translate(128, 128); g.strokeStyle = '#bff8ff'; g.lineWidth = 3; g.beginPath(); g.arc(0, 0, 110, 0, 7); g.stroke();
+  for (let i = 0; i < 8; i++) { g.rotate(Math.PI / 4); g.beginPath(); g.moveTo(0, -20); g.lineTo(0, -110); g.stroke(); }
+  g.fillStyle = '#ffffff'; for (let i = 0; i < 14; i++) { const a = i * 2.4, r = 30 + (i * 37) % 70; g.beginPath(); g.arc(Math.cos(a) * r, Math.sin(a) * r, 3, 0, 7); g.fill(); }
+  const disc = mesh(new THREE.CircleGeometry(0.19, 32), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(dc), transparent: true, color: new THREE.Color(C.teal).multiplyScalar(2), blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }), device);
+  disc.castShadow = false;
+  const lenses = [];
+  for (let i = 0; i < 3; i++) { const l = mesh(new THREE.CircleGeometry(0.07, 20), ADD(C.teal, 1.6, 0.75), root, [0, 1, 0]); l.castShadow = false; lenses.push(l); }
+  blobShadow(root, 0.45);
+  return { root, body, torso, head, legL, legR, armL, armR, tails: [tailL, tailR], device, deviceRings: [dRing, dRing2, disc], lenses, glow: [disc], kind: 'arcanist', height: 1.55 };
+}
+
+function buildHealer() {
+  const root = new THREE.Group(), body = group(root);
+  const ivory = M(C.ivory), ivoryShade = M(0xd8cbb0), gold = M(C.brass), teal = M(C.teal);
+  const legL = limb(body, [-0.09, 0.4, 0], 0.16, 0.075, ivoryShade), legR = limb(body, [0.09, 0.4, 0], 0.16, 0.075, ivoryShade);
+  mesh(new THREE.CylinderGeometry(0.17, 0.33, 0.78, 12, 1, true), M(C.ivory, { side: THREE.DoubleSide }), body, [0, 0.48, 0]);
+  mesh(new THREE.TorusGeometry(0.32, 0.028, 6, 24), gold, body, [0, 0.1, 0], [Math.PI / 2, 0, 0]);
+  mesh(new THREE.TorusGeometry(0.19, 0.035, 6, 20), teal, body, [0, 0.82, 0], [Math.PI / 2, 0, 0]);
+  const torso = group(body, [0, 0.98, 0]);
+  mesh(new THREE.SphereGeometry(0.2, 14, 10), ivory, torso, null, null, [1, 0.95, 0.8]);
+  // split-tail mantle
+  const mantle = group(torso, [0, 0.12, -0.12]);
+  const tailL = mesh(new THREE.PlaneGeometry(0.2, 1.05, 1, 5), M(0xefe2c4, { side: THREE.DoubleSide }), mantle, [-0.12, -0.5, 0], [0.1, 0, 0.08]);
+  const tailR = mesh(new THREE.PlaneGeometry(0.2, 1.05, 1, 5), M(0xefe2c4, { side: THREE.DoubleSide }), mantle, [0.12, -0.5, 0], [0.1, 0, -0.08]);
+  mesh(new THREE.BoxGeometry(0.42, 0.04, 0.03), gold, mantle, [0, 0.02, 0]);
+  for (const s of [-1, 1]) mesh(new THREE.SphereGeometry(0.11, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), M(0xefe2c4), torso, [s * 0.2, 0.1, 0], [0, 0, s * -0.4]);
+  const head = group(body, [0, 1.3, 0]);
+  mesh(new THREE.SphereGeometry(0.13, 14, 12), M(0xf1dcc4), head);
+  mesh(new THREE.SphereGeometry(0.15, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.6), ivory, head, [0, 0.02, -0.03]);
+  const halo = mesh(new THREE.TorusGeometry(0.21, 0.018, 8, 40), G(C.gold, 1.8), head, [0, 0.08, -0.16]);
+  halo.castShadow = false;
+  const armL = limb(torso, [-0.22, 0.08, 0], 0.2, 0.06, ivory), armR = limb(torso, [0.22, 0.08, 0], 0.2, 0.06, ivory);
+  // tuning-fork staff
+  const staff = group(armR, [0, -0.34, 0.03]);
+  mesh(new THREE.CylinderGeometry(0.022, 0.022, 1.3, 8), M(0x8a6332), staff, [0, 0.2, 0]);
+  const fork = group(staff, [0, 0.88, 0]);
+  mesh(new THREE.TorusGeometry(0.09, 0.022, 6, 16, Math.PI), gold, fork, [0, 0, 0], [0, 0, Math.PI]);
+  mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.24, 8), gold, fork, [-0.09, 0.12, 0]);
+  mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.24, 8), gold, fork, [0.09, 0.12, 0]);
+  const forkGlow = mesh(new THREE.SphereGeometry(0.045, 10, 8), G(C.teal, 2.2), fork, [0, 0.1, 0]);
+  // hovering chimes
+  const chimes = [];
+  for (let i = 0; i < 3; i++) { const ch = mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.2 - i * 0.03, 8), M(C.gold), root, [0, 1.2, 0]); chimes.push(ch); }
+  blobShadow(root, 0.45);
+  return { root, body, torso, head, legL, legR, armL, armR, tails: [tailL, tailR], weapon: staff, halo, chimes, glow: [halo, forkGlow], forkGlow, kind: 'healer', height: 1.5 };
+}
+const BUILDERS = { vanguard: () => buildVanguardV(), arcanist: buildArcanist, healer: buildHealer };
+
+/* ---------- The Bellkeeper (art bible §10) ---------- */
+function buildBellkeeper() {
+  const root = group(scene, [0, 0, 0]);
+  const brass = M(0xb07f3e), brassLight = M(C.brass), cobalt = M(0x1c2d4c), ivory = M(C.ivory), slate = M(0x3a4d6a);
+  // anchored pedestal
+  mesh(new THREE.CylinderGeometry(1.15, 1.45, 0.42, 16), slate, root, [0, 0.21, 0]);
+  mesh(new THREE.CylinderGeometry(1.0, 1.15, 0.2, 16), brassLight, root, [0, 0.52, 0]);
+  for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; mesh(new THREE.BoxGeometry(0.22, 0.5, 0.42), cobalt, root, [Math.cos(a) * 1.2, 0.3, Math.sin(a) * 1.2], [0, -a, 0]); }
+  const upper = group(root, [0, 0.62, 0]);       // yaws toward the attack
+  const sway = group(upper);                    // breathing / recoil
+  // clapper / pendulum core, visible beneath the bell mouth
+  const pend = group(sway, [0, 3.0, 0]);
+  mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.7, 8), brassLight, pend, [0, -0.85, 0]);
+  const coreMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(C.gold).multiplyScalar(2.2) });
+  const core = mesh(new THREE.SphereGeometry(0.3, 20, 14), coreMat, pend, [0, -1.75, 0]); core.castShadow = false;
+  const coreHalo = mesh(new THREE.SphereGeometry(0.45, 20, 14), ADD(C.gold, 0.8, 0.25), pend, [0, -1.75, 0]); coreHalo.castShadow = false;
+  // hooded bell torso (open mouth)
+  const bell = mesh(bellGeo(1.35, 2.4, 40), M(0xa8773a, { side: THREE.DoubleSide }), sway, [0, 1.0, 0]);
+  mesh(new THREE.TorusGeometry(1.4, 0.09, 8, 48), brassLight, sway, [0, 1.02, 0], [Math.PI / 2, 0, 0]);
+  mesh(new THREE.TorusGeometry(0.95, 0.05, 6, 40), cobalt, sway, [0, 2.0, 0], [Math.PI / 2, 0, 0]);
+  for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; mesh(new THREE.BoxGeometry(0.06, 0.6, 0.04), ivory, sway, [Math.cos(a) * 1.18, 1.45, Math.sin(a) * 1.18], [0, -a, Math.cos(a) * 0.32 * 0 + 0.0]).lookAt(new THREE.Vector3(0, 1.45, 0)); }
+  // hood
+  mesh(new THREE.SphereGeometry(0.72, 20, 14, 0, Math.PI * 2, 0, Math.PI * 0.62), brass, sway, [0, 3.3, -0.1], null, [1, 1.15, 1]);
+  // ivory mask with tiny intense focal glow
+  const head = group(sway, [0, 3.35, 0.38]);
+  mesh(new THREE.SphereGeometry(0.4, 18, 14, -Math.PI / 2, Math.PI, 0.25, 2.2), ivory, head, null, null, [1, 1.1, 0.55]);
+  const eye = mesh(new THREE.SphereGeometry(0.075, 12, 10), G(C.gold, 3), head, [0, 0.06, 0.22]); eye.castShadow = false;
+  mesh(new THREE.BoxGeometry(0.02, 0.32, 0.02), M(0x7d5a2b), head, [0, -0.15, 0.2]);
+  // tapered shoulder armour
+  const shoulders = [];
+  for (const s of [-1, 1]) {
+    const sh = group(sway, [s * 1.2, 2.75, 0]);
+    mesh(new THREE.ConeGeometry(0.62, 0.95, 6), brassLight, sh, [0, 0.05, 0], [0, 0, s * (Math.PI / 2 + 0.35)]);
+    mesh(new THREE.SphereGeometry(0.34, 12, 10), cobalt, sh);
+    shoulders.push(sh);
+  }
+  // segmented arms with heavy forearms
+  const arms = shoulders.map((sh, i) => {
+    const s = i ? 1 : -1, upperArm = group(sh, [s * 0.2, -0.1, 0]);
+    mesh(new THREE.CylinderGeometry(0.15, 0.13, 0.85, 8), slate, upperArm, [0, -0.45, 0]);
+    mesh(new THREE.TorusGeometry(0.16, 0.04, 6, 12), brassLight, upperArm, [0, -0.85, 0], [Math.PI / 2, 0, 0]);
+    const fore = group(upperArm, [0, -0.9, 0]);
+    mesh(new THREE.CylinderGeometry(0.3, 0.2, 0.95, 8), brass, fore, [0, -0.45, 0]);
+    mesh(new THREE.BoxGeometry(0.42, 0.22, 0.42), cobalt, fore, [0, -0.98, 0]);
+    const knuckle = mesh(new THREE.SphereGeometry(0.1, 8, 6), G(C.gold, 1.4), fore, [0, -1.12, 0.12]); knuckle.castShadow = false;
+    return { upper: upperArm, fore };
+  });
+  // broken halo ring mechanism behind the shoulders
+  const halo = group(sway, [0, 3.2, -0.75]);
+  mesh(new THREE.TorusGeometry(1.75, 0.09, 8, 60, Math.PI * 1.55), brassLight, halo, null, [0, 0, -Math.PI * 0.27]);
+  for (let i = 0; i < 22; i++) { const a = -Math.PI * 0.27 + i / 22 * Math.PI * 1.55; mesh(new THREE.BoxGeometry(0.14, 0.24, 0.1), brass, halo, [Math.cos(a) * 1.86, Math.sin(a) * 1.86, 0], [0, 0, a]); }
+  const haloInner = group(halo); mesh(new THREE.TorusGeometry(1.25, 0.04, 6, 50, Math.PI * 1.2), M(C.gold), haloInner);
+  const surge = mesh(new THREE.TorusGeometry(1.42, 0.06, 6, 60), ADD(C.coral, 1.5, 0), sway, [0, 1.02, 0], [Math.PI / 2, 0, 0]); surge.castShadow = false;
+  blobShadow(root, 2.2);
+  return { root, upper, sway, pend, core, coreMat, coreHalo, head, eye, arms, halo, haloInner, surge, bell };
+}
+
+/* ---------- Telegraphs: exact simulation geometry, drawn in a shader (art bible §11) ---------- */
+const teleVert = 'varying vec2 vP; void main(){ vec4 w = modelMatrix*vec4(position,1.); vP = w.xz; gl_Position = projectionMatrix*viewMatrix*w; }';
+const teleFrag = `
+  precision highp float;
+  uniform int kind; uniform int style; uniform vec2 origin; uniform float r, inner, dir, uHalf, progress, locked, time, flash, alpha;
+  uniform vec3 col; uniform vec4 arena; varying vec2 vP;
+  const float S = ${S.toFixed(6)};
+  float angd(float a){ return atan(sin(a), cos(a)); }
+  void main(){
+    vec2 p = vP / S + vec2(${ORIGIN.x.toFixed(1)}, ${ORIGIN.y.toFixed(1)});
+    if (p.x < arena.x || p.y < arena.y || p.x > arena.z || p.y > arena.w) discard;
+    vec2 d = p - origin; float L = length(d); float sd; float ang = atan(d.y, d.x);
+    if (kind == 0) { float a = abs(angd(ang - dir)) - uHalf; sd = max(L - r, a * max(L, 1.0)); }
+    else if (kind == 1) sd = max(inner - L, L - r);
+    else if (kind == 3) { vec2 ld = vec2(cos(dir), sin(dir)); float al = dot(d, ld), pe = d.x * -ld.y + d.y * ld.x; sd = max(abs(pe) - inner, max(-inner - al, al - r)); } // charge lane: r = length, inner = half width
+    else sd = L - r;
+    float aa = fwidth(sd) * 1.2 + 0.4;
+    float inside = 1.0 - smoothstep(-aa, aa, sd);
+    float edge = 1.0 - smoothstep(0.0, 4.5 + aa, abs(sd));
+    if (inside < 0.001 && edge < 0.001) discard;
+    // timing layer (11.3): calm, then pulse, then sharpest contrast
+    float remain = 1.0 - progress;
+    float pulseHz = remain > 0.66 ? 0.0 : remain > 0.33 ? 2.0 : 4.5;
+    float pulse = 0.5 + 0.5 * sin(time * 6.2831 * pulseHz);
+    float edgeA = mix(0.75, 1.0, remain < 0.1 ? 1.0 : pulse * step(0.01, pulseHz));
+    float fillA = 0.13 + 0.17 * progress * progress;
+    float pat = 0.0;
+    if (style == 0) {
+      if (kind == 0) pat = smoothstep(0.55, 0.62, fract(L / 38.0 - time * 0.4)) * 0.5 + (1.0 - smoothstep(0.0, 1.6, abs(mod(angd(ang - dir) * L, 34.0) - 17.0))) * 0.25; // radial harmonic arcs + segmented lines
+      else if (kind == 1) { float notch = 1.0 - smoothstep(0.0, 1.5, abs(mod(ang * 57.2958, 9.0) - 4.5)); pat = notch * (1.0 - smoothstep(0.0, 18.0, min(L - inner, r - L))) * 0.9 + smoothstep(0.6, 0.7, fract((d.x + d.y) / 26.0)) * 0.18; } // concentric notches + striping
+      else if (kind == 3) { vec2 ld = vec2(cos(dir), sin(dir)); float al = dot(d, ld), pe = d.x * -ld.y + d.y * ld.x; float ch = fract((al - abs(pe) * 0.8) / 36.0 - time * 1.6); pat = smoothstep(0.42, 0.5, ch) * (1.0 - smoothstep(0.62, 0.7, ch)) * 0.8; } // chevrons pointing down the lane
+      else pat = smoothstep(0.55, 0.65, fract(L / 22.0 + time * 0.5)) * 0.35;
+    } else if (style == 1) { // shelter: inward chevrons
+      float ch = fract(L / 24.0 + time * 0.9); pat = smoothstep(0.45, 0.55, ch) * (1.0 - smoothstep(0.75, 0.85, ch)) * 0.5;
+    }
+    vec3 c = col;
+    float a;
+    if (style == 2) { // memory mark: dotted, unfilled, low contrast
+      float dots = step(0.5, fract(ang * L / 18.0 * 0.159)); a = edge * dots * 0.42 + inside * 0.025;
+      if (kind == 0) { float side = 1.0 - smoothstep(0.0, 3.5, abs(abs(angd(ang - dir)) - uHalf) * L); a = max(a * step(r * 0.98, L + 9.0), side * step(L, r) * step(0.5, fract(L / 16.0)) * 0.42); }
+    } else {
+      a = max(inside * (fillA + pat * 0.22), edge * edgeA);
+      if (locked < 0.5) a *= 0.8 + 0.2 * sin(time * 14.0);
+    }
+    c = mix(c, vec3(1.0, 0.97, 0.9), flash);
+    a = clamp(a + flash * inside * 0.55, 0.0, 1.0) * alpha;
+    gl_FragColor = vec4(c * (1.0 + edge * 0.6), a);
+  }`;
+const teleGeo = new THREE.PlaneGeometry(40, 40); teleGeo.rotateX(-Math.PI / 2);
+function makeTelegraph(h, style = 0) {
+  const color = style === 1 ? C.gold : style === 2 ? C.lavender : style === 3 ? 0xffb35a : C.coral; // 3 = counterable strike
+  const mat = new THREE.ShaderMaterial({
+    vertexShader: teleVert, fragmentShader: teleFrag, transparent: true, depthWrite: false, extensions: { derivatives: true },
+    uniforms: {
+      kind: { value: h.kind === 'cone' ? 0 : h.kind === 'donut' ? 1 : h.kind === 'lane' ? 3 : 2 }, style: { value: style }, origin: { value: new THREE.Vector2(h.ox, h.oy) },
+      r: { value: h.kind === 'lane' ? h.len : h.r }, inner: { value: h.inner || 0 }, dir: { value: h.dir }, uHalf: { value: h.half || 0 }, progress: { value: 0 }, locked: { value: 1 },
+      time: { value: 0 }, flash: { value: 0 }, alpha: { value: 1 }, col: { value: new THREE.Color(color) }, arena: { value: new THREE.Vector4(ARENA.x0, ARENA.y0, ARENA.x1, ARENA.y1) },
+    },
+  });
+  const m = new THREE.Mesh(teleGeo, mat); m.position.set(0, 0.02 + (style === 2 ? 0 : 0.004), 0); m.renderOrder = style === 2 ? 1 : 2;
+  scene.add(m); return m;
+}
+
+/* ---------- VFX ---------- */
+const effects = [];
+function fx(obj, life, update) { scene.add(obj); effects.push({ obj, life, t: 0, update }); return obj; }
+function tickFx(dt) {
+  for (let i = effects.length - 1; i >= 0; i--) {
+    const e = effects[i]; e.t += dt; const k = e.t / e.life;
+    if (k >= 1) { scene.remove(e.obj); e.obj.traverse?.(o => { o.geometry?.dispose?.(); }); effects.splice(i, 1); continue; }
+    e.update(k, e.obj, dt);
+  }
+}
+const fade = (o, a) => o.traverse(m => { if (m.material && 'opacity' in m.material) m.material.opacity = a; });
+function ringFx(pos, color, r0, r1, life, { width = 0.08, dashed = 0, y = 0.05, k = 1.8 } = {}) {
+  let geo;
+  if (dashed) { const g = new THREE.Group(); for (let i = 0; i < dashed; i++) { const m = new THREE.Mesh(new THREE.RingGeometry(1 - width, 1, 6, 1, i / dashed * Math.PI * 2, Math.PI * 2 / dashed * 0.55), ADD(color, k)); m.rotation.x = -Math.PI / 2; g.add(m); } geo = g; }
+  else { geo = new THREE.Mesh(new THREE.RingGeometry(1 - width, 1, 64), ADD(color, k)); geo.rotation.x = -Math.PI / 2; }
+  const o = new THREE.Group(); o.add(geo); o.position.copy(pos); o.position.y = y;
+  return fx(o, life, (t, ob) => { const r = r0 + (r1 - r0) * (1 - Math.pow(1 - t, 2.5)); ob.scale.setScalar(r); fade(ob, 1 - t); });
+}
+function beamFx(a, b, color, width, life, k = 2) {
+  const len = a.distanceTo(b), m = new THREE.Mesh(new THREE.CylinderGeometry(width, width, len, 8, 1, true), ADD(color, k));
+  m.position.copy(a).add(b).multiplyScalar(0.5); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize());
+  return fx(m, life, (t, o) => { o.material.opacity = 1 - t; o.scale.x = o.scale.z = 1 - t * 0.6; });
+}
+function sparkFx(pos, color, n = 10, speed = 3, life = 0.45, size = 0.08) {
+  const g = new THREE.Group(); g.position.copy(pos);
+  const parts = [];
+  for (let i = 0; i < n; i++) {
+    const m = new THREE.Mesh(new THREE.OctahedronGeometry(size), ADD(color, 2.2)); g.add(m);
+    const v = new THREE.Vector3(Math.random() - 0.5, Math.random() * 0.8, Math.random() - 0.5).normalize().multiplyScalar(speed * (0.5 + Math.random()));
+    parts.push({ m, v });
+  }
+  return fx(g, life, (t, o, dt) => { for (const p of parts) { p.m.position.addScaledVector(p.v, dt); p.v.y -= 6 * dt; p.m.scale.setScalar(1 - t); } fade(o, 1 - t); });
+}
+function slashFx(pos, yaw, color, radius, arc, life, { tilt = -0.25, width = 0.22, k = 2.2 } = {}) {
+  const g = new THREE.Group(); g.position.copy(pos); g.rotation.y = yaw;
+  const m = new THREE.Mesh(new THREE.RingGeometry(radius - width, radius, 40, 1, Math.PI / 2 - arc / 2, arc), ADD(color, k));
+  m.rotation.x = -Math.PI / 2 + tilt; g.add(m);
+  const edge = new THREE.Mesh(new THREE.RingGeometry(radius - 0.025, radius + 0.025, 40, 1, Math.PI / 2 - arc / 2, arc), ADD(0xffffff, 2)); edge.rotation.copy(m.rotation); g.add(edge);
+  return fx(g, life, (t, o) => { o.children[0].rotation.z = o.children[1].rotation.z = (t - 0.5) * 1.2; fade(o, 1 - t * t); o.scale.setScalar(1 + t * 0.15); });
+}
+function clockHandFx(center, yaw) { // Vanguard signature: a large golden clock-hand arc
+  const g = new THREE.Group(); g.position.copy(center); g.position.y = 0.35;
+  const face = new THREE.Mesh(new THREE.RingGeometry(2.25, 2.4, 64), ADD(C.gold, 2)); face.rotation.x = -Math.PI / 2; g.add(face);
+  for (let i = 0; i < 12; i++) { const tk = new THREE.Mesh(new THREE.PlaneGeometry(0.08, 0.35), ADD(C.gold, 2)); tk.rotation.x = -Math.PI / 2; const a = i / 12 * Math.PI * 2; tk.position.set(Math.cos(a) * 2.05, 0, Math.sin(a) * 2.05); tk.rotation.z = -a + Math.PI / 2; g.add(tk); }
+  const handShape = new THREE.Shape(); handShape.moveTo(-0.12, 0); handShape.lineTo(0, 2.3); handShape.lineTo(0.12, 0); handShape.lineTo(0, -0.3); handShape.closePath();
+  const hand = new THREE.Mesh(new THREE.ShapeGeometry(handShape), ADD(0xfff0c0, 2.6)); hand.rotation.x = -Math.PI / 2; const hp = new THREE.Group(); hp.add(hand); g.add(hp);
+  const trail = new THREE.Mesh(new THREE.RingGeometry(0.3, 2.3, 48, 1, 0, 0.01), ADD(C.gold, 1.2, 0.5)); trail.rotation.x = -Math.PI / 2; g.add(trail);
+  return fx(g, 0.75, (t, o) => {
+    const sweep = Math.min(1, t / 0.55) * Math.PI * 2; hp.rotation.y = yaw - sweep;
+    trail.geometry.dispose(); trail.geometry = new THREE.RingGeometry(0.3, 2.3, 48, 1, -yaw + Math.PI / 2 - 0 + 0, Math.max(0.01, sweep)); trail.rotation.z = 0;
+    trail.rotation.set(-Math.PI / 2, 0, yaw - Math.PI / 2 - sweep + 0);
+    face.material.opacity = 1 - t; trail.material.opacity = 0.5 * (1 - t); hand.material.opacity = t < 0.6 ? 1 : 1 - (t - 0.6) / 0.4;
+    g.scale.setScalar(0.9 + 0.1 * Math.sin(t * Math.PI));
+  });
+}
+function shieldFx(actorView, color, life) { // faceted harmonic shield
+  const m = new THREE.Mesh(new THREE.IcosahedronGeometry(0.75, 1), new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(1.6), wireframe: true, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
+  const fill = new THREE.Mesh(new THREE.IcosahedronGeometry(0.73, 1), ADD(color, 0.6, 0.25)); m.add(fill);
+  return fx(m, life, (t, o) => { o.position.copy(actorView.root.position); o.position.y = 0.75; o.rotation.y += 0.05; const s = t < 0.15 ? t / 0.15 : 1; o.scale.setScalar(0.6 + 0.4 * s); o.material.opacity = 0.9 * (1 - Math.max(0, (t - 0.7) / 0.3)); fill.material.opacity = 0.25 * (1 - t); });
+}
+function columnFx(pos, color, life, r = 0.7, h = 7) {
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 24, 1, true), ADD(color, 1.8, 0.8)); m.position.copy(pos); m.position.y = h / 2;
+  return fx(m, life, (t, o) => { o.material.opacity = 0.8 * (1 - t); o.scale.set(1 - t * 0.7, 1, 1 - t * 0.7); });
+}
+function moteTrail(from, to, color, life = 0.35, size = 0.1) {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(size, 10, 8), ADD(color, 2.4)); m.position.copy(from);
+  const glow = new THREE.Mesh(new THREE.SphereGeometry(size * 2.4, 10, 8), ADD(color, 0.8, 0.35)); m.add(glow);
+  return fx(m, life, (t, o) => { o.position.lerpVectors(from, to, t); o.position.y += Math.sin(t * Math.PI) * 0.8; });
+}
+
+/* ---------- Audio: synthesized bells (no files) ---------- */
+let audio = null, soundOn = true;
+function ac() { if (!audio) { try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { soundOn = false; } } return audio; }
+function bell(freq, dur = 2.5, gain = 0.15, partials = [0.5, 1, 1.19, 1.56, 2, 2.51, 3.01]) {
+  if (!soundOn) return; const a = ac(); if (!a) return; const t = a.currentTime;
+  const out = a.createGain(); out.gain.value = gain; out.connect(a.destination);
+  partials.forEach((p, i) => { const o = a.createOscillator(), g = a.createGain(); o.type = 'sine'; o.frequency.value = freq * p * (1 + (i % 2 ? 0.002 : -0.001)); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(1 / (i + 1.3), t + 0.005); g.gain.exponentialRampToValueAtTime(0.0001, t + dur / (1 + i * 0.35)); o.connect(g); g.connect(out); o.start(t); o.stop(t + dur); });
+}
+function thud(freq = 70, gain = 0.25) { if (!soundOn) return; const a = ac(); if (!a) return; const t = a.currentTime, o = a.createOscillator(), g = a.createGain(); o.frequency.setValueAtTime(freq * 2, t); o.frequency.exponentialRampToValueAtTime(freq, t + 0.12); g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3); o.connect(g); g.connect(a.destination); o.start(t); o.stop(t + 0.3); }
+
+/* ---------- HUD icons ---------- */
+const ICON = {
+  strike: '<path d="M14 50 L44 12 L50 18 L18 54 Z" fill="#F6C968"/><path d="M12 46 L22 56" stroke="#C38D46" stroke-width="5"/>',
+  stored: '<path d="M10 44 L40 10 L46 16 L16 50 Z" fill="#F6C968" opacity=".55"/><path d="M18 52 L48 18 L54 24 L24 58 Z" fill="#F6C968"/><circle cx="46" cy="44" r="6" fill="#55C9CE"/>',
+  breaker: '<circle cx="32" cy="32" r="24" fill="none" stroke="#F6C968" stroke-width="4"/><path d="M32 32 L32 10" stroke="#F4E9D1" stroke-width="5" stroke-linecap="round"/><path d="M32 32 L48 40" stroke="#F6C968" stroke-width="4" stroke-linecap="round"/>',
+  brace: '<path d="M10 38 A22 22 0 0 1 54 38 Z" fill="#C38D46" stroke="#F4E9D1" stroke-width="3"/><path d="M32 22 L36 32 L28 32 Z" fill="#F6C968"/>',
+  spark: '<path d="M8 32 L56 32" stroke="#55C9CE" stroke-width="3"/><path d="M48 32 L42 26 M48 32 L42 38" stroke="#bff8ff" stroke-width="3"/><circle cx="14" cy="32" r="5" fill="#bff8ff"/>',
+  lance: '<path d="M8 14 L56 32 L8 50" fill="none" stroke="#55C9CE" stroke-width="3"/><path d="M8 32 L56 32" stroke="#bff8ff" stroke-width="4"/>',
+  cast: '<circle cx="32" cy="32" r="22" fill="none" stroke="#a99be0" stroke-width="3"/><circle cx="32" cy="32" r="13" fill="none" stroke="#55C9CE" stroke-width="2"/><path d="M32 6 L35 29 L58 32 L35 35 L32 58 L29 35 L6 32 L29 29 Z" fill="#bff8ff"/>',
+  step: '<path d="M10 40 L26 40" stroke="#55C9CE" stroke-width="3" stroke-dasharray="4 4"/><path d="M28 18 A16 16 0 0 1 56 34 A16 16 0 0 1 28 50 Z" fill="#655491" stroke="#bff8ff" stroke-width="3"/>',
+  gleam: '<circle cx="32" cy="32" r="9" fill="#F6C968"/><circle cx="32" cy="32" r="18" fill="none" stroke="#F6C968" stroke-width="2" stroke-dasharray="3 5"/>',
+  mend: '<path d="M32 52 C10 38 12 18 24 18 C29 18 32 22 32 24 C32 22 35 18 40 18 C52 18 54 38 32 52 Z" fill="#8ff0b8"/><circle cx="32" cy="32" r="27" fill="none" stroke="#8ff0b8" stroke-width="2" stroke-dasharray="4 4"/>',
+  sanctuary: '<circle cx="32" cy="32" r="8" fill="#F6C968"/><circle cx="32" cy="32" r="17" fill="none" stroke="#F6C968" stroke-width="2" stroke-dasharray="4 3"/><circle cx="32" cy="32" r="26" fill="none" stroke="#F4E9D1" stroke-width="2" stroke-dasharray="4 4"/>',
+  dash: '<path d="M8 40 L30 40" stroke="#4aa8ff" stroke-width="4" stroke-dasharray="5 4"/><path d="M14 30 L34 30" stroke="#9fdcff" stroke-width="3" stroke-dasharray="4 4"/><path d="M34 18 L56 32 L34 46 Z" fill="#5fe3ff"/>',
+  ward: '<rect x="20" y="10" width="6" height="32" rx="2" fill="#F6C968"/><rect x="30" y="10" width="6" height="40" rx="2" fill="#F6C968"/><rect x="40" y="10" width="6" height="26" rx="2" fill="#F6C968"/><path d="M14 40 A18 18 0 0 0 50 40" fill="none" stroke="#a8e3ff" stroke-width="3"/>',
+};
+
+/* =====================================================================
+   GAME STATE + LOOP
+   ===================================================================== */
+const opts = { hp: 'standard', phase: 0, inv: false, ko: 'end', ally: true, rings: false, seed: 7, strikes: true, mouseAim: true, encounter: 'v1' };
+let mode = 'select';      // select | intro | play | paused | result
+let classId = 'vanguard';
+let sim = null, view = null, allyView = null, boss = null;
+let teleMeshes = new Map(), memoryMesh = null, ringMeshes = [];
+let supportTarget = 0;
+const TARGET_NAMES = ['Auto', 'Self', 'Ally'];
+
+boss = buildBellkeeper();
+const showcase = {};
+for (const id of CLASS_ORDER) { const v = BUILDERS[id](); v.root.visible = false; scene.add(v.root); showcase[id] = v; }
+
+function setClassView(id) {
+  if (view && view !== showcase[view.kind]) scene.remove(view.root);
+  for (const k of CLASS_ORDER) showcase[k].root.visible = false;
+  view = showcase[id]; view.root.visible = true; view.anim = newAnim();
+}
+function newAnim() { return { walk: 0, yaw: Math.PI, attack: null, hit: 0, ko: 0, guard: 0, lean: 0 }; }
+
+function startFight() {
+  for (const m of teleMeshes.values()) scene.remove(m); teleMeshes.clear();
+  if (memoryMesh) { scene.remove(memoryMesh); memoryMesh = null; }
+  for (const e of effects) scene.remove(e.obj); effects.length = 0;
+  sim = new Sim(classId, opts);
+  setClassView(classId);
+  if (allyView) { scene.remove(allyView.root); allyView = null; }
+  if (sim.ally) { allyView = buildVanguardV({ cloth: 0x6b7a90, clothDark: 0x4a586c, gold: 0xb9a888, goldDark: 0x8d7d60, glow: 0xbfe9c8 }); allyView.anim = newAnim(); scene.add(allyView.root); }
+  buildRings(); buildHud();
+  lastSimTime = performance.now(); acc = 0;
+  document.getElementById('card').style.opacity = 0;
+}
+
+/* ---------- Input ---------- */
+const keys = new Set(), pressedEdge = new Set(); let mouseL = false, mouseR = false;
+addEventListener('keydown', e => {
+  if (['Space', 'Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+  if (!keys.has(e.code)) pressedEdge.add(e.code); keys.add(e.code);
+  if (e.code === 'Escape') { if (mode === 'play') pause(true); else if (mode === 'paused') pause(false); }
+  if (e.code === 'KeyR' && (mode === 'play' || mode === 'result' || mode === 'paused')) { hide('result'); hide('pause'); beginIntro(); }
+  if ((e.code === 'Digit6' || e.code === 'Numpad6') && mode === 'play') { supportTarget = (supportTarget + 1) % 3; }
+  if (mode === 'select') { const i = ['Digit1', 'Digit2', 'Digit3'].indexOf(e.code); if (i >= 0) selectClass(CLASS_ORDER[i]); if (e.code === 'Enter') beginIntro(); }
+});
+addEventListener('keyup', e => keys.delete(e.code));
+addEventListener('blur', () => { keys.clear(); mouseL = mouseR = false; });
+canvas.addEventListener('mousedown', e => { if (e.button === 0) mouseL = true; if (e.button === 2) mouseR = true; ac(); });
+addEventListener('mouseup', e => { if (e.button === 0) mouseL = false; if (e.button === 2) mouseR = false; });
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+let prevHeld = [false, false, false, false], latch = [false, false, false, false], prevDash = false, dashLatch = false;
+// Mouse aim: active while the mouse has moved in the last few seconds; the cursor's floor point sets facing.
+const mouseNdc = new THREE.Vector2(); let lastMouseMove = -1e9; const aimRay = new THREE.Raycaster(), floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), aimHit = new THREE.Vector3();
+addEventListener('mousemove', e => { mouseNdc.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); lastMouseMove = performance.now(); });
+function aimInput(pad) {
+  if (pad && Math.hypot(pad.axes[2] || 0, pad.axes[3] || 0) > 0.35) { const l = Math.hypot(pad.axes[2], pad.axes[3]); return { ax: pad.axes[2] / l, ay: pad.axes[3] / l }; }
+  if (!opts.mouseAim || !sim || performance.now() - lastMouseMove > 2500) return { ax: 0, ay: 0 };
+  aimRay.setFromCamera(mouseNdc, camera); if (!aimRay.ray.intersectPlane(floorPlane, aimHit)) return { ax: 0, ay: 0 };
+  const px = aimHit.x / S + ORIGIN.x - sim.p.x, py = aimHit.z / S + ORIGIN.y - sim.p.y, l = Math.hypot(px, py);
+  return l < 12 ? { ax: 0, ay: 0 } : { ax: px / l, ay: py / l };
+}
+function readPad() { const pads = navigator.getGamepads ? navigator.getGamepads() : []; for (const p of pads) if (p && p.connected && p.mapping === 'standard') return p; return null; } // ignores pedals, sticks and other non-standard HID devices
+function gatherInput() {
+  const k = c => keys.has(c), pad = readPad();
+  let mx = (k('KeyD') || k('ArrowRight') ? 1 : 0) - (k('KeyA') || k('ArrowLeft') ? 1 : 0);
+  let my = (k('KeyS') || k('ArrowDown') ? 1 : 0) - (k('KeyW') || k('ArrowUp') ? 1 : 0);
+  const b = btn => pad && pad.buttons[btn] && pad.buttons[btn].pressed;
+  if (pad && Math.hypot(pad.axes[0], pad.axes[1]) > 0.25 && Math.hypot(pad.axes[0], pad.axes[1]) > Math.hypot(mx, my)) { mx = pad.axes[0]; my = pad.axes[1]; }
+  const held = [k('Digit1') || k('Numpad1') || mouseL || b(0), k('Digit2') || k('Numpad2') || mouseR || b(2), k('Digit3') || k('Numpad3') || b(3), k('Digit4') || k('Numpad4') || b(5)];
+  const self = k('ShiftLeft') || k('ShiftRight') || b(4);
+  const dash = k('Digit5') || k('Numpad5') || b(1);
+  if (dash && !prevDash) dashLatch = true; prevDash = dash;
+  return { mx, my, held, target: self ? 1 : supportTarget, ...aimInput(pad) };
+}
+
+/* ---------- Fixed-step loop ---------- */
+let lastSimTime = performance.now(), acc = 0, lastFrame = performance.now(), time = 0;
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.1, (now - lastFrame) / 1000); lastFrame = now; time += dt;
+  if (mode === 'play' && sim) {
+    const inp = window.__bot ? window.__bot(sim) : gatherInput();
+    for (let i = 0; i < 4; i++) latch[i] = latch[i] || inp.held[i];
+    acc += dt; const step = 1 / TICK;
+    while (acc >= step) {
+      acc -= step;
+      const held = inp.held.map((h, i) => h || latch[i]);
+      const pressed = held.map((h, i) => h && !prevHeld[i]);
+      prevHeld = held; latch = [false, false, false, false];
+      sim.step({ mx: inp.mx, my: inp.my, held, pressed, g: held[3], gp: pressed[3], target: inp.target, ax: inp.ax, ay: inp.ay, dp: dashLatch || !!inp.dashBot }); dashLatch = false;
+      consumeFx();
+      if (sim.outcome !== 'playing') { showResult(); break; }
+    }
+  }
+  updateWorld(dt, mode === 'play' ? acc * TICK : 1);
+  composer.render();
+}
+
+/* ---------- Simulation events -> visuals / sound / HUD ---------- */
+const floaters = document.getElementById('floaters');
+function screenOf(v3) { const p = v3.clone().project(camera); return { x: (p.x * 0.5 + 0.5) * innerWidth, y: (-p.y * 0.5 + 0.5) * innerHeight, ok: p.z < 1 }; }
+function floatText(world, text, color, cls = '') {
+  const s = screenOf(world); if (!s.ok) return;
+  const d = document.createElement('div'); d.className = 'float ' + cls; d.textContent = text; d.style.color = color;
+  d.style.left = (s.x + (Math.random() - 0.5) * 30) + 'px'; d.style.top = s.y + 'px';
+  floaters.appendChild(d); setTimeout(() => d.remove(), 1000);
+}
+const actorView = id => id === 2 ? allyView : view;
+const faceYaw = a => yawToward(Math.cos(a.face), Math.sin(a.face));
+const actorPos = (id, h = 0) => { const a = id === 2 ? sim.ally : sim.p; return W(a.x, a.y, h); };
+function bossHitPoint(fromId = 1) { const a = fromId === 2 ? sim.ally : sim.p; const d = Math.atan2(a.y - BOSS.y, a.x - BOSS.x); return W(BOSS.x + Math.cos(d) * 48, BOSS.y + Math.sin(d) * 48, 1.6); }
+const OUTCOME_TEXT = { avoided: 'Avoided', guarded: 'Guarded', immune: 'Immune', shielded: 'Warded', invulnerable: 'Hit (invulnerable)', hit: 'Hit', countered: 'Countered!', dodged: 'Dodged (i-frames)' };
+const OUTCOME_COLOR = { avoided: '#9ff0c0', guarded: '#F6C968', immune: '#c9c3ff', shielded: '#a8e3ff', invulnerable: '#ffb0a0', hit: '#ff7a6b', countered: '#ffe08a', dodged: '#9fdcff' };
+
+function consumeFx() {
+  for (const e of sim.fx) handleFx(e);
+  sim.fx.length = 0;
+}
+function handleFx(e) {
+  const k = sim.kit;
+  switch (e.type) {
+    case 'hit': {
+      const from = e.who === 2 ? allyView : view; const hp = bossHitPoint(e.who);
+      if (e.who === 2) { slashFx(hp.clone().setY(1.1), from.root.rotation.y, 0xd8d0c0, 0.7, 1.6, 0.18, { k: 1.4 }); break; }
+      if (k.id !== 'vanguard') startAttackAnim(view, e.slot);
+      if (k.id === 'vanguard') {
+        sparkFx(hp, e.slot === 2 ? C.gold : 0x9fdcff, 6, 2.5, 0.3, 0.05); // swing, rush and Final Hour visuals come from their own events
+      } else if (k.id === 'arcanist') {
+        const hand = actorPos(1, 1.3);
+        if (e.slot === 0) { beamFx(hand, hp, C.teal, 0.025, 0.14); sparkFx(hp, 0xbff8ff, 5, 2, 0.25, 0.04); }
+        if (e.slot === 1) { for (const off of [-0.6, 0, 0.6]) { const side = new THREE.Vector3(Math.cos(view.root.rotation.y) * off, 0.2 + Math.abs(off) * 0.4, -Math.sin(view.root.rotation.y) * off); beamFx(hand.clone().add(side), hp, off ? 0xa99be0 : 0xbff8ff, off ? 0.03 : 0.05, 0.22); } sparkFx(hp, 0xbff8ff, 12, 3.5); }
+        if (e.slot === 2) { columnFx(W(BOSS.x, BOSS.y), C.teal, 0.6, 1.5, 9); ringFx(W(BOSS.x, BOSS.y), 0xbff8ff, 0.5, 3.4, 0.6, { width: 0.06 }); sparkFx(hp, 0xbff8ff, 26, 6, 0.6, 0.1); bell(523, 1.8, 0.08); }
+      } else {
+        moteTrail(actorPos(1, 1.9), hp, C.gold, 0.22, 0.08); sparkFx(hp, C.gold, 5, 2, 0.3, 0.04);
+      }
+      if (boss) boss.flash = 0.12;
+      const color = ['#fff1cf', '#9fe9ee', '#F6C968'][e.slot] || '#fff';
+      floatText(hp.clone().add(new THREE.Vector3(0, 0.6, 0)), String(e.dmg), e.who === 2 ? '#c9c0ae' : color, e.slot === 2 ? 'big' : e.who === 2 ? 'small' : '');
+      break;
+    }
+    case 'cast':
+      if (k.id === 'arcanist') { view.anim.casting = true; ringFx(actorPos(1), C.teal, 0.3, 1.1, 1.0, { dashed: 12, width: 0.05 }); }
+      if (k.id === 'healer') { view.anim.casting = true; const t = e.who === 2 ? allyView : view; ringFx(W(0, 0), C.gold, 0, 0, 0.01); t && ringFx(t.root.position, 0x8ff0b8, 0.9, 0.6, 0.5, { dashed: 10, width: 0.06 }); }
+      break;
+    case 'cancel': view.anim.casting = false; floatText(actorPos(1, 2), 'Cancelled', '#ffd0b0', 'small'); break;
+    case 'guard': {
+      startAttackAnim(view, 3);
+      if (k.id === 'vanguard') shieldFx(view, 0x5fe3ff, 0.3);
+      if (k.id === 'arcanist') { const a = W(e.from.x, e.from.y, 0.8), b = W(e.to.x, e.to.y, 0.8); if (a.distanceTo(b) > 0.1) { beamFx(a, b, C.teal, 0.12, 0.25, 1.4); sparkFx(a, C.teal, 8, 2, 0.3, 0.05); } shieldFx(view, C.teal, 0.45); }
+      flashSlot(3); break;
+    }
+    case 'ward': {
+      startAttackAnim(view, 3); const t = actorView(e.who);
+      moteTrail(actorPos(1, 1.9), actorPos(e.who, 1), 0xa8e3ff, 0.25, 0.09);
+      ringFx(t.root.position, 0xa8e3ff, 0.4, 0.8, 0.5, { dashed: 8 });
+      floatText(actorPos(e.who, 2.1), e.cleansed ? 'Ward · Chill cleansed' : 'Ward', '#a8e3ff', 'small'); bell(1318, 0.9, 0.04); flashSlot(3); break;
+    }
+    case 'heal': {
+      if (e.amount > 0 || e.src !== 'mendTick') floatText(actorPos(e.who, 2.1), '+' + e.amount + (e.over ? ` (${e.over} over)` : ''), '#8ff0b8', e.src === 'mendTick' ? 'small' : '');
+      sparkFx(actorPos(e.who, 0.6), 0x8ff0b8, e.src === 'sanctuary' ? 14 : 6, 1.6, 0.6, 0.05); break;
+    }
+    case 'mendDone': view.anim.casting = false; startAttackAnim(view, 1); moteTrail(actorPos(1, 1.9), actorPos(e.who, 1), 0x8ff0b8, 0.25, 0.1); bell(880, 1.2, 0.05); break;
+    case 'sanctuary': startAttackAnim(view, 2); for (let i = 0; i < 3; i++) setTimeout(() => ringFx(view.root.position, i % 2 ? C.ivory : C.gold, 0.4, 180 * S, 0.9, { dashed: 18, width: 0.04 }), i * 140); columnFx(view.root.position, C.gold, 0.7, 0.6, 4); bell(660, 2.2, 0.08); break;
+    case 'focus': if (e.amount > 0) flashRes(); break;
+    case 'blocked': if (!/cooling|cadence|casting/.test(e.why)) floatText(actorPos(1, 2.1), e.why, '#ffc79a', 'small'); break;
+    case 'warn': {
+      const h = e.h, style = h.req === 'shelter' ? 1 : h.counterable ? 3 : 0;
+      if (h.counterable && k.id === 'vanguard') floatText(W(h.ox, h.oy, 1.8), 'GUARD TO COUNTER', '#ffcf8a', 'small');
+      teleMeshes.set(h.id, makeTelegraph(h, style));
+      boss.windup = { dir: (h.kind === 'cone' || h.kind === 'lane') ? h.dir : Math.atan2(sim.p.y - BOSS.y, sim.p.x - BOSS.x), t: 0, dur: (h.R - h.W) / TICK, attack: h.attack };
+      bell(h.attack === 'final' ? 147 : h.req === 'shelter' ? 330 : 220, 2.2, h.attack === 'final' ? 0.18 : 0.07, [1, 2.01, 2.99]);
+      if (h.attack === 'final') document.getElementById('guardCall').classList.remove('hidden');
+      break;
+    }
+    case 'lock': { const m = teleMeshes.get(e.id); if (m) m.material.uniforms.locked.value = 1; bell(1760, 0.25, 0.05, [1, 2.7]); break; }
+    case 'resolve': {
+      const m = teleMeshes.get(e.id);
+      if (m) { teleMeshes.delete(e.id); const u = m.material.uniforms; fx(m, 0.22, (t) => { u.flash.value = 1 - t; u.alpha.value = 1 - t; }); }
+      boss.strike = 0.0001; boss.windup = null;
+      ringFx(W(BOSS.x, BOSS.y), C.coral, 1.2, 4.2, 0.35, { width: 0.04, k: 1.4 });
+      bell(e.h.attack === 'final' ? 98 : 131, 3.0, 0.2); thud(55, 0.22);
+      if (e.h.attack === 'final') setTimeout(() => document.getElementById('guardCall').classList.add('hidden'), 300);
+      shake = Math.max(shake, 0.12);
+      break;
+    }
+    case 'outcome': {
+      const v = actorView(e.who); if (!v) break;
+      floatText(actorPos(e.who, 2.2), OUTCOME_TEXT[e.outcome], OUTCOME_COLOR[e.outcome], e.outcome === 'hit' ? '' : 'small');
+      if (e.outcome === 'hit') { v.anim.hit = 1; sparkFx(actorPos(e.who, 0.8), C.coral, 12, 3); if (e.who === 1) { shake = 0.3; thud(80, 0.3); } }
+      if (e.outcome === 'guarded') sparkFx(actorPos(e.who, 0.8), C.gold, 10, 2.5);
+      if (e.outcome === 'shielded') ringFx(v.root.position, 0xa8e3ff, 0.5, 1.2, 0.4);
+      if (e.who === 1) showCard(e);
+      break;
+    }
+    case 'ko': { const v = actorView(e.who); if (v) v.anim.ko = 0.0001; floatText(actorPos(e.who, 2.4), e.who === 2 ? 'Ally down' : 'Knocked out', '#ff9b8b', 'big'); break; }
+    case 'respawn': view.anim = newAnim(); break;
+    // ---- Vanguard 2.0 + dash (reference sheet section 4: blue sword trails, shield impact, dash trail, counter burst) ----
+    case 'vswing': {
+      const p = sim.p, Y = faceYaw(p) + Math.PI, fwd = new THREE.Vector3(Math.cos(p.face), 0, Math.sin(p.face));
+      const pos = actorPos(1, 0.95).addScaledVector(fwd, 0.2);
+      if (e.step === 0) { slashFx(pos, Y, 0x3d8dff, 1.75, 2.4, 0.22, { tilt: -0.35, width: 0.34, k: 2.1 }); slashFx(pos, Y, 0xd8f4ff, 1.68, 2.2, 0.16, { tilt: -0.35, width: 0.08, k: 2.4 }); }
+      if (e.step === 1) { slashFx(pos, Y, 0x3d8dff, 1.75, 2.4, 0.22, { tilt: 0.35, width: 0.34, k: 2.1 }); slashFx(pos, Y, 0xd8f4ff, 1.68, 2.2, 0.16, { tilt: 0.35, width: 0.08, k: 2.4 }); }
+      if (e.step === 2) { slashFx(pos, Y, 0x2f7dff, 2.4, 3.6, 0.32, { tilt: -0.08, width: 0.55, k: 2.4 }); slashFx(pos, Y, 0xe8fbff, 2.3, 3.4, 0.24, { tilt: -0.08, width: 0.1, k: 2.6 }); ringFx(view.root.position, 0x5fe3ff, 0.6, VG.combo[2].range * S, 0.3, { width: 0.04 }); }
+      if (e.step === 3) { slashFx(pos.clone().addScaledVector(fwd, 0.4), Y, 0x6fd0ff, 1.9, 1.5, 0.2, { tilt: 0, width: 0.45, k: 2.4 }); }
+      if (e.landed) { sparkFx(bossHitPoint(), 0x9fdcff, e.step === 2 ? 14 : 7, 3, 0.35, 0.05); thud(e.step === 2 ? 120 : 180, e.step === 2 ? 0.12 : 0.05); }
+      break;
+    }
+    case 'dash': {
+      const a = W(e.from.x, e.from.y, 0.55), b = W(e.from.x + e.dx * DASH.distance, e.from.y + e.dy * DASH.distance, 0.55);
+      beamFx(a, b, 0x3d8dff, 0.2, 0.3, 1.1); beamFx(a.clone().setY(0.95), b.clone().setY(0.95), 0xbfe9ff, 0.05, 0.22, 2.2);
+      sparkFx(a, 0x9fdcff, 8, 2.5, 0.3, 0.05); ringFx(a, 0x4aa8ff, 0.2, 0.9, 0.3, { width: 0.1 }); flashSlot('Dash');
+      break;
+    }
+    case 'rushStart': {
+      shieldFx(view, e.empowered ? C.gold : 0x5fe3ff, 0.5);
+      if (e.empowered) floatText(actorPos(1, 2.4), 'REVERSAL RUSH', '#ffe08a', 'big');
+      break;
+    }
+    case 'rushHit': {
+      sparkFx(bossHitPoint(), e.empowered ? C.gold : 0x9fdcff, 18, 5, 0.5, 0.08); thud(90, 0.2); shake = Math.max(shake, 0.18);
+      if (e.empowered) { ringFx(view.root.position, C.gold, 0.4, VG.shockwave * S, 0.45, { width: 0.08, k: 2 }); ringFx(view.root.position, 0x5fe3ff, 0.3, VG.shockwave * S * 0.8, 0.4, { width: 0.05 }); bell(330, 1.6, 0.1); }
+      break;
+    }
+    case 'reversal': floatText(actorPos(1, 2.5), 'Reversal ready', '#ffe08a', 'small'); flashSlot(1); bell(988, 0.6, 0.04); break;
+    case 'counter':
+      floatText(actorPos(1, 2.7), 'COUNTER!', '#ffe08a', 'big'); sparkFx(actorPos(1, 1.0), C.gold, 30, 6, 0.6, 0.09);
+      ringFx(view.root.position, C.gold, 0.3, 1.8, 0.4, { width: 0.12, k: 2.4 }); bell(1175, 1.2, 0.1); shake = Math.max(shake, 0.15);
+      break;
+    case 'finalStart': floatText(actorPos(1, 2.4), 'FINAL HOUR', '#F6C968', 'small'); break;
+    case 'finalHit':
+      if (e.landed) { clockHandFx(W(BOSS.x, BOSS.y), faceYaw(sim.p) + Math.PI); sparkFx(bossHitPoint(), C.gold, 26, 6, 0.6, 0.1); bell(392, 1.6, 0.1); shake = Math.max(shake, 0.2);
+        if (e.marked) floatText(W(BOSS.x, BOSS.y, 5.2), 'MARK SHATTERED', '#ffe08a', 'big'); }
+      break;
+    // ---- Bellkeeper v1.0 ----
+    case 'phase': {
+      const el = $('intro').firstElementChild; el.textContent = ['', 'II · THE DISSONANCE', 'III · THE FINAL TOLL'][e.phase] || '';
+      show('intro'); el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; setTimeout(() => { if (mode === 'play') hide('intro'); }, 2200);
+      bell(98, 3.5, 0.22); setTimeout(() => bell(73, 3, 0.16), 400); ringFx(W(BOSS.x, BOSS.y), C.gold, 1, 9, 1.2, { width: 0.03, k: 1.4 });
+      break;
+    }
+    case 'vulnerable':
+      if (e.extended) { floatText(W(BOSS.x, BOSS.y, 5.4), 'THE BELL FALTERS', '#ffe08a', 'big'); bell(196, 2.5, 0.12); }
+      break;
+    case 'chargeGo': {
+      const a = W(e.h.ox, e.h.oy, 0.3), b = W(e.h.end.x, e.h.end.y, 0.3);
+      beamFx(a, b, C.coral, 0.6, 0.4, 0.9); sparkFx(a, 0xffc49a, 16, 4, 0.5, 0.08);
+      setTimeout(() => { sparkFx(b, 0xffc49a, 22, 5, 0.6, 0.1); ringFx(b, C.coral, 0.5, 3, 0.4, { width: 0.06 }); thud(50, 0.3); shake = Math.max(shake, 0.35); }, V1.charge.travel / TICK * 1000);
+      thud(70, 0.2);
+      break;
+    }
+    case 'enrage': { const c = document.getElementById('castLine'); c.textContent = 'THE FINAL HOUR TOLLS'; bell(98, 4, 0.25); break; }
+  }
+}
+
+function fmtTime(ticks) { const s = Math.max(0, Math.floor(ticks / TICK)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+function cardText(h, outcome) {
+  const when = fmtTime(sim.tick);
+  const where = h.kind === 'lane' ? 'you were in the charge lane when the boss committed' : h.attack === 'chimeMarker' ? 'a chime marker locked under you and burst' : h.attack === 'strike' ? 'the Pendulum Strike landed on you' : h.decisive ? 'the Final Toll’s last strike caught you inside the cone' : h.req === 'shelter' ? 'you were outside the sanctuary' : h.req === 'guard' ? 'only Guard answers the Final Hour' : h.kind === 'donut' ? 'you stood in the ring — the hollow centre and the far edge are safe' : h.kind === 'circle' ? 'you were inside the mark when it struck' : h.echoOf ? 'the bell remembered that sweep and struck the same place' : 'you were inside the cone';
+  const result = outcome === 'guarded' ? 'You guarded, so no damage was taken — but the mechanic failed.' : outcome === 'immune' ? 'Recent-hit immunity saved you; the mechanic still failed.' : outcome === 'shielded' ? 'Your ward absorbed it; the mechanic still failed.' : outcome === 'dodged' ? 'Your dash i-frames saved you — but you were still inside, so the mechanic failed.' : outcome === 'invulnerable' ? `Invulnerable (practice) — this would have cost ${h.dmg || 1} of ${MAXHP} pips.` : `You lost ${h.dmg || 1} of ${MAXHP} pips.`;
+  return { title: `${h.name} (${when})`, body: `${where[0].toUpperCase() + where.slice(1)}. ${result}`, h };
+}
+let cardTimer = 0;
+function showCard(e) {
+  const card = document.getElementById('card');
+  if (e.outcome === 'avoided') return;
+  if (e.outcome === 'countered') { card.className = 'good'; card.innerHTML = `<div class="title">${e.h.name} (${fmtTime(sim.tick)})</div>Countered with Resonant Guard: +1 Resonance and Reversal Rush is primed.`; card.style.opacity = 1; cardTimer = 3.5; return; }
+  if (e.h.req === 'guard' && e.outcome === 'guarded') { card.className = 'good'; card.innerHTML = `<div class="title">${e.h.name} (${fmtTime(sim.tick)})</div>Guarded the Final Hour. Again in 1.5 s.`; card.style.opacity = 1; cardTimer = 3.5; return; }
+  const t = cardText(e.h, e.outcome);
+  card.className = e.outcome === 'hit' ? '' : 'warn';
+  card.innerHTML = miniMap(e.h) + `<div class="title">${t.title}</div>${t.body}`;
+  card.style.opacity = 1; cardTimer = 6;
+}
+function miniMap(h) { // small arena diagram built from resolved geometry
+  const sx = 70 / (ARENA.x1 - ARENA.x0), sy = 70 / (ARENA.y1 - ARENA.y0), X = x => (x - ARENA.x0) * sx, Y = y => (y - ARENA.y0) * sy;
+  let shape = '';
+  if (h.kind === 'circle') shape = `<circle cx="${X(h.ox)}" cy="${Y(h.oy)}" r="${Math.min(h.r * sx, 120)}" fill="${h.req === 'shelter' ? '#F6C96855' : '#EB685D66'}" stroke="${h.req === 'shelter' ? '#F6C968' : '#EB685D'}"/>`;
+  else if (h.kind === 'donut') shape = `<circle cx="${X(h.ox)}" cy="${Y(h.oy)}" r="${(h.r + h.inner) / 2 * sx}" fill="none" stroke="#EB685D88" stroke-width="${(h.r - h.inner) * sx}"/>`;
+  else { const a1 = h.dir - h.half, a2 = h.dir + h.half, r = h.r; shape = `<path d="M${X(h.ox)} ${Y(h.oy)} L${X(h.ox + Math.cos(a1) * r)} ${Y(h.oy + Math.sin(a1) * r)} A${r * sx} ${r * sy} 0 0 1 ${X(h.ox + Math.cos(a2) * r)} ${Y(h.oy + Math.sin(a2) * r)} Z" fill="#EB685D66" stroke="#EB685D"/>`; }
+  return `<svg width="70" height="70" style="background:#22344f;border:1px solid #c38d4666;border-radius:3px"><defs><clipPath id="cl"><rect width="70" height="70"/></clipPath></defs><g clip-path="url(#cl)">${shape}</g><circle cx="${X(BOSS.x)}" cy="${Y(BOSS.y)}" r="3" fill="#C38D46"/><circle cx="${X(sim.p.x)}" cy="${Y(sim.p.y)}" r="3" fill="#55C9CE" stroke="#fff"/></svg>`;
+}
+
+/* ---------- Character animation ---------- */
+function startAttackAnim(v, slot) { v.anim.attack = { slot, t: 0, dur: slot === 2 ? 0.55 : slot === 3 ? 0.4 : 0.28 }; }
+function animateActor(v, a, dt, alpha, isPlayer) {
+  if (!v) return;
+  const A = v.anim, x = a.px + (a.x - a.px) * alpha, y = a.py + (a.y - a.py) * alpha;
+  const target = W(x, y); const moved = target.distanceTo(v.root.position);
+  if (moved > 1.5) v.root.position.copy(target); else v.root.position.lerp(target, 1);
+  const speed = moved / Math.max(dt, 1e-4);
+  const attacking = sim.tick - a.lastAction < 30 || a.castUntil;
+  let want = A.yaw;
+  if (attacking || (isPlayer && sim.kit.id !== 'healer' && a.moving < 0.1)) want = yawToward(BOSS.x - a.x, BOSS.y - a.y);
+  if (a.moving > 0.1 && !attacking) want = yawToward(a.mx, a.my);
+  const v2 = isPlayer && sim.kit.id === 'vanguard'; if (v2) want = faceYaw(a); // directional combat: always face the aim
+  A.yaw += angDiff(want, A.yaw) * Math.min(1, dt * 14);
+  v.root.rotation.y = A.yaw;
+  const walking = Math.min(1, speed / 5);
+  A.walk += dt * (6 + 6 * walking) * (walking > 0.05 ? 1 : 0);
+  const sw = Math.sin(A.walk) * 0.7 * walking;
+  v.legL.rotation.x = sw; v.legR.rotation.x = -sw;
+  v.body.position.y = Math.abs(Math.sin(A.walk)) * 0.05 * walking + Math.sin(time * 2) * 0.012;
+  A.lean += ((walking * 0.18) - A.lean) * Math.min(1, dt * 8); v.body.rotation.x = A.lean;
+  // arms: idle sway + walk + action poses
+  let rA = -sw * 0.6, lA = sw * 0.6, rZ = 0, lZ = 0;
+  if (v.kind === 'vanguard') { rA = -0.35 - sw * 0.4; lA = -0.5 + sw * 0.3; lZ = 0.15; }
+  if (A.attack) {
+    A.attack.t += dt; const t = A.attack.t / A.attack.dur, s = A.attack.slot;
+    if (t >= 1) A.attack = null;
+    else if (v.kind === 'vanguard') {
+      if (s === 3) { lA = -1.5; lZ = -0.5; }
+      else { const wind = s === 2 ? -2.8 : -2.1, follow = s === 2 ? 1.1 : 0.6; rA = t < 0.3 ? wind * (t / 0.3) : wind + (follow - wind) * Math.min(1, (t - 0.3) / 0.3); rZ = s === 1 ? -0.5 : 0; }
+    } else if (v.kind === 'arcanist') { rA = -1.5 * Math.sin(Math.min(1, t * 1.6) * Math.PI); if (s >= 1) lA = rA; }
+    else { rA = s === 2 ? -2.6 * Math.sin(t * Math.PI) : -1.4 * Math.sin(t * Math.PI); if (s === 3) lA = -1.2 * Math.sin(t * Math.PI); }
+  }
+  if (a.castUntil) { const def = sim.kit.slots[a.castSlot]; const t = 1 - (a.castUntil - sim.tick) / def.cast; rA = lA = -2.2 - 0.3 * t; rZ = -0.4; lZ = 0.4; }
+  if (v2) { // Vanguard 2.0 poses driven by the simulation action state (windup -> strike -> follow-through)
+    const T = sim.tick + alpha; let twist = 0, lean2 = null;
+    const POSE = { // [windup rA, rZ, twist] -> [strike rA, rZ, twist]
+      hit1: [[-1.6, -1.0, 0.55], [-0.5, 0.65, -0.6]], hit2: [[-1.4, 0.75, -0.55], [-0.45, -0.95, 0.6]],
+      hit3: [[-2.9, -0.2, 0.85], [0.9, 0.2, -1.0]], dashAttack: [[-1.0, -0.3, 0.3], [-1.65, -0.1, -0.2]],
+      final: [[-3.0, -0.2, 0.6], [1.0, 0.1, -0.8]] };
+    if (a.vAction && POSE[a.vAction]) {
+      const [w, s] = POSE[a.vAction], wk = clamp((T - a.vStart) / Math.max(1, a.vHit - a.vStart), 0, 1), fk = clamp((T - a.vHit) / 5, 0, 1);
+      const e = wk < 1 ? wk * wk : 1, q = fk;
+      rA = (wk < 1 ? w[0] * e : w[0] + (s[0] - w[0]) * q); rZ = (wk < 1 ? w[1] * e : w[1] + (s[1] - w[1]) * q); twist = (wk < 1 ? w[2] * e : w[2] + (s[2] - w[2]) * q);
+      lA = -0.9; lZ = 0.25; lean2 = a.vAction === 'dashAttack' ? 0.45 : a.vAction === 'final' ? 0.2 : 0.18;
+    } else if (a.vAction === 'rush') { rA = -0.25; rZ = -0.3; lA = -1.6; lZ = -0.45; twist = -0.35; lean2 = 0.45; }
+    if (sim.tick < a.dashUntil) { rA = 0.7; lA = 0.4; rZ = -0.2; twist = 0; lean2 = 0.55; }
+    if (sim.tick < a.guardUntil && !a.vAction) { lA = -1.55; lZ = -0.45; twist = -0.3; }
+    if (v.torso) v.torso.rotation.y += (twist - v.torso.rotation.y) * Math.min(1, dt * 24);
+    if (lean2 != null) { A.lean += (lean2 - A.lean) * Math.min(1, dt * 14); v.body.rotation.x = A.lean; }
+  }
+  v.armR.rotation.x += (rA - v.armR.rotation.x) * Math.min(1, dt * 22); v.armL.rotation.x += (lA - v.armL.rotation.x) * Math.min(1, dt * 22);
+  v.armR.rotation.z = -0.12 + rZ; v.armL.rotation.z = 0.12 + lZ;
+  // cloth follow-through
+  const cloth = Math.sin(time * 3 + 1) * 0.06 + walking * 0.45 + A.lean;
+  if (v.cape) v.cape.rotation.x = cloth * 0.9;
+  if (v.tails) v.tails.forEach((t, i) => t.rotation.x = 0.12 + cloth * 0.9 + Math.sin(time * 4 + i) * 0.05);
+  // class props
+  if (v.device) { v.device.position.y = 1.45 + Math.sin(time * 1.6) * 0.05; const casting = !!a.castUntil; v.deviceRings[0].rotation.y += dt * (casting ? 7 : 0.8); v.deviceRings[1].rotation.x += dt * (casting ? 5 : 0.5); v.deviceRings[2].rotation.z += dt * (casting ? 4 : 0.3);
+    const tgtY = casting ? 2.15 : 1.45, tgtX = casting ? 0 : 0.32, tgtZ = casting ? 0.25 : -0.28; v.device.position.x += (tgtX - v.device.position.x) * dt * 6; v.device.position.z += (tgtZ - v.device.position.z) * dt * 6; v.device.position.y += (tgtY - v.device.position.y) * dt * 6; }
+  if (v.lenses) v.lenses.forEach((l, i) => { const ang = time * 1.4 + i * 2.1; l.position.set(Math.cos(ang) * 0.55, 0.95 + Math.sin(time * 2 + i) * 0.12, Math.sin(ang) * 0.55); l.lookAt(camera.position); });
+  if (v.chimes) v.chimes.forEach((c, i) => { const ang = -0.7 + i * 0.35; c.position.set(Math.sin(ang - 1.2) * 0.45, 1.35 + Math.sin(time * 2.2 + i * 1.3) * 0.06, Math.cos(ang - 1.2) * 0.45); c.rotation.z = Math.sin(time * 3 + i) * 0.15; });
+  if (v.halo) v.halo.rotation.z += dt * 0.6;
+  // hit flinch / knockout / chill tint
+  if (A.hit > 0) { A.hit = Math.max(0, A.hit - dt * 4); v.body.rotation.x -= A.hit * 0.4; }
+  if (a.hp <= 0) { A.ko = Math.min(1, (A.ko || 0) + dt * 2.5); v.body.rotation.x = -A.ko * 1.45; v.body.position.y = -A.ko * 0.25; }
+  else if (A.ko) A.ko = 0;
+  const chill = sim.tick < a.chillUntil, immune = sim.tick < a.immuneUntil && Math.floor(time * 14) % 2 === 0;
+  v.root.traverse(o => { if (o.isMesh && o.material && o.material.isMeshToonMaterial) { if (!o.material.userData.base) o.material.userData.base = o.material.emissive.clone(); } });
+  setTint(v, immune ? 0x445566 : chill ? 0x1f4f6a : 0);
+}
+const tinted = new WeakMap();
+function setTint(v, hex) {
+  if (tinted.get(v) === hex) return; tinted.set(v, hex);
+  v.root.traverse(o => { if (o.isMesh && o.material && o.material.isMeshToonMaterial) { if (!o.userData.own) { o.material = o.material.clone(); o.userData.own = true; } o.material.emissive.setHex(hex); } });
+}
+
+/* ---------- Boss animation ---------- */
+function animateBoss(dt) {
+  const B = boss; if (!B) return;
+  const tgt = sim ? (B.windup ? B.windup.dir : Math.atan2(sim.p.y - BOSS.y, sim.p.x - BOSS.x)) : Math.PI / 2;
+  const yawWant = yawToward(Math.cos(tgt), Math.sin(tgt));
+  B.yaw = (B.yaw ?? yawWant); B.yaw += angDiff(yawWant, B.yaw) * Math.min(1, dt * (B.windup ? 6 : 1.2));
+  B.upper.rotation.y = B.yaw;
+  { const bt = W(BOSS.x, BOSS.y); B.root.position.lerp(bt, Math.min(1, dt * 30)); bellGlow.position.set(B.root.position.x, 2.2, B.root.position.z); } // boss can move (Pendulum Charge)
+  if (sim && sim.bossMove) { B.sway.rotation.x = 0.35; }
+  B.staggered = !!(sim && sim.enc === 'v1' && sim.vulnerable);
+  // idle: slow gear breathing and measured pendulum
+  B.halo.rotation.z += dt * 0.25; B.haloInner.rotation.z -= dt * 0.6;
+  let swing = Math.sin(time * 1.3) * 0.12, glow = 0.85 + Math.sin(time * 2) * 0.1, armUp = 0, surge = 0, recoil = 0;
+  if (B.windup) { // windup: housing turns, arm aligns, glow tightens, coral surge
+    B.windup.t += dt; const k = Math.min(1, B.windup.t / B.windup.dur);
+    armUp = Math.min(1, k * 2.2); swing = Math.sin(time * 1.3) * 0.12 * (1 - k) - 0.25 * armUp; glow = 1 + k * 0.9; surge = k;
+  }
+  if (B.strike != null) { B.strike += dt; const k = B.strike / 0.6; recoil = Math.sin(Math.min(1, k) * Math.PI) * (1 - Math.min(1, k)); if (k >= 1) B.strike = null; swing = 0.5 * Math.sin(k * 10) * (1 - k); }
+  B.pend.rotation.x = swing; B.pend.rotation.z = Math.sin(time * 0.9) * 0.04;
+  B.sway.position.y = Math.sin(time * 1.1) * 0.05 - recoil * 0.15; B.sway.rotation.x = -recoil * 0.12;
+  const [L, R] = B.arms;
+  R.upper.rotation.x = -0.25 - armUp * 1.35 + recoil * 1.6; R.fore.rotation.x = -0.35 - armUp * 0.6;
+  L.upper.rotation.x = -0.15 - armUp * 0.4 + recoil * 0.4; L.fore.rotation.x = -0.25;
+  R.upper.rotation.z = -0.15; L.upper.rotation.z = 0.15;
+  B.coreMat.color.copy(new THREE.Color(C.gold).lerp(new THREE.Color(C.coral), surge * 0.85)).multiplyScalar(1.8 + glow * 0.6 + (B.flash > 0 ? 1.5 : 0));
+  B.coreHalo.scale.setScalar(1 + glow * 0.15 - surge * 0.3); B.surge.material.opacity = surge * 0.85 * (0.7 + 0.3 * Math.sin(time * 18));
+  B.eye.material.color.setHex(surge > 0.05 ? C.coral : C.gold).multiplyScalar(2.6 + surge * 2);
+  if (B.staggered) { glow = 0.4 + 0.3 * Math.sin(time * 10); B.sway.rotation.z = Math.sin(time * 7) * 0.05; } else B.sway.rotation.z = 0; // vulnerable: dimmed, wobbling core
+  bellGlow.intensity = 3 + glow * 3 + surge * 6; bellGlow.color.setHex(surge > 0.3 ? 0xff8a5a : 0xffb85a);
+  if (B.flash > 0) B.flash -= dt;
+  B.root.visible = !sim || sim.outcome !== 'victory' || (B.fall = (B.fall || 0) + dt) < 2.5;
+  if (sim && sim.outcome === 'victory') { const f = Math.min(1, (B.fall || 0) / 2); B.sway.rotation.x = f * 0.5; B.sway.position.y = -f * 1.2; B.coreMat.color.setHex(0x553311); }
+}
+
+// ---------- Vanguard 2.0 world cues: ReversalMark glyph over the boss, facing arrow under the player ----------
+let markGlyph = null, faceArrow = null;
+function updateV2World() {
+  if (!sim || !view) return;
+  if (!markGlyph) {
+    markGlyph = new THREE.Group();
+    markGlyph.add(new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.05, 8, 40), ADD(C.gold, 2.2)));
+    const hand = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.5, 0.02), ADD(0xffe08a, 2.4)); hand.geometry.translate(0, 0.2, 0); markGlyph.add(hand); markGlyph.userData.hand = hand;
+    scene.add(markGlyph);
+  }
+  const marked = sim.tick < sim.markUntil; markGlyph.visible = marked;
+  if (marked) { markGlyph.position.set(0, 6.0 + Math.sin(time * 3) * 0.1, 0); markGlyph.lookAt(camera.position); markGlyph.userData.hand.rotation.z = -time * 4; }
+  if (!faceArrow) {
+    const sh = new THREE.Shape(); sh.moveTo(0, 0.95); sh.lineTo(0.17, 0.64); sh.lineTo(0, 0.7); sh.lineTo(-0.17, 0.64); sh.closePath();
+    const m = new THREE.Mesh(new THREE.ShapeGeometry(sh), new THREE.MeshBasicMaterial({ color: new THREE.Color(0x5fe3ff).multiplyScalar(1.4), transparent: true, opacity: 0.75, depthWrite: false }));
+    m.rotation.x = -Math.PI / 2; faceArrow = new THREE.Group(); faceArrow.add(m); scene.add(faceArrow);
+  }
+  faceArrow.visible = sim.kit.id === 'vanguard' && sim.alive(sim.p) && mode === 'play';
+  faceArrow.position.set(view.root.position.x, 0.03, view.root.position.z); faceArrow.rotation.y = faceYaw(sim.p) + Math.PI;
+}
+
+/* ---------- Range rings (optional) ---------- */
+function buildRings() {
+  for (const r of ringMeshes) scene.remove(r); ringMeshes = [];
+  sim.kit.slots.forEach((s, i) => {
+    if (!s.range) return;
+    const g = new THREE.Group(); const n = 64;
+    for (let j = 0; j < n; j += 2) { const m = new THREE.Mesh(new THREE.RingGeometry(s.range * S - 0.03, s.range * S, 4, 1, j / n * Math.PI * 2, Math.PI * 2 / n), new THREE.MeshBasicMaterial({ color: [0xF4E9D1, 0x55C9CE, 0xF6C968, 0xa8e3ff][i], transparent: true, opacity: 0.45, depthWrite: false })); m.rotation.x = -Math.PI / 2; g.add(m); }
+    g.position.y = 0.03; g.userData = { support: s.support || s.guard, slot: i };
+    scene.add(g); ringMeshes.push(g);
+  });
+}
+
+/* ---------- World update ---------- */
+let shake = 0;
+const CAM_BASE = new THREE.Vector3(0, 29, 22.5), camLook = new THREE.Vector3(0, 0, 1.0), camBase = CAM_BASE.clone();
+let selectSpin = 0;
+function updateWorld(dt, alpha) {
+  const mp = moteGeo.attributes.position; for (let i = 0; i < moteN; i++) { mp.array[i * 3 + 1] += dt * 0.25; if (mp.array[i * 3 + 1] > 12) mp.array[i * 3 + 1] = 2; } mp.needsUpdate = true;
+  const quiet = sim && sim.hazards.length > 0;
+  motes.material.opacity += ((quiet ? 0.25 : 0.7) - motes.material.opacity) * dt * 3;
+  arenaEnv.update(time, dt, quiet); // floor engravings dim during warnings
+  tickFx(dt);
+
+  if (mode === 'select') {
+    selectSpin += dt * 0.6;
+    const v = view; if (v) { v.root.position.set(0, 0, 6.2); v.root.rotation.y = Math.PI * 0.08 + Math.sin(selectSpin) * 0.5; v.anim.walk += 0; animateIdleShowcase(v, dt); }
+    camera.position.lerp(new THREE.Vector3(0, 1.15, 10.3), Math.min(1, dt * 3)); camera.lookAt(0, 0.5, 6.2);
+    animateBoss(dt);
+    return;
+  }
+  if (!sim) return;
+  animateActor(view, sim.p, dt, alpha, true);
+  if (allyView && sim.ally) animateActor(allyView, sim.ally, dt, alpha, false);
+  animateBoss(dt); updateV2World();
+  // telegraph uniforms
+  for (const h of sim.hazards) {
+    const m = teleMeshes.get(h.id); if (!m) continue; const u = m.material.uniforms;
+    u.origin.value.set(h.ox, h.oy); u.dir.value = h.dir; u.locked.value = h.locked ? 1 : 0;
+    u.progress.value = clamp((sim.tick + alpha - h.W) / (h.R - h.W), 0, 1); u.time.value = time;
+  }
+  for (const e of effects) if (e.obj.material?.uniforms?.time) e.obj.material.uniforms.time.value = time;
+  // echo memory mark
+  if (sim.memory && !memoryMesh) memoryMesh = makeTelegraph({ kind: 'cone', ox: sim.memory.ox, oy: sim.memory.oy, r: sim.memory.r, dir: sim.memory.dir, half: sim.memory.half }, 2);
+  if (!sim.memory && memoryMesh) { scene.remove(memoryMesh); memoryMesh = null; }
+  if (memoryMesh) { const u = memoryMesh.material.uniforms; u.dir.value = sim.memory.dir; u.origin.value.set(sim.memory.ox, sim.memory.oy); u.time.value = time; }
+  // range rings
+  for (const g of ringMeshes) { g.visible = opts.rings; const s = sim.kit.slots[g.userData.slot]; const c = g.userData.support ? view.root.position : W(BOSS.x, BOSS.y); g.position.x = c.x; g.position.z = c.z; const inR = g.userData.support || dist(sim.p, BOSS) <= s.range; g.children.forEach(m => m.material.opacity = inR ? 0.55 : 0.18); }
+  // camera: fixed shared framing, gentle bias toward the player, restrained shake
+  const bias = W(sim.p.x, sim.p.y).multiplyScalar(0.12);
+  const want = camBase.clone().add(new THREE.Vector3(bias.x, 0, bias.z));
+  camera.position.lerp(want, Math.min(1, dt * 2.5));
+  if (shake > 0) { shake = Math.max(0, shake - dt * 1.6); camera.position.x += (Math.random() - 0.5) * shake * 0.3; camera.position.y += (Math.random() - 0.5) * shake * 0.3; }
+  camera.lookAt(camLook.clone().add(new THREE.Vector3(bias.x, 0, bias.z)));
+  updateHud(dt);
+}
+function animateIdleShowcase(v, dt) {
+  v.body.position.y = Math.sin(time * 2) * 0.015; v.legL.rotation.x = v.legR.rotation.x = 0;
+  v.armR.rotation.x = v.kind === 'vanguard' ? -0.35 : -0.15 + Math.sin(time * 1.5) * 0.05; v.armL.rotation.x = v.kind === 'vanguard' ? -0.5 : -0.1; v.armR.rotation.z = -0.12; v.armL.rotation.z = 0.12 + (v.kind === 'vanguard' ? 0.15 : 0);
+  if (v.cape) v.cape.rotation.x = 0.1 + Math.sin(time * 2) * 0.05;
+  if (v.tails) v.tails.forEach((t, i) => t.rotation.x = 0.15 + Math.sin(time * 2 + i) * 0.06);
+  if (v.device) { v.deviceRings[0].rotation.y += dt; v.deviceRings[1].rotation.x += dt * 0.7; v.deviceRings[2].rotation.z += dt * 0.4; v.device.position.set(0.32, 1.45 + Math.sin(time * 1.6) * 0.05, -0.28); }
+  if (v.lenses) v.lenses.forEach((l, i) => { const ang = time * 1.4 + i * 2.1; l.position.set(Math.cos(ang) * 0.55, 0.95 + Math.sin(time * 2 + i) * 0.12, Math.sin(ang) * 0.55); l.lookAt(camera.position); });
+  if (v.chimes) v.chimes.forEach((c, i) => { const ang = -0.7 + i * 0.35; c.position.set(Math.sin(ang - 1.2) * 0.45, 1.35 + Math.sin(time * 2.2 + i * 1.3) * 0.06, Math.cos(ang - 1.2) * 0.45); });
+  if (v.halo) v.halo.rotation.z += dt * 0.6;
+}
+
+/* ---------- HUD ---------- */
+const $ = id => document.getElementById(id);
+function buildHud() {
+  const k = sim.kit;
+  $('actions').innerHTML = k.slots.map((s, i) => `<div class="slot" id="slot${i}"><div class="name">${s.name}</div><svg viewBox="0 0 64 64">${ICON[s.icon]}</svg><div class="cd"></div><div class="cdText"></div><div class="key">${i + 1}</div><div class="cost">${s.res < 0 ? -s.res : s.cost ? s.cost : ''}</div></div>`).join('');
+  $('actions').insertAdjacentHTML('beforeend', `<div class="slot dash" id="slotDash"><div class="name">Clockstep Dash</div><svg viewBox="0 0 64 64">${ICON.dash}</svg><div class="cd"></div><div class="cdText"></div><div class="key">5</div><div class="cost"></div></div>`);
+  $('hpRow').innerHTML = '<label>Health</label>' + Array.from({ length: MAXHP }, (_, i) => `<div class="pip hp" id="hp${i}"></div>`).join('');
+  $('resRow').innerHTML = `<label>${k.resource}</label>` + Array.from({ length: k.cap }, (_, i) => `<div class="pip res" id="res${i}"></div>`).join('');
+  $('healerHint').classList.toggle('hidden', k.id !== 'healer');
+  $('phasePips').innerHTML = (sim.enc === 'v1' ? ['I', 'II', 'III'] : ['I', 'II', 'III', 'IV', 'V', 'XII']).map((p, i) => `<span id="ph${i}">${p}</span>`).join('');
+  $('bossBar').querySelectorAll('.tick').forEach(t => t.remove());
+  for (let i = 1; i < 10; i++) { const t = document.createElement('div'); t.className = 'tick'; t.style.left = i * 10 + '%'; $('bossBar').appendChild(t); }
+  $('playerTag').innerHTML = '';
+}
+function flashSlot(i) { const s = $('slot' + i); if (!s) return; s.classList.remove('flash'); void s.offsetWidth; s.classList.add('flash'); }
+function flashRes() { $('resRow').animate([{ filter: 'brightness(1.8)' }, { filter: 'none' }], 300); }
+function updateHud(dt) {
+  const k = sim.kit, p = sim.p;
+  // boss
+  const frac = isFinite(sim.bossMax) ? sim.bossHp / sim.bossMax : 1;
+  $('bossHp').style.width = (frac * 100) + '%'; $('bossHpLag').style.width = (frac * 100) + '%';
+  $('bossName').textContent = isFinite(sim.bossMax) ? `THE BELLKEEPER · ${Math.ceil(frac * 100)}%` : 'THE BELLKEEPER · TRAINING';
+  const ph = sim.enc === 'v1' ? sim.phase : phaseOf(sim.tick);
+  for (let i = 0; i < 6; i++) { const e = $('ph' + i); if (e) e.className = i === ph ? 'on' : i < ph ? 'done' : ''; }
+  $('fightTime').textContent = sim.enc === 'v1' ? `${V1_PHASE_NAMES[sim.phase]} · ${fmtTime(sim.tick)}` : fmtTime(sim.tick) + ' / 4:00';
+  if (sim.tick < ENRAGE) {
+    const live = sim.hazards.filter(h => h.attack !== 'final').sort((a, b) => a.R - b.R)[0];
+    $('castLine').textContent = (!live && sim.enc === 'v1' && sim.vulnerable) ? (sim.vulnerableExtended ? 'THE BELL FALTERS · STRIKE NOW' : 'VULNERABLE') : live ? `${live.name.toUpperCase()} · ${((live.R - sim.tick) / TICK).toFixed(1)}` + (!live.locked ? ' · TRACKING' : '') : '';
+  }
+  // player vitals
+  for (let i = 0; i < MAXHP; i++) { const e = $('hp' + i); e.className = 'pip hp' + (i < p.hp ? ' on' : '') + (i === p.hp && p.shield > 0 && sim.tick < p.shieldUntil ? ' shield' : ''); }
+  for (let i = 0; i < k.cap; i++) $('res' + i).className = 'pip res' + (i < p.res ? ' on' : '');
+  // action slots: radial cooldown + blocked state
+  k.slots.forEach((s, i) => {
+    const el = $('slot' + i); if (!el) return;
+    const rem = Math.max(0, p.ready[i] - sim.tick), frac = s.cd ? rem / s.cd : 0;
+    el.querySelector('.cd').style.setProperty('--a', (frac * 360) + 'deg');
+    el.querySelector('.cdText').textContent = rem > 0 && rem > 30 ? (rem / TICK).toFixed(rem > 600 ? 0 : 1) : '';
+    const cost = s.res < 0 ? -s.res : s.cost || 0;
+    const outRange = !s.support && !s.guard && dist(p, BOSS) > s.range;
+    el.classList.toggle('blocked', rem === 0 && (p.res < cost || outRange));
+    el.classList.toggle('ready', rem === 0 && !(p.res < cost || outRange));
+  });
+  { const dEl = $('slotDash'); if (dEl) { const ch = p.dashCharges, recharging = ch < DASH.charges ? Math.max(0, p.dashRechargeAt - sim.tick) / DASH.recharge : 0; dEl.querySelector('.cd').style.setProperty('--a', (ch === 0 ? recharging : 0) * 360 + 'deg'); dEl.querySelector('.cost').textContent = '×' + ch; dEl.classList.toggle('ready', ch > 0); dEl.classList.toggle('blocked', ch === 0); } }
+  { const t = $('slot1'); if (t) t.classList.toggle('reversal', k.id === 'vanguard' && sim.tick < p.reversalUntil); }
+  $('targetTag').textContent = k.id === 'healer' ? `Heal target: ${TARGET_NAMES[supportTarget]}` + (sim.ally ? ` · Ally ${sim.ally.hp}/${MAXHP}` : '') : '';
+  // near-player guard + resource readout (keeps eyes on the arena)
+  const tag = $('playerTag'); tag.classList.remove('hidden');
+  const sp = screenOf(view.root.position.clone().add(new THREE.Vector3(0, -0.25, 0.55)));
+  tag.style.left = sp.x + 'px'; tag.style.top = sp.y + 'px';
+  const guardReady = sim.tick >= p.ready[3];
+  tag.innerHTML = `<i class="${guardReady ? '' : 'off'}" style="background:${guardReady ? '#F6C968' : ''};box-shadow:${guardReady ? '0 0 6px #F6C968' : 'none'}"></i>` + Array.from({ length: k.cap }, (_, i) => `<i class="${i < p.res ? '' : 'off'}"></i>`).join('');
+  const cb = $('castBar');
+  if (p.castUntil) { const def = k.slots[p.castSlot]; cb.classList.remove('hidden'); const s2 = screenOf(view.root.position.clone().add(new THREE.Vector3(0, view.height + 0.45, 0))); cb.style.left = s2.x + 'px'; cb.style.top = s2.y + 'px'; cb.firstElementChild.style.width = ((1 - (p.castUntil - sim.tick) / def.cast) * 100) + '%'; }
+  else cb.classList.add('hidden');
+  // record
+  const secs = Math.max(1, (sim.tick - (sim.stats.firstHit || sim.tick)) / TICK);
+  $('meterBody').innerHTML = `<div class="row">Damage <b>${sim.stats.dmg}</b></div><div class="row">DPS <b>${(sim.stats.dmg / secs).toFixed(1)}</b></div>` +
+    k.slots.slice(0, 3).map((s, i) => s.dmg ? `<div class="row">${s.name} <b>${sim.stats.bySlot[i]}</b></div>` : '').join('') +
+    (k.id === 'healer' ? `<div class="row">Healing <b>${sim.stats.healed}</b></div>` : '') +
+    `<div class="row">Mechanics avoided <b>${sim.stats.avoided}</b></div><div class="row">Failed (guarded) <b>${sim.stats.failed} (${sim.stats.guarded})</b></div>`;
+  if (cardTimer > 0) { cardTimer -= dt; if (cardTimer <= 0) $('card').style.opacity = 0; }
+}
+
+/* ---------- Screens ---------- */
+const show = id => $(id).classList.remove('hidden'), hide = id => $(id).classList.add('hidden');
+function buildSelect() {
+  $('cards').innerHTML = CLASS_ORDER.map((id, i) => { const k = KITS[id]; return `<div class="classCard" data-id="${id}"><div class="role">${i + 1} · ${k.role}</div><h2>${k.name.toUpperCase()}</h2><p>${k.identity}</p><ul>${k.slots.map(s => `<li><b>${s.name}</b> — ${s.desc}</li>`).join('')}</ul><div class="swatches">${k.swatch.map(c => `<i style="background:${c}"></i>`).join('')}</div></div>`; }).join('');
+  $('cards').querySelectorAll('.classCard').forEach(c => { c.onmouseenter = () => selectClass(c.dataset.id); c.onclick = () => { selectClass(c.dataset.id); }; c.ondblclick = beginIntro; });
+}
+function selectClass(id) { classId = id; setClassView(id); $('cards').querySelectorAll('.classCard').forEach(c => c.classList.toggle('sel', c.dataset.id === id)); }
+function toSelect() { mode = 'select'; sim = null; for (const m of teleMeshes.values()) scene.remove(m); teleMeshes.clear(); if (memoryMesh) { scene.remove(memoryMesh); memoryMesh = null; } if (allyView) { scene.remove(allyView.root); allyView = null; } for (const r of ringMeshes) scene.remove(r); ringMeshes = []; hide('hud'); hide('pause'); hide('result'); hide('playerTag'); hide('castBar'); hide('guardCall'); show('select'); selectClass(classId); boss.fall = 0; }
+function beginIntro() {
+  ac(); hide('select'); hide('result'); hide('pause'); hide('guardCall');
+  boss.fall = 0; boss.windup = null; boss.strike = null;
+  startFight(); mode = 'intro'; show('hud'); show('intro');
+  const el = $('intro').firstElementChild; el.textContent = 'THE BELLKEEPER'; el.style.animation = 'none'; void el.offsetWidth; el.style.animation = '';
+  bell(98, 4, 0.22); setTimeout(() => bell(147, 3, 0.12), 500);
+  const startCam = camera.position.clone();
+  const t0 = performance.now(); let t = 0; const tick = () => { t = (performance.now() - t0) / 1000; camera.position.lerpVectors(startCam, camBase, Math.min(1, t / 1.6)); camera.lookAt(camLook); updateHudIntro(); if (t < 2.0 && mode === 'intro') requestAnimationFrame(tick); else { hide('intro'); mode = 'play'; acc = 0; } };
+  tick();
+}
+function updateHudIntro() { if (sim && view) { view.root.position.copy(W(sim.p.x, sim.p.y)); view.root.rotation.y = Math.PI; } }
+function pause(on) { if (on) { mode = 'paused'; syncOpts(); show('pause'); } else { hide('pause'); mode = 'play'; acc = 0; } }
+function syncOpts() { $('optEnc').value = opts.encounter; $('optHp').value = opts.hp; $('optPhase').value = opts.phase; $('optInv').textContent = opts.inv ? 'On' : 'Off'; $('optKo').value = opts.ko; $('optAlly').textContent = opts.ally ? 'On' : 'Off'; $('optRings').textContent = opts.rings ? 'On' : 'Off'; $('optSound').textContent = soundOn ? 'On' : 'Off'; $('optStrikes').textContent = opts.strikes ? 'On' : 'Off'; $('optAim').textContent = opts.mouseAim ? 'On' : 'Off'; }
+$('optHp').onchange = e => { opts.hp = e.target.value; };
+$('optEnc').onchange = e => { opts.encounter = e.target.value; };
+$('optPhase').onchange = e => { opts.phase = +e.target.value; };
+$('optKo').onchange = e => { opts.ko = e.target.value; if (sim) sim.opts.ko = opts.ko; };
+$('optInv').onclick = () => { opts.inv = !opts.inv; if (sim) sim.opts.inv = opts.inv; syncOpts(); };
+$('optAlly').onclick = () => { opts.ally = !opts.ally; syncOpts(); };
+$('optRings').onclick = () => { opts.rings = !opts.rings; syncOpts(); };
+$('optSound').onclick = () => { soundOn = !soundOn; syncOpts(); };
+$('optStrikes').onclick = () => { opts.strikes = !opts.strikes; syncOpts(); };
+$('optAim').onclick = () => { opts.mouseAim = !opts.mouseAim; syncOpts(); };
+$('resumeBtn').onclick = () => pause(false);
+$('restartBtn').onclick = () => beginIntro();
+$('classBtn').onclick = toSelect; $('resultClassBtn').onclick = toSelect;
+$('retryBtn').onclick = () => beginIntro();
+$('beginBtn').onclick = beginIntro;
+function showResult() {
+  mode = 'result'; const s = sim.stats, won = sim.outcome === 'victory';
+  $('resultTitle').textContent = won ? 'THE BELL FALLS SILENT' : 'KNOCKED OUT';
+  $('resultTitle').style.color = won ? '#F6C968' : '#EB685D';
+  let why = '';
+  if (won) why = `The Bellkeeper fell at ${fmtTime(sim.tick)} — ${sim.tick < ENRAGE ? 'before the Final Hour.' : 'after the Final Hour began.'}`;
+  else if (sim.koReason) { const t = cardText(sim.koReason.h, 'hit'), tip = V1_IMPROVE[sim.koReason.h.attack]; why = (sim.enc === 'v1' ? `<div style="color:#c9c3e6;font-size:13px;letter-spacing:.12em">PHASE REACHED · ${['I', 'II', 'III'][sim.phaseReached]} — ${V1_PHASE_NAMES[sim.phaseReached].toUpperCase()}${sim.koReason.h.block ? ' · PATTERN ' + sim.koReason.h.block : ''}</div>` : '') + (tip ? `<div style="margin-top:8px"><b style="color:#F6C968">HOW TO IMPROVE</b><br>${tip}</div>` : '') + '<br>' + `<b>${t.title}</b><br>${t.body.replace(/You lost d+ of d+ pips./, 'That took your last pips.')}`; }
+  $('resultWhy').innerHTML = why;
+  $('resultStats').innerHTML = `<div>Warden</div><b>${sim.kit.name}</b><div>Time</div><b>${fmtTime(sim.tick - sim.startTick)}</b><div>Damage</div><b>${s.dmg}</b><div>Boss health left</div><b>${isFinite(sim.bossMax) ? Math.ceil(sim.bossHp / sim.bossMax * 100) + '%' : '—'}</b><div>Mechanics avoided</div><b>${s.avoided} / ${s.avoided + s.failed + (s.countered || 0)}</b><div>Mechanics failed</div><b>${s.failed} (${s.guarded} guarded)</b>` + (sim.kit.id === 'healer' ? `<div>Healing</div><b>${s.healed}</b>` : '');
+  setTimeout(() => { if (mode === 'result') show('result'); }, won ? 1600 : 900);
+  bell(won ? 523 : 110, 4, 0.16);
+}
+
+function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false); composer.setSize(w, h); bloom.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix(); camBase.copy(camLook).add(CAM_BASE.clone().sub(camLook).multiplyScalar(Math.max(1, Math.pow(1.7 / camera.aspect, 0.85)))); }
+addEventListener('resize', resize); resize();
+buildSelect(); selectClass('vanguard');
+camera.position.set(0, 1.15, 10.3); camera.lookAt(0, 0.5, 6.2);
+hide('loading'); show('select');
+// ---------- Test autoplay (?autoplay=vanguard&inv&phase=N): a simple bot for screenshots and smoke tests ----------
+{
+  const Q = new URLSearchParams(location.search), cls = Q.get('autoplay');
+  if (cls && KITS[cls]) {
+    if (Q.has('inv')) opts.inv = true;
+    if (Q.get('phase')) opts.phase = +Q.get('phase');
+    selectClass(cls);
+    const ff = +Q.get('ff') || 0;
+    if (Q.get('enc')) opts.encounter = Q.get('enc');
+    if (ff) setTimeout(() => { // fast-forward: simulate ff ticks with the bot, then render that moment
+      hide('select'); startFight(); show('hud'); mode = 'play'; let prev = [false, false, false, false];
+      for (let i = 0; i < ff && sim.outcome === 'playing'; i++) { const inp = window.__bot(sim); const pressed = inp.held.map((h, k) => h && !prev[k]); prev = inp.held;
+        sim.step({ mx: inp.mx, my: inp.my, held: inp.held, pressed, g: inp.held[3], gp: pressed[3], target: 0, ax: inp.ax, ay: inp.ay, dp: !!inp.dashBot }); consumeFx(); }
+      boss.root.position.copy(W(BOSS.x, BOSS.y)); for (const a of sim.actors) { a.px = a.x; a.py = a.y; }
+    }, 100); else setTimeout(beginIntro, 50);
+    let last = [false, false, false, false];
+    window.__bot = s => {
+      const p = s.p, d = Math.hypot(BOSS.x - p.x, BOSS.y - p.y), want = s.kit.id === 'vanguard' ? 115 : 300;
+      let mx = 0, my = 0; if (d > want) { mx = (BOSS.x - p.x) / d; my = (BOSS.y - p.y) / d; }
+      const strike = s.hazards.find(h => h.counterable && h.R - s.tick <= 6 && h.R - s.tick >= 0);
+      const danger = s.hazards.find(h => !h.counterable && h.req === 'avoid' && h.R - s.tick === 10 && contains(h, p));
+      const inReach = s.kit.id !== 'vanguard' || d <= 150;
+      const held = [inReach, inReach && p.res >= 3 && s.kit.id !== 'healer', inReach && s.tick >= p.ready[2], !!strike];
+      const pressed = held.map((h, i) => h && !last[i]); last = held;
+      const dp = !!danger;
+      const aim = s.kit.id === 'vanguard' && d > 1 ? { ax: (BOSS.x - p.x) / d, ay: (BOSS.y - p.y) / d } : { ax: 0, ay: 0 };
+      return { mx: dp ? -my : mx, my: dp ? mx : my, held, target: 0, ...aim, dashBot: dp };
+    };
+  }
+}
+requestAnimationFrame(frame);
+window.__arena = { get sim() { return sim; }, get mode() { return mode; }, get view() { return view; }, beginIntro, selectClass, opts, Sim, KITS, SCHEDULE, contains };
+</script>
+</body>
+</html>

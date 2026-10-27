@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chimesinger Viewer</title>
+<style>
+  :root { --bg: #11152a; --panel: rgba(14, 18, 38, 0.86); --line: #3a4470; --gold: #d9a64c; --text: #e8ecff; --dim: #9aa3c8; --cyan: #5fe3ff; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, sans-serif; overflow: hidden; }
+  canvas { display: block; }
+  #ui { position: fixed; left: 16px; right: 16px; bottom: 16px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; }
+  button { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 9px 14px; font: inherit; cursor: pointer; }
+  button.on { border-color: var(--gold); color: var(--gold); }
+  #title { position: fixed; top: 14px; left: 16px; font-weight: 600; letter-spacing: 0.06em; color: var(--gold); }
+  #ref { position: fixed; top: 12px; right: 12px; width: 120px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+  #status { position: fixed; top: 38px; left: 16px; color: var(--dim); font-size: 12px; }
+  @media (max-width: 600px) { #ref { width: 80px; } }
+</style>
+</head>
+<body>
+<div id="title">CHIMESINGER · MODEL VIEWER</div>
+<div id="status">Loading model…</div>
+<img id="ref" src="models/upload/chimesinger-front.png" alt="Reference front view">
+<div id="ui"></div>
+<script src="models/chimesinger-glb.js"></script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1; renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x1a2040); scene.fog = new THREE.Fog(0x1a2040, 8, 22);
+const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.05, 100);
+const controls = new OrbitControls(camera, renderer.domElement); controls.target.set(0, 0.95, 0); controls.enableDamping = true;
+
+scene.add(new THREE.HemisphereLight(0xbfd0ff, 0x2a2238, 1.1));
+const sun = new THREE.DirectionalLight(0xfff1dc, 2.4); sun.position.set(3, 6, 4); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -3, right: 3, top: 3, bottom: -3 }); scene.add(sun);
+const rim = new THREE.DirectionalLight(0x7fb8ff, 1.2); rim.position.set(-4, 3, -5); scene.add(rim);
+
+// slate floor that scrolls under the run cycle so in-place motion reads as running
+const tile = document.createElement('canvas'); tile.width = tile.height = 256; const tg = tile.getContext('2d');
+tg.fillStyle = '#2b3150'; tg.fillRect(0, 0, 256, 256); tg.strokeStyle = '#3d466e'; tg.lineWidth = 4; tg.strokeRect(2, 2, 252, 252);
+const floorTex = new THREE.CanvasTexture(tile); floorTex.wrapS = floorTex.wrapT = THREE.RepeatWrapping; floorTex.repeat.set(12, 12); floorTex.colorSpace = THREE.SRGBColorSpace;
+const floor = new THREE.Mesh(new THREE.CircleGeometry(12, 64), new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.9 }));
+floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+
+const composer = new EffectComposer(renderer); composer.addPass(new RenderPass(scene, camera));
+composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.55, 0.4, 0.85)); composer.addPass(new OutputPass());
+
+const views = { Close: [2.6, 1.7, 3.6], 'Top-down': [0, 7.5, 6.5], 'Right hand': [0.35, 0.18, 0.45], 'Left hand': [-0.35, 0.18, 0.45] };
+// hand views follow the fist (bones 'hand.R' / 'hand.L', named handR / handL by three.js) so the grip can be inspected in motion
+const HAND_BONE = { 'Right hand': 'handR', 'Left hand': 'handL' };
+let follow = null, followPrev = new THREE.Vector3();
+const setView = v => {
+  follow = HAND_BONE[v] && model ? model.getObjectByName(HAND_BONE[v]) : null;
+  if (follow) { follow.getWorldPosition(followPrev); controls.target.copy(followPrev); camera.position.copy(followPrev).add(new THREE.Vector3(...views[v])); return; }
+  camera.position.set(...views[v]); controls.target.set(0, v === 'Close' ? 0.95 : 0.6, 0);
+};
+let model;
+setView('Close');
+
+const status = document.getElementById('status'), ui = document.getElementById('ui');
+const b64 = window.CHIMESINGER_GLB_B64;
+const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+// clip order for the buttons; number keys 1-9 play the first nine
+const ORDER = ['Idle', 'Run', 'Sprint', 'ResonantNote', 'Bellstrike', 'HarmonicRefrain', 'Crescendo', 'MendingChorus', 'Dodge', 'Jump'];
+const LABEL = { ResonantNote: 'Resonant Note', HarmonicRefrain: 'Harmonic Refrain', MendingChorus: 'Mending Chorus', Dodge: 'Harmonic Step' };
+let mixer, actions = {}, current, moving = false, paused = false, speed = 1;
+new GLTFLoader().parse(bytes.buffer, '', gltf => {
+  model = gltf.scene; model.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  scene.add(model); mixer = new THREE.AnimationMixer(model);
+  for (const clip of gltf.animations) actions[clip.name] = mixer.clipAction(clip);
+  const loops = new Set(['Idle', 'Run', 'Sprint']);
+  for (const [n, a] of Object.entries(actions)) if (!loops.has(n)) { a.setLoop(THREE.LoopOnce); a.clampWhenFinished = true; }
+  mixer.addEventListener('finished', () => play(moving || 'Idle'));
+  const order = ORDER.filter(n => actions[n]);
+  for (const n of order) { const b = document.createElement('button'); b.textContent = LABEL[n] || n; b.dataset.anim = n; b.onclick = () => { if (loops.has(n)) moving = n !== 'Idle' && n; play(n); }; ui.appendChild(b); }
+  for (const v of Object.keys(views)) { const b = document.createElement('button'); b.textContent = v; b.onclick = () => setView(v); ui.appendChild(b); }
+  const sp = document.createElement('button'); sp.textContent = 'Slow-mo'; sp.onclick = () => { sp.classList.toggle('on'); speed = sp.classList.contains('on') ? 0.25 : 1; if (!paused) mixer.timeScale = speed; }; ui.appendChild(sp);
+  // pause and single-frame step (30 fps clips) for checking contact frames up close
+  const pb = document.createElement('button'); pb.textContent = 'Pause'; pb.onclick = () => { paused = !paused; pb.classList.toggle('on', paused); mixer.timeScale = paused ? 0 : speed; }; ui.appendChild(pb);
+  for (const [label, d] of [['◀ Frame', -1], ['Frame ▶', 1]]) {
+    const b = document.createElement('button'); b.textContent = label;
+    b.onclick = () => { if (!paused) pb.onclick(); if (current) { const c = current.getClip(); current.time = Math.min(c.duration, Math.max(0, current.time + d / 30)); mixer.update(0); } };
+    ui.appendChild(b);
+  }
+  play('Idle');
+  status.textContent = 'Drag to orbit · scroll to zoom · keys 1–9 play animations';
+}, e => { status.textContent = 'Failed to load model: ' + e.message; console.error(e); });
+
+function play(name) {
+  const next = actions[name]; if (!next) return;
+  next.reset().play();
+  if (current && current !== next) next.crossFadeFrom(current, 0.12, false);
+  current = next;
+  for (const b of ui.querySelectorAll('button[data-anim]')) b.classList.toggle('on', b.dataset.anim === name);
+}
+addEventListener('keydown', e => { const n = ORDER[+e.key - 1]; if (n && actions[n]) { if (['Idle', 'Run', 'Sprint'].includes(n)) moving = n !== 'Idle' && n; play(n); } });
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); });
+
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const dt = clock.getDelta(); if (mixer) mixer.update(dt);
+  const speed = current && current === actions.Run ? 1.6 : current && current === actions.Sprint ? 2.8 : 0;
+  // texture +V runs toward -Z on the rotated floor; the model faces +Z, so tiles must slide toward -Z (behind her)
+  floorTex.offset.y -= dt * speed * (mixer ? mixer.timeScale : 1);
+  if (follow) {   // carry the camera along with the fist
+    const p = follow.getWorldPosition(new THREE.Vector3()); const d = p.clone().sub(followPrev);
+    camera.position.add(d); controls.target.add(d); followPrev.copy(p);
+  }
+  if (current) status.textContent = (LABEL[current.getClip().name] || current.getClip().name) + ' · frame ' + (Math.round(current.time * 30) + 1) + ' / ' + (Math.round(current.getClip().duration * 30) + 1);
+  controls.update(); composer.render();
+});
+</script>
+</body>
+</html>

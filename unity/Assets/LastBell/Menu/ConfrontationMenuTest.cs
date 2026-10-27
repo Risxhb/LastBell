@@ -1,0 +1,156 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using LastBell.Run;
+using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.LowLevel;
+using UnityEngine.InputSystem.UI;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
+
+namespace LastBell.Menu
+{
+    // Explicit opt-in rendered checks. Never runs in an ordinary preview.
+    public sealed class ConfrontationMenuTest : MonoBehaviour
+    {
+        public static bool Requested=>Environment.GetCommandLineArgs().Contains("-lastbellConfrontationTest");
+        // Opt-in: framing captures and checks only, skipping scene transitions.
+        static bool CaptureOnly=>Environment.GetCommandLineArgs().Contains("-lastbellConfrontationCaptureOnly");
+        static bool launched;
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        static void Prepare(){if(Requested)MenuAppearance.Selected=MenuStyle.Alternative;}
+        readonly List<string> report=new List<string>(),errors=new List<string>();
+        int failures;
+        string output,originalHero;
+        Keyboard keyboard;Gamepad pad;
+        InputSettings oldSettings,testSettings;
+        IEnumerator Start()
+        {
+            if(launched){Destroy(this);yield break;}launched=true;
+            var lifetime=new GameObject("Confrontation validation lifetime");DontDestroyOnLoad(lifetime);
+            var runner=lifetime.AddComponent<ConfrontationMenuTestRunner>();runner.Owner=this;
+            yield return null;runner.StartCoroutine(Run());
+        }
+        IEnumerator Run()
+        {
+            Application.logMessageReceived+=Log;Application.runInBackground=true;
+            var args=Environment.GetCommandLineArgs();int at=Array.IndexOf(args,"-lastbellOut");output=at>=0&&at+1<args.Length?args[at+1]:"E:/Collab/build-evidence/confrontation-menu-20261023/editor";Directory.CreateDirectory(output);
+            originalHero=SavedHeroSelection.Current;
+            oldSettings=InputSystem.settings;oldSettings.hideFlags=HideFlags.DontUnloadUnusedAsset;
+            testSettings=Instantiate(oldSettings);testSettings.hideFlags=HideFlags.DontUnloadUnusedAsset;testSettings.backgroundBehavior=InputSettings.BackgroundBehavior.IgnoreFocus;
+#if UNITY_EDITOR
+            testSettings.editorInputBehaviorInPlayMode=InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
+#endif
+            InputSystem.settings=testSettings;keyboard=InputSystem.AddDevice<Keyboard>();pad=InputSystem.AddDevice<Gamepad>();
+            yield return new WaitForSecondsRealtime(3);
+            var menu=FindAnyObjectByType<ConfrontationMenu>();
+            EventSystem.current.GetComponent<InputSystemUIInputModule>().actionsAsset.devices=new InputDevice[]{keyboard,pad};
+            Check("perspective fixed camera",!menu.View.orthographic&&Vector3.Distance(menu.View.transform.position,menu.CameraPosition)<.001f);
+            Check("exact uniform double boss scale",menu.BossWrapper.localScale==Vector3.one*2&&menu.Boss.transform.localScale==Vector3.one);
+            Check("authored boss and idle",menu.Boss.HasModel&&menu.Boss.Has("Idle"));
+            Check("alternate logo sprite with alpha",Resources.Load<Sprite>("Menu/ConfrontationLogo")!=null);
+            Check("no gameplay authority",!RunDirector.Instance&&!FindAnyObjectByType<BossEncounter>()&&!FindAnyObjectByType<PlayerController>());
+            Check("single music owner",FindObjectsByType<MenuMusic>(FindObjectsSortMode.None).Length==1&&menu.Music.MenuSource.isPlaying);
+            yield return Press(Key.DownArrow);Check("keyboard moves to Boss Rush",EventSystem.current.currentSelectedGameObject==menu.RushButton.gameObject);
+            InputSystem.QueueStateEvent(pad,new GamepadState().WithButton(GamepadButton.DpadDown));yield return null;yield return null;InputSystem.QueueStateEvent(pad,new GamepadState());yield return null;yield return null;
+            Check("controller moves to Settings",EventSystem.current.currentSelectedGameObject==menu.SettingsButton.gameObject);
+            yield return Press(Key.Enter);Check("keyboard opens settings",menu.SettingsOpen&&!menu.StartButton.IsInteractable());
+            menu.CloseSettings();Check("settings focus returns",!menu.SettingsOpen&&EventSystem.current.currentSelectedGameObject==menu.SettingsButton.gameObject);
+            var source=menu.Music.MenuSource;float musicTime=source.time;
+            foreach(var size in new[]{new Vector2Int(1600,900),new Vector2Int(1280,720),new Vector2Int(2560,1080),new Vector2Int(1024,768)})
+            {
+                MenuFlowTest.SetResolution(size.x,size.y);yield return new WaitForSecondsRealtime(1);
+                Check("actual requested resolution "+size,Screen.width==size.x&&Screen.height==size.y);
+                for(int i=0;i<RunDirector.Classes.Length;i++)
+                {
+                    menu.SelectClass(i);yield return new WaitForSecondsRealtime(.45f);
+                    Check("selected class "+size+" "+i,menu.Hero.HasModel&&menu.Hero.Has("Idle")&&SavedHeroSelection.Current==RunDirector.Classes[i]);
+                    Check("one active hero",menu.GetComponentsInChildren<CharacterPresenter>().Length==2);
+                    var bones=menu.Hero.GetComponentsInChildren<SkinnedMeshRenderer>().SelectMany(r=>r.bones).Where(b=>b).Distinct().ToArray();
+                    var rotations=bones.Select(b=>b.localRotation).ToArray();yield return new WaitForSecondsRealtime(.35f);
+                    Check("idle bones animate "+i,bones.Where((b,j)=>Quaternion.Angle(rotations[j],b.localRotation)>.01f).Any());
+                    Vector3 hero=menu.View.WorldToViewportPoint(menu.Hero.transform.parent.position+Vector3.up*1.4f),boss=menu.View.WorldToViewportPoint(menu.BossWrapper.position+Vector3.up*4);
+                    report.Add("FRAME "+Screen.width+"x"+Screen.height+" hero="+hero+" boss="+boss);
+                    Check("hero left / boss middle",hero.z>0&&hero.x>.03f&&hero.x<.43f&&boss.x>.32f&&boss.x<.68f);
+                    var rect=(RectTransform)menu.StartButton.transform;var corners=new Vector3[4];rect.GetWorldCorners(corners);
+                    Check("navigation fits screen",corners.All(p=>p.x>=0&&p.x<=Screen.width&&p.y>=0&&p.y<=Screen.height));
+                    yield return Capture(RunDirector.Classes[i]+"-"+Screen.width+"x"+Screen.height+".png");
+                }
+            }
+            Check("music continuous across class changes",menu.Music.MenuSource==source&&source.isPlaying&&source.time>musicTime);
+            if(!CaptureOnly){
+            // Boss Rush lives on this menu: arena step, boss step, Back returns to the menu with the stage restored.
+            menu.SelectClass(2);menu.BossRush();yield return null;
+            Check("Boss Rush opens on the main menu",menu.Rush&&menu.Rush.Hero==RunDirector.Classes[2]&&!menu.Rush.BossStep&&!FindAnyObjectByType<HeroSelection>());
+            float liveUntil=Time.realtimeSinceStartup+15;while(menu.Rush&&!menu.Rush.LiveBackdrop&&Time.realtimeSinceStartup<liveUntil)yield return null;
+            Check("Boss Rush shows the live arena backdrop",menu.Rush&&menu.Rush.LiveBackdrop&&menu.StageHidden&&!menu.View.enabled);
+            yield return new WaitForSecondsRealtime(1);yield return Capture("boss-rush-arena.png");
+            menu.Rush.Continue();yield return null;
+            Check("Continue opens the boss step",menu.Rush.BossStep&&menu.Rush.EncounterButtons[0].gameObject.activeInHierarchy&&!menu.Rush.MapButtons[0].gameObject.activeInHierarchy);
+            yield return Capture("boss-rush-boss.png");
+            yield return Press(Key.Escape);Check("Escape returns to the arena step",menu.Rush&&!menu.Rush.BossStep);
+            yield return Press(Key.Escape);yield return new WaitForSecondsRealtime(1.5f);
+            Check("Boss Rush Back restores the menu stage",!menu.Rush&&!menu.StageHidden&&menu.View.enabled&&menu.RushButton.IsInteractable()&&EventSystem.current.currentSelectedGameObject==menu.RushButton.gameObject);
+            Check("backdrop scene unloaded",SceneManager.sceneCount==1);
+            SceneManager.LoadScene(ConfrontationMenu.ScenePath);yield return SceneReady(()=>FindAnyObjectByType<ConfrontationMenu>()?.Hero!=null);
+            menu=FindAnyObjectByType<ConfrontationMenu>();Check("class restored on scene return",menu.Hero&&SavedHeroSelection.Current==RunDirector.Classes[2]);
+            menu.StartRun();yield return SceneReady(()=>RunDirector.Instance&&RunDirector.Instance.State==RunState.Ready);
+            Check("Start Run retains selected class",RunDirector.Instance&&RunDirector.Instance.ClassName==RunDirector.Classes[2]&&!MenuLaunch.Pending);
+            Check("preview actors unloaded",!FindAnyObjectByType<ConfrontationMenu>()&&!GameObject.Find("Bellwarden presentation — exact 2x"));
+            if(RunDirector.Instance){RunDirector.Instance.SetPaused(true);RunDirector.Instance.ReturnToMenu();}yield return SceneReady(()=>FindAnyObjectByType<ConfrontationMenu>()?.Hero!=null);
+            Check("gameplay returns only to selected alternative",MenuAppearance.Selected==MenuStyle.Alternative&&!FindAnyObjectByType<MainMenu>()&&SceneManager.sceneCount==1);
+            for(int i=0;i<2;i++)
+            {
+                SceneManager.LoadScene(ConfrontationMenu.ScenePath);yield return SceneReady(()=>FindAnyObjectByType<ConfrontationMenu>()?.Hero!=null);
+                menu=FindAnyObjectByType<ConfrontationMenu>();menu.SelectClass(i);menu.StartRun();yield return SceneReady(()=>RunDirector.Instance&&RunDirector.Instance.State==RunState.Ready);
+                Check("run uses selected class "+RunDirector.Classes[i],RunDirector.Instance&&RunDirector.Instance.ClassName==RunDirector.Classes[i]);
+                if(RunDirector.Instance){RunDirector.Instance.SetPaused(true);RunDirector.Instance.ReturnToMenu();}
+                yield return SceneReady(()=>FindAnyObjectByType<ConfrontationMenu>()?.Hero!=null);
+            }
+            MenuFlowTest.SetResolution(1600,900);yield return new WaitForSecondsRealtime(1);
+            menu=FindAnyObjectByType<ConfrontationMenu>();menu.OpenSettings();yield return Capture("alternative-settings.png");
+            Check("settings open on music volume, menu blocked",menu.SettingsOpen&&EventSystem.current.currentSelectedGameObject==menu.MusicVolumeControl.gameObject&&!menu.StartButton.IsInteractable());
+            Check("frame settings: VSync and FPS cap rows present",menu.VSyncControl&&menu.FrameCapControl&&menu.VSyncControl.gameObject.activeInHierarchy&&menu.FrameCapControl.gameObject.activeInHierarchy);
+            {
+                var resText=menu.ResolutionDropdown?menu.ResolutionDropdown.GetComponentInChildren<Text>().text:"";
+                menu.ResolutionDropdown.onClick.Invoke();yield return null;yield return null;
+                var sel=EventSystem.current.currentSelectedGameObject;
+                Check("resolution dropdown opens a themed list with every resolution, focused on the current one",menu.ResolutionListOpen&&menu.ResolutionItems.Length==MenuSettings.Resolutions.Length&&sel&&menu.ResolutionItems.Any(b=>b.gameObject==sel)&&sel.GetComponentInChildren<Text>().text==resText);
+                yield return Capture("settings-resolution-dropdown.png");
+                yield return Press(Key.Escape);
+                Check("Escape closes the resolution list only, focus back on the row, value unchanged",!menu.ResolutionListOpen&&menu.SettingsOpen&&EventSystem.current.currentSelectedGameObject==menu.ResolutionDropdown.gameObject&&menu.ResolutionDropdown.GetComponentInChildren<Text>().text==resText);
+            }
+            if(!PlayerPrefs.HasKey("LastBell.Menu.VSync"))Check("frame settings default: VSync off, 120 FPS cap",!MenuSettings.VSync&&MenuSettings.FrameCap==120&&QualitySettings.vSyncCount==0&&Application.targetFrameRate==120);
+            Check("settings has no interface option",menu.GetComponentsInChildren<Text>(true).All(t=>t.text!="UI"&&t.text!="Interface"));
+            yield return Press(Key.Escape);Check("Escape closes settings",!menu.SettingsOpen&&menu.StartButton.IsInteractable());
+            // mini music player
+            menu.MusicPauseButton.onClick.Invoke();Check("music player pauses",menu.Music.UserPaused);
+            menu.MusicPlayButton.onClick.Invoke();Check("music player plays",!menu.Music.UserPaused);
+            if(MenuMusic.TrackCount>1){var title=menu.Music.TrackTitle;menu.MusicNextButton.onClick.Invoke();Check("music player skips",menu.Music.TrackTitle!=title);}
+            else Check("single menu song loops with no skip button",!menu.MusicNextButton.gameObject.activeSelf&&menu.Music.MenuSource.loop&&menu.Music.MenuSource.clip&&menu.Music.MenuSource.clip.name=="BittersweetDawn");
+            // the old Showcase menu is never presented: its startup scene routes here
+            SceneManager.LoadScene(MainMenu.ScenePath);yield return SceneReady(()=>FindAnyObjectByType<ConfrontationMenu>()?.Hero!=null);
+            Check("startup routes to the only main menu",!FindAnyObjectByType<MainMenu>()&&SceneManager.sceneCount==1&&MenuAppearance.Selected==MenuStyle.Alternative);
+            Check("one persistent audio owner after navigation",FindObjectsByType<MenuMusic>(FindObjectsSortMode.None).Length==1);
+            }
+            SavedHeroSelection.Current=originalHero;InputSystem.settings=oldSettings;InputSystem.RemoveDevice(keyboard);InputSystem.RemoveDevice(pad);Destroy(testSettings);
+            Check("zero runtime errors",errors.Count==0);report.AddRange(errors);report.Add("RESULT "+(report.Count(s=>s.StartsWith("PASS ")))+" passed / "+failures+" failed");
+            File.WriteAllLines(Path.Combine(output,"report.txt"),report);Application.logMessageReceived-=Log;
+#if UNITY_EDITOR
+            UnityEditor.EditorApplication.Exit(failures==0?0:1);
+#else
+            Application.Quit(failures==0?0:1);
+#endif
+        }
+        IEnumerator SceneReady(Func<bool> ready){float end=Time.realtimeSinceStartup+45;while(!ready()&&Time.realtimeSinceStartup<end)yield return null;yield return new WaitForSecondsRealtime(1);Check("scene transition completed",ready());}
+        IEnumerator Press(Key key){InputSystem.QueueStateEvent(keyboard,new KeyboardState(key));yield return null;yield return null;InputSystem.QueueStateEvent(keyboard,new KeyboardState());yield return null;yield return null;}
+        IEnumerator Capture(string name){yield return new WaitForEndOfFrame();var t=new Texture2D(Screen.width,Screen.height,TextureFormat.RGB24,false);t.ReadPixels(new Rect(0,0,Screen.width,Screen.height),0,0);t.Apply();File.WriteAllBytes(Path.Combine(output,name),t.EncodeToPNG());Destroy(t);}
+        void Check(string name,bool pass){report.Add((pass?"PASS ":"FAIL ")+name);if(!pass)failures++;Debug.Log(report[report.Count-1]);}
+        void Log(string message,string stack,LogType type){if(type==LogType.Error||type==LogType.Exception||type==LogType.Assert)errors.Add(message+"\n"+stack);}
+    }
+    public sealed class ConfrontationMenuTestRunner:MonoBehaviour {public ConfrontationMenuTest Owner;}
+}

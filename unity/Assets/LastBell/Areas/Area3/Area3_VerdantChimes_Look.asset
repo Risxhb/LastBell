@@ -1,0 +1,57 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 11f009884d47bf64a8227a686fa66c05, type: 3}
+  m_Name: Area3_VerdantChimes_Look
+  m_EditorClassIdentifier: Assembly-CSharp::LastBell.Areas.Area3.LookSettings
+  sunColor: {r: 1, g: 0.91, b: 0.78, a: 1}
+  sunIntensity: 1
+  sunEuler: {x: 44, y: 129, z: 0}
+  diffuseRemapMin: 0.38
+  diffuseRemapMax: 0.66
+  unlitTint: {r: 0.25, g: 0.43, b: 0.46, a: 1}
+  brushNoiseScale: 1
+  brushNoiseStr: 0.1
+  fakeTopAmbient: {r: 0.373, g: 0.62, b: 0.525, a: 1}
+  topStart: 0.2
+  topEnd: 0.95
+  topStrength: 0.32
+  backlightTint: {r: 0.75, g: 0.96, b: 0.91, a: 1}
+  backlightStr: 0.42
+  backlightTightness: 3.2
+  ambientSky: {r: 0.25, g: 0.36, b: 0.37, a: 1}
+  ambientGround: {r: 0.07, g: 0.1, b: 0.1, a: 1}
+  fillColor: {r: 0.19, g: 0.42, b: 0.41, a: 1}
+  fillDirection: {x: 0.3, y: 0.45, z: -0.84}
+  fogColor: {r: 0.52, g: 0.72, b: 0.7, a: 1}
+  fogStart: 60
+  fogEnd: 220
+  cloudTop: -6
+  cloudBottom: -30
+  cloudPower: 1.6
+  cloudNoiseScale: 0.03
+  cloudWisp: 6
+  cloudThin: {r: 0.22, g: 0.48, b: 0.5, a: 1}
+  cloudThick: {r: 0.92, g: 0.99, b: 0.97, a: 1}
+  floorKeepRadius: 17
+  hazeColor: {r: 0.52, g: 0.72, b: 0.7, a: 1}
+  hazeStart: 35
+  hazeEnd: 120
+  hazeAmount: 0.62
+  windDirection: {x: 0.8, y: 0.35}
+  windStrength: 2.2
+  gustFrequency: 0.6
+  flowSpeed: 6.5
+  outlineColor: {r: 0.047, g: 0.14, b: 0.133, a: 1}
+  outlineOpacity: 0.75
+  outlineThickness: 1.5
+  outlineFadeStart: 30
+  outlineFadeEnd: 75
