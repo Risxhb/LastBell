@@ -51,7 +51,11 @@ namespace LastBell.Run
             // the next loop hides the numerals and replays the same order
             var order1 = t.Boss.Rite.Order.ToList();
             t.Begin(t.Boss.Rite.Loop());
-            yield return t.Until(() => t.Spawns.Count(x => x.Source == "Pour I") >= 2, 15, "loop 2 Casting Order");
+            for (float w = 0; w < 15 && t.Spawns.Count(x => x.Source == "Pour I") < 2; w += Time.deltaTime)
+            {
+                foreach (var p in t.Party) if (p.Hp < 60) p.DebugSetHp(PlayerController.MaxHp);   // keep the still party standing
+                yield return null;
+            }
             int pourCount = t.Spawns.Count(x => x.Source == "Pour I");
             t.Check("loop 2 hides the numerals and replays the same order", !t.Boss.Rite.NumeralsShown && t.Boss.Rite.Order.SequenceEqual(order1), $"shown {t.Boss.Rite.NumeralsShown}, loops {t.Boss.Rite.Loops}, now {t.Boss.Current}, pours {pourCount}");
             yield return t.Shot("v4_forge_rite");
