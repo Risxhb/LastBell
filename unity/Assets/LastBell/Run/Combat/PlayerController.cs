@@ -315,6 +315,7 @@ namespace LastBell.Run
         public abstract string ClassState();                // Opening / Harmony etc.
         public abstract void Step(PlayerInput inp);
         public virtual void TickTimersOnly() { }             // cooldowns keep running while stunned or dashing
+        public virtual bool Acting => false;                 // mid-action (bots: decide the next press when idle)
         public virtual bool CanDash() => true;
         public virtual bool CanJump() => true;
         public virtual void OnDash() { }

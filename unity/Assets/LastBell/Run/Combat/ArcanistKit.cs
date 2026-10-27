@@ -34,6 +34,7 @@ namespace LastBell.Run
 
         enum Act { None, Bolt, Seal, Lance, Conv, Anchor, Return }
         Act act; int t; Vector3 aim; bool altHand;
+        public override bool Acting => act != Act.None;
         int boltCd, lanceCd, convCd, anchorCd, charges = SealCharges, recharge;
         int buffered = -1, bufferUntil; const int BufferTicks = 9;
         public int Ticks { get; private set; }
