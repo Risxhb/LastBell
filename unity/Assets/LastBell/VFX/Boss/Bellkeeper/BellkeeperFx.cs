@@ -76,6 +76,8 @@ namespace LastBell.VFX
             public void Resolve() { flash = 0; }
             public void Expire() { if (flash < 0) flash = 0.1f; }   // fades out with no damage flash (cooled slag)
             public void Tint(Color fill, Color border) { mpb.SetColor(PFill, fill); mpb.SetColor(PBorder, border); }
+            // area motif inside the shape (Reference/Telegraph-Style v2): 0 = the per-shape Bellkeeper identity, 1 = Skyward Spire
+            public void Motif(int area) { mpb.SetFloat(PMotif, area); }
             // Unfinished Hour inactive outline: dashed, unfilled, low contrast. Presentation only, never resolves.
             public void Memory() { mpb.SetFloat(PMemory, 1); Tint(new Color(0.35f, 0.38f, 0.45f), new Color(0.95f, 0.9f, 0.78f)); maxFade = 0.55f; }
             // removed without a resolve flash (the memory turning into its live warning, or being erased)
@@ -84,7 +86,8 @@ namespace LastBell.VFX
             public void Clip(Vector3 centre, float radius) { mpb.SetFloat(PClipRadius, radius); mpb.SetVector(PClipCentre, new Vector4(centre.x, centre.z, 0, 0)); }
         }
         static readonly int PFill = Shader.PropertyToID("_ColorFill"), PBorder = Shader.PropertyToID("_ColorBorder"),
-            PMemory = Shader.PropertyToID("_Memory"), PClipRadius = Shader.PropertyToID("_ClipRadius"), PClipCentre = Shader.PropertyToID("_ClipCentre");
+            PMemory = Shader.PropertyToID("_Memory"), PClipRadius = Shader.PropertyToID("_ClipRadius"), PClipCentre = Shader.PropertyToID("_ClipCentre"),
+            PMotif = Shader.PropertyToID("_Motif");
 
         Telegraph NewTelegraph(int shape, float radius, float inner, float half, Mesh quad)
         {
@@ -94,7 +97,7 @@ namespace LastBell.VFX
             t.mr = t.go.AddComponent<MeshRenderer>(); t.mr.sharedMaterial = telegraphMat;
             t.mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; t.mr.receiveShadows = false;
             t.mpb.SetFloat(PShape, shape); t.mpb.SetFloat(PRadius, radius); t.mpb.SetFloat(PInner, inner); t.mpb.SetFloat(PHalf, half);
-            t.mpb.SetFloat(PProgress, 0); t.mpb.SetFloat(PLock, 0); t.mpb.SetFloat(PFlash, 0); t.mpb.SetFloat(PFade, 0);
+            t.mpb.SetFloat(PProgress, 0); t.mpb.SetFloat(PLock, 0); t.mpb.SetFloat(PFlash, 0); t.mpb.SetFloat(PFade, 0); t.mpb.SetFloat(PMotif, 0);
             t.mr.SetPropertyBlock(t.mpb); telegraphs.Add(t); return t;
         }
         static float Pad(float r) => r + 0.3f;
