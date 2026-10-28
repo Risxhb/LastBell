@@ -90,6 +90,7 @@ namespace LastBell.Run
         public IInputSource Input;
         public bool AbilitiesEnabled;   // only during combat
         public bool MovementEnabled = true;
+        public Shop.PlayerBuild Build;   // run items bought in the shop (null = none); read through Shop.ItemHooks
 
         public int Hp { get; private set; } = MaxHp;
         public float Stamina { get; private set; } = MaxStamina;
@@ -139,14 +140,14 @@ namespace LastBell.Run
         {
             if (Down) return;
             Hp = MaxHp;
-            if (refillPotions) Potions = MaxPotions;
+            if (refillPotions) Potions = MaxPotions + Shop.ItemHooks.ExtraPotions(this);
         }
 
         bool DrinkPotion()
         {
             if (Down || Potions == 0 || Hp >= MaxHp || sincePotion < PotionLockout) return false;
             Potions--; PotionsDrunk++; sincePotion = 0;
-            Heal(PotionHeal);
+            Heal(Shop.ItemHooks.PotionHeal(this, PotionHeal));
             World.BossFx.PotionHeal(transform);
             return true;
         }
@@ -211,7 +212,7 @@ namespace LastBell.Run
             if (Down) { Presenter.Tick(this); return; }
             sinceSpend++; sincePotion++;
             if (inp.Potion && stun == 0) DrinkPotion();   // usable while moving or mid-action, not while stunned
-            if (sinceSpend > Sim.Ticks(RegenDelay)) Stamina = Mathf.Min(MaxStamina, Stamina + Regen * Sim.Dt);
+            if (sinceSpend > Sim.Ticks(Shop.ItemHooks.RegenDelay(this, RegenDelay))) Stamina = Mathf.Min(MaxStamina, Stamina + Regen * Sim.Dt);
 
             var cam = Camera.main;
             Vector3 fwd = cam ? Sim.Flat(cam.transform.forward).normalized : Vector3.forward;
@@ -259,7 +260,7 @@ namespace LastBell.Run
                     Kit.Step(inp); stepped = true;
                     float scale = Kit.MoveScale;
                     sprinting = inp.Sprint && move.sqrMagnitude > 0.01f && scale >= 1 && Stamina > 0;
-                    if (sprinting) Spend(SprintCost * Sim.Dt);
+                    if (sprinting) Spend(Shop.ItemHooks.SprintCost(this, SprintCost) * Sim.Dt);
                     vel = move * (sprinting ? SprintSpeed : WalkSpeed) * scale + Kit.Velocity;
                     if (Kit.FaceAim) Face(inp.Aim, TurnRate * 2);
                     else if (move.sqrMagnitude > 0.01f && scale > 0) transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(move), TurnRate * Sim.Dt);

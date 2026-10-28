@@ -272,7 +272,7 @@ namespace LastBell.Run
         // ---- glyphs ----
         void GainGlyph()
         {
-            if (Glyphs >= MaxGlyphs) return;
+            if (Glyphs >= Shop.ItemHooks.GlyphCap(P, MaxGlyphs)) return;
             Glyphs++; W.Fx.GlyphGain(P, Glyphs, beamContact);
         }
         // a rune spends one glyph for full power (free in Surge); returns whether it is powered
@@ -394,7 +394,7 @@ namespace LastBell.Run
         void StartSurge()
         {
             surgeCd = SurgeCd - SurgeRelease;
-            LastSurgeGlyphs = Glyphs; surgeTotal = surgeLeft = SurgePerGlyph * Glyphs; Glyphs = 0;
+            LastSurgeGlyphs = Glyphs; surgeTotal = surgeLeft = Shop.ItemHooks.SurgePerGlyph(P, SurgePerGlyph) * Glyphs; Glyphs = 0;
             W.Fx.SurgeStart(P, LastSurgeGlyphs, surgeTotal);
         }
 

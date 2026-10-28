@@ -137,7 +137,9 @@ namespace LastBell.Run
         public int DamageBoss(int damage, Vector3 contact, string ability, bool hitFx = true)
         {
             var b = Boss; if (b == null || !b.Solid || damage <= 0) return 0;
+            damage = Shop.ItemHooks.Outgoing(this, damage, ability);   // run items (no-op without a shop run)
             int dealt = b.TakeHit(damage, contact, hitFx);
+            Shop.ItemHooks.Dealt(this, ability, dealt);
             DamageDealt += dealt;
             if (dealt > 0) { Add(RunMeter, ability, dealt); Add(EncounterMeter, ability, dealt); }
             return dealt;

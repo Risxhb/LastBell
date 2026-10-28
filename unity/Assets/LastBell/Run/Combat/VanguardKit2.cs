@@ -164,7 +164,7 @@ namespace LastBell.Run
             {
                 // release: cooldown starts and Opening is consumed here, whether or not the blow lands
                 sunderCd = SunderCd;
-                sunderEmpowered = OpeningActive;
+                sunderEmpowered = OpeningActive && Shop.ItemHooks.SunderEmpowerable(P);
                 if (sunderEmpowered) { opening = 0; W.Fx.Opening(P, false); ultCd = Mathf.Max(0, ultCd - UltRefund); }
                 int dmg = SunderDamage + (sunderEmpowered ? SunderBonus : 0);
                 int dealt = W.StrikeBoss(P, P.transform.position, P.transform.forward, SunderReach, SunderArc, dmg, sunderEmpowered ? "SunderingBlow+" : "SunderingBlow");
@@ -180,7 +180,7 @@ namespace LastBell.Run
             if (t == 1) W.Fx.UltWindup(P, UltRelease);
             if (t == UltRelease)
             {
-                ultCd = UltCd;
+                ultCd = Shop.ItemHooks.Cooldown(P, "LastWord", UltCd);
                 W.StrikeBoss(P, P.transform.position, P.transform.forward, UltReach, UltArc, UltDamage, "LastWord");
                 waveLive = true; waveHit = false; waveTravel = 0;
                 waveDir = Sim.Flat(aim - P.transform.position).sqrMagnitude > 0.1f ? Sim.Flat(aim - P.transform.position).normalized : P.transform.forward;
@@ -238,7 +238,7 @@ namespace LastBell.Run
             return 1 - BraceReduction;
         }
 
-        void GrantOpening() { opening = OpeningTicks; W.Fx.Opening(P, true); }
+        void GrantOpening() { opening = OpeningTicks; W.Fx.Opening(P, true); if (Shop.ItemHooks.OnOpening(P)) ultCd = 0; }
 
         public override bool CanJump() => act == Act.None;
         public override bool CanDash() => !(act == Act.Ult && t >= UltRelease) && !(act == Act.Sunder && t >= SunderRelease);

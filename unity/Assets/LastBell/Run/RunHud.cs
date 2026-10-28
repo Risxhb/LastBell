@@ -235,6 +235,7 @@ namespace LastBell.Run
             bool practice = d.Mode == RunMode.Practice;
             // practice shows no preparation card (Risxhb, October 25, 2026): the fight starts by itself (RunDirector.AutoReady)
             if (practice) return;
+            if (Shop.RunShopFlow.Showing) return;   // the intermission shop replaces the preparation card
             string eb = UiTheme.Spaced(RunDifficulty.Name(d.Difficulty));
             string head = (practice ? "PRACTICE — " + RunDirector.Bosses[d.Encounter].Name : "PREPARATION").ToUpperInvariant();
             string body = practice ? "Practice never advances the run." : d.EncounterOrder.Length == 1 ? "One fight: the Bellkeeper." : $"{d.EncounterOrder.Length} bosses in a row. Health refills before each boss; potions carry over until the final boss refills them.";

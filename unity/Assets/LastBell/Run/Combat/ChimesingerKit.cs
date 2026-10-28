@@ -201,10 +201,10 @@ namespace LastBell.Run
 
         void Chorus()
         {
-            chorusCd = ChorusCd;
+            chorusCd = Shop.ItemHooks.Cooldown(P, "MendingChorus", ChorusCd);
             // immediate: heals the caster and every standing ally inside the radius, capped at max health
             foreach (var ally in W.Players)
-                if (!ally.Down && Sim.Flat(ally.transform.position - P.transform.position).magnitude <= ChorusRadius) ally.Heal(ChorusHeal);
+                if (!ally.Down && Sim.Flat(ally.transform.position - P.transform.position).magnitude <= ChorusRadius) { ally.Heal(ChorusHeal); Shop.ItemHooks.ChorusTouched(P, ally); }
             W.Fx.Chorus(P.transform.position, ChorusRadius);
             if (act == Act.None) { act = Act.Chorus; t = 0; P.Presenter.Action("MendingChorus", ChorusAnim); }
         }

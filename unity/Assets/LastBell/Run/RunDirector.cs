@@ -124,6 +124,7 @@ namespace LastBell.Run
             int map = RunMaps.Current;
             if (map >= 0) CombatWorld.SetPlayerBound(RunMaps.All[map].Bound, RunMaps.All[map].Square);
             if (!GetComponent<RunHud>()) gameObject.AddComponent<RunHud>();
+            if (!GetComponent<Shop.RunShopFlow>()) gameObject.AddComponent<Shop.RunShopFlow>();   // intermission shop (docs/design/run-shop-plan.md)
             LastBell.Menu.MenuSettings.ApplyFrameRate();   // Settings: VSync (off by default) and FPS cap (120 by default)
             if (RunAutoTest.Requested) RunAutoTest.Launch();
         }
@@ -377,6 +378,8 @@ namespace LastBell.Run
                         if (Boss) { Destroy(Boss.gameObject); Boss = null; World.Boss = null; }
                         if (Mode == RunMode.Practice) { Victory = true; Go(RunState.Results); }
                         else if (Array.IndexOf(EncounterOrder, Encounter) == EncounterOrder.Length - 1) { Victory = true; Go(RunState.Results); }
+                        // run shop: the intermission before the next boss is its preparation (Ready), where the shop opens
+                        else if (Shop.RunShopFlow.Enabled) { Encounter = EncounterOrder[Array.IndexOf(EncounterOrder, Encounter) + 1]; Go(RunState.Ready); }
                         else BeginIntro(EncounterOrder[Array.IndexOf(EncounterOrder, Encounter) + 1]);
                     }
                     break;
