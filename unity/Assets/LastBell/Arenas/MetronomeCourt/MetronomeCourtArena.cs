@@ -19,21 +19,26 @@ namespace LastBell.Arenas.MetronomeCourt
     // One physical rod. Because the fixed gameplay camera cannot frame anything north of the floor edge, the metronome
     // reaches into the frame through (a) a tempo-tinted spot light behind its apex that washes the court in the tempo
     // colour (no rod shadow on the floor: lighting alone signals Haste/Normal) and (b) rim lanterns whose glow follows the rod's lean, flashing together on transition ticks.
-    public sealed class MetronomeCourtArena : MonoBehaviour
+    public sealed partial class MetronomeCourtArena : MonoBehaviour
     {
         public bool quiet;   // HazardSystem dims decoration while hazards are up (shared arena convention)
 
         public const float TempoLineRadius = 12.1f;
         public const float FloorRadius = 13.1f, DialInner = 12.4f, ParapetRadius = 13.5f, PostRadius = 14.4f, MetronomeZ = -19.5f, FrameHeight = 10f;
-        static readonly Color Stone = new Color(0.52f, 0.53f, 0.55f), StoneWarm = new Color(0.56f, 0.54f, 0.51f), Grout = new Color(0.34f, 0.33f, 0.32f), StoneDark = new Color(0.27f, 0.26f, 0.27f),
-            Ivory = new Color(0.78f, 0.74f, 0.65f), Brass = new Color(0.78f, 0.58f, 0.28f), BrassInlay = new Color(0.62f, 0.50f, 0.30f),
-            Iron = new Color(0.11f, 0.11f, 0.13f), DialBand = new Color(0.19f, 0.19f, 0.21f), Teal = new Color(0.08f, 0.32f, 0.33f),
-            Abyss = new Color(0.05f, 0.07f, 0.10f), BannerTeal = new Color(0.06f, 0.26f, 0.28f), FloorStone = new Color(0.46f, 0.45f, 0.44f), FloorGrout = new Color(0.40f, 0.39f, 0.38f), CrackGlow = new Color(1.4f, 0.25f, 0.1f);
+        static readonly Color Stone = new Color(0.52f, 0.53f, 0.55f), StoneWarm = new Color(0.56f, 0.54f, 0.51f), Grout = new Color(0.34f, 0.33f, 0.32f), StoneDark = new Color(0.30f, 0.30f, 0.35f),   // pass 3: toward the brief's blue-violet recess, so its courses read
+            // October 27 (art pass): inlays at about half saturation; charcoal iron lifted to the brief's readable navy (#252C3D)
+            Ivory = new Color(0.64f, 0.615f, 0.565f), Brass = new Color(0.78f, 0.58f, 0.28f), BrassInlay = new Color(0.44f, 0.40f, 0.33f),
+            Iron = new Color(0.145f, 0.17f, 0.24f), DialBand = new Color(0.19f, 0.19f, 0.21f), Teal = new Color(0.08f, 0.32f, 0.33f),
+            Abyss = new Color(0.05f, 0.07f, 0.10f), BannerTeal = new Color(0.06f, 0.26f, 0.28f), FloorStone = new Color(0.45f, 0.46f, 0.48f), FloorGrout = new Color(0.38f, 0.39f, 0.43f), CrackGlow = new Color(1.4f, 0.25f, 0.1f);
         public static readonly Color HasteTint = new Color(1f, 0.58f, 0.22f), NormalTint = new Color(0.28f, 0.92f, 0.82f);
         // lights use a paler gold in Haste so the wash never muddies the red-orange warnings; emissives keep HasteTint
         public static readonly Color HasteLightTint = new Color(1f, 0.78f, 0.42f);
         // and a cool blue in Normal: the teal emissive tint times brass albedo came out olive/lime
-        public static readonly Color NormalLightTint = new Color(0.50f, 0.78f, 0.95f);
+        // pass 4 (critic: "the Normal tempo still turns the whole scene blue"): a paler, less saturated cool, so the stone keeps
+        // its identity; the tempo itself lives on the dashed ring, the lanterns, the metronome seams and the HUD
+        public static readonly Color NormalLightTint = new Color(0.80f, 0.85f, 0.93f);
+        // review-capture switch (editor art captures only): forces the preview tempo; null in the game
+        public static bool? ReviewHaste;
         public const float FogStart = 47f, FogEnd = 100f;   // the far floor edge is ~46 m from the gameplay camera: fog never touches the court
 
         public Transform Rod { get; private set; }
@@ -82,6 +87,7 @@ namespace LastBell.Arenas.MetronomeCourt
             if (mats.TryGetValue(key, out var m) && m) return m;
             m = Prim.Material(c, glow ? 2f : 0); m.name = "MetronomeCourt_" + key;
             m.SetFloat("_Smoothness", smooth); m.SetFloat("_Metallic", metal);
+            ApplySurface(m, c, metal, glow);   // October 27: painted surface kit (Surfaces.cs)
             return mats[key] = m;
         }
         static Material StoneM(Color c) => M(c, 0.18f);
@@ -146,12 +152,12 @@ namespace LastBell.Arenas.MetronomeCourt
                     nrm[y * S + x] = new Color32(255, (byte)Mathf.RoundToInt((nv.y * 0.5f + 0.5f) * 255), 0, (byte)Mathf.RoundToInt((nv.x * 0.5f + 0.5f) * 255));
                 }
             floorAlbedo = new Texture2D(S, S, TextureFormat.RGBA32, true, false) { name = "MetronomeCourt_FloorAlbedo", wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Trilinear, anisoLevel = 4 };
-            floorAlbedo.SetPixels32(alb); floorAlbedo.Apply(true, true);
+            floorAlbedo.SetPixels32(alb); floorAlbedo.Apply(true, Application.isPlaying);   // readable in the editor, for the menu's baked copy
             floorNormal = new Texture2D(S, S, TextureFormat.RGBA32, true, true) { name = "MetronomeCourt_FloorNormal", wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Trilinear, anisoLevel = 4 };
             floorNormal.SetPixels32(nrm); floorNormal.Apply(true, true);
         }
         static Material BrassM => M(Brass, 0.7f, 0.85f);
-        static Material FloorBrassM => M(Brass * 0.92f, 0.3f, 0.4f);   // inlays flush with the floor: low gloss (no specular crawl)
+        static Material FloorBrassM => M(Brass * 0.62f, 0.3f, 0.4f);   // October 27 pass 3: aged, quieter medallion and plaques   // inlays flush with the floor: low gloss (no specular crawl)
         static Material IronM => M(Iron, 0.35f, 0.6f);
 
         Transform P(PrimitiveKind k, Transform parent, Vector3 pos, Vector3 scale, Material mat, Vector3? euler = null, string name = null)
@@ -278,27 +284,58 @@ namespace LastBell.Arenas.MetronomeCourt
             {
                 float a = i * 22.5f + 11.25f; if (Mathf.Abs(Mathf.DeltaAngle(a, 0)) < 12f) continue;   // the bridge piers own the south face
                 var dirB = Quaternion.Euler(0, a, 0) * Vector3.forward; var at = dirB * (FloorRadius + 0.82f);
-                P(PrimitiveKind.Cube, stat, at + Vector3.up * -3.4f, new Vector3(1.3f, 2.6f, 0.06f), StoneM(StoneDark * 0.45f), new Vector3(0, a, 0), "DrumBay");
-                P(PrimitiveKind.Cube, stat, at + Vector3.up * -2.1f, new Vector3(0.92f, 0.92f, 0.06f), StoneM(StoneDark * 0.45f), new Vector3(0, a, 45), "DrumBayPoint");
+                // October 27 pass 2: deeper, taller pointed bays framed by stone pilasters and a sill
+                P(PrimitiveKind.Cube, stat, at + Vector3.up * -3.7f, new Vector3(1.7f, 3.0f, 0.06f), StoneM(StoneDark * 0.4f), new Vector3(0, a, 0), "DrumBay");
+                P(PrimitiveKind.Cube, stat, at + Vector3.up * -2.2f, new Vector3(1.2f, 1.2f, 0.06f), StoneM(StoneDark * 0.4f), new Vector3(0, a, 45), "DrumBayPoint");
+                var tanB = Quaternion.Euler(0, a, 0) * Vector3.right;
+                foreach (var sx in new[] { -1f, 1f })
+                    P(PrimitiveKind.Cube, stat, at + tanB * (sx * 1.12f) + dirB * 0.12f + Vector3.up * -3.3f, new Vector3(0.38f, 4.4f, 0.3f), StoneM(StoneDark * 1.45f), new Vector3(0, a, 0), "DrumPilaster");
+                P(PrimitiveKind.Cube, stat, at + dirB * 0.1f + Vector3.up * -5.3f, new Vector3(2.7f, 0.3f, 0.3f), StoneM(StoneDark * 1.45f), new Vector3(0, a, 0), "DrumBaySill");
                 P(PrimitiveKind.Cube, stat, at + dirB * 0.02f + Vector3.up * -1.35f, new Vector3(1.7f, 0.12f, 0.06f), M(Brass * 0.6f, 0.45f, 0.8f), new Vector3(0, a, 0), "DrumBayLintel");
                 if (i % 4 == 2)
                     P(PrimitiveKind.Cube, stat, at + dirB * 0.08f + Vector3.up * -3.0f, new Vector3(0.7f, 2.6f, 0.03f), M(BannerTeal, 0.3f), new Vector3(0, a, 0), "DrumBanner");
+                var bayFace = Quaternion.LookRotation(dirB);
+                if (i == 12)
+                {   // pass 4 (final critic: "no gear housing"): one west bay opens on part of the drum's iron gear train
+                    var gc = at + dirB * 0.14f + Vector3.up * -4.2f; var gearIron = M(Iron * 1.3f, 0.35f, 0.6f);
+                    Mesh(stat, Sector(0.6f, 0.82f, 0, 360, 0.14f, 32), gearIron, "HousingGearRim", gc).localRotation = bayFace * Quaternion.Euler(90, 0, 0);
+                    for (int k = 0; k < 12; k++)
+                        P(PrimitiveKind.Cube, stat, gc + bayFace * (Quaternion.Euler(0, 0, k * 30f) * Vector3.up * 0.9f), new Vector3(0.17f, 0.2f, 0.14f), gearIron, (bayFace * Quaternion.Euler(0, 0, k * 30f)).eulerAngles, "HousingGearTooth");
+                    foreach (var sa in new[] { 45f, 135f })
+                        P(PrimitiveKind.Cube, stat, gc, new Vector3(0.1f, 1.4f, 0.1f), gearIron, (bayFace * Quaternion.Euler(0, 0, sa)).eulerAngles, "HousingGearSpoke");
+                    P(PrimitiveKind.Cylinder, stat, gc + dirB * 0.05f, new Vector3(0.32f, 0.08f, 0.32f), M(Brass * 0.5f, 0.4f, 0.8f), (bayFace * Quaternion.Euler(90, 0, 0)).eulerAngles, "HousingGearHub");
+                }
+                if (i == 13)
+                {   // pass 4 (final critic: "no maintenance doors"): an iron door with brass straps in the next bay
+                    P(PrimitiveKind.Cube, stat, at + dirB * 0.06f + Vector3.up * -4.05f, new Vector3(1.05f, 2.2f, 0.05f), M(Iron * 1.25f, 0.35f, 0.6f), new Vector3(0, a, 0), "MaintenanceDoor");
+                    foreach (var hy in new[] { -4.75f, -3.4f })
+                        P(PrimitiveKind.Cube, stat, at + dirB * 0.09f + Vector3.up * hy, new Vector3(1.1f, 0.09f, 0.03f), M(Brass * 0.5f, 0.4f, 0.8f), new Vector3(0, a, 0), "DoorStrap");
+                }
             }
             // rim ledge under the parapet and posts (top just below the floor so it never z-fights the dial band)
             // October 26, 2026: the ledge top used to sit at -0.02, the same height as the grout disc's top that fills
             // every joint, so the two fought inside the joints and the joints seemed to shift while moving. It now sits at
             // -0.06, clear of the grout.
             P(PrimitiveKind.Cylinder, stat, new Vector3(0, -1.11f, 0), new Vector3(29.9f, 1.05f, 29.9f), StoneM(StoneDark * 1.1f), name: "RimLedge");   // cylinder: scale.y = half-height; top at -0.06
-            P(PrimitiveKind.Cylinder, stat, new Vector3(0, -0.16f, 0), new Vector3(30.1f, 0.08f, 30.1f), M(Brass * 0.75f, 0.45f, 0.8f), name: "RimLedgeTrim");   // a band on the ledge edge, below its top (no shared surface)
+            P(PrimitiveKind.Cylinder, stat, new Vector3(0, -0.16f, 0), new Vector3(30.1f, 0.08f, 30.1f), M(Brass * 0.45f, 0.4f, 0.8f), name: "RimLedgeTrim");   // a band on the ledge edge, below its top (no shared surface)
             P(PrimitiveKind.Cone, stat, new Vector3(0, -10.5f, 0), new Vector3(FloorRadius * 2 + 1.6f, 7f, FloorRadius * 2 + 1.6f), StoneM(StoneDark), new Vector3(180, 0, 0), "PlatformKeel");
             // one calm stone family with a wider +-7% jitter on a darker base (keeps telegraph contrast), a shared grain
             // detail, bevelled slab edges, and 1 in 12 slabs weathered (darker, with a damp sheen)
-            var jitter = new[] { 0.92f, 0.97f, 1.0f, 1.03f, 1.07f };
-            Material Shade(bool inner)
+            // October 27: one cool limestone family; a narrower jitter so the disc stops reading as alternating pie wedges
+            var jitter = new[] { 0.955f, 0.98f, 1.0f, 1.02f, 1.045f };
+            // October 27 pass 2: wear gathers toward the rim (outer band only: a slightly darker family and more worn
+            // slabs, chosen by slab index so the shared random sequence, and every later placement, is unchanged)
+            Material Shade(bool inner, int outerIndex = -1)
             {
                 float k = inner ? 0.97f : 1f;
-                if (rng.Next(12) == 0) return FloorM(FloorStone * 0.84f * k, 0.3f);
-                return FloorM(FloorStone * jitter[rng.Next(jitter.Length)] * k);
+                if (rng.Next(12) == 0) return FloorM(FloorStone * 0.95f * k, 0.18f);
+                var m = FloorM(FloorStone * jitter[rng.Next(jitter.Length)] * k);
+                // pass 4 (final critic: wear should gather at the rim as lighter, warmer pigment): the outer band leans warm and
+                // its worn slabs are a step lighter; the middle band is unchanged, so the wear fades out by mid-radius
+                var worn = Color.Lerp(FloorStone, StoneWarm, 0.3f);
+                // (pass-4 critic: the separately lighter worn slabs read as hard-edged patchwork, so they now differ by 2 % only)
+                if (outerIndex >= 0) m = (outerIndex * 7) % 5 == 1 ? FloorM(Color.Lerp(FloorStone, StoneWarm, 0.45f) * 1.02f, 0.18f) : FloorM(worn * (outerIndex % 2 == 0 ? 0.99f : 1.005f));
+                return m;
             }
             const float gap = 0.025f, bevel = 0.04f;   // 4 cm: wide enough to span pixels (a 2 cm facet crawled when moving)   // half-joint: joints are a constant 0.05 m everywhere
             Mesh(stat, Sector(0, 2.6f, 0, 360, 0.3f, 48, gap, bevel), FloorM(FloorStone * 0.97f), "FloorCentre");
@@ -309,7 +346,7 @@ namespace LastBell.Arenas.MetronomeCourt
                 for (int i = 0; i < count; i++)
                 {
                     float span = 360f / count, a0 = off + i * span;
-                    Mesh(stat, Sector(r0, r1, a0, a0 + span, 0.3f, 6, gap, bevel, rng.Next(4), new Vector2((float)rng.NextDouble(), (float)rng.NextDouble())), Shade(r0 < 3f), "Slab");
+                    Mesh(stat, Sector(r0, r1, a0, a0 + span, 0.3f, 6, gap, bevel, rng.Next(4), new Vector2((float)rng.NextDouble(), (float)rng.NextDouble())), Shade(r0 < 3f, r0 > 9f ? i : -1), "Slab");
                 }
             // hairline cracks removed (October 25, 2026): 2.5 cm strips are sub-pixel at gameplay distance and crawled when
             // the camera moved. The random draws they used are kept so every later random choice stays the same.
@@ -333,11 +370,11 @@ namespace LastBell.Arenas.MetronomeCourt
                 float a = i * 30f + 15f; var dir = Quaternion.Euler(0, a, 0) * Vector3.forward;
                 P(PrimitiveKind.Cube, stat, dir * 1.45f + Vector3.up * 0.006f, new Vector3(0.08f, 0.012f, 0.22f), FloorBrassM, new Vector3(0, a, 0), "CentreNotch");
             }
-            Ring(stat, DialInner, 0.1f, 120, FloorBrassM, "DialInnerLine");
+            Ring(stat, DialInner, 0.1f, 120, M(Brass * 0.55f, 0.3f, 0.4f), "DialInnerLine");   // dimmer: three bright rim bands competed with warnings
             var tempoLine = new GameObject("TempoLine").transform; tempoLine.SetParent(root, false);
             SegmentedRing(tempoLine, TempoLineRadius, 0.14f, 120, M(HasteTint, 0.2f, 0, true), "TempoLineSeg");
             foreach (var r in tempoLine.GetComponentsInChildren<Renderer>()) tempoLineRs.Add(r);
-            Ring(stat, FloorRadius - 0.06f, 0.1f, 120, FloorBrassM, "DialOuterLine");
+            Ring(stat, FloorRadius - 0.06f, 0.1f, 120, M(Brass * 0.55f, 0.3f, 0.4f), "DialOuterLine");
             var glyph = StoneM(DialBand * 0.8f);
             for (int i = 0; i < 60; i++)
             {
@@ -365,7 +402,7 @@ namespace LastBell.Arenas.MetronomeCourt
                 {
                     P(PrimitiveKind.Cube, stat, at + Vector3.up * ph / 2, new Vector3(1.78f, ph, 0.42f), StoneM(Ivory), yawE, "ParapetSegment");
                     // chamfered brass cap so the rim edge reads from the high camera
-                    Mesh(stat, Frustum(0.91f, 0.22f, 0.86f, 0.17f, 0.06f), BrassM, "ParapetCap", at + Vector3.up * ph).localRotation = Quaternion.Euler(yawE);
+                    Mesh(stat, Frustum(0.91f, 0.22f, 0.86f, 0.17f, 0.06f), StoneM(Ivory * 0.88f), "ParapetCap", at + Vector3.up * ph).localRotation = Quaternion.Euler(yawE);   // lit stone, not a gold band
                     // a recessed dark panel on the outer face (the side the south camera actually sees)
                     P(PrimitiveKind.Cube, stat, at + dir * 0.215f + Vector3.up * 0.22f, new Vector3(1.4f, 0.18f, 0.01f), StoneM(StoneDark * 0.9f), yawE, "ParapetPanel");
                 }
@@ -383,7 +420,7 @@ namespace LastBell.Arenas.MetronomeCourt
                     P(PrimitiveKind.Cube, stat, at + Vector3.up * 0.795f, new Vector3(1.78f, 0.09f, 0.3f), StoneM(Ivory), yawE, "ParapetRail");
                     // brass string course along the rail and the cap on top
                     P(PrimitiveKind.Cube, stat, at + inward * 0.155f + Vector3.up * 0.76f, new Vector3(1.78f, 0.06f, 0.01f), BrassM, yawE, "StringCourse");
-                    Mesh(stat, Frustum(0.91f, 0.2f, 0.87f, 0.15f, 0.06f), BrassM, "ParapetCap", at + Vector3.up * 0.84f).localRotation = Quaternion.Euler(yawE);
+                    Mesh(stat, Frustum(0.91f, 0.2f, 0.87f, 0.15f, 0.06f), StoneM(Ivory * 0.88f), "ParapetCap", at + Vector3.up * 0.84f).localRotation = Quaternion.Euler(yawE);
                 }
             }
             for (int i = 0; i < 16; i++)
@@ -409,7 +446,10 @@ namespace LastBell.Arenas.MetronomeCourt
                     float l = Mathf.Max(x0, -paveHalf), r = Mathf.Min(x0 + pave, paveHalf);
                     if (r - l < 0.2f) continue;
                     int pick = Mathf.Abs(Mathf.RoundToInt(x0 * 7 + row * 3)) % 4;
-                    var slab = row % 5 == 3 && pick == 1 ? FloorM(FloorStone * 0.84f, 0.38f) : FloorM(FloorStone * new[] { 0.95f, 1.0f, 1.04f, 0.98f }[pick]);
+                    // October 27 pass 3: textured paving (surface kit) with a warmer, worn centre path
+                    var paveC = Mathf.Abs((l + r) / 2) < 1.2f ? new Color(0.53f, 0.50f, 0.46f) : new Color(0.46f, 0.46f, 0.47f);
+                    // pass 4 (critic: "blocky, hard-stepped patches"): a soft paving texture, gentler value steps between slabs
+                    var slab = row % 5 == 3 && pick == 1 ? PavingM(paveC * 0.9f) : PavingM(paveC * new[] { 0.96f, 1.0f, 1.03f, 0.985f }[pick]);
                     P(PrimitiveKind.Cube, stat, new Vector3((l + r) / 2, -0.05f, pz), new Vector3(r - l - 0.05f, 0.1f, pave - 0.05f), slab, name: "BridgeSlab");
                 }
                 if (row % 5 == 4) P(PrimitiveKind.Cube, stat, new Vector3(0, 0.003f, pz + pave * 0.5f), new Vector3(paveHalf * 2, 0.006f, 0.04f), M(BrassInlay, 0.45f, 0.8f), name: "BridgeBrassJoint");
@@ -429,16 +469,27 @@ namespace LastBell.Arenas.MetronomeCourt
                 P(PrimitiveKind.Cube, stat, new Vector3(rx, 0.58f, 21.4f), new Vector3(0.16f, 0.08f, 13.8f), StoneM(Ivory), name: "BridgeRail");
                 P(PrimitiveKind.Cube, stat, new Vector3(rx, 0.635f, 21.4f), new Vector3(0.18f, 0.03f, 13.8f), M(Brass * 0.7f, 0.5f, 0.8f), name: "BridgeRailCap");
                 // a low newel ends each rail at the court (under 0.8 m: never hides a player)
-                P(PrimitiveKind.Cube, stat, new Vector3(rx, 0.35f, 14.55f), new Vector3(0.5f, 0.7f, 0.5f), StoneM(Ivory), name: "BridgeNewel");
-                Mesh(stat, Frustum(0.28f, 0.28f, 0.14f, 0.14f, 0.08f), M(Brass * 0.7f, 0.5f, 0.8f), "BridgeNewelCap", new Vector3(rx, 0.7f, 14.55f));
-                for (int k = 1; k < 4; k++)
+                // pass 6 (Risxhb: the brass post caps "look basic"): each post gets a plinth course, a sunk panel on its two
+                // long faces, an ivory cornice slab that overhangs the shaft, and a stepped brass cap. The rail posts also carry
+                // a brass ball finial; the newel at the court mouth stays under 0.8 m, so it has no ball.
+                var capBrass = M(Brass * 0.6f, 0.4f, 0.8f); var sunk = StoneM(Ivory * 0.78f);
+                void PostKit(Vector3 baseAt, float half, float height, bool ball, string nm)
                 {
-                    float pz = 13.9f + k * 3.75f;
-                    P(PrimitiveKind.Cube, stat, new Vector3(rx, 0.36f, pz), new Vector3(0.42f, 0.72f, 0.42f), StoneM(Ivory), name: "BridgePost");
-                    Mesh(stat, Frustum(0.25f, 0.25f, 0.12f, 0.12f, 0.1f), M(Brass * 0.7f, 0.5f, 0.8f), "BridgePostCap", new Vector3(rx, 0.72f, pz));
+                    P(PrimitiveKind.Cube, stat, baseAt + Vector3.up * height / 2, new Vector3(half * 2, height, half * 2), StoneM(Ivory), name: nm);
+                    P(PrimitiveKind.Cube, stat, baseAt + Vector3.up * 0.06f, new Vector3(half * 2 + 0.08f, 0.12f, half * 2 + 0.08f), StoneM(Ivory * 0.9f), name: nm + "Plinth");
+                    foreach (var sx in new[] { -1f, 1f })
+                        P(PrimitiveKind.Cube, stat, baseAt + new Vector3(sx * (half + 0.004f), height * 0.52f, 0), new Vector3(0.02f, height * 0.5f, half * 1.2f), sunk, name: nm + "Panel");
+                    Mesh(stat, Frustum(half + 0.05f, half + 0.05f, half + 0.05f, half + 0.05f, 0.05f), StoneM(Ivory * 0.92f), nm + "Cornice", baseAt + Vector3.up * height);
+                    Mesh(stat, Frustum(half + 0.01f, half + 0.01f, half - 0.03f, half - 0.03f, 0.035f), capBrass, nm + "CapBand", baseAt + Vector3.up * (height + 0.05f));
+                    Mesh(stat, Frustum(half - 0.03f, half - 0.03f, 0.05f, 0.05f, ball ? 0.13f : 0.07f), capBrass, nm + "Cap", baseAt + Vector3.up * (height + 0.085f));
+                    if (ball) P(PrimitiveKind.Sphere, stat, baseAt + Vector3.up * (height + 0.27f), Vector3.one * 0.13f, capBrass, name: nm + "Ball");
                 }
+                PostKit(new Vector3(rx, 0, 14.55f), 0.25f, 0.62f, false, "BridgeNewel");
+                for (int k = 1; k < 4; k++)
+                    PostKit(new Vector3(rx, 0, 13.9f + k * 3.75f), 0.21f, 0.66f, true, "BridgePost");
                 // piers with stone arches on the outer faces, and a dark recessed spandrel wall behind them so they silhouette
-                for (int k = 0; k < 4; k++) P(PrimitiveKind.Cube, stat, new Vector3(rx, -3f, 15.5f + k * 4f), new Vector3(0.7f, 5f, 0.9f), StoneM(StoneDark), name: "BridgePier");
+                // October 27: piers descend into the cloud billows instead of stopping in mid-air
+                for (int k = 0; k < 4; k++) P(PrimitiveKind.Cube, stat, new Vector3(rx, -7.5f, 15.5f + k * 4f), new Vector3(0.7f, 14f, 0.9f), StoneM(StoneDark), name: "BridgePier");
                 P(PrimitiveKind.Cube, stat, new Vector3(2.15f * s, -1.63f, 21.5f), new Vector3(0.25f, 1.74f, 12f), StoneM(StoneDark * 0.6f), name: "BridgeSpandrelWall");
                 for (int k = 0; k < 3; k++)
                 {
@@ -457,11 +508,18 @@ namespace LastBell.Arenas.MetronomeCourt
             // ---- north plinth and the independent giant metronome ----
             var m = new GameObject("Metronome (arena object)").transform; m.SetParent(root, false); m.localPosition = new Vector3(0, 0, MetronomeZ);
             P(PrimitiveKind.Cube, stat, new Vector3(0, -2.2f, MetronomeZ), new Vector3(9f, 4.4f, 7f), StoneM(StoneDark), name: "Plinth");
-            P(PrimitiveKind.Cube, stat, new Vector3(0, 0.05f, MetronomeZ), new Vector3(8.4f, 0.15f, 6.4f), BrassM, name: "PlinthTrim");
+            // October 27: a stone cap with a narrow brass edge (was a full brass plate that blew out under the tempo light),
+            // and two stepped foundation courses that carry the plinth down into the cloud sea
+            P(PrimitiveKind.Cube, stat, new Vector3(0, 0.05f, MetronomeZ), new Vector3(8.4f, 0.15f, 6.4f), StoneM(Stone * 0.82f), name: "PlinthTrim");
+            P(PrimitiveKind.Cube, stat, new Vector3(0, -0.5f, MetronomeZ), new Vector3(9.6f, 0.45f, 7.6f), StoneM(Stone * 0.62f), name: "PlinthCourse");
+            P(PrimitiveKind.Cube, stat, new Vector3(0, -1.15f, MetronomeZ), new Vector3(10.3f, 0.5f, 8.3f), StoneM(Stone * 0.52f), name: "PlinthCourse");   // pass 3: one more step   // pass 2: a stepped course under the cap
+            P(PrimitiveKind.Cube, stat, new Vector3(0, 0.0f, MetronomeZ), new Vector3(8.6f, 0.12f, 6.6f), M(Brass * 0.5f, 0.4f, 0.8f), name: "PlinthEdge");
+            P(PrimitiveKind.Cube, stat, new Vector3(0, -5.2f, MetronomeZ - 0.4f), new Vector3(10.2f, 1.6f, 8.2f), StoneM(StoneDark * 1.1f), name: "PlinthFoundation");
+            P(PrimitiveKind.Cube, stat, new Vector3(0, -7.6f, MetronomeZ - 0.8f), new Vector3(11.4f, 3.2f, 9.4f), StoneM(StoneDark * 0.95f), name: "PlinthFoundation");
             for (int k = 0; k < 3; k++)
             {
                 P(PrimitiveKind.Cube, stat, new Vector3(0, -0.3f - k * 0.6f, MetronomeZ + 3.8f + k * 0.7f), new Vector3(9f, 0.6f, 0.7f), StoneM(Stone), name: "PlinthStep");
-                P(PrimitiveKind.Cube, stat, new Vector3(0, -0.02f - k * 0.6f, MetronomeZ + 4.12f + k * 0.7f), new Vector3(9f, 0.06f, 0.08f), M(Brass, 0.5f, 0.8f, true), name: "StepNosing");
+                P(PrimitiveKind.Cube, stat, new Vector3(0, -0.02f - k * 0.6f, MetronomeZ + 4.12f + k * 0.7f), new Vector3(9f, 0.06f, 0.08f), M(Brass * 0.6f, 0.5f, 0.8f), name: "StepNosing");   // no emission (it blew the plinth out)
             }
             foreach (var sx in new[] { -1, 1 }) Post(stat, root, new Vector3(4.2f * sx, 0, MetronomeZ - 2.1f), 0);   // plinth pylons: the rim's post kit, behind the frame base
             BuildMetronome(m);
@@ -489,6 +547,8 @@ namespace LastBell.Arenas.MetronomeCourt
                 ArchBridge(stat, a, 34 + (i % 3) * 6f, rng);
             }
 
+            BuildRisingStructures(stat);   // October 27: masonry rising out of the cloud sea (Exterior.cs)
+            BakeSurfaceUVs(root);          // October 27: world-scale UVs for the painted surface kit, before batching
             StaticBatchingUtility.Combine(stat.gameObject);
             BuildHaze(root);
             var rim = new GameObject("Tempo rim light"); rim.transform.SetParent(root, false);
@@ -501,6 +561,7 @@ namespace LastBell.Arenas.MetronomeCourt
             probe.timeSlicingMode = ReflectionProbeTimeSlicingMode.NoTimeSlicing; probe.size = new Vector3(90, 40, 90); probe.resolution = 128; probe.importance = 1;
             probe.clearFlags = ReflectionProbeClearFlags.Skybox; probe.shadowDistance = 0;
             BuildAmbience(root);
+            BakeSurfaceUVs(root);   // gears and drifting masonry
             BindWorldLighting();
         }
 
@@ -515,7 +576,13 @@ namespace LastBell.Arenas.MetronomeCourt
             // dusk: blue-violet zenith down to a warm horizon band (no fog on the sky), and linear fog that starts beyond the
             // far floor edge so it softens the backdrop and fills the void without touching the court
             if (!skyMat) { var sh = Resources.Load<Shader>("MetronomeCourtSky"); if (sh) skyMat = new Material(sh) { name = "MetronomeCourt_Sky" }; }
-            if (skyMat) RenderSettings.skybox = skyMat;
+            if (skyMat)
+            {
+                // October 27: a paler blue-violet opening behind the metronome apex, so the iron frame separates from the sky
+                skyMat.SetColor("_Mid", new Color(0.19f, 0.19f, 0.31f)); skyMat.SetColor("_Horizon", new Color(0.36f, 0.30f, 0.40f));
+                skyMat.SetColor("_Zenith", new Color(0.07f, 0.08f, 0.16f));
+                RenderSettings.skybox = skyMat;
+            }
             RenderSettings.fog = true; RenderSettings.fogMode = FogMode.Linear; RenderSettings.fogStartDistance = FogStart; RenderSettings.fogEndDistance = FogEnd;
             RenderSettings.fogColor = new Color(0.13f, 0.14f, 0.22f);
         }
@@ -523,12 +590,17 @@ namespace LastBell.Arenas.MetronomeCourt
         void UpdateWorldLighting(bool haste, bool frenzy)
         {
             tempoBlend = Mathf.MoveTowards(tempoBlend, haste ? 1 : 0, Time.deltaTime / 0.15f);   // fast, so the world never disagrees with the HUD's tempo for long
-            var warm = new Color(1.0f, 0.93f, 0.84f); var cool = new Color(0.88f, 0.94f, 1.0f);
+            // October 27: a narrower warm/cool swing so the stone keeps its identity in both tempos (brief section 12)
+            // pass 4 (final critic: "the Normal tempo still turns the whole scene blue"): the key, ambient and grade swings
+            // multiplied into a +-25% red/blue swing on the stone (measured on the floor: hue 27 sat 0.14 in Haste, hue 216
+            // sat 0.25 in Normal). Each is now a few percent, so the stone holds one cool grey and the tempo lives on the
+            // ring, the lanterns, the metronome seams and the HUD
+            var warm = new Color(1.0f, 0.98f, 0.95f); var cool = new Color(1.0f, 1.0f, 1.0f);   // the dusk base light is already cool
             if (keyLight) keyLight.color = Color.Lerp(cool, warm, tempoBlend);
-            RenderSettings.ambientEquatorColor = baseEquator * Color.Lerp(new Color(0.96f, 0.99f, 1.03f), new Color(1.03f, 1.0f, 0.96f), tempoBlend);
+            RenderSettings.ambientEquatorColor = baseEquator * Color.Lerp(new Color(1.01f, 1.0f, 0.99f), new Color(1.01f, 1.0f, 0.99f), tempoBlend);
             if (grade != null)
             {
-                var filter = Color.Lerp(new Color(0.97f, 1.0f, 1.01f), new Color(1.02f, 0.99f, 0.95f), tempoBlend);
+                var filter = Color.Lerp(new Color(1.01f, 1.0f, 0.985f), new Color(1.01f, 1.0f, 0.98f), tempoBlend);
                 if (frenzy) filter *= new Color(1.02f, 0.97f, 0.97f);   // frenzy lives on cracks and flicker, not a pink floor
                 grade.colorFilter.Override(filter);
             }
@@ -541,10 +613,14 @@ namespace LastBell.Arenas.MetronomeCourt
             var toward = -Sim.Flat(pos).normalized; var side = Vector3.Cross(Vector3.up, toward);
             float faceYaw = Mathf.Atan2(toward.x, toward.z) * Mathf.Rad2Deg;
             var winM = M(Sim.Flat(pos).magnitude > 55f ? WindowGlow * 1.5f : WindowGlow, 0.2f, 0, true);   // far towers: brighter so the fog doesn't erase them
+            // October 27: atmospheric recession, near towers dark stone, far ones dissolving toward dusty indigo/violet
+            float far = Mathf.Round(Mathf.InverseLerp(40f, 76f, Sim.Flat(pos).magnitude) * 3f) / 3f;   // four steps: shared materials
+            var StoneDark = Color.Lerp(MetronomeCourtArena.StoneDark, new Color(0.30f, 0.30f, 0.42f), far);
+            var IronM = M(Color.Lerp(Iron, new Color(0.21f, 0.21f, 0.31f), far), 0.35f, 0.6f);
             for (int k = 0; k < 3; k++)
             {
                 float ww = w * (1 - 0.18f * k);
-                P(PrimitiveKind.Cube, stat, new Vector3(pos.x, y + seg / 2, pos.z), new Vector3(ww, seg, ww), StoneM(StoneDark * (0.9f + 0.1f * k)), name: "TowerTier");
+                Mesh(stat, Frustum(ww * 0.5f, ww * 0.5f, ww * 0.45f, ww * 0.45f, seg), StoneM(StoneDark * (0.9f + 0.1f * k)), "TowerTier", new Vector3(pos.x, y, pos.z));   // October 27: tapered tiers, not prisms
                 P(PrimitiveKind.Cube, stat, new Vector3(pos.x, y + seg, pos.z), new Vector3(ww + 0.4f, 0.3f, ww + 0.4f), StoneM(StoneDark * 0.8f), name: "TowerCornice");
                 // corner buttresses break the box into a gothic mass
                 for (int c = 0; c < 4; c++)
@@ -572,7 +648,7 @@ namespace LastBell.Arenas.MetronomeCourt
                 y += seg;
             }
             // a spire 2.2x taller, with four pinnacles at its base and four more at half height
-            P(PrimitiveKind.Cone, stat, new Vector3(pos.x, y + 8.8f, pos.z), new Vector3(w * 0.75f, 17.6f, w * 0.75f), IronM, name: "Spire");
+            Mesh(stat, Frustum(w * 0.42f, w * 0.42f, 0.04f, 0.04f, 17.6f), IronM, "Spire", new Vector3(pos.x, y + 0.15f, pos.z));   // four-sided spire, as the flank belfries
             for (int b = 0; b < 4; b++)
             {
                 var o = Quaternion.Euler(0, b * 90 + 45, 0) * Vector3.forward * (w * 0.62f);
@@ -592,7 +668,7 @@ namespace LastBell.Arenas.MetronomeCourt
             P(PrimitiveKind.Cube, stat, centre + Vector3.up * 6f, new Vector3(span, 1.2f, 3f), M(col, 0.1f), new Vector3(0, yaw, 0), "BridgeDeck");
             for (int k = -1; k <= 1; k++)
             {
-                P(PrimitiveKind.Cube, stat, centre + tangent * (k * span / 3), new Vector3(1.6f, 12f, 3f), M(col, 0.1f), new Vector3(0, yaw, 0), "BridgePier");
+                P(PrimitiveKind.Cube, stat, centre + tangent * (k * span / 3) + Vector3.up * -5f, new Vector3(1.6f, 22f, 3f), M(col, 0.1f), new Vector3(0, yaw, 0), "BridgePier");   // pass 3: runs down into the cloud (was 12 m, ended in the void)
                 if (k < 1)
                 {
                     var mid = centre + tangent * ((k + 0.5f) * span / 3);
@@ -649,7 +725,7 @@ namespace LastBell.Arenas.MetronomeCourt
         // overlap slightly so no gap shows, so they alternate between two heights and never share a surface.
         void SegmentedRing(Transform parent, float r, float width, int segs, Material mat, string name)
         {
-            float seg = 2 * Mathf.PI * r / segs * 1.03f;
+            float seg = 2 * Mathf.PI * r / segs * (name == "TempoLineSeg" ? 0.62f : 1.03f);   // October 27 pass 2: the tempo ring is dashed
             for (int i = 0; i < segs; i++)
             {
                 float a = (i + 0.5f) * 360f / segs; var dir = Quaternion.Euler(0, a, 0) * Vector3.forward;
@@ -669,6 +745,7 @@ namespace LastBell.Arenas.MetronomeCourt
             for (int k = 0; k < 4; k++)
                 P(PrimitiveKind.Cube, l, Quaternion.Euler(0, k * 90 + 45, 0) * Vector3.forward * 0.2f * scale, new Vector3(0.03f, 0.44f, 0.03f) * scale, IronM, name: "LanternBar");
             Mesh(l, Frustum(0.15f * scale, 0.15f * scale, 0.012f * scale, 0.012f * scale, 0.18f * scale), IronM, "LanternCap", Vector3.up * 0.26f * scale);
+            P(PrimitiveKind.Cube, l, Vector3.up * 0.235f * scale, new Vector3(0.36f, 0.035f, 0.36f) * scale, IronM, name: "LanternDripBand");   // pass 6
             P(PrimitiveKind.Sphere, l, Vector3.up * 0.48f * scale, Vector3.one * 0.07f * scale, BrassM, name: "LanternFinial");
             var glowRing = P(PrimitiveKind.Cube, l, Vector3.up * 0.25f * scale, new Vector3(0.34f, 0.02f, 0.34f) * scale, M(new Color(1f, 0.7f, 0.3f), 0.2f, 0, true), name: "LanternGlowRing");
             lanterns.Add((glowRing.GetComponent<Renderer>(), at.x));
@@ -688,6 +765,10 @@ namespace LastBell.Arenas.MetronomeCourt
             mat.SetFloat("_Mode", 1); var fog = new Color(0.16f, 0.17f, 0.26f); mat.SetColor("_ColorLow", fog); mat.SetColor(PColorHigh, fog);
             mat.SetFloat("_Dissolve", 0); mat.SetFloat("_Soft", 1f); mat.SetVector("_NoiseScale", Vector4.zero); mat.SetVector("_Scroll", Vector4.zero);
             mat.SetFloat("_Intensity", 1.4f); mat.renderQueue = 2980;
+            // October 27 (Risxhb): the flat cloud decks and the haze disc read as an empty lavender plane; a menu-like sea
+            // of soft cloud puffs replaces them (Exterior.cs). The old decks remain as the fallback if its shader is missing.
+            BuildCloudSea(root);
+            if (CloudPuffCount > 0) return;
             foreach (var (cy, ch, ci) in new[] { (-12f, 110f, 0.6f), (-26f, 150f, 0.75f) })   // a cloud deck: two broad layers, lighter than the fog
             {
                 var deckM = new Material(mat) { name = "MetronomeCourt_CloudDeck" };
@@ -726,45 +807,44 @@ namespace LastBell.Arenas.MetronomeCourt
         void BuildAmbience(Transform root)
         {
             var arng = new System.Random(97);
-            var gearM = M(new Color(0.07f, 0.075f, 0.10f), 0.35f, 0.6f);
+            var gearM = M(new Color(0.17f, 0.18f, 0.26f), 0.35f, 0.6f);   // October 27: mid-distance iron, not a black wall
             var gearTrim = M(Brass * 0.35f, 0.4f, 0.8f);
-            // giant gears: meshing pairs in the sky behind the metronome and towers (dark silhouettes, faint brass rims)
-            // (moved in from z -76..-80 to just behind the metronome, Risxhb, October 25, 2026: they now read as part of the court)
-            foreach (var (pos, radius, teeth, dir) in new[] { (new Vector3(-17f, 12f, -34f), 10f, 24, 1f), (new Vector3(5f, 6.5f, -37f), 6f, 16, -1.6f), (new Vector3(20f, 15f, -32f), 12f, 28, 0.84f) })
+            // October 27 (critic: a wall of solid gears crowded the landmark): openwork gears (rim, spokes, hub; the sky shows
+            // through) moved off the metronome's sky opening. One master gear on the west flank, half sunk in the cloud sea,
+            // a smaller partner above it, and a third low in the east cloud. Each faces the court.
+            foreach (var (pos, radius, teeth, dir) in new[] { (new Vector3(-33f, -4f, -24f), 13f, 30, 0.5f), (new Vector3(-44f, -7f, -8f), 7f, 18, -1.2f), (new Vector3(36f, -9f, -14f), 8f, 20, 0.8f) })
             {
-                var g = new GameObject("Sky gear").transform; g.SetParent(root, false); g.localPosition = pos; g.localRotation = Quaternion.identity;
+                var g = new GameObject("Sky gear").transform; g.SetParent(root, false); g.localPosition = pos;
+                g.localRotation = Quaternion.LookRotation(-Sim.Flat(pos).normalized, Vector3.up);
                 var spin = new GameObject("Spin").transform; spin.SetParent(g, false);
-                P(PrimitiveKind.Cylinder, spin, Vector3.zero, new Vector3(radius * 2f, 0.6f, radius * 2f), gearM, new Vector3(90, 0, 0), "GearDisc");
-                P(PrimitiveKind.Cylinder, spin, new Vector3(0, 0, 0.5f), new Vector3(radius * 2.02f, 0.05f, radius * 2.02f), gearTrim, new Vector3(90, 0, 0), "GearRim");
-                P(PrimitiveKind.Cylinder, spin, new Vector3(0, 0, 0.7f), new Vector3(radius * 0.35f, 0.4f, radius * 0.35f), gearTrim, new Vector3(90, 0, 0), "GearHub");
+                Mesh(spin, Sector(radius * 0.8f, radius, 0, 360, 0.7f, 72), gearM, "GearRim").localRotation = Quaternion.Euler(90, 0, 0);
+                P(PrimitiveKind.Cylinder, spin, new Vector3(0, 0, -0.35f), new Vector3(radius * 0.3f, 0.5f, radius * 0.3f), gearTrim, new Vector3(90, 0, 0), "GearHub");
                 for (int k = 0; k < teeth; k++)
                 {
                     float a = k * 360f / teeth;
-                    P(PrimitiveKind.Cube, spin, Quaternion.Euler(0, 0, a) * Vector3.up * (radius + 1.0f), new Vector3(radius * 0.16f, 2.2f, 1.1f), gearM, new Vector3(0, 0, a), "GearTooth");
+                    P(PrimitiveKind.Cube, spin, Quaternion.Euler(0, 0, a) * Vector3.up * (radius + 0.6f), new Vector3(radius * 0.14f, 1.4f, 0.6f), gearM, new Vector3(0, 0, a), "GearTooth");
                 }
-                for (int k = 0; k < 6; k++)   // dark windows between spokes: the sky shows through as spoke gaps
-                    P(PrimitiveKind.Cube, spin, new Vector3(0, 0, 0.55f), new Vector3(radius * 0.12f, radius * 1.7f, 0.1f), gearTrim, new Vector3(0, 0, k * 30f), "GearSpoke");
+                for (int k = 0; k < 3; k++)   // six broad spokes (three bars through the hub) with wide gaps for the sky
+                    P(PrimitiveKind.Cube, spin, new Vector3(0, 0, -0.35f), new Vector3(radius * 0.13f, radius * 1.7f, 0.5f), gearM, new Vector3(0, 0, k * 60f), "GearSpoke");
                 gears.Add((spin, dir));
             }
 
             // floating broken masonry: below the rim (y -2.5 .. -12), never above the court, darker than the floor
-            var chunkStone = StoneM(StoneDark * 0.8f); var chunkIvory = StoneM(Ivory * 0.4f);   // darker than the fog: parallax, never competes
+            var chunkStone = StoneM(StoneDark * 0.8f);   // darker than the fog: parallax, never competes
             for (int i = 0; i < 14; i++)
             {
                 float a = 40f + i * (280f / 13f) + (float)arng.NextDouble() * 10f;   // all round except straight north (behind the metronome)
                 if (Mathf.Abs(Mathf.DeltaAngle(a + 180f, 0f)) < 22f) a += 44f;   // keep clear of the south bridge
-                float r = 18f + (float)arng.NextDouble() * 16f, y = -4f - (float)arng.NextDouble() * 12f;
-                if (r < 26f) y = Mathf.Min(y, -10f);   // near pieces sink well below the rim: they never reach into gameplay frames
+                float r = 18f + (float)arng.NextDouble() * 16f, y = -14f - (float)arng.NextDouble() * 6f;   // October 27: debris half-sunk in the cloud sea, not loose in the void
+                if (r < 26f) y = Mathf.Min(y, -14f);   // near pieces sink well below the rim: they never reach into gameplay frames
                 var home = Quaternion.Euler(0, a + 180f, 0) * Vector3.forward * r + Vector3.up * y;
                 var t = new GameObject("Drifting masonry").transform; t.SetParent(root, false); t.localPosition = home;
                 t.localRotation = Quaternion.Euler((float)arng.NextDouble() * 40 - 20, (float)arng.NextDouble() * 360, (float)arng.NextDouble() * 40 - 20);
                 int kind = i % 5;
                 if (kind == 0)
-                {   // an old clock face with two hands
-                    P(PrimitiveKind.Cylinder, t, Vector3.zero, new Vector3(3.2f, 0.12f, 3.2f), chunkIvory, null, "ClockFace");
-                    P(PrimitiveKind.Cylinder, t, Vector3.up * 0.13f, new Vector3(3.4f, 0.04f, 3.4f), gearTrim, null, "ClockRim");
-                    P(PrimitiveKind.Cube, t, new Vector3(0, 0.2f, 0.55f), new Vector3(0.12f, 0.04f, 1.1f), gearM, null, "ClockHand");
-                    P(PrimitiveKind.Cube, t, new Vector3(0.4f, 0.2f, 0), new Vector3(0.8f, 0.04f, 0.1f), gearM, new Vector3(0, 30, 0), "ClockHand");
+                {   // pass 4 (critic: "a stray brass disc"): a broken column drum with its capital, not a brass-rimmed clock face
+                    P(PrimitiveKind.Cylinder, t, Vector3.zero, new Vector3(1.5f, 1.1f, 1.5f), chunkStone, null, "ColumnDrum");
+                    P(PrimitiveKind.Cube, t, Vector3.up * 1.25f, new Vector3(2.0f, 0.4f, 2.0f), chunkStone, null, "ColumnCapital");
                 }
                 else if (kind == 1)
                 {   // a snapped spire
@@ -794,7 +874,7 @@ namespace LastBell.Arenas.MetronomeCourt
                 P(PrimitiveKind.Cone, far, pos + Vector3.up * (h + 5f), new Vector3(w * 0.7f, 10f, 1.5f), farM, yaw, "FarSpire");
                 if (i % 3 == 0) P(PrimitiveKind.Cube, far, pos + Vector3.up * h * 0.7f - Sim.Flat(pos).normalized * 0.8f, new Vector3(0.5f, 1.2f, 0.1f), farWin, yaw, "FarWindow");
             }
-            StaticBatchingUtility.Combine(far.gameObject);
+            BakeSurfaceUVs(far); StaticBatchingUtility.Combine(far.gameObject);
 
             // cloud banks: broad soft sheets drifting slowly round the court just under the rim
             var srcM = Resources.Load<Material>("Run/FX_ColorDissolve");
@@ -805,15 +885,16 @@ namespace LastBell.Arenas.MetronomeCourt
             bankM.SetVector("_NoiseScale", new Vector4(3, 3, 0, 0)); bankM.SetVector("_Scroll", new Vector4(0.02f, 0.01f, 0, 0)); bankM.SetFloat("_Intensity", 1.0f); bankM.renderQueue = 2975;
             for (int i = 0; i < 9; i++)
             {
-                float rad = 24f + (float)arng.NextDouble() * 22f, ang = i * 40f + (float)arng.NextDouble() * 20f, y = -3f - (float)arng.NextDouble() * 5f;
+                float rad = 24f + (float)arng.NextDouble() * 22f, ang = i * 40f + (float)arng.NextDouble() * 20f, y = -6.5f - (float)arng.NextDouble() * 4f;   // October 27: lower, among the rising masonry
                 float sz = 14f + (float)arng.NextDouble() * 12f;
                 var go = new GameObject("Cloud bank"); go.transform.SetParent(root, false);
                 // placed at its orbit position now, not only from Update (October 26, 2026): the menu's baked copy of the
                 // court has no arena script, and the banks were left stacked at the centre, fighting the floor slabs
                 go.transform.localPosition = Quaternion.Euler(0, ang, 0) * Vector3.forward * rad + Vector3.up * y;
                 go.transform.localRotation = Quaternion.Euler(0, ang, 0);
-                go.AddComponent<MeshFilter>().sharedMesh = FlatQuad(sz, sz * 0.55f);
-                var mr = go.AddComponent<MeshRenderer>(); mr.sharedMaterial = bankM; mr.shadowCastingMode = ShadowCastingMode.Off; mr.receiveShadows = false;
+                var puffs = CloudMaterial();   // October 27: a drifting cluster of soft puffs instead of a flat sheet
+                go.AddComponent<MeshFilter>().sharedMesh = puffs ? BankMesh(sz * 0.6f, new System.Random(1000 + i)) : FlatQuad(sz, sz * 0.55f);
+                var mr = go.AddComponent<MeshRenderer>(); mr.sharedMaterial = puffs ? puffs : bankM; mr.shadowCastingMode = ShadowCastingMode.Off; mr.receiveShadows = false;
                 cloudBanks.Add((go.transform, rad, ang, y, (i % 2 == 0 ? 1f : 0.7f) * (0.6f + (float)arng.NextDouble() * 0.5f)));
             }
 
@@ -921,27 +1002,44 @@ namespace LastBell.Arenas.MetronomeCourt
         {
             if (CameraSide(at))
             {
-                P(PrimitiveKind.Cube, stat, at + Vector3.up * 0.04f, new Vector3(0.46f, 0.08f, 0.46f), StoneM(StoneDark), new Vector3(0, yaw, 0), "BollardBase");
-                Mesh(stat, Frustum(0.25f, 0.25f, 0.16f, 0.16f, 0.62f), StoneM(Ivory), "BollardShaft", at + Vector3.up * 0.08f).localRotation = Quaternion.Euler(0, yaw, 0);
-                P(PrimitiveKind.Cube, stat, at + Vector3.up * 0.45f, new Vector3(0.43f, 0.03f, 0.43f), BrassM, new Vector3(0, yaw, 0), "BollardCollar");
-                Mesh(stat, Frustum(0.2f, 0.2f, 0.16f, 0.16f, 0.06f), BrassM, "BollardCap", at + Vector3.up * 0.7f).localRotation = Quaternion.Euler(0, yaw, 0);
+                // pass 6 (Risxhb: the bollard "looks basic"): a moulded post. A chamfered dark plinth and an ivory base moulding,
+                // a tapered shaft with a sunk panel and brass boss on its court and outer faces, a brass band that hugs the
+                // taper (the flat plate read as a thin line), a flared capital and abacus, and a chamfered brass cap under the
+                // lantern. Same height as before (under 0.8 m to the lantern): the near side stays low.
+                var by = Quaternion.Euler(0, yaw, 0); var agedB = M(Brass * 0.6f, 0.4f, 0.8f); var panelM = StoneM(StoneDark * 0.85f);
+                Mesh(stat, Frustum(0.29f, 0.29f, 0.26f, 0.26f, 0.07f), StoneM(StoneDark), "BollardBase", at).localRotation = by;
+                Mesh(stat, Frustum(0.25f, 0.25f, 0.2f, 0.2f, 0.06f), StoneM(Ivory * 0.92f), "BollardBaseMould", at + Vector3.up * 0.07f).localRotation = by;
+                Mesh(stat, Frustum(0.2f, 0.2f, 0.16f, 0.16f, 0.5f), StoneM(Ivory), "BollardShaft", at + Vector3.up * 0.13f).localRotation = by;
+                foreach (var face in new[] { -1f, 1f })
+                {
+                    var fd = by * Vector3.forward * face;   // court (-1) and outer (+1) faces
+                    P(PrimitiveKind.Cube, stat, at + Vector3.up * 0.36f + fd * 0.178f, new Vector3(0.2f, 0.27f, 0.02f), panelM, new Vector3(-4.6f * face, yaw, 0), "BollardPanel");
+                    P(PrimitiveKind.Cube, stat, at + Vector3.up * 0.36f + fd * 0.19f, new Vector3(0.07f, 0.07f, 0.025f), agedB, new Vector3(-4.6f * face, yaw, 45f), "BollardBoss");
+                }
+                Mesh(stat, Frustum(0.2f, 0.2f, 0.195f, 0.195f, 0.05f), agedB, "BollardCollar", at + Vector3.up * 0.53f).localRotation = by;
+                Mesh(stat, Frustum(0.16f, 0.16f, 0.21f, 0.21f, 0.06f), StoneM(Ivory), "BollardCapital", at + Vector3.up * 0.63f).localRotation = by;
+                Mesh(stat, Frustum(0.22f, 0.22f, 0.22f, 0.22f, 0.035f), StoneM(Ivory * 0.92f), "BollardAbacus", at + Vector3.up * 0.69f).localRotation = by;
+                Mesh(stat, Frustum(0.2f, 0.2f, 0.15f, 0.15f, 0.05f), agedB, "BollardCap", at + Vector3.up * 0.725f).localRotation = by;
                 Lantern(root, at + Vector3.up * 0.96f, 0.75f);   // the lantern base sits on the bollard cap
                 return;
             }
             P(PrimitiveKind.Cube, stat, at + Vector3.up * 0.3f, new Vector3(1.15f, 0.6f, 1.15f), StoneM(StoneDark), new Vector3(0, yaw, 0), "PostPlinth");
             P(PrimitiveKind.Cube, stat, at + Vector3.up * 1.9f, new Vector3(0.75f, 2.6f, 0.75f), StoneM(Ivory), new Vector3(0, yaw, 0), "PostShaft");
-            P(PrimitiveKind.Cylinder, stat, at + Vector3.up * 0.75f, new Vector3(0.95f, 0.05f, 0.95f), BrassM, name: "PostCollar");
-            P(PrimitiveKind.Cylinder, stat, at + Vector3.up * 2.9f, new Vector3(0.95f, 0.05f, 0.95f), BrassM, name: "PostCollar");
-            P(PrimitiveKind.Cube, stat, at + Vector3.up * 3.3f, new Vector3(1.0f, 0.2f, 1.0f), BrassM, new Vector3(0, yaw, 0), "PostCornice");
+            var agedBrass = M(Brass * 0.6f, 0.4f, 0.8f);   // pass 4 (critic: "yellow-lit caps", the hottest value near warnings)
+            P(PrimitiveKind.Cylinder, stat, at + Vector3.up * 0.75f, new Vector3(0.95f, 0.05f, 0.95f), agedBrass, name: "PostCollar");
+            P(PrimitiveKind.Cylinder, stat, at + Vector3.up * 2.9f, new Vector3(0.95f, 0.05f, 0.95f), agedBrass, name: "PostCollar");
+            P(PrimitiveKind.Cube, stat, at + Vector3.up * 3.3f, new Vector3(1.0f, 0.2f, 1.0f), agedBrass, new Vector3(0, yaw, 0), "PostCornice");
             P(PrimitiveKind.Cone, stat, at + Vector3.up * 4.5f, new Vector3(0.55f, 1.2f, 0.55f), IronM, name: "PostSpire");
             // banner faces the court (and so the camera), hung from a brass rod
             var inward = -Sim.Flat(at).normalized; float faceYaw = Mathf.Atan2(inward.x, inward.z) * Mathf.Rad2Deg;
             var cloth = M(BannerTeal, 0.3f); var tilt = new Vector3(3f, faceYaw, 0);
             var side = Quaternion.Euler(0, faceYaw, 0) * Vector3.right;
-            P(PrimitiveKind.Cube, stat, at + inward * 0.42f + Vector3.up * 2.05f, new Vector3(0.5f, 1.6f, 0.03f), cloth, tilt, "Banner");
+            // pass 4 (critic: "every banner is the same length"): three lengths round the court, all hung from the same rod
+            float bannerLen = new[] { 1.6f, 1.25f, 1.9f }[Mathf.Abs(Mathf.RoundToInt(yaw / 10f)) % 3];
+            P(PrimitiveKind.Cube, stat, at + inward * 0.42f + Vector3.up * (2.85f - bannerLen / 2), new Vector3(0.5f, bannerLen, 0.03f), cloth, tilt, "Banner");
             // swallowtail: two flaps hanging from the body's lower edge, splayed outward so a V-notch opens between them
             foreach (var sx in new[] { -1, 1 })
-                P(PrimitiveKind.Cube, stat, at + inward * 0.415f + side * (0.13f * sx) + Vector3.up * 1.07f, new Vector3(0.24f, 0.36f, 0.03f), cloth, new Vector3(3f, faceYaw, sx * 14f), "BannerTail");
+                P(PrimitiveKind.Cube, stat, at + inward * 0.415f + side * (0.13f * sx) + Vector3.up * (2.85f - bannerLen - 0.18f), new Vector3(0.24f, 0.36f, 0.03f), cloth, new Vector3(3f, faceYaw, sx * 14f), "BannerTail");
             P(PrimitiveKind.Cube, stat, at + inward * 0.44f + Vector3.up * 2.87f, new Vector3(0.78f, 0.05f, 0.05f), BrassM, new Vector3(0, faceYaw, 0), "BannerRod");
             P(PrimitiveKind.Cube, stat, at + inward * 0.455f + Vector3.up * 2.15f, new Vector3(0.22f, 0.22f, 0.02f), BrassM, new Vector3(3f, faceYaw, 45f), "BannerEmblem");
             Lantern(root, at + Vector3.up * 3.75f, 1f, pool: true);
@@ -949,6 +1047,7 @@ namespace LastBell.Arenas.MetronomeCourt
 
         void BuildMetronome(Transform m)
         {
+            // October 27: stiles 1.3 m wide (were 0.9) so the frame holds its silhouette at thumbnail size
             // dark iron back case (trapezoid), tapered open front frame with brass edge bevels and tempo-lit seams
             Frame = new GameObject("Frame").transform; Frame.SetParent(m, false);
             float baseHalf = 3.4f, topHalf = 0.6f, h = FrameHeight;
@@ -958,15 +1057,15 @@ namespace LastBell.Arenas.MetronomeCourt
             {
                 var a = new Vector3(baseHalf * s, 0, 0.35f); var b = new Vector3(topHalf * s, h, 0.35f);
                 var rot = Quaternion.FromToRotation(Vector3.up, (b - a).normalized);
-                var stile = P(PrimitiveKind.Cube, Frame, (a + b) / 2, new Vector3(0.9f, (b - a).magnitude, 0.8f), IronM, name: "Stile"); stile.localRotation = rot;
-                var trim = P(PrimitiveKind.Cube, Frame, (a + b) / 2 + new Vector3(-0.34f * s, 0, 0.41f), new Vector3(0.12f, (b - a).magnitude, 0.05f), BrassM, name: "StileBevel"); trim.localRotation = rot;
+                var stile = P(PrimitiveKind.Cube, Frame, (a + b) / 2, new Vector3(1.6f, (b - a).magnitude, 0.8f), IronM, name: "Stile"); stile.localRotation = rot;
+                var trim = P(PrimitiveKind.Cube, Frame, (a + b) / 2 + new Vector3(-0.64f * s, 0, 0.41f), new Vector3(0.3f, (b - a).magnitude, 0.05f), M(Brass * 0.7f, 0.4f, 0.8f), name: "StileBevel"); trim.localRotation = rot;   // pass 4: aged, low-gloss brass (critic: an orange bloom inside the case)
                 // tempo seam: the middle 60% of the stile only, so it accents rather than out-glowing everything
-                var seam = P(PrimitiveKind.Cube, Frame, (a + b) / 2 + new Vector3(0.16f * s, 0, 0.42f), new Vector3(0.05f, (b - a).magnitude * 0.6f, 0.02f), M(HasteTint, 0.2f, 0, true), name: "StileSeam"); seam.localRotation = rot;
+                var seam = P(PrimitiveKind.Cube, Frame, (a + b) / 2 + new Vector3(0.16f * s, 0, 0.42f), new Vector3(0.1f, (b - a).magnitude * 0.6f, 0.02f), M(HasteTint, 0.2f, 0, true), name: "StileSeam"); seam.localRotation = rot;   // pass 4: a broader, dimmer seam (critic: thin emissive lines)
                 seams.Add(seam.GetComponent<Renderer>());
                 // rivet row down each stile face, and a triangular gusset at each base corner
                 for (int k = 0; k < 10; k++)
                 {
-                    var rp = Vector3.Lerp(a, b, (k + 0.5f) / 10f) + new Vector3(-0.2f * s, 0, 0.41f);
+                    var rp = Vector3.Lerp(a, b, (k + 0.5f) / 10f) + new Vector3(-0.42f * s, 0, 0.41f);
                     P(PrimitiveKind.Cube, Frame, rp, new Vector3(0.08f, 0.08f, 0.05f), M(Brass * 0.85f, 0.5f, 0.8f), new Vector3(0, 0, 45), "Rivet");
                 }
                 Mesh(Frame, Frustum(0.7f, 0.15f, 0.03f, 0.15f, 1.1f), IronM, "Gusset", new Vector3((baseHalf - 1.0f) * s, 0.6f, 0.5f));
@@ -1001,7 +1100,7 @@ namespace LastBell.Arenas.MetronomeCourt
             for (int k = 0; k < 3; k++)
             {
                 float t = 0.25f + 0.25f * k; int sx = k % 2 == 0 ? -1 : 1;
-                var cp = Vector3.Lerp(new Vector3(baseHalf * sx, 0, 0.35f), new Vector3(topHalf * sx, h, 0.35f), t) + new Vector3(-0.34f * sx, 0, 0.39f);   // recessed into the bevel face
+                var cp = Vector3.Lerp(new Vector3(baseHalf * sx, 0, 0.35f), new Vector3(topHalf * sx, h, 0.35f), t) + new Vector3(-0.64f * sx, 0, 0.39f);   // recessed into the bevel face
                 var chip = P(PrimitiveKind.Cube, Frame, cp, new Vector3(0.25f, 0.3f, 0.03f), M(new Color(0.04f, 0.04f, 0.05f), 0.1f), new Vector3(0, 0, 30 * sx), "BevelChip");
                 chips.Add(chip.GetComponent<Renderer>()); chip.GetComponent<Renderer>().enabled = false;
             }
@@ -1009,12 +1108,15 @@ namespace LastBell.Arenas.MetronomeCourt
             foreach (var y in new[] { h * 0.22f, h * 0.9f })   // braces clear of the scale plate (2.6-8.6 m), so no cross reads
             {
                 float half = Mathf.Lerp(baseHalf, topHalf, y / h);
-                P(PrimitiveKind.Cube, Frame, new Vector3(0, y, 0.3f), new Vector3(half * 2, 0.2f, 0.3f), BrassM, name: "Brace");
+                P(PrimitiveKind.Cube, Frame, new Vector3(0, y, 0.3f), new Vector3(half * 2, 0.2f, 0.3f), M(Brass * 0.55f, 0.4f, 0.8f), name: "Brace");   // pass 3: was the hot bar behind the escapement
             }
             P(PrimitiveKind.Cube, Frame, new Vector3(0, h + 0.3f, 0), new Vector3(1.7f, 0.6f, 1.2f), BrassM, name: "ApexCap");
-            P(PrimitiveKind.Cone, Frame, new Vector3(0, h + 1.1f, 0), new Vector3(0.7f, 1.0f, 0.7f), IronM, name: "ApexFinial");
+            // October 27 pass 2: a stepped iron crown and a taller finial give the top a silhouette at thumbnail size
+            Mesh(Frame, Frustum(1.15f, 0.8f, 0.45f, 0.35f, 1.3f), IronM, "ApexCrown", new Vector3(0, h + 0.6f, 0));
+            P(PrimitiveKind.Cylinder, Frame, new Vector3(0, h + 1.95f, 0), new Vector3(0.75f, 0.06f, 0.75f), M(Brass * 0.7f, 0.5f, 0.8f), name: "ApexCollar");
+            P(PrimitiveKind.Cone, Frame, new Vector3(0, h + 2.9f, 0), new Vector3(0.5f, 1.9f, 0.5f), IronM, name: "ApexFinial");
             P(PrimitiveKind.Cube, Frame, new Vector3(0, 0.3f, 0), new Vector3(baseHalf * 2 + 0.8f, 0.6f, 1.8f), IronM, name: "FrameBase");
-            P(PrimitiveKind.Cube, Frame, new Vector3(0, 0.62f, 0.2f), new Vector3(baseHalf * 2 + 0.9f, 0.08f, 1.9f), BrassM, name: "FrameBaseTrim");
+            P(PrimitiveKind.Cube, Frame, new Vector3(0, 0.62f, 0.2f), new Vector3(baseHalf * 2 + 0.9f, 0.08f, 1.9f), M(Brass * 0.55f, 0.4f, 0.8f), name: "FrameBaseTrim");   // October 27: was a hot strip in Haste
             P(PrimitiveKind.Cube, Frame, new Vector3(0, 5.6f, 0.2f), new Vector3(0.35f, 6.0f, 0.03f), M(Brass * 0.8f, 0.5f, 0.4f), name: "ScalePlate");
             for (int k = 0; k < 18; k++) P(PrimitiveKind.Cube, Frame, new Vector3(0, 2.75f + k * (5.7f / 17f), 0.225f), new Vector3(k % 3 == 0 ? 0.3f : 0.17f, 0.04f, 0.02f), IronM, name: "ScaleMark");
             // escapement wheel (2.6 m, spokes and teeth) at the lower pivot; steps on each tick, with a pawl that clicks
@@ -1041,7 +1143,7 @@ namespace LastBell.Arenas.MetronomeCourt
             P(PrimitiveKind.Cube, Weight, new Vector3(0, 0, 0.26f), new Vector3(0.6f, 0.98f, 0.04f), IronM, name: "WeightFace");
             var slot = P(PrimitiveKind.Cube, Weight, new Vector3(0, 0, 0.29f), new Vector3(0.26f, 0.26f, 0.02f), M(HasteTint, 0.2f, 0, true), new Vector3(0, 0, 45), "WeightSlot");
             seams.Add(slot.GetComponent<Renderer>());
-            var go = new GameObject("Metronome light"); go.transform.SetParent(m, false); go.transform.localPosition = new Vector3(0, 6, 4);
+            var go = new GameObject("Metronome light"); go.transform.SetParent(m, false); go.transform.localPosition = new Vector3(0, 6, 6.5f);   // pass 4: forward of the case, so the brass legs are lit, not glowing
             metronomeLight = go.AddComponent<Light>(); metronomeLight.type = LightType.Point; metronomeLight.range = 18; metronomeLight.intensity = 6; metronomeLight.shadows = LightShadows.None;
             // tempo spot light: above and just behind the apex, aimed across the court, washing the dial in the tempo
             // colour. It casts no shadows, so the metronome leaves no shadow on the arena floor.
@@ -1074,7 +1176,7 @@ namespace LastBell.Arenas.MetronomeCourt
                 // (the Tyrant opens in Haste at 220 BPM; the Oracle opens in Normal at 140 BPM)
                 bool oracleNext = d != null && d.Encounter == RunDirector.ChimeboundOraclePractice;
                 float previewBpm = oracleNext ? ChimeboundOracleEncounter.NormalBpm : 220f;
-                Preview = true; haste = !oracleNext;
+                Preview = true; haste = ReviewHaste ?? !oracleNext;
                 if (d == null || !d.Paused) previewBeat += Time.deltaTime * previewBpm / 60.0;
                 phase = Mathf.Cos((float)(previewBeat % 2.0) * Mathf.PI);
                 beat = (int)System.Math.Floor(previewBeat); beatPos = previewBeat; beatSec = 60f / previewBpm;
@@ -1105,9 +1207,9 @@ namespace LastBell.Arenas.MetronomeCourt
             // Floor light is steady (Risxhb, October 26, 2026): the per-beat pulse and the enrage noise on the lights that
             // cover the floor read as heavy shimmer (measured: whole-floor flicker 4.9% live vs 2.3% with them off). The
             // tempo still reads from the light colour, the rod and the metronome's own glow, which keeps a soft flash.
-            if (metronomeLight) { metronomeLight.color = frenzy ? Color.Lerp(tint, CrackGlow, 0.35f) : tint; metronomeLight.intensity = (haste ? 6f : 4f) * (1 + 0.25f * flash); }
-            if (TempoSpotLight) { TempoSpotLight.color = LightTint; TempoSpotLight.intensity = Mathf.Lerp(80f, 95f, tempoBlend) * (quiet ? 0.6f : 1f); }
-            if (TempoRimLight) { TempoRimLight.color = LightTint; TempoRimLight.intensity = Mathf.Lerp(0.4f, 0.45f, tempoBlend) * (quiet ? 0.75f : 1f); }
+            if (metronomeLight) { metronomeLight.color = frenzy ? Color.Lerp(tint, CrackGlow, 0.35f) : tint; metronomeLight.intensity = (haste ? 3.6f : 2.6f) * (1 + 0.25f * flash); }
+            if (TempoSpotLight) { TempoSpotLight.color = LightTint; TempoSpotLight.intensity = Mathf.Lerp(38f, 48f, tempoBlend) * (quiet ? 0.6f : 1f); }   // pass 4: Normal 38 (was 18) with the paler tint, Haste 48 (was 60): the floor keeps its brightness and stone colour in both tempos   // October 27: softer wash (was 80-95): the floor read warm brown in Haste, slate in Normal
+            if (TempoRimLight) { TempoRimLight.color = LightTint; TempoRimLight.intensity = Mathf.Lerp(0.16f, 0.38f, tempoBlend) * (quiet ? 0.75f : 1f); }   // pass 4: 0.16 / 0.38 (were 0.22 / 0.45), so neither tempo recolours the stone
             _ = flicker;   // the enrage noise now shows on the cracks and the boss only
             if (mpb == null) mpb = new MaterialPropertyBlock();   // survives a script reload
             // lantern glow follows the rod's lean across the rim; all flash together on accented transition ticks
@@ -1119,8 +1221,8 @@ namespace LastBell.Arenas.MetronomeCourt
                 float k = (quiet ? 0.7f : 1f) * ((haste ? 1.3f : 1.0f) * (0.8f + 2.2f * near) * (1 + 0.3f * BeatPulse) + 2.5f * flash);
                 // soft-capped (never clips to white) with the flicker, the hazard dim and the tick flash applied after the cap
                 float raw = (haste ? 1.3f : 1.0f) * (0.8f + 2.2f * near) * (1 + 0.3f * BeatPulse);
-                float e = 1.6f * Mathf.Clamp01(raw / 3.5f) * (0.92f + 0.16f * Mathf.PerlinNoise(x * 1.7f, Time.time * 3f));
-                e = e * (quiet ? 0.6f : 1f) + 1.2f * flash;
+                float e = 1.15f * Mathf.Clamp01(raw / 3.5f) * (0.92f + 0.16f * Mathf.PerlinNoise(x * 1.7f, Time.time * 3f));
+                e = e * (quiet ? 0.6f : 1f) + 0.9f * flash;   // pass 3: lantern glass no longer white-hot
                 mpb.SetColor(PBase, tint * 0.5f); mpb.SetColor(PEmission, tint * e); r.SetPropertyBlock(mpb);
             }
             if (poolMpb == null) poolMpb = new MaterialPropertyBlock();
@@ -1132,20 +1234,22 @@ namespace LastBell.Arenas.MetronomeCourt
                 poolMpb.SetColor(PColorHigh, LightTint * k); r.SetPropertyBlock(poolMpb);
             }
             var seamTint = frenzy && Mathf.PerlinNoise(Time.time * 7, 1.7f) > 0.55f ? CrackGlow : tint;
-            mpb.SetColor(PBase, seamTint); mpb.SetColor(PEmission, seamTint * ((haste ? 0.9f : 0.6f) + 0.3f * flash));
+            mpb.SetColor(PBase, seamTint); mpb.SetColor(PEmission, seamTint * ((haste ? 0.6f : 0.45f) + 0.3f * flash));
             foreach (var r in seams) if (r) r.SetPropertyBlock(mpb);
             // tempo line: brighter than the brass beside it, with a bright ~30-degree segment chasing once around per beat
             // the bright segment ticks one hour per beat (a clock hand, a lap every 12 beats) and decays over a quarter beat;
             // while hazards are up the line drops to a dim base with no chase or flash, so warnings stay the brightest thing
             float hourA = 180f + 30f * (float)(System.Math.Floor(beatPos) % 12), beatFrac = (float)(beatPos - System.Math.Floor(beatPos));
             float tick = Mathf.Clamp01(1f - beatFrac / 0.25f) * (boss && boss.Dead ? 0 : 1);
-            float lineBase = quiet ? 0.3f : (haste ? 1.4f : 1.0f) + 0.8f * flash;
+            // October 27: dimmer tempo ring (was 1.4/1.0, chase 1.6): it sat on warning edges as a bright orange band
+            float lineBase = quiet ? 0.2f : (haste ? 0.45f : 0.4f) + 0.5f * flash;
             for (int i = 0; i < tempoLineRs.Count; i++)
             {
                 var r = tempoLineRs[i]; if (!r) continue;
                 float segA = (i + 0.5f) * 360f / tempoLineRs.Count, dA = Mathf.Abs(Mathf.DeltaAngle(segA, hourA));
                 float chase = quiet ? 0 : (dA < 15f ? 1f - dA / 15f : 0f) * tick;
-                mpb.SetColor(PBase, tint); mpb.SetColor(PEmission, tint * Mathf.Min(3f, lineBase + 1.6f * chase));
+                var ringTint = haste ? HasteLightTint : NormalTint;   // pale gold, kept apart from the red-orange warnings
+                mpb.SetColor(PBase, ringTint * 0.55f); mpb.SetColor(PEmission, ringTint * Mathf.Min(1.4f, lineBase + 0.8f * chase));
                 r.SetPropertyBlock(mpb);
             }
             if (probe && !probeRendered) { probe.RenderProbe(); probeRendered = true; }
