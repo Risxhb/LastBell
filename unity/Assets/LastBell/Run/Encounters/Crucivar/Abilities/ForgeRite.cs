@@ -68,7 +68,7 @@ namespace LastBell.Run
         }
 
         // ---------------- Ember Brand ----------------
-        void EmberBrand()
+        internal void EmberBrand()
         {
             foreach (var p in Standing())
             {
@@ -101,7 +101,7 @@ namespace LastBell.Run
         }
 
         // ---------------- Furnace Spin ----------------
-        void FurnaceSpin()
+        internal void FurnaceSpin()
         {
             var origin = Flat(Boss.transform.position);
             float baseYaw = Boss.transform.eulerAngles.y + 45f, dir = loops % 2 == 1 ? 1f : -1f;
@@ -122,7 +122,7 @@ namespace LastBell.Run
         }
 
         // ---------------- Backdraft ----------------
-        IEnumerable<int> Backdraft()
+        internal IEnumerable<int> Backdraft()
         {
             var centre = Flat(Boss.transform.position);
             var blast = W.Hazards.Spawn(new Hazard
@@ -147,7 +147,7 @@ namespace LastBell.Run
         }
 
         // ---------------- Casting Order ----------------
-        void CastingOrder()
+        internal void CastingOrder()
         {
             var standing = Standing();
             bool memory = hideNext && Order.Count > 0;
@@ -200,7 +200,7 @@ namespace LastBell.Run
         // ---------------- Anvil Quake ----------------
         // three bands from the anvil out to the wall, all shown at once, landing inner -> middle -> outer: step into a band
         // that has already gone off (in toward the boss once the inner ring has landed)
-        void AnvilQuake()
+        internal void AnvilQuake()
         {
             Boss.Rig.Pour(false);
             var origin = Flat(Boss.transform.position);

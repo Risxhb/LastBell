@@ -32,7 +32,7 @@ namespace LastBell.Run
 
         sealed class Bot : IInputSource
         {
-            public string Name; public PlayerController P; public Vector3 Goal; public bool Dash, Attack; public Vector3 Aim;
+            public string Name; public PlayerController P; public Vector3 Goal; public bool Dash, Attack; public Vector3 Aim, Target; public float TargetRadius;
             public float NextPlan; public int Hits, Damage, Downs;
             public PlayerInput Read(PlayerController who)
             {
@@ -103,12 +103,13 @@ namespace LastBell.Run
                     // the kill after loop 6 (the bots' damage alone would end it in half a minute)
                     if (d.Boss is CrucivarEncounter cb && cb.Rite != null && !cb.Dead)
                     {
-                        int done = cb.Rite.Loops - (cb.Current.StartsWith("Forge Rite") || cb.Current == "Vulnerable" ? 0 : 1);
-                        float floor = done < 2 ? 0.66f : done < 4 ? 0.31f : done < 6 ? 0.02f : 0f;
+                        int ph = cb.PhaseIndex;
+                        float floor = cb.PhaseLoops < 2 ? (ph == 1 ? 0.66f : ph == 2 ? 0.31f : 0.02f) : 0f;
                         if (cb.Hp < cb.MaxHp * floor) cb.DebugSetHpFraction(floor);
-                        if (cb.Rite.Loops != logged)
+                        int key = ph * 100 + cb.PhaseLoops;
+                        if (key != logged)
                         {
-                            logged = cb.Rite.Loops;
+                            logged = key;
                             Debug.Log($"[watch] fight {fights} loop {logged} · boss {cb.Hp}/{cb.MaxHp} · " + string.Join(" · ", bots.Select(b => $"{b.Name} {b.Hits} hits/{b.Damage} dmg/{b.Downs} downs")));
                         }
                     }
@@ -133,17 +134,21 @@ namespace LastBell.Run
             }
             if (UnityEngine.InputSystem.Keyboard.current?.tabKey.wasPressedThisFrame == true) follow = !follow;
             var boss = Sim.Flat(d.Boss.transform.position);
+            var parts = w.Parts.Where(q => q.Alive).OrderBy(q => q.Name).ToList();
             foreach (var b in bots)
             {
                 if (!b.P || b.P.Down) continue;
                 var me = Sim.Flat(b.P.transform.position);
-                b.Aim = boss;
+                // Foundry Uprising: each bot takes a casting by party order (extra bots double up on the first ones)
+                var part = parts.Count > 0 ? parts[bots.IndexOf(b) % parts.Count] : null;
+                b.Target = part != null ? Sim.Flat(part.Pos) : boss; b.TargetRadius = part != null ? part.BodyRadius : d.Boss.BodyRadius;
+                b.Aim = b.Target;
                 if (Time.time >= b.NextPlan)
                 {
                     b.NextPlan = Time.time + 0.12f;   // a human-ish reaction cadence
                     b.Goal = Plan(b, me, boss, w);
                 }
-                b.Attack = Danger(b, me, boss, w, 0) < 1f && (me - boss).magnitude < d.Boss.BodyRadius + 3.2f;
+                b.Attack = Danger(b, me, boss, w, 0) < 1f && (me - b.Target).magnitude < b.TargetRadius + 3.2f;
                 // dash out when a hit lands within 0.3 s and the goal is clear
                 if (Danger(b, me, boss, w, 0.3f, imminentOnly: true) >= 50f && Danger(b, b.Goal, boss, w, 0) < 50f && (b.Goal - me).magnitude > 0.8f) b.Dash = true;
             }
@@ -164,7 +169,12 @@ namespace LastBell.Run
                     float cost = Danger(b, c, boss, w, travel / 6f) + travel * 1.2f;
                     float r = (c - boss).magnitude;
                     if (carrying) cost += Mathf.Max(0f, CrucivarAbility.Rim - 3f - r) * 4f;
-                    else cost += r < d.Boss.BodyRadius + 1f ? 40f : Mathf.Abs(r - (d.Boss.BodyRadius + 2.2f)) * 1.5f;   // stay in melee, out of the body
+                    else
+                    {
+                        float rt = (c - b.Target).magnitude;   // stay in melee of the target (the boss or my casting), out of its body
+                        cost += rt < b.TargetRadius + 1f ? 40f : Mathf.Abs(rt - (b.TargetRadius + 2.2f)) * 1.5f;
+                        if (r < d.Boss.BodyRadius + 1f) cost += 40f;
+                    }
                     foreach (var o in bots) if (o != b && o.P && !o.P.Down) { float s = (Sim.Flat(o.P.transform.position) - c).magnitude; if (s < 3.4f) cost += (3.4f - s) * 8f; }
                     if (cost < bestCost) { bestCost = cost; best = c; }
                 }
@@ -175,11 +185,18 @@ namespace LastBell.Run
         float Danger(Bot b, Vector3 c, Vector3 boss, CombatWorld w, float ahead, bool imminentOnly = false)
         {
             float cost = 0;
+            var uprising = (d.Boss as CrucivarEncounter)?.Uprising;
             foreach (var h in w.Hazards.Live)
             {
                 float toLand = (h.ResolveAt - h.Age) * Sim.Dt;
                 float live = h.ActiveTicks > 1 ? (h.ResolveAt + h.ActiveTicks - h.Age) * Sim.Dt : 0;
                 if (h.BurnPerSecond > 0) { if (!imminentOnly && Inside(h, c, 0.35f)) cost += 70f; continue; }
+                if (uprising != null && uprising.Velocity.TryGetValue(h, out var vel))
+                {   // a marching bullet: test where it will be over the next moments
+                    for (float t = 0; t <= Mathf.Max(ahead, 0.15f) + 0.35f; t += 0.1f)
+                        if ((Sim.Flat(h.Origin + vel * t) - c).magnitude < h.Radius + 0.75f) { cost += 100f; break; }
+                    continue;
+                }
                 if (h.Damage <= 0 || (toLand < -0.05f && live <= 0)) continue;
                 if (imminentOnly && toLand > ahead && live <= 0) continue;
                 if (h.Source == "Ember Brand")

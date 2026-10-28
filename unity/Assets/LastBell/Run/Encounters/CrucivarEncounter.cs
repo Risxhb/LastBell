@@ -294,8 +294,8 @@ namespace LastBell.Run
         {
             if (Mould != null) return;
             Mould = new MouldPress(); Chain = new GearChain(); Bellows = new BellowsDraw(); Casting = new GreatCasting(); Press = new SecondPress();
-            Sweep = new AnvilSweep(); Spit = new SlagSpit(); Rite = new ForgeRite();
-            foreach (var a in new CrucivarAbility[] { Mould, Chain, Bellows, Casting, Press, Sweep, Spit, Rite }) a.Bind(this, W);
+            Sweep = new AnvilSweep(); Spit = new SlagSpit(); Rite = new ForgeRite(); Uprising = new FoundryUprising();
+            foreach (var a in new CrucivarAbility[] { Mould, Chain, Bellows, Casting, Press, Sweep, Spit, Rite, Uprising }) a.Bind(this, W);
         }
 
         public IEnumerable<int> WalkToAnvil()
@@ -434,10 +434,15 @@ namespace LastBell.Run
             }
         }
 
-        // ================ ability set v4 (rework, REWORK-PROMPT.md): Phase 1 "Forge Rite" prototype ================
-        // Only Phase 1 is designed so far, so Forge Rite loops at every HP. The 65 % and 30 % transitions still play
-        // (harmless, no heal) and end the phase: every Ember Brand pool clears.
+        // ================ ability set v4 (rework, REWORK-PROMPT.md) ================
+        // Phase 1 "Forge Rite" (accepted for now, 10-27) loops until 65 %. Phase 2 "Foundry Uprising" (proposal) cycles
+        // uprising -> 3.5 s punish -> Casting Order + Anvil Quake until 30 %. Phase 3 isn't designed yet, so Forge Rite
+        // loops again. The transitions play (harmless, no heal) and end the phase: every Ember Brand pool clears.
         public ForgeRite Rite { get; private set; }
+        public FoundryUprising Uprising { get; private set; }
+        public int PhaseLoops { get; private set; }   // loops / uprisings finished in this phase (watch pacing)
+        public void Label(string text) => PhaseName = text;
+        public const float UprisingPunish = 3.5f;
 
         IEnumerable<int> V4Script()
         {
@@ -454,10 +459,24 @@ namespace LastBell.Run
                     continue;
                 }
                 Attacks++;
-                foreach (var w in Rite.Loop()) yield return w;
-                foreach (var w in Recover("Forge Rite (vents cooling)", "Vulnerable", Sim.Ticks(ForgeRite.Punish))) yield return w;
+                if (phase == 2)
+                {
+                    Current = "Foundry Uprising";
+                    foreach (var w in Uprising.Run()) yield return w;
+                    foreach (var w in Recover("Foundry Uprising (furnace staggered)", "Vulnerable", Sim.Ticks(UprisingPunish))) yield return w;
+                    Current = "Casting Order"; Rite.CastingOrder();
+                    yield return Sim.Ticks(2.5f);
+                    Current = "Anvil Quake"; Rite.AnvilQuake();
+                    yield return Sim.Ticks(4f);
+                }
+                else
+                {
+                    foreach (var w in Rite.Loop()) yield return w;
+                    foreach (var w in Recover("Forge Rite (vents cooling)", "Vulnerable", Sim.Ticks(ForgeRite.Punish))) yield return w;
+                }
+                PhaseLoops++;
                 int want = PhaseFor();
-                if (want != phase) { phase = want; Rite.ClearPools(); foreach (var w in V2Shift()) yield return w; }
+                if (want != phase) { phase = want; PhaseLoops = 0; Rite.ClearPools(); foreach (var w in V2Shift()) yield return w; }
             }
         }
 
