@@ -57,6 +57,7 @@ namespace LastBell.Run
                 Source = "Pour Flood", Shape = HazardShape.Ring, Kind = HazardKind.Ground, Origin = Vector3.zero, Inner = Rim - 1.2f, Radius = Rim + Hazard.Margin + 0.5f,
                 LockAt = 0, ResolveAt = deadline, ShareTotal = 1, WipeIfEmpty = true, Includes = _ => false,   // nobody can soak it: it wipes
             });
+            Flood.OnResolve = _ => Floods++;   // counted here: the wipe can end the script before the loop sees it
             bool layered = Uprisings > 1;
             IEnumerator<int> draft = null; int draftWait = 0;
             for (t = 0; ; t++)
@@ -74,7 +75,7 @@ namespace LastBell.Run
                     foreach (var tu in Turrets) if (tu.Up) RunHud.Float(tu.Pos + Vector3.up * 3f, left.ToString(), left <= 10 ? new Color(1f, 0.45f, 0.32f) : new Color(1f, 0.95f, 0.82f));
                 }
                 if (spawned >= total && Turrets.All(x => !x.Up)) { Cancel(Flood); Flood = null; break; }
-                if (t >= deadline) { Floods++; Flood = null; break; }   // the flood landed: the party is down
+                if (t >= deadline) { Flood = null; break; }   // the flood landed: the party is down
                 yield return 1;
             }
             Boss.Label("Casting Heat");
