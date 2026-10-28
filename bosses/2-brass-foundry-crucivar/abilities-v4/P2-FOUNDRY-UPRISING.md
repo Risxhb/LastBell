@@ -1,6 +1,6 @@
 # Crucivar v4, Phase 2: Foundry Uprising (proposal)
 
-**Status: proposal, not accepted.** Built on Chzy18's add and bullet-hell idea (27 Oct). Chzy18 chose to make it its own phase with the boss still fighting, not an intermission.
+**Status: accepted for now (Chzy18, 28 Oct 2026), after watching the Unity prototype (`-lastbellAbilitySet v4`, FoundryUprisingTest 11/11, 33c3584). Numbers are placeholders.** Built on Chzy18's add and bullet-hell idea (27 Oct). Chzy18 chose to make it its own phase with the boss still fighting, not an intermission.
 
 ## Phase
 - **HP band:** 65–30 % (Casting Heat).
