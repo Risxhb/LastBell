@@ -1,8 +1,9 @@
 # The Chimebound Oracle
 
-The first of three Metronome Court minibosses (with the Pendulum Sentinel and the Dial Warden). The Oracle is a bullet-hell caster. He is meant to feel about as hard as a current WoW heroic raid boss.
+The first of three Skyward Spire minibosses (with the Pendulum Sentinel and the Dial Warden). His practice fight takes place on the Skyward Spire. The Oracle is a bullet-hell caster. He is meant to feel about as hard as a current WoW heroic raid boss.
 
-- **Status:** practice only, on its own Boss Rush entry: **Metronome Court → Chimebound Oracle (practice)**. The run order is unchanged.
+- **Status:** practice only, on its own Boss Rush entry: **Skyward Spire → Chimebound Oracle (practice)**. The run order is unchanged. Start it directly with `LastBell.exe -lastbellPractice oracle`.
+- **Arena (moved 28 Oct 2026, Risxhb):** his default arena is now the Skyward Spire (13.9 m bound), not the Metronome Court (12.5 m). He can still be picked on the Metronome Court in Boss Rush; there the court's metronome swings with his clock as before. The Spire has no metronome, so there his beat shows only through his bells, the floor and the sound. Tested in `builds/chimebound-oracle-20261025/spire1`: 73/0 on the Spire and 75/0 on the Court (`-chimeboundOracleCourt`); the lane fairness checks pass at both sizes (evidence in `build-evidence/chimebound-oracle-20261025/spire1/`).
 - **Body:** Chzy18's Meshy model (`Meshy_AI_Celestial_Bell_Orrery`): a cobalt sphere with an eye-lens, inside a gold wheel carrying five bells. Scaled to 4 m (the sphere is about 2 m across) and floating 0.45 m up.
   - **Rig:** `prototype/arena-3d/models/blender/miniboss_prep.py` then `chimebound_oracle_rig.py`. Unity copy: `unity/Assets/LastBell/Characters/ChimeboundOracle/Resources/Characters/ChimeboundOracle.glb`.
   - **How it moves:** the wheel turns round the sphere like a clock face; each bell counter-turns so it keeps hanging, and swings on its own.
@@ -16,7 +17,7 @@ The first of three Metronome Court minibosses (with the Pendulum Sentinel and th
 
 - **No ability text reaches the player.** The phase line and intro lesson are empty. Ability names appear only in the F7 developer overlay, which is off by default, so removing it later changes nothing players see.
 - **Players learn from the tells:** the Oracle's pose, the floor warnings and a sound for each mechanic.
-- **Every strike lands on a metronome beat.** The court's metronome follows the Oracle's own clock.
+- **Every strike lands on a metronome beat.** The beat is the Oracle's own clock. On the Metronome Court, the court's metronome follows it.
 - **No jumping.** A soak chain replaces the jump check.
 - **No dash is ever required.** The lane fairness check proves every pattern can be survived walking at 80% speed.
 
@@ -29,7 +30,7 @@ The first of three Metronome Court minibosses (with the Pendulum Sentinel and th
 | Well groups | 2 groups of 3 wells, 6 orbs each | 2 groups of 4 wells, **9** orbs each |
 | Soak chain | 3 circles, 3 s each | 5 circles, 2 s each, with lanes striking |
 
-- **Grand Toll (50%):** once his HP reaches half, it holds there. At the next block boundary he walks to the centre, faces the metronome and rings it. Over three accented beats the weight slides down and the tempo commits to Haste for the rest of the fight.
+- **Grand Toll (50%):** once his HP reaches half, it holds there. At the next block boundary he walks to the centre, faces north (where the Metronome Court's metronome stands) and tolls. Over three accented beats the weight slides down and the tempo commits to Haste for the rest of the fight.
 - **The recital:** while his HP still holds, he plays one Called Changes cast at the new speed. After that he can be damaged again.
 - **Last Bell (soft enrage, the berserk):** at 4:00 of combat, every lane strikes together. Between volleys, a group of 5 wells drops (9 orbs each).
 
@@ -37,7 +38,7 @@ The first of three Metronome Court minibosses (with the Pendulum Sentinel and th
 
 | Ability | Tell (no text) | What happens | Damage |
 |---|---|---|---|
-| **Toll Lanes** | Staff raised toward the metronome. Rune lanes light up. Each lane's own pitch plays one beat before it strikes (low on the left, high on the right). | The floor is 8 north–south lanes, each 3.125 m wide. A strike rolls from the metronome end toward the camera over 0.15 s. Each lane hits a player at most once. | 45 |
+| **Toll Lanes** | Staff raised toward the north end. Rune lanes light up. Each lane's own pitch plays one beat before it strikes (low on the left, high on the right). | The floor is 8 north–south lanes across the whole arena: 3.475 m wide on the Skyward Spire, 3.125 m on the Metronome Court. A strike rolls from the north end toward the camera over 0.15 s. Each lane hits a player at most once. | 45 |
 | **Chime Wells** | Staff struck on the floor, a low hum, amber circles. Inside each circle, one chevron arrow per orb points outward the way that orb will fly. | Wells drop in groups: the whole group lands together, warns for 4 beats, then detonates together, firing orbs from each rim. Above 50%: two groups of 3, 6 orbs each, never while lanes are striking. Below 50%: two groups of 4, 9 orbs each. The two wells in Called Changes + Wells also fire a second ring 2 beats later, turned 20° (shown by dimmer arrows). In the Last Bell: groups of 5. | 25 eruption, 15 per orb |
 | **Carillon Chain** | Arms spread, waist bells shake, the whole route shown dim. | Only the lit circle counts: stand in it for 0.5 s. A brass thread on the floor points to the next circle, and each one chimes higher than the last. Standing in an unlit circle does nothing. A circle that runs out goes off and hits everyone. Below 50%, a single lane strikes every 3 beats, never on the lit circle or the next two. | 30 to everyone per miss |
 | **Resonant Mark** | Arm pointed at a player, a violet ring on them that ticks and tightens on each beat (twice per beat at the end). | After about 6 s, a small well drops where the player stands. Two beats later it fires 3 orbs. Marks up to 3 players. | 20, then 15 per orb |

@@ -5,17 +5,17 @@ using UnityEngine;
 
 namespace LastBell.Run
 {
-    // The Chimebound Oracle: a practice-only Metronome Court miniboss (docs/bosses/chimebound-oracle.md). Labelled
+    // The Chimebound Oracle: a practice-only Skyward Spire miniboss (docs/bosses/chimebound-oracle.md). Labelled
     // stand-in body until a final model exists. Every number is a first-pass, heroic-raid target for Medium, not approved
     // balance. Damage is against 100 HP; geometry in metres before the 0.3 m player margin.
     //
     // No ability text reaches the player: PhaseName and Lesson stay empty, and names live only in the F7 diagnostics.
     // Each mechanic is taught by its tell (pose, floor, sound), and every strike lands on a metronome beat.
     //
-    // Tempo: the court's metronome follows this boss's TempoClock. Above 50% it swings at Normal (140 BPM). At 50% the
-    // Oracle walks to the centre, rings the metronome, the weight slides and it commits to Haste (185 BPM) for good.
+    // Tempo: this boss's TempoClock sets the beat (on the Metronome Court, the court's metronome follows it). Above 50% it
+    // runs at Normal (140 BPM). At 50% the Oracle walks to the centre, tolls, and it commits to Haste (185 BPM) for good.
     //
-    //   Toll Lanes      8 north-south lanes; each strike cascades from the metronome end toward the camera in 0.15 s
+    //   Toll Lanes      8 north-south lanes; each strike cascades from the far (north) end toward the camera in 0.15 s
     //                   and hits a player once per lane. Above 50%: Rounds (0..7, one every 2 beats, 4-beat warning) or
     //                   Odds & Evens. Below 50%: Called Changes (new order each cast, all runes shown at once, the
     //                   fastest-filling rune fires first, one slot per beat, OracleLanes rules + walking route check).
@@ -672,7 +672,7 @@ namespace LastBell.Run
             GatePending = false; HoldHp = true;
             Current = "Grand Toll"; Log("Grand Toll");
             foreach (var w in WalkTo(Vector3.zero, WalkSpeed * 1.4f, 240)) yield return w;
-            transform.rotation = Quaternion.Euler(0, 180, 0);   // face the metronome (north, -z)
+            transform.rotation = Quaternion.Euler(0, 180, 0);   // face north (-z), where the Metronome Court's metronome stands
             Current = "Grand Toll"; Rig.Pose(OraclePose.RingMetronome, Beats(1));
             Audio.Toll(); Fx.Rim(transform.position, 3f, new Color(1.0f, 1.5f, 2.2f), 0.4f);
             Clock.BeginTransition();

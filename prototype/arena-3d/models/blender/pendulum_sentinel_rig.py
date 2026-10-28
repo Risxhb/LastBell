@@ -8,7 +8,7 @@
 # Clips: Idle 4 s loop, Walk 1.5 s loop (tripod gait), SwingWind 1.0 s, SwingLeft 1.0 s, SwingRight 1.0 s
 #        (Shortening Swing; the pass through the middle is at 0.5), WeightSpin 2.0 s loop, WeightThrow 1.0 s
 #        (release 0.35), PlumbDrop 1.2 s, PlumbLoop 2.0 s loop, ChargeLean 1.0 s, Charge 0.8 s loop,
-#        ChargeReturn 1.0 s, PhaseShift 2.0 s, Defeat 2.5 s (held)
+#        ChargeReturn 1.0 s, WallSlam 0.8 s (impact 0.1), StuckLoop 2 s loop, PhaseShift 2.0 s, Defeat 2.5 s (held)
 import bpy, sys, os, math
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from miniboss_rig_lib import *
@@ -170,6 +170,26 @@ def charge_return(t):
     for s in 'RLB': ch['aim']['arm.' + s] = add(REST['arm.' + s], (0, 0.6 * u, 0.15 * abs(u)))
     return ch
 
+# Return Stroke's end: he hits the arena edge (impact at 0.1), crumples forward against it and rebounds; then stays
+# stuck there, leaning, trembling, the pendulum still ringing (the fight's major punish window)
+def wall_slam(t):
+    T = 0.1
+    k = snap(t, T, 0.06, 0.5)
+    lean = key(t, [(0, 1.0), (T, 1.4), (0.35, 0.7), (0.8, 0.85)])
+    ch = legs_rest(base(t), 0.18 * key(t, [(0, 0.3), (0.4, 1.0)]), 0.18 + 0.2 * key(t, [(0, 0), (0.4, 1.0)]))
+    ch['rot']['hips'] = (LEAN * lean, 3 * k, 0); ch['rot']['body'] = (ring(t, T, 6, 4, 4), ring(t, T, 4, 3, 4), 0)
+    ch['rot']['pendulum'] = (-35 + ring(t, T, 50, 1.6, 2.5), ring(t, T, 25, 1.2, 2.5), 0)
+    for s in 'RLB': ch['aim']['arm.' + s] = add(REST['arm.' + s], (0, -0.5 * k, -0.2 * k))
+    return ch
+def stuck_loop(t):   # 2 s loop
+    p = 2 * math.pi * t / 2.0
+    ch = legs_rest(base(t, 2.0), 0.18, 0.38)
+    ch['rot']['hips'] = (LEAN * 0.85, 0, 0)
+    ch['rot']['body'] = (0.8 * math.sin(2 * math.pi * 6 * t), 0.6 * math.sin(2 * math.pi * 5 * t), 0)
+    ch['rot']['pendulum'] = (-25 + 8 * math.sin(p), 14 * math.sin(2 * p), 0)
+    for s in 'RLB': ch['aim']['arm.' + s] = add(REST['arm.' + s], (0, 0.1, -0.2))
+    return ch
+
 def phase_shift(t):
     s = key(t, [(0, 0), (0.6, 1.0), (1.5, 1.0), (2.0, 0)])
     ch = legs_rest(base(t), 0.1 * s, 0.1 * s)
@@ -193,9 +213,10 @@ rig.bake('SwingWind', 1.0, swing_wind); rig.bake('SwingLeft', 1.0, swing_left); 
 rig.bake('WeightSpin', 2.0, weight_spin); rig.bake('WeightThrow', 1.0, weight_throw)
 rig.bake('PlumbDrop', 1.2, plumb_drop); rig.bake('PlumbLoop', 2.0, plumb_loop)
 rig.bake('ChargeLean', 1.0, charge_lean); rig.bake('Charge', 0.8, charge); rig.bake('ChargeReturn', 1.0, charge_return)
+rig.bake('WallSlam', 0.8, wall_slam); rig.bake('StuckLoop', 2.0, stuck_loop)
 rig.bake('PhaseShift', 2.0, phase_shift); rig.bake('Defeat', 2.5, defeat)
 if '--preview' in args:
     rig.preview(work, [('Idle', 0), ('Walk', 0.3), ('SwingWind', 1.0), ('SwingLeft', 0.5), ('WeightSpin', 0.4),
-                       ('WeightThrow', 0.4), ('PlumbLoop', 0), ('ChargeLean', 1.0), ('PhaseShift', 1.0), ('Defeat', 2.5)],
+                       ('WeightThrow', 0.4), ('PlumbLoop', 0), ('ChargeLean', 1.0), ('WallSlam', 0.2), ('StuckLoop', 0.5), ('Defeat', 2.5)],
                 cam=(-4.6, -7.0, 3.9), target=(0, 0, 2.1))
 rig.export(work, 'pendulum_sentinel', out_glb)

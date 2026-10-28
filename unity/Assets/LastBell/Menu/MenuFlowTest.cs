@@ -46,10 +46,14 @@ namespace LastBell.Menu
             Check("startup routes to the only main menu",menu&&!FindAnyObjectByType<MainMenu>()&&SceneUtility.GetScenePathByBuildIndex(0)==MainMenu.ScenePath);
             Check("old hero select is not in the build",!Application.CanStreamedLevelBeLoaded(HeroSelection.ScenePath));
             Check("four primary actions",menu.StartButton && menu.RushButton && menu.SettingsButton && menu.ExitButton);
-            Check("keyboard focus starts at Start Run",EventSystem.current.currentSelectedGameObject==menu.StartButton.gameObject);
+            // Start Run is greyed out for players (October 27, 2026), so focus starts on Boss Rush.
+            Check("Start Run greyed out",menu.StartButton.interactable==ConfrontationMenu.StartRunEnabled);
+            Check("keyboard focus starts at the first live entry",EventSystem.current.currentSelectedGameObject==(ConfrontationMenu.StartRunEnabled?menu.StartButton:menu.RushButton).gameObject);
             if(stage>=8)
             {
-                yield return Press(Key.DownArrow);Check("keyboard down selects Boss Rush",EventSystem.current.currentSelectedGameObject==menu.RushButton.gameObject);
+                if(ConfrontationMenu.StartRunEnabled){yield return Press(Key.DownArrow);Check("keyboard down selects Boss Rush",EventSystem.current.currentSelectedGameObject==menu.RushButton.gameObject);}
+                else{yield return Press(Key.UpArrow);Check("keyboard up skips greyed-out Start Run",EventSystem.current.currentSelectedGameObject==menu.NextButton.gameObject);
+                    yield return Press(Key.DownArrow);Check("keyboard down returns to Boss Rush",EventSystem.current.currentSelectedGameObject==menu.RushButton.gameObject);}
                 yield return Press(Key.DownArrow);Check("keyboard down selects Settings",EventSystem.current.currentSelectedGameObject==menu.SettingsButton.gameObject);
                 yield return Press(Key.Enter);Check("keyboard submit opens Settings",menu.SettingsOpen);
                 yield return Press(Key.Escape);Check("keyboard Escape closes Settings",!menu.SettingsOpen);
@@ -88,7 +92,7 @@ namespace LastBell.Menu
                 setup.SelectMap(1);liveUntil=Time.realtimeSinceStartup+12;while(!setup.LiveBackdrop&&Time.realtimeSinceStartup<liveUntil)yield return null;
                 setup.Continue();yield return new WaitForSeconds(.5f);yield return Shot("test-rush-boss-stage"+stage+".png");
                 setup.Back();setup.Back();yield return new WaitForSeconds(1.5f);
-                Check("setup Back restores the menu stage",!menu.Rush&&!menu.StageHidden&&menu.View.enabled&&menu.StartButton.IsInteractable());
+                Check("setup Back restores the menu stage",!menu.Rush&&!menu.StageHidden&&menu.View.enabled&&menu.RushButton.IsInteractable());
                 Check("setup Back unloads the backdrop",SceneManager.sceneCount==1);
                 Integrity("main menu after Boss Rush");
             }
@@ -274,7 +278,9 @@ namespace LastBell.Menu
             }
             File.WriteAllBytes(Path.Combine(output,file),t.EncodeToPNG());Destroy(t);
         }
-        static string ExpectedMusic(int encounter) => new[]{"The Unfinished Hour","Crown of the Meridian","Where the Last Flower Falls","Pressure Beneath the Brass","By My Measure (Haste)"}[encounter];
+        // Practice-only minibosses past the table have no boss track yet; MusicCheck reports them as a GAP instead of crashing.
+        static readonly string[] BossTracks={"The Unfinished Hour","Crown of the Meridian","Where the Last Flower Falls","Pressure Beneath the Brass","By My Measure (Haste)"};
+        static string ExpectedMusic(int encounter) => encounter<BossTracks.Length?BossTracks[encounter]:"(no track) "+RunDirector.Bosses[encounter].Name;
         void MusicCheck(string label,string clip)
         {
             var owners=FindObjectsByType<MenuMusic>();var music=owners.Length==1?owners[0]:null;

@@ -18,7 +18,7 @@ namespace LastBell.Menu
         public Button[] EncounterButtons {get;private set;}
         // Boss step rows (Risxhb, October 25, 2026): Bosses, then Minibosses, each a row of cards like the arena step.
         // Buttons stay indexed by RunDirector.Bosses; only their placement follows these rows. The final boss is last.
-        public static readonly string[] MinibossPrefixes={"Chimebound Oracle","Dial Warden"};
+        public static readonly string[] MinibossPrefixes={"Chimebound Oracle","Dial Warden","Pendulum Sentinel"};
         public static bool IsMiniboss(int encounter)=>System.Array.Exists(MinibossPrefixes,p=>RunDirector.Bosses[encounter].Name.StartsWith(p));
         static readonly string[] BossOrder={"Aurelion","Crucivar","Sylvara","Tempo Tyrant"};
         public static int[] BossRow{get{

@@ -113,3 +113,36 @@ The rig: 1.8 m robed wizard, Vanguard-like body bones, no finger bones, 16×3 ro
 - **Arrival:** motes rush inward to his position (0.1 s) and he is rebuilt from the feet up (a horizontal bright band rising 0 → 1.9 m over 0.12 s), a thin ring at his feet, one soft pulse on the astrolabe, a brief small light.
 - **Blocked (stunned mid-blink):** his body flickers twice and snaps back together where he stands; no arrival ring.
 - **Acceptance:** the player never loses their character: departure and arrival are unmistakable at gameplay distance, travel is a thin hint, the whole thing is under 0.5 s.
+
+## Glyphs and Arcane Surge (October 26, 2026, after the playtest)
+
+The kit changed (see [arcanist-redesign.md](arcanist-redesign.md)). Disintegrate now carves **glyphs** (0–3), Rune Sigil (3) and Arcane Comet (now on 4) each spend one for full power (cast without one they are faint and deal 35%), and **Arcane Surge** (5) spends every glyph for 2 s of empowerment per glyph. The Astral Orb pet is gone. Charged Magic Missiles fly straight at the cursor (no homing). These prompts follow the shared rules above. Glyph and Surge colours: glyph core **rune violet** (0.7, 0.38, 1.6) with a **gold edge** (1.8, 1.35, 0.7) on its outline; Surge uses the same violet with **gold accents**, so it reads as "the glyphs, released".
+
+### E7. Glyphs (the core resource)
+
+The player must be able to count their glyphs at a glance at gameplay distance, without the HUD, and see each one arrive and leave.
+
+- **Sockets (always on while he has 0–3 glyphs):** a thin, faint orbit ring around him at waist height (radius 0.75 m, 0.02 m line, intensity about 0.15) with **3 small socket ticks** evenly spaced on it, turning slowly (20°/s). It shows how many glyphs he *could* hold. Lines only; it must not read as a floor marker (it floats at 1.0 m).
+- **A held glyph:** a small upright rune (procedural 3–4 stroke glyph, 0.28 m tall) floating in its socket at 1.0–1.2 m height, facing the camera, bobbing ±3 cm out of phase with the others. Bright rune-violet strokes with a gold edge and a soft halo (about 0.5 m). Each glyph sits in a fixed socket, so 1, 2 and 3 glyphs are visibly different shapes around him. The ring speeds up slightly with each glyph held (20 → 35 → 50°/s).
+- **Gain (carved by Disintegrate):** at the moment a beam step completes on the boss, a bright spark leaves the beam's contact point and races **back along the beam** to him (0.18 s). It arrives at the next empty socket and the glyph **draws itself stroke by stroke** (0.15 s) with a small flash ring (0.4 m) and 6–8 motes. Three gains in one channel must read as three separate beats.
+- **Spend (Sigil or Comet with a glyph):** the glyph leaves its socket and flies on a short arc (0.25 s) to the centre of the rune being drawn at the target, leaving a thin violet ribbon. Where it lands, the rune starts brighter, with gold edges and a small ring. The socket goes dark.
+- **Unpowered rune (cast with no glyph):** the rune is drawn at about 40% brightness, thin, grey-violet, with the glyph band and hexagram missing (outer ring, inner ring and centre only), so "weak" reads instantly. Its explosion is proportionally smaller.
+- **Full (3 glyphs):** the three glyphs pulse together gently (0.8 Hz), so "ready to Surge" is visible.
+- **Acceptance:** at gameplay distance you can count 0/1/2/3 glyphs in under half a second; gain and spend are unmistakable and never cover boss telegraphs; nothing touches the floor.
+
+### E8. Arcane Surge
+
+The big "unleash" moment, then a clearly visible empowered state with a visible timer, then a readable end.
+
+- **Cast (0.3 s, the ArcaneSurge clip, standing in with the AstralOrb release):** every held glyph is pulled from its socket into the astrolabe (0.15 s, converging arcs); the astrolabe flares; motes are drawn in.
+- **Release:** a vertical column of violet light from his feet (radius 0.6 m, 3.5 m tall, 0.25 s) with gold edges, a **double shockwave ring** along the floor (thin lines, to 3.5 m), a short light pulse (≤ 0.2 s) and a small camera shake. Scale the release with glyphs spent (1 = modest, 3 = big).
+- **Active (2 s per glyph):**
+  - **Two rune rings** around him, counter-rotating: one at his feet (radius 1.1 m, floor queue, thin), one at chest height (radius 0.85 m), both with glyph marks drawn on them.
+  - The **chest ring is the timer**: its arc depletes as Surge runs out.
+  - A **crown** of small glyphs (one per glyph spent, ×2) orbiting above his head.
+  - A faint violet **rim light on his body** (a shell over the character at low intensity), and rising motes.
+  - **Empowered spells show gold:** missiles cast in Surge get gold edges and trails; Sigil and Comet runes cast in Surge draw in gold and faster.
+- **Last 1 s:** the rings flicker and slow.
+- **End:** the rings collapse inward into him (0.2 s) with one soft pulse and fade; the sockets are empty again.
+- **Cancel (dash before the release):** the glyphs snap back to their sockets; no release.
+- **Acceptance:** Surge is the most "powerful" read on the character, but the floor ring stays a thin line, nothing hides boss warnings, and the timer is readable at gameplay distance.

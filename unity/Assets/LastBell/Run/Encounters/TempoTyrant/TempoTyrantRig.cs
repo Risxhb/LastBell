@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace LastBell.Run
 {
-    public enum TyrantPose { Idle, Walk, Rush, Windup, SlashLeft, SlashRight, Overhead, ThrustWindup, Thrust, RingCast, GroundStrike, Recover, Frenzy, Defeat }
+    public enum TyrantPose { Idle, Walk, Rush, Windup, SlashLeft, SlashRight, Overhead, ThrustWindup, Thrust, RingCast, GroundStrike, Recover, Frenzy, Defeat, Backswing }
 
     // LABELLED STAND-IN for The Tempo Tyrant (docs/metronome-arena/tempo-tyrant.md): a code-built clockwork knight with
     // the same readable silhouette as the greatsword sheet (3.5 m, ivory plate, brass trim, dark joints, narrow closed
@@ -198,6 +198,8 @@ namespace LastBell.Run
                 case TyrantPose.Thrust: return (new Vector3(5, 0, 0), new Vector3(92, 0, 0), -0.2f, 24);
                 case TyrantPose.RingCast: return (new Vector3(-55, 0, 0), new Vector3(-5, 0, 0), 0.05f, -4);
                 case TyrantPose.GroundStrike: return k < 1 ? (new Vector3(-50, 0, 0), new Vector3(-10, 0, 0), 0, -4) : (new Vector3(25, 0, 0), new Vector3(165, 0, 0), -0.55f, 20);
+                // placeholder (no rig clip yet): the blade whips round behind him along the charge lane, leaning back
+                case TyrantPose.Backswing: return k < 1 ? (new Vector3(0, -50, 0), new Vector3(90, 0, 35), -0.2f, 6) : (new Vector3(0, 165, 0), new Vector3(90, 0, -15), -0.3f, -10);
                 case TyrantPose.Recover: return (new Vector3(15, 0, 0), new Vector3(150, 0, 0), -0.25f, 12);
                 case TyrantPose.Frenzy: return (new Vector3(-20, 30, 0), new Vector3(40, 0, -25), -0.3f, -8);
                 case TyrantPose.Defeat: return (new Vector3(30, 0, 0), new Vector3(175, 0, 0), -0.95f, 28);

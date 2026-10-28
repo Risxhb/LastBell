@@ -64,7 +64,7 @@
   - Sediment with Rising Silt: the pools sit in the rings, so you clear them when the tide lets you.
   - Triple Toll (five tolls).
   - Aqueduct Fall with rubble.
-- **Flood (soft enrage) at 5:00:** the tide never stops, and the dry ring shrinks each cycle.
+- **No enrage** (content rules §5). Its other parts still need checking against those rules (phase change, Hard mechanic, soaks) before it is built.
 - **Max HP:** 3500.
 
 ## Difficulty

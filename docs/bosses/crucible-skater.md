@@ -56,7 +56,7 @@
   - Double Figure of Eight.
   - Overflow, then a second Overflow 8 beats later. Only slabs made after the first one count.
   - Crucible Spin with a reverse.
-- **Boil-over (soft enrage) at 5:00:** an Overflow every 10 beats, with no free plates.
+- **No enrage** (content rules §5). Its other parts still need checking against those rules (phase change, Hard mechanic, soaks) before it is built.
 - **Max HP:** 3200.
 
 ## Difficulty

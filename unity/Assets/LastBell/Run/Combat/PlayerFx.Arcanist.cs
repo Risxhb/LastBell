@@ -12,22 +12,28 @@ namespace LastBell.Run
     public sealed partial class PlayerFx
     {
         // palette (HDR), kept moderate so violet survives tonemapping instead of clipping to white
-        public static readonly Color ArcLilac = new Color(0.85f, 0.5f, 1.6f), HotWhite = new Color(1.7f, 1.45f, 2.0f),
-            Ultraviolet = new Color(0.55f, 0.18f, 1.5f), UVCore = new Color(1.3f, 0.95f, 2.0f), Void = new Color(0.05f, 0.01f, 0.10f),
+        public static readonly Color ArcLilac = new Color(0.75f, 0.52f, 1.75f), HotWhite = new Color(1.7f, 1.45f, 2.0f),
+            Ultraviolet = new Color(0.55f, 0.18f, 1.5f), UVCore = new Color(1.3f, 0.95f, 2.0f), BeamCore = new Color(0.95f, 0.6f, 2.05f), BeamHot = new Color(1.4f, 1.05f, 2.25f), Void = new Color(0.05f, 0.01f, 0.10f),
             AshMagenta = new Color(1.6f, 0.35f, 1.2f), RuneViolet = new Color(0.7f, 0.38f, 1.6f), ArmedGold = new Color(1.8f, 1.35f, 0.7f),
             StarSilver = new Color(1.45f, 1.45f, 1.7f), StarEdge = new Color(0.8f, 0.45f, 1.6f), CometViolet = new Color(0.75f, 0.38f, 1.7f),
-            DeepViolet = new Color(0.22f, 0.08f, 0.45f), BurntViolet = new Color(0.16f, 0.1f, 0.24f), BurntGrey = new Color(0.35f, 0.25f, 0.5f);
+            DeepViolet = new Color(0.22f, 0.08f, 0.45f), BurntViolet = new Color(0.16f, 0.1f, 0.24f), BurntGrey = new Color(0.35f, 0.25f, 0.5f),
+            FaintInk = new Color(0.4f, 0.32f, 0.6f), FaintHot = new Color(0.72f, 0.64f, 0.95f), DeepGold = new Color(1.25f, 0.8f, 0.3f),
+            CometDeep = new Color(0.42f, 0.25f, 1.6f), CometPale = new Color(0.85f, 0.7f, 2.1f),   // comet impact violets (bluer, so they don't tone-map pink)
+            SurgeInk = new Color(1.5f, 1.05f, 0.5f), SigilArmed = new Color(2.0f, 1.5f, 0.6f),
+            BlinkLow = new Color(0.5f, 0.3f, 1.45f), BlinkHigh = new Color(1.0f, 0.8f, 1.95f), GlyphHot = new Color(1.0f, 0.62f, 2.0f), EdgeGold = new Color(1.1f, 0.7f, 0.18f), EdgeGoldHot = new Color(1.35f, 0.9f, 0.3f), SurgeDart = new Color(1.25f, 0.8f, 1.05f),
+            FireLow = new Color(0.7f, 0.25f, 1.6f), FireHigh = new Color(1.9f, 1.05f, 2.1f),
+            MeteorChar = new Color(0.085f, 0.075f, 0.08f), Molten = new Color(1.1f, 0.7f, 2.4f), WhiteHot = new Color(1.7f, 1.45f, 2.5f);   // the meteor's stone
         // kept for older callers (menu battle bolts)
         public static readonly Color TimeTeal = new Color(0.45f, 1.9f, 1.75f);
 
         static readonly int PT = Shader.PropertyToID("_T"), PNoiseAmt = Shader.PropertyToID("_NoiseAmt"), PFresnel = Shader.PropertyToID("_Fresnel"),
             PSoft = Shader.PropertyToID("_Soft"), PEdgeGlow = Shader.PropertyToID("_EdgeGlow"), PNoiseScale = Shader.PropertyToID("_NoiseScale"),
-            PFlow = Shader.PropertyToID("_Flow"), PClipY = Shader.PropertyToID("_ClipY");
-        const float MBand = 0, MDot = 1, MStroke = 2, MBeam = 3, MShell = 4, MFlake = 5, MShadow = 6, MDart = 7, MPillar = 8;
+            PFlow = Shader.PropertyToID("_Flow"), PClipY = Shader.PropertyToID("_ClipY"), PCull = Shader.PropertyToID("_Cull"), PHeatDir = Shader.PropertyToID("_HeatDir");
+        const float MBand = 0, MDot = 1, MStroke = 2, MBeam = 3, MShell = 4, MFlake = 5, MShadow = 6, MDart = 7, MPillar = 8, MRock = 9;
 
         bool arcReady;
-        Material arcAdd, arcAddFloor, arcAlpha, arcAlphaFloor, ashMat, arcTrailMat, silverTrailMat;
-        FxParticles arcMotes, arcSparks, ashFx, embers;
+        Material arcAdd, arcAddFloor, arcAlpha, arcAlphaFloor, arcAlphaSolid, arcAlphaFloorTop, arcOver, arcOverEdge, arcAlphaUnder, ashMat, arcTrailMat, silverTrailMat, goldTrailMat;
+        FxParticles arcMotes, arcSparks, ashFx, embers, flameFx;
         Mesh sphereMesh, dartMesh, shardMesh, beamMesh, billboard, taperMesh, helixMesh, colShell;
         readonly List<TrailRenderer> trailPool = new List<TrailRenderer>();
         Light[] arcLights; float[] lightLeft, lightLife, lightPeak;
@@ -35,16 +41,20 @@ namespace LastBell.Run
         sealed class Handle { public Burst b; public int id; public bool Alive(PlayerFx f) => b != null && b.id == id && f.live.Contains(b); }
         sealed class ArcState
         {
-            public Transform hand, astrolabe; public SkinnedMeshRenderer[] skins;
-            public Handle glyph; public float glyphFill, glyphPulse = -9; public readonly Handle[] darts = new Handle[3];
+            public Transform hand, astrolabe; public AstrolabeRig rig; public SkinnedMeshRenderer[] skins;
+            public Handle glyph; public float glyphFill, glyphPulse = -9; public readonly Handle[] darts = new Handle[5];
+            public readonly List<Handle> glyphArcs = new List<Handle>();   // the charge ring's arcs, one per dart
             public readonly List<Handle> lens = new List<Handle>(); public readonly List<Handle> beam = new List<Handle>();
             public Vector3 beamFrom, beamEnd; public int beamStep; public bool beamHit; public float beamStart, ashAcc, ashTail = -9, stepPulse = -9, shedAcc, shakeAt, debrisAt;
-            public readonly List<Handle> orbCharge = new List<Handle>(); public readonly List<Handle> orb = new List<Handle>();
-            public float orbStart = -1, orbEnding = -1; public Vector3 orbLift;
-            public Handle thread; public Vector3 blinkFrom;
+            // glyphs: the socket ring, one set of parts per glyph, when each finished arriving; the orbit angle; the Surge cast pull
+            public readonly List<Handle> sockets = new List<Handle>(); public readonly Handle[][] glyphOrbs = new Handle[ArcanistKit.MaxGlyphs][];
+            public readonly float[] glyphBorn = new float[ArcanistKit.MaxGlyphs]; public float orbit, surgePull = -1, surgeSnap = -9, snapFrom, surgeCastLife = 0.3f, fullAt = -9;
+            public float rimNext;
+            public readonly List<Handle> surgeCast = new List<Handle>(); public readonly List<Handle> surge = new List<Handle>(); public float surgeEnding = -1;
+            public Handle thread; public Vector3 blinkFrom; public List<Handle> departShell;
         }
         readonly Dictionary<PlayerController, ArcState> arc = new Dictionary<PlayerController, ArcState>();
-        sealed class MarkFx { public readonly List<Handle> parts = new List<Handle>(); public Vector3 pos, from; public float start, life; public Transform comet; public float emberAcc; public List<(Vector3 a, Vector3 b)> strokes; public List<Mesh> glyphMeshes; public List<float> rings; public List<(Vector3 at, Quaternion rot)> glyphPose; public float ringYaw, glyphSize, line; }
+        sealed class MarkFx { public readonly List<Handle> parts = new List<Handle>(); public Vector3 pos, from; public float start, life; public Transform comet; public float emberAcc, smokeAcc, fireAcc; public List<(Vector3 a, Vector3 b)> strokes; public List<Mesh> glyphMeshes; public List<float> rings; public List<(Vector3 at, Quaternion rot)> glyphPose; public float ringYaw, glyphSize, line, window; public bool weak; public int runeFrom, runeTo; public float snuffAt = -1; }
         readonly Dictionary<int, MarkFx> marks = new Dictionary<int, MarkFx>();
 
         // ------------------------------------------------------------------ setup
@@ -63,17 +73,31 @@ namespace LastBell.Run
             // alpha-blended dark layers (Disintegrate sheath, scorches) draw before the additive light, never over it
             arcAlpha = new Material(sh) { renderQueue = 3058 }; arcAlpha.SetFloat(PSrc, 1); arcAlpha.SetFloat(PDst, 10);
             arcAlphaFloor = new Material(sh) { renderQueue = FloorQueue }; arcAlphaFloor.SetFloat(PSrc, 1); arcAlphaFloor.SetFloat(PDst, 10);
+            // a solid body: front faces only, so its back faces never draw over its front (no seam)
+            arcAlphaSolid = new Material(arcAlpha) { renderQueue = 3058 }; arcAlphaSolid.SetFloat(PCull, 2);
+            // a floor darkening drawn after the floor runes (still under boss telegraphs at 3050+)
+            arcAlphaFloorTop = new Material(arcAlphaFloor) { renderQueue = FloorQueue + 4 };
+            // a premultiplied-alpha layer drawn after the additive light: a glyph's violet core covers its own gold edge
+            // stroke instead of adding to it (no white clipping)
+            arcOver = new Material(sh) { renderQueue = 3062 }; arcOver.SetFloat(PSrc, 1); arcOver.SetFloat(PDst, 10);
+            arcAlphaUnder = new Material(arcAlphaFloor) { renderQueue = FloorQueue - 1 };
+            // a glyph's gold outline: drawn solid (not added) just before its violet core, so it stays gold instead of blooming white
+            arcOverEdge = new Material(arcOver) { renderQueue = 3061 };
             arcMotes = FxParticles.Create(transform, "Arcanist motes", DotMat(sh, ArcLilac, HotWhite), 600, 0f, 2.5f, 0f);
             arcSparks = FxParticles.Create(transform, "Arcanist sparks", DotMat(sh, ArcLilac, HotWhite), 400, 5f, 1.6f, 0.06f);
             embers = FxParticles.Create(transform, "Arcanist embers", DotMat(sh, AshMagenta, new Color(1.9f, 0.8f, 1.6f)), 200, 2f, 1.2f, 0.05f);
+            // violet fire puffs: soft noisy sprites that rise a little and stretch along their motion (the meteor's flames)
+            var fireMat = DotMat(sh, FireLow, FireHigh); fireMat.SetFloat(PNoiseAmt, 0.7f); fireMat.SetVector(PNoiseScale, new Vector4(2.5f, 2.5f, 0, 0)); fireMat.SetFloat(PSoft, 0.45f);
+            flameFx = FxParticles.Create(transform, "Arcanist flames", fireMat, 500, -1.5f, 2.2f, 0.06f);
             ashMat = new Material(sh); ashMat.SetFloat(PSrc, 1); ashMat.SetFloat(PDst, 10); ashMat.SetFloat(PMode, MFlake);
-            ashMat.SetColor(PLow, new Color(0.05f, 0.02f, 0.06f)); ashMat.SetColor(PHigh, new Color(0.10f, 0.05f, 0.12f)); ashMat.SetColor(PEdge, AshMagenta);
-            ashMat.SetFloat(PNoiseAmt, 0.7f); ashMat.SetVector(PNoiseScale, new Vector4(3, 3, 0, 0)); ashMat.SetFloat(PSoft, 0.1f); ashMat.SetFloat(PEdgeGlow, 1.6f);
-            ashMat.SetFloat(PDissolve, 0.2f);   // the glowing erosion edge shows from the start
-            ashFx = FxParticles.Create(transform, "Arcanist ash", ashMat, 300, 1.5f, 0.4f, 0f);
+            ashMat.SetColor(PLow, new Color(0.06f, 0.03f, 0.08f)); ashMat.SetColor(PHigh, new Color(0.1f, 0.05f, 0.13f)); ashMat.SetColor(PEdge, new Color(1.4f, 0.3f, 1.0f));
+            ashMat.SetFloat(PNoiseAmt, 0.6f); ashMat.SetVector(PNoiseScale, new Vector4(1.2f, 1.2f, 0, 0)); ashMat.SetFloat(PSoft, 0.05f); ashMat.SetFloat(PEdgeGlow, 0.5f);
+            ashMat.SetFloat(PDissolve, 0.18f);   // a ragged dark flake with a thin glowing erosion edge
+            ashFx = FxParticles.Create(transform, "Arcanist ash", ashMat, 300, 4.5f, 0.5f, 0f);
             arcTrailMat = new Material(sh); arcTrailMat.SetFloat(PMode, MBeam); arcTrailMat.SetFloat(PWidth, 0.35f); arcTrailMat.SetColor(PLow, ArcLilac); arcTrailMat.SetColor(PHigh, HotWhite);
             arcTrailMat.SetVector(PFlow, new Vector4(2.5f, 0, 1.2f, 0.4f)); arcTrailMat.SetFloat(PIntensity, 0.85f);
             silverTrailMat = new Material(arcTrailMat); silverTrailMat.SetColor(PLow, StarEdge); silverTrailMat.SetColor(PHigh, StarSilver);
+            goldTrailMat = new Material(arcTrailMat); goldTrailMat.SetColor(PLow, Color.Lerp(ArcLilac, ArmedGold, 0.5f)); goldTrailMat.SetColor(PHigh, ArmedGold);
             sphereMesh = UvSphere(18, 28);   // built in code: CreatePrimitive drags in a SphereCollider, which Web builds strip
             dartMesh = CrossedDart(0.2f, 0.62f); shardMesh = CrossedDart(0.12f, 0.42f); beamMesh = AxisQuad(0, 1, 1); billboard = AxisQuad(-0.5f, 0.5f, 1);
             taperMesh = Taper(); helixMesh = Helix(16f, 24, 0.012f); colShell = TaperedTube(1.2f, 0.8f, 3f, 48);
@@ -240,7 +264,7 @@ namespace LastBell.Run
                     foreach (var t in vis.GetComponentsInChildren<Transform>(true))
                     {
                         if (t.name == "hand.R") s.hand = t;
-                        if (t.name == "Astrolabe") s.astrolabe = t;
+                        if (t.name == "Astrolabe") { s.astrolabe = t; s.rig = t.GetComponent<AstrolabeRig>(); }
                     }
                     s.skins = vis.GetComponentsInChildren<SkinnedMeshRenderer>(true);
                 }
@@ -251,7 +275,9 @@ namespace LastBell.Run
         static void Hide(PlayerController p, bool on) { if (p && p.Presenter) p.Presenter.SetHidden(on); }
         static bool IsHidden(PlayerController p) => p && p.Presenter && p.Presenter.Hidden;
         Vector3 HandPos(PlayerController p) { var s = St(p); return s.hand && !IsHidden(p) ? s.hand.position + p.transform.forward * 0.08f : p.transform.position + ArcanistKit.HandOffset(p.transform); }
-        Vector3 AstroPos(PlayerController p) { var s = St(p); return s.astrolabe ? s.astrolabe.position : p.transform.position + Vector3.up * 1.6f + p.transform.right * 0.5f - p.transform.forward * 0.1f; }
+        Vector3 AstroPos(PlayerController p) { var s = St(p); return s.rig && !IsHidden(p) ? s.rig.CorePos : s.astrolabe && !IsHidden(p) ? s.astrolabe.position : p.transform.position + Vector3.up * 1.6f + p.transform.right * 0.5f - p.transform.forward * 0.1f; }
+        // where the beam is drawn from: the astrolabe's globe (it hangs at the lens point), else 0.42 m past the palm
+        Vector3 BeamRoot(PlayerController p, ArcState s, Vector3 dir) => s.rig && !IsHidden(p) ? s.rig.CorePos : HandPos(p) + dir * 0.42f;
         static Vector3 AimOf(PlayerController p) { var d = Sim.Flat(p.Last.Aim - p.transform.position); return d.sqrMagnitude > 0.1f ? d.normalized : p.transform.forward; }
         ArcanistKit Arcanist(PlayerController p) => p ? p.Kit as ArcanistKit : null;
 
@@ -292,16 +318,17 @@ namespace LastBell.Run
             arc.Clear(); marks.Clear();
             foreach (var t in trailPool) if (t) { t.Clear(); t.gameObject.SetActive(false); }
             for (int i = 0; i < arcLights.Length; i++) { arcLights[i].enabled = false; lightLeft[i] = 0; }
-            arcMotes.Clear(); arcSparks.Clear(); ashFx.Clear(); embers.Clear();
+            arcMotes.Clear(); arcSparks.Clear(); ashFx.Clear(); embers.Clear(); flameFx.Clear();
         }
         public void ArcanistReset(PlayerController p)
         {
             if (!arcReady) return;
             if (arc.TryGetValue(p, out var s))
             {
-                KillH(s.glyph); foreach (var d in s.darts) KillH(d);
-                foreach (var h in s.lens) KillH(h); foreach (var h in s.beam) KillH(h); foreach (var h in s.orbCharge) KillH(h); foreach (var h in s.orb) KillH(h);
-                KillH(s.thread); arc.Remove(p);
+                KillH(s.glyph); foreach (var h in s.glyphArcs) KillH(h); foreach (var d in s.darts) KillH(d);
+                foreach (var h in s.lens) KillH(h); foreach (var h in s.beam) KillH(h); foreach (var h in s.sockets) KillH(h); foreach (var h in s.surgeCast) KillH(h); foreach (var h in s.surge) KillH(h);
+                for (int i = 0; i < s.glyphOrbs.Length; i++) KillGlyph(s, i);
+                KillH(s.thread); if (s.rig) { s.rig.LensRelease(); s.rig.SurgeOff(); } arc.Remove(p);
             }
             foreach (var m in marks.Values) { foreach (var h in m.parts) KillH(h); if (m.comet) Destroy(m.comet.gameObject); }
             marks.Clear();
@@ -311,7 +338,7 @@ namespace LastBell.Run
         {
             if (!arcReady) return;
             float dt = Time.deltaTime;
-            arcTrailMat.SetFloat(PT, Time.time); silverTrailMat.SetFloat(PT, Time.time);
+            arcTrailMat.SetFloat(PT, Time.time); silverTrailMat.SetFloat(PT, Time.time); goldTrailMat.SetFloat(PT, Time.time);
             for (int i = 0; i < arcLights.Length; i++)
             {
                 if (lightLeft[i] <= 0) { arcLights[i].enabled = false; continue; }
@@ -353,30 +380,44 @@ namespace LastBell.Run
             foreach (var kv in arc)
             {
                 var s = kv.Value; bool on = (s.beam.Count > 0 && s.beamHit) || Time.time < s.ashTail; if (!on) continue;
-                s.ashAcc += dt * (s.beamStep == 1 ? 12 : s.beamStep == 2 ? 20 : 40);
-                var at = s.beamEnd; var back = (s.beamFrom - s.beamEnd); back.y = 0; back = back.sqrMagnitude > 1e-4f ? back.normalized : Vector3.back;
+                s.ashAcc += dt * (s.beamStep == 1 ? 16 : s.beamStep == 2 ? 24 : 40);
+                var at = ContactFront(s); var back = (s.beamFrom - s.beamEnd); back.y = 0; back = back.sqrMagnitude > 1e-4f ? back.normalized : Vector3.back;
+                var side = Vector3.Cross(Vector3.up, back);
                 while (s.ashAcc >= 1)
                 {
                     s.ashAcc -= 1;
-                    var v = back * Random.Range(0.6f, 1.0f) + Random.insideUnitSphere * 0.45f + Vector3.up * 0.4f;
-                    ashFx.Emit(at + Random.insideUnitSphere * 0.2f, v, Random.Range(0.22f, 0.3f), Random.Range(0.8f, 1.2f));
-                    if (Random.value < 0.14f) embers.Emit(at, back * 2.5f + Random.insideUnitSphere * 1.5f + Vector3.up, 0.05f, 0.12f);
+                    var v = back * Random.Range(0.8f, 1.5f) + side * Random.Range(-1.0f, 1.0f) + Vector3.up * Random.Range(0.2f, 0.7f);
+                    ashFx.Emit(at + Random.insideUnitSphere * 0.25f, v, Random.Range(0.15f, 0.24f), Random.Range(0.8f, 1.2f));
+                    if (Random.value < 0.2f) arcSparks.Emit(at, back * 3.5f + Random.insideUnitSphere * 2.5f + Vector3.up, 0.05f, 0.14f);
                 }
             }
-            // comets in the sky: fall between the ticks with ease-in; embers peel off sideways
+            // comets in the sky: parked out of view, then a steep plunge over the last `window` seconds that speeds up all the
+            // way (t^2.6); embers peel off sideways while it falls
             foreach (var m in marks.Values)
             {
                 if (!m.comet) continue;
-                // a near-steady plunge (slightly accelerating): out of view early on, then a huge meteor crashing down
-                // across the screen through the last ~0.7 s
-                float u = Mathf.Clamp01((Time.time - m.start) / m.life); float left = Mathf.Pow(1 - u, 1.15f);
-                m.comet.position = Vector3.Lerp(m.pos + Vector3.up * 2.2f, m.from, left);
+                float left = m.life - (Time.time - m.start), k = Mathf.Clamp01(1 - left / Mathf.Max(0.01f, m.window));
+                var end = m.pos + Vector3.up * 0.9f;
+                m.comet.position = Vector3.LerpUnclamped(m.from, end, Mathf.Pow(k, 2.6f));
+                if (k <= 0) continue;
+                float ws = m.weak ? 0.65f : 1f;
                 m.emberAcc += dt * 50;
+                var fd = (end - m.from).normalized;
                 while (m.emberAcc >= 1)
                 {
-                    m.emberAcc -= 1; var side = Vector3.Cross((m.pos - m.from).normalized, Vector3.up) * (Random.value < 0.5f ? -1 : 1);
-                    embers.Emit(m.comet.position + Random.insideUnitSphere * 2f, side * Random.Range(3f, 7f) + Vector3.up * 1.5f, 0.3f, 0.7f);
+                    m.emberAcc -= 1; var side = Vector3.Cross(fd, Vector3.up).normalized * (Random.value < 0.5f ? -1 : 1);
+                    embers.Emit(m.comet.position - fd * 1.2f * ws + Random.onUnitSphere * 0.9f * ws, side * Random.Range(2f, 4f) - fd * 4f + Vector3.up, Random.Range(0.14f, 0.24f), Random.Range(0.3f, 0.5f));
                 }
+                // fire: soft violet puffs torn off the back half of the rock, streaming back along the fall and burning out fast
+                m.fireAcc += dt * 90;
+                while (m.fireAcc >= 1)
+                {
+                    m.fireAcc -= 1; var o = Random.onUnitSphere; if (Vector3.Dot(o, fd) > 0.2f) o -= fd * 1.2f;
+                    flameFx.Emit(m.comet.position + o.normalized * 1.05f * ws, -fd * Random.Range(5f, 10f) + o * 1.5f, Random.Range(0.8f, 1.5f) * ws, Random.Range(0.18f, 0.3f));
+                }
+                // dark smoke left hanging along the path, lit violet in the middle by the fire
+                m.smokeAcc += dt * 14;
+                while (m.smokeAcc >= 1) { m.smokeAcc -= 1; Smoke(m.comet.position - fd * 2.6f * ws + Random.insideUnitSphere * 0.7f, Random.insideUnitSphere * 0.8f - fd * 1.5f, Random.Range(1.2f, 1.6f) * ws, Random.Range(2.4f, 3.0f) * ws, Random.Range(0.5f, 0.65f), 0.85f); }
             }
         }
 
@@ -385,11 +426,14 @@ namespace LastBell.Run
         {
             EnsureArc(); var at = HandPos(p);
             // a 0.25 m glyph disc at the palm and a short muzzle streak along the shot
-            Arc(DashedRing(0.17f, 0.25f, 3, 26, 10), true, arcAdd, at, Facing(dir), 0.12f, (b, u) =>
+            Arc(RingU(0.085f, 0.095f, 32), true, arcAdd, at, FaceCam(at), 0.1f, (b, u) =>
             {
-                b.go.transform.localScale = Vector3.one * Mathf.Lerp(0.8f, 1.3f, Ease(u)); b.go.transform.Rotate(0, Time.deltaTime * 300, 0, Space.Self);
-                b.mpb.SetFloat(PDissolve, u * u); b.mpb.SetFloat(PWidth, 0.7f); b.mpb.SetFloat(PIntensity, 1.15f);
-            }, MBeam, ArcLilac, ArcLilac * 1.25f, AshMagenta);
+                b.go.transform.localScale = Vector3.one * Mathf.Lerp(0.8f, 1.4f, Ease(u)); b.mpb.SetFloat(PDissolve, u * u); b.mpb.SetFloat(PWidth, 0.6f); b.mpb.SetFloat(PIntensity, 1.3f);
+            }, MBeam, ArcLilac, HotWhite, ArcLilac);
+            Arc(TickRing(0.1f, 0.14f, 3, 0.02f), true, arcAdd, at, FaceCam(at) * Quaternion.Euler(0, Random.value * 120, 0), 0.1f, (b, u) =>
+            {
+                b.go.transform.localScale = Vector3.one * Mathf.Lerp(0.8f, 1.3f, Ease(u)); b.mpb.SetFloat(PProgress, 1.1f); b.mpb.SetFloat(PWidth, 0.07f); b.mpb.SetFloat(PDissolve, u * u); b.mpb.SetFloat(PIntensity, 1.3f);
+            }, MStroke, ArcLilac, HotWhite, ArcLilac);
             Arc(beamMesh, false, arcAdd, at, AlongFacingCam(at, dir), 0.1f, (b, u) =>
             {
                 b.go.transform.localScale = new Vector3(0.05f, 1, 0.3f * (1 - 0.5f * u)); b.mpb.SetFloat(PWidth, 0.4f); b.mpb.SetFloat(PDissolve, u); b.mpb.SetFloat(PIntensity, 1.1f);
@@ -397,107 +441,142 @@ namespace LastBell.Run
             for (int i = 0; i < 4; i++) arcMotes.Emit(at, dir * 1.5f + Random.insideUnitSphere * 0.8f, 0.08f, 0.18f);
         }
 
-        // the glyph ring at the casting hand: three arcs that brighten as each dart is summoned, with a pulse per dart
+        // the glyph ring at the casting hand (0.36 m): one arc per dart (3, or 5 in Surge), each lighting as its dart is
+        // summoned, the newest with a pulse; the unlit arcs stay faint so the ring visibly fills by thirds
         public void MissileChargeStart(PlayerController p)
         {
-            var s = St(p); KillH(s.glyph); s.glyphFill = 0; s.glyphPulse = -9;
-            var b = Arc(DashedRing(0.3f, 0.335f, 3, 16, 24), true, arcAdd, HandPos(p), Quaternion.identity, 9999, (bb, time) =>
+            var s = St(p); KillH(s.glyph); s.glyph = null; foreach (var h in s.glyphArcs) KillH(h); s.glyphArcs.Clear(); s.glyphFill = 0; s.glyphPulse = -9;
+            var kit = Arcanist(p); int cap = kit != null ? kit.MissileCap : 3; bool gold = kit != null && kit.Surging;
+            float span = 360f / cap, gap = cap > 3 ? 16 : 22;
+            for (int k = 0; k < cap; k++)
             {
-                if (!p) return;
-                bb.go.transform.SetPositionAndRotation(HandPos(p) + Vector3.up * 0.05f, Facing(AimOf(p)) * Quaternion.Euler(0, 180 - time * 30, 0));
-                float pulse = Mathf.Exp(-(Time.time - s.glyphPulse) * 18);
-                bb.go.transform.localScale = Vector3.one * (1 + 0.15f * pulse);
-                bb.mpb.SetFloat(PWidth, 0.6f);
-                bb.mpb.SetFloat(PIntensity, 0.35f + 0.65f * Mathf.Clamp01(s.glyphFill) + 0.5f * pulse);
-            }, MBeam, ArcLilac, HotWhite, AshMagenta);
-            s.glyph = H(b);
+                int kk = k;
+                var b = Arc(FxMeshes.Sector(0.19f, 0.225f, (span - gap) / 2, 14, false, "FX_MS_GlyphArc"), true, arcAdd, HandPos(p), Quaternion.identity, 9999, (bb, time) =>
+                {
+                    if (!p) return;
+                    int lit = Mathf.RoundToInt(s.glyphFill * cap); bool on = kk < lit, newest = kk == lit - 1;
+                    float pulse = newest ? Mathf.Exp(-(Time.time - s.glyphPulse) * 14) : 0;
+                    var hp = HandPos(p) + Vector3.up * 0.05f; bb.go.transform.SetPositionAndRotation(hp, FaceCam(hp) * Quaternion.Euler(0, 180 - time * 40 + kk * span, 0));
+                    bb.go.transform.localScale = Vector3.one * Ease(Mathf.Clamp01(time / 0.1f)) * (1 + 0.3f * pulse);
+                    bb.mpb.SetFloat(PWidth, 0.55f);
+                    bb.mpb.SetFloat(PIntensity, on ? 1.4f + 0.9f * pulse : 0.3f);
+                }, MBeam, gold ? DeepGold : ArcLilac, gold ? ArmedGold : HotWhite, AshMagenta);
+                s.glyphArcs.Add(H(b));
+            }
+            s.glyphArcs.Add(H(Arc(RingU(0.195f, 0.205f, 48), true, arcAdd, HandPos(p), Quaternion.identity, 9999, (bb, time) =>
+            {
+                if (!p) return; var hp = HandPos(p) + Vector3.up * 0.05f; bb.go.transform.SetPositionAndRotation(hp, FaceCam(hp));
+                bb.go.transform.localScale = Vector3.one * Ease(Mathf.Clamp01(time / 0.1f)); bb.mpb.SetFloat(PWidth, 0.6f); bb.mpb.SetFloat(PIntensity, 0.3f);
+            }, MBeam, ArcLilac, ArcLilac, AshMagenta)));
         }
 
         public void MissileSummon(PlayerController p, int n)
         {
-            var s = St(p); s.glyphFill = n / 3f; s.glyphPulse = Time.time;
-            int i = n - 1; if (i < 0 || i > 2) return;
+            var s = St(p); var kit = Arcanist(p); int cap = kit != null ? kit.MissileCap : 3; s.glyphFill = n / (float)cap; s.glyphPulse = Time.time;
+            int i = n - 1; if (i < 0 || i >= s.darts.Length) return;
             KillH(s.darts[i]);
-            var slot = p.transform.position + ArcanistKit.MissileSlot(p.transform, i);
+            var slot = HoverSlot(p, i, cap);
             for (int k = 0; k < 10; k++) { var off = Random.onUnitSphere * 0.6f; arcMotes.Emit(slot + off, -off / 0.12f, 0.07f, 0.12f); }
-            int idx = i;
-            var b = Arc(dartMesh, false, arcAdd, slot, Quaternion.identity, 9999, (bb, time) =>
+            int idx = i; bool gold = cap > 3;
+            var b = Arc(dartMesh, false, arcOver, slot, Quaternion.identity, 9999, (bb, time) =>
             {
                 if (!p) return;
-                var pos = p.transform.position + ArcanistKit.MissileSlot(p.transform, idx) + Vector3.up * 0.03f * Mathf.Sin(time * 5 + idx * 2.1f);
+                var pos = HoverSlot(p, idx, cap) + Vector3.up * 0.03f * Mathf.Sin(time * 5 + idx * 2.1f);
                 var dir = (p.Last.Aim + Vector3.up * 1.2f - pos);
-                bb.go.transform.SetPositionAndRotation(pos, Quaternion.LookRotation(dir.sqrMagnitude > 1e-4f ? dir : Vector3.forward) * Quaternion.Euler(0, 0, time * 90));
-                bb.go.transform.localScale = Vector3.one * Ease(Mathf.Clamp01(time / 0.12f));
-                bb.mpb.SetFloat(PIntensity, 0.85f); bb.mpb.SetFloat(PNoiseAmt, 0.08f);
-            }, MDart, ArcLilac, HotWhite, AshMagenta);
+                bb.go.transform.SetPositionAndRotation(pos, AlongFacingCam(pos, dir.sqrMagnitude > 1e-4f ? dir : Vector3.forward));
+                bb.go.transform.localScale = Vector3.one * 0.62f * Ease(Mathf.Clamp01(time / 0.12f));
+                bb.mpb.SetFloat(PIntensity, 1.0f); bb.mpb.SetFloat(PNoiseAmt, 0f);
+            }, MDart, gold ? SurgeDart : ArcLilac, gold ? ArmedGold : HotWhite, AshMagenta);
             s.darts[i] = H(b);
             ArcLight(slot, ArcLilac, 0.5f, 2.5f, 0.12f);
+        }
+
+        // where a summoned dart hovers: its kit slot (where it launches from) pushed 0.3 m back and spread 1.4x wider, so the
+        // fan sits behind his shoulder clear of the astrolabe; the launch jump of about 0.3 m is hidden by the flight speed
+        Vector3 HoverSlot(PlayerController p, int i, int cap)
+        {
+            var t = p.transform; float f = cap <= 1 ? 0 : i / (cap - 1f) - 0.5f;   // -0.5 .. 0.5 across the fan
+            float a = f * (cap > 3 ? 90f : 60f) * Mathf.Deg2Rad, r = cap > 3 ? 0.5f : 0.45f;
+            // a 60 degree arc (90 in Surge) behind his right shoulder, just behind and around the astrolabe
+            return t.position + Vector3.up * (1.6f + r * Mathf.Cos(a)) + t.right * (0.55f + r * Mathf.Sin(a)) - t.forward * 0.5f;
         }
 
         public void MissileChargeCancel(PlayerController p)
         {
             var s = St(p); var hand = HandPos(p);
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < s.darts.Length; i++)
             {
                 var d = s.darts[i]; if (d == null || !d.Alive(this)) continue;
                 var from = d.b.go.transform.position; var rot = d.b.go.transform.rotation; KillH(d); s.darts[i] = null;
                 // the collapse plays where the darts were, so it still reads beside a Blink
-                var inward = Vector3.ClampMagnitude(hand - from, 0.4f);
-                Arc(dartMesh, false, arcAdd, from, rot, 0.25f, (bb, u) =>
+                var inward = hand - from;
+                Arc(dartMesh, false, arcOver, from, rot, 0.25f, (bb, u) =>
                 {
-                    bb.go.transform.position = from + inward * Ease(u); bb.go.transform.localScale = Vector3.one * (1 - u); bb.mpb.SetFloat(PDissolve, u * 0.5f); bb.mpb.SetFloat(PIntensity, 1.1f);
-                }, MDart, ArcLilac, ArcLilac * 1.3f, AshMagenta);
-                for (int k = 0; k < 2; k++) arcMotes.Emit(from, inward / 0.25f + Random.insideUnitSphere * 0.3f, 0.07f, 0.25f);
+                    bb.go.transform.position = from + inward * Ease(Mathf.Clamp01(u / 0.7f)); bb.go.transform.localScale = Vector3.one * 0.62f * (1 - u * u);
+                    bb.mpb.SetFloat(PDissolve, u * 0.5f); bb.mpb.SetFloat(PIntensity, 1.0f);
+                }, MDart, ArcLilac, HotWhite, AshMagenta);
+                for (int k = 0; k < 2; k++) arcMotes.Emit(from, inward / 0.15f + Random.insideUnitSphere * 0.3f, 0.06f, 0.15f);
             }
-            if (s.glyph != null && s.glyph.Alive(this))
+            foreach (var h in s.glyphArcs)
             {
-                var at = s.glyph.b.go.transform.position; var rot = s.glyph.b.go.transform.rotation; KillH(s.glyph);
-                for (int k = 0; k < 3; k++)
+                if (!h.Alive(this)) continue;
+                var at = h.b.go.transform.position; var rot = h.b.go.transform.rotation; var mesh = h.b.mf.sharedMesh; h.b.owns = false; KillH(h);
+                var outward = rot * Vector3.forward * 0.15f; float tw = Random.Range(-40f, 40f);
+                Arc(mesh, true, arcOver, at, rot, 0.25f, (bb, u) =>
                 {
-                    var piece = FxMeshes.Sector(0.3f, 0.335f, 52f, 16, false, "FX_MS_GlyphPiece"); var r = rot * Quaternion.Euler(0, k * 120, 0);
-                    var outward = r * Vector3.forward * 0.15f;
-                    Arc(piece, true, arcAdd, at, r, 0.25f, (bb, u) =>
-                    {
-                        bb.go.transform.position = at + outward * u + Vector3.down * 0.3f * u * u; bb.go.transform.rotation = r * Quaternion.Euler(u * 25, 0, u * 15);
-                        bb.mpb.SetFloat(PDissolve, u); bb.mpb.SetFloat(PWidth, 0.6f); bb.mpb.SetFloat(PIntensity, 0.8f);
-                    }, MBeam, DeepViolet, ArcLilac, AshMagenta);
-                }
+                    bb.go.transform.position = at + outward * u + Vector3.down * 0.35f * u * u; bb.go.transform.rotation = rot * Quaternion.Euler(u * 30, 0, u * tw);
+                    bb.mpb.SetFloat(PDissolve, u); bb.mpb.SetFloat(PWidth, 0.55f); bb.mpb.SetFloat(PIntensity, 1.5f);
+                }, MBeam, ArcLilac, HotWhite, ArcLilac);
             }
+            s.glyphArcs.Clear();
             s.glyph = null;
         }
 
         public void MissileVolley(PlayerController p, int n)
         {
             var s = St(p); var at = HandPos(p);
-            if (s.glyph != null && s.glyph.Alive(this)) { var gb = s.glyph.b; float t0 = gb.t; gb.life = gb.t + 0.12f; gb.anim = (b, u) => { b.mpb.SetFloat(PDissolve, Mathf.Clamp01((b.t - t0) / 0.12f)); }; }
-            s.glyph = null;
-            Arc(RingU(0.3f, 0.34f, 64), true, arcAdd, at, Facing(AimOf(p)), 0.18f, (b, u) =>
+            // the ring flashes full, then erodes; one thin ring is thrown out from it
+            foreach (var h in s.glyphArcs)
             {
-                b.go.transform.localScale = Vector3.one * (1 + 1.6f * Ease(u)); b.mpb.SetFloat(PDissolve, u); b.mpb.SetFloat(PWidth, 0.6f); b.mpb.SetFloat(PIntensity, 1.1f);
+                if (!h.Alive(this)) continue; var gb = h.b; float t0 = gb.t;
+                gb.life = gb.t + 0.14f; gb.anim = (b, u) => { float k = Mathf.Clamp01((b.t - t0) / 0.14f); b.mpb.SetFloat(PIntensity, 1.8f * (1 - k)); b.mpb.SetFloat(PDissolve, k * k); };
+            }
+            s.glyphArcs.Clear(); s.glyph = null;
+            Arc(RingU(0.17f, 0.19f, 64), true, arcAdd, at, Facing(AimOf(p)), 0.18f, (b, u) =>
+            {
+                b.go.transform.localScale = Vector3.one * (1 + 2.6f * Ease(u)); b.mpb.SetFloat(PDissolve, u); b.mpb.SetFloat(PWidth, 0.6f); b.mpb.SetFloat(PIntensity, 1.1f);
             }, MBeam, ArcLilac, HotWhite, AshMagenta);
             ArcLight(at, ArcLilac, 1.2f, 4f, 0.15f);
         }
         // a hovering dart hands over to its projectile (the darts launch 0.05 s apart)
-        public void MissileLaunch(PlayerController p, int i) { var s = St(p); if (i >= 0 && i < 3) { KillH(s.darts[i]); s.darts[i] = null; } }
+        readonly Vector3[] launchFrom = new Vector3[5]; readonly float[] launchAt = { -9, -9, -9, -9, -9 };
+        public void MissileLaunch(PlayerController p, int i)
+        {
+            var s = St(p); if (i < 0 || i >= s.darts.Length) return;
+            if (s.darts[i] != null && s.darts[i].Alive(this)) { launchFrom[i] = s.darts[i].b.go.transform.position; launchAt[i] = Time.time; }
+            KillH(s.darts[i]); s.darts[i] = null;
+        }
 
         // a missile in flight: the dart drawn between ticks (extrapolated from the last tick), two short weaving ribbons
-        public void Missile(ProjectileSystem.Projectile pr, bool charged, int index = 1)
+        public void Missile(ProjectileSystem.Projectile pr, bool charged, int index = 1, bool surged = false)
         {
             EnsureArc();
             float tickAt = Time.time; Vector3 lastPos = pr.Pos;
             float phase = Random.value * 6.28f;
-            var b = Arc(dartMesh, false, arcAdd, pr.Pos, Quaternion.LookRotation(pr.Vel), 9999, (bb, time) =>
+            // a charged dart leaves from where it hovered: the gap to its launch line closes over 0.1 s
+            var kick = charged && index >= 0 && index < 5 && Time.time - launchAt[index] < 0.05f ? launchFrom[index] - pr.Pos : Vector3.zero;
+            var b = Arc(dartMesh, false, arcOver, pr.Pos, Quaternion.LookRotation(pr.Vel), 9999, (bb, time) =>
             {
                 float since = Mathf.Min(Time.time - tickAt, Sim.Dt * 1.5f);
-                var pos = lastPos + pr.Vel * since;
+                var pos = lastPos + pr.Vel * since + kick * (1 - Ease(Mathf.Clamp01(time / 0.1f)));
                 var side = Vector3.Cross(Vector3.up, pr.Vel.normalized); var weave = side * 0.05f * Mathf.Sin(time * 56.5f + phase);   // about 9 Hz
                 bb.go.transform.SetPositionAndRotation(pos + weave, Quaternion.LookRotation(pr.Vel) * Quaternion.Euler(0, 0, time * 360));
                 bb.go.transform.localScale = Vector3.one * 1.15f;
-                bb.mpb.SetFloat(PIntensity, 1.0f); bb.mpb.SetFloat(PNoiseAmt, 0.08f);
-            }, MDart, ArcLilac, HotWhite, AshMagenta);
+                bb.mpb.SetFloat(PIntensity, 1.1f); bb.mpb.SetFloat(PNoiseAmt, 0f);
+            }, MDart, surged ? SurgeDart : ArcLilac, surged ? ArmedGold : HotWhite, AshMagenta);   // empowered by Arcane Surge: a gold rim, gold tip, gold trails
             var h = H(b);
-            float tt = charged ? 0.03f : 0.024f;
-            var t1 = TakeTrail(tt * 1.3f, 0.14f, pr.Pos); var t2 = TakeTrail(tt * 1.05f, 0.09f, pr.Pos + Vector3.up * 0.04f);
+            float tt = (charged ? 0.03f : 0.024f) * (surged ? 1.8f : 1f);
+            var t1 = TakeTrail(tt * 1.3f, surged ? 0.18f : 0.14f, pr.Pos, surged ? goldTrailMat : null); var t2 = TakeTrail(tt * 1.05f, 0.09f, pr.Pos + Vector3.up * 0.04f, surged ? goldTrailMat : null);
             pr.OnMove = q =>
             {
                 tickAt = Time.time; lastPos = q.Pos;
@@ -512,70 +591,67 @@ namespace LastBell.Run
                 StartCoroutine(ReleaseTrail(t1, tt * 1.3f)); StartCoroutine(ReleaseTrail(t2, tt * 1.05f));
                 // charged hits land 0.2 m apart across the boss (and toward the caster), so three pops read as three
                 var side = Vector3.Cross(Vector3.up, q.Vel.normalized);
-                if (hit) MissileImpact(at + (charged ? side * (index - 1) * 0.2f : Vector3.zero) - q.Vel.normalized * 0.3f, q.Vel); else MissileFizzle(q.Pos, q.Vel);
+                // charged hits after the first are 75 % size and spread 0.3 m apart, so three to five pops read as separate
+                if (hit) MissileImpact(at + (charged ? side * (index - 1) * 0.3f + Vector3.up * 0.15f * (index % 2) : Vector3.zero) - q.Vel.normalized * 0.3f, q.Vel, charged && index > 0 ? 0.75f : 1f, surged);
+                else MissileFizzle(q.Pos, q.Vel);
             };
         }
 
-        void MissileImpact(Vector3 at, Vector3 vel)
+        // contact (0.18 s): a small bright core, six thin rays (0.3 m) from a small gap, one thin ring opening to 0.9 m, a
+        // tiny rune flashing at the centre, four rune shards thrown out; gold edges when surged
+        void MissileImpact(Vector3 at, Vector3 vel, float sc = 1, bool surged = false)
         {
-            var rot = FaceCam(at); var back = -vel.normalized;
-            // a small lilac core (0.2 m, 0.06 s), six crisp lilac rays held 0.18 s, one thin ring, four rune shards
+            var rot = FaceCam(at); var back = -vel.normalized; var hot = surged ? ArmedGold : ArcLilac * 1.3f;
             Arc(billboard, false, arcAdd, at, rot, 0.06f, (b, u) =>
             {
-                b.go.transform.localScale = Vector3.one * 0.6f; b.mpb.SetFloat(PDissolve, u); b.mpb.SetFloat(PIntensity, 1.0f);
-            }, MDot, ArcLilac, ArcLilac * 1.25f, AshMagenta);
+                b.go.transform.localScale = Vector3.one * 0.55f * sc; b.mpb.SetFloat(PDissolve, u); b.mpb.SetFloat(PIntensity, 1.0f);
+            }, MDot, ArcLilac, HotWhite, AshMagenta);
+            for (int k = 0; k < 2; k++)
+            {
+                var r = rot * Quaternion.Euler(0, 45 + 90 * k, 0);
+                Arc(beamMesh, false, arcAdd, at - r * Vector3.forward * 0.13f * sc, r, 0.07f, (b, u) =>
+                {
+                    b.go.transform.localScale = new Vector3(0.05f * sc, 1, 0.26f * sc); b.mpb.SetFloat(PWidth, 0.35f); b.mpb.SetFloat(PIntensity, 1.4f * (1 - u));
+                }, MBeam, HotWhite, HotWhite, HotWhite);
+            }
             for (int k = 0; k < 6; k++)
             {
                 var r = rot * Quaternion.Euler(0, k * 60 + Random.Range(-10f, 10f), 0);
-                Arc(beamMesh, false, arcAdd, at + r * Vector3.forward * 0.06f, r, 0.26f, (b, u) =>
+                Arc(beamMesh, false, arcAdd, at + r * Vector3.forward * 0.06f * sc, r, 0.16f, (b, u) =>
                 {
-                    float t = u * 0.26f; b.go.transform.localScale = new Vector3(0.05f, 1, 0.42f * Mathf.Lerp(0.4f, 1f, Ease(Mathf.Clamp01(t / 0.05f))));
-                    b.mpb.SetFloat(PWidth, 0.4f); b.mpb.SetFloat(PDissolve, Mathf.Clamp01((t - 0.18f) / 0.08f)); b.mpb.SetFloat(PIntensity, 1.15f);
-                }, MBeam, ArcLilac, ArcLilac * 1.35f, AshMagenta);
+                    float t = u * 0.16f; b.go.transform.localScale = new Vector3(0.075f * sc, 1, 0.3f * sc * Mathf.Lerp(0.4f, 1f, Ease(Mathf.Clamp01(t / 0.04f))));
+                    b.mpb.SetFloat(PWidth, 0.45f); b.mpb.SetFloat(PDissolve, Mathf.Clamp01((t - 0.08f) / 0.08f)); b.mpb.SetFloat(PIntensity, 1.1f);
+                }, MBeam, ArcLilac, hot, AshMagenta);
             }
-            // a small magic circle bursts open on the hit: a dashed outer ring and a thin inner ring turning against
-            // each other, six ticks between them, a rune glyph flashing at the centre, then it all erodes
-            float spinDir = Random.value < 0.5f ? 1 : -1;
-            Arc(DashedRing(0.52f, 0.58f, 6, 16, 12), true, arcAdd, at, rot, 0.3f, (b, u) =>
+            Arc(RingU(0.43f, 0.45f, 64), true, arcAdd, at, rot, 0.18f, (b, u) =>
             {
-                b.go.transform.rotation = rot * Quaternion.Euler(0, spinDir * 220 * u * 0.3f, 0);
-                b.go.transform.localScale = Vector3.one * Mathf.Lerp(0.35f, 1.05f, Ease(Mathf.Clamp01(u / 0.6f)));
-                b.mpb.SetFloat(PWidth, 0.6f); b.mpb.SetFloat(PDissolve, Mathf.Clamp01((u - 0.45f) / 0.55f)); b.mpb.SetFloat(PIntensity, 1.1f);
-            }, MBeam, ArcLilac, ArcLilac * 1.3f, AshMagenta);
-            Arc(RingU(0.33f, 0.35f, 48), true, arcAdd, at, rot, 0.26f, (b, u) =>
+                b.go.transform.localScale = Vector3.one * sc * Mathf.Lerp(0.35f, 1f, Ease(Mathf.Clamp01(u / 0.6f)));
+                b.mpb.SetFloat(PWidth, 0.7f); b.mpb.SetFloat(PDissolve, Mathf.Clamp01((u - 0.45f) / 0.55f)); b.mpb.SetFloat(PIntensity, 1.1f);
+            }, MBeam, surged ? DeepGold : ArcLilac, hot, AshMagenta);
+            var glyph = Glyph(0.2f * sc, 0.03f, out var glyphGlow); Destroy(glyphGlow);
+            Arc(glyph, true, arcAdd, at, rot, 0.14f, (b, u) =>
             {
-                b.go.transform.rotation = rot * Quaternion.Euler(0, -spinDir * 300 * u * 0.26f, 0);
-                b.go.transform.localScale = Vector3.one * Mathf.Lerp(0.5f, 1f, Ease(Mathf.Clamp01(u / 0.5f)));
-                b.mpb.SetFloat(PWidth, 0.6f); b.mpb.SetFloat(PDissolve, Mathf.Clamp01((u - 0.4f) / 0.6f)); b.mpb.SetFloat(PIntensity, 1.0f);
-            }, MBeam, ArcLilac, ArcLilac * 1.3f, AshMagenta);
-            Arc(TickRing(0.39f, 0.48f, 6, 0.035f), true, arcAdd, at, rot, 0.3f, (b, u) =>
+                b.go.transform.localScale = Vector3.one * Mathf.Lerp(0.7f, 1.1f, Ease(u));
+                b.mpb.SetFloat(PProgress, 1.1f); b.mpb.SetFloat(PWidth, 0.07f); b.mpb.SetFloat(PDissolve, Mathf.Clamp01((u - 0.35f) / 0.65f)); b.mpb.SetFloat(PIntensity, 1.2f);
+            }, MStroke, ArcLilac, hot, AshMagenta);
+            for (int k = 0; k < 6; k++)
             {
-                b.go.transform.rotation = rot * Quaternion.Euler(0, spinDir * 220 * u * 0.3f + 30, 0);
-                b.go.transform.localScale = Vector3.one * Mathf.Lerp(0.4f, 1.05f, Ease(Mathf.Clamp01(u / 0.6f)));
-                b.mpb.SetFloat(PProgress, 1.1f); b.mpb.SetFloat(PWidth, 0.07f); b.mpb.SetFloat(PDissolve, Mathf.Clamp01((u - 0.45f) / 0.55f)); b.mpb.SetFloat(PIntensity, 1.15f);
-            }, MStroke, ArcLilac, HotWhite, AshMagenta);
-            var glyph = Glyph(0.26f, 0.035f, out var glyphGlow); Destroy(glyphGlow);
-            Arc(glyph, true, arcAdd, at, rot, 0.2f, (b, u) =>
-            {
-                b.go.transform.localScale = Vector3.one * Mathf.Lerp(0.7f, 1.15f, Ease(u));
-                b.mpb.SetFloat(PProgress, 1.1f); b.mpb.SetFloat(PWidth, 0.07f); b.mpb.SetFloat(PDissolve, Mathf.Clamp01((u - 0.35f) / 0.65f)); b.mpb.SetFloat(PIntensity, 1.3f);
-            }, MStroke, ArcLilac, HotWhite, AshMagenta);
-            for (int k = 0; k < 8; k++)
-            {
-                float a = k * 45 * Mathf.Deg2Rad; var d = rot * new Vector3(Mathf.Sin(a), 0, Mathf.Cos(a));
-                arcMotes.Emit(at + d * 0.5f, d * Random.Range(1.2f, 2f), 0.06f, 0.25f);
+                float a = k * 60 * Mathf.Deg2Rad; var d = rot * new Vector3(Mathf.Sin(a), 0, Mathf.Cos(a));
+                arcMotes.Emit(at + d * 0.3f * sc, d * Random.Range(1.2f, 2f), 0.05f, 0.2f);
             }
+            // rune shards: tiny glyph strokes thrown 0.4-0.6 m out and falling
             for (int k = 0; k < 4; k++)
             {
-                var v = (back + Random.insideUnitSphere * 0.9f + Vector3.up * 0.5f).normalized * Random.Range(2.5f, 4f); var spin = Random.Range(-720f, 720f);
-                Arc(dartMesh, false, arcAdd, at, Quaternion.LookRotation(v), 0.3f, (b, u) =>
+                var v = (back + Random.insideUnitSphere * 0.9f + Vector3.up * 0.6f).normalized * Random.Range(2.2f, 3.2f); var spin = Random.Range(-720f, 720f);
+                var piece = LineQuad(new Vector3(0, 0, -0.06f), new Vector3(0, 0, 0.06f), 0.03f);
+                Arc(piece, true, arcAdd, at, rot, 0.24f, (b, u) =>
                 {
-                    float t = u * 0.3f; b.go.transform.position = at + v * t + Vector3.down * 4.9f * t * t;
-                    b.go.transform.rotation = Quaternion.LookRotation(v) * Quaternion.Euler(spin * t, 0, 0); b.go.transform.localScale = Vector3.one * 0.25f;
-                    b.mpb.SetFloat(PDissolve, Mathf.Clamp01((u - 0.4f) / 0.6f)); b.mpb.SetFloat(PIntensity, 1f);
-                }, MDart, ArcLilac, HotWhite, AshMagenta);
+                    float t = u * 0.24f; var q = at + v * t + Vector3.down * 4.9f * t * t;
+                    b.go.transform.SetPositionAndRotation(q, FaceCam(q) * Quaternion.Euler(0, spin * t, 0));
+                    b.mpb.SetFloat(PProgress, 1.1f); b.mpb.SetFloat(PWidth, 0.07f); b.mpb.SetFloat(PDissolve, Mathf.Clamp01((u - 0.5f) / 0.5f)); b.mpb.SetFloat(PIntensity, 1.4f);
+                }, MStroke, ArcLilac, hot, AshMagenta);
             }
-            ArcLight(at, ArcLilac, 1.3f, 3.5f, 0.1f);
+            ArcLight(at, ArcLilac, 1.2f * sc, 3f, 0.1f);
         }
         void MissileFizzle(Vector3 at, Vector3 vel)
         {
@@ -587,8 +663,113 @@ namespace LastBell.Run
 
         // ================================================================== E2 Disintegrate
         // widths per damage step: step 3 (max charge) is a much heavier beam
-        static float SheathW(int step) => step == 1 ? 0.22f : step == 2 ? 0.34f : 0.62f;
-        static float CoreW(int step) => step == 1 ? 0.05f : step == 2 ? 0.09f : 0.2f;
+        // the contact drawn on the boss's armour: the beam end is on his drawn model (SurfaceEnd), so the scorch and ash sit
+        // a hair off it toward the caster and 0.3 m toward the camera, which keeps them out of the armour without moving
+        // them on screen
+        Vector3 ContactFront(ArcState s)
+        {
+            var back = s.beamFrom - s.beamEnd; back.y = 0; back = back.sqrMagnitude > 1e-4f ? back.normalized : Vector3.back;
+            return s.beamEnd + back * 0.06f - (Cam ? Cam.transform.forward * 0.3f : Vector3.zero);
+        }
+
+        // The visible contact. The gameplay hit test uses the boss's round hit body, which can sit a metre in front of his
+        // armour, so the drawn beam stopped in mid-air. Presentation only: trace the beam's line onto his drawn model (a
+        // pose snapshot refreshed 10 times a second) and end the beam there. Damage, hits and damage numbers are unchanged.
+        sealed class BossSurface
+        {
+            public BossEncounter boss; public float bakedAt = -9;
+            public readonly List<Piece> pieces = new List<Piece>();
+            public sealed class Piece { public Renderer r; public bool skinned; public Mesh baked; public readonly List<Vector3> v = new List<Vector3>(); public int[] t; public Matrix4x4 toBoss; public Bounds box; }
+        }
+        BossSurface bossSurface;
+        BossSurface SurfaceOf(Vector3 near)
+        {
+            var bs = bossSurface;
+            if (bs == null || !bs.boss || !bs.boss.Solid)
+            {
+                BossEncounter best = null; float bd = float.MaxValue;
+                foreach (var b in UnityEngine.Object.FindObjectsByType<BossEncounter>(FindObjectsSortMode.None))
+                {
+                    if (!b.Solid) continue; float d = (b.transform.position - near).sqrMagnitude;
+                    if (d < bd) { bd = d; best = b; }
+                }
+                if (bs != null) foreach (var pc in bs.pieces) if (pc.baked) Destroy(pc.baked);
+                bossSurface = null; if (!best) return null;
+                bs = bossSurface = new BossSurface { boss = best };
+                foreach (var r in best.GetComponentsInChildren<Renderer>(true))
+                    if (r is SkinnedMeshRenderer || (r is MeshRenderer && r.GetComponent<MeshFilter>())) bs.pieces.Add(new BossSurface.Piece { r = r, skinned = r is SkinnedMeshRenderer });
+            }
+            if (Time.time - bs.bakedAt >= 0.1f) { bs.bakedAt = Time.time; BakeSurface(bs); }
+            return bs;
+        }
+        // only his solid, visible body counts: hidden parts, glows and other see-through layers are skipped
+        static void BakeSurface(BossSurface bs)
+        {
+            var w2b = bs.boss.transform.worldToLocalMatrix;
+            foreach (var pc in bs.pieces)
+            {
+                var r = pc.r; var m = r ? r.sharedMaterial : null;
+                if (!r || !r.enabled || !r.gameObject.activeInHierarchy || !m || m.renderQueue >= 2450) { pc.v.Clear(); continue; }
+                try
+                {
+                    if (pc.skinned)
+                    {
+                        var sk = (SkinnedMeshRenderer)r; if (!sk.sharedMesh) { pc.v.Clear(); continue; }
+                        if (!pc.baked) pc.baked = new Mesh { name = "FX_MS_BossSurface" };
+                        sk.BakeMesh(pc.baked, true); pc.baked.GetVertices(pc.v);
+                        if (pc.t == null) pc.t = pc.baked.triangles;
+                        pc.baked.RecalculateBounds(); pc.box = pc.baked.bounds;
+                        pc.toBoss = w2b * Matrix4x4.TRS(r.transform.position, r.transform.rotation, Vector3.one);
+                    }
+                    else
+                    {
+                        var mesh = r.GetComponent<MeshFilter>().sharedMesh; if (!mesh || !mesh.isReadable) { pc.v.Clear(); continue; }
+                        if (pc.t == null) { mesh.GetVertices(pc.v); pc.t = mesh.triangles; pc.box = mesh.bounds; }
+                        pc.toBoss = w2b * r.transform.localToWorldMatrix;
+                    }
+                    pc.box.Expand(0.05f);
+                }
+                catch (System.Exception) { pc.v.Clear(); pc.t = null; }
+            }
+        }
+        // the nearest point where o + d*t (d a unit vector, 0.05 < t < maxT) meets his drawn model, either side of a face
+        static bool TraceSurface(BossSurface bs, Vector3 o, Vector3 d, float maxT, out float hitT)
+        {
+            hitT = maxT; bool any = false; var b2w = bs.boss.transform.localToWorldMatrix;
+            foreach (var pc in bs.pieces)
+            {
+                if (pc.v.Count == 0 || pc.t == null) continue;
+                var inv = (b2w * pc.toBoss).inverse; var lo = inv.MultiplyPoint3x4(o); var ld = inv.MultiplyVector(d);
+                if (ld.sqrMagnitude < 1e-12f || !pc.box.IntersectRay(new Ray(lo, ld))) continue;
+                var v = pc.v; var t = pc.t; int n = v.Count;
+                for (int i = 0; i + 2 < t.Length; i += 3)
+                {
+                    int i0 = t[i], i1 = t[i + 1], i2 = t[i + 2]; if (i0 >= n || i1 >= n || i2 >= n) continue;
+                    var a = v[i0]; var e1 = v[i1] - a; var e2 = v[i2] - a;
+                    var pv = Vector3.Cross(ld, e2); float det = Vector3.Dot(e1, pv); if (det > -1e-10f && det < 1e-10f) continue;
+                    float id = 1 / det; var tv = lo - a; float u = Vector3.Dot(tv, pv) * id; if (u < 0 || u > 1) continue;
+                    var qv = Vector3.Cross(tv, e1); float w = Vector3.Dot(ld, qv) * id; if (w < 0 || u + w > 1) continue;
+                    float tt = Vector3.Dot(e2, qv) * id; if (tt > 0.05f && tt < hitT) { hitT = tt; any = true; }
+                }
+            }
+            return any;
+        }
+        // where the drawn beam ends: its own line onto his model; if that slips past him (between the legs, over a
+        // shoulder), toward his centre line at the contact height, then a little above and below; else the hit-body point
+        Vector3 SurfaceEnd(Vector3 from, Vector3 end)
+        {
+            var bs = SurfaceOf(end); if (bs == null) return end;
+            var bp = bs.boss.transform.position; float reach = bs.boss.BodyRadius * 2 + 0.6f;
+            for (int k = 0; k < 4; k++)
+            {
+                var aim = k == 0 ? end : new Vector3(bp.x, end.y + (k == 2 ? 0.4f : k == 3 ? -0.4f : 0), bp.z);
+                var d = aim - from; float len = d.magnitude; if (len < 0.1f) continue; d /= len;
+                if (TraceSurface(bs, from, d, len + reach, out float t)) return from + d * t;
+            }
+            return end;
+        }
+        static float SheathW(int step) => step == 1 ? 0.22f : step == 2 ? 0.32f : 0.46f;
+        static float CoreW(int step) => step == 1 ? 0.035f : step == 2 ? 0.05f : 0.075f;
         public void BeamWindup(PlayerController p, int ticks)
         {
             var s = St(p); foreach (var h in s.lens) KillH(h); s.lens.Clear();
@@ -596,24 +777,26 @@ namespace LastBell.Run
             for (int k = 0; k < 3; k++)
             {
                 int ring = k;
-                var mesh = ring == 0 ? DashedRing(0.375f, 0.40f, 4, 14) : ring == 1 ? DashedRing(0.255f, 0.28f, 4, 18) : DashedRing(0.06f, 0.12f, 3, 40, 6);
+                var mesh = ring == 0 ? DashedRing(0.315f, 0.34f, 4, 14) : ring == 1 ? DashedRing(0.235f, 0.255f, 4, 18) : DashedRing(0.06f, 0.12f, 3, 40, 6);
                 var b = Arc(mesh, true, arcAdd, HandPos(p), Quaternion.identity, 9999, (bb, time) =>
                 {
                     if (!p) return;
                     var kk = Arcanist(p); bool beam = kk != null && kk.BeamActive;
                     var aim = beam ? kk.BeamDir : AimOf(p); int step = beam ? kk.BeamStep : 0;
                     var at = HandPos(p) + aim * 0.42f;
+                    // the astrolabe is the lens: it hangs at the lens point facing the beam and the rings form around it
+                    if (s.rig) { if (ring == 0) s.rig.Lens(at, aim, step); at = s.rig.CorePos; }
                     float grow = Ease(Mathf.Clamp01(time / life));
                     float rate = (ring == 1 ? -540f : ring == 0 ? 360f : 200f) * (1 + 0.5f * step);
                     bb.go.transform.SetPositionAndRotation(at, Facing(aim) * Quaternion.Euler(0, rate * time, 0));
                     float pulse = Mathf.Exp(-(Time.time - s.stepPulse) * 14);
                     bb.go.transform.localScale = Vector3.one * grow * (1 + 0.18f * pulse);
-                    bb.mpb.SetFloat(PWidth, 0.6f); bb.mpb.SetFloat(PIntensity, 0.8f + 0.12f * step + 0.6f * pulse);
+                    bb.mpb.SetFloat(PWidth, 0.6f); bb.mpb.SetFloat(PIntensity, 1.3f * (0.8f + 0.12f * step + 0.6f * pulse));   // +30%: faint at gameplay distance
                 }, MBeam, Ultraviolet, UVCore, AshMagenta);
                 s.lens.Add(H(b));
             }
             var hand = HandPos(p);
-            for (int k = 0; k < 12; k++) { var off = Random.onUnitSphere * 0.7f; arcSparks.Emit(hand + off, -off / life * 0.9f, 0.04f, life * 0.9f); }
+            for (int k = 0; k < 12; k++) { var off = Random.onUnitSphere * 0.65f; arcMotes.Emit(hand + off, -off / (life * 0.9f), 0.12f, life * 0.9f); }
         }
 
         public void BeamStart(PlayerController p)
@@ -627,11 +810,11 @@ namespace LastBell.Run
             {
                 int layer = k;
                 var mat = layer == 0 ? arcAlpha : arcAdd;
-                Color low = layer == 0 ? Void : layer == 3 ? UVCore : Ultraviolet, high = layer == 0 ? Void : layer == 3 ? new Color(1.6f, 1.25f, 2.3f) : UVCore;
+                Color low = layer == 0 ? Void : layer == 3 ? BeamCore : Ultraviolet, high = layer == 0 ? Void : layer == 3 ? BeamHot : new Color(0.9f, 0.4f, 2.0f);
                 var b = Arc(beamMesh, false, mat, s.beamFrom, Quaternion.identity, 9999, (bb, time) =>
                 {
                     if (!p) return;
-                    var dir = (s.beamEnd - s.beamFrom).normalized; var from = HandPos(p) + dir * 0.42f; var d = s.beamEnd - from; float len = Mathf.Max(0.1f, d.magnitude);
+                    var dir = (s.beamEnd - s.beamFrom).normalized; var from = BeamRoot(p, s, dir); var d = s.beamEnd - from; float len = Mathf.Max(0.1f, d.magnitude);
                     int step = s.beamStep; float sheath = SheathW(step), core = CoreW(step);
                     float snap = Ease(Mathf.Clamp01(time / 0.035f));
                     float pulse = Mathf.Exp(-(Time.time - s.stepPulse) * 10);   // a surge down the beam at each step
@@ -639,38 +822,40 @@ namespace LastBell.Run
                     var rot = AlongFacingCam(from, d); var pos = from;
                     if (layer == 1 || layer == 2) pos += rot * Vector3.right * (layer == 1 ? -1 : 1) * sheath * 0.5f * jitter;
                     bb.go.transform.SetPositionAndRotation(pos, rot);
-                    float w = layer == 0 ? sheath : layer == 3 ? core * 2.2f : 0.07f + 0.04f * (step - 1);
+                    float w = layer == 0 ? sheath : layer == 3 ? core * 2.4f : 0.045f + 0.015f * step;
                     bb.go.transform.localScale = new Vector3(w * jitter * (1 + 0.6f * pulse), 1, len * snap);
-                    bb.mpb.SetFloat(PWidth, layer == 0 ? 0.75f : layer == 3 ? 0.45f : 0.6f);
-                    bb.mpb.SetFloat(PIntensity, layer == 0 ? 0.88f : layer == 3 ? (1.3f + 0.25f * step) + 0.8f * pulse : (0.5f + 0.2f * step) + 0.4f * pulse);
+                    bb.mpb.SetFloat(PWidth, layer == 0 ? 0.95f : layer == 3 ? 0.4f : 0.5f);
+                    // the void sheath is near-opaque so the beam reads dark ("unmaking"); the core is a thin violet-white thread
+                    bb.mpb.SetFloat(PIntensity, layer == 0 ? 1.0f : layer == 3 ? (1.3f + 0.15f * step) + 0.55f * pulse : (0.28f + 0.08f * step) + 0.3f * pulse);
                     float flow = 2.2f + 1.6f * step;
                     bb.mpb.SetVector(PFlow, new Vector4(-flow, 0.3f * step, -flow * 0.6f, -0.4f * step)); bb.mpb.SetVector(PNoiseScale, new Vector4(Mathf.Max(1.5f, len * (0.35f + 0.25f * step)), 3 + step, 0, 0));
                     bb.mpb.SetFloat(PNoiseAmt, layer == 3 ? 0.2f + 0.1f * step : 0.35f + 0.15f * step);
                 }, MBeam, low, high, AshMagenta);
                 s.beam.Add(H(b));
             }
-            // crackling arcs: jagged lightning along the beam that re-forms every 0.045 s, more and wilder at each step
-            for (int k = 0; k < 3; k++)
+            // two thin ultraviolet strands twisting around the beam (smooth helices, front half bright, back half dim); they
+            // wind tighter and turn faster at each step
+            for (int k = 0; k < 2; k++)
             {
-                int idx = k; var mesh = new Mesh { name = "FX_MS_BeamArc" }; mesh.MarkDynamic(); float next = 0;
+                int idx = k; var mesh = new Mesh { name = "FX_MS_BeamStrand" }; mesh.MarkDynamic();
                 var b = Arc(mesh, true, arcAdd, Vector3.zero, Quaternion.identity, 9999, (bb, time) =>
                 {
                     if (!p) return;
                     bb.go.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
-                    int step = s.beamStep; bool on = idx < step;
-                    if (time >= next) { next = time + 0.045f; var dir = (s.beamEnd - s.beamFrom).normalized; JaggedArc(mesh, HandPos(p) + dir * 0.42f, s.beamEnd, (0.06f + 0.08f * step) * (step == 3 ? 1.6f : 1), 0.025f + 0.012f * step); }
-                    bb.mpb.SetFloat(PProgress, 1.1f); bb.mpb.SetFloat(PWidth, 0.07f);
-                    bb.mpb.SetFloat(PIntensity, on ? 1.1f + Random.Range(0f, 0.7f) : 0); bb.mpb.SetFloat(PNoiseAmt, 0.2f);
-                }, MStroke, UVCore, new Color(1.7f, 1.4f, 2.4f), AshMagenta);
+                    int step = s.beamStep; var dir = (s.beamEnd - s.beamFrom).normalized;
+                    float snap = Ease(Mathf.Clamp01(time / 0.035f)); var from = BeamRoot(p, s, dir);
+                    HelixStrand(mesh, from, Vector3.Lerp(from, s.beamEnd, snap), SheathW(step) * 0.5f + 0.02f, 1.25f - 0.1f * step, idx * Mathf.PI * 0.85f - time * (9 + 4 * step), 0.016f + 0.003f * step);
+                    bb.mpb.SetFloat(PWidth, 0.5f); bb.mpb.SetFloat(PIntensity, 0.85f + 0.12f * step); bb.mpb.SetFloat(PNoiseAmt, 0.2f);
+                }, MBeam, Ultraviolet, new Color(1.0f, 0.55f, 2.1f), AshMagenta);
                 s.beam.Add(H(b));
             }
             // contact scorch (dark, alpha) that follows the contact point while the beam hits
             var sc = Arc(billboard, false, arcAlpha, s.beamEnd, Quaternion.identity, 9999, (bb, time) =>
             {
-                bb.go.transform.SetPositionAndRotation(s.beamEnd, FaceCam(s.beamEnd));
-                bb.go.transform.localScale = Vector3.one * (s.beamHit ? 0.55f + 0.25f * s.beamStep : 0.001f);
-                bb.mpb.SetFloat(PWidth, 0.95f); bb.mpb.SetFloat(PIntensity, 0.65f);
-            }, MShadow, new Color(0.03f, 0.0f, 0.06f), Void, Ultraviolet);
+                var q = ContactFront(s); bb.go.transform.SetPositionAndRotation(q, FaceCam(q) * Quaternion.Euler(0, time * 40, 0));
+                bb.go.transform.localScale = Vector3.one * (s.beamHit ? 0.32f + 0.08f * s.beamStep : 0.001f);
+                bb.mpb.SetFloat(PWidth, 0.45f); bb.mpb.SetFloat(PIntensity, 0.95f); bb.mpb.SetFloat(PNoiseAmt, 0.85f); bb.mpb.SetVector(PNoiseScale, new Vector4(5, 5, 0, 0)); bb.mpb.SetFloat(PDissolve, 0.25f); bb.mpb.SetFloat(PSoft, 0.3f);
+            }, MShadow, new Color(0.04f, 0.0f, 0.07f), Void, new Color(0.45f, 0.1f, 0.6f));
             s.beam.Add(H(sc));
             var hand = HandPos(p);
             Arc(RingU(0.55f, 0.6f, 48), true, arcAdd, hand + AimOf(p) * 0.42f, Facing(AimOf(p)), 0.15f, (b, u) =>
@@ -698,12 +883,40 @@ namespace LastBell.Run
             mesh.Clear(); mesh.vertices = v; mesh.uv = uv; mesh.triangles = t; mesh.RecalculateBounds();
         }
 
+        // a thin camera-facing ribbon wound around the line a -> b (radius, pitch in metres per turn), tapering in at both ends;
+        // vertex colour dims the half of each turn that passes behind the beam, so it reads as twisting
+        static void HelixStrand(Mesh mesh, Vector3 a, Vector3 b, float radius, float pitch, float phase, float width)
+        {
+            var d = b - a; float len = d.magnitude; if (len < 0.05f) { mesh.Clear(); return; }
+            var dn = d / len; var cam = Cam; var toCam = cam ? (cam.transform.position - (a + b) * 0.5f).normalized : Vector3.up;
+            var side = Vector3.Cross(dn, toCam); if (side.sqrMagnitude < 1e-6f) side = Vector3.Cross(dn, Vector3.up); side.Normalize();
+            var up = Vector3.Cross(side, dn).normalized;
+            int n = Mathf.Clamp(Mathf.CeilToInt(len / 0.07f), 8, 260);
+            var pts = new Vector3[n + 1]; var fr = new float[n + 1];
+            for (int i = 0; i <= n; i++)
+            {
+                float f = (float)i / n, ang = phase + f * len / pitch * Mathf.PI * 2;
+                float taper = Mathf.Clamp01(f * len / 0.35f) * Mathf.Clamp01((1 - f) * len / 0.2f);
+                pts[i] = a + d * f + (side * Mathf.Cos(ang) + up * Mathf.Sin(ang)) * radius * taper; fr[i] = Mathf.Sin(ang);
+            }
+            var v = new Vector3[(n + 1) * 2]; var uv = new Vector2[v.Length]; var col = new Color[v.Length]; var t = new int[n * 6];
+            for (int i = 0; i <= n; i++)
+            {
+                var tan = (pts[Mathf.Min(n, i + 1)] - pts[Mathf.Max(0, i - 1)]).normalized; var w = Vector3.Cross(tan, toCam).normalized * width * 0.5f;
+                v[i * 2] = pts[i] - w; v[i * 2 + 1] = pts[i] + w; float f = (float)i / n; uv[i * 2] = new Vector2(f, 0); uv[i * 2 + 1] = new Vector2(f, 1);
+                float lit = Mathf.Lerp(0.3f, 1f, 0.5f + 0.5f * fr[i]); col[i * 2] = col[i * 2 + 1] = new Color(lit, lit, lit, lit);
+                if (i < n) { int k = i * 6, q = i * 2; t[k] = q; t[k + 1] = q + 2; t[k + 2] = q + 1; t[k + 3] = q + 1; t[k + 4] = q + 2; t[k + 5] = q + 3; }
+            }
+            mesh.Clear(); mesh.vertices = v; mesh.uv = uv; mesh.colors = col; mesh.triangles = t; mesh.RecalculateBounds();
+        }
+
         public void Beam(PlayerController p, Vector3 from, Vector3 dir, Vector3 end, int step, bool hit)
         {
             var s = St(p);
+            if (hit) end = SurfaceEnd(from, end);   // drawn on his armour, not his hit body (presentation only)
             if (step > s.beamStep && s.beam.Count > 0)
             {
-                s.stepPulse = Time.time; var lensAt = HandPos(p) + dir * 0.42f;
+                s.stepPulse = Time.time; var lensAt = s.rig ? s.rig.CorePos : HandPos(p) + dir * 0.42f;
                 bool max = step == 3;
                 Arc(RingU(0.47f, 0.5f, 48), true, arcAdd, lensAt, Facing(dir), max ? 0.2f : 0.12f, (b, u) =>
                 {
@@ -715,10 +928,11 @@ namespace LastBell.Run
                 {
                     // a burst at the contact as the beam surges
                     for (int k = 0; k < (max ? 30 : 14); k++) embers.Emit(end, (Random.insideUnitSphere + (from - end).normalized * 0.8f) * (max ? 7f : 4f), 0.09f, 0.3f);
-                    Arc(billboard, false, arcAdd, end, FaceCam(end), 0.12f, (b, u) =>
+                    var cf = ContactFront(s);
+                    Arc(billboard, false, arcAdd, cf, FaceCam(cf), 0.1f, (b, u) =>
                     {
-                        b.go.transform.localScale = Vector3.one * Mathf.Lerp(0.8f, max ? 2.4f : 1.4f, u); b.mpb.SetFloat(PDissolve, u); b.mpb.SetFloat(PIntensity, 1.1f);
-                    }, MDot, Ultraviolet, UVCore, AshMagenta);
+                        b.go.transform.localScale = Vector3.one * Mathf.Lerp(0.6f, max ? 1.4f : 1.0f, u); b.mpb.SetFloat(PDissolve, u); b.mpb.SetFloat(PIntensity, 0.8f);
+                    }, MDot, Ultraviolet, new Color(0.9f, 0.4f, 2.0f), AshMagenta);
                 }
             }
             s.beamFrom = from; s.beamEnd = end; s.beamStep = step; s.beamHit = hit;
@@ -734,15 +948,15 @@ namespace LastBell.Run
                 // the sheath shrinks away and the core thins to a 0.015 m thread over 0.15 s, then cuts
                 float w0 = CoreW(s.beamStep) * 2.2f, sh0 = SheathW(s.beamStep);
                 var endRot = AlongFacingCam(from, d);
-                Arc(beamMesh, false, arcAlpha, from, endRot, 0.15f, (b, u) =>
+                Arc(beamMesh, false, arcAlpha, from, endRot, 0.18f, (b, u) =>
                 {
-                    b.go.transform.localScale = new Vector3(Mathf.Lerp(sh0, 0.001f, Ease(u)), 1, len); b.mpb.SetFloat(PWidth, 0.75f); b.mpb.SetFloat(PIntensity, 0.85f * (1 - u));
+                    b.go.transform.localScale = new Vector3(Mathf.Lerp(sh0, 0.001f, Ease(u)), 1, len); b.mpb.SetFloat(PWidth, 0.95f); b.mpb.SetFloat(PIntensity, 1.0f * (1 - u));
                 }, MBeam, Void, Void, AshMagenta);
-                Arc(beamMesh, false, arcAdd, from, endRot, 0.17f, (b, u) =>
+                Arc(beamMesh, false, arcAdd, from, endRot, 0.21f, (b, u) =>
                 {
                     b.go.transform.localScale = new Vector3(Mathf.Lerp(w0, 0.03f, Ease(Mathf.Clamp01(u / 0.88f))), 1, len); b.mpb.SetFloat(PWidth, 0.45f);
-                    b.mpb.SetFloat(PIntensity, u < 0.88f ? 1.3f : 0);
-                }, MBeam, UVCore, new Color(1.6f, 1.25f, 2.3f), AshMagenta);
+                    b.mpb.SetFloat(PIntensity, u < 0.88f ? 1.1f : 0);
+                }, MBeam, BeamCore, BeamHot, AshMagenta);
             }
             else
             {
@@ -763,8 +977,8 @@ namespace LastBell.Run
                             float l = t < 0.133f ? seg + len * 0.04f * full : seg * (1 - 0.25f * broke);
                             b.go.transform.localScale = new Vector3((sheathLayer ? sh0 : c0) * (1 - 0.3f * broke), 1, l);
                             b.mpb.SetFloat(PWidth, sheathLayer ? 0.75f : 0.45f); b.mpb.SetFloat(PDissolve, broke);
-                            b.mpb.SetFloat(PIntensity, (sheathLayer ? 0.85f : 1.35f) * stutter(t));
-                        }, MBeam, sheathLayer ? Void : UVCore, sheathLayer ? Void : new Color(1.6f, 1.25f, 2.3f), AshMagenta);
+                            b.mpb.SetFloat(PIntensity, (sheathLayer ? 1.0f : 1.1f) * stutter(t));
+                        }, MBeam, sheathLayer ? Void : BeamCore, sheathLayer ? Void : BeamHot, AshMagenta);
                     }
                 }
             }
@@ -778,20 +992,22 @@ namespace LastBell.Run
         void LensApart(PlayerController p, bool thrown)
         {
             var s = St(p);
+            if (s.rig) { s.rig.LensRelease(); if (thrown) { s.rig.Pulse(0.5f, 9f); s.rig.Apart(); } }
             for (int i = 0; i < s.lens.Count; i++)
             {
                 var h = s.lens[i]; if (!h.Alive(this)) continue;
                 var at = h.b.go.transform.position; var rot = h.b.go.transform.rotation; var mesh = h.b.mf.sharedMesh; var sc = h.b.go.transform.localScale;
                 h.b.owns = false; KillH(h);
                 var axis = rot * Vector3.up; float dirSign = i == 0 ? 1 : i == 1 ? -1 : 0.4f;
-                // thrown (broken / cancelled): spin outward 1 -> 1.8x at 720 deg/s and fade; a normal end: shrink back
-                // into the astrolabe at the shoulder over 0.2 s
-                Arc(mesh, true, arcAdd, at, rot, thrown ? 0.28f : 0.2f, (b, u) =>
+                var side = rot * (i == 1 ? Vector3.left : Vector3.right); int ii = i;   // in-plane drift, opposite for the two big rings
+                // thrown (broken / cancelled): fly apart over 0.25 s (about +0.4 m wider, 1440 deg/s, drifting in opposite
+                // directions) and fade; a normal end: shrink back into the astrolabe over 0.2 s
+                Arc(mesh, true, arcAdd, at, rot, thrown ? 0.25f : 0.2f, (b, u) =>
                 {
-                    float t = u * (thrown ? 0.28f : 0.2f);
-                    b.go.transform.position = thrown ? at + axis * dirSign * 2.5f * t : Vector3.Lerp(at, p ? AstroPos(p) : at, Ease(u));
-                    b.go.transform.localScale = thrown ? sc * (1 + 0.8f * u) : sc * (1 - u);
-                    b.go.transform.Rotate(0, Time.deltaTime * 720, 0, Space.Self);
+                    float t = u * (thrown ? 0.25f : 0.2f);
+                    b.go.transform.position = thrown ? at + (axis * dirSign * 1.6f + side * (ii == 2 ? 0f : 1.2f)) * t : Vector3.Lerp(at, p ? AstroPos(p) : at, Ease(u));
+                    b.go.transform.localScale = thrown ? sc * (1 + 1.2f * Ease(u)) : sc * (1 - u);
+                    b.go.transform.Rotate(0, Time.deltaTime * (thrown ? 1440 : 720) * (ii == 1 ? -1 : 1), 0, Space.Self);
                     b.mpb.SetFloat(PDissolve, thrown ? u : u * 0.5f); b.mpb.SetFloat(PWidth, 0.6f); b.mpb.SetFloat(PIntensity, thrown ? 1.1f : 0.8f);
                 }, MBeam, Ultraviolet, UVCore, AshMagenta);
             }
@@ -804,12 +1020,29 @@ namespace LastBell.Run
         // ring, a hexagram, six spokes, a centre circle and a centre star. Every stroke is a bright core line over a soft
         // wide glow, with energy flowing along it (scrolling noise). Before it completes it arms from the centre out in
         // gold. Line meshes are kept on the mark so the burnt rune can be left behind.
-        void DrawRune(MarkFx m, Vector3 c, float R, float life, int glyphCount, float line, Color ink, Color hot, Color armedCol)
+        void DrawRune(MarkFx m, Vector3 c, float R, float life, int glyphCount, float line, Color ink, Color hot, Color armedCol, bool powered = true, float powerAt = 0)
         {
+            // a powered rune is drawn faint until its glyph lands (powerAt seconds in), then lights to full over 0.1 s
+            float Pw(float time) => !powered ? 0 : powerAt <= 0 ? 1 : Mathf.Clamp01((time - powerAt) / 0.1f);
+            float Land(float time) => !powered || powerAt <= 0 || time < powerAt ? 0 : 1 - Mathf.Clamp01((time - powerAt) / 0.3f);   // gold edges for 0.3 s after the glyph lands
+            Color Ink(float time) => Color.Lerp(FaintInk, ink, Pw(time)); Color Hot(float time) => Color.Lerp(Color.Lerp(FaintHot, hot, Pw(time)), ArmedGold, Land(time));
+            float Dim(float time) => !powered ? 0.95f : Mathf.Lerp(0.55f, 1f, Pw(time));
+            // cast without a glyph: a faint grey-violet sketch at under half brightness, no glyph band, no hexagram, no gold
+            if (!powered) { ink = FaintInk; hot = FaintHot; armedCol = FaintHot; glyphCount = 0; m.weak = true; line *= 1.3f; }
             m.strokes = new List<(Vector3, Vector3)>(); m.rings = new List<float>(); m.glyphMeshes = new List<Mesh>(); m.glyphPose = new List<(Vector3, Quaternion)>(); m.line = line;
             // armBefore: seconds before the end when this part turns gold (centre first)
             void Part(Mesh core, Mesh glow, Quaternion rot, Vector3 scale, float t0, float t1, float armBefore, float glowScale = 1)
             {
+                if (glow != null)
+                {
+                    var ub = Arc(Instantiate(glow), true, arcAlphaUnder, c + Vector3.up * 0.001f, rot, 9999, (bb, time) =>
+                    {
+                        float u = time / life, prog = Mathf.Clamp01((u - t0) / Mathf.Max(0.001f, t1 - t0)); float armed = Mathf.Clamp01((time - (life - armBefore)) / 0.05f);
+                        bb.mpb.SetFloat(PProgress, prog * 1.03f); bb.mpb.SetFloat(PWidth, 0.3f); bb.mpb.SetFloat(PNoiseAmt, 0.1f);
+                        bb.mpb.SetFloat(PIntensity, (m.snuffAt > 0 ? 0 : 1) * (0.3f + 0.35f * armed));
+                    }, MStroke, Void, Void, Void);
+                    ub.go.transform.localScale = scale; m.parts.Add(H(ub));
+                }
                 for (int g = 0; g < 2; g++)
                 {
                     bool isGlow = g == 1; var mesh = isGlow ? glow : core; if (mesh == null) continue;
@@ -818,9 +1051,11 @@ namespace LastBell.Run
                         float u = time / life, prog = Mathf.Clamp01((u - t0) / Mathf.Max(0.001f, t1 - t0));
                         float armed = Mathf.Clamp01((time - (life - armBefore)) / 0.05f);
                         bb.mpb.SetFloat(PProgress, prog * 1.03f); bb.mpb.SetFloat(PWidth, isGlow ? 0.2f : 0.07f);
-                        bb.mpb.SetColor(PLow, Color.Lerp(ink, armedCol, armed)); bb.mpb.SetColor(PHigh, Color.Lerp(hot, armedCol, armed));
+                        float sn = m.snuffAt > 0 ? Mathf.Clamp01((Time.time - m.snuffAt) / 0.12f) : 0;
+                        bb.mpb.SetColor(PLow, Color.Lerp(Color.Lerp(Ink(time), armedCol, armed), BurntGrey, sn)); bb.mpb.SetColor(PHigh, Color.Lerp(Color.Lerp(Hot(time), armedCol, armed), BurntGrey, sn));
                         float breathe = 0.9f + 0.1f * Mathf.Sin(time * 9 + t0 * 20);
-                        bb.mpb.SetFloat(PIntensity, isGlow ? (0.28f + 0.04f * armed) * glowScale : (1.15f + 0.15f * armed) * breathe);   // armed: gold lines, not a filled glow
+                        bb.mpb.SetFloat(PDissolve, sn * 0.9f);
+                        bb.mpb.SetFloat(PIntensity, (1 - 0.7f * sn) * Dim(time) * (isGlow ? (0.2f - 0.1f * armed) * glowScale * (1 - sn) : (1.25f + 0.2f * armed) * breathe));   // armed: gold lines, not a filled glow
                         bb.mpb.SetFloat(PNoiseAmt, isGlow ? 0.35f : 0.5f);
                         bb.mpb.SetVector(PFlow, new Vector4(-2.4f, 0, -1.1f, 0.3f)); bb.mpb.SetVector(PNoiseScale, new Vector4(7, 2, 0, 0));
                     }, MStroke, ink, hot, AshMagenta);
@@ -831,19 +1066,24 @@ namespace LastBell.Run
             void Ring(float r, float w, float t0, float t1, float armBefore, bool clockwise, float yaw)
             {
                 m.rings.Add(r);
-                Part(RingU(r - w, r, 160), RingU(r - w * 3.5f, r + w * 2.5f, 160), Quaternion.Euler(0, yaw, 0), new Vector3(clockwise ? -1 : 1, 1, 1), t0, t1, armBefore);
+                Part(RingU(r - w, r, 160), RingU(r - w * 1.9f, r + w * 0.9f, 160), Quaternion.Euler(0, yaw, 0), new Vector3(clockwise ? -1 : 1, 1, 1), t0, t1, armBefore);
             }
             void Line(Vector3 a, Vector3 b, float w, float t0, float t1, float armBefore)
             {
-                m.strokes.Add((a, b)); Part(LineQuad(a, b, w), LineQuad(a, b, w * 4f), Quaternion.identity, Vector3.one, t0, t1, armBefore, 0.8f);
+                m.strokes.Add((a, b)); Part(LineQuad(a, b, w), LineQuad(a, b, w * 2.8f), Quaternion.identity, Vector3.one, t0, t1, armBefore, 0.8f);
             }
-            float arm = Mathf.Min(0.2f, life * 0.18f);   // the gold wave runs over the last 18 % (at most 0.2 s)
-            Ring(R, line * 1.4f, 0f, 0.97f, arm * 0.25f, true, m.ringYaw);
-            Ring(R * 0.9f, line * 0.8f, 0.04f, 0.7f, arm * 0.35f, false, m.ringYaw + 90);
-            Ring(R * 0.68f, line, 0.1f, 0.6f, arm * 0.55f, true, m.ringYaw + 45);
-            Ring(R * 0.3f, line, 0.4f, 0.75f, arm * 0.95f, false, m.ringYaw + 10);
+            float arm = Mathf.Clamp(life * 0.18f, 0.12f, 0.2f);   // the gold wave runs over the last 18 % (0.12-0.2 s, so it shows even in Surge)
+            if (!powered)
+                m.parts.Add(H(Arc(RingU(R - line, R, 160), true, arcAddFloor, c + Vector3.up * 0.003f, Quaternion.identity, 9999, (b, time) =>
+                {
+                    b.mpb.SetFloat(PProgress, 1.1f); b.mpb.SetFloat(PWidth, 0.07f); b.mpb.SetFloat(PIntensity, m.snuffAt > 0 ? 0 : 0.18f);
+                }, MStroke, FaintInk, FaintInk, FaintInk)));
+            Ring(R, line * 0.95f, 0f, 0.97f, arm * 0.25f, true, m.ringYaw);
+            Ring(R * 0.9f, line * 0.6f, 0.04f, 0.7f, arm * 0.35f, false, m.ringYaw + 90);
+            Ring(R * 0.68f, line * 0.75f, 0.1f, 0.6f, arm * 0.55f, true, m.ringYaw + 45);
+            Ring(R * 0.3f, line * 0.75f, 0.4f, 0.75f, arm * 0.95f, false, m.ringYaw + 10);
             // hexagram inscribed in the inner ring
-            for (int k = 0; k < 6; k++)
+            for (int k = 0; k < (powered ? 6 : 0); k++)
             {
                 int tri = k % 2; float a0 = (tri * 60 + (k / 2) * 120) * Mathf.Deg2Rad, a1 = a0 + 120 * Mathf.Deg2Rad; float r = R * 0.68f;
                 var A = new Vector3(Mathf.Sin(a0), 0, Mathf.Cos(a0)) * r; var B = new Vector3(Mathf.Sin(a1), 0, Mathf.Cos(a1)) * r;
@@ -880,8 +1120,10 @@ namespace LastBell.Run
                     {
                         float u = time / life, prog = Mathf.Clamp01((u - t0) / (t1 - t0)); float armed = Mathf.Clamp01((time - (life - armBefore)) / 0.05f);
                         bb.mpb.SetFloat(PProgress, prog * 1.03f); bb.mpb.SetFloat(PWidth, 0.07f);
-                        bb.mpb.SetColor(PLow, Color.Lerp(ink, armedCol, armed)); bb.mpb.SetColor(PHigh, Color.Lerp(hot, armedCol, armed));
-                        bb.mpb.SetFloat(PIntensity, isGlow ? 0.26f + 0.03f * armed : 1.2f + 0.15f * armed); bb.mpb.SetFloat(PNoiseAmt, 0.4f);
+                        float sn = m.snuffAt > 0 ? Mathf.Clamp01((Time.time - m.snuffAt) / 0.12f) : 0;
+                        bb.mpb.SetColor(PLow, Color.Lerp(Color.Lerp(Ink(time), armedCol, armed), BurntGrey, sn)); bb.mpb.SetColor(PHigh, Color.Lerp(Color.Lerp(Hot(time), armedCol, armed), BurntGrey, sn));
+                        bb.mpb.SetFloat(PDissolve, sn * 0.9f);
+                        bb.mpb.SetFloat(PIntensity, (1 - 0.7f * sn) * Dim(time) * (isGlow ? (0.26f - 0.12f * armed) * (1 - sn) : 1.2f + 0.15f * armed)); bb.mpb.SetFloat(PNoiseAmt, 0.4f);
                         bb.mpb.SetVector(PFlow, new Vector4(-2.4f, 0, -1.1f, 0.3f)); bb.mpb.SetVector(PNoiseScale, new Vector4(4, 2, 0, 0));
                     }, MStroke, ink, hot, AshMagenta);
                     m.parts.Add(H(b));
@@ -892,12 +1134,21 @@ namespace LastBell.Run
             {
                 float u = time / life; float a = -(Mathf.Min(u, 0.97f) / 0.97f) * Mathf.PI * 2 + (180 - m.ringYaw) * Mathf.Deg2Rad;
                 var h = c + new Vector3(Mathf.Sin(a), 0, Mathf.Cos(a)) * (R - line * 0.7f) + Vector3.up * 0.06f;
-                b.go.transform.SetPositionAndRotation(h, FaceCam(h)); b.go.transform.localScale = Vector3.one * Mathf.Max(0.5f, R * 0.18f);
-                b.mpb.SetFloat(PIntensity, u < 0.97f ? 1.2f : 0);
-                if (u < 0.97f && Random.value < 0.6f) arcMotes.Emit(h, Vector3.up * 1.4f + Random.insideUnitSphere * 0.25f, 0.1f, 0.45f);
+                b.go.transform.SetPositionAndRotation(h, FaceCam(h)); b.go.transform.localScale = Vector3.one * Mathf.Max(0.7f, R * 0.2f) * (0.9f + 0.15f * Mathf.Sin(time * 40));
+                b.mpb.SetFloat(PIntensity, u < 0.97f && m.snuffAt < 0 ? 1.5f * Dim(time) : 0);
+                if (u < 0.97f && Random.value < 0.8f) arcMotes.Emit(h, Vector3.up * 1.5f + Random.insideUnitSphere * 0.25f, 0.11f, 0.4f);
                 // once armed, motes rise from all over the circle
                 if (time > life - arm && Random.value < 0.9f) { var rc = Random.insideUnitCircle.normalized; var q = c + new Vector3(rc.x, 0, rc.y) * R * Random.Range(0.3f, 1f); arcMotes.Emit(q, Vector3.up * 2.2f, 0.11f, 0.4f); }
-            }, MDot, ink, hot, AshMagenta)));
+            }, MDot, Color.Lerp(ink, HotWhite, 0.5f), HotWhite, AshMagenta)));
+            // the head's tail: a short bright arc just behind the head along the ring
+            m.parts.Add(H(Arc(RingU(R - line * 1.3f, R + line * 0.2f, 24), true, arcAddFloor, c + Vector3.up * 0.006f, Quaternion.identity, 9999, (b, time) =>
+            {
+                float u = time / life, a = (Mathf.Min(u, 0.97f) / 0.97f) * 360f;
+                // RingU spans the full circle along U; show only the last 30 degrees behind the head
+                b.go.transform.rotation = Quaternion.Euler(0, m.ringYaw, 0); b.go.transform.localScale = new Vector3(-1, 1, 1);
+                b.mpb.SetFloat(PProgress, a / 360f * 1.0f); b.mpb.SetFloat(PTail, 0.025f); b.mpb.SetFloat(PWidth, 0.004f);
+                b.mpb.SetFloat(PIntensity, u < 0.97f && m.snuffAt < 0 ? 1.6f * Dim(time) : 0);
+            }, MBand, ink, HotWhite, AshMagenta)));
         }
         // `count` short radial ticks between radii r0 and r1, as one mesh
         static Mesh TickRing(float r0, float r1, int count, float w)
@@ -913,86 +1164,73 @@ namespace LastBell.Run
             return m;
         }
         // a rune glyph: 3-4 strokes between points of a 3x3 grid (size g), as one mesh, plus its soft glow
-        static Mesh Glyph(float g, float w, out Mesh glow)
+        static Mesh Glyph(float g, float w, out Mesh glow) { var m = GlyphSet(g, w, out glow, out var e); Destroy(e); return m; }
+        // a held-glyph rune, g tall, in local XZ with +Z as "up" (FaceCam turns local Z to screen up): a stem, a hook off its
+        // top, a cross-tick and sometimes a foot, so none reads as an arrow; core, soft glow and a wider (gold) edge stroke
+        static Mesh RuneGlyph(float g, float w, out Mesh glow, out Mesh edge, float edgeW = 2.1f)
+        {
+            float h = g * 0.5f, side = Random.value < 0.5f ? -1 : 1;
+            var segs = new List<(Vector3, Vector3)>();
+            float sx = Random.Range(-0.06f, 0.06f) * g;
+            segs.Add((new Vector3(sx, 0, -h), new Vector3(sx, 0, h)));                                         // stem
+            segs.Add((new Vector3(sx, 0, h), new Vector3(sx + side * g * 0.32f, 0, h - g * Random.Range(0.18f, 0.3f))));   // hook
+            float ty = Random.Range(-0.2f, 0.1f) * g, tilt = Random.Range(-0.12f, 0.12f) * g;
+            segs.Add((new Vector3(sx - g * 0.26f, 0, ty - tilt), new Vector3(sx + g * 0.26f, 0, ty + tilt)));      // cross-tick
+            if (Random.value < 0.6f) segs.Add((new Vector3(sx, 0, -h), new Vector3(sx - side * g * 0.22f, 0, -h + g * 0.16f)));   // foot
+            // each stroke's U runs over its own share of 0..1, so a Stroke progress of 0 -> 1 draws them one after another
+            Mesh Build(float width, string name)
+            {
+                var ci = new CombineInstance[segs.Count];
+                for (int k = 0; k < segs.Count; k++)
+                {
+                    var q = LineQuad(segs[k].Item1, segs[k].Item2, width); var uv = q.uv;
+                    for (int j = 0; j < uv.Length; j++) uv[j].x = (k + uv[j].x) / segs.Count;
+                    q.uv = uv; ci[k] = new CombineInstance { mesh = q, transform = Matrix4x4.identity };
+                }
+                var m = new Mesh { name = name }; m.CombineMeshes(ci, true, true); foreach (var c in ci) Destroy(c.mesh); return m;
+            }
+            glow = Build(w * 3.2f, "FX_MS_RuneGlow"); edge = Build(w * edgeW, "FX_MS_RuneEdge");
+            return Build(w, "FX_MS_Rune");
+        }
+        // the same rune as core, soft glow and a wider edge stroke (drawn gold behind the violet core)
+        static Mesh GlyphSet(float g, float w, out Mesh glow, out Mesh edge)
         {
             var pts = new List<Vector3>(); for (int x = -1; x <= 1; x++) for (int z = -1; z <= 1; z++) pts.Add(new Vector3(x, 0, z) * g * 0.5f);
-            int n = Random.Range(3, 5); var core = new CombineInstance[n]; var halo = new CombineInstance[n]; int last = Random.Range(0, 9);
+            int n = Random.Range(3, 5); var core = new CombineInstance[n]; var halo = new CombineInstance[n]; var rim = new CombineInstance[n]; int last = Random.Range(0, 9);
             for (int k = 0; k < n; k++)
             {
                 int next; do { next = Random.Range(0, 9); } while (next == last || (pts[next] - pts[last]).magnitude > g * 0.75f);
                 core[k] = new CombineInstance { mesh = LineQuad(pts[last], pts[next], w), transform = Matrix4x4.identity };
                 halo[k] = new CombineInstance { mesh = LineQuad(pts[last], pts[next], w * 4f), transform = Matrix4x4.identity };
+                rim[k] = new CombineInstance { mesh = LineQuad(pts[last], pts[next], w * 2.4f), transform = Matrix4x4.identity };
                 last = Random.value < 0.7f ? next : Random.Range(0, 9);
             }
             var m = new Mesh { name = "FX_MS_Glyph" }; m.CombineMeshes(core, true, true);
             glow = new Mesh { name = "FX_MS_GlyphGlow" }; glow.CombineMeshes(halo, true, true);
-            foreach (var ci in core) Destroy(ci.mesh); foreach (var ci in halo) Destroy(ci.mesh);
+            edge = new Mesh { name = "FX_MS_GlyphEdge" }; edge.CombineMeshes(rim, true, true);
+            foreach (var ci in core) Destroy(ci.mesh); foreach (var ci in halo) Destroy(ci.mesh); foreach (var ci in rim) Destroy(ci.mesh);
             return m;
         }
-        // the rune itself detonates: every line flashes white-gold, the rings blast outward at different speeds, light
-        // pillars sweep up from the glyphs around the circle, the glyphs are thrown up spinning, and the lines shatter
-        void RuneDetonate(MarkFx m, Vector3 c, float R)
-        {
-            float line = m.line > 0 ? m.line : 0.08f;
-            var flashCol = new Color(2.2f, 1.9f, 1.3f);
-            if (m.rings != null)
-                for (int i = 0; i < m.rings.Count; i++)
-                {
-                    float r = m.rings[i], grow = 1.25f + 0.25f * (m.rings.Count - i) / m.rings.Count, life = 0.32f + 0.05f * i;
-                    // the ring flashes in place, then blasts outward and erodes
-                    Arc(RingU(r - line * 1.6f, r, 160), true, arcAddFloor, c + Vector3.up * 0.01f, Quaternion.Euler(0, Random.value * 360, 0), life, (b, u) =>
-                    {
-                        float sc = Mathf.Lerp(1f, grow, Ease(Mathf.Clamp01((u - 0.15f) / 0.85f))); b.go.transform.localScale = new Vector3(sc, 1, sc);
-                        b.mpb.SetFloat(PProgress, 1.1f); b.mpb.SetFloat(PWidth, 0.07f); b.mpb.SetFloat(PDissolve, Mathf.Clamp01((u - 0.25f) / 0.75f));
-                        b.mpb.SetFloat(PIntensity, u < 0.15f ? 1.8f : 1.3f); b.mpb.SetFloat(PNoiseAmt, 0.6f);
-                    }, MStroke, ArmedGold, flashCol, AshMagenta);
-                }
-            // light pillars sweeping round the circle from each glyph
-            if (m.glyphPose != null)
-                for (int i = 0; i < m.glyphPose.Count; i++)
-                {
-                    var (at, rot) = m.glyphPose[i]; float delay = 0.012f * i, life = 0.34f + delay; var foot = new Vector3(at.x, c.y, at.z);
-                    Arc(cyl, false, arcAdd, foot, Quaternion.identity, life, (b, u) =>
-                    {
-                        float t = Mathf.Clamp01((u * life - delay) / 0.34f);
-                        b.go.transform.localScale = new Vector3(0.22f * (1 - 0.5f * t), (t <= 0 ? 0.01f : 3.2f * Ease(Mathf.Clamp01(t / 0.25f))), 0.22f * (1 - 0.5f * t));
-                        b.mpb.SetFloat(PDissolve, Mathf.Clamp01((t - 0.3f) / 0.7f)); b.mpb.SetFloat(PIntensity, t <= 0 ? 0 : 1.2f);
-                    }, MPillar, CometViolet, flashCol, AshMagenta);
-                    // the glyph itself thrown up and out, spinning
-                    var g = Glyph(m.glyphSize > 0 ? m.glyphSize : 0.5f, line * 0.8f, out var gg); Destroy(gg);
-                    var outDir = Sim.Flat(at - c).normalized; var v = outDir * Random.Range(2.5f, 4.5f) + Vector3.up * Random.Range(5f, 7.5f); var spin = Random.Range(-540f, 540f);
-                    Arc(g, true, arcAdd, at, rot, 0.75f, (b, u) =>
-                    {
-                        float t = u * 0.75f; b.go.transform.position = at + v * t + Vector3.down * 4.9f * t * t;
-                        b.go.transform.rotation = rot * Quaternion.Euler(spin * t, spin * 0.6f * t, 0);
-                        b.mpb.SetFloat(PProgress, 1.1f); b.mpb.SetFloat(PWidth, 0.07f); b.mpb.SetFloat(PDissolve, Mathf.Clamp01((t - 0.2f) / 0.55f)); b.mpb.SetFloat(PIntensity, 1.4f);
-                    }, MStroke, ArmedGold, flashCol, AshMagenta);
-                }
-            // every straight line shatters: its two halves fly apart and up
-            if (m.strokes != null)
-                foreach (var (a0, b0) in m.strokes)
-                {
-                    var mid = (a0 + b0) * 0.5f;
-                    for (int h = 0; h < 2; h++)
-                    {
-                        var A = h == 0 ? a0 : mid; var B = h == 0 ? mid : b0; var centre = c + (A + B) * 0.5f;
-                        var half = LineQuad(A - (A + B) * 0.5f, B - (A + B) * 0.5f, line);
-                        var v = (Sim.Flat(centre - c).normalized * Random.Range(1.5f, 3.5f) + Vector3.up * Random.Range(3f, 5.5f));
-                        var spin = Random.Range(-360f, 360f);
-                        Arc(half, true, arcAdd, centre, Quaternion.identity, 0.6f, (b, u) =>
-                        {
-                            float t = u * 0.6f; b.go.transform.position = centre + v * t + Vector3.down * 4.9f * t * t;
-                            b.go.transform.rotation = Quaternion.Euler(spin * t, spin * 0.4f * t, 0);
-                            b.mpb.SetFloat(PProgress, 1.1f); b.mpb.SetFloat(PWidth, 0.07f); b.mpb.SetFloat(PDissolve, Mathf.Clamp01((t - 0.12f) / 0.48f)); b.mpb.SetFloat(PIntensity, 1.35f);
-                        }, MStroke, ArmedGold, flashCol, AshMagenta);
-                    }
-                }
-        }
         // the burnt rune left on the floor after it fires: dim violet-grey lines that erode away
-        void BurntRune(MarkFx m, Vector3 c, float life, float line)
+        void BurntRune(MarkFx m, Vector3 c, float life, float line, float kb = 1, bool flash = true, float hold = 0)
         {
-            System.Action<Burst, float> burnt = (b, u) => { b.mpb.SetFloat(PProgress, 1.1f); b.mpb.SetFloat(PWidth, 0.07f); b.mpb.SetFloat(PDissolve, 0.05f + u * 0.9f); b.mpb.SetFloat(PIntensity, 0.42f); };
-            System.Action<Burst, float> ember = (b, u) => { b.mpb.SetFloat(PProgress, 1.1f); b.mpb.SetFloat(PWidth, 0.07f); b.mpb.SetFloat(PDissolve, u); b.mpb.SetFloat(PIntensity, 0.35f); };
+            System.Action<Burst, float> burnt = (b, u) => { float t = u * life; b.mpb.SetFloat(PEdgeGlow, 0f); b.mpb.SetFloat(PProgress, 1.1f); b.mpb.SetFloat(PWidth, 0.07f); b.mpb.SetFloat(PDissolve, 0.05f + 0.9f * Mathf.Clamp01((t - hold) / (life - hold))); b.mpb.SetFloat(PIntensity, 0.55f); };
+            var ash = Color.Lerp(BurntGrey, RuneViolet, 0.35f);
+            System.Action<Burst, float> ember = (b, u) =>
+            {
+                float t = u * life, lit = flash && t < 0.06f ? 1 : 0; b.mpb.SetFloat(PEdgeGlow, 0f);
+                if (!flash)
+                {
+                    float sn = Mathf.Clamp01(t / 0.12f);
+                    b.mpb.SetColor(PLow, Color.Lerp(CometViolet, ash, sn)); b.mpb.SetColor(PHigh, Color.Lerp(CometPale, RuneViolet, sn));
+                    b.mpb.SetFloat(PProgress, 1.1f); b.mpb.SetFloat(PWidth, 0.07f); b.mpb.SetFloat(PDissolve, Mathf.Clamp01((t - 0.12f) / (life - 0.12f)));
+                    b.mpb.SetFloat(PIntensity, Mathf.Lerp(1.0f, 0.3f, sn) * Mathf.Max(0.6f, kb)); return;
+                }
+                b.mpb.SetColor(PLow, lit > 0 ? RuneViolet : ash); b.mpb.SetColor(PHigh, lit > 0 ? ArmedGold : RuneViolet);
+                b.mpb.SetFloat(PProgress, 1.1f); b.mpb.SetFloat(PWidth, 0.07f); b.mpb.SetFloat(PDissolve, Mathf.Clamp01((t - Mathf.Max(0.06f, hold)) / (life - Mathf.Max(0.06f, hold))));
+                if (flash && lit <= 0) { b.mpb.SetColor(PLow, new Color(0.45f, 0.35f, 0.6f)); b.mpb.SetColor(PHigh, new Color(0.6f, 0.45f, 0.95f)); }
+                b.mpb.SetFloat(PIntensity, (lit > 0 ? 1.4f : flash ? Mathf.Lerp(1.0f, 0.6f, Mathf.Clamp01(t / 0.3f)) : 0.35f) * Mathf.Max(0.6f, kb));
+            };
             if (m.rings != null) foreach (var r in m.rings)
                 {
                     Arc(RingU(r - line * 1.2f, r, 128), true, arcAlphaFloor, c, Quaternion.identity, life, burnt, MStroke, BurntGrey, BurntGrey, RuneViolet);
@@ -1001,18 +1239,20 @@ namespace LastBell.Run
             if (m.strokes != null) foreach (var (a, bb) in m.strokes)
                 {
                     Arc(LineQuad(a, bb, line * 1.2f), true, arcAlphaFloor, c, Quaternion.identity, life, burnt, MStroke, BurntGrey, BurntGrey, RuneViolet);
-                    Arc(LineQuad(a, bb, line * 0.5f), true, arcAddFloor, c, Quaternion.identity, life, ember, MStroke, RuneViolet, RuneViolet, AshMagenta);
+                    Arc(LineQuad(a, bb, line * 0.75f), true, arcAddFloor, c, Quaternion.identity, life, ember, MStroke, RuneViolet, RuneViolet, AshMagenta);
                 }
         }
 
         // ================================================================== E3 Rune Sigil
-        public void SigilPlace(PlayerController p, int id, Vector3 pos, int armTicks)
+        public void SigilPlace(PlayerController p, int id, Vector3 pos, int armTicks, bool powered = true)
         {
             EnsureArc();
             float life = armTicks / (float)Sim.Hz, hold = life + 0.12f; float R = ArcanistKit.SigilRadius;
             var m = new MarkFx { pos = new Vector3(pos.x, 0.04f, pos.z), start = Time.time, life = life, ringYaw = Random.value * 360 };
             marks[id] = m;
-            DrawRune(m, m.pos, R, life, 10, 0.07f, RuneViolet, HotWhite, ArmedGold);
+            var kit = Arcanist(p); bool surging = kit != null && kit.Surging;
+            DrawRune(m, m.pos, R, life, 10, 0.07f, surging ? SurgeInk * 0.8f : RuneViolet, surging ? ArmedGold : HotWhite, SigilArmed, powered,
+                powered && kit != null && !surging ? GlyphFly + 0.02f : 0);
             foreach (var hp in m.parts) StartCoroutine(KillAfter(hp, hold));
             Arc(RingU(0.1f, 0.14f, 24), true, arcAdd, HandPos(p), Facing(Vector3.up), 0.2f, (b, u) =>
             {
@@ -1025,49 +1265,67 @@ namespace LastBell.Run
             if (!marks.TryGetValue(id, out var m)) return;
             marks.Remove(id); foreach (var h in m.parts) KillH(h);
             var c = new Vector3(pos.x, 0.04f, pos.z); float R = ArcanistKit.SigilRadius;
-            // the column: a see-through tapered shell, bright at its rim, eaten from the top down; a hot core, a flash
-            Arc(colShell, false, arcAdd, c, Quaternion.identity, 0.38f, (b, u) =>
+            float k = m.weak ? 0.55f : 1f, kb = m.weak ? 0.5f : 1f;   // cast without a glyph: about half the size and brightness
+            // the rune stays on the floor through the blast: its lines flash, then burn down to dim violet-grey
+            BurntRune(m, c, 1.0f, 0.07f, kb, true, 0.3f);
+            // the burst: a column of flowing violet light (3 m) that punches past full width (0.5 -> 1.08 -> 1.0 in 0.1 s): a
+            // soft pillar with vertical strands, bright at the floor and fading up, frayed by noise and eaten from the top
+            // down with a gold edge, over a faint rim shell; gone by 0.32 s
+            for (int layer = 0; layer < 1; layer++)
             {
-                float t = u * 0.38f; float rise = Ease(Mathf.Clamp01(t / 0.05f));
-                b.go.transform.localScale = new Vector3(1.15f, rise * 1.5f, 1.15f);
-                b.mpb.SetFloat(PFresnel, 1.4f); b.mpb.SetFloat(PClipY, c.y + 4.8f * (1 - Mathf.Clamp01((t - 0.08f) / 0.3f)));
-                b.mpb.SetFloat(PIntensity, 0.95f); b.mpb.SetVector(PFlow, new Vector4(0, -3.5f, 0.4f, -2.2f)); b.mpb.SetFloat(PNoiseAmt, 0.6f);
-                b.mpb.SetVector(PNoiseScale, new Vector4(10, 3, 0, 0));
-            }, MShell, RuneViolet, RuneViolet * 1.4f, AshMagenta);
-            Arc(cyl, false, arcAdd, c, Quaternion.identity, 0.14f, (b, u) =>
+                bool pillar = layer == 0;
+                Arc(colShell, false, arcAdd, c, Quaternion.identity, 0.32f, (b, u) =>
+                {
+                    float t = u * 0.32f;
+                    float w = t < 0.05f ? Mathf.Lerp(0.5f, 1.08f, Ease(t / 0.05f)) : Mathf.Lerp(1.08f, 0.82f, Ease(Mathf.Clamp01((t - 0.05f) / 0.27f)));
+                    b.go.transform.localScale = new Vector3(w * k, Mathf.Lerp(0.55f, 1f, Ease(Mathf.Clamp01(t / 0.06f))) * k, w * k);
+                    b.mpb.SetFloat(PFresnel, 1.4f); b.mpb.SetFloat(PEdgeGlow, 1.4f); b.mpb.SetFloat(PSoft, 0.25f);
+                    b.mpb.SetFloat(PClipY, c.y + 3.2f * k * (1 - 0.85f * Ease(Mathf.Clamp01((t - 0.08f) / 0.24f))));
+                    b.mpb.SetFloat(PDissolve, 0.22f + 0.7f * Mathf.Clamp01((t - 0.06f) / 0.26f));
+                    b.mpb.SetFloat(PIntensity, (pillar ? 0.62f : 0.22f) * kb); b.mpb.SetVector(PFlow, new Vector4(0, -5f, 0.6f, -3f)); b.mpb.SetFloat(PNoiseAmt, 1f);
+                    b.mpb.SetVector(PNoiseScale, new Vector4(pillar ? 30 : 16, 2, 0, 0));
+                }, pillar ? MPillar : MShell, RuneViolet, m.weak ? FaintHot : ArcLilac, m.weak ? FaintHot : ArmedGold);
+            }
+            // the punch on the detonation frame: a white-hot core (0.3 m x 1.5 m, 0.1 s), a flash, real light
+            Arc(cyl, false, arcAdd, c, Quaternion.identity, 0.1f, (b, u) =>
             {
-                b.go.transform.localScale = new Vector3(0.45f, 4f, 0.45f); b.mpb.SetFloat(PDissolve, u); b.mpb.SetFloat(PIntensity, 1.3f);
-            }, MPillar, RuneViolet, HotWhite, AshMagenta);
-            Arc(billboard, false, arcAdd, c + Vector3.up * 1f, FaceCam(c), 0.1f, (b, u) =>
+                b.go.transform.localScale = new Vector3(0.6f * k * (1 - 0.4f * u), 1.5f * k, 0.6f * k * (1 - 0.4f * u)); b.mpb.SetFloat(PDissolve, u); b.mpb.SetFloat(PIntensity, 1.5f * kb);
+            }, MPillar, ArcLilac, HotWhite, AshMagenta);
+            Arc(billboard, false, arcAdd, c + Vector3.up * 0.6f, FaceCam(c), 0.1f, (b, u) =>
             {
-                b.go.transform.localScale = Vector3.one * Mathf.Lerp(3f, 3.6f, u); b.mpb.SetFloat(PDissolve, u); b.mpb.SetFloat(PIntensity, 1.3f);
+                b.go.transform.localScale = Vector3.one * Mathf.Lerp(2.2f, 2.8f, u) * k; b.mpb.SetFloat(PDissolve, u); b.mpb.SetFloat(PIntensity, 1.4f * kb);
             }, MDot, RuneViolet, HotWhite, AshMagenta);
-            // two rings racing out to the rune's edge and past it
-            for (int k = 0; k < 2; k++)
+            ArcLight(c + Vector3.up, RuneViolet, 3f * kb, 7f * k, 0.15f);
+            // two thin rings out to the rune's edge and past it, from the same frame
+            for (int j = 0; j < 1; j++)
             {
-                float delay = k * 0.06f, far = R + 0.6f * k;
-                Arc(RingU(0.97f, 1f, 96), true, arcAddFloor, c, Quaternion.identity, 0.3f + delay, (b, u) =>
+                float delay = 0, far = R * (m.weak ? 0.6f : 1f), life = 0.24f;
+                Arc(RingU(0.975f, 1f, 128), true, arcAddFloor, c, Quaternion.identity, life, (b, u) =>
                 {
-                    float t = Mathf.Clamp01((u * (0.3f + delay) - delay) / 0.3f); float r = Mathf.Lerp(0.4f, far, Ease(t)); b.go.transform.localScale = new Vector3(r, 1, r);
-                    b.mpb.SetFloat(PProgress, 1.1f); b.mpb.SetFloat(PWidth, 0.6f); b.mpb.SetFloat(PIntensity, t <= 0 ? 0 : 1.8f * (1 - 0.7f * t));
-                }, MStroke, RuneViolet, RuneViolet * 1.4f, AshMagenta);
+                    float t = Mathf.Clamp01((u * life - delay) / 0.24f); float r = Mathf.Lerp(0.6f * R * k, far, Ease(t)); b.go.transform.localScale = new Vector3(r, 1, r);
+                    b.mpb.SetFloat(PProgress, 1.1f); b.mpb.SetFloat(PWidth, 0.6f); b.mpb.SetFloat(PIntensity, t <= 0 ? 0 : 2.0f * kb * (1 - 0.75f * t));
+                }, MStroke, RuneViolet, j == 0 ? ArmedGold : ArcLilac, AshMagenta);
             }
-            for (int k = 0; k < 12; k++)
+            // pieces of the rune's strokes thrown out and up: straight and curved pieces (0.25-0.4 m), spinning in the view
+            // plane, landing within about 1.5x the radius and burnt away before they land
+            int frags = m.weak ? 4 : 8;
+            for (int j = 0; j < frags; j++)
             {
-                float a = (k * 30 + Random.Range(-12f, 12f)) * Mathf.Deg2Rad; var dir = new Vector3(Mathf.Sin(a), 0, Mathf.Cos(a));
-                float el = Random.Range(45f, 65f) * Mathf.Deg2Rad, sp = Random.Range(5f, 7f);
-                var v = dir * Mathf.Cos(el) * sp + Vector3.up * Mathf.Sin(el) * sp; var spin = Random.Range(-540f, 540f); var start = c + dir * 1.0f + Vector3.up * 0.3f;
-                Arc(LineQuad(new Vector3(0, 0, -0.22f), new Vector3(0, 0, 0.22f), 0.11f), true, arcAdd, start, Quaternion.LookRotation(dir), 0.7f, (b, u) =>
+                float a = (j + Random.Range(-0.3f, 0.3f)) * Mathf.PI * 2 / frags; var outDir = new Vector3(Mathf.Sin(a), 0, Mathf.Cos(a));
+                var start = c + outDir * R * 0.5f * k + Vector3.up * 0.25f; var v = outDir * Random.Range(2.5f, 4f) * k + Vector3.up * Random.Range(4f, 5.5f) * k;
+                float spin = Random.Range(360f, 720f) * (Random.value < 0.5f ? -1 : 1), len = Random.Range(0.25f, 0.4f) * Mathf.Max(0.75f, k);
+                var piece = j % 2 == 0 ? LineQuad(new Vector3(0, 0, -len / 2), new Vector3(0, 0, len / 2), 0.05f) : FxMeshes.Sector(len * 1.1f - 0.05f, len * 1.1f, 28f, 8, false, "FX_MS_RunePiece");
+                Arc(piece, true, arcAdd, start, Quaternion.identity, 0.45f, (b, u) =>
                 {
-                    float t = u * 0.7f; b.go.transform.position = start + v * t + Vector3.down * 4.9f * t * t;
-                    b.go.transform.rotation = Quaternion.LookRotation(dir) * Quaternion.Euler(spin * t, 0, spin * 0.5f * t);
-                    b.mpb.SetFloat(PProgress, 1.1f); b.mpb.SetFloat(PWidth, 0.07f); b.mpb.SetFloat(PDissolve, Mathf.Clamp01((t - 0.15f) / 0.55f)); b.mpb.SetFloat(PIntensity, 1.35f);
-                }, MStroke, RuneViolet, ArmedGold, AshMagenta);
+                    float t = u * 0.45f; var q = start + v * t + Vector3.down * 11f * t * t;
+                    b.go.transform.SetPositionAndRotation(q, FaceCam(q) * Quaternion.Euler(0, spin * t, 0));
+                    b.mpb.SetColor(PLow, Color.Lerp(m.weak ? FaintHot : RuneViolet, RuneViolet, u)); b.mpb.SetColor(PHigh, Color.Lerp(m.weak ? FaintHot : ArmedGold, ArcLilac, u));
+                    b.mpb.SetFloat(PProgress, 1.1f); b.mpb.SetFloat(PWidth, 0.07f); b.mpb.SetFloat(PDissolve, Mathf.Clamp01((t - 0.12f) / 0.33f)); b.mpb.SetFloat(PEdgeGlow, 1.2f);
+                    b.mpb.SetFloat(PIntensity, 0.95f * Mathf.Max(0.6f, kb));
+                }, MStroke, RuneViolet, ArcLilac, ArmedGold);
             }
-            for (int k = 0; k < 24; k++) arcSparks.Emit(c + Vector3.up * 0.5f, (Random.insideUnitSphere + Vector3.up * 0.8f) * 7f, 0.07f, 0.35f);
-            ArcLight(c + Vector3.up, RuneViolet, hit ? 2.6f : 2f, 7f, 0.22f);
-            CameraShake.Shake(0.12f, 0.15f);
-            BurntRune(m, c, 0.9f, 0.07f);
+            for (int j = 0; j < (m.weak ? 6 : 16); j++) arcSparks.Emit(c + Vector3.up * 0.4f, (Random.insideUnitSphere + Vector3.up * 0.8f) * 7f * k, 0.07f, 0.3f);
+            CameraShake.Shake(m.weak ? 0.05f : 0.12f, 0.15f);
         }
         public void SigilFade(int id) => FadeMark(id);
         void FadeMark(int id)
@@ -1083,158 +1341,433 @@ namespace LastBell.Run
             if (m.comet) Destroy(m.comet.gameObject);
         }
 
-        // ================================================================== E4 Astral Orb
-        public void OrbCharge(PlayerController p, int ticks)
+        // ================================================================== E7 Glyphs
+        // Disintegrate carves glyphs (max 3): small violet runes orbiting the Arcanist's waist on a faint socket ring.
+        // Rune Sigil and Arcane Comet each spend one (it flies into the rune); Arcane Surge spends them all.
+        // where glyph i sits: on the socket ring, lifted a little above it; pulled into the astrolabe while Surge is cast
+        Vector3 GlyphSocket(PlayerController p, ArcState s, int i)
         {
-            var s = St(p); foreach (var h in s.orbCharge) KillH(h); s.orbCharge.Clear();
-            float life = ticks / (float)Sim.Hz;
-            for (int k = 0; k < 2; k++)
-            {
-                int ring = k;
-                var b = Arc(DashedRing(0.2f, 0.218f, 4, 12, 12), true, arcAdd, AstroPos(p), Quaternion.identity, 9999, (bb, time) =>
-                {
-                    if (!p) return; float u = Mathf.Clamp01(time / life);
-                    bb.go.transform.SetPositionAndRotation(AstroPos(p), Quaternion.Euler(ring == 0 ? 70 : -40, time * (200 + 900 * u) * (ring == 0 ? 1 : -1), ring == 0 ? 15 : 60));
-                    bb.go.transform.localScale = Vector3.one * (1 + 0.5f * Ease(u)); bb.mpb.SetFloat(PWidth, 0.6f); bb.mpb.SetFloat(PIntensity, 0.6f + 0.3f * u);
-                }, MBeam, StarEdge, StarSilver, AshMagenta);
-                s.orbCharge.Add(H(b));
-            }
-            // the progress ring tightens onto the growing seed (the timer); brighter than the spread rings
-            var pr = Arc(RingU(0.94f, 1f, 64), true, arcAdd, AstroPos(p), Quaternion.identity, 9999, (bb, time) =>
-            {
-                if (!p) return; float u = Mathf.Clamp01(time / life);
-                bb.go.transform.SetPositionAndRotation(AstroPos(p), FaceCam(AstroPos(p)));
-                bb.go.transform.localScale = Vector3.one * Mathf.Lerp(0.5f, 0.18f, Mathf.Clamp01(u * 1.08f)); bb.mpb.SetFloat(PWidth, 0.6f); bb.mpb.SetFloat(PIntensity, 1.2f);
-            }, MBeam, StarEdge, StarSilver, AshMagenta);
-            s.orbCharge.Add(H(pr));
-            // the seed: the orb itself growing to 40 % at the astrolabe, fed by the motes
-            var seed = Arc(billboard, false, arcAdd, AstroPos(p), Quaternion.identity, 9999, (bb, time) =>
-            {
-                if (!p) return; float u = Mathf.Clamp01(time / life); var q = AstroPos(p);
-                bb.go.transform.SetPositionAndRotation(q, FaceCam(q)); bb.go.transform.localScale = Vector3.one * 0.25f * 0.4f * Ease(u) * 2.2f; bb.mpb.SetFloat(PIntensity, 1.1f);
-            }, MDot, StarSilver, HotWhite, AshMagenta);
-            s.orbCharge.Add(H(seed));
-            var a = AstroPos(p);
-            for (int k = 0; k < 16; k++) { var off = Random.onUnitSphere * 0.8f; arcMotes.Emit(a + off, -off / life * 1.1f, 0.06f, life * 0.85f); }
+            float a = (s.orbit + i * 120f) * Mathf.Deg2Rad;
+            var at = p.transform.position + new Vector3(Mathf.Sin(a), 0, Mathf.Cos(a)) * 0.85f + Vector3.up * (1.35f + 0.03f * Mathf.Sin(Time.time * 2.4f + i * 2.1f));
+            float pull = s.surgePull >= 0 ? Ease(Mathf.Clamp01((Time.time - s.surgePull) / s.surgeCastLife))
+                : s.snapFrom * (1 - Ease(Mathf.Clamp01((Time.time - s.surgeSnap) / 0.09f)));
+            return pull > 0 ? Vector3.Lerp(at, AstroPos(p), pull) : at;
         }
-        public void OrbCancel(PlayerController p)
+        void KillGlyph(ArcState s, int i)
         {
-            var s = St(p); var a = AstroPos(p);
-            for (int i = 0; i < s.orbCharge.Count; i++)
+            if (s.glyphOrbs[i] == null) return;
+            foreach (var h in s.glyphOrbs[i]) KillH(h); s.glyphOrbs[i] = null;
+        }
+        static float GlyphSpeed(int g) => g <= 0 ? 12 : g == 1 ? 20 : g == 2 ? 35 : 50;
+        const float GlyphFly = 0.25f;   // a spent glyph's flight into its rune
+
+        // called by the kit every tick: makes sure the socket ring exists (idempotent)
+        public void ArcanistTick(PlayerController p)
+        {
+            if (!p) return;
+            var s = St(p);
+            if (s.sockets.Count > 0 && s.sockets[0].Alive(this)) return;
+            foreach (var h in s.sockets) KillH(h); s.sockets.Clear();
+            // a thin dashed ring at the waist with gaps at the three sockets, and a tick under each socket; it turns faster
+            // with each glyph held and is barely there when empty
+            for (int part = 0; part < 2; part++)
             {
-                var h = s.orbCharge[i]; if (!h.Alive(this)) continue;
-                var sc = h.b.go.transform.localScale; var rot = h.b.go.transform.rotation; var mesh = h.b.mf.sharedMesh; bool own = h.b.owns; h.b.owns = false;
-                bool progress = i == 2, seedPart = i == 3; KillH(h);
-                if (seedPart) { if (own) Destroy(mesh); continue; }
-                // the progress ring snaps open to at most 0.8 m and fades; the spread rings settle back to rest
-                Arc(mesh, own, arcAdd, a, rot, progress ? 0.15f : 0.2f, (b, u) =>
+                int pp = part;
+                Mesh mesh = pp == 0 ? DashedRing(0.835f, 0.855f, 3, 26, 32) : TickRing(0.77f, 0.93f, 3, 0.05f);
+                var b = Arc(mesh, true, arcAdd, p.transform.position, Quaternion.identity, 9999, (bb, time) =>
                 {
-                    b.go.transform.localScale = progress ? Vector3.one * Mathf.Lerp(sc.x, 0.8f, Ease(u)) : Vector3.Lerp(sc, Vector3.one, u);
-                    b.mpb.SetFloat(PDissolve, u); b.mpb.SetFloat(PWidth, 0.6f); b.mpb.SetFloat(PIntensity, 0.55f);
-                }, MBeam, StarEdge, StarSilver, AshMagenta);
+                    if (!p) return; var kit = Arcanist(p); int g = kit != null ? kit.Glyphs : 0;
+                    if (pp == 0) s.orbit += Time.deltaTime * GlyphSpeed(g);
+                    bb.go.transform.SetPositionAndRotation(p.transform.position + Vector3.up * 1.25f, Quaternion.Euler(0, s.orbit + (pp == 0 ? 60 : 0), 0));
+                    bb.mpb.SetColor(PHigh, g >= ArcanistKit.MaxGlyphs ? ArmedGold : ArcLilac);   // full: the ring takes a gold tint
+                    bool off = IsHidden(p) || (kit != null && kit.Surging);
+                    float full = g >= ArcanistKit.MaxGlyphs ? 0.5f + 0.5f * Mathf.Sin(Time.time * 6f) : 0;
+                    float lvl = off ? 0 : (pp == 0 ? 0.14f + 0.1f * g : 0.4f + 0.15f * g) * (1 + 0.3f * full);
+                    if (pp == 0) bb.mpb.SetFloat(PWidth, 0.6f); else { bb.mpb.SetFloat(PProgress, 1.1f); bb.mpb.SetFloat(PWidth, 0.07f); }
+                    bb.mpb.SetFloat(PIntensity, lvl);
+                }, pp == 0 ? MBeam : MStroke, RuneViolet, ArcLilac, AshMagenta);
+                s.sockets.Add(H(b));
             }
-            s.orbCharge.Clear();
-            for (int k = 0; k < 16; k++) arcMotes.Emit(a, Random.onUnitSphere * 2f, 0.05f, 0.2f);
         }
 
-        public void OrbRelease(PlayerController p)
+        public void GlyphGain(PlayerController p, int count, Vector3 from)
         {
-            var s = St(p); foreach (var h in s.orbCharge) KillH(h); s.orbCharge.Clear(); foreach (var h in s.orb) KillH(h); s.orb.Clear();
-            var a = AstroPos(p); s.orbStart = Time.time; s.orbEnding = -1; s.orbLift = a - p.transform.position;
-            Arc(RingU(0.46f, 0.5f, 48), true, arcAdd, a, FaceCam(a), 0.15f, (b, u) =>
+            if (!p) return;
+            var s = St(p); int i = count - 1; if (i < 0 || i >= ArcanistKit.MaxGlyphs) return;
+            ArcanistTick(p); KillGlyph(s, i);
+            const float race = 0.22f, draw = 0.15f;
+            s.glyphBorn[i] = Time.time + race;
+            // a gold-white spark races back along the beam from the boss to the empty socket, drawn in front of the beam
+            var start = from; var tr = TakeTrail(0.12f, 0.12f, start, goldTrailMat);
+            Arc(billboard, false, arcAdd, start, Quaternion.identity, race, (b, u) =>
             {
-                b.go.transform.localScale = Vector3.one * Mathf.Lerp(0.3f, 1f, Ease(u)); b.mpb.SetFloat(PDissolve, u); b.mpb.SetFloat(PWidth, 0.6f); b.mpb.SetFloat(PIntensity, 1.0f);
-            }, MBeam, StarEdge, StarSilver, AshMagenta);
-            for (int k = 0; k < 8; k++) arcSparks.Emit(a, Random.onUnitSphere * 2.2f + Vector3.up * 0.5f, 0.04f, 0.15f);
-            ArcLight(a, StarSilver, 1.0f, 3.5f, 0.18f);
-            // the orb: a small bright core (0.14 m), a rim-lit violet shell (0.28 m), two crossing dashed rings (0.22 m)
+                if (!p) return; var q = Vector3.Lerp(start, GlyphSocket(p, s, i), u * u * (3 - 2 * u)) + Vector3.up * 0.25f * Mathf.Sin(u * Mathf.PI);
+                if (Cam) q -= Cam.transform.forward * 0.35f;
+                b.go.transform.SetPositionAndRotation(q, FaceCam(q)); b.go.transform.localScale = Vector3.one * 0.32f; b.mpb.SetFloat(PIntensity, 1.15f);
+                if (tr) tr.transform.position = q;
+                if (Random.value < 0.6f) arcMotes.Emit(q, Random.insideUnitSphere * 0.4f, 0.06f, 0.2f);
+            }, MDot, ArmedGold, HotWhite, AshMagenta);
+            StartCoroutine(ReleaseTrailAfter(tr, race, 0.12f));
+            // the glyph: a 0.28 m violet rune with a gold edge, drawn stroke by stroke as the spark lands, a soft glow behind
+            var rs = Random.state; Random.InitState(7919 * (i + 3));   // each socket keeps its own rune shape
+            var core = RuneGlyph(0.34f, 0.028f, out var glow, out var edge, 1.65f);
+            Random.state = rs;
+            var parts = new Handle[4];
             for (int k = 0; k < 4; k++)
             {
-                int part = k;
-                Mesh mesh = part == 0 ? billboard : part == 1 ? sphereMesh : RingU(part == 2 ? 0.285f : 0.245f, part == 2 ? 0.3f : 0.26f, 64);
-                var b = Arc(mesh, part >= 2, arcAdd, a, Quaternion.identity, 9999, (bb, time) =>
+                int part = k; Mesh mesh = part == 0 ? core : part == 1 ? glow : part == 2 ? billboard : edge;
+                var b = Arc(mesh, part != 2, part == 0 ? arcOver : part == 3 ? arcOverEdge : arcAdd, GlyphSocket(p, s, i), Quaternion.identity, 9999, (bb, time) =>
                 {
-                    if (!p) return;
-                    var kit = Arcanist(p); float left = kit != null ? kit.OrbLeft01 * 8f : 0;
-                    float lift = Ease(Mathf.Clamp01(time / 0.15f));
-                    var spot = p.transform.position + Vector3.Lerp(s.orbLift, ArcanistKit.OrbOffset(p.transform), lift) + Vector3.up * 0.04f * Mathf.Sin(time * 2.2f);
-                    // contract to 85 % over the 0.12 s before each shot (every 1 s from 0.5 s), then pulse to 110 % for 0.06 s
-                    float ph = Mathf.Repeat(time - 0.5f, 1f); float pulse = 1;
-                    if (time > 0.38f && ph > 0.88f) pulse = 1 - 0.15f * Ease((ph - 0.88f) / 0.12f);
-                    else if (time > 0.5f && ph < 0.06f) pulse = 0.85f + 0.25f * Mathf.Sin(ph / 0.06f * Mathf.PI * 0.5f);
-                    else if (time > 0.5f && ph < 0.12f) pulse = 1.1f - 0.1f * ((ph - 0.06f) / 0.06f);
-                    // last 1.5 s: blink down to 30 % for 0.05 s, the blinks closing from every 0.4 s to every 0.1 s; rings slow
-                    float flick = 1;
-                    if (left < 1.5f && left > 0) { float period = Mathf.Lerp(0.1f, 0.4f, left / 1.5f); if (Mathf.Repeat(time, period) < 0.05f) flick = 0.3f; }
-                    // ending: drift back into the astrolabe and shrink to nothing over 0.3 s (rings fade in the first 0.2 s)
-                    float end = s.orbEnding < 0 ? 0 : Mathf.Clamp01((Time.time - s.orbEnding) / 0.3f);
-                    if (end > 0) spot = Vector3.Lerp(spot, AstroPos(p), Ease(end));
-                    float grow = Mathf.Lerp(0.4f, 1f, lift) * (1 - end * end);
-                    float size = part == 0 ? 0.22f : part == 1 ? 0.28f : 1f;   // the core billboard's soft dot covers about half its quad
-                    float spinRate = left < 1.5f ? 32 : 108;   // 0.3 rev/s, slowing to 30 % in the last 1.5 s
-                    var rot = part == 0 ? FaceCam(spot) : part == 1 ? Quaternion.identity : Quaternion.Euler(part == 2 ? 70 : 35, time * spinRate * (part == 2 ? 1 : -1), part == 2 ? 10 : -25);
-                    bb.go.transform.SetPositionAndRotation(spot, rot); bb.go.transform.localScale = Vector3.one * size * pulse * grow;
-                    float ringFade = part >= 2 ? 1 - Mathf.Clamp01(end / 0.67f) : 1;
-                    bb.mpb.SetFloat(PIntensity, (part == 0 ? 0.8f : part == 1 ? 0.75f : 1.2f) * flick * ringFade);
-                    if (part >= 2) bb.mpb.SetFloat(PWidth, 0.6f);
-                    if (part == 1) { bb.mpb.SetFloat(PFresnel, 2.4f); bb.mpb.SetFloat(PNoiseAmt, 0.35f); }
-                }, part == 0 ? MDot : part == 1 ? MShell : MBeam, part == 0 ? StarSilver * 0.8f : part == 1 ? StarEdge * 1.3f : StarEdge, part == 0 ? new Color(1.6f, 1.6f, 2.0f) : StarSilver, AshMagenta);
-                s.orb.Add(H(b));
+                    if (!p) return; var kit = Arcanist(p); int g = kit != null ? kit.Glyphs : 0;
+                    var q = GlyphSocket(p, s, i); float since = Time.time - s.glyphBorn[i];
+                    bool show = g > i && since >= 0 && (!IsHidden(p) || Time.time - s.surgeSnap < 0.2f);   // snapping back from a cancelled Surge stays visible
+                    float prog = Mathf.Clamp01(since / draw), flash = since > draw ? Mathf.Exp(-(since - draw) * 9) : 0;
+                    float full = g >= ArcanistKit.MaxGlyphs ? 0.5f + 0.5f * Mathf.Sin(Time.time * 5f) : 0;   // all three pulse together (0.8 Hz)
+                    float gold = Mathf.Exp(-Mathf.Max(0, Time.time - s.fullAt) * 7);                           // the third glyph: a gold flare on all three
+                    bb.go.transform.SetPositionAndRotation(q + (part == 2 && Cam ? -Cam.transform.forward * 0.02f : Vector3.zero), FaceCam(q) * Quaternion.Euler(0, 8 * Mathf.Sin(Time.time * 1.7f + i), 0));
+                    if (part == 2) { bb.go.transform.localScale = Vector3.one * (0.55f + 0.2f * flash) * (1 + 0.35f * full); bb.mpb.SetFloat(PIntensity, show ? (0.16f + 0.22f * full + 0.5f * flash) * prog : 0); return; }
+                    bb.go.transform.localScale = Vector3.one * (1 + 0.2f * full);
+                    bb.mpb.SetFloat(PProgress, prog * 1.03f); bb.mpb.SetFloat(PWidth, part == 1 ? 0.2f : 0.09f);
+                    bb.mpb.SetFloat(PIntensity, !show ? 0 : part == 0 ? 1.0f + 0.35f * full : part == 3 ? 1.0f + 0.35f * full + 0.3f * flash + 0.4f * gold : 0.08f + 0.08f * full);
+                    bb.mpb.SetVector(PFlow, new Vector4(-2.4f, 0, -1.1f, 0.3f));
+                }, part == 2 ? MDot : MStroke, part == 2 ? new Color(0.75f, 0.45f, 0.9f) : part == 3 ? EdgeGold : RuneViolet, part == 3 ? EdgeGoldHot : GlyphHot, AshMagenta);
+                parts[k] = H(b);
+            }
+            s.glyphOrbs[i] = parts;
+            StartCoroutine(GlyphArrive(p, s, i, race, count >= ArcanistKit.MaxGlyphs));
+        }
+        System.Collections.IEnumerator ReleaseTrailAfter(TrailRenderer tr, float after, float fade)
+        {
+            yield return new WaitForSeconds(after); yield return ReleaseTrail(tr, fade);
+        }
+        // the glyph finishing: a ring flashes out from it, motes; the third glyph also flashes the whole socket ring gold
+        System.Collections.IEnumerator GlyphArrive(PlayerController p, ArcState s, int i, float after, bool full)
+        {
+            yield return new WaitForSeconds(after); if (!p) yield break;
+            var q = GlyphSocket(p, s, i);
+            Arc(RingU(0.15f, 0.18f, 40), true, arcAdd, q, FaceCam(q), 0.22f, (b, u) =>
+            {
+                if (!p) return; var at = GlyphSocket(p, s, i); b.go.transform.SetPositionAndRotation(at, FaceCam(at));
+                b.go.transform.localScale = Vector3.one * Mathf.Lerp(0.7f, 1.3f, Ease(u)); b.mpb.SetFloat(PWidth, 0.6f); b.mpb.SetFloat(PDissolve, u); b.mpb.SetFloat(PIntensity, 1.4f);
+            }, MBeam, new Color(0.5f, 0.3f, 1.6f), EdgeGold, EdgeGold);
+            for (int k = 0; k < 8; k++) arcMotes.Emit(q, Random.onUnitSphere * 1.5f, 0.1f, 0.3f);
+            ArcLight(q, ArcLilac, 0.6f, 2.5f, 0.15f);
+            if (!full) yield break;
+            // full: the three glyphs flare gold together (no ring)
+            s.fullAt = Time.time;
+            for (int j = 0; j < ArcanistKit.MaxGlyphs; j++) { var gq = GlyphSocket(p, s, j); for (int k = 0; k < 4; k++) arcMotes.Emit(gq, Random.onUnitSphere * 0.8f + Vector3.up * 0.6f, 0.06f, 0.35f); }
+        }
+
+        // a glyph spent on a rune: it leaves its socket and arcs into the rune's centre, landing with a gold flash
+        public void GlyphSpend(PlayerController p, int remaining, Vector3 target)
+        {
+            if (!p) return;
+            var s = St(p); int i = remaining; if (i < 0 || i >= ArcanistKit.MaxGlyphs) return;
+            var from = s.glyphOrbs[i] != null && s.glyphOrbs[i][0].Alive(this) ? s.glyphOrbs[i][0].b.go.transform.position : GlyphSocket(p, s, i);
+            KillGlyph(s, i);
+            // the socket it left flashes once and goes dark
+            Arc(RingU(0.85f, 1f, 32), true, arcAdd, from, FaceCam(from), 0.22f, (b, u) =>
+            {
+                if (!p) return; var q = GlyphSocket(p, s, i); b.go.transform.SetPositionAndRotation(q, FaceCam(q));
+                b.go.transform.localScale = Vector3.one * Mathf.Lerp(0.2f, 0.1f, u); b.mpb.SetFloat(PWidth, 0.6f); b.mpb.SetFloat(PIntensity, u < 0.25f ? 1.2f : 0.5f * (1 - u));
+            }, MBeam, RuneViolet, ArcLilac, AshMagenta);
+            for (int k = 0; k < 4; k++) arcMotes.Emit(from, Random.onUnitSphere * 0.6f + Vector3.down * 0.3f, 0.05f, 0.25f);
+            const float fly = GlyphFly;
+            var tgt = new Vector3(target.x, 0.15f, target.z);
+            var core = RuneGlyph(0.34f, 0.028f, out var glow, out var edge); Destroy(glow);
+            var tr = TakeTrail(0.2f, 0.16f, from);
+            float h = Mathf.Max(1.6f, Sim.Flat(tgt - from).magnitude * 0.35f);
+            for (int part = 0; part < 2; part++)
+            {
+                int pp = part;
+                Arc(pp == 0 ? core : edge, true, pp == 0 ? arcOver : arcOverEdge, from, FaceCam(from), fly, (b, u) =>
+                {
+                    var q = Vector3.Lerp(from, tgt, u) + Vector3.up * h * Mathf.Sin(u * Mathf.PI);
+                    b.go.transform.SetPositionAndRotation(q, FaceCam(q) * Quaternion.Euler(0, u * 200, 0)); b.go.transform.localScale = Vector3.one * (1 + 0.8f * u);
+                    b.mpb.SetFloat(PProgress, 1.1f); b.mpb.SetFloat(PWidth, 0.09f); b.mpb.SetFloat(PIntensity, pp == 0 ? 1.3f : 1.2f);
+                    if (pp == 0 && tr) tr.transform.position = q;
+                    if (pp == 0 && Random.value < 0.5f) arcMotes.Emit(q, Random.insideUnitSphere * 0.3f, 0.06f, 0.25f);
+                }, MStroke, pp == 0 ? RuneViolet : EdgeGold, pp == 0 ? GlyphHot : EdgeGoldHot, AshMagenta);
+            }
+            StartCoroutine(ReleaseTrailAfter(tr, fly, 0.12f));
+            StartCoroutine(GlyphLand(tgt, fly));
+        }
+        System.Collections.IEnumerator GlyphLand(Vector3 at, float after)
+        {
+            yield return new WaitForSeconds(after);
+            var c = new Vector3(at.x, 0.06f, at.z);
+            // a small 4-point star (violet with gold points) standing up at the centre, and one thin gold ring opening to 0.8 m
+            for (int k = 0; k < 2; k++)
+            {
+                var q = c + Vector3.up * 0.5f; var r = FaceCam(q) * Quaternion.Euler(0, k * 90 + 45, 0);
+                Arc(beamMesh, false, arcAdd, q, r, 0.16f, (b, u) =>
+                {
+                    b.go.transform.position = q - b.go.transform.forward * 0.45f * Mathf.Lerp(0.6f, 1f, Ease(u));
+                    b.go.transform.localScale = new Vector3(0.11f, 1, 1.2f * Mathf.Lerp(0.6f, 1f, Ease(u))); b.mpb.SetFloat(PWidth, 0.35f); b.mpb.SetFloat(PDissolve, u * u); b.mpb.SetFloat(PIntensity, 1.4f);
+                }, MBeam, RuneViolet, ArmedGold, AshMagenta);
+            }
+            Arc(RingU(0.27f, 0.3f, 48), true, arcAdd, c + Vector3.up * 0.5f, FaceCam(c), 0.2f, (b, u) =>
+            {
+                var q = c + Vector3.up * 0.5f; b.go.transform.SetPositionAndRotation(q, FaceCam(q));
+                b.go.transform.localScale = Vector3.one * Mathf.Lerp(0.5f, 1.1f, Ease(u)); b.mpb.SetFloat(PWidth, 0.6f); b.mpb.SetFloat(PDissolve, u); b.mpb.SetFloat(PIntensity, 1.3f);
+            }, MBeam, new Color(0.5f, 0.3f, 1.6f), GlyphHot, EdgeGold);
+            Arc(RingU(0.95f, 1f, 64), true, arcAddFloor, c, Quaternion.identity, 0.22f, (b, u) =>
+            {
+                float r = Mathf.Lerp(0.2f, 0.8f, Ease(u)); b.go.transform.localScale = new Vector3(r, 1, r);
+                b.mpb.SetFloat(PProgress, 1.1f); b.mpb.SetFloat(PWidth, 0.6f); b.mpb.SetFloat(PIntensity, 1.5f * (1 - u));
+            }, MStroke, ArmedGold, SigilArmed, AshMagenta);
+            for (int k = 0; k < 10; k++) arcSparks.Emit(c + Vector3.up * 0.2f, (Random.insideUnitSphere + Vector3.up) * 3f, 0.05f, 0.25f);
+            ArcLight(c + Vector3.up * 0.5f, ArmedGold, 1.0f, 3f, 0.15f);
+        }
+
+        // ================================================================== E8 Arcane Surge
+        // Cast (0.3 s): the glyphs are pulled into the astrolabe. Release: a column and a double shockwave, both sized by
+        // the glyphs spent. Active (2 s per glyph): a gold foot ring, a chest ring that empties as the timer, a crown of the
+        // spent glyphs, a faint rim of light on the body, rising motes; the last second flickers; the end folds inward.
+        public void SurgeCharge(PlayerController p, int glyphs, int ticks)
+        {
+            if (!p) return;
+            var s = St(p); float life = ticks / (float)Sim.Hz; s.surgeCastLife = life * 0.85f; s.surgePull = Time.time; s.snapFrom = 0;
+            if (s.rig) s.rig.SurgeCharge(life);   // the core brightens toward gold and the cage spins up as the glyphs arrive
+            foreach (var h in s.surgeCast) KillH(h); s.surgeCast.Clear();
+            // a ring at the astrolabe tightening onto it while a dashed ring spins up
+            s.surgeCast.Add(H(Arc(RingU(0.92f, 1f, 64), true, arcAdd, AstroPos(p), Quaternion.identity, 9999, (b, time) =>
+            {
+                if (!p) return; float u = Mathf.Clamp01(time / life); var q = AstroPos(p);
+                b.go.transform.SetPositionAndRotation(q, FaceCam(q)); b.go.transform.localScale = Vector3.one * Mathf.Lerp(0.95f, 0.18f, Ease(u));
+                b.mpb.SetFloat(PWidth, 0.6f); b.mpb.SetFloat(PIntensity, 0.8f + 0.7f * u);
+            }, MBeam, ArcLilac, ArmedGold, AshMagenta)));
+            s.surgeCast.Add(H(Arc(DashedRing(0.3f, 0.33f, 3, 30, 16), true, arcAdd, AstroPos(p), Quaternion.identity, 9999, (b, time) =>
+            {
+                if (!p) return; float u = Mathf.Clamp01(time / life); var q = AstroPos(p);
+                b.go.transform.SetPositionAndRotation(q, FaceCam(q) * Quaternion.Euler(0, time * (300 + 900 * u), 0)); b.go.transform.localScale = Vector3.one * (1 + 0.4f * u);
+                b.mpb.SetFloat(PWidth, 0.6f); b.mpb.SetFloat(PIntensity, 0.7f + 0.6f * u);
+            }, MBeam, ArcLilac, ArmedGold, AshMagenta)));
+            s.surgeCast.Add(H(Arc(billboard, false, arcAdd, AstroPos(p), Quaternion.identity, 9999, (b, time) =>
+            {
+                if (!p) return; float u = Mathf.Clamp01(time / life); var q = AstroPos(p);
+                b.go.transform.SetPositionAndRotation(q, FaceCam(q)); b.go.transform.localScale = Vector3.one * Mathf.Lerp(0.3f, 0.9f, Ease(u)); b.mpb.SetFloat(PIntensity, 0.6f + 0.9f * u);
+            }, MDot, ArmedGold, HotWhite, AshMagenta)));
+            var a = AstroPos(p);
+            for (int k = 0; k < 14; k++) { var off = Random.onUnitSphere * 0.9f; arcMotes.Emit(a + off, -off / life, 0.06f, life * 0.95f); }
+        }
+        // a small gold ring at a socket as its glyph snaps home
+        System.Collections.IEnumerator SnapTick(PlayerController p, ArcState s, int i, float after)
+        {
+            yield return new WaitForSeconds(after); if (!p) yield break;
+            Arc(RingU(0.85f, 1f, 32), true, arcAdd, GlyphSocket(p, s, i), Quaternion.identity, 0.12f, (b, u) =>
+            {
+                if (!p) return; var q = GlyphSocket(p, s, i); b.go.transform.SetPositionAndRotation(q, FaceCam(q));
+                b.go.transform.localScale = Vector3.one * Mathf.Lerp(0.1f, 0.26f, Ease(u)); b.mpb.SetFloat(PWidth, 0.6f); b.mpb.SetFloat(PDissolve, u); b.mpb.SetFloat(PIntensity, 1.5f);
+            }, MBeam, RuneViolet, ArmedGold, AshMagenta);
+            var sq = GlyphSocket(p, s, i); for (int k = 0; k < 4; k++) { var off = Random.onUnitSphere * 0.3f; arcMotes.Emit(sq + off, -off / 0.1f, 0.06f, 0.1f); }
+        }
+        public void SurgeCancel(PlayerController p)
+        {
+            if (!p) return;
+            var s = St(p);
+            s.snapFrom = s.surgePull >= 0 ? Ease(Mathf.Clamp01((Time.time - s.surgePull) / s.surgeCastLife)) : 0; s.surgeSnap = Time.time; s.surgePull = -1;
+            if (s.rig) s.rig.SurgeCancel();
+            for (int i = 0; i < ArcanistKit.MaxGlyphs; i++) if (s.glyphOrbs[i] != null) StartCoroutine(SnapTick(p, s, i, 0.09f));
+            foreach (var h in s.surgeCast)
+            {
+                if (!h.Alive(this)) continue; var b0 = h.b; float t0 = b0.t; var sc = b0.go.transform.localScale; var off = b0.go.transform.position - AstroPos(p);
+                b0.life = b0.t + 0.05f; b0.anim = (b, u) => { float k = Mathf.Clamp01((b.t - t0) / 0.05f); if (p) b.go.transform.position = AstroPos(p) + off; b.go.transform.localScale = sc * (1 + 0.4f * k); b.mpb.SetFloat(PDissolve, k); };   // follows him
+            }
+            s.surgeCast.Clear();
+            var a = AstroPos(p); for (int k = 0; k < 10; k++) arcMotes.Emit(a, Random.onUnitSphere * 1.8f, 0.05f, 0.2f);
+        }
+
+        public void SurgeStart(PlayerController p, int glyphs, int ticks)
+        {
+            if (!p) return;
+            var s = St(p);
+            foreach (var h in s.surgeCast) KillH(h); s.surgeCast.Clear(); s.surgePull = -1; s.snapFrom = 0;
+            if (s.rig) s.rig.SurgeOn();   // empowered: the core holds a brighter gold-violet glow until SurgeEnd
+            for (int i = 0; i < s.glyphOrbs.Length; i++) KillGlyph(s, i);
+            foreach (var h in s.surge) KillH(h); s.surge.Clear(); s.surgeEnding = -1;
+            var c = p.transform.position; float g = Mathf.Max(1, glyphs), wide = 0.85f + 0.1f * g;
+            // release: a see-through tapered column of flowing violet light with gold lips, eaten from the top down,
+            // and a double shockwave; both bigger with each glyph spent
+            for (int layer = 0; layer < 2; layer++)
+            {
+                bool pillar = layer == 0;
+                Arc(colShell, false, arcAdd, c, Quaternion.identity, 0.25f, (b, u) =>
+                {
+                    float t = u * 0.25f; float rise = Ease(Mathf.Clamp01(t / 0.05f)); var at = p ? p.transform.position : c;
+                    b.go.transform.position = at; b.go.transform.localScale = new Vector3(0.55f * wide, rise * 1.25f, 0.55f * wide);
+                    b.mpb.SetFloat(PFresnel, 1.3f); b.mpb.SetFloat(PClipY, 99);
+                    b.mpb.SetFloat(PIntensity, (pillar ? 0.62f : 0.2f) * (1 - Mathf.Clamp01((t - 0.15f) / 0.1f))); b.mpb.SetVector(PFlow, new Vector4(0, -4.5f, 0.6f, -2.8f)); b.mpb.SetFloat(PNoiseAmt, 1f);
+                    b.mpb.SetVector(PNoiseScale, new Vector4(pillar ? 30 : 14, 2, 0, 0)); b.mpb.SetFloat(PEdgeGlow, 1.5f); b.mpb.SetFloat(PSoft, 0.25f);
+                    b.mpb.SetFloat(PDissolve, 0.2f + 0.75f * Mathf.Clamp01((t - 0.06f) / 0.19f));   // streaky from the start, frays all over with a gold edge
+                }, pillar ? MPillar : MShell, RuneViolet, new Color(1.0f, 0.55f, 2.1f), ArmedGold);
+            }
+            for (int rb = 0; rb < 3; rb++)
+            {
+                float ang = rb * 120f + Random.Range(-20f, 20f);
+                Arc(beamMesh, false, arcAdd, c, Quaternion.identity, 0.22f, (b, u) =>
+                {
+                    var at = p ? p.transform.position : c; var d = Quaternion.Euler(0, ang + u * 60f, 0) * Vector3.forward * 0.6f * wide;
+                    var q = at + d; float h = 3.4f * Ease(Mathf.Clamp01(u / 0.25f));
+                    b.go.transform.SetPositionAndRotation(q, AlongFacingCam(q, Vector3.up)); b.go.transform.localScale = new Vector3(0.07f, 1, h);
+                    b.mpb.SetFloat(PWidth, 0.4f); b.mpb.SetFloat(PDissolve, Mathf.Clamp01((u - 0.4f) / 0.6f)); b.mpb.SetFloat(PIntensity, 1.2f);
+                    b.mpb.SetVector(PFlow, new Vector4(-4f, 0, -2f, 0)); b.mpb.SetFloat(PNoiseAmt, 0.6f);
+                }, MBeam, DeepGold, ArmedGold, ArmedGold);
+            }
+            for (int lip = 0; lip < 1; lip++)
+            {
+                float y = 0.05f, r = 0.66f * wide;
+                Arc(RingU(r - 0.04f, r, 64), true, lip == 0 ? arcAddFloor : arcAdd, c + Vector3.up * y, Quaternion.identity, 0.3f, (b, u) =>
+                {
+                    if (p) b.go.transform.position = p.transform.position + Vector3.up * y;
+                    b.go.transform.localScale = Vector3.one * Mathf.Lerp(0.8f, 1.15f, Ease(u)); b.mpb.SetFloat(PProgress, 1.1f); b.mpb.SetFloat(PWidth, 0.6f);
+                    b.mpb.SetFloat(PIntensity, 1.5f * (1 - u));
+                }, MStroke, ArmedGold, HotWhite, AshMagenta);
+            }
+            for (int k = 0; k < 2; k++)
+            {
+                float delay = k * 0.06f, far = 1.25f + 0.75f * g + 0.3f * k * (g / 3f);
+                Arc(RingU(0.985f, 1f, 128), true, arcAddFloor, c + Vector3.up * 0.03f, Quaternion.identity, 0.35f + delay, (b, u) =>
+                {
+                    float t = Mathf.Clamp01((u * (0.35f + delay) - delay) / 0.35f); float r = Mathf.Lerp(0.5f + 0.4f * k, far, Ease(t)); b.go.transform.localScale = new Vector3(r, 1, r);
+                    b.mpb.SetFloat(PProgress, 1.1f); b.mpb.SetFloat(PWidth, 0.6f); b.mpb.SetFloat(PIntensity, t <= 0 ? 0 : (k == 0 ? 2.2f : 1.7f) * (1 - 0.75f * t));
+                }, MStroke, k == 0 ? DeepGold : RuneViolet, k == 0 ? ArmedGold : ArcLilac, AshMagenta);
+            }
+            for (int k = 0; k < 10 + 6 * glyphs; k++) arcSparks.Emit(c + Vector3.up * Random.Range(0.3f, 1.6f), (Random.insideUnitSphere * 0.8f + Vector3.up * 1.2f) * Random.Range(3f, 6f), 0.06f, 0.4f);
+            ArcLight(c + Vector3.up, ArmedGold, 1.4f + 0.5f * g, 6f, 0.28f);
+            CameraShake.Shake(0.05f + 0.03f * g, 0.16f);
+
+            // the active state; every part follows him, hides with him during Blink, strobes in the last second and folds
+            // into his chest at the end
+            float Vis(float time, out float fold)
+            {
+                fold = s.surgeEnding < 0 ? 0 : Mathf.Clamp01((Time.time - s.surgeEnding) / 0.22f);
+                var kit = Arcanist(p); float left = kit != null && kit.Surging ? kit.SurgeSeconds : 0;
+                if (IsHidden(p)) return 0;
+                float grow = Ease(Mathf.Clamp01(time / 0.2f));
+                float flick = 1;
+                if (left > 0 && left < 1f) flick = Mathf.Cos(time * 7f * Mathf.PI * 2) > -0.2f ? 1f : 0.2f;
+                return grow * flick * (1 - fold * 0.6f);
+            }
+            float Spin(float time) { var kit = Arcanist(p); return kit != null && kit.Surging && kit.SurgeSeconds < 1f ? 0.3f : 1f; }
+            // foot ring: dashed violet on the floor, turning, with a thin inner line; motes rise off it
+            float footYaw = 0;
+            s.surge.Add(H(Arc(DashedRing(1.04f, 1.1f, 6, 9, 20), true, arcAddFloor, c, Quaternion.identity, 9999, (b, time) =>
+            {
+                if (!p) return; float v = Vis(time, out var fold); var q = p.transform.position + Vector3.up * 0.04f;
+                footYaw += Time.deltaTime * 40 * Spin(time);
+                b.go.transform.SetPositionAndRotation(q, Quaternion.Euler(0, footYaw, 0)); float sc = Mathf.Lerp(1f, 0.1f, Ease(fold)); b.go.transform.localScale = new Vector3(sc, 1, sc);
+                b.mpb.SetFloat(PWidth, 0.6f); b.mpb.SetFloat(PIntensity, 0.9f * v);
+                if (v > 0.5f && Random.value < Time.deltaTime * 45) { float a = Random.value * Mathf.PI * 2; arcMotes.Emit(q + new Vector3(Mathf.Sin(a), 0, Mathf.Cos(a)) * 1.05f, Vector3.up * Random.Range(1.2f, 2f), 0.08f, 0.6f); }
+                if (v > 0.5f && Random.value < Time.deltaTime * 28) { var r2 = Random.insideUnitCircle * 0.4f; arcSparks.Emit(q + new Vector3(r2.x, Random.Range(0.3f, 1.6f), r2.y), Vector3.up * Random.Range(0.8f, 1.4f), 0.06f, 0.8f); }
+                if (v > 0.2f && Time.time >= s.rimNext) { s.rimNext = Time.time + 0.1f; BakeShell(s, 0.16f, 0.5f * v, false, true, 0, RuneViolet, ArmedGold); }
+            }, MBeam, DeepGold, ArmedGold, AshMagenta)));
+            s.surge.Add(H(Arc(RingU(0.9f, 0.925f, 96), true, arcAddFloor, c, Quaternion.identity, 9999, (b, time) =>
+            {
+                if (!p) return; float v = Vis(time, out var fold); b.go.transform.position = p.transform.position + Vector3.up * 0.035f;
+                float sc = Mathf.Lerp(1f, 0.1f, Ease(fold)); b.go.transform.localScale = new Vector3(sc, 1, sc);
+                b.mpb.SetFloat(PWidth, 0.6f); b.mpb.SetFloat(PIntensity, 0.55f * v);
+            }, MBeam, RuneViolet, ArcLilac, AshMagenta)));
+            // chest ring: the timer, a gold arc that empties around him, with a bright head at its end over a faint full ring
+            const float chestR = 1.0f;
+            Quaternion ChestRot() => Quaternion.Euler(0, p.transform.eulerAngles.y + 180, 0);
+            s.surge.Add(H(Arc(RingU(chestR - 0.02f, chestR + 0.02f, 128), true, arcAdd, c, Quaternion.identity, 9999, (b, time) =>
+            {
+                if (!p) return; float v = Vis(time, out var fold);
+                b.go.transform.SetPositionAndRotation(p.transform.position + Vector3.up * 1.3f, ChestRot());
+                float sc = Mathf.Lerp(1f, 0.1f, Ease(fold)); b.go.transform.localScale = new Vector3(sc, 1, sc);
+                var kk = Arcanist(p); bool last = kk != null && kk.Surging && kk.SurgeSeconds < 1f;
+                b.mpb.SetFloat(PProgress, 1.1f); b.mpb.SetFloat(PWidth, 0.07f); b.mpb.SetFloat(PIntensity, (last ? 0.3f : 0.14f) * v);
+            }, MStroke, RuneViolet, ArcLilac, AshMagenta)));
+            s.surge.Add(H(Arc(RingU(chestR - 0.02f, chestR + 0.02f, 128), true, arcAdd, c, Quaternion.identity, 9999, (b, time) =>
+            {
+                if (!p) return; float v = Vis(time, out var fold); var kit = Arcanist(p);
+                b.go.transform.SetPositionAndRotation(p.transform.position + Vector3.up * 1.3f, ChestRot());
+                float sc = Mathf.Lerp(1f, 0.1f, Ease(fold)); b.go.transform.localScale = new Vector3(sc, 1, sc);
+                b.mpb.SetFloat(PProgress, TimerArc(kit) * 1.01f); b.mpb.SetFloat(PWidth, 0.07f); b.mpb.SetFloat(PIntensity, 1.4f * v);
+                b.mpb.SetVector(PFlow, new Vector4(-2.4f, 0, -1.1f, 0.3f));
+            }, MStroke, DeepGold, ArmedGold, AshMagenta)));
+            float tickYaw = 0;
+            s.surge.Add(H(Arc(TickRing(chestR - 0.08f, chestR + 0.08f, 8, 0.03f), true, arcAdd, c, Quaternion.identity, 9999, (b, time) =>
+            {
+                if (!p) return; float v = Vis(time, out var fold); tickYaw -= Time.deltaTime * 35 * Spin(time);
+                b.go.transform.SetPositionAndRotation(p.transform.position + Vector3.up * 1.3f, Quaternion.Euler(0, tickYaw, 0));
+                float sc = Mathf.Lerp(1f, 0.1f, Ease(fold)); b.go.transform.localScale = new Vector3(sc, 1, sc);
+                b.mpb.SetFloat(PProgress, 1.1f); b.mpb.SetFloat(PWidth, 0.07f); b.mpb.SetFloat(PIntensity, 0.9f * v);
+            }, MStroke, DeepGold, ArmedGold, AshMagenta)));
+            s.surge.Add(H(Arc(billboard, false, arcAdd, c, Quaternion.identity, 9999, (b, time) =>
+            {
+                if (!p) return; float v = Vis(time, out var fold); var kit = Arcanist(p); float prog = TimerArc(kit);
+                float a = (180 - 360 * prog) * Mathf.Deg2Rad;   // RingU runs from +180° to -180° along U
+                var q = p.transform.position + Vector3.up * 1.3f + ChestRot() * new Vector3(Mathf.Sin(a), 0, Mathf.Cos(a)) * chestR * (1 - 0.9f * Ease(fold));
+                b.go.transform.SetPositionAndRotation(q, FaceCam(q)); b.go.transform.localScale = Vector3.one * 0.2f; b.mpb.SetFloat(PIntensity, prog > 0 ? 0.8f * v : 0);   // a small spark at the arc's end
+            }, MDot, ArmedGold, HotWhite, AshMagenta)));
+            // a crown of the spent glyphs above his head: violet runes with gold edges and a soft halo, turning
+            int crown = glyphs * 2;
+            for (int j = 0; j < crown; j++)
+            {
+                int jj = j; var gm = RuneGlyph(0.22f, 0.022f, out var gg, out var ge, 1.65f); Destroy(gg);
+                for (int part = 0; part < 3; part++)
+                {
+                    int pp = part; Mesh mesh = pp == 0 ? gm : pp == 1 ? ge : billboard;
+                    s.surge.Add(H(Arc(mesh, pp < 2, pp == 0 ? arcOver : pp == 1 ? arcOverEdge : arcAdd, c, Quaternion.identity, 9999, (b, time) =>
+                    {
+                        if (!p) return; float v = Vis(time, out var fold);
+                        float a = (time * 60 * Spin(time) + jj * 360f / crown) * Mathf.Deg2Rad; float r = 0.42f * (1 - fold);
+                        var q = p.transform.position + Vector3.up * Mathf.Lerp(2.0f, 1.3f, Ease(fold)) + new Vector3(Mathf.Sin(a), 0, Mathf.Cos(a)) * r;
+                        float grow = Ease(Mathf.Clamp01(time / 0.25f));
+                        b.go.transform.SetPositionAndRotation(q + (pp == 2 && Cam ? Cam.transform.forward * 0.03f : Vector3.zero), FaceCam(q));
+                        if (pp == 2) { b.go.transform.localScale = Vector3.one * 0.32f * grow; b.mpb.SetFloat(PIntensity, 0.2f * v); return; }
+                        b.go.transform.localScale = Vector3.one * grow;
+                        b.mpb.SetFloat(PProgress, 1.1f); b.mpb.SetFloat(PWidth, 0.09f); b.mpb.SetFloat(PIntensity, (pp == 0 ? 1.0f : 1.0f) * v);
+                    }, pp == 2 ? MDot : MStroke, pp == 1 ? EdgeGold : RuneViolet, pp == 1 ? EdgeGoldHot : GlyphHot, AshMagenta)));
+                }
             }
         }
 
-        public void OrbShot(PlayerController p, ProjectileSystem.Projectile pr)
+        // the chest timer's arc: empties over all but the last second, then holds a 12 % sliver that flickers out
+        static float TimerArc(ArcanistKit kit)
         {
-            EnsureArc();
-            float tickAt = Time.time; Vector3 lastPos = pr.Pos;
-            var b = Arc(billboard, false, arcAdd, pr.Pos, Quaternion.identity, 9999, (bb, time) =>
-            {
-                var pos = lastPos + pr.Vel * Mathf.Min(Time.time - tickAt, Sim.Dt * 1.5f);
-                bb.go.transform.SetPositionAndRotation(pos, FaceCam(pos)); bb.go.transform.localScale = Vector3.one * 0.17f; bb.mpb.SetFloat(PIntensity, 1.2f);
-            }, MDot, StarSilver, new Color(1.6f, 1.6f, 2.0f), AshMagenta);
-            var h = H(b); var tr = TakeTrail(0.014f, 0.05f, pr.Pos, silverTrailMat);
-            pr.OnMove = q => { tickAt = Time.time; lastPos = q.Pos; if (tr) tr.transform.position = q.Pos; };
-            pr.OnEnd = (q, hit, at) =>
-            {
-                KillH(h); StartCoroutine(ReleaseTrail(tr, 0.014f));
-                if (!hit) return;
-                // a crisp 4-point star, 0.3 m, 0.12 s: silver core, violet tips; two tiny sparks
-                var rot = FaceCam(at);
-                for (int k = 0; k < 4; k++)
-                {
-                    var r = rot * Quaternion.Euler(0, k * 90 + 45, 0);
-                    Arc(beamMesh, false, arcAdd, at, r, 0.12f, (bb, u) =>
-                    {
-                        bb.go.transform.localScale = new Vector3(0.04f, 1, 0.15f * Mathf.Lerp(0.6f, 1, Ease(u))); bb.mpb.SetFloat(PWidth, 0.4f); bb.mpb.SetFloat(PDissolve, u); bb.mpb.SetFloat(PIntensity, 1.6f);
-                    }, MBeam, StarEdge, StarSilver, AshMagenta);
-                }
-                for (int k = 0; k < 2; k++) arcSparks.Emit(at, Random.onUnitSphere * 2f, 0.03f, 0.12f);
-            };
+            if (kit == null || !kit.Surging) return 0;
+            float left = kit.SurgeSeconds, total = left / Mathf.Max(0.001f, kit.SurgeLeft01);
+            return left <= 1f ? 0.12f : Mathf.Lerp(0.12f, 1f, (left - 1f) / Mathf.Max(0.01f, total - 1f));
         }
 
-        public void OrbEnd(PlayerController p)
+        public void SurgeEnd(PlayerController p)
         {
-            var s = St(p); if (s.orb.Count == 0) return;
-            s.orbEnding = Time.time;
-            var handles = new List<Handle>(s.orb); s.orb.Clear();
-            foreach (var h in handles) StartCoroutine(KillAfter(h, 0.3f));
-            StartCoroutine(OrbGlint(p, 0.27f));
+            if (!p || !arc.TryGetValue(p, out var s)) return;
+            if (s.rig) s.rig.SurgeOff();
+            if (s.surge.Count == 0) return;
+            s.surgeEnding = Time.time;
+            var hs = new List<Handle>(s.surge); s.surge.Clear();
+            foreach (var h in hs) StartCoroutine(KillAfter(h, 0.23f));
+            var c = p.transform.position + Vector3.up * 1.3f;
+            for (int k = 0; k < 16; k++) { var off = Random.onUnitSphere * 1.1f; arcMotes.Emit(c + off, -off / 0.22f, 0.06f, 0.22f); }
+            StartCoroutine(SurgeGlint(p, 0.22f));
         }
-        System.Collections.IEnumerator OrbGlint(PlayerController p, float after)
+        // the end: one thin gold ring opening at his chest once everything has folded in
+        System.Collections.IEnumerator SurgeGlint(PlayerController p, float after)
         {
             yield return new WaitForSeconds(after); if (!p) yield break;
-            var a = AstroPos(p);
-            Arc(billboard, false, arcAdd, a, FaceCam(a), 0.1f, (b, u) =>
+            Arc(RingU(0.9f, 1f, 64), true, arcAdd, p.transform.position + Vector3.up * 1.3f, Quaternion.identity, 0.15f, (b, u) =>
             {
-                if (!p) return; var q = AstroPos(p); b.go.transform.SetPositionAndRotation(q, FaceCam(q));
-                b.go.transform.localScale = Vector3.one * Mathf.Lerp(0.3f, 0.12f, u); b.mpb.SetFloat(PDissolve, u); b.mpb.SetFloat(PIntensity, 1.0f);
-            }, MDot, StarEdge, StarSilver, AshMagenta);
+                if (!p) return; b.go.transform.position = p.transform.position + Vector3.up * 1.3f;
+                float r = Mathf.Lerp(0.6f, 0.05f, Ease(u)); b.go.transform.localScale = new Vector3(r, 1, r);
+                b.mpb.SetFloat(PWidth, 0.6f); b.mpb.SetFloat(PIntensity, 1.0f);
+            }, MBeam, RuneViolet, ArmedGold, AshMagenta);
+            yield return new WaitForSeconds(0.14f); if (!p) yield break;
+            var g = p.transform.position + Vector3.up * 1.3f;
+            Arc(billboard, false, arcAdd, g, FaceCam(g), 0.2f, (b, u) =>
+            {
+                if (!p) return; var q = p.transform.position + Vector3.up * 1.3f - (Cam ? Cam.transform.forward * 0.3f : Vector3.zero);
+                b.go.transform.SetPositionAndRotation(q, FaceCam(q)); b.go.transform.localScale = Vector3.one * Mathf.Lerp(0.3f, 0.12f, u); b.mpb.SetFloat(PIntensity, 1.3f * (1 - u));
+            }, MDot, ArmedGold, new Color(2.2f, 1.9f, 1.4f), AshMagenta);
         }
 
         // ================================================================== E5 Arcane Comet
         // The mark is a large rune drawn over the whole fall (its outer ring is the timer); the comet itself starts far
         // up out of view and slams down in the last part of the fall, landing as the rune completes.
-        public void CometMark(PlayerController p, int id, Vector3 pos, int fallTicks)
+        public void CometMark(PlayerController p, int id, Vector3 pos, int fallTicks, bool powered = true)
         {
             EnsureArc();
             float life = fallTicks / (float)Sim.Hz; float R = ArcanistKit.CometRadius, C = ArcanistKit.CometCore;
@@ -1242,146 +1775,341 @@ namespace LastBell.Run
             // it comes in diagonally from the side of the screen away from the mark (and a little toward the camera), high
             // up: off screen at first, then a meteor streaking across the view and crashing into the mark
             var m = new MarkFx { pos = c, start = Time.time, life = life, from = CometStart(c), ringYaw = Random.value * 360 }; marks[id] = m;
-            // ground shadow: wide and faint, tightening and darkening as the comet nears
-            m.parts.Add(H(Arc(billboard, false, arcAlphaFloor, c + Vector3.up * 0.003f, Quaternion.identity, life, (b, u) =>
+            // ground shadow: wide and faint, tightening (4 m -> 1.33 m) and darkening as the comet comes in, with a thin violet rim
+            // that pulses in the last 0.3 s so the landing reads even on a dark floor
+            float ShadowE() => Mathf.Clamp01(1 - (m.life - (Time.time - m.start)) / Mathf.Max(0.01f, m.window * 1.6f));
+            m.parts.Add(H(Arc(billboard, false, arcAlphaFloorTop, c + Vector3.up * 0.008f, Quaternion.identity, life, (b, u) =>
             {
-                float e = u * u * u; float r = Mathf.Lerp(R * 1.2f, C * 1.2f, e);
+                float e = ShadowE(); float r = Mathf.Lerp(4f, 1.33f, e * e);
                 b.go.transform.localScale = new Vector3(r * 2, 1, r * 2);
-                b.mpb.SetFloat(PWidth, Mathf.Lerp(0.85f, 0.4f, e)); b.mpb.SetFloat(PIntensity, Mathf.Lerp(0.1f, 0.85f, e));
-            }, MShadow, new Color(0.02f, 0.0f, 0.05f), Void, CometViolet)));
-            DrawRune(m, c, R, life, 14, 0.09f, CometViolet, HotWhite, ArmedGold);
-            // the comet: a big blazing violet meteor (a flowing shell inside a ragged flame shell, a white-hot core, a wide
-            // halo) with a long, wide tail and a stream of embers (moved in LateUpdate)
+                b.mpb.SetFloat(PWidth, Mathf.Lerp(0.85f, 0.55f, e)); b.mpb.SetFloat(PIntensity, e <= 0 ? 0 : Mathf.Lerp(0.15f, m.weak ? 0.38f : 0.55f, e));
+            }, MShadow, new Color(0.01f, 0.0f, 0.03f), Void, CometViolet)));
+            m.parts.Add(H(Arc(RingU(0.96f, 1f, 96), true, arcAddFloor, c + Vector3.up * 0.01f, Quaternion.identity, life, (b, u) =>
+            {
+                float e = ShadowE(), left = m.life - (Time.time - m.start); float r = Mathf.Lerp(4f, 1.33f, e * e);
+                b.go.transform.localScale = new Vector3(r, 1, r);
+                float pulse = left < 0.3f ? 0.6f + 0.5f * Mathf.Abs(Mathf.Sin(left * 40f)) : 0.3f * e;
+                b.mpb.SetFloat(PProgress, 1.1f); b.mpb.SetFloat(PWidth, 0.07f); b.mpb.SetFloat(PIntensity, e <= 0 ? 0 : pulse);
+            }, MStroke, CometDeep, CometPale, CometDeep)));
+            var kit = Arcanist(p); bool surging = kit != null && kit.Surging;
+            m.runeFrom = m.parts.Count;
+            DrawRune(m, c, R, life, 14, 0.09f, surging ? SurgeInk : CometViolet, surging ? ArmedGold : HotWhite, new Color(0.5f, 0.38f, 1.0f), powered,
+                powered && kit != null && !surging ? GlyphFly + 0.02f : 0);
+            m.runeTo = m.parts.Count;
+            float ws = powered ? 1f : 0.65f;   // cast without a glyph: a smaller meteor for a smaller strike
+            // the comet: a faceted charred rock with molten violet cracks and a small white-hot cap on its leading face (Rock
+            // shading), a hot bow glow just ahead of it, a faint halo, a two-layer tail, and (LateUpdate) fire puffs shed from its
+            // surface that trail into ragged flames, embers and a smoke trail. It waits just above the view and slams down in the last 1.1 s of the fall,
+            // stretching 1.4x along its path just before contact. No smooth glowing shells: those read as a jelly ball.
             var cometGo = new GameObject("Arcane comet").transform; cometGo.SetParent(transform, false); cometGo.position = m.from; m.comet = cometGo;
-            var fall = (c - m.from).normalized;
-            m.parts.Add(H(Arc(sphereMesh, false, arcAdd, m.from, Quaternion.identity, life, (b, u) =>
+            m.window = Mathf.Min(1.1f, life * 0.45f);
+            var fall = (c - m.from).normalized; if (rockMesh == null) rockMesh = Rock(11, 16, 0.42f);
+            float Stretch() { float left = m.life - (Time.time - m.start); return left < 0.12f ? Mathf.Lerp(1.4f, 1f, Mathf.Clamp01(left / 0.12f)) : 1f; }
+            float Thin() => 1f - 0.15f * (Stretch() - 1f) / 0.4f;
+            Quaternion Spin(float t) => Quaternion.LookRotation(fall) * Quaternion.Euler(t * 25, 0, t * 140);
+            m.parts.Add(H(Arc(rockMesh, false, arcAlphaSolid, m.from, Quaternion.identity, life, (b, u) =>
             {
-                if (!cometGo) return; b.go.transform.position = cometGo.position; b.go.transform.localScale = Vector3.one * 4.4f;
-                b.mpb.SetFloat(PFresnel, 1.1f); b.mpb.SetFloat(PIntensity, 1.1f); b.mpb.SetVector(PFlow, new Vector4(0, 4, 1.5f, 3)); b.mpb.SetFloat(PNoiseAmt, 0.65f);
-            }, MShell, CometViolet, HotWhite, AshMagenta)));
-            m.parts.Add(H(Arc(sphereMesh, false, arcAdd, m.from, Quaternion.identity, life, (b, u) =>
+                if (!cometGo) return; b.go.transform.SetPositionAndRotation(cometGo.position, Spin(b.t)); b.go.transform.localScale = new Vector3(2.6f * Thin(), 2.6f * Thin(), 2.6f * Stretch()) * ws;
+                b.mpb.SetFloat(PIntensity, 1.5f); b.mpb.SetVector(PNoiseScale, new Vector4(2.4f, 0, 0, 0)); b.mpb.SetFloat(PWidth, 0.08f); b.mpb.SetFloat(PEdgeGlow, 0.45f);
+                b.mpb.SetVector(PFlow, new Vector4(0.12f, 0.3f, 0.08f, 0)); b.mpb.SetVector(PHeatDir, fall);
+            }, MRock, MeteorChar, Molten, WhiteHot)));
+            // flame licks: rooted on the leading half of the rock, swept back along the fall, short and fast-flickering, white-hot
+            // at the stone fading to violet and burning away at their tips
+            for (int f = 0; f < 11; f++)
             {
-                if (!cometGo) return; b.go.transform.position = cometGo.position; b.go.transform.rotation = Quaternion.LookRotation(fall) * Quaternion.Euler(0, 0, b.t * 200);
-                b.go.transform.localScale = new Vector3(5.6f, 5.6f, 7.6f);
-                b.mpb.SetFloat(PFresnel, 1.2f); b.mpb.SetFloat(PIntensity, 0.6f); b.mpb.SetFloat(PDissolve, 0.3f + 0.1f * Mathf.Sin(b.t * 23));
-                b.mpb.SetVector(PFlow, new Vector4(0, 7, 2, 5)); b.mpb.SetFloat(PNoiseAmt, 0.85f); b.mpb.SetVector(PNoiseScale, new Vector4(6, 6, 0, 0));
-            }, MShell, DeepViolet, CometViolet, AshMagenta)));
+                float ang = f * (360f / 11) + Random.Range(-12f, 12f), baseLen = Random.Range(1.7f, 2.7f) * ws, wid = Random.Range(0.95f, 1.4f) * ws, ph = Random.value * 10;
+                float ahead = Random.Range(0.1f, 0.6f), rr = Random.Range(0.95f, 1.2f);
+                m.parts.Add(H(Arc(taperMesh, false, arcAdd, m.from, Quaternion.identity, life, (b, u) =>
+                {
+                    if (!cometGo) return;
+                    // rooted on the rock's outline as the camera sees it, on its sides and back only, so the flames stream away
+                    // from the stone instead of across its face
+                    var toCam = Cam ? (Cam.transform.position - cometGo.position).normalized : Vector3.up;
+                    var backS = Vector3.ProjectOnPlane(-fall, toCam); backS = backS.sqrMagnitude > 1e-4f ? backS.normalized : Vector3.up;
+                    var sideS = Vector3.Cross(toCam, backS).normalized;
+                    float a = (ang / 360f - 0.5f) * 250f * Mathf.Deg2Rad;   // -125..125 degrees either side of the back
+                    var off = backS * Mathf.Cos(a) + sideS * Mathf.Sin(a);
+                    var root = cometGo.position + off * (rr + 0.15f) * ws - fall * ahead * 0.5f; var back = (backS * 1.2f + off * 0.5f).normalized;
+                    float fl = Mathf.PerlinNoise(b.t * 14f + ph, ph), len = baseLen * (0.6f + 0.6f * fl) * Stretch();
+                    var tip = root + back * len;
+                    b.go.transform.SetPositionAndRotation(tip, AlongFacingCam(tip, -back)); b.go.transform.localScale = new Vector3(wid * (0.8f + 0.3f * fl), 1, len);
+                    b.mpb.SetFloat(PProgress, 1f); b.mpb.SetFloat(PTail, 0.35f); b.mpb.SetFloat(PWidth, 0.06f); b.mpb.SetFloat(PIntensity, 1.25f);
+                    b.mpb.SetFloat(PDissolve, 0.04f); b.mpb.SetFloat(PSoft, 0.7f); b.mpb.SetFloat(PEdgeGlow, 0f); b.mpb.SetFloat(PNoiseAmt, 0.75f);
+                    b.mpb.SetVector(PNoiseScale, new Vector4(2.5f, 3f, 0, 0)); b.mpb.SetVector(PFlow, new Vector4(-9f, 0.8f, -5f, -1.2f));
+                }, MBand, new Color(0.8f, 0.3f, 1.6f), new Color(2.2f, 1.2f, 2.0f), CometViolet)));
+            }
+            // a soft fire plume streaming back behind the rock (6 m), flame-coloured near it, burning away along its length
+            {
+                float ph = Random.value * 10;
+                m.parts.Add(H(Arc(taperMesh, false, arcAdd, m.from, Quaternion.identity, life, (b, u) =>
+                {
+                    if (!cometGo) return; float len = 6.5f * ws * (0.9f + 0.2f * Mathf.PerlinNoise(b.t * 9f, ph)); var head = cometGo.position - fall * 1.1f * ws; var tail = head - fall * len;
+                    b.go.transform.SetPositionAndRotation(tail, AlongFacingCam(tail, fall)); b.go.transform.localScale = new Vector3(2.8f * ws, 1, len);
+                    b.mpb.SetFloat(PProgress, 1f); b.mpb.SetFloat(PTail, 0.3f); b.mpb.SetFloat(PWidth, 0.05f); b.mpb.SetFloat(PIntensity, 0.6f);
+                    b.mpb.SetFloat(PDissolve, 0.05f); b.mpb.SetFloat(PSoft, 0.6f); b.mpb.SetFloat(PEdgeGlow, 0f); b.mpb.SetFloat(PNoiseAmt, 0.8f);
+                    b.mpb.SetVector(PNoiseScale, new Vector4(4f, 2.5f, 0, 0)); b.mpb.SetVector(PFlow, new Vector4(-8f, 0.5f, -4.5f, -0.8f));
+                }, MBand, new Color(0.8f, 0.3f, 1.6f), new Color(2.2f, 1.2f, 2.0f), CometViolet)));
+            }
+            // the bow glow: compressed hot air just ahead of the leading face
             m.parts.Add(H(Arc(billboard, false, arcAdd, m.from, Quaternion.identity, life, (b, u) =>
             {
-                if (!cometGo) return; b.go.transform.SetPositionAndRotation(cometGo.position, FaceCam(cometGo.position)); b.go.transform.localScale = Vector3.one * 3.4f; b.mpb.SetFloat(PIntensity, 1.4f);
-            }, MDot, HotWhite, new Color(2.2f, 2.0f, 2.4f), AshMagenta)));
+                if (!cometGo) return; var q = cometGo.position + fall * 1.5f * Stretch(); b.go.transform.SetPositionAndRotation(q, FaceCam(q));
+                b.go.transform.localScale = Vector3.one * (1.6f + 0.15f * Mathf.Sin(b.t * 31)) * ws; b.mpb.SetFloat(PIntensity, 0.9f); b.mpb.SetFloat(PNoiseAmt, 0.3f);
+            }, MDot, CometViolet, WhiteHot, CometDeep)));
             m.parts.Add(H(Arc(billboard, false, arcAdd, m.from, Quaternion.identity, life, (b, u) =>
             {
-                if (!cometGo) return; b.go.transform.SetPositionAndRotation(cometGo.position, FaceCam(cometGo.position)); b.go.transform.localScale = Vector3.one * 6.5f; b.mpb.SetFloat(PIntensity, 0.3f);
-            }, MDot, DeepViolet, CometViolet, AshMagenta)));
-            m.parts.Add(H(Arc(taperMesh, false, arcAdd, m.from, Quaternion.identity, life, (b, u) =>
+                if (!cometGo) return; b.go.transform.SetPositionAndRotation(cometGo.position, FaceCam(cometGo.position)); b.go.transform.localScale = Vector3.one * 5f; b.mpb.SetFloat(PIntensity, 0.07f);
+            }, MDot, DeepViolet, CometDeep, CometDeep)));
+            for (int layer = 0; layer < 2; layer++)
             {
-                if (!cometGo) return; var head = cometGo.position; var tail = head - fall * 26f;
-                b.go.transform.SetPositionAndRotation(tail, AlongFacingCam(tail, fall)); b.go.transform.localScale = new Vector3(5.5f, 1, 26f);
-                b.mpb.SetFloat(PProgress, 1f); b.mpb.SetFloat(PTail, 0.5f); b.mpb.SetFloat(PWidth, 0.06f); b.mpb.SetFloat(PIntensity, 1.15f);
-                b.mpb.SetVector(PFlow, new Vector4(-5f, 0, -2.5f, 0.8f)); b.mpb.SetFloat(PNoiseAmt, 0.7f); b.mpb.SetVector(PNoiseScale, new Vector4(10, 2.5f, 0, 0));
-            }, MBand, CometViolet, HotWhite, AshMagenta)));
+                float len = (layer == 0 ? 10f : 5f) * ws, wid = (layer == 0 ? 1.4f : 0.45f) * ws, inten = layer == 0 ? 0.35f : 0.45f;
+                m.parts.Add(H(Arc(taperMesh, false, arcAdd, m.from, Quaternion.identity, life, (b, u) =>
+                {
+                    if (!cometGo) return; var head = cometGo.position - fall * 0.8f; var tail = head - fall * len;
+                    b.go.transform.SetPositionAndRotation(tail, AlongFacingCam(tail, fall)); b.go.transform.localScale = new Vector3(wid, 1, len);
+                    b.mpb.SetFloat(PWidth, layer == 0 ? 0.5f : 0.3f); b.mpb.SetFloat(PIntensity, inten);
+                    b.mpb.SetVector(PFlow, new Vector4(-6f, 0, -3f, 0.8f)); b.mpb.SetFloat(PNoiseAmt, 0.6f); b.mpb.SetVector(PNoiseScale, new Vector4(10, 2.5f, 0, 0));
+                }, MBeam, layer == 0 ? CometViolet : CometPale, layer == 0 ? CometPale : WhiteHot, CometDeep)));
+            }
             Arc(RingU(0.15f, 0.2f, 24), true, arcAdd, HandPos(p) + Vector3.up * 0.3f, Facing(Vector3.up), 0.25f, (b, u) =>
             {
                 b.go.transform.localScale = Vector3.one * (1 + 2 * u); b.mpb.SetFloat(PWidth, 0.6f); b.mpb.SetFloat(PDissolve, u); b.mpb.SetFloat(PIntensity, 1.1f);
             }, MBeam, CometViolet, HotWhite, AshMagenta);
         }
 
-        // where the comet starts, chosen in the gameplay camera's view: through a point just past the screen edge on the far
-        // side from the mark (a little above it), 16 m above the floor, then pushed 2.5x further out, so it is off screen
-        // at first and streaks in from the side of the view for about the last second, wherever the mark is on screen
+        // where the comet starts: at about the mark's own distance from the camera (so it doesn't shrink away as it falls), about
+        // 50 degrees steep, leaning in from the side of the view with more room, raised until it is just outside the view; it
+        // crosses a good part of the screen before it slams down onto the mark (the boss usually sits high on screen)
         static Vector3 CometStart(Vector3 mark)
         {
-            var cam = Cam; if (!cam) return mark + Vector3.up * 40f + Vector3.right * 30f;
-            var sp = cam.WorldToViewportPoint(mark);
-            var ray = cam.ViewportPointToRay(new Vector3(sp.x > 0.5f ? -0.05f : 1.05f, Mathf.Min(0.85f, sp.y + 0.2f), 0));
-            float t = ray.direction.y < -0.05f ? (16f - ray.origin.y) / ray.direction.y : 30f;
-            var edge = ray.origin + ray.direction * Mathf.Max(5f, t);
-            return mark + (edge - mark) * 3.2f;
+            var cam = Cam; if (!cam) return mark + Vector3.up * 24f + Vector3.right * 8f;
+            var right = Sim.Flat(cam.transform.right).normalized; var far = Sim.Flat(cam.transform.forward).normalized;
+            float side = cam.WorldToViewportPoint(mark).x > 0.5f ? -1 : 1;   // lean in from the side with more room
+            for (float h = 8f; h <= 60f; h += 1f)
+            {
+                var at = mark + Vector3.up * h + right * side * h * 0.85f + far * h * 0.1f; var vp = cam.WorldToViewportPoint(at);
+                if (vp.z < 0 || vp.y > 1.1f || vp.x < -0.1f || vp.x > 1.1f) return at;
+            }
+            return mark + Vector3.up * 60f + right * side * 18f;
+        }
+
+        Mesh rockMesh; Mesh[] fragMeshes;
+        // a lumpy faceted rock of radius about 0.5: a sphere pushed in and out by smooth noise, then split per triangle so every
+        // facet has its own flat normal (reads as broken stone, not a smooth glossy ball)
+        static Mesh Rock(int lat, int lon, float lump)
+        {
+            var sm = UvSphere(lat, lon); var v = sm.vertices; var tri = sm.triangles; float sx = Random.value * 10, sy = Random.value * 10;
+            for (int i = 0; i < v.Length; i++)
+            {
+                var d = v[i].normalized;
+                float n = Mathf.PerlinNoise(d.x * 1.6f + sx, d.y * 1.6f + d.z * 1.3f + sy), n2 = Mathf.PerlinNoise(d.z * 3.4f + sy, d.x * 3.1f + d.y * 1.2f + sx);
+                v[i] = d * 0.5f * (1f - lump * 0.6f + lump * n + lump * 0.4f * n2);
+            }
+            var fv = new Vector3[tri.Length]; var ft = new int[tri.Length]; var fuv = new Vector2[tri.Length];
+            for (int i = 0; i < tri.Length; i++) { fv[i] = v[tri[i]]; ft[i] = i; fuv[i] = new Vector2(0.5f, 0.5f); }
+            Destroy(sm);
+            var m = new Mesh { name = "FX_MS_Rock", vertices = fv, uv = fuv, triangles = ft }; m.RecalculateNormals(); m.RecalculateBounds(); return m;
+        }
+        System.Collections.IEnumerator SmokeLater(float delay, Vector3 at, float size)
+        {
+            yield return new WaitForSeconds(delay); Smoke(at, Vector3.up * 0.6f, size * 1.4f, size * 3.2f, 0.6f, 0.45f);
+        }
+        // a puff of smoke: alpha-blended, grows and thins out; lit violet in the middle
+        void Smoke(Vector3 at, Vector3 vel, float size0, float size1, float life, float alpha)
+        {
+            var spin = Random.Range(-60f, 60f);
+            Arc(billboard, false, arcAlpha, at, FaceCam(at), life, (b, u) =>
+            {
+                float t = u * life; var q = at + vel * t; b.go.transform.SetPositionAndRotation(q, FaceCam(q) * Quaternion.Euler(0, spin * t, 0));
+                b.go.transform.localScale = Vector3.one * Mathf.Lerp(size0, size1, 1 - (1 - u) * (1 - u));
+                b.mpb.SetFloat(PNoiseAmt, 0.85f); b.mpb.SetVector(PNoiseScale, new Vector4(2.5f, 2.5f, 0, 0)); b.mpb.SetVector(PFlow, new Vector4(0.3f, 0.4f, -0.2f, 0.3f)); b.mpb.SetFloat(PSoft, 0.7f);
+                b.mpb.SetFloat(PDissolve, 0.08f + 0.3f * u); b.mpb.SetFloat(PEdgeGlow, 0f);
+                b.mpb.SetFloat(PIntensity, alpha * Mathf.Clamp01(u / 0.15f) * (1 - u));
+            }, MDot, new Color(0.12f, 0.09f, 0.15f), new Color(0.26f, 0.2f, 0.32f), CometDeep);
         }
 
         public void CometImpact(int id, Vector3 pos, bool hit, bool bull)
         {
             if (!marks.TryGetValue(id, out var m)) return;
-            marks.Remove(id); foreach (var h in m.parts) KillH(h);
+            marks.Remove(id);
+            m.snuffAt = Time.time;
+            for (int i = 0; i < m.parts.Count; i++)
+            {
+                var h = m.parts[i];
+                if (i < m.runeFrom || i >= m.runeTo || !h.Alive(this)) { KillH(h); continue; }
+                h.b.life = h.b.t + 0.13f;   // the rune's own anims dim it to ash and erode it over 0.12 s
+            }
             if (m.comet) Destroy(m.comet.gameObject);
             var c = new Vector3(pos.x, 0.05f, pos.z); float R = ArcanistKit.CometRadius;
-            // contact: the meteor itself squashes flat into the floor for an instant
-            Arc(sphereMesh, false, arcAdd, c + Vector3.up * 1.2f, Quaternion.identity, 0.12f, (b, u) =>
+            if (m.rings != null) foreach (var rr in m.rings)
+                    for (int j = 0; j < 4; j++)
+                    {
+                        float a = Random.value * Mathf.PI * 2; var q = c + new Vector3(Mathf.Sin(a), 0.05f, Mathf.Cos(a)) * rr;
+                        ashFx.Emit(q, Vector3.up * Random.Range(0.3f, 0.6f), Random.Range(0.07f, 0.11f), Random.Range(0.5f, 0.7f));
+                    }
+            float k = m.weak ? 0.6f : 1f, kb = m.weak ? 0.5f : 1f;   // cast without a glyph: a smaller strike
+            var hot = new Color(1.1f, 0.75f, 2.2f);   // the impact's hottest violet; white only at the very core
+            // the scar, drawn under the blast: the rune is snuffed out (it goes straight to ash and erodes; it does not explode
+            // itself, the meteor does), a broken-edged crater, jagged seams; all of it holds for 0.3 s, then erodes away
+            BurntRune(m, c, 1.6f, 0.09f, kb, false);
+            Arc(billboard, false, arcAlphaFloor, c, Quaternion.identity, 1.8f, (b, u) =>
             {
-                b.go.transform.localScale = new Vector3(Mathf.Lerp(4.4f, 9f, Ease(u)), Mathf.Lerp(3.2f, 0.6f, Ease(u)), Mathf.Lerp(4.4f, 9f, Ease(u)));
-                b.go.transform.position = c + Vector3.up * Mathf.Lerp(1.6f, 0.3f, u);
-                b.mpb.SetFloat(PFresnel, 1.1f); b.mpb.SetFloat(PDissolve, Mathf.Clamp01((u - 0.4f) / 0.6f)); b.mpb.SetFloat(PIntensity, 1.3f); b.mpb.SetFloat(PNoiseAmt, 0.6f);
-            }, MShell, CometViolet, HotWhite, AshMagenta);
-            // the slam: a huge flash, a tall column, two shockwaves racing past the rune, a dust ring, a hail of crystal
-            // shards, a deep crater with long glowing cracks, a strong light and a hard camera shake
-            Arc(billboard, false, arcAdd, c + Vector3.up * 1.2f, FaceCam(c), 0.14f, (b, u) =>
+                float t = u * 1.8f; b.go.transform.localScale = new Vector3(3.2f * k, 1, 3.2f * k);
+                b.mpb.SetFloat(PWidth, 0.55f); b.mpb.SetFloat(PNoiseAmt, 0.55f); b.mpb.SetVector(PNoiseScale, new Vector4(5, 5, 0, 0));
+                b.mpb.SetFloat(PIntensity, 0.85f * (1 - Ease(Mathf.Clamp01((t - 0.3f) / 1.5f))));
+            }, MShadow, new Color(0.03f, 0.01f, 0.05f), Void, CometViolet);
+            for (int j = 0; j < 7; j++)
             {
-                b.go.transform.localScale = Vector3.one * Mathf.Lerp(8f, 9.5f, u); b.mpb.SetFloat(PDissolve, u); b.mpb.SetFloat(PIntensity, 1.6f);
-            }, MDot, CometViolet, HotWhite, AshMagenta);
-            Arc(beamMesh, false, arcAdd, c, Quaternion.identity, 0.28f, (b, u) =>
+                float a = (j * 360f / 7 + Random.Range(-14f, 14f)) * Mathf.Deg2Rad; var dir = new Vector3(Mathf.Sin(a), 0, Mathf.Cos(a));
+                var seam = JaggedCrack(dir, 0.35f, Random.Range(1.6f, 2.4f) * k, 0.13f, 8f, 16f);
+                Arc(seam, true, arcAddFloor, c, Quaternion.identity, 1.8f, (b, u) =>
+                {
+                    float t = u * 1.8f;
+                    b.mpb.SetFloat(PProgress, Mathf.Lerp(0.15f, 1.1f, Ease(Mathf.Clamp01(t / 0.12f)))); b.mpb.SetFloat(PWidth, 0.08f);
+                    b.mpb.SetFloat(PDissolve, Mathf.Clamp01((t - 0.4f) / 1.4f)); b.mpb.SetFloat(PIntensity, (1.5f + 1.0f * Mathf.Clamp01(1 - t / 0.5f)) * kb);
+                }, MStroke, new Color(0.55f, 0.3f, 1.8f), new Color(0.9f, 0.62f, 2.3f), CometDeep);
+            }
+            // contact: a small white-hot core at ground zero inside a short violet halo
+            Arc(billboard, false, arcAdd, c + Vector3.up * 0.6f, FaceCam(c), 0.12f, (b, u) =>
             {
-                var cam2 = Cam; var toCam = cam2 ? Sim.Flat(cam2.transform.position - c).normalized : Vector3.back;
-                b.go.transform.SetPositionAndRotation(c, Quaternion.LookRotation(Vector3.up, toCam)); b.go.transform.localScale = new Vector3(1.6f * (1 - 0.5f * u), 1, 10f * Mathf.Lerp(0.6f, 1f, Ease(u)));
-                b.mpb.SetFloat(PWidth, 0.5f); b.mpb.SetFloat(PDissolve, u); b.mpb.SetFloat(PIntensity, 1.4f); b.mpb.SetVector(PFlow, new Vector4(-5, 0, -2.5f, 0.5f));
-            }, MBeam, CometViolet, HotWhite, AshMagenta);
-            Arc(colShell, false, arcAdd, c, Quaternion.identity, 0.35f, (b, u) =>
+                b.go.transform.localScale = Vector3.one * Mathf.Lerp(1.8f, 1.2f, u) * k; b.mpb.SetFloat(PDissolve, u); b.mpb.SetFloat(PIntensity, 1.7f * kb);
+            }, MDot, hot, new Color(2.4f, 2.2f, 2.6f), CometViolet);
+            Arc(billboard, false, arcAdd, c + Vector3.up * 1f, FaceCam(c), 0.2f, (b, u) =>
             {
-                float t = u * 0.35f; b.go.transform.localScale = new Vector3(1.6f + 1.2f * Ease(u), Ease(Mathf.Clamp01(t / 0.05f)) * 1.3f, 1.6f + 1.2f * Ease(u));
-                b.mpb.SetFloat(PFresnel, 1.3f); b.mpb.SetFloat(PDissolve, Mathf.Clamp01((t - 0.06f) / 0.29f)); b.mpb.SetFloat(PIntensity, 1.0f); b.mpb.SetFloat(PNoiseAmt, 0.6f);
-            }, MShell, CometViolet, HotWhite, AshMagenta);
-            for (int k = 0; k < 2; k++)
+                b.go.transform.localScale = Vector3.one * Mathf.Lerp(4f, 5.5f, Ease(u)) * k; b.mpb.SetFloat(PDissolve, u); b.mpb.SetFloat(PIntensity, 0.9f * kb * (1 - u));
+            }, MDot, DeepViolet, CometViolet, CometViolet);
+            // the fireball: the meteor's fire bursts out of the crater as flame tongues thrown up and out, gone in about 0.3 s
+            for (int j = 0; j < (m.weak ? 8 : 14); j++)
             {
-                float delay = k * 0.08f, far = R + 2f + k * 1.5f, life = 0.42f + delay;
-                Arc(RingU(0.94f, 1f, 160), true, arcAddFloor, c, Quaternion.identity, life, (b, u) =>
+                var d = Quaternion.Euler(0, j * (360f / (m.weak ? 8 : 14)) + Random.Range(-12f, 12f), 0) * Vector3.forward;
+                var dirF = (d + Vector3.up * Random.Range(0.5f, 1.6f)).normalized; float len = Random.Range(3.0f, 4.6f) * k, wid = Random.Range(1.5f, 2.2f) * k, fl = Random.Range(0.28f, 0.36f);
+                var root = c + Vector3.up * 0.3f + d * 0.4f * k;
+                Arc(taperMesh, false, arcAdd, root, Quaternion.identity, fl, (b, u) =>
+                {
+                    float g = Ease(Mathf.Clamp01(u / 0.4f)), l = Mathf.Max(0.05f, len * g); var tip = root + dirF * l;
+                    b.go.transform.SetPositionAndRotation(tip, AlongFacingCam(tip, -dirF)); b.go.transform.localScale = new Vector3(wid, 1, l);
+                    b.mpb.SetFloat(PProgress, 1f); b.mpb.SetFloat(PTail, 0.4f); b.mpb.SetFloat(PWidth, 0.06f); b.mpb.SetFloat(PIntensity, 1.6f * kb);
+                    b.mpb.SetFloat(PDissolve, 0.05f + 0.9f * u * u); b.mpb.SetFloat(PSoft, 0.6f); b.mpb.SetFloat(PEdgeGlow, 0f); b.mpb.SetFloat(PNoiseAmt, 0.8f);
+                    b.mpb.SetVector(PNoiseScale, new Vector4(2.5f, 3f, 0, 0)); b.mpb.SetVector(PFlow, new Vector4(-6f, 0.8f, -3.5f, -1.2f));
+                }, MBand, new Color(0.8f, 0.3f, 1.6f), new Color(2.2f, 1.2f, 2.0f), CometViolet);
+            }
+            // a soft fire bloom that rises about 1 m and burns out by 0.35 s
+            Arc(billboard, false, arcAdd, c + Vector3.up * 0.8f, FaceCam(c), 0.35f, (b, u) =>
+            {
+                var q = c + Vector3.up * (0.9f + 1.2f * Ease(u)) * k; b.go.transform.SetPositionAndRotation(q, FaceCam(q));
+                b.go.transform.localScale = Vector3.one * Mathf.Lerp(2.8f, 4.6f, Ease(u)) * k;
+                b.mpb.SetFloat(PNoiseAmt, 0.7f); b.mpb.SetVector(PNoiseScale, new Vector4(3, 3, 0, 0)); b.mpb.SetVector(PFlow, new Vector4(0.5f, -2f, -0.4f, -1.4f));
+                b.mpb.SetFloat(PDissolve, u < 0.3f ? 0 : (u - 0.3f) * (u - 0.3f) * 2f); b.mpb.SetFloat(PSoft, 0.5f); b.mpb.SetFloat(PEdgeGlow, 0f); b.mpb.SetFloat(PIntensity, 1.4f * kb);
+            }, MDot, new Color(0.8f, 0.3f, 1.6f), new Color(2.2f, 1.2f, 2.0f), CometViolet);
+            for (int j = 0; j < (m.weak ? 24 : 48); j++)
+            {
+                var d = Random.onUnitSphere; d.y = Mathf.Abs(d.y) * 0.8f + 0.2f;
+                flameFx.Emit(c + Vector3.up * 0.5f + d * 0.5f * k, d * Random.Range(4f, 8f) * k, Random.Range(1.0f, 1.8f) * k, Random.Range(0.25f, 0.4f));
+            }
+            for (int j = 0; j < (m.weak ? 12 : 24); j++)
+                embers.Emit(c + Vector3.up * 0.6f, (Random.insideUnitSphere * 0.8f + Vector3.up) * Random.Range(4f, 8f) * k, Random.Range(0.1f, 0.18f), Random.Range(0.5f, 0.9f));
+            // then a dark smoke plume rolls up and out of it
+            for (int j = 0; j < (m.weak ? 6 : 12); j++)
+            {
+                var d = Quaternion.Euler(0, j * (m.weak ? 60f : 30f) + Random.Range(-12f, 12f), 0) * Vector3.forward;
+                Smoke(c + d * 1.0f * k + Vector3.up * 0.4f, (d * Random.Range(1.2f, 2.0f) + Vector3.up * Random.Range(1.4f, 1.9f)) * k, 1.2f * k, 3.4f * k, Random.Range(0.8f, 1.0f), 1.1f);
+            }
+            // two thin shockwaves racing out past the rune
+            for (int j = 0; j < 2; j++)
+            {
+                float delay = j * 0.08f, far = (R + 2f + j * 1.5f) * k, life = 0.42f + delay;
+                Arc(RingU(0.985f, 1f, 160), true, arcAddFloor, c, Quaternion.identity, life, (b, u) =>
                 {
                     float t = Mathf.Clamp01((u * life - delay) / 0.42f); float r = Mathf.Lerp(0.8f, far, Ease(t)); b.go.transform.localScale = new Vector3(r, 1, r);
-                    b.mpb.SetFloat(PProgress, 1.1f); b.mpb.SetFloat(PWidth, 0.6f); b.mpb.SetFloat(PDissolve, Mathf.Clamp01((t - 0.55f) / 0.45f)); b.mpb.SetFloat(PIntensity, t <= 0 ? 0 : 1.7f);
-                }, MStroke, CometViolet, HotWhite, AshMagenta);
+                    b.mpb.SetFloat(PProgress, 1.1f); b.mpb.SetFloat(PWidth, 0.6f); b.mpb.SetFloat(PDissolve, Mathf.Clamp01((t - 0.4f) / 0.6f)); b.mpb.SetFloat(PNoiseAmt, 0.6f); b.mpb.SetFloat(PIntensity, t <= 0 ? 0 : 0.8f * kb);
+                }, MStroke, new Color(0.6f, 0.55f, 0.8f), new Color(1.1f, 1.0f, 1.4f), new Color(0.6f, 0.55f, 0.8f));
             }
-            // dust ring rolling outward along the floor
-            for (int k = 0; k < 48; k++)
+            // the meteor itself breaks up: charred fragments with glowing cracks thrown out and up, tumbling under gravity,
+            // landing within about 4 m and burning away after they land
+            if (fragMeshes == null) { fragMeshes = new Mesh[3]; for (int j = 0; j < 3; j++) fragMeshes[j] = Rock(4, 5, 0.9f); }
+            int chunks = m.weak ? 6 : 11;
+            for (int j = 0; j < chunks; j++)
             {
-                float a = k / 48f * Mathf.PI * 2; var d = new Vector3(Mathf.Sin(a), 0, Mathf.Cos(a));
-                arcMotes.Emit(c + d * 1.2f + Vector3.up * 0.25f, d * Random.Range(7f, 10f) + Vector3.up * Random.Range(0.3f, 1.2f), 0.3f, Random.Range(0.4f, 0.6f));
-            }
-            for (int k = 0; k < 22; k++)
-            {
-                var dir = Quaternion.Euler(0, k * (360f / 22) + Random.Range(-8f, 8f), 0) * Vector3.forward;
-                var v = dir * Random.Range(4.5f, 8f) + Vector3.up * Random.Range(5f, 9f); var start = c + dir * 0.6f + Vector3.up * 0.4f; var spin = Random.Range(-720f, 720f);
-                float size = Random.Range(0.5f, 0.95f); float land = (v.y + Mathf.Sqrt(v.y * v.y + 2 * 9.8f * 0.4f)) / 9.8f;
-                Arc(shardMesh, false, arcAdd, start, Quaternion.LookRotation(dir), land + 0.4f, (b, u) =>
+                var dir = Quaternion.Euler(0, Random.value * 360f, 0) * Vector3.forward;
+                var v = dir * Random.Range(1.6f, 5.0f) * k + Vector3.up * Random.Range(2.5f, 5.5f); const float g = 13f; var start = c + dir * 0.6f * k + Vector3.up * 0.6f;
+                float size = Random.Range(0.22f, 0.46f) * k, land = (v.y + Mathf.Sqrt(v.y * v.y + 2 * g * 0.5f)) / g; var spinAxis = Random.onUnitSphere; float spin = Random.Range(360f, 900f);
+                var rot0 = Random.rotation; var shape = new Vector3(Random.Range(0.8f, 1.3f), Random.Range(0.6f, 1f), Random.Range(0.9f, 1.4f)); var mesh = fragMeshes[j % 3];
+                Arc(mesh, false, arcAlphaSolid, start, rot0, land + 0.45f, (b, u) =>
                 {
-                    float t = Mathf.Min(u * (land + 0.4f), land); var at = start + v * t + Vector3.down * 4.9f * t * t; if (at.y < 0.06f) at.y = 0.06f;
-                    b.go.transform.position = at; if (t < land) b.go.transform.rotation = Quaternion.LookRotation(dir) * Quaternion.Euler(spin * t, spin * 0.3f * t, 0);
-                    b.go.transform.localScale = new Vector3(size * 2.4f, size * 2.4f, size);
-                    b.mpb.SetFloat(PDissolve, Mathf.Clamp01((u * (land + 0.4f) - land) / 0.4f)); b.mpb.SetFloat(PIntensity, 1.2f);
-                }, MDart, CometViolet, HotWhite, AshMagenta);
-            }
-            // the crater: a dark scorch (3 m radius) under eight long cracks that hold bright, then erode over 2 s
-            Arc(billboard, false, arcAlphaFloor, c, Quaternion.identity, 2.4f, (b, u) =>
-            {
-                b.go.transform.localScale = new Vector3(6f, 1, 6f); b.mpb.SetFloat(PWidth, 0.55f); b.mpb.SetFloat(PIntensity, 0.9f * (1 - u * u));
-            }, MShadow, new Color(0.03f, 0.01f, 0.05f), Void, CometViolet);
-            for (int k = 0; k < 8; k++)
-            {
-                float a = (k * 45 + Random.Range(-14f, 14f)) * Mathf.Deg2Rad; var dir = new Vector3(Mathf.Sin(a), 0, Mathf.Cos(a));
-                var seam = Crack(dir, 0.5f, Random.Range(2.8f, 4.2f), 4, 0.12f);
-                Arc(seam, true, arcAddFloor, c, Quaternion.identity, 2.4f, (b, u) =>
+                    float t = u * (land + 0.45f), tf = Mathf.Min(t, land); var at = start + v * tf + Vector3.down * 0.5f * g * tf * tf; at.y = Mathf.Max(at.y, size * 0.3f);
+                    if (t > land) { float tb = t - land; at += Sim.Flat(v) * 0.15f * tb + Vector3.up * Mathf.Max(0, 1.6f * tb - 8f * tb * tb); }   // a small bounce
+                    var vel = v + Vector3.down * g * tf;
+                    b.go.transform.position = at; b.go.transform.rotation = Quaternion.AngleAxis(spin * tf, spinAxis) * rot0; b.go.transform.localScale = shape * size;
+                    b.mpb.SetVector(PNoiseScale, new Vector4(3f, 0, 0, 0)); b.mpb.SetFloat(PWidth, 0.05f); b.mpb.SetFloat(PEdgeGlow, t < land ? 0.25f : 0.1f);
+                    b.mpb.SetVector(PHeatDir, t < land ? vel : Vector3.up); b.mpb.SetFloat(PSoft, 0.15f);
+                    b.mpb.SetFloat(PDissolve, Mathf.Clamp01((t - land) / 0.45f)); b.mpb.SetFloat(PIntensity, 1.5f);
+                }, MRock, MeteorChar, Molten, WhiteHot);
+                // a smoke wisp from each fragment
+                for (int w = 0; w < 3; w++) { float tw = land * (0.2f + 0.3f * w); var pw = start + v * tw + Vector3.down * 0.5f * g * tw * tw; StartCoroutine(SmokeLater(tw, pw, size)); }
+                // a short glowing streak behind each fragment while it flies
+                Arc(taperMesh, false, arcAdd, start, Quaternion.identity, land, (b, u) =>
                 {
-                    float t = u * 2.4f;
-                    b.mpb.SetFloat(PProgress, Mathf.Lerp(0.15f, 1.1f, Ease(Mathf.Clamp01(t / 0.12f)))); b.mpb.SetFloat(PWidth, 0.08f);
-                    b.mpb.SetFloat(PDissolve, Mathf.Clamp01((t - 0.4f) / 2f)); b.mpb.SetFloat(PIntensity, 1.3f);
-                }, MStroke, CometViolet, HotWhite, AshMagenta);
+                    float tf = u * land; var at = start + v * tf + Vector3.down * 0.5f * g * tf * tf; var vel = v + Vector3.down * g * tf; float len = Mathf.Min(0.6f, vel.magnitude * 0.1f);
+                    var tail = at - vel.normalized * len; b.go.transform.SetPositionAndRotation(tail, AlongFacingCam(tail, vel)); b.go.transform.localScale = new Vector3(size * 0.9f, 1, len);
+                    b.mpb.SetFloat(PWidth, 0.35f); b.mpb.SetFloat(PIntensity, 0.55f * (1 - u * 0.6f));
+                }, MBeam, CometDeep, Molten, CometDeep);
             }
-            for (int k = 0; k < 12; k++) embers.Emit(c + Random.insideUnitSphere * 2f + Vector3.up * 0.2f, Vector3.up * Random.Range(0.8f, 1.6f), 0.1f, Random.Range(0.9f, 1.6f));
-            for (int k = 0; k < 40; k++) arcSparks.Emit(c + Vector3.up * 0.6f, (Random.insideUnitSphere + Vector3.up) * 10f, 0.1f, 0.5f);
-            ArcLight(c + Vector3.up * 1.5f, CometViolet, bull ? 5f : 4f, 14f, 0.35f);
-            CameraShake.Shake(bull ? 0.8f : 0.55f, bull ? 0.45f : 0.38f);
-            RuneDetonate(m, c, R);
-            BurntRune(m, c, 1.4f, 0.09f);
+            // a few embers rising from the crater
+            for (int j = 0; j < 10; j++)
+            {
+                var off = Random.insideUnitCircle * 1.6f * k;
+                embers.Emit(c + new Vector3(off.x, 0.2f, off.y), Vector3.up * Random.Range(0.6f, 1.0f) + new Vector3(off.x, 0, off.y) * 0.1f, 0.09f, Random.Range(1.0f, 1.4f));
+            }
+            StartCoroutine(CraterEmbers(c, k));
+            for (int j = 0; j < 20; j++) arcSparks.Emit(c + Vector3.up * 0.6f, (Random.insideUnitSphere + Vector3.up) * 7f * k, 0.08f, 0.4f);
+            ArcLight(c + Vector3.up * 0.6f, CometViolet, (bull ? 16f : 13f) * kb, 8f * k, 0.3f);
+            CameraShake.Shake(m.weak ? 0.3f : bull ? 0.8f : 0.55f, bull ? 0.45f : 0.38f);
         }
         public void CometFade(int id) => FadeMark(id);
+        // a few more embers lifting off the seams over the next second
+        System.Collections.IEnumerator CraterEmbers(Vector3 c, float k)
+        {
+            for (int i = 0; i < 6; i++)
+            {
+                yield return new WaitForSeconds(0.15f);
+                var off = Random.insideUnitCircle * 1.8f * k; embers.Emit(c + new Vector3(off.x, 0.15f, off.y), Vector3.up * Random.Range(0.5f, 0.9f), 0.08f, Random.Range(1.0f, 1.3f));
+            }
+        }
+
+        Mesh crystalMesh;
+        // a faceted crystal: a six-sided bipyramid 1 m long along Z, flat-shaded so its facets catch the rim light
+        static Mesh Crystal()
+        {
+            var v = new List<Vector3>(); var n = new List<Vector3>(); var uv = new List<Vector2>(); var t = new List<int>();
+            var top = new Vector3(0, 0, 0.5f); var bot = new Vector3(0, 0, -0.5f);
+            void Tri(Vector3 a, Vector3 b, Vector3 c)
+            {
+                var nn = Vector3.Cross(b - a, c - a).normalized; int i = v.Count;
+                v.Add(a); v.Add(b); v.Add(c); n.Add(nn); n.Add(nn); n.Add(nn); uv.Add(new Vector2(0, 0)); uv.Add(new Vector2(1, 0)); uv.Add(new Vector2(0.5f, 1));
+                t.Add(i); t.Add(i + 1); t.Add(i + 2);
+            }
+            for (int i = 0; i < 6; i++)
+            {
+                float a0 = i * Mathf.PI / 3, a1 = (i + 1) * Mathf.PI / 3;
+                var p0 = new Vector3(Mathf.Cos(a0) * 0.28f, Mathf.Sin(a0) * 0.28f, 0.08f); var p1 = new Vector3(Mathf.Cos(a1) * 0.28f, Mathf.Sin(a1) * 0.28f, 0.08f);
+                Tri(top, p0, p1); Tri(bot, p1, p0);
+            }
+            var m = new Mesh { name = "FX_MS_Crystal" }; m.SetVertices(v); m.SetNormals(n); m.SetUVs(0, uv); m.SetTriangles(t, 0); m.RecalculateBounds(); return m;
+        }
+        // a jagged crack: 4 segments kinking 15-30° alternately, narrowing toward its tip
+        static Mesh JaggedCrack(Vector3 dir, float start, float len, float w, float kinkMin = 15f, float kinkMax = 30f)
+        {
+            var pts = new List<Vector3> { dir * start }; var head = dir; float sign = Random.value < 0.5f ? 1 : -1;
+            for (int i = 1; i <= 4; i++) { head = Quaternion.Euler(0, sign * Random.Range(kinkMin, kinkMax), 0) * (i == 1 ? dir : head); sign = -sign; pts.Add(pts[i - 1] + head * len / 4); }
+            var vs = new List<Vector3>(); var uv = new List<Vector2>(); var tr = new List<int>();
+            for (int i = 0; i < pts.Count; i++)
+            {
+                var d = (i < pts.Count - 1 ? pts[i + 1] - pts[i] : pts[i] - pts[i - 1]).normalized; var nn = Vector3.Cross(Vector3.up, d) * (w / 2 * (1 - 0.65f * i / (pts.Count - 1)));
+                vs.Add(pts[i] - nn); vs.Add(pts[i] + nn); float f = (float)i / (pts.Count - 1); uv.Add(new Vector2(f, 0)); uv.Add(new Vector2(f, 1));
+                if (i < pts.Count - 1) { int b = i * 2; tr.AddRange(new[] { b, b + 2, b + 1, b + 1, b + 2, b + 3 }); }
+            }
+            var m = new Mesh { name = "FX_MS_JaggedCrack" }; m.SetVertices(vs); m.SetUVs(0, uv); m.SetTriangles(tr, 0); m.RecalculateBounds(); return m;
+        }
 
         // ================================================================== E6 Blink
         public void BlinkOut(PlayerController p)
@@ -1389,10 +2117,10 @@ namespace LastBell.Run
             var s = St(p); var at = p.transform.position; s.blinkFrom = at;
             Arc(DashedRing(0.5f, 0.54f, 6, 14, 10), true, arcAddFloor, new Vector3(at.x, 0.05f, at.z), Quaternion.Euler(0, Random.value * 60, 0), 0.15f, (b, u) =>
             {
-                b.go.transform.localScale = Vector3.one * Mathf.Lerp(0.5f, 1.15f, Ease(u)); b.mpb.SetFloat(PWidth, 0.6f); b.mpb.SetFloat(PDissolve, u); b.mpb.SetFloat(PIntensity, 1.1f);
-            }, MBeam, ArcLilac, HotWhite, AshMagenta);
-            // the departure silhouette: a snapshot of his current pose as a hollow rim-lit lilac shell, gone in 0.15 s
-            BakeShell(s, 0.15f, 1.0f, true);
+                b.go.transform.localScale = Vector3.one * Mathf.Lerp(0.5f, 1.15f, Ease(u)); b.mpb.SetFloat(PWidth, 0.6f); b.mpb.SetFloat(PDissolve, u); b.mpb.SetFloat(PIntensity, 1.2f);
+            }, MBeam, BlinkLow, BlinkHigh, BlinkLow);
+            // the departure silhouette: a snapshot of his current pose as a hollow rim-lit violet shell, gone in 0.15 s
+            s.departShell = BakeShell(s, 0.15f, 0.9f, true, false, 0, BlinkLow, BlinkHigh);
             var chest = at + Vector3.up * 1.1f;
             for (int k = 0; k < 14; k++) arcMotes.Emit(chest + Random.insideUnitSphere * 0.45f, Random.insideUnitSphere * 1.2f + Vector3.up * 0.4f, 0.1f, Random.Range(0.2f, 0.25f));
             // four angular shards thrown 0.6-0.9 m outward and up
@@ -1403,40 +2131,44 @@ namespace LastBell.Run
                 Arc(dartMesh, false, arcAdd, start, Quaternion.LookRotation(v), 0.25f, (b, u) =>
                 {
                     float t = u * 0.25f; b.go.transform.position = start + v * t + Vector3.down * 4.9f * t * t; b.go.transform.rotation = Quaternion.LookRotation(v) * Quaternion.Euler(spin * t, 0, 0);
-                    b.go.transform.localScale = new Vector3(1.2f, 1.2f, 0.35f); b.mpb.SetFloat(PDissolve, Mathf.Clamp01((u - 0.5f) / 0.5f)); b.mpb.SetFloat(PIntensity, 1.1f);
-                }, MDart, ArcLilac, ArcLilac * 1.3f, AshMagenta);
+                    b.go.transform.localScale = new Vector3(0.6f, 0.6f, 0.28f); b.mpb.SetFloat(PDissolve, 0.15f + 0.85f * Mathf.Clamp01((u - 0.4f) / 0.6f)); b.mpb.SetFloat(PEdgeGlow, 1.4f); b.mpb.SetFloat(PIntensity, 1.0f);
+                }, MDart, new Color(0.3f, 0.15f, 0.9f), BlinkHigh, BlinkHigh);
             }
             KillH(s.thread);
             // the travel thread: thin, tapered (widest where he left), faint, with motes running along it toward him
-            s.thread = H(Arc(taperMesh, false, arcAdd, chest, Quaternion.identity, 9999, (b, time) =>
+            s.thread = H(Arc(beamMesh, false, arcAdd, chest, Quaternion.identity, 9999, (b, time) =>
             {
-                if (!p) return; var to = s.blinkFrom + Vector3.up * 1.0f; var from = p.transform.position + Vector3.up * 1.0f; var d = to - from;
+                if (!p) return; var to = s.blinkFrom + Vector3.up * 0.6f; var from = p.transform.position + Vector3.up * 0.6f; var d = to - from;
                 if (d.sqrMagnitude < 1e-4f) { b.go.transform.localScale = Vector3.zero; return; }
-                b.go.transform.SetPositionAndRotation(from, AlongFacingCam(from, d)); b.go.transform.localScale = new Vector3(0.07f, 1, d.magnitude);
-                b.mpb.SetFloat(PWidth, 0.8f); b.mpb.SetFloat(PIntensity, 1.2f);
-                if (Random.value < 0.7f) arcMotes.Emit(to - d * Random.value * 0.6f, -d.normalized * 30f, 0.07f, 0.06f);
-            }, MBeam, ArcLilac, HotWhite, AshMagenta));
+                b.go.transform.SetPositionAndRotation(from, AlongFacingCam(from, d)); b.go.transform.localScale = new Vector3(0.025f, 1, d.magnitude);
+                b.mpb.SetFloat(PWidth, 0.5f); b.mpb.SetFloat(PIntensity, 0.5f);
+                if (Random.value < 0.5f) arcMotes.Emit(to - d * Random.value * 0.8f, -d.normalized * 18f, 0.05f, 0.08f);
+            }, MBeam, BlinkLow, BlinkHigh, BlinkLow));
         }
         // a snapshot of his current pose as a rim-lit lilac shell. erode: eaten away (departure); follow: stays on his drawn
         // body (arrival, blocked); rebuild > 0: drawn only up to a height that rises from his feet over `rebuild` seconds
-        void BakeShell(ArcState s, float life, float intensity, bool erode, bool follow = false, float rebuild = 0)
+        List<Handle> BakeShell(ArcState s, float life, float intensity, bool erode, bool follow = false, float rebuild = 0, Color? low = null, Color? high = null)
         {
-            if (s.skins == null) return;
+            var made = new List<Handle>();
+            if (s.skins == null) return made;
             foreach (var sk in s.skins)
             {
                 if (!sk) continue;
                 var mesh = new Mesh(); sk.BakeMesh(mesh, true);
                 var tf = sk.transform; float feet = tf.position.y;
                 foreach (var t in tf.root.GetComponentsInChildren<PlayerController>(true)) { feet = t.transform.position.y; break; }
-                Arc(mesh, true, arcAdd, tf.position, tf.rotation, life, (b, u) =>
+                made.Add(H(Arc(mesh, true, arcAdd, tf.position, tf.rotation, life, (b, u) =>
                 {
                     if (follow && tf) b.go.transform.SetPositionAndRotation(tf.position, tf.rotation);
                     b.mpb.SetFloat(PFresnel, 2.5f); b.mpb.SetFloat(PDissolve, erode ? Mathf.Clamp01(u * 1.05f) : 0);
-                    b.mpb.SetFloat(PIntensity, intensity * (erode || rebuild > 0 ? 1 : 1 - u));
+                    // a rebuild shell fades out in the last 0.05 s once the cut has passed his head
+                    float tail = rebuild > 0 ? Mathf.Clamp01((life - u * life) / 0.05f) : 1;
+                    b.mpb.SetFloat(PIntensity, intensity * (erode || rebuild > 0 ? tail : 1 - u));
                     b.mpb.SetVector(PNoiseScale, new Vector4(14, 14, 0, 0)); b.mpb.SetFloat(PNoiseAmt, erode ? 0.6f : 0.2f); b.mpb.SetFloat(PSoft, 0.08f);
-                    if (rebuild > 0) b.mpb.SetFloat(PClipY, (follow && tf ? tf.position.y : feet) - 0.05f + 1.95f * Mathf.Clamp01(u * life / rebuild));
-                }, MShell, ArcLilac, HotWhite, AshMagenta);
+                    if (rebuild > 0) b.mpb.SetFloat(PClipY, feet - 0.05f + 1.95f * Ease(Mathf.Clamp01(u * life / rebuild)));
+                }, MShell, low ?? ArcLilac, high ?? HotWhite, high ?? AshMagenta)));
             }
+            return made;
         }
 
         public void BlinkIn(PlayerController p)
@@ -1449,30 +2181,30 @@ namespace LastBell.Run
             }
             s.thread = null;
             var chest = at + Vector3.up * 1.0f;
-            for (int k = 0; k < 12; k++) { var off = Random.onUnitSphere * 0.8f; arcMotes.Emit(chest + off, -off / 0.1f, 0.09f, 0.1f); }
+            for (int k = 0; k < 14; k++) { var off = new Vector3(Random.Range(-0.8f, 0.8f), Random.Range(-0.9f, 0.7f), Random.Range(-0.8f, 0.8f)); arcMotes.Emit(chest + off, -off / 0.08f, 0.08f, 0.08f); }
             // rebuilt from the feet up: his body stays hidden 0.12 s while a lilac shell of him is drawn up to a rising cut
             // with a bright band at the cut, then the body shows and the shell fades on it. Everything follows his drawn spot.
             Hide(p, true);   // same tick the kit showed him: the body is never drawn before the rebuild
-            StartCoroutine(Rebuild(p, s, 0.12f));
+            StartCoroutine(Rebuild(p, s, 0.16f));
             // a crisp thin violet floor ring at his feet, expanding 0.3 -> 0.9 m over 0.15 s
             Arc(RingU(0.965f, 1f, 64), true, arcAddFloor, new Vector3(at.x, 0.05f, at.z), Quaternion.identity, 0.18f, (b, u) =>
             {
                 if (p) { var pp = p.transform.position; b.go.transform.position = new Vector3(pp.x, 0.05f, pp.z); }
-                float r = Mathf.Lerp(0.3f, 0.9f, Ease(Mathf.Clamp01(u / 0.83f))); b.go.transform.localScale = new Vector3(r, 1, r);
+                float r = Mathf.Lerp(0.3f, 0.6f, Ease(Mathf.Clamp01(u / 0.6f))); b.go.transform.localScale = new Vector3(r, 1, r);
                 b.mpb.SetFloat(PProgress, 1.1f); b.mpb.SetFloat(PWidth, 0.6f); b.mpb.SetFloat(PDissolve, u * u); b.mpb.SetFloat(PIntensity, 1.6f);
-            }, MStroke, new Color(1.3f, 0.7f, 2.2f) * 0.75f, new Color(1.3f, 0.7f, 2.2f) * 0.9f, AshMagenta);
-            StartCoroutine(AstroPulse(p, 0.09f));
+            }, MStroke, BlinkLow, BlinkHigh, BlinkLow);
+            StartCoroutine(AstroPulse(p, 0.15f));
             ArcLight(chest, ArcLilac, 0.9f, 3f, 0.15f);
         }
         // one astrolabe pulse: a small ring at the astrolabe (0.25 m), 0.1 s, once the rebuild band passes his shoulder
         System.Collections.IEnumerator AstroPulse(PlayerController p, float after)
         {
             yield return new WaitForSeconds(after); if (!p) yield break;
-            var a = AstroPos(p);
+            var a = AstroPos(p); var rs = St(p).rig; if (rs) rs.Flash();
             Arc(RingU(0.23f, 0.25f, 32), true, arcAdd, a, FaceCam(a), 0.1f, (b, u) =>
             {
                 if (!p) return; var q = AstroPos(p); b.go.transform.SetPositionAndRotation(q, FaceCam(q)); b.go.transform.localScale = Vector3.one * Mathf.Lerp(0.8f, 1.25f, u);
-                b.mpb.SetFloat(PWidth, 0.6f); b.mpb.SetFloat(PDissolve, u); b.mpb.SetFloat(PIntensity, 1.2f);
+                b.mpb.SetFloat(PWidth, 0.6f); b.mpb.SetFloat(PDissolve, u); b.mpb.SetFloat(PIntensity, 0.8f);   // one soft pulse
             }, MBeam, ArcLilac, HotWhite, AshMagenta);
         }
 
@@ -1482,7 +2214,7 @@ namespace LastBell.Run
             yield return new WaitForEndOfFrame();   // bake the pose he is drawn in this frame
             if (!p) yield break;
             Hide(p, true);
-            BakeShell(s, seconds + 0.12f, 1.1f, false, follow: true, rebuild: seconds);
+            BakeShell(s, seconds + 0.05f, 0.9f, false, follow: true, rebuild: seconds, low: BlinkLow, high: BlinkHigh);
             yield return new WaitForSeconds(seconds);
             if (p && !(p.Kit is ArcanistKit k && k.Blinking)) Hide(p, false);
         }
@@ -1491,6 +2223,8 @@ namespace LastBell.Run
         {
             var s = St(p);
             if (s.thread != null) { KillH(s.thread); s.thread = null; }
+            // the departure silhouette goes at once, so it never stands beside his body
+            if (s.departShell != null) foreach (var h in s.departShell) if (h.Alive(this)) { var b0 = h.b; float t0 = b0.t; b0.life = b0.t + 0.04f; }
             StartCoroutine(Flicker(p, s));
         }
         // stunned mid-blink: two flickers where the "off" frames show his lilac shell at 60 % (never nothing), then 8 motes
@@ -1500,14 +2234,13 @@ namespace LastBell.Run
             for (int k = 0; k < 2; k++)
             {
                 if (!p) yield break; yield return new WaitForEndOfFrame();
-                Hide(p, true); BakeShell(s, 0.05f, 0.6f, false, follow: true);
+                Hide(p, true); BakeShell(s, 0.05f, 0.6f, false, follow: true, low: BlinkLow, high: BlinkHigh);
                 yield return new WaitForSeconds(0.05f);
                 if (!p) yield break; Hide(p, false); yield return new WaitForSeconds(0.05f);
             }
             if (!p) yield break;
             var chest = p.transform.position + Vector3.up * 1.0f;
-            for (int k = 0; k < 8; k++) { var off = Random.onUnitSphere * 0.7f; arcMotes.Emit(chest + off, -off / 0.1f, 0.09f, 0.1f); }
-            yield return new WaitForEndOfFrame(); if (p) BakeShell(s, 0.12f, 0.8f, false, follow: true);
+            for (int k = 0; k < 6; k++) { var off = Random.onUnitSphere * 0.7f; arcMotes.Emit(chest + off, -off / 0.08f, 0.08f, 0.08f); }
         }
     }
 }

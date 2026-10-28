@@ -117,11 +117,12 @@ One `TempoClock` per fight, advanced only on the 60 Hz combat tick. `Time.timeSc
 | Threefold Severance 1, left cleave | lane slab x < +2.5 m (boss frame), clipped to the floor; ≈63% of the floor from the centre | opening **9** | 26 |
 | Threefold Severance 2, right cleave | x > −2.5 m | +4 | 26 |
 | Threefold Severance 3, overhead | **his entire front half**: everything ahead of his centre line (changed October 24, 2026 at Risxhb's request; was a 7 m front band). Only the area behind him is safe | +4, then 3/5 recovery | 30 |
-| Sundering Wake, charge | 3 m lane to the farthest player, travel ≤15 m clamped to 8.5 m, +2.6 m thrust reach | 4/5 warning, 0.45 s travel; hit when the blade arrives | 24 |
-| Sundering Wake, eruption | 2.2 m lane on the travelled path (yellow, with a jagged crack); separate hazard and ID | 3/4 warning, resolves once | 16 |
+| Sundering Wake, charge | 3 m lane to the farthest player, travel ≤15 m clamped to 8.5 m, +2.6 m thrust reach. **Haste: 2 charges** (Oct 28): after the backswing he re-targets the farthest player from where he landed and charges again at once, no centre-up or recovery; Normal: 1 charge | 4/5 warning (second charge 3), 0.45 s travel; hit when the blade arrives | 24 |
+| Sundering Wake, **backswing** (Oct 28) | half-disc, 6 m radius, behind his landing point, facing back up the charge lane (Strike). Dashed preview at the landing marker from the start of each charge warning | live on arrival, lands **1** beat later in Haste, **2** in Normal | 26, knockback 1.5 m |
+| Sundering Wake, eruption | 2.2 m lane on the travelled path (yellow, with a jagged crack); separate hazard and ID. Every charge leaves its own, so Haste lanes can cross | 3/4 warning from arrival, resolves once | 16 |
 | Hollow Crown, ring | everything outside a 4 m pocket around him | 6/7 | 22 |
 | Hollow Crown, inner | 5.5 m circle under him | +3/+4, then 4/6 recovery | 22 |
-| Closing Rush | announced (text, plus a solid ivory stop ring and pip), **no damage** | 2-beat tell after 1.5 s with the pursuit target beyond 9 m; 8 s cooldown | — |
+| Closing Rush | announced (text, plus a solid ivory stop ring and pip), **no damage** (open question: should the stop ring hit?) | **1-beat** tell after **0.5 s** with the pursuit target beyond **7.5 m**; **24 m/s**; **3 s** cooldown (Oct 28). Fires between blocks, between Haste charges and during the Spiral Slices walk-in | — |
 | Sundering Wake, mirrored eruption (**Haste only**) | the eruption lane reflected across the arena's north-south line (left/right on screen) | dashed preview from the start of the charge warning; goes live and erupts on the same ticks as the real fissure | 16 |
 | Spiral Slices, spiral | the floor's 12 wedge slices (30° each, between the brass hour spokes). 11 pulse each step; the one safe slice moves one slice right (clockwise) or left (anticlockwise) per step | whole floor dashed for 4/5 beats; first pulse after 4/5 more; then 9 more pulses 2/2 beats apart | 12 per pulse, no stun or knockback |
 | Spiral Slices, every other | 6 alternate slices from the centre, then the other 6 | 4/5, then +3/+4; 2/3 recovery | 18 |
@@ -157,7 +158,7 @@ Risxhb asked for harder boss mechanics, starting with the Tempo Tyrant. Both com
 
 - **Severance lock:** before the first preview the boss re-centres (within 1.5 m of the arena centre) and faces the nearest player. Position and facing then stay locked; the test measured 0.000 drift. All three strikes preview from the start. **Imminent:** a saturated red-orange fill and a white numeral on an orange box. **Upcoming:** a dashed, unfilled outline and a bracketed numeral on a dark pill. **Spent:** drops at once to a faint ivory, sorts under live warnings and is gone in 0.15 s. On impact a short sword-arc ribbon shows the blade path, without flooding the floor. Each strike is its own hazard, so one player can take one hit per strike, and three separate strikes can each hit.
 - **Pursuit:** the target is the farthest standing player (ties go to the lowest roster index). The current target is kept while it stays beyond 7.5 m (hysteresis). If the target goes down during a rush tell, the rush cancels and the boss reselects at the next boundary. Pursuit walks for at most 1.25 s per boundary, so one distant player cannot drag him indefinitely.
-- **Hollow Crown and Wake** start from the centre gate. The Wake block ends only after its eruption, so it never overlaps another attack.
+- **Hollow Crown and Wake** start from the centre gate (a Haste Wake's second charge starts where the first landed). In ordinary blocks the Wake block ends only after its last eruption, so it never overlaps another attack; in Broken Cadence it does, by design.
 
 ## Tunables (constants in `TempoTyrantEncounter` / `TempoClock`)
 
@@ -169,12 +170,14 @@ Risxhb asked for harder boss mechanics, starting with the Tempo Tyrant. Both com
 | `SevOpen` / `SevGap` / `SevRecover` (Haste, Normal) | (9,9) / (4,4) / (3,5) beats | route checks set the floor |
 | `SevSide` | 2.5 m half-width | ≈63% of the floor per cleave from the centre. `SevBand` (3.5 m) is no longer used: strike 3 covers the whole front half |
 | `CentreGate` | 1.5 m | Severance, Crown and Wake start this close to the centre |
-| `WakeWidth` / `FissureWidth` / `WakeReach` | 3 / 2.2 / 2.6 m | `WakeWarn` (4,5), `FissureWarn` (3,4), `WakeRecover` (2,3), travel 27 ticks |
+| `WakeWidth` / `FissureWidth` / `WakeReach` | 3 / 2.2 / 2.6 m | `WakeWarn` (4,5), `WakeWarn2` (3,4), `FissureWarn` (3,4), `WakeRecover` (2,3), travel 27 ticks |
+| `HasteCharges` / `NormalCharges` | 2 / 1 | charges per Sundering Wake |
+| `BackswingRadius` / `BackswingHalf` / `Backswing` | 6 m / 90° / (1,2) beats | `BackswingDmg` 26 |
 | `CrownPocket` / `CrownInner` | 4 / 5.5 m | `CrownRing` (6,7), `CrownInnerWarn` (3,4), `CrownRecover` (4,6) |
-| `RushTell` | (2,2) beats | non-damaging |
-| `FightDist` / `RushDist` / hysteresis | 4.5 / 9 / 1.5 m | rush after 90 ticks far, 8 s cooldown, 16 m/s |
+| `RushTell` | (1,1) beats | non-damaging (was 2,2) |
+| `FightDist` / `RushDist` / hysteresis | 4.5 / 7.5 / 1.5 m | `RushSustainTicks` 30 (0.5 s far), `RushCooldownTicks` 3 s, `RushSpeed` 24 m/s (was 9 m, 90 ticks, 8 s, 16 m/s) |
 | `HasteWalk` / `NormalWalk` | 4.2 / 3.4 m/s | |
-| `FrenzyAt` / `FissureLeadBeats` | strictly < 20% / 8 | |
+| `FrenzyAt` / `FissureLeadBeats` | strictly < 20% / 8 | Broken Cadence windows: `TempoTyrantEncounter.Cadence` (table below) |
 | `MirrorMinAngle` | 20° | skip the mirror when it would nearly coincide with the real fissure |
 | `SliceCount` / `SliceHalf` / `SpiralSteps` | 12 / 15° / 10 | slices are on the floor's hour spokes (spoke i at i·30°) |
 | `SliceIndicate` / `SliceFirst` / `SliceStep` | (4,5) / (4,5) / (2,2) beats | whole-floor indication, first pulse, then one pulse per step |
@@ -185,7 +188,48 @@ Risxhb asked for harder boss mechanics, starting with the Tempo Tyrant. Both com
 
 ## Below 20%: Broken Cadence
 
-Triggers once, the first block boundary after HP is **strictly below** 20%. It plays a 1.5 s non-damaging tell (announcement, stance, metronome cracks and stronger light), and the tempo keeps alternating. **Each Haste passage opens with Sundering Wake, then Threefold Severance.** The Severance setup is recomputed after the charge has ended, and its opening is `max(9 beats, eruption + 8 beats)`, so the fissure is always spent at least 8 beats before strike 1 and never blocks a route between slash safe regions. If frenzy begins during Haste, the chain runs as the next block, queued once. If a pending tempo change comes first, the chain opens the next Haste passage instead. Normal passages use the ordinary rotation.
+Triggers once, the first block boundary after HP is **strictly below** 20%. It plays a 1.5 s non-damaging tell (announcement, stance, metronome cracks and stronger light), and the tempo keeps alternating.
+
+**Rework, October 28, 2026 (Risxhb: "chains mechanics on top of one another, never two slice mechanics at once, much faster").** The old chain (each Haste passage opening with Wake then Severance) is replaced by an **overlap scheduler** (`CadenceBlock`), in **both tempos**:
+- **Every block is a chain of 3 attacks.** The first comes from the ordinary rotation. Each next one is picked in turn from the pairings allowed after the previous attack (`Cadence.Pairs`) and **starts while the previous attack's last hit is still on the floor** (2–4 beats before it lands), not after its recovery. Only the chain's last attack recovers.
+- **Pairings** (first → overlapping second, and what is still pending when the second starts):
+
+| Pairing | Pending from the first | Second attack's first warning (Haste/Normal beats) |
+| --- | --- | --- |
+| Hollow Crown → Sundering Wake | inner circle | charge 1: 3/3 |
+| Sundering Wake → Threefold Severance | last fissure (+ mirror) | opening 6/6, and never less than 5 beats after the eruption |
+| Hollow Crown → Spiral Slices | inner circle | indicate 4/3 |
+| Spiral Slices → Hollow Crown | second every-other set | ring 4/5 |
+| Threefold Severance → Spiral Slices | strike 3 | indicate 3/3; the first safe slice is the one **behind him** (safe from strike 3) |
+| Spiral Slices → Threefold Severance | second every-other set | opening 6/6 |
+
+- **Never two slice attacks at once:** Spiral Slices and its every-other part count as one slice attack. There is no Slices → Slices pairing, and a Slices attack waits until no other slice is live.
+- **He never moves mid-Severance:** Severance is paired only with hazards already on the floor (a pending fissure, or slices). While a strike is pending, the centre-up and any rush wait.
+- **Faster:** every warning starts at about 0.65× its ordinary value and is raised back to the route-check floor (`routes_check.py floors`). In Broken Cadence the first safe slice is revealed while the floor is indicated, so an overlap is readable from the start.
+
+| Window (beats, Haste/Normal) | Ordinary | Broken Cadence | Note |
+| --- | --- | --- | --- |
+| Severance opening / gap | 9/9 / 4/4 | 9/9 / 4/4 | a lone Severance can't go faster: 6-beat opening and 3-beat gap fail far starts. Overlapping openings are 6 (table above) |
+| Wake warning / second charge | 4/5 / 3/4 | 3/3 / 2/3 | |
+| Backswing | 1/2 | 1/1.5 | |
+| Fissure warning | 3/4 | 2/3 | |
+| Crown ring / inner | 6/7 / 3/4 | 5/6 / 3/3 | 4 beats can't reach the pocket from the rim; a 2-beat inner can't leave it |
+| Spiral opening (indicate + first) | 8/10 | 8/9 | a co-op safe slice can be across the floor |
+| Spiral step | 2/2 | 1.5/1.5 | 1 beat passes only hugging the boss; 1.5 keeps the 5 m chase |
+| Every other 1 / 2 | 4/5 / 3/4 | 3/3 / 2/3 | |
+
+- **Routes:** every pairing, and every attack alone (it can open a chain), passes at 220 BPM sprinting with finite stamina and at 165 BPM walking, in both the in-game check and the full offline sweep. See Validation.
+
+## Below 10%: Falling Hours
+
+Added October 28, 2026 at Risxhb's request. This is a **deliberate soft enrage**, allowed for this boss only (`content-rules.md`, Tempo Tyrant exception). Code: `TempoTyrantEncounter.Orbs.cs`.
+- **Trigger:** once, at the first block boundary strictly below 10% HP. A 1 s non-damaging tell ("THE HOURS FALL") plays, then the orbs run alongside every attack, in both tempos, until he dies.
+- **Drops:** glowing orbs fall from the sky into a 1.5 m landing circle (Ground). The warning is 5 beats in Haste and 4 in Normal (1.36 / 1.45 s), and a drop deals 18. Every 3rd drop lands on a standing player (in turn); the rest land anywhere on the floor (seeded, same every attempt).
+- **Density:** 0.4 drops/s at the start, +0.02/s every second (one more drop per second every 50 s), capped at 3/s (reached after 130 s).
+- **Bouncing orbs:** each landing orb spews **3** orbs, 120° apart at a random angle. Each is 0.6 m (Strike), rolls at 6 m/s (walking speed) and deals 10. It can't be jumped (Risxhb): touching one hits. It bounces off the arena wall **3** times and dissipates on its fourth wall contact. Each orb hits a player at most once.
+- **Escape:** a walker leaves a landing circle in 0.6 s of a 1.36 s warning; a bouncing orb is no faster than walking, so players step out of its path. Survival gets harder without limit as density rises; that is the enrage.
+- **Defeat** clears every orb in the killing tick. The orbs share one cached material and mesh, so nothing accumulates across attempts.
+- **Open:** damage, density ramp and cap are first-pass numbers; Risxhb to tune by feel. Bouncing orbs have no direction preview beyond the orb itself.
 
 ## Music and ticks
 
@@ -206,6 +250,18 @@ Triggers once, the first block boundary after HP is **strictly below** 20%. It p
 - **Still open:** human listening, to check whether the 1.33× Haste version sounds driving rather than smeared.
 
 ## Validation
+
+### October 28, 2026: ultimate rework (plan sections 0–3)
+
+Separate player `builds/tempo-ultimate-20261028/r1/LastBell.exe` (`tools/tempo-tyrant/build-and-test.sh`), **0 errors / 50 warnings**. Acceptance run **170 / 170, zero runtime errors**, 177 fps at 2560×1440 with the 240 FPS cap. Evidence: `build-evidence/tempo-ultimate-20261028/r1/test/`.
+- **Backswing:** dashed preview from the start of the warning; live on arrival; lands 2 beats later in Normal (44 ticks); hits a player 3 m behind his landing point once and misses one in front.
+- **Haste second charge:** re-targets the farthest player (yaw 225° = bearing to that player), starts exactly 108 ticks after charge 1 (warning + travel + backswing); each charge leaves its own fissure.
+- **Closing Rush:** 1-beat tell (16 ticks), 8.7 m in 22 ticks = 23.8 m/s, stops at 4.5 m; 14 rushes, every gap ≥ 3 s; fired from pursuit and the Slices walk-in.
+- **Broken Cadence:** all 6 pairings ran in 61 s, in both tempos, each with the previous attack's hazards still pending (1–6). Never more than one slice attack live; 0 ticks off his planted spot while a Severance strike was pending; pending fissures erupted 149–183 ticks before strike 1.
+- **Routes (in game, sampled):** Wake rework, the 4 attacks alone and the 6 pairings, each in Haste (sprint + finite stamina) and Normal (walking): all pass, worst slack 0.00 s (Crown → Slices, Haste) to 1.16 s, in 22 s. Ordinary Severance/Crown/Mirrored Wake routes unchanged. Offline full sweep `python tools/tempo-tyrant/routes_check.py ultimate`: **22 / 22**.
+- **Route model notes:** the Haste stamina model starts each sequence with full stamina; a player arriving drained has less. Pairings are proven pairwise (whole first attack + overlapping second), not as whole 3-attack chains. In co-op the spiral's safe slice belongs to the player nearest the centre, so a far player must cross the floor (pre-existing, sampled as every slice).
+- **Frame pacing (`docs/frame-pacing.md`):** the new code is tick-only (no frame-time code). The model is drawn up to one tick (≤0.55 m at charge speed) behind the logic position at arrival; the backswing lands 16+ ticks later, so the swing lines up. A rush is 0.4 m per tick, below the 2 m snap. The suite also passes **170/170 at a 60 FPS cap** (58.7 fps) **and with VSync** (145.8 fps), using the test-only `-tempoTyrantFps <n>` / `-tempoTyrantVsync` override (never saved). Menu flow (stage 8 quick) 155/155. `-lastbellPractice tempo-tyrant` reaches combat with no exceptions.
+- **Not checked:** human feel and difficulty, real co-op, the placeholder backswing pose's readability.
 
 Unity **6000.6.6f1**. Evidence: `E:/Collab/build-evidence/tempo-tyrant-20261023/`. The final polish build was made with `MetronomeCourtBuilder.BuildWindowsPlayer`, which uses the same scenes and options as Current Player, and outputs to `builds/tempo-tyrant-20261023/`. It finished with **0 errors / 46 warnings** (the same count as the recorded baseline).
 

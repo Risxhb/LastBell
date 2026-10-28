@@ -12,11 +12,14 @@
 //   _Mode 6 Shadow:  a soft round dark spot, hardness _Width (alpha-blend it with a dark _ColorLow)
 //   _Mode 7 Dart:    a diamond along U with a hot tip at U = 1 (missiles, shards)
 //   _Mode 8 Pillar:  bright at the base, fading up V, with vertical strands (light columns; cylinder mesh U around)
+//   _Mode 9 Rock:    opaque charred stone (_ColorLow, lit by a fixed key light per facet) with thin molten cracks
+//                    (_ColorHigh, from 3D noise in object space, width _Width) and a white-hot face toward _HeatDir
+//                    (_ColorEdge x _EdgeGlow); erosion burns it away with a glowing edge. Alpha-blend it.
 Shader "LastBell/FX/ArcaneFlow"
 {
     Properties
     {
-        [Enum(Band,0,Dot,1,Stroke,2,Beam,3,Shell,4,Flake,5,Shadow,6,Dart,7,Pillar,8)] _Mode ("Shape", Float) = 3
+        [Enum(Band,0,Dot,1,Stroke,2,Beam,3,Shell,4,Flake,5,Shadow,6,Dart,7,Pillar,8,Rock,9)] _Mode ("Shape", Float) = 3
         [HDR] _ColorLow ("Body", Color) = (0.75, 0.25, 1.9, 1)
         [HDR] _ColorHigh ("Hot", Color) = (2.4, 2.2, 2.6, 1)
         [HDR] _ColorEdge ("Erosion edge", Color) = (2.0, 0.45, 1.5, 1)
@@ -33,14 +36,16 @@ Shader "LastBell/FX/ArcaneFlow"
         _T ("Effect time", Float) = 0
         _ClipY ("World height clip (off below -50)", Float) = -100
         _Intensity ("Intensity", Float) = 1
+        _HeatDir ("Rock: hot face direction (world)", Vector) = (0, -1, 0, 0)
         [Enum(UnityEngine.Rendering.BlendMode)] _SrcBlend ("Src blend", Float) = 1
         [Enum(UnityEngine.Rendering.BlendMode)] _DstBlend ("Dst blend", Float) = 1
+        [Enum(UnityEngine.Rendering.CullMode)] _Cull ("Cull (Off = both sides)", Float) = 0
     }
     SubShader
     {
         Tags { "Queue" = "Transparent+60" "RenderType" = "Transparent" "IgnoreProjector" = "True" }
         Blend [_SrcBlend] [_DstBlend]
-        ZWrite Off Cull Off
+        ZWrite Off Cull [_Cull]
         Pass
         {
             HLSLPROGRAM
@@ -48,16 +53,16 @@ Shader "LastBell/FX/ArcaneFlow"
             #pragma fragment frag
             #include "UnityCG.cginc"
             float _Mode, _Progress, _Width, _Tail, _Dissolve, _Soft, _EdgeGlow, _NoiseAmt, _Fresnel, _T, _Intensity, _ClipY;
-            float4 _ColorLow, _ColorHigh, _ColorEdge, _NoiseScale, _Flow;
+            float4 _ColorLow, _ColorHigh, _ColorEdge, _NoiseScale, _Flow, _HeatDir;
             struct appdata { float4 vertex : POSITION; float3 normal : NORMAL; float2 uv : TEXCOORD0; float4 color : COLOR; };
-            struct v2f { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; float4 color : COLOR; float rim : TEXCOORD1; float wy : TEXCOORD2; };
+            struct v2f { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; float4 color : COLOR; float rim : TEXCOORD1; float wy : TEXCOORD2; float3 wn : TEXCOORD3; float3 op : TEXCOORD4; };
             v2f vert (appdata v)
             {
                 v2f o; o.pos = UnityObjectToClipPos(v.vertex); o.uv = v.uv; o.color = v.color;
                 float3 n = normalize(UnityObjectToWorldNormal(v.normal));
                 float3 vd = normalize(WorldSpaceViewDir(v.vertex));
                 o.rim = 1 - abs(dot(n, vd));
-                o.wy = mul(unity_ObjectToWorld, v.vertex).y;
+                o.wy = mul(unity_ObjectToWorld, v.vertex).y; o.wn = n; o.op = v.vertex.xyz;
                 return o;
             }
             float hash (float2 p) { return frac(sin(dot(p, float2(127.1, 311.7))) * 43758.5453); }
@@ -66,8 +71,53 @@ Shader "LastBell/FX/ArcaneFlow"
                 float2 i = floor(p), f = frac(p); f = f * f * (3 - 2 * f);
                 return lerp(lerp(hash(i), hash(i + float2(1, 0)), f.x), lerp(hash(i + float2(0, 1)), hash(i + 1), f.x), f.y);
             }
+            float hash3 (float3 p) { return frac(sin(dot(p, float3(127.1, 311.7, 74.7))) * 43758.5453); }
+            float vnoise3 (float3 p)
+            {
+                float3 i = floor(p), f = frac(p); f = f * f * (3 - 2 * f);
+                float a = lerp(lerp(hash3(i), hash3(i + float3(1, 0, 0)), f.x), lerp(hash3(i + float3(0, 1, 0)), hash3(i + float3(1, 1, 0)), f.x), f.y);
+                float b = lerp(lerp(hash3(i + float3(0, 0, 1)), hash3(i + float3(1, 0, 1)), f.x), lerp(hash3(i + float3(0, 1, 1)), hash3(i + 1), f.x), f.y);
+                return lerp(a, b, f.z);
+            }
+            // distances to the nearest and second-nearest cell points (3D Voronoi): F2 - F1 is small along cell borders
+            float2 voro3 (float3 p)
+            {
+                float3 i = floor(p), f = frac(p); float d1 = 8, d2 = 8;
+                for (int z = -1; z <= 1; z++) for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++)
+                {
+                    float3 g = float3(x, y, z), c = i + g;
+                    float3 r = g + float3(hash3(c), hash3(c + 17.1), hash3(c + 31.7)) - f; float d = dot(r, r);
+                    if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) d2 = d;
+                }
+                return float2(sqrt(d1), sqrt(d2));
+            }
+            float4 Rock (v2f i)
+            {
+                float3 N = normalize(i.wn), H = normalize(_HeatDir.xyz + float3(0, 1e-4, 0));
+                float3 p = i.op * _NoiseScale.x;
+                float n1 = vnoise3(p + _Flow.xyz * _T), n2 = vnoise3(p * 2.7 + 11.3), n3 = vnoise3(p * 0.5 + 3.7);
+                float face = dot(N, H), heat = saturate(face);
+                float key = saturate(dot(N, normalize(float3(-0.35, 0.85, -0.4))));
+                float3 col = _ColorLow.rgb * (0.45 + 0.4 * key) * (0.55 + 0.7 * n2);                      // charred stone: soft facet shading, mottled
+                float2 vo = voro3(p + (n3 - 0.5) * 0.8);                                                 // cracks along cell borders
+                float vein = 1 - smoothstep(0, _Width * (0.25 + 1.5 * n2 * n2), vo.y - vo.x);           // crack width varies along them
+                vein *= smoothstep(0.45, 0.72, n3) * (0.4 + 1.0 * n1);                                   // only some borders split; light pulses along them
+                col += _ColorHigh.rgb * saturate(vein) * (0.15 + 1.85 * smoothstep(-0.2, 0.9, face));        // cracks hottest on the leading face, faint behind
+                col += _ColorHigh.rgb * 0.1 * smoothstep(0.55, 0.98, face) * (0.6 + 0.8 * n1);               // the leading face glows molten
+                col += _ColorEdge.rgb * pow(heat, 6) * _EdgeGlow;                                         // a small hot cap on the leading face
+                float nn = n1 * 0.5 + n2 * 0.5, mask = 1, edge = 0;
+                if (_Dissolve > 0.001)
+                {
+                    mask = saturate((nn - _Dissolve) / _Soft);
+                    edge = mask * (1 - saturate((nn - _Dissolve - _Soft * 0.5) / _Soft));
+                    col += _ColorHigh.rgb * edge * 1.5;
+                }
+                float a = saturate(mask * i.color.a * _Intensity);
+                return float4(col * i.color.rgb * a, a);   // premultiplied
+            }
             float4 frag (v2f i) : SV_Target
             {
+                if (_Mode > 8.5) return Rock(i);
                 float2 uv = i.uv; float s = 1; float dissolve = _Dissolve; float a0 = i.color.a;
                 if (_Mode < 0.5)
                 {

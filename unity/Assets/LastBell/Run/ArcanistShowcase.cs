@@ -41,6 +41,7 @@ namespace LastBell.Run
 
         readonly Bot bot = new Bot();
         string outDir, only; Camera close; RenderTexture rt; Texture2D grab, grabClose;
+        PlayerController watch; string stateLog;   // when set, Record writes his HP / dash state for every frame
         Func<Vector3> closeTarget; Vector3 closeOffset;
 
         IEnumerator Start()
@@ -64,7 +65,7 @@ namespace LastBell.Run
 
             IEnumerator Reset()
             {
-                bot.Clear(); d.Boss.Halt(); d.World.ClearTransient(); p.DebugSetHp(PlayerController.MaxHp);
+                bot.Clear(); d.Boss.Halt(); d.World.ClearTransient(); p.DebugSetHp(PlayerController.MaxHp); k.ResetAll();
                 var b = d.Boss.transform.position; var cm = Camera.main;
                 // stand between the camera and the boss, a little to the side, so the gameplay view shows both
                 var back = cm ? -Sim.Flat(cm.transform.forward).normalized : Vector3.back; var side = Vector3.Cross(Vector3.up, -back);
@@ -82,8 +83,8 @@ namespace LastBell.Run
             {
                 if (Want("missile_tap"))
                 {
-                    yield return Reset(); FocusMid(); var rec = StartCoroutine(Record("missile_tap", 30));
-                    for (int i = 0; i < 3; i++) { bot.press[0] = true; yield return Frames(7); }
+                    yield return Reset(); FocusMid(); var rec = StartCoroutine(Record("missile_tap", 36));
+                    for (int i = 0; i < 3; i++) { bot.press[0] = true; yield return Frames(9); }
                     yield return rec;
                 }
                 if (Want("missile_charge"))
@@ -106,33 +107,58 @@ namespace LastBell.Run
                 }
                 if (Want("disintegrate_broken"))
                 {
-                    yield return Reset(); while (k.Cooldown01(1) > 0) yield return null;
+                    yield return Reset();
                     FocusMid(); var rec = StartCoroutine(Record("disintegrate_broken", 45));
                     bot.press[1] = true; bot.hold[1] = true; yield return Frames(30);
                     bot.dash = true; bot.MoveWorld = Vector3.left; yield return Frames(4); bot.hold[1] = false; bot.Clear(); yield return rec;
                 }
                 if (Want("rune_sigil"))
                 {
-                    yield return Reset(); FocusBoss(); var rec = StartCoroutine(Record("rune_sigil", 48));
+                    yield return Reset(); k.DebugSetGlyphs(1); yield return Frames(12);
+                    FocusBoss(); var rec = StartCoroutine(Record("rune_sigil", 54));
                     bot.press[2] = true; yield return rec;
                 }
-                if (Want("astral_orb"))
+                if (Want("glyph_build"))
                 {
-                    yield return Reset(); FocusMe(); var rec = StartCoroutine(Record("astral_orb", 105));
-                    bot.press[3] = true; yield return Frames(60); FocusMid(); yield return rec;
-                    // the end of its 8 s: the last 1.5 s flicker and the return (the orb ends about 262 frames after the cast)
-                    FocusMe(); yield return Frames(105); yield return Record("astral_orb_end", 70);
+                    // a full Disintegrate on the boss: a glyph carved at each step, then the three glyphs orbiting him
+                    yield return Reset(); FocusMid(); var rec = StartCoroutine(Record("glyph_build", 96));
+                    bot.press[1] = true; bot.hold[1] = true; yield return Frames(84); bot.hold[1] = false; yield return rec;
+                    FocusMe(); closeOffset = new Vector3(2.2f, 1.4f, 3.0f); yield return Record("glyphs_idle", 45);
                 }
-                if (Want("astral_orb_cancel"))
+                if (Want("rune_sigil_weak"))
                 {
-                    yield return Reset(); while (k.Cooldown01(3) > 0 || k.OrbActive) yield return null;
-                    FocusMe(); var rec = StartCoroutine(Record("astral_orb_cancel", 30));
-                    bot.press[3] = true; yield return Frames(12); bot.dash = true; bot.MoveWorld = Vector3.right; yield return Frames(4); bot.Clear(); yield return rec;
+                    yield return Reset(); FocusBoss(); var rec = StartCoroutine(Record("rune_sigil_weak", 54));
+                    bot.press[2] = true; yield return rec;
                 }
                 if (Want("arcane_comet"))
                 {
-                    yield return Reset(); FocusBoss(); var rec = StartCoroutine(Record("arcane_comet", 96));
+                    yield return Reset(); k.DebugSetGlyphs(1); yield return Frames(12);
+                    FocusBoss(); var rec = StartCoroutine(Record("arcane_comet", 165));   // through the whole aftermath
+                    bot.press[3] = true; yield return rec;
+                }
+                if (Want("arcane_comet_weak"))
+                {
+                    yield return Reset(); FocusBoss(); var rec = StartCoroutine(Record("arcane_comet_weak", 150));   // through the impact
+                    bot.press[3] = true; yield return rec;
+                }
+                if (Want("surge"))
+                {
+                    // 3 glyphs: the cast pulls them in, the release, then a 5-missile volley and a fast sigil while
+                    // empowered, then the last second flickering and the fold at the end of its 6 s
+                    yield return Reset(); k.DebugSetGlyphs(3); yield return Frames(15);
+                    FocusMe(); closeOffset = new Vector3(3.2f, 2.0f, 4.2f); var rec = StartCoroutine(Record("surge", 40));
                     bot.press[4] = true; yield return rec;
+                    FocusMid(); rec = StartCoroutine(Record("surge_active", 110));
+                    bot.press[0] = true; bot.hold[0] = true; yield return Frames(30); bot.hold[0] = false; yield return Frames(20);
+                    bot.press[2] = true; yield return Frames(26);
+                    bot.press[0] = true; yield return Frames(10); bot.press[0] = true; yield return rec;   // two surged taps (two darts each)
+                    yield return Frames(5); FocusMe(); closeOffset = new Vector3(3.2f, 2.0f, 4.2f); yield return Record("surge_end", 45);
+                }
+                if (Want("surge_cancel"))
+                {
+                    yield return Reset(); k.DebugSetGlyphs(3); yield return Frames(15);
+                    FocusMe(); closeOffset = new Vector3(3.2f, 2.0f, 4.2f); var rec = StartCoroutine(Record("surge_cancel", 30));
+                    bot.press[4] = true; yield return Frames(3); bot.dash = true; bot.MoveWorld = Vector3.right; yield return Frames(4); bot.Clear(); yield return rec;
                 }
                 if (Want("blink_blocked"))
                 {
@@ -144,12 +170,80 @@ namespace LastBell.Run
                     yield return Frames(2); bot.dash = true; bot.MoveWorld = Vector3.right; yield return Frames(6); bot.Clear(); yield return rec;
                     p.DebugSetHp(PlayerController.MaxHp);
                 }
+                if (Want("blink_hit"))
+                {
+                    // no invincibility on Blink: a 25-damage strike resolves 4 ticks into the dash and must land
+                    yield return Reset(); FocusMe(); closeOffset = new Vector3(3.5f, 2.2f, 4.5f);
+                    watch = p; stateLog = Path.Combine(outDir, "blink_hit_state.csv"); File.WriteAllText(stateLog, "frame,hp,dashing,hidden,stunned\n");
+                    var rec = StartCoroutine(Record("blink_hit", 30));
+                    yield return Frames(3);
+                    d.World.Hazards.Spawn(new Hazard { Source = "Test strike during Blink", Shape = HazardShape.Circle, Kind = HazardKind.Strike, Origin = p.transform.position, Radius = 3f, ResolveAt = 8, Damage = 25 });
+                    yield return Frames(2); bot.dash = true; bot.MoveWorld = Vector3.right; yield return Frames(8); bot.Clear(); yield return rec;
+                    Log($"blink_hit: hp after {p.Hp} (started at {PlayerController.MaxHp}); the hit landed during the dash, no invincibility");
+                    watch = null; p.DebugSetHp(PlayerController.MaxHp);
+                }
                 if (Want("blink"))
                 {
                     yield return Reset(); FocusMe(); closeOffset = new Vector3(3.5f, 2.2f, 4.5f);
                     var rec = StartCoroutine(Record("blink", 24));
                     yield return Frames(3); bot.dash = true; bot.MoveWorld = Vector3.right; yield return Frames(10); bot.Clear(); yield return rec;
                 }
+                // astrolabe review (orb critique, Oct 28): only when named in -arcanistOnly. The close camera frames the
+                // device itself; <name>_orb.csv logs where it sits relative to him every frame.
+                Transform astro = null, headT = null;
+                if (p.Presenter) foreach (var t in p.Presenter.Visual.GetComponentsInChildren<Transform>(true)) { if (t.name == "Astrolabe") astro = t; if (t.name == "head") headT = t; }
+                void FocusOrb(Vector3 off) { closeTarget = () => astro ? astro.position : Me() + Vector3.up * 1.5f; closeOffset = off; }
+                void OrbLog(string name) { orbLog = Path.Combine(outDir, name + "_orb.csv"); orbT = astro; orbHead = headT; orbP = p; File.WriteAllText(orbLog, "frame,right,up,forward,head_dist,yaw,tilt\n"); }
+                if (Named("orb_idle"))
+                {
+                    yield return Reset(); FocusOrb(new Vector3(0.7f, 0.5f, 1.7f)); OrbLog("orb_idle"); yield return Record("orb_idle", 60);
+                    FocusOrb(new Vector3(1.4f, 0.2f, -1.6f)); OrbLog("orb_front"); yield return Record("orb_front", 45);
+                }
+                if (Named("orb_walk"))
+                {
+                    yield return Reset(); FocusMe(); closeOffset = new Vector3(2.2f, 1.2f, 2.8f); OrbLog("orb_walk");
+                    var rec = StartCoroutine(Record("orb_walk", 75));
+                    bot.MoveWorld = Vector3.right; yield return Frames(30); bot.MoveWorld = Vector3.zero; yield return Frames(15);
+                    bot.MoveWorld = Vector3.left; yield return Frames(20); bot.Clear(); yield return rec;
+                }
+                if (Named("orb_lens"))
+                {
+                    yield return Reset(); FocusOrb(new Vector3(1.6f, 0.7f, 1.4f)); OrbLog("orb_lens");
+                    var rec = StartCoroutine(Record("orb_lens", 96));
+                    bot.press[1] = true; bot.hold[1] = true; yield return Frames(84); bot.hold[1] = false; yield return rec;
+                    yield return Frames(15);
+                }
+                if (Named("orb_surge"))
+                {
+                    yield return Reset(); k.DebugSetGlyphs(3); yield return Frames(15);
+                    FocusOrb(new Vector3(1.3f, 0.8f, 2.0f)); OrbLog("orb_surge");
+                    var rec = StartCoroutine(Record("orb_surge", 60));
+                    bot.press[4] = true; yield return rec;
+                    yield return Frames(200);   // let the empowered state run out before the next sequence
+                }
+                if (Named("orb_blink"))
+                {
+                    yield return Reset(); FocusMe(); closeOffset = new Vector3(2.6f, 1.4f, 3.2f); OrbLog("orb_blink");
+                    var rec = StartCoroutine(Record("orb_blink", 30));
+                    yield return Frames(3); bot.dash = true; bot.MoveWorld = Vector3.right; yield return Frames(10); bot.Clear(); yield return rec;
+                }
+                if (Named("orb_cream"))
+                {
+                    // on the cream stone outside the navy clock face (gameplay contrast on a light floor)
+                    yield return Reset(); var cm2 = Camera.main; var bk = cm2 ? -Sim.Flat(cm2.transform.forward).normalized : Vector3.back;
+                    p.transform.position = d.World.Constrain(Boss() + bk * 10.5f, PlayerController.Radius); p.FaceNow(Boss()); yield return Frames(15);
+                    FocusMe(); closeOffset = new Vector3(2.2f, 1.2f, 2.8f); OrbLog("orb_cream");
+                    var rec = StartCoroutine(Record("orb_cream", 60));
+                    yield return Frames(20); bot.MoveWorld = Vector3.right; yield return Frames(25); bot.Clear(); yield return rec;
+                }
+                if (Named("orb_comet"))
+                {
+                    yield return Reset(); k.DebugSetGlyphs(1); yield return Frames(12);
+                    FocusOrb(new Vector3(1.4f, 0.6f, -1.8f)); OrbLog("orb_comet");
+                    var rec = StartCoroutine(Record("orb_comet", 36)); bot.press[3] = true; yield return rec;
+                    yield return Frames(150);
+                }
+                orbLog = null;
             }
             finally { Time.captureFramerate = 0; }
             Log("showcase done");
@@ -158,6 +252,8 @@ namespace LastBell.Run
         }
 
         bool Want(string name) => string.IsNullOrEmpty(only) || Array.IndexOf(only.Split(','), name) >= 0;
+        bool Named(string name) => !string.IsNullOrEmpty(only) && Array.IndexOf(only.Split(','), name) >= 0;
+        string orbLog; Transform orbT, orbHead; PlayerController orbP;
         static IEnumerator Frames(int n) { for (int i = 0; i < n; i++) yield return null; }
         void Log(string s) { Debug.Log("[arcanist showcase] " + s); File.AppendAllText(Path.Combine(outDir, "showcase.log"), s + "\n"); }
 
@@ -171,6 +267,14 @@ namespace LastBell.Run
                 if (grab == null || grab.width != Screen.width || grab.height != Screen.height) grab = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
                 grab.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0); grab.Apply(false);
                 File.WriteAllBytes(Path.Combine(dir, $"g_{i:000}.png"), grab.EncodeToPNG());
+                if (watch && stateLog != null) File.AppendAllText(stateLog, $"{i},{watch.Hp},{watch.Dashing},{watch.Presenter.Hidden},{watch.Stunned}\n");
+                if (orbLog != null && orbT && orbP)
+                {
+                    var tr = orbP.transform; var dd = orbT.position - tr.position;
+                    float yaw = Vector3.SignedAngle(Sim.Flat(tr.forward), Sim.Flat(orbT.forward), Vector3.up), tilt = Vector3.Angle(orbT.up, Vector3.up);
+                    float hd = orbHead ? Vector3.Distance(orbHead.position, orbT.position) : -1;
+                    File.AppendAllText(orbLog, FormattableString.Invariant($"{i},{Vector3.Dot(dd, tr.right):0.000},{dd.y:0.000},{Vector3.Dot(dd, tr.forward):0.000},{hd:0.000},{yaw:0.0},{tilt:0.0}\n"));
+                }
                 if (close && closeTarget != null)
                 {
                     var t = closeTarget(); var cam = main ? main.transform : null;
