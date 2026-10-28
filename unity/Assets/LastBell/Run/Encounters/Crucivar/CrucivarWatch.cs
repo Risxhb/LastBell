@@ -104,7 +104,9 @@ namespace LastBell.Run
                     if (d.Boss is CrucivarEncounter cb && cb.Rite != null && !cb.Dead)
                     {
                         int ph = cb.PhaseIndex;
-                        float floor = cb.PhaseLoops < 2 ? (ph == 1 ? 0.66f : ph == 2 ? 0.31f : 0.02f) : 0f;
+                        // -crucivarWatchFrom p2: start just under 65 %, so Phase 2 comes after the first Forge Rite loop
+                        if (fromP2 && ph == 1 && cb.Hp > cb.MaxHp * 0.645f) cb.DebugSetHpFraction(0.64f);
+                        float floor = cb.PhaseLoops < 2 ? (ph == 1 ? (fromP2 ? 0f : 0.66f) : ph == 2 ? 0.31f : 0.02f) : 0f;
                         if (cb.Hp < cb.MaxHp * floor) cb.DebugSetHpFraction(floor);
                         int key = ph * 100 + cb.PhaseLoops;
                         if (key != logged)
@@ -123,6 +125,8 @@ namespace LastBell.Run
         }
 
         // ---------------- the bots' brains ----------------
+        static bool fromP2 => CrucivarArgs.Arg("-crucivarWatchFrom") == "p2";
+
         void Update()
         {
             if (d == null || d.State != RunState.Combat || d.World == null || d.Boss == null) return;
