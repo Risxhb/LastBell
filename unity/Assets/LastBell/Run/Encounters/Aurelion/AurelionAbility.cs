@@ -51,8 +51,23 @@ namespace LastBell.Run
             // capped so a hit never lands above 90 after the difficulty scale (no one-shots, design rules 5): Hard 69 x 1.3
             if (AurelionArgs.V4 && Boss.Light != null && Boss.Phase >= 4 && h.Damage > 0)
                 h.Damage = Mathf.Min(Mathf.RoundToInt(h.Damage * Boss.Light.DamageScale), Mathf.Max(h.Damage, Mathf.FloorToInt(LastLightCap / W.DamageTakenScale)));
-            return Boss.Track(W.Hazards.Spawn(h));
+            if (h.BurnPerSecond > 0) h.FillToLock = true;   // a burn counts down to its lock, then holds: no slow fake countdown
+            Boss.Track(W.Hazards.Spawn(h));
+            if (h.Tele != null)
+            {
+                h.Tele.Motif(SkywardMotif);
+                // draw order (readability A2/A4): standing burns under everything, tracking warnings in the middle, a
+                // locked footprint over them (it is the one that will hit)
+                if (h.BurnPerSecond > 0) h.Tele.Order = -1;
+                else if (h.Locked) h.Tele.Order = 1;
+                else h.Tele.LockOnTop = true;
+            }
+            return h;
         }
+        // every Aurelion warning wears the Skyward Spire motif (light rays, orbital arcs, sun bars) over the shared plain
+        // outline, outward-fill countdown and resolve flash (Reference/Telegraph-Style v2, gpt/08-design-rules.md §5).
+        // Cues that are not "get out" warnings (Meridian Towers' cobalt soaks) set their own look after Spawn.
+        public const int SkywardMotif = 1;
         protected void Say(string current) => Boss.SetCurrent(current);
         protected void Glow(float k) => Boss.Glow(k);
         protected void Flare(float f = 1) => Boss.Flare(f);

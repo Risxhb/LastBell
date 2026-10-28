@@ -19,11 +19,9 @@ namespace LastBell.Run
         public override string Id => "aurelion.noon_shadow";
         public override string Name => "Noon Shadow";
 
-        public const float WindowS = 3.8f, MeanDeadZone = 1f, ReachPastRim = 0.5f, LineWidth = 0.14f;
+        public const float WindowS = 3.8f, MeanDeadZone = 1f, ReachPastRim = 0.5f;
         public const int Damage = 45, Stun = 15;   // 0.25 s stun, no knockback
 
-        static readonly Color NoonFill = new Color(1f, 0.6f, 0.26f), NoonBorder = new Color(2.4f, 1.75f, 0.7f);
-        static readonly Color Gnomon = new Color(1.9f, 1.45f, 0.55f);
 
         // test evidence: the last run's halves (Noon, then Afternoon), the yaw each one lit, and their spawn / resolve ticks
         public readonly List<Hazard> Halves = new List<Hazard>();
@@ -76,13 +74,10 @@ namespace LastBell.Run
                 Origin = Centre, Yaw = yaw, HalfAngle = 90f, Radius = Reach,
                 LockAt = 0, ResolveAt = resolveAt, Damage = Damage, Knockback = 0, Stun = Stun,
             };
-            // the gnomon shadow: a crisp gold line across the whole dais, presentation only (not a hazard, never hits)
-            var line = W.BossFx.Lane(2 * Reach, LineWidth);
-            line.Place(Centre + Sim.Dir(yaw + 90f) * Reach, yaw - 90f);
-            line.Tint(Gnomon, Gnomon); line.Progress(1); line.Lock();
-            h.OnResolve = hz => { ResolveTicks.Add(W.Tick); line.Expire(); Flare(1.2f); };
+            // Telegraph style (Reference/Telegraph-Style v2): the standard coral half with the Skyward rays, its own plain
+            // border is the dividing line (no separate gold gnomon line over the outline or across the safe half)
+            h.OnResolve = hz => { ResolveTicks.Add(W.Tick); Flare(1.2f); };
             Spawn(h);
-            h.Tele.Tint(NoonFill, NoonBorder);   // noon light: amber-gold, the warning fill brightens toward the resolve
             Halves.Add(h); LitYaws.Add(yaw); SpawnTicks.Add(W.Tick);
             return h;
         }

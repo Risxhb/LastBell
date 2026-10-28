@@ -299,7 +299,7 @@ namespace LastBell.Run
                 case "aurelion.zenith_marks": return Block("Zenith Marks + Meridian Lances", MarksWithLances(phase));
                 case "aurelion.meridian_towers": return Block("Meridian Towers", Towers.Run());
                 case "aurelion.sunspots": return Block("Sunspots", Spots.Run());
-                case "aurelion.total_eclipse": return Block("Total Eclipse", Eclipse.Run());
+                case "aurelion.total_eclipse": return Block("Total Eclipse", TotalEclipseFx.During(W, Eclipse, Eclipse.Run()));
                 case "aurelion.severance": return Block("Severance", Sever.Run());
                 case "aurelion.last_light": return Block("Last Light", Together(Light.Run(), 0, LastLightRotation()));
                 default: return Block("Hour Hands", Hands.Run());

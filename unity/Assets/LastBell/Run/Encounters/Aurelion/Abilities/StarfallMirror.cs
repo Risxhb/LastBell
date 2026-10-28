@@ -77,22 +77,19 @@ namespace LastBell.Run
                 LockAt = follow, ResolveAt = resolve, Damage = Dmg, Knockback = 0, Stun = Sim.Ticks(StunS),
             };
             var s = new Star { Who = who, Main = star, Mirror = mirror, Index = index };
-            BellkeeperFx.Telegraph outline = null;
             // the star follows its player until the lock; a recipient who goes down has both circles withdrawn
             star.Track = hz =>
             {
-                if (!who || who.Down) { W.Hazards.Cancel(hz); W.Hazards.Cancel(mirror); outline?.Dismiss(); return; }
+                if (!who || who.Down) { W.Hazards.Cancel(hz); W.Hazards.Cancel(mirror); return; }
                 hz.Origin = Sim.Flat(who.transform.position);
             };
             // set before Spawn so a test's Spawned hook sees it; the mirror follows its star (the star tracks first each tick)
-            mirror.Track = hz => { hz.Origin = Reflect(star.Origin); outline?.Place(hz.Origin, 0); };
+            mirror.Track = hz => { hz.Origin = Reflect(star.Origin); };
             star.OnResolve = hz => W.BossFx.ChimeResolve(hz.Origin, hz.Radius);
-            mirror.OnResolve = hz => { W.BossFx.ChimeResolve(hz.Origin, hz.Radius); outline?.Dismiss(); };
+            mirror.OnResolve = hz => W.BossFx.ChimeResolve(hz.Origin, hz.Radius);
+            // Telegraph style: both circles are the standard coral hit shape with the Skyward rays and nothing else (the
+            // old porcelain after-image ring sat outside the hit shape and was dotted, which reads as a friendly effect)
             Spawn(star); Spawn(mirror);
-            // both circles keep the standard coral telegraph (it is the hit shape); the reflection also wears a thin
-            // porcelain after-image outline just outside its reach (presentation only), so it reads as someone's
-            outline = W.BossFx.Ring(r + Hazard.Margin + 0.05f, r + Hazard.Margin + 0.2f);
-            outline.Memory(); outline.Place(mirror.Origin, 0);
             Stars.Add(s);
         }
     }

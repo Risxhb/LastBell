@@ -205,7 +205,7 @@ namespace LastBell.Run
                         if (!IntermissionDone && phase == 1)
                         {
                             IntermissionDone = true; ClearPhasePools();
-                            foreach (var w in Block("Total Eclipse", Eclipse.Run())) yield return w;
+                            foreach (var w in Block("Total Eclipse", TotalEclipseFx.During(W, Eclipse, Eclipse.Run()))) yield return w;
                         }
                         phase = Mathf.Max(want, 2); ClearPhasePools();
                         foreach (var w in V4Shift()) yield return w;

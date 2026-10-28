@@ -70,10 +70,11 @@ namespace LastBell.Run
     sealed class OrreryClosingFx : MonoBehaviour
     {
         static readonly Color Gold = new Color(0.82f, 0.64f, 0.3f);
+        const float EdgeInset = 0.3f;   // telegraph style: decor rings sit inside the hazard, continuous, never on the outline
         static readonly Color CalmFill = new Color(0.78f, 0.36f, 0.30f), CalmBorder = new Color(1.6f, 0.75f, 0.45f);
         const float RimStartY = 3.5f, CrownStartY = 3.4f;
 
-        sealed class Ring { public Hazard H; public Transform Root, Bead; public Material Mat; public float Spin, Turn, R, StartY, Fade = -1; }
+        sealed class Ring { public Hazard H; public Transform Root, Bead; public Material Mat; public float Spin, Turn, R, StartY, Fade = -1; public LastBell.VFX.BellkeeperFx.Telegraph Edge; }
         readonly List<Ring> rings = new List<Ring>();
         CombatWorld w; int horizon;
 
@@ -81,8 +82,8 @@ namespace LastBell.Run
         {
             var go = new GameObject("Orrery Closing fx"); go.transform.SetParent(world.Root, false);
             var fx = go.AddComponent<OrreryClosingFx>(); fx.w = world; fx.horizon = horizonTicks;
-            fx.Add(rim, rim.Inner, 1, RimStartY);
-            fx.Add(crown, crown.Radius, -1.6f, CrownStartY);
+            fx.Add(rim, rim.Inner + EdgeInset, 1, RimStartY);       // just inside each hazard, clear of its plain outline
+            fx.Add(crown, crown.Radius - EdgeInset, -1.6f, CrownStartY);
         }
 
         void Add(Hazard h, float r, float spin, float startY)
@@ -94,7 +95,7 @@ namespace LastBell.Run
             for (int k = 0; k < n; k++)
             {
                 float ang = k * 360f / n;
-                Share(Prim.Make(PrimitiveKind.Cube, o.Root, Quaternion.Euler(0, ang, 0) * new Vector3(0, 0, r), new Vector3(2 * Mathf.PI * r / n * 0.62f, 0.05f, 0.07f), Gold, 0, Quaternion.Euler(0, ang + 90, 0)), o.Mat);
+                Share(Prim.Make(PrimitiveKind.Cube, o.Root, Quaternion.Euler(0, ang, 0) * new Vector3(0, 0, r), new Vector3(2 * Mathf.PI * r / n * 1.02f, 0.05f, 0.07f), Gold, 0, Quaternion.Euler(0, ang + 90, 0)), o.Mat);
             }
             // clock ticks just inside the edge (the rim's point out into the danger, the crown's point in)
             float side = h.Shape == HazardShape.Ring ? 0.25f : -0.25f;
@@ -115,7 +116,7 @@ namespace LastBell.Run
                 var h = o.H;
                 bool live = w != null && w.Hazards.Live.Contains(h) && !h.Cancelled;
                 bool resolved = h.Age >= h.ResolveAt;
-                if (!live && o.Fade < 0) o.Fade = resolved ? 1f : 0.4f;   // resolved / expired: flash; cleared early: dim
+                if (!live && o.Fade < 0) { o.Fade = resolved ? 1f : 0.4f; o.Edge?.Expire(); o.Edge = null; }   // resolved / expired: flash; cleared early: dim
                 if (o.Fade >= 0)
                 {
                     o.Fade -= dt * 1.6f;
@@ -144,6 +145,10 @@ namespace LastBell.Run
                     o.Root.position = new Vector3(p.x, 0.05f, p.z);
                     o.Mat.SetColor("_EmissionColor", Gold * (0.6f + 1.8f * pulse) * Mathf.Lerp(0.35f, 1f, dim));
                     if (h.Tele != null) h.Tele.Tint(CalmFill * Mathf.Lerp(0.55f, 1f, dim), CalmBorder * (0.6f + 0.8f * pulse));
+                    // readability A5: the usable inside edge stays a continuous stroke above every transient fill (Hour Hands,
+                    // stars, pools) for the whole Horizon; presentation only, the rim hazard owns the hit
+                    if (o.Edge == null && h.Shape == HazardShape.Ring) { o.Edge = w.BossFx.Ring(h.Inner, h.Inner + 0.22f); o.Edge.Motif(2); o.Edge.Progress(1); o.Edge.Order = 4; o.Edge.Place(h.Origin, 0); }
+                    o.Edge?.Tint(CalmBorder, CalmBorder * (0.8f + 0.6f * pulse));
                 }
                 o.Root.rotation = Quaternion.Euler(0, o.Turn, 0);
                 o.Bead.localPosition = Quaternion.Euler(0, o.Turn * 2.5f, 0) * new Vector3(0, 0.18f, o.R);
@@ -153,7 +158,7 @@ namespace LastBell.Run
 
         void OnDestroy()
         {
-            foreach (var o in rings) if (o.Mat) Destroy(o.Mat);
+            foreach (var o in rings) { if (o.Mat) Destroy(o.Mat); o.Edge?.Expire(); }
         }
     }
 }

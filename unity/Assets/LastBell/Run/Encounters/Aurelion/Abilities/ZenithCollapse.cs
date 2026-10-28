@@ -20,8 +20,6 @@ namespace LastBell.Run
 
         public const float Outer = 30f, WindowS = 3.0f, HardWindowS = 2.4f, StunS = 0.25f;
         public const int Damage = 45;
-        // amber-coral fill (warmer than the standard strike coral, so the signature reads at a glance) and a crisp amber edge
-        public static readonly Color Fill = new Color(1.0f, 0.50f, 0.26f), Edge = new Color(2.8f, 1.55f, 0.55f);
 
         public static float SafeRadius(int n, int phase) => n <= 2 ? (phase >= 3 ? 5.0f : 4.5f) : n <= 4 ? 5.5f : 6.5f;
         public int WindowTicks => Sim.Ticks(Hard ? HardWindowS : WindowS * WarnScale);
@@ -45,7 +43,6 @@ namespace LastBell.Run
                 Inner = CurrentSafe, Radius = Outer, LockAt = 0, ResolveAt = win,
                 Damage = Damage + HungerBonus, Knockback = 0, Stun = Sim.Ticks(StunS),
             });
-            Last.Tele?.Tint(Fill, Edge);
             Last.OnResolve = hz => { W.BossFx.TollResolve(hz.Origin, hz.Inner, Rim); Flare(1.4f); };
             ZenithCollapseFx.Create(W, Last);
             for (int i = 0; i < win - 1; i++) { Glow(i / (float)win); yield return 1; }
@@ -101,7 +98,7 @@ namespace LastBell.Run
         {
             o.R = r;
             int n = o.Segs.Length;
-            float len = 2 * Mathf.PI * r / n * 0.62f;
+            float len = 2 * Mathf.PI * r / n * 1.02f;   // continuous: dashed gold would read as a friendly dotted circle
             for (int k = 0; k < n; k++)
             {
                 o.Segs[k].localPosition = Quaternion.Euler(0, k * 360f / n, 0) * new Vector3(0, 0, r);
@@ -127,7 +124,7 @@ namespace LastBell.Run
             }
             float k = Mathf.Clamp01(h.Age / (float)Mathf.Max(1, h.ResolveAt));
             float e = k * k;   // slow at first, then falling fast onto the edge
-            float edge = h.Inner + 0.06f;   // just outside the hit edge: the decor never enters the disc
+            float edge = h.Inner + 0.3f;    // inside the annulus, clear of its plain inner edge: the decor never enters the disc or covers the outline
             LeadRadius = 0;
             foreach (var o in rings)
             {

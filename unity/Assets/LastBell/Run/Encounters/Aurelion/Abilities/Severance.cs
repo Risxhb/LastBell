@@ -6,7 +6,7 @@ namespace LastBell.Run
 {
     // v4 Severance: Day and Night (aurelion.severance), Phase 3, abilities-v4/ABILITIES-v4.md §3.5 (proposal). Source:
     // L'ura's Severance (two dimensions; crossing kills, an empty side wipes), adapted: no one-shots, the line moves.
-    //   - A gold meridian line splits the dais through the centre; the far half is Night (violet), the near half Day.
+    //   - A meridian line (coral, hostile) splits the dais through the centre; the far half is Night (violet), the near half Day.
     //     Each player's side is where they stand when it lands.
     //   - The line travels 270 degrees in 20 s (forward 135, then back 135 from 10 s, warned 1.5 s ahead): keep moving ahead of it.
     //   - Crossing the line (by moving, or by letting it sweep over you) is a heavy hit (50) every time.
@@ -31,7 +31,9 @@ namespace LastBell.Run
         readonly Dictionary<PlayerController, int> planned = new Dictionary<PlayerController, int>();
         public int Planned(PlayerController p) => planned.TryGetValue(p, out int s) ? s : 0;   // -1 Day, +1 Night, 0 free (solo)
         public const int Damage = 50;
-        static readonly Color Gold = new Color(2.2f, 1.7f, 0.6f), NightFill = new Color(0.42f, 0.22f, 0.7f), NightRim = new Color(0.9f, 0.55f, 1.8f);
+        static readonly Color LineFill = new Color(1.35f, 0.42f, 0.32f), LineEdge = new Color(2.2f, 1.45f, 0.65f),
+            NightFill = new Color(0.26f, 0.14f, 0.44f), NightRim = new Color(0.55f, 0.35f, 1.0f);
+        const float LineW = 0.36f;   // presentation: the hit is a change of side (0.05 m), the stroke just has to read
         static readonly float[] StartYaws = { 0f, 60f, 120f };
 
         public bool Active { get; private set; }
@@ -51,16 +53,20 @@ namespace LastBell.Run
             Say(Name);
             Active = true; Crossings = 0; side.Clear();
             yaw0 = StartYaws[Casts++ % StartYaws.Length]; LineYaw = yaw0; lineTick = 0;
-            var line = W.BossFx.Lane(2 * (Rim + 0.5f), 0.16f); line.Tint(Gold, Gold); line.Progress(1);
-            var night = W.BossFx.Cone(Rim + 0.5f, 90f); night.Tint(NightFill, NightRim); night.Progress(0.2f);
-            line.Place(Centre - Sim.Dir(LineYaw) * (Rim + 0.5f), LineYaw); night.Place(Centre, LineYaw - 90f);
+            // Telegraph style (audit F06): the line is the hostile part, two coral/amber half-strokes from the compass star whose
+            // fill sweeps outward during the split (the countdown to the lock), then hold bright while it is live. Night is
+            // lighting only: a faint violet with no motif, drawn under the line.
+            var line = new[] { W.BossFx.Lane(Rim + 0.5f, LineW), W.BossFx.Lane(Rim + 0.5f, LineW) };
+            foreach (var l in line) { l.Tint(LineFill, LineEdge); l.Motif(AurelionAbility.SkywardMotif); l.Progress(0); l.Order = 3; }
+            var night = W.BossFx.Cone(Rim + 0.5f, 90f); night.Tint(NightFill, NightRim); night.Motif(2); night.Progress(0); night.Order = -2;
+            PlaceLine(line); night.Place(Centre, LineYaw - 90f);
             // 3 s to split before the sides lock: co-op, half the party is called Day and half Night (party order, alternating)
             Splitting = true; planned.Clear();
             var party = Standing();
             for (int i = 0; i < party.Count; i++) planned[party[i]] = party.Count == 1 ? 0 : i % 2 == 0 ? -1 : 1;
             RunHud.Banner(party.Count > 1 ? "SEVERANCE — SPLIT: DAY AND NIGHT" : "SEVERANCE — DAY AND NIGHT", new Color(0.85f, 0.7f, 1f), SplitS);
-            for (int t = 0; t < Sim.Ticks(SplitS); t++) yield return 1;
-            Splitting = false; line.Lock(); night.Progress(0.35f);
+            for (int t = 0; t < Sim.Ticks(SplitS); t++) { foreach (var l in line) l.Progress(t / (float)Sim.Ticks(SplitS)); yield return 1; }
+            Splitting = false; foreach (var l in line) { l.Progress(1); l.Lock(); }
             foreach (var p in Standing()) { int s = SideOf(p.transform.position); side[p] = s == 0 ? 1 : s; }
             Glow(1.6f); Flare(1.2f);
 
@@ -70,7 +76,7 @@ namespace LastBell.Run
             {
                 lineTick = t; LineYaw = YawAt(t / (float)Sim.Hz);
                 if (t == Sim.Ticks(LengthS / 2 - BackWarnS)) RunHud.Banner("THE LINE TURNS BACK", new Color(1f, 0.85f, 0.5f), BackWarnS);
-                line.Place(Centre - Sim.Dir(LineYaw) * (Rim + 0.5f), LineYaw);
+                PlaceLine(line);
                 night.Place(Centre, LineYaw - 90f);
                 Cross();
                 if (N >= 2)
@@ -83,7 +89,7 @@ namespace LastBell.Run
                 if (on) { if (wait > 0) wait--; else if (side2.MoveNext()) wait = Mathf.Max(1, side2.Current) - 1; else on = false; }
                 yield return 1;
             }
-            line.Expire(); night.Expire();
+            foreach (var l in line) l.Expire(); night.Expire();
             Active = false;
             if (N >= 2) foreach (var w in Boss.Towers.RunReunion()) yield return w;
         }
@@ -99,6 +105,8 @@ namespace LastBell.Run
             yield return Sim.Ticks(1f);
             foreach (var w in Boss.Lances.Run(4, 1, false)) yield return w;
         }
+
+        void PlaceLine(BellkeeperFx.Telegraph[] line) { line[0].Place(Centre, LineYaw); line[1].Place(Centre, LineYaw + 180f); }
 
         // the line is a wall: every change of side (you moved over it, or it swept over you) is a heavy hit
         void Cross()
