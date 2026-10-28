@@ -152,6 +152,9 @@ namespace LastBell.Run
         Vector3 Plan(Bot b, Vector3 me, Vector3 boss, CombatWorld w)
         {
             Vector3 best = me; float bestCost = float.MaxValue;
+            // carrying my own brand: drop it out by the wall like a player would, so the pools (which last the whole
+            // phase) don't pave over the melee ring and stall the fight
+            bool carrying = w.Hazards.Live.Any(h => h.Source == "Ember Brand" && h.Age < h.ResolveAt && (Sim.Flat(h.Origin) - me).magnitude < 0.25f);
             for (int ring = 0; ring <= 4; ring++)
                 for (int k = 0; k < (ring == 0 ? 1 : 20); k++)
                 {
@@ -160,7 +163,8 @@ namespace LastBell.Run
                     float travel = (c - me).magnitude;
                     float cost = Danger(b, c, boss, w, travel / 6f) + travel * 1.2f;
                     float r = (c - boss).magnitude;
-                    cost += r < d.Boss.BodyRadius + 1f ? 40f : Mathf.Abs(r - (d.Boss.BodyRadius + 2.2f)) * 1.5f;   // stay in melee, out of the body
+                    if (carrying) cost += Mathf.Max(0f, CrucivarAbility.Rim - 3f - r) * 4f;
+                    else cost += r < d.Boss.BodyRadius + 1f ? 40f : Mathf.Abs(r - (d.Boss.BodyRadius + 2.2f)) * 1.5f;   // stay in melee, out of the body
                     foreach (var o in bots) if (o != b && o.P && !o.P.Down) { float s = (Sim.Flat(o.P.transform.position) - c).magnitude; if (s < 3.4f) cost += (3.4f - s) * 8f; }
                     if (cost < bestCost) { bestCost = cost; best = c; }
                 }
