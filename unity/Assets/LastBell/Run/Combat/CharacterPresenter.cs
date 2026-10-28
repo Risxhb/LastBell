@@ -79,10 +79,13 @@ namespace LastBell.Run
             foreach (var r in model.GetComponentsInChildren<Renderer>())
                 foreach (var m in r.materials)
                 {
+                    // the Arcanist's astrolabe sets its own materials (AstrolabeRig): no glow boost or metal scaling here
+                    if (m.name.StartsWith("astrolabe")) continue;
                     // glTFast drops KHR_materials_emissive_strength; restore a readable glow (same factors as the tests)
                     if (m.HasProperty("emissiveFactor")) { m.SetColor("emissiveFactor", m.GetColor("emissiveFactor") * glowBoost); glow.Add((m, m.GetColor("emissiveFactor"))); }
                     if (metalScale != 1 && m.HasProperty("metallicFactor")) m.SetFloat("metallicFactor", m.GetFloat("metallicFactor") * metalScale);
                 }
+            if (model.name == "Arcanist") AstrolabeRig.Attach(model);   // his astrolabe: glow, light and motion in code (orb critique, Oct 28)
             clips = loaded;
             var animator = model.GetComponentInChildren<Animator>();
             if (animator == null) animator = model.AddComponent<Animator>();

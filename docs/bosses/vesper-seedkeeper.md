@@ -60,7 +60,7 @@
   - Lantern Tethers that drift.
   - Seedfall, then Vesper Bloom (the knots burst into flowers only after the storm).
   - Halo Sweep with a reverse.
-- **Nightfall (soft enrage) at 5:00:** a Vesper Bloom every 12 beats, and each one puts out one more lantern, down to one.
+- **No enrage** (content rules §5). Its other parts still need checking against those rules (phase change, Hard mechanic, soaks) before it is built.
 - **Max HP:** 3200.
 
 ## Difficulty

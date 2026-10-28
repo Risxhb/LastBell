@@ -155,7 +155,7 @@ namespace LastBell.Run
                 UiTheme.Fill(dr, UiTheme.InkStrip);
                 UiTheme.Label(new Rect(dr.x + UiTheme.G1 * s, dr.y + 4 * s, dr.width - 2 * UiTheme.G1 * s, dr.height - 6 * s),
                     $"tempo {c.State} age {c.StateAge}/{c.Duration}{(c.Pending ? " PENDING" : "")}{(c.Transitioning ? " TRANSITION" : "")} · beat {c.Beat:0.0} · commits {c.Commits}\n" +
-                    $"{c.Bpm:0.##} BPM · Wake {WarningSeconds():0.0} s · gap {GapSeconds():0.0} s · frenzy {(boss.Frenzy ? "on" : "off")} chain {(boss.ChainDue ? "due" : "-")} · {boss.Current}\n" +
+                    $"{c.Bpm:0.##} BPM · Wake {WarningSeconds():0.0} s · gap {GapSeconds():0.0} s · frenzy {(boss.Frenzy ? "on" : "off")} chains {boss.ChainsRun} · {boss.Current}\n" +
                     (boss.Audio ? boss.Audio.StatusText : ""), diag, UiTheme.IvoryMuted);
             }
         }

@@ -55,6 +55,12 @@ namespace LastBell.Arenas.MetronomeCourt.EditorTools
             Shot("09_closeup_pier_head", new Vector3(-13f, 3.5f, 3f), new Vector3(-19.5f, -4.5f, -5.5f));
             Shot("10_closeup_bollard", new Vector3(3.6f, 1.9f, 10.9f), new Vector3(5.5f, 0.55f, 13.3f));
             Shot("11_closeup_bridge_post", new Vector3(0.9f, 1.7f, 15.6f), new Vector3(2.45f, 0.6f, 17.65f));
+            // October 28 critic pass: the view Risxhb screenshotted (gameplay camera, player near the west rim, a pier head
+            // and the rim posts below), plus a medium shot of the same pier head from above
+            var west = new Vector3(-12f, 0, -5f);
+            Shot("12_gameplay_west_pier", west + follow, west + Vector3.up);
+            Shot("13_mid_pier_head_above", new Vector3(-13.5f, 9f, 1f), new Vector3(-19.5f, -1.5f, -5.5f));
+            Shot("14_closeup_banner_post", new Vector3(-9.6f, 4.4f, -2.6f), new Vector3(-13.3f, 2.7f, -5.5f));   // the rim post at 247.5 degrees
             // pass 4: the same gameplay projections in the Normal (cool) tempo, to check that the stone keeps its colour
             MetronomeCourtArena.ReviewHaste = false;
             typeof(MetronomeCourtArena).GetField("tempoBlend", flags).SetValue(arena, 0f);
@@ -62,7 +68,7 @@ namespace LastBell.Arenas.MetronomeCourt.EditorTools
             Shot("08_gameplay_normal", follow, Vector3.up);
             Shot("edge_-13_0_normal", new Vector3(-12.5f, 0, 0) + follow, new Vector3(-12.5f, 1, 0));
             MetronomeCourtArena.ReviewHaste = null;
-            Debug.Log("METRONOME ARENA CAPTURE: 16 editor views (Haste preview plus two Normal, no fight; not gameplay/performance) -> " + output);
+            Debug.Log("METRONOME ARENA CAPTURE: 19 editor views (Haste preview plus two Normal, no fight; not gameplay/performance) -> " + output);
         }
 
         // Rewrites the Test Rush map tile (Resources/Menu/Maps/metronome-court.png) from the current arena code, with the

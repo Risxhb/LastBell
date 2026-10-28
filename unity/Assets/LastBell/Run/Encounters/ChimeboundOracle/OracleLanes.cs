@@ -19,8 +19,8 @@ namespace LastBell.Run
     public static class OracleLanes
     {
         public const int Count = 8;
-        public static float Bound = 12.5f;                       // the Metronome Court floor radius (CombatWorld.PlayerBound)
-        public static float Width => 2 * Bound / Count;            // 3.125 m on the 25 m court
+        public static float Bound = 13.9f;                       // the arena's play bound, set from CombatWorld.PlayerBound at spawn
+        public static float Width => 2 * Bound / Count;            // 3.475 m on the Skyward Spire (13.9), 3.125 m on the Metronome Court (12.5)
         public static float CentreX(int lane) => -Bound + Width * (lane + 0.5f);
         public static int LaneOf(float x) => Mathf.Clamp(Mathf.FloorToInt((x + Bound) / Width), 0, Count - 1);
 

@@ -60,7 +60,7 @@
   - Riveting.
   - The Great Cast with the moulds placed in rivet lines; the rivets fire after the cast.
   - Pitch Match (two notes).
-- **Overtone (soft enrage) at 5:00:** Standing Wave never stops.
+- **No enrage** (content rules §5). Its other parts still need checking against those rules (phase change, Hard mechanic, soaks) before it is built.
 - **Max HP:** 3600.
 
 ## Difficulty

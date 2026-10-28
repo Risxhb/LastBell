@@ -17,6 +17,15 @@ namespace LastBell.Run
     {
         public static bool Requested => Environment.GetCommandLineArgs().Any(a => a.Equals("-tempoTyrantTest", StringComparison.OrdinalIgnoreCase));
         static bool Quick => Environment.GetCommandLineArgs().Any(a => a.Equals("-tempoTyrantQuick", StringComparison.OrdinalIgnoreCase));
+        // frame-pacing runs (docs/frame-pacing.md): -tempoTyrantFps <n> or -tempoTyrantVsync for this run only (never saved)
+        static void ApplyFrameOverride()
+        {
+            var args = Environment.GetCommandLineArgs();
+            int i = Array.FindIndex(args, a => a.Equals("-tempoTyrantFps", StringComparison.OrdinalIgnoreCase));
+            if (args.Any(a => a.Equals("-tempoTyrantVsync", StringComparison.OrdinalIgnoreCase))) { QualitySettings.vSyncCount = 1; Application.targetFrameRate = -1; }
+            else if (i >= 0 && i + 1 < args.Length && int.TryParse(args[i + 1], out int fps)) { QualitySettings.vSyncCount = 0; Application.targetFrameRate = fps; }
+        }
+        static string FrameMode => QualitySettings.vSyncCount > 0 ? "VSync" : Application.targetFrameRate > 0 ? Application.targetFrameRate + " FPS cap" : "unlimited";
         static string OutDir
         {
             get
@@ -77,7 +86,7 @@ namespace LastBell.Run
         readonly Dictionary<int, Seen> seen = new Dictionary<int, Seen>();
         readonly List<(int tick, string source, int hazard, PlayerController who, int dmg)> hits = new List<(int, string, int, PlayerController, int)>();
         readonly List<PlayerController> extras = new List<PlayerController>();
-        string dir; bool keepAlive = true; Dictionary<string, int> matNames;
+        string dir; bool keepAlive = true; int keepAbove = 60; Dictionary<string, int> matNames;
         TempoTyrantEncounter boss;
         int transitionHazardFrames, transitionFrames, comboDrift; float comboDriftMax;
 
@@ -135,7 +144,7 @@ namespace LastBell.Run
         void Keep()
         {
             if (d == null || d.World == null) return;
-            foreach (var p in d.World.Players) if (keepAlive && !p.Down && p.Hp < 60) p.DebugSetHp(100);
+            foreach (var p in d.World.Players) if (keepAlive && !p.Down && p.Hp < keepAbove) p.DebugSetHp(100);
             var me = d.Player;
             if (me && goal.HasValue)
             {
@@ -211,6 +220,7 @@ namespace LastBell.Run
             boss = d.Boss as TempoTyrantEncounter;
             boss.ForcedNext = "Severance";
             yield return Until(() => d.State == RunState.Combat, 6, "combat");
+            ApplyFrameOverride(); Note("frame mode: " + FrameMode);
             yield return Shot("gameplay_start_haste");
             Check("fight starts in Haste at beat 0", boss.Clock.State == Tempo.Haste && boss.Clock.Beat < 1 && boss.Clock.Commits == 0);
             Check("stand-in is labelled", boss.Placeholder && boss.Rig && boss.Rig.name.Contains("STAND-IN"));
@@ -236,7 +246,7 @@ namespace LastBell.Run
             float pulseMin = 1, pulseMax = 0;
             for (float t = 0; t < 1.5f; t += Time.deltaTime) { if (arenaNow) { pulseMin = Mathf.Min(pulseMin, arenaNow.BeatPulse); pulseMax = Mathf.Max(pulseMax, arenaNow.BeatPulse); } yield return null; }
             Check("metronome weight sits low in Haste (asset A)", arenaNow && arenaNow.WeightHeight < MetronomeCourtArena.WeightHaste + 0.4f, arenaNow ? $"weight {arenaNow.WeightHeight:0.00}" : "");
-            Check("lights pulse on the beat", pulseMax - pulseMin > 0.5f, $"pulse {pulseMin:0.00}..{pulseMax:0.00}");
+            Check("lights pulse on the beat", pulseMax - pulseMin > 0.5f && arenaNow.LightsPulse, $"pulse {pulseMin:0.00}..{pulseMax:0.00}");
             Check("court floor: stone grain detail + reflection probe rendered (asset B)", MetronomeCourtArena.FloorDetailReady && arenaNow && arenaNow.ProbeRendered, "");
             Check("ambience: sky gears turn, broken masonry drifts in the void (asset E)", arenaNow && arenaNow.GearCount >= 3 && arenaNow.DrifterCount >= 10 && arenaNow.GearAngle - gearA0 > 0.5f,
                 arenaNow ? $"gears {arenaNow.GearCount}, drifters {arenaNow.DrifterCount}, turned {arenaNow.GearAngle - gearA0:0.0} deg" : "");
@@ -290,6 +300,9 @@ namespace LastBell.Run
             // ---------------- frenzy ----------------
             yield return Frenzy();
 
+            // ---------------- below 10%: Falling Hours ----------------
+            yield return FallingHours();
+
             // ---------------- pause / resume ----------------
             yield return PauseResume();
 
@@ -299,7 +312,7 @@ namespace LastBell.Run
             // ---------------- whole-route feasibility (authoritative geometry) ----------------
             Routes();
 
-            Note($"performance: {perfFrames} combat frames, average {(perfTime > 0 ? perfFrames / perfTime : 0):0.0} fps at {Screen.width}x{Screen.height}");
+            Note($"performance: {perfFrames} combat frames, average {(perfTime > 0 ? perfFrames / perfTime : 0):0.0} fps at {Screen.width}x{Screen.height} ({FrameMode})");
             Check("no errors or exceptions logged", errors == 0, $"{errors}");
             Finish();
         }
@@ -370,11 +383,21 @@ namespace LastBell.Run
             int startHits = hits.Count, eruptions0 = boss.FissureEruptions, mirrors0 = boss.MirrorPreviews + boss.MirrorEruptions;
             yield return Until(() => boss.Current == "Sundering Wake", 20, "Wake");
             int wakeStart = d.World.Tick; var lane = boss.LastWake; var wakeTempo = boss.Clock.State;
+            // Backswing: one roster player just behind his landing point (off the charge lane), one just in front of it
+            var cl = boss.ChargeLog[boss.ChargeLog.Count - 1];
+            var fwdW = Sim.Dir(cl.yaw); var rightW = Vector3.Cross(Vector3.up, fwdW);
+            var behindP = AddExtra(cl.end - fwdW * 3f + rightW * 2.5f); var frontP = AddExtra(cl.end + fwdW * 2f + rightW * 2.5f);
+            int bsPreviews = boss.BackswingPreviews;
             yield return Wait(0.2f);
+            Check("Backswing: dashed preview at the landing point from the start of the charge warning (not live yet)", bsPreviews >= 1 && boss.BackswingPreviews == bsPreviews &&
+                (boss.LastBackswing == null || !d.World.Hazards.Live.Contains(boss.LastBackswing)), $"previews {boss.BackswingPreviews}");
             yield return Shot("wake_warning_path_endpoint");
             int warnTicks = boss.Clock.TicksFor(TempoTyrantEncounter.Of(TempoTyrantEncounter.WakeWarn, boss.Clock.State));
             yield return Until(() => boss.Rig.Current == TyrantPose.Thrust, 6, "Wake travel");
             yield return Shot("wake_travel");
+            yield return Until(() => boss.LastBackswing != null && d.World.Hazards.Live.Contains(boss.LastBackswing), 3, "backswing live");
+            var bsH = boss.LastBackswing;
+            yield return Shot("wake_backswing");
             yield return Until(() => boss.LastFissure != null && boss.LastFissure != lane && d.World.Hazards.Live.Contains(boss.LastFissure), 4, "fissure warning");
             var fissure = boss.LastFissure;
             if (fissure != null)
@@ -396,6 +419,20 @@ namespace LastBell.Run
             Check("Wake: fissure erupts exactly once", boss.FissureEruptions == eruptions0 + 1);
             var erupt = mine.Where(h => h.source == "Sundering Wake (eruption)").ToList();
             Check("Wake: eruption hits a player standing in the wake once", buddy != null && erupt.Count(h => h.who == buddy) == 1, $"{erupt.Count} eruption hits");
+            if (bsH != null)
+            {
+                var bsHits = mine.Where(h => h.hazard == bsH.Id).ToList();
+                Check("Backswing: hits the player behind his landing point once, misses the one in front", bsHits.Count(h => h.who == behindP) == 1 && bsHits.Count(h => h.who == frontP) == 0,
+                    $"behind {bsHits.Count(h => h.who == behindP)}, front {bsHits.Count(h => h.who == frontP)}");
+                Check("Backswing: a half-disc behind the landing point facing back up the lane", bsH.Shape == HazardShape.Cone && Mathf.Approximately(bsH.HalfAngle, 90) &&
+                    Mathf.Abs(Mathf.DeltaAngle(bsH.Yaw, cl.yaw + 180)) < 0.5f && Sim.Flat(bsH.Origin - cl.end).magnitude < 0.05f && bsH.Kind == HazardKind.Strike);
+                int bsWant = boss.Clock.TicksFor(TempoTyrantEncounter.Of(TempoTyrantEncounter.Backswing, wakeTempo));
+                if (seen.TryGetValue(bsH.Id, out var sb))
+                    Check($"Backswing: live on arrival, lands {TempoTyrantEncounter.Of(TempoTyrantEncounter.Backswing, wakeTempo)} beat(s) later ({wakeTempo})",
+                        Mathf.Abs(sb.Spawn - (cl.tick + warnTicks + TempoTyrantEncounter.WakeTravelTicks)) <= 1 && sb.Resolve - sb.Spawn + 1 == bsWant,
+                        $"spawn {sb.Spawn - cl.tick} ticks after the warning, live {sb.Resolve - sb.Spawn + 1} ticks (want {bsWant})");
+            }
+            else Check("Backswing: went live", false);
             Check("Wake: endpoint inside the boss bound", new Vector2(boss.transform.position.x, boss.transform.position.z).magnitude <= TempoTyrantEncounter.OwnBound + 0.05f);
             if (wakeTempo == Tempo.Normal)
                 Check("Wake (Normal): no mirrored fissure outside Haste", boss.LastMirror == null && boss.MirrorPreviews + boss.MirrorEruptions == mirrors0);
@@ -523,6 +560,9 @@ namespace LastBell.Run
                 $"fissure {f.Origin} yaw {f.Yaw:0.0}, mirror {m.Origin} yaw {m.Yaw:0.0}");
             var mid = m.Origin + Sim.Dir(m.Yaw) * (m.Length * 0.6f);
             var buddy = AddExtra(mid);
+            // Haste: after the backswing he re-targets the farthest player and charges again at once
+            int charges0 = boss.ChargeLog.Count; var c1 = boss.ChargeLog[charges0 - 1];
+            var farAway = AddExtra(-Sim.Flat(c1.end).normalized * 11.8f);
             Note($"mirror-lane player at {buddy.transform.position}: in mirror {m.Contains(buddy.transform.position)}, in fissure {f.Contains(buddy.transform.position)}");
             yield return Wait(0.1f);
             yield return Shot("mirrored_wake_live");
@@ -534,6 +574,21 @@ namespace LastBell.Run
             if (seen.TryGetValue(f.Id, out var sf) && seen.TryGetValue(m.Id, out var sm))
                 Check("Mirrored Wake: both lanes go live and erupt on the same ticks", sf.Spawn == sm.Spawn && sf.Resolve == sm.Resolve, $"fissure {sf.Spawn}->{sf.Resolve}, mirror {sm.Spawn}->{sm.Resolve}");
             Check("Mirrored Wake: each lane erupts exactly once", boss.MirrorEruptions == mErupt0 + 1 && boss.FissureEruptions == fErupt0 + 1);
+            yield return Until(() => boss.ChargeLog.Count > charges0, 4, "second charge");
+            if (boss.ChargeLog.Count > charges0)
+            {
+                var c2 = boss.ChargeLog[charges0];
+                int bsT = TempoClock.TicksFor(TempoTyrantEncounter.Backswing.H, boss.Clock.HasteBpm), w1 = TempoClock.TicksFor(TempoTyrantEncounter.WakeWarn.H, boss.Clock.HasteBpm);
+                float wantYaw = Sim.YawTo(c2.start, farAway.transform.position, 0);
+                Check("Haste: the second charge re-targets the farthest player, straight after the backswing", c2.index == 1 && c2.target == farAway && Sim.Flat(c2.start - c1.end).magnitude < 0.05f &&
+                    Mathf.Abs(Mathf.DeltaAngle(c2.yaw, wantYaw)) < 2f && Mathf.Abs(c2.tick - (c1.tick + w1 + TempoTyrantEncounter.WakeTravelTicks + bsT)) <= 1,
+                    $"target {(c2.target ? c2.target.name : "none")}, yaw {c2.yaw:0} vs {wantYaw:0}, starts {c2.tick - c1.tick} ticks after charge 1 (want {w1 + TempoTyrantEncounter.WakeTravelTicks + bsT})");
+                yield return Shot("haste_second_charge");
+                int f2 = boss.FissureEruptions;
+                yield return Until(() => boss.FissureEruptions > f2, 5, "second fissure");
+                Check("Haste: each charge leaves its own fissure", boss.FissureEruptions == fErupt0 + 2 && boss.LastFissure != f && boss.LastFissure.Source == "Sundering Wake (eruption 2)", boss.LastFissure != null ? boss.LastFissure.Source : "");
+            }
+            else Check("Haste: the second charge happened", false);
             RemoveExtras();
             yield return Until(() => boss.Current == "between blocks" || boss.Current.StartsWith("pursuit") || boss.Current.StartsWith("Closing"), 10, "Mirrored Wake block ends");
             Check("Mirrored Wake: no lingering hazards after the block", !d.World.Hazards.Live.Any(h => h.Source.StartsWith("Sundering Wake")));
@@ -574,6 +629,20 @@ namespace LastBell.Run
             yield return Shot("closing_rush_tell");
             yield return Until(() => boss.Rushes > rushes && boss.Current != "Closing Rush", 6, "rush travel");   // "Closing Rush (stopped)" once he lands
             Check("closing rush announced and non-damaging", boss.Rushes > rushes && hits.Skip(rushHits).All(h => !h.source.Contains("Rush")));
+            var rr = boss.RushLog.LastOrDefault(x => x.StopTick >= 0);
+            if (rr != null)
+            {
+                int tellWant = TempoClock.TicksFor(TempoTyrantEncounter.Of(TempoTyrantEncounter.RushTell, boss.Clock.State), boss.Clock.Bpm);
+                float speed = rr.Distance / (rr.TravelTicks / (float)Sim.Hz);
+                Check("rush timing: 0.5 s far, 1-beat tell, 24 m/s, 7.5 m", rr.FarTicks >= TempoTyrantEncounter.RushSustainTicks && TempoTyrantEncounter.RushSustainTicks == 30 &&
+                    rr.TellTicks == tellWant && speed <= TempoTyrantEncounter.RushSpeed + 0.01f && speed >= TempoTyrantEncounter.RushSpeed - 2.5f && Mathf.Approximately(TempoTyrantEncounter.RushDist, 7.5f) && Mathf.Approximately(TempoTyrantEncounter.RushSpeed, 24f),
+                    $"far {rr.FarTicks} ticks, tell {rr.TellTicks} (want {tellWant}), {rr.Distance:0.0} m in {rr.TravelTicks} ticks = {speed:0.0} m/s, from {rr.Where}");
+            }
+            else Check("rush timing recorded", false);
+            var done = boss.RushLog.Where(x => x.StopTick >= 0).ToList();
+            var gaps = done.Zip(done.Skip(1), (a, b) => b.TellTick - a.StopTick).ToList();
+            Check("rush cooldown 3 s between rushes", TempoTyrantEncounter.RushCooldownTicks == 3 * Sim.Hz && gaps.All(g => g >= TempoTyrantEncounter.RushCooldownTicks - 1),
+                $"{done.Count} rushes, gaps {string.Join(",", gaps)} ticks; fired from: {string.Join(",", boss.RushLog.Select(x => x.Where).Distinct())}");
             Check("rush stops at fighting distance inside the bound", new Vector2(boss.transform.position.x, boss.transform.position.z).magnitude <= TempoTyrantEncounter.OwnBound + 0.05f &&
                 Sim.Flat(d.Player.transform.position - boss.transform.position).magnitude <= TempoTyrantEncounter.FightDist + 1.5f,
                 $"distance {Sim.Flat(d.Player.transform.position - boss.transform.position).magnitude:0.0} m");
@@ -609,23 +678,78 @@ namespace LastBell.Run
             yield return Wait(0.2f);
             Check("frenzy: cosmetic metronome cracks shown", arena && arena.ShowingCracks);
             RenderShot("frenzy_metronome_cracks", new Vector3(0, 6, 4), new Vector3(0, 5, MetronomeCourtArena.MetronomeZ), 50);
-            int chains = boss.ChainsRun;
-            // stand still near the centre: the chain may charge past; the bot is kept standing
-            yield return Until(() => boss.ChainsRun > chains, 50, "first Broken Cadence chain");
-            yield return Until(() => boss.Current == "Threefold Severance", 20, "chain Severance");
-            yield return Shot("frenzy_chain_severance");
-            yield return Until(() => boss.Current.StartsWith("Threefold Severance (recovery)") || boss.Current == "between blocks", 20, "chain end");
-            Check("chain: fissure erupts >= 8 beats before strike 1", boss.LastStrike1ResolveAge - boss.LastFissureResolveAge >= boss.Clock.TicksFor(TempoTyrantEncounter.FissureLeadBeats) - 1,
-                $"eruption {boss.LastFissureResolveAge}, strike 1 {boss.LastStrike1ResolveAge}");
-            if (!Quick)
+            int chains = boss.ChainsRun, cad0 = boss.CadenceLog.Count;
+            keepAbove = 99;   // overlapping hits: refill after every hit so the bot never goes down
+            yield return Until(() => boss.ChainsRun > chains, 50, "first Broken Cadence block");
+            yield return Until(() => boss.CadenceLog.Count > cad0, 20, "first overlap");
+            yield return Wait(0.3f);
+            yield return Shot("broken_cadence_overlap");
+            // observe until chains have run in both tempos and every pairing has shown up (bounded)
+            float waited = 0;
+            while (waited < (Quick ? 45f : 120f))
             {
-                yield return Until(() => boss.ChainsRun > chains + 1, 150, "chain on the next Haste passage");
-                Check("frenzy triggered exactly once", boss.FrenzyTriggers == 1);
-                var log = boss.BlockLog.Where(l => l.EndsWith("Broken Cadence chain")).ToList();
-                Check("chains only in Haste, once per passage", log.Count == boss.ChainsRun && log.All(l => l.Contains(" Haste ")), string.Join(" | ", log));
+                int pairsSeen = boss.CadenceLog.Skip(cad0).Select(x => (x.from, x.to)).Distinct().Count();
+                int temposSeen = boss.BlockLog.Where(l => l.Contains("Broken Cadence:")).Select(l => l.Split(' ')[1]).Distinct().Count();
+                if (pairsSeen >= TempoTyrantEncounter.Cadence.Pairs.Length && temposSeen >= 2) break;
+                yield return Wait(1f); waited += 1f;
             }
+            keepAbove = 60;
+            var ov = boss.CadenceLog.Skip(cad0).ToList();
+            Check("Broken Cadence: every block is an overlapping chain of allowed pairings", ov.Count > 0 && ov.All(x => TempoTyrantEncounter.Cadence.Allowed(x.from, x.to) && x.pending > 0),
+                string.Join(" | ", ov.Select(x => $"{x.from}>{x.to} ({x.pending} pending)")));
+            int seenPairs = ov.Select(x => (x.from, x.to)).Distinct().Count();
+            if (!Quick) Check("Broken Cadence: every pairing seen", seenPairs == TempoTyrantEncounter.Cadence.Pairs.Length, $"{seenPairs}/{TempoTyrantEncounter.Cadence.Pairs.Length} in {waited:0} s");
+            else Note($"Broken Cadence pairings seen: {seenPairs}/{TempoTyrantEncounter.Cadence.Pairs.Length} in {waited:0} s (quick run)");
+            var chainLog = boss.BlockLog.Where(l => l.Contains("Broken Cadence:")).ToList();
+            Check("Broken Cadence: runs in both tempos", chainLog.Any(l => l.Contains(" Haste ")) && chainLog.Any(l => l.Contains(" Normal ")), string.Join(" | ", chainLog));
+            Check("Broken Cadence: never two slice attacks at once", boss.MaxSliceAttacksAtOnce <= 1 && ov.Any(x => x.to == TempoTyrantEncounter.Atk.Slices || x.from == TempoTyrantEncounter.Atk.Slices),
+                $"max {boss.MaxSliceAttacksAtOnce} slice attacks live together");
+            Check("Broken Cadence: he never moves while a Severance strike is pending", boss.SevLockViolations == 0, $"{boss.SevLockViolations} ticks");
+            int leadWant = Mathf.Min(TempoClock.TicksFor(TempoTyrantEncounter.Cadence.FissureLead.H, boss.Clock.HasteBpm), TempoClock.TicksFor(TempoTyrantEncounter.Cadence.FissureLead.N, boss.Clock.NormalBpm));
+            Check("Broken Cadence: a pending fissure erupts >= its lead before strike 1", boss.FissureLeads.All(l => l >= leadWant - 1), $"leads {string.Join(",", boss.FissureLeads)} ticks (min {leadWant})");
+            Check("Broken Cadence windows: never longer than ordinary, most shorter", CadenceShorter(), CadenceTable());
+            Note(CadenceTable());
+            Check("frenzy triggered exactly once", boss.FrenzyTriggers == 1);
             Note("block log: " + string.Join(" | ", boss.BlockLog));
             Note("tempo history: " + string.Join(" | ", boss.Clock.History.Select(h => $"tick {h.tick} -> {h.to} after {h.stateTicks / 60f:0.00}s")));
+        }
+
+        // Below 10%: orbs fall onto the floor, more often the longer it lasts; each spews 3 orbs that bounce off the
+        // wall 3 times. The bot stands still (kept standing) so orbs land on it and around it.
+        IEnumerator FallingHours()
+        {
+            keepAlive = true; keepAbove = 99;
+            yield return Until(() => !boss.Clock.Transitioning, 10, "no tempo shift");
+            boss.DebugSetHpFraction(0.10f);
+            int blocks = boss.Blocks;
+            yield return Until(() => boss.Blocks >= blocks + 1, 40, "block at exactly 10%");
+            Check("Falling Hours: exactly 10% does not start it (strictly below)", !boss.OrbsOn);
+            boss.DebugSetHpFraction(0.09f);
+            yield return Until(() => boss.OrbsOn, 60, "Falling Hours");
+            if (!boss.OrbsOn) yield break;
+            int hits0 = hits.Count; float span = Quick ? 12f : 20f;
+            yield return Wait(4f);
+            yield return Shot("falling_hours_early");
+            yield return Wait(span - 4f);
+            yield return Shot("falling_hours_dense");
+            int start = boss.OrbsStartTick, half = (int)(span / 2 * Sim.Hz);
+            int first = boss.DropTicks.Count(t => t - start < half), second = boss.DropTicks.Count(t => t - start >= half && t - start < 2 * half);
+            Check("Falling Hours: orbs fall more often the longer it lasts", first > 0 && second > first && boss.OrbRate > TempoTyrantEncounter.OrbRateStart,
+                $"{first} drops in the first {span / 2:0} s, {second} in the next; rate now {boss.OrbRate:0.00}/s");
+            Check("Falling Hours: every landed orb spews 3 orbs", boss.DropsLanded > 0 && boss.BouncersSpawned == TempoTyrantEncounter.OrbSplit * boss.DropsLanded,
+                $"{boss.DropsLanded} landed, {boss.BouncersSpawned} bouncing orbs");
+            Check("Falling Hours: each bouncing orb bounces off the wall 3 times, then dissipates", boss.BouncerBounceLog.Count > 0 && boss.BouncerBounceLog.All(b => b == TempoTyrantEncounter.OrbBounces),
+                $"{boss.BouncerBounceLog.Count} dissipated, bounces {string.Join(",", boss.BouncerBounceLog.Distinct())}");
+            Check("Falling Hours: orbs can't be jumped", seen.Values.Where(x => x.Source.StartsWith("Falling Hours")).All(x => !x.H.JumpClearable) && seen.Values.Any(x => x.Source.Contains("bouncing")));
+            Check("Falling Hours: bouncing orbs stay on the floor", boss.MaxBouncerRadius <= CombatWorld.PlayerBound + 0.01f, $"max {boss.MaxBouncerRadius:0.00} m");
+            var orbHits = hits.Skip(hits0).Where(h => h.source.StartsWith("Falling Hours")).ToList();
+            Check("Falling Hours: orbs hit, each at most once per player", orbHits.Count > 0 && orbHits.GroupBy(h => (h.hazard, h.who)).All(g => g.Count() == 1),
+                $"{orbHits.Count} hits ({orbHits.Count(h => h.source.Contains("bouncing"))} from bouncing orbs)");
+            float warnS = Mathf.Min(TempoClock.TicksFor(TempoTyrantEncounter.OrbFallWarn.H, boss.Clock.HasteBpm), TempoClock.TicksFor(TempoTyrantEncounter.OrbFallWarn.N, boss.Clock.NormalBpm)) / (float)Sim.Hz;
+            Check("Falling Hours routes: a walker leaves a landing circle in time; bouncing orbs no faster than walking",
+                (TempoTyrantEncounter.OrbImpactRadius + Hazard.Margin) / PlayerController.WalkSpeed + TempoTyrantRoutes.Reaction <= warnS && TempoTyrantEncounter.BouncerSpeed <= PlayerController.WalkSpeed,
+                $"needs {(TempoTyrantEncounter.OrbImpactRadius + Hazard.Margin) / PlayerController.WalkSpeed + TempoTyrantRoutes.Reaction:0.00} s of {warnS:0.00} s");
+            Note($"Falling Hours: {boss.Drops} drops, {boss.LiveOrbCount} orbs live at the end of {span:0} s");
         }
 
         IEnumerator PauseResume()
@@ -655,6 +779,7 @@ namespace LastBell.Run
             boss.DebugDefeat();
             Check("defeat cancels outstanding damage in the killing tick", d.World.Hazards.Count == 0, $"{pending} -> {d.World.Hazards.Count}");
             Check("defeated boss stops colliding", !boss.Solid);
+            Check("defeat clears the Falling Hours orbs", boss.LiveOrbCount == 0 && !boss.OrbsOn, $"{boss.LiveOrbCount} orbs");
             yield return new WaitForSeconds(1.2f);
             yield return Shot("defeat");
             Check("no damage after defeat", hits.Count == hitsBefore);
@@ -723,20 +848,30 @@ namespace LastBell.Run
                 }
                 Check($"routes: Hollow Crown in then out at {bpm} BPM, {how}", ok == starts, $"{ok}/{starts}, worst slack {worst:0.00} s");
             }
-            // chain: charges ending near the centre from several directions; fissure lane up during the opening.
-            // The fissure always shows its full 5-beat warning from the moment the charge ends (players react from then),
-            // and strike 1 resolves >= 8 beats after the eruption (the opening is lengthened to guarantee it).
-            int cs = 0, cok = 0; float cw = float.MaxValue;
-            foreach (var split in new[] { (TempoTyrantEncounter.FissureWarn.H, (float)TempoTyrantEncounter.FissureLeadBeats) })
-                foreach (var from in new[] { new Vector3(0, 0, 8), new Vector3(8, 0, 0), new Vector3(-6, 0, -6), new Vector3(5, 0, -7) })
-                    foreach (int y in new[] { 0, 90, 200, 315 })
-                    {
-                        var end = Sim.Flat(-from).normalized * 1.5f;
-                        var r = TempoTyrantRoutes.Chain(from, end, y, 220f, PlayerController.SprintSpeed, bound, split.Item1, split.Item2, mirrored: true);
-                        cs += r.Starts; cok += r.Feasible; cw = Mathf.Min(cw, r.WorstSlack);
-                        foreach (var f in r.Failures.Take(2)) Note("route failure: " + f);
-                    }
-            Check("routes: Broken Cadence chain (fissure + mirror, then 1-2-3) at 220 BPM, sprinting", cok == cs, $"{cok}/{cs}, worst slack {cw:0.00} s");
+            // Oct 28 ultimate rework (TempoTyrantRoutes timelines; the full sweep is tools/tempo-tyrant/routes_check.py ultimate).
+            // Haste: sprint with stamina simulated along the route; Normal: walking.
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            foreach (var tp in new[] { Tempo.Haste, Tempo.Normal })
+            {
+                string how = tp == Tempo.Haste ? "sprint + finite stamina" : "walking";
+                var r = TempoTyrantRoutes.WakeRework(tp, bound);
+                Check($"routes: Sundering Wake rework ({tp}: charge, backswing, fissure{(tp == Tempo.Haste ? " + mirror, charge again" : "")}), {how}", r.Feasible == r.Starts, $"{r.Feasible}/{r.Starts}, worst slack {r.WorstSlack:0.00} s");
+                foreach (var f in r.Failures.Take(3)) Note("route failure: " + f);
+                foreach (TempoTyrantEncounter.Atk a in System.Enum.GetValues(typeof(TempoTyrantEncounter.Atk)))
+                {
+                    r = TempoTyrantRoutes.CadenceAlone(a, tp, bound);
+                    Check($"routes: Broken Cadence {a} alone ({tp}), {how}", r.Feasible == r.Starts, $"{r.Feasible}/{r.Starts}, worst slack {r.WorstSlack:0.00} s");
+                    foreach (var f in r.Failures.Take(3)) Note("route failure: " + f);
+                }
+                foreach (var pr in TempoTyrantEncounter.Cadence.Pairs)
+                {
+                    r = TempoTyrantRoutes.CadencePair(pr.from, pr.to, tp, bound);
+                    Check($"routes: Broken Cadence pairing {pr.from} -> {pr.to} ({tp}, join {TempoTyrantEncounter.Of(pr.join, tp)} beats), {how}", r.Feasible == r.Starts, $"{r.Feasible}/{r.Starts}, worst slack {r.WorstSlack:0.00} s");
+                    foreach (var f in r.Failures.Take(3)) Note("route failure: " + f);
+                }
+            }
+            TempoTyrantRoutes.ReleaseCaches();
+            Note($"Oct 28 route checks took {sw.ElapsedMilliseconds / 1000f:0.0} s");
             // Mirrored Wake alone: charges in every 15-degree direction (short and long), off both lanes within the
             // 3-beat fissure warning, walking, counting none of the earlier preview time
             int ms = 0, mok = 0, mskip = 0; float mw = float.MaxValue;
@@ -758,7 +893,7 @@ namespace LastBell.Run
         static readonly (string name, (float H, float N) w)[] Windows =
         {
             ("Severance opening", TempoTyrantEncounter.SevOpen), ("Severance gap", TempoTyrantEncounter.SevGap), ("Wake warning", TempoTyrantEncounter.WakeWarn),
-            ("fissure warning", TempoTyrantEncounter.FissureWarn), ("Crown ring", TempoTyrantEncounter.CrownRing), ("Crown inner", TempoTyrantEncounter.CrownInnerWarn),
+            ("second charge", TempoTyrantEncounter.WakeWarn2), ("backswing", TempoTyrantEncounter.Backswing), ("fissure warning", TempoTyrantEncounter.FissureWarn), ("Crown ring", TempoTyrantEncounter.CrownRing), ("Crown inner", TempoTyrantEncounter.CrownInnerWarn),
             ("rush tell", TempoTyrantEncounter.RushTell), ("slice indicate", TempoTyrantEncounter.SliceIndicate), ("first slice", TempoTyrantEncounter.SliceFirst),
             ("spiral step", TempoTyrantEncounter.SliceStep), ("every-other 1", TempoTyrantEncounter.AltWarn), ("every-other 2", TempoTyrantEncounter.AltGap),
         };
@@ -768,6 +903,21 @@ namespace LastBell.Run
             return Windows.All(x => x.w.H <= x.w.N && TempoClock.TicksFor(x.w.H, c.HasteBpm) < TempoClock.TicksFor(x.w.N, c.NormalBpm)) &&
                    Windows.Count(x => x.w.H < x.w.N) >= 4;
         }
+        static readonly (string name, (float H, float N) ord, (float H, float N) cad)[] CadenceWindows =
+        {
+            ("Severance opening", TempoTyrantEncounter.SevOpen, TempoTyrantEncounter.Cadence.SevOpen), ("Severance gap", TempoTyrantEncounter.SevGap, TempoTyrantEncounter.Cadence.SevGap),
+            ("Wake warning", TempoTyrantEncounter.WakeWarn, TempoTyrantEncounter.Cadence.WakeWarn), ("second charge", TempoTyrantEncounter.WakeWarn2, TempoTyrantEncounter.Cadence.WakeWarn2),
+            ("backswing", TempoTyrantEncounter.Backswing, TempoTyrantEncounter.Cadence.Backswing), ("fissure warning", TempoTyrantEncounter.FissureWarn, TempoTyrantEncounter.Cadence.FissureWarn),
+            ("Crown ring", TempoTyrantEncounter.CrownRing, TempoTyrantEncounter.Cadence.CrownRing), ("Crown inner", TempoTyrantEncounter.CrownInnerWarn, TempoTyrantEncounter.Cadence.CrownInner),
+            ("spiral opening", (TempoTyrantEncounter.SliceIndicate.H + TempoTyrantEncounter.SliceFirst.H, TempoTyrantEncounter.SliceIndicate.N + TempoTyrantEncounter.SliceFirst.N),
+                (TempoTyrantEncounter.Cadence.SliceIndicate.H + TempoTyrantEncounter.Cadence.SliceFirst.H, TempoTyrantEncounter.Cadence.SliceIndicate.N + TempoTyrantEncounter.Cadence.SliceFirst.N)),
+            ("spiral step", TempoTyrantEncounter.SliceStep, TempoTyrantEncounter.Cadence.SliceStep), ("every-other 1", TempoTyrantEncounter.AltWarn, TempoTyrantEncounter.Cadence.AltWarn),
+            ("every-other 2", TempoTyrantEncounter.AltGap, TempoTyrantEncounter.Cadence.AltGap),
+        };
+        static bool CadenceShorter() => CadenceWindows.All(x => x.cad.H <= x.ord.H && x.cad.N <= x.ord.N) && CadenceWindows.Count(x => x.cad.H < x.ord.H) >= 6;
+        static string CadenceTable() => "Broken Cadence windows (beats, ordinary -> cadence, Haste/Normal): " +
+            string.Join("; ", CadenceWindows.Select(x => $"{x.name} {x.ord.H}/{x.ord.N} -> {x.cad.H}/{x.cad.N}")) + "; joins: " +
+            string.Join("; ", TempoTyrantEncounter.Cadence.Pairs.Select(pr => $"{pr.from}>{pr.to} {pr.join.H}/{pr.join.N}"));
         static string HasteTable()
         {
             var c = new TempoClock();

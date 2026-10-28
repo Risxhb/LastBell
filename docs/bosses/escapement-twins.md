@@ -63,7 +63,7 @@
   - Double Vesica.
   - Agreement into Day and Night: the beam fires and the marks are given out at once.
   - Escape Wheel (reverse).
-- **Deadbeat (soft enrage) at 5:00:** the escape wheel never stops, and the whole floor fires on every tock except one random gap.
+- **No enrage** (content rules §5). Its other parts still need checking against those rules (phase change, Hard mechanic, soaks) before it is built.
 - **Max HP:** 3800 (one health bar for both towers).
 
 ## Difficulty

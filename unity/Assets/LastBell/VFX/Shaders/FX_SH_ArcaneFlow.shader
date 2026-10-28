@@ -98,11 +98,12 @@ Shader "LastBell/FX/ArcaneFlow"
                 float n1 = vnoise3(p + _Flow.xyz * _T), n2 = vnoise3(p * 2.7 + 11.3), n3 = vnoise3(p * 0.5 + 3.7);
                 float face = dot(N, H), heat = saturate(face);
                 float key = saturate(dot(N, normalize(float3(-0.35, 0.85, -0.4))));
-                float3 col = _ColorLow.rgb * (0.55 + 0.45 * key) * (0.6 + 0.8 * n2);                      // charred stone: soft facet shading, mottled
+                float3 col = _ColorLow.rgb * (0.45 + 0.4 * key) * (0.55 + 0.7 * n2);                      // charred stone: soft facet shading, mottled
                 float2 vo = voro3(p + (n3 - 0.5) * 0.8);                                                 // cracks along cell borders
-                float vein = 1 - smoothstep(0, _Width * (0.4 + n2), vo.y - vo.x);
-                vein *= smoothstep(0.35, 0.6, n3) * (0.6 + 0.8 * n1);                                    // only some borders split; light pulses along them
-                col += _ColorHigh.rgb * saturate(vein) * (0.4 + 1.6 * smoothstep(-0.3, 0.9, face));          // cracks hottest on the leading face
+                float vein = 1 - smoothstep(0, _Width * (0.25 + 1.5 * n2 * n2), vo.y - vo.x);           // crack width varies along them
+                vein *= smoothstep(0.45, 0.72, n3) * (0.4 + 1.0 * n1);                                   // only some borders split; light pulses along them
+                col += _ColorHigh.rgb * saturate(vein) * (0.15 + 1.85 * smoothstep(-0.2, 0.9, face));        // cracks hottest on the leading face, faint behind
+                col += _ColorHigh.rgb * 0.1 * smoothstep(0.55, 0.98, face) * (0.6 + 0.8 * n1);               // the leading face glows molten
                 col += _ColorEdge.rgb * pow(heat, 6) * _EdgeGlow;                                         // a small hot cap on the leading face
                 float nn = n1 * 0.5 + n2 * 0.5, mask = 1, edge = 0;
                 if (_Dissolve > 0.001)
