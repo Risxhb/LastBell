@@ -152,7 +152,7 @@ namespace LastBell.Run
             d.ReturnToMenu();
             yield return null;
             AurelionArgs.SetOverride = null;
-            yield return AurelionV2Checks();
+            yield return AurelionV2Checks();   // ability sets v2, v3 and v4 (Risx removed this call on 27 Oct; the Aurelion lane keeps it)
         }
 
         // evidence: the orrery rings late in each Alignment warning (first Alignment of the fight only)

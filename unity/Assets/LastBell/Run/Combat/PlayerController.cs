@@ -19,7 +19,7 @@ namespace LastBell.Run
 
     public interface IInputSource { PlayerInput Read(PlayerController who); }
 
-    // Keyboard + mouse, the project's agreed bindings (number row for actions, 5 dash; LMB basic, RMB dash as extras;
+    // Keyboard + mouse, the project's agreed bindings (WASD move; LMB basic only, RMB dash only, 2-5 class actions;
     // Shift sprint, Space jump). Reads Input System devices directly like the existing test controllers. Gamepads are
     // not read: the user's rudder pedals register as a non-standard controller.
     public sealed class KeyboardMouseInput : IInputSource
@@ -32,16 +32,16 @@ namespace LastBell.Run
         {
             var kb = Keyboard.current; var m = Mouse.current; if (kb == null) return;
             bool lmb = m != null && m.leftButton.isPressed, rmb = m != null && m.rightButton.isPressed;
-            bool anyHeld = lmb || rmb || kb.digit1Key.isPressed || kb.digit2Key.isPressed || kb.digit3Key.isPressed || kb.digit4Key.isPressed
-                           || kb.digit5Key.isPressed || kb.digit6Key.isPressed || kb.spaceKey.isPressed;
+            bool anyHeld = lmb || rmb || kb.digit2Key.isPressed || kb.digit3Key.isPressed || kb.digit4Key.isPressed
+                           || kb.digit5Key.isPressed || kb.spaceKey.isPressed;
             if (Blocked) { armed = false; latched = default; return; }
             if (!armed) { if (!anyHeld) armed = true; return; }
-            latched.P0 |= kb.digit1Key.wasPressedThisFrame || (m != null && m.leftButton.wasPressedThisFrame);
+            latched.P0 |= m != null && m.leftButton.wasPressedThisFrame;
             latched.P1 |= kb.digit2Key.wasPressedThisFrame;
             latched.P2 |= kb.digit3Key.wasPressedThisFrame;
             latched.P3 |= kb.digit4Key.wasPressedThisFrame;
-            latched.P4 |= kb.digit6Key.wasPressedThisFrame;
-            latched.Dash |= kb.digit5Key.wasPressedThisFrame || (m != null && m.rightButton.wasPressedThisFrame);
+            latched.P4 |= kb.digit5Key.wasPressedThisFrame;
+            latched.Dash |= m != null && m.rightButton.wasPressedThisFrame;
             latched.Jump |= kb.spaceKey.wasPressedThisFrame;
             latched.Potion |= kb.fKey.wasPressedThisFrame;
         }
@@ -56,8 +56,8 @@ namespace LastBell.Run
             if (kb.dKey.isPressed) a.x += 1; if (kb.aKey.isPressed) a.x -= 1;
             r.Move = Vector2.ClampMagnitude(a, 1);
             r.Sprint = kb.leftShiftKey.isPressed || kb.rightShiftKey.isPressed;
-            r.H0 = kb.digit1Key.isPressed || (m != null && m.leftButton.isPressed);
-            r.H1 = kb.digit2Key.isPressed; r.H2 = kb.digit3Key.isPressed; r.H3 = kb.digit4Key.isPressed; r.H4 = kb.digit6Key.isPressed;
+            r.H0 = m != null && m.leftButton.isPressed;
+            r.H1 = kb.digit2Key.isPressed; r.H2 = kb.digit3Key.isPressed; r.H3 = kb.digit4Key.isPressed; r.H4 = kb.digit5Key.isPressed;
             r.Aim = who.transform.position + who.transform.forward * 3;
             var cam = Camera.main;
             if (cam && m != null)
@@ -114,6 +114,7 @@ namespace LastBell.Run
             go.transform.SetParent(world.Root, false);
             go.transform.SetPositionAndRotation(pos, Quaternion.Euler(0, yaw, 0));
             var pc = go.AddComponent<PlayerController>();
+            SimSmoother.Attach(go);   // drawn between ticks (smooth at 120 fps+); the sim pose is untouched
             pc.ClassName = className; pc.World = world;
             pc.Presenter = CharacterPresenter.ForPlayer(go.transform, className);
             pc.Kit = className == "Chimesinger" ? new ChimesingerKit() : className == "Arcanist" ? new ArcanistKit() : (PlayerKit)new VanguardKit2();
@@ -315,6 +316,7 @@ namespace LastBell.Run
         public abstract string ClassState();                // Opening / Harmony etc.
         public abstract void Step(PlayerInput inp);
         public virtual void TickTimersOnly() { }             // cooldowns keep running while stunned or dashing
+        public virtual bool Acting => false;                 // mid-action (bots: decide the next press when idle)
         public virtual bool CanDash() => true;
         public virtual bool CanJump() => true;
         public virtual void OnDash() { }

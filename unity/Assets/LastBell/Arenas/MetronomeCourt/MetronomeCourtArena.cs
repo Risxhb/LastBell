@@ -285,7 +285,10 @@ namespace LastBell.Arenas.MetronomeCourt
                     P(PrimitiveKind.Cube, stat, at + dirB * 0.08f + Vector3.up * -3.0f, new Vector3(0.7f, 2.6f, 0.03f), M(BannerTeal, 0.3f), new Vector3(0, a, 0), "DrumBanner");
             }
             // rim ledge under the parapet and posts (top just below the floor so it never z-fights the dial band)
-            P(PrimitiveKind.Cylinder, stat, new Vector3(0, -1.07f, 0), new Vector3(29.9f, 1.05f, 29.9f), StoneM(StoneDark * 1.1f), name: "RimLedge");   // cylinder: scale.y = half-height; top at -0.02, clear of the floor (no z-fighting)
+            // October 26, 2026: the ledge top used to sit at -0.02, the same height as the grout disc's top that fills
+            // every joint, so the two fought inside the joints and the joints seemed to shift while moving. It now sits at
+            // -0.06, clear of the grout.
+            P(PrimitiveKind.Cylinder, stat, new Vector3(0, -1.11f, 0), new Vector3(29.9f, 1.05f, 29.9f), StoneM(StoneDark * 1.1f), name: "RimLedge");   // cylinder: scale.y = half-height; top at -0.06
             P(PrimitiveKind.Cylinder, stat, new Vector3(0, -0.16f, 0), new Vector3(30.1f, 0.08f, 30.1f), M(Brass * 0.75f, 0.45f, 0.8f), name: "RimLedgeTrim");   // a band on the ledge edge, below its top (no shared surface)
             P(PrimitiveKind.Cone, stat, new Vector3(0, -10.5f, 0), new Vector3(FloorRadius * 2 + 1.6f, 7f, FloorRadius * 2 + 1.6f), StoneM(StoneDark), new Vector3(180, 0, 0), "PlatformKeel");
             // one calm stone family with a wider +-7% jitter on a darker base (keeps telegraph contrast), a shared grain
@@ -805,6 +808,10 @@ namespace LastBell.Arenas.MetronomeCourt
                 float rad = 24f + (float)arng.NextDouble() * 22f, ang = i * 40f + (float)arng.NextDouble() * 20f, y = -3f - (float)arng.NextDouble() * 5f;
                 float sz = 14f + (float)arng.NextDouble() * 12f;
                 var go = new GameObject("Cloud bank"); go.transform.SetParent(root, false);
+                // placed at its orbit position now, not only from Update (October 26, 2026): the menu's baked copy of the
+                // court has no arena script, and the banks were left stacked at the centre, fighting the floor slabs
+                go.transform.localPosition = Quaternion.Euler(0, ang, 0) * Vector3.forward * rad + Vector3.up * y;
+                go.transform.localRotation = Quaternion.Euler(0, ang, 0);
                 go.AddComponent<MeshFilter>().sharedMesh = FlatQuad(sz, sz * 0.55f);
                 var mr = go.AddComponent<MeshRenderer>(); mr.sharedMaterial = bankM; mr.shadowCastingMode = ShadowCastingMode.Off; mr.receiveShadows = false;
                 cloudBanks.Add((go.transform, rad, ang, y, (i % 2 == 0 ? 1f : 0.7f) * (0.6f + (float)arng.NextDouble() * 0.5f)));
@@ -1095,9 +1102,13 @@ namespace LastBell.Arenas.MetronomeCourt
             if (boss && boss.Dead) BeatPulse = 0;
             LightTint = Color.Lerp(NormalLightTint, HasteLightTint, tempoBlend);
             float flicker = frenzy ? 0.75f + 0.25f * Mathf.PerlinNoise(Time.time * 9, 0.3f) : 1f;
-            if (metronomeLight) { metronomeLight.color = frenzy ? Color.Lerp(tint, CrackGlow, 0.35f) : tint; metronomeLight.intensity = (haste ? 6f : 4f) * flicker * (1 + flash); }
-            if (TempoSpotLight) { TempoSpotLight.color = LightTint; TempoSpotLight.intensity = Mathf.Lerp(80f, 95f, tempoBlend) * flicker * (quiet ? 0.6f : 1f) * (1 + 0.18f * BeatPulse + 0.5f * flash); }
-            if (TempoRimLight) { TempoRimLight.color = LightTint; TempoRimLight.intensity = Mathf.Lerp(0.4f, 0.45f, tempoBlend) * (quiet ? 0.75f : 1f) * (1 + 0.1f * BeatPulse + 0.3f * flash); }
+            // Floor light is steady (Risxhb, October 26, 2026): the per-beat pulse and the enrage noise on the lights that
+            // cover the floor read as heavy shimmer (measured: whole-floor flicker 4.9% live vs 2.3% with them off). The
+            // tempo still reads from the light colour, the rod and the metronome's own glow, which keeps a soft flash.
+            if (metronomeLight) { metronomeLight.color = frenzy ? Color.Lerp(tint, CrackGlow, 0.35f) : tint; metronomeLight.intensity = (haste ? 6f : 4f) * (1 + 0.25f * flash); }
+            if (TempoSpotLight) { TempoSpotLight.color = LightTint; TempoSpotLight.intensity = Mathf.Lerp(80f, 95f, tempoBlend) * (quiet ? 0.6f : 1f); }
+            if (TempoRimLight) { TempoRimLight.color = LightTint; TempoRimLight.intensity = Mathf.Lerp(0.4f, 0.45f, tempoBlend) * (quiet ? 0.75f : 1f); }
+            _ = flicker;   // the enrage noise now shows on the cracks and the boss only
             if (mpb == null) mpb = new MaterialPropertyBlock();   // survives a script reload
             // lantern glow follows the rod's lean across the rim; all flash together on accented transition ticks
             LanternPulseX = phase * 14f;
@@ -1117,11 +1128,11 @@ namespace LastBell.Arenas.MetronomeCourt
             {
                 if (!r) continue;
                 float near = Mathf.Exp(-(x - LanternPulseX) * (x - LanternPulseX) / 6f);
-                float k = (quiet ? 0.6f : 1f) * (0.7f + 0.6f * near) * (1 + 0.3f * BeatPulse + flash);
+                float k = (quiet ? 0.6f : 1f) * (0.7f + 0.6f * near) * (1 + 0.06f * BeatPulse + 0.25f * flash);   // gentle: floor glow, not a strobe
                 poolMpb.SetColor(PColorHigh, LightTint * k); r.SetPropertyBlock(poolMpb);
             }
             var seamTint = frenzy && Mathf.PerlinNoise(Time.time * 7, 1.7f) > 0.55f ? CrackGlow : tint;
-            mpb.SetColor(PBase, seamTint); mpb.SetColor(PEmission, seamTint * ((haste ? 0.9f : 0.6f) + 1.0f * flash));
+            mpb.SetColor(PBase, seamTint); mpb.SetColor(PEmission, seamTint * ((haste ? 0.9f : 0.6f) + 0.3f * flash));
             foreach (var r in seams) if (r) r.SetPropertyBlock(mpb);
             // tempo line: brighter than the brass beside it, with a bright ~30-degree segment chasing once around per beat
             // the bright segment ticks one hour per beat (a clock hand, a lap every 12 beats) and decays over a quarter beat;

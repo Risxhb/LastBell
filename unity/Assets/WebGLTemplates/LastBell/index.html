@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="player.css">
 </head>
 <body>
-  <header><a class="title" href="./">LAST BELL</a><span>PLAYABLE DEMO</span><a href="https://github.com/Risxhb/collab">Project ↗</a></header>
+  <header><a class="title" href="./">LAST BELL</a><span>PLAYABLE DEMO</span><a href="https://github.com/Risxhb/LastBell">Project ↗</a></header>
   <main>
     <section id="player" aria-label="Last Bell game player">
       <canvas id="unity-canvas" width="1280" height="720" tabindex="0" aria-label="Last Bell. Use a keyboard and mouse to play."></canvas>
@@ -23,7 +23,35 @@
       </div>
     </section>
     <div class="toolbar"><span id="hint">Vanguard · Arcanist · Chimesinger</span><button id="fullscreen" type="button" disabled>Fullscreen</button></div>
-    <details><summary>Controls &amp; about this demo</summary><p>Choose your class above Start Run and select a difficulty, then start the run. A shuffled boss rush ends with Bellkeeper. Boss-Rush Test Rush lets you choose a map and encounter for practice.</p><p>Move with WASD, hold Shift to sprint and press Space to jump. Aim with the mouse. Use 1 / left click for your basic attack, 2–4 for class skills, 5 / right click to dash, 6 for Chimesinger’s heal, F for a potion and Escape to pause.</p><p>Work in progress. Alternative Confrontation is the default main menu. Settings &gt; UI can switch to the five-arena showcase. Boss music continues between fights and crossfades during each countdown. Browser performance may vary.</p></details>
+    <section class="news" aria-labelledby="news-title">
+      <h2 id="news-title">What’s new in this demo</h2>
+      <p class="news-date">October 27, 2026</p>
+      <p class="news-lead">The <strong>Arcanist</strong> now plays around <strong>glyphs</strong>. Channel Disintegrate on the boss to carve them, spend them on full-power Rune Sigils and Arcane Comets, or cash them all into Arcane Surge. Magic Missile fills the gaps. It is still a ranged glass cannon with no defensive ability, so keep moving.</p>
+      <h3>How glyphs work</h3>
+      <ul class="changes">
+        <li><strong>Carve:</strong> each damage step of Disintegrate that hits the boss carves one glyph, up to 3. They circle your waist and stay until you spend them.</li>
+        <li><strong>Spend:</strong> Rune Sigil and Arcane Comet each spend one glyph for full damage. Cast without one, the rune is drawn faint and deals only 35%.</li>
+        <li><strong>Cash in:</strong> Arcane Surge spends every glyph for 2 s of Surge each (up to 6 s). While surging, spells cost no glyph and land twice as fast.</li>
+      </ul>
+      <h3>Arcanist abilities</h3>
+      <ul class="abilities">
+        <li><div class="ability-head"><span class="ability-name">Magic Missile</span><kbd>Left click</kbd></div><p>Tap: one missile straight at the cursor (10). It can miss.</p><p>Hold: summon up to 3 missiles (5 in Surge); release to fire them straight at the cursor (13 each). They no longer home, so aim.</p><p>You move at half speed while charging. Dashing drops the charge.</p></li>
+        <li><div class="ability-head"><span class="ability-name">Disintegrate</span><kbd>2 · hold</kbd></div><p>A beam you steer toward the cursor for up to 2 s, building in 3 damage steps.</p><p>Each step completed on the boss <strong>carves a glyph</strong>. You move at 20% speed; dashing breaks the beam but keeps the glyphs already carved. Cooldown 8 s.</p></li>
+        <li><div class="ability-head"><span class="ability-name">Rune Sigil</span><kbd>3</kbd></div><p>Draws a rune at the cursor (16 m) that explodes after 0.8 s (55) on the boss inside it (2.5 m).</p><p><strong>Spends 1 glyph.</strong> Without one it is faint and deals 35%. Cooldown 6 s.</p></li>
+        <li><div class="ability-head"><span class="ability-name">Arcane Comet</span><kbd>4</kbd></div><p>Draws a rune at the cursor (20 m); 3 s later a burning meteor crashes into it (90, 4 m). The bullseye in the middle doubles it. The mark stays where you put it, so predict where the boss will be.</p><p><strong>Spends 1 glyph.</strong> Without one it deals 35%. Cooldown 18 s.</p></li>
+        <li><div class="ability-head"><span class="ability-name">Arcane Surge</span><kbd>5</kbd></div><p><strong>Spends every glyph</strong> (needs at least one) for 2 s of Surge per glyph.</p><p>While surging: charged volleys summon 5 missiles, taps fire two, and Rune Sigil and Arcane Comet cost no glyph and arm or fall twice as fast. A dash during the short cast cancels it and keeps the glyphs. Cooldown 15 s.</p></li>
+        <li><div class="ability-head"><span class="ability-name">Blink</span><kbd>Right click</kbd></div><p>The shared dash, shown as a teleport. Short burst (3 m in 0.2 s) in the move direction. Costs 30 stamina; sprint and jump share the bar.</p><p>No invincibility: get out of the shape before it resolves.</p></li>
+      </ul>
+      <p class="news-note">Plain numbers in brackets, like (10), are damage. Hover over an ability in game to see its tooltip.</p>
+      <h3>Also new</h3>
+      <ul class="changes">
+        <li><strong>New Arcanist spell icons</strong> and reworked effects: glyphs at your waist, a gold Surge aura, a sharper Rune Sigil blast, and the Arcane Comet as a burning meteor that shatters on impact.</li>
+        <li><strong>New controls for every class:</strong> left click is the basic attack, right click is dash, and 2–5 are class skills.</li>
+        <li><strong>Minibosses</strong> to practise in Boss Rush: the Chimebound Oracle and the Dial Warden, plus an early Pendulum Sentinel prototype on Skyward Spire (all work in progress).</li>
+        <li><strong>New arena art</strong> for Skyward Spire, Verdant Chimes and Shattered Hour, and a refreshed main menu with new menu music.</li>
+      </ul>
+    </section>
+    <details><summary>Controls &amp; about this demo</summary><p>Choose your class above Start Run and select a difficulty, then start the run. A shuffled boss rush ends with Bellkeeper. Boss-Rush Test Rush lets you choose a map and encounter for practice.</p><p>Move with WASD, hold Shift to sprint and press Space to jump. Aim with the mouse. Left click for your basic attack (the Arcanist can hold it to charge missiles), 2–5 for class skills, right click to dash, F for a potion and Escape to pause.</p><p>Work in progress. Alternative Confrontation is the default main menu. Settings &gt; UI can switch to the five-arena showcase. Boss music continues between fights and crossfades during each countdown. Browser performance may vary.</p></details>
   </main>
   <footer>LAST BELL <span>WORK IN PROGRESS</span></footer>
   <script>

@@ -14,8 +14,12 @@ namespace LastBell.Menu
         float fromMenu, fromBoss, fromPrevious, transition = 1;
         RunDirector countdown;
         bool inCombat, menuPaused;
-        static readonly string[] MenuTracks = { "MainMenu2", "MainMenuOpening", "MainMenuMusic" };
-        static readonly string[] MenuTitles = { "MAIN MENU 2", "MAIN MENU 3", "MAIN MENU 1" };
+        // Risxhb, October 26, 2026: Bittersweet Dawn opens the menu, The Hero Rises is the second song; the two alternate
+        // (each plays once, then the next; Next skips). The earlier playlist was { "MainMenu2", "MainMenuOpening",
+        // "MainMenuMusic" }. With a single track it loops and the Confrontation menu hides its skip button.
+        static readonly string[] MenuTracks = { "BittersweetDawn", "TheHeroRises" };
+        static readonly string[] MenuTitles = { "BITTERSWEET DAWN", "THE HERO RISES" };
+        public static int TrackCount => MenuTracks.Length;
         bool playbackObserved, trackStarted;
         int trackIndex;
         public bool PlayingOpening => trackIndex == 0;
@@ -43,7 +47,7 @@ namespace LastBell.Menu
         {
             trackIndex = index;
             menu.Stop(); menu.clip = Resources.Load<AudioClip>("Menu/" + MenuTracks[trackIndex]);
-            menu.loop = false; playbackObserved = false; trackStarted = false;
+            menu.loop = MenuTracks.Length == 1; playbackObserved = false; trackStarted = false;
             if (!menu.clip) { Debug.LogError("Missing menu track: " + MenuTracks[trackIndex]); return; }
             if (!UserPaused && !menuPaused) { menu.Play(); trackStarted = true; }
         }
@@ -126,7 +130,7 @@ namespace LastBell.Menu
             if (inCombat)
             {
                 menuPaused = false;
-                NextTrack(); // A genuine menu return starts one of the three tracks from its beginning.
+                NextTrack(); // A genuine menu return starts the next menu song (the only one, when there is one) from its beginning.
                 BeginFade(false);
             }
             else if (menuPaused) { menuPaused = false; if (!UserPaused) ResumeTrack(); }

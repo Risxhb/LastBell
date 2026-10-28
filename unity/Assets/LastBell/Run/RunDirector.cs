@@ -44,6 +44,8 @@ namespace LastBell.Run
             new BossEntry("Tempo Tyrant (practice)", w => BossEncounter.Spawn<TempoTyrantEncounter>(w, new Vector3(0, 0, -2f), 0), inRun: false, map: TempoTyrantMap),
             // Metronome Court miniboss, practice only like the Tyrant (docs/bosses/chimebound-oracle.md)
             new BossEntry("Chimebound Oracle (practice)", w => BossEncounter.Spawn<ChimeboundOracleEncounter>(w, new Vector3(0, 0, -2f), 0), inRun: false, map: TempoTyrantMap),
+            // Skyward Spire miniboss with the parry QTE, practice only (docs/bosses/dial-warden.md)
+            new BossEntry("Dial Warden (practice)", w => BossEncounter.Spawn<DialWardenEncounter>(w, new Vector3(0, 0, -1.5f), 0), inRun: false, map: AurelionMap),
         };
         // Catalog eligibility is stable; each run owns its shuffled sequence, with final encounters appended.
         public static readonly int[] RunOrder = Enumerable.Range(0, Bosses.Length).Where(i => Bosses[i].InRun).OrderBy(i => Bosses[i].Final).ToArray();
@@ -64,6 +66,7 @@ namespace LastBell.Run
         public static int TempoTyrantPractice => Array.FindIndex(Bosses, b => b.Map == TempoTyrantMap);
         public const string TempoTyrantMap = "metronome-court";
         public static int ChimeboundOraclePractice => Array.FindIndex(Bosses, b => b.Name.StartsWith("Chimebound Oracle"));
+        public static int DialWardenPractice => Array.FindIndex(Bosses, b => b.Name.StartsWith("Dial Warden"));
         public static readonly string[] Classes = { "Vanguard", "Chimesinger", "Arcanist" };
         const int IntroTicks = 120, ClearTicks = 180, DownedTicks = 100;
         public const int PracticeAutoReadyTicks = 45;   // 0.75 s in the arena before a practice fight starts
@@ -121,7 +124,7 @@ namespace LastBell.Run
             int map = RunMaps.Current;
             if (map >= 0) CombatWorld.SetPlayerBound(RunMaps.All[map].Bound, RunMaps.All[map].Square);
             if (!GetComponent<RunHud>()) gameObject.AddComponent<RunHud>();
-            Application.targetFrameRate = 120;
+            LastBell.Menu.MenuSettings.ApplyFrameRate();   // Settings: VSync (off by default) and FPS cap (120 by default)
             if (RunAutoTest.Requested) RunAutoTest.Launch();
         }
         void OnDestroy() { if (Instance == this) Instance = null; }
@@ -362,7 +365,9 @@ namespace LastBell.Run
             if (World == null || Paused) return;
             acc += Mathf.Min(Time.deltaTime, 0.1f);
             int guard = 0;
-            while (acc >= Sim.Dt && guard++ < 8) { acc -= Sim.Dt; Tick(); }
+            SimSmoother.RestoreAll();   // ticks see exact sim poses
+            while (acc >= Sim.Dt && guard++ < 8) { acc -= Sim.Dt; Tick(); SimSmoother.CaptureAll(); }
+            SimSmoother.PresentAll(acc / Sim.Dt);   // draw between the last two ticks: smooth at any frame rate
         }
 
         void Tick()

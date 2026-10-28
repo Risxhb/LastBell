@@ -109,14 +109,19 @@ namespace LastBell.Run
                 Note($"demo death @{b.FightTicks / (float)Sim.Hz:0.0}s: {p.ClassName} by {h.Source} {dmg} in [{blk}], potions left {p.Potions} | {(p.Input as AllyBot)?.DebugLine}");
             };
             // the two damage windows (Codex proposal 1): Corona Shield (25 s) and Last Light (88 s)
-            int eclT0 = -1, eclMax = 0, p4T0 = -1, p4Hp0 = 0; bool eclDone = false;
+            int eclT0 = -1, eclSec = -1, eclMax = 0, eclLeft = 0, p4T0 = -1, p4Hp0 = 0; bool eclDone = false;
             bool fast = Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellDemoFast", StringComparison.OrdinalIgnoreCase)) && !DemoRecord;
             if (fast) Time.timeScale = 4;   // measurement runs (no recording) at 4x
-            string last = ""; float t = 0;
-            while (t < 480 && d.State == RunState.Combat)
+            // fight time, not frame time: big parties at 4x fall behind the frame clock (an 8-player run stopped at 4:27 of fight)
+            string last = ""; float t0 = Time.realtimeSinceStartup;
+            while (b.FightTicks < 480 * Sim.Hz && Time.realtimeSinceStartup - t0 < 1800 && d.State == RunState.Combat)
             {
                 DemoCaption(b);
+                if (!eclDone && b.Eclipse.Active) eclLeft = b.ShieldHp;
                 if (!eclDone && b.Eclipse.Active && eclT0 < 0) { eclT0 = d.World.Tick; eclMax = b.ShieldMax; }
+                if (!eclDone && eclT0 >= 0 && b.Eclipse.Active && (d.World.Tick - eclT0) / Sim.Hz > eclSec && (eclSec = (d.World.Tick - eclT0) / Sim.Hz) >= 0)
+                    foreach (var p in d.World.Players)
+                        Note($"demo corona @{(d.World.Tick - eclT0) / (float)Sim.Hz:0}s: shield {b.ShieldHp} | {p.ClassName} hp {p.Hp} inwell {b.Eclipse.InWell(p.transform.position)} at {Sim.Flat(p.transform.position)} | {(p.Input as AllyBot)?.DebugLine}");
                 if (!eclDone && eclT0 >= 0 && !b.Eclipse.Active) { eclDone = true; Note($"demo window Corona: {eclMax - b.ShieldHp} of {eclMax} in {(d.World.Tick - eclT0) / (float)Sim.Hz:0.0} s (limit 25 s), {(b.Eclipse.Broken ? "broken" : "held")}"); }
                 if (p4T0 < 0 && b.Phase >= 4) { p4T0 = d.World.Tick; p4Hp0 = b.Hp; }
                 if (b.Towers.Towers.Exists(tw => tw.ResolveTick >= d.World.Tick) && d.World.Tick % 15 == 0)
@@ -126,8 +131,9 @@ namespace LastBell.Run
                         Note($"towers @{b.FightTicks / (float)Sim.Hz:0.0}s {p.ClassName}: tower {(tw == null ? "-" : tw.Index + " at " + Sim.Flat(tw.At))} | {(p.Input as AllyBot)?.DebugLine}");
                     }
                 if (b.PhaseName != last) { last = b.PhaseName; Note($"demo @{b.FightTicks / (float)Sim.Hz:0.0}s: {last}"); }
-                t += Time.deltaTime; yield return null;
+                yield return null;
             }
+            if (!eclDone && eclT0 >= 0) Note($"demo window Corona: {eclMax - eclLeft} of {eclMax} in {(d.World.Tick - eclT0) / (float)Sim.Hz:0.0} s (limit 25 s), held");
             if (p4T0 >= 0) Note($"demo window Last Light: {p4Hp0 - b.Hp} of {p4Hp0} in {(d.World.Tick - p4T0) / (float)Sim.Hz:0.0} s (floor deadline 88 s), {b.Light.Fallen} slices fallen");
             Note($"demo damage dealt: {d.World.DamageDealt} by the party; player {d.Player?.ClassName}");
             Time.timeScale = 1;
@@ -138,7 +144,7 @@ namespace LastBell.Run
             if (b.Telemetry) foreach (var s in b.Telemetry.Summary()) Note("demo telemetry: " + s);
             foreach (var g in b.Telemetry.Rows.Where(r => r.Kind == "hit").GroupBy(r => r.Player)) Note($"demo hits {g.Key}: " + string.Join(", ", g.GroupBy(r => r.Source).Select(s => $"{s.Key} {s.Count()}x{s.Sum(r => r.Value):0}")));
             Check("demo: the fight ran to an end", d.State != RunState.Combat, d.State.ToString());
-            t = 0; while (t < 5) { t += Time.deltaTime; yield return null; }
+            float t = 0; while (t < 5) { t += Time.deltaTime; yield return null; }
             demoRecording = false; yield return null; yield return null;
             RunHud.CaptionTitle = null;
             AllyBot.AllyMode = BotMode.Perfect; AllyBot.Attacks = false;   // back to the menu defaults

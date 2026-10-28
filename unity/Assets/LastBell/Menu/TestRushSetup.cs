@@ -18,7 +18,7 @@ namespace LastBell.Menu
         public Button[] EncounterButtons {get;private set;}
         // Boss step rows (Risxhb, October 25, 2026): Bosses, then Minibosses, each a row of cards like the arena step.
         // Buttons stay indexed by RunDirector.Bosses; only their placement follows these rows. The final boss is last.
-        public static readonly string[] MinibossPrefixes={"Chimebound Oracle"};
+        public static readonly string[] MinibossPrefixes={"Chimebound Oracle","Dial Warden"};
         public static bool IsMiniboss(int encounter)=>System.Array.Exists(MinibossPrefixes,p=>RunDirector.Bosses[encounter].Name.StartsWith(p));
         static readonly string[] BossOrder={"Aurelion","Crucivar","Sylvara","Tempo Tyrant"};
         public static int[] BossRow{get{
@@ -236,17 +236,16 @@ namespace LastBell.Menu
             var own=RunDirector.Bosses[encounter].Map;int m=own!=null?RunMaps.IndexOf(own):map;
             return m>=0&&m<RunMaps.All.Length?Preview(m):null;
         }
-        // Same card as the arena step (frame, art, name shade, number, gold accent), for one encounter.
+        // Same card frame as the arena step (number, gold accent, focus), for one encounter. Names only, no arena art
+        // (Risxhb, October 26, 2026): the art comes back once each boss has its own portrait.
         Button BossCard(int encounter,int slot,Transform parent,Vector2 min,Vector2 max,UnityEngine.Events.UnityAction action,out Text label,out TestRushFocus focus,out RawImage art)
         {
             var (b,frame,f)=Base(CardName(encounter),parent,min,max,action,new Vector2(8,0));focus=f;f.Frame=frame;f.Grow=1.02f;f.ChosenEdge=UiTheme.GoldBright;f.FocusEdge=FocusGold;
-            var inner=MenuUI.Rect("Card art",b.transform,Vector2.zero,Vector2.one,new Vector2(2,2));inner.gameObject.AddComponent<RectMask2D>();
+            var inner=MenuUI.Rect("Card face",b.transform,Vector2.zero,Vector2.one,new Vector2(2,2));inner.gameObject.AddComponent<RectMask2D>();
             MenuUI.Panel("Card backing",inner,Vector2.zero,Vector2.one,new Color(.02f,.025f,.04f,1));
-            art=MenuUI.Rect("Encounter arena preview",inner,Vector2.zero,Vector2.one).gameObject.AddComponent<RawImage>();art.texture=EncounterPreview(encounter,MapIndex);art.raycastTarget=false;
-            var fit=art.gameObject.AddComponent<AspectRatioFitter>();fit.aspectMode=AspectRatioFitter.AspectMode.EnvelopeParent;fit.aspectRatio=16f/9;f.Art=art;
-            var fade=MenuUI.Rect("Name shade",inner,Vector2.zero,new Vector2(1,.62f)).gameObject.AddComponent<RawImage>();fade.texture=cardFade;fade.raycastTarget=false;
-            MenuUI.Text((slot+1).ToString("00"),inner,new Vector2(.02f,.80f),new Vector2(.5f,.98f),14,MenuUI.Gold,TextAnchor.MiddleLeft);
-            label=MenuUI.Text("",inner,new Vector2(.02f,.03f),new Vector2(.98f,.24f),21,MenuUI.Ivory,TextAnchor.MiddleLeft);label.resizeTextForBestFit=true;label.resizeTextMinSize=12;label.resizeTextMaxSize=21;f.Label=label;Shadow(label,.9f);
+            art=null;
+            MenuUI.Text((slot+1).ToString("00"),inner,new Vector2(.04f,.80f),new Vector2(.5f,.98f),14,MenuUI.Gold,TextAnchor.MiddleLeft);
+            label=MenuUI.Text("",inner,new Vector2(.06f,.2f),new Vector2(.94f,.8f),26,MenuUI.Ivory,TextAnchor.MiddleCenter);label.resizeTextForBestFit=true;label.resizeTextMinSize=14;label.resizeTextMaxSize=26;f.Label=label;Shadow(label,.9f);
             var accent=MenuUI.Panel("Chosen accent",inner,Vector2.zero,new Vector2(1,0),MenuUI.Gold);accent.rectTransform.sizeDelta=new Vector2(0,4);accent.rectTransform.pivot=new Vector2(.5f,0);f.Accent=accent;
             return b;
         }

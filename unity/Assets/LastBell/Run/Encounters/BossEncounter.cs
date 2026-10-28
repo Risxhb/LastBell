@@ -24,7 +24,8 @@ namespace LastBell.Run
         public string PhaseName { get; protected set; } = "";
         public string Current { get; protected set; } = "";   // attack in progress, for the HUD / tests
         public virtual string HudExtra => null;          // an extra boss-bar line (Aurelion v4: enrage clock, shield)
-        protected virtual bool PartyScaled => false;      // true: co-op HP 1 + 0.7 x (fighters - 1) (Aurelion v4 is tuned with it)
+        protected virtual bool PartyScaled => false;      // true: co-op HP 1 + PartyStep x (fighters - 1) (Aurelion v4 is tuned with it)
+        protected virtual float PartyStep => 0.7f;        // the packets' provisional 0.7 per extra fighter
         public event Action<BossEncounter> Defeated;
         public event Action<BossEncounter, string> PhaseChanged;
 
@@ -42,9 +43,10 @@ namespace LastBell.Run
             // co-op HP: 1 + 0.7 x (fighting players - 1), the packets' provisional formula until the Bellkeeper D6 decides.
             // Opt-in per boss (PartyScaled): only bosses tuned with it use it, so other bosses keep their authored HP.
             int fighters = 0; foreach (var p in w.Players) if (!(p.Input is AllyBot) || AllyBot.Attacks) fighters++;   // passive bots don't count
-            float party = b.PartyScaled ? 1 + 0.7f * Mathf.Max(0, fighters - 1) : 1;
+            float party = b.PartyScaled ? 1 + b.PartyStep * Mathf.Max(0, fighters - 1) : 1;
             if (TestHpScale != 1 || party != 1) b.MaxHp = Mathf.Max(1, Mathf.RoundToInt(b.MaxHp * TestHpScale * party));
             b.Hp = b.MaxHp; b.Build();
+            SimSmoother.Attach(go);   // drawn between ticks like the player
             return b;
         }
 
@@ -85,7 +87,7 @@ namespace LastBell.Run
             wait = Mathf.Max(1, script.Current) - 1;
         }
 
-        public int TakeHit(int damage, Vector3 contact)
+        public int TakeHit(int damage, Vector3 contact, bool hitFx = true)
         {
             if (Dead) return 0;
             damage = Absorb(damage);   // a shield (Aurelion v4 Corona Shield) takes its share first
@@ -93,7 +95,8 @@ namespace LastBell.Run
             int dealt = Mathf.Min(damage, Hp);
             Hp -= dealt;
             RunHud.Float(contact + Vector3.up * 0.5f, dealt.ToString(), new Color(1f, 0.86f, 0.45f));
-            W.BossFx.BossHit(contact); glowLevel = Mathf.Max(glowLevel, 2f);
+            if (hitFx) W.BossFx.BossHit(contact);   // abilities with their own impact effect skip the shared flash
+            glowLevel = Mathf.Max(glowLevel, 2f);
             OnHurt();
             if (Hp <= 0) Die();
             return dealt;

@@ -41,6 +41,8 @@ namespace LastBell.Menu
         public Slider MusicVolumeControl { get; private set; }
         public Button ApplyButton { get; private set; }
         public Button SettingsBackButton { get; private set; }
+        public Button VSyncControl { get; private set; }
+        public Button FrameCapControl { get; private set; }
         public TestRushSetup Rush { get; private set; }
         public bool Loading { get; private set; }
         public bool SettingsOpen => settings && settings.activeSelf;
@@ -133,15 +135,17 @@ namespace LastBell.Menu
             className=MenuUI.Text(SavedHeroSelection.Current.ToUpperInvariant(),panel,new Vector2(.13f,.645f),new Vector2(.87f,.705f),UiTheme.SizeHeading,UiTheme.Ivory);
             PreviousButton=ClassArrow(panel,false);FitBox(PreviousButton,new Vector2(.22f,.675f),44);
             NextButton=ClassArrow(panel,true);FitBox(NextButton,new Vector2(.78f,.675f),44);
-            var diff=DifficultyButton=Nav("Difficulty",panel,.06f,()=>{RunDifficulty.Selected=(Difficulty)(((int)RunDifficulty.Selected+1)%RunDifficulty.Names.Length);RefreshDifficulty();},16);
-            difficulty=diff.GetComponentInChildren<Text>();diff.GetComponent<ConfrontationNavFocus>().Rest=new Color(MenuUI.Gold.r,MenuUI.Gold.g,MenuUI.Gold.b,.75f);RefreshDifficulty();
+            var diff=DifficultyButton=Nav("Difficulty",panel,.06f,()=>{RunDifficulty.Selected=(Difficulty)(((int)RunDifficulty.Selected+1)%RunDifficulty.Names.Length);RefreshDifficulty();},20);   // 20 px (was 16): readable, still secondary to the main entries (Risxhb, October 26, 2026)
+            difficulty=diff.GetComponentInChildren<Text>();{var sh=difficulty.gameObject.AddComponent<Shadow>();sh.effectColor=new Color(0,0,0,.5f);sh.effectDistance=new Vector2(1,-1);}/* the rim glint runs behind this line */diff.GetComponent<ConfrontationNavFocus>().Rest=new Color(MenuUI.Gold.r,MenuUI.Gold.g,MenuUI.Gold.b,.75f);RefreshDifficulty();
             difficultyPrev=CycleArrow(diff.transform,false,16,new Color(MenuUI.Gold.r,MenuUI.Gold.g,MenuUI.Gold.b,.5f));
             difficultyNext=CycleArrow(diff.transform,true,16,new Color(MenuUI.Gold.r,MenuUI.Gold.g,MenuUI.Gold.b,.5f));
 
             BuildMusicPlayer();
             var stack=new Selectable[]{PreviousButton,NextButton,StartButton,RushButton,SettingsButton,ExitButton,diff,MusicPlayButton};
             for(int i=0;i<stack.Length;i++)stack[i].navigation=new Navigation{mode=Navigation.Mode.Explicit,selectOnDown=stack[(i+1)%stack.Length],selectOnUp=stack[(i+stack.Length-1)%stack.Length],selectOnLeft=i==0||i==1?PreviousButton:null,selectOnRight=i==0||i==1?NextButton:i==stack.Length-1?MusicPauseButton:null};
-            MusicPauseButton.navigation=new Navigation{mode=Navigation.Mode.Explicit,selectOnLeft=MusicPlayButton,selectOnRight=MusicNextButton,selectOnUp=diff,selectOnDown=PreviousButton};
+            // One menu song (Bittersweet Dawn, October 26, 2026): no skip button; Pause wraps right to Play.
+            bool skip=MenuMusic.TrackCount>1;MusicNextButton.gameObject.SetActive(skip);
+            MusicPauseButton.navigation=new Navigation{mode=Navigation.Mode.Explicit,selectOnLeft=MusicPlayButton,selectOnRight=skip?MusicNextButton:MusicPlayButton,selectOnUp=diff,selectOnDown=PreviousButton};
             MusicNextButton.navigation=new Navigation{mode=Navigation.Mode.Explicit,selectOnLeft=MusicPauseButton,selectOnRight=MusicPlayButton,selectOnUp=diff,selectOnDown=PreviousButton};
             BuildSettings();
             message=MenuUI.Text("",safe,new Vector2(.70f,.074f),new Vector2(.99f,.106f),14,MenuUI.Gold);
@@ -206,7 +210,7 @@ namespace LastBell.Menu
         void ApplyTextSizes(bool small)
         {
             if(selectClass)selectClass.fontSize=small?16:13;
-            if(difficulty){difficulty.fontSize=small?18:16;difficulty.resizeTextMaxSize=difficulty.fontSize;difficulty.resizeTextMinSize=small?16:13;}
+            if(difficulty){difficulty.fontSize=small?22:20;difficulty.resizeTextMaxSize=difficulty.fontSize;difficulty.resizeTextMinSize=small?18:15;}
             if(trackTitle){trackTitle.fontSize=small?14:UiTheme.SizeMicro;trackTitle.resizeTextMaxSize=trackTitle.fontSize;}
         }
         Button ClassArrow(Transform parent,bool next)
@@ -282,7 +286,7 @@ namespace LastBell.Menu
             var title=MenuUI.Text("SETTINGS",col,new Vector2(0,.83f),new Vector2(1,.93f),52,UiTheme.Ivory,TextAnchor.MiddleLeft);title.resizeTextForBestFit=true;title.resizeTextMinSize=28;title.resizeTextMaxSize=52;
             var rule=MenuUI.Panel("Title rule",col,new Vector2(0,.825f),new Vector2(0,.825f),MenuUI.Gold);rule.rectTransform.pivot=new Vector2(0,.5f);rule.rectTransform.sizeDelta=new Vector2(96,2);
 
-            const float rowH=.09f; float RowY(int i)=>.70f-i*.105f;
+            const float rowH=.075f; float RowY(int i)=>.715f-i*.088f;   // six rows (volume, display, resolution, quality, VSync, FPS cap) above Back/Apply
             void Divider(int i){var d=MenuUI.Panel("Row divider",col,new Vector2(0,RowY(i)-.008f),new Vector2(1,RowY(i)-.008f),new Color(UiTheme.Ivory.r,UiTheme.Ivory.g,UiTheme.Ivory.b,.10f));d.rectTransform.sizeDelta=new Vector2(0,1);}
             Text Caption(Transform row,string text)=>MenuUI.Text(text,row,new Vector2(0,0),new Vector2(.42f,1),UiTheme.SizeBody,UiTheme.IvoryBody,TextAnchor.MiddleLeft);
             // value row: the value is the button's first Text child; chevrons sit at both ends of the value area
@@ -317,32 +321,109 @@ namespace LastBell.Menu
             var modes=MenuSettings.Resolutions;int resolution=Mathf.Max(0,Array.FindIndex(modes,r=>r.x==Screen.width&&r.y==Screen.height));int mode=MenuSettings.DisplayMode,quality=QualitySettings.GetQualityLevel();
             Button display=null,res=null,q=null;
             display=ValueRow(mode==0?"Windowed":"Borderless",1,()=>{mode=1-mode;display.GetComponentInChildren<Text>().text=mode==0?"Windowed":"Borderless";},"Display mode");
-            res=ValueRow(modes[resolution].x+" × "+modes[resolution].y,2,()=>{resolution=(resolution+1)%modes.Length;res.GetComponentInChildren<Text>().text=modes[resolution].x+" × "+modes[resolution].y;},"Resolution");
+            // Resolution is a themed dropdown (Risxhb, October 26, 2026): the row opens a list under itself.
+            string ResText(int i)=>modes[i].x+" × "+modes[i].y;
+            res=ValueRow(ResText(resolution),2,()=>OpenResolutionList(),"Resolution");
+            foreach(var a in res.GetComponentsInChildren<ClassSelectionArrow>(true))
+            {if(!a.Next)Destroy(a.gameObject);else a.rectTransform.localEulerAngles=new Vector3(0,0,-90);}   // one down chevron
+            ResolutionDropdown=res;
+            {
+                const float itemH=40;   // up to 7 rows visible keep a clear gap above Apply
+                var blocker=MenuUI.Panel("Resolution list blocker",col,Vector2.zero,Vector2.one,new Color(0,0,0,0));
+                blocker.rectTransform.offsetMin=new Vector2(-6000,-6000);blocker.rectTransform.offsetMax=new Vector2(6000,6000);blocker.raycastTarget=true;
+                var close=blocker.gameObject.AddComponent<Button>();close.transition=Selectable.Transition.None;close.navigation=new Navigation{mode=Navigation.Mode.None};close.onClick.AddListener(CloseResolutionList);
+                var frame=MenuUI.Panel("Resolution list",col,new Vector2(.46f,RowY(2)),new Vector2(1,RowY(2)),new Color(UiTheme.InkDeep.r,UiTheme.InkDeep.g,UiTheme.InkDeep.b,.97f));
+                frame.raycastTarget=true;frame.rectTransform.pivot=new Vector2(.5f,1);frame.rectTransform.anchoredPosition=new Vector2(0,-2);
+                var edge=frame.gameObject.AddComponent<Outline>();edge.effectColor=new Color(UiTheme.Gold.r,UiTheme.Gold.g,UiTheme.Gold.b,.7f);edge.effectDistance=new Vector2(1,-1);
+                var viewport=MenuUI.Rect("Viewport",frame.transform,Vector2.zero,Vector2.one,new Vector2(4,4));viewport.gameObject.AddComponent<RectMask2D>();
+                var content=MenuUI.Rect("Content",viewport,new Vector2(0,1),new Vector2(1,1));content.pivot=new Vector2(.5f,1);content.anchoredPosition=Vector2.zero;
+                var scroll=frame.gameObject.AddComponent<ScrollRect>();scroll.viewport=viewport;scroll.content=content;scroll.horizontal=false;scroll.movementType=ScrollRect.MovementType.Clamped;scroll.scrollSensitivity=itemH;
+                void Fill()   // (re)build the list rows from modes
+                {
+                    if(resolutionItems!=null)foreach(var old in resolutionItems)if(old)Destroy(old.gameObject);
+                    frame.rectTransform.sizeDelta=new Vector2(0,Mathf.Min(modes.Length,7)*itemH+8);content.sizeDelta=new Vector2(0,modes.Length*itemH);
+                    var items=new Button[modes.Length];
+                    for(int i=0;i<modes.Length;i++)
+                    {
+                        int at=i;
+                        var it=Nav(ResText(i),content,0,()=>{resolution=at;res.GetComponentInChildren<Text>().text=ResText(at);CloseResolutionList();},18);
+                        var rt=(RectTransform)it.transform;rt.anchorMin=new Vector2(0,1);rt.anchorMax=new Vector2(1,1);rt.pivot=new Vector2(.5f,1);rt.sizeDelta=new Vector2(0,itemH);rt.anchoredPosition=new Vector2(0,-i*itemH);
+                        it.GetComponentInChildren<Text>().alignment=TextAnchor.MiddleCenter;items[i]=it;
+                    }
+                    for(int i=0;i<items.Length;i++)items[i].navigation=new Navigation{mode=Navigation.Mode.Explicit,selectOnUp=i>0?items[i-1]:null,selectOnDown=i<items.Length-1?items[i+1]:null};
+                    resolutionItems=items;
+                }
+                resolutionBlocker=blocker.gameObject;resolutionFrame=frame.gameObject;resolutionScroll=scroll;resolutionItemHeight=itemH;Fill();
+                // the window can change size after this panel is built (saved size, -screen-width, Apply): resync on every open
+                syncResolution=()=>
+                {
+                    var now=MenuSettings.Resolutions;
+                    if(!now.SequenceEqual(modes)){modes=now;Fill();}
+                    resolution=Mathf.Max(0,Array.FindIndex(modes,r=>r.x==Screen.width&&r.y==Screen.height));res.GetComponentInChildren<Text>().text=ResText(resolution);
+                };
+                openResolution=()=>
+                {
+                    resolutionBlocker.SetActive(true);resolutionFrame.SetActive(true);resolutionBlocker.transform.SetAsLastSibling();resolutionFrame.transform.SetAsLastSibling();
+                    var items=resolutionItems;
+                    for(int i=0;i<items.Length;i++)items[i].GetComponentInChildren<Text>().color=i==resolution?UiTheme.GoldBright:UiTheme.Ivory;
+                    EventSystem.current.SetSelectedGameObject(items[resolution].gameObject);KeepResolutionInView(true);
+                };
+                resolutionBlocker.SetActive(false);resolutionFrame.SetActive(false);
+            }
             q=ValueRow(QualitySettings.names[quality],3,()=>{quality=(quality+1)%QualitySettings.names.Length;q.GetComponentInChildren<Text>().text=QualitySettings.names[quality];},"Quality");
+            // frame pacing (October 26, 2026): VSync off by default; the cap is ignored while VSync is on
+            bool vsync=MenuSettings.VSync;int cap=Mathf.Max(0,Array.IndexOf(MenuSettings.FrameCaps,MenuSettings.FrameCap));
+            Button vs=null,fps=null;
+            string CapText()=>vsync?"Follows VSync":MenuSettings.CapName(MenuSettings.FrameCaps[cap]);
+            vs=ValueRow(vsync?"On":"Off",4,()=>{vsync=!vsync;vs.GetComponentInChildren<Text>().text=vsync?"On":"Off";fps.GetComponentInChildren<Text>().text=CapText();},"VSync");
+            fps=ValueRow(CapText(),5,()=>{if(vsync)return;cap=(cap+1)%MenuSettings.FrameCaps.Length;fps.GetComponentInChildren<Text>().text=CapText();},"FPS cap");
+            VSyncControl=vs;FrameCapControl=fps;
 #if UNITY_WEBGL && !UNITY_EDITOR
             display.interactable=res.interactable=false;res.GetComponentInChildren<Text>().text="Use browser fullscreen";
 #endif
             // actions: text Back on the left, the one Gold primary (Apply) on the right
             SettingsBackButton=Nav("Back",col,.10f,CloseSettings,22);Fit(SettingsBackButton,0,.10f,.36f,.18f);
             SettingsBackButton.GetComponentInChildren<Text>().alignment=TextAnchor.MiddleLeft;
-            ApplyButton=MenuUI.Button("Apply",col,new Vector2(.52f,.10f),new Vector2(1,.18f),()=>MenuSettings.Apply(modes[resolution].x,modes[resolution].y,mode,quality));
+            ApplyButton=MenuUI.Button("Apply",col,new Vector2(.52f,.10f),new Vector2(1,.18f),()=>{MenuSettings.SetFrameRate(vsync,MenuSettings.FrameCaps[cap]);MenuSettings.Apply(modes[resolution].x,modes[resolution].y,mode,quality);});
             var af=ApplyButton.GetComponent<MenuFocus>();af.Primary=true;
             var ink=new Color(.07f,.05f,.02f,1f);
             if(af.Marker){var d=af.Marker.GetComponent<FocusDiamond>();if(d)d.color=ink;}
             if(af.Underline){var u=af.Underline.GetComponent<Image>();if(u)u.color=ink;}
-            Selectable[] order={slider,display,res,q,SettingsBackButton,ApplyButton};
+            Selectable[] order={slider,display,res,q,vs,fps,SettingsBackButton,ApplyButton};
             for(int i=0;i<order.Length;i++)order[i].navigation=new Navigation{mode=Navigation.Mode.Explicit,selectOnUp=order[(i+order.Length-1)%order.Length],selectOnDown=order[(i+1)%order.Length],
                 selectOnLeft=order[i]==ApplyButton?SettingsBackButton:order[i]==slider?null:null,selectOnRight=order[i]==SettingsBackButton?ApplyButton:null};
             settings.SetActive(false);
         }
         public void OpenSettings()
         {
-            if(Loading||Rush)return;settings.SetActive(true);
+            if(Loading||Rush)return;syncResolution?.Invoke();settings.SetActive(true);
             navigation.interactable=navigation.blocksRaycasts=false;navigation.alpha=0;musicGroup.interactable=musicGroup.blocksRaycasts=false;
             EventSystem.current.SetSelectedGameObject(MusicVolumeControl.gameObject);
         }
+        // ---- resolution dropdown ----
+        GameObject resolutionBlocker,resolutionFrame;Button[] resolutionItems;ScrollRect resolutionScroll;float resolutionItemHeight;System.Action openResolution,syncResolution;
+        public Button ResolutionDropdown{get;private set;}
+        public bool ResolutionListOpen=>resolutionFrame&&resolutionFrame.activeSelf;
+        public Button[] ResolutionItems=>resolutionItems;
+        public void OpenResolutionList(){if(!ResolutionListOpen)openResolution?.Invoke();}
+        public void CloseResolutionList()
+        {
+            if(!ResolutionListOpen)return;resolutionFrame.SetActive(false);resolutionBlocker.SetActive(false);
+            if(ResolutionDropdown)EventSystem.current.SetSelectedGameObject(ResolutionDropdown.gameObject);
+        }
+        // keyboard/controller focus scrolls the list so the selected entry stays inside the frame
+        void KeepResolutionInView(bool centre=false)
+        {
+            if(!ResolutionListOpen||resolutionItems==null)return;var sel=EventSystem.current?EventSystem.current.currentSelectedGameObject:null;
+            int i=sel?Array.FindIndex(resolutionItems,b=>b&&b.gameObject==sel):-1;if(i<0)return;
+            var content=resolutionScroll.content;float view=resolutionScroll.viewport.rect.height,h=resolutionItemHeight,y=content.anchoredPosition.y;
+            float top=i*h,bottom=top+h;
+            if(centre)y=top-(view-h)*.5f;else if(top<y)y=top;else if(bottom>y+view)y=bottom-view;
+            content.anchoredPosition=new Vector2(content.anchoredPosition.x,Mathf.Clamp(y,0,Mathf.Max(0,content.rect.height-view)));
+        }
         public void CloseSettings()
         {
+            CloseResolutionList();
             settings.SetActive(false);navigation.interactable=navigation.blocksRaycasts=true;navigation.alpha=1;musicGroup.interactable=musicGroup.blocksRaycasts=true;
             PlayerPrefs.Save();EventSystem.current.SetSelectedGameObject(SettingsButton.gameObject);
         }
@@ -364,7 +445,8 @@ namespace LastBell.Menu
             if(View.enabled)View.fieldOfView=Mathf.Clamp(42*Mathf.Max(1,1.77778f/View.aspect),42,62);
             bool back=Keyboard.current?.escapeKey.wasPressedThisFrame==true||Gamepad.current?.buttonEast.wasPressedThisFrame==true;
             if(MenuFlowTest.Requested&&MenuSmokeTest.TestKeyboard!=null)back|=MenuSmokeTest.TestKeyboard.escapeKey.wasPressedThisFrame||MenuSmokeTest.TestGamepad.buttonEast.wasPressedThisFrame;
-            if(back){if(Rush)Rush.Back();else if(SettingsOpen)CloseSettings();}
+            if(back){if(Rush)Rush.Back();else if(ResolutionListOpen)CloseResolutionList();else if(SettingsOpen)CloseSettings();}
+            KeepResolutionInView();
             if(Loading){navigation.interactable=false;musicGroup.interactable=false;}
         }
         void OnDestroy()

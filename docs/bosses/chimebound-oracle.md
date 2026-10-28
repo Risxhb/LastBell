@@ -1,9 +1,14 @@
 # The Chimebound Oracle
 
-The first of three Metronome Court minibosses. The other two, the Pendulum Sentinel and the Dial Warden, are not built yet. The Oracle is a bullet-hell caster. He is meant to feel about as hard as a current WoW heroic raid boss.
+The first of three Metronome Court minibosses (with the Pendulum Sentinel and the Dial Warden). The Oracle is a bullet-hell caster. He is meant to feel about as hard as a current WoW heroic raid boss.
 
 - **Status:** practice only, on its own Boss Rush entry: **Metronome Court → Chimebound Oracle (practice)**. The run order is unchanged.
-- **Body:** a labelled stand-in, made from code-built shapes: a hooded robe, a bell staff and a hanging clapper. Final model, rig and animation are still to come.
+- **Body:** Chzy18's Meshy model (`Meshy_AI_Celestial_Bell_Orrery`): a cobalt sphere with an eye-lens, inside a gold wheel carrying five bells. Scaled to 4 m (the sphere is about 2 m across) and floating 0.45 m up.
+  - **Rig:** `prototype/arena-3d/models/blender/miniboss_prep.py` then `chimebound_oracle_rig.py`. Unity copy: `unity/Assets/LastBell/Characters/ChimeboundOracle/Resources/Characters/ChimeboundOracle.glb`.
+  - **How it moves:** the wheel turns round the sphere like a clock face; each bell counter-turns so it keeps hanging, and swings on its own.
+  - **Pose to clip** (`ChimeboundOracleRig`): staff raise → StaffRaise then LanesLoop (rises, tips back, the wheel spins); floor strike → FloorStrike (drops to the floor); arms spread → ArmsSpread then ChainLoop (bells pushed out and shaking); point → Point then PointLoop (top bell thrown at the target); clapper → ClapperWindup, WindLoop, ClapperSwing; Grand Toll → RingMetronome then TollLoop; Recover; Defeat.
+  - The eye glows with a point light: rune blue, warm in Haste, brighter during windups.
+  - The old code-built stand-in (hooded robe, bell staff, clapper) is used only if the model is missing.
 - **Code:** `unity/Assets/LastBell/Run/Encounters/ChimeboundOracle/`.
 - **Numbers:** every value below is a first-pass target for Medium. None is approved balance. Damage is out of 100 player HP.
 
@@ -98,7 +103,7 @@ The acceptance test is `ChimeboundOracleAutoTest`, run with `-chimeboundOracleTe
 
 ## Not done yet
 
-- The final model, rig and animation.
+- A human look at the model in play (the clips were checked in Blender renders only).
 - A music track on the 140/185 BPM grid. The default boss music plays now, so the beat-locked strikes don't line up with it.
 - A human playtest for difficulty and readability.
 - At 4:00 the arena's frenzy effects turn on, but the metronome doesn't swing wider.

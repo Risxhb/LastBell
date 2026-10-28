@@ -42,12 +42,15 @@ namespace LastBell.Run
         protected int N => Math.Max(1, Standing().Count);
         protected PlayerController Farthest(Vector3 from) => Standing().OrderByDescending(p => Sim.Flat(p.transform.position - from).sqrMagnitude).FirstOrDefault();
         protected PlayerController Nearest(Vector3 from) => Standing().OrderBy(p => Sim.Flat(p.transform.position - from).sqrMagnitude).FirstOrDefault();
+        public const int LastLightCap = 90;   // the biggest hit Last Light's scaling may build, after the difficulty scale
         protected Hazard Spawn(Hazard h)
         {
             if (string.IsNullOrEmpty(h.Source) || h.Source == "Hazard") h.Source = Name;
             if (AurelionArgs.V3 || AurelionArgs.V4) h.Damage = V3Tier(h.Damage);
             // v4 Last Light, the soft enrage: every fallen slice makes his attacks 10 % stronger
-            if (AurelionArgs.V4 && Boss.Light != null && Boss.Phase >= 4 && h.Damage > 0) h.Damage = Mathf.RoundToInt(h.Damage * Boss.Light.DamageScale);
+            // capped so a hit never lands above 90 after the difficulty scale (no one-shots, design rules 5): Hard 69 x 1.3
+            if (AurelionArgs.V4 && Boss.Light != null && Boss.Phase >= 4 && h.Damage > 0)
+                h.Damage = Mathf.Min(Mathf.RoundToInt(h.Damage * Boss.Light.DamageScale), Mathf.Max(h.Damage, Mathf.FloorToInt(LastLightCap / W.DamageTakenScale)));
             return Boss.Track(W.Hazards.Spawn(h));
         }
         protected void Say(string current) => Boss.SetCurrent(current);

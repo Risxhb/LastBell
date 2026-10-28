@@ -38,8 +38,8 @@ namespace LastBell.Run
         public Action<Hazard> Track;            // called every tick until locked (follow a target / the boss facing)
         public Action<Hazard> OnResolve;         // presentation of the resolve (effects), after the hit test
         public Action<Hazard> OnSpent;           // the active period is over (same tick as OnResolve when ActiveTicks is 0)
-        public float ClipRadius;                 // > 0: the telegraph is drawn only over the floor disc of this radius (presentation)
         public Func<PlayerController, bool> Affects;   // null = everyone; else only these players can be hit (per-player marks)
+        public float ClipRadius;                 // > 0: the telegraph is drawn only over the floor disc of this radius (presentation)
         public bool HitOnResolve = true;         // false: the owner deals the hits itself while the warning is up (a sweeping charge)
         public bool Soak;                        // a ring to stand IN (a tower), not a shape to leave: bots and the HUD read it
 
