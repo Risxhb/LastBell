@@ -245,6 +245,10 @@ namespace LastBell.Run
             h.BurnPerSecond = 0.0001f; h.ActiveTicks = 0; h.ResolveAt = h.Age;
         }
 
+        // a lone turret with no casting (Molten Crown keeps one firing Lane Streams all phase)
+        public Turret LoneTurret(Vector3 pos) => new Turret { K = 0, Pos = pos, A = Pattern.Lane, B = Pattern.Lane };
+        public void FireLane(Turret tu) { tu.Shots++; Fire(tu, Pattern.Lane); }
+
         public static string Numeral(int k) => new[] { "I", "II", "III", "IV" }[k];
 
         // ---------------- stand-in looks ----------------

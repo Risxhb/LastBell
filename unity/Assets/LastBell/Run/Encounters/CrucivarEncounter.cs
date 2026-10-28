@@ -294,8 +294,8 @@ namespace LastBell.Run
         {
             if (Mould != null) return;
             Mould = new MouldPress(); Chain = new GearChain(); Bellows = new BellowsDraw(); Casting = new GreatCasting(); Press = new SecondPress();
-            Sweep = new AnvilSweep(); Spit = new SlagSpit(); Rite = new ForgeRite(); Uprising = new FoundryUprising();
-            foreach (var a in new CrucivarAbility[] { Mould, Chain, Bellows, Casting, Press, Sweep, Spit, Rite, Uprising }) a.Bind(this, W);
+            Sweep = new AnvilSweep(); Spit = new SlagSpit(); Rite = new ForgeRite(); Uprising = new FoundryUprising(); Crown = new MoltenCrown();
+            foreach (var a in new CrucivarAbility[] { Mould, Chain, Bellows, Casting, Press, Sweep, Spit, Rite, Uprising, Crown }) a.Bind(this, W);
         }
 
         public IEnumerable<int> WalkToAnvil()
@@ -436,10 +436,11 @@ namespace LastBell.Run
 
         // ================ ability set v4 (rework, REWORK-PROMPT.md) ================
         // Phase 1 "Forge Rite" (accepted for now, 10-27) loops until 65 %. Phase 2 "Foundry Uprising" (proposal) cycles
-        // uprising -> 3.5 s punish -> Casting Order + Anvil Quake until 30 %. Phase 3 isn't designed yet, so Forge Rite
-        // loops again. The transitions play (harmless, no heal) and end the phase: every Ember Brand pool clears.
+        // uprising -> 3.5 s punish -> Casting Order + Anvil Quake until 30 %. Phase 3 "Molten Crown" (proposal) cycles
+        // towers, crown and the rest (21.5 s) + 3.5 s punish until he dies or the furnace erupts. The transitions play (harmless, no heal) and end the phase: every Ember Brand pool clears.
         public ForgeRite Rite { get; private set; }
         public FoundryUprising Uprising { get; private set; }
+        public MoltenCrown Crown { get; private set; }
         public int PhaseLoops { get; private set; }   // loops / uprisings finished in this phase (watch pacing)
         public void Label(string text) => PhaseName = text;
         public const float UprisingPunish = 3.5f;
@@ -468,6 +469,12 @@ namespace LastBell.Run
                     yield return Sim.Ticks(2.5f);
                     Current = "Anvil Quake"; Rite.AnvilQuake();
                     yield return Sim.Ticks(4f);
+                }
+                else if (phase == 3)
+                {
+                    Current = "Molten Crown";
+                    foreach (var w in Crown.Run()) yield return w;
+                    foreach (var w in Recover("Molten Crown (furnace venting)", "Vulnerable", Sim.Ticks(UprisingPunish))) yield return w;
                 }
                 else
                 {

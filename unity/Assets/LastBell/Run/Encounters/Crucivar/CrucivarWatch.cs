@@ -32,7 +32,7 @@ namespace LastBell.Run
 
         sealed class Bot : IInputSource
         {
-            public string Name; public PlayerController P; public Vector3 Goal; public bool Dash, Attack; public Vector3 Aim, Target; public float TargetRadius;
+            public string Name; public PlayerController P; public Vector3 Goal; public bool Dash, Attack; public Vector3 Aim, Target; public float TargetRadius; public Vector3? Tower;
             public float NextPlan; public int Hits, Damage, Downs;
             public PlayerInput Read(PlayerController who)
             {
@@ -106,7 +106,8 @@ namespace LastBell.Run
                         int ph = cb.PhaseIndex;
                         // -crucivarWatchFrom p2: start just under 65 %, so Phase 2 comes after the first Forge Rite loop
                         if (fromP2 && ph == 1 && cb.Hp > cb.MaxHp * 0.645f) cb.DebugSetHpFraction(0.64f);
-                        float floor = cb.PhaseLoops < 2 ? (ph == 1 ? (fromP2 ? 0f : 0.66f) : ph == 2 ? 0.31f : 0.02f) : 0f;
+                        if (fromP3 && ph < 3 && cb.Hp > cb.MaxHp * 0.295f) cb.DebugSetHpFraction(0.29f);   // -crucivarWatchFrom p3: Phase 3 after the first loop
+                        float floor = cb.PhaseLoops < 2 ? (ph == 1 ? (fromP2 || fromP3 ? 0f : 0.66f) : ph == 2 ? (fromP3 ? 0f : 0.31f) : 0.02f) : 0f;
                         if (cb.Hp < cb.MaxHp * floor) cb.DebugSetHpFraction(floor);
                         int key = ph * 100 + cb.PhaseLoops;
                         if (key != logged)
@@ -126,6 +127,7 @@ namespace LastBell.Run
 
         // ---------------- the bots' brains ----------------
         static bool fromP2 => CrucivarArgs.Arg("-crucivarWatchFrom") == "p2";
+        static bool fromP3 => CrucivarArgs.Arg("-crucivarWatchFrom") == "p3";
 
         void Update()
         {
@@ -139,6 +141,16 @@ namespace LastBell.Run
             if (UnityEngine.InputSystem.Keyboard.current?.tabKey.wasPressedThisFrame == true) follow = !follow;
             var boss = Sim.Flat(d.Boss.transform.position);
             var parts = w.Parts.Where(q => q.Alive).OrderBy(q => q.Name).ToList();
+            // Molten Crown: fill each pending tower set in party order, so every tower gets its count
+            var crown = (d.Boss as CrucivarEncounter)?.Crown;
+            foreach (var b in bots) b.Tower = null;
+            if (crown != null)
+                foreach (var set in crown.Towers.Where(x => x.H.Age < x.H.ResolveAt).GroupBy(x => x.Set).OrderBy(g => g.Min(x => x.H.ResolveAt - x.H.Age)))
+                {
+                    int q = 0;
+                    foreach (var tw in set.OrderBy(x => x.H.Id))
+                        for (int j = 0; j < tw.Need; j++, q++) { var bb = bots[q % bots.Count]; if (bb.Tower == null) bb.Tower = Sim.Flat(tw.H.Origin); }
+                }
             foreach (var b in bots)
             {
                 if (!b.P || b.P.Down) continue;
@@ -168,8 +180,16 @@ namespace LastBell.Run
                 for (int k = 0; k < (ring == 0 ? 1 : 20); k++)
                 {
                     var c = ring == 0 ? me : me + Quaternion.Euler(0, 18f * k, 0) * Vector3.forward * (1.3f * ring);
-                    if (c.magnitude > CrucivarAbility.Rim - 0.8f) continue;
+                    float edge = (d.Boss as CrucivarEncounter)?.Crown?.Edge ?? CrucivarAbility.Rim;
+                    if (c.magnitude > Mathf.Min(CrucivarAbility.Rim, edge) - 0.8f) continue;
                     float travel = (c - me).magnitude;
+                    if (b.Tower is Vector3 tower)
+                    {   // my mould first: the landing is a wipe if it is short
+                        float tc = Danger(b, c, boss, w, travel / 6f) * 0.3f + (c - tower).magnitude * 6f + travel * 0.5f;
+                        if ((c - tower).magnitude < 1.0f) tc -= 5f;
+                        if (tc < bestCost) { bestCost = tc; best = c; }
+                        continue;
+                    }
                     float cost = Danger(b, c, boss, w, travel / 6f) + travel * 1.2f;
                     float r = (c - boss).magnitude;
                     if (carrying) cost += Mathf.Max(0f, CrucivarAbility.Rim - 3f - r) * 4f;
@@ -201,6 +221,7 @@ namespace LastBell.Run
                         if ((Sim.Flat(h.Origin + vel * t) - c).magnitude < h.Radius + 0.75f) { cost += 100f; break; }
                     continue;
                 }
+                if (h.Source == "Crown Rise") { if (Inside(h, c, 0.45f)) cost += 120f; continue; }
                 if (h.Damage <= 0 || (toLand < -0.05f && live <= 0)) continue;
                 if (imminentOnly && toLand > ahead && live <= 0) continue;
                 if (h.Source == "Ember Brand")

@@ -18,6 +18,7 @@ namespace LastBell.Run
 
         sealed class Tower { public Hazard H; public GameObject Root; public Transform Fill; public bool Dim; public int Inside; }
 
+        public bool HideCounts;   // Molten Crown memory cycles: the moulds show "?" instead of their count
         CombatWorld w;
         readonly List<Tower> towers = new List<Tower>();
         AudioSource audioSrc;
@@ -120,13 +121,13 @@ namespace LastBell.Run
                 var c = new Vector2(sp.x, Screen.height - sp.y);
                 float a = t.Dim ? 0.4f : 1f;
                 var rect = new Rect(c.x - 50, c.y - 44, 100, 80);
-                string label = t.H.ShareCount.ToString();
+                string label = HideCounts ? "?" : t.H.ShareCount.ToString();
                 numStyle.normal.textColor = InkShadow * new Color(1, 1, 1, a);
                 GUI.Label(new Rect(rect.x + 3, rect.y + 3, rect.width, rect.height), label, numStyle);
                 numStyle.normal.textColor = new Color(Ivory.r, Ivory.g, Ivory.b, a);
                 GUI.Label(rect, label, numStyle);
                 // one slot per needed player: thin ivory tick when filled, dark when empty
-                int slots = Mathf.Max(t.H.ShareCount, t.Inside);
+                int slots = HideCounts ? t.Inside : Mathf.Max(t.H.ShareCount, t.Inside);
                 float x0 = c.x - (slots * 18 - 6) / 2f;
                 for (int i = 0; i < slots; i++)
                 {
