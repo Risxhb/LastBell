@@ -106,9 +106,11 @@ Each rule below is settled unless it says otherwise.
 - **Punish windows:**
   - Every boss has at least one **3–4 s major recovery**, long enough for Vanguard's heavy attack and the casters' stationary casts.
   - Don't uniformly speed attacks up to make a fight harder.
+  - **Exception: slow casts (Risxhb, 2026-10-27).** If a mechanic takes a while to go off, shortening its warning is fine, as long as the §2 escape check still passes.
 - **No enrage timers.** No soft-enrage that slowly fills the floor. Pools and zones always expire.
 - **Exception, Bellkeeper Ultimate (Chzy18, 2026-10-23: "forget those rules").** The Bellkeeper's **Ultimate** fight (since 2026-10-25 the only Bellkeeper fight: the normal v2 fight is retired) is tuned to Final Fantasy XIV Ultimate difficulty. The limits above don't hold it back: any number of overlapping patterns (as long as a route exists), a hard enrage plus per-phase DPS checks, party-wide wipes on a failed mechanic even solo, and **one-shots** for mechanic failures (and heavy hits where an Ultimate would). 10–14 min, 5 phases plus 2 transitions; practice may start at any phase. **Still settled for it:** every mechanic has a real way to survive it, no player teleports, no class is required, the boss never heals or gets a new health bar, mouse aiming, no iframes.
   - **Settled (Chzy18, 2026-10-25):** the Ultimate must stay **soloable**. Solo is held to the same standard as every other fight: possible with good play, even if it takes many attempts. It also keeps the **Easy/Medium/Hard** levels like every other boss.
+- **Exception, Tempo Tyrant (Risxhb, 2026-10-28).** The Tempo Tyrant is the post-game superboss, tuned to Ultimate / mythic-raid difficulty. Any number of overlapping patterns is allowed, as long as a route exists (checked in `TempoTyrantRoutes` and `tools/tempo-tyrant/routes_check.py`). **Still settled for it:** every mechanic has a real way to survive it, no iframes, no player teleports, each hazard hits a player at most once, no class is required. **Soft enrage allowed (Risxhb, 2026-10-28):** below 10% HP, *Falling Hours* rains orbs onto the floor, denser the longer the fight lasts, until the boss dies. No hard enrage until Risxhb approves one.
 - **Phases:**
   - **Provisional:** area bosses have 3 HP phases, minibosses have 2.
   - **Settled:**

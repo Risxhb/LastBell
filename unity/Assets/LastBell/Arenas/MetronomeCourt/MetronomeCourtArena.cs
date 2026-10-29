@@ -57,6 +57,10 @@ namespace LastBell.Arenas.MetronomeCourt
         public bool Preview { get; private set; }
         public int LanternCount => lanterns.Count;
         public float LanternPulseX { get; private set; }
+        // Only the Tempo Tyrant makes the court's lights pulse (Risxhb, October 28, 2026). For any other boss fought here,
+        // the Chimebound Oracle included, the lanterns, floor pools, seams and tempo ring stay on at a steady level:
+        // no beat pulse, no glow following the rod, no flicker or transition flash. The rod and gears still move.
+        public bool LightsPulse { get; private set; } = true;
         public const float SwingDegrees = 26f, RodLength = 10.5f;
         public const float WeightHaste = 4.4f, WeightNormal = 7.4f;   // the weight IS the tempo: low = fast, high = slow
         public float WeightHeight { get; private set; } = WeightHaste;
@@ -430,6 +434,7 @@ namespace LastBell.Arenas.MetronomeCourt
                 Post(stat, root, Quaternion.Euler(0, a, 0) * Vector3.forward * PostRadius, a);
             }
             foreach (var s in new[] { -1, 1 }) Post(stat, root, new Vector3(3.15f * s, 0, PostRadius), 0);   // clear of the bridge newels
+            BuildSwags(stat);
 
             // ---- south entry bridge (decorative approach; not part of the combat bound) ----
             // deck 5.3 m wide (the curb and rail now sit on it, no overhang): a grout bed, an ivory threshold sill at the court,
@@ -738,16 +743,31 @@ namespace LastBell.Arenas.MetronomeCourt
         // could hide a player at the wall, so camera-side perimeter pieces are low bollards with a lantern on top.
         static bool CameraSide(Vector3 at) => at.z > -4f;
 
-        void Lantern(Transform root, Vector3 at, float scale, bool pool = false)
+        void Lantern(Transform root, Vector3 at, float scale, bool pool = false, bool turret = false)
         {
             var l = new GameObject("Lantern").transform; l.SetParent(root, false); l.localPosition = at;
-            var core = P(PrimitiveKind.Sphere, l, Vector3.zero, Vector3.one * 0.38f * scale, M(new Color(1f, 0.7f, 0.3f), 0.2f, 0, true), name: "LanternCore");
+            // r3 (October 28 critic: "an orange ping-pong ball stuck in a frame"): four lit glass panes inside the corner bars,
+            // so the cage reads as a lit box with dark mullions, round a small egg-shaped flame (the old 0.38 m ball cut
+            // through the bars). Both take the lantern glow; the glass is blended toward cream in Update.
+            var glassM = M(new Color(0.3f, 0.27f, 0.19f), 0.6f, 0, true);
             for (int k = 0; k < 4; k++)
-                P(PrimitiveKind.Cube, l, Quaternion.Euler(0, k * 90 + 45, 0) * Vector3.forward * 0.2f * scale, new Vector3(0.03f, 0.44f, 0.03f) * scale, IronM, name: "LanternBar");
-            Mesh(l, Frustum(0.15f * scale, 0.15f * scale, 0.012f * scale, 0.012f * scale, 0.18f * scale), IronM, "LanternCap", Vector3.up * 0.26f * scale);
-            P(PrimitiveKind.Cube, l, Vector3.up * 0.235f * scale, new Vector3(0.36f, 0.035f, 0.36f) * scale, IronM, name: "LanternDripBand");   // pass 6
-            P(PrimitiveKind.Sphere, l, Vector3.up * 0.48f * scale, Vector3.one * 0.07f * scale, BrassM, name: "LanternFinial");
-            var glowRing = P(PrimitiveKind.Cube, l, Vector3.up * 0.25f * scale, new Vector3(0.34f, 0.02f, 0.34f) * scale, M(new Color(1f, 0.7f, 0.3f), 0.2f, 0, true), name: "LanternGlowRing");
+            {
+                // final fix (critic: glass filled half the turret, slivers at the seams): in a turret the panes run from the
+                // plinth to the drum and overlap at the corners
+                float pr = turret ? 0.2f : 0.135f, pw = turret ? 0.42f : 0.27f, ph = turret ? 0.62f : 0.4f, py = turret ? 0.09f : 0f;
+                var pane = P(PrimitiveKind.Cube, l, Quaternion.Euler(0, k * 90, 0) * Vector3.forward * pr * scale + Vector3.up * py * scale, new Vector3(pw, ph, 0.012f) * scale, glassM, new Vector3(0, k * 90, 0), "LanternPane");
+                lanternGlass.Add((pane.GetComponent<Renderer>(), at.x));
+            }
+            var core = P(PrimitiveKind.Sphere, l, Vector3.down * 0.02f * scale, new Vector3(0.16f, 0.22f, 0.16f) * scale, M(new Color(1f, 0.94f, 0.81f), 0.2f, 0, true), name: "LanternCore");
+            if (!turret)   // round 3: inside a post's turret the columns are the cage, so the lantern keeps only its glass
+            {
+                for (int k = 0; k < 4; k++)
+                    P(PrimitiveKind.Cube, l, Quaternion.Euler(0, k * 90 + 45, 0) * Vector3.forward * 0.2f * scale, new Vector3(0.03f, 0.44f, 0.03f) * scale, IronM, name: "LanternBar");
+                Mesh(l, Frustum(0.15f * scale, 0.15f * scale, 0.012f * scale, 0.012f * scale, 0.18f * scale), IronM, "LanternCap", Vector3.up * 0.26f * scale);
+                P(PrimitiveKind.Cube, l, Vector3.up * 0.235f * scale, new Vector3(0.36f, 0.035f, 0.36f) * scale, IronM, name: "LanternDripBand");   // pass 6
+                P(PrimitiveKind.Sphere, l, Vector3.up * 0.48f * scale, Vector3.one * 0.07f * scale, BrassM, name: "LanternFinial");
+            }
+            var glowRing = P(PrimitiveKind.Cube, l, (turret ? Vector3.zero : Vector3.up * 0.25f) * scale, (turret ? new Vector3(0.2f, 0.02f, 0.2f) : new Vector3(0.34f, 0.02f, 0.34f)) * scale, M(new Color(1f, 0.7f, 0.3f), 0.2f, 0, true), name: "LanternGlowRing");
             lanterns.Add((glowRing.GetComponent<Renderer>(), at.x));
             P(PrimitiveKind.Cube, l, Vector3.down * 0.24f * scale, new Vector3(0.4f, 0.05f, 0.4f) * scale, BrassM, name: "LanternBase");
             lanterns.Add((core.GetComponent<Renderer>(), at.x));
@@ -797,6 +817,44 @@ namespace LastBell.Arenas.MetronomeCourt
         // below the court, a far fog-coloured city layer, cloud banks drifting past the rim, and faint dust/ember motes
         readonly List<(Transform t, float speed)> gears = new List<(Transform, float)>();
         readonly List<(Transform t, Vector3 home, float phase, Vector3 spin)> drifters = new List<(Transform, Vector3, float, Vector3)>();
+        // r3: banners that sway (rest rotation, amplitude in degrees, phase, speed), weather vanes that turn (degrees per
+        // second), and the lanterns' glass panes (lit like the lanterns, blended toward cream)
+        readonly List<(Transform t, Quaternion rest, float amp, float phase, float speed)> swingers = new List<(Transform, Quaternion, float, float, float)>();
+        readonly List<(Transform t, float speed)> spinners = new List<(Transform, float)>();
+        readonly List<(Renderer r, float x)> lanternGlass = new List<(Renderer, float)>();
+        float swayTime;
+        readonly List<Vector3> rimBollards = new List<Vector3>();
+        // round 3 (N2): banner cloth, lighter teal with a faint teal emission so a banner on the shade face still reads
+        static Material bannerCloth;
+        static Material BannerCloth()
+        {
+            if (bannerCloth) return bannerCloth;
+            var c = new Color(0.14f, 0.50f, 0.48f);
+            bannerCloth = new Material(SurfM(c, Surface.Cloth, 0.3f)) { name = "MetronomeCourt_BannerCloth" };
+            bannerCloth.EnableKeyword("_EMISSION"); bannerCloth.SetColor("_EmissionColor", new Color(0.02f, 0.07f, 0.07f));
+            return bannerCloth;
+        }
+        // round 3 (N6): an aged-brass chain swag between neighbouring near-rim bollards, hung from rings on their collars
+        void BuildSwags(Transform stat)
+        {
+            var chain = M(Brass * 0.6f, 0.4f, 0.8f);
+            var sorted = new List<Vector3>(rimBollards); sorted.Sort((p, q) => Mathf.Atan2(p.x, p.z).CompareTo(Mathf.Atan2(q.x, q.z)));
+            for (int i = 0; i + 1 < sorted.Count; i++)
+            {
+                Vector3 a = sorted[i], b = sorted[i + 1];
+                if (Vector3.Angle(a, b) > 30f) continue;   // the bridge gap
+                var dirAB = (b - a).normalized; Vector3 from = a + Vector3.up * 0.53f + dirAB * 0.22f, to = b + Vector3.up * 0.53f - dirAB * 0.22f;
+                foreach (var ring in new[] { from, to }) P(PrimitiveKind.Cube, stat, ring, new Vector3(0.08f, 0.08f, 0.02f), chain, Quaternion.LookRotation(dirAB).eulerAngles, "SwagRing");
+                const int links = 18; const float sag = 0.3f;
+                Vector3 Pt(float s) => Vector3.Lerp(from, to, s) + Vector3.down * (sag * 4 * s * (1 - s));
+                for (int k = 0; k < links; k++)
+                {
+                    Vector3 p0 = Pt(k / (float)links), p1 = Pt((k + 1) / (float)links), seg = p1 - p0;
+                    var q = Quaternion.LookRotation(seg) * Quaternion.Euler(0, 0, k % 2 == 0 ? 0 : 90);
+                    P(PrimitiveKind.Cube, stat, (p0 + p1) / 2, new Vector3(0.05f, 0.018f, seg.magnitude * 1.05f), chain, q.eulerAngles, "SwagLink");
+                }
+            }
+        }
         readonly List<(Transform t, float radius, float angle, float y, float speed)> cloudBanks = new List<(Transform, float, float, float, float)>();
         Mesh moteMesh; Vector3[] motePos, moteVel; Vector3[] moteVerts; Color[] moteCols; float gearSpeed = 1f;
         public int GearCount => gears.Count;
@@ -939,6 +997,9 @@ namespace LastBell.Arenas.MetronomeCourt
             foreach (var (t, speed) in gears) if (t) t.Rotate(0, 0, 3.2f * speed * gearSpeed * dt, Space.Self);
             if (gears.Count > 0) GearAngle += 3.2f * gears[0].speed * gearSpeed * dt;
             float tt = Time.time;
+            swayTime += dt;
+            foreach (var (t, rest, amp, phase, speed) in swingers) if (t) t.localRotation = rest * Quaternion.Euler(Mathf.Sin(swayTime * speed + phase) * amp, 0, 0);
+            foreach (var (t, speed) in spinners) if (t) t.Rotate(0, speed * dt * (0.6f + 0.4f * Mathf.Sin(swayTime * 0.3f + speed)), 0, Space.Self);
             foreach (var (t, home, phase, spin) in drifters)
                 if (t) { t.localPosition = home + new Vector3(0, Mathf.Sin(tt * 0.35f + phase) * 0.45f, Mathf.Cos(tt * 0.2f + phase) * 0.3f); t.Rotate(spin * dt, Space.Self); }
             for (int i = 0; i < cloudBanks.Count; i++)
@@ -1021,28 +1082,89 @@ namespace LastBell.Arenas.MetronomeCourt
                 Mesh(stat, Frustum(0.22f, 0.22f, 0.22f, 0.22f, 0.035f), StoneM(Ivory * 0.92f), "BollardAbacus", at + Vector3.up * 0.69f).localRotation = by;
                 Mesh(stat, Frustum(0.2f, 0.2f, 0.15f, 0.15f, 0.05f), agedB, "BollardCap", at + Vector3.up * 0.725f).localRotation = by;
                 Lantern(root, at + Vector3.up * 0.96f, 0.75f);   // the lantern base sits on the bollard cap
+                if (Mathf.Abs(Sim.Flat(at).magnitude - PostRadius) < 0.05f) rimBollards.Add(at);
                 return;
             }
-            P(PrimitiveKind.Cube, stat, at + Vector3.up * 0.3f, new Vector3(1.15f, 0.6f, 1.15f), StoneM(StoneDark), new Vector3(0, yaw, 0), "PostPlinth");
-            P(PrimitiveKind.Cube, stat, at + Vector3.up * 1.9f, new Vector3(0.75f, 2.6f, 0.75f), StoneM(Ivory), new Vector3(0, yaw, 0), "PostShaft");
-            var agedBrass = M(Brass * 0.6f, 0.4f, 0.8f);   // pass 4 (critic: "yellow-lit caps", the hottest value near warnings)
-            P(PrimitiveKind.Cylinder, stat, at + Vector3.up * 0.75f, new Vector3(0.95f, 0.05f, 0.95f), agedBrass, name: "PostCollar");
-            P(PrimitiveKind.Cylinder, stat, at + Vector3.up * 2.9f, new Vector3(0.95f, 0.05f, 0.95f), agedBrass, name: "PostCollar");
-            P(PrimitiveKind.Cube, stat, at + Vector3.up * 3.3f, new Vector3(1.0f, 0.2f, 1.0f), agedBrass, new Vector3(0, yaw, 0), "PostCornice");
-            P(PrimitiveKind.Cone, stat, at + Vector3.up * 4.5f, new Vector3(0.55f, 1.2f, 0.55f), IronM, name: "PostSpire");
-            // banner faces the court (and so the camera), hung from a brass rod
-            var inward = -Sim.Flat(at).normalized; float faceYaw = Mathf.Atan2(inward.x, inward.z) * Mathf.Rad2Deg;
-            var cloth = M(BannerTeal, 0.3f); var tilt = new Vector3(3f, faceYaw, 0);
-            var side = Quaternion.Euler(0, faceYaw, 0) * Vector3.right;
-            // pass 4 (critic: "every banner is the same length"): three lengths round the court, all hung from the same rod
-            float bannerLen = new[] { 1.6f, 1.25f, 1.9f }[Mathf.Abs(Mathf.RoundToInt(yaw / 10f)) % 3];
-            P(PrimitiveKind.Cube, stat, at + inward * 0.42f + Vector3.up * (2.85f - bannerLen / 2), new Vector3(0.5f, bannerLen, 0.03f), cloth, tilt, "Banner");
-            // swallowtail: two flaps hanging from the body's lower edge, splayed outward so a V-notch opens between them
-            foreach (var sx in new[] { -1, 1 })
-                P(PrimitiveKind.Cube, stat, at + inward * 0.415f + side * (0.13f * sx) + Vector3.up * (2.85f - bannerLen - 0.18f), new Vector3(0.24f, 0.36f, 0.03f), cloth, new Vector3(3f, faceYaw, sx * 14f), "BannerTail");
-            P(PrimitiveKind.Cube, stat, at + inward * 0.44f + Vector3.up * 2.87f, new Vector3(0.78f, 0.05f, 0.05f), BrassM, new Vector3(0, faceYaw, 0), "BannerRod");
-            P(PrimitiveKind.Cube, stat, at + inward * 0.455f + Vector3.up * 2.15f, new Vector3(0.22f, 0.22f, 0.02f), BrassM, new Vector3(3f, faceYaw, 45f), "BannerEmblem");
-            Lantern(root, at + Vector3.up * 3.75f, 1f, pool: true);
+            // r3 (October 28 critic: "a white box with a brown lid and a witch's hat", collars rendering as orange crescents):
+            // square brass collar bands with beads, chamfered corner beads and sunk side panels on the shaft, a stepped ivory
+            // cornice on corbels with a brass drip edge and a slate top, an open lantern turret (four slim columns) carrying a
+            // solid iron drum, an iron pyramid spire with a brass ring, and a turning weather vane at the top
+            var pby = new Vector3(0, yaw, 0); var agedBrass = M(Brass * 0.6f, 0.4f, 0.8f); var darkBrass = M(Brass * 0.42f, 0.4f, 0.8f);
+            var ivoryShade = StoneM(Ivory * 0.85f); var postPanel = StoneM(Ivory * 0.72f);   // round 2: a sunk ivory panel (dark stone read as a black window)
+            P(PrimitiveKind.Cube, stat, at + Vector3.up * 0.3f, new Vector3(1.15f, 0.6f, 1.15f), StoneM(StoneDark), pby, "PostPlinth");
+            P(PrimitiveKind.Cube, stat, at + Vector3.up * 1.9f, new Vector3(0.75f, 2.6f, 0.75f), StoneM(Ivory), pby, "PostShaft");
+            for (int k = 0; k < 4; k++)
+                P(PrimitiveKind.Cube, stat, at + Quaternion.Euler(0, yaw + 45 + 90 * k, 0) * Vector3.forward * 0.48f + Vector3.up * 1.9f, new Vector3(0.08f, 2.6f, 0.08f), ivoryShade, new Vector3(0, yaw + 45, 0), "PostCornerBead");
+            foreach (float cy in new[] { 0.75f, 2.9f })
+            {
+                P(PrimitiveKind.Cube, stat, at + Vector3.up * cy, new Vector3(0.83f, 0.12f, 0.83f), agedBrass, pby, "PostCollar");
+                foreach (float dy in new[] { -0.075f, 0.075f })
+                    P(PrimitiveKind.Cube, stat, at + Vector3.up * (cy + dy), new Vector3(0.79f, 0.03f, 0.79f), darkBrass, pby, "PostCollarBead");
+            }
+            // the banner hangs on the shaft face nearest the court (snapped to the shaft, so a yaw-0 pylon stays square)
+            var inwardRaw = -Sim.Flat(at).normalized; float faceYaw = Mathf.Atan2(inwardRaw.x, inwardRaw.z) * Mathf.Rad2Deg;
+            faceYaw = yaw + Mathf.Round(Mathf.DeltaAngle(yaw, faceYaw) / 90f) * 90f;
+            var fq = Quaternion.Euler(0, faceYaw, 0); var inward = fq * Vector3.forward; var side = fq * Vector3.right;
+            foreach (float s in new[] { -1f, 1f })   // sunk panels on the two side faces
+                P(PrimitiveKind.Cube, stat, at + side * (s * 0.385f) + Vector3.up * 1.82f, new Vector3(0.02f, 1.5f, 0.4f), postPanel, new Vector3(0, faceYaw, 0), "PostPanel");
+            P(PrimitiveKind.Cube, stat, at + Vector3.up * 3.2f, new Vector3(0.82f, 0.08f, 0.82f), StoneM(Ivory * 0.92f), pby, "PostNecking");
+            foreach (var fd in new[] { inward, -inward, side, -side })
+                foreach (float s in new[] { -0.2f, 0.2f })
+                    P(PrimitiveKind.Cube, stat, at + fd * 0.43f + Vector3.Cross(Vector3.up, fd) * s + Vector3.up * 3.27f, new Vector3(0.12f, 0.14f, 0.1f), StoneM(Ivory * 0.92f), new Vector3(0, Mathf.Atan2(fd.x, fd.z) * Mathf.Rad2Deg, 0), "PostCorbel");
+            P(PrimitiveKind.Cube, stat, at + Vector3.up * 3.38f, new Vector3(0.98f, 0.14f, 0.98f), StoneM(Ivory), pby, "PostCornice");
+            P(PrimitiveKind.Cube, stat, at + Vector3.up * 3.47f, new Vector3(1.04f, 0.04f, 1.04f), agedBrass, pby, "PostDripEdge");
+            Mesh(stat, Frustum(0.45f, 0.45f, 0.38f, 0.38f, 0.06f), SlateM(new Color(0.33f, 0.36f, 0.38f)), "PostCorniceTop", at + Vector3.up * 3.49f).localRotation = Quaternion.Euler(pby);
+            P(PrimitiveKind.Cube, stat, at + Vector3.up * 3.58f, new Vector3(0.46f, 0.06f, 0.46f), agedBrass, pby, "PostLanternPlinth");
+            // round 3 (N3): lighter iron, one cage (the lantern inside drops its own bars and cap), a 20% shorter spire with
+            // pale lead hips like the pier roofs
+            var turretIron = M(new Color(0.20f, 0.22f, 0.26f), 0.35f, 0.6f); var postLead = M(new Color(0.45f, 0.47f, 0.50f), 0.2f);
+            for (int k = 0; k < 4; k++)   // lantern turret columns, plinth to drum
+                P(PrimitiveKind.Cube, stat, at + Quaternion.Euler(0, yaw + 45 + 90 * k, 0) * Vector3.forward * 0.29f + Vector3.up * 3.96f, new Vector3(0.05f, 0.72f, 0.05f), turretIron, pby, "PostTurretColumn");
+            P(PrimitiveKind.Cube, stat, at + Vector3.up * 4.39f, new Vector3(0.46f, 0.18f, 0.46f), turretIron, pby, "PostSpireDrum");
+            Mesh(stat, Frustum(0.3f, 0.3f, 0.02f, 0.02f, 0.8f), turretIron, "PostSpire", at + Vector3.up * 4.48f).localRotation = Quaternion.Euler(pby);
+            for (int k = 0; k < 4; k++)
+            {
+                Vector3 c = at + Vector3.up * 4.48f + Quaternion.Euler(0, yaw + 45 + 90 * k, 0) * Vector3.forward * 0.424f, apexPt = at + Vector3.up * 5.28f, ax = apexPt - c;
+                P(PrimitiveKind.Cube, stat, (c + apexPt) / 2, new Vector3(0.05f, ax.magnitude, 0.04f), postLead, Quaternion.FromToRotation(Vector3.up, ax).eulerAngles, "PostSpireHip");
+            }
+            Mesh(stat, Frustum(0.215f, 0.215f, 0.205f, 0.205f, 0.06f), agedBrass, "PostSpireRing", at + Vector3.up * 4.72f).localRotation = Quaternion.Euler(pby);
+            P(PrimitiveKind.Cube, stat, at + Vector3.up * 5.46f, new Vector3(0.025f, 0.4f, 0.025f), turretIron, null, "PostVaneRod");
+            var vane = new GameObject("PostWeatherVane").transform; vane.SetParent(root, false); vane.localPosition = at + Vector3.up * 5.58f;
+            P(PrimitiveKind.Cube, vane, Vector3.zero, new Vector3(0.5f, 0.03f, 0.02f), IronM, null, "VaneArm");
+            P(PrimitiveKind.Cube, vane, new Vector3(0.25f, 0, 0), new Vector3(0.09f, 0.09f, 0.02f), IronM, new Vector3(0, 0, 45), "VaneHead");
+            P(PrimitiveKind.Cube, vane, new Vector3(-0.2f, 0.03f, 0), new Vector3(0.14f, 0.12f, 0.015f), agedBrass, null, "VaneTail");
+            float vanePhase = Mathf.Abs(yaw * 7.3f + at.x * 13.1f) % 360f;
+            vane.localRotation = Quaternion.Euler(0, vanePhase, 0); spinners.Add((vane, 18f + (vanePhase % 7f)));
+            // r3 (F4): a real banner. It hangs from a brass rod on two brackets, 0.3 m clear of the shaft (a visible gap and
+            // shadow), lighter teal with an ivory border, a darker hem and a brass bell glyph, a swallowtail with a proper
+            // notch, and it sways: the body from the rod, the tails a little more from the body's foot
+            var cloth = BannerCloth(); var glyph = M(new Color(0.72f, 0.6f, 0.34f), 0.3f); var border = M(new Color(0.85f, 0.80f, 0.68f), 0.3f);
+            float bannerLen = new[] { 1.6f, 1.25f, 1.9f }[Mathf.Abs(Mathf.RoundToInt(yaw / 10f)) % 3];   // pass 4: three lengths round the court
+            foreach (float s in new[] { -0.3f, 0.3f })
+                P(PrimitiveKind.Cube, stat, at + inward * 0.53f + side * s + Vector3.up * 2.87f, new Vector3(0.04f, 0.04f, 0.32f), agedBrass, new Vector3(0, faceYaw, 0), "BannerBracket");
+            P(PrimitiveKind.Cube, stat, at + inward * 0.68f + Vector3.up * 2.87f, new Vector3(0.78f, 0.05f, 0.05f), BrassM, new Vector3(0, faceYaw, 0), "BannerRod");
+            foreach (float s in new[] { -0.4f, 0.4f })
+                P(PrimitiveKind.Sphere, stat, at + inward * 0.68f + side * s + Vector3.up * 2.87f, Vector3.one * 0.07f, BrassM, null, "BannerRodFinial");
+            var hinge = new GameObject("BannerHinge").transform; hinge.SetParent(root, false);
+            hinge.localPosition = at + inward * 0.68f + Vector3.up * 2.84f; hinge.localRotation = fq;
+            P(PrimitiveKind.Cube, hinge, new Vector3(0, -bannerLen / 2, 0), new Vector3(0.5f, bannerLen, 0.03f), cloth, null, "Banner");
+            foreach (float s in new[] { -1f, 1f })   // round 3 (N2): an inset ivory border that draws a light outline at range
+                P(PrimitiveKind.Cube, hinge, new Vector3(s * 0.185f, -bannerLen / 2 - 0.02f, 0.017f), new Vector3(0.05f, bannerLen - 0.12f, 0.006f), border, null, "BannerBorder");
+            P(PrimitiveKind.Cube, hinge, new Vector3(0, -0.065f, 0.017f), new Vector3(0.42f, 0.05f, 0.006f), border, null, "BannerBorder");
+            // a bell silhouette: flared body, lip bar, crown loop and clapper
+            Mesh(hinge, Trapezoid(0.11f, 0.045f, 0.2f, 0.01f), glyph, "BannerBellBody", new Vector3(0, -0.52f, 0.026f));
+            P(PrimitiveKind.Cube, hinge, new Vector3(0, -0.52f, 0.022f), new Vector3(0.26f, 0.035f, 0.01f), glyph, null, "BannerBellLip");
+            P(PrimitiveKind.Cube, hinge, new Vector3(0, -0.295f, 0.022f), new Vector3(0.05f, 0.05f, 0.01f), glyph, new Vector3(0, 0, 45), "BannerBellCrown");
+            P(PrimitiveKind.Sphere, hinge, new Vector3(0, -0.565f, 0.022f), new Vector3(0.045f, 0.045f, 0.012f), glyph, null, "BannerBellClapper");
+            var tails = new GameObject("BannerTails").transform; tails.SetParent(hinge, false); tails.localPosition = new Vector3(0, -bannerLen, 0);
+            foreach (float s in new[] { -1f, 1f })
+            {
+                var tp = new GameObject("BannerTailPivot").transform; tp.SetParent(tails, false); tp.localPosition = new Vector3(s * 0.125f, 0, 0); tp.localRotation = Quaternion.Euler(0, 0, s * 6f);
+                Mesh(tp, Trapezoid(0.06f, 0.125f, 0.45f, 0.03f), cloth, "BannerTail", new Vector3(0, -0.45f, 0.015f));
+            }
+            float ph = Mathf.Abs(at.x * 3.1f + at.z * 1.7f);
+            swingers.Add((hinge, fq, 2.5f, ph, 0.9f)); swingers.Add((tails, Quaternion.identity, 6f, ph + 0.6f, 0.9f));
+            Lantern(root, at + Vector3.up * 3.86f, 1f, pool: true, turret: true);   // r3: on the turret plinth, under the drum
         }
 
         void BuildMetronome(Transform m)
@@ -1182,7 +1304,9 @@ namespace LastBell.Arenas.MetronomeCourt
                 beat = (int)System.Math.Floor(previewBeat); beatPos = previewBeat; beatSec = 60f / previewBpm;
                 if (boss && boss.Dead) phase = 0;
             }
-            if (beat != lastBeat) { lastBeat = beat; escapement -= 24; pawlKick = 1; if (accent) flash = 1; }
+            // Tempo Tyrant fight, its readiness preview, or no run at all (editor captures)
+            LightsPulse = fight ? tyrant != null : d == null || d.Encounter == RunDirector.TempoTyrantPractice;
+            if (beat != lastBeat) { lastBeat = beat; escapement -= 24; pawlKick = 1; if (accent && LightsPulse) flash = 1; }
             RodAngle = phase * SwingDegrees;
             if (Rod) Rod.localRotation = Quaternion.Euler(0, 0, RodAngle);
             escShown = Mathf.MoveTowards(escShown, escapement, Time.deltaTime * 600);
@@ -1201,9 +1325,11 @@ namespace LastBell.Arenas.MetronomeCourt
             // 165 BPM, so the tempo reads from motion as well as colour, anywhere on the court. Frozen while paused.
             float sinceBeat = (float)(beatPos - System.Math.Floor(beatPos)) * beatSec;
             BeatPulse = sinceBeat < 0.03f ? sinceBeat / 0.03f : Mathf.Exp(-(sinceBeat - 0.03f) / 0.12f);
-            if (boss && boss.Dead) BeatPulse = 0;
+            if ((boss && boss.Dead) || !LightsPulse) BeatPulse = 0;
+            if (!LightsPulse) flash = 0;
             LightTint = Color.Lerp(NormalLightTint, HasteLightTint, tempoBlend);
-            float flicker = frenzy ? 0.75f + 0.25f * Mathf.PerlinNoise(Time.time * 9, 0.3f) : 1f;
+            float flicker = frenzy && LightsPulse ? 0.75f + 0.25f * Mathf.PerlinNoise(Time.time * 9, 0.3f) : 1f;
+            const float SteadyNear = 0.4f;   // steady lantern/pool level: about the rim's average while the glow follows the rod
             // Floor light is steady (Risxhb, October 26, 2026): the per-beat pulse and the enrage noise on the lights that
             // cover the floor read as heavy shimmer (measured: whole-floor flicker 4.9% live vs 2.3% with them off). The
             // tempo still reads from the light colour, the rod and the metronome's own glow, which keeps a soft flash.
@@ -1214,33 +1340,46 @@ namespace LastBell.Arenas.MetronomeCourt
             if (mpb == null) mpb = new MaterialPropertyBlock();   // survives a script reload
             // lantern glow follows the rod's lean across the rim; all flash together on accented transition ticks
             LanternPulseX = phase * 14f;
+            float LanternGlow(float x)
+            {
+                float near = LightsPulse ? Mathf.Exp(-(x - LanternPulseX) * (x - LanternPulseX) / 6f) : SteadyNear;
+                // soft-capped (never clips to white) with the flicker, the hazard dim and the tick flash applied after the cap
+                float raw = (haste ? 1.3f : 1.0f) * (0.8f + 2.2f * near) * (1 + 0.3f * BeatPulse);
+                float e = 1.15f * Mathf.Clamp01(raw / 3.5f) * (LightsPulse ? 0.92f + 0.16f * Mathf.PerlinNoise(x * 1.7f, Time.time * 3f) : 1f);
+                return e * (quiet ? 0.6f : 1f) + 0.9f * flash;   // pass 3: lantern glass no longer white-hot
+            }
             foreach (var (r, x) in lanterns)
             {
                 if (!r) continue;
-                float near = Mathf.Exp(-(x - LanternPulseX) * (x - LanternPulseX) / 6f);
-                float k = (quiet ? 0.7f : 1f) * ((haste ? 1.3f : 1.0f) * (0.8f + 2.2f * near) * (1 + 0.3f * BeatPulse) + 2.5f * flash);
-                // soft-capped (never clips to white) with the flicker, the hazard dim and the tick flash applied after the cap
-                float raw = (haste ? 1.3f : 1.0f) * (0.8f + 2.2f * near) * (1 + 0.3f * BeatPulse);
-                float e = 1.15f * Mathf.Clamp01(raw / 3.5f) * (0.92f + 0.16f * Mathf.PerlinNoise(x * 1.7f, Time.time * 3f));
-                e = e * (quiet ? 0.6f : 1f) + 0.9f * flash;   // pass 3: lantern glass no longer white-hot
+                float e = LanternGlow(x);
                 mpb.SetColor(PBase, tint * 0.5f); mpb.SetColor(PEmission, tint * e); r.SetPropertyBlock(mpb);
+            }
+            // r3: the glass panes carry the same glow, blended halfway to candle cream (the tempo still reads, but the rim
+            // lanterns are no longer orange dots next to the red-orange warnings)
+            // round 3 (N3): the glass is candle cream whatever the tempo (tan glass matched the Haste rim dashes); it still
+            // brightens with the lantern glow, and the tempo reads from the spot and rim light, the rod and the metronome
+            var glassTint = new Color(0.95f, 0.89f, 0.72f);
+            foreach (var (r, x) in lanternGlass)
+            {
+                if (!r) continue;
+                mpb.SetColor(PBase, glassTint * 0.6f); mpb.SetColor(PEmission, glassTint * (0.6f + 0.75f * LanternGlow(x))); r.SetPropertyBlock(mpb);
             }
             if (poolMpb == null) poolMpb = new MaterialPropertyBlock();
             foreach (var (r, x) in pools)
             {
                 if (!r) continue;
-                float near = Mathf.Exp(-(x - LanternPulseX) * (x - LanternPulseX) / 6f);
+                float near = LightsPulse ? Mathf.Exp(-(x - LanternPulseX) * (x - LanternPulseX) / 6f) : SteadyNear;
                 float k = (quiet ? 0.6f : 1f) * (0.7f + 0.6f * near) * (1 + 0.06f * BeatPulse + 0.25f * flash);   // gentle: floor glow, not a strobe
                 poolMpb.SetColor(PColorHigh, LightTint * k); r.SetPropertyBlock(poolMpb);
             }
-            var seamTint = frenzy && Mathf.PerlinNoise(Time.time * 7, 1.7f) > 0.55f ? CrackGlow : tint;
+            var seamTint = frenzy && LightsPulse && Mathf.PerlinNoise(Time.time * 7, 1.7f) > 0.55f ? CrackGlow : tint;
             mpb.SetColor(PBase, seamTint); mpb.SetColor(PEmission, seamTint * ((haste ? 0.6f : 0.45f) + 0.3f * flash));
             foreach (var r in seams) if (r) r.SetPropertyBlock(mpb);
             // tempo line: brighter than the brass beside it, with a bright ~30-degree segment chasing once around per beat
             // the bright segment ticks one hour per beat (a clock hand, a lap every 12 beats) and decays over a quarter beat;
             // while hazards are up the line drops to a dim base with no chase or flash, so warnings stay the brightest thing
             float hourA = 180f + 30f * (float)(System.Math.Floor(beatPos) % 12), beatFrac = (float)(beatPos - System.Math.Floor(beatPos));
-            float tick = Mathf.Clamp01(1f - beatFrac / 0.25f) * (boss && boss.Dead ? 0 : 1);
+            float tick = Mathf.Clamp01(1f - beatFrac / 0.25f) * (boss && boss.Dead || !LightsPulse ? 0 : 1);
             // October 27: dimmer tempo ring (was 1.4/1.0, chase 1.6): it sat on warning edges as a bright orange band
             float lineBase = quiet ? 0.2f : (haste ? 0.45f : 0.4f) + 0.5f * flash;
             for (int i = 0; i < tempoLineRs.Count; i++)

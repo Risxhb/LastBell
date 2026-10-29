@@ -377,6 +377,8 @@ namespace LastBell.Menu.EditorTools
         // ankles, detail sat on tops the low camera can't see, the brass band was invisible. Now: dark non-reflective
         // caps with a real overhang, a shadow line under each cap (brass on posts), a plinth, a damp darker band, slightly
         // lighter chamfered post edges and block seams, and an untinted stone body.
+        // Set while another pass calls MerlonPass, so batch mode does not exit before the caller finishes.
+        public static bool Chained;
         public static Color MerlonStone = new Color(.17f, .16f, .22f), MerlonCap = new Color(.13f, .12f, .17f);
         public static void MerlonPass()
         {
@@ -434,7 +436,7 @@ namespace LastBell.Menu.EditorTools
             }
             if (swapped == 0) throw new InvalidOperationException("Merlon pass: no mauve blocks found");
             Save(s); Debug.Log($"Merlon pass: {swapped} blocks re-stoned, {caps} parapet details");
-            if (Application.isBatchMode) EditorApplication.Exit(0);
+            if (Application.isBatchMode && !Chained) EditorApplication.Exit(0);
         }
         // ---------------- 7. green bushes -> wet rubble and a broken bell fragment ----------------
         // Refinement 1 (critic, October 26, 2026): shards were floating ~0.4 m up (tilt about a far pivot) and edge-on;

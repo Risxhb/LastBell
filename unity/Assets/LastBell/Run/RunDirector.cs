@@ -42,10 +42,13 @@ namespace LastBell.Run
             // Metronome Court miniboss: explicit Practice entry only (inRun: false), so shuffled run slots are unchanged.
             // Run integration point for later review: set inRun to true here (docs/metronome-arena/tempo-tyrant.md).
             new BossEntry("Tempo Tyrant (practice)", w => BossEncounter.Spawn<TempoTyrantEncounter>(w, new Vector3(0, 0, -2f), 0), inRun: false, map: TempoTyrantMap),
-            // Metronome Court miniboss, practice only like the Tyrant (docs/bosses/chimebound-oracle.md)
-            new BossEntry("Chimebound Oracle (practice)", w => BossEncounter.Spawn<ChimeboundOracleEncounter>(w, new Vector3(0, 0, -2f), 0), inRun: false, map: TempoTyrantMap),
+            // Skyward Spire miniboss, practice only (docs/bosses/chimebound-oracle.md). Picked on the Metronome Court in
+            // Boss Rush instead, the court's metronome follows his clock.
+            new BossEntry("Chimebound Oracle (practice)", w => BossEncounter.Spawn<ChimeboundOracleEncounter>(w, new Vector3(0, 0, -2f), 0), inRun: false, map: AurelionMap),
             // Skyward Spire miniboss with the parry QTE, practice only (docs/bosses/dial-warden.md)
             new BossEntry("Dial Warden (practice)", w => BossEncounter.Spawn<DialWardenEncounter>(w, new Vector3(0, 0, -1.5f), 0), inRun: false, map: AurelionMap),
+            // Skyward Spire miniboss, practice only (docs/bosses/pendulum-sentinel.md, a proposal)
+            new BossEntry("Pendulum Sentinel (practice)", w => BossEncounter.Spawn<PendulumSentinelEncounter>(w, new Vector3(0, 0, -1.5f), 0), inRun: false, map: AurelionMap),
         };
         // Catalog eligibility is stable; each run owns its shuffled sequence, with final encounters appended.
         public static readonly int[] RunOrder = Enumerable.Range(0, Bosses.Length).Where(i => Bosses[i].InRun).OrderBy(i => Bosses[i].Final).ToArray();
@@ -67,6 +70,7 @@ namespace LastBell.Run
         public const string TempoTyrantMap = "metronome-court";
         public static int ChimeboundOraclePractice => Array.FindIndex(Bosses, b => b.Name.StartsWith("Chimebound Oracle"));
         public static int DialWardenPractice => Array.FindIndex(Bosses, b => b.Name.StartsWith("Dial Warden"));
+        public static int PendulumSentinelPractice => Array.FindIndex(Bosses, b => b.Name.StartsWith("Pendulum Sentinel"));
         public static readonly string[] Classes = { "Vanguard", "Chimesinger", "Arcanist" };
         const int IntroTicks = 120, ClearTicks = 180, DownedTicks = 100;
         public const int PracticeAutoReadyTicks = 45;   // 0.75 s in the arena before a practice fight starts

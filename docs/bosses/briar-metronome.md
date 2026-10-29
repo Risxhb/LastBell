@@ -64,7 +64,7 @@
   - Weight of Seasons (double).
   - Overgrowth with Lost Seasons: the hedges show where you can't go.
   - Pruning Cuts with Across.
-- **Last Season (soft enrage) at 5:00:** a Lost Seasons with one more seed every cast.
+- **No enrage** (content rules §5). Its other parts still need checking against those rules (phase change, Hard mechanic, soaks) before it is built.
 - **Max HP:** 3400.
 
 ## Difficulty

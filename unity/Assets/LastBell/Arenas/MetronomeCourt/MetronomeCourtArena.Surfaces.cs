@@ -13,11 +13,11 @@ namespace LastBell.Arenas.MetronomeCourt
     public sealed partial class MetronomeCourtArena
     {
         public static bool SurfaceKit = true;   // review switch; the October 27 pass-1 build had no kit
-        enum Surface { None, Masonry, Ivory, Brass, Iron, Cloth, Slate, Paving }   // pass 4: slate roofs and soft bridge paving (assigned explicitly)
+        enum Surface { None, Masonry, Ivory, Brass, Iron, Cloth, Slate, Paving, Weathered }   // r3: Weathered (pier masonry), assigned explicitly   // pass 4: slate roofs and soft bridge paving (assigned explicitly)
         static readonly Dictionary<Surface, Texture2D> surfaceTex = new Dictionary<Surface, Texture2D>();
         static readonly Dictionary<Surface, float> surfaceMean = new Dictionary<Surface, float>();
         // metres covered by one texture repeat
-        static float TileOf(Surface s) => s == Surface.Masonry ? 3.6f : s == Surface.Ivory ? 2.0f : s == Surface.Brass ? 1.2f : s == Surface.Iron ? 2.0f : s == Surface.Slate ? 1.8f : s == Surface.Paving ? 2.4f : 0.8f;
+        static float TileOf(Surface s) => s == Surface.Masonry || s == Surface.Weathered ? 3.6f : s == Surface.Ivory ? 2.0f : s == Surface.Brass ? 1.2f : s == Surface.Iron ? 2.0f : s == Surface.Slate ? 1.8f : s == Surface.Paving ? 2.4f : 0.8f;
         public int SurfaceUvBakes { get; private set; }
 
         static Surface Classify(Color c, float metal, bool glow)
@@ -88,6 +88,24 @@ namespace LastBell.Arenas.MetronomeCourt
                             val *= Mathf.Lerp(1f, 1.12f, Mathf.SmoothStep(0.80f, 0.90f, rv) * Mathf.SmoothStep(0.985f, 0.95f, rv));   // lit upper arris
                             if (SHash(block, row, 14) > 0.6f && fu + (1 - rv) * 0.6f < 0.3f) val *= 0.84f;   // a chipped corner
                             val *= Mathf.Lerp(0.5f, 1f, Mathf.SmoothStep(0.03f, 0.09f, joint));             // painted joint, one value step down
+                            break;
+                        }
+                        case Surface.Weathered:
+                        {   // r3 (October 28 critic, F5: "perfectly clean"): the pier masonry, older than the court's. The same
+                            // courses and blocks as Masonry, with stronger per-block steps, rain streaks that run down from each
+                            // course joint (narrow vertical noise, darkest just under the joint, gone by the lower fifth), a dark
+                            // grime band under each joint and a lighter worn arris above it. Two broad values that hold at range.
+                            int row = Mathf.FloorToInt(v * 5); float rv = v * 5 - row;
+                            float off = SHash(row, 0, 11) * 0.6f + (row % 2) * 0.5f, bu = (u * 2 + off) % 2f; int block = Mathf.FloorToInt(bu); float fu = bu - block;
+                            float joint = Mathf.Min(Mathf.Min(rv, 1 - rv), Mathf.Min(fu, 1 - fu) * 2.5f);
+                            val = 0.80f + 0.30f * SHash(block, row, 12);
+                            val *= 1 + 0.16f * (SNoise(u * 2, v * 2, 2, 15) - 0.5f) + 0.08f * (SNoise(u * 5, v * 5, 5, 16) - 0.5f);
+                            float streak = Mathf.Clamp01((SNoise(u * 16, v * 1.6f, 16, 71) - 0.45f) * 2.6f);
+                            val *= 1 - 0.32f * streak * Mathf.SmoothStep(0.15f, 0.85f, rv);                       // rain streaks under each joint
+                            val *= Mathf.Lerp(1f, 0.82f, Mathf.SmoothStep(0.72f, 0.94f, rv) * Mathf.SmoothStep(0.99f, 0.95f, rv));   // grime band under the joint
+                            val *= Mathf.Lerp(1f, 1.16f, Mathf.SmoothStep(0.10f, 0.04f, rv) * Mathf.SmoothStep(0.0f, 0.03f, rv));    // worn arris above the joint
+                            if (SHash(block, row, 14) > 0.55f && fu + (1 - rv) * 0.6f < 0.34f) val *= 0.8f;    // chipped corners
+                            val *= Mathf.Lerp(0.48f, 1f, Mathf.SmoothStep(0.03f, 0.09f, joint));
                             break;
                         }
                         case Surface.Ivory:

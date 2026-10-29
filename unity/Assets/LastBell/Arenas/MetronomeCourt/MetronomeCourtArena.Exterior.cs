@@ -168,9 +168,20 @@ namespace LastBell.Arenas.MetronomeCourt
         void BuildRisingStructures(Transform stat)
         {
             var srng = new System.Random(523); float R() => (float)srng.NextDouble();
-            var pierStone = StoneM(StoneDark * 1.08f); var capStone = StoneM(new Color(0.40f, 0.40f, 0.43f)); var recess = StoneM(StoneDark * 0.4f);
-            var ribStone = StoneM(StoneDark * 1.25f);
-            var pierSlate = SlateM(new Color(0.25f, 0.26f, 0.34f)); var finialIron = M(new Color(0.17f, 0.18f, 0.26f), 0.35f, 0.6f);
+            var drng = new System.Random(911); float D() => (float)drng.NextDouble();   // r3 decoration (moss, ivy, streaks): its own sequence, so the piers keep their places
+            // r3 (October 28 critic, F5): the piers use the weathered masonry (rain streaks, stronger block steps)
+            var pierStone = SurfM(StoneDark * 1.08f, Surface.Weathered); var capStone = StoneM(new Color(0.40f, 0.40f, 0.43f)); var recess = StoneM(StoneDark * 0.4f);
+            // r3 (F8): the rib stones carry the soft paving mottle; the coursed masonry smeared into diagonal streaks on them
+            var ribStone = PavingM(StoneDark * 1.25f); var ribStoneB = PavingM(StoneDark * 1.15f); var mortar = StoneM(StoneDark * 0.45f);
+            // r3 (F2): a lighter, greener weathered slate, so the roof no longer matches the fog and vanishes from above
+            var pierSlate = SurfM(new Color(0.30f, 0.31f, 0.33f), Surface.Slate, 0.1f);   // round 3: matte and neutral (round 2 read as a glass pyramid)
+            var finialIron = M(new Color(0.17f, 0.18f, 0.26f), 0.35f, 0.6f);
+            var lead = M(new Color(0.45f, 0.47f, 0.50f), 0.2f); var walk = PavingM(new Color(0.29f, 0.31f, 0.36f)); var coping = StoneM(new Color(0.32f, 0.32f, 0.35f));
+            // r3 (F1): cream candle light behind iron louvres in the belfry openings (cream, not orange: the warnings stay hottest)
+            var belfryLight = M(new Color(0.5f, 0.41f, 0.27f), 0.2f, 0, true); var louvre = M(new Color(0.17f, 0.18f, 0.23f), 0.35f, 0.6f);   // round 2: warmer and dimmer light (round 1 read near-white)
+            var moss = M(new Color(0.33f, 0.38f, 0.25f)); var ivy = SurfM(new Color(0.20f, 0.26f, 0.16f), Surface.Cloth); var ivyLeaf = SurfM(new Color(0.33f, 0.40f, 0.23f), Surface.Cloth);
+            var quoin = StoneM(new Color(0.5f, 0.5f, 0.54f)); var agedBrassP = M(Brass * 0.6f, 0.4f, 0.8f);   // round 3: light corner quoins, aged brass finials
+            var stain = StoneM(StoneDark * 0.75f); var stainLight = StoneM(new Color(0.40f, 0.40f, 0.43f) * 0.62f);
             var pierAt = new Dictionary<float, Vector3>();   // pass 4: pier centres, for the arches below
             // buttress piers: every one carries a rib up into the rim ledge (a load path), skipping the bridge and the metronome
             foreach (float a in new[] { 38f, 72f, 108f, 143f, 217f, 252f, 288f, 322f })
@@ -191,35 +202,78 @@ namespace LastBell.Arenas.MetronomeCourt
                 // between four gothic pinnacles (square shaft and spirelet), and a steep slate spire with an iron finial and a
                 // brass ball. The parapet closes the open top that read as a hollow box from the combat camera.
                 var head = foot + Vector3.up * h;
+                Vector3 L(float x, float y, float z) => head + Vector3.up * y + rot * new Vector3(x, 0, z);   // head-local point
                 foreach (var (cx, cz) in new[] { (-1f, -1f), (-1f, 1f), (1f, -1f), (1f, 1f) })
                 {
-                    P(PrimitiveKind.Cube, stat, head + Vector3.up * 0.95f + rot * new Vector3(cx * 1.32f, 0, cz * 1.32f), new Vector3(0.32f, 1.9f, 0.32f), capStone, new Vector3(0, a, 0), "PierHeadPilaster");
-                    var diag = rot * new Vector3(cx, 0, cz).normalized;
-                    P(PrimitiveKind.Cube, stat, head + Vector3.up * 1.95f + rot * new Vector3(cx * 1.58f, 0, cz * 1.58f), new Vector3(0.3f, 0.28f, 0.55f), capStone, Quaternion.LookRotation(diag).eulerAngles + new Vector3(14f, 0, 0), "PierHeadGargoyle");
-                    var corner = head + Vector3.up * 2.15f + rot * new Vector3(cx * 1.3f, 0, cz * 1.3f);
+                    P(PrimitiveKind.Cube, stat, L(cx * 1.32f, 0.95f, cz * 1.32f), new Vector3(0.32f, 1.9f, 0.32f), capStone, new Vector3(0, a, 0), "PierHeadPilaster");
+                    // r3 (F7): a carved spout gargoyle (bracket, a body pitched 25 degrees down, a wedge head with ears and an
+                    // open spout) instead of a tilted box, and the water stain it leaves down both outer faces of the pilaster
+                    var diag = rot * new Vector3(cx, 0, cz).normalized; var look = Quaternion.LookRotation(diag); var pitch = look * Quaternion.Euler(25f, 0, 0);
+                    var g0 = L(cx * 1.5f, 1.95f, cz * 1.5f);
+                    P(PrimitiveKind.Cube, stat, g0 + Vector3.down * 0.19f - diag * 0.08f, new Vector3(0.16f, 0.2f, 0.16f), capStone, look.eulerAngles, "PierGargoyleBracket");
+                    P(PrimitiveKind.Cube, stat, g0, new Vector3(0.26f, 0.24f, 0.5f), capStone, pitch.eulerAngles, "PierHeadGargoyle");
+                    var gHead = g0 + pitch * Vector3.forward * 0.22f;
+                    Mesh(stat, Frustum(0.13f, 0.12f, 0.07f, 0.06f, 0.22f), capStone, "PierGargoyleHead", gHead).localRotation = pitch * Quaternion.Euler(90f, 0, 0);
+                    foreach (var ex in new[] { -1f, 1f })
+                        P(PrimitiveKind.Cube, stat, gHead + pitch * new Vector3(ex * 0.07f, 0.13f, 0.04f), new Vector3(0.05f, 0.07f, 0.05f), capStone, pitch.eulerAngles, "PierGargoyleEar");
+                    P(PrimitiveKind.Cube, stat, gHead + pitch * Vector3.forward * 0.25f, new Vector3(0.07f, 0.07f, 0.12f), recess, pitch.eulerAngles, "PierGargoyleSpout");
+                    foreach (var (fx, fz) in new[] { (cx, 0f), (0f, cz) })
+                    {
+                        var fn = rot * new Vector3(fx, 0, fz);
+                        Mesh(stat, Trapezoid(0.035f, 0.1f, 1.35f, 0.01f), stainLight, "PierGargoyleStain", L(cx * 1.32f, 0.25f, cz * 1.32f) + fn * 0.165f).localRotation = Quaternion.LookRotation(fn);
+                    }
+                    var corner = L(cx * 1.3f, 2.15f, cz * 1.3f);
                     P(PrimitiveKind.Cube, stat, corner + Vector3.up * 0.35f, new Vector3(0.36f, 0.7f, 0.36f), capStone, new Vector3(0, a, 0), "PierPinnacleShaft");
-                    Mesh(stat, Frustum(0.2f, 0.2f, 0.02f, 0.02f, 1.1f), capStone, "RisingPierPinnacle", corner + Vector3.up * 0.7f).localRotation = rot;
+                    P(PrimitiveKind.Cube, stat, corner + Vector3.up * 0.73f, new Vector3(0.42f, 0.06f, 0.42f), quoin, new Vector3(0, a, 0), "PierPinnacleBand");   // r3: a capping band and a finial (critic: "bare spikes")
+                    Mesh(stat, Frustum(0.2f, 0.2f, 0.02f, 0.02f, 1.1f), capStone, "RisingPierPinnacle", corner + Vector3.up * 0.76f).localRotation = rot;
+                    // round 3 (N1): two rings of crockets pitched 30 degrees out, so the spikes read as Gothic pinnacles
+                    foreach (float ct in new[] { 0.33f, 0.66f })
+                        foreach (var fd in new[] { rot * Vector3.forward, rot * Vector3.back, rot * Vector3.right, rot * Vector3.left })
+                            P(PrimitiveKind.Cube, stat, corner + Vector3.up * (0.76f + 1.1f * ct) + fd * (0.2f - 0.18f * ct + 0.03f), new Vector3(0.08f, 0.08f, 0.12f), capStone, (Quaternion.LookRotation(fd) * Quaternion.Euler(-30f, 0, 0)).eulerAngles, "PierPinnacleCrocket");
+                    P(PrimitiveKind.Sphere, stat, corner + Vector3.up * 1.9f, Vector3.one * 0.12f, agedBrassP, null, "PierPinnacleFinial");
                 }
-                Mesh(stat, Frustum(1.47f, 1.47f, 1.47f, 1.47f, 0.1f), capStone, "PierHeadString", head + Vector3.up * 1.72f).localRotation = rot;
+                Mesh(stat, Frustum(1.47f, 1.47f, 1.47f, 1.47f, 0.1f), capStone, "PierHeadString", L(0, 1.72f, 0)).localRotation = rot;
+                // r3 (F2): a crenellated parapet (a base course with three merlons and darker coping per side) round a lead-grey
+                // walk that closes the gap to the roof, and a lighter slate roof with pale lead hip flashings that draw the
+                // pyramid from straight above. Merlons top out at head + 2.71 m, the finial at head + 4.0 m: under the play plane.
+                Mesh(stat, Frustum(1.3f, 1.3f, 1.3f, 1.3f, 0.06f), walk, "PierParapetWalk", L(0, 2.15f, 0)).localRotation = rot;
                 foreach (var (lx, lz, yawOff) in new[] { (0f, 1.38f, 0f), (0f, -1.38f, 0f), (1.38f, 0f, 90f), (-1.38f, 0f, 90f) })
-                    P(PrimitiveKind.Cube, stat, head + Vector3.up * 2.35f + rot * new Vector3(lx, 0, lz), new Vector3(2.25f, 0.4f, 0.2f), capStone, new Vector3(0, a + yawOff, 0), "PierParapet");
-                Mesh(stat, Frustum(1.05f, 1.05f, 0.04f, 0.04f, 1.7f), pierSlate, "RisingPierRoof", head + Vector3.up * 2.15f).localRotation = rot;
-                Mesh(stat, Frustum(0.1f, 0.1f, 0.02f, 0.02f, 0.45f), finialIron, "RisingPierFinial", head + Vector3.up * 3.8f).localRotation = rot;
-                P(PrimitiveKind.Sphere, stat, head + Vector3.up * 3.92f, Vector3.one * 0.18f, M(Brass * 0.6f, 0.4f, 0.8f), null, "RisingPierBall");
-                // a pointed opening with a sill on each chamber face (the court face keeps its original opening)
+                {
+                    var c0 = L(lx, 0, lz); var along = rot * (yawOff == 0 ? Vector3.right : Vector3.forward);
+                    P(PrimitiveKind.Cube, stat, c0 + Vector3.up * 2.25f, new Vector3(2.25f, 0.2f, 0.2f), capStone, new Vector3(0, a + yawOff, 0), "PierParapetBase");
+                    foreach (float m in new[] { -0.75f, 0f, 0.75f })
+                    {
+                        P(PrimitiveKind.Cube, stat, c0 + along * m + Vector3.up * 2.5f, new Vector3(0.5f, 0.3f, 0.2f), capStone, new Vector3(0, a + yawOff, 0), "PierMerlon");
+                        P(PrimitiveKind.Cube, stat, c0 + along * m + Vector3.up * 2.67f, new Vector3(0.54f, 0.04f, 0.24f), coping, new Vector3(0, a + yawOff, 0), "PierMerlonCoping");
+                    }
+                }
+                Mesh(stat, Frustum(1.05f, 1.05f, 0.04f, 0.04f, 1.7f), pierSlate, "RisingPierRoof", L(0, 2.15f, 0)).localRotation = rot;
+                foreach (var (cx, cz) in new[] { (-1f, -1f), (-1f, 1f), (1f, -1f), (1f, 1f) })
+                {
+                    Vector3 c = L(cx * 1.05f, 2.15f, cz * 1.05f), apexPt = L(0, 3.85f, 0), ax = apexPt - c;
+                    P(PrimitiveKind.Cube, stat, (c + apexPt) / 2, new Vector3(0.09f, ax.magnitude, 0.05f), lead, Quaternion.FromToRotation(Vector3.up, ax).eulerAngles, "PierRoofHip");
+                }
+                Mesh(stat, Frustum(0.1f, 0.1f, 0.02f, 0.02f, 0.45f), finialIron, "RisingPierFinial", L(0, 3.8f, 0)).localRotation = rot;
+                P(PrimitiveKind.Sphere, stat, L(0, 4.27f, 0), Vector3.one * 0.14f, agedBrassP, null, "RisingPierBall");
+                // r3 (F1): every chamber face has a lit belfry opening: a cream light panel (and its pointed head) set back
+                // behind three iron louvres, framed by cap-stone jambs and a pointed hood that stand proud, so it reads as a
+                // recess with light in it (the old 0.06 m black boxes read as stickers). Sill with a moss cap below.
                 foreach (var (lx, lz, yawOff) in new[] { (0f, -1.40f, 0f), (0f, 1.40f, 0f), (1.40f, 0f, 90f), (-1.40f, 0f, 90f) })
                 {
-                    var at = head + Vector3.up * 1.0f + rot * new Vector3(lx, 0, lz);
-                    if (lz > -1f)
+                    var at = L(lx, 1.0f, lz); var n = rot * new Vector3(lx, 0, lz).normalized; var fy = new Vector3(0, a + yawOff, 0);
+                    var sideV = Quaternion.Euler(fy) * Vector3.right;
+                    P(PrimitiveKind.Cube, stat, at, new Vector3(0.66f, 1.05f, 0.04f), belfryLight, fy, "PierHeadOpeningLight");
+                    P(PrimitiveKind.Cube, stat, at + Vector3.up * 0.52f, new Vector3(0.47f, 0.47f, 0.04f), belfryLight, new Vector3(0, a + yawOff, 45), "PierHeadOpeningPoint");
+                    for (int k = -1; k <= 1; k++)
+                        P(PrimitiveKind.Cube, stat, at + Vector3.up * (k * 0.3f) + n * 0.06f, new Vector3(0.62f, 0.05f, 0.14f), louvre, new Vector3(30f, a + yawOff, 0), "PierHeadLouvre");
+                    foreach (var s in new[] { -1f, 1f })
                     {
-                        P(PrimitiveKind.Cube, stat, at, new Vector3(0.7f, 1.1f, 0.06f), recess, new Vector3(0, a + yawOff, 0), "PierHeadOpening");
-                        P(PrimitiveKind.Cube, stat, at + Vector3.up * 0.55f, new Vector3(0.5f, 0.5f, 0.06f), recess, new Vector3(0, a + yawOff, 45), "PierHeadOpeningPoint");
+                        P(PrimitiveKind.Cube, stat, at + sideV * (s * 0.39f) + n * 0.06f, new Vector3(0.12f, 1.1f, 0.18f), capStone, fy, "PierHeadJamb");
+                        P(PrimitiveKind.Cube, stat, at + Vector3.up * 0.72f + sideV * (s * 0.18f) + n * 0.06f, new Vector3(0.52f, 0.1f, 0.18f), capStone, new Vector3(0, a + yawOff, -s * 45f), "PierHeadHood");
                     }
-                    P(PrimitiveKind.Cube, stat, at + Vector3.up * -0.62f + rot * new Vector3(lx, 0, lz).normalized * 0.06f, new Vector3(0.95f, 0.12f, 0.22f), capStone, new Vector3(0, a + yawOff, 0), "PierHeadSill");
+                    var sill = at + Vector3.up * -0.62f + n * 0.06f;
+                    P(PrimitiveKind.Cube, stat, sill, new Vector3(0.95f, 0.12f, 0.22f), capStone, fy, "PierHeadSill");
                 }
-                var slot = dir * (r - 1.42f) + Vector3.up * (top + 1.0f);
-                P(PrimitiveKind.Cube, stat, slot, new Vector3(0.7f, 1.1f, 0.06f), recess, new Vector3(0, a, 0), "PierHeadOpening");
-                P(PrimitiveKind.Cube, stat, slot + Vector3.up * 0.55f, new Vector3(0.5f, 0.5f, 0.06f), recess, new Vector3(0, a, 45), "PierHeadOpeningPoint");
                 // stepped weathering courses down the shaft (pass 5: a belt course under the corbel and one more set-off),
                 // and a lancet slit in each side face
                 float W(float y) => 1.9f - 0.65f * y / h;   // the shaft's half-width at height y above its foot
@@ -228,8 +282,55 @@ namespace LastBell.Arenas.MetronomeCourt
                 foreach (var sx in new[] { -1f, 1f })
                 {
                     var slit = foot + Vector3.up * (h - 4.0f) + rot * new Vector3(sx * (W(h - 4.0f) + 0.02f), 0, 0);
-                    P(PrimitiveKind.Cube, stat, slit, new Vector3(0.28f, 1.3f, 0.06f), recess, new Vector3(0, a + 90f, 0), "PierSlit");
-                    P(PrimitiveKind.Cube, stat, slit + Vector3.up * 0.65f, new Vector3(0.2f, 0.2f, 0.06f), recess, new Vector3(0, a + 90f, 45), "PierSlitPoint");
+                    // round 3 (N4): a lit slit in a stone surround, which breaks up the dark column under the head
+                    P(PrimitiveKind.Cube, stat, slit - rot * new Vector3(sx * 0.012f, 0, 0), new Vector3(0.44f, 1.5f, 0.05f), capStone, new Vector3(0, a + 90f, 0), "PierSlitSurround");
+                    P(PrimitiveKind.Cube, stat, slit, new Vector3(0.24f, 1.25f, 0.06f), belfryLight, new Vector3(0, a + 90f, 0), "PierSlit");
+                    P(PrimitiveKind.Cube, stat, slit + Vector3.up * 0.63f, new Vector3(0.17f, 0.17f, 0.06f), belfryLight, new Vector3(0, a + 90f, 45), "PierSlitPoint");
+                }
+                // r3 (F5, F9): grime streaks running down the shaft from under the corbel, and two to four ivy curtains with
+                // leaf clumps hanging from the cornice (chamber faces, beside the openings) or from under the corbel (shaft)
+                for (int k = 0; k < 3; k++)
+                {
+                    int f = drng.Next(4); float fx = f == 0 ? 1 : f == 1 ? -1 : 0, fz = f == 2 ? 1 : f == 3 ? -1 : 0;
+                    var fn = rot * new Vector3(fx, 0, fz); float len = 2.0f + D() * 1.2f, y0 = h - 0.4f, w = W(y0 - len * 0.5f);
+                    var along = rot * new Vector3(fz, 0, fx) * ((D() - 0.5f) * 1.4f);
+                    Mesh(stat, Trapezoid(0.2f + D() * 0.06f, 0.3f + D() * 0.06f, len, 0.01f), stain, "PierGrimeStreak", foot + Vector3.up * (y0 - len) + fn * (w + 0.015f) + along).localRotation = Quaternion.LookRotation(fn);
+                }
+                // round 3 (N4): light quoins up the four shaft corners under the corbel (alternating long and short blocks,
+                // 3 cm proud), the strongest masonry cue at range, and ivy as cascades of overlapping flattened clumps that
+                // narrow as they fall, in two greens, from a parapet corner and from beside a window hood
+                for (int j = 0; j < 12; j++)
+                {
+                    float qy = h - 0.55f - j * 0.35f, qw = W(qy), ql = j % 2 == 0 ? 0.55f : 0.3f;
+                    foreach (var (cx, cz) in new[] { (-1f, -1f), (-1f, 1f), (1f, -1f), (1f, 1f) })
+                    {
+                        var cn = foot + Vector3.up * qy + rot * new Vector3(cx * qw, 0, cz * qw);
+                        if (j % 2 == 0) P(PrimitiveKind.Cube, stat, cn + rot * new Vector3(-cx * (ql / 2 - 0.03f), 0, cz * 0.02f), new Vector3(ql, 0.32f, 0.1f), quoin, new Vector3(0, a, 0), "PierQuoin");
+                        else P(PrimitiveKind.Cube, stat, cn + rot * new Vector3(cx * 0.02f, 0, -cz * (ql / 2 - 0.03f)), new Vector3(0.1f, 0.32f, ql), quoin, new Vector3(0, a, 0), "PierQuoin");
+                    }
+                }
+                int ivyCount = 2 + drng.Next(2);
+                for (int k = 0; k < ivyCount; k++)
+                {
+                    float cx = drng.Next(2) == 0 ? -1 : 1, cz = drng.Next(2) == 0 ? -1 : 1;
+                    Vector3 fn, startPt, sideAxis;
+                    if (k == 0)
+                    {   // beside a window hood, on a random chamber face
+                        int f = drng.Next(4); float fx = f == 0 ? 1 : f == 1 ? -1 : 0, fz = f == 2 ? 1 : f == 3 ? -1 : 0;
+                        fn = rot * new Vector3(fx, 0, fz); sideAxis = rot * new Vector3(fz, 0, fx);
+                        startPt = L(0, 1.8f, 0) + fn * 1.42f + sideAxis * (cx * 0.62f);
+                    }
+                    else
+                    {   // over a parapet corner, beside the pinnacle
+                        fn = rot * new Vector3(cx, 0, cz).normalized; sideAxis = Vector3.Cross(Vector3.up, fn);
+                        startPt = L(cx * 1.44f, 2.3f, cz * 1.44f);
+                    }
+                    var fq = Quaternion.LookRotation(fn); int clumps = 4 + drng.Next(4); float size = 0.42f + D() * 0.06f; var pos = startPt;
+                    for (int c = 0; c < clumps; c++)
+                    {
+                        P(PrimitiveKind.Sphere, stat, pos + fn * 0.04f, new Vector3(size, size * 0.72f, size * 0.32f), c % 3 == 1 ? ivyLeaf : ivy, (fq * Quaternion.Euler(0, 0, D() * 180f)).eulerAngles, "PierIvy");
+                        pos += Vector3.down * (size * 0.62f) + sideAxis * ((D() - 0.5f) * 0.16f); size *= 0.86f;
+                    }
                 }
                 // a dark pointed maintenance opening facing the court
                 var face = dir * (r - 1.33f) + Vector3.up * (top - 3.2f);
@@ -245,14 +346,19 @@ namespace LastBell.Arenas.MetronomeCourt
                 // pass 2: an arched flying buttress (five stones on a curve that sags below the chord) instead of a strut
                 var sag = Vector3.down * 1.6f; var tangentP = Vector3.Cross(Vector3.up, dir);
                 Vector3 Curve(float t) => Vector3.Lerp(from, to, t) + sag * (4 * t * (1 - t));
-                for (int k = 0; k < 5; k++)
+                // r3 (F8): eight voussoirs with 3 cm joints over a dark mortar core, alternating in value, so the rib reads as
+                // jointed stones instead of one bent plank (and the soft paving mottle no longer smears into diagonal streaks)
+                for (int k = 0; k < 8; k++)
                 {
-                    Vector3 p0 = Curve(k / 5f), p1 = Curve((k + 1) / 5f); var ribDir = (p1 - p0).normalized;
-                    var stone = P(PrimitiveKind.Cube, stat, (p0 + p1) / 2, new Vector3(0.85f, (p1 - p0).magnitude + 0.08f, 1.0f + 0.12f * (k % 2)), ribStone, null, "PierRibStone");
-                    stone.localRotation = Quaternion.LookRotation(Vector3.Cross(tangentP, ribDir), ribDir);
+                    Vector3 p0 = Curve(k / 8f), p1 = Curve((k + 1) / 8f); var ribDir = (p1 - p0).normalized; float segLen = (p1 - p0).magnitude;
+                    var q = Quaternion.LookRotation(Vector3.Cross(tangentP, ribDir), ribDir);
+                    P(PrimitiveKind.Cube, stat, (p0 + p1) / 2, new Vector3(0.7f, segLen + 0.06f, 0.86f), mortar, q.eulerAngles, "PierRibCore");
+                    P(PrimitiveKind.Cube, stat, (p0 + p1) / 2, new Vector3(0.85f, segLen - 0.03f, 1.0f + 0.12f * (k % 2)), k % 2 == 0 ? ribStone : ribStoneB, q.eulerAngles, "PierRibStone");
+                    // round 3 (N5): a jointed coping block on each voussoir (the straight slab still smeared and read as a plank)
+                    var up2 = Vector3.Cross(tangentP, ribDir).normalized; if (up2.y < 0) up2 = -up2;
+                    P(PrimitiveKind.Cube, stat, (p0 + p1) / 2 + up2 * 0.57f, new Vector3(0.6f, segLen - 0.04f, 0.14f), k % 2 == 0 ? capStone : coping, q.eulerAngles, "PierRibCoping");
+                    D();   // keeps the decoration sequence (the moss patch here read as a green tile at range and was removed)
                 }
-                var cope = P(PrimitiveKind.Cube, stat, (from + to) / 2 + Vector3.up * 0.55f, new Vector3(0.5f, (to - from).magnitude * 0.98f, 0.5f), capStone, null, "PierRibCoping");
-                var copeDir = (to - from).normalized; cope.localRotation = Quaternion.LookRotation(Vector3.Cross(tangentP, copeDir), copeDir);
             }
             // pass 4 (final critic: "no pointed arches, triangular gaps"): a pointed arch between each flank pier pair, its
             // voussoirs on two curves that meet at a keystone, leaving triangular gaps under the gallery and the ribs
@@ -281,13 +387,24 @@ namespace LastBell.Arenas.MetronomeCourt
             foreach (var (a0, a1) in new[] { (28f, 96f), (118f, 160f), (205f, 262f), (282f, 334f) })
             {
                 Mesh(stat, Sector(14.9f, 17.1f, a0, a1, 0.55f, 16, 0, 0.06f), gallery, "ServiceGallery", Vector3.up * -7.2f);
+                var railPosts = new List<Vector3>();
                 for (float a = a0 + 6; a < a1 - 3; a += 11)
                 {
+                    // final fix (critic: "a loose rail post at the rib foot"): no post within 4 degrees of a pier's rib, and
+                    // the rail breaks there instead of running through the rib
+                    if (System.Array.Exists(new[] { 38f, 72f, 108f, 143f, 217f, 252f, 288f, 322f }, pa => Mathf.Abs(Mathf.DeltaAngle(pa, a)) < 4f)) { railPosts.Add(new Vector3(float.NaN, 0, 0)); continue; }
                     var d = Quaternion.Euler(0, a, 0) * Vector3.forward;
                     P(PrimitiveKind.Cube, stat, d * 16.85f + Vector3.up * -6.75f, new Vector3(0.07f, 0.9f, 0.07f), rail, new Vector3(0, a, 0), "GalleryRailPost");
+                    railPosts.Add(d * 16.85f + Vector3.up * -6.35f);
                 }
-                float mid = (a0 + a1) / 2; var md = Quaternion.Euler(0, mid, 0) * Vector3.forward;
-                P(PrimitiveKind.Cube, stat, md * 16.85f + Vector3.up * -6.35f, new Vector3((a1 - a0) * Mathf.Deg2Rad * 16.85f * 0.8f, 0.06f, 0.06f), rail, new Vector3(0, mid, 0), "GalleryRail");
+                // r3 (critic: "stray brown rods under the buttress"): one straight rail across the whole arc stuck out past the
+                // curved gallery at both ends; the rail is now a chord between each pair of neighbouring posts
+                for (int k = 0; k + 1 < railPosts.Count; k++)
+                {
+                    if (float.IsNaN(railPosts[k].x) || float.IsNaN(railPosts[k + 1].x)) continue;
+                    var span = railPosts[k + 1] - railPosts[k];
+                    P(PrimitiveKind.Cube, stat, (railPosts[k] + railPosts[k + 1]) / 2, new Vector3(0.06f, 0.06f, span.magnitude + 0.06f), rail, Quaternion.LookRotation(span).eulerAngles, "GalleryRail");
+                }
             }
             // belfry spires on the flanks, rising from the sea to well above the rim (outside every gameplay frame's floor)
             var mid1 = StoneM(new Color(0.27f, 0.27f, 0.37f)); var roof = SlateM(new Color(0.19f, 0.20f, 0.29f));   // middle layer: dusty indigo; pass 4: slate roofs

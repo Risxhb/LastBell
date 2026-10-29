@@ -29,6 +29,10 @@ namespace LastBell.Menu
         public Vector3 CameraPosition = new Vector3(.6f,.75f,10.9f), CameraTarget = new Vector3(-.6f,2.2f,-7);
         // Set before loading this scene to reopen Boss Rush (e.g. "Test Setup" from a practice run).
         public static bool ResumeBossRush;
+        // Start Run is greyed out for players (Risxhb, October 27, 2026): shown but not clickable, skipped by keyboard and
+        // controller focus, which starts on Boss Rush. StartRun() still works when called from code (the run tests use it).
+        // Applies to Windows and the web demo alike. Set true to bring the button back.
+        public static bool StartRunEnabled = false;
         public CharacterPresenter Hero { get; private set; }
         public CharacterPresenter Boss { get; private set; }
         public Transform BossWrapper { get; private set; }
@@ -83,7 +87,7 @@ namespace LastBell.Menu
             // Bellkeeper2 is the project's authored bell-headed Bellwarden presentation.
             Boss=CharacterPresenter.Create(BossWrapper,"Bellkeeper2",2,.8f,0,null);Sanitize(Boss);
             SelectClass(SelectedIndex); BuildUI();
-            EventSystem.current.SetSelectedGameObject(StartButton.gameObject);
+            EventSystem.current.SetSelectedGameObject((StartRunEnabled?StartButton:RushButton).gameObject);
             if(ResumeBossRush){ResumeBossRush=false;BossRush();if(Rush)Rush.OpenBossStep();}
             MenuFlowTest.Install();
             if(ConfrontationMenuTest.Requested) gameObject.AddComponent<ConfrontationMenuTest>();
@@ -126,6 +130,7 @@ namespace LastBell.Menu
             var logo=MenuUI.Panel("Last Bell logo",panel,new Vector2(-.1f,.73f),new Vector2(1.1f,1),Color.white);
             logo.sprite=Resources.Load<Sprite>("Menu/ConfrontationLogo");logo.preserveAspect=true;
             StartButton=Nav("Start Run",panel,.51f,StartRun,28);RushButton=Nav("Boss Rush",panel,.40f,BossRush);
+            StartButton.interactable=StartRunEnabled;   // greyed out: ConfrontationNavFocus dims a non-interactable label
             SettingsButton=Nav("Settings",panel,.29f,OpenSettings);ExitButton=Nav("Exit",panel,.18f,Exit);
 #if UNITY_WEBGL && !UNITY_EDITOR
             ExitButton.GetComponentInChildren<Text>().text="Return to Menu";
@@ -141,7 +146,7 @@ namespace LastBell.Menu
             difficultyNext=CycleArrow(diff.transform,true,16,new Color(MenuUI.Gold.r,MenuUI.Gold.g,MenuUI.Gold.b,.5f));
 
             BuildMusicPlayer();
-            var stack=new Selectable[]{PreviousButton,NextButton,StartButton,RushButton,SettingsButton,ExitButton,diff,MusicPlayButton};
+            var stack=new Selectable[]{PreviousButton,NextButton,StartButton,RushButton,SettingsButton,ExitButton,diff,MusicPlayButton}.Where(s=>s!=StartButton||StartRunEnabled).ToArray();
             for(int i=0;i<stack.Length;i++)stack[i].navigation=new Navigation{mode=Navigation.Mode.Explicit,selectOnDown=stack[(i+1)%stack.Length],selectOnUp=stack[(i+stack.Length-1)%stack.Length],selectOnLeft=i==0||i==1?PreviousButton:null,selectOnRight=i==0||i==1?NextButton:i==stack.Length-1?MusicPauseButton:null};
             // One menu song (Bittersweet Dawn, October 26, 2026): no skip button; Pause wraps right to Play.
             bool skip=MenuMusic.TrackCount>1;MusicNextButton.gameObject.SetActive(skip);
