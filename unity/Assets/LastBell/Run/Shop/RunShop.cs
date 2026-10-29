@@ -34,9 +34,9 @@ namespace LastBell.Run.Shop
     {
         public const int StockSize = 6, ClassSlots = 3, GeneralSlots = 2, SpecialSlot = 5;
         public const int AreaBossPay = 150, MinibossPay = 100, BonusPay = 20, GiftCapPerVisit = 150, CoopTimerSeconds = 90;
-        // proposal (run-shop-plan §1): pay the area's 3 missing miniboss clears at its shop until minibosses join the run
+        // accepted by Chzy18 2026-10-28 (run-shop-plan §1): pay the area's 3 missing miniboss clears at its shop until minibosses join the run
         public static bool StandInMinibossPay = true;
-        // proposal (run-shop-plan §1): par times for the "cleared under par" bonus, seconds
+        // accepted by Chzy18 2026-10-28 (run-shop-plan §1): par times for the "cleared under par" bonus, seconds
         public const int AreaBossPar = 240, FinalBossPar = 360, MinibossPar = 150;
 
         public readonly int Seed;

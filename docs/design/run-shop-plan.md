@@ -31,8 +31,8 @@ So every run encounter today is a main boss, and every gap between fights is an 
 | Gone at run end | The wallet resets on `Results` and on every fresh run |
 
 - **`RunWallet`**: one per player slot, holding `Chimes`, `Earned` and `ReceivedThisVisit`.
-- **Proposal, stand-in miniboss pay.** The run has no minibosses yet, so Shop 1 would open with 0 Chimes. **Default:** each area shop also pays the area's three missing miniboss clears (3 × 100 = 300), shown on the screen as "Area minibosses (stand-in)". It switches off for an area once that area's minibosses are in the run. This keeps the spec's ~1,350–1,830 Chimes per run.
-- **Proposal, par times.** The spec doesn't give par values. **Default:** area bosses 4:00, the Bellkeeper 6:00, minibosses 2:30 (the spec's §5 lengths), kept in one table so playtests can tune them.
+- **Stand-in miniboss pay (accepted by Chzy18, 2026-10-28).** The run has no minibosses yet, so Shop 1 would open with 0 Chimes. Each area shop also pays the area's three missing miniboss clears (3 × 100 = 300), shown on the screen as "Area minibosses (stand-in)". It switches off for an area once that area's minibosses are in the run. This keeps the spec's ~1,350–1,830 Chimes per run.
+- **Par times (accepted by Chzy18, 2026-10-28):** area bosses 4:00, the Bellkeeper 6:00, minibosses 2:30 (the spec's §5 lengths), kept in one table so playtests can tune them.
 
 ## 2. The shop screen at the intermission (step 2)
 
@@ -152,7 +152,6 @@ Until netcode lands, the autotest adds **test slots** (wallet and build only, no
 6. **First playable slice → Azure PR** into `feature/confrontation-menu`.
 7. Practice shop, the full 70-item pool (with the max HP and range hooks), co-op once netcode or party bots land, then the Standard Kit for Ultimate practice and Toll (spec §11 order).
 
-## 7. Open questions (sent to the review inbox)
+## 7. Open questions
 
-1. **Stand-in miniboss pay** (§1): pay 300 Chimes at each area shop until that area's minibosses join the run? Default: yes.
-2. **Par times** (§1): area bosses 4:00, Bellkeeper 6:00, minibosses 2:30? Default: yes, to be tuned.
+None open. Chzy18 accepted both review-inbox items on 2026-10-28: 300 stand-in Chimes per area shop until that area's minibosses are in the run, and par times of 4:00 / 6:00 / 2:30 in one table to tune.
