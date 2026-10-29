@@ -351,7 +351,7 @@ namespace LastBell.Run
             if (State == RunState.Combat || State == RunState.Cleared || State == RunState.Downed) RunTicks++;
             if (gen != Generation) return;
             // practice has no preparation card: it starts by itself after a short beat (tests keep the manual Ready)
-            if (State == RunState.Ready && Mode == RunMode.Practice && AutoReady && StateTicks >= PracticeAutoReadyTicks) { RequestReady(); return; }
+            if (State == RunState.Ready && Mode == RunMode.Practice && AutoReady && StateTicks >= PracticeAutoReadyTicks && !Shop.RunShopFlow.Showing) { RequestReady(); return; }   // an area-boss practice shop waits for Ready
             switch (State)
             {
                 case RunState.Intro:

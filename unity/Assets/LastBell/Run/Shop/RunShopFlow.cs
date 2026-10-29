@@ -47,7 +47,7 @@ namespace LastBell.Run.Shop
             switch (s)
             {
                 case RunState.Ready:
-                    if (!Enabled || d.Mode != RunMode.Run) { EndRun(); break; }
+                    if (!Enabled || (d.Mode == RunMode.Practice && !PracticeShopFor(d.Encounter))) { EndRun(); break; }
                     if (Run == null || runId != d.RunsStarted) BeginRun();
                     OpenFor(d.Encounter);
                     break;
@@ -60,7 +60,7 @@ namespace LastBell.Run.Shop
                     }
                     break;
                 case RunState.Cleared:
-                    if (Run != null && d.Mode == RunMode.Run && d.Boss != null)
+                    if (Run != null && d.Mode == RunMode.Run && d.Boss != null)   // practice never pays
                     {
                         bool final = RunDirector.Bosses[d.Encounter].Final;
                         int seconds = (d.World.Tick - d.World.SegmentStartTick) / Sim.Hz;
@@ -73,10 +73,15 @@ namespace LastBell.Run.Shop
             }
         }
 
+        // One-area practice gets one shop before that area's boss (spec §1): area bosses only. Minibosses have no shop, and
+        // Ultimate practice will use the Standard Kit instead (spec §9).
+        public static bool PracticeShopFor(int encounter) =>
+            encounter >= 0 && encounter < RunDirector.Bosses.Length && RunDirector.Bosses[encounter].InRun && !RunDirector.Bosses[encounter].Final;
+
         void BeginRun()
         {
             runId = d.RunsStarted; openedFor = -1;
-            Run = new ShopRun(SeedOverride ?? Guid.NewGuid().GetHashCode(), d.EncounterOrder.Length);
+            Run = new ShopRun(SeedOverride ?? Guid.NewGuid().GetHashCode(), d.Mode == RunMode.Practice ? 1 : d.EncounterOrder.Length);
             d.Player.Build = Run.Add(d.ClassName);   // party bots / netcode add their slots here later
             ItemHooks.Run = Run;
             d.Log.Add($"shop: new run, seed {Run.Seed}");
@@ -92,7 +97,7 @@ namespace LastBell.Run.Shop
         {
             if (openedFor == encounter + 1000 * d.RunsStarted) return;   // one visit per boss (Ready can't re-enter mid-visit)
             openedFor = encounter + 1000 * d.RunsStarted; openedAt = Time.frameCount;
-            int pos = Array.IndexOf(d.EncounterOrder, encounter);
+            int pos = d.Mode == RunMode.Run ? Array.IndexOf(d.EncounterOrder, encounter) : 0;
             bool final = RunDirector.Bosses[encounter].Final;
             // health refills at the shop (as before: every boss after the first); potions follow the existing rule
             if (pos > 0) d.Player.RefreshHealth(refillPotions: pos == d.EncounterOrder.Length - 1);
@@ -169,7 +174,7 @@ namespace LastBell.Run.Shop
             float x = x0 + pad, y = y0 + pad, iw = W - 2 * pad;
 
             // header: visit, next boss, wallet
-            UiTheme.Label(R(x, y, iw, 20), UiTheme.Spaced(Run.FinalShop ? "Final shop" : $"Shop {Run.Visit} of {Run.TotalVisits}"), eyebrow);
+            UiTheme.Label(R(x, y, iw, 20), UiTheme.Spaced(d.Mode == RunMode.Practice ? "Practice shop" : Run.FinalShop ? "Final shop" : $"Shop {Run.Visit} of {Run.TotalVisits}"), eyebrow);
             UiTheme.Label(R(x, y + 22, iw - 320, 40), "INTERMISSION  ·  next: " + Run.NextBoss, title);
             UiTheme.Label(R(x + iw - 320, y + 8, 320, 40), $"{me.Chimes}  CHIMES", chimes);
             UiTheme.Label(R(x + iw - 320, y + 46, 320, 18), $"Keystones {me.Keystones}/{ItemCatalog.KeystonesPerRun}  ·  earned this run {me.Earned}", UiTheme.Style(13, false, TextAnchor.MiddleRight, UiTheme.IvoryMicro));

@@ -57,7 +57,7 @@ Stock rules:
 - No item is offered twice to the same player, and owned items leave the pool.
 - No selling (rejected, §12.7).
 
-**Practice:** one-area practice gets a single shop with that area's 300 stand-in Chimes in step 5. Until then practice is unchanged, so the boss lanes' practice tests keep their auto-start.
+**Practice:** practice of an area boss (Aurelion, Crucivar, Sylvara) gets a single shop with that area's 300 stand-in Chimes (spec §1). The shop holds the practice auto-start until Ready is pressed, because the spec says the shop waits for the player. That reverses Risx's "practice starts by itself" request for area-boss practice only, and Chzy18's accepted spec wins. Miniboss practice keeps its auto-start and has no shop. Ultimate practice gets the Standard Kit later (spec §9). Practice never pays Chimes, and a practice retry opens a fresh shop. Automated suites keep the old flow.
 
 ## 3. The item framework and class hooks (step 3)
 
@@ -150,7 +150,7 @@ Until netcode lands, the autotest adds **test slots** (wallet and build only, no
 4. Item framework + the 15 slice items + kit hooks.
 5. Autotest + shop bot. Build and test under the Unity lock.
 6. **First playable slice → Azure PR** into `feature/confrontation-menu`.
-7. Practice shop, the full 70-item pool (with the max HP and range hooks), co-op once netcode or party bots land, then the Standard Kit for Ultimate practice and Toll (spec §11 order).
+7. ~~Practice shop~~ (built 2026-10-28, after PR 10). Then the full 70-item pool (with the max HP and range hooks), co-op once netcode or party bots land, then the Standard Kit for Ultimate practice and Toll (spec §11 order).
 
 ## 7. Open questions
 

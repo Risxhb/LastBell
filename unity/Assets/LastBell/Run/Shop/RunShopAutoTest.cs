@@ -199,8 +199,36 @@ namespace LastBell.Run.Shop
             RunShopFlow.BotBuys = false;
             d.SetPaused(true); d.ReturnToMenu(); yield return null;
 
+            yield return PracticeChecks();
+
             Check("no errors or exceptions logged", errors == 0, errors + " logged");
             Finish();
+        }
+
+        // One-area practice (spec §1): one shop before an area boss with the area's 300 stand-in Chimes; none for
+        // minibosses or the Bellkeeper; practice never pays and a practice retry starts a fresh shop.
+        IEnumerator PracticeChecks()
+        {
+            Check("practice shop only before area bosses", RunShopFlow.PracticeShopFor(RunDirector.AurelionPractice) && RunShopFlow.PracticeShopFor(RunDirector.CrucivarPractice) && RunShopFlow.PracticeShopFor(RunDirector.SylvaraPractice)
+                && !RunShopFlow.PracticeShopFor(0) && !RunShopFlow.PracticeShopFor(RunDirector.TempoTyrantPractice) && !RunShopFlow.PracticeShopFor(RunDirector.DialWardenPractice));
+            int spire = RunMaps.IndexOf(RunDirector.AurelionMap);
+            d.StartPractice("Chimesinger", RunDirector.AurelionPractice);
+            yield return Until(() => RunMaps.Current == spire && RunDirector.Instance && RunDirector.Instance != d && RunDirector.Instance.State == RunState.Ready, 40, "Aurelion practice");
+            d = RunDirector.Instance;
+            yield return new WaitForSeconds(1.5f);   // longer than the practice auto-start
+            Check("Aurelion practice: the shop opens and holds the auto-start", d.State == RunState.Ready && d.Mode == RunMode.Practice && RunShopFlow.Showing, $"{d.State}");
+            Check("practice shop: one visit, 300 stand-in Chimes", Run != null && Run.Visit == 1 && Run.TotalVisits == 1 && Me.Chimes == 300 && d.Player.Build == Me, $"{Me?.Chimes}");
+            yield return Shot("practice");
+            int c = Card(x => x.Tier == ItemTier.Common);
+            Check("practice: buy works", c >= 0 && Run.TryBuy(0, c, out _));
+            Check("practice: Ready starts the boss", RunShopFlow.Instance.Leave());
+            yield return Until(() => d.State == RunState.Combat, 6, "practice combat");
+            Check("practice: the build carries into the fight", d.State == RunState.Combat && d.Player.Build != null && d.Player.Build.Items.Count == 1);
+            d.Boss.DebugDefeat();
+            yield return Until(() => d.State == RunState.Results, 8, "practice results");
+            Check("practice clear: no Chimes paid, items gone", d.Victory && Run == null && ItemHooks.Run == null);
+            Check("practice retry: a fresh shop", d.RequestRetry() && Run != null && Me.Chimes == 300 && Me.Items.Count == 0);
+            d.SetPaused(true); d.ReturnToMenu(); yield return null;
         }
 
         IEnumerator ClassRun(string cls, IEnumerator checks)
