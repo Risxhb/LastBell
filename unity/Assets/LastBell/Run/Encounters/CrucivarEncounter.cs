@@ -55,11 +55,17 @@ namespace LastBell.Run
         public int PhaseIndex => phase;
         public int Attacks { get; private set; }
 
-        // v3 uses the packet's 6600 (ABILITIES-v3.md); v1 and v2 keep the shortened 2500 test value
-        void Awake() { MaxHp = CrucivarArgs.V3 || CrucivarArgs.V4 ? 6600 : 2500; BodyRadius = 1.7f; HitHeight = 2.0f; MarkHeight = 4.6f; }
+        // v4 (abilities-v4/FIGHT-SHEET.md, proposal): 8500 solo, about 4 min at the measured bot damage, plus PartyStep per
+        // extra fighter, applied in Build once the party is in. v3 uses the packet's 6600 (ABILITIES-v3.md); v1 and v2 keep
+        // the shortened 2500 test value.
+        public const int V4Hp = 8500;
+        public const float PartyStep = 0.9f;
+        public static int V4MaxHp(int players) => Mathf.RoundToInt(V4Hp * (1 + PartyStep * Mathf.Max(0, players - 1)));
+        void Awake() { MaxHp = CrucivarArgs.V4 ? V4Hp : CrucivarArgs.V3 ? 6600 : 2500; BodyRadius = 1.7f; HitHeight = 2.0f; MarkHeight = 4.6f; }
 
         protected override void Build()
         {
+            if (CrucivarArgs.V4 && W.Players.Count > 1) { MaxHp = Mathf.RoundToInt(MaxHp * (1 + PartyStep * (W.Players.Count - 1))); Hp = MaxHp; }   // after the -lastbellBossHp scale
             presenter = CharacterPresenter.Create(transform, "Crucivar", 3f, 0.8f, 0, CrucivarRig.BuildPlaceholder);
             rig = presenter.Visual.gameObject.AddComponent<CrucivarRig>();
             rig.Bind(presenter.Visual);

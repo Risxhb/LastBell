@@ -17,6 +17,7 @@ namespace LastBell.Run
         {
             yield return t.Setup(4, at: new[] { new Vector3(0, 0, 6), new Vector3(6, 0, -1.5f), new Vector3(0, 0, -9), new Vector3(-6, 0, -1.5f) });
             if (t.Boss == null) yield break;
+            t.Check("v4 HP: 8500 solo, +0.9 per extra fighter (4 players 31450)", CrucivarEncounter.V4MaxHp(1) == 8500 && CrucivarEncounter.V4MaxHp(4) == 31450, CrucivarEncounter.V4MaxHp(4).ToString());
             int c0 = t.W.Tick;
             t.Begin(t.Boss.Rite.Loop());
             int peak = 0;
