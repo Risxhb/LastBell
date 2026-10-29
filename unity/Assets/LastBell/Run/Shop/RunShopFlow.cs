@@ -142,7 +142,7 @@ namespace LastBell.Run.Shop
         void Do(bool ok, string why) { LastRefusal = ok ? null : why; }
 
         // ---------------------------------------------------------------- screen
-        GUIStyle eyebrow, title, body, small, smallC, price, chimes, btn, btnP, tierSt;
+        GUIStyle eyebrow, title, body, small, smallC, smallLow, price, chimes, btn, btnP, tierSt;
         int styleH = -1;
         static readonly Color RareCol = new Color(0.60f, 0.74f, 1.00f), KeyCol = UiTheme.GoldBright;
         static Color TierCol(ItemTier t) => t == ItemTier.Common ? UiTheme.IvoryBody : t == ItemTier.Rare ? RareCol : KeyCol;
@@ -157,6 +157,7 @@ namespace LastBell.Run.Shop
             body = UiTheme.Style(16, false, TextAnchor.UpperLeft, UiTheme.IvoryBody, true);
             small = UiTheme.Style(14, false, TextAnchor.UpperLeft, UiTheme.IvoryMuted, true);
             smallC = UiTheme.Style(14, false, TextAnchor.MiddleCenter, UiTheme.IvoryMuted);
+            smallLow = UiTheme.Style(14, false, TextAnchor.LowerLeft, UiTheme.IvoryMuted, true);
             price = UiTheme.Style(18, true, TextAnchor.MiddleLeft, UiTheme.Gold);
             chimes = UiTheme.Style(28, true, TextAnchor.MiddleRight, UiTheme.GoldBright);
             tierSt = UiTheme.Style(13, true, TextAnchor.MiddleLeft, UiTheme.IvoryBody);
@@ -291,8 +292,8 @@ namespace LastBell.Run.Shop
             cy += 76;
             UiTheme.Label(R(px, cy, pw, 130), def.Card(false), body);
             cy += 134;
-            if (Run.Solo && def.SoloNote != null) UiTheme.Label(R(px, cy, pw, 36), def.SoloNote, small);
             float by = y + h - 14 - 40;
+            if (Run.Solo && def.SoloNote != null) UiTheme.Label(R(px, by - 34 - 40, pw, 40), def.SoloNote, smallLow);   // sits just above the price, however narrow the card
             if (Coin) GUI.DrawTexture(R(px, by - 30, 24, 24), Coin, ScaleMode.ScaleToFit, true);
             UiTheme.Label(R(px + (Coin ? 30 : 0), by - 30, pw, 24), $"{def.Price} Chimes", price);
             bool keyCap = def.Tier == ItemTier.Keystone && me.Keystones >= ItemCatalog.KeystonesPerRun;
