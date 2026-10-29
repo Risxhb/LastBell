@@ -56,10 +56,13 @@ namespace LastBell.Run
         CombatWorld hooked;
         bool follow; int fights; float fightStart;
         // -crucivarMeasure: no pacing; each phase runs a fixed number of loops (3 / 2 uprisings / 3 cycles), then the
-        // boss is set just past the threshold; the log gets the players' damage per phase. Use a big -lastbellBossHp so
-        // the bots never cross a threshold themselves. -crucivarBots n (1-8) sets the party; the editor quits after the fight.
+        // boss is set just past the threshold; the log gets the players' damage per phase. Until then the boss is held just
+        // above the threshold, so the bots never cross it themselves. -crucivarBots n (1-8) sets the party; the editor quits after the fight.
         static bool Measure => Environment.GetCommandLineArgs().Any(a => a.Equals("-crucivarMeasure", StringComparison.OrdinalIgnoreCase));
         static int BotCount => int.TryParse(CrucivarArgs.Arg("-crucivarBots"), out int n) ? Mathf.Clamp(n, 1, 8) : 4;
+
+        void MeasureLog(int ph, int loops, float secs, int dealt, string note) =>
+            Debug.Log($"[measure] bots {bots.Count} phase {ph}: {loops} loops in {secs:0.0}s, players dealt {dealt}, team dps {dealt / Mathf.Max(0.1f, secs):0.0}, per bot {dealt / Mathf.Max(0.1f, secs) / bots.Count:0.0}, downs {bots.Sum(b => b.Downs)}{note}");
 
         void Start()
         {
@@ -96,7 +99,7 @@ namespace LastBell.Run
                     w.PlayerHit += (p, h, dmg) => { var b = bots.FirstOrDefault(x => x.P == p); if (b != null) { b.Hits++; b.Damage += dmg; } };
                 }
                 fights++; fightStart = Time.time;
-                int logged = 0, mPhase = 1, mDealt0 = w.DamageDealt; float mT0 = Time.time; bool mDone = false;
+                int logged = 0, mPhase = 1, mDealt0 = w.DamageDealt; float mT0 = Time.time; bool mDone = false, mLogged = false;
                 while (d.State == RunState.Combat)
                 {
                     foreach (var b in bots)
@@ -111,14 +114,16 @@ namespace LastBell.Run
                         int ph = cb.PhaseIndex;
                         if (Measure)
                         {
-                            if (ph != mPhase) { mPhase = ph; mT0 = Time.time; mDealt0 = w.DamageDealt; }
+                            if (ph != mPhase) { mPhase = ph; mT0 = Time.time; mDealt0 = w.DamageDealt; mLogged = false; }
                             int want = ph == 1 ? 3 : ph == 2 ? 2 : 3;
-                            if (!mDone && cb.PhaseLoops >= want)
+                            if (!mLogged && cb.PhaseLoops >= want)
                             {
-                                float secs = Time.time - mT0; int dealt = w.DamageDealt - mDealt0;
-                                Debug.Log($"[measure] bots {bots.Count} phase {ph}: {cb.PhaseLoops} loops in {secs:0.0}s, players dealt {dealt}, team dps {dealt / secs:0.0}, per bot {dealt / secs / bots.Count:0.0}, downs {bots.Sum(b => b.Downs)}");
+                                mLogged = true; MeasureLog(ph, cb.PhaseLoops, Time.time - mT0, w.DamageDealt - mDealt0, "");
                                 if (ph == 1) cb.DebugSetHpFraction(0.64f); else if (ph == 2) cb.DebugSetHpFraction(0.29f); else { mDone = true; cb.DebugDefeat(); }
                             }
+                            // until then the bots must not cross the threshold themselves (the shift waits for the end of a loop)
+                            float mFloor = ph == 1 ? 0.66f : ph == 2 ? 0.31f : 0.02f;
+                            if (!mLogged && cb.Hp < cb.MaxHp * mFloor) cb.DebugSetHpFraction(mFloor);
                             yield return null; continue;
                         }
                         // -crucivarWatchFrom p2: start just under 65 %, so Phase 2 comes after the first Forge Rite loop
@@ -137,6 +142,7 @@ namespace LastBell.Run
                 }
                 if (Measure)
                 {
+                    if (!mDone && !mLogged) MeasureLog(mPhase, (d.Boss as CrucivarEncounter)?.PhaseLoops ?? 0, Time.time - mT0, w.DamageDealt - mDealt0, " (partial: the fight ended first)");
                     Debug.Log($"[measure] fight over after {Time.time - fightStart:0}s · phase {((d.Boss as CrucivarEncounter)?.PhaseIndex ?? 0)} · " + (mDone ? "measured all phases" : "ended early (wipe?)"));
 #if UNITY_EDITOR
                     UnityEditor.EditorApplication.Exit(0);
