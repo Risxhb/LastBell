@@ -47,7 +47,7 @@ namespace LastBell.Run.Shop
                 Effect = "Sundering Blow cracks the boss for 4 s. Everyone's heavy hits on it deal +{v}%: Last Word, Bellstrike, Crescendo, Rune Sigil, Arcane Comet.",
                 SoloNote = "Solo: applies to your own Last Word." },
             new ItemDef { Id = Oathbound, Name = "Oathbound", Class = "Vanguard", Tier = ItemTier.Keystone, Value = 3, Tempered = 2,
-                Effect = "Sundering Blow can't be empowered. Every {v}th Opening you earn resets Last Word's cooldown." },
+                Effect = "Sundering Blow can't be empowered. Every {v} Openings you earn reset Last Word's cooldown." },
             // ---- Chimesinger ----
             new ItemDef { Id = HeavyBell, Name = "Heavy Bell", Class = "Chimesinger", Tier = ItemTier.Common, Value = 20, Tempered = 30,
                 Effect = "Bellstrike deals +{v}% damage." },
