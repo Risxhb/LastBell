@@ -91,6 +91,8 @@ namespace LastBell.Run
         public bool AbilitiesEnabled;   // only during combat
         public bool MovementEnabled = true;
         public Shop.PlayerBuild Build;   // run items bought in the shop (null = none); read through Shop.ItemHooks
+        public int MaxHealth => Shop.ItemHooks.MaxHp(this, MaxHp);                              // MaxHp unless items change it
+        public float MaxStaminaNow => Shop.ItemHooks.F(this, "stamina.max", MaxStamina);
 
         public int Hp { get; private set; } = MaxHp;
         public float Stamina { get; private set; } = MaxStamina;
@@ -106,7 +108,7 @@ namespace LastBell.Run
         public PlayerInput Last { get; private set; }
 
         int dashTick, dashLock, jumpTick = -1, stun, knockTick, sinceSpend = 999;
-        Vector3 dashDir, knockDir; float knockDist;
+        Vector3 dashDir, knockDir; float knockDist, dashDist = DashDistance;
         bool sprinting;
 
         public static PlayerController Spawn(CombatWorld world, string className, Vector3 pos, float yaw)
@@ -129,7 +131,7 @@ namespace LastBell.Run
         public void PrepareForEncounter(Vector3 pos, float yaw)
         {
             transform.SetPositionAndRotation(pos, Quaternion.Euler(0, yaw, 0));
-            Stamina = MaxStamina; dashTick = 0; dashLock = 0; jumpTick = -1; Height = 0; stun = 0; knockTick = 0; sinceSpend = 999;
+            Stamina = MaxStaminaNow; dashTick = 0; dashLock = 0; jumpTick = -1; Height = 0; stun = 0; knockTick = 0; sinceSpend = 999;
             Kit.ResetAll();
             Presenter.ResetPose();
         }
@@ -139,13 +141,13 @@ namespace LastBell.Run
         public void RefreshHealth(bool refillPotions)
         {
             if (Down) return;
-            Hp = MaxHp;
+            Hp = MaxHealth;
             if (refillPotions) Potions = MaxPotions + Shop.ItemHooks.ExtraPotions(this);
         }
 
         bool DrinkPotion()
         {
-            if (Down || Potions == 0 || Hp >= MaxHp || sincePotion < PotionLockout) return false;
+            if (Down || Potions == 0 || Hp >= MaxHealth || sincePotion < PotionLockout) return false;
             Potions--; PotionsDrunk++; sincePotion = 0;
             Heal(Shop.ItemHooks.PotionHeal(this, PotionHeal));
             World.BossFx.PotionHeal(transform);
@@ -155,13 +157,13 @@ namespace LastBell.Run
         public void Heal(int amount)
         {
             if (Down || amount <= 0) return;
-            int h = Mathf.Min(amount, MaxHp - Hp); if (h <= 0) return;
+            int h = Mathf.Min(amount, MaxHealth - Hp); if (h <= 0) return;
             Hp += h; RunHud.Float(transform.position + Vector3.up * 2.4f, "+" + h, new Color(0.55f, 1f, 0.75f));
         }
 
         // dev / test hook only
-        public void DebugSetHp(int hp) { Hp = Mathf.Clamp(hp, 1, MaxHp); }
-        public void DebugRevive() { if (!Down) return; Down = false; Hp = MaxHp; Stamina = MaxStamina; Presenter.ResetPose(); }
+        public void DebugSetHp(int hp) { Hp = Mathf.Clamp(hp, 1, MaxHealth); }
+        public void DebugRevive() { if (!Down) return; Down = false; Hp = MaxHealth; Stamina = MaxStaminaNow; Presenter.ResetPose(); }
 
         public void ReceiveHit(Hazard h)
         {
@@ -176,7 +178,7 @@ namespace LastBell.Run
             if (Hp == 0) { GoDown(); return; }
             if (!noKnock)
             {
-                stun = h.Stun; knockDir = h.PushDir(transform.position); knockDist = h.Knockback; knockTick = KnockTicks;
+                stun = h.Stun; knockDir = h.PushDir(transform.position); knockDist = h.Knockback * Shop.ItemHooks.F(this, "knockback", 1); knockTick = KnockTicks;
                 dashTick = 0; Kit.Interrupt();
                 Presenter.Hit();
             }
@@ -212,7 +214,7 @@ namespace LastBell.Run
             if (Down) { Presenter.Tick(this); return; }
             sinceSpend++; sincePotion++;
             if (inp.Potion && stun == 0) DrinkPotion();   // usable while moving or mid-action, not while stunned
-            if (sinceSpend > Sim.Ticks(Shop.ItemHooks.RegenDelay(this, RegenDelay))) Stamina = Mathf.Min(MaxStamina, Stamina + Regen * Sim.Dt);
+            if (sinceSpend > Sim.Ticks(Shop.ItemHooks.RegenDelay(this, RegenDelay))) Stamina = Mathf.Min(MaxStaminaNow, Stamina + Regen * Sim.Dt);
 
             var cam = Camera.main;
             Vector3 fwd = cam ? Sim.Flat(cam.transform.forward).normalized : Vector3.forward;
@@ -234,22 +236,23 @@ namespace LastBell.Run
             }
             else if (dashTick > 0)
             {
-                dashTick--; vel = dashDir * (DashDistance / DashTicks) * Sim.Hz;
-                if (dashTick == 0) dashLock = DashRecover;
+                dashTick--; vel = dashDir * (dashDist / DashTicks) * Sim.Hz;
+                if (dashTick == 0) { dashLock = DashRecover; Shop.ItemHooks.OnDashEnd(this); }
             }
             else
             {
                 if (dashLock > 0) dashLock--;
-                if (inp.Dash && dashLock == 0 && Stamina >= DashCost && Kit.CanDash())
+                float dashCost = Shop.ItemHooks.F(this, "dash.cost", DashCost);
+                if (inp.Dash && dashLock == 0 && Stamina >= dashCost && Kit.CanDash())
                 {
-                    Spend(DashCost);
+                    Spend(dashCost); dashDist = Shop.ItemHooks.F(this, "dash.distance", DashDistance);
                     dashDir = move.sqrMagnitude > 0.01f ? move.normalized : transform.forward;
                     transform.rotation = Quaternion.LookRotation(dashDir);
                     dashTick = DashTicks - 1;   // this activation tick is the first of the DashTicks steps (3 m over 12 ticks)
-                    Kit.OnDash();
+                    Kit.OnDash(); Shop.ItemHooks.OnDash(this);
                     Presenter.Dash();
                     World.Fx.DashTrail(this);
-                    vel = dashDir * (DashDistance / DashTicks) * Sim.Hz;
+                    vel = dashDir * (dashDist / DashTicks) * Sim.Hz;
                 }
                 else
                 {
@@ -261,7 +264,7 @@ namespace LastBell.Run
                     float scale = Kit.MoveScale;
                     sprinting = inp.Sprint && move.sqrMagnitude > 0.01f && scale >= 1 && Stamina > 0;
                     if (sprinting) Spend(Shop.ItemHooks.SprintCost(this, SprintCost) * Sim.Dt);
-                    vel = move * (sprinting ? SprintSpeed : WalkSpeed) * scale + Kit.Velocity;
+                    vel = move * (sprinting ? SprintSpeed : WalkSpeed) * scale * Shop.ItemHooks.F(this, "move.speed", 1) + Kit.Velocity;
                     if (Kit.FaceAim) Face(inp.Aim, TurnRate * 2);
                     else if (move.sqrMagnitude > 0.01f && scale > 0) transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(move), TurnRate * Sim.Dt);
                 }

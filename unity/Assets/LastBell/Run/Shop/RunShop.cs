@@ -8,23 +8,38 @@ namespace LastBell.Run.Shop
     // Lives for one run; the director's fresh run builds a new ShopRun, so nothing carries over between runs.
     public sealed class PlayerBuild
     {
-        public sealed class Owned { public ItemDef Def; public bool Tempered; public float Value => Tempered && Def.Tempered.HasValue ? Def.Tempered.Value : Def.Value; }
+        public sealed class Owned
+        {
+            public ItemDef Def; public bool Tempered;
+            public float Value => Tempered && Def.Tempered.HasValue ? Def.Tempered.Value : Def.Value;
+            public float Value2 => Tempered && Def.Tempered.HasValue ? Def.Tempered2 : Def.Value2;
+        }
+        // per-encounter item state (ItemHooks), rebuilt at every encounter start: class state resets (design rules §3)
+        public sealed class Live
+        {
+            public int Openings, ValourUntil = -1, RallyUntil = -1, LightFeetUntil = -1, VolleyBoostUntil = -1;
+            public float ValourPct, RallyPct, Overflow;
+            public bool MomentumReady, MomentumHit, GraceReady, BlinkReady, RhythmOn;
+            public int RhythmCombos, Notes, RingHits, StruckNotes;
+            public readonly List<int> Taps = new List<int>();
+        }
+        public Live L { get; private set; } = new Live();
 
         public readonly int Slot; public readonly string ClassName;
         public readonly bool TestSlot;            // autotest-only slot: wallet and build, no body (co-op checks before netcode)
         public int Chimes, Earned, ReceivedThisVisit, Keystones;
         public readonly List<Owned> Items = new List<Owned>();
         // this visit's stock: 6 cards (3 class, 2 general, 1 Rare-or-Keystone), null = sold or nothing left to offer
-        public readonly ItemDef[] Stock = new ItemDef[ShopRun.StockSize];
+        public readonly ItemDef[] Stock = new ItemDef[ShopRun.MaxStock];
+        public int StockCount => Has(ItemCatalog.FourthChoice) ? ShopRun.MaxStock : ShopRun.StockSize;   // Fourth Choice: +1 class card
         public int Locked = -1; public bool LockUsed; public int Rerolls; public bool Ready;
-        // hook state, cleared at every encounter start (class state resets before each encounter, design rules §3)
-        public int Openings, ValourUntil = -1; public float ValourPct;
 
         public PlayerBuild(int slot, string className, bool testSlot = false) { Slot = slot; ClassName = className; TestSlot = testSlot; }
         public Owned Get(string id) { foreach (var o in Items) if (o.Def.Id == id) return o; return null; }
         public bool Has(string id) => Get(id) != null;
         public float V(string id) => Get(id)?.Value ?? 0;
-        public void ResetEncounter() { Openings = 0; ValourUntil = -1; ValourPct = 0; }
+        public float V2(string id) => Get(id)?.Value2 ?? 0;
+        public void ResetEncounter() { L = new Live(); }
     }
 
     // The run's shop state and its host checks (spec §5.5): every change is a Try* request naming the requesting slot,
@@ -32,7 +47,7 @@ namespace LastBell.Run.Shop
     // client later sends the same requests and only the host runs them.
     public sealed class ShopRun
     {
-        public const int StockSize = 6, ClassSlots = 3, GeneralSlots = 2, SpecialSlot = 5;
+        public const int StockSize = 6, MaxStock = 7, ClassSlots = 3, GeneralSlots = 2, SpecialSlot = 5, ExtraClassSlot = 6;
         public const int AreaBossPay = 150, MinibossPay = 100, BonusPay = 20, GiftCapPerVisit = 150, CoopTimerSeconds = 90;
         // accepted by Chzy18 2026-10-28 (run-shop-plan §1): pay the area's 3 missing miniboss clears at its shop until minibosses join the run
         public static bool StandInMinibossPay = true;
@@ -47,6 +62,7 @@ namespace LastBell.Run.Shop
         public bool FinalShop { get; private set; }
         public string NextBoss { get; private set; }
         public int CrackUntil = -1; public float CrackPct; // Cracked Armour, boss-wide
+        public int BrandUntil = -1, BrandHits; public PlayerController BrandOwner;   // Glyph Brand, boss-wide
         public readonly List<string> Ledger = new List<string>();   // earnings since the last shop, shown on the screen
         public readonly List<string> Log = new List<string>();      // every accepted request (tests, playtest reports)
 
@@ -88,8 +104,11 @@ namespace LastBell.Run.Shop
         public bool AllReady => Slots.All(s => s.Ready);
 
         // ---------------- stock (spec §3) ----------------
-        bool Offerable(PlayerBuild s, ItemDef d) =>
-            !s.Has(d.Id) && Array.IndexOf(s.Stock, d) < 0 && (d.OfferedSolo || !Solo) &&
+        bool Offerable(PlayerBuild s, ItemDef d) => CanOffer(s, d) && Array.IndexOf(s.Stock, d) < 0;
+        // whether this item may ever be stocked for this player now (held, owned, solo value, partner class, own class)
+        public bool CanOffer(PlayerBuild s, ItemDef d) =>
+            !d.Held && !s.Has(d.Id) && (d.OfferedSolo || !Solo) &&
+            (d.PartnerClass == null || ClassInParty(d.PartnerClass)) &&
             (d.Class == null || d.Class == s.ClassName);
         bool KeystoneAllowed(PlayerBuild s) => Visit >= 2 && s.Keystones < ItemCatalog.KeystonesPerRun;
 
@@ -97,12 +116,12 @@ namespace LastBell.Run.Shop
         {
             // seeded from run seed + slot + visit + reroll count, so a seeded run gives everyone the same shops
             var rng = new Random(unchecked(Seed * 73856093 ^ (s.Slot + 1) * 19349663 ^ Visit * 83492791 ^ (s.Rerolls + 1) * 50331653));
-            for (int i = 0; i < StockSize; i++) if (!(keepLocked && i == s.Locked)) s.Stock[i] = null;
-            for (int i = 0; i < StockSize; i++)
+            for (int i = 0; i < MaxStock; i++) if (!(keepLocked && i == s.Locked)) s.Stock[i] = null;
+            for (int i = 0; i < s.StockCount; i++)
             {
                 if (keepLocked && i == s.Locked) continue;
                 IEnumerable<ItemDef> pool;
-                if (i < ClassSlots) pool = ItemCatalog.All.Where(d => d.Class == s.ClassName && d.Tier != ItemTier.Keystone);
+                if (i < ClassSlots || i == ExtraClassSlot) pool = ItemCatalog.All.Where(d => d.Class == s.ClassName && d.Tier != ItemTier.Keystone);
                 else if (i < ClassSlots + GeneralSlots) pool = ItemCatalog.All.Where(d => d.General && d.Tier != ItemTier.Keystone);
                 else pool = ItemCatalog.All.Where(d => d.Tier == ItemTier.Rare || (d.Tier == ItemTier.Keystone && KeystoneAllowed(s)));
                 var c = pool.Where(d => Offerable(s, d)).ToList();
@@ -122,7 +141,7 @@ namespace LastBell.Run.Shop
         public bool TryBuy(int slot, int card, out string why)
         {
             var s = Slot(slot); why = Check(s);
-            if (why == null && (card < 0 || card >= StockSize || s.Stock[card] == null)) why = "not in stock";
+            if (why == null && (card < 0 || card >= s.StockCount || s.Stock[card] == null)) why = "not in stock";
             var d = why == null ? s.Stock[card] : null;
             if (why == null && s.Has(d.Id)) why = "already owned";
             if (why == null && d.Tier == ItemTier.Keystone && s.Keystones >= ItemCatalog.KeystonesPerRun) why = "Keystone limit (2 per run)";
@@ -165,7 +184,7 @@ namespace LastBell.Run.Shop
         public bool TryLock(int slot, int card, out string why)
         {
             var s = Slot(slot); why = Check(s);
-            if (why == null && (card < 0 || card >= StockSize || s.Stock[card] == null)) why = "not in stock";
+            if (why == null && (card < 0 || card >= s.StockCount || s.Stock[card] == null)) why = "not in stock";
             if (why == null && s.LockUsed) why = "one lock per visit";
             if (why != null) return false;
             s.Locked = card; s.LockUsed = true;

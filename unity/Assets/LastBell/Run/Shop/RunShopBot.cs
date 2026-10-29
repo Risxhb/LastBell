@@ -14,7 +14,7 @@ namespace LastBell.Run.Shop
             if (me == null || !run.Open) return log;
             bool BuyBest()
             {
-                var order = Enumerable.Range(0, ShopRun.StockSize).Where(i => me.Stock[i] != null)
+                var order = Enumerable.Range(0, me.StockCount).Where(i => me.Stock[i] != null)
                     .OrderByDescending(i => (int)me.Stock[i].Tier).ThenBy(i => me.Stock[i].General ? 1 : 0).ToList();
                 foreach (int i in order)
                 {

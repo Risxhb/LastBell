@@ -756,7 +756,7 @@ namespace LastBell.Run
             float vw = UiTheme.VirtualWidth, pw = Mathf.Max(480, barW), x = vw / 2 - pw / 2, top = PanelTop;
             float y = top;
             // health: liquid pool (same animation as the boss bar), class name left and number right on the bar
-            float hf = Mathf.Clamp01((float)p.Hp / PlayerController.MaxHp);
+            float hf = Mathf.Clamp01((float)p.Hp / p.MaxHealth);
             var hb = S(x - 2, y - 2, pw + 4, 20);
             UiTheme.Fill(hb, A(UiTheme.InkDeep, 0.85f)); UiTheme.Border(hb, A(UiTheme.GoldDim, 0.8f), Px);
             F(x, y, pw, 16, UiTheme.BarBack);
@@ -764,7 +764,7 @@ namespace LastBell.Run
             T(x + 8, y - 4, pw * 0.5f, 24, p.ClassName, keyStL, UiTheme.IvoryBody);
             y += 22;
             // stamina: thin bar; its number only appears while it is spent
-            float st = Mathf.Clamp01(p.Stamina / PlayerController.MaxStamina);
+            float st = Mathf.Clamp01(p.Stamina / p.MaxStaminaNow);
             F(x, y, pw, 5, A(UiTheme.BarBack, 0.9f));
             F(x, y, pw * st, 5, UiTheme.Stamina);
             if (st < 0.999f) T(x, y + 4, pw, 16, Mathf.RoundToInt(p.Stamina).ToString(), microR, UiTheme.IvoryMuted);

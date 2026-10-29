@@ -84,6 +84,7 @@ namespace LastBell.Run
             if (Boss != null && !Boss.Dead) Boss.Step();
             Projectiles.Step();
             Hazards.Step();
+            Shop.ItemHooks.Step(this);   // timed item hits (Pendulum Cut, Iron Echo, Toll of Steel)
         }
 
         // Clears everything an encounter can leave behind: hazards, projectiles, boss-owned effects. Called at every
@@ -149,6 +150,7 @@ namespace LastBell.Run
         {
             DamageTaken += dmg; LastDamageSource = h.Source;
             TakenLog.Add((Tick, h.Source, dmg, p.Hp));
+            Shop.ItemHooks.OnPlayerHit(p);   // Rhythm Keeper resets
             PlayerHit?.Invoke(p, h, dmg);
         }
 

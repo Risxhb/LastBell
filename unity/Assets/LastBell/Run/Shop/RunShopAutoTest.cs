@@ -25,15 +25,15 @@ namespace LastBell.Run.Shop
 
         sealed class Bot : IInputSource
         {
-            public Vector3 Aim; public bool[] press = new bool[5], hold = new bool[5]; public bool potion;
+            public Vector3 Aim; public bool[] press = new bool[5], hold = new bool[5]; public bool potion, dash;
             public PlayerInput Read(PlayerController who)
             {
-                var r = new PlayerInput { Aim = Aim, Potion = potion, P0 = press[0], P1 = press[1], P2 = press[2], P3 = press[3], P4 = press[4],
+                var r = new PlayerInput { Aim = Aim, Potion = potion, Dash = dash, P0 = press[0], P1 = press[1], P2 = press[2], P3 = press[3], P4 = press[4],
                     H0 = hold[0] || press[0], H1 = hold[1] || press[1], H2 = hold[2], H3 = hold[3], H4 = hold[4] };
-                for (int i = 0; i < 5; i++) press[i] = false; potion = false;
+                for (int i = 0; i < 5; i++) press[i] = false; potion = false; dash = false;
                 return r;
             }
-            public void Clear() { for (int i = 0; i < 5; i++) press[i] = hold[i] = false; potion = false; }
+            public void Clear() { for (int i = 0; i < 5; i++) press[i] = hold[i] = false; potion = false; dash = false; }
         }
 
         RunDirector d; readonly Bot bot = new Bot();
@@ -91,7 +91,10 @@ namespace LastBell.Run.Shop
             yield return Until(() => RunDirector.Instance && RunDirector.Instance.State == RunState.Menu, 30, "menu");
             d = RunDirector.Instance; d.InputOverride = bot;
             Check("shop is on for this suite", RunShopFlow.Enabled);
-            Check("all 15 item icons load (64 and 128)", ItemCatalog.All.All(i => RunShopFlow.ItemIcon(i, true) != null && RunShopFlow.ItemIcon(i, false) != null));
+            var slice = new[] { ItemCatalog.TemperedEdge, ItemCatalog.Countdown, ItemCatalog.CrackedArmour, ItemCatalog.Oathbound, ItemCatalog.HeavyBell, ItemCatalog.SwiftChorus, ItemCatalog.ChorusOfValour,
+                ItemCatalog.UnboundCast, ItemCatalog.LongSurge, ItemCatalog.PerpetualBeam, ItemCatalog.StrongBrew, ItemCatalog.Sprinter, ItemCatalog.DeepBreath, ItemCatalog.LoneBell, ItemCatalog.SpareFlask };
+            Check("the 15 slice item icons load (64 and 128)", slice.All(id => RunShopFlow.ItemIcon(ItemCatalog.Get(id), true) != null && RunShopFlow.ItemIcon(ItemCatalog.Get(id), false) != null));
+            Check("the pool has 70 items: 20 per class and 10 general; 2 held", ItemCatalog.All.Length == 70 && ItemCatalog.All.Count(i => i.General) == 10 && RunDirector.Classes.All(c => ItemCatalog.All.Count(i => i.Class == c) == 20) && ItemCatalog.All.Count(i => i.Held) == 2);
             Check("Chimes coin and burst icons load", RunShopFlow.Coin != null && RunShopFlow.Burst != null && RunHud.Icon("chimes-128") != null && RunHud.Icon("chimes-burst-32") != null);
             RunShopFlow.SeedOverride = RunShopFlow.SeedOverride ?? 1234;
             RunShopFlow.BotBuys = false;
@@ -142,6 +145,9 @@ namespace LastBell.Run.Shop
             Check("boss 1 starts after the shop", d.State == RunState.Combat && d.Encounter == order[0] && !Run.Open);
             Check("the build carries into the fight", d.Player.Build != null && d.Player.Build.Has(bought.Id));
             yield return VanguardHooks();
+            var keepItems = Me.Items.ToList(); Run.CrackUntil = -1;
+            yield return VanguardPool();
+            Me.Items.Clear(); Me.Items.AddRange(keepItems); Me.ResetEncounter();
 
             // clear boss 1 -> Chimes -> shop 2
             int before = Me.Chimes;
@@ -187,6 +193,12 @@ namespace LastBell.Run.Shop
             Check("one screen: 8 players and a long build fit 1080p with no scrolling", panel.yMin >= 0 && panel.yMax <= 1080 && panel.xMin >= 0 && panel.xMax <= UiTheme.VirtualWidth && Me.Items.Count >= 9, $"{panel}");
             Run.Slots.RemoveAll(s => s.TestSlot); Me.Items.RemoveAll(o => extra.Contains(o.Def.Id));
             yield return null; yield return Shot("final_solo");
+            // Fourth Choice (test setup: owned): the next roll has 7 cards, the 7th a class card, still on one screen
+            Grant(Me, ItemCatalog.FourthChoice); Run.TryReroll(0, out _);
+            Check("Fourth Choice: 7 cards, the 7th a class card", Me.StockCount == 7 && Me.Stock[6] != null && Me.Stock[6].Class == "Vanguard", Me.Stock[6]?.Name ?? "none");
+            yield return null; yield return Shot("seven_cards");
+            Check("seven cards still fit one screen", RunShopFlow.Instance.LastPanel.yMax <= 1080 && RunShopFlow.Instance.LastPanel.xMax <= UiTheme.VirtualWidth);
+            Me.Items.RemoveAll(o => o.Def.Id == ItemCatalog.FourthChoice);
             int items = Me.Items.Count;
             RunShopFlow.Instance.Leave();
             yield return Until(() => d.State == RunState.Combat, 6, "Bellkeeper");
@@ -199,8 +211,8 @@ namespace LastBell.Run.Shop
             d.SetPaused(true); d.ReturnToMenu(); yield return null;
 
             // ---------------- Chimesinger and Arcanist hooks ----------------
-            yield return ClassRun("Chimesinger", ChimesingerHooks());
-            yield return ClassRun("Arcanist", ArcanistHooks());
+            yield return ClassRun("Chimesinger", Seq(ChimesingerHooks(), ChimesingerPool()));
+            yield return ClassRun("Arcanist", Seq(ArcanistHooks(), ArcanistPool(), Act(GeneralPool)));
 
             // ---------------- the shop bot ----------------
             RunShopFlow.BotBuys = true;
@@ -329,7 +341,7 @@ namespace LastBell.Run.Shop
             bot.press[4] = true;
             yield return Until(() => ck.Cooldown01(4) > 0, 2, "Mending Chorus");
             Check("Swift Chorus: Mending Chorus cooldown 15 s -> 12.75 s through the kit", ck.Cooldown01(4) > 0.83f && ck.Cooldown01(4) <= 0.851f, $"{ck.Cooldown01(4):0.000} of 15 s");
-            Check("Chorus of Valour solo: the caster gets +12% for 4 s", Me.ValourUntil > d.World.Tick && ItemHooks.Outgoing(d.World, 50, "ResonantNote") == 56, $"until {Me.ValourUntil}, now {d.World.Tick}");
+            Check("Chorus of Valour solo: the caster gets +12% for 4 s", Me.L.ValourUntil > d.World.Tick && ItemHooks.Outgoing(d.World, 50, "ResonantNote") == 56, $"until {Me.L.ValourUntil}, now {d.World.Tick}");
             Grant(Me, ItemCatalog.LoneBell);
             Check("Lone Bell solo: +15% stacks additively with Valour", ItemHooks.Outgoing(d.World, 100, "ResonantNote") == 127);
         }
@@ -354,6 +366,158 @@ namespace LastBell.Run.Shop
             Check("Unbound Cast and Perpetual Beam: the larger share wins", (Grant2(Me, ItemCatalog.UnboundCast) && ItemHooks.Outgoing(d.World, 35, "Arcane Comet (no glyph)") == 70));
         }
         static bool Grant2(PlayerBuild b, string id) { Grant(b, id); return true; }
+        static IEnumerator Seq(params IEnumerator[] parts) { foreach (var p in parts) yield return p; }
+        static IEnumerator Act(Action a) { a(); yield break; }
+
+        // ================= full pool (55 items accepted 2026-10-28) =================
+        // Every item's hook is checked with the item granted (test setup) on the real player; effects a key press can
+        // show are also checked through the kit. Each class then fights 6 s holding its whole pool at once (smoke).
+        bool Close(float a, float b, float eps = 0.02f) => Mathf.Abs(a - b) <= eps;
+        void Only(params string[] ids) { Me.Items.Clear(); Me.ResetEncounter(); foreach (var id in ids) Grant(Me, id); }
+        IEnumerator Ready() { bot.Clear(); P.Kit.ResetAll(); yield return Until(() => P.Stunned == 0 && !P.Dashing, 3, "player free"); }
+        void NearBoss(float dist = 2.6f)   // test setup: stand beside the boss, facing it
+        {
+            var b = d.Boss.transform.position; var at = b + new Vector3(0, 0, d.Boss.BodyRadius + dist);
+            P.transform.position = at; P.FaceNow(b); bot.Aim = b;
+        }
+        bool MeterHas(string ability) => d.World.RunMeter.ContainsKey(ability);
+        IEnumerator Hold(int slot, float seconds) { float t = 0; bot.hold[slot] = true; while (t < seconds) { bot.Aim = d.Boss.transform.position; KeepAlive(); t += Time.deltaTime; yield return null; } bot.hold[slot] = false; }
+        IEnumerator Press(int slot, float after) { bot.Aim = d.Boss.transform.position; bot.press[slot] = true; yield return Wait(after); }
+        IEnumerator Smoke(string cls, Func<int, int> rotation)
+        {
+            Me.Items.Clear(); Me.ResetEncounter();
+            foreach (var it in ItemCatalog.All.Where(x => (x.Class == cls || x.General) && !x.Held && x.OfferedSolo)) Grant(Me, it.Id, tempered: it.Tempered.HasValue);
+            Note($"test setup: {cls} holds {Me.Items.Count} items, all tempered where they can be");
+            yield return Ready(); NearBoss(cls == "Vanguard" ? 2.4f : 7f);
+            int hp0 = d.Boss.Hp, err0 = errors; float t = 0; int frame = 0;
+            while (t < 6f && d.State == RunState.Combat)
+            {
+                KeepAlive(); bot.Aim = d.Boss.transform.position;
+                int s = rotation(frame++); if (s >= 0 && s < 5) { bot.press[s] = true; bot.hold[s] = true; } else if (s == 9) bot.dash = true;
+                if (frame % 4 == 0) for (int i = 1; i < 5; i++) bot.hold[i] = false;
+                t += Time.deltaTime; yield return null;
+            }
+            bot.Clear();
+            Check($"{cls} with the whole pool: fights 6 s with no errors and damages the boss", errors == err0 && d.Boss.Hp < hp0, $"{hp0} -> {d.Boss.Hp}, errors +{errors - err0}");
+            Me.Items.Clear(); Me.ResetEncounter();
+        }
+
+        IEnumerator VanguardPool()
+        {
+            var vk = (VanguardKit2)P.Kit; d.Boss.Halt(); d.World.ClearTransient();
+            Only(ItemCatalog.QuickHands); Check("Quick Hands: combo window +0.3 s", ItemHooks.I(P, "v.combo.window", 36) == 54);
+            Only(ItemCatalog.WideArc); Check("Wide Arc: hit 3 arc +30%", Close(ItemHooks.F(P, "v.hit3.arc", 170), 221));
+            Only(ItemCatalog.LongReach); Check("Long Reach: Sundering Blow +1.5 m", Close(ItemHooks.F(P, "v.sunder.reach", 3.3f), 4.8f));
+            Only(ItemCatalog.Grit); Check("Grit: max HP 108 (Grit+ 112, under the +20% cap)", P.MaxHealth == 108 && Tempered(ItemCatalog.Grit, () => P.MaxHealth == 112));
+            Only(ItemCatalog.SteadyStance); Check("Steady Stance: Brace slow halved (0.35 -> 0.675 speed)", Close(ItemHooks.F(P, "v.brace.move", 0.35f), 0.675f));
+            Only(ItemCatalog.DoubleOpening); Check("Double Opening: Opening stacks to 2", ItemHooks.I(P, "v.opening.stacks", 1) == 2);
+            Only(ItemCatalog.HeavyHour); Check("Heavy Hour: windup 0.8 -> 1.1 s, +45%, wider fan", ItemHooks.I(P, "v.ult.windup", 48) == 66 && Close(ItemHooks.F(P, "v.ult.fan", 2.2f), 3.08f) && ItemHooks.Outgoing(d.World, 100, "LastWord") == 145);
+            Only(ItemCatalog.QuickVerdict); Check("Quick Verdict: windup 0.5 s, -20%", ItemHooks.I(P, "v.ult.windup", 48) == 30 && ItemHooks.Outgoing(d.World, 100, "LastWord") == 80);
+            Only(ItemCatalog.Momentum); ItemHooks.OnDash(P);
+            Check("Momentum: a dash makes the next basic hit 3, once", ItemHooks.TakeMomentum(P) && !ItemHooks.TakeMomentum(P));
+            Only(ItemCatalog.RhythmKeeper); for (int i = 0; i < 3; i++) ItemHooks.Dealt(d.World, "SteelRhythm3", 10);
+            bool on = ItemHooks.Outgoing(d.World, 100, "SteelRhythm1") == 110; ItemHooks.OnPlayerHit(P);
+            Check("Rhythm Keeper: 3 full combos give +10% until hit", on && ItemHooks.Outgoing(d.World, 100, "SteelRhythm1") == 100);
+            Only(ItemCatalog.Rally); ItemHooks.Dealt(d.World, "LastWord", 10);
+            Check("Rally solo: a Last Word hit gives you +10% for 4 s", ItemHooks.Outgoing(d.World, 100, "SteelRhythm1") == 110);
+            Check("Second Step is held out of the shop (no dash cooldown to beat)", ItemCatalog.Get(ItemCatalog.SecondStep).Held && !Run.CanOffer(Me, ItemCatalog.Get(ItemCatalog.SecondStep)));
+            // Clockwork Step through a real dash
+            Only(ItemCatalog.ClockworkStep); yield return Ready();
+            P.transform.position = new Vector3(-4, 0, 6.5f); P.transform.rotation = Quaternion.Euler(0, 90, 0);
+            var p0 = P.transform.position; bot.dash = true; yield return Wait(0.5f);
+            Check("Clockwork Step: a real dash travels 3.6 m", Close(Sim.Flat(P.transform.position - p0).magnitude, 3.6f, 0.15f), $"{Sim.Flat(P.transform.position - p0).magnitude:0.00} m");
+            // Toll of Steel, Pendulum Cut and Iron Echo through the kit, next to the boss
+            Only(ItemCatalog.TollOfSteel, ItemCatalog.PendulumCut, ItemCatalog.IronEcho); yield return Ready(); NearBoss();
+            yield return Hold(0, 2.5f); bot.Clear(); yield return Wait(0.6f);
+            Check("Toll of Steel: Steel Rhythm reaches hit 4 and sends its fan", MeterHas("SteelRhythm4") && MeterHas("SteelRhythm4 fan"), string.Join(",", d.World.RunMeter.Keys));
+            NearBoss(); yield return Press(1, 1.8f);
+            Check("Pendulum Cut: Sundering Blow keeps cutting", MeterHas("Pendulum Cut"));
+            NearBoss(); yield return Press(2, 2.4f);
+            Check("Iron Echo: Last Word's fan repeats", MeterHas("LastWordWave (echo)"), string.Join(",", d.World.RunMeter.Keys));
+            d.Boss.BeginCombat();
+            yield return Smoke("Vanguard", f => f % 40 == 0 ? 1 : f % 97 == 0 ? 2 : f % 61 == 0 ? 9 : f % 151 == 0 ? 3 : 0);
+        }
+
+        IEnumerator ChimesingerPool()
+        {
+            var ck = (ChimesingerKit)P.Kit; d.Boss.Halt(); d.World.ClearTransient();
+            Only(ItemCatalog.BrightNote); Check("Bright Note: +10% damage, +15% speed", ItemHooks.Outgoing(d.World, 100, "ResonantNote") == 110 && Close(ItemHooks.F(P, "c.note.speed", 22), 25.3f));
+            Only(ItemCatalog.WideRefrain, ItemCatalog.LongRefrain); Check("Wide / Long Refrain: angle +25%, range +2 m", Close(ItemHooks.F(P, "c.refrain.half", 32), 40) && Close(ItemHooks.F(P, "c.refrain.range", 7.5f), 9.5f));
+            Only(ItemCatalog.WideChorus); Check("Wide Chorus: radius +30%", Close(ItemHooks.F(P, "c.chorus.radius", 6), 7.8f));
+            Only(ItemCatalog.LightStep); Check("Light Step: dash costs 24", Close(ItemHooks.F(P, "dash.cost", 30), 24));
+            Only(ItemCatalog.GraceNote); ItemHooks.OnDash(P);
+            Check("Grace Note: the next note after a dash deals double, once", ItemHooks.Note(P, Vector3.forward, 16, 22) == 32 && ItemHooks.Note(P, Vector3.forward, 16, 22) == 16);
+            Only(ItemCatalog.Chord); int n0 = d.World.Projectiles.Count; for (int i = 0; i < 4; i++) ItemHooks.Note(P, Vector3.forward, 16, 22);
+            Check("Chord: the 4th note adds 2 side notes", d.World.Projectiles.Count == n0 + 2, $"+{d.World.Projectiles.Count - n0}");
+            Only(ItemCatalog.ThirdEcho); Check("Third Echo: echo cap 3", ItemHooks.I(P, "c.echo.cap", 2) == 3);
+            Only(ItemCatalog.GreatBell); Check("Great Bell: echo cap 4, Crescendo cooldown +30%", ItemHooks.I(P, "c.echo.cap", 2) == 4 && ItemHooks.I(P, "c.cresc.cd", 300) == 390);
+            Only(ItemCatalog.Fortissimo); Check("Fortissimo: +12% per echo", ItemHooks.Crescendo(P, 100, 2) == 124);
+            Only(ItemCatalog.Overflow); P.DebugSetHp(P.MaxHealth); ItemHooks.ChorusTouched(P, P, 30);
+            Check("Overflow: 30 overheal at full HP stores +15% for the next Crescendo, once", ItemHooks.Crescendo(P, 100, 0) == 115 && ItemHooks.Crescendo(P, 100, 0) == 100);
+            Only(ItemCatalog.ChoirLeader); Check("Choir Leader: heal -25%, detonation at 50%", ItemHooks.I(P, "c.chorus.heal", 30) == 22 && Close(ItemHooks.F(P, "c.choir", 0), 0.5f));
+            Only(ItemCatalog.NoteTrail); n0 = d.World.Projectiles.Count; ItemHooks.OnDashEnd(P);
+            Check("Note Trail: a dash ends with 3 notes", d.World.Projectiles.Count == n0 + 3);
+            Check("Twin Bells is held out of the shop (no spawned parts to ring)", !Run.CanOffer(Me, ItemCatalog.Get(ItemCatalog.TwinBells)));
+            // ring the bell for real, then the ringing items
+            Only(ItemCatalog.SharedRinging, ItemCatalog.StruckTogether, ItemCatalog.Encore); yield return Ready();
+            P.transform.position = new Vector3(0, 0, 6.5f); yield return Press(1, 0.6f);
+            Check("Bellstrike rings the bell", ck.Bell);
+            int e0 = ck.Echoes; for (int i = 0; i < 5; i++) ItemHooks.Dealt(d.World, "ResonantNote", 5);
+            Check("Shared Ringing solo: every 5th own note adds an echo", ck.Echoes == e0 + 1, $"{e0} -> {ck.Echoes}");
+            ItemHooks.Dealt(d.World, "ResonantNote", 5);
+            Check("Struck Together solo: every 6th note rings the bell for 30% of Bellstrike", MeterHas("Bellstrike (struck together)"));
+            yield return Press(3, 0.8f);
+            Check("Encore: Crescendo leaves the bell ringing with 1 echo", ck.Bell && ck.Echoes == 1, $"bell {ck.Bell}, echoes {ck.Echoes}");
+            d.Boss.BeginCombat();
+            yield return Smoke("Chimesinger", f => f % 50 == 0 ? 1 : f % 70 == 0 ? 2 : f % 113 == 0 ? 3 : f % 200 == 0 ? 4 : f % 83 == 0 ? 9 : 0);
+        }
+
+        IEnumerator ArcanistPool()
+        {
+            var ak = (ArcanistKit)P.Kit; d.Boss.Halt(); d.World.ClearTransient();
+            Only(ItemCatalog.QuickCarving, ItemCatalog.WideBeam, ItemCatalog.SteadyHand);
+            Check("Quick Carving / Wide Beam / Steady Hand: steps 40 -> 33 ticks, width +30%, turn +25%", ItemHooks.I(P, "a.dis.step", 40) == 33 && Close(ItemHooks.F(P, "a.dis.width", 0.7f), 0.91f) && Close(ItemHooks.F(P, "a.dis.turn", 1.5f), 1.875f));
+            Only(ItemCatalog.WideSigil, ItemCatalog.FarBlink); Check("Wide Sigil / Far Blink: radius +25%, Blink +0.6 m", Close(ItemHooks.F(P, "a.sigil.radius", 2.5f), 3.125f) && Close(ItemHooks.F(P, "dash.distance", 3), 3.6f));
+            Only(ItemCatalog.GlassEdge); Check("Glass Edge: +12% damage, max HP 92", ItemHooks.Outgoing(d.World, 100, "Magic Missile") == 112 && P.MaxHealth == 92);
+            Only(ItemCatalog.FourthGlyph); Check("Fourth Glyph: glyph cap 4", ItemHooks.GlyphCap(P, 3) == 4);
+            Only(ItemCatalog.FourthGlyph, ItemCatalog.PerpetualBeam); Check("Perpetual Beam still caps at 2 with Fourth Glyph", ItemHooks.GlyphCap(P, 3) == 2);
+            Only(ItemCatalog.HastyComet); Check("Hasty Comet: 3 -> 2.2 s, -15%", ItemHooks.I(P, "a.comet.fall", 180) == 132 && ItemHooks.Outgoing(d.World, 100, "Arcane Comet") == 85);
+            Only(ItemCatalog.GreatComet); Check("Great Comet: 3 -> 3.8 s, +40%, larger", ItemHooks.I(P, "a.comet.fall", 180) == 228 && ItemHooks.Outgoing(d.World, 100, "Arcane Comet") == 140 && Close(ItemHooks.F(P, "a.comet.radius", 4), 5));
+            Only(ItemCatalog.SurgeEcho); Check("Surge Echo: 1 glyph back", ItemHooks.I(P, "a.surge_end_glyphs", 0) == 1);
+            Only(ItemCatalog.MissileVolley); bool t1 = ItemHooks.Tap(P), t2 = ItemHooks.Tap(P), t3 = ItemHooks.Tap(P);
+            Check("Missile Volley: the 3rd quick tap earns a free missile", !t1 && !t2 && t3);
+            Only(ItemCatalog.GlyphBrand); ak.DebugSetGlyphs(0); ItemHooks.Dealt(d.World, "Arcane Comet", 10);
+            for (int i = 0; i < 8; i++) ItemHooks.Dealt(d.World, "Magic Missile", 1);
+            Check("Glyph Brand solo: a branded boss gives a glyph per 8 missiles", ak.Glyphs == 1, $"{ak.Glyphs}");
+            var rune = ItemCatalog.Get(ItemCatalog.ResonantRune); var duo = new ShopRun(9, 4); duo.Add("Arcanist"); duo.Add("Chimesinger", testSlot: true); duo.OpenVisit("x", false, true);
+            Check("Resonant Rune: offered only with a Chimesinger in the party, never solo", !Run.CanOffer(Me, rune) && duo.CanOffer(duo.Slot(0), rune));
+            // through the kit
+            Only(ItemCatalog.Starfall); yield return Ready(); P.transform.position = new Vector3(0, 0, 6.5f);
+            yield return Press(3, 0.6f);
+            Check("Starfall: a Comet lands as 3 marks", ak.Comets.Count == 3, $"{ak.Comets.Count}");
+            Only(ItemCatalog.TwinSigil); yield return Ready(); ak.DebugSetGlyphs(1);
+            yield return Press(2, 0.5f);
+            Check("Twin Sigil: a powered Sigil places 2", ak.Sigils.Count == 2, $"{ak.Sigils.Count}");
+            Only(ItemCatalog.SplitMissile); yield return Ready();
+            bool four = false; float t = 0; bot.hold[0] = true; bot.press[0] = true;
+            while (t < 1.4f) { four |= ak.Charging && ak.Missiles == 4; t += Time.deltaTime; yield return null; }
+            bot.Clear(); yield return Wait(0.5f);
+            Check("Split Missile: a full charge summons and fires 4", four && ak.LastVolley == 4, $"last volley {ak.LastVolley}");
+            d.Boss.BeginCombat();
+            yield return Smoke("Arcanist", f => f % 140 == 0 ? 1 : f % 90 == 0 ? 2 : f % 170 == 0 ? 3 : f % 230 == 0 ? 4 : f % 77 == 0 ? 9 : 0);
+        }
+
+        void GeneralPool()
+        {
+            Only(ItemCatalog.LongLungs); Check("Long Lungs: +15 max stamina", Close(P.MaxStaminaNow, 115));
+            Only(ItemCatalog.SureFooting); Check("Sure Footing: knockback -30%, no Temper", Close(ItemHooks.F(P, "knockback", 1), 0.7f) && !ItemCatalog.Get(ItemCatalog.SureFooting).Tempered.HasValue);
+            Only(ItemCatalog.Formation); Check("Formation solo: a flat +6%", ItemHooks.Outgoing(d.World, 100, "Magic Missile") == 106);
+            Only(ItemCatalog.LightFeet); ItemHooks.OnDashEnd(P); Check("Light Feet: +10% move speed after a dash", Close(ItemHooks.F(P, "move.speed", 1), 1.1f));
+            Me.Items.Clear(); Me.ResetEncounter();
+        }
+        bool Tempered(string id, Func<bool> check) { var o = Me.Get(id); o.Tempered = true; bool ok = check(); o.Tempered = false; return ok; }
+
+
 
         void Finish()
         {

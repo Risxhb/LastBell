@@ -61,7 +61,9 @@ namespace LastBell.Run.Shop
                     {
                         Run.Close();
                         foreach (var b in Run.Slots) b.ResetEncounter();
-                        Run.CrackUntil = -1;
+                        Run.CrackUntil = -1; Run.BrandUntil = -1; Run.BrandOwner = null;
+                        ItemHooks.ClearEffects();
+                        d.Player.RefreshHealth(refillPotions: false);   // the shop's refill, now at the bought max HP (Grit, Glass Edge)
                     }
                     break;
                 case RunState.Cleared:
@@ -202,8 +204,8 @@ namespace LastBell.Run.Shop
             y += HeadH;
 
             // six cards
-            float cw = (iw - 5 * CardGap) / 6;
-            for (int i = 0; i < ShopRun.StockSize; i++) Card(me, i, x + i * (cw + CardGap), y, cw, CardH);
+            int cards = me.StockCount; float cw = (iw - (cards - 1) * CardGap) / cards;   // 6 cards, 7 with Fourth Choice
+            for (int i = 0; i < cards; i++) Card(me, i, x + i * (cw + CardGap), y, cw, CardH);
             y += CardH + 20;
 
             // owned items with Temper (fixed-width chips, wrapping in rows)
@@ -272,7 +274,7 @@ namespace LastBell.Run.Shop
             bool locked = me.Locked == i;
             UiTheme.Frame(R(x, y, w, h), locked ? UiTheme.FocusFill : UiTheme.Ink, i == ShopRun.SpecialSlot, false);
             float px = x + 14, pw = w - 28, cy = y + 14;
-            string slotName = i < ShopRun.ClassSlots ? me.ClassName : i < ShopRun.ClassSlots + ShopRun.GeneralSlots ? "General" : "Rare or Keystone";
+            string slotName = i < ShopRun.ClassSlots || i == ShopRun.ExtraClassSlot ? me.ClassName : i < ShopRun.ClassSlots + ShopRun.GeneralSlots ? "General" : "Rare or Keystone";
             if (def == null)
             {
                 UiTheme.Label(R(px, cy, pw, 18), UiTheme.Spaced(slotName), UiTheme.Style(12, true, TextAnchor.UpperLeft, UiTheme.IvoryMicro));
