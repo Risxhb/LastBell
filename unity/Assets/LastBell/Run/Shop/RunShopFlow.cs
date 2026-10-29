@@ -168,6 +168,11 @@ namespace LastBell.Run.Shop
             GUI.enabled = keep; return hit;
         }
 
+        // One screen, no scrolling or paging (Chzy18, 29 Oct): the panel height follows the content, worst case a full
+        // 8-player party (7 allies) and a long build, which still fits 1080 virtual px.
+        const float Pad = 24, HeadH = 102, CardH = 350, CardGap = 14, ChipW = 300, ChipH = 36, ChipGap = 8, AllyW = 368, AllyH = 64, FootH = 48;
+        static int Rows(int n, int perRow) => n <= 0 ? 1 : (n + perRow - 1) / perRow;
+
         void OnGUI()
         {
             ClearPopup();
@@ -175,69 +180,75 @@ namespace LastBell.Run.Shop
             GUI.depth = -1;   // above the run HUD
             Styles();
             var me = Run.Slot(0);
-            float vw = UiTheme.VirtualWidth, W = Mathf.Min(1560, vw - 64), x0 = (vw - W) / 2, y0 = 96, pad = 24;
             bool coop = !Run.Solo;
-            float H = 760 + (coop ? 120 : 0);
+            var allies = Run.Slots.Where(s => s != me).ToList();
+            float vw = UiTheme.VirtualWidth, W = Mathf.Min(1560, vw - 64), iw = W - 2 * Pad;
+            int chipsPerRow = Mathf.Max(1, (int)((iw + ChipGap) / (ChipW + ChipGap))), alliesPerRow = Mathf.Max(1, (int)((iw + 12) / (AllyW + 12)));
+            float buildH = 26 + Rows(me.Items.Count, chipsPerRow) * (ChipH + ChipGap) + 12;
+            float allyH = coop ? 26 + Rows(allies.Count, alliesPerRow) * (AllyH + 10) + 8 : 0;
+            float H = Pad + HeadH + CardH + 20 + buildH + allyH + FootH + Pad;
+            float x0 = (vw - W) / 2, y0 = Mathf.Max(16, (1080 - H) / 2);
             UiTheme.Frame(R(x0, y0, W, H), UiTheme.InkDeep);
-            float x = x0 + pad, y = y0 + pad, iw = W - 2 * pad;
+            float x = x0 + Pad, y = y0 + Pad;
 
-            // header: visit, next boss, wallet
+            // header: visit, next boss, wallet, this visit's earnings
             UiTheme.Label(R(x, y, iw, 20), UiTheme.Spaced(d.Mode == RunMode.Practice ? "Practice shop" : Run.FinalShop ? "Final shop" : $"Shop {Run.Visit} of {Run.TotalVisits}"), eyebrow);
-            UiTheme.Label(R(x, y + 22, iw - 320, 40), "INTERMISSION  ·  next: " + Run.NextBoss, title);
+            UiTheme.Label(R(x, y + 22, iw - 340, 40), "INTERMISSION  ·  next: " + Run.NextBoss, title);
             string wallet = $"{me.Chimes}  CHIMES"; float tw = chimes.CalcSize(new GUIContent(wallet)).x / UiTheme.Scale;
             UiTheme.Label(R(x + iw - 320, y + 8, 320, 40), wallet, chimes);
             if (Coin) GUI.DrawTexture(R(x + iw - tw - 50, y + 8, 40, 40), Coin, ScaleMode.ScaleToFit, true);
-            UiTheme.Label(R(x + iw - 320, y + 46, 320, 18), $"Keystones {me.Keystones}/{ItemCatalog.KeystonesPerRun}  ·  earned this run {me.Earned}", UiTheme.Style(13, false, TextAnchor.MiddleRight, UiTheme.IvoryMicro));
-            y += 72;
-            if (Run.Ledger.Count > 0) { UiTheme.Label(R(x, y, iw, 20), string.Join("     ", Run.Ledger), small); }
-            y += 30;
+            UiTheme.Label(R(x + iw - 340, y + 46, 340, 18), $"Keystones {me.Keystones}/{ItemCatalog.KeystonesPerRun}  ·  earned this run {me.Earned}", UiTheme.Style(13, false, TextAnchor.MiddleRight, UiTheme.IvoryMicro));
+            if (Run.Ledger.Count > 0) UiTheme.Label(R(x, y + 72, iw, 20), string.Join("     ", Run.Ledger), small);
+            y += HeadH;
 
             // six cards
-            const float gap = 14; float cw = (iw - 5 * gap) / 6, ch = 350;
-            for (int i = 0; i < ShopRun.StockSize; i++) Card(me, i, x + i * (cw + gap), y, cw, ch);
-            y += ch + 20;
+            float cw = (iw - 5 * CardGap) / 6;
+            for (int i = 0; i < ShopRun.StockSize; i++) Card(me, i, x + i * (cw + CardGap), y, cw, CardH);
+            y += CardH + 20;
 
-            // owned items with Temper
-            UiTheme.Label(R(x, y, iw, 20), UiTheme.Spaced("Your build") + (me.Items.Count == 0 ? "      nothing yet" : ""), eyebrow);
-            y += 26;
-            float ox = x;
+            // owned items with Temper (fixed-width chips, wrapping in rows)
+            UiTheme.Label(R(x, y, iw, 20), UiTheme.Spaced("Your build") + (me.Items.Count == 0 ? "      nothing yet" : $"      {me.Items.Count} items"), eyebrow);
+            float cy = y + 26; int k = 0;
             foreach (var o in me.Items.ToArray())
             {
-                string label = o.Def.Name + (o.Tempered ? " +" : "");
-                float w = Mathf.Max(150, body.CalcSize(new GUIContent(label)).x / UiTheme.Scale + 24);
-                if (ox + w + 130 > x + iw) { ox = x; y += 44; }
-                UiTheme.Frame(R(ox, y, w, 36), UiTheme.Ink, false, false);
-                UiTheme.Label(R(ox + 12, y + 8, w - 16, 22), label, UiTheme.Style(15, true, TextAnchor.UpperLeft, TierCol(o.Def.Tier)));
-                bool can = !o.Tempered && o.Def.Tempered.HasValue && me.Chimes >= ItemCatalog.TemperPrice;
-                if (o.Def.Tempered.HasValue && !o.Tempered && Button(ox + w + 6, y, 118, 36, $"Temper {ItemCatalog.TemperPrice}", can)) Do(Run.TryTemper(0, o.Def.Id, out var why), why);
-                ox += w + (o.Def.Tempered.HasValue && !o.Tempered ? 130 : 12);
+                float ox = x + (k % chipsPerRow) * (ChipW + ChipGap), oy = cy + (k / chipsPerRow) * (ChipH + ChipGap); k++;
+                bool temperable = o.Def.Tempered.HasValue && !o.Tempered;
+                UiTheme.Frame(R(ox, oy, ChipW, ChipH), UiTheme.Ink, false, false);
+                var ic = ItemIcon(o.Def, false); if (ic) GUI.DrawTexture(R(ox + 4, oy + 4, 28, 28), ic, ScaleMode.ScaleToFit, true);
+                UiTheme.Label(R(ox + 38, oy + 9, ChipW - 38 - (temperable ? 112 : 8), 22), o.Def.Name + (o.Tempered ? " +" : ""), UiTheme.Style(15, true, TextAnchor.UpperLeft, TierCol(o.Def.Tier)));
+                if (temperable && Button(ox + ChipW - 108, oy + 3, 104, ChipH - 6, $"Temper {ItemCatalog.TemperPrice}", me.Chimes >= ItemCatalog.TemperPrice)) Do(Run.TryTemper(0, o.Def.Id, out var why), why);
             }
-            y += 56;
+            y += buildH;
 
-            // allies (co-op only): build, wallet, chip in
+            // allies (co-op only): build, wallet, ready, chip in
             if (coop)
             {
                 UiTheme.Label(R(x, y, iw, 20), UiTheme.Spaced("Allies") + $"      chip in: each ally can receive {ShopRun.GiftCapPerVisit} per visit", eyebrow);
-                y += 26; float ax = x;
-                foreach (var a in Run.Slots.Where(s => s != me))
+                float ay0 = y + 26; int n = 0;
+                foreach (var a in allies)
                 {
-                    UiTheme.Frame(R(ax, y, 360, 70), UiTheme.Ink, false, false);
-                    UiTheme.Label(R(ax + 12, y + 6, 340, 20), $"{a.ClassName}  ·  {a.Chimes} Chimes{(a.Ready ? "  ·  READY" : "")}", UiTheme.Style(15, true, TextAnchor.UpperLeft, UiTheme.Ivory));
-                    UiTheme.Label(R(ax + 12, y + 30, 230, 36), a.Items.Count == 0 ? "no items" : string.Join(", ", a.Items.Select(o => o.Def.Name + (o.Tempered ? "+" : ""))), small);
-                    if (Button(ax + 250, y + 26, 100, 36, "Chip in 50", me.Chimes >= 50 && a.ReceivedThisVisit + 50 <= ShopRun.GiftCapPerVisit)) Do(Run.TryGift(0, a.Slot, 50, out var why), why);
-                    ax += 372;
+                    float ax = x + (n % alliesPerRow) * (AllyW + 12), ay = ay0 + (n / alliesPerRow) * (AllyH + 10); n++;
+                    UiTheme.Frame(R(ax, ay, AllyW, AllyH), UiTheme.Ink, false, false);
+                    UiTheme.Label(R(ax + 12, ay + 6, AllyW - 24, 20), $"{a.ClassName}  ·  {a.Chimes} Chimes  ·  got {a.ReceivedThisVisit}/{ShopRun.GiftCapPerVisit}{(a.Ready ? "  ·  READY" : "")}", UiTheme.Style(14, true, TextAnchor.UpperLeft, UiTheme.Ivory));
+                    UiTheme.Label(R(ax + 12, ay + 30, AllyW - 136, 30), a.Items.Count == 0 ? "no items" : string.Join(", ", a.Items.Select(o => o.Def.Name + (o.Tempered ? "+" : ""))), small);
+                    if (Button(ax + AllyW - 116, ay + 28, 104, 30, "Chip in 50", me.Chimes >= 50 && a.ReceivedThisVisit + 50 <= ShopRun.GiftCapPerVisit)) Do(Run.TryGift(0, a.Slot, 50, out var why), why);
                 }
-                y += 90;
+                y += allyH;
             }
 
-            // footer: reroll, refusal, ready
-            float fy = y0 + H - pad - 48;
+            // footer: reroll, refusal / hints, ready timer, ready
+            float fy = y0 + H - Pad - FootH;
             int rp = Run.RerollPrice(me);
-            if (Button(x, fy, 200, 48, $"Reroll {rp}  (R)", me.Chimes >= rp)) Do(Run.TryReroll(0, out var why), why);
+            if (Button(x, fy, 200, FootH, $"Reroll {rp}  (R)", me.Chimes >= rp)) Do(Run.TryReroll(0, out var why), why);
             UiTheme.Label(R(x + 220, fy + 4, iw - 520, 20), LastRefusal ?? (me.LockUsed ? "Lock used this visit." : "Lock keeps one card through rerolls (one lock per visit, free)."), LastRefusal != null ? UiTheme.Style(15, true, TextAnchor.UpperLeft, UiTheme.Danger) : small);
-            UiTheme.Label(R(x + 220, fy + 26, iw - 520, 20), coop ? $"The shop closes when everyone is ready or after {ShopRun.CoopTimerSeconds} s ({Mathf.Max(0, ShopRun.CoopTimerSeconds - d.StateTicks / Sim.Hz)} s)." : "Unspent Chimes stay in your wallet. The shop waits for you.", small);
-            if (Button(x + iw - 280, fy, 280, 48, me.Ready ? "WAITING FOR ALLIES" : "READY  (Enter)", !me.Ready, btnP)) Leave();
+            UiTheme.Label(R(x + 220, fy + 26, iw - 520, 20), coop ? $"The shop closes when everyone is ready or after {ShopRun.CoopTimerSeconds} s: {Mathf.Max(0, ShopRun.CoopTimerSeconds - d.StateTicks / Sim.Hz)} s left." : "Unspent Chimes stay in your wallet. The shop waits for you.", coop ? UiTheme.Style(14, true, TextAnchor.UpperLeft, UiTheme.Gold) : small);
+            if (Button(x + iw - 280, fy, 280, FootH, me.Ready ? "WAITING FOR ALLIES" : "READY  (Enter)", !me.Ready, btnP)) Leave();
+            LastPanel = new Rect(x0, y0, W, H);
         }
+        public Rect LastPanel { get; private set; }   // virtual px; the autotest checks it fits one screen
+
+        // accepted item icons (Codex, 29 Oct batch): Resources/Run/Icons/items/<id without class prefix>-64|128
+        public static Texture2D ItemIcon(ItemDef d, bool large) => RunHud.Icon("items/" + d.Id.Substring(2).Replace('_', '-') + (large ? "-128" : "-64"));
 
         // +Chimes over the clear card: rises and fades over 2.6 s (HUD space only: no glow, no ground marks)
         void ClearPopup()
@@ -268,12 +279,14 @@ namespace LastBell.Run.Shop
                 UiTheme.Label(R(x, y + h / 2 - 10, w, 20), "sold", smallC);
                 return;
             }
-            UiTheme.Label(R(px, cy, pw, 18), TierName(def.Tier) + (def.Tags != ItemTag.None ? "  ·  " + def.Tags.ToString().ToUpperInvariant() : ""), UiTheme.Style(13, true, TextAnchor.UpperLeft, TierCol(def.Tier)));
-            cy += 22;
-            UiTheme.Label(R(px, cy, pw, 50), def.Name, UiTheme.Style(20, true, TextAnchor.UpperLeft, UiTheme.Ivory, true));
-            cy += 54;
-            UiTheme.Label(R(px, cy, pw, 120), def.Card(false), body);
-            cy += 124;
+            // icon on the left, tier and name beside it
+            var ic = ItemIcon(def, true); float tx = px + (ic ? 74 : 0);
+            if (ic) GUI.DrawTexture(R(px, cy, 64, 64), ic, ScaleMode.ScaleToFit, true);
+            UiTheme.Label(R(tx, cy, px + pw - tx, 18), TierName(def.Tier) + (def.Tags != ItemTag.None ? "  ·  " + def.Tags.ToString().ToUpperInvariant() : ""), UiTheme.Style(13, true, TextAnchor.UpperLeft, TierCol(def.Tier)));
+            UiTheme.Label(R(tx, cy + 20, px + pw - tx, 48), def.Name, UiTheme.Style(19, true, TextAnchor.UpperLeft, UiTheme.Ivory, true));
+            cy += 76;
+            UiTheme.Label(R(px, cy, pw, 130), def.Card(false), body);
+            cy += 134;
             if (Run.Solo && def.SoloNote != null) UiTheme.Label(R(px, cy, pw, 36), def.SoloNote, small);
             float by = y + h - 14 - 40;
             if (Coin) GUI.DrawTexture(R(px, by - 30, 24, 24), Coin, ScaleMode.ScaleToFit, true);

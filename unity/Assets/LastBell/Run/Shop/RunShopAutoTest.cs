@@ -91,6 +91,7 @@ namespace LastBell.Run.Shop
             yield return Until(() => RunDirector.Instance && RunDirector.Instance.State == RunState.Menu, 30, "menu");
             d = RunDirector.Instance; d.InputOverride = bot;
             Check("shop is on for this suite", RunShopFlow.Enabled);
+            Check("all 15 item icons load (64 and 128)", ItemCatalog.All.All(i => RunShopFlow.ItemIcon(i, true) != null && RunShopFlow.ItemIcon(i, false) != null));
             Check("Chimes coin and burst icons load", RunShopFlow.Coin != null && RunShopFlow.Burst != null && RunHud.Icon("chimes-128") != null && RunHud.Icon("chimes-burst-32") != null);
             RunShopFlow.SeedOverride = RunShopFlow.SeedOverride ?? 1234;
             RunShopFlow.BotBuys = false;
@@ -175,6 +176,17 @@ namespace LastBell.Run.Shop
             Check("final shop's special card is Rare or Keystone", Me.Stock[ShopRun.SpecialSlot] == null || Me.Stock[ShopRun.SpecialSlot].Tier != ItemTier.Common);
             Check("potions refill before the final boss (rule unchanged)", d.Player.Potions == PlayerController.MaxPotions);
             yield return Shot("final");
+            // one screen (Chzy18, 29 Oct): worst case, a full party of 8 (7 allies) and a long build (test setup)
+            var extra = new List<string>();
+            foreach (var def in ItemCatalog.All.Where(i => (i.Class == "Vanguard" || i.General) && !Me.Has(i.Id))) { Grant(Me, def.Id); extra.Add(def.Id); }
+            string[] classes = RunDirector.Classes;
+            for (int j = 0; j < 7; j++) { var s = Run.Add(classes[j % 3], testSlot: true); s.Ready = j % 2 == 0; s.Chimes = 100 + 40 * j; Grant(s, ItemCatalog.All.First(i => i.Class == classes[j % 3]).Id); Grant(s, ItemCatalog.StrongBrew); }
+            yield return null; yield return Shot("coop_full");
+            var panel = RunShopFlow.Instance.LastPanel;
+            Note($"screen {Screen.width}x{Screen.height}, panel {panel}, build {Me.Items.Count} items");
+            Check("one screen: 8 players and a long build fit 1080p with no scrolling", panel.yMin >= 0 && panel.yMax <= 1080 && panel.xMin >= 0 && panel.xMax <= UiTheme.VirtualWidth && Me.Items.Count >= 9, $"{panel}");
+            Run.Slots.RemoveAll(s => s.TestSlot); Me.Items.RemoveAll(o => extra.Contains(o.Def.Id));
+            yield return null; yield return Shot("final_solo");
             int items = Me.Items.Count;
             RunShopFlow.Instance.Leave();
             yield return Until(() => d.State == RunState.Combat, 6, "Bellkeeper");
