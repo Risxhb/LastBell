@@ -284,10 +284,11 @@ namespace LastBell.Run
             Boss = Bosses[index].Spawn(World);
             World.Boss = Boss;
             World.CombatActive = false;
-            // health policy (see PlayerController.RefreshHealth): every run boss after the first refills health; the last
-            // also refills potions. A practice starts with a fresh player.
+            // health policy (gpt/08 §3): every run boss after the first refills health, and an area's final boss also refills
+            // potions. Every boss in the run is an area boss for now (minibosses aren't in runs yet), so all of them refill both.
+            // A practice starts with a fresh player.
             int pos = Array.IndexOf(EncounterOrder, index);
-            if (Mode == RunMode.Run && pos > 0) Player.RefreshHealth(refillPotions: pos == EncounterOrder.Length - 1);
+            if (Mode == RunMode.Run && pos > 0) Player.RefreshHealth(refillPotions: true);
             Player.PrepareForEncounter(PlayerSocket, 180);
             Player.AbilitiesEnabled = false;
             Go(RunState.Intro);

@@ -149,6 +149,10 @@ namespace LastBell.Run.Shop
             yield return VanguardPool();
             Me.Items.Clear(); Me.Items.AddRange(keepItems); Me.ResetEncounter();
 
+            // drink a potion in fight 1, so shop 2 has something to refill
+            d.Player.DebugSetHp(40); bot.potion = true;
+            { float tp = 0; while (d.Player.Potions == PlayerController.MaxPotions && tp < 1) { tp += Time.deltaTime; yield return null; } }
+            int potsSpent = PlayerController.MaxPotions - d.Player.Potions;
             // clear boss 1 -> Chimes -> shop 2
             int before = Me.Chimes;
             d.Boss.DebugDefeat();
@@ -160,6 +164,7 @@ namespace LastBell.Run.Shop
             Check("clear pays 150 + nobody down 20 + under par 20 + stand-in 300", got == 150 + 20 + 20 + 300, $"+{got}: {string.Join(" | ", Run.Ledger)}");
             Check("shop 2 opens before boss 2", RunShopFlow.Showing && Run.Visit == 2 && d.Encounter == order[1]);
             Check("health refilled at the shop", d.Player.Hp == PlayerController.MaxHp);
+            Check("potions refill before every area boss (gpt/08 §3), not only the last", potsSpent > 0 && d.Player.Potions == PlayerController.MaxPotions, $"spent {potsSpent}, now {d.Player.Potions}");
             Check("no Chimes for a fight twice: none paid while the shop is open", Me.Earned == 300 + got);
             yield return Shot("visit2");
             // Keystone cap (test setup: two Keystones already counted)
@@ -180,7 +185,7 @@ namespace LastBell.Run.Shop
             Check("final shop before the Bellkeeper", Run.FinalShop && Run.Visit == 4 && RunDirector.Bosses[d.Encounter].Final);
             Check("final shop pays no stand-in", Me.Chimes - before == 190, $"+{Me.Chimes - before}");
             Check("final shop's special card is Rare or Keystone", Me.Stock[ShopRun.SpecialSlot] == null || Me.Stock[ShopRun.SpecialSlot].Tier != ItemTier.Common);
-            Check("potions refill before the final boss (rule unchanged)", d.Player.Potions == PlayerController.MaxPotions);
+            Check("potions refill before the final boss too", d.Player.Potions == PlayerController.MaxPotions);
             yield return Shot("final");
             // one screen (Chzy18, 29 Oct): worst case, a full party of 8 (7 allies) and a long build (test setup)
             var extra = new List<string>();

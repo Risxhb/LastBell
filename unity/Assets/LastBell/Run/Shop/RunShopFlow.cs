@@ -108,8 +108,8 @@ namespace LastBell.Run.Shop
             openedFor = encounter + 1000 * d.RunsStarted; openedAt = Time.frameCount;
             int pos = d.Mode == RunMode.Run ? Array.IndexOf(d.EncounterOrder, encounter) : 0;
             bool final = RunDirector.Bosses[encounter].Final;
-            // health refills at the shop (as before: every boss after the first); potions follow the existing rule
-            if (pos > 0) d.Player.RefreshHealth(refillPotions: pos == d.EncounterOrder.Length - 1);
+            // health and potions refill at the shop before every boss after the first (gpt/08 §3: every run boss is an area boss)
+            if (pos > 0) d.Player.RefreshHealth(refillPotions: true);
             Run.OpenVisit(RunDirector.Bosses[encounter].Name, final, areaShop: !final);
             LastRefusal = null;
             d.Log.Add($"shop: visit {Run.Visit} before {RunDirector.Bosses[encounter].Name}, {Run.Slot(0).Chimes} Chimes");
