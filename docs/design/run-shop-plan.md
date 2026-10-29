@@ -155,3 +155,7 @@ Until netcode lands, the autotest adds **test slots** (wallet and build only, no
 ## 7. Open questions
 
 None open. Chzy18 accepted both review-inbox items on 2026-10-28: 300 stand-in Chimes per area shop until that area's minibosses are in the run, and par times of 4:00 / 6:00 / 2:30 in one table to tune.
+
+## 8. When minibosses join runs
+
+Every boss in a run is an area boss today, so two things run before every boss after the first: the shop (`RunShopFlow.OpenFor`) and the health-and-potion refill (`RunDirector`, `RunShopFlow`). Once minibosses join runs, both must check for an area boss first. Minibosses get no shop (meta: shop only) and refill health only. Potions carry over between minibosses (gpt/08 §3). The playtest agent flagged this on 29 Oct.
