@@ -172,7 +172,7 @@ namespace LastBell.Run.Shop
 
         // One screen, no scrolling or paging (Chzy18, 29 Oct): the panel height follows the content, worst case a full
         // 8-player party (7 allies) and a long build, which still fits 1080 virtual px.
-        const float Pad = 24, HeadH = 102, CardH = 350, CardGap = 14, ChipW = 300, ChipH = 36, ChipGap = 8, AllyW = 368, AllyH = 64, FootH = 48;
+        const float Pad = 24, HeadH = 102, CardH = 320, CardGap = 14, ChipW = 290, ChipH = 36, ChipGap = 8, AllyW = 368, AllyH = 64, FootH = 48;
         static int Rows(int n, int perRow) => n <= 0 ? 1 : (n + perRow - 1) / perRow;
 
         void OnGUI()
@@ -185,7 +185,9 @@ namespace LastBell.Run.Shop
             bool coop = !Run.Solo;
             var allies = Run.Slots.Where(s => s != me).ToList();
             float vw = UiTheme.VirtualWidth, W = Mathf.Min(1560, vw - 64), iw = W - 2 * Pad;
-            int chipsPerRow = Mathf.Max(1, (int)((iw + ChipGap) / (ChipW + ChipGap))), alliesPerRow = Mathf.Max(1, (int)((iw + 12) / (AllyW + 12)));
+            int chipsPerRow = Mathf.Max(1, (int)((iw + ChipGap) / (ChipW + ChipGap)));
+            float chipW = (iw - (chipsPerRow - 1) * ChipGap) / chipsPerRow;   // chips stretch to fill the row
+            int alliesPerRow = Mathf.Max(1, (int)((iw + 12) / (AllyW + 12)));
             float buildH = 26 + Rows(me.Items.Count, chipsPerRow) * (ChipH + ChipGap) + 12;
             float allyH = coop ? 26 + Rows(allies.Count, alliesPerRow) * (AllyH + 10) + 8 : 0;
             float H = Pad + HeadH + CardH + 20 + buildH + allyH + FootH + Pad;
@@ -208,17 +210,17 @@ namespace LastBell.Run.Shop
             for (int i = 0; i < cards; i++) Card(me, i, x + i * (cw + CardGap), y, cw, CardH);
             y += CardH + 20;
 
-            // owned items with Temper (fixed-width chips, wrapping in rows)
+            // owned items with Temper (chips wrapping in rows)
             UiTheme.Label(R(x, y, iw, 20), UiTheme.Spaced("Your build") + (me.Items.Count == 0 ? "      nothing yet" : $"      {me.Items.Count} items"), eyebrow);
             float cy = y + 26; int k = 0;
             foreach (var o in me.Items.ToArray())
             {
-                float ox = x + (k % chipsPerRow) * (ChipW + ChipGap), oy = cy + (k / chipsPerRow) * (ChipH + ChipGap); k++;
+                float ox = x + (k % chipsPerRow) * (chipW + ChipGap), oy = cy + (k / chipsPerRow) * (ChipH + ChipGap); k++;
                 bool temperable = o.Def.Tempered.HasValue && !o.Tempered;
-                UiTheme.Frame(R(ox, oy, ChipW, ChipH), UiTheme.Ink, false, false);
+                UiTheme.Frame(R(ox, oy, chipW, ChipH), UiTheme.Ink, false, false);
                 var ic = ItemIcon(o.Def, false); if (ic) GUI.DrawTexture(R(ox + 4, oy + 4, 28, 28), ic, ScaleMode.ScaleToFit, true);
-                UiTheme.Label(R(ox + 38, oy + 9, ChipW - 38 - (temperable ? 112 : 8), 22), o.Def.Name + (o.Tempered ? " +" : ""), UiTheme.Style(15, true, TextAnchor.UpperLeft, TierCol(o.Def.Tier)));
-                if (temperable && Button(ox + ChipW - 108, oy + 3, 104, ChipH - 6, $"Temper {ItemCatalog.TemperPrice}", me.Chimes >= ItemCatalog.TemperPrice)) Do(Run.TryTemper(0, o.Def.Id, out var why), why);
+                UiTheme.Label(R(ox + 38, oy + 9, chipW - 38 - (temperable ? 112 : 8), 22), o.Def.Name + (o.Tempered ? " +" : ""), UiTheme.Style(15, true, TextAnchor.UpperLeft, TierCol(o.Def.Tier)));
+                if (temperable && Button(ox + chipW - 108, oy + 3, 104, ChipH - 6, $"Temper {ItemCatalog.TemperPrice}", me.Chimes >= ItemCatalog.TemperPrice)) Do(Run.TryTemper(0, o.Def.Id, out var why), why);
             }
             y += buildH;
 

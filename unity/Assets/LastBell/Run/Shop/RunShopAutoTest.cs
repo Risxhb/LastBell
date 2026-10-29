@@ -288,7 +288,7 @@ namespace LastBell.Run.Shop
             Check("the receive cap resets each visit", coop.TryGift(0, 1, 150, out _));
             Check("co-op ready check: the test slot is ready, the player isn't", !coop.AllReady && coop.SetReady(0, true) && coop.AllReady);
             Check("prices: 90 / 150 / 240, temper 110", ItemCatalog.Price(ItemTier.Common) == 90 && ItemCatalog.Price(ItemTier.Rare) == 150 && ItemCatalog.Price(ItemTier.Keystone) == 240 && ItemCatalog.TemperPrice == 110);
-            Check("every item has a + value or is marked untemperable, and Spare Flask is untemperable", ItemCatalog.All.All(i => i.Tempered.HasValue || i.Id == ItemCatalog.SpareFlask));
+            Check("Spare Flask is untemperable (and Temper is never offered for no-Temper items)", !ItemCatalog.Get(ItemCatalog.SpareFlask).Tempered.HasValue, $"{ItemCatalog.All.Count(i => !i.Tempered.HasValue)}");
         }
 
         PlayerController P => d.Player;

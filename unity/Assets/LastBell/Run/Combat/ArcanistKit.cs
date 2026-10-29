@@ -104,9 +104,9 @@ namespace LastBell.Run
         public override string ClassState()
         {
             var sb = new System.Text.StringBuilder();
-            sb.Append("GLYPHS ").Append(new string('◆', Glyphs)).Append(new string('◇', MaxGlyphs - Glyphs));
+            sb.Append("GLYPHS ").Append(new string('◆', Glyphs)).Append(new string('◇', Mathf.Max(0, Shop.ItemHooks.GlyphCap(P, MaxGlyphs) - Glyphs)));   // Fourth Glyph
             if (Surging) Sep(sb).Append($"SURGE {SurgeSeconds:0.0}s");
-            if (act == Act.Charge) Sep(sb).Append("MISSILES ").Append(new string('●', Missiles)).Append(new string('○', MissileCap - Missiles));
+            if (act == Act.Charge) Sep(sb).Append("MISSILES ").Append(new string('●', Missiles)).Append(new string('○', Mathf.Max(0, MissileCap - Missiles)));
             if (act == Act.DisBeam) Sep(sb).Append("DISINTEGRATE ").Append(new string('▮', BeamStep)).Append(new string('▯', 3 - BeamStep));
             foreach (var c in comets) Sep(sb).Append($"COMET {c.Left / (float)Sim.Hz:0.0}s");
             return sb.ToString();
