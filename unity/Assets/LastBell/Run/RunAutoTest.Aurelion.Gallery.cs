@@ -16,6 +16,7 @@ namespace LastBell.Run
         string galleryCam = "";
         IEnumerator AurelionGalleryShots()
         {
+            if (SeveranceShots) { yield return SeveranceShotsAll(); yield break; }
             Note("---------- Aurelion ability gallery ----------");
             AurelionArgs.SoloOverride = null;
             RunDirector.ShotCamera = (new Vector3(0, 27, 17), new Vector3(0, 0, 1.5f)); galleryCam = "";

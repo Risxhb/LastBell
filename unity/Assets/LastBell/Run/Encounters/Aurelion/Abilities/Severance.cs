@@ -32,7 +32,11 @@ namespace LastBell.Run
         public int Planned(PlayerController p) => planned.TryGetValue(p, out int s) ? s : 0;   // -1 Day, +1 Night, 0 free (solo)
         public const int Damage = 50;
         static readonly Color LineFill = new Color(1.35f, 0.42f, 0.32f), LineEdge = new Color(2.2f, 1.45f, 0.65f),
-            NightFill = new Color(0.26f, 0.14f, 0.44f), NightRim = new Color(0.55f, 0.35f, 1.0f);
+            // Night is a shadow, not a colour (Chzy18 accepted 2026-10-28; gpt/08 §4: no Arcanist violets in boss cues): a neutral
+            // near-black that darkens the floor, a thin silver edge, and words for the sides (work/severance-night-20261028)
+            NightFill = new Color(0.05f, 0.05f, 0.05f), NightRim = new Color(0.86f, 0.87f, 0.88f),
+            NightText = new Color(0.92f, 0.93f, 0.94f), DayText = new Color(1f, 0.93f, 0.70f), CallText = new Color(0.92f, 0.93f, 0.94f);   // neutral: no hue near his StarSilver or comets
+        const float NightShade = 0.7f;    // the Night half dims the bright floor by about half (a state region, not a warning; 0.55 measured only a 38 % drop)
         const float LineW = 0.36f;   // presentation: the hit is a change of side (0.05 m), the stroke just has to read
         static readonly float[] StartYaws = { 0f, 60f, 120f };
 
@@ -55,18 +59,24 @@ namespace LastBell.Run
             yaw0 = StartYaws[Casts++ % StartYaws.Length]; LineYaw = yaw0; lineTick = 0;
             // Telegraph style (audit F06): the line is the hostile part, two coral/amber half-strokes from the compass star whose
             // fill sweeps outward during the split (the countdown to the lock), then hold bright while it is live. Night is
-            // lighting only: a faint violet with no motif, drawn under the line.
+            // lighting only: a shadow with no motif, drawn under the line, and the halves are named on the floor.
             var line = new[] { W.BossFx.Lane(Rim + 0.5f, LineW), W.BossFx.Lane(Rim + 0.5f, LineW) };
             foreach (var l in line) { l.Tint(LineFill, LineEdge); l.Motif(AurelionAbility.SkywardMotif); l.Progress(0); l.Order = 3; }
-            var night = W.BossFx.Cone(Rim + 0.5f, 90f); night.Tint(NightFill, NightRim); night.Motif(2); night.Progress(0); night.Order = -2;
+            var night = W.BossFx.Cone(Rim + 0.5f, 90f); night.Tint(NightFill, NightRim); night.Shade(NightShade); night.Motif(2); night.Progress(0); night.Order = -1;   // under every warning, like the Total Eclipse umbra
             PlaceLine(line); night.Place(Centre, LineYaw - 90f);
+            var nightLbl = RunHud.Label(Vector3.zero, "NIGHT ☾", NightText, 30); var dayLbl = RunHud.Label(Vector3.zero, "DAY ☉", DayText, 30);
+            PlaceNames(nightLbl, dayLbl);
             // 3 s to split before the sides lock: co-op, half the party is called Day and half Night (party order, alternating)
             Splitting = true; planned.Clear();
             var party = Standing();
             for (int i = 0; i < party.Count; i++) planned[party[i]] = party.Count == 1 ? 0 : i % 2 == 0 ? -1 : 1;
-            RunHud.Banner(party.Count > 1 ? "SEVERANCE — SPLIT: DAY AND NIGHT" : "SEVERANCE — DAY AND NIGHT", new Color(0.85f, 0.7f, 1f), SplitS);
+            // co-op: each player's own call above them for the split (the banner alone names no one)
+            var calls = new List<RunHud.WorldLabel>();
+            if (party.Count > 1) foreach (var p in party) calls.Add(RunHud.Label(Vector3.up * 2.4f, planned[p] > 0 ? "NIGHT ☾" : "DAY ☉", planned[p] > 0 ? NightText : DayText, 26, p.transform));
+            RunHud.Banner(party.Count > 1 ? "SEVERANCE — SPLIT: DAY AND NIGHT" : "SEVERANCE — DAY AND NIGHT", CallText, SplitS);
             for (int t = 0; t < Sim.Ticks(SplitS); t++) { foreach (var l in line) l.Progress(t / (float)Sim.Ticks(SplitS)); yield return 1; }
             Splitting = false; foreach (var l in line) { l.Progress(1); l.Lock(); }
+            foreach (var c in calls) c.Hide();
             foreach (var p in Standing()) { int s = SideOf(p.transform.position); side[p] = s == 0 ? 1 : s; }
             Glow(1.6f); Flare(1.2f);
 
@@ -78,6 +88,7 @@ namespace LastBell.Run
                 if (t == Sim.Ticks(LengthS / 2 - BackWarnS)) RunHud.Banner("THE LINE TURNS BACK", new Color(1f, 0.85f, 0.5f), BackWarnS);
                 PlaceLine(line);
                 night.Place(Centre, LineYaw - 90f);
+                PlaceNames(nightLbl, dayLbl);
                 Cross();
                 if (N >= 2)
                 {
@@ -90,6 +101,7 @@ namespace LastBell.Run
                 yield return 1;
             }
             foreach (var l in line) l.Expire(); night.Expire();
+            nightLbl.Hide(); dayLbl.Hide();
             Active = false;
             if (N >= 2) foreach (var w in Boss.Towers.RunReunion()) yield return w;
         }
@@ -107,6 +119,9 @@ namespace LastBell.Run
         }
 
         void PlaceLine(BellkeeperFx.Telegraph[] line) { line[0].Place(Centre, LineYaw); line[1].Place(Centre, LineYaw + 180f); }
+        // the side names sit in the middle of each half, just above the floor, and turn with the line
+        void PlaceNames(RunHud.WorldLabel night, RunHud.WorldLabel day)
+        { night.Pos = Centre + Sim.Dir(LineYaw - 90f) * (Rim * 0.55f) + Vector3.up * 0.2f; day.Pos = Centre + Sim.Dir(LineYaw + 90f) * (Rim * 0.55f) + Vector3.up * 0.2f; }
 
         // the line is a wall: every change of side (you moved over it, or it swept over you) is a heavy hit
         void Cross()

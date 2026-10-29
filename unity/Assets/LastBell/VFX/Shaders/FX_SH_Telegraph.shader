@@ -25,6 +25,7 @@ Shader "LastBell/FX/Telegraph"
         _ClipRadius ("Floor clip radius (0 = off)", Float) = 0
         _ClipCentre ("Floor clip centre (world xz)", Vector) = (0, 0, 0, 0)
         [Enum(PerShape,0,SkywardSpire,1,None,2)] _Motif ("Area motif (Telegraph-Style v2)", Float) = 0
+        _Shade ("State shade: solid fill opacity, 0 = off (Severance Night)", Range(0,1)) = 0
         _HoleCount ("Cut-out discs (_Holes: world xz + radius)", Float) = 0
     }
     SubShader
@@ -38,7 +39,7 @@ Shader "LastBell/FX/Telegraph"
             #pragma vertex vert
             #pragma fragment frag
             #include "UnityCG.cginc"
-            float _Shape, _Radius, _Inner, _HalfAngle, _Progress, _Lock, _Flash, _Fade, _Border, _Memory, _ClipRadius, _Motif, _HoleCount; float4 _ClipCentre; float4 _Holes[6];
+            float _Shape, _Radius, _Inner, _HalfAngle, _Progress, _Lock, _Flash, _Fade, _Border, _Memory, _ClipRadius, _Motif, _HoleCount; float _Shade; float4 _ClipCentre; float4 _Holes[6];
             float4 _ColorFill, _ColorBorder, _ColorFlash, _ColorInk;
             struct appdata { float4 vertex : POSITION; };
             struct v2f { float4 pos : SV_POSITION; float2 p : TEXCOORD0; float3 world : TEXCOORD1; };
@@ -131,6 +132,8 @@ Shader "LastBell/FX/Telegraph"
                 fill = lerp(fill, _ColorInk.rgb, 0.75 * under); fillA = lerp(fillA, 0.8, under);
                 float3 col = lerp(fill, _ColorBorder.rgb * (1 + 0.8 * _Lock), border);
                 float a = lerp(fillA, 0.95, border);
+                // a state region (Severance's Night): one flat fill at a fixed opacity that really darkens a bright floor; the border stays
+                if (_Shade > 0) { col = lerp(_ColorFill.rgb, col, border); a = lerp(_Shade, a, border); }
                 col = lerp(col, _ColorFlash.rgb, _Flash); a = lerp(a, 0.85, _Flash);
                 return float4(col, a * inside * _Fade);
             }
