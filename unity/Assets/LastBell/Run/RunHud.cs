@@ -881,7 +881,7 @@ namespace LastBell.Run
                 var mid = hz.Origin + Sim.Dir(hz.Yaw) * hz.Length * 0.5f;
                 var s = cam.WorldToScreenPoint(mid); if (s.z < 0) continue;
                 UiTheme.Fill(new Rect(s.x - UiTheme.V(36), h - s.y - UiTheme.V(14), UiTheme.V(72), UiTheme.V(28)), UiTheme.InkStrip);
-                UiTheme.Label(new Rect(s.x - UiTheme.V(60), h - s.y - UiTheme.V(15), UiTheme.V(120), UiTheme.V(30)), "JUMP", floatSt, UiTheme.Calm);
+                UiTheme.Label(new Rect(s.x - UiTheme.V(60), h - s.y - UiTheme.V(15), UiTheme.V(120), UiTheme.V(30)), "JUMP", floatSt, UiTheme.Ivory);   // ivory on the ink strip, not a friendly cyan
             }
         }
     }
