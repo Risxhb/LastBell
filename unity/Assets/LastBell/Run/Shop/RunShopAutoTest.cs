@@ -91,6 +91,7 @@ namespace LastBell.Run.Shop
             yield return Until(() => RunDirector.Instance && RunDirector.Instance.State == RunState.Menu, 30, "menu");
             d = RunDirector.Instance; d.InputOverride = bot;
             Check("shop is on for this suite", RunShopFlow.Enabled);
+            Check("Chimes coin and burst icons load", RunShopFlow.Coin != null && RunShopFlow.Burst != null && RunHud.Icon("chimes-128") != null && RunHud.Icon("chimes-burst-32") != null);
             RunShopFlow.SeedOverride = RunShopFlow.SeedOverride ?? 1234;
             RunShopFlow.BotBuys = false;
             yield return Wait(0.5f);
@@ -144,8 +145,11 @@ namespace LastBell.Run.Shop
             // clear boss 1 -> Chimes -> shop 2
             int before = Me.Chimes;
             d.Boss.DebugDefeat();
+            yield return Until(() => d.State == RunState.Cleared, 4, "clear 1");
+            yield return new WaitForSeconds(0.6f); yield return Shot("clear_popup");
             yield return Until(() => d.State == RunState.Ready, 8, "shop 2");
             int got = Me.Chimes - before;
+            Check("+Chimes popup shows the clear's pay (without the stand-in)", RunShopFlow.Instance.LastPopup == 190, $"+{RunShopFlow.Instance.LastPopup}");
             Check("clear pays 150 + nobody down 20 + under par 20 + stand-in 300", got == 150 + 20 + 20 + 300, $"+{got}: {string.Join(" | ", Run.Ledger)}");
             Check("shop 2 opens before boss 2", RunShopFlow.Showing && Run.Visit == 2 && d.Encounter == order[1]);
             Check("health refilled at the shop", d.Player.Hp == PlayerController.MaxHp);

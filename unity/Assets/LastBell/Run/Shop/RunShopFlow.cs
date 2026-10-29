@@ -32,6 +32,11 @@ namespace LastBell.Run.Shop
         public static bool Showing => Instance && Instance.Run != null && Instance.Run.Open && Instance.d && Instance.d.State == RunState.Ready;
         public ShopRun Run { get; private set; }
         public string LastRefusal { get; private set; }
+        public int LastPopup { get; private set; }   // the +Chimes popup shown on the last clear
+        float popupAt = -99;
+        // Chimes art (Codex, accepted by Chzy18 in the 29 Oct batch): bell-coin for the wallet and prices, coin burst for +Chimes
+        public static Texture2D Coin => RunHud.Icon("chimes-64");
+        public static Texture2D Burst => RunHud.Icon("chimes-burst-64");
         int runId = -1, openedFor = -1, openedAt; bool botPending;
         RunDirector d;
 
@@ -64,7 +69,9 @@ namespace LastBell.Run.Shop
                     {
                         bool final = RunDirector.Bosses[d.Encounter].Final;
                         int seconds = (d.World.Tick - d.World.SegmentStartTick) / Sim.Hz;
+                        int before = Run.Slot(0).Earned;
                         Run.PayClear(d.Boss.DisplayName.Split(',')[0].Trim(), final, d.World.Players.All(p => !p.Down), seconds);
+                        LastPopup = Run.Slot(0).Earned - before; popupAt = Time.unscaledTime;
                     }
                     break;
                 case RunState.Results: case RunState.Menu:
@@ -163,6 +170,7 @@ namespace LastBell.Run.Shop
 
         void OnGUI()
         {
+            ClearPopup();
             if (!Showing) return;
             GUI.depth = -1;   // above the run HUD
             Styles();
@@ -176,7 +184,9 @@ namespace LastBell.Run.Shop
             // header: visit, next boss, wallet
             UiTheme.Label(R(x, y, iw, 20), UiTheme.Spaced(d.Mode == RunMode.Practice ? "Practice shop" : Run.FinalShop ? "Final shop" : $"Shop {Run.Visit} of {Run.TotalVisits}"), eyebrow);
             UiTheme.Label(R(x, y + 22, iw - 320, 40), "INTERMISSION  ·  next: " + Run.NextBoss, title);
-            UiTheme.Label(R(x + iw - 320, y + 8, 320, 40), $"{me.Chimes}  CHIMES", chimes);
+            string wallet = $"{me.Chimes}  CHIMES"; float tw = chimes.CalcSize(new GUIContent(wallet)).x / UiTheme.Scale;
+            UiTheme.Label(R(x + iw - 320, y + 8, 320, 40), wallet, chimes);
+            if (Coin) GUI.DrawTexture(R(x + iw - tw - 50, y + 8, 40, 40), Coin, ScaleMode.ScaleToFit, true);
             UiTheme.Label(R(x + iw - 320, y + 46, 320, 18), $"Keystones {me.Keystones}/{ItemCatalog.KeystonesPerRun}  ·  earned this run {me.Earned}", UiTheme.Style(13, false, TextAnchor.MiddleRight, UiTheme.IvoryMicro));
             y += 72;
             if (Run.Ledger.Count > 0) { UiTheme.Label(R(x, y, iw, 20), string.Join("     ", Run.Ledger), small); }
@@ -229,6 +239,22 @@ namespace LastBell.Run.Shop
             if (Button(x + iw - 280, fy, 280, 48, me.Ready ? "WAITING FOR ALLIES" : "READY  (Enter)", !me.Ready, btnP)) Leave();
         }
 
+        // +Chimes over the clear card: rises and fades over 2.6 s (HUD space only: no glow, no ground marks)
+        void ClearPopup()
+        {
+            float t = Time.unscaledTime - popupAt;
+            if (LastPopup <= 0 || t > 2.6f || !d || (d.State != RunState.Cleared && d.State != RunState.Ready)) return;
+            if (Showing && t > 0.8f) return;   // the shop's own ledger takes over
+            Styles();
+            float a = Mathf.Clamp01(t / 0.25f) * (1 - Mathf.Clamp01((t - 2.0f) / 0.6f)), rise = 18 * Mathf.Clamp01(t / 2.6f);
+            string text = $"+{LastPopup} CHIMES"; var st = UiTheme.Style(30, true, TextAnchor.MiddleLeft, UiTheme.GoldBright);
+            float w = st.CalcSize(new GUIContent(text)).x / UiTheme.Scale, cx = UiTheme.VirtualWidth / 2, y = 480 - rise;
+            var keep = GUI.color; GUI.color = new Color(1, 1, 1, a);
+            if (Burst) GUI.DrawTexture(R(cx - (w + 56) / 2, y - 4, 48, 48), Burst, ScaleMode.ScaleToFit, true);
+            UiTheme.Label(R(cx - (w + 56) / 2 + 56, y, w + 8, 40), text, st, new Color(UiTheme.GoldBright.r, UiTheme.GoldBright.g, UiTheme.GoldBright.b, a));
+            GUI.color = keep;
+        }
+
         void Card(PlayerBuild me, int i, float x, float y, float w, float h)
         {
             var def = me.Stock[i];
@@ -250,7 +276,8 @@ namespace LastBell.Run.Shop
             cy += 124;
             if (Run.Solo && def.SoloNote != null) UiTheme.Label(R(px, cy, pw, 36), def.SoloNote, small);
             float by = y + h - 14 - 40;
-            UiTheme.Label(R(px, by - 30, pw, 24), $"{def.Price} Chimes", price);
+            if (Coin) GUI.DrawTexture(R(px, by - 30, 24, 24), Coin, ScaleMode.ScaleToFit, true);
+            UiTheme.Label(R(px + (Coin ? 30 : 0), by - 30, pw, 24), $"{def.Price} Chimes", price);
             bool keyCap = def.Tier == ItemTier.Keystone && me.Keystones >= ItemCatalog.KeystonesPerRun;
             if (Button(px, by, pw * 0.62f, 40, "Buy", me.Chimes >= def.Price && !keyCap)) Do(Run.TryBuy(0, i, out var why), why);
             if (Button(px + pw * 0.66f, by, pw * 0.34f, 40, locked ? "Locked" : "Lock", !me.LockUsed)) Do(Run.TryLock(0, i, out var why), why);
