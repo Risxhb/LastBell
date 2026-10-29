@@ -5,6 +5,19 @@
 - **B, Chained Crucible:** tethered pairs and line stacks.
 - **C, Meltdown:** a remix of every attack under a heat timer.
 
+## Hard cut (built 28 Oct, 5c83988)
+
+Chzy18 found the first version too easy ("we need more"), so every layer from the browser mock-up was added:
+1. **Tighter towers:** set B lands 1.6 s after set A (not 2.0 s), on the opposite side of the boss.
+2. **Hidden counts:** on even cycles each mould shows "?" instead of its count. You have to remember the last cycle's counts.
+3. **Pours during the towers:** Casting Order at 3.5 s aims through the players while they soak. The pours land at 5.5–7.0 s.
+4. **Backdraft after set B:** pull, then the 5 m blast, starting 0.2 s after the last set lands.
+5. **A lone lava turret:** it stays on the rim all phase and fires a Lane Stream every 4 s.
+6. **Tower slag:** every landed tower leaves a 2 m slag pool (20/s) until the phase ends.
+7. **Heat:** every hit and burn gets +15 % per crown, up to ×1.45 before the eruption.
+
+The cycle is 21.5 s plus a 3.5 s punish. Code: `Abilities/MoltenCrown.cs`. Test: `MoltenCrownTest`, with v4 at 45/45. Watch it with `crucivar-playtest/Watch bots - Crucivar v4 Phase 3 Molten Crown.cmd`.
+
 ## Phase
 - **HP band:** 30–0 % (Open Pressure). The second form is already in place, so there's no new transformation. Pools from Phase 2 clear at 30 %.
 - **Theme:** the furnace overflows. Crucivar casts soak towers in moulds and the party has to fill them. After every tower set, the molten lava rim rises for good, so the arena keeps shrinking. If the fight drags on, the furnace erupts.
