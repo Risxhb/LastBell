@@ -53,6 +53,9 @@ namespace LastBell.Run
 
         int PhaseFor() => Hp > MaxHp * 0.70f ? 1 : Hp > MaxHp * 0.35f ? 2 : 3;
 
+        // a restarted script starts from phase 1 again; transitions then follow HP as usual
+        public override void BeginCombat() { phase = 1; loop = 0; PhaseName = Phase1; base.BeginCombat(); }
+
         protected override IEnumerable<int> Script()
         {
             while (true)
