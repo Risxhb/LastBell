@@ -178,7 +178,7 @@ namespace LastBell.Run.Shop
             y += 30;
 
             // six cards
-            const float gap = 14; float cw = (iw - 5 * gap) / 6, ch = 330;
+            const float gap = 14; float cw = (iw - 5 * gap) / 6, ch = 350;
             for (int i = 0; i < ShopRun.StockSize; i++) Card(me, i, x + i * (cw + gap), y, cw, ch);
             y += ch + 20;
 

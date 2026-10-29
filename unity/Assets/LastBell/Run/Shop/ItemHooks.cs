@@ -36,7 +36,7 @@ namespace LastBell.Run.Shop
         // ---------------- damage (CombatWorld.DamageBoss) ----------------
         public static int Outgoing(CombatWorld w, int damage, string ability)
         {
-            if (Run == null || damage <= 0) return damage;
+            if (Run == null || damage <= 0 || ability == null) return damage;
             var p = Owner(w, ability); var b = B(p);
             float scale = 1, pct = 0;
             if (b != null)
@@ -60,7 +60,7 @@ namespace LastBell.Run.Shop
 
         public static void Dealt(CombatWorld w, string ability, int dealt)
         {
-            if (Run == null || dealt <= 0 || !ability.StartsWith("SunderingBlow")) return;
+            if (Run == null || dealt <= 0 || ability == null || !ability.StartsWith("SunderingBlow")) return;
             var b = B(Owner(w, ability));
             if (b != null && b.Has(ItemCatalog.CrackedArmour)) { Run.CrackUntil = w.Tick + BuffTicks; Run.CrackPct = b.V(ItemCatalog.CrackedArmour); }
         }

@@ -129,8 +129,8 @@ namespace LastBell.Run.Shop
             // temper
             Check("temper costs 110 and upgrades once", Run.TryTemper(0, bought.Id, out _) && Me.Chimes == 25 && Me.Get(bought.Id).Tempered);
             Check("temper only once per item", !Run.TryTemper(0, bought.Id, out var why3), why3);
-            int rare = Card(x => x.Tier == ItemTier.Rare);
-            Check("can't buy without the Chimes", rare >= 0 && !Run.TryBuy(0, rare, out var why4) && why4 == "not enough Chimes", why4 ?? "no rare");
+            int rare = Card(x => x.Tier == ItemTier.Rare); string why4 = null;
+            Check("can't buy without the Chimes", rare >= 0 && !Run.TryBuy(0, rare, out why4) && why4 == "not enough Chimes", why4 ?? "no rare");
             Check("no chip-in solo", !Run.TryGift(0, 0, 10, out var why5), why5);
             yield return Shot("visit1_after");
 
@@ -269,7 +269,7 @@ namespace LastBell.Run.Shop
             ItemHooks.Dealt(d.World, "SunderingBlow", 70);
             Check("Cracked Armour solo: Last Word +15%, the crack lasts 4 s", ItemHooks.Outgoing(d.World, 140, "LastWord") == 161 && Run.CrackUntil == d.World.Tick + 240);
             // take the granted items back so the run's own shop checks stay clean
-            me.Items.RemoveAll(o => o.Def.Id != Me.Items[0].Def.Id);
+            string keep = me.Items[0].Def.Id; me.Items.RemoveAll(o => o.Def.Id != keep);
             P.RefreshHealth(refillPotions: true);
             P.DebugSetHp(PlayerController.MaxHp);
             d.Boss.BeginCombat();
