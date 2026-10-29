@@ -1,6 +1,6 @@
-# Crucivar v4, Phase 3: Molten Crown (proposal)
+# Crucivar v4, Phase 3: Molten Crown
 
-**Status: proposal, not accepted.** Chzy18 picked this direction on 28 Oct from three options:
+**Status: accepted for now (Chzy18 via the review inbox, 28 Oct 2026), the hard cut as built (5c83988). Numbers are placeholders.** Chzy18 picked this direction on 28 Oct from three options:
 - **A, Molten Crown:** picked.
 - **B, Chained Crucible:** tethered pairs and line stacks.
 - **C, Meltdown:** a remix of every attack under a heat timer.
