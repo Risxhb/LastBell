@@ -48,7 +48,12 @@ namespace LastBell.Run.Shop
             {
                 // controller (every class)
                 case "dash.distance": { float d = v; if (b.Has(ClockworkStep)) d = Mathf.Max(d, b.V(ClockworkStep)); return d + b.V(FarBlink); }
-                case "dash.cost": return b.Has(LightStep) ? b.V(LightStep) : v;
+                case "dash.cost":
+                {
+                    float c = b.Has(LightStep) ? b.V(LightStep) : v;
+                    if (b.Has(SecondStep) && Tick(p) - b.L.LastDashAt <= Sim.Ticks(1.5f)) c = Mathf.Min(c, b.V(SecondStep));   // Second Step: a quick second dash is cheaper (no iframes)
+                    return c;
+                }
                 case "stamina.max": return v + b.V(LongLungs);
                 case "knockback": return v * (1 - Mathf.Min(KnockbackCapPct, b.V(SureFooting)) / 100f);
                 case "move.speed": return b.L.LightFeetUntil > Tick(p) ? v * (1 + b.V(LightFeet) / 100f) : v;
@@ -185,7 +190,7 @@ namespace LastBell.Run.Shop
         public static void OnDash(PlayerController p)
         {
             var b = B(p); if (b == null) return;
-            b.L.MomentumReady = b.Has(Momentum); b.L.GraceReady = b.Has(GraceNote); b.L.BlinkReady = b.Has(BlinkCharge);
+            b.L.MomentumReady = b.Has(Momentum); b.L.GraceReady = b.Has(GraceNote); b.L.BlinkReady = b.Has(BlinkCharge); b.L.LastDashAt = Tick(p);
         }
         public static void OnDashEnd(PlayerController p)
         {

@@ -20,7 +20,7 @@ namespace LastBell.Run.Shop
             public int Openings, ValourUntil = -1, RallyUntil = -1, LightFeetUntil = -1, VolleyBoostUntil = -1;
             public float ValourPct, RallyPct, Overflow;
             public bool MomentumReady, MomentumHit, GraceReady, BlinkReady, RhythmOn;
-            public int RhythmCombos, Notes, RingHits, StruckNotes;
+            public int RhythmCombos, Notes, RingHits, StruckNotes, LastDashAt = -100000;
             public readonly List<int> Taps = new List<int>();
         }
         public Live L { get; private set; } = new Live();

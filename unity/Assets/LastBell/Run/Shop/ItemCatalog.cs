@@ -50,7 +50,7 @@ namespace LastBell.Run.Shop
             SteadyStance = "v.steady_stance", Momentum = "v.momentum", DoubleOpening = "v.double_opening", PendulumCut = "v.pendulum_cut", HeavyHour = "v.heavy_hour",
             QuickVerdict = "v.quick_verdict", IronEcho = "v.iron_echo", SecondStep = "v.second_step", RhythmKeeper = "v.rhythm_keeper", Rally = "v.rally", TollOfSteel = "v.toll_of_steel";
         public const string BrightNote = "c.bright_note", WideRefrain = "c.wide_refrain", LongRefrain = "c.long_refrain", WideChorus = "c.wide_chorus", LightStep = "c.light_step",
-            GraceNote = "c.grace_note", Chord = "c.chord", TwinBells = "c.twin_bells", ThirdEcho = "c.third_echo", Fortissimo = "c.fortissimo", Encore = "c.encore",
+            GraceNote = "c.grace_note", Chord = "c.chord", ThirdEcho = "c.third_echo", Fortissimo = "c.fortissimo", Encore = "c.encore",
             NoteTrail = "c.note_trail", Overflow = "c.overflow", SharedRinging = "c.shared_ringing", StruckTogether = "c.struck_together", GreatBell = "c.great_bell", ChoirLeader = "c.choir_leader";
         public const string QuickCarving = "a.quick_carving", WideBeam = "a.wide_beam", SteadyHand = "a.steady_hand", SplitMissile = "a.split_missile", WideSigil = "a.wide_sigil",
             BlinkCharge = "a.blink_charge", FarBlink = "a.far_blink", GlassEdge = "a.glass_edge", FourthGlyph = "a.fourth_glyph", MissileVolley = "a.missile_volley", TwinSigil = "a.twin_sigil",
@@ -121,8 +121,8 @@ namespace LastBell.Run.Shop
                 Effect = "Last Word windup 0.8 -> 0.5 s, {v}% damage." },
             new ItemDef { Id = IronEcho, Name = "Iron Echo", Class = "Vanguard", Tier = ItemTier.Rare, Value = 50, Tempered = 75,
                 Effect = "Last Word's fan repeats 0.6 s later for {v}% damage." },
-            new ItemDef { Id = SecondStep, Name = "Second Step", Class = "Vanguard", Tier = ItemTier.Rare, Value = 45, Tempered = 38, Held = true,
-                Effect = "Clockstep can be used twice within 1.5 s. The second one costs {v} stamina. No invincibility." },
+            new ItemDef { Id = SecondStep, Name = "Second Step", Class = "Vanguard", Tier = ItemTier.Rare, Value = 20, Tempered = 15,
+                Effect = "A dash within 1.5 s of another dash costs {v} stamina instead of 30." },
             new ItemDef { Id = RhythmKeeper, Name = "Rhythm Keeper", Class = "Vanguard", Tier = ItemTier.Rare, Value = 10, Tempered = 15,
                 Effect = "Three full Steel Rhythm combos in a row without being hit: +{v}% damage until you're hit." },
             new ItemDef { Id = Rally, Name = "Rally", Class = "Vanguard", Tier = ItemTier.Rare, Tags = ItemTag.Party, Value = 10, Tempered = 15,
@@ -144,8 +144,6 @@ namespace LastBell.Run.Shop
                 Effect = "After Harmonic Step, your next Resonant Note deals double damage.", TemperNote = "Tempered: +150% instead." },
             new ItemDef { Id = Chord, Name = "Chord", Class = "Chimesinger", Tier = ItemTier.Rare, Value = 4, Tempered = 3,
                 Effect = "Every {o} Resonant Note splits into 3 aimed notes in a narrow spread. They don't home in." },
-            new ItemDef { Id = TwinBells, Name = "Twin Bells", Class = "Chimesinger", Tier = ItemTier.Rare, Value = 2, Tempered = null, Held = true,
-                Effect = "Two bells can ring at once, for example on the boss and on a part it spawned." },
             new ItemDef { Id = ThirdEcho, Name = "Third Echo", Class = "Chimesinger", Tier = ItemTier.Rare, Value = 3, Tempered = null,
                 Effect = "Echoes cap at {v} instead of 2." },
             new ItemDef { Id = Fortissimo, Name = "Fortissimo", Class = "Chimesinger", Tier = ItemTier.Rare, Value = 12, Tempered = 18,

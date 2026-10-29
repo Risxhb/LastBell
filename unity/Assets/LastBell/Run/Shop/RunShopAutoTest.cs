@@ -94,7 +94,7 @@ namespace LastBell.Run.Shop
             var slice = new[] { ItemCatalog.TemperedEdge, ItemCatalog.Countdown, ItemCatalog.CrackedArmour, ItemCatalog.Oathbound, ItemCatalog.HeavyBell, ItemCatalog.SwiftChorus, ItemCatalog.ChorusOfValour,
                 ItemCatalog.UnboundCast, ItemCatalog.LongSurge, ItemCatalog.PerpetualBeam, ItemCatalog.StrongBrew, ItemCatalog.Sprinter, ItemCatalog.DeepBreath, ItemCatalog.LoneBell, ItemCatalog.SpareFlask };
             Check("the 15 slice item icons load (64 and 128)", slice.All(id => RunShopFlow.ItemIcon(ItemCatalog.Get(id), true) != null && RunShopFlow.ItemIcon(ItemCatalog.Get(id), false) != null));
-            Check("the pool has 70 items: 20 per class and 10 general; 2 held", ItemCatalog.All.Length == 70 && ItemCatalog.All.Count(i => i.General) == 10 && RunDirector.Classes.All(c => ItemCatalog.All.Count(i => i.Class == c) == 20) && ItemCatalog.All.Count(i => i.Held) == 2);
+            Check("the pool has 69 items: 20 Vanguard, 19 Chimesinger, 20 Arcanist, 10 general; none held", ItemCatalog.All.Length == 69 && ItemCatalog.All.Count(i => i.General) == 10 && RunDirector.Classes.All(c => ItemCatalog.All.Count(i => i.Class == c) == (c == "Chimesinger" ? 19 : 20)) && !ItemCatalog.All.Any(i => i.Held) && !ItemCatalog.All.Any(i => i.Id == "c.twin_bells"));
             Check("Chimes coin and burst icons load", RunShopFlow.Coin != null && RunShopFlow.Burst != null && RunHud.Icon("chimes-128") != null && RunHud.Icon("chimes-burst-32") != null);
             RunShopFlow.SeedOverride = RunShopFlow.SeedOverride ?? 1234;
             RunShopFlow.BotBuys = false;
@@ -420,7 +420,12 @@ namespace LastBell.Run.Shop
             Check("Rhythm Keeper: 3 full combos give +10% until hit", on && ItemHooks.Outgoing(d.World, 100, "SteelRhythm1") == 100);
             Only(ItemCatalog.Rally); ItemHooks.Dealt(d.World, "LastWord", 10);
             Check("Rally solo: a Last Word hit gives you +10% for 4 s", ItemHooks.Outgoing(d.World, 100, "SteelRhythm1") == 110);
-            Check("Second Step is held out of the shop (no dash cooldown to beat)", ItemCatalog.Get(ItemCatalog.SecondStep).Held && !Run.CanOffer(Me, ItemCatalog.Get(ItemCatalog.SecondStep)));
+            Only(ItemCatalog.SecondStep); Me.ResetEncounter();
+            bool first = ItemHooks.F(P, "dash.cost", 30) == 30; ItemHooks.OnDash(P);
+            Check("Second Step: the first dash costs 30, a dash within 1.5 s costs 20", first && ItemHooks.F(P, "dash.cost", 30) == 20);
+            Check("Second Step tempered: 15", Tempered(ItemCatalog.SecondStep, () => ItemHooks.F(P, "dash.cost", 30) == 15));
+            Me.L.LastDashAt = d.World.Tick - Sim.Ticks(1.6f); Check("Second Step: after 1.5 s the dash costs 30 again", ItemHooks.F(P, "dash.cost", 30) == 30);
+            Check("Second Step is no longer held", !ItemCatalog.Get(ItemCatalog.SecondStep).Held);
             // Clockwork Step through a real dash
             Only(ItemCatalog.ClockworkStep); yield return Ready();
             P.transform.position = new Vector3(-4, 0, 6.5f); P.transform.rotation = Quaternion.Euler(0, 90, 0);
@@ -457,7 +462,6 @@ namespace LastBell.Run.Shop
             Only(ItemCatalog.ChoirLeader); Check("Choir Leader: heal -25%, detonation at 50%", ItemHooks.I(P, "c.chorus.heal", 30) == 22 && Close(ItemHooks.F(P, "c.choir", 0), 0.5f));
             Only(ItemCatalog.NoteTrail); n0 = d.World.Projectiles.Count; ItemHooks.OnDashEnd(P);
             Check("Note Trail: a dash ends with 3 notes", d.World.Projectiles.Count == n0 + 3);
-            Check("Twin Bells is held out of the shop (no spawned parts to ring)", !Run.CanOffer(Me, ItemCatalog.Get(ItemCatalog.TwinBells)));
             // ring the bell for real, then the ringing items
             Only(ItemCatalog.SharedRinging, ItemCatalog.StruckTogether, ItemCatalog.Encore); yield return Ready();
             P.transform.position = new Vector3(0, 0, 6.5f); yield return Press(1, 0.6f);
