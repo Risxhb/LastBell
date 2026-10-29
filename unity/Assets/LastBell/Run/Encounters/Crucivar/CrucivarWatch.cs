@@ -55,6 +55,11 @@ namespace LastBell.Run
         readonly Dictionary<int, float> lastYaw = new Dictionary<int, float>(), turnRate = new Dictionary<int, float>();
         CombatWorld hooked;
         bool follow; int fights; float fightStart;
+        // -crucivarMeasure: no pacing; each phase runs a fixed number of loops (3 / 2 uprisings / 3 cycles), then the
+        // boss is set just past the threshold; the log gets the players' damage per phase. Use a big -lastbellBossHp so
+        // the bots never cross a threshold themselves. -crucivarBots n (1-8) sets the party; the editor quits after the fight.
+        static bool Measure => Environment.GetCommandLineArgs().Any(a => a.Equals("-crucivarMeasure", StringComparison.OrdinalIgnoreCase));
+        static int BotCount => int.TryParse(CrucivarArgs.Arg("-crucivarBots"), out int n) ? Mathf.Clamp(n, 1, 8) : 4;
 
         void Start()
         {
@@ -78,10 +83,10 @@ namespace LastBell.Run
                 while (d.State != RunState.Combat) yield return null;
                 var w = d.World;
                 lead.P = d.Player; bots.Add(lead);
-                for (int i = 1; i < 4; i++)
+                for (int i = 1; i < BotCount; i++)
                 {
-                    var p = PlayerController.Spawn(w, Classes[i], new Vector3(-4.5f + 3f * i, 0, 6f), 180);
-                    var b = new Bot { Name = Names[i], P = p };
+                    var p = PlayerController.Spawn(w, Classes[i % Classes.Length], new Vector3(-4.5f + 1.5f * i, 0, 6f), 180);
+                    var b = new Bot { Name = "Bot " + (i + 1), P = p };
                     p.Input = b; p.AbilitiesEnabled = true; bots.Add(b);
                 }
                 foreach (var b in bots) b.Goal = b.P.transform.position;
@@ -91,7 +96,7 @@ namespace LastBell.Run
                     w.PlayerHit += (p, h, dmg) => { var b = bots.FirstOrDefault(x => x.P == p); if (b != null) { b.Hits++; b.Damage += dmg; } };
                 }
                 fights++; fightStart = Time.time;
-                int logged = 0;
+                int logged = 0, mPhase = 1, mDealt0 = w.DamageDealt; float mT0 = Time.time; bool mDone = false;
                 while (d.State == RunState.Combat)
                 {
                     foreach (var b in bots)
@@ -104,6 +109,18 @@ namespace LastBell.Run
                     if (d.Boss is CrucivarEncounter cb && cb.Rite != null && !cb.Dead)
                     {
                         int ph = cb.PhaseIndex;
+                        if (Measure)
+                        {
+                            if (ph != mPhase) { mPhase = ph; mT0 = Time.time; mDealt0 = w.DamageDealt; }
+                            int want = ph == 1 ? 3 : ph == 2 ? 2 : 3;
+                            if (!mDone && cb.PhaseLoops >= want)
+                            {
+                                float secs = Time.time - mT0; int dealt = w.DamageDealt - mDealt0;
+                                Debug.Log($"[measure] bots {bots.Count} phase {ph}: {cb.PhaseLoops} loops in {secs:0.0}s, players dealt {dealt}, team dps {dealt / secs:0.0}, per bot {dealt / secs / bots.Count:0.0}, downs {bots.Sum(b => b.Downs)}");
+                                if (ph == 1) cb.DebugSetHpFraction(0.64f); else if (ph == 2) cb.DebugSetHpFraction(0.29f); else { mDone = true; cb.DebugDefeat(); }
+                            }
+                            yield return null; continue;
+                        }
                         // -crucivarWatchFrom p2: start just under 65 %, so Phase 2 comes after the first Forge Rite loop
                         if (fromP2 && ph == 1 && cb.Hp > cb.MaxHp * 0.645f) cb.DebugSetHpFraction(0.64f);
                         if (fromP3 && ph < 3 && cb.Hp > cb.MaxHp * 0.295f) cb.DebugSetHpFraction(0.29f);   // -crucivarWatchFrom p3: Phase 3 after the first loop
@@ -117,6 +134,13 @@ namespace LastBell.Run
                         }
                     }
                     yield return null;
+                }
+                if (Measure)
+                {
+                    Debug.Log($"[measure] fight over after {Time.time - fightStart:0}s · phase {((d.Boss as CrucivarEncounter)?.PhaseIndex ?? 0)} · " + (mDone ? "measured all phases" : "ended early (wipe?)"));
+#if UNITY_EDITOR
+                    UnityEditor.EditorApplication.Exit(0);
+#endif
                 }
                 Debug.Log($"[watch] fight {fights} over after {Time.time - fightStart:0}s · " + string.Join(" · ", bots.Select(b => $"{b.Name} {b.Hits} hits/{b.Damage} dmg/{b.Downs} downs")));
                 foreach (var b in bots.Skip(1)) if (b.P) { w.Players.Remove(b.P); Destroy(b.P.gameObject); }
