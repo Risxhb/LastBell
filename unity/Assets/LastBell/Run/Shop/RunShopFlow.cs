@@ -250,6 +250,16 @@ namespace LastBell.Run.Shop
             if (Button(x + iw - 280, fy, 280, FootH, me.Ready ? "WAITING FOR ALLIES" : "READY  (Enter)", !me.Ready, btnP)) Leave();
             LastPanel = new Rect(x0, y0, W, H);
         }
+        // the largest size (down to 14) at which the name's longest word fits on one line, so names only wrap at spaces
+        static int WordFit(string text, int size, float width)
+        {
+            for (; size > 14; size--)
+            {
+                var st = UiTheme.Style(size, true, TextAnchor.UpperLeft, UiTheme.Ivory);
+                if (text.Split(' ').All(w => st.CalcSize(new GUIContent(w)).x / UiTheme.Scale <= width)) break;
+            }
+            return size;
+        }
         public Rect LastPanel { get; private set; }   // virtual px; the autotest checks it fits one screen
 
         // accepted item icons (Codex, 29 Oct batch): Resources/Run/Icons/items/<id without class prefix>-64|128
@@ -288,7 +298,7 @@ namespace LastBell.Run.Shop
             var ic = ItemIcon(def, true); float tx = px + (ic ? 74 : 0);
             if (ic) GUI.DrawTexture(R(px, cy, 64, 64), ic, ScaleMode.ScaleToFit, true);
             UiTheme.Label(R(tx, cy, px + pw - tx, 18), TierName(def.Tier) + (def.Tags != ItemTag.None ? "  ·  " + def.Tags.ToString().ToUpperInvariant() : ""), UiTheme.Style(13, true, TextAnchor.UpperLeft, TierCol(def.Tier)));
-            UiTheme.Label(R(tx, cy + 20, px + pw - tx, 48), def.Name, UiTheme.Style(19, true, TextAnchor.UpperLeft, UiTheme.Ivory, true));
+            UiTheme.Label(R(tx, cy + 20, px + pw - tx, 48), def.Name, UiTheme.Style(WordFit(def.Name, 19, px + pw - tx), true, TextAnchor.UpperLeft, UiTheme.Ivory, true));
             cy += 76;
             UiTheme.Label(R(px, cy, pw, 130), def.Card(false), body);
             cy += 134;
