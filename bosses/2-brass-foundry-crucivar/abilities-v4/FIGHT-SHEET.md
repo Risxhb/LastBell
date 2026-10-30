@@ -1,6 +1,6 @@
 # Crucivar v4: fight sheet
 
-**Status: proposal (29 Oct 2026).** The three phases are accepted for now. This sheet sets the whole fight: HP bands, boss HP, co-op scaling, casting HP, the enrages, and Easy/Hard. The HP is built and tested; the numbers are placeholders until people play it.
+**Status: accepted (Chzy18 via the review inbox, 29 Oct 2026): keep about 4 min solo, not longer like Aurelion.** The three phases are accepted for now. This sheet sets the whole fight: HP bands, boss HP, co-op scaling, casting HP, the enrages, and Easy/Hard. The HP is built and tested; the numbers are placeholders until people play it.
 
 ## The fight at a glance
 
@@ -72,7 +72,7 @@ The difficulty damage scale is unchanged (damage scale only, per the difficulty 
 5. One Azure PR into `feature/confrontation-menu`, after your OK through the review inbox.
 
 ## Open questions
-1. Is about 4 min solo the right length, or should it be longer, like Aurelion's 5–7 min? The base HP is the only number that needs to change.
+1. ~~Fight length~~: settled 29 Oct, keep about 4 min solo.
 2. PartyStep 0.9: should co-op be longer than solo (Aurelion's 1.25) or about the same?
 3. Phase 1 Hard: does it need a named extra, or is the damage scale enough?
 4. Should passive menu bots count toward the HP, as Aurelion's do not?
