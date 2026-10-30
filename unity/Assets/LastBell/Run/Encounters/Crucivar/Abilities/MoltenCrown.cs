@@ -62,6 +62,7 @@ namespace LastBell.Run
             running = true; wiping = false; fullest.Clear();
             for (int t = 0; t < end; t++)
             {
+                if (!Boss) { running = false; yield break; }   // the encounter is gone (a restart)
                 for (int s = 0; s < sets.Length; s++)
                 {
                     if (t == Sim.Ticks(SetGap * s)) RiseSet(sets[s], s);

@@ -73,12 +73,14 @@ namespace LastBell.Run
             var press = t.Spawned("Second Press").ToList();
             var setA = t.Spawned("Mould Tower A").ToList();
             var first = setA.FirstOrDefault();
-            t.Check("Hard: Second Press re-stamps one tower of each set (ties: the first)", crown.Presses - presses0 == 2 && press.Count == 2 && first != null && (press[0].H.Origin - first.H.Origin).sqrMagnitude < 0.01f && crown.Wipes == 0,
-                $"presses {crown.Presses - presses0}, spawned {press.Count}");
+            t.Check("Hard: Second Press re-stamps one tower of each set", crown.Presses - presses0 == 2 && press.Count == 2 && setA.Any(a => (press[0].H.Origin - a.H.Origin).sqrMagnitude < 0.01f) && crown.Wipes == 0,
+                $"presses {crown.Presses - presses0}, spawned {press.Count}, on a set A tower {setA.Any(a => press.Count > 0 && (press[0].H.Origin - a.H.Origin).sqrMagnitude < 0.01f)}, wipes {crown.Wipes}");
             t.Check("Hard: the press starts once its set has landed and warns about 2 s", first != null && press.Count > 0 && press[0].Tick - first.Tick >= first.H.ResolveAt && press[0].H.ResolveAt >= Sim.Ticks(1.5f),
                 press.Count > 0 && first != null ? $"{press[0].Tick - first.Tick} ticks after the rise, warn {press[0].H.ResolveAt}" : "none");
 
             // third cycle: nobody soaks, so the first tower to land wipes the party
+            for (s = 0; s < 30f && t.Boss.TestBusy; s += Time.deltaTime) { foreach (var p in t.Party) p.DebugSetHp(PlayerController.MaxHp); yield return null; }   // keep the party up until the Hard cycle ends
+            t.Check("the Hard cycle runs to its end", !t.Boss.TestBusy);
             yield return t.Setup(4, at: new[] { new Vector3(0, 0, 4f), new Vector3(4, 0, 0), new Vector3(0, 0, -4f), new Vector3(-4, 0, 0) });
             foreach (var p in t.Party) { p.DebugSetHp(PlayerController.MaxHp); t.Place(p, new Vector3(0, 0, 9.5f)); }
             t.Begin(crown.Run());
