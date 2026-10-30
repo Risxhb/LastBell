@@ -129,6 +129,7 @@ namespace LastBell.Run
             int map = RunMaps.Current;
             if (map >= 0) CombatWorld.SetPlayerBound(RunMaps.All[map].Bound, RunMaps.All[map].Square);
             if (!GetComponent<RunHud>()) gameObject.AddComponent<RunHud>();
+            if (!GetComponent<Shop.RunShopFlow>()) gameObject.AddComponent<Shop.RunShopFlow>();   // intermission shop (docs/design/run-shop-plan.md)
             LastBell.Menu.MenuSettings.ApplyFrameRate();   // Settings: VSync (off by default) and FPS cap (120 by default)
             if (RunAutoTest.Requested) RunAutoTest.Launch();
         }
@@ -290,10 +291,11 @@ namespace LastBell.Run
             ApplyPracticePhase();   // the boss bar shows the chosen phase during the intro
             World.Boss = Boss;
             World.CombatActive = false;
-            // health policy (see PlayerController.RefreshHealth): every run boss after the first refills health; the last
-            // also refills potions. A practice starts with a fresh player.
+            // health policy (gpt/08 §3): every run boss after the first refills health, and an area's final boss also refills
+            // potions. Every boss in the run is an area boss for now (minibosses aren't in runs yet), so all of them refill both.
+            // A practice starts with a fresh player.
             int pos = Array.IndexOf(EncounterOrder, index);
-            if (Mode == RunMode.Run && pos > 0) Player.RefreshHealth(refillPotions: pos == EncounterOrder.Length - 1);
+            if (Mode == RunMode.Run && pos > 0) Player.RefreshHealth(refillPotions: true);
             Player.PrepareForEncounter(PlayerSocket, 180);
             Player.AbilitiesEnabled = false;
             Go(RunState.Intro);
@@ -368,7 +370,7 @@ namespace LastBell.Run
             if (State == RunState.Combat || State == RunState.Cleared || State == RunState.Downed) RunTicks++;
             if (gen != Generation) return;
             // practice has no preparation card: it starts by itself after a short beat (tests keep the manual Ready)
-            if (State == RunState.Ready && Mode == RunMode.Practice && AutoReady && StateTicks >= PracticeAutoReadyTicks) { RequestReady(); return; }
+            if (State == RunState.Ready && Mode == RunMode.Practice && AutoReady && StateTicks >= PracticeAutoReadyTicks && !Shop.RunShopFlow.Showing) { RequestReady(); return; }   // an area-boss practice shop waits for Ready
             switch (State)
             {
                 case RunState.Intro:
@@ -395,6 +397,8 @@ namespace LastBell.Run
                         if (Boss) { Destroy(Boss.gameObject); Boss = null; World.Boss = null; }
                         if (Mode == RunMode.Practice) { Victory = true; Go(RunState.Results); }
                         else if (Array.IndexOf(EncounterOrder, Encounter) == EncounterOrder.Length - 1) { Victory = true; Go(RunState.Results); }
+                        // run shop: the intermission before the next boss is its preparation (Ready), where the shop opens
+                        else if (Shop.RunShopFlow.Enabled) { Encounter = EncounterOrder[Array.IndexOf(EncounterOrder, Encounter) + 1]; Go(RunState.Ready); }
                         else BeginIntro(EncounterOrder[Array.IndexOf(EncounterOrder, Encounter) + 1]);
                     }
                     break;

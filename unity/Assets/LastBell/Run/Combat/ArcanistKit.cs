@@ -42,7 +42,7 @@ namespace LastBell.Run
             return Vector3.up * (1.8f + 0.28f * Mathf.Cos(a)) + t.right * (0.62f + 0.45f * Mathf.Sin(a)) - t.forward * 0.15f;
         }
 
-        public sealed class Mark { public int Id; public Vector3 Pos; public int Left, Total; public bool Powered; }
+        public sealed class Mark { public int Id; public Vector3 Pos; public int Left, Total; public bool Powered; public float Scale = 1; }   // Scale: Starfall's share
         readonly List<Mark> sigils = new List<Mark>(), comets = new List<Mark>();
         int markIds;
 
@@ -60,11 +60,13 @@ namespace LastBell.Run
         public float SurgeLeft01 => surgeTotal > 0 ? surgeLeft / (float)surgeTotal : 0;
         public float SurgeSeconds => surgeLeft / (float)Sim.Hz;
         public int Missiles { get; private set; }            // summoned while charging
-        public int MissileCap => Surging ? SurgeMissiles : MaxMissiles;
+        public int MissileCap => Surging ? SurgeMissiles : Shop.ItemHooks.I(P, "a.missile.cap", MaxMissiles);   // Split Missile
         public int LastVolley { get; private set; }          // missiles in the last released volley
         public bool Charging => act == Act.Charge;
         public bool BeamActive => act == Act.DisBeam;
-        public int BeamStep => beamTicks < DisStepTicks ? 1 : beamTicks < 2 * DisStepTicks ? 2 : 3;
+        public int BeamStep => beamTicks < disStep ? 1 : beamTicks < 2 * disStep ? 2 : 3;
+        int disStep = DisStepTicks;   // Quick Carving shortens the steps (read when the beam starts)
+        public void ItemGainGlyph() => GainGlyph();   // Glyph Brand
         public Vector3 BeamDir => beamDir;
         public int BeamDamage { get; private set; }          // dealt by the current or last beam
         public IReadOnlyList<Mark> Sigils => sigils;
@@ -102,9 +104,9 @@ namespace LastBell.Run
         public override string ClassState()
         {
             var sb = new System.Text.StringBuilder();
-            sb.Append("GLYPHS ").Append(new string('◆', Glyphs)).Append(new string('◇', MaxGlyphs - Glyphs));
+            sb.Append("GLYPHS ").Append(new string('◆', Glyphs)).Append(new string('◇', Mathf.Max(0, Shop.ItemHooks.GlyphCap(P, MaxGlyphs) - Glyphs)));   // Fourth Glyph
             if (Surging) Sep(sb).Append($"SURGE {SurgeSeconds:0.0}s");
-            if (act == Act.Charge) Sep(sb).Append("MISSILES ").Append(new string('●', Missiles)).Append(new string('○', MissileCap - Missiles));
+            if (act == Act.Charge) Sep(sb).Append("MISSILES ").Append(new string('●', Missiles)).Append(new string('○', Mathf.Max(0, MissileCap - Missiles)));
             if (act == Act.DisBeam) Sep(sb).Append("DISINTEGRATE ").Append(new string('▮', BeamStep)).Append(new string('▯', 3 - BeamStep));
             foreach (var c in comets) Sep(sb).Append($"COMET {c.Left / (float)Sim.Hz:0.0}s");
             return sb.ToString();
@@ -151,7 +153,7 @@ namespace LastBell.Run
                 if (--sigils[i].Left <= 0)
                 {
                     var s = sigils[i]; sigils.RemoveAt(i);
-                    bool hit = live && Sim.Flat(b.transform.position - s.Pos).magnitude <= SigRadius + b.BodyRadius;
+                    bool hit = live && Sim.Flat(b.transform.position - s.Pos).magnitude <= Shop.ItemHooks.F(P, "a.sigil.radius", SigRadius) + b.BodyRadius;   // Wide Sigil
                     int dmg = s.Powered ? SigDamage : Mathf.RoundToInt(SigDamage * Unpowered);
                     LastSigil = hit ? W.DamageBoss(dmg, b.transform.position + Vector3.up * b.HitHeight, s.Powered ? "Rune Sigil" : "Rune Sigil (no glyph)", false) : 0;
                     LastSigilPowered = s.Powered;
@@ -162,13 +164,18 @@ namespace LastBell.Run
                 {
                     var c = comets[i]; comets.RemoveAt(i);
                     float d = live ? Sim.Flat(b.transform.position - c.Pos).magnitude : 999;
-                    bool hit = live && d <= ComRadius + b.BodyRadius, bull = hit && d <= ComCore + 0.5f * b.BodyRadius;
+                    bool hit = live && d <= Shop.ItemHooks.F(P, "a.comet.radius", ComRadius) + b.BodyRadius, bull = hit && d <= ComCore + 0.5f * b.BodyRadius;   // Great Comet
                     int dmg = (bull ? ComDamage * 2 : ComDamage); if (!c.Powered) dmg = Mathf.RoundToInt(dmg * Unpowered);
+                    if (c.Scale != 1) dmg = Mathf.Max(1, Mathf.RoundToInt(dmg * c.Scale));
                     LastComet = hit ? W.DamageBoss(dmg, b.transform.position + Vector3.up * b.HitHeight, (bull ? "Arcane Comet (bullseye)" : "Arcane Comet") + (c.Powered ? "" : " (no glyph)"), false) : 0;
                     LastCometBullseye = bull; LastCometPowered = c.Powered;
                     W.Fx.CometImpact(c.Id, c.Pos, hit, bull);
                 }
-            if (surgeLeft > 0 && --surgeLeft == 0) { surgeTotal = 0; W.Fx.SurgeEnd(P); }
+            if (surgeLeft > 0 && --surgeLeft == 0)
+            {
+                surgeTotal = 0; W.Fx.SurgeEnd(P);
+                for (int g = Shop.ItemHooks.I(P, "a.surge_end_glyphs", 0); g > 0; g--) GainGlyph();   // Surge Echo
+            }
             // Blink: the body is hidden for the dash and rebuilt where it ends; a stun mid-blink shows him where he stands
             if (blinking && P.Stunned > 0) { blinking = false; P.Presenter.SetHidden(false); W.Fx.BlinkBlocked(P); }
             else if (blinking && !P.Dashing)
@@ -204,7 +211,7 @@ namespace LastBell.Run
                     break;
                 case Act.Charge:
                     MoveScale = 0.5f; FaceAim = true;
-                    int n = Mathf.Min(MissileCap, t / (Surging ? SurgeChargeStep : ChargeStep));
+                    int n = Shop.ItemHooks.I(P, "a.blink.ready", 0) > 0 ? MissileCap : Mathf.Min(MissileCap, t / (Surging ? SurgeChargeStep : ChargeStep));   // Blink Charge
                     if (n != Missiles) { Missiles = n; W.Fx.MissileSummon(P, n); }
                     if (!inp.Held(0)) { if (Missiles > 0) BeginVolley(); else EndCharge(false); }
                     break;
@@ -216,18 +223,18 @@ namespace LastBell.Run
                     break;
                 case Act.DisWind:
                     MoveScale = 0.2f; FaceAim = true;
-                    if (t >= DisWind) { act = Act.DisBeam; t = 0; beamTicks = 0; stepHit = false; beamDir = AimDir(); P.Presenter.Overlay("DisintegrateHold", 1.0f, loop: true); W.Fx.BeamStart(P); BeamTick(); }
+                    if (t >= DisWind) { act = Act.DisBeam; t = 0; beamTicks = 0; stepHit = false; disStep = Shop.ItemHooks.I(P, "a.dis.step", DisStepTicks); beamDir = AimDir(); P.Presenter.Overlay("DisintegrateHold", 1.0f, loop: true); W.Fx.BeamStart(P); BeamTick(); }
                     break;
                 case Act.DisBeam:
                     MoveScale = 0.2f; FaceAim = false;
                     beamTicks++;
                     // the beam turns toward the cursor at a capped rate, and the body follows the beam
                     var want = AimDir();
-                    beamDir = Vector3.RotateTowards(beamDir, want, DisTurn * Mathf.Deg2Rad, 0).normalized;
+                    beamDir = Vector3.RotateTowards(beamDir, want, Shop.ItemHooks.F(P, "a.dis.turn", DisTurn) * Mathf.Deg2Rad, 0).normalized;   // Steady Hand
                     P.transform.rotation = Quaternion.LookRotation(beamDir);
                     BeamTick();
                     // each completed damage step that hit the boss carves a glyph
-                    if (beamTicks % DisStepTicks == 0) { if (stepHit) GainGlyph(); stepHit = false; }
+                    if (beamTicks % disStep == 0) { if (stepHit) GainGlyph(); stepHit = false; }
                     if (!inp.Held(1) || beamTicks >= DisMax) EndBeam(false);
                     break;
                 case Act.DisEnd:
@@ -263,7 +270,11 @@ namespace LastBell.Run
         Vector3 ClampAim(float range)
         {
             var d = Sim.Flat(aim - P.transform.position); if (d.magnitude > range) d = d.normalized * range;
-            var at = P.transform.position + d; at.y = 0; float bound = CombatWorld.PlayerBound;
+            return ClampAimAt(P.transform.position + d);
+        }
+        Vector3 ClampAimAt(Vector3 at)
+        {
+            at.y = 0; float bound = CombatWorld.PlayerBound;
             if (CombatWorld.SquareBound) { at.x = Mathf.Clamp(at.x, -bound, bound); at.z = Mathf.Clamp(at.z, -bound, bound); }
             else { var f = new Vector2(at.x, at.z); if (f.magnitude > bound) { f = f.normalized * bound; at.x = f.x; at.z = f.y; } }
             return at;
@@ -272,7 +283,7 @@ namespace LastBell.Run
         // ---- glyphs ----
         void GainGlyph()
         {
-            if (Glyphs >= MaxGlyphs) return;
+            if (Glyphs >= Shop.ItemHooks.GlyphCap(P, MaxGlyphs)) return;
             Glyphs++; W.Fx.GlyphGain(P, Glyphs, beamContact);
         }
         // a rune spends one glyph for full power (free in Surge); returns whether it is powered
@@ -295,6 +306,8 @@ namespace LastBell.Run
                 var side = Vector3.Cross(Vector3.up, dir) * 0.35f;
                 Fire(from + side, dir * MissileSpeed, MissileRange, TapDamage, "Magic Missile", false, 2, true);
             }
+            // Missile Volley: the third quick tap fires a free missile beside the others
+            if (Shop.ItemHooks.Tap(P)) Fire(from - Vector3.Cross(Vector3.up, dir) * 0.35f, dir * MissileSpeed, MissileRange, TapDamage, "Magic Missile (volley)", false, 3, Surging);
             W.Fx.MissileTapCast(P, from, dir);
         }
         void BeginCharge()
@@ -313,6 +326,7 @@ namespace LastBell.Run
         void BeginFireVolley()
         {
             tapCd = TapCd; LastVolley = volleyCount = Missiles;
+            Shop.ItemHooks.Cast(P, "a.volley", P.transform.position, AimDir(), 0, 0);   // Blink Charge is spent on this volley
             W.Fx.MissileVolley(P, Missiles);
             Missiles = 0;
         }
@@ -347,10 +361,10 @@ namespace LastBell.Run
         void BeamTick()
         {
             var tr = P.transform; var from = tr.position + HandOffset(tr);
-            int dealt = 0; Vector3 at = from + beamDir * DisRange; bool hit = false;
+            int dealt = 0; Vector3 at = from + beamDir * DisRange; bool hit = false; float width = Shop.ItemHooks.F(P, "a.dis.width", DisWidth);   // Wide Beam
             if (beamTicks % DisEvery == 0)
             {
-                dealt = W.LineBoss(tr.position, beamDir, DisRange, DisWidth, DisDamage[BeamStep - 1], "Disintegrate", out at, false);
+                dealt = W.LineBoss(tr.position, beamDir, DisRange, width, DisDamage[BeamStep - 1], "Disintegrate", out at, false);
                 BeamDamage += dealt; hit = dealt > 0; if (hit) { stepHit = true; beamContact = at; }
             }
             else
@@ -360,7 +374,7 @@ namespace LastBell.Run
                 if (b != null && b.Solid)
                 {
                     var to = Sim.Flat(b.transform.position - tr.position); float along = Vector3.Dot(to, beamDir), side = (to - beamDir * along).magnitude;
-                    if (along > 0 && along < DisRange + b.BodyRadius && side < DisWidth / 2 + b.BodyRadius) { hit = true; at = tr.position + beamDir * Mathf.Max(0, along - b.BodyRadius) + Vector3.up * b.HitHeight; beamContact = at; }
+                    if (along > 0 && along < DisRange + b.BodyRadius && side < width / 2 + b.BodyRadius) { hit = true; at = tr.position + beamDir * Mathf.Max(0, along - b.BodyRadius) + Vector3.up * b.HitHeight; beamContact = at; }
                 }
             }
             W.Fx.Beam(P, from, beamDir, hit ? at : from + beamDir * DisRange, BeamStep, hit);
@@ -379,22 +393,35 @@ namespace LastBell.Run
             var at = ClampAim(SigRange); bool powered = SpendGlyph(at); int arm = Surging ? SigArmSurge : SigArm;
             var s = new Mark { Id = ++markIds, Pos = at, Left = arm, Total = arm, Powered = powered };
             sigils.Add(s); W.Fx.SigilPlace(P, s.Id, at, arm, powered);
+            // Twin Sigil: a powered cast places a second sigil a short way along the aim
+            for (int k = 1; powered && k < Shop.ItemHooks.I(P, "a.sigil.count", 1); k++)
+            {
+                var at2 = ClampAimAt(at + AimDir() * 2.5f * k);
+                var s2 = new Mark { Id = ++markIds, Pos = at2, Left = arm, Total = arm, Powered = true };
+                sigils.Add(s2); W.Fx.SigilPlace(P, s2.Id, at2, arm, true);
+            }
         }
 
         // ---- Arcane Comet ----
         void PlaceComet()
         {
             comCd = ComCd;
-            var at = ClampAim(ComRange); bool powered = SpendGlyph(at); int fall = Surging ? ComFallSurge : ComFall;
-            var c = new Mark { Id = ++markIds, Pos = at, Left = fall, Total = fall, Powered = powered };
-            comets.Add(c); W.Fx.CometMark(P, c.Id, at, fall, powered);
+            var at = ClampAim(ComRange); bool powered = SpendGlyph(at); int fall = Shop.ItemHooks.I(P, "a.comet.fall", Surging ? ComFallSurge : ComFall);   // Hasty / Great Comet
+            // Starfall: three impacts in a line along the aim (the mark and one either side), each a share of a Comet
+            float share = Shop.ItemHooks.F(P, "a.starfall", 0); var along = AimDir();
+            for (int k = share > 0 ? -1 : 0; k <= (share > 0 ? 1 : 0); k++)
+            {
+                var pos = k == 0 ? at : ClampAimAt(at + along * 3f * k);
+                var c = new Mark { Id = ++markIds, Pos = pos, Left = fall, Total = fall, Powered = powered, Scale = share > 0 ? share : 1 };
+                comets.Add(c); W.Fx.CometMark(P, c.Id, pos, fall, powered);
+            }
         }
 
         // ---- Arcane Surge ----
         void StartSurge()
         {
             surgeCd = SurgeCd - SurgeRelease;
-            LastSurgeGlyphs = Glyphs; surgeTotal = surgeLeft = SurgePerGlyph * Glyphs; Glyphs = 0;
+            LastSurgeGlyphs = Glyphs; surgeTotal = surgeLeft = Shop.ItemHooks.SurgePerGlyph(P, SurgePerGlyph) * Glyphs; Glyphs = 0;
             W.Fx.SurgeStart(P, LastSurgeGlyphs, surgeTotal);
         }
 

@@ -237,6 +237,7 @@ namespace LastBell.Run
             bool practice = d.Mode == RunMode.Practice;
             // practice shows no preparation card (Risxhb, October 25, 2026): the fight starts by itself (RunDirector.AutoReady)
             if (practice) return;
+            if (Shop.RunShopFlow.Showing) return;   // the intermission shop replaces the preparation card
             string eb = UiTheme.Spaced(RunDifficulty.Name(d.Difficulty));
             string head = (practice ? "PRACTICE — " + RunDirector.Bosses[d.Encounter].Name : "PREPARATION").ToUpperInvariant();
             string body = practice ? "Practice never advances the run." : d.EncounterOrder.Length == 1 ? "One fight: the Bellkeeper." : $"{d.EncounterOrder.Length} bosses in a row. Health refills before each boss; potions carry over until the final boss refills them.";
@@ -812,7 +813,7 @@ namespace LastBell.Run
             float vw = UiTheme.VirtualWidth, pw = Mathf.Max(480, barW), x = vw / 2 - pw / 2, top = PanelTop;
             float y = top;
             // health: liquid pool (same animation as the boss bar), class name left and number right on the bar
-            float hf = Mathf.Clamp01((float)p.Hp / PlayerController.MaxHp);
+            float hf = Mathf.Clamp01((float)p.Hp / p.MaxHealth);
             var hb = S(x - 2, y - 2, pw + 4, 20);
             UiTheme.Fill(hb, A(UiTheme.InkDeep, 0.85f)); UiTheme.Border(hb, A(UiTheme.GoldDim, 0.8f), Px);
             F(x, y, pw, 16, UiTheme.BarBack);
@@ -820,7 +821,7 @@ namespace LastBell.Run
             T(x + 8, y - 4, pw * 0.5f, 24, p.ClassName, keyStL, UiTheme.IvoryBody);
             y += 22;
             // stamina: thin bar; its number only appears while it is spent
-            float st = Mathf.Clamp01(p.Stamina / PlayerController.MaxStamina);
+            float st = Mathf.Clamp01(p.Stamina / p.MaxStaminaNow);
             F(x, y, pw, 5, A(UiTheme.BarBack, 0.9f));
             F(x, y, pw * st, 5, UiTheme.Stamina);
             if (st < 0.999f) T(x, y + 4, pw, 16, Mathf.RoundToInt(p.Stamina).ToString(), microR, UiTheme.IvoryMuted);
@@ -862,7 +863,7 @@ namespace LastBell.Run
             var mouse = Mouse.current; bool attacking = mouse != null && (mouse.leftButton.isPressed || mouse.rightButton.isPressed);
             bool showTip = over >= 0 && !attacking && Time.unscaledTime - tipSince >= TipDelay;
             if (!showTip) { }
-            else if (pr.Contains(Event.current.mousePosition)) Tooltip(x, top, $"POTION  [F]\n+{PlayerController.PotionHeal} HP, 1 s between drinks. {p.Potions}/{PlayerController.MaxPotions} left.\nPotions carry over between minibosses; health and potions refill before the final boss.");
+            else if (pr.Contains(Event.current.mousePosition)) Tooltip(x, top, $"POTION  [F]\n+{PlayerController.PotionHeal} HP, 1 s between drinks. {p.Potions}/{PlayerController.MaxPotions} left.\nPotions carry over between minibosses; health and potions refill before each area boss.");
             else if (dr.Contains(Event.current.mousePosition)) Tooltip(x, top, "DASH  [RMB]\nShort burst (3 m in 0.2 s) in the move direction. Costs 30 stamina; sprint and jump share the bar.\nNo invincibility: get out of the shape before it resolves. Cancels basic attacks and unreleased windups.");
             else if (hover >= 0) Tooltip(x, top, k.Tooltip(hover));
             if (ShowMeter && d.World != null) Meter(Right - MeterW, 260, d.World.EncounterMeter, "DAMAGE · this encounter", (d.World.Tick - d.World.SegmentStartTick) / 60f);
