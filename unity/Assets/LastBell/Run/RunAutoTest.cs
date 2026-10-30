@@ -895,7 +895,7 @@ namespace LastBell.Run
                 Check($"Sylvara P3 uses {id}", sy.Order.Contains(id));
             Note($"Sylvara P3 buds: {sy.BudsCut} cut, {sy.BudsBloomed} bloomed");
 
-            // Phase 4: seed storm and the enrage steps (the timing is a proposal under review)
+            // Phase 4: seed storm and the enrage steps (timing accepted 29 Oct)
             sy.Order.Clear();
             d.Boss.DebugSetHpFraction(0.24f);
             yield return Until(() => sy.PhaseName == "Seed Storm", 4, "Sylvara phase 4");

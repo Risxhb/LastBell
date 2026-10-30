@@ -12,7 +12,7 @@ namespace LastBell.Run
     //   P1 Spiral Bloom (30 s)      petal spiral, seed pods, sweeping waterfall jets, front-and-back Pruning Arc
     //   P2 Two-Colour Choir (21 s)  brass/cobalt arms and lanes; only your colour hurts you; each toll swaps it
     //   P3 Hollow Bloom (24 s)      second form: 4-arm spiral and two waves of Choir Buds to cut
-    //   P4 Seed Storm (24 s)        rings of seeds that burst into petals; enrage (timing is a proposal under review)
+    //   P4 Seed Storm (24 s)        rings of seeds that burst into petals; enrage (timing accepted 29 Oct)
     // Angles in this file are radians on the floor: a = 0 is +x, a = 90° is +z. Distances are metres from the centre.
     public sealed class SylvaraEncounter : BossEncounter
     {
@@ -28,7 +28,7 @@ namespace LastBell.Run
         const float Deg = Mathf.Deg2Rad, Tau = Mathf.PI * 2;
         const int Stun = 9;                       // ground and arc hits: 0.15 s, no knockback (v1 D6); bullets never stun
         public const int Brass = 1, Cobalt = 2;
-        // Enrage (proposal, 29 Oct): +1 seed per ring and rings 0.1 s sooner every 24 s loop, capped at loop 5;
+        // Enrage (accepted, Chzy18 29 Oct; same clock on every difficulty): +1 seed per ring and rings 0.1 s sooner every 24 s loop, capped at loop 5;
         // Last Storm at 2:00 into Phase 4.
         public const float LastStormAt = 120;
 
