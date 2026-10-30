@@ -25,12 +25,14 @@ namespace LastBell.Run
         enum Act { None, Note, Strike, Refrain, Cresc, Chorus }
         int buffered = -1, bufferUntil; const int BufferTicks = 9;   // PF-05 input buffer
         Act act; int t;
+        public override bool Acting => act != Act.None;
         Vector3 aim;
         int noteCd, refrainCd, crescCd, chorusCd, charges = StrikeCharges, recharge;
         public int Harmony { get; private set; }
         // the ringing bell (on the boss: there is one target per encounter)
         public bool Bell => bellLeft > 0;
         int bellLeft; public int Strength { get; private set; }
+        public int BellLeft => bellLeft;   // bots
         readonly int[] echo = new int[4]; public int Echoes { get; private set; }   // 4 = the most any item allows (Great Bell)
         int EchoCap => Shop.ItemHooks.I(P, "c.echo.cap", MaxEchoes);                  // Third Echo, Great Bell
         public static int BaseNoteDamage => NoteDamage; public static float BaseNoteSpeed => NoteSpeed; public static int BaseStrikeDamage => StrikeDamage;   // item-fired notes and rings

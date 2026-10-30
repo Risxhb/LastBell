@@ -18,7 +18,7 @@ namespace LastBell.Run
         static string[] ExpectedPhaseNames(BossEncounter b) => b switch
         {
             BellkeeperEncounter _ => new[] { BellkeeperEncounter.Phase1, BellkeeperEncounter.Phase2, BellkeeperEncounter.Phase3 },
-            AurelionEncounter _ => new[] { "Perfect Order", "Misalignment", "Exposed Meridian" },
+            AurelionEncounter _ => new[] { "Perfect Order", "Misalignment", "Exposed Meridian", "Last Light" },
             SylvaraEncounter _ => new[] { "Dormant Choir", "Awakening Bloom", "Hollow Refrain" },
             CrucivarEncounter _ => new[] { "Sealed Furnace", "Casting Heat", "Open Pressure" },
             TempoTyrantEncounter _ => new[] { "Haste", "Broken Cadence · Haste" },

@@ -20,7 +20,24 @@ namespace LastBell.Run
             int h = (floatSeq++ + (text != null ? text.Length : 0)) & int.MaxValue;
             floats.Add(new FloatText { pos = world, text = text, color = c, jx = (h % 5 - 2) * 9f });
         }
-        public static void ClearTransient() { floats.Clear(); }
+        public static void ClearTransient() { floats.Clear(); labels.Clear(); banner = null; }
+        // a big centre-screen call (Aurelion v4: wipes, the enrage warning) for `seconds` of real time
+        static string banner; static Color bannerColor; static float bannerUntil;
+        public static void Banner(string text, Color c, float seconds) { banner = text; bannerColor = c; bannerUntil = Time.unscaledTime + seconds; }
+        public static string CurrentBanner => banner != null && Time.unscaledTime < bannerUntil ? banner : null;
+        // a narrated caption box (demo videos): a title and a line of explanation, until changed or cleared with null
+        public static string CaptionTitle, CaptionBody;
+        // a world-space label that stays until its owner hides it (Aurelion v3: Ecliptic numerals, SUN / SHADE marks);
+        // with `follow`, Pos is an offset above that transform (a moving player)
+        public sealed class WorldLabel { public Vector3 Pos; public Transform Follow; public string Text; public Color Color; public int Size; public bool Hidden; public void Hide() => Hidden = true; }
+        static readonly List<WorldLabel> labels = new List<WorldLabel>();
+        public static WorldLabel Label(Vector3 world, string text, Color c, int size = 34, Transform follow = null)
+        {
+            labels.RemoveAll(l => l.Hidden);
+            var l = new WorldLabel { Pos = world, Text = text, Color = c, Size = size, Follow = follow };
+            if (labels.Count < 40) labels.Add(l);
+            return l;
+        }
 
         RunDirector d;
         GUIStyle revealName, revealEpithet, resultPrimary, resultAction;
@@ -50,7 +67,8 @@ namespace LastBell.Run
         // Phase ticks only for bosses that change phase, at their real thresholds (fraction of max HP).
         static float[] PhaseTicks(BossEncounter b) =>
             b is BellkeeperEncounter ? new[] { 0.70f, 0.35f } :
-            b is AurelionEncounter || b is CrucivarEncounter || b is SylvaraEncounter ? new[] { 0.65f, 0.30f } :
+            b is AurelionEncounter ae ? ae.PhaseMarks :   // v4: 70 / 40 / 20 %, v2-v3: 65 / 30 %
+            b is CrucivarEncounter || b is SylvaraEncounter ? new[] { 0.65f, 0.30f } :
             b is TempoTyrantEncounter ? new[] { TempoTyrantEncounter.FrenzyAt } :
             b is ChimeboundOracleEncounter || b is DialWardenEncounter || b is PendulumSentinelEncounter ? new[] { 0.5f } : null;
         float hitFlash;
@@ -82,6 +100,8 @@ namespace LastBell.Run
             }
             if (d.State == RunState.Menu && kb.dKey.wasPressedThisFrame)
                 d.SelectDifficulty((Difficulty)(((int)RunDifficulty.Selected + 1) % RunDifficulty.Names.Length));
+            if (d.State == RunState.Menu && kb.aKey.wasPressedThisFrame)
+                d.SelectAllies((RunParty.Selected + 1) % (RunParty.MaxAllies + 1));
         }
 
         void TickChip()
@@ -207,7 +227,9 @@ namespace LastBell.Run
                 // boss-order tracker (Track) removed from the combat HUD at Risxhb's request
                 Boss();
                 PlayerPanel();
+                BannerText(); CaptionText();
                 Floats();
+                Labels();
                 HazardLabels();
                 PlayerMarks();
                 if (ShowMechanicGallery) MechanicGallery();
@@ -656,6 +678,8 @@ namespace LastBell.Run
             // phase line (no HP numbers; the Tempo Tyrant shows its tempo in its own HUD)
             float yy = rowsY;
             if (!(b is TempoTyrantEncounter)) T(x + 10, yy, bw * 0.65f, rowH, b.PhaseName, row15, BA(UiTheme.Ivory));
+            // Aurelion v4: the enrage clock and the Corona Shield (BossEncounter.HudExtra), right of the phase line
+            if (b.HudExtra != null) { var hx = UiTheme.Style(UiTheme.SizeNumeric, true, TextAnchor.MiddleRight, UiTheme.Ivory); T(x + bw * 0.35f, yy, bw * 0.65f - 10, rowH, b.HudExtra, hx, BA(UiTheme.Ivory)); }
 
             // attack-name warning rows removed (Risxhb, October 24, 2026): telegraphs on the floor carry the warning.
             // Exception (Chzy18, October 24, 2026): a hazard tagged with a hostile mechanic (Hazard.MechanicId) gets one row with
@@ -803,6 +827,7 @@ namespace LastBell.Run
             return r;
         }
 
+        // bot allies (RunParty): class and health, left edge
         void PlayerPanel()
         {
             var p = d.Player; if (p == null) return;
@@ -928,6 +953,64 @@ namespace LastBell.Run
                 float cx = s.x + UiTheme.V(f.jx), cy = h - s.y - UiTheme.V(FloatRise * Mathf.Clamp01(f.age / FloatLife));
                 UiTheme.Label(new Rect(cx - UiTheme.V(60), cy - UiTheme.V(15), UiTheme.V(120), UiTheme.V(30)), f.text, floatSt, c);
             }
+        }
+
+        // Aurelion v4 overlays (wipe / enrage banner, demo captions, world labels): their own plain styles
+        GUIStyle lab, ban, numStyle;
+        GUIStyle num => numStyle ?? (numStyle = new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter });
+        GUIStyle capT, capB;
+        void CaptionText()
+        {
+            if (string.IsNullOrEmpty(CaptionTitle)) return;
+            if (capT == null) { capT = new GUIStyle(num) { fontSize = 28 }; capB = new GUIStyle(num) { fontSize = 20, wordWrap = true, fontStyle = FontStyle.Normal }; }
+            float w = Mathf.Min(1100, Screen.width - 40), x = (Screen.width - w) / 2, y = Screen.height - 330;
+            UiTheme.Fill(new Rect(x, y, w, 96), new Color(0.03f, 0.04f, 0.09f, 0.82f));
+            capT.normal.textColor = new Color(1f, 0.86f, 0.5f); GUI.Label(new Rect(x, y + 4, w, 36), CaptionTitle, capT);
+            capB.normal.textColor = new Color(0.93f, 0.95f, 1f); GUI.Label(new Rect(x + 16, y + 40, w - 32, 54), CaptionBody ?? "", capB);
+        }
+
+        void BannerText()
+        {
+            var t = CurrentBanner; if (t == null) return;
+            if (ban == null) ban = new GUIStyle(num) { fontSize = 46 };
+            ban.normal.textColor = new Color(0, 0, 0, 0.8f); GUI.Label(new Rect(3, Screen.height * 0.3f + 3, Screen.width, 70), t, ban);
+            ban.normal.textColor = bannerColor; GUI.Label(new Rect(0, Screen.height * 0.3f, Screen.width, 70), t, ban);
+        }
+        void Labels()
+        {
+            var cam = Camera.main; if (!cam) return; float h = Screen.height;
+            if (lab == null) lab = new GUIStyle(num) { wordWrap = false, clipping = TextClipping.Overflow };   // "SUNSPOT I  II" stays on one line
+            // keep labels out of the boss block, the demo caption and the screen edges (Aurelion readability A1/A3/A4): a
+            // label pushed inward keeps a thin leader back to the spot it names
+            float top = d.Boss != null ? UiTheme.V(165) : 16, bottom = string.IsNullOrEmpty(CaptionTitle) ? h - UiTheme.V(150) : h - 340;
+            foreach (var l in labels)
+            {
+                if (l.Hidden || (l.Follow == null && !ReferenceEquals(l.Follow, null))) continue;
+                var s = cam.WorldToScreenPoint(l.Follow ? l.Follow.position + l.Pos : l.Pos); if (s.z < 0) continue;
+                lab.fontSize = l.Size; float wide = Mathf.Max(200, lab.CalcSize(new GUIContent(l.Text)).x + 8);
+                float half = l.Size * 0.6f;
+                var at = new Vector2(s.x, h - s.y);
+                var c = new Vector2(Mathf.Clamp(at.x, wide / 2 + 10, Screen.width - wide / 2 - 10), Mathf.Clamp(at.y, top + half, Mathf.Max(top + half, bottom - half)));
+                if ((c - at).sqrMagnitude > 36)
+                {
+                    var dir = (at - c).normalized;
+                    Leader(c + dir * half, at, new Color(l.Color.r, l.Color.g, l.Color.b, 0.8f));
+                    UiTheme.Fill(new Rect(at.x - 3, at.y - 3, 6, 6), l.Color);
+                }
+                lab.normal.textColor = new Color(0, 0, 0, 0.75f);
+                GUI.Label(new Rect(c.x - wide / 2 + 2, c.y - 28, wide, 60), l.Text, lab);
+                lab.normal.textColor = l.Color;
+                GUI.Label(new Rect(c.x - wide / 2, c.y - 30, wide, 60), l.Text, lab);
+            }
+        }
+
+        static void Leader(Vector2 a, Vector2 b, Color c)
+        {
+            var v = b - a; float len = v.magnitude; if (len < 4) return;
+            var m = GUI.matrix;
+            GUIUtility.RotateAroundPivot(Mathf.Atan2(v.y, v.x) * Mathf.Rad2Deg, a);
+            UiTheme.Fill(new Rect(a.x, a.y - 1, len, 2), c);
+            GUI.matrix = m;
         }
 
         void HazardLabels()

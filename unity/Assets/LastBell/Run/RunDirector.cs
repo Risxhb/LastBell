@@ -37,7 +37,7 @@ namespace LastBell.Run
         {
             new BossEntry("Bellkeeper", w => BossEncounter.Spawn<BellkeeperEncounter>(w, Vector3.zero, 0), final: true, phases: 3),
             // Skyward Spire area boss; authored practice map
-            new BossEntry("Aurelion (area 1)", w => BossEncounter.Spawn<AurelionEncounter>(w, new Vector3(0, 0, -1.5f), 0), map: AurelionMap, phases: 3),
+            new BossEntry("Aurelion (area 1)", w => BossEncounter.Spawn<AurelionEncounter>(w, new Vector3(0, 0, -1.5f), 0), map: AurelionMap, phases: AurelionArgs.V4 ? 4 : 3),   // v4 (the default set) adds Last Light
             // Verdant Chimes area boss (graybox); authored practice map
             new BossEntry("Sylvara (area 3)", w => BossEncounter.Spawn<SylvaraEncounter>(w, new Vector3(0, 0, -1.5f), 0), map: SylvaraMap, phases: 3),
             // Brass Foundry area boss; authored practice map
@@ -86,6 +86,10 @@ namespace LastBell.Run
         public RunMode Mode { get; private set; }
         public string ClassName { get; private set; } = "Vanguard";
         public Difficulty Difficulty { get; private set; } = Difficulty.Medium;   // copied from the menu at run start
+        public int AllyCount { get; private set; }            // bot allies, copied from the menu at run start (RunParty); a retry keeps it
+        public readonly List<PlayerController> Allies = new List<PlayerController>();
+        // allies line up behind the player at the south entry, alternating left and right
+        static Vector3 AllySocket(int i) => PlayerSocket + new Vector3((i % 2 == 0 ? -1 : 1) * (1.6f + 1.6f * (i / 2)), 0, 1.2f);
         public int Encounter { get; private set; }          // index into Bosses (the last is the final boss)
         public int PracticePhase { get; private set; } = 1; // practice only: the 1-based HP phase the fight starts in (a retry keeps it)
         public int Generation { get; private set; }
@@ -189,6 +193,7 @@ namespace LastBell.Run
             PracticePhase = mode == RunMode.Practice && encounter >= 0 && encounter < Bosses.Length ? Mathf.Clamp(phase, 1, Bosses[encounter].Phases) : 1;
             Mode = mode; ClassName = Array.IndexOf(Classes, className) >= 0 ? className : "Vanguard";
             Difficulty = RunDifficulty.Selected;
+            AllyCount = RunParty.Selected;
             BuildRun(encounter);
             Go(RunState.Ready);
             return true;
@@ -211,6 +216,16 @@ namespace LastBell.Run
             if (State != RunState.Menu) return false;
             if (RunDifficulty.Selected != level) Log.Add($"{Time.frameCount}: difficulty {RunDifficulty.Name(level)}");
             RunDifficulty.Selected = level;
+            return true;
+        }
+
+        // Menu only: how many bot allies the next run or practice brings (remembered between sessions).
+        public bool SelectAllies(int count)
+        {
+            if (State != RunState.Menu) return false;
+            count = Mathf.Clamp(count, 0, RunParty.MaxAllies);
+            if (RunParty.Selected != count) Log.Add($"{Time.frameCount}: allies {count}");
+            RunParty.Selected = count;
             return true;
         }
 
@@ -267,6 +282,15 @@ namespace LastBell.Run
             Player.Input = InputOverride ?? new KeyboardMouseInput();
             Player.AbilitiesEnabled = false;
             Player.Presenter.GetUp();
+            // bot allies (RunParty): classes spread across all three, standing in a row behind the player
+            Allies.Clear();
+            var allyClasses = RunParty.AllyClasses(ClassName, AllyCount);
+            for (int i = 0; i < allyClasses.Length; i++)
+            {
+                var a = PlayerController.Spawn(World, allyClasses[i], AllySocket(i), 180);
+                a.Input = new AllyBot(i, allyClasses.Length, AllyBot.AllyMode); a.AbilitiesEnabled = false; a.Presenter.GetUp();
+                Allies.Add(a);
+            }
             Encounter = startEncounter; practiceEncounter = startEncounter;
             RunTicks = 0; EncountersCleared = 0; Victory = false; DefeatCause = null;
             acc = 0;
@@ -277,6 +301,7 @@ namespace LastBell.Run
             if (World != null) World.ClearTransient();
             if (bossFx) bossFx.ResetAll(); if (playerFx) playerFx.ResetAll();
             if (scopeParent) Destroy(scopeParent.gameObject);
+            Allies.Clear();
             World = null; Player = null; Boss = null; scopeParent = null;
             RunHud.ClearTransient();
             Paused = false;
@@ -298,6 +323,11 @@ namespace LastBell.Run
             if (Mode == RunMode.Run && pos > 0) Player.RefreshHealth(refillPotions: true);
             Player.PrepareForEncounter(PlayerSocket, 180);
             Player.AbilitiesEnabled = false;
+            for (int i = 0; i < Allies.Count; i++)
+            {
+                if (Mode == RunMode.Run && pos > 0) Allies[i].RefreshHealth(refillPotions: pos == RunOrder.Length - 1);
+                Allies[i].PrepareForEncounter(AllySocket(i), 180); Allies[i].AbilitiesEnabled = false;
+            }
             Go(RunState.Intro);
         }
 
@@ -308,6 +338,7 @@ namespace LastBell.Run
             World.CombatActive = true;
             World.BeginSegment();
             Player.AbilitiesEnabled = true;
+            foreach (var a in Allies) a.AbilitiesEnabled = true;
             Boss.BeginCombat();
             ApplyPracticePhase();   // again after BeginCombat, so a boss that resets its phase state there keeps the pick
             Go(RunState.Combat);
@@ -329,6 +360,7 @@ namespace LastBell.Run
             Log.Add($"encounter end {Boss?.Id} defeated={bossDefeated}");
             World.CombatActive = false;
             Player.AbilitiesEnabled = false;
+            foreach (var a in Allies) a.AbilitiesEnabled = false;
             World.ClearTransient();
             if (!bossDefeated && Boss) Boss.Halt();
         }
@@ -419,7 +451,9 @@ namespace LastBell.Run
             if (Player) cam.transform.rotation = Quaternion.LookRotation(-FollowOffset + Vector3.up);
             else cam.transform.rotation = Quaternion.LookRotation(look - MenuCamPos);
             cam.fieldOfView = 44;
+            if (ShotCamera.HasValue) { cam.transform.position = ShotCamera.Value.pos; cam.transform.rotation = Quaternion.LookRotation(ShotCamera.Value.look - ShotCamera.Value.pos); }
         }
+        public static (Vector3 pos, Vector3 look)? ShotCamera;   // autotest gallery: a fixed overhead view of the whole arena
 
         // slot on the progress track: one per boss
         public int ProgressSlot => Math.Max(0, Array.IndexOf(EncounterOrder, Encounter));

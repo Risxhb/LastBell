@@ -1,8 +1,31 @@
 # Aurelion ability set v2: morning report (proposal)
 
-**State:** designed, built, compile-checked. **Unity autotest: see "Test results".** Nothing is human-approved until Chzy18 plays it.
+**State:** designed, built, **autotested: 292 passed, 0 failed, 0 errors** (full Aurelion suite, v1 and v2, in the Windows player). **Not human-approved:** nothing is until Chzy18 plays it.
 
-Branch: `feature/aurelion-abilities-v2` (integration). Draft PR into `feature/boss-aurelion`: see the PR link in the Abilities session.
+Branch: `feature/aurelion-abilities-v2` (integration). The tested head is local commit `5afa691`, with this report on top.
+
+**The draft PR into `feature/boss-aurelion` is not open yet, and GitHub is not up to date.** Since about 10:50 every push to Risxhb/collab fails with *"remote: Your account is suspended"* (HTTP 403). `origin/feature/aurelion-abilities-v2` stops at `3f3b54e`. The last few commits exist only in the local repo shared by all the worktrees under `last bell/`: the phase-plan test fixes and this report. Once the account works again, run `git push` from `last bell/aurelion-abilities` and open the PR.
+
+## Update: v2.1 (harder, after Chzy18's playtest)
+
+Spec: `ABILITIES-v2.1.md`. **State:** built, **autotested 405 passed, 0 failed, 0 errors** (integrated run 5 at local `492b757`, with Zenith Collapse's telegraph rings; report `last bell/aurelion-logs/aurelion-integration/autotest-5/autotest-report.txt`; run 4 at `4b8e7a3` was 398/0). **Full suite** (every run-loop check, party bots, Aurelion v1 + v2, Sylvara) at `9768fcb` after merging the parent's `feature/party-bots`: **587 passed, 0 failed, 0 errors** (`autotest-6`). Playtested once by Chzy18 (run 4 build, solo, Hard, 20 % HP): "still not hard enough solo, but let's table that for now". Escape check passes every case at Easy, Medium and Hard (`escape-check-v2.1-*.md`). Not human-approved.
+
+- **Zenith Collapse** (new, all levels):
+  - He walks to the arena centre, then a Ground annulus round him leaves a safe disc of 4.5 m at N ≤ 2 (5.0 m in Phase 3), 5.5 m at N 3–4 and 6.5 m at N ≥ 5.
+  - 45 damage. It resolves after 3.0 s (Hard 2.4 s, Easy 3.75 s).
+  - It's always paired with Meridian Lances, which resolve 0.3 s after it.
+  - Gold orrery rings slide in to the disc edge.
+- **Constant layering** on Medium and Hard (Easy keeps v2): two patterns in almost every block, 0.3 s gaps, the 3.5 s punish unchanged. Pairs are timed by resolve tick through each ability's `Duration()`.
+- **Hard windows ×0.7**, with these exceptions:
+  - Lances volley 2 tracks 1.2 s.
+  - The cascade and Orrery stop at the 2.0 s floor.
+  - Starfall keeps 1.1 s when paired with Lances.
+- Every Hard escape from the worst spot needs a dash or a sprint. The tightest margin is 0.35 s (own Starfall star, with a dash).
+- **Playtest:** `LastBell.exe -lastbellBossHp 0.2` (new switch: scales every boss's HP), then practice → "Aurelion (area 1)".
+- **Deviation from the spec:** he doesn't cast Starfall during the walk to the centre. It would make three patterns at the start of the Zenith pair, and he only walks once because he stays at the centre.
+- **Open (from the spec):**
+  - Should Medium also tighten?
+  - Is Zenith Collapse always at the centre too predictable?
 
 ## How to play it
 
@@ -19,12 +42,14 @@ Branch: `feature/aurelion-abilities-v2` (integration). Draft PR into `feature/bo
 
 | Ability | Code | State |
 |---|---|---|
-| Meridian Lances | `Encounters/Aurelion/Abilities/MeridianLances.cs` | built, checks written |
-| Starfall Mirror | `.../StarfallMirror.cs` | built, checks written |
-| Noon Shadow | `.../NoonShadow.cs` | built, checks written |
-| Orrery Closing (signature, with the Horizon) | `.../OrreryClosing.cs` | built, checks written |
-| Hour Hands (Hard only) | `.../HourHands.cs` | built, checks written |
-| Phase plan, transitions, punish, v1 switch, practice hook | `Encounters/Aurelion/AurelionEncounter.V2.cs` | built, checks written |
+| Meridian Lances | `Encounters/Aurelion/Abilities/MeridianLances.cs` | complete: built, all checks pass |
+| Starfall Mirror | `.../StarfallMirror.cs` | complete: built, all checks pass |
+| Noon Shadow | `.../NoonShadow.cs` | complete: built, all checks pass (stand-in look: no sun-ray hatching yet) |
+| Orrery Closing (signature, with the Horizon) | `.../OrreryClosing.cs` | complete: built, all checks pass |
+| Hour Hands (Hard only) | `.../HourHands.cs` | complete: built, all checks pass |
+| Phase plan, transitions, punish, v1 switch, practice hook | `Encounters/Aurelion/AurelionEncounter.V2.cs` | complete: built, all checks pass |
+
+None are partial or not started. "Complete" means prototype-complete: stand-in telegraphs and reused v1 boss clips, no new art, audio or animation.
 
 The phase plan follows ABILITIES.md §3 exactly:
 - Perfect Order: Lances (3 beams) > Starfall > Noon > Orrery > punish.
@@ -38,7 +63,50 @@ Telegraphs are stand-ins on the shared hazard telegraph (coral/amber, crisp edge
 
 ## Test results
 
-_Filled in after the integrated Unity run (see below)._
+**Integrated run 3 at `5afa691`: ALL PASSED: 292 passed, 0 failed, 0 errors logged.**
+- Windows player, Unity 6000.6.6f1, `-lastbellAutotest -lastbellAurelionOnly`.
+- Report: `last bell/aurelion-logs/aurelion-integration/autotest-3/autotest-report.txt`.
+
+| Section | Passed | Failed |
+|---|---|---|
+| Aurelion v1 (old set, now behind `-lastbellAbilitySet v1`) | 51 | 0 |
+| Meridian Lances | 70 | 0 |
+| Starfall Mirror | 30 | 0 |
+| Noon Shadow | 35 | 0 |
+| Orrery Closing | 47 | 0 |
+| Hour Hands | 30 | 0 |
+| Phase plan, transitions, punish, practice hook, v1 switch | 29 | 0 |
+
+Each ability's section covers the brief's eight checks:
+1. spawn, lock and resolve ticks at Easy, Medium and Hard;
+2. escape routes with scripted players at 4.2 and 6 m/s, a 0.25 s reaction, finite stamina and one dash where the brief allows it;
+3. a player standing still is hit;
+4. a player standing still is hit both next to the boss and at 8 m+ or at the rim;
+5. one hit per instance;
+6. the solo rule and N = 2, 4 and 8;
+7. boss death mid-windup cancels on the same tick;
+8. the Easy and Hard differences.
+
+The phase-plan section checks:
+- each phase's block order;
+- one queued transition at 65 %, and the second form at 30 % with the same HP bar and no heal;
+- a burst through both thresholds playing one transition;
+- the 3.5 s punish with no live hazard;
+- at most two damaging patterns at once;
+- Hour Hands on Hard only;
+- the Noon + Starfall pairing (both resolve on the same tick, and edge runners clear both with one dash each);
+- the `-lastbellAbility` loop for every ability;
+- `-lastbellAbilitySet v1`.
+
+The integrated runs were not clean at first. Run 1 at `e63ef17` gave 269 passed and 22 failed; run 2 at `3f3b54e` gave 290 and 8. Every failure was in test code, never in an ability:
+- Scripted players couldn't dash: the harness turned off `AbilitiesEnabled`, which also drops dash input.
+- Lances read the previous cast's lock tick.
+- Noon expected the wrong lit-side angles.
+- Orrery's crown walker aimed at a spot inside the crown.
+- Hour Hands' solo case stood where the knockback lands between two hours.
+- The phase plan's edge runner ran into the boss's body.
+
+**Screenshots and clips:** the six PNGs in the report folder are from the v1 section (phase 1–3, the Alignment rings and the boss-death windup). The v2 checks don't capture screenshots or video yet. The next useful step is a short capture per ability with `RunAutoTest.Capture`.
 
 ## Escape check
 
@@ -56,6 +124,8 @@ From the integration (Abilities session):
 3. **Easy keeps the Horizon at 4 s** (as the brief says) while the warnings stretch ×1.25, so on Easy the Horizon covers less of Starfall's warning.
 4. The ABILITIES.md §8 questions still stand: the second form at 30 %, HP scaling, Noon's line through the centre or the boss, the Starfall mirror point, Hour Hands on Easy, and whether to keep v1.
 
+5. **Hour Hands: spoke II's snapping to hours leaves gaps.** Beyond about 4.6 m from him a player can stand between two hours, outside the 1.8 m spoke. Solo, spoke I's knockback can land a still player in that gap, so spoke II misses. That matches the brief's geometry. Should spoke II aim at the exact bearing, or should the spoke be wider?
+
 From the ability sessions (details in each brief's build notes):
 - **Lances:** the cascade is locked at once and always turns +22.5°. With nobody standing, it aims along his facing.
 - **Noon:** the cone reaches the rim + 0.5 m, not 28 m (same hits). The line itself is unsafe (0.3 m margin). Sun-ray hatching and the white-gold flash are not built yet.
@@ -67,6 +137,10 @@ From the ability sessions (details in each brief's build notes):
 - **Hour Hands:** players who share an hour on the lock share the first spoke; the duplicate spokes are withdrawn.
 
 ## Blocked / environment
+
+- **GitHub account suspended** (see the top). The commits are safe in the local repo. Nothing after `3f3b54e` has been pushed, and the draft PR isn't open.
+- **Build noise.** One ability branch once committed re-saved scenes, scene `.meta` files with new GUIDs, and URP settings. It was reverted on the integration branch and on that ability branch. Every session now restores those paths after a build.
+- **Disk usage.** Noon Shadow's scan found about 80 GB in per-worktree Unity Library caches (2.8–3.7 GB each) across the boss trees. The Skyward Spire session freed about 8.3 GB by deleting its own video-capture frames.
 
 - **Drive C: is full** (between 0.1 and 2.5 GB free overnight). A Unity Library is 3.3 GB and a player build 1.3 GB, so only one worktree in this tree could build.
   - The ability sessions compile-checked with Roslyn (`tools/aurelion/compile-check.sh`).

@@ -17,7 +17,7 @@ namespace LastBell.VFX
         static readonly int PShape = Shader.PropertyToID("_Shape"), PRadius = Shader.PropertyToID("_Radius"),
             PInner = Shader.PropertyToID("_Inner"), PHalf = Shader.PropertyToID("_HalfAngle"),
             PProgress = Shader.PropertyToID("_Progress"), PLock = Shader.PropertyToID("_Lock"),
-            PFlash = Shader.PropertyToID("_Flash"), PFade = Shader.PropertyToID("_Fade"),
+            PFlash = Shader.PropertyToID("_Flash"), PFade = Shader.PropertyToID("_Fade"), PShade = Shader.PropertyToID("_Shade"),
             PMode = Shader.PropertyToID("_Mode"), PLow = Shader.PropertyToID("_ColorLow"),
             PHigh = Shader.PropertyToID("_ColorHigh"), PEdge = Shader.PropertyToID("_ColorEdge"),
             PWidth = Shader.PropertyToID("_Width"), PTail = Shader.PropertyToID("_Tail"),
@@ -72,10 +72,23 @@ namespace LastBell.VFX
             internal bool spentTinted;
             public void Place(Vector3 origin, float yaw) { go.transform.SetPositionAndRotation(new Vector3(origin.x, Floor, origin.z), Quaternion.Euler(0, yaw, 0)); }
             public void Progress(float p) { mpb.SetFloat(PProgress, Mathf.Clamp01(p)); }
-            public void Lock() { if (!locked) { locked = true; lockFlash = 1; } }
+            public void Lock() { if (!locked) { locked = true; lockFlash = 1; if (LockOnTop && mr.sortingOrder < 1) mr.sortingOrder = 1; } }
             public void Resolve() { flash = 0; }
             public void Expire() { if (flash < 0) flash = 0.1f; }   // fades out with no damage flash (cooled slag)
             public void Tint(Color fill, Color border) { mpb.SetColor(PFill, fill); mpb.SetColor(PBorder, border); }
+            // a state region, not a warning: a flat fill at this opacity (Severance's Night shadow); 0 = the normal telegraph fill
+            public void Shade(float opacity) { mpb.SetFloat(PShade, Mathf.Clamp01(opacity)); }
+            // area motif inside the shape (Reference/Telegraph-Style v2): 0 = the per-shape Bellkeeper identity, 1 = Skyward Spire
+            public void Motif(int area) { mpb.SetFloat(PMotif, area); }
+            // a nonhostile goal (get in / stand here): thin, dotted and unfilled in its own identity colour (Telegraph-Style v2)
+            public void Friendly(Color rim) { mpb.SetFloat(PMemory, 1); Tint(rim * 0.35f, rim); maxFade = 1; }
+            // cut-out discs (x, z, radius in world metres, up to 6): the shape minus them; presentation only
+            public void Holes(Vector4[] holes, int count) { if (holeBuf == null) holeBuf = new Vector4[6]; for (int k = 0; k < 6; k++) holeBuf[k] = k < count ? holes[k] : Vector4.zero; mpb.SetVectorArray(PHoles, holeBuf); mpb.SetFloat(PHoleCount, Mathf.Min(count, 6)); }
+            Vector4[] holeBuf;
+            // draw order among telegraphs (higher draws over lower): a persistent edge or a locked strike over tracking fills
+            public int Order { get => mr.sortingOrder; set => mr.sortingOrder = value; }
+            // opt-in: on its lock the telegraph moves above unlocked ones (Aurelion, readability A4: locked edges first)
+            public bool LockOnTop;
             // Unfinished Hour inactive outline: dashed, unfilled, low contrast. Presentation only, never resolves.
             public void Memory() { mpb.SetFloat(PMemory, 1); Tint(new Color(0.35f, 0.38f, 0.45f), new Color(0.95f, 0.9f, 0.78f)); maxFade = 0.55f; }
             // removed without a resolve flash (the memory turning into its live warning, or being erased)
@@ -84,7 +97,8 @@ namespace LastBell.VFX
             public void Clip(Vector3 centre, float radius) { mpb.SetFloat(PClipRadius, radius); mpb.SetVector(PClipCentre, new Vector4(centre.x, centre.z, 0, 0)); }
         }
         static readonly int PFill = Shader.PropertyToID("_ColorFill"), PBorder = Shader.PropertyToID("_ColorBorder"),
-            PMemory = Shader.PropertyToID("_Memory"), PClipRadius = Shader.PropertyToID("_ClipRadius"), PClipCentre = Shader.PropertyToID("_ClipCentre");
+            PMemory = Shader.PropertyToID("_Memory"), PClipRadius = Shader.PropertyToID("_ClipRadius"), PClipCentre = Shader.PropertyToID("_ClipCentre"),
+            PMotif = Shader.PropertyToID("_Motif"), PHoles = Shader.PropertyToID("_Holes"), PHoleCount = Shader.PropertyToID("_HoleCount");
 
         Telegraph NewTelegraph(int shape, float radius, float inner, float half, Mesh quad)
         {
@@ -94,7 +108,7 @@ namespace LastBell.VFX
             t.mr = t.go.AddComponent<MeshRenderer>(); t.mr.sharedMaterial = telegraphMat;
             t.mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; t.mr.receiveShadows = false;
             t.mpb.SetFloat(PShape, shape); t.mpb.SetFloat(PRadius, radius); t.mpb.SetFloat(PInner, inner); t.mpb.SetFloat(PHalf, half);
-            t.mpb.SetFloat(PProgress, 0); t.mpb.SetFloat(PLock, 0); t.mpb.SetFloat(PFlash, 0); t.mpb.SetFloat(PFade, 0);
+            t.mpb.SetFloat(PProgress, 0); t.mpb.SetFloat(PLock, 0); t.mpb.SetFloat(PFlash, 0); t.mpb.SetFloat(PFade, 0); t.mpb.SetFloat(PMotif, 0); t.mpb.SetFloat(PShade, 0);
             t.mr.SetPropertyBlock(t.mpb); telegraphs.Add(t); return t;
         }
         static float Pad(float r) => r + 0.3f;

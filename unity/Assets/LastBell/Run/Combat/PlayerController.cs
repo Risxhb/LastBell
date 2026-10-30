@@ -199,6 +199,15 @@ namespace LastBell.Run
             if (Hp == 0) GoDown();
         }
 
+        // a party-wide wipe mechanic (Aurelion v4: an empty tower, Final Noon): down now, whatever the HP. Not a hit: no
+        // shield or mitigation applies, and it is reported as the defeat cause.
+        public void ForceDown(string cause)
+        {
+            if (Down) return;
+            Hp = 0; World.LastDamageSource = cause;
+            GoDown();
+        }
+
         void GoDown()
         {
             Down = true; stun = 0; dashTick = 0; jumpTick = -1; Height = 0;
@@ -316,6 +325,7 @@ namespace LastBell.Run
         public abstract string ClassState();                // Opening / Harmony etc.
         public abstract void Step(PlayerInput inp);
         public virtual void TickTimersOnly() { }             // cooldowns keep running while stunned or dashing
+        public virtual bool Acting => false;                 // mid-action (bots: decide the next press when idle)
         public virtual bool CanDash() => true;
         public virtual bool CanJump() => true;
         public virtual void OnDash() { }
