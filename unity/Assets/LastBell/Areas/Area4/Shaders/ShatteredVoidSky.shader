@@ -5,10 +5,10 @@ Shader "LastBell/Area4/ShatteredVoidSky"
     Properties
     {
         _Base ("Base", Color) = (0.043, 0.031, 0.125, 1)
-        _Mid ("Mid", Color) = (0.11, 0.06, 0.24, 1)
+        _Mid ("Mid", Color) = (0.055, 0.03, 0.13, 1)
         _Nebula ("Nebula", Color) = (0.48, 0.31, 0.82, 1)
         _Wisp ("Wisp", Color) = (0.61, 0.53, 0.91, 1)
-        _NebulaStrength ("Nebula strength", Float) = 1.0
+        _NebulaStrength ("Nebula strength", Float) = 0.45
         _StarDensity ("Star density", Range(0.99, 1)) = 0.9975
     }
     SubShader
@@ -42,7 +42,9 @@ Shader "LastBell/Area4/ShatteredVoidSky"
                 c = lerp(c, _Base.rgb * 1.3, smoothstep(0.2, 0.95, y));
                 float neb = fbm(d * 3 + float3(0, t * 0.01, t * 0.004));
                 float wisp = fbm(d * 7 - neb * 1.6 + float3(t * 0.006, 0, 0));
-                c += _Nebula.rgb * pow(neb, 3.2) * _NebulaStrength + _Wisp.rgb * pow(wisp, 4) * 0.9;
+                c += _Nebula.rgb * pow(neb, 3.2) * _NebulaStrength + _Wisp.rgb * pow(wisp, 4) * 0.45;
+                float north = smoothstep(0.35, 1, -d.z) * exp(-abs(d.y - 0.05) * 3.5), horizon = exp(-abs(d.y + 0.02) * 9);
+                c += (_Nebula.rgb * 0.55 + _Wisp.rgb * 0.25 * neb) * north * (0.5 + neb) + _Wisp.rgb * 0.12 * horizon;
                 float s = h3(floor(d * 420));
                 c += float3(1, 0.92, 0.97) * step(_StarDensity, s) * (0.6 + 0.4 * sin(t * 2 + s * 90));
                 return half4(c, 1);

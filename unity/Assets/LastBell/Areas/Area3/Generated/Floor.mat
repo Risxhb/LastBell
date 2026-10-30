@@ -44,6 +44,7 @@ Material:
     - _GlowStrength: 0.35
     - _Metal: 0
     - _StoneDetail: 0
+    - _Sway: 0
     - _UseMask: 1
     - _UseNormalMap: 1
     - _UseVertexColor: 0

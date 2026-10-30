@@ -48,9 +48,12 @@ namespace LastBell.Run
         public Action<Hazard> OnResolve;         // presentation of the resolve (effects), after the hit test
         public Action<Hazard> OnSpent;           // the active period is over (same tick as OnResolve when ActiveTicks is 0)
         public Func<Vector3, Vector3> Push;      // knockback direction override (Second Press pushes toward the arena centre)
+        public float ClipRadius;                 // > 0: the telegraph is drawn only over the floor disc of this radius (presentation)
+        public bool HitOnResolve = true;         // false: the owner deals the hits itself while the warning is up (a sweeping charge)
 
         public int Age { get; internal set; }
         public bool Locked => Age >= LockAt;
+        public bool Cancelled { get; internal set; }   // withdrawn before resolving (e.g. its recipient went down)
         internal BellkeeperFx.Telegraph Tele;
         internal readonly HashSet<PlayerController> Hit = new HashSet<PlayerController>();
 
@@ -122,6 +125,7 @@ namespace LastBell.Run
             // jump-clearable bars read differently from everything else (teal, plus the HUD's JUMP label)
             if (h.JumpClearable) h.Tele.Tint(JumpFill, JumpBorder);
             else if (h.BurnPerSecond > 0) h.Tele.Tint(SlagFill, SlagBorder);   // standing slag: molten, not the strike coral
+            if (h.ClipRadius > 0) h.Tele.Clip(Vector3.zero, h.ClipRadius);
             h.Tele.Place(h.Origin, h.Yaw);
             if (h.LockAt <= 0) h.Tele.Lock();
             live.Add(h);
@@ -144,6 +148,7 @@ namespace LastBell.Run
             for (int i = live.Count - 1; i >= 0; i--)
             {
                 var h = live[i];
+                if (h.Cancelled) { live.RemoveAt(i); h.Tele.Expire(); continue; }   // withdrawn: fades with no damage flash
                 if (h.Age < h.ResolveAt) continue;
                 bool first = h.Age == h.ResolveAt, last = h.Age >= h.ResolveAt + Mathf.Max(0, h.ActiveTicks - 1);
                 if (last && h.BurnPerSecond > 0) { live.RemoveAt(i); h.Tele.Expire(); h.OnResolve?.Invoke(h); continue; }   // cooled slag: harmless, no hit
@@ -151,7 +156,7 @@ namespace LastBell.Run
                 if (last) { live.RemoveAt(i); h.Tele.Resolve(); }
                 if (first) Resolved++;
                 if (h.ShareTotal > 0) { if (first) ResolveShared(h); }
-                else
+                else if (h.HitOnResolve)
                     foreach (var p in w.Players)
                     {
                         if (p.Down || h.Hit.Contains(p) || !h.Hits(p)) continue;
@@ -182,6 +187,8 @@ namespace LastBell.Run
         }
         public static int ShareOf(Hazard h, int inside) => inside <= 0 ? 0 : Mathf.CeilToInt(h.ShareTotal / (float)inside);
 
+        // Withdraws one pending hazard: it is removed at the end of this step and never resolves or deals damage.
+        public void Cancel(Hazard h) { h.Cancelled = true; }
         // Standing hazards: each player burns at the highest rate of the locked ones they stand in (overlaps never add up),
         // in whole HP as the fraction accumulates. Leaving every pool drops the carried fraction.
         void StepBurn()

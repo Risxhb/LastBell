@@ -1,11 +1,15 @@
-// Area 3 sea of mist (Windblown teardown §6): two scrolling fbm layers in world XZ, lit teal, fading with distance.
+// Area 3 sea of mist (Windblown teardown §6): one of several stacked layers between about -10 and -36 m. Density comes
+// from the shared cloud noise (LBCloud.hlsl), so the wisps here line up with the height fog on the towers, and drifts on
+// the shared wind at the layer's own speed. Depth fade (soft intersection) means pillars never show a hard cut line.
+// Brighter toward the sun and around waterfall impacts, darker in the abyss under the platform.
 Shader "LastBell/Area3/Mist"
 {
     Properties
     {
-        _Thin ("Thin Colour", Color) = (0.10, 0.32, 0.33, 1)
-        _Thick ("Thick Colour", Color) = (0.62, 0.88, 0.85, 1)
         _Opacity ("Opacity", Range(0, 1)) = 0.5
+        _LayerSeed ("Layer Seed", Float) = 0
+        _Speed ("Drift Speed", Float) = 1
+        _SoftDistance ("Soft Intersection (m)", Float) = 3
     }
     SubShader
     {
@@ -20,20 +24,30 @@ Shader "LastBell/Area3/Mist"
             #pragma vertex vert
             #pragma fragment frag
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+            #include "LBCloud.hlsl"
             CBUFFER_START(UnityPerMaterial)
-                float4 _Thin, _Thick; float _Opacity;
+                float _Opacity, _LayerSeed, _Speed, _SoftDistance;
             CBUFFER_END
             struct A { float4 positionOS : POSITION; };
-            struct Vt { float4 positionCS : SV_POSITION; float3 w : TEXCOORD0; };
-            Vt vert(A v) { Vt o; o.w = TransformObjectToWorld(v.positionOS.xyz); o.positionCS = TransformWorldToHClip(o.w); return o; }
-            float h(float2 p) { return frac(sin(dot(p, float2(127.1, 311.7))) * 43758.5453); }
-            float n(float2 p) { float2 i = floor(p), f = frac(p); f = f * f * (3 - 2 * f); return lerp(lerp(h(i), h(i + float2(1, 0)), f.x), lerp(h(i + float2(0, 1)), h(i + float2(1, 1)), f.x), f.y); }
-            float fbm(float2 p) { float a = 0.5, s = 0; for (int k = 0; k < 5; k++) { s += n(p) * a; p *= 2.03; a *= 0.5; } return s; }
+            struct Vt { float4 positionCS : SV_POSITION; float3 w : TEXCOORD0; float4 screen : TEXCOORD1; };
+            Vt vert(A v) { Vt o; o.w = TransformObjectToWorld(v.positionOS.xyz); o.positionCS = TransformWorldToHClip(o.w); o.screen = ComputeScreenPos(o.positionCS); return o; }
             half4 frag(Vt i) : SV_Target
             {
-                float2 p = i.w.xz * 0.03; float d = length(i.w.xz), t = _Time.y;
-                float c = fbm(p + float2(t * 0.012, t * 0.006)) * 0.6 + fbm(p * 2.1 - float2(t * 0.02, 0)) * 0.4, dens = smoothstep(0.38, 0.78, c);
-                return half4(lerp(_Thin.rgb, _Thick.rgb, dens) * lerp(0.55, 1, smoothstep(15, 60, d)), dens * _Opacity * smoothstep(260, 120, d)); // darker in the abyss under the platform
+                float2 xz = i.w.xz + _LB_Wind.xy * _LB_Time * 0.4 * (_Speed - 1);          // each layer drifts at its own speed
+                float dens = lbcDensity(xz, _LayerSeed), d = length(i.w.xz);
+                float impact = lbcImpact(i.w.xz, 5);
+                float gap = smoothstep(0.32, 0.5, lbcNoise(i.w.xz * 0.011 + lbcDrift(0.5) * 0.3 + 4.1));            // open patches over the water
+                dens = saturate(dens * lerp(0.15, 1, gap) + impact * 0.45);                    // spray thickens the cloud where falls land
+                float3 col = lerp(_LB_CloudThin.rgb, _LB_CloudThick.rgb, dens);
+                float2 sunXZ = normalize(_MainLightPosition.xz + 1e-4);
+                col *= lerp(0.55, 1, smoothstep(15, 60, d));                                 // darker under the platform
+                col *= 1 + 0.45 * saturate(dot(normalize(i.w.xz + 1e-4), sunXZ)) * smoothstep(25, 110, d); // brighter on the sun side
+                col += _LB_CloudThick.rgb * impact * 0.35;
+                float sceneZ = LinearEyeDepth(SampleSceneDepth(i.screen.xy / i.screen.w), _ZBufferParams), fragZ = i.screen.w;
+                float soft = saturate((sceneZ - fragZ) / _SoftDistance);                     // soft intersection with geometry
+                return half4(col, dens * _Opacity * soft * smoothstep(300, 140, d));
             }
             ENDHLSL
         }

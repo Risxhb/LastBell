@@ -14,7 +14,7 @@ namespace LastBell.Run
     // with exit code 0 (all checks passed) or 1. Dev hooks it uses are the same ones the HUD labels (F9/F8: defeat the
     // boss, set its HP fraction) plus DebugSetHp on the player to shorten the defeat path; all damage taken comes from
     // real hazards.
-    public sealed class RunAutoTest : MonoBehaviour
+    public sealed partial class RunAutoTest : MonoBehaviour
     {
         public static bool Requested => Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellAutotest", StringComparison.OrdinalIgnoreCase));
         static string OutDir
@@ -203,12 +203,26 @@ namespace LastBell.Run
             Check($"{label}: nothing resolved after boss death", d.World == null || d.World.Hazards.Resolved == resolved0);
         }
 
+        IEnumerator AdvanceToFinal()
+        {
+            while (d.State == RunState.Combat && d.ProgressSlot < d.EncounterOrder.Length - 1)
+            {
+                int slot = d.ProgressSlot;d.Boss.DebugDefeat();
+                yield return Until(() => d.State == RunState.Combat && d.ProgressSlot == slot + 1, 8, "random run advances slot " + slot);
+                if (d.Player) d.Player.DebugSetHp(PlayerController.MaxHp);
+            }
+            Check("final encounter is Bellkeeper",d.Boss is BellkeeperEncounter && d.ProgressSlot == d.EncounterOrder.Length - 1);
+        }
+
         // ------------------------------------------------------------ the scenario
         IEnumerator Main()
         {
             Note($"Last Bell autotest · {Application.version} · Unity {Application.unityVersion} · {SystemInfo.graphicsDeviceName} · {DateTime.Now:yyyy-MM-dd HH:mm}");
             d.InputOverride = bot;
             yield return Wait(1.0f);
+            if (AurelionOnly) { yield return AurelionChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
+            // -lastbellArcanistOnly: just the Arcanist run and its kit checks (skips the menu, map, other-class and boss suites)
+            if (ArcanistOnly) { yield return ArcanistRun(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
             Check($"boots into the menu on a run map ({RunMaps.CurrentName})", d.State == RunState.Menu && RunMaps.Current >= 0);
             for (int i = 0; i < RunMaps.All.Length; i++)
                 Check($"map selectable: {RunMaps.All[i].Name}", RunMaps.InBuild(i), RunMaps.All[i].RunScene);
@@ -236,9 +250,10 @@ namespace LastBell.Run
             for (int i = 0; i < 4; i++) { d.RequestReady(); d.RequestReady(); yield return null; }
             yield return Until(() => d.State == RunState.Combat, 4, "combat 1");
             yield return Wait(0.3f);
-            Check("repeated Ready starts exactly one encounter", d.EncounterStarts == starts0 + 1 && d.Encounter == 0, $"starts {d.EncounterStarts - starts0}");
-            Check("the run fights only real bosses: one fight, the Bellkeeper", RunDirector.RunOrder.Length == 1 && d.Boss is BellkeeperEncounter && !d.Boss.Placeholder);
+            Check("repeated Ready starts exactly one encounter", d.EncounterStarts == starts0 + 1 && d.Encounter == d.EncounterOrder[0], $"starts {d.EncounterStarts - starts0}");
+            Check("run contains all four real bosses with Bellkeeper last", d.EncounterOrder.Length == 4 && d.EncounterOrder.Distinct().Count() == 4 && RunDirector.Bosses[d.EncounterOrder.Last()].Final && !d.Boss.Placeholder);
             Check("run starts at full health and potions", d.Player.Hp == PlayerController.MaxHp && d.Player.Potions == PlayerController.MaxPotions, $"hp {d.Player.Hp}, potions {d.Player.Potions}");
+            yield return AdvanceToFinal();
             var bk = (BellkeeperEncounter)d.Boss;
             int bossHp0 = d.Boss.Hp;
             bool sawOpening = false; var vk = d.Player.Kit as VanguardKit2;
@@ -320,7 +335,7 @@ namespace LastBell.Run
             yield return Wait(1.0f); yield return Shot("bellkeeper_defeat");
             Check("defeat opens the chest fully", bk.ShellAngle > 60, $"shell {bk.ShellAngle:0}°");
             yield return Until(() => d.State == RunState.Results, 6, "results 1");
-            Check("victory after the Bellkeeper, the run's only encounter", d.Victory && d.EncountersCleared == 1 && d.EncounterStarts == 1 && d.EncounterEnds == 1,
+            Check("victory after all four bosses, Bellkeeper last", d.Victory && d.EncountersCleared == 4 && d.EncounterStarts == 4 && d.EncounterEnds == 4,
                 $"victory {d.Victory}, cleared {d.EncountersCleared}, starts {d.EncounterStarts}, ends {d.EncounterEnds}");
             yield return Shot("results_victory");
 
@@ -328,7 +343,7 @@ namespace LastBell.Run
             int runs0 = d.RunsStarted;
             for (int i = 0; i < 4; i++) { d.RequestRetry(); d.RequestRetry(); yield return null; }
             yield return Wait(0.5f);
-            Check("repeated Retry starts exactly one fresh run", d.RunsStarted == runs0 + 1 && d.State == RunState.Ready && d.Encounter == 0, $"runs +{d.RunsStarted - runs0}, state {d.State}");
+            Check("repeated Retry starts exactly one fresh run", d.RunsStarted == runs0 + 1 && d.State == RunState.Ready && d.Encounter == d.EncounterOrder[0], $"runs +{d.RunsStarted - runs0}, state {d.State}");
             FreshRunChecks("after victory");
 
             // ---------- run 2: defeat path ----------
@@ -365,6 +380,7 @@ namespace LastBell.Run
             yield return Wait(0.4f); yield return Shot("ready_chimesinger");
             d.RequestReady();
             yield return Until(() => d.State == RunState.Combat, 4, "chimesinger combat");
+            yield return AdvanceToFinal();
             yield return ChimesingerChecks();
             chimeStep = 0; d.Player.DebugSetHp(PlayerController.MaxHp); d.Boss.BeginCombat();
             var f2 = StartCoroutine(Fight(4f, ChimeRotation, 6f));
@@ -372,28 +388,11 @@ namespace LastBell.Run
             yield return Shot("chimesinger_bellkeeper");
             yield return TickRegressions();   // ends the fight with a real Resonant Note killing blow
             yield return Until(() => d.State == RunState.Results, 8, "results 4");
-            Check("Chimesinger run reaches victory", d.Victory && d.EncountersCleared == 1);
+            Check("Chimesinger run reaches victory", d.Victory && d.EncountersCleared == 4);
             d.ReturnToMenu(); yield return null;
 
             // ---------- run 5: Arcanist rotation and full victory ----------
-            d.StartRun("Arcanist");
-            yield return Wait(0.4f); yield return Shot("ready_arcanist");
-            Check("Arcanist uses its model", d.Player.Presenter.HasModel);
-            d.RequestReady();
-            yield return Until(() => d.State == RunState.Combat, 4, "arcanist combat");
-            yield return ArcanistChecks();
-            if (d.State == RunState.Combat)
-            {
-                d.Player.DebugSetHp(PlayerController.MaxHp); d.Boss.BeginCombat();
-                var f3 = StartCoroutine(Fight(4f, ArcRotation, 6f));
-                yield return WaitAlive(4f); StopCoroutine(f3); bot.Clear();
-                yield return Shot("arcanist_bellkeeper");
-                d.Boss.DebugDefeat();
-                yield return Until(() => d.State != RunState.Combat, 2, "arcanist boss defeated");
-            }
-            yield return Until(() => d.State == RunState.Results, 8, "results 5");
-            Check("Arcanist run reaches victory", d.Victory && d.EncountersCleared == 1);
-            d.ReturnToMenu(); yield return null;
+            yield return ArcanistRun();
 
             // ---------- practice ----------
             d.StartPractice("Vanguard", 0);
@@ -439,6 +438,8 @@ namespace LastBell.Run
                 d.ReturnToMenu();
             }
             Check("map tour returns to the starting map", RunMaps.Current == startMap);
+            // ---------- area bosses (practice only for now) ----------
+            yield return AurelionChecks();
 
             yield return SylvaraChecks();
 
@@ -450,7 +451,7 @@ namespace LastBell.Run
         void FreshRunChecks(string when)
         {
             var p = d.Player;
-            Check($"fresh run {when}: full health/stamina/potions, encounter 1", p.Hp == PlayerController.MaxHp && p.Potions == PlayerController.MaxPotions && Mathf.Approximately(p.Stamina, PlayerController.MaxStamina) && d.Encounter == 0 && d.EncountersCleared == 0);
+            Check($"fresh run {when}: full health/stamina/potions, encounter 1", p.Hp == PlayerController.MaxHp && p.Potions == PlayerController.MaxPotions && Mathf.Approximately(p.Stamina, PlayerController.MaxStamina) && d.Encounter == d.EncounterOrder[0] && d.EncountersCleared == 0);
             bool cdsClear = true; for (int i = 0; i < p.Kit.SlotNames.Length; i++) cdsClear &= p.Kit.Cooldown01(i) <= 0;
             Check($"fresh run {when}: cooldowns and class state reset", cdsClear && string.IsNullOrEmpty(p.Kit.ClassState()) || (p.Kit is ChimesingerKit ck && ck.Harmony == 0 && !ck.Bell));
             Check($"fresh run {when}: no stale bosses, hazards or projectiles", FindObjectsByType<BossEncounter>().Length == 0 && d.World.Hazards.Count == 0 && d.World.Projectiles.Count == 0 && d.Boss == null);
@@ -568,66 +569,151 @@ namespace LastBell.Run
             d.Boss.BeginCombat();
         }
 
-        static int ArcRotation(int f) => f % 150 == 10 ? 1 : f % 150 == 100 ? 2 : f % 300 == 140 ? 3 : f % 10 == 0 ? 0 : -1;
+        // taps every 10 ticks, with a Rune Sigil, an Arcane Comet and (once glyphs are held) an Arcane Surge mixed in
+        static int ArcRotation(int f) => f % 360 == 60 ? 2 : f % 1100 == 200 ? 3 : f % 1000 == 500 ? 4 : f % 10 == 0 ? 0 : -1;
 
-        // #41 sequence: Seal A -> three Clockbolts -> empowered Lance -> Seal B -> three Clockbolts -> empowered Lance ->
-        // Convergence in the shared ripe window. Plus early detonation, Tick cap, dash-cancelled Lance and the Anchor.
+        int MeterHits(string ability) => d.World.EncounterMeter.TryGetValue(ability, out var r) ? r.Hits : 0;
+        int MeterDamage(string ability) => d.World.EncounterMeter.TryGetValue(ability, out var r) ? r.Damage : 0;
+
+        // run 5: an Arcanist run to the final boss, the Arcanist kit checks there, then a full victory
+        IEnumerator ArcanistRun()
+        {
+            d.StartRun("Arcanist");
+            yield return Wait(0.4f); yield return Shot("ready_arcanist");
+            Check("Arcanist uses its model", d.Player.Presenter.HasModel);
+            d.RequestReady();
+            yield return Until(() => d.State == RunState.Combat, 4, "arcanist combat");
+            yield return AdvanceToFinal();
+            yield return ArcanistChecks();
+            if (d.State == RunState.Combat)
+            {
+                d.Player.DebugSetHp(PlayerController.MaxHp); d.Boss.BeginCombat();
+                var f3 = StartCoroutine(Fight(4f, ArcRotation, 6f));
+                yield return WaitAlive(4f); StopCoroutine(f3); bot.Clear();
+                yield return Shot("arcanist_bellkeeper");
+                d.Boss.DebugDefeat();
+                yield return Until(() => d.State != RunState.Combat, 2, "arcanist boss defeated");
+            }
+            yield return Until(() => d.State == RunState.Results, 8, "results 5");
+            Check("Arcanist run reaches victory", d.Victory && d.EncountersCleared == 4);
+            d.ReturnToMenu(); yield return null;
+        }
+
+        // Arcane kit (docs/design/arcanist-redesign.md): Magic Missile tap and an aimed 3-missile charge, Disintegrate's
+        // channel (steps, glyphs, turn cap, early release, dash refund), glyph-powered and weak Rune Sigil (0.8 s) and
+        // Arcane Comet (3 s, bullseye), Arcane Surge (cast refund, 2 s per glyph, 5-missile charge) and Blink.
         IEnumerator ArcanistChecks()
         {
             var p = d.Player; var k = (ArcanistKit)p.Kit; var w = d.World;
             d.Boss.Halt(); yield return Wait(0.3f); w.ClearTransient();
-            p.transform.position = d.Boss.transform.position + new Vector3(0, 0, 6f);
-            bot.Aim = d.Boss.transform.position;
-            // Tick cap
-            for (int i = 0; i < 5; i++) { bot.press[0] = true; yield return Wait(0.36f); }
-            Check("Clockbolt builds Ticks and caps at 3", k.Ticks == 3, k.ClassState());
-            // dash cancels an unfinished Lance: nothing spent, Ticks kept
-            bot.press[2] = true; yield return Wait(0.08f); bot.dash = true; bot.MoveWorld = Vector3.right; yield return Wait(0.3f); bot.Clear();
-            Check("Clockstep cancels an unfinished Arc Lance and keeps Ticks", k.Ticks == 3 && k.Cooldown01(2) <= 0, k.ClassState());
-            p.transform.position = d.Boss.transform.position + new Vector3(0, 0, 6f); bot.Aim = d.Boss.transform.position;
-            // early detonation: one fresh seal, no inscription
-            bot.press[1] = true; yield return Wait(0.4f);
-            Check("Time Seal places a seal and spends a charge", k.Seals.Count == 1 && k.Charges == 1, k.ClassState());
-            bot.press[3] = true; yield return Wait(0.5f);
-            int early = k.LastConvergence;
-            Check("early Convergence detonates and clears seals", early > 0 && k.Seals.Count == 0, "damage " + early);
-            yield return Until(() => k.Cooldown01(3) <= 0 && k.Charges == 2, 7, "Convergence and both seal charges ready");
-            // full sequence
-            StartCoroutine(Capture("arcanist_rotation", 480));
-            bot.Aim = d.Boss.transform.position;
-            float seq0 = Time.time;
-            bot.press[1] = true; yield return Wait(0.25f);                                      // Seal A
-            for (int i = 0; i < 3; i++) { bot.press[0] = true; yield return Wait(0.27f); }      // three Clockbolts
-            yield return Until(() => k.Ticks == 3, 0.4f, "3 Ticks after three Clockbolts");
-            Check("three Clockbolts reach 3 Ticks", k.Ticks == 3, k.ClassState());
-            bot.press[2] = true; yield return Wait(0.38f);                                      // empowered Lance
-            Check("empowered Arc Lance spends Ticks and inscribes the oldest seal", k.LastLanceEmpowered && k.Ticks == 0 && k.Seals.Count == 1 && k.Seals[0].Inscribed, k.ClassState());
-            bot.press[1] = true; yield return Wait(0.25f);                                      // Seal B, < 2 s after A
-            Note($"Seal A -> Seal B spacing: {(Time.time - seq0) - 0.25f:0.00} s (must be < 2 s for a shared ripe window)");
-            Check("Seal B is a separate seal on the same target", k.Seals.Count == 2 && !k.Seals[1].Inscribed, k.ClassState());
-            for (int i = 0; i < 3; i++) { bot.press[0] = true; yield return Wait(0.27f); }
-            bot.press[2] = true; yield return Wait(0.38f);
-            Check("second empowered Lance inscribes seal B", k.Seals.Count == 2 && k.Seals[0].Inscribed && k.Seals[1].Inscribed, k.ClassState());
-            yield return Until(() => k.Seals.Count == 2 && k.Seals[0].Ripe && k.Seals[1].Ripe, 5, "both seals ripe together");
-            Check("the two-seal schedule fits inside the shared ripe window", k.Seals.Count == 2 && k.Seals[1].Ripe, k.ClassState());
-            yield return Shot("arcanist_two_ripe_seals");
-            int bossHp = d.Boss.Hp;
-            bot.press[3] = true; yield return Wait(0.5f);
-            int full = k.LastConvergence;
-            Check("perfect Convergence out-damages early detonation", full > early * 4, $"perfect {full} vs early {early}");
-            Check("Convergence resolves exactly once", bossHp - d.Boss.Hp == full, $"boss lost {bossHp - d.Boss.Hp}, convergence {full}");
-            // Temporal Anchor: place, move, recast -> back at the anchor with a shield that absorbs a hit
-            yield return Wait(0.3f);
-            var anchorAt = p.transform.position;
-            bot.press[4] = true; yield return Wait(0.35f);
-            Check("Temporal Anchor records the position", k.AnchorSet);
-            bot.MoveWorld = Vector3.left; yield return Wait(0.6f); bot.Clear();
-            bot.press[4] = true; yield return Wait(0.25f);
-            Check("recast returns to the anchor", Sim.Flat(p.transform.position - anchorAt).magnitude < 0.5f, $"{Sim.Flat(p.transform.position - anchorAt).magnitude:0.00} m away");
-            int hp0 = p.Hp;
-            w.Hazards.Spawn(new Hazard { Source = "Test strike", Shape = HazardShape.Circle, Kind = HazardKind.Strike, Origin = p.transform.position, Radius = 1.5f, ResolveAt = 6, Damage = 20 });
-            yield return Wait(0.3f);
-            Check("Anchor shield absorbs the next hit", p.Hp == hp0 && k.ShieldHp == 10, $"hp {hp0} -> {p.Hp}, shield {k.ShieldHp}");
+            var boss = d.Boss.transform.position;
+            var stand = boss + new Vector3(0, 0, 6f + d.Boss.BodyRadius);
+            p.transform.position = stand;
+            bot.Aim = boss;
+            // ---- Magic Missile: tap
+            int tap0 = MeterHits("Magic Missile");
+            bot.press[0] = true; yield return Wait(0.5f);
+            Check("Magic Missile tap fires one straight missile that hits", MeterHits("Magic Missile") == tap0 + 1, $"hits {MeterHits("Magic Missile") - tap0}");
+            Check("a tap does not start a charge", !k.Charging);
+            // ---- charge 3, release at the boss: all three hit
+            int ch0 = MeterHits("Magic Missile (charged)");
+            bot.press[0] = true; bot.hold[0] = true; yield return Wait(0.95f);
+            Check("holding LMB summons 3 missiles", k.Charging && k.Missiles == 3, k.ClassState());
+            yield return Shot("arcanist_missile_charge");
+            bot.hold[0] = false; yield return Wait(1.4f);
+            Check("releasing fires the charged volley at the cursor; all 3 hit", k.LastVolley == 3 && MeterHits("Magic Missile (charged)") == ch0 + 3, $"volley {k.LastVolley}, hits {MeterHits("Magic Missile (charged)") - ch0}");
+            // no tracking: released while aiming 90 degrees away from the boss, they fly where the mouse is and miss
+            bot.Aim = p.transform.position + Vector3.right * 6; bot.press[0] = true; bot.hold[0] = true; yield return Wait(0.95f);
+            bot.hold[0] = false; yield return Wait(1.6f);
+            Check("charged missiles fly at the cursor and do not track the boss", MeterHits("Magic Missile (charged)") == ch0 + 3, $"hits {MeterHits("Magic Missile (charged)") - ch0 - 3} of 3 (want 0)");
+            bot.Aim = boss;
+            // dash during a charge drops it
+            bot.press[0] = true; bot.hold[0] = true; yield return Wait(0.6f);
+            bot.dash = true; bot.MoveWorld = Vector3.right; yield return Wait(0.05f);
+            Check("Blink drops a missile charge", !k.Charging && k.Missiles == 0, k.ClassState());
+            Check("Blink hides the body during the dash", p.Presenter.Hidden && k.Blinking);
+            yield return Wait(0.4f); bot.Clear();
+            Check("Blink shows the body again where the dash ends", !p.Presenter.Hidden && !k.Blinking);
+            p.transform.position = stand; bot.Aim = boss; yield return Wait(0.3f);
+            // ---- Disintegrate: a dash during the windup refunds it
+            bot.press[1] = true; bot.hold[1] = true; yield return Wait(0.12f);
+            bot.dash = true; yield return Wait(0.3f); bot.hold[1] = false;
+            Check("dashing during the Disintegrate windup refunds it", !k.BeamActive && k.Cooldown01(1) <= 0, k.SlotState(1));
+            p.transform.position = stand; bot.Aim = boss; yield return Wait(0.3f);
+            // full channel: 13 damage ticks, 3 steps, one glyph per step that hit
+            Check("the Arcanist starts with no glyphs", k.Glyphs == 0, k.ClassState());
+            int dis0 = MeterDamage("Disintegrate"); bool sawStep3 = false; int glyphsAtStep3 = -1;
+            StartCoroutine(Capture("arcanist_disintegrate", 180));
+            bot.press[1] = true; bot.hold[1] = true;
+            float tt = 0; bool shotBeam = false;
+            while (tt < 2.8f)
+            {
+                sawStep3 |= k.BeamActive && k.BeamStep == 3;
+                if (k.BeamActive && k.BeamStep == 3 && glyphsAtStep3 < 0) glyphsAtStep3 = k.Glyphs;
+                if (sawStep3 && !shotBeam) { shotBeam = true; yield return Shot("arcanist_disintegrate_step3"); }
+                tt += Time.deltaTime; yield return null;
+            }
+            bot.hold[1] = false; yield return Wait(0.3f);
+            Check("Disintegrate channels for 2 s through 3 damage steps", sawStep3 && !k.BeamActive);
+            Check("a full Disintegrate deals 4x8 + 4x12 + 5x16 = 160", MeterDamage("Disintegrate") - dis0 == 160 && k.BeamDamage == 160, $"dealt {MeterDamage("Disintegrate") - dis0}");
+            Check("each Disintegrate step that hits carves a glyph: 2 by step 3, 3 after a full channel", glyphsAtStep3 == 2 && k.Glyphs == 3, $"step 3 start {glyphsAtStep3}, end {k.Glyphs}");
+            Check("Disintegrate cooldown starts when the beam ends", k.Cooldown01(1) > 0.85f, k.SlotState(1));
+            yield return Shot("arcanist_glyphs_full");
+            // ---- Arcane Surge: a dash before the release refunds it and keeps the glyphs
+            bot.press[4] = true; yield return Wait(0.07f);
+            bot.dash = true; bot.MoveWorld = Vector3.left; yield return Wait(0.35f); bot.Clear();
+            Check("dashing during the Arcane Surge cast cancels it for free and keeps the glyphs", !k.Surging && k.Glyphs == 3 && k.Cooldown01(4) <= 0, k.ClassState());
+            p.transform.position = stand; bot.Aim = boss; yield return Wait(0.3f);
+            // ---- Rune Sigil with a glyph: drawn, armed, explodes on the boss after 0.8 s
+            int sig0 = MeterDamage("Rune Sigil");
+            bot.Aim = boss; bot.press[2] = true; yield return Wait(0.45f);
+            Check("Rune Sigil is placed at the cursor and spends a glyph", k.Sigils.Count == 1 && Sim.Flat(k.Sigils[0].Pos - boss).magnitude < 0.3f && k.Sigils[0].Powered && k.Glyphs == 2, k.ClassState());
+            yield return Shot("arcanist_rune_sigil");
+            yield return Wait(0.2f);
+            Check("Rune Sigil is still arming at 0.65 s", k.Sigils.Count == 1);
+            yield return Wait(0.4f);
+            Check("a powered Rune Sigil explodes after 0.8 s for 55", k.Sigils.Count == 0 && MeterDamage("Rune Sigil") - sig0 == 55 && k.LastSigilPowered, $"dealt {MeterDamage("Rune Sigil") - sig0}");
+            // ---- Arcane Comet with a glyph: a 3 s fall, bullseye on a still boss
+            int com0 = MeterDamage("Arcane Comet (bullseye)");
+            bot.Aim = boss; bot.press[3] = true; yield return Wait(0.3f);
+            Check("Arcane Comet marks the cursor, spends a glyph and starts falling", k.Comets.Count == 1 && Sim.Flat(k.Comets[0].Pos - boss).magnitude < 0.3f && k.Comets[0].Powered && k.Glyphs == 1, k.ClassState());
+            yield return Wait(2.3f); yield return Shot("arcanist_comet_falling");
+            Check("the comet is still falling at 2.6 s", k.Comets.Count == 1);
+            yield return Until(() => k.Comets.Count == 0, 1.5f, "comet lands");
+            yield return Wait(0.05f); yield return Shot("arcanist_comet_impact");
+            Check("Arcane Comet lands 3 s after the mark; a powered bullseye deals 180", k.LastComet == 180 && k.LastCometBullseye && k.LastCometPowered && MeterDamage("Arcane Comet (bullseye)") - com0 == 180, $"comet {k.LastComet}, bullseye {k.LastCometBullseye}");
+            // ---- Arcane Surge with 3 glyphs (topped up from the 1 left): 6 s, a 5-missile charge
+            k.DebugSetGlyphs(3);
+            bot.Aim = boss; bot.press[4] = true; yield return Until(() => k.Surging, 1.5f, "Surge starts"); yield return Wait(0.1f);
+            Check("Arcane Surge spends every glyph for 2 s each", k.Surging && k.Glyphs == 0 && k.LastSurgeGlyphs == 3 && k.SurgeSeconds > 5.4f && k.SurgeSeconds <= 6f, k.ClassState());
+            yield return Shot("arcanist_surge");
+            int sv0 = MeterHits("Magic Missile (charged)");
+            yield return Wait(0.15f);   // the Surge cast (0.3 s) has to finish before LMB starts a charge
+            bot.press[0] = true; bot.hold[0] = true; yield return Wait(0.6f); yield return Until(() => k.Missiles == 5, 1.5f, "5 missiles");
+            Check("in Surge the charge summons 5 missiles", k.Charging && k.Missiles == 5, k.ClassState());
+            bot.hold[0] = false; yield return Wait(1.2f);
+            Check("the Surge volley fires 5 missiles that hit", k.LastVolley == 5 && MeterHits("Magic Missile (charged)") - sv0 == 5, $"volley {k.LastVolley}, hits {MeterHits("Magic Missile (charged)") - sv0}");
+            yield return Until(() => !k.Surging, 6.5f, "Surge ends");
+            Check("Arcane Surge ends on time", !k.Surging);
+            // ---- Rune Sigil without a glyph: 35 %
+            yield return Until(() => k.Cooldown01(2) <= 0, 7, "Rune Sigil ready");
+            int weak0 = MeterDamage("Rune Sigil (no glyph)");
+            bot.Aim = boss; bot.press[2] = true; yield return Wait(0.2f);
+            Check("a Rune Sigil cast with no glyph is weak", k.Sigils.Count == 1 && !k.Sigils[0].Powered, k.ClassState());
+            yield return Shot("arcanist_rune_sigil_weak");
+            yield return Wait(0.9f);
+            Check("a weak Rune Sigil deals 35 % (19)", MeterDamage("Rune Sigil (no glyph)") - weak0 == 19 && !k.LastSigilPowered, $"dealt {MeterDamage("Rune Sigil (no glyph)") - weak0}");
+            bot.press[4] = true; yield return Wait(0.3f);
+            Check("Arcane Surge needs glyphs", !k.Surging, k.SlotState(4));
+            // ---- Disintegrate turn cap and early release
+            yield return Until(() => k.Cooldown01(1) <= 0, 9, "Disintegrate ready");
+            bot.Aim = boss; bot.press[1] = true; bot.hold[1] = true; yield return Wait(0.6f);
+            var dir0 = k.BeamDir; int tick0 = w.Tick;
+            bot.Aim = p.transform.position + Vector3.Cross(Vector3.up, dir0) * 8; yield return Wait(0.2f);
+            float turned = Vector3.Angle(dir0, k.BeamDir); int ticks = w.Tick - tick0;
+            Check("Disintegrate turns toward the cursor at 1.5° per tick at most", k.BeamActive && turned <= ticks * 1.5f + 0.5f && turned >= (ticks - 2) * 1.5f, $"{turned:0.0}° in {ticks} ticks");
+            bot.hold[1] = false; yield return Wait(0.1f);
+            Check("releasing 2 ends the beam early", !k.BeamActive && k.Cooldown01(1) > 0.9f);
             p.DebugSetHp(PlayerController.MaxHp);
             d.Boss.BeginCombat();
         }
@@ -683,6 +769,7 @@ namespace LastBell.Run
         }
 
         // ------------------------------------------------------------ Sylvara (graybox, docs/design/sylvara.md v0.1)
+        static bool ArcanistOnly => Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellArcanistOnly", StringComparison.OrdinalIgnoreCase));
         static bool OnlySylvara => Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellSylvara", StringComparison.OrdinalIgnoreCase));
 
         IEnumerator SylvaraChecks()

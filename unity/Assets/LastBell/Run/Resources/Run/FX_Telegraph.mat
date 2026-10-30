@@ -26,6 +26,7 @@ Material:
     m_Ints: []
     m_Floats:
     - _Border: 0.09
+    - _ClipRadius: 0
     - _Fade: 1
     - _Flash: 0
     - _HalfAngle: 40
@@ -36,6 +37,7 @@ Material:
     - _Radius: 2
     - _Shape: 0
     m_Colors:
+    - _ClipCentre: {r: 0, g: 0, b: 0, a: 0}
     - _ColorBorder: {r: 1.25, g: 0.5, b: 0.36, a: 1}
     - _ColorFill: {r: 0.92, g: 0.41, b: 0.36, a: 1}
     - _ColorFlash: {r: 3, g: 2.2, b: 1.3, a: 1}

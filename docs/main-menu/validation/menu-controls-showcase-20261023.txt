@@ -1,0 +1,160 @@
+PASS single combined main menu is current scene
+PASS opening song plays first
+PASS all catalog stages embedded
+PASS original menu environment preserved inactive
+PASS music controls present and keyboard reachable
+PASS pause holds playback position
+PASS next while paused selects mainmenu3 without autoplay
+PASS play starts newly selected song
+PASS next cycles to existing menu song
+PASS next wraps to mainmenu2
+PASS no building transition geometry
+PASS faster camera orbit is active
+PASS stage order 0 Test Map
+PASS one visible environment 0
+PASS party and boss 0
+ACTIVITY 0 choreography=9.68791 travel=3.162277,8.180904,7.34036,6.603206
+PASS active movement and skills 0
+PASS one camera listener and event system 0
+PASS presentation has no combat authority 0
+PASS same uninterrupted music source 0
+PASS fade covers background 0
+PASS menu raycast survives fade 0
+PASS settings usable during fade 0
+PASS stage order 1 Skyward Spire
+PASS one visible environment 1
+PASS party and boss 1
+ACTIVITY 1 choreography=5.965138 travel=2.52425,2.66669,3.814836,3.44093,9.287129
+PASS active movement and skills 1
+PASS one camera listener and event system 1
+PASS presentation has no combat authority 1
+PASS same uninterrupted music source 1
+PASS 15-second covered swap 1
+PASS fade covers background 1
+PASS menu raycast survives fade 1
+PASS settings usable during fade 1
+PASS stage order 2 Brass Foundry
+PASS one visible environment 2
+PASS party and boss 2
+ACTIVITY 2 choreography=5.999598 travel=2.584255,2.719293,3.816702,3.440931,13.69544,8.963677
+PASS active movement and skills 2
+PASS one camera listener and event system 2
+PASS presentation has no combat authority 2
+PASS same uninterrupted music source 2
+PASS 15-second covered swap 2
+PASS fade covers background 2
+PASS menu raycast survives fade 2
+PASS settings usable during fade 2
+PASS stage order 3 Verdant Chimes
+PASS one visible environment 3
+PASS party and boss 3
+ACTIVITY 3 choreography=6.001749 travel=2.587931,2.722524,3.81759,3.44093,13.69543,10.39389,10.35835
+PASS active movement and skills 3
+PASS one camera listener and event system 3
+PASS presentation has no combat authority 3
+PASS same uninterrupted music source 3
+PASS 15-second covered swap 3
+PASS fade covers background 3
+PASS menu raycast survives fade 3
+PASS settings usable during fade 3
+PASS stage order 4 Shattered Hour
+PASS one visible environment 4
+PASS party and boss 4
+ACTIVITY 4 choreography=6.001556 travel=2.587605,2.722236,3.817687,3.440929,13.69544,10.40611,10.35835,8.904557,7.861316
+PASS active movement and skills 4
+PASS one camera listener and event system 4
+PASS presentation has no combat authority 4
+PASS same uninterrupted music source 4
+PASS 15-second covered swap 4
+PASS fade covers background 4
+PASS menu raycast survives fade 4
+PASS settings usable during fade 4
+PASS stage order 5 Test Map
+PASS one visible environment 5
+PASS party and boss 5
+ACTIVITY 5 choreography=6.001071 travel=2.586775,2.721508,3.820225,3.440929
+PASS active movement and skills 5
+PASS one camera listener and event system 5
+PASS presentation has no combat authority 5
+PASS same uninterrupted music source 5
+PASS 15-second covered swap 5
+PASS fade covers background 5
+PASS menu raycast survives fade 5
+PASS settings usable during fade 5
+PASS stage order 6 Skyward Spire
+PASS one visible environment 6
+PASS party and boss 6
+ACTIVITY 6 choreography=6.000706 travel=2.586149,2.720957,3.814708,3.440929,9.287127
+PASS active movement and skills 6
+PASS one camera listener and event system 6
+PASS presentation has no combat authority 6
+PASS same uninterrupted music source 6
+PASS 15-second covered swap 6
+PASS fade covers background 6
+PASS menu raycast survives fade 6
+PASS settings usable during fade 6
+PASS stage order 7 Brass Foundry
+PASS one visible environment 7
+PASS party and boss 7
+ACTIVITY 7 choreography=6.001674 travel=2.587804,2.722411,3.808156,3.440928,13.69543,8.963396
+PASS active movement and skills 7
+PASS one camera listener and event system 7
+PASS presentation has no combat authority 7
+PASS same uninterrupted music source 7
+PASS 15-second covered swap 7
+PASS fade covers background 7
+PASS menu raycast survives fade 7
+PASS settings usable during fade 7
+PASS stage order 8 Verdant Chimes
+PASS one visible environment 8
+PASS party and boss 8
+ACTIVITY 8 choreography=5.999654 travel=2.58435,2.719377,3.807885,3.44093,13.69543,10.39224,10.35835
+PASS active movement and skills 8
+PASS one camera listener and event system 8
+PASS presentation has no combat authority 8
+PASS same uninterrupted music source 8
+PASS 15-second covered swap 8
+PASS fade covers background 8
+PASS menu raycast survives fade 8
+PASS settings usable during fade 8
+PASS stage order 9 Shattered Hour
+PASS one visible environment 9
+PASS party and boss 9
+ACTIVITY 9 choreography=5.999005 travel=2.583238,2.718401,3.818443,3.440931,13.69544,10.4061,10.35837,8.904562,7.849056
+PASS active movement and skills 9
+PASS one camera listener and event system 9
+PASS presentation has no combat authority 9
+PASS same uninterrupted music source 9
+PASS 15-second covered swap 9
+PASS fade covers background 9
+PASS menu raycast survives fade 9
+PASS settings usable during fade 9
+PASS stage order 10 Test Map
+PASS one visible environment 10
+PASS party and boss 10
+ACTIVITY 10 choreography=6.000352 travel=2.585546,2.720427,3.81828,3.44093
+PASS active movement and skills 10
+PASS one camera listener and event system 10
+PASS presentation has no combat authority 10
+PASS same uninterrupted music source 10
+PASS 15-second covered swap 10
+MATERIALS first=392 second=392
+PASS bounded materials after second full rotation
+PASS bounded objects after second full rotation
+PASS eight-player party included
+PAUSE start index=0 paused=True playing=False sample=7345152 time=153.024
+PAUSE after index=0 paused=True playing=False sample=7345152 time=153.024
+PASS pause survives arena transition
+RESUME sample=7392256 time=154.0053 playing=True
+PASS resume continues after transition
+PASS automatic playlist advancement 0
+PASS automatic playlist advancement 1
+PASS automatic playlist advancement 2
+PLAYLIST index=0 clip=MainMenu2 playing=True
+PASS showcase stops on navigation
+PASS selection cleans up showcase
+PASS selection preserves music
+PASS return starts clean first arena
+PASS return preserves music source
+PASS zero runtime errors
+RESULT: 143 passed / 0 failed

@@ -1,31 +1,19 @@
-# Collab
+# Last Bell
 
-Private workspace for a two-person project.
+A clockwork-fantasy boss rush with real-time, isometric combat. Choose the Vanguard, Arcanist or Chimesinger, learn boss patterns, and fight through three minibosses before the final boss.
 
-## Start here
+## Play the demo
 
-- New collaborator: follow [COLLABORATOR-START-HERE.md](COLLABORATOR-START-HERE.md).
-- Use Issues to propose tasks and discuss questions.
-- Give each task one owner and a clear definition of done.
-- Make changes on a branch and open a pull request for review.
-- Record lasting decisions in [docs/decisions.md](docs/decisions.md).
-- Follow the [collaboration workflow](docs/workflow.md).
-- Use the [private agent message board](docs/agent-board.md) for Codex and Claude handoffs.
+**[Play Last Bell in your browser](https://risxhb.github.io/lastbell/)**
 
-## Large assets
+1. Open the link on a desktop with a keyboard and mouse, then click **Play demo**. The first download includes all five arenas.
+2. Choose your class above **Start Run** and choose a difficulty, then start. **Boss Rush** opens the map/encounter practice setup.
+3. Start the run and press **Enter** on the Ready screen to begin fighting.
 
-Large models, textures and media are not committed. They ship as versioned ZIP asset packs on GitHub Releases, listed in [asset-packs.json](asset-packs.json). After cloning, and whenever `asset-packs.json` changes, run this from the repository root **before opening Unity**:
+**Controls:** WASD to move, mouse to aim, left click / **1** for basic attacks, **2–4** for class skills, right click / **5** to dash, **6** for an additional class skill, **Space** to jump, **Shift** to sprint, **F** for a potion, and **Esc** to pause.
 
-```bat
-setup-assets.cmd
-```
+The demo is a work in progress.
 
-It downloads each pack, checks its SHA-256, and extracts it into the repository root with Unity's original `.meta` files. Details, error messages and how to publish a pack: [docs/asset-packs.md](docs/asset-packs.md).
+This combined Unity player is the current development baseline. **All boss, arena and other game modifications must integrate into this player.** New profiles start in Alternative Confrontation; Settings > UI > Main Menu can select the five-arena Original Showcase. Boss music continues between fights and crossfades into the next track during the countdown.
 
-## Project boundaries
-
-This is an independent repository. It does not deploy to GitHub Pages or change `risxhb.github.io` or any other project. Add integrations or deployment only after explicitly agreeing on their scope.
-
-## Project overview
-
-The current planning draft is [raid-simulator-plan.md](raid-simulator-plan.md). Review the direction and agree on the first milestone together before implementation.
+For local development and the shared Windows/browser build path, read [Current main player](docs/main-menu/current-player.md). Run `setup-assets.cmd` before opening Unity, build **Last Bell > Current Player > Build Windows Player**, and launch `Play Last Bell.cmd`.

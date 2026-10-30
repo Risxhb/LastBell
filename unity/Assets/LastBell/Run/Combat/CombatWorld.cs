@@ -137,7 +137,7 @@ namespace LastBell.Run
         }
 
         // A straight line (beam / hitscan) of the given width.
-        public int LineBoss(Vector3 origin, Vector3 forward, float length, float width, int damage, string ability, out Vector3 contact)
+        public int LineBoss(Vector3 origin, Vector3 forward, float length, float width, int damage, string ability, out Vector3 contact, bool hitFx = true)
         {
             contact = origin + Sim.Flat(forward).normalized * length;
             var f = Sim.Flat(forward).normalized;
@@ -153,13 +153,13 @@ namespace LastBell.Run
             if (hit != null) { contact = origin + f * Mathf.Max(0, best - hit.BodyRadius) + Vector3.up * hit.HitHeight; return DamagePart(hit, damage, contact, ability); }
             if (!boss) return 0;
             contact = origin + f * Mathf.Max(0, best - b.BodyRadius) + Vector3.up * b.HitHeight;
-            return DamageBoss(damage, contact, ability);
+            return DamageBoss(damage, contact, ability, hitFx);
         }
 
-        public int DamageBoss(int damage, Vector3 contact, string ability)
+        public int DamageBoss(int damage, Vector3 contact, string ability, bool hitFx = true)
         {
             var b = Boss; if (b == null || !b.Solid || damage <= 0) return 0;
-            int dealt = b.TakeHit(damage, contact);
+            int dealt = b.TakeHit(damage, contact, hitFx);
             DamageDealt += dealt;
             if (dealt > 0) { Add(RunMeter, ability, dealt); Add(EncounterMeter, ability, dealt); }
             return dealt;
@@ -222,6 +222,11 @@ namespace LastBell.Run
         {
             public Vector3 Pos, Vel; public float Range, Travelled, Radius; public int Damage; public string Ability;
             public Action<int, Vector3> OnHit; public Color Color;
+            // optional: turn toward the boss by up to Homing degrees per tick, after HomingDelay ticks of straight flight
+            public float Homing; public int HomingDelay, Age;
+            // optional custom presentation (Arcanist): OnMove replaces the shared head each tick, OnEnd(hit, at) replaces
+            // the shared impact and also runs when the projectile expires or is cleared (hit false)
+            public Action<Projectile> OnMove; public Action<Projectile, bool, Vector3> OnEnd;
         }
         readonly CombatWorld w; readonly List<Projectile> live = new List<Projectile>(), batch = new List<Projectile>();
         int clears;   // bumped by ClearAll, so a step can tell its batch was cancelled mid-dispatch
@@ -239,9 +244,16 @@ namespace LastBell.Run
             int gen = clears;
             for (int i = batch.Count - 1; i >= 0 && clears == gen; i--)
             {
-                var p = batch[i]; var step = p.Vel * Sim.Dt;
+                var p = batch[i]; var b = w.Boss;
+                p.Age++;
+                if (p.Homing > 0 && p.Age > p.HomingDelay && b != null && b.Solid)
+                {
+                    var want = b.transform.position + Vector3.up * b.HitHeight - p.Pos;
+                    if (want.sqrMagnitude > 1e-4f) p.Vel = Vector3.RotateTowards(p.Vel, want.normalized * p.Vel.magnitude, p.Homing * Mathf.Deg2Rad, 0);
+                }
+                var step = p.Vel * Sim.Dt;
                 p.Pos += step; p.Travelled += step.magnitude;
-                w.Fx.ProjectileHead(p.Pos, p.Color);
+                if (p.OnMove != null) p.OnMove(p); else w.Fx.ProjectileHead(p.Pos, p.Color);
                 BossPart part = null;
                 foreach (var q in w.Parts) if (q.Alive && Sim.Flat(p.Pos - q.Pos).magnitude <= q.BodyRadius + p.Radius) { part = q; break; }
                 if (part != null)
@@ -249,23 +261,26 @@ namespace LastBell.Run
                     var contact = part.Pos + Sim.Flat(p.Pos - part.Pos).normalized * part.BodyRadius + Vector3.up * part.HitHeight;
                     live.Remove(p);
                     int dealt = w.DamagePart(part, p.Damage, contact, p.Ability);
-                    w.Fx.NoteImpact(contact, p.Color);
+                    if (p.OnEnd != null) p.OnEnd(p, true, contact); else w.Fx.NoteImpact(contact, p.Color);
                     p.OnHit?.Invoke(dealt, contact);
                     continue;
                 }
-                var b = w.Boss;
                 if (b != null && b.Solid && Sim.Flat(p.Pos - b.transform.position).magnitude <= b.BodyRadius + p.Radius)
                 {
                     var contact = b.transform.position + Sim.Flat(p.Pos - b.transform.position).normalized * b.BodyRadius + Vector3.up * b.HitHeight;
                     live.Remove(p);
-                    int dealt = w.DamageBoss(p.Damage, contact, p.Ability);
-                    w.Fx.NoteImpact(contact, p.Color);
+                    int dealt = w.DamageBoss(p.Damage, contact, p.Ability, p.OnEnd == null);   // custom projectiles draw their own impact
+                    if (p.OnEnd != null) p.OnEnd(p, true, contact); else w.Fx.NoteImpact(contact, p.Color);
                     p.OnHit?.Invoke(dealt, contact);
                     continue;
                 }
-                if (p.Travelled >= p.Range || !CombatWorld.InPlayerBound(p.Pos, 2)) live.Remove(p);
+                if (p.Travelled >= p.Range || !CombatWorld.InPlayerBound(p.Pos, 2)) { live.Remove(p); p.OnEnd?.Invoke(p, false, p.Pos); }
             }
         }
-        public void ClearAll() { live.Clear(); clears++; }
+        public void ClearAll()
+        {
+            var ending = live.ToArray(); live.Clear(); clears++;
+            foreach (var p in ending) p.OnEnd?.Invoke(p, false, p.Pos);
+        }
     }
 }

@@ -1,0 +1,20 @@
+{
+  "packs": [
+    {
+      "name": "arena-assets",
+      "version": 1,
+      "file": "arena-assets-v1.zip",
+      "sha256": "66a29dd313f9c7dd8e77649d66fcc7ed69586233a457042e66f00d12dda5f9d2",
+      "url": "https://github.com/Risxhb/collab/releases/download/arena-assets-v1/arena-assets-v1.zip",
+      "source": { "type": "azure-universal", "organization": "https://dev.azure.com/ChzandZum", "project": "Last Bell", "feed": "last-bell-assets", "package": "arena-assets", "packageVersion": "1.0.0" }
+    },
+    {
+      "name": "arena-assets",
+      "version": 2,
+      "file": "arena-assets-v2.zip",
+      "sha256": "993ec3b4eacebcf44bc5b4804a13a05336a56efaf094d525a3b0ec69c0c28206",
+      "url": "https://github.com/Risxhb/collab/releases/download/arena-assets-v2/arena-assets-v2.zip",
+      "source": { "type": "azure-universal", "organization": "https://dev.azure.com/ChzandZum", "project": "Last Bell", "feed": "last-bell-assets", "package": "arena-assets", "packageVersion": "2.0.0" }
+    }
+  ]
+}

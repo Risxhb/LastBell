@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b101b">
+  <meta name="description" content="Play the Last Bell demo. Three classes, five arenas, and a clockwork boss rush — directly in your browser.">
+  <title>Last Bell · Play the demo</title>
+  <link rel="stylesheet" href="player.css">
+</head>
+<body>
+  <header><a class="title" href="./">LAST BELL</a><span>PLAYABLE DEMO</span><a href="https://github.com/Risxhb/LastBell">Project ↗</a></header>
+  <main>
+    <section id="player" aria-label="Last Bell game player">
+      <canvas id="unity-canvas" width="1280" height="720" tabindex="0" aria-label="Last Bell. Use a keyboard and mouse to play."></canvas>
+      <div id="cover">
+        <p class="eyebrow">THE HOUR IS YOURS TO BREAK</p>
+        <h1>LAST BELL</h1>
+        <p>A clockwork boss rush.</p>
+        <button id="play" type="button">Play demo</button>
+        <p id="status" role="status" aria-live="polite">The first download includes all five arenas. Desktop keyboard and mouse recommended.</p>
+        <progress id="progress" max="1" value="0" aria-label="Loading game" hidden></progress>
+      </div>
+    </section>
+    <div class="toolbar"><span id="hint">Vanguard · Arcanist · Chimesinger</span><button id="fullscreen" type="button" disabled>Fullscreen</button></div>
+    <section class="news" aria-labelledby="news-title">
+      <h2 id="news-title">What’s new in this demo</h2>
+      <p class="news-date">October 28, 2026</p>
+      <p class="news-lead">The <strong>Arcanist</strong> is finished, and the <strong>Tempo Tyrant</strong> is much harder (see Also new). The Arcanist plays around <strong>glyphs</strong>. Channel Disintegrate on the boss to carve them, spend them on full-power Rune Sigils and Arcane Comets, or cash them all into Arcane Surge. Magic Missile fills the gaps. It is still a ranged glass cannon with no defensive ability, so keep moving.</p>
+      <h3>How glyphs work</h3>
+      <ul class="changes">
+        <li><strong>Carve:</strong> each damage step of Disintegrate that hits the boss carves one glyph, up to 3. They circle your waist and stay until you spend them.</li>
+        <li><strong>Spend:</strong> Rune Sigil and Arcane Comet each spend one glyph for full damage. Cast without one, the rune is drawn faint and deals only 35%.</li>
+        <li><strong>Cash in:</strong> Arcane Surge spends every glyph for 2 s of Surge each (up to 6 s). While surging, spells cost no glyph and land twice as fast.</li>
+      </ul>
+      <h3>Arcanist abilities</h3>
+      <ul class="abilities">
+        <li><div class="ability-head"><span class="ability-name">Magic Missile</span><kbd>Left click</kbd></div><p>Tap: one missile straight at the cursor (10). It can miss.</p><p>Hold: summon up to 3 missiles (5 in Surge); release to fire them straight at the cursor (13 each). They no longer home, so aim.</p><p>You move at half speed while charging. Dashing drops the charge.</p></li>
+        <li><div class="ability-head"><span class="ability-name">Disintegrate</span><kbd>2 · hold</kbd></div><p>A beam you steer toward the cursor for up to 2 s, building in 3 damage steps.</p><p>Each step completed on the boss <strong>carves a glyph</strong>. You move at 20% speed; dashing breaks the beam but keeps the glyphs already carved. Cooldown 8 s.</p></li>
+        <li><div class="ability-head"><span class="ability-name">Rune Sigil</span><kbd>3</kbd></div><p>Draws a rune at the cursor (16 m) that explodes after 0.8 s (55) on the boss inside it (2.5 m).</p><p><strong>Spends 1 glyph.</strong> Without one it is faint and deals 35%. Cooldown 6 s.</p></li>
+        <li><div class="ability-head"><span class="ability-name">Arcane Comet</span><kbd>4</kbd></div><p>Draws a rune at the cursor (20 m); 3 s later a burning meteor crashes into it (90, 4 m). The bullseye in the middle doubles it. The mark stays where you put it, so predict where the boss will be.</p><p><strong>Spends 1 glyph.</strong> Without one it deals 35%. Cooldown 18 s.</p></li>
+        <li><div class="ability-head"><span class="ability-name">Arcane Surge</span><kbd>5</kbd></div><p><strong>Spends every glyph</strong> (needs at least one) for 2 s of Surge per glyph.</p><p>While surging: charged volleys summon 5 missiles, taps fire two, and Rune Sigil and Arcane Comet cost no glyph and arm or fall twice as fast. A dash during the short cast cancels it and keeps the glyphs. Cooldown 15 s.</p></li>
+        <li><div class="ability-head"><span class="ability-name">Blink</span><kbd>Right click</kbd></div><p>The shared dash, shown as a teleport. Short burst (3 m in 0.2 s) in the move direction. Costs 30 stamina; sprint and jump share the bar.</p><p>No invincibility: get out of the shape before it resolves.</p></li>
+      </ul>
+      <p class="news-note">Plain numbers in brackets, like (10), are damage. Hover over an ability in game to see its tooltip.</p>
+      <h3>Also new</h3>
+      <ul class="changes">
+        <li><strong>Tempo Tyrant, harder:</strong> each Sundering Wake charge ends in a backswing (and he charges twice in Haste), a faster Closing Rush, overlapping attack chains in Broken Cadence, and Falling Hours below 10% health: orbs rain down and burst into bouncing orbs.</li>
+        <li><strong>Arcanist finished:</strong> a remodelled brass astrolabe orb, and a polish pass on every spell effect. Disintegrate's beam, scorch and ash now end on the boss's armour.</li>
+        <li><strong>Pendulum Sentinel, harder:</strong> faster swings with bigger shapes, a cleave after Return Stroke, three charges below half health, and Counterweight soaks that burst into bouncing orbs if nobody stands under them.</li>
+        <li><strong>Metronome Court finished:</strong> new pier heads, banner posts and bollards, and its lights now pulse only during the Tempo Tyrant fight. The main menu and arena picker show the finished court.</li>
+        <li><strong>New Arcanist spell icons</strong> and reworked effects: glyphs at your waist, a gold Surge aura, a sharper Rune Sigil blast, and the Arcane Comet as a burning meteor that shatters on impact.</li>
+        <li><strong>New controls for every class:</strong> left click is the basic attack, right click is dash, and 2–5 are class skills.</li>
+        <li><strong>Minibosses</strong> to practise in Boss Rush: the Chimebound Oracle and the Dial Warden, plus the Pendulum Sentinel on Skyward Spire (all work in progress).</li>
+        <li><strong>Metronome Court rebuilt:</strong> the arena now rises out of a sea of clouds, with pinnacled piers, belfries, painted stone and brass, a pale-gold tempo ring and a stronger metronome on a stone plinth.</li>
+        <li><strong>New arena art</strong> for Skyward Spire, Verdant Chimes and Shattered Hour, and a refreshed main menu with new menu music.</li>
+      </ul>
+    </section>
+    <details><summary>Controls &amp; about this demo</summary><p>Choose your class and difficulty on the main menu, then pick Boss Rush to choose an arena and a boss or miniboss to fight. Start Run (the shuffled run that ends with Bellkeeper) is greyed out in this demo while it is reworked.</p><p>Move with WASD, hold Shift to sprint and press Space to jump. Aim with the mouse. Left click for your basic attack (the Arcanist can hold it to charge missiles), 2–5 for class skills, right click to dash, F for a potion and Escape to pause.</p><p>Work in progress. Alternative Confrontation is the default main menu. Settings &gt; UI can switch to the five-arena showcase. Boss music continues between fights and crossfades during each countdown. Browser performance may vary.</p></details>
+  </main>
+  <footer>LAST BELL <span>WORK IN PROGRESS</span></footer>
+  <script>
+    const canvas = document.getElementById('unity-canvas');
+    const cover = document.getElementById('cover');
+    const play = document.getElementById('play');
+    const status = document.getElementById('status');
+    const progress = document.getElementById('progress');
+    const fullscreen = document.getElementById('fullscreen');
+    let instance;
+    let dataBlobUrl;
+    async function downloadData() {
+      const response = await fetch('Build/data-manifest.json', {cache: 'no-cache'});
+      if (!response.ok) throw new Error('Unable to download the game manifest.');
+      const manifest = await response.json();
+      const buffers = [];
+      let downloaded = 0;
+      for (const part of manifest.parts) {
+        const response = await fetch('Build/' + part.file);
+        if (!response.ok) throw new Error('A game download failed. Please retry.');
+        const reader = response.body.getReader();
+        const buffer = new Uint8Array(part.bytes);
+        let offset = 0;
+        for (;;) {
+          const {done, value} = await reader.read();
+          if (done) break;
+          buffer.set(value, offset);
+          offset += value.length;
+          downloaded += value.length;
+          progress.value = 0.8 * downloaded / manifest.totalBytes;
+          status.textContent = 'Downloading the demo… ' + Math.round(downloaded / manifest.totalBytes * 100) + '%';
+        }
+        if (offset !== part.bytes) throw new Error('The download was incomplete. Please retry.');
+        const hash = await crypto.subtle.digest('SHA-256', buffer);
+        const digest = Array.from(new Uint8Array(hash), b => b.toString(16).padStart(2, '0')).join('');
+        if (digest !== part.sha256) throw new Error('The download failed its integrity check. Please retry.');
+        buffers.push(buffer);
+      }
+      if (downloaded !== manifest.totalBytes) throw new Error('The game data is incomplete.');
+      dataBlobUrl = URL.createObjectURL(new Blob(buffers, {type: 'application/octet-stream'}));
+      return dataBlobUrl;
+    }
+    function fail(message) {
+      cover.hidden = false;
+      status.textContent = 'The game could not start. ' + message;
+      progress.hidden = true;
+      play.hidden = false;
+      play.disabled = false;
+      play.textContent = 'Reload and retry';
+      play.onclick = () => location.reload();
+    }
+    play.onclick = () => {
+      play.disabled = true;
+      play.hidden = true;
+      progress.hidden = false;
+      status.textContent = 'Downloading the demo…';
+      const loader = document.createElement('script');
+      loader.src = 'Build/{{{ LOADER_FILENAME }}}';
+      loader.onerror = () => fail('Please check your connection and try again.');
+      loader.onload = async () => { try { const dataUrl = await downloadData(); await createUnityInstance(canvas, {
+        dataUrl,
+        frameworkUrl: 'Build/{{{ FRAMEWORK_FILENAME }}}',
+        codeUrl: 'Build/{{{ CODE_FILENAME }}}',
+        streamingAssetsUrl: 'StreamingAssets',
+        companyName: {{{ JSON.stringify(COMPANY_NAME) }}},
+        productName: {{{ JSON.stringify(PRODUCT_NAME) }}},
+        productVersion: {{{ JSON.stringify(PRODUCT_VERSION) }}},
+        matchWebGLToCanvasSize: true,
+        devicePixelRatio: Math.min(window.devicePixelRatio || 1, 1.5),
+        cacheControl: url => url.startsWith('blob:') ? 'no-store' : 'must-revalidate',
+        showBanner: (message, type) => { if (type === 'error') fail(message); else console.warn(message); },
+        onQuit: () => location.reload()
+      }, value => {
+        progress.value = 0.8 + value * 0.2;
+        status.textContent = 'Preparing the main menu… ' + Math.round(value * 100) + '%';
+      }).then(game => {
+        instance = game;
+        cover.hidden = true;
+        fullscreen.disabled = false;
+        canvas.focus();
+        URL.revokeObjectURL(dataBlobUrl);
+        document.getElementById('hint').textContent = 'Click the game to focus · Escape to pause';
+      }); } catch (error) { if (dataBlobUrl) URL.revokeObjectURL(dataBlobUrl); fail(String(error)); } };
+      document.body.appendChild(loader);
+    };
+    fullscreen.onclick = () => { if (instance) { instance.SetFullscreen(1); canvas.focus(); } };
+    canvas.addEventListener('contextmenu', event => event.preventDefault());
+    canvas.addEventListener('pointerdown', () => canvas.focus());
+    canvas.addEventListener('keydown', event => {
+      if (['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Tab'].includes(event.code)) event.preventDefault();
+    });
+  </script>
+</body>
+</html>
