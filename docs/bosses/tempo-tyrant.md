@@ -1,6 +1,6 @@
 # The Tempo Tyrant — Metronome Court miniboss (practice entry)
 
-**Status, October 23, 2026:** playable local practice encounter in the current combined player (`feature/confrontation-menu`). The boss body is a **labelled code-built stand-in**: the final model and rig are still an art gate. The arena is code-built and has been through **three critic → refinement polish passes**: the prompts are in the workspace `docs/metronome-arena/refinement/round-1..3-prompt.md`. The fight's music is **By My Measure**. **Normal** plays it as written at 165 BPM, with the former Haste pace. **Haste** is a savage tier: the song runs at 1.33× (220 BPM), and indicators, windups and combos have much shorter windows. This applies to this fight only. All numbers below are tunable first-pass proposals, not approved balance.
+**Status, October 23, 2026:** playable local practice encounter in the current combined player (`feature/confrontation-menu`). The boss uses **Risxhb's Meshy model and greatsword** (28 Oct; see below); the code-built stand-in remains as a fallback. The arena is code-built and has been through **three critic → refinement polish passes**: the prompts are in the workspace `docs/metronome-arena/refinement/round-1..3-prompt.md`. The fight's music is **By My Measure**. **Normal** plays it as written at 165 BPM, with the former Haste pace. **Haste** is a savage tier: the song runs at 1.33× (220 BPM), and indicators, windups and combos have much shorter windows. This applies to this fight only. All numbers below are tunable first-pass proposals, not approved balance.
 
 Sources: [build brief](../../../docs/metronome-arena/claude-build-prompt.md) (workspace), the greatsword sheet `tempo-tyrant-meshy-greatsword-v2.png` and arena sheet `metronome-court-reference-v1.png` (workspace `docs/metronome-arena/`, plus `reference/metronome/Arena Concept.png`, which is identical to the arena sheet).
 
@@ -62,6 +62,13 @@ Main menu → **Boss Rush** (the existing Test Rush setup) → map **Metronome C
   - **Rim lanterns whose glow follows the rod's lean**, all flashing together on the accented transition ticks.
 - **Tempo changes the world:** over 0.5 s the key light, ambient and colour grade shift slightly warm in Haste and cool in Normal, through a runtime copy of the volume profile.
 - Without a running fight (Ready, menu return) the metronome previews Haste ticking. It deals no damage and freezes while paused.
+
+## Boss: Meshy model (October 28, 2026)
+
+Risxhb supplied the Meshy model (`Characters/TempoTyrant/Resources/Characters/TempoTyrant.glb`: ivory plate knight, Mixamo-style rig, 71 bones) and his greatsword, the Azure Oathblade (`TempoTyrantSword.glb`). The model is 1.7 m as authored and scaled to 3.5 m in game; the sword is scaled to 3.3 m. The fight now uses them; the code-built stand-in below is only a fallback if the files are missing.
+- **Clips:** only `Walk`, `Run` and `SlowWalkLoop` (renamed from Meshy's Walking / Running / walking_2_inplace; all in place). Walk plays while he pursues and Run during a Closing Rush. Every other pose is his rest stance.
+- **Attacks have no clips yet.** The stand-in stays as an invisible pose skeleton: its arms pivot and greatsword still take every attack pose (slashes, overhead, thrust, backswing, ground strike). The Meshy sword is drawn exactly on that greatsword, and both of the model's arms are bent onto the grip with two-bone IK each frame (`TempoTyrantRig.LateUpdate`). So every swing reads, but the legs and torso don't act. Authored attack clips (Meshy's animation library or Mixamo, same rig) would replace this.
+- **Not yet:** Haste/Normal seam tint on the model (the stand-in's seams changed colour; the model keeps its own teal), hand wrap on the grip, and a defeat clip (he tips over with the presenter's procedural fall).
 
 ## Boss: stand-in
 

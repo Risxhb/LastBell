@@ -321,6 +321,15 @@ namespace LastBell.Run
             foreach (var w in Zenith.Run()) yield return w;
         }
 
+        // practice phase row: DebugSetPhase's state with HP at the top of the band (v1 and v2 share the thresholds)
+        public override float[] PhaseStarts => new[] { 1f, V2P2At, V2P3At };
+        public override int PhaseNumber => phase;
+        protected override void EnterPhase(int n)
+        {
+            phase = n; SecondForm = n >= 3;
+            PhaseName = n == 2 ? "Misalignment" : "Exposed Meridian";
+        }
+
         int V2PhaseFor() => Hp > MaxHp * V2P2At ? 1 : Hp > MaxHp * V2P3At ? 2 : 3;
 
         IEnumerable<int> V2Script()
