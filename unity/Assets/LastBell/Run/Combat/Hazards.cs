@@ -20,6 +20,8 @@ namespace LastBell.Run
         static int nextId;
         public readonly int Id = ++nextId;
         public string Source = "Hazard";
+        public string AttackId;                  // v2 attack runtime ID ("bellkeeper.leaning_bell"): picks the icon in the death recap (BossAttackIcons)
+        public string MechanicId;                // hostile mechanic ("spread", "soak_tower"): its icon and name in the boss panel warning (MechanicIcons)
         public HazardShape Shape;
         public HazardKind Kind = HazardKind.Strike;
         public Vector3 Origin;

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -90,6 +91,9 @@ namespace LastBell.Run
         public IInputSource Input;
         public bool AbilitiesEnabled;   // only during combat
         public bool MovementEnabled = true;
+        // mechanic markers over this player (MechanicIcons IDs: order numeral, team, carried mark, a spread target ...), set
+        // by the encounter; drawn by RunHud with the name beside each icon; cleared before each encounter
+        public readonly List<string> Marks = new List<string>();
 
         public int Hp { get; private set; } = MaxHp;
         public float Stamina { get; private set; } = MaxStamina;
@@ -131,6 +135,7 @@ namespace LastBell.Run
             Stamina = MaxStamina; dashTick = 0; dashLock = 0; jumpTick = -1; Height = 0; stun = 0; knockTick = 0; sinceSpend = 999;
             Kit.ResetAll();
             Presenter.ResetPose();
+            Marks.Clear();
         }
 
         // Health policy (Chzy18, Oct 21): full health before every boss after the first; potions carry over between
