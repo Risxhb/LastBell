@@ -99,7 +99,9 @@ namespace LastBell.Run
             var starts = PhaseStarts;
             if (Dead || n < 1 || n > starts.Length) return false;
             if (n == 1) return true;
-            Hp = Mathf.Clamp(Mathf.FloorToInt(MaxHp * starts[n - 1]), 1, MaxHp);
+            // one HP under the threshold: `Hp > MaxHp * 0.70f` can see 2519.99996 for 3600 HP, so exactly 2520 would read as
+            // the phase above and shift straight back
+            Hp = Mathf.Clamp(Mathf.FloorToInt(MaxHp * starts[n - 1]) - 1, 1, MaxHp);
             EnterPhase(n);
             return PhaseNumber == n;
         }

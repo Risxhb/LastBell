@@ -93,7 +93,8 @@ namespace LastBell.Run
                     CheckPhaseStart(tag + " (retry)", entry, d.Boss, n);
                 }
             }
-            if (d.Boss && !d.Boss.Dead) d.Boss.DebugDefeat();
+            // test teardown: a miniboss holds at 50 % until its shift, so DebugDefeat in phase 1 needs the last phase first
+            if (d.Boss && !d.Boss.Dead) { if (d.Boss.PhaseNumber < d.Boss.PhaseCount) d.Boss.StartAtPhase(d.Boss.PhaseCount); d.Boss.DebugDefeat(); }
             yield return Until(() => d.State == RunState.Results, 6, tag + " results");
             yield return PhaseToMenu();
         }
