@@ -91,9 +91,11 @@ namespace LastBell.Run.Shop
             yield return Until(() => RunDirector.Instance && RunDirector.Instance.State == RunState.Menu, 30, "menu");
             d = RunDirector.Instance; d.InputOverride = bot;
             Check("shop is on for this suite", RunShopFlow.Enabled);
-            var slice = new[] { ItemCatalog.TemperedEdge, ItemCatalog.Countdown, ItemCatalog.CrackedArmour, ItemCatalog.Oathbound, ItemCatalog.HeavyBell, ItemCatalog.SwiftChorus, ItemCatalog.ChorusOfValour,
-                ItemCatalog.UnboundCast, ItemCatalog.LongSurge, ItemCatalog.PerpetualBeam, ItemCatalog.StrongBrew, ItemCatalog.Sprinter, ItemCatalog.DeepBreath, ItemCatalog.LoneBell, ItemCatalog.SpareFlask };
-            Check("the 15 slice item icons load (64 and 128)", slice.All(id => RunShopFlow.ItemIcon(ItemCatalog.Get(id), true) != null && RunShopFlow.ItemIcon(ItemCatalog.Get(id), false) != null));
+            // accepted icons (29 Oct): all but three items, which wait for a redraw and stay text-only
+            var redraw = new[] { ItemCatalog.LongReach, ItemCatalog.SharedRinging, ItemCatalog.LongLungs };
+            bool IconOk(ItemDef i) => RunShopFlow.ItemIcon(i, true) != null && RunShopFlow.ItemIcon(i, false) != null;
+            Check("66 item icons load (64 and 128); Long Reach, Shared Ringing and Long Lungs have none yet",
+                ItemCatalog.All.Count(IconOk) == 66 && ItemCatalog.All.Where(i => !redraw.Contains(i.Id)).All(IconOk), $"{ItemCatalog.All.Count(IconOk)}");
             Check("the pool has 69 items: 20 Vanguard, 19 Chimesinger, 20 Arcanist, 10 general; none held", ItemCatalog.All.Length == 69 && ItemCatalog.All.Count(i => i.General) == 10 && RunDirector.Classes.All(c => ItemCatalog.All.Count(i => i.Class == c) == (c == "Chimesinger" ? 19 : 20)) && !ItemCatalog.All.Any(i => i.Held) && !ItemCatalog.All.Any(i => i.Id == "c.twin_bells"));
             Check("Chimes coin and burst icons load", RunShopFlow.Coin != null && RunShopFlow.Burst != null && RunHud.Icon("chimes-128") != null && RunHud.Icon("chimes-burst-32") != null);
             RunShopFlow.SeedOverride = RunShopFlow.SeedOverride ?? 1234;
