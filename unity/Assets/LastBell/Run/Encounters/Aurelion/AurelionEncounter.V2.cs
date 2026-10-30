@@ -321,11 +321,18 @@ namespace LastBell.Run
             foreach (var w in Zenith.Run()) yield return w;
         }
 
-        // practice phase row: DebugSetPhase's state with HP at the top of the band (v1 and v2 share the thresholds)
-        public override float[] PhaseStarts => new[] { 1f, V2P2At, V2P3At };
+        // practice phase row: DebugSetPhase's state with HP at the top of the band (v1 and v2 share the thresholds; v4
+        // adds Last Light at 20 %, its state is DebugSetPhaseV4's without the HP)
+        public override float[] PhaseStarts => AurelionArgs.V4 ? new[] { 1f, V4P2At, V4P3At, V4P4At } : new[] { 1f, V2P2At, V2P3At };
         public override int PhaseNumber => phase;
         protected override void EnterPhase(int n)
         {
+            if (AurelionArgs.V4)
+            {
+                phase = n; SecondForm = n >= 3; IntermissionDone = true;   // a fresh boss: no pools yet
+                SetPhase(n == 2 ? "Misalignment" : n == 3 ? "Exposed Meridian" : "Last Light");
+                return;
+            }
             phase = n; SecondForm = n >= 3;
             PhaseName = n == 2 ? "Misalignment" : "Exposed Meridian";
         }
