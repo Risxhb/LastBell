@@ -58,6 +58,18 @@ namespace LastBell.Run
 
         int PhaseFor() => Hp > MaxHp * 0.70f ? 1 : Hp > MaxHp * 0.35f ? 2 : 3;
 
+        // practice phase row: the shift's state without its 1.5 s animation (no stored memory, loop restarts, look snaps).
+        // The Ultimate offers its five HP phases P1-P5 (BellkeeperUltimate.cs).
+        public override float[] PhaseStarts => Set == AbilitySet.Ultimate ? UltPhaseStarts : new[] { 1f, 0.70f, 0.35f };
+        public override int PhaseNumber => Set == AbilitySet.Ultimate ? UltPhaseNumber : phase;
+        protected override void EnterPhase(int n)
+        {
+            if (Set == AbilitySet.Ultimate) { UltEnterPhase(n); return; }
+            Forget();
+            phase = n; loop = 0; lookPhase = n - 1;
+            PhaseName = n == 2 ? Phase2 : Phase3;
+        }
+
         protected override IEnumerable<int> Script() => Set == AbilitySet.V1 ? ScriptV1() : ScriptV2();   // v2 and the Ultimate share the scheduler
 
         IEnumerable<int> ScriptV1()

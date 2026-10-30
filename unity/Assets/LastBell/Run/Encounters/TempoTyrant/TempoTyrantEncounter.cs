@@ -47,7 +47,7 @@ namespace LastBell.Run
         public override string Id => "boss.tempo-tyrant";
         public override string DisplayName => "The Tempo Tyrant";
         public override string Lesson => "Follow the numbered 1-2-3 into cleared ground; the slow tempo is your opening";
-        public override bool Placeholder => true;   // stand-in body; the final model/rig is a remaining art gate
+        public override bool Placeholder => Rig == null || !Rig.HasModel;   // the Meshy model, unless Resources/Characters/TempoTyrant is missing
         public override float NextPhaseFraction() => 0.19f;
 
         // ---------------- tunables (see the tunables table in the encounter doc) ----------------
@@ -199,6 +199,17 @@ namespace LastBell.Run
             Fx = gameObject.AddComponent<TempoTyrantFx>();
             Clock.Reset();
             PhaseName = "Haste";
+        }
+
+        // practice phase row: Phase 2 is Broken Cadence (strictly below 20%), as at the end of its tell. The tempo still
+        // alternates on its own clock, and Falling Hours still starts below 10%.
+        public override float[] PhaseStarts => new[] { 1f, 0.199f };
+        public override int PhaseNumber => Frenzy ? 2 : 1;
+        protected override void EnterPhase(int n)
+        {
+            if (Frenzy) return;
+            FrenzyPending = false; Frenzy = true; Rig.Frenzy = true;
+            PhaseName = "Broken Cadence · " + Clock.State;
         }
 
         public static bool ArenaCentred(Vector3 p) => new Vector2(p.x, p.z).magnitude <= CentreGate + 0.05f;

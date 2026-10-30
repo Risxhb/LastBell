@@ -21,8 +21,8 @@ namespace LastBell.Run
         {
             get
             {
+                if (spawningUltimate) return AbilitySet.Ultimate;   // the Ultimate entry always spawns the Ultimate (a test's SetOverride can't turn it into v1)
                 if (SetOverride.HasValue) return SetOverride.Value;
-                if (spawningUltimate) return AbilitySet.Ultimate;
                 var s = Arg("-lastbellAbilitySet")?.Trim();
                 if (string.Equals(s, "ultimate", StringComparison.OrdinalIgnoreCase) || HasArg("-lastbellUltimate")) return AbilitySet.Ultimate;
                 // the normal Bellkeeper stays v1 (the v2 attack set is retired); v2 only by asking for it explicitly. The Ultimate is its own set.

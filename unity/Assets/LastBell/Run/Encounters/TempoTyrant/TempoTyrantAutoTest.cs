@@ -223,7 +223,8 @@ namespace LastBell.Run
             ApplyFrameOverride(); Note("frame mode: " + FrameMode);
             yield return Shot("gameplay_start_haste");
             Check("fight starts in Haste at beat 0", boss.Clock.State == Tempo.Haste && boss.Clock.Beat < 1 && boss.Clock.Commits == 0);
-            Check("stand-in is labelled", boss.Placeholder && boss.Rig && boss.Rig.name.Contains("STAND-IN"));
+            Check("Meshy model and greatsword loaded (stand-in hidden)", boss.Rig && boss.Rig.HasModel && !boss.Placeholder && boss.Rig.transform.Find("Greatsword (Meshy)") && boss.Rig.Presenter.Has("Walk") && boss.Rig.Presenter.Has("Run"),
+                boss.Rig ? boss.Rig.name : "no rig");
             TempoTyrantHud.ShowDiagnostics = false;   // clean captures; the report carries the numbers
             Check("music: By My Measure paired with its 1.33x Haste version", boss.Audio && boss.Audio.Music == TempoTyrantAudio.MusicStatus.Paired, boss.Audio ? boss.Audio.StatusText : "");
             var music = FindAnyObjectByType<LastBell.Menu.MenuMusic>();

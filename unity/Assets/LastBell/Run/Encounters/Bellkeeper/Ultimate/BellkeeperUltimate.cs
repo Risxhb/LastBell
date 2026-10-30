@@ -160,8 +160,9 @@ namespace LastBell.Run
             UltPlanActive = true; pushFired = false;
             Ult.ResetAll(); mRelay.ResetBeats(); mBroken.ResetBeats(); mOpen.ResetCounts(); mGear.ResetCounts(); mFinal.ResetCounts();
             FitHpToParty();
-            var start = IsPractice && RequestedSegment.HasValue ? RequestedSegment.Value : UltSegment.P1;
-            if (start != UltSegment.P1) { Hp = Mathf.RoundToInt(MaxHp * StartOf(start)); PlanLog.Add((W.Tick, "practice from " + start)); }
+            var start = pickedSegment ?? (IsPractice && RequestedSegment.HasValue ? RequestedSegment.Value : UltSegment.P1);
+            if (pickedSegment.HasValue) PlanLog.Add((W.Tick, "practice phase row from " + start));   // UltEnterPhase set the HP
+            else if (start != UltSegment.P1) { Hp = Mathf.RoundToInt(MaxHp * StartOf(start)); PlanLog.Add((W.Tick, "practice from " + start)); }
             for (var s = start; s <= UltSegment.P5; s++)
             {
                 if (UltV2 && (s == UltSegment.T1 || s == UltSegment.T2)) continue;   // v2: the transitions are not rebuilt yet (P1 -> P2 -> P3 -> P4)
@@ -183,7 +184,27 @@ namespace LastBell.Run
             PlanLog.Add((W.Tick, "segment " + s));
             phase = SegLook[(int)s];
             Ult.Reset();
-            SetPhase(SegmentNames[(int)s]);
+            if (PhaseName != SegmentNames[(int)s]) SetPhase(SegmentNames[(int)s]);   // the opening segment (P1, or the picked phase) already shows its name: no phase change
+        }
+
+        // ---------------- practice phase row (Test Rush "Start Phase", -lastbellPractice ... -lastbellPhase N) ----------------
+        // Phases 1-5 are P1-P5; the transitions T1 / T2 stay on -lastbellUltimatePhase. The director calls StartAtPhase at spawn
+        // and again after BeginCombat, so this is idempotent.
+        static readonly UltSegment[] PhaseSegments = { UltSegment.P1, UltSegment.P2, UltSegment.P3, UltSegment.P4, UltSegment.P5 };
+        static readonly int[] SegPhaseNumber = { 1, 2, 2, 3, 4, 4, 5 };   // P1 T1 P2 P3 T2 P4 P5: a transition counts as the phase it leads into
+        UltSegment? pickedSegment;   // the plan starts here and keeps the HP set below
+        float[] UltPhaseStarts => Array.ConvertAll(PhaseSegments, StartOf);
+        int UltPhaseNumber => SegPhaseNumber[(int)Segment];
+        void UltEnterPhase(int n)
+        {
+            var s = PhaseSegments[n - 1];
+            // fit the bar to the party first (FitHpToParty only touches an untouched boss), then one HP under the threshold:
+            // `Hp > MaxHp * 0.70f` can read exactly 70 % as the phase above
+            Hp = MaxHp; FitHpToParty();
+            Hp = Mathf.Clamp(Mathf.FloorToInt(MaxHp * StartOf(s)) - 1, 1, MaxHp);
+            pickedSegment = s; Segment = s;
+            phase = SegLook[(int)s]; lookPhase = phase - 1;
+            PhaseName = SegmentNames[(int)s];
         }
 
         IEnumerable<int> RunSegment(UltSegment s)

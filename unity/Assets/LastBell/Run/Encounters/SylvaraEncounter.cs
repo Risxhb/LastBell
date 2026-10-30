@@ -119,6 +119,17 @@ namespace LastBell.Run
 
         int PhaseFor() => Hp > MaxHp * 0.65f ? 1 : Hp > MaxHp * 0.30f ? 2 : 3;
 
+        // practice phase row: the shift's end state without its animation (flowers out, bells drawn in, mask parted)
+        public override float[] PhaseStarts => new[] { 1f, 0.65f, 0.30f };
+        public override int PhaseNumber => phase;
+        protected override void EnterPhase(int n)
+        {
+            phase = n; PhaseName = n == 2 ? "Awakening Bloom" : "Hollow Refrain";
+            if (shoulderFlowers) shoulderFlowers.gameObject.SetActive(true);
+            if (bellRoot) for (int b = 0; b < bellRoot.childCount; b++) { var c = bellRoot.GetChild(b); c.localPosition = new Vector3((b - 1) * 0.42f, c.localPosition.y, 0); }
+            if (n == 3 && maskL) { maskL.localPosition = new Vector3(-0.32f, 3.65f, 0.2f); maskR.localPosition = new Vector3(0.32f, 3.65f, 0.2f); }
+        }
+
         protected override IEnumerable<int> Script()
         {
             while (true)
