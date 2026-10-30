@@ -95,7 +95,7 @@ namespace LastBell.Run
         public HazardSystem(CombatWorld world) { w = world; }
         public event Action<Hazard> Spawned;   // tests record exact spawn ticks
 
-        static readonly Color JumpFill = new Color(0.30f, 0.85f, 0.95f), JumpBorder = new Color(0.55f, 1.6f, 1.8f);
+        static readonly Color JumpFill = new Color(0.92f, 0.41f, 0.36f), JumpBorder = new Color(2.0f, 1.38f, 0.75f);   // coral #EB685D, warm edge #F1A65A (accepted 29 Oct)
         static readonly Color SlagFill = new Color(0.95f, 0.36f, 0.08f), SlagBorder = new Color(2.4f, 1.2f, 0.35f);
         readonly Dictionary<PlayerController, float> burn = new Dictionary<PlayerController, float>();
 
@@ -109,7 +109,7 @@ namespace LastBell.Run
                 case HazardShape.Cone: h.Tele = fx.Cone(h.Radius, h.HalfAngle); break;
                 default: h.Tele = fx.Lane(h.Length, h.Width); break;
             }
-            // jump-clearable bars read differently from everything else (teal, plus the HUD's JUMP label)
+            // jump-clearable bars: warm coral with an amber edge (not cyan, which is the Vanguard's), plus the HUD's JUMP label
             if (h.JumpClearable) h.Tele.Tint(JumpFill, JumpBorder);
             else if (h.BurnPerSecond > 0) h.Tele.Tint(SlagFill, SlagBorder);   // standing slag: molten, not the strike coral
             if (h.ClipRadius > 0) h.Tele.Clip(Vector3.zero, h.ClipRadius);
