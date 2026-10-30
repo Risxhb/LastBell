@@ -38,6 +38,9 @@ namespace LastBell.Run
 
         public readonly List<PlayerController> Players = new List<PlayerController>();
         public BossEncounter Boss;                // null between encounters; Solid is false once defeated
+        // Extra bodies an encounter can add (Crucivar's Molten Castings): player strikes, lines and projectiles hit the
+        // nearest of the boss and its live parts. Cleared with the encounter's transient state.
+        public readonly List<BossPart> Parts = new List<BossPart>();
         public readonly HazardSystem Hazards;
         public readonly ProjectileSystem Projectiles;
         public readonly BellkeeperFx BossFx;
@@ -97,6 +100,8 @@ namespace LastBell.Run
             BossFx.ClearTelegraphs();
             BossFx.ChargeTrail(Root, false);
             foreach (var p in Players) p.Kit?.ClearTargetState();
+            foreach (var part in Parts) part.OnCleared?.Invoke(part);
+            Parts.Clear();
         }
 
         public PlayerController NearestStanding(Vector3 from)
@@ -116,11 +121,20 @@ namespace LastBell.Run
         // kit's contact tick; returns the damage dealt (0 = miss).
         public int StrikeBoss(PlayerController from, Vector3 origin, Vector3 forward, float reach, float arcDeg, int damage, string ability)
         {
-            var b = Boss; if (b == null || !b.Solid) return 0;
-            var to = Sim.Flat(b.transform.position - origin); forward = Sim.Flat(forward);
-            if (to.magnitude > reach + b.BodyRadius) return 0;
-            if (arcDeg < 360 && to.magnitude > b.BodyRadius && Vector3.Angle(forward, to) > arcDeg / 2 + Mathf.Rad2Deg * Mathf.Atan2(b.BodyRadius, to.magnitude)) return 0;
-            var contact = b.transform.position - to.normalized * b.BodyRadius + Vector3.up * b.HitHeight;
+            forward = Sim.Flat(forward);
+            bool In(Vector3 pos, float r, out float dist)
+            {
+                var to = Sim.Flat(pos - origin); dist = to.magnitude;
+                if (dist > reach + r) return false;
+                return arcDeg >= 360 || dist <= r || Vector3.Angle(forward, to) <= arcDeg / 2 + Mathf.Rad2Deg * Mathf.Atan2(r, dist);
+            }
+            var b = Boss; float best = float.MaxValue; BossPart hit = null;
+            bool boss = b != null && b.Solid && In(b.transform.position, b.BodyRadius, out best);
+            if (!boss) best = float.MaxValue;
+            foreach (var part in Parts) if (part.Alive && In(part.Pos, part.BodyRadius, out float d) && d < best) { best = d; hit = part; }
+            if (hit != null) return DamagePart(hit, damage, hit.Pos - Sim.Flat(hit.Pos - origin).normalized * hit.BodyRadius + Vector3.up * hit.HitHeight, ability);
+            if (!boss) return 0;
+            var contact = b.transform.position - Sim.Flat(b.transform.position - origin).normalized * b.BodyRadius + Vector3.up * b.HitHeight;
             return DamageBoss(damage, contact, ability);
         }
 
@@ -128,11 +142,19 @@ namespace LastBell.Run
         public int LineBoss(Vector3 origin, Vector3 forward, float length, float width, int damage, string ability, out Vector3 contact, bool hitFx = true)
         {
             contact = origin + Sim.Flat(forward).normalized * length;
-            var b = Boss; if (b == null || !b.Solid) return 0;
-            var f = Sim.Flat(forward).normalized; var to = Sim.Flat(b.transform.position - origin);
-            float along = Vector3.Dot(to, f); float side = (to - f * along).magnitude;
-            if (along < -b.BodyRadius || along > length + b.BodyRadius || side > width / 2 + b.BodyRadius) return 0;
-            contact = origin + f * Mathf.Max(0, along - b.BodyRadius) + Vector3.up * b.HitHeight;
+            var f = Sim.Flat(forward).normalized;
+            bool On(Vector3 pos, float r, out float along)
+            {
+                var to = Sim.Flat(pos - origin); along = Vector3.Dot(to, f); float side = (to - f * along).magnitude;
+                return along >= -r && along <= length + r && side <= width / 2 + r;
+            }
+            var b = Boss; float best = float.MaxValue; BossPart hit = null;
+            bool boss = b != null && b.Solid && On(b.transform.position, b.BodyRadius, out best);
+            if (!boss) best = float.MaxValue;
+            foreach (var part in Parts) if (part.Alive && On(part.Pos, part.BodyRadius, out float a) && a < best) { best = a; hit = part; }
+            if (hit != null) { contact = origin + f * Mathf.Max(0, best - hit.BodyRadius) + Vector3.up * hit.HitHeight; return DamagePart(hit, damage, contact, ability); }
+            if (!boss) return 0;
+            contact = origin + f * Mathf.Max(0, best - b.BodyRadius) + Vector3.up * b.HitHeight;
             return DamageBoss(damage, contact, ability, hitFx);
         }
 
@@ -142,6 +164,15 @@ namespace LastBell.Run
             damage = Shop.ItemHooks.Outgoing(this, damage, ability);   // run items (no-op without a shop run)
             int dealt = b.TakeHit(damage, contact, hitFx);
             Shop.ItemHooks.Dealt(this, ability, dealt);
+            DamageDealt += dealt;
+            if (dealt > 0) { Add(RunMeter, ability, dealt); Add(EncounterMeter, ability, dealt); }
+            return dealt;
+        }
+
+        public int DamagePart(BossPart part, int damage, Vector3 contact, string ability)
+        {
+            if (part == null || !part.Alive || damage <= 0 || part.TakeHit == null) return 0;
+            int dealt = part.TakeHit(damage, contact);
             DamageDealt += dealt;
             if (dealt > 0) { Add(RunMeter, ability, dealt); Add(EncounterMeter, ability, dealt); }
             return dealt;
@@ -178,6 +209,16 @@ namespace LastBell.Run
             }
             return pos;
         }
+    }
+
+    // A damageable body that isn't the boss (CombatWorld.Parts). The encounter owns its position, look and what a hit does.
+    public sealed class BossPart
+    {
+        public string Name = "part";
+        public Vector3 Pos; public float BodyRadius = 1f, HitHeight = 1f;
+        public bool Alive = true;
+        public Func<int, Vector3, int> TakeHit;   // returns the damage dealt
+        public Action<BossPart> OnCleared;        // encounter end / transition: remove its look
     }
 
     // Player projectiles (Chimesinger's Resonant Note). Moved on the combat tick; a hit resolves exactly once.
@@ -219,6 +260,17 @@ namespace LastBell.Run
                 var step = p.Vel * Sim.Dt;
                 p.Pos += step; p.Travelled += step.magnitude;
                 if (p.OnMove != null) p.OnMove(p); else w.Fx.ProjectileHead(p.Pos, p.Color);
+                BossPart part = null;
+                foreach (var q in w.Parts) if (q.Alive && Sim.Flat(p.Pos - q.Pos).magnitude <= q.BodyRadius + p.Radius) { part = q; break; }
+                if (part != null)
+                {
+                    var contact = part.Pos + Sim.Flat(p.Pos - part.Pos).normalized * part.BodyRadius + Vector3.up * part.HitHeight;
+                    live.Remove(p);
+                    int dealt = w.DamagePart(part, p.Damage, contact, p.Ability);
+                    if (p.OnEnd != null) p.OnEnd(p, true, contact); else w.Fx.NoteImpact(contact, p.Color);
+                    p.OnHit?.Invoke(dealt, contact);
+                    continue;
+                }
                 if (b != null && b.Solid && Sim.Flat(p.Pos - b.transform.position).magnitude <= b.BodyRadius + p.Radius)
                 {
                     var contact = b.transform.position + Sim.Flat(p.Pos - b.transform.position).normalized * b.BodyRadius + Vector3.up * b.HitHeight;
