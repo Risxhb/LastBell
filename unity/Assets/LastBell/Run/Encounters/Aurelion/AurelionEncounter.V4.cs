@@ -136,7 +136,7 @@ namespace LastBell.Run
                     yield return Block("Zenith Marks + Meridian Lances", MarksWithLances(2));   // two-step, then the punish
                     break;
                 default:
-                    yield return Block("Last Light", Together(Light.Run(), 0, LastLightRotation()));
+                    yield return Block("Last Light", Together(LastLightFloorFx.During(W, Light, Light.Run()), 0, LastLightRotation()));
                     break;
             }
         }

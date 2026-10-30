@@ -301,7 +301,7 @@ namespace LastBell.Run
                 case "aurelion.sunspots": return Block("Sunspots", Spots.Run());
                 case "aurelion.total_eclipse": return Block("Total Eclipse", TotalEclipseFx.During(W, Eclipse, Eclipse.Run()));
                 case "aurelion.severance": return Block("Severance", Sever.Run());
-                case "aurelion.last_light": return Block("Last Light", Together(Light.Run(), 0, LastLightRotation()));
+                case "aurelion.last_light": return Block("Last Light", Together(LastLightFloorFx.During(W, Light, Light.Run()), 0, LastLightRotation()));
                 default: return Block("Hour Hands", Hands.Run());
             }
         }
