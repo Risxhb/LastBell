@@ -76,6 +76,32 @@ namespace LastBell.Run
             t.Check("boss death cancels the loop's hazards", t.W.Hazards.Count == 0);
             yield return t.Seconds(1.5f);
             t.Check("no damage after the boss dies", t.Hits.Count == hits);
+            t.Check("Medium has no Quake Echo", !t.Spawns.Any(x => x.Source.StartsWith("Quake Echo")));
+
+            // Hard: Quake Echo, the bands again outside-in from 0.8 s after the outer band
+            yield return t.Setup(4, Difficulty.Hard, at: new[] { new Vector3(0, 0, 6), new Vector3(6, 0, -1.5f), new Vector3(0, 0, -9), new Vector3(-6, 0, -1.5f) });
+            if (t.Boss == null) yield break;
+            t.Begin(t.Boss.Rite.Loop());
+            for (s = 0; s < 30 && t.Boss.TestBusy; s += Time.deltaTime)
+            {
+                foreach (var p in t.Party) if (p.Hp < 60) p.DebugSetHp(PlayerController.MaxHp);
+                yield return null;
+            }
+            int At(string src) => t.Spawns.Where(x => x.Source == src).Select(x => x.Tick + x.H.ResolveAt).DefaultIfEmpty(-1).Min();
+            int outer = At("Anvil Quake III"), e3 = At("Quake Echo III"), e2 = At("Quake Echo II"), e1 = At("Quake Echo I");
+            t.Check("Hard: Quake Echo fires III / II / I at +0.8 / 1.6 / 2.4 s after the outer band", t.Boss.Rite.Echoes == 1 && outer > 0
+                && Math.Abs(e3 - outer - 48) <= 2 && Math.Abs(e2 - outer - 96) <= 2 && Math.Abs(e1 - outer - 144) <= 2, $"echoes {t.Boss.Rite.Echoes}, {e3 - outer}/{e2 - outer}/{e1 - outer}");
+            t.Check("Hard: the echo shows only once the outer band has landed", t.Spawned("Quake Echo").All(x => x.Tick >= outer - 1));
+            var ech = new[] { "Quake Echo I", "Quake Echo II", "Quake Echo III" }.Select(n => t.Spawns.FirstOrDefault(x => x.Source == n)?.H).ToArray();
+            if (ech.All(x => x != null))
+            {
+                var eo = Sim.Flat(ech[0].Origin); var wp = Vector3.right * (CrucivarAbility.Rim - 0.2f);
+                bool OnlyE(int i, Vector3 p) => Enumerable.Range(0, 3).All(k => ech[k].Contains(p) == (k == i));
+                t.Check("Hard: the echo bands match the quake bands", OnlyE(0, eo + Vector3.forward * 2f) && OnlyE(1, eo + Vector3.forward * 6.5f) && OnlyE(2, wp));
+            }
+            else t.Check("Hard: the echo bands match the quake bands", false, "missing echo");
+            t.Check("Hard: the loop runs to its end", !t.Boss.TestBusy);
+            t.Check("Hard: one hit per instance", t.OneHitPerInstance());
         }
     }
 }

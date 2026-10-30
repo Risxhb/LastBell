@@ -17,6 +17,7 @@ namespace LastBell.Run
     //  11.0  Anvil Quake        inner circle (0-4 m) at 1.4 s, middle band (4-9 m) at 2.2 s, outer band (9 m to the wall) at
     //                           3.0 s, 40 each, Strike, all shown at once; lands after the last pour (Chzy18 10-27 replaced
     //                           the Hammerfall cleave, which came down right after the pours and could be out-ranged)
+    //        Quake Echo (Hard)  as the outer band lands the bands show again and fire outside-in at +0.8 / 1.6 / 2.4 s
     //  13.5  Ember Brand        again
     //  17.5  punish window      3.0 s (the encounter plays it)
     public sealed class ForgeRite : CrucivarAbility
@@ -34,8 +35,10 @@ namespace LastBell.Run
         public const int PourDmg = 30;
         public const float QuakeFirst = 1.4f, QuakeGap = 0.8f, QuakeInner = 4f, QuakeMiddle = 9f;
         public const int QuakeDmg = 40;
+        public const float EchoGap = 0.8f;   // Hard: Quake Echo
 
         int loops;
+        public int Echoes { get; private set; }
         public int Loops => loops;
         public readonly List<Hazard> Pools = new List<Hazard>();
         public List<PlayerController> Order { get; private set; } = new List<PlayerController>();
@@ -208,10 +211,21 @@ namespace LastBell.Run
             float wall = Rim + origin.magnitude + Hazard.Margin;
             Spawn("Anvil Quake I", HazardShape.Circle, 0, QuakeInner, T(QuakeFirst));
             Spawn("Anvil Quake II", HazardShape.Ring, QuakeInner, QuakeMiddle, T(QuakeFirst + QuakeGap));
-            Spawn("Anvil Quake III", HazardShape.Ring, QuakeMiddle, wall, T(QuakeFirst + 2 * QuakeGap));   // reaches the wall: no out-ranging
+            var outerBand = Spawn("Anvil Quake III", HazardShape.Ring, QuakeMiddle, wall, T(QuakeFirst + 2 * QuakeGap));   // reaches the wall: no out-ranging
             Boss.Presenter.PlayOnce("Diebreaker", T(QuakeFirst) / (float)Sim.Hz);
+            // Hard (Chzy18 accepted 10-30): Quake Echo. Once the outer band lands the bands show again and fire outside-in,
+            // 0.8 s apart from 0.8 s later, so stepping inward is no longer safe for the rest of the quake
+            if (Hard)
+                outerBand.OnResolve += hz =>
+                {
+                    if (!Boss) return;
+                    Echoes++;
+                    Spawn("Quake Echo III", HazardShape.Ring, QuakeMiddle, wall, T(EchoGap));
+                    Spawn("Quake Echo II", HazardShape.Ring, QuakeInner, QuakeMiddle, T(2 * EchoGap));
+                    Spawn("Quake Echo I", HazardShape.Circle, 0, QuakeInner, T(3 * EchoGap));
+                };
 
-            void Spawn(string name, HazardShape shape, float inner, float outer, int at)
+            Hazard Spawn(string name, HazardShape shape, float inner, float outer, int at)
             {
                 var h = W.Hazards.Spawn(new Hazard
                 {
@@ -223,6 +237,7 @@ namespace LastBell.Run
                     if (hz.Shape == HazardShape.Circle) W.BossFx.DiebreakerResolve(hz.Origin, hz.Radius); else W.BossFx.BellowsBlast(hz.Origin, hz.Radius);
                     Boss.Flare(1f);
                 };
+                return h;
             }
         }
     }

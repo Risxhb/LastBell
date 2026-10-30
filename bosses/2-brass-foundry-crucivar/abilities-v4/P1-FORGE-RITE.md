@@ -36,7 +36,7 @@
 
 ## Not done yet
 - **Easy:** for now, every warning is only stretched by 1.25.
-- **Hard:** no named extra mechanic yet.
+- **Hard (named extra: Quake Echo, accepted by Chzy18 30 Oct over Reversing Spin and Brand Flare):** as Anvil Quake's outer band lands, the three bands show again and fire outside-in at +0.8 / 1.6 / 2.4 s (40 each, same bands). Stepping inward after the outer band is no longer safe; step back out once the outer echo has gone off. It threatens melee and ranged alike. **Built 30 Oct;** `ForgeRiteTest` checks it.
 - **Escape-check numbers:** the v4 entries aren't in `crucivar-escape-check.ps1` yet.
 - **Telegraph look and fire VFX:** still placeholder shapes.
 - **Co-op rules:** N = 2/8 rules are still to be written. The prototype scales brands and numerals by party size, but only N = 4 has been watched.
