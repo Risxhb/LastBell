@@ -173,7 +173,7 @@ namespace LastBell.Run
             RunHud.Float(transform.position + Vector3.up * 2.4f, "-" + dmg, mult < 1 ? new Color(0.6f, 0.9f, 1f) : new Color(1f, 0.42f, 0.36f));
             World.BossFx.PlayerHit(transform.position);
             if (Hp == 0) { GoDown(); return; }
-            if (!noKnock)
+            if (!noKnock && h.Flinch)
             {
                 stun = h.Stun; knockDir = h.PushDir(transform.position); knockDist = h.Knockback; knockTick = KnockTicks;
                 dashTick = 0; Kit.Interrupt();
