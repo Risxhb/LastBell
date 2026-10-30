@@ -8,7 +8,7 @@ namespace LastBell.Menu
 {
     public sealed class TestRushSetup:MonoBehaviour
     {
-        public static int SavedMap,SavedEncounter;
+        public static int SavedMap,SavedEncounter,SavedPhase=1;
         public static string SavedHero="Vanguard";
         public int MapIndex {get;private set;}
         public int EncounterIndex {get;private set;}
@@ -16,6 +16,12 @@ namespace LastBell.Menu
         public Button LaunchButton {get;private set;}
         public Button[] MapButtons {get;private set;}
         public Button[] EncounterButtons {get;private set;}
+        // Phase row (boss step): the HP phase the fight starts in, 1-based. Only the selected boss's phases show
+        // (RunDirector.BossEntry.Phases); picking another boss goes back to Phase 1.
+        public int PhaseIndex {get;private set;}=1;
+        public Button[] PhaseButtons {get;private set;}
+        public static int MaxPhases{get{int n=1;foreach(var b in RunDirector.Bosses)n=Mathf.Max(n,b.Phases);return n;}}
+        public static int PhasesOf(int encounter)=>encounter>=0&&encounter<RunDirector.Bosses.Length?RunDirector.Bosses[encounter].Phases:1;
         // Boss step rows (Risxhb, October 25, 2026): Bosses, then Minibosses, each a row of cards like the arena step.
         // Buttons stay indexed by RunDirector.Bosses; only their placement follows these rows. The final boss is last.
         public static readonly string[] MinibossPrefixes={"Chimebound Oracle","Dial Warden","Pendulum Sentinel"};
@@ -34,7 +40,7 @@ namespace LastBell.Menu
         public bool Loading {get;private set;}
         public bool OwnsFocus=>ownedPanel&&EventSystem.current.currentSelectedGameObject&&EventSystem.current.currentSelectedGameObject.transform.IsChildOf(ownedPanel.transform);
         static readonly Color Muted=new Color(.93f,.88f,.76f,.62f), Faint=new Color(.93f,.88f,.76f,.16f);
-        Text[] mapLabels,encounterLabels;Text arenaTitle,titleEyebrow,backLabel;Image titleRule;RawImage[] encounterArt;
+        Text[] mapLabels,encounterLabels,phaseLabels;TestRushFocus[] phaseFocus;Text phaseNote;Text arenaTitle,titleEyebrow,backLabel;Image titleRule;RawImage[] encounterArt;
         GameObject arenaGroup,bossGroup;Button backButton;
         // Two steps on the main menu: arena first, then the boss (encounter) with hero, difficulty and launch.
         public bool BossStep {get;private set;}
@@ -46,7 +52,7 @@ namespace LastBell.Menu
         GameObject ownedPanel;
         public void Build(ConfrontationMenu owner,Transform parent,string hero)
         {
-            selection=owner;Hero=hero;SavedHero=hero;MapIndex=Mathf.Clamp(SavedMap,0,RunMaps.All.Length-1);EncounterIndex=Mathf.Clamp(SavedEncounter,0,RunDirector.Bosses.Length-1);
+            selection=owner;Hero=hero;SavedHero=hero;MapIndex=Mathf.Clamp(SavedMap,0,RunMaps.All.Length-1);EncounterIndex=Mathf.Clamp(SavedEncounter,0,RunDirector.Bosses.Length-1);PhaseIndex=Mathf.Clamp(SavedPhase,1,PhasesOf(EncounterIndex));
             var panel=MenuUI.Panel("Test Rush setup",parent,Vector2.zero,Vector2.one,new Color(.012f,.014f,.026f,1));panel.raycastTarget=true;transform.SetParent(panel.transform,false);
             ownedPanel=panel.gameObject;panelBase=panel;
             BuildBackdrop(panel.transform);
@@ -81,10 +87,16 @@ namespace LastBell.Menu
             EncounterButtons=new Button[RunDirector.Bosses.Length];encounterLabels=new Text[EncounterButtons.Length];encounterFocus=new TestRushFocus[EncounterButtons.Length];encounterArt=new RawImage[EncounterButtons.Length];
             var bossRow=BossRow;var miniRow=MinibossRow;
             float bossCard=.92f/Mathf.Max(5,bossRow.Length);
-            SectionLabel("Bosses",B,.595f,bossRow.Length);
-            for(int k=0;k<bossRow.Length;k++){int at=bossRow[k];float x=.04f+k*bossCard;EncounterButtons[at]=BossCard(at,k,B,new Vector2(x,.41f),new Vector2(x+bossCard,.59f),()=>SelectEncounter(at),out encounterLabels[at],out encounterFocus[at],out encounterArt[at]);}
-            SectionLabel("Minibosses",B,.365f,miniRow.Length);
-            for(int k=0;k<miniRow.Length;k++){int at=miniRow[k];float x=.04f+k*bossCard;EncounterButtons[at]=BossCard(at,k,B,new Vector2(x,.18f),new Vector2(x+bossCard,.36f),()=>SelectEncounter(at),out encounterLabels[at],out encounterFocus[at],out encounterArt[at]);}
+            // rows sit 0.06 higher than before the phase row (Chzy18, October 29, 2026), so the phase tabs fit above the footer
+            SectionLabel("Bosses",B,.655f,bossRow.Length);
+            for(int k=0;k<bossRow.Length;k++){int at=bossRow[k];float x=.04f+k*bossCard;EncounterButtons[at]=BossCard(at,k,B,new Vector2(x,.47f),new Vector2(x+bossCard,.65f),()=>SelectEncounter(at),out encounterLabels[at],out encounterFocus[at],out encounterArt[at]);}
+            SectionLabel("Minibosses",B,.425f,miniRow.Length);
+            for(int k=0;k<miniRow.Length;k++){int at=miniRow[k];float x=.04f+k*bossCard;EncounterButtons[at]=BossCard(at,k,B,new Vector2(x,.24f),new Vector2(x+bossCard,.42f),()=>SelectEncounter(at),out encounterLabels[at],out encounterFocus[at],out encounterArt[at]);}
+            // Phase row: one tab per phase of the selected boss, Phase 1 first
+            MenuUI.Text(Spaced("Start Phase"),B,new Vector2(.035f,.195f),new Vector2(.5f,.227f),15,MenuUI.Gold,TextAnchor.MiddleLeft);
+            phaseNote=MenuUI.Text("",B,new Vector2(.5f,.195f),new Vector2(.965f,.227f),UiTheme.SizeLabel,new Color(UiTheme.GoldLabel.r,UiTheme.GoldLabel.g,UiTheme.GoldLabel.b,.7f),TextAnchor.MiddleRight);
+            PhaseButtons=new Button[MaxPhases];phaseLabels=new Text[PhaseButtons.Length];phaseFocus=new TestRushFocus[PhaseButtons.Length];
+            for(int p=0;p<PhaseButtons.Length;p++){int n=p+1;float x=.04f+p*.15f;PhaseButtons[p]=Tab("Phase "+n,B,new Vector2(x,.135f),new Vector2(x+.15f,.19f),()=>SelectPhase(n),out phaseLabels[p],out phaseFocus[p]);}
 
             // Footer: one text action on the left (Main Menu / Back), the step's primary action on the right.
             MenuUI.Panel("Footer rule",panel.transform,new Vector2(.04f,.122f),new Vector2(.96f,.1235f),Faint);
@@ -100,7 +112,7 @@ namespace LastBell.Menu
         void ShowStep(bool boss)
         {
             BossStep=boss;arenaGroup.SetActive(!boss);bossGroup.SetActive(boss);
-            if(boss)Link(System.Array.ConvertAll(BossRow,i=>EncounterButtons[i]),System.Array.ConvertAll(MinibossRow,i=>EncounterButtons[i]),new[]{backButton,LaunchButton});
+            if(boss)LinkBossStep();
             else Link(MapButtons,new[]{backButton,ContinueButton});
             backLabel.text=boss?"Back":"Main Menu";
             if(arenaTitle)Refresh();
@@ -112,7 +124,14 @@ namespace LastBell.Menu
         public void OpenBossStep(){ShowStep(true);}
         public static Texture2D Preview(int i)=>Resources.Load<Texture2D>("Menu/Maps/"+RunMaps.All[i].Id);
         public void SelectMap(int i){if(Loading||i<0||i>=MapButtons.Length)return;MapIndex=SavedMap=i;Refresh();}
-        public void SelectEncounter(int i){if(Loading||i<0||i>=EncounterButtons.Length)return;EncounterIndex=SavedEncounter=i;Refresh();}
+        public void SelectEncounter(int i){if(Loading||i<0||i>=EncounterButtons.Length)return;if(i!=EncounterIndex)PhaseIndex=SavedPhase=1;EncounterIndex=SavedEncounter=i;Refresh();if(BossStep)LinkBossStep();}
+        public void SelectPhase(int n){if(Loading||n<1||n>PhasesOf(EncounterIndex))return;PhaseIndex=SavedPhase=n;Refresh();}
+        // the phase row holds only the selected boss's phases, so its links follow the selection
+        void LinkBossStep()
+        {
+            var phases=new Button[PhasesOf(EncounterIndex)];System.Array.Copy(PhaseButtons,phases,phases.Length);
+            Link(System.Array.ConvertAll(BossRow,i=>EncounterButtons[i]),System.Array.ConvertAll(MinibossRow,i=>EncounterButtons[i]),phases,new[]{backButton,LaunchButton});
+        }
         public static string Incompatibility(int map,int encounter)
         {
             if(map<0||map>=RunMaps.All.Length||encounter<0||encounter>=RunDirector.Bosses.Length)return "Choose a valid map and encounter.";
@@ -126,6 +145,9 @@ namespace LastBell.Menu
         {
             for(int i=0;i<mapLabels.Length;i++){mapLabels[i].text=RunMaps.All[i].Name+(Preview(i)?"":" (unavailable)");mapFocus[i].Chosen=i==MapIndex;}
             for(int i=0;i<encounterLabels.Length;i++){encounterLabels[i].text=CardName(i);encounterFocus[i].Chosen=i==EncounterIndex;if(encounterArt[i])encounterArt[i].texture=EncounterPreview(i,MapIndex);}
+            int phaseCount=PhasesOf(EncounterIndex);PhaseIndex=Mathf.Clamp(PhaseIndex,1,phaseCount);
+            for(int p=0;p<PhaseButtons.Length;p++){PhaseButtons[p].gameObject.SetActive(p<phaseCount);phaseFocus[p].Chosen=p+1==PhaseIndex;}
+            phaseNote.text=Spaced(phaseCount==1?"Phase 1 only":phaseCount.ToString("00")+" phases");
             // the arena step names the selected arena; the boss step shows only its card rows
             arenaTitle.text=RunMaps.All[MapIndex].Name.ToUpperInvariant();
             titleEyebrow.text=Spaced("Selected Arena");
@@ -141,7 +163,7 @@ namespace LastBell.Menu
         }
         public void Launch()
         {
-            if(Loading||!Valid||!MenuLaunch.Test(Hero,MapIndex,EncounterIndex))return;
+            if(Loading||!Valid||!MenuLaunch.Test(Hero,MapIndex,EncounterIndex,PhaseIndex))return;
             Loading=true;LaunchButton.interactable=false;
             foreach(var b in ownedPanel.GetComponentsInChildren<Button>())b.interactable=false;
         }

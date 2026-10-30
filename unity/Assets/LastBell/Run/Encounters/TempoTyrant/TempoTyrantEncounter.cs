@@ -201,6 +201,17 @@ namespace LastBell.Run
             PhaseName = "Haste";
         }
 
+        // practice phase row: Phase 2 is Broken Cadence (strictly below 20%), as at the end of its tell. The tempo still
+        // alternates on its own clock, and Falling Hours still starts below 10%.
+        public override float[] PhaseStarts => new[] { 1f, 0.199f };
+        public override int PhaseNumber => Frenzy ? 2 : 1;
+        protected override void EnterPhase(int n)
+        {
+            if (Frenzy) return;
+            FrenzyPending = false; Frenzy = true; Rig.Frenzy = true;
+            PhaseName = "Broken Cadence · " + Clock.State;
+        }
+
         public static bool ArenaCentred(Vector3 p) => new Vector2(p.x, p.z).magnitude <= CentreGate + 0.05f;
         float Walk => Clock.State == Tempo.Haste ? HasteWalk : NormalWalk;
         int Beats(float b) => Clock.TicksFor(b);

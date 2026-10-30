@@ -8,7 +8,7 @@ namespace LastBell.Menu
     // Bound to one destination and consumed before gameplay begins. Retry never reuses a pending request.
     public static class MenuLaunch
     {
-        sealed class Request { public string Hero,Scene;public Difficulty Difficulty;public bool Test;public int Encounter;public int[] Order; }
+        sealed class Request { public string Hero,Scene;public Difficulty Difficulty;public bool Test;public int Encounter,Phase=1;public int[] Order; }
         static Request pending;
         public static bool Pending=>pending!=null;
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -22,10 +22,10 @@ namespace LastBell.Menu
             pending=new Request{Hero=hero,Scene=RunMaps.All[map].RunScene,Difficulty=RunDifficulty.Selected,Order=order};
             MenuReturnBridge.Ensure();MenuReturnBridge.TestSession=false;SceneManager.LoadSceneAsync(pending.Scene);return true;
         }
-        public static bool Test(string hero,int map,int encounter)
+        public static bool Test(string hero,int map,int encounter,int phase=1)
         {
             if(pending!=null||Array.IndexOf(RunDirector.Classes,hero)<0||TestRushSetup.Incompatibility(map,encounter)!=null)return false;
-            pending=new Request{Hero=hero,Scene=RunMaps.All[map].RunScene,Difficulty=RunDifficulty.Selected,Test=true,Encounter=encounter};
+            pending=new Request{Hero=hero,Scene=RunMaps.All[map].RunScene,Difficulty=RunDifficulty.Selected,Test=true,Encounter=encounter,Phase=phase};
             MenuReturnBridge.Ensure();MenuReturnBridge.TestSession=true;SceneManager.LoadSceneAsync(pending.Scene);return true;
         }
         public static bool Consume(RunDirector director)
@@ -33,7 +33,7 @@ namespace LastBell.Menu
             if(pending==null)return false;var request=pending;pending=null;
             if(SceneManager.GetActiveScene().path!=request.Scene)return false;
             RunDifficulty.Selected=request.Difficulty;
-            return request.Test?director.StartPracticeOnSelectedMap(request.Hero,request.Encounter):director.StartRun(request.Hero,request.Order);
+            return request.Test?director.StartPracticeOnSelectedMap(request.Hero,request.Encounter,request.Phase):director.StartRun(request.Hero,request.Order);
         }
     }
 }

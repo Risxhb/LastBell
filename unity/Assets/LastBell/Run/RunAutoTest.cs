@@ -227,6 +227,7 @@ namespace LastBell.Run
             for (int i = 0; i < RunMaps.All.Length; i++)
                 Check($"map selectable: {RunMaps.All[i].Name}", RunMaps.InBuild(i), RunMaps.All[i].RunScene);
             yield return Shot("menu");
+            if (PhaseSelectOnly) { yield return PracticePhaseChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
             if (OnlySylvara)
             {
                 yield return SylvaraChecks();
@@ -442,6 +443,9 @@ namespace LastBell.Run
             yield return AurelionChecks();
 
             yield return SylvaraChecks();
+
+            // ---------- practice phase row: every boss, every phase ----------
+            yield return PracticePhaseChecks();
 
             // ---------- report ----------
             Check("no errors or exceptions logged", errors == 0, errors + " logged");

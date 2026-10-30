@@ -66,6 +66,16 @@ namespace LastBell.Run
 
         int PhaseFor() => Hp > MaxHp * P2At ? 1 : Hp > MaxHp * P3At ? 2 : 3;
 
+        // practice phase row: the shift's state without its animation; the rig sheds its insulation (and opens on 3)
+        public override float[] PhaseStarts => new[] { 1f, P2At, P3At };
+        public override int PhaseNumber => phase;
+        protected override void EnterPhase(int n)
+        {
+            if (phase == n) return;
+            phase = n; step = 0; PhaseName = n == 2 ? "Casting Heat" : "Open Pressure";
+            rig.BeginPhase(n);
+        }
+
         protected override IEnumerable<int> Script()
         {
             while (true)
