@@ -28,27 +28,31 @@ namespace LastBell.Run
         public sealed class BossEntry
         {
             public readonly string Name; public readonly Func<CombatWorld, BossEncounter> Spawn; public readonly bool InRun, Final; public readonly string Map;
-            public BossEntry(string name, Func<CombatWorld, BossEncounter> spawn, bool inRun = true, string map = null, bool final = false) { Name = name; Spawn = spawn; InRun = inRun; Map = map; Final = final; }
+            // Phases: how many HP phases the practice phase row offers (1 = Phase 1 only). It must match the encounter's
+            // PhaseStarts; the autotest checks that for every entry.
+            public readonly int Phases;
+            public BossEntry(string name, Func<CombatWorld, BossEncounter> spawn, bool inRun = true, string map = null, bool final = false, int phases = 1) { Name = name; Spawn = spawn; InRun = inRun; Map = map; Final = final; Phases = Math.Max(1, phases); }
         }
         public static readonly BossEntry[] Bosses =
         {
-            new BossEntry("Bellkeeper", w => BossEncounter.Spawn<BellkeeperEncounter>(w, Vector3.zero, 0), final: true),
+            new BossEntry("Bellkeeper", w => BossEncounter.Spawn<BellkeeperEncounter>(w, Vector3.zero, 0), final: true, phases: 3),
             // Skyward Spire area boss; authored practice map
-            new BossEntry("Aurelion (area 1)", w => BossEncounter.Spawn<AurelionEncounter>(w, new Vector3(0, 0, -1.5f), 0), map: AurelionMap),
+            new BossEntry("Aurelion (area 1)", w => BossEncounter.Spawn<AurelionEncounter>(w, new Vector3(0, 0, -1.5f), 0), map: AurelionMap, phases: 3),
             // Verdant Chimes area boss (graybox); authored practice map
-            new BossEntry("Sylvara (area 3)", w => BossEncounter.Spawn<SylvaraEncounter>(w, new Vector3(0, 0, -1.5f), 0), map: SylvaraMap),
+            new BossEntry("Sylvara (area 3)", w => BossEncounter.Spawn<SylvaraEncounter>(w, new Vector3(0, 0, -1.5f), 0), map: SylvaraMap, phases: 3),
             // Brass Foundry area boss; authored practice map
-            new BossEntry("Crucivar (area 2)", w => BossEncounter.Spawn<CrucivarEncounter>(w, new Vector3(0, 0, -1.5f), 0), map: CrucivarMap),
+            new BossEntry("Crucivar (area 2)", w => BossEncounter.Spawn<CrucivarEncounter>(w, new Vector3(0, 0, -1.5f), 0), map: CrucivarMap, phases: 3),
             // Metronome Court miniboss: explicit Practice entry only (inRun: false), so shuffled run slots are unchanged.
             // Run integration point for later review: set inRun to true here (docs/metronome-arena/tempo-tyrant.md).
-            new BossEntry("Tempo Tyrant (practice)", w => BossEncounter.Spawn<TempoTyrantEncounter>(w, new Vector3(0, 0, -2f), 0), inRun: false, map: TempoTyrantMap),
+            // Phase 2 is Broken Cadence (below 20%).
+            new BossEntry("Tempo Tyrant (practice)", w => BossEncounter.Spawn<TempoTyrantEncounter>(w, new Vector3(0, 0, -2f), 0), inRun: false, map: TempoTyrantMap, phases: 2),
             // Skyward Spire miniboss, practice only (docs/bosses/chimebound-oracle.md). Picked on the Metronome Court in
             // Boss Rush instead, the court's metronome follows his clock.
-            new BossEntry("Chimebound Oracle (practice)", w => BossEncounter.Spawn<ChimeboundOracleEncounter>(w, new Vector3(0, 0, -2f), 0), inRun: false, map: AurelionMap),
+            new BossEntry("Chimebound Oracle (practice)", w => BossEncounter.Spawn<ChimeboundOracleEncounter>(w, new Vector3(0, 0, -2f), 0), inRun: false, map: AurelionMap, phases: 2),
             // Skyward Spire miniboss with the parry QTE, practice only (docs/bosses/dial-warden.md)
-            new BossEntry("Dial Warden (practice)", w => BossEncounter.Spawn<DialWardenEncounter>(w, new Vector3(0, 0, -1.5f), 0), inRun: false, map: AurelionMap),
+            new BossEntry("Dial Warden (practice)", w => BossEncounter.Spawn<DialWardenEncounter>(w, new Vector3(0, 0, -1.5f), 0), inRun: false, map: AurelionMap, phases: 2),
             // Skyward Spire miniboss, practice only (docs/bosses/pendulum-sentinel.md, a proposal)
-            new BossEntry("Pendulum Sentinel (practice)", w => BossEncounter.Spawn<PendulumSentinelEncounter>(w, new Vector3(0, 0, -1.5f), 0), inRun: false, map: AurelionMap),
+            new BossEntry("Pendulum Sentinel (practice)", w => BossEncounter.Spawn<PendulumSentinelEncounter>(w, new Vector3(0, 0, -1.5f), 0), inRun: false, map: AurelionMap, phases: 2),
         };
         // Catalog eligibility is stable; each run owns its shuffled sequence, with final encounters appended.
         public static readonly int[] RunOrder = Enumerable.Range(0, Bosses.Length).Where(i => Bosses[i].InRun).OrderBy(i => Bosses[i].Final).ToArray();
@@ -83,6 +87,7 @@ namespace LastBell.Run
         public string ClassName { get; private set; } = "Vanguard";
         public Difficulty Difficulty { get; private set; } = Difficulty.Medium;   // copied from the menu at run start
         public int Encounter { get; private set; }          // index into Bosses (the last is the final boss)
+        public int PracticePhase { get; private set; } = 1; // practice only: the 1-based HP phase the fight starts in (a retry keeps it)
         public int Generation { get; private set; }
         public int StateTicks { get; private set; }
         public float IntroProgress => Mathf.Clamp01((float)StateTicks / IntroTicks);
@@ -150,36 +155,37 @@ namespace LastBell.Run
             return Begin(RunMode.Run, className, EncounterOrder[0]);
         }
         // Explicit map/encounter test launch. Legacy practice still uses its authored default; this path never remaps.
-        public bool StartPracticeOnSelectedMap(string className, int encounter)
+        public bool StartPracticeOnSelectedMap(string className, int encounter, int phase = 1)
         {
             if (State != RunState.Menu || Array.IndexOf(Classes, className) < 0 ||
                 LastBell.Menu.TestRushSetup.Incompatibility(RunMaps.Current, encounter) != null) return false;
-            return Begin(RunMode.Practice, className, encounter);
+            return Begin(RunMode.Practice, className, encounter, phase);
         }
         // A boss with its own arena loads that map first; the new scene's director starts the practice (Start below).
-        public bool StartPractice(string className, int encounter)
+        public bool StartPractice(string className, int encounter, int phase = 1)
         {
             encounter = Mathf.Clamp(encounter, 0, Bosses.Length - 1);
             var map = Bosses[encounter].Map;
             if (map != null && State == RunState.Menu)
             {
                 int v = RunMaps.IndexOf(map);
-                if (v >= 0 && v != RunMaps.Current && RunMaps.InBuild(v)) { pendingPractice = (className, encounter); return SelectMap(v); }
+                if (v >= 0 && v != RunMaps.Current && RunMaps.InBuild(v)) { pendingPractice = (className, encounter, phase); return SelectMap(v); }
             }
-            return Begin(RunMode.Practice, className, encounter);
+            return Begin(RunMode.Practice, className, encounter, phase);
         }
-        static (string cls, int enc)? pendingPractice;   // survives the scene load
+        static (string cls, int enc, int phase)? pendingPractice;   // survives the scene load
         void Start()
         {
             if (LastBell.Menu.MenuLaunch.Consume(this)) { pendingPractice = null; return; }
             if (pendingPractice == null || Instance != this) return;
-            var (cls, enc) = pendingPractice.Value; pendingPractice = null;
-            Begin(RunMode.Practice, cls, enc);
+            var (cls, enc, ph) = pendingPractice.Value; pendingPractice = null;
+            Begin(RunMode.Practice, cls, enc, ph);
         }
 
-        bool Begin(RunMode mode, string className, int encounter)
+        bool Begin(RunMode mode, string className, int encounter, int phase = 1)
         {
             if (State != RunState.Menu) return false;
+            PracticePhase = mode == RunMode.Practice && encounter >= 0 && encounter < Bosses.Length ? Mathf.Clamp(phase, 1, Bosses[encounter].Phases) : 1;
             Mode = mode; ClassName = Array.IndexOf(Classes, className) >= 0 ? className : "Vanguard";
             Difficulty = RunDifficulty.Selected;
             BuildRun(encounter);
@@ -281,6 +287,7 @@ namespace LastBell.Run
             World.ClearTransient();
             if (Boss) Destroy(Boss.gameObject);
             Boss = Bosses[index].Spawn(World);
+            ApplyPracticePhase();   // the boss bar shows the chosen phase during the intro
             World.Boss = Boss;
             World.CombatActive = false;
             // health policy (see PlayerController.RefreshHealth): every run boss after the first refills health; the last
@@ -300,7 +307,18 @@ namespace LastBell.Run
             World.BeginSegment();
             Player.AbilitiesEnabled = true;
             Boss.BeginCombat();
+            ApplyPracticePhase();   // again after BeginCombat, so a boss that resets its phase state there keeps the pick
             Go(RunState.Combat);
+        }
+
+        // Practice phase row: start the fight in PracticePhase (1 = a normal start). The player was built fresh for this
+        // practice, so health and potions are full as at any fight start.
+        void ApplyPracticePhase()
+        {
+            if (Mode != RunMode.Practice || PracticePhase <= 1 || !Boss) return;
+            bool ok = Boss.StartAtPhase(PracticePhase);
+            Log.Add($"practice phase {PracticePhase} {(ok ? "ok" : "refused")} {Boss.Id} hp {Boss.Hp}/{Boss.MaxHp} '{Boss.PhaseName}'");
+            if (!ok) Debug.LogWarning($"[run] practice: {Boss.Id} could not start at phase {PracticePhase} ({Boss.PhaseCount} phases)");
         }
 
         void EndCombat(bool bossDefeated)

@@ -84,6 +84,29 @@ namespace LastBell.Run
         public virtual float NextPhaseFraction() => Hp > MaxHp * 0.7f ? 0.69f : 0.34f;   // F8: just below the next threshold
         public void DebugSetHpFraction(float f){ if (!Dead) Hp = Mathf.Clamp(Mathf.RoundToInt(MaxHp * f), 1, MaxHp); }
 
+        // ---------------- practice: start at phase N (Test Rush phase row, -lastbellPhase) ----------------
+        // PhaseStarts: the HP fraction each HP phase begins at, phase 1 first (always 1). One entry = Phase 1 only: the
+        // boss can't be skipped into a later phase safely yet. PhaseNumber is the 1-based HP phase the fight is in now.
+        public virtual float[] PhaseStarts => new[] { 1f };
+        public virtual int PhaseNumber => 1;
+        public int PhaseCount => PhaseStarts.Length;
+        // Puts the boss in phase n as if that phase's transition had just finished: HP at the top of the band (no heal
+        // later, same bar), phase state, name, looks and per-phase setup through EnterPhase. Idempotent, so the director
+        // applies it when the boss spawns (the bar reads right during the intro) and again right after BeginCombat (a boss
+        // that resets its phase state there can't undo it). Phase 1 is a normal fight start.
+        public bool StartAtPhase(int n)
+        {
+            var starts = PhaseStarts;
+            if (Dead || n < 1 || n > starts.Length) return false;
+            if (n == 1) return true;
+            // one HP under the threshold: `Hp > MaxHp * 0.70f` can see 2519.99996 for 3600 HP, so exactly 2520 would read as
+            // the phase above and shift straight back
+            Hp = Mathf.Clamp(Mathf.FloorToInt(MaxHp * starts[n - 1]) - 1, 1, MaxHp);
+            EnterPhase(n);
+            return PhaseNumber == n;
+        }
+        protected virtual void EnterPhase(int n) { }
+
         void Die()
         {
             Dead = true; script = null; Current = "defeated";
