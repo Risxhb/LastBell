@@ -80,7 +80,7 @@ The cycle is 21.5 s plus a 3.5 s punish. Code: `Abilities/MoltenCrown.cs`. Test:
   - Crown Rise warned 4.0 s ahead;
   - Eruption on the fifth crown instead of the fourth;
   - damage ×0.6.
-- **Hard (named extra: Second Press returns):** the fullest tower in each set re-stamps 2.0 s after it lands, pushing toward the centre. Whoever just soaked it has to step out. This is the existing v2 mechanic.
+- **Hard (named extra: Second Press returns):** the fullest tower in each set re-stamps 2.0 s after it lands, pushing toward the centre. Whoever just soaked it has to step out. This is the existing v2 mechanic. **Built 30 Oct (proposal):** 35 damage, r 2.2, 2.0 s warning, knocked 1.5 m toward the centre; `MoltenCrownTest` checks it.
 
 ## Escape check (to add once accepted)
 Worst cases to check:
