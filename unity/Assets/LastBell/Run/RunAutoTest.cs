@@ -838,6 +838,7 @@ namespace LastBell.Run
                 if (!p1Shot && d.World.Bullets.Count > 80) { p1Shot = true; yield return Shot("sylvara_v3_p1"); StartCoroutine(Capture("sylvara_v3_p1", 240)); }
             }
             yield return Play(5f, () => sy.Order.Count(o => o == "Pruning Arc") >= 2);
+            if (!p1Shot) yield return Shot("sylvara_v3_p1");
             Note("Sylvara P1 order: " + string.Join(" → ", sy.Order));
             foreach (var id in new[] { "Petal Spiral", "Seed Pods", "Waterfall Jets", "Toll", "Feet Pod", "Pruning Arc", "Doubled Pods", "Second Spiral", "Triangle Pods" })
                 Check($"Sylvara P1 uses {id}", sy.Order.Contains(id));
@@ -919,19 +920,65 @@ namespace LastBell.Run
             yield return Play(3f, () => false);
             yield return Shot("sylvara_v3_last_storm");
 
-            watching = false; d.World.Bullets.Hit -= onBullet; d.World.PlayerHit -= onHit;
+            d.World.Bullets.Hit -= onBullet; d.World.PlayerHit -= onHit;
             Check("Sylvara: each bullet hits at most once", bulletOnce);
             Check("Sylvara: bullets deal damage with no stun or knockback", bulletNoStun);
             Check("Sylvara: coloured bullets only hit their own colour", colourOk);
             Check("Sylvara: each ground or arc hazard hits at most once (R16)", hitsPerInstance.Values.All(n => n == 1), $"{hitsPerInstance.Count} instances hit");
             Note($"Sylvara v3: bot took {taken} damage ({bulletHits} bullet hits, {hitsPerInstance.Count} hazard hits), healed by the test; peak {maxBullets} bullets on screen, {d.World.Bullets.Fired} fired");
 
-            yield return KillDuringWindup("sylvara");
+            yield return KillDuringWindup("sylvara");   // Last Storm is still running: the watcher keeps the bot alive until she dies
+            watching = false;
             Check("sylvara: boss death clears every bullet", d.World == null || d.World.Bullets.Count == 0);
             yield return Until(() => d.State == RunState.Results, 8, "Sylvara practice results");
             Check("Sylvara practice clear ends in a practice result", d.Victory && d.Mode == RunMode.Practice);
             Check("Sylvara: no bud props left after defeat", sy == null || sy.PropCount == 0, sy ? sy.PropCount + " left" : "");
             d.ReturnToMenu(); yield return null;
+            yield return SylvaraBotChecks();
+        }
+
+        // Sylvara with three bot allies (the menu's Allies row): they spawn, dodge the bullet hell and cut buds by themselves
+        IEnumerator SylvaraBotChecks()
+        {
+            int keep = RunParty.Selected;
+            Check("the menu sets the ally count", d.SelectAllies(3) && RunParty.Selected == 3);
+            Check("Sylvara practice with 3 allies starts", d.StartPractice("Vanguard", RunDirector.SylvaraPractice));
+            yield return Until(() => RunDirector.Instance && RunDirector.Instance.State == RunState.Ready, 30, "Verdant Chimes loaded for the bot fight");
+            if (RunDirector.Instance != d) { directorLog.AddRange(d.Log); d = RunDirector.Instance; d.InputOverride = bot; bot.Clear(); }
+            if (d.Player) d.Player.Input = bot;
+            d.RequestReady();
+            yield return Until(() => d.State == RunState.Combat, 4, "bot fight combat");
+            var sy = d.Boss as SylvaraEncounter;
+            Check("three bot allies fight beside the player", d.Allies.Count == 3 && d.Allies.All(a => a.Input is AllyBot), d.Allies.Count.ToString());
+            if (sy == null || d.Allies.Count == 0) { RunParty.Selected = keep; yield break; }
+            var hits = new Dictionary<PlayerController, int>(); int downs = 0;
+            Action<PlayerController, BulletSystem.Bullet, int> onBullet = (p, b, dmg) => { if (p != d.Player) hits[p] = (hits.TryGetValue(p, out int n) ? n : 0) + 1; };
+            d.World.Bullets.Hit += onBullet;
+            var report = new List<string>();
+            float[] at = { 1f, 0.74f, 0.49f, 0.24f };
+            for (int ph = 0; ph < 4; ph++)
+            {
+                if (ph > 0) { d.Boss.DebugSetHpFraction(at[ph]); yield return Wait(2f); }
+                hits.Clear();
+                float t0 = Time.time, seconds = 20f;
+                while (Time.time - t0 < seconds && d.State == RunState.Combat)
+                {
+                    bot.Clear(); d.Player.transform.position = new Vector3(0, 0, -CombatWorld.PlayerBound + 0.5f);
+                    d.Player.DebugSetHp(PlayerController.MaxHp);   // the test player stands aside; only the bots play
+                    foreach (var a in d.Allies) if (a.Down) { downs++; a.DebugRevive(); }
+                    yield return null;
+                }
+                int n = hits.Values.Sum();
+                report.Add($"{sy.PhaseName}: {n} bullet hits on 3 bots in {seconds:0} s ({n * 60f / seconds / 3:0} per bot per minute)");
+                if (ph == 2) Check("bots cut Choir Buds by themselves", sy.BudsCut > 0, $"{sy.BudsCut} cut, {sy.BudsBloomed} bloomed");
+            }
+            d.World.Bullets.Hit -= onBullet;
+            Note("Sylvara bots: " + string.Join(" · ", report) + $" · downs {downs}");
+            Check("Sylvara bots survive every phase (no downs in 80 s)", downs == 0, downs + " downs");
+            d.Boss.DebugDefeat();
+            yield return Until(() => d.State == RunState.Results, 8, "bot fight results");
+            d.ReturnToMenu(); yield return null;
+            RunParty.Selected = keep;
         }
 
         // Exact-tick regressions from the foundation review of PR #42 (risxhb/codex, Oct 21). The director is paused

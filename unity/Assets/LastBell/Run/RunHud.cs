@@ -83,6 +83,8 @@ namespace LastBell.Run
             }
             if (d.State == RunState.Menu && kb.dKey.wasPressedThisFrame)
                 d.SelectDifficulty((Difficulty)(((int)RunDifficulty.Selected + 1) % RunDifficulty.Names.Length));
+            if (d.State == RunState.Menu && kb.aKey.wasPressedThisFrame)
+                d.SelectAllies((RunParty.Selected + 1) % (RunParty.MaxAllies + 1));
         }
 
         void TickChip()
@@ -366,6 +368,7 @@ namespace LastBell.Run
                         + 26 + 40 + 8 + 40 + 12
                         + 28 + mapNoteH + mapRows * 40 + (mapRows - 1) * rowGap + 12
                         + 28 + diffNoteH + 40 + 20
+                        + 26 + 40 + 20
                         + 44 + 20
                         + 26 + bossRows * 40 + (bossRows - 1) * rowGap + 16
                         + ctrlH + 16 + 40 + pad;
@@ -411,6 +414,18 @@ namespace LastBell.Run
                 bool on = (int)level == i;
                 if (GUI.Toggle(dr, on, (on ? "> " : "") + RunDifficulty.Names[i], btn) && !on) d.SelectDifficulty((Difficulty)i);
                 if (on) UiTheme.Border(dr, UiTheme.Gold, Px);
+            }
+            y += 60;
+
+            // bot allies (RunParty): Chzy18 wants the count in the menu for every test build
+            T(x, y, inner, 20, UiTheme.Spaced("Allies (bots)") + "   (A to switch)", eyebrow); y += 26;
+            int na = RunParty.MaxAllies + 1; float aw = (inner - (na - 1) * colGap) / na;
+            for (int i = 0; i < na; i++)
+            {
+                var ar = S(x + i * (aw + colGap), y, aw, 40);
+                bool on = RunParty.Selected == i;
+                if (GUI.Toggle(ar, on, (on ? "> " : "") + i, btn) && !on) d.SelectAllies(i);
+                if (on) UiTheme.Border(ar, UiTheme.Gold, Px);
             }
             y += 60;
             if (GUI.Button(S(r.x + W / 2 - 150, y, 300, 44), "START RUN  (Enter)", btnP)) d.StartRun(RunDirector.Classes[menuClass]);

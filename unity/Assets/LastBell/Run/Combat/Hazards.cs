@@ -39,8 +39,8 @@ namespace LastBell.Run
         public Action<Hazard> OnResolve;         // presentation of the resolve (effects), after the hit test
         public Action<Hazard> OnSpent;           // the active period is over (same tick as OnResolve when ActiveTicks is 0)
         public float ClipRadius;                 // > 0: the telegraph is drawn only over the floor disc of this radius (presentation)
-        public bool HitOnResolve = true;
-        public bool Flinch = true;               // false: the hit deals damage only, with no stun, knockback or interrupt (hostile bullets)         // false: the owner deals the hits itself while the warning is up (a sweeping charge)
+        public bool HitOnResolve = true;         // false: the owner deals the hits itself while the warning is up (a sweeping charge)
+        public bool Flinch = true;               // false: the hit deals damage only, with no stun, knockback or interrupt (hostile bullets)
 
         public int Age { get; internal set; }
         public bool Locked => Age >= LockAt;
