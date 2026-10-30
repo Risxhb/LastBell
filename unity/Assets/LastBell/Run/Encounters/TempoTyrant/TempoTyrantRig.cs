@@ -14,8 +14,23 @@ namespace LastBell.Run
     // tick (so poses freeze with pause). Strikes snap to their impact pose on the resolve tick. Seams are dim teal in
     // Normal and amber in Haste on identical geometry. Materials are cached per process and shared, so repeated
     // attempts never accumulate materials; emission changes go through MaterialPropertyBlocks.
+    //
+    // MODEL (October 28, 2026): Risxhb's Meshy model (Resources/Characters/TempoTyrant, a Mixamo-style rig with Walk /
+    // Run / SlowWalkLoop clips only) and its greatsword (Resources/Characters/TempoTyrantSword) replace the stand-in
+    // when present. The stand-in body then stays as an invisible pose skeleton: its arms pivot and greatsword still
+    // take every attack pose exactly as before, the Meshy sword is drawn on that greatsword, and both of the model's
+    // arms are bent onto the grip (two-bone IK) after the clips are evaluated. Walk and rush play the model's walk and
+    // run loops; every other pose is the model's rest stance plus the IK arms, until attack clips are supplied.
+    [DefaultExecutionOrder(1000)]   // IK after RunDirector draws the smoothed pose and the presenter evaluates its clips
     public sealed class TempoTyrantRig : MonoBehaviour
     {
+        public const string ModelResource = "TempoTyrant", SwordResource = "TempoTyrantSword";
+        public const float ModelGlbHeight = 1.7f;                    // the Meshy model's authored height (m)
+        public const float SwordLength = 3.3f, SwordGlbLength = 1.9f, SwordGlbGripY = -0.67f;   // pommel at -0.95, blade to +0.95
+        CharacterPresenter presenter; Transform model, meshSword;
+        Transform rUpper, rFore, rHand, lUpper, lFore, lHand;
+        public bool HasModel => presenter != null && presenter.HasModel;
+        public CharacterPresenter Presenter => presenter;
         public const float Height = 3.5f;
         static readonly Color Ivory = new Color(0.86f, 0.82f, 0.72f), Brass = new Color(0.72f, 0.53f, 0.26f),
             Joint = new Color(0.11f, 0.11f, 0.13f), Tabard = new Color(0.09f, 0.10f, 0.13f), Steel = new Color(0.80f, 0.80f, 0.78f),
@@ -69,6 +84,8 @@ namespace LastBell.Run
             host.transform.SetParent(boss, false);
             var rig = host.AddComponent<TempoTyrantRig>();
             rig.BuildBody();
+            rig.TryModel();
+            if (rig.HasModel) host.name = "Visual (Tempo Tyrant: Meshy model)";
             return rig;
         }
 
@@ -207,6 +224,78 @@ namespace LastBell.Run
             }
         }
 
+        // the Meshy model under the stand-in body (so it takes the body's lean, crouch and bob), scaled to 3.5 m
+        void TryModel()
+        {
+            presenter = CharacterPresenter.Create(Body, ModelResource, 2.5f, 1f, 0, null);
+            if (!presenter.HasModel) { DestroyImmediate(presenter.gameObject); presenter = null; return; }
+            presenter.Visual.localScale = Vector3.one * (Height / ModelGlbHeight);
+            model = presenter.Visual;
+            foreach (var r in Body.GetComponentsInChildren<Renderer>(true))
+                if (!r.transform.IsChildOf(model)) r.enabled = false;   // the stand-in stays as the invisible pose skeleton
+            Transform Bone(string n)
+            {
+                foreach (var t in model.GetComponentsInChildren<Transform>(true)) if (t.name == "mixamorig:" + n || t.name.EndsWith(n) && t.name.Contains("mixamorig")) return t;
+                return null;
+            }
+            rUpper = Bone("RightArm"); rFore = Bone("RightForeArm"); rHand = Bone("RightHand");
+            lUpper = Bone("LeftArm"); lFore = Bone("LeftForeArm"); lHand = Bone("LeftHand");
+            if (!rUpper || !rFore || !rHand || !lUpper || !lFore || !lHand) Debug.LogWarning("Tempo Tyrant model: arm bones not found, the sword is drawn without IK arms");
+            var sw = Resources.Load<GameObject>("Characters/" + SwordResource);
+            if (sw)
+            {
+                meshSword = Instantiate(sw, transform, false).transform; meshSword.name = "Greatsword (Meshy)";
+                meshSword.localScale = Vector3.one * (SwordLength / SwordGlbLength);
+                foreach (var r in meshSword.GetComponentsInChildren<Renderer>()) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+            }
+            else Debug.LogWarning("Tempo Tyrant: Resources/Characters/" + SwordResource + " missing");
+        }
+
+        // model loops follow the pose: walk / rush loops, otherwise the rest stance (the arms come from the IK)
+        void PoseModel()
+        {
+            if (!HasModel) return;
+            presenter.GlowLevel = 0.8f + 0.4f * Glow;
+            if (Current == TyrantPose.Defeat) { presenter.Down(); return; }
+            if (Current == TyrantPose.Walk) presenter.TickBoss("Walk", Haste ? 1.25f : 1f);
+            else if (Current == TyrantPose.Rush) presenter.TickBoss("Run", 1.4f);
+            else presenter.TickBoss("Rest");   // no idle clip: the rest stance
+        }
+
+        void LateUpdate()
+        {
+            if (!HasModel || Sword == null) return;
+            // the Meshy greatsword sits exactly on the stand-in greatsword (grip at its origin, blade along +Y)
+            if (meshSword)
+            {
+                float k = SwordLength / SwordGlbLength;
+                meshSword.rotation = Sword.rotation;
+                meshSword.position = Sword.position - Sword.rotation * new Vector3(0, SwordGlbGripY * k, 0);
+            }
+            if (!rUpper || !lUpper) return;
+            // two hands on the grip: right hand just under the crossguard, left hand below it; elbows out and down
+            var right = transform.right; var down = -transform.up; var back = -transform.forward;
+            TwoBone(rUpper, rFore, rHand, Sword.TransformPoint(0, 0.06f, 0), rUpper.position + (right * 0.8f + down * 1.0f + back * 0.3f));
+            TwoBone(lUpper, lFore, lHand, Sword.TransformPoint(0, -0.16f, 0), lUpper.position + (-right * 0.8f + down * 1.0f + back * 0.3f));
+        }
+
+        // analytic two-bone IK in world space: bends a -> b -> c so c reaches the target, the elbow toward the pole
+        static void TwoBone(Transform a, Transform b, Transform c, Vector3 target, Vector3 pole)
+        {
+            Vector3 A = a.position, B = b.position, C = c.position;
+            float la = (B - A).magnitude, lb = (C - B).magnitude;
+            var toT = target - A; float d = Mathf.Clamp(toT.magnitude, 1e-3f, (la + lb) * 0.999f);
+            var dir = toT.normalized;
+            float cosA = Mathf.Clamp((la * la + d * d - lb * lb) / (2 * la * d), -1, 1);
+            var bend = Vector3.ProjectOnPlane(pole - A, dir);
+            if (bend.sqrMagnitude < 1e-6f) bend = Vector3.Cross(dir, Vector3.up);
+            bend.Normalize();
+            var elbow = A + dir * (la * cosA) + bend * (la * Mathf.Sqrt(1 - cosA * cosA));
+            a.rotation = Quaternion.FromToRotation(B - A, elbow - A) * a.rotation;
+            B = b.position; C = c.position;
+            b.rotation = Quaternion.FromToRotation(C - B, A + dir * d - B) * b.rotation;
+        }
+
         void ApplyPose(bool snap)
         {
             // timed strikes hold the windup until the last 5 ticks before impact, then whip through
@@ -226,6 +315,7 @@ namespace LastBell.Run
         {
             if (Body == null || mpb == null) return;   // a script reload drops the code-built state
             ApplyPose(false);
+            PoseModel();
             pulse = Mathf.MoveTowards(pulse, 0, Time.deltaTime * 6f);
             frenzyAmount = Mathf.MoveTowards(frenzyAmount, Frenzy ? 1 : 0, Time.deltaTime);
             float tempoK = Haste ? 0.7f + 2.2f * pulse : 0.55f + 0.35f * Mathf.Sin(Time.time * Mathf.PI);   // Haste strobe / Normal 0.5 Hz breath

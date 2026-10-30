@@ -47,7 +47,7 @@ namespace LastBell.Run
         public override string Id => "boss.tempo-tyrant";
         public override string DisplayName => "The Tempo Tyrant";
         public override string Lesson => "Follow the numbered 1-2-3 into cleared ground; the slow tempo is your opening";
-        public override bool Placeholder => true;   // stand-in body; the final model/rig is a remaining art gate
+        public override bool Placeholder => Rig == null || !Rig.HasModel;   // the Meshy model, unless Resources/Characters/TempoTyrant is missing
         public override float NextPhaseFraction() => 0.19f;
 
         // ---------------- tunables (see the tunables table in the encounter doc) ----------------
