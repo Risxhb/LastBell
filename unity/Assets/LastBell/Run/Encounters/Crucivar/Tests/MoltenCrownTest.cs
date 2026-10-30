@@ -51,24 +51,16 @@ namespace LastBell.Run
             t.Check("one hit per instance", t.OneHitPerInstance());
             yield return t.Shot("v4_molten_crown");
 
-            // second cycle: the counts are hidden; nobody soaks, so the first tower to land wipes the party
+            // second cycle, on Hard: the counts are hidden, and Second Press re-stamps the fullest tower of each set 2.0 s after it lands
             yield return t.Until(() => !t.Boss.TestBusy, 5f, "cycle 1 over");
-            foreach (var p in t.Party) { p.DebugSetHp(PlayerController.MaxHp); t.Place(p, new Vector3(0, 0, 9.5f)); }
-            t.Begin(crown.Run());
-            yield return t.Seconds(1f);
-            t.Check("the second cycle hides the tower counts", crown.CountsHidden);
-            yield return t.Until(() => t.Party.All(p => p.Down), 8f, "overflow");
-            t.Check("an empty tower is Molten Overflow: the party wipes", t.Party.All(p => p.Down) && crown.Wipes == 1, $"down {t.Party.Count(p => p.Down)}/4, wipes {crown.Wipes}");
-
-            // Hard: Second Press re-stamps the fullest tower of each set 2.0 s after it lands
-            yield return t.Until(() => !t.Boss.TestBusy, 25f, "cycle 2 over");
             yield return t.Setup(4, Difficulty.Hard, at: new[] { new Vector3(0, 0, 4f), new Vector3(4, 0, 0), new Vector3(0, 0, -4f), new Vector3(-4, 0, 0) });
             int presses0 = crown.Presses;
             t.Begin(crown.Run());
-            s = 0;
+            s = 0; bool hidden = false;
             while (s < 12f && t.Boss.TestBusy)
             {
                 foreach (var p in t.Party) if (p.Hp < 60) p.DebugSetHp(PlayerController.MaxHp);
+                hidden |= crown.CountsHidden;
                 var set = crown.Towers.Where(x => x.H.Age < x.H.ResolveAt).GroupBy(x => x.Set).OrderBy(g => g.Min(x => x.H.ResolveAt - x.H.Age)).FirstOrDefault();
                 if (set != null)
                 {
@@ -77,13 +69,21 @@ namespace LastBell.Run
                 }
                 s += Time.deltaTime; yield return null;
             }
+            t.Check("the second cycle hides the tower counts", hidden);
             var press = t.Spawned("Second Press").ToList();
             var setA = t.Spawned("Mould Tower A").ToList();
             var first = setA.FirstOrDefault();
-            t.Check("Hard: Second Press re-stamps one tower of each set (ties: the first)", crown.Presses - presses0 == 2 && press.Count == 2 && first != null && (press[0].H.Origin - first.H.Origin).sqrMagnitude < 0.01f && crown.Wipes == 1,
+            t.Check("Hard: Second Press re-stamps one tower of each set (ties: the first)", crown.Presses - presses0 == 2 && press.Count == 2 && first != null && (press[0].H.Origin - first.H.Origin).sqrMagnitude < 0.01f && crown.Wipes == 0,
                 $"presses {crown.Presses - presses0}, spawned {press.Count}");
             t.Check("Hard: the press starts once its set has landed and warns about 2 s", first != null && press.Count > 0 && press[0].Tick - first.Tick >= first.H.ResolveAt && press[0].H.ResolveAt >= Sim.Ticks(1.5f),
                 press.Count > 0 && first != null ? $"{press[0].Tick - first.Tick} ticks after the rise, warn {press[0].H.ResolveAt}" : "none");
+
+            // third cycle: nobody soaks, so the first tower to land wipes the party
+            yield return t.Setup(4, at: new[] { new Vector3(0, 0, 4f), new Vector3(4, 0, 0), new Vector3(0, 0, -4f), new Vector3(-4, 0, 0) });
+            foreach (var p in t.Party) { p.DebugSetHp(PlayerController.MaxHp); t.Place(p, new Vector3(0, 0, 9.5f)); }
+            t.Begin(crown.Run());
+            yield return t.Until(() => t.Party.All(p => p.Down), 8f, "overflow");
+            t.Check("an empty tower is Molten Overflow: the party wipes", t.Party.All(p => p.Down) && crown.Wipes == 1, $"down {t.Party.Count(p => p.Down)}/4, wipes {crown.Wipes}");
         }
     }
 }

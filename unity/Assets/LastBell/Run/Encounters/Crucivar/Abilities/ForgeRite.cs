@@ -150,6 +150,7 @@ namespace LastBell.Run
         internal void CastingOrder()
         {
             var standing = Standing();
+            if (standing.Count == 0 || !Boss) return;   // nobody left to aim at (a wipe mid-cycle)
             bool memory = hideNext && Order.Count > 0;
             hideNext = !memory;
             if (!memory)

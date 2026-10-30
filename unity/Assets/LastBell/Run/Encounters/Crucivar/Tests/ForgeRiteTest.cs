@@ -29,6 +29,8 @@ namespace LastBell.Run
                 foreach (var p in t.Party) if (p.Hp < 60) p.DebugSetHp(PlayerController.MaxHp);   // keep the still party standing
                 s += Time.deltaTime; yield return null;
             }
+            // time from the loop's own start (the first brand): in a full-suite run the body can start a few seconds after Begin
+            c0 = t.Spawned("Ember Brand").Select(x => x.Tick).DefaultIfEmpty(c0).Min();
             int R(string src) => t.Spawned(src).Select(x => x.Tick - c0 + x.H.ResolveAt).DefaultIfEmpty(-1).Min();
             t.Check("Ember Brand: one per player, lands at 3.5 s", t.Spawned("Ember Brand").Count() == 8 && R("Ember Brand") >= 210 && R("Ember Brand") <= 212, $"{t.Spawned("Ember Brand").Count()} brands, {R("Ember Brand")}");
             t.Check("Furnace Spin: four jets live from 3.5 s for 4 s", t.Spawned("Furnace Spin").Count() == 4 && t.Spawned("Furnace Spin").All(x => x.H.ActiveTicks == 240), $"{t.Spawned("Furnace Spin").Count()}");
