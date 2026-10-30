@@ -16,7 +16,7 @@ Chzy18 accepted the full fight for the Unity build on 29 Oct. The enrage timing 
   - Each bullet hits once, with no stun or knockback (`Hazard.Flinch = false`).
   - Bullets can be coloured (Phase 2) and can split (Phase 4 seeds).
 - `unity/Assets/LastBell/Run/Encounters/SylvaraEncounter.cs` is the v3 fight:
-  - HP 13500;
+  - HP 9000 (solo base; Chzy18 asked for lower on 29 Oct, was 13500);
   - rooted at the arena centre;
   - phase changes at 75/50/25 %.
 - The autotest `-lastbellSylvara` section covers:
@@ -30,7 +30,7 @@ Chzy18 accepted the full fight for the Unity build on 29 Oct. The enrage timing 
 ## Design only / not built yet
 - **Hard and Easy extras** for each phase: proposals in the phase docs, to be sent for review later.
 - **Choir Bud damage.** In Unity, buds are cut by standing within 3 m, as in the demo. Real class damage on buds needs boss parts that can be targeted.
-- **HP tuning.** 13500 is a placeholder. The target is for a normal party to finish Phase 4 in about 75–90 s.
+- **HP tuning.** 9000 is the current solo base, not yet tuned against measured damage, and there is no party scaling yet. The target is for a normal party to finish Phase 4 in about 75–90 s.
 - **Pod gap tick marks** from the demo.
 - **Sylvara's own model and VFX.** She uses the existing rigged stand-in, and bullets are plain emissive spheres.
 

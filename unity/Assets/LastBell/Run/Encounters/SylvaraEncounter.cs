@@ -67,6 +67,7 @@ namespace LastBell.Run
         readonly HashSet<PlayerController> swapWarned = new HashSet<PlayerController>();
         readonly Dictionary<PlayerController, Transform> colourRings = new Dictionary<PlayerController, Transform>();
         public int ColourOf(PlayerController p) => colour.TryGetValue(p, out int c) ? c : 0;
+        public bool SwapWarned(PlayerController p) => swapWarned.Contains(p);   // the ring is flickering: a toll swaps colours soon
 
         Transform maskL, maskR, bellRoot, shoulderFlowers;
         readonly List<Transform> props = new List<Transform>();
@@ -76,7 +77,7 @@ namespace LastBell.Run
         static readonly Vector3 FrontOffset = new Vector3(0, 3.0f, 2.6f), RimOffset = new Vector3(0, 5.2f, -2.4f);
         const float FrontIntensity = 12f, RimIntensity = 18f;
 
-        void Awake() { MaxHp = 13500; BodyRadius = 1.6f; HitHeight = 2.4f; MarkHeight = 4.8f; }
+        void Awake() { MaxHp = 9000;  BodyRadius = 1.6f; HitHeight = 2.4f; MarkHeight = 4.8f; }   // 9000 solo base (Chzy18, 29 Oct: "lower as a base"; was 13500)
 
         static readonly Color Stone = new Color(0.68f, 0.70f, 0.64f), Wood = new Color(0.27f, 0.20f, 0.15f),
             BrassC = new Color(0.55f, 0.47f, 0.25f), Ivory = new Color(0.90f, 0.87f, 0.78f),
@@ -221,11 +222,11 @@ namespace LastBell.Run
                     At(23.5f, "Triangle Pods", TrianglePods);
                     At(27, "Pruning Arc", PruningArc);
                     break;
-                case 2:   // Two-Colour Choir, harder version
-                    At(0, "Colour Spiral", () => sp1 = Spiral(1, 6, 14 * Deg, 5, 0.13f, 9, 7, new[] { Brass, Cobalt }));
+                case 2:   // Two-Colour Choir, harder version; 29 Oct playtest (Chzy18): bullets a little slower and spaced out so you can run between them
+                    At(0, "Colour Spiral", () => sp1 = Spiral(1, 6, 14 * Deg, 4.2f, 0.17f, 9, 7, new[] { Brass, Cobalt }));
                     At(0.01f, "Brass Lanes", () => ChoirLanes(Brass, -Mathf.PI / 2, 1, 10));
                     At(6, "Cobalt Lanes", () => ChoirLanes(Cobalt, Mathf.PI, 1, 20));
-                    At(10, "Second Colour Spiral", () => sp2 = Spiral(-1, 4, 18 * Deg, 4, 0.18f, 8, 5, new[] { Cobalt, Brass }));
+                    At(10, "Second Colour Spiral", () => sp2 = Spiral(-1, 4, 18 * Deg, 3.5f, 0.22f, 8, 5, new[] { Cobalt, Brass }));
                     At(12, "Root Ring", () => RootRing(3.5f));
                     At(14.5f, "Brass Lanes", () => ChoirLanes(Brass, Mathf.PI / 2, -1, 20));
                     foreach (float t in W.Players.Count == 1 ? new[] { 4f, 8, 12, 16, 20 } : new[] { 5f, 10, 15, 20 })
@@ -425,11 +426,12 @@ namespace LastBell.Run
         void TollBurst()
         {
             float off = Rnd(0, Tau);
-            for (int i = 0; i < 20; i++) { float a = off + i * Tau / 20; Shot(On(a, Rim), a, 5, 12, 6, i % 2 == 1 ? Cobalt : Brass, "Toll Burst"); }
+            for (int i = 0; i < 20; i++) { float a = off + i * Tau / 20; Shot(On(a, Rim), a, 4.5f, 12, 6, i % 2 == 1 ? Cobalt : Brass, "Toll Burst"); }
         }
-        // Choir lanes: bullets cross the whole arena in parallel lanes 2.4 m apart, fired every 0.25 s from the far wall,
-        // drifting 0.4 m/s sideways. They stop at `until` seconds into the loop.
-        void ChoirLanes(int col, float travel, int drift, float until, float period = 0.25f)
+        // Choir lanes: bullets cross the whole arena at 5 m/s in parallel lanes 3.4 m apart, fired every 0.35 s from the far wall,
+        // drifting 0.4 m/s sideways (29 Oct playtest: was 6 m/s, 2.4 m and 0.25 s). They stop at `until` seconds into the loop.
+        const float LaneGap = 3.4f;
+        void ChoirLanes(int col, float travel, int drift, float until, float period = 0.35f)
         {
             var d = new Vector3(Mathf.Cos(travel), 0, Mathf.Sin(travel)); var pp = new Vector3(-d.z, 0, d.x);
             float acc = 0, off = 0;
@@ -437,14 +439,14 @@ namespace LastBell.Run
             e.Update = dt =>
             {
                 if (LoopT >= until) { e.On = false; return; }
-                off = (off + drift * 0.4f * dt + 2.4f) % 2.4f; acc += dt;
+                off = (off + drift * 0.4f * dt + LaneGap) % LaneGap; acc += dt;
                 while (acc >= period)
                 {
                     acc -= period;
-                    for (float o = -R + 0.3f + off; o < R; o += 2.4f)
+                    for (float o = -R + 0.3f + off; o < R; o += LaneGap)
                     {
                         float back = Mathf.Sqrt(Mathf.Max(0, R * R - o * o));
-                        Shot(pp * o - d * back, travel, 6, 12, 5, col, col == Brass ? "Brass Lane" : "Cobalt Lane");
+                        Shot(pp * o - d * back, travel, 5, 12, 6, col, col == Brass ? "Brass Lane" : "Cobalt Lane");
                     }
                 }
             };

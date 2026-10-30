@@ -8,7 +8,7 @@ namespace LastBell.Run
     // This branch's version is the Sylvara v3 dodger (bullet hell). The Aurelion lane has its own AllyBot with Aurelion's
     // memory jobs (integrate/aurelion); when both land, keep that one and call SylvaraSteer from it for SylvaraEncounter.
     // - Steering: every 3 ticks it tries standing still and 16 directions at walk and sprint speed, plays every bullet that
-    //   can hurt it 0.8 s ahead (its own colour only in Two-Colour Choir, seed bursts included) plus the telegraphs about to
+    //   can hurt it 0.8 s ahead (its own colour only in Two-Colour Choir, both while a swap is warned; seed bursts included) plus the telegraphs about to
     //   land, and takes the cheapest path. When every path is hit, it dashes if a dash clears.
     // - Jobs: it holds its own angle round her (casters at range, Vanguard close) and in Hollow Bloom stands next to a
     //   Choir Bud to cut it (one bud per bot, by slot).
@@ -91,12 +91,14 @@ namespace LastBell.Run
         {
             var w = me.World; var boss = w.Boss;
             int mine = w.Bullets.ColourOf != null ? w.Bullets.ColourOf(me) : 0;
+            // its ring flickers before a toll swaps colours (the same warning a player sees): both colours count until the swap
+            bool both = w.Boss is SylvaraEncounter sy && sy.SwapWarned(me);
             // bullets that can reach anywhere it could be within the horizon
             near.Clear();
             float reach = PlayerController.SprintSpeed * Horizon + 1.2f;
             foreach (var b in w.Bullets.Live)
             {
-                if (b.Dead || (b.Colour != 0 && b.Colour != mine)) continue;
+                if (b.Dead || (b.Colour != 0 && b.Colour != mine && !both)) continue;
                 var end = b.Pos + b.Vel * Horizon;
                 if (SegDist(pos, b.Pos, end) < reach + (b.Split != null ? 3f : 0f)) near.Add(b);
             }
