@@ -158,8 +158,8 @@ namespace LastBell.Menu
             movementRow.childControlWidth=true;movementRow.childControlHeight=true;movementRow.childForceExpandWidth=false;movementRow.childForceExpandHeight=false;
             DashIcon=MenuUI.Rect("Dash icon",movement,Vector2.zero,Vector2.zero).gameObject.AddComponent<RawImage>();DashIcon.texture=RunHud.SlotIcon(RunDirector.Classes[SelectedIndex],n);DashIcon.raycastTarget=false;
             var dashSize=DashIcon.gameObject.AddComponent<LayoutElement>();dashSize.minWidth=dashSize.preferredWidth=28;dashSize.minHeight=dashSize.preferredHeight=28;
-            var dashName=RunDirector.Classes[SelectedIndex]=="Chimesinger"?"Harmonic Step":RunDirector.Classes[SelectedIndex]=="Arcanist"?"Clockstep":"Dash";
-            var caption=MenuUI.Text($"MOVEMENT / {dashName} [5 / RMB]   •   {PlayerController.DashDistance} m in {PlayerController.DashTicks/(float)Sim.Hz:0.0} s   •   {PlayerController.DashCost} stamina   •   No invincibility",movement,Vector2.zero,Vector2.one,17,MenuUI.Gold);
+            var dashName=RunDirector.Classes[SelectedIndex]=="Chimesinger"?"Harmonic Step":RunDirector.Classes[SelectedIndex]=="Arcanist"?"Blink":"Dash";
+            var caption=MenuUI.Text($"MOVEMENT / {dashName} [RMB]   •   {PlayerController.DashDistance} m in {PlayerController.DashTicks/(float)Sim.Hz:0.0} s   •   {PlayerController.DashCost} stamina   •   No invincibility",movement,Vector2.zero,Vector2.one,17,MenuUI.Gold);
             caption.horizontalOverflow=HorizontalWrapMode.Overflow;
         }
         static void Pin(RectTransform r,Vector2 topLeft,Vector2 size){r.pivot=new Vector2(0,1);r.sizeDelta=size;r.anchoredPosition=topLeft;}

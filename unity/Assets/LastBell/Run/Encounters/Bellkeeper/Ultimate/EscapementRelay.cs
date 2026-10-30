@@ -19,7 +19,10 @@ namespace LastBell.Run
     // Nothing is unavoidable: a perfect beat costs nobody HP. Fails, on the beat tick: plate empty = WIPE; more players on
     // the plate than soakers = 60 to each on it; a chain holder short or on the near half = the pendulum swings through the
     // plate (a 999 lane from the boss over it); a ✕ empty = a 120° cone on that side, 999.
-    // Party sizes: K = min(players, 4) duties; trio SOAK → TOCK → CHAIN, duo SOAK → CHAIN, solo SOAK every beat.
+    // Party sizes: K = min(players, 4) duties; trio SOAK → TOCK → CHAIN, duo SOAK → CHAIN. Solo SOAK → TICK → SOAK → TOCK
+    // (Chzy18 27 Oct, a solo-only exception to "solo plays the same phases": SOAK every beat kept a melee player 7 m from
+    // the boss for all of P1, so a solo Vanguard could not clear it). On a solo ✕ beat the plate rests (no empty-plate wipe)
+    // and the ✕ is the duty: empty = the bell tips that side, as for a party.
     // 5-8 players: players 5-8 take hours I..IV again and share that hour's duty with its first holder (two soakers).
     // Cue: At[0] = the first beat (s after launch), then one every BeatSeconds until StopAfterBeat(). The beat number (so
     // the hand and the duties) carries over between casts and starts at 2 on a fresh fight (as in the P1 paper simulation, cards-v2/p1-example.html).
@@ -80,8 +83,8 @@ namespace LastBell.Run
         public static Vector3 ChainSpot(int beat) => PlanDir(HandAngle(beat) + 180) * ChainHint;
         public int Duties => Mathf.Clamp(Party, 1, 4);
         public int HourOf(PlayerController p) { int i = W.Players.IndexOf(p); return i < 0 ? 0 : i % 4 + 1; }
-        static readonly int[][] Cycle = { new[] { 0 }, new[] { 0, 1 }, new[] { 0, 2, 1 }, new[] { 0, 3, 2, 1 } };
-        public int DutyOf(PlayerController p, int beat) { int h = HourOf(p), k = Duties; return h == 0 ? -1 : Cycle[k - 1][(((h - 1 + beat) % k) + k) % k]; }
+        static readonly int[][] Cycle = { new[] { 0, 3, 0, 2 }, new[] { 0, 1 }, new[] { 0, 2, 1 }, new[] { 0, 3, 2, 1 } };
+        public int DutyOf(PlayerController p, int beat) { int h = HourOf(p); var c = Cycle[Duties - 1]; int n = c.Length; return h == 0 ? -1 : c[(((h - 1 + beat) % n) + n) % n]; }
         public static bool ChainOk(Vector3 q, int beat) => Sim.Flat(q).magnitude >= ChainMin && Vector3.Dot(Sim.Flat(q), PlanDir(HandAngle(beat))) <= 0;
         public bool Holds(PlayerController p, int beat)
         {
@@ -131,8 +134,10 @@ namespace LastBell.Run
             }
             Boss.Face(Quaternion.LookRotation(PlanDir(HandAngle(b))).eulerAngles.y);
             W.BossFx.ChimeResolve(plate, PlateSize);
-            if (onPlate == 0) { Fail(b, "empty plate"); Ult.Wipe("The escapement skips (empty plate)"); return; }
-            if (onPlate > Mathf.Max(1, soakers))
+            // solo on a ✕ beat: the plate rests and the ✕ is the duty (checked below)
+            int soloDuty = k == 1 && players.Count > 0 ? DutyOf(players[0], b) : 0;
+            if (soloDuty == 0 && onPlate == 0) { Fail(b, "empty plate"); Ult.Wipe("The escapement skips (empty plate)"); return; }
+            if (soloDuty == 0 && onPlate > Mathf.Max(1, soakers))
             {
                 clean = false; Fail(b, "too many on the plate");
                 Spawn(new Hazard { Source = Source + ": crowded plate", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = plate, Radius = OnPlate, LockAt = 0, ResolveAt = UltShapes.ResolveIn(0), Damage = OverSoakDamage });
@@ -151,8 +156,9 @@ namespace LastBell.Run
                     h.OnResolve = hz => W.BossFx.SweepResolve(Vector3.zero, hz.Yaw, 13f, 12f);
                 }
             }
-            for (int duty = 2; duty < k; duty++)
+            for (int duty = 2; duty < Mathf.Max(k, 4); duty++)
             {
+                if (k == 1 ? duty != soloDuty : duty >= k) continue;   // a party holds ✕ 2..k-1; solo only its own ✕
                 var spot = Weight(b, duty); bool held = false;
                 foreach (var p in players) if (!p.Down && (Sim.Flat(p.transform.position) - spot).magnitude <= WeightSize) held = true;
                 if (held) continue;
@@ -184,7 +190,9 @@ namespace LastBell.Run
                     r.Hint = ChainSpot(b); int bb = b;
                     r.Ok = q => Sim.Flat(q).magnitude >= ChainMin + 0.4f && Vector3.Dot(Sim.Flat(q), PlanDir(HandAngle(bb))) <= -1f && (Sim.Flat(q) - plate).magnitude > OnPlate + 0.5f; break;
                 default:
-                    var w = Weight(b, d); r.Hint = w;
+                    // a melee player holds the ✕ on its inner edge, against the boss, where its swings reach (the ✕ counts out to
+                    // WeightSize, and a debt ring covers all but this edge anyway)
+                    var w = Weight(b, d); r.Hint = p.ClassName == "Vanguard" ? w.normalized * Mathf.Max(Boss.BodyRadius + 0.6f, WeightRadius - WeightSize + 0.55f) : w;
                     r.Ok = q => (Sim.Flat(q) - w).magnitude <= WeightSize - 0.35f; break;
             }
             into.Add(r);
@@ -209,7 +217,7 @@ namespace LastBell.Run
         Transform root, pivot, mySpot; readonly Renderer[] plates = new Renderer[4];
         readonly List<Transform> chains = new List<Transform>();
         static Material brassDim, brassHot, ivory, coralM, brassM, chainBand, spotM;
-        float shownYaw;
+        float shownYaw, handVel;
         public static readonly Color[] DutyColors = { new Color(1f, 0.8f, 0.35f), new Color(0.5f, 0.75f, 1f), new Color(0.97f, 0.95f, 0.9f), new Color(0.97f, 0.95f, 0.9f) };
 
         void Build()
@@ -226,7 +234,7 @@ namespace LastBell.Run
             for (int i = 0; i < 4; i++)
             {
                 var t = Prim.Make(PrimitiveKind.Cylinder, root, PlanDir(90 * i) * PlateRadius + Vector3.up * 0.04f, new Vector3(PlateSize * 2, 0.02f, PlateSize * 2), Color.white);
-                plates[i] = t.GetComponent<Renderer>(); plates[i].sharedMaterial = brassDim;
+                plates[i] = t.GetComponent<Renderer>(); plates[i].sharedMaterial = brassDim; UltArt.DressPlate(t);
             }
             pivot = new GameObject("hand").transform; pivot.SetParent(root, false); pivot.localPosition = Vector3.zero;
             // the hand: a glowing line on the floor out to the plate, and a bar with an arrowhead above the boss's head
@@ -244,6 +252,7 @@ namespace LastBell.Run
                 Mat(Prim.Make(PrimitiveKind.Cube, pivot, new Vector3(Mathf.Sin(a) * mid, 0.03f, Mathf.Cos(a) * mid), new Vector3(2.1f, 0.02f, 11.5f - ChainMin), Color.white, 0, Quaternion.Euler(0, deg, 0)), chainBand);
                 Mat(Prim.Make(PrimitiveKind.Cube, pivot, new Vector3(Mathf.Sin(a) * ChainMin, 0.05f, Mathf.Cos(a) * ChainMin), new Vector3(2.0f, 0.03f, 0.14f), Color.white, 0, Quaternion.Euler(0, deg, 0)), ivory);
             }
+            UltArt.DressHand(pivot);
             // practice aid: a beam on the run's own player's spot
             mySpot = new GameObject("my spot").transform; mySpot.SetParent(root, false);
             Mat(Prim.Make(PrimitiveKind.Cylinder, mySpot, new Vector3(0, 0.07f, 0), new Vector3(1.1f, 0.02f, 1.1f), Color.white), spotM);
@@ -255,7 +264,7 @@ namespace LastBell.Run
         {
             int lit = ((Beat % 4) + 4) % 4;
             for (int i = 0; i < 4; i++) if (plates[i]) plates[i].sharedMaterial = i == lit ? brassHot : brassDim;
-            if (snap && pivot) { shownYaw = Quaternion.LookRotation(PlanDir(HandAngle(Beat))).eulerAngles.y; pivot.rotation = Quaternion.Euler(0, shownYaw, 0); }
+            if (snap && pivot) { handVel = 0; shownYaw =Quaternion.LookRotation(PlanDir(HandAngle(Beat))).eulerAngles.y; pivot.rotation = Quaternion.Euler(0, shownYaw, 0); }
         }
 
         // where a player should stand for the next beat (the guide's spot: the plate, the ✕, or straight across for the chain)
@@ -265,8 +274,8 @@ namespace LastBell.Run
         {
             if (!pivot) return;
             float want = Quaternion.LookRotation(PlanDir(HandAngle(Beat))).eulerAngles.y;
-            shownYaw = Mathf.MoveTowardsAngle(shownYaw, want, 720 * Sim.Dt);   // the tick: a quick 90° snap
-            pivot.rotation = Quaternion.Euler(0, shownYaw, 0);
+            UltArt.TickHand(pivot, ref shownYaw, ref handVel, want, Sim.Dt);   // the tick: a clockwork snap, a little overshoot
+            int lit = ((Beat % 4) + 4) % 4; for (int i = 0; i < 4; i++) if (i == lit) UltArt.BreatheRim(plates[i], brassHot, Now / (float)Sim.Hz); else UltArt.StillRim(plates[i]);
             // chains to this beat's holders (brass when long enough on the far half, coral when not)
             int n = 0;
             foreach (var p in W.Players)
@@ -303,8 +312,8 @@ namespace LastBell.Run
             }
             Label(cam, Plate(Beat), 0.3f, "PLATE", DutyColors[0], spotStyle);
             if (Duties >= 2) Label(cam, ChainSpot(Beat), 0.3f, "CHAIN", DutyColors[1], spotStyle);
-            if (Duties >= 3) Label(cam, Weight(Beat, 2), 1.0f, "TOCK", DutyColors[2], spotStyle);
-            if (Duties >= 4) Label(cam, Weight(Beat, 3), 1.0f, "TICK", DutyColors[3], spotStyle);
+            if (Duties >= 3 || Duties == 1) Label(cam, Weight(Beat, 2), 1.0f, "TOCK", DutyColors[2], spotStyle);
+            if (Duties >= 4 || Duties == 1) Label(cam, Weight(Beat, 3), 1.0f, "TICK", DutyColors[3], spotStyle);
             for (int i = 0; i < W.Players.Count; i++)
             {
                 var p = W.Players[i]; int d = DutyOf(p, Beat); if (p.Down || d < 0) continue;

@@ -254,6 +254,7 @@ namespace LastBell.Run
         // ------------------------------------------------------------ shared
         public void DashTrail(PlayerController p)
         {
+            if (p.ClassName == "Arcanist") return;   // Blink draws its own departure, thread and arrival (PlayerFx.Arcanist)
             if (!trails.TryGetValue(p, out var tr) || tr == null)
             {
                 var go = new GameObject("Dash trail"); go.transform.SetParent(p.transform, false); go.transform.localPosition = new Vector3(0, 0.9f, 0);

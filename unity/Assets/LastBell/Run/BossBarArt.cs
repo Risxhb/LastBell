@@ -43,16 +43,21 @@ namespace LastBell.Run
                 // The whole bar is a liquid: the crimson pool drifts, and two layers of smoke waves roll through it in
                 // opposite directions at different scales, so the body of the bar is always moving. Below the low-HP
                 // threshold the pool throbs darker.
+                // Risxhb, October 26, 2026: the flow must read at a glance, so it drifts about three times faster than the
+                // first version, a second counter-flowing pool churns through the first, and the smoke waves are stronger.
                 float pulse = lowHp ? 0.82f + 0.18f * Mathf.Sin(t * 6f) : 1f;
                 float uvW = fill.width / Mathf.Max(1, bar.height * 8f);
-                Draw(fill, liquid, new Rect(t * 0.07f, 0, uvW, 1), new Color(pulse, pulse, pulse, alpha));
+                Draw(fill, liquid, new Rect(t * 0.22f, 0, uvW, 1), new Color(pulse, pulse, pulse, alpha));
+                Draw(fill, liquid, new Rect(-t * 0.14f + 0.43f, 0, uvW * 0.6f, 1), new Color(pulse, pulse * 0.9f, pulse * 0.9f, 0.45f * alpha));
                 float sw = fill.width / Mathf.Max(1, bar.height * 6f);
-                Draw(fill, smoke, new Rect(t * 0.09f, Mathf.Sin(t * 0.45f) * 0.25f, sw, 0.9f), new Color(1f, 0.78f, 0.72f, 0.42f * alpha));
-                Draw(fill, smoke, new Rect(-t * 0.05f + 0.31f, t * 0.06f, sw * 1.7f, 1.3f), new Color(0.55f, 0.08f, 0.07f, 0.55f * alpha));
-                Draw(fill, smoke, new Rect(t * 0.16f + 0.67f, -t * 0.03f, sw * 0.8f, 0.7f), new Color(1f, 0.86f, 0.8f, 0.22f * alpha));
+                // smoke is darker red than the pool (Risxhb, October 26, 2026), so the currents read against the bright
+                // crimson as they roll through; the pale highlight layers were washing the bar towards pink
+                Draw(fill, smoke, new Rect(t * 0.24f, Mathf.Sin(t * 0.9f) * 0.3f, sw, 0.9f), new Color(0.36f, 0.02f, 0.03f, 0.62f * alpha));
+                Draw(fill, smoke, new Rect(-t * 0.15f + 0.31f, t * 0.12f, sw * 1.7f, 1.3f), new Color(0.24f, 0.0f, 0.02f, 0.6f * alpha));
+                Draw(fill, smoke, new Rect(t * 0.38f + 0.67f, -t * 0.08f, sw * 0.8f, 0.7f), new Color(0.48f, 0.05f, 0.05f, 0.45f * alpha));
                 // surface ripple along the top of the pool
                 float rh = Mathf.Max(2, bar.height * 0.32f);
-                Draw(new Rect(fill.x, fill.y, fill.width, rh), ripple, new Rect(t * 0.18f, 0, fill.width / Mathf.Max(1, bar.height * 4f), 1), new Color(1, 1, 1, 0.6f * alpha));
+                Draw(new Rect(fill.x, fill.y, fill.width, rh), ripple, new Rect(t * 0.4f, 0, fill.width / Mathf.Max(1, bar.height * 4f), 1), new Color(1, 1, 1, 0.7f * alpha));
                 // depth: darker floor so the pool reads rounded
                 UiTheme.Fill(new Rect(fill.x, fill.yMax - bar.height * 0.3f, fill.width, bar.height * 0.3f), new Color(0.16f, 0.01f, 0.01f, 0.35f * alpha));
             }
@@ -90,7 +95,7 @@ namespace LastBell.Run
                     float u = x / (float)W, v = y / (float)(H - 1);
                     float n = TileNoise(u * 6, v * 1.5f, 6) * 0.6f + TileNoise(u * 14 + 3, v * 3 + 1, 14) * 0.4f;
                     float depth = Mathf.Lerp(0.55f, 1.08f, v);               // brighter towards the top
-                    float band = 0.82f + 0.36f * n;
+                    float band = 0.6f + 0.8f * n;                            // strong swirls so the drift is visible
                     float k = depth * band;
                     px[y * W + x] = new Color(0.74f * k, 0.13f * k + 0.05f * n, 0.11f * k, 1);
                 }

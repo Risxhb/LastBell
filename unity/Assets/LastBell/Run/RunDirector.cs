@@ -42,8 +42,13 @@ namespace LastBell.Run
             // Metronome Court miniboss: explicit Practice entry only (inRun: false), so shuffled run slots are unchanged.
             // Run integration point for later review: set inRun to true here (docs/metronome-arena/tempo-tyrant.md).
             new BossEntry("Tempo Tyrant (practice)", w => BossEncounter.Spawn<TempoTyrantEncounter>(w, new Vector3(0, 0, -2f), 0), inRun: false, map: TempoTyrantMap),
-            // Metronome Court miniboss, practice only like the Tyrant (docs/bosses/chimebound-oracle.md)
-            new BossEntry("Chimebound Oracle (practice)", w => BossEncounter.Spawn<ChimeboundOracleEncounter>(w, new Vector3(0, 0, -2f), 0), inRun: false, map: TempoTyrantMap),
+            // Skyward Spire miniboss, practice only (docs/bosses/chimebound-oracle.md). Picked on the Metronome Court in
+            // Boss Rush instead, the court's metronome follows his clock.
+            new BossEntry("Chimebound Oracle (practice)", w => BossEncounter.Spawn<ChimeboundOracleEncounter>(w, new Vector3(0, 0, -2f), 0), inRun: false, map: AurelionMap),
+            // Skyward Spire miniboss with the parry QTE, practice only (docs/bosses/dial-warden.md)
+            new BossEntry("Dial Warden (practice)", w => BossEncounter.Spawn<DialWardenEncounter>(w, new Vector3(0, 0, -1.5f), 0), inRun: false, map: AurelionMap),
+            // Skyward Spire miniboss, practice only (docs/bosses/pendulum-sentinel.md, a proposal)
+            new BossEntry("Pendulum Sentinel (practice)", w => BossEncounter.Spawn<PendulumSentinelEncounter>(w, new Vector3(0, 0, -1.5f), 0), inRun: false, map: AurelionMap),
             // appended last so every other entry keeps its index; the final boss's Ultimate (WIP proposal, bosses/4-shattered-hour-bellkeeper/ultimate/): practice only, on the Throne
             new BossEntry("Bellkeeper — Ultimate", BellkeeperEncounter.SpawnUltimate, inRun: false, map: BellkeeperEncounter.ThroneMap),
         };
@@ -67,6 +72,8 @@ namespace LastBell.Run
         public static int TempoTyrantPractice => Array.FindIndex(Bosses, b => b.Map == TempoTyrantMap);
         public const string TempoTyrantMap = "metronome-court";
         public static int ChimeboundOraclePractice => Array.FindIndex(Bosses, b => b.Name.StartsWith("Chimebound Oracle"));
+        public static int DialWardenPractice => Array.FindIndex(Bosses, b => b.Name.StartsWith("Dial Warden"));
+        public static int PendulumSentinelPractice => Array.FindIndex(Bosses, b => b.Name.StartsWith("Pendulum Sentinel"));
         public static readonly string[] Classes = { "Vanguard", "Chimesinger", "Arcanist" };
         const int IntroTicks = 120, ClearTicks = 180, DownedTicks = 100;
         public const int PracticeAutoReadyTicks = 45;   // 0.75 s in the arena before a practice fight starts
@@ -124,7 +131,7 @@ namespace LastBell.Run
             int map = RunMaps.Current;
             if (map >= 0) CombatWorld.SetPlayerBound(RunMaps.All[map].Bound, RunMaps.All[map].Square);
             if (!GetComponent<RunHud>()) gameObject.AddComponent<RunHud>();
-            Application.targetFrameRate = 120;
+            LastBell.Menu.MenuSettings.ApplyFrameRate();   // Settings: VSync (off by default) and FPS cap (120 by default)
             if (RunAutoTest.Requested) RunAutoTest.Launch();
         }
         void OnDestroy() { if (Instance == this) Instance = null; }
@@ -369,7 +376,9 @@ namespace LastBell.Run
             if (World == null || Paused) return;
             acc += Mathf.Min(Time.deltaTime, 0.1f);
             int guard = 0;
-            while (acc >= Sim.Dt && guard++ < 8) { acc -= Sim.Dt; Tick(); }
+            SimSmoother.RestoreAll();   // ticks see exact sim poses
+            while (acc >= Sim.Dt && guard++ < 8) { acc -= Sim.Dt; Tick(); SimSmoother.CaptureAll(); }
+            SimSmoother.PresentAll(acc / Sim.Dt);   // draw between the last two ticks: smooth at any frame rate
         }
 
         void Tick()

@@ -24,8 +24,9 @@ namespace LastBell.Run
         IEnumerator BellkeeperUltimateChecks()
         {
             Note("---------- Bellkeeper Ultimate (proposal) ----------");
-            // the v1 checks play the v1 fight; the v2 slice checks play v2
-            BellkeeperEncounter.V2Override = BkFilter != null && (BkFilter.StartsWith("bots_p1v2") || BkFilter.StartsWith("bots_p2v2") || BkFilter.StartsWith("bots_p3v2") || BkFilter.StartsWith("bots_p4v2") || BkFilter.StartsWith("bots_p5v2"));
+            // the legacy v1 checks play the v1 fight (its mechanics and Part 5 harness are v1-only); the v2 checks below
+            // play v2, and the default run (no filter) ends with the v2 fight (UltV2FightChecks)
+            BellkeeperEncounter.V2Override = false;
             if (UltWants("scaffold")) yield return UltScaffoldChecks();
             if (UltWants(UltimateMechanics.PendulumClocks)) yield return UltPendulumClocksChecks();
             if (UltWants(UltimateMechanics.StoppedHour)) yield return UltStoppedHourChecks();
@@ -38,9 +39,13 @@ namespace LastBell.Run
             if (UltWants("plan")) yield return UltPlanChecks();
             if (UltWants("bots_dps")) yield return UltDpsChecks();
             if (UltWants("bots")) yield return UltBotChecks();
+            if (UltWants("bots_v2_levels")) yield return UltV2LevelSweep();
+            if (UltWants("bots_v2_seeds")) yield return UltV2SeedSweep();
             if (UltWants("bots_video")) yield return UltDemoVideo();
             if (UltWants("bots_attempts")) yield return UltAttempts();
             if (UltWants("bots_watch")) yield return UltWatchAttempts();
+            BellkeeperEncounter.V2Override = true;   // from here on: the v2 fight
+            if (UltWants("v2_fight")) yield return UltV2FightChecks();
             if (UltWants("bots_p1v2")) yield return UltP1V2Checks();
             if (UltWants("bots_p1v2_video")) yield return UltP1V2Video();
             if (UltWants("bots_p1v2_watch")) yield return UltP1V2Watch();
@@ -50,9 +55,12 @@ namespace LastBell.Run
             if (UltWants("bots_p3v2_dbg")) yield return UltP3V2Dbg();
             if (UltWants("bots_p4v2")) yield return UltP4V2Checks();
             if (UltWants("bots_p4v2_video")) yield return UltP1V2Video(false, UltimateBot.Skill.Perfect, "perfect", "P4");
+            // art: just The Floor Breaks (20 s), from above and from the game's chase camera
+            if (UltWants("bots_p4v2_break")) { yield return UltP1V2Video(false, UltimateBot.Skill.Perfect, "break", "P4", 20); yield return UltP1V2Video(false, UltimateBot.Skill.Perfect, "breakchase", "P4", 20, true); }
             if (UltWants("bots_p4v2_watch")) yield return UltP1V2Watch("P4");
             if (UltWants("bots_p5v2")) yield return UltP5V2Checks();
             if (UltWants("bots_p5v2_video")) yield return UltP1V2Video(false, UltimateBot.Skill.Perfect, "perfect", "P5");
+            if (UltWants("bots_p5v2_chase")) yield return UltP1V2Video(false, UltimateBot.Skill.Perfect, "chase", "P5", 66, true);   // art: what a player sees
             if (UltWants("bots_p5v2_watch")) yield return UltP1V2Watch("P5");
             if (UltWants("bots_p3v2_video")) yield return UltP1V2Video(false, UltimateBot.Skill.Perfect, "perfect", "P3");
             if (UltWants("bots_p3v2_watch")) yield return UltP1V2Watch("P3");
@@ -62,13 +70,14 @@ namespace LastBell.Run
         }
 
         // ---------------- harness ----------------
-        IEnumerator UltStart(string ability = null, string segment = null, string cls = "Vanguard")
+        // level: Hard by default, the Ultimate's designed numbers (gpt/08 §5, 27 Oct); every exact-damage and timing check is written for them
+        IEnumerator UltStart(string ability = null, string segment = null, string cls = "Vanguard", Difficulty level = Difficulty.Hard)
         {
             BellkeeperEncounter.SetOverride = BellkeeperEncounter.AbilitySet.Ultimate;
             BellkeeperEncounter.AbilityOverride = ability ?? "";
             BellkeeperEncounter.PhaseOverride = segment;
             if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }
-            d.SelectDifficulty(Difficulty.Medium);
+            d.SelectDifficulty(level);
             int m = RunMaps.IndexOf(BellkeeperEncounter.ThroneMap);
             bool switching = m != RunMaps.Current;
             if (switching) directorLog.AddRange(d.Log);
@@ -92,6 +101,7 @@ namespace LastBell.Run
             BellkeeperEncounter.PhaseOverride = null;
             BellkeeperEncounter.PushTimersOn = true;
             BellkeeperEncounter.V2Override = null;
+            BellkeeperEncounter.V2StopAfterP4 = false;
             BellkeeperEncounter.PushSeconds = (float[])BellkeeperEncounter.DefaultPush.Clone();
             yield return BkLeave();
         }
@@ -138,8 +148,18 @@ namespace LastBell.Run
                   keys.Count == 19 && keys.Distinct().Count() == 19 && keys.Contains("leaning_bell") && keys.Contains("toll_tide") && keys.Contains("reflection")
                   && !keys.Contains("striking_order") && UltimateMechanics.Ids.All(id => keys.Contains(BellkeeperAbilities.Normalize(id))), string.Join(", ", keys));
             Note("Ultimate mechanics built: " + string.Join(", ", bk.Mechanics.Select(m => m.Key + (m.Built ? "" : " (stub)"))));
-            Check("Ultimate: one tuning (the world runs at Medium)", d.World.Difficulty == Difficulty.Medium);
+            // Hard is the Ultimate's baseline (gpt/08 §5, Chzy18 27 Oct): its own table, not the run-wide x0.6 / x1 / x1.3
+            Check("Ultimate: Hard plays at Hard, the designed numbers (damage taken x1)", d.World.Difficulty == Difficulty.Hard && Mathf.Approximately(d.World.DamageTakenScale, 1f));
             Check("Ultimate: the Bellkeeper uses his model on the Throne", bk.Presenter != null && bk.Presenter.HasModel && RunMaps.Current == RunMaps.IndexOf(BellkeeperEncounter.ThroneMap), RunMaps.CurrentName);
+            // the run's level applies (gpt/08, Chzy18 25 Oct: Easy/Medium/Hard like every boss): damage taken scales, one-shots stay one-shots
+            foreach (var lv in new[] { Difficulty.Easy, Difficulty.Medium })
+            {
+                yield return UltStart(level: lv);
+                if (bk == null) yield break;
+                float want = BellkeeperEncounter.UltDamageTaken[(int)lv];
+                Check($"Ultimate: {RunDifficulty.Name(lv)} plays at {RunDifficulty.Name(lv)} (damage taken x{want:0.##}; a one-shot still kills)", d.World.Difficulty == lv && Mathf.Approximately(d.World.DamageTakenScale, want) && Mathf.RoundToInt(UltimateState.Lethal * want) >= PlayerController.MaxHp,
+                      $"{RunDifficulty.Name(d.World.Difficulty)} x{d.World.DamageTakenScale:0.##}");
+            }
 
             // practice hooks: each mechanic loops alone
             foreach (var id in UltimateMechanics.Ids)

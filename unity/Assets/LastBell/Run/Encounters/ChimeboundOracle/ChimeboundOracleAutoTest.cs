@@ -13,11 +13,13 @@ namespace LastBell.Run
     // extra simulated roster players for the mark count (not co-op), the labelled dev hooks (ForcedNext, ForceEnrage,
     // boss HP fraction / defeat, player DebugSetHp, direct player placement for orb and well hit checks). It measures
     // what the hazards actually do, runs the lane fairness checks, captures screenshots, writes
-    // chimebound-oracle-report.txt and exits 0 / 1.
+    // chimebound-oracle-report.txt and exits 0 / 1. It fights on his default arena, the Skyward Spire; add
+    // -chimeboundOracleCourt to fight on the Metronome Court instead and check that the court's metronome follows him.
     public sealed class ChimeboundOracleAutoTest : MonoBehaviour
     {
         public static bool Requested => Environment.GetCommandLineArgs().Any(a => a.Equals("-chimeboundOracleTest", StringComparison.OrdinalIgnoreCase));
         static bool Flicker => Environment.GetCommandLineArgs().Any(a => a.Equals("-chimeboundOracleFlicker", StringComparison.OrdinalIgnoreCase));
+        static bool Court => Environment.GetCommandLineArgs().Any(a => a.Equals("-chimeboundOracleCourt", StringComparison.OrdinalIgnoreCase));
         static string OutDir
         {
             get
@@ -219,8 +221,9 @@ namespace LastBell.Run
         {
             Section("registration and fairness (pure rules)");
             yield return new WaitForSeconds(1f);
-            int map = RunMaps.IndexOf(RunDirector.TempoTyrantMap), enc = RunDirector.ChimeboundOraclePractice;
-            Check("practice entry registered on Metronome Court, practice only", enc >= 0 && RunDirector.Bosses[enc].Map == "metronome-court" && !RunDirector.Bosses[enc].InRun);
+            int map = RunMaps.IndexOf(Court ? RunDirector.TempoTyrantMap : RunDirector.AurelionMap), enc = RunDirector.ChimeboundOraclePractice;
+            Note(Court ? "arena: Metronome Court (-chimeboundOracleCourt)" : "arena: Skyward Spire (his default)");
+            Check("practice entry registered on the Skyward Spire, practice only", enc >= 0 && RunDirector.Bosses[enc].Map == "skyward-spire" && !RunDirector.Bosses[enc].InRun);
             Check("run order unchanged (4 run bosses, Oracle excluded)", RunDirector.RunOrder.Length == 4 && !RunDirector.RunOrder.Contains(enc));
             Check("Tempo Tyrant practice entry still resolves", RunDirector.TempoTyrantPractice >= 0 && RunDirector.Bosses[RunDirector.TempoTyrantPractice].Name.StartsWith("Tempo Tyrant"));
             FairnessChecks();
@@ -230,15 +233,24 @@ namespace LastBell.Run
             if (RunDirector.Instance == null) UnityEngine.SceneManagement.SceneManager.LoadScene(RunMaps.All[map].RunScene);
             while (RunDirector.Instance == null || RunDirector.Instance.State != RunState.Menu) yield return null;
             d = RunDirector.Instance;
-            Check("practice request accepted", d.StartPractice("Vanguard", enc));
+            if (Court && RunMaps.Current != map)
+            {
+                // Boss Rush with the Metronome Court picked: load the court, then start on the selected map
+                d.SelectMap(map);
+                float tm = 0; while ((RunDirector.Instance == null || RunMaps.Current != map || RunDirector.Instance.State != RunState.Menu) && tm < 30) { tm += Time.deltaTime; yield return null; }
+                d = RunDirector.Instance;
+            }
+            Check("practice request accepted", Court ? d.StartPracticeOnSelectedMap("Vanguard", enc) : d.StartPractice("Vanguard", enc));
             float t0 = 0; while ((RunDirector.Instance == null || RunDirector.Instance.State != RunState.Ready) && t0 < 30) { t0 += Time.deltaTime; yield return null; }
             d = RunDirector.Instance;
-            Check("practice Ready on Metronome Court", d && d.State == RunState.Ready && RunMaps.Current == map && d.Mode == RunMode.Practice && d.Encounter == enc);
+            Check($"practice Ready on {RunMaps.All[map].Name}", d && d.State == RunState.Ready && RunMaps.Current == map && d.Mode == RunMode.Practice && d.Encounter == enc);
             var arena = FindAnyObjectByType<MetronomeCourtArena>();
             float minA = 999, maxA = -999;
             for (float t = 0; t < 1.2f; t += Time.deltaTime) { if (arena) { minA = Mathf.Min(minA, arena.RodAngle); maxA = Mathf.Max(maxA, arena.RodAngle); } yield return null; }
-            Check("readiness previews the metronome at the Oracle's Normal tempo", arena && arena.Preview && maxA - minA > 5f && arena.WeightHeight > MetronomeCourtArena.WeightHaste + 1f,
-                arena ? $"swing {maxA - minA:0.0} deg, weight {arena.WeightHeight:0.00}" : "no arena");
+            if (Court)
+                Check("readiness previews the metronome at the Oracle's Normal tempo", arena && arena.Preview && maxA - minA > 5f && arena.WeightHeight > MetronomeCourtArena.WeightHaste + 1f,
+                    arena ? $"swing {maxA - minA:0.0} deg, weight {arena.WeightHeight:0.00}" : "no arena");
+            else Check("the Skyward Spire has no court metronome: the fight keeps his own clock", arena == null);
             d.Player.Input = bot;
             d.World.PlayerHit += OnHit;
             OracleLanes.Bound = CombatWorld.PlayerBound;
@@ -253,12 +265,23 @@ namespace LastBell.Run
             yield return Until(() => d.State == RunState.Combat, 6, "combat");
             Section("combat start");
             Check("fight opens in Normal at 140 BPM, beat 0", boss.Clock.State == Tempo.Normal && Mathf.Approximately(boss.Clock.Bpm, 140) && boss.Clock.Beat < 1.5 && boss.Clock.Commits == 0);
-            Check("stand-in is labelled", boss.Placeholder && boss.Rig && boss.Rig.name.Contains("STAND-IN"));
+            Check("Oracle uses its rigged model, not the stand-in", boss.Rig && boss.Rig.HasModel && !boss.Placeholder && !boss.Rig.name.Contains("STAND-IN"),
+                boss.Rig && boss.Rig.Presenter ? $"clip {boss.Rig.Presenter.CurrentClip}" : "no presenter");
             Check("no ability text: empty phase line and intro lesson, diagnostics off by default", boss.PhaseName == "" && boss.Lesson == "" && !ChimeboundOracleHud.ShowDiagnostics);
             yield return Wait(0.5f);
+            Check($"the lanes span this arena: 8 of {OracleLanes.Width:0.000} m across {2 * OracleLanes.Bound:0.#} m", Mathf.Approximately(OracleLanes.Bound, RunMaps.All[map].Bound),
+                $"bound {OracleLanes.Bound:0.00}, map {RunMaps.All[map].Bound:0.00}");
             arena = FindAnyObjectByType<MetronomeCourtArena>();
-            Check("the court's metronome follows the Oracle's clock", arena && !arena.Preview && Mathf.Abs(arena.RodAngle - boss.Clock.RodPhase * MetronomeCourtArena.SwingDegrees) < 10f,
-                arena ? $"rod {arena.RodAngle:0.0}, clock {boss.Clock.RodPhase * MetronomeCourtArena.SwingDegrees:0.0}" : "");
+            if (Court)
+                Check("the court's metronome follows the Oracle's clock", arena && !arena.Preview && Mathf.Abs(arena.RodAngle - boss.Clock.RodPhase * MetronomeCourtArena.SwingDegrees) < 10f,
+                    arena ? $"rod {arena.RodAngle:0.0}, clock {boss.Clock.RodPhase * MetronomeCourtArena.SwingDegrees:0.0}" : "");
+            if (Court)
+            {
+                // only the Tempo Tyrant pulses the court's lights (Risxhb, October 28, 2026): steady through a few beats here
+                float pulseMax = 0; bool pulsing = false;
+                for (float t = 0; t < 1.2f; t += Time.deltaTime) { if (arena) { pulseMax = Mathf.Max(pulseMax, arena.BeatPulse); pulsing |= arena.LightsPulse; } yield return null; }
+                Check("the court's lights stay steady (no beat pulse) for the Oracle", arena && !pulsing && pulseMax == 0, $"pulse max {pulseMax:0.00}");
+            }
             yield return Shot("start_normal");
             if (Flicker) { yield return FlickerFrames(); Finish(); yield break; }
 
@@ -290,12 +313,12 @@ namespace LastBell.Run
         // into a map of pixels that change direction frame to frame (flicker), against smooth motion.
         // Time is frozen (timeScale 0: no beat pulse, motes or follow smoothing), then only the camera moves, a few
         // centimetres per frame. Anything that changes direction frame to frame is aliasing or z-fighting, not motion.
-        IEnumerator FrameRun(string name, Vector3 camFrom, Vector3 camTo, Vector3 look, int frames)
+        IEnumerator FrameRun(string name, Vector3 camFrom, Vector3 camTo, Vector3 look, int frames, bool live = false)
         {
             var sub = Path.Combine(dir, "flicker-" + name); Directory.CreateDirectory(sub);
             var cam = Camera.main; if (!cam) yield break;
             cam.transform.GetPositionAndRotation(out var keepPos, out var keepRot);
-            float keepScale = Time.timeScale; Time.timeScale = 0;
+            float keepScale = Time.timeScale; Time.timeScale = live ? 1 : 0;   // live: time runs (lights swing), camera still
             for (int f = 0; f < frames; f++)
             {
                 var p = Vector3.Lerp(camFrom, camTo, f / (float)(frames - 1));
@@ -318,6 +341,40 @@ namespace LastBell.Run
             var game = Camera.main.transform.position;
             yield return FrameRun("floor", game, game + new Vector3(1.2f, 0, 0), new Vector3(0, 1, 4), 40);
             yield return FrameRun("far", new Vector3(0, 40.6f, 21.6f), new Vector3(1.5f, 40.6f, 21.6f), new Vector3(0, 1, -8), 40);
+            // Diagnosis (October 26, 2026): the same floor pan with 4x MSAA, then with the sun's shadows off, to see which
+            // one removes the remaining shimmer. Settings are restored afterwards.
+            var urp = UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline as UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset;
+            int msaa = urp ? urp.msaaSampleCount : 1;
+            if (urp) { urp.msaaSampleCount = 4; yield return Wait(0.3f); yield return FrameRun("floor-msaa4", game, game + new Vector3(1.2f, 0, 0), new Vector3(0, 1, 4), 40); urp.msaaSampleCount = msaa; }
+            var sun = FindObjectsByType<Light>(FindObjectsSortMode.None).Where(l => l.type == LightType.Directional && l.shadows != LightShadows.None).ToArray();
+            var kinds = sun.Select(l => l.shadows).ToArray();
+            foreach (var l in sun) l.shadows = LightShadows.None;
+            yield return Wait(0.3f);
+            yield return FrameRun("floor-noshadow", game, game + new Vector3(1.2f, 0, 0), new Vector3(0, 1, 4), 40);
+            for (int i = 0; i < sun.Length; i++) sun[i].shadows = kinds[i];
+            Note($"diagnosis: msaa was {msaa}, {sun.Length} shadowed directional light(s)");
+            // Walk smoothness (October 26, 2026): the player walks straight across while the game's own follow camera
+            // tracks it; per-frame camera travel divided by frame time should be steady. Stutter shows as frames that
+            // move about double and frames that barely move. Compare with -lastbellNoSmoothing.
+            Time.timeScale = 1;
+            Place(new Vector3(-9, 0, 6)); goal = new Vector3(9, 0, 6);
+            yield return Wait(0.8f);
+            var cam2 = Camera.main; var camSpeeds = new List<float>(); var heroSpeeds = new List<float>(); var dts = new List<float>();
+            var lastCam = cam2.transform.position; var lastHero = d.Player.transform.position;
+            for (int f = 0; f < 150; f++)
+            {
+                yield return null;
+                float dt = Time.unscaledDeltaTime; if (dt <= 0) continue;
+                camSpeeds.Add((cam2.transform.position - lastCam).magnitude / dt); heroSpeeds.Add((d.Player.transform.position - lastHero).magnitude / dt); dts.Add(dt);
+                lastCam = cam2.transform.position; lastHero = d.Player.transform.position;
+            }
+            goal = null;
+            string Stat(List<float> v)
+            {
+                var s = v.Skip(20).ToList(); float mean = s.Average(), sd = Mathf.Sqrt(s.Average(x => (x - mean) * (x - mean)));
+                return $"{mean:0.00} m/s, variation {100 * sd / Mathf.Max(0.001f, mean):0}%, stalled frames {s.Count(x => x < mean * 0.35f)}/{s.Count}";
+            }
+            Note($"walk smoothness: smoothing {(SimSmoother.Enabled ? "on" : "off")}, {1f / dts.Skip(20).Average():0} fps; hero {Stat(heroSpeeds)}; camera {Stat(camSpeeds)}");
             Time.timeScale = 1;
             boss.ForcedNext = "Called";
             yield return Until(() => d.World.Hazards.Live.Count(h => h.Source == "Toll Lane") >= 4, 30, "lanes up for capture");
@@ -330,24 +387,30 @@ namespace LastBell.Run
         // ---------------- pure rules ----------------
         void FairnessChecks()
         {
-            OracleLanes.Bound = 12.5f;   // the Metronome Court floor
-            Check("8 lanes of 3.125 m across the 25 m court", Mathf.Approximately(OracleLanes.Width, 3.125f));
-            Check("Rounds and Odds & Evens survivable on foot (Normal, Medium and Easy warnings)",
-                OracleLanes.Survivable(OracleLanes.Rounds(), 140, 4, 0) && OracleLanes.Survivable(OracleLanes.OddsEvens(), 140, 4, 0) &&
-                OracleLanes.Survivable(OracleLanes.Rounds(), 140, 6, 0) && OracleLanes.Survivable(OracleLanes.OddsEvens(), 140, 6, 0));
-            Check("fallback Called Changes order passes every rule", OracleLanes.OrderRulesHold(OracleLanes.SafeFallback()) && OracleLanes.Survivable(OracleLanes.SafeFallback(), 185, 4, 2));
-            foreach (var (name, warn, echo) in new[] { ("Medium", 4f, 0f), ("Easy", 6f, 0f), ("Hard (echo)", 4f, 2f) })
+            // every check at both arenas he can be fought on: the Spire (default) and the Metronome Court
+            float spire = RunMaps.All[RunMaps.IndexOf(RunDirector.AurelionMap)].Bound, court = RunMaps.All[RunMaps.IndexOf(RunDirector.TempoTyrantMap)].Bound;
+            foreach (var (at, bound, width) in new[] { ("Skyward Spire", spire, 3.475f), ("Metronome Court", court, 3.125f) })
             {
-                var r = new System.Random(4242); int ok = 0, fallback = 0, totalTries = 0, maxTries = 0; const int N = 1000;
-                for (int i = 0; i < N; i++)
+                OracleLanes.Bound = bound;
+                Check($"{at}: 8 lanes of {width:0.000} m across the {2 * bound:0.#} m floor", Mathf.Approximately(OracleLanes.Width, width), $"{OracleLanes.Width:0.000} m");
+                Check($"{at}: Rounds and Odds & Evens survivable on foot (Normal, Medium and Easy warnings)",
+                    OracleLanes.Survivable(OracleLanes.Rounds(), 140, 4, 0) && OracleLanes.Survivable(OracleLanes.OddsEvens(), 140, 4, 0) &&
+                    OracleLanes.Survivable(OracleLanes.Rounds(), 140, 6, 0) && OracleLanes.Survivable(OracleLanes.OddsEvens(), 140, 6, 0));
+                Check($"{at}: fallback Called Changes order passes every rule", OracleLanes.OrderRulesHold(OracleLanes.SafeFallback()) && OracleLanes.Survivable(OracleLanes.SafeFallback(), 185, 4, 2));
+                foreach (var (name, warn, echo) in new[] { ("Medium", 4f, 0f), ("Easy", 6f, 0f), ("Hard (echo)", 4f, 2f) })
                 {
-                    var s = OracleLanes.CalledChanges(r, 185, warn, echo, out int tries);
-                    if (tries < 0) fallback++; else { totalTries += tries; maxTries = Mathf.Max(maxTries, tries); }
-                    if (OracleLanes.OrderRulesHold(s) && OracleLanes.Survivable(s, 185, warn, echo)) ok++;
+                    var r = new System.Random(4242); int ok = 0, fallback = 0, totalTries = 0, maxTries = 0; const int N = 1000;
+                    for (int i = 0; i < N; i++)
+                    {
+                        var s = OracleLanes.CalledChanges(r, 185, warn, echo, out int tries);
+                        if (tries < 0) fallback++; else { totalTries += tries; maxTries = Mathf.Max(maxTries, tries); }
+                        if (OracleLanes.OrderRulesHold(s) && OracleLanes.Survivable(s, 185, warn, echo)) ok++;
+                    }
+                    Check($"{at}: Called Changes {name}: {N} shuffled casts all follow the order rules and are survivable walking at 80% speed", ok == N && fallback == 0,
+                        $"{ok}/{N} ok, fallback {fallback}, avg tries {(totalTries / (float)Mathf.Max(1, N - fallback)):0.0}, max {maxTries}");
                 }
-                Check($"Called Changes {name}: {N} shuffled casts all follow the order rules and are survivable walking at 80% speed", ok == N && fallback == 0,
-                    $"{ok}/{N} ok, fallback {fallback}, avg tries {(totalTries / (float)Mathf.Max(1, N - fallback)):0.0}, max {maxTries}");
             }
+            OracleLanes.Bound = spire;
             // the strict walking check rejects a pattern that is not survivable (the check can fail)
             var bad = new List<OracleLanes.Slot> { new OracleLanes.Slot(0, 0, 2), new OracleLanes.Slot(0, 4, 6), new OracleLanes.Slot(0, 1, 3), new OracleLanes.Slot(0, 5, 7) };
             Check("fairness check rejects an unsurvivable pattern (all 8 lanes on one beat)", !OracleLanes.Survivable(bad, 185, 4, 0));
@@ -521,7 +584,7 @@ namespace LastBell.Run
             Check("the metronome commits to Haste at 185 BPM, once", boss.Clock.State == Tempo.Haste && Mathf.Approximately(boss.Clock.Bpm, 185) && boss.Clock.Commits == 1 && boss.Phase2);
             var arena = FindAnyObjectByType<MetronomeCourtArena>();
             yield return Wait(1.2f);
-            Check("the weight slides low (fast) and the court lights warm", arena && arena.WeightHeight < MetronomeCourtArena.WeightHaste + 0.6f && arena.TempoBlend > 0.8f, arena ? $"weight {arena.WeightHeight:0.00} blend {arena.TempoBlend:0.00}" : "");
+            if (Court) Check("the weight slides low (fast) and the court lights warm", arena && arena.WeightHeight < MetronomeCourtArena.WeightHaste + 0.6f && arena.TempoBlend > 0.8f, arena ? $"weight {arena.WeightHeight:0.00} blend {arena.TempoBlend:0.00}" : "");
             int startLog = boss.LaneLog.Count;
             yield return Until(() => !boss.HoldHp, 25, "recital ends");
             Check("the recital is one Called Changes cast at Haste", boss.LaneLog.Skip(startLog).Count(x => x.pattern == "Called Changes") == 8);

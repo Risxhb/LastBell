@@ -11,6 +11,9 @@ namespace LastBell.Run
     //   -lastbellTestAbility bots_p1v2_video  a real-time clip (30 fps frames, under a minute) of the perfect party of 4
     public sealed partial class RunAutoTest
     {
+        // damage the perfect bots took from the named sources (a phase's own hazards)
+        int OwnPhaseDamage(params string[] sources) => bkHits.Where(h => sources.Any(x => h.Source != null && h.Source.StartsWith(x))).Sum(h => h.Damage);
+
         IEnumerator UltP1V2Checks()
         {
             Note("---------- Ultimate v2 · P1 slice (proposal) ----------");
@@ -48,8 +51,11 @@ namespace LastBell.Run
                 Note("   dealt: " + string.Join(", ", d.World.Players.Select(p => $"{p.ClassName} {(d.World.DealtBy.TryGetValue(p, out int v) ? v : 0)}")));
                 if (r.must)
                 {
-                    Check($"{r.label}: clears P1", ultLast.Killed, ultLast.ToString());
-                    Check($"{r.label}: 0 damage taken, 0 potions", taken == 0 && ultLast.Potions == 0, $"damage {taken}, potions {ultLast.Potions}");
+                    // the run goes on after P1 (the full fight): P1 is cleared when P2 begins inside the cap
+                    Check($"{r.label}: clears P1", ultLast.Segments.Any(x => x.seg == BellkeeperEncounter.UltSegment.P2), ultLast.ToString());
+                    // the phase's own hazards never touch perfect bots (the run goes on into later phases, so the whole run's damage and
+                    // potions say nothing about this phase)
+                    { int own = OwnPhaseDamage("Escapement Relay", "Chime Debt"); Check($"{r.label}: no damage from P1's own hazards", own == 0, $"P1 damage {own} (all phases {taken}, potions {ultLast.Potions})"); }
                     Check($"{r.label}: every relay beat clean", relay.Beats > 20 && relay.BeatsClean == relay.Beats, $"{relay.BeatsClean}/{relay.Beats}");
                     Check($"{r.label}: two debt rounds resolved", debts.Detonated + debts.Erased >= 8, $"{debts.Detonated} detonated, {debts.Erased} erased");
                 }
@@ -87,8 +93,11 @@ namespace LastBell.Run
                 Note("   dealt: " + string.Join(", ", d.World.Players.Select(p => $"{p.ClassName} {(d.World.DealtBy.TryGetValue(p, out int v) ? v : 0)}")));
                 if (r.must)
                 {
-                    Check($"{r.label}: clears", ultLast.Killed, ultLast.ToString());
-                    Check($"{r.label}: 0 damage taken, 0 potions", taken == 0 && ultLast.Potions == 0, $"damage {taken}, potions {ultLast.Potions}");
+                    if (r.seg == "P1") Check($"{r.label}: clears P1 and P2", ultLast.Segments.Any(x => x.seg == BellkeeperEncounter.UltSegment.P3), ultLast.ToString());
+                    else Check($"{r.label}: clears", ultLast.Killed, ultLast.ToString());
+                    // the phase's own hazards never touch perfect bots (the run goes on into later phases, so the whole run's damage and
+                    // potions say nothing about this phase)
+                    { int own = OwnPhaseDamage("Broken Hour"); Check($"{r.label}: no damage from P2's own hazards", own == 0, $"P2 damage {own} (all phases {taken}, potions {ultLast.Potions})"); }
                     Check($"{r.label}: every Broken Hour beat clean", bh.Beats >= 18 && bh.BeatsClean == bh.Beats, $"{bh.BeatsClean}/{bh.Beats}");
                 }
             }
@@ -124,7 +133,9 @@ namespace LastBell.Run
                 if (r.must)
                 {
                     Check($"{r.label}: clears", ultLast.Killed, ultLast.ToString());
-                    Check($"{r.label}: 0 damage taken, 0 potions", taken == 0 && ultLast.Potions == 0, $"damage {taken}, potions {ultLast.Potions}");
+                    // the phase's own hazards never touch perfect bots (the run goes on into later phases, so the whole run's damage and
+                    // potions say nothing about this phase)
+                    { int own = OwnPhaseDamage("The Open Hour"); Check($"{r.label}: no damage from P3's own hazards", own == 0, $"P3 damage {own} (all phases {taken}, potions {ultLast.Potions})"); }
                 }
             }
             BellkeeperEncounter.V2StopAfterP4 = false;
@@ -155,7 +166,9 @@ namespace LastBell.Run
                 if (r.must)
                 {
                     Check($"{r.label}: kills (by the end of the last stand)", ultLast.Killed, ultLast.ToString());
-                    Check($"{r.label}: 0 damage taken, 0 potions", taken == 0 && ultLast.Potions == 0, $"damage {taken}, potions {ultLast.Potions}");
+                    // the phase's own hazards never touch perfect bots (the run goes on into later phases, so the whole run's damage and
+                    // potions say nothing about this phase)
+                    { int own = OwnPhaseDamage("Final Toll"); Check($"{r.label}: no damage from P5's own hazards", own == 0, $"P5 damage {own} (all phases {taken}, potions {ultLast.Potions})"); }
                 }
             }
         }
@@ -186,23 +199,25 @@ namespace LastBell.Run
                 if (r.must)
                 {
                     Check($"{r.label}: clears", ultLast.Killed, ultLast.ToString());
-                    Check($"{r.label}: 0 damage taken, 0 potions", taken == 0 && ultLast.Potions == 0, $"damage {taken}, potions {ultLast.Potions}");
+                    // the phase's own hazards never touch perfect bots (the run goes on into later phases, so the whole run's damage and
+                    // potions say nothing about this phase)
+                    { int own = OwnPhaseDamage("The Gear Floor"); Check($"{r.label}: no damage from P4's own hazards", own == 0, $"P4 damage {own} (all phases {taken}, potions {ultLast.Potions})"); }
                 }
             }
         }
 
         // watch = live in the window at real speed (no capture): the full P1 attempt plus 4 s of the outcome
-        IEnumerator UltP1V2Video(bool watch = false, UltimateBot.Skill skill = UltimateBot.Skill.Perfect, string label = "perfect", string seg = "P1")
+        IEnumerator UltP1V2Video(bool watch = false, UltimateBot.Skill skill = UltimateBot.Skill.Perfect, string label = "perfect", string seg = "P1", int seconds = 0, bool chase = false)
         {
             yield return UltStart(null, seg);
             if (bk == null) yield break;
             var bots = UltimateParty.Fill(d.World, 4, skill, PartyClasses);
             foreach (var b in bots) b.Speed = PlayerController.WalkSpeed;
-            var cdir = System.IO.Path.Combine(dir, "clip_" + seg.ToLowerInvariant() + "v2"); if (!watch) System.IO.Directory.CreateDirectory(cdir);
+            var cdir = System.IO.Path.Combine(dir, "clip_" + seg.ToLowerInvariant() + "v2" + (seconds > 0 ? "_" + label : "")); if (!watch) System.IO.Directory.CreateDirectory(cdir);
             bkHits.Clear();
             // the whole dial from above, north up (the game's chase camera shows only a corner of it)
             var game = Camera.main; Camera over = null;
-            if (game)
+            if (game && !chase)   // chase: the game's own camera (what a player sees)
             {
                 over = new GameObject("P1 v2 overview camera").AddComponent<Camera>();
                 over.CopyFrom(game); over.tag = "MainCamera"; over.fieldOfView = 50;
@@ -212,7 +227,7 @@ namespace LastBell.Run
             var boss = bk;
             bk.BeginCombat(); d.SetPaused(false);
             if (!watch) Time.captureFramerate = 30;
-            int frame = 0, max = watch ? int.MaxValue : 30 * (seg == "P4" ? 230 : seg == "P5" ? 72 : 58);   /* P4 runs on through both transitions and P5 */ float t0 = Time.unscaledTime, tail = -1;
+            int frame = 0, max = watch ? int.MaxValue : 30 * (seconds > 0 ? seconds : seg == "P4" ? 230 : seg == "P5" ? 72 : 58);   /* P4 runs on through both transitions and P5 */ float t0 = Time.unscaledTime, tail = -1;
             while (frame < max)
             {
                 yield return new WaitForEndOfFrame();

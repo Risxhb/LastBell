@@ -29,7 +29,7 @@ namespace LastBell.Run
         readonly HashSet<string> missedKeys = new HashSet<string>();     // Miss: "segment|mechanic|launch" skipped
         readonly HashSet<string> seenReads = new HashSet<string>();
         readonly HashSet<int> skippedSegments = new HashSet<int>();
-        Vector3 target; bool hasTarget; int replanAt, tick, lastPress = -999, castHold;
+        Vector3 target; bool hasTarget; int replanAt, tick, lastPress = -999, castHold, beamHold;
         readonly int[] cd = new int[5];
 
         public PlayerInput Read(PlayerController me)
@@ -52,18 +52,22 @@ namespace LastBell.Run
                         inp.Move = ToScreen(vel / PlayerController.WalkSpeed);
                         inp.Sprint = vel.magnitude > PlayerController.WalkSpeed + 0.1f;
                         for (int i = 0; i < cd.Length; i++) if (cd[i] > 0) cd[i]--;
+                        beamHold = 0;   // a steered phase never holds a beam
+                        // an Arcanist's shots slow its caster (x0.6, merged kit 27 Oct): no shots on a sprint (an urgent dodge); the
+                        // route search plans its first leg at the current speed, so a shot in progress is part of the plan
+                        bool slowsMe = me.Kit is ArcanistKit && vel.magnitude > PlayerController.WalkSpeed + 0.1f;
                         if (m.AttackTarget(me, out var aim, out float reach, out bool full))
                         {
                             // the phase names a target (P4: the nearest gear core or the boss) and whether the whole kit is safe
                             inp.Aim = aim + Vector3.up * 0.1f;
-                            if (Attacks && reach <= Range(me) + 0.6f) { if (full) Attack(me, ref inp, false); else if (tick - lastPress >= 6) { inp.P0 = inp.H0 = true; lastPress = tick; } }
+                            if (Attacks && reach <= Reach(me) + 0.6f) { if (full && !slowsMe) Attack(me, ref inp, 0); else if (!slowsMe && tick - lastPress >= 6) { inp.P0 = inp.H0 = true; lastPress = tick; } }
                         }
                         else
                         {
                             float gap = Sim.Flat(bpos - pos).magnitude - boss.BodyRadius;
-                            if (Attacks && me.ClassName != "Vanguard" && gap <= Range(me) + 1f && tick - lastPress >= 6) { inp.P0 = inp.H0 = true; lastPress = tick; }
+                            if (Attacks && (me.ClassName != "Vanguard" || gap <= 0.6f) && !slowsMe && gap <= Reach(me) + 1f && tick - lastPress >= 6) { inp.P0 = inp.H0 = true; lastPress = tick; }
                         }
-                        if (me.Potions > 0 && me.Hp < 55 && me.Hp < PlayerController.MaxHp) inp.Potion = tick % 4 == 0;
+                        if (me.Potions > 0 && me.Hp < DrinkBelow(me) && me.Hp < PlayerController.MaxHp) inp.Potion = tick % 4 == 0;
                         DebugLine = $"{m.Name}: v ({vel.x:0.0},{vel.z:0.0}) at ({pos.x:0.0},{pos.z:0.0})";
                         return inp;
                     }
@@ -103,10 +107,10 @@ namespace LastBell.Run
 
             // ---- potions: a MinHp rule, or low ----
             int needHp = 0; foreach (var d in demands) needHp = Mathf.Max(needHp, d.MinHp);
-            if (me.Hp < PlayerController.MaxHp && me.Potions > 0 && me.Stunned == 0 && (me.Hp < needHp || me.Hp < 55 || (FreezeSoon(boss, me, now) && me.Hp < 90))) inp.Potion = tick % 4 == 0;   // potions are locked while Stilled: top up under the hourglass
+            if (me.Hp < PlayerController.MaxHp && me.Potions > 0 && me.Stunned == 0 && (me.Hp < needHp || me.Hp < DrinkBelow(me) || (FreezeSoon(boss, me, now) && me.Hp < 90))) inp.Potion = tick % 4 == 0;   // potions are locked while Stilled: top up under the hourglass
 
             // ---- plan a spot (every 4 ticks, or at once when the current spot breaks a rule) ----
-            var rules = new List<BotDemand>(); foreach (var d in demands) if (d.Ok != null) rules.Add(d);
+            rules.Clear(); foreach (var d in demands) if (d.Ok != null) rules.Add(d);
             if (rules.Count == 0) { hasTarget = false; }
             else if (!hasTarget || now >= replanAt || !Satisfies(target, rules, rules[0].Tick + 6))
             {
@@ -146,7 +150,7 @@ namespace LastBell.Run
             // no swings while walking to a spot or just before a rule: lunges and casts would carry it off its spot
             // (a memory spot, e.g. a Stopped Hour hiding spot that also aims frozen clocks, is held still for its last 1.5 s)
             // (a Vanguard's lunges carry it about a metre: no swings in the last 1.25 s before any rule)
-            bool positioning = hasTarget && (Sim.Flat(target - pos).magnitude > 0.5f || (rules.Count > 0 && rules[0].Tick - now < (rules[0].Memory ? 90 : me.ClassName == "Vanguard" ? 75 : 30)));
+            bool positioning = hasTarget && (Sim.Flat(target - pos).magnitude > 0.5f || (rules.Count > 0 && rules[0].Tick - now < (rules[0].Memory ? 90 : me.ClassName == "Vanguard" && !((rules[0].From is EscapementRelay || (rules[0].From is BrokenHour && w.Players.Count == 1)) && Sim.Flat(bpos - pos).magnitude - boss.BodyRadius <= 0.7f) ? 75 : 30)));
             for (int i = 0; i < cd.Length; i++) if (cd[i] > 0) cd[i]--;
             bool stilled = boss.Ult != null && boss.Ult.IsStilled(me);
             // Chimesinger: Mending Chorus (burst heal round the caster) when it would top up a hurt ally or two (potions run out in P5)
@@ -155,7 +159,9 @@ namespace LastBell.Run
                 int hurt = 0; foreach (var p in w.Players) if (!p.Down && p.Hp < 65 && Sim.Flat(p.transform.position - pos).magnitude < 5.5f) hurt++;
                 if (hurt >= 2 || (hurt == 1 && me.Hp < 65)) { inp.P4 = true; cd[4] = 900; lastPress = tick; }
             }
-            if (Attacks && !positioning && bossGap <= Range(me) + 1.5f && (boss.Ult == null || !boss.Ult.IsStilled(me))) Attack(me, ref inp, rules.Count == 0 || rules[0].Tick - now > 90);
+            // the Arcanist's Disintegrate is held: keep holding while the spot is safe, let go the moment it has to move
+            if (beamHold > 0) { if (positioning || stilled) beamHold = 0; else { inp.H1 = true; beamHold--; lastPress = tick; } }
+            else if (Attacks && !positioning && bossGap <= Reach(me) + 1.5f && (boss.Ult == null || !boss.Ult.IsStilled(me))) Attack(me, ref inp, rules.Count == 0 ? 9999 : rules[0].Tick - now);
             if (move != Vector3.zero) move = AroundBoss(pos, move, boss, hasTarget ? target : (Vector3?)null);
             inp.Move = ToScreen(move);
             DebugLine = $"rules {rules.Count} first {(rules.Count > 0 ? rules[0].Why + " in " + (rules[0].Tick - now) : "-")} target {(hasTarget ? $"({target.x:0.0},{target.z:0.0})" : "-")} at ({pos.x:0.0},{pos.z:0.0})";
@@ -171,6 +177,23 @@ namespace LastBell.Run
         // Candidate spots: rings round the arena centre and the boss, every rule's hint, and here.
         readonly List<Vector3> cands = new List<Vector3>(), next = new List<Vector3>();
         readonly List<(int tick, List<Vector3> pts)> later = new List<(int, List<Vector3>)>();
+        // reused every tick / plan (8 practice allies planning every 4 ticks made garbage each frame)
+        readonly List<BotDemand> rules = new List<BotDemand>();
+        readonly List<Vector3>[] laterPts = { new List<Vector3>(), new List<Vector3>(), new List<Vector3>() };
+        readonly List<Vector3> laterAll = new List<Vector3>();
+        // nearest walking distance from c to any of pts, capped at cap: a path is never shorter than the straight line, so
+        // a point already farther in a straight line skips PathLen (same result, far fewer path checks)
+        static float NearestPath(Vector3 c, List<Vector3> pts, Vector3 bp, float body, float cap)
+        {
+            float nd = cap;
+            foreach (var q in pts)
+            {
+                float dx = q.x - c.x, dz = q.z - c.z;
+                if (dx * dx + dz * dz >= nd * nd) continue;
+                nd = Mathf.Min(nd, PathLen(c, q, bp, body));
+            }
+            return nd;
+        }
         bool Plan(PlayerController me, BellkeeperEncounter boss, Vector3 pos, List<BotDemand> rules, int now, out Vector3 best)
         {
             cands.Clear(); cands.Add(pos);
@@ -200,9 +223,10 @@ namespace LastBell.Run
             {
                 int tg = rules[gs].Tick, ge = gs;
                 while (ge < rules.Count && rules[ge].Tick <= tg + 6) ge++;
-                var pts = new List<Vector3>();
-                for (int i = 0; i < cands.Count; i += 3) if (Valid(cands[i], boss) && AllOk(cands[i], rules, gs, ge)) pts.Add(cands[i]);
-                if (pts.Count > 40) { int stride = pts.Count / 40 + 1; var few = new List<Vector3>(); for (int i = 0; i < pts.Count; i += stride) few.Add(pts[i]); pts = few; }
+                var pts = laterPts[k]; pts.Clear(); laterAll.Clear();
+                for (int i = 0; i < cands.Count; i += 3) if (Valid(cands[i], boss) && AllOk(cands[i], rules, gs, ge)) laterAll.Add(cands[i]);
+                if (laterAll.Count > 40) { int stride = laterAll.Count / 40 + 1; for (int i = 0; i < laterAll.Count; i += stride) pts.Add(laterAll[i]); }
+                else pts.AddRange(laterAll);
                 if (pts.Count > 0) later.Add((tg, pts));
                 gs = ge;
             }
@@ -212,26 +236,31 @@ namespace LastBell.Run
                 if (!Valid(c, boss) || !AllOk(c, rules, 0, g1End)) continue;
                 float d = PathLen(pos, c, bp, boss.BodyRadius);
                 float score = d + (d > reach1 ? 100 + d : 0);                 // unreachable: only if nothing else works
+                // the cheap terms first; every term is >= 0, so a spot already no better than the best is skipped before
+                // the path checks against the next groups (the same pick, a fraction of the work: 8 allies ran at 4 fps)
+                // later rules still in view: a small pull toward satisfying them too
+                // (a visible coral shape due soon costs far more than a memory rule seconds away)
+                for (int i = g2End; i < rules.Count; i++) if (!rules[i].Ok(c)) score += rules[i].Memory ? 0.8f : rules[i].Tick - t1 < 45 ? 12f : 3f;
+                // uptime: among spots that keep the rules, prefer ones in reach of the boss (a melee player weaves in)
+                if (Attacks) score += UptimePull * Mathf.Max(0, Sim.Flat(c - bp).magnitude - boss.BodyRadius - Reach(me));
+                if (score >= bestScore) continue;
+                score += BurnCost(boss, pos, c, UseDash && me.Stamina >= PlayerController.DashCost);
+                if (score >= bestScore) continue;
+                float dashGain = UseDash && me.Stamina >= PlayerController.DashCost ? PlayerController.DashDistance : 0;
+                foreach (var (tg, pts) in later)
+                {
+                    float nd = NearestPath(c, pts, bp, boss.BodyRadius, 30);
+                    if (nd > Speed * (tg - t1) / (float)Sim.Hz + dashGain) score += 8;   // a soft pull: never worth standing in a live shape
+                }
+                if (score >= bestScore) continue;
                 if (t2 >= 0)
                 {
-                    float nd = 30; foreach (var q in next) nd = Mathf.Min(nd, PathLen(c, q, bp, boss.BodyRadius));
+                    float nd = NearestPath(c, next, bp, boss.BodyRadius, 30);
                     float secs2 = (t2 - t1) / (float)Sim.Hz;
                     // the second hop's slack: a dash's gain if one is left, else a walking margin (no dash, no slack)
                     float slack = UseDash && me.Stamina >= PlayerController.DashCost ? 1.5f : -0.5f;
                     score += 0.6f * nd + (nd > Speed * secs2 + slack ? 20 : 0);
                 }
-                float dashGain = UseDash && me.Stamina >= PlayerController.DashCost ? PlayerController.DashDistance : 0;
-                foreach (var (tg, pts) in later)
-                {
-                    float nd = 30; foreach (var q in pts) nd = Mathf.Min(nd, PathLen(c, q, bp, boss.BodyRadius));
-                    if (nd > Speed * (tg - t1) / (float)Sim.Hz + dashGain) score += 8;   // a soft pull: never worth standing in a live shape
-                }
-                // later rules still in view: a small pull toward satisfying them too
-                // (a visible coral shape due soon costs far more than a memory rule seconds away)
-                for (int i = g2End; i < rules.Count; i++) if (!rules[i].Ok(c)) score += rules[i].Memory ? 0.8f : rules[i].Tick - t1 < 45 ? 12f : 3f;
-                score += BurnCost(boss, pos, c, UseDash && me.Stamina >= PlayerController.DashCost);
-                // uptime: among spots that keep the rules, prefer ones in reach of the boss (a melee player weaves in)
-                if (Attacks) score += UptimePull * Mathf.Max(0, Sim.Flat(c - bp).magnitude - boss.BodyRadius - Range(me));
                 if (score < bestScore) { bestScore = score; best = c; found = true; }
             }
             return found;
@@ -278,9 +307,16 @@ namespace LastBell.Run
             return s.HourglassFrom >= 0 && now >= s.HourglassFrom && now < s.StillFrom;
         }
 
+        // drink below this: melee lives next to the boss, where 50-damage bullets come in pairs, so it tops up before one hit can
+        // leave it a hit from death (party Vanguards were dying in P5 with potions left)
+        static int DrinkBelow(PlayerController me) => me.ClassName == "Vanguard" ? 75 : 55;
         float Range(PlayerController me) => me.ClassName == "Vanguard" ? 0.9f : me.ClassName == "Chimesinger" ? 6.0f : 7.5f;
+        // how far its attacks reach (Range is where it stands when idle): the redesigned Arcanist's missiles fly 18 m and its beam,
+        // rune and comet reach 16-20 m (merged 27 Oct), so it no longer has to walk in to 7.5 m to shoot
+        float Reach(PlayerController me) => me.Kit is ArcanistKit ? 15f : Range(me);
 
-        void Attack(PlayerController me, ref PlayerInput inp, bool longCastOk)
+        // freeTicks: how long until the next rule (0 = a steered phase: nothing long)
+        void Attack(PlayerController me, ref PlayerInput inp, int freeTicks)
         {
             if (tick - lastPress < 6) return;
             int s;
@@ -292,12 +328,28 @@ namespace LastBell.Run
                 case "Chimesinger":
                     if (cd[3] == 0) { s = 3; cd[3] = 480; } else if (cd[2] == 0) { s = 2; cd[2] = 300; } else if (cd[1] == 0) { s = 1; cd[1] = 150; } else s = 0;
                     break;
-                default:   // Arcanist
-                    if (cd[1] == 0) { s = 1; cd[1] = 360; } else if (cd[2] == 0 && longCastOk) { s = 2; cd[2] = 200; castHold = 50; } else if (cd[3] == 0) { s = 3; cd[3] = 420; } else s = 0;   // Arc Lance roots the caster: not with a rule close
+                default:   // Arcanist, the arcane redesign (merged 27 Oct): glyphs from Disintegrate feed Rune Sigil, Arcane Comet and Surge
+                    var ak = me.Kit as ArcanistKit; int g = ak != null ? ak.Glyphs : 0; bool surging = ak != null && ak.Surging;
+                    bool Ready(int k) => ak != null && ak.Cooldown01(k) <= 0;
+                    if (Ready(4) && g >= 2 && !surging) s = 4;                         // Surge: Sigil and Comet free and faster
+                    else if (Ready(3) && (g > 0 || surging)) s = 3;                   // Arcane Comet (90; the boss stands still)
+                    else if (Ready(2) && (g > 0 || surging)) s = 2;                   // Rune Sigil (55)
+                    else if (Ready(1) && freeTicks >= 21 + 40 + 16)                    // Disintegrate: held, one glyph per 40-tick step on the boss
+                    { s = 1; beamHold = 21 + Mathf.Min(3, (freeTicks - 21 - 16) / 40) * 40 + 1; }
+                    else if (Ready(2)) s = 2;                                         // a faint rune still hurts
+                    else s = 5;                                                       // a Magic Missile tap
                     break;
             }
             lastPress = tick;
-            switch (s) { case 0: inp.P0 = inp.H0 = true; break; case 1: inp.P1 = true; break; case 2: inp.P2 = true; break; default: inp.P3 = true; break; }
+            switch (s)
+            {
+                case 0: inp.P0 = inp.H0 = true; break;
+                case 1: inp.P1 = true; if (beamHold > 0) inp.H1 = true; break;
+                case 2: inp.P2 = true; break;
+                case 4: inp.P4 = true; break;
+                case 5: inp.P0 = true; break;   // tap, not hold: a held basic charges a volley
+                default: inp.P3 = true; break;
+            }
         }
 
         static Vector3 AroundBoss(Vector3 pos, Vector3 move, BossEncounter b, Vector3? target = null)

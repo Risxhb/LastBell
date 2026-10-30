@@ -51,7 +51,7 @@ def export(name):
     print('EXPORTED', path, os.path.getsize(path))
 
 # ---------------- FB_Floor ----------------
-RINGS = [1.2, 2.6, 4.2, 5.8, 7.4, 9.0, 10.4, 11.9]
+RINGS = [1.2, 2.6, 4.2, 5.8, 7.4, 9.0, 10.4, 11.9, 13.5]   # out to the arena floor's edge (Area 4 builder: R 13.5)
 TOP, DEPTH, GROUT = 0.05, 0.18, 0.06
 
 def stone(name, r0, r1, a0, a1, material):

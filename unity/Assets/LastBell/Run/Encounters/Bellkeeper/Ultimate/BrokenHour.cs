@@ -55,8 +55,11 @@ namespace LastBell.Run
         public static Vector3 Plate(int v) => HandDir(v) * PlateRadius;
         int Hours => Mathf.Clamp(Party, 1, 4);
         public int HourOf(PlayerController p) { int i = W.Players.IndexOf(p); return i < 0 ? -1 : i % 4; }   // 0..3 = I..IV
-        int SoakHour(int n) => n % Hours;                    // the n-th resolved beat's soaker hour
-        int InvHour(int n) { int h = (SoakHour(n) + 2) % 4; return h < Hours ? h : -1; }
+        // Solo, the plate needs you every second beat; on the others it rests and only the slam applies, so a melee player can stand
+        // at the boss (Chzy18 28 Oct, RI-010 accepted: a solo-only exception like P1's cycle; a solo Vanguard otherwise never reached the boss)
+        bool PlateRests(int n) => Hours == 1 && n % 2 == 1;
+        int SoakHour(int n) => PlateRests(n) ? -1 : n % Hours;   // the n-th resolved beat's soaker hour (-1: the plate rests)
+        int InvHour(int n) { if (SoakHour(n) < 0) return -1; int h = (SoakHour(n) + 2) % 4; return h < Hours ? h : -1; }
         PlayerController Partner(PlayerController p)
         {
             int i = W.Players.IndexOf(p); if (i < 0) return null;
@@ -109,7 +112,7 @@ namespace LastBell.Run
                 while (Now < NextBeatTick)
                 {
                     if (count > 0 && Hours >= 4) StepPasses();   // the first beat's holder is dealt, not passed (players may start bunched)
-                    if (slam == null && NextBeatTick - Now <= Sim.Ticks(SlamWarn)) slam = SpawnSlam();
+                    if (slam == null && NextBeatTick - Now <= Sim.Ticks(SlamWarn + WarnLead)) slam = SpawnSlam();
                     Present(); yield return 1;
                 }
                 Resolve(); slam = null;
@@ -176,7 +179,7 @@ namespace LastBell.Run
             }
             Boss.Face(Quaternion.LookRotation(HandDir(v)).eulerAngles.y);
             W.BossFx.ChimeResolve(plate, 1.6f);
-            if (onPlate == 0) { Fail("plate empty"); Ult.Wipe("The hour breaks (empty plate)"); return; }
+            if (onPlate == 0 && sh >= 0) { Fail("plate empty"); Ult.Wipe("The hour breaks (empty plate)"); return; }
             // the right INVERTED holders
             bool right = true;
             foreach (var p in W.Players) if (!p.Down && (HourOf(p) == ih) != inverted.Contains(p)) right = false;
@@ -346,7 +349,8 @@ namespace LastBell.Run
             for (int k = 0; k < 4; k++)
             {
                 var p = grp[k]; if (p == null) continue;
-                Vector3 spot = k == sh ? Plate(v) : k == ih ? -d * 1.5f + side * 2.5f : k == (sh + 1) % 4 ? d * 3.5f - side * 1.8f : d * 3.0f - side * 8.6f;   // chains 8.9 m and 6.8 m, uncrossed
+                Vector3 spot = sh < 0 ? d * (Boss.BodyRadius + 0.6f) :   // the plate rests (solo): at the boss on the plate's half
+                    k == sh ? Plate(v) : k == ih ? -d * 1.5f + side * 2.5f : k == (sh + 1) % 4 ? d * 3.5f - side * 1.8f : d * 3.0f - side * 8.6f;   // chains 8.9 m and 6.8 m, uncrossed
                 plan[p] = new Step { Spot = spot };
             }
         }
@@ -369,8 +373,8 @@ namespace LastBell.Run
         // ---------------- presentation ----------------
         Transform root, pivot, mySpot, myMeet; readonly Renderer[] plates = new Renderer[4];
         readonly List<Transform> chainBars = new List<Transform>(), auras = new List<Transform>();
-        static Material brassDim, brassHot, brassM, goldChain, blueChain, coralM, purple, spotM, passM;
-        float shownYaw;
+        static Material brassDim, brassHot, brassM, goldChain, blueChain, coralM, cobaltM, ivoryM, spotM, passM;
+        float shownYaw, handVel;
 
         void Build()
         {
@@ -380,20 +384,22 @@ namespace LastBell.Run
                 brassDim = Prim.Material(new Color(0.55f, 0.43f, 0.2f), 0.35f); brassHot = Prim.Material(new Color(1f, 0.8f, 0.4f), 2.2f);
                 brassM = Prim.Material(new Color(0.9f, 0.7f, 0.32f), 1.4f); goldChain = Prim.Material(new Color(1f, 0.78f, 0.35f), 1.6f);
                 blueChain = Prim.Material(new Color(0.45f, 0.65f, 1f), 1.6f); coralM = Prim.Material(new Color(1f, 0.2f, 0.2f), 2f);
-                purple = Prim.Material(new Color(0.72f, 0.45f, 1f), 2.2f); spotM = Prim.Material(new Color(0.3f, 1f, 0.85f), 2.5f);
+                // INVERTED: a co-op mark, cobalt ring and ivory ticks (no filled disc, no Arcanist violet: accepted 28 Oct, gpt/08 §4)
+                cobaltM = Prim.Material(new Color(0.22f, 0.36f, 0.85f), 2.0f); ivoryM = Prim.Material(new Color(0.97f, 0.94f, 0.86f), 2.0f); spotM = Prim.Material(new Color(0.3f, 1f, 0.85f), 2.5f);
                 passM = Prim.Material(new Color(1f, 0.6f, 0.4f), 2.5f);
             }
             root = new GameObject("Broken Hour (stand-in)").transform; root.SetParent(W.Root, false);
             for (int i = 0; i < 4; i++)
             {
                 var t = Prim.Make(PrimitiveKind.Cylinder, root, PlanDir(90 * i) * PlateRadius + Vector3.up * 0.04f, new Vector3(3.2f, 0.02f, 3.2f), Color.white);
-                plates[i] = t.GetComponent<Renderer>(); plates[i].sharedMaterial = brassDim;
+                plates[i] = t.GetComponent<Renderer>(); plates[i].sharedMaterial = brassDim; UltArt.DressPlate(t);
             }
             pivot = new GameObject("hand").transform; pivot.SetParent(root, false);
             Mat(Prim.Make(PrimitiveKind.Cube, pivot, new Vector3(0, 0.06f, 3.6f), new Vector3(0.45f, 0.03f, 4.6f), Color.white), brassHot);
             Mat(Prim.Make(PrimitiveKind.Cube, pivot, new Vector3(0, 4.2f, 3.0f), new Vector3(0.4f, 0.2f, 6.0f), Color.white), brassM);
             Mat(Prim.Make(PrimitiveKind.Cone, pivot, new Vector3(0, 4.2f, 6.4f), new Vector3(1.1f, 0.9f, 1.1f), Color.white, 0, Quaternion.Euler(90, 0, 0)), brassM);
             Mat(Prim.Make(PrimitiveKind.Cube, pivot, new Vector3(0, 0.05f, 0), new Vector3(23f, 0.03f, 0.12f), Color.white), brassM);   // the half line
+            UltArt.DressHand(pivot);
             mySpot = new GameObject("my spot").transform; mySpot.SetParent(root, false);
             Mat(Prim.Make(PrimitiveKind.Cylinder, mySpot, new Vector3(0, 0.07f, 0), new Vector3(1.1f, 0.02f, 1.1f), Color.white), spotM);
             Mat(Prim.Make(PrimitiveKind.Cylinder, mySpot, new Vector3(0, 1.6f, 0), new Vector3(0.12f, 1.6f, 0.12f), Color.white), spotM);
@@ -408,7 +414,8 @@ namespace LastBell.Run
             int lit = ((Beat % 4) + 4) % 4;
             for (int i = 0; i < 4; i++) if (plates[i]) plates[i].sharedMaterial = i == lit ? brassHot : brassDim;
             float want = Quaternion.LookRotation(HandDir(Beat)).eulerAngles.y;
-            shownYaw = Mathf.MoveTowardsAngle(shownYaw, want, 720 * Sim.Dt); pivot.rotation = Quaternion.Euler(0, shownYaw, 0);
+            UltArt.TickHand(pivot, ref shownYaw, ref handVel, want, Sim.Dt);   // a clockwork snap, a little overshoot
+            for (int i = 0; i < 4; i++) if (i == lit) UltArt.BreatheRim(plates[i], brassHot, Now / (float)Sim.Hz); else UltArt.StillRim(plates[i]);
             int n = 0;
             foreach (var (a, b) in Chains())
             {
@@ -424,7 +431,22 @@ namespace LastBell.Run
             foreach (var p in inverted)
             {
                 if (p.Down) continue;
-                if (auras.Count <= k) { var t = Prim.Make(PrimitiveKind.Cylinder, root, Vector3.zero, new Vector3(1.9f, 0.02f, 1.9f), Color.white); Mat(t, purple); auras.Add(t); }
+                if (auras.Count <= k)
+                {
+                    // a thin unfilled cobalt ring (r 0.95) of 20 segments and four ivory ticks pointing in, like an upside-down bell rim
+                    var t = new GameObject("INVERTED mark").transform; t.SetParent(root, false);
+                    for (int s2 = 0; s2 < 20; s2++)
+                    {
+                        float a = 18f * s2 * Mathf.Deg2Rad; var o = new Vector3(Mathf.Sin(a), 0, Mathf.Cos(a)) * 0.95f;
+                        Mat(Prim.Make(PrimitiveKind.Cube, t, o, new Vector3(0.07f, 0.02f, 0.3f), Color.white, 0, Quaternion.Euler(0, 18f * s2 + 90, 0)), cobaltM);
+                    }
+                    for (int s2 = 0; s2 < 4; s2++)
+                    {
+                        float a = 90f * s2 * Mathf.Deg2Rad; var o = new Vector3(Mathf.Sin(a), 0, Mathf.Cos(a)) * 0.72f;
+                        Mat(Prim.Make(PrimitiveKind.Cube, t, o, new Vector3(0.08f, 0.025f, 0.36f), Color.white, 0, Quaternion.Euler(0, 90f * s2, 0)), ivoryM);
+                    }
+                    auras.Add(t);
+                }
                 var au = auras[k++]; au.gameObject.SetActive(true); au.position = Sim.Flat(p.transform.position) + Vector3.up * 0.09f;
             }
             for (int i = k; i < auras.Count; i++) auras[i].gameObject.SetActive(false);
@@ -444,10 +466,11 @@ namespace LastBell.Run
         {
             int sh = SoakHour(count), ih = InvHour(count), h = HourOf(p);
             if (h == sh) { c = EscapementRelay.DutyColors[0]; return "SOAK"; }
+            if (sh < 0) { c = EscapementRelay.DutyColors[2]; return "PLATE RESTS → stay on its half"; }   // solo: every second beat
             if (h == ih)
             {
                 // say whether it has arrived (Chzy18 playtest 25 Oct: "it says I'm inverted but I'm still dying")
-                if (inverted.Contains(p)) { c = new Color(0.78f, 0.6f, 1f); return "INVERTED ✓ → stand in the SLAM"; }
+                if (inverted.Contains(p)) { c = new Color(0.97f, 0.94f, 0.86f); return "INVERTED ✓ → stand in the SLAM"; }   // ivory (the mark under you is cobalt)
                 string from = ""; foreach (var q in inverted) if (!q.Down) { from = UltimateState.Roman[HourOf(q) + 1]; break; }
                 c = new Color(1f, 0.45f, 0.4f); return "GET INVERTED: touch " + (from == "" ? "its holder" : from) + " (meet at the beam)";
             }

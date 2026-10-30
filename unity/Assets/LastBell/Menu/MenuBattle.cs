@@ -183,16 +183,16 @@ namespace LastBell.Menu
                     if (Crossed(t, at))
                     {
                         var a = actors[i]; string role = a.Root.name;
-                        string clip = role.StartsWith("Vanguard") ? "SunderingBlow" : role.StartsWith("Arcanist") ? "ArcLance" : "Bellstrike";
+                        string clip = role.StartsWith("Vanguard") ? "SunderingBlow" : role.StartsWith("Arcanist") ? "DisintegrateStart" : "Bellstrike";
                         a.PlantedUntil = Elapsed + .65f;
                         a.Root.LookAt(new Vector3(actors[0].Root.position.x, 0, actors[0].Root.position.z));
-                        a.Presenter.PlayOnce(clip, .65f); Bolt(i, role.StartsWith("Arcanist") ? Teal : Gold); SpellsPresented++;
+                        a.Presenter.PlayOnce(clip, .65f); Bolt(i, role.StartsWith("Arcanist") ? Violet : Gold); SpellsPresented++;
                     }
             }
             // Attack releases are separated from animation cues so bolts/impacts match contact poses.
             Cue(t, 0.5f, 1, "SteelRhythm1", 0.5f); Cue(t, 1.1f, 1, "SteelRhythm2", 0.5f);
             Cue(t, 1.8f, 1, "SteelRhythm3", 0.7f); Cue(t, 3, 1, "SunderingBlow", 0.85f);
-            Cue(t, 1.4f, 2, "TimeSeal", 0.6f); Cue(t, 4, 2, "ArcLance", 0.8f);
+            Cue(t, 1.0f, 2, "RuneSigil", 0.3f); Cue(t, 4, 2, "DisintegrateStart", 0.35f); Cue(t, 4.35f, 2, "DisintegrateHold", 1.25f); Cue(t, 9.75f, 2, "ArcaneComet", 0.4f);
             Cue(t, 2.5f, 3, "Bellstrike", 0.7f); Cue(t, 5.2f, 3, "HarmonicRefrain", 0.8f);
             Cue(t, 7.1f, 0, "BellSweep", 2.6f);
             Cue(t, 7.8f, 1, "Dodge", 0.5f); Cue(t, 8, 2, "Dodge", 0.5f);
@@ -205,16 +205,15 @@ namespace LastBell.Menu
             Cue(t, 24.4f, 0, "Vulnerable", 3);
             Cue(t, 24.8f, 1, "SteelRhythm1", 0.5f); Cue(t, 25.4f, 1, "SteelRhythm2", 0.5f);
             Cue(t, 26.1f, 1, "SteelRhythm3", 0.7f); Cue(t, 27.2f, 1, "SunderingBlow", 0.85f);
-            Cue(t, 26.5f, 2, "TimeSeal", 0.6f); Cue(t, 28, 2, "ArcLance", 0.8f);
+            Cue(t, 26.1f, 2, "RuneSigil", 0.3f); Cue(t, 28, 2, "DisintegrateStart", 0.35f); Cue(t, 28.35f, 2, "DisintegrateHold", 1.25f);
             Cue(t, 29.5f, 2, "Convergence", 0.8f); Cue(t, 30.2f, 3, "Crescendo", 1.1f);
             // Interleaved ranged basics, rather than every actor attacking on the same beat.
             foreach (float at in BasicTimes)
             {
-                Cue(t, at, 2, "Clockbolt", 0.45f); Cue(t, at + 0.7f, 3, "ResonantNote", 0.5f);
-                if (Crossed(t, at + 0.18f)) Bolt(2, Teal);
+                Cue(t, at, 2, "MissileTap", 0.3f); Cue(t, at + 0.7f, 3, "ResonantNote", 0.5f);
+                if (Crossed(t, at + 0.18f)) Bolt(2, Violet);
                 if (Crossed(t, at + 0.92f)) Bolt(3, Gold);
             }
-            if (Crossed(t, 4.35f) || Crossed(t, 28.35f)) Bolt(2, Teal, 0.16f);
             SpellCues(t);
             AnimateEffects();
             int moteIndex = 0;
@@ -267,15 +266,22 @@ namespace LastBell.Menu
             if (Crossed(t, 15.2f)) fx.Shield(vanguard, 0, true);
             if (Crossed(t, 16.5f)) fx.Shield(vanguard, 0, false);
             if (Crossed(t, 7.8f)) fx.DashTrail(vanguard);
-            if (Crossed(t, 8)) fx.ClockstepTrail(arcanist);
-            if (Crossed(t, 1.75f) || Crossed(t, 26.85f)) { fx.SealCast(arcanist.transform.position + Vector3.up, hit, true); SpellsPresented++; }
-            if (Crossed(t, 4) || Crossed(t, 28)) fx.LanceCharge(arcanist, 20, true);
-            if (Crossed(t, 4.35f) || Crossed(t, 28.35f))
+            // Arcanist (arcane kit): Blink, Rune Sigil, Disintegrate and Arcane Comet, presentation only
+            if (Crossed(t, 7.8f)) fx.BlinkOut(arcanist);
+            if (Crossed(t, 8.0f)) fx.BlinkIn(arcanist);
+            if (Crossed(t, 1.15f) || Crossed(t, 26.25f)) fx.SigilPlace(arcanist, 9001, target.position, 36);
+            if (Crossed(t, 1.75f) || Crossed(t, 26.85f)) { fx.SigilExplode(9001, target.position, true); SpellsPresented++; }
+            if (Crossed(t, 4) || Crossed(t, 28)) fx.BeamWindup(arcanist, 21);
+            if (Crossed(t, 4.35f) || Crossed(t, 28.35f)) { fx.BeamStart(arcanist); SpellsPresented++; }
+            if ((t >= 4.35f && t < 5.6f) || (t >= 28.35f && t < 29.6f))
             {
-                Vector3 from = arcanist.transform.position + Vector3.up;
-                fx.Lance(from, (hit - from).normalized, Vector3.Distance(from, hit) + 1, true, true); SpellsPresented++;
+                Vector3 from = arcanist.transform.position + Vector3.up * 1.35f;
+                float e = t < 20 ? t - 4.35f : t - 28.35f;
+                fx.Beam(arcanist, from, Sim.Flat(hit - from).normalized, hit, e < 0.42f ? 1 : e < 0.84f ? 2 : 3, true);
             }
-            if (Crossed(t, 29.9f)) { fx.SealBurst(target.position, true); SpellsPresented++; }
+            if (Crossed(t, 5.6f) || Crossed(t, 29.6f)) fx.BeamEnd(arcanist, false);
+            if (Crossed(t, 9.9f)) fx.CometMark(arcanist, 9002, target.position, 120);
+            if (Crossed(t, 11.9f)) { fx.CometImpact(9002, target.position, true, true); SpellsPresented++; }
             if (Crossed(t, 2.85f)) { fx.Bellstrike(chime.transform.position + Vector3.up, hit, true, false); SpellsPresented++; }
             if (Crossed(t, 5.6f)) { fx.Refrain(chime, 9, 32, true); SpellsPresented++; }
             if (Crossed(t, 12.9f) || Crossed(t, 30.8f)) { fx.Crescendo(target.position, true, 2, true); SpellsPresented++; }

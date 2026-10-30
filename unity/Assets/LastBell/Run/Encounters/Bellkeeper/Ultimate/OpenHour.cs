@@ -35,7 +35,7 @@ namespace LastBell.Run
         static readonly int[][] CurtOrder = { new[] { 2, 0, 3, 1 }, new[] { 1, 3, 0, 2 }, new[] { 3, 1, 2, 0 } };
 
         sealed class Bullet { public Vector3 P, V; public bool Rev, Echo, Gone; public float Born; }
-        sealed class Mine { public Vector3 P; public float At; public PlayerController Owner; public int OwnerHour; public bool Done; public Transform Fx; }
+        sealed class Mine { public Vector3 P; public float At; public PlayerController Owner; public int OwnerHour; public bool Done, Burst; public LastBell.VFX.BellkeeperFx.Telegraph Tele; }
         readonly List<Bullet> bullets = new List<Bullet>();
         readonly List<Mine> mines = new List<Mine>();
         readonly Dictionary<PlayerController, bool[]> crossed = new Dictionary<PlayerController, bool[]>();
@@ -60,7 +60,7 @@ namespace LastBell.Run
             return a + (Mathf.FloorToInt(s / ArmFlip) % 2 == 1 ? -1 : 1) * ArmTurn * (t - s);
         }
         bool RewindAt(float t) { float tl = TL(t); foreach (var r in Rewinds) if (tl >= r && tl < r + RewindPause) return true; return false; }
-        float? RewindSoon(float t) { float tl = TL(t); foreach (var r in Rewinds) if (tl < r && tl >= r - Warn) return r - tl; return null; }
+        float? RewindSoon(float t) { float tl = TL(t); foreach (var r in Rewinds) if (tl < r && tl >= r - (Warn + WarnLead)) return r - tl; return null; }
         // the rewind (absolute seconds) inside (t, t+dt], or -1
         float RewindIn(float t, float dt) { float b = t - TL(t); foreach (var r in Rewinds) { float a = b + r; if (a > t && a <= t + dt) return a; a += Loop; if (a > t && a <= t + dt) return a; } return -1; }
         float CurtStart(int ci, float t) => t - TL(t) + Curtains[ci].at;   // this loop's start of curtain ci
@@ -159,7 +159,7 @@ namespace LastBell.Run
                 for (int k = 0; k < EchoShots; k++) { var d = Dir(360f / EchoShots * k + 45 * (m.OwnerHour % 2)); bullets.Add(new Bullet { P = m.P, V = d * EchoShotSpeed, Echo = true, Born = nt }); }
                 W.BossFx.ChimeResolve(m.P, EchoR);
             }
-            for (int i = mines.Count - 1; i >= 0; i--) if (mines[i].Done && nt - mines[i].At > 0.3f) { if (mines[i].Fx) Object.Destroy(mines[i].Fx.gameObject); mines.RemoveAt(i); }
+            for (int i = mines.Count - 1; i >= 0; i--) if (mines[i].Done && nt - mines[i].At > 0.3f) { if (mines[i].Tele != null && !mines[i].Burst) mines[i].Tele.Dismiss(); mines.RemoveAt(i); }
             // curtains
             for (int ci = 0; ci < 3; ci++)
             {
@@ -236,7 +236,7 @@ namespace LastBell.Run
                 }
             if (soaker && !crossFirst)
             {
-                var pl = PlateOf(k); float need = (pl - pos).magnitude / PlayerController.WalkSpeed + 1.6f;
+                var pl = PlateOf(k); float need = (pl - pos).magnitude / PlayerController.WalkSpeed + 1.6f;   // not more: arriving early means standing still on the plate, and your own echo bursts under you
                 if (tb <= need) { urgent = true; beatAt = k * Beat; job = $"SOAK in {tb:0.0}s"; return pl; }
             }
             for (int ci = 0; ci < 3; ci++)
@@ -254,14 +254,32 @@ namespace LastBell.Run
             float[] rings = { 4.3f, 4.3f, 9.6f, 10.6f };   // I and II share a ring 120° apart (each passes the other's spot 4 s later: its echo is gone)
             int i = W.Players.IndexOf(p);
             float a = ArmAngle(t) + 60 + 120 * (h % 3) + (i >= 4 ? 30 : 0);
+            // a solo melee player weaves against the boss, where its swings reach (its lunge into the solid boss can't carry it into a
+            // bullet); a party keeps the rings, where the others' echoes stay clear
+            if (Party == 1 && p.ClassName == "Vanguard") return Dir(a) * (Boss.BodyRadius + PR + 0.35f);
             return Dir(a) * Mathf.Min(rings[h % 4] + (i >= 4 ? 0.8f : 0), Bound - 0.6f);
         }
         float Bound => Mathf.Min(11.6f, CombatWorld.PlayerBound - 0.1f);
 
-        readonly List<Vector3>[] pred = new List<Vector3>[12];
+        // bots: the boss is the target, but a swing roots its caster, and an echo bursts where you stood 2 s ago: no attack while one
+        // of my own echoes is due here within 1.2 s (a solo Vanguard swinging against the boss stood still into its own echo)
+        public override bool AttackTarget(PlayerController p, out Vector3 aim, out float reach, out bool fullKit)
+        {
+            aim = Boss.transform.position; fullKit = false; reach = 99;
+            if (!Running || p.Down) return false;
+            var q = Sim.Flat(p.transform.position); float t = T;
+            reach = (q - Sim.Flat(Boss.transform.position)).magnitude - Boss.BodyRadius;
+            if (p.ClassName == "Vanguard" && reach > 0.6f) reach = 99;   // melee swings only pressed against the boss: a lunge elsewhere carries it into bullets
+            foreach (var m in mines) if (m.Owner == p && !m.Done && m.At > t && m.At <= t + 1.2f && (q - m.P).magnitude < EchoR + PR + 0.6f) { reach = 99; break; }
+            GoalOf(p, t, out bool urgent, out _, out _); if (urgent) reach = 99;   // the plate or a curtain is due: no rooting swing
+            return true;
+        }
+
+        readonly List<Vector3>[] pred = new List<Vector3>[16];
         Vector3 Search(PlayerController p, Vector3 pos, float t, Vector3 goal, bool urgent, float beatAt)
         {
-            const float Leg = 0.2f; const int Legs = 3, Samples = 4, BeamW = 10; float dtS = Leg / Samples; int N = Legs * Samples;
+            // 4 legs (0.8 s): with 3 a bot could walk into a pocket between its own echo and a curtain before it saw the exit shut
+            const float Leg = 0.2f; const int Legs = 4, Samples = 4, BeamW = 12; float dtS = Leg / Samples; int N = Legs * Samples;
             var bossP = Sim.Flat(Boss.transform.position); int hour = HourOf(p);
             for (int k = 0; k < N; k++)
             {
@@ -285,6 +303,8 @@ namespace LastBell.Run
                 for (int ci = 0; ci < 3; ci++) { if (Crossed(p)[ci]) continue; int ch = CurtainHit(ci, q, t + s, hour, 0.2f); if (ch == 2) return 2; if (ch == 1) return 1; }
                 if (beatAt >= 0 && Mathf.Abs(t + s - beatAt) <= dtS * 0.6f && (q - goal).magnitude > OnPlate - 0.3f) return 2;
                 if (mc < 0.12f) return 1;
+                // leave my own echo spots early: a burst due within the next second costs, so the route is clear before the pocket closes
+                foreach (var m in mines) if (m.Owner == p && m.At > t + s && m.At <= t + s + 1f && (q - m.P).magnitude < EchoR + PR + 0.6f) extra += 1f;
                 int kb = Mathf.FloorToInt((t + s) / Beat) + 1; float tbb = kb * Beat - (t + s);
                 if (SoakHour(kb) != hour % Hours && tbb < 3 && (q - PlateOf(kb)).magnitude < OnPlate + EchoR + 0.3f) extra += 0.5f;   // keep my echoes off the next soaker's plate
                 return 0;
@@ -294,6 +314,8 @@ namespace LastBell.Run
             for (int ci = 0; ci < 3; ci++) if (!Crossed(p)[ci] && (CurtOn(ci, t) || CurtSoon(ci, t))) { var d = Dir(Curtains[ci].a); dirs.Add(d); dirs.Add(-d); }
             var vels = new List<Vector3> { Vector3.zero };
             foreach (var d in dirs) { vels.Add(d * PlayerController.WalkSpeed); vels.Add(d * PlayerController.SprintSpeed); vels.Add(d * PlayerController.WalkSpeed * 0.4f); }
+            // the first leg moves at the player's speed now (a shot or cast in progress slows it, e.g. the Arcanist's missiles x0.6)
+            float slow0 = p.Kit != null ? Mathf.Clamp01(p.Kit.MoveScale) : 1f;
             var beam = new List<(Vector3 q, Vector3 first, float risk, float score)> { (pos, Vector3.zero, 0f, 0f) };
             (Vector3 v, float score)? fallback = null;
             for (int leg = 0; leg < Legs; leg++)
@@ -305,7 +327,7 @@ namespace LastBell.Run
                         var q = r.q; float risk = r.risk; bool dead = false; int worst = 0;
                         for (int k2 = 0; k2 < Samples; k2++)
                         {
-                            q += v * dtS; float extra = 0;
+                            q += v * dtS * (leg == 0 ? slow0 : 1f); float extra = 0;
                             int sev = Severity(q, leg * Samples + k2, ref extra, out float mc);
                             if (sev > 0) { dead = true; worst = sev; break; }
                             risk += Mathf.Max(0, 0.5f - mc) * 2 + extra;
@@ -324,21 +346,23 @@ namespace LastBell.Run
         // ---------------- presentation (stand-ins: brass / lavender / ivory bullet spheres, echo discs, plates, labels) ----------------
         Transform root, hand; readonly Renderer[] plates = new Renderer[4];
         readonly List<Transform> pool = new List<Transform>();
-        static Material brassB, revB, echoB, ivoryB, plateDim, plateHot, echoRing, handM;
+        static Material brassB, revB, echoB, ivoryB, plateDim, plateHot, handM;
+        float handYaw, handVel;
         void Build()
         {
             if (root) return;
             if (!brassB)
             {
                 brassB = Prim.Material(new Color(1f, 0.78f, 0.35f), 2.2f); revB = Prim.Material(new Color(1f, 0.55f, 0.4f), 2.4f);
-                echoB = Prim.Material(new Color(0.85f, 0.72f, 1f), 2.2f); ivoryB = Prim.Material(new Color(0.97f, 0.95f, 0.88f), 2.2f);
+                echoB = Prim.Material(new Color(1f, 0.86f, 0.78f), 2.0f);   // echo shots: warm ivory, coral glow (no Arcanist violet, gpt/08 §4) ivoryB = Prim.Material(new Color(0.97f, 0.95f, 0.88f), 2.2f);
                 plateDim = Prim.Material(new Color(0.55f, 0.43f, 0.2f), 0.35f); plateHot = Prim.Material(new Color(1f, 0.8f, 0.4f), 2.2f);
-                echoRing = Prim.Material(new Color(0.7f, 0.45f, 1f), 1.6f); handM = Prim.Material(new Color(0.9f, 0.7f, 0.32f), 1.4f);
+                handM = Prim.Material(new Color(0.9f, 0.7f, 0.32f), 1.4f);
             }
             root = new GameObject("The Open Hour (stand-in)").transform; root.SetParent(W.Root, false);
-            for (int i = 0; i < 4; i++) { var t = Prim.Make(PrimitiveKind.Cylinder, root, Dir(90 * i) * PlateR + Vector3.up * 0.04f, new Vector3(3.2f, 0.02f, 3.2f), Color.white); plates[i] = t.GetComponent<Renderer>(); Mat(t, plateDim); }
+            for (int i = 0; i < 4; i++) { var t = Prim.Make(PrimitiveKind.Cylinder, root, Dir(90 * i) * PlateR + Vector3.up * 0.04f, new Vector3(3.2f, 0.02f, 3.2f), Color.white); plates[i] = t.GetComponent<Renderer>(); Mat(t, plateDim); UltArt.DressPlate(t); }
             hand = new GameObject("hand").transform; hand.SetParent(root, false);
             Mat(Prim.Make(PrimitiveKind.Cube, hand, new Vector3(0, 0.06f, 3.6f), new Vector3(0.45f, 0.03f, 4.6f), Color.white), plateHot);
+            UltArt.DressHand(hand);
         }
         static void Mat(Transform t, Material m) { var r = t.GetComponent<Renderer>(); r.sharedMaterial = m; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; }
         void Present(float t)
@@ -346,7 +370,8 @@ namespace LastBell.Run
             if (!root) return;
             int k = Mathf.FloorToInt(t / Beat) + 1, lit = ((k % 4) + 4) % 4;
             for (int i = 0; i < 4; i++) if (plates[i]) plates[i].sharedMaterial = i == lit ? plateHot : plateDim;
-            hand.rotation = Quaternion.LookRotation(Dir(90f * k));
+            UltArt.TickHand(hand, ref handYaw, ref handVel, Quaternion.LookRotation(Dir(90f * k)).eulerAngles.y, Sim.Dt);   // a clockwork snap
+            for (int i = 0; i < 4; i++) if (i == lit) UltArt.BreatheRim(plates[i], plateHot, t); else UltArt.StillRim(plates[i]);
             int n = 0;
             void Ball(Vector3 p, Material m, float size)
             {
@@ -354,7 +379,7 @@ namespace LastBell.Run
                 var b = pool[n++]; b.gameObject.SetActive(true); b.position = new Vector3(p.x, 0.9f, p.z); b.localScale = Vector3.one * size;
                 var rr = b.GetComponent<Renderer>(); if (rr.sharedMaterial != m) rr.sharedMaterial = m;
             }
-            foreach (var b in bullets) Ball(b.P, b.Echo ? echoB : b.Rev ? revB : brassB, BR * 2.2f);
+            foreach (var b in bullets) Ball(b.P, b.Echo ? echoB : b.Rev ? revB : brassB, BR * (b.Echo ? 1.7f : 2.2f));   // echo shots smaller than the Mainspring's
             for (int ci = 0; ci < 3; ci++)
             {
                 if (!CurtOn(ci, t)) continue; var d = Dir(Curtains[ci].a); var pp = Perp(d); float line = CurtLine(ci, t);
@@ -365,14 +390,22 @@ namespace LastBell.Run
                 }
             }
             for (int i = n; i < pool.Count; i++) pool[i].gameObject.SetActive(false);
+            // Echoes (accepted 28 Oct, VIOLET-PROPOSAL-2026-10-28.md): a fixed outline at the true kill distance (EchoR + PR = 1.55 m) from
+            // the moment it is left; your own: ivory rim, a coral fill growing outward over its last 0.8 s and a flash on the burst; the
+            // others' (they can't kill you, their shots can): dashed and half see-through. No Arcanist violet, no growing filled disc.
+            var me = W.Players.Count > 0 ? W.Players[0] : null;
             foreach (var m in mines)
             {
-                if (!m.Fx) { m.Fx = Prim.Make(PrimitiveKind.Cylinder, root, m.P + Vector3.up * 0.06f, new Vector3(0.1f, 0.02f, 0.1f), Color.white); Mat(m.Fx, echoRing); }
-                float f = Mathf.Clamp01(1 - (m.At - t) / EchoDelay); float sz = EchoR * 2 * (m.Done ? 1.1f : Mathf.Max(0.15f, f));
-                m.Fx.localScale = new Vector3(sz, 0.02f, sz);
+                if (m.Tele == null)
+                {
+                    m.Tele = W.BossFx.Circle(EchoR + PR); m.Tele.Place(m.P, 0); m.Tele.SpentFast = true;
+                    if (m.Owner == me) m.Tele.Tint(new Color(1f, 0.42f, 0.32f), new Color(0.97f, 0.94f, 0.86f)); else m.Tele.Memory();
+                }
+                if (m.Done) { if (!m.Burst) { m.Burst = true; if (m.Owner == me) m.Tele.Resolve(); else m.Tele.Dismiss(); } continue; }
+                m.Tele.Progress(m.Owner == me ? Mathf.Clamp01(1 - (m.At - t) / (0.8f + WarnLead)) : 0);
             }
         }
-        void ClearMines() { foreach (var m in mines) if (m.Fx) Object.Destroy(m.Fx.gameObject); mines.Clear(); }
+        void ClearMines() { foreach (var m in mines) if (m.Tele != null && !m.Burst) m.Tele.Dismiss(); mines.Clear(); }
         void Teardown()
         {
             if (root) Object.Destroy(root.gameObject);
@@ -397,6 +430,8 @@ namespace LastBell.Run
                 for (int g = 0; g < 4; g++) { var q = pp * GapOff[g] + d * line; if (q.magnitude < 12.3f) Label(cam, q, 0.9f, UltimateState.Roman[orders[ci][g] + 1], new Color(1f, 0.82f, 0.48f), numStyle); }
                 if (soon) Label(cam, d * -10.8f, 0.3f, "CURTAIN in " + (CurtStart(ci, t) - t).ToString("0.0") + "s", Color.white, nameStyle);
             }
+            // your own echoes carry your hour numeral: they only kill you
+            if (W.Players.Count > 0) foreach (var m in mines) if (!m.Done && m.Owner == W.Players[0]) Label(cam, m.P, 0.15f, UltimateState.Roman[m.OwnerHour + 1], new Color(0.97f, 0.94f, 0.86f), numStyle);
             for (int i = 0; i < W.Players.Count; i++)
             {
                 var p = W.Players[i]; if (p.Down) continue;

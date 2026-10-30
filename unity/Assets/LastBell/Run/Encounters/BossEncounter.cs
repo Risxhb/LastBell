@@ -49,6 +49,7 @@ namespace LastBell.Run
             go.transform.SetParent(w.Root, false);
             go.transform.SetPositionAndRotation(pos, Quaternion.Euler(0, yaw, 0));
             var b = go.AddComponent<T>(); b.W = w; b.Hp = b.MaxHp; b.Build();
+            SimSmoother.Attach(go);   // drawn between ticks like the player
             return b;
         }
 
@@ -79,7 +80,7 @@ namespace LastBell.Run
             wait = Mathf.Max(1, script.Current) - 1;
         }
 
-        public int TakeHit(int damage, Vector3 contact)
+        public int TakeHit(int damage, Vector3 contact, bool hitFx = true)
         {
             if (Dead) return 0;
             damage = Mathf.RoundToInt(damage * DamageTakenScale(contact)); if (damage <= 0) return 0;
@@ -87,7 +88,8 @@ namespace LastBell.Run
             int dealt = Mathf.Min(damage, Hp - floor);
             Hp -= dealt;
             RunHud.Float(contact + Vector3.up * 0.5f, dealt.ToString(), new Color(1f, 0.86f, 0.45f));
-            W.BossFx.BossHit(contact); glowLevel = Mathf.Max(glowLevel, 2f);
+            if (hitFx) W.BossFx.BossHit(contact);   // abilities with their own impact effect skip the shared flash
+            glowLevel = Mathf.Max(glowLevel, 2f);
             OnHurt();
             if (Hp <= 0) Die();
             return dealt;
@@ -101,6 +103,8 @@ namespace LastBell.Run
         // multiplies every hit this boss takes, by where it lands (the Bellkeeper Ultimate's P5: the bell resonates, only the
         // Bellkeeper that rang last takes damage, x4 in the last stand)
         protected virtual float DamageTakenScale(Vector3 contact) => 1f;
+        // the run level's multiplier on this boss's damage to players; a boss may author its own table (the Bellkeeper Ultimate)
+        public virtual float PlayerDamageScale(Difficulty d) => RunDifficulty.DamageTakenScale(d);
         bool ignoreFloor;
         public virtual float NextPhaseFraction() => Hp > MaxHp * 0.7f ? 0.69f : 0.34f;   // F8: just below the next threshold
         public void DebugSetHpFraction(float f){ if (!Dead) Hp = Mathf.Clamp(Mathf.RoundToInt(MaxHp * f), 1, MaxHp); }

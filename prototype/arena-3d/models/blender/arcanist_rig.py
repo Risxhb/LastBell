@@ -132,7 +132,9 @@ for k in range(3):
 blend_rows(cloth.astype(np.float32), r)
 # head and hair; the tall ivory collar around them stays with the neck and chest
 rn = np.hypot(x, y + 0.05)
-collar = (z > 1.42) & (z < 1.65) & (rn > 0.075) & (val > 0.5) & (sat < 0.35)
+# (pale face skin is warm and more saturated than the ivory: it must stay on the head, or the face tears when the head turns)
+# (the eye whites are pale too: the face front above the chin is never collar)
+collar = (z > 1.42) & (z < 1.62) & (rn > 0.075) & (val > 0.5) & (sat < 0.2) & ~skin & ~((y < -0.09) & (z > 1.55))
 r = zeros(); r[:, gi['head']] = 1
 blend_rows((sm((z - 1.47) / 0.05) * ~collar).astype(np.float32), r)
 r = zeros(); r[:, gi['neck']] = 0.6; r[:, gi['chest']] = 0.4
@@ -446,7 +448,8 @@ def base_pose(t, K):
     tw, lean, drop, hy = g('tw', 0.0), g('lean', 0.0), g('drop', 0.0), g('hy', 0.0)
     hz = STANCE_HZ - drop + g('hz', 0.0); hp = lean * 0.3
     s = {
-        'hips': {'loc': (0, hy, hz), 'rot': Rzyx(x=hp, y=g('roll', 0.0), z=tw * 0.4)},
+        # 'htw' 0 keeps the twist out of the pelvis (the leg IK is front-to-back only, so a turning pelvis drags the feet)
+        'hips': {'loc': (0, hy, hz), 'rot': Rzyx(x=hp, y=g('roll', 0.0), z=tw * 0.4 * g('htw', 1.0))},
         'spine': {'rot': Rzyx(x=2 + lean * 0.7, z=tw * 0.3)}, 'chest': {'rot': Rzyx(x=g('chest', 0.0), z=tw * 0.4)},
         'head': {'rot': Rzyx(x=-lean * 0.6 + g('nod', 0.0), z=-tw * 0.6)},
         '_flow': g('flow', 0.0), '_flare': g('flare', 0.0),
@@ -466,11 +469,13 @@ def kit_pose(K): return lambda f, t: base_pose(t, K)
 
 def idle(f, t):
     p = 2 * math.pi * t; b = math.sin(p)
-    K = {'chest': [(0, 1.5 * b)] * 2, 'tw': [(0, -3 + 3 * math.sin(p + 0.5))] * 2, 'roll': [(0, 1.2 * b)] * 2,
+    # the sway lives in the spine and chest only: both feet stay planted
+    K = {'chest': [(0, 1.5 * b)] * 2, 'tw': [(0, -3 + 3 * math.sin(p + 0.5))] * 2, 'htw': [(0, 0.0)] * 2,
          'lu': [(0, (0.35, 0.05 + 0.03 * math.sin(p + 0.6), -0.94))] * 2, 'ru': [(0, (-0.35, 0.05 + 0.03 * math.sin(p + 0.9), -0.94))] * 2,
          'drop': [(0, 0.01 * (1 - math.cos(p)))] * 2, 'nod': [(0, -1.5 * b)] * 2,
          'orb': [(0, (0, 0, 0.03 * math.sin(p)))] * 2, 'spin': [(0, 360 * t)] * 2, 'otilt': [(0, 4 * math.sin(p + 1))] * 2}
-    return base_pose(0, K)
+    s = base_pose(0, K); s['_ground'] = 0.0      # soles pinned to the floor through the breathing bob
+    return s
 
 # ---------------- the Arcanist kit (handoff/arcanist-animation-20261021). PF-05 asks for fast chaining: short anticipation,
 # the hit lands early, recovery is cancellable (CLIP_EVENTS). Distinct top-down silhouettes:

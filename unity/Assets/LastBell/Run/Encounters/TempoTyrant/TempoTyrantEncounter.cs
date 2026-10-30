@@ -1,12 +1,15 @@
 using System.Collections.Generic;
+using System.Linq;
 using LastBell.VFX;
 using UnityEngine;
 
 namespace LastBell.Run
 {
-    // The Tempo Tyrant: a practice-only miniboss for the Metronome Court (docs/metronome-arena/tempo-tyrant.md).
-    // Greatsword knight, labelled stand-in body until the final model/rig exists. All numbers are tunable first-pass
-    // proposals, not approved balance. Geometry is in metres before the 0.3 m player margin; damage against 100 HP.
+    // The Tempo Tyrant: the post-game superboss (docs/bosses/tempo-tyrant.md, ultimate plan
+    // docs/bosses/tempo-tyrant-ultimate-plan.md). Greatsword knight, labelled stand-in body until the final model/rig
+    // exists. All numbers are tunable first-pass proposals, not approved balance. Geometry is in metres before the
+    // 0.3 m player margin; damage against 100 HP. Overlaps beyond two patterns are allowed by the Tempo Tyrant
+    // exception in docs/design/content-rules.md (Risxhb, 2026-10-28) as long as a route exists (TempoTyrantRoutes).
     //
     // Tempo: one TempoClock (starts in Haste). Attack timings are authored in beats and converted with the tempo that
     // is current when the block starts; a block never changes tempo mid-way. A duration expiry only requests a change;
@@ -15,12 +18,17 @@ namespace LastBell.Run
     //
     //   Threefold Severance  1 left cleave (x < +2.5 m in the boss frame), 2 right cleave (x > -2.5), 3 overhead: his whole
     //                        front half (everything ahead of his centre line). Opening 9 beats (6 and 8 failed far-start route checks), 4 beats between impacts,
-    //                        recovery 5/6 beats (Haste/Normal). Position and facing locked before the first preview; he never swivels.
-    //   Sundering Wake       3 m lane to a distant player (+2.6 m thrust reach), 5/6-beat warning, travel 0.45 s (hit when the blade arrives),
-    //                        then a separate 2.2 m eruption lane on the same path, 4/5-beat warning, resolves once.
-    //   Hollow Crown         ring outside a 4 m pocket (7/8 beats), then a 5.5 m circle under him (4 beats more).
-    //   Closing Rush         announced, non-damaging: after 1.5 s with the pursuit target beyond 9 m.
-    //   Mirrored Wake        Haste only: a second eruption lane, the fissure reflected across the arena's north-south line
+    //                        recovery 3/5 beats (Haste/Normal). Position and facing locked before the first preview; he never swivels.
+    //   Sundering Wake       a charge down a 3 m lane at the farthest player (+2.6 m thrust reach), 4/5-beat warning, travel
+    //                        0.45 s (hit when the blade arrives). On arrival the Backswing: a 6 m half-disc behind his landing
+    //                        point (facing back up the lane), live 1/2 beats, previewed dashed from the start of the warning.
+    //                        Each charge leaves its own 2.2 m eruption lane (3/4-beat warning, resolves once). Haste: he
+    //                        re-targets the farthest player and charges again straight after the backswing (2 charges,
+    //                        the second with a 3-beat warning); Normal: 1 charge. (Oct 28 rework, Risxhb.)
+    //   Hollow Crown         ring outside a 4 m pocket (6/7 beats), then a 5.5 m circle under him (3/4 beats more).
+    //   Closing Rush         announced, non-damaging: after 0.5 s with the pursuit target beyond 7.5 m; 1-beat tell,
+    //                        24 m/s, 3 s cooldown. Also between Haste charges and during the Spiral Slices walk-in.
+    //   Mirrored Wake        Haste only: every eruption lane gets a twin reflected across the arena's north-south line
     //                        (left/right on the fixed camera). Dashed preview from the start of the charge warning; it
     //                        erupts on the same tick as the real fissure. Skipped when the two lanes would nearly coincide.
     //   Spiral Slices        the floor's 12 wedge slabs (between the brass hour spokes) are the attack. He conducts from the
@@ -28,10 +36,13 @@ namespace LastBell.Run
     //                        clears) and the other 11 pulse. The safe slice then spirals one slice clockwise (right) or
     //                        anticlockwise (left) per step while every other slice pulses, so players chase it round.
     //                        Then every other slice from the centre: one set of 6, then the other 6.
-    //                        (Replaced Stop-Time on October 24, 2026, at Risxhb's request.)
-    //   Broken Cadence       below 20% HP (once, queued to a block boundary): every Haste passage opens with
-    //                        Sundering Wake -> Threefold Severance, fissure always erupting >= 8 beats before strike 1.
-    public sealed class TempoTyrantEncounter : BossEncounter
+    //   Broken Cadence       below 20% HP (once, queued to a block boundary), in both tempos: every block is a chain of
+    //                        overlapping attacks. Each next attack starts while the previous one's last hit is still on the
+    //                        floor (Cadence.Pairs), never two slice attacks at once, warnings about 35% shorter but never
+    //                        below the route-check floor of the pairing (Cadence windows).
+    //   Falling Hours        below 10% HP: orbs rain onto the floor, denser the longer it lasts; each spews 3 orbs that
+    //                        bounce off the wall 3 times (TempoTyrantEncounter.Orbs.cs). A deliberate soft enrage.
+    public sealed partial class TempoTyrantEncounter : BossEncounter
     {
         public override string Id => "boss.tempo-tyrant";
         public override string DisplayName => "The Tempo Tyrant";
@@ -48,20 +59,22 @@ namespace LastBell.Run
         // placement to activation. Normal stays walkable; Haste needs sprint and pre-positioning (route checks prove both
         // remain survivable, without dashes or immunity).
         public static readonly (float H, float N) SevOpen = (9, 9), SevGap = (4, 4), SevRecover = (3, 5),
-            WakeWarn = (4, 5), FissureWarn = (3, 4), WakeRecover = (2, 3),
-            CrownRing = (6, 7), CrownInnerWarn = (3, 4), CrownRecover = (4, 6), RushTell = (2, 2);
+            WakeWarn = (4, 5), WakeWarn2 = (3, 4), Backswing = (1, 2), FissureWarn = (3, 4), WakeRecover = (2, 3),
+            CrownRing = (6, 7), CrownInnerWarn = (3, 4), CrownRecover = (4, 6), RushTell = (1, 1);
         public static float Of((float H, float N) w, Tempo t) => t == Tempo.Haste ? w.H : w.N;
         public const float WakeWidth = 3f, FissureWidth = 2.2f,
             WakeOvershoot = 2f, WakeMaxTravel = 15f, WakeMinTravel = 4f, WakeReach = 2.6f;   // reach: greatsword thrust beyond the body
         public const int WakeTravelTicks = 27;
+        public const int HasteCharges = 2, NormalCharges = 1;   // charges per Sundering Wake
+        public const float BackswingRadius = 6f, BackswingHalf = 90f;   // half-disc behind the landing point
         public const float CrownPocket = 4f, CrownInner = 5.5f;
-        public const float FightDist = 4.5f, RushDist = 9f, RushHysteresis = 1.5f, RushSpeed = 16f;
-        public const int RushSustainTicks = 90, RushCooldownTicks = 8 * Sim.Hz, PursuitMaxTicks = 75;
+        public const float FightDist = 4.5f, RushDist = 7.5f, RushHysteresis = 1.5f, RushSpeed = 24f;
+        public const int RushSustainTicks = 30, RushCooldownTicks = 3 * Sim.Hz, PursuitMaxTicks = 75;
         public const float HasteWalk = 4.2f, NormalWalk = 3.4f;
         public const float FrenzyAt = 0.2f;
         public const int FrenzyTellTicks = 90;
-        public const int SevDmg1 = 26, SevDmg2 = 26, SevDmg3 = 30, WakeDmg = 24, FissureDmg = 16, RingDmg = 22, InnerDmg = 22;
-        public const int FissureLeadBeats = 8;                  // chain: eruption at least this many beats before strike 1
+        public const int SevDmg1 = 26, SevDmg2 = 26, SevDmg3 = 30, WakeDmg = 24, BackswingDmg = 26, FissureDmg = 16, RingDmg = 22, InnerDmg = 22;
+        public const int FissureLeadBeats = 8;                  // ordinary blocks: an eruption is never this close before strike 1
         // Mirrored Wake (Haste): skipped when the reflected lane points within this angle of the real one (they'd overlap)
         public const float MirrorMinAngle = 20f;
         // Spiral Slices: 12 slices of 30 degrees on the floor's hour spokes (spoke i at i*30 deg from +z, clockwise from
@@ -71,6 +84,31 @@ namespace LastBell.Run
         public static readonly (float H, float N) SliceIndicate = (4, 5), SliceFirst = (4, 5), SliceStep = (2, 2),
             AltWarn = (4, 5), AltGap = (3, 4), SliceRecover = (2, 3);
         public const int SpiralDmg = 12, AltDmg = 18;
+
+        public enum Atk { Severance, Wake, Crown, Slices }
+
+        // Broken Cadence (below 20% HP, both tempos). Every warning starts at about 0.65x its ordinary value and is raised
+        // back to the route-check floor (tools/tempo-tyrant/routes_check.py floors; TempoTyrantRoutes in the autotest).
+        // Join = the overlapping attack's first warning for that pairing (Wake: charge 1, Severance: opening, Crown: ring,
+        // Slices: indicate). A pairing with no route is not listed.
+        public static class Cadence
+        {
+            // floors (Oct 28 search): a lone Severance keeps its 9-beat opening and 4-beat gap (6 and 3 fail far starts);
+            // the spiral's opening (indicate + first) stays near its ordinary length because a co-op safe slice can be
+            // across the floor; spiral steps 1.5 beats (1 passes only hugging the boss, so 1.5 keeps the 5 m chase).
+            public static readonly (float H, float N) SevOpen = (9, 9), SevGap = (4, 4),
+                WakeWarn = (3, 3), WakeWarn2 = (2, 3), Backswing = (1, 1.5f), FissureWarn = (2, 3), FissureLead = (5, 5),
+                CrownRing = (5, 6), CrownInner = (3, 3),
+                SliceIndicate = (5, 5), SliceFirst = (3, 4), SliceStep = (1.5f, 1.5f), AltWarn = (3, 3), AltGap = (2, 3);
+            public static readonly (Atk from, Atk to, (float H, float N) join)[] Pairs =
+            {
+                (Atk.Crown, Atk.Wake, (3, 3)), (Atk.Wake, Atk.Severance, (6, 6)), (Atk.Crown, Atk.Slices, (4, 3)),
+                (Atk.Slices, Atk.Crown, (4, 5)), (Atk.Severance, Atk.Slices, (3, 3)), (Atk.Slices, Atk.Severance, (6, 6)),
+            };
+            public const int ChainLength = 3;   // attacks per Broken Cadence block
+            public static (float H, float N) Join(Atk from, Atk to) => Pairs.First(p => p.from == from && p.to == to).join;
+            public static bool Allowed(Atk from, Atk to) => Pairs.Any(p => p.from == from && p.to == to);
+        }
 
         // this boss's live-warning palette (HDR): saturated red-orange strikes, hot amber eruption, ivory stop markers
         public static readonly Color LiveFill = new Color(1.25f, 0.30f, 0.12f), LiveBorder = new Color(2.2f, 0.75f, 0.25f),
@@ -101,8 +139,7 @@ namespace LastBell.Run
         public bool Frenzy { get; private set; }
         public bool FrenzyPending { get; private set; }
         public int FrenzyTriggers { get; private set; }
-        public bool ChainDue { get; private set; }
-        public int ChainsRun { get; private set; }
+        public int ChainsRun { get; private set; }   // Broken Cadence blocks run
         public int Blocks { get; private set; }
         public int Rushes { get; private set; }
         public int RushCancels { get; private set; }
@@ -117,11 +154,24 @@ namespace LastBell.Run
         public readonly List<Hazard> SeveranceStrikes = new List<Hazard>();
         public float LockedYaw { get; private set; }
         public Vector3 LockedPos { get; private set; }
-        [System.NonSerialized] public Hazard LastWake, LastFissure, LastMirror, LastRing, LastInner;
+        [System.NonSerialized] public Hazard LastWake, LastCharge, LastBackswing, LastFissure, LastMirror, LastRing, LastInner;
         public int LastFissureResolveAge = -1, LastStrike1ResolveAge = -1;
         public int MirrorPreviews { get; private set; }
         public int MirrorEruptions { get; private set; }
         public int MirrorSkips { get; private set; }
+        public int BackswingPreviews { get; private set; }
+        public int BackswingResolves { get; private set; }
+        // every charge: tick its warning started, charge index in its Wake (0 = first), path, and the player it targeted
+        public readonly List<(int tick, int index, Vector3 start, Vector3 end, float yaw, PlayerController target)> ChargeLog =
+            new List<(int, int, Vector3, Vector3, float, PlayerController)>();
+        // every closing rush: tell start tick, far-ticks when it fired, tell and travel ticks, distance, where it fired
+        public sealed class RushRecord { public int TellTick, FarTicks, TellTicks, TravelTicks = -1, StopTick = -1; public float Distance; public string Where; }
+        public readonly List<RushRecord> RushLog = new List<RushRecord>();
+        // Broken Cadence: each overlap (tick, first, second, hazards of the first still pending when the second started)
+        public readonly List<(int tick, Atk from, Atk to, int pending)> CadenceLog = new List<(int, Atk, Atk, int)>();
+        public int MaxSliceAttacksAtOnce { get; private set; }   // distinct Spiral Slices attacks with hazards live together
+        public int SevLockViolations { get; private set; }       // ticks he stood off his locked spot while a strike was pending
+        public readonly List<int> FissureLeads = new List<int>();   // Wake -> Severance overlaps: eruption to strike 1 (ticks)
 
         // Spiral Slices state (HUD / tests)
         public bool SlicesActive { get; private set; }
@@ -133,10 +183,10 @@ namespace LastBell.Run
         // one entry per pulse: resolve tick, safe slice (-1 for every-other), every-other parity (-1 for the spiral)
         public readonly List<(int tick, int safe, int parity)> SliceLog = new List<(int, int, int)>();
         int sliceUses;
+        readonly List<(Hazard h, int attack)> sliceHazards = new List<(Hazard, int)>();
 
-        int farTicks, rushReadyAt, rotation;
+        int farTicks, rushReadyAt, rotation, cadencePick, sevLockUntil = -1, fissureSerial;
         public string ForcedNext;   // dev/test hook only
-        enum Atk { Severance, Wake, Crown, Slices }
         static readonly Atk[] Rotation = { Atk.Severance, Atk.Wake, Atk.Crown, Atk.Slices, Atk.Severance, Atk.Crown, Atk.Wake, Atk.Slices };
 
         void Awake() { MaxHp = 2600; BodyRadius = 1.4f; HitHeight = 2.0f; MarkHeight = 4.4f; }
@@ -155,6 +205,8 @@ namespace LastBell.Run
         float Walk => Clock.State == Tempo.Haste ? HasteWalk : NormalWalk;
         int Beats(float b) => Clock.TicksFor(b);
         int Beats((float H, float N) w) => Clock.TicksFor(Of(w, Clock.State));
+        // ordinary window, or its Broken Cadence value once the frenzy is on
+        int Bt((float H, float N) ordinary, (float H, float N) cadence) => Beats(Frenzy ? cadence : ordinary);
 
         // ---------------- script ----------------
         protected override IEnumerable<int> Script()
@@ -165,6 +217,8 @@ namespace LastBell.Run
                 if (!Frenzy && !FrenzyPending && Hp * 5 < MaxHp) FrenzyPending = true;   // strictly below 20%
                 if (FrenzyPending)
                     foreach (var w in FrenzyTell()) yield return w;
+                if (!OrbsOn && Hp * 10 < MaxHp)   // strictly below 10%: Falling Hours (TempoTyrantEncounter.Orbs.cs)
+                    foreach (var w in OrbTell()) yield return w;
                 if (Clock.Pending)
                     foreach (var w in TempoTransition()) yield return w;
 
@@ -173,24 +227,29 @@ namespace LastBell.Run
 
                 // ---- one attack block ----
                 Blocks++;
-                if (Frenzy && Clock.State == Tempo.Haste && ChainDue)
+                if (Frenzy)
                 {
-                    ChainDue = false; ChainsRun++;
-                    Log("Broken Cadence chain");
-                    foreach (var w in FrenzyChain()) yield return w;
+                    ChainsRun++;
+                    foreach (var w in CadenceBlock()) yield return w;
                 }
                 else
                 {
-                    // test hook: ForcedNext ("Severance" / "Wake" / "Crown" / "Slices") replaces the next rotation entry once
-                    var atk = ForcedNext != null && System.Enum.TryParse<Atk>(ForcedNext, out var forced) ? forced : Rotation[rotation++ % Rotation.Length];
-                    ForcedNext = null;
+                    var atk = NextAttack();
                     Log(atk.ToString());
-                    IEnumerable<int> body = atk == Atk.Severance ? Severance(-1, true) : atk == Atk.Wake ? Wake(false) : atk == Atk.Crown ? Crown() : Slices();
+                    IEnumerable<int> body = atk == Atk.Severance ? Severance(-1, true, false) : atk == Atk.Wake ? Wake(false) : atk == Atk.Crown ? Crown(false) : Slices(false);
                     foreach (var w in body) yield return w;
                 }
                 Current = "between blocks"; Rig.Pose(TyrantPose.Idle);
                 yield return Beats(2);
             }
+        }
+
+        // test hook: ForcedNext ("Severance" / "Wake" / "Crown" / "Slices") replaces the next rotation entry once
+        Atk NextAttack()
+        {
+            var atk = ForcedNext != null && System.Enum.TryParse<Atk>(ForcedNext, out var forced) ? forced : Rotation[rotation++ % Rotation.Length];
+            ForcedNext = null;
+            return atk;
         }
 
         void Log(string block) => BlockLog.Add($"{W.Tick} {Clock.State} {block}");
@@ -207,7 +266,6 @@ namespace LastBell.Run
             Announcement = "";
             PhaseName = Clock.State == Tempo.Haste ? (Frenzy ? "Broken Cadence · Haste" : "Haste") : (Frenzy ? "Broken Cadence · Normal" : "Normal");
             SetPhase(PhaseName);
-            if (Frenzy && Clock.State == Tempo.Haste) ChainDue = true;   // each Haste passage opens with the chain
             Log("tempo -> " + Clock.State);
         }
 
@@ -224,7 +282,6 @@ namespace LastBell.Run
                 Windup(0.45f * i / FrenzyTellTicks); yield return 1;
             }
             Release(0.5f); Announcement = "";
-            if (Clock.State == Tempo.Haste) ChainDue = true;   // queued once; never double-enqueued by the next commit
             PhaseName = "Broken Cadence · " + Clock.State; SetPhase(PhaseName);
         }
 
@@ -255,7 +312,19 @@ namespace LastBell.Run
             if (t != PursuitTarget) { PursuitTarget = t; farTicks = 0; }
             if (t && Sim.Flat(t.transform.position - transform.position).magnitude > RushDist) farTicks++; else farTicks = 0;
             if (Current == "approach" || Current == "reposition" || Current == "pursuit") Rig.Pose(TyrantPose.Walk);
+            StepOrbs();
+            // he never leaves his planted spot while a Severance strike is pending (also across a Broken Cadence overlap)
+            if (Age < sevLockUntil && Sim.Flat(transform.position - LockedPos).magnitude > 0.01f) SevLockViolations++;
+            // never two slice attacks at once: count distinct Spiral Slices attacks with hazards live together
+            if (sliceHazards.Count > 0)
+            {
+                sliceHazards.RemoveAll(x => x.h.Cancelled || x.h.Age > x.h.ResolveAt || !W.Hazards.Live.Contains(x.h));
+                int n = sliceHazards.Select(x => x.attack).Distinct().Count();
+                if (n > MaxSliceAttacksAtOnce) MaxSliceAttacksAtOnce = n;
+            }
         }
+
+        bool RushReady(PlayerController t) => t && !t.Down && farTicks >= RushSustainTicks && Age >= rushReadyAt && Age >= sevLockUntil;
 
         IEnumerable<int> Pursue()
         {
@@ -264,9 +333,9 @@ namespace LastBell.Run
                 var t = PursuitTarget; if (!t) yield break;
                 var to = Sim.Flat(t.transform.position - transform.position);
                 if (to.magnitude <= FightDist) yield break;
-                if (farTicks >= RushSustainTicks && Age >= rushReadyAt)
+                if (RushReady(t))
                 {
-                    foreach (var w in ClosingRush(t)) yield return w;
+                    foreach (var w in ClosingRush(t, "pursuit")) yield return w;
                     yield break;
                 }
                 Current = "pursuit";
@@ -285,10 +354,11 @@ namespace LastBell.Run
             return ClampInside(start, start + dir * Mathf.Max(0, dist - FightDist), OwnBound);
         }
 
-        IEnumerable<int> ClosingRush(PlayerController t)
+        IEnumerable<int> ClosingRush(PlayerController t, string where)
         {
             Current = "Closing Rush (announced)"; Announcement = "CLOSING RUSH"; Rig.Pose(TyrantPose.Rush);
             int tell = Beats(RushTell);
+            var rec = new RushRecord { TellTick = W.Tick, FarTicks = farTicks, TellTicks = tell, Where = where }; RushLog.Add(rec);
             var endMarker = StopMarker(RushEndpoint(t));
             for (int i = 0; i < tell; i++)
             {
@@ -300,22 +370,79 @@ namespace LastBell.Run
             var start = transform.position; var end = RushEndpoint(t);
             endMarker.ring.Place(end, 0); endMarker.pip.Place(end, 0);
             int travel = Mathf.Max(1, Mathf.CeilToInt(Vector3.Distance(start, end) / RushSpeed * Sim.Hz));
+            rec.TravelTicks = travel; rec.Distance = Vector3.Distance(start, end);
             Current = "Closing Rush"; Rushes++;
             for (int i = 1; i <= travel; i++) { transform.position = Vector3.Lerp(start, end, i / (float)travel); yield return 1; }
             endMarker.ring.Dismiss(); endMarker.pip.Dismiss(); Announcement = ""; rushReadyAt = Age + RushCooldownTicks; farTicks = 0;
+            rec.StopTick = W.Tick;
             Current = "Closing Rush (stopped)";
             Rig.Pose(TyrantPose.Idle);
             yield return Beats(1);
         }
 
         // ---------------- positioning gate ----------------
-        IEnumerable<int> CentreUp()
+        // allowRush: he may break off into a closing rush while walking in (ordinary Spiral Slices)
+        IEnumerable<int> CentreUp(bool allowRush = false)
         {
             if (ArenaCentred(transform.position)) yield break;
-            var p = Sim.Flat(transform.position); var dest = p.normalized * (CentreGate * 0.4f);
-            foreach (var w in WalkTo(dest, Walk * 1.6f, 240)) yield return w;
+            while (Age < sevLockUntil) yield return 1;   // never off his planted spot while a Severance strike is pending
+            var dest = Sim.Flat(transform.position).normalized * (CentreGate * 0.4f);
+            for (int i = 0; i < 180 && Sim.Flat(dest - transform.position).magnitude > 0.3f; i++)
+            {
+                if (allowRush && RushReady(PursuitTarget))
+                {
+                    foreach (var w in ClosingRush(PursuitTarget, "Slices walk-in")) yield return w;
+                    if (ArenaCentred(transform.position)) yield break;
+                    dest = Sim.Flat(transform.position).normalized * (CentreGate * 0.4f);
+                }
+                Current = "reposition";
+                TurnTowards(Sim.YawTo(transform.position, dest, transform.eulerAngles.y), 200);
+                transform.position = Vector3.MoveTowards(transform.position, new Vector3(dest.x, 0, dest.z), Walk * 1.6f * Sim.Dt);
+                yield return 1;
+            }
             if (!ArenaCentred(transform.position)) transform.position = Sim.Flat(transform.position).normalized * CentreGate;   // after a stalled walk
         }
+
+        // ---------------- Broken Cadence: overlapping chains ----------------
+        // The first attack comes from the ordinary rotation; each next one is picked (in turn) from the pairings allowed
+        // after the previous attack and starts as soon as the previous one has its last hit on the floor (handoff), so
+        // their hits overlap. A Slices attack never starts while another one's slices are live.
+        IEnumerable<int> CadenceBlock()
+        {
+            var chain = new List<Atk> { NextAttack() };
+            for (int i = 1; i < Cadence.ChainLength; i++)
+            {
+                var opts = Cadence.Pairs.Where(p => p.from == chain[i - 1]).ToList();
+                if (opts.Count == 0) break;
+                chain.Add(opts[cadencePick++ % opts.Count].to);
+            }
+            Log("Broken Cadence: " + string.Join(" > ", chain));
+            for (int i = 0; i < chain.Count; i++)
+            {
+                bool handoff = i < chain.Count - 1;
+                var atk = chain[i]; Atk? prev = i > 0 ? chain[i - 1] : (Atk?)null;
+                float join = -1;
+                if (prev.HasValue)
+                {
+                    join = Of(Cadence.Join(prev.Value, atk), Clock.State);
+                    CadenceLog.Add((W.Tick, prev.Value, atk, PendingOf(prev.Value)));
+                }
+                IEnumerable<int> body;
+                switch (atk)
+                {
+                    case Atk.Severance: body = Severance(join, true, handoff, prev == Atk.Wake ? LastFissureResolveAge : -1); break;
+                    case Atk.Wake: body = Wake(handoff, join); break;
+                    case Atk.Crown: body = Crown(handoff, join); break;
+                    default: body = Slices(handoff, join, prev == Atk.Severance ? BehindSlice(LockedPos, LockedYaw) : -1); break;
+                }
+                foreach (var w in body) yield return w;
+            }
+        }
+
+        static readonly string[][] SourcesOf = { new[] { "Threefold Severance" }, new[] { "Sundering Wake" }, new[] { "Hollow Crown" }, new[] { "Spiral Slices", "Every Other Slice" } };
+        public int PendingOf(Atk a) => W.Hazards.Live.Count(h => !h.Cancelled && SourcesOf[(int)a].Any(s => h.Source.StartsWith(s)));
+        // the slice directly behind him (5 m back from his planted spot): safe from Severance strike 3
+        public static int BehindSlice(Vector3 boss, float yaw) => SliceOf(boss - Sim.Dir(yaw) * 5f);
 
         // ---------------- Threefold Severance ----------------
         // Boss frame: right = +x. Each strike is a lane rectangle covering a slab of the arena (telegraph clipped to the
@@ -341,8 +468,10 @@ namespace LastBell.Run
             return p;
         }
 
-        // openingTicks < 0: the authored 6-beat opening at the current tempo
-        IEnumerable<int> Severance(int openingTicks, bool gate)
+        // joinBeats > 0: the opening when it overlaps (Broken Cadence pairing); otherwise the ordinary / cadence opening.
+        // eruptAge >= 0: a pending fissure erupts then; the opening is lengthened so it lands >= the fissure lead first.
+        // handoff: return once strike 3 is live (he stays planted until it lands; CentreUp and rushes wait for it).
+        IEnumerable<int> Severance(float joinBeats, bool gate, bool handoff, int eruptAge = -1)
         {
             if (gate) foreach (var w in CentreUp()) yield return w;
             Current = "Threefold Severance";
@@ -350,8 +479,14 @@ namespace LastBell.Run
             float yaw = YawToTarget();
             transform.rotation = Quaternion.Euler(0, yaw, 0);
             LockedYaw = yaw; LockedPos = Sim.Flat(transform.position);
-            int open = openingTicks > 0 ? openingTicks : Beats(SevOpen), gap = Beats(SevGap);
+            int open = joinBeats > 0 ? Beats(joinBeats) : Bt(SevOpen, Cadence.SevOpen), gap = Bt(SevGap, Cadence.SevGap);
+            if (eruptAge >= 0)
+            {
+                open = Mathf.Max(open, eruptAge - Age + Bt((FissureLeadBeats, FissureLeadBeats), Cadence.FissureLead));
+                FissureLeads.Add(Age + open - eruptAge);   // ticks from the pending eruption to strike 1
+            }
             int[] resolveAt = { open, open + gap, open + 2 * gap };
+            sevLockUntil = Age + resolveAt[2] + 1;
             // previews: the full 1-2-3 sequence from the start; only the imminent strike is a live (filled) warning
             var previews = new BellkeeperFx.Telegraph[3];
             SeveranceStrikes.Clear(); Numbers.Clear();
@@ -375,11 +510,13 @@ namespace LastBell.Run
                     if (n == 3) Fx.Streak(LockedPos, yaw, 1.0f, 9f); else Fx.Arc(LockedPos, yaw, n == 1 ? -1 : 1);
                     Release(1.2f); CameraShake.Shake(0.12f, 0.2f);
                     if (n == 1) LastStrike1ResolveAge = Age;
+                    if (n == 3 && handoff) Numbers.RemoveAll(x => x.number == 3);
                 };
                 if (previews[k] != null) { previews[k].Dismiss(); previews[k] = null; }
                 Live(h, false, 0.25f); SeveranceStrikes.Add(h);
                 for (int i = 0; i < Numbers.Count; i++) Numbers[i] = (Numbers[i].at, Numbers[i].number, Numbers[i].number == k + 1);
                 Rig.Pose(k == 0 ? TyrantPose.SlashLeft : k == 1 ? TyrantPose.SlashRight : TyrantPose.Overhead, h.ResolveAt);
+                if (handoff && k == 2) yield break;   // strike 3 is on the floor; the next attack overlaps it
                 for (; age < resolveAt[k]; age++) { Windup((age - start) / (float)h.ResolveAt); yield return 1; }
                 Numbers.RemoveAll(x => x.number == n);
             }
@@ -412,23 +549,56 @@ namespace LastBell.Run
             return (start, end, Sim.YawTo(start, end, transform.eulerAngles.y));
         }
 
-        // inChain: the fissure eruption tick is reported so the following Severance can be scheduled after it
-        IEnumerable<int> Wake(bool inChain)
+        public static float BackYaw(float chargeYaw) => Mathf.Repeat(chargeYaw + 180f, 360f);
+        // the Backswing: a half-disc behind the landing point, facing back up the charge lane
+        public static Hazard BackswingHazard(Vector3 landing, float chargeYaw) => new Hazard
+        {
+            Source = "Sundering Wake (backswing)", Shape = HazardShape.Cone, Kind = HazardKind.Strike, Origin = Sim.Flat(landing),
+            Yaw = BackYaw(chargeYaw), Radius = BackswingRadius, HalfAngle = BackswingHalf, LockAt = 0, Damage = BackswingDmg, Knockback = 1.5f,
+            ClipRadius = CombatWorld.PlayerBound + PlayerController.Radius,
+        };
+
+        // handoff: return once the last backswing has landed (its fissures still warning) for a Broken Cadence pairing.
+        // joinBeats > 0: the first charge's warning when it overlaps.
+        IEnumerable<int> Wake(bool handoff, float joinBeats = -1)
         {
             foreach (var w in CentreUp()) yield return w;   // room to charge: the lane always has real travel
+            int charges = Clock.State == Tempo.Haste ? HasteCharges : NormalCharges;
+            for (int c = 0; c < charges; c++)
+            {
+                if (c > 0 && !Frenzy && RushReady(PursuitTarget))   // ordinary blocks: he may close in between charges
+                    foreach (var w in ClosingRush(PursuitTarget, "between charges")) yield return w;
+                int warn = c == 0 ? (joinBeats > 0 ? Beats(joinBeats) : Bt(WakeWarn, Cadence.WakeWarn)) : Bt(WakeWarn2, Cadence.WakeWarn2);
+                foreach (var w in Charge(c, warn)) yield return w;
+            }
+            if (handoff) yield break;
+            Current = "Sundering Wake (recovery)";
+            int rec = Mathf.Max(Beats(WakeRecover), LastFissureResolveAge - Age + 1);   // the block ends after its last eruption
+            glowTarget = 0.5f; yield return rec; glowTarget = 1;
+        }
+
+        // One charge: warning (lane, landing marker, dashed backswing and mirror previews), travel, then the backswing
+        // and this charge's own eruption lane (+ mirror in Haste). Returns when the backswing lands.
+        IEnumerable<int> Charge(int c, int warn)
+        {
             Current = "Sundering Wake";
-            var target = WakeTarget();
+            var target = WakeTarget();   // re-targets the farthest player from where he stands now
             var (start, end, yaw) = WakePath(target ? target.transform.position : transform.position + transform.forward * 6);
             transform.rotation = Quaternion.Euler(0, yaw, 0);
             float travelLen = Vector3.Distance(start, end);
-            int warn = Beats(WakeWarn);
-            var h = new Hazard { Source = "Sundering Wake (charge)", Shape = HazardShape.Lane, Kind = HazardKind.Strike, Origin = start, Yaw = yaw,
+            ChargeLog.Add((W.Tick, c, start, end, yaw, target));
+            string tag = c == 0 ? "" : " " + (c + 1);
+            var h = new Hazard { Source = "Sundering Wake (charge" + tag + ")", Shape = HazardShape.Lane, Kind = HazardKind.Strike, Origin = start, Yaw = yaw,
                 Length = travelLen + BodyRadius + WakeReach, Width = WakeWidth, LockAt = 0, ResolveAt = warn + WakeTravelTicks, Damage = WakeDmg, Knockback = 2f,
                 HitOnResolve = false };
-            LastWake = Live(h);
+            LastCharge = Live(h); if (c == 0) LastWake = LastCharge;
             var endMarker = StopMarker(end, false);   // where he stops (the lane runs on by his body and 2.6 m thrust reach)
+            // the backswing, previewed (dashed) at the landing point from the start of the warning
+            var bsPreview = W.BossFx.Cone(BackswingRadius, BackswingHalf); bsPreview.Memory();
+            bsPreview.Clip(Vector3.zero, CombatWorld.PlayerBound + PlayerController.Radius); bsPreview.Place(end, BackYaw(yaw));
+            BackswingPreviews++;
             // Haste: the fissure's mirror image, previewed (dashed) from now so players can read it before it goes live
-            LastMirror = null;
+            if (c == 0) LastMirror = null;
             BellkeeperFx.Telegraph mirrorPreview = null;
             var (mOrigin, mYaw) = MirrorLane(start, yaw);
             bool mirror = Clock.State == Tempo.Haste && MirrorUseful(yaw);
@@ -456,16 +626,23 @@ namespace LastBell.Run
             }
             W.BossFx.ChargeTrail(transform, false); Fx.Rim(transform.position, BodyRadius + 0.2f, RimBrass * 0.6f); CameraShake.Shake(0.1f, 0.15f);
             endMarker.ring.Dismiss(); endMarker.pip.Dismiss();
+            // the backswing goes live on arrival: almost immediate, but it has been on the floor (dashed) all along
+            bsPreview.Dismiss();
+            int bs = Bt(Backswing, Cadence.Backswing);
+            var b = BackswingHazard(end, yaw); b.ResolveAt = bs;
+            b.OnResolve = hz => { BackswingResolves++; Fx.Arc(hz.Origin, hz.Yaw, c % 2 == 0 ? 1 : -1); Release(1f); CameraShake.Shake(0.1f, 0.18f); };
+            LastBackswing = Live(b, false, 0.35f);
             // the delayed wake: a separate hazard instance with its own warning; it erupts exactly once
-            int fissureWarn = Beats(FissureWarn);
-            var f = new Hazard { Source = "Sundering Wake (eruption)", Shape = HazardShape.Lane, Kind = HazardKind.Ground, Origin = start, Yaw = yaw,
+            int fissureWarn = Bt(FissureWarn, Cadence.FissureWarn);
+            int serial = ++fissureSerial;
+            var f = new Hazard { Source = "Sundering Wake (eruption" + tag + ")", Shape = HazardShape.Lane, Kind = HazardKind.Ground, Origin = start, Yaw = yaw,
                 Length = travelLen, Width = FissureWidth, LockAt = 0, ResolveAt = fissureWarn, Damage = FissureDmg, Knockback = 1f };
-            f.OnResolve = hz => { FissureEruptions++; Fx.Streak(hz.Origin, hz.Yaw, 0, hz.Length, RimAmber, hz.Width * 0.5f); Rig.Fissure(false); };
+            f.OnResolve = hz => { FissureEruptions++; Fx.Streak(hz.Origin, hz.Yaw, 0, hz.Length, RimAmber, hz.Width * 0.5f); if (serial == fissureSerial) Rig.Fissure(false); };
             LastFissure = Live(f, true);
             if (mirror)
             {
                 mirrorPreview.Dismiss();
-                var m = new Hazard { Source = "Sundering Wake (mirrored eruption)", Shape = HazardShape.Lane, Kind = HazardKind.Ground, Origin = mOrigin, Yaw = mYaw,
+                var m = new Hazard { Source = "Sundering Wake (mirrored eruption" + tag + ")", Shape = HazardShape.Lane, Kind = HazardKind.Ground, Origin = mOrigin, Yaw = mYaw,
                     Length = travelLen, Width = FissureWidth, LockAt = 0, ResolveAt = fissureWarn, Damage = FissureDmg, Knockback = 1f };
                 m.OnResolve = hz => { MirrorEruptions++; Fx.Streak(hz.Origin, hz.Yaw, 0, hz.Length, RimAmber, hz.Width * 0.5f); };
                 LastMirror = Live(m, true);
@@ -473,20 +650,20 @@ namespace LastBell.Run
             }
             LastFissureResolveAge = Age + fissureWarn;
             Rig.Fissure(true, start, end);
+            Current = "Sundering Wake (backswing)";
+            Rig.Pose(TyrantPose.Backswing, bs);
+            for (int i = 0; i < bs; i++) { Windup(i / (float)bs); yield return 1; }
             Rig.Pose(TyrantPose.Recover);
-            if (inChain) yield break;   // the chain schedules the Severance around the pending eruption
-            Current = "Sundering Wake (recovery)";
-            int rec = Mathf.Max(Beats(WakeRecover), fissureWarn + 1);   // the block ends after its eruption: no overlap
-            glowTarget = 0.5f; yield return rec; glowTarget = 1;
         }
 
         // ---------------- Hollow Crown ----------------
-        IEnumerable<int> Crown()
+        // handoff: return once the ring has landed (the inner circle still warning). joinBeats > 0: ring warning.
+        IEnumerable<int> Crown(bool handoff, float joinBeats = -1)
         {
             foreach (var w in CentreUp()) yield return w;
             Current = "Hollow Crown"; Rig.Pose(TyrantPose.RingCast);
             var c = Sim.Flat(transform.position);
-            int ringT = Beats(CrownRing), innerT = Beats(CrownInnerWarn);
+            int ringT = joinBeats > 0 ? Beats(joinBeats) : Bt(CrownRing, Cadence.CrownRing), innerT = Bt(CrownInnerWarn, Cadence.CrownInner);
             var ring = new Hazard { Source = "Hollow Crown (outer ring)", Shape = HazardShape.Ring, Kind = HazardKind.Ground, Origin = c, Inner = CrownPocket,
                 Radius = SevReach, LockAt = 0, ResolveAt = ringT, Damage = RingDmg, Knockback = 1f, ClipRadius = CombatWorld.PlayerBound + PlayerController.Radius };
             ring.OnResolve = hz => { Fx.Rim(hz.Origin, hz.Inner, RimAmber * 0.6f); Release(1); };   // amber, not white: the inner warning is live here
@@ -504,8 +681,9 @@ namespace LastBell.Run
             Rig.Pose(TyrantPose.GroundStrike, innerT);
             var inner = new Hazard { Source = "Hollow Crown (inner circle)", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = c, Radius = CrownInner,
                 LockAt = 0, ResolveAt = innerT, Damage = InnerDmg, Knockback = 1.5f };
-            inner.OnResolve = hz => { Fx.Rim(hz.Origin, hz.Radius, RimIvory); Release(1.0f); CameraShake.Shake(0.15f, 0.25f); };
+            inner.OnResolve = hz => { Fx.Rim(hz.Origin, hz.Radius, RimIvory); Release(1.0f); CameraShake.Shake(0.15f, 0.25f); if (handoff) Numbers.RemoveAll(x => x.number == 2 && x.at == label2); };
             LastInner = Live(inner, false, 0.5f);
+            if (handoff) yield break;   // the inner circle is on the floor; the next attack overlaps it
             for (int i = 0; i < innerT; i++) { Windup(i / (float)innerT); yield return 1; }
             Numbers.Clear();
             Current = "Hollow Crown (recovery)"; Rig.Pose(TyrantPose.Recover);
@@ -552,30 +730,37 @@ namespace LastBell.Run
                 }
                 Release(0.4f);
             };
-            foreach (var h in group) Live(h, false, flash);
+            foreach (var h in group) { Live(h, false, flash); sliceHazards.Add((h, sliceUses)); }
             return group;
         }
 
-        IEnumerable<int> Slices()
+        bool SliceAttackLive => sliceHazards.Any(x => !x.h.Cancelled && W.Hazards.Live.Contains(x.h));
+
+        // handoff: return once the second every-other set is on the floor. joinBeats > 0: indicate when it overlaps.
+        // forcedSafe >= 0: the first safe slice (Broken Cadence after a Severance: the slice behind him).
+        // Broken Cadence reveals the first safe slice while the floor is indicated, so an overlap is readable from the start.
+        IEnumerable<int> Slices(bool handoff, float joinBeats = -1, int forcedSafe = -1)
         {
-            foreach (var w in CentreUp()) yield return w;   // he conducts the floor from the centre
+            while (SliceAttackLive) yield return 1;   // never two slice attacks at once
+            foreach (var w in CentreUp(allowRush: !Frenzy)) yield return w;   // he conducts the floor from the centre
             Current = "Spiral Slices"; Rig.Pose(TyrantPose.RingCast);
             SliceBlocks++; SlicesActive = true;
             SpiralDir = sliceUses++ % 2 == 0 ? 1 : -1;
             // the first safe slice is the one under the nearest player, so the opening is always reachable
             var near = W.NearestStanding(Vector3.zero);
-            int safe = near ? SliceOf(near.transform.position) : 0;
+            int safe = forcedSafe >= 0 ? forcedSafe : near ? SliceOf(near.transform.position) : 0;
             Announcement = SpiralDir > 0 ? "SPIRAL  RIGHT  >>>" : "<<<  SPIRAL  LEFT";
 
-            // 1) indicate the whole floor: every slice dashed
+            // 1) indicate the whole floor: every slice dashed (Broken Cadence: all but the safe one, revealed now)
             var outline = new BellkeeperFx.Telegraph[SliceCount];
-            for (int i = 0; i < SliceCount; i++) outline[i] = SliceOutline(i);
-            int indicate = Beats(SliceIndicate);
+            for (int i = 0; i < SliceCount; i++) if (!Frenzy || i != safe) outline[i] = SliceOutline(i);
+            if (Frenzy) SafeSlice = safe;
+            int indicate = joinBeats > 0 ? Beats(joinBeats) : Bt(SliceIndicate, Cadence.SliceIndicate);
             for (int i = 0; i < indicate; i++) { Windup(0.3f * i / indicate); yield return 1; }
             // 2) the first slice goes (its outline clears) and the other 11 go live; then the safe slice spirals on
-            for (int i = 0; i < SliceCount; i++) outline[i].Dismiss();
+            for (int i = 0; i < SliceCount; i++) if (outline[i] != null) outline[i].Dismiss();
             SafeSlice = safe;
-            int step = Beats(SliceStep), first = Beats(SliceFirst);
+            int step = Bt(SliceStep, Cadence.SliceStep), first = Bt(SliceFirst, Cadence.SliceFirst);
             for (int k = 0; k < SpiralSteps; k++)
             {
                 int warn = k == 0 ? first : step;
@@ -592,7 +777,7 @@ namespace LastBell.Run
             // 3) every other slice from the centre: first the set holding the slice the spiral ended on, then the other
             int parity = last % 2;
             Current = "Spiral Slices (every other)"; Rig.Pose(TyrantPose.GroundStrike);
-            int altWarn = Beats(AltWarn), altGap = Beats(AltGap);
+            int altWarn = Bt(AltWarn, Cadence.AltWarn), altGap = Bt(AltGap, Cadence.AltGap);
             var setA = new List<int>(); var setB = new List<int>();
             for (int i = 0; i < SliceCount; i++) (i % 2 == parity ? setA : setB).Add(i);
             var previewB = new List<BellkeeperFx.Telegraph>();
@@ -605,26 +790,20 @@ namespace LastBell.Run
             foreach (var t in previewB) t.Dismiss();
             AltSafeParity = parity;
             Rig.Pose(TyrantPose.GroundStrike, altGap);
-            SliceVolley(setB, "Every Other Slice (2)", AltDmg, altGap, 0.4f);
+            var groupB = SliceVolley(setB, "Every Other Slice (2)", AltDmg, altGap, 0.4f);
             SliceLog.Add((W.Tick + altGap, -1, 1 - parity));
+            if (handoff && groupB.Count > 0)
+            {
+                // set B is on the floor; the next attack overlaps it. The attack ends when B lands.
+                var lead = groupB[0]; var hit = lead.OnResolve;
+                lead.OnResolve = hz => { hit?.Invoke(hz); Release(1f); CameraShake.Shake(0.12f, 0.2f); SlicesActive = false; AltSafeParity = -1; };
+                yield break;
+            }
             for (int i = 0; i < altGap; i++) { Windup(i / (float)altGap); yield return 1; }
             Release(1f); CameraShake.Shake(0.12f, 0.2f);
             SlicesActive = false; AltSafeParity = -1;
             Current = "Spiral Slices (recovery)"; Rig.Pose(TyrantPose.Recover);
             glowTarget = 0.5f; yield return Beats(SliceRecover); glowTarget = 1;
-        }
-
-        // ---------------- Broken Cadence chain ----------------
-        IEnumerable<int> FrenzyChain()
-        {
-            foreach (var w in Wake(true)) yield return w;
-            int eruptAge = LastFissureResolveAge;
-            // reposition after the charge has actually ended (the fissure is already warning on the floor)
-            foreach (var w in CentreUp()) yield return w;
-            // full opening, lengthened when needed so the eruption lands >= FissureLeadBeats before strike 1;
-            // nothing is shortened. The fissure is spent before any route between slash safe regions is needed.
-            int open = Mathf.Max(Beats(SevOpen), eruptAge - Age + Beats(FissureLeadBeats));
-            foreach (var w in Severance(open, false)) yield return w;
         }
 
         // ---------------- helpers ----------------
@@ -647,6 +826,7 @@ namespace LastBell.Run
         {
             Numbers.Clear(); Announcement = ""; PhaseName = "Defeated";
             SlicesActive = false; SafeSlice = -1; AltSafeParity = -1;
+            ClearOrbs();
             Rig.Fissure(false); Rig.Pose(TyrantPose.Defeat);
             if (Audio) Audio.StopAll();
             W.Fx.Crescendo(transform.position, true, 2, true);

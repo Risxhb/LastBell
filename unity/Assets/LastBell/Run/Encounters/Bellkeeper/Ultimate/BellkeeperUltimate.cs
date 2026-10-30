@@ -24,9 +24,11 @@ namespace LastBell.Run
         public static int UltimateBaseHp = DefaultBaseHp;
         // Set from the Part 5 bot sweeps (clears-par-6: perfect party of 4 kills 3/4 in ~6:10, party of 8 1/1, solo Chimesinger 1/1)
         public const int DefaultBaseHp = 12000;
-        // solo gets a smaller bar: one player carries every clock and every Stilled hide and deals far less per head (Part 5:
-        // solo DPS ~38 vs ~47 per player in a party of 4); -lastbellUltSolo overrides
-        public static float UltimateSoloScale = float.TryParse(Arg("-lastbellUltSolo"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float ss) ? ss : 0.65f;
+        // solo gets a smaller bar: one player carries every duty. 0.25 since 28 Oct (was 0.65): v2 solo must clear with every class on
+        // every level (gpt/08 §5), and a solo Vanguard reaches the boss for well under half a second of each 5 s P1 cycle (the plate is
+        // 7 m out every other beat), so at 0.65 it ran out of P1's time at 92 %; 0.22 cleared P1 and P2 on their minimum lengths. Phase
+        // minimums keep a ranged solo near 6 min. Solo only: parties are unchanged. -lastbellUltSolo overrides
+        public static float UltimateSoloScale = float.TryParse(Arg("-lastbellUltSolo"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float ss) ? ss : 0.25f;
 
         public enum UltSegment { P1, T1, P2, P3, T2, P4, P5 }
         public static readonly string[] SegmentNames =
@@ -89,8 +91,8 @@ namespace LastBell.Run
             mFutures = Mech<TwoFutures>(); mHand = Mech<ConductorsHand>(); mTolling = Mech<TollingHour>(); mThirteenth = Mech<ThirteenthHour>();
             mQuotes = Mech<AreaQuotes>(); mFracture = Mech<FractureOfTime>();
             mRelay = Mech<EscapementRelay>(); mDebts = Mech<ChimeDebts>(); mBroken = Mech<BrokenHour>(); mOpen = Mech<OpenHour>(); mGear = Mech<GearFloor>(); mFinal = Mech<FinalToll>();
-            // one tuning (ULTIMATE.md §2): Easy x0.6 / Hard x1.3 don't apply to the Ultimate
-            if (W.Difficulty != Difficulty.Medium) { Debug.Log($"Bellkeeper Ultimate: one tuning; the run's {RunDifficulty.Name(W.Difficulty)} becomes Medium for this fight"); W.Difficulty = Difficulty.Medium; }
+            // the run's level applies (gpt/08 §settled, Chzy18 25 Oct: the Ultimate keeps Easy/Medium/Hard like every boss). For now
+            // that is the shared scaling of damage taken (Easy x0.6, Hard x1.3); the one-shots (999) stay one-shots on every level.
             W.DealtScale = p => Ult != null && Ult.IsCracked(p) ? 0f : 1f;
             MaxHp = Hp = UltimateBaseHp;
             PhaseName = SegmentNames[0];
@@ -292,7 +294,8 @@ namespace LastBell.Run
         public static bool? V2Override;
         public const int V2P1MinLoops = 2;          // P1 shows two debt rounds before it can end (72 s), whatever the DPS
         public const float V2P1Push = 150;          // the P1 push (cards-v2 timeline: P1 0-150 s)
-        float PushFor(UltSegment s) => UltV2 && s == UltSegment.P1 ? V2P1Push : UltV2 && s == UltSegment.P2 ? V2P2Push : UltV2 && s == UltSegment.P3 ? V2P3Push : UltV2 && s == UltSegment.P4 ? V2P4Push : UltV2 && s == UltSegment.P5 ? 0 : PushSeconds[(int)s];
+        float PushFor(UltSegment s) => UltTimerFor(W.Difficulty) * PushBase(s);
+        float PushBase(UltSegment s) => UltV2 && s == UltSegment.P1 ? V2P1Push : UltV2 && s == UltSegment.P2 ? V2P2Push : UltV2 && s == UltSegment.P3 ? V2P3Push : UltV2 && s == UltSegment.P4 ? V2P4Push : UltV2 && s == UltSegment.P5 ? 0 : PushSeconds[(int)s];
         public const float V2P2End = 0.70f, V2P2Push = 150, V2P2MinSeconds = 60;   // P2: 15 % of the bar, at least 60 s (20 beats), push 150 s
         public const float V2P3End = 0.55f, V2P3Push = 150, V2P3MinSeconds = 60;   // P3: 70 -> 55 %, at least one 60 s pattern, push 150 s
         public const float V2P4End = 0.35f, V2P4Push = 180, V2P4MinSeconds = 60;   // P4: 55 -> 35 %, at least 8 slams, push 180 s

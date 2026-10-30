@@ -61,16 +61,35 @@ foreach ($pack in $packs) {
 
     try {
         $zipPath = Join-Path $cacheDir $pack.file
-        if (-not ((Test-Path $zipPath) -and (Get-Sha256 $zipPath) -eq $pack.sha256)) {
-            Write-Host "[get]  $label ($(Format-Size $pack.size)) from $($pack.url)"
+        if ((Test-Path $zipPath) -and (Get-Sha256 $zipPath) -ne $pack.sha256) { Remove-Item $zipPath -Force }
+        if (-not (Test-Path $zipPath)) {
             $partial = "$zipPath.part"
+            if (Test-Path $partial) { Remove-Item $partial -Force }
+            $primaryError = $null
             try {
-                (New-Object Net.WebClient).DownloadFile($pack.url, $partial)
+                if ($env:LAST_BELL_ASSET_SOURCE_DIR) {
+                    Write-Host "[get]  $label from local source override"
+                    Copy-Item -LiteralPath (Join-Path $env:LAST_BELL_ASSET_SOURCE_DIR $pack.file) -Destination $partial -ErrorAction Stop
+                } elseif ($source = Get-AzureSource $pack) {
+                    Write-Host "[get]  $label from Azure Artifacts $($source.feed)/$($source.package) $($source.packageVersion)"
+                    $downloadDir = Join-Path $cacheDir "$($pack.file).azure"
+                    Invoke-UniversalDownload $source $pack.file $downloadDir
+                    Move-Item -LiteralPath (Join-Path $downloadDir $pack.file) -Destination $partial -Force
+                } else {
+                    throw 'No primary source configured.'
+                }
             } catch {
+                $primaryError = $_.Exception.Message
                 if (Test-Path $partial) { Remove-Item $partial -Force }
-                $reason = $_.Exception.Message
-                if ($_.Exception.InnerException) { $reason = $_.Exception.InnerException.Message }
-                throw "Download failed for $label.`n  URL: $($pack.url)`n  Reason: $reason`n  Check your connection and that the release still exists, then run setup again."
+            }
+            if ($primaryError) {
+                if (-not $pack.url) { throw "Download failed for $label. $primaryError" }
+                Write-Host "[warn] $primaryError Falling back to the legacy GitHub release."
+                try { (New-Object Net.WebClient).DownloadFile($pack.url, $partial) }
+                catch {
+                    if (Test-Path $partial) { Remove-Item $partial -Force }
+                    throw "Download failed for $label from Azure and legacy URL. $primaryError Legacy URL: $($pack.url)."
+                }
             }
             Move-Item $partial $zipPath -Force
         }

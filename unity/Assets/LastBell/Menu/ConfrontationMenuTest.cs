@@ -55,10 +55,12 @@ namespace LastBell.Menu
             Check("alternate logo sprite with alpha",Resources.Load<Sprite>("Menu/ConfrontationLogo")!=null);
             Check("no gameplay authority",!RunDirector.Instance&&!FindAnyObjectByType<BossEncounter>()&&!FindAnyObjectByType<PlayerController>());
             Check("single music owner",FindObjectsByType<MenuMusic>(FindObjectsSortMode.None).Length==1&&menu.Music.MenuSource.isPlaying);
-            yield return Press(Key.DownArrow);Check("keyboard moves to Boss Rush",EventSystem.current.currentSelectedGameObject==menu.RushButton.gameObject);
+            // Start Run is greyed out for players (October 27, 2026): focus starts on Boss Rush instead.
+            if(ConfrontationMenu.StartRunEnabled){yield return Press(Key.DownArrow);Check("keyboard moves to Boss Rush",EventSystem.current.currentSelectedGameObject==menu.RushButton.gameObject);}
+            else Check("Start Run greyed out, focus on Boss Rush",!menu.StartButton.IsInteractable()&&EventSystem.current.currentSelectedGameObject==menu.RushButton.gameObject);
             InputSystem.QueueStateEvent(pad,new GamepadState().WithButton(GamepadButton.DpadDown));yield return null;yield return null;InputSystem.QueueStateEvent(pad,new GamepadState());yield return null;yield return null;
             Check("controller moves to Settings",EventSystem.current.currentSelectedGameObject==menu.SettingsButton.gameObject);
-            yield return Press(Key.Enter);Check("keyboard opens settings",menu.SettingsOpen&&!menu.StartButton.IsInteractable());
+            yield return Press(Key.Enter);Check("keyboard opens settings",menu.SettingsOpen&&!menu.RushButton.IsInteractable());
             menu.CloseSettings();Check("settings focus returns",!menu.SettingsOpen&&EventSystem.current.currentSelectedGameObject==menu.SettingsButton.gameObject);
             var source=menu.Music.MenuSource;float musicTime=source.time;
             foreach(var size in new[]{new Vector2Int(1600,900),new Vector2Int(1280,720),new Vector2Int(2560,1080),new Vector2Int(1024,768)})
@@ -113,13 +115,25 @@ namespace LastBell.Menu
             }
             MenuFlowTest.SetResolution(1600,900);yield return new WaitForSecondsRealtime(1);
             menu=FindAnyObjectByType<ConfrontationMenu>();menu.OpenSettings();yield return Capture("alternative-settings.png");
-            Check("settings open on music volume, menu blocked",menu.SettingsOpen&&EventSystem.current.currentSelectedGameObject==menu.MusicVolumeControl.gameObject&&!menu.StartButton.IsInteractable());
+            Check("settings open on music volume, menu blocked",menu.SettingsOpen&&EventSystem.current.currentSelectedGameObject==menu.MusicVolumeControl.gameObject&&!menu.RushButton.IsInteractable());
+            Check("frame settings: VSync and FPS cap rows present",menu.VSyncControl&&menu.FrameCapControl&&menu.VSyncControl.gameObject.activeInHierarchy&&menu.FrameCapControl.gameObject.activeInHierarchy);
+            {
+                var resText=menu.ResolutionDropdown?menu.ResolutionDropdown.GetComponentInChildren<Text>().text:"";
+                menu.ResolutionDropdown.onClick.Invoke();yield return null;yield return null;
+                var sel=EventSystem.current.currentSelectedGameObject;
+                Check("resolution dropdown opens a themed list with every resolution, focused on the current one",menu.ResolutionListOpen&&menu.ResolutionItems.Length==MenuSettings.Resolutions.Length&&sel&&menu.ResolutionItems.Any(b=>b.gameObject==sel)&&sel.GetComponentInChildren<Text>().text==resText);
+                yield return Capture("settings-resolution-dropdown.png");
+                yield return Press(Key.Escape);
+                Check("Escape closes the resolution list only, focus back on the row, value unchanged",!menu.ResolutionListOpen&&menu.SettingsOpen&&EventSystem.current.currentSelectedGameObject==menu.ResolutionDropdown.gameObject&&menu.ResolutionDropdown.GetComponentInChildren<Text>().text==resText);
+            }
+            if(!PlayerPrefs.HasKey("LastBell.Menu.VSync"))Check("frame settings default: VSync off, 120 FPS cap",!MenuSettings.VSync&&MenuSettings.FrameCap==120&&QualitySettings.vSyncCount==0&&Application.targetFrameRate==120);
             Check("settings has no interface option",menu.GetComponentsInChildren<Text>(true).All(t=>t.text!="UI"&&t.text!="Interface"));
-            yield return Press(Key.Escape);Check("Escape closes settings",!menu.SettingsOpen&&menu.StartButton.IsInteractable());
+            yield return Press(Key.Escape);Check("Escape closes settings",!menu.SettingsOpen&&menu.RushButton.IsInteractable());
             // mini music player
             menu.MusicPauseButton.onClick.Invoke();Check("music player pauses",menu.Music.UserPaused);
             menu.MusicPlayButton.onClick.Invoke();Check("music player plays",!menu.Music.UserPaused);
-            var title=menu.Music.TrackTitle;menu.MusicNextButton.onClick.Invoke();Check("music player skips",menu.Music.TrackTitle!=title);
+            if(MenuMusic.TrackCount>1){var title=menu.Music.TrackTitle;menu.MusicNextButton.onClick.Invoke();Check("music player skips",menu.Music.TrackTitle!=title);}
+            else Check("single menu song loops with no skip button",!menu.MusicNextButton.gameObject.activeSelf&&menu.Music.MenuSource.loop&&menu.Music.MenuSource.clip&&menu.Music.MenuSource.clip.name=="BittersweetDawn");
             // the old Showcase menu is never presented: its startup scene routes here
             SceneManager.LoadScene(MainMenu.ScenePath);yield return SceneReady(()=>FindAnyObjectByType<ConfrontationMenu>()?.Hero!=null);
             Check("startup routes to the only main menu",!FindAnyObjectByType<MainMenu>()&&SceneManager.sceneCount==1&&MenuAppearance.Selected==MenuStyle.Alternative);

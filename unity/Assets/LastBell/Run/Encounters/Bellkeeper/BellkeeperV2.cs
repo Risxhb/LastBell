@@ -170,7 +170,7 @@ namespace LastBell.Run
         void FitHpToParty()
         {
             int n = 0; foreach (var p in W.Players) if (!(p.Input is AllyBot) || AllyBot.Attacks) n++;   // passive menu allies don't count
-            n = Mathf.Max(1, n); int want = Mathf.RoundToInt((Set == AbilitySet.Ultimate ? UltimateBaseHp * (n == 1 ? UltimateSoloScale : 1) : BaseHp) * (1 + 0.7f * (n - 1)));
+            n = Mathf.Max(1, n); int want = Mathf.RoundToInt((Set == AbilitySet.Ultimate ? UltimateBaseHp * (n == 1 ? UltimateSoloScale : 1) * UltHpFor(W.Difficulty) : BaseHp) * (1 + 0.7f * (n - 1)));
             if (want == MaxHp || Hp != MaxHp) return;
             MaxHp = want; Hp = want;
         }

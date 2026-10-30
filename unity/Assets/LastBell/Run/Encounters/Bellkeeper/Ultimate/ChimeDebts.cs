@@ -76,7 +76,7 @@ namespace LastBell.Run
                     if (d.Paid && d.RingOutline != null && Now >= d.PayTick + Sim.Ticks(ShownSeconds)) Fade(d);   // from here on it is a memory
                     // ...until the last WarnSeconds: then the blast shows red again (Chzy18 playtest 25 Oct: a hidden ring over the
                     // TOCK ✕ read as an unfair swipe), so the TOCK holder can see the safe inner edge
-                    if (d.Paid && !d.Warned && !d.Erased && Now >= d.DetTick - Sim.Ticks(WarnSeconds))
+                    if (d.Paid && !d.Warned && !d.Erased && Now >= d.DetTick - Sim.Ticks(WarnSeconds + WarnLead))
                     {
                         d.Warned = true; int left = Mathf.Max(1, d.DetTick - Now);
                         Spawn(new Hazard { Source = Source + " (warning)", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = d.Ring.Origin, Radius = d.Ring.Radius, LockAt = 0, ResolveAt = UltShapes.ResolveIn(left), Damage = 0, Knockback = 0, Stun = 0, HitOnResolve = false });

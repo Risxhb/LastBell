@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-Packages large asset folders into a versioned ZIP, publishes it as a GitHub Release
+Packages large asset folders into a versioned ZIP, publishes to Azure Artifacts
 and records it in asset-packs.json.
 
 .DESCRIPTION
@@ -10,7 +10,7 @@ Run from a checkout that has the asset files on disk. The script:
   2. computes the ZIP's SHA-256.
 Without -Publish it stops there (a dry run: check the ZIP in .asset-packs/out/).
 With -Publish it also:
-  3. creates the GitHub Release <Name>-v<Version> and uploads the ZIP (needs gh, logged in);
+  3. publishes an immutable Azure Universal Package containing the ZIP;
   4. adds or updates the pack's entry in asset-packs.json;
   5. adds the paths to .gitignore and removes them from the Git index
      (the files stay on disk).
@@ -27,8 +27,7 @@ param(
     [Parameter(Mandatory)] [ValidatePattern('^[a-z0-9][a-z0-9-]*$')] [string]$Name,
     [Parameter(Mandatory)] [ValidateRange(1, 9999)] [int]$Version,
     [Parameter(Mandatory)] [string[]]$Path,
-    [string]$Repo = 'Risxhb/collab',
-    [string]$Notes,
+    [string]$Feed = 'last-bell-assets',
     [switch]$Publish
 )
 
@@ -59,38 +58,18 @@ $sha = Get-Sha256 $zipPath
 $size = (Get-Item $zipPath).Length
 Write-Host "  $(Format-Size $size), sha256 $sha"
 
-$url = "https://github.com/$Repo/releases/download/$tag/$zipName"
+$source = New-UniversalSource $Name $Version $Feed
 
 if ($Publish) {
-    $previous = $ErrorActionPreference
-    $ErrorActionPreference = 'Continue'
-    & gh release view $tag --repo $Repo *> $null
-    $exists = $LASTEXITCODE -eq 0
-    $ErrorActionPreference = $previous
-    if ($exists) {
-        throw "Release $tag already exists on $Repo. Published versions are never replaced; use a new -Version."
-    }
-    $bt = [string][char]96
-    $pathList = ($paths | ForEach-Object { $bt + $_ + $bt }) -join ', '
-    $sizeText = Format-Size $size
-    $body = (@(
-        "Asset pack **$Name** v$Version for Last Bell.",
-        '',
-        "- File: $bt$zipName$bt ($sizeText, $($files.Count) files, $metaCount Unity .meta files)",
-        "- SHA-256: $bt$sha$bt",
-        "- Extracts to the repository root. Paths: $pathList",
-        '',
-        "Install with ${bt}setup-assets.cmd$bt (see docs/asset-packs.md). Don't edit or replace this release; publish a new version instead."
-    ) -join "`n")
-    if ($Notes) { $body += "`n`n$Notes" }
-    $notesFile = Join-Path $outDir "$tag-notes.md"
-    [IO.File]::WriteAllText($notesFile, $body, (New-Object Text.UTF8Encoding $false))
-    Write-Host "Publishing release $tag on $Repo ..."
-    $code = Invoke-Native { gh release create $tag $zipPath --repo $Repo --title "Asset pack: $Name v$Version" --notes-file $notesFile --target main }
-    if ($code -ne 0) { throw "gh release create failed for $tag." }
+    # The package directory contains only the verified archive. Azure rejects reused versions.
+    $publishDir = Join-Path $outDir "$tag-package"
+    [void](New-Item -ItemType Directory -Force $publishDir)
+    Copy-Item -LiteralPath $zipPath -Destination (Join-Path $publishDir $zipName) -Force
+    Write-Host "Publishing $tag to Azure Artifacts feed $Feed ..."
+    Invoke-UniversalPublish $source $publishDir
 } else {
     # A dry run leaves asset-packs.json and .gitignore alone, so nobody commits a URL that doesn't exist yet.
-    Write-Host "Dry run: built $zipPath only. Re-run with -Publish to create release $tag and update asset-packs.json."
+    Write-Host "Dry run: built $zipPath only. Re-run with -Publish to publish to Azure Artifacts and update asset-packs.json."
     return
 }
 
@@ -98,7 +77,7 @@ $entry = [pscustomobject][ordered]@{
     name      = $Name
     version   = $Version
     file      = $zipName
-    url       = $url
+    source    = $source
     sha256    = $sha
     size      = $size
     extractTo = '.'
@@ -134,4 +113,4 @@ $code = Invoke-Native { git -C $root rm -r -q --cached --ignore-unmatch -- $untr
 if ($code -ne 0) { throw 'git rm --cached failed; the release and manifest are done, so untrack the paths by hand.' }
 Write-Host ''
 Write-Host "Done. Commit asset-packs.json and .gitignore (and the index removals) on your branch."
-Write-Host "Download URL: $url"
+Write-Host "Azure package: $Feed/$Name $($source.packageVersion)"

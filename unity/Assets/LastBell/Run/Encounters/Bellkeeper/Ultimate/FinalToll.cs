@@ -18,7 +18,8 @@ namespace LastBell.Run
     //             debts), DEBTS (P1: a 2 m ring under everyone that detonates next toll), INVERTED (P2: the half centred
     //             on the INVERTED hour's last gap slams: that hour inside, everyone else out), HAMMER (P4: 12 shards from a
     //             point near the rim, marked 1.6 s before). One a toll for I-VI, two for VII-IX, all four for X-XII.
-    //   RESONANCE inside the bell every hit on the boss counts double (BellkeeperEncounter.V2P5Resonance)
+    //   RESONANCE inside the bell every hit on the boss counts x1.25 (BellkeeperEncounter.V2P5Resonance; first asked as x2,
+    //             tuned down), and x4 in the Last Stand (StandScale)
     //   MAINSPRING from toll IV, P3's three spiral arms fire between sound rings, stopping 0.8 s before each toll (50).
     //   THE ECHO BELLKEEPER toll IX on: a ghost Bellkeeper (an extra body, r 1) 6.5 m out across the boss from each toll's
     //             plate (it moves after every toll) strikes its own clapper lane through itself. Only the one that RANG LAST
@@ -37,8 +38,10 @@ namespace LastBell.Run
         public static readonly float[] TollAt = { 0, 4, 8, 12, 16, 20, 24, 27.5f, 31, 34.5f, 38, 41.5f, 45, 48.5f };
         public const float RingStart = 11.6f, RingSpeed = 5f, GapHalf = 16f, RingHalf = 0.3f, LaneHalf = 1.5f, LaneShow = 1.6f,
             PlateR = 5.5f, PlateSize = 1.6f, DebtR = 2f, EchoDelay = 0.8f, ArmEvery = 0.45f, ArmSpeed = 3.5f, ArmTurn = 35f,
-            ShardSpeed = 4f, BR = 0.22f, PR = 0.45f, Bound = 11.1f, Stand = 10f, StandScale = 4f, EchoOut = 6.5f, EchoRad = 1f,
+            ShardSpeed = 4f, BR = 0.22f, PR = 0.45f, Bound = 11.1f, StandScale = 4f, EchoOut = 6.5f, EchoRad = 1f,
             PlatOut = 3.4f, PlatR = 1.9f, ShardR = 0.9f;   // each platform reaches the boss, so a melee lunge ends on it
+        float Stand => Boss.UltStandFor;
+        float Show => LaneShow + WarnLead;   // the clapper and hammer lanes show 0.3 s earlier on Easy   // the Last Stand before the bell falls: 10 s on Hard, longer on Medium and Easy
         const int BulletDamage = 50, RingDamage = 50;
         static readonly string[] KN = { "PLATE", "DEBTS", "INVERTED", "HAMMER" };
 
@@ -154,20 +157,21 @@ namespace LastBell.Run
                 if (k < 13)
                 {
                     float left = TollAt[k] - t;
-                    if (lane == null && left <= LaneShow)
+                    if (lane == null && left <= Show)
                     {
                         float yaw = LaneAng(k) + 180;   // Sim.Dir(yaw) = Dir(plan angle)
                         lane = Spawn(new Hazard { Source = Source + ": the clapper", Shape = HazardShape.Lane, Kind = HazardKind.Strike, Origin = -Sim.Dir(yaw) * 12f, Yaw = yaw, Length = 24, Width = LaneHalf * 2, LockAt = 0, ResolveAt = UltShapes.ResolveIn(Mathf.Max(1, Sim.Ticks(left))), Damage = 0, Knockback = 0, Stun = 0, HitOnResolve = false });
-                        lane.OnResolve = hz => { W.BossFx.TollResolve(Vector3.zero, 0.6f, 11f); CameraShake.Shake(0.2f, 0.3f); };
+                        int kl = k; lane.OnResolve = hz => { W.BossFx.TollResolve(Vector3.zero, 0.6f, 11f); W.BossFx.UltClapperStrike(Vector3.zero, Dir(LaneAng(kl)), 22f); CameraShake.Shake(0.2f, 0.3f); };
                     }
-                    if (eLane == null && k >= 9 && k <= 12 && left <= LaneShow)
+                    if (eLane == null && k >= 9 && k <= 12 && left <= Show)
                     {
                         float yaw = EchoLaneAng(k) + 180;
                         eLane = Spawn(new Hazard { Source = Source + ": the echo's clapper", Shape = HazardShape.Lane, Kind = HazardKind.Strike, Origin = EchoPos(k) - Sim.Dir(yaw) * 14f, Yaw = yaw, Length = 28, Width = LaneHalf * 2, LockAt = 0, ResolveAt = UltShapes.ResolveIn(Mathf.Max(1, Sim.Ticks(left))), Damage = 0, Knockback = 0, Stun = 0, HitOnResolve = false });
+                        int ke = k; eLane.OnResolve = hz => W.BossFx.UltClapperStrike(EchoPos(ke), Dir(EchoLaneAng(ke)), 22f);
                     }
                     if (half == null && Has(k, 2))
                         half = Spawn(new Hazard { Source = Source + ": INVERTED", Shape = HazardShape.Cone, Kind = HazardKind.Ground, Origin = Vector3.zero, Yaw = InvAng(k) + 180, HalfAngle = 90, Radius = 11.6f, LockAt = 0, ResolveAt = UltShapes.ResolveIn(Mathf.Max(1, Sim.Ticks(left))), Damage = 0, Knockback = 0, Stun = 0, HitOnResolve = false });
-                    if (mark == null && Has(k, 3) && left <= LaneShow)
+                    if (mark == null && Has(k, 3) && left <= Show)
                         mark = Spawn(new Hazard { Source = Source + ": the hammer", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = HammerAt(k), Radius = 0.9f, LockAt = 0, ResolveAt = UltShapes.ResolveIn(Mathf.Max(1, Sim.Ticks(left))), Damage = 0, Knockback = 0, Stun = 0, HitOnResolve = false });
                 }
                 // the toll
@@ -182,11 +186,11 @@ namespace LastBell.Run
                 // the last stand: the fall, the shards, the end
                 if (Standing(nt))
                 {
-                    foreach (var p in W.Players) if (!p.Down && p.Height < 0.05f && !p.Dashing && (Sim.Flat(p.transform.position) - PlatC(HourOf(p))).magnitude > PlatR) Hit(p, UltimateState.Lethal, "the fall");
+                    foreach (var p in W.Players) if (!p.Down && p.Height < 0.05f && (Sim.Flat(p.transform.position) - PlatC(HourOf(p))).magnitude > PlatR) Hit(p, UltimateState.Lethal, "the fall");   // feet down off the platform: dashing too (no iframes)
                     for (int n = 0; n < ShardCount; n++)
                     {
                         var sh = Shard(n);
-                        if (!shardTele[n] && nt >= sh.at - 1f) { shardTele[n] = true; Spawn(new Hazard { Source = Source + ": a falling shard", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = sh.p, Radius = ShardR, LockAt = 0, ResolveAt = UltShapes.ResolveIn(Mathf.Max(1, Sim.Ticks(sh.at - t))), Damage = 0, Knockback = 0, Stun = 0, HitOnResolve = false }); }
+                        if (!shardTele[n] && nt >= sh.at - (1f + WarnLead)) { shardTele[n] = true; Spawn(new Hazard { Source = Source + ": a falling shard", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = sh.p, Radius = ShardR, LockAt = 0, ResolveAt = UltShapes.ResolveIn(Mathf.Max(1, Sim.Ticks(sh.at - t))), Damage = 0, Knockback = 0, Stun = 0, HitOnResolve = false }); }
                         if (!shardDone[n] && nt >= sh.at) { shardDone[n] = true; foreach (var p in W.Players) if (!p.Down && (Sim.Flat(p.transform.position) - sh.p).magnitude < ShardR + PR) Hit(p, UltimateState.Lethal, "a falling shard"); }
                     }
                     if (nt >= TollAt[13] + Stand) { Fails.Add("the bell falls"); Ult.Wipe("The bell falls"); break; }
@@ -236,7 +240,7 @@ namespace LastBell.Run
                     if (HourOf(p) == ih ? o <= 0.6f : o >= -0.6f) Hit(p, UltimateState.Lethal, HourOf(p) == ih ? "the bell (inverted)" : "the slam");
                 }
             }
-            if (Has(k, 3)) { var c = HammerAt(k); for (int j = 0; j < 12; j++) bullets.Add(new Bullet { P = c, V = Dir(30 * j + 7 * k) * ShardSpeed, What = "a hammer shard" }); }
+            if (Has(k, 3)) { var c = HammerAt(k); for (int j = 0; j < 12; j++) bullets.Add(new Bullet { P = c, V = Dir(30 * j + 7 * k) * ShardSpeed, What = "a hammer shard" }); W.BossFx.ChargeLand(c); }   // the hammer lands: a stomp ring, dust, sparks
             if (Has(k, 1) && k < 12)
                 foreach (var p in W.Players)
                 {
@@ -351,10 +355,11 @@ namespace LastBell.Run
             return true;
         }
 
-        readonly List<Vector3>[] pred = new List<Vector3>[12];
+        readonly List<Vector3>[] pred = new List<Vector3>[16];
         Vector3 Search(PlayerController p, Vector3 pos, float t, Vector3 goal)
         {
-            const float Leg = 0.2f; const int Legs = 3, Samples = 4, BeamW = 10; float dtS = Leg / Samples; int N = Legs * Samples;
+            // 4 legs (0.8 s), as P3: at 9 m/s a sprinting bot could commit to a route across the clapper lane before it saw the toll
+            const float Leg = 0.2f; const int Legs = 4, Samples = 4, BeamW = 12; float dtS = Leg / Samples; int N = Legs * Samples;
             int hour = HourOf(p);
             for (int s = 0; s < N; s++)
             {
@@ -427,10 +432,21 @@ namespace LastBell.Run
             return beam[0].first;
         }
 
-        // ---------------- presentation (stand-ins) ----------------
-        Transform root, plate, mySpot, echo, echoLive, floor, bellModel; readonly Transform[] plats = new Transform[4]; readonly List<Transform> pool = new List<Transform>(), ring1 = new List<Transform>(), ring2 = new List<Transform>();
-        static Material bellM, ringM, echoM, plateM, bulletM, spotM, ghostM, liveM, pitM, platM;
-        const int RingPieces = 90;
+        // ---------------- presentation ----------------
+        // Models (proposal, ART-PLAN-v2.md batch 3; tools/bellkeeper-ultimate/models/p5_kit.py): the bell's floor, the Last
+        // Stand platforms and falling bell shards, the SOAK plate, the clappers, brass hammer shards and the Echo as a ghost of
+        // the boss. The arena's void stays open beneath (ArenaVoid): at XIII the bell's floor drops into it. Stand-ins remain
+        // where a model is missing.
+        Transform root, plate, mySpot, echo, echoLive, floor, bellModel; readonly Transform[] plats = new Transform[4]; readonly List<Transform> pool = new List<Transform>();
+        static Material bellM, ringM, echoM, plateM, bulletM, spotM, ghostM, liveM, pitM, platM, ghostFx;
+        Transform floorModel; readonly Transform[] clappers = new Transform[2]; readonly List<Transform> shardPool = new List<Transform>(), fallers = new List<Transform>();
+        readonly bool[] landed = new bool[ShardCount];
+        const float ClapperPivot = 6.4f, ClapperScale = 0.6f;   // hung low and small (FT_Clapper x0.6: ball centre 5.4 m down, 1 m off the floor), so its rod stays below the camera
+        // polish (proposal): the HAMMER callback's hammer, the bell's wall breaking at XIII, the Echo's re-forming, the platforms rising
+        const float HammerScale = 0.45f, BellWallR = 12f, ShatterLen = 2.6f;
+        const int BellPieces = 18;
+        Transform hammer; readonly List<Transform> bellBits = new List<Transform>(); readonly Vector3[] platBase = new Vector3[4];
+        readonly List<Renderer> ghostR = new List<Renderer>(); MaterialPropertyBlock ghostBlock; Vector3 echoWas; float echoMovedAt = -9; bool echoSeen, shattered;
         void Build()
         {
             if (root) return;
@@ -444,64 +460,245 @@ namespace LastBell.Run
             }
             root = new GameObject("Final Toll (stand-in)").transform; root.SetParent(W.Root, false);
             floor = Prim.Make(PrimitiveKind.Cylinder, root, new Vector3(0, 0.02f, 0), new Vector3(23.4f, 0.01f, 23.4f), Color.white); Mat(floor, bellM);
+            ArenaVoid.Open(W.Root);   // the arena's own floor goes: below the bell's floor is the void
+            floorModel = GearFloor.Model("FT_BellFloor", root, Vector3.zero, Quaternion.identity); if (floorModel) floor.gameObject.SetActive(false);
+            for (int i = 0; i < 2; i++) { clappers[i] = GearFloor.Model("FT_Clapper", root, Vector3.up * ClapperPivot, Quaternion.identity); if (clappers[i]) { clappers[i].localScale = Vector3.one * ClapperScale; clappers[i].gameObject.SetActive(false); } }
+            for (int n = 0; n < ShardCount; n++) { var fx = GearFloor.Model("FT_BellShard", root, Vector3.up * 30, Quaternion.identity); if (!fx) break; fx.gameObject.SetActive(false); fallers.Add(fx); landed[n] = false; }
             var prefab = Resources.Load<GameObject>("Ultimate/GB_GreatBell");
             if (prefab) { bellModel = Object.Instantiate(prefab, root, false).transform; bellModel.name = "the great bell"; var dome = bellModel.Find("Dome"); if (dome) dome.gameObject.SetActive(false); }
             echo = new GameObject("the Echo Bellkeeper").transform; echo.SetParent(root, false);
-            Mat(Prim.Make(PrimitiveKind.Cylinder, echo, new Vector3(0, 1.4f, 0), new Vector3(EchoRad * 2, 1.4f, EchoRad * 2), Color.white), ghostM);
-            Mat(Prim.Make(PrimitiveKind.Sphere, echo, new Vector3(0, 3.1f, 0), Vector3.one * 1.3f, Color.white), ghostM);
+            if (!Ghost(echo))
+            {
+                Mat(Prim.Make(PrimitiveKind.Cylinder, echo, new Vector3(0, 1.4f, 0), new Vector3(EchoRad * 2, 1.4f, EchoRad * 2), Color.white), ghostM);
+                Mat(Prim.Make(PrimitiveKind.Sphere, echo, new Vector3(0, 3.1f, 0), Vector3.one * 1.3f, Color.white), ghostM);
+            }
             echoLive = Prim.Make(PrimitiveKind.Cylinder, echo, new Vector3(0, 0.05f, 0), new Vector3(EchoRad * 2 + 0.7f, 0.02f, EchoRad * 2 + 0.7f), Color.white); Mat(echoLive, liveM);
             echo.gameObject.SetActive(false);
-            for (int h = 0; h < 4; h++) { plats[h] = Prim.Make(PrimitiveKind.Cylinder, root, PlatC(h) + Vector3.up * 0.06f, new Vector3(PlatR * 2, 0.04f, PlatR * 2), Color.white); Mat(plats[h], platM); plats[h].gameObject.SetActive(false); }
-            for (int j = 0; j < RingPieces; j++)
-            {
-                var a = Prim.Make(PrimitiveKind.Cube, root, Vector3.zero, new Vector3(0.6f, 0.18f, 0.45f), Color.white); Mat(a, ringM); a.gameObject.SetActive(false); ring1.Add(a);
-                var b = Prim.Make(PrimitiveKind.Cube, root, Vector3.zero, new Vector3(0.6f, 0.18f, 0.45f), Color.white); Mat(b, echoM); b.gameObject.SetActive(false); ring2.Add(b);
-            }
-            plate = Prim.Make(PrimitiveKind.Cylinder, root, Vector3.zero, new Vector3(PlateSize * 2, 0.03f, PlateSize * 2), Color.white); Mat(plate, plateM); plate.gameObject.SetActive(false);
+            for (int h = 0; h < 4; h++) if (GearFloor.Model("FT_Platform", root, PlatC(h), Quaternion.FromToRotation(Vector3.left, PlatC(h).normalized)) is Transform pm) { plats[h] = pm; pm.gameObject.SetActive(false); } else { plats[h] = Prim.Make(PrimitiveKind.Cylinder, root, PlatC(h) + Vector3.up * 0.06f, new Vector3(PlatR * 2, 0.04f, PlatR * 2), Color.white); Mat(plats[h], platM); plats[h].gameObject.SetActive(false); }
+            if (!ringGlowA) { ringGlowA = Fx(new Color(0.25f, 0.12f, 0.02f), new Color(1.9f, 1.35f, 0.55f), 0.85f); ringGlowB = Fx(new Color(0.02f, 0.07f, 0.16f), new Color(0.5f, 1.2f, 2.0f), 0.85f); }
+            ringA = NewRing("the sound ring", ringM, ringGlowA); ringB = NewRing("the echo ring", echoM, ringGlowB);
+            // the bell's own hammer for the HAMMER callback, and the great bell's wall in pieces for XIII
+            hammer = GearFloor.Model("GF_Hammer", root, Vector3.up * 30, Quaternion.identity); if (hammer) { hammer.localScale = Vector3.one * HammerScale; hammer.gameObject.SetActive(false); }
+            for (int n = 0; n < BellPieces; n++) { var bp = GearFloor.Model("FT_BellShard", root, Vector3.up * 30, Quaternion.identity); if (!bp) break; bp.localScale = Vector3.one * (1.4f + 0.5f * (n % 3)); bp.gameObject.SetActive(false); bellBits.Add(bp); }
+            for (int h = 0; h < 4; h++) platBase[h] = plats[h] ? plats[h].position : Vector3.zero;
+            ghostR.Clear(); foreach (var r in echo.GetComponentsInChildren<Renderer>()) if (r.sharedMaterial == ghostFx) ghostR.Add(r);
+            echoSeen = false; shattered = false;
+            plate = GearFloor.Model("FT_Plate", root, Vector3.zero, Quaternion.identity);
+            if (!plate) { plate = Prim.Make(PrimitiveKind.Cylinder, root, Vector3.zero, new Vector3(PlateSize * 2, 0.03f, PlateSize * 2), Color.white); Mat(plate, plateM); }
+            plate.gameObject.SetActive(false);
             mySpot = new GameObject("my spot").transform; mySpot.SetParent(root, false);
             Mat(Prim.Make(PrimitiveKind.Cylinder, mySpot, new Vector3(0, 1.6f, 0), new Vector3(0.12f, 1.6f, 0.12f), Color.white), spotM);
         }
-        static void Mat(Transform t, Material m) { var r = t.GetComponent<Renderer>(); r.sharedMaterial = m; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; }
-        void DrawRing(List<Transform> pieces, float R, int k, bool echo)
+        // the Echo: a copy of the boss's own meshes (frozen in their pose) in the additive effect shader, its UVs remapped so the
+        // "pillar" shape glows teal-blue at the feet and fades up the body, with slow vertical ripples
+        bool Ghost(Transform into)
         {
-            if (R < 0) { foreach (var x in pieces) x.gameObject.SetActive(false); return; }
-            float step = 360f / RingPieces;
-            for (int j = 0; j < RingPieces; j++)
+            if (!Boss) return false;
+            if (!ghostFx)
             {
-                float a = step * (j + 0.5f); bool gap = false;
-                for (int g = 0; g < 4; g++) if (AngDiff(a, GapCentre(k, g) + (echo ? 45 : 0)) < GapHalf) gap = true;
-                var x = pieces[j]; x.gameObject.SetActive(!gap); if (gap) continue;
-                var d = Dir(a); x.position = d * R + Vector3.up * 0.12f; x.rotation = Quaternion.LookRotation(d);
-                x.localScale = new Vector3(Mathf.Max(0.2f, 2 * Mathf.PI * R / RingPieces + 0.05f), 0.18f, 0.45f);
+                var sh = Shader.Find("LastBell/FX/ColorDissolve"); if (!sh) { var m0 = Resources.Load<Material>("Run/FX_ColorDissolve"); if (m0) sh = m0.shader; }
+                if (!sh) return false;
+                ghostFx = new Material(sh) { name = "Echo ghost" }; ghostFx.SetFloat("_Mode", 2); ghostFx.SetColor("_ColorLow", new Color(0.02f, 0.07f, 0.16f)); ghostFx.SetColor("_ColorHigh", new Color(0.25f, 0.62f, 1.0f));
+                ghostFx.SetFloat("_Dissolve", 0); ghostFx.SetFloat("_Intensity", 0.16f);   // additive over every layer of the mesh: kept faint so it reads as a teal shape, not a white blob
+                ghostFx.SetVector("_NoiseScale", new Vector4(3, 6, 0, 0)); ghostFx.SetVector("_Scroll", new Vector4(0, 0.4f, 0, 0));
             }
+            float top = Mathf.Max(1f, Boss.MarkHeight); int made = 0;
+            void Add(Mesh src, Matrix4x4 toBoss, string name)
+            {
+                if (!src || !src.isReadable) return;
+                var m = new Mesh { name = name + " (echo)", indexFormat = src.indexFormat }; var vs = src.vertices; var bv = new Vector3[vs.Length]; var uv = new Vector2[vs.Length];
+                for (int i = 0; i < vs.Length; i++) { var w = toBoss.MultiplyPoint3x4(vs[i]); bv[i] = w; uv[i] = new Vector2(Mathf.Atan2(w.z, w.x) / (2 * Mathf.PI) + 0.5f, Mathf.Clamp01(w.y / top) * 0.92f); }
+                m.vertices = bv; m.triangles = src.triangles; m.uv = uv; var cols = new Color[bv.Length]; for (int i = 0; i < cols.Length; i++) cols[i] = Color.white; m.colors = cols; m.RecalculateBounds();   // vertices in the boss's own space
+                var go = new GameObject(name); go.transform.SetParent(into, false);
+                go.AddComponent<MeshFilter>().sharedMesh = m; var mr = go.AddComponent<MeshRenderer>(); mr.sharedMaterial = ghostFx; mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; made++;
+            }
+            var bossInv = Boss.transform.worldToLocalMatrix;
+            foreach (var r in Boss.GetComponentsInChildren<Renderer>())
+            {
+                if (!r.enabled || !r.gameObject.activeInHierarchy) continue;
+                if (r is SkinnedMeshRenderer sk)
+                {
+                    // BakeMesh gives the posed mesh in the renderer's space without its scale; put that scale back
+                    var baked = new Mesh(); sk.BakeMesh(baked, false);
+                    Add(baked, bossInv * Matrix4x4.TRS(sk.transform.position, sk.transform.rotation, Vector3.one), sk.name); Object.Destroy(baked);
+                }
+                else if (r is MeshRenderer && r.TryGetComponent<MeshFilter>(out var mf)) Add(mf.sharedMesh, bossInv * r.transform.localToWorldMatrix, r.name);
+            }
+            return made > 0;
+        }
+        // the clapper over a lane: winds up over one end as the lane shows, swings through on the toll, rides up the far side
+        void PlaceClapper(Transform c, Vector3 pivot, float laneAng, float rel)
+        {
+            if (!c) return;
+            bool on = rel > -Show && rel < 0.45f; c.gameObject.SetActive(on); if (!on) return;
+            float a = rel < -0.3f ? Mathf.Lerp(-62f, -76f, Mathf.InverseLerp(-Show, -0.3f, rel)) + Mathf.Sin(rel * 40f) * 1.2f   // drawn back, trembling
+                    : rel < 0.3f ? -76f + 152f * Mathf.SmoothStep(0, 1, Mathf.InverseLerp(-0.3f, 0.3f, rel)) : 76f;
+            var axis = Vector3.Cross(Vector3.up, Dir(laneAng));
+            c.position = pivot + Vector3.up * ClapperPivot; c.rotation = Quaternion.AngleAxis(a, axis);
+        }
+        static bool AddTo(List<Transform> l, Transform x) { x.gameObject.SetActive(false); l.Add(x); return true; }
+        static void Mat(Transform t, Material m) { var r = t.GetComponent<Renderer>(); r.sharedMaterial = m; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; }
+        // the sound ring (and the echo) as resonance linework: four arcs between the gaps, each a crisp filled band (the
+        // hostile part: amber, or pale blue for the echo) with a wall of light rising off it and a fading wake behind it (the
+        // ring rushes inward, so the wake trails outside). The gaps stay clean cuts. Rebuilt each frame from the rule's numbers.
+        sealed class RingFx { public GameObject Go; public Mesh M; }
+        RingFx ringA, ringB;
+        static Material ringGlowA, ringGlowB;
+        readonly List<Vector3> rv = new List<Vector3>(); readonly List<Vector2> ruv = new List<Vector2>(); readonly List<Color> rcol = new List<Color>();
+        readonly List<int> rt0 = new List<int>(), rt1 = new List<int>();
+        static Material Fx(Color low, Color high, float intensity)
+        {
+            var sh = Shader.Find("LastBell/FX/ColorDissolve"); if (!sh) { var m0 = Resources.Load<Material>("Run/FX_ColorDissolve"); if (m0) sh = m0.shader; }
+            if (!sh) return null;
+            var m = new Material(sh); m.SetFloat("_Mode", 2); m.SetColor("_ColorLow", low); m.SetColor("_ColorHigh", high); m.SetFloat("_Dissolve", 0); m.SetFloat("_Intensity", intensity);
+            m.SetVector("_NoiseScale", new Vector4(9, 2, 0, 0)); m.SetVector("_Scroll", new Vector4(0.8f, 0, 0, 0)); return m;
+        }
+        RingFx NewRing(string name, Material core, Material glow)
+        {
+            var go = new GameObject(name); go.transform.SetParent(root, false);
+            var m = new Mesh { name = name }; m.MarkDynamic(); go.AddComponent<MeshFilter>().sharedMesh = m;
+            var mr = go.AddComponent<MeshRenderer>(); mr.sharedMaterials = glow ? new[] { core, glow } : new[] { core }; mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            go.SetActive(false); return new RingFx { Go = go, M = m };
+        }
+        void DrawRing(RingFx f, float R, int k, bool echo)
+        {
+            if (f == null) return;
+            f.Go.SetActive(R >= 0); if (R < 0) return;
+            rv.Clear(); ruv.Clear(); rcol.Clear(); rt0.Clear(); rt1.Clear();
+            float off = echo ? 45 : 0;
+            for (int g = 0; g < 4; g++)
+            {
+                float a0 = GapCentre(k, g) + off + GapHalf, a1 = GapCentre(k, (g + 1) % 4) + off - GapHalf;
+                a1 = a0 + ((a1 - a0) % 360 + 360) % 360;   // gap centres are 90° apart, so each arc is 90 - 2 x GapHalf
+                int segs = Mathf.Max(2, Mathf.CeilToInt((a1 - a0) / 2f));
+                for (int s = 0; s <= segs; s++)
+                {
+                    float u = s / (float)segs; var d = Dir(Mathf.Lerp(a0, a1, u)); float ux = u * (a1 - a0) / 30f;
+                    rv.Add(d * (R - RingHalf + 0.08f) + Vector3.up * 0.12f); rv.Add(d * (R + RingHalf - 0.08f) + Vector3.up * 0.12f);   // the band
+                    rv.Add(d * R + Vector3.up * 0.05f); rv.Add(d * R + Vector3.up * 0.8f);                                            // the wall of light
+                    rv.Add(d * (R + 0.2f) + Vector3.up * 0.07f); rv.Add(d * (R + 1.9f) + Vector3.up * 0.07f);                        // the wake
+                    ruv.Add(new Vector2(ux, 0)); ruv.Add(new Vector2(ux, 1)); ruv.Add(new Vector2(ux, 0)); ruv.Add(new Vector2(ux, 1)); ruv.Add(new Vector2(ux, 0)); ruv.Add(new Vector2(ux, 1));
+                    // the arc's ends fade a touch, so the gap reads as a soft-lit doorway, not a hole
+                    float endA = Mathf.Clamp01(Mathf.Min(u, 1 - u) * (a1 - a0) / 6f) * 0.5f + 0.5f;
+                    for (int v = 0; v < 6; v++) rcol.Add(new Color(1, 1, 1, v >= 4 ? 0.6f * endA : endA));
+                    if (s == segs) continue;
+                    int i = rv.Count - 6, j = i + 6;
+                    rt0.Add(i); rt0.Add(j); rt0.Add(i + 1); rt0.Add(i + 1); rt0.Add(j); rt0.Add(j + 1);
+                    for (int w = 2; w <= 4; w += 2)
+                    {
+                        rt1.Add(i + w); rt1.Add(j + w); rt1.Add(i + w + 1); rt1.Add(i + w + 1); rt1.Add(j + w); rt1.Add(j + w + 1);   // both faces
+                        rt1.Add(i + w); rt1.Add(i + w + 1); rt1.Add(j + w); rt1.Add(i + w + 1); rt1.Add(j + w + 1); rt1.Add(j + w);
+                    }
+                }
+            }
+            var m = f.M; m.Clear(); m.SetVertices(rv); m.SetUVs(0, ruv); m.SetColors(rcol);
+            m.subMeshCount = 2; m.SetTriangles(rt0, 0); m.SetTriangles(rt1, 1); m.RecalculateNormals(); m.RecalculateBounds();
         }
         void Present(float t)
         {
             if (!root) return;
             int c = Cur(t), k = c + 1;
-            DrawRing(ring1, RingR(t), c, false); DrawRing(ring2, EchoR(t), c, true);
-            RunDirector.CameraPull = Mathf.Clamp01(1 - t / 1.4f);   // back in from the bell's fall
-            if (bellModel) bellModel.gameObject.SetActive(!Standing(t));   // XIII shatters it
-            bool eo = EchoOn(t); echo.gameObject.SetActive(eo); if (eo) { echo.position = EchoAt(t); echoLive.gameObject.SetActive(EchoLive(t)); }
-            bool st = Standing(t); floor.GetComponent<Renderer>().sharedMaterial = st ? pitM : bellM;
-            for (int h = 0; h < 4; h++) { bool show = t >= TollAt[12]; plats[h].gameObject.SetActive(show && (st || Mathf.FloorToInt(t * 4) % 2 == 0)); }
+            DrawRing(ringA, RingR(t), c, false); DrawRing(ringB, EchoR(t), c, true);
+            bool st = Standing(t); float su = t - TollAt[13];   // su: seconds since XIII
+            // the camera: back in from the bell's fall, then a short pull-back as the bell shatters (the 1-2 s transition
+            // exception, ART-PLAN-v2 "Decided"); kept shallow so the first shard warnings stay readable
+            float shatterPull = su < 0 ? 0 : su < 0.3f ? su / 0.3f : su < 0.7f ? 1 : Mathf.Clamp01(1 - (su - 0.7f) / 0.6f);
+            RunDirector.CameraPull = Mathf.Max(Mathf.Clamp01(1 - t / 1.4f), 0.6f * shatterPull);
+            if (bellModel)
+            {
+                bellModel.gameObject.SetActive(!st);   // XIII shatters it
+                // every toll rocks the bell on its crown (16 m up), across the clapper's lane, and it rings down
+                float since = c >= 1 && c < 13 ? t - TollAt[c] : 99, w = since < 3.5f ? 1.3f * Mathf.Exp(-1.4f * since) * Mathf.Sin(since * 6.5f) : 0;
+                var rock = Quaternion.AngleAxis(w, Vector3.Cross(Vector3.up, Dir(c >= 1 ? LaneAng(c) : 0)));
+                bellModel.localRotation = rock; bellModel.localPosition = Vector3.up * 16f - rock * (Vector3.up * 16f);
+            }
+            // the bell's wall breaks outward at XIII: pieces thrown off its whole round, tumbling down into the void
+            if (st && !shattered) { shattered = true; W.BossFx.UltBellShatter(BellWallR); }
+            if (!st) shattered = false;
+            for (int i = 0; i < bellBits.Count; i++)
+            {
+                var bp = bellBits[i]; bool on = st && su < ShatterLen; bp.gameObject.SetActive(on); if (!on) continue;
+                float a = 360f / bellBits.Count * i + (i * 37 % 11), y0 = 2f + (i % 4) * 2.2f, sp = 5f + (i % 3) * 2.5f;
+                var d = Dir(a); bp.position = d * (BellWallR + sp * su) + Vector3.up * (y0 + 3f * su - 4.9f * su * su);
+                bp.rotation = Quaternion.AngleAxis(200f * su + 40 * i, Vector3.Cross(Vector3.up, d) + Vector3.up * 0.3f * (i % 2 == 0 ? 1 : -1));
+            }
+            bool eo = EchoOn(t); echo.gameObject.SetActive(eo);
+            if (eo)
+            {
+                // the Echo moves after each toll: it comes apart where it was and gathers where it goes (re-forming over 0.4 s,
+                // never fully gone: it is a body you can't walk through)
+                var at = EchoAt(t);
+                if (!echoSeen || (at - echoWas).sqrMagnitude > 0.25f) { W.BossFx.UltEchoShift(echoSeen ? echoWas : Vector3.zero, at); echoMovedAt = t; echoWas = at; echoSeen = true; }
+                echo.position = at; echoLive.gameObject.SetActive(EchoLive(t));
+                if (EchoLive(t)) { float p = 1f + 0.08f * Mathf.Sin(t * 8f); echoLive.localScale = new Vector3((EchoRad * 2 + 0.7f) * p, 0.02f, (EchoRad * 2 + 0.7f) * p); }
+                if (ghostBlock == null) ghostBlock = new MaterialPropertyBlock();
+                float form = Mathf.Clamp01((t - echoMovedAt) / 0.4f);
+                ghostBlock.SetFloat("_Dissolve", 0.6f * (1 - form)); ghostBlock.SetFloat("_Intensity", 0.16f * (0.85f + 0.15f * Mathf.Sin(t * 3f)));
+                foreach (var r in ghostR) if (r) r.SetPropertyBlock(ghostBlock);
+            }
+            else echoSeen = false;
+            // the HAMMER callback: the bell's hammer hovers over its mark as it shows, drops in the last 0.25 s, lifts away
+            if (hammer)
+            {
+                int kh = k < 13 && Has(k, 3) && TollAt[k] - t <= Show ? k : c >= 1 && c < 13 && Has(c, 3) && t - TollAt[c] < 0.6f ? c : -1;
+                hammer.gameObject.SetActive(kh > 0);
+                if (kh > 0)
+                {
+                    float left = TollAt[kh] - t, hh = left > 0.25f ? Mathf.Lerp(3f, 7f, (left - 0.25f) / Show) : left > 0 ? 3f * (left / 0.25f) : Mathf.Lerp(0, 5f, -left / 0.6f);
+                    hammer.position = HammerAt(kh) + Vector3.up * hh;
+                }
+            }
+            if (floorModel)
+            {
+                float fall = t - TollAt[13];   // XIII: the bell's floor drops away into the void (1.2 s)
+                floorModel.gameObject.SetActive(fall < 1.2f); if (fall < 1.2f) floorModel.position = Vector3.down * (fall > 0 ? 9f * fall * fall : 0);
+            }
+            else floor.GetComponent<Renderer>().sharedMaterial = st ? pitM : bellM;
+            // the clappers: the bell's (through the centre) and, IX-XII, the echo's
+            int kc = c + 1 < 13 && t > TollAt[c + 1] - Show ? c + 1 : c; bool lanes = kc >= 1 && kc < 13; float relc = lanes ? t - TollAt[kc] : 99;
+            PlaceClapper(clappers[0], Vector3.zero, lanes ? LaneAng(kc) : 0, relc);
+            PlaceClapper(clappers[1], kc >= 9 && kc <= 12 ? EchoPos(kc) : Vector3.zero, kc >= 9 && kc <= 12 ? EchoLaneAng(kc) : 0, kc >= 9 && kc <= 12 ? relc : 99);
+            // the Last Stand's falling shards: down from the sky over their 1 s warning, burst on landing
+            for (int fi = 0; fi < fallers.Count; fi++)
+            {
+                var sh = Shard(fi); float u = t - (sh.at - 1f); var fx = fallers[fi];
+                bool on = u > 0 && u < 1.12f; fx.gameObject.SetActive(on);
+                if (on) { float uu = Mathf.Min(1, u); fx.position = sh.p + Vector3.up * (16f * (1 - uu * uu)); fx.rotation = Quaternion.Euler(70f * u + 13 * fi, 40f * fi, 25f * u); }
+                if (u >= 1f && !landed[fi]) { landed[fi] = true; W.BossFx.TollResolve(sh.p, 0.2f, ShardR + 0.4f); }
+                if (u < 0.5f) landed[fi] = false;
+            }
+            for (int h = 0; h < 4; h++)
+            {
+                // from XII the platforms rise up through the bell's floor (0.8 s, easing in) and wait there for XIII
+                bool show = t >= TollAt[12]; plats[h].gameObject.SetActive(show); if (!show) continue;
+                float up = 1 - Mathf.Clamp01((t - TollAt[12]) / 0.8f); plats[h].position = platBase[h] + Vector3.down * 3.5f * up * up;
+            }
             bool showPlate = k < 13 && Has(k, 0) && HourPresent(Soaker(k));
             plate.gameObject.SetActive(showPlate); if (showPlate) plate.position = PlatePos(k) + Vector3.up * 0.04f;
-            int n = 0;
+            int n = 0, ns = 0;
             foreach (var b in bullets)
             {
+                if (b.What == "a hammer shard" && (shardPool.Count > ns || GearFloor.Model("GF_Shard", root, Vector3.zero, Quaternion.identity) is Transform nsx && AddTo(shardPool, nsx)))
+                {
+                    var sx = shardPool[ns++]; sx.gameObject.SetActive(true); sx.position = new Vector3(b.P.x, 0.9f, b.P.z);
+                    var vv = Sim.Flat(b.V); if (vv.sqrMagnitude > 0.01f) sx.rotation = Quaternion.FromToRotation(Vector3.left, vv.normalized) * Quaternion.Euler(Time.time * 360f, 0, 0);
+                    continue;
+                }
                 if (pool.Count <= n) { var tr = Prim.Make(PrimitiveKind.Sphere, root, Vector3.zero, Vector3.one * BR * 2.2f, Color.white); Mat(tr, bulletM); pool.Add(tr); }
                 var x = pool[n++]; x.gameObject.SetActive(true); x.position = new Vector3(b.P.x, 0.9f, b.P.z);
             }
             for (int i = n; i < pool.Count; i++) pool[i].gameObject.SetActive(false);
+            for (int i = ns; i < shardPool.Count; i++) shardPool[i].gameObject.SetActive(false);
             var me = W.Players.Count > 0 ? W.Players[0] : null;
             if (mySpot) { bool show = EscapementRelay.ShowMySpot && me && !me.Down && plans.ContainsKey(me); mySpot.gameObject.SetActive(show); if (show) { var gl = plans[me].Goal; mySpot.position = new Vector3(gl.x, 0, gl.z); } }
         }
         void Teardown()
         {
             if (root) Object.Destroy(root.gameObject);
+            ArenaVoid.Close(); floorModel = null; clappers[0] = clappers[1] = null; shardPool.Clear(); fallers.Clear();
+            ringA = ringB = null; hammer = null; bellBits.Clear(); ghostR.Clear();
             RunDirector.CameraPull = 0;
-            root = plate = mySpot = echo = echoLive = floor = bellModel = null; for (int h = 0; h < 4; h++) plats[h] = null; pool.Clear(); ring1.Clear(); ring2.Clear(); plans.Clear();
+            root = plate = mySpot = echo = echoLive = floor = bellModel = null; for (int h = 0; h < 4; h++) plats[h] = null; pool.Clear(); plans.Clear();
         }
 
         static GUIStyle nameStyle, bigStyle, midStyle;
@@ -525,7 +722,7 @@ namespace LastBell.Run
             if (EchoOn(t)) { Label(cam, EchoAt(t), 4.2f, EchoLive(t) ? "ECHO · LIVE" : "echo", EchoLive(t) ? new Color(1f, 0.85f, 0.45f) : new Color(0.65f, 0.85f, 1f), midStyle); Label(cam, Vector3.zero, 4.6f, EchoLive(t) ? "boss" : "BOSS · LIVE", EchoLive(t) ? new Color(0.9f, 0.88f, 0.8f, 0.7f) : new Color(1f, 0.85f, 0.45f), midStyle); }
             if (t >= TollAt[12]) for (int h = 0; h < 4; h++) Label(cam, PlatC(h) + PlatC(h).normalized * 2.3f, 0.4f, "platform " + UltimateState.Roman[h + 1], new Color(1f, 0.85f, 0.5f), nameStyle);
             if (k < 13 && Has(k, 0) && HourPresent(Soaker(k))) Label(cam, PlatePos(k), 0.6f, UltimateState.Roman[Soaker(k) + 1] + " SOAK", new Color(1f, 0.85f, 0.5f), nameStyle);
-            if (k < 13 && Has(k, 2)) Label(cam, Dir(InvAng(k)) * 8f, 0.6f, UltimateState.Roman[InvHour(k) + 1] + " INVERTED: inside", new Color(0.8f, 0.65f, 1f), nameStyle);
+            if (k < 13 && Has(k, 2)) Label(cam, Dir(InvAng(k)) * 8f, 0.6f, UltimateState.Roman[InvHour(k) + 1] + " INVERTED: inside", new Color(0.97f, 0.94f, 0.86f), nameStyle);   // ivory, like P2 (no Arcanist violet, accepted 28 Oct)
             for (int i = 0; i < W.Players.Count; i++)
             {
                 var p = W.Players[i]; if (p.Down) continue;
@@ -534,6 +731,25 @@ namespace LastBell.Run
             string text = Standing(t) ? $"LAST STAND · {TollAt[13] + Stand - t:0.0}s · hits x{StandScale:0} · stay on your platform" : k >= 13 ? $"XIII in {left:0.0}s · THE BELL SHATTERS: get to your platform" : $"toll {UltimateState.Roman[k]} in {left:0.0}s · {string.Join(" + ", System.Array.ConvertAll(Kinds(k), x => KN[x]))}" + (Echoes(k) ? " · ECHO" : "") + (t >= TollAt[4] ? " · MAINSPRING" : "");
             bigStyle.normal.textColor = k >= 10 ? new Color(1f, 0.42f, 0.3f) : new Color(1f, 0.85f, 0.55f);
             GUI.Label(new Rect(0, Screen.height * 0.17f, Screen.width, 50), text, bigStyle);
+            float su = t - TollAt[13]; if (su >= 0 && su < 1.8f) CrackedTitle("THE LAST BELL", su);
+        }
+        // XIII's title: the words crack along a slanted line, the two halves sliding apart, then fade
+        static GUIStyle titleStyle;
+        static void CrackedTitle(string text, float u)
+        {
+            if (titleStyle == null) titleStyle = new GUIStyle(GUI.skin.label) { fontSize = 72, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            float a = u < 0.15f ? u / 0.15f : Mathf.Clamp01(1 - (u - 1.2f) / 0.6f), split = Mathf.SmoothStep(0, 1, Mathf.Clamp01((u - 0.25f) / 0.5f)) * 9f;
+            float y = Screen.height * 0.3f, h = 100, w = Screen.width;
+            for (int half = 0; half < 2; half++)
+            {
+                // the top half drifts up-left, the bottom down-right; each is clipped to its side of the crack
+                var shift = half == 0 ? new Vector2(-split, -split * 0.5f) : new Vector2(split, split * 0.5f);
+                GUI.BeginGroup(new Rect(0, y + (half == 0 ? 0 : h * 0.52f), w, h * (half == 0 ? 0.52f : 0.48f)));
+                var r = new Rect(shift.x, shift.y - (half == 0 ? 0 : h * 0.52f), w, h);
+                titleStyle.normal.textColor = new Color(0.55f, 0.12f, 0.08f, 0.9f * a); GUI.Label(new Rect(r.x + 3, r.y + 3, r.width, r.height), text, titleStyle);
+                titleStyle.normal.textColor = new Color(1f, 0.93f, 0.78f, a); GUI.Label(r, text, titleStyle);
+                GUI.EndGroup();
+            }
         }
         static void Label(Camera cam, Vector3 world, float height, string text, Color c, GUIStyle style)
         {

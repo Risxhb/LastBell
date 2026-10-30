@@ -42,6 +42,10 @@ namespace LastBell.Run
         int t0, slams, seed; bool stop, goWild, wild, breakMode, locked; float settle, wildAt, nextArm; int wildSlams;
         readonly bool[] launched = new bool[4];
         public const float BreakLen = 15f, WildLen = 15f;
+        // the pawls are drawn from the first tick and lethal 3 s later: P3's outer ring (9.6-10.6 m) crosses the pawl lines (9.2-11.2 m on
+        // the N/E/S/W axes), so a player could end P3 standing on one with no warning (every mechanic needs a real way to survive)
+        public const float PawlGrace = 3f;
+        float pawlLive;
         public bool CoreGone(int g) => launched[g];
         readonly float[] spin = new float[5];
         public int Slams => slams;
@@ -88,7 +92,7 @@ namespace LastBell.Run
             if (k % 3 == 0) l.Add((SlamGear(k) + 1 + ((k >> 2) % 3)) % 4);
             return l;
         }
-        bool Revealed(int k, float t) => t >= k * Slam - Warn;
+        bool Revealed(int k, float t) => t >= k * Slam - (Warn + WarnLead);
         int HourOf(PlayerController p) { int i = W.Players.IndexOf(p); return i < 0 ? -1 : i % 4; }
         int TargetOf(PlayerController p, int k, float t)
         {
@@ -110,19 +114,20 @@ namespace LastBell.Run
             for (int i = 0; i < 4; i++)
             {
                 if (launched[i]) continue;
-                var (a, b) = Pawl(i); if (SegDist(q, a, b) < PR + 0.15f) return "a pawl";
+                var (a, b) = Pawl(i); if (t >= pawlLive && SegDist(q, a, b) < PR + 0.15f) return "a pawl";
                 if (t >= settle && !wild && Biting(i, t) && (Sim.Flat(q) - MeshPoint(i)).magnitude < BiteR + PR) return "the teeth";
             }
             return "";
         }
-        static bool Grounded(PlayerController p) => p.Height < 0.05f && !p.Dashing;
+        // on the floor: feet down. A dash is on the floor too (no iframes, gpt/08): it only helps by carrying you out of the shape
+        static bool Grounded(PlayerController p) => p.Height < 0.05f;
 
         // ---------------- cast ----------------
         public override IEnumerable<int> Cast()
         {
             Boss.ShowAttack(Name);
             stop = false; goWild = false; wild = false; locked = false; wildSlams = 0; for (int g = 0; g < 4; g++) launched[g] = false;
-            breakMode = Cue.Variant == "break"; settle = breakMode ? 0 : Settle; nextArm = -BreakLen + 0.5f;
+            breakMode = Cue.Variant == "break"; settle = breakMode ? 0 : Settle; pawlLive = (breakMode ? -BreakLen : 0) + PawlGrace; nextArm = -BreakLen + 0.5f;
             t0 = Now + (breakMode ? Sim.Ticks(BreakLen) : 0); slams = 0; seed = Cue.Seed % 997; shards.Clear(); plans.Clear();
             for (int i = 0; i < 5; i++) spin[i] = 0;
             Build();
@@ -175,7 +180,7 @@ namespace LastBell.Run
                         wildSlams = ws; int sg = WildSlamGear(ws);
                         if (!launched[sg])
                         {
-                            foreach (var p in W.Players) if (!p.Down && Grounded(p) && GearAt(p.transform.position) == sg) Hit(p, UltimateState.Lethal, "the hammer");
+                            foreach (var p in W.Players) if (!p.Down && GearAt(p.transform.position) == sg) Hit(p, UltimateState.Lethal, "the hammer");   // it falls from above: a jump or a dash is no shield
                             for (int j = 0; j < 12; j++) shards.Add(new Shard { P = GearCentre(sg), V = Dir(30 * j + 7 * ws) * ShardSpeed });
                             W.BossFx.TollResolve(GearCentre(sg), 0.5f, O_R); CameraShake.Shake(0.15f, 0.25f);
                         }
@@ -211,7 +216,7 @@ namespace LastBell.Run
                 {
                     slams = ks; telegraphs.Clear();
                     var ss = SlamGears(ks);
-                    foreach (var p in W.Players) if (!p.Down && Grounded(p) && ss.Contains(GearAt(p.transform.position))) Hit(p, UltimateState.Lethal, "the hammer");
+                    foreach (var p in W.Players) if (!p.Down && ss.Contains(GearAt(p.transform.position))) Hit(p, UltimateState.Lethal, "the hammer");   // from above: no jump or dash exemption
                     foreach (var g in ss) for (int j = 0; j < Shards; j++) shards.Add(new Shard { P = GearCentre(g), V = Dir(360f / Shards * j + 11 * ks) * ShardSpeed });
                     // the train jams if a gear is not held by its own player (Chzy18 25 Oct "force it": anyone else on it doesn't
                     // count, so the two-place rotation is the rule, not just the bots' strat)
@@ -265,7 +270,8 @@ namespace LastBell.Run
                 // ride my gear until it is hammered or about to tear loose, then cross to the centre gear and stay there
                 float tw = t - wildAt; int ws = Mathf.FloorToInt(tw / 2.5f) + 1;
                 bool hammered = cur >= 0 && cur < 4 && ws <= 3 && 2.5f * ws - tw < 1.5f && WildSlamGear(ws) == cur;
-                if (cur >= 0 && cur < 4 && !hammered && tw < 6.5f && tw < LaunchAt(cur) - wildAt - 3) tg = cur; else tg = 4;
+                // leave 5 s before the gear tears loose (was 3): the spin-up made the last crossing impossible (a party Vanguard went with gear E)
+                if (cur >= 0 && cur < 4 && !hammered && tw < 4.5f && tw < LaunchAt(cur) - wildAt - 5) tg = cur; else tg = 4;
                 job = tg == 4 ? "→ CENTRE" : "ride " + GN[tg];
             }
             Vector3 Park(int g) => g == 4
@@ -319,6 +325,11 @@ namespace LastBell.Run
             int clearSteps = 30; var dq = q;
             for (int s = 0; s <= 30; s++) { bool hit = false; for (int g = 0; g < 4; g++) { if ((dq - MeshPoint(g)).magnitude < BiteR + PR + 0.3f) hit = true; var (pa, pb) = Pawl(g); if (SegDist(dq, pa, pb) < PR + 0.5f) hit = true; } if (hit) { clearSteps = s; break; } dq += FloorVel(dq, t + s * 0.05f) * 0.05f; }
             if (clearSteps < 30) fullKit = false;
+            // The Train Runs Wild: no swing on a gear that tears loose within 2 s (a rooted solo Vanguard went with gear S)
+            { int gq = GearAt(q); if (wild && gq >= 0 && gq < 4 && !launched[gq] && LaunchAt(gq) - t < 2f) { reach = 99; fullKit = false; return true; } }
+            // a swing roots its caster: none while a shard or spiral bullet crosses this spot in the next 0.6 s (in The Floor Breaks a parked
+            // Vanguard swung at its core and took four bullets in a row)
+            foreach (var sh in shards) if (!sh.Gone) for (float dt = 0; dt <= 0.6f; dt += 0.05f) if ((sh.P + sh.V * dt - q).magnitude < PR + BR + 0.3f) { reach = 99; fullKit = false; return true; }
             if (clearSteps < 10 || (!wild && GearAt(q) != TargetOf(p, k, t)) || (plans.TryGetValue(p, out var pl) && (q - Sim.Flat(pl.Goal)).magnitude > 1.0f)) { reach = 99; fullKit = false; }
             return true;
         }
@@ -338,6 +349,9 @@ namespace LastBell.Run
                 if (wild) for (int g = 0; g < 4; g++) { float la = LaunchAt(g); if (!launched[g] && tq > la) for (int j = -2; j <= 2; j++) arr.Add(GearCentre(g) + Dir(90f * g + 180 + 24 * j) * 5f * (tq - la)); }
             }
             var bossP = Sim.Flat(Boss.transform.position); string why = ""; float ms = p.Kit != null ? p.Kit.MoveScale : 1f;
+            // The Train Runs Wild: once on the centre gear, stay on it (everyone ends there). A solo Vanguard dodged shards onto gear S
+            // as the spin-up began and could never cross back: every route led off the gear
+            bool holdCentre = wild && GearAt(pos) == 4;
             bool Dead(Vector3 q, int s, ref float risk)
             {
                 float tq = t + (s + 1) * dtS;
@@ -345,6 +359,7 @@ namespace LastBell.Run
                 { float c = (q - bossP).magnitude - Boss.BodyRadius - PR; if (c < -0.05f) { why = "boss"; return true; } if (c < 0.4f) risk += (0.4f - c) * 2; }   // the boss is solid, not deadly
                 bool inside = false; for (int g = 0; g < 5; g++) if ((g == 4 || (!launched[g] && !(wild && tq >= LaunchAt(g) - 0.25f))) && (q - GearCentre(g)).magnitude <= GearR(g) - 0.25f) inside = true;
                 if (!inside && FloorGone(q, tq + 0.1f)) { why = "off gear"; return true; }
+                if (holdCentre && GearAt(q) >= 0 && GearAt(q) < 4) { why = "left the centre"; return true; }
                 if (wSlamG >= 0 && tq >= wSlamT - dtS * 0.5f && tq < wSlamT + dtS * 0.5f && GearAt(q) == wSlamG) { why = "slam"; return true; }
                 for (int g = 0; g < 4; g++) { if (launched[g]) continue; float c = (q - GearCentre(g)).magnitude - HubR - PR; if (c < -0.1f) { why = "core"; return true; } if (c < 0.3f) risk += (0.3f - c) * 1.5f; }   // the core is solid, not deadly: only a route through it is out
                 if (revealed && tq >= slamT - dtS * 0.5f && tq < slamT + dtS * 0.5f && ss.Contains(GearAt(q))) { why = "slam"; return true; }
@@ -353,7 +368,9 @@ namespace LastBell.Run
                 for (int g = 0; g < 4; g++) { float depth = BiteR + PR + 0.1f - (q - MeshPoint(g)).magnitude; if (tq >= settle && !wild && depth > 0 && BiteWithin(g, tq - 0.08f, depth / 3f + 0.15f)) { why = "teeth"; return true; } }   // inside a mesh only if it can get out before the bite
                 int gq = GearAt(q);
                 if (gq >= 0 && gq < 4) { float edge = O_R - (q - GearCentre(gq)).magnitude; if (edge < 0.6f && (q - MeshPoint(gq)).magnitude > 1.4f) risk += (0.6f - edge) * 3; }
-                for (int g = 0; g < 4; g++) { if (launched[g]) continue; var (a, b) = Pawl(g); float c = SegDist(q, a, b) - PR; if (c < 0.8f) risk += (0.8f - c) * 2; }
+                // a live pawl kills at PR + 0.15: the route keeps a hard 0.4 (circling round the core to the inner park spot, a Vanguard
+                // shaved the pawl and the floor's drift finished it), then a soft cost out to 0.8
+                for (int g = 0; g < 4; g++) { if (launched[g]) continue; var (a, b) = Pawl(g); float c = SegDist(q, a, b) - PR; if (tq >= pawlLive && c < 0.4f) { why = "pawl"; return true; } if (c < 0.8f) risk += (0.8f - c) * 2; }
                 return false;
             }
             var dirs = new List<Vector3>(); for (int j = 0; j < 16; j++) dirs.Add(Dir(22.5f * j));
@@ -444,7 +461,18 @@ namespace LastBell.Run
                 var fl = Model("FB_Floor", root, Vector3.zero, Quaternion.identity);
                 if (fl)
                 {
-                    if (!crackM) crackM = Prim.Material(new Color(1f, 0.5f, 0.38f), 1.4f);
+                    // the stones replace the arena's own floor (Area 4's FloorDisc) and wear its material with its planar
+                    // mapping, so nothing changes until they crack; when they fall you see the arena's void beneath
+                    // (Chzy18 26 Oct: "fall away and match the background of the arena")
+                    ArenaVoid.Open(W.Root); arenaFloor = ArenaVoid.Floor;   // the arena floor hidden, its void opened beneath
+                    foreach (var mf in fl.GetComponentsInChildren<MeshFilter>())
+                    {
+                        if (!arenaFloor) break;
+                        var mr = mf.GetComponent<Renderer>(); mr.sharedMaterial = arenaFloor.sharedMaterial; mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                        var mesh = mf.mesh; var vs = mesh.vertices; var uv = new Vector2[vs.Length];
+                        for (int i = 0; i < vs.Length; i++) { var l = arenaFloor.transform.InverseTransformPoint(mf.transform.TransformPoint(vs[i])); uv[i] = new Vector2(-l.x / (2 * ArenaFloorH) + 0.5f, -l.z / (2 * ArenaFloorH) + 0.5f); }
+                        mesh.uv = uv;
+                    }
                     foreach (var r in fl.GetComponentsInChildren<Renderer>())
                     {
                         var c = Sim.Flat(r.transform.position); bool onGear = false; for (int g = 0; g < 5; g++) if ((c - GearCentre(g)).magnitude < GearR(g) - 0.4f) onGear = true;
@@ -456,13 +484,14 @@ namespace LastBell.Run
             bell = Model("GB_GreatBell", root, Vector3.up * 60, Quaternion.identity); if (bell) bell.gameObject.SetActive(false);
         }
         bool models; readonly Transform[] hammers = new Transform[2];
-        sealed class Tile { public Transform T; public Renderer R; public Material Mat; public Vector3 Base, Spin; public Quaternion Rot; public float At; }
+        sealed class Tile { public Transform T; public Renderer R; public Material Mat; public Vector3 Base, Spin; public Quaternion Rot; public float At; public bool Loose; }
         readonly List<Tile> tiles = new List<Tile>();
         readonly List<(Vector3 p, Quaternion r)>[] partBase = { new List<(Vector3, Quaternion)>(), new List<(Vector3, Quaternion)>(), new List<(Vector3, Quaternion)>(), new List<(Vector3, Quaternion)>() };
-        Transform bell; static Material crackM;
+        Transform bell; Renderer arenaFloor; MaterialPropertyBlock tileGlow;
+        const float ArenaFloorH = 13.6f;   // Area 4 builder's FloorH: the floor texture's planar half-size
         public const float BellFallAt = 12.2f;   // s into the wild: the great bell drops, landing as the wild ends (WildLen)
         const float ModelLift = 0.07f;   // gear tops at 0.1 m, clear of the pit disc (0.02) and the arena floor
-        static Transform Model(string name, Transform parent, Vector3 pos, Quaternion rot)
+        internal static Transform Model(string name, Transform parent, Vector3 pos, Quaternion rot)   // also FinalToll
         {
             var prefab = Resources.Load<GameObject>("Ultimate/" + name); if (prefab == null) return null;
             var t = Object.Instantiate(prefab, parent, false).transform; t.name = name; t.position = pos; t.rotation = rot;
@@ -473,9 +502,9 @@ namespace LastBell.Run
         void PlaceHammer(int i, int gear, float left)
         {
             var hm = hammers[i]; if (!hm) return;
-            if (gear < 0 || left > Warn + 0.01f || left < -0.6f) { hm.gameObject.SetActive(false); return; }
+            if (gear < 0 || left > Warn + WarnLead + 0.01f || left < -0.6f) { hm.gameObject.SetActive(false); return; }
             hm.gameObject.SetActive(true);
-            float h = left > 0.25f ? Mathf.Lerp(4.0f, 9.0f, (left - 0.25f) / Warn) : left > 0 ? 4.0f * (left / 0.25f) : Mathf.Lerp(0, 6f, -left / 0.6f);
+            float h = left > 0.25f ? Mathf.Lerp(4.0f, 9.0f, (left - 0.25f) / (Warn + WarnLead)) : left > 0 ? 4.0f * (left / 0.25f) : Mathf.Lerp(0, 6f, -left / 0.6f);
             hm.position = GearCentre(gear) + Vector3.up * h;
         }
         static void Mat(Transform t, Material m) { var r = t.GetComponent<Renderer>(); r.sharedMaterial = m; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; }
@@ -488,17 +517,30 @@ namespace LastBell.Run
                 // the floor breaks in two waves: the cracks flash first
                 bool flash = ((t > -11 && t < -9) || (t > -7 && t < -5)) && Mathf.FloorToInt(t * 6) % 2 == 0;
                 if (pit) pit.gameObject.SetActive(t >= -9); if (floorIn) floorIn.gameObject.SetActive(t >= -9 && t < -5);
-                for (int g = 0; g < 4; g++) if (gearR[g]) gearR[g].sharedMaterial = flash ? hotM : gearM;
+                for (int g = 0; g < 4; g++) if (gearR[g]) gearR[g].sharedMaterial = flash && !models ? hotM : gearM;
             }
             else { if (pit) pit.gameObject.SetActive(t >= settle || Mathf.FloorToInt(t * 6) % 2 == 0 && t > settle - 1.5f); if (floorIn) floorIn.gameObject.SetActive(false); }   // the floor flickers out, then the pit
             if (tiles.Count > 0)
             {
-                if (pit) pit.gameObject.SetActive(true); if (floorIn) floorIn.gameObject.SetActive(false);
+                if (pit) pit.gameObject.SetActive(!arenaFloor); if (floorIn) floorIn.gameObject.SetActive(false);
+                // the cracks glow: in its last 2 s each stone's own glowing lines (the floor's fissure and engraving, its emission
+                // map) burn brighter in an uneven pulse (the floor material is see-through, so nothing can glow from under it)
+                if (tileGlow == null) tileGlow = new MaterialPropertyBlock();
                 bool flick = Mathf.FloorToInt(t * 8) % 2 == 0;
                 foreach (var ti in tiles)
                 {
                     if (!ti.T) continue; float tf = t - ti.At;
-                    if (tf < 0) { ti.T.gameObject.SetActive(true); ti.T.position = ti.Base; ti.T.rotation = ti.Rot; ti.R.sharedMaterial = tf > -2f && flick ? crackM : ti.Mat; continue; }   // the cracks glow first
+                    if (tf < 0)
+                    {
+                        ti.T.gameObject.SetActive(true); ti.R.sharedMaterial = ti.Mat; ti.Loose = false;
+                        float sh = tf > -2f ? (2f + tf) / 2f : 0;   // shudders harder as its fall nears
+                        ti.T.position = ti.Base + new Vector3(Mathf.PerlinNoise(t * 23f, ti.At) - 0.5f, 0, Mathf.PerlinNoise(ti.At, t * 23f) - 0.5f) * 0.09f * sh + Vector3.down * 0.05f * sh;
+                        ti.T.rotation = Quaternion.Euler((Mathf.PerlinNoise(t * 17f, ti.At * 3) - 0.5f) * 5f * sh, 0, (Mathf.PerlinNoise(ti.At * 3, t * 17f) - 0.5f) * 5f * sh) * ti.Rot;
+                        if (sh > 0 && ti.Mat && ti.Mat.HasProperty("_EmissionColor")) { tileGlow.SetColor("_EmissionColor", ti.Mat.GetColor("_EmissionColor") * (1f + 3.5f * sh * (0.6f + 0.4f * Mathf.PerlinNoise(t * 9f, ti.At * 5)))); ti.R.SetPropertyBlock(tileGlow); }
+                        else ti.R.SetPropertyBlock(null);
+                        continue;
+                    }
+                    if (!ti.Loose) { ti.Loose = true; W.BossFx.UltStoneDrop(ti.Base); }   // it breaks loose: dust and sparks from the crack
                     if (tf > 1.1f) { ti.T.gameObject.SetActive(false); continue; }
                     ti.R.sharedMaterial = ti.Mat;
                     ti.T.position = ti.Base + Vector3.down * (0.4f * tf + 7f * tf * tf); ti.T.rotation = Quaternion.Euler(ti.Spin * tf) * ti.Rot;
@@ -535,13 +577,13 @@ namespace LastBell.Run
             {
                 float ph = ((t + g * BiteEvery / 4) % BiteEvery + BiteEvery) % BiteEvery, soon = BiteEvery - ph;
                 bool biteOn = t >= settle && !wild;
-                if (meshR[g]) { meshR[g].sharedMaterial = !biteOn ? meshDim : ph < BiteLen ? meshBite : soon < 1.0f ? meshWarn : meshDim; if (models) meshR[g].enabled = biteOn && (ph < BiteLen || soon < 1.0f); }
+                if (meshR[g]) { meshR[g].sharedMaterial = !biteOn ? meshDim : ph < BiteLen ? meshBite : soon < 1.0f + WarnLead ? meshWarn : meshDim; if (models) meshR[g].enabled = biteOn && (ph < BiteLen || soon < 1.0f + WarnLead); }
                 float kr = BiteR + PR, cr = kr + 2.2f * Mathf.Clamp01((soon - 0.0f) / (BiteEvery - BiteLen));   // closes on the zone as the bite comes
                 for (int j = 0; j < countdown[g].Count; j++)
                 {
                     var x = countdown[g][j]; bool show = biteOn && !launched[g] && ph >= BiteLen; x.gameObject.SetActive(show); if (!show) continue;
                     float a = 360f / CountdownPieces * j; var d = Dir(a); x.position = MeshPoint(g) + d * cr + Vector3.up * 0.14f; x.rotation = Quaternion.LookRotation(d);
-                    x.GetComponent<Renderer>().sharedMaterial = soon < 1.0f ? meshWarn : meshDim;
+                    x.GetComponent<Renderer>().sharedMaterial = soon < 1.0f + WarnLead ? meshWarn : meshDim;
                 }
             }
             if (models) for (int g = 0; g < 5; g++) if (gearR[g]) gearR[g].enabled = gearR[g].sharedMaterial == hotM;
@@ -565,6 +607,7 @@ namespace LastBell.Run
         void Teardown()
         {
             if (root) Object.Destroy(root.gameObject);
+            ArenaVoid.Close(); arenaFloor = null;   // the arena gets its floor back (P5 opens the void again under the bell)
             root = mySpot = pit = floorIn = null; hammers[0] = hammers[1] = null; models = false; bell = null; tiles.Clear(); pool.Clear(); plans.Clear(); foreach (var l in gearParts) l.Clear(); foreach (var l in countdown) l.Clear();
             for (int i = 0; i < 5; i++) { pivots[i] = null; gearR[i] = null; } for (int i = 0; i < 4; i++) meshR[i] = null;
         }

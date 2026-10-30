@@ -1,6 +1,8 @@
 # Ultimate v2 · the end of the fight (proposal)
 
-Status: **proposal**. Nothing here is locked. Browser mockup: `tools/bellkeeper-ultimate/sims/p5-example.html`
+Status: **proposal**, built in Unity (2026-10-26: both transitions, P4, P5 with the Echo and the Last Stand, all on Easy, Medium and Hard). Nothing here is locked or human-approved. In Unity, hits on the boss inside the bell count x1.25 (`V2P5Resonance`, first asked as x2) and x4 in the Last Stand. A dash gives no protection anywhere (no iframes).
+
+Earlier status line: Browser mockup: `tools/bellkeeper-ultimate/sims/p5-example.html`
 (headless test: `node tools/bellkeeper-ultimate/sims/test-p5.js`). It has three scenes and a "play all three in a row"
 button. P4 itself is in `p4-example.html` and in Unity (`GearFloor.cs`).
 

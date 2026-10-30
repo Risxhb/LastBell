@@ -1,6 +1,6 @@
 #!/bin/bash
-# Bellkeeper Ultimate: build a worktree's Unity project and run the in-game autotest, holding the machine-wide
-# Unity lock (only one Unity build or test at a time on this PC).
+# Bellkeeper Ultimate: build a worktree's Unity project and run the in-game autotest, holding one slot of the
+# machine-wide Unity lock (two slots since 29 Oct: two Unity builds or tests at a time on this PC).
 #
 #   tools/bellkeeper-ultimate/build-and-test.sh <name> [player args...]
 #
@@ -12,28 +12,20 @@
 #   BK_SKIP_BUILD=1 run the last build again without rebuilding
 #   BK_TIMEOUT      game timeout in seconds (default 6000: the full Ultimate section with every mechanic built runs past 40 min)
 #
-# The worktree is the one this script lives in. The lock is <B>/.unity-build-lock (mkdir is atomic); it waits 60 s
-# between tries, breaks a lock older than 45 min only when no Unity.exe / LastBell.exe is running, and always removes
-# its own lock on exit.
+# The worktree is the one this script lives in. The lock is the shared helper <B>/tools/unity-lock.sh: it takes
+# whichever of <B>/.unity-build-lock and <B>/.unity-build-lock-2 is free (a performance capture takes both), and this
+# script always releases its slot on exit.
 set -u
 NAME=${1:?usage: build-and-test.sh <name> [player args...]}; shift
 WT="$(cd "$(dirname "$0")/../.." && pwd)"
 B="/c/Users/BS_Ch/Documents/Codex/last bell"
-LOCK="$B/.unity-build-lock"; OWNER="${BK_SESSION:-$NAME}"
+OWNER="${BK_SESSION:-$NAME}"
 UNITY="/c/Program Files/Unity/Hub/Editor/6000.6.6f1/Editor/Unity.exe"
 O="$B/bellkeeper-ultimate-evidence/$NAME"
 
-while ! mkdir "$LOCK" 2>/dev/null; do
-  age=$(( $(date +%s) - $(stat -c %Y "$LOCK" 2>/dev/null || date +%s) ))
-  if [ "$age" -gt 2700 ] && ! tasklist 2>/dev/null | grep -qiE "^(Unity|LastBell)\.exe"; then
-    echo "breaking a stale lock ($age s old, owner: $(cat "$LOCK/owner.txt" 2>/dev/null), no Unity running)"
-    rm -rf "$LOCK"; continue
-  fi
-  echo "$(date +%H:%M:%S) waiting for the Unity lock (owner: $(cat "$LOCK/owner.txt" 2>/dev/null), ${age}s)"
-  sleep 60
-done
-echo "$OWNER $(date -Iseconds) $WT" > "$LOCK/owner.txt"
-trap 'rm -rf "$LOCK"' EXIT
+. "$B/tools/unity-lock.sh"
+unity_lock_acquire "$OWNER $WT"
+trap unity_lock_release EXIT
 
 rm -rf "$O"; mkdir -p "$O"
 if [ "${BK_SKIP_BUILD:-0}" != "1" ]; then
@@ -48,7 +40,7 @@ echo game-exit=$?
 head -1 "$O/autotest-report.txt" 2>/dev/null || echo "NO REPORT"
 grep -E "^FAIL" "$O/autotest-report.txt" 2>/dev/null | head -40
 grep -E "Exception" "$O/player.log" 2>/dev/null | sort -u | head -10
-rm -rf "$LOCK"; trap - EXIT
+unity_lock_release; trap - EXIT
 # frames -> MP4 (Blender's FFmpeg), after the lock: it isn't Unity
 if ls -d "$O"/frames_* >/dev/null 2>&1; then
   "/c/Program Files/Blender Foundation/Blender 5.2/blender.exe" -b -P "$(cygpath -w "$WT/tools/run-loop/frames_to_mp4.py")" -- "$(cygpath -w "$O")" 2>&1 | grep -E "^VIDEO|Error|Traceback"

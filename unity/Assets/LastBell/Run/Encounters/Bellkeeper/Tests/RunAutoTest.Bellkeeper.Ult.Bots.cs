@@ -30,7 +30,7 @@ namespace LastBell.Run
             public readonly List<string> DeathLines = new List<string>();
             public int Dealt; public float Hp01;
             public override string ToString() =>
-                $"{Label}: {(Killed ? "KILL" : Wiped ? "WIPE (" + Cause + ")" : "time cap")} at {Ticks / 60f / 60f:0}:{Ticks / 60f % 60:00} · boss {Hp01:P1} left · " +
+                $"{Label}: {(Killed ? "KILL" : Wiped ? "WIPE (" + Cause + ")" : "time cap")} at {Ticks / 3600}:{Ticks / 60 % 60:00} · boss {Hp01:P1} left · " +
                 $"deaths {Deaths} · potions {Potions} · segments {string.Join(" ", Segments.Select(s => $"{s.seg}@{s.tick / 60f:0}s"))}";
         }
         UltFight ultLast;
@@ -38,10 +38,10 @@ namespace LastBell.Run
         // One stepped fight: n strat bots of `skill` (the run's player is bot 0), from `segment` (null = P1), until the boss
         // dies, the party is down, or capSeconds pass.
         IEnumerator UltRun(string label, int n, UltimateBot.Skill skill, string segment = null, float capSeconds = 1200, string cls0 = "Vanguard",
-                           Action<UltFight> perSecond = null /* every 0.25 s */, bool pushOn = true)
+                           Action<UltFight> perSecond = null /* every 0.25 s */, bool pushOn = true, Difficulty level = Difficulty.Hard)
         {
             ultLast = null;
-            yield return UltStart(null, segment, cls0);
+            yield return UltStart(null, segment, cls0, level);
             if (bk == null) yield break;
             BellkeeperEncounter.PushTimersOn = pushOn;
             var classes = PartyClasses.Skip(1).ToArray();

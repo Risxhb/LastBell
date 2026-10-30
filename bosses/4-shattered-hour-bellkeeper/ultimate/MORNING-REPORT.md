@@ -1,5 +1,12 @@
 # The Bellkeeper — Ultimate: morning report (2026-10-24)
 
+> **Out of date (kept as the 24 Oct record).** It describes the Ultimate's first version (v1: the Pendulum Clocks to the Thirteenth Hour). Since then:
+> - **Ultimate v2** replaced the phases: P1 Escapement Relay and Chime Debts, P2 Broken Hour, P3 Open Hour, The Floor Breaks, P4 Gear Floor, The Train Runs Wild, P5 Final Toll. All are proposals, built in Unity, and none is human-approved.
+> - The Ultimate is the only Bellkeeper fight. The normal v2 attack set is retired; the normal entry is v1.
+> - Easy, Medium and Hard all apply to the Ultimate (gpt/08, settled 25 Oct). It no longer forces Medium.
+> - The repository moved to Azure DevOps. The Ultimate is on `integrate/bellkeeper-ultimate`, draft PR 5.
+> - Current docs: `BUILD.md`, `P1-v2-LOCKED.md`, `P2-v2-LOCKED.md`, `P5-v2-PROPOSAL.md` and `ART-PLAN-v2.md`.
+
 **Status:** designed, built and tested by autotest and strat bots. **Not human-approved:** nothing here is approved until Chzy18 plays it. Every mechanic is a proposal (`ULTIMATE.md`, as changed below).
 
 Branch: `feature/bellkeeper-ultimate` (worktree `last bell\bellkeeper-ultimate-design`), **local only**. GitHub is suspended, so nothing was pushed. Eight mechanic branches `feature/bellkeeper-ult-<id>` are merged into it.

@@ -47,10 +47,10 @@ The menu has a **Difficulty** row: **Easy**, **Medium** or **Hard** (or press **
 | --- | --- |
 | WASD | move (camera-relative) |
 | Mouse | aim; every ability fires toward the cursor |
-| 1 / LMB (hold to repeat) | Basic: Steel Rhythm / Resonant Note |
+| LMB only (hold to repeat) | Basic: Steel Rhythm / Resonant Note |
 | 2, 3, 4 | Vanguard: Sundering Blow, Last Word, **hold** Brace. Chimesinger: Bellstrike, Harmonic Refrain, Crescendo. Arcanist: Time Seal, Arc Lance, Convergence |
-| 6 | Chimesinger: Mending Chorus · Arcanist: Temporal Anchor (press again to return) |
-| 5 / RMB | dash (Clockstep / Harmonic Step) |
+| 5 | Chimesinger: Mending Chorus · Arcanist: Temporal Anchor (press again to return) |
+| RMB only | dash (Clockstep / Harmonic Step) |
 | Space / Shift | jump / sprint (shared movement stamina) |
 | F | drink a potion (+40 HP) |
 | Enter | Ready / Continue / Start run |

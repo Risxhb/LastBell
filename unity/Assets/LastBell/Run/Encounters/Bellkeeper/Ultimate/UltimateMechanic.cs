@@ -28,6 +28,8 @@ namespace LastBell.Run
 
         protected UltimateState Ult => Boss.Ult;
         protected int Party => Boss.PartySize;
+        // Easy shows lethal warnings 0.3 s earlier (RI-005, accepted 27 Oct); only the warning moves, never the hit
+        protected float WarnLead => Boss.UltWarnLeadFor;
         protected int Now => W.Tick;
         // world tick of this cast's launch, and of a cue time (seconds after launch)
         protected int LaunchTick => LastCastTick;

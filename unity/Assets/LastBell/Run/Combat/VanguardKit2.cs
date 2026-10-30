@@ -46,7 +46,7 @@ namespace LastBell.Run
         public float UltRemaining => ultCd / (float)Sim.Hz;
 
         public override string[] SlotNames => new[] { "Steel Rhythm", "Sundering Blow", "Last Word", "Brace" };
-        public override string[] SlotKeys => new[] { "1 / LMB", "2", "3", "4 hold" };
+        public override string[] SlotKeys => new[] { "LMB", "2", "3", "4 hold" };
         public override float Cooldown01(int s) => s switch { 1 => sunderCd / (float)SunderCd, 2 => ultCd / (float)UltCd, 3 => act == Act.Brace ? 1 : braceCd / (float)BraceCd, _ => 0 };
         public override string SlotState(int s) => s switch
         {
@@ -59,7 +59,7 @@ namespace LastBell.Run
         static string Sec(int ticks) => (ticks / (float)Sim.Hz).ToString("0.0") + "s";
         public override string Tooltip(int s) => s switch
         {
-            0 => "STEEL RHYTHM  [1 / LMB, hold to repeat]\nThree-hit sword combo toward the cursor: two quick cuts, then a heavier cleave.\nLanding hit 3 grants OPENING (6 s, does not stack). No cooldown.\nA dash keeps your combo step for 3 s.",
+            0 => "STEEL RHYTHM  [LMB, hold to repeat]\nThree-hit sword combo toward the cursor: two quick cuts, then a heavier cleave.\nLanding hit 3 grants OPENING (6 s, does not stack). No cooldown.\nA dash keeps your combo step for 3 s.",
             1 => "SUNDERING BLOW  [2]\nHeavy aimed strike. Cooldown 8 s, starting on release.\nWith OPENING: extra damage and 2 s off Last Word's cooldown.\nDash before the release cancels it with no cooldown spent.",
             2 => "LAST WORD  [3]\nPlanted 0.8 s windup, overhead strike, then a shockwave toward the cursor.\nCooldown 45 s. Works without OPENING. Dash during the windup cancels it (nothing spent).",
             _ => "BRACE  [hold 4]\nRaise the shield toward the cursor for up to 1.5 s; you can still walk slowly.\nFrontal strikes: 60% less damage, no knockback. Rear hits and ground eruptions bypass it.\nFirst absorbed hit grants OPENING. Cooldown 12 s after lowering. No attacking while braced.",

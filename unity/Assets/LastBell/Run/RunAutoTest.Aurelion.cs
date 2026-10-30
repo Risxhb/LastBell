@@ -23,7 +23,8 @@ namespace LastBell.Run
 
         IEnumerator AurelionChecks()
         {
-            Note("---------- Aurelion, the Meridian Regent (practice) ----------");
+            AurelionArgs.SetOverride = "v1";   // this section checks the original five attacks (the ability set v2 tests were removed on Oct 27)
+            Note("---------- Aurelion, the Meridian Regent (practice, ability set v1) ----------");
             if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }   // the earlier practice section ends on Ready
             // his practice is fought in his own arena: from another map the button loads Skyward Spire first
             int spire = RunMaps.IndexOf(RunDirector.AurelionMap);
@@ -144,6 +145,7 @@ namespace LastBell.Run
             Check("Aurelion practice clear is a practice result", d.Mode == RunMode.Practice && d.Victory);
             d.ReturnToMenu();
             yield return null;
+            AurelionArgs.SetOverride = null;
         }
 
         // evidence: the orrery rings late in each Alignment warning (first Alignment of the fight only)

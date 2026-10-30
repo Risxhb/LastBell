@@ -24,8 +24,14 @@ Material:
     serializedVersion: 3
     m_TexEnvs: []
     m_Ints: []
-    m_Floats: []
+    m_Floats:
+    - _Coverage: 0.56
+    - _Defined: 1
+    - _Sharp: 0.04
+    - _ZenithCalm: 0.65
     m_Colors:
+    - _CloudDark: {r: 0.045, g: 0.032, b: 0.09, a: 1}
+    - _CloudLit: {r: 0.52, g: 0.38, b: 0.7, a: 1}
     - _Glow: {r: 0.13, g: 0.11, b: 0.22, a: 1}
     - _Horizon: {r: 0.3, g: 0.2, b: 0.4, a: 1}
     - _Low: {r: 0.06, g: 0.05, b: 0.12, a: 1}
