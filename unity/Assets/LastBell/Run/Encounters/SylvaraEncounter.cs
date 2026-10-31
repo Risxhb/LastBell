@@ -139,6 +139,17 @@ namespace LastBell.Run
         int PhaseFor() => Hp > MaxHp * Thr2 ? 1 : Hp > MaxHp * Thr3 ? 2 : Hp > MaxHp * Thr4 ? 3 : 4;
         public override float NextPhaseFraction() => Hp > MaxHp * Thr2 ? Thr2 - 0.01f : Hp > MaxHp * Thr3 ? Thr3 - 0.01f : Thr4 - 0.01f;
 
+        // practice phase row: start in phase n with its looks at once. phase = 0 makes the script's next tick open that phase
+        // the way a fight start does (clean, no shift animation): colours in Phase 2, the enrage clock in Phase 4.
+        public override float[] PhaseStarts => new[] { 1f, Thr2, Thr3, Thr4 };
+        public override int PhaseNumber => phase == 0 ? PhaseFor() : phase;
+        protected override void EnterPhase(int n)
+        {
+            phase = 0; PhaseName = PhaseNames[n - 1];
+            if (shoulderFlowers) shoulderFlowers.gameObject.SetActive(n >= 2);
+            if (n >= 3 && maskL) { maskL.localPosition = new Vector3(-0.32f, 3.65f, 0.2f); maskR.localPosition = new Vector3(0.32f, 3.65f, 0.2f); }
+        }
+
         // ---------------- schedule ----------------
         protected override IEnumerable<int> Script()
         {
@@ -167,7 +178,8 @@ namespace LastBell.Run
         IEnumerable<int> Transition(int to)
         {
             bool first = phase == 0;
-            phase = to; SetPhase(PhaseNames[to - 1]);
+            phase = to;
+            if (!first || PhaseName != PhaseNames[to - 1]) SetPhase(PhaseNames[to - 1]);   // a practice start already shows its name
             ClearFight();
             if (to == 2) AssignColours();
             if (to == 4) { p4Start = Age + (first ? 0 : TransTicks); P4Loop = 0; LastStorm = false; }

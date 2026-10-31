@@ -220,6 +220,16 @@ namespace LastBell.Run
             if (Current == "approach" || Current == "reposition") Rig.Pose(OraclePose.Walk);
         }
 
+        // practice phase row: the end of the Grand Toll (Haste tempo, HP released at half), without the toll and recital
+        public override float[] PhaseStarts => new[] { 1f, 0.5f };
+        public override int PhaseNumber => Phase2 ? 2 : 1;
+        protected override void EnterPhase(int n)
+        {
+            if (Phase2) return;
+            Phase2 = true; GatePending = false; HoldHp = false;
+            Clock.Reset(Tempo.Haste);
+        }
+
         protected override void OnHurt()
         {
             // the Grand Toll: HP holds at half from the moment it is reached until the recital ends

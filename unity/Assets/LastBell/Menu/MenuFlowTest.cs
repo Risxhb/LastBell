@@ -84,6 +84,17 @@ namespace LastBell.Menu
                 }
                 Check("boss step rows: Bosses (Bellkeeper last) and Minibosses (Chimebound Oracle)",TestRushSetup.BossRow.Length+TestRushSetup.MinibossRow.Length==RunDirector.Bosses.Length&&RunDirector.Bosses[TestRushSetup.BossRow[TestRushSetup.BossRow.Length-1]].Final&&TestRushSetup.MinibossRow.Length>=1&&RunDirector.Bosses[TestRushSetup.MinibossRow[0]].Name.StartsWith("Chimebound Oracle"));
                 Check("invalid selection rejected",TestRushSetup.Incompatibility(-1,0)!=null&&TestRushSetup.Incompatibility(0,999)!=null);
+                // Phase row (Chzy18, October 29, 2026): only the selected boss's phases show, Phase 1 first; a new boss resets it
+                bool phaseRow=setup.PhaseButtons.Length==TestRushSetup.MaxPhases;string phaseDetail="";
+                for(int enc=0;enc<RunDirector.Bosses.Length;enc++)
+                {
+                    setup.SelectEncounter(enc);int n=TestRushSetup.PhasesOf(enc);int shown=setup.PhaseButtons.Count(b=>b.gameObject.activeInHierarchy);
+                    bool ok=setup.PhaseIndex==1&&shown==n;setup.SelectPhase(n);ok&=setup.PhaseIndex==n;setup.SelectPhase(n+1);ok&=setup.PhaseIndex==n;
+                    if(!ok)phaseDetail+=" "+enc+":"+shown+"/"+n;phaseRow&=ok;
+                }
+                Check("phase row lists only each boss's phases, Phase 1 first"+phaseDetail,phaseRow);
+                int threePhase=System.Array.FindIndex(RunDirector.Bosses,b=>b.Phases==3&&!b.Final);
+                if(threePhase>=0){setup.SelectEncounter(threePhase);setup.SelectPhase(2);}   // the boss-step shot below shows the row in use
                 setup.Back();Check("Back returns to the arena step",!setup.BossStep);
                 setup.SelectMap(1);float liveUntil=Time.realtimeSinceStartup+12;while(!setup.LiveBackdrop&&Time.realtimeSinceStartup<liveUntil)yield return null;
                 Check("setup shows live showcase arena",setup.LiveBackdrop);Check("setup hides the menu stage",menu.StageHidden&&!menu.View.enabled);yield return new WaitForSeconds(1);
@@ -95,6 +106,24 @@ namespace LastBell.Menu
                 Check("setup Back restores the menu stage",!menu.Rush&&!menu.StageHidden&&menu.View.enabled&&menu.RushButton.IsInteractable());
                 Check("setup Back unloads the backdrop",SceneManager.sceneCount==1);
                 Integrity("main menu after Boss Rush");
+
+                // a picked phase reaches the fight and survives the return to the menu
+                menu=FindAnyObjectByType<ConfrontationMenu>();menu.SelectClass(0);menu.BossRush();yield return null;setup=menu.Rush;
+                int phaseEnc=System.Array.FindIndex(RunDirector.Bosses,b=>b.Final);int lastPhase=TestRushSetup.PhasesOf(phaseEnc);
+                setup.SelectMap(0);setup.Continue();setup.SelectEncounter(phaseEnc);setup.SelectPhase(lastPhase);setup.Launch();
+                yield return SceneReady(()=>RunDirector.Instance&&RunDirector.Instance.State==RunState.Ready);var pd=RunDirector.Instance;
+                Check("test launch keeps the picked phase",pd&&pd.Encounter==phaseEnc&&pd.PracticePhase==lastPhase);
+                if(pd)
+                {
+                    pd.RequestReady();yield return new WaitForSeconds(4.5f);
+                    Check("fight starts in the picked phase",pd.State==RunState.Combat&&pd.Boss&&pd.Boss.PhaseNumber==lastPhase&&pd.Boss.Hp<pd.Boss.MaxHp);
+                    yield return Shot("test-rush-phase-combat-stage"+stage+".png");
+                    pd.SetPaused(true);MenuReturnBridge.Return(true);yield return SceneReady(()=>{var m=FindAnyObjectByType<ConfrontationMenu>();return m&&m.Rush;});
+                    menu=FindAnyObjectByType<ConfrontationMenu>();var back=menu?menu.Rush:null;
+                    Check("return keeps the picked boss and phase",back&&back.BossStep&&back.EncounterIndex==phaseEnc&&back.PhaseIndex==lastPhase);
+                    if(back){back.SelectPhase(1);back.Close();yield return new WaitForSeconds(1);}
+                }
+                yield return SceneReady(()=>{var m=FindAnyObjectByType<ConfrontationMenu>();return m&&m.Canvas&&!m.Loading&&!m.Rush;});menu=FindAnyObjectByType<ConfrontationMenu>();
             }
             if(stage>=5)
             {
