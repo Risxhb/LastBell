@@ -119,7 +119,7 @@ namespace LastBell.Menu
             RefreshTabs();LinkNavigation();
             EventSystem.current.SetSelectedGameObject(HeroButtons[i].gameObject);
         }
-        public static PlayerKit KitFor(string hero)=>hero=="Chimesinger"?new ChimesingerKit():hero=="Arcanist"?new ArcanistKit():new VanguardKit2();
+        public static PlayerKit KitFor(string hero)=>hero=="Chimesinger"?new ChimesingerKit():hero=="Arcanist"?new ArcanistKit():hero==RunDirector.ArchivedVanguard?new VanguardKit2():new TollbreakerKit();
         void BuildSkills()
         {
             if(skills){skills.SetActive(false);Destroy(skills);}

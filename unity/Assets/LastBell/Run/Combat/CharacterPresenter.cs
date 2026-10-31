@@ -27,6 +27,11 @@ namespace LastBell.Run
             ["DisintegrateEnd"] = new[] { "DisintegrateEnd", "Clockbolt" }, ["RuneSigil"] = new[] { "RuneSigil", "TimeSeal" },
             ["AstralOrb"] = new[] { "AstralOrb", "TemporalAnchor" }, ["ArcaneSurge"] = new[] { "ArcaneSurge", "AstralOrb", "TemporalAnchor" }, ["ArcaneComet"] = new[] { "ArcaneComet", "Convergence" },
             ["BlinkIn"] = new[] { "BlinkIn", "AnchorReturn" },
+            // Tollbreaker: his own clips first (TollbreakerKit names), then the stand-in body's closest Vanguard swing
+            ["TwinHurl"] = new[] { "TwinHurl", "SteelRhythm1", "Combo1" }, ["TwinHurl2"] = new[] { "TwinHurl2", "SteelRhythm2", "Combo2" },
+            ["HurlHeavy"] = new[] { "HurlHeavy", "SteelRhythm3", "Combo3" }, ["GrindingToll"] = new[] { "GrindingToll", "SteelRhythm2", "Combo2" },
+            ["SplittingThrow"] = new[] { "SplittingThrow", "SunderingBlow", "PendulumRush" }, ["CallOfIron"] = new[] { "CallOfIron", "BraceRaise", "SteelRhythm1" },
+            ["BellFrenzy"] = new[] { "BellFrenzy", "LastWord", "ReversalRush" },
         };
         static readonly HashSet<string> Looping = new HashSet<string> { "Idle", "Run", "Sprint", "Walk", "Vulnerable", "BraceHold", "BraceWalk", "Guard", "Float" };
 
@@ -49,8 +54,28 @@ namespace LastBell.Run
         readonly List<(Material m, Color c)> glow = new List<(Material, Color)>();
         public float GlowLevel = 1;
 
-        public static CharacterPresenter ForPlayer(Transform parent, string className) =>
-            Create(parent, className, className == "Chimesinger" ? 2f : 2.5f, 1f, 0, PlaceholderBody(className), className == "Arcanist");   // astrolabe / rune glow restored like the Vanguard's
+        public static CharacterPresenter ForPlayer(Transform parent, string className)
+        {
+            // the Tollbreaker has no character sheet or game model yet: until Resources/Characters/Tollbreaker exists he
+            // borrows the archived Vanguard's body, re-tinted (steel-teal cloth, teal glow) so the two never read as one
+            bool standIn = className == "Tollbreaker" && Resources.Load<GameObject>("Characters/Tollbreaker") == null;
+            var p = Create(parent, standIn ? "Vanguard" : className, className == "Chimesinger" ? 2f : 2.5f, 1f, 0, PlaceholderBody(className), className == "Arcanist");   // astrolabe / rune glow restored like the Vanguard's
+            if (standIn) p.Tint(new Color(0.62f, 0.86f, 0.9f), new Color(0.35f, 1.9f, 1.75f));
+            return p;
+        }
+        // multiplies every base colour and recolours the glow (stand-in bodies)
+        public void Tint(Color baseMul, Color glowColor)
+        {
+            foreach (var r in GetComponentsInChildren<Renderer>(true))
+                foreach (var m in r.materials)
+                    if (m.HasProperty("baseColorFactor")) m.SetColor("baseColorFactor", m.GetColor("baseColorFactor") * baseMul);
+            float gm = Mathf.Max(glowColor.r, Mathf.Max(glowColor.g, glowColor.b));
+            for (int i = 0; i < glow.Count; i++)
+            {
+                var (m, c) = glow[i]; var g = glowColor * (Mathf.Max(c.r, Mathf.Max(c.g, c.b)) / gm);
+                glow[i] = (m, g); m.SetColor("emissiveFactor", g);
+            }
+        }
 
         public static CharacterPresenter Create(Transform parent, string resource, float glowBoost, float metalScale, float yawOffset, System.Func<Transform, Transform> placeholder, bool castLayers = false)
         {
@@ -282,7 +307,7 @@ namespace LastBell.Run
         // simple readable stand-in body if a character GLB is missing from Resources
         static System.Func<Transform, Transform> PlaceholderBody(string className) => host =>
         {
-            var col = className == "Chimesinger" ? new Color(0.92f, 0.9f, 0.85f) : className == "Arcanist" ? new Color(0.45f, 0.3f, 0.7f) : new Color(0.2f, 0.32f, 0.62f);
+            var col = className == "Tollbreaker" ? new Color(0.25f, 0.5f, 0.55f) : className == "Chimesinger" ? new Color(0.92f, 0.9f, 0.85f) : className == "Arcanist" ? new Color(0.45f, 0.3f, 0.7f) : new Color(0.2f, 0.32f, 0.62f);
             Prim.Make(PrimitiveKind.Capsule, host, new Vector3(0, 0.9f, 0), new Vector3(0.7f, 0.9f, 0.7f), col);
             Prim.Make(PrimitiveKind.Cube, host, new Vector3(0, 1.3f, 0.4f), new Vector3(0.2f, 0.2f, 0.5f), new Color(1f, 0.8f, 0.3f), 1.5f);
             return host;

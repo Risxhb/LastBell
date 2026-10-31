@@ -91,7 +91,7 @@ namespace LastBell.Menu
             // A 15-second wipe never pays the cost of instantiating an eight-player cast.
             foreach (string resource in new[] { "Bellkeeper2", "Aurelion", "Crucivar", "Sylvara" })
                 bossPool.Add(resource, Spawn(resource, BossPosition, true));
-            string[] classes = { "Vanguard", "Arcanist", "Chimesinger" };
+            string[] classes = { "Tollbreaker", "Arcanist", "Chimesinger" };
             for (int i = 0; i < 8; i++) partyPool.Add(Spawn(classes[i % 3], Vector3.zero));
             ActivateCast();
         }
@@ -183,7 +183,7 @@ namespace LastBell.Menu
                     if (Crossed(t, at))
                     {
                         var a = actors[i]; string role = a.Root.name;
-                        string clip = role.StartsWith("Vanguard") ? "SunderingBlow" : role.StartsWith("Arcanist") ? "DisintegrateStart" : "Bellstrike";
+                        string clip = role.StartsWith("Tollbreaker") ? "SplittingThrow" : role.StartsWith("Arcanist") ? "DisintegrateStart" : "Bellstrike";
                         a.PlantedUntil = Elapsed + .65f;
                         a.Root.LookAt(new Vector3(actors[0].Root.position.x, 0, actors[0].Root.position.z));
                         a.Presenter.PlayOnce(clip, .65f); Bolt(i, role.StartsWith("Arcanist") ? Violet : Gold); SpellsPresented++;

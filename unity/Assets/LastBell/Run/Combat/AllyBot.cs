@@ -40,7 +40,7 @@ namespace LastBell.Run
             reactTicks = mode == BotMode.Passive ? 15 + (index * 7) % 10 : 0;   // 0.25-0.4 s; test bots react on the first tick
         }
 
-        float Range(PlayerController me) => HoldRange ?? (me.ClassName == "Vanguard" ? 0.9f : me.ClassName == "Chimesinger" ? 6.5f : 8.5f);
+        float Range(PlayerController me) => HoldRange ?? (me.ClassName == "Vanguard" ? 0.9f : me.ClassName == "Tollbreaker" ? 3.5f : me.ClassName == "Chimesinger" ? 6.5f : 8.5f);
 
         public PlayerInput Read(PlayerController me)
         {
@@ -192,6 +192,15 @@ namespace LastBell.Run
                     if (ready(2) && Clear(me, 125)) s = 2;           // Last Word (its wave also reaches 8 m)
                     else if (ready(1) && Clear(me, 100)) s = 1;      // Sundering Blow
                     else if (Clear(me, 90)) s = 0;                   // Steel Rhythm (roots too, up to 0.55 s)
+                    break;
+                // Tollbreaker (kit spec rotation): frenzy in a quiet moment, split him, grind under him, recall through him, throw
+                case "Tollbreaker":
+                    if (me.Kit.Acting || !(me.Kit is TollbreakerKit tb)) return;
+                    if (ready(4) && tb.AxesStuck == 0 && Clear(me, 60)) s = 4;                    // Bell Frenzy
+                    else if (ready(2) && tb.AxesInHand > 0 && !tb.SplitActive && Clear(me, 40)) s = 2;   // Splitting Throw (planted 0.4 s)
+                    else if (ready(3) && tb.AxesStuck > 0 && (!tb.SplitActive || tb.AxesInHand == 0)) s = 3;   // Call of Iron
+                    else if (ready(1) && tb.AxesInHand > 0) s = 1;                                // Grinding Toll
+                    else if (tb.AxesInHand > 0) { inp.P0 = true; lastPress = tick; return; }       // Twin Hurl: a tap (holding would lodge it)
                     break;
                 // casters: decide only between actions; the priorities follow Codex's reference rotation (solo study 25 Oct),
                 // which reaches the kits' dummy throughput (Chimesinger ~60, Arcanist ~100 DPS)

@@ -28972,7 +28972,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LastBell.Menu.ConfrontationMenu
   Classes:
-  - Class: Vanguard
+  - Class: Tollbreaker
     Offset: {x: 0.15, y: 0, z: 0}
     Yaw: 6
     Scale: 1

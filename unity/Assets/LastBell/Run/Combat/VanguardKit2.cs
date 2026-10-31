@@ -2,6 +2,9 @@ using UnityEngine;
 
 namespace LastBell.Run
 {
+    // ARCHIVED (Chzy18, 29 Oct: melee was too hard to tune). The Tollbreaker (TollbreakerKit) took the Vanguard's place in
+    // the class picker and the bot slots; this kit stays compiled and is reached only by the class name
+    // RunDirector.ArchivedVanguard from code (the older test suites). No menu offers it.
     // Vanguard, approved four-slot kit (#31 handoff, October 20): Steel Rhythm (Basic), Sundering Blow (Special),
     // Last Word (Ultimate), Brace (shield Defensive); dash is the shared movement action. No attack resources, no parry,
     // no iframes. Opening is one non-stacking 6 s empowerment. Cooldowns and contact ticks live here, not in clips:
