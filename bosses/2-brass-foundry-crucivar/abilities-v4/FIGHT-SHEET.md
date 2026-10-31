@@ -55,9 +55,9 @@ The difficulty damage scale is unchanged (damage scale only, per the difficulty 
 
 | Phase | Easy | Hard (named extra) |
 |---|---|---|
-| 1 Forge Rite | warnings ×1.25 | none yet: **open question 3** |
+| 1 Forge Rite | warnings ×1.25 | **Quake Echo**: after Anvil Quake's outer band lands, the bands fire again outside-in at +0.8 / 1.6 / 2.4 s (accepted and built 30 Oct; Phase 1 only) |
 | 2 Foundry Uprising | paths drawn 2.5 s, Pour Flood timer 40 s, damage ×0.6 | **Cast in Order**: castings must die in numeral order; killing one out of order makes every turret fire a Ring Wave at once (built) |
-| 3 Molten Crown | towers rise 6.0 s ahead, crown warned 4.0 s, eruption on the 5th crown (built), damage ×0.6 | **Second Press**: the fullest tower in each set re-stamps 2.0 s after landing (built 30 Oct, proposal) |
+| 3 Molten Crown | towers rise 6.0 s ahead, crown warned 4.0 s, eruption on the 5th crown (built), damage ×0.6 | **Second Press**: the fullest tower in each set re-stamps 2.0 s after landing (built 30 Oct) |
 
 ## Built and tested
 - `CrucivarEncounter`: v4 HP 8500, PartyStep 0.9, and the helper `V4MaxHp(players)`. `ForgeRiteTest` checks 8500 solo and 31450 for 4 players.
@@ -65,14 +65,13 @@ The difficulty damage scale is unchanged (damage scale only, per the difficulty 
 - `CrucivarWatch -crucivarMeasure -crucivarBots n`: the measure mode. It logs each phase once, holds the boss just above the threshold until the loops are done, and logs a partial phase if the fight ends first.
 
 ## Still to do (lane plan)
-1. Hard extra for Phase 1 (Second Press for Phase 3 is built).
-2. Escape checks for v4 (worst cases are listed in each phase doc).
-3. The telegraph look and the fire VFX pass.
-4. Merge Azure `feature/confrontation-menu`. That fixes the old controls. Then check that the party count at boss spawn includes the menu bots, rebuild, and run the autotest under the lock.
-5. One Azure PR into `feature/confrontation-menu`, after your OK through the review inbox.
+- **Done 30 Oct:** both Hard extras are built. Azure `feature/confrontation-menu` is merged. v4 is the default Crucivar fight (Chzy18, 30 Oct): Run Loop, Test Rush and the start-phase picker all play v4, and `-lastbellAbilitySet v3` still plays v3. PR 12 merged; later work goes in a new PR.
+1. Escape checks for v4 (the worst cases are listed in each phase doc).
+2. The telegraph look and the fire VFX pass.
+3. Open question 4: whether passive menu bots count toward the HP.
 
 ## Open questions
 1. ~~Fight length~~: settled 29 Oct, keep about 4 min solo.
 2. PartyStep 0.9: should co-op be longer than solo (Aurelion's 1.25) or about the same?
-3. Phase 1 Hard: does it need a named extra, or is the damage scale enough?
+3. ~~Phase 1 Hard~~: settled 30 Oct, Quake Echo.
 4. Should passive menu bots count toward the HP, as Aurelion's do not?
