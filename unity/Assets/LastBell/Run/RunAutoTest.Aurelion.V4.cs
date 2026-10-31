@@ -25,6 +25,7 @@ namespace LastBell.Run
             if (V2Wants("aurelion.sunspots")) yield return V2Section("v4 Sunspots", V4Sunspots());
             if (V2Wants("aurelion.total_eclipse")) yield return V2Section("v4 Total Eclipse", V4Eclipse());
             if (V2Wants("aurelion.severance")) yield return V2Section("v4 Severance", V4Severance());
+            if (V2Wants("aurelion.meridian_recall")) yield return V2Section("v4 Meridian Recall (Hard)", V4Recall());
             if (V2Wants("aurelion.last_light")) yield return V2Section("v4 Last Light and the enrage", V4LastLight());
             if (V2Wants("aurelion.v4_fight")) yield return V2Section("v4 fight", V4Fight());
             if (V2Wants("aurelion.v4_dps")) yield return V2Section("v4 damage per second (boss HP tuning)", V4Dps());
@@ -121,6 +122,48 @@ namespace LastBell.Run
             float t = 0; while (t < 40 && !V4Wiped) { if (V2Main && !V2Main.Down) V2Main.DebugSetHp(PlayerController.MaxHp); t += Time.deltaTime; yield return null; }
             V2Check("an unbroken Corona Shield wipes the party after 25 s", V4Wiped && V2Boss.WipeCause.StartsWith("Total Eclipse"), V2Boss.WipeCause ?? "no wipe");
             V2Check("standing in the dark takes Umbra every second after 1 s", V2HitsOn(V2Main, "Umbra").Count() >= 20, V2HitsOn(V2Main, "Umbra").Count() + " Umbra hits");
+        }
+
+        // ================================================================ Meridian Recall (Hard only)
+        IEnumerator V4Recall()
+        {
+            // a 3-beam volley through the player at 9 m, then the boss steps 6 m away: the replay keeps the old lines
+            yield return V2Setup(1, Difficulty.Hard, new[] { new Vector3(0, 0, 9f) }, 2, Vector3.zero);
+            if (V2Boss == null) yield break;
+            var rc = V2Boss.Recall; var ln = V2Boss.Lances;
+            yield return V2Fire(ln.Run(3, 1, false), 10);
+            var volley = ln.Volleys.Count > 0 ? ln.Volleys[ln.Volleys.Count - 1] : new List<Hazard>();
+            yield return V2Ticks(30);                                  // let the volley's own knockback and stun play out
+            float aim = ln.AimOf(0);
+            V2Boss.transform.position = new Vector3(0, 0, -6f);
+            V2Main.DebugSetHp(PlayerController.MaxHp);
+            V2Place(V2Main, Sim.Dir(aim) * 8f);                      // on the remembered beam, 8 m from the old centre
+            int hits0 = V2HitsOn(V2Main, "Meridian Recall").Count(), start = V2W.Tick;
+            V2Begin(rc.Run()); yield return V2Ticks(2);
+            var rep = rc.Replay.ToList();
+            bool copied = rep.Count == volley.Count && rep.Count == 6 && rep.Select((h, i) => Sim.Flat(h.Origin - volley[i].Origin).sqrMagnitude < 1e-4f && Mathf.Abs(Mathf.DeltaAngle(h.Yaw, volley[i].Yaw)) < 0.01f).All(x => x);
+            V2Check("the replay copies the last volley's 6 half-lanes: its old centre and locked bearings, not the boss's new spot", copied,
+                $"{rep.Count} lanes; replay {string.Join(" ", rep.Select(h => $"{h.Yaw:0.#}@{h.Origin.z:0.#}"))} | volley {string.Join(" ", volley.Select(h => $"{h.Yaw:0.#}@{h.Origin.z:0.#}"))}");
+            V2Check("locked from its first tick, 3.5 s to the hit (no Hard x0.7)", rep.Count > 0 && rep.All(h => h.Locked && h.ResolveAt == Sim.Ticks(MeridianRecall.WarnS)), rep.Count > 0 ? $"lock {rep[0].LockAt}, resolve {rep[0].ResolveAt}" : "none");
+            yield return V2WaitIdle(10); yield return V2Ticks(3);
+            var got = V2HitsOn(V2Main, "Meridian Recall").Skip(hits0).ToList();
+            V2Check("standing on the remembered line at 8 m: hit once for 65 on Hard (heavy, not a one-shot)", got.Count == 1 && got[0].Damage == 65 && !V2Main.Down, $"{got.Count} hits, {string.Join("/", got.Select(h => h.Damage))}, down {V2Main.Down}");
+
+            // the same volley, but standing in the gap between two remembered beams: untouched
+            yield return V2Setup(1, Difficulty.Hard, new[] { new Vector3(0, 0, 9f) }, 2, Vector3.zero);
+            if (V2Boss == null) yield break;
+            rc = V2Boss.Recall; ln = V2Boss.Lances;
+            yield return V2Fire(ln.Run(3, 1, false), 10);
+            yield return V2Ticks(30);
+            aim = ln.AimOf(0);
+            V2Main.DebugSetHp(PlayerController.MaxHp);
+            V2Place(V2Main, Sim.Dir(aim + 30f) * 8f);                // 3 beams are 60 degrees apart: 30 degrees is mid-gap
+            hits0 = V2HitsOn(V2Main, "Meridian Recall").Count();
+            yield return V2Fire(rc.Run(), 10); yield return V2Ticks(3);
+            V2Check("in the gap between remembered beams: no hit", V2HitsOn(V2Main, "Meridian Recall").Count() == hits0);
+
+            // the solo loop: a volley, then its replay
+            V2Check("the F6 / -lastbellAbility loop knows aurelion.meridian_recall", AurelionArgs.Known("aurelion.meridian_recall"));
         }
 
         // ================================================================ Severance
@@ -237,6 +280,7 @@ namespace LastBell.Run
                 if (V2Boss == null) yield break;
                 V2Main.RefreshHealth(true);   // V2Setup restores HP, not potions
                 V2Boss.DebugResetFight();
+                int recallLog0 = V2Boss.BlockLog.Count;
                 V3Bot(V2Main, BotMode.Perfect);
                 var detail = new List<string>();
                 Action<PlayerController, Hazard, int> onHit = (p, h, dmg) =>
@@ -257,6 +301,9 @@ namespace LastBell.Run
                 foreach (var s in detail) Note($"v4 {level} perfect hit: {s}");
                 Note($"v4 {level} perfect route, Phases 1-3: down {V2Main.Down}, wipe {V2Boss?.WipeCause}, potions {V2Main.PotionsDrunk}; hits: {V3HitList()}");
                 V2Check($"{level}: the perfect route survives Phases 1-3 (every block) without a wipe", !V2Main.Down && !V4Wiped, V2Boss?.WipeCause ?? V3HitList());
+                var recalls = V2Boss == null ? new List<int>() : V2Boss.BlockLog.Skip(recallLog0).Where(b => b.block == "Meridian Recall").Select(b => b.phase).ToList();
+                if (level == Difficulty.Hard) V2Check("Hard: Meridian Recall plays once in Phase 2 and once in Phase 3, each after its volley", recalls.SequenceEqual(new[] { 2, 3 }), $"recall phases {string.Join("/", recalls)}");
+                else V2Check($"{level}: no Meridian Recall (Hard only)", recalls.Count == 0, $"recall phases {string.Join("/", recalls)}");
                 V3Unbot();
             }
 

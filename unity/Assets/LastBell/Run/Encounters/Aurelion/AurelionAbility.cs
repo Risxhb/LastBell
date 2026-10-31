@@ -101,7 +101,7 @@ namespace LastBell.Run
         public static bool WindowsMediumOverride;
         public static bool WindowsMedium => WindowsMediumOverride || Environment.GetCommandLineArgs().Any(x => x.Equals("-lastbellWindowsMedium", StringComparison.OrdinalIgnoreCase));
         public static string Solo => SoloOverride ?? Arg("-lastbellAbility");
-        public static readonly string[] Ids = { "aurelion.meridian_lances", "aurelion.starfall_mirror", "aurelion.noon_shadow", "aurelion.orrery_closing", "aurelion.hour_hands", "aurelion.zenith_collapse", "aurelion.ecliptic_order", "aurelion.zenith_marks", "aurelion.meridian_towers", "aurelion.sunspots", "aurelion.total_eclipse", "aurelion.severance", "aurelion.last_light" };
+        public static readonly string[] Ids = { "aurelion.meridian_lances", "aurelion.starfall_mirror", "aurelion.noon_shadow", "aurelion.orrery_closing", "aurelion.hour_hands", "aurelion.zenith_collapse", "aurelion.ecliptic_order", "aurelion.zenith_marks", "aurelion.meridian_towers", "aurelion.sunspots", "aurelion.total_eclipse", "aurelion.severance", "aurelion.last_light", "aurelion.meridian_recall" };
         public static bool Known(string id) => id != null && Ids.Contains(id);
     }
 }

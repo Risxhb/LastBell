@@ -223,7 +223,7 @@ namespace LastBell.Run
             // the six abilities are registered and bound
             yield return V2Setup(1);
             if (V2Boss == null) yield break;
-            V2Check("13 abilities registered (v2.1 adds Zenith Collapse, v3 Ecliptic Order and Zenith Marks, v4 five more)", V2Boss.Abilities.Count == 13 && AurelionArgs.Ids.All(id => V2Boss.Abilities.Any(a => a.Id == id)),
+            V2Check("14 abilities registered (v2.1 adds Zenith Collapse, v3 Ecliptic Order and Zenith Marks, v4 six more)", V2Boss.Abilities.Count == 14 && AurelionArgs.Ids.All(id => V2Boss.Abilities.Any(a => a.Id == id)),
                 string.Join(", ", V2Boss.Abilities.Select(a => a.Id)));
 
             // Misalignment pairing, Noon Shadow + Starfall Mirror (Starfall 0.7 s into Noon): both resolve on the same tick,
