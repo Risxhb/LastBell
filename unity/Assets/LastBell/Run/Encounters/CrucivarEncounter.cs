@@ -81,7 +81,7 @@ namespace LastBell.Run
         protected override void EnterPhase(int n)
         {
             if (phase == n) return;
-            phase = n; step = 0; PhaseName = n == 2 ? "Casting Heat" : "Open Pressure";
+            phase = n; step = 0; SecondForm = n >= 2; PhaseName = n == 2 ? "Casting Heat" : "Open Pressure";
             rig.BeginPhase(n);
         }
 

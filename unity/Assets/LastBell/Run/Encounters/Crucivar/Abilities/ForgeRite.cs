@@ -64,7 +64,7 @@ namespace LastBell.Run
             foreach (var w in Until(8.5f)) yield return w;
             Boss.SetCurrent("Casting Order"); CastingOrder();
             foreach (var w in Until(11.0f)) yield return w;
-            Boss.SetCurrent("Anvil Quake"); AnvilQuake();
+            Boss.SetCurrent("Anvil Quake"); AnvilQuake(echo: Hard);
             foreach (var w in Until(13.5f)) yield return w;
             Boss.SetCurrent("Ember Brand"); EmberBrand();
             foreach (var w in Until(17.5f)) yield return w;
@@ -204,7 +204,7 @@ namespace LastBell.Run
         // ---------------- Anvil Quake ----------------
         // three bands from the anvil out to the wall, all shown at once, landing inner -> middle -> outer: step into a band
         // that has already gone off (in toward the boss once the inner ring has landed)
-        internal void AnvilQuake()
+        internal void AnvilQuake(bool echo = false)   // echo: Phase 1's Hard extra only (Phase 2 reuses the quake without it)
         {
             Boss.Rig.Pour(false);
             var origin = Flat(Boss.transform.position);
@@ -215,7 +215,7 @@ namespace LastBell.Run
             Boss.Presenter.PlayOnce("Diebreaker", T(QuakeFirst) / (float)Sim.Hz);
             // Hard (Chzy18 accepted 10-30): Quake Echo. Once the outer band lands the bands show again and fire outside-in,
             // 0.8 s apart from 0.8 s later, so stepping inward is no longer safe for the rest of the quake
-            if (Hard)
+            if (echo)
                 outerBand.OnResolve += hz =>
                 {
                     if (!Boss) return;
