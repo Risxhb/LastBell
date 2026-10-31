@@ -204,6 +204,15 @@ namespace LastBell.Run
             if (!Phase2 && !GatePending && Hp * 2 <= MaxHp) GatePending = true;
         }
 
+        // practice phase row: the end of the 50% transformation (slower tempo), without the shift itself
+        public override float[] PhaseStarts => new[] { 1f, 0.5f };
+        public override int PhaseNumber => Phase2 ? 2 : 1;
+        protected override void EnterPhase(int n)
+        {
+            if (Phase2) return;
+            Phase2 = true; GatePending = false; beatAge = 0;
+        }
+
         IEnumerable<int> ToCentre() { if (Sim.Flat(transform.position).magnitude > 0.3f) foreach (var w in WalkTo(Centre, WalkSpeed * 1.4f, 300)) yield return w; }
 
         // ================= 1. Shortening Swing =================

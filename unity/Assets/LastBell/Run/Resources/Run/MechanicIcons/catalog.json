@@ -1,0 +1,201 @@
+{
+  "source": "ability-icons commit 54f7d22 (art/mechanic-icons-20261022), approved by Chzy18 2026-10-24 (APPROVAL.md); export PNGs byte-identical to friendly-manifest.json / hostile-manifest.json",
+  "mechanics": [
+    {
+      "id": "order_i",
+      "set": "friendly",
+      "name": "Order I",
+      "meaning": "Your place in a sequence: first.",
+      "icon": "friendly_order_i"
+    },
+    {
+      "id": "order_ii",
+      "set": "friendly",
+      "name": "Order II",
+      "meaning": "Your place in a sequence: second.",
+      "icon": "friendly_order_ii"
+    },
+    {
+      "id": "order_iii",
+      "set": "friendly",
+      "name": "Order III",
+      "meaning": "Your place in a sequence: third.",
+      "icon": "friendly_order_iii"
+    },
+    {
+      "id": "order_iv",
+      "set": "friendly",
+      "name": "Order IV",
+      "meaning": "Your place in a sequence: fourth.",
+      "icon": "friendly_order_iv"
+    },
+    {
+      "id": "order_v",
+      "set": "friendly",
+      "name": "Order V",
+      "meaning": "Your place in a sequence: fifth.",
+      "icon": "friendly_order_v"
+    },
+    {
+      "id": "order_vi",
+      "set": "friendly",
+      "name": "Order VI",
+      "meaning": "Your place in a sequence: sixth.",
+      "icon": "friendly_order_vi"
+    },
+    {
+      "id": "order_vii",
+      "set": "friendly",
+      "name": "Order VII",
+      "meaning": "Your place in a sequence: seventh.",
+      "icon": "friendly_order_vii"
+    },
+    {
+      "id": "order_viii",
+      "set": "friendly",
+      "name": "Order VIII",
+      "meaning": "Your place in a sequence: eighth.",
+      "icon": "friendly_order_viii"
+    },
+    {
+      "id": "team_brass",
+      "set": "friendly",
+      "name": "Brass team",
+      "meaning": "Team marker: brass rim, round.",
+      "icon": "friendly_team_brass"
+    },
+    {
+      "id": "team_cobalt",
+      "set": "friendly",
+      "name": "Cobalt team",
+      "meaning": "Team marker: cobalt rim, diamond.",
+      "icon": "friendly_team_cobalt"
+    },
+    {
+      "id": "carried_mark",
+      "set": "friendly",
+      "name": "Carried mark",
+      "meaning": "You are holding the mark. Identity only; it never hurts.",
+      "icon": "friendly_carried_mark"
+    },
+    {
+      "id": "tether_partner",
+      "set": "friendly",
+      "name": "Tether partner",
+      "meaning": "You are linked to this player. Identity only; it never hurts.",
+      "icon": "friendly_tether_partner"
+    },
+    {
+      "id": "spread",
+      "set": "hostile",
+      "name": "Spread",
+      "meaning": "Each marked player is the centre of a circle: stand apart.",
+      "icon": "hostile_spread"
+    },
+    {
+      "id": "soak_tower",
+      "set": "hostile",
+      "name": "Soak tower",
+      "meaning": "Shared soak: get inside; the damage splits between everyone in it.",
+      "icon": "hostile_soak_tower"
+    },
+    {
+      "id": "line_stack",
+      "set": "hostile",
+      "name": "Line stack",
+      "meaning": "Stand together in the line to share the hit.",
+      "icon": "hostile_line_stack"
+    },
+    {
+      "id": "stretch_tether",
+      "set": "hostile",
+      "name": "Stretch tether",
+      "meaning": "Two linked players: move apart until the tether is taut.",
+      "icon": "hostile_stretch_tether"
+    },
+    {
+      "id": "pass_the_mark",
+      "set": "hostile",
+      "name": "Pass the mark",
+      "meaning": "The mark jumps to another player: hand it on in time.",
+      "icon": "hostile_pass_the_mark"
+    },
+    {
+      "id": "movement_stop",
+      "set": "hostile",
+      "name": "Stop moving",
+      "meaning": "Stand still until it resolves.",
+      "icon": "hostile_movement_stop"
+    },
+    {
+      "id": "movement_move",
+      "set": "hostile",
+      "name": "Keep moving",
+      "meaning": "Keep moving until it resolves.",
+      "icon": "hostile_movement_move"
+    },
+    {
+      "id": "one_side_cleave",
+      "set": "hostile",
+      "name": "One-side cleave",
+      "meaning": "Half the area is hit: go to the other side.",
+      "icon": "hostile_one_side_cleave"
+    },
+    {
+      "id": "player_mirror",
+      "set": "hostile",
+      "name": "Player mirror",
+      "meaning": "A copy of your mark appears mirrored across the arena: watch both.",
+      "icon": "hostile_player_mirror"
+    },
+    {
+      "id": "pull",
+      "set": "hostile",
+      "name": "Pull",
+      "meaning": "You are pulled toward the centre: move against it.",
+      "icon": "hostile_pull"
+    },
+    {
+      "id": "shrinking_edge",
+      "set": "hostile",
+      "name": "Shrinking edge",
+      "meaning": "The arena edge closes in: move inward.",
+      "icon": "hostile_shrinking_edge"
+    },
+    {
+      "id": "cone",
+      "set": "hostile",
+      "name": "Cone",
+      "meaning": "A cone from the boss: leave its angle.",
+      "icon": "hostile_cone"
+    },
+    {
+      "id": "ring",
+      "set": "hostile",
+      "name": "Ring",
+      "meaning": "A ring: stand inside the gap or outside it.",
+      "icon": "hostile_ring"
+    },
+    {
+      "id": "lane",
+      "set": "hostile",
+      "name": "Lane",
+      "meaning": "A straight lane: step sideways out of it.",
+      "icon": "hostile_lane"
+    },
+    {
+      "id": "delayed_circle",
+      "set": "hostile",
+      "name": "Delayed circle",
+      "meaning": "A circle that resolves late: leave it before its countdown ends.",
+      "icon": "hostile_delayed_circle"
+    },
+    {
+      "id": "low_bar",
+      "set": "hostile",
+      "name": "Low bar",
+      "meaning": "A low bar sweeps the floor: jump over it.",
+      "icon": "hostile_low_bar"
+    }
+  ]
+}
