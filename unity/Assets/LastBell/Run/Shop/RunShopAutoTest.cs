@@ -396,6 +396,7 @@ namespace LastBell.Run.Shop
             foreach (var it in ItemCatalog.All.Where(x => (x.Class == cls || x.General) && !x.Held && x.OfferedSolo)) Grant(Me, it.Id, tempered: it.Tempered.HasValue);
             Note($"test setup: {cls} holds {Me.Items.Count} items, all tempered where they can be");
             yield return Ready(); NearBoss(cls == "Vanguard" ? 2.4f : 7f);
+            d.Boss.Halt(); d.World.ClearTransient();   // a smoke test of items: no boss attacks (Aurelion v4 wipes force a down)
             int hp0 = d.Boss.Hp, err0 = errors; float t = 0; int frame = 0;
             while (t < 6f && d.State == RunState.Combat)
             {
@@ -404,7 +405,7 @@ namespace LastBell.Run.Shop
                 if (frame % 4 == 0) for (int i = 1; i < 5; i++) bot.hold[i] = false;
                 t += Time.deltaTime; yield return null;
             }
-            bot.Clear();
+            bot.Clear(); d.Boss.BeginCombat();
             Check($"{cls} with the whole pool: fights 6 s with no errors and damages the boss", errors == err0 && d.Boss.Hp < hp0, $"{hp0} -> {d.Boss.Hp}, errors +{errors - err0}");
             Me.Items.Clear(); Me.ResetEncounter();
         }
