@@ -26,9 +26,9 @@ namespace LastBell.Run
 
         public override IEnumerator Run(CrucivarV2AutoTest t)
         {
-            // v3 is the default set, and Crucivar has the packet's 6600 HP
+            // v4 is the default set since 10-30 (v3 needs -lastbellAbilitySet v3); v3 keeps the packet's 6600 HP
             var keep = CrucivarArgs.SetOverride; CrucivarArgs.SetOverride = null;
-            t.Check("v3 is the default ability set (no -lastbellAbilitySet)", CrucivarArgs.Arg("-lastbellAbilitySet") != null || (CrucivarArgs.V3 && CrucivarArgs.Set == "v3"), CrucivarArgs.Set);
+            t.Check("v4 is the default ability set (no -lastbellAbilitySet)", CrucivarArgs.Arg("-lastbellAbilitySet") != null || (CrucivarArgs.V4 && CrucivarArgs.Set == "v4"), CrucivarArgs.Set);
             CrucivarArgs.SetOverride = keep;
             yield return t.Setup(1);
             if (t.Boss != null && t.Boss.MaxHp != 6600) { t.KillBoss(); yield return t.Setup(1); }   // respawn under v3
