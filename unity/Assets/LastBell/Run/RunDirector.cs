@@ -35,7 +35,10 @@ namespace LastBell.Run
         }
         public static readonly BossEntry[] Bosses =
         {
-            new BossEntry("Bellkeeper", w => BossEncounter.Spawn<BellkeeperEncounter>(w, Vector3.zero, 0), final: true, phases: 3),
+            // the final boss is the Bellkeeper Ultimate (Chzy18, 30 Oct: the run's final slot spawns it at the run's level; the v1
+            // fight is archived, out of the run and the menus, reachable only by a test's SetOverride). Practice opens on the Throne;
+            // a run's map comes from its first boss, so the map here never moves a run. Phases P1-P5 (T1/T2 on -lastbellUltimatePhase).
+            new BossEntry("Bellkeeper", BellkeeperEncounter.SpawnUltimate, map: BellkeeperEncounter.ThroneMap, final: true, phases: 5),
             // Skyward Spire area boss; authored practice map
             new BossEntry("Aurelion (area 1)", w => BossEncounter.Spawn<AurelionEncounter>(w, new Vector3(0, 0, -1.5f), 0), map: AurelionMap, phases: 3),
             // Verdant Chimes area boss (graybox); authored practice map
@@ -53,9 +56,6 @@ namespace LastBell.Run
             new BossEntry("Dial Warden (practice)", w => BossEncounter.Spawn<DialWardenEncounter>(w, new Vector3(0, 0, -1.5f), 0), inRun: false, map: AurelionMap, phases: 2),
             // Skyward Spire miniboss, practice only (docs/bosses/pendulum-sentinel.md, a proposal)
             new BossEntry("Pendulum Sentinel (practice)", w => BossEncounter.Spawn<PendulumSentinelEncounter>(w, new Vector3(0, 0, -1.5f), 0), inRun: false, map: AurelionMap, phases: 2),
-            // appended last so every other entry keeps its index; the final boss's Ultimate (WIP proposal, bosses/4-shattered-hour-bellkeeper/ultimate/): practice only, on the Throne.
-            // Phases P1-P5 (the transitions T1/T2 stay on -lastbellUltimatePhase).
-            new BossEntry("Bellkeeper — Ultimate", BellkeeperEncounter.SpawnUltimate, inRun: false, map: BellkeeperEncounter.ThroneMap, phases: 5),
         };
         // Catalog eligibility is stable; each run owns its shuffled sequence, with final encounters appended.
         public static readonly int[] RunOrder = Enumerable.Range(0, Bosses.Length).Where(i => Bosses[i].InRun).OrderBy(i => Bosses[i].Final).ToArray();
@@ -66,7 +66,7 @@ namespace LastBell.Run
             for (int i = opening.Length - 1; i > 0; i--) { int j = random.Next(i + 1); int swap = opening[i]; opening[i] = opening[j]; opening[j] = swap; }
             return opening.Concat(RunOrder.Where(i => Bosses[i].Final)).ToArray();
         }
-        public static int BellkeeperUltimatePractice => Array.FindIndex(Bosses, b => b.Name.EndsWith("Ultimate"));
+        public static int BellkeeperUltimatePractice => Array.FindIndex(Bosses, b => b.Final);   // the final entry is the Ultimate (30 Oct)
         public int[] EncounterOrder { get; private set; } = (int[])RunOrder.Clone();
         public static int SylvaraPractice => Array.FindIndex(Bosses, b => b.Map == SylvaraMap);
         public const string SylvaraMap = "verdant-chimes";
@@ -174,6 +174,8 @@ namespace LastBell.Run
         {
             encounter = Mathf.Clamp(encounter, 0, Bosses.Length - 1);
             var map = Bosses[encounter].Map;
+            // the archived v1 Bellkeeper (a test's SetOverride) has no arena of its own: it stays on the current map
+            if (Bosses[encounter].Final && BellkeeperEncounter.SetOverride == BellkeeperEncounter.AbilitySet.V1) map = null;
             if (map != null && State == RunState.Menu)
             {
                 int v = RunMaps.IndexOf(map);

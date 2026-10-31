@@ -29,10 +29,17 @@ namespace LastBell.Run
         IEnumerator PracticePhaseChecks()
         {
             Note("---- practice phase row ----");
+            // the run-loop checks fight the archived v1 Bellkeeper (SetOverride); the phase row checks what the menu spawns
+            var setOverride = BellkeeperEncounter.SetOverride; BellkeeperEncounter.SetOverride = null;
             yield return PhaseToMenu();
             // out-of-range picks clamp to the boss's phases (the menu never offers them; -lastbellPhase refuses them)
             int bk = Array.FindIndex(RunDirector.Bosses, b => b.Final);
-            Check("practice phase: a pick past the last phase clamps to it", d.StartPractice("Vanguard", bk, 99) && d.PracticePhase == RunDirector.Bosses[bk].Phases, $"phase {d.PracticePhase}");
+            // the final entry fights on the Throne, so the pick may load that map: read the new scene's director
+            bool clampOk = d.StartPractice("Vanguard", bk, 99);
+            yield return Until(() => RunDirector.Instance && RunDirector.Instance.State == RunState.Ready && RunDirector.Instance.Encounter == bk, 30, "clamp ready");
+            if (RunDirector.Instance != d) { directorLog.AddRange(d.Log); d = RunDirector.Instance; d.InputOverride = bot; bot.Clear(); }
+            if (d.Player) d.Player.Input = bot;
+            Check("practice phase: a pick past the last phase clamps to it", clampOk && d.PracticePhase == RunDirector.Bosses[bk].Phases, $"phase {d.PracticePhase}");
             yield return PhaseToMenu();
             Check("practice phase: a run always starts in phase 1", d.StartRun("Vanguard") && d.PracticePhase == 1);
             yield return PhaseToMenu();
@@ -40,6 +47,7 @@ namespace LastBell.Run
                 for (int n = 1; n <= RunDirector.Bosses[e].Phases; n++)
                     yield return PracticeAtPhase(e, n, n == RunDirector.Bosses[e].Phases);
             yield return PhaseToMenu();
+            BellkeeperEncounter.SetOverride = setOverride;
         }
 
         IEnumerator PhaseToMenu()

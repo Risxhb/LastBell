@@ -129,10 +129,10 @@ namespace LastBell.Run
         {
             BellkeeperEncounter.SetOverride = null; BellkeeperEncounter.AbilityOverride = null;
             int ue = RunDirector.BellkeeperUltimatePractice;
-            Check("Ultimate: a separate practice entry \"Bellkeeper — Ultimate\" on the Throne, not in the run",
-                  ue > 0 && RunDirector.Bosses[ue].Name == "Bellkeeper — Ultimate" && !RunDirector.Bosses[ue].InRun && RunDirector.Bosses[ue].Map == BellkeeperEncounter.ThroneMap
-                  && !RunDirector.RunOrder.Contains(ue), ue < 0 ? "missing" : RunDirector.Bosses[ue].Map);
-            Check("Ultimate: the normal Bellkeeper entry stays v1 (the v2 set is retired)", BellkeeperEncounter.RequestedSet == BellkeeperEncounter.AbilitySet.V1 && RunDirector.Bosses[0].Name == "Bellkeeper");
+            Check("Ultimate: the run's final entry \"Bellkeeper\" is the Ultimate (practice on the Throne, last in every run)",
+                  ue >= 0 && RunDirector.Bosses[ue].Name == "Bellkeeper" && RunDirector.Bosses[ue].InRun && RunDirector.Bosses[ue].Map == BellkeeperEncounter.ThroneMap
+                  && RunDirector.RunOrder.Last() == ue && RunDirector.Bosses.Count(b => b.Name.StartsWith("Bellkeeper")) == 1, ue < 0 ? "missing" : RunDirector.Bosses[ue].Map);
+            Check("Ultimate: v1 is archived (a plain Bellkeeper spawn without the final entry stays v1, for the run-loop checks)", BellkeeperEncounter.RequestedSet == BellkeeperEncounter.AbilitySet.V1);
             Check("Ultimate: ids map to keys (ultimate.ledger = ult_ledger)",
                   BellkeeperAbilities.Normalize("ultimate.ledger") == "ult_ledger" && BellkeeperAbilities.Normalize("bellkeeper.ult_pendulum_clocks") == "ult_pendulum_clocks"
                   && BellkeeperAbilities.Normalize("ult-two-futures") == "ult_two_futures");

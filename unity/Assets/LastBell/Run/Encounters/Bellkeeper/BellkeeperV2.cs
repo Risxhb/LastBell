@@ -13,7 +13,8 @@ namespace LastBell.Run
         public enum AbilitySet { V1, V2, Ultimate }
         // Tests set these; otherwise the command line decides: -lastbellAbilitySet v1|v2|ultimate (default v2),
         // -lastbellUltimate (= ultimate), -lastbellAbility <key>, -lastbellBots <N> (practice with N-1 scripted stand-ins).
-        // The practice entry "Bellkeeper — Ultimate" spawns the Ultimate whatever the switches say (SpawnUltimate).
+        // The final entry "Bellkeeper" spawns the Ultimate (SpawnUltimate) unless a test's SetOverride asks for a set: v1 is
+        // archived (30 Oct) and only the run-loop checks still fight it, as their sparring partner.
         public static AbilitySet? SetOverride;
         public static string AbilityOverride;
         static bool spawningUltimate;
@@ -21,8 +22,8 @@ namespace LastBell.Run
         {
             get
             {
-                if (spawningUltimate) return AbilitySet.Ultimate;   // the Ultimate entry always spawns the Ultimate (a test's SetOverride can't turn it into v1)
                 if (SetOverride.HasValue) return SetOverride.Value;
+                if (spawningUltimate) return AbilitySet.Ultimate;
                 var s = Arg("-lastbellAbilitySet")?.Trim();
                 if (string.Equals(s, "ultimate", StringComparison.OrdinalIgnoreCase) || HasArg("-lastbellUltimate")) return AbilitySet.Ultimate;
                 // the normal Bellkeeper stays v1 (the v2 attack set is retired); v2 only by asking for it explicitly. The Ultimate is its own set.

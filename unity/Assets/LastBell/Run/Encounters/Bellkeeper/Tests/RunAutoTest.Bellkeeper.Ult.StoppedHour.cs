@@ -337,6 +337,8 @@ namespace LastBell.Run
             // solo P3 through the real plan (part5-attempts-3: the perfect solo bot was lashed at the first P3 resume): frozen
             // 23-27 s through clocks III (24) and IV (27), Reflection on the resume; the hiding spot hugs the boss
             // (4.2 m/s without attacks: the escape proof; 6 m/s with attacks, loops 1 and 2: as the bot clears play it)
+            // The solo bar is the full one here: at the solo scale (0.25 since 28 Oct) the attacking bot ends P3 before loop 2's resume.
+            float soloScale = BellkeeperEncounter.UltimateSoloScale; BellkeeperEncounter.UltimateSoloScale = 1f;
             foreach (var (speed, attacks, loops) in new[] { (4.2f, false, 1), (6f, true, 2) })
             {
                 yield return UltStart(null, "P3");
@@ -357,6 +359,7 @@ namespace LastBell.Run
                 }
                 d.Player.Input = bot;
             }
+            BellkeeperEncounter.UltimateSoloScale = soloScale;
             yield return UltStart(null, "P4");
             if (bk == null) yield break;
             ShHook(); sh = bk.Mechanic<StoppedHour>(); ShBots();
