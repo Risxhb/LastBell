@@ -53,6 +53,18 @@ namespace LastBell.Run
 
         int PhaseFor() => Hp > MaxHp * 0.70f ? 1 : Hp > MaxHp * 0.35f ? 2 : 3;
 
+        // practice phase row: the shift's state without its 1.5 s animation (no stored memory, loop restarts, look snaps)
+        public override float[] PhaseStarts => new[] { 1f, 0.70f, 0.35f };
+        public override int PhaseNumber => phase;
+        protected override void EnterPhase(int n)
+        {
+            Forget();
+            phase = n; loop = 0; lookPhase = n - 1;
+            PhaseName = n == 2 ? Phase2 : Phase3;
+        }
+        // a restarted script starts from phase 1 again; transitions then follow HP as usual
+        public override void BeginCombat() { phase = 1; loop = 0; PhaseName = Phase1; base.BeginCombat(); }
+
         protected override IEnumerable<int> Script()
         {
             while (true)

@@ -59,7 +59,7 @@ namespace LastBell.Run
         // extra fighter, applied in Build once the party is in. v3 uses the packet's 6600 (ABILITIES-v3.md); v1 and v2 keep
         // the shortened 2500 test value.
         public const int V4Hp = 8500;
-        public const float PartyStep = 0.9f;
+        public new const float PartyStep = 0.9f;   // hides BossEncounter.PartyStep (Aurelion opt-in); Crucivar scales its own HP in Build
         public static int V4MaxHp(int players) => Mathf.RoundToInt(V4Hp * (1 + PartyStep * Mathf.Max(0, players - 1)));
         void Awake() { MaxHp = CrucivarArgs.V4 ? V4Hp : CrucivarArgs.V3 ? 6600 : 2500; BodyRadius = 1.7f; HitHeight = 2.0f; MarkHeight = 4.6f; }
 
@@ -74,6 +74,16 @@ namespace LastBell.Run
         }
 
         int PhaseFor() => Hp > MaxHp * P2At ? 1 : Hp > MaxHp * P3At ? 2 : 3;
+
+        // practice phase row: the shift's state without its animation; the rig sheds its insulation (and opens on 3)
+        public override float[] PhaseStarts => new[] { 1f, P2At, P3At };
+        public override int PhaseNumber => phase;
+        protected override void EnterPhase(int n)
+        {
+            if (phase == n) return;
+            phase = n; step = 0; PhaseName = n == 2 ? "Casting Heat" : "Open Pressure";
+            rig.BeginPhase(n);
+        }
 
         protected override IEnumerable<int> Script() => CrucivarArgs.V1 ? V1Script() : CrucivarArgs.V4 ? V4Script() : V2Script();
 

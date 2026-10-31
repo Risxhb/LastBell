@@ -23,6 +23,13 @@ namespace LastBell.Run
         // Easy stretches every warning, track and window by 1.25 (ABILITIES.md §5); gaps and the punish stay as authored.
         public float WarnScale => W.Difficulty == Difficulty.Easy ? 1.25f : 1f;
         protected int T(float seconds) => Sim.Ticks(seconds * WarnScale);
+        // v2.1 §2: on Hard every lock-to-hit WINDOW is x0.7 (never below `floor`, e.g. Orrery's 2.0 s); tracks stay as on
+        // Medium (use T for them). Easy stretches windows like every warning (x1.25).
+        protected int Win(float seconds, float floor = 0) => Sim.Ticks(Hard && !AurelionArgs.WindowsMedium ? Mathf.Max(seconds * HardWindow, floor) : seconds * WarnScale);
+        public const float HardWindow = 0.7f;
+        // v3 damage tiers (HARDER-PROMPT target 5): every hit is punish (<= 30) or kill (>= 50) at Medium, nothing between:
+        // Meridian Lances 35 -> 30, Orrery Closing 40 and Zenith Collapse 45 -> 50
+        public static int V3Tier(int dmg) => dmg <= 30 ? dmg : dmg < 40 ? 30 : Math.Max(50, dmg);
         protected bool Hard => W.Difficulty == Difficulty.Hard;
         protected bool Easy => W.Difficulty == Difficulty.Easy;
 
@@ -35,7 +42,32 @@ namespace LastBell.Run
         protected int N => Math.Max(1, Standing().Count);
         protected PlayerController Farthest(Vector3 from) => Standing().OrderByDescending(p => Sim.Flat(p.transform.position - from).sqrMagnitude).FirstOrDefault();
         protected PlayerController Nearest(Vector3 from) => Standing().OrderBy(p => Sim.Flat(p.transform.position - from).sqrMagnitude).FirstOrDefault();
-        protected Hazard Spawn(Hazard h) { if (string.IsNullOrEmpty(h.Source) || h.Source == "Hazard") h.Source = Name; return Boss.Track(W.Hazards.Spawn(h)); }
+        public const int LastLightCap = 90;   // the biggest hit Last Light's scaling may build, after the difficulty scale
+        protected Hazard Spawn(Hazard h)
+        {
+            if (string.IsNullOrEmpty(h.Source) || h.Source == "Hazard") h.Source = Name;
+            if (AurelionArgs.V3 || AurelionArgs.V4) h.Damage = V3Tier(h.Damage);
+            // v4 Last Light, the soft enrage: every fallen slice makes his attacks 10 % stronger
+            // capped so a hit never lands above 90 after the difficulty scale (no one-shots, design rules 5): Hard 69 x 1.3
+            if (AurelionArgs.V4 && Boss.Light != null && Boss.Phase >= 4 && h.Damage > 0)
+                h.Damage = Mathf.Min(Mathf.RoundToInt(h.Damage * Boss.Light.DamageScale), Mathf.Max(h.Damage, Mathf.FloorToInt(LastLightCap / W.DamageTakenScale)));
+            if (h.BurnPerSecond > 0) h.FillToLock = true;   // a burn counts down to its lock, then holds: no slow fake countdown
+            Boss.Track(W.Hazards.Spawn(h));
+            if (h.Tele != null)
+            {
+                h.Tele.Motif(SkywardMotif);
+                // draw order (readability A2/A4): standing burns under everything, tracking warnings in the middle, a
+                // locked footprint over them (it is the one that will hit)
+                if (h.BurnPerSecond > 0) h.Tele.Order = -1;
+                else if (h.Locked) h.Tele.Order = 1;
+                else h.Tele.LockOnTop = true;
+            }
+            return h;
+        }
+        // every Aurelion warning wears the Skyward Spire motif (light rays, orbital arcs, sun bars) over the shared plain
+        // outline, outward-fill countdown and resolve flash (Reference/Telegraph-Style v2, gpt/08-design-rules.md §5).
+        // Cues that are not "get out" warnings (Meridian Towers' cobalt soaks) set their own look after Spawn.
+        public const int SkywardMotif = 1;
         protected void Say(string current) => Boss.SetCurrent(current);
         protected void Glow(float k) => Boss.Glow(k);
         protected void Flare(float f = 1) => Boss.Flare(f);
@@ -48,8 +80,7 @@ namespace LastBell.Run
     }
 
     // Launch switches (practice only):
-    //   -lastbellAbilitySet v1|v2   v1 (default) is the original five attacks; v2 is the ability set Chzy18 is still building
-    //                               (a concept run). Risxhb, October 26, 2026: the player defaults to v1 until v2 is done.
+    //   -lastbellAbilitySet v1|v2|v3|v4   v4 (default) is the mythic set (abilities-v4); v3 the Milestone A set; v2 is v2.1; v1 the packet's five attacks
     //   -lastbellAbility <id>       fire one v2 ability on its own, on loop, e.g. aurelion.noon_shadow
     // In practice F6 cycles the same single-ability loop: off > each ability in turn > off.
     public static class AurelionArgs
@@ -60,11 +91,17 @@ namespace LastBell.Run
             int i = Array.FindIndex(a, x => x.Equals(name, StringComparison.OrdinalIgnoreCase));
             return i >= 0 && i + 1 < a.Length ? a[i + 1] : null;
         }
+        public const string DefaultSet = "v4";   // Chzy18 2026-10-22: every level gets the mythic set; v2 / v3 stay reachable by flag
         public static string SetOverride;     // tests force a set without a command line
         public static string SoloOverride;    // F6 / tests: the single ability to loop (null = command line)
-        public static bool V1 => !(SetOverride ?? Arg("-lastbellAbilitySet") ?? "v1").Equals("v2", StringComparison.OrdinalIgnoreCase);
+        public static bool V1 => (SetOverride ?? Arg("-lastbellAbilitySet") ?? DefaultSet).Equals("v1", StringComparison.OrdinalIgnoreCase);
+        public static bool V3 => (SetOverride ?? Arg("-lastbellAbilitySet") ?? DefaultSet).Equals("v3", StringComparison.OrdinalIgnoreCase);
+        public static bool V4 => (SetOverride ?? Arg("-lastbellAbilitySet") ?? DefaultSet).Equals("v4", StringComparison.OrdinalIgnoreCase);
+        // test switch (HARDER-PROMPT target 7): Hard damage and mechanics with Medium window lengths
+        public static bool WindowsMediumOverride;
+        public static bool WindowsMedium => WindowsMediumOverride || Environment.GetCommandLineArgs().Any(x => x.Equals("-lastbellWindowsMedium", StringComparison.OrdinalIgnoreCase));
         public static string Solo => SoloOverride ?? Arg("-lastbellAbility");
-        public static readonly string[] Ids = { "aurelion.meridian_lances", "aurelion.starfall_mirror", "aurelion.noon_shadow", "aurelion.orrery_closing", "aurelion.hour_hands" };
+        public static readonly string[] Ids = { "aurelion.meridian_lances", "aurelion.starfall_mirror", "aurelion.noon_shadow", "aurelion.orrery_closing", "aurelion.hour_hands", "aurelion.zenith_collapse", "aurelion.ecliptic_order", "aurelion.zenith_marks", "aurelion.meridian_towers", "aurelion.sunspots", "aurelion.total_eclipse", "aurelion.severance", "aurelion.last_light" };
         public static bool Known(string id) => id != null && Ids.Contains(id);
     }
 }
