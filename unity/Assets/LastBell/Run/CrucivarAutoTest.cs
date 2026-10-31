@@ -61,6 +61,7 @@ namespace LastBell.Run
         void Start()
         {
             d = GetComponent<RunDirector>(); dir = OutDir; Directory.CreateDirectory(dir);
+            CrucivarArgs.SetOverride = "v1";   // this suite checks the original five attacks; v2 has CrucivarV2AutoTest
             Application.logMessageReceived += OnLog;
             Application.runInBackground = true;
             StartCoroutine(Main());

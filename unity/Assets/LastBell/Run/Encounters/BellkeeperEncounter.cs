@@ -62,6 +62,8 @@ namespace LastBell.Run
             phase = n; loop = 0; lookPhase = n - 1;
             PhaseName = n == 2 ? Phase2 : Phase3;
         }
+        // a restarted script starts from phase 1 again; transitions then follow HP as usual
+        public override void BeginCombat() { phase = 1; loop = 0; PhaseName = Phase1; base.BeginCombat(); }
 
         protected override IEnumerable<int> Script()
         {

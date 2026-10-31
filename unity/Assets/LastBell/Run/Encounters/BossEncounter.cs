@@ -68,7 +68,7 @@ namespace LastBell.Run
         protected virtual void OnHurt() { }
         protected virtual int Absorb(int damage) => damage;   // returns what gets through to HP
 
-        public void BeginCombat() { script = Script().GetEnumerator(); wait = 0; }
+        public virtual void BeginCombat() { script = Script().GetEnumerator(); wait = 0; }
         public void Halt() { script = null; Current = "idle"; }   // player defeat: stop attacking, keep standing
 
         public void Step()
