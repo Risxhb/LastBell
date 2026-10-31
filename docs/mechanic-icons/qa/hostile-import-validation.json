@@ -1,0 +1,112 @@
+﻿[
+    {
+        "file":  "hostile_line_stack.png",
+        "exportSha256":  "86092A49768EEF6608BA32A3EB2ED14C937850EC11AABFDDAAD2F4BFA0353E5F",
+        "sourceSha256":  "C2D86EC32597BCCF203D3D514090C13DF0003A7118681F27AEFECB3B7A97A571",
+        "validation":  {
+                           "width":  256,
+                           "height":  256,
+                           "alphaMin":  0,
+                           "alphaMax":  255,
+                           "transparentPixels":  50391,
+                           "opaquePixels":  12928,
+                           "partialPixels":  2217,
+                           "bounds":  [
+                                          31,
+                                          55,
+                                          225,
+                                          201
+                                      ],
+                           "borderPixels":  0,
+                           "saturatedWarmScreenPixels":  9374
+                       }
+    },
+    {
+        "file":  "hostile_movement_move.png",
+        "exportSha256":  "D62FED7D580748DA684AEB11292B06550C0A121E8898A830DD1489730826EB03",
+        "sourceSha256":  "7C4D400718A9D9D61057B76C1B4429B03EA0018648C49AEB21E37B3C7FC05C06",
+        "validation":  {
+                           "width":  256,
+                           "height":  256,
+                           "alphaMin":  0,
+                           "alphaMax":  255,
+                           "transparentPixels":  55040,
+                           "opaquePixels":  7714,
+                           "partialPixels":  2782,
+                           "bounds":  [
+                                          31,
+                                          68,
+                                          225,
+                                          188
+                                      ],
+                           "borderPixels":  0,
+                           "saturatedWarmScreenPixels":  5096
+                       }
+    },
+    {
+        "file":  "hostile_movement_stop.png",
+        "exportSha256":  "CB73404BC5AD1C90BC9B09E976EEEF7B8C4DA2DB177265FED47C85A8316566D3",
+        "sourceSha256":  "2A50E52FE960B7D0917ED2C5E5411F1AB2E9CC214CB1AC0DA45637321056A861",
+        "validation":  {
+                           "width":  256,
+                           "height":  256,
+                           "alphaMin":  0,
+                           "alphaMax":  255,
+                           "transparentPixels":  54161,
+                           "opaquePixels":  10104,
+                           "partialPixels":  1271,
+                           "bounds":  [
+                                          31,
+                                          68,
+                                          225,
+                                          188
+                                      ],
+                           "borderPixels":  0,
+                           "saturatedWarmScreenPixels":  5991
+                       }
+    },
+    {
+        "file":  "hostile_ring.png",
+        "exportSha256":  "DD502A5269E529D55D4C3E094E10D844F82C7700A6DD607189ABAE339EAE5BC9",
+        "sourceSha256":  "AFCBEF40F69BF940EE94B47FBD7735F9CAE4A0CCFF9686B263D479D09BE78C2C",
+        "validation":  {
+                           "width":  256,
+                           "height":  256,
+                           "alphaMin":  0,
+                           "alphaMax":  255,
+                           "transparentPixels":  47728,
+                           "opaquePixels":  15820,
+                           "partialPixels":  1988,
+                           "bounds":  [
+                                          31,
+                                          48,
+                                          225,
+                                          207
+                                      ],
+                           "borderPixels":  0,
+                           "saturatedWarmScreenPixels":  12025
+                       }
+    },
+    {
+        "file":  "hostile_stretch_tether.png",
+        "exportSha256":  "E70E886929B83D613998CFE82875E844744AAA563A9C91B1F8EF316BF7C71873",
+        "sourceSha256":  "65773EC8A250ABF6F284E2B6E3CCEFD7A4D2C34055DFA4CBAAAD51472905DA52",
+        "validation":  {
+                           "width":  256,
+                           "height":  256,
+                           "alphaMin":  0,
+                           "alphaMax":  255,
+                           "transparentPixels":  59554,
+                           "opaquePixels":  4558,
+                           "partialPixels":  1424,
+                           "bounds":  [
+                                          31,
+                                          98,
+                                          225,
+                                          158
+                                      ],
+                           "borderPixels":  0,
+                           "saturatedWarmScreenPixels":  2980
+                       }
+    }
+]

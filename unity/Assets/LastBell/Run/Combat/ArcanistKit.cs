@@ -48,6 +48,7 @@ namespace LastBell.Run
 
         enum Act { None, Tap, Charge, Volley, DisWind, DisBeam, DisEnd, Sigil, Comet, Surge, BlinkIn }
         Act act; int t; Vector3 aim; bool altHand;
+        public override bool Acting => act != Act.None;
         int tapCd, disCd, sigCd, comCd, surgeCd;
         int buffered = -1, bufferUntil; const int BufferTicks = 9;
         Vector3 beamDir; int beamTicks; bool stepHit; Vector3 beamContact;

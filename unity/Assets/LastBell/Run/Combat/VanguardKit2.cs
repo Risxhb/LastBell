@@ -31,6 +31,7 @@ namespace LastBell.Run
         int buffered = -1, bufferUntil;   // PF-05: an ability pressed during another action fires as soon as it can (0.15 s)
         const int BufferTicks = 9;
         Act act; int t;           // ticks into the current action
+        public override bool Acting => act != Act.None;
         int step;                 // basic: hit being played (0..2)
         bool queued, contactDone, sunderEmpowered;
         int comboStep, comboExpire;   // next basic index and its expiry
