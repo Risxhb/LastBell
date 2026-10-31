@@ -4,6 +4,9 @@
 // and adds a thin warm rim on the side facing the sun. Alpha fades where the puff nears opaque geometry
 // (camera depth texture, _SoftDistance metres), so clouds wrap round towers instead of slicing them with a straight
 // edge. The camera must request the depth texture (SkywardSpireBuilder turns it on per camera).
+// SKYCLOUD_BATCHED (play mode, SkywardSpireArena): every puff is one quad of a single merged mesh. Each vertex carries
+// its puff's centre, size, atlas cell, colours and opacity, and the drift, breathing and opacity pulse that the
+// arena script used to apply per transform and per material are computed here from _CloudClock and _CloudDrift.
 Shader "LastBell/SkyCloud"
 {
     Properties
@@ -28,28 +31,55 @@ Shader "LastBell/SkyCloud"
             #pragma vertex vert
             #pragma fragment frag
             #pragma multi_compile_fog
+            #pragma multi_compile_local _ SKYCLOUD_BATCHED
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _MainTex_ST, _Lit, _Shade, _Rim, _SunDir;
-                float _Cell, _FlipX, _Opacity, _SoftDistance;
+                float _Cell, _FlipX, _Opacity, _SoftDistance, _CloudClock, _CloudDrift;
             CBUFFER_END
             TEXTURE2D(_MainTex); SAMPLER(sampler_MainTex);
 
-            struct Attributes { float4 positionOS : POSITION; float2 uv : TEXCOORD0; };
-            struct Varyings { float4 positionCS : SV_POSITION; float2 uv : TEXCOORD0; float2 local : TEXCOORD1; float2 sun : TEXCOORD2; float eyeDepth : TEXCOORD3; float4 screen : TEXCOORD4; float fog : TEXCOORD5; };
+            struct Attributes
+            {
+                float4 positionOS : POSITION; float2 uv : TEXCOORD0;
+            #if defined(SKYCLOUD_BATCHED)
+                float4 centre : TEXCOORD1;   // rest centre (world), breathing phase
+                float4 size : TEXCOORD2;     // rest size (world), atlas cell, mirrored
+                float4 drift : TEXCOORD3;    // start angle, radius, speed (rad/s), 1 if the puff drifts round the spire
+                float4 look : TEXCOORD4;     // opacity, opacity-pulse phase, soft distance, breathing amount
+                float4 lit : TEXCOORD5; float4 shade : TEXCOORD6; float4 rim : TEXCOORD7;
+            #endif
+            };
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION; float2 uv : TEXCOORD0; float2 local : TEXCOORD1; float2 sun : TEXCOORD2; float eyeDepth : TEXCOORD3; float4 screen : TEXCOORD4; float fog : TEXCOORD5;
+            #if defined(SKYCLOUD_BATCHED)
+                float4 litOpacity : TEXCOORD6; float4 shadeSoft : TEXCOORD7; float3 rim : TEXCOORD8;
+            #endif
+            };
 
             Varyings vert (Attributes v)
             {
                 Varyings o;
+            #if defined(SKYCLOUD_BATCHED)
+                float a = v.drift.x + v.drift.z * _CloudDrift;
+                float3 centre = v.drift.w > 0.5 ? float3(cos(a) * v.drift.y, v.centre.y, sin(a) * v.drift.y) : v.centre.xyz;
+                float2 size = v.size.xy * (1 + sin(_CloudClock * 0.25 + v.centre.w) * v.look.w);
+                float cellIn = v.size.z, flip = v.size.w;
+                o.litOpacity = float4(v.lit.rgb, v.look.x * (0.92 + 0.08 * sin(_CloudClock * 0.18 + v.look.y)));
+                o.shadeSoft = float4(v.shade.rgb, v.look.z); o.rim = v.rim.rgb;
+            #else
                 float3 centre = TransformObjectToWorld(float3(0, 0, 0));
                 float2 size = float2(length(GetObjectToWorldMatrix()._m00_m10_m20), length(GetObjectToWorldMatrix()._m01_m11_m21));
+                float cellIn = _Cell, flip = _FlipX;
+            #endif
                 float3 right = UNITY_MATRIX_V[0].xyz, up = UNITY_MATRIX_V[1].xyz;
                 float3 world = centre + right * v.positionOS.x * size.x + up * v.positionOS.y * size.y;
                 o.positionCS = TransformWorldToHClip(world);
-                float cell = floor(_Cell + 0.5), col = fmod(cell, 2), row = floor(cell / 2);
-                float u = _FlipX > 0.5 ? 1 - v.uv.x : v.uv.x;
+                float cell = floor(cellIn + 0.5), col = fmod(cell, 2), row = floor(cell / 2);
+                float u = flip > 0.5 ? 1 - v.uv.x : v.uv.x;
                 o.uv = float2((col + u) / 2, (row + v.uv.y) / 4);
                 o.local = v.uv;
                 float3 s = normalize(_SunDir.xyz); o.sun = normalize(float2(dot(s, right), dot(s, up)) + 1e-4);
@@ -61,15 +91,20 @@ Shader "LastBell/SkyCloud"
 
             half4 frag (Varyings i) : SV_Target
             {
+            #if defined(SKYCLOUD_BATCHED)
+                half3 lit = i.litOpacity.rgb, shade = i.shadeSoft.rgb, rim = i.rim; float opacity = i.litOpacity.a, softDistance = i.shadeSoft.a;
+            #else
+                half3 lit = _Lit.rgb, shade = _Shade.rgb, rim = _Rim.rgb; float opacity = _Opacity, softDistance = _SoftDistance;
+            #endif
                 float4 t = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, i.uv);
-                half3 col = lerp(_Shade.rgb, _Lit.rgb, t.r);
+                half3 col = lerp(shade, lit, t.r);
                 float edge = 1 - smoothstep(0.15, 0.85, t.a), facing = saturate(dot(normalize(i.local - 0.5 + 1e-4), i.sun));
-                col += _Rim.rgb * edge * facing * 0.35;
+                col += rim * edge * facing * 0.35;
                 float2 suv = i.screen.xy / i.screen.w;
                 float scene = LinearEyeDepth(SampleSceneDepth(suv), _ZBufferParams);
-                float soft = saturate((scene - i.eyeDepth) / max(0.01, _SoftDistance));
+                float soft = saturate((scene - i.eyeDepth) / max(0.01, softDistance));
                 col = MixFog(col, i.fog);
-                return half4(col, t.a * _Opacity * soft);
+                return half4(col, t.a * opacity * soft);
             }
             ENDHLSL
         }
