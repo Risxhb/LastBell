@@ -68,8 +68,8 @@ namespace LastBell.Run.Shop
             float t = 0; while (!c() && t < timeout) { KeepAlive(); t += Time.deltaTime; yield return null; }
             if (!c()) Note($"timeout waiting for {what} ({d?.State})");
         }
-        // these checks are about items, not survival: top the player up while a boss is live
-        void KeepAlive() { if (d && d.Player && !d.Player.Down && d.Player.Hp < 60) d.Player.DebugSetHp(PlayerController.MaxHp); }
+        // these checks are about items, not survival: top the player up after every hit (Aurelion v4 hits for up to 90)
+        void KeepAlive() { if (d && d.Player && !d.Player.Down && d.Player.Hp < d.Player.MaxHealth) d.Player.DebugSetHp(d.Player.MaxHealth); }
         IEnumerator Shot(string name)
         {
             yield return new WaitForEndOfFrame();
