@@ -59,5 +59,4 @@ Demo: the "P4 enrage" row, "Seed Storm, enrage" (option V), with Loop 1 / 3 / 5 
   The soft steps stay under Phase 2's level (about 220/min). Last Storm downs a full-HP player in about 5–8 s.
 
 ## Open questions
-1. **Hard:** needs one named extra mechanic. Proposal: seeds burst into 10 petals. Comes back as its own review item with the other phases' Hard/Easy extras.
-2. **Easy:** proposal: 6 seeds per ring, every 2.5 s. Same review item.
+1. **Hard and Easy:** proposals in [DIFFICULTY-EXTRAS.md](DIFFICULTY-EXTRAS.md) (one review packet, 31 Oct).

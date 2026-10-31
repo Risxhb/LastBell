@@ -38,5 +38,4 @@
 ## Open questions
 1. **Bud HP and placement:** fixed 10 m from the centre, or anchored to the arena's root pillars?
 2. **Uncut buds:** today a bloom is just one petal ring. Should an uncut bud also make her spiral faster for the rest of the loop?
-3. **Hard:** needs one named extra mechanic. Proposal: one more bud per wave.
-4. **Easy:** proposal: buds bloom after 15 s and the spiral has 3 arms.
+3. **Hard and Easy:** proposals in [DIFFICULTY-EXTRAS.md](DIFFICULTY-EXTRAS.md) (one review packet, 31 Oct).

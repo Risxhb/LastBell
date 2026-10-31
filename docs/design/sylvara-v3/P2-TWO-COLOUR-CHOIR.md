@@ -38,9 +38,8 @@
 ## Open questions
 1. **Colour readability in Unity:** brass vs cobalt has to read at the gameplay camera next to the Verdant lighting and the coral hostile colour. Every bullet still needs a coral rim to say "hostile".
 2. **Down players:** a downed player keeps their colour. Do tolls skip them?
-3. **Hard:** needs one named extra mechanic. Proposal: the Toll Burst fires twice, 0.5 s apart.
-4. **Easy:** proposal: the lanes fire every 0.35 s and there's no second set.
-5. **Unused options:** Choir Buds, Seed Relay and Hush and Chorus are still in the demo. They are spare parts (no intermission, 29 Oct).
+3. **Hard and Easy:** proposals in [DIFFICULTY-EXTRAS.md](DIFFICULTY-EXTRAS.md) (one review packet, 31 Oct).
+4. **Unused options:** Choir Buds, Seed Relay and Hush and Chorus are still in the demo. They are spare parts (no intermission, 29 Oct).
 
 ## Playtest change (29 Oct, Unity build)
 Chzy18 played the Unity build: "slow the ball down a little bit in p2 and space them out more so you can run in between". Choir lanes now travel at 5 m/s (was 6), sit 3.4 m apart (was 2.4) and fire every 0.35 s (was 0.25). The colour spirals are 4.2 and 3.5 m/s (were 5 and 4), firing every 0.17 and 0.22 s (were 0.13 and 0.18). The toll burst moves at 4.5 m/s (was 5).
