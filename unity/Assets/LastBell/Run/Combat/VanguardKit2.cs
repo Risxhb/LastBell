@@ -31,12 +31,20 @@ namespace LastBell.Run
         int buffered = -1, bufferUntil;   // PF-05: an ability pressed during another action fires as soon as it can (0.15 s)
         const int BufferTicks = 9;
         Act act; int t;           // ticks into the current action
+        public override bool Acting => act != Act.None;
         int step;                 // basic: hit being played (0..2)
         bool queued, contactDone, sunderEmpowered;
         int comboStep, comboExpire;   // next basic index and its expiry
         int sunderCd, ultCd, braceCd, opening;
         int bracePhase; bool braceAbsorbed;   // 0 raise, 1 hold, 2 lower
         Vector3 aim;
+        // run items (Shop.ItemHooks): Toll of Steel adds a 4th basic hit (it reuses hit 3's timings), Double Opening stacks
+        // Opening to 2, Heavy Hour / Quick Verdict change Last Word's windup
+        int LastStep => Shop.ItemHooks.I(P, "v.combo.length", 3) - 1;
+        static int H(int s) => Mathf.Min(s, 2);   // timing row for hit s
+        int ChainFrom(int s) => s < 2 ? BasicChainFrom[s] : s < LastStep ? 20 : 99;
+        float Arc(int s) => s >= 2 ? Shop.ItemHooks.F(P, "v.hit3.arc", BasicArc[2]) : BasicArc[s];
+        int openStacks, ultRelease = UltRelease, ultTotal = UltTotal; float waveWidth = WaveWidth;
         // Last Word shockwave (presentation follows its simulated position)
         bool waveLive; Vector3 wavePos, waveDir; float waveTravel; bool waveHit;
 
@@ -50,7 +58,7 @@ namespace LastBell.Run
         public override float Cooldown01(int s) => s switch { 1 => sunderCd / (float)SunderCd, 2 => ultCd / (float)UltCd, 3 => act == Act.Brace ? 1 : braceCd / (float)BraceCd, _ => 0 };
         public override string SlotState(int s) => s switch
         {
-            0 => comboExpire > 0 || act == Act.Basic ? $"hit {Mathf.Min(3, (act == Act.Basic ? step : comboStep) + 1)}/3" : "",
+            0 => comboExpire > 0 || act == Act.Basic ? $"hit {Mathf.Min(LastStep + 1, (act == Act.Basic ? step : comboStep) + 1)}/{LastStep + 1}" : "",
             1 => sunderCd > 0 ? Sec(sunderCd) : OpeningActive ? "EMPOWERED" : "ready",
             2 => ultCd > 0 ? Sec(ultCd) : "ready",
             3 => act == Act.Brace ? (bracePhase < 2 ? "BRACED" : "lowering") : braceCd > 0 ? Sec(braceCd) : "ready",
@@ -69,7 +77,7 @@ namespace LastBell.Run
         public override void ResetAll()
         {
             act = Act.None; t = 0; step = 0; queued = false; comboStep = 0; comboExpire = 0;
-            sunderCd = ultCd = braceCd = 0; opening = 0; waveLive = false; buffered = -1;
+            sunderCd = ultCd = braceCd = 0; opening = 0; openStacks = 0; waveLive = false; buffered = -1;
             MoveScale = 1; Velocity = Vector3.zero; FaceAim = false;
             P.World.Fx.Opening(P, false); P.World.Fx.Shield(P, 0, false);
         }
@@ -78,7 +86,7 @@ namespace LastBell.Run
         {
             if (sunderCd > 0) sunderCd--; if (ultCd > 0) ultCd--;
             if (braceCd > 0 && act != Act.Brace) braceCd--;
-            if (opening > 0 && --opening == 0) P.World.Fx.Opening(P, false);
+            if (opening > 0 && --opening == 0) { openStacks = 0; P.World.Fx.Opening(P, false); }
             if (comboExpire > 0 && act != Act.Basic && --comboExpire == 0) comboStep = 0;
             StepWave();
         }
@@ -105,14 +113,18 @@ namespace LastBell.Run
         void Idle(PlayerInput inp)
         {
             if (TryAbility(inp)) return;
-            if (inp.Pressed(0) || inp.Held(0)) StartBasic(comboExpire > 0 ? comboStep : 0);
+            if (inp.Pressed(0) || inp.Held(0)) StartBasic(Shop.ItemHooks.TakeMomentum(P) ? 2 : comboExpire > 0 ? comboStep : 0);   // Momentum: after a dash, hit 3
         }
 
         bool TryAbility(PlayerInput inp)
         {
             bool Want(int s) => inp.Pressed(s) || buffered == s;
             if ((Want(3) || inp.Held(3)) && braceCd == 0) { buffered = -1; StartBrace(); return true; }   // hold works as a buffer
-            if (Want(2) && ultCd == 0) { buffered = -1; Start(Act.Ult); P.Presenter.Action("LastWord", UltTotal); return true; }
+            if (Want(2) && ultCd == 0)
+            {
+                buffered = -1; ultRelease = Shop.ItemHooks.I(P, "v.ult.windup", UltRelease); ultTotal = UltTotal + ultRelease - UltRelease;
+                Start(Act.Ult); P.Presenter.Action("LastWord", ultTotal); return true;
+            }
             if (Want(1) && sunderCd == 0) { buffered = -1; Start(Act.Sunder); P.Presenter.Action("SunderingBlow", SunderTotal); return true; }
             return false;
         }
@@ -121,37 +133,39 @@ namespace LastBell.Run
 
         void StartBasic(int i)
         {
-            Start(Act.Basic); step = Mathf.Clamp(i, 0, 2); queued = false; comboExpire = 0;
-            P.Presenter.Action("SteelRhythm" + (step + 1), BasicTotal[step]);
+            Start(Act.Basic); step = Mathf.Clamp(i, 0, LastStep); queued = false; comboExpire = 0;
+            P.Presenter.Action("SteelRhythm" + (H(step) + 1), BasicTotal[H(step)]);
         }
 
         void Basic(PlayerInput inp)
         {
             t++; MoveScale = 0;
-            if (inp.Pressed(0) || (inp.Held(0) && t >= BasicChainFrom[step])) queued = true;
-            if (t <= BasicContact[step] + 2) Velocity = P.transform.forward * (BasicLunge[step] / (BasicContact[step] + 2)) * Sim.Hz;
-            if (t == BasicContact[step])
+            int r = H(step);
+            if (inp.Pressed(0) || (inp.Held(0) && t >= ChainFrom(step))) queued = true;
+            if (t <= BasicContact[r] + 2) Velocity = P.transform.forward * (BasicLunge[r] / (BasicContact[r] + 2)) * Sim.Hz;
+            if (t == BasicContact[r])
             {
                 contactDone = true;
-                int dealt = W.StrikeBoss(P, P.transform.position, P.transform.forward, BasicReach[step], BasicArc[step], BasicDamage[step], "SteelRhythm" + (step + 1));
-                W.Fx.Slash(P, BasicReach[step], BasicArc[step], step == 2, step == 1);
-                if (dealt > 0 && step == 2) GrantOpening();
+                int dealt = W.StrikeBoss(P, P.transform.position, P.transform.forward, BasicReach[r], Arc(step), BasicDamage[r], "SteelRhythm" + (step + 1));
+                W.Fx.Slash(P, BasicReach[r], Arc(step), step >= 2, step == 1);
+                if (dealt > 0 && step == LastStep) GrantOpening();
+                if (step == 3) Shop.ItemHooks.Cast(P, "v.hit4", P.transform.position + P.transform.forward * 1.2f, P.transform.forward, WaveDamage, WaveWidth);   // Toll of Steel's fan
             }
             // after contact, a ready ability cancels the rest of the swing (Basic 3 -> empowered Special); the dash
             // cancels at any time (controller calls OnDash)
-            if (t > BasicContact[step] + 1)
+            if (t > BasicContact[r] + 1)
             {
-                int keepStep = step; bool landed3 = step == 2;
+                int keepStep = step; bool landed3 = step == LastStep;
                 act = Act.None;
-                if (TryAbility(inp)) { comboStep = landed3 ? 0 : Mathf.Min(2, keepStep + 1); comboExpire = landed3 ? 0 : ComboAfterDash; return; }
+                if (TryAbility(inp)) { comboStep = landed3 ? 0 : Mathf.Min(LastStep, keepStep + 1); comboExpire = landed3 ? 0 : ComboAfterDash; return; }
                 act = Act.Basic;
             }
-            if (queued && t >= BasicChainFrom[step] && step < 2) { StartBasic(step + 1); return; }
-            if (t >= BasicTotal[step])
+            if (queued && t >= ChainFrom(step) && step < LastStep) { StartBasic(step + 1); return; }
+            if (t >= BasicTotal[r])
             {
                 act = Act.None;
-                comboStep = step < 2 ? step + 1 : 0;
-                comboExpire = step < 2 ? ComboWindow : 0;
+                comboStep = step < LastStep ? step + 1 : 0;
+                comboExpire = step < LastStep ? Shop.ItemHooks.I(P, "v.combo.window", ComboWindow) : 0;
             }
         }
 
@@ -164,11 +178,14 @@ namespace LastBell.Run
             {
                 // release: cooldown starts and Opening is consumed here, whether or not the blow lands
                 sunderCd = SunderCd;
-                sunderEmpowered = OpeningActive;
-                if (sunderEmpowered) { opening = 0; W.Fx.Opening(P, false); ultCd = Mathf.Max(0, ultCd - UltRefund); }
+                sunderEmpowered = OpeningActive && Shop.ItemHooks.SunderEmpowerable(P);
+                bool doubled = sunderEmpowered && openStacks >= 2;   // Double Opening spends both stacks
+                if (sunderEmpowered) { opening = 0; openStacks = 0; W.Fx.Opening(P, false); ultCd = Mathf.Max(0, ultCd - UltRefund); }
                 int dmg = SunderDamage + (sunderEmpowered ? SunderBonus : 0);
-                int dealt = W.StrikeBoss(P, P.transform.position, P.transform.forward, SunderReach, SunderArc, dmg, sunderEmpowered ? "SunderingBlow+" : "SunderingBlow");
-                W.Fx.Sunder(P, SunderReach, sunderEmpowered, dealt > 0);
+                float reach = Shop.ItemHooks.F(P, "v.sunder.reach", SunderReach), arc = doubled ? Shop.ItemHooks.F(P, "v.sunder.double_arc", SunderArc) : SunderArc;
+                int dealt = W.StrikeBoss(P, P.transform.position, P.transform.forward, reach, arc, dmg, doubled ? "SunderingBlow++" : sunderEmpowered ? "SunderingBlow+" : "SunderingBlow");
+                W.Fx.Sunder(P, reach, sunderEmpowered, dealt > 0);
+                Shop.ItemHooks.Cast(P, "v.sunder", P.transform.position, P.transform.forward, reach, arc);   // Pendulum Cut
             }
             if (t >= SunderTotal) act = Act.None;
         }
@@ -176,29 +193,30 @@ namespace LastBell.Run
         void Ult()
         {
             t++; MoveScale = 0;
-            if (t < UltRelease - 12) FaceAim = true;
-            if (t == 1) W.Fx.UltWindup(P, UltRelease);
-            if (t == UltRelease)
+            if (t < ultRelease - 12) FaceAim = true;
+            if (t == 1) W.Fx.UltWindup(P, ultRelease);
+            if (t == ultRelease)
             {
-                ultCd = UltCd;
+                ultCd = Shop.ItemHooks.Cooldown(P, "LastWord", UltCd);
                 W.StrikeBoss(P, P.transform.position, P.transform.forward, UltReach, UltArc, UltDamage, "LastWord");
                 waveLive = true; waveHit = false; waveTravel = 0;
                 waveDir = Sim.Flat(aim - P.transform.position).sqrMagnitude > 0.1f ? Sim.Flat(aim - P.transform.position).normalized : P.transform.forward;
-                wavePos = P.transform.position + P.transform.forward * 1.2f;
+                wavePos = P.transform.position + P.transform.forward * 1.2f; waveWidth = Shop.ItemHooks.F(P, "v.ult.fan", WaveWidth);
                 W.Fx.UltSlam(P, wavePos);
+                Shop.ItemHooks.Cast(P, "v.lastword", wavePos, waveDir, WaveDamage, waveWidth);   // Iron Echo
             }
-            if (t >= UltTotal) act = Act.None;
+            if (t >= ultTotal) act = Act.None;
         }
 
         void StepWave()
         {
             if (!waveLive) return;
             float d = WaveSpeed * Sim.Dt; wavePos += waveDir * d; waveTravel += d;
-            W.Fx.Shockwave(wavePos, waveDir, WaveWidth);
+            W.Fx.Shockwave(wavePos, waveDir, waveWidth);
             if (!waveHit)
             {
                 var b = W.Boss;
-                if (b != null && b.Solid && Sim.Flat(b.transform.position - wavePos).magnitude <= b.BodyRadius + WaveWidth / 2)
+                if (b != null && b.Solid && Sim.Flat(b.transform.position - wavePos).magnitude <= b.BodyRadius + waveWidth / 2)
                 {
                     waveHit = true;   // the shockwave hits once per cast
                     W.DamageBoss(WaveDamage, b.transform.position - Sim.Flat(b.transform.position - wavePos).normalized * b.BodyRadius + Vector3.up * b.HitHeight, "LastWordWave");
@@ -216,7 +234,7 @@ namespace LastBell.Run
 
         void Brace(PlayerInput inp)
         {
-            t++; FaceAim = true; MoveScale = BraceMove;
+            t++; FaceAim = true; MoveScale = Shop.ItemHooks.F(P, "v.brace.move", BraceMove);
             if (bracePhase == 0 && t >= BraceRaise) { bracePhase = 1; }
             if (bracePhase < 2 && (t >= BraceMax || (!inp.Held(3) && t >= BraceRaise))) { bracePhase = 2; t = 0; P.Presenter.Brace(2); W.Fx.Shield(P, 0, false); }
             if (bracePhase == 2 && t >= BraceLower) EndBrace();
@@ -238,15 +256,19 @@ namespace LastBell.Run
             return 1 - BraceReduction;
         }
 
-        void GrantOpening() { opening = OpeningTicks; W.Fx.Opening(P, true); }
+        void GrantOpening()
+        {
+            opening = OpeningTicks; openStacks = Mathf.Min(Shop.ItemHooks.I(P, "v.opening.stacks", 1), openStacks + 1);
+            W.Fx.Opening(P, true); if (Shop.ItemHooks.OnOpening(P)) ultCd = 0;
+        }
 
         public override bool CanJump() => act == Act.None;
-        public override bool CanDash() => !(act == Act.Ult && t >= UltRelease) && !(act == Act.Sunder && t >= SunderRelease);
+        public override bool CanDash() => !(act == Act.Ult && t >= ultRelease) && !(act == Act.Sunder && t >= SunderRelease);
 
         // Dash interrupts basics and unreleased Special/Ultimate windups: no damage, no cooldown spent.
         public override void OnDash()
         {
-            if (act == Act.Basic) { comboStep = contactDone ? Mathf.Min(2, step + 1) : step; if (contactDone && step == 2) comboStep = 0; comboExpire = ComboAfterDash; }
+            if (act == Act.Basic) { comboStep = contactDone ? Mathf.Min(LastStep, step + 1) : step; if (contactDone && step == LastStep) comboStep = 0; comboExpire = ComboAfterDash; }
             else if (comboExpire > 0) comboExpire = Mathf.Max(comboExpire, ComboAfterDash);
             if (act == Act.Brace) EndBrace();
             if (act == Act.Ult) W.Fx.UltCancel(P);

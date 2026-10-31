@@ -220,6 +220,7 @@ namespace LastBell.Run
             Note($"Last Bell autotest · {Application.version} · Unity {Application.unityVersion} · {SystemInfo.graphicsDeviceName} · {DateTime.Now:yyyy-MM-dd HH:mm}");
             d.InputOverride = bot;
             yield return Wait(1.0f);
+            if (PartyOnly) { yield return PartyChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
             if (AurelionOnly) { yield return AurelionChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
             // -lastbellArcanistOnly: just the Arcanist run and its kit checks (skips the menu, map, other-class and boss suites)
             if (ArcanistOnly) { yield return ArcanistRun(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
@@ -227,6 +228,7 @@ namespace LastBell.Run
             for (int i = 0; i < RunMaps.All.Length; i++)
                 Check($"map selectable: {RunMaps.All[i].Name}", RunMaps.InBuild(i), RunMaps.All[i].RunScene);
             yield return Shot("menu");
+            if (PhaseSelectOnly) { yield return PracticePhaseChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
             if (OnlySylvara)
             {
                 yield return SylvaraChecks();
@@ -240,6 +242,8 @@ namespace LastBell.Run
                 Check($"{cls} skill-bar icons load ({slots} incl. dash)", found == slots, $"{found}/{slots}");
             }
             Check("potion icon loads", RunHud.Icon("potion") != null);
+            BossAttackIconChecks();
+            MechanicIconChecks();
             yield return DifficultyChecks();
 
             // ---------- run 1: Vanguard, full victory, repeated presses ----------
@@ -362,6 +366,7 @@ namespace LastBell.Run
             Check("defeat result shows the cause", !d.Victory && !string.IsNullOrEmpty(d.DefeatCause), d.DefeatCause);
             Check("no hazards or attacks after defeat", d.World.Hazards.Count == 0 && !d.World.CombatActive);
             yield return Shot("results_defeat");
+            yield return DeathRecapIconChecks("defeat");
             runs0 = d.RunsStarted;
             for (int i = 0; i < 3; i++) { d.RequestRetry(); yield return null; }
             Check("retry after defeat starts one fresh run", d.RunsStarted == runs0 + 1 && d.State == RunState.Ready);
@@ -400,6 +405,7 @@ namespace LastBell.Run
             yield return Until(() => d.State == RunState.Combat, 4, "practice combat");
             Check("practice starts the chosen encounter", d.Boss is BellkeeperEncounter && d.Mode == RunMode.Practice);
             yield return Wait(1f);
+            yield return MechanicIconInGameChecks();
             d.Boss.DebugDefeat();
             yield return Until(() => d.State == RunState.Results, 6, "practice results");
             Check("practice clear ends in a practice result, not a run victory", d.Mode == RunMode.Practice && d.EncountersCleared == 1);
@@ -439,9 +445,13 @@ namespace LastBell.Run
             }
             Check("map tour returns to the starting map", RunMaps.Current == startMap);
             // ---------- area bosses (practice only for now) ----------
+            yield return PartyChecks();
             yield return AurelionChecks();
 
             yield return SylvaraChecks();
+
+            // ---------- practice phase row: every boss, every phase ----------
+            yield return PracticePhaseChecks();
 
             // ---------- report ----------
             Check("no errors or exceptions logged", errors == 0, errors + " logged");

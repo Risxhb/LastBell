@@ -23,6 +23,9 @@ namespace LastBell.Run
         public bool Solid => !Dead && W != null;
         public string PhaseName { get; protected set; } = "";
         public string Current { get; protected set; } = "";   // attack in progress, for the HUD / tests
+        public virtual string HudExtra => null;          // an extra boss-bar line (Aurelion v4: enrage clock, shield)
+        protected virtual bool PartyScaled => false;      // true: co-op HP 1 + PartyStep x (fighters - 1) (Aurelion v4 is tuned with it)
+        protected virtual float PartyStep => 0.7f;        // the packets' provisional 0.7 per extra fighter
         public event Action<BossEncounter> Defeated;
         public event Action<BossEncounter, string> PhaseChanged;
 
@@ -36,9 +39,26 @@ namespace LastBell.Run
             var go = new GameObject(typeof(T).Name);
             go.transform.SetParent(w.Root, false);
             go.transform.SetPositionAndRotation(pos, Quaternion.Euler(0, yaw, 0));
-            var b = go.AddComponent<T>(); b.W = w; b.Hp = b.MaxHp; b.Build();
+            var b = go.AddComponent<T>(); b.W = w;
+            // co-op HP: 1 + 0.7 x (fighting players - 1), the packets' provisional formula until the Bellkeeper D6 decides.
+            // Opt-in per boss (PartyScaled): only bosses tuned with it use it, so other bosses keep their authored HP.
+            int fighters = 0; foreach (var p in w.Players) if (!(p.Input is AllyBot) || AllyBot.Attacks) fighters++;   // passive bots don't count
+            float party = b.PartyScaled ? 1 + b.PartyStep * Mathf.Max(0, fighters - 1) : 1;
+            if (TestHpScale != 1 || party != 1) b.MaxHp = Mathf.Max(1, Mathf.RoundToInt(b.MaxHp * TestHpScale * party));
+            b.Hp = b.MaxHp; b.Build();
             SimSmoother.Attach(go);   // drawn between ticks like the player
             return b;
+        }
+
+        // Playtest switch: LastBell.exe -lastbellBossHp <fraction> scales every boss's health (e.g. 0.2 = 20 %), so all
+        // phases can be reached quickly. Phase thresholds are fractions of MaxHp, so the phase plan is unchanged.
+        public static readonly float TestHpScale = ReadHpScale();
+        static float ReadHpScale()
+        {
+            var args = Environment.GetCommandLineArgs();
+            int i = Array.FindIndex(args, a => a.Equals("-lastbellBossHp", StringComparison.OrdinalIgnoreCase));
+            return i >= 0 && i + 1 < args.Length && float.TryParse(args[i + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float f)
+                ? Mathf.Clamp(f, 0.01f, 1f) : 1f;
         }
 
         protected abstract void Build();                     // visuals (placeholder geometry or model)
@@ -46,8 +66,9 @@ namespace LastBell.Run
         protected virtual void StepAlways() { }               // presentation-adjacent state on every tick
         protected virtual void OnDefeat() { }
         protected virtual void OnHurt() { }
+        protected virtual int Absorb(int damage) => damage;   // returns what gets through to HP
 
-        public void BeginCombat() { script = Script().GetEnumerator(); wait = 0; }
+        public virtual void BeginCombat() { script = Script().GetEnumerator(); wait = 0; }
         public void Halt() { script = null; Current = "idle"; }   // player defeat: stop attacking, keep standing
 
         public void Step()
@@ -69,6 +90,8 @@ namespace LastBell.Run
         public int TakeHit(int damage, Vector3 contact, bool hitFx = true)
         {
             if (Dead) return 0;
+            damage = Absorb(damage);   // a shield (Aurelion v4 Corona Shield) takes its share first
+            if (damage <= 0) { RunHud.Float(contact + Vector3.up * 0.5f, "absorbed", new Color(0.7f, 0.85f, 1f)); return 0; }
             int dealt = Mathf.Min(damage, Hp);
             Hp -= dealt;
             RunHud.Float(contact + Vector3.up * 0.5f, dealt.ToString(), new Color(1f, 0.86f, 0.45f));
@@ -83,6 +106,29 @@ namespace LastBell.Run
         public void DebugDefeat() { if (!Dead) { Hp = 1; TakeHit(1, transform.position + Vector3.up * HitHeight); } }
         public virtual float NextPhaseFraction() => Hp > MaxHp * 0.7f ? 0.69f : 0.34f;   // F8: just below the next threshold
         public void DebugSetHpFraction(float f){ if (!Dead) Hp = Mathf.Clamp(Mathf.RoundToInt(MaxHp * f), 1, MaxHp); }
+
+        // ---------------- practice: start at phase N (Test Rush phase row, -lastbellPhase) ----------------
+        // PhaseStarts: the HP fraction each HP phase begins at, phase 1 first (always 1). One entry = Phase 1 only: the
+        // boss can't be skipped into a later phase safely yet. PhaseNumber is the 1-based HP phase the fight is in now.
+        public virtual float[] PhaseStarts => new[] { 1f };
+        public virtual int PhaseNumber => 1;
+        public int PhaseCount => PhaseStarts.Length;
+        // Puts the boss in phase n as if that phase's transition had just finished: HP at the top of the band (no heal
+        // later, same bar), phase state, name, looks and per-phase setup through EnterPhase. Idempotent, so the director
+        // applies it when the boss spawns (the bar reads right during the intro) and again right after BeginCombat (a boss
+        // that resets its phase state there can't undo it). Phase 1 is a normal fight start.
+        public bool StartAtPhase(int n)
+        {
+            var starts = PhaseStarts;
+            if (Dead || n < 1 || n > starts.Length) return false;
+            if (n == 1) return true;
+            // one HP under the threshold: `Hp > MaxHp * 0.70f` can see 2519.99996 for 3600 HP, so exactly 2520 would read as
+            // the phase above and shift straight back
+            Hp = Mathf.Clamp(Mathf.FloorToInt(MaxHp * starts[n - 1]) - 1, 1, MaxHp);
+            EnterPhase(n);
+            return PhaseNumber == n;
+        }
+        protected virtual void EnterPhase(int n) { }
 
         void Die()
         {

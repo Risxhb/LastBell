@@ -96,6 +96,9 @@ public static class AE {
         }
         return worst;
     }
+    // v2.1 Zenith Collapse (annulus on a centred boss), alone and with k beams aimed at a0
+    public static double Zenith(double disc, out double wx, out double wy) { return Worst((x, y) => InRing(x, y, 0, 0, disc, 30), 0, 0, true, out wx, out wy); }
+    public static double ZenithLances(double disc, int k, double a0, double hw, out double wx, out double wy) { return Worst((x, y) => InRing(x, y, 0, 0, disc, 30) || InBeams(x, y, 0, 0, k, a0, hw), 0, 0, true, out wx, out wy); }
     public static double Nearest(Shape danger, double x, double y, double bx, double by, bool body) {
         for (double r = 0.05; r <= 2*R; r += 0.05)
             for (int k = 0; k < 120; k++) {
@@ -109,26 +112,36 @@ public static class AE {
 Add-Type -TypeDefinition $code -Language CSharp
 [AE]::R = $Bound; [AE]::Bmax = $BossMax; [AE]::Body = $Body; [AE]::PR = $PlayerR; [AE]::M = $M
 
-# ---- the numbers under test (Medium, proposal; see ABILITIES.md) ----
-$easy = $Difficulty -eq "Easy"; $k = if ($easy) { 1.25 } else { 1.0 }
-$L = @{ HW = 1.1; Track1 = 1.2*$k; Window = 1.2*$k; Track2 = 1.0*$k }   # Meridian Lances: 2.2 m beams; aim tracks, then locks
-$S = @{ R4 = 2.2; R8 = 1.8; Lock = 2.0*$k; Resolve = 3.1*$k }     # Starfall Mirror
-$N = @{ Warn = 3.8*$k }                                           # Noon Shadow (half arena)
-$O = @{ RimIn = 8.5; Crown = 3.6; Warn = 2.3*$k }                 # Orrery Closing
-$H = @{ HW = 0.9; Lock = 1.5; Resolve = 2.5 }                     # Hour Hands (Hard only)
-$react = 0.25
+# ---- the numbers under test (proposal; ABILITIES.md v2, ABILITIES-v2.1.md for Hard and the new cases) ----
+# Tracks and follows stretch x1.25 on Easy and stay put on Hard; lock-to-hit windows are x1.25 on Easy and x0.7 on Hard
+# (v2.1 §2: never below the 2 s total-warning floor, Orrery stops at 2.0 s, Starfall keeps 1.1 s when paired with Lances).
+$easy = $Difficulty -eq "Easy"; $hard = $Difficulty -eq "Hard"
+$k = if ($easy) { 1.25 } else { 1.0 }
+$wk = if ($easy) { 1.25 } elseif ($hard) { 0.7 } else { 1.0 }
+$L = @{ HW = 1.1; Track1 = 1.2*$k; Window = 1.2*$wk; Track2 = $(if ($hard) { 1.2 } else { 1.0*$k }) }   # Meridian Lances: 2.2 m beams
+$S = @{ R4 = 2.2; R8 = 1.8; Lock = 2.0*$k; Window = 1.1*$wk; Paired = 1.1*$k }   # Starfall Mirror (Paired = window beside Lances)
+$N = @{ Warn = 3.8*$wk }                                          # Noon Shadow (half arena; locked at once)
+$O = @{ RimIn = 8.5; Crown = 3.6; Warn = $(if ($hard) { 2.0 } else { 2.3*$k }) }   # Orrery Closing (locked at once)
+$H = @{ HW = 0.9; Window = 1.0*$wk }                              # Hour Hands (Hard only)
+$Z = @{ Warn = $(if ($hard) { 2.4 } else { 3.0*$k }) }            # Zenith Collapse (v2.1; locked at once)
+$react = 0.25; $sprint = 9.0; $drain = 25.0
+$need = if ($hard) { 0.0 } else { 0.3 }                            # v2.1 §4: Hard margins >= 0 on the fastest route, Medium/Easy >= 0.3 s
 
+# walk, walk + one dash (3 m / 0.2 s + 4 ticks recovery), sprint (9 m/s, 25 stamina/s; always affordable from full here)
 function EscapeTimes([double]$d, [double]$walk) {
   $w = $react + $d / $walk
   $dash = if ($d -le 3) { $react + $d / 3 * 0.2 } else { $react + 0.2 + 4/60 + ($d - 3) / $walk }
-  return @([math]::Round($w, 2), [math]::Round([math]::Min($w, $dash), 2))
+  $sp = $react + $d / $sprint
+  return @([math]::Round($w, 2), [math]::Round([math]::Min($w, $dash), 2), [math]::Round($sp, 2))
 }
 $rows = New-Object System.Collections.ArrayList
 function Row([string]$name, [double]$d, [double]$window, [string]$where) {
   $a = EscapeTimes $d 4.2; $b = EscapeTimes $d 6.0
-  $m = [math]::Round($window - $a[1], 2)
-  $verdict = if ($d -lt 0) { "FAIL (no safe point)" } elseif ($m -lt 0.5) { "FAIL (margin < 0.5 s)" } elseif ($m -gt 1.2) { "pass (loose)" } else { "pass" }
-  [void]$rows.Add("| $name | $([math]::Round($d,2)) | $window | $($a[0]) / $($a[1]) | $($b[0]) / $($b[1]) | $m | $verdict | $where |")
+  $fast = [math]::Min([math]::Min($a[0], $a[1]), $a[2])
+  $route = if ($fast -eq $a[0]) { "walk" } elseif ($fast -eq $a[1]) { "dash" } else { "sprint ($([math]::Round($d / $sprint * $drain)) st)" }
+  $m = [math]::Round($window - $fast, 2)
+  $verdict = if ($d -lt 0) { "FAIL (no safe point)" } elseif ($m -lt $need) { "FAIL (margin < $need s)" } else { "pass" }
+  [void]$rows.Add("| $name | $([math]::Round($d,2)) | $([math]::Round($window,2)) | $($a[0]) / $($a[1]) / $($a[2]) | $($b[0]) / $($b[1]) | $m ($route) | $verdict | $where |")
 }
 
 # 1. Meridian Lances: 3 beams (P1) and 4 beams (P2/P3), every boss radius and aim
@@ -139,42 +152,60 @@ foreach ($beams in 3, 4) {
 }
 
 # 2. Starfall Mirror: own star at lock (r + margin), N <= 4 and N >= 5 radii
-Row "Starfall Mirror, own star (N 1-4, r 2.2)" ($S.R4 + $M) ($S.Resolve - $S.Lock) "centre of your own star"
-Row "Starfall Mirror, own star (N 5-8, r 1.8)" ($S.R8 + $M) ($S.Resolve - $S.Lock) "centre of your own star"
+Row "Starfall Mirror, own star (N 1-4, r 2.2)" ($S.R4 + $M) $S.Window "centre of your own star"
+Row "Starfall Mirror, own star (N 5-8, r 1.8)" ($S.R8 + $M) $S.Window "centre of your own star"
 
 # 3. Noon Shadow: half arena through the centre (cone, half-angle 90 deg, from the centre)
 $at = ""; $d = [AE]::Noon([ref]$at)
-Row "Noon Shadow (half arena)" $d $N.Warn $at
+Row "Noon Shadow / Afternoon (half arena)" $d $N.Warn $at
 
 # 4. Orrery Closing: rim ring 8.5 -> outside the bound, plus the crown circle round the boss
 $at = ""; $d = [AE]::Orrery($O.RimIn, $O.Crown, [ref]$at)
 Row "Orrery Closing (rim + crown)" $d $O.Warn $at
 
 # 5. Hour Hands (Hard): your own spoke (lane half-width 0.9)
-Row "Hour Hands (Hard), own spoke" ($H.HW + $M) ($H.Resolve - $H.Lock) "on your spoke's centre line"
+Row "Hour Hands, own spoke" ($H.HW + $M) $H.Window "on your spoke's centre line"
+
+# 6. Zenith Collapse (v2.1): annulus on the boss at the centre; safe disc 4.5 (N <= 2), 5.0 (N <= 2, Phase 3), 5.5, 6.5 m
+foreach ($disc in 4.5, 5.0, 5.5, 6.5) {
+  $wx = 0.0; $wy = 0.0
+  $d = [AE]::Zenith($disc, [ref]$wx, [ref]$wy)
+  Row "Zenith Collapse, safe disc $disc m" $d $Z.Warn "rim point ($([math]::Round($wx,1)), $([math]::Round($wy,1)))"
+}
 
 # ---- pairings (joint routes) ----
-# Noon + Starfall: the deep-edge runner (fastest route: one dash, then walk). Starfall starts 0.7 s into Noon, locks 2.0 s later on the
-# runner's position, both resolve together. Running straight across clears the star and the half line together.
-$t = $N.Warn; $lockT = 0.7*$k + $S.Lock
+# Noon + Starfall: the deep-edge runner. Starfall locks on the runner mid-run; running straight across clears the star
+# and the half line together, so the route is the run itself.
 foreach ($walk in 4.2, 6.0) {
-  $dLine = $Bound + $M; $need = (EscapeTimes $dLine $walk)[1]
-  $ranAtLock = [math]::Max(0, ($lockT - $react) * $walk)
-  $starExit = if ($ranAtLock -ge $dLine) { 0 } else { ($S.R4 + $M) / $walk }
-  [void]$rows.Add("| Pairing: Noon + Starfall, edge runner at $walk m/s | $([math]::Round($dLine,2)) | $t | $([math]::Round($need,2)) | - | $([math]::Round($t - $need,2)) | $(if ($t - $need -ge 0.5) {'pass'} else {'FAIL'}) | star locks $([math]::Round($ranAtLock,1)) m into the run; exiting it takes $([math]::Round($starExit,2)) s on the same line |")
+  $dLine = $Bound + $M; $e = EscapeTimes $dLine $walk; $fast = [math]::Min([math]::Min($e[0], $e[1]), $e[2])
+  [void]$rows.Add("| Pairing: Noon + Starfall, edge runner (walk $walk m/s) | $([math]::Round($dLine,2)) | $([math]::Round($N.Warn,2)) | $($e[0]) / $($e[1]) / $($e[2]) | - | $([math]::Round($N.Warn - $fast,2)) | $(if ($N.Warn - $fast -ge $need) {'pass'} else {'FAIL'}) | running straight across clears the star on the same line |")
 }
 # Horizon + Starfall at N = 4 and N = 8: players on a 6 m circle round a centred boss, stars and mirrors locked on
 # them; each must reach a point clear of every star and mirror, inside the rim and outside the crown.
 foreach ($n in 4, 8) {
   $r = if ($n -le 4) { $S.R4 } else { $S.R8 }
   $d = [AE]::Layout($n, 6.0, $r, $O.RimIn, $O.Crown)
-  Row "Pairing: Horizon + Starfall, N = $n on a 6 m circle" $d ($S.Resolve - $S.Lock) "every player to a spot clear of all stars and mirrors, inside the rim, outside the crown"
+  Row "Pairing: Horizon + Starfall, N = $n on a 6 m circle" $d $S.Window "every player to a spot clear of all stars and mirrors, inside the rim, outside the crown"
+}
+# v2.1 Lances + Starfall: leave your own star (r + margin) and end in a beam gap (<= 1.6 m more); the star keeps its full
+# window beside the Lances, and the beams resolve 0.2 s before it.
+Row "Pairing (v2.1): Lances + Starfall (star window kept)" ($S.R4 + $M + 1.6) $S.Paired "own star centre, then the nearest beam gap"
+# v2.1 Zenith Collapse + Lances: from the rim, into the safe disc and on into a gap between the beams (boss at the centre,
+# every aim). The runner must be inside the disc when the Collapse resolves (the beams follow 0.3 s later).
+foreach ($c in @(@{ Disc = 4.5; Beams = 3 }, @{ Disc = 5.5; Beams = 3 }, @{ Disc = 6.5; Beams = 3 }, @{ Disc = 5.0; Beams = 4 })) {
+  $worst = 0.0; $where = ""
+  foreach ($deg in 0, 7.5, 15, 22.5, 30) {
+    $a0 = $deg * [math]::PI / 180; $disc = $c.Disc; $beams = $c.Beams; $wx = 0.0; $wy = 0.0
+    $d = [AE]::ZenithLances($disc, $beams, $a0, $L.HW, [ref]$wx, [ref]$wy)
+    if ($d -lt 0 -or $d -gt $worst) { $worst = $d; $where = "aim $deg deg, from ($([math]::Round($wx,1)), $([math]::Round($wy,1)))" }
+  }
+  Row "Pairing (v2.1): Zenith Collapse ($($c.Disc) m) + Lances ($($c.Beams) beams)" $worst $Z.Warn $where
 }
 
-"# Aurelion ability set v2: escape check ($Difficulty)"
+"# Aurelion ability set v2.1: escape check ($Difficulty)"
 ""
-"Produced by ``tools/encounter-escape/aurelion-v2-escape-check.ps1 -Difficulty $Difficulty`` on $(Get-Date -Format 'yyyy-MM-dd HH:mm'). Arena: Skyward Spire play bound $Bound m, boss inside $BossMax m, boss body $Body m + player radius $PlayerR m, hit margin $M m. Reaction $react s is included in every escape time. Margin = window - fastest route at 4.2 m/s; the brief asks for 0.5-0.8 s."
+"Produced by ``tools/encounter-escape/aurelion-v2-escape-check.ps1 -Difficulty $Difficulty`` on $(Get-Date -Format 'yyyy-MM-dd HH:mm'). Arena: Skyward Spire play bound $Bound m, boss inside $BossMax m, boss body $Body m + player radius $PlayerR m, hit margin $M m. Reaction $react s is included in every escape time. Routes: walk, walk + one dash, sprint at $sprint m/s ($drain stamina/s). Margin = window - fastest route at 4.2 m/s walk; pass needs >= $need s (v2.1: Hard >= 0 on the fastest route, Medium and Easy >= 0.3 s)."
 ""
-"| Case | Worst escape (m) | Window (s) | 4.2 m/s walk / walk+dash (s) | 6 m/s walk / walk+dash (s) | Margin at 4.2 (s) | Verdict | Worst configuration |"
+"| Case | Worst escape (m) | Window (s) | 4.2 m/s walk / walk+dash / sprint (s) | 6 m/s walk / walk+dash (s) | Margin at 4.2 (s, route) | Verdict | Worst configuration |"
 "|---|---|---|---|---|---|---|---|"
 $rows

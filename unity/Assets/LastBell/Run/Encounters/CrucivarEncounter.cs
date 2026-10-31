@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -54,19 +55,39 @@ namespace LastBell.Run
         public int PhaseIndex => phase;
         public int Attacks { get; private set; }
 
-        void Awake() { MaxHp = 2500; BodyRadius = 1.7f; HitHeight = 2.0f; MarkHeight = 4.6f; }
+        // v4 (abilities-v4/FIGHT-SHEET.md, proposal): 8500 solo, about 4 min at the measured bot damage, plus PartyStep per
+        // extra fighter, applied in Build once the party is in. v3 uses the packet's 6600 (ABILITIES-v3.md); v1 and v2 keep
+        // the shortened 2500 test value.
+        public const int V4Hp = 8500;
+        public new const float PartyStep = 0.9f;   // hides BossEncounter.PartyStep (Aurelion opt-in); Crucivar scales its own HP in Build
+        public static int V4MaxHp(int players) => Mathf.RoundToInt(V4Hp * (1 + PartyStep * Mathf.Max(0, players - 1)));
+        void Awake() { MaxHp = CrucivarArgs.V4 ? V4Hp : CrucivarArgs.V3 ? 6600 : 2500; BodyRadius = 1.7f; HitHeight = 2.0f; MarkHeight = 4.6f; }
 
         protected override void Build()
         {
+            if (CrucivarArgs.V4 && W.Players.Count > 1) { MaxHp = Mathf.RoundToInt(MaxHp * (1 + PartyStep * (W.Players.Count - 1))); Hp = MaxHp; }   // after the -lastbellBossHp scale
             presenter = CharacterPresenter.Create(transform, "Crucivar", 3f, 0.8f, 0, CrucivarRig.BuildPlaceholder);
             rig = presenter.Visual.gameObject.AddComponent<CrucivarRig>();
             rig.Bind(presenter.Visual);
             PhaseName = "Sealed Furnace";
+            BindAbilities();
         }
 
         int PhaseFor() => Hp > MaxHp * P2At ? 1 : Hp > MaxHp * P3At ? 2 : 3;
 
-        protected override IEnumerable<int> Script()
+        // practice phase row: the shift's state without its animation; the rig sheds its insulation (and opens on 3)
+        public override float[] PhaseStarts => new[] { 1f, P2At, P3At };
+        public override int PhaseNumber => phase;
+        protected override void EnterPhase(int n)
+        {
+            if (phase == n) return;
+            phase = n; step = 0; PhaseName = n == 2 ? "Casting Heat" : "Open Pressure";
+            rig.BeginPhase(n);
+        }
+
+        protected override IEnumerable<int> Script() => CrucivarArgs.V1 ? V1Script() : CrucivarArgs.V4 ? V4Script() : V2Script();
+
+        IEnumerable<int> V1Script()
         {
             while (true)
             {
@@ -251,6 +272,243 @@ namespace LastBell.Run
             }
             rig.Pour(false);
             foreach (var w in Recover("Casting Cycle (cooling)", "Vulnerable", CastRec)) yield return w;
+        }
+
+        // ================ ability set v2 (abilities-v2/ABILITIES.md, proposal) ================
+        // Phase plan (Medium; Easy stretches the warnings inside each ability, never the recoveries):
+        //   1 Sealed Furnace  Mould Press > 2.0 · Bellows Draw > 3.5 major · Great Casting (pour only) > 2.0
+        //   65 %: second form "Casting Heat" (1.5 s, harmless, queued after the current attack, same HP bar)
+        //   2 Casting Heat    Gear Chain > 1.5 · Slag Rim + Mould Press > 2.0 · Slag Rim + Gear Chain > 1.5 ·
+        //                     Bellows Draw > 3.5 major · Great Casting (pour + 3 spokes) > 2.0
+        //   30 %: "Open Pressure" (1.5 s, harmless)
+        //   3 Open Pressure   Great Casting (full) > 3.5 major · Slag Rim + Gear Chain > 1.5 · Mould Press > 2.0 ·
+        //                     Bellows Draw > 2.0
+        // Hard adds Second Press after every Mould Press. The boss walks to the anvil (within 3 m of the centre, 1.4 m/s,
+        // at most 1.5 s) before Mould Press, Bellows Draw and the Great Casting.
+        public MouldPress Mould { get; private set; }
+        public GearChain Chain { get; private set; }
+        public BellowsDraw Bellows { get; private set; }
+        public GreatCasting Casting { get; private set; }
+        public SecondPress Press { get; private set; }
+        public CombatWorld World => W;
+        public bool SecondForm { get; private set; }
+        public int Transitions { get; private set; }
+        public void SetCurrent(string name) => Current = name;
+        public void Glow(float k) => Windup(k);
+        public void Flare(float f = 1) => Release(f);
+
+        // tests: hold the schedule and run only what TestRun hands over
+        public bool TestHold;
+        IEnumerable<int> testBody;
+        public void TestRun(IEnumerable<int> body) => testBody = body;
+        public bool TestBusy => testBody != null || testRunning;
+        bool testRunning;
+
+        const float AnvilRange = 3f, AnvilMaxWalk = 1.5f;
+
+        void BindAbilities()
+        {
+            if (Mould != null) return;
+            Mould = new MouldPress(); Chain = new GearChain(); Bellows = new BellowsDraw(); Casting = new GreatCasting(); Press = new SecondPress();
+            Sweep = new AnvilSweep(); Spit = new SlagSpit(); Rite = new ForgeRite(); Uprising = new FoundryUprising(); Crown = new MoltenCrown();
+            foreach (var a in new CrucivarAbility[] { Mould, Chain, Bellows, Casting, Press, Sweep, Spit, Rite, Uprising, Crown }) a.Bind(this, W);
+        }
+
+        public IEnumerable<int> WalkToAnvil()
+        {
+            var to = Sim.Flat(transform.position); if (to.magnitude <= AnvilRange) yield break;
+            var dest = to.normalized * (AnvilRange - 0.2f);
+            foreach (var w in WalkTo(dest, Walk, Sim.Ticks(AnvilMaxWalk))) yield return w;
+        }
+
+        public IEnumerable<int> MouldWithPress(bool forcePress = false)
+        {
+            foreach (var w in Mould.Run()) yield return w;
+            if ((forcePress || W.Difficulty == Difficulty.Hard) && Mould.Last != null)
+                foreach (var w in Press.Run(Mould.Last)) yield return w;
+        }
+
+        IEnumerable<int> Step(bool walk, Func<IEnumerable<int>> body, string recoverName, string clip, float recover, bool slagRim = false)
+        {
+            if (walk) foreach (var w in WalkToAnvil()) yield return w;
+            if (slagRim) Bellows.SlagRim();
+            Attacks++;
+            foreach (var w in body()) yield return w;
+            foreach (var w in Recover(recoverName, clip, Sim.Ticks(recover))) yield return w;
+        }
+
+        IEnumerable<IEnumerable<int>> Plan(int ph)
+        {
+            switch (ph)
+            {
+                case 1:
+                    yield return Step(true, () => MouldWithPress(), "Mould Press (hammer lifts)", "Idle", 2.0f);
+                    yield return Step(true, Bellows.Run, "Bellows Draw (vents cooling)", "Vulnerable", 3.5f);
+                    yield return Step(true, () => Casting.Run(0), "Great Casting (cooling)", "Idle", 2.0f);
+                    break;
+                case 2:
+                    yield return Step(false, Chain.Run, "Gear Chain", "Idle", 1.5f);
+                    yield return Step(true, () => MouldWithPress(), "Mould Press (hammer lifts)", "Idle", 2.0f, slagRim: true);
+                    yield return Step(false, Chain.Run, "Gear Chain", "Idle", 1.5f, slagRim: true);
+                    yield return Step(true, Bellows.Run, "Bellows Draw (vents cooling)", "Vulnerable", 3.5f);
+                    yield return Step(true, () => Casting.Run(3), "Great Casting (cooling)", "Idle", 2.0f);
+                    break;
+                default:
+                    yield return Step(true, () => Casting.Run(6), "Great Casting (hammer lodged)", "HammerLodged", 3.5f);
+                    yield return Step(false, Chain.Run, "Gear Chain", "Idle", 1.5f, slagRim: true);
+                    yield return Step(true, () => MouldWithPress(), "Mould Press (hammer lifts)", "Idle", 2.0f);
+                    yield return Step(true, Bellows.Run, "Bellows Draw (vents cooling)", "Idle", 2.0f);
+                    break;
+            }
+        }
+
+        // ================ ability set v3 (abilities-v2/ABILITIES-v3.md, proposal): "much, much harder" ================
+        // HP 6600 (the packet's target), 0.5 s gaps, a filler (Anvil Sweep / Slag Spit, alternating) between abilities,
+        // layering from phase 1 after one lone Mould Press, one 3.0 s major punish per loop.
+        //   1 Sealed Furnace  [loop 1: Mould Press | later: Mould Press + Slag Rim] · Sweep · Bellows Draw · Spit ·
+        //                     Great Casting (pour + 4 spokes) · Sweep · Gear Chain + Slag Rim · 3.0 punish
+        //   2 Casting Heat    Gear Chain + Rim · Spit · Mould Press + Rim · Sweep · Bellows Draw · Spit ·
+        //                     Great Casting (pour + 8 spokes) · 3.0 punish
+        //   3 Open Pressure   Great Casting (8 spokes + return wave) · 3.0 punish · Gear Chain + Rim · Sweep ·
+        //                     Mould Press (Hard: + Second Press) · Spit · Bellows Draw · Sweep
+        public AnvilSweep Sweep { get; private set; }
+        public SlagSpit Spit { get; private set; }
+        public const float GapV3 = 0.5f, PunishV3 = 3.0f;
+        int p1Loops;
+
+        IEnumerable<IEnumerable<int>> PlanV3(int ph)
+        {
+            const float g = GapV3;
+            switch (ph)
+            {
+                case 1:
+                    yield return Step(true, () => MouldWithPress(), "recovering", "Idle", g, slagRim: p1Loops++ > 0);
+                    yield return Step(false, Sweep.Run, "recovering", "Idle", g);
+                    yield return Step(true, Bellows.Run, "recovering", "Idle", g);
+                    yield return Step(false, Spit.Run, "recovering", "Idle", g);
+                    yield return Step(true, () => Casting.Run(4), "recovering", "Idle", g);
+                    yield return Step(false, Sweep.Run, "recovering", "Idle", g);
+                    yield return Step(false, Chain.Run, "Gear Chain (furnace venting)", "Vulnerable", PunishV3, slagRim: true);
+                    break;
+                case 2:
+                    yield return Step(false, Chain.Run, "recovering", "Idle", g, slagRim: true);
+                    yield return Step(false, Spit.Run, "recovering", "Idle", g);
+                    yield return Step(true, () => MouldWithPress(), "recovering", "Idle", g, slagRim: true);
+                    yield return Step(false, Sweep.Run, "recovering", "Idle", g);
+                    yield return Step(true, Bellows.Run, "recovering", "Idle", g);
+                    yield return Step(false, Spit.Run, "recovering", "Idle", g);
+                    yield return Step(true, () => Casting.Run(8), "Great Casting (crucible cooling)", "Vulnerable", PunishV3);
+                    break;
+                default:
+                    yield return Step(true, () => Casting.Run(8, returnWave: true), "Great Casting (hammer lodged)", "HammerLodged", PunishV3);
+                    yield return Step(false, Chain.Run, "recovering", "Idle", g, slagRim: true);
+                    yield return Step(false, Sweep.Run, "recovering", "Idle", g);
+                    yield return Step(true, () => MouldWithPress(), "recovering", "Idle", g);
+                    yield return Step(false, Spit.Run, "recovering", "Idle", g);
+                    yield return Step(true, Bellows.Run, "recovering", "Idle", g);
+                    yield return Step(false, Sweep.Run, "recovering", "Idle", g);
+                    break;
+            }
+        }
+
+        // one ability on loop (-lastbellAbility <id>); its phase variant follows the HP phase and the set
+        IEnumerable<int> Solo(string id) => id switch
+        {
+            "crucivar.mould_press" => Step(true, () => MouldWithPress(), "Mould Press (hammer lifts)", "Idle", 2.0f),
+            "crucivar.second_press" => Step(true, () => MouldWithPress(forcePress: true), "Second Press (hammer lifts)", "Idle", 2.0f),
+            "crucivar.gear_chain" => Step(false, Chain.Run, "Gear Chain", "Idle", 1.5f),
+            "crucivar.bellows_draw" => Step(true, Bellows.Run, "Bellows Draw (vents cooling)", "Vulnerable", 3.5f),
+            "crucivar.anvil_sweep" => Step(false, Sweep.Run, "Anvil Sweep", "Idle", 1.0f),
+            "crucivar.slag_spit" => Step(false, Spit.Run, "Slag Spit", "Idle", 1.0f),
+            _ => Step(true, () => CrucivarArgs.V3 ? Casting.Run(phase == 1 ? 4 : 8, returnWave: phase >= 3) : Casting.Run(phase == 1 ? 0 : phase == 2 ? 3 : 6), "Great Casting (cooling)", "Idle", 3.5f),
+        };
+
+        IEnumerable<int> V2Script()
+        {
+            BindAbilities();
+            string solo = CrucivarArgs.Known(CrucivarArgs.Solo) ? CrucivarArgs.Solo : null;
+            while (true)
+            {
+                if (TestHold)
+                {
+                    if (testBody == null) { Current = "test hold"; yield return 1; continue; }
+                    var body = testBody; testRunning = true;
+                    foreach (var w in body) yield return w;
+                    testBody = null; testRunning = false;
+                    continue;
+                }
+                bool restart = false;
+                foreach (var step in solo != null ? new[] { Solo(solo) } : CrucivarArgs.V3 ? PlanV3(phase) : Plan(phase))
+                {
+                    foreach (var w in step) yield return w;
+                    // a transition waits for the current attack to finish; two thresholds in one burst queue one change
+                    int want = PhaseFor();
+                    if (want != phase) { phase = want; foreach (var w in V2Shift()) yield return w; restart = true; break; }
+                    if (TestHold) { restart = true; break; }
+                }
+                if (!restart) yield return 1;
+            }
+        }
+
+        // ================ ability set v4 (rework, REWORK-PROMPT.md) ================
+        // Phase 1 "Forge Rite" (accepted for now, 10-27) loops until 65 %. Phase 2 "Foundry Uprising" (proposal) cycles
+        // uprising -> 3.5 s punish -> Casting Order + Anvil Quake until 30 %. Phase 3 "Molten Crown" (proposal) cycles
+        // towers, crown and the rest (21.5 s) + 3.5 s punish until he dies or the furnace erupts. The transitions play (harmless, no heal) and end the phase: every Ember Brand pool clears.
+        public ForgeRite Rite { get; private set; }
+        public FoundryUprising Uprising { get; private set; }
+        public MoltenCrown Crown { get; private set; }
+        public int PhaseLoops { get; private set; }   // loops / uprisings finished in this phase (watch pacing)
+        public void Label(string text) => PhaseName = text;
+        public const float UprisingPunish = 3.5f;
+
+        IEnumerable<int> V4Script()
+        {
+            BindAbilities();
+            if (!TestHold) foreach (var w in WalkTo(Vector3.zero, Walk)) yield return w;   // Forge Rite is built round the arena centre
+            while (true)
+            {
+                if (TestHold)
+                {
+                    if (testBody == null) { Current = "test hold"; yield return 1; continue; }
+                    var body = testBody; testRunning = true;
+                    foreach (var w in body) yield return w;
+                    testBody = null; testRunning = false;
+                    continue;
+                }
+                Attacks++;
+                if (phase == 2)
+                {
+                    Current = "Foundry Uprising";
+                    foreach (var w in Uprising.Run()) yield return w;
+                    foreach (var w in Recover("Foundry Uprising (furnace staggered)", "Vulnerable", Sim.Ticks(UprisingPunish))) yield return w;
+                    Current = "Casting Order"; Rite.CastingOrder();
+                    yield return Sim.Ticks(2.5f);
+                    Current = "Anvil Quake"; Rite.AnvilQuake();
+                    yield return Sim.Ticks(4f);
+                }
+                else if (phase == 3)
+                {
+                    Current = "Molten Crown";
+                    foreach (var w in Crown.Run()) yield return w;
+                    foreach (var w in Recover("Molten Crown (furnace venting)", "Vulnerable", Sim.Ticks(UprisingPunish))) yield return w;
+                }
+                else
+                {
+                    foreach (var w in Rite.Loop()) yield return w;
+                    foreach (var w in Recover("Forge Rite (vents cooling)", "Vulnerable", Sim.Ticks(ForgeRite.Punish))) yield return w;
+                }
+                PhaseLoops++;
+                int want = PhaseFor();
+                if (want != phase) { phase = want; PhaseLoops = 0; Rite.ClearPools(); foreach (var w in V2Shift()) yield return w; }
+            }
+        }
+
+        // second form at 65 % (insulation falls, glow deepens), Open Pressure at 30 %: 1.5 s, harmless, no heal
+        IEnumerable<int> V2Shift()
+        {
+            Transitions++;
+            if (phase >= 2) SecondForm = true;
+            foreach (var w in PhaseShift()) yield return w;
         }
 
         // ---------------- presentation ----------------

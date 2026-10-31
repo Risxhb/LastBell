@@ -20,7 +20,24 @@ namespace LastBell.Run
             int h = (floatSeq++ + (text != null ? text.Length : 0)) & int.MaxValue;
             floats.Add(new FloatText { pos = world, text = text, color = c, jx = (h % 5 - 2) * 9f });
         }
-        public static void ClearTransient() { floats.Clear(); }
+        public static void ClearTransient() { floats.Clear(); labels.Clear(); banner = null; }
+        // a big centre-screen call (Aurelion v4: wipes, the enrage warning) for `seconds` of real time
+        static string banner; static Color bannerColor; static float bannerUntil;
+        public static void Banner(string text, Color c, float seconds) { banner = text; bannerColor = c; bannerUntil = Time.unscaledTime + seconds; }
+        public static string CurrentBanner => banner != null && Time.unscaledTime < bannerUntil ? banner : null;
+        // a narrated caption box (demo videos): a title and a line of explanation, until changed or cleared with null
+        public static string CaptionTitle, CaptionBody;
+        // a world-space label that stays until its owner hides it (Aurelion v3: Ecliptic numerals, SUN / SHADE marks);
+        // with `follow`, Pos is an offset above that transform (a moving player)
+        public sealed class WorldLabel { public Vector3 Pos; public Transform Follow; public string Text; public Color Color; public int Size; public bool Hidden; public void Hide() => Hidden = true; }
+        static readonly List<WorldLabel> labels = new List<WorldLabel>();
+        public static WorldLabel Label(Vector3 world, string text, Color c, int size = 34, Transform follow = null)
+        {
+            labels.RemoveAll(l => l.Hidden);
+            var l = new WorldLabel { Pos = world, Text = text, Color = c, Size = size, Follow = follow };
+            if (labels.Count < 40) labels.Add(l);
+            return l;
+        }
 
         RunDirector d;
         GUIStyle revealName, revealEpithet, resultPrimary, resultAction;
@@ -50,7 +67,8 @@ namespace LastBell.Run
         // Phase ticks only for bosses that change phase, at their real thresholds (fraction of max HP).
         static float[] PhaseTicks(BossEncounter b) =>
             b is BellkeeperEncounter ? new[] { 0.70f, 0.35f } :
-            b is AurelionEncounter || b is CrucivarEncounter || b is SylvaraEncounter ? new[] { 0.65f, 0.30f } :
+            b is AurelionEncounter ae ? ae.PhaseMarks :   // v4: 70 / 40 / 20 %, v2-v3: 65 / 30 %
+            b is CrucivarEncounter || b is SylvaraEncounter ? new[] { 0.65f, 0.30f } :
             b is TempoTyrantEncounter ? new[] { TempoTyrantEncounter.FrenzyAt } :
             b is ChimeboundOracleEncounter || b is DialWardenEncounter || b is PendulumSentinelEncounter ? new[] { 0.5f } : null;
         float hitFlash;
@@ -82,6 +100,8 @@ namespace LastBell.Run
             }
             if (d.State == RunState.Menu && kb.dKey.wasPressedThisFrame)
                 d.SelectDifficulty((Difficulty)(((int)RunDifficulty.Selected + 1) % RunDifficulty.Names.Length));
+            if (d.State == RunState.Menu && kb.aKey.wasPressedThisFrame)
+                d.SelectAllies((RunParty.Selected + 1) % (RunParty.MaxAllies + 1));
         }
 
         void TickChip()
@@ -207,8 +227,12 @@ namespace LastBell.Run
                 // boss-order tracker (Track) removed from the combat HUD at Risxhb's request
                 Boss();
                 PlayerPanel();
+                BannerText(); CaptionText();
                 Floats();
+                Labels();
                 HazardLabels();
+                PlayerMarks();
+                if (ShowMechanicGallery) MechanicGallery();
                 switch (d.State)
                 {
                     case RunState.Ready: ReadyCard(); break;
@@ -235,6 +259,7 @@ namespace LastBell.Run
             bool practice = d.Mode == RunMode.Practice;
             // practice shows no preparation card (Risxhb, October 25, 2026): the fight starts by itself (RunDirector.AutoReady)
             if (practice) return;
+            if (Shop.RunShopFlow.Showing) return;   // the intermission shop replaces the preparation card
             string eb = UiTheme.Spaced(RunDifficulty.Name(d.Difficulty));
             string head = (practice ? "PRACTICE — " + RunDirector.Bosses[d.Encounter].Name : "PREPARATION").ToUpperInvariant();
             string body = practice ? "Practice never advances the run." : d.EncounterOrder.Length == 1 ? "One fight: the Bellkeeper." : $"{d.EncounterOrder.Length} bosses in a row. Health refills before each boss; potions carry over until the final boss refills them.";
@@ -330,7 +355,10 @@ namespace LastBell.Run
             var r = Card(w, pad + 44 + 8 + 26 + pad, 270, false, UiTheme.Danger);
             float y = r.y + pad;
             T(r.x, y, w, 44, UiTheme.Spaced("Down"), display36); y += 52;
-            string a = "Struck by ", cause = d.DefeatCause ?? "?";
+            // a catalogued boss attack shows its 64 px icon, with the attack name and boss beside it (BossAttackIcons)
+            var wd = d.World; var ka = wd != null && wd.TakenLog.Count > 0 ? TakenAttack(wd, wd.TakenLog.Count - 1) : null; var ki = BossAttackIcons.Icon(ka);
+            if (ki != null) GUI.DrawTexture(S(r.x + pad, r.y + pad + 8, 64, 64), ki, ScaleMode.ScaleToFit, true);
+            string a = "Struck by ", cause = ka != null ? ka.Label : d.DefeatCause ?? "?";
             float wa = Wv(bodyL, a), wc = Wv(bodyL, cause), x = r.x + w / 2 - (wa + wc) / 2;
             T(x, y, wa + 2, 26, a, bodyL, UiTheme.Ivory);
             T(x + wa, y, wc + 2, 26, cause, bodyL, UiTheme.Gold);
@@ -523,20 +551,51 @@ namespace LastBell.Run
                 ColumnHead(rx, yy, SW, "Death recap"); yy += 42;
                 T(rx, yy, SW, 18, "last hits taken, oldest first", micro, UiTheme.IvoryMicro); yy += 26;
                 const float numW = 150;   // damage, hp, time
-                int last = w.TakenLog[w.TakenLog.Count - 1].tick;
+                int last = w.TakenLog[w.TakenLog.Count - 1].tick, hover = -1;
+                var mouse = Event.current.mousePosition;
                 for (int i = from; i < w.TakenLog.Count; i++)
                 {
                     var e = w.TakenLog[i]; bool fatal = i == w.TakenLog.Count - 1;
-                    float rh = fatal ? 46 : 28, ty = yy + (fatal ? 18 : 0);
+                    // a catalogued boss attack shows its icon (40 px on the killing blow, 22 px otherwise) and "Attack · Boss";
+                    // the name always sits beside the icon, because several icons look alike at small sizes (BossAttackIcons)
+                    var at = TakenAttack(w, i); var icon = BossAttackIcons.Icon(at);
+                    float rh = fatal ? (icon != null ? 62 : 46) : 28, ty = yy + (fatal ? 18 : 0), ic = fatal ? 40 : 22, lx = rx;
                     if (fatal) { F(rx - 12, yy + 2, SW + 12, rh - 4, A(UiTheme.Danger, 0.10f)); F(rx - 12, yy + 2, 4, rh - 4, UiTheme.Danger); T(rx, yy + 2, SW, 16, "KILLING BLOW", micro, UiTheme.Danger); }
-                    T(rx, ty, SW - numW - 8, 26, Ellipsize(small13, e.source, SW - numW - 8), small13, fatal ? UiTheme.Ivory : UiTheme.IvoryBody);
+                    if (icon != null) { GUI.DrawTexture(S(rx, ty + (fatal ? 0 : 2), ic, ic), icon, ScaleMode.ScaleToFit, true); lx = rx + ic + 8; }
+                    string what = at != null ? at.Label : e.source;
+                    T(lx, ty, SW - numW - 8 - (lx - rx), 26, Ellipsize(small13, what, SW - numW - 8 - (lx - rx)), small13, fatal ? UiTheme.Ivory : UiTheme.IvoryBody);
                     T(rx + SW - numW, ty, 44, 26, "-" + e.damage, small13R, fatal ? UiTheme.Danger : UiTheme.IvoryBody);
                     T(rx + SW - numW + 46, ty, 54, 26, "hp " + e.hpAfter, small13R, UiTheme.IvoryMuted);
                     T(rx + SW - numW + 100, ty, 50, 26, $"{(e.tick - last) / 60f:0.0}s", small13R, UiTheme.IvoryMuted);
                     if (!fatal) F(rx, yy + rh - 1, SW, 1, A(UiTheme.Ivory, 0.08f));
+                    if (at != null && S(rx - 12, yy, SW + 12, rh).Contains(mouse)) hover = i;
                     yy += rh;
                 }
+                if (hover < 0 && PinRecapTooltip) hover = w.TakenLog.Count - 1;
+                var ha = hover >= 0 ? TakenAttack(w, hover) : null;
+                if (ha != null) AttackTooltip(rx, yy + 12, SW, ha, $"Hit you for {w.TakenLog[hover].damage} (hp {w.TakenLog[hover].hpAfter} after){(hover == w.TakenLog.Count - 1 ? ": the killing blow." : ".")}");
             }
+        }
+
+        // Boss attack icons in the recap (BossAttackIcons): the attack ID recorded per hit, parallel to TakenLog.
+        // PinRecapTooltip shows the killing blow's details without a mouse (autotest screenshots).
+        public static bool PinRecapTooltip;
+        static BossAttackIcons.Attack TakenAttack(CombatWorld w, int i) => i < w.TakenAttackIds.Count ? BossAttackIcons.Get(w.TakenAttackIds[i]) : null;
+
+        // Boss attack details (virtual units): the 64 px icon with the attack name, boss and tag beside it, then its shape.
+        void AttackTooltip(float x, float y, float width, BossAttackIcons.Attack a, string line)
+        {
+            const float pad = UiTheme.G2, ic = 64;
+            string body = a.shape + (string.IsNullOrEmpty(line) ? "" : "\n" + line);
+            float tw = width - 2 * pad - ic - 12, bh = Hv(descSt, body, tw), h = Mathf.Max(ic + 2 * pad, pad + 22 + 20 + bh + pad);
+            UiTheme.Frame(S(x, y, width, h), UiTheme.InkDeep, true, true);
+            F(x, y, 3, h, UiTheme.Gold);
+            var icon = BossAttackIcons.Icon(a);
+            if (icon != null) GUI.DrawTexture(S(x + pad, y + pad, ic, ic), icon, ScaleMode.ScaleToFit, true);
+            float tx = x + pad + ic + 12;
+            T(tx, y + pad, tw, 22, a.name.ToUpper(), heading);
+            T(tx, y + pad + 22, tw, 20, $"{a.bossName}   ·   {a.tag}", eyebrow);
+            T(tx, y + pad + 44, tw, bh + 4, body, descSt);
         }
 
         void Pause()
@@ -619,8 +678,31 @@ namespace LastBell.Run
             // phase line (no HP numbers; the Tempo Tyrant shows its tempo in its own HUD)
             float yy = rowsY;
             if (!(b is TempoTyrantEncounter)) T(x + 10, yy, bw * 0.65f, rowH, b.PhaseName, row15, BA(UiTheme.Ivory));
+            // Aurelion v4: the enrage clock and the Corona Shield (BossEncounter.HudExtra), right of the phase line
+            if (b.HudExtra != null) { var hx = UiTheme.Style(UiTheme.SizeNumeric, true, TextAnchor.MiddleRight, UiTheme.Ivory); T(x + bw * 0.35f, yy, bw * 0.65f - 10, rowH, b.HudExtra, hx, BA(UiTheme.Ivory)); }
 
-            // attack-name warning rows removed (Risxhb, October 24, 2026): telegraphs on the floor carry the warning
+            // attack-name warning rows removed (Risxhb, October 24, 2026): telegraphs on the floor carry the warning.
+            // Exception (Chzy18, October 24, 2026): a hazard tagged with a hostile mechanic (Hazard.MechanicId) gets one row with
+            // the mechanic's 22 px icon and name, after the attack's own icon and name when it has one. Untagged hazards stay
+            // floor-only, so this panel is unchanged until an encounter tags a mechanic. docs/run-loop/mechanic-icons.md
+            var seen = new HashSet<string>(); yy += rowH + 4;
+            foreach (var hzd in d.World.Hazards.Live)
+            {
+                var m = MechanicIcons.Get(hzd.MechanicId); if (m == null) continue;
+                var at = BossAttackIcons.Resolve(hzd, b);
+                if (!seen.Add((at?.id ?? hzd.Source) + "|" + m.id)) continue;
+                float lx = x + 10;
+                var ai = BossAttackIcons.Icon(at);
+                if (ai != null) { GUI.DrawTexture(S(lx, yy + 1, 22, 22), ai, ScaleMode.ScaleToFit, true); lx += 28; }
+                string what = (at != null ? $"{at.name}  ({at.bossName})" : hzd.Source).ToUpper();
+                T(lx, yy, Wv(row15, what) + 4, rowH, what, row15, BA(UiTheme.Ivory)); lx += Wv(row15, what) + 12;
+                var mi = MechanicIcons.Icon(m);
+                if (mi != null) { GUI.DrawTexture(S(lx, yy + 1, 22, 22), mi, ScaleMode.ScaleToFit, true); lx += 28; }
+                Hints.TryGetValue(hzd.Source, out var hint);
+                string mname = m.name.ToUpper() + (string.IsNullOrEmpty(hint) ? "" : " — " + hint);
+                T(lx, yy, Wv(row15, mname) + 4, rowH, mname, row15, BA(UiTheme.GoldBright));
+                yy += rowH;
+            }
         }
 
         // Skill bar icons by Codex (#43 / PR #45): Resources/Run/Icons/<file>.png, 256 px. Slot order = the kit's slots,
@@ -745,6 +827,7 @@ namespace LastBell.Run
             return r;
         }
 
+        // bot allies (RunParty): class and health, left edge
         void PlayerPanel()
         {
             var p = d.Player; if (p == null) return;
@@ -755,7 +838,7 @@ namespace LastBell.Run
             float vw = UiTheme.VirtualWidth, pw = Mathf.Max(480, barW), x = vw / 2 - pw / 2, top = PanelTop;
             float y = top;
             // health: liquid pool (same animation as the boss bar), class name left and number right on the bar
-            float hf = Mathf.Clamp01((float)p.Hp / PlayerController.MaxHp);
+            float hf = Mathf.Clamp01((float)p.Hp / p.MaxHealth);
             var hb = S(x - 2, y - 2, pw + 4, 20);
             UiTheme.Fill(hb, A(UiTheme.InkDeep, 0.85f)); UiTheme.Border(hb, A(UiTheme.GoldDim, 0.8f), Px);
             F(x, y, pw, 16, UiTheme.BarBack);
@@ -763,7 +846,7 @@ namespace LastBell.Run
             T(x + 8, y - 4, pw * 0.5f, 24, p.ClassName, keyStL, UiTheme.IvoryBody);
             y += 22;
             // stamina: thin bar; its number only appears while it is spent
-            float st = Mathf.Clamp01(p.Stamina / PlayerController.MaxStamina);
+            float st = Mathf.Clamp01(p.Stamina / p.MaxStaminaNow);
             F(x, y, pw, 5, A(UiTheme.BarBack, 0.9f));
             F(x, y, pw * st, 5, UiTheme.Stamina);
             if (st < 0.999f) T(x, y + 4, pw, 16, Mathf.RoundToInt(p.Stamina).ToString(), microR, UiTheme.IvoryMuted);
@@ -805,7 +888,7 @@ namespace LastBell.Run
             var mouse = Mouse.current; bool attacking = mouse != null && (mouse.leftButton.isPressed || mouse.rightButton.isPressed);
             bool showTip = over >= 0 && !attacking && Time.unscaledTime - tipSince >= TipDelay;
             if (!showTip) { }
-            else if (pr.Contains(Event.current.mousePosition)) Tooltip(x, top, $"POTION  [F]\n+{PlayerController.PotionHeal} HP, 1 s between drinks. {p.Potions}/{PlayerController.MaxPotions} left.\nPotions carry over between minibosses; health and potions refill before the final boss.");
+            else if (pr.Contains(Event.current.mousePosition)) Tooltip(x, top, $"POTION  [F]\n+{PlayerController.PotionHeal} HP, 1 s between drinks. {p.Potions}/{PlayerController.MaxPotions} left.\nPotions carry over between minibosses; health and potions refill before each area boss.");
             else if (dr.Contains(Event.current.mousePosition)) Tooltip(x, top, "DASH  [RMB]\nShort burst (3 m in 0.2 s) in the move direction. Costs 30 stamina; sprint and jump share the bar.\nNo invincibility: get out of the shape before it resolves. Cancels basic attacks and unreleased windups.");
             else if (hover >= 0) Tooltip(x, top, k.Tooltip(hover));
             if (ShowMeter && d.World != null) Meter(Right - MeterW, 260, d.World.EncounterMeter, "DAMAGE · this encounter", (d.World.Tick - d.World.SegmentStartTick) / 60f);
@@ -872,6 +955,64 @@ namespace LastBell.Run
             }
         }
 
+        // Aurelion v4 overlays (wipe / enrage banner, demo captions, world labels): their own plain styles
+        GUIStyle lab, ban, numStyle;
+        GUIStyle num => numStyle ?? (numStyle = new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter });
+        GUIStyle capT, capB;
+        void CaptionText()
+        {
+            if (string.IsNullOrEmpty(CaptionTitle)) return;
+            if (capT == null) { capT = new GUIStyle(num) { fontSize = 28 }; capB = new GUIStyle(num) { fontSize = 20, wordWrap = true, fontStyle = FontStyle.Normal }; }
+            float w = Mathf.Min(1100, Screen.width - 40), x = (Screen.width - w) / 2, y = Screen.height - 330;
+            UiTheme.Fill(new Rect(x, y, w, 96), new Color(0.03f, 0.04f, 0.09f, 0.82f));
+            capT.normal.textColor = new Color(1f, 0.86f, 0.5f); GUI.Label(new Rect(x, y + 4, w, 36), CaptionTitle, capT);
+            capB.normal.textColor = new Color(0.93f, 0.95f, 1f); GUI.Label(new Rect(x + 16, y + 40, w - 32, 54), CaptionBody ?? "", capB);
+        }
+
+        void BannerText()
+        {
+            var t = CurrentBanner; if (t == null) return;
+            if (ban == null) ban = new GUIStyle(num) { fontSize = 46 };
+            ban.normal.textColor = new Color(0, 0, 0, 0.8f); GUI.Label(new Rect(3, Screen.height * 0.3f + 3, Screen.width, 70), t, ban);
+            ban.normal.textColor = bannerColor; GUI.Label(new Rect(0, Screen.height * 0.3f, Screen.width, 70), t, ban);
+        }
+        void Labels()
+        {
+            var cam = Camera.main; if (!cam) return; float h = Screen.height;
+            if (lab == null) lab = new GUIStyle(num) { wordWrap = false, clipping = TextClipping.Overflow };   // "SUNSPOT I  II" stays on one line
+            // keep labels out of the boss block, the demo caption and the screen edges (Aurelion readability A1/A3/A4): a
+            // label pushed inward keeps a thin leader back to the spot it names
+            float top = d.Boss != null ? UiTheme.V(165) : 16, bottom = string.IsNullOrEmpty(CaptionTitle) ? h - UiTheme.V(150) : h - 340;
+            foreach (var l in labels)
+            {
+                if (l.Hidden || (l.Follow == null && !ReferenceEquals(l.Follow, null))) continue;
+                var s = cam.WorldToScreenPoint(l.Follow ? l.Follow.position + l.Pos : l.Pos); if (s.z < 0) continue;
+                lab.fontSize = l.Size; float wide = Mathf.Max(200, lab.CalcSize(new GUIContent(l.Text)).x + 8);
+                float half = l.Size * 0.6f;
+                var at = new Vector2(s.x, h - s.y);
+                var c = new Vector2(Mathf.Clamp(at.x, wide / 2 + 10, Screen.width - wide / 2 - 10), Mathf.Clamp(at.y, top + half, Mathf.Max(top + half, bottom - half)));
+                if ((c - at).sqrMagnitude > 36)
+                {
+                    var dir = (at - c).normalized;
+                    Leader(c + dir * half, at, new Color(l.Color.r, l.Color.g, l.Color.b, 0.8f));
+                    UiTheme.Fill(new Rect(at.x - 3, at.y - 3, 6, 6), l.Color);
+                }
+                lab.normal.textColor = new Color(0, 0, 0, 0.75f);
+                GUI.Label(new Rect(c.x - wide / 2 + 2, c.y - 28, wide, 60), l.Text, lab);
+                lab.normal.textColor = l.Color;
+                GUI.Label(new Rect(c.x - wide / 2, c.y - 30, wide, 60), l.Text, lab);
+            }
+        }
+
+        static void Leader(Vector2 a, Vector2 b, Color c)
+        {
+            var v = b - a; float len = v.magnitude; if (len < 4) return;
+            var m = GUI.matrix;
+            GUIUtility.RotateAroundPivot(Mathf.Atan2(v.y, v.x) * Mathf.Rad2Deg, a);
+            UiTheme.Fill(new Rect(a.x, a.y - 1, len, 2), c);
+            GUI.matrix = m;
+        }
+
         void HazardLabels()
         {
             var cam = Camera.main; if (!cam) return; float h = Screen.height;
@@ -881,7 +1022,54 @@ namespace LastBell.Run
                 var mid = hz.Origin + Sim.Dir(hz.Yaw) * hz.Length * 0.5f;
                 var s = cam.WorldToScreenPoint(mid); if (s.z < 0) continue;
                 UiTheme.Fill(new Rect(s.x - UiTheme.V(36), h - s.y - UiTheme.V(14), UiTheme.V(72), UiTheme.V(28)), UiTheme.InkStrip);
-                UiTheme.Label(new Rect(s.x - UiTheme.V(60), h - s.y - UiTheme.V(15), UiTheme.V(120), UiTheme.V(30)), "JUMP", floatSt, UiTheme.Calm);
+                UiTheme.Label(new Rect(s.x - UiTheme.V(60), h - s.y - UiTheme.V(15), UiTheme.V(120), UiTheme.V(30)), "JUMP", floatSt, UiTheme.Ivory);   // ivory on the ink strip, not a friendly cyan
+            }
+        }
+
+        // Mechanic markers over players' heads (PlayerController.Marks, MechanicIcons): 40 px icons side by side, each with its
+        // name on a strip under it, because several look alike at this size. Placement approved by Chzy18 on October 24, 2026;
+        // see docs/run-loop/mechanic-icons.md. Nothing is drawn until an encounter assigns a mark.
+        void PlayerMarks()
+        {
+            var cam = Camera.main; if (!cam) return; float h = Screen.height, sz = UiTheme.V(40), gap = UiTheme.V(48);
+            foreach (var p in d.World.Players)
+            {
+                if (p == null || p.Down || p.Marks.Count == 0) continue;
+                var s = cam.WorldToScreenPoint(p.transform.position + Vector3.up * 2.6f); if (s.z < 0) continue;
+                float x0 = s.x - (p.Marks.Count * (sz + gap) - gap) / 2, y0 = h - s.y - sz - UiTheme.V(20);
+                for (int i = 0; i < p.Marks.Count; i++)
+                {
+                    var m = MechanicIcons.Get(p.Marks[i]); if (m == null) continue;
+                    var r = new Rect(x0 + i * (sz + gap), y0, sz, sz);
+                    var t = MechanicIcons.Icon(m); if (t != null) GUI.DrawTexture(r, t, ScaleMode.ScaleToFit, true);
+                    float nw = slotName.CalcSize(new GUIContent(m.name)).x;
+                    UiTheme.Fill(new Rect(r.center.x - nw / 2 - UiTheme.V(4), r.yMax + UiTheme.V(1), nw + UiTheme.V(8), UiTheme.V(17)), UiTheme.InkStrip);
+                    UiTheme.Label(new Rect(r.center.x - UiTheme.V(60), r.yMax + UiTheme.V(1), UiTheme.V(120), UiTheme.V(17)), m.name, slotName);
+                }
+            }
+        }
+
+        // Test and review aid (autotest screenshot, no key binding): every catalogued mechanic icon at HUD size (64 px) with
+        // its name, friendly markers first, then hostile mechanics.
+        public static bool ShowMechanicGallery;
+        void MechanicGallery()
+        {
+            const float ic = 64, CW = 128, CH = 96; const int perRow = 8; var all = MechanicIcons.All;
+            int friendly = 0; foreach (var m in all) if (m.Friendly) friendly++;
+            int rows = (friendly + perRow - 1) / perRow + (all.Count - friendly + perRow - 1) / perRow;   // each set starts a new row
+            float pw = perRow * CW + 32, ph = rows * CH + 56, px = UiTheme.VirtualWidth / 2 - pw / 2, py = 150;
+            UiTheme.Frame(S(px, py, pw, ph), UiTheme.InkDeep, true, true);
+            F(px, py, pw, 3, UiTheme.Gold);
+            T(px + 16, py + 12, pw - 32, 22, UiTheme.Spaced("Mechanic icons") + "   ·   friendly markers, then hostile mechanics   ·   64 px", eyebrow);
+            int col = 0; float y = py + 44; string set = null;
+            foreach (var m in all)
+            {
+                if (set != null && m.set != set || col == perRow) { col = 0; y += CH; }
+                set = m.set;
+                float cx = px + 16 + col * CW;
+                var t = MechanicIcons.Icon(m); if (t != null) GUI.DrawTexture(S(cx + (CW - ic) / 2, y, ic, ic), t, ScaleMode.ScaleToFit, true);
+                T(cx, y + ic + 4, CW, 22, m.name, slotName);
+                col++;
             }
         }
     }

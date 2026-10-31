@@ -16,6 +16,12 @@ namespace LastBell.Run.EditorTools
         public static string RunScene => RunMaps.All[0].RunScene;
         const string ResDir = "Assets/LastBell/Run/Resources/Run";
         public const string BuildPath = "Builds/Windows/LastBell.exe";
+        // -lastbellBuildOut <path>: build somewhere else (e.g. while the default build is open for a playtest)
+        static string OutPath()
+        {
+            var a = System.Environment.GetCommandLineArgs(); int i = System.Array.IndexOf(a, "-lastbellBuildOut");
+            return i >= 0 && i + 1 < a.Length ? a[i + 1] : BuildPath;
+        }
 
         // Look-check props the area builders leave in their scenes; they don't belong in a fight.
         static readonly string[] StripNames = { "ScaleReference_Vanguard", "TelegraphCheck", "TelegraphTest" };
@@ -91,13 +97,13 @@ namespace LastBell.Run.EditorTools
             var opts = new BuildPlayerOptions
             {
                 scenes = RunMaps.All.Select(m => m.RunScene).ToArray(),
-                locationPathName = BuildPath,
+                locationPathName = OutPath(),
                 target = BuildTarget.StandaloneWindows64,
                 options = BuildOptions.None,
             };
             var report = BuildPipeline.BuildPlayer(opts);
             var s = report.summary;
-            Debug.Log($"Last Bell build: {s.result}, {s.totalErrors} errors, {s.totalWarnings} warnings, {s.totalSize / (1024 * 1024)} MB, {s.totalTime} -> {Path.GetFullPath(BuildPath)}");
+            Debug.Log($"Last Bell build: {s.result}, {s.totalErrors} errors, {s.totalWarnings} warnings, {s.totalSize / (1024 * 1024)} MB, {s.totalTime} -> {Path.GetFullPath(OutPath())}");
             if (Application.isBatchMode) EditorApplication.Exit(s.result == BuildResult.Succeeded ? 0 : 1);
         }
 

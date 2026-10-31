@@ -1,0 +1,55 @@
+{
+  "source": "ability-icons commit 0d0555a (art/mechanic-icons-20261022), approved by Chzy18 2026-10-23; ids, names, tags and shapes from docs/boss-attack-icons/<boss>/manifest.json; this copy carries only the 5 Aurelion attacks (Crucivar and Sylvara icons stay local until those bosses ship; normal Bellkeeper v2 is retired)",
+  "attacks": [
+    {
+      "id": "aurelion.meridian_lances",
+      "boss": "aurelion",
+      "bossName": "Aurelion",
+      "name": "Meridian Lances",
+      "tag": "Strike",
+      "shape": "Three or four full-arena crossing beams, 2.2 m wide.",
+      "icon": "aurelion_meridian_lances",
+      "aliases": []
+    },
+    {
+      "id": "aurelion.starfall_mirror",
+      "boss": "aurelion",
+      "bossName": "Aurelion",
+      "name": "Starfall Mirror",
+      "tag": "Ground",
+      "shape": "Player-centred circles plus reflections through arena centre; r 2.2 (1.8 at N≥5).",
+      "icon": "aurelion_starfall_mirror",
+      "aliases": []
+    },
+    {
+      "id": "aurelion.noon_shadow",
+      "boss": "aurelion",
+      "bossName": "Aurelion",
+      "name": "Noon Shadow",
+      "tag": "Ground",
+      "shape": "Half-arena cleave split by a straight line through arena centre.",
+      "icon": "aurelion_noon_shadow",
+      "aliases": []
+    },
+    {
+      "id": "aurelion.orrery_closing",
+      "boss": "aurelion",
+      "bossName": "Aurelion",
+      "name": "Orrery Closing",
+      "tag": "Ground",
+      "shape": "Outer rim annulus r≥8.5 plus filled crown circle r3.6 at boss; safe band between.",
+      "icon": "aurelion_orrery_closing",
+      "aliases": []
+    },
+    {
+      "id": "aurelion.hour_hands",
+      "boss": "aurelion",
+      "bossName": "Aurelion",
+      "name": "Hour Hands",
+      "tag": "Strike",
+      "shape": "Boss-to-rim radial lane spokes through player hours, 1.8 m wide; Hard only.",
+      "icon": "aurelion_hour_hands",
+      "aliases": []
+    }
+  ]
+}

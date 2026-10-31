@@ -175,6 +175,15 @@ namespace LastBell.Run
             if (presenter) presenter.TickBoss(Current == "approach" || Current == "reposition" ? "Walk" : loopClip);
         }
 
+        // practice phase row: the end of the 50% shift (slower tempo, HP released at half), without the shift and Arrest
+        public override float[] PhaseStarts => new[] { 1f, 0.5f };
+        public override int PhaseNumber => Phase2 ? 2 : 1;
+        protected override void EnterPhase(int n)
+        {
+            if (Phase2) return;
+            Phase2 = true; GatePending = false; HoldHp = false; beatAge = 0;
+        }
+
         protected override void OnHurt()
         {
             // the 50% shift: HP holds at half from the moment it is reached until the reversed Arrest the Hand ends

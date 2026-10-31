@@ -25,13 +25,17 @@ namespace LastBell.Run
         enum Act { None, Note, Strike, Refrain, Cresc, Chorus }
         int buffered = -1, bufferUntil; const int BufferTicks = 9;   // PF-05 input buffer
         Act act; int t;
+        public override bool Acting => act != Act.None;
         Vector3 aim;
         int noteCd, refrainCd, crescCd, chorusCd, charges = StrikeCharges, recharge;
         public int Harmony { get; private set; }
         // the ringing bell (on the boss: there is one target per encounter)
         public bool Bell => bellLeft > 0;
         int bellLeft; public int Strength { get; private set; }
-        readonly int[] echo = new int[MaxEchoes]; public int Echoes { get; private set; }
+        public int BellLeft => bellLeft;   // bots
+        readonly int[] echo = new int[4]; public int Echoes { get; private set; }   // 4 = the most any item allows (Great Bell)
+        int EchoCap => Shop.ItemHooks.I(P, "c.echo.cap", MaxEchoes);                  // Third Echo, Great Bell
+        public static int BaseNoteDamage => NoteDamage; public static float BaseNoteSpeed => NoteSpeed; public static int BaseStrikeDamage => StrikeDamage;   // item-fired notes and rings
         public int LastCrescendo { get; private set; }
 
         public override string[] SlotNames => new[] { "Resonant Note", "Bellstrike", "Harmonic Refrain", "Crescendo", "Mending Chorus" };
@@ -60,7 +64,7 @@ namespace LastBell.Run
         };
         public override string ClassState()
         {
-            string bell = Bell ? $"BELL {bellLeft / (float)Sim.Hz:0.0}s  strength {new string('+', Strength)}{(Strength == 0 ? "base" : "")}  echoes {Echoes}/{MaxEchoes}" : "no bell";
+            string bell = Bell ? $"BELL {bellLeft / (float)Sim.Hz:0.0}s  strength {new string('+', Strength)}{(Strength == 0 ? "base" : "")}  echoes {Echoes}/{EchoCap}" : "no bell";
             return $"HARMONY {Harmony}/{HarmonyMax}   {bell}";
         }
 
@@ -71,7 +75,7 @@ namespace LastBell.Run
             MoveScale = 1; Velocity = Vector3.zero; FaceAim = false;
         }
 
-        void ClearBell() { bellLeft = 0; Strength = 0; Echoes = 0; echo[0] = echo[1] = 0; P.World.Fx.Bell(null, 0, 0, 0); }
+        void ClearBell() { bellLeft = 0; Strength = 0; Echoes = 0; System.Array.Clear(echo, 0, echo.Length); P.World.Fx.Bell(null, 0, 0, 0); }
         public override void ClearTargetState() => ClearBell();
 
         void Timers()
@@ -140,11 +144,12 @@ namespace LastBell.Run
         {
             noteCd = NoteCd;
             var dir = Sim.Flat(aim - P.transform.position); dir = dir.sqrMagnitude > 0.1f ? dir.normalized : P.transform.forward;
+            float speed = Shop.ItemHooks.F(P, "c.note.speed", NoteSpeed); int damage = Shop.ItemHooks.Note(P, dir, NoteDamage, speed);   // Bright Note, Grace Note, Chord
             var start = P.transform.position + dir * 0.8f + Vector3.up * 1.3f;
             W.Fx.NoteCast(start, dir);
             W.Projectiles.Fire(new ProjectileSystem.Projectile
             {
-                Pos = start, Vel = dir * NoteSpeed, Range = NoteRange, Radius = 0.35f, Damage = NoteDamage, Ability = "ResonantNote",
+                Pos = start, Vel = dir * speed, Range = NoteRange, Radius = 0.35f, Damage = damage, Ability = "ResonantNote",
                 Color = PlayerFx.NoteGold,
                 OnHit = (dealt, at) => { if (dealt > 0) Harmony = Mathf.Min(HarmonyMax, Harmony + 1); }
             });
@@ -169,22 +174,25 @@ namespace LastBell.Run
         void DoRefrain()
         {
             refrainCd = RefrainCd;
-            int dealt = W.StrikeBoss(P, P.transform.position, P.transform.forward, RefrainRange, RefrainHalf * 2, RefrainDamage, "HarmonicRefrain");
-            if (dealt > 0 && Bell && Echoes < MaxEchoes)
+            float range = Shop.ItemHooks.F(P, "c.refrain.range", RefrainRange), half = Shop.ItemHooks.F(P, "c.refrain.half", RefrainHalf);
+            int dealt = W.StrikeBoss(P, P.transform.position, P.transform.forward, range, half * 2, RefrainDamage, "HarmonicRefrain");
+            if (dealt > 0 && Bell && Echoes < EchoCap)
             {
                 echo[Echoes++] = Mathf.RoundToInt(dealt * EchoFraction * Mathf.Pow(StrengthStep, Strength));
                 W.Fx.EchoAdded(W.Boss, Echoes);
             }
-            W.Fx.Refrain(P, RefrainRange, RefrainHalf, dealt > 0);
+            W.Fx.Refrain(P, range, half, dealt > 0);
         }
 
         void DoCrescendo()
         {
-            crescCd = CrescCd;
+            crescCd = Shop.ItemHooks.I(P, "c.cresc.cd", CrescCd);   // Great Bell
             int dmg = Harmony * CrescPerHarmony;
-            bool full = Bell && Echoes == MaxEchoes && Strength > 0;
+            bool full = Bell && Echoes == EchoCap && Strength > 0;
             if (Bell) { int e = 0; for (int i = 0; i < Echoes; i++) e += echo[i]; dmg += Mathf.RoundToInt(BellBurst * Mathf.Pow(StrengthStep, Strength)) + e; }
             Harmony = 0;
+            dmg = Shop.ItemHooks.Crescendo(P, dmg, Bell ? Echoes : 0);   // Fortissimo, Overflow
+            int keep = Bell ? Shop.ItemHooks.I(P, "c.encore", 0) : 0, firstEcho = echo[0];
             var b = W.Boss; int dealt = 0;
             if (b != null && b.Solid && dmg > 0)
             {
@@ -197,15 +205,38 @@ namespace LastBell.Run
             else W.Fx.Crescendo(P.transform.position + P.transform.forward * 2, false, 0, false);
             LastCrescendo = dealt;
             ClearBell();
+            // Encore: the bell keeps ringing with one echo
+            if (keep > 0) { bellLeft = BellLife; Echoes = 1; echo[0] = Mathf.Max(firstEcho, Mathf.RoundToInt(RefrainDamage * EchoFraction)); }
+        }
+
+        // Choir Leader: a Mending Chorus also detonates the bell as a weaker Crescendo (no Harmony spent)
+        void ChoirDetonate(float strength)
+        {
+            var b = W.Boss; if (!Bell || b == null || !b.Solid) return;
+            int e = 0; for (int i = 0; i < Echoes; i++) e += echo[i];
+            int dmg = Mathf.RoundToInt((BellBurst * Mathf.Pow(StrengthStep, Strength) + e) * strength);
+            W.DamageBoss(dmg, b.transform.position + Vector3.up * b.HitHeight, "Crescendo (choir)");
+            W.Fx.Crescendo(b.transform.position, true, Echoes, false);
+            ClearBell();
+        }
+        // Shared Ringing, Resonant Rune: an echo added from outside the kit, worth a Refrain echo at the bell's strength
+        public bool ItemAddEcho()
+        {
+            if (!Bell || Echoes >= EchoCap) return false;
+            echo[Echoes++] = Mathf.RoundToInt(RefrainDamage * EchoFraction * Mathf.Pow(StrengthStep, Strength));
+            W.Fx.EchoAdded(W.Boss, Echoes);
+            return true;
         }
 
         void Chorus()
         {
-            chorusCd = ChorusCd;
+            chorusCd = Shop.ItemHooks.Cooldown(P, "MendingChorus", ChorusCd);
             // immediate: heals the caster and every standing ally inside the radius, capped at max health
+            float radius = Shop.ItemHooks.F(P, "c.chorus.radius", ChorusRadius); int heal = Shop.ItemHooks.I(P, "c.chorus.heal", ChorusHeal);   // Wide Chorus, Choir Leader
             foreach (var ally in W.Players)
-                if (!ally.Down && Sim.Flat(ally.transform.position - P.transform.position).magnitude <= ChorusRadius) ally.Heal(ChorusHeal);
-            W.Fx.Chorus(P.transform.position, ChorusRadius);
+                if (!ally.Down && Sim.Flat(ally.transform.position - P.transform.position).magnitude <= radius) { Shop.ItemHooks.ChorusTouched(P, ally, heal); ally.Heal(heal); }
+            W.Fx.Chorus(P.transform.position, radius);
+            float choir = Shop.ItemHooks.F(P, "c.choir", 0); if (choir > 0) ChoirDetonate(choir);
             if (act == Act.None) { act = Act.Chorus; t = 0; P.Presenter.Action("MendingChorus", ChorusAnim); }
         }
 

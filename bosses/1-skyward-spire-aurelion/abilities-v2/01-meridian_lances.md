@@ -75,6 +75,13 @@ Code: `Encounters/Aurelion/Abilities/MeridianLances.cs`. Checks: `RunAutoTest.Au
 - **One hit per beam:** each beam is two `Lane` hazards (28 m × 2.2 m) from his centre with opposite yaws, so Brace sees every hit as coming from him. Both halves resolve on the same tick. Whichever half is tested first copies its hit set into the other half in its `OnResolve`, which runs before the other half's hit test. A player is therefore hit at most once per beam. Beams are separate instances, not merged per volley. Where two beams cross is inside his body, which players can't enter. No shared-system change was needed.
 - **Tracking:** all beams of a volley share one aim. It turns at most 2° per tick (120°/s) toward the nearest beam line to the target, since the lines repeat every 180/beams degrees. Origin follows his position until the lock.
 - **Tick convention:** this follows `HazardSystem`. A volley spawned on tick t tracks on ticks t…t+71, locks on t+71 and resolves on t+143. It is warned for 144 ticks (2.4 s), with exactly 72 ticks from the lock to the resolve. Volley 2 spawns on volley 1's resolve tick. `Run` returns on the last resolve tick.
+- **v2.1 Hard** (`ABILITIES-v2.1.md` §2), built, not yet autotested in Unity:
+  - Every lock-to-hit window is ×0.7: 0.84 s, which is 50 ticks.
+  - Volley 2 tracks for 1.2 s.
+  - The cascade resolves after 2.0 s (the floor).
+  - Each volley therefore warns for at least 2.04 s on Hard. Medium and Easy are unchanged.
+  - `Duration(beams, volleys, cascade)` returns Run's real offset from its first tick to its last resolve.
+  - The Hard escape checks use one dash or a sprint (9 m/s) after a 0.25 s reaction.
 - **Look:** the shared telegraph is used with no new art. It shows dim before the lock, gives a lock flash, then a 0.2 s resolve flash. The boss plays the v1 `MeridianAlignment` clip as a stand-in for "glaive raised to the zenith". The HUD reads "Cascading Lances" for the Phase 3 variant.
 
 ### Open questions (calls made overnight)
