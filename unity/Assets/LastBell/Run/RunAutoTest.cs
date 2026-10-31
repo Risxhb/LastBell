@@ -191,10 +191,12 @@ namespace LastBell.Run
         {
             yield return Until(() => d.World != null && d.World.Hazards.Count > 0 && d.World.Hazards.Live.All(h => h.Age < h.ResolveAt - 6), 12, label + " hazard warning up");
             if (d.State != RunState.Combat) yield break;
-            int hp0 = d.Player.Hp, resolved0 = d.World.Hazards.Resolved, pending = d.World.Hazards.Count;
+            int pending = d.World.Hazards.Count;
             string names = string.Join(", ", d.World.Hazards.Live.Select(h => h.Source).Distinct());
             yield return Shot(label + "_windup");
             if (capture != null) StartCoroutine(Capture(capture, 200));
+            // read just before the kill: hits during the screenshot frames (a bullet hell keeps firing) are not after death
+            int hp0 = d.Player.Hp, resolved0 = d.World.Hazards.Resolved;
             d.Boss.DebugDefeat();
             Check($"{label}: boss death cancels pending hazards", d.World.Hazards.Count == 0, $"{pending} pending ({names}) -> {d.World.Hazards.Count}");
             Check($"{label}: defeated boss stops colliding", d.Boss == null || !d.Boss.Solid);
@@ -962,6 +964,7 @@ namespace LastBell.Run
             Check("three bot allies fight beside the player", d.Allies.Count == 3 && d.Allies.All(a => a.Input is AllyBot), d.Allies.Count.ToString());
             if (sy == null || d.Allies.Count == 0) { RunParty.Selected = keep; yield break; }
             var hits = new Dictionary<PlayerController, int>(); int downs = 0;
+            var budGap = new Dictionary<PlayerController, float>();
             Action<PlayerController, BulletSystem.Bullet, int> onBullet = (p, b, dmg) => { if (p != d.Player) hits[p] = (hits.TryGetValue(p, out int n) ? n : 0) + 1; };
             d.World.Bullets.Hit += onBullet;
             var report = new List<string>();
@@ -976,10 +979,12 @@ namespace LastBell.Run
                     bot.Clear(); d.Player.transform.position = new Vector3(0, 0, -CombatWorld.PlayerBound + 0.5f);
                     d.Player.DebugSetHp(PlayerController.MaxHp);   // the test player stands aside; only the bots play
                     foreach (var a in d.Allies) if (a.Down) { downs++; a.DebugRevive(); }
+                    if (ph == 2) foreach (var a in d.Allies) foreach (var bp in sy.AliveBudPositions()) { float g = Sim.Flat(a.transform.position - bp).magnitude; if (!budGap.TryGetValue(a, out float o) || g < o) budGap[a] = g; }
                     yield return null;
                 }
                 int n = hits.Values.Sum();
                 report.Add($"{sy.PhaseName}: {n} bullet hits on 3 bots in {seconds:0} s ({n * 60f / seconds / 3:0} per bot per minute)");
+                if (ph == 2) Note("Sylvara bots, closest to a bud: " + string.Join(", ", d.Allies.Select(a => $"{a.ClassName} {(budGap.TryGetValue(a, out float g) ? g.ToString("0.0") + " m" : "none")} [{(a.Input as AllyBot)?.DebugLine}]")));
                 if (ph == 2) Check("bots cut Choir Buds by themselves", sy.BudsCut > 0, $"{sy.BudsCut} cut, {sy.BudsBloomed} bloomed");
             }
             d.World.Bullets.Hit -= onBullet;

@@ -435,7 +435,7 @@ namespace LastBell.Run
             sylOn = true;
             var inp = new PlayerInput();
             var pos = Sim.Flat(me.transform.position); var bp = Sim.Flat(sy.transform.position);
-            var target = bp;
+            var target = bp; Vector3? reach = null;
 
             // where it wants to be: its own angle round her, or next to its Choir Bud
             float ang = 360f * slot / of + 30f;
@@ -444,14 +444,14 @@ namespace LastBell.Run
             if (buds.Count > 0)
             {
                 var bud = buds[slot % buds.Count];
-                home = bud + Sim.Flat(pos - bud).normalized * 1.8f; target = bud;
+                home = bud + Sim.Flat(pos - bud).normalized * 1.8f; target = bud; reach = bud;
             }
             var flat = new Vector2(home.x, home.z); float lim = CombatWorld.PlayerBound - 1f;
             if (flat.magnitude > lim) { flat = flat.normalized * lim; home = new Vector3(flat.x, 0, flat.y); }
 
             if (tick % 3 == 1 || me.Dashing)
             {
-                sylMove = SylvaraSteer.Choose(me, pos, home, out sylSprint, out sylDash, out sylCost);
+                sylMove = SylvaraSteer.Choose(me, pos, home, out sylSprint, out sylDash, out sylCost, reach);
                 sylPos = pos;
                 if (sylDash) inp.Dash = true;
             }
@@ -480,7 +480,8 @@ namespace LastBell.Run
         static readonly Vector3[] dirs = MakeDirs();
         static Vector3[] MakeDirs() { var d = new Vector3[16]; for (int i = 0; i < 16; i++) d[i] = Sim.Dir(i * 22.5f); return d; }
 
-        public static Vector3 Choose(PlayerController me, Vector3 pos, Vector3 home, out bool sprint, out bool dash, out float bestCost)
+        // bud: a Choir Bud it is cutting; ending a move outside its 3 m reach costs more than a near miss (not a hit)
+        public static Vector3 Choose(PlayerController me, Vector3 pos, Vector3 home, out bool sprint, out bool dash, out float bestCost, Vector3? bud = null)
         {
             var w = me.World; var boss = w.Boss;
             int mine = w.Bullets.ColourOf != null ? w.Bullets.ColourOf(me) : 0;
@@ -496,14 +497,14 @@ namespace LastBell.Run
                 if (SegDist(pos, b.Pos, end) < reach + (b.Split != null ? 3f : 0f)) near.Add(b);
             }
             sprint = false; dash = false;
-            var best = Vector3.zero; bestCost = Cost(me, pos, Vector3.zero, 0, home, boss);
+            var best = Vector3.zero; bestCost = Cost(me, pos, Vector3.zero, 0, home, boss, bud);
             bool canSprint = me.Stamina > PlayerController.SprintCost;
             for (int s = 0; s < (canSprint ? 2 : 1); s++)
             {
                 float v = s == 0 ? PlayerController.WalkSpeed : PlayerController.SprintSpeed;
                 foreach (var d in dirs)
                 {
-                    float c = Cost(me, pos, d, v, home, boss) + (s == 1 ? 0.6f : 0);
+                    float c = Cost(me, pos, d, v, home, boss, bud) + (s == 1 ? 0.6f : 0);
                     if (c < bestCost) { bestCost = c; best = d; sprint = s == 1; }
                 }
             }
@@ -513,7 +514,7 @@ namespace LastBell.Run
                 float dashSpeed = PlayerController.DashDistance / (PlayerController.DashTicks * Sim.Dt);
                 foreach (var d in dirs)
                 {
-                    float c = Cost(me, pos, d, dashSpeed, home, boss, PlayerController.DashTicks * Sim.Dt) + 2f;
+                    float c = Cost(me, pos, d, dashSpeed, home, boss, bud, PlayerController.DashTicks * Sim.Dt) + 2f;
                     if (c < bestCost) { bestCost = c; best = d; dash = true; sprint = false; }
                 }
             }
@@ -521,7 +522,7 @@ namespace LastBell.Run
         }
 
         // moves at v along d for `moveFor` seconds (all of the horizon by default), then stands
-        static float Cost(PlayerController me, Vector3 pos, Vector3 d, float v, Vector3 home, BossEncounter boss, float moveFor = Horizon)
+        static float Cost(PlayerController me, Vector3 pos, Vector3 d, float v, Vector3 home, BossEncounter boss, Vector3? bud, float moveFor = Horizon)
         {
             float cost = 0; var bp = boss != null ? Sim.Flat(boss.transform.position) : Vector3.zero;
             float body = boss != null ? boss.BodyRadius + PlayerController.Radius + 0.1f : 0;
@@ -561,6 +562,7 @@ namespace LastBell.Run
                 cost += h.BurnPerSecond > 0 ? 60 : left < Horizon + 0.4f ? 150 : 25;
             }
             cost += Sim.Flat(q - home).magnitude * 0.35f;
+            if (bud.HasValue) { float past = Sim.Flat(q - bud.Value).magnitude - 2.6f; if (past > 0) cost += 6 + past * 2; }
             return cost;
         }
 
