@@ -40,6 +40,9 @@ namespace LastBell.Run
             }
             var towers = t.Spawned("Mould Tower").ToList();
             t.Check("two sets of two towers rise, set B 1.6 s after set A", towers.Count == 4 && sawB && towers.Max(x => x.Tick) - towers.Min(x => x.Tick) >= Sim.Ticks(1.6f) - 1, $"{towers.Count} towers");
+            var setA = towers.Where(x => x.Source == "Mould Tower A").ToList(); var setB = towers.Where(x => x.Source == "Mould Tower B").ToList();
+            float gapAB = setB.Count == 0 || setA.Count == 0 ? 0 : setB.Min(b => setA.Min(a => Sim.Flat(b.H.Origin - a.H.Origin).magnitude));
+            t.Check("set B lands between set A's towers, not on them (you soak A, then run to B)", gapAB >= MoltenCrown.TowerRadius * 2f, $"nearest A-B {gapAB:0.0} m");
             t.Check("filled towers land safe (no wipe) and leave slag", crown.Wipes == 0 && t.Spawned("Tower Slag").Count() == 4, $"wipes {crown.Wipes}, slag {t.Spawned("Tower Slag").Count()}");
             t.Check("pours aimed through the party during the towers", t.Spawned("Pour I").Any());
             t.Check("Backdraft right after set B", t.Spawned("Backdraft").Any());

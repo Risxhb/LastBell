@@ -192,13 +192,13 @@ namespace LastBell.Run
         }
 
         // a lane from the boss that always ends at the arena wall
-        static void ToWall(Hazard h) => h.Length = GreatCasting.RayToCircle(h.Origin, Sim.Dir(h.Yaw), Rim + Hazard.Margin, out float t) ? t : Rim * 2;
+        static void ToWall(Hazard h) { float t = WallDist(h.Origin, Sim.Dir(h.Yaw)); h.Length = t > 0 ? t : Far * 2; }
 
         void Aim(Hazard h, PlayerController target)
         {
             var d = Flat(target.transform.position - h.Origin);
             if (d.sqrMagnitude > 0.01f) h.Yaw = Sim.YawTo(h.Origin, target.transform.position, h.Yaw);
-            h.Length = GreatCasting.RayToCircle(h.Origin, Sim.Dir(h.Yaw), Rim + Hazard.Margin, out float t) ? t : Rim * 2;
+            ToWall(h);
         }
 
         // ---------------- Anvil Quake ----------------
@@ -208,7 +208,7 @@ namespace LastBell.Run
         {
             Boss.Rig.Pour(false);
             var origin = Flat(Boss.transform.position);
-            float wall = Rim + origin.magnitude + Hazard.Margin;
+            float wall = Far + origin.magnitude + Hazard.Margin;
             Spawn("Anvil Quake I", HazardShape.Circle, 0, QuakeInner, T(QuakeFirst));
             Spawn("Anvil Quake II", HazardShape.Ring, QuakeInner, QuakeMiddle, T(QuakeFirst + QuakeGap));
             var outerBand = Spawn("Anvil Quake III", HazardShape.Ring, QuakeMiddle, wall, T(QuakeFirst + 2 * QuakeGap));   // reaches the wall: no out-ranging

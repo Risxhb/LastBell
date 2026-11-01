@@ -27,6 +27,19 @@ namespace LastBell.Run
         protected static Vector3 Flat(Vector3 v) => Sim.Flat(v);
 
         public static float Rim => CombatWorld.PlayerBound;   // 13.7 m in the Brass Foundry
+        // the farthest floor point from the centre: Test Rush can put him on a square map (the key-art dais), whose corners
+        // lie Rim x 1.41 out, so anything meant to reach the wall sizes to this, not Rim (no safe corners)
+        public static float Far => CombatWorld.SquareBound ? Rim * 1.41422f : Rim;
+        // distance along dir from o to the floor's edge plus the hit margin (circle or square floor); 0 if o is outside
+        public static float WallDist(Vector3 o, Vector3 dir)
+        {
+            o = Sim.Flat(o); dir = Sim.Flat(dir).normalized;
+            float r = Rim + Hazard.Margin;
+            if (!CombatWorld.SquareBound) return GreatCasting.RayToCircle(o, dir, r, out float t) ? t : 0;
+            float tx = Mathf.Abs(dir.x) < 1e-5f ? float.MaxValue : ((dir.x > 0 ? r : -r) - o.x) / dir.x;
+            float tz = Mathf.Abs(dir.z) < 1e-5f ? float.MaxValue : ((dir.z > 0 ? r : -r) - o.z) / dir.z;
+            return Mathf.Max(0, Mathf.Min(tx, tz));
+        }
         // the four die bays, 6 m out on the diagonals, in the tie-break order NE, SE, SW, NW. The run layout puts the
         // entry to the south at +z, so north is -z and east is +x.
         public const float BayRadius = 6f;

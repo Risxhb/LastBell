@@ -54,7 +54,7 @@ namespace LastBell.Run
             int deadline = Sim.Ticks(Easy ? EasyDeadline : n == 1 ? SoloDeadline : Deadline);
             Flood = W.Hazards.Spawn(new Hazard
             {
-                Source = "Pour Flood", Shape = HazardShape.Ring, Kind = HazardKind.Ground, Origin = Vector3.zero, Inner = Rim - 1.2f, Radius = Rim + Hazard.Margin + 0.5f,
+                Source = "Pour Flood", Shape = HazardShape.Ring, Kind = HazardKind.Ground, Origin = Vector3.zero, Inner = Rim - 1.2f, Radius = Far + Hazard.Margin + 0.5f,
                 LockAt = 0, ResolveAt = deadline, ShareTotal = 1, WipeIfEmpty = true, Includes = _ => false,   // nobody can soak it: it wipes
             });
             Flood.OnResolve = _ => Floods++;   // counted here: the wipe can end the script before the loop sees it
@@ -170,16 +170,16 @@ namespace LastBell.Run
                         Bullet(tu, tu.Pos, Sim.Dir(baseYaw + a) * RingSpeed, "Ring Wave bullet");
                     }
                 }
-                Path(tu, "Ring Wave", HazardShape.Cone, tu.Pos, baseYaw, Rim * 2 + 1, 0, mid, 0, warn, Shot);
-                Path(tu, "Ring Wave", HazardShape.Cone, tu.Pos, baseYaw + RingGapAt + RingGapHalf + side, Rim * 2 + 1, 0, side, 0, warn, Shot);
-                Path(tu, "Ring Wave", HazardShape.Cone, tu.Pos, baseYaw - RingGapAt - RingGapHalf - side, Rim * 2 + 1, 0, side, 0, warn, Shot);
+                Path(tu, "Ring Wave", HazardShape.Cone, tu.Pos, baseYaw, Far * 2 + 1, 0, mid, 0, warn, Shot);
+                Path(tu, "Ring Wave", HazardShape.Cone, tu.Pos, baseYaw + RingGapAt + RingGapHalf + side, Far * 2 + 1, 0, side, 0, warn, Shot);
+                Path(tu, "Ring Wave", HazardShape.Cone, tu.Pos, baseYaw - RingGapAt - RingGapHalf - side, Far * 2 + 1, 0, side, 0, warn, Shot);
             }
             else
             {
                 float a0 = baseYaw - 60f + (tu.Shots % 2 == 0 ? 0 : 60f), sweep = SpiralTurn * SpiralFor;
                 bool started = false;
                 for (int k = 0; k < 3; k++)
-                    Path(tu, "Spiral Arm", HazardShape.Cone, tu.Pos, a0 + k * 120f + sweep / 2, Rim * 2 + 1, 0, sweep / 2 + 4f, 0, warn, () =>
+                    Path(tu, "Spiral Arm", HazardShape.Cone, tu.Pos, a0 + k * 120f + sweep / 2, Far * 2 + 1, 0, sweep / 2 + 4f, 0, warn, () =>
                     {
                         if (started) return; started = true;
                         spirals.Add((tu, a0, t));
@@ -229,13 +229,7 @@ namespace LastBell.Run
         }
 
         // distance along d from p until it leaves the arena (0 if it never enters)
-        static float Exit(Vector3 p, Vector3 d)
-        {
-            p = Flat(p); d = Flat(d).normalized;
-            float b = Vector3.Dot(p, d), c = p.sqrMagnitude - (Rim + Hazard.Margin) * (Rim + Hazard.Margin), disc = b * b - c;
-            if (disc <= 0) return 0;
-            return Mathf.Max(0, -b + Mathf.Sqrt(disc));
-        }
+        static float Exit(Vector3 p, Vector3 d) => WallDist(p, d);
 
         // a hazard that should go quietly: no hit, no wipe, cools like a slag pool this tick
         static void Cancel(Hazard h)

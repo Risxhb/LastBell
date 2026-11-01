@@ -65,7 +65,7 @@ namespace LastBell.Run
                 if (!Boss) { running = false; yield break; }   // the encounter is gone (a restart)
                 for (int s = 0; s < sets.Length; s++)
                 {
-                    if (t == Sim.Ticks(SetGap * s)) RiseSet(sets[s], s);
+                    if (t == Sim.Ticks(SetGap * s)) RiseSet(sets[s], s, sets[0].Length);
                     if (Hard && t == Sim.Ticks(SetGap * s) + T(Rise) + 2 && fullest.TryGetValue(s, out var f)) Press(f.h.Origin);   // the set has landed
                 }
                 if (t == Sim.Ticks(3.5f)) { Boss.SetCurrent("Casting Order"); Boss.Rite.CastingOrder(); }
@@ -84,7 +84,9 @@ namespace LastBell.Run
         }
 
         // ---------------- Mould Towers ----------------
-        void RiseSet(int[] needs, int set)
+        // set B sits halfway between set A's towers (180 / A's count off it): a straight 180 put an even count back on A's
+        // spots, so the A soakers stood still for B (escape check 31 Oct); solo keeps its own 120 step
+        void RiseSet(int[] needs, int set, int countA)
         {
             Boss.SetCurrent("Mould Towers");
             bool solo = Standing().Count <= 1;
@@ -92,7 +94,7 @@ namespace LastBell.Run
             var list = new List<Hazard>();
             for (int k = 0; k < needs.Length; k++)
             {
-                float yaw = k * 360f / needs.Length + set * 180f + 17f + Cycles * 40f + (solo ? set * 120f : 0);
+                float yaw = k * 360f / needs.Length + (solo ? set * 300f : set * 180f / countA) + 17f + Cycles * 40f;
                 int need = needs[k];
                 var h = new Hazard
                 {
@@ -130,7 +132,7 @@ namespace LastBell.Run
             wiping = true; Wipes++;
             W.Hazards.Spawn(new Hazard
             {
-                Source = why, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Vector3.zero, Radius = Rim + 1f,
+                Source = why, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Vector3.zero, Radius = Far + 1f,
                 LockAt = 0, ResolveAt = 1, ShareTotal = 1, WipeIfEmpty = true, Includes = _ => false,
             });
         }
@@ -164,7 +166,7 @@ namespace LastBell.Run
                 W.BossFx.BellowsBlast(Vector3.zero, to);
                 W.Hazards.Spawn(new Hazard
                 {
-                    Source = "Molten Crown", Shape = HazardShape.Ring, Kind = HazardKind.Ground, Origin = Vector3.zero, Inner = to, Radius = Rim + 1f,
+                    Source = "Molten Crown", Shape = HazardShape.Ring, Kind = HazardKind.Ground, Origin = Vector3.zero, Inner = to, Radius = Far + 1f,
                     LockAt = 0, ResolveAt = Sim.Ticks(3600), BurnPerSecond = CrownBurn,
                 });
             };
@@ -175,7 +177,7 @@ namespace LastBell.Run
             Boss.SetCurrent("Furnace Eruption");
             var h = W.Hazards.Spawn(new Hazard
             {
-                Source = "Furnace Eruption", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Vector3.zero, Radius = Rim + 1f,
+                Source = "Furnace Eruption", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Vector3.zero, Radius = Far + 1f,
                 LockAt = 0, ResolveAt = T(EruptWarn), ShareTotal = 1, WipeIfEmpty = true, Includes = _ => false,
             });
             h.OnResolve = _ => Wipes++;
