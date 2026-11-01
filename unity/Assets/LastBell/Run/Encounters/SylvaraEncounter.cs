@@ -33,7 +33,7 @@ namespace LastBell.Run
         public const float LastStormAt = 120;
         // Easy and Hard (accepted, Chzy18 31 Oct; docs DIFFICULTY-EXTRAS.md): Hard adds one mechanic per phase (P1 every pod
         // doubled, P2 double toll burst, P3 one more bud per wave, P4 10-petal seed bursts); Easy warns longer and fires
-        // less. The enrage clock and Last Storm are the same on every level (a softer Easy Last Storm is still a proposal).
+        // less. The enrage clock is the same on every level; Last Storm is softer on Easy (accepted 31 Oct).
         public Difficulty Level => W != null ? W.Difficulty : Difficulty.Medium;
         bool Easy => Level == Difficulty.Easy;
         bool Hard => Level == Difficulty.Hard;
@@ -544,7 +544,12 @@ namespace LastBell.Run
         void StartStorm()
         {
             LastStorm = P4Loop >= 5;
-            if (LastStorm) { StormSeeds = 14; StormEvery = 0.6f; sp1 = Spiral(-1, 4, 12 * Deg, 5, 0.15f, 9, 7); }
+            if (LastStorm)
+            {
+                // Easy (accepted 31 Oct): 12 seeds every 0.8 s and a 3-arm spiral, so it downs a player in about 18 s, not 5
+                if (Easy) { StormSeeds = 12; StormEvery = 0.8f; sp1 = Spiral(-1, 3, 10 * Deg, 4.5f, 0.15f, 9, 7); }
+                else { StormSeeds = 14; StormEvery = 0.6f; sp1 = Spiral(-1, 4, 12 * Deg, 5, 0.15f, 9, 7); }
+            }
             else
             {
                 int k = Mathf.Min(P4Loop, 4); StormSeeds = (Easy ? 6 : 8) + k; StormEvery = (Easy ? 2.5f : 2.0f) - 0.1f * k;   // Easy: 6 every 2.5 s, same steps

@@ -28,7 +28,7 @@ Chzy18 accepted the full fight for the Unity build on 29 Oct. The enrage timing 
   - clean-up on death.
 
 ## Design only / not built yet
-- **Hard and Easy extras** for each phase: accepted 31 Oct ([DIFFICULTY-EXTRAS.md](DIFFICULTY-EXTRAS.md)) and built in Unity. A softer Easy Last Storm is a proposal waiting for review. The demo has a Level row (Easy / Medium / Hard).
+- **Hard and Easy extras** for each phase: accepted 31 Oct ([DIFFICULTY-EXTRAS.md](DIFFICULTY-EXTRAS.md)) and built in Unity. Last Storm is softer on Easy (accepted 31 Oct). The demo has a Level row (Easy / Medium / Hard).
 - **Choir Bud damage.** In Unity, buds are cut by standing within 3 m, as in the demo. Real class damage on buds needs boss parts that can be targeted.
 - **HP tuning.** 9000 is the current solo base, not yet tuned against measured damage, and there is no party scaling yet. The target is for a normal party to finish Phase 4 in about 75–90 s.
 - **Pod gap tick marks** from the demo.

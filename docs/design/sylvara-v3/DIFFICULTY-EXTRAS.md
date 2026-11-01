@@ -1,6 +1,6 @@
-# Sylvara v3: Easy and Hard extras (proposal)
+# Sylvara v3: Easy and Hard extras (accepted 31 Oct)
 
-Status: **accepted** (review inbox, 31 Oct), except the softer Easy Last Storm below, which is a **proposal**. Medium is the accepted fight, and every number in the phase docs is Medium.
+Status: **accepted** (review inbox, 31 Oct), including the softer Easy Last Storm below. Built in Unity. Medium is the accepted fight, and every number in the phase docs is Medium.
 
 The rule is from `gpt/08-design-rules.md` (difficulty levels):
 - The build already scales damage taken (Easy ×0.6, Hard ×1.3).
@@ -19,9 +19,9 @@ Try it in the demo: `demo/sylvara-v3-demos.html`, **Level** row in the top bar. 
 | 4 Seed Storm | **Seeds burst into 10 petals** (was 8). | Seed rings start at 6 seeds every 2.5 s (Medium: 8 every 2.0 s). The enrage steps are the same: one more seed and 0.1 s sooner every 24 s loop. |
 
 - **Enrage:** the Phase 4 clock is the same on all three levels (accepted 29 Oct; the 31 Oct review kept it).
-- **Easy Last Storm (proposal, 31 Oct):** the review chose "Soften on Easy". It still starts at 2:00 with the same 3 s banner, and it still ends the fight, only slower.
+- **Easy Last Storm (accepted 31 Oct):** the review chose "Soften on Easy". It still starts at 2:00 with the same 3 s banner, and it still ends the fight, only slower.
 
-  | | Medium and Hard | Easy (proposal) |
+  | | Medium and Hard | Easy |
   |---|---|---|
   | Seed rings | 14 seeds every 0.6 s | 12 seeds every 0.8 s |
   | Spiral | 4 arms, 5 m/s, every 0.15 s, 12°/s | 3 arms, 4.5 m/s, every 0.15 s, 10°/s |
@@ -46,6 +46,6 @@ Try it in the demo: `demo/sylvara-v3-demos.html`, **Level** row in the top bar. 
 
 ## Open questions
 1. Hard Phase 1: doubled pods are enough (31 Oct review).
-2. Easy Last Storm: are the numbers above soft enough, or too soft? (Sent to the review inbox on 31 Oct.)
+2. Easy Last Storm: the numbers above were accepted on 31 Oct.
 3. Built in Unity (31 Oct): `SylvaraEncounter` reads `CombatWorld.Difficulty` for the accepted extras, and the autotest checks each level.
    - As in the demo, the Easy Pruning Arc warning applies wherever the Arc appears (Phases 1 and 3). The Easy pod warning and the Hard doubled pods apply to Phase 1 pods only.

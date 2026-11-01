@@ -934,7 +934,7 @@ namespace LastBell.Run
             yield return Shot("sylvara_v3_last_storm");
 
             // Easy and Hard extras (accepted 31 Oct): one Hard mechanic per phase, longer warnings and fewer bullets on Easy;
-            // the enrage clock and Last Storm stay the same on every level
+            // the enrage clock stays the same on every level, and Last Storm is softer on Easy
             int budBase = sy.BudCount;
             foreach (var lv in new[] { Difficulty.Easy, Difficulty.Hard })
             {
@@ -955,7 +955,8 @@ namespace LastBell.Run
                 Check($"Sylvara {lv} P4: the same enrage steps (+2 seeds, 0.2 s sooner at loop 3)",
                     sy.StormSeeds == (e ? 8 : 10) && Mathf.Abs(sy.StormEvery - (e ? 2.3f : 1.8f)) < 0.001f, $"{sy.StormSeeds} / {sy.StormEvery}");
                 sy.DebugStartStorm(7);
-                Check($"Sylvara {lv} P4: the same Last Storm (14 seeds every 0.6 s)", sy.LastStorm && sy.StormSeeds == 14 && Mathf.Abs(sy.StormEvery - 0.6f) < 0.001f);
+                Check($"Sylvara {lv} P4: Last Storm {(e ? "12 seeds every 0.8 s (softer on Easy)" : "14 seeds every 0.6 s, as on Medium")}",
+                    sy.LastStorm && sy.StormSeeds == (e ? 12 : 14) && Mathf.Abs(sy.StormEvery - (e ? 0.8f : 0.6f)) < 0.001f, $"{sy.StormSeeds} / {sy.StormEvery}");
             }
             {
                 // Hard live: a seed bursts into 10 petals
