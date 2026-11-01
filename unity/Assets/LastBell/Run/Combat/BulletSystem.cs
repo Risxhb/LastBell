@@ -85,42 +85,80 @@ namespace LastBell.Run
         // presentation, every frame
         public void Draw(Transform root) => view.Draw(root, live);
 
-        // Pooled spheres, one shared emissive material per colour. Hundreds of bullets stay cheap under the SRP batcher.
+        // Pooled per look (BulletArt): coral, brass and cobalt petals, the Storm Seed and the Waterfall Jet's water drops.
+        // Shared materials per look, so hundreds of bullets stay cheap under the SRP batcher. Every look fits its hit circle.
         sealed class BulletView
         {
-            static readonly Color Petal = new Color(1f, 0.48f, 0.36f), Brass = new Color(0.85f, 0.64f, 0.25f),
-                Cobalt = new Color(0.36f, 0.52f, 1f), Seed = new Color(0.62f, 0.85f, 0.35f);
-            readonly List<Transform> pool = new List<Transform>();
-            readonly List<int> poolKind = new List<int>();
-            Material[] mats;
+            public const int CoralPetal = 0, BrassPetal = 1, CobaltPetal = 2, Seed = 3, Water = 4, Kinds = 5;
+            static readonly Color Coral = new Color(1f, 0.40f, 0.26f), CoralCore = new Color(1f, 0.86f, 0.66f),
+                Brass = new Color(0.86f, 0.56f, 0.20f), BrassCore = new Color(1f, 0.84f, 0.40f),
+                Cobalt = new Color(0.20f, 0.34f, 0.95f), CobaltCore = new Color(0.72f, 0.88f, 1f),
+                WaterC = new Color(0.86f, 0.92f, 0.94f), SeedFallback = new Color(0.30f, 0.45f, 0.38f);
+            readonly List<Transform>[] pools = { new List<Transform>(), new List<Transform>(), new List<Transform>(), new List<Transform>(), new List<Transform>() };
+            readonly int[] shown = new int[Kinds];
+            Material[][] mats;
             Transform parent;
-            int shown;
 
-            int KindOf(Bullet b) => b.Radius >= 0.5f ? 3 : b.Colour;
+            public static int KindOf(Bullet b) => b.Radius >= 0.5f ? Seed : b.Source == "Waterfall Jet" ? Water : b.Colour == 1 ? BrassPetal : b.Colour == 2 ? CobaltPetal : CoralPetal;
+            Transform Make(int k)
+            {
+                if (k == Seed) return BulletArt.MakeSeed(parent, mats[Seed][0]);
+                var go = new GameObject(k == Water ? "Water Drop" : "Petal");
+                go.transform.SetParent(parent, false);
+                go.AddComponent<MeshFilter>().sharedMesh = k == Water ? BulletArt.Drop : BulletArt.Petal(k == CobaltPetal);
+                var mr = go.AddComponent<MeshRenderer>(); mr.sharedMaterials = mats[k];
+                mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;   // hundreds of them; the floor stays readable
+                return go.transform;
+            }
             public void Draw(Transform root, List<Bullet> bullets)
             {
                 if (!root) return;
-                if (!parent) { parent = new GameObject("Hostile Bullets").transform; parent.SetParent(root, false); pool.Clear(); poolKind.Clear(); }
-                mats ??= new[] { Prim.Material(Petal, 2.2f), Prim.Material(Brass, 2.2f), Prim.Material(Cobalt, 2.2f), Prim.Material(Seed, 1.6f) };
-                int n = 0;
+                if (!parent) { parent = new GameObject("Hostile Bullets").transform; parent.SetParent(root, false); foreach (var p in pools) p.Clear(); Array.Clear(shown, 0, Kinds); }
+                mats ??= new[]
+                {
+                    new[] { Prim.Material(Coral, 1.8f), Prim.Material(CoralCore, 4f) },
+                    new[] { Prim.Material(Brass, 1.6f), Prim.Material(BrassCore, 4f) },
+                    new[] { Prim.Material(Cobalt, 1.8f), Prim.Material(CobaltCore, 4f) },
+                    new[] { Prim.Material(SeedFallback, 0.4f) },
+                    new[] { Prim.Material(WaterC, 0.8f), Prim.Material(Coral, 3f) },
+                };
+                var n = new int[Kinds]; float now = Time.time;
                 foreach (var b in bullets)
                 {
                     if (b.Dead) continue;
-                    int k = KindOf(b);
-                    if (n == pool.Count) { pool.Add(Prim.Make(PrimitiveKind.Sphere, parent, Vector3.zero, Vector3.one, Petal)); poolKind.Add(-1); }
-                    var t = pool[n];
-                    if (poolKind[n] != k) { t.GetComponent<MeshRenderer>().sharedMaterial = mats[k]; poolKind[n] = k; }
+                    int k = KindOf(b); var pool = pools[k];
+                    if (n[k] == pool.Count) pool.Add(Make(k));
+                    var t = pool[n[k]++];
                     if (!t.gameObject.activeSelf) t.gameObject.SetActive(true);
                     t.position = b.Pos + Vector3.up * Height;
-                    float d = b.Radius * 2;
-                    t.localScale = k == 0 ? new Vector3(d, d * 0.6f, d * 1.5f) : Vector3.one * d;   // petals are long along their flight
-                    if (k == 0 && b.Vel.sqrMagnitude > 1e-4f) t.rotation = Quaternion.LookRotation(b.Vel);
-                    n++;
+                    var fwd = b.Vel.sqrMagnitude > 1e-4f ? b.Vel : Vector3.forward;
+                    if (k == Seed)
+                    {
+                        // the fuse: the coral core swells and brightens to the burst, and the husk shivers in the last quarter
+                        float f = b.Life > 0 ? Mathf.Clamp01(b.Age / b.Life) : 0;
+                        t.rotation = Quaternion.Euler(0, b.Age * 40f, 0);
+                        float shiver = f > 0.75f ? 1 + 0.04f * Mathf.Sin(now * 60f) * (f - 0.75f) * 4 : 1;
+                        t.localScale = Vector3.one * (b.Radius / 0.6f) * shiver;
+                        var core = t.Find("Fuse"); if (core) core.localScale = Vector3.one * (0.55f + 0.4f * f * f);
+                    }
+                    else
+                    {
+                        // nose first, flat, with a slow roll so the petal catches the light; scaled to the hit radius
+                        float roll = k == Water ? 0 : 25f * Mathf.Sin(b.Age * 3f + b.GetHashCode() * 0.1f);
+                        t.rotation = Quaternion.LookRotation(fwd) * Quaternion.Euler(0, 0, roll);
+                        t.localScale = Vector3.one * (b.Radius / 0.35f);
+                    }
                 }
-                for (int i = n; i < shown; i++) if (pool[i]) pool[i].gameObject.SetActive(false);
-                shown = n;
+                for (int k = 0; k < Kinds; k++)
+                {
+                    for (int i = n[k]; i < shown[k]; i++) if (pools[k][i]) pools[k][i].gameObject.SetActive(false);
+                    shown[k] = n[k];
+                }
             }
-            public void Hide() { for (int i = 0; i < shown && i < pool.Count; i++) if (pool[i]) pool[i].gameObject.SetActive(false); shown = 0; }
+            public void Hide()
+            {
+                for (int k = 0; k < Kinds; k++) { for (int i = 0; i < shown[k] && i < pools[k].Count; i++) if (pools[k][i]) pools[k][i].gameObject.SetActive(false); shown[k] = 0; }
+            }
         }
     }
 }

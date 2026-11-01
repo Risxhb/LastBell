@@ -67,7 +67,7 @@ namespace LastBell.Run
         readonly List<(int at, Action fn)> later = new List<(int, Action)>();
         Emitter sp1, sp2;
 
-        sealed class Bud { public Vector3 Pos; public float Hp = BudHp, Life, Base, Acc; public int Born; public bool Alive = true; public Transform Prop; public Hazard Timer; public BossPart Part; }
+        sealed class Bud { public Vector3 Pos; public float Hp = BudHp, Life, Base, Acc; public int Born; public bool Alive = true; public Transform Prop; public PropMotion View; public Hazard Timer; public BossPart Part; }
         // Choir Buds are boss parts (CombatWorld.Parts): every class's attacks hit them, and the damage also hits Sylvara.
         // 120 HP: one player cuts one in about 3-4 s (P3 doc).
         public const float BudHp = 120;
@@ -312,6 +312,8 @@ namespace LastBell.Run
             for (int i = 0; i < n; i++) { float a = off + i * Tau / n; Shot(c + On(a, r0), a, v, dmg, 6, 0, src); }
         }
         static float Rnd(float a, float b) => UnityEngine.Random.Range(a, b);
+        static readonly System.Random look = new System.Random(31);   // presentation only, so props never shift the fight's rolls
+        static float LookRnd(float a, float b) => a + (float)look.NextDouble() * (b - a);
         Hazard Tune(Hazard h) { h.Stun = Stun; h.Knockback = 0; return h; }
         int FarCount { get { int n = W.Players.Count; return n <= 2 ? 1 : n <= 4 ? 2 : 3; } }
         public int BudCount { get { int n = W.Players.Count; return (n <= 2 ? 2 : n <= 4 ? 3 : 4) + (Hard ? 1 : 0); } }   // Hard: one more bud
@@ -369,6 +371,13 @@ namespace LastBell.Run
                 PetalRing(hz.Origin, n, 5.5f, off, r0, 12, "Pod Petal");
                 if (doubled) { var o = hz.Origin; Later(0.6f, () => PetalRing(o, n, 5.5f, off + Mathf.PI / n, r0, 12, "Pod Petal")); }
             };
+            // the pod model drops onto the warning in its last 0.4 s and lands on the resolve (proposal art)
+            var pv = SylvaraProps.Spawn(SylvaraProps.Pod, transform.parent, h.Origin, LookRnd(0, 360));
+            if (pv)
+            {
+                PodModels++; props.Add(pv.transform); pv.Follow = () => h.Origin; pv.FallIn(PodLandIn(phase));
+                var land = h.OnResolve; h.OnResolve = hz => { land(hz); if (pv) pv.Land(); };
+            }
             W.Hazards.Spawn(h);
         }
         void PodsOnFar(bool doubled = false)
@@ -390,8 +399,23 @@ namespace LastBell.Run
         {
             presenter.PlayOnce("Rootscript", 2f);
             var h = Tune(new Hazard { Source = "Root Ring", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Radius = r, LockAt = 0, ResolveAt = Sim.Ticks(2), Damage = 18, Origin = Vector3.zero });
-            h.OnResolve = hz => { W.BossFx.ChimeResolve(hz.Origin, hz.Radius); Release(); };
+            h.OnResolve = hz => { W.BossFx.ChimeResolve(hz.Origin, hz.Radius); Release(); RootsErupt(hz.Origin, hz.Radius); };
             W.Hazards.Spawn(h);
+        }
+        // Root Ring look (proposal art): root pieces burst up inside the disc around her feet after it resolves, hold 0.3 s
+        // and sink, so the warning is never covered.
+        public const int RootPieces = 10;
+        public int PodModels, RootModels, BudModels;   // tests: prop models placed (0 when the art isn't installed)
+        void RootsErupt(Vector3 c, float r)
+        {
+            float a0 = LookRnd(0, Tau);
+            for (int i = 0; i < RootPieces; i++)
+            {
+                float a = a0 + i * Tau / RootPieces, rr = r * (i % 2 == 0 ? 0.78f : 0.62f);
+                var p = SylvaraProps.Spawn(SylvaraProps.Root, transform.parent, c + On(a, rr), 90 - a / Deg + LookRnd(-20, 20), LookRnd(0.9f, 1.2f));
+                if (!p) return;
+                RootModels++; props.Add(p.transform); p.Rise(0.3f);
+            }
         }
 
         // Waterfall Jets: one per player past 8 m (else the farthest). The wedge warns 1.5 s; then a solid stream (a drop
@@ -514,9 +538,15 @@ namespace LastBell.Run
         void SproutBud(float a, float life)
         {
             var b = new Bud { Pos = On(a, 10), Born = Age, Life = life, Base = Rnd(0, Tau) };
-            b.Prop = Prim.Make(PrimitiveKind.Cone, transform.parent, b.Pos + Vector3.up * 0.6f, new Vector3(0.8f, 1.2f, 0.8f), Ivory, 0.8f);
-            props.Add(b.Prop);
-            props.Add(Prim.Make(PrimitiveKind.Sphere, b.Prop, new Vector3(0, -0.3f, 0), new Vector3(1.6f, 0.5f, 1.6f), new Color(0.30f, 0.42f, 0.24f)));
+            // the bell-flower model (proposal art), facing her; the cone and moss stand-in when the art isn't installed
+            b.View = SylvaraProps.Spawn(SylvaraProps.Bud, transform.parent, b.Pos, Mathf.Atan2(-b.Pos.x, -b.Pos.z) / Deg);
+            if (b.View) { BudModels++; b.Prop = b.View.transform; props.Add(b.Prop); b.View.Sprout(); }
+            else
+            {
+                b.Prop = Prim.Make(PrimitiveKind.Cone, transform.parent, b.Pos + Vector3.up * 0.6f, new Vector3(0.8f, 1.2f, 0.8f), Ivory, 0.8f);
+                props.Add(b.Prop);
+                props.Add(Prim.Make(PrimitiveKind.Sphere, b.Prop, new Vector3(0, -0.3f, 0), new Vector3(1.6f, 0.5f, 1.6f), new Color(0.30f, 0.42f, 0.24f)));
+            }
             b.Timer = W.Hazards.Spawn(new Hazard
             {
                 Source = "Choir Bud", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = b.Pos, Radius = 1.0f,
@@ -537,6 +567,7 @@ namespace LastBell.Run
             e.Update = dt =>
             {
                 if (!b.Alive) { e.On = false; return; }
+                if (b.View) b.View.Open = Mathf.Clamp01((Age - b.Born) * Sim.Dt / b.Life);
                 b.Base += 30 * Deg * dt; b.Acc += dt;
                 while (b.Acc >= 0.3f) { b.Acc -= 0.3f; for (int i = 0; i < 3; i++) { float aa = b.Base + i * Tau / 3; Shot(b.Pos + On(aa, 0.8f), aa, 4, 10, 4, 0, "Bud Petal"); } }
                 if (b.Hp <= 0)
@@ -544,14 +575,14 @@ namespace LastBell.Run
                     KillBud(b); BudsCut++; W.Hazards.Cancel(b.Timer);
                     RunHud.Float(b.Pos + Vector3.up * 1.8f, "CUT", Turquoise);
                     W.Fx.Crescendo(b.Pos, true, 0, false);
-                    if (b.Prop) b.Prop.gameObject.SetActive(false);
+                    if (b.View) b.View.Wither(); else if (b.Prop) b.Prop.gameObject.SetActive(false);
                 }
                 else if ((Age - b.Born) * Sim.Dt >= b.Life)
                 {
                     KillBud(b); BudsBloomed++;
                     RunHud.Float(b.Pos + Vector3.up * 1.8f, "BLOOM", Amber);
                     PetalRing(b.Pos, 20, 5, Rnd(0, Tau), 0.8f, 12, "Bud Bloom");
-                    if (b.Prop) b.Prop.gameObject.SetActive(false);
+                    if (b.View) b.View.Bloom(); else if (b.Prop) b.Prop.gameObject.SetActive(false);
                 }
             };
             Add(e);

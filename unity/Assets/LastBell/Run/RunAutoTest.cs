@@ -898,6 +898,37 @@ namespace LastBell.Run
                 bot.Clear();
             }
 
+            // Attack props (proposal art, 1 Nov): every look fits its hit circle; the Meshy models are gitignored, so their
+            // checks run only where the art is installed. A watcher takes one screenshot of each prop in action.
+            {
+                bool Fits(Mesh m, float r) { var b = m.bounds; return Mathf.Max(Mathf.Abs(b.min.x), Mathf.Abs(b.max.x), Mathf.Abs(b.min.z), Mathf.Abs(b.max.z)) <= r + 1e-3f; }
+                Check("petal bullets (coral, brass, cobalt) fit the 0.35 m hit circle", Fits(BulletArt.Petal(false), 0.35f) && Fits(BulletArt.Petal(true), 0.35f));
+                Check("water drops fit the 0.35 m hit circle", Fits(BulletArt.Drop, 0.35f));
+                bool art = SylvaraProps.Has(SylvaraProps.Bud) && SylvaraProps.Has(SylvaraProps.Pod) && SylvaraProps.Has(SylvaraProps.Root) && BulletArt.HasSeedModel;
+                Note("Sylvara attack props: " + (art ? "Meshy models installed" : "art not installed, stand-ins used"));
+                if (BulletArt.HasSeedModel)
+                {
+                    var seedT = BulletArt.MakeSeed(null, null); var rs = seedT.GetComponentsInChildren<Renderer>(); var sb = rs[0].bounds; foreach (var r in rs) sb.Encapsulate(r.bounds);
+                    float half = Mathf.Max(sb.extents.x, sb.extents.z); Destroy(seedT.gameObject);
+                    Check("the Storm Seed model fits its 0.6 m hit radius", half <= 0.6f, $"{half:0.00} m");
+                }
+                StartCoroutine(PropShots());
+            }
+            IEnumerator PropShots()
+            {
+                bool pod = false, roots = false, bud = false;
+                while (d.World != null && !(pod && roots && bud))
+                {
+                    foreach (var m in FindObjectsByType<PropMotion>(FindObjectsSortMode.None))
+                    {
+                        if (!pod && m.name == SylvaraProps.Pod && m.Now == PropMotion.Mode.Land) { pod = true; yield return Shot("sylvara_props_pod_lands"); break; }
+                        if (!roots && m.name == SylvaraProps.Root && m.Now == PropMotion.Mode.Rise) { roots = true; yield return new WaitForSeconds(0.12f); yield return Shot("sylvara_props_root_ring"); break; }
+                        if (!bud && m.name == SylvaraProps.Bud && m.Open > 0.5f) { bud = true; yield return Shot("sylvara_props_choir_buds"); break; }
+                    }
+                    yield return null;
+                }
+            }
+
             // Phase 1: one full loop
             bool p1Shot = false;
             float s1 = Time.time;
@@ -912,6 +943,7 @@ namespace LastBell.Run
             foreach (var id in new[] { "Petal Spiral", "Seed Pods", "Waterfall Jets", "Toll", "Feet Pod", "Pruning Arc", "Doubled Pods", "Second Spiral", "Triangle Pods" })
                 Check($"Sylvara P1 uses {id}", sy.Order.Contains(id));
             Check("Sylvara P1 fills the arena with bullets", d.World.Bullets.Fired > 300, $"{d.World.Bullets.Fired} fired, peak {d.World.Bullets.Peak}");
+            if (SylvaraProps.Has(SylvaraProps.Pod)) Check("Seed Pods drop the pod model onto their warnings", sy.PodModels > 0, sy.PodModels.ToString());
 
             // Phase 2: colours
             sy.Order.Clear();
@@ -943,6 +975,7 @@ namespace LastBell.Run
             Check("Two-Colour Choir: a toll swaps the player's colour", swapped);
             foreach (var id in new[] { "Colour Spiral", "Brass Lanes", "Cobalt Lanes", "Second Colour Spiral", "Root Ring", "Toll" })
                 Check($"Sylvara P2 uses {id}", sy.Order.Contains(id));
+            if (SylvaraProps.Has(SylvaraProps.Root)) Check("the Root Ring raises root models inside its disc", sy.RootModels >= SylvaraEncounter.RootPieces, sy.RootModels.ToString());
 
             // Phase 3: buds
             sy.Order.Clear();
@@ -952,6 +985,7 @@ namespace LastBell.Run
             Check("leaving Phase 2 clears the colours", sy.ColourOf(d.Player) == 0);
             yield return Until(() => sy.BudsAlive > 0, 5, "Choir Buds sprouted");
             yield return Shot("sylvara_v3_p3");
+            if (SylvaraProps.Has(SylvaraProps.Bud)) Check("Choir Buds use the bell-flower model", sy.BudModels > 0, sy.BudModels.ToString());
             var buds = sy.AliveBudPositions();
             if (buds.Count > 0)
             {
