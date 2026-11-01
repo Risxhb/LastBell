@@ -1,6 +1,6 @@
-# Sylvara v3: HP and party scaling (proposal, 1 Nov)
+# Sylvara v3: HP and party scaling (accepted 1 Nov)
 
-Status: **proposal**, waiting for the review inbox. Today's build is 9,000 HP for every party size.
+Status: **accepted** (review inbox, 1 Nov) and built in Unity: `SylvaraEncounter.PartyHp`, checked by the autotest. Before this the build had 9,000 HP for every party size.
 
 ## Measured (Unity autotest, Medium, 1 Nov)
 These are perfect-mode bots with `AllyBot.Attacks` on, real downs and a 480 s cap. Buds take real class damage, and that damage also counts against Sylvara. Evidence: `sylvara-v3-logs/15/clear/autotest-report.txt` (local, run with `-lastbellSylvaraClear`).

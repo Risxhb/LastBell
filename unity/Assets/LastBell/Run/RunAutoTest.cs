@@ -811,6 +811,7 @@ namespace LastBell.Run
                 d.Player.Input = new AllyBot(allies, allies + 1, BotMode.Perfect);
                 w.Difficulty = Difficulty.Medium;
                 int n = allies + 1, maxHp = sy.MaxHp, downs = 0, tick0 = w.Tick, last = tick0;
+                Check($"Sylvara HP for {n} fighting players is the accepted table's {SylvaraEncounter.HpFor(n)}", maxHp == SylvaraEncounter.HpFor(n), maxHp.ToString());
                 var down = new HashSet<PlayerController>(); var phaseAt = new List<(string name, int tick)> { (sy.PhaseName, tick0) };
                 while (d.State == RunState.Combat && d.World == w && (w.Tick - tick0) < Sim.Ticks(480))
                 {
@@ -859,6 +860,7 @@ namespace LastBell.Run
             Check("Sylvara uses her rigged model with the clips v3 plays", syPres && syPres.HasModel && !sy.Placeholder && syClips.All(c => syPres.Has(c)), syPres ? string.Join(",", syClips.Where(c => !syPres.Has(c))) : "no presenter");
             Check("Sylvara v3 is rooted at the arena centre", Sim.Flat(sy.transform.position).magnitude < 0.01f);
             Check("Sylvara v3 opens in Spiral Bloom", sy.PhaseName == "Spiral Bloom", sy.PhaseName);
+            Check("Sylvara solo HP is 4,600 (passive bots don't count)", sy.MaxHp == Mathf.RoundToInt(4600 * BossEncounter.TestHpScale), sy.MaxHp.ToString());
             d.World.Difficulty = Difficulty.Medium;   // a saved menu choice must not change the checked numbers; levels are checked in Phase 4
 
             // watch the whole fight: every bullet hits once, bullets never stun, hazards hit once per instance

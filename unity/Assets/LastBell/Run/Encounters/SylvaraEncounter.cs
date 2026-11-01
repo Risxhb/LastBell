@@ -97,7 +97,12 @@ namespace LastBell.Run
         static readonly Vector3 FrontOffset = new Vector3(0, 3.0f, 2.6f), RimOffset = new Vector3(0, 5.2f, -2.4f);
         const float FrontIntensity = 12f, RimIntensity = 18f;
 
-        void Awake() { MaxHp = 9000;  BodyRadius = 1.6f; HitHeight = 2.4f; MarkHeight = 4.8f; }   // 9000 solo base (Chzy18, 29 Oct: "lower as a base"; was 13500)
+        void Awake() { MaxHp = PartyHp[1];  BodyRadius = 1.6f; HitHeight = 2.4f; MarkHeight = 4.8f; }
+
+        // HP by fighting party size, about a 3:20 clear at the measured bot damage (HP-SCALING.md, accepted 1 Nov). A table, not
+        // PartyStep: damage per player rises with party size, so one step can't fit both 4 and 8. Same on every level.
+        public static readonly int[] PartyHp = { 0, 4600, 9200, 13800, 18400, 29600, 40700, 51900, 63000 };
+        public static int HpFor(int fighters) => PartyHp[Mathf.Clamp(fighters, 1, PartyHp.Length - 1)];
 
         static readonly Color Stone = new Color(0.68f, 0.70f, 0.64f), Wood = new Color(0.27f, 0.20f, 0.15f),
             BrassC = new Color(0.55f, 0.47f, 0.25f), Ivory = new Color(0.90f, 0.87f, 0.78f),
@@ -106,6 +111,8 @@ namespace LastBell.Run
 
         protected override void Build()
         {
+            int fighters = 0; foreach (var p in W.Players) if (!(p.Input is AllyBot) || AllyBot.Attacks) fighters++;   // as BossEncounter.Spawn counts them
+            MaxHp = Mathf.Max(1, Mathf.RoundToInt(HpFor(fighters) * TestHpScale)); Hp = MaxHp;
             // Resources/Characters/Sylvara.glb (Meshy, rigged by prototype/arena-3d/models/build-sylvara.ps1); the primitive
             // body below is the fallback stand-in when the model is missing
             presenter = CharacterPresenter.Create(transform, "Sylvara", 4f, 0.6f, 0, host =>
