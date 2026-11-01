@@ -1029,6 +1029,24 @@ namespace LastBell.Run
         // Mechanic markers over players' heads (PlayerController.Marks, MechanicIcons): 40 px icons side by side, each with its
         // name on a strip under it, because several look alike at this size. Placement approved by Chzy18 on October 24, 2026;
         // see docs/run-loop/mechanic-icons.md. Nothing is drawn until an encounter assigns a mark.
+        // white anti-aliased disc, tinted at draw time (backing for over-head markers)
+        static Texture2D markDisc;
+        static Texture2D MarkDisc
+        {
+            get
+            {
+                if (markDisc) return markDisc;
+                const int n = 64; markDisc = new Texture2D(n, n, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
+                var px = new Color[n * n];
+                for (int y = 0; y < n; y++) for (int x = 0; x < n; x++)
+                {
+                    float dx = x + 0.5f - n / 2f, dy = y + 0.5f - n / 2f, a = Mathf.Clamp01(n / 2f - Mathf.Sqrt(dx * dx + dy * dy));
+                    px[y * n + x] = new Color(1, 1, 1, a);
+                }
+                markDisc.SetPixels(px); markDisc.Apply(); return markDisc;
+            }
+        }
+
         void PlayerMarks()
         {
             var cam = Camera.main; if (!cam) return; float h = Screen.height, sz = UiTheme.V(40), gap = UiTheme.V(48);
@@ -1041,6 +1059,10 @@ namespace LastBell.Run
                 {
                     var m = MechanicIcons.Get(p.Marks[i]); if (m == null) continue;
                     var r = new Rect(x0 + i * (sz + gap), y0, sz, sz);
+                    // dark ink disc behind the marker so its thin ivory rim reads on light floors (Chzy18, 31 Oct)
+                    var gc = GUI.color; GUI.color = UiTheme.InkStrip;
+                    GUI.DrawTexture(new Rect(r.center.x - sz * 0.58f, r.center.y - sz * 0.58f, sz * 1.16f, sz * 1.16f), MarkDisc, ScaleMode.StretchToFill, true);
+                    GUI.color = gc;
                     var t = MechanicIcons.Icon(m); if (t != null) GUI.DrawTexture(r, t, ScaleMode.ScaleToFit, true);
                     float nw = slotName.CalcSize(new GUIContent(m.name)).x;
                     UiTheme.Fill(new Rect(r.center.x - nw / 2 - UiTheme.V(4), r.yMax + UiTheme.V(1), nw + UiTheme.V(8), UiTheme.V(17)), UiTheme.InkStrip);
