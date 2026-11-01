@@ -89,8 +89,8 @@ Casting HP scales like the boss, `1 + 0.7 × (fighters − 1)`, so splitting up 
 - **Easy:** paths drawn 2.5 s, timer 40 s, damage ×0.6.
 - **Hard (named extra: Cast in Order):** castings must die in numeral order. Killing one out of order makes every remaining turret fire a Ring Wave at once.
 
-## Escape check (to add to `crucivar-escape-check.ps1` once accepted)
-Worst cases to check:
+## Escape check (built 31 Oct)
+`tools/encounter-escape/crucivar-v4-escape-check.ps1` has 0 failures on Easy, Medium and Hard (worst: reaching a Ring Wave gap from the far rim, 3.3 s spare). The cone and pour lengths now run to the floor's farthest point, so the square key-art map has no safe corners. Cases first listed for it:
 - crossing a Lane Stream gap at 4.2 m/s while carrying a brand;
 - a Ring Wave gap lining up with a Furnace Spin jet;
 - the solo player's route to the second casting under a Spiral Arm.

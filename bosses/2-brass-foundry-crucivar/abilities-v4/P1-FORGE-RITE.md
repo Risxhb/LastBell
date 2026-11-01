@@ -37,6 +37,6 @@
 ## Not done yet
 - **Easy:** for now, every warning is only stretched by 1.25.
 - **Hard (named extra: Quake Echo, accepted by Chzy18 30 Oct over Reversing Spin and Brand Flare):** as Anvil Quake's outer band lands, the three bands show again and fire outside-in at +0.8 / 1.6 / 2.4 s (40 each, same bands). Stepping inward after the outer band is no longer safe; step back out once the outer echo has gone off. It threatens melee and ranged alike. **Built 30 Oct;** `ForgeRiteTest` checks it.
-- **Escape-check numbers:** the v4 entries aren't in `crucivar-escape-check.ps1` yet.
-- **Telegraph look and fire VFX:** still placeholder shapes.
+- **Escape check (31 Oct):** `tools/encounter-escape/crucivar-v4-escape-check.ps1`, 0 failures on Easy, Medium and Hard. Furnace Spin can't be followed at the wall (the gap moves 9.6 m/s there), but walking in to 8.6 m in the 1.5 s warning passes. The square key-art map's corners were out of reach of the quake and jets; everything that should reach the wall now sizes to the floor's farthest point.
+- **Telegraph look and fire VFX (31 Oct):** every plain v4 warning uses the Brass Foundry motif (Telegraph-Style 02: gear teeth inside the edge, rivets, molten streaks). Soak, burn and jump warnings keep their own looks. Furnace Spin throws flame along its jets, bullets shed embers, Pour Flood rolls a lava wave in from the rim and the eruption fills the floor.
 - **Co-op rules:** N = 2/8 rules are still to be written. The prototype scales brands and numerals by party size, but only N = 4 has been watched.

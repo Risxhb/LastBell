@@ -41,7 +41,7 @@ The watch bots are all Vanguard on scripted input. They dodge and use their abil
 - **Target:** gpt/08 gives area bosses about 3–4 min. You asked for a fight close to Aurelion's difficulty, so I aimed at the long end: about 4 min solo. Aurelion is the 5–7 min exception, with base 12000 and +1.25 per fighter.
 - **Eruption margin, solo:** Phase 3 takes about 65 s, and the eruption comes at about 90 s. That leaves one spare cycle. If you lose much damage to downs, you'll see the eruption.
 - **The step is 0.9, not Aurelion's 1.25:** more players also bring more towers and more castings, and the bots show that damage doesn't scale perfectly. With people who scale linearly, 4 players finish a bit faster than solo.
-- The step uses everyone in the fight when the boss spawns.
+- The step counts the fighters present when the boss spawns. Passive menu bots aren't counted (the shared rule, 31 Oct).
 
 ## Casting HP (built)
 
@@ -66,12 +66,15 @@ The difficulty damage scale is unchanged (damage scale only, per the difficulty 
 
 ## Still to do (lane plan)
 - **Done 30 Oct:** both Hard extras are built. Azure `feature/confrontation-menu` is merged. v4 is the default Crucivar fight (Chzy18, 30 Oct): Run Loop, Test Rush and the start-phase picker all play v4, and `-lastbellAbilitySet v3` still plays v3. PR 12 merged; later work goes in a new PR.
-1. Escape checks for v4 (the worst cases are listed in each phase doc).
-2. The telegraph look and the fire VFX pass.
-3. Open question 4: whether passive menu bots count toward the HP.
+- **Done 31 Oct:**
+  - Escape checks: `tools/encounter-escape/crucivar-v4-escape-check.ps1` has 0 failures on every difficulty. `V4BoundsTest` checks that nobody can leave the floor and that wall-reaching attacks cover the farthest spot, on the round floor and on the square key-art map. The square map's corners had been safe; now they aren't.
+  - Mould Towers set B now lands between set A's towers. For 2, 4 and 8 players it had landed on set A's own spots. This is a proposal, sent to the review inbox.
+  - Telegraph look and fire VFX: the Brass Foundry motif on plain warnings, flame along Furnace Spin, embers on bullets, the Pour Flood lava wave and the eruption fill.
+  - Open question 4 settled (below).
+- Next: a playtest of the full v4 fight with people.
 
 ## Open questions
 1. ~~Fight length~~: settled 29 Oct, keep about 4 min solo.
 2. PartyStep 0.9: should co-op be longer than solo (Aurelion's 1.25) or about the same?
 3. ~~Phase 1 Hard~~: settled 30 Oct, Quake Echo.
-4. Should passive menu bots count toward the HP, as Aurelion's do not?
+4. ~~Menu bots and HP~~: settled 31 Oct. Crucivar uses the shared `BossEncounter.Spawn` rule: passive menu bots don't raise the boss or casting HP, while mechanic counts keep scaling with everyone standing.

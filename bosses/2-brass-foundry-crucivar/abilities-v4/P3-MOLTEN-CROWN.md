@@ -8,7 +8,7 @@
 ## Hard cut (built 28 Oct, 5c83988)
 
 Chzy18 found the first version too easy ("we need more"), so every layer from the browser mock-up was added:
-1. **Tighter towers:** set B lands 1.6 s after set A (not 2.0 s), on the opposite side of the boss.
+1. **Tighter towers:** set B lands 1.6 s after set A (not 2.0 s), between set A's towers. Before 31 Oct it sat on the opposite side, which for 2, 4 and 8 players put it on set A's own spots (proposal fix, sent to the review inbox).
 2. **Hidden counts:** on even cycles each mould shows "?" instead of its count. You have to remember the last cycle's counts.
 3. **Pours during the towers:** Casting Order at 3.5 s aims through the players while they soak. The pours land at 5.5–7.0 s.
 4. **Backdraft after set B:** pull, then the 5 m blast, starting 0.2 s after the last set lands.
@@ -82,8 +82,8 @@ The cycle is 21.5 s plus a 3.5 s punish. Code: `Abilities/MoltenCrown.cs`. Test:
   - damage ×0.6.
 - **Hard (named extra: Second Press returns):** the fullest tower in each set re-stamps 2.0 s after it lands, pushing toward the centre. Whoever just soaked it has to step out. This is the existing v2 mechanic. **Built 30 Oct (proposal):** 35 damage, r 2.2, 2.0 s warning, knocked 1.5 m toward the centre; `MoltenCrownTest` checks it.
 
-## Escape check (to add once accepted)
-Worst cases to check:
+## Escape check (built 31 Oct)
+`tools/encounter-escape/crucivar-v4-escape-check.ps1` has 0 failures on Easy, Medium and Hard. The worst case is the far-edge soaker of a set A tower reaching set B: 7.8 m in 1.6 s, 0.6 s spare. Cases first listed for it:
 - a set A tower soaker running to the far set B tower, 2.0 s, at 4.2 m/s with one dash;
 - the crown landing while a player carries a brand at the edge;
 - Furnace Spin at a 7 m edge, where following the gap at mid-range has to stay possible.
