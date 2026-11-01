@@ -17,7 +17,7 @@ namespace LastBell.Run
     //                              Towers + Lances > Hour Hands (Hard) > punish
     //   4 Last Light 15-0 %        the floor falls every 15 s (wipe at 120 s) beside Lances + Starfall,
     //                              Marks + Lances, Hour Hands; no punish, no Towers, Ecliptic, Collapse or Sunspots (they would burn)
-    // Zenith Collapse grows every cast (Solar Hunger). Final Noon wipes the party at 7:00 (warned at 6:30). Sunspot pools
+    // Zenith Collapse grows every cast (Solar Hunger). Final Noon wipes the party at 6:30 (warned at 6:00). Sunspot pools
     // last until the phase ends.
     public sealed partial class AurelionEncounter
     {

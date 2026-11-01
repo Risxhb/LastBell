@@ -22,6 +22,7 @@ namespace LastBell.Run
         public static readonly float[] Order = { 0f, 180f, 90f, 270f, 45f, 225f, 135f, 315f };
         public readonly List<Hazard> Sectors = new List<Hazard>();
         public int Fallen => Sectors.Count;
+        public Transform BossBody => Body;   // presentation: the camera frames him during the phase (LastLightFloorFx)
 
         public IEnumerable<int> Run()
         {

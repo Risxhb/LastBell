@@ -35,6 +35,8 @@ Boss HP: 12,000 solo, plus 1.25 × 12,000 for each extra fighter (57,000 for 4 p
 - **Meridian Recall (Hard only):** he fires his last Lances volley again, once, from where he stood when he first fired it, on the same lines. The beams show locked for 3.5 s, then hit for 65. Stand in a gap between the old lines.
 - **Last Light's floor falls:** each slice trembles through its warning, then drops into the sky below. Standing over a hole still burns at 25/s, as before.
 - **Start Phase** row in Boss Rush (step 6 above).
+- **Total Eclipse wells** are now thin, dotted cobalt circles with no fill, like the towers: places to stand in, not things to dodge.
+- **Last Light camera:** for the whole phase the camera keeps Aurelion in view with you, pulling back as he gets further away.
 
 ## Keys
 

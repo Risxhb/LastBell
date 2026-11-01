@@ -54,6 +54,17 @@ namespace LastBell.Run
             yield return GalleryShot("total_eclipse_umbra", 1, b => TotalEclipseFx.During(V2W, b.Eclipse, b.Eclipse.Run()), Sim.Ticks(4.0f), after: b => b.RaiseShield(0));
             yield return GalleryShot("last_light_warning", 1, b => b.Light.Run().Take(2), Sim.Ticks(LastLight.EveryS - LastLight.WarnS + 1.5f));
             yield return GalleryShot("last_light_burn", 1, b => b.Light.Run().Take(3), Sim.Ticks(LastLight.EveryS + 1.0f));
+            // A16 (telegraph audit): Final Noon, the hard enrage: its 30 s warning banner, then the wipe, over Last Light
+            yield return GalleryShot("final_noon_warning", 4, b => NoonAt(b, AurelionEncounter.EnrageWarnS - 0.5f, LastLightFloorFx.During(V2W, b.Light, b.Light.Run().Take(2))), Sim.Ticks(1.0f), after: b => b.TestClock = false);
+            yield return GalleryShot("final_noon_wipe", 4, b => NoonAt(b, AurelionEncounter.EnrageS - 0.5f, LastLightFloorFx.During(V2W, b.Light, Hold(Sim.Ticks(1.5f) - 1))), Sim.Ticks(1.5f), after: b => b.TestClock = false);   // ends on the shot: the wipe sends the run to Results
+        }
+
+        static System.Collections.Generic.IEnumerable<int> Hold(int ticks) { yield return ticks; }
+        // runs the enrage clock from s seconds while the body plays (the gallery holds the boss, so the clock would stop)
+        static System.Collections.Generic.IEnumerable<int> NoonAt(AurelionEncounter b, float s, System.Collections.Generic.IEnumerable<int> body)
+        {
+            b.TestClock = true; b.DebugSetFightSeconds(s);
+            foreach (var w in body) yield return w;
         }
 
         // still: the player stands there (no bot), so a following shape stays on screen
@@ -67,7 +78,7 @@ namespace LastBell.Run
             V2Main.DebugSetHp(PlayerController.MaxHp);
             yield return Shot("aurelion_" + name + galleryCam);
             if (V2Boss != null) after?.Invoke(V2Boss);
-            yield return V2WaitIdle(wait);
+            if (d.State == RunState.Combat) yield return V2WaitIdle(wait);   // a wipe shot (Final Noon) has already sent the run to Results
             V3Unbot();
         }
     }

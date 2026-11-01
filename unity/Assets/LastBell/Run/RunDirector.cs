@@ -445,7 +445,15 @@ namespace LastBell.Run
             if (!cam) cam = Camera.main; if (!cam) return;
             cam.orthographic = false;   // some arenas' own top-down view key (C) switches the camera to orthographic
             Vector3 target, look;
-            if (Player) { target = Player.transform.position + FollowOffset; look = Player.transform.position + Vector3.up; }
+            if (Player)
+            {
+                // an encounter can ask the camera to keep a second point in view too (Aurelion's Last Light: the boss with the
+                // remaining floor, readability A2): shift toward it and pull back with the distance, same angle
+                var at = Player.transform.position; float zoom = 1;
+                var also = FrameAlso?.Invoke();
+                if (also.HasValue) { var d = Vector3.ProjectOnPlane(also.Value - at, Vector3.up); at += d * 0.45f; zoom = 1 + 0.45f * Mathf.Clamp01((d.magnitude - 5f) / 20f); }
+                target = at + FollowOffset * zoom; look = at + Vector3.up;
+            }
             else { target = MenuCamPos; look = new Vector3(0, 0, 1); }
             cam.transform.position = Vector3.SmoothDamp(cam.transform.position, target, ref camVel, 0.12f);
             if (Player) cam.transform.rotation = Quaternion.LookRotation(-FollowOffset + Vector3.up);
@@ -454,6 +462,7 @@ namespace LastBell.Run
             if (ShotCamera.HasValue) { cam.transform.position = ShotCamera.Value.pos; cam.transform.rotation = Quaternion.LookRotation(ShotCamera.Value.look - ShotCamera.Value.pos); }
         }
         public static (Vector3 pos, Vector3 look)? ShotCamera;   // autotest gallery: a fixed overhead view of the whole arena
+        public static Func<Vector3?> FrameAlso;   // set by an encounter for one phase, cleared after; null = follow the player only
 
         // slot on the progress track: one per boss
         public int ProgressSlot => Math.Max(0, Array.IndexOf(EncounterOrder, Encounter));

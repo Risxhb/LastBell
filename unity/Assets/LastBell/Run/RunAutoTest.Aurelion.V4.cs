@@ -236,11 +236,21 @@ namespace LastBell.Run
             V2Check("the eighth sector ends the fight: Final Noon wipes the party", V4Wiped && V2Boss.WipeCause.StartsWith("Final Noon"), V2Boss.WipeCause ?? "no wipe");
             V3Unbot();
 
-            // the hard enrage at 7:00
+            // readability A2: while Last Light runs the camera keeps the boss in view with you; afterwards it follows you alone
+            yield return V2Setup(1, Difficulty.Medium, new[] { new Vector3(0, 0, 9f) }, 4, new Vector3(0, 0, -8f));
+            if (V2Boss == null) yield break;
+            var framed = RunDirector.FrameAlso == null;
+            V2Begin(LastLightFloorFx.During(V2W, V2Boss.Light, V2Boss.Light.Run().Take(2))); yield return V2Ticks(5);
+            var f = RunDirector.FrameAlso?.Invoke();
+            framed &= f.HasValue && Sim.Flat(f.Value - V2Boss.transform.position).sqrMagnitude < 0.01f;
+            yield return V2WaitIdle(20);
+            V2Check("Last Light: the camera frames the boss with the player for the phase, then lets go", framed && RunDirector.FrameAlso == null, f.HasValue ? $"framed {f.Value}" : "not framed");
+
+            // the hard enrage at 6:30
             yield return V2Setup(1, Difficulty.Medium, new[] { new Vector3(0, 0, 9f) }, 2, Vector3.zero);
             if (V2Boss == null) yield break;
             V2Boss.TestClock = true; V2Boss.DebugSetFightSeconds(AurelionEncounter.EnrageS - 1f);
-            yield return Until(() => V4Wiped, 10, "the 7:00 enrage");
+            yield return Until(() => V4Wiped, 10, "the 6:30 enrage");
             V2Check("Final Noon wipes the party at 6:30 (the hard enrage)", V4Wiped && V2Boss.WipeCause.Contains("enrage"), V2Boss.WipeCause ?? "no wipe");
             if (V2Boss) V2Boss.TestClock = false;
         }
