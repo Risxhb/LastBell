@@ -796,7 +796,7 @@ namespace LastBell.Run
         IEnumerator SylvaraClearTimes()
         {
             bool was = AllyBot.Attacks; AllyBot.Attacks = true; int keep = RunParty.Selected;
-            var runs = new (string cls, int allies)[] { ("Vanguard", 0), ("Chimesinger", 0), ("Arcanist", 0), ("Vanguard", 3), ("Chimesinger", 3), ("Arcanist", 7) };
+            var runs = new (string cls, int allies)[] { ("Vanguard", 0), ("Chimesinger", 0), ("Arcanist", 0), ("Vanguard", 3), ("Chimesinger", 3), ("Arcanist", 3), ("Vanguard", 7), ("Arcanist", 7) };
             foreach (var (cls, allies) in runs)
             {
                 if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }
@@ -819,7 +819,7 @@ namespace LastBell.Run
                     foreach (var p in w.Players) { if (p.Down && down.Add(p)) downs++; else if (!p.Down) down.Remove(p); }
                     yield return null;
                 }
-                float secs = (last - tick0) / (float)Sim.Hz; bool won = d.Victory;
+                float secs = (last - tick0) / (float)Sim.Hz; bool won = d.State == RunState.Cleared || d.Victory || (sy && sy.Dead), wiped = d.State == RunState.Downed;
                 var parts = new List<string>();
                 for (int i = 0; i < phaseAt.Count; i++)
                 {
@@ -827,7 +827,7 @@ namespace LastBell.Run
                     parts.Add($"{phaseAt[i].name} {(end - phaseAt[i].tick) / (float)Sim.Hz:0}s");
                 }
                 float hpLeft = sy ? sy.Hp / (float)maxHp : 0;
-                Note($"Sylvara clear: {n} player{(n > 1 ? "s" : "")} ({cls} + {allies} bots), HP {maxHp}: {(won ? "cleared" : $"not cleared ({hpLeft:P0} left)")} in {secs:0} s"
+                Note($"Sylvara clear: {n} player{(n > 1 ? "s" : "")} ({cls} + {allies} bots), HP {maxHp}: {(won ? "cleared" : wiped ? $"wiped ({hpLeft:P0} left)" : $"not cleared ({hpLeft:P0} left)")} in {secs:0} s"
                     + $" ({string.Join(", ", parts)}); {downs} downs; party DPS {(maxHp * (1 - (won ? 0 : hpLeft))) / Mathf.Max(1, secs):0}; buds {sy?.BudsCut ?? 0} cut, {sy?.BudsBloomed ?? 0} bloomed");
                 Check($"Sylvara clear run {cls} +{allies}: the bots deal damage", won || hpLeft < 1f);
                 if (d.State == RunState.Combat && d.Boss) d.Boss.DebugDefeat();   // timed out: end it so the next run can start

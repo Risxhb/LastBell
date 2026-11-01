@@ -22,7 +22,7 @@
 | 15 | **Pruning Arc** | a 120° cut in front, then 120° behind 0.8 s later, 8 m long, each throwing a fan of 9 petals (as in Phase 1) | 2.0 / 2.8 s | 20 + 12 | the side slivers are the only safe ground | the petal fans |
 | 20 | **Seed Pods** | on the farthest 1/1/2/3 players (as in Phase 1) | 2.5 s | 16 + 12 | | dropped on you |
 
-- **Cutting a bud:** the demo cuts a bud at 30/s while you stand within 3 m (100 HP). In Unity, buds are planned to take real class damage; the current build keeps the demo rule (stand within 3 m) until boss parts can be targeted. Their HP gets tuned once measured DPS exists, so one player cuts one bud in about 3–4 s.
+- **Cutting a bud:** the demo cuts a bud at 30/s while you stand within 3 m (100 HP). In Unity (built 31 Oct) buds take real class damage: each bud is a boss part with 120 HP, the nearest live part takes the hit (melee, lines and projectiles alike), and every point dealt to a bud also comes off Sylvara. Standing next to a bud no longer cuts it. Party bots walk out and attack buds. The autotest checks that one player attacking a bud cuts it in under 6 s.
 - **Peak density in the demo:** about 150–220 bullets.
 - **Difficulty in the demo:** it was eased twice on 28 Oct and now sits at or below Phase 2. Chzy18 called the first versions "insane".
 
