@@ -1,6 +1,6 @@
 # Item catalogue
 
-**Status:** living catalogue, owned by the Items session. 69 named items are **accepted**: the 15 slice-1 items through the shop spec and build plan, and 54 more, with this catalogue's Temper values, through the review inbox (Chzy18, 2026-10-28; the Second Step rewrite 2026-10-29). Twin Bells was cut on 2026-10-29. Only the 10 Toll slots are still proposals. New rows start as proposals. Written 2026-10-28.
+**Status:** living catalogue, owned by the Items session. **Class change (Chzy18, 2026-10-29):** the Vanguard is retired, and its 20 rows are kept as **archived**. The 20 **Tollbreaker** items (TB01–TB20) replace them, accepted on 2026-11-01 (`docs/proposals/tollbreaker-items-2026-10-31.md`). Before that, 69 named items were **accepted**: the 15 slice-1 items through the shop spec and build plan, and 54 more, with this catalogue's Temper values, through the review inbox (Chzy18, 2026-10-28; the Second Step rewrite 2026-10-29). Twin Bells was cut on 2026-10-29. Only the 10 Toll slots are still proposals. New rows start as proposals. Written 2026-10-28.
 
 **Sources:** `AGENTS.md`; `gpt/08-design-rules.md` (§0.3, §1, §2, §3, §4); `docs/proposals/meta-shop-spec-2026-10-29.md` (final, §12 answers); `docs/proposals/meta-loot-and-toll-2026-10-29.md` §1.4–1.9 (the 70-item draft pool and the dropped list); `docs/design/run-shop-plan.md` §3 (item framework, slice 1); `unity/Assets/LastBell/Run/Shop/ItemCatalog.cs` (built values).
 
@@ -8,6 +8,7 @@
 - Slice 1 is built and on Azure as [PR 10](https://dev.azure.com/ChzandZum/_git/Last%20Bell/pullrequest/10) (`feature/run-shop`), which isn't merged yet. The shop autotest passes 71/71.
 - **Icons: all 69 accepted (Chzy18, review inbox, 2026-10-29)** as the item-art direction. The slice-1 icons are in `work/shop-art-20261029/icons/` and the other 54 in `work/item-icons-20261030/icons/` (64 and 128 px). Long Reach (V04), Shared Ringing (C16) and Long Lungs (G02) must be redrawn before they go into the game (Codex task 1 in `CODEX-TASKS-2026-10-31.md`, output in `work/item-icons-20261031/`).
 - The other 54 are accepted. 53 are built on local `feature/run-shop` (`96624b2`), not yet built in Unity or tested. The Second Step rewrite (accepted 2026-10-29) is built in `1d5364e`, also untested; shop build 4 is waiting for the Unity lock. Twin Bells was cut. Their cards show text only until the icons are wired in.
+- **Tollbreaker (2026-11-01):** 20 items are accepted and not built. They go in with the class code swap, after the Aurelion and Ultimate playtests. Until then the Vanguard and its items stay in the build as they are. At the swap, TB01, TB02, TB17 and TB20 take over the 4 Vanguard slice slots, and every Vanguard item leaves the shop. The Long Reach redraw is no longer needed. Tollbreaker icons are still to be made.
 
 ## How to read the table
 
@@ -21,26 +22,46 @@
 
 | # | Item | Class | Tier | Tags | Effect | Tempered (+) | Solo | Hooks | Status | Icon |
 |---|---|---|---|---|---|---|---|---|---|---|
-| V01 | Tempered Edge | Vanguard | C | | Steel Rhythm hit 3 +20% damage | +30% | works | built: damage hook | **built (PR 10, not merged)** | accepted |
-| V02 | Quick Hands | Vanguard | C | | Combo window between Steel Rhythm hits +0.3 s | +0.45 s | works | new: combo window in VanguardKit2 | **built (96624b2, local, untested)** | accepted |
-| V03 | Wide Arc | Vanguard | C | | Hit 3 cleaves a 30% wider arc | 45% wider | works | new: hit-3 arc number | **built (96624b2, local, untested)** | accepted |
-| V04 | Long Reach | Vanguard | C | | Sundering Blow range +1.5 m | +2.25 m | works | new: Sunder range number | **built (96624b2, local, untested)** | accepted, **redraw needed** |
-| V05 | Countdown | Vanguard | C | | Last Word cooldown −20% | −30% | works | built: Last Word cooldown | **built (PR 10, not merged)** | accepted |
-| V06 | Grit | Vanguard | C | | +8% max HP (counts toward the +20% cap) | +12% | works | new: max HP stat + cap clamp | **built (96624b2, local, untested)** | accepted |
-| V07 | Clockwork Step | Vanguard | C | | Clockstep distance 3 → 3.6 m. No iframes | 3.9 m | works | new: dash distance | **built (96624b2, local, untested)** | accepted |
-| V08 | Steady Stance | Vanguard | C | | Brace's movement slow is halved. Mitigation unchanged | slow cut by 75% | works | new: Brace move slow | **built (96624b2, local, untested)** | accepted |
-| V09 | Momentum | Vanguard | C | | After Clockstep, the next Steel Rhythm hit counts as hit 3 | that hit also +15% damage | works | new: dash-end event in VanguardKit2 | **built (96624b2, local, untested)** | accepted |
-| V10 | Double Opening | Vanguard | R | | Opening stacks to 2. Sundering Blow spends both for a wider split impact | double-spent Sunder +15% damage | works | new: Opening stack cap, Sunder spend | **built (96624b2, local, untested)** | accepted |
-| V11 | Pendulum Cut | Vanguard | R | | Sundering Blow's line keeps cutting for 1 s | 1.5 s | works | new: lingering Sunder hazard (friendly, kit look) | **built (96624b2, local, untested)** | accepted |
-| V12 | Heavy Hour | Vanguard | R | | Last Word windup 0.8 → 1.1 s, +45% damage, wider fan | +67% damage (windup unchanged) | works | new: Last Word windup, fan width | **built (96624b2, local, untested)** | accepted |
-| V13 | Quick Verdict | Vanguard | R | | Last Word windup 0.8 → 0.5 s, −20% damage | −10% damage | works | new: Last Word windup | **built (96624b2, local, untested)** | accepted |
-| V14 | Iron Echo | Vanguard | R | | Last Word's fan repeats 0.6 s later for 50% damage | 75% | works | new: delayed repeat of an ability hit | **built (96624b2, local, untested)** | accepted |
-| V15 | Second Step | Vanguard | R | | A dash within 1.5 s of another dash costs 20 stamina instead of 30. No iframes *(rewrite accepted 2026-10-29)* | 15 stamina | works | new: dash stamina cost, time since last dash | **built (1d5364e, local, untested)** | accepted |
-| V16 | Rhythm Keeper | Vanguard | R | | 3 full Steel Rhythm combos in a row without being hit: +10% damage until hit | +15% | works | new: combo counter; built: on-hit reset, damage hook | **built (96624b2, local, untested)** | accepted |
-| V17 | Cracked Armour | Vanguard | R | Crack | Sundering Blow cracks the boss 4 s; heavy hits on it +15% (Last Word, Bellstrike, Crescendo, Rune Sigil, Arcane Comet) | +22.5% | your own Last Word | built | **built (PR 10, not merged)** | accepted |
-| V18 | Rally | Vanguard | R | Party | A Last Word hit gives allies within 6 m +10% damage for 4 s | +15% | gives it to you | built: ally range, damage buff (from slice 1) | **built (96624b2, local, untested)** | accepted |
-| V19 | Toll of Steel | Vanguard | K | | Steel Rhythm becomes 4 hits; hit 4 sends a small Last Word fan (40%). Opening comes from hit 4 | fan 60% | works | new: combo length, Opening source | **built (96624b2, local, untested)** | accepted |
-| V20 | Oathbound | Vanguard | K | | Sundering Blow can't be empowered; every 3rd Opening resets Last Word | every 2nd Opening | works | built | **built (PR 10, not merged)** | accepted |
+| V01 | Tempered Edge | Vanguard (archived) | C | | Steel Rhythm hit 3 +20% damage | +30% | works | built: damage hook | **archived:** built (PR 10); stays in the shop until the class swap | archived |
+| V02 | Quick Hands | Vanguard (archived) | C | | Combo window between Steel Rhythm hits +0.3 s | +0.45 s | works | new: combo window in VanguardKit2 | **archived:** class retired 2026-10-29 | archived |
+| V03 | Wide Arc | Vanguard (archived) | C | | Hit 3 cleaves a 30% wider arc | 45% wider | works | new: hit-3 arc number | **archived:** class retired 2026-10-29 | archived |
+| V04 | Long Reach | Vanguard (archived) | C | | Sundering Blow range +1.5 m | +2.25 m | works | new: Sunder range number | **archived:** class retired 2026-10-29 | archived |
+| V05 | Countdown | Vanguard (archived) | C | | Last Word cooldown −20% | −30% | works | built: Last Word cooldown | **archived:** built (PR 10); stays in the shop until the class swap | archived |
+| V06 | Grit | Vanguard (archived) | C | | +8% max HP (counts toward the +20% cap) | +12% | works | new: max HP stat + cap clamp | **archived:** class retired 2026-10-29 | archived |
+| V07 | Clockwork Step | Vanguard (archived) | C | | Clockstep distance 3 → 3.6 m. No iframes | 3.9 m | works | new: dash distance | **archived:** class retired 2026-10-29 | archived |
+| V08 | Steady Stance | Vanguard (archived) | C | | Brace's movement slow is halved. Mitigation unchanged | slow cut by 75% | works | new: Brace move slow | **cut:** Brace retired | archived |
+| V09 | Momentum | Vanguard (archived) | C | | After Clockstep, the next Steel Rhythm hit counts as hit 3 | that hit also +15% damage | works | new: dash-end event in VanguardKit2 | **archived:** class retired 2026-10-29 | archived |
+| V10 | Double Opening | Vanguard (archived) | R | | Opening stacks to 2. Sundering Blow spends both for a wider split impact | double-spent Sunder +15% damage | works | new: Opening stack cap, Sunder spend | **archived:** class retired 2026-10-29 | archived |
+| V11 | Pendulum Cut | Vanguard (archived) | R | | Sundering Blow's line keeps cutting for 1 s | 1.5 s | works | new: lingering Sunder hazard (friendly, kit look) | **archived:** class retired 2026-10-29 | archived |
+| V12 | Heavy Hour | Vanguard (archived) | R | | Last Word windup 0.8 → 1.1 s, +45% damage, wider fan | +67% damage (windup unchanged) | works | new: Last Word windup, fan width | **archived:** class retired 2026-10-29 | archived |
+| V13 | Quick Verdict | Vanguard (archived) | R | | Last Word windup 0.8 → 0.5 s, −20% damage | −10% damage | works | new: Last Word windup | **archived:** class retired 2026-10-29 | archived |
+| V14 | Iron Echo | Vanguard (archived) | R | | Last Word's fan repeats 0.6 s later for 50% damage | 75% | works | new: delayed repeat of an ability hit | **archived:** class retired 2026-10-29 | archived |
+| V15 | Second Step | Vanguard (archived) | R | | A dash within 1.5 s of another dash costs 20 stamina instead of 30. No iframes *(rewrite accepted 2026-10-29)* | 15 stamina | works | new: dash stamina cost, time since last dash | **archived:** class retired 2026-10-29 | archived |
+| V16 | Rhythm Keeper | Vanguard (archived) | R | | 3 full Steel Rhythm combos in a row without being hit: +10% damage until hit | +15% | works | new: combo counter; built: on-hit reset, damage hook | **archived:** class retired 2026-10-29 | archived |
+| V17 | Cracked Armour | Vanguard (archived) | R | Crack | Sundering Blow cracks the boss 4 s; heavy hits on it +15% (Last Word, Bellstrike, Crescendo, Rune Sigil, Arcane Comet) | +22.5% | your own Last Word | built | **archived:** built (PR 10); stays in the shop until the class swap | archived |
+| V18 | Rally | Vanguard (archived) | R | Party | A Last Word hit gives allies within 6 m +10% damage for 4 s | +15% | gives it to you | built: ally range, damage buff (from slice 1) | **archived:** class retired 2026-10-29 | archived |
+| V19 | Toll of Steel | Vanguard (archived) | K | | Steel Rhythm becomes 4 hits; hit 4 sends a small Last Word fan (40%). Opening comes from hit 4 | fan 60% | works | new: combo length, Opening source | **archived:** class retired 2026-10-29 | archived |
+| V20 | Oathbound | Vanguard (archived) | K | | Sundering Blow can't be empowered; every 3rd Opening resets Last Word | every 2nd Opening | works | built | **archived:** built (PR 10); stays in the shop until the class swap | archived |
+| TB01 | Keen Edge | Tollbreaker | C | | Twin Hurl's outward hit +20% (14 → 17) | +30% | works | built: damage hook | **accepted (2026-11-01)**, slice: replaces Tempered Edge at the class swap | none |
+| TB02 | Short Fuse | Tollbreaker | C | | Splitting Throw cooldown −20% (10 → 8 s) | −30% | works | new: `SplitCd` | **accepted (2026-11-01)**, slice: replaces Countdown at the class swap | none |
+| TB03 | Wide Grind | Tollbreaker | C | | Grinding Toll's ring is 30% wider (1.5 → 1.95 m across) | +45% | works | new: `TollRadius` | **accepted (2026-11-01)** | none |
+| TB04 | Long Grind | Tollbreaker | C | | Grinding Toll spins 2.5 s instead of 2 s | 2.8 s | works | new: `TollSpinTicks` | **accepted (2026-11-01)** | none |
+| TB05 | Quick Catch | Tollbreaker | C | | Returning axes fly 20% faster (18 → 21.6 m/s) | +30% | works | new: `ReturnSpeed` | **accepted (2026-11-01)** | none |
+| TB06 | Heavy Haft | Tollbreaker | C | | The held (lodging) Twin Hurl throw +20% damage (30 → 36) | +30% | works | built: damage hook | **accepted (2026-11-01)** | none |
+| TB07 | Iron Pull | Tollbreaker | C | | Call of Iron +1.6 per metre (8 → 9.6), cap 110 → 125 per axe | +2.4 per metre, cap 132 | works | new: `CallPerMetre`, `CallMax` | **accepted (2026-11-01)** | none |
+| TB08 | Battle Spin | Tollbreaker | C | | After a dash, the next Twin Hurl tap hits like a held throw (30) without lodging | that hit also +15% | works | new: dash-end event | **accepted (2026-11-01)** | none |
+| TB09 | Close Quarters | Tollbreaker | C | | Twin Hurl hits +12% while you're within 4 m of the boss | +18% | works | built: damage hook; new: distance to boss | **accepted (2026-11-01)** | none |
+| TB10 | Deep Split | Tollbreaker | R | | Splitting Throw's bonus lasts 8 s instead of 6 (the axe stays lodged to match) | 9 s | works | new: `SplitTicks`, `BossLodgeTicks` | **accepted (2026-11-01)** | none |
+| TB11 | Twin Split | Tollbreaker | R | | With both axes in hand, Splitting Throw throws both; the second lodges beside the first for 50%. The bonus doesn't stack, and both hands are empty until Call of Iron | second 75% | works | new: two-axe split | **accepted (2026-11-01)** | none |
+| TB12 | Quick Grind | Tollbreaker | R | | Grinding Toll hits every 0.3 s instead of 0.4 s | 0.27 s | works | new: `TollEvery` | **accepted (2026-11-01)** | none |
+| TB13 | Ringing Return | Tollbreaker | R | | Each axe Call of Iron sends through the boss takes 2 s off Splitting Throw's cooldown | 3 s | works | new: recall-hit event, cooldown refund | **accepted (2026-11-01)** | none |
+| TB14 | Backswing | Tollbreaker | R | | Returning Twin Hurl axes hit 12 instead of 6 | 15 | works | new: `TapBack` | **accepted (2026-11-01)** | none |
+| TB15 | Anchor Line | Tollbreaker | R | | Floor-lodged axes last 12 s instead of 8; Call of Iron from the floor +20% | +30% | works | new: `FloorLodgeTicks`; built: damage hook | **accepted (2026-11-01)** | none |
+| TB16 | Berserker's Pace | Tollbreaker | R | | Each Twin Hurl hit from within 4 m adds +2% damage for 3 s, up to +10%. Lost when you're hit | +3% each, up to +15% | works | new: stack counter, distance to boss; built: on-hit reset | **accepted (2026-11-01)** | none |
+| TB17 | Riven Iron | Tollbreaker | R | | An axe Call of Iron sends through the boss cracks it for 4 s: your own Splitting Throw and Call of Iron hits on it +15%. Personal only | +22.5% | works | built: Crack state (personal); new: recall trigger | **accepted (2026-11-01)**, slice: replaces Cracked Armour at the class swap | none |
+| TB18 | War Cry | Tollbreaker | R | Party | Bell Frenzy gives allies within 6 m +10% damage for its 4 s | +15% | gives it to you | built: ally range, damage buff | **accepted (2026-11-01)** | none |
+| TB19 | Frenzied Hour | Tollbreaker | K | | Bell Frenzy cooldown 30 → 18 s, but it lasts 3 s instead of 4 and the fan's side axes deal 35% | cooldown 15 s | works | new: `FrenzyCd`, `FrenzyTicks`, `FanSide` | **accepted (2026-11-01)** | none |
+| TB20 | Rooted Axe | Tollbreaker | K | | Splitting Throw's axe stays in the boss until Call of Iron, and the split lasts as long, but the bonus is +25% and Call of Iron's cooldown is 9 s | bonus +30% | works | new: no boss timeout while split, `SplitBonus`, `CallCd` | **accepted (2026-11-01)**, slice: replaces Oathbound at the class swap | none |
 | C01 | Bright Note | Chimesinger | C | | Resonant Note +10% damage, +15% projectile speed | +15% / +22% | works | built: damage hook; new: note speed | **built (96624b2, local, untested)** | accepted |
 | C02 | Heavy Bell | Chimesinger | C | | Bellstrike +20% damage | +30% | works | built: damage hook | **built (PR 10, not merged)** | accepted |
 | C03 | Wide Refrain | Chimesinger | C | | Harmonic Refrain cone +25% angle | +37% | works | new: Refrain angle | **built (96624b2, local, untested)** | accepted |
@@ -94,7 +115,9 @@
 | T01–T05 | *Toll IV items* | any | — | | 5 sidegrades, not named yet (Toll IV reward, spec §10) | | | | proposal (unnamed) | none |
 | T06–T10 | *Toll VII items* | any | — | | 5 more, not named yet (Toll VII reward) | | | | proposal (unnamed) | none |
 
-**Count:** 69 named items (20 Vanguard, 19 Chimesinger, 20 Arcanist, 10 general) plus 10 Toll slots. 15 accepted and built (PR 10, not merged), 54 accepted and built locally (untested, `96624b2` + `1d5364e`), 1 cut (Twin Bells), 10 Toll slots still proposals.
+**Count:** 69 live items (20 Tollbreaker, 19 Chimesinger, 20 Arcanist, 10 general), plus 20 archived Vanguard rows, 1 cut item (Twin Bells) and 10 Toll slots that are still proposals.
+- Built: 11 non-Vanguard slice items (PR 10, not merged) and 38 non-Vanguard pool items (local, untested).
+- Not built: the 20 Tollbreaker items (waiting for the class swap).
 
 ## Build notes
 
@@ -127,11 +150,11 @@ Every row was checked against the rules:
 - **Soloable, nothing required.** Every combo item has a solo fallback, or is gated out when solo (Resonant Rune). No encounter or class needs an item.
 - **Potions (§3).** Nothing refills potions mid-fight or between minibosses. Strong Brew and Spare Flask change heal size and the refill count only.
 - **Defensive caps.**
-  - Max HP: Grit is +8% (+12% tempered). The code must clamp the total at +20%, so later Toll items can't push past it.
+  - Max HP: Grit (+8%, archived with the Vanguard) was the only max HP item. The +20% clamp stays in code for future items.
   - Knockback: Sure Footing sits at the −30% cap, so it has no Temper, and no other item may reduce knockback.
-  - Brace: no item changes Brace mitigation or makes it work on Ground hazards. Steady Stance only changes the movement slow.
+  - Brace is retired with the Vanguard (2026-10-29), and Steady Stance is cut. The Tollbreaker has no defensive ability, so none of his items gives max HP, damage reduction or a shield.
 - **Aiming.** Chord, Note Trail and Starfall fire along the aim. Nothing homes in or locks on.
-- **Colours.** Item-added visuals never use coral or amber. Pendulum Cut, Iron Echo and Toll of Steel reuse the Vanguard kit look. Arcanist items that resize his spells keep his own spell shades and his no-filled-disc rule. No item adds violet to anything that could read as a boss warning.
+- **Colours.** Item-added visuals never use coral or amber. Tollbreaker items reuse his kit look: thin dotted cyan, never filled. Arcanist items that resize his spells keep his own spell shades and his no-filled-disc rule. No item adds violet to anything that could read as a boss warning.
 - **Dropped items** (loot doc §1.9) stay dropped: Phase Step, Recovery Grace, Iron Wall, Riposte, homing shots, an Arcanist ward, Second Wind, lifesteal, Fresh Flask and Recall.
 
 ## Balance notes (for a later balance pass)
@@ -140,7 +163,7 @@ Every row was checked against the rules:
   - Glass Edge, a Common, gives +12% damage against a +5 budget. Its −8% HP is the trade.
   - Formation+ reaches +27% and Lone Bell+ reaches +22.5%. Both are conditional.
 - **Thin slots:**
-  - The Arcanist has 1 Keystone; the Vanguard and Chimesinger have 2 each.
+  - The Arcanist has 1 Keystone; the Tollbreaker and Chimesinger have 2 each.
   - The general pool has no Keystone.
 - **Fourth Choice** was written for pick offers. It's built as the shop version above (+1 stock slot) until the balance pass decides.
 - **Resonant Rune** (A19): the loot doc gives it a fallback ("without a Chimesinger: Sigil +10%"). Spec §3 gates cross-class items out when that class isn't in the party, so the fallback would never show. It's built gated until the balance pass decides.
