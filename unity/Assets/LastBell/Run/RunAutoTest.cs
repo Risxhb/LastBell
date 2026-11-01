@@ -231,6 +231,12 @@ namespace LastBell.Run
                 Check($"map selectable: {RunMaps.All[i].Name}", RunMaps.InBuild(i), RunMaps.All[i].RunScene);
             yield return Shot("menu");
             if (PhaseSelectOnly) { yield return PracticePhaseChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
+            if (SylvaraClearOnly)
+            {
+                yield return SylvaraClearTimes();
+                Check("no errors or exceptions logged", errors == 0, errors + " logged");
+                Finish(); yield break;
+            }
             if (OnlySylvara)
             {
                 yield return SylvaraChecks();
@@ -783,6 +789,54 @@ namespace LastBell.Run
         // ------------------------------------------------------------ Sylvara v3 (bullet hell, abilities-v3/P1..P4)
         static bool ArcanistOnly => Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellArcanistOnly", StringComparison.OrdinalIgnoreCase));
         static bool OnlySylvara => Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellSylvara", StringComparison.OrdinalIgnoreCase));
+        static bool SylvaraClearOnly => Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellSylvaraClear", StringComparison.OrdinalIgnoreCase));
+
+        // HP tuning (opt-in, -lastbellSylvaraClear): attacking bots clear the whole fight on Medium, with real downs and no
+        // healing by the test. The player is a bot too. Reports clear time, time per phase, downs and damage per second.
+        IEnumerator SylvaraClearTimes()
+        {
+            bool was = AllyBot.Attacks; AllyBot.Attacks = true; int keep = RunParty.Selected;
+            var runs = new (string cls, int allies)[] { ("Vanguard", 0), ("Chimesinger", 0), ("Arcanist", 0), ("Vanguard", 3), ("Chimesinger", 3), ("Arcanist", 7) };
+            foreach (var (cls, allies) in runs)
+            {
+                if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }
+                d.SelectAllies(allies);
+                if (!d.StartPractice(cls, RunDirector.SylvaraPractice)) { Check($"Sylvara clear run {cls} +{allies} starts", false); continue; }
+                yield return Until(() => RunDirector.Instance && RunDirector.Instance.State == RunState.Ready, 30, "Verdant Chimes loaded for a clear run");
+                if (RunDirector.Instance != d) { directorLog.AddRange(d.Log); d = RunDirector.Instance; d.InputOverride = bot; bot.Clear(); }
+                d.RequestReady();
+                yield return Until(() => d.State == RunState.Combat, 4, "clear run combat");
+                var sy = d.Boss as SylvaraEncounter; var w = d.World;
+                if (sy == null) continue;
+                d.Player.Input = new AllyBot(allies, allies + 1, BotMode.Perfect);
+                w.Difficulty = Difficulty.Medium;
+                int n = allies + 1, maxHp = sy.MaxHp, downs = 0, tick0 = w.Tick, last = tick0;
+                var down = new HashSet<PlayerController>(); var phaseAt = new List<(string name, int tick)> { (sy.PhaseName, tick0) };
+                while (d.State == RunState.Combat && d.World == w && (w.Tick - tick0) < Sim.Ticks(480))
+                {
+                    last = w.Tick;
+                    if (sy.PhaseName != phaseAt[phaseAt.Count - 1].name) phaseAt.Add((sy.PhaseName, w.Tick));
+                    foreach (var p in w.Players) { if (p.Down && down.Add(p)) downs++; else if (!p.Down) down.Remove(p); }
+                    yield return null;
+                }
+                float secs = (last - tick0) / (float)Sim.Hz; bool won = d.Victory;
+                var parts = new List<string>();
+                for (int i = 0; i < phaseAt.Count; i++)
+                {
+                    int end = i + 1 < phaseAt.Count ? phaseAt[i + 1].tick : last;
+                    parts.Add($"{phaseAt[i].name} {(end - phaseAt[i].tick) / (float)Sim.Hz:0}s");
+                }
+                float hpLeft = sy ? sy.Hp / (float)maxHp : 0;
+                Note($"Sylvara clear: {n} player{(n > 1 ? "s" : "")} ({cls} + {allies} bots), HP {maxHp}: {(won ? "cleared" : $"not cleared ({hpLeft:P0} left)")} in {secs:0} s"
+                    + $" ({string.Join(", ", parts)}); {downs} downs; party DPS {(maxHp * (1 - (won ? 0 : hpLeft))) / Mathf.Max(1, secs):0}; buds {sy?.BudsCut ?? 0} cut, {sy?.BudsBloomed ?? 0} bloomed");
+                Check($"Sylvara clear run {cls} +{allies}: the bots deal damage", won || hpLeft < 1f);
+                if (d.State == RunState.Combat && d.Boss) d.Boss.DebugDefeat();   // timed out: end it so the next run can start
+                yield return Until(() => d.State != RunState.Combat, 10, "clear run ends");
+            }
+            AllyBot.Attacks = was;
+            if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }
+            d.SelectAllies(keep);
+        }
 
         IEnumerator SylvaraChecks()
         {
@@ -899,10 +953,18 @@ namespace LastBell.Run
             var buds = sy.AliveBudPositions();
             if (buds.Count > 0)
             {
+                // buds are boss parts: standing next to one does nothing, the class's attacks cut it, and the damage also hits her
                 int cut0 = sy.BudsCut; var at = buds[0] - buds[0].normalized * 1.5f;
                 float t3 = Time.time;
-                while (sy.BudsCut == cut0 && Time.time - t3 < 6f) { bot.Clear(); d.Player.transform.position = at; yield return null; }
-                Check("standing next to a Choir Bud cuts it in a few seconds", sy.BudsCut > cut0, $"{Time.time - t3:0.0}s");
+                while (Time.time - t3 < 1f) { bot.Clear(); d.Player.transform.position = at; yield return null; }
+                Check("standing next to a Choir Bud without attacking does not cut it", sy.BudsCut == cut0 && sy.BudHpAt(buds[0]) >= SylvaraEncounter.BudHp);
+                int hpBoss = d.Boss.Hp; t3 = Time.time;
+                while (sy.BudsCut == cut0 && Time.time - t3 < 8f) { bot.Clear(); bot.Aim = buds[0]; bot.hold[0] = true; bot.press[0] = Time.frameCount % 6 == 0; d.Player.transform.position = at; yield return null; }
+                bot.Clear();
+                float cutIn = Time.time - t3;
+                Check("attacking a Choir Bud cuts it in a few seconds (class damage)", sy.BudsCut > cut0 && cutIn < 6f, $"{d.ClassName} {cutIn:0.0}s");
+                Check("damage to a Choir Bud also hits Sylvara", hpBoss - d.Boss.Hp >= SylvaraEncounter.BudHp * 0.9f, $"{hpBoss - d.Boss.Hp}");
+                Note($"Sylvara: {d.ClassName} cut a {SylvaraEncounter.BudHp} HP Choir Bud in {cutIn:0.0}s");
             }
             yield return Play(14f, () => sy.Order.Contains("Pruning Arc"));
             foreach (var id in new[] { "Hollow Spiral", "Choir Buds", "Feet Pod", "Pruning Arc" })

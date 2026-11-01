@@ -67,9 +67,13 @@ namespace LastBell.Run
         readonly List<(int at, Action fn)> later = new List<(int, Action)>();
         Emitter sp1, sp2;
 
-        sealed class Bud { public Vector3 Pos; public float Hp = 100, Life, Base, Acc; public int Born; public bool Alive = true; public Transform Prop; public Hazard Timer; }
+        sealed class Bud { public Vector3 Pos; public float Hp = BudHp, Life, Base, Acc; public int Born; public bool Alive = true; public Transform Prop; public Hazard Timer; public BossPart Part; }
+        // Choir Buds are boss parts (CombatWorld.Parts): every class's attacks hit them, and the damage also hits Sylvara.
+        // 120 HP: one player cuts one in about 3-4 s (P3 doc).
+        public const float BudHp = 120;
         readonly List<Bud> buds = new List<Bud>();
         public int BudsAlive { get { int n = 0; foreach (var b in buds) if (b.Alive) n++; return n; } }
+        public float BudHpAt(Vector3 pos) { foreach (var b in buds) if (b.Alive && (b.Pos - pos).sqrMagnitude < 0.01f) return b.Hp; return 0; }   // tests
         public List<Vector3> AliveBudPositions() { var l = new List<Vector3>(); foreach (var b in buds) if (b.Alive) l.Add(b.Pos); return l; }
         // test hook: restart the Seed Storm as Phase 4 loop k would start it (k >= 5 = Last Storm), without waiting
         public void DebugStartStorm(int k)
@@ -221,7 +225,7 @@ namespace LastBell.Run
         {
             foreach (var e in emit) e.On = false;
             emit.Clear(); later.Clear(); sp1 = sp2 = null;
-            foreach (var b in buds) b.Alive = false;
+            foreach (var b in buds) KillBud(b);
             buds.Clear();
             W.Bullets.ClearAll();
             W.Hazards.ClearAll();
@@ -489,8 +493,8 @@ namespace LastBell.Run
         }
 
         // ---------------- Phase 3: Choir Buds ----------------
-        // A bud is a boss part 10 m out with its own 3-arm spiral. Standing within 3 m cuts it (graybox rule from the demo:
-        // 100 HP at 30/s per player in reach, halved per extra player); left alive 12 s it blooms into 20 petals.
+        // A bud is a boss part 10 m out with its own 3-arm spiral. Class damage cuts it (BudHp); each point dealt to a bud
+        // also hits Sylvara, so cutting buds keeps the damage going. Left alive 12 s (Easy 15) it blooms into 20 petals.
         void PlantBuds(float life)
         {
             int n = BudCount; float a0 = Rnd(0, Tau);
@@ -511,6 +515,16 @@ namespace LastBell.Run
                 Source = "Choir Bud", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = b.Pos, Radius = 1.0f,
                 LockAt = 0, ResolveAt = Sim.Ticks(life), Damage = 0, HitOnResolve = false,
             });
+            b.Part = new BossPart { Name = "Choir Bud", Pos = b.Pos, BodyRadius = 0.9f, HitHeight = 0.8f };
+            b.Part.TakeHit = (dmg, contact) =>
+            {
+                if (!b.Alive) return 0;
+                int dealt = Mathf.Min(dmg, Mathf.CeilToInt(b.Hp)); b.Hp -= dealt;
+                RunHud.Float(contact + Vector3.up * 0.5f, dealt.ToString(), Turquoise);
+                if (Solid && dealt > 0) TakeHit(dealt, transform.position + Vector3.up * HitHeight, false);
+                return dealt;
+            };
+            W.Parts.Add(b.Part);
             buds.Add(b);
             var e = new Emitter();
             e.Update = dt =>
@@ -518,18 +532,16 @@ namespace LastBell.Run
                 if (!b.Alive) { e.On = false; return; }
                 b.Base += 30 * Deg * dt; b.Acc += dt;
                 while (b.Acc >= 0.3f) { b.Acc -= 0.3f; for (int i = 0; i < 3; i++) { float aa = b.Base + i * Tau / 3; Shot(b.Pos + On(aa, 0.8f), aa, 4, 10, 4, 0, "Bud Petal"); } }
-                int near = 0; foreach (var p in W.Players) if (!p.Down && Sim.Flat(p.transform.position - b.Pos).magnitude < 3) near++;
-                if (near > 0) b.Hp -= near * 30 * dt / Mathf.Max(1, near * 0.5f);
                 if (b.Hp <= 0)
                 {
-                    b.Alive = false; BudsCut++; W.Hazards.Cancel(b.Timer);
+                    KillBud(b); BudsCut++; W.Hazards.Cancel(b.Timer);
                     RunHud.Float(b.Pos + Vector3.up * 1.8f, "CUT", Turquoise);
                     W.Fx.Crescendo(b.Pos, true, 0, false);
                     if (b.Prop) b.Prop.gameObject.SetActive(false);
                 }
                 else if ((Age - b.Born) * Sim.Dt >= b.Life)
                 {
-                    b.Alive = false; BudsBloomed++;
+                    KillBud(b); BudsBloomed++;
                     RunHud.Float(b.Pos + Vector3.up * 1.8f, "BLOOM", Amber);
                     PetalRing(b.Pos, 20, 5, Rnd(0, Tau), 0.8f, 12, "Bud Bloom");
                     if (b.Prop) b.Prop.gameObject.SetActive(false);
@@ -591,6 +603,8 @@ namespace LastBell.Run
             emit.RemoveAll(e => !e.On);
         }
 
+        void KillBud(Bud b) { b.Alive = false; if (b.Part != null) { b.Part.Alive = false; W.Parts.Remove(b.Part); } }
+
         public int PropCount => props.Count;
         void ClearProps() { foreach (var p in props) if (p) Destroy(p.gameObject); props.Clear(); }
 
@@ -642,7 +656,7 @@ namespace LastBell.Run
         protected override void OnDefeat()
         {
             foreach (var e in emit) e.On = false;
-            emit.Clear(); later.Clear(); buds.Clear(); colour.Clear(); swapWarned.Clear();
+            emit.Clear(); later.Clear(); foreach (var b in buds) KillBud(b); buds.Clear(); colour.Clear(); swapWarned.Clear();
             ClearProps();
             glowTarget = 0.3f; glowLevel = 2f;
             presenter.PlayOnce("Defeat", 2.5f);
