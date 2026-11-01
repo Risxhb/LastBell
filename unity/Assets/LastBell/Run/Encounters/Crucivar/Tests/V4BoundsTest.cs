@@ -53,8 +53,8 @@ namespace LastBell.Run
                 t.Check($"{tag}: every Furnace Spin jet reaches the farthest spot along it", jets.Count == 4 && jetsReach, string.Join("/", jets.Select(j => $"{j.Yaw:0}:{j.Length:0.0}")));
                 t.Check($"{tag}: the floor edge along any heading is inside the wall distance", Enumerable.Range(0, 72).All(k =>
                 {
-                    var d = Sim.Dir(k * 5f); float w = CrucivarAbility.WallDist(Vector3.zero, d);
-                    return CombatWorld.InPlayerBound(d * (w - Hazard.Margin - 0.02f), 0.001f) && !CombatWorld.InPlayerBound(d * (w - Hazard.Margin + 0.05f));
+                    var d = Sim.Dir(k * 5f); float w = CrucivarAbility.WallDist(Vector3.zero, d) * b / (b + Hazard.Margin);   // from the centre the margin scales with the ray, so this is the floor edge
+                    return CombatWorld.InPlayerBound(d * (w - 0.02f), 0.001f) && !CombatWorld.InPlayerBound(d * (w + 0.05f));
                 }));
                 W(t).ClearTransient();
                 yield return t.Ticks(2);
