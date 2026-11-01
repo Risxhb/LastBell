@@ -47,7 +47,7 @@ Demo: the "P4 enrage" row, "Seed Storm, enrage" (option V), with Loop 1 / 3 / 5 
 
 - Pods and the Root Ring keep their places in every loop.
 - **Tuning target:** set Phase 4 HP so a normal party kills her in about 75–90 s, so most kills land in loop 4 and Last Storm is reached only by a party that is short on damage.
-- **Difficulty:** the same clock on Easy, Medium and Hard (accepted).
+- **Difficulty:** the same clock on Easy, Medium and Hard (accepted). Last Storm is the same on every level for now; a softer Easy one is a proposal in [DIFFICULTY-EXTRAS.md](DIFFICULTY-EXTRAS.md).
 - **Demo measurements** (bots, damage per player per minute):
 
   | Players | Loop 1 | Loop 3 | Loop 5 | Last Storm |
@@ -59,4 +59,4 @@ Demo: the "P4 enrage" row, "Seed Storm, enrage" (option V), with Loop 1 / 3 / 5 
   The soft steps stay under Phase 2's level (about 220/min). Last Storm downs a full-HP player in about 5–8 s.
 
 ## Open questions
-1. **Hard and Easy:** proposals in [DIFFICULTY-EXTRAS.md](DIFFICULTY-EXTRAS.md) (one review packet, 31 Oct).
+1. **Hard and Easy:** accepted 31 Oct, see [DIFFICULTY-EXTRAS.md](DIFFICULTY-EXTRAS.md); built in Unity. The softer Easy Last Storm is still a proposal (sent to the review inbox 31 Oct).

@@ -805,6 +805,7 @@ namespace LastBell.Run
             Check("Sylvara uses her rigged model with the clips v3 plays", syPres && syPres.HasModel && !sy.Placeholder && syClips.All(c => syPres.Has(c)), syPres ? string.Join(",", syClips.Where(c => !syPres.Has(c))) : "no presenter");
             Check("Sylvara v3 is rooted at the arena centre", Sim.Flat(sy.transform.position).magnitude < 0.01f);
             Check("Sylvara v3 opens in Spiral Bloom", sy.PhaseName == "Spiral Bloom", sy.PhaseName);
+            d.World.Difficulty = Difficulty.Medium;   // a saved menu choice must not change the checked numbers; levels are checked in Phase 4
 
             // watch the whole fight: every bullet hits once, bullets never stun, hazards hit once per instance
             var bulletsHit = new HashSet<BulletSystem.Bullet>(); bool bulletOnce = true, bulletNoStun = true, colourOk = true;
@@ -931,6 +932,38 @@ namespace LastBell.Run
             Check("enrage cap: Last Storm from 2:00 throws 14 seeds every 0.6 s", sy.LastStorm && sy.StormSeeds == 14 && Mathf.Abs(sy.StormEvery - 0.6f) < 0.001f);
             yield return Play(3f, () => false);
             yield return Shot("sylvara_v3_last_storm");
+
+            // Easy and Hard extras (accepted 31 Oct): one Hard mechanic per phase, longer warnings and fewer bullets on Easy;
+            // the enrage clock and Last Storm stay the same on every level
+            int budBase = sy.BudCount;
+            foreach (var lv in new[] { Difficulty.Easy, Difficulty.Hard })
+            {
+                d.World.Difficulty = lv; bool e = lv == Difficulty.Easy, h = !e;
+                Check($"Sylvara {lv} P1: pods land at {(e ? 3.0f : 2.5f)} s, {(h ? "every one doubled" : "single")}, spiral {(e ? 12 : 15)}°/s",
+                    Mathf.Approximately(sy.PodLandIn(1), e ? 3.0f : 2.5f) && sy.PodDoubledIn(1) == h && Mathf.Approximately(sy.P1Spin, e ? 12 : 15)
+                    && !sy.PodDoubledIn(3) && Mathf.Approximately(sy.PodLandIn(3), 2.5f));
+                Check($"Sylvara {lv} P1: jets warn {(e ? 2.0f : 1.5f)} s, Pruning Arc {(e ? "2.5 / 3.3" : "2.0 / 2.8")} s",
+                    Mathf.Approximately(sy.JetWarn, e ? 2.0f : 1.5f) && Mathf.Approximately(sy.ArcExtra, e ? 0.5f : 0));
+                Check($"Sylvara {lv} P2: lanes every {(e ? 0.5f : 0.35f)} s, second spiral {(e ? "off" : "on")}, {(h ? "double" : "single")} toll",
+                    Mathf.Approximately(sy.LanePeriod, e ? 0.5f : 0.35f) && sy.SecondColourSpiral == h && sy.DoubleToll == h);
+                Check($"Sylvara {lv} P3: {(h ? "one more bud" : "same buds")}, bloom {(e ? 15 : 12)} s, {(e ? 3 : 4)}-arm spiral",
+                    sy.BudCount == budBase + (h ? 1 : 0) && Mathf.Approximately(sy.BloomAfter, e ? 15 : 12) && sy.HollowArms == (e ? 3 : 4), $"{sy.BudCount} buds");
+                sy.DebugStartStorm(0);
+                Check($"Sylvara {lv} P4: loop 1 {(e ? "6 seeds every 2.5" : "8 seeds every 2.0")} s, bursts of {(h ? 10 : 8)}",
+                    sy.StormSeeds == (e ? 6 : 8) && Mathf.Abs(sy.StormEvery - (e ? 2.5f : 2.0f)) < 0.001f && sy.BurstPetals == (h ? 10 : 8), $"{sy.StormSeeds} / {sy.StormEvery} / {sy.BurstPetals}");
+                sy.DebugStartStorm(2);
+                Check($"Sylvara {lv} P4: the same enrage steps (+2 seeds, 0.2 s sooner at loop 3)",
+                    sy.StormSeeds == (e ? 8 : 10) && Mathf.Abs(sy.StormEvery - (e ? 2.3f : 1.8f)) < 0.001f, $"{sy.StormSeeds} / {sy.StormEvery}");
+                sy.DebugStartStorm(7);
+                Check($"Sylvara {lv} P4: the same Last Storm (14 seeds every 0.6 s)", sy.LastStorm && sy.StormSeeds == 14 && Mathf.Abs(sy.StormEvery - 0.6f) < 0.001f);
+            }
+            {
+                // Hard live: a seed bursts into 10 petals
+                d.World.Difficulty = Difficulty.Hard; sy.DebugStartStorm(0);
+                yield return Play(4.5f, () => false);   // the first ring comes at 2.0 s and bursts 1.6 s later
+                Check("Sylvara Hard P4: a seed bursts into 10 petals", sy.LastBurstFired == 10, sy.LastBurstFired.ToString());
+            }
+            d.World.Difficulty = Difficulty.Medium; sy.DebugStartStorm(7);
 
             d.World.Bullets.Hit -= onBullet; d.World.PlayerHit -= onHit;
             Check("Sylvara: each bullet hits at most once", bulletOnce);

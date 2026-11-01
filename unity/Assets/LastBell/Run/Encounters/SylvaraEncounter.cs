@@ -31,6 +31,22 @@ namespace LastBell.Run
         // Enrage (accepted, Chzy18 29 Oct; same clock on every difficulty): +1 seed per ring and rings 0.1 s sooner every 24 s loop, capped at loop 5;
         // Last Storm at 2:00 into Phase 4.
         public const float LastStormAt = 120;
+        // Easy and Hard (accepted, Chzy18 31 Oct; docs DIFFICULTY-EXTRAS.md): Hard adds one mechanic per phase (P1 every pod
+        // doubled, P2 double toll burst, P3 one more bud per wave, P4 10-petal seed bursts); Easy warns longer and fires
+        // less. The enrage clock and Last Storm are the same on every level (a softer Easy Last Storm is still a proposal).
+        public Difficulty Level => W != null ? W.Difficulty : Difficulty.Medium;
+        bool Easy => Level == Difficulty.Easy;
+        bool Hard => Level == Difficulty.Hard;
+        public int BurstPetals => Hard ? 10 : 8;
+        public int LastBurstFired { get; private set; }        // petals the latest seed burst actually fired (tests)
+        public float P1Spin => Easy ? 12 : 15;                 // P1 spiral, °/s
+        public float LanePeriod => Easy ? 0.5f : 0.35f;        // P2 choir lanes
+        public bool SecondColourSpiral => !Easy;
+        public bool DoubleToll => Hard;
+        public float BloomAfter => Easy ? 15 : 12;             // P3 buds
+        public int HollowArms => Easy ? 3 : 4;
+        public float PodLandIn(int ph) => ph == 1 && Easy ? 3.0f : 2.5f;
+        public bool PodDoubledIn(int ph) => ph == 1 && Hard;
 
         CharacterPresenter presenter;
         int phase;
@@ -220,7 +236,7 @@ namespace LastBell.Run
             switch (ph)
             {
                 case 1:   // Spiral Bloom
-                    At(0, "Petal Spiral", () => sp1 = Spiral(1, 4, 15 * Deg, 5, 0.15f, 9, 7));
+                    At(0, "Petal Spiral", () => sp1 = Spiral(1, 4, P1Spin * Deg, 5, 0.15f, 9, 7));
                     At(3, "Seed Pods", () => PodsOnFar());
                     At(6, "Waterfall Jets", Jets);
                     At(8, "Toll", () => Toll("TOLL: the spin reverses"));
@@ -236,23 +252,25 @@ namespace LastBell.Run
                     break;
                 case 2:   // Two-Colour Choir, harder version; 29 Oct playtest (Chzy18): bullets a little slower and spaced out so you can run between them
                     At(0, "Colour Spiral", () => sp1 = Spiral(1, 6, 14 * Deg, 4.2f, 0.17f, 9, 7, new[] { Brass, Cobalt }));
-                    At(0.01f, "Brass Lanes", () => ChoirLanes(Brass, -Mathf.PI / 2, 1, 10));
-                    At(6, "Cobalt Lanes", () => ChoirLanes(Cobalt, Mathf.PI, 1, 20));
-                    At(10, "Second Colour Spiral", () => sp2 = Spiral(-1, 4, 18 * Deg, 3.5f, 0.22f, 8, 5, new[] { Cobalt, Brass }));
+                    float lane = LanePeriod;   // Easy: lanes every 0.5 s and no second spiral set
+                    At(0.01f, "Brass Lanes", () => ChoirLanes(Brass, -Mathf.PI / 2, 1, 10, lane));
+                    At(6, "Cobalt Lanes", () => ChoirLanes(Cobalt, Mathf.PI, 1, 20, lane));
+                    if (SecondColourSpiral) At(10, "Second Colour Spiral", () => sp2 = Spiral(-1, 4, 18 * Deg, 3.5f, 0.22f, 8, 5, new[] { Cobalt, Brass }));
                     At(12, "Root Ring", () => RootRing(3.5f));
-                    At(14.5f, "Brass Lanes", () => ChoirLanes(Brass, Mathf.PI / 2, -1, 20));
+                    At(14.5f, "Brass Lanes", () => ChoirLanes(Brass, Mathf.PI / 2, -1, 20, lane));
                     foreach (float t in W.Players.Count == 1 ? new[] { 4f, 8, 12, 16, 20 } : new[] { 5f, 10, 15, 20 })
                     {
                         At(t - 1, "Toll", () => { Toll("TOLL: every colour swaps"); WarnSwap(); });
                         At(t, null, SwapColours);
-                        At(t + 0.02f, null, TollBurst);
+                        At(t + 0.02f, null, () => { TollBurst(); if (DoubleToll) Later(0.5f, TollBurst); });   // Hard: double toll
                     }
                     break;
                 case 3:   // Hollow Bloom (second form)
-                    At(0.01f, "Hollow Spiral", () => sp1 = Spiral(1, 4, 10 * Deg, 4.5f, 0.18f, 9, 7));
-                    At(1, "Choir Buds", () => PlantBuds(12));
+                    float bloom = BloomAfter;   // Easy: buds bloom after 15 s and the spiral has 3 arms
+                    At(0.01f, "Hollow Spiral", () => sp1 = Spiral(1, HollowArms, 10 * Deg, 4.5f, 0.18f, 9, 7));
+                    At(1, "Choir Buds", () => PlantBuds(bloom));
                     At(8, "Feet Pod", () => Pod(null, Vector3.zero, 3.0f));
-                    At(12, "Choir Buds", () => PlantBuds(12));
+                    At(12, "Choir Buds", () => PlantBuds(bloom));
                     At(15, "Pruning Arc", PruningArc);
                     At(20, "Seed Pods", () => PodsOnFar());
                     break;
@@ -285,7 +303,7 @@ namespace LastBell.Run
         static float Rnd(float a, float b) => UnityEngine.Random.Range(a, b);
         Hazard Tune(Hazard h) { h.Stun = Stun; h.Knockback = 0; return h; }
         int FarCount { get { int n = W.Players.Count; return n <= 2 ? 1 : n <= 4 ? 2 : 3; } }
-        int BudCount { get { int n = W.Players.Count; return n <= 2 ? 2 : n <= 4 ? 3 : 4; } }
+        public int BudCount { get { int n = W.Players.Count; return (n <= 2 ? 2 : n <= 4 ? 3 : 4) + (Hard ? 1 : 0); } }   // Hard: one more bud
         List<PlayerController> Farthest(int k)
         {
             var s = Standing; s.Sort((a, b) => Sim.Flat(b.transform.position).sqrMagnitude.CompareTo(Sim.Flat(a.transform.position).sqrMagnitude));
@@ -321,14 +339,15 @@ namespace LastBell.Run
         void Reverse(Emitter e) { if (e != null && spinDir.TryGetValue(e, out var f)) f(); }
 
         // Seed Pod: a 2.5 m circle on the target, tracking 0.6 s, lands at 2.5 s, then 12 petals; doubled = a second ring
-        // 0.6 s later rotated half a step into the first ring's gaps
+        // 0.6 s later rotated half a step into the first ring's gaps. Phase 1 pods: every one doubled on Hard, 3.0 s on Easy.
         void Pod(PlayerController target, Vector3 at, float r = 2.5f, bool doubled = false)
         {
             const int n = 12; float off = Rnd(0, Tau);
+            doubled |= PodDoubledIn(phase);
             var h = Tune(new Hazard
             {
                 Source = target ? "Seed Pod" : "Feet Pod", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Radius = r,
-                LockAt = target ? Sim.Ticks(0.6f) : 0, ResolveAt = Sim.Ticks(2.5f), Damage = 16,
+                LockAt = target ? Sim.Ticks(0.6f) : 0, ResolveAt = Sim.Ticks(PodLandIn(phase)), Damage = 16,
                 Origin = target ? Sim.Flat(target.transform.position) : at,
             });
             if (target) h.Track = hz => { if (target && !target.Down) hz.Origin = Sim.Flat(target.transform.position); };
@@ -367,8 +386,10 @@ namespace LastBell.Run
         // Waterfall Jets: one per player past 8 m (else the farthest). The wedge warns 1.5 s; then a solid stream (a drop
         // every 0.07 s at 9 m/s) pours from the wall to her rim while its source slides 40° along the wall over 2 s,
         // starting 20° before the target.
+        public float JetWarn => Easy ? 2.0f : 1.5f;   // Easy: 2.0 s
         void Jets()
         {
+            float warn = JetWarn;
             var ts = Standing.FindAll(p => Sim.Flat(p.transform.position).magnitude > 8);
             if (ts.Count == 0) ts = Farthest(1);
             for (int i = 0; i < ts.Count; i++)
@@ -377,9 +398,9 @@ namespace LastBell.Run
                 W.Hazards.Spawn(new Hazard
                 {
                     Source = "Waterfall Jet", Shape = HazardShape.Cone, Kind = HazardKind.Strike, Origin = Vector3.zero, Yaw = YawOf(a0),
-                    Radius = R, HalfAngle = 20, LockAt = 0, ResolveAt = Sim.Ticks(1.5f), Damage = 0, HitOnResolve = false,
+                    Radius = R, HalfAngle = 20, LockAt = 0, ResolveAt = Sim.Ticks(warn), Damage = 0, HitOnResolve = false,
                 });
-                Later(1.5f, () =>
+                Later(warn, () =>
                 {
                     float t = 0, acc = 0;
                     var e = new Emitter();
@@ -396,21 +417,23 @@ namespace LastBell.Run
 
         // Pruning Arc: a 120° cut, 8 m, toward the nearest player (tracks 0.3 s), lands at 2.0 s; the back cut lands 0.8 s
         // later. Each cut throws 9 petals (15° apart) from 8 m out to the wall. The two 60° side slivers are safe.
+        public float ArcExtra => Easy ? 0.5f : 0;   // Easy: both cuts land 0.5 s later (2.5 / 3.3 s)
         void PruningArc()
         {
+            float w = ArcExtra;
             presenter.PlayOnce("PruningArc", 2.9f);
             var near = W.NearestStanding(Vector3.zero);
             float a = near ? AngOf(near.transform.position) : Rnd(0, Tau);
             var front = Tune(new Hazard
             {
                 Source = "Pruning Arc", Shape = HazardShape.Cone, Kind = HazardKind.Strike, Origin = Vector3.zero, Yaw = YawOf(a),
-                Radius = 8, HalfAngle = 60, LockAt = Sim.Ticks(0.3f), ResolveAt = Sim.Ticks(2.0f), Damage = 20,
+                Radius = 8, HalfAngle = 60, LockAt = Sim.Ticks(0.3f), ResolveAt = Sim.Ticks(2.0f + w), Damage = 20,
             });
             front.Track = hz => { if (near && !near.Down) hz.Yaw = YawOf(AngOf(near.transform.position)); };
             var back = Tune(new Hazard
             {
                 Source = "Pruning Arc (back)", Shape = HazardShape.Cone, Kind = HazardKind.Strike, Origin = Vector3.zero, Yaw = front.Yaw + 180,
-                Radius = 8, HalfAngle = 60, LockAt = Sim.Ticks(0.3f), ResolveAt = Sim.Ticks(2.8f), Damage = 20,
+                Radius = 8, HalfAngle = 60, LockAt = Sim.Ticks(0.3f), ResolveAt = Sim.Ticks(2.8f + w), Damage = 20,
             });
             back.Track = hz => hz.Yaw = front.Yaw + 180;
             Action<Hazard> fan = hz =>
@@ -516,7 +539,7 @@ namespace LastBell.Run
         }
 
         // ---------------- Phase 4: Seed Storm ----------------
-        // Rings of big seeds (0.6 m) from her rim at 3 m/s; alternate rings burst after 1.6 s or 2.4 s into 8 petals at
+        // Rings of big seeds (0.6 m) from her rim at 3 m/s; alternate rings burst after 1.6 s or 2.4 s into 8 petals (Hard 10) at
         // 4.5 m/s. Enrage steps apply from the second loop; Last Storm replaces everything from 2:00.
         void StartStorm()
         {
@@ -524,7 +547,7 @@ namespace LastBell.Run
             if (LastStorm) { StormSeeds = 14; StormEvery = 0.6f; sp1 = Spiral(-1, 4, 12 * Deg, 5, 0.15f, 9, 7); }
             else
             {
-                int k = Mathf.Min(P4Loop, 4); StormSeeds = 8 + k; StormEvery = 2.0f - 0.1f * k;
+                int k = Mathf.Min(P4Loop, 4); StormSeeds = (Easy ? 6 : 8) + k; StormEvery = (Easy ? 2.5f : 2.0f) - 0.1f * k;   // Easy: 6 every 2.5 s, same steps
                 if (k > 0) RunHud.Float(transform.position + Vector3.up * 5.4f, $"The storm thickens: {StormSeeds} seeds", Amber);
                 sp1 = Spiral(-1, 2, 8 * Deg, 4.5f, 0.22f, 9, 7);
             }
@@ -544,7 +567,12 @@ namespace LastBell.Run
             for (int i = 0; i < n; i++)
             {
                 float a = off + i * Tau / n;
-                Shot(On(a, Rim), a, 3, 16, fuse, 0, "Seed", 0.6f, b => PetalRing(b.Pos, 8, 4.5f, Rnd(0, Tau), 0.3f, 12, "Seed Burst"));
+                Shot(On(a, Rim), a, 3, 16, fuse, 0, "Seed", 0.6f, b =>
+                {
+                    int f0 = W.Bullets.Fired;
+                    PetalRing(b.Pos, BurstPetals, 4.5f, Rnd(0, Tau), 0.3f, 12, "Seed Burst");
+                    LastBurstFired = W.Bullets.Fired - f0;
+                });
             }
         }
 

@@ -38,4 +38,4 @@
 ## Open questions
 1. **Bud HP and placement:** fixed 10 m from the centre, or anchored to the arena's root pillars?
 2. **Uncut buds:** today a bloom is just one petal ring. Should an uncut bud also make her spiral faster for the rest of the loop?
-3. **Hard and Easy:** proposals in [DIFFICULTY-EXTRAS.md](DIFFICULTY-EXTRAS.md) (one review packet, 31 Oct).
+3. **Hard and Easy:** accepted 31 Oct, see [DIFFICULTY-EXTRAS.md](DIFFICULTY-EXTRAS.md); built in Unity.

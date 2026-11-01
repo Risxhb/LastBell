@@ -47,4 +47,5 @@ Try it in the demo: `demo/sylvara-v3-demos.html`, **Level** row in the top bar. 
 ## Open questions
 1. Hard Phase 1: doubled pods are enough (31 Oct review).
 2. Easy Last Storm: are the numbers above soft enough, or too soft? (Sent to the review inbox on 31 Oct.)
-3. Unity: `SylvaraEncounter` reads `CombatWorld.Difficulty` for the accepted extras, and the autotest checks each level's extra.
+3. Built in Unity (31 Oct): `SylvaraEncounter` reads `CombatWorld.Difficulty` for the accepted extras, and the autotest checks each level.
+   - As in the demo, the Easy Pruning Arc warning applies wherever the Arc appears (Phases 1 and 3). The Easy pod warning and the Hard doubled pods apply to Phase 1 pods only.

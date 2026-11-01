@@ -38,7 +38,7 @@
 ## Open questions
 1. **Colour readability in Unity:** brass vs cobalt has to read at the gameplay camera next to the Verdant lighting and the coral hostile colour. Every bullet still needs a coral rim to say "hostile".
 2. **Down players:** a downed player keeps their colour. Do tolls skip them?
-3. **Hard and Easy:** proposals in [DIFFICULTY-EXTRAS.md](DIFFICULTY-EXTRAS.md) (one review packet, 31 Oct).
+3. **Hard and Easy:** accepted 31 Oct, see [DIFFICULTY-EXTRAS.md](DIFFICULTY-EXTRAS.md); built in Unity.
 4. **Unused options:** Choir Buds, Seed Relay and Hush and Chorus are still in the demo. They are spare parts (no intermission, 29 Oct).
 
 ## Playtest change (29 Oct, Unity build)
