@@ -56,16 +56,20 @@ namespace LastBell.Run
                         // an Arcanist's shots slow its caster (x0.6, merged kit 27 Oct): no shots on a sprint (an urgent dodge); the
                         // route search plans its first leg at the current speed, so a shot in progress is part of the plan
                         bool slowsMe = me.Kit is ArcanistKit && vel.magnitude > PlayerController.WalkSpeed + 0.1f;
+                        // a press that roots or slows past the search's first leg (a melee swing, to its end): only if the route search
+                        // still finds a way with no hit after standing that long (31 Oct: each kit says how long a press holds it)
+                        bool RootOk(int slot) { float r = me.Kit != null ? me.Kit.RootFor(slot) : 0; return r <= 0.2f || m.SafeToRoot(me, r, me.Kit.RootScale(slot)); }
+                        bool pressNow = tick - lastPress >= 6;
                         if (m.AttackTarget(me, out var aim, out float reach, out bool full))
                         {
                             // the phase names a target (P4: the nearest gear core or the boss) and whether the whole kit is safe
                             inp.Aim = aim + Vector3.up * 0.1f;
-                            if (Attacks && reach <= Reach(me) + 0.6f) { if (full && !slowsMe) Attack(me, ref inp, 0); else if (!slowsMe && tick - lastPress >= 6) { inp.P0 = inp.H0 = true; lastPress = tick; } }
+                            if (Attacks && reach <= Reach(me) + 0.6f) { if (full && !slowsMe && pressNow && RootOk(-1)) Attack(me, ref inp, 0); else if (!slowsMe && pressNow && RootOk(0)) { inp.P0 = inp.H0 = true; lastPress = tick; } }
                         }
                         else
                         {
                             float gap = Sim.Flat(bpos - pos).magnitude - boss.BodyRadius;
-                            if (Attacks && (me.ClassName != "Vanguard" || gap <= 0.6f) && !slowsMe && gap <= Reach(me) + 1f && tick - lastPress >= 6) { inp.P0 = inp.H0 = true; lastPress = tick; }
+                            if (Attacks && (me.ClassName != "Vanguard" || gap <= 0.6f) && !slowsMe && gap <= Reach(me) + 1f && pressNow && RootOk(0)) { inp.P0 = inp.H0 = true; lastPress = tick; }
                         }
                         if (me.Potions > 0 && me.Hp < DrinkBelow(me) && me.Hp < PlayerController.MaxHp) inp.Potion = tick % 4 == 0;
                         DebugLine = $"{m.Name}: v ({vel.x:0.0},{vel.z:0.0}) at ({pos.x:0.0},{pos.z:0.0})";

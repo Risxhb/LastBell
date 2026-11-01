@@ -66,6 +66,27 @@ namespace LastBell.Run
         };
         public override string ClassState() => OpeningActive ? $"OPENING {opening / (float)Sim.Hz:0.0}s" : "";
 
+        // bots: every swing roots (MoveScale 0) to its end; an ability pressed after a basic's contact cancels the rest of it
+        public override float SlowLeft => act switch
+        {
+            Act.Basic => (BasicTotal[step] - t) / (float)Sim.Hz, Act.Sunder => (SunderTotal - t) / (float)Sim.Hz,
+            Act.Ult => (UltTotal - t) / (float)Sim.Hz, Act.Brace => 0.2f, _ => 0
+        };
+        public override float RootFor(int slot)
+        {
+            if (slot < 0) return Mathf.Max(RootFor(0), Mathf.Max(RootFor(1), RootFor(2)));
+            float before = act == Act.Basic && contactDone && slot > 0 ? 0 : SlowLeft;
+            int next = act == Act.Basic ? (step < 2 ? step + 1 : 0) : comboExpire > 0 ? comboStep : 0;
+            return slot switch
+            {
+                0 => before + BasicTotal[next] / (float)Sim.Hz,
+                1 => sunderCd > 0 ? 0 : before + SunderTotal / (float)Sim.Hz,
+                2 => ultCd > 0 ? 0 : before + UltTotal / (float)Sim.Hz,
+                _ => 0
+            };
+        }
+        public override float RootScale(int slot) => 0;
+
         public override void ResetAll()
         {
             act = Act.None; t = 0; step = 0; queued = false; comboStep = 0; comboExpire = 0;

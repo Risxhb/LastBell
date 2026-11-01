@@ -46,6 +46,24 @@ namespace LastBell.Run
         public virtual bool Steer(PlayerController p, UltimateBot.Skill skill, out Vector3 vel) { vel = default; return false; }
         // ...and what a steered bot attacks: aim point, and whether its whole kit is safe (else basic attacks from range only)
         public virtual bool AttackTarget(PlayerController p, out Vector3 aim, out float reach, out bool fullKit) { aim = default; reach = 0; fullKit = false; return false; }
+        // ...and before a press that roots or slows it for `seconds` (at `scale`): does the route search still find a way with
+        // no hit, standing that long first? (the searches count the whole root, not only their first leg)
+        public virtual bool SafeToRoot(PlayerController p, float seconds, float scale) => true;
+        // the route searches' slowdown: (seconds, scale) for the current action, or for a press being tested
+        protected float rootTestFor = -1, rootTestScale = 1;
+        protected bool lastClean;   // the last search found a route with no hit through every leg
+        protected bool RootTest(float seconds, float scale, Action search)
+        {
+            rootTestFor = seconds; rootTestScale = scale;
+            try { search(); } finally { rootTestFor = -1; rootTestScale = 1; }
+            return lastClean;
+        }
+        protected (float forS, float scale) SlowOf(PlayerController p)
+        {
+            float ms = p.Kit != null ? Mathf.Clamp01(p.Kit.MoveScale) : 1f, left = p.Kit != null ? p.Kit.SlowLeft : 0;
+            if (rootTestFor < 0) return (left, ms);
+            return (Mathf.Max(left, rootTestFor), Mathf.Min(ms, rootTestScale));
+        }
 
         // -lastbellAbility ult_<id>: the default practice loop (Setup, Cast with the default cue, 2 s gap). Override when
         // the mechanic needs partners (e.g. a recorded P1 before a replay).

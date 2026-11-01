@@ -336,6 +336,12 @@ namespace LastBell.Run
             vel = v; return true;
         }
 
+        public override bool SafeToRoot(PlayerController p, float seconds, float scale)
+        {
+            if (!Running || p.Down || !plans.TryGetValue(p, out var pl) || pl.Job == "forgets its debt") return true;
+            return RootTest(seconds, scale, () => Search(p, Sim.Flat(p.transform.position), T, pl.Goal));
+        }
+
         public override bool AttackTarget(PlayerController p, out Vector3 aim, out float reach, out bool fullKit)
         {
             aim = Boss.transform.position; reach = 99; fullKit = false;
@@ -368,7 +374,7 @@ namespace LastBell.Run
                 for (float te = nextArm; te <= tq; te += ArmEvery) if (Firing(te)) for (int j = 0; j < 3; j++) arr.Add(Dir(ArmAng(te) + 120 * j) * (Boss.BodyRadius + ArmSpeed * (tq - te)));
                 int kq = Cur(tq); if (kq > tolls && kq < 13 && Has(kq, 3)) { var c = HammerAt(kq); for (int j = 0; j < 12; j++) arr.Add(c + Dir(30 * j + 7 * kq) * ShardSpeed * (tq - TollAt[kq])); }
             }
-            float ms = p.Kit != null ? p.Kit.MoveScale : 1f;
+            var (slowFor, ms) = SlowOf(p); lastClean = true;   // a swing roots to its end, not only the first leg
             int Dead(Vector3 q, int s, ref float risk)
             {
                 float tq = t + (s + 1) * dtS, r = q.magnitude;
@@ -411,7 +417,7 @@ namespace LastBell.Run
                         var q = r.q; float risk = r.risk; int worst = 0;
                         for (int s2 = 0; s2 < Samples; s2++)
                         {
-                            q += (leg == 0 ? v * ms : v) * dtS;
+                            q += ((leg * Samples + s2) * dtS < slowFor ? v * ms : v) * dtS;
                             int dd = Dead(q, leg * Samples + s2, ref risk); if (dd != 0) { worst = dd; break; }
                         }
                         if (worst != 0)
@@ -423,6 +429,7 @@ namespace LastBell.Run
                     }
                 if (next.Count == 0)
                 {
+                    lastClean = false;
                     if (leg == 0) { if (Log) Debug.Log($"[final toll] {t:0.00}s {UltimateState.Roman[hour + 1]} cornered at ({pos.x:0.0},{pos.z:0.0}) goal ({goal.x:0.0},{goal.z:0.0})"); return fallback; }
                     break;
                 }

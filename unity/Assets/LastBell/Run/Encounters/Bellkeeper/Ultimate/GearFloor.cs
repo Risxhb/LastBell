@@ -307,6 +307,13 @@ namespace LastBell.Run
             vel = v; return true;
         }
 
+        public override bool SafeToRoot(PlayerController p, float seconds, float scale)
+        {
+            if (!Running || p.Down || !plans.TryGetValue(p, out var pl)) return true;
+            float t = T; int k = Mathf.Max(1, Mathf.FloorToInt(t / Slam) + 1);
+            return RootTest(seconds, scale, () => Search(p, Sim.Flat(p.transform.position), t, pl.Goal, k));
+        }
+
         public override bool AttackTarget(PlayerController p, out Vector3 aim, out float reach, out bool fullKit)
         {
             aim = Boss.transform.position; reach = 99; fullKit = false;
@@ -348,7 +355,7 @@ namespace LastBell.Run
                 if (tq > wSlamT && wSlamG >= 0) for (int j = 0; j < 12; j++) arr.Add(GearCentre(wSlamG) + Dir(30 * j + 7 * wsN) * ShardSpeed * (tq - wSlamT));
                 if (wild) for (int g = 0; g < 4; g++) { float la = LaunchAt(g); if (!launched[g] && tq > la) for (int j = -2; j <= 2; j++) arr.Add(GearCentre(g) + Dir(90f * g + 180 + 24 * j) * 5f * (tq - la)); }
             }
-            var bossP = Sim.Flat(Boss.transform.position); string why = ""; float ms = p.Kit != null ? p.Kit.MoveScale : 1f;
+            var bossP = Sim.Flat(Boss.transform.position); string why = ""; var (slowFor, ms) = SlowOf(p); lastClean = true;
             // The Train Runs Wild: once on the centre gear, stay on it (everyone ends there). A solo Vanguard dodged shards onto gear S
             // as the spin-up began and could never cross back: every route led off the gear
             bool holdCentre = wild && GearAt(pos) == 4;
@@ -388,13 +395,13 @@ namespace LastBell.Run
                         for (int s2 = 0; s2 < Samples; s2++)
                         {
                             float tt = t + (leg * Samples + s2) * dtS;
-                            q += ((leg == 0 ? v * ms : v) + FloorVel(q, tt)) * dtS;   // a cast still running slows the first leg
+                            q += (((leg * Samples + s2) * dtS < slowFor ? v * ms : v) + FloorVel(q, tt)) * dtS;   // a swing or cast still running slows the route to its end
                             if (Dead(q, leg * Samples + s2, ref risk)) { dead = true; break; }
                         }
                         if (dead) continue;
                         next.Add((q, leg == 0 ? v : r.first, risk, risk + (q - goal).magnitude * 1.2f + (v.magnitude > PlayerController.WalkSpeed ? 0.1f : 0)));
                     }
-                if (next.Count == 0) { if (leg == 0 && Log) Debug.Log($"[gear floor] {t:0.00}s {UltimateState.Roman[HourOf(p) + 1]} cornered at ({pos.x:0.0},{pos.z:0.0}) goal ({goal.x:0.0},{goal.z:0.0}) last {why}"); break; }
+                if (next.Count == 0) { lastClean = false; if (leg == 0 && Log) Debug.Log($"[gear floor] {t:0.00}s {UltimateState.Roman[HourOf(p) + 1]} cornered at ({pos.x:0.0},{pos.z:0.0}) goal ({goal.x:0.0},{goal.z:0.0}) last {why}"); break; }
                 next.Sort((x, y) => x.score.CompareTo(y.score));
                 beam = next.GetRange(0, Mathf.Min(BeamW, next.Count));
             }

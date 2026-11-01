@@ -109,11 +109,24 @@ namespace LastBell.Run
                     break;
             }
             if (s < 0) return;
+            // a press that roots or slows (a melee swing, a cast) must end before any live hazard here resolves (31 Oct): an
+            // ability that would not falls back to the basic, and a basic that would not waits
+            if (s > 0 && !RootSafe(me, s)) { cd[s] = 0; castHold = 0; s = 0; }
+            if (!RootSafe(me, s)) return;
             lastPress = tick;
             switch (s) { case 0: inp.P0 = inp.H0 = true; break; case 1: inp.P1 = true; break; case 2: inp.P2 = true; break; case 3: inp.P3 = true; break; default: inp.P4 = true; break; }
         }
 
         static bool Inside(IReadOnlyList<Hazard> live, Vector3 p) { foreach (var h in live) if (h.Contains(p)) return true; return false; }
+
+        static bool RootSafe(PlayerController me, int slot)
+        {
+            float r = me.Kit != null ? me.Kit.RootFor(slot) : 0;
+            if (r <= 0.2f) return true;
+            int within = Mathf.CeilToInt((r + 0.1f) * Sim.Hz); var pos = me.transform.position;
+            foreach (var h in me.World.Hazards.Live) if (h.ResolveAt - h.Age <= within && h.Contains(pos)) return false;
+            return true;
+        }
 
         static Vector3 NearestClear(Vector3 pos, BossEncounter b, IReadOnlyList<Hazard> live, out float need)
         {

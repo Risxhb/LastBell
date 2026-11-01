@@ -195,7 +195,7 @@ namespace LastBell.Run
         }
 
         // ---------------- the bots: a short route search (UltimateBot asks Steer while this runs) ----------------
-        sealed class Plan { public Vector3 V; public int Until; public string Job; }
+        sealed class Plan { public Vector3 V; public int Until; public string Job; public Vector3 Goal; public bool Urgent; public float BeatAt = -1; public bool Searched; }
         readonly Dictionary<PlayerController, Plan> plans = new Dictionary<PlayerController, Plan>();
         public static bool LogSteer;   // tests: every time a bot finds no safe route
         public string JobOf(PlayerController p) => plans.TryGetValue(p, out var pl) ? pl.Job : null;
@@ -215,7 +215,7 @@ namespace LastBell.Run
             if (plans.TryGetValue(p, out var cur) && Now < cur.Until) { vel = cur.V; return true; }
             var goal = GoalOf(p, t, out bool urgent, out float beatAt, out string job);
             var v2 = Search(p, pos, t, goal, urgent, beatAt);
-            plans[p] = new Plan { V = v2, Until = Now + (skill == UltimateBot.Skill.Late ? 15 : 3), Job = job };
+            plans[p] = new Plan { V = v2, Until = Now + (skill == UltimateBot.Skill.Late ? 15 : 3), Job = job, Goal = goal, Urgent = urgent, BeatAt = beatAt, Searched = true };
             vel = v2; return true;
         }
 
@@ -261,6 +261,12 @@ namespace LastBell.Run
         }
         float Bound => Mathf.Min(11.6f, CombatWorld.PlayerBound - 0.1f);
 
+        public override bool SafeToRoot(PlayerController p, float seconds, float scale)
+        {
+            if (!Running || p.Down || !plans.TryGetValue(p, out var pl) || !pl.Searched) return true;
+            return RootTest(seconds, scale, () => Search(p, Sim.Flat(p.transform.position), T, pl.Goal, pl.Urgent, pl.BeatAt));
+        }
+
         // bots: the boss is the target, but a swing roots its caster, and an echo bursts where you stood 2 s ago: no attack while one
         // of my own echoes is due here within 1.2 s (a solo Vanguard swinging against the boss stood still into its own echo)
         public override bool AttackTarget(PlayerController p, out Vector3 aim, out float reach, out bool fullKit)
@@ -281,6 +287,8 @@ namespace LastBell.Run
             // 4 legs (0.8 s): with 3 a bot could walk into a pocket between its own echo and a curtain before it saw the exit shut
             const float Leg = 0.2f; const int Legs = 4, Samples = 4, BeamW = 12; float dtS = Leg / Samples; int N = Legs * Samples;
             var bossP = Sim.Flat(Boss.transform.position); int hour = HourOf(p);
+            // the boss body pushes a player out to exactly BodyRadius + PR: one already pressed there (a swing's lunge) may stay
+            float r0 = (pos - bossP).magnitude;
             for (int k = 0; k < N; k++)
             {
                 float s = (k + 1) * dtS; var arr = pred[k] ?? (pred[k] = new List<Vector3>()); arr.Clear();
@@ -297,7 +305,7 @@ namespace LastBell.Run
             int Severity(Vector3 q, int k, ref float extra, out float mc)
             {
                 float s = (k + 1) * dtS; mc = 9;
-                float rq = (q - bossP).magnitude, rc = q.magnitude; if (rc > Bound - 0.1f || rq < Boss.BodyRadius + PR + 0.05f) return 2;
+                float rq = (q - bossP).magnitude, rc = q.magnitude; if (rc > Bound - 0.1f || rq < Mathf.Min(Boss.BodyRadius + PR + 0.05f, r0 - 0.02f)) return 2;
                 foreach (var bp in pred[k]) { float c = (q - bp).magnitude - PR - BR; if (c < mc) mc = c; }
                 foreach (var m in mines) if (m.Owner == p && m.At > t + s - dtS - 0.02f && m.At <= t + s + 0.02f && (q - m.P).magnitude < EchoR + PR + 0.5f) return 2;
                 for (int ci = 0; ci < 3; ci++) { if (Crossed(p)[ci]) continue; int ch = CurtainHit(ci, q, t + s, hour, 0.2f); if (ch == 2) return 2; if (ch == 1) return 1; }
@@ -314,8 +322,8 @@ namespace LastBell.Run
             for (int ci = 0; ci < 3; ci++) if (!Crossed(p)[ci] && (CurtOn(ci, t) || CurtSoon(ci, t))) { var d = Dir(Curtains[ci].a); dirs.Add(d); dirs.Add(-d); }
             var vels = new List<Vector3> { Vector3.zero };
             foreach (var d in dirs) { vels.Add(d * PlayerController.WalkSpeed); vels.Add(d * PlayerController.SprintSpeed); vels.Add(d * PlayerController.WalkSpeed * 0.4f); }
-            // the first leg moves at the player's speed now (a shot or cast in progress slows it, e.g. the Arcanist's missiles x0.6)
-            float slow0 = p.Kit != null ? Mathf.Clamp01(p.Kit.MoveScale) : 1f;
+            // moves at the player's speed while its current action (or a tested press) slows it: a swing roots to its end
+            var (slowFor, slowMs) = SlowOf(p); lastClean = true;
             var beam = new List<(Vector3 q, Vector3 first, float risk, float score)> { (pos, Vector3.zero, 0f, 0f) };
             (Vector3 v, float score)? fallback = null;
             for (int leg = 0; leg < Legs; leg++)
@@ -327,7 +335,7 @@ namespace LastBell.Run
                         var q = r.q; float risk = r.risk; bool dead = false; int worst = 0;
                         for (int k2 = 0; k2 < Samples; k2++)
                         {
-                            q += v * dtS * (leg == 0 ? slow0 : 1f); float extra = 0;
+                            q += v * dtS * ((leg * Samples + k2) * dtS < slowFor ? slowMs : 1f); float extra = 0;
                             int sev = Severity(q, leg * Samples + k2, ref extra, out float mc);
                             if (sev > 0) { dead = true; worst = sev; break; }
                             risk += Mathf.Max(0, 0.5f - mc) * 2 + extra;
@@ -336,7 +344,7 @@ namespace LastBell.Run
                         if (dead) { if (leg == 0) { float sc = risk + 1000 * worst + (q - goal).magnitude;   /* cornered: a 50 hit beats a lethal one */ if (fallback == null || sc < fallback.Value.score) fallback = (v, sc); } continue; }
                         next.Add((q, first, risk, risk + (q - goal).magnitude * (urgent ? 1.6f : 0.8f) + (v.magnitude > PlayerController.WalkSpeed ? 0.15f : 0)));
                     }
-                if (next.Count == 0) { if (leg == 0) { if (LogSteer) Debug.Log($"[open hour] {t:0.00}s {UltimateState.Roman[hour + 1]} cornered at ({pos.x:0.0},{pos.z:0.0}) goal ({goal.x:0.0},{goal.z:0.0}) urgent {urgent} · bullets {bullets.Count} · fallback {(fallback.HasValue ? fallback.Value.score.ToString("0") : "-")}"); return fallback?.v ?? Vector3.zero; } break; }
+                if (next.Count == 0) { lastClean = false; if (leg == 0) { if (LogSteer) Debug.Log($"[open hour] {t:0.00}s {UltimateState.Roman[hour + 1]} cornered at ({pos.x:0.0},{pos.z:0.0}) goal ({goal.x:0.0},{goal.z:0.0}) urgent {urgent} · bullets {bullets.Count} · fallback {(fallback.HasValue ? fallback.Value.score.ToString("0") : "-")}"); return fallback?.v ?? Vector3.zero; } break; }
                 next.Sort((x, y) => x.score.CompareTo(y.score));
                 beam = next.GetRange(0, Mathf.Min(BeamW, next.Count));
             }
