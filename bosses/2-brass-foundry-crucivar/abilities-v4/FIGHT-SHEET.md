@@ -68,7 +68,7 @@ The difficulty damage scale is unchanged (damage scale only, per the difficulty 
 - **Done 30 Oct:** both Hard extras are built. Azure `feature/confrontation-menu` is merged. v4 is the default Crucivar fight (Chzy18, 30 Oct): Run Loop, Test Rush and the start-phase picker all play v4, and `-lastbellAbilitySet v3` still plays v3. PR 12 merged; later work goes in a new PR.
 - **Done 31 Oct:**
   - Escape checks: `tools/encounter-escape/crucivar-v4-escape-check.ps1` has 0 failures on every difficulty. `V4BoundsTest` checks that nobody can leave the floor and that wall-reaching attacks cover the farthest spot, on the round floor and on the square key-art map. The square map's corners had been safe; now they aren't.
-  - Mould Towers set B now lands between set A's towers. For 2, 4 and 8 players it had landed on set A's own spots. This is a proposal, sent to the review inbox.
+  - Mould Towers set B now lands between set A's towers. For 2, 4 and 8 players it had landed on set A's own spots. Accepted by Chzy18 on 1 Nov.
   - Telegraph look and fire VFX: the Brass Foundry motif on plain warnings, flame along Furnace Spin, embers on bullets, the Pour Flood lava wave and the eruption fill.
   - Open question 4 settled (below).
 - Next: a playtest of the full v4 fight with people.

@@ -8,7 +8,7 @@
 ## Hard cut (built 28 Oct, 5c83988)
 
 Chzy18 found the first version too easy ("we need more"), so every layer from the browser mock-up was added:
-1. **Tighter towers:** set B lands 1.6 s after set A (not 2.0 s), between set A's towers. Before 31 Oct it sat on the opposite side, which for 2, 4 and 8 players put it on set A's own spots (proposal fix, sent to the review inbox).
+1. **Tighter towers:** set B lands 1.6 s after set A (not 2.0 s), between set A's towers. Before 31 Oct it sat on the opposite side, which for 2, 4 and 8 players put it on set A's own spots (accepted by Chzy18, 1 Nov).
 2. **Hidden counts:** on even cycles each mould shows "?" instead of its count. You have to remember the last cycle's counts.
 3. **Pours during the towers:** Casting Order at 3.5 s aims through the players while they soak. The pours land at 5.5–7.0 s.
 4. **Backdraft after set B:** pull, then the 5 m blast, starting 0.2 s after the last set lands.
