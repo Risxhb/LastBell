@@ -1043,14 +1043,15 @@ const OPTT = {
 // Seed Storm as it would run past its first loop. Soft enrage: each new loop adds a seed per ring and rings come
 // 0.1 s sooner (8 seeds / 2.0 s → 12 / 1.6 s at loop 5). Hard enrage at 120 s: Last Storm, which wipes.
 const ENRAGE_AT = 120;
+const EASY_STORM = { n: 12, every: 0.8, arms: 3, v: 4.5, rate: 0.15 };
 // loop k (0-based): Medium 8 + k seeds every 2.0 - 0.1k s; Easy keeps the same steps from 6 seeds every 2.5 s. Last Storm is the same on all levels.
 const storm = k => isE() ? { n: 6 + k, every: 2.5 - 0.1 * k } : { n: 8 + k, every: 2.0 - 0.1 * k };
 const OPTV = {
   name: "Seed Storm, enrage", key: "V", len: ENRAGE_AT + 15, phase: 4,
-  pitch: "Proposal for the Phase 4 enrage. The storm thickens every 24 s loop: one more seed per ring and rings 0.1 s sooner, up to 12 seeds every 1.6 s at loop 5. At 2:00 into Phase 4 comes Last Storm: 14-seed rings every 0.6 s and a 4-arm spiral, which wipes the party in seconds.",
+  pitch: "Proposal for the Phase 4 enrage. The storm thickens every 24 s loop: one more seed per ring and rings 0.1 s sooner, up to 12 seeds every 1.6 s at loop 5. At 2:00 into Phase 4 comes Last Storm: 14-seed rings every 0.6 s and a 4-arm spiral, which wipes the party in seconds (slower on Easy).",
   rules: [
     ["Loops 1–5", "Loop 1: 8 seeds every 2.0 s. Loop 2: 9 / 1.9 s. Loop 3: 10 / 1.8 s. Loop 4: 11 / 1.7 s. Loop 5: 12 / 1.6 s."],
-    ["2:00", "Last Storm (hard enrage), with a 3 s banner first. Rings of 14 seeds every 0.6 s, plus a 4-arm spiral."],
+    ["2:00", "Last Storm (hard enrage), with a 3 s banner first. Rings of 14 seeds every 0.6 s, plus a 4-arm spiral. Easy (proposal): 12 seeds every 0.8 s and a 3-arm spiral."],
     ["Timing", "Phase 4 HP gets tuned so a normal party kills her in about 75–90 s, so most fights end in loop 4."],
     ["Jump", "Use the Loop / Last Storm buttons to skip ahead."],
   ],
@@ -1070,7 +1071,10 @@ const OPTV = {
     }
     ev.push({ at: ENRAGE_AT - 3, label: "", fn: () => toll("LAST STORM", 3) });
     ev.push({ at: ENRAGE_AT, label: "Last Storm", fn: () => {
-      W.storm = { n: 14, every: 0.6 }; if (W.sp1) W.sp1.on = false; W.sp1 = spiral(-1, 4, 12 * DEG, 5, 0.15, 9, 7);
+      // Easy (proposal): fewer, slower seeds and a 3-arm spiral, so it downs a player in about twice the time
+      const e = EASY_STORM;
+      W.storm = isE() ? { n: e.n, every: e.every } : { n: 14, every: 0.6 }; if (W.sp1) W.sp1.on = false;
+      W.sp1 = isE() ? spiral(-1, e.arms, 10 * DEG, e.v, e.rate, 9, 7) : spiral(-1, 4, 12 * DEG, 5, 0.15, 9, 7);
     } });
     return ev.sort((a, b) => a.at - b.at);
   },
@@ -1127,7 +1131,7 @@ const OPTZ = {
     ["Phase 2", "Two-Colour Choir, 21 s: brass and cobalt arms and lanes. Only your colour hurts, and each toll swaps it."],
     ["Phase 3", "Hollow Bloom, 24 s: the mask splits. A 4-arm spiral and two waves of Choir Buds to cut."],
     ["Phase 4", "Seed Storm, 24 s: rings of big seeds that burst into petals, over a slow spiral."],
-    ["Level", "Proposal: Easy and Hard (top bar). Hard adds one mechanic per phase: every pod doubled, a double toll burst, one more bud per wave, 10-petal seed bursts. Easy gives longer warnings and fewer bullets. Damage x0.6 / x1.3."],
+    ["Level", "Easy and Hard (top bar), accepted 31 Oct; the softer Easy Last Storm is still a proposal. Hard adds one mechanic per phase: every pod doubled, a double toll burst, one more bud per wave, 10-petal seed bursts. Easy gives longer warnings and fewer bullets. Damage x0.6 / x1.3."],
   ],
   build: () => {
     const ev = []; let t = 0;
@@ -1620,6 +1624,6 @@ function frame(now) {
 }
 if (reduce) S.slow = true, document.getElementById("slow").setAttribute("aria-pressed", "true");
 requestAnimationFrame(frame);
-window.__sylvara = { views, S, run: (v, sec) => { for (let i = 0; i < sec / DT; i++) inView(v, step); }, setOpt: k => { active = views[0]; setOpt(k); } }; // test hook
+window.__sylvara = { views, S, EASY_STORM, run: (v, sec) => { for (let i = 0; i < sec / DT; i++) inView(v, step); }, setOpt: k => { active = views[0]; setOpt(k); } }; // test hook
 })();
 </script>
