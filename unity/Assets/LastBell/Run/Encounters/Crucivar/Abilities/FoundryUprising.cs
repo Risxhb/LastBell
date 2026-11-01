@@ -57,7 +57,7 @@ namespace LastBell.Run
                 Source = "Pour Flood", Shape = HazardShape.Ring, Kind = HazardKind.Ground, Origin = Vector3.zero, Inner = Rim - 1.2f, Radius = Far + Hazard.Margin + 0.5f,
                 LockAt = 0, ResolveAt = deadline, ShareTotal = 1, WipeIfEmpty = true, Includes = _ => false,   // nobody can soak it: it wipes
             });
-            Flood.OnResolve = _ => Floods++;   // counted here: the wipe can end the script before the loop sees it
+            Flood.OnResolve = hz => { Floods++; W.BossFx.RimFlood(hz.Inner, Rim); };   // counted here: the wipe can end the script before the loop sees it
             bool layered = Uprisings > 1;
             IEnumerator<int> draft = null; int draftWait = 0;
             for (t = 0; ; t++)
@@ -97,7 +97,7 @@ namespace LastBell.Run
             var tu = new Turret
             {
                 K = k, Pos = Sim.Dir(yaw) * (Rim + 0.4f), A = pats[(k + Uprisings - 1) % 3], B = pats[(k + Uprisings) % 3],
-                NextFire = t + Sim.Ticks(Rise + (W.Players.Count == 1 ? 0 : Stagger * k)), CastMax = CastHp * (1 + 0.7f * (Mathf.Max(1, W.Players.Count) - 1)),
+                NextFire = t + Sim.Ticks(Rise + (W.Players.Count == 1 ? 0 : Stagger * k)), CastMax = CastHp * (1 + 0.7f * (Fighters() - 1)),   // HP: passive menu bots don't count (Chzy18 10-31)
             };
             float hp = tu.CastMax;
             tu.Casting = new BossPart { Name = "Molten Casting " + Numeral(k), Pos = Sim.Dir(yaw + 180f) * CastRing, BodyRadius = CastRadius, HitHeight = 1.0f };
@@ -222,7 +222,7 @@ namespace LastBell.Run
                 Source = name, Shape = HazardShape.Circle, Kind = HazardKind.Strike, Origin = at, Radius = BulletRadius,
                 ResolveAt = 1, ActiveTicks = ticks, LockAt = ticks + 2, Damage = BulletDmg, Knockback = 0.5f, Stun = 6,
             };
-            h.Track = hz => hz.Origin += vel * Sim.Dt;
+            h.Track = hz => { hz.Origin += vel * Sim.Dt; if (hz.Age % 8 == 4) W.BossFx.Ember(hz.Origin, vel); };
             h.OnSpent = hz => Velocity.Remove(hz);
             Velocity[h] = vel;
             W.Hazards.Spawn(h);

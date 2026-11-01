@@ -24,6 +24,8 @@ namespace LastBell.Run
         // ability set v3 (ABILITIES-v3.md): every ability reads its numbers per cast, so tests can switch sets live
         protected static bool V3 => CrucivarArgs.V3;
         protected List<PlayerController> Standing() => W.Players.FindAll(p => !p.Down);
+        // players who deal damage, for HP scaling (BossEncounter.Spawn's rule): passive menu bots only do the mechanics
+        protected int Fighters() { int f = 0; foreach (var p in W.Players) if (!(p.Input is AllyBot) || AllyBot.Attacks) f++; return Mathf.Max(1, f); }
         protected static Vector3 Flat(Vector3 v) => Sim.Flat(v);
 
         public static float Rim => CombatWorld.PlayerBound;   // 13.7 m in the Brass Foundry

@@ -55,23 +55,37 @@ namespace LastBell.Run
         public int PhaseIndex => phase;
         public int Attacks { get; private set; }
 
-        // v4 (abilities-v4/FIGHT-SHEET.md, proposal): 8500 solo, about 4 min at the measured bot damage, plus PartyStep per
-        // extra fighter, applied in Build once the party is in. v3 uses the packet's 6600 (ABILITIES-v3.md); v1 and v2 keep
-        // the shortened 2500 test value.
+        // v4 (abilities-v4/FIGHT-SHEET.md, accepted 10-29): 8500 solo, about 4 min at the measured bot damage, plus 0.9 per
+        // extra fighter through the shared rule in BossEncounter.Spawn, so passive menu bots don't raise it (Chzy18 10-31).
+        // v3 uses the packet's 6600 (ABILITIES-v3.md); v1 and v2 keep the shortened 2500 test value.
         public const int V4Hp = 8500;
-        public new const float PartyStep = 0.9f;   // hides BossEncounter.PartyStep (Aurelion opt-in); Crucivar scales its own HP in Build
-        public static int V4MaxHp(int players) => Mathf.RoundToInt(V4Hp * (1 + PartyStep * Mathf.Max(0, players - 1)));
+        public const float V4PartyStep = 0.9f;
+        protected override bool PartyScaled => CrucivarArgs.V4;
+        protected override float PartyStep => V4PartyStep;
+        public static int V4MaxHp(int fighters) => Mathf.RoundToInt(V4Hp * (1 + V4PartyStep * Mathf.Max(0, fighters - 1)));
         void Awake() { MaxHp = CrucivarArgs.V4 ? V4Hp : CrucivarArgs.V3 ? 6600 : 2500; BodyRadius = 1.7f; HitHeight = 2.0f; MarkHeight = 4.6f; }
 
         protected override void Build()
         {
-            if (CrucivarArgs.V4 && W.Players.Count > 1) { MaxHp = Mathf.RoundToInt(MaxHp * (1 + PartyStep * (W.Players.Count - 1))); Hp = MaxHp; }   // after the -lastbellBossHp scale
             presenter = CharacterPresenter.Create(transform, "Crucivar", 3f, 0.8f, 0, CrucivarRig.BuildPlaceholder);
             rig = presenter.Visual.gameObject.AddComponent<CrucivarRig>();
             rig.Bind(presenter.Visual);
             PhaseName = "Sealed Furnace";
             BindAbilities();
+            if (CrucivarArgs.V4) { W.Hazards.Spawned -= FoundryLook; W.Hazards.Spawned += FoundryLook; }
         }
+
+        // v4 look pass (Reference/Telegraph-Style 02, approved 10-23): every "get out" warning wears the Brass Foundry motif
+        // (square gear teeth, rivets, molten streaks) over the shared outline, fill and flash. Not on soaks (Mould Towers keep
+        // their count look), standing slag (its own molten tint) or jump bands. Only while he is the live boss.
+        public const int FoundryMotif = 3;
+        void FoundryLook(Hazard h)
+        {
+            if (!this || W == null || W.Boss != this || h.Tele == null) return;
+            if (h.ShareCount > 0 || h.BurnPerSecond > 0 || h.JumpClearable) return;
+            h.Tele.Motif(FoundryMotif);
+        }
+        void OnDestroy() { if (W != null && W.Hazards != null) W.Hazards.Spawned -= FoundryLook; }
 
         int PhaseFor() => Hp > MaxHp * P2At ? 1 : Hp > MaxHp * P3At ? 2 : 3;
 

@@ -180,7 +180,7 @@ namespace LastBell.Run
                 Source = "Furnace Eruption", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Vector3.zero, Radius = Far + 1f,
                 LockAt = 0, ResolveAt = T(EruptWarn), ShareTotal = 1, WipeIfEmpty = true, Includes = _ => false,
             });
-            h.OnResolve = _ => Wipes++;
+            h.OnResolve = _ => { Wipes++; W.BossFx.Eruption(Rim); };
         }
 
         // ---------------- heat and the lone turret ----------------

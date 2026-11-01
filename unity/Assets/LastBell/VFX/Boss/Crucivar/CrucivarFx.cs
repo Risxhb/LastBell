@@ -70,6 +70,49 @@ namespace LastBell.VFX
             CameraShake.Shake(0.2f, 0.22f);
         }
 
+        // ---------------- v4 fire (look pass, 31 Oct) ----------------
+        // Furnace Spin: flame licks along a live jet. Called every few ticks while it sweeps; the jet's telegraph stays the
+        // hit shape, these only rise out of it (short-lived, inside the lane).
+        public void FlameJet(Vector3 origin, float yaw, float length, float width)
+        {
+            var rot = Quaternion.Euler(0, yaw, 0);
+            for (float z = 2.2f; z < length; z += 1.6f)
+            {
+                var p = origin + rot * new Vector3(Random.Range(-0.35f, 0.35f) * width, 0.25f, z + Random.Range(-0.5f, 0.5f));
+                Sparks(p, Vector3.up * 1.2f + rot * Vector3.forward * 0.6f, 2, 0.5f, 3.2f, 0.2f, 0.35f);
+            }
+        }
+
+        // a turret's molten shot: a few embers trail behind the bullet (the moving circle is the hit shape)
+        public void Ember(Vector3 pos, Vector3 vel)
+        {
+            Sparks(new Vector3(pos.x, 0.35f, pos.z), -vel.normalized * 0.4f + Vector3.up * 0.6f, 1, 0.4f, 1.6f, 0.16f, 0.3f);
+        }
+
+        // Pour Flood: the rim ring lands as molten metal all round the arena
+        public void RimFlood(float inner, float outer)
+        {
+            for (int k = 0; k < 24; k++)
+            {
+                var d = Quaternion.Euler(0, k * 15f, 0) * Vector3.forward;
+                Sparks(d * ((inner + outer) * 0.5f) + Vector3.up * 0.3f, Vector3.up, 6, 1.0f, 5.5f, 0.2f, 0.6f);
+            }
+            CameraShake.Shake(0.5f, 0.5f);
+        }
+
+        // Furnace Eruption: the whole floor erupts from the furnace outward
+        public void Eruption(float radius)
+        {
+            SlagSplash(Vector3.zero, radius * 0.5f);
+            BellowsBlast(Vector3.zero, radius);
+            for (int k = 0; k < 16; k++)
+            {
+                var d = Quaternion.Euler(0, k * 22.5f, 0) * Vector3.forward;
+                for (float r = 2f; r < radius; r += 3f) Sparks(d * r + Vector3.up * 0.3f, Vector3.up, 3, 0.8f, 7f, 0.22f, 0.7f);
+            }
+            CameraShake.Shake(0.7f, 0.8f);
+        }
+
         // Rail Ram braking at the lane end: reuses the charge trail and landing.
         public void RamBrake(Vector3 pos) => ChargeLand(pos);
     }

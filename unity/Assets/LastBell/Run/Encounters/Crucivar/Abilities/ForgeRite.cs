@@ -118,7 +118,11 @@ namespace LastBell.Run
                     Damage = JetDmg, Knockback = 1f,
                 };
                 ToWall(h);
-                h.Track = hz => { if (hz.Age >= hz.ResolveAt) hz.Yaw += dir * JetTurnDeg * Sim.Dt; ToWall(hz); };   // turns only once it is live, always reaches the wall
+                h.Track = hz =>
+                {
+                    if (hz.Age >= hz.ResolveAt) hz.Yaw += dir * JetTurnDeg * Sim.Dt; ToWall(hz);   // turns only once it is live, always reaches the wall
+                    if (hz.Age >= hz.ResolveAt && (hz.Age - hz.ResolveAt) % 4 == 0) W.BossFx.FlameJet(hz.Origin, hz.Yaw, hz.Length, hz.Width);   // flames while it sweeps
+                };
                 W.Hazards.Spawn(h);
             }
             Boss.Rig.VentsAll(true);
