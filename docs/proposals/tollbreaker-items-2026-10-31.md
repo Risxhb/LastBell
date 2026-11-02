@@ -19,7 +19,7 @@
 
 These are the numbers from the accepted spec (all TUNE):
 - **Twin Hurl (LMB):**
-  - A tap hits 14 going out and 6 coming back, with a 0.25 s throw rate and a 9 m range.
+  - A tap hits 14 going out and 3 coming back (6 until option B, Chzy18, 2026-11-01), with a 0.25 s throw rate and a 9 m range.
   - Returning axes fly at 18 m/s, so the closer he stands, the faster he throws ("closer is faster").
   - Holding for 0.5 s gives a heavier throw that hits 30 and lodges: 6 s in the boss, 8 s in the floor.
 - **Grinding Toll (2):** an 8 s cooldown. The axe spins in place for 2 s, 1.5 m across, hitting 10 every 0.4 s. It never seeks.
@@ -47,7 +47,7 @@ The tiers mirror the old Vanguard set: 9 Commons, 9 Rares (one Crack combo and o
 | TB11 | Twin Split | R | | With both axes in hand, Splitting Throw throws both. The second lodges beside the first for 50% damage. The bonus doesn't stack, and both hands are empty until Call of Iron | second 75% | works | new: two-axe split throw | V11 Pendulum Cut |
 | TB12 | Quick Grind | R | | Grinding Toll hits every 0.3 s instead of 0.4 s | 0.27 s | works | new: `TollEvery` | V12 Heavy Hour |
 | TB13 | Ringing Return | R | | Each axe Call of Iron sends through the boss takes 2 s off Splitting Throw's cooldown | 3 s | works | new: on-recall-hit event, cooldown refund | V13 Quick Verdict |
-| TB14 | Backswing | R | | Returning Twin Hurl axes hit 12 instead of 6 | 15 | works | new: `TapBack` | V14 Iron Echo |
+| TB14 | Backswing | R | | Returning Twin Hurl axes hit 6 instead of 3 (rebased 2026-11-01) | 7 | works | new: `TapBack` | V14 Iron Echo |
 | TB15 | Anchor Line | R | | Floor-lodged axes last 12 s instead of 8, and Call of Iron from the floor deals +20% | +30% | works | new: `FloorLodgeTicks`; built: damage hook (recall, floor source) | V15 Second Step |
 | TB16 | Berserker's Pace | R | | Each Twin Hurl hit from within 4 m adds +2% damage for 3 s, up to +10%. Lost when you're hit | +3% each, up to +15% | works | new: stack counter, distance to boss; built: on-hit reset | V16 Rhythm Keeper |
 | TB17 | Riven Iron | R | | An axe Call of Iron sends through the boss cracks it for 4 s: **your own** Splitting Throw and Call of Iron hits on it deal +15%. Personal only, with no ally effect (Chzy18, 2026-11-01) | +22.5% | works | built: Crack state (Cracked Armour), personal; new: recall trigger | V17 Cracked Armour (slice) |
