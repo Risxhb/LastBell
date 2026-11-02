@@ -8,7 +8,9 @@ namespace LastBell.Run
 {
     // Watch mode: four bots play Crucivar in the Brass Foundry while you look on (practice only, never in a run):
     //   Unity.exe -projectPath unity -executeMethod LastBell.Run.EditorTools.CrucivarTestTools.PlayModeTest
-    //             -crucivarWatch [-lastbellBossHp 0.4]
+    //             -crucivarWatch [-lastbellBossHp 0.4] [-crucivarAllyBot]
+    // -crucivarAllyBot hands every bot to the shared AllyBot (Perfect, attacking), which knows each class kit (Tollbreaker
+    // included); the watch logging, pacing and measure mode stay the same.
     // The boss runs its real schedule. Each bot is a real PlayerController on scripted input: it scores spots around
     // itself against every live hazard (where the jets will have turned to, Backdraft's pull, its own brand vs the
     // others, the pools), walks to the best one, dashes when a hit is about to land, and hits the boss in between.
@@ -34,8 +36,10 @@ namespace LastBell.Run
         {
             public string Name; public PlayerController P; public Vector3 Goal; public bool Dash, Attack; public Vector3 Aim, Target; public float TargetRadius; public Vector3? Tower;
             public float NextPlan; public int Hits, Damage, Downs;
+            public AllyBot Ally;   // -crucivarAllyBot: the shared bot drives
             public PlayerInput Read(PlayerController who)
             {
+                if (Ally != null) return Ally.Read(who);
                 var r = new PlayerInput { Aim = Aim };
                 var to = Sim.Flat(Goal - who.transform.position);
                 Vector3 move = to.magnitude < 0.15f ? Vector3.zero : to.normalized;
@@ -59,6 +63,7 @@ namespace LastBell.Run
         // boss is set just past the threshold; the log gets the players' damage per phase. Until then the boss is held just
         // above the threshold, so the bots never cross it themselves. -crucivarBots n (1-8) sets the party; the editor quits after the fight.
         static bool Measure => Environment.GetCommandLineArgs().Any(a => a.Equals("-crucivarMeasure", StringComparison.OrdinalIgnoreCase));
+        static bool UseAllyBot => Environment.GetCommandLineArgs().Any(a => a.Equals("-crucivarAllyBot", StringComparison.OrdinalIgnoreCase));
         static int BotCount => int.TryParse(CrucivarArgs.Arg("-crucivarBots"), out int n) ? Mathf.Clamp(n, 1, 8) : 4;
 
         void MeasureLog(int ph, int loops, float secs, int dealt, string note) =>
@@ -77,7 +82,8 @@ namespace LastBell.Run
             while (true)
             {
                 bots.Clear();
-                var lead = new Bot { Name = Names[0] };
+                if (UseAllyBot) AllyBot.Attacks = true;
+                var lead = new Bot { Name = Names[0], Ally = UseAllyBot ? new AllyBot(0, BotCount, BotMode.Perfect) : null };
                 d.InputOverride = lead;
                 if (d.State == RunState.Results) d.RequestRetry();
                 if (d.State == RunState.Menu) d.StartPractice(Classes[0], RunDirector.CrucivarPractice);
@@ -89,7 +95,7 @@ namespace LastBell.Run
                 for (int i = 1; i < BotCount; i++)
                 {
                     var p = PlayerController.Spawn(w, Classes[i % Classes.Length], new Vector3(-4.5f + 1.5f * i, 0, 6f), 180);
-                    var b = new Bot { Name = "Bot " + (i + 1), P = p };
+                    var b = new Bot { Name = "Bot " + (i + 1), P = p, Ally = UseAllyBot ? new AllyBot(i, BotCount, BotMode.Perfect) : null };
                     p.Input = b; p.AbilitiesEnabled = true; bots.Add(b);
                 }
                 foreach (var b in bots) b.Goal = b.P.transform.position;
