@@ -10,6 +10,7 @@ namespace LastBell.Run
     public static class RunParty
     {
         public const int MaxAllies = 7;
+        public static readonly string[] Retired = { "Vanguard" };   // Chzy18, 2 Nov: Vanguard is retired; never a bot ally (Tollbreaker replaces it)
         static bool loaded; static int selected;
 
         public static int Selected
@@ -18,11 +19,11 @@ namespace LastBell.Run
             set { Load(); selected = Mathf.Clamp(value, 0, MaxAllies); }
         }
 
-        // Ally classes, spread across all three: start with the classes the player didn't pick, then cycle, so 7 allies
+        // Ally classes, spread across the current classes (never a retired one): start with the classes the player didn't pick, then cycle, so 7 allies
         // are 3 / 2 / 2 (with the player, the party is never one class unless there is a single ally).
         public static string[] AllyClasses(string playerClass, int allies)
         {
-            var cls = RunDirector.Classes; int start = Mathf.Max(0, Array.IndexOf(cls, playerClass)) + 1;
+            var cls = Array.FindAll(RunDirector.Classes, c => Array.IndexOf(Retired, c) < 0); int start = Mathf.Max(0, Array.IndexOf(cls, playerClass)) + 1;
             var r = new string[allies];
             for (int i = 0; i < allies; i++) r[i] = cls[(start + i) % cls.Length];
             return r;

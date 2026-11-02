@@ -197,7 +197,7 @@ namespace LastBell.Run
         // attacks, at its range; reports DPS and the boss HP a 6:00 solo fight would want (about 4.6 min of uptime)
         IEnumerator V4Dps()
         {
-            foreach (var cls in new[] { "Arcanist", "Chimesinger", "Vanguard" })
+            foreach (var cls in new[] { "Arcanist", "Chimesinger" })   // Vanguard retired (Chzy18, 2 Nov)
             {
                 yield return V2Setup(1, Difficulty.Medium, new[] { new Vector3(0, 0, -12f) }, 1, Vector3.zero);
                 if (V2Boss == null) yield break;
