@@ -38,6 +38,8 @@ Add-Row 1 'Ember Brand' 'leave another carrier''s 3 m brand (it lands 3.5 s afte
 Add-Row 1 'Furnace Spin' 'at the wall: walk in to where the gap can be followed (jets turn 40 deg/s, shown 1.5 s)' ($Arena - $Walk / (40 * [math]::PI / 180)) (1.5 * $ws) ("follow radius walking {0:F1} m, sprinting {1:F1} m; at the wall the gap moves {2:F1} m/s" -f ($Walk / (40 * [math]::PI / 180)), ($Sprint / (40 * [math]::PI / 180)), ($Arena * 40 * [math]::PI / 180))
 # Backdraft: from hugging the boss to outside the 5 m blast by 3.0 s, while a 2 m inward pull runs for 0.4 s of it
 Add-Row 1 'Backdraft' 'from hugging the boss to outside the 5 m blast, against the 2 m pull' ((5.0 + $M - $hug) + 2.0) (3.0 * $ws) 'pull counted as extra distance'
+Add-Row 1 'Backdraft II' 'carrying the second brand: out of the 5 m blast from hugging the boss, against the 2 m pull (from 14.0 s, 11-01)' ((5.0 + $M - $hug) + 2.0) (3.0 * $ws) 'the brand lands 3.5 s after it appears, so the carrier has the blast window too'
+Add-Row 1 'Brand Pool' 'step off the 2 m pool that forms under you (it heats 1.0 s before it burns, 11-01)' (2.0 + $M) (1.0 * $ws)
 Add-Row 1 'Casting Order' 'leave your locked pour lane (2.6 m wide, locks 1.5 s before it lands)' (2.6 / 2 + $M) (1.5 * $ws)
 Add-Row 1 'Anvil Quake' 'hugging the boss: leave the inner circle (0-4 m) before 1.4 s' (4.0 + $M - $hug) (1.4 * $ws)
 Add-Row 1 'Anvil Quake' 'cross a band edge into the band that just went off (0.8 s between bands)' (2 * $M) (0.8 * $ws)
@@ -48,6 +50,7 @@ if ($Level -eq 'Hard') {
 # ---------------- Phase 2 Foundry Uprising (FoundryUprising.cs) ----------------
 $warn2 = if ($Level -eq 'Easy') { 2.5 } else { 2.0 }
 Add-Row 2 'Lane Stream' 'leave a 1 m bullet lane (paths drawn first)' (0.5 + $M) $warn2
+Add-Row 2 'Lane Stream (dense, 11-01)' 'step into the 1.0 m safe strip between two of the 5 lanes (2.6 m apart), from a lane centre' (1.3) $warn2 'or step outside the outer lanes'
 $code = @'
 using System;
 public static class V4Esc {
@@ -105,6 +108,7 @@ Add-Row 3 'Mould Towers' 'set A to set B (90 deg apart since 31 Oct), from the n
 Add-Row 3 'Mould Towers' 'set A to set B, from the far edge of A (worst soaker)' (2 * $rad * [math]::Sin([math]::PI / 4)) 1.6
 Add-Row 3 'Mould Towers' 'solo: tower I to tower II (60 deg apart), from the far edge of I' (2 * $rad * [math]::Sin([math]::PI / 6)) 1.6
 Add-Row 3 'Crown Rise' 'from the wall to inside the new edge (13.7 -> 11 m, the widest step)' (13.7 - 11 + $M) $crownWarn
+Add-Row 3 'Tower Slag' 'step off the slag a landed tower leaves (2 m, heats 1.0 s, 11-01)' (2.0 + $M) (1.0 * $ws) 'a rising tower also cools any burn on its spot'
 if ($Level -eq 'Hard') { Add-Row 3 'Second Press (Hard)' 'leave the re-stamped tower from its centre' (2.2 + $M) 2.0 }
 
 # ---------------- report ----------------

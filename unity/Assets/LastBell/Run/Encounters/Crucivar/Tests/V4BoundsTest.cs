@@ -49,8 +49,10 @@ namespace LastBell.Run
                 var outer = t.Spawns.First(x => x.Source == "Anvil Quake III").H;
                 t.Check($"{tag}: the outer Anvil Quake band covers the far spot", outer.Contains(far), $"radius {outer.Radius:0.0}");
                 var jets = t.Spawned("Furnace Spin").Select(x => x.H).ToList();
-                bool jetsReach = jets.All(j => { return j.Length >= Sim.Flat(far).magnitude && j.Contains(Sim.Dir(j.Yaw) * (Sim.Flat(far).magnitude - 0.1f)); });
-                t.Check($"{tag}: every Furnace Spin jet reaches the farthest spot along it", jets.Count == 4 && jetsReach, string.Join("/", jets.Select(j => $"{j.Yaw:0}:{j.Length:0.0}")));
+                // each jet runs to the floor edge along its own heading, and one of them crosses the far spot
+                bool jetsReach = jets.All(j => { float e = CrucivarAbility.WallDist(j.Origin, Sim.Dir(j.Yaw)) * b / (b + Hazard.Margin); return j.Contains(Sim.Dir(j.Yaw) * (e - 0.1f)); })
+                    && jets.Any(j => j.Contains(far));
+                t.Check($"{tag}: every Furnace Spin jet reaches the floor edge, and one crosses the far spot", jets.Count == ForgeRite.JetCount && jetsReach, string.Join("/", jets.Select(j => $"{j.Yaw:0}:{j.Length:0.0}")));
                 t.Check($"{tag}: the floor edge along any heading is inside the wall distance", Enumerable.Range(0, 72).All(k =>
                 {
                     var d = Sim.Dir(k * 5f); float w = CrucivarAbility.WallDist(Vector3.zero, d) * b / (b + Hazard.Margin);   // from the centre the margin scales with the ray, so this is the floor edge

@@ -26,6 +26,9 @@ namespace LastBell.Run
 
         public const float LoopLength = 20.5f, Punish = 3.0f;
         public const float BrandRadius = 3f, BrandLand = 3.5f, PoolRadius = 2f, PoolBurn = 20f;
+        // a new slag pool heats for 1.0 s before it burns, so whoever it forms under can step off (Chzy18 11-01: no unavoidable damage)
+        public const float PoolArm = 1.0f;
+        public const int JetCount = 6;   // since 11-01 (Chzy18: Phase 1 too easy), was 4
         public const int BrandDmg = 30;
         public const float JetWidth = 1.8f, JetShow = 1.5f, JetSweep = 4f, JetTurnDeg = 40f;
         public const int JetDmg = 30;
@@ -67,6 +70,10 @@ namespace LastBell.Run
             Boss.SetCurrent("Anvil Quake"); AnvilQuake(echo: Hard);
             foreach (var w in Until(13.5f)) yield return w;
             Boss.SetCurrent("Ember Brand"); EmberBrand();
+            // second Backdraft (11-01): its pull drags the brand carriers back in while they walk their brands out
+            foreach (var w in Until(14.0f)) yield return w;
+            Boss.SetCurrent("Backdraft");
+            foreach (var w in Backdraft()) { t += w; yield return w; }
             foreach (var w in Until(17.5f)) yield return w;
         }
 
@@ -89,7 +96,7 @@ namespace LastBell.Run
                     Pools.Add(W.Hazards.Spawn(new Hazard
                     {
                         Source = "Brand Pool", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = hz.Origin, Radius = PoolRadius,
-                        LockAt = 0, ResolveAt = Sim.Ticks(3600), BurnPerSecond = PoolBurn,   // lasts until the phase ends
+                        LockAt = T(PoolArm), ResolveAt = Sim.Ticks(3600), BurnPerSecond = PoolBurn,   // heats for PoolArm, then lasts until the phase ends
                     }));
                 };
                 W.Hazards.Spawn(h);
@@ -109,11 +116,11 @@ namespace LastBell.Run
             var origin = Flat(Boss.transform.position);
             float baseYaw = Boss.transform.eulerAngles.y + 45f, dir = loops % 2 == 1 ? 1f : -1f;
             int show = T(JetShow), sweep = Sim.Ticks(JetSweep);
-            for (int k = 0; k < 4; k++)
+            for (int k = 0; k < JetCount; k++)
             {
                 var h = new Hazard
                 {
-                    Source = "Furnace Spin", Shape = HazardShape.Lane, Kind = HazardKind.Strike, Origin = origin, Yaw = baseYaw + 90f * k,
+                    Source = "Furnace Spin", Shape = HazardShape.Lane, Kind = HazardKind.Strike, Origin = origin, Yaw = baseYaw + 360f / JetCount * k,
                     Width = JetWidth, ResolveAt = show, ActiveTicks = sweep, LockAt = show + sweep + 1,
                     Damage = JetDmg, Knockback = 1f,
                 };

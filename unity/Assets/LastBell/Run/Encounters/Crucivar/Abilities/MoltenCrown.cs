@@ -10,7 +10,7 @@ namespace LastBell.Run
     //        inside when a tower lands counts: too few = Molten Overflow (party wipe), extras farthest out take 50. Every
     //        landed tower leaves slag (20/s) for the phase. Even cycles hide the counts ("?"): remember the last cycle's.
     //        Solo: three one-player towers 1.6 s apart.
-    //  3.5  Casting Order: pours aimed through the players while they soak (lands 5.5-7.0)
+    //  B+3.4 Casting Order, after the towers and Backdraft (was 3.5 s, through the soakers; moved 11-01)
     //  B+0.2 Backdraft right after the last set lands (pull, then the 5 m blast)
     //  9.5  Ember Brand (pools last the phase)
     // 10.0  Crown Rise: the rim from the new edge out turns to molten crown (50/s) for good, 3.0 s warning:
@@ -68,7 +68,9 @@ namespace LastBell.Run
                     if (t == Sim.Ticks(SetGap * s)) RiseSet(sets[s], s, sets[0].Length);
                     if (Hard && t == Sim.Ticks(SetGap * s) + T(Rise) + 2 && fullest.TryGetValue(s, out var f)) Press(f.h.Origin);   // the set has landed
                 }
-                if (t == Sim.Ticks(3.5f)) { Boss.SetCurrent("Casting Order"); Boss.Rite.CastingOrder(); }
+                // after the towers and Backdraft (11-01): at 3.5 s the pours locked onto set B soakers who had to stay put
+                if (t == Sim.Ticks(lastLand + 3.4f)) { Boss.SetCurrent("Casting Order"); Boss.Rite.CastingOrder(); }
+                CoolTowerSpots();
                 if (t == Sim.Ticks(lastLand + 0.2f)) { Boss.SetCurrent("Backdraft"); draft = Boss.Rite.Backdraft().GetEnumerator(); draftWait = 0; }
                 if (draft != null && --draftWait <= 0) { if (draft.MoveNext()) draftWait = draft.Current; else draft = null; }
                 if (t == Sim.Ticks(9.5f)) { Boss.SetCurrent("Ember Brand"); Boss.Rite.EmberBrand(); }
@@ -112,6 +114,24 @@ namespace LastBell.Run
             Boss.Rig.Pour(true);
         }
 
+        // a rising mould cools any burning ground it touches (old slag, brand pools, pour channels), so soaking never means
+        // standing in burn (Chzy18 11-01: no unavoidable damage)
+        public int Cooled { get; private set; }
+        void CoolTowerSpots()
+        {
+            foreach (var tw in Towers)
+            {
+                if (!W.Hazards.Live.Contains(tw.H)) continue;
+                foreach (var b in W.Hazards.Live)
+                {
+                    if (b.BurnPerSecond <= 0 || b.Source == "Molten Crown" || b.ResolveAt <= b.Age + 1) continue;
+                    bool touches = b.Contains(tw.H.Origin);
+                    for (int k = 0; k < 8 && !touches; k++) touches = b.Contains(tw.H.Origin + Sim.Dir(k * 45f) * (TowerRadius + 0.5f));
+                    if (touches) { b.ResolveAt = b.Age + 1; Cooled++; }
+                }
+            }
+        }
+
         void Land(Hazard h, int need, int set)
         {
             var inside = Standing().Where(p => h.Contains(p.transform.position)).ToList();
@@ -122,7 +142,7 @@ namespace LastBell.Run
             Boss.Rite.Pools.Add(W.Hazards.Spawn(new Hazard
             {
                 Source = "Tower Slag", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = h.Origin, Radius = TowerRadius,
-                LockAt = 0, ResolveAt = Sim.Ticks(3600), BurnPerSecond = SlagBurn,
+                LockAt = T(ForgeRite.PoolArm), ResolveAt = Sim.Ticks(3600), BurnPerSecond = SlagBurn,   // heats first: the soakers step off
             }));
         }
 

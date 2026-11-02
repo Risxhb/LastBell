@@ -33,7 +33,7 @@ namespace LastBell.Run
             c0 = t.Spawned("Ember Brand").Select(x => x.Tick).DefaultIfEmpty(c0).Min();
             int R(string src) => t.Spawned(src).Select(x => x.Tick - c0 + x.H.ResolveAt).DefaultIfEmpty(-1).Min();
             t.Check("Ember Brand: one per player, lands at 3.5 s", t.Spawned("Ember Brand").Count() == 8 && R("Ember Brand") >= 210 && R("Ember Brand") <= 212, $"{t.Spawned("Ember Brand").Count()} brands, {R("Ember Brand")}");
-            t.Check("Furnace Spin: four jets live from 3.5 s for 4 s", t.Spawned("Furnace Spin").Count() == 4 && t.Spawned("Furnace Spin").All(x => x.H.ActiveTicks == 240), $"{t.Spawned("Furnace Spin").Count()}");
+            t.Check("Furnace Spin: six jets live from 3.5 s for 4 s", t.Spawned("Furnace Spin").Count() == ForgeRite.JetCount && t.Spawned("Furnace Spin").All(x => x.H.ActiveTicks == 240), $"{t.Spawned("Furnace Spin").Count()}");
             var jet = t.Spawned("Furnace Spin").First().H;
             t.Check("Furnace Spin: the jets turned while live", Mathf.Abs(Mathf.DeltaAngle(jet.Yaw, t.Spawned("Furnace Spin").First().H.Yaw)) >= 0 && jet.Age > jet.ResolveAt);
             t.Check("Furnace Spin: every jet reaches the wall", t.Spawned("Furnace Spin").All(x => Mathf.Abs((Sim.Flat(x.H.Origin) + Sim.Dir(x.H.Yaw) * x.H.Length).magnitude - (CrucivarAbility.Rim + Hazard.Margin)) < 0.05f));
@@ -53,6 +53,9 @@ namespace LastBell.Run
                 $"{R("Anvil Quake I")}/{R("Anvil Quake II")}/{R("Anvil Quake III")}");
             t.Check("peak of live patterns is three or more", peak >= 3, $"peak {peak}");
             t.Check("still players get hit (brands on each other, jets, blast, quake)", t.Hits.Count > 0, $"{t.Hits.Count} hits");
+            t.Check("brand pools heat 1.0 s before they burn (the carrier can step off)", t.Spawned("Brand Pool").All(x => x.H.LockAt == Sim.Ticks(ForgeRite.PoolArm)));
+            var drafts = t.Spawned("Backdraft").Select(x => x.Tick - c0).ToList();
+            t.Check("a second Backdraft pulls during the second brand (from 14.0 s)", drafts.Count >= 2 && drafts.Max() - drafts.Min() >= Sim.Ticks(8.5f), string.Join("/", drafts));
             int pools = t.W.Hazards.Live.Count(h => h.Source == "Brand Pool");
             t.Check("brand pools outlast the loop", pools == 8, $"{pools} live");
             t.Boss.Rite.ClearPools();

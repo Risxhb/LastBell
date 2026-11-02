@@ -44,7 +44,10 @@ namespace LastBell.Run
             float gapAB = towB.Count == 0 || towA.Count == 0 ? 0 : towB.Min(b => towA.Min(a => Sim.Flat(b.H.Origin - a.H.Origin).magnitude));
             t.Check("set B lands between set A's towers, not on them (you soak A, then run to B)", gapAB >= MoltenCrown.TowerRadius * 2f, $"nearest A-B {gapAB:0.0} m");
             t.Check("filled towers land safe (no wipe) and leave slag", crown.Wipes == 0 && t.Spawned("Tower Slag").Count() == 4, $"wipes {crown.Wipes}, slag {t.Spawned("Tower Slag").Count()}");
-            t.Check("pours aimed through the party during the towers", t.Spawned("Pour I").Any());
+            var lastTower = towers.Max(x => x.Tick + x.H.ResolveAt);
+            t.Check("pours come after the towers have landed (no pour lands on a soaker who must stay)", t.Spawned("Pour I").Any() && t.Spawned("Pour ").Where(x => !x.Source.Contains("Channel")).All(x => x.Tick > lastTower),
+                string.Join("/", t.Spawned("Pour ").Select(x => x.Tick - lastTower)));
+            t.Check("tower slag heats 1.0 s before it burns", t.Spawned("Tower Slag").All(x => x.H.LockAt == Sim.Ticks(ForgeRite.PoolArm)));
             t.Check("Backdraft right after set B", t.Spawned("Backdraft").Any());
             t.Check("the lava turret fires Lane Streams", t.Spawns.Any(x => x.Source == "Lane Stream bullet"));
             t.Check("the crown rises to 11 m and burns for good", crown.Crowns == 1 && Mathf.Approximately(crown.Edge, 11f) && t.W.Hazards.Live.Any(h => h.Source == "Molten Crown" && h.BurnPerSecond > 0),
@@ -57,8 +60,16 @@ namespace LastBell.Run
             // second cycle, on Hard: the counts are hidden, and Second Press re-stamps the fullest tower of each set 2.0 s after it lands
             yield return t.Until(() => !t.Boss.TestBusy, 5f, "cycle 1 over");
             yield return t.Setup(4, Difficulty.Hard, at: new[] { new Vector3(0, 0, 4f), new Vector3(4, 0, 0), new Vector3(0, 0, -4f), new Vector3(-4, 0, 0) });
-            int presses0 = crown.Presses;
+            int presses0 = crown.Presses, cooled0 = crown.Cooled;
             t.Begin(crown.Run());
+            yield return t.Ticks(2);
+            // burning ground all round the tower ring: every piece that touches a rising tower cools at once
+            for (int k = 0; k < 24; k++) t.W.Hazards.Spawn(new Hazard { Source = "Test Slag", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Sim.Dir(k * 15f) * 5.5f, Radius = 2f, LockAt = 0, ResolveAt = Sim.Ticks(1f), BurnPerSecond = 20f });   // short-lived: it must not outlast this check
+            yield return t.Ticks(3);
+            bool Touch(Hazard b, Hazard tw) => b.Contains(tw.Origin) || Enumerable.Range(0, 8).Any(k => b.Contains(tw.Origin + Sim.Dir(k * 45f) * MoltenCrown.TowerRadius));
+            var pend = crown.Towers.Where(x => x.H.Age < x.H.ResolveAt).Select(x => x.H).ToList();
+            t.Check("a rising tower cools the burning ground on its spot (soaking never means standing in burn)", pend.Count > 0 && crown.Cooled > cooled0
+                && !t.W.Hazards.Live.Any(b => b.BurnPerSecond > 0 && b.Age < b.ResolveAt - 1 && pend.Any(tw => Touch(b, tw))), $"cooled {crown.Cooled - cooled0}, pending {pend.Count}");
             s = 0; bool hidden = false;
             while (s < 12f && t.Boss.TestBusy)
             {
@@ -85,6 +96,8 @@ namespace LastBell.Run
             for (s = 0; s < 30f && t.Boss.TestBusy; s += Time.deltaTime) { foreach (var p in t.Party) p.DebugSetHp(PlayerController.MaxHp); yield return null; }   // keep the party up until the Hard cycle ends
             t.Check("the Hard cycle runs to its end", !t.Boss.TestBusy);
             yield return t.Setup(4, at: new[] { new Vector3(0, 0, 4f), new Vector3(4, 0, 0), new Vector3(0, 0, -4f), new Vector3(-4, 0, 0) });
+            if (t.Boss == null) yield break;
+            crown = t.Boss.Crown;   // the last pour channels can down the idle party after the Hard cycle, which restarts the encounter
             foreach (var p in t.Party) { p.DebugSetHp(PlayerController.MaxHp); t.Place(p, new Vector3(0, 0, 9.5f)); }
             t.Begin(crown.Run());
             yield return t.Until(() => t.Party.All(p => p.Down), 8f, "overflow");

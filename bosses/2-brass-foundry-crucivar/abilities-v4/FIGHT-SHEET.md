@@ -78,3 +78,22 @@ The difficulty damage scale is unchanged (damage scale only, per the difficulty 
 2. PartyStep 0.9: should co-op be longer than solo (Aurelion's 1.25) or about the same?
 3. ~~Phase 1 Hard~~: settled 30 Oct, Quake Echo.
 4. ~~Menu bots and HP~~: settled 31 Oct. Crucivar uses the shared `BossEncounter.Spawn` rule: passive menu bots don't raise the boss or casting HP, while mechanic counts keep scaling with everyone standing.
+
+## Playtest changes, 1 Nov (proposal)
+Chzy18's playtest found Phases 1 and 2 too easy, Phase 2 short on bullets, and unavoidable damage in the soak and pool mechanics.
+- **No unavoidable damage:**
+  - Brand pools and tower slag now heat for 1.0 s (1.25 s on Easy) before they burn, so whoever they form under can step off.
+  - A rising Mould Tower cools any burning ground on its spot (old slag, brand pools, pour channels).
+  - Phase 3 Casting Order moved from 3.5 s to after the towers and Backdraft. Its pours had locked onto set B soakers who had to stay in their tower.
+- **Phase 1 harder:**
+  - Furnace Spin has 6 jets (was 4), so the gaps are 60° apart.
+  - A second Backdraft starts at 14.0 s, pulling the second-brand carriers back in while they walk out.
+- **Phase 2 more bullets:**
+  - Lane Stream fires 5 lanes of 8 bullets (was 3 of 5), 2.6 m apart with a 1.0 m safe strip between them.
+  - Ring Wave fires a second wave on the same gaps 0.6 s later.
+  - Spiral Arm runs 2.4 s (was 1.6).
+  - The rest between volleys is halved (0.5 s, 0.3 s from the third uprising).
+  - Phase 3's lone lava turret is unchanged.
+- **Checks:**
+  - The escape check passes on Easy, Medium and Hard, with new rows for the second Backdraft, the pools, the tower slag and the dense lanes.
+  - The v4 tests pass 76/76.
