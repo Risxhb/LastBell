@@ -35,12 +35,12 @@ namespace LastBell.Run
         }
         public static readonly BossEntry[] Bosses =
         {
-            // the final boss is the Bellkeeper Ultimate (Chzy18, 30 Oct: the run's final slot spawns it at the run's level; the v1
-            // fight is archived, out of the run and the menus, reachable only by a test's SetOverride). Practice opens on the Throne;
-            // a run's map comes from its first boss, so the map here never moves a run. Phases P1-P5 (T1/T2 on -lastbellUltimatePhase).
+            // the final boss is the Bellkeeper Ultimate (Chzy18, 30 Oct: the run's final slot spawns it at the run's level; v1
+            // fight is retired, 1 Nov). Practice opens on the Throne;
+            // a run's map comes from its first boss, so the map here never moves a run. Phases P1-P5.
             new BossEntry("Bellkeeper", BellkeeperEncounter.SpawnUltimate, map: BellkeeperEncounter.ThroneMap, final: true, phases: 5),
             // Skyward Spire area boss; authored practice map
-            new BossEntry("Aurelion (area 1)", w => BossEncounter.Spawn<AurelionEncounter>(w, new Vector3(0, 0, -1.5f), 0), map: AurelionMap, phases: 3),
+            new BossEntry("Aurelion (area 1)", w => BossEncounter.Spawn<AurelionEncounter>(w, new Vector3(0, 0, -1.5f), 0), map: AurelionMap, phases: AurelionArgs.V4 ? 4 : 3),   // v4 (the default set) adds Last Light
             // Verdant Chimes area boss (graybox); authored practice map
             new BossEntry("Sylvara (area 3)", w => BossEncounter.Spawn<SylvaraEncounter>(w, new Vector3(0, 0, -1.5f), 0), map: SylvaraMap, phases: 3),
             // Brass Foundry area boss; authored practice map
@@ -137,6 +137,7 @@ namespace LastBell.Run
             int map = RunMaps.Current;
             if (map >= 0) CombatWorld.SetPlayerBound(RunMaps.All[map].Bound, RunMaps.All[map].Square);
             if (!GetComponent<RunHud>()) gameObject.AddComponent<RunHud>();
+            if (!GetComponent<Shop.RunShopFlow>()) gameObject.AddComponent<Shop.RunShopFlow>();   // intermission shop (docs/design/run-shop-plan.md)
             LastBell.Menu.MenuSettings.ApplyFrameRate();   // Settings: VSync (off by default) and FPS cap (120 by default)
             if (RunAutoTest.Requested) RunAutoTest.Launch();
         }
@@ -174,8 +175,7 @@ namespace LastBell.Run
         {
             encounter = Mathf.Clamp(encounter, 0, Bosses.Length - 1);
             var map = Bosses[encounter].Map;
-            // the archived v1 Bellkeeper (a test's SetOverride) has no arena of its own: it stays on the current map
-            if (Bosses[encounter].Final && BellkeeperEncounter.SetOverride == BellkeeperEncounter.AbilitySet.V1) map = null;
+            if (PracticeStaysOnMap) map = null;   // tests: the run-loop checks practise on the map they are touring
             if (map != null && State == RunState.Menu)
             {
                 int v = RunMaps.IndexOf(map);
@@ -184,6 +184,7 @@ namespace LastBell.Run
             return Begin(RunMode.Practice, className, encounter, phase);
         }
         static (string cls, int enc, int phase)? pendingPractice;   // survives the scene load
+        public static bool PracticeStaysOnMap;   // tests only (run-loop checks); the menu always takes a boss to its own arena
         void Start()
         {
             if (LastBell.Menu.MenuLaunch.Consume(this)) { pendingPractice = null; return; }
@@ -293,7 +294,7 @@ namespace LastBell.Run
             for (int i = 0; i < allyClasses.Length; i++)
             {
                 var a = PlayerController.Spawn(World, allyClasses[i], AllySocket(i), 180);
-                a.Input = new AllyBot(i, allyClasses.Length); a.AbilitiesEnabled = false; a.Presenter.GetUp();
+                a.Input = new AllyBot(i, allyClasses.Length, AllyBot.AllyMode); a.AbilitiesEnabled = false; a.Presenter.GetUp();
                 Allies.Add(a);
             }
             Encounter = startEncounter; practiceEncounter = startEncounter;
@@ -321,20 +322,21 @@ namespace LastBell.Run
             ApplyPracticePhase();   // the boss bar shows the chosen phase during the intro
             World.Boss = Boss;
             World.CombatActive = false;
-            // health policy (see PlayerController.RefreshHealth): every run boss after the first refills health; the last
-            // also refills potions. A practice starts with a fresh player.
+            // health policy (gpt/08 §3): every run boss after the first refills health, and an area's final boss also refills
+            // potions. Every boss in the run is an area boss for now (minibosses aren't in runs yet), so all of them refill both.
+            // A practice starts with a fresh player.
             int pos = Array.IndexOf(EncounterOrder, index);
-            if (Mode == RunMode.Run && pos > 0) Player.RefreshHealth(refillPotions: pos == EncounterOrder.Length - 1);
+            if (Mode == RunMode.Run && pos > 0) Player.RefreshHealth(refillPotions: true);
             Player.PrepareForEncounter(PlayerSocket, 180);
             Player.AbilitiesEnabled = false;
-            // the Bellkeeper Ultimate's menu allies are its Perfect strat bots (GUIDE.md: mechanics and attacks); elsewhere AllyBot
-            bool ultimate = Boss is BellkeeperEncounter bk && bk.Set == BellkeeperEncounter.AbilitySet.Ultimate;
+            // the Bellkeeper Ultimate's menu allies are its Perfect strat bots (mechanics and attacks); elsewhere AllyBot
+            bool ultimate = Boss is BellkeeperEncounter && !BellkeeperEncounter.TestIdle;   // the idle test target keeps passive allies
             for (int i = 0; i < Allies.Count; i++)
             {
                 if (Mode == RunMode.Run && pos > 0) Allies[i].RefreshHealth(refillPotions: pos == RunOrder.Length - 1);
                 Allies[i].PrepareForEncounter(AllySocket(i), 180); Allies[i].AbilitiesEnabled = false;
                 if (ultimate) UltimateParty.Drive(Allies[i], i + 1, Allies.Count + 1);
-                else if (!(Allies[i].Input is AllyBot)) Allies[i].Input = new AllyBot(i, Allies.Count);
+                else if (!(Allies[i].Input is AllyBot)) Allies[i].Input = new AllyBot(i, Allies.Count, AllyBot.AllyMode);
             }
             Go(RunState.Intro);
         }
@@ -410,7 +412,7 @@ namespace LastBell.Run
             if (State == RunState.Combat || State == RunState.Cleared || State == RunState.Downed) RunTicks++;
             if (gen != Generation) return;
             // practice has no preparation card: it starts by itself after a short beat (tests keep the manual Ready)
-            if (State == RunState.Ready && Mode == RunMode.Practice && AutoReady && StateTicks >= PracticeAutoReadyTicks) { RequestReady(); return; }
+            if (State == RunState.Ready && Mode == RunMode.Practice && AutoReady && StateTicks >= PracticeAutoReadyTicks && !Shop.RunShopFlow.Showing) { RequestReady(); return; }   // an area-boss practice shop waits for Ready
             switch (State)
             {
                 case RunState.Intro:
@@ -437,6 +439,8 @@ namespace LastBell.Run
                         if (Boss) { Destroy(Boss.gameObject); Boss = null; World.Boss = null; }
                         if (Mode == RunMode.Practice) { Victory = true; Go(RunState.Results); }
                         else if (Array.IndexOf(EncounterOrder, Encounter) == EncounterOrder.Length - 1) { Victory = true; Go(RunState.Results); }
+                        // run shop: the intermission before the next boss is its preparation (Ready), where the shop opens
+                        else if (Shop.RunShopFlow.Enabled) { Encounter = EncounterOrder[Array.IndexOf(EncounterOrder, Encounter) + 1]; Go(RunState.Ready); }
                         else BeginIntro(EncounterOrder[Array.IndexOf(EncounterOrder, Encounter) + 1]);
                     }
                     break;
@@ -461,7 +465,9 @@ namespace LastBell.Run
             if (Player) cam.transform.rotation = Quaternion.LookRotation(-offset + Vector3.up);
             else cam.transform.rotation = Quaternion.LookRotation(look - MenuCamPos);
             cam.fieldOfView = 44;
+            if (ShotCamera.HasValue) { cam.transform.position = ShotCamera.Value.pos; cam.transform.rotation = Quaternion.LookRotation(ShotCamera.Value.look - ShotCamera.Value.pos); }
         }
+        public static (Vector3 pos, Vector3 look)? ShotCamera;   // autotest gallery: a fixed overhead view of the whole arena
 
         // slot on the progress track: one per boss
         public int ProgressSlot => Math.Max(0, Array.IndexOf(EncounterOrder, Encounter));

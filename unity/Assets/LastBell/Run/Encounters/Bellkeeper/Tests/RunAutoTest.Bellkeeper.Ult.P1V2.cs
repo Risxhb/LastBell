@@ -20,7 +20,6 @@ namespace LastBell.Run
             var runs = new (string label, int n, UltimateBot.Skill skill, bool must)[]
             {
                 ("v2 P1 party4 perfect", 4, UltimateBot.Skill.Perfect, true),
-                ("v2 P1 party8 perfect", 8, UltimateBot.Skill.Perfect, false),
                 ("v2 P1 trio perfect", 3, UltimateBot.Skill.Perfect, false),
                 ("v2 P1 duo perfect", 2, UltimateBot.Skill.Perfect, false),
                 ("v2 P1 solo perfect", 1, UltimateBot.Skill.Perfect, false),
@@ -41,7 +40,7 @@ namespace LastBell.Run
                         foreach (var p in d.World.Players)
                             Note($"   t {s:0.00} {p.ClassName} hp {p.Hp} st {p.Stamina:0} · {(p.Input as UltimateBot)?.DebugLine}");
                     };
-                yield return UltRun(r.label, r.n, r.skill, "P1", 220, "Vanguard", trace);
+                yield return UltRun(r.label, r.n, r.skill, "P1", 220, "Arcanist", trace);
                 if (ultLast == null || bk == null) continue;
                 var relay = bk.UltRelay;
                 int taken = bkHits.Sum(h => h.Damage);
@@ -63,11 +62,11 @@ namespace LastBell.Run
         }
 
         // -lastbellTestAbility bots_p2v2: P2 Broken Hour from its practice start, and a full v2 attempt (P1 then P2)
-        // -lastbellTestAbility bots_p2v2_8: the party of 8 alone, with the solver and every pass logged
+        // -lastbellTestAbility bots_p2v2_8: the party of 4 alone, with the solver and every pass logged (the game is 1-4 players, 1 Nov)
         IEnumerator UltP2V2Eight()
         {
             BrokenHour.LogSolver = true;
-            yield return UltRun("v2 P2 party8 perfect", 8, UltimateBot.Skill.Perfect, "P2", 330, "Vanguard");
+            yield return UltRun("v2 P2 party4 perfect", 4, UltimateBot.Skill.Perfect, "P2", 330, "Arcanist");
             if (bk != null) { var bh = bk.UltBroken; Note($"   broken hour {bh.BeatsClean}/{bh.Beats} clean · passes {bh.Passes}" + (bh.Fails.Count > 0 ? " · fails: " + string.Join("; ", bh.Fails.Take(6)) : "")); }
             BrokenHour.LogSolver = false;
         }
@@ -79,14 +78,13 @@ namespace LastBell.Run
             {
                 ("v2 P2 party4 perfect", 4, UltimateBot.Skill.Perfect, "P2", true),
                 ("v2 P1+P2 party4 perfect", 4, UltimateBot.Skill.Perfect, "P1", true),
-                ("v2 P2 party8 perfect", 8, UltimateBot.Skill.Perfect, "P2", false),
                 ("v2 P2 trio perfect", 3, UltimateBot.Skill.Perfect, "P2", false),
                 ("v2 P2 party4 late", 4, UltimateBot.Skill.Late, "P2", false),
                 ("v2 P2 party4 miss", 4, UltimateBot.Skill.Miss, "P2", false),
             };
             foreach (var r in runs)
             {
-                yield return UltRun(r.label, r.n, r.skill, r.seg, 330, "Vanguard");
+                yield return UltRun(r.label, r.n, r.skill, r.seg, 330, "Arcanist");
                 if (ultLast == null || bk == null) continue;
                 var bh = bk.UltBroken; int taken = bkHits.Sum(h => h.Damage);
                 Note($"   broken hour {bh.BeatsClean}/{bh.Beats} clean · passes {bh.Passes} · damage taken {taken} ({string.Join(", ", bkHits.GroupBy(h => h.Source).Select(g => g.Key + " " + g.Sum(h => h.Damage)))})" + (bh.Fails.Count > 0 ? " · fails: " + string.Join("; ", bh.Fails.Take(5)) : ""));
@@ -106,7 +104,7 @@ namespace LastBell.Run
         IEnumerator UltP3V2Dbg()
         {
             OpenHour.LogSteer = true;
-            yield return UltRun("v2 P3 party8 perfect", 8, UltimateBot.Skill.Perfect, "P3", 120, "Vanguard");
+            yield return UltRun("v2 P3 party4 perfect", 4, UltimateBot.Skill.Perfect, "P3", 120, "Arcanist");
             OpenHour.LogSteer = false;
         }
 
@@ -118,14 +116,13 @@ namespace LastBell.Run
             {
                 ("v2 P3 party4 perfect", 4, UltimateBot.Skill.Perfect, "P3", true),
                 ("v2 P1-P3 party4 perfect", 4, UltimateBot.Skill.Perfect, "P1", false),
-                ("v2 P3 party8 perfect", 8, UltimateBot.Skill.Perfect, "P3", false),
                 ("v2 P3 trio perfect", 3, UltimateBot.Skill.Perfect, "P3", false),
                 ("v2 P3 party4 late", 4, UltimateBot.Skill.Late, "P3", false),
                 ("v2 P3 party4 miss", 4, UltimateBot.Skill.Miss, "P3", false),
             };
             foreach (var r in runs)
             {
-                yield return UltRun(r.label, r.n, r.skill, r.seg, 420, "Vanguard");
+                yield return UltRun(r.label, r.n, r.skill, r.seg, 420, "Arcanist");
                 if (ultLast == null || bk == null) continue;
                 var oh = bk.UltOpen; int taken = bkHits.Sum(h => h.Damage);
                 Note($"   open hour plates {oh.BeatsClean}/{oh.Beats} · damage taken {taken} ({string.Join(", ", bkHits.GroupBy(h => h.Source).Select(g => g.Key + " " + g.Sum(h => h.Damage)))})" + (oh.Fails.Count > 0 ? " · " + string.Join("; ", oh.Fails.Take(6)) : ""));
@@ -149,7 +146,6 @@ namespace LastBell.Run
             {
                 ("v2 P5 party4 perfect", 4, UltimateBot.Skill.Perfect, "P5", true),
                 ("v2 P1-P5 party4 perfect", 4, UltimateBot.Skill.Perfect, "P1", false),
-                ("v2 P5 party8 perfect", 8, UltimateBot.Skill.Perfect, "P5", false),
                 ("v2 P5 trio perfect", 3, UltimateBot.Skill.Perfect, "P5", false),
                 ("v2 P5 party4 late", 4, UltimateBot.Skill.Late, "P5", false),
                 ("v2 P5 party4 miss", 4, UltimateBot.Skill.Miss, "P5", false),
@@ -157,7 +153,7 @@ namespace LastBell.Run
             foreach (var r in runs)
             {
                 FinalToll.Log = r.seg == "P5";
-                yield return UltRun(r.label, r.n, r.skill, r.seg, 600, "Vanguard");
+                yield return UltRun(r.label, r.n, r.skill, r.seg, 600, "Arcanist");
                 FinalToll.Log = false;
                 if (ultLast == null || bk == null) continue;
                 var ft = bk.UltFinal; int taken = bkHits.Sum(h => h.Damage);
@@ -181,7 +177,6 @@ namespace LastBell.Run
             {
                 ("v2 P4 party4 perfect", 4, UltimateBot.Skill.Perfect, "P4", true),
                 ("v2 P1-P4 party4 perfect", 4, UltimateBot.Skill.Perfect, "P1", false),
-                ("v2 P4 party8 perfect", 8, UltimateBot.Skill.Perfect, "P4", false),
                 ("v2 P4 trio perfect", 3, UltimateBot.Skill.Perfect, "P4", false),
                 ("v2 P4 party4 late", 4, UltimateBot.Skill.Late, "P4", false),
                 ("v2 P4 party4 miss", 4, UltimateBot.Skill.Miss, "P4", false),
@@ -190,7 +185,7 @@ namespace LastBell.Run
             foreach (var r in runs)
             {
                 GearFloor.Log = r.seg == "P4";
-                yield return UltRun(r.label, r.n, r.skill, r.seg, 480, "Vanguard");
+                yield return UltRun(r.label, r.n, r.skill, r.seg, 480, "Arcanist");
                 GearFloor.Log = false;
                 if (ultLast == null || bk == null) continue;
                 var gf = bk.UltGear; int taken = bkHits.Sum(h => h.Damage);

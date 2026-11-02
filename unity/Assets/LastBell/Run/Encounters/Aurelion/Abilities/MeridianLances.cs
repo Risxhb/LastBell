@@ -15,14 +15,16 @@ namespace LastBell.Run
     //   Volley 2 (volleys == 2): warns on volley 1's resolve tick, one beam through the nearest player, tracks 1.0 s,
     //             resolves 1.2 s after the lock (2.2 s). With cascade (Phase 3) it is instead volley 1's locked aim
     //             rotated 22.5°, shown locked at once, resolving 2.2 s after it appears.
-    // Easy stretches every track and window by 1.25 (T); Hard is unchanged. Returns on the tick the last volley resolves.
+    // Easy stretches every track and window by 1.25. Hard (v2.1 §2) cuts each lock-to-hit window to x0.7 (0.84 s; the
+    // cascade to its 2.0 s floor) and raises volley 2's track to 1.2 s so its total warning stays at least 2 s.
+    // Returns on the tick the last volley resolves; Duration() gives the same offset without running.
     public sealed class MeridianLances : AurelionAbility
     {
         public override string Id => "aurelion.meridian_lances";
         public override string Name => "Meridian Lances";
 
         public const float Width = 2.2f, TurnRate = 120f, CascadeTurn = 22.5f;
-        public const float Track1S = 1.2f, Track2S = 1.0f, WindowS = 1.2f, CascadeS = 2.2f;
+        public const float Track1S = 1.2f, Track2S = 1.0f, Track2HardS = 1.2f, WindowS = 1.2f, CascadeS = 2.2f, CascadeFloorS = 2.0f;
         public const int Damage = 35, Stun = 15;   // 0.25 s stun, standard 1.5 m knockback sideways out of the lane
 
         // test evidence from the last run: each volley's half-lanes (beam b = [2b] and [2b+1]), its aim (beam 0's yaw,
@@ -37,10 +39,10 @@ namespace LastBell.Run
             Say(cascade ? "Cascading Lances" : Name);
             Volleys.Clear(); SpawnTicks.Clear(); aims.Clear();
             beams = Mathf.Clamp(beams, 1, 8);
-            Glow(1.4f); Clip("MeridianAlignment", T(Track1S + WindowS));   // stand-in: glaive raised to the zenith
+            Glow(1.4f); Clip("MeridianAlignment", Lock1 + Window);   // stand-in: glaive raised to the zenith
 
             // volley 1: through the farthest player
-            int lock1 = T(Track1S), res1 = lock1 + T(WindowS);
+            int lock1 = Lock1, res1 = lock1 + Window;
             var v1 = Volley(beams, AimAt(Farthest(BossPos)), lock1, res1, () => Farthest(BossPos));
             yield return res1 - 1;                                   // resumes on volley 1's resolve tick
             if (volleys < 2) yield break;
@@ -48,17 +50,32 @@ namespace LastBell.Run
             if (cascade)
             {
                 // volley 2, cascade: volley 1's lines turned 22.5°, locked at once
-                int res2 = T(CascadeS);
+                int res2 = Cascade;
                 Volley(beams, v1.Yaw + CascadeTurn, 0, res2, null);
                 yield return res2 - 1;
             }
             else
             {
                 // volley 2: through the nearest player
-                int lock2 = T(Track2S), res2 = lock2 + T(WindowS);
+                int lock2 = Lock2, res2 = lock2 + Window;
                 Volley(beams, AimAt(Nearest(BossPos)), lock2, res2, () => Nearest(BossPos));
                 yield return res2 - 1;
             }
+        }
+
+        // the timings at the current difficulty, in ticks: tracks (to the lock), the lock-to-hit window, the cascade's warning
+        int Lock1 => T(Track1S);
+        int Lock2 => Hard ? T(Track2HardS) : T(Track2S);
+        int Window => Win(WindowS);
+        int Cascade => Win(CascadeS, CascadeFloorS);
+
+        // ticks from Run's first tick to its last resolve tick (= when Run returns); the v2.1 plan lines pairs up with it.
+        // CONTRACT: keep it equal to Run's real timing when the windows change.
+        public int Duration(int beams, int volleys, bool cascade)
+        {
+            int d = Lock1 + Window - 1;
+            if (volleys > 1) d += cascade ? Cascade - 1 : Lock2 + Window - 1;
+            return d;
         }
 
         float AimAt(PlayerController p) => p ? Sim.YawTo(BossPos, p.transform.position, Body.eulerAngles.y) : Body.eulerAngles.y;

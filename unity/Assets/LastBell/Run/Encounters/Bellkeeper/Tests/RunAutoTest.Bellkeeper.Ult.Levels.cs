@@ -18,19 +18,16 @@ namespace LastBell.Run
             var levels = new[] { Difficulty.Easy, Difficulty.Medium, Difficulty.Hard }.Where(l => lv == null || lv.ToLowerInvariant().Contains(l.ToString().ToLowerInvariant())).ToArray();
             var runs = new (string id, string label, int n, UltimateBot.Skill skill, string cls, bool mustWin)[]
             {
-                ("sv", "solo Vanguard", 1, UltimateBot.Skill.Perfect, "Vanguard", true),
                 ("sc", "solo Chimesinger", 1, UltimateBot.Skill.Perfect, "Chimesinger", true),
                 ("sa", "solo Arcanist", 1, UltimateBot.Skill.Perfect, "Arcanist", true),
-                ("p4", "party of 4", 4, UltimateBot.Skill.Perfect, "Vanguard", true),
-                ("p8", "party of 8", 8, UltimateBot.Skill.Perfect, "Vanguard", true),   // gpt/08: design for 1-8 players
-                ("l4", "Late party of 4", 4, UltimateBot.Skill.Late, "Vanguard", false),
+                ("p4", "party of 4", 4, UltimateBot.Skill.Perfect, "Arcanist", true),
+                ("l4", "Late party of 4", 4, UltimateBot.Skill.Late, "Arcanist", false),
             }.Where(r => rn == null || rn.Split(',').Contains(r.id)).ToArray();
             OpenHour.LogSteer = GearFloor.Log = AurelionArgs.Arg("-lastbellUltSteerLog") != null;
             var table = new System.Text.StringBuilder();
             foreach (var level in levels)
                 foreach (var r in runs)
                 {
-                    BellkeeperEncounter.V2Override = true;   // the v2 fight (line 28 picks v1 for keys outside bots_pNv2)
                     string label = $"v2 {level} {r.label}";
                     yield return UltRun(label, r.n, r.skill, null, 900, r.cls, level: level);
                     var f = ultLast;
@@ -40,7 +37,6 @@ namespace LastBell.Run
                     if (r.mustWin) Check($"Ultimate v2 levels: {label} clears", f != null && f.Killed, f?.ToString());
                 }
             Note("Ultimate v2 level sweep:\n" + table);
-            BellkeeperEncounter.V2Override = null;
         }
     }
 }

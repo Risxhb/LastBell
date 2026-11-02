@@ -25,12 +25,12 @@ namespace LastBell.Run
                 int pass = 0; var times = new List<int>();
                 for (int s = 0; s < seeds; s++)
                 {
-                    BellkeeperEncounter.SeedOffset = seed0 + s; BellkeeperEncounter.V2Override = true; BellkeeperEncounter.V2StopAfterP4 = false;
+                    BellkeeperEncounter.SeedOffset = seed0 + s; BellkeeperEncounter.V2StopAfterP4 = false;
                     if (kind == "p3")
-                        yield return UltRun($"seed {s} · P3 alone", 4, UltimateBot.Skill.Perfect, "P3", 300, "Vanguard",
+                        yield return UltRun($"seed {s} · P3 alone", 4, UltimateBot.Skill.Perfect, "P3", 300, "Arcanist",
                             f => { if (bk != null && !bk.Dead && bk.Segment != BellkeeperEncounter.UltSegment.P3) bk.DebugDefeat(); });
                     else
-                        yield return UltRun($"seed {s} · full fight", 4, UltimateBot.Skill.Perfect, null, 900, "Vanguard");
+                        yield return UltRun($"seed {s} · full fight", 4, UltimateBot.Skill.Perfect, null, 900, "Arcanist");
                     var f2 = ultLast; if (f2 == null) continue;
                     // P3 alone passes when P3 ends with nobody down in it (what follows is P4's business)
                     bool ok = kind == "p3" ? f2.Segments.Any(x => x.seg == BellkeeperEncounter.UltSegment.P4) && !f2.DeathLines.Any(l => l.Contains(" in P3 ")) : f2.Killed && f2.Deaths == 0;
@@ -46,7 +46,7 @@ namespace LastBell.Run
                 Note($"SEEDS {kind}: {pass}/{seeds} clean clears" + (times.Count > 0 ? $" · clear times {string.Join(" ", times.Select(x => $"{x / 60}:{x % 60:00}"))}" : ""));
             }
             foreach (var kv in causes.OrderByDescending(x => x.Value)) Note($"   deaths: {kv.Value}x {kv.Key}");
-            BellkeeperEncounter.SeedOffset = seed0; BellkeeperEncounter.V2Override = null;
+            BellkeeperEncounter.SeedOffset = seed0;
         }
     }
 }

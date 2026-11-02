@@ -66,29 +66,16 @@ namespace LastBell.Run
         protected int StandingCount { get { int n = 0; foreach (var p in W.Players) if (!p.Down) n++; return n; } }
     }
 
-    // The v2 set: one instance of each per encounter, in ABILITIES.md order.
+    // Ability keys: "bellkeeper.ult_open_hour", "ult_open_hour", "ult-open-hour" and "ultimate.open_hour" all name the same move.
     public static class BellkeeperAbilities
     {
-        public const string LeaningBell = "bellkeeper.leaning_bell", StrikingOrder = "bellkeeper.striking_order",
-            Reflection = "bellkeeper.reflection", TollTide = "bellkeeper.toll_tide", UnfinishedHour = "bellkeeper.unfinished_hour";
-        public static readonly string[] Ids = { LeaningBell, StrikingOrder, Reflection, TollTide, UnfinishedHour };
-
-        public static BellkeeperAbility[] CreateAll() => new BellkeeperAbility[]
-        {
-            new LeaningBellAbility(), new StrikingOrderAbility(), new ReflectionAbility(), new TollTideAbility(), new UnfinishedHourAbility(),
-        };
-
-        // "bellkeeper.leaning_bell", "leaning_bell", "leaning-bell", "Leaning Bell" and "01" all name the same ability.
         public static string Normalize(string key)
         {
             if (string.IsNullOrWhiteSpace(key)) return null;
             var k = key.Trim().ToLowerInvariant().Replace('-', '_').Replace(' ', '_');
             if (k.StartsWith("bellkeeper.")) k = k.Substring("bellkeeper.".Length);
-            if (k.StartsWith("ultimate.")) k = "ult_" + k.Substring("ultimate.".Length);   // ULTIMATE.md ids: ultimate.ledger = ult_ledger
-            if (int.TryParse(k, out int n) && n >= 1 && n <= Ids.Length) k = Ids[n - 1].Substring("bellkeeper.".Length);
-            if (k.StartsWith("the_")) k = k.Substring(4);
-            if (k == "reflection_of_the_hour") k = "reflection";
-            if (k == "last_toll_tide") k = "toll_tide";
+            if (k.StartsWith("ultimate.")) k = "ult_" + k.Substring("ultimate.".Length);   // ULTIMATE.md ids: ultimate.ledger = ult_ledger
+            if (k.StartsWith("the_")) k = k.Substring(4);
             return k;
         }
     }

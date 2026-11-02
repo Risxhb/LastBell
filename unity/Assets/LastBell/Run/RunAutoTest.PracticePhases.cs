@@ -17,9 +17,8 @@ namespace LastBell.Run
         // the phase names each boss shows at the start of each phase (minibosses show no phase text by design)
         static string[] ExpectedPhaseNames(BossEncounter b) => b switch
         {
-            BellkeeperEncounter u when u.Set == BellkeeperEncounter.AbilitySet.Ultimate => new[] { 0, 2, 3, 5, 6 }.Select(i => BellkeeperEncounter.SegmentNames[i]).ToArray(),   // P1-P5
-            BellkeeperEncounter _ => new[] { BellkeeperEncounter.Phase1, BellkeeperEncounter.Phase2, BellkeeperEncounter.Phase3 },
-            AurelionEncounter _ => new[] { "Perfect Order", "Misalignment", "Exposed Meridian" },
+            BellkeeperEncounter _ => BellkeeperEncounter.SegmentNames,   // the Ultimate: P1-P5
+            AurelionEncounter _ => new[] { "Perfect Order", "Misalignment", "Exposed Meridian", "Last Light" },
             SylvaraEncounter _ => new[] { "Dormant Choir", "Awakening Bloom", "Hollow Refrain" },
             CrucivarEncounter _ => new[] { "Sealed Furnace", "Casting Heat", "Open Pressure" },
             TempoTyrantEncounter _ => new[] { "Haste", "Broken Cadence · Haste" },
@@ -29,25 +28,25 @@ namespace LastBell.Run
         IEnumerator PracticePhaseChecks()
         {
             Note("---- practice phase row ----");
-            // the run-loop checks fight the archived v1 Bellkeeper (SetOverride); the phase row checks what the menu spawns
-            var setOverride = BellkeeperEncounter.SetOverride; BellkeeperEncounter.SetOverride = null;
+            // the run-loop checks keep the Ultimate idle and practise on the current map; the phase row checks what the menu spawns
+            bool idle = BellkeeperEncounter.TestIdle, stay = RunDirector.PracticeStaysOnMap; BellkeeperEncounter.TestIdle = false; RunDirector.PracticeStaysOnMap = false;
             yield return PhaseToMenu();
             // out-of-range picks clamp to the boss's phases (the menu never offers them; -lastbellPhase refuses them)
             int bk = Array.FindIndex(RunDirector.Bosses, b => b.Final);
             // the final entry fights on the Throne, so the pick may load that map: read the new scene's director
-            bool clampOk = d.StartPractice("Vanguard", bk, 99);
+            bool clampOk = d.StartPractice("Arcanist", bk, 99);
             yield return Until(() => RunDirector.Instance && RunDirector.Instance.State == RunState.Ready && RunDirector.Instance.Encounter == bk, 30, "clamp ready");
             if (RunDirector.Instance != d) { directorLog.AddRange(d.Log); d = RunDirector.Instance; d.InputOverride = bot; bot.Clear(); }
             if (d.Player) d.Player.Input = bot;
             Check("practice phase: a pick past the last phase clamps to it", clampOk && d.PracticePhase == RunDirector.Bosses[bk].Phases, $"phase {d.PracticePhase}");
             yield return PhaseToMenu();
-            Check("practice phase: a run always starts in phase 1", d.StartRun("Vanguard") && d.PracticePhase == 1);
+            Check("practice phase: a run always starts in phase 1", d.StartRun("Arcanist") && d.PracticePhase == 1);
             yield return PhaseToMenu();
             for (int e = 0; e < RunDirector.Bosses.Length; e++)
                 for (int n = 1; n <= RunDirector.Bosses[e].Phases; n++)
                     yield return PracticeAtPhase(e, n, n == RunDirector.Bosses[e].Phases);
             yield return PhaseToMenu();
-            BellkeeperEncounter.SetOverride = setOverride;
+            BellkeeperEncounter.TestIdle = idle; RunDirector.PracticeStaysOnMap = stay;
         }
 
         IEnumerator PhaseToMenu()
@@ -63,7 +62,7 @@ namespace LastBell.Run
             yield return PhaseToMenu();
             var entry = RunDirector.Bosses[e];
             string tag = $"{LastBell.Menu.TestRushSetup.CardName(e)} phase {n}";
-            Check($"{tag}: practice accepted", d.StartPractice("Vanguard", e, n));
+            Check($"{tag}: practice accepted", d.StartPractice("Arcanist", e, n));
             yield return Until(() => RunDirector.Instance && RunDirector.Instance.State == RunState.Ready && RunDirector.Instance.Encounter == e, 30, tag + " ready");
             if (RunDirector.Instance != d) { directorLog.AddRange(d.Log); d = RunDirector.Instance; d.InputOverride = bot; bot.Clear(); }
             if (d.Player) d.Player.Input = bot;   // a new scene built the player before the bot was attached

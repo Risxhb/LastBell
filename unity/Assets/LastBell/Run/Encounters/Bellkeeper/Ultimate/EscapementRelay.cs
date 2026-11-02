@@ -23,7 +23,6 @@ namespace LastBell.Run
     // (Chzy18 27 Oct, a solo-only exception to "solo plays the same phases": SOAK every beat kept a melee player 7 m from
     // the boss for all of P1, so a solo Vanguard could not clear it). On a solo ✕ beat the plate rests (no empty-plate wipe)
     // and the ✕ is the duty: empty = the bell tips that side, as for a party.
-    // 5-8 players: players 5-8 take hours I..IV again and share that hour's duty with its first holder (two soakers).
     // Cue: At[0] = the first beat (s after launch), then one every BeatSeconds until StopAfterBeat(). The beat number (so
     // the hand and the duties) carries over between casts and starts at 2 on a fresh fight (as in the P1 paper simulation, cards-v2/p1-example.html).
     public sealed class EscapementRelay : UltimateMechanic
@@ -178,14 +177,13 @@ namespace LastBell.Run
             if (!Running || NextBeatTick < 0 || p.Down) return;
             int b = Beat, d = DutyOf(p, b); if (d < 0) return;
             int tick = NextBeatTick, since = tick - Sim.Ticks(BeatSeconds);
-            var plate = Plate(b); int slot = W.Players.IndexOf(p) / 4;   // the 2nd holder of an hour stands beside the 1st
+            var plate = Plate(b);
             BotDemand r = new BotDemand { Tick = tick, Since = since, From = this, Why = $"relay beat {b}: {DutyNames[d]}" };
             switch (d)
             {
                 case 0:
-                    var side = Vector3.Cross(Vector3.up, PlanDir(HandAngle(b))) * (Party > 4 ? (slot == 0 ? -0.55f : 0.55f) : 0);
-                    r.Hint = plate + side; var c = r.Hint; float tol = Party > 4 ? 0.6f : 1.2f;
-                    r.Ok = q => (Sim.Flat(q) - c).magnitude <= tol; break;
+                    r.Hint = plate; var c = r.Hint;
+                    r.Ok = q => (Sim.Flat(q) - c).magnitude <= 1.2f; break;
                 case 1:
                     r.Hint = ChainSpot(b); int bb = b;
                     r.Ok = q => Sim.Flat(q).magnitude >= ChainMin + 0.4f && Vector3.Dot(Sim.Flat(q), PlanDir(HandAngle(bb))) <= -1f && (Sim.Flat(q) - plate).magnitude > OnPlate + 0.5f; break;

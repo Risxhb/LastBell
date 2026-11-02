@@ -111,7 +111,7 @@ namespace LastBell.Run
 
             // ---- potions: a MinHp rule, or low ----
             int needHp = 0; foreach (var d in demands) needHp = Mathf.Max(needHp, d.MinHp);
-            if (me.Hp < PlayerController.MaxHp && me.Potions > 0 && me.Stunned == 0 && (me.Hp < needHp || me.Hp < DrinkBelow(me) || (FreezeSoon(boss, me, now) && me.Hp < 90))) inp.Potion = tick % 4 == 0;   // potions are locked while Stilled: top up under the hourglass
+            if (me.Hp < PlayerController.MaxHp && me.Potions > 0 && me.Stunned == 0 && (me.Hp < needHp || me.Hp < DrinkBelow(me))) inp.Potion = tick % 4 == 0;   // potions are locked while Stilled: top up under the hourglass
 
             // ---- plan a spot (every 4 ticks, or at once when the current spot breaks a rule) ----
             rules.Clear(); foreach (var d in demands) if (d.Ok != null) rules.Add(d);
@@ -156,16 +156,15 @@ namespace LastBell.Run
             // (a Vanguard's lunges carry it about a metre: no swings in the last 1.25 s before any rule)
             bool positioning = hasTarget && (Sim.Flat(target - pos).magnitude > 0.5f || (rules.Count > 0 && rules[0].Tick - now < (rules[0].Memory ? 90 : me.ClassName == "Vanguard" && !((rules[0].From is EscapementRelay || (rules[0].From is BrokenHour && w.Players.Count == 1)) && Sim.Flat(bpos - pos).magnitude - boss.BodyRadius <= 0.7f) ? 75 : 30)));
             for (int i = 0; i < cd.Length; i++) if (cd[i] > 0) cd[i]--;
-            bool stilled = boss.Ult != null && boss.Ult.IsStilled(me);
             // Chimesinger: Mending Chorus (burst heal round the caster) when it would top up a hurt ally or two (potions run out in P5)
-            if (Attacks && me.ClassName == "Chimesinger" && !stilled && cd[4] == 0 && tick - lastPress >= 6)
+            if (Attacks && me.ClassName == "Chimesinger" && cd[4] == 0 && tick - lastPress >= 6)
             {
                 int hurt = 0; foreach (var p in w.Players) if (!p.Down && p.Hp < 65 && Sim.Flat(p.transform.position - pos).magnitude < 5.5f) hurt++;
                 if (hurt >= 2 || (hurt == 1 && me.Hp < 65)) { inp.P4 = true; cd[4] = 900; lastPress = tick; }
             }
             // the Arcanist's Disintegrate is held: keep holding while the spot is safe, let go the moment it has to move
-            if (beamHold > 0) { if (positioning || stilled) beamHold = 0; else { inp.H1 = true; beamHold--; lastPress = tick; } }
-            else if (Attacks && !positioning && bossGap <= Reach(me) + 1.5f && (boss.Ult == null || !boss.Ult.IsStilled(me))) Attack(me, ref inp, rules.Count == 0 ? 9999 : rules[0].Tick - now);
+            if (beamHold > 0) { if (positioning) beamHold = 0; else { inp.H1 = true; beamHold--; lastPress = tick; } }
+            else if (Attacks && !positioning && bossGap <= Reach(me) + 1.5f) Attack(me, ref inp, rules.Count == 0 ? 9999 : rules[0].Tick - now);
             if (move != Vector3.zero) move = AroundBoss(pos, move, boss, hasTarget ? target : (Vector3?)null);
             inp.Move = ToScreen(move);
             DebugLine = $"rules {rules.Count} first {(rules.Count > 0 ? rules[0].Why + " in " + (rules[0].Tick - now) : "-")} target {(hasTarget ? $"({target.x:0.0},{target.z:0.0})" : "-")} at ({pos.x:0.0},{pos.z:0.0})";
@@ -301,14 +300,6 @@ namespace LastBell.Run
         {
             bool In(Vector3 q) { foreach (var h in w.Hazards.Live) if (h.BurnPerSecond > 0 && h.Locked && h.Contains(q)) return true; return false; }
             return !In(pos) && In(pos + dir * 0.6f) && !In(pos + dir * (PlayerController.DashDistance - 0.25f));
-        }
-
-        // this player's hourglass is up: it will be Stilled soon
-        static bool FreezeSoon(BellkeeperEncounter boss, PlayerController me, int now)
-        {
-            if (boss.Ult == null) return false;
-            var s = boss.Ult.Of(me);
-            return s.HourglassFrom >= 0 && now >= s.HourglassFrom && now < s.StillFrom;
         }
 
         // drink below this: melee lives next to the boss, where 50-damage bullets come in pairs, so it tops up before one hit can

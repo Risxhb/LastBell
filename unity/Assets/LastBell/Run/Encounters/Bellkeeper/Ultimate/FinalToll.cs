@@ -27,7 +27,7 @@ namespace LastBell.Run
     //   LAST STAND toll XIII shatters the bell: four platforms (one per hour, 3.4 m out, r 1.9, touching the boss; shown from XII). Off your
     //             own platform is the fall (999); 13 bell shards drop on them (off-centre, shown 1 s, 999). Hits count x4 for
     //             10 s; then the bell falls (WIPE).
-    // Hours are W.Players index % 4 (5-8 players: two per hour). An hour with nobody in it asks nothing (no plate that toll;
+    // Hours are W.Players index (1-4 players). An hour with nobody in it asks nothing (no plate that toll;
     // nobody may stand in the INVERTED half). Bots steer (Steer) with the simulation's route search.
     public sealed class FinalToll : UltimateMechanic
     {
@@ -317,10 +317,10 @@ namespace LastBell.Run
             }
             if (k >= 9 && k <= 12 && k % 2 == 1)   // the echo rings next: be at it as it does
             {
-                var E = EchoPos(k); float ea = AngOf(E) + (i % 2 == 1 ? 100 : -100) + ((i % 4) < 2 ? -20 : 20) + (i >= 4 ? 30 : 0);
+                var E = EchoPos(k); float ea = AngOf(E) + (i % 2 == 1 ? 100 : -100) + ((i % 4) < 2 ? -20 : 20);
                 job = (Melee(p) ? "melee" : "ranged") + " → ECHO"; return Clear(k, E + Dir(ea) * (Melee(p) ? EchoRad + PR + 0.7f : 4.5f), null);
             }
-            float a = (k < 13 ? LaneAng(k) : 0) + 90 + (i % 2 == 1 ? 0 : 180) + ((i % 4) < 2 ? -25 : 25) + (i >= 4 ? 40 : 0);
+            float a = (k < 13 ? LaneAng(k) : 0) + 90 + (i % 2 == 1 ? 0 : 180) + ((i % 4) < 2 ? -25 : 25);
             job = (Melee(p) ? "melee" : "ranged") + (k >= 9 ? " → BOSS" : "");
             return Clear(k, Dir(a) * (Melee(p) ? 3.1f : 5.2f), null);
         }

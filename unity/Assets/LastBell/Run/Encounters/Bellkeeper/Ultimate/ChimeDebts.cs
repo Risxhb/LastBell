@@ -16,7 +16,6 @@ namespace LastBell.Run
     // (Card 02 paid on a numeral, dealt 60 and stayed visible; a debt paid on a ✕ beside the boss closed the crossing lane
     // round him, 60 did not cost the run, and a visible ring was dodged by bots that skipped the memory.)
     // Cue: At[0] = the round opens (s after launch). Without a running relay (practice): At = pay times of hours I..IV.
-    // 5-8 players: both holders of an hour soak together, so they pay together.
     public sealed class ChimeDebts : UltimateMechanic
     {
         public override string Id => UltimateMechanics.ChimeDebts;

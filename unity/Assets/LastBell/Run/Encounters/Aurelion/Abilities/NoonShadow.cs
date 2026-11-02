@@ -9,7 +9,8 @@ namespace LastBell.Run
     // with the mean within 1 m of the centre (2 players on opposite sides) it is the half holding the farthest player.
     // The side is picked and locked on the warning's first tick and resolves 3.8 s later (45, no knockback, 0.25 s stun).
     // Afternoon (afternoon = Phase 3, or always when solo): the other half warns on Noon's resolve tick and resolves
-    // 3.8 s after that. Easy stretches both windows by 1.25 (T). Returns on the tick the last half resolves.
+    // 3.8 s after that. Easy stretches both windows by 1.25, Hard shortens them to 2.66 s (x0.7, v2.1 §2: sprint from the
+    // far edge), through Win. Returns on the tick the last half resolves, Duration(afternoon) ticks after its first tick.
     // The cone reaches Rim + 0.5 m instead of the brief's 28 m: every point a player can stand on is covered either way
     // (players are held inside the round 13.9 m bound) and the light stays on the dais instead of spilling into the sky.
     // The cone's 0.6 m core and its 0.3 m margin make the line itself unsafe: step at least 0.3 m past it.
@@ -18,11 +19,9 @@ namespace LastBell.Run
         public override string Id => "aurelion.noon_shadow";
         public override string Name => "Noon Shadow";
 
-        public const float WindowS = 3.8f, MeanDeadZone = 1f, ReachPastRim = 0.5f, LineWidth = 0.14f;
+        public const float WindowS = 3.8f, MeanDeadZone = 1f, ReachPastRim = 0.5f;
         public const int Damage = 45, Stun = 15;   // 0.25 s stun, no knockback
 
-        static readonly Color NoonFill = new Color(1f, 0.6f, 0.26f), NoonBorder = new Color(2.4f, 1.75f, 0.7f);
-        static readonly Color Gnomon = new Color(1.9f, 1.45f, 0.55f);
 
         // test evidence: the last run's halves (Noon, then Afternoon), the yaw each one lit, and their spawn / resolve ticks
         public readonly List<Hazard> Halves = new List<Hazard>();
@@ -36,7 +35,7 @@ namespace LastBell.Run
             Say(Name);
             Halves.Clear(); LitYaws.Clear(); SpawnTicks.Clear(); ResolveTicks.Clear();
             bool twice = afternoon || N <= 1;
-            int window = T(WindowS);
+            int window = Win(WindowS);
             Glow(1.4f); Clip("MeridianAlignment", twice ? 2 * window : window);
 
             float yaw = PickYaw();
@@ -48,6 +47,10 @@ namespace LastBell.Run
             Half(yaw + 180f, window);
             yield return window - 1;                                  // Afternoon's resolve tick
         }
+
+        // ticks from Run's first tick to its last resolve tick (= when Run returns); the v2.1 plan lines pairs up with it.
+        // CONTRACT: keep it equal to Run's real timing when the windows change.
+        public int Duration(bool afternoon) => (afternoon || N <= 1 ? 2 : 1) * (Win(WindowS) - 1);
 
         // the half holding the standing players' mean; near the centre, the half holding the farthest player
         public float PickYaw()
@@ -71,13 +74,10 @@ namespace LastBell.Run
                 Origin = Centre, Yaw = yaw, HalfAngle = 90f, Radius = Reach,
                 LockAt = 0, ResolveAt = resolveAt, Damage = Damage, Knockback = 0, Stun = Stun,
             };
-            // the gnomon shadow: a crisp gold line across the whole dais, presentation only (not a hazard, never hits)
-            var line = W.BossFx.Lane(2 * Reach, LineWidth);
-            line.Place(Centre + Sim.Dir(yaw + 90f) * Reach, yaw - 90f);
-            line.Tint(Gnomon, Gnomon); line.Progress(1); line.Lock();
-            h.OnResolve = hz => { ResolveTicks.Add(W.Tick); line.Expire(); Flare(1.2f); };
+            // Telegraph style (Reference/Telegraph-Style v2): the standard coral half with the Skyward rays, its own plain
+            // border is the dividing line (no separate gold gnomon line over the outline or across the safe half)
+            h.OnResolve = hz => { ResolveTicks.Add(W.Tick); Flare(1.2f); };
             Spawn(h);
-            h.Tele.Tint(NoonFill, NoonBorder);   // noon light: amber-gold, the warning fill brightens toward the resolve
             Halves.Add(h); LitYaws.Add(yaw); SpawnTicks.Add(W.Tick);
             return h;
         }

@@ -15,12 +15,11 @@ namespace LastBell.Run
         public static float[] UltWarnLead =        { 0.3f,  0f,    0f };   // lethal warnings show this much earlier; the hit lands when it always did
 
         static int Lv(Difficulty d) => Mathf.Clamp((int)d, 0, 2);
-        bool UltTable => Set == AbilitySet.Ultimate;
-
-        public override float PlayerDamageScale(Difficulty d) => UltTable ? UltDamageTaken[Lv(d)] : base.PlayerDamageScale(d);
-        float UltHpFor(Difficulty d) => UltTable ? UltHpScale[Lv(d)] : 1f;
-        float UltTimerFor(Difficulty d) => UltTable ? UltTimerScale[Lv(d)] : 1f;
+        // the run-loop checks' idle sparring target (TestIdle) keeps the run-wide scale their exact-damage probes expect
+        public override float PlayerDamageScale(Difficulty d) => TestIdle ? base.PlayerDamageScale(d) : UltDamageTaken[Lv(d)];
+        float UltHpFor(Difficulty d) => UltHpScale[Lv(d)];
+        float UltTimerFor(Difficulty d) => UltTimerScale[Lv(d)];
         public float UltStandFor => UltStandSeconds[Lv(W.Difficulty)];
-        public float UltWarnLeadFor => UltTable ? UltWarnLead[Lv(W.Difficulty)] : 0f;
+        public float UltWarnLeadFor => UltWarnLead[Lv(W.Difficulty)];
     }
 }

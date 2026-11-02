@@ -16,7 +16,7 @@ namespace LastBell.Run
     // after every slam (so most slams everyone crosses through the centre); the player whose gear is hammered waits on the
     // centre. A gear without ITS OWN player at a slam jams the train: WIPE (anyone else on it doesn't count). Every third slam the gears reverse.
     // Each outer gear's hub is a CORE (BellkeeperEncounter.ExtraBodies): solid, and a hit on it damages the boss (one bar).
-    // Melee parks against its core, where the floor barely moves. 5-8 players: two per gear. Below 4: only gears with a
+    // Melee parks against its core, where the floor barely moves. Below 4: only gears with a
     // player assigned must be held.
     // Bots steer (Steer) with the simulation's route search, the floor's drift included.
     // The two transitions live here too (proposal, sims/p5-example.html, Chzy18 25 Oct "the entire fight put together"):
@@ -275,8 +275,8 @@ namespace LastBell.Run
                 job = tg == 4 ? "→ CENTRE" : "ride " + GN[tg];
             }
             Vector3 Park(int g) => g == 4
-                ? Dir(45 + 90 * (i % 4) + spin[4] + (i >= 4 ? 30 : 0)) * 2.3f
-                : GearCentre(g) + Dir(90f * g + 180 + (SpinSign(t) > 0 ? 35 : -35) + (i >= 4 ? 70 : 0)) * (Melee(p) ? HubR + PR + 0.5f : 2.6f);
+                ? Dir(45 + 90 * (i % 4) + spin[4]) * 2.3f
+                : GearCentre(g) + Dir(90f * g + 180 + (SpinSign(t) > 0 ? 35 : -35)) * (Melee(p) ? HubR + PR + 0.5f : 2.6f);
             Vector3 goal = cur == tg ? Park(tg) : cur == 4 ? (tg == 4 ? Park(4) : MeshPoint(tg)) : cur < 0 ? Park(tg) : Dir(90f * cur) * 2.6f;   // else across the mesh point onto the centre gear's ring
             // the core (and the pawl behind it) block the straight line: go round the core first (the short route search can't see past it)
             if (cur >= 0 && cur < 4)

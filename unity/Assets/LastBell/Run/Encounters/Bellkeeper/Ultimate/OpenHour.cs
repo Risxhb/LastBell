@@ -18,7 +18,7 @@ namespace LastBell.Run
     //                beat's soaker the gap nearest its plate.
     //   PLATE        every 6 s the next hour (I, II, III, IV, ...) must be on the lit plate (r 7). Empty = WIPE.
     // No unavoidable damage. Bots steer with a short route search (Steer), the simulation's: 3 legs of 0.2 s against
-    // every predicted bullet, burst and wall. 5-8 players: hours repeat (two soakers, shared numerals).
+    // every predicted bullet, burst and wall.
     public sealed class OpenHour : UltimateMechanic
     {
         public override string Id => UltimateMechanics.OpenHour;
@@ -253,11 +253,11 @@ namespace LastBell.Run
             }
             float[] rings = { 4.3f, 4.3f, 9.6f, 10.6f };   // I and II share a ring 120° apart (each passes the other's spot 4 s later: its echo is gone)
             int i = W.Players.IndexOf(p);
-            float a = ArmAngle(t) + 60 + 120 * (h % 3) + (i >= 4 ? 30 : 0);
+            float a = ArmAngle(t) + 60 + 120 * (h % 3);
             // a solo melee player weaves against the boss, where its swings reach (its lunge into the solid boss can't carry it into a
             // bullet); a party keeps the rings, where the others' echoes stay clear
             if (Party == 1 && p.ClassName == "Vanguard") return Dir(a) * (Boss.BodyRadius + PR + 0.35f);
-            return Dir(a) * Mathf.Min(rings[h % 4] + (i >= 4 ? 0.8f : 0), Bound - 0.6f);
+            return Dir(a) * Mathf.Min(rings[h % 4], Bound - 0.6f);
         }
         float Bound => Mathf.Min(11.6f, CombatWorld.PlayerBound - 0.1f);
 

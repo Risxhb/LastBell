@@ -15,10 +15,9 @@ namespace LastBell.Run
     //              both), and no two chains may cross (60 to the four players).
     // INVERTED belongs to the soaker's partner (hour + 2), so every beat it changes hands: the holder must touch the next
     // holder between beats. It jumps on touch (within 1.5 m) to a player who doesn't hold it, then can't move again for 1 s.
-    // The wrong holders on a beat = WIPE. Party sizes: players 5-8 take hours I..IV again (two per hour: two soakers, two
-    // INVERTED, their own chains); below 4, the hours that exist rotate and missing partners mean no chain / no INVERTED.
-    // Whoever receives INVERTED keeps it until the beat (it can't be passed on twice). Below 4 players it is dealt each beat;
-    // with 5-8 each group of four passes its own, and the two soakers share the plate 1.6 m apart.
+    // The wrong holders on a beat = WIPE. Party sizes (1-4 players, 1 Nov): below 4,
+    // the hours that exist rotate and missing partners mean no chain / no INVERTED.
+    // Whoever receives INVERTED keeps it until the beat (it can't be passed on twice). Below 4 players it is dealt each beat.
     // The perfect bots' strat is a party plan per beat (the simulation's solver): a spot for everyone, and the meeting
     // point and time for the touch. The run's own player gets the same plan as a practice beam (EscapementRelay.ShowMySpot).
     public sealed class BrokenHour : UltimateMechanic
@@ -63,7 +62,7 @@ namespace LastBell.Run
         PlayerController Partner(PlayerController p)
         {
             int i = W.Players.IndexOf(p); if (i < 0) return null;
-            int j = i / 4 * 4 + (i % 4 + 2) % 4;
+            int j = (i + 2) % 4;
             return j < W.Players.Count && j != i ? W.Players[j] : null;
         }
         static bool Near(Vector3 q, int v) => Vector3.Dot(Sim.Flat(q), HandDir(v)) > HalfMargin;
@@ -153,7 +152,6 @@ namespace LastBell.Run
                 foreach (var to in players)
                 {
                     if (to == from || to.Down || inverted.Contains(to) || Locked(to)) continue;
-                    if (players.IndexOf(to) / 4 != players.IndexOf(from) / 4) continue;   // 5-8 players: each group of four passes its own INVERTED
                     if ((Sim.Flat(to.transform.position) - Sim.Flat(from.transform.position)).magnitude > Touch) continue;
                     inverted.Remove(from); inverted.Add(to); settled.Add(to); Passes++;
                     if (LogSolver) Debug.Log($"[broken hour] pass {players.IndexOf(from)} -> {players.IndexOf(to)} at beat {Beats + 1} ({(NextBeatTick - Now) / (float)Sim.Hz:0.00} s before it)");
@@ -275,15 +273,12 @@ namespace LastBell.Run
 
         bool SolveGroup(PlayerController[] grp, int g, int v, int sh, int ih, int now, float secs, float walk, List<(Vector3 a, Vector3 b)> done, List<Vector3> taken)
         {
-            // 5-8 players: the two soakers stand 0.8 m either side of the plate's centre, so their chains don't start at one point
-            Vector3 plateC = Plate(v), pl = plateC + (W.Players.Count > 4 ? Vector3.Cross(Vector3.up, HandDir(v)) * (g == 0 ? -0.8f : 0.8f) : Vector3.zero); var cur = new Vector3[4];
+            Vector3 plateC = Plate(v), pl = plateC; var cur = new Vector3[4];
             for (int k = 0; k < 4; k++) cur[k] = Sim.Flat(grp[k].transform.position);
             int s = sh, h = ih, x = -1;
             for (int k = 0; k < 4; k++) if (inverted.Contains(grp[k]) && k != h) x = k;      // this group's holder who must pass to h
             int ya = (s + 1) % 4, yb = (s + 3) % 4;
-            // 5-8 players: each group keeps to its own side of the line through the plate and the boss, so the groups' chains never meet
-            var sideDir = Vector3.Cross(Vector3.up, HandDir(v)) * (g == 0 ? -1f : 1f); bool split = W.Players.Count > 4;
-            bool OwnSide(Vector3 q) => !split || Vector3.Dot(q, sideDir) >= 0.8f;
+            bool OwnSide(Vector3 q) => true;
             int nH = 0, nPair = 0, nGap = 0, nSpace = 0, nMeet = 0;
             var near = new List<Vector3>(); foreach (var q in grid) if (Vector3.Dot(q, HandDir(v)) > SolveMargin && (q - plateC).magnitude > OnPlate + 0.6f && FarFrom(q, taken) && OwnSide(q)) near.Add(q);
             float bestScore = float.MaxValue; Vector3 bh = default, ba = default, bb = default, bm = default; float btm = 0; bool found = false;

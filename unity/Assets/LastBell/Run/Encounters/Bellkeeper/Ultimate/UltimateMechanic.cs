@@ -4,9 +4,9 @@ using UnityEngine;
 
 namespace LastBell.Run
 {
-    // One signature mechanic of the Bellkeeper Ultimate (proposal, bosses/4-shattered-hour-bellkeeper/ultimate/ULTIMATE.md
-    // §3). Each lives in its own file in this folder and is built by its own session; the encounter's Ultimate plan
-    // (BellkeeperUltimate.cs, ULTIMATE.md §5) only decides when each one starts and with which cue.
+    // One mechanic of the Bellkeeper Ultimate (specs: bosses/4-shattered-hour-bellkeeper/ultimate/P1-v2-LOCKED.md, P2-v2-LOCKED.md,
+    // P5-v2-PROPOSAL.md). Each lives in its own file in this folder; the encounter's plan (BellkeeperUltimate.cs) only decides
+    // when each one starts and with which cue.
     //
     // Contract (on top of BellkeeperAbility's: Cast() is a tick coroutine, tick 0 = the launch tick, hazards via Spawn()):
     // - The plan sets NextCue and launches; Cue holds it for the whole cast (DefaultCue() if launched bare, e.g. practice).
@@ -103,21 +103,16 @@ namespace LastBell.Run
         public UltimateMechanic From;
     }
 
-    // The Ultimate's mechanics, one instance of each per encounter (ULTIMATE.md §3 order). Keys: -lastbellAbility ult_<id>.
+    // The Ultimate's mechanics (the v2 fight: P1 relay + debts, P2 Broken Hour, P3 Open Hour, P4 Gear Floor, P5 Final Toll), one
+    // instance of each per encounter. Keys: -lastbellAbility ult_<id>. The v1 Ultimate plan's mechanics were deleted (Chzy18, 1 Nov).
     public static class UltimateMechanics
     {
-        public const string PendulumClocks = "bellkeeper.ult_pendulum_clocks", StoppedHour = "bellkeeper.ult_stopped_hour",
-            Ledger = "bellkeeper.ult_ledger", BackwardsBell = "bellkeeper.ult_backwards_bell", TwoFutures = "bellkeeper.ult_two_futures",
-            ConductorsHand = "bellkeeper.ult_conductors_hand", TollingHour = "bellkeeper.ult_tolling_hour",
-            ThirteenthHour = "bellkeeper.ult_thirteenth_hour", AreaQuotes = "bellkeeper.ult_area_quotes", Fracture = "bellkeeper.ult_fracture",
-            // v2 (ULTIMATE-PROMPT-v2.md, cards-v2): the P1 slice
-            EscapementRelay = "bellkeeper.ult_escapement_relay", ChimeDebts = "bellkeeper.ult_chime_debts", BrokenHour = "bellkeeper.ult_broken_hour", OpenHour = "bellkeeper.ult_open_hour", GearFloor = "bellkeeper.ult_gear_floor", FinalToll = "bellkeeper.ult_final_toll";
-        public static readonly string[] Ids = { PendulumClocks, StoppedHour, Ledger, BackwardsBell, TwoFutures, ConductorsHand, TollingHour, ThirteenthHour, AreaQuotes, Fracture, EscapementRelay, ChimeDebts, BrokenHour, OpenHour, GearFloor, FinalToll };
+        public const string EscapementRelay = "bellkeeper.ult_escapement_relay", ChimeDebts = "bellkeeper.ult_chime_debts", BrokenHour = "bellkeeper.ult_broken_hour",
+            OpenHour = "bellkeeper.ult_open_hour", GearFloor = "bellkeeper.ult_gear_floor", FinalToll = "bellkeeper.ult_final_toll";
+        public static readonly string[] Ids = { EscapementRelay, ChimeDebts, BrokenHour, OpenHour, GearFloor, FinalToll };
 
         public static UltimateMechanic[] CreateAll() => new UltimateMechanic[]
         {
-            new PendulumClocks(), new StoppedHour(), new LedgerMechanic(), new BackwardsBell(), new TwoFutures(),
-            new ConductorsHand(), new TollingHour(), new ThirteenthHour(), new AreaQuotes(), new FractureOfTime(),
             new EscapementRelay(), new ChimeDebts(), new BrokenHour(), new OpenHour(), new GearFloor(), new FinalToll(),
         };
     }

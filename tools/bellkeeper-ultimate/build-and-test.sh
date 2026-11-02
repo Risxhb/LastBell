@@ -6,7 +6,7 @@
 #
 #   <name>          evidence folder name, e.g. ult-clocks-1 (output: <B>/bellkeeper-ultimate-evidence/<name>)
 #   player args     extra LastBell.exe arguments. Fast loop for an ability session:
-#                     -lastbellBellkeeperUltimate -lastbellTestAbility ult_pendulum_clocks
+#                     -lastbellBellkeeperUltimate -lastbellTestAbility bots_p3v2
 #                   Nothing extra = the full run-loop autotest (every check, ~20 min).
 #   BK_SESSION      lock owner written into owner.txt (default: <name>)
 #   BK_SKIP_BUILD=1 run the last build again without rebuilding
