@@ -33,6 +33,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const Q = new URLSearchParams(location.search), VIEW = Q.get('view') || 'game', EXPORT = Q.has('export');
 if (Q.has('clean') || EXPORT) document.body.classList.add('clean');
@@ -88,11 +89,10 @@ if (EXPORT) {
   } catch (e) { window.__arenaExport = { error: String(e && e.stack || e) }; }
 } else {
   if (Q.has('rings')) { const ring = new THREE.Mesh(new THREE.RingGeometry(env.PLAY_R - 0.06, env.PLAY_R, 128).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6 })); ring.position.y = 0.04; scene.add(ring); }
-  // the Vanguard for scale (characters session's model, loaded read-only)
-  const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: o.metal ? 0.4 : 0.75, metalness: o.metal ? 0.7 : 0, side: o.side || THREE.FrontSide });
-  const Gl = (c, k) => new THREE.MeshBasicMaterial({ color: new THREE.Color(c).multiplyScalar(k), toneMapped: false });
-  window.THREE = THREE; await loadScript('../../vanguard-model.js');
-  if (typeof window.buildVanguardModel === 'function') { const v = window.buildVanguardModel(M, Gl), obj = v.root || v; obj.scale.setScalar(1.2); obj.traverse(o => { if (o.isMesh) o.castShadow = true; }); const hero = new THREE.Group(); hero.position.set(-3.5, 0, 6); hero.rotation.y = Math.PI * 0.8; hero.add(obj); scene.add(hero); }
+  // the Tollbreaker for scale (characters session's model, loaded read-only; 2.0 m tall)
+  await loadScript('../../models/tollbreaker-glb.js');
+  const tbModel = window.TOLLBREAKER_GLB_B64 && await new Promise(res => new GLTFLoader().parse(Uint8Array.from(atob(window.TOLLBREAKER_GLB_B64), c => c.charCodeAt(0)).buffer, '', g => res(g.scene), () => res(null)));
+  if (tbModel) { tbModel.traverse(o => { if (o.isMesh) o.castShadow = true; }); const hero = new THREE.Group(); hero.position.set(-3.5, 0, 6); hero.rotation.y = Math.PI * 0.8; hero.add(tbModel); scene.add(hero); }
 
   // frame: MSAA -> depth/normal outlines on lit surfaces -> bloom -> tonemap -> light grade (same chain as verdant-look.html)
   const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(innerWidth, innerHeight, { samples: 4, type: THREE.HalfFloatType }));
