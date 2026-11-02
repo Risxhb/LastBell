@@ -31,7 +31,7 @@ You are reworking **Crucivar, the Furnace Heart**, the Brass Foundry's area boss
    - 3.5 s punishes, 0.1 s gaps;
    - proven beatable by four perfect AllyBots on Hard.
 4. Current Crucivar:
-   - `bosses/2-brass-foundry-crucivar/BOSS.md`, `abilities-v2/ABILITIES.md`, `ABILITIES-v3.md` (12602a7) and `MORNING-REPORT.md`;
+   - `bosses/2-brass-foundry-crucivar/BOSS.md` and the v2/v3 write-ups (deleted 2 Nov 2026 with the retired sets; in git history);
    - code in `unity/Assets/LastBell/Run/Encounters/Crucivar/` (seven abilities exist: Mould Press, Gear Chain, Bellows Draw, The Great Casting, Second Press, Anvil Sweep, Slag Spit; reuse what fits).
 5. Look:
    - `gpt/README.md`, `gpt/04-bosses.md`, `gpt/05-arenas.md`;

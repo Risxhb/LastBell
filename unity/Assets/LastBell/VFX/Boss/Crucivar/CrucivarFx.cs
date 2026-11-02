@@ -11,7 +11,7 @@ namespace LastBell.VFX
         static readonly Color Molten = new Color(2.4f, 0.9f, 0.25f), Slag = new Color(0.55f, 0.16f, 0.05f),
             Steam = new Color(1.6f, 1.55f, 1.45f), SteamLow = new Color(0.32f, 0.30f, 0.30f);
 
-        // Diebreaker: the hammer lands in its toothed circle. A flat brass flash and clang; no extra shockwave.
+        // hammer landing (Anvil Quake's circle, Hard Second Press): A flat brass flash and clang; no extra shockwave.
         public void DiebreakerResolve(Vector3 centre, float radius)
         {
             var c = new Vector3(centre.x, 0.06f, centre.z);
@@ -25,7 +25,7 @@ namespace LastBell.VFX
             CameraShake.Shake(0.34f, 0.3f);
         }
 
-        // Slag Cast: the arc of molten metal lands and splashes; the pool itself is the standing hazard's telegraph.
+        // molten splash (brand landing, tower landing, castings sinking); the pool itself is the standing hazard's telegraph.
         public void SlagSplash(Vector3 pos, float radius)
         {
             var c = new Vector3(pos.x, 0.06f, pos.z);
@@ -38,25 +38,7 @@ namespace LastBell.VFX
             CameraShake.Shake(0.1f, 0.15f);
         }
 
-        // Pressure Release: a brief steam jet runs out through each locked sector, then clears fast.
-        public void SteamRelease(Vector3 origin, float yaw, float radius, float halfAngle)
-        {
-            Play(FxMeshes.Sector(1.2f, radius, halfAngle), true, alphaMat, origin + Vector3.up * 0.1f, yaw, 0.45f, (b, u) =>
-            {
-                b.mpb.SetFloat(PProgress, Mathf.Lerp(-0.1f, 1.15f, Ease(Mathf.Clamp01(u / 0.3f))));
-                b.mpb.SetFloat(PWidth, 0.25f); b.mpb.SetFloat(PTail, 0.6f); b.mpb.SetFloat(PDissolve, Mathf.Clamp01((u - 0.25f) / 0.75f));
-            }, 0, SteamLow, Steam, Ivory);
-            var rot = Quaternion.Euler(0, yaw, 0);
-            for (int i = 0; i < 5; i++)
-            {
-                float a = Mathf.Lerp(halfAngle, -halfAngle, i / 4f) * Mathf.Deg2Rad;
-                var d = rot * new Vector3(Mathf.Sin(a), 0, Mathf.Cos(a));
-                dust.Emit(origin + d * 1.6f + Vector3.up * 1.2f, d * 6f + Vector3.up * 0.8f, 1.6f, 0.45f, 0.4f);
-            }
-            CameraShake.Shake(0.12f, 0.2f);
-        }
-
-        // Casting Cycle: one die-stamp strip presses down, then the stamped metal cools (the strip is safe right after).
+        // a die-stamp strip presses down (the Casting Order pours), then the stamped metal cools (the strip is safe right after).
         public void StripStamp(Vector3 origin, float yaw, float length, float width)
         {
             Play(FxMeshes.Quad(-width / 2, width / 2, 0, length), true, alphaMat, origin + Vector3.up * 0.07f, yaw, 0.5f, (b, u) =>
@@ -113,7 +95,5 @@ namespace LastBell.VFX
             CameraShake.Shake(0.7f, 0.8f);
         }
 
-        // Rail Ram braking at the lane end: reuses the charge trail and landing.
-        public void RamBrake(Vector3 pos) => ChargeLand(pos);
     }
 }
