@@ -406,6 +406,7 @@ namespace LastBell.Run
         // and sink, so the warning is never covered.
         public const int RootPieces = 10;
         public int PodModels, RootModels, BudModels;   // tests: prop models placed (0 when the art isn't installed)
+        public void DebugRoots() => RootsErupt(Vector3.zero, 3.5f);   // tests: the Root Ring's look alone, for a screenshot
         void RootsErupt(Vector3 c, float r)
         {
             float a0 = LookRnd(0, Tau);

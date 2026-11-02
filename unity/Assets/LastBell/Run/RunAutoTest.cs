@@ -917,15 +917,18 @@ namespace LastBell.Run
             // review screenshots: the test player is moved next to each prop first so the camera frames it (the bot is healed)
             IEnumerator PropShots()
             {
-                bool pod = false, roots = false, bud = false, seedShot = false;
-                while (d.World != null && !(pod && roots && bud && seedShot))
+                bool pod = false, bud = false, seedShot = false;
+                if (SylvaraProps.Has(SylvaraProps.Root))
                 {
-                    if (!roots && sy.PhaseName == "Two-Colour Choir" && sy.Order.Contains("Root Ring"))
-                    {
-                        roots = true; float tw = Time.time;
-                        while (sy.RootModels == 0 && Time.time - tw < 3f) { d.Player.transform.position = new Vector3(0, 0, -6.5f); yield return null; }
-                        yield return new WaitForSeconds(0.14f); yield return Shot("sylvara_props_root_ring"); continue;
-                    }
+                    // the Root Ring's look on demand, with the player just outside the 3.5 m disc so the camera frames it
+                    float tw = Time.time;
+                    while (Time.time - tw < 0.6f) { d.Player.transform.position = new Vector3(0, 0, 5f); yield return null; }
+                    int r0 = sy.RootModels; sy.DebugRoots();
+                    Check("the Root Ring look raises its root models", sy.RootModels - r0 == SylvaraEncounter.RootPieces);
+                    yield return new WaitForSeconds(0.2f); yield return Shot("sylvara_props_root_ring");
+                }
+                while (d.World != null && !(pod && bud && seedShot))
+                {
                     foreach (var m in FindObjectsByType<PropMotion>(FindObjectsSortMode.None))
                     {
                         if (!pod && m.name == SylvaraProps.Pod && m.Now == PropMotion.Mode.Fall && m.LandsIn < 0.12f) { pod = true; yield return Shot("sylvara_props_pod_falls"); break; }
@@ -959,7 +962,7 @@ namespace LastBell.Run
             if (SylvaraProps.Has(SylvaraProps.Pod)) Check("Seed Pods drop the pod model onto their warnings", sy.PodModels > 0, sy.PodModels.ToString());
 
             // Phase 2: colours
-            sy.Order.Clear();
+            sy.Order.Clear(); int rootsBefore = sy.RootModels;
             d.Boss.DebugSetHpFraction(0.74f);
             yield return Until(() => sy.PhaseName == "Two-Colour Choir", 4, "Sylvara phase 2");
             Check("Sylvara enters Two-Colour Choir below 75 %", sy.PhaseName == "Two-Colour Choir");
@@ -990,8 +993,8 @@ namespace LastBell.Run
                 Check($"Sylvara P2 uses {id}", sy.Order.Contains(id));
             if (SylvaraProps.Has(SylvaraProps.Root))
             {
-                yield return Play(4f, () => sy.RootModels > 0);   // the ring starts at 12 s and resolves 2 s later
-                Check("the Root Ring raises root models inside its disc", sy.RootModels >= SylvaraEncounter.RootPieces, sy.RootModels.ToString());
+                yield return Play(4f, () => sy.RootModels > rootsBefore);   // the ring starts at 12 s and resolves 2 s later
+                Check("the Root Ring raises root models inside its disc", sy.RootModels - rootsBefore >= SylvaraEncounter.RootPieces, (sy.RootModels - rootsBefore).ToString());
             }
 
             // Phase 3: buds
