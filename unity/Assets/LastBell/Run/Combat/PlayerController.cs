@@ -221,6 +221,15 @@ namespace LastBell.Run
             GoDown();
         }
 
+        // Put the player somewhere else at once (Aurelion's Last Light fall, proposal): any knockback, pull or dash in
+        // progress ends, so nothing carries them back over the edge.
+        public void Relocate(Vector3 pos)
+        {
+            if (Down) return;
+            transform.position = World.Constrain(Sim.Flat(pos), Radius);
+            knockTick = 0; pullTick = 0; dashTick = 0;
+        }
+
         // Forced movement with no damage, stun or interrupt (Crucivar's inhale). The player keeps control: the pull is
         // added to their own movement for `ticks` ticks, then stops. Never a teleport.
         public void Pull(Vector3 dir, float distance, int ticks)

@@ -246,6 +246,30 @@ namespace LastBell.Run
             yield return V2WaitIdle(20);
             V2Check("Last Light: the camera frames the boss with the player for the phase, then lets go", framed && RunDirector.FrameAlso == null, f.HasValue ? $"framed {f.Value}" : "not framed");
 
+            // the fall (proposal, 1 Nov, Chzy18 picked "B: Fall"): standing where the first slice falls drops you onto the
+            // nearest standing floor for a heavy hit that is never a one-shot, Medium and Hard
+            foreach (var lv in new[] { Difficulty.Medium, Difficulty.Hard })
+            {
+                yield return V2Setup(1, lv, new[] { new Vector3(0.5f, 0, 6f) }, 4, new Vector3(0, 0, -8f));
+                if (V2Boss == null) yield break;
+                var lf = V2Boss.Light;
+                // the previous check leaves its locked slice live: clear it and stand the player back on the mark
+                V2Boss.ClearPhasePools(); V2Main.Relocate(new Vector3(0.5f, 0, 6f)); V2Main.DebugSetHp(PlayerController.MaxHp);
+                V2Begin(LastLightFloorFx.During(V2W, lf, lf.Run().Take(2)));   // ends on the first slice's lock tick
+                yield return V2WaitIdle(20);
+                yield return V2Ticks(10);
+                var fall = lf.Falls.Count > 0 ? lf.Falls[0] : default;
+                int want = Mathf.RoundToInt(LastLight.FallDamage * V2W.DamageTakenScale);
+                bool landedClear = fall.p != null && !lf.OverHole(fall.to, LastLight.Clearance - 0.05f) && !lf.OverHole(V2Main.transform.position);
+                float moved = fall.p != null ? Sim.Flat(fall.to - fall.from).magnitude : -1;
+                yield return V2Ticks(30);
+                V2Check($"Last Light ({lv}): stepping onto a fallen slice drops you onto the nearest standing floor for {want}, never a one-shot",
+                    lf.Falls.Count == 1 && fall.damage == want && !V2Main.Down && V2Main.Hp == PlayerController.MaxHp - want && landedClear && moved < 4f,
+                    fall.p != null ? $"{fall.damage} damage, moved {moved:0.0} m to {fall.to}, hp {V2Main.Hp}, falls {lf.Falls.Count}" : "no fall");
+                V2Boss.ClearPhasePools();
+                yield return V2WaitIdle(20);
+            }
+
             // the hard enrage at 6:30
             yield return V2Setup(1, Difficulty.Medium, new[] { new Vector3(0, 0, 9f) }, 2, Vector3.zero);
             if (V2Boss == null) yield break;

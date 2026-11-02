@@ -350,6 +350,7 @@ namespace LastBell.Run
             }
             MaxLiveHazards = Mathf.Max(MaxLiveHazards, W.Hazards.Count);
             V4Clock();
+            if (AurelionArgs.V4 && Light != null && W.CombatActive) Light.StepFalls();
             if (presenter) presenter.TickBoss(Current == "approach" || Current == "reposition" ? "Walk" : "Idle");
         }
         public int BehindTicks(PlayerController p) => behind.TryGetValue(p, out int t) ? t : 0;

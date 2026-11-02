@@ -54,6 +54,9 @@ namespace LastBell.Run
             yield return GalleryShot("total_eclipse_umbra", 1, b => TotalEclipseFx.During(V2W, b.Eclipse, b.Eclipse.Run()), Sim.Ticks(4.0f), after: b => b.RaiseShield(0));
             yield return GalleryShot("last_light_warning", 1, b => b.Light.Run().Take(2), Sim.Ticks(LastLight.EveryS - LastLight.WarnS + 1.5f));
             yield return GalleryShot("last_light_burn", 1, b => b.Light.Run().Take(3), Sim.Ticks(LastLight.EveryS + 1.0f));
+            // the fall (proposal, 1 Nov): standing on the first slice as its warning ends, then landed on the nearest floor
+            yield return GalleryShot("last_light_fall_1_standing", 4, b => LastLightFloorFx.During(V2W, b.Light, b.Light.Run().Take(3)), Sim.Ticks(LastLight.EveryS - 0.5f), new Vector3(0.5f, 0, 6f));
+            yield return GalleryShot("last_light_fall_2_landed", 4, b => LastLightFloorFx.During(V2W, b.Light, b.Light.Run().Take(3)), Sim.Ticks(LastLight.EveryS + 0.35f), new Vector3(0.5f, 0, 6f));
             // A16 (telegraph audit): Final Noon, the hard enrage: its 30 s warning banner, then the wipe, over Last Light
             yield return GalleryShot("final_noon_warning", 4, b => NoonAt(b, AurelionEncounter.EnrageWarnS - 0.5f, LastLightFloorFx.During(V2W, b.Light, b.Light.Run().Take(2))), Sim.Ticks(1.0f), after: b => b.TestClock = false);
             yield return GalleryShot("final_noon_wipe", 4, b => NoonAt(b, AurelionEncounter.EnrageS - 0.5f, LastLightFloorFx.During(V2W, b.Light, Hold(Sim.Ticks(1.5f) - 1))), Sim.Ticks(1.5f), after: b => b.TestClock = false);   // ends on the shot: the wipe sends the run to Results
