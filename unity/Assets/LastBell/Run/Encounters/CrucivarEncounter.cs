@@ -14,7 +14,7 @@ namespace LastBell.Run
     {
         public override string Id => "boss.crucivar";
         public override string DisplayName => "Crucivar, The Furnace Heart";
-        public override string Lesson => "Cross behind the cooled strikes; punish the lodged hammer";
+        public override string Lesson => "Carry your brand out, break the castings, fill the moulds";
         public override bool Placeholder => !presenter || !presenter.HasModel;
         public override float NextPhaseFraction() => Hp > MaxHp * P2At ? P2At - 0.01f : P3At - 0.01f;
 
