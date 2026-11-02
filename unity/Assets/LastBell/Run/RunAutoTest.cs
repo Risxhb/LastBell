@@ -958,7 +958,8 @@ namespace LastBell.Run
                 Check("standing next to a Choir Bud without attacking does not cut it", sy.BudsCut == cut0 && sy.BudHpAt(buds[0]) >= SylvaraEncounter.BudHp);
                 d.Player.Kit.ClearTargetState();   // the held attacks above left Tollbreaker's axes lodged (back after 6-8 s): start with both in hand
                 int hpBoss = d.Boss.Hp; t3 = Time.time;
-                while (sy.BudsCut == cut0 && Time.time - t3 < 8f) { bot.Clear(); bot.Aim = buds[0]; bot.hold[0] = d.ClassName != "Tollbreaker"; bot.press[0] = Time.frameCount % 6 == 0; d.Player.transform.position = at; yield return null; }
+                // Tollbreaker taps (a held Twin Hurl lodges); a tap stays pending until a sim tick reads it, or a fast frame rate drops it
+                while (sy.BudsCut == cut0 && Time.time - t3 < 8f) { bool tap = bot.press[0]; bot.Clear(); bot.Aim = buds[0]; bot.hold[0] = d.ClassName != "Tollbreaker"; bot.press[0] = tap || Time.frameCount % 6 == 0; d.Player.transform.position = at; yield return null; }
                 bot.Clear();
                 float cutIn = Time.time - t3;
                 Check("attacking a Choir Bud cuts it in a few seconds (class damage)", sy.BudsCut > cut0 && cutIn < 6f, $"{d.ClassName} {cutIn:0.0}s");
