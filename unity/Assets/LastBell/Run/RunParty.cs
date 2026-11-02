@@ -20,9 +20,12 @@ namespace LastBell.Run
 
         // Ally classes, spread across all three: start with the classes the player didn't pick, then cycle, so 7 allies
         // are 3 / 2 / 2 (with the player, the party is never one class unless there is a single ally).
+        // tests only: the classes allies cycle through instead of every class (null = all). The Sylvara tests leave out the
+        // retired Vanguard (Chzy18, 2 Nov) until Tollbreaker lands.
+        public static string[] Pool;
         public static string[] AllyClasses(string playerClass, int allies)
         {
-            var cls = RunDirector.Classes; int start = Mathf.Max(0, Array.IndexOf(cls, playerClass)) + 1;
+            var cls = Pool ?? RunDirector.Classes; int start = Mathf.Max(0, Array.IndexOf(cls, playerClass)) + 1;
             var r = new string[allies];
             for (int i = 0; i < allies; i++) r[i] = cls[(start + i) % cls.Length];
             return r;

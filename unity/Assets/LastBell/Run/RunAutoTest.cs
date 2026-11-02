@@ -788,6 +788,8 @@ namespace LastBell.Run
 
         // ------------------------------------------------------------ Sylvara v3 (bullet hell, abilities-v3/P1..P4)
         static bool ArcanistOnly => Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellArcanistOnly", StringComparison.OrdinalIgnoreCase));
+        // the current classes for every Sylvara run: Vanguard is retired (Chzy18, 2 Nov); add Tollbreaker when it lands
+        static readonly string[] SylvaraClasses = { "Chimesinger", "Arcanist" };
         static bool OnlySylvara => Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellSylvara", StringComparison.OrdinalIgnoreCase));
         static bool SylvaraClearOnly => Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellSylvaraClear", StringComparison.OrdinalIgnoreCase));
 
@@ -796,7 +798,8 @@ namespace LastBell.Run
         IEnumerator SylvaraClearTimes()
         {
             bool was = AllyBot.Attacks; AllyBot.Attacks = true; int keep = RunParty.Selected;
-            var runs = new (string cls, int allies)[] { ("Vanguard", 0), ("Chimesinger", 0), ("Arcanist", 0), ("Vanguard", 3), ("Chimesinger", 3), ("Arcanist", 3) };   // 1-4 players (1 Nov)
+            RunParty.Pool = SylvaraClasses;
+            var runs = new (string cls, int allies)[] { ("Chimesinger", 0), ("Arcanist", 0), ("Chimesinger", 3), ("Arcanist", 3) };   // 1-4 players (1 Nov), no Vanguard (retired 2 Nov)
             foreach (var (cls, allies) in runs)
             {
                 if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }
@@ -834,7 +837,7 @@ namespace LastBell.Run
                 if (d.State == RunState.Combat && d.Boss) d.Boss.DebugDefeat();   // timed out: end it so the next run can start
                 yield return Until(() => d.State != RunState.Combat, 10, "clear run ends");
             }
-            AllyBot.Attacks = was;
+            AllyBot.Attacks = was; RunParty.Pool = null;
             if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }
             d.SelectAllies(keep);
         }
@@ -844,12 +847,12 @@ namespace LastBell.Run
             // the practice section above leaves the director in Ready, where ReturnToMenu only works from the pause menu
             if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }
             int verdant = RunMaps.IndexOf(RunDirector.SylvaraMap);
-            Check("Sylvara practice accepted from the menu", d.StartPractice("Vanguard", RunDirector.SylvaraPractice));
+            Check("Sylvara practice accepted from the menu", d.StartPractice("Chimesinger", RunDirector.SylvaraPractice));
             yield return Until(() => RunMaps.Current == verdant && RunDirector.Instance && RunDirector.Instance.State == RunState.Ready, 30, "Verdant Chimes loaded for Sylvara");
             if (RunDirector.Instance != d) { directorLog.AddRange(d.Log); d = RunDirector.Instance; d.InputOverride = bot; bot.Clear(); }
             if (d.Player) d.Player.Input = bot;   // the new scene built the player before the bot was attached
             Check("Sylvara practice loads the Verdant Chimes arena", RunMaps.Current == verdant && HazardSystem.ArenaCount > 0, RunMaps.CurrentName);
-            Check("Sylvara practice keeps the chosen class across the map load", d.ClassName == "Vanguard" && d.Mode == RunMode.Practice && d.Encounter == RunDirector.SylvaraPractice);
+            Check("Sylvara practice keeps the chosen class across the map load", d.ClassName == "Chimesinger" && d.Mode == RunMode.Practice && d.Encounter == RunDirector.SylvaraPractice);
             d.RequestReady();
             yield return Until(() => d.State == RunState.Combat, 4, "Sylvara practice combat");
             var sy = d.Boss as SylvaraEncounter;
@@ -1118,9 +1121,9 @@ namespace LastBell.Run
         // Sylvara with three bot allies (the menu's Allies row): they spawn, dodge the bullet hell and cut buds by themselves
         IEnumerator SylvaraBotChecks()
         {
-            int keep = RunParty.Selected;
+            int keep = RunParty.Selected; RunParty.Pool = SylvaraClasses;
             Check("the menu sets the ally count", d.SelectAllies(3) && RunParty.Selected == 3);
-            Check("Sylvara practice with 3 allies starts", d.StartPractice("Vanguard", RunDirector.SylvaraPractice));
+            Check("Sylvara practice with 3 allies starts", d.StartPractice("Chimesinger", RunDirector.SylvaraPractice));
             yield return Until(() => RunDirector.Instance && RunDirector.Instance.State == RunState.Ready, 30, "Verdant Chimes loaded for the bot fight");
             if (RunDirector.Instance != d) { directorLog.AddRange(d.Log); d = RunDirector.Instance; d.InputOverride = bot; bot.Clear(); }
             if (d.Player) d.Player.Input = bot;
@@ -1128,7 +1131,7 @@ namespace LastBell.Run
             yield return Until(() => d.State == RunState.Combat, 4, "bot fight combat");
             var sy = d.Boss as SylvaraEncounter;
             Check("three bot allies fight beside the player", d.Allies.Count == 3 && d.Allies.All(a => a.Input is AllyBot), d.Allies.Count.ToString());
-            if (sy == null || d.Allies.Count == 0) { RunParty.Selected = keep; yield break; }
+            if (sy == null || d.Allies.Count == 0) { RunParty.Selected = keep; RunParty.Pool = null; yield break; }
             var hits = new Dictionary<PlayerController, int>(); int downs = 0;
             var budGap = new Dictionary<PlayerController, float>();
             Action<PlayerController, BulletSystem.Bullet, int> onBullet = (p, b, dmg) => { if (p != d.Player) hits[p] = (hits.TryGetValue(p, out int n) ? n : 0) + 1; };
@@ -1159,7 +1162,7 @@ namespace LastBell.Run
             d.Boss.DebugDefeat();
             yield return Until(() => d.State == RunState.Results, 8, "bot fight results");
             d.ReturnToMenu(); yield return null;
-            RunParty.Selected = keep;
+            RunParty.Selected = keep; RunParty.Pool = null;
         }
 
         // Exact-tick regressions from the foundation review of PR #42 (risxhb/codex, Oct 21). The director is paused
