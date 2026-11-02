@@ -27,10 +27,10 @@ Average party DPS is about 23 solo, 92 at 4 players and 315 at 8. Damage per pla
 | How it was set | measured | between 1 and 4 | between 1 and 4 | measured | between 4 and 8 | between 4 and 8 | between 4 and 8 | measured |
 
 - It's built as a per-party-size table in `SylvaraEncounter`, replacing the shared `1 + PartyStep × (n − 1)` formula. Fighters are counted the same way as for Aurelion: players, plus bots only when bots attack.
-- A table is needed because a single step can't fit both measured points. Step 1.0 fits 4 players but gives 8 players 36,800 (about 2 min). Step 1.8 fits 8 but gives 4 players 29,000 (about 5 min).
+- A table was needed because one step couldn't fit both the 4- and the 8-player measurements. With 1–4 players only, the table equals a step of 1.0, and it stays a table so it can be tuned per size.
 - Bots in perfect mode probably deal more damage than people do, so real clears will likely run longer than 200 s. The table can be scaled down after playtests.
 
 ## Open questions
 1. **Solo survival:** the perfect solo bot wipes at every HP. Vanguard (melee) dies at 15 s, and the ranged classes die after about 4 minutes. That's bot dodging, not HP, but it means the solo number is untested past Phase 3. Should solo get its own easing, or should it wait for a human solo playtest?
 2. **Bud damage counts against Sylvara 1:1:** cutting buds is never lost damage. Keep it, or count bud damage at a lower rate?
-3. **2, 3, 5, 6 and 7 players** are filled in between the measured counts, not measured. Run them later if a playtest feels off.
+3. **2 and 3 players** are filled in between the measured counts, not measured. Run them later if a playtest feels off.

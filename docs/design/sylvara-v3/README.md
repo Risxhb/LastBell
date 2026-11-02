@@ -16,7 +16,7 @@ Chzy18 accepted the full fight for the Unity build on 29 Oct. The enrage timing 
   - Each bullet hits once, with no stun or knockback (`Hazard.Flinch = false`).
   - Bullets can be coloured (Phase 2) and can split (Phase 4 seeds).
 - `unity/Assets/LastBell/Run/Encounters/SylvaraEncounter.cs` is the v3 fight:
-  - HP by party size: 4,600 solo up to 63,000 at 8 fighters (accepted 1 Nov, [HP-SCALING.md](HP-SCALING.md));
+  - HP by party size: 4,600 solo up to 18,400 at 4 fighters (accepted 1 Nov; the game is 1–4 players, [HP-SCALING.md](HP-SCALING.md));
   - rooted at the arena centre;
   - phase changes at 75/50/25 %.
 - The autotest `-lastbellSylvara` section covers:

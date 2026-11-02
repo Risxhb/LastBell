@@ -551,7 +551,7 @@ namespace LastBell.Run
                     {
                         // a seed bursts into a ring of petals: keep clear of the burst point and its ring for a moment
                         var at = b.Pos + b.Vel * fuse; float since = t - fuse;
-                        float ring = 4.5f * since, gap = Mathf.Abs(Sim.Flat(q - at).magnitude - ring) - (0.35f + Hazard.Margin + Buffer);
+                        float ring = 4.5f * since, gap = Mathf.Abs(Sim.Flat(q - at).magnitude - ring) - (BulletArt.PetalHitRadius + Hazard.Margin + Buffer);
                         if (since < 0.6f && gap < 0) cost += 40 * early;
                     }
                 }

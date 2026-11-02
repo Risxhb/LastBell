@@ -796,7 +796,7 @@ namespace LastBell.Run
         IEnumerator SylvaraClearTimes()
         {
             bool was = AllyBot.Attacks; AllyBot.Attacks = true; int keep = RunParty.Selected;
-            var runs = new (string cls, int allies)[] { ("Vanguard", 0), ("Chimesinger", 0), ("Arcanist", 0), ("Vanguard", 3), ("Chimesinger", 3), ("Arcanist", 3), ("Vanguard", 7), ("Arcanist", 7) };
+            var runs = new (string cls, int allies)[] { ("Vanguard", 0), ("Chimesinger", 0), ("Arcanist", 0), ("Vanguard", 3), ("Chimesinger", 3), ("Arcanist", 3) };   // 1-4 players (1 Nov)
             foreach (var (cls, allies) in runs)
             {
                 if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }
@@ -902,8 +902,11 @@ namespace LastBell.Run
             // checks run only where the art is installed. A watcher takes one screenshot of each prop in action.
             {
                 bool Fits(Mesh m, float r) { var b = m.bounds; return Mathf.Max(Mathf.Abs(b.min.x), Mathf.Abs(b.max.x), Mathf.Abs(b.min.z), Mathf.Abs(b.max.z)) <= r + 1e-3f; }
-                Check("petal bullets (coral, brass, cobalt) fit the 0.35 m hit circle", Fits(BulletArt.Petal(false), 0.35f) && Fits(BulletArt.Petal(true), 0.35f));
-                Check("water drops fit the 0.35 m hit circle", Fits(BulletArt.Drop, 0.35f));
+                Check($"petal bullets (coral, brass, cobalt) fit their {BulletArt.PetalHitRadius:0.00} m hit circle", Fits(BulletArt.Petal(false), BulletArt.PetalHitRadius) && Fits(BulletArt.Petal(true), BulletArt.PetalHitRadius));
+                // the circle shrank to fit the slimmer petal (1 Nov): its tips reach the edge, no larger
+                Check("petal hit circle is the petal's reach (0.30 m, was 0.35)", Mathf.Approximately(BulletArt.PetalHitRadius, 0.30f) && !Fits(BulletArt.Petal(false), BulletArt.PetalHitRadius - 0.02f));
+                Check($"a fired petal uses the {BulletArt.PetalHitRadius:0.00} m circle", new BulletSystem.Bullet().Radius == BulletArt.PetalHitRadius);
+                Check($"water drops fit their {BulletArt.DropHitRadius:0.00} m hit circle", Fits(BulletArt.Drop, BulletArt.DropHitRadius));
                 bool art = SylvaraProps.Has(SylvaraProps.Bud) && SylvaraProps.Has(SylvaraProps.Pod) && SylvaraProps.Has(SylvaraProps.Root) && BulletArt.HasSeedModel;
                 Note("Sylvara attack props: " + (art ? "Meshy models installed" : "art not installed, stand-ins used"));
                 if (BulletArt.HasSeedModel)

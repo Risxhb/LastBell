@@ -25,7 +25,7 @@ Status: **proposal**. Chzy18 asked on 1 Nov to "build out the animation and mode
 
 | Thing | Today | Proposed model | Animation |
 |---|---|---|---|
-| Petal bullet (all phases) | coral sphere | a single cream-to-coral petal, about 0.5 m long, with a coral glowing core | turns to face its flight path and spins slowly |
+| Petal bullet (all phases) | coral sphere | a single coral petal, 0.6 m long, with a bright core. **Built and accepted 1 Nov.** Its hit circle shrank from 0.35 m to 0.30 m to fit the slimmer petal (Chzy18, 1 Nov), so petals are easier to dodge. Water drops keep 0.35 m. | turns to face its flight path and spins slowly |
 | Two-colour petal (P2) | brass or cobalt sphere | the same petal tinted brass or cobalt, with a matching rim | same |
 | Big seed (P4 Seed Ring) | green sphere | a brass-capped seed pod about 0.6 m across, with a verdigris husk and seams | the seams glow brighter as the fuse runs down, so you can see when it will burst; on burst the husk splits and the petals fly out |
 | Choir Bud (P3) | primitive | a bell-flower on a root stalk, matching the reference sheet's Phase 2 panel: a brass bell inside ivory petals | grows out of the floor in 0.6 s; the petals open wider as the bloom timer runs; when cut it droops and sinks; when it blooms it flares open, then crumbles |

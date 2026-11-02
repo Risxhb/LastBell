@@ -100,8 +100,8 @@ namespace LastBell.Run
         void Awake() { MaxHp = PartyHp[1];  BodyRadius = 1.6f; HitHeight = 2.4f; MarkHeight = 4.8f; }
 
         // HP by fighting party size, about a 3:20 clear at the measured bot damage (HP-SCALING.md, accepted 1 Nov). A table, not
-        // PartyStep: damage per player rises with party size, so one step can't fit both 4 and 8. Same on every level.
-        public static readonly int[] PartyHp = { 0, 4600, 9200, 13800, 18400, 29600, 40700, 51900, 63000 };
+        // PartyStep, so each size can be tuned on its own. Same on every level. The game is 1-4 players (Chzy18, 1 Nov).
+        public static readonly int[] PartyHp = { 0, 4600, 9200, 13800, 18400 };
         public static int HpFor(int fighters) => PartyHp[Mathf.Clamp(fighters, 1, PartyHp.Length - 1)];
 
         static readonly Color Stone = new Color(0.68f, 0.70f, 0.64f), Wood = new Color(0.27f, 0.20f, 0.15f),
@@ -305,7 +305,7 @@ namespace LastBell.Run
         float R => CombatWorld.PlayerBound;
         void Later(float seconds, Action fn) => later.Add((Age + Mathf.Max(1, Sim.Ticks(seconds)), fn));
         Emitter Add(Emitter e) { emit.Add(e); return e; }
-        void Shot(Vector3 at, float a, float v, int dmg = 12, float life = 6, int col = 0, string src = "Petal", float r = 0.35f, Action<BulletSystem.Bullet> split = null) =>
+        void Shot(Vector3 at, float a, float v, int dmg = 12, float life = 6, int col = 0, string src = "Petal", float r = BulletArt.PetalHitRadius, Action<BulletSystem.Bullet> split = null) =>
             W.Bullets.Fire(at, a, v, dmg, life, r, col, src, split);
         void PetalRing(Vector3 c, int n, float v, float off, float r0, int dmg = 12, string src = "Petal")
         {
@@ -444,7 +444,7 @@ namespace LastBell.Run
                     {
                         t += dt; if (t > 2) { e.On = false; return; }
                         float a = start + dir * span * (t / 2); acc += dt;
-                        while (acc >= 0.07f) { acc -= 0.07f; Shot(On(a, R - 0.1f), a + Mathf.PI, 9, 14, (R - Rim) / 9, 0, "Waterfall Jet"); }
+                        while (acc >= 0.07f) { acc -= 0.07f; Shot(On(a, R - 0.1f), a + Mathf.PI, 9, 14, (R - Rim) / 9, 0, "Waterfall Jet", BulletArt.DropHitRadius); }
                     };
                     Add(e);
                 });

@@ -13,7 +13,7 @@ namespace LastBell.Run
         public sealed class Bullet
         {
             public Vector3 Pos, Vel;
-            public float Radius = 0.35f, Life = 6, Age;
+            public float Radius = BulletArt.PetalHitRadius, Life = 6, Age;
             public int Damage = 12;
             public int Colour;                    // 0 hurts everyone; otherwise only players whose colour matches (Two-Colour Choir)
             public string Source = "Bullet";
@@ -36,7 +36,7 @@ namespace LastBell.Run
 
         public BulletSystem(CombatWorld world) { w = world; }
 
-        public Bullet Fire(Vector3 pos, float yawRad, float speed, int damage, float life = 6, float radius = 0.35f, int colour = 0, string source = "Bullet", Action<Bullet> split = null)
+        public Bullet Fire(Vector3 pos, float yawRad, float speed, int damage, float life = 6, float radius = BulletArt.PetalHitRadius, int colour = 0, string source = "Bullet", Action<Bullet> split = null)
         {
             var b = new Bullet
             {
@@ -146,7 +146,7 @@ namespace LastBell.Run
                         // nose first, flat, with a slow roll so the petal catches the light; scaled to the hit radius
                         float roll = k == Water ? 0 : 25f * Mathf.Sin(b.Age * 3f + b.GetHashCode() * 0.1f);
                         t.rotation = Quaternion.LookRotation(fwd) * Quaternion.Euler(0, 0, roll);
-                        t.localScale = Vector3.one * (b.Radius / 0.35f);
+                        t.localScale = Vector3.one * (b.Radius / (k == Water ? BulletArt.DropHitRadius : BulletArt.PetalHitRadius));
                     }
                 }
                 for (int k = 0; k < Kinds; k++)

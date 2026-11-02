@@ -9,7 +9,9 @@ namespace LastBell.Run
     // gitignored art) with a sphere fallback.
     public static class BulletArt
     {
-        // 0.60 m petal ("eye" outline with S-curled tips) for the 0.35 m hit radius, flat in XZ, nose along +Z.
+        // 0.60 m petal ("eye" outline with S-curled tips), flat in XZ, nose along +Z. Its hit radius is 0.30 m, the petal's own
+        // reach (Chzy18, 1 Nov: the circle shrinks to fit the slimmer petal; it was 0.35 m for the old round blobs).
+        public const float PetalHitRadius = 0.30f, DropHitRadius = 0.35f;
         // Submesh 0 is the petal, submesh 1 the bright core at the hit centre: round, or four-lobed for the cobalt petal so
         // the two Phase 2 colours differ in grayscale too.
         public const float PetalHalfLength = 0.30f;
@@ -64,7 +66,7 @@ namespace LastBell.Run
         static Mesh BuildDrop()
         {
             var v = new List<Vector3>(); var water = new List<int>(); var core = new List<int>();
-            Ellipsoid(v, water, Vector3.zero, new Vector3(0.2f, 0.16f, 0.25f), 10, 7, 0.35f);   // tail 0.25 x 1.35 = 0.34 m, inside 0.35
+            Ellipsoid(v, water, Vector3.zero, new Vector3(0.2f, 0.16f, 0.25f), 10, 7, 0.35f);   // tail 0.25 x 1.35 = 0.34 m, inside DropHitRadius
             Ellipsoid(v, core, Vector3.zero, new Vector3(0.07f, 0.07f, 0.12f), 8, 5, 0);
             var m = new Mesh { name = "WaterDrop" };
             m.SetVertices(v); m.subMeshCount = 2; m.SetTriangles(water, 0); m.SetTriangles(core, 1);

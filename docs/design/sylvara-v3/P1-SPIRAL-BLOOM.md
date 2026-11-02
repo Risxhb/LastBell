@@ -37,7 +37,7 @@
 - **28 Oct:** Phase 1 accepted.
 
 ## Open questions
-1. **Bullet hitbox:** the demo uses a 0.4 m player radius and 0.35 m bullets. Keep that, or add a smaller hurtbox for bullets only (a new rule)?
+1. **Bullet hitbox:** the demo used a 0.4 m player radius and 0.35 m bullets. Since 1 Nov the petals are 0.30 m (Chzy18: the circle fits the new petal model); Waterfall Jet drops stay 0.35 m. A smaller player hurtbox for bullets is still open.
 2. **New shared code:** hostile bullets need a shared projectile system (one hit per bullet, cleared on boss death or phase change). Today only player projectiles exist.
 3. **Hard and Easy:** accepted 31 Oct, see [DIFFICULTY-EXTRAS.md](DIFFICULTY-EXTRAS.md); built in Unity.
 4. **Escape check:** the jets and the Arc side slivers need entries in `tools/encounter-escape/` before any build.
