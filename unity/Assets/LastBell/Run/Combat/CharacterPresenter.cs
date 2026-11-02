@@ -14,11 +14,6 @@ namespace LastBell.Run
         // semantic name -> clip names to try, in order (approved-kit name first, then reused older clips)
         static readonly Dictionary<string, string[]> Fallbacks = new Dictionary<string, string[]>
         {
-            ["SteelRhythm1"] = new[] { "SteelRhythm1", "Combo1" }, ["SteelRhythm2"] = new[] { "SteelRhythm2", "Combo2" },
-            ["SteelRhythm3"] = new[] { "SteelRhythm3", "Combo3" },
-            ["SunderingBlow"] = new[] { "SunderingBlow", "PendulumRush" }, ["LastWord"] = new[] { "LastWord", "ReversalRush", "FinalHour" },
-            ["BraceHold"] = new[] { "BraceHold", "Guard" }, ["BraceWalk"] = new[] { "BraceWalk", "BraceHold", "Guard" },
-            ["BraceRaise"] = new[] { "BraceRaise" }, ["BraceLower"] = new[] { "BraceLower" }, ["BraceHit"] = new[] { "BraceHit" },
             ["PhaseShift"] = new[] { "PhaseShift", "Vulnerable" }, ["Defeat"] = new[] { "Defeat", "Vulnerable" },
             // Arcanist arcane kit: the new clips first, then the closest clip of the earlier kit
             ["MissileTap"] = new[] { "MissileTap", "Clockbolt" }, ["MissileTap2"] = new[] { "MissileTap2", "Clockbolt2" },
@@ -27,13 +22,10 @@ namespace LastBell.Run
             ["DisintegrateEnd"] = new[] { "DisintegrateEnd", "Clockbolt" }, ["RuneSigil"] = new[] { "RuneSigil", "TimeSeal" },
             ["AstralOrb"] = new[] { "AstralOrb", "TemporalAnchor" }, ["ArcaneSurge"] = new[] { "ArcaneSurge", "AstralOrb", "TemporalAnchor" }, ["ArcaneComet"] = new[] { "ArcaneComet", "Convergence" },
             ["BlinkIn"] = new[] { "BlinkIn", "AnchorReturn" },
-            // Tollbreaker: his own clips first (TollbreakerKit names), then the stand-in body's closest Vanguard swing
-            ["TwinHurl"] = new[] { "TwinHurl", "SteelRhythm1", "Combo1" }, ["TwinHurl2"] = new[] { "TwinHurl2", "SteelRhythm2", "Combo2" },
-            ["HurlHeavy"] = new[] { "HurlHeavy", "SteelRhythm3", "Combo3" }, ["GrindingToll"] = new[] { "GrindingToll", "SteelRhythm2", "Combo2" },
-            ["SplittingThrow"] = new[] { "SplittingThrow", "SunderingBlow", "PendulumRush" }, ["CallOfIron"] = new[] { "CallOfIron", "BraceRaise", "SteelRhythm1" },
-            ["BellFrenzy"] = new[] { "BellFrenzy", "LastWord", "ReversalRush" },
+            // Tollbreaker: Grinding Toll reuses his second throw until it has its own clip
+            ["GrindingToll"] = new[] { "GrindingToll", "TwinHurl2" },
         };
-        static readonly HashSet<string> Looping = new HashSet<string> { "Idle", "Run", "Sprint", "Walk", "Vulnerable", "BraceHold", "BraceWalk", "Guard", "Float" };
+        static readonly HashSet<string> Looping = new HashSet<string> { "Idle", "Run", "Sprint", "Walk", "Vulnerable", "Guard", "Float" };
 
         public Transform Visual { get; private set; }
         public bool HasModel { get; private set; }
@@ -43,7 +35,6 @@ namespace LastBell.Run
         AnimationClip[] clips; readonly Dictionary<string, int> index = new Dictionary<string, int>();
         float[] times, weights, speeds; int current = -1;
         string oneShot; float oneShotLeft;
-        int brace;                       // 0 off, 1 raised, 2 lowering
         string idleClip = "Idle";
 
         // locomotion inputs set by the controller each tick
@@ -56,25 +47,7 @@ namespace LastBell.Run
 
         public static CharacterPresenter ForPlayer(Transform parent, string className)
         {
-            // the Tollbreaker has no character sheet or game model yet: until Resources/Characters/Tollbreaker exists he
-            // borrows the archived Vanguard's body, re-tinted (steel-teal cloth, teal glow) so the two never read as one
-            bool standIn = className == "Tollbreaker" && Resources.Load<GameObject>("Characters/Tollbreaker") == null;
-            var p = Create(parent, standIn ? "Vanguard" : className, className == "Chimesinger" ? 2f : 2.5f, 1f, 0, PlaceholderBody(className), className == "Arcanist");   // astrolabe / rune glow restored like the Vanguard's
-            if (standIn) p.Tint(new Color(0.62f, 0.86f, 0.9f), new Color(0.35f, 1.9f, 1.75f));
-            return p;
-        }
-        // multiplies every base colour and recolours the glow (stand-in bodies)
-        public void Tint(Color baseMul, Color glowColor)
-        {
-            foreach (var r in GetComponentsInChildren<Renderer>(true))
-                foreach (var m in r.materials)
-                    if (m.HasProperty("baseColorFactor")) m.SetColor("baseColorFactor", m.GetColor("baseColorFactor") * baseMul);
-            float gm = Mathf.Max(glowColor.r, Mathf.Max(glowColor.g, glowColor.b));
-            for (int i = 0; i < glow.Count; i++)
-            {
-                var (m, c) = glow[i]; var g = glowColor * (Mathf.Max(c.r, Mathf.Max(c.g, c.b)) / gm);
-                glow[i] = (m, g); m.SetColor("emissiveFactor", g);
-            }
+            return Create(parent, className, className == "Chimesinger" ? 2f : 2.5f, 1f, 0, PlaceholderBody(className), className == "Arcanist");   // astrolabe / rune glow restored
         }
 
         public static CharacterPresenter Create(Transform parent, string resource, float glowBoost, float metalScale, float yawOffset, System.Func<Transform, Transform> placeholder, bool castLayers = false)
@@ -164,25 +137,16 @@ namespace LastBell.Run
         public void Dash() => PlayOnce("Dodge", 0.3f, 0.05f);
         public void Jump() => PlayOnce("Jump", 0.62f, 0.2f);
         public void Land() { if (!PlayOnce("Land", 0.2f)) { } }
-        public void Brace(int state)
-        {
-            brace = state;
-            if (state == 1) { if (!Action("BraceRaise", 6)) oneShotLeft = 0; }
-            else if (state == 2) { if (!Action("BraceLower", 9)) { oneShotLeft = 0; } }
-            else oneShotLeft = 0;
-        }
-        public void BraceHit() { if (!Action("BraceHit", 12)) flinch = 0.4f; }
         public void Hit() { if (!PlayOnce("Hit", 0.3f)) flinch = 1; }
         public void Down() { EndOverlay(); downTarget = 1; if (PlayOnce("Down", 0.8f)) { downTarget = 0; oneShotLeft = 9999; } }
         public void GetUp() { downTarget = 0; if (!PlayOnce("GetUp", 0.9f)) { downAmount = 1; } }
-        public void ResetPose() { downTarget = downAmount = 0; flinch = 0; brace = 0; oneShotLeft = 0; GlowLevel = 1; SetLoop(idleClip); EndOverlay(); SetHidden(false); }
+        public void ResetPose() { downTarget = downAmount = 0; flinch = 0; oneShotLeft = 0; GlowLevel = 1; SetLoop(idleClip); EndOverlay(); SetHidden(false); }
         public void SetIdleClip(string name) { idleClip = name; if (oneShotLeft <= 0) SetLoop(name); }
 
         // called on the combat tick by its owner; picks the locomotion loop when no one-shot is playing
         public void Tick(PlayerController pc)
         {
             if (oneShotLeft > 0) return;
-            if (brace == 1) { SetLoop(Locomotion > 0.3f ? "BraceWalk" : "BraceHold"); return; }
             if (Locomotion > 0.3f) SetLoop(Sprinting ? "Sprint" : "Run", Sprinting ? Locomotion / 6.5f : Locomotion / RunClipSpeed);
             else SetLoop(idleClip);
         }

@@ -10,8 +10,7 @@ namespace LastBell.Run
     // (partner distance outside the band) at resolve; presentation draws the chain.
     public enum HazardShape { Circle, Ring, Cone, Lane, Tether }
 
-    // Strike = a directed physical blow (Vanguard's Brace can mitigate it from the front).
-    // Ground = an eruption under the player (Brace never helps). Bellkeeper spec v0.2 §3, Vanguard #31 Brace rule.
+    // Strike = a directed physical blow. Ground = an eruption under the player. Bellkeeper spec v0.2 §3.
     public enum HazardKind { Strike, Ground }
 
     // One boss attack instance. Its geometry is the telegraph and the hit test (spec: "damage geometry is the
@@ -98,7 +97,7 @@ namespace LastBell.Run
             var d = Sim.Flat(p - Origin); return d.sqrMagnitude > 1e-4f ? d.normalized : Sim.Dir(Yaw);
         }
 
-        // where the blow comes from, for Brace's frontal test
+        // where the blow comes from (frontal tests)
         public Vector3 IncomingFrom(Vector3 p) => Shape == HazardShape.Lane ? Origin + Sim.Dir(Yaw) * Mathf.Max(0, Vector3.Dot(Sim.Flat(p - Origin), Sim.Dir(Yaw)) - 1f) : Origin;
     }
 
@@ -128,7 +127,7 @@ namespace LastBell.Run
                 case HazardShape.Tether: h.Tele = fx.Circle(0.01f); h.Tele.Tint(Color.clear, Color.clear); break;   // the ability draws the chain
                 default: h.Tele = fx.Lane(h.Length, h.Width); break;
             }
-            // jump-clearable bars: warm coral with an amber edge (not cyan, which is the Vanguard's), plus the HUD's JUMP label
+            // jump-clearable bars: warm coral with an amber edge (not cyan, which is the Tollbreaker's), plus the HUD's JUMP label
             if (h.JumpClearable) h.Tele.Tint(JumpFill, JumpBorder);
             else if (h.BurnPerSecond > 0) h.Tele.Tint(SlagFill, SlagBorder);   // standing slag: molten, not the strike coral
             if (h.ClipRadius > 0) h.Tele.Clip(Vector3.zero, h.ClipRadius);

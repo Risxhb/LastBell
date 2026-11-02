@@ -276,7 +276,7 @@ namespace LastBell.Run
                     W.Projectiles.Fire(new ProjectileSystem.Projectile
                     {
                         Pos = a.Pos, Vel = dir * ThrowSpeed, Range = MaxRange, Radius = AxeRadius,
-                        Damage = Boosted(Mathf.RoundToInt(TapOut * FanSideNow)), Ability = "Twin Hurl (fan)", Color = PlayerFx.VanCyan
+                        Damage = Boosted(Mathf.RoundToInt(TapOut * FanSideNow)), Ability = "Twin Hurl (fan)", Color = PlayerFx.TollCyan
                     });
                 }
         }
@@ -394,7 +394,7 @@ namespace LastBell.Run
                 }
             }
         }
-        void Impact(Vector3 at) => W.Fx.NoteImpact(at, PlayerFx.VanCyan);   // stand-in hit spark (shared player motes)
+        void Impact(Vector3 at) => W.Fx.NoteImpact(at, PlayerFx.TollCyan);   // stand-in hit spark (shared player motes)
         int Hand(Axe a) => a == Axes[0] ? 0 : 1;
         void Turn(Axe a) { a.State = AxeState.Back; a.Hit = false; a.Free = false; }
         void Spin(Axe a) { a.State = AxeState.Spin; a.Life = TollSpinNow; a.Age = 0; a.Pos.y = 0.5f; }

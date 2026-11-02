@@ -31,9 +31,9 @@ namespace LastBell.Run
             yield return PhaseToMenu();
             // out-of-range picks clamp to the boss's phases (the menu never offers them; -lastbellPhase refuses them)
             int bk = Array.FindIndex(RunDirector.Bosses, b => b.Final);
-            Check("practice phase: a pick past the last phase clamps to it", d.StartPractice("Vanguard", bk, 99) && d.PracticePhase == RunDirector.Bosses[bk].Phases, $"phase {d.PracticePhase}");
+            Check("practice phase: a pick past the last phase clamps to it", d.StartPractice("Tollbreaker", bk, 99) && d.PracticePhase == RunDirector.Bosses[bk].Phases, $"phase {d.PracticePhase}");
             yield return PhaseToMenu();
-            Check("practice phase: a run always starts in phase 1", d.StartRun("Vanguard") && d.PracticePhase == 1);
+            Check("practice phase: a run always starts in phase 1", d.StartRun("Tollbreaker") && d.PracticePhase == 1);
             yield return PhaseToMenu();
             for (int e = 0; e < RunDirector.Bosses.Length; e++)
                 for (int n = 1; n <= RunDirector.Bosses[e].Phases; n++)
@@ -54,7 +54,7 @@ namespace LastBell.Run
             yield return PhaseToMenu();
             var entry = RunDirector.Bosses[e];
             string tag = $"{LastBell.Menu.TestRushSetup.CardName(e)} phase {n}";
-            Check($"{tag}: practice accepted", d.StartPractice("Vanguard", e, n));
+            Check($"{tag}: practice accepted", d.StartPractice("Tollbreaker", e, n));
             yield return Until(() => RunDirector.Instance && RunDirector.Instance.State == RunState.Ready && RunDirector.Instance.Encounter == e, 30, tag + " ready");
             if (RunDirector.Instance != d) { directorLog.AddRange(d.Log); d = RunDirector.Instance; d.InputOverride = bot; bot.Clear(); }
             if (d.Player) d.Player.Input = bot;   // a new scene built the player before the bot was attached

@@ -124,8 +124,7 @@ namespace LastBell.Run
             SimSmoother.Attach(go);   // drawn between ticks (smooth at 120 fps+); the sim pose is untouched
             pc.ClassName = className; pc.World = world;
             pc.Presenter = CharacterPresenter.ForPlayer(go.transform, className);
-            pc.Kit = className == "Chimesinger" ? new ChimesingerKit() : className == "Arcanist" ? new ArcanistKit()
-                : className == RunDirector.ArchivedVanguard ? new VanguardKit2() : (PlayerKit)new TollbreakerKit();
+            pc.Kit = className == "Chimesinger" ? new ChimesingerKit() : className == "Arcanist" ? new ArcanistKit() : (PlayerKit)new TollbreakerKit();
             pc.Kit.Attach(pc);
             world.Players.Add(pc);
             return pc;

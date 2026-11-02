@@ -17,10 +17,10 @@ namespace LastBell.Run.Shop
         // per-encounter item state (ItemHooks), rebuilt at every encounter start: class state resets (design rules §3)
         public sealed class Live
         {
-            public int Openings, ValourUntil = -1, RallyUntil = -1, LightFeetUntil = -1, VolleyBoostUntil = -1;
-            public float ValourPct, RallyPct, Overflow;
-            public bool MomentumReady, MomentumHit, GraceReady, BlinkReady, RhythmOn;
-            public int RhythmCombos, Notes, RingHits, StruckNotes, LastDashAt = -100000;
+            public int ValourUntil = -1, CryUntil = -1, LightFeetUntil = -1, VolleyBoostUntil = -1, RivenUntil = -1, PaceUntil = -1;
+            public float ValourPct, CryPct, Overflow;
+            public bool GraceReady, BlinkReady, PaceNext;
+            public int PaceStacks, Notes, RingHits, StruckNotes, LastDashAt = -100000;
             public readonly List<int> Taps = new List<int>();
         }
         public Live L { get; private set; } = new Live();
@@ -61,7 +61,6 @@ namespace LastBell.Run.Shop
         public bool Open { get; private set; }
         public bool FinalShop { get; private set; }
         public string NextBoss { get; private set; }
-        public int CrackUntil = -1; public float CrackPct; // Cracked Armour, boss-wide
         public int BrandUntil = -1, BrandHits; public PlayerController BrandOwner;   // Glyph Brand, boss-wide
         public readonly List<string> Ledger = new List<string>();   // earnings since the last shop, shown on the screen
         public readonly List<string> Log = new List<string>();      // every accepted request (tests, playtest reports)

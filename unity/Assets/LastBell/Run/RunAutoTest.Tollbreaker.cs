@@ -15,7 +15,7 @@ namespace LastBell.Run
 
         IEnumerator TollbreakerRun()
         {
-            Check("the Tollbreaker is first in the class picker (the Vanguard's place)", RunDirector.Classes[0] == "Tollbreaker" && !RunDirector.Classes.Contains("Vanguard"));
+            Check("the Tollbreaker is first in the class picker; the Vanguard is gone", RunDirector.Classes[0] == "Tollbreaker" && !RunDirector.Classes.Contains("Vanguard") && Resources.Load<GameObject>("Characters/Vanguard") == null);
             Check("StartRun accepts the Tollbreaker", d.StartRun("Tollbreaker"));
             yield return Wait(0.4f); yield return Shot("ready_tollbreaker");
             Check("the Tollbreaker runs TollbreakerKit on his own model and clips", d.Player.Kit is TollbreakerKit && d.Player.Presenter.HasModel

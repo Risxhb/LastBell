@@ -119,7 +119,7 @@ namespace LastBell.Menu
             RefreshTabs();LinkNavigation();
             EventSystem.current.SetSelectedGameObject(HeroButtons[i].gameObject);
         }
-        public static PlayerKit KitFor(string hero)=>hero=="Chimesinger"?new ChimesingerKit():hero=="Arcanist"?new ArcanistKit():hero==RunDirector.ArchivedVanguard?new VanguardKit2():new TollbreakerKit();
+        public static PlayerKit KitFor(string hero)=>hero=="Chimesinger"?new ChimesingerKit():hero=="Arcanist"?new ArcanistKit():new TollbreakerKit();
         void BuildSkills()
         {
             if(skills){skills.SetActive(false);Destroy(skills);}
@@ -245,7 +245,7 @@ namespace LastBell.Menu
             for(int i=firstHero;i<lastHero;i++)foreach(var corner in ModelCorners(i))
             {var v=inv*(corner-b.center);distance=Mathf.Max(distance,Mathf.Abs(v.x)/(tan*presentationAspect*.90f)-v.z,Mathf.Abs(v.y)/(tan*.90f)-v.z);}
             // Selected view: a neighbouring hero that would be sliced by the screen edge (e.g. the Arcanist beside the
-            // Vanguard at 16:9) is pulled fully into frame when that costs at most 30% extra distance; heroes further out
+            // Tollbreaker at 16:9) is pulled fully into frame when that costs at most 30% extra distance; heroes further out
             // stay entirely off-frame. The selected hero's own fit above is never reduced, so PresentationRect still holds it.
             if(SelectedIndex>=0)
             {
