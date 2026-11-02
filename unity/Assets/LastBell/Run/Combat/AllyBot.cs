@@ -49,7 +49,13 @@ namespace LastBell.Run
             var w = me.World; var boss = w.Boss;
             Vector3 pos = me.transform.position, want;
             if (boss == null || !boss.Solid) { inp.Move = ToScreen(Vector3.zero); return inp; }
-            var bpos = Sim.Flat(boss.transform.position);
+            // the target: the boss, or the nearest live boss part while any stands (Crucivar's castings, which must die
+            // before the Pour Flood); hits land on whichever of them is nearest, so aim and reach follow the target
+            var bpos = Sim.Flat(boss.transform.position); float brad = boss.BodyRadius;
+            float bestPart = float.MaxValue;
+            foreach (var part in w.Parts)
+                if (part.Alive) { float d = Sim.Flat(part.Pos - pos).sqrMagnitude; if (d < bestPart) { bestPart = d; bpos = Sim.Flat(part.Pos); brad = part.BodyRadius; } }
+            tPos = bpos; tRad = brad;
             inp.Aim = bpos;
 
             // 1) dodge: in a hazard that locked at least our reaction time ago (test bots: from its first tick) -> nearest
@@ -111,7 +117,7 @@ namespace LastBell.Run
                 // casters: the basic casts on the move (0.55-0.6 speed), so keep it going while repositioning (following a
                 // turning well, a far job) when nothing lands yet or the slower walk still has time to spare
                 if (Attacks && me.ClassName != "Vanguard" && !inp.Dash && !me.Kit.Acting && tick - lastPress >= 6 && me.Kit.Cooldown01(0) <= 0.001f
-                    && Sim.Flat(bpos - pos).magnitude - boss.BodyRadius <= Range(me) + 1.85f
+                    && Sim.Flat(bpos - pos).magnitude - brad <= Range(me) + 1.85f
                     && (threat == null || move == Vector3.zero || need / (PlayerController.WalkSpeed * 0.55f) < t - 0.3f))
                 { inp.P0 = inp.H0 = true; lastPress = tick; }
                 castHold = 0;
@@ -120,7 +126,7 @@ namespace LastBell.Run
             {
                 // 2) hold a position round the boss at this class's range, on this ally's own angle
                 float ang = 360f * slot / of + 30f;
-                float dist = boss.BodyRadius + Range(me);
+                float dist = brad + Range(me);
                 want = bpos + Sim.Dir(ang) * dist;
                 // Total Eclipse: hold the edge of the nearest light well closest to him (melee still reaches from there)
                 if (boss is AurelionEncounter ae && ae.Eclipse != null && ae.Eclipse.Active && ae.Eclipse.Wells.Count > 0)
@@ -143,7 +149,7 @@ namespace LastBell.Run
                 if (castHold > 0) castHold--;
                 // 3) attack when in range (off: Chzy18 2026-10-22, "the bots are doing too much damage": they only do the
                 // mechanics). Set Attacks = true to bring the rotation back.
-                float gap = Sim.Flat(bpos - pos).magnitude - boss.BodyRadius;
+                float gap = Sim.Flat(bpos - pos).magnitude - brad;
                 if (Attacks && gap <= Range(me) + 1.85f) Attack(me, ref inp);   // Vanguard: 2.75 m; the swing's lunge closes to the 2.6 m reach
                 // Vanguard's Last Word reaches 8 m with its wave: use it from range too
                 else if (Attacks && me.ClassName == "Vanguard" && gap <= 7.5f && me.Kit.Cooldown01(2) <= 0.001f && tick - lastPress >= 6 && Clear(me, 125)) { inp.P2 = true; lastPress = tick; }
@@ -435,10 +441,11 @@ namespace LastBell.Run
         }
 
         // the spot in attack reach of him (gap Range-1 .. Range+1.6: it stops within 0.15 m, inside the swing gate) nearest this bot that the current constraints allow
+        Vector3 tPos; float tRad;   // this tick's target (the boss or its nearest live part)
         bool AttackSpot(PlayerController me, BossEncounter boss, out Vector3 spot)
         {
-            var pos = me.transform.position; var bp = Sim.Flat(boss.transform.position);
-            float lo = boss.BodyRadius + PlayerController.Radius + Mathf.Max(0.2f, Range(me) - 1f), hi = boss.BodyRadius + Range(me) + 1.6f;
+            var pos = me.transform.position; var bp = tPos;
+            float lo = tRad + PlayerController.Radius + Mathf.Max(0.2f, Range(me) - 1f), hi = tRad + Range(me) + 1.6f;
             spot = pos; float best = float.MaxValue;
             var ecl = (boss as AurelionEncounter)?.Eclipse; bool turning = ecl != null && ecl.Active;   // a well spot must stay lit a while
             for (float r = lo; r <= hi; r += 0.3f)
