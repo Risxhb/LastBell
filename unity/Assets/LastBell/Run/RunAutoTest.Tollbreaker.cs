@@ -56,6 +56,7 @@ namespace LastBell.Run
             yield return Until(() => k.AxesInHand == 2, 2, "the axe flies back to his hand");
             yield return Wait(0.1f);
             Check("the caught axe is back in his fist", inHand.All(t => t.gameObject.activeSelf));
+            Check("the return hit is flagged as a return for the item damage hook (Keen Edge)", k.Hitting.Ability == "Twin Hurl" && k.Hitting.Return && !k.Hitting.Recall, $"{k.Hitting.Ability} return {k.Hitting.Return}");
             Check("Twin Hurl hits going out and coming back (14 + 3)", hp0 - d.Boss.Hp >= 17, $"{hp0 - d.Boss.Hp} dealt");
 
             // ---- closer is faster: an axe thrown from 3 m is back sooner than one from 8 m ----

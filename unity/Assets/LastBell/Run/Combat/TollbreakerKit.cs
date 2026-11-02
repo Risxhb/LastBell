@@ -38,7 +38,8 @@ namespace LastBell.Run
         int TollSpinNow => NI("t.toll.spin", TollSpinTicks);         // Long Grind
         int TollEveryNow => Mathf.Max(1, NI("t.toll.every", TollEvery));   // Quick Grind
         float ReturnSpeedNow => N("t.return.speed", ReturnSpeed);    // Quick Catch
-        int TapBackNow => NI("t.tap.back", TapBack);                 // Backswing
+        int TapBackNow => NI("t.tap.back", TapBack);                 // Backswing (Twin Hurl returns only)
+        int TollBackNow => NI("t.toll.back", TapBack);               // Grinding Toll's return (same base, its own key)
         float CallPerMetreNow => N("t.call.per_m", CallPerMetre);    // Iron Pull
         int CallMaxNow => NI("t.call.max", CallMax);                 // Iron Pull
         int CallCdNow => NI("t.call.cd", CallCd);                    // Rooted Axe
@@ -60,7 +61,7 @@ namespace LastBell.Run
         public sealed class HitContext
         {
             public string Ability; public float ReleaseDistance, Distance;
-            public bool Recall, FromFloor, Heavy, BattleSpin;
+            public bool Recall, Return, FromFloor, Heavy, BattleSpin;   // Return: a non-recall axe flying back (Keen Edge skips it)
         }
         public readonly HitContext Hitting = new HitContext();
         // Ringing Return: the shop takes ticks off a cooldown (slot 1-4) on the recall-hit event
@@ -308,7 +309,7 @@ namespace LastBell.Run
         }
         void Context(Axe a, string ability, bool recall)
         {
-            var h = Hitting; h.Ability = ability; h.Recall = recall; h.FromFloor = recall && a.FromFloor; h.Heavy = a.Heavy || a.Splitting;
+            var h = Hitting; h.Ability = ability; h.Recall = recall; h.Return = !recall && (a.State == AxeState.Back); h.FromFloor = recall && a.FromFloor; h.Heavy = a.Heavy || a.Splitting;
             h.BattleSpin = a.BattleSpin && !recall; h.ReleaseDistance = a.ReleaseDistance; h.Distance = ToBoss(P.transform.position);
         }
         int Deal(int dmg, Vector3 contact, BossPart part, string ability, bool boostable)
@@ -361,7 +362,7 @@ namespace LastBell.Run
                     if (!a.Hit && !a.Free && Touch(a.Pos, AxeRadius, out var c, out var part))
                     {
                         a.Hit = true;
-                        int dmg = recall ? Mathf.Min(CallMaxNow, Mathf.RoundToInt(CallBase + CallPerMetreNow * a.Travelled)) : TapBackNow;
+                        int dmg = recall ? Mathf.Min(CallMaxNow, Mathf.RoundToInt(CallBase + CallPerMetreNow * a.Travelled)) : a.Toll ? TollBackNow : TapBackNow;
                         string ab = recall ? "Call of Iron" : a.Toll ? "Grinding Toll" : "Twin Hurl";
                         Context(a, ab, recall); int dealt = Deal(dmg, c, part, ab, !recall);
                         if (recall)
