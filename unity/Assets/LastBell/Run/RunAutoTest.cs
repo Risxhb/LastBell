@@ -975,7 +975,11 @@ namespace LastBell.Run
             Check("Two-Colour Choir: a toll swaps the player's colour", swapped);
             foreach (var id in new[] { "Colour Spiral", "Brass Lanes", "Cobalt Lanes", "Second Colour Spiral", "Root Ring", "Toll" })
                 Check($"Sylvara P2 uses {id}", sy.Order.Contains(id));
-            if (SylvaraProps.Has(SylvaraProps.Root)) Check("the Root Ring raises root models inside its disc", sy.RootModels >= SylvaraEncounter.RootPieces, sy.RootModels.ToString());
+            if (SylvaraProps.Has(SylvaraProps.Root))
+            {
+                yield return Play(4f, () => sy.RootModels > 0);   // the ring starts at 12 s and resolves 2 s later
+                Check("the Root Ring raises root models inside its disc", sy.RootModels >= SylvaraEncounter.RootPieces, sy.RootModels.ToString());
+            }
 
             // Phase 3: buds
             sy.Order.Clear();
@@ -1021,6 +1025,17 @@ namespace LastBell.Run
                 burst |= d.World.Bullets.Live.Any(b => b.Source == "Seed Burst");
             }
             yield return Shot("sylvara_v3_p4");
+            {
+                // hundreds of bullet meshes on screen must not wash the frame out (a NaN normal once bloomed it to white)
+                yield return new WaitForEndOfFrame();
+                var tex = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
+                tex.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0); tex.Apply();
+                var px = tex.GetPixels32(); double sum = 0; int white = 0;
+                for (int i = 0; i < px.Length; i += 7) { float l = (px[i].r + px[i].g + px[i].b) / 765f; sum += l; if (l > 0.97f) white++; }
+                Destroy(tex);
+                float mean = (float)(sum / (px.Length / 7)), whiteShare = white / (float)(px.Length / 7);
+                Check("Seed Storm frame is not washed out (bullet looks)", whiteShare < 0.2f && mean < 0.8f, $"mean {mean:0.00}, white {whiteShare:P0}");
+            }
             Check("Seed Storm throws seeds", seed);
             Check("seeds burst into petals when their fuse ends", burst);
             Check("Seed Storm loop 1: 8 seeds every 2.0 s", sy.StormSeeds == 8 && Mathf.Approximately(sy.StormEvery, 2.0f), $"{sy.StormSeeds} / {sy.StormEvery}");

@@ -23,7 +23,7 @@ namespace LastBell.Run
             const int L = 14, Wd = 6;    // along, across (per side)
             for (int i = 0; i <= L; i++)
             {
-                float u = i / (float)L, z = (u * 2 - 1) * PetalHalfLength;
+                float u = 0.015f + 0.97f * i / L, z = (u * 2 - 1) * PetalHalfLength;   // stop short of the tips: no zero-area triangles (NaN normals)
                 float half = 0.17f * Mathf.Pow(Mathf.Sin(Mathf.PI * u), 0.75f);
                 float curl = 0.07f * Mathf.Pow(Mathf.Abs(u * 2 - 1), 3) * Mathf.Sign(u * 2 - 1);   // nose tip curls up, tail tip down
                 for (int j = -Wd; j <= Wd; j++)
@@ -50,25 +50,32 @@ namespace LastBell.Run
             for (int k = 0; k < N; k++) core.AddRange(new[] { centre, centre + 1 + (k + 1) % N, centre + 1 + k });
             var m = new Mesh { name = lobed ? "PetalLobed" : "Petal" };
             m.SetVertices(v); m.subMeshCount = 2; m.SetTriangles(body, 0); m.SetTriangles(core, 1);
-            m.RecalculateNormals(); m.RecalculateBounds(); return m;
+            m.RecalculateNormals(); SafeNormals(m); m.RecalculateBounds(); return m;
+        }
+        // a NaN normal turns a lit pixel NaN, and bloom smears that over the whole screen: replace any bad normal with up
+        public static void SafeNormals(Mesh m)
+        {
+            var n = m.normals;
+            for (int i = 0; i < n.Length; i++) if (float.IsNaN(n[i].x) || float.IsNaN(n[i].y) || float.IsNaN(n[i].z) || n[i].sqrMagnitude < 0.5f) n[i] = Vector3.up;
+            m.normals = n;
         }
 
         // a stretched water drop (0.6 m long) with a small coral core, for the Waterfall Jet stream
         static Mesh BuildDrop()
         {
             var v = new List<Vector3>(); var water = new List<int>(); var core = new List<int>();
-            Ellipsoid(v, water, Vector3.zero, new Vector3(0.2f, 0.16f, 0.3f), 10, 7, 0.35f);
+            Ellipsoid(v, water, Vector3.zero, new Vector3(0.2f, 0.16f, 0.25f), 10, 7, 0.35f);   // tail 0.25 x 1.35 = 0.34 m, inside 0.35
             Ellipsoid(v, core, Vector3.zero, new Vector3(0.07f, 0.07f, 0.12f), 8, 5, 0);
             var m = new Mesh { name = "WaterDrop" };
             m.SetVertices(v); m.subMeshCount = 2; m.SetTriangles(water, 0); m.SetTriangles(core, 1);
-            m.RecalculateNormals(); m.RecalculateBounds(); return m;
+            m.RecalculateNormals(); SafeNormals(m); m.RecalculateBounds(); return m;
         }
         static void Ellipsoid(List<Vector3> v, List<int> t, Vector3 c, Vector3 r, int segs, int rings, float tail)
         {
             int start = v.Count;
             for (int i = 0; i <= rings; i++)
             {
-                float th = Mathf.PI * i / rings - Mathf.PI / 2;
+                float th = (Mathf.PI * i / rings - Mathf.PI / 2) * 0.97f;   // stop short of the poles: no zero-area triangles (NaN normals)
                 for (int j = 0; j <= segs; j++)
                 {
                     float ph = 2 * Mathf.PI * j / segs, z = Mathf.Sin(th) * r.z;
