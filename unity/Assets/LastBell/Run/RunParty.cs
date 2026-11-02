@@ -3,13 +3,14 @@ using UnityEngine;
 
 namespace LastBell.Run
 {
-    // How many bot allies fight beside the player (menu row, or  LastBell.exe -lastbellAllies 0..7). Chzy18 asked for
-    // 1-7 allies on 2026-10-22 so co-op mechanics can be tested solo; 0 keeps the solo fight. Per session only (not
+    // How many bot allies fight beside the player (menu row, or  LastBell.exe -lastbellAllies 0..3). Chzy18 asked for
+    // allies on 2026-10-22 so co-op mechanics can be tested solo; 0 keeps the solo fight. The game is 1-4 players (Chzy18,
+    // 2026-11-01; it was 1-8), so at most 3 bots join. Per session only (not
     // remembered): the main menu has no Allies control, so a saved count would silently add bots to games and to the
     // other test runs. A run copies it when it starts.
     public static class RunParty
     {
-        public const int MaxAllies = 7;
+        public const int MaxAllies = 3;
         static bool loaded; static int selected;
 
         public static int Selected
@@ -18,8 +19,8 @@ namespace LastBell.Run
             set { Load(); selected = Mathf.Clamp(value, 0, MaxAllies); }
         }
 
-        // Ally classes, spread across all three: start with the classes the player didn't pick, then cycle, so 7 allies
-        // are 3 / 2 / 2 (with the player, the party is never one class unless there is a single ally).
+        // Ally classes, spread across all three: start with the classes the player didn't pick, then cycle, so 3 allies
+        // are one of each (with the player, the party is never one class unless there is a single ally).
         public static string[] AllyClasses(string playerClass, int allies)
         {
             var cls = RunDirector.Classes; int start = Mathf.Max(0, Array.IndexOf(cls, playerClass)) + 1;
