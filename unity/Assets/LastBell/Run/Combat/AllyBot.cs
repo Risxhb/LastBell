@@ -460,7 +460,12 @@ namespace LastBell.Run
             // Choir Buds are a mechanic (boss parts that must be cut), so every bot swings its basic attack at its bud, even
             // the non-attacking menu bots; the boss herself only when attacks are on
             bool atBud = reach.HasValue && Sim.Flat(target - pos).magnitude <= 3.2f;
-            if (atBud || Attacks && Sim.Flat(target - pos).magnitude <= Range(me) + sy.BodyRadius + 2f) inp.P0 = inp.H0 = tick % 6 == 0 || me.ClassName != "Arcanist";
+            // (Tollbreaker plays its rotation: a held Twin Hurl lodges the axe, and lodged axes need a recall)
+            if (atBud || Attacks && Sim.Flat(target - pos).magnitude <= Range(me) + sy.BodyRadius + 2f)
+            {
+                if (me.Kit is TollbreakerKit) Attack(me, ref inp);
+                else inp.P0 = inp.H0 = tick % 6 == 0 || me.ClassName != "Arcanist";
+            }
             if (me.Hp < 70 && me.Potions > 0 && tick % 30 == 0) inp.Potion = true;
             inp.Move = ToScreen(sylMove);
             return inp;
