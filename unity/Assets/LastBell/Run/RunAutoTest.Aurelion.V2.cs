@@ -106,7 +106,7 @@ namespace LastBell.Run
             if (V2Party.Count == 0) { V2Party.Add(V2Main); v2Inputs[V2Main] = v2MainInput; V2Main.Input = v2MainInput; }
             while (V2Party.Count < players)
             {
-                var p = PlayerController.Spawn(V2W, "Chimesinger", new Vector3(0, 0, 5), 180);
+                var p = PlayerController.Spawn(V2W, "Tollbreaker", new Vector3(0, 0, 5), 180);
                 var s = new V2Input(); p.Input = s; v2Inputs[p] = s; p.AbilitiesEnabled = true; V2Party.Add(p);
             }
             for (int i = 0; i < V2Party.Count; i++)
@@ -139,7 +139,7 @@ namespace LastBell.Run
                     V2Party.Clear(); v2Inputs.Clear();
                     int spire = RunMaps.IndexOf(RunDirector.AurelionMap);
                     d.InputOverride = v2MainInput;
-                    d.StartPractice("Arcanist", RunDirector.AurelionPractice);
+                    d.StartPractice("Tollbreaker", RunDirector.AurelionPractice);
                     yield return Until(() => RunMaps.Current == spire && RunDirector.Instance && RunDirector.Instance.State == RunState.Ready, 30, "Aurelion v2: Skyward Spire practice ready");
                     if (RunDirector.Instance != d) { directorLog.AddRange(d.Log); d = RunDirector.Instance; }
                     d.InputOverride = v2MainInput;

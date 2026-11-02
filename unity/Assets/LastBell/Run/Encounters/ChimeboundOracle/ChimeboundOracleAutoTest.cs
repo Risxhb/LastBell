@@ -240,7 +240,7 @@ namespace LastBell.Run
                 float tm = 0; while ((RunDirector.Instance == null || RunMaps.Current != map || RunDirector.Instance.State != RunState.Menu) && tm < 30) { tm += Time.deltaTime; yield return null; }
                 d = RunDirector.Instance;
             }
-            Check("practice request accepted", Court ? d.StartPracticeOnSelectedMap("Vanguard", enc) : d.StartPractice("Vanguard", enc));
+            Check("practice request accepted", Court ? d.StartPracticeOnSelectedMap("Tollbreaker", enc) : d.StartPractice("Tollbreaker", enc));
             float t0 = 0; while ((RunDirector.Instance == null || RunDirector.Instance.State != RunState.Ready) && t0 < 30) { t0 += Time.deltaTime; yield return null; }
             d = RunDirector.Instance;
             Check($"practice Ready on {RunMaps.All[map].Name}", d && d.State == RunState.Ready && RunMaps.Current == map && d.Mode == RunMode.Practice && d.Encounter == enc);

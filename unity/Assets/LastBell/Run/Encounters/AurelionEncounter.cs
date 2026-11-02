@@ -17,7 +17,7 @@ namespace LastBell.Run
         public int Phase => phase;
         int phase = 1;
 
-        // HP: Chzy18 2026-10-27 "beef up the health" (5-7 min target); was 10 000 (solo Vanguard 4:35, Arcanist 2:34 on Hard)
+        // HP: Chzy18 2026-10-27 "beef up the health" (5-7 min target); was 10 000 (solo melee class 4:35, Arcanist 2:34 on Hard)
         void Awake() { MaxHp = 12000; BodyRadius = 1.1f; HitHeight = 2.6f; MarkHeight = 5.2f; }
 
         protected override bool PartyScaled => true;   // v4 is tuned with the co-op HP formula
