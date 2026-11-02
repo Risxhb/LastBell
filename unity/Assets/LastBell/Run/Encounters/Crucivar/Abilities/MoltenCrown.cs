@@ -103,6 +103,7 @@ namespace LastBell.Run
                 {
                     Source = "Mould Tower " + (set == 0 ? "A" : set == 1 ? "B" : "C"), Shape = HazardShape.Circle, Kind = HazardKind.Ground,
                     Origin = Sim.Dir(yaw) * rad, Radius = TowerRadius, LockAt = 0, ResolveAt = T(Rise), ShareCount = need, Knockback = 0,
+                    Soak = true,   // a ring to stand in: AllyBot must not step out of it (Run loop and shop smoke run, 11-01)
                 };
                 h.Includes = p => h.Age < h.ResolveAt && h.Contains(p.transform.position);   // counts for the mould look; the landing is custom
                 h.OnResolve = hz => Land(hz, need, set);
