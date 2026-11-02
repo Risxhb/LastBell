@@ -40,7 +40,7 @@ namespace LastBell.Run
         public void FallIn(float seconds) { landIn = seconds; Begin(Mode.Fall); Apply(); }
         public void Land() { if (Follow != null) transform.position = Flat(Follow()); Begin(Mode.Land); }
         public void Rise(float holdSeconds) { hold = holdSeconds; Begin(Mode.Rise); Apply(); }
-        public void Wither() { tiltAxis = Quaternion.Euler(0, (GetInstanceID() * 137) % 360, 0) * Vector3.right; Begin(Mode.Wither); }   // no gameplay RNG
+        public void Wither() { tiltAxis = Quaternion.Euler(0, (transform.position.x * 37 + transform.position.z * 91) % 360, 0) * Vector3.right; Begin(Mode.Wither); }   // no gameplay RNG
         public void Bloom() { Begin(Mode.Bloom); }
 
         static Vector3 Flat(Vector3 p) => new Vector3(p.x, 0, p.z);
