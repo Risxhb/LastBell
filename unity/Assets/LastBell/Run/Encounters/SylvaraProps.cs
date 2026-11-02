@@ -38,6 +38,7 @@ namespace LastBell.Run
         void Begin(Mode m) { Now = m; t = 0; basePos = transform.position; baseRot = transform.rotation; }
         public void Sprout() { Begin(Mode.Sprout); Apply(); }
         public void FallIn(float seconds) { landIn = seconds; Begin(Mode.Fall); Apply(); }
+        public float LandsIn => Now == Mode.Fall ? landIn - t : 0;   // tests: seconds until the pod lands
         public void Land() { if (Follow != null) transform.position = Flat(Follow()); Begin(Mode.Land); }
         public void Rise(float holdSeconds) { hold = holdSeconds; Begin(Mode.Rise); Apply(); }
         public void Wither() { tiltAxis = Quaternion.Euler(0, (transform.position.x * 37 + transform.position.z * 91) % 360, 0) * Vector3.right; Begin(Mode.Wither); }   // no gameplay RNG

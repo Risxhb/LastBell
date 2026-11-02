@@ -914,17 +914,30 @@ namespace LastBell.Run
                 }
                 StartCoroutine(PropShots());
             }
+            // review screenshots: the test player is moved next to each prop first so the camera frames it (the bot is healed)
             IEnumerator PropShots()
             {
-                bool pod = false, roots = false, bud = false;
-                while (d.World != null && !(pod && roots && bud))
+                bool pod = false, roots = false, bud = false, seedShot = false;
+                while (d.World != null && !(pod && roots && bud && seedShot))
                 {
+                    if (!roots && sy.PhaseName == "Two-Colour Choir" && sy.Order.Contains("Root Ring"))
+                    {
+                        roots = true; float tw = Time.time;
+                        while (sy.RootModels == 0 && Time.time - tw < 3f) { d.Player.transform.position = new Vector3(0, 0, -6.5f); yield return null; }
+                        yield return new WaitForSeconds(0.14f); yield return Shot("sylvara_props_root_ring"); continue;
+                    }
                     foreach (var m in FindObjectsByType<PropMotion>(FindObjectsSortMode.None))
                     {
-                        if (!pod && m.name == SylvaraProps.Pod && m.Now == PropMotion.Mode.Land) { pod = true; yield return Shot("sylvara_props_pod_lands"); break; }
-                        if (!roots && m.name == SylvaraProps.Root && m.Now == PropMotion.Mode.Rise) { roots = true; yield return new WaitForSeconds(0.12f); yield return Shot("sylvara_props_root_ring"); break; }
-                        if (!bud && m.name == SylvaraProps.Bud && m.Open > 0.5f) { bud = true; yield return Shot("sylvara_props_choir_buds"); break; }
+                        if (!pod && m.name == SylvaraProps.Pod && m.Now == PropMotion.Mode.Fall && m.LandsIn < 0.12f) { pod = true; yield return Shot("sylvara_props_pod_falls"); break; }
+                        if (!bud && sy.BudsCut > 0 && m.name == SylvaraProps.Bud && m.Now == PropMotion.Mode.Sprout && m.Open > 0.4f)   // after the cut test
+                        {
+                            bud = true; var bp = m.transform.position; var at = bp - bp.normalized * 3.5f; float tb = Time.time;
+                            while (Time.time - tb < 0.8f) { d.Player.transform.position = at; yield return null; }
+                            yield return Shot("sylvara_props_choir_bud"); break;
+                        }
                     }
+                    if (!seedShot && sy.PhaseName == "Seed Storm" && d.World.Bullets.Live.Any(b => b.Source == "Seed" && b.Age > b.Life * 0.6f && Sim.Flat(b.Pos - d.Player.transform.position).magnitude < 6f))
+                    { seedShot = true; yield return Shot("sylvara_props_storm_seeds"); }
                     yield return null;
                 }
             }

@@ -116,7 +116,7 @@ namespace LastBell.Run
                 if (!parent) { parent = new GameObject("Hostile Bullets").transform; parent.SetParent(root, false); foreach (var p in pools) p.Clear(); Array.Clear(shown, 0, Kinds); }
                 mats ??= new[]
                 {
-                    new[] { Prim.Material(Coral, 1.8f), Prim.Material(CoralCore, 4f) },
+                    new[] { Prim.Material(Coral, 0.9f), Prim.Material(CoralCore, 3f) },   // low enough that the coral reads as coral, not white
                     new[] { Prim.Material(Brass, 1.6f), Prim.Material(BrassCore, 4f) },
                     new[] { Prim.Material(Cobalt, 1.8f), Prim.Material(CobaltCore, 4f) },
                     new[] { Prim.Material(SeedFallback, 0.4f) },
