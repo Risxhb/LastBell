@@ -12,7 +12,7 @@ namespace LastBell.Run
         public override string Id => "crucivar.v4_molten_crown";
         public override int Order => 320;
 
-        public override IEnumerator Run(CrucivarV2AutoTest t)
+        public override IEnumerator Run(CrucivarAutoTest t)
         {
             yield return t.Setup(4, at: new[] { new Vector3(0, 0, 4f), new Vector3(4, 0, 0), new Vector3(0, 0, -4f), new Vector3(-4, 0, 0) });
             if (t.Boss == null) yield break;

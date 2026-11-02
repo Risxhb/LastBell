@@ -12,7 +12,7 @@ namespace LastBell.Run
         public override string Id => "crucivar.v4_forge_rite";
         public override int Order => 300;
 
-        public override IEnumerator Run(CrucivarV2AutoTest t)
+        public override IEnumerator Run(CrucivarAutoTest t)
         {
             yield return t.Setup(4, at: new[] { new Vector3(0, 0, 6), new Vector3(6, 0, -1.5f), new Vector3(0, 0, -9), new Vector3(-6, 0, -1.5f) });
             if (t.Boss == null) yield break;

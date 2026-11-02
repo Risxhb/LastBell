@@ -7,25 +7,25 @@ using UnityEngine;
 
 namespace LastBell.Run
 {
-    // Acceptance run for Crucivar's v4 fight inside the real game (Brass Foundry practice). The name is from ability set v2;
-    // the older sets were retired on 11-01 and only v4 is tested now:
+    // Acceptance run for Crucivar's v4 fight inside the real game (Brass Foundry practice). Only the current fight is
+    // tested (Chzy18 11-01: no tests on retired boss versions; the old v1 suite of this name and the v2/v3 checks are gone):
     //   Unity.exe -projectPath unity -executeMethod LastBell.Run.EditorTools.CrucivarTestTools.PlayModeTest
-    //             -crucivarV2Test [-crucivarAbility <id>] -lastbellOut <dir>
+    //             -crucivarTest [-crucivarAbility <id>] -lastbellOut <dir>
     // It holds Crucivar's schedule (TestHold) and runs every CrucivarAbilityTest (one per ability in
     // Encounters/Crucivar/Tests), optionally only the one whose Id matches -crucivarAbility.
     // Extra party members are real PlayerControllers driven by scripted input, so hits, stamina, dash and knockback all
-    // go through the normal code. Writes crucivar-v2-report.txt and screenshots, exits 0 (all passed) or 1.
-    public sealed class CrucivarV2AutoTest : MonoBehaviour
+    // go through the normal code. Writes crucivar-report.txt and screenshots, exits 0 (all passed) or 1.
+    public sealed class CrucivarAutoTest : MonoBehaviour
     {
-        public static bool Requested => Environment.GetCommandLineArgs().Any(a => a.Equals("-crucivarV2Test", StringComparison.OrdinalIgnoreCase));
-        static string OutDir => CrucivarArgs.Arg("-lastbellOut") ?? Path.Combine(Application.persistentDataPath, "crucivar-v2-test");
+        public static bool Requested => Environment.GetCommandLineArgs().Any(a => a.Equals("-crucivarTest", StringComparison.OrdinalIgnoreCase));
+        static string OutDir => CrucivarArgs.Arg("-lastbellOut") ?? Path.Combine(Application.persistentDataPath, "crucivar-test");
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Boot()
         {
             if (!Requested) return;
             var d = FindAnyObjectByType<RunDirector>();
-            if (d && !d.GetComponent<CrucivarV2AutoTest>()) d.gameObject.AddComponent<CrucivarV2AutoTest>();
+            if (d && !d.GetComponent<CrucivarAutoTest>()) d.gameObject.AddComponent<CrucivarAutoTest>();
         }
 
         // ---------------- scripted input ----------------
@@ -88,9 +88,9 @@ namespace LastBell.Run
         {
             if (ok) pass++; else fail++;
             var line = $"{(ok ? "PASS" : "FAIL")}  [{section}] {name}{(string.IsNullOrEmpty(detail) ? "" : "  — " + detail)}";
-            lines.Add(line); Debug.Log("[crucivar-v2-test] " + line);
+            lines.Add(line); Debug.Log("[crucivar-test] " + line);
         }
-        public void Note(string s) { lines.Add("      " + s); Debug.Log("[crucivar-v2-test] " + s); }
+        public void Note(string s) { lines.Add("      " + s); Debug.Log("[crucivar-test] " + s); }
         public IEnumerator Shot(string name)
         {
             yield return new WaitForEndOfFrame();
@@ -194,7 +194,7 @@ namespace LastBell.Run
         // ---------------- the run ----------------
         IEnumerator MainLoop()
         {
-            Note($"Crucivar v2 autotest · Unity {Application.unityVersion} · {SystemInfo.graphicsDeviceName} · {DateTime.Now:yyyy-MM-dd HH:mm}");
+            Note($"Crucivar autotest · Unity {Application.unityVersion} · {SystemInfo.graphicsDeviceName} · {DateTime.Now:yyyy-MM-dd HH:mm}");
             D.InputOverride = mainInput;
             yield return Seconds(1.0f);
             Check("boots into the menu", D.State == RunState.Menu);
@@ -222,9 +222,9 @@ namespace LastBell.Run
             }
             section = "suite";
             Check("no errors or exceptions logged", errors == 0, $"{errors}");
-            lines.Insert(0, $"Crucivar v2 autotest: {pass} passed, {fail} failed");
-            File.WriteAllLines(Path.Combine(dir, "crucivar-v2-report.txt"), lines);
-            Debug.Log($"[crucivar-v2-test] done: {pass} passed, {fail} failed");
+            lines.Insert(0, $"Crucivar autotest: {pass} passed, {fail} failed");
+            File.WriteAllLines(Path.Combine(dir, "crucivar-report.txt"), lines);
+            Debug.Log($"[crucivar-test] done: {pass} passed, {fail} failed");
             yield return Seconds(0.5f);
 #if UNITY_EDITOR
             UnityEditor.EditorApplication.isPlaying = false;
@@ -240,6 +240,6 @@ namespace LastBell.Run
     {
         public abstract string Id { get; }
         public virtual int Order => 0;
-        public abstract IEnumerator Run(CrucivarV2AutoTest t);
+        public abstract IEnumerator Run(CrucivarAutoTest t);
     }
 }

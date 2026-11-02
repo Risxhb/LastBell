@@ -12,7 +12,7 @@ namespace LastBell.Run
         public override string Id => "crucivar.v4_bounds";
         public override int Order => 330;
 
-        public override IEnumerator Run(CrucivarV2AutoTest t)
+        public override IEnumerator Run(CrucivarAutoTest t)
         {
             float keepBound = CombatWorld.PlayerBound; bool keepSquare = CombatWorld.SquareBound;
             foreach (var square in new[] { false, true })
@@ -73,6 +73,6 @@ namespace LastBell.Run
             t.Check("one hit per instance", t.OneHitPerInstance());
         }
 
-        static CombatWorld W(CrucivarV2AutoTest t) => t.W;
+        static CombatWorld W(CrucivarAutoTest t) => t.W;
     }
 }
