@@ -956,6 +956,7 @@ namespace LastBell.Run
                 float t3 = Time.time;
                 while (Time.time - t3 < 1f) { bot.Clear(); d.Player.transform.position = at; yield return null; }
                 Check("standing next to a Choir Bud without attacking does not cut it", sy.BudsCut == cut0 && sy.BudHpAt(buds[0]) >= SylvaraEncounter.BudHp);
+                d.Player.Kit.ClearTargetState();   // the held attacks above left Tollbreaker's axes lodged (back after 6-8 s): start with both in hand
                 int hpBoss = d.Boss.Hp; t3 = Time.time;
                 while (sy.BudsCut == cut0 && Time.time - t3 < 8f) { bot.Clear(); bot.Aim = buds[0]; bot.hold[0] = d.ClassName != "Tollbreaker"; bot.press[0] = Time.frameCount % 6 == 0; d.Player.transform.position = at; yield return null; }
                 bot.Clear();
