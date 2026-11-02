@@ -7,7 +7,7 @@ namespace LastBell.Run
 {
     // v4 Last Light (aurelion.last_light), Phase 4's floor fill, abilities-v4/ABILITIES-v4.md §3.6 (proposal). Sources:
     // Ansurek's room-filling silk, Dimensius's stage 3 pressure. Every 12 s (10 s from the fifth) a shadow sector (a 45-degree wedge from the
-    // centre past the rim, Ground) darkens for good and falls into the sky (proposal, 1 Nov: stepping in drops you, see StepFalls; it burned 25/s before). The order is authored so the
+    // centre past the rim, Ground) darkens for good and falls into the sky (accepted 1 Nov: stepping in drops you, see StepFalls; it burned 25/s before). The order is authored so the
     // lit floor stays one connected piece as long as possible. When the eighth sector falls the floor is gone: Final
     // Noon wipes the party (88 s into Phase 4); each fallen slice makes all his attacks 10 % stronger. Run() returns only by wiping, so the encounter runs it beside the
     // Phase 4 rotation (AurelionEncounter.Together).
@@ -26,7 +26,7 @@ namespace LastBell.Run
         public int Fallen => Sectors.Count;
         public Transform BossBody => Body;   // presentation: the camera frames him during the phase (LastLightFloorFx)
 
-        // ---- the fall (proposal, 1 Nov: Chzy18 picked "B: Fall" in the review inbox over the 25/s burn) ----
+        // ---- the fall (Chzy18 picked "B: Fall" over the 25/s burn and accepted 40 damage, review inbox, 1 Nov) ----
         // Stepping onto a fallen slice drops you: you land back on the nearest standing floor at once and take FallDamage
         // (before the difficulty scale: Easy 24, Medium 40, Hard 52), never a one-shot from full health; two falls in a
         // row can kill. A jump carries you over a hole (you fall only if you come down in it); a dash does not.
