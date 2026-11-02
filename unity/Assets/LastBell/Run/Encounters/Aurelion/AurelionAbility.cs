@@ -25,8 +25,10 @@ namespace LastBell.Run
         protected int T(float seconds) => Sim.Ticks(seconds * WarnScale);
         // v2.1 §2: on Hard every lock-to-hit WINDOW is x0.7 (never below `floor`, e.g. Orrery's 2.0 s); tracks stay as on
         // Medium (use T for them). Easy stretches windows like every warning (x1.25).
-        protected int Win(float seconds, float floor = 0) => Sim.Ticks(Hard && !AurelionArgs.WindowsMedium ? Mathf.Max(seconds * HardWindow, floor) : seconds * WarnScale);
-        public const float HardWindow = 0.7f;
+        // v4 Medium (Chzy18, 1 Nov: "make medium harder"): windows x0.85, halfway to Hard; the same floors apply
+        protected int Win(float seconds, float floor = 0) => Sim.Ticks(Hard && !AurelionArgs.WindowsMedium ? Mathf.Max(seconds * HardWindow, floor) : MediumV4 ? Mathf.Max(seconds * MediumWindow, floor) : seconds * WarnScale);
+        public const float HardWindow = 0.7f, MediumWindow = 0.85f;
+        protected bool MediumV4 => W.Difficulty == Difficulty.Medium && AurelionArgs.V4;
         // v3 damage tiers (HARDER-PROMPT target 5): every hit is punish (<= 30) or kill (>= 50) at Medium, nothing between:
         // Meridian Lances 35 -> 30, Orrery Closing 40 and Zenith Collapse 45 -> 50
         public static int V3Tier(int dmg) => dmg <= 30 ? dmg : dmg < 40 ? 30 : Math.Max(50, dmg);

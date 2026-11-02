@@ -20,6 +20,8 @@ With bot allies: click **Allies (bots)** on the boss step until it shows the num
 
 Boss HP: 12,000 solo, plus 1.25 × 12,000 for each extra fighter (57,000 for 4 players).
 
+Warning windows: Medium is 0.85 × the base time (since 1 Nov, halfway to Hard), Hard 0.7 ×, Easy 1.25 ×. Medium and Hard keep the same minimum times; for example the Lances lock 1.2 s → 1.02 s on Medium.
+
 | Phase | HP | What's in it |
 |---|---|---|
 | 1 Perfect Order | 100–70 % | Paired from the pull: Ecliptic + Lances, Towers + Starfall, Sunspots + Starfall, Collapse + Lances, Towers + Marks, Marks + Lances |

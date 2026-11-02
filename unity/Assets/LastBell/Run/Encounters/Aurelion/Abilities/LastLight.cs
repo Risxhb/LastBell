@@ -94,7 +94,7 @@ namespace LastBell.Run
                 var h = Spawn(new Hazard
                 {
                     Source = Name, Shape = HazardShape.Cone, Kind = HazardKind.Ground, Origin = Centre, Yaw = Order[k], HalfAngle = Half,
-                    Radius = Rim + 0.5f, LockAt = Sim.Ticks(WarnS), ResolveAt = Sim.Ticks(600f), BurnPerSecond = Burn, Knockback = 0,
+                    Radius = Rim + 0.5f, LockAt = Sim.Ticks(WarnS), ResolveAt = Sim.Ticks(600f), BurnPerSecond = Burn, Knockback = 0, Pit = FallMode,
                 });
                 Sectors.Add(h); Boss.PhasePools.Add(h);
                 yield return Sim.Ticks(WarnS);

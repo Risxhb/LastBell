@@ -308,7 +308,7 @@ namespace LastBell.Run
             {
                 var h = bLive[i];
                 if (h.BurnPerSecond <= 0 && bTick + (h.ResolveAt - h.Age) > bIgnoreAfter) continue;
-                if (Hits(h, bMe, q) && !(bAllowBurn && h.BurnPerSecond > 0 && bAnyJob)) return true;
+                if (Hits(h, bMe, q) && !(bAllowBurn && h.BurnPerSecond > 0 && bAnyJob && !h.Pit)) return true;
             }
             if (!bFull) return false;
             var a = bA;
@@ -378,14 +378,15 @@ namespace LastBell.Run
             return best < float.MaxValue;
         }
 
-        static bool ThroughBurn(Vector3 from, Vector3 to, BossEncounter b)
+        // pitsOnly: the fallback that accepts walking through burns still goes round a hole you fall through (Hazard.Pit)
+        static bool ThroughBurn(Vector3 from, Vector3 to, BossEncounter b, bool pitsOnly = false)
         {
             var w = (b as AurelionEncounter)?.World; if (w == null) return false;
             var live = w.Hazards.Live;
             for (int j = 0; j < live.Count; j++)
             {
                 var h = live[j];
-                if (h.BurnPerSecond <= 0 || h.Contains(from)) continue;   // already standing in it: leaving is fine
+                if (h.BurnPerSecond <= 0 || (pitsOnly && !h.Pit) || h.Contains(from)) continue;   // already standing in it: leaving is fine
                 for (int i = 1; i < 6; i++) if (h.Contains(Vector3.Lerp(from, to, i / 6f))) return true;
             }
             return false;
@@ -416,7 +417,7 @@ namespace LastBell.Run
                     var dir = Dirs48[k]; var q = pos + dir * r;
                     if (!CombatWorld.InPlayerBound(q, -0.2f)) continue;
                     if (Sim.Flat(q - bp).magnitude < b.BodyRadius + PlayerController.Radius + 0.1f) continue;
-                    if (bad(q) || (avoidBurn && ThroughBurn(pos, q, b))) continue;   // go round burning pools, not through them
+                    if (bad(q) || ThroughBurn(pos, q, b, !avoidBurn)) continue;   // go round burning pools (always round a pit), not through them
                     need = r; return dir;
                 }
             need = 99; return Vector3.zero;
