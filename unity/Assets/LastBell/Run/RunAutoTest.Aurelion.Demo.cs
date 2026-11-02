@@ -85,7 +85,7 @@ namespace LastBell.Run
             // -lastbellDemoClass, -lastbellDemoLevel, -lastbellDemoAllies: the solo reference runs (Codex proposal 1) use the same fight
             string cls = AurelionArgs.Arg("-lastbellDemoClass") ?? "Arcanist";
             var level = Enum.TryParse(AurelionArgs.Arg("-lastbellDemoLevel") ?? "Hard", true, out Difficulty lv) ? lv : Difficulty.Hard;
-            int allies = int.TryParse(AurelionArgs.Arg("-lastbellDemoAllies") ?? "3", out int na) ? Mathf.Clamp(na, 0, 7) : 3;
+            int allies = int.TryParse(AurelionArgs.Arg("-lastbellDemoAllies") ?? "3", out int na) ? Mathf.Clamp(na, 0, RunParty.MaxAllies) : 3;
             d.SelectDifficulty(level);
             d.SelectAllies(allies);
             AllyBot.AllyMode = BotMode.Perfect; AllyBot.Attacks = true;
