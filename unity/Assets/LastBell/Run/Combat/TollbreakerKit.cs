@@ -28,13 +28,57 @@ namespace LastBell.Run
         // Bell Frenzy: 4 s; the thrown axe is back the instant it hits, each tap throws a fan of 3 (sides 50 %)
         const int FrenzyCd = 1800, FrenzyTicks = 240, FrenzyCast = 18; const float FanAngle = 14f, FanSide = 0.5f;
 
+        // ---- run items (docs/proposals/tollbreaker-items-2026-10-31.md): numbers the shop may override (Shop.ItemHooks keys
+        // "t.*"; no items = the constants above), the events it listens to, and what the damage hook can read (Hitting)
+        public System.Collections.Generic.Dictionary<string, float> TestTuning;   // autotest only: forces a "t.*" value without a shop build
+        float N(string key, float v) => TestTuning != null && TestTuning.TryGetValue(key, out var x) ? x : Shop.ItemHooks.F(P, key, v);
+        int NI(string key, int v) => Mathf.RoundToInt(N(key, v));
+        int SplitCdNow => NI("t.split.cd", SplitCd);                 // Short Fuse
+        float TollR => N("t.toll.radius", TollRadius);                // Wide Grind
+        int TollSpinNow => NI("t.toll.spin", TollSpinTicks);         // Long Grind
+        int TollEveryNow => Mathf.Max(1, NI("t.toll.every", TollEvery));   // Quick Grind
+        float ReturnSpeedNow => N("t.return.speed", ReturnSpeed);    // Quick Catch
+        int TapBackNow => NI("t.tap.back", TapBack);                 // Backswing
+        float CallPerMetreNow => N("t.call.per_m", CallPerMetre);    // Iron Pull
+        int CallMaxNow => NI("t.call.max", CallMax);                 // Iron Pull
+        int CallCdNow => NI("t.call.cd", CallCd);                    // Rooted Axe
+        int SplitTicksNow => NI("t.split.ticks", SplitTicks);        // Deep Split
+        int BossLodgeNow => NI("t.lodge.boss", BossLodgeTicks);      // Deep Split
+        int FloorLodgeNow => NI("t.lodge.floor", FloorLodgeTicks);   // Anchor Line
+        int FrenzyCdNow => NI("t.frenzy.cd", FrenzyCd);              // Frenzied Hour
+        int FrenzyTicksNow => NI("t.frenzy.ticks", FrenzyTicks);     // Frenzied Hour
+        float FanSideNow => N("t.fan.side", FanSide);                // Frenzied Hour
+        public float SplitBonusNow => N("t.split.bonus", SplitBonus);   // Rooted Axe
+        // behaviour switches (0 = off): Twin Split (second axe's damage %), Rooted Axe, Battle Spin
+        float TwinSplitPct => N("t.twin_split", 0);
+        bool Rooted => N("t.rooted", 0) > 0;
+        bool BattleSpinOn => N("t.battle_spin", 0) > 0;
+        bool battleSpin;   // Battle Spin armed by a dash end, spent by the next tap
+
+        // what the hit about to land is (set just before every Twin Hurl, Grinding Toll, Splitting Throw and Call of Iron
+        // hit): Close Quarters / Berserker's Pace read the distances, Anchor Line the floor recall, Riven Iron the recall
+        public sealed class HitContext
+        {
+            public string Ability; public float ReleaseDistance, Distance;
+            public bool Recall, FromFloor, Heavy, BattleSpin;
+        }
+        public readonly HitContext Hitting = new HitContext();
+        // Ringing Return: the shop takes ticks off a cooldown (slot 1-4) on the recall-hit event
+        public void ReduceCooldown(int slot, int ticks)
+        {
+            if (slot == 1) tollCd = Mathf.Max(0, tollCd - ticks); else if (slot == 2) splitCd = Mathf.Max(0, splitCd - ticks);
+            else if (slot == 3) callCd = Mathf.Max(0, callCd - ticks); else if (slot == 4) frenzyCd = Mathf.Max(0, frenzyCd - ticks);
+        }
+        float ToBoss(Vector3 from) => W.Boss != null && W.Boss.Solid ? Mathf.Max(0, Sim.Flat(W.Boss.transform.position - from).magnitude - W.Boss.BodyRadius) : float.MaxValue;
+
         public enum AxeState { Hand, Out, Back, Lodged, Spin, Recall }
         public sealed class Axe
         {
             public AxeState State;
             public Vector3 Pos, Dir; public float Travelled, Range;
             public int Damage, Life, Age; public string Ability;
-            public bool Hit, Heavy, Splitting, Toll, Frenzy, Free, InBoss;
+            public bool Hit, Heavy, Splitting, Toll, Frenzy, Free, InBoss, FromFloor, BattleSpin;
+            public float ReleaseDistance;   // his gap to the boss when it left his hand (Close Quarters)
             public Vector3 Offset;
             public bool InHand => State == AxeState.Hand;
             public bool Stuck => State == AxeState.Lodged || State == AxeState.Spin;
@@ -59,7 +103,7 @@ namespace LastBell.Run
         public override string[] SlotKeys => new[] { "LMB", "2", "3", "4", "5" };
         public override float Cooldown01(int s) => s switch
         {
-            1 => tollCd / (float)TollCd, 2 => splitCd / (float)SplitCd, 3 => callCd / (float)CallCd, 4 => frenzyCd / (float)FrenzyCd, _ => 0
+            1 => tollCd / (float)TollCd, 2 => splitCd / (float)Mathf.Max(1, SplitCdNow), 3 => callCd / (float)Mathf.Max(1, CallCdNow), 4 => frenzyCd / (float)Mathf.Max(1, FrenzyCdNow), _ => 0
         };
         public override string SlotState(int s) => s switch
         {
@@ -92,7 +136,7 @@ namespace LastBell.Run
         public override void ResetAll()
         {
             act = Act.None; t = 0; buffered = -1; nextThrow = 0; emptyFlash = 0; callArmed = false; lastHand = 1;
-            tollCd = splitCd = callCd = frenzyCd = splitLeft = frenzyLeft = 0; Throws = 0; LastCallDamage = 0;
+            tollCd = splitCd = callCd = frenzyCd = splitLeft = frenzyLeft = 0; Throws = 0; LastCallDamage = 0; battleSpin = false;
             foreach (var a in Axes) Catch(a);
             MoveScale = 1; Velocity = Vector3.zero; FaceAim = false;
             Vis.Reset(this);
@@ -103,6 +147,7 @@ namespace LastBell.Run
             if (tollCd > 0) tollCd--; if (splitCd > 0) splitCd--; if (callCd > 0) callCd--; if (frenzyCd > 0) frenzyCd--;
             if (splitLeft > 0) splitLeft--; if (frenzyLeft > 0) frenzyLeft--; if (emptyFlash > 0) emptyFlash--;
             for (int i = 0; i < 2; i++) StepAxe(Axes[i]);
+            if (Rooted) foreach (var a in Axes) if (a.Splitting && a.State == AxeState.Lodged && a.InBoss) splitLeft = Mathf.Max(splitLeft, 2);
             Vis.Draw(this, callArmed);
         }
 
@@ -173,8 +218,15 @@ namespace LastBell.Run
             if (t < SplitWindup) { FaceAim = true; return; }
             if (t == SplitWindup && Axes[hand].InHand)
             {
-                var a = Launch(hand, Mathf.Clamp(Sim.Flat(aim - P.transform.position).magnitude, MinLodge, MaxRange), SplitDamage, "Splitting Throw");
-                a.Splitting = true; splitCd = Shop.ItemHooks.Cooldown(P, "SplittingThrow", SplitCd);
+                float range = Mathf.Clamp(Sim.Flat(aim - P.transform.position).magnitude, MinLodge, MaxRange);
+                bool both = TwinSplitPct > 0 && Axes[1 - hand].InHand;   // Twin Split: both axes, the second for its % (no extra split)
+                var a = Launch(hand, range, SplitDamage, "Splitting Throw");
+                a.Splitting = true; splitCd = Shop.ItemHooks.Cooldown(P, "SplittingThrow", SplitCdNow);
+                if (both)
+                {
+                    var b2 = Launch(1 - hand, range, Mathf.RoundToInt(SplitDamage * TwinSplitPct / 100f), "Splitting Throw");
+                    b2.Splitting = true; b2.Pos = a.Pos + Vector3.Cross(Vector3.up, a.Dir) * (hand == 0 ? -0.45f : 0.45f); lastHand = hand;
+                }
             }
             if (t >= SplitTotal) act = Act.None;
         }
@@ -183,7 +235,8 @@ namespace LastBell.Run
         {
             // lodged axes come back for free (no damage); axes in flight are caught too, so both hands are full
             foreach (var a in Axes) Catch(a);
-            frenzyLeft = FrenzyTicks; frenzyCd = Shop.ItemHooks.Cooldown(P, "BellFrenzy", FrenzyCd);
+            frenzyLeft = FrenzyTicksNow; frenzyCd = Shop.ItemHooks.Cooldown(P, "BellFrenzy", FrenzyCdNow);
+            Shop.ItemHooks.Cast(P, "t.frenzy", P.transform.position, P.transform.forward, frenzyLeft, 0);   // War Cry (allies in range)
             act = Act.Frenzy; t = 0;
             P.Presenter.Action("BellFrenzy", FrenzyCast + 12);
             Impact(P.transform.position);
@@ -194,8 +247,8 @@ namespace LastBell.Run
             if (callCd > 0 || AxesStuck == 0) return;
             LastCallDamage = 0;
             foreach (var a in Axes)
-                if (a.Stuck) { a.State = AxeState.Recall; a.Travelled = 0; a.Hit = false; a.Free = false; a.InBoss = false; a.Ability = "Call of Iron"; }
-            callCd = Shop.ItemHooks.Cooldown(P, "CallOfIron", CallCd);
+                if (a.Stuck) { a.FromFloor = !a.InBoss; a.State = AxeState.Recall; a.Travelled = 0; a.Hit = false; a.Free = false; a.InBoss = false; a.Ability = "Call of Iron"; }
+            callCd = Shop.ItemHooks.Cooldown(P, "CallOfIron", CallCdNow);
             P.Presenter.Action("CallOfIron", 20);
         }
 
@@ -209,9 +262,11 @@ namespace LastBell.Run
         void Release(int h, bool heavy)
         {
             act = Act.None;
+            bool spin = !heavy && battleSpin; battleSpin = false;   // Battle Spin: this tap hits like the held throw, but doesn't lodge
             var a = Launch(h, heavy ? Mathf.Clamp(Sim.Flat(aim - P.transform.position).magnitude, MinLodge, MaxRange) : MaxRange,
-                heavy ? HeavyDamage : TapOut, heavy ? "Twin Hurl (held)" : "Twin Hurl");
-            a.Heavy = heavy; a.Frenzy = FrenzyActive && !heavy;
+                heavy || spin ? HeavyDamage : TapOut, heavy ? "Twin Hurl (held)" : spin ? "Twin Hurl (battle spin)" : "Twin Hurl");
+            a.Heavy = heavy; a.BattleSpin = spin; a.Frenzy = FrenzyActive && !heavy;
+            Shop.ItemHooks.Cast(P, "t.release", a.Pos, a.Dir, a.ReleaseDistance, heavy ? 1 : 0);   // Close Quarters, Berserker's Pace
             nextThrow = W.Tick + Mathf.Max(0, ThrowInterval - CastTicks);
             if (a.Frenzy)
                 for (int side = -1; side <= 1; side += 2)
@@ -220,7 +275,7 @@ namespace LastBell.Run
                     W.Projectiles.Fire(new ProjectileSystem.Projectile
                     {
                         Pos = a.Pos, Vel = dir * ThrowSpeed, Range = MaxRange, Radius = AxeRadius,
-                        Damage = Boosted(Mathf.RoundToInt(TapOut * FanSide)), Ability = "Twin Hurl (fan)", Color = PlayerFx.VanCyan
+                        Damage = Boosted(Mathf.RoundToInt(TapOut * FanSideNow)), Ability = "Twin Hurl (fan)", Color = PlayerFx.VanCyan
                     });
                 }
         }
@@ -229,14 +284,15 @@ namespace LastBell.Run
         {
             var a = Axes[h]; lastHand = h; Throws++;
             a.State = AxeState.Out; a.Pos = HandPos(h); a.Dir = AimDir(); a.Travelled = 0; a.Range = range;
-            a.Damage = damage; a.Ability = ability; a.Hit = a.Heavy = a.Splitting = a.Toll = a.Frenzy = a.Free = a.InBoss = false; a.Age = 0;
+            a.Damage = damage; a.Ability = ability; a.Hit = a.Heavy = a.Splitting = a.Toll = a.Frenzy = a.Free = a.InBoss = a.FromFloor = a.BattleSpin = false; a.Age = 0;
+            a.ReleaseDistance = ToBoss(P.transform.position);
             return a;
         }
 
         void Catch(Axe a) { a.State = AxeState.Hand; a.InBoss = false; a.Hit = false; a.Free = false; a.Toll = false; }
 
         // split bonus: personal, only this Tollbreaker's Twin Hurl and Grinding Toll hits on the boss
-        int Boosted(int dmg) => SplitActive ? Mathf.RoundToInt(dmg * SplitBonus) : dmg;
+        int Boosted(int dmg) => SplitActive ? Mathf.RoundToInt(dmg * SplitBonusNow) : dmg;
 
         // what an axe at pos touches: a live boss part (Crucivar's castings) or the boss body
         bool Touch(Vector3 pos, float radius, out Vector3 contact, out BossPart part)
@@ -249,6 +305,11 @@ namespace LastBell.Run
             if (b == null || !b.Solid || Sim.Flat(pos - b.transform.position).magnitude > b.BodyRadius + radius) return false;
             contact = b.transform.position + Sim.Flat(pos - b.transform.position).normalized * b.BodyRadius + Vector3.up * b.HitHeight;
             return true;
+        }
+        void Context(Axe a, string ability, bool recall)
+        {
+            var h = Hitting; h.Ability = ability; h.Recall = recall; h.FromFloor = recall && a.FromFloor; h.Heavy = a.Heavy || a.Splitting;
+            h.BattleSpin = a.BattleSpin && !recall; h.ReleaseDistance = a.ReleaseDistance; h.Distance = ToBoss(P.transform.position);
         }
         int Deal(int dmg, Vector3 contact, BossPart part, string ability, bool boostable)
         {
@@ -269,13 +330,13 @@ namespace LastBell.Run
                         a.Hit = true;
                         if (a.Damage > 0)
                         {
-                            Deal(a.Damage, c, part, a.Ability, !a.Splitting);
+                            Context(a, a.Ability, false); Deal(a.Damage, c, part, a.Ability, !a.Splitting);
                             Impact(c);
                         }
                         if (a.Splitting || a.Heavy)
                         {
                             Lodge(a, part == null);
-                            if (a.Splitting && part == null) splitLeft = SplitTicks;
+                            if (a.Splitting && part == null) splitLeft = Mathf.Max(splitLeft, SplitTicksNow);   // a second Twin Split axe doesn't stack
                             return;
                         }
                         if (a.Toll) { Spin(a); return; }
@@ -294,15 +355,20 @@ namespace LastBell.Run
                 case AxeState.Recall:
                 {
                     bool recall = a.State == AxeState.Recall;
-                    var to = HandPos(Hand(a)) - a.Pos; float step = (recall ? RecallSpeed : ReturnSpeed) * Sim.Dt;
+                    var to = HandPos(Hand(a)) - a.Pos; float step = (recall ? RecallSpeed : ReturnSpeedNow) * Sim.Dt;
                     if (to.magnitude <= Mathf.Max(CatchRadius, step)) { Catch(a); return; }
                     // touch before moving: an axe that turned on the boss is still against it on its first tick back
                     if (!a.Hit && !a.Free && Touch(a.Pos, AxeRadius, out var c, out var part))
                     {
                         a.Hit = true;
-                        int dmg = recall ? Mathf.Min(CallMax, Mathf.RoundToInt(CallBase + CallPerMetre * a.Travelled)) : TapBack;
-                        int dealt = Deal(dmg, c, part, recall ? "Call of Iron" : a.Toll ? "Grinding Toll" : "Twin Hurl", !recall);
-                        if (recall) LastCallDamage = Mathf.Max(LastCallDamage, dealt);
+                        int dmg = recall ? Mathf.Min(CallMaxNow, Mathf.RoundToInt(CallBase + CallPerMetreNow * a.Travelled)) : TapBackNow;
+                        string ab = recall ? "Call of Iron" : a.Toll ? "Grinding Toll" : "Twin Hurl";
+                        Context(a, ab, recall); int dealt = Deal(dmg, c, part, ab, !recall);
+                        if (recall)
+                        {
+                            LastCallDamage = Mathf.Max(LastCallDamage, dealt);
+                            if (part == null) Shop.ItemHooks.Cast(P, "t.recall.hit", c, to.normalized, dealt, a.FromFloor ? 1 : 0);   // Ringing Return, Riven Iron
+                        }
                         Impact(c);
                     }
                     a.Pos += to.normalized * step; a.Travelled += step;
@@ -316,12 +382,12 @@ namespace LastBell.Run
                         if (b == null || !b.Solid) { a.InBoss = false; a.Life = 0; }
                         else a.Pos = b.transform.position + a.Offset;
                     }
-                    if (--a.Life <= 0) { a.State = AxeState.Back; a.Free = true; a.Hit = true; a.InBoss = false; }   // timed out: flies home, no damage
+                    if (--a.Life <= 0 && !(Rooted && a.Splitting && a.InBoss)) { a.State = AxeState.Back; a.Free = true; a.Hit = true; a.InBoss = false; }   // timed out: flies home, no damage (Rooted Axe: never while split)
                     break;
                 }
                 case AxeState.Spin:
                 {
-                    if (a.Age % TollEvery == 0 && Touch(a.Pos, TollRadius, out var c, out var part)) { Deal(TollDamage, c, part, "Grinding Toll", true); Impact(c); }
+                    if (a.Age % TollEveryNow == 0 && Touch(a.Pos, TollR, out var c, out var part)) { Context(a, "Grinding Toll", false); Deal(TollDamage, c, part, "Grinding Toll", true); Impact(c); }
                     if (--a.Life <= 0) Turn(a);
                     break;
                 }
@@ -330,7 +396,7 @@ namespace LastBell.Run
         void Impact(Vector3 at) => W.Fx.NoteImpact(at, PlayerFx.VanCyan);   // stand-in hit spark (shared player motes)
         int Hand(Axe a) => a == Axes[0] ? 0 : 1;
         void Turn(Axe a) { a.State = AxeState.Back; a.Hit = false; a.Free = false; }
-        void Spin(Axe a) { a.State = AxeState.Spin; a.Life = TollSpinTicks; a.Age = 0; a.Pos.y = 0.5f; }
+        void Spin(Axe a) { a.State = AxeState.Spin; a.Life = TollSpinNow; a.Age = 0; a.Pos.y = 0.5f; }
         void Lodge(Axe a, bool inBoss)
         {
             a.State = AxeState.Lodged; a.InBoss = inBoss && W.Boss != null && W.Boss.Solid;
@@ -339,11 +405,12 @@ namespace LastBell.Run
             {
                 var p = W.Constrain(a.Pos, 0.2f); a.Pos = new Vector3(p.x, 0.25f, p.z);   // in the floor, inside the arena
             }
-            a.Life = a.InBoss ? BossLodgeTicks : FloorLodgeTicks;
+            a.Life = a.InBoss ? BossLodgeNow : FloorLodgeNow;
         }
 
         public override bool CanDash() => true;   // axes in flight or lodged keep going
         public override void OnDash() { Cancel(); }
+        public override void OnDashEnd() { if (BattleSpinOn) battleSpin = true; }   // Battle Spin
         public override void Interrupt() { Cancel(); callArmed = false; }
         // an unreleased throw, windup or toll is dropped with nothing spent
         void Cancel() { if (act != Act.Frenzy) act = Act.None; Velocity = Vector3.zero; }
@@ -441,7 +508,7 @@ namespace LastBell.Run
                         case AxeState.Out: case AxeState.Back: case AxeState.Recall:
                             v.rotation = Quaternion.LookRotation(a.Dir.sqrMagnitude > 0 ? a.Dir : Vector3.forward) * Quaternion.Euler(time * 1440f, 0, 0); break;
                         case AxeState.Spin:
-                            v.rotation = Quaternion.Euler(0, time * 1080f, 90); Ring(a.Pos, TollRadius, 16, time * 2); break;
+                            v.rotation = Quaternion.Euler(0, time * 1080f, 90); Ring(a.Pos, k.TollR, 16, time * 2); break;
                         default:   // lodged: blade buried, haft tilted up toward the thrower
                             v.rotation = Quaternion.LookRotation(a.Dir.sqrMagnitude > 0 ? a.Dir : Vector3.forward) * Quaternion.Euler(-60, 0, 0); break;
                     }

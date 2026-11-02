@@ -128,6 +128,32 @@ namespace LastBell.Run
             Check("in Bell Frenzy each tap throws a fan (side axes hit for half)", Meter("Twin Hurl (fan)") - fan0 > 0, $"{Meter("Twin Hurl (fan)") - fan0} dealt");
             yield return Until(() => !k.FrenzyActive, 5, "Bell Frenzy ends");
             yield return Until(() => k.AxesInHand == 2, 3, "both axes home after the frenzy");
+
+            // ---- run item hooks (kit side; the shop wires the items): forced through TestTuning, no shop build ----
+            Check("item hooks: with no items every number is the kit's own (Hitting set by the last hit)", k.Hitting.Ability != null && k.SplitBonusNow == TollbreakerKit.SplitBonus);
+            k.TestTuning = new System.Collections.Generic.Dictionary<string, float> { ["t.battle_spin"] = 1, ["t.split.cd"] = 60, ["t.twin_split"] = 50, ["t.rooted"] = 1, ["t.lodge.boss"] = 30 };
+            Stand(At(0, r + 3f)); bot.Aim = boss; yield return Wait(0.2f);
+            int spin0 = Meter("Twin Hurl (battle spin)");
+            bot.dash = true; yield return Wait(0.5f);
+            Stand(At(0, r + 3f)); yield return Wait(0.1f);
+            bot.press[0] = true; yield return Until(() => Meter("Twin Hurl (battle spin)") > spin0, 2, "Battle Spin tap");
+            Check("Battle Spin: the tap after a dash hits like the held throw (30) and doesn't lodge", Meter("Twin Hurl (battle spin)") - spin0 >= 30 && !k.Axes.Any(a => a.Stuck), $"{Meter("Twin Hurl (battle spin)") - spin0} dealt");
+            yield return Until(() => k.AxesInHand == 2, 3, "battle spin axe home");
+            yield return Until(() => k.Cooldown01(2) <= 0, 12, "Splitting Throw ready");
+            bot.press[2] = true;
+            yield return Until(() => k.SplitActive && k.AxesStuck == 2, 1.5f, "Twin Split lodges both");
+            Check("Twin Split: with both axes in hand, Splitting Throw lodges both in the boss", k.AxesStuck == 2 && k.Axes.All(a => a.InBoss) && k.AxesInHand == 0, k.ClassState());
+            Check("Short Fuse: Splitting Throw's cooldown reads the item number (1 s here)", k.Cooldown01(2) > 0);
+            yield return Wait(1.0f);
+            Check("Rooted Axe: past the boss-lodge timeout the split axe stays and the split holds", k.AxesStuck == 2 && k.SplitActive, k.ClassState());
+            k.ReduceCooldown(3, 9999);
+            Check("Ringing Return's refund: ReduceCooldown clears a cooldown", k.Cooldown01(3) <= 0);
+            bot.press[3] = true;
+            yield return Until(() => k.AxesInHand == 2, 3, "the rooted axes come home on Call of Iron");
+            Check("Call of Iron brings rooted axes home and sets the recall hit context", k.AxesInHand == 2 && k.Hitting.Recall && k.Hitting.Ability == "Call of Iron");
+            k.TestTuning = null;
+            yield return Until(() => !k.SplitActive, 7, "the split ends");
+
             // his model has no Land or GetUp clip yet: both stay procedural
             Check("presenter: every Tollbreaker action resolves to a clip (no placeholder)", !p.Presenter.Placeholders.Any(x => x != "Land" && x != "GetUp"), string.Join(",", p.Presenter.Placeholders));
             bot.Clear(); d.Boss.BeginCombat();

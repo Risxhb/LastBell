@@ -275,7 +275,7 @@ namespace LastBell.Run
             else if (dashTick > 0)
             {
                 dashTick--; vel = dashDir * (dashDist / DashTicks) * Sim.Hz;
-                if (dashTick == 0) { dashLock = DashRecover; Shop.ItemHooks.OnDashEnd(this); }
+                if (dashTick == 0) { dashLock = DashRecover; Kit.OnDashEnd(); Shop.ItemHooks.OnDashEnd(this); }
             }
             else
             {
@@ -354,6 +354,7 @@ namespace LastBell.Run
         public virtual bool CanDash() => true;
         public virtual bool CanJump() => true;
         public virtual void OnDash() { }
+        public virtual void OnDashEnd() { }                  // the dash has finished (Battle Spin)
         public virtual void Interrupt() { }                  // hit-stun or down: cancel unreleased actions
         public virtual void ClearTargetState() { }           // target died / encounter over: drop marks on the boss
         public abstract void ResetAll();                     // encounter start or fresh run
