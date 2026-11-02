@@ -10,7 +10,6 @@ namespace LastBell.Run
     public sealed class ForgeRiteTest : CrucivarAbilityTest
     {
         public override string Id => "crucivar.v4_forge_rite";
-        public override string Set => "v4";
         public override int Order => 300;
 
         public override IEnumerator Run(CrucivarV2AutoTest t)

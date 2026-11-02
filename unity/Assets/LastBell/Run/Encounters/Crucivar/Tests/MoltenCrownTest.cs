@@ -10,7 +10,6 @@ namespace LastBell.Run
     public sealed class MoltenCrownTest : CrucivarAbilityTest
     {
         public override string Id => "crucivar.v4_molten_crown";
-        public override string Set => "v4";
         public override int Order => 320;
 
         public override IEnumerator Run(CrucivarV2AutoTest t)
@@ -19,7 +18,7 @@ namespace LastBell.Run
             if (t.Boss == null) yield break;
             var crown = t.Boss.Crown;
             t.Check("4 players: set A 2 + 2, set B 2 + 2", MoltenCrown.Sets(4).Length == 2 && MoltenCrown.Sets(4).All(s => s.SequenceEqual(new[] { 2, 2 })));
-            t.Check("8 players: set A four towers of 2, set B 4 + 4", MoltenCrown.Sets(8)[0].SequenceEqual(new[] { 2, 2, 2, 2 }) && MoltenCrown.Sets(8)[1].SequenceEqual(new[] { 4, 4 }));
+            t.Check("3 players: set A 2 + 1, set B 2 + 1", MoltenCrown.Sets(3)[0].SequenceEqual(new[] { 2, 1 }) && MoltenCrown.Sets(3)[1].SequenceEqual(new[] { 2, 1 }));
             t.Check("solo: three towers of one", MoltenCrown.Sets(1).Length == 3 && MoltenCrown.Sets(1).All(s => s.SequenceEqual(new[] { 1 })));
 
             t.Begin(crown.Run());

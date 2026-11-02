@@ -1,5 +1,7 @@
 # Crucivar, the Furnace Heart: ability set v2 (proposal)
 
+> **Retired 1 Nov 2026 (Chzy18: "retire everything that isn't current").** The game only has the v4 fight now (`bosses/2-brass-foundry-crucivar/abilities-v4/`). The code and tests for this set were removed; they are in git history before that date. This page is kept for reference only.
+
 **Status: proposal.** Designed, not built. Nothing here is human-approved until Chzy18 plays it.
 
 **Sources read:**

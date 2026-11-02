@@ -8,7 +8,7 @@
 ## Hard cut (built 28 Oct, 5c83988)
 
 Chzy18 found the first version too easy ("we need more"), so every layer from the browser mock-up was added:
-1. **Tighter towers:** set B lands 1.6 s after set A (not 2.0 s), between set A's towers. Before 31 Oct it sat on the opposite side, which for 2, 4 and 8 players put it on set A's own spots (accepted by Chzy18, 1 Nov).
+1. **Tighter towers:** set B lands 1.6 s after set A (not 2.0 s), between set A's towers. Before 31 Oct it sat on the opposite side, which for 2 and 4 players put it on set A's own spots (accepted by Chzy18, 1 Nov).
 2. **Hidden counts:** on even cycles each mould shows "?" instead of its count. You have to remember the last cycle's counts.
 3. **Pours during the towers:** Casting Order at 3.5 s aims through the players while they soak. The pours land at 5.5–7.0 s.
 4. **Backdraft after set B:** pull, then the 5 m blast, starting 0.2 s after the last set lands.
@@ -42,7 +42,7 @@ The cycle is 21.5 s plus a 3.5 s punish. Code: `Abilities/MoltenCrown.cs`. Test:
 | 1 | 1, 1, 1 in a row | — |
 | 2 | 1 + 1 | 1 + 1 |
 | 4 | 2 + 2 | 2 + 2 |
-| 8 | 2 + 2 + 2 + 2 | 4 + 4 |
+| 3 | 2 + 1 | 2 + 1 |
 
 ### Crown Rise (R&S block 17: temporary arena edges, made permanent here)
 - **Shape:** a ring from the new edge out to the old one, warned 3.0 s ahead.
@@ -97,5 +97,5 @@ None found.
 ## Open questions
 1. Are the crown sizes right (13.7 → 11 → 9 → 7 m, then erupt)?
 2. Should brand pools and pour channels clear when the crown rises, or keep piling up?
-3. Tower counts for 3 and 5–7 players. My default is to split the party as evenly as possible across 2 towers per set (3 sets for 7 or more).
+3. ~~Tower counts for 3 and 5–7 players~~: settled 1 Nov. The game is 1–4 players, and 3 players split 2 + 1 in both sets.
 4. Should the crown be a burn (50/s, you can stand in it briefly) or a hard wall?

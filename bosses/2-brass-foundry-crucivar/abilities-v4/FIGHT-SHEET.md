@@ -68,7 +68,7 @@ The difficulty damage scale is unchanged (damage scale only, per the difficulty 
 - **Done 30 Oct:** both Hard extras are built. Azure `feature/confrontation-menu` is merged. v4 is the default Crucivar fight (Chzy18, 30 Oct): Run Loop, Test Rush and the start-phase picker all play v4, and `-lastbellAbilitySet v3` still plays v3. PR 12 merged; later work goes in a new PR.
 - **Done 31 Oct:**
   - Escape checks: `tools/encounter-escape/crucivar-v4-escape-check.ps1` has 0 failures on every difficulty. `V4BoundsTest` checks that nobody can leave the floor and that wall-reaching attacks cover the farthest spot, on the round floor and on the square key-art map. The square map's corners had been safe; now they aren't.
-  - Mould Towers set B now lands between set A's towers. For 2, 4 and 8 players it had landed on set A's own spots. Accepted by Chzy18 on 1 Nov.
+  - Mould Towers set B now lands between set A's towers. For 2 and 4 players it had landed on set A's own spots. Accepted by Chzy18 on 1 Nov.
   - Telegraph look and fire VFX: the Brass Foundry motif on plain warnings, flame along Furnace Spin, embers on bullets, the Pour Flood lava wave and the eruption fill.
   - Open question 4 settled (below).
 - Next: a playtest of the full v4 fight with people.
@@ -78,6 +78,12 @@ The difficulty damage scale is unchanged (damage scale only, per the difficulty 
 2. PartyStep 0.9: should co-op be longer than solo (Aurelion's 1.25) or about the same?
 3. ~~Phase 1 Hard~~: settled 30 Oct, Quake Echo.
 4. ~~Menu bots and HP~~: settled 31 Oct. Crucivar uses the shared `BossEncounter.Spawn` rule: passive menu bots don't raise the boss or casting HP, while mechanic counts keep scaling with everyone standing.
+
+## Older sets retired (Chzy18, 1 Nov)
+v4 is the only Crucivar fight now. The packet's five attacks (v1), ability sets v2 and v3, their tests (the old "v1" suite and the v2/v3 checks), the v2/v3 escape check and `-lastbellAbilitySet` / `-lastbellAbility` for Crucivar were removed. The Crucivar autotest (`-crucivarV2Test`, the name is historical) now runs only the v4 checks. The Mould Towers look and the Hard Second Press numbers that v4 borrowed from v2 were kept.
+
+## 1–4 players (Chzy18, 1 Nov)
+The game is now 1–4 players. Mould Towers use two towers per set for 2–4 players, Phase 2 has at most 3 turrets, and the 5–8-player layouts and tests are gone.
 
 ## Playtest changes, 1 Nov (proposal)
 Chzy18's playtest found Phases 1 and 2 too easy, Phase 2 short on bullets, and unavoidable damage in the soak and pool mechanics.

@@ -47,7 +47,7 @@ namespace LastBell.Run
         readonly List<(Turret tu, float a0, int start)> spirals = new List<(Turret, float, int)>();
         readonly List<(int at, System.Action fire)> later = new List<(int, System.Action)>();   // the second Ring Wave
 
-        public int TurretCount(int fighters) => fighters <= 3 ? 2 : fighters <= 6 ? 3 : 4;
+        public int TurretCount(int fighters) => fighters <= 3 ? 2 : 3;   // 1-4 players (Chzy18 11-01)
 
         public IEnumerable<int> Run()
         {

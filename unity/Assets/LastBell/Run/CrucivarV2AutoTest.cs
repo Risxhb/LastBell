@@ -7,11 +7,12 @@ using UnityEngine;
 
 namespace LastBell.Run
 {
-    // Acceptance run for Crucivar's ability set v2 inside the real game (Brass Foundry practice):
+    // Acceptance run for Crucivar's v4 fight inside the real game (Brass Foundry practice). The name is from ability set v2;
+    // the older sets were retired on 11-01 and only v4 is tested now:
     //   Unity.exe -projectPath unity -executeMethod LastBell.Run.EditorTools.CrucivarTestTools.PlayModeTest
     //             -crucivarV2Test [-crucivarAbility <id>] -lastbellOut <dir>
     // It holds Crucivar's schedule (TestHold) and runs every CrucivarAbilityTest (one per ability in
-    // Encounters/Crucivar/Tests, plus the phase-plan test), optionally only the one whose Id matches -crucivarAbility.
+    // Encounters/Crucivar/Tests), optionally only the one whose Id matches -crucivarAbility.
     // Extra party members are real PlayerControllers driven by scripted input, so hits, stamina, dash and knockback all
     // go through the normal code. Writes crucivar-v2-report.txt and screenshots, exits 0 (all passed) or 1.
     public sealed class CrucivarV2AutoTest : MonoBehaviour
@@ -77,7 +78,6 @@ namespace LastBell.Run
             D = GetComponent<RunDirector>(); dir = OutDir; Directory.CreateDirectory(dir);
             Application.logMessageReceived += OnLog;
             Application.runInBackground = true;
-            CrucivarArgs.SetOverride = "v2";
             StartCoroutine(MainLoop());
         }
         void OnDestroy() { Application.logMessageReceived -= OnLog; }
@@ -209,7 +209,6 @@ namespace LastBell.Run
             foreach (var t in tests)
             {
                 section = t.Id; int before = fail;
-                CrucivarArgs.SetOverride = t.Set;
                 Note($"---- {t.Id} ----");
                 var e = t.Run(this);
                 while (true)
@@ -236,12 +235,11 @@ namespace LastBell.Run
         }
     }
 
-    // One test per ability (Encounters/Crucivar/Tests/<Ability>Test.cs). Id is the ability id (or crucivar.phase_plan).
+    // One test per phase or check (Encounters/Crucivar/Tests/<Name>Test.cs).
     public abstract class CrucivarAbilityTest
     {
         public abstract string Id { get; }
         public virtual int Order => 0;
-        public virtual string Set => "v2";   // the ability set this test runs under (CrucivarArgs.SetOverride)
         public abstract IEnumerator Run(CrucivarV2AutoTest t);
     }
 }

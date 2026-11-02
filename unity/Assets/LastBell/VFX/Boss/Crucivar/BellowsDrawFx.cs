@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace LastBell.VFX
 {
-    // Crucivar v2 Bellows Draw (abilities-v2/03-crucivar.bellows_draw.md). Presentation only: the encounter calls these on
+    // Crucivar blast and inhale effects, first built for the retired v2 Bellows Draw; v4 Backdraft and Anvil Quake use them. Presentation only: the encounter calls these on
     // its own ticks and the hazards' telegraphs are the hit shapes. The inhale chevrons are amber (forced movement, never
     // damage); the rim pour and the blast use molten slag and the danger coral.
     public sealed partial class BellkeeperFx

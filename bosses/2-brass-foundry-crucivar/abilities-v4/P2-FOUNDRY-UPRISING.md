@@ -76,7 +76,8 @@ He stays at the centre and keeps using Phase 1 attacks, so the bullet fire is la
 | 1 | 2, **in sequence** | the second rises when the first sinks; the timer gives each one 18 s |
 | 2 | 2 | one casting each, or both together |
 | 4 | 3 | one casting needs two people, or one fast pair clears two |
-| 8 | 4 | the group must split into four teams |
+
+The game is 1–4 players since 1 Nov (Chzy18), so there's no 8-player row.
 
 Casting HP scales like the boss, `1 + 0.7 × (fighters − 1)`, so splitting up is always the fastest way.
 

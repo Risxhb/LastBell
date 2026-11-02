@@ -10,7 +10,6 @@ namespace LastBell.Run
     public sealed class FoundryUprisingTest : CrucivarAbilityTest
     {
         public override string Id => "crucivar.v4_foundry_uprising";
-        public override string Set => "v4";
         public override int Order => 310;
 
         public override IEnumerator Run(CrucivarV2AutoTest t)

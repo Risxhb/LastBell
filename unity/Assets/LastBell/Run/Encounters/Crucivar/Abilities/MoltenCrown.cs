@@ -26,7 +26,8 @@ namespace LastBell.Run
         public const float Cycle = 21.5f, Rise = 5f, SetGap = 1.6f, TowerRadius = 2f, ExtraDmg = 50, CrownWarn = 3f, EruptWarn = 5f;
         public const float CrownBurn = 50f, SlagBurn = 20f, HeatPerCrown = 0.15f, TurretEvery = 4f;
         public const float PressDelay = 2.0f, PressRadius = 2.2f, PressKnock = 1.5f;
-        public const int PressDamage = SecondPress.DamageV3;
+        public const int PressDamage = 35;   // Hard: Second Press (the v2 mechanic, 35 since v3)
+        public const float PressStun = 0.25f;
         public static readonly float[] Edges = { 13.7f, 11f, 9f, 7f, 6f };
 
         public sealed class Tower { public Hazard H; public int Need, Set; }
@@ -46,7 +47,7 @@ namespace LastBell.Run
         {
             if (n <= 1) return new[] { new[] { 1 }, new[] { 1 }, new[] { 1 } };
             int[] Split(int total, int parts) { var a = new int[parts]; for (int i = 0; i < total; i++) a[i % parts]++; return a.Where(x => x > 0).ToArray(); }
-            return new[] { Split(n, n >= 5 ? 4 : 2), Split(n, 2) };
+            return new[] { Split(n, 2), Split(n, 2) };   // 1-4 players (Chzy18 11-01): two towers per set
         }
 
         public IEnumerable<int> Run()
@@ -164,7 +165,7 @@ namespace LastBell.Run
             var h = W.Hazards.Spawn(new Hazard
             {
                 Source = "Second Press", Shape = HazardShape.Circle, Kind = HazardKind.Strike, Origin = Flat(centre), Radius = PressRadius,
-                LockAt = 0, ResolveAt = T(PressDelay), Damage = PressDamage, Knockback = PressKnock, Stun = Sim.Ticks(SecondPress.StunSeconds),
+                LockAt = 0, ResolveAt = T(PressDelay), Damage = PressDamage, Knockback = PressKnock, Stun = Sim.Ticks(PressStun),
                 Push = p => -Flat(p),   // toward the centre, away from the crown
             });
             h.OnResolve = hz => { W.BossFx.DiebreakerResolve(hz.Origin, hz.Radius); Boss.Flare(1.2f); Boss.Rig?.HammerLand(); };

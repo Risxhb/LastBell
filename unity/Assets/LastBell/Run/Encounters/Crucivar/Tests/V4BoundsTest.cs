@@ -10,7 +10,6 @@ namespace LastBell.Run
     public sealed class V4BoundsTest : CrucivarAbilityTest
     {
         public override string Id => "crucivar.v4_bounds";
-        public override string Set => "v4";
         public override int Order => 330;
 
         public override IEnumerator Run(CrucivarV2AutoTest t)

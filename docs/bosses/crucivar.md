@@ -1,5 +1,7 @@
 # Crucivar, The Furnace Heart: playable graybox fight and model
 
+> **Retired 1 Nov 2026 (Chzy18: "retire everything that isn't current").** The game only has the v4 fight now (`bosses/2-brass-foundry-crucivar/abilities-v4/`). The code and tests for this set were removed; they are in git history before that date. This page is kept for reference only.
+
 The Brass Foundry's area boss, from Codex's four-boss packet (draft PR #46, board #47, packet section 2). This branch, `feature/boss-crucivar`, stacks on `feature/run-loop` and adds the Brass Foundry arena commit from `feature/class-test-arena`. It adds:
 
 - A playable fight with all five attacks and all three phases.
