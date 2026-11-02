@@ -385,7 +385,11 @@ namespace LastBell.Run
                 return true;
             }
 
-            public void Reset(TollbreakerKit k) { if (root) { foreach (var a in axes) if (a) a.gameObject.SetActive(false); foreach (var d in dots) if (d) d.gameObject.SetActive(false); } }
+            public void Reset(TollbreakerKit k)
+            {
+                foreach (var h in held) if (h) h.gameObject.SetActive(true);
+                if (root) { foreach (var a in axes) if (a) a.gameObject.SetActive(false); foreach (var d in dots) if (d) d.gameObject.SetActive(false); }
+            }
 
             Transform Dot()
             {
@@ -410,13 +414,25 @@ namespace LastBell.Run
                 for (int i = 1; i <= n; i++) { var p = from + d * (i / (float)(n + 1)); Dot().position = new Vector3(p.x, 0.06f, p.z); }
             }
 
+            // the model's own axes ('AxeR' / 'AxeL' nodes in his fists): hidden while that axe is out of his hand
+            readonly Transform[] held = new Transform[2]; bool heldLooked;
+            void FindHeld(TollbreakerKit k)
+            {
+                if (heldLooked || k.P == null || k.P.Presenter == null || !k.P.Presenter.HasModel) return;
+                heldLooked = true;
+                foreach (var t in k.P.Presenter.Visual.GetComponentsInChildren<Transform>(true))
+                    if (t.name == "AxeR") held[0] = t; else if (t.name == "AxeL") held[1] = t;
+            }
+
             public void Draw(TollbreakerKit k, bool preview)
             {
                 if (!Ready(k)) return;
+                FindHeld(k);
                 used = 0; float time = k.W.Tick / (float)Sim.Hz;
                 for (int i = 0; i < 2; i++)
                 {
                     var a = k.Axes[i]; var v = axes[i];
+                    if (held[i] && held[i].gameObject.activeSelf != a.InHand) held[i].gameObject.SetActive(a.InHand);
                     bool show = a.State != AxeState.Hand; v.gameObject.SetActive(show);
                     if (!show) continue;
                     v.position = a.Pos;

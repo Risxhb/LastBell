@@ -18,7 +18,8 @@ namespace LastBell.Run
             Check("the Tollbreaker is first in the class picker (the Vanguard's place)", RunDirector.Classes[0] == "Tollbreaker" && !RunDirector.Classes.Contains("Vanguard"));
             Check("StartRun accepts the Tollbreaker", d.StartRun("Tollbreaker"));
             yield return Wait(0.4f); yield return Shot("ready_tollbreaker");
-            Check("the Tollbreaker runs TollbreakerKit on a stand-in body", d.Player.Kit is TollbreakerKit && d.Player.Presenter.HasModel && d.Player.Presenter.Has("Idle"));
+            Check("the Tollbreaker runs TollbreakerKit on his own model and clips", d.Player.Kit is TollbreakerKit && d.Player.Presenter.HasModel
+                  && d.Player.Presenter.Visual.Find("Tollbreaker") != null && d.Player.Presenter.Has("TwinHurl") && d.Player.Presenter.Has("SplittingThrow"));
             d.RequestReady();
             yield return Until(() => d.State == RunState.Combat, 4, "tollbreaker combat");
             yield return AdvanceToFinal();
@@ -49,7 +50,12 @@ namespace LastBell.Run
             bot.press[0] = true;
             yield return Until(() => k.Throws > th0, 1, "a tap throws");
             Check("a tap throws one axe and keeps the other", k.AxesInHand == 1, k.ClassState());
+            yield return Wait(0.1f);
+            var inHand = p.Presenter.Visual.GetComponentsInChildren<Transform>(true).Where(t => t.name == "AxeR" || t.name == "AxeL").ToArray();
+            Check("the thrown axe leaves his fist (one model axe hidden)", inHand.Length == 2 && inHand.Count(t => t.gameObject.activeSelf) == 1, $"{inHand.Length} model axes, {inHand.Count(t => t.gameObject.activeSelf)} shown");
             yield return Until(() => k.AxesInHand == 2, 2, "the axe flies back to his hand");
+            yield return Wait(0.1f);
+            Check("the caught axe is back in his fist", inHand.All(t => t.gameObject.activeSelf));
             Check("Twin Hurl hits going out and coming back (14 + 6)", hp0 - d.Boss.Hp >= 20, $"{hp0 - d.Boss.Hp} dealt");
 
             // ---- closer is faster: an axe thrown from 3 m is back sooner than one from 8 m ----
@@ -122,7 +128,8 @@ namespace LastBell.Run
             Check("in Bell Frenzy each tap throws a fan (side axes hit for half)", Meter("Twin Hurl (fan)") - fan0 > 0, $"{Meter("Twin Hurl (fan)") - fan0} dealt");
             yield return Until(() => !k.FrenzyActive, 5, "Bell Frenzy ends");
             yield return Until(() => k.AxesInHand == 2, 3, "both axes home after the frenzy");
-            Check("presenter: every Tollbreaker action resolves to a clip (no placeholder)", !p.Presenter.Placeholders.Any(x => x != "Land"), string.Join(",", p.Presenter.Placeholders));
+            // his model has no Land or GetUp clip yet: both stay procedural
+            Check("presenter: every Tollbreaker action resolves to a clip (no placeholder)", !p.Presenter.Placeholders.Any(x => x != "Land" && x != "GetUp"), string.Join(",", p.Presenter.Placeholders));
             bot.Clear(); d.Boss.BeginCombat();
         }
 
