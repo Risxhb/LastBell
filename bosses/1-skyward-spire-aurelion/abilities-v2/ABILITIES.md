@@ -1,5 +1,7 @@
 # Aurelion, the Meridian Regent: ability set v2 (proposal)
 
+> **Retired set (1 Nov).** Only v4 is played (`../abilities-v4/ABILITIES-v4.md`). This file stays because v4 reuses abilities and numbers defined here; its phase plans, Noon Shadow and escape checks no longer apply.
+
 **Status: proposal.** This is designed and escape-checked, but not built and not approved. Nothing here is human-approved until Chzy18 plays it.
 
 **Sources read:**

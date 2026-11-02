@@ -31,9 +31,7 @@ namespace LastBell.Run
         // (before the difficulty scale: Easy 24, Medium 40, Hard 52), never a one-shot from full health; two falls in a
         // row can kill. A jump carries you over a hole (you fall only if you come down in it); a dash does not.
         // The wedge keeps its burn rate for its look and for ally-bot avoidance, but in fall mode nobody stands in it
-        // long enough to burn (the fall moves you out on the tick you step in). -lastbellLastLightBurn brings the burn back.
-        public static bool BurnOverride;   // tests: the old 25/s burn without a command line
-        public static bool FallMode => !BurnOverride && !Array.Exists(Environment.GetCommandLineArgs(), x => x.Equals("-lastbellLastLightBurn", StringComparison.OrdinalIgnoreCase));
+        // long enough to burn (the fall moves you out on the tick you step in). The old burn-only mode was removed on 2 Nov.
         public const int FallDamage = 40;
         public const string FallSource = "Last Light — the fall";
         public static int FallStun => Sim.Ticks(0.6f);
@@ -70,7 +68,7 @@ namespace LastBell.Run
         // every tick (AurelionEncounter.StepAlways) while v4 runs
         public void StepFalls()
         {
-            if (!FallMode || Sectors.Count == 0) return;
+            if (Sectors.Count == 0) return;
             foreach (var p in W.Players)
             {
                 if (!p || p.Down || p.Height > 0 || !OverHole(p.transform.position)) continue;
@@ -94,7 +92,7 @@ namespace LastBell.Run
                 var h = Spawn(new Hazard
                 {
                     Source = Name, Shape = HazardShape.Cone, Kind = HazardKind.Ground, Origin = Centre, Yaw = Order[k], HalfAngle = Half,
-                    Radius = Rim + 0.5f, LockAt = Sim.Ticks(WarnS), ResolveAt = Sim.Ticks(600f), BurnPerSecond = Burn, Knockback = 0, Pit = FallMode,
+                    Radius = Rim + 0.5f, LockAt = Sim.Ticks(WarnS), ResolveAt = Sim.Ticks(600f), BurnPerSecond = Burn, Knockback = 0, Pit = true,
                 });
                 Sectors.Add(h); Boss.PhasePools.Add(h);
                 yield return Sim.Ticks(WarnS);

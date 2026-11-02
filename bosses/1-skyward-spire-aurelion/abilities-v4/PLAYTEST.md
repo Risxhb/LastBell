@@ -2,7 +2,7 @@
 
 *Proposal build on `integrate/aurelion` (Azure PR 2). Design: `ABILITIES-v4.md`. Player guide: `GUIDE.md`.*
 
-v4 is the only Aurelion fight on every difficulty. The older v1–v3 sets were retired on 1 Nov, and `-lastbellAbilitySet` no longer exists.
+v4 is the only Aurelion fight on every difficulty. The older v1–v3 sets were retired on 1 Nov, and `-lastbellAbilitySet` no longer exists. Their code was removed on 2 Nov.
 
 ## Start a fight, click by click
 

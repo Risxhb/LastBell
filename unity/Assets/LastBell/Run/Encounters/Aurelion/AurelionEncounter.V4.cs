@@ -38,7 +38,7 @@ namespace LastBell.Run
         }
 
         public const float V4P2At = 0.70f, V4P3At = 0.40f, V4P4At = 0.20f, EnrageS = 390f, EnrageWarnS = 360f;   // Final Noon at 6:30
-        public float[] PhaseMarks => AurelionArgs.V4 ? new[] { V4P2At, V4P3At, V4P4At } : new[] { V2P2At, V2P3At };
+        public float[] PhaseMarks => new[] { V4P2At, V4P3At, V4P4At };
 
         // ---- fight-ending wipes, the Corona Shield, pools that last until the phase ends, the enrage clock ----
         public string WipeCause { get; private set; }
@@ -70,7 +70,6 @@ namespace LastBell.Run
         {
             get
             {
-                if (!AurelionArgs.V4) return null;
                 int s = FightTicks / Sim.Hz;
                 string clock = $"{s / 60}:{s % 60:00} / {(int)EnrageS / 60}:{(int)EnrageS % 60:00}";
                 return ShieldHp > 0 ? $"CORONA SHIELD {ShieldHp}   ·   {clock}" : clock;
@@ -80,7 +79,7 @@ namespace LastBell.Run
         // called every tick (StepAlways): the enrage clock runs while the v4 script runs (not while tests hold him)
         void V4Clock()
         {
-            if (!AurelionArgs.V4 || (TestHold && !TestClock) || W == null || !W.CombatActive || Dead) return;
+            if ((TestHold && !TestClock) || W == null || !W.CombatActive || Dead) return;
             FightTicks++;
             if (FightTicks == Sim.Ticks(EnrageWarnS)) RunHud.Banner("FINAL NOON IN 30 SECONDS", new Color(1f, 0.85f, 0.45f), 3f);
             if (FightTicks == Sim.Ticks(EnrageS)) Wipe("Final Noon — the enrage");

@@ -7,7 +7,7 @@ namespace LastBell.Run
 {
     // One Aurelion ability-set-v2 ability (bosses/1-skyward-spire-aurelion/abilities-v2/ABILITIES.md, proposal). Each
     // ability is one class in Abilities/ that spawns its hazards through W.Hazards and yields ticks like an encounter
-    // script (`yield return n` = resume n ticks later). The phase plan (AurelionEncounter.V2Script) decides when it runs
+    // script (`yield return n` = resume n ticks later). The phase plan (AurelionEncounter.V4Script) decides when it runs
     // and plays the gaps and the open-chest punish; an ability's Run returns when its last damaging hazard has resolved
     // (the Horizon is the one exception: Orrery Closing returns when the rim and crown resolve, and the Horizon stays
     // lit on its own ActiveTicks). Boss death clears every pending hazard in the killing tick (BossEncounter.Die), so
@@ -28,7 +28,7 @@ namespace LastBell.Run
         // v4 Medium (Chzy18, 1 Nov: "make medium harder"): windows x0.85, halfway to Hard; the same floors apply
         protected int Win(float seconds, float floor = 0) => Sim.Ticks(Hard && !AurelionArgs.WindowsMedium ? Mathf.Max(seconds * HardWindow, floor) : MediumV4 ? Mathf.Max(seconds * MediumWindow, floor) : seconds * WarnScale);
         public const float HardWindow = 0.7f, MediumWindow = 0.85f;
-        protected bool MediumV4 => W.Difficulty == Difficulty.Medium && AurelionArgs.V4;
+        protected bool MediumV4 => W.Difficulty == Difficulty.Medium;
         // v3 damage tiers (HARDER-PROMPT target 5): every hit is punish (<= 30) or kill (>= 50) at Medium, nothing between:
         // Meridian Lances 35 -> 30, Orrery Closing 40 and Zenith Collapse 45 -> 50
         public static int V3Tier(int dmg) => dmg <= 30 ? dmg : dmg < 40 ? 30 : Math.Max(50, dmg);
@@ -48,10 +48,10 @@ namespace LastBell.Run
         protected Hazard Spawn(Hazard h)
         {
             if (string.IsNullOrEmpty(h.Source) || h.Source == "Hazard") h.Source = Name;
-            if (AurelionArgs.V3 || AurelionArgs.V4) h.Damage = V3Tier(h.Damage);
+            h.Damage = V3Tier(h.Damage);
             // v4 Last Light, the soft enrage: every fallen slice makes his attacks 10 % stronger
             // capped so a hit never lands above 90 after the difficulty scale (no one-shots, design rules 5): Hard 69 x 1.3
-            if (AurelionArgs.V4 && Boss.Light != null && Boss.Phase >= 4 && h.Damage > 0)
+            if (Boss.Light != null && Boss.Phase >= 4 && h.Damage > 0)
                 h.Damage = Mathf.Min(Mathf.RoundToInt(h.Damage * Boss.Light.DamageScale), Mathf.Max(h.Damage, Mathf.FloorToInt(LastLightCap / W.DamageTakenScale)));
             if (h.BurnPerSecond > 0) h.FillToLock = true;   // a burn counts down to its lock, then holds: no slow fake countdown
             Boss.Track(W.Hazards.Spawn(h));
@@ -94,10 +94,6 @@ namespace LastBell.Run
             return i >= 0 && i + 1 < a.Length ? a[i + 1] : null;
         }
         public static string SoloOverride;    // F6 / tests: the single ability to loop (null = command line)
-        // v4 is the only set (Chzy18, 1 Nov); V1 and V3 stay as false switches until the old v1-v3 code is removed
-        public static bool V1 => false;
-        public static bool V3 => false;
-        public static bool V4 => true;
         // test switch (HARDER-PROMPT target 7): Hard damage and mechanics with Medium window lengths
         public static bool WindowsMediumOverride;
         public static bool WindowsMedium => WindowsMediumOverride || Environment.GetCommandLineArgs().Any(x => x.Equals("-lastbellWindowsMedium", StringComparison.OrdinalIgnoreCase));

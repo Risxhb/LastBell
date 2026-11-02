@@ -29,7 +29,7 @@ namespace LastBell.Run
             d.RequestReady();
             yield return Until(() => d.State == RunState.Combat, 15, "combat");
             var b = d.Boss as AurelionEncounter;
-            Check("v4 live: Aurelion uses the v4 set by default", b != null && AurelionArgs.V4, b == null ? "no boss" : "");
+            Check("v4 live: Aurelion uses the v4 set by default", b != null && b.PhaseStarts.Length == 4, b == null ? "no boss" : "");
             if (b == null) yield break;
             Note($"v4 live: boss HP {b.MaxHp}, difficulty {d.World.Difficulty}");
             bool was = AllyBot.Attacks; AllyBot.Attacks = true;
