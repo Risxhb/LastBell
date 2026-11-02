@@ -126,7 +126,7 @@ namespace LastBell.Run
             if (Party.Count == 0) { Party.Add(Main); inputs[Main] = mainInput; }
             while (Party.Count < players)
             {
-                var p = PlayerController.Spawn(W, "Vanguard", new Vector3(0, 0, 5), 180);
+                var p = PlayerController.Spawn(W, Party.Count % 2 == 1 ? "Chimesinger" : "Arcanist", new Vector3(0, 0, 5), 180);   // no Vanguard (retired 11-02)
                 var s = new Scripted(); p.Input = s; inputs[p] = s; p.AbilitiesEnabled = false; Party.Add(p);
             }
             for (int i = 0; i < Party.Count; i++)
@@ -173,7 +173,7 @@ namespace LastBell.Run
                 if (D.State == RunState.Combat && D.Boss is CrucivarEncounter b && !b.Dead && !Main.Down) { Hook(); Boss = b; yield break; }
                 if (D.State == RunState.Combat || D.State == RunState.Downed || D.State == RunState.Cleared) yield return Until(() => D.State == RunState.Results, 12, "results after a wipe/defeat");
                 if (D.State == RunState.Results) { Party.Clear(); inputs.Clear(); D.RequestRetry(); }
-                if (D.State == RunState.Menu) { D.InputOverride = mainInput; D.StartPractice("Vanguard", RunDirector.CrucivarPractice); }
+                if (D.State == RunState.Menu) { D.InputOverride = mainInput; D.StartPractice("Arcanist", RunDirector.CrucivarPractice); }
                 yield return Until(() => D.State == RunState.Ready, 8, "ready");
                 D.RequestReady();
                 if (D.Boss is CrucivarEncounter nb) nb.TestHold = true;   // before the script's first step

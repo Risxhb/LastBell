@@ -27,7 +27,7 @@ namespace LastBell.Run
             if (d && !d.GetComponent<CrucivarWatch>()) d.gameObject.AddComponent<CrucivarWatch>();
         }
 
-        static readonly string[] Classes = { "Vanguard", "Vanguard", "Vanguard", "Vanguard" };
+        static readonly string[] Classes = { "Arcanist", "Chimesinger", "Arcanist", "Chimesinger" };   // Vanguard retired (Chzy18 11-02); Tollbreaker joins when it lands
         static readonly string[] Names = { "Bot 1", "Bot 2", "Bot 3", "Bot 4" };
 
         sealed class Bot : IInputSource
