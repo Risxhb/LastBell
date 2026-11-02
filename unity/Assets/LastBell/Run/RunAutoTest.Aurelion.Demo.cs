@@ -80,13 +80,13 @@ namespace LastBell.Run
 
         IEnumerator AurelionDemoFight()
         {
+            AurelionArgs.SoloOverride = null;
             Note("---------- Aurelion v4 demo: 4 perfect bots, Hard ----------");
-            AurelionArgs.SetOverride = null; AurelionArgs.SoloOverride = null;
             if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }
             // -lastbellDemoClass, -lastbellDemoLevel, -lastbellDemoAllies: the solo reference runs (Codex proposal 1) use the same fight
             string cls = AurelionArgs.Arg("-lastbellDemoClass") ?? "Arcanist";
             var level = Enum.TryParse(AurelionArgs.Arg("-lastbellDemoLevel") ?? "Hard", true, out Difficulty lv) ? lv : Difficulty.Hard;
-            int allies = int.TryParse(AurelionArgs.Arg("-lastbellDemoAllies") ?? "3", out int na) ? Mathf.Clamp(na, 0, 7) : 3;
+            int allies = int.TryParse(AurelionArgs.Arg("-lastbellDemoAllies") ?? "3", out int na) ? Mathf.Clamp(na, 0, 3) : 3;   // 1-4 players (Chzy18, 1 Nov)
             d.SelectDifficulty(level);
             d.SelectAllies(allies);
             AllyBot.AllyMode = BotMode.Perfect; AllyBot.Attacks = true;

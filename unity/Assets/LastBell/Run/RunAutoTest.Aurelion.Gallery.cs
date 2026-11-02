@@ -25,17 +25,12 @@ namespace LastBell.Run
             RunDirector.ShotCamera = null; galleryCam = "_gamecam";
             yield return GalleryPass();
             yield return V2Teardown();
-            AurelionArgs.SetOverride = null;
         }
 
         IEnumerator GalleryPass()
         {
-            AurelionArgs.SetOverride = "v3";
             yield return GalleryShot("meridian_lances", 2, b => b.Lances.Run(4, 1, false), 80);
             yield return GalleryShot("starfall_mirror", 1, b => b.Starfall.Run(), 100, new Vector3(-5, 0, 2));
-            AurelionArgs.SetOverride = "v2";
-            yield return GalleryShot("noon_shadow_v2_only", 1, b => b.Noon.Run(false), 120);
-            AurelionArgs.SetOverride = "v3";
             yield return GalleryShot("orrery_closing", 2, b => b.Closing.Run(240), 100);
             yield return GalleryShot("orrery_horizon", 2, b => b.Closing.Run(240), 200);
             yield return GalleryShot("hour_hands", 2, b => b.Hands.Run(), 70);
@@ -44,7 +39,6 @@ namespace LastBell.Run
             yield return GalleryShot("ecliptic_order_2_strike", 1, b => b.Ecliptic.Run(3), Sim.Ticks(3.2f) - 8);
             yield return GalleryShot("zenith_marks_1_mark", 1, b => b.MarksWithLances(1), 60, new Vector3(-6, 0, 0));
             yield return GalleryShot("zenith_marks_2_verdict", 1, b => b.MarksWithLances(1), Sim.Ticks(3.0f) - 6);
-            AurelionArgs.SetOverride = "v4";
             yield return GalleryShot("meridian_towers", 1, b => b.Towers.Run(), Sim.Ticks(3.0f));   // the bot stands in each tower (an empty one wipes)
             yield return GalleryShot("sunspots", 1, b => b.Spots.Run(), Sim.Ticks(2.0f));
             yield return GalleryShot("severance", 3, b => b.Sever.Run(), Sim.Ticks(5.0f), wait: 45);

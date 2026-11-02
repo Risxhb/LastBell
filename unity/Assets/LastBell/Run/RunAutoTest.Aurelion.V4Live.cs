@@ -15,8 +15,8 @@ namespace LastBell.Run
 
         IEnumerator AurelionV4LiveFight()
         {
+            AurelionArgs.SoloOverride = null;
             Note("---------- Aurelion v4 live fight (menu > Hard > practice) ----------");
-            AurelionArgs.SetOverride = null; AurelionArgs.SoloOverride = null;
             if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }
             d.SelectDifficulty(Difficulty.Hard);
             var ally = new AllyBot(0, 1, BotMode.Perfect) { HoldRange = V3Ranged };

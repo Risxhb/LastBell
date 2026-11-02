@@ -19,7 +19,6 @@ namespace LastBell.Run
         {
             Note("---------- Aurelion ability set v4, mythic (proposal) ----------");
             AurelionArgs.SoloOverride = null; AurelionArgs.WindowsMediumOverride = false;
-            AurelionArgs.SetOverride = "v4";
             Time.timeScale = 4;
             if (V2Wants("aurelion.meridian_towers")) yield return V2Section("v4 Meridian Towers", V4Towers());
             if (V2Wants("aurelion.sunspots")) yield return V2Section("v4 Sunspots", V4Sunspots());
@@ -30,7 +29,6 @@ namespace LastBell.Run
             if (V2Wants("aurelion.v4_fight")) yield return V2Section("v4 fight", V4Fight());
             if (V2Wants("aurelion.v4_dps")) yield return V2Section("v4 damage per second (boss HP tuning)", V4Dps());
             Time.timeScale = 1;
-            AurelionArgs.SetOverride = null;
         }
 
         // a body that may end in a wipe (the practice then ends): wait for the body or the wipe, whichever comes first

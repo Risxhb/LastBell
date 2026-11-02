@@ -6,7 +6,7 @@ using UnityEngine.InputSystem;
 namespace LastBell.Run
 {
     // ================ Aurelion ability set v2 (abilities-v2/ABILITIES.md, proposal) ================
-    // The default set; -lastbellAbilitySet v1 keeps the packet's five attacks (AurelionEncounter.cs) for comparison.
+    // v1-v3 were retired on 1 Nov (Chzy18): only v4 runs; the v1-v3 paths here are unreachable until they are removed.
     // Phase plan (Medium, seconds; Easy stretches the warnings inside each ability, never the gaps or the punish):
     //   1 Perfect Order 100–65 %   Lances (3 beams, 1 volley) > 1.0 · Starfall > 1.0 · Noon Shadow > 1.0 ·
     //                              Orrery Closing (no Horizon) > punish 3.5
@@ -208,7 +208,7 @@ namespace LastBell.Run
             }
         }
 
-        // ================ v3, Milestone A interim loop (abilities-v3/ABILITIES-v3.md, proposal; -lastbellAbilitySet v3) ================
+        // ================ v3, Milestone A interim loop (abilities-v3/ABILITIES-v3.md, retired 1 Nov, unreachable) ================
         // The v2.1 plan with its two pure "step out" slots replaced; every other block unchanged:
         //   1 Perfect Order     Lances (3) + Starfall > Ecliptic Order (3 anchors, alone) > Zenith Collapse + Lances (3) >
         //                       Zenith Marks + Lances (3) > punish 3.5

@@ -82,8 +82,8 @@ namespace LastBell.Run
     }
 
     // Launch switches (practice only):
-    //   -lastbellAbilitySet v1|v2|v3|v4   v4 (default) is the mythic set (abilities-v4); v3 the Milestone A set; v2 is v2.1; v1 the packet's five attacks
-    //   -lastbellAbility <id>       fire one v2 ability on its own, on loop, e.g. aurelion.noon_shadow
+    //   v4, the mythic set, is the only fight (Chzy18, 1 Nov: older versions retired, -lastbellAbilitySet removed)
+    //   -lastbellAbility <id>       fire one ability on its own, on loop, e.g. aurelion.meridian_lances
     // In practice F6 cycles the same single-ability loop: off > each ability in turn > off.
     public static class AurelionArgs
     {
@@ -93,17 +93,16 @@ namespace LastBell.Run
             int i = Array.FindIndex(a, x => x.Equals(name, StringComparison.OrdinalIgnoreCase));
             return i >= 0 && i + 1 < a.Length ? a[i + 1] : null;
         }
-        public const string DefaultSet = "v4";   // Chzy18 2026-10-22: every level gets the mythic set; v2 / v3 stay reachable by flag
-        public static string SetOverride;     // tests force a set without a command line
         public static string SoloOverride;    // F6 / tests: the single ability to loop (null = command line)
-        public static bool V1 => (SetOverride ?? Arg("-lastbellAbilitySet") ?? DefaultSet).Equals("v1", StringComparison.OrdinalIgnoreCase);
-        public static bool V3 => (SetOverride ?? Arg("-lastbellAbilitySet") ?? DefaultSet).Equals("v3", StringComparison.OrdinalIgnoreCase);
-        public static bool V4 => (SetOverride ?? Arg("-lastbellAbilitySet") ?? DefaultSet).Equals("v4", StringComparison.OrdinalIgnoreCase);
+        // v4 is the only set (Chzy18, 1 Nov); V1 and V3 stay as false switches until the old v1-v3 code is removed
+        public static bool V1 => false;
+        public static bool V3 => false;
+        public static bool V4 => true;
         // test switch (HARDER-PROMPT target 7): Hard damage and mechanics with Medium window lengths
         public static bool WindowsMediumOverride;
         public static bool WindowsMedium => WindowsMediumOverride || Environment.GetCommandLineArgs().Any(x => x.Equals("-lastbellWindowsMedium", StringComparison.OrdinalIgnoreCase));
         public static string Solo => SoloOverride ?? Arg("-lastbellAbility");
-        public static readonly string[] Ids = { "aurelion.meridian_lances", "aurelion.starfall_mirror", "aurelion.noon_shadow", "aurelion.orrery_closing", "aurelion.hour_hands", "aurelion.zenith_collapse", "aurelion.ecliptic_order", "aurelion.zenith_marks", "aurelion.meridian_towers", "aurelion.sunspots", "aurelion.total_eclipse", "aurelion.severance", "aurelion.last_light", "aurelion.meridian_recall" };
+        public static readonly string[] Ids = { "aurelion.meridian_lances", "aurelion.starfall_mirror", "aurelion.orrery_closing", "aurelion.hour_hands", "aurelion.zenith_collapse", "aurelion.ecliptic_order", "aurelion.zenith_marks", "aurelion.meridian_towers", "aurelion.sunspots", "aurelion.total_eclipse", "aurelion.severance", "aurelion.last_light", "aurelion.meridian_recall" };
         public static bool Known(string id) => id != null && Ids.Contains(id);
     }
 }

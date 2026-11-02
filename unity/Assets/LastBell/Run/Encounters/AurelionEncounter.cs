@@ -65,7 +65,7 @@ namespace LastBell.Run
 
         protected override IEnumerable<int> Script() => AurelionArgs.V1 ? V1Script() : AurelionArgs.V4 ? V4Script() : V2Script();
 
-        // ability set v1 (the packet's five attacks), kept for comparison behind -lastbellAbilitySet v1; v2 is in Aurelion/AurelionEncounter.V2.cs
+        // ability set v1 (the packet's five attacks), retired 1 Nov and unreachable (AurelionArgs.V1 is false); v2 is in Aurelion/AurelionEncounter.V2.cs
         IEnumerable<int> V1Script()
         {
             int want = PhaseFor();

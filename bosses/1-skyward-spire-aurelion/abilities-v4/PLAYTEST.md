@@ -2,7 +2,7 @@
 
 *Proposal build on `integrate/aurelion` (Azure PR 2). Design: `ABILITIES-v4.md`. Player guide: `GUIDE.md`.*
 
-v4 is the default on every difficulty. `-lastbellAbilitySet v3` brings back the Milestone A set, and `v2` brings back v2.1.
+v4 is the only Aurelion fight on every difficulty. The older v1–v3 sets were retired on 1 Nov, and `-lastbellAbilitySet` no longer exists.
 
 ## Start a fight, click by click
 
