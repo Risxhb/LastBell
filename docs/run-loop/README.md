@@ -167,4 +167,4 @@ Screens and videos: `run-loop-evidence/autotest-7/*.png` and `*.mp4` (vanguard_k
 
 ## Media
 
-Screenshots, videos and contact sheets from the gameplay camera are in [media/](media/): menu, Dial Warden combat, Low Pendulum JUMP warning, intermission, Bellkeeper Final Toll, victory and defeat results (with death recap and meter), Chimesinger full setup, plus vanguard_kit.mp4, chimesinger_rotation.mp4, low_pendulum_jump.mp4, bellkeeper_defeat.mp4.
+Screenshots, videos and contact sheets from the gameplay camera are in [media/](media/): menu, Dial Warden combat, Low Pendulum JUMP warning, intermission, Bellkeeper Final Toll, victory and defeat results (with death recap and meter), Chimesinger full setup, plus chimesinger_rotation.mp4, low_pendulum_jump.mp4, bellkeeper_defeat.mp4.
