@@ -8,7 +8,7 @@
 - Slice 1 is built and on Azure as [PR 10](https://dev.azure.com/ChzandZum/_git/Last%20Bell/pullrequest/10) (`feature/run-shop`), which isn't merged yet. The shop autotest passes 71/71.
 - **Icons: all 69 accepted (Chzy18, review inbox, 2026-10-29)** as the item-art direction. The slice-1 icons are in `work/shop-art-20261029/icons/` and the other 54 in `work/item-icons-20261030/icons/` (64 and 128 px). Long Reach (V04), Shared Ringing (C16) and Long Lungs (G02) must be redrawn before they go into the game (Codex task 1 in `CODEX-TASKS-2026-10-31.md`, output in `work/item-icons-20261031/`).
 - The other 54 are accepted. 53 are built on local `feature/run-shop` (`96624b2`), not yet built in Unity or tested. The Second Step rewrite (accepted 2026-10-29) is built in `1d5364e`, also untested; shop build 4 is waiting for the Unity lock. Twin Bells was cut. Their cards show text only until the icons are wired in.
-- **Tollbreaker (2026-11-01):** 20 items are accepted and not built. They go in with the class code swap, after the Aurelion and Ultimate playtests. Until then the Vanguard and its items stay in the build as they are. At the swap, TB01, TB02, TB17 and TB20 take over the 4 Vanguard slice slots, and every Vanguard item leaves the shop. The Long Reach redraw is no longer needed. **Tollbreaker icons: all 20 accepted (Chzy18, review inbox, 2026-11-01)**, in `work/item-icons-tollbreaker-20261101/icons/` (64 and 128 px).
+- **Tollbreaker (2026-11-01):** all 20 items are built on Azure PR 14 (feature/tollbreaker-class, 523232d, shop suite 145/145), and the Vanguard items are out of the shop (Chzy18 asked for the Vanguard to be removed completely). The Long Reach redraw is no longer needed. **Tollbreaker icons: all 20 accepted (Chzy18, review inbox, 2026-11-01)**, in `work/item-icons-tollbreaker-20261101/icons/` (64 and 128 px).
 
 ## How to read the table
 
@@ -22,11 +22,11 @@
 
 | # | Item | Class | Tier | Tags | Effect | Tempered (+) | Solo | Hooks | Status | Icon |
 |---|---|---|---|---|---|---|---|---|---|---|
-| V01 | Tempered Edge | Vanguard (archived) | C | | Steel Rhythm hit 3 +20% damage | +30% | works | built: damage hook | **archived:** built (PR 10); stays in the shop until the class swap | archived |
+| V01 | Tempered Edge | Vanguard (archived) | C | | Steel Rhythm hit 3 +20% damage | +30% | works | built: damage hook | **archived:** built (PR 10); removed from the shop (Azure PR 14, 523232d) | archived |
 | V02 | Quick Hands | Vanguard (archived) | C | | Combo window between Steel Rhythm hits +0.3 s | +0.45 s | works | new: combo window in VanguardKit2 | **archived:** class retired 2026-10-29 | archived |
 | V03 | Wide Arc | Vanguard (archived) | C | | Hit 3 cleaves a 30% wider arc | 45% wider | works | new: hit-3 arc number | **archived:** class retired 2026-10-29 | archived |
 | V04 | Long Reach | Vanguard (archived) | C | | Sundering Blow range +1.5 m | +2.25 m | works | new: Sunder range number | **archived:** class retired 2026-10-29 | archived |
-| V05 | Countdown | Vanguard (archived) | C | | Last Word cooldown −20% | −30% | works | built: Last Word cooldown | **archived:** built (PR 10); stays in the shop until the class swap | archived |
+| V05 | Countdown | Vanguard (archived) | C | | Last Word cooldown −20% | −30% | works | built: Last Word cooldown | **archived:** built (PR 10); removed from the shop (Azure PR 14, 523232d) | archived |
 | V06 | Grit | Vanguard (archived) | C | | +8% max HP (counts toward the +20% cap) | +12% | works | new: max HP stat + cap clamp | **archived:** class retired 2026-10-29 | archived |
 | V07 | Clockwork Step | Vanguard (archived) | C | | Clockstep distance 3 → 3.6 m. No iframes | 3.9 m | works | new: dash distance | **archived:** class retired 2026-10-29 | archived |
 | V08 | Steady Stance | Vanguard (archived) | C | | Brace's movement slow is halved. Mitigation unchanged | slow cut by 75% | works | new: Brace move slow | **cut:** Brace retired | archived |
@@ -38,30 +38,30 @@
 | V14 | Iron Echo | Vanguard (archived) | R | | Last Word's fan repeats 0.6 s later for 50% damage | 75% | works | new: delayed repeat of an ability hit | **archived:** class retired 2026-10-29 | archived |
 | V15 | Second Step | Vanguard (archived) | R | | A dash within 1.5 s of another dash costs 20 stamina instead of 30. No iframes *(rewrite accepted 2026-10-29)* | 15 stamina | works | new: dash stamina cost, time since last dash | **archived:** class retired 2026-10-29 | archived |
 | V16 | Rhythm Keeper | Vanguard (archived) | R | | 3 full Steel Rhythm combos in a row without being hit: +10% damage until hit | +15% | works | new: combo counter; built: on-hit reset, damage hook | **archived:** class retired 2026-10-29 | archived |
-| V17 | Cracked Armour | Vanguard (archived) | R | Crack | Sundering Blow cracks the boss 4 s; heavy hits on it +15% (Last Word, Bellstrike, Crescendo, Rune Sigil, Arcane Comet) | +22.5% | your own Last Word | built | **archived:** built (PR 10); stays in the shop until the class swap | archived |
+| V17 | Cracked Armour | Vanguard (archived) | R | Crack | Sundering Blow cracks the boss 4 s; heavy hits on it +15% (Last Word, Bellstrike, Crescendo, Rune Sigil, Arcane Comet) | +22.5% | your own Last Word | built | **archived:** built (PR 10); removed from the shop (Azure PR 14, 523232d) | archived |
 | V18 | Rally | Vanguard (archived) | R | Party | A Last Word hit gives allies within 6 m +10% damage for 4 s | +15% | gives it to you | built: ally range, damage buff (from slice 1) | **archived:** class retired 2026-10-29 | archived |
 | V19 | Toll of Steel | Vanguard (archived) | K | | Steel Rhythm becomes 4 hits; hit 4 sends a small Last Word fan (40%). Opening comes from hit 4 | fan 60% | works | new: combo length, Opening source | **archived:** class retired 2026-10-29 | archived |
-| V20 | Oathbound | Vanguard (archived) | K | | Sundering Blow can't be empowered; every 3rd Opening resets Last Word | every 2nd Opening | works | built | **archived:** built (PR 10); stays in the shop until the class swap | archived |
-| TB01 | Keen Edge | Tollbreaker | C | | Twin Hurl's outward hit +20% (14 → 17) | +30% | works | built: damage hook | **accepted (2026-11-01)**, slice: replaces Tempered Edge at the class swap | accepted |
-| TB02 | Short Fuse | Tollbreaker | C | | Splitting Throw cooldown −20% (10 → 8 s) | −30% | works | new: `SplitCd` | **accepted (2026-11-01)**, slice: replaces Countdown at the class swap | accepted |
-| TB03 | Wide Grind | Tollbreaker | C | | Grinding Toll's ring is 30% wider (1.5 → 1.95 m across) | +45% | works | new: `TollRadius` | **accepted (2026-11-01)** | accepted |
-| TB04 | Long Grind | Tollbreaker | C | | Grinding Toll spins 2.5 s instead of 2 s | 2.8 s | works | new: `TollSpinTicks` | **accepted (2026-11-01)** | accepted |
-| TB05 | Quick Catch | Tollbreaker | C | | Returning axes fly 20% faster (18 → 21.6 m/s) | +30% | works | new: `ReturnSpeed` | **accepted (2026-11-01)** | accepted |
-| TB06 | Heavy Haft | Tollbreaker | C | | The held (lodging) Twin Hurl throw +20% damage (30 → 36) | +30% | works | built: damage hook | **accepted (2026-11-01)** | accepted |
-| TB07 | Iron Pull | Tollbreaker | C | | Call of Iron +1.6 per metre (8 → 9.6), cap 110 → 125 per axe | +2.4 per metre, cap 132 | works | new: `CallPerMetre`, `CallMax` | **accepted (2026-11-01)** | accepted |
-| TB08 | Battle Spin | Tollbreaker | C | | After a dash, the next Twin Hurl tap hits like a held throw (30) without lodging | that hit also +15% | works | new: dash-end event | **accepted (2026-11-01)** | accepted |
-| TB09 | Close Quarters | Tollbreaker | C | | Twin Hurl hits +12% while you're within 4 m of the boss | +18% | works | built: damage hook; new: distance to boss | **accepted (2026-11-01)** | accepted |
-| TB10 | Deep Split | Tollbreaker | R | | Splitting Throw's bonus lasts 8 s instead of 6 (the axe stays lodged to match) | 9 s | works | new: `SplitTicks`, `BossLodgeTicks` | **accepted (2026-11-01)** | accepted |
-| TB11 | Twin Split | Tollbreaker | R | | With both axes in hand, Splitting Throw throws both; the second lodges beside the first for 50%. The bonus doesn't stack, and both hands are empty until Call of Iron | second 75% | works | new: two-axe split | **accepted (2026-11-01)** | accepted |
-| TB12 | Quick Grind | Tollbreaker | R | | Grinding Toll hits every 0.3 s instead of 0.4 s | 0.27 s | works | new: `TollEvery` | **accepted (2026-11-01)** | accepted |
-| TB13 | Ringing Return | Tollbreaker | R | | Each axe Call of Iron sends through the boss takes 2 s off Splitting Throw's cooldown | 3 s | works | new: recall-hit event, cooldown refund | **accepted (2026-11-01)** | accepted |
-| TB14 | Backswing | Tollbreaker | R | | Returning Twin Hurl axes hit 6 instead of 3 | 7 | works | new: `TapBack` | **accepted (2026-11-01; rebased to the 3-damage return the same day)** | accepted |
-| TB15 | Anchor Line | Tollbreaker | R | | Floor-lodged axes last 12 s instead of 8; Call of Iron from the floor +20% | +30% | works | new: `FloorLodgeTicks`; built: damage hook | **accepted (2026-11-01)** | accepted |
-| TB16 | Berserker's Pace | Tollbreaker | R | | Each Twin Hurl hit from within 4 m adds +2% damage for 3 s, up to +10%. Lost when you're hit | +3% each, up to +15% | works | new: stack counter, distance to boss; built: on-hit reset | **accepted (2026-11-01)** | accepted |
-| TB17 | Riven Iron | Tollbreaker | R | | An axe Call of Iron sends through the boss cracks it for 4 s: your own Splitting Throw and Call of Iron hits on it +15%. Personal only | +22.5% | works | built: Crack state (personal); new: recall trigger | **accepted (2026-11-01)**, slice: replaces Cracked Armour at the class swap | accepted |
-| TB18 | War Cry | Tollbreaker | R | Party | Bell Frenzy gives allies within 6 m +10% damage for its 4 s | +15% | gives it to you | built: ally range, damage buff | **accepted (2026-11-01)** | accepted |
-| TB19 | Frenzied Hour | Tollbreaker | K | | Bell Frenzy cooldown 30 → 18 s, but it lasts 3 s instead of 4 and the fan's side axes deal 35% | cooldown 15 s | works | new: `FrenzyCd`, `FrenzyTicks`, `FanSide` | **accepted (2026-11-01)** | accepted |
-| TB20 | Rooted Axe | Tollbreaker | K | | Splitting Throw's axe stays in the boss until Call of Iron, and the split lasts as long, but the bonus is +25% and Call of Iron's cooldown is 9 s | bonus +30% | works | new: no boss timeout while split, `SplitBonus`, `CallCd` | **accepted (2026-11-01)**, slice: replaces Oathbound at the class swap | accepted |
+| V20 | Oathbound | Vanguard (archived) | K | | Sundering Blow can't be empowered; every 3rd Opening resets Last Word | every 2nd Opening | works | built | **archived:** built (PR 10); removed from the shop (Azure PR 14, 523232d) | archived |
+| TB01 | Keen Edge | Tollbreaker | C | | Twin Hurl's outward hit +20% (14 → 17) | +30% | works | built: damage hook | **built (Azure PR 14, 523232d)**; accepted 2026-11-01 | accepted |
+| TB02 | Short Fuse | Tollbreaker | C | | Splitting Throw cooldown −20% (10 → 8 s) | −30% | works | new: `SplitCd` | **built (Azure PR 14, 523232d)**; accepted 2026-11-01 | accepted |
+| TB03 | Wide Grind | Tollbreaker | C | | Grinding Toll's ring is 30% wider (1.5 → 1.95 m across) | +45% | works | new: `TollRadius` | **built (Azure PR 14, 523232d)**; accepted 2026-11-01 | accepted |
+| TB04 | Long Grind | Tollbreaker | C | | Grinding Toll spins 2.5 s instead of 2 s | 2.8 s | works | new: `TollSpinTicks` | **built (Azure PR 14, 523232d)**; accepted 2026-11-01 | accepted |
+| TB05 | Quick Catch | Tollbreaker | C | | Returning axes fly 20% faster (18 → 21.6 m/s) | +30% | works | new: `ReturnSpeed` | **built (Azure PR 14, 523232d)**; accepted 2026-11-01 | accepted |
+| TB06 | Heavy Haft | Tollbreaker | C | | The held (lodging) Twin Hurl throw +20% damage (30 → 36) | +30% | works | built: damage hook | **built (Azure PR 14, 523232d)**; accepted 2026-11-01 | accepted |
+| TB07 | Iron Pull | Tollbreaker | C | | Call of Iron +1.6 per metre (8 → 9.6), cap 110 → 125 per axe | +2.4 per metre, cap 132 | works | new: `CallPerMetre`, `CallMax` | **built (Azure PR 14, 523232d)**; accepted 2026-11-01 | accepted |
+| TB08 | Battle Spin | Tollbreaker | C | | After a dash, the next Twin Hurl tap hits like a held throw (30) without lodging | that hit also +15% | works | new: dash-end event | **built (Azure PR 14, 523232d)**; accepted 2026-11-01 | accepted |
+| TB09 | Close Quarters | Tollbreaker | C | | Twin Hurl hits +12% while you're within 4 m of the boss | +18% | works | built: damage hook; new: distance to boss | **built (Azure PR 14, 523232d)**; accepted 2026-11-01 | accepted |
+| TB10 | Deep Split | Tollbreaker | R | | Splitting Throw's bonus lasts 8 s instead of 6 (the axe stays lodged to match) | 9 s | works | new: `SplitTicks`, `BossLodgeTicks` | **built (Azure PR 14, 523232d)**; accepted 2026-11-01 | accepted |
+| TB11 | Twin Split | Tollbreaker | R | | With both axes in hand, Splitting Throw throws both; the second lodges beside the first for 50%. The bonus doesn't stack, and both hands are empty until Call of Iron | second 75% | works | new: two-axe split | **built (Azure PR 14, 523232d)**; accepted 2026-11-01 | accepted |
+| TB12 | Quick Grind | Tollbreaker | R | | Grinding Toll hits every 0.3 s instead of 0.4 s | 0.27 s | works | new: `TollEvery` | **built (Azure PR 14, 523232d)**; accepted 2026-11-01 | accepted |
+| TB13 | Ringing Return | Tollbreaker | R | | Each axe Call of Iron sends through the boss takes 2 s off Splitting Throw's cooldown | 3 s | works | new: recall-hit event, cooldown refund | **built (Azure PR 14, 523232d)**; accepted 2026-11-01 | accepted |
+| TB14 | Backswing | Tollbreaker | R | | Returning Twin Hurl axes hit 6 instead of 3 | 7 | works | new: `TapBack` | **built (Azure PR 14, 523232d)**; accepted 2026-11-01, rebased to the 3-damage return the same day | accepted |
+| TB15 | Anchor Line | Tollbreaker | R | | Floor-lodged axes last 12 s instead of 8; Call of Iron from the floor +20% | +30% | works | new: `FloorLodgeTicks`; built: damage hook | **built (Azure PR 14, 523232d)**; accepted 2026-11-01 | accepted |
+| TB16 | Berserker's Pace | Tollbreaker | R | | Each Twin Hurl hit from within 4 m adds +2% damage for 3 s, up to +10%. Lost when you're hit | +3% each, up to +15% | works | new: stack counter, distance to boss; built: on-hit reset | **built (Azure PR 14, 523232d)**; accepted 2026-11-01 | accepted |
+| TB17 | Riven Iron | Tollbreaker | R | | An axe Call of Iron sends through the boss cracks it for 4 s: your own Splitting Throw and Call of Iron hits on it +15%. Personal only | +22.5% | works | built: Crack state (personal); new: recall trigger | **built (Azure PR 14, 523232d)**; accepted 2026-11-01 | accepted |
+| TB18 | War Cry | Tollbreaker | R | Party | Bell Frenzy gives allies within 6 m +10% damage for its 4 s | +15% | gives it to you | built: ally range, damage buff | **built (Azure PR 14, 523232d)**; accepted 2026-11-01 | accepted |
+| TB19 | Frenzied Hour | Tollbreaker | K | | Bell Frenzy cooldown 30 → 18 s, but it lasts 3 s instead of 4 and the fan's side axes deal 35% | cooldown 15 s | works | new: `FrenzyCd`, `FrenzyTicks`, `FanSide` | **built (Azure PR 14, 523232d)**; accepted 2026-11-01 | accepted |
+| TB20 | Rooted Axe | Tollbreaker | K | | Splitting Throw's axe stays in the boss until Call of Iron, and the split lasts as long, but the bonus is +25% and Call of Iron's cooldown is 9 s | bonus +30% | works | new: no boss timeout while split, `SplitBonus`, `CallCd` | **built (Azure PR 14, 523232d)**; accepted 2026-11-01 | accepted |
 | C01 | Bright Note | Chimesinger | C | | Resonant Note +10% damage, +15% projectile speed | +15% / +22% | works | built: damage hook; new: note speed | **built (96624b2, local, untested)** | accepted |
 | C02 | Heavy Bell | Chimesinger | C | | Bellstrike +20% damage | +30% | works | built: damage hook | **built (PR 10, not merged)** | accepted |
 | C03 | Wide Refrain | Chimesinger | C | | Harmonic Refrain cone +25% angle | +37% | works | new: Refrain angle | **built (96624b2, local, untested)** | accepted |
@@ -117,7 +117,7 @@
 
 **Count:** 69 live items (20 Tollbreaker, 19 Chimesinger, 20 Arcanist, 10 general), plus 20 archived Vanguard rows, 1 cut item (Twin Bells) and 10 Toll slots that are still proposals.
 - Built: 11 non-Vanguard slice items (PR 10, not merged) and 38 non-Vanguard pool items (local, untested).
-- Not built: the 20 Tollbreaker items (waiting for the class swap).
+- Built: the 20 Tollbreaker items (Azure PR 14, 523232d, not merged).
 
 ## Build notes
 
@@ -138,6 +138,15 @@
 | Note Trail (C14) | notes at base damage, 6° apart |
 | Momentum (V09), Grace Note (C08), Blink Charge (A07) | armed by any dash, used by the next attack |
 | Light Feet (G10) | lasts 1 s from the end of the dash |
+
+**Tollbreaker build choices** (Tollbreaker lane, Azure PR 14, `523232d`, 2026-11-01). These are build values that playtests can tune; they aren't design changes.
+
+| Item | Build choice |
+|---|---|
+| Close Quarters (TB09), Berserker's Pace (TB16) | "within 4 m" is his distance to the boss when he releases the throw |
+| Keen Edge, Close Quarters, Berserker's Pace (TB01, TB09, TB16) | Bell Frenzy's side fan axes get none of these bonuses (Keen Edge also skips return hits) |
+| War Cry (TB18) | in a party, the buff skips the Tollbreaker himself; solo, it goes to him |
+| Struck Together (C17) | its "heavy hit" list swaps Last Word for Splitting Throw and the held Twin Hurl |
 
 **Held items, resolved 2026-10-29:**
 - **Second Step (V15):** the shared dash has no cooldown, only stamina, so the old "twice within 1.5 s, the second costs 45" would only make the second dash cost more. **Rewrite accepted (Chzy18, 2026-10-29):** a dash within 1.5 s of another dash costs 20 stamina instead of 30 (15 tempered). No iframes.
