@@ -15,7 +15,7 @@ namespace LastBell.Run
         // Twin Hurl: 0.17 s cast, 0.25 s from one release to the next; hold 0.5 s for the heavier throw that lodges
         const int CastTicks = 10, ThrowInterval = 15, HoldTicks = 30, BufferTicks = 9;
         const float ThrowSpeed = 22f, ReturnSpeed = 18f, RecallSpeed = 30f, MaxRange = 9f, MinLodge = 1.5f, AxeRadius = 0.35f, CatchRadius = 0.6f;
-        const int TapOut = 14, TapBack = 6, HeavyDamage = 30;                              // TUNE
+        const int TapOut = 14, TapBack = 3, HeavyDamage = 30;   // return hit 6 -> 3 (Twin Hurl and Grinding Toll): option B, Chzy18 1 Nov
         const int BossLodgeTicks = 360, FloorLodgeTicks = 480;                            // lodged axes time out (6 s / 8 s)
         // Grinding Toll: an axe thrown to the cursor spins in place for 2 s, 1.5 m across, hitting every 0.4 s
         const int TollCd = 480, TollCast = 8, TollSpinTicks = 120, TollEvery = 24, TollDamage = 10;   // TUNE

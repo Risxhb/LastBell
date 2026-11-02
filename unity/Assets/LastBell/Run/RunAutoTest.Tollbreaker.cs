@@ -56,7 +56,7 @@ namespace LastBell.Run
             yield return Until(() => k.AxesInHand == 2, 2, "the axe flies back to his hand");
             yield return Wait(0.1f);
             Check("the caught axe is back in his fist", inHand.All(t => t.gameObject.activeSelf));
-            Check("Twin Hurl hits going out and coming back (14 + 6)", hp0 - d.Boss.Hp >= 20, $"{hp0 - d.Boss.Hp} dealt");
+            Check("Twin Hurl hits going out and coming back (14 + 3)", hp0 - d.Boss.Hp >= 17, $"{hp0 - d.Boss.Hp} dealt");
 
             // ---- closer is faster: an axe thrown from 3 m is back sooner than one from 8 m ----
             float t3 = 0, t8 = 0;
@@ -94,8 +94,8 @@ namespace LastBell.Run
             Check("Splitting Throw lodges in the boss and starts the split", k.SplitActive && k.Axes.Any(a => a.Stuck && a.InBoss) && Meter("Splitting Throw") >= 50, k.ClassState());
             int tap0 = Meter("Twin Hurl"); int before2 = k.Throws;
             bot.press[0] = true; yield return Until(() => k.Throws > before2, 1, "a split tap");
-            yield return Until(() => Meter("Twin Hurl") - tap0 >= 28, 2, "the split tap hits out and back");
-            Check("inside the split, Twin Hurl hits deal +40 % (20 -> 28)", Meter("Twin Hurl") - tap0 >= 28, $"{Meter("Twin Hurl") - tap0} dealt");
+            yield return Until(() => Meter("Twin Hurl") - tap0 >= 24, 2, "the split tap hits out and back");
+            Check("inside the split, Twin Hurl hits deal +40 % (17 -> 24)", Meter("Twin Hurl") - tap0 >= 24, $"{Meter("Twin Hurl") - tap0} dealt");
             yield return Wait(0.6f);   // Call of Iron's cooldown
             yield return Until(() => k.Cooldown01(3) <= 0, 6, "Call of Iron ready");
             bot.press[3] = true;
