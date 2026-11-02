@@ -53,7 +53,7 @@ namespace LastBell.Run
                 $"{R("Anvil Quake I")}/{R("Anvil Quake II")}/{R("Anvil Quake III")}");
             t.Check("peak of live patterns is three or more", peak >= 3, $"peak {peak}");
             t.Check("still players get hit (brands on each other, jets, blast, quake)", t.Hits.Count > 0, $"{t.Hits.Count} hits");
-            t.Check("brand pools heat 1.0 s before they burn (the carrier can step off)", t.Spawned("Brand Pool").All(x => x.H.LockAt == Sim.Ticks(ForgeRite.PoolArm)));
+            t.Check("the brand stops following 1.0 s before it lands; its pool forms where it stopped", t.Spawned("Ember Brand").All(x => x.H.ResolveAt - x.H.LockAt == Sim.Ticks(ForgeRite.BrandFreeze)) && t.Spawned("Brand Pool").All(x => x.H.LockAt == 0));
             var drafts = t.Spawned("Backdraft").Select(x => x.Tick - c0).ToList();
             t.Check("a second Backdraft pulls during the second brand (from 14.0 s)", drafts.Count >= 2 && drafts.Max() - drafts.Min() >= Sim.Ticks(8.5f), string.Join("/", drafts));
             int pools = t.W.Hazards.Live.Count(h => h.Source == "Brand Pool");

@@ -12,7 +12,7 @@
 
 | t (s) | Mechanic | Shape | Kind | Warning | Damage | Melee threat | Ranged threat |
 |---|---|---|---|---|---|---|---|
-| 0.0 | **Ember Brand** | 3 m circle on each player, follows them | Ground | 3.5 s | 30 to anyone else inside | brands drop in the melee ring | carriers drift to the edge, and pools there box ranged players in |
+| 0.0 | **Ember Brand** | 3 m circle on each player, follows them until 1.0 s before it lands, then stays put | Ground | 3.5 s | 30 to anyone else inside | brands drop in the melee ring | carriers drift to the edge, and pools there box ranged players in |
 | | brand pool | 2 m circle under the carrier | Ground | — | 20/s burn | — | — |
 | 2.0 | **Furnace Spin** | 4 lanes, 1.8 m wide, boss to the wall, 90° apart, sweeping 40°/s for 4 s; the direction flips each loop | Strike | 1.5 s | 30 per jet | the gap near the body is narrow | the gap at the wall moves 9.8 m/s, so ranged must come within about 6 m |
 | 5.0 | **Backdraft** | everyone pulled 2 m in (1.6–2.0 s), then a 5 m blast at 3.0 s | Ground | 3.0 s | 45 + 1.5 m push | the blast | the pull drags edge players toward it |
@@ -28,6 +28,7 @@
 
 ## Settled for this phase (dated)
 - **26 Oct:** Ember Brand pools last until the phase ends. The phase change clears them.
+- **1 Nov (proposal):** the brand stops following 1.0 s before it lands, so the carrier walks off before its pool forms. The pool then burns at once.
 - **27 Oct:** the jets reach the wall, so out-ranging doesn't work.
 - **27 Oct:** Hammerfall (front/back cleave plus slam) was removed as unfair right after the pours. Anvil Quake replaces it, landing after the last pour.
 - **27 Oct:** the boss stands at the arena centre. Following the Furnace Spin gap at mid-range is the intended dodge.

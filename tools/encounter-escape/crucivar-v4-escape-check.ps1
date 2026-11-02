@@ -39,7 +39,7 @@ Add-Row 1 'Furnace Spin' 'at the wall: walk in to where the gap can be followed 
 # Backdraft: from hugging the boss to outside the 5 m blast by 3.0 s, while a 2 m inward pull runs for 0.4 s of it
 Add-Row 1 'Backdraft' 'from hugging the boss to outside the 5 m blast, against the 2 m pull' ((5.0 + $M - $hug) + 2.0) (3.0 * $ws) 'pull counted as extra distance'
 Add-Row 1 'Backdraft II' 'carrying the second brand: out of the 5 m blast from hugging the boss, against the 2 m pull (from 14.0 s, 11-01)' ((5.0 + $M - $hug) + 2.0) (3.0 * $ws) 'the brand lands 3.5 s after it appears, so the carrier has the blast window too'
-Add-Row 1 'Brand Pool' 'step off the 2 m pool that forms under you (it heats 1.0 s before it burns, 11-01)' (2.0 + $M) (1.0 * $ws)
+Add-Row 1 'Brand Pool' 'walk off your brand after it stops following (1.0 s before it lands and pools, 11-01)' (2.0 + $M) (1.0 * $ws)
 Add-Row 1 'Casting Order' 'leave your locked pour lane (2.6 m wide, locks 1.5 s before it lands)' (2.6 / 2 + $M) (1.5 * $ws)
 Add-Row 1 'Anvil Quake' 'hugging the boss: leave the inner circle (0-4 m) before 1.4 s' (4.0 + $M - $hug) (1.4 * $ws)
 Add-Row 1 'Anvil Quake' 'cross a band edge into the band that just went off (0.8 s between bands)' (2 * $M) (0.8 * $ws)

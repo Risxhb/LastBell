@@ -82,7 +82,8 @@ The difficulty damage scale is unchanged (damage scale only, per the difficulty 
 ## Playtest changes, 1 Nov (proposal)
 Chzy18's playtest found Phases 1 and 2 too easy, Phase 2 short on bullets, and unavoidable damage in the soak and pool mechanics.
 - **No unavoidable damage:**
-  - Brand pools and tower slag now heat for 1.0 s (1.25 s on Easy) before they burn, so whoever they form under can step off.
+  - Ember Brand stops following its carrier 1.0 s (1.25 s on Easy) before it lands, so the carrier walks off before the pool forms. (A first try had the pool heat 1.0 s under the carrier; Chzy18 found the pop jarring, so it was replaced the same day.)
+  - Tower slag heats for 1.0 s (1.25 s on Easy) before it burns, so the soakers can step off.
   - A rising Mould Tower cools any burning ground on its spot (old slag, brand pools, pour channels).
   - Phase 3 Casting Order moved from 3.5 s to after the towers and Backdraft. Its pours had locked onto set B soakers who had to stay in their tower.
 - **Phase 1 harder:**

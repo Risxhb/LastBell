@@ -6,8 +6,8 @@ namespace LastBell.Run
 {
     // Ability set v4, Phase 1 "Forge Rite" (proposal; Chzy18 picked it from the browser trials on 2026-10-26). One loop of
     // 20.5 s, Medium numbers; Easy stretches every warning by 1.25. Up to three things are live at once (pools included).
-    //   0.0  Ember Brand        3 m brand follows each player, lands 3.5 s: 30 Ground to OTHER players inside; leaves a 2 m
-    //                           slag pool (20/s) under the carrier that lasts until the phase ends (ClearPools)
+    //   0.0  Ember Brand        3 m brand follows each player and stops 1.0 s before it lands at 3.5 s: 30 Ground to OTHER
+    //                           players inside; leaves a 2 m slag pool (20/s) where it stopped, until the phase ends (ClearPools)
     //   2.0  Furnace Spin       four flame jets to the wall (1.8 m wide) shown 1.5 s, then sweep round the boss for 4 s at 40 deg/s,
     //                           30 each, once per jet; the turn direction flips every loop
     //   5.0  Backdraft          5 m blast round the boss at 3.0 s (45, 1.5 m push); everyone pulled 2 m inward at 1.6-2.0 s
@@ -26,8 +26,9 @@ namespace LastBell.Run
 
         public const float LoopLength = 20.5f, Punish = 3.0f;
         public const float BrandRadius = 3f, BrandLand = 3.5f, PoolRadius = 2f, PoolBurn = 20f;
-        // a new slag pool heats for 1.0 s before it burns, so whoever it forms under can step off (Chzy18 11-01: no unavoidable damage)
-        public const float PoolArm = 1.0f;
+        // the brand stops following 1.0 s before it lands, so the carrier walks off before the pool forms (Chzy18 11-01: a pool
+        // popping under you felt like a hit). Tower slag still heats PoolArm before it burns (no unavoidable damage).
+        public const float BrandFreeze = 1.0f, PoolArm = 1.0f;
         public const int JetCount = 6;   // since 11-01 (Chzy18: Phase 1 too easy), was 4
         public const int BrandDmg = 30;
         public const float JetWidth = 1.8f, JetShow = 1.5f, JetSweep = 4f, JetTurnDeg = 40f;
@@ -86,9 +87,9 @@ namespace LastBell.Run
                 var h = new Hazard
                 {
                     Source = "Ember Brand", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Flat(p.transform.position),
-                    Radius = BrandRadius, LockAt = T(BrandLand), ResolveAt = T(BrandLand), Damage = BrandDmg, Knockback = 0,
+                    Radius = BrandRadius, LockAt = T(BrandLand - BrandFreeze), ResolveAt = T(BrandLand), Damage = BrandDmg, Knockback = 0,
                 };
-                h.Track = hz => { if (!owner.Down) hz.Origin = Flat(owner.transform.position); };
+                h.Track = hz => { if (!owner.Down) hz.Origin = Flat(owner.transform.position); };   // until LockAt
                 h.Includes = q => q != owner && h.Contains(q.transform.position);   // the carrier is never hit by its own brand
                 h.OnResolve = hz =>
                 {
@@ -96,7 +97,7 @@ namespace LastBell.Run
                     Pools.Add(W.Hazards.Spawn(new Hazard
                     {
                         Source = "Brand Pool", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = hz.Origin, Radius = PoolRadius,
-                        LockAt = T(PoolArm), ResolveAt = Sim.Ticks(3600), BurnPerSecond = PoolBurn,   // heats for PoolArm, then lasts until the phase ends
+                        LockAt = 0, ResolveAt = Sim.Ticks(3600), BurnPerSecond = PoolBurn,   // burns at once (the carrier left), lasts until the phase ends
                     }));
                 };
                 W.Hazards.Spawn(h);
