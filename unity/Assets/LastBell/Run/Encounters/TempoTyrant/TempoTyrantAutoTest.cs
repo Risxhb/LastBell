@@ -189,8 +189,8 @@ namespace LastBell.Run
             if (RunDirector.Instance == null) UnityEngine.SceneManagement.SceneManager.LoadScene(RunMaps.All[map].RunScene);
             while (RunDirector.Instance == null || RunDirector.Instance.State != RunState.Menu) yield return null;
             d = RunDirector.Instance;
-            if (RunMaps.Current != map) { Check("practice loads its arena", d.StartPractice("Vanguard", enc)); }
-            else Check("practice starts on its arena", d.StartPractice("Vanguard", enc));
+            if (RunMaps.Current != map) { Check("practice loads its arena", d.StartPractice("Tollbreaker", enc)); }
+            else Check("practice starts on its arena", d.StartPractice("Tollbreaker", enc));
             float t0 = 0; while ((RunDirector.Instance == null || RunDirector.Instance.State != RunState.Ready) && t0 < 30) { t0 += Time.deltaTime; yield return null; }
             d = RunDirector.Instance;
             Check("practice Ready on Metronome Court", d && d.State == RunState.Ready && RunMaps.Current == map && d.Mode == RunMode.Practice && d.Encounter == enc);

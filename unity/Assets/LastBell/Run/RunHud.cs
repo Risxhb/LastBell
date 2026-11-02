@@ -414,7 +414,7 @@ namespace LastBell.Run
             }
             y += 48;
             string desc = menuClass == 0
-                ? "Sword and shield. 1 Steel Rhythm (3-hit combo; hit 3 grants Opening) · 2 Sundering Blow · 3 Last Word · 4 hold Brace (frontal 60% reduction)."
+                ? "Two throwing axes. LMB Twin Hurl (tap, or hold to lodge) · 2 Grinding Toll · 3 Splitting Throw (his hits +40%) · 4 Call of Iron (recall through the boss) · 5 Bell Frenzy."
                 : menuClass == 1
                 ? "Bell staff. 1 Resonant Note (+Harmony) · 2 Bellstrike (2 charges, rings a bell) · 3 Harmonic Refrain (adds echoes) · 4 Crescendo (detonate) · 6 Mending Chorus (instant heal)."
                 : "Time magic. 1 Clockbolt (+Tick, max 3) · 2 Time Seal (2 charges, 6 s, ripe last 2 s) · 3 Arc Lance (3 Ticks: inscribes a seal) · 4 Convergence (detonate seals) · 6 Temporal Anchor (recast to return + shield).";
@@ -723,7 +723,8 @@ namespace LastBell.Run
         // then the class's dash, then the potion. A missing icon falls back to the ability name.
         static readonly Dictionary<string, string[]> SlotIconNames = new Dictionary<string, string[]>
         {
-            ["Vanguard"] = new[] { "vanguard_steel_rhythm", "vanguard_sundering_blow", "vanguard_last_word", "vanguard_brace", "vanguard_dash" },
+            // Tollbreaker: stand-in icons (older steel-set art and the retired Arcanist set) until his own are drawn
+            ["Tollbreaker"] = new[] { "tollbreaker_twin_hurl", "arcanist_clockstep", "tollbreaker_splitting_throw", "tollbreaker_call_of_iron", "chimes-128", "tollbreaker_dash" },
             ["Chimesinger"] = new[] { "chimesinger_resonant_note", "chimesinger_bellstrike", "chimesinger_harmonic_refrain", "chimesinger_crescendo", "chimesinger_mending_chorus", "chimesinger_harmonic_step" },
             ["Arcanist"] = new[] { "arcanist_magic_missile", "arcanist_disintegrate", "arcanist_rune_sigil", "arcanist_comet", "arcanist_arcane_surge", "arcanist_blink" },
         };

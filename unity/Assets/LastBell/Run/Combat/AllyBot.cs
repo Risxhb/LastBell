@@ -41,7 +41,7 @@ namespace LastBell.Run
             reactTicks = mode == BotMode.Passive ? 15 + (index * 7) % 10 : 0;   // 0.25-0.4 s; test bots react on the first tick
         }
 
-        float Range(PlayerController me) => HoldRange ?? (me.ClassName == "Vanguard" ? 0.9f : me.ClassName == "Chimesinger" ? 6.5f : 8.5f);
+        float Range(PlayerController me) => HoldRange ?? (me.ClassName == "Tollbreaker" ? 3.5f : me.ClassName == "Chimesinger" ? 6.5f : 8.5f);
 
         public PlayerInput Read(PlayerController me)
         {
@@ -112,7 +112,7 @@ namespace LastBell.Run
                 }
                 // casters: the basic casts on the move (0.55-0.6 speed), so keep it going while repositioning (following a
                 // turning well, a far job) when nothing lands yet or the slower walk still has time to spare
-                if (Attacks && me.ClassName != "Vanguard" && !inp.Dash && !me.Kit.Acting && tick - lastPress >= 6 && me.Kit.Cooldown01(0) <= 0.001f
+                if (Attacks && !inp.Dash && !me.Kit.Acting && tick - lastPress >= 6 && me.Kit.Cooldown01(0) <= 0.001f
                     && Sim.Flat(bpos - pos).magnitude - boss.BodyRadius <= Range(me) + 1.85f
                     && (threat == null || move == Vector3.zero || need / (PlayerController.WalkSpeed * 0.55f) < t - 0.3f))
                 { inp.P0 = inp.H0 = true; lastPress = tick; }
@@ -146,9 +146,7 @@ namespace LastBell.Run
                 // 3) attack when in range (off: Chzy18 2026-10-22, "the bots are doing too much damage": they only do the
                 // mechanics). Set Attacks = true to bring the rotation back.
                 float gap = Sim.Flat(bpos - pos).magnitude - boss.BodyRadius;
-                if (Attacks && gap <= Range(me) + 1.85f) Attack(me, ref inp);   // Vanguard: 2.75 m; the swing's lunge closes to the 2.6 m reach
-                // Vanguard's Last Word reaches 8 m with its wave: use it from range too
-                else if (Attacks && me.ClassName == "Vanguard" && gap <= 7.5f && me.Kit.Cooldown01(2) <= 0.001f && tick - lastPress >= 6 && Clear(me, 125)) { inp.P2 = true; lastPress = tick; }
+                if (Attacks && gap <= Range(me) + 1.85f) Attack(me, ref inp);
             }
             if (me.Hp < (Mode == BotMode.Passive ? 40 : 70) && me.Potions > 0 && tick % 30 == 0) inp.Potion = true;   // test bots: before a Hard kill hit (65) could down them
             // walk round his body, not into it: a straight line across the centre would pin the bot against him
@@ -179,7 +177,7 @@ namespace LastBell.Run
             // a pressed ability's cooldown starts on release: wait for it (up to 1.5 s) instead of pressing again and restarting the
             // cast; if it never started (the cast didn't take: no target, a missing condition), skip that ability for 8 s
             // (casters press only when idle, so an action starting counts too: charge abilities show no cooldown while charges remain)
-            if (pendingSlot > 0 && me.Kit.Cooldown01(pendingSlot) <= 0.001f && !(me.ClassName != "Vanguard" && me.Kit.Acting))
+            if (pendingSlot > 0 && me.Kit.Cooldown01(pendingSlot) <= 0.001f && !me.Kit.Acting)
             {
                 if (tick < pendingUntil) return;
                 skipUntil[pendingSlot] = tick + 480;
@@ -188,12 +186,14 @@ namespace LastBell.Run
             int s = -1;
             switch (me.ClassName)
             {
-                case "Vanguard":
-                    // Last Word and Sundering Blow can't be dashed out of after release: only start them with nothing landing here
-                    // before they end and it has walked out (the dodge waits until 0.75 s plus the walk is left)
-                    if (ready(2) && Clear(me, 125)) s = 2;           // Last Word (its wave also reaches 8 m)
-                    else if (ready(1) && Clear(me, 100)) s = 1;      // Sundering Blow
-                    else if (Clear(me, 90)) s = 0;                   // Steel Rhythm (roots too, up to 0.55 s)
+                // Tollbreaker (kit spec rotation): frenzy in a quiet moment, split him, grind under him, recall through him, throw
+                case "Tollbreaker":
+                    if (me.Kit.Acting || !(me.Kit is TollbreakerKit tb)) return;
+                    if (ready(4) && tb.AxesStuck == 0 && Clear(me, 60)) s = 4;                    // Bell Frenzy
+                    else if (ready(2) && tb.AxesInHand > 0 && !tb.SplitActive && Clear(me, 40)) s = 2;   // Splitting Throw (planted 0.4 s)
+                    else if (ready(3) && tb.AxesStuck > 0 && (!tb.SplitActive || tb.AxesInHand == 0)) s = 3;   // Call of Iron
+                    else if (ready(1) && tb.AxesInHand > 0) s = 1;                                // Grinding Toll
+                    else if (tb.AxesInHand > 0) { inp.P0 = true; lastPress = tick; return; }       // Twin Hurl: a tap (holding would lodge it)
                     break;
                 // casters: decide only between actions; the priorities follow Codex's reference rotation (solo study 25 Oct),
                 // which reaches the kits' dummy throughput (Chimesinger ~60, Arcanist ~100 DPS)

@@ -91,7 +91,6 @@ namespace LastBell.Run
             Projectiles.Step();
             Bullets.Step();
             Hazards.Step();
-            Shop.ItemHooks.Step(this);   // timed item hits (Pendulum Cut, Iron Echo, Toll of Steel)
         }
 
         // Clears everything an encounter can leave behind: hazards, projectiles, boss-owned effects. Called at every

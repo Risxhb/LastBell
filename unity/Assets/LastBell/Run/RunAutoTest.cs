@@ -179,7 +179,6 @@ namespace LastBell.Run
             }
             bot.Clear();
         }
-        static int VanguardRotation(int f) => f % 240 == 60 ? 1 : f % 8 == 0 ? 0 : -1;
         int[] chimeSeq = { 1, 0, 0, 0, 2, 1, 0, 0, 0, 2, 3 }; int chimeStep; int chimeWait;
         int ChimeRotation(int f)
         {
@@ -226,6 +225,8 @@ namespace LastBell.Run
             if (AurelionOnly) { yield return AurelionChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
             // -lastbellArcanistOnly: just the Arcanist run and its kit checks (skips the menu, map, other-class and boss suites)
             if (ArcanistOnly) { yield return ArcanistRun(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
+            if (SoloSweepOn) { yield return SoloSweep(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
+            if (TollbreakerOnly) { yield return TollbreakerRun(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
             Check($"boots into the menu on a run map ({RunMaps.CurrentName})", d.State == RunState.Menu && RunMaps.Current >= 0);
             for (int i = 0; i < RunMaps.All.Length; i++)
                 Check($"map selectable: {RunMaps.All[i].Name}", RunMaps.InBuild(i), RunMaps.All[i].RunScene);
@@ -245,7 +246,7 @@ namespace LastBell.Run
             }
             foreach (var cls in RunDirector.Classes)
             {
-                int slots = cls == "Vanguard" ? 5 : 6, found = 0;
+                int slots = 6, found = 0;
                 for (int i = 0; i < slots; i++) if (RunHud.SlotIcon(cls, i) != null) found++;
                 Check($"{cls} skill-bar icons load ({slots} incl. dash)", found == slots, $"{found}/{slots}");
             }
@@ -254,10 +255,10 @@ namespace LastBell.Run
             MechanicIconChecks();
             yield return DifficultyChecks();
 
-            // ---------- run 1: Vanguard, full victory, repeated presses ----------
-            Check("StartRun accepted once", d.StartRun("Vanguard") && !d.StartRun("Vanguard"));
+            // ---------- run 1: Tollbreaker, full victory, repeated presses ----------
+            Check("StartRun accepted once", d.StartRun("Tollbreaker") && !d.StartRun("Tollbreaker"));
             yield return Wait(0.6f);
-            yield return Shot("ready_vanguard");
+            yield return Shot("ready_tollbreaker");
             int starts0 = d.EncounterStarts;
             for (int i = 0; i < 4; i++) { d.RequestReady(); d.RequestReady(); yield return null; }
             yield return Until(() => d.State == RunState.Combat, 4, "combat 1");
@@ -268,16 +269,15 @@ namespace LastBell.Run
             yield return AdvanceToFinal();
             var bk = (BellkeeperEncounter)d.Boss;
             int bossHp0 = d.Boss.Hp;
-            bool sawOpening = false; var vk = d.Player.Kit as VanguardKit2;
+            bool sawSplit = false; var tk = d.Player.Kit as TollbreakerKit;
             float t0 = Time.time;
-            var fight = StartCoroutine(Fight(7f, VanguardRotation, 1.6f));
+            var fight = StartCoroutine(Fight(7f, TollRotation, 3f));
             bool shot = false;
-            while (Time.time - t0 < 7f && d.State == RunState.Combat) { KeepAlive(); sawOpening |= vk.OpeningActive; if (Time.time - t0 > 3.5f && !shot) { shot = true; yield return Shot("combat_vanguard_opening"); } yield return null; }
+            while (Time.time - t0 < 7f && d.State == RunState.Combat) { KeepAlive(); sawSplit |= tk.SplitActive; if (Time.time - t0 > 3.5f && !shot) { shot = true; yield return Shot("combat_tollbreaker_split"); } yield return null; }
             StopCoroutine(fight); bot.Clear();
-            Check("Vanguard strikes damage the boss through the kit", d.Boss.Hp < bossHp0, $"{bossHp0} -> {d.Boss.Hp}");
-            Check("Steel Rhythm hit 3 granted Opening", sawOpening);
-            yield return VanguardShowcase();
-            yield return VanguardKitChecks();
+            Check("Tollbreaker axes damage the boss through the kit", d.Boss.Hp < bossHp0, $"{bossHp0} -> {d.Boss.Hp}");
+            Check("Splitting Throw split the boss in the run", sawSplit);
+            yield return HazardOnceCheck();
             // potions: drink one mid-fight (heal and lockout), then the Bellkeeper resumes
             yield return Until(() => d.World.Hazards.Count == 0, 6, "quiet for the potion check"); d.Boss.Halt();
             yield return Until(() => d.Player.Stunned == 0, 2, "hit-stun over");   // drinking is blocked while stunned
@@ -291,7 +291,7 @@ namespace LastBell.Run
             Check("Bellkeeper uses its model", bk.Presenter != null && bk.Presenter.HasModel);
             Check("Bellkeeper 2.0 rig has the shell halves and three rings", bk.PhaseRigFound);
             StartCoroutine(Capture("bellkeeper_fight", 300));
-            fight = StartCoroutine(Fight(4.5f, VanguardRotation, 1.8f));
+            fight = StartCoroutine(Fight(4.5f, TollRotation, 3f));
             yield return WaitAlive(2.5f); yield return Shot("combat_bellkeeper"); yield return WaitAlive(2.2f);
             StopCoroutine(fight); bot.Clear();
             // The Unfinished Hour (spec v0.3 §3.1, §4.1): phase 1 records one footprint, then replays it alone
@@ -367,7 +367,8 @@ namespace LastBell.Run
             float tt = 0;
             while (d.State == RunState.Combat && tt < 30) { if (d.Boss) { bot.Aim = d.Boss.transform.position; var to = Sim.Flat(d.Boss.transform.position - d.Player.transform.position); bot.MoveWorld = to.magnitude > 3f ? to.normalized : Vector3.zero; } tt += Time.deltaTime; yield return null; }
             bot.Clear();
-            Check("Vanguard plays Down", d.Player.Presenter.CurrentClip == "Down", d.Player.Presenter.CurrentClip);
+            // his model has no Down clip yet: the procedural fall stands in (noted as a placeholder)
+            Check("Tollbreaker goes down (Down clip, or the procedural fall until his model has one)", d.Player.Presenter.CurrentClip == "Down" || d.Player.Presenter.Placeholders.Contains("Down"), d.Player.Presenter.CurrentClip);
             Check("player goes down from a real hazard", d.State == RunState.Downed || d.State == RunState.Results, $"state {d.State}, cause {d.DefeatCause}");
             yield return Wait(0.3f); yield return Shot("downed");
             yield return Until(() => d.State == RunState.Results, 4, "results 2");
@@ -407,8 +408,11 @@ namespace LastBell.Run
             // ---------- run 5: Arcanist rotation and full victory ----------
             yield return ArcanistRun();
 
+            // ---------- run 6: Tollbreaker kit checks, solo Bellkeeper pass and full victory ----------
+            yield return TollbreakerRun();
+
             // ---------- practice ----------
-            d.StartPractice("Vanguard", 0);
+            d.StartPractice("Tollbreaker", 0);
             d.RequestReady();
             yield return Until(() => d.State == RunState.Combat, 4, "practice combat");
             Check("practice starts the chosen encounter", d.Boss is BellkeeperEncounter && d.Mode == RunMode.Practice);
@@ -435,10 +439,10 @@ namespace LastBell.Run
                 yield return Wait(1.5f);
                 Check($"map {map.Name}: loads into the menu with its arena", RunMaps.Current == m && d.State == RunState.Menu && HazardSystem.ArenaCount > 0, $"arena scripts {HazardSystem.ArenaCount}");
                 yield return Shot("map_" + map.Id + "_menu");
-                d.StartPractice("Vanguard", 0); d.RequestReady();
+                d.StartPractice("Tollbreaker", 0); d.RequestReady();
                 yield return Until(() => d.State == RunState.Combat, 4, map.Name + " practice combat");
                 int hp0 = d.Boss ? d.Boss.Hp : 0;
-                var fm = StartCoroutine(Fight(4f, VanguardRotation, 2.2f));
+                var fm = StartCoroutine(Fight(4f, TollRotation, 3f));
                 yield return WaitAlive(4f); StopCoroutine(fm); bot.Clear();
                 yield return Shot("map_" + map.Id + "_combat");
                 Check($"map {map.Name}: Bellkeeper fight runs (boss takes damage, player stays on the floor)",
@@ -489,7 +493,7 @@ namespace LastBell.Run
             foreach (var (level, expect) in new[] { (Difficulty.Easy, 30), (Difficulty.Medium, 50), (Difficulty.Hard, 65) })
             {
                 d.SelectDifficulty(level);
-                d.StartPractice("Vanguard", 0);
+                d.StartPractice("Tollbreaker", 0);
                 yield return Wait(0.3f);
                 string n = RunDifficulty.Name(level);
                 Check($"{n}: practice copies the menu difficulty", d.Difficulty == level && d.World != null && d.World.Difficulty == level);
@@ -505,84 +509,18 @@ namespace LastBell.Run
             Check("difficulty back on Medium for the rest of the test", d.State == RunState.Menu && RunDifficulty.Selected == Difficulty.Medium);
         }
 
-        // One readable rotation on camera: Steel Rhythm x3 -> empowered Sundering Blow -> Brace -> Last Word.
-        IEnumerator VanguardShowcase()
+        // a quiet moment with the boss stopped: one test eruption hits the player exactly once
+        IEnumerator HazardOnceCheck()
         {
-            var p = d.Player; var seen = new HashSet<string>();
-            yield return Until(() => d.World.Hazards.Count == 0, 6, "quiet before showcase");
-            d.Boss.Halt(); p.DebugSetHp(PlayerController.MaxHp);
-            yield return Survive(9f, () => p.Kit.Cooldown01(1) <= 0 && p.Kit.Cooldown01(2) <= 0);   // fresh cooldowns for the showcase
-            yield return Until(() => p.Kit.Cooldown01(1) <= 0, 1, "Sundering Blow ready for the showcase");
-            for (float w = 0; w < 3f; w += Time.deltaTime)   // walk back into reach
-            {
-                var to0 = Sim.Flat(d.Boss.transform.position - p.transform.position);
-                if (to0.magnitude - d.Boss.BodyRadius < 1.8f) break;
-                bot.Aim = d.Boss.transform.position; bot.MoveWorld = to0.normalized; yield return null;
-            }
-            StartCoroutine(Capture("vanguard_kit", 330));
-            float t = 0;
-            while (t < 5.4f)
-            {
-                var b = d.Boss; var to = Sim.Flat(b.transform.position - p.transform.position);
-                bot.Aim = b.transform.position; bot.MoveWorld = to.magnitude - b.BodyRadius > 1.8f ? to.normalized : Vector3.zero;
-                if (t < 1.25f) bot.press[0] = true;
-                else if (t < 1.4f) bot.press[1] = true;                 // buffered into the end of the third hit
-                else if (t > 2.2f && t < 3.0f) { bot.hold[3] = true; bot.press[3] = t < 2.25f; }
-                else if (t > 3.3f && t < 3.5f) { bot.hold[3] = false; bot.press[2] = true; }
-                seen.Add(p.Presenter.CurrentClip);
-                t += Time.deltaTime; yield return null;
-            }
-            bot.Clear();
-            Note("clips seen: " + string.Join(", ", seen));
-            foreach (var c in new[] { "SteelRhythm1", "SteelRhythm2", "SteelRhythm3", "SunderingBlow", "LastWord" })
-                Check("Vanguard plays " + c, seen.Contains(c));
-            Check("Vanguard plays the Brace set", seen.Contains("BraceRaise") || seen.Contains("BraceHold") || seen.Contains("BraceWalk"));
-            Check("Vanguard approved-kit clips need no placeholder", !p.Presenter.Placeholders.Any(x => x != "Land"), string.Join(",", p.Presenter.Placeholders));
-            d.Boss.BeginCombat();
-        }
-
-        IEnumerator VanguardKitChecks()
-        {
-            d.Player.DebugSetHp(PlayerController.MaxHp);
-            var p = d.Player; var k = (VanguardKit2)p.Kit; var w = d.World;
+            var p = d.Player; var w = d.World;
+            p.DebugSetHp(PlayerController.MaxHp);
             yield return Until(() => w.Hazards.Count == 0, 6, "a quiet moment");
-            d.Boss.Halt();   // test setup: stop the boss so the checks only see test hazards
-            yield return Wait(1.6f);
-            // dash cancels an unreleased Sundering Blow: no cooldown spent
-            yield return Until(() => k.Cooldown01(1) <= 0, 9, "Sundering Blow ready");
-            bot.press[1] = true; yield return Wait(0.12f); bot.dash = true; yield return Wait(0.4f);
-            Check("dash before release cancels Sundering Blow without cooldown", k.Cooldown01(1) <= 0);
-            // Opening -> empowered Sundering Blow takes 2 s off Last Word
-            bot.Aim = d.Boss.transform.position;
-            bot.press[2] = true; yield return Wait(1.6f);   // Last Word released, 45 s cooldown running
-            float ultBefore = k.UltRemaining;
-            int guard = 0;
-            while (!k.OpeningActive && guard++ < 400) { bot.Aim = d.Boss.transform.position; var to = Sim.Flat(d.Boss.transform.position - p.transform.position); bot.MoveWorld = to.magnitude > 3f ? to.normalized : Vector3.zero; bot.press[0] = true; yield return null; }
-            bot.Clear(); yield return Wait(0.6f);
-            float before = k.UltRemaining;
-            bot.Aim = d.Boss.transform.position; bot.press[1] = true; yield return Wait(0.6f);
-            Check("Last Word cooldown is running", ultBefore > 5, ultBefore.ToString("0.0") + " s left");
-            Check("empowered Sundering Blow consumes Opening and cuts Last Word by 2 s", !k.OpeningActive && before - k.UltRemaining > 2.3f && before - k.UltRemaining < 2.9f, $"ult {before:0.00} -> {k.UltRemaining:0.00}");
-            // Brace: frontal strike reduced 60 %, no knockback; rear strike full
-            yield return Until(() => k.Cooldown01(3) <= 0, 13, "Brace ready");
-            var front = p.transform.position + p.transform.forward * 3;
-            bot.Aim = front; bot.hold[3] = true; bot.press[3] = true; yield return Wait(0.25f);
-            int hp0 = p.Hp; var pos0 = p.transform.position;
-            w.Hazards.Spawn(new Hazard { Source = "Test strike (front)", Shape = HazardShape.Circle, Kind = HazardKind.Strike, Origin = front, Radius = 3.2f, ResolveAt = 6, Damage = 20 });
-            yield return Wait(0.3f);
-            Check("Brace: frontal strike reduced by 60 %", hp0 - p.Hp == 8, $"took {hp0 - p.Hp} of 20");
-            Check("Brace: no knockback from a mitigated hit", Sim.Flat(p.transform.position - pos0).magnitude < 0.3f);
-            Check("Brace absorption grants Opening", k.OpeningActive);
-            hp0 = p.Hp;
-            w.Hazards.Spawn(new Hazard { Source = "Test strike (rear)", Shape = HazardShape.Circle, Kind = HazardKind.Strike, Origin = p.transform.position - p.transform.forward * 3, Radius = 3.2f, ResolveAt = 6, Damage = 20 });
-            yield return Wait(0.3f);
-            Check("Brace: rear strike bypasses", hp0 - p.Hp == 20, $"took {hp0 - p.Hp}");
-            bot.Clear(); yield return Wait(0.4f);
-            hp0 = p.Hp;
+            d.Boss.Halt();   // test setup: stop the boss so the check only sees the test hazard
+            yield return Wait(0.6f);
+            int hp0 = p.Hp;
             w.Hazards.Spawn(new Hazard { Source = "Test eruption", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = p.transform.position, Radius = 1.5f, ResolveAt = 6, Damage = 10 });
-            var probe = w.Hazards.Live.Last();
             yield return Wait(0.3f);
-            Check("one hazard instance hits at most once", hp0 - p.Hp == 10);
+            Check("one hazard instance hits at most once", hp0 - p.Hp == 10, $"took {hp0 - p.Hp}");
             p.DebugSetHp(PlayerController.MaxHp);
             d.Boss.BeginCombat();
         }
@@ -788,8 +726,6 @@ namespace LastBell.Run
 
         // ------------------------------------------------------------ Sylvara v3 (bullet hell, abilities-v3/P1..P4)
         static bool ArcanistOnly => Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellArcanistOnly", StringComparison.OrdinalIgnoreCase));
-        // the current classes for every Sylvara run: Vanguard is retired (Chzy18, 2 Nov); add Tollbreaker when it lands
-        static readonly string[] SylvaraClasses = { "Chimesinger", "Arcanist" };
         static bool OnlySylvara => Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellSylvara", StringComparison.OrdinalIgnoreCase));
         static bool SylvaraClearOnly => Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellSylvaraClear", StringComparison.OrdinalIgnoreCase));
 
@@ -798,12 +734,13 @@ namespace LastBell.Run
         IEnumerator SylvaraClearTimes()
         {
             bool was = AllyBot.Attacks; AllyBot.Attacks = true; int keep = RunParty.Selected;
-            RunParty.Pool = SylvaraClasses;
-            var runs = new (string cls, int allies)[] { ("Chimesinger", 0), ("Arcanist", 0), ("Chimesinger", 3), ("Arcanist", 3) };   // 1-4 players (1 Nov), no Vanguard (retired 2 Nov)
-            foreach (var (cls, allies) in runs)
+            var keepLevel = RunDifficulty.Selected;
+            // Tollbreaker solo on every level, plus one party run on Hard (1-4 players; test less, 1 Nov)
+            var runs = new (string cls, int allies, Difficulty level)[] { ("Tollbreaker", 0, Difficulty.Easy), ("Tollbreaker", 0, Difficulty.Medium), ("Tollbreaker", 0, Difficulty.Hard), ("Tollbreaker", 3, Difficulty.Hard) };
+            foreach (var (cls, allies, level) in runs)
             {
                 if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }
-                d.SelectAllies(allies);
+                d.SelectAllies(allies); d.SelectDifficulty(level);
                 if (!d.StartPractice(cls, RunDirector.SylvaraPractice)) { Check($"Sylvara clear run {cls} +{allies} starts", false); continue; }
                 yield return Until(() => RunDirector.Instance && RunDirector.Instance.State == RunState.Ready, 30, "Verdant Chimes loaded for a clear run");
                 if (RunDirector.Instance != d) { directorLog.AddRange(d.Log); d = RunDirector.Instance; d.InputOverride = bot; bot.Clear(); }
@@ -812,7 +749,6 @@ namespace LastBell.Run
                 var sy = d.Boss as SylvaraEncounter; var w = d.World;
                 if (sy == null) continue;
                 d.Player.Input = new AllyBot(allies, allies + 1, BotMode.Perfect);
-                w.Difficulty = Difficulty.Medium;
                 int n = allies + 1, maxHp = sy.MaxHp, downs = 0, tick0 = w.Tick, last = tick0;
                 Check($"Sylvara HP for {n} fighting players is the accepted table's {SylvaraEncounter.HpFor(n)}", maxHp == SylvaraEncounter.HpFor(n), maxHp.ToString());
                 var down = new HashSet<PlayerController>(); var phaseAt = new List<(string name, int tick)> { (sy.PhaseName, tick0) };
@@ -831,13 +767,13 @@ namespace LastBell.Run
                     parts.Add($"{phaseAt[i].name} {(end - phaseAt[i].tick) / (float)Sim.Hz:0}s");
                 }
                 float hpLeft = sy ? sy.Hp / (float)maxHp : 0;
-                Note($"Sylvara clear: {n} player{(n > 1 ? "s" : "")} ({cls} + {allies} bots), HP {maxHp}: {(won ? "cleared" : wiped ? $"wiped ({hpLeft:P0} left)" : $"not cleared ({hpLeft:P0} left)")} in {secs:0} s"
+                Note($"Sylvara clear, {RunDifficulty.Name(level)}: {n} player{(n > 1 ? "s" : "")} ({cls} + {allies} bots), HP {maxHp}: {(won ? "cleared" : wiped ? $"wiped ({hpLeft:P0} left)" : $"not cleared ({hpLeft:P0} left)")} in {secs:0} s"
                     + $" ({string.Join(", ", parts)}); {downs} downs; party DPS {(maxHp * (1 - (won ? 0 : hpLeft))) / Mathf.Max(1, secs):0}; buds {sy?.BudsCut ?? 0} cut, {sy?.BudsBloomed ?? 0} bloomed");
-                Check($"Sylvara clear run {cls} +{allies}: the bots deal damage", won || hpLeft < 1f);
+                Check($"Sylvara clear run {cls} +{allies} {RunDifficulty.Name(level)}: the bots deal damage", won || hpLeft < 1f);
                 if (d.State == RunState.Combat && d.Boss) d.Boss.DebugDefeat();   // timed out: end it so the next run can start
                 yield return Until(() => d.State != RunState.Combat, 10, "clear run ends");
             }
-            AllyBot.Attacks = was; RunParty.Pool = null;
+            AllyBot.Attacks = was; d.SelectDifficulty(keepLevel);
             if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }
             d.SelectAllies(keep);
         }
@@ -847,12 +783,12 @@ namespace LastBell.Run
             // the practice section above leaves the director in Ready, where ReturnToMenu only works from the pause menu
             if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }
             int verdant = RunMaps.IndexOf(RunDirector.SylvaraMap);
-            Check("Sylvara practice accepted from the menu", d.StartPractice("Chimesinger", RunDirector.SylvaraPractice));
+            Check("Sylvara practice accepted from the menu", d.StartPractice("Tollbreaker", RunDirector.SylvaraPractice));
             yield return Until(() => RunMaps.Current == verdant && RunDirector.Instance && RunDirector.Instance.State == RunState.Ready, 30, "Verdant Chimes loaded for Sylvara");
             if (RunDirector.Instance != d) { directorLog.AddRange(d.Log); d = RunDirector.Instance; d.InputOverride = bot; bot.Clear(); }
             if (d.Player) d.Player.Input = bot;   // the new scene built the player before the bot was attached
             Check("Sylvara practice loads the Verdant Chimes arena", RunMaps.Current == verdant && HazardSystem.ArenaCount > 0, RunMaps.CurrentName);
-            Check("Sylvara practice keeps the chosen class across the map load", d.ClassName == "Chimesinger" && d.Mode == RunMode.Practice && d.Encounter == RunDirector.SylvaraPractice);
+            Check("Sylvara practice keeps the chosen class across the map load", d.ClassName == "Tollbreaker" && d.Mode == RunMode.Practice && d.Encounter == RunDirector.SylvaraPractice);
             d.RequestReady();
             yield return Until(() => d.State == RunState.Combat, 4, "Sylvara practice combat");
             var sy = d.Boss as SylvaraEncounter;
@@ -1121,9 +1057,9 @@ namespace LastBell.Run
         // Sylvara with three bot allies (the menu's Allies row): they spawn, dodge the bullet hell and cut buds by themselves
         IEnumerator SylvaraBotChecks()
         {
-            int keep = RunParty.Selected; RunParty.Pool = SylvaraClasses;
+            int keep = RunParty.Selected;
             Check("the menu sets the ally count", d.SelectAllies(3) && RunParty.Selected == 3);
-            Check("Sylvara practice with 3 allies starts", d.StartPractice("Chimesinger", RunDirector.SylvaraPractice));
+            Check("Sylvara practice with 3 allies starts", d.StartPractice("Tollbreaker", RunDirector.SylvaraPractice));
             yield return Until(() => RunDirector.Instance && RunDirector.Instance.State == RunState.Ready, 30, "Verdant Chimes loaded for the bot fight");
             if (RunDirector.Instance != d) { directorLog.AddRange(d.Log); d = RunDirector.Instance; d.InputOverride = bot; bot.Clear(); }
             if (d.Player) d.Player.Input = bot;
@@ -1131,7 +1067,7 @@ namespace LastBell.Run
             yield return Until(() => d.State == RunState.Combat, 4, "bot fight combat");
             var sy = d.Boss as SylvaraEncounter;
             Check("three bot allies fight beside the player", d.Allies.Count == 3 && d.Allies.All(a => a.Input is AllyBot), d.Allies.Count.ToString());
-            if (sy == null || d.Allies.Count == 0) { RunParty.Selected = keep; RunParty.Pool = null; yield break; }
+            if (sy == null || d.Allies.Count == 0) { RunParty.Selected = keep; yield break; }
             var hits = new Dictionary<PlayerController, int>(); int downs = 0;
             var budGap = new Dictionary<PlayerController, float>();
             Action<PlayerController, BulletSystem.Bullet, int> onBullet = (p, b, dmg) => { if (p != d.Player) hits[p] = (hits.TryGetValue(p, out int n) ? n : 0) + 1; };
@@ -1162,7 +1098,7 @@ namespace LastBell.Run
             d.Boss.DebugDefeat();
             yield return Until(() => d.State == RunState.Results, 8, "bot fight results");
             d.ReturnToMenu(); yield return null;
-            RunParty.Selected = keep; RunParty.Pool = null;
+            RunParty.Selected = keep;
         }
 
         // Exact-tick regressions from the foundation review of PR #42 (risxhb/codex, Oct 21). The director is paused
