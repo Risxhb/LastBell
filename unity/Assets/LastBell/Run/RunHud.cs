@@ -332,7 +332,7 @@ namespace LastBell.Run
         // combat. IMGUI text goes through TextCore in Unity 6, so this draws through GUIStyle rather than only asking the legacy
         // Font for characters. Runs on the first HUD repaint after the styles are built and again on each Ready screen
         // (RunDirector.ReadyWarmUp), since a full atlas drops glyphs that haven't been drawn lately.
-        const string WarmChars = " ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,:;'\"!?-+*/%()[]<>#&=_|—·…●○☾☉•×→–›◆◇▮▯°";   // every non-ASCII glyph in our UI strings: one missing here costs 13-15 ms the first time (font fallback)
+        const string WarmChars = " ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,:;'\"!?-+*/%()[]<>#&=_|—·…●○☾☉•×→–›◆◇▮▯°✓✕";   // every non-ASCII glyph in our UI strings: one missing here costs 13-15 ms the first time (font fallback)
         bool fontsWarm;
         void OnEnable() => RunDirector.ReadyWarmUp += OnReadyWarmUp;
         void OnDisable() => RunDirector.ReadyWarmUp -= OnReadyWarmUp;
