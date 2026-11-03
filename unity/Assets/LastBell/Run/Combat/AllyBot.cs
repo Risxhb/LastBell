@@ -241,7 +241,17 @@ namespace LastBell.Run
             for (int i = 0; i < live.Count; i++) { var h = live[i]; if (h.BurnPerSecond <= 0 && h.ResolveAt - h.Age <= ticks && (Hits(h, me, pos) || Hits(h, me, lunge))) return false; }
             return true;
         }
-        static bool Hits(Hazard h, PlayerController me, Vector3 q) => !h.Soak && h.Contains(q) && (h.Affects == null || h.Affects(me));
+        static bool Hits(Hazard h, PlayerController me, Vector3 q) => !h.Soak && (h.Contains(q) || Ahead(h, q)) && (h.Affects == null || h.Affects(me));
+        // a moving circle (a bullet with Drift) also covers the stretch it travels in the next BulletLook seconds: a bot that
+        // only sees where bullets are now walks into them (solo Tollbreaker on Crucivar Medium went down to Ring Wave, 11-02)
+        public const float BulletLook = 0.35f;
+        static bool Ahead(Hazard h, Vector3 q)
+        {
+            if (h.Shape != HazardShape.Circle || h.Drift.sqrMagnitude < 0.01f) return false;
+            var d = Sim.Flat(h.Drift) * BulletLook; var v = Sim.Flat(q - h.Origin);
+            float u = Mathf.Clamp01(Vector3.Dot(v, d) / d.sqrMagnitude);
+            return (v - d * u).magnitude <= h.Radius + Hazard.Margin;
+        }
 
         // generic soak job (Project overview 11-01): any live hazard marked Soak is a tower to fill with its ShareCount (1 if
         // none). Bosses with their own tower job (Aurelion's Meridian Towers, with owners and order) keep that one. Only the
