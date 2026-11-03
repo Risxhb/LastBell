@@ -56,6 +56,9 @@ namespace LastBell.Run
             // New-player tutorial (Run/Tutorial, docs/tutorial.md): a guided Tempo Tyrant fight on Metronome Court, practice only.
             // Also LastBell.exe -lastbellTutorial. Kept last so the other entries' indices don't move.
             new BossEntry(TutorialName, w => TutorialDirector.Attach(BossEncounter.Spawn<TempoTyrantEncounter>(w, new Vector3(0, 0, -2f), 0)), inRun: false, map: TempoTyrantMap),
+            // Brass Foundry miniboss, practice only (docs/bosses/rivet-cantor.md, a proposal; placeholder visuals). After the
+            // tutorial so the earlier entries' indices don't move.
+            new BossEntry("Rivet Cantor (practice)", w => BossEncounter.Spawn<RivetCantorEncounter>(w, new Vector3(0, 0, -1.5f), 0), inRun: false, map: CrucivarMap, phases: 2),
         };
         // Catalog eligibility is stable; each run owns its shuffled sequence, with final encounters appended.
         public static readonly int[] RunOrder = Enumerable.Range(0, Bosses.Length).Where(i => Bosses[i].InRun).OrderBy(i => Bosses[i].Final).ToArray();
@@ -80,6 +83,7 @@ namespace LastBell.Run
         public const string TutorialName = "Tutorial (Tempo Tyrant)";
         public static int TutorialPractice => Array.FindIndex(Bosses, b => b.Name == TutorialName);
         public static int PendulumSentinelPractice => Array.FindIndex(Bosses, b => b.Name.StartsWith("Pendulum Sentinel"));
+        public static int RivetCantorPractice => Array.FindIndex(Bosses, b => b.Name.StartsWith("Rivet Cantor"));
         // The Tollbreaker took the Vanguard's place (Chzy18, 29 Oct), and the Vanguard was removed from the game (1 Nov).
         public static readonly string[] Classes = { "Tollbreaker", "Chimesinger", "Arcanist" };
         const int IntroTicks = 120, ClearTicks = 180, DownedTicks = 100;
