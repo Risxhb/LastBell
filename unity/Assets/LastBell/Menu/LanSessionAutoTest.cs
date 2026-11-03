@@ -38,11 +38,13 @@ namespace LastBell.Menu
         {
             var args=Environment.GetCommandLineArgs(); int n=Array.IndexOf(args,name); return n>=0 && n+1<args.Length ? args[n+1] : fallback;
         }
+        // The automated clients' class (default Arcanist); the host passes the same flag so it knows what to expect.
+        static string ClientClass { get { var c=Argument("-lastbellLanClientClass","Arcanist"); return LanLobby.ValidClass(c) ? c : "Arcanist"; } }
         IEnumerator Start()
         {
             yield return new WaitForSecondsRealtime(1);
             LanSessionCoordinator session=null;
-            try { session=LanSessionCoordinator.Open(host ? LanLobby.Host(Port(),LanMenuPanel.BuildId(),"Vanguard") : LanLobby.Connect("127.0.0.1",Port(),LanMenuPanel.BuildId(),"Arcanist")); }
+            try { session=LanSessionCoordinator.Open(host ? LanLobby.Host(Port(),LanMenuPanel.BuildId(),"Tollbreaker") : LanLobby.Connect("127.0.0.1",Port(),LanMenuPanel.BuildId(),ClientClass)); }
             catch(Exception ex) { Check("open LAN: "+ex.Message,false); Finish(); yield break; }
             Debug.Log(host ? "[LAN smoke] HOST READY" : "[LAN smoke] CLIENT CONNECTING");
             int peerCount=PeerCount(); float until=Time.realtimeSinceStartup+90;
@@ -65,7 +67,7 @@ namespace LastBell.Menu
         IEnumerator HostFight(LanSessionCoordinator session)
         {
             var d=RunDirector.Instance;
-            Check("host has all remote player actors",d && d.World != null && d.Allies.Count==PeerCount() && d.Allies.All(a=>a.ClassName=="Arcanist"));
+            Check("host has all remote player actors",d && d.World != null && d.Allies.Count==PeerCount() && d.Allies.All(a=>a.ClassName==ClientClass));
             if (!d || d.World==null || d.Allies.Count!=PeerCount()) yield break;
             Vector3 initial=d.Allies[0].transform.position;
             if (d.State==RunState.Ready) d.RequestReady();
@@ -104,7 +106,7 @@ namespace LastBell.Menu
             // Retry keeps the frozen LAN roster and must keep streaming to clients although the world tick restarts.
             yield return new WaitForSecondsRealtime(2);
             bool retried=d.RequestRetry();
-            Check("host retries with the same remote players",retried && d.Allies.Count==PeerCount() && d.Allies.All(a=>a.ClassName=="Arcanist"));
+            Check("host retries with the same remote players",retried && d.Allies.Count==PeerCount() && d.Allies.All(a=>a.ClassName==ClientClass));
             if (!retried) yield break;
             until=Time.realtimeSinceStartup+30;
             while (session && d && d.State!=RunState.Combat && Time.realtimeSinceStartup<until) { if (d.State==RunState.Ready) d.RequestReady(); yield return null; }
@@ -156,10 +158,12 @@ namespace LastBell.Menu
             Check("client sees its own class abilities go on cooldown",observedOwnCooldown);
             var fx=session.ClientView ? session.ClientView.Effects : null;
             if (fx!=null) Debug.Log("[LAN smoke] client effects: "+fx.Played+" played, "+fx.Failed+" failed: "+string.Join(", ",fx.PlayedMethods.OrderBy(m=>m)));
+            string[] bossSide={"Float","Shake","SweepResolve","TollResolve","ChargeTrail","ChargeLand","ChimeResolve","BossHit","PlayerHit","PotionHeal","ResetAll"};
             string[] arcanist={"MissileTapCast","MissileChargeStart","Missile","BeamStart","Beam","SigilPlace","CometMark","GlyphGain"};
             Debug.Log("[LAN smoke] client prediction: drew its own character up to "+maxLead.ToString("0.00")+" m ahead of the host's last state");
             Check("client predicts its own movement (ahead of the host, within 3 m)",maxLead>0.05f && maxLead<3);
-            Check("client plays the Arcanists' ability effects",fx!=null && arcanist.Count(m=>fx.PlayedMethods.Contains(m))>=3);
+            if (ClientClass=="Arcanist") Check("client plays the Arcanists' ability effects",fx!=null && arcanist.Count(m=>fx.PlayedMethods.Contains(m))>=3);
+            else Check("client plays player ability effects ("+ClientClass+" client)",fx!=null && fx.PlayedMethods.Any(m=>!bossSide.Contains(m)&&!m.Contains(".")));
             Check("client plays hit feedback and damage numbers",fx!=null && fx.PlayedMethods.Contains("Float"));
             Check("client effect replay has almost no failures",fx!=null && fx.Played>0 && fx.Failed*20<=fx.Played);
             if (combatTime>0) Debug.Log("[LAN smoke] client frame rate in combat: "+Mathf.RoundToInt(combatFrames/combatTime)+" fps over "+combatTime.ToString("0.0")+" s");

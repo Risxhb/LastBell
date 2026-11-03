@@ -30,7 +30,8 @@ namespace LastBell.Menu
             var main=menu.Canvas.GetComponentsInChildren<Button>(true);
             Check("Confrontation starts with Multiplayer", Find(main,"Multiplayer") != null);
             Check("Start Run and Boss Rush are absent", Find(main,"Start Run") == null && Find(main,"Boss Rush") == null);
-            Check("all three classes available", RunDirector.Classes.SequenceEqual(new[]{"Vanguard","Chimesinger","Arcanist"}));
+            Check("all three classes available", RunDirector.Classes.SequenceEqual(new[]{"Tollbreaker","Chimesinger","Arcanist"}));
+            Check("LAN class list matches the game's, Tollbreaker first", LastBell.Run.Networking.LanLobby.ClassList.SequenceEqual(RunDirector.Classes) && LastBell.Run.Networking.LanLobby.DefaultClass=="Tollbreaker");
             menu.RushButton.onClick.Invoke(); yield return null;
             Check("Multiplayer opens", menu.LanPanel != null);
             if (menu.LanPanel)

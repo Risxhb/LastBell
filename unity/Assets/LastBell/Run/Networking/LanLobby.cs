@@ -13,7 +13,10 @@ namespace LastBell.Run.Networking
         public const int MaxClients = Capacity - 1;
         const byte Protocol = 3, Hello = 1, Snapshot = 2, ChooseClass = 3, StartFight = 4, InputFrame = 5, WorldFrame = 6, SceneReady = 7;
         const int MaxMessagesPerPump = 64;
-        static readonly string[] Classes = { "Vanguard", "Chimesinger", "Arcanist" };
+        // Mirrors RunDirector.Classes (kept Unity-free for the .NET harness); LanMenuAutoTest checks the two match.
+        static readonly string[] Classes = { "Tollbreaker", "Chimesinger", "Arcanist" };
+        public static IReadOnlyList<string> ClassList => Classes;
+        public static string DefaultClass => Classes[0];
         static readonly string[] Arenas = { "test", "skyward-spire", "brass-foundry", "verdant-chimes", "shattered-hour", "metronome-court" };
         static readonly string[] Encounters = { "Bellkeeper", "Aurelion", "Tempo Tyrant", "Chimebound Oracle", "Pendulum Sentinel" };
         public sealed class Member { public int Id; public string ClassName; }

@@ -147,7 +147,7 @@ static class Program
                 overflow?.Dispose();
             }
         }
-        using (var lobby = LanLobby.Host(port, "build-a", "Vanguard"))
+        using (var lobby = LanLobby.Host(port, "build-a", "Tollbreaker"))
         {
             var clients = new LanLobby[LanLobby.MaxClients];
             try
@@ -155,7 +155,7 @@ static class Program
                 for (int i = 0; i < clients.Length; i++) clients[i] = LanLobby.Connect("127.0.0.1", port, "build-a", "Arcanist");
                 bool TickUntil(Func<bool> condition) => Wait(() => { lobby.Pump(); foreach (var c in clients) c.Pump(); return condition(); });
                 Check(TickUntil(() => lobby.Members.Count == 4 && Array.TrueForAll(clients, c => c.Connected && c.Members.Count == 4)), "lobby admits host and three clients with complete roster");
-                using (var fourth = LanLobby.Connect("127.0.0.1", port, "build-a", "Vanguard"))
+                using (var fourth = LanLobby.Connect("127.0.0.1", port, "build-a", "Tollbreaker"))
                 {
                     Check(TickUntil(() => { fourth.Pump(); return fourth.Error != null; }) && !fourth.Connected, "fourth client is rejected when the group is full");
                     Check(fourth.Error.Contains("full"), "rejected client is told the group may be full: " + fourth.Error);
@@ -168,12 +168,12 @@ static class Program
                 Check(TickUntil(() => Array.TrueForAll(clients, c => c.Arena == "metronome-court" && c.Encounter == "Tempo Tyrant" && System.Linq.Enumerable.Any(c.Members, m => m.Id == memberId && m.ClassName == "Chimesinger"))), "host selection and class propagate to all clients");
                 clients[2].Dispose();
                 Check(TickUntil(() => lobby.Members.Count == 3 && clients[0].Members.Count == 3), "disconnect removes peer and updates roster");
-                using (var wrong = LanLobby.Connect("127.0.0.1", port, "different-build", "Vanguard"))
+                using (var wrong = LanLobby.Connect("127.0.0.1", port, "different-build", "Tollbreaker"))
                 {
                     Check(Wait(() => { lobby.Pump(); wrong.Pump(); return wrong.Error != null; }), "different build is rejected");
                     Check(lobby.Members.Count == 3, "rejected build never joins roster");
                 }
-                clients[2] = LanLobby.Connect("127.0.0.1", port, "build-a", "Vanguard");
+                clients[2] = LanLobby.Connect("127.0.0.1", port, "build-a", "Tollbreaker");
                 Check(TickUntil(() => lobby.Members.Count == 4 && clients[2].Connected && Array.TrueForAll(clients, c => c.Members.Count == 4)), "a freed slot can be filled again up to four players");
                 int inputFrom = -1, inputSeq = -1, worldTick = -1; byte[] inputData = null, worldData = null;
                 lobby.InputReceived += (id, seq, data) => { inputFrom = id; inputSeq = seq; inputData = data; };
@@ -183,7 +183,7 @@ static class Program
                 Check(!lobby.AllClientsReady, "host waits for clients to load");
                 for (int i = 0; i < clients.Length; i++) Check(clients[i].ClientSceneReady(), "client reports scene ready " + i);
                 Check(TickUntil(() => lobby.AllClientsReady), "host sees all clients ready");
-                Check(!lobby.SetSelection("test", "Bellkeeper") && !clients[0].SetClass("Vanguard"), "fight freezes lobby selection and class");
+                Check(!lobby.SetSelection("test", "Bellkeeper") && !clients[0].SetClass("Tollbreaker"), "fight freezes lobby selection and class");
                 Check(clients[0].SendInput(1, new byte[] { 9, 8 }), "client queues input frame");
                 Check(TickUntil(() => inputFrom == memberId) && inputSeq == 1 && inputData.Length == 2 && inputData[0] == 9, "host receives player input with identity and sequence");
                 Check(lobby.SendWorld(75, worldBytes), "host queues world snapshot");

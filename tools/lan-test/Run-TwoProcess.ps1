@@ -3,7 +3,8 @@ param(
     [Parameter(Mandatory=$true)][string]$OutputDirectory,
     [ValidateSet('Bellkeeper','Aurelion','Tempo Tyrant','Chimebound Oracle','Pendulum Sentinel')][string]$Boss='Bellkeeper',
     [ValidateSet('test','skyward-spire','brass-foundry','verdant-chimes','shattered-hour','metronome-court')][string]$Arena='test',
-    [ValidateRange(1,3)][int]$PeerCount=1
+    [ValidateRange(1,3)][int]$PeerCount=1,
+    [ValidateSet('Tollbreaker','Chimesinger','Arcanist')][string]$ClientClass='Arcanist'
 )
 $ErrorActionPreference = 'Stop'
 if (-not (Test-Path -LiteralPath $Player -PathType Leaf)) { throw "Player not found: $Player" }
@@ -16,7 +17,7 @@ $hostLog = Join-Path $hostOut 'player.log'
 $hostProc = $null; $clients = [System.Collections.Generic.List[System.Diagnostics.Process]]::new()
 $clientOutputs = [System.Collections.Generic.List[string]]::new()
 try {
-    $common = @('-timestamps','-screen-fullscreen','0','-screen-width','1280','-screen-height','720','-lastbellLanPort',"$port")
+    $common = @('-timestamps','-screen-fullscreen','0','-screen-width','1280','-screen-height','720','-lastbellLanPort',"$port",'-lastbellLanClientClass',$ClientClass)
     $hostArgs = $common + @('-lastbellLanSmokeHost','-lastbellLanPeerCount',"$PeerCount",'-lastbellLanBoss',('"'+$Boss+'"'),'-lastbellLanArena',$Arena,'-lastbellOut',('"'+$hostOut+'"'),'-logFile',('"'+$hostLog+'"'))
     $hostProc = Start-Process -FilePath $Player -ArgumentList $hostArgs -WindowStyle Hidden -PassThru
     $deadline = [DateTime]::UtcNow.AddSeconds(75)
