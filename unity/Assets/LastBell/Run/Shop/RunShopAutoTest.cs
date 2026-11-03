@@ -68,8 +68,8 @@ namespace LastBell.Run.Shop
             float t = 0; while (!c() && t < timeout) { KeepAlive(); t += Time.deltaTime; yield return null; }
             if (!c()) Note($"timeout waiting for {what} ({d?.State})");
         }
-        // these checks are about items, not survival: top the player up while a boss is live
-        void KeepAlive() { if (d && d.Player && !d.Player.Down && d.Player.Hp < 60) d.Player.DebugSetHp(PlayerController.MaxHp); }
+        // these checks are about items, not survival: top the player up after every hit (Aurelion v4 hits for up to 90)
+        void KeepAlive() { if (d && d.Player && !d.Player.Down && d.Player.Hp < d.Player.MaxHealth) d.Player.DebugSetHp(d.Player.MaxHealth); }
         IEnumerator Shot(string name)
         {
             yield return new WaitForEndOfFrame();
@@ -91,11 +91,11 @@ namespace LastBell.Run.Shop
             yield return Until(() => RunDirector.Instance && RunDirector.Instance.State == RunState.Menu, 30, "menu");
             d = RunDirector.Instance; d.InputOverride = bot;
             Check("shop is on for this suite", RunShopFlow.Enabled);
-            // accepted icons (29 Oct): all but three items, which wait for a redraw and stay text-only
-            var redraw = new[] { ItemCatalog.LongReach, ItemCatalog.SharedRinging, ItemCatalog.LongLungs };
+            // accepted icons (29 and 31 Oct): all but Long Reach, which waits for a redraw and stays text-only
+            var redraw = new[] { ItemCatalog.LongReach };
             bool IconOk(ItemDef i) => RunShopFlow.ItemIcon(i, true) != null && RunShopFlow.ItemIcon(i, false) != null;
-            Check("66 item icons load (64 and 128); Long Reach, Shared Ringing and Long Lungs have none yet",
-                ItemCatalog.All.Count(IconOk) == 66 && ItemCatalog.All.Where(i => !redraw.Contains(i.Id)).All(IconOk), $"{ItemCatalog.All.Count(IconOk)}");
+            Check("68 item icons load (64 and 128); Long Reach has none yet",
+                ItemCatalog.All.Count(IconOk) == 68 && ItemCatalog.All.Where(i => !redraw.Contains(i.Id)).All(IconOk), $"{ItemCatalog.All.Count(IconOk)}");
             Check("the pool has 69 items: 20 Vanguard, 19 Chimesinger, 20 Arcanist, 10 general; none held", ItemCatalog.All.Length == 69 && ItemCatalog.All.Count(i => i.General) == 10 && RunDirector.Classes.All(c => ItemCatalog.All.Count(i => i.Class == c) == (c == "Chimesinger" ? 19 : 20)) && !ItemCatalog.All.Any(i => i.Held) && !ItemCatalog.All.Any(i => i.Id == "c.twin_bells"));
             Check("Chimes coin and burst icons load", RunShopFlow.Coin != null && RunShopFlow.Burst != null && RunHud.Icon("chimes-128") != null && RunHud.Icon("chimes-burst-32") != null);
             RunShopFlow.SeedOverride = RunShopFlow.SeedOverride ?? 1234;
@@ -396,6 +396,7 @@ namespace LastBell.Run.Shop
             foreach (var it in ItemCatalog.All.Where(x => (x.Class == cls || x.General) && !x.Held && x.OfferedSolo)) Grant(Me, it.Id, tempered: it.Tempered.HasValue);
             Note($"test setup: {cls} holds {Me.Items.Count} items, all tempered where they can be");
             yield return Ready(); NearBoss(cls == "Vanguard" ? 2.4f : 7f);
+            d.Boss.Halt(); d.World.ClearTransient();   // a smoke test of items: no boss attacks (Aurelion v4 wipes force a down)
             int hp0 = d.Boss.Hp, err0 = errors; float t = 0; int frame = 0;
             while (t < 6f && d.State == RunState.Combat)
             {
@@ -404,7 +405,7 @@ namespace LastBell.Run.Shop
                 if (frame % 4 == 0) for (int i = 1; i < 5; i++) bot.hold[i] = false;
                 t += Time.deltaTime; yield return null;
             }
-            bot.Clear();
+            bot.Clear(); d.Boss.BeginCombat();
             Check($"{cls} with the whole pool: fights 6 s with no errors and damages the boss", errors == err0 && d.Boss.Hp < hp0, $"{hp0} -> {d.Boss.Hp}, errors +{errors - err0}");
             Me.Items.Clear(); Me.ResetEncounter();
         }
