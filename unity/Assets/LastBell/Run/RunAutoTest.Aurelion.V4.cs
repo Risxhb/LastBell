@@ -316,6 +316,71 @@ namespace LastBell.Run
                 a.TestHold = true; V3Unbot();
             }
 
+            // 20 %: Last Light starts at once (Chzy18, 2 Nov), cutting off the running block with no hit
+            yield return V2Setup(1, Difficulty.Medium, new[] { new Vector3(0, 0, 9f) }, 3, Vector3.zero);
+            if (V2Boss == null) yield break;
+            {
+                var a = V2Boss; V3Bot(V2Main, BotMode.Perfect);
+                a.DebugSetHpFraction(0.3f); a.TestHold = false;
+                yield return Until(() => V2W.Hazards.Live.Count > 0 && a.Current != "phase shift", 15, "a Phase 3 block with shapes up");
+                int hp0 = V2Main.Hp, cuts0 = a.Cuts, t0 = V2W.Tick;
+                a.DebugSetHpFraction(0.19f);
+                yield return Until(() => a.Phase == 4, 5, "Last Light");
+                int took = V2W.Tick - t0;
+                V2Check("at 20 %: Last Light starts within 2 ticks, the running block cut off with no hit",
+                    a.Phase == 4 && took <= 2 && a.Cuts == cuts0 + 1 && !a.Sever.Active && V2Main.Hp >= hp0 && !V4Wiped,
+                    $"phase {a.Phase} after {took} ticks, cuts {a.Cuts - cuts0}, severance {a.Sever.Active}, hp {hp0}>{V2Main.Hp}");
+                a.TestHold = true; V3Unbot();
+            }
+
+            // Errant Planets (Phase 2, 2 Nov): two planets circle at 4.5 m/s; standing on a path costs one 30 hit as one passes
+            yield return V2Setup(1, Difficulty.Medium, new[] { new Vector3(0, 0, 9f) }, 2, Vector3.zero);
+            if (V2Boss == null) yield break;
+            {
+                var a = V2Boss; a.DebugSetPhaseV4(2); a.TestExtras = true;
+                yield return Until(() => a.Planets.Live, 3, $"planets up (phase {a.Phase}, current {a.Current}, combat {V2W.CombatActive}, eclipse {a.Eclipse.Active})");
+                if (!a.Planets.Live) { V2Check("Errant Planets: planets appear in Phase 2", false, $"phase {a.Phase}, current {a.Current}"); a.TestExtras = false; yield break; }
+                int n = a.Planets.Count; var p0 = n > 0 ? a.Planets.PlanetAt(0) : Vector3.zero;
+                yield return V2Ticks(60);
+                float moved = n > 0 ? Sim.Flat(a.Planets.PlanetAt(0) - p0).magnitude : 0;
+                // stand 3 m ahead of planet 1 on its orbit (it turns +): it reaches us in about 0.7 s
+                var c = new Vector3(1.5f, 0, 1.0f); var ahead = c + Quaternion.Euler(0, 25f, 0) * Sim.Flat(a.Planets.PlanetAt(0) - c);
+                V2Main.DebugSetHp(PlayerController.MaxHp); V2Place(V2Main, ahead); int hp0 = V2Main.Hp;
+                yield return V2Ticks(Sim.Ticks(1.6f));
+                int lost = hp0 - V2Main.Hp;
+                a.TestExtras = false; yield return V2Ticks(2);
+                V2Check("Errant Planets: 2 planets in Phase 2 at 4.5 m/s; one passing deals 30 once; gone when they stop",
+                    n == 2 && Mathf.Abs(moved - 4.5f) < 0.3f && lost == ErrantPlanets.Damage && !a.Planets.Live, $"planets {n}, moved {moved:0.00} m in 1 s, hp lost {lost}, live after {a.Planets.Live}");
+            }
+            // Falling Meridians (Phase 3, 2 Nov): every 5 s a 2.5 m circle at each player's feet; standing still costs 30
+            yield return V2Setup(1, Difficulty.Medium, new[] { new Vector3(0, 0, 7f) }, 3, Vector3.zero);
+            if (V2Boss == null) yield break;
+            {
+                var a = V2Boss; a.DebugSetPhaseV4(3); a.Meridians.Reset(); a.TestExtras = true;
+                V2Main.DebugSetHp(PlayerController.MaxHp); int hp0 = V2Main.Hp;
+                yield return V2Ticks(Sim.Ticks(FallingMeridians.EveryS) + a.Meridians.Warn + 3);
+                int lost = hp0 - V2Main.Hp, casts = a.Meridians.Casts, n = a.Meridians.Last.Count;
+                float off = n > 0 ? Sim.Flat(a.Meridians.Last[0].Origin - V2Main.transform.position).magnitude : 99;
+                a.TestExtras = false;
+                V2Check("Falling Meridians: after 5 s, one 2.5 m circle at each player's feet, 1.2 s warning on Medium, 30 if you stand still",
+                    casts == 1 && n == 1 && off < 0.3f && lost == FallingMeridians.Damage && a.Meridians.Warn == Sim.Ticks(1.2f), $"casts {casts}, circles {n}, {off:0.00} m from the player, hp lost {lost}");
+            }
+
+            // Phases 2 and 3 shorter windows (2 Nov, proposal): Zenith Collapse 2.55 > 2.30 > 2.04 s on Medium; damage unchanged
+            {
+                var dm = new List<int>(); var zw = new List<int>();
+                for (int ph = 1; ph <= 3; ph++)
+                {
+                    yield return V2Setup(1, Difficulty.Medium, new[] { new Vector3(0, 0, 9f) }, ph, Vector3.zero);
+                    if (V2Boss == null) yield break;
+                    V2Boss.DebugSetPhaseV4(ph); zw.Add(V2Boss.Zenith.WindowTicks);
+                    yield return V2Fire(V2Boss.Lances.Run(3, 1, false), 10);
+                    dm.Add(V2Boss.Lances.Volleys.Count > 0 && V2Boss.Lances.Volleys[V2Boss.Lances.Volleys.Count - 1].Count > 0 ? V2Boss.Lances.Volleys[V2Boss.Lances.Volleys.Count - 1][0].Damage : -1);
+                }
+                V2Check("Phases 2 and 3: windows x0.9 / x0.8, damage unchanged (Lances 30 in every phase)",
+                    dm.SequenceEqual(new[] { 30, 30, 30 }) && zw[1] == Sim.Ticks(2.55f * 0.9f) && zw[2] == Sim.Ticks(2.55f * 0.8f), $"Lances {string.Join("/", dm)}, Collapse window ticks {string.Join("/", zw)}");
+            }
+
             // the perfect route through Phases 1-3 on Hard: survives every block (potions allowed), never wipes
             foreach (var level in new[] { Difficulty.Medium, Difficulty.Hard })
             {

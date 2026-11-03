@@ -19,6 +19,8 @@ namespace LastBell.Run
         protected AurelionEncounter Boss { get; private set; }
         protected CombatWorld W { get; private set; }
         public void Bind(AurelionEncounter boss, CombatWorld world) { Boss = boss; W = world; }
+        // Last Light cuts the running block off at 20 % (Chzy18, 2 Nov): drop any state the bots or the HUD would still read
+        public virtual void Abort() { }
 
         // Easy stretches every warning, track and window by 1.25 (ABILITIES.md §5); gaps and the punish stay as authored.
         public float WarnScale => W.Difficulty == Difficulty.Easy ? 1.25f : 1f;
@@ -26,7 +28,10 @@ namespace LastBell.Run
         // v2.1 §2: on Hard every lock-to-hit WINDOW is x0.7 (never below `floor`, e.g. Orrery's 2.0 s); tracks stay as on
         // Medium (use T for them). Easy stretches windows like every warning (x1.25).
         // v4 Medium (Chzy18, 1 Nov: "make medium harder"): windows x0.85, halfway to Hard; the same floors apply
-        protected int Win(float seconds, float floor = 0) => Sim.Ticks(Hard && !AurelionArgs.WindowsMedium ? Mathf.Max(seconds * HardWindow, floor) : MediumV4 ? Mathf.Max(seconds * MediumWindow, floor) : seconds * WarnScale);
+        protected int Win(float seconds, float floor = 0) { seconds *= PhaseWindow; return Sim.Ticks(Hard && !AurelionArgs.WindowsMedium ? Mathf.Max(seconds * HardWindow, floor) : MediumV4 ? Mathf.Max(seconds * MediumWindow, floor) : seconds * WarnScale); }
+        // Phases 2 and 3 harder (Chzy18, 2 Nov: "P2 and 3 are too easy"): shorter windows, same floors (proposal; no damage: rejected)
+        public const float P2Window = 0.9f, P3Window = 0.8f;
+        protected float PhaseWindow => Boss.Phase == 2 ? P2Window : Boss.Phase == 3 ? P3Window : 1f;
         public const float HardWindow = 0.7f, MediumWindow = 0.85f;
         protected bool MediumV4 => W.Difficulty == Difficulty.Medium;
         // v3 damage tiers (HARDER-PROMPT target 5): every hit is punish (<= 30) or kill (>= 50) at Medium, nothing between:

@@ -41,6 +41,7 @@ namespace LastBell.Run
         static readonly float[] StartYaws = { 0f, 60f, 120f };
 
         public bool Active { get; private set; }
+        public override void Abort() { Active = false; Splitting = false; }
         public float LineYaw { get; private set; }                 // the line runs along LineYaw through the centre
         public int Crossings { get; private set; }
         public int Casts { get; private set; }

@@ -35,6 +35,7 @@ namespace LastBell.Run
             public bool Resolved;
         }
         public readonly List<Tower> Towers = new List<Tower>();   // test evidence: the last cast
+        public override void Abort() => Towers.Clear();
         public int Casts { get; private set; }
         public bool Failed { get; private set; }                 // the last cast had a tower short of players (party wiped)
 

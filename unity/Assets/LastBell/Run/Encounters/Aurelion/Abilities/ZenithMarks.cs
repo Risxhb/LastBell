@@ -38,6 +38,7 @@ namespace LastBell.Run
 
         public int ResolveTick { get; private set; }                         // the last step's resolve tick
         public bool Pending(int tick) => CueVisible && tick <= ResolveTick;   // a mark is up and has not resolved
+        public override void Abort() { Marks.Clear(); CueVisible = false; }
         // the mark this player must keep now (its earliest step still to resolve), or null
         public Marked Current(PlayerController who, int tick) => Pending(tick) ? Marks.Where(m => m.Who == who && m.ResolveTick >= tick).OrderBy(m => m.ResolveTick).FirstOrDefault() : null;
 

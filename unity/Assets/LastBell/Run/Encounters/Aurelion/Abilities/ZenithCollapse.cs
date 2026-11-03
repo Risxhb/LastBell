@@ -22,7 +22,7 @@ namespace LastBell.Run
         public const int Damage = 45;
 
         public static float SafeRadius(int n, int phase) => n <= 2 ? (phase >= 3 ? 5.0f : 4.5f) : n <= 4 ? 5.5f : 6.5f;
-        public int WindowTicks => Sim.Ticks(Hard ? HardWindowS : MediumV4 ? WindowS * MediumWindow : WindowS * WarnScale);   // v4 Medium 2.55 s (1 Nov)
+        public int WindowTicks => Sim.Ticks((Hard ? HardWindowS : MediumV4 ? WindowS * MediumWindow : WindowS * WarnScale) * PhaseWindow);   // v4 Medium 2.55 s (1 Nov); x0.9 in Phase 2, x0.8 in Phase 3 (2 Nov)
         // ticks from Run's first tick to its resolve tick (= when Run returns)
         public int Duration() => WindowTicks - 1;
 

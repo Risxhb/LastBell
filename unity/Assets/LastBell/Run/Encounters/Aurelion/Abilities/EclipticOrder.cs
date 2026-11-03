@@ -50,6 +50,7 @@ namespace LastBell.Run
         public int StrikeTick(int k) => First + k * Step;           // ticks from the reveal
         public int StrikeAt(int k) => RevealTick + StrikeTick(k) - 1;   // world tick strike k resolves on
         // the strike still to come at world tick `tick` (its safe disc is where to stand), or -1 when no cast is running
+        public override void Abort() { RevealTick = -1; CueVisible = false; }
         public int NextStrike(int tick)
         {
             if (RevealTick < 0) return -1;

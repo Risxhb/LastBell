@@ -27,6 +27,8 @@ namespace LastBell.Run
         public Severance Sever { get; private set; }
         public LastLight Light { get; private set; }
         public MeridianRecall Recall { get; private set; }
+        public ErrantPlanets Planets { get; private set; }
+        public FallingMeridians Meridians { get; private set; }
         void BindV4()
         {
             Towers = Register(new MeridianTowers());      // [ability: meridian_towers] (v4)
@@ -35,6 +37,8 @@ namespace LastBell.Run
             Sever = Register(new Severance());            // [ability: severance] (v4)
             Light = Register(new LastLight());            // [ability: last_light] (v4)
             Recall = Register(new MeridianRecall());      // [ability: meridian_recall] (v4, Hard only)
+            Planets = Register(new ErrantPlanets());      // [ability: errant_planets] (v4 Phase 2, 2 Nov)
+            Meridians = Register(new FallingMeridians()); // [ability: falling_meridians] (v4 Phase 3, 2 Nov)
         }
 
         public const float V4P2At = 0.70f, V4P3At = 0.40f, V4P4At = 0.20f, EnrageS = 390f, EnrageWarnS = 360f;   // Final Noon at 6:30
@@ -112,6 +116,20 @@ namespace LastBell.Run
             DevourLeft = Sim.Ticks(DevourS); Devours++;
             RunHud.Banner("DEVOUR", new Color(0.95f, 0.78f, 0.4f), DevourS);
         }
+        // ---- Phases 2 and 3: something to dodge on top of every block (Chzy18, 2 Nov: not more damage) ----
+        // Errant Planets over Misalignment (not Total Eclipse), Falling Meridians over Exposed Meridian (not Severance). Off in the
+        // single-ability loop (F6) and while a test holds the script, unless the test turns them on.
+        public bool TestExtras;
+        void StepPhaseExtras()
+        {
+            bool fighting = Planets != null && Meridians != null && W.CombatActive && !Dead && Current != "phase shift"
+                && (!TestHold || TestExtras) && !AurelionArgs.Known(AurelionArgs.Solo);
+            if (fighting && phase == 2 && !(Eclipse != null && Eclipse.Active)) { Planets.Begin(); Planets.Step(); }
+            else if (Planets != null && Planets.Live) Planets.End();
+            if (fighting && phase == 3 && !(Sever != null && Sever.Active)) Meridians.Step();
+            else if (Meridians != null) Meridians.Reset();
+        }
+
         void StepDevour()
         {
             if (DevourLeft <= 0) return;
@@ -242,7 +260,17 @@ namespace LastBell.Run
                 bool restart = false;
                 foreach (var step in solo != null ? new[] { SoloBlock(solo), V2Gap(1.5f) } : Plan(phase))
                 {
-                    foreach (var w in step) yield return w;
+                    // Last Light starts the tick he reaches 20 % (Chzy18, 2 Nov): the running block is cut off, its shapes
+                    // withdrawn with no damage; the earlier changes still wait for the block to end
+                    bool cut = false;
+                    using (var e = step.GetEnumerator())
+                        while (!cut && e.MoveNext())
+                            for (int n = Mathf.Max(1, e.Current); n > 0; n--)
+                            {
+                                if (phase == 3 && solo == null && V4PhaseFor() == 4) { cut = true; break; }
+                                yield return 1;
+                            }
+                    if (cut) AbortBlock();
                     int want = V4PhaseFor();
                     if (want > phase)
                     {
@@ -260,6 +288,21 @@ namespace LastBell.Run
                 }
                 if (!restart) yield return 1;
             }
+        }
+
+        // withdraws a block cut off mid-cast: every shape fades with no hit, the pull stops, labels and calls go, and each
+        // ability drops the jobs the bots would still walk to
+        public int Cuts { get; private set; }   // test evidence
+        void AbortBlock()
+        {
+            Cuts++;
+            var live = W.Hazards.Live;
+            for (int i = 0; i < live.Count; i++) W.Hazards.Cancel(live[i]);
+            W.BossFx.ClearTelegraphs();
+            W.Projectiles.ClearAll();
+            RunHud.ClearTransient();
+            DevourLeft = 0;
+            foreach (var a in abilities) a.Abort();
         }
 
         IEnumerable<int> V4Shift()

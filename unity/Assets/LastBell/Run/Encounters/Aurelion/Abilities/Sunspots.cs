@@ -27,6 +27,7 @@ namespace LastBell.Run
 
         public sealed class Spot { public PlayerController Who; public int Index, DetonateTick; public Hazard Blast, Pool; public bool Done; }
         public readonly List<Spot> Spots = new List<Spot>();     // test evidence: the last cast
+        public override void Abort() => Spots.Clear();
         public readonly List<Hazard> Pools = new List<Hazard>(); // every pool still on the floor (cleared at phase end)
         public int Casts { get; private set; }
         public bool Chained { get; private set; }

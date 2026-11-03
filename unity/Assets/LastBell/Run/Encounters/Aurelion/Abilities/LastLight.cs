@@ -29,7 +29,7 @@ namespace LastBell.Run
         // ---- the fall (Chzy18 picked "B: Fall" over the 25/s burn and accepted 40 damage, review inbox, 1 Nov) ----
         // Stepping onto a fallen slice drops you: you land back on the nearest standing floor at once and take FallDamage
         // (before the difficulty scale: Easy 24, Medium 40, Hard 52), never a one-shot from full health; two falls in a
-        // row can kill. A jump carries you over a hole (you fall only if you come down in it); a dash does not.
+        // row can kill. No way across a hole (no jumping in the game, Chzy18 2 Nov; a dash does not carry you over): walk round it.
         // The wedge keeps its burn rate for its look and for ally-bot avoidance, but in fall mode nobody stands in it
         // long enough to burn (the fall moves you out on the tick you step in). The old burn-only mode was removed on 2 Nov.
         public const int FallDamage = 40;
@@ -71,7 +71,7 @@ namespace LastBell.Run
             if (Sectors.Count == 0) return;
             foreach (var p in W.Players)
             {
-                if (!p || p.Down || p.Height > 0 || !OverHole(p.transform.position)) continue;
+                if (!p || p.Down || !OverHole(p.transform.position)) continue;
                 var from = p.transform.position; var to = Landing(from);
                 p.Relocate(to);
                 int before = p.Hp;
