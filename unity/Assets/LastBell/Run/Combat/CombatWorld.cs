@@ -217,6 +217,8 @@ namespace LastBell.Run
         public string Name = "part";
         public Vector3 Pos; public float BodyRadius = 1f, HitHeight = 1f;
         public bool Alive = true;
+        public float Hp, MaxHp;                   // read-only for bots and HUD; the encounter keeps them current (0 if unused)
+        public int Order = -1;                    // kill order where the encounter has one (Foundry castings: numeral, 0 first), else -1
         public Func<int, Vector3, int> TakeHit;   // returns the damage dealt
         public Action<BossPart> OnCleared;        // encounter end / transition: remove its look
     }

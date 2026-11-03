@@ -43,6 +43,8 @@ namespace LastBell.Run
             int boss0 = t.Boss.Hp;
             int dealt = t.W.DamagePart(first.Casting, 100, first.Casting.Pos, "test");
             t.Check("painshare: half the damage to a casting also hits Crucivar", dealt == 100 && boss0 - t.Boss.Hp == 50, $"dealt {dealt}, boss -{boss0 - t.Boss.Hp}");
+            t.Check("each casting shows its HP and kill order to bots (Hp, MaxHp, Order)", Mathf.Approximately(first.Casting.MaxHp, first.CastMax) && Mathf.Approximately(first.Casting.Hp, first.CastMax - 100) && up.Turrets.All(x => x.Casting.Order == x.K),
+                $"{first.Casting.Hp}/{first.Casting.MaxHp}, order {string.Join(",", up.Turrets.Select(x => x.Casting.Order))}");
 
             foreach (var x in up.Turrets.ToList()) t.W.DamagePart(x.Casting, 99999, x.Casting.Pos, "test");
             yield return t.Until(() => !t.Boss.TestBusy, 3f, "uprising over");

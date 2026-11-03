@@ -104,14 +104,13 @@ namespace LastBell.Run
                 K = k, Pos = Sim.Dir(yaw) * (Rim + 0.4f), A = pats[(k + Uprisings - 1) % 3], B = pats[(k + Uprisings) % 3],
                 NextFire = t + Sim.Ticks(Rise + (W.Players.Count == 1 ? 0 : Stagger * k)), CastMax = CastHp * (1 + 0.7f * (Fighters() - 1)),   // HP: passive menu bots don't count (Chzy18 10-31)
             };
-            float hp = tu.CastMax;
-            tu.Casting = new BossPart { Name = "Molten Casting " + Numeral(k), Pos = Sim.Dir(yaw + 180f) * CastRing, BodyRadius = CastRadius, HitHeight = 1.0f };
+            var part = tu.Casting = new BossPart { Name = "Molten Casting " + Numeral(k), Pos = Sim.Dir(yaw + 180f) * CastRing, BodyRadius = CastRadius, HitHeight = 1.0f, Hp = tu.CastMax, MaxHp = tu.CastMax, Order = k };
             tu.Casting.TakeHit = (dmg, contact) =>
             {
                 if (!tu.Up) return 0;
-                int dealt = Mathf.Min(dmg, Mathf.CeilToInt(hp)); hp -= dealt;
+                int dealt = Mathf.Min(dmg, Mathf.CeilToInt(part.Hp)); part.Hp -= dealt;
                 RunHud.Float(contact + Vector3.up * 0.5f, dealt.ToString(), new Color(1f, 0.86f, 0.45f));
-                if (hp <= 0) Sink(tu);
+                if (part.Hp <= 0) Sink(tu);
                 if (Boss.Solid) Boss.TakeHit(Mathf.Max(1, Mathf.RoundToInt(dealt * Painshare)), Boss.transform.position + Vector3.up * Boss.HitHeight);
                 return dealt;
             };
