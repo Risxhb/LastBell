@@ -121,6 +121,13 @@ namespace LastBell.Run
         }
 
         public static IReadOnlyList<Hazard> Bullets => bullets;   // the small moving circles flying now (Crucivar's turret bullets)
+
+        // a boss part's HP and kill order (Crucivar PR 19 adds BossPart.Hp, MaxHp and Order); read by name so this
+        // branch builds before that lands: -1 / 0 when the field is not there
+        static readonly System.Reflection.FieldInfo partHp = typeof(BossPart).GetField("Hp"), partMax = typeof(BossPart).GetField("MaxHp"), partOrder = typeof(BossPart).GetField("Order");
+        public static float PartHp(BossPart p) => partHp != null ? (float)partHp.GetValue(p) : 0;
+        public static float PartMaxHp(BossPart p) => partMax != null ? (float)partMax.GetValue(p) : 0;
+        public static int PartOrder(BossPart p) => partOrder != null ? (int)partOrder.GetValue(p) : -1;
         public static Vector3 ShotVel(Hazard b) => shotSeen.TryGetValue(b, out var o) ? o.vel : Vector3.zero;
 
         public static bool GhostHits(PlayerController me, Vector3 q)

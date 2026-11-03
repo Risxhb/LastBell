@@ -51,7 +51,7 @@ namespace LastBell.Run
                     yield return Until(() => d.State == RunState.Combat, 15, $"{name} combat");
                     if (d.State != RunState.Combat || !d.Boss) { rows.Add($"{name} | {level} | no fight | - | - | {d.State}"); continue; }
                     var boss = d.Boss; int t0 = d.World.Tick; float real0 = Time.realtimeSinceStartup;
-                    taken.Clear(); var world = d.World; world.PlayerHit += Took; tt0 = t0; tb = boss; trace.Add("== " + name + " " + level + " allies " + allies); var downs = new HashSet<PlayerController>(); int lastPh = 0; var seenHz = new HashSet<Hazard>(); int lastRec = 0, lastSolo = 0;
+                    taken.Clear(); var world = d.World; world.PlayerHit += Took; tt0 = t0; tb = boss; trace.Add("== " + name + " " + level + " allies " + allies); var downs = new HashSet<PlayerController>(); int lastPh = 0; var seenHz = new HashSet<Hazard>(); int lastRec = 0, lastSolo = 0, lastPart = -99;
                     Time.timeScale = 4;
                     while (d.State == RunState.Combat && (d.World.Tick - t0) < SweepFightCap * Sim.Hz && Time.realtimeSinceStartup - real0 < 300)
                     {
@@ -61,6 +61,8 @@ namespace LastBell.Run
                                 trace.Add($"{(d.World.Tick - t0) / (float)Sim.Hz,6:0.0} P{lastPh} {hz.Source} at r {Sim.Flat(hz.Origin).magnitude:0.0} yaw {Sim.YawTo(Vector3.zero, hz.Origin, 0):0} | " + string.Join(" ", d.World.Players.Select(pp => $"p{d.World.Players.IndexOf(pp)} r{Sim.Flat(pp.transform.position).magnitude:0.0} y{Sim.YawTo(Vector3.zero, pp.transform.position, 0):0} {(pp.Input as AllyBot)?.DebugLine}")));
                         if (traceOn && lastPh == 1 && (d.World.Tick - t0) < 30 * Sim.Hz && d.World.Tick % 12 == 0 && d.World.Hazards.Live.Any(hz => hz.Source == "Ember Brand"))
                             foreach (var p in d.World.Players) trace.Add($"{(d.World.Tick - t0) / (float)Sim.Hz:0.00}   brand p{d.World.Players.IndexOf(p)} r{Sim.Flat(p.transform.position).magnitude:0.0} y{Sim.YawTo(Vector3.zero, p.transform.position, 0):0} {(p.Input as AllyBot)?.DebugLine}");
+                        if (traceOn && d.World.Parts.Count > 0 && d.World.Tick - lastPart >= Sim.Hz && (lastPart = d.World.Tick) > 0)   // boss parts each second: kill order, HP, who is nearest
+                            trace.Add($"{(d.World.Tick - t0) / (float)Sim.Hz,6:0.0} P{lastPh} parts " + string.Join(" ", d.World.Parts.Select(pt => $"[{pt.Name} o{BotSight.PartOrder(pt)} {BotSight.PartHp(pt):0}/{BotSight.PartMaxHp(pt):0} {(pt.Alive ? "up" : "sunk")} near {string.Join("", d.World.Players.Where(pp => pp && !pp.Down && Sim.Flat(pp.transform.position - pt.Pos).magnitude < pt.BodyRadius + 4.5f).Select(pp => "p" + d.World.Players.IndexOf(pp)))}]")));
                         if (traceOn && lastPh >= 2 && d.World.Tick - lastRec >= 4)
                             foreach (var p in d.World.Players)
                             {

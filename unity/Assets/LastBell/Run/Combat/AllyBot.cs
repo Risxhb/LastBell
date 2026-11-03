@@ -42,6 +42,29 @@ namespace LastBell.Run
 
         float Range(PlayerController me) => HoldRange ?? (me.ClassName == "Tollbreaker" ? 3.5f : me.ClassName == "Chimesinger" ? 6.5f : 8.5f);
 
+        // which boss part to hit: the first in kill order (or by name where the encounter gives none). With three or more
+        // bots the back half wears down the next casting meanwhile, so the party does not stand in one turret's fan, and
+        // stops while it is within PartReserve of sinking (on Hard one sunk out of order sets every turret firing)
+        const float PartReserve = 0.15f, PartReserveMin = 60f;
+        BossPart PartTarget(CombatWorld w)
+        {
+            BossPart first = null, next = null;
+            foreach (var part in w.Parts)
+            {
+                if (!part.Alive) continue;
+                if (first == null || Before(part, first)) { next = first; first = part; }
+                else if (next == null || Before(part, next)) next = part;
+            }
+            if (next != null && of >= 3 && slot >= of / 2 && BotSight.PartOrder(next) >= 0
+                && BotSight.PartHp(next) > Mathf.Max(PartReserveMin, BotSight.PartMaxHp(next) * PartReserve)) return next;
+            return first;
+        }
+        static bool Before(BossPart a, BossPart b)
+        {
+            int oa = BotSight.PartOrder(a), ob = BotSight.PartOrder(b);
+            return oa >= 0 && ob >= 0 ? oa < ob : string.CompareOrdinal(a.Name, b.Name) < 0;
+        }
+
         public PlayerInput Read(PlayerController me)
         {
             tick++;
@@ -53,9 +76,7 @@ namespace LastBell.Run
             // first of them by name: the castings carry their numerals, and on Hard one sunk out of order sets every turret
             // firing (a party went down to it, 11-03); hits land on whichever of them is nearest, so aim and reach follow it
             var bpos = Sim.Flat(boss.transform.position); float brad = boss.BodyRadius;
-            BossPart first = null;
-            foreach (var part in w.Parts)
-                if (part.Alive && (first == null || string.CompareOrdinal(part.Name, first.Name) < 0)) first = part;
+            var first = PartTarget(w);
             if (first != null) { bpos = Sim.Flat(first.Pos); brad = first.BodyRadius; }
             tPos = bpos; tRad = brad;
             inp.Aim = bpos;
