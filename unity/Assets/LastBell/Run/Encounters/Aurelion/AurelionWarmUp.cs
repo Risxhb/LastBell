@@ -13,6 +13,7 @@ namespace LastBell.Run
         {
             (20, FontStyle.Bold), (26, FontStyle.Bold), (28, FontStyle.Bold), (30, FontStyle.Bold),
             (44, FontStyle.Bold), (46, FontStyle.Bold), (54, FontStyle.Bold), (20, FontStyle.Normal),
+            (0, FontStyle.Normal),   // 0: the boss block's HudExtra line ("CORONA SHIELD n  ·  clock"), the run HUD's own numeric style
         };
         static string chars;
         int step;
@@ -22,17 +23,18 @@ namespace LastBell.Run
             if (Event.current.type != EventType.Repaint) return;
             if (chars == null)
             {
-                var sb = new System.Text.StringBuilder("☾ ☉ • > ");
+                var sb = new System.Text.StringBuilder("☾ ☉ • — · > ");   // "—" first shows in the Total Eclipse banner (perf 3 Nov, 25 ms)
                 for (char ch = ' '; ch <= '~'; ch++) sb.Append(ch);
                 chars = sb.ToString();
             }
             var (size, style) = Steps[step];
-            var s = new GUIStyle(GUI.skin.label) { fontSize = size, fontStyle = style, alignment = TextAnchor.MiddleCenter, wordWrap = false, clipping = TextClipping.Overflow };
+            var s = size > 0 ? new GUIStyle(GUI.skin.label) { fontSize = size, fontStyle = style, alignment = TextAnchor.MiddleCenter, wordWrap = false, clipping = TextClipping.Overflow }
+                             : UiTheme.Style(UiTheme.SizeNumeric, true, TextAnchor.MiddleRight, UiTheme.Ivory);
             s.normal.textColor = new Color(1, 1, 1, 0);
             s.CalcSize(new GUIContent(chars));
             var font = s.font != null ? s.font : GUI.skin.font;
-            if (font != null && font.dynamic) font.RequestCharactersInTexture(chars, size, style);
-            GUI.Label(new Rect(0, 0, Screen.width, size * 1.5f), chars, s);
+            if (font != null && font.dynamic) font.RequestCharactersInTexture(chars, s.fontSize, s.fontStyle);
+            GUI.Label(new Rect(0, 0, Screen.width, s.fontSize * 1.5f), chars, s);
             if (++step >= Steps.Length) Destroy(this);
         }
     }
