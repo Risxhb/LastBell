@@ -45,6 +45,7 @@ namespace LastBell.Run
             t.Check("painshare: half the damage to a casting also hits Crucivar", dealt == 100 && boss0 - t.Boss.Hp == 50, $"dealt {dealt}, boss -{boss0 - t.Boss.Hp}");
             t.Check("each casting shows its HP and kill order to bots (Hp, MaxHp, Order)", Mathf.Approximately(first.Casting.MaxHp, first.CastMax) && Mathf.Approximately(first.Casting.Hp, first.CastMax - 100) && up.Turrets.All(x => x.Casting.Order == x.K),
                 $"{first.Casting.Hp}/{first.Casting.MaxHp}, order {string.Join(",", up.Turrets.Select(x => x.Casting.Order))}");
+            yield return t.Shot("v4_casting_bars");   // casting I at -100 HP: the bars under the numerals
 
             foreach (var x in up.Turrets.ToList()) t.W.DamagePart(x.Casting, 99999, x.Casting.Pos, "test");
             yield return t.Until(() => !t.Boss.TestBusy, 3f, "uprising over");
@@ -62,6 +63,19 @@ namespace LastBell.Run
             while (s < 28f) { foreach (var p in t.Party) p.DebugSetHp(PlayerController.MaxHp); s += Time.deltaTime; yield return null; }
             yield return t.Until(() => t.Party.All(p => p.Down), 6f, "flood");
             t.Check("an uprising left standing floods at 30 s and downs the whole party", t.Party.All(p => p.Down) && up.Floods == 1, $"down {t.Party.Count(p => p.Down)}/4, floods {up.Floods}");
+
+            // Hard: the casting that may die next is framed, the others dimmed (look check only)
+            yield return t.Setup(4, Difficulty.Hard, at: new[] { new Vector3(0, 0, 3f), new Vector3(0, 0, -13f), new Vector3(9, 0, 0), new Vector3(-6, 0, 5) });
+            if (t.Boss == null) yield break;
+            up = t.Boss.Uprising;
+            t.Begin(up.Run());
+            yield return t.Seconds(3f);
+            t.W.DamagePart(up.Turrets[0].Casting, Mathf.RoundToInt(up.Turrets[0].CastMax * 0.6f), up.Turrets[0].Casting.Pos, "test");
+            foreach (var p in t.Party) p.DebugSetHp(PlayerController.MaxHp);
+            yield return t.Shot("v4_casting_bars_hard");
+            foreach (var x in up.Turrets.ToList()) t.W.DamagePart(x.Casting, 99999, x.Casting.Pos, "test");   // in order, so nothing fires
+            yield return t.Until(() => !t.Boss.TestBusy, 3f, "Hard uprising over");
+            t.Check("Hard: killing the castings in order ends the uprising", !t.Boss.TestBusy && up.Turrets.All(x => !x.Up));
         }
     }
 }

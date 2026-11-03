@@ -276,12 +276,42 @@ namespace LastBell.Run
             cast.position = tu.Casting.Pos;
             Prim.Make(PrimitiveKind.Capsule, cast, Vector3.up * 1.0f, new Vector3(CastRadius * 2, 1.0f, CastRadius * 2), new Color(0.85f, 0.52f, 0.16f), 1.6f);
             Label(cast, Numeral(tu.K), 2.6f);
+            cast.gameObject.AddComponent<CastingBar>().Init(tu.Casting, Hard ? () => !Turrets.Any(x => x.Up && x.K < tu.K) : (System.Func<bool>)null);
             tu.CastLook = cast;
 
             var chain = new GameObject("Casting chain " + Numeral(tu.K)).AddComponent<LineRenderer>(); chain.transform.SetParent(W.Root, false);
             chain.positionCount = 2; chain.SetPosition(0, tu.Pos + Vector3.up * 0.4f); chain.SetPosition(1, tu.Casting.Pos + Vector3.up * 0.4f);
             chain.startWidth = chain.endWidth = 0.09f; chain.sharedMaterial = Prim.Material(new Color(1f, 0.95f, 0.82f), 1.2f);
             tu.Chain = chain;
+        }
+
+        // HP bar under the casting numeral (RI-106, accepted by Chzy18 3 Nov). On Hard the casting that may die next gets an
+        // ivory frame and full colour; the others are dimmed, so the kill order reads at a glance.
+        sealed class CastingBar : MonoBehaviour
+        {
+            BossPart part; System.Func<bool> next;
+            string numeral; GUIStyle style;
+            public void Init(BossPart p, System.Func<bool> isNext) { part = p; next = isNext; numeral = Numeral(p.Order); }
+            void OnGUI()
+            {
+                var cam = Camera.main; if (!cam || part == null || !part.Alive || part.MaxHp <= 0) return;
+                // above the glowing casting on an ink strip: over the casting itself it was lost in the glow
+                var sp = cam.WorldToScreenPoint(part.Pos + Vector3.up * 2.6f); if (sp.z <= 0) return;
+                if (style == null) style = new GUIStyle(GUI.skin.label) { fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+                style.fontSize = Mathf.RoundToInt(UiTheme.V(20));
+                bool order = next != null, now = !order || next();   // only Hard has a kill order to show
+                float w = UiTheme.V(110), h = UiTheme.V(10), nw = UiTheme.V(30), pad = UiTheme.V(5), f = Mathf.Clamp01(part.Hp / part.MaxHp), a = now ? 1f : 0.5f;
+                // kept on screen and under the boss bar: a casting at the far rim sits right under it
+                float cx = Mathf.Clamp(sp.x, w, Screen.width - w), cy = Mathf.Clamp(Screen.height - sp.y - UiTheme.V(62), UiTheme.V(150), Screen.height - UiTheme.V(40));
+                var strip = new Rect(cx - (nw + w) / 2 - pad, cy - UiTheme.V(13), nw + w + pad * 2, UiTheme.V(26));
+                if (order && now) UiTheme.Fill(new Rect(strip.x - 2, strip.y - 2, strip.width + 4, strip.height + 4), new Color(1f, 0.95f, 0.82f, 0.9f));
+                UiTheme.Fill(strip, new Color(0.03f, 0.03f, 0.05f, 0.88f));
+                style.normal.textColor = new Color(1f, 0.95f, 0.82f, a);
+                GUI.Label(new Rect(strip.x + pad, strip.y, nw, strip.height), numeral, style);
+                var r = new Rect(strip.x + pad + nw, cy - h / 2, w, h);
+                UiTheme.Fill(r, new Color(0.22f, 0.12f, 0.08f, a));
+                UiTheme.Fill(new Rect(r.x, r.y, r.width * f, r.height), new Color(1f, 0.55f, 0.18f, a));
+            }
         }
 
         static void Label(Transform parent, string text, float height)
