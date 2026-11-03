@@ -139,8 +139,13 @@ namespace LastBell.Run
             return h;
         }
 
+        // profiler scopes (perf agent, 2 Nov: name the phase-2 garbage); a marker costs nothing outside the profiler
+        static readonly Unity.Profiling.ProfilerMarker PmTrack = new Unity.Profiling.ProfilerMarker("LastBell.Hazards.TrackAndTelegraph"),
+            PmBurn = new Unity.Profiling.ProfilerMarker("LastBell.Hazards.Burn"), PmResolve = new Unity.Profiling.ProfilerMarker("LastBell.Hazards.Resolve");
+
         public void Step()
         {
+            using (PmTrack.Auto())
             for (int i = 0; i < live.Count; i++)
             {
                 var h = live[i];
@@ -150,7 +155,8 @@ namespace LastBell.Run
                 h.Tele.Place(h.Origin, h.Yaw);
                 h.Tele.Progress(h.FillToLock ? (h.LockAt > 0 ? (float)h.Age / h.LockAt : 1) : (float)h.Age / Mathf.Max(1, h.ResolveAt));
             }
-            StepBurn();
+            using (PmBurn.Auto()) StepBurn();
+            using (PmResolve.Auto())
             for (int i = live.Count - 1; i >= 0; i--)
             {
                 var h = live[i];
