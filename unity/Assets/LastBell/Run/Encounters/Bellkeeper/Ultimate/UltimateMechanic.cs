@@ -81,6 +81,26 @@ namespace LastBell.Run
         }
 
         public override void Cancel() { base.Cancel(); }
+
+        // a world label (OnGUI), shadowed. Labels drawn in the same GUI pass don't overlap: one that would land on an earlier one moves
+        // up a row (performance agent's screenshots, 2 Nov: two players side by side read "IV II gap IV" in P5). One copy for every phase.
+        static readonly List<Rect> placed = new List<Rect>(); static int placedFrame = -1; static EventType placedEvent;
+        protected static void Label(Camera cam, Vector3 world, float height, string text, Color c, GUIStyle style)
+        {
+            var sp = cam.WorldToScreenPoint(new Vector3(world.x, height, world.z)); if (sp.z <= 0) return;
+            if (placedFrame != Time.frameCount || placedEvent != Event.current.type) { placed.Clear(); placedFrame = Time.frameCount; placedEvent = Event.current.type; }
+            float w = style.CalcSize(new GUIContent(text)).x + 6, h = 26;
+            var box = new Rect(sp.x - w / 2, Screen.height - sp.y - h / 2, w, h);
+            for (int tries = 0; tries < 4; tries++)
+            {
+                bool hit = false; foreach (var q in placed) if (q.Overlaps(box)) { hit = true; box.y = q.y - h; break; }
+                if (!hit) break;
+            }
+            placed.Add(box);
+            var r = new Rect(sp.x - 130, box.y, 260, h);
+            style.normal.textColor = new Color(0, 0, 0, 0.85f); GUI.Label(new Rect(r.x + 1.5f, r.y + 1.5f, r.width, r.height), text, style);
+            style.normal.textColor = c; GUI.Label(r, text, style);
+        }
     }
 
     // How the plan starts one cast of a mechanic.

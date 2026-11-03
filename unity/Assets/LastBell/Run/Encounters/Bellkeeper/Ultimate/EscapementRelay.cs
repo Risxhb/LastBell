@@ -325,13 +325,6 @@ namespace LastBell.Run
                 GUI.Label(new Rect(0, Screen.height * 0.2f, Screen.width, 60), soon ? "REWIND NEXT BEAT" : "<< REWINDING", bigStyle);
             }
         }
-        static void Label(Camera cam, Vector3 world, float height, string text, Color c, GUIStyle style)
-        {
-            var sp = cam.WorldToScreenPoint(new Vector3(world.x, height, world.z)); if (sp.z <= 0) return;
-            var r = new Rect(sp.x - 120, Screen.height - sp.y - 13, 240, 26);
-            style.normal.textColor = new Color(0, 0, 0, 0.85f); GUI.Label(new Rect(r.x + 1.5f, r.y + 1.5f, r.width, r.height), text, style);
-            style.normal.textColor = c; GUI.Label(r, text, style);
-        }
 
         // -lastbellAbility ult_escapement_relay: the relay alone, 20 beats, then 4 s off
         public override IEnumerable<int> Practice()

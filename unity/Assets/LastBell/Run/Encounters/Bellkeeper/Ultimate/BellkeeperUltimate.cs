@@ -263,13 +263,15 @@ namespace LastBell.Run
             {
                 if (!UltPlanActive || SegmentStartTick < 0) return null;
                 float left = PushLeft;
-                string push = left < 0 ? "" : $"   ·   push {Mathf.Max(0, left) / 60:0}:{Mathf.Max(0, left) % 60:00}";
+                // the phase line above already names the segment (PhaseName): only the push timer and my job here (was "ULTIMATE · P4 ·
+                // The Unfinished Hour · push", a repeat of the line above it, performance agent's screenshots, 2 Nov)
+                string push = left < 0 ? null : $"push {Mathf.Max(0, left) / 60:0}:{Mathf.Max(0, left) % 60:00}";
                 var relay = mRelay != null && W.Players.Count > 0 ? mRelay.HudText(W.Players[0]) : null;
                 if (relay == null && mBroken != null && W.Players.Count > 0) relay = mBroken.HudText(W.Players[0]);
                 if (relay == null && mOpen != null && W.Players.Count > 0) relay = mOpen.HudText(W.Players[0]);
                 if (relay == null && mGear != null && W.Players.Count > 0) relay = mGear.HudText(W.Players[0]);
                 if (relay == null && mFinal != null && W.Players.Count > 0) relay = mFinal.HudText(W.Players[0]);
-                return "ULTIMATE · " + SegmentNames[(int)Segment] + push + (relay != null ? "\n" + relay : "");
+                return push == null ? relay : relay == null ? push : push + "\n" + relay;
             }
         }
         // the four phase thresholds on the bar (was the v1 plan's 85 / 55 / 35 / 15 % until 1 Nov)
@@ -279,28 +281,74 @@ namespace LastBell.Run
         static GUIStyle glyphStyle;
         // The phases' labels share the skin's bold font at these sizes; P2 is the first to use → ✓ –. Measuring them once on the
         // first frame loads the fonts and their OpenType tables then (performance agent, 2 Nov: a 79 ms font load at the P1 -> P2 change).
-        static bool fontsWarm;
         // Every printable ASCII character plus the symbols, bold and regular: the first debt timer ("DEBT 6.0s": the '.') still
-        // loaded font tables at 18.6 s and 21.1 s with the shorter string (performance agent, 2 Nov)
-        static void WarmFonts()
+        // loaded font tables at 18.6 s and 21.1 s with the shorter string (performance agent, 2 Nov).
+        // Measuring alone never puts the glyphs on the font's texture: P4's slam 6 still grew and re-uploaded it mid-fight (10 ms
+        // GUIStyle.GetMeshInfo, then a 29 ms swap-chain wait; performance agent, 3 Nov). So each size and style is also rasterized,
+        // one per repaint from the encounter's first GUI frame (the intro), so no single frame pays for all of them.
+        // That texture is only the old path: IMGUI lays text out through TextCore, which loads a face's tables and glyphs on the first
+        // real draw (slam 6 still 23 ms, P2 +10 s a 13 ms GPOS load; performance agent, 3 Nov). So each step also draws the
+        // whole set once with GUI.Label, invisible.
+        static readonly int[] warmSizes = { 15, 16, 17, 20, 22, 24, 32, 34, 40, 72 };
+        // ...then the run HUD's Inter faces once each: it shows HudLine and the attack names in them (a face loads its tables once). Each
+        // face takes three frames, measure, texture, draw: in one frame each was a 28 ms intro frame (performance agent, 3 Nov)
+        const int WarmSteps = 10 * 2 + 2 * 3;
+        internal static bool FontsWarmed => warmStep >= WarmSteps;
+        static string warmChars; static int warmStep;
+        static void WarmFontStep()
         {
-            var sb = new System.Text.StringBuilder("→ ✓ – ✕ · ");
-            for (char ch = ' '; ch <= '~'; ch++) sb.Append(ch);
-            var c = new GUIContent(sb.ToString());
+            if (warmChars == null)
+            {
+                var sb = new System.Text.StringBuilder("→ ✓ – — − ✕ · ° ≥ ");
+                for (char ch = ' '; ch <= '~'; ch++) sb.Append(ch);
+                warmChars = sb.ToString();
+            }
             var s = new GUIStyle(GUI.skin.label);
-            foreach (var fs in new[] { FontStyle.Bold, FontStyle.Normal })
-                foreach (int size in new[] { 15, 16, 17, 20, 22, 24, 32, 34, 40, 72 }) { s.fontStyle = fs; s.fontSize = size; s.CalcSize(c); }
+            int part = -1;   // -1: all three parts in this frame
+            if (warmStep >= warmSizes.Length * 2) { int i = warmStep - warmSizes.Length * 2; s.font = i / 3 == 0 ? UiTheme.Regular : UiTheme.SemiBold; s.fontStyle = FontStyle.Normal; s.fontSize = 20; part = i % 3; }
+            else { s.fontStyle = warmStep % 2 == 0 ? FontStyle.Bold : FontStyle.Normal; s.fontSize = warmSizes[warmStep / 2]; }
+            if (part <= 0) s.CalcSize(new GUIContent(warmChars));
+            var font = s.font != null ? s.font : GUI.skin.font;
+            if ((part < 0 || part == 1) && font != null && font.dynamic) font.RequestCharactersInTexture(warmChars, s.fontSize, s.fontStyle);
+            s.wordWrap = false; s.clipping = TextClipping.Overflow; s.normal.textColor = new Color(1, 1, 1, 0);
+            if (part < 0 || part == 2) GUI.Label(new Rect(0, 0, Screen.width, s.fontSize * 1.5f), warmChars, s);
+            warmStep++;
+        }
+        // -lastbellFontLog: every font texture rebuild, with the fight time (where a texture still grows mid-fight)
+        static bool fontLogOn;
+        void LogFontRebuilds()
+        {
+            if (fontLogOn || Arg("-lastbellFontLog") == null) return;
+            fontLogOn = true; Font.textureRebuilt += f => Debug.Log($"[font] texture rebuilt: {f.name} · frame {Time.frameCount} · tick {(W != null ? W.Tick : -1)} · segment {Segment}");
         }
         void OnGUI()
         {
+            LogFontRebuilds();
+            if (Ult != null && warmStep < WarmSteps && Event.current.type == EventType.Repaint) WarmFontStep();
             if (Ult == null || W == null || Dead) return;
-            if (!fontsWarm) { fontsWarm = true; WarmFonts(); }
             var cam = Camera.main; if (!cam) return;
+            if (fontLogOn) { TimedGui(cam); return; }
             mRelay?.DrawGui(cam);
             mBroken?.DrawGui(cam);
             mOpen?.DrawGui(cam);
             mGear?.DrawGui(cam);
             mFinal?.DrawGui(cam);
+            DrawGlyphs(cam);
+        }
+        // -lastbellFontLog: each phase's labels timed; a draw over 2 ms is logged (a face or atlas loaded mid-fight)
+        readonly System.Diagnostics.Stopwatch guiWatch = new System.Diagnostics.Stopwatch();
+        void TimedGui(Camera cam)
+        {
+            void Timed(string what, Action draw)
+            {
+                guiWatch.Restart(); draw(); double ms = guiWatch.Elapsed.TotalMilliseconds;
+                if (ms > 2) Debug.Log($"[font] slow GUI: {what} {ms:0.0} ms · {Event.current.type} · frame {Time.frameCount} · tick {W.Tick} · segment {Segment}");
+            }
+            Timed("relay", () => mRelay?.DrawGui(cam)); Timed("broken", () => mBroken?.DrawGui(cam)); Timed("open", () => mOpen?.DrawGui(cam));
+            Timed("gear", () => mGear?.DrawGui(cam)); Timed("final", () => mFinal?.DrawGui(cam)); Timed("glyphs", () => DrawGlyphs(cam));
+        }
+        void DrawGlyphs(Camera cam)
+        {
             if (glyphStyle == null) glyphStyle = new GUIStyle(GUI.skin.label) { fontSize = 15, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = new Color(0.96f, 0.93f, 0.84f) } };
             foreach (var p in W.Players)
             {

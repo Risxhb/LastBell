@@ -713,13 +713,6 @@ namespace LastBell.Run
             GUI.Label(new Rect(0, Screen.height * 0.17f, Screen.width, 50), text, bigStyle);
             if (k % Flip == 0 && Revealed(k, t)) { midStyle.normal.textColor = new Color(1f, 0.82f, 0.48f); GUI.Label(new Rect(0, Screen.height * 0.17f + 44, Screen.width, 34), "the gears reverse after this slam", midStyle); }
         }
-        static void Label(Camera cam, Vector3 world, float height, string text, Color c, GUIStyle style)
-        {
-            var sp = cam.WorldToScreenPoint(new Vector3(world.x, height, world.z)); if (sp.z <= 0) return;
-            var r = new Rect(sp.x - 130, Screen.height - sp.y - 14, 260, 28);
-            style.normal.textColor = new Color(0, 0, 0, 0.85f); GUI.Label(new Rect(r.x + 1.5f, r.y + 1.5f, r.width, r.height), text, style);
-            style.normal.textColor = c; GUI.Label(r, text, style);
-        }
         public string HudText(PlayerController p)
         {
             if (!Running || p == null) return null;

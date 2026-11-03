@@ -502,7 +502,7 @@ namespace LastBell.Run
         readonly List<Renderer> ghostR = new List<Renderer>(); MaterialPropertyBlock ghostBlock; Vector3 echoWas; float echoMovedAt = -9; bool echoSeen, shattered;
         // Prebuild: the bell floor, clappers, platforms and shards are made hidden when combat starts (performance agent, 2 Nov:
         // the P4 -> P5 change took 60 ms and 4.4 MB); Arm() does the cast-time part
-        public override void Prebuild() { MakeObjects(); root.gameObject.SetActive(false); ArenaVoid.Prepare(W.Root); }   // the void scan, kept for the cast
+        public override void Prebuild() { MakeObjects(); root.gameObject.SetActive(false); ArenaVoid.Prepare(W.Root); EchoBuffers(); }   // the void scan, kept for the cast
         void Build() { MakeObjects(); root.gameObject.SetActive(true); Arm(); }
         void MakeObjects()
         {
@@ -577,6 +577,20 @@ namespace LastBell.Run
             ghostR.Clear(); foreach (var r in echo.GetComponentsInChildren<Renderer>()) if (r.sharedMaterial == ghostFx) ghostR.Add(r);
         }
         void FinishGhost() { while (ghostSteps != null) StepGhost(); }
+        // the Echo copy's buffers, sized in Prebuild (the intro) for the biggest mesh of either form, so late P4 allocates nothing
+        static readonly List<Vector3> eV = new List<Vector3>(), eW = new List<Vector3>(); static readonly List<Vector2> eUv = new List<Vector2>();
+        static readonly List<Color32> eCol = new List<Color32>(); static readonly List<int> eTri = new List<int>(), eSub = new List<int>();
+        void EchoBuffers()
+        {
+            if (!Boss) return; int nv = 0, ni = 0;
+            foreach (var r in Boss.GetComponentsInChildren<Renderer>(true))
+            {
+                var mesh = r is SkinnedMeshRenderer sk ? sk.sharedMesh : r.TryGetComponent<MeshFilter>(out var mf) ? mf.sharedMesh : null; if (!mesh) continue;
+                nv = Mathf.Max(nv, mesh.vertexCount); long n = 0; for (int s = 0; s < mesh.subMeshCount; s++) n += mesh.GetIndexCount(s); ni = Mathf.Max(ni, (int)n);
+            }
+            if (eV.Capacity < nv) { eV.Capacity = nv; eW.Capacity = nv; eUv.Capacity = nv; eCol.Capacity = nv; }
+            if (eTri.Capacity < ni) { eTri.Capacity = ni; eSub.Capacity = ni; }
+        }
         // the Echo: a copy of the boss's own meshes (frozen in their pose) in the additive effect shader, its UVs remapped so the
         // "pillar" shape glows teal-blue at the feet and fades up the body, with slow vertical ripples. Yields true between
         // ticks; its last value is whether it made any mesh.
@@ -595,9 +609,11 @@ namespace LastBell.Run
             void Add(Mesh src, Matrix4x4 toBoss, string name)
             {
                 if (!src || !src.isReadable) return;
-                var m = new Mesh { name = name + " (echo)", indexFormat = src.indexFormat }; var vs = src.vertices; var bv = new Vector3[vs.Length]; var uv = new Vector2[vs.Length];
-                for (int i = 0; i < vs.Length; i++) { var w = toBoss.MultiplyPoint3x4(vs[i]); bv[i] = w; uv[i] = new Vector2(Mathf.Atan2(w.z, w.x) / (2 * Mathf.PI) + 0.5f, Mathf.Clamp01(w.y / top) * 0.92f); }
-                m.vertices = bv; m.triangles = src.triangles; m.uv = uv; var cols = new Color[bv.Length]; for (int i = 0; i < cols.Length; i++) cols[i] = Color.white; m.colors = cols; m.RecalculateBounds();   // vertices in the boss's own space
+                // through the reused lists (EchoBuffers): new arrays per part were 3.6 MB at once in late P4 (performance agent, 3 Nov)
+                var m = new Mesh { name = name + " (echo)", indexFormat = src.indexFormat }; src.GetVertices(eV); eW.Clear(); eUv.Clear(); eCol.Clear();
+                foreach (var v in eV) { var w = toBoss.MultiplyPoint3x4(v); eW.Add(w); eUv.Add(new Vector2(Mathf.Atan2(w.z, w.x) / (2 * Mathf.PI) + 0.5f, Mathf.Clamp01(w.y / top) * 0.92f)); eCol.Add(new Color32(255, 255, 255, 255)); }
+                eTri.Clear(); for (int s = 0; s < src.subMeshCount; s++) { src.GetTriangles(eSub, s); eTri.AddRange(eSub); }
+                m.SetVertices(eW); m.SetTriangles(eTri, 0); m.SetUVs(0, eUv); m.SetColors(eCol); m.RecalculateBounds();   // vertices in the boss's own space
                 var go = new GameObject(name); go.transform.SetParent(into, false);
                 go.AddComponent<MeshFilter>().sharedMesh = m; var mr = go.AddComponent<MeshRenderer>(); mr.sharedMaterial = ghostFx; mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; made++;
             }
@@ -848,13 +864,6 @@ namespace LastBell.Run
                 titleStyle.normal.textColor = new Color(1f, 0.93f, 0.78f, a); GUI.Label(r, text, titleStyle);
                 GUI.EndGroup();
             }
-        }
-        static void Label(Camera cam, Vector3 world, float height, string text, Color c, GUIStyle style)
-        {
-            var sp = cam.WorldToScreenPoint(new Vector3(world.x, height, world.z)); if (sp.z <= 0) return;
-            var r = new Rect(sp.x - 130, Screen.height - sp.y - 14, 260, 28);
-            style.normal.textColor = new Color(0, 0, 0, 0.85f); GUI.Label(new Rect(r.x + 1.5f, r.y + 1.5f, r.width, r.height), text, style);
-            style.normal.textColor = c; GUI.Label(r, text, style);
         }
         public string HudText(PlayerController p)
         {

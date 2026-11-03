@@ -104,6 +104,7 @@ namespace LastBell.Run
         protected override void Update()
         {
             base.Update();
+            IntroPrebuild();
             if (presenter) presenter.GlowLevel = glowLevel * Lerp3(PhaseGlow, lookPhase);
             if (Dead && presenter && presenter.Visual)
             {

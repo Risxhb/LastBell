@@ -77,24 +77,48 @@ namespace LastBell.Run
         }
         protected override void OnHalt() { StopAbilities(); }
 
+        // markers for the step's parts (performance agent, 3 Nov: 22 ms of unmarked script under RunDirector.Update at combat start)
+        static readonly Unity.Profiling.ProfilerMarker PrebuildMarker = new Unity.Profiling.ProfilerMarker("Ultimate.Prebuild"),
+            TickMarker = new Unity.Profiling.ProfilerMarker("Ultimate.Tick"), PlanMarker = new Unity.Profiling.ProfilerMarker("Ultimate.Plan"),
+            StepMarker = new Unity.Profiling.ProfilerMarker("Ultimate.Step");
+        // The intro builds the phases' scene objects, one mechanic a frame after the font warm-up (performance agent, 3 Nov: Prebuild on
+        // the first combat tick was a 122 ms frame, 70 ms of it loading models from disk). The first Script() keeps what the intro built;
+        // every later start (a restart, a halt) drops and rebuilds as before.
+        // The phases' models are loaded in the background from the intro's first frame (Prebuild loading them was a 66 ms and a 36 ms
+        // intro frame, performance agent 3 Nov); Prebuild waits for them, then finds them already loaded. Until PR 21's Ready warm-up.
+        // every model in Ultimate/Resources/Ultimate (the first list missed P1's and P5's: two 30 ms loads were left, 3 Nov), and the FX material
+        static readonly string[] IntroModels = { "CR_Hand", "CR_Plate", "FB_Floor", "FT_BellFloor", "FT_BellShard", "FT_Clapper", "FT_Plate", "FT_Platform",
+            "GB_GreatBell", "GF_CentreGear", "GF_Core", "GF_Hammer", "GF_OuterGear", "GF_Pawl", "GF_Shard" };
+        readonly List<ResourceRequest> introLoads = new List<ResourceRequest>();
+        bool begun; int introBuilt;
+        void IntroPrebuild()   // from Update
+        {
+            if (begun || TestIdle || PracticeAbility != null || Mechanics == null || introBuilt >= Mechanics.Count) return;
+            if (introLoads.Count == 0) { foreach (var name in IntroModels) introLoads.Add(Resources.LoadAsync<GameObject>("Ultimate/" + name)); introLoads.Add(Resources.LoadAsync<Material>("Run/FX_ColorDissolve")); }
+            if (!FontsWarmed || !introLoads.TrueForAll(r => r.isDone)) return;
+            using (PrebuildMarker.Auto()) Mechanics[introBuilt++].Prebuild();
+        }
         // One script step per tick: the plan, then every ability that was already running.
         protected override IEnumerable<int> Script()
         {
-            StopAbilities();
+            if (!begun && introBuilt > 0) { running.Clear(); foreach (var a in abilities) { a.NextTuning = null; if (a is UltimateMechanic m) m.NextCue = null; } Ult?.Reset(); UltPlanActive = false; }
+            else StopAbilities();
+            begun = true;
             if (!TestIdle) FitHpToParty();   // the idle test target keeps its bar (a dummy for the run-loop and ally checks)
-            if (!TestIdle && PracticeAbility == null && Mechanics != null) foreach (var m in Mechanics) m.Prebuild();
+            if (!TestIdle && PracticeAbility == null && Mechanics != null) using (PrebuildMarker.Auto()) foreach (var m in Mechanics) m.Prebuild();
             IEnumerator<int> plan = null; int wait = 0;
             while (true)
             {
-                UltimateTick();
+                using (TickMarker.Auto()) UltimateTick();
                 stepping.Clear(); stepping.AddRange(running);
                 if (wait > 0) wait--;
                 else
                 {
+                    using var planMark = PlanMarker.Auto();
                     if (plan == null || !plan.MoveNext()) { plan = (ManualPlan || TestIdle ? IdlePlan() : PracticeAbility != null ? PracticeAbility.Practice() : UltimatePlan()).GetEnumerator(); plan.MoveNext(); }
                     wait = Mathf.Max(1, plan.Current) - 1;
                 }
-                foreach (var r in stepping) if (running.Contains(r) && !Advance(r)) running.Remove(r);
+                using (StepMarker.Auto()) foreach (var r in stepping) if (running.Contains(r) && !Advance(r)) running.Remove(r);
                 yield return 1;
             }
         }
