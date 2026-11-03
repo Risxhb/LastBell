@@ -39,6 +39,8 @@ namespace LastBell.Run
         {
             public string Name; public PlayerController P; public Vector3 Goal; public bool Dash, Attack; public Vector3 Aim, Target; public float TargetRadius; public Vector3? Tower;
             public float NextPlan; public int Hits, Damage, Downs;
+            public readonly Dictionary<string, int> BySource = new Dictionary<string, int>();   // measure: damage taken per attack
+            public readonly List<string> Last = new List<string>();                               // measure: the last hits, newest last
             public AllyBot Ally;   // -crucivarAllyBot: the shared bot drives
             public PlayerInput Read(PlayerController who)
             {
@@ -105,7 +107,8 @@ namespace LastBell.Run
                 if (hooked != w)
                 {
                     hooked = w;
-                    w.PlayerHit += (p, h, dmg) => { var b = bots.FirstOrDefault(x => x.P == p); if (b != null) { b.Hits++; b.Damage += dmg; } };
+                    w.PlayerHit += (p, h, dmg) => { var b = bots.FirstOrDefault(x => x.P == p); if (b != null) { b.Hits++; b.Damage += dmg; var src = h?.Source ?? "?"; b.BySource[src] = (b.BySource.TryGetValue(src, out var v) ? v : 0) + dmg;
+                        b.Last.Add($"{Time.time - fightStart:0.0}s {src} -{dmg} (hp {p.Hp})"); if (b.Last.Count > 8) b.Last.RemoveAt(0); } };
                 }
                 fights++; fightStart = Time.time;
                 int logged = 0, mPhase = 1, mDealt0 = w.DamageDealt; float mT0 = Time.time; bool mDone = false, mLogged = false;
@@ -152,6 +155,11 @@ namespace LastBell.Run
                 if (Measure)
                 {
                     if (!mDone && !mLogged) MeasureLog(mPhase, (d.Boss as CrucivarEncounter)?.PhaseLoops ?? 0, Time.time - mT0, w.DamageDealt - mDealt0, " (partial: the fight ended first)");
+                    foreach (var b in bots)
+                    {
+                        Debug.Log($"[measure] {b.Name} damage taken by attack: " + string.Join(", ", b.BySource.OrderByDescending(kv => kv.Value).Select(kv => $"{kv.Key} {kv.Value}")));
+                        Debug.Log($"[measure] {b.Name} last hits: " + string.Join(" | ", b.Last) + $" · down {b.P.Down}");
+                    }
                     Debug.Log($"[measure] fight over after {Time.time - fightStart:0}s · phase {((d.Boss as CrucivarEncounter)?.PhaseIndex ?? 0)} · " + (mDone ? "measured all phases" : "ended early (wipe?)"));
 #if UNITY_EDITOR
                     UnityEditor.EditorApplication.Exit(0);
