@@ -256,7 +256,7 @@ namespace LastBell.Run
                 case EscapementTwinsEncounter.Pallet:
                 {
                     int want = R.Locks(p2);
-                    var log = boss.LockLog.Skip(lockLog).ToList();
+                    var log = boss.LockLog.Where(l => l.tick >= t0).ToList();   // logged on the block's first tick
                     Check($"{n}p {ph} Pallet Lock: {want} locks resolve, {want - 1} swaps", boss.LocksResolved - locks == want && boss.Swaps - swaps == want - 1 && mine.Count == 2 * want,
                         $"{boss.LocksResolved - locks} locks, {boss.Swaps - swaps} swaps, {mine.Count} rings");
                     Check($"{n}p {ph} Pallet Lock: marks split {R.BrassCount(n)} brass / {n - R.BrassCount(n)} cobalt, then flip",
@@ -269,7 +269,7 @@ namespace LastBell.Run
                 case EscapementTwinsEncounter.Wheel:
                 {
                     int want = R.Volleys(p2);
-                    var log = boss.VolleyLog.Skip(volLog).ToList();
+                    var log = boss.VolleyLog.Where(l => l.tick >= t0).ToList();
                     Check($"{n}p {ph} Escape Wheel: {want} volleys of {R.Spokes} spokes resolve, alternating Tick/Tock", boss.VolleysResolved - vol == want && mine.Count == want * R.Spokes
                         && log.Count == want && log.Select((l, i) => l.tick_ == (i % 2 == 0)).All(x => x), $"{boss.VolleysResolved - vol} volleys, {mine.Count} spokes");
                     Note($"Escape Wheel hits on the bots: {HitsSince(t0, "Escape Wheel")}");
@@ -278,7 +278,7 @@ namespace LastBell.Run
                 case EscapementTwinsEncounter.Counter:
                 {
                     int sets = R.Sets(p2), circles = n <= 1 ? sets : 2 * sets;
-                    var log = boss.SoakLog.Skip(soakLog).ToList();
+                    var log = boss.SoakLog.Where(l => l.tick >= t0).ToList();
                     Check($"{n}p {ph} Counterpoise: {circles} circle(s) resolve, none empty (no wipe)", boss.SoaksResolved - soaks == circles && boss.SoakEmpty == empty,
                         string.Join("; ", log.Select(l => $"set {l.set} need {l.need} got {l.inside}")));
                     Check($"{n}p {ph} Counterpoise: every circle soaked by at least its numeral", log.All(l => l.inside >= l.need));
