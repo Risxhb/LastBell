@@ -1256,6 +1256,9 @@ namespace LastBell.Areas.Area2.EditorTools
                 foreach (float s in new[] { -1f, 1f })
                 {
                     Parapet(m, 18.9f, 33.5f, s * 2.62f, grp, s > 0);
+                    // gate pillars with small cage lanterns at the gantry mouth, as at the entry bridge (lanterns without lights: light budget)
+                    var gm = m * T(17.2f, 0, s * 3.3f);
+                    if (Model(grp, "SM_Area2_GatePillar", gm * Matrix4x4.Rotate(Quaternion.LookRotation(Vector3.right)))) Lantern(Child(root, grp + "/Lanterns"), gm.MultiplyPoint3x4(new Vector3(0, 4.85f, 0)), 0.35f, false);
                     // suspension pylon: tall square masonry with brass bands and a pyramid cap; two chains to the deck rail
                     var pm = m * T(26f, 0, s * 3.45f);
                     if (!Model(grp, "SM_Area2_Pylon", pm))
@@ -1426,7 +1429,9 @@ namespace LastBell.Areas.Area2.EditorTools
             }
             for (int i = 0; i < 26; i++) // far silhouettes on the horizon
             {
-                float a = Rnd() * TAU, r = Rnd(170, 250), w = Rnd(6, 14), top = Rnd(15, 60); var m = TR(Polar(a, r, 0), Rnd(0, 90));
+                float a = Rnd() * TAU, r = Rnd(170, 250), w = Rnd(6, 14), top = Rnd(15, 60), yaw = Rnd(0, 90); var m = TR(Polar(a, r, 0), yaw);
+                // real foundry silhouettes (stacks, sawtooth roofs, lit windows) instead of plain cards
+                if (Model(grp, "SM_Area2_City_" + "ABCDEF"[i % 6], Matrix4x4.TRS(Polar(a, r, GROUND), Quaternion.Euler(0, yaw, 0), new Vector3(w / 6f, (top - GROUND) / 12f, w / 6f)))) continue;
                 Box(city, m, new Vector3(w, top - GROUND, w), new Vector3(0, (top + GROUND) / 2, 0));
                 Box(city, m, new Vector3(w * 0.6f, 8, w * 0.6f), new Vector3(0, top + 4, 0));
                 if (Rnd() < 0.5f) Lathe(iron, m * Matrix4x4.Rotate(Quaternion.Euler(0, 45, 0)), new[] { new Vector2(w * 0.45f, top + 8), new Vector2(0, top + 8 + w) }, 4);
@@ -1551,6 +1556,8 @@ namespace LastBell.Areas.Area2.EditorTools
                 Make("SteamVent", mSteam, p => { p.shape = Area2Particles.Shape.Point; p.center = v; p.capacity = 30; p.rate = 0.4f; p.burstInterval = 4.5f; p.burstCount = 6; p.lifetime = new Vector2(2.5f, 3.5f); p.size = new Vector2(0.6f, 1.1f); p.grow = new Vector2(0.7f, 3f); p.velocityMin = new Vector3(-0.3f, 1.2f, -0.3f); p.velocityMax = new Vector3(0.3f, 2.2f, 0.3f); p.wander = 0.3f; p.fadeIn = 0.1f; p.seed = 20 + k++; });
             foreach (var s in smokeStacks)
                 Make("ChimneySmoke", mSmoke, p => { p.shape = Area2Particles.Shape.Point; p.center = s; p.capacity = 28; p.rate = 1.6f; p.lifetime = new Vector2(10, 14); p.size = new Vector2(2.5f, 4f); p.grow = new Vector2(0.8f, 2.6f); p.velocityMin = new Vector3(0.2f, 1.8f, -0.2f); p.velocityMax = new Vector3(0.6f, 2.8f, 0.2f); p.wander = 0.4f; p.fadeIn = 0.15f; p.fadeOut = 0.5f; p.seed = 40 + k++; });
+            // a slow orange haze rising out of the abyss around the drum, so depth reads as glowing smoke, not a flat colour
+            Make("AbyssHaze", mUnderGlow, p => { p.shape = Area2Particles.Shape.Ring; p.center = new Vector3(0, -18, 0); p.radius = 34; p.thickness = 22; p.capacity = 40; p.rate = 2; p.lifetime = new Vector2(16, 22); p.size = new Vector2(16, 26); p.grow = new Vector2(0.9f, 1.4f); p.velocityMin = new Vector3(-0.2f, 0.25f, -0.2f); p.velocityMax = new Vector3(0.2f, 0.6f, 0.2f); p.fadeIn = 0.35f; p.fadeOut = 0.45f; p.seed = 95; });
             Make("SmokeBanks", mSmoke, p => { p.shape = Area2Particles.Shape.Box; p.center = new Vector3(0, -36, 0); p.boxSize = new Vector3(240, 8, 240); p.capacity = 70; p.rate = 3.5f; p.lifetime = new Vector2(18, 24); p.size = new Vector2(18, 34); p.grow = new Vector2(0.9f, 1.3f); p.velocityMin = new Vector3(-0.4f, 0, -0.4f); p.velocityMax = new Vector3(0.4f, 0.15f, 0.4f); p.fadeIn = 0.3f; p.fadeOut = 0.4f; p.seed = 90; });
         }
 
