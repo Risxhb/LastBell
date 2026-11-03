@@ -9,7 +9,8 @@ namespace LastBell.Run
 {
     // -lastbellSoloSweep: one class (-lastbellDemoClass, default the Tollbreaker) played by a Perfect bot against the four
     // main bosses (no minibosses), at 4x. Hard only by default (Chzy18, 1 Nov: the levels only scale damage); -lastbellSweepLevels
-    // Easy,Medium,Hard picks others. -lastbellSweepAllies N adds N attacking bot allies (3 = a party of 4). A measurement,
+    // Easy,Medium,Hard picks others. -lastbellSweepAllies N adds N attacking bot allies (3 = a party of 4); -lastbellSweepOnly
+    // Crucivar sweeps only the bosses whose name holds that text. A measurement,
     // not a pass/fail: each fight's result (win or loss, clear time, how far the boss got, what killed him, what hit him
     // most) goes in the report and in solo-sweep.txt.
     public sealed partial class RunAutoTest
@@ -30,6 +31,7 @@ namespace LastBell.Run
                 {
                     string name = RunDirector.Bosses[e].Name;
                     if (name.Contains("(practice)")) continue;   // minibosses are not swept (Chzy18, 2 Nov)
+                    var only = AurelionArgs.Arg("-lastbellSweepOnly"); if (only != null && !name.Contains(only)) continue;   // one boss by name
                     if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }
                     d.SelectDifficulty(level); d.SelectAllies(allies);
                     AllyBot.AllyMode = BotMode.Perfect; AllyBot.Attacks = true;

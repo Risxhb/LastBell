@@ -164,6 +164,7 @@ namespace LastBell.Run
         bool Scripted(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
         {
             if (!(boss is AurelionEncounter) && Brand(me, boss, pos, ref inp)) return true;   // Aurelion keeps its own Sunspot job
+            if (!(boss is AurelionEncounter) && Spokes(me, boss, pos, ref inp)) return true;
             if (boss is ChimeboundOracleEncounter or) return Carillon(me, or, pos, ref inp);
             if (boss is PendulumSentinelEncounter ps) return Level(me, ps, pos, ref inp);
             if (!(boss is DialWardenEncounter dw)) return false;
@@ -247,7 +248,7 @@ namespace LastBell.Run
         }
 
         // a mark that follows this player and spares them (Crucivar's Ember Brand) leaves a burning pool where it lands: walk
-        // it to the floor's edge, clear of other pools and other players, before it stops following; a threat on the way
+        // it out to a ring 11.5 m from the centre, clear of other pools and other players, before it stops following; a threat on the way
         // is dodged first (the normal reading)
         bool Brand(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
         {
@@ -260,7 +261,7 @@ namespace LastBell.Run
             if (brand == null) return false;
             bad = Bad(me, boss);
             if (bad(pos)) return false;
-            float rim = CombatWorld.PlayerBound - 1.2f, mine = Sim.YawTo(Vector3.zero, pos, 0);
+            float rim = Mathf.Min(BrandRing, CombatWorld.PlayerBound - 1.2f), mine = Sim.YawTo(Vector3.zero, pos, 0);   // not the wall: back in to the jet gaps within the 1 s freeze
             Vector3 goal = pos; float bestCost = float.MaxValue;
             for (int k = 0; k < 24; k++)
             {
@@ -268,7 +269,7 @@ namespace LastBell.Run
                 var q = Sim.Dir(yaw) * rim;
                 if (!CombatWorld.InPlayerBound(q, -0.3f)) q = Sim.Dir(yaw) * (rim - 2f);
                 bool ok = true;
-                for (int i = 0; i < live.Count && ok; i++) { var h = live[i]; if (h.BurnPerSecond > 0 && h.Contains(q)) ok = false; }
+                for (int i = 0; i < live.Count && ok; i++) { var h = live[i]; if ((h.BurnPerSecond > 0 || Jet(h)) && (h.Contains(q) || (Jet(h) && h.Contains((q + pos) / 2f)))) ok = false; }
                 foreach (var p in me.World.Players) if (ok && p && p != me && !p.Down && Sim.Flat(p.transform.position - q).magnitude < brand.Radius + 1f) ok = false;
                 if (!ok) continue;
                 float c = Sim.Flat(q - pos).magnitude;
@@ -276,11 +277,76 @@ namespace LastBell.Run
             }
             var v = Sim.Flat(goal - pos);
             var move = v.magnitude < 0.3f ? Vector3.zero : v.normalized;
-            if (move != Vector3.zero && bad(pos + move * 0.6f)) return false;
+            if (move != Vector3.zero && bad(pos + move * 0.6f)) move = Bend(pos, move);
             if (v.magnitude > 2f && me.Stamina > 30) inp.Sprint = true;
             if (move != Vector3.zero) move = AroundBoss(pos, move, boss);
             inp.Move = ToScreen(move);
             return true;
+        }
+
+        // jets turning round one hub (Crucivar's Furnace Spin) reach the wall, where they outrun a sprint: ride the middle of
+        // the nearest gap about 6.5 m out, turning with them (shown jets first, the turn read from their yaw)
+        Hazard spokeRef; float spokeYaw, spokeDir;
+        static readonly float[] SpokeRadii = { 6.5f, 5.6f, 7.4f };   // near the hub a jet covers too wide an angle, far out the gap outruns a walk
+        const float BrandRing = 11.5f;   // where a brand is walked to: its pool (2 m) stays outside the ring the jet gaps are ridden on
+        bool Spokes(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
+        {
+            var live = me.World.Hazards.Live; var jets = new List<Hazard>();
+            for (int i = 0; i < live.Count; i++)
+            {
+                var h = live[i];
+                if (Jet(h)
+                    && (jets.Count == 0 || Sim.Flat(h.Origin - jets[0].Origin).magnitude < 0.1f)) jets.Add(h);
+            }
+            if (jets.Count < 3) { spokeRef = null; return false; }
+            var j0 = jets[0];
+            if (spokeRef != j0) { spokeRef = j0; spokeYaw = j0.Yaw; spokeDir = 0; }
+            else { float dy = Mathf.DeltaAngle(spokeYaw, j0.Yaw); if (Mathf.Abs(dy) > 0.01f) spokeDir = Mathf.Sign(dy); spokeYaw = j0.Yaw; }
+            var hub = Sim.Flat(j0.Origin);
+            var yaws = new List<float>(); foreach (var h in jets) yaws.Add(Mathf.Repeat(h.Yaw, 360f));
+            yaws.Sort();
+            // a spot in a gap clear of burning pools and channels; once the jets turn, only the gap this player is in (the
+            // others are across a live jet), and a burning spot there beats leaving it
+            bool turning = j0.Age >= j0.ResolveAt;
+            float mine = Sim.YawTo(hub, pos, 0);
+            Vector3 goal = Vector3.zero; float bestCost = float.MaxValue;
+            for (int pass = 0; pass < 2 && bestCost == float.MaxValue; pass++)
+                for (int k = 0; k < yaws.Count; k++)
+                {
+                    float a = yaws[k], b = k + 1 < yaws.Count ? yaws[k + 1] : yaws[0] + 360f, mid = (a + b) / 2f + spokeDir * 6f;
+                    if (turning && Mathf.Repeat(mine - a, 360f) > b - a) continue;
+                    foreach (float r in SpokeRadii)
+                    {
+                        var q = hub + Sim.Dir(mid) * r;
+                        bool ok = CombatWorld.InPlayerBound(q, -0.3f);
+                        for (int i = 0; i < live.Count && ok && pass == 0; i++) { var h = live[i]; if ((h.BurnPerSecond > 0 || (h.Track != null && h.Includes != null && h.Age >= h.LockAt)) && (h.Contains(q) || h.Contains(hub + Sim.Dir(mid + spokeDir * 12f) * r))) ok = false; }
+                        if (!ok) continue;
+                        float c = Sim.Flat(q - pos).magnitude + Mathf.Abs(r - 6.5f);
+                        if (c < bestCost) { bestCost = c; goal = q; }
+                    }
+                }
+            if (bestCost == float.MaxValue) return false;
+            var v = Sim.Flat(goal - pos);
+            var move = v.magnitude < 0.3f ? Vector3.zero : v.normalized;
+            bad = Bad(me, boss);
+            if (move != Vector3.zero && bad(pos + move * 0.6f)) move = Bend(pos, move);   // round a pool rather than back to the plain reading, which the turning jets beat
+            if (v.magnitude > 2f && me.Stamina > 30) inp.Sprint = true;
+            if (move != Vector3.zero) move = AroundBoss(pos, move, boss);
+            inp.Move = ToScreen(move);
+            return true;
+        }
+
+        static bool Jet(Hazard h) => h.Shape == HazardShape.Lane && h.Track != null && h.ActiveTicks > 0 && h.Damage > 0 && !h.Cancelled && h.Age < h.ResolveAt + h.ActiveTicks;
+
+        // the first of a few turned steps that is not bad, else the step as it was
+        Vector3 Bend(Vector3 pos, Vector3 move)
+        {
+            foreach (float turn in new[] { 35f, -35f, 70f, -70f })
+            {
+                var alt = Quaternion.Euler(0, turn, 0) * move;
+                if (!bad(pos + alt * 0.6f)) return alt;
+            }
+            return move;
         }
 
         static Vector3 SafeRing(Vector3 pos)
@@ -444,7 +510,7 @@ namespace LastBell.Run
         }
         static bool Hits(Hazard h, PlayerController me, Vector3 q) => !h.Soak && (h.Contains(q) || SideOf(h, q)) && (h.Affects == null || h.Affects(me)) && !Spares(h, me);
         // a shape that leaves out the player standing in it (an Ember Brand never hits its own carrier) is no danger to them
-        static bool Spares(Hazard h, PlayerController me) => h.Includes != null && h.Contains(me.transform.position) && !h.Includes(me);
+        static bool Spares(Hazard h, PlayerController me) => h.Includes != null && (h.Track == null || h.Age < h.LockAt) && h.Contains(me.transform.position) && !h.Includes(me);   // a frozen brand is left: its pool forms there
         // a lane that strikes after its warning (a Toll Lane) can hit a little wider than it is drawn: keep a hand's width clear
         static bool SideOf(Hazard h, Vector3 q)
         {
