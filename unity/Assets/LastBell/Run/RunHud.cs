@@ -71,7 +71,7 @@ namespace LastBell.Run
             b is SylvaraEncounter ? new[] { 0.75f, 0.50f, 0.25f } :
             b is CrucivarEncounter ? new[] { 0.65f, 0.30f } :
             b is TempoTyrantEncounter ? new[] { TempoTyrantEncounter.FrenzyAt } :
-            b is ChimeboundOracleEncounter || b is DialWardenEncounter || b is PendulumSentinelEncounter ? new[] { 0.5f } : null;
+            b is ChimeboundOracleEncounter || b is DialWardenEncounter || b is PendulumSentinelEncounter || b is EscapementTwinsEncounter ? new[] { 0.5f } : null;
         float hitFlash;
 
         void Awake() { d = GetComponent<RunDirector>(); }
