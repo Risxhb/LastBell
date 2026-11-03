@@ -1,90 +1,115 @@
 # The Silt Carillon
 
-**Warden of the Water Steps.** A Verdant Chimes miniboss: a 2.7 m dome of mossy ivory stone with blue rose windows, carried on four brass-root legs. Three bells hang under its front arch below a small ivory face. It once measured the flow of an aqueduct by tolling the water steps. Its fight is a tide that rises and falls in rings, three bells that call a sequence, silt that has to be cleared and stones that fall from the old aqueduct.
+**Proposal (November 3, 2026), not yet approved by Chzy18.** It replaces the earlier Silt Carillon design (Rising Silt rings, Triple Toll, Sediment, Aqueduct Fall), which stays in git history. The rigged Meshy model from that design (`prototype/arena-3d/models/rigged/minibosses/SiltCarillon.glb`) is not used yet: the practice build uses a primitive stand-in.
 
-- **Status:** design and rig only. No encounter code yet. The rigged model with every clip below is `prototype/arena-3d/models/rigged/minibosses/SiltCarillon.glb` (kept out of Unity's Resources until the encounter exists).
-- **Body:** Chzy18's Meshy model (`Meshy_AI_Verdant_Bell_Shrine`), rigged in Blender with `prototype/arena-3d/models/blender/silt_carillon_rig.py`.
-- **Numbers:** first-pass targets for Medium, out of 100 player HP. Easy and Hard scale boss damage by ×0.6 and ×1.3.
+**Warden of the Drowned Steps.** A Verdant Chimes miniboss. Long ago it was the bell-tower that tolled the river's flood stages. The river silted it up, and now it rings the tide in itself. It is a squat dome of mossy ivory stone on a mud-caked base, with three sunken bells hanging under its arches. It barely moves. It controls the floor instead: mud rolls in and out across the arena, bells surface in the silt and have to be rung, and silt pours on anyone who stands still.
 
-## Rules this fight follows
+- **Area:** The Verdant Chimes (shares Sylvara's arena, `verdant-chimes`, player bound 13.5 m).
+- **Related to Sylvara, but different:** Sylvara is a bullet-hell with no punish windows and no rest. The Carillon is slow and heavy. There are no bullets: the danger is *ground* that changes under you, and the fight has a guaranteed rest (Drained) whenever the party rings its bells. The same garden, gone under water.
+- **Status:** practice only (`inRun: false`), placeholder body, raid warning look (Telegraph-Style v2, `HazardSystem.RaidStyle`) on every warning. No final model, FX or audio.
+- **Code:** `unity/Assets/LastBell/Run/Encounters/SiltCarillon/`. Launch: `Play Silt Carillon Practice.cmd` (`-lastbellPractice silt`). Test: `LastBell.exe -siltCarillonTest -lastbellOut <folder>`.
 
-- **No ability text.** Names only in the F7 overlay.
-- **Everything lands on its beat:** 96 BPM above 50%, 116 BPM below.
-- **No jumping and no dash required.** Every mechanic is survivable walking at 80% speed.
-- **No knockback.**
-- **Its danger colour is coral, never turquoise.** The arena's turquoise water stays decoration; resonance on the floor is coral.
+## Rules this fight follows (content rules)
 
-## The four mechanics
+- No ability text in the game: names appear only in the F7 diagnostics overlay.
+- Everything lands on the beat: **96 BPM above 50%, 116 BPM below**.
+- No dodge immunity, no jump or dash required: every warning passes the escape check walking at 4.2 m/s after a 0.3 s reaction.
+- No knockback on any of its hits (they would push players into the mud).
+- Danger is coral/amber; the bells you must stand in are ivory/teal friendly rims with a large numeral.
+- Shared soaks follow §5 exactly: shares split between the players inside, missing shares fall on those inside, one player alone survives from full HP, an **empty bell wipes the party**. The first bell set of the fight is introduced with a longer warning.
+- Two HP phases (50%), a harmless 2 s transformation that waits for the current attack, no heal, no enrage.
+- At most two damaging patterns at once (the tide plus one other).
+- Major punish window: **Drained**, 3.5 s with nothing live, after every rung bell set.
 
-### 1. Rising Silt (moving safe ring)
+## The four abilities
 
-- **Tell:** it squats on its four legs and the rose windows dim; a low rushing sound.
-- **The rings:** the floor is cut into 5 rings, each 2.4 m wide, from its body to the edge.
-- **The tide:** the tide floods inward one ring per 2 beats, from the outside, then ebbs back out. At any moment one ring is dry (bright), the next one in is drying, and the rest are flooded.
-- **Damage:** **35** per beat to anyone in a flooded ring.
-- **What you do:** walk in a ring at a time with the dry ring, then back out with it.
-- **Below 50%:** the dry ring is not whole. It has a 120° flooded arc that turns with it, so players walk around as well as in and out.
+### 1. Silt Tide (the safe ground shifts)
 
-### 2. Triple Toll (memory and dodge)
+Mud floods part of the floor. Once the warning fills, the mud stays as a standing pool that burns anyone in it.
 
-- **Tell:** the three bells light up one by one in an order (left, middle, right in some order), each with its own note and floor glyph.
-- **The shapes:**
-  - **Left bell:** a 120° cone from its front to the edge.
-  - **Middle bell:** a 6 m circle around it.
-  - **Right bell:** a ring from 4 m to the edge.
-  - **45 damage** each.
-- **The order:** after showing the order (one bell per beat), it waits 2 beats, then tolls them in that order, 2 beats apart.
-  - The floor warning shows only the shape coming next, and only 1 beat ahead.
-  - The order has to be remembered from the lights.
-- **Below 50%:** a sequence of 5 tolls (bells can repeat), shown 2 per beat.
+- **High Tide (above 50%):** the ring from **7 m** to the edge floods. Warning **5 beats** (3.1 s), then mud for up to **16 beats** (10 s), **25 HP/s**. It ebbs at the end of its attack, or at once when the bells are rung.
+- **Crosscurrent (below 50%):** the floor is cut into six 60° sectors from the Carillon. Three alternate sectors flood (warning **4 beats**), stay mud for **6 beats**, then drain while the other three get their 4-beat warning, and so on. The safe ground rotates round the tower. Hug a sector line and you only take a step each swap; stand at the edge and you walk up to 7 m.
+- **Melee:** Crosscurrent sectors run right up to its body. High Tide leaves the centre dry, but always comes with the bells or the Peal, which hit the centre.
+- **Ranged:** High Tide takes the whole outer ring away (the fight's "staying at range is punished" attack).
+- **Hard, Backwash (the named extra mechanic):** when mud drains, the drained ground strikes once **1.5 beats** later (**30**). Wait a beat and a half before you step into freshly drained ground.
 
-### 3. Sediment (soak to clear)
+### 2. Sunken Bells (shared soaks that push the tide back)
 
-- **Tell:** it shakes its dome; mud slaps onto the floor in pools.
-- **The pools:** 3 pools of silt (2.5 m) appear around the arena; 4 for 5+ players.
-- **Clearing:** a pool clears after a player has stood in it for 2 beats in total; standing in it does no damage. The pools set after 10 beats.
-- **Fail:** each pool still there when they set turns to stone and erupts: **40 to everyone**, plus 10 for each other uncleared pool.
-- **Solo:** the 3 pools are within reach of each other. The route is checked: walking at 80% speed clears all three with 2 beats spare.
-- **Below 50%:** each clearing leaves the clearer **Silted** for 8 beats; a Silted player can't clear another pool. Solo is exempt (one pool fewer instead).
+As a tide rises, bells surface in the dry ground. Each is a shared soak with a large numeral: the number of players it wants.
 
-### 4. Aqueduct Fall (falling stones, dense dodge)
+- **Where:** High Tide: two bells on opposite sides of the tower, 4.5 m out (the dry disc). Crosscurrent: in two of the three dry sectors, 6 m out. Radius 1.6 m (room for two).
+- **When:** they toll **3 beats after the mud locks** (8 beats after they surface; the first set of the fight gets 3 more beats, Easy 2 more).
+- **Damage:** **60** per bell, split between everyone inside. Fewer than the numeral: the missing shares fall on those inside (one player alone takes 60 and lives). **An empty bell wipes the party** (§5).
+- **Reward:** when every bell of the set has been rung, the tide drains at once and the Carillon is **Drained**: it slumps for **3.5 s** with nothing live. This is the major punish window.
+- **Melee and ranged:** a bell is somewhere specific, so nobody can just stay where they are.
 
-- **Tell:** it rears up on its back legs and the bells swing wildly. The sky shadows of falling stone appear.
-- **The stones:** for 8 beats, 6 stones land per beat at random spots (2 m circles). Each shadow grows for 2 beats before its stone lands.
-- **Damage:** **30** per stone.
-- **Fairness:** the stones are placed so that every 2 m spot on the floor has a stone-free neighbour reachable in time. No stone lands on a spot where a stone landed the beat before.
-- **Below 50%:** 9 per beat, and the stones leave rubble that lasts 4 beats (stone-coloured, harmless, but no new stone lands on it). Standing in rubble is the safe way to wait.
+| Party | Bells | What players do |
+|---|---|---|
+| 1 (solo) | one bell **I** | ring it yourself |
+| 2 | **I** and **I**, opposite sides | the pair splits round the tower |
+| 3 | **II** and **I** | a pair and a single |
+| 4 | **II** and **II**, opposite sides | two pairs |
 
-## Phases, rotation and enrage
+Bot allies (0–3) take bells like players do (the generic soak job: each bell takes its count, nearest first).
 
-- **Above 50%:** Triple Toll → Rising Silt → Sediment → Aqueduct Fall, then repeat.
-- **At 50%:** HP holds. The back arch lifts, the bells drop lower, a gold regulator core shows in the dome, the beat goes from 96 to 116 BPM, and it casts a Rising Silt with the turning flooded arc.
-- **Below 50% (combinations):**
-  - Triple Toll during Aqueduct Fall.
-  - Sediment with Rising Silt: the pools sit in the rings, so you clear them when the tide lets you.
-  - Triple Toll (five tolls).
-  - Aqueduct Fall with rubble.
-- **No enrage** (content rules §5). Its other parts still need checking against those rules (phase change, Hard mechanic, soaks) before it is built.
-- **Max HP:** 3500.
+### 3. Silt Fall (sediment weighs down whoever stands still)
 
-## Difficulty
+Silt pours from its arches onto every player, once per beat.
+
+- **The drops:** each standing player gets **4 drops** (**5** below 50%), one per beat. A drop is a 1.8 m circle that follows its player, locks **1.5 beats** before it lands (**1.75** at 116 BPM, so it is never under 0.9 s), and hits for **30**.
+- **Mounds:** each landed drop leaves a silt mound (same circle) that burns **20 HP/s** for **6 beats**, then sets and disappears.
+- **What you do:** keep walking. A moving player is never hit; a player who stands still is. The mounds you leave behind are your trail, so walk where your trail won't block the others.
+- **Melee and ranged:** every player is targeted wherever they stand.
+- **Co-op:** drops don't care whose they are: one landing on two players hits both. **2 players:** take opposite sides of the tower. **3:** thirds. **4:** quadrants, each walking their own arc. **Solo:** one trail. In 4-player co-op the floor fills with up to 16 mounds, so the party needs a plan, but the mounds always expire.
+
+### 4. Drowned Peal (in, out, in)
+
+The great bell under the dome tolls and the sound rolls across the floor in three bands:
+
+- **A:** circle 0–4.5 m (round the tower), **B:** ring 4.5–9 m, **C:** ring 9 m–edge. **40** each.
+- **Outgoing peal:** A, then B, then C. **Ebb peal (below 50%):** C, then B, then A.
+- **Timing:** the first band lands after **4 beats**, then one band every **1.5 beats**. All three are shown from the start; the next to land is the one on top, filling fastest.
+- **What you do:** stand next to the band that lands first, step into it once it has landed, and stay there. Hug the tower in an outgoing peal and you must step out to 4.8 m and back in. At range you get close to the 9 m line before the first band lands.
+- **Melee and ranged:** band A hits the hugger, band C hits the long-range player.
+- **Co-op:** individual. With High Tide or Crosscurrent at the same time, the safe ground is smaller and has to be shared.
+
+## Phases and rotation
+
+Each attack ends only when its last hazard has gone (mounds included), then 1 beat of rest.
+
+- **Phase 1 (100–50%, 96 BPM):** High Tide + Sunken Bells (Drained) → Silt Fall → Outgoing Peal → High Tide + Outgoing Peal → Silt Fall → repeat.
+- **50%:** it finishes the current attack, then 2 s of harmless transformation (it stays damageable, nothing spawns), and the tempo rises to 116 BPM.
+- **Phase 2 (50–0%, 116 BPM):** Crosscurrent + Sunken Bells (Drained) → Silt Fall (5 drops) → Ebb Peal → Crosscurrent + Outgoing Peal → Silt Fall → repeat.
+- **Max HP:** 3200 (not party-scaled; bots don't attack by default).
+- **No enrage** (§5).
+
+## Numbers by difficulty
+
+Medium is the baseline. Every level also scales boss damage (Easy ×0.6, Hard ×1.3).
 
 | | Easy | Medium | Hard |
 |---|---|---|---|
-| Tide speed | 3 beats per ring | 2 beats per ring | 2 beats per ring, flooded arc above 50% too |
-| Triple Toll floor warning | the whole order | the next shape, 1 beat ahead | none (lights only) |
-| Sediment time to set | 12 beats | 10 beats | 8 beats |
-| Stones per beat | 4 | 6 | 8 |
+| High Tide warning | 6 beats | 5 beats | 5 beats |
+| Crosscurrent warning | 5 beats | 4 beats | 4 beats |
+| Bell toll after the mud locks | 5 beats | 3 beats | 3 beats |
+| Silt Fall drop lock-to-land | +0.5 beat | 1.5 (1.75 at 116) | 1.5 (1.75 at 116) |
+| Drowned Peal first band / gap | 5 / 2 beats | 4 / 1.5 beats | 4 / 1.5 beats |
+| Extra mechanic | – | – | **Backwash** |
 
-## Rig clips
+## Escape checks (4.2 m/s, 0.3 s reaction)
 
-The dome, each leg (upper and lower) and each of the three bells are rigid parts pinned to bones.
+The acceptance test checks these, plus a walker for each one:
 
-| Clip | Use |
-|---|---|
-| Idle, Walk | four-legged walk, bells swaying |
-| Squat, TideLoop | Rising Silt: low on its legs, rocking with the tide |
-| TollLeft, TollMiddle, TollRight | Triple Toll: each bell swung hard, the body leaning into it |
-| DomeShake | Sediment |
-| Rear, RearLoop | Aqueduct Fall: up on its back legs, the bells swinging wildly |
-| PhaseShift, Defeat | |
+- High Tide: edge to inside 7 m (6.8 m to walk) in 5 beats at 96 BPM: 11.9 m of walking time.
+- Crosscurrent: the middle of a sector at the edge to the nearest dry sector (7.05 m) in 4 beats at 116 BPM: 7.4 m.
+- Silt Fall: from the centre of a locked drop out of it (2.1 m) in 1.5 beats at 96 / 1.75 at 116: 2.7 / 2.5 m.
+- Drowned Peal: across a band boundary into the band that just landed (0.6 m) in 1.5 beats at 116: 2.0 m.
+- Bells: from anywhere on the dry ground to a bell in 8 beats at 116 BPM.
+
+## Open questions for review
+
+1. **Empty bell = wipe.** That's what §5 requires of a shared soak, but it is harsh for a miniboss. Is a big party-wide hit acceptable instead?
+2. **Area motif:** the shader has no Verdant Chimes motif yet, so every warning uses the default raid motif (Skyward light rays). Should we add one?
+3. **Rest between attacks:** Drained is the only 3.5 s window. Should the Peal have a short recovery too?
+4. **Model:** use the old rigged Meshy model once its clips are remapped, or make a new one?
+5. **Run slot:** practice only for now. Which miniboss slot should it take in the Verdant Chimes run?
