@@ -288,7 +288,9 @@ namespace LastBell.Run.Networking
                 GUI.Label(new Rect(point.x - 90, Screen.height - point.y - 24, 180, 24), NameOf(pair.Key), nameStyle);
             }
         }
-        string NameOf(int id)
+        // The lobby name and the drawn class of a player in this fight (name tags; diagnostics).
+        public string ClassOf(int id) => actors.TryGetValue(id, out var a) && a.Player ? a.Player.ClassName : null;
+        public string NameOf(int id)
         {
             foreach (var m in lobby.Members) if (m.Id == id && !string.IsNullOrEmpty(m.Name)) return m.Name;
             return id == 0 ? "Host" : "Player " + id;

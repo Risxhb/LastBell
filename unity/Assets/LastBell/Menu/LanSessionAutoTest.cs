@@ -93,6 +93,10 @@ namespace LastBell.Menu
         IEnumerator HostFight(LanSessionCoordinator session)
         {
             var d=RunDirector.Instance;
+            var lanRoster=LanHostRoster.Active; var lobbyMembers=session.Lobby.Members.OrderBy(m=>m.Id).ToList();
+            Check("fight players match the lobby: host class, remote names and classes",d && lanRoster!=null && d.ClassName==lobbyMembers[0].ClassName
+                && lanRoster.Remote.Select(m=>m.Name+"/"+m.ClassName).SequenceEqual(lobbyMembers.Skip(1).Select(m=>m.Name+"/"+m.ClassName))
+                && d.Allies.Select(a=>a.ClassName).SequenceEqual(lobbyMembers.Skip(1).Select(m=>m.ClassName)));
             Check("host has all remote player actors",d && d.World != null && d.Allies.Count==PeerCount() && d.Allies.All(a=>a.ClassName==ClientClass));
             if (!d || d.World==null || d.Allies.Count!=PeerCount()) yield break;
             Vector3 initial=d.Allies[0].transform.position;
@@ -144,13 +148,14 @@ namespace LastBell.Menu
         {
             float until=Time.realtimeSinceStartup+100; bool observedCombat=false, observedDamage=false, observedResult=false, observedHazard=false, observedTelegraph=false, observedProjectile=false, observedHud=false, observedOwnCooldown=false;
             float combatSince=-1, combatTime=0; int combatFrames=0; bool shotCombat=false;
-            float maxLead=0; LanWorldFrame lastFrame=null; int snapshots=0, movedFrames=0; Vector3 lastSnapshotPos=Vector3.zero; Vector3 lastDrawn=Vector3.zero; bool haveDrawn=false;
+            bool rosterMatched=false; float maxLead=0; LanWorldFrame lastFrame=null; int snapshots=0, movedFrames=0; Vector3 lastSnapshotPos=Vector3.zero; Vector3 lastDrawn=Vector3.zero; bool haveDrawn=false;
             while (session && session.ClientView && Time.realtimeSinceStartup<until)
             {
                 var state=session.ClientView.Current;
                 if (state!=null)
                 {
                     var d=RunDirector.Instance; var me=state.Players.Find(p=>p.Id==session.Lobby.LocalId);
+                    if (!rosterMatched) { var view=session.ClientView; rosterMatched=session.Lobby.Members.All(m=>view.NameOf(m.Id)==m.Name && view.ClassOf(m.Id)==m.ClassName); }
                     maxLead=Mathf.Max(maxLead,session.ClientView.PredictionLead);
                     // the normal RunHud draws the replica: the director holds this client's player, fed by the host's numbers
                     observedHud |= RunHud.LanClientView && d && d.Player && d.World!=null && me!=null && d.Player.Hp==me.Hp && d.Player.Kit.NetCooldowns!=null && (state.Boss==null || (d.Boss && d.Boss.Hp==state.Boss.Hp));
@@ -182,6 +187,7 @@ namespace LastBell.Menu
             Check("client receives fight results",observedResult);
             Check("client HUD shows the host's fight (health, cooldowns, boss)",observedHud);
             Check("client sees its own class abilities go on cooldown",observedOwnCooldown);
+            Check("client draws every lobby player with their lobby name and class",rosterMatched);
             var fx=session.ClientView ? session.ClientView.Effects : null;
             if (fx!=null) Debug.Log("[LAN smoke] client effects: "+fx.Played+" played, "+fx.Failed+" failed: "+string.Join(", ",fx.PlayedMethods.OrderBy(m=>m)));
             string[] bossSide={"Float","Shake","SweepResolve","TollResolve","ChargeTrail","ChargeLand","ChimeResolve","BossHit","PlayerHit","PotionHeal","ResetAll","Crescendo"};

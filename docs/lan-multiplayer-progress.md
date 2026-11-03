@@ -1,5 +1,19 @@
 # LAN multiplayer: transport foundation (unfinished)
 
+## November 3: the LAN lobby (names, classes, Ready, start), on the Tollbreaker base
+
+Branch `feature/lan-lobby` (worktree `lan-lobby/` in the workspace), planned in the workspace's `docs/lan-lobby-plan-20261102.md`. The LAN work above was committed as of 3 Nov 00:28 and merged with Azure PRs 14–20 (Tollbreaker replaces Vanguard) and the Tutorial.
+
+- **Classes:** Tollbreaker, Chimesinger, Arcanist (`LanLobby.ClassList`, checked against `RunDirector.Classes`). The Vanguard's effect replay cases were dropped when its effects were removed.
+- **Names:** `LanProfile` saves the player's name in `persistentDataPath/lan-profile.json`; `-lastbellProfile <name>` names one run without saving. Rules in `LanPlayerName` (2–16 ASCII letters, digits, space, _ or -). The host suffixes duplicates (" (2)").
+- **Lobby rules (protocol 4), all enforced by the host:** everyone, host included, presses Ready; Ready locks your class; changing boss or arena un-readies everyone; a joiner starts not ready and others keep theirs; Start needs 2+ players, all ready (`CanStart`, `StartBlocker`).
+- **Lobby scene** `Menu/LanLobby.unity` (`LanLobbyScreen`): name card → Host/Connect → lobby with the boss and arena at the top (host pickers; clients read-only with a change notice), four slots with each player's class model and name, Ready and Start. Controls and the full flow: [lan-lobby-playtest.md](lan-lobby-playtest.md).
+- **Fights** show lobby names over players; the diagnostics check that the fight's players, names and classes match the lobby.
+
+**Verified on `builds/lan-lobby-20261103/r6/LastBell.exe`** (workspace; 0 errors / 63 warnings; evidence `build-evidence/lan-lobby-20261103/r6/`), one Windows computer, automated players: .NET harness 201/201; menu diagnostic 49/49 and 40/40 with `-lastbellProfile` (host and client screenshots in `menu/`); every fight run readies, has the host change the boss and back, readies again and starts: Tempo Tyrant host + 1 Tollbreaker client and host + 1 Arcanist client (host 22/22, client 19/19), host + 3 Tollbreaker clients (22/22, 19/19 each), Bellkeeper host + 1 Chimesinger client (22/22, 19/19); 0 exceptions. Lobby 190–220 fps with four models at 2560×1440.
+
+Not done: a person playing it, two computers, non-16:9 screens; after a fight everyone returns to the main menu rather than the lobby.
+
 ## November 3: clients see the host's effects and their own movement responds at once
 
 Goal (user): a client should play the game the way the host does.
