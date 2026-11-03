@@ -28,6 +28,10 @@ namespace LastBell.Run
         protected virtual float PartyStep => 0.7f;        // the packets' provisional 0.7 per extra fighter
         public event Action<BossEncounter> Defeated;
         public event Action<BossEncounter, string> PhaseChanged;
+        // Tutorial hooks (Run/Tutorial): BeforeStep runs at the start of every combat tick, before the script; HpFloor > 0
+        // keeps HP from dropping below it (the tutorial boss can't die until told to). DebugDefeat ignores the floor.
+        public event Action<BossEncounter> BeforeStep;
+        public int HpFloor;
 
         protected CombatWorld W;
         IEnumerator<int> script; int wait;
@@ -74,6 +78,8 @@ namespace LastBell.Run
         public void Step()
         {
             if (Dead) return;
+            BeforeStep?.Invoke(this);
+            if (Dead) return;
             Age++;
             StepAlways();
             if (script == null) return;
@@ -92,7 +98,8 @@ namespace LastBell.Run
             if (Dead) return 0;
             damage = Absorb(damage);   // a shield (Aurelion v4 Corona Shield) takes its share first
             if (damage <= 0) { RunHud.Float(contact + Vector3.up * 0.5f, "absorbed", new Color(0.7f, 0.85f, 1f)); return 0; }
-            int dealt = Mathf.Min(damage, Hp);
+            int dealt = Mathf.Min(damage, Hp - Mathf.Clamp(HpFloor, 0, Hp));
+            if (dealt <= 0) { RunHud.Float(contact + Vector3.up * 0.5f, "held", new Color(0.7f, 0.85f, 1f)); return 0; }
             Hp -= dealt;
             RunHud.Float(contact + Vector3.up * 0.5f, dealt.ToString(), new Color(1f, 0.86f, 0.45f));
             if (hitFx) W.BossFx.BossHit(contact);   // abilities with their own impact effect skip the shared flash
@@ -103,7 +110,7 @@ namespace LastBell.Run
         }
 
         // dev / test hook: defeat now (goes through the same path as a killing blow)
-        public void DebugDefeat() { if (!Dead) { Hp = 1; TakeHit(1, transform.position + Vector3.up * HitHeight); } }
+        public void DebugDefeat() { if (!Dead) { HpFloor = 0; Hp = 1; TakeHit(1, transform.position + Vector3.up * HitHeight); } }
         public virtual float NextPhaseFraction() => Hp > MaxHp * 0.7f ? 0.69f : 0.34f;   // F8: just below the next threshold
         public void DebugSetHpFraction(float f){ if (!Dead) Hp = Mathf.Clamp(Mathf.RoundToInt(MaxHp * f), 1, MaxHp); }
 
