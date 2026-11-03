@@ -5,8 +5,9 @@ namespace LastBell.Run
     // Warms Aurelion's world-label and banner text before the fight (perf captures 3 Nov: the first "NIGHT ☾ / DAY ☉" at the
     // 40 % step loaded the font's fallback glyphs inside one frame, 59 ms; the first Phase 2 labels laid out new text, 23-30 ms).
     // Added by AurelionEncounter.Build. IMGUI lays text out through TextCore, which loads glyphs and tables only on a real
-    // draw, so each OnGUI repaint draws the whole set once with GUI.Label, invisible, at one size and style (the run HUD's
-    // labels, banners and captions use the plain skin label), then it removes itself.
+    // draw (CalcSize and Font.RequestCharactersInTexture only churn the legacy atlas, perf 3 Nov), so each OnGUI repaint
+    // draws the whole set once with GUI.Label, invisible, at one size and style (the run HUD's labels, banners and
+    // captions use the plain skin label), then it removes itself.
     public sealed class AurelionWarmUp : MonoBehaviour
     {
         static readonly (int size, FontStyle style)[] Steps =
@@ -31,9 +32,6 @@ namespace LastBell.Run
             var s = size > 0 ? new GUIStyle(GUI.skin.label) { fontSize = size, fontStyle = style, alignment = TextAnchor.MiddleCenter, wordWrap = false, clipping = TextClipping.Overflow }
                              : UiTheme.Style(UiTheme.SizeNumeric, true, TextAnchor.MiddleRight, UiTheme.Ivory);
             s.normal.textColor = new Color(1, 1, 1, 0);
-            s.CalcSize(new GUIContent(chars));
-            var font = s.font != null ? s.font : GUI.skin.font;
-            if (font != null && font.dynamic) font.RequestCharactersInTexture(chars, s.fontSize, s.fontStyle);
             GUI.Label(new Rect(0, 0, Screen.width, s.fontSize * 1.5f), chars, s);
             if (++step >= Steps.Length) Destroy(this);
         }
