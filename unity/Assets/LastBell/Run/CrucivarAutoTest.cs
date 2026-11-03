@@ -99,6 +99,8 @@ namespace LastBell.Run
             File.WriteAllBytes(Path.Combine(dir, $"{++shots:00}_{name}.png"), tex.EncodeToPNG()); Destroy(tex);
         }
         public int Failures => fail;
+        const float TestBudget = 600;   // real seconds per ability test, well above the longest one
+        void WriteReport(string tag) => File.WriteAllLines(Path.Combine(dir, "crucivar-report.txt"), new[] { $"Crucivar autotest: {pass} passed, {fail} failed {tag}".TrimEnd() }.Concat(lines));
 
         // ---------------- waiting ----------------
         public IEnumerator Seconds(float s) { float t = 0; while (t < s) { t += Time.deltaTime; yield return null; } }
@@ -210,20 +212,26 @@ namespace LastBell.Run
             {
                 section = t.Id; int before = fail;
                 Note($"---- {t.Id} ----");
-                var e = t.Run(this);
-                while (true)
+                // nested waits (Setup, Until, Ticks...) run on this stack, not Unity's, so an exception in one is caught here
+                // instead of silently ending the suite with the editor left open; a test past its budget is stopped
+                var stack = new Stack<IEnumerator>(); stack.Push(t.Run(this));
+                float start = Time.realtimeSinceStartup;
+                while (stack.Count > 0)
                 {
-                    object cur;
-                    try { if (!e.MoveNext()) break; cur = e.Current; }
+                    if (Time.realtimeSinceStartup - start > TestBudget) { Check($"test finished within {TestBudget / 60:0} min", false, $"stopped after {Time.realtimeSinceStartup - start:0} s"); break; }
+                    var e = stack.Peek(); object cur;
+                    try { if (!e.MoveNext()) { stack.Pop(); continue; } cur = e.Current; }
                     catch (Exception ex) { Check("test body ran without an exception", false, ex.GetType().Name + ": " + ex.Message); break; }
+                    if (cur is IEnumerator inner) { stack.Push(inner); continue; }
                     yield return cur;
                 }
+                if (Boss != null) Boss.TestHold = true;
                 Note($"{t.Id}: {(fail == before ? "all passed" : (fail - before) + " failed")}");
+                WriteReport("(running)");   // a stuck run still shows which test it reached
             }
             section = "suite";
             Check("no errors or exceptions logged", errors == 0, $"{errors}");
-            lines.Insert(0, $"Crucivar autotest: {pass} passed, {fail} failed");
-            File.WriteAllLines(Path.Combine(dir, "crucivar-report.txt"), lines);
+            WriteReport("");
             Debug.Log($"[crucivar-test] done: {pass} passed, {fail} failed");
             yield return Seconds(0.5f);
 #if UNITY_EDITOR
