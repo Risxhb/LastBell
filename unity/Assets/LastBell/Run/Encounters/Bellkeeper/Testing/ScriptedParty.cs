@@ -40,7 +40,7 @@ namespace LastBell.Run
 
     public static class ScriptedParty
     {
-        public static PlayerController Add(CombatWorld w, Vector3 pos, string className = "Arcanist")
+        public static PlayerController Add(CombatWorld w, Vector3 pos, string className = "Tollbreaker")
         {
             var p = PlayerController.Spawn(w, className, new Vector3(pos.x, 0, pos.z), 180);
             p.Input = new ScriptedPlayer();

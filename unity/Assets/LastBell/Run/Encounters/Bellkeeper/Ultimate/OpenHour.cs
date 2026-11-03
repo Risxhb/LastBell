@@ -256,7 +256,6 @@ namespace LastBell.Run
             float a = ArmAngle(t) + 60 + 120 * (h % 3);
             // a solo melee player weaves against the boss, where its swings reach (its lunge into the solid boss can't carry it into a
             // bullet); a party keeps the rings, where the others' echoes stay clear
-            if (Party == 1 && p.ClassName == "Vanguard") return Dir(a) * (Boss.BodyRadius + PR + 0.35f);
             return Dir(a) * Mathf.Min(rings[h % 4], Bound - 0.6f);
         }
         float Bound => Mathf.Min(11.6f, CombatWorld.PlayerBound - 0.1f);
@@ -275,7 +274,6 @@ namespace LastBell.Run
             if (!Running || p.Down) return false;
             var q = Sim.Flat(p.transform.position); float t = T;
             reach = (q - Sim.Flat(Boss.transform.position)).magnitude - Boss.BodyRadius;
-            if (p.ClassName == "Vanguard" && reach > 0.6f) reach = 99;   // melee swings only pressed against the boss: a lunge elsewhere carries it into bullets
             foreach (var m in mines) if (m.Owner == p && !m.Done && m.At > t && m.At <= t + 1.2f && (q - m.P).magnitude < EchoR + PR + 0.6f) { reach = 99; break; }
             GoalOf(p, t, out bool urgent, out _, out _); if (urgent) reach = 99;   // the plate or a curtain is due: no rooting swing
             return true;

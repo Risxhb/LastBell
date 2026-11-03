@@ -59,9 +59,9 @@ namespace LastBell.Run
                         inp.Sprint = vel.magnitude > PlayerController.WalkSpeed + 0.1f;
                         for (int i = 0; i < cd.Length; i++) if (cd[i] > 0) cd[i]--;
                         beamHold = 0;   // a steered phase never holds a beam
-                        // an Arcanist's shots slow its caster (x0.6, merged kit 27 Oct): no shots on a sprint (an urgent dodge); the
+                        // an Arcanist's shots and a Tollbreaker's throws slow their caster (x0.6): no shots on a sprint (an urgent dodge); the
                         // route search plans its first leg at the current speed, so a shot in progress is part of the plan
-                        bool slowsMe = me.Kit is ArcanistKit && vel.magnitude > PlayerController.WalkSpeed + 0.1f;
+                        bool slowsMe = (me.Kit is ArcanistKit || me.Kit is TollbreakerKit) && vel.magnitude > PlayerController.WalkSpeed + 0.1f;
                         // a press that roots or slows past the search's first leg (a melee swing, to its end): only if the route search
                         // still finds a way with no hit after standing that long (31 Oct: each kit says how long a press holds it)
                         bool RootOk(int slot) { float r = me.Kit != null ? me.Kit.RootFor(slot) : 0; return r <= 0.2f || m.SafeToRoot(me, r, me.Kit.RootScale(slot)); }
@@ -75,7 +75,7 @@ namespace LastBell.Run
                         else
                         {
                             float gap = Sim.Flat(bpos - pos).magnitude - boss.BodyRadius;
-                            if (Attacks && (me.ClassName != "Vanguard" || gap <= 0.6f) && !slowsMe && gap <= Reach(me) + 1f && pressNow && RootOk(0)) { inp.P0 = inp.H0 = true; lastPress = tick; }
+                            if (Attacks && !slowsMe && gap <= Reach(me) + 1f && pressNow && RootOk(0)) { inp.P0 = inp.H0 = true; lastPress = tick; }
                         }
                         if (me.Potions > 0 && me.Hp < DrinkBelow(me) && me.Hp < PlayerController.MaxHp) inp.Potion = tick % 4 == 0;
                         DebugLine = $"{m.Name}: v ({vel.x:0.0},{vel.z:0.0}) at ({pos.x:0.0},{pos.z:0.0})";
@@ -159,8 +159,7 @@ namespace LastBell.Run
             float bossGap = Sim.Flat(bpos - pos).magnitude - boss.BodyRadius;
             // no swings while walking to a spot or just before a rule: lunges and casts would carry it off its spot
             // (a memory spot, e.g. a Stopped Hour hiding spot that also aims frozen clocks, is held still for its last 1.5 s)
-            // (a Vanguard's lunges carry it about a metre: no swings in the last 1.25 s before any rule)
-            bool positioning = hasTarget && (Sim.Flat(target - pos).magnitude > 0.5f || (rules.Count > 0 && rules[0].Tick - now < (rules[0].Memory ? 90 : me.ClassName == "Vanguard" && !((rules[0].From is EscapementRelay || (rules[0].From is BrokenHour && w.Players.Count == 1)) && Sim.Flat(bpos - pos).magnitude - boss.BodyRadius <= 0.7f) ? 75 : 30)));
+            bool positioning = hasTarget && (Sim.Flat(target - pos).magnitude > 0.5f || (rules.Count > 0 && rules[0].Tick - now < (rules[0].Memory ? 90 : 30)));
             for (int i = 0; i < cd.Length; i++) if (cd[i] > 0) cd[i]--;
             // Chimesinger: Mending Chorus (burst heal round the caster) when it would top up a hurt ally or two (potions run out in P5)
             if (Attacks && me.ClassName == "Chimesinger" && cd[4] == 0 && tick - lastPress >= 6)
@@ -311,10 +310,9 @@ namespace LastBell.Run
             return !In(pos) && In(pos + dir * 0.6f) && !In(pos + dir * (PlayerController.DashDistance - 0.25f));
         }
 
-        // drink below this: melee lives next to the boss, where 50-damage bullets come in pairs, so it tops up before one hit can
-        // leave it a hit from death (party Vanguards were dying in P5 with potions left)
-        static int DrinkBelow(PlayerController me) => me.ClassName == "Vanguard" ? 75 : 55;
-        float Range(PlayerController me) => me.ClassName == "Vanguard" ? 0.9f : me.ClassName == "Chimesinger" ? 6.0f : 7.5f;
+        // drink below this
+        static int DrinkBelow(PlayerController me) => 55;
+        float Range(PlayerController me) => me.ClassName == "Tollbreaker" ? 3.5f : me.ClassName == "Chimesinger" ? 6.0f : 7.5f;
         // how far its attacks reach (Range is where it stands when idle): the redesigned Arcanist's missiles fly 18 m and its beam,
         // rune and comet reach 16-20 m (merged 27 Oct), so it no longer has to walk in to 7.5 m to shoot
         float Reach(PlayerController me) => me.Kit is ArcanistKit ? 15f : Range(me);
@@ -326,8 +324,16 @@ namespace LastBell.Run
             int s;
             switch (me.ClassName)
             {
-                case "Vanguard":
-                    if (cd[2] == 0) { s = 2; cd[2] = 600; } else if (cd[1] == 0) { s = 1; cd[1] = 240; } else s = 0;
+                // Tollbreaker (kit spec rotation, as AllyBot): frenzy in a quiet moment, split him, recall through him, grind, throw
+                case "Tollbreaker":
+                    if (!(me.Kit is TollbreakerKit tb) || tb.Acting) return;
+                    bool TbReady(int k) => tb.Cooldown01(k) <= 0.001f;
+                    if (TbReady(4) && tb.AxesStuck == 0) s = 4;                                         // Bell Frenzy
+                    else if (TbReady(2) && tb.AxesInHand > 0 && !tb.SplitActive) s = 2;                // Splitting Throw (planted 0.4 s)
+                    else if (TbReady(3) && tb.AxesStuck > 0 && (!tb.SplitActive || tb.AxesInHand == 0)) s = 3;   // Call of Iron
+                    else if (TbReady(1) && tb.AxesInHand > 0) s = 1;                                    // Grinding Toll
+                    else if (tb.AxesInHand > 0) s = 5;                                                  // Twin Hurl: a tap (holding would lodge it)
+                    else return;
                     break;
                 case "Chimesinger":
                     if (cd[3] == 0) { s = 3; cd[3] = 480; } else if (cd[2] == 0) { s = 2; cd[2] = 300; } else if (cd[1] == 0) { s = 1; cd[1] = 150; } else s = 0;

@@ -128,7 +128,6 @@ namespace LastBell.Run
         int HourOf(PlayerController p) { int i = W.Players.IndexOf(p); return i < 0 ? -1 : i % 4; }
         bool HourPresent(int h) { foreach (var p in W.Players) if (!p.Down && HourOf(p) == h) return true; return false; }
         bool OnPlate(int k, Vector3 q, float slack = 0) => Has(k, 0) && HourPresent(Soaker(k)) && (Sim.Flat(q) - PlatePos(k)).magnitude < PlateSize + slack;
-        static bool Melee(PlayerController p) => p.ClassName == "Vanguard";
 
         // ---------------- cast ----------------
         public override IEnumerable<int> Cast()
@@ -286,7 +285,7 @@ namespace LastBell.Run
             if (Standing(t))
             {
                 // the last stand: on my platform, as near the boss as it allows (melee at its inner edge), clear of the next shards
-                var want = plat - plat.normalized * (Melee(p) ? 1.2f : 0.4f);
+                var want = plat - plat.normalized * 0.4f;
                 var due = new List<Vector3>(); for (int n = 0; n < ShardCount; n++) { var sh = Shard(n); if (sh.h == h && sh.at > t - 0.05f && sh.at - t < 1.3f) due.Add(sh.p); }
                 if (due.Count > 0)
                 {
@@ -318,11 +317,11 @@ namespace LastBell.Run
             if (k >= 9 && k <= 12 && k % 2 == 1)   // the echo rings next: be at it as it does
             {
                 var E = EchoPos(k); float ea = AngOf(E) + (i % 2 == 1 ? 100 : -100) + ((i % 4) < 2 ? -20 : 20);
-                job = (Melee(p) ? "melee" : "ranged") + " → ECHO"; return Clear(k, E + Dir(ea) * (Melee(p) ? EchoRad + PR + 0.7f : 4.5f), null);
+                job = "→ ECHO"; return Clear(k, E + Dir(ea) * 4.5f, null);
             }
             float a = (k < 13 ? LaneAng(k) : 0) + 90 + (i % 2 == 1 ? 0 : 180) + ((i % 4) < 2 ? -25 : 25);
-            job = (Melee(p) ? "melee" : "ranged") + (k >= 9 ? " → BOSS" : "");
-            return Clear(k, Dir(a) * (Melee(p) ? 3.1f : 5.2f), null);
+            job = k >= 9 ? "→ BOSS" : "";
+            return Clear(k, Dir(a) * 5.2f, null);
         }
 
         public override bool Steer(PlayerController p, UltimateBot.Skill skill, out Vector3 vel)
@@ -349,14 +348,12 @@ namespace LastBell.Run
             var q = Sim.Flat(p.transform.position); float t = T; int k = Cur(t) + 1;
             reach = q.magnitude - Boss.BodyRadius - PR;
             if (EchoOn(t) && EchoLive(t)) { var E = EchoAt(t); aim = E + Vector3.up * 1.2f; reach = (q - E).magnitude - EchoRad - PR; }
-            bool shardSoon = false; if (t > TollAt[13] - 1.5f) { int hh = HourOf(p); for (int n = 0; n < ShardCount; n++) { var sh = Shard(n); if (sh.h == hh && sh.at > t - 0.05f && sh.at - t < 1.4f) shardSoon = true; } }
             float left = Standing(t) ? 99 : NextAt(k) - t, R1 = RingR(t), R2 = EchoV(t), myR = q.magnitude;
             bool ringSoon = (R1 > 0 && R1 > myR - 1.2f && (R1 - myR) / RingSpeed < 0.7f) || (R2 > 0 && R2 > myR - 1.2f && (R2 - myR) / RingSpeed < 0.7f);
-            bool settled = plans.TryGetValue(p, out var pl) && (q - Sim.Flat(pl.Goal)).magnitude < (Melee(p) ? 1.5f : 3f);
-            // casts slow you (the Vanguard's basic roots it): ranged swing on the move, melee once near its spot; never with a ring
+            bool settled = plans.TryGetValue(p, out var pl) && (q - Sim.Flat(pl.Goal)).magnitude < 3f;
+            // casts slow you: swing on the move, never with a ring
             // or the toll close (the route search counts the slowdown)
-            float nearB = 9; foreach (var b in bullets) nearB = Mathf.Min(nearB, (b.P - q).magnitude);
-            if (!settled || ringSoon || left < (Melee(p) ? 1.3f : 0.6f) || (Melee(p) && (nearB < 2.2f || shardSoon))) reach = 99;   // nor a lunge into a bullet or under a shard   // the Vanguard's combo lunges: not into the lane
+            if (!settled || ringSoon || left < 0.6f) reach = 99;
             fullKit = settled && !ringSoon && left > 1.6f;
             return true;
         }

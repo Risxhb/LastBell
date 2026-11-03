@@ -52,7 +52,7 @@ namespace LastBell.Run
 
         // ---------------- harness ----------------
         // level: Hard by default, the Ultimate's designed numbers (gpt/08 §5, 27 Oct); every exact-damage and timing check is written for them
-        IEnumerator UltStart(string ability = null, string segment = null, string cls = "Arcanist", Difficulty level = Difficulty.Hard)
+        IEnumerator UltStart(string ability = null, string segment = null, string cls = "Tollbreaker", Difficulty level = Difficulty.Hard)
         {
             BellkeeperEncounter.AbilityOverride = ability ?? "";
             BellkeeperEncounter.PhaseOverride = segment;

@@ -27,10 +27,10 @@ namespace LastBell.Run
                 {
                     BellkeeperEncounter.SeedOffset = seed0 + s; BellkeeperEncounter.V2StopAfterP4 = false;
                     if (kind == "p3")
-                        yield return UltRun($"seed {s} · P3 alone", 4, UltimateBot.Skill.Perfect, "P3", 300, "Arcanist",
+                        yield return UltRun($"seed {s} · P3 alone", 4, UltimateBot.Skill.Perfect, "P3", 300, "Tollbreaker",
                             f => { if (bk != null && !bk.Dead && bk.Segment != BellkeeperEncounter.UltSegment.P3) bk.DebugDefeat(); });
                     else
-                        yield return UltRun($"seed {s} · full fight", 4, UltimateBot.Skill.Perfect, null, 900, "Arcanist");
+                        yield return UltRun($"seed {s} · full fight", 4, UltimateBot.Skill.Perfect, null, 900, "Tollbreaker");
                     var f2 = ultLast; if (f2 == null) continue;
                     // P3 alone passes when P3 ends with nobody down in it (what follows is P4's business)
                     bool ok = kind == "p3" ? f2.Segments.Any(x => x.seg == BellkeeperEncounter.UltSegment.P4) && !f2.DeathLines.Any(l => l.Contains(" in P3 ")) : f2.Killed && f2.Deaths == 0;

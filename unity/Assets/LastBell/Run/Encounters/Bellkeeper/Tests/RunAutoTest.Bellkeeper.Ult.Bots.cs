@@ -12,7 +12,7 @@ namespace LastBell.Run
     // with it, Chzy18 1 Nov.)
     public sealed partial class RunAutoTest
     {
-        static readonly string[] PartyClasses = { "Arcanist", "Chimesinger", "Arcanist", "Chimesinger" };   // Vanguard retired (Chzy18, 2 Nov); Tollbreaker joins when it lands
+        static readonly string[] PartyClasses = { "Tollbreaker", "Chimesinger", "Arcanist", "Tollbreaker" };   // Tollbreaker replaces the retired Vanguard (2 Nov)
 
         sealed class UltFight
         {
@@ -29,7 +29,7 @@ namespace LastBell.Run
 
         // One stepped fight: n strat bots of `skill` (the run's player is bot 0), from `segment` (null = P1), until the boss
         // dies, the party is down, or capSeconds pass.
-        IEnumerator UltRun(string label, int n, UltimateBot.Skill skill, string segment = null, float capSeconds = 1200, string cls0 = "Arcanist",
+        IEnumerator UltRun(string label, int n, UltimateBot.Skill skill, string segment = null, float capSeconds = 1200, string cls0 = "Tollbreaker",
                            Action<UltFight> perSecond = null /* every 0.25 s */, bool pushOn = true, Difficulty level = Difficulty.Hard)
         {
             ultLast = null;

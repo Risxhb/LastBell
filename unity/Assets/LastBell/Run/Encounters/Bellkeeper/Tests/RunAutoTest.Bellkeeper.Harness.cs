@@ -50,7 +50,7 @@ namespace LastBell.Run
             for (int i = 0; i <= maxTicks; i++) { if (cond()) return i; if (i < maxTicks) d.World.Step(); }
             return -1;
         }
-        PlayerController BkAdd(Vector3 pos, string cls = "Arcanist") => ScriptedParty.Add(d.World, pos, cls);
+        PlayerController BkAdd(Vector3 pos, string cls = "Tollbreaker") => ScriptedParty.Add(d.World, pos, cls);
         ScriptedPlayer BkScript(PlayerController p) => ScriptedParty.Script(p);
         static void BkPlace(PlayerController p, Vector3 pos) { p.transform.position = new Vector3(pos.x, 0, pos.z); }
         int BkHitsOn(PlayerController p, string source = null) => bkHits.Count(h => h.Player == p && (source == null || h.Source == source));

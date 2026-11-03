@@ -12,7 +12,7 @@ namespace LastBell.Run
         {
             Note("---------- Ultimate v2: the fight as shipped (default run) ----------");
             BellkeeperEncounter.V2StopAfterP4 = false;
-            yield return UltRun("v2 full fight · party of 4 · Perfect · Hard", 4, UltimateBot.Skill.Perfect, null, 900, "Arcanist", level: Difficulty.Hard);
+            yield return UltRun("v2 full fight · party of 4 · Perfect · Hard", 4, UltimateBot.Skill.Perfect, null, 900, "Tollbreaker", level: Difficulty.Hard);
             var f = ultLast;
             var segs = f == null ? new BellkeeperEncounter.UltSegment[0] : f.Segments.Select(s => s.seg).ToArray();
             var want = new[] { BellkeeperEncounter.UltSegment.P1, BellkeeperEncounter.UltSegment.P2, BellkeeperEncounter.UltSegment.P3, BellkeeperEncounter.UltSegment.P4, BellkeeperEncounter.UltSegment.P5 };

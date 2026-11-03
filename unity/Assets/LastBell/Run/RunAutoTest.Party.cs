@@ -30,7 +30,7 @@ namespace LastBell.Run
             var classes = d.World.Players.GroupBy(p => p.ClassName).ToDictionary(g => g.Key, g => g.Count());
             Check("allies: classes spread across all three (no class more than 3 of 8)", classes.Count == 3 && classes.Values.Max() <= 3,
                 string.Join(", ", classes.Select(kv => kv.Key + " " + kv.Value)));
-            Check("allies: the first allies are the classes the player didn't pick", d.Allies[0].ClassName == "Vanguard" && d.Allies[1].ClassName == "Chimesinger");
+            Check("allies: the first allies are the classes the player didn't pick", d.Allies[0].ClassName == "Tollbreaker" && d.Allies[1].ClassName == "Chimesinger");
             d.RequestReady();
             yield return Until(() => d.State == RunState.Combat, 4, "party practice combat");
             Check("allies: passive bots don't raise the boss's HP (only fighting players count)", d.Boss && d.Boss.MaxHp == soloHp, $"solo {soloHp}, party {d.Boss?.MaxHp}");

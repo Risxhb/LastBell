@@ -268,7 +268,7 @@ namespace LastBell.Run
         public static bool Log;   // tests: bot positions every 0.5 s, and every time a bot finds no safe route
         public string JobOf(PlayerController p) => plans.TryGetValue(p, out var pl) ? pl.Job : null;
         // the Tollbreaker parks against its core too (Chzy18 2 Nov, review inbox): its axes fly back sooner from close in
-        static bool Melee(PlayerController p) => p.ClassName == "Vanguard" || p.ClassName == "Tollbreaker";
+        static bool Melee(PlayerController p) => p.ClassName == "Tollbreaker";
 
         Vector3 GoalOf(PlayerController p, float t, out string job, out int k)
         {

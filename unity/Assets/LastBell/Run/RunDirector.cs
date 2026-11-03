@@ -79,7 +79,8 @@ namespace LastBell.Run
         public static int ChimeboundOraclePractice => Array.FindIndex(Bosses, b => b.Name.StartsWith("Chimebound Oracle"));
         public static int DialWardenPractice => Array.FindIndex(Bosses, b => b.Name.StartsWith("Dial Warden"));
         public static int PendulumSentinelPractice => Array.FindIndex(Bosses, b => b.Name.StartsWith("Pendulum Sentinel"));
-        public static readonly string[] Classes = { "Vanguard", "Chimesinger", "Arcanist" };
+        // The Tollbreaker took the Vanguard's place (Chzy18, 29 Oct), and the Vanguard was removed from the game (1 Nov).
+        public static readonly string[] Classes = { "Tollbreaker", "Chimesinger", "Arcanist" };
         const int IntroTicks = 120, ClearTicks = 180, DownedTicks = 100;
         public const int PracticeAutoReadyTicks = 45;   // 0.75 s in the arena before a practice fight starts
         // Automated suites (every one writes to -lastbellOut) drive Ready themselves, so they keep the manual start.
@@ -88,7 +89,7 @@ namespace LastBell.Run
 
         public RunState State { get; private set; } = RunState.Menu;
         public RunMode Mode { get; private set; }
-        public string ClassName { get; private set; } = "Vanguard";
+        public string ClassName { get; private set; } = "Tollbreaker";
         public Difficulty Difficulty { get; private set; } = Difficulty.Medium;   // copied from the menu at run start
         public int AllyCount { get; private set; }            // bot allies, copied from the menu at run start (RunParty); a retry keeps it
         public readonly List<PlayerController> Allies = new List<PlayerController>();
@@ -197,7 +198,7 @@ namespace LastBell.Run
         {
             if (State != RunState.Menu) return false;
             PracticePhase = mode == RunMode.Practice && encounter >= 0 && encounter < Bosses.Length ? Mathf.Clamp(phase, 1, Bosses[encounter].Phases) : 1;
-            Mode = mode; ClassName = Array.IndexOf(Classes, className) >= 0 ? className : "Vanguard";
+            Mode = mode; ClassName = Array.IndexOf(Classes, className) >= 0 ? className : Classes[0];
             Difficulty = RunDifficulty.Selected;
             AllyCount = RunParty.Selected;
             BuildRun(encounter);

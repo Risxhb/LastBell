@@ -18,10 +18,11 @@ namespace LastBell.Run
             var levels = new[] { Difficulty.Easy, Difficulty.Medium, Difficulty.Hard }.Where(l => lv == null || lv.ToLowerInvariant().Contains(l.ToString().ToLowerInvariant())).ToArray();
             var runs = new (string id, string label, int n, UltimateBot.Skill skill, string cls, bool mustWin)[]
             {
+                ("st", "solo Tollbreaker", 1, UltimateBot.Skill.Perfect, "Tollbreaker", true),
                 ("sc", "solo Chimesinger", 1, UltimateBot.Skill.Perfect, "Chimesinger", true),
                 ("sa", "solo Arcanist", 1, UltimateBot.Skill.Perfect, "Arcanist", true),
-                ("p4", "party of 4", 4, UltimateBot.Skill.Perfect, "Arcanist", true),
-                ("l4", "Late party of 4", 4, UltimateBot.Skill.Late, "Arcanist", false),
+                ("p4", "party of 4", 4, UltimateBot.Skill.Perfect, "Tollbreaker", true),
+                ("l4", "Late party of 4", 4, UltimateBot.Skill.Late, "Tollbreaker", false),
             }.Where(r => rn == null || rn.Split(',').Contains(r.id)).ToArray();
             OpenHour.LogSteer = GearFloor.Log = AurelionArgs.Arg("-lastbellUltSteerLog") != null;
             var table = new System.Text.StringBuilder();

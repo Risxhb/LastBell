@@ -34,13 +34,13 @@ namespace LastBell.Run
             // out-of-range picks clamp to the boss's phases (the menu never offers them; -lastbellPhase refuses them)
             int bk = Array.FindIndex(RunDirector.Bosses, b => b.Final);
             // the final entry fights on the Throne, so the pick may load that map: read the new scene's director
-            bool clampOk = d.StartPractice("Arcanist", bk, 99);
+            bool clampOk = d.StartPractice("Tollbreaker", bk, 99);
             yield return Until(() => RunDirector.Instance && RunDirector.Instance.State == RunState.Ready && RunDirector.Instance.Encounter == bk, 30, "clamp ready");
             if (RunDirector.Instance != d) { directorLog.AddRange(d.Log); d = RunDirector.Instance; d.InputOverride = bot; bot.Clear(); }
             if (d.Player) d.Player.Input = bot;
             Check("practice phase: a pick past the last phase clamps to it", clampOk && d.PracticePhase == RunDirector.Bosses[bk].Phases, $"phase {d.PracticePhase}");
             yield return PhaseToMenu();
-            Check("practice phase: a run always starts in phase 1", d.StartRun("Arcanist") && d.PracticePhase == 1);
+            Check("practice phase: a run always starts in phase 1", d.StartRun("Tollbreaker") && d.PracticePhase == 1);
             yield return PhaseToMenu();
             for (int e = 0; e < RunDirector.Bosses.Length; e++)
                 for (int n = 1; n <= RunDirector.Bosses[e].Phases; n++)
@@ -62,7 +62,7 @@ namespace LastBell.Run
             yield return PhaseToMenu();
             var entry = RunDirector.Bosses[e];
             string tag = $"{LastBell.Menu.TestRushSetup.CardName(e)} phase {n}";
-            Check($"{tag}: practice accepted", d.StartPractice("Arcanist", e, n));
+            Check($"{tag}: practice accepted", d.StartPractice("Tollbreaker", e, n));
             yield return Until(() => RunDirector.Instance && RunDirector.Instance.State == RunState.Ready && RunDirector.Instance.Encounter == e, 30, tag + " ready");
             if (RunDirector.Instance != d) { directorLog.AddRange(d.Log); d = RunDirector.Instance; d.InputOverride = bot; bot.Clear(); }
             if (d.Player) d.Player.Input = bot;   // a new scene built the player before the bot was attached

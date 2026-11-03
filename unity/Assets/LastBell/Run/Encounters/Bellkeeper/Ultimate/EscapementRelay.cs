@@ -190,7 +190,7 @@ namespace LastBell.Run
                 default:
                     // a melee player holds the ✕ on its inner edge, against the boss, where its swings reach (the ✕ counts out to
                     // WeightSize, and a debt ring covers all but this edge anyway)
-                    var w = Weight(b, d); r.Hint = p.ClassName == "Vanguard" ? w.normalized * Mathf.Max(Boss.BodyRadius + 0.6f, WeightRadius - WeightSize + 0.55f) : w;
+                    var w = Weight(b, d); r.Hint = w;
                     r.Ok = q => (Sim.Flat(q) - w).magnitude <= WeightSize - 0.35f; break;
             }
             into.Add(r);
