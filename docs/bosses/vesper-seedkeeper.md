@@ -1,6 +1,7 @@
 # The Vesper Seedkeeper (v2, proposal)
 
-**Status:** proposal, practice only (`inRun: false`), placeholder visuals. Replaces the first design (still in git history,
+**Status:** proposal, practice only (`inRun: false`). Review answers (3 Nov 2026) are in: stakes can also be attacked,
+the surge stays at 30, 3 players get two seeds, and the rigged model replaces the stand-in. Replaces the first design (still in git history,
 commit `ca0f3a7`). Sources read: `docs/design/content-rules.md` (this file follows it), Aurelion v4 (`Aurelion/Abilities/*`),
 Crucivar v4 (`Crucivar/Abilities/*`), Sylvara v3 (`SylvaraEncounter.cs`), and the Pendulum Sentinel / Chimebound Oracle
 encounters it is built like. Code: `unity/Assets/LastBell/Run/Encounters/VesperSeedkeeper/`.
@@ -17,9 +18,12 @@ together, and the nightfall that only those planted seeds keep out.
 pause. The Seedkeeper is her dusk: no bullets at all, slow raid telegraphs, long co-op jobs, and a real punish window
 every loop. Seeds and blooms are the shared motif; where her seed pods burst into petals, its seeds become the only light.
 
-**Placeholder look (this build):** primitives only, labelled `(STAND-IN, labelled placeholder)`. The Meshy rig
-(`prototype/arena-3d/models/rigged/minibosses/VesperSeedkeeper.glb`) is not used yet. No final FX or audio: every warning
-is a shared raid telegraph (`HazardSystem.RaidStyle`, Telegraph-Style v2), friendly lights use the thin friendly rim.
+**Look:** the rigged model (Chzy18's Meshy lotus vessel, rigged with `prototype/arena-3d/models/blender/vesper_seedkeeper_rig.py`)
+is at `unity/Assets/LastBell/Characters/VesperSeedkeeper/Resources/Characters/VesperSeedkeeper.glb`, loaded like the
+Pendulum Sentinel's; a labelled primitive stand-in is the fallback if it is ever missing. Clips used: Idle, Walk (drifting), LanternCast +
+TetherLoop (Vesper Cords), SeedTip (Seedgift), BloomOpen + BloomLoop (Nightfall), HaloTilt + SweepLoop (Dusk Tide),
+PhaseShift, Defeat. No final FX or audio: every warning is a shared raid telegraph (`HazardSystem.RaidStyle`,
+Telegraph-Style v2), friendly lights use the thin friendly rim.
 
 ## The four abilities
 
@@ -28,7 +32,7 @@ Numbers are **Medium**, out of 100 player HP. Easy and Hard also scale damage ta
 
 | # | Ability | One line |
 |---|---|---|
-| 1 | **Vesper Cords** | N cords tie the vessel to stakes near the edge; stand on a stake when it snaps, or the dusk surges through the party. |
+| 1 | **Vesper Cords** | N cords tie the vessel to stakes near the edge; stand on a stake when it snaps (or break it early), or the dusk surges through the party. |
 | 2 | **Seedgift** | the vessel hands glowing seeds to the farthest players; a partner (or the whole party) stacks under the carrier to plant it. |
 | 3 | **Nightfall** | the floor goes dark; only the planted seeds' blooms are lit, each holding as many players as planted it. |
 | 4 | **Dusk Tide** | its light ebbs then floods: get close, then get out; then it closes its petals (the punish window). |
@@ -40,6 +44,9 @@ Numbers are **Medium**, out of 100 player HP. Easy and Hard also scale damage ta
 - **Snap (7.0 s):** every cord whips along its length: a **1.4 m lane from the vessel to just short of the stake, 40**
   (Strike). At the same tick each stake checks for a player standing on it: **severed**. Each **unsevered** cord surges:
   **30 to every standing player** (unavoidable, so a missed stake always costs the whole party).
+- **Breaking a stake:** each stake is also a boss part with **60 HP** (Medium). Attacking it breaks it early: its cord and
+  lane are withdrawn and it counts as severed. Its hits also count against the boss, like every boss part. Ranged players
+  can shoot their stake from where they stand, melee players walk to it and break it, or anyone just stands on it.
 - **Melee threat:** the lanes start at the vessel, so hugging it on a cord line gets hit, and every stake is at the edge.
   **Ranged threat:** the lanes reach the edge; ranged players have to leave their spot for a stake.
 - **Escape:** walk to a stake (worst case about 24 m in 7 s = 3.4 m/s), keep off the cord lines.
@@ -52,11 +59,12 @@ Numbers are **Medium**, out of 100 player HP. Easy and Hard also scale damage ta
 ### 2. Seedgift (Ground stack, carried)
 
 - **Tell:** the vessel tips and a bright seed lands over the carrier's head (carried-mark icon). Carriers: the player
-  **farthest from the vessel**, then (4 players) the player farthest from the first carrier.
-- **Seeds:** 1 seed for 1–3 players, 2 seeds for 4. Each seed is a **2.4 m circle that follows its carrier for 5 s, then
+  **farthest from the vessel**, then (3–4 players) the player farthest from the first carrier.
+- **Seeds:** 1 seed for 1–2 players, 2 seeds for 3–4. Each seed is a **2.4 m circle that follows its carrier for 5 s, then
   locks**, and lands **1 s later**: **80 split between everyone inside** (a shared soak, ShareCount shown as a numeral).
-  Solo: 40, all on the carrier.
-- **Shares:** 1 player: 1 (40). 2 players: both under the one seed (40 each). 3 players: all three (27 each). 4 players: two
+  A seed meant for one carrier (solo, or the lone seed at 3 players) is **40**, all on the carrier.
+- **Shares:** 1 player: 1 (40). 2 players: both under the one seed (40 each). 3 players: the first carrier and a partner share
+  one seed (40 each) while the second carrier takes a lone seed (40) apart from them. 4 players: two
   pairs, one under each seed (40 each). Over-soaking lowers each share; a player in two seeds takes both.
 - **Planting:** where it lands, the seed is planted and becomes a **Dusk Bloom** (2.4 m light) for the Nightfall that
   follows. The vessel's shadow pushes it out: a bloom is never closer than 7.2 m to the vessel (it rolls out).
@@ -69,7 +77,7 @@ Numbers are **Medium**, out of 100 player HP. Easy and Hard also scale damage ta
 - Always follows Seedgift. **Tell:** the vesper toll; the whole floor gets a dark hostile footprint with the blooms cut out
   of it (holes = the exact lit test). Each bloom shows its capacity numeral.
 - **Dark (6.0 s):** **70 to every player not standing in a lit bloom.** A bloom holds as many players as planted it
-  (the seed's share count: 1 / 2 / 3 / 2); one more and it **gutters**: everyone in it takes the 70 too.
+  (the seed's share count: 1 / 2 / 2+1 / 2+2); one more and it **gutters**: everyone in it takes the 70 too.
 - **Umbra:** the vessel's own shadow, a **4 m circle under it, 70**, lands with the dark (Ground). A player hit by the
   umbra is not hit again by the dark. Blooms never overlap it (7.2 m rule).
 - **Melee threat:** the umbra. **Ranged threat:** you must be in a bloom, wherever the carriers planted it.
@@ -103,7 +111,8 @@ Numbers are **Medium**, out of 100 player HP. Easy and Hard also scale damage ta
   always expire within their block.
 - **Overlap:** never more than two damaging patterns at once (cord lanes + surge; umbra + dark; Late Bloom comes after).
 - **Max HP:** 3000 (no co-op HP scaling, like the other practice minibosses; bots don't attack by default).
-- **No ability text:** the phase line and intro lesson are empty; names live in the F7 overlay only.
+- **Text:** the phase line and intro lesson are empty. The shared boss-panel warning list names each live warning and its
+  mechanic icon (for example "Nightfall (bloom) · soak tower"), and the F7 overlay has the full diagnostics.
 
 ## Difficulty
 
@@ -118,8 +127,8 @@ Numbers are **Medium**, out of 100 player HP. Easy and Hard also scale damage ta
 | | Solo | 2 players | 3 players | 4 players |
 |---|---|---|---|---|
 | Vesper Cords | 1 stake (2 below 50%) | 2 stakes, one each | 3 stakes | 4 stakes, one per side |
-| Seedgift | 1 seed, 40 on you | 1 seed, both stack (40 each) | 1 seed, all stack (27 each) | 2 seeds, two pairs (40 each) |
-| Nightfall | your bloom holds 1 | the bloom holds 2 | the bloom holds 3 | two blooms hold 2 each |
+| Seedgift | 1 seed, 40 on you | 1 seed, both stack (40 each) | 2 seeds: a pair (40 each) and a lone carrier (40) | 2 seeds, two pairs (40 each) |
+| Nightfall | your bloom holds 1 | the bloom holds 2 | blooms hold 2 and 1 | two blooms hold 2 each |
 | Dusk Tide | same for everyone | | | |
 
 **Bots (allies 0–3):** every job is a generic soak (stakes, seed stacks, blooms) or a plain shape to leave, so the standard
@@ -133,12 +142,14 @@ numerals and dodge the cords, umbra and tide.
 - The first design's "no jumping, no knockback" stays: every hit here has no knockback.
 - Nothing else conflicts. No enrage was added.
 
+## Review decisions (3 Nov 2026)
+
+1. Stakes can also be broken by attacking them (done: 60 HP boss parts).
+2. The surge stays at 30 per unsevered cord.
+3. 3 players get two seeds: a pair and a lone carrier (done).
+4. The rigged model replaces the stand-in (done).
+
 ## Open questions
 
-1. Should cords also be severable by **attacking** the stake (a boss part), as well as by standing on it? Bots don't attack
-   by default, so the standing rule is the one they can do.
-2. Is 30 per unsevered cord (120 if four are missed) the right sting, or should a missed cord wipe like an empty soak?
-3. Three players share one seed (27 each). Would two seeds (a pair and a solo carrier) be more interesting?
-4. Should the Meshy rig replace the stand-in now, and which clips map to which ability (the old clip list fits:
-   LanternCast for Cords, SeedTip for Seedgift, BloomOpen for Nightfall, HaloTilt for Dusk Tide)?
-5. LAN: hazards, telegraphs and marks replicate; the placeholder cord lines, stake posts and seed orbs are host-only meshes.
+1. LAN: hazards, telegraphs and marks replicate; the placeholder cord lines, stake posts and seed orbs are host-only meshes
+   (the model's current clip does replicate).

@@ -475,7 +475,11 @@ namespace LastBell.Run
             var ahead = Sim.Flat(pos + move.normalized * 0.8f) - bp;
             if (ahead.magnitude >= clear) return move;   // stepping in toward him is fine (inside a Collapse disc, say)
             // heading into him: go round on the side the move already leans to (tangent), drifting outward a little
-            var tan = Vector3.Cross(Vector3.up, to.normalized); if (Vector3.Dot(tan, move) < 0) tan = -tan;
+            // a goal straight behind him: the lean's sign flips with noise every tick and the bot rocked in place against
+            // him (Vesper Seedkeeper, 2 players opposite each other); within ±15° of dead ahead keep turning one way
+            var tan = Vector3.Cross(Vector3.up, to.normalized);
+            float lean = Vector3.Dot(tan, move.normalized);
+            if (lean < -0.26f) tan = -tan;
             return (tan + to.normalized * 0.25f).normalized * move.magnitude;
         }
 

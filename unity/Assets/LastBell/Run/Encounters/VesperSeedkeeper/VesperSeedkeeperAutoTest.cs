@@ -137,7 +137,7 @@ namespace LastBell.Run
             float waitMenu = 0; while ((RunDirector.Instance == null || RunDirector.Instance.State != RunState.Menu) && waitMenu < 30) { waitMenu += Time.deltaTime; yield return null; }
             if (RunDirector.Instance == null) { Check("run scene loads", false, "no RunDirector after 30 s"); Finish(); yield break; }
 
-            foreach (int party in new[] { 2, 4 }) yield return PartyFight(party);
+            foreach (int party in new[] { 2, 3, 4 }) yield return PartyFight(party);
             yield return DangerChecks();
             yield return DifficultyChecks();
             Finish();
@@ -191,10 +191,11 @@ namespace LastBell.Run
                 }
             Check("Vesper Cords: the lanes stop short of the stakes (a severer is never on a lane)",
                 R.CordLane(Vector3.zero, R.StakeAt(0)).length + Hazard.Margin < R.StakeRing - (R.StakeRadius - 0.45f));
-            Check("Seedgift: seeds 1/1/1/2, shares 1/2/3/2, totals 40/80/80/80 for 1-4 players",
-                new[] { 1, 2, 3, 4 }.Select(R.Seeds).SequenceEqual(new[] { 1, 1, 1, 2 }) && new[] { 1, 2, 3, 4 }.Select(R.Share).SequenceEqual(new[] { 1, 2, 3, 2 }) &&
-                new[] { 1, 2, 3, 4 }.Select(R.SeedTotal).SequenceEqual(new[] { 40, 80, 80, 80 }));
-            Check("Seedgift: one player taking every share survives from full (80 < 100)", R.SeedTotal(4) < PlayerController.MaxHp && VesperSeedkeeperEncounter.SeedWither < PlayerController.MaxHp);
+            Check("Seedgift: seeds 1/1/2/2 for 1-4 players; shares [1], [2], [2,1] (a pair and a lone carrier), [2,2]; 40 on a lone carrier, 80 split by a pair",
+                new[] { 1, 2, 3, 4 }.Select(R.Seeds).SequenceEqual(new[] { 1, 1, 2, 2 }) &&
+                R.Shares(1).SequenceEqual(new[] { 1 }) && R.Shares(2).SequenceEqual(new[] { 2 }) && R.Shares(3).SequenceEqual(new[] { 2, 1 }) && R.Shares(4).SequenceEqual(new[] { 2, 2 }) &&
+                new[] { 1, 2, 3, 4 }.All(n => R.Shares(n).Length == R.Seeds(n) && R.Shares(n).Sum() == n) && R.SeedTotal(1) == 40 && R.SeedTotal(2) == 80);
+            Check("Seedgift: one player taking every share survives from full (80 < 100)", R.SeedTotal(2) < PlayerController.MaxHp && VesperSeedkeeperEncounter.SeedWither < PlayerController.MaxHp);
             bool plant = true; string why = "";
             foreach (var b in new[] { Vector3.zero, new Vector3(3, 0, 0), new Vector3(-2, 0, 2), new Vector3(0, 0, -3) })
                 for (float x = -14; x <= 14; x += 0.5f)
@@ -229,7 +230,16 @@ namespace LastBell.Run
             yield return StartFight(party, Difficulty.Medium, 20261103 + party);
             if (!boss) yield break;
             string tag = $"{party}p";
-            Check($"{tag}: opens in phase 1, placeholder body, no ability text", !boss.Phase2 && boss.Placeholder && boss.PhaseName == "" && boss.Lesson == "" && boss.MaxHp == 3000);
+            Check($"{tag}: opens in phase 1, no ability text", !boss.Phase2 && boss.PhaseName == "" && boss.Lesson == "" && boss.MaxHp == 3000);
+            if (party == 2)
+            {
+                if (boss.Presenter && boss.Presenter.HasModel)
+                {
+                    var missing = VesperSeedkeeperEncounter.ClipNames.Where(c => !boss.Presenter.Has(c)).ToList();
+                    Check("the rigged model is loaded with all 11 clips", !boss.Placeholder && missing.Count == 0, missing.Count > 0 ? "missing: " + string.Join(", ", missing) : "");
+                }
+                else Check("no rigged model in this build: the labelled stand-in is used (Placeholder)", boss.Placeholder && GameObject.Find("Vesper Seedkeeper (STAND-IN, labelled placeholder)"));
+            }
             Check($"{tag}: party of {party} standing", Standing == party, $"{Standing}");
             yield return Until(() => Sim.Flat(boss.transform.position).magnitude < 0.35f, 8, "drifts to the centre");
             if (party == 4) RenderShot("model_front_placeholder", new Vector3(0, 3.6f, 9.5f), new Vector3(0, 2.2f, 0), 40);
@@ -248,6 +258,7 @@ namespace LastBell.Run
             Check($"{tag} Vesper Cords: every warning has the raid look and a stake numeral 1", spawned.Where(s => s.tick >= t0 && s.h.Source.StartsWith("Vesper Cords")).All(s => s.h.Tele != null) &&
                 spawned.Count(s => s.tick >= t0 && s.h.Source == "Vesper Cords (stake)" && s.h.Soak && s.h.ShareCount == 1) == party);
             CheckClean($"{tag} Vesper Cords");
+            if (party == 2) yield return StakeBreakCheck(tag);
 
             // ---- Dusk Tide ----
             yield return TideBlock(tag, false);
@@ -316,21 +327,55 @@ namespace LastBell.Run
             yield return Until(() => boss.PendingSeeds > 0, 20, "seeds given");
             int carriers = boss.Carriers.Count;
             Check($"{tag} Seedgift: {R.Seeds(party)} seed(s), carriers marked", carriers == R.Seeds(party) && boss.Carriers.All(c => c.Marks.Contains(MechanicIcons.CarriedMark)), $"{carriers} carriers");
-            if (party == 4 && !tag.Contains("P2")) { yield return Wait(4.2f); Overhead($"{tag}_seedgift_stacks"); }
+            yield return Wait(2.5f);
+            foreach (var p in d.World.Players) if (p.Input is AllyBot ab) Note($"{tag} Seedgift +2.5 s {p.ClassName}{(boss.Carriers.Contains(p) ? " (carrier)" : "")}: {ab.DebugLine}");
+            if (party == 4 && !tag.Contains("P2")) { yield return Wait(1.7f); Overhead($"{tag}_seedgift_stacks"); }
             yield return Until(() => boss.NightActive, 15, "nightfall");
             if (party == 4 && !tag.Contains("P2")) { yield return Wait(3.0f); Overhead($"{tag}_nightfall"); yield return Shot($"{tag}_nightfall_game_camera"); }
             yield return BetweenBlocks();
             var seeds = boss.SeedLog.Skip(s0).ToList();
-            Check($"{tag} Seedgift: every seed planted by its full share ({R.Share(party)} each), {(boss.Phase2 ? "Nightfall at once" : "Nightfall after")}",
-                seeds.Count == R.Seeds(party) && seeds.All(s => s.inside == R.Share(party)) && boss.SeedsWithered == 0,
+            var want = R.Shares(party).OrderBy(x => x).ToArray();
+            Check($"{tag} Seedgift: every seed planted by its full share ({string.Join("+", R.Shares(party))}), {(boss.Phase2 ? "Nightfall at once" : "Nightfall after")}",
+                seeds.Count == R.Seeds(party) && seeds.Select(s => s.inside).OrderBy(x => x).SequenceEqual(want) && boss.SeedsWithered == 0,
                 string.Join(", ", seeds.Select(s => $"{s.inside} inside, {s.share} each")));
             Check($"{tag} Seedgift: blooms planted 7.2 m+ from the vessel", seeds.All(s => float.IsInfinity(s.planted.x) || Sim.Flat(s.planted - boss.transform.position).magnitude >= R.BloomMinFromBoss - 0.6f));
             var night = boss.NightLog.Skip(n0).ToList();
             Check($"{tag} Nightfall: all {party} in light, none in the dark, no bloom guttered", night.Count == 1 && night[0].lit == party && night[0].dark == 0 && night[0].guttered == 0,
                 night.Count > 0 ? $"blooms {night[0].blooms}, lit {night[0].lit}, dark {night[0].dark}, guttered {night[0].guttered}" : "no nightfall");
             Check($"{tag} Nightfall: the bots kept out of the umbra", HitsSince(t0, "Nightfall (umbra)") == 0);
-            Check($"{tag} Nightfall: bloom soaks with their numerals spawned", spawned.Count(s => s.tick >= t0 && s.h.Source == "Nightfall (bloom)" && s.h.Soak && s.h.ShareCount == R.Share(party)) == R.Seeds(party));
+            Check($"{tag} Nightfall: bloom soaks with their numerals spawned ({string.Join("+", R.Shares(party))})",
+                spawned.Where(s => s.tick >= t0 && s.h.Source == "Nightfall (bloom)" && s.h.Soak).Select(s => s.h.ShareCount).OrderBy(x => x).SequenceEqual(want));
             CheckClean($"{tag} Seedgift + Nightfall");
+        }
+
+        // a stake can also be broken early by attacking it (a boss part; its hits count against the boss too)
+        IEnumerator StakeBreakCheck(string tag)
+        {
+            int t0 = d.World.Tick, c0 = boss.CordLog.Count, br0 = boss.CordsBroken, sev0 = boss.CordsSevered;
+            boss.ForcedNext = "Cords";
+            yield return Until(() => boss.PendingCords > 0, 20, "cords out (break)");
+            yield return Wait(0.5f);
+            var parts = boss.LiveStakeParts();
+            var part = parts.FirstOrDefault();
+            int hp0 = boss.Hp, dealt = 0, lanes0 = d.World.Hazards.Live.Count(h => h.Source == "Vesper Cords (snap)");
+            if (part != null)
+            {
+                // a real strike (the shared melee test every kit uses): from 1.2 m outside the stake, facing it
+                var dir = Sim.Flat(part.Pos).normalized; var from = part.Pos + dir * 1.2f;
+                Check($"{tag} stake break: the stake is a live boss part in the world", d.World.Parts.Contains(part) && part.Alive);
+                for (int i = 0; i < 6 && boss.LiveStakeParts().Contains(part); i++) dealt += d.World.StrikeBoss(d.Player, from, -dir, 2f, 90f, 25, "test strike");
+            }
+            yield return Wait(0.15f);
+            int lanes1 = d.World.Hazards.Live.Count(h => h.Source == "Vesper Cords (snap)");
+            Check($"{tag} stake break: {VesperSeedkeeperEncounter.StakeHp} damage breaks it; its lane and stake are withdrawn; the hits count against the boss",
+                part != null && boss.CordsBroken == br0 + 1 && !part.Alive && !d.World.Parts.Contains(part) && dealt == VesperSeedkeeperEncounter.StakeHp &&
+                lanes1 == lanes0 - 1 && hp0 - boss.Hp == VesperSeedkeeperEncounter.StakeHp,
+                $"dealt {dealt}, broken {boss.CordsBroken - br0}, lanes {lanes0}->{lanes1}, boss hp {hp0}->{boss.Hp}");
+            yield return BetweenBlocks();
+            var cords = boss.CordLog.Skip(c0).ToList();
+            Check($"{tag} stake break: the other stake is still severed by the bots, no surge", cords.Count == 1 && cords[0].severed == cords[0].stakes && boss.CordsSevered - sev0 == cords[0].stakes &&
+                HitsSince(t0, "Vesper Cords (surge)") == 0, string.Join(",", cords.Select(c => $"{c.severed}/{c.stakes}")));
+            CheckClean($"{tag} stake break");
         }
 
         IEnumerator DefeatChecks(string tag)

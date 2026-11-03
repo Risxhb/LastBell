@@ -20,7 +20,8 @@ namespace LastBell.Run
     //                  closes its petals for the 3.5 s punish window.
     //
     // Every job is a generic soak (Hazard.Soak with ShareCount) or a plain shape to leave, so ally bots play it as is.
-    // Placeholder visuals only (primitives, no Meshy model, no audio). Every warning gets the raid look (RaidStyle).
+    // Visuals: the rigged model (Characters/VesperSeedkeeper) when present, else a labelled primitive stand-in; no final FX
+    // or audio yet. Every warning gets the raid look (RaidStyle).
     // 50%: the shift waits for the block to finish, then 2 s harmless; no heal, no enrage. No ability text: PhaseName
     // and Lesson stay empty; names live in the F7 overlay (VesperSeedkeeperHud).
     public sealed class VesperSeedkeeperEncounter : BossEncounter
@@ -29,9 +30,15 @@ namespace LastBell.Run
         public override string DisplayName => "The Vesper Seedkeeper";
         public override string Lesson => "";
         public override float NextPhaseFraction() => 0.49f;
+        // the rigged model when Resources/Characters/VesperSeedkeeper(.glb) is in the project, else the labelled stand-in
+        public override bool Placeholder => !presenter || !presenter.HasModel;
+        CharacterPresenter presenter; public CharacterPresenter Presenter => presenter;
+        string loopClip = "Idle";
+        public static readonly string[] ClipNames = { "Idle", "Walk", "LanternCast", "TetherLoop", "BloomOpen", "BloomLoop", "SeedTip", "HaloTilt", "SweepLoop", "PhaseShift", "Defeat" };
+        void Clip(string name, int ticks) { if (presenter) presenter.Action(name, Mathf.Max(1, ticks)); }
 
         // ---------------- tunables (Medium) ----------------
-        public const int CordDmg = 40, SurgeDmg = 30, SeedWither = 60, DarkDmg = 70, UmbraDmg = 70, TideDmg = 55, LateBloomDmg = 40;
+        public const int StakeHp = 60, CordDmg = 40, SurgeDmg = 30, SeedWither = 60, DarkDmg = 70, UmbraDmg = 70, TideDmg = 55, LateBloomDmg = 40;
         public const float CordSec = 7.0f, SeedFollowSec = 5.0f, SeedFallSec = 1.0f, NightGapSec = 1.5f, NightSec = 6.0f, NightSecLow = 5.0f;
         public const float TideFirstSec = 2.8f, TideSecondSec = 1.6f, PunishSec = 3.5f, LateBloomSec = 1.2f, ShiftSec = 2.0f, GapSec = 1.0f;
         public const float DriftSpeed = 3.0f;
@@ -59,7 +66,7 @@ namespace LastBell.Run
         public int HpAtShiftStart { get; private set; }
         public bool Closed { get; private set; }     // the punish window
 
-        public int CordCasts, CordsSevered, CordsMissed, CordLaneHits, SurgeHits;
+        public int CordCasts, CordsBroken, CordsSevered, CordsMissed, CordLaneHits, SurgeHits;
         public int SeedCasts, SeedsPlanted, SeedsWithered, SeedsWithdrawn;
         public int NightCasts, NightLit, NightDark, NightGuttered, UmbraHits, LateBloomHits;
         public int TideCasts, EbbHits, FlowHits;
@@ -96,8 +103,15 @@ namespace LastBell.Run
         {
             PhaseName = "";
             R.Bound = CombatWorld.PlayerBound;
+            presenter = CharacterPresenter.Create(transform, "VesperSeedkeeper", 1.5f, 1f, 0, host => { BuildStandIn(host); return host; });
+            gameObject.AddComponent<VesperSeedkeeperHud>().Bind(this);
+        }
+
+        // a labelled code-built stand-in, used only when the rigged model is missing
+        void BuildStandIn(Transform host)
+        {
             visual = new GameObject("Vesper Seedkeeper (STAND-IN, labelled placeholder)").transform;
-            visual.SetParent(transform, false);
+            visual.SetParent(host, false);
             Prim.Make(PrimitiveKind.Sphere, visual, new Vector3(0, 2.0f, 0), new Vector3(2.3f, 1.3f, 2.3f), Ivory).name = "Vessel bowl (stand-in)";
             core = Prim.Make(PrimitiveKind.Sphere, visual, new Vector3(0, 2.25f, 0), Vector3.one * 1.0f, Gold, 3f); core.name = "Core of light (stand-in)";
             coreR = core.GetComponent<Renderer>();
@@ -110,7 +124,6 @@ namespace LastBell.Run
             halo = Prim.Make(PrimitiveKind.Cylinder, visual, new Vector3(0, 3.7f, 0), new Vector3(2.4f, 0.03f, 2.4f), Gold, 2f); halo.name = "Halo (stand-in)";
             Prim.Make(PrimitiveKind.Cylinder, visual, new Vector3(0, 1.1f, 0), new Vector3(0.06f, 0.5f, 0.06f), Cobalt).name = "Lantern cord (stand-in)";
             Prim.Make(PrimitiveKind.Sphere, visual, new Vector3(0, 0.6f, 0), Vector3.one * 0.45f, Gold, 2.5f).name = "Hanging lantern (stand-in)";
-            gameObject.AddComponent<VesperSeedkeeperHud>().Bind(this);
         }
 
         bool Hard => Level == Difficulty.Hard;
@@ -163,6 +176,7 @@ namespace LastBell.Run
             // seed orbs ride over their carriers (presentation, host side)
             foreach (var (orb, who) in seedOrbs) if (orb && who) orb.position = who.transform.position + Vector3.up * 2.9f;
             if (!Phase2 && !GatePending && Hp * 2 <= MaxHp) GatePending = true;
+            if (presenter) presenter.TickBoss(Current == "reposition" ? "Walk" : loopClip);
         }
 
         public override float[] PhaseStarts => new[] { 1f, 0.5f };
@@ -179,6 +193,7 @@ namespace LastBell.Run
         {
             foreach (var w in DriftTo(Vector3.zero)) yield return w;
             Current = Phase2 ? "Vesper Cords (two waves)" : "Vesper Cords"; CordCasts++;
+            Clip("LanternCast", Sim.Ticks(1f)); loopClip = "TetherLoop";
             int n = R.Cords(Standing); float offset = (float)(rng.NextDouble() * 360.0);
             int first = T(CordSec);
             CordSet(n, offset, 1, first);
@@ -190,57 +205,87 @@ namespace LastBell.Run
             }
             for (int t = 0; PendingCords > 0 && t < 1200; t++) { Windup(Mathf.Clamp01(t / (float)first)); yield return 1; }
             Release(1.2f);
-            Current = "Vesper Cords (recovery)";
+            Current = "Vesper Cords (recovery)"; loopClip = "Idle";
             yield return Sim.Ticks(0.5f);
         }
+
+        // One cord: its lane, its stake (a soak to stand on) and the stake as a boss part (break it early by attacking it;
+        // its hits count against the boss too, like every part). Severed = someone on the stake at the snap, or broken.
+        sealed class Cord { public Hazard Lane, Stake; public BossPart Part; public Transform View, Post; public bool Done; public int Hp, Wave; public float Angle; public CordWave Set; }
+        sealed class CordWave { public int Count, Severed, Resolved, Wave; }
+        readonly List<Cord> cords = new List<Cord>();
+        public List<BossPart> LiveStakeParts() { var l = new List<BossPart>(); foreach (var c in cords) if (!c.Done) l.Add(c.Part); return l; }
 
         void CordSet(int n, float offset, int wave, int resolve)
         {
             var boss = Sim.Flat(transform.position);
-            var stakes = new List<Hazard>(); int severed = 0, resolved = 0;
+            var set = new CordWave { Count = n, Wave = wave };
             foreach (float a in R.StakeAngles(n, offset, wave == 2))
             {
-                var at = R.StakeAt(a); float ang = a;
+                var at = R.StakeAt(a);
                 var (yaw, len) = R.CordLane(boss, at);
                 PendingCords++;
-                var lane = new Hazard { Source = "Vesper Cords (snap)", MechanicId = MechanicIcons.Lane, Shape = HazardShape.Lane, Kind = HazardKind.Strike, Origin = boss, Yaw = yaw,
+                var c = new Cord { Hp = StakeHp, Wave = wave, Angle = a, Set = set };
+                c.Lane = new Hazard { Source = "Vesper Cords (snap)", MechanicId = MechanicIcons.Lane, Shape = HazardShape.Lane, Kind = HazardKind.Strike, Origin = boss, Yaw = yaw,
                     Length = len, Width = R.CordWidth, LockAt = 0, ResolveAt = resolve, Damage = CordDmg, Knockback = 0, Stun = 6, ClipRadius = R.Bound + 0.6f };
-                lane.OnResolve = hz => CordLaneHits += hz.Hit.Count;
-                Live(lane, StrikeFill, StrikeBorder);
-                var stake = new Hazard { Source = "Vesper Cords (stake)", MechanicId = MechanicIcons.SoakTower, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = at,
+                c.Lane.OnResolve = hz => CordLaneHits += hz.Hit.Count;
+                Live(c.Lane, StrikeFill, StrikeBorder);
+                c.Stake = new Hazard { Source = "Vesper Cords (stake)", MechanicId = MechanicIcons.SoakTower, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = at,
                     Radius = R.StakeRadius, LockAt = 0, ResolveAt = resolve, Damage = 0, HitOnResolve = false, Soak = true, ShareCount = 1, Knockback = 0, Stun = 0 };
-                var cordView = CordProp(boss, at); var post = Prop(PrimitiveKind.Cylinder, at + Vector3.up * 0.5f, new Vector3(0.35f, 0.5f, 0.35f), Cobalt, 0, "Cord stake (stand-in)");
-                stake.OnResolve = hz =>
+                c.View = CordProp(boss, at); c.Post = Prop(PrimitiveKind.Cylinder, at + Vector3.up * 0.5f, new Vector3(0.35f, 0.5f, 0.35f), Cobalt, 0, "Cord stake (stand-in)");
+                c.Stake.OnResolve = hz =>
                 {
                     bool on = false;
                     foreach (var p in W.Players) if (!p.Down && Sim.Flat(p.transform.position - hz.Origin).magnitude <= hz.Radius + Hazard.Margin) on = true;
-                    StakeLog.Add((Tick, wave, ang, hz.Origin, on));
-                    if (on) { CordsSevered++; severed++; }
-                    else
-                    {
-                        // unsevered: the dusk surges through the whole party
-                        CordsMissed++;
-                        var surge = Blow("Vesper Cords (surge)", hz.Origin, SurgeDmg);
-                        foreach (var p in W.Players) if (!p.Down) { surge.Hit.Add(p); p.ReceiveHit(surge); SurgeHits++; }
-                        W.BossFx.ChimeResolve(hz.Origin, 2.2f);
-                    }
-                    KillProp(cordView); KillProp(post);
-                    PendingCords--;
-                    if (++resolved == stakes.Count) CordLog.Add((Tick, wave, stakes.Count, severed));
+                    FinishCord(c, on, false);
                 };
-                Live(stake, GroundFill, GroundBorder);
-                stakes.Add(stake);
+                Live(c.Stake, GroundFill, GroundBorder);
+                c.Part = new BossPart { Name = "Vesper stake", Pos = at, BodyRadius = R.StakePartRadius, HitHeight = 0.6f };
+                c.Part.TakeHit = (dmg, contact) =>
+                {
+                    if (c.Done || Dead) return 0;
+                    int dealt = Mathf.Min(dmg, c.Hp); c.Hp -= dealt;
+                    RunHud.Float(contact + Vector3.up * 0.5f, dealt.ToString(), Gold);
+                    if (Solid && dealt > 0) TakeHit(dealt, transform.position + Vector3.up * HitHeight, false);   // parts are the boss
+                    if (Dead) return dealt;   // that hit was the killing blow: everything is already cleared
+                    if (c.Hp <= 0) { W.Hazards.Cancel(c.Lane); W.Hazards.Cancel(c.Stake); CordsBroken++; FinishCord(c, true, true); }
+                    return dealt;
+                };
+                W.Parts.Add(c.Part);
+                cords.Add(c);
             }
+        }
+
+        void FinishCord(Cord c, bool severed, bool broken)
+        {
+            if (c.Done) return;
+            c.Done = true;
+            StakeLog.Add((Tick, c.Wave, c.Angle, c.Stake.Origin, severed));
+            if (severed) { CordsSevered++; c.Set.Severed++; }
+            else
+            {
+                // unsevered: the dusk surges through the whole party
+                CordsMissed++;
+                var surge = Blow("Vesper Cords (surge)", c.Stake.Origin, SurgeDmg);
+                foreach (var p in W.Players) if (!p.Down) { surge.Hit.Add(p); p.ReceiveHit(surge); SurgeHits++; }
+                W.BossFx.ChimeResolve(c.Stake.Origin, 2.2f);
+            }
+            if (broken) W.BossFx.ChimeResolve(c.Stake.Origin, 1.2f);
+            KillProp(c.View); KillProp(c.Post);
+            c.Part.Alive = false; W.Parts.Remove(c.Part); cords.Remove(c);
+            PendingCords--;
+            if (++c.Set.Resolved == c.Set.Count) CordLog.Add((Tick, c.Set.Wave, c.Set.Count, c.Set.Severed));
         }
 
         // ================= 2. Seedgift + 3. Nightfall =================
         IEnumerable<int> Seedgift()
         {
             Current = "Seedgift"; SeedCasts++;
-            int standing = Standing, seeds = R.Seeds(standing), share = R.Share(standing), total = R.SeedTotal(standing);
-            PickCarriers(seeds);
+            var shares = R.Shares(Standing);
+            PickCarriers(shares.Length);
             int lockAt = T(SeedFollowSec), landAt = lockAt + T(SeedFallSec);
-            foreach (var who in carriers) GiveSeed(who, share, total, lockAt, landAt);
+            Clip("SeedTip", Sim.Ticks(1f));
+            for (int i = 0; i < carriers.Count; i++) GiveSeed(carriers[i], shares[i], R.SeedTotal(shares[i]), lockAt, landAt);
             for (int t = 0; PendingSeeds > 0 && t < 1200; t++) { Windup(Mathf.Clamp01(t / (float)landAt)); yield return 1; }
             Release(0.8f);
             carriers.Clear();
@@ -304,6 +349,7 @@ namespace LastBell.Run
         IEnumerable<int> Nightfall()
         {
             Current = "Nightfall"; NightCasts++; NightActive = true;
+            Clip("BloomOpen", Sim.Ticks(1.2f)); loopClip = "BloomLoop";
             int dur = T(Phase2 ? NightSecLow : NightSec);
             // each bloom is a soak to fill with its numeral (bots read it); the dark itself is dealt here
             var soaks = new List<Hazard>();
@@ -339,7 +385,7 @@ namespace LastBell.Run
                 }
             ClearBlooms();
             NightActive = false;
-            Current = "Nightfall (dawn)";
+            Current = "Nightfall (dawn)"; loopClip = "Idle";
             for (int t = 0; late.Exists(IsLive) && t < 300; t++) yield return 1;
             yield return Sim.Ticks(0.5f);
         }
@@ -372,9 +418,10 @@ namespace LastBell.Run
             var spots = new List<Vector3>(); foreach (var p in StandingPlayers()) spots.Add(p.transform.position);
             foreach (var w in DriftTo(R.TideSpot(spots))) yield return w;
             Current = reversed ? "Dusk Tide (reversed)" : "Dusk Tide"; TideCasts++;
+            Clip("HaloTilt", Sim.Ticks(0.8f)); loopClip = "SweepLoop";
             var at = Sim.Flat(transform.position);
             int first = T(TideFirstSec), second = first + T(TideSecondSec);
-            halo.localPosition = new Vector3(0, reversed ? 1.5f : 3.7f, 0);   // the cue: halo dropped low = flood first
+            if (halo) halo.localPosition = new Vector3(0, reversed ? 1.5f : 3.7f, 0);   // stand-in cue: halo dropped low = flood first
             var ebb = new Hazard { Source = "Dusk Tide (ebb)", MechanicId = MechanicIcons.Ring, Shape = HazardShape.Ring, Kind = HazardKind.Ground, Origin = at, Inner = R.TideRadius,
                 Radius = R.Bound + 1.5f, LockAt = 0, ResolveAt = reversed ? second : first, Damage = TideDmg, Knockback = 0, Stun = 6, ClipRadius = R.Bound + 0.6f };
             ebb.OnResolve = hz => EbbHits += hz.Hit.Count;
@@ -384,7 +431,8 @@ namespace LastBell.Run
             Live(ebb, GroundFill, GroundBorder); Live(flow, StrikeFill, StrikeBorder);
             TideLog.Add((Tick, reversed, at, Tick + first, Tick + second));
             for (int t = 0; (IsLive(ebb) || IsLive(flow)) && t < second + 60; t++) { Windup((t + 1) / (float)second); yield return 1; }
-            Release(1f); halo.localPosition = new Vector3(0, 3.7f, 0);
+            Release(1f); if (halo) halo.localPosition = new Vector3(0, 3.7f, 0);
+            loopClip = "Idle";
             // the punish window: petals closed, the core dimmed, nothing live
             Current = "Dusk Tide (closed)"; Closed = true; glowTarget = 0.4f;
             int from = Tick;
@@ -398,6 +446,7 @@ namespace LastBell.Run
         {
             GatePending = false;
             Current = "Shift"; Log("Shift"); ShiftStart = Tick; HpAtShiftStart = Hp;
+            Clip("PhaseShift", Sim.Ticks(ShiftSec)); loopClip = "Idle";
             CameraShake.Shake(0.12f, 0.3f);
             yield return Sim.Ticks(ShiftSec);   // harmless: nothing is spawned, it stays damageable
             Phase2 = true; OpenPetals(); Release(1.5f); ShiftEnd = Tick;
@@ -429,6 +478,7 @@ namespace LastBell.Run
             if (visual) visual.localPosition = new Vector3(0, 0.6f + Mathf.Sin(bob * 1.3f) * 0.12f, 0);
             if (halo) halo.Rotate(0, 25f * Time.deltaTime, 0, Space.Self);
             if (coreR) Prim.SetGlow(coreR, Gold * (3f * glowLevel));
+            if (presenter) presenter.GlowLevel = glowLevel;
         }
 
         protected override void OnDefeat()
@@ -436,10 +486,11 @@ namespace LastBell.Run
             // hazards and telegraphs were cancelled by the world's ClearTransient in this same tick
             foreach (var who in carriers) if (who) who.Marks.Remove(MechanicIcons.CarriedMark);
             foreach (var p in W.Players) p.Marks.Remove(MechanicIcons.CarriedMark);
-            carriers.Clear(); Blooms.Clear(); dark = null;
+            carriers.Clear(); Blooms.Clear(); cords.Clear(); dark = null;
             ClearProps();
             PendingCords = 0; PendingSeeds = 0; NightActive = false; Closed = false;
-            if (visual) visual.localRotation = Quaternion.Euler(70, 0, 0);   // tipped over (placeholder defeat pose)
+            if (visual) visual.localRotation = Quaternion.Euler(70, 0, 0);   // tipped over (stand-in defeat pose)
+            if (presenter) presenter.Action("Defeat", 150);
             W.Fx.Crescendo(transform.position, true, 2, true);
         }
 

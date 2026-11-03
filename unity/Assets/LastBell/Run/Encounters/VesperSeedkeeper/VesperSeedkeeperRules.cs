@@ -9,16 +9,17 @@ namespace LastBell.Run
     public static class VesperSeedkeeperRules
     {
         public static float Bound = 13.5f;                 // Verdant Chimes play bound (RunMaps)
-        public const float StakeRing = 10.5f, StakeRadius = 1.6f, CordWidth = 1.4f, CordGap = 0.8f;
+        public const float StakeRing = 10.5f, StakeRadius = 1.6f, StakePartRadius = 0.6f, CordWidth = 1.4f, CordGap = 0.8f;
         public const float SeedRadius = 2.4f, BloomRadius = 2.4f, BloomMinFromBoss = 7.2f, UmbraRadius = 4.0f;
         public const float TideRadius = 6.0f, LateBloomRadius = 2.8f, TideDrift = 3.0f;
         public const float SlowWalk = 4.2f, DesignWalk = 6f, Reaction = 0.3f;
 
         public static int Cords(int standing) => Mathf.Clamp(standing, 1, 4);
-        public static int Seeds(int standing) => standing >= 4 ? 2 : 1;
-        // players per seed (and per bloom): 1 / 2 / 3 / 2
-        public static int Share(int standing) => standing >= 4 ? 2 : Mathf.Clamp(standing, 1, 3);
-        public static int SeedTotal(int standing) => standing <= 1 ? 40 : 80;
+        public static int Seeds(int standing) => standing >= 3 ? 2 : 1;
+        // players per seed (and per bloom), first carrier first: solo [1], 2 [2], 3 [2, 1] (a pair and a lone carrier), 4 [2, 2]
+        public static int[] Shares(int standing) => standing >= 4 ? new[] { 2, 2 } : standing == 3 ? new[] { 2, 1 } : new[] { Mathf.Clamp(standing, 1, 2) };
+        // a seed's damage: 80 split by a pair, 40 on a lone carrier (solo, or the 3-player lone seed)
+        public static int SeedTotal(int share) => share <= 1 ? 40 : 80;
 
         // stake angles (degrees, Sim.Dir convention); wave 2 sits halfway between the first ones
         public static List<float> StakeAngles(int n, float offset, bool secondWave)
