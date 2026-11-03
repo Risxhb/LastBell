@@ -74,6 +74,14 @@ namespace LastBell.Run
         float hitFlash;
 
         void Awake() { d = GetComponent<RunDirector>(); }
+        // load the player panel's art while the scene loads: done on its first draw it cost 26 ms (perf report
+        // aurelion-4p-2026-11-03, frame 763)
+        void Start()
+        {
+            BossBarArt.Warm();
+            foreach (var names in SlotIconNames.Values) foreach (var n in names) Icon(n);
+            Icon("potion");
+        }
 
         void Update()
         {
@@ -222,12 +230,14 @@ namespace LastBell.Run
         {
             if (d == null) return;
             GUI.depth = 0;   // above encounter HUDs (TempoTyrantHud draws at depth 10)
+            long t = Stamp();
             Styles();
             if (!fontsWarm) WarmFonts();
-            DrainWarmUp();
+            DrainWarmUp(); t = Sec("styles + warm-up", t);
             tipText = null;
-            DrawHud();
+            DrawHud(); t = Stamp();
             if (tipText != null) DrawTooltip(tipX, tipTop, tipText);
+            Sec("tooltip draw", t);
         }
 
         // -lastbellFontLog: time each HUD section in every event (layout and repaint), so a slow text layout is found even when
@@ -256,7 +266,7 @@ namespace LastBell.Run
                 Floats(); t = Sec("floats", t);
                 Labels(); t = Sec("world labels", t);
                 HazardLabels(); t = Sec("hazard labels", t);
-                PlayerMarks(); Sec("player marks", t);
+                PlayerMarks(); t = Sec("player marks", t);
                 if (ShowMechanicGallery) MechanicGallery();
                 switch (d.State)
                 {
@@ -265,10 +275,11 @@ namespace LastBell.Run
                     case RunState.Cleared: ClearedCard(); break;
                     case RunState.Downed: DownedCard(); break;
                 }
+                Sec("state card", t);   // Ready / Intro / Cleared / Downed, plus the mechanic gallery
             }
             if (d.State == RunState.Results) Results();
             if (!world) return;
-            if (d.Paused) Pause();
+            if (d.Paused) { long tp = Stamp(); Pause(); Sec("pause", tp); }
             // dev line: dimmed Micro, lifted clear of the "Development Build" watermark
             // dev key hint removed from the HUD (keys still work: F9 defeat boss, F8 next phase)
             // map / difficulty chip removed from the combat HUD (Risxhb, October 24, 2026)

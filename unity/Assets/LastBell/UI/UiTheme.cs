@@ -105,12 +105,15 @@ namespace LastBell
             Diamond(new Vector2(b.x, b.yMax), d, Gold); Diamond(new Vector2(b.xMax, b.yMax), d, Gold);
         }
         // Text with a 1 px (scaled) drop shadow at black 0.85.
+        // A fade goes through GUI.color, not the text colour: the text colour is part of the IMGUI text cache key, so a
+        // fading float laid its text out again every frame (perf report aurelion-4p-2026-11-03: "absorbed" 9.4 ms).
         public static void Label(Rect r, string text, GUIStyle style, Color? color = null)
         {
             var keep = style.normal.textColor; var c = color ?? keep; float o = Mathf.Max(1, Mathf.Round(Scale));
-            style.normal.textColor = new Color(0, 0, 0, 0.85f * c.a); RawLabel(new Rect(r.x + o, r.y + o, r.width, r.height), text, style);
+            var oldGui = GUI.color; GUI.color = new Color(oldGui.r, oldGui.g, oldGui.b, oldGui.a * c.a); c.a = 1;
+            style.normal.textColor = new Color(0, 0, 0, 0.85f); RawLabel(new Rect(r.x + o, r.y + o, r.width, r.height), text, style);
             style.normal.textColor = c; RawLabel(r, text, style);
-            style.normal.textColor = keep;
+            style.normal.textColor = keep; GUI.color = oldGui;
         }
         // GUI.Label, timed under -lastbellFontLog: any text layout over FontLogMs is logged with its text, size and font, to
         // find a text that is laid out for the first time mid-fight (perf report aurelion-eclipse-2026-11-03).
