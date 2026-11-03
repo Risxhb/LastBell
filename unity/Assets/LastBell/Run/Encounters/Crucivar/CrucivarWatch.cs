@@ -29,7 +29,10 @@ namespace LastBell.Run
             if (d && !d.GetComponent<CrucivarWatch>()) d.gameObject.AddComponent<CrucivarWatch>();
         }
 
-        static readonly string[] Classes = { "Arcanist", "Chimesinger", "Arcanist", "Chimesinger" };   // Vanguard retired (Chzy18 11-02); Tollbreaker joins when it lands
+        // Vanguard retired (Chzy18 11-02); Tollbreaker leads once its kit is in the build (PR 14), Arcanist/Chimesinger until then
+        static readonly string[] Classes = typeof(PlayerKit).Assembly.GetType("LastBell.Run.TollbreakerKit") != null
+            ? new[] { "Tollbreaker", "Arcanist", "Chimesinger", "Tollbreaker" }
+            : new[] { "Arcanist", "Chimesinger", "Arcanist", "Chimesinger" };
         static readonly string[] Names = { "Bot 1", "Bot 2", "Bot 3", "Bot 4" };
 
         sealed class Bot : IInputSource
