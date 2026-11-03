@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="UnityInputStubs.cs" />
+    <Compile Include="../../unity/Assets/LastBell/Run/Networking/LanConnection.cs" Link="LanConnection.cs" />
+    <Compile Include="../../unity/Assets/LastBell/Run/Networking/LanLobby.cs" Link="LanLobby.cs" />
+    <Compile Include="../../unity/Assets/LastBell/Run/Networking/LanInputFrame.cs" Link="LanInputFrame.cs" />
+    <Compile Include="../../unity/Assets/LastBell/Run/Networking/LanUnityInput.cs" Link="LanUnityInput.cs" />
+    <Compile Include="../../unity/Assets/LastBell/Run/Networking/LanHostRoster.cs" Link="LanHostRoster.cs" />
+    <Compile Include="../../unity/Assets/LastBell/Run/Networking/LanWorldFrame.cs" Link="LanWorldFrame.cs" />
+  </ItemGroup>
+</Project>

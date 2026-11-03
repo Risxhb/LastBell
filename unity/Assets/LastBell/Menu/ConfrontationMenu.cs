@@ -48,6 +48,9 @@ namespace LastBell.Menu
         public Button VSyncControl { get; private set; }
         public Button FrameCapControl { get; private set; }
         public TestRushSetup Rush { get; private set; }
+#if LASTBELL_LAN_TEST
+        public LanMenuPanel LanPanel { get; private set; }
+#endif
         public bool Loading { get; private set; }
         public bool SettingsOpen => settings && settings.activeSelf;
         public bool StageHidden { get; private set; }
@@ -88,8 +91,14 @@ namespace LastBell.Menu
             Boss=CharacterPresenter.Create(BossWrapper,"Bellkeeper2",2,.8f,0,null);Sanitize(Boss);
             SelectClass(SelectedIndex); BuildUI();
             EventSystem.current.SetSelectedGameObject((StartRunEnabled?StartButton:RushButton).gameObject);
+#if !LASTBELL_LAN_TEST
             if(ResumeBossRush){ResumeBossRush=false;BossRush();if(Rush)Rush.OpenBossStep();}
+#endif
             MenuFlowTest.Install();
+#if LASTBELL_LAN_TEST
+            LanMenuAutoTest.Install(this);
+            LanSessionAutoTest.Install();
+#endif
             if(ConfrontationMenuTest.Requested) gameObject.AddComponent<ConfrontationMenuTest>();
         }
         static void Sanitize(CharacterPresenter p)
@@ -129,8 +138,12 @@ namespace LastBell.Menu
             var panel=navigationRect=MenuUI.Rect("Right navigation",safe,new Vector2(.73f,.08f),new Vector2(.97f,.86f));navigation=panel.gameObject.AddComponent<CanvasGroup>();
             var logo=MenuUI.Panel("Last Bell logo",panel,new Vector2(-.1f,.73f),new Vector2(1.1f,1),Color.white);
             logo.sprite=Resources.Load<Sprite>("Menu/ConfrontationLogo");logo.preserveAspect=true;
+#if LASTBELL_LAN_TEST
+            RushButton=Nav("Multiplayer",panel,.45f,OpenLan,28);
+#else
             StartButton=Nav("Start Run",panel,.51f,StartRun,28);RushButton=Nav("Boss Rush",panel,.40f,BossRush);
             StartButton.interactable=StartRunEnabled;   // greyed out: ConfrontationNavFocus dims a non-interactable label
+#endif
             SettingsButton=Nav("Settings",panel,.29f,OpenSettings);ExitButton=Nav("Exit",panel,.18f,Exit);
 #if UNITY_WEBGL && !UNITY_EDITOR
             ExitButton.GetComponentInChildren<Text>().text="Return to Menu";
@@ -146,7 +159,7 @@ namespace LastBell.Menu
             difficultyNext=CycleArrow(diff.transform,true,16,new Color(MenuUI.Gold.r,MenuUI.Gold.g,MenuUI.Gold.b,.5f));
 
             BuildMusicPlayer();
-            var stack=new Selectable[]{PreviousButton,NextButton,StartButton,RushButton,SettingsButton,ExitButton,diff,MusicPlayButton}.Where(s=>s!=StartButton||StartRunEnabled).ToArray();
+            var stack=new Selectable[]{PreviousButton,NextButton,StartButton,RushButton,SettingsButton,ExitButton,diff,MusicPlayButton}.Where(s=>s!=null&&(s!=StartButton||StartRunEnabled)).ToArray();
             for(int i=0;i<stack.Length;i++)stack[i].navigation=new Navigation{mode=Navigation.Mode.Explicit,selectOnDown=stack[(i+1)%stack.Length],selectOnUp=stack[(i+stack.Length-1)%stack.Length],selectOnLeft=i==0||i==1?PreviousButton:null,selectOnRight=i==0||i==1?NextButton:i==stack.Length-1?MusicPauseButton:null};
             // One menu song (Bittersweet Dawn, October 26, 2026): no skip button; Pause wraps right to Play.
             bool skip=MenuMusic.TrackCount>1;MusicNextButton.gameObject.SetActive(skip);
@@ -243,6 +256,19 @@ namespace LastBell.Menu
         }
 
         // ---------------------------------------------------------------- actions
+#if LASTBELL_LAN_TEST
+        void OpenLan()
+        {
+            if(Loading||SettingsOpen||LanPanel)return;
+            navigation.interactable=navigation.blocksRaycasts=false;navigation.alpha=0;musicGroup.interactable=musicGroup.blocksRaycasts=false;musicGroup.alpha=0;
+            shade.enabled=false;LanPanel=new GameObject("LAN setup").AddComponent<LanMenuPanel>();LanPanel.Build(this,safe,SavedHeroSelection.Current);
+        }
+        public void CloseLan()
+        {
+            LanPanel=null;shade.enabled=true;navigation.interactable=navigation.blocksRaycasts=true;navigation.alpha=1;musicGroup.interactable=musicGroup.blocksRaycasts=true;musicGroup.alpha=1;
+            EventSystem.current.SetSelectedGameObject(RushButton.gameObject);
+        }
+#endif
         public void StartRun(){if(Loading||SettingsOpen||Rush)return;Loading=MenuLaunch.Normal(SavedHeroSelection.Current);if(!Loading)message.text="Run scenes unavailable in this build.";}
         // Boss Rush opens in this scene (no separate hero-select scene): arena step, then the boss step.
         public void BossRush()
@@ -450,7 +476,11 @@ namespace LastBell.Menu
             if(View.enabled)View.fieldOfView=Mathf.Clamp(42*Mathf.Max(1,1.77778f/View.aspect),42,62);
             bool back=Keyboard.current?.escapeKey.wasPressedThisFrame==true||Gamepad.current?.buttonEast.wasPressedThisFrame==true;
             if(MenuFlowTest.Requested&&MenuSmokeTest.TestKeyboard!=null)back|=MenuSmokeTest.TestKeyboard.escapeKey.wasPressedThisFrame||MenuSmokeTest.TestGamepad.buttonEast.wasPressedThisFrame;
-            if(back){if(Rush)Rush.Back();else if(ResolutionListOpen)CloseResolutionList();else if(SettingsOpen)CloseSettings();}
+            if(back){
+#if LASTBELL_LAN_TEST
+                if(LanPanel)LanPanel.Close();else
+#endif
+                if(Rush)Rush.Back();else if(ResolutionListOpen)CloseResolutionList();else if(SettingsOpen)CloseSettings();}
             KeepResolutionInView();
             if(Loading){navigation.interactable=false;musicGroup.interactable=false;}
         }

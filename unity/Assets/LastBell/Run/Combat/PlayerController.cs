@@ -12,6 +12,7 @@ namespace LastBell.Run
         public Vector2 Move;          // camera-relative WASD, x right / y up the screen
         public Vector3 Aim;           // cursor on the floor (world)
         public bool Sprint, Jump, Dash, Potion;
+        public bool WorldMove;        // LAN remote players: Move is already world x / z (the client used its own camera)
         public bool P0, P1, P2, P3, P4;   // pressed this tick
         public bool H0, H1, H2, H3, H4;   // held
         public bool Pressed(int i) => i switch { 0 => P0, 1 => P1, 2 => P2, 3 => P3, _ => P4 };
@@ -95,8 +96,9 @@ namespace LastBell.Run
         // by the encounter; drawn by RunHud with the name beside each icon; cleared before each encounter
         public readonly List<string> Marks = new List<string>();
         public Shop.PlayerBuild Build;   // run items bought in the shop (null = none); read through Shop.ItemHooks
-        public int MaxHealth => Shop.ItemHooks.MaxHp(this, MaxHp);                              // MaxHp unless items change it
-        public float MaxStaminaNow => Shop.ItemHooks.F(this, "stamina.max", MaxStamina);
+        public int MaxHealth => netMaxHp > 0 ? netMaxHp : Shop.ItemHooks.MaxHp(this, MaxHp);                              // MaxHp unless items change it
+        public float MaxStaminaNow => netMaxStamina > 0 ? netMaxStamina : Shop.ItemHooks.F(this, "stamina.max", MaxStamina);
+        int netMaxHp; float netMaxStamina;   // LAN client replica: the host's maxima
 
         public int Hp { get; private set; } = MaxHp;
         public float Stamina { get; private set; } = MaxStamina;
@@ -164,6 +166,13 @@ namespace LastBell.Run
             if (Down || amount <= 0) return;
             int h = Mathf.Min(amount, MaxHealth - Hp); if (h <= 0) return;
             Hp += h; RunHud.Float(transform.position + Vector3.up * 2.4f, "+" + h, new Color(0.55f, 1f, 0.75f));
+        }
+
+        // LAN client replica only: show the host's values (this copy never runs Step).
+        public void ApplyNetworkState(int hp, int maxHp, float stamina, float maxStamina, int potions, bool down)
+        {
+            netMaxHp = Mathf.Max(1, maxHp); netMaxStamina = Mathf.Max(1, maxStamina);
+            Hp = Mathf.Max(0, hp); Stamina = Mathf.Max(0, stamina); Potions = Mathf.Max(0, potions); Down = down;
         }
 
         // dev / test hook only
@@ -257,7 +266,7 @@ namespace LastBell.Run
             Vector3 fwd = cam ? Sim.Flat(cam.transform.forward).normalized : Vector3.forward;
             if (fwd.sqrMagnitude < 0.01f) fwd = Vector3.forward;
             Vector3 right = Vector3.Cross(Vector3.up, fwd);
-            Vector3 move = fwd * inp.Move.y + right * inp.Move.x;
+            Vector3 move = inp.WorldMove ? new Vector3(inp.Move.x, 0, inp.Move.y) : fwd * inp.Move.y + right * inp.Move.x;
 
             Vector3 vel = Vector3.zero; bool stepped = false;
             if (jumpTick >= 0)
@@ -348,6 +357,11 @@ namespace LastBell.Run
         public abstract string Tooltip(int slot);           // PF-04: name, binding, effect, cooldown, conditions
         public abstract string ClassState();                // Opening / Harmony etc.
         public abstract void Step(PlayerInput inp);
+        // LAN client replica: the host's cooldowns, slot text and class state (null = this kit's own). The HUD reads Shown*.
+        public float[] NetCooldowns; public string[] NetSlotStates; public string NetClassState;
+        public float ShownCooldown(int slot) => NetCooldowns != null && slot < NetCooldowns.Length ? NetCooldowns[slot] : Cooldown01(slot);
+        public string ShownSlotState(int slot) => NetSlotStates != null && slot < NetSlotStates.Length ? NetSlotStates[slot] : SlotState(slot);
+        public string ShownClassState() => NetClassState ?? ClassState();
         public virtual void TickTimersOnly() { }             // cooldowns keep running while stunned or dashing
         public virtual bool Acting => false;                 // mid-action (bots: decide the next press when idle)
         public virtual bool CanDash() => true;

@@ -35,7 +35,7 @@ namespace LastBell.Run
         Burst ultCharge; int ultId;
 
         public void ResetAll()
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "ResetAll", new object[0]);
             for (int i = live.Count - 1; i >= 0; i--) { var b = live[i]; if (b.owns) Destroy(b.mf.sharedMesh); b.go.SetActive(false); pool.Push(b); }
             live.Clear();
             foreach (var s in shields.Values) if (s) Destroy(s.gameObject);
@@ -123,7 +123,7 @@ namespace LastBell.Run
         // Steel Rhythm: a flat crescent at blade height sweeping across the hit arc; the third cut is wider, brighter
         // and leaves a floor scuff (under the telegraphs).
         public void Slash(PlayerController p, float reach, float arc, bool heavy, bool backhand)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "Slash", new object[] { p, reach, arc, heavy, backhand });
             var pos = p.transform.position + Vector3.up * (1.0f + p.Height);
             var mesh = FxMeshes.Sector(reach * 0.35f, reach, arc / 2, 32);
             float yaw = p.transform.eulerAngles.y;
@@ -146,7 +146,7 @@ namespace LastBell.Run
 
         // Sundering Blow: a short heavy downward cleave; empowered adds a gold split along the floor and more sparks.
         public void Sunder(PlayerController p, float reach, bool empowered, bool hit)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "Sunder", new object[] { p, reach, empowered, hit });
             var f = p.transform.forward; var c = p.transform.position + f * reach * 0.75f;
             var mesh = FxMeshes.Sector(0.3f, reach, 18, 16);
             Play(mesh, true, add, p.transform.position + Vector3.up * 0.9f, Quaternion.Euler(0, p.transform.eulerAngles.y, 0) * Quaternion.Euler(-35, 0, 0), 0.25f, (b, u) =>
@@ -167,7 +167,7 @@ namespace LastBell.Run
         // Last Word: the blade gathers light over the windup (a shrinking ring around the player), then the overhead
         // slam and a travelling shockwave.
         public void UltWindup(PlayerController p, int ticks)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "UltWindup", new object[] { p, ticks });
             Kill(ultCharge, ultId);
             float life = ticks / (float)Sim.Hz;
             ultCharge = Play(FxMeshes.Annulus(0.85f, 1f), true, addFloor, new Vector3(p.transform.position.x, 0.05f, p.transform.position.z), Quaternion.identity, life, (b, u) =>
@@ -177,9 +177,9 @@ namespace LastBell.Run
             }, 2, Ink, VanGold, Ivory, p.transform);
             ultId = ultCharge.id;
         }
-        public void UltCancel(PlayerController p) { Kill(ultCharge, ultId); ultCharge = null; }
+        public void UltCancel(PlayerController p) { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "UltCancel", new object[] { p }); Kill(ultCharge, ultId); ultCharge = null; }
         public void UltSlam(PlayerController p, Vector3 at)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "UltSlam", new object[] { p, at });
             ultCharge = null;
             var c = new Vector3(at.x, 0.05f, at.z);
             Play(FxMeshes.Annulus(0.2f, 2.2f), true, alphaFloor, c, Quaternion.identity, 0.45f, (b, u) =>
@@ -196,7 +196,7 @@ namespace LastBell.Run
         }
         float lastWave;
         public void Shockwave(Vector3 pos, Vector3 dir, float width)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "Shockwave", new object[] { pos, dir, width });
             if (Time.time - lastWave < 0.03f) return; lastWave = Time.time;
             var yaw = Quaternion.LookRotation(dir).eulerAngles.y;
             Play(FxMeshes.Sector(0.1f, width / 2, 70, 16), true, addFloor, new Vector3(pos.x, 0.06f, pos.z), Quaternion.Euler(0, yaw, 0), 0.25f, (b, u) =>
@@ -209,7 +209,7 @@ namespace LastBell.Run
         // Brace: a translucent rune disc in front of the shield arm while raised; a hit flashes it (controlled impact,
         // not a parry/invulnerability flash).
         public void Shield(PlayerController p, int kind, bool on)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "Shield", new object[] { p, kind, on });
             if (!shields.TryGetValue(p, out var s) || s == null)
             {
                 var go = new GameObject("Brace shield"); go.transform.SetParent(transform, false);
@@ -237,7 +237,7 @@ namespace LastBell.Run
 
         // Opening: a slow-turning ring of three cyan ticks under the Vanguard (a shape, not only a colour) + rising motes
         public void Opening(PlayerController p, bool on)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "Opening", new object[] { p, on });
             if (openings.TryGetValue(p, out var o)) { Kill(o.b, o.id); openings.Remove(p); }
             if (!on) return;
             var tick = FxMeshes.Sector(0.85f, 1.05f, 160, 48, true);
@@ -253,7 +253,7 @@ namespace LastBell.Run
 
         // ------------------------------------------------------------ shared
         public void DashTrail(PlayerController p)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "DashTrail", new object[] { p });
             if (p.ClassName == "Arcanist") return;   // Blink draws its own departure, thread and arrival (PlayerFx.Arcanist)
             if (!trails.TryGetValue(p, out var tr) || tr == null)
             {
@@ -271,15 +271,15 @@ namespace LastBell.Run
 
         // ------------------------------------------------------------ Chimesinger
         // Resonant Note: a small gold note with a short glittering tail (projectile drawn on the combat tick)
-        public void NoteCast(Vector3 at, Vector3 dir) { Spray(at, dir, 6, 0.4f, 3, 0.12f, 0.25f, motes); }
+        public void NoteCast(Vector3 at, Vector3 dir) { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "NoteCast", new object[] { at, dir }); Spray(at, dir, 6, 0.4f, 3, 0.12f, 0.25f, motes); }
         public void ProjectileHead(Vector3 pos, Color c)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "ProjectileHead", new object[] { pos, c });
             motes.Emit(pos, Vector3.zero, 0.42f, 0.06f);
             motes.Emit(pos + UnityEngine.Random.insideUnitSphere * 0.08f, UnityEngine.Random.insideUnitSphere * 0.3f, 0.16f, 0.3f);
         }
-        public void NoteImpact(Vector3 pos, Color c) { Spray(pos, Vector3.up, 8, 1f, 3, 0.12f, 0.3f, motes); }
+        public void NoteImpact(Vector3 pos, Color c) { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "NoteImpact", new object[] { pos, c }); Spray(pos, Vector3.up, 8, 1f, 3, 0.12f, 0.3f, motes); }
         public void NoteTrail(PlayerController p)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "NoteTrail", new object[] { p });
             // Harmonic Step: fading golden notes along the path (the trail renderer is shared with every dash)
             for (int i = 0; i < 10; i++) motes.Emit(p.transform.position + UnityEngine.Random.insideUnitSphere * 0.4f + Vector3.up * 1f, Vector3.up * 0.5f, 0.2f, 0.7f);
         }
@@ -287,7 +287,7 @@ namespace LastBell.Run
         // Bellstrike: a bright straight bolt to the target; a new bell drops in with one ring, a refresh rings twice
         // and tightens the strength ring.
         public void Bellstrike(Vector3 from, Vector3 to, bool hit, bool refresh)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "Bellstrike", new object[] { from, to, hit, refresh });
             var d = Sim.Flat(to - from); float len = d.magnitude; if (len < 0.1f) return;
             var lane = FxMeshes.Quad(-0.12f, 0.12f, 0, len);
             Play(lane, true, add, from, Quaternion.LookRotation(d), 0.16f, (b, u) => { b.mpb.SetFloat(PDissolve, u); b.mpb.SetFloat(PIntensity, 1.4f); }, 2, Ink, NoteGold, Ivory);
@@ -308,7 +308,7 @@ namespace LastBell.Run
         // The ringing bell above the boss. Size/ring encode strength (0-2), orbiting pips encode echoes (0-2),
         // the bell's glow dims as it nears expiry.
         public void Bell(BossEncounter boss, int strength, int echoes, float life01)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "Bell", new object[] { boss, strength, echoes, life01 });
             if (boss == null || !boss.Solid)
             {
                 if (bell) bell.gameObject.SetActive(false); return;
@@ -339,7 +339,7 @@ namespace LastBell.Run
             Prim.SetGlow(bellBody, new Color(0.95f, 0.75f, 0.3f) * (0.15f + 0.6f * life01));
         }
         public void EchoAdded(BossEncounter boss, int echoes)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "EchoAdded", new object[] { boss, echoes });
             if (boss == null) return;
             var at = boss.transform.position + Vector3.up * boss.MarkHeight;
             Spray(at, Vector3.up, 10 * echoes, 0.9f, 3, 0.18f, 0.5f, motes);
@@ -347,7 +347,7 @@ namespace LastBell.Run
 
         // Harmonic Refrain: a directional wave of three expanding gold arcs (ripples), clearly different from the bolt
         public void Refrain(PlayerController p, float range, float half, bool hit)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "Refrain", new object[] { p, range, half, hit });
             float yaw = p.transform.eulerAngles.y;
             for (int k = 0; k < 3; k++)
             {
@@ -363,7 +363,7 @@ namespace LastBell.Run
 
         // Crescendo: the bell collapses into a column and bursts; a full setup adds a second shock ring and more light
         public void Crescendo(Vector3 at, bool bellDetonated, int echoes, bool full)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "Crescendo", new object[] { at, bellDetonated, echoes, full });
             var c = new Vector3(at.x, 0.05f, at.z);
             Play(cyl, false, add, c, Quaternion.identity, full ? 0.55f : 0.4f, (b, u) =>
             {
@@ -387,7 +387,7 @@ namespace LastBell.Run
         // Mending Chorus: one immediate expanding ring of the heal radius + rising notes on everyone healed. No lingering
         // disc: the ring has cleared within 0.5 s (no sanctuary / shield implied).
         public void Chorus(Vector3 at, float radius)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "Chorus", new object[] { at, radius });
             var c = new Vector3(at.x, 0.05f, at.z);
             Play(FxMeshes.Annulus(0.85f, 1f), true, addFloor, c, Quaternion.identity, 0.45f, (b, u) =>
             {

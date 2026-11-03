@@ -321,7 +321,7 @@ namespace LastBell.Run
             arcMotes.Clear(); arcSparks.Clear(); ashFx.Clear(); embers.Clear(); flameFx.Clear();
         }
         public void ArcanistReset(PlayerController p)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "ArcanistReset", new object[] { p });
             if (!arcReady) return;
             if (arc.TryGetValue(p, out var s))
             {
@@ -423,7 +423,7 @@ namespace LastBell.Run
 
         // ================================================================== E1 Magic Missile
         public void MissileTapCast(PlayerController p, Vector3 from, Vector3 dir)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "MissileTapCast", new object[] { p, from, dir });
             EnsureArc(); var at = HandPos(p);
             // a 0.25 m glyph disc at the palm and a short muzzle streak along the shot
             Arc(RingU(0.085f, 0.095f, 32), true, arcAdd, at, FaceCam(at), 0.1f, (b, u) =>
@@ -444,7 +444,7 @@ namespace LastBell.Run
         // the glyph ring at the casting hand (0.36 m): one arc per dart (3, or 5 in Surge), each lighting as its dart is
         // summoned, the newest with a pulse; the unlit arcs stay faint so the ring visibly fills by thirds
         public void MissileChargeStart(PlayerController p)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "MissileChargeStart", new object[] { p });
             var s = St(p); KillH(s.glyph); s.glyph = null; foreach (var h in s.glyphArcs) KillH(h); s.glyphArcs.Clear(); s.glyphFill = 0; s.glyphPulse = -9;
             var kit = Arcanist(p); int cap = kit != null ? kit.MissileCap : 3; bool gold = kit != null && kit.Surging;
             float span = 360f / cap, gap = cap > 3 ? 16 : 22;
@@ -471,7 +471,7 @@ namespace LastBell.Run
         }
 
         public void MissileSummon(PlayerController p, int n)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "MissileSummon", new object[] { p, n });
             var s = St(p); var kit = Arcanist(p); int cap = kit != null ? kit.MissileCap : 3; s.glyphFill = n / (float)cap; s.glyphPulse = Time.time;
             int i = n - 1; if (i < 0 || i >= s.darts.Length) return;
             KillH(s.darts[i]);
@@ -502,7 +502,7 @@ namespace LastBell.Run
         }
 
         public void MissileChargeCancel(PlayerController p)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "MissileChargeCancel", new object[] { p });
             var s = St(p); var hand = HandPos(p);
             for (int i = 0; i < s.darts.Length; i++)
             {
@@ -533,7 +533,7 @@ namespace LastBell.Run
         }
 
         public void MissileVolley(PlayerController p, int n)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "MissileVolley", new object[] { p, n });
             var s = St(p); var at = HandPos(p);
             // the ring flashes full, then erodes; one thin ring is thrown out from it
             foreach (var h in s.glyphArcs)
@@ -551,7 +551,7 @@ namespace LastBell.Run
         // a hovering dart hands over to its projectile (the darts launch 0.05 s apart)
         readonly Vector3[] launchFrom = new Vector3[5]; readonly float[] launchAt = { -9, -9, -9, -9, -9 };
         public void MissileLaunch(PlayerController p, int i)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "MissileLaunch", new object[] { p, i });
             var s = St(p); if (i < 0 || i >= s.darts.Length) return;
             if (s.darts[i] != null && s.darts[i].Alive(this)) { launchFrom[i] = s.darts[i].b.go.transform.position; launchAt[i] = Time.time; }
             KillH(s.darts[i]); s.darts[i] = null;
@@ -559,7 +559,7 @@ namespace LastBell.Run
 
         // a missile in flight: the dart drawn between ticks (extrapolated from the last tick), two short weaving ribbons
         public void Missile(ProjectileSystem.Projectile pr, bool charged, int index = 1, bool surged = false)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "Missile", new object[] { pr, charged, index, surged });
             EnsureArc();
             float tickAt = Time.time; Vector3 lastPos = pr.Pos;
             float phase = Random.value * 6.28f;
@@ -771,7 +771,7 @@ namespace LastBell.Run
         static float SheathW(int step) => step == 1 ? 0.22f : step == 2 ? 0.32f : 0.46f;
         static float CoreW(int step) => step == 1 ? 0.035f : step == 2 ? 0.05f : 0.075f;
         public void BeamWindup(PlayerController p, int ticks)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "BeamWindup", new object[] { p, ticks });
             var s = St(p); foreach (var h in s.lens) KillH(h); s.lens.Clear();
             float life = ticks / (float)Sim.Hz;
             for (int k = 0; k < 3; k++)
@@ -800,7 +800,7 @@ namespace LastBell.Run
         }
 
         public void BeamStart(PlayerController p)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "BeamStart", new object[] { p });
             var s = St(p); foreach (var h in s.beam) KillH(h); s.beam.Clear();
             s.beamStart = Time.time; s.ashAcc = 0; s.shedAcc = 0; s.beamStep = 1;
             // layers: 0 void sheath (dark, alpha), 1-2 ultraviolet rim lines on the sheath's edges, 3 bright core.
@@ -911,7 +911,7 @@ namespace LastBell.Run
         }
 
         public void Beam(PlayerController p, Vector3 from, Vector3 dir, Vector3 end, int step, bool hit)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "Beam", new object[] { p, from, dir, end, step, hit });
             var s = St(p);
             if (hit) end = SurfaceEnd(from, end);   // drawn on his armour, not his hit body (presentation only)
             if (step > s.beamStep && s.beam.Count > 0)
@@ -938,7 +938,7 @@ namespace LastBell.Run
             s.beamFrom = from; s.beamEnd = end; s.beamStep = step; s.beamHit = hit;
         }
         public void BeamEnd(PlayerController p, bool broken)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "BeamEnd", new object[] { p, broken });
             var s = St(p);
             var from = HandPos(p); var to = s.beamEnd; var d = to - from; float len = d.magnitude;
             foreach (var h in s.beam) KillH(h); s.beam.Clear();
@@ -985,7 +985,7 @@ namespace LastBell.Run
             LensApart(p, broken);
         }
         public void BeamCancel(PlayerController p)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "BeamCancel", new object[] { p });
             LensApart(p, true); var hand = HandPos(p);
             for (int k = 0; k < 12; k++) arcSparks.Emit(hand, Random.onUnitSphere * 2.5f, 0.05f, 0.25f);
         }
@@ -1245,7 +1245,7 @@ namespace LastBell.Run
 
         // ================================================================== E3 Rune Sigil
         public void SigilPlace(PlayerController p, int id, Vector3 pos, int armTicks, bool powered = true)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "SigilPlace", new object[] { p, id, pos, armTicks, powered });
             EnsureArc();
             float life = armTicks / (float)Sim.Hz, hold = life + 0.12f; float R = ArcanistKit.SigilRadius;
             var m = new MarkFx { pos = new Vector3(pos.x, 0.04f, pos.z), start = Time.time, life = life, ringYaw = Random.value * 360 };
@@ -1261,7 +1261,7 @@ namespace LastBell.Run
         }
 
         public void SigilExplode(int id, Vector3 pos, bool hit)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "SigilExplode", new object[] { id, pos, hit });
             if (!marks.TryGetValue(id, out var m)) return;
             marks.Remove(id); foreach (var h in m.parts) KillH(h);
             var c = new Vector3(pos.x, 0.04f, pos.z); float R = ArcanistKit.SigilRadius;
@@ -1327,7 +1327,7 @@ namespace LastBell.Run
             for (int j = 0; j < (m.weak ? 6 : 16); j++) arcSparks.Emit(c + Vector3.up * 0.4f, (Random.insideUnitSphere + Vector3.up * 0.8f) * 7f * k, 0.07f, 0.3f);
             CameraShake.Shake(m.weak ? 0.05f : 0.12f, 0.15f);
         }
-        public void SigilFade(int id) => FadeMark(id);
+        public void SigilFade(int id) { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "SigilFade", new object[] { id }); FadeMark(id); }
         void FadeMark(int id)
         {
             if (!marks.TryGetValue(id, out var m)) return;
@@ -1391,7 +1391,7 @@ namespace LastBell.Run
         }
 
         public void GlyphGain(PlayerController p, int count, Vector3 from)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "GlyphGain", new object[] { p, count, from });
             if (!p) return;
             var s = St(p); int i = count - 1; if (i < 0 || i >= ArcanistKit.MaxGlyphs) return;
             ArcanistTick(p); KillGlyph(s, i);
@@ -1460,7 +1460,7 @@ namespace LastBell.Run
 
         // a glyph spent on a rune: it leaves its socket and arcs into the rune's centre, landing with a gold flash
         public void GlyphSpend(PlayerController p, int remaining, Vector3 target)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "GlyphSpend", new object[] { p, remaining, target });
             if (!p) return;
             var s = St(p); int i = remaining; if (i < 0 || i >= ArcanistKit.MaxGlyphs) return;
             var from = s.glyphOrbs[i] != null && s.glyphOrbs[i][0].Alive(this) ? s.glyphOrbs[i][0].b.go.transform.position : GlyphSocket(p, s, i);
@@ -1525,7 +1525,7 @@ namespace LastBell.Run
         // the glyphs spent. Active (2 s per glyph): a gold foot ring, a chest ring that empties as the timer, a crown of the
         // spent glyphs, a faint rim of light on the body, rising motes; the last second flickers; the end folds inward.
         public void SurgeCharge(PlayerController p, int glyphs, int ticks)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "SurgeCharge", new object[] { p, glyphs, ticks });
             if (!p) return;
             var s = St(p); float life = ticks / (float)Sim.Hz; s.surgeCastLife = life * 0.85f; s.surgePull = Time.time; s.snapFrom = 0;
             if (s.rig) s.rig.SurgeCharge(life);   // the core brightens toward gold and the cage spins up as the glyphs arrive
@@ -1563,7 +1563,7 @@ namespace LastBell.Run
             var sq = GlyphSocket(p, s, i); for (int k = 0; k < 4; k++) { var off = Random.onUnitSphere * 0.3f; arcMotes.Emit(sq + off, -off / 0.1f, 0.06f, 0.1f); }
         }
         public void SurgeCancel(PlayerController p)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "SurgeCancel", new object[] { p });
             if (!p) return;
             var s = St(p);
             s.snapFrom = s.surgePull >= 0 ? Ease(Mathf.Clamp01((Time.time - s.surgePull) / s.surgeCastLife)) : 0; s.surgeSnap = Time.time; s.surgePull = -1;
@@ -1579,7 +1579,7 @@ namespace LastBell.Run
         }
 
         public void SurgeStart(PlayerController p, int glyphs, int ticks)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "SurgeStart", new object[] { p, glyphs, ticks });
             if (!p) return;
             var s = St(p);
             foreach (var h in s.surgeCast) KillH(h); s.surgeCast.Clear(); s.surgePull = -1; s.snapFrom = 0;
@@ -1734,7 +1734,7 @@ namespace LastBell.Run
         }
 
         public void SurgeEnd(PlayerController p)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "SurgeEnd", new object[] { p });
             if (!p || !arc.TryGetValue(p, out var s)) return;
             if (s.rig) s.rig.SurgeOff();
             if (s.surge.Count == 0) return;
@@ -1768,7 +1768,7 @@ namespace LastBell.Run
         // The mark is a large rune drawn over the whole fall (its outer ring is the timer); the comet itself starts far
         // up out of view and slams down in the last part of the fall, landing as the rune completes.
         public void CometMark(PlayerController p, int id, Vector3 pos, int fallTicks, bool powered = true)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "CometMark", new object[] { p, id, pos, fallTicks, powered });
             EnsureArc();
             float life = fallTicks / (float)Sim.Hz; float R = ArcanistKit.CometRadius, C = ArcanistKit.CometCore;
             var c = new Vector3(pos.x, 0.045f, pos.z);
@@ -1929,7 +1929,7 @@ namespace LastBell.Run
         }
 
         public void CometImpact(int id, Vector3 pos, bool hit, bool bull)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "CometImpact", new object[] { id, pos, hit, bull });
             if (!marks.TryGetValue(id, out var m)) return;
             marks.Remove(id);
             m.snuffAt = Time.time;
@@ -2065,7 +2065,7 @@ namespace LastBell.Run
             ArcLight(c + Vector3.up * 0.6f, CometViolet, (bull ? 16f : 13f) * kb, 8f * k, 0.3f);
             CameraShake.Shake(m.weak ? 0.3f : bull ? 0.8f : 0.55f, bull ? 0.45f : 0.38f);
         }
-        public void CometFade(int id) => FadeMark(id);
+        public void CometFade(int id) { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "CometFade", new object[] { id }); FadeMark(id); }
         // a few more embers lifting off the seams over the next second
         System.Collections.IEnumerator CraterEmbers(Vector3 c, float k)
         {
@@ -2113,7 +2113,7 @@ namespace LastBell.Run
 
         // ================================================================== E6 Blink
         public void BlinkOut(PlayerController p)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "BlinkOut", new object[] { p });
             var s = St(p); var at = p.transform.position; s.blinkFrom = at;
             Arc(DashedRing(0.5f, 0.54f, 6, 14, 10), true, arcAddFloor, new Vector3(at.x, 0.05f, at.z), Quaternion.Euler(0, Random.value * 60, 0), 0.15f, (b, u) =>
             {
@@ -2172,7 +2172,7 @@ namespace LastBell.Run
         }
 
         public void BlinkIn(PlayerController p)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "BlinkIn", new object[] { p });
             var s = St(p); var at = p.transform.position;
             if (s.thread != null && s.thread.Alive(this))
             {
@@ -2220,7 +2220,7 @@ namespace LastBell.Run
         }
 
         public void BlinkBlocked(PlayerController p)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "BlinkBlocked", new object[] { p });
             var s = St(p);
             if (s.thread != null) { KillH(s.thread); s.thread = null; }
             // the departure silhouette goes at once, so it never stands beside his body

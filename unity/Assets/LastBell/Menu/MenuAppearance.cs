@@ -25,6 +25,11 @@ namespace LastBell.Menu
         public static bool Available(MenuStyle style)=>Application.CanStreamedLevelBeLoaded(PathFor(style));
         public static bool Enter(MenuStyle presented,GameObject owner)
         {
+#if LASTBELL_LAN_TEST
+            // This edition always uses Confrontation without writing the ordinary player's saved menu preference.
+            if(presented==MenuStyle.Alternative)return true;
+            owner.SetActive(false);SceneManager.LoadScene(ConfrontationMenu.ScenePath,LoadSceneMode.Single);return false;
+#else
             // Old opt-in diagnostics explicitly exercise the showcase, without replacing the user's saved choice.
             var args=Environment.GetCommandLineArgs();
             if(RunAutoTest.Requested||MapPreviewCapture.Requested)return true;
@@ -35,6 +40,7 @@ namespace LastBell.Menu
             owner.SetActive(false);
             SceneManager.LoadScene(ScenePath,LoadSceneMode.Single);
             return false;
+#endif
         }
         public static void Switch(MenuStyle style)
         {

@@ -24,6 +24,14 @@ namespace LastBell.Run
         public string PhaseName { get; protected set; } = "";
         public string Current { get; protected set; } = "";   // attack in progress, for the HUD / tests
         public virtual string HudExtra => null;          // an extra boss-bar line (Aurelion v4: enrage clock, shield)
+        // LAN client replica (never stepped): the host's values for the HUD. netExtra null = this boss's own HudExtra.
+        string netExtra; bool netState;
+        public string HudExtraShown => netState ? (string.IsNullOrEmpty(netExtra) ? null : netExtra) : HudExtra;
+        public void ApplyNetworkState(int hp, int maxHp, bool dead, string phase, string attack, string extra)
+        {
+            MaxHp = Mathf.Max(1, maxHp); Hp = Mathf.Clamp(hp, 0, MaxHp); Dead = dead;
+            PhaseName = phase ?? ""; Current = attack ?? ""; netExtra = extra; netState = true;
+        }
         protected virtual bool PartyScaled => false;      // true: co-op HP 1 + PartyStep x (fighters - 1) (Aurelion v4 is tuned with it)
         protected virtual float PartyStep => 0.7f;        // the packets' provisional 0.7 per extra fighter
         public event Action<BossEncounter> Defeated;

@@ -139,6 +139,21 @@ namespace LastBell.Run
         }
         void OnDestroy() { if (Instance == this) Instance = null; }
 
+        // LAN client (Networking.LanClientWorld): this idle, disabled director holds a replica of the host's fight so RunHud
+        // can draw it. Nothing here steps the replica; DetachLanReplica puts the director back to idle.
+        public void AttachLanReplica(CombatWorld world, PlayerController local, IEnumerable<PlayerController> others)
+        {
+            World = world; Player = local; Allies.Clear(); Allies.AddRange(others); Mode = RunMode.Practice;
+        }
+        public void ApplyLanState(RunState state, int stateTicks, bool victory, BossEncounter boss)
+        {
+            State = state; StateTicks = stateTicks; Victory = victory; Boss = boss;
+        }
+        public void DetachLanReplica()
+        {
+            World = null; Player = null; Boss = null; Allies.Clear(); State = RunState.Menu; StateTicks = 0; Victory = false;
+        }
+
         void Go(RunState s)
         {
             Generation++; Transitions++; StateTicks = 0;
@@ -189,11 +204,14 @@ namespace LastBell.Run
 
         bool Begin(RunMode mode, string className, int encounter, int phase = 1)
         {
+#if LASTBELL_LAN_TEST
+            if (mode != RunMode.Practice || encounter < 0 || encounter >= Bosses.Length || !Networking.LanLobby.ValidEncounter(LastBell.Menu.TestRushSetup.CardName(encounter))) return false;
+#endif
             if (State != RunState.Menu) return false;
             PracticePhase = mode == RunMode.Practice && encounter >= 0 && encounter < Bosses.Length ? Mathf.Clamp(phase, 1, Bosses[encounter].Phases) : 1;
             Mode = mode; ClassName = Array.IndexOf(Classes, className) >= 0 ? className : "Vanguard";
             Difficulty = RunDifficulty.Selected;
-            AllyCount = RunParty.Selected;
+            AllyCount = Networking.LanHostRoster.Active != null ? Networking.LanHostRoster.Active.Remote.Count : RunParty.Selected;
             BuildRun(encounter);
             Go(RunState.Ready);
             return true;
@@ -284,11 +302,12 @@ namespace LastBell.Run
             Player.Presenter.GetUp();
             // bot allies (RunParty): classes spread across all three, standing in a row behind the player
             Allies.Clear();
-            var allyClasses = RunParty.AllyClasses(ClassName, AllyCount);
+            var lanRoster = Networking.LanHostRoster.Active;
+            var allyClasses = lanRoster == null ? RunParty.AllyClasses(ClassName, AllyCount) : lanRoster.Remote.Select(m => m.ClassName).ToArray();
             for (int i = 0; i < allyClasses.Length; i++)
             {
                 var a = PlayerController.Spawn(World, allyClasses[i], AllySocket(i), 180);
-                a.Input = new AllyBot(i, allyClasses.Length, AllyBot.AllyMode); a.AbilitiesEnabled = false; a.Presenter.GetUp();
+                a.Input = lanRoster == null ? (IInputSource)new AllyBot(i, allyClasses.Length, AllyBot.AllyMode) : lanRoster.InputFor(lanRoster.Remote[i].Id); a.AbilitiesEnabled = false; a.Presenter.GetUp();
                 Allies.Add(a);
             }
             Encounter = startEncounter; practiceEncounter = startEncounter;

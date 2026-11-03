@@ -279,6 +279,25 @@ namespace LastBell.Run
 
         public string CurrentClip => current >= 0 && clips != null && current < clips.Length ? clips[current].name : "-";
 
+        // Presentation-only network state: this never changes the actor's gameplay or ability timing.
+        public float NetworkClipSpeed => current >= 0 && speeds != null && current < speeds.Length ? speeds[current] : 1;
+        public float NetworkOverlaySpeed => Overlaying ? ovSpeed : 1;
+        public void ApplyNetworkPose(string clip, float clipSpeed, string overlay, float overlaySpeed, bool hide)
+        {
+            if (index.TryGetValue(clip ?? "", out int i))
+            {
+                if (current != i) { current = i; times[i] = 0; }
+                speeds[i] = clipSpeed <= 0 ? 1 : Mathf.Clamp(clipSpeed, .05f, 20); oneShotLeft = .2f;
+            }
+            if (layered && index.TryGetValue(overlay ?? "", out int o))
+            {
+                if (ov != o) { ov = o; ovTimes[o] = 0; }
+                ovSpeed = Mathf.Clamp(overlaySpeed, .05f, 20); ovLoop = overlay.EndsWith("Loop"); ovLeft = .2f;
+            }
+            else if (layered) EndOverlay();
+            if (Hidden != hide) SetHidden(hide);
+        }
+
         // simple readable stand-in body if a character GLB is missing from Resources
         static System.Func<Transform, Transform> PlaceholderBody(string className) => host =>
         {

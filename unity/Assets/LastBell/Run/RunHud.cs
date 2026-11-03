@@ -15,7 +15,7 @@ namespace LastBell.Run
         const float FloatLife = 0.9f, FloatRise = 40;
         // x jitter (virtual px, -18..18) picked deterministically per float so simultaneous numbers stack in a column
         public static void Float(Vector3 world, string text, Color c)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Hud, "Float", new object[] { world, text, c });
             if (floats.Count >= 80) return;
             int h = (floatSeq++ + (text != null ? text.Length : 0)) & int.MaxValue;
             floats.Add(new FloatText { pos = world, text = text, color = c, jx = (h % 5 - 2) * 9f });
@@ -75,6 +75,11 @@ namespace LastBell.Run
 
         void Awake() { d = GetComponent<RunDirector>(); }
 
+        // LAN client (LanClientWorld): the director holds a replica of the host's fight and never runs it. The HUD draws the
+        // replica; the menu, Retry and Main Menu shortcuts are the host's, so a client gets a waiting card and Leave instead.
+        public static bool LanClientView;
+        public static System.Action LanLeave;
+
         void Update()
         {
             for (int i = floats.Count - 1; i >= 0; i--)
@@ -87,6 +92,7 @@ namespace LastBell.Run
             TickFade();
             var kb = Keyboard.current; if (kb == null || d == null) return;
             if (kb.tabKey.wasPressedThisFrame) ShowMeter = !ShowMeter;
+            if (LanClientView) return;
             if (d.State == RunState.Results)
             {
                 if (kb.rKey.wasPressedThisFrame) d.RequestRetry();
@@ -220,6 +226,7 @@ namespace LastBell.Run
         {
             // The legacy run menu is a standalone diagnostic only: when the main menu owns the session (a launch is pending or
             // the return bridge exists) the Menu state is a one-frame hand-off, so draw a plain ink frame instead of flashing it.
+            if (LanClientView && d.State == RunState.Menu) return;   // before the host's first snapshot
             if (d.State == RunState.Menu) { if (LastBell.Menu.MenuReturnBridge.Active || LastBell.Menu.MenuLaunch.Pending) UiTheme.Fill(new Rect(0, 0, Screen.width, Screen.height), UiTheme.InkDeep); else Menu(); return; }
             bool world = d.World != null;
             if (world)
@@ -235,13 +242,13 @@ namespace LastBell.Run
                 if (ShowMechanicGallery) MechanicGallery();
                 switch (d.State)
                 {
-                    case RunState.Ready: ReadyCard(); break;
+                    case RunState.Ready: if (!LanClientView) ReadyCard(); break;
                     case RunState.Intro: if (d.Boss != null) IntroCard(); break;
                     case RunState.Cleared: ClearedCard(); break;
                     case RunState.Downed: DownedCard(); break;
                 }
             }
-            if (d.State == RunState.Results) Results();
+            if (d.State == RunState.Results) { if (LanClientView) LanResults(); else Results(); }
             if (!world) return;
             if (d.Paused) Pause();
             // dev line: dimmed Micro, lifted clear of the "Development Build" watermark
@@ -498,6 +505,20 @@ namespace LastBell.Run
             F(centred ? x + w / 2 - 48 : x, y + 26, 96, 2, UiTheme.Gold);
         }
 
+        // LAN client results: the host decides Retry or Main Menu; the client can only wait or leave.
+        void LanResults()
+        {
+            Dim();
+            float vw = UiTheme.VirtualWidth, CW = 560, cx = vw / 2 - CW / 2, y = 220;
+            DrawBand(y - 120, 520, 1);
+            string head = d.Victory ? "VICTORY" : "DEFEAT";
+            T(cx, y, CW, 56, UiTheme.Spaced(head), display40, d.Victory ? UiTheme.Gold : UiTheme.Danger); y += 64;
+            F(cx + CW / 2 - 60, y, 120, 1.5f, UiTheme.Gold); y += 22;
+            const string body = "Waiting for the host to retry or leave.";
+            T(cx, y, CW, Hv(bodyC, body, CW) + 4, body, bodyC); y += 60;
+            if (StripButton(cx, y, CW, 44, "Leave session", resultAction)) LanLeave?.Invoke();
+        }
+
         void Results()
         {
             Dim();
@@ -679,7 +700,7 @@ namespace LastBell.Run
             float yy = rowsY;
             if (!(b is TempoTyrantEncounter)) T(x + 10, yy, bw * 0.65f, rowH, b.PhaseName, row15, BA(UiTheme.Ivory));
             // Aurelion v4: the enrage clock and the Corona Shield (BossEncounter.HudExtra), right of the phase line
-            if (b.HudExtra != null) { var hx = UiTheme.Style(UiTheme.SizeNumeric, true, TextAnchor.MiddleRight, UiTheme.Ivory); T(x + bw * 0.35f, yy, bw * 0.65f - 10, rowH, b.HudExtra, hx, BA(UiTheme.Ivory)); }
+            if (b.HudExtraShown != null) { var hx = UiTheme.Style(UiTheme.SizeNumeric, true, TextAnchor.MiddleRight, UiTheme.Ivory); T(x + bw * 0.35f, yy, bw * 0.65f - 10, rowH, b.HudExtraShown, hx, BA(UiTheme.Ivory)); }
 
             // attack-name warning rows removed (Risxhb, October 24, 2026): telegraphs on the floor carry the warning.
             // Exception (Chzy18, October 24, 2026): a hazard tagged with a hostile mechanic (Hazard.MechanicId) gets one row with
@@ -856,7 +877,7 @@ namespace LastBell.Run
             for (int i = 0; i < n; i++)
             {
                 string key = KeyFor(k.SlotKeys[i], preferMouseBasic, out bool hold);
-                var r = Tile(bx + i * (TileW + gap), by, key, hold, SlotIcon(p.ClassName, i), k.SlotNames[i], k.SlotState(i), k.Cooldown01(i), off);
+                var r = Tile(bx + i * (TileW + gap), by, key, hold, SlotIcon(p.ClassName, i), k.SlotNames[i], k.ShownSlotState(i), k.ShownCooldown(i), off);
                 if (r.Contains(Event.current.mousePosition)) hover = i;
             }
             bool dashReady = p.Stamina >= PlayerController.DashCost;
@@ -868,7 +889,7 @@ namespace LastBell.Run
             // the controls hint line was removed from the player HUD at Risxhb's request
 
             // class state (HARMONY / SEALS / TICKS ...) as quiet tags above the health bar
-            string cs = k.ClassState();
+            string cs = k.ShownClassState();
             if (!string.IsNullOrEmpty(cs))
             {
                 var parts = cs.Split(new[] { "   " }, System.StringSplitOptions.RemoveEmptyEntries);

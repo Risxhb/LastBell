@@ -15,12 +15,16 @@ namespace LastBell.Menu
         public static void Clear(){pending=null;}
         public static bool Normal(string hero)
         {
+#if LASTBELL_LAN_TEST
+            return false;
+#else
             if(pending!=null || Array.IndexOf(RunDirector.Classes,hero)<0 || RunDirector.RunOrder.Length==0)return false;
             var order=RunDirector.CreateRunOrder();int encounter=order[0];
             int map=RunMaps.IndexOf(RunDirector.Bosses[encounter].Map??"test");
             if(!RunMaps.InBuild(map))return false;
             pending=new Request{Hero=hero,Scene=RunMaps.All[map].RunScene,Difficulty=RunDifficulty.Selected,Order=order};
             MenuReturnBridge.Ensure();MenuReturnBridge.TestSession=false;SceneManager.LoadSceneAsync(pending.Scene);return true;
+#endif
         }
         public static bool Test(string hero,int map,int encounter,int phase=1)
         {
