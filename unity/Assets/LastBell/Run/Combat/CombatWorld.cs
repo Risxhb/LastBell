@@ -80,14 +80,19 @@ namespace LastBell.Run
             Projectiles = new ProjectileSystem(this);
         }
 
+        // profiler scopes (perf agent, 2 Nov): one per part of the combat tick
+        static readonly Unity.Profiling.ProfilerMarker PmPlayers = new Unity.Profiling.ProfilerMarker("LastBell.World.Players"),
+            PmBoss = new Unity.Profiling.ProfilerMarker("LastBell.World.Boss"), PmProjectiles = new Unity.Profiling.ProfilerMarker("LastBell.World.Projectiles"),
+            PmHazards = new Unity.Profiling.ProfilerMarker("LastBell.World.Hazards");
+
         public void Step()
         {
             Tick++;
-            foreach (var p in Players) p.Step();
+            using (PmPlayers.Auto()) foreach (var p in Players) p.Step();
             if (!CombatActive) return;
-            if (Boss != null && !Boss.Dead) Boss.Step();
-            Projectiles.Step();
-            Hazards.Step();
+            using (PmBoss.Auto()) if (Boss != null && !Boss.Dead) Boss.Step();
+            using (PmProjectiles.Auto()) Projectiles.Step();
+            using (PmHazards.Auto()) Hazards.Step();
         }
 
         // Clears everything an encounter can leave behind: hazards, projectiles, boss-owned effects. Called at every

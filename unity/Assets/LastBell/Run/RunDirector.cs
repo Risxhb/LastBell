@@ -390,15 +390,19 @@ namespace LastBell.Run
             if (World == null || Paused) return;
             acc += Mathf.Min(Time.deltaTime, 0.1f);
             int guard = 0;
-            SimSmoother.RestoreAll();   // ticks see exact sim poses
-            while (acc >= Sim.Dt && guard++ < 8) { acc -= Sim.Dt; Tick(); SimSmoother.CaptureAll(); }
-            SimSmoother.PresentAll(acc / Sim.Dt);   // draw between the last two ticks: smooth at any frame rate
+            using (PmSmooth.Auto()) SimSmoother.RestoreAll();   // ticks see exact sim poses
+            while (acc >= Sim.Dt && guard++ < 8) { acc -= Sim.Dt; using (PmTick.Auto()) Tick(); using (PmSmooth.Auto()) SimSmoother.CaptureAll(); }
+            using (PmSmooth.Auto()) SimSmoother.PresentAll(acc / Sim.Dt);   // draw between the last two ticks: smooth at any frame rate
         }
+
+        // profiler scopes (perf agent, 2 Nov): a sim tick, the world step inside it, and the pose smoothing around it
+        static readonly Unity.Profiling.ProfilerMarker PmTick = new Unity.Profiling.ProfilerMarker("LastBell.Director.Tick"),
+            PmWorld = new Unity.Profiling.ProfilerMarker("LastBell.Director.WorldStep"), PmSmooth = new Unity.Profiling.ProfilerMarker("LastBell.Director.SimSmoother");
 
         void Tick()
         {
             int gen = Generation;
-            World.Step();
+            using (PmWorld.Auto()) World.Step();
             StateTicks++;
             if (State == RunState.Combat || State == RunState.Cleared || State == RunState.Downed) RunTicks++;
             if (gen != Generation) return;
