@@ -81,6 +81,14 @@ namespace LastBell.Run
             StartCoroutine(MainLoop());
         }
         void OnDestroy() { Application.logMessageReceived -= OnLog; }
+        // heartbeat every 5 real seconds: a stuck run shows whether frames still run and what the suite waits on
+        float beat; string waiting = "";
+        void Update()
+        {
+            if (Time.realtimeSinceStartup < beat) return;
+            beat = Time.realtimeSinceStartup + 5;
+            Debug.Log($"[crucivar-test] beat f{Time.frameCount} dt {Time.deltaTime:0.000} scale {Time.timeScale} state {D?.State} paused {D?.Paused} tick {W?.Tick} [{section}] {waiting}");
+        }
         void OnLog(string msg, string stack, LogType t) { if ((t == LogType.Exception || t == LogType.Error) && !(stack ?? "").Contains("UnityEditor.")) { errors++; lines.Add("      LOG " + t + ": " + msg); } }
 
         // ---------------- reporting ----------------
@@ -107,7 +115,9 @@ namespace LastBell.Run
         public IEnumerator Ticks(int n) { int end = W.Tick + n; float guard = 0; while (W != null && W.Tick < end && guard < n / 20f + 10) { guard += Time.deltaTime; yield return null; } }
         public IEnumerator Until(Func<bool> cond, float timeout, string what)
         {
+            waiting = what;
             float t = 0; while (!cond() && t < timeout) { t += Time.deltaTime; yield return null; }
+            waiting = "";
             if (!cond()) Check("reached: " + what, false, $"timed out after {timeout}s");
         }
 
