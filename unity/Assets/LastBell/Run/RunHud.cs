@@ -388,7 +388,7 @@ namespace LastBell.Run
             while (warmQueue.Count > 0 && System.Diagnostics.Stopwatch.GetTimestamp() - t0 < budget) warmQueue.Dequeue()();
             GUI.color = old; warmFrames++;
             if (warmQueue.Count == 0 && UiTheme.FontLog)
-                Debug.Log($"[fontlog] HUD font warm-up done over {warmFrames} frames, {(System.Diagnostics.Stopwatch.GetTimestamp() - warmStarted) * 1000.0 / System.Diagnostics.Stopwatch.Frequency:0} ms wall");
+                Debug.Log($"[fontlog] HUD font warm-up done over {warmFrames} frames, {(System.Diagnostics.Stopwatch.GetTimestamp() - warmStarted) * 1000.0 / System.Diagnostics.Stopwatch.Frequency:0} ms wall; atlases: {UiTheme.AtlasSummary()}");
         }
         // one step for the ASCII set, then one per non-ASCII glyph: each fallback-font glyph costs 13-15 ms the first time,
         // so batched into one step they froze single Ready frames for 50-170 ms (perf report aurelion-4p-2026-11-03, 10:20)
@@ -987,7 +987,8 @@ namespace LastBell.Run
             for (int i = 0; i < n; i++)
             {
                 string key = KeyFor(k.SlotKeys[i], preferMouseBasic, out bool hold);
-                var r = Tile(bx + i * (TileW + gap), by, key, hold, SlotIcon(p.ClassName, i), k.SlotNames[i], k.SlotState(i), k.Cooldown01(i), off);
+                long tk = Stamp(); string state = k.SlotState(i); float cd = k.Cooldown01(i); Sec("player panel: kit state", tk);
+                var r = Tile(bx + i * (TileW + gap), by, key, hold, SlotIcon(p.ClassName, i), k.SlotNames[i], state, cd, off);
                 if (r.Contains(Event.current.mousePosition)) hover = i;
             }
             bool dashReady = p.Stamina >= PlayerController.DashCost;

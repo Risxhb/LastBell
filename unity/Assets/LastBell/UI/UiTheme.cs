@@ -130,8 +130,28 @@ namespace LastBell
         public static void LogSlowText(long t0, string what, string text, GUIStyle style)
         {
             double ms = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
-            if (ms >= FontLogMs)
-                Debug.Log($"[fontlog] {ms:0.0} ms {what} frame {Time.frameCount} t {Time.timeSinceLevelLoad:0.00}: \"{text}\" size {style.fontSize} {style.fontStyle} font {(style.font ? style.font.name : "skin")}");
+            if (ms < FontLogMs) return;
+            string atlas = AtlasSummary(), change = atlas == lastAtlas ? "" : $" ATLAS CHANGED [{lastAtlas}] -> [{atlas}]";
+            lastAtlas = atlas;
+            Debug.Log($"[fontlog] {ms:0.0} ms {what} frame {Time.frameCount} t {Time.timeSinceLevelLoad:0.00} gc {System.GC.CollectionCount(0)}: \"{text}\" size {style.fontSize} {style.fontStyle} font {(style.font ? style.font.name : "skin")}{change}");
+        }
+        // TextCore font atlases (pages and size per font asset), to see whether a slow layout grew or added an atlas page
+        static string lastAtlas = "";
+        public static string AtlasSummary()
+        {
+            var sb = new System.Text.StringBuilder();
+            foreach (var fa in Resources.FindObjectsOfTypeAll<UnityEngine.TextCore.Text.FontAsset>())
+            {
+                var tex = fa.atlasTextures; int n = tex == null ? 0 : tex.Length;
+                sb.Append(fa.name).Append(' ').Append(n).Append('x').Append(fa.atlasWidth).Append('/').Append(fa.atlasHeight).Append(' ').Append(fa.characterTable.Count).Append("ch; ");
+            }
+            return sb.ToString();
+        }
+        // the legacy font path (TextGenerator, RequestCharactersInTexture) rebuilds its own texture when it fills up
+        [RuntimeInitializeOnLoadMethod]
+        static void HookFontRebuilds()
+        {
+            if (FontLog) Font.textureRebuilt += f => Debug.Log($"[fontlog] legacy font texture rebuilt: {(f ? f.name : "?")} frame {Time.frameCount} t {Time.timeSinceLevelLoad:0.00}");
         }
         // Label style sized for the current screen: px is the 1080p size.
         public static GUIStyle Style(int px, bool strong, TextAnchor anchor, Color color, bool wrap = false)
