@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace LastBell.Run
 {
@@ -24,6 +25,15 @@ namespace LastBell.Run
         static void Boot()
         {
             if (!Requested) return;
+            // a built player starts at the main menu, whose live backdrop has a RunDirector of its own: driving that one
+            // froze the player at Ready (Tollbreaker lane, 11-03). Load the Brass Foundry run map first, as the editor run does.
+            string foundry = RunMaps.All[RunMaps.IndexOf("brass-foundry")].RunScene;
+            if (SceneManager.GetActiveScene().path != foundry) { SceneManager.sceneLoaded += OnFoundry; SceneManager.LoadScene(foundry); return; }
+            Attach();
+        }
+        static void OnFoundry(Scene s, LoadSceneMode m) { SceneManager.sceneLoaded -= OnFoundry; Attach(); }
+        static void Attach()
+        {
             var d = FindAnyObjectByType<RunDirector>();
             if (d && !d.GetComponent<CrucivarAutoTest>()) d.gameObject.AddComponent<CrucivarAutoTest>();
         }
