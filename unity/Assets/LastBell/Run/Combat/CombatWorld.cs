@@ -43,6 +43,7 @@ namespace LastBell.Run
         public readonly List<BossPart> Parts = new List<BossPart>();
         public readonly HazardSystem Hazards;
         public readonly ProjectileSystem Projectiles;
+        public readonly BulletSystem Bullets;          // hostile bullets (Sylvara v3)
         public readonly BellkeeperFx BossFx;
         public readonly PlayerFx Fx;
         public readonly Transform Root;
@@ -78,6 +79,7 @@ namespace LastBell.Run
             BossFx.ResetAll(); Fx.ResetAll();
             Hazards = new HazardSystem(this);
             Projectiles = new ProjectileSystem(this);
+            Bullets = new BulletSystem(this) { Bound = PlayerBound + 0.6f };
         }
 
         public void Step()
@@ -87,6 +89,7 @@ namespace LastBell.Run
             if (!CombatActive) return;
             if (Boss != null && !Boss.Dead) Boss.Step();
             Projectiles.Step();
+            Bullets.Step();
             Hazards.Step();
         }
 
@@ -96,6 +99,7 @@ namespace LastBell.Run
         {
             Hazards.ClearAll();
             Projectiles.ClearAll();
+            Bullets.ClearAll(); Bullets.ColourOf = null;
             BossFx.ClearTelegraphs();
             BossFx.ChargeTrail(Root, false);
             foreach (var p in Players) p.Kit?.ClearTargetState();

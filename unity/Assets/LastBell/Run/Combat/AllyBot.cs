@@ -11,6 +11,7 @@ namespace LastBell.Run
     //   No cheats: it sees exactly the telegraphs a player sees, and has no immunity.
     // - Rotation: a simple per-class priority list, OFF by default (AllyBot.Attacks): Chzy18 wants bots that do the
     //   mechanics without fighting, so they never shorten the fight.
+    // - Sylvara v3 (bullet hell): ReadSylvara and SylvaraSteer below take over, since bullets are not telegraphs.
     // Test modes (Aurelion v3, HARDER-PROMPT §7; the run menu always uses Passive):
     // - Reflex: reflex-perfect and memory-blind. It reacts on the tick any hostile shape appears (amber included, not at
     //   lock), dashing and sprinting, enters any visible soak, drinks potions, and ignores numerals, marks and in/out cues.
@@ -24,7 +25,7 @@ namespace LastBell.Run
         readonly int reactTicks;
         public readonly BotMode Mode;
         // tests: what it decided last tick; only formatted when read, so a tick stores plain values and makes no strings
-        public string DebugLine => dMe == null ? null : Describe();
+        public string DebugLine => sylOn ? SylvaraLine() : dMe == null ? null : Describe();
         public float? HoldRange;          // tests: keep this gap to the boss instead of the class's range (8.5 = a ranged player)
         // bots are mechanics dummies by default: they move, dodge and spread, but never attack or heal. Launch switch
         // -lastbellAllyAttack turns their class rotation on (the boss then scales his HP for them, BossEncounter.Spawn).
@@ -49,6 +50,7 @@ namespace LastBell.Run
             var w = me.World; var boss = w.Boss;
             Vector3 pos = me.transform.position, want;
             if (boss == null || !boss.Solid) { inp.Move = ToScreen(Vector3.zero); return inp; }
+            if (boss is SylvaraEncounter sy) return ReadSylvara(me, sy);
             var bpos = Sim.Flat(boss.transform.position);
             inp.Aim = bpos;
 
@@ -496,11 +498,161 @@ namespace LastBell.Run
             need = 99; return Vector3.zero;
         }
 
+        // Sylvara v3: bullet-hell steering (SylvaraSteer). It holds its own angle round her (casters at range, Vanguard
+        // close) and in Hollow Bloom stands next to a Choir Bud to cut it (one bud per bot, by slot). Every 3 ticks it
+        // re-plans the cheapest path through the bullets and telegraphs 0.8 s ahead.
+        Vector3 sylMove; bool sylSprint, sylOn, sylDash; float sylCost; Vector3 sylPos;
+        string SylvaraLine() => $"cost {sylCost:0.0} move ({sylMove.x:0.0},{sylMove.z:0.0}) sprint {sylSprint} dash {sylDash} at ({sylPos.x:0.0},{sylPos.z:0.0})";
+
+        PlayerInput ReadSylvara(PlayerController me, SylvaraEncounter sy)
+        {
+            sylOn = true;
+            var inp = new PlayerInput();
+            var pos = Sim.Flat(me.transform.position); var bp = Sim.Flat(sy.transform.position);
+            var target = bp; Vector3? reach = null;
+
+            // where it wants to be: its own angle round her, or next to its Choir Bud
+            float ang = 360f * slot / of + 30f;
+            var home = bp + Sim.Dir(ang) * (sy.BodyRadius + Range(me) + 0.5f);
+            var buds = sy.AliveBudPositions();
+            if (buds.Count > 0)
+            {
+                var bud = buds[slot % buds.Count];
+                home = bud + Sim.Flat(pos - bud).normalized * 1.8f; target = bud; reach = bud;
+            }
+            var flat = new Vector2(home.x, home.z); float lim = CombatWorld.PlayerBound - 1f;
+            if (flat.magnitude > lim) { flat = flat.normalized * lim; home = new Vector3(flat.x, 0, flat.y); }
+
+            if (tick % 3 == 1 || me.Dashing)
+            {
+                sylMove = SylvaraSteer.Choose(me, pos, home, out sylSprint, out sylDash, out sylCost, reach);
+                sylPos = pos;
+                if (sylDash) inp.Dash = true;
+            }
+            inp.Sprint = sylSprint;
+            inp.Aim = target;
+            // Choir Buds are a mechanic (boss parts that must be cut), so every bot swings its basic attack at its bud, even
+            // the non-attacking menu bots; the boss herself only when attacks are on
+            bool atBud = reach.HasValue && Sim.Flat(target - pos).magnitude <= 3.2f;
+            // (Tollbreaker plays its rotation: a held Twin Hurl lodges the axe, and lodged axes need a recall)
+            if (atBud || Attacks && Sim.Flat(target - pos).magnitude <= Range(me) + sy.BodyRadius + 2f)
+            {
+                if (me.Kit is TollbreakerKit) Attack(me, ref inp);
+                else inp.P0 = inp.H0 = tick % 6 == 0 || me.ClassName != "Arcanist";
+            }
+            if (me.Hp < 70 && me.Potions > 0 && tick % 30 == 0) inp.Potion = true;
+            inp.Move = ToScreen(sylMove);
+            return inp;
+        }
+
         static Vector2 ToScreen(Vector3 world)
         {
             var cam = Camera.main; var fwd = cam ? Sim.Flat(cam.transform.forward).normalized : Vector3.forward;
             var right = Vector3.Cross(Vector3.up, fwd);
             return Vector2.ClampMagnitude(new Vector2(Vector3.Dot(world, right), Vector3.Dot(world, fwd)), 1);
+        }
+    }
+
+    // Bullet-hell steering (Sylvara v3): scores candidate moves against every hostile bullet and telegraph that can hurt
+    // this player in the next 0.8 s.
+    public static class SylvaraSteer
+    {
+        const float Horizon = 0.8f, Step = 0.05f, Buffer = 0.25f;
+        static readonly List<BulletSystem.Bullet> near = new List<BulletSystem.Bullet>();
+        static readonly Vector3[] dirs = MakeDirs();
+        static Vector3[] MakeDirs() { var d = new Vector3[16]; for (int i = 0; i < 16; i++) d[i] = Sim.Dir(i * 22.5f); return d; }
+
+        // bud: a Choir Bud it is cutting; ending a move outside its 3 m reach costs more than a near miss (not a hit)
+        public static Vector3 Choose(PlayerController me, Vector3 pos, Vector3 home, out bool sprint, out bool dash, out float bestCost, Vector3? bud = null)
+        {
+            var w = me.World; var boss = w.Boss;
+            int mine = w.Bullets.ColourOf != null ? w.Bullets.ColourOf(me) : 0;
+            // its ring flickers before a toll swaps colours (the same warning a player sees): both colours count until the swap
+            bool both = w.Boss is SylvaraEncounter sy && sy.SwapWarned(me);
+            // bullets that can reach anywhere it could be within the horizon
+            near.Clear();
+            float reach = PlayerController.SprintSpeed * Horizon + 1.2f;
+            foreach (var b in w.Bullets.Live)
+            {
+                if (b.Dead || (b.Colour != 0 && b.Colour != mine && !both)) continue;
+                var end = b.Pos + b.Vel * Horizon;
+                if (SegDist(pos, b.Pos, end) < reach + (b.Split != null ? 3f : 0f)) near.Add(b);
+            }
+            sprint = false; dash = false;
+            var best = Vector3.zero; bestCost = Cost(me, pos, Vector3.zero, 0, home, boss, bud);
+            bool canSprint = me.Stamina > PlayerController.SprintCost;
+            for (int s = 0; s < (canSprint ? 2 : 1); s++)
+            {
+                float v = s == 0 ? PlayerController.WalkSpeed : PlayerController.SprintSpeed;
+                foreach (var d in dirs)
+                {
+                    float c = Cost(me, pos, d, v, home, boss, bud) + (s == 1 ? 0.6f : 0);
+                    if (c < bestCost) { bestCost = c; best = d; sprint = s == 1; }
+                }
+            }
+            // every path is hit: a 3 m dash (0.2 s) clears it when its line and landing are clean
+            if (bestCost >= 50 && !me.Dashing && me.Stamina >= PlayerController.DashCost)
+            {
+                float dashSpeed = PlayerController.DashDistance / (PlayerController.DashTicks * Sim.Dt);
+                foreach (var d in dirs)
+                {
+                    float c = Cost(me, pos, d, dashSpeed, home, boss, bud, PlayerController.DashTicks * Sim.Dt) + 2f;
+                    if (c < bestCost) { bestCost = c; best = d; dash = true; sprint = false; }
+                }
+            }
+            return best;
+        }
+
+        // moves at v along d for `moveFor` seconds (all of the horizon by default), then stands
+        static float Cost(PlayerController me, Vector3 pos, Vector3 d, float v, Vector3 home, BossEncounter boss, Vector3? bud, float moveFor = Horizon)
+        {
+            float cost = 0; var bp = boss != null ? Sim.Flat(boss.transform.position) : Vector3.zero;
+            float body = boss != null ? boss.BodyRadius + PlayerController.Radius + 0.1f : 0;
+            Vector3 q = pos;
+            int steps = Mathf.RoundToInt(Horizon / Step);
+            for (int k = 1; k <= steps; k++)
+            {
+                float t = k * Step;
+                q = pos + d * v * Mathf.Min(t, moveFor);
+                if (!CombatWorld.InPlayerBound(q, -0.3f)) return 500 + k;
+                if (boss != null && Sim.Flat(q - bp).magnitude < body) return 400 + k;
+                float early = 1.5f - t / Horizon;   // hits sooner are worse: there is less time to fix them later
+                foreach (var b in near)
+                {
+                    float fuse = b.Split != null ? b.Life - b.Age : float.MaxValue;
+                    if (t <= fuse)
+                    {
+                        float gap = Sim.Flat(q - (b.Pos + b.Vel * t)).magnitude - (b.Radius + Hazard.Margin + Buffer);
+                        if (gap < 0) cost += 100 * early;
+                        else if (gap < 0.6f) cost += (0.6f - gap) * 4;
+                    }
+                    else
+                    {
+                        // a seed bursts into a ring of petals: keep clear of the burst point and its ring for a moment
+                        var at = b.Pos + b.Vel * fuse; float since = t - fuse;
+                        float ring = 4.5f * since, gap = Mathf.Abs(Sim.Flat(q - at).magnitude - ring) - (BulletArt.PetalHitRadius + Hazard.Margin + Buffer);
+                        if (since < 0.6f && gap < 0) cost += 40 * early;
+                    }
+                }
+            }
+            // telegraphs that land within the horizon (plus a little) where it ends up
+            foreach (var h in me.World.Hazards.Live)
+            {
+                bool hurts = (h.HitOnResolve && h.Damage > 0) || h.BurnPerSecond > 0;
+                if (!hurts || !h.Contains(q)) continue;
+                float left = (h.ResolveAt - h.Age) * Sim.Dt;
+                cost += h.BurnPerSecond > 0 ? 60 : left < Horizon + 0.4f ? 150 : 25;
+            }
+            cost += Sim.Flat(q - home).magnitude * 0.35f;
+            if (bud.HasValue) { float past = Sim.Flat(q - bud.Value).magnitude - 2.6f; if (past > 0) cost += 6 + past * 2; }
+            return cost;
+        }
+
+        static float SegDist(Vector3 p, Vector3 a, Vector3 b)
+        {
+            var ab = b - a; float l = ab.sqrMagnitude;
+            float t = l < 1e-6f ? 0 : Mathf.Clamp01(Vector3.Dot(p - a, ab) / l);
+            return Sim.Flat(p - (a + ab * t)).magnitude;
         }
     }
 }

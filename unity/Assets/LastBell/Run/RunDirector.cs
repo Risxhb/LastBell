@@ -39,7 +39,7 @@ namespace LastBell.Run
             // Skyward Spire area boss; authored practice map
             new BossEntry("Aurelion (area 1)", w => BossEncounter.Spawn<AurelionEncounter>(w, new Vector3(0, 0, -1.5f), 0), map: AurelionMap, phases: 4),   // v4 adds Last Light
             // Verdant Chimes area boss (graybox); authored practice map
-            new BossEntry("Sylvara (area 3)", w => BossEncounter.Spawn<SylvaraEncounter>(w, new Vector3(0, 0, -1.5f), 0), map: SylvaraMap, phases: 3),
+            new BossEntry("Sylvara (area 3)", w => BossEncounter.Spawn<SylvaraEncounter>(w, Vector3.zero, 0), map: SylvaraMap, phases: 4),
             // Brass Foundry area boss; authored practice map
             new BossEntry("Crucivar (area 2)", w => BossEncounter.Spawn<CrucivarEncounter>(w, new Vector3(0, 0, -1.5f), 0), map: CrucivarMap, phases: 3),
             // Metronome Court miniboss: explicit Practice entry only (inRun: false), so shuffled run slots are unchanged.
@@ -383,7 +383,7 @@ namespace LastBell.Run
                     if (State == RunState.Combat && Boss && !Boss.Dead)
                     {
                         if (kb.f9Key.wasPressedThisFrame) Boss.DebugDefeat();
-                        if (kb.f8Key.wasPressedThisFrame) Boss.DebugSetHpFraction(Boss is SylvaraEncounter ? (Boss.Hp > Boss.MaxHp * 0.65f ? 0.64f : 0.29f) : Boss.NextPhaseFraction());
+                        if (kb.f8Key.wasPressedThisFrame) Boss.DebugSetHpFraction(Boss.NextPhaseFraction());
                     }
                 }
             }
@@ -393,6 +393,7 @@ namespace LastBell.Run
             SimSmoother.RestoreAll();   // ticks see exact sim poses
             while (acc >= Sim.Dt && guard++ < 8) { acc -= Sim.Dt; Tick(); SimSmoother.CaptureAll(); }
             SimSmoother.PresentAll(acc / Sim.Dt);   // draw between the last two ticks: smooth at any frame rate
+            World?.Bullets.Draw(World.Root);
         }
 
         void Tick()

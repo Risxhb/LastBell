@@ -58,10 +58,8 @@ Sub-hazards that one attack spawns (rims, crowns, blasts, stamps, echoes) inheri
 ### Crucivar
 - The v2/v3 abilities these icons were made for are retired (1 Nov 2026). The v4 fight has no approved icons yet; its warnings show as text.
 
-### Sylvara (`feature/sylvara-abilities-v2`)
-- `SylvaraAbility.Id` is the short form (`verdant_canticle`), so use `h.AttackId ??= "sylvara." + Id;`. The natural place is `SylvaraEncounter.Tuned`/`Tune`, or each ability's spawn calls.
-- Today's names resolve: `Verdant Canticle I–III`, `Two Choirs`, `Listening Roots: Hush/Chorus/root ring` and `Refrain Seed bloom/burst` (the older `RefrainSeed …` spelling has an alias).
-- Antiphon's answer is spawned by Two Choirs' `ResolveVerse`, with `Source = "Two Choirs"`, so **its hits currently show as Two Choirs**. Setting `answer.AttackId = "sylvara.antiphon";` in `Antiphon.Step`, right after `verse.ResolveVerse(...)`, fixes that. It's the one real gap on any branch, and the fallback can't fix it.
+### Sylvara (`feature/sylvara-v3`)
+- The v3 bullet-hell fight replaced the v2 abilities, so their icon notes were removed (git history keeps them). The v3 hazards and bullets set no `AttackId` yet, and their attacks show as text. Icons for the v3 attacks are still to be designed.
 
 ### Bellkeeper (`feature/bellkeeper-abilities-v2`)
 - `BellkeeperAbility.Id` is the full ID, so add `h.AttackId ??= Id;` in `BellkeeperAbility.Spawn`.

@@ -190,10 +190,12 @@ namespace LastBell.Run
         {
             yield return Until(() => d.World != null && d.World.Hazards.Count > 0 && d.World.Hazards.Live.All(h => h.Age < h.ResolveAt - 6), 12, label + " hazard warning up");
             if (d.State != RunState.Combat) yield break;
-            int hp0 = d.Player.Hp, resolved0 = d.World.Hazards.Resolved, pending = d.World.Hazards.Count;
+            int pending = d.World.Hazards.Count;
             string names = string.Join(", ", d.World.Hazards.Live.Select(h => h.Source).Distinct());
             yield return Shot(label + "_windup");
             if (capture != null) StartCoroutine(Capture(capture, 200));
+            // read just before the kill: hits during the screenshot frames (a bullet hell keeps firing) are not after death
+            int hp0 = d.Player.Hp, resolved0 = d.World.Hazards.Resolved;
             d.Boss.DebugDefeat();
             Check($"{label}: boss death cancels pending hazards", d.World.Hazards.Count == 0, $"{pending} pending ({names}) -> {d.World.Hazards.Count}");
             Check($"{label}: defeated boss stops colliding", d.Boss == null || !d.Boss.Solid);
@@ -230,6 +232,12 @@ namespace LastBell.Run
                 Check($"map selectable: {RunMaps.All[i].Name}", RunMaps.InBuild(i), RunMaps.All[i].RunScene);
             yield return Shot("menu");
             if (PhaseSelectOnly) { yield return PracticePhaseChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
+            if (SylvaraClearOnly)
+            {
+                yield return SylvaraClearTimes();
+                Check("no errors or exceptions logged", errors == 0, errors + " logged");
+                Finish(); yield break;
+            }
             if (OnlySylvara)
             {
                 yield return SylvaraChecks();
@@ -718,9 +726,59 @@ namespace LastBell.Run
             d.Boss.BeginCombat();
         }
 
-        // ------------------------------------------------------------ Sylvara (graybox, docs/design/sylvara.md v0.1)
+        // ------------------------------------------------------------ Sylvara v3 (bullet hell, abilities-v3/P1..P4)
         static bool ArcanistOnly => Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellArcanistOnly", StringComparison.OrdinalIgnoreCase));
         static bool OnlySylvara => Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellSylvara", StringComparison.OrdinalIgnoreCase));
+        static bool SylvaraClearOnly => Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellSylvaraClear", StringComparison.OrdinalIgnoreCase));
+
+        // HP tuning (opt-in, -lastbellSylvaraClear): attacking bots clear the whole fight on Medium, with real downs and no
+        // healing by the test. The player is a bot too. Reports clear time, time per phase, downs and damage per second.
+        IEnumerator SylvaraClearTimes()
+        {
+            bool was = AllyBot.Attacks; AllyBot.Attacks = true; int keep = RunParty.Selected;
+            var keepLevel = RunDifficulty.Selected;
+            // Tollbreaker solo on every level, plus one party run on Hard (1-4 players; test less, 1 Nov)
+            var runs = new (string cls, int allies, Difficulty level)[] { ("Tollbreaker", 0, Difficulty.Easy), ("Tollbreaker", 0, Difficulty.Medium), ("Tollbreaker", 0, Difficulty.Hard), ("Tollbreaker", 3, Difficulty.Hard) };
+            foreach (var (cls, allies, level) in runs)
+            {
+                if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }
+                d.SelectAllies(allies); d.SelectDifficulty(level);
+                if (!d.StartPractice(cls, RunDirector.SylvaraPractice)) { Check($"Sylvara clear run {cls} +{allies} starts", false); continue; }
+                yield return Until(() => RunDirector.Instance && RunDirector.Instance.State == RunState.Ready, 30, "Verdant Chimes loaded for a clear run");
+                if (RunDirector.Instance != d) { directorLog.AddRange(d.Log); d = RunDirector.Instance; d.InputOverride = bot; bot.Clear(); }
+                d.RequestReady();
+                yield return Until(() => d.State == RunState.Combat, 4, "clear run combat");
+                var sy = d.Boss as SylvaraEncounter; var w = d.World;
+                if (sy == null) continue;
+                d.Player.Input = new AllyBot(allies, allies + 1, BotMode.Perfect);
+                int n = allies + 1, maxHp = sy.MaxHp, downs = 0, tick0 = w.Tick, last = tick0;
+                Check($"Sylvara HP for {n} fighting players is the accepted table's {SylvaraEncounter.HpFor(n)}", maxHp == SylvaraEncounter.HpFor(n), maxHp.ToString());
+                var down = new HashSet<PlayerController>(); var phaseAt = new List<(string name, int tick)> { (sy.PhaseName, tick0) };
+                while (d.State == RunState.Combat && d.World == w && (w.Tick - tick0) < Sim.Ticks(480))
+                {
+                    last = w.Tick;
+                    if (sy.PhaseName != phaseAt[phaseAt.Count - 1].name) phaseAt.Add((sy.PhaseName, w.Tick));
+                    foreach (var p in w.Players) { if (p.Down && down.Add(p)) downs++; else if (!p.Down) down.Remove(p); }
+                    yield return null;
+                }
+                float secs = (last - tick0) / (float)Sim.Hz; bool won = d.State == RunState.Cleared || d.Victory || (sy && sy.Dead), wiped = d.State == RunState.Downed;
+                var parts = new List<string>();
+                for (int i = 0; i < phaseAt.Count; i++)
+                {
+                    int end = i + 1 < phaseAt.Count ? phaseAt[i + 1].tick : last;
+                    parts.Add($"{phaseAt[i].name} {(end - phaseAt[i].tick) / (float)Sim.Hz:0}s");
+                }
+                float hpLeft = sy ? sy.Hp / (float)maxHp : 0;
+                Note($"Sylvara clear, {RunDifficulty.Name(level)}: {n} player{(n > 1 ? "s" : "")} ({cls} + {allies} bots), HP {maxHp}: {(won ? "cleared" : wiped ? $"wiped ({hpLeft:P0} left)" : $"not cleared ({hpLeft:P0} left)")} in {secs:0} s"
+                    + $" ({string.Join(", ", parts)}); {downs} downs; party DPS {(maxHp * (1 - (won ? 0 : hpLeft))) / Mathf.Max(1, secs):0}; buds {sy?.BudsCut ?? 0} cut, {sy?.BudsBloomed ?? 0} bloomed");
+                Check($"Sylvara clear run {cls} +{allies} {RunDifficulty.Name(level)}: the bots deal damage", won || hpLeft < 1f);
+                if (d.State == RunState.Combat && d.Boss) d.Boss.DebugDefeat();   // timed out: end it so the next run can start
+                yield return Until(() => d.State != RunState.Combat, 10, "clear run ends");
+            }
+            AllyBot.Attacks = was; d.SelectDifficulty(keepLevel);
+            if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }
+            d.SelectAllies(keep);
+        }
 
         IEnumerator SylvaraChecks()
         {
@@ -739,103 +797,312 @@ namespace LastBell.Run
             Check("Sylvara practice starts her encounter", sy != null && d.Mode == RunMode.Practice);
             if (sy == null) yield break;
             Check("Sylvara: full health and potions (area final boss)", d.Player.Hp == PlayerController.MaxHp && d.Player.Potions == PlayerController.MaxPotions);
-            var syPres = sy.Presenter; var syClips = new[] { "Idle", "Walk", "PruningArc", "Rootscript", "Seed", "Procession", "Bloom", "Vulnerable", "PhaseShift", "Defeat" };
-            Check("Sylvara uses her rigged model with all clips", syPres && syPres.HasModel && !sy.Placeholder && syClips.All(c => syPres.Has(c)), syPres ? string.Join(",", syClips.Where(c => !syPres.Has(c))) : "no presenter");
-            d.Player.transform.position = new Vector3(0, 0, 3.2f); yield return Wait(0.4f);   // frame the body for the shot
-            yield return Shot("sylvara_body");
-            StartCoroutine(Capture("sylvara_arc", 210));   // the first Pruning Arc on the model
+            var syPres = sy.Presenter; var syClips = new[] { "Idle", "PruningArc", "Rootscript", "Seed", "PhaseShift", "Defeat" };
+            Check("Sylvara uses her rigged model with the clips v3 plays", syPres && syPres.HasModel && !sy.Placeholder && syClips.All(c => syPres.Has(c)), syPres ? string.Join(",", syClips.Where(c => !syPres.Has(c))) : "no presenter");
+            Check("Sylvara v3 is rooted at the arena centre", Sim.Flat(sy.transform.position).magnitude < 0.01f);
+            Check("Sylvara v3 opens in Spiral Bloom", sy.PhaseName == "Spiral Bloom", sy.PhaseName);
+            Check("Sylvara solo HP is 4,600 (passive bots don't count)", sy.MaxHp == Mathf.RoundToInt(4600 * BossEncounter.TestHpScale), sy.MaxHp.ToString());
+            d.World.Difficulty = Difficulty.Medium;   // a saved menu choice must not change the checked numbers; levels are checked in Phase 4
 
-            // watch the whole fight: hits per instance, hit rules, patterns live at once
-            var hitsPerInstance = new Dictionary<int, int>(); bool hitRules = true; int maxPatterns = 0, taken = 0;
+            // watch the whole fight: every bullet hits once, bullets never stun, hazards hit once per instance
+            var bulletsHit = new HashSet<BulletSystem.Bullet>(); bool bulletOnce = true, bulletNoStun = true, colourOk = true;
+            int bulletHits = 0, taken = 0;
+            var hitsPerInstance = new Dictionary<int, int>();
+            Action<PlayerController, BulletSystem.Bullet, int> onBullet = (p, b, dmg) =>
+            {
+                bulletOnce &= bulletsHit.Add(b); bulletHits++;
+                if (b.Colour != 0) colourOk &= sy.ColourOf(p) == b.Colour;
+            };
             Action<PlayerController, Hazard, int> onHit = (p, h, dmg) =>
             {
-                hitsPerInstance[h.Id] = hitsPerInstance.TryGetValue(h.Id, out int n) ? n + 1 : 1;
-                hitRules &= h.Knockback == 0 && h.Stun == 9; taken += dmg;
+                taken += dmg;
+                if (!h.Flinch) bulletNoStun &= h.Stun == 0 && h.Knockback == 0;
+                else hitsPerInstance[h.Id] = hitsPerInstance.TryGetValue(h.Id, out int n) ? n + 1 : 1;
             };
-            d.World.PlayerHit += onHit;
-            bool watching = true;
+            d.World.Bullets.Hit += onBullet; d.World.PlayerHit += onHit;
+            bool watching = true; int maxBullets = 0;
             IEnumerator Watch()
             {
                 while (watching && d.World != null)
                 {
-                    int patterns = d.World.Hazards.Live.Select(h => h.Source.StartsWith("Threefold Bloom") ? "Threefold Bloom" : h.Source).Distinct().Count();
-                    maxPatterns = Mathf.Max(maxPatterns, patterns);
+                    maxBullets = Mathf.Max(maxBullets, d.World.Bullets.Count);
                     if (d.Player && d.Player.Hp < 45) d.Player.DebugSetHp(PlayerController.MaxHp);   // keep the schedule running; damage is noted
                     yield return null;
                 }
             }
             StartCoroutine(Watch());
-
-            // Phase 1: every attack once, and one full Bloom
-            bool bloomShot = false, rootShot = false;
-            float t0 = Time.time;
-            while (Time.time - t0 < 40f && d.State == RunState.Combat && !(sy.Order.Distinct().Count() >= 5 && sy.BloomsCompleted >= 1))
+            IEnumerator Play(float seconds, Func<bool> until)
             {
-                var sv = StartCoroutine(Survive(0.25f)); yield return Wait(0.25f); StopCoroutine(sv);
-                if (!rootShot && d.World.Hazards.Live.Count(h => h.Source == "Rootscript") >= 2) { rootShot = true; yield return Shot("sylvara_rootscript"); }
-                if (!bloomShot && d.World.Hazards.Live.Count(h => h.Source.StartsWith("Threefold Bloom")) >= 2) { bloomShot = true; yield return Shot("sylvara_bloom"); StartCoroutine(Capture("sylvara_bloom", 240)); }
+                float t0 = Time.time;
+                while (Time.time - t0 < seconds && d.State == RunState.Combat && !Safe(until))
+                { var sv = StartCoroutine(Survive(0.25f)); yield return Wait(0.25f); StopCoroutine(sv); }
+                bot.Clear();
             }
-            bot.Clear();
-            Note("Sylvara phase 1 order: " + string.Join(" → ", sy.Order));
-            foreach (var id in new[] { "Pruning Arc", "Rootscript", "Seed of the Refrain", "Briar Procession", "Threefold Bloom" })
-                Check($"Sylvara phase 1 uses {id}", sy.Order.Contains(id));
-            var log = sy.BloomLog.Take(3).ToList();
-            bool ordered = log.Count == 3 && log[0].index == 0 && log[1].index == 1 && log[2].index == 2;
-            bool timing = ordered && log.All(e => e.spentTick - e.resolveTick == 17) && log[1].resolveTick - log[0].resolveTick == 72 && log[2].resolveTick - log[1].resolveTick == 72;
-            Check("Threefold Bloom resolves I → II → III", ordered, string.Join(", ", log.Select(e => e.index + 1)));
-            Check("Bloom flowers: 72-tick stagger, 18-tick active period (resolve tick + 17)", timing, string.Join(" | ", log.Select(e => $"{e.resolveTick}->{e.spentTick}")));
 
-            // stand in flower II through its whole active period: exactly one 13 HP hit, no knockback (test setup moves
-            // the player; the hit comes from the real hazard). Then walk into flower III during its active period: hit once.
-            yield return Until(() => d.World.Hazards.Live.Any(h => h.Source == "Threefold Bloom II" && h.ResolveAt - h.Age <= 4), 40, "next Bloom flower II about to open");
-            var f2 = d.World.Hazards.Live.FirstOrDefault(h => h.Source == "Threefold Bloom II");
-            if (f2 != null)
+            // Attack props (proposal art, 1 Nov): every look fits its hit circle; the Meshy models are gitignored, so their
+            // checks run only where the art is installed. A watcher takes one screenshot of each prop in action.
             {
-                d.Player.DebugSetHp(PlayerController.MaxHp); bot.Clear();
-                d.Player.transform.position = f2.Origin; var at = f2.Origin;
-                int hits0 = hitsPerInstance.Count;
-                while (d.World.Hazards.Live.Contains(f2)) { bot.Clear(); yield return null; }
-                yield return Wait(0.1f);
-                Check("standing in a flower for its whole active period: hit exactly once for 13", hitsPerInstance.TryGetValue(f2.Id, out int n2) && n2 == 1 && d.Player.Hp == PlayerController.MaxHp - 13, $"hits {n2}, hp {d.Player.Hp}");
-                Check("no knockback: the player is still where the flower hit them", Sim.Flat(d.Player.transform.position - at).magnitude < 0.05f);
-                var f3 = d.World.Hazards.Live.FirstOrDefault(h => h.Source == "Threefold Bloom III");
-                if (f3 != null)
+                bool Fits(Mesh m, float r) { var b = m.bounds; return Mathf.Max(Mathf.Abs(b.min.x), Mathf.Abs(b.max.x), Mathf.Abs(b.min.z), Mathf.Abs(b.max.z)) <= r + 1e-3f; }
+                Check($"petal bullets (coral, brass, cobalt) fit their {BulletArt.PetalHitRadius:0.00} m hit circle", Fits(BulletArt.Petal(false), BulletArt.PetalHitRadius) && Fits(BulletArt.Petal(true), BulletArt.PetalHitRadius));
+                // the circle shrank to fit the slimmer petal (1 Nov): its tips reach the edge, no larger
+                Check("petal hit circle is the petal's reach (0.30 m, was 0.35)", Mathf.Approximately(BulletArt.PetalHitRadius, 0.30f) && !Fits(BulletArt.Petal(false), BulletArt.PetalHitRadius - 0.02f));
+                Check($"a fired petal uses the {BulletArt.PetalHitRadius:0.00} m circle", new BulletSystem.Bullet().Radius == BulletArt.PetalHitRadius);
+                Check($"water drops fit their {BulletArt.DropHitRadius:0.00} m hit circle", Fits(BulletArt.Drop, BulletArt.DropHitRadius));
+                bool art = SylvaraProps.Has(SylvaraProps.Bud) && SylvaraProps.Has(SylvaraProps.Pod) && SylvaraProps.Has(SylvaraProps.Root) && BulletArt.HasSeedModel;
+                Note("Sylvara attack props: " + (art ? "Meshy models installed" : "art not installed, stand-ins used"));
+                if (BulletArt.HasSeedModel)
                 {
-                    yield return Until(() => f3.Age >= f3.ResolveAt + 6, 4, "flower III active");
-                    d.Player.DebugSetHp(PlayerController.MaxHp);
-                    d.Player.transform.position = f3.Origin;   // entering mid-activation
-                    while (d.World.Hazards.Live.Contains(f3)) yield return null;
-                    yield return Wait(0.1f);
-                    Check("entering a flower during its active period: hit once", hitsPerInstance.TryGetValue(f3.Id, out int n3) && n3 == 1, $"hits {n3}");
-                    yield return Wait(0.5f);
-                    d.Player.DebugSetHp(PlayerController.MaxHp);
-                    Check("a spent flower is safe: no further hits", hitsPerInstance.Count == hits0 + 2);
+                    var seedT = BulletArt.MakeSeed(null, null); var rs = seedT.GetComponentsInChildren<Renderer>(); var sb = rs[0].bounds; foreach (var r in rs) sb.Encapsulate(r.bounds);
+                    float half = Mathf.Max(sb.extents.x, sb.extents.z); Destroy(seedT.gameObject);
+                    Check("the Storm Seed model fits its 0.6 m hit radius", half <= 0.6f, $"{half:0.00} m");
+                }
+                StartCoroutine(PropShots());
+            }
+            // review screenshots: the test player is moved next to each prop first so the camera frames it (the bot is healed)
+            IEnumerator PropShots()
+            {
+                bool pod = false, bud = false, seedShot = false;
+                if (SylvaraProps.Has(SylvaraProps.Root))
+                {
+                    // the Root Ring's look on demand, with the player just outside the 3.5 m disc so the camera frames it
+                    float tw = Time.time;
+                    while (Time.time - tw < 0.6f) { d.Player.transform.position = new Vector3(0, 0, 5f); yield return null; }
+                    int r0 = sy.RootModels; sy.DebugRoots();
+                    Check("the Root Ring look raises its root models", sy.RootModels - r0 == SylvaraEncounter.RootPieces);
+                    yield return new WaitForSeconds(0.2f); yield return Shot("sylvara_props_root_ring");
+                }
+                while (d.World != null && !(pod && bud && seedShot))
+                {
+                    foreach (var m in FindObjectsByType<PropMotion>(FindObjectsSortMode.None))
+                    {
+                        if (!pod && m.name == SylvaraProps.Pod && m.Now == PropMotion.Mode.Fall && m.LandsIn < 0.12f) { pod = true; yield return Shot("sylvara_props_pod_falls"); break; }
+                        if (!bud && sy.BudsCut > 0 && m.name == SylvaraProps.Bud && m.Now == PropMotion.Mode.Sprout && m.Open > 0.4f)   // after the cut test
+                        {
+                            bud = true; var bp = m.transform.position; var at = bp - bp.normalized * 3.5f; float tb = Time.time;
+                            while (Time.time - tb < 0.8f) { d.Player.transform.position = at; yield return null; }
+                            yield return Shot("sylvara_props_choir_bud"); break;
+                        }
+                    }
+                    if (!seedShot && sy.PhaseName == "Seed Storm" && d.World.Bullets.Live.Any(b => b.Source == "Seed" && b.Age > b.Life * 0.6f && Sim.Flat(b.Pos - d.Player.transform.position).magnitude < 6f))
+                    { seedShot = true; yield return Shot("sylvara_props_storm_seeds"); }
+                    yield return null;
                 }
             }
 
-            // phase transitions are queued to block boundaries
-            d.Boss.DebugSetHpFraction(0.64f);
-            yield return Until(() => sy.PhaseName == "Awakening Bloom", 25, "Sylvara phase 2");
-            Check("Sylvara enters Awakening Bloom below 65 %", sy.PhaseName == "Awakening Bloom");
-            yield return Wait(2f); yield return Shot("sylvara_phase2");
-            d.Boss.DebugSetHpFraction(0.29f);
-            float t1 = Time.time;
-            while (sy.PhaseName != "Hollow Refrain" && Time.time - t1 < 40f && d.State == RunState.Combat)
-            { var sv = StartCoroutine(Survive(0.25f)); yield return Wait(0.25f); StopCoroutine(sv); }
-            Check("Sylvara enters Hollow Refrain below 30 %", sy.PhaseName == "Hollow Refrain");
-            yield return Wait(2f); yield return Shot("sylvara_phase3");
+            // Phase 1: one full loop
+            bool p1Shot = false;
+            float s1 = Time.time;
+            while (Time.time - s1 < 34f && d.State == RunState.Combat && !sy.Order.Contains("Triangle Pods"))
+            {
+                yield return Play(0.5f, () => false);
+                if (!p1Shot && d.World.Bullets.Count > 80) { p1Shot = true; yield return Shot("sylvara_v3_p1"); StartCoroutine(Capture("sylvara_v3_p1", 240)); }
+            }
+            yield return Play(5f, () => sy.Order.Count(o => o == "Pruning Arc") >= 2);
+            if (!p1Shot) yield return Shot("sylvara_v3_p1");
+            Note("Sylvara P1 order: " + string.Join(" → ", sy.Order));
+            foreach (var id in new[] { "Petal Spiral", "Seed Pods", "Waterfall Jets", "Toll", "Feet Pod", "Pruning Arc", "Doubled Pods", "Second Spiral", "Triangle Pods" })
+                Check($"Sylvara P1 uses {id}", sy.Order.Contains(id));
+            Check("Sylvara P1 fills the arena with bullets", d.World.Bullets.Fired > 300, $"{d.World.Bullets.Fired} fired, peak {d.World.Bullets.Peak}");
+            if (SylvaraProps.Has(SylvaraProps.Pod)) Check("Seed Pods drop the pod model onto their warnings", sy.PodModels > 0, sy.PodModels.ToString());
 
-            watching = false; d.World.PlayerHit -= onHit;
-            Check("Sylvara: each hazard instance hits at most once (R16)", hitsPerInstance.Values.All(n => n == 1), $"{hitsPerInstance.Count} instances hit");
-            Check("Sylvara: hits stun 0.15 s with no knockback (D6)", hitRules);
-            Check("Sylvara: never more than one damaging pattern live (Steady Ticking)", maxPatterns <= 1, $"max {maxPatterns}");
-            Note($"Sylvara: bot took {taken} damage over the fight ({hitsPerInstance.Count} hits), healed by the test to keep the schedule running");
+            // Phase 2: colours
+            sy.Order.Clear(); int rootsBefore = sy.RootModels;
+            d.Boss.DebugSetHpFraction(0.74f);
+            yield return Until(() => sy.PhaseName == "Two-Colour Choir", 4, "Sylvara phase 2");
+            Check("Sylvara enters Two-Colour Choir below 75 %", sy.PhaseName == "Two-Colour Choir");
+            Check("a phase change clears every bullet", d.World.Bullets.Count == 0, d.World.Bullets.Count + " left");
+            yield return Until(() => sy.Current != "phase shift", 3, "phase 2 transition over");
+            int mine = sy.ColourOf(d.Player), other = mine == SylvaraEncounter.Brass ? SylvaraEncounter.Cobalt : SylvaraEncounter.Brass;
+            Check("the player has a colour in Phase 2", mine == SylvaraEncounter.Brass || mine == SylvaraEncounter.Cobalt, mine.ToString());
+            {
+                // a still bullet on the player: the other colour passes through, their own colour hits
+                d.Player.DebugSetHp(PlayerController.MaxHp);
+                var ghost = d.World.Bullets.Fire(d.Player.transform.position, 0, 0, 12, 0.25f, 0.35f, other, "Test Bullet");
+                yield return Wait(0.35f);
+                var real = d.World.Bullets.Fire(d.Player.transform.position, 0, 0, 12, 0.25f, 0.35f, sy.ColourOf(d.Player), "Test Bullet");
+                yield return Wait(0.35f);
+                Check("Two-Colour Choir: the other colour's bullet passes through you", !bulletsHit.Contains(ghost));
+                Check("Two-Colour Choir: your own colour's bullet hits you", bulletsHit.Contains(real));
+            }
+            int c0 = sy.ColourOf(d.Player); bool swapped = false, p2Shot = false;
+            float s2 = Time.time;
+            while (Time.time - s2 < 12f && d.State == RunState.Combat)
+            {
+                yield return Play(0.5f, () => false);
+                swapped |= sy.ColourOf(d.Player) != c0 && sy.ColourOf(d.Player) != 0;
+                if (!p2Shot && d.World.Bullets.Count > 150) { p2Shot = true; yield return Shot("sylvara_v3_p2"); }
+            }
+            Check("Two-Colour Choir: a toll swaps the player's colour", swapped);
+            foreach (var id in new[] { "Colour Spiral", "Brass Lanes", "Cobalt Lanes", "Second Colour Spiral", "Root Ring", "Toll" })
+                Check($"Sylvara P2 uses {id}", sy.Order.Contains(id));
+            if (SylvaraProps.Has(SylvaraProps.Root))
+            {
+                yield return Play(4f, () => sy.RootModels > rootsBefore);   // the ring starts at 12 s and resolves 2 s later
+                Check("the Root Ring raises root models inside its disc", sy.RootModels - rootsBefore >= SylvaraEncounter.RootPieces, (sy.RootModels - rootsBefore).ToString());
+            }
 
-            yield return KillDuringWindup("sylvara");
+            // Phase 3: buds
+            sy.Order.Clear();
+            d.Boss.DebugSetHpFraction(0.49f);
+            yield return Until(() => sy.PhaseName == "Hollow Bloom", 4, "Sylvara phase 3");
+            Check("Sylvara enters Hollow Bloom below 50 %", sy.PhaseName == "Hollow Bloom");
+            Check("leaving Phase 2 clears the colours", sy.ColourOf(d.Player) == 0);
+            yield return Until(() => sy.BudsAlive > 0, 5, "Choir Buds sprouted");
+            yield return Shot("sylvara_v3_p3");
+            if (SylvaraProps.Has(SylvaraProps.Bud)) Check("Choir Buds use the bell-flower model", sy.BudModels > 0, sy.BudModels.ToString());
+            var buds = sy.AliveBudPositions();
+            if (buds.Count > 0)
+            {
+                // buds are boss parts: standing next to one does nothing, the class's attacks cut it, and the damage also hits her
+                int cut0 = sy.BudsCut; var at = buds[0] - buds[0].normalized * 1.5f;
+                float t3 = Time.time;
+                while (Time.time - t3 < 1f) { bot.Clear(); d.Player.transform.position = at; yield return null; }
+                Check("standing next to a Choir Bud without attacking does not cut it", sy.BudsCut == cut0 && sy.BudHpAt(buds[0]) >= SylvaraEncounter.BudHp);
+                d.Player.Kit.ClearTargetState();   // the held attacks above left Tollbreaker's axes lodged (back after 6-8 s): start with both in hand
+                int hpBoss = d.Boss.Hp; t3 = Time.time;
+                // Tollbreaker taps (a held Twin Hurl lodges); a tap stays pending until a sim tick reads it, or a fast frame rate drops it
+                while (sy.BudsCut == cut0 && Time.time - t3 < 8f) { bool tap = bot.press[0]; bot.Clear(); bot.Aim = buds[0]; bot.hold[0] = d.ClassName != "Tollbreaker"; bot.press[0] = tap || Time.frameCount % 6 == 0; d.Player.transform.position = at; yield return null; }
+                bot.Clear();
+                float cutIn = Time.time - t3;
+                Check("attacking a Choir Bud cuts it in a few seconds (class damage)", sy.BudsCut > cut0 && cutIn < 6f, $"{d.ClassName} {cutIn:0.0}s");
+                Check("damage to a Choir Bud also hits Sylvara", hpBoss - d.Boss.Hp >= SylvaraEncounter.BudHp * 0.9f, $"{hpBoss - d.Boss.Hp}");
+                Note($"Sylvara: {d.ClassName} cut a {SylvaraEncounter.BudHp} HP Choir Bud in {cutIn:0.0}s");
+            }
+            yield return Play(14f, () => sy.Order.Contains("Pruning Arc"));
+            foreach (var id in new[] { "Hollow Spiral", "Choir Buds", "Feet Pod", "Pruning Arc" })
+                Check($"Sylvara P3 uses {id}", sy.Order.Contains(id));
+            Note($"Sylvara P3 buds: {sy.BudsCut} cut, {sy.BudsBloomed} bloomed");
+
+            // Phase 4: seed storm and the enrage steps (timing accepted 29 Oct)
+            sy.Order.Clear();
+            d.Boss.DebugSetHpFraction(0.24f);
+            yield return Until(() => sy.PhaseName == "Seed Storm", 4, "Sylvara phase 4");
+            Check("Sylvara enters Seed Storm below 25 %", sy.PhaseName == "Seed Storm");
+            bool seed = false, burst = false;
+            float s4 = Time.time;
+            while (Time.time - s4 < 7f && d.State == RunState.Combat)
+            {
+                yield return Play(0.25f, () => false);
+                seed |= d.World.Bullets.Live.Any(b => b.Source == "Seed");
+                burst |= d.World.Bullets.Live.Any(b => b.Source == "Seed Burst");
+            }
+            yield return Shot("sylvara_v3_p4");
+            {
+                // hundreds of bullet meshes on screen must not wash the frame out (a NaN normal once bloomed it to white)
+                yield return new WaitForEndOfFrame();
+                var tex = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
+                tex.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0); tex.Apply();
+                var px = tex.GetPixels32(); double sum = 0; int white = 0;
+                for (int i = 0; i < px.Length; i += 7) { float l = (px[i].r + px[i].g + px[i].b) / 765f; sum += l; if (l > 0.97f) white++; }
+                Destroy(tex);
+                float mean = (float)(sum / (px.Length / 7)), whiteShare = white / (float)(px.Length / 7);
+                Check("Seed Storm frame is not washed out (bullet looks)", whiteShare < 0.2f && mean < 0.8f, $"mean {mean:0.00}, white {whiteShare:P0}");
+            }
+            Check("Seed Storm throws seeds", seed);
+            Check("seeds burst into petals when their fuse ends", burst);
+            Check("Seed Storm loop 1: 8 seeds every 2.0 s", sy.StormSeeds == 8 && Mathf.Approximately(sy.StormEvery, 2.0f), $"{sy.StormSeeds} / {sy.StormEvery}");
+            sy.DebugStartStorm(2);
+            Check("enrage step: loop 3 throws 10 seeds every 1.8 s", sy.StormSeeds == 10 && Mathf.Abs(sy.StormEvery - 1.8f) < 0.001f, $"{sy.StormSeeds} / {sy.StormEvery}");
+            sy.DebugStartStorm(7);
+            Check("enrage cap: Last Storm from 2:00 throws 14 seeds every 0.6 s", sy.LastStorm && sy.StormSeeds == 14 && Mathf.Abs(sy.StormEvery - 0.6f) < 0.001f);
+            yield return Play(3f, () => false);
+            yield return Shot("sylvara_v3_last_storm");
+
+            // Easy and Hard extras (accepted 31 Oct): one Hard mechanic per phase, longer warnings and fewer bullets on Easy;
+            // the enrage clock stays the same on every level, and Last Storm is softer on Easy
+            int budBase = sy.BudCount;
+            foreach (var lv in new[] { Difficulty.Easy, Difficulty.Hard })
+            {
+                d.World.Difficulty = lv; bool e = lv == Difficulty.Easy, h = !e;
+                Check($"Sylvara {lv} P1: pods land at {(e ? 3.0f : 2.5f)} s, {(h ? "every one doubled" : "single")}, spiral {(e ? 12 : 15)}°/s",
+                    Mathf.Approximately(sy.PodLandIn(1), e ? 3.0f : 2.5f) && sy.PodDoubledIn(1) == h && Mathf.Approximately(sy.P1Spin, e ? 12 : 15)
+                    && !sy.PodDoubledIn(3) && Mathf.Approximately(sy.PodLandIn(3), 2.5f));
+                Check($"Sylvara {lv} P1: jets warn {(e ? 2.0f : 1.5f)} s, Pruning Arc {(e ? "2.5 / 3.3" : "2.0 / 2.8")} s",
+                    Mathf.Approximately(sy.JetWarn, e ? 2.0f : 1.5f) && Mathf.Approximately(sy.ArcExtra, e ? 0.5f : 0));
+                Check($"Sylvara {lv} P2: lanes every {(e ? 0.5f : 0.35f)} s, second spiral {(e ? "off" : "on")}, {(h ? "double" : "single")} toll",
+                    Mathf.Approximately(sy.LanePeriod, e ? 0.5f : 0.35f) && sy.SecondColourSpiral == h && sy.DoubleToll == h);
+                Check($"Sylvara {lv} P3: {(h ? "one more bud" : "same buds")}, bloom {(e ? 15 : 12)} s, {(e ? 3 : 4)}-arm spiral",
+                    sy.BudCount == budBase + (h ? 1 : 0) && Mathf.Approximately(sy.BloomAfter, e ? 15 : 12) && sy.HollowArms == (e ? 3 : 4), $"{sy.BudCount} buds");
+                sy.DebugStartStorm(0);
+                Check($"Sylvara {lv} P4: loop 1 {(e ? "6 seeds every 2.5" : "8 seeds every 2.0")} s, bursts of {(h ? 10 : 8)}",
+                    sy.StormSeeds == (e ? 6 : 8) && Mathf.Abs(sy.StormEvery - (e ? 2.5f : 2.0f)) < 0.001f && sy.BurstPetals == (h ? 10 : 8), $"{sy.StormSeeds} / {sy.StormEvery} / {sy.BurstPetals}");
+                sy.DebugStartStorm(2);
+                Check($"Sylvara {lv} P4: the same enrage steps (+2 seeds, 0.2 s sooner at loop 3)",
+                    sy.StormSeeds == (e ? 8 : 10) && Mathf.Abs(sy.StormEvery - (e ? 2.3f : 1.8f)) < 0.001f, $"{sy.StormSeeds} / {sy.StormEvery}");
+                sy.DebugStartStorm(7);
+                Check($"Sylvara {lv} P4: Last Storm {(e ? "12 seeds every 0.8 s (softer on Easy)" : "14 seeds every 0.6 s, as on Medium")}",
+                    sy.LastStorm && sy.StormSeeds == (e ? 12 : 14) && Mathf.Abs(sy.StormEvery - (e ? 0.8f : 0.6f)) < 0.001f, $"{sy.StormSeeds} / {sy.StormEvery}");
+            }
+            {
+                // Hard live: a seed bursts into 10 petals
+                d.World.Difficulty = Difficulty.Hard; sy.DebugStartStorm(0);
+                yield return Play(4.5f, () => false);   // the first ring comes at 2.0 s and bursts 1.6 s later
+                Check("Sylvara Hard P4: a seed bursts into 10 petals", sy.LastBurstFired == 10, sy.LastBurstFired.ToString());
+            }
+            d.World.Difficulty = Difficulty.Medium; sy.DebugStartStorm(7);
+
+            d.World.Bullets.Hit -= onBullet; d.World.PlayerHit -= onHit;
+            Check("Sylvara: each bullet hits at most once", bulletOnce);
+            Check("Sylvara: bullets deal damage with no stun or knockback", bulletNoStun);
+            Check("Sylvara: coloured bullets only hit their own colour", colourOk);
+            Check("Sylvara: each ground or arc hazard hits at most once (R16)", hitsPerInstance.Values.All(n => n == 1), $"{hitsPerInstance.Count} instances hit");
+            Note($"Sylvara v3: bot took {taken} damage ({bulletHits} bullet hits, {hitsPerInstance.Count} hazard hits), healed by the test; peak {maxBullets} bullets on screen, {d.World.Bullets.Fired} fired");
+
+            yield return KillDuringWindup("sylvara");   // Last Storm is still running: the watcher keeps the bot alive until she dies
+            watching = false;
+            Check("sylvara: boss death clears every bullet", d.World == null || d.World.Bullets.Count == 0);
             yield return Until(() => d.State == RunState.Results, 8, "Sylvara practice results");
             Check("Sylvara practice clear ends in a practice result", d.Victory && d.Mode == RunMode.Practice);
-            Check("Sylvara: no Bloom props left after defeat", sy.PropCount == 0, sy.PropCount + " left");
+            Check("Sylvara: no bud props left after defeat", sy == null || sy.PropCount == 0, sy ? sy.PropCount + " left" : "");
             d.ReturnToMenu(); yield return null;
+            yield return SylvaraBotChecks();
+        }
+
+        // Sylvara with three bot allies (the menu's Allies row): they spawn, dodge the bullet hell and cut buds by themselves
+        IEnumerator SylvaraBotChecks()
+        {
+            int keep = RunParty.Selected;
+            Check("the menu sets the ally count", d.SelectAllies(3) && RunParty.Selected == 3);
+            Check("Sylvara practice with 3 allies starts", d.StartPractice("Tollbreaker", RunDirector.SylvaraPractice));
+            yield return Until(() => RunDirector.Instance && RunDirector.Instance.State == RunState.Ready, 30, "Verdant Chimes loaded for the bot fight");
+            if (RunDirector.Instance != d) { directorLog.AddRange(d.Log); d = RunDirector.Instance; d.InputOverride = bot; bot.Clear(); }
+            if (d.Player) d.Player.Input = bot;
+            d.RequestReady();
+            yield return Until(() => d.State == RunState.Combat, 4, "bot fight combat");
+            var sy = d.Boss as SylvaraEncounter;
+            Check("three bot allies fight beside the player", d.Allies.Count == 3 && d.Allies.All(a => a.Input is AllyBot), d.Allies.Count.ToString());
+            if (sy == null || d.Allies.Count == 0) { RunParty.Selected = keep; yield break; }
+            var hits = new Dictionary<PlayerController, int>(); int downs = 0;
+            var budGap = new Dictionary<PlayerController, float>();
+            Action<PlayerController, BulletSystem.Bullet, int> onBullet = (p, b, dmg) => { if (p != d.Player) hits[p] = (hits.TryGetValue(p, out int n) ? n : 0) + 1; };
+            d.World.Bullets.Hit += onBullet;
+            var report = new List<string>();
+            float[] at = { 1f, 0.74f, 0.49f, 0.24f };
+            for (int ph = 0; ph < 4; ph++)
+            {
+                if (ph > 0) { d.Boss.DebugSetHpFraction(at[ph]); yield return Wait(2f); }
+                hits.Clear();
+                float t0 = Time.time, seconds = 20f;
+                while (Time.time - t0 < seconds && d.State == RunState.Combat)
+                {
+                    bot.Clear(); d.Player.transform.position = new Vector3(0, 0, -CombatWorld.PlayerBound + 0.5f);
+                    d.Player.DebugSetHp(PlayerController.MaxHp);   // the test player stands aside; only the bots play
+                    foreach (var a in d.Allies) if (a.Down) { downs++; a.DebugRevive(); }
+                    if (ph == 2) foreach (var a in d.Allies) foreach (var bp in sy.AliveBudPositions()) { float g = Sim.Flat(a.transform.position - bp).magnitude; if (!budGap.TryGetValue(a, out float o) || g < o) budGap[a] = g; }
+                    yield return null;
+                }
+                int n = hits.Values.Sum();
+                report.Add($"{sy.PhaseName}: {n} bullet hits on 3 bots in {seconds:0} s ({n * 60f / seconds / 3:0} per bot per minute)");
+                if (ph == 2) Note("Sylvara bots, closest to a bud: " + string.Join(", ", d.Allies.Select(a => $"{a.ClassName} {(budGap.TryGetValue(a, out float g) ? g.ToString("0.0") + " m" : "none")} [{(a.Input as AllyBot)?.DebugLine}]")));
+                if (ph == 2) Check("bots cut Choir Buds by themselves", sy.BudsCut > 0, $"{sy.BudsCut} cut, {sy.BudsBloomed} bloomed");
+            }
+            d.World.Bullets.Hit -= onBullet;
+            Note("Sylvara bots: " + string.Join(" · ", report) + $" · downs {downs}");
+            Check("Sylvara bots survive every phase (no downs in 80 s)", downs == 0, downs + " downs");
+            d.Boss.DebugDefeat();
+            yield return Until(() => d.State == RunState.Results, 8, "bot fight results");
+            d.ReturnToMenu(); yield return null;
+            RunParty.Selected = keep;
         }
 
         // Exact-tick regressions from the foundation review of PR #42 (risxhb/codex, Oct 21). The director is paused
