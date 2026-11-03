@@ -101,7 +101,7 @@ namespace LastBell.Run
                 int need = needs[k];
                 var h = new Hazard
                 {
-                    Source = "Mould Tower " + (set == 0 ? "A" : set == 1 ? "B" : "C"), Shape = HazardShape.Circle, Kind = HazardKind.Ground,
+                    Source = "Mould Tower " + (set == 0 ? "A" : set == 1 ? "B" : "C"), AttackId = "crucivar.mould_towers", Shape = HazardShape.Circle, Kind = HazardKind.Ground,
                     Origin = Sim.Dir(yaw) * rad, Radius = TowerRadius, LockAt = 0, ResolveAt = T(Rise), ShareCount = need, Knockback = 0,
                     Soak = true,   // a ring to stand in: AllyBot must not step out of it (Run loop and shop smoke run, 11-01)
                 };
@@ -143,7 +143,7 @@ namespace LastBell.Run
             foreach (var p in inside.OrderByDescending(p => Flat(p.transform.position).magnitude).Take(inside.Count - need)) p.ReceiveHit(h, Mathf.RoundToInt(ExtraDmg * Heat));
             Boss.Rite.Pools.Add(W.Hazards.Spawn(new Hazard
             {
-                Source = "Tower Slag", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = h.Origin, Radius = TowerRadius,
+                Source = "Tower Slag", AttackId = "crucivar.tower_slag", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = h.Origin, Radius = TowerRadius,
                 LockAt = T(ForgeRite.PoolArm), ResolveAt = Sim.Ticks(3600), BurnPerSecond = SlagBurn,   // heats first: the soakers step off
             }));
         }
@@ -154,7 +154,7 @@ namespace LastBell.Run
             wiping = true; Wipes++;
             W.Hazards.Spawn(new Hazard
             {
-                Source = why, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Vector3.zero, Radius = Far + 1f,
+                Source = why, AttackId = "crucivar.molten_overflow", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Vector3.zero, Radius = Far + 1f,
                 LockAt = 0, ResolveAt = 1, ShareTotal = 1, WipeIfEmpty = true, Includes = _ => false,
             });
         }
@@ -165,7 +165,7 @@ namespace LastBell.Run
             Boss.SetCurrent("Second Press"); Presses++;
             var h = W.Hazards.Spawn(new Hazard
             {
-                Source = "Second Press", Shape = HazardShape.Circle, Kind = HazardKind.Strike, Origin = Flat(centre), Radius = PressRadius,
+                Source = "Second Press", AttackId = "crucivar.second_press", Shape = HazardShape.Circle, Kind = HazardKind.Strike, Origin = Flat(centre), Radius = PressRadius,
                 LockAt = 0, ResolveAt = T(PressDelay), Damage = PressDamage, Knockback = PressKnock, Stun = Sim.Ticks(PressStun),
                 Push = p => -Flat(p),   // toward the centre, away from the crown
             });
@@ -179,7 +179,7 @@ namespace LastBell.Run
             float from = Edge, to = Edges[Crowns + 1];
             var h = W.Hazards.Spawn(new Hazard
             {
-                Source = "Crown Rise", Shape = HazardShape.Ring, Kind = HazardKind.Ground, Origin = Vector3.zero, Inner = to, Radius = from + Hazard.Margin,
+                Source = "Crown Rise", AttackId = "crucivar.molten_crown", Shape = HazardShape.Ring, Kind = HazardKind.Ground, Origin = Vector3.zero, Inner = to, Radius = from + Hazard.Margin,
                 LockAt = 0, ResolveAt = T(CrownWarn), Damage = 0, Includes = _ => false,
             });
             h.OnResolve = _ =>
@@ -188,7 +188,7 @@ namespace LastBell.Run
                 W.BossFx.BellowsBlast(Vector3.zero, to);
                 W.Hazards.Spawn(new Hazard
                 {
-                    Source = "Molten Crown", Shape = HazardShape.Ring, Kind = HazardKind.Ground, Origin = Vector3.zero, Inner = to, Radius = Far + 1f,
+                    Source = "Molten Crown", AttackId = "crucivar.molten_crown", Shape = HazardShape.Ring, Kind = HazardKind.Ground, Origin = Vector3.zero, Inner = to, Radius = Far + 1f,
                     LockAt = 0, ResolveAt = Sim.Ticks(3600), BurnPerSecond = CrownBurn,
                 });
             };
@@ -199,7 +199,7 @@ namespace LastBell.Run
             Boss.SetCurrent("Furnace Eruption");
             var h = W.Hazards.Spawn(new Hazard
             {
-                Source = "Furnace Eruption", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Vector3.zero, Radius = Far + 1f,
+                Source = "Furnace Eruption", AttackId = "crucivar.furnace_eruption", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Vector3.zero, Radius = Far + 1f,
                 LockAt = 0, ResolveAt = T(EruptWarn), ShareTotal = 1, WipeIfEmpty = true, Includes = _ => false,
             });
             h.OnResolve = _ => { Wipes++; W.BossFx.Eruption(Rim); };

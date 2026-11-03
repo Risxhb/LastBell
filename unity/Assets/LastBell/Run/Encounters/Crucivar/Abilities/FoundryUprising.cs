@@ -59,7 +59,7 @@ namespace LastBell.Run
             int deadline = Sim.Ticks(Easy ? EasyDeadline : n == 1 ? SoloDeadline : Deadline);
             Flood = W.Hazards.Spawn(new Hazard
             {
-                Source = "Pour Flood", Shape = HazardShape.Ring, Kind = HazardKind.Ground, Origin = Vector3.zero, Inner = Rim - 1.2f, Radius = Far + Hazard.Margin + 0.5f,
+                Source = "Pour Flood", AttackId = "crucivar.pour_flood", Shape = HazardShape.Ring, Kind = HazardKind.Ground, Origin = Vector3.zero, Inner = Rim - 1.2f, Radius = Far + Hazard.Margin + 0.5f,
                 LockAt = 0, ResolveAt = deadline, ShareTotal = 1, WipeIfEmpty = true, Includes = _ => false,   // nobody can soak it: it wipes
             });
             Flood.OnResolve = hz => { Floods++; W.BossFx.RimFlood(hz.Inner, Rim); };   // counted here: the wipe can end the script before the loop sees it
@@ -218,7 +218,7 @@ namespace LastBell.Run
         {
             var h = W.Hazards.Spawn(new Hazard
             {
-                Source = name + " path", Shape = shape, Kind = HazardKind.Strike, Origin = Flat(origin), Yaw = yaw, Length = length, Width = width,
+                Source = name + " path", AttackId = Attack(name), Shape = shape, Kind = HazardKind.Strike, Origin = Flat(origin), Yaw = yaw, Length = length, Width = width,
                 Radius = shape == HazardShape.Cone ? length : radius, HalfAngle = half, LockAt = 0, ResolveAt = warn, Damage = 0, Includes = _ => false,
             });
             h.OnResolve = _ => { tu.Pending.Remove(h); if (tu.Up && Boss.Solid) fire(); };
@@ -233,14 +233,17 @@ namespace LastBell.Run
             int ticks = Mathf.Max(2, Sim.Ticks(life));
             var h = new Hazard
             {
-                Source = name, Shape = HazardShape.Circle, Kind = HazardKind.Strike, Origin = at, Radius = BulletRadius,
-                ResolveAt = 1, ActiveTicks = ticks, LockAt = ticks + 2, Damage = BulletDmg, Knockback = 0.5f, Stun = 6,
+                Source = name, AttackId = Attack(name), Shape = HazardShape.Circle, Kind = HazardKind.Strike, Origin = at, Radius = BulletRadius,
+                ResolveAt = 1, ActiveTicks = ticks, LockAt = ticks + 2, Damage = BulletDmg, Knockback = 0.5f, Stun = 6, Drift = vel,
             };
             h.Track = hz => { hz.Origin += vel * Sim.Dt; if (hz.Age % 8 == 4) W.BossFx.Ember(hz.Origin, vel); };
             h.OnSpent = hz => Velocity.Remove(hz);
             Velocity[h] = vel;
             W.Hazards.Spawn(h);
         }
+
+        // "Ring Wave bullet" -> "crucivar.ring_wave" (boss attack icons)
+        static string Attack(string name) => name.StartsWith("Lane Stream") ? "crucivar.lane_stream" : name.StartsWith("Ring Wave") ? "crucivar.ring_wave" : "crucivar.spiral_arm";
 
         // distance along d from p until it leaves the arena (0 if it never enters)
         static float Exit(Vector3 p, Vector3 d) => WallDist(p, d);

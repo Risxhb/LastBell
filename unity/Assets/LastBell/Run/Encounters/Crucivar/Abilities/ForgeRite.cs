@@ -86,7 +86,7 @@ namespace LastBell.Run
                 var owner = p;
                 var h = new Hazard
                 {
-                    Source = "Ember Brand", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Flat(p.transform.position),
+                    Source = "Ember Brand", AttackId = "crucivar.ember_brand", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Flat(p.transform.position),
                     Radius = BrandRadius, LockAt = T(BrandLand - BrandFreeze), ResolveAt = T(BrandLand), Damage = BrandDmg, Knockback = 0,
                 };
                 h.Track = hz => { if (!owner.Down) hz.Origin = Flat(owner.transform.position); };   // until LockAt
@@ -96,7 +96,7 @@ namespace LastBell.Run
                     W.BossFx.SlagSplash(hz.Origin, hz.Radius);
                     Pools.Add(W.Hazards.Spawn(new Hazard
                     {
-                        Source = "Brand Pool", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = hz.Origin, Radius = PoolRadius,
+                        Source = "Brand Pool", AttackId = "crucivar.ember_brand", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = hz.Origin, Radius = PoolRadius,
                         LockAt = 0, ResolveAt = Sim.Ticks(3600), BurnPerSecond = PoolBurn,   // burns at once (the carrier left), lasts until the phase ends
                     }));
                 };
@@ -121,7 +121,7 @@ namespace LastBell.Run
             {
                 var h = new Hazard
                 {
-                    Source = "Furnace Spin", Shape = HazardShape.Lane, Kind = HazardKind.Strike, Origin = origin, Yaw = baseYaw + 360f / JetCount * k,
+                    Source = "Furnace Spin", AttackId = "crucivar.furnace_spin", Shape = HazardShape.Lane, Kind = HazardKind.Strike, Origin = origin, Yaw = baseYaw + 360f / JetCount * k,
                     Width = JetWidth, ResolveAt = show, ActiveTicks = sweep, LockAt = show + sweep + 1,
                     Damage = JetDmg, Knockback = 1f,
                 };
@@ -142,7 +142,7 @@ namespace LastBell.Run
             var centre = Flat(Boss.transform.position);
             var blast = W.Hazards.Spawn(new Hazard
             {
-                Source = "Backdraft", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = centre, Radius = BlastRadius,
+                Source = "Backdraft", AttackId = "crucivar.backdraft", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = centre, Radius = BlastRadius,
                 LockAt = 0, ResolveAt = T(BlastAt), Damage = BlastDmg, Knockback = 1.5f,
             });
             blast.OnResolve = hz => { W.BossFx.BellowsBlast(hz.Origin, hz.Radius); Boss.Flare(1.3f); Boss.Rig.VentsAll(false); };
@@ -183,7 +183,7 @@ namespace LastBell.Run
                 int resolve = T(PourLead + PourGap * k), lockAt = resolve - T(PourLockBefore);
                 var h = new Hazard
                 {
-                    Source = "Pour " + new[] { "I", "II", "III", "IV" }[k], Shape = HazardShape.Lane, Kind = HazardKind.Ground, Origin = origin,
+                    Source = "Pour " + new[] { "I", "II", "III", "IV" }[k], AttackId = "crucivar.casting_order", Shape = HazardShape.Lane, Kind = HazardKind.Ground, Origin = origin,
                     Width = PourWidth, LockAt = lockAt, ResolveAt = resolve, Damage = PourDmg, Knockback = 1f, Yaw = Boss.transform.eulerAngles.y,
                 };
                 Aim(h, target);
@@ -193,7 +193,7 @@ namespace LastBell.Run
                     W.BossFx.StripStamp(hz.Origin, hz.Yaw, hz.Length, hz.Width);
                     W.Hazards.Spawn(new Hazard
                     {
-                        Source = "Pour Channel", Shape = HazardShape.Lane, Kind = HazardKind.Ground, Origin = hz.Origin, Yaw = hz.Yaw,
+                        Source = "Pour Channel", AttackId = "crucivar.casting_order", Shape = HazardShape.Lane, Kind = HazardKind.Ground, Origin = hz.Origin, Yaw = hz.Yaw,
                         Length = hz.Length, Width = hz.Width, LockAt = 0, ResolveAt = Sim.Ticks(ChannelLife), BurnPerSecond = ChannelBurn,
                     });
                 };
@@ -241,7 +241,8 @@ namespace LastBell.Run
             {
                 var h = W.Hazards.Spawn(new Hazard
                 {
-                    Source = name, Shape = shape, Kind = HazardKind.Strike, Origin = origin, Inner = inner, Radius = outer,
+                    Source = name, AttackId = name.StartsWith("Quake Echo") ? "crucivar.quake_echo" : "crucivar.anvil_quake",
+                    Shape = shape, Kind = HazardKind.Strike, Origin = origin, Inner = inner, Radius = outer,
                     LockAt = 0, ResolveAt = at, Damage = QuakeDmg, Knockback = 1f,
                 });
                 h.OnResolve = hz =>
