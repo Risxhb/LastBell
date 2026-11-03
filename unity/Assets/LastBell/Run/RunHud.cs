@@ -135,7 +135,7 @@ namespace LastBell.Run
         void Styles()
         {
             if (styleHeight == Screen.height && display30 != null) return;
-            styleHeight = Screen.height;
+            styleHeight = Screen.height; fontsWarm = false;
             var ivoryControls = new Color(UiTheme.Ivory.r, UiTheme.Ivory.g, UiTheme.Ivory.b, 0.6f);
             display30 = UiTheme.Style(30, true, TextAnchor.MiddleCenter, UiTheme.Ivory);
             display36 = UiTheme.Style(UiTheme.SizeDisplay, true, TextAnchor.MiddleCenter, UiTheme.Ivory);
@@ -211,6 +211,7 @@ namespace LastBell.Run
             if (d == null) return;
             GUI.depth = 0;   // above encounter HUDs (TempoTyrantHud draws at depth 10)
             Styles();
+            if (!fontsWarm) WarmFonts();
             tipText = null;
             DrawHud();
             if (tipText != null) DrawTooltip(tipX, tipTop, tipText);
@@ -280,15 +281,60 @@ namespace LastBell.Run
         // ---- Souls-style boss reveal / defeat: no panel, the name large over the arena on a soft dark band ----
         static Texture2D band;
         GUIStyle fitSt;
-        // A copy of `st` whose font shrinks (never grows) until `text` fits `maxW` virtual px.
+        // A copy of `st` whose font shrinks (never grows) until `text` fits `maxW` virtual px. The shrunk size snaps down to
+        // one of FitSteps, so a new long name never asks the font for a size it hasn't laid out yet (perf report
+        // bellkeeper-ultimate-2026-11-03: a fresh size cost 10.6 ms in GetMeshInfo plus a font texture upload mid-fight).
+        static readonly float[] FitSteps = { 0.9f, 0.8f, 0.7f, 0.6f, 0.5f, 0.4f, 0.3f };
         GUIStyle Fit(GUIStyle st, string text, float maxW)
         {
             if (fitSt == null) fitSt = new GUIStyle(st);
             fitSt.font = st.font; fitSt.alignment = st.alignment; fitSt.fontStyle = st.fontStyle; fitSt.wordWrap = false; fitSt.clipping = TextClipping.Overflow;
             fitSt.normal.textColor = st.normal.textColor; fitSt.fontSize = st.fontSize;
             float w = fitSt.CalcSize(new GUIContent(text)).x / UiTheme.Scale;
-            if (w > maxW) fitSt.fontSize = Mathf.Max(8, Mathf.FloorToInt(st.fontSize * maxW / w));
+            if (w > maxW)
+            {
+                float want = maxW / w; int size = FitSize(st, FitSteps[FitSteps.Length - 1]);
+                foreach (var f in FitSteps) if (f <= want) { size = FitSize(st, f); break; }
+                fitSt.fontSize = size;
+            }
             return fitSt;
+        }
+        static int FitSize(GUIStyle st, float f) => Mathf.Max(8, Mathf.FloorToInt(st.fontSize * f));
+
+        // Font warm-up: lay out and draw (invisibly) every glyph the HUD uses at every size it uses (each style, the Fit steps
+        // of the fitted styles, the overlay sizes), so no glyph or size is laid out or put on the atlas for the first time in
+        // combat. IMGUI text goes through TextCore in Unity 6, so this draws through GUIStyle rather than only asking the legacy
+        // Font for characters. Runs on the first HUD repaint after the styles are built and again on each Ready screen
+        // (RunDirector.ReadyWarmUp), since a full atlas drops glyphs that haven't been drawn lately.
+        const string WarmChars = " ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,:;'\"!?-+*/%()[]<>#&=_|—·…●○☾☉";
+        bool fontsWarm;
+        void OnEnable() => RunDirector.ReadyWarmUp += OnReadyWarmUp;
+        void OnDisable() => RunDirector.ReadyWarmUp -= OnReadyWarmUp;
+        void OnReadyWarmUp(RunDirector dir, int encounter) { if (dir == d) fontsWarm = false; }
+        void WarmFonts()
+        {
+            if (Event.current.type != EventType.Repaint) return;
+            fontsWarm = true;
+            var old = GUI.color; GUI.color = Color.clear;
+            foreach (var st in new[] { revealName, revealEpithet, resultPrimary, resultAction, display30, display36, display40, heading, eyebrow, eyebrowC,
+                     labelGold, bodyC, bodyL, row15, numR, numC, small13, small13R, micro, microR, controls, chipSt, keySt, keyStL, cornerSt, stateSt, pill,
+                     tab, floatSt, slotName, tipSt, descSt, microC, subC, rowLabel, microHead, btn, btnP, mapBtn, microWrap, meterHead })
+                if (st != null) WarmFont(st.font, st.fontSize, st.fontStyle);
+            foreach (var st in new[] { revealName, revealEpithet, display30 })
+                foreach (var f in FitSteps) WarmFont(st.font, FitSize(st, f), st.fontStyle);
+            // the overlays (caption 28/20, banner 46, world labels 30-54) use the skin font at fixed unscaled sizes
+            foreach (int size in new[] { 20, 28, 30, 34, 44, 46, 54 }) { WarmFont(null, size, FontStyle.Bold); WarmFont(null, size, FontStyle.Normal); }
+            GUI.color = old;
+        }
+        GUIStyle warmSt; static readonly GUIContent warmText = new GUIContent(WarmChars);
+        void WarmFont(Font font, int size, FontStyle style)
+        {
+            if (font == null) font = GUI.skin.font;
+            if (font != null && font.dynamic) font.RequestCharactersInTexture(WarmChars, size, style);
+            if (warmSt == null) warmSt = new GUIStyle(GUI.skin.label) { wordWrap = false, richText = false, clipping = TextClipping.Overflow };
+            warmSt.font = font; warmSt.fontSize = size; warmSt.fontStyle = style;
+            var sz = warmSt.CalcSize(warmText);
+            warmSt.Draw(new Rect(0, 0, sz.x, sz.y), warmText, false, false, false, false);   // GUI.color is clear: nothing shows
         }
         static Texture2D Band()
         {
@@ -679,7 +725,8 @@ namespace LastBell.Run
             float yy = rowsY;
             if (!(b is TempoTyrantEncounter)) T(x + 10, yy, bw * 0.65f, rowH, b.PhaseName, row15, BA(UiTheme.Ivory));
             // Aurelion v4: the enrage clock and the Corona Shield (BossEncounter.HudExtra), right of the phase line
-            if (b.HudExtra != null) { var hx = UiTheme.Style(UiTheme.SizeNumeric, true, TextAnchor.MiddleRight, UiTheme.Ivory); T(x + bw * 0.35f, yy, bw * 0.65f - 10, rowH, b.HudExtra, hx, BA(UiTheme.Ivory)); }
+            // (numR is the same style; building a new GUIStyle here every frame made every layout of the ticking shield text a cold one)
+            if (b.HudExtra != null) T(x + bw * 0.35f, yy, bw * 0.65f - 10, rowH, b.HudExtra, numR, BA(UiTheme.Ivory));
 
             // attack-name warning rows removed (Risxhb, October 24, 2026): telegraphs on the floor carry the warning.
             // Exception (Chzy18, October 24, 2026): a hazard tagged with a hostile mechanic (Hazard.MechanicId) gets one row with
