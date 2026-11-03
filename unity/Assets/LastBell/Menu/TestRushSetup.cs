@@ -20,6 +20,9 @@ namespace LastBell.Menu
         // (RunDirector.BossEntry.Phases); picking another boss goes back to Phase 1.
         public int PhaseIndex {get;private set;}=1;
         public Button[] PhaseButtons {get;private set;}
+        // Allies (bots) row (Chzy18, 24 Oct: every test build lets you pick 0-7 bots): one tab that cycles RunParty.Selected
+        public Button AlliesButton {get;private set;}
+        Text alliesLabel;TestRushFocus alliesFocus;
         public static int MaxPhases{get{int n=1;foreach(var b in RunDirector.Bosses)n=Mathf.Max(n,b.Phases);return n;}}
         public static int PhasesOf(int encounter)=>encounter>=0&&encounter<RunDirector.Bosses.Length?RunDirector.Bosses[encounter].Phases:1;
         // Boss step rows (Risxhb, October 25, 2026): Bosses, then Minibosses, each a row of cards like the arena step.
@@ -103,6 +106,7 @@ namespace LastBell.Menu
             backButton=TextButton("Main Menu",panel.transform,new Vector2(.035f,.035f),new Vector2(.19f,.105f),Back);backLabel=backButton.GetComponentInChildren<Text>();
             ContinueButton=PrimaryButton("Continue",A,new Vector2(.71f,.03f),new Vector2(.96f,.108f),Continue);
             LaunchButton=PrimaryButton("Launch Test Rush",B,new Vector2(.71f,.03f),new Vector2(.96f,.108f),Launch);
+            AlliesButton=Tab("Allies (bots)",B,new Vector2(.25f,.04f),new Vector2(.55f,.1f),CycleAllies,out alliesLabel,out alliesFocus);
 
             ShowStep(false);
             Refresh();
@@ -126,11 +130,12 @@ namespace LastBell.Menu
         public void SelectMap(int i){if(Loading||i<0||i>=MapButtons.Length)return;MapIndex=SavedMap=i;Refresh();}
         public void SelectEncounter(int i){if(Loading||i<0||i>=EncounterButtons.Length)return;if(i!=EncounterIndex)PhaseIndex=SavedPhase=1;EncounterIndex=SavedEncounter=i;Refresh();if(BossStep)LinkBossStep();}
         public void SelectPhase(int n){if(Loading||n<1||n>PhasesOf(EncounterIndex))return;PhaseIndex=SavedPhase=n;Refresh();}
+        public void CycleAllies(){if(Loading)return;RunParty.Selected=(RunParty.Selected+1)%(RunParty.MaxAllies+1);Refresh();}
         // the phase row holds only the selected boss's phases, so its links follow the selection
         void LinkBossStep()
         {
             var phases=new Button[PhasesOf(EncounterIndex)];System.Array.Copy(PhaseButtons,phases,phases.Length);
-            Link(System.Array.ConvertAll(BossRow,i=>EncounterButtons[i]),System.Array.ConvertAll(MinibossRow,i=>EncounterButtons[i]),phases,new[]{backButton,LaunchButton});
+            Link(System.Array.ConvertAll(BossRow,i=>EncounterButtons[i]),System.Array.ConvertAll(MinibossRow,i=>EncounterButtons[i]),phases,new[]{backButton,AlliesButton,LaunchButton});
         }
         public static string Incompatibility(int map,int encounter)
         {
@@ -148,6 +153,7 @@ namespace LastBell.Menu
             int phaseCount=PhasesOf(EncounterIndex);PhaseIndex=Mathf.Clamp(PhaseIndex,1,phaseCount);
             for(int p=0;p<PhaseButtons.Length;p++){PhaseButtons[p].gameObject.SetActive(p<phaseCount);phaseFocus[p].Chosen=p+1==PhaseIndex;}
             phaseNote.text=Spaced(phaseCount==1?"Phase 1 only":phaseCount.ToString("00")+" phases");
+            alliesLabel.text=Spaced("Allies (bots)")+"   "+RunParty.Selected;alliesFocus.Chosen=RunParty.Selected>0;
             // the arena step names the selected arena; the boss step shows only its card rows
             arenaTitle.text=RunMaps.All[MapIndex].Name.ToUpperInvariant();
             titleEyebrow.text=Spaced("Selected Arena");

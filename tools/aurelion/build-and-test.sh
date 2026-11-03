@@ -1,6 +1,6 @@
 #!/bin/bash
 # Build this worktree's Windows player and run the autotest, under the machine-wide Unity lock.
-#   bash tools/aurelion/build-and-test.sh <session-name> <n> [player args, e.g. -lastbellAurelionOnly -lastbellAurelionV2Only -lastbellAbilityTest aurelion.noon_shadow]
+#   bash tools/aurelion/build-and-test.sh <session-name> <n> [player args, e.g. -lastbellAurelionOnly -lastbellAurelionV4Only]
 # Logs and the report go to "<project root>/aurelion-logs/<session-name>/autotest-<n>". Exit 0 = build OK and all checks passed.
 # Lock: "<project root>/.unity-build-lock" (mkdir is atomic); waits 60 s between tries, removed on exit even on failure.
 SESSION=$1; N=$2; shift 2

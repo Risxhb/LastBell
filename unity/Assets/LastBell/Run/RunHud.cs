@@ -67,7 +67,7 @@ namespace LastBell.Run
         // Phase ticks only for bosses that change phase, at their real thresholds (fraction of max HP).
         static float[] PhaseTicks(BossEncounter b) =>
             b is BellkeeperEncounter ? new[] { 0.70f, 0.35f } :
-            b is AurelionEncounter ae ? ae.PhaseMarks :   // v4: 70 / 40 / 20 %, v2-v3: 65 / 30 %
+            b is AurelionEncounter ae ? ae.PhaseMarks :   // 70 / 40 / 20 %
             b is CrucivarEncounter || b is SylvaraEncounter ? new[] { 0.65f, 0.30f } :
             b is TempoTyrantEncounter ? new[] { TempoTyrantEncounter.FrenzyAt } :
             b is ChimeboundOracleEncounter || b is DialWardenEncounter || b is PendulumSentinelEncounter ? new[] { 0.5f } : null;
@@ -356,7 +356,8 @@ namespace LastBell.Run
             float y = r.y + pad;
             T(r.x, y, w, 44, UiTheme.Spaced("Down"), display36); y += 52;
             // a catalogued boss attack shows its 64 px icon, with the attack name and boss beside it (BossAttackIcons)
-            var wd = d.World; var ka = wd != null && wd.TakenLog.Count > 0 ? TakenAttack(wd, wd.TakenLog.Count - 1) : null; var ki = BossAttackIcons.Icon(ka);
+            // the last hit only if it took you to 0: a scripted wipe (Final Noon, an empty tower) downs you with its own cause
+            var wd = d.World; var ka = wd != null && wd.TakenLog.Count > 0 && wd.TakenLog[wd.TakenLog.Count - 1].hpAfter <= 0 ? TakenAttack(wd, wd.TakenLog.Count - 1) : null; var ki = BossAttackIcons.Icon(ka);
             if (ki != null) GUI.DrawTexture(S(r.x + pad, r.y + pad + 8, 64, 64), ki, ScaleMode.ScaleToFit, true);
             string a = "Struck by ", cause = ka != null ? ka.Label : d.DefeatCause ?? "?";
             float wa = Wv(bodyL, a), wc = Wv(bodyL, cause), x = r.x + w / 2 - (wa + wc) / 2;
@@ -555,7 +556,7 @@ namespace LastBell.Run
                 var mouse = Event.current.mousePosition;
                 for (int i = from; i < w.TakenLog.Count; i++)
                 {
-                    var e = w.TakenLog[i]; bool fatal = i == w.TakenLog.Count - 1;
+                    var e = w.TakenLog[i]; bool fatal = i == w.TakenLog.Count - 1 && e.hpAfter <= 0;
                     // a catalogued boss attack shows its icon (40 px on the killing blow, 22 px otherwise) and "Attack · Boss";
                     // the name always sits beside the icon, because several icons look alike at small sizes (BossAttackIcons)
                     var at = TakenAttack(w, i); var icon = BossAttackIcons.Icon(at);

@@ -30,6 +30,7 @@ A player's guide to the current v4 fight on every difficulty.
 | **Cascading Lances** (Phase 3) | Two volleys; the second is turned 22.5° | Clear the first, then the second. |
 | **Starfall Mirror** | A red circle follows you; a copy lands mirrored through the centre | Step off your star when it locks. Never stand on anyone's mirror. Co-op: don't stand opposite a partner through the centre. |
 | **Hour Hands** (every level, Phase 2+) | A gold clock hand per player sweeps out from him | Step off your own hand. |
+| **Meridian Recall** (Hard only, Phases 2 and 3) | The last Lances volley comes back: the same red beams, locked at once, from **where he stood when he fired it** | He replays it once, 3.5 s after it appears. Heavy hit (65 on Hard). Remember the old lines and stand in a gap between them; he may have moved, so read the beams, not him. |
 
 ### Heavy hits: be in the right place
 
@@ -76,6 +77,7 @@ Order:
 
 Order:
 1. Sunspots + Starfall + Lances
+   - Hard: **Meridian Recall** of that volley
 2. Towers + Marks + Starfall
 3. Ecliptic + Lances (+ Starfall solo)
 4. Collapse + Lances
@@ -89,6 +91,7 @@ Order:
 Order:
 1. **Severance** (3 s split, then a 20 s sweep that turns back at 10 s; Reunion in co-op)
 2. Cascading Lances + Starfall + Hour Hands
+   - Hard: **Meridian Recall** of the turned volley
 3. Sunspots + Collapse
 4. Towers + Lances + Starfall
 5. two-step Marks + Lances
@@ -163,4 +166,5 @@ All of them ended with 2 to 6 slices fallen in Last Light, well before the 8th.
 
 - **F6** loops one ability.
 - **F8** skips a phase.
+- **Start Phase** (Test Rush, boss step): start the fight in Phase 1, 2, 3 or 4 (Last Light) with full health and potions.
 - `-lastbellBossHp 0.2` runs the whole fight in about a minute.

@@ -23,12 +23,10 @@ namespace LastBell.Run
             }
             RunDirector.ShotCamera = null;
             yield return V2Teardown();
-            AurelionArgs.SetOverride = null;
         }
 
         IEnumerator LastLightShotsFor(string cam)
         {
-            AurelionArgs.SetOverride = "v4";
             yield return V2Setup(1, Difficulty.Medium, null, 4, Vector3.zero);
             if (V2Boss == null) yield break;
             V3Bot(V2Main, BotMode.Perfect);

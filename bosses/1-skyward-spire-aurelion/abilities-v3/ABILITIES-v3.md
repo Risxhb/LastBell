@@ -1,5 +1,7 @@
 # Aurelion ability set v3: Milestone A (proposal)
 
+> **Retired set (1 Nov).** Only v4 is played (`../abilities-v4/ABILITIES-v4.md`). This file stays because v4 reuses abilities and numbers defined here; its phase plans, Noon Shadow and escape checks no longer apply.
+
 *Local branch `feature/aurelion-v3`. Launch with `-lastbellAbilitySet v3`; `v2` keeps v2.1.*
 
 This is the response to Chzy18's "still not hard enough solo" (Hard, solo ranged, 20 % HP), following `HARDER-PROMPT.md`.

@@ -37,7 +37,7 @@ namespace LastBell.Run
         {
             new BossEntry("Bellkeeper", w => BossEncounter.Spawn<BellkeeperEncounter>(w, Vector3.zero, 0), final: true, phases: 3),
             // Skyward Spire area boss; authored practice map
-            new BossEntry("Aurelion (area 1)", w => BossEncounter.Spawn<AurelionEncounter>(w, new Vector3(0, 0, -1.5f), 0), map: AurelionMap, phases: AurelionArgs.V4 ? 4 : 3),   // v4 (the default set) adds Last Light
+            new BossEntry("Aurelion (area 1)", w => BossEncounter.Spawn<AurelionEncounter>(w, new Vector3(0, 0, -1.5f), 0), map: AurelionMap, phases: 4),   // v4 adds Last Light
             // Verdant Chimes area boss (graybox); authored practice map
             new BossEntry("Sylvara (area 3)", w => BossEncounter.Spawn<SylvaraEncounter>(w, new Vector3(0, 0, -1.5f), 0), map: SylvaraMap, phases: 3),
             // Brass Foundry area boss; authored practice map
@@ -446,7 +446,15 @@ namespace LastBell.Run
             if (!cam) cam = Camera.main; if (!cam) return;
             cam.orthographic = false;   // some arenas' own top-down view key (C) switches the camera to orthographic
             Vector3 target, look;
-            if (Player) { target = Player.transform.position + FollowOffset; look = Player.transform.position + Vector3.up; }
+            if (Player)
+            {
+                // an encounter can ask the camera to keep a second point in view too (Aurelion's Last Light: the boss with the
+                // remaining floor, readability A2): shift toward it and pull back with the distance, same angle
+                var at = Player.transform.position; float zoom = 1;
+                var also = FrameAlso?.Invoke();
+                if (also.HasValue) { var d = Vector3.ProjectOnPlane(also.Value - at, Vector3.up); at += d * 0.45f; zoom = 1 + 0.45f * Mathf.Clamp01((d.magnitude - 5f) / 20f); }
+                target = at + FollowOffset * zoom; look = at + Vector3.up;
+            }
             else { target = MenuCamPos; look = new Vector3(0, 0, 1); }
             cam.transform.position = Vector3.SmoothDamp(cam.transform.position, target, ref camVel, 0.12f);
             if (Player) cam.transform.rotation = Quaternion.LookRotation(-FollowOffset + Vector3.up);
@@ -455,6 +463,7 @@ namespace LastBell.Run
             if (ShotCamera.HasValue) { cam.transform.position = ShotCamera.Value.pos; cam.transform.rotation = Quaternion.LookRotation(ShotCamera.Value.look - ShotCamera.Value.pos); }
         }
         public static (Vector3 pos, Vector3 look)? ShotCamera;   // autotest gallery: a fixed overhead view of the whole arena
+        public static Func<Vector3?> FrameAlso;   // set by an encounter for one phase, cleared after; null = follow the player only
 
         // slot on the progress track: one per boss
         public int ProgressSlot => Math.Max(0, Array.IndexOf(EncounterOrder, Encounter));
