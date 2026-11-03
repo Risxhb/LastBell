@@ -290,7 +290,9 @@ namespace LastBell.Run
             if (fitSt == null) fitSt = new GUIStyle(st);
             fitSt.font = st.font; fitSt.alignment = st.alignment; fitSt.fontStyle = st.fontStyle; fitSt.wordWrap = false; fitSt.clipping = TextClipping.Overflow;
             fitSt.normal.textColor = st.normal.textColor; fitSt.fontSize = st.fontSize;
+            long t0 = UiTheme.FontLog ? System.Diagnostics.Stopwatch.GetTimestamp() : 0;
             float w = fitSt.CalcSize(new GUIContent(text)).x / UiTheme.Scale;
+            if (UiTheme.FontLog) UiTheme.LogSlowText(t0, "fit", text, fitSt);
             if (w > maxW)
             {
                 float want = maxW / w; int size = FitSize(st, FitSteps[FitSteps.Length - 1]);
@@ -315,7 +317,7 @@ namespace LastBell.Run
         {
             if (Event.current.type != EventType.Repaint) return;
             fontsWarm = true;
-            var old = GUI.color; GUI.color = Color.clear;
+            var old = GUI.color; GUI.color = Color.clear; long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             foreach (var st in new[] { revealName, revealEpithet, resultPrimary, resultAction, display30, display36, display40, heading, eyebrow, eyebrowC,
                      labelGold, bodyC, bodyL, row15, numR, numC, small13, small13R, micro, microR, controls, chipSt, keySt, keyStL, cornerSt, stateSt, pill,
                      tab, floatSt, slotName, tipSt, descSt, microC, subC, rowLabel, microHead, btn, btnP, mapBtn, microWrap, meterHead })
@@ -324,9 +326,27 @@ namespace LastBell.Run
                 foreach (var f in FitSteps) WarmFont(st.font, FitSize(st, f), st.fontStyle);
             // the overlays (caption 28/20, banner 46, world labels 30-54) use the skin font at fixed unscaled sizes
             foreach (int size in new[] { 20, 28, 30, 34, 44, 46, 54 }) { WarmFont(null, size, FontStyle.Bold); WarmFont(null, size, FontStyle.Normal); }
+            // the boss block's mechanic rows (BossBlock): each attack and mechanic line is a long string laid out the first time
+            // its hazard appears (perf report aurelion-eclipse-2026-11-03: 7.4 ms at Starfall Mirror), so lay them all out here
+            if (row15 != null)
+            {
+                foreach (var at in BossAttackIcons.All) if (at != null) WarmText(row15, $"{at.name}  ({at.bossName})".ToUpper());
+                foreach (var m in MechanicIcons.All)
+                {
+                    if (m == null || string.IsNullOrEmpty(m.name)) continue;
+                    WarmText(row15, m.name.ToUpper());
+                    foreach (var hint in Hints.Values) WarmText(row15, m.name.ToUpper() + " — " + hint);
+                }
+            }
             GUI.color = old;
+            if (UiTheme.FontLog) Debug.Log($"[fontlog] HUD font warm-up took {(System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency:0.0} ms");
         }
         GUIStyle warmSt; static readonly GUIContent warmText = new GUIContent(WarmChars);
+        static void WarmText(GUIStyle st, string text)
+        {
+            var c = new GUIContent(text); var sz = st.CalcSize(c);
+            st.Draw(new Rect(0, 0, sz.x, sz.y), c, false, false, false, false);   // GUI.color is clear: nothing shows
+        }
         void WarmFont(Font font, int size, FontStyle style)
         {
             if (font == null) font = GUI.skin.font;
@@ -1012,16 +1032,16 @@ namespace LastBell.Run
             if (capT == null) { capT = new GUIStyle(num) { fontSize = 28 }; capB = new GUIStyle(num) { fontSize = 20, wordWrap = true, fontStyle = FontStyle.Normal }; }
             float w = Mathf.Min(1100, Screen.width - 40), x = (Screen.width - w) / 2, y = Screen.height - 330;
             UiTheme.Fill(new Rect(x, y, w, 96), new Color(0.03f, 0.04f, 0.09f, 0.82f));
-            capT.normal.textColor = new Color(1f, 0.86f, 0.5f); GUI.Label(new Rect(x, y + 4, w, 36), CaptionTitle, capT);
-            capB.normal.textColor = new Color(0.93f, 0.95f, 1f); GUI.Label(new Rect(x + 16, y + 40, w - 32, 54), CaptionBody ?? "", capB);
+            capT.normal.textColor = new Color(1f, 0.86f, 0.5f); UiTheme.RawLabel(new Rect(x, y + 4, w, 36), CaptionTitle, capT);
+            capB.normal.textColor = new Color(0.93f, 0.95f, 1f); UiTheme.RawLabel(new Rect(x + 16, y + 40, w - 32, 54), CaptionBody ?? "", capB);
         }
 
         void BannerText()
         {
             var t = CurrentBanner; if (t == null) return;
             if (ban == null) ban = new GUIStyle(num) { fontSize = 46 };
-            ban.normal.textColor = new Color(0, 0, 0, 0.8f); GUI.Label(new Rect(3, Screen.height * 0.3f + 3, Screen.width, 70), t, ban);
-            ban.normal.textColor = bannerColor; GUI.Label(new Rect(0, Screen.height * 0.3f, Screen.width, 70), t, ban);
+            ban.normal.textColor = new Color(0, 0, 0, 0.8f); UiTheme.RawLabel(new Rect(3, Screen.height * 0.3f + 3, Screen.width, 70), t, ban);
+            ban.normal.textColor = bannerColor; UiTheme.RawLabel(new Rect(0, Screen.height * 0.3f, Screen.width, 70), t, ban);
         }
         void Labels()
         {
@@ -1034,7 +1054,9 @@ namespace LastBell.Run
             {
                 if (l.Hidden || (l.Follow == null && !ReferenceEquals(l.Follow, null))) continue;
                 var s = cam.WorldToScreenPoint(l.Follow ? l.Follow.position + l.Pos : l.Pos); if (s.z < 0) continue;
-                lab.fontSize = l.Size; float wide = Mathf.Max(200, lab.CalcSize(new GUIContent(l.Text)).x + 8);
+                lab.fontSize = l.Size; long t0 = UiTheme.FontLog ? System.Diagnostics.Stopwatch.GetTimestamp() : 0;
+                float wide = Mathf.Max(200, lab.CalcSize(new GUIContent(l.Text)).x + 8);
+                if (UiTheme.FontLog) UiTheme.LogSlowText(t0, "label size", l.Text, lab);
                 float half = l.Size * 0.6f;
                 var at = new Vector2(s.x, h - s.y);
                 var c = new Vector2(Mathf.Clamp(at.x, wide / 2 + 10, Screen.width - wide / 2 - 10), Mathf.Clamp(at.y, top + half, Mathf.Max(top + half, bottom - half)));
@@ -1045,9 +1067,9 @@ namespace LastBell.Run
                     UiTheme.Fill(new Rect(at.x - 3, at.y - 3, 6, 6), l.Color);
                 }
                 lab.normal.textColor = new Color(0, 0, 0, 0.75f);
-                GUI.Label(new Rect(c.x - wide / 2 + 2, c.y - 28, wide, 60), l.Text, lab);
+                UiTheme.RawLabel(new Rect(c.x - wide / 2 + 2, c.y - 28, wide, 60), l.Text, lab);
                 lab.normal.textColor = l.Color;
-                GUI.Label(new Rect(c.x - wide / 2, c.y - 30, wide, 60), l.Text, lab);
+                UiTheme.RawLabel(new Rect(c.x - wide / 2, c.y - 30, wide, 60), l.Text, lab);
             }
         }
 

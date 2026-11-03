@@ -108,9 +108,26 @@ namespace LastBell
         public static void Label(Rect r, string text, GUIStyle style, Color? color = null)
         {
             var keep = style.normal.textColor; var c = color ?? keep; float o = Mathf.Max(1, Mathf.Round(Scale));
-            style.normal.textColor = new Color(0, 0, 0, 0.85f * c.a); GUI.Label(new Rect(r.x + o, r.y + o, r.width, r.height), text, style);
-            style.normal.textColor = c; GUI.Label(r, text, style);
+            style.normal.textColor = new Color(0, 0, 0, 0.85f * c.a); RawLabel(new Rect(r.x + o, r.y + o, r.width, r.height), text, style);
+            style.normal.textColor = c; RawLabel(r, text, style);
             style.normal.textColor = keep;
+        }
+        // GUI.Label, timed under -lastbellFontLog: any text layout over FontLogMs is logged with its text, size and font, to
+        // find a text that is laid out for the first time mid-fight (perf report aurelion-eclipse-2026-11-03).
+        public static readonly bool FontLog = System.Array.Exists(System.Environment.GetCommandLineArgs(), a => a.Equals("-lastbellFontLog", System.StringComparison.OrdinalIgnoreCase));
+        const double FontLogMs = 2;
+        public static void RawLabel(Rect r, string text, GUIStyle style)
+        {
+            if (!FontLog || Event.current.type != EventType.Repaint) { GUI.Label(r, text, style); return; }
+            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
+            GUI.Label(r, text, style);
+            LogSlowText(t0, "label", text, style);
+        }
+        public static void LogSlowText(long t0, string what, string text, GUIStyle style)
+        {
+            double ms = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+            if (ms >= FontLogMs)
+                Debug.Log($"[fontlog] {ms:0.0} ms {what} frame {Time.frameCount} t {Time.timeSinceLevelLoad:0.00}: \"{text}\" size {style.fontSize} {style.fontStyle} font {(style.font ? style.font.name : "skin")}");
         }
         // Label style sized for the current screen: px is the 1080p size.
         public static GUIStyle Style(int px, bool strong, TextAnchor anchor, Color color, bool wrap = false)
