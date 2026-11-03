@@ -21,7 +21,7 @@ namespace LastBell.Run
         public override string Id => "crucivar.foundry_uprising";
 
         public const float Rise = 2.5f, PathWarn = 2.0f, FireTime = 1.0f, Stagger = 1.3f, Deadline = 30f, SoloDeadline = 36f, EasyDeadline = 40f;
-        public const float CastRing = 7.5f, CastRadius = 1.2f, CastHp = 300f, Painshare = 0.5f;   // FIGHT-SHEET.md: about 9 s of solo damage each
+        public const float CastRing = 7.5f, CastRadius = 1.2f, CastHp = 300f, CastStep = 0.5f, Painshare = 0.5f;   // FIGHT-SHEET.md: about 9 s of solo damage each; +0.5 per extra fighter (was 0.7 to 3 Nov)
         public const float BulletRadius = 0.5f, LaneSpacing = 3.5f, LaneSpeed = 6f, RingSpeed = 5f, RingGapHalf = 8f, RingGapAt = 26f;
         public const float SpiralTurn = 30f, SpiralSpeed = 6f, SpiralFor = 2.4f, SpiralEvery = 0.12f;
         // denser since 11-01 (Chzy18: more bullets in Phase 2): 5 lanes of 8 (P3's lone turret keeps 3 of 5), a second Ring Wave
@@ -102,7 +102,7 @@ namespace LastBell.Run
             var tu = new Turret
             {
                 K = k, Pos = Sim.Dir(yaw) * (Rim + 0.4f), A = pats[(k + Uprisings - 1) % 3], B = pats[(k + Uprisings) % 3],
-                NextFire = t + Sim.Ticks(Rise + (W.Players.Count == 1 ? 0 : Stagger * k)), CastMax = CastHp * (1 + 0.7f * (Fighters() - 1)),   // HP: passive menu bots don't count (Chzy18 10-31)
+                NextFire = t + Sim.Ticks(Rise + (W.Players.Count == 1 ? 0 : Stagger * k)), CastMax = CastHp * (1 + CastStep * (Fighters() - 1)),   // HP: passive menu bots don't count (Chzy18 10-31)
             };
             var part = tu.Casting = new BossPart { Name = "Molten Casting " + Numeral(k), Pos = Sim.Dir(yaw + 180f) * CastRing, BodyRadius = CastRadius, HitHeight = 1.0f, Hp = tu.CastMax, MaxHp = tu.CastMax, Order = k };
             tu.Casting.TakeHit = (dmg, contact) =>

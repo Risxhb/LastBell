@@ -45,10 +45,10 @@ The watch bots are all Vanguard on scripted input. They dodge and use their abil
 
 ## Casting HP (built)
 
-**300 per casting, +0.7 per extra player** (it was a 150 demo value). `FoundryUprising.CastHp`.
+**300 per casting, +0.5 per extra player** (it was a 150 demo value; the step was 0.7 until 3 Nov). `FoundryUprising.CastHp`.
 - **Solo:** two castings in a row, each about 9 s of damage at 35 DPS. With the rise, they're done in about 22 s of the 36 s timer.
-- **4 players:** three castings of 930 HP. At the bots' 117 DPS that takes about 24 s of the 30 s, which is tight. If people find it too tight, lower the per-player step before the base HP.
-- **3 Nov, denser bullets (Hard, 4 bots, Tollbreaker lane trace):** the bots now do about 86 DPS on the castings, so 2790 HP needs about 32 s against the 30 s flood even with no downs; they lose at the Pour Flood with the boss at 54%. Not changed: bots dodge worse than people. If a 4-player playtest also floods, the first step to try is 0.7 → 0.5 per extra player (750 HP each, about 26 s at that pace).
+- **4 players:** three castings of 750 HP (2250 in all; 930 with the old 0.7 step). At the 31 Oct bots' 117 DPS that takes about 24 s of the 30 s, which is tight. If people find it too tight, lower the per-player step before the base HP.
+- **3 Nov, denser bullets (Hard, 4 bots, Tollbreaker lane trace):** the bots now do about 86 DPS on the castings, so 2790 HP needs about 32 s against the 30 s flood even with no downs; they lose at the Pour Flood with the boss at 54%. Changed the same day (done as recommended, review later): the step is now 0.5, so 2250 HP takes about 26 s at that pace, 4 s inside the flood, with the Pour Flood timer and the layout unchanged. If a 4-player playtest finds it too easy, go back to 0.7.
 
 ## Easy and Hard
 
