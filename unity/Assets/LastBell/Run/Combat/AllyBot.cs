@@ -51,6 +51,8 @@ namespace LastBell.Run
             if (boss == null || !boss.Solid) { inp.Move = ToScreen(Vector3.zero); return inp; }
             var bpos = Sim.Flat(boss.transform.position);
             inp.Aim = bpos;
+            BotSight.Update(w, boss);
+            if (Scripted(me, boss, pos, ref inp)) return inp;
 
             // 1) dodge: in a hazard that locked at least our reaction time ago (test bots: from its first tick) -> nearest
             // clear spot. A Perfect bot also heads for its memory job (next anchor, mark side) as soon as it is due.
@@ -62,6 +64,8 @@ namespace LastBell.Run
                 var h = live[i];
                 if (h.Age >= (Mode == BotMode.Passive ? Mathf.Max(h.LockAt, 0) + reactTicks : 0) && Hits(h, me, pos) && h.ResolveAt - h.Age < left) { threat = h; left = h.ResolveAt - h.Age; }
             }
+            // an orb heading here, or a strike still rolling where its warning was
+            if (threat == null && (BotSight.OrbHits(pos, OrbAhead, OrbPad) || BotSight.GhostHits(me, pos))) { threat = Unseen; left = 20; }
             int duty = Duty(me, boss);   // ticks until its job resolves, or -1
             if (threat != null && !bad(pos)) threat = null;   // a shape that lands after its job: not in the way yet
             // dodge whatever lands first: shapes landing more than 0.5 s after it are not in the way yet (Perfect / Reflex only)
@@ -154,6 +158,171 @@ namespace LastBell.Run
             return inp;
         }
 
+        // Bosses whose mechanics are not floor shapes, played from what the screen shows (the Dial Warden: the lit hours and
+        // their key prompts, the safe circle while the hand sweeps, the Mainspring gaps, the Scales' mirror circle). True when
+        // it set this tick's input.
+        bool Scripted(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
+        {
+            if (boss is ChimeboundOracleEncounter or) return Carillon(me, or, pos, ref inp);
+            if (boss is PendulumSentinelEncounter ps) return Level(me, ps, pos, ref inp);
+            if (!(boss is DialWardenEncounter dw)) return false;
+            if (!dw.QteSources.ContainsKey(me)) dw.QteSources[me] = new BotQte(dw, me);   // a test's scripted source stays
+            Vector3? goal = null; bool still = true;
+            if (dw.LapActive && !dw.Breaking)
+            {
+                var pad = PadFor(dw, me);
+                // its lit hour, or inside the safe circle round him (clear of his body) while the hand sweeps
+                goal = pad != null ? pad.Pos : (Vector3?)SafeRing(pos);
+            }
+            else if (Mainspring(dw, me, pos, out var cell, out still)) goal = cell;
+            else if (dw.ScalesActive && dw.Throw > 0 && dw.ThrowLog.Count > 0) goal = dw.ThrowLog[dw.ThrowLog.Count - 1].mirror;
+            if (goal == null) return false;
+            bad = Bad(me, boss);
+            var v = Sim.Flat(goal.Value - pos);
+            var move = v.magnitude < 0.12f ? Vector3.zero : v.normalized;
+            if (v.magnitude > 3f && me.Stamina > 30) inp.Sprint = true;
+            // swing only while the route holds still (a planted throw would leave it behind)
+            float gap = Sim.Flat(boss.transform.position - pos).magnitude - boss.BodyRadius;
+            if (Attacks && still && move == Vector3.zero && gap <= Range(me) + 1.85f) Attack(me, ref inp);
+            if (me.Hp < (Mode == BotMode.Passive ? 40 : 70) && me.Potions > 0 && tick % 30 == 0) inp.Potion = true;
+            if (move != Vector3.zero) move = AroundBoss(pos, move, boss);
+            inp.Move = ToScreen(move);
+            return true;
+        }
+
+        // Carillon Chain: the standing player nearest the lit circle walks into it and holds there; a lane or orb in the
+        // way is dodged first (the normal reading), and nobody else changes what they do
+        bool Carillon(PlayerController me, ChimeboundOracleEncounter or, Vector3 pos, ref PlayerInput inp)
+        {
+            if (!or.ChainActive || or.ChainIndex < 0 || or.ChainIndex >= or.ChainPositions.Count) return false;
+            var c = Sim.Flat(or.ChainPositions[or.ChainIndex]);
+            PlayerController near = null; float nd = float.MaxValue;
+            foreach (var p in me.World.Players) { if (!p || p.Down) continue; float d = Sim.Flat(p.transform.position - c).sqrMagnitude; if (d < nd) { nd = d; near = p; } }
+            if (near != me) return false;
+            bad = Bad(me, or);
+            if (bad(pos)) return false;
+            var v = c - Sim.Flat(pos);
+            var move = v.magnitude < ChimeboundOracleEncounter.SoakRadius - 0.5f ? Vector3.zero : v.normalized;
+            if (move != Vector3.zero && bad(pos + move * 0.6f)) return false;
+            if (v.magnitude > 3f && me.Stamina > 30) inp.Sprint = true;
+            float gap = Sim.Flat(or.transform.position - pos).magnitude - or.BodyRadius;
+            if (Attacks && move == Vector3.zero && gap <= Range(me) + 1.85f) Attack(me, ref inp);
+            if (me.Hp < (Mode == BotMode.Passive ? 40 : 70) && me.Potions > 0 && tick % 30 == 0) inp.Potion = true;
+            if (move != Vector3.zero) move = AroundBoss(pos, move, or);
+            inp.Move = ToScreen(move);
+            return true;
+        }
+
+        // Plumb Line: everyone outside a level mark is hit, and a mark holds two. Players in turn take the nearest mark with
+        // room (the marks drift, so the bot follows its mark's centre); nothing else is live while the pendulum stands still
+        bool Level(PlayerController me, PendulumSentinelEncounter ps, Vector3 pos, ref PlayerInput inp)
+        {
+            var marks = ps.LiveMarks;
+            if (!ps.PlumbActive || marks == null || marks.Count == 0) return false;
+            var room = new int[marks.Count]; int mine = -1;
+            foreach (var p in me.World.Players)
+            {
+                if (!p || p.Down) continue;
+                int best = -1; float bd = float.MaxValue;
+                for (int i = 0; i < marks.Count; i++)
+                {
+                    if (room[i] >= PendulumSentinelEncounter.Capacity) continue;
+                    float d = Sim.Flat(p.transform.position - marks[i]).sqrMagnitude; if (d < bd) { bd = d; best = i; }
+                }
+                if (best < 0) continue;
+                room[best]++;
+                if (p == me) { mine = best; break; }
+            }
+            if (mine < 0) return false;
+            var v = Sim.Flat(marks[mine] - pos);
+            var move = v.magnitude < 0.15f ? Vector3.zero : v.normalized;
+            if (v.magnitude > 3f && me.Stamina > 30) inp.Sprint = true;
+            float gap = Sim.Flat(ps.transform.position - pos).magnitude - ps.BodyRadius;
+            if (Attacks && move == Vector3.zero && gap <= Range(me) + 1.85f) Attack(me, ref inp);
+            if (me.Hp < (Mode == BotMode.Passive ? 40 : 70) && me.Potions > 0 && tick % 30 == 0) inp.Potion = true;
+            if (move != Vector3.zero) move = AroundBoss(pos, move, ps);
+            inp.Move = ToScreen(move);
+            return true;
+        }
+
+        static Vector3 SafeRing(Vector3 pos)
+        {
+            var d = Sim.Flat(pos); float r = (DialWardenRoutes.BodyClear + DialWardenRoutes.SafeRadius - Hazard.Margin) / 2f;
+            return (d.magnitude > 0.05f ? d.normalized : Vector3.forward) * r;
+        }
+
+        // the lit hour this bot takes: unmanned hours in the hand's order, each to the nearest free standing player
+        static DialWardenEncounter.Lit PadFor(DialWardenEncounter dw, PlayerController me)
+        {
+            foreach (var l in dw.LitList) if (l.Player == me && !l.Resolved) return l;
+            var used = new HashSet<PlayerController>();
+            foreach (var l in dw.LitList) if (l.Player != null && !l.Resolved) used.Add(l.Player);
+            var open = new List<DialWardenEncounter.Lit>();
+            foreach (var l in dw.LitList) if (!l.Opened && !l.Resolved) open.Add(l);
+            open.Sort((a, b) => a.Step.CompareTo(b.Step));
+            foreach (var l in open)
+            {
+                PlayerController best = null; float bd = float.MaxValue;
+                foreach (var p in me.World.Players)
+                {
+                    if (!p || p.Down || used.Contains(p)) continue;
+                    float d = Sim.Flat(p.transform.position - l.Pos).sqrMagnitude; if (d < bd) { bd = d; best = p; }
+                }
+                if (best == null) return null;
+                if (best == me) return l;
+                used.Add(best);
+            }
+            return null;
+        }
+
+        // Mainspring: one walk through every wave on the floor (the boss's own route solver, run on the gaps it shows),
+        // planned again whenever a wave is launched or a Constellation path is set to fire. still: the route stays on this cell for the next few steps.
+        static CombatWorld planWorld; static int planWaves = -1, planFires = -1, planT0; static DialWardenRoutes.Grid plan;
+        readonly Dictionary<int, List<Vector3>> routes = new Dictionary<int, List<Vector3>>(); int routeFor = -1;
+        bool Mainspring(DialWardenEncounter dw, PlayerController me, Vector3 pos, out Vector3 cell, out bool still)
+        {
+            cell = pos; still = true;
+            int now = dw.Tick;
+            if (planWorld != me.World || planWaves != dw.WaveLog.Count || planFires != dw.FireStart)
+            {
+                planWorld = me.World; planWaves = dw.WaveLog.Count; planFires = dw.FireStart; planT0 = now; plan = null;
+                var tl = new DialWardenRoutes.Timeline();
+                foreach (var (_, w, origin) in dw.WaveLog)
+                    if (origin + w.End >= now)
+                        tl.Waves.Add(new DialWardenRoutes.Wave { Start = w.Start + origin - now, OutGaps = w.OutGaps, InGaps = w.InGaps, GapHalf = w.GapHalf, VOut = w.VOut, VIn = w.VIn, ImplosionDelay = w.ImplosionDelay });
+                // a Constellation path still to fire, remembered from its lines (on Hard the beams flash only as they strike)
+                if (dw.FireStart >= 0 && dw.Gold != null)
+                    foreach (var f in DialWardenRoutes.Fires(dw.Gold, dw.Silver, dw.BeatTicks))
+                        if (dw.FireStart + f.Tick >= now) tl.Fires.Add(new DialWardenRoutes.Fire { Tick = dw.FireStart + f.Tick - now, A = f.A, B = f.B, Silver = f.Silver });
+                if (tl.Waves.Count > 0 || tl.Fires.Count > 0) plan = DialWardenRoutes.Solve(tl);
+            }
+            if (plan == null || now - planT0 >= plan.Steps * DialWardenRoutes.StepTicks) return false;
+            if (routeFor != planT0) { routes.Clear(); routeFor = planT0; }
+            if (!routes.TryGetValue(planT0, out var path)) { path = DialWardenRoutes.Plan(plan, pos); routes[planT0] = path; }
+            if (path == null || path.Count == 0) return false;   // nothing survivable (Midnight): fall back to dodging
+            int s = (now - planT0) / DialWardenRoutes.StepTicks;
+            int at = Mathf.Min(s + 1, path.Count - 1);
+            cell = path[at];
+            for (int k = at; k <= Mathf.Min(at + 3, path.Count - 1); k++) if (Sim.Flat(path[k] - path[at]).sqrMagnitude > 0.01f) still = false;
+            return true;
+        }
+
+        // the parry prompt, keyed like a player reading it: a direction every 0.1 s, then E on the hand's arrival
+        sealed class BotQte : IQteSource
+        {
+            readonly DialWardenEncounter boss; readonly PlayerController me; int lastPress = -999;
+            public BotQte(DialWardenEncounter b, PlayerController p) { boss = b; me = p; }
+            public void Begin() { lastPress = -999; }
+            public void Drain(List<QteKey> into)
+            {
+                var q = boss ? boss.PromptFor(me, out _) : null;
+                if (q == null || !q.Open) return;
+                int now = boss.Tick;
+                if (!q.OnParry) { if (now - lastPress >= 6 && now - q.OpenTick >= 8) { into.Add(q.Sequence[q.Index]); lastPress = now; } return; }
+                if (now >= q.ArriveTick) into.Add(QteKey.Parry);
+            }
+        }
+
         PlayerController dMe; int dDuty, dNote; string dThreat; bool dBad; Vector3 dMove, dPos;
         string Describe()
         {
@@ -235,7 +404,17 @@ namespace LastBell.Run
             for (int i = 0; i < live.Count; i++) { var h = live[i]; if (h.BurnPerSecond <= 0 && h.ResolveAt - h.Age <= ticks && (Hits(h, me, pos) || Hits(h, me, lunge))) return false; }
             return true;
         }
-        static bool Hits(Hazard h, PlayerController me, Vector3 q) => !h.Soak && h.Contains(q) && (h.Affects == null || h.Affects(me));
+        static bool Hits(Hazard h, PlayerController me, Vector3 q) => !h.Soak && (h.Contains(q) || SideOf(h, q)) && (h.Affects == null || h.Affects(me));
+        // a lane that strikes after its warning (a Toll Lane) can hit a little wider than it is drawn: keep a hand's width clear
+        static bool SideOf(Hazard h, Vector3 q)
+        {
+            if (h.Shape != HazardShape.Lane || h.HitOnResolve) return false;
+            var side = Sim.Dir(h.Yaw + 90f) * LanePad;
+            return h.Contains(q + side) || h.Contains(q - side);
+        }
+        const float LanePad = 0.2f;
+        static readonly Hazard Unseen = new Hazard { Source = "orb / rolling strike" };   // the threat when it is not a live hazard
+        const float OrbAhead = 0.5f, OrbPad = 0.25f;
 
         // where this bot must not stand now: inside any shape that would hit it; a Perfect bot also avoids anywhere outside
         // the next Ecliptic anchor's disc and the wrong side of its Zenith Mark (with a 0.35-0.4 m buffer); v4 jobs: its
@@ -310,6 +489,8 @@ namespace LastBell.Run
                 if (h.BurnPerSecond <= 0 && bTick + (h.ResolveAt - h.Age) > bIgnoreAfter) continue;
                 if (Hits(h, bMe, q) && !(bAllowBurn && h.BurnPerSecond > 0 && bAnyJob)) return true;
             }
+            if (BotSight.Orbs.Count > 0 && BotSight.OrbHits(q, OrbAhead, OrbPad)) return true;
+            if (BotSight.GhostHits(bMe, q)) return true;
             if (!bFull) return false;
             var a = bA;
             if (bK >= 0 && Sim.Flat(q - bAnchor).magnitude > bDisc) return true;

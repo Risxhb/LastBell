@@ -258,6 +258,7 @@ namespace LastBell.Run
 
         void Hit(PlayerController p, int dmg, string what)
         {
+            if (Log) Debug.Log($"[gear floor] {T:0.00}s {UltimateState.Roman[HourOf(p) + 1]} hit by {what} at ({p.transform.position.x:0.0},{p.transform.position.z:0.0}) job {JobOf(p)} · {p.ClassName} hp {p.Hp} slow {(p.Kit != null ? p.Kit.SlowLeft : 0):0.00}");
             Fails.Add($"{T:0.0}s {UltimateState.Roman[HourOf(p) + 1]}: {what}");
             p.ReceiveHit(new Hazard { Source = Source + ": " + what, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Sim.Flat(p.transform.position), Radius = 0.5f, Damage = dmg, Knockback = 0, Stun = 0 });
         }
@@ -301,6 +302,10 @@ namespace LastBell.Run
             }
             return goal;
         }
+
+        // The Train Runs Wild spins the floor at up to x2.2 and sprays shards from every hammer and torn gear: replan every 3 ticks
+        // there, as P5 does (2 Nov: at 6 a party Tollbreaker on the centre gear drifted into a shard)
+        protected override int ReplanTicks => wild ? 3 : 6;
 
         public override bool Steer(PlayerController p, UltimateBot.Skill skill, out Vector3 vel)
         {

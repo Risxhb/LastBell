@@ -33,6 +33,7 @@ namespace LastBell.Run
                            Action<UltFight> perSecond = null /* every 0.25 s */, bool pushOn = true, Difficulty level = Difficulty.Hard)
         {
             ultLast = null;
+            if (AurelionArgs.Arg("-lastbellUltSteerLog") != null) OpenHour.LogSteer = GearFloor.Log = true;   // tests: every bot hit and cornered route
             yield return UltStart(null, segment, cls0, level);
             if (bk == null) yield break;
             BellkeeperEncounter.PushTimersOn = pushOn;

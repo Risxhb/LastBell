@@ -64,7 +64,9 @@ namespace LastBell.Run
                         bool slowsMe = (me.Kit is ArcanistKit || me.Kit is TollbreakerKit) && vel.magnitude > PlayerController.WalkSpeed + 0.1f;
                         // a press that roots or slows past the search's first leg (a melee swing, to its end): only if the route search
                         // still finds a way with no hit after standing that long (31 Oct: each kit says how long a press holds it)
-                        bool RootOk(int slot) { float r = me.Kit != null ? me.Kit.RootFor(slot) : 0; return r <= 0.2f || m.SafeToRoot(me, r, me.Kit.RootScale(slot)); }
+                        // (a short slow that the kit reports, the Tollbreaker's x0.6 throw, is tested too: on P4's spinning gears 0.17 s of it
+                        // put a party Tollbreaker under a hammer shard, 2 Nov)
+                        bool RootOk(int slot) { float r = me.Kit != null ? me.Kit.RootFor(slot) : 0; return r <= 0 || (r <= 0.2f && me.Kit.RootScale(slot) >= 1) || m.SafeToRoot(me, r, me.Kit.RootScale(slot)); }
                         bool pressNow = tick - lastPress >= 6;
                         if (m.AttackTarget(me, out var aim, out float reach, out bool full))
                         {

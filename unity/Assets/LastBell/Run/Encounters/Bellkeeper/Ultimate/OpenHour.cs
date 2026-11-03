@@ -189,7 +189,7 @@ namespace LastBell.Run
         bool[] Crossed(PlayerController p) { if (!crossed.TryGetValue(p, out var c)) crossed[p] = c = new bool[3]; return c; }
         void Hit(PlayerController p, int dmg, string what)
         {
-            if (LogSteer) Debug.Log($"[open hour] {T:0.00}s {UltimateState.Roman[HourOf(p) + 1]} hit by {what} at ({p.transform.position.x:0.0},{p.transform.position.z:0.0}) job {JobOf(p)}");
+            if (LogSteer) Debug.Log($"[open hour] {T:0.00}s {UltimateState.Roman[HourOf(p) + 1]} hit by {what} at ({p.transform.position.x:0.0},{p.transform.position.z:0.0}) job {JobOf(p)} · {p.ClassName} hp {p.Hp} slow {(p.Kit != null ? p.Kit.SlowLeft : 0):0.00}");
             Fails.Add($"{T:0.0}s {UltimateState.Roman[HourOf(p) + 1]}: {what}");
             p.ReceiveHit(new Hazard { Source = Source + ": " + what, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Sim.Flat(p.transform.position), Radius = 0.5f, Damage = dmg, Knockback = 0, Stun = 0 });
         }
@@ -281,7 +281,7 @@ namespace LastBell.Run
 
         readonly List<Vector3>[] pred = new List<Vector3>[16];
         readonly List<Vector3> dirs = new List<Vector3>(), vels = new List<Vector3>();
-        readonly List<Mine> myMines = new List<Mine>();
+        readonly List<Mine> myMines = new List<Mine>(), otherMines = new List<Mine>();
         struct Node { public Vector3 Q, First; public float Risk, Score; }
         List<Node> beam = new List<Node>(), grown = new List<Node>();
         static readonly System.Comparison<Node> ByScore = (x, y) => x.Score.CompareTo(y.Score);
@@ -313,7 +313,7 @@ namespace LastBell.Run
                 }
                 arr.Sort(ByX);
             }
-            myMines.Clear(); foreach (var m in mines) if (m.Owner == p) myMines.Add(m);
+            myMines.Clear(); otherMines.Clear(); foreach (var m in mines) if (m.Owner == p) myMines.Add(m); else if (!m.Done) otherMines.Add(m);
             var crossedNow = Crossed(p);
             const float Near = 0.5f + PR + BR;   // a bullet farther than this adds no risk
             // 0 safe, 1 a 50 hit (a bullet, the wall), 2 lethal or a wipe (my own echo, another's gap, off the plate on the beat, the edge)
@@ -331,6 +331,9 @@ namespace LastBell.Run
                 if (mc < 0.12f) return 1;
                 // leave my own echo spots early: a burst due within the next second costs, so the route is clear before the pocket closes
                 foreach (var m in myMines) if (m.At > t + s && m.At <= t + s + 1f && (q - m.P).magnitude < EchoR + PR + 0.6f) extra += 1f;
+                // and the others' echo spots: a burst starts its four shots at the spot, so a player pinned there against the boss takes all
+                // four at once (2 Nov: a party Tollbreaker pressed to the boss was cornered on another's echo and went down in one tick)
+                foreach (var m in otherMines) if (m.At > t + s && m.At <= t + s + 1.2f && (q - m.P).magnitude < PR + BR + 0.6f) extra += 0.5f;
                 int kb = Mathf.FloorToInt((t + s) / Beat) + 1; float tbb = kb * Beat - (t + s);
                 if (SoakHour(kb) != hour % Hours && tbb < 3 && (q - PlateOf(kb)).magnitude < OnPlate + EchoR + 0.3f) extra += 0.5f;   // keep my echoes off the next soaker's plate
                 return 0;
