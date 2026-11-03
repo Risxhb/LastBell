@@ -56,7 +56,7 @@
 | C13 | Encore | Chimesinger | R | | Crescendo leaves 1 echo on the bell | — | works | new: post-Crescendo echo | **built (96624b2, local, untested)** | accepted |
 | C14 | Note Trail | Chimesinger | R | | Harmonic Step ends by firing 3 notes toward the cursor | 4 notes | works | new: dash-end event, note burst | **built (96624b2, local, untested)** | accepted |
 | C15 | Overflow | Chimesinger | R | | Chorus overheal adds to the next Crescendo: +1% per 2 HP, up to +25% | up to +37% | works (self-heal overheal) | new: overheal amount from Chorus | **built (96624b2, local, untested)** | accepted |
-| C16 | Shared Ringing | Chimesinger | R | Ring | Every 5th ally hit on a ringing target adds an echo (cap applies) | every 4th | counts your Resonant Notes | new: hits-on-ringing-target counter | **built (96624b2, local, untested)** | accepted, **redraw needed** |
+| C16 | Shared Ringing | Chimesinger | R | Ring | Every 5th ally hit on a ringing target adds an echo (cap applies) | every 4th | counts your Resonant Notes | new: hits-on-ringing-target counter | **built (96624b2, local, untested)** | accepted (redrawn 2026-10-31) |
 | C17 | Struck Together | Chimesinger | R | Ring | An ally's heavy hit on a ringing target rings the bell once for 30% of Bellstrike | 45% | every 6th Resonant Note does it | new: heavy-hit event on ringing target | **built (96624b2, local, untested)** | accepted |
 | C18 | Chorus of Valour | Chimesinger | R | Party | Allies your Chorus touches get +12% damage for 4 s | +18% | gives it to you | built | **built (PR 10, not merged)** | accepted |
 | C19 | Great Bell | Chimesinger | K | | Only one bell, twice as large, echo cap 4, Crescendo cooldown +30% | cooldown penalty +15% | works | new: bell count, size, echo cap, Crescendo cooldown | **built (96624b2, local, untested)** | accepted |
@@ -69,7 +69,7 @@
 | A06 | Unbound Cast | Arcanist | C | | Sigil and Comet without a glyph deal 50% instead of 35% | 57.5% | works | built | **built (PR 10, not merged)** | accepted |
 | A07 | Blink Charge | Arcanist | C | | After Blink, the next Magic Missile is fully charged | that volley +15% damage | works | new: dash-end event in ArcanistKit | **built (96624b2, local, untested)** | accepted |
 | A08 | Far Blink | Arcanist | C | | Blink distance +0.6 m. No iframes | +0.9 m | works | new: dash distance | **built (96624b2, local, untested)** | accepted |
-| A09 | Glass Edge | Arcanist | C | | +12% damage, −8% max HP | +18% damage (HP loss unchanged) | works | built: damage hook; new: max HP stat | **built (96624b2, local, untested)** | accepted |
+| A09 | Glass Edge | Arcanist | C | | +8% damage, −8% max HP *(balance pass 2026-11-02, was +12%)* | +12% damage (HP loss unchanged) | works | built: damage hook; new: max HP stat | **built (96624b2, local, untested)** | accepted |
 | A10 | Fourth Glyph | Arcanist | R | | Glyph cap 3 → 4 | — | works | built: glyph cap | **built (96624b2, local, untested)** | accepted |
 | A11 | Missile Volley | Arcanist | R | | Three quick taps fire a free 4th missile | free missile +50% damage | works | new: tap counter | **built (96624b2, local, untested)** | accepted |
 | A12 | Twin Sigil | Arcanist | R | | A Sigil cast with a glyph places two sigils in a short line | — | works | new: Sigil count | **built (96624b2, local, untested)** | accepted |
@@ -79,20 +79,20 @@
 | A16 | Long Surge | Arcanist | R | | Surge 2.5 s per glyph instead of 2 s | 2.75 s | works | built | **built (PR 10, not merged)** | accepted |
 | A17 | Surge Echo | Arcanist | R | | When Surge ends, get 1 glyph back | — | works | new: Surge-end event | **built (96624b2, local, untested)** | accepted |
 | A18 | Glyph Brand | Arcanist | R | Glyph | Comet brands the boss 5 s; every 8 ally hits on it carve you 1 glyph | every 6 hits | counts your missiles | new: boss brand state (like Crack), hit counter | **built (96624b2, local, untested)** | accepted |
-| A19 | Resonant Rune | Arcanist | R | Ring | A Sigil going off on a ringing target adds an echo to the bell | — | gated: Chimesinger in party (see open question 1) | new: Sigil-on-ringing-target event | **built (96624b2, local, untested)** | accepted |
+| A19 | Resonant Rune | Arcanist | R | Ring | A Sigil going off on a ringing target adds an echo to the bell | — | gated: Chimesinger in party (final, balance pass 2026-11-02) | new: Sigil-on-ringing-target event | **built (96624b2, local, untested)** | accepted |
 | A20 | Perpetual Beam | Arcanist | K | | Glyph cap 2; Sigil and Comet without a glyph deal 70% | 87.5% | works | built | **built (PR 10, not merged)** | accepted |
 | G01 | Deep Breath | general | C | | Stamina regen starts 0.6 s after use instead of 0.75 s | 0.53 s | works | built | **built (PR 10, not merged)** | accepted |
-| G02 | Long Lungs | general | C | | +15 max stamina | +22 | works | new: max stamina stat | **built (96624b2, local, untested)** | accepted, **redraw needed** |
+| G02 | Long Lungs | general | C | | +15 max stamina | +22 | works | new: max stamina stat | **built (96624b2, local, untested)** | accepted (redrawn 2026-10-31) |
 | G03 | Sprinter | general | C | | Sprint drains 21/s instead of 25/s | 19/s | works | built | **built (PR 10, not merged)** | accepted |
 | G04 | Sure Footing | general | C | | Knockback taken −30%. Stun on hit stays | — (already at the −30% cap) | works | new: knockback scale + cap clamp | **built (96624b2, local, untested)** | accepted |
 | G05 | Strong Brew | general | C | | Potions heal 48 instead of 40. Carry-over unchanged | 52 | works | built | **built (PR 10, not merged)** | accepted |
 | G06 | Spare Flask | general | R | | +1 potion at each refill. Carry-over unchanged | — | works | built | **built (PR 10, not merged)** | accepted |
-| G07 | Lone Bell | general | R | | +15% damage while no ally is within 8 m | +22.5% | works (always active solo) | built | **built (PR 10, not merged)** | accepted |
+| G07 | Lone Bell | general | R | | +12% damage while no ally is within 8 m *(balance pass 2026-11-02, was +15%)* | +18% | works (always active solo) | built | **built (PR 10, not merged)** | accepted |
 | G08 | Formation | general | R | Party | +6% damage per ally within 5 m, up to +18% | +9% per ally, up to +27% | flat +6% (+9%) | built: ally range, damage hook | **built (96624b2, local, untested)** | accepted |
-| G09 | Fourth Choice | general | R | | **Shop version (new):** your stock has 7 slots instead of 6 for the rest of the run (+1 class slot) | — | works | new: stock size in ShopRun | **built (96624b2, local, untested)** | accepted |
+| G09 | Fourth Choice | general | R | | **Shop version (final, balance pass 2026-11-02):** your stock has 7 slots instead of 6 for the rest of the run (+1 class slot) | — | works | new: stock size in ShopRun | **built (96624b2, local, untested)** | accepted |
 | G10 | Light Feet | general | C | | +10% move speed for 1 s after a dash | +15% | works | new: move speed buff | **built (96624b2, local, untested)** | accepted |
-| T01–T05 | *Toll IV items* | any | — | | 5 sidegrades, not named yet (Toll IV reward, spec §10) | | | | proposal (unnamed) | none |
-| T06–T10 | *Toll VII items* | any | — | | 5 more, not named yet (Toll VII reward) | | | | proposal (unnamed) | none |
+| T01–T05 | *Toll IV items* | any | — | | 5 sidegrades, named after playtests and aimed at thin slots (Toll IV reward, spec §10) | | | | proposal (unnamed) | none |
+| T06–T10 | *Toll VII items* | any | — | | 5 more, named after playtests (Toll VII reward) | | | | proposal (unnamed) | none |
 
 **Count:** 69 live items (20 Tollbreaker, 19 Chimesinger, 20 Arcanist, 10 general), plus 10 Toll slots that are still proposals.
 - Built: 11 slice items (PR 10, not merged) and 38 pool items (local, untested).
@@ -137,20 +137,18 @@ Every row was checked against the rules:
 - **Colours.** Item-added visuals never use coral or amber. Tollbreaker items reuse his kit look: thin dotted cyan, never filled. Arcanist items that resize his spells keep his own spell shades and his no-filled-disc rule. No item adds violet to anything that could read as a boss warning.
 - **Dropped items** (loot doc §1.9) stay dropped: Phase Step, Recovery Grace, Iron Wall, Riposte, homing shots, an Arcanist ward, Second Wind, lifesteal, Fresh Flask and Recall.
 
-## Balance notes (for a later balance pass)
+## Balance pass (accepted by Chzy18, 2026-11-02)
 
-- **Over budget on paper:**
-  - Glass Edge, a Common, gives +12% damage against a +5 budget. Its −8% HP is the trade.
-  - Formation+ reaches +27% and Lone Bell+ reaches +22.5%. Both are conditional.
-- **Thin slots:**
-  - The Arcanist has 1 Keystone; the Tollbreaker and Chimesinger have 2 each.
-  - The general pool has no Keystone.
-- **Fourth Choice** was written for pick offers. It's built as the shop version above (+1 stock slot) until the balance pass decides.
-- **Resonant Rune** (A19): the loot doc gives it a fallback ("without a Chimesinger: Sigil +10%"). Spec §3 gates cross-class items out when that class isn't in the party, so the fallback would never show. It's built gated until the balance pass decides.
+Six decisions, accepted as one block (`docs/proposals/item-balance-pass-2026-11-02.md`):
+- **Glass Edge** (A09): +8% damage (Tempered +12%) with −8% max HP, down from +12%.
+- **Lone Bell** (G07): +12% (Tempered +18%), down from +15%, because it is always on when solo.
+- **Formation** (G08): unchanged. It is conditional, and with at most 4 players its 3-ally cap fits exactly.
+- **Fourth Choice** (G09): the shop version (+1 stock slot) is final.
+- **Resonant Rune** (A19): stays gated on a Chimesinger in the party. The loot doc's solo fallback is dropped.
+- **Toll IV and VII items**: named after playtests, aimed at the thin slots: the Arcanist has 1 Keystone, and the general pool has none.
 
 ## Open questions
 
-1. **For the balance pass** (Chzy18, 2026-10-28): Fourth Choice, the Resonant Rune gate, and the over-budget items listed above.
-2. Should the **Toll IV and VII items** be named now or after playtests? (Loot doc open question 8.)
+None right now. The Toll IV and VII items get named after playtests (decided 2026-11-02).
 
 *Settled 2026-10-28:* the Temper values were accepted as one block, along with Starfall's per-impact damage and the Tempers for yes/no items.

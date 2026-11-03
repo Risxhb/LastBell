@@ -350,7 +350,7 @@ namespace LastBell.Run.Shop
             Check("Swift Chorus: Mending Chorus cooldown 15 s -> 12.75 s through the kit", ck.Cooldown01(4) > 0.83f && ck.Cooldown01(4) <= 0.851f, $"{ck.Cooldown01(4):0.000} of 15 s");
             Check("Chorus of Valour solo: the caster gets +12% for 4 s", Me.L.ValourUntil > d.World.Tick && ItemHooks.Outgoing(d.World, 50, "ResonantNote") == 56, $"until {Me.L.ValourUntil}, now {d.World.Tick}");
             Grant(Me, ItemCatalog.LoneBell);
-            Check("Lone Bell solo: +15% stacks additively with Valour", ItemHooks.Outgoing(d.World, 100, "ResonantNote") == 127);
+            Check("Lone Bell solo: +12% stacks additively with Valour", ItemHooks.Outgoing(d.World, 100, "ResonantNote") == 124);
         }
 
         IEnumerator ArcanistHooks()
@@ -490,7 +490,7 @@ namespace LastBell.Run.Shop
             Only(ItemCatalog.QuickCarving, ItemCatalog.WideBeam, ItemCatalog.SteadyHand);
             Check("Quick Carving / Wide Beam / Steady Hand: steps 40 -> 33 ticks, width +30%, turn +25%", ItemHooks.I(P, "a.dis.step", 40) == 33 && Close(ItemHooks.F(P, "a.dis.width", 0.7f), 0.91f) && Close(ItemHooks.F(P, "a.dis.turn", 1.5f), 1.875f));
             Only(ItemCatalog.WideSigil, ItemCatalog.FarBlink); Check("Wide Sigil / Far Blink: radius +25%, Blink +0.6 m", Close(ItemHooks.F(P, "a.sigil.radius", 2.5f), 3.125f) && Close(ItemHooks.F(P, "dash.distance", 3), 3.6f));
-            Only(ItemCatalog.GlassEdge); Check("Glass Edge: +12% damage, max HP 92", ItemHooks.Outgoing(d.World, 100, "Magic Missile") == 112 && P.MaxHealth == 92);
+            Only(ItemCatalog.GlassEdge); Check("Glass Edge: +8% damage, max HP 92", ItemHooks.Outgoing(d.World, 100, "Magic Missile") == 108 && P.MaxHealth == 92);
             Only(ItemCatalog.FourthGlyph); Check("Fourth Glyph: glyph cap 4", ItemHooks.GlyphCap(P, 3) == 4);
             Only(ItemCatalog.FourthGlyph, ItemCatalog.PerpetualBeam); Check("Perpetual Beam still caps at 2 with Fourth Glyph", ItemHooks.GlyphCap(P, 3) == 2);
             Only(ItemCatalog.HastyComet); Check("Hasty Comet: 3 -> 2.2 s, -15%", ItemHooks.I(P, "a.comet.fall", 180) == 132 && ItemHooks.Outgoing(d.World, 100, "Arcane Comet") == 85);
