@@ -198,7 +198,7 @@ namespace LastBell.Run
         // was a new IMGUI text handle, and Unity's ClearUnusedTextHandles cost 5-10 ms when it swept them (perf report
         // bellkeeper-ultimate-2026-11-03, Update 12:25: the Ultimate's slam 6 frame).
         static readonly string[] DotSep = { " · " };
-        static readonly System.Text.RegularExpressions.Regex Tenths = new System.Text.RegularExpressions.Regex(@"(d+.d)s");
+        static readonly System.Text.RegularExpressions.Regex Tenths = new System.Text.RegularExpressions.Regex(@"(\d+\.\d)s");
         static string WholeSeconds(string s) => s.IndexOf('.') < 0 ? s : Tenths.Replace(s, m =>
         {
             float v = float.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
