@@ -11,7 +11,7 @@
 
 ## Rules this fight follows (content rules)
 
-- No ability text in the game: names appear only in the F7 diagnostics overlay.
+- No ability text in the game: names appear only in the F7 diagnostics overlay (hazards carry no mechanic tag, so the boss panel shows none).
 - Everything lands on the beat: **96 BPM above 50%, 116 BPM below**.
 - No dodge immunity, no jump or dash required: every warning passes the escape check walking at 4.2 m/s after a 0.3 s reaction.
 - No knockback on any of its hits (they would push players into the mud).
@@ -38,7 +38,7 @@ Mud floods part of the floor. Once the warning fills, the mud stays as a standin
 As a tide rises, bells surface in the dry ground. Each is a shared soak with a large numeral: the number of players it wants.
 
 - **Where:** High Tide: two bells on opposite sides of the tower, 4.5 m out (the dry disc). Crosscurrent: in two of the three dry sectors, 6 m out. Radius 1.6 m (room for two).
-- **When:** they toll **3 beats after the mud locks** (8 beats after they surface; the first set of the fight gets 3 more beats, Easy 2 more).
+- **When:** they surface with the tide's warning and toll **8 beats** later above 50% (3 beats after the mud locks) and **10 beats** later below 50% (the farther bell of a pair is reachable from anywhere in that time). The first set of the fight gets 3 more beats, Easy 2 more.
 - **Damage:** **60** per bell, split between everyone inside. Fewer than the numeral: the missing shares fall on those inside (one player alone takes 60 and lives). **An empty bell wipes the party** (§5).
 - **Reward:** when every bell of the set has been rung, the tide drains at once and the Carillon is **Drained**: it slumps for **3.5 s** with nothing live. This is the major punish window.
 - **Melee and ranged:** a bell is somewhere specific, so nobody can just stay where they are.
@@ -91,7 +91,7 @@ Medium is the baseline. Every level also scales boss damage (Easy ×0.6, Hard ×
 |---|---|---|---|
 | High Tide warning | 6 beats | 5 beats | 5 beats |
 | Crosscurrent warning | 5 beats | 4 beats | 4 beats |
-| Bell toll after the mud locks | 5 beats | 3 beats | 3 beats |
+| Bell toll after they surface | 10 / 12 beats | 8 / 10 beats | 8 / 10 beats |
 | Silt Fall drop lock-to-land | +0.5 beat | 1.5 (1.75 at 116) | 1.5 (1.75 at 116) |
 | Drowned Peal first band / gap | 5 / 2 beats | 4 / 1.5 beats | 4 / 1.5 beats |
 | Extra mechanic | – | – | **Backwash** |
@@ -104,7 +104,7 @@ The acceptance test checks these, plus a walker for each one:
 - Crosscurrent: the middle of a sector at the edge to the nearest dry sector (7.05 m) in 4 beats at 116 BPM: 7.4 m.
 - Silt Fall: from the centre of a locked drop out of it (2.1 m) in 1.5 beats at 96 / 1.75 at 116: 2.7 / 2.5 m.
 - Drowned Peal: across a band boundary into the band that just landed (0.6 m) in 1.5 beats at 116: 2.0 m.
-- Bells: from anywhere on the dry ground to a bell in 8 beats at 116 BPM.
+- Bells: from anywhere on the floor to the farther bell of a pair (18 m above 50%, 19.5 m below) in 8 beats at 96 BPM / 10 beats at 116 BPM: 19.7 / 20.5 m.
 
 ## Open questions for review
 
