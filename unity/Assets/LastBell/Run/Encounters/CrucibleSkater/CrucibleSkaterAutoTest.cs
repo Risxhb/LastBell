@@ -91,9 +91,17 @@ namespace LastBell.Run
             if (!cond()) Check("reached: " + what, false, $"timed out after {timeout}s (boss: {(boss ? boss.Current : "-")})");
         }
         IEnumerator Wait(float s) { float t = 0; while (t < s) { t += Time.deltaTime; Keep(); yield return null; } }
+        // the raid look, read while each warning is live (an expired telegraph's renderer is gone)
+        readonly Dictionary<Hazard, bool> styled = new Dictionary<Hazard, bool>();
+        void SampleStyle()
+        {
+            foreach (var (_, h) in spawned)
+                if (!styled.ContainsKey(h) && h.Tele != null && h.Tele.mr) styled[h] = h.Tele.LockOnTop || h.Tele.Order != 0;
+        }
         void Keep()
         {
             if (d == null || d.World == null) return;
+            SampleStyle();
             foreach (var p in d.World.Players) if (keepAlive && !p.Down && p.Hp < 100) p.DebugSetHp(100);
         }
         void OnHit(PlayerController p, Hazard h, int dmg) => hits.Add((d.World.Tick, h.Source, p, dmg));
@@ -196,7 +204,7 @@ namespace LastBell.Run
                 d ? $"{d.World?.Players.Count} players" : "");
             if (!d || d.State != RunState.Ready) yield break;
             d.Player.Input = new AllyBot(n - 1, n, BotMode.Perfect);
-            hits.Clear(); spawned.Clear();
+            hits.Clear(); spawned.Clear(); styled.Clear();
             d.World.PlayerHit -= OnHit; d.World.PlayerHit += OnHit;
             d.World.Hazards.Spawned -= OnSpawn; d.World.Hazards.Spawned += OnSpawn;
             Check("Ready accepted", d.RequestReady());
@@ -419,8 +427,9 @@ namespace LastBell.Run
             var own = spawned.Where(x => x.h.Source != null).ToList();
             var outlived = own.Where(x => x.h.ResolveAt < (1 << 27) && x.tick + x.h.ResolveAt + Mathf.Max(0, x.h.ActiveTicks) + 3 < now && d.World.Hazards.Live.Contains(x.h)).ToList();
             Check("nothing outlives its time (every warning, soak, trail resolves or cools on schedule)", outlived.Count == 0, string.Join(", ", outlived.Select(x => x.h.Source).Distinct()));
-            var plain = own.Where(x => x.h.Tele != null && !x.h.Tele.LockOnTop && x.h.Tele.Order == 0).ToList();
-            Check($"every warning is in the raid style (HazardSystem.RaidStyle): {own.Count} spawned", own.Count > 0 && plain.Count == 0, string.Join(", ", plain.Select(x => x.h.Source).Distinct()));
+            var plain = own.Where(x => styled.TryGetValue(x.h, out bool ok) && !ok).ToList();
+            int unseen = own.Count(x => !styled.ContainsKey(x.h));
+            Check($"every warning is in the raid style (HazardSystem.RaidStyle): {own.Count} spawned", own.Count > 0 && plain.Count == 0 && unseen * 10 < own.Count, $"{unseen} not sampled; plain: " + string.Join(", ", plain.Select(x => x.h.Source).Distinct()));
             Check("every trail is a standing burn that counts down to its lock (no fake countdown)", own.Where(x => x.h.Source.EndsWith("trail")).All(x => x.h.BurnPerSecond > 0 && x.h.FillToLock));
             var sources = own.Select(x => x.h.Source).Distinct().OrderBy(s => s).ToList();
             Note("hazards seen: " + string.Join(", ", sources));
