@@ -819,7 +819,8 @@ namespace LastBell.Areas.Area2.EditorTools
             mAbyss = Unlit("AbyssGround", Hex(0x1E0904));   // the pit floor glows faintly, so the dark city reads as silhouettes against it
             mCityRoof = Lit("CityRoof", null, null, Hex(0x221C1A), 0.3f, 0.2f, 0);
             // flowing molten brass (Shaders/MoltenFlow.shader)
-            mMolten = Molten("MoltenChannel", moltenT, 0.35f, 0, new Vector2(ChannelIn, ChannelOut), 2.2f, 0.5f, 0.6f, 0.03f, 2.2f); mMolten.SetFloat("_CorePeak", 3.0f); mMolten.SetColor("_HotColor", Hex(0xFFB060));
+            mMolten = Molten("MoltenChannel", moltenT, 0.35f, 0, new Vector2(ChannelIn, ChannelOut), 4.2f, 0.36f, 0.5f, 0.03f, 2.9f); mMolten.SetFloat("_CorePeak", 3.6f); mMolten.SetColor("_HotColor", Hex(0xFFC878));
+            mMolten.SetColor("_CrustColor", Hex(0x4A1606)); mMolten.SetColor("_CrustColor2", Hex(0x6E2408));   // softer crust: long molten bands, not leopard spots
             mGapMolten = Molten("MoltenGap", moltenT, 0.15f, 0, new Vector2(14.95f, ChannelIn + 0.05f), 2.3f, 0.45f, 0.12f, 0f, 2.0f, 0.6f); mGapMolten.SetFloat("_CorePeak", 3.2f);
             mRiver = Molten("MoltenRiver", moltenT, 0.1f, 1, new Vector2(0, 2f), 3f, 0.6f, 0.05f, 0f, 0.7f); mRiver.SetFloat("_CorePeak", 2.4f);
             mPool = Molten("MoltenPool", moltenT, 0.05f, 0, new Vector2(0, 7f), 2.5f, 0.6f, 0.4f, 0f, 0.8f, 0.5f); mPool.SetFloat("_CorePeak", 2.6f);
@@ -938,13 +939,19 @@ namespace LastBell.Areas.Area2.EditorTools
                 Lathe(brass, I, new[] { new Vector2(13.98f, 0.25f), new Vector2(14.01f, 0.285f), new Vector2(14.08f, 0.305f), new Vector2(14.15f, 0.285f), new Vector2(14.18f, 0.25f) }, Mathf.CeilToInt((a1 - a0) * 14.1f / 0.3f), a0, a1); // half-round brass curb
                 for (float a = a0 + 0.04f; a < a1; a += 1.0f / 14.1f) Box(iron, Radial(a), new Vector3(0.05f, 0.03f, 0.05f), new Vector3(0, 0.305f, 14.08f));
                 Sector(stoneD, I, 14.4f, ChannelIn, a0, a1, -1.7f, 0.02f, inner: false);   // rim base; its outer face is the channel's inner wall
+                if (Modelled)   // the reference's continuous parapet under the merlons, with a dark brass cap band on its arena face
+                {
+                    float p0 = a0 + 0.02f, p1 = a1 - 0.02f;
+                    { float kb = bevel; bevel = 0; Sector(stone, I, 14.45f, 15.25f, p0, p1, 0.02f, 0.45f); bevel = kb; }
+                    Sector(dbrass, I, 14.41f, 14.52f, p0, p1, 0.36f, 0.48f, 0, ends: false);
+                }
             }
             int n = 0;
             foreach (var (a0, a1) in Arcs(15.2f, 0.35f))
             {
                 if (Modelled) // the reference's crown: big stepped teeth alternating with small ones, molten glow in every gap
                 {
-                    const float BIGW = 2.1f, SMALLW = 1.3f, GAPW = 0.5f;
+                    const float BIGW = 2.45f, SMALLW = 1.5f, GAPW = 0.45f;   // the models (2.1 m / 1.3 m) are widened to these
                     // big + small teeth, starting and ending on a big one, with the leftover arc shared out as equal gaps
                     float arc = (a1 - a0) * 15.2f; int bigs = Mathf.Max(1, Mathf.FloorToInt((arc + SMALLW + GAPW) / (BIGW + SMALLW + 2 * GAPW)));
                     int cnt = bigs * 2 - 1; float gap = (arc - bigs * BIGW - (bigs - 1) * SMALLW) / Mathf.Max(1, cnt - 1), at = 0;
@@ -953,7 +960,7 @@ namespace LastBell.Areas.Area2.EditorTools
                     {
                         bool big = j % 2 == 0; float w = big ? BIGW : SMALLW, mid = a0 + (at + w / 2) / 15.2f; at += w + gap;
                         Model("FurnaceRim", "SM_Area2_RimTooth_" + (big ? "Big_" : "Small_") + "ABC"[(n / 2) % 3],
-                            Radial(mid) * Matrix4x4.TRS(new Vector3(0, 0, 14.45f), Quaternion.identity, new Vector3(1, Rnd(0.92f, 1.08f), 1)));
+                            Radial(mid) * Matrix4x4.TRS(new Vector3(0, 0, 14.45f), Quaternion.identity, new Vector3(big ? BIGW / 2.1f : SMALLW / 1.3f, Rnd(0.86f, 1.14f), 1)));
                         // molten slot in the gap after this tooth, open into the channel, so every gap glows from above
                         float ga = a0 + (at - gap / 2) / 15.2f, hw = gap * 0.4f / 15.2f;
                         if (j < cnt - 1) Sector(G("FurnaceRim", mGapMolten), I, 14.95f, ChannelIn + 0.05f, ga - hw, ga + hw, 0.035f, 0.035f, 3, inner: false, outer: false, ends: false);
@@ -1013,10 +1020,11 @@ namespace LastBell.Areas.Area2.EditorTools
                 l.type = LightType.Point; l.color = c; l.intensity = intensity; l.range = range; l.shadows = LightShadows.None; l.transform.position = at;
                 if (flicker) flickerLights.Add(l);
             }
-            for (int i = 0; i < 16; i++) Point("Molten Uplight", Polar((i + 0.5f) / 16 * TAU, ChannelMid, ChannelY + 0.5f), Hex(0xFF7A1F), 14f, 7, true);
+            for (int i = 0; i < 16; i++) Point("Molten Uplight", Polar((i + 0.5f) / 16 * TAU, i % 2 == 0 ? ChannelMid : ChannelIn + 0.35f, ChannelY + 0.5f), Hex(0xFF7A1F), i % 2 == 0 ? 14f : 9f, i % 2 == 0 ? 7f : 4.5f, true);   // odd ones light the merlons' backs
             // half on the rim teeth's backs, half on the outer wall's face, so the masonry outside the ring catches the lava light too
             for (int i = 0; i < 16; i++) Point("Rim Glow", Polar(i / 16f * TAU, i % 2 == 0 ? 17.0f : 18.2f, i % 2 == 0 ? 0.5f : 0.2f), Hex(0xFF8A30), i % 2 == 0 ? 9f : 7f, i % 2 == 0 ? 4.5f : 5.5f, true);
-            for (int i = 0; i < 8; i++) Point("Rim Bounce", Polar((i + 0.5f) / 8 * TAU, 15.6f, 1.6f), Hex(0xFF7A2A), 2.2f, 2.2f, false);
+            for (int i = 0; i < 8; i++) Point("Rim Bounce", Polar((i + 0.5f) / 8 * TAU, 14.9f, 1.3f), Hex(0xFF7A2A), 3.2f, 4.2f, false);   // warms the floor's outer 2–3 m (light only)
+            foreach (float deg in new[] { 45f, 135f }) Point("Tower Rim Light", Polar(deg * Mathf.Deg2Rad, 18.5f, 7f), Hex(0xFF8A3A), 6f, 9f, false);   // the camera-side towers catch the lava light
         }
 
         // Outer foundry wall: massive uneven segments, thick buttresses, pipe runs with brass flanges, dimly glowing furnace
@@ -1376,7 +1384,7 @@ namespace LastBell.Areas.Area2.EditorTools
             for (int k = 0; k < 8; k++)
             {
                 float a = k / 8f * TAU + Rnd(-0.25f, 0.25f), w = Rnd(1.0f, 1.6f), turn = (k % 2 == 0 ? 1 : -1) * Rnd(0.012f, 0.03f); var pts = new List<Vector3>();
-                for (float r = 14; r < 220; r += 4) { a += turn + Rnd(-0.04f, 0.04f); pts.Add(Polar(a, r, GROUND + 0.08f)); }   // starts under the drum, curving along the streets
+                for (float r = 38; r < 220; r += 4) { a += turn + Rnd(-0.04f, 0.04f); pts.Add(Polar(a, r, GROUND + 0.08f)); }   // starts out in the city, curving along the streets
                 // one continuous ribbon: each point's side vector averages its neighbouring segments, so there are no gaps
                 var sides = new Vector3[pts.Count];
                 for (int i = 0; i < pts.Count; i++) { var d = (pts[Mathf.Min(i + 1, pts.Count - 1)] - pts[Mathf.Max(i - 1, 0)]).normalized; sides[i] = Vector3.Cross(Vector3.up, d) * w / 2; riverPts.Add((pts[i], w)); }
