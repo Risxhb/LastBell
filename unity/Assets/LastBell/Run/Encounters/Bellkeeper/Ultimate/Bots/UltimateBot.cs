@@ -32,7 +32,13 @@ namespace LastBell.Run
         Vector3 target; bool hasTarget; int replanAt, tick, lastPress = -999, castHold, beamHold;
         readonly int[] cd = new int[5];
 
-        public PlayerInput Read(PlayerController me)
+        // performance captures: the bot's own steps by name (the steered phases' route searches have their own markers)
+        static readonly Unity.Profiling.ProfilerMarker ReadMarker = new Unity.Profiling.ProfilerMarker("Ultimate.Bot.Read"),
+            SteerMarker = new Unity.Profiling.ProfilerMarker("Ultimate.Bot.Steer"), DemandsMarker = new Unity.Profiling.ProfilerMarker("Ultimate.Bot.Demands"),
+            PlanMarker = new Unity.Profiling.ProfilerMarker("Ultimate.Bot.Plan"), LaterMarker = new Unity.Profiling.ProfilerMarker("Ultimate.Bot.Plan.LaterGroups"),
+            ScoreMarker = new Unity.Profiling.ProfilerMarker("Ultimate.Bot.Plan.Score");
+        public PlayerInput Read(PlayerController me) { using (ReadMarker.Auto()) return Decide(me); }
+        PlayerInput Decide(PlayerController me)
         {
             tick++;
             var inp = new PlayerInput();
@@ -47,7 +53,7 @@ namespace LastBell.Run
             // the bot only adds basic attacks from range (no lunges or casts that would carry it into a bullet)
             if (boss.Mechanics != null)
                 foreach (var m in boss.Mechanics)
-                    if (m.Running && m.Steer(me, Mode, out var vel))
+                    if (m.Running && Steered(m, me, out var vel))
                     {
                         inp.Move = ToScreen(vel / PlayerController.WalkSpeed);
                         inp.Sprint = vel.magnitude > PlayerController.WalkSpeed + 0.1f;
@@ -88,7 +94,7 @@ namespace LastBell.Run
                 demands.Add(new BotDemand { Tick = at, Since = spawn, Ok = q => !hz.Contains(q), Hint = pos, Why = h.Source });
             }
             if (boss.Mechanics != null)
-                foreach (var m in boss.Mechanics) m.Demands(me, demands);
+                using (DemandsMarker.Auto()) foreach (var m in boss.Mechanics) m.Demands(me, demands);
 
             // ---- filter: known by now, not past, inside the horizon; Miss skips one memory assignment per segment ----
             int seg = (int)boss.Segment;
@@ -119,7 +125,7 @@ namespace LastBell.Run
             else if (!hasTarget || now >= replanAt || !Satisfies(target, rules, rules[0].Tick + 6))
             {
                 var old = target; bool had = hasTarget;
-                hasTarget = Plan(me, boss, pos, rules, now, out target);
+                using (PlanMarker.Auto()) hasTarget = Plan(me, boss, pos, rules, now, out target);
                 replanAt = now + 4;
                 if (hasTarget && (!had || Sim.Flat(target - old).magnitude > 2f)) Decisions++;
             }
@@ -171,6 +177,7 @@ namespace LastBell.Run
             return inp;
         }
 
+        bool Steered(UltimateMechanic m, PlayerController me, out Vector3 vel) { using (SteerMarker.Auto()) return m.Steer(me, Mode, out vel); }
         static bool Satisfies(Vector3 q, List<BotDemand> rules, int untilTick)
         {
             foreach (var r in rules) { if (r.Tick > untilTick) break; if (!r.Ok(q)) return false; }
@@ -222,6 +229,7 @@ namespace LastBell.Run
             // further groups (up to three more): a spot that leaves one of them out of reach in time is penalised, so a
             // later hide or clock spot pulls the bot early enough (a two-group horizon arrived late to Stopped Hour hides)
             later.Clear();
+            using (LaterMarker.Auto())
             for (int gs = g2End, k = 0; gs < rules.Count && k < 3; k++)
             {
                 int tg = rules[gs].Tick, ge = gs;
@@ -234,6 +242,7 @@ namespace LastBell.Run
                 gs = ge;
             }
             float bestScore = float.MaxValue; best = pos; bool found = false;
+            using var scoring = ScoreMarker.Auto();
             foreach (var c in cands)
             {
                 if (!Valid(c, boss) || !AllOk(c, rules, 0, g1End)) continue;

@@ -212,10 +212,10 @@ namespace LastBell.Run
                 vel = v.magnitude > 0.05f ? v.normalized * PlayerController.WalkSpeed : Vector3.zero;
                 plans[p] = new Plan { V = vel, Until = Now + 1, Job = "attacks the boss" }; return true;
             }
-            if (plans.TryGetValue(p, out var cur) && Now < cur.Until) { vel = cur.V; return true; }
+            if (plans.TryGetValue(p, out var cur) && (Now < cur.Until || !SearchTurn(p))) { vel = cur.V; return true; }
             var goal = GoalOf(p, t, out bool urgent, out float beatAt, out string job);
             var v2 = Search(p, pos, t, goal, urgent, beatAt);
-            plans[p] = new Plan { V = v2, Until = Now + (skill == UltimateBot.Skill.Late ? 15 : 3), Job = job, Goal = goal, Urgent = urgent, BeatAt = beatAt, Searched = true };
+            plans[p] = new Plan { V = v2, Until = Now + (skill == UltimateBot.Skill.Late ? 15 : 1), Job = job, Goal = goal, Urgent = urgent, BeatAt = beatAt, Searched = true };
             vel = v2; return true;
         }
 
@@ -282,57 +282,77 @@ namespace LastBell.Run
         }
 
         readonly List<Vector3>[] pred = new List<Vector3>[16];
-        Vector3 Search(PlayerController p, Vector3 pos, float t, Vector3 goal, bool urgent, float beatAt)
+        readonly List<Vector3> dirs = new List<Vector3>(), vels = new List<Vector3>();
+        readonly List<Mine> myMines = new List<Mine>();
+        struct Node { public Vector3 Q, First; public float Risk, Score; }
+        List<Node> beam = new List<Node>(), grown = new List<Node>();
+        static readonly System.Comparison<Node> ByScore = (x, y) => x.Score.CompareTo(y.Score);
+        static readonly System.Comparison<Vector3> ByX = (a, b) => a.x.CompareTo(b.x);
+        static readonly Unity.Profiling.ProfilerMarker SearchMarker = new Unity.Profiling.ProfilerMarker("Ultimate.OpenHour.Search");
+        Vector3 Search(PlayerController p, Vector3 pos, float t, Vector3 goal, bool urgent, float beatAt) { using (SearchMarker.Auto()) return SearchRoutes(p, pos, t, goal, urgent, beatAt); }
+        Vector3 SearchRoutes(PlayerController p, Vector3 pos, float t, Vector3 goal, bool urgent, float beatAt)
         {
             // 4 legs (0.8 s): with 3 a bot could walk into a pocket between its own echo and a curtain before it saw the exit shut
-            const float Leg = 0.2f; const int Legs = 4, Samples = 4, BeamW = 12; float dtS = Leg / Samples; int N = Legs * Samples;
+            const float Leg = 0.2f; const int Legs = 4, Samples = 4, BeamW = 8; float dtS = Leg / Samples; int N = Legs * Samples;   // beam 12 before 2 Nov (performance)
             var bossP = Sim.Flat(Boss.transform.position); int hour = HourOf(p);
             // the boss body pushes a player out to exactly BodyRadius + PR: one already pressed there (a swing's lunge) may stay
             float r0 = (pos - bossP).magnitude;
+            // 2 Nov (performance agent: 6-8 ms a search set P3's 1% low): only the bullets a sprint could reach are predicted, sorted
+            // by x and looked up near the route; my own echoes and crossed curtains are listed once; the lists are reused
             for (int k = 0; k < N; k++)
             {
                 float s = (k + 1) * dtS; var arr = pred[k] ?? (pred[k] = new List<Vector3>()); arr.Clear();
+                // a bullet farther than a sprint can get by this sample, plus the 0.5 m risk margin, can't change the result
+                float lim = s * PlayerController.SprintSpeed + PR + BR + 0.5f, lim2 = lim * lim;
+                void Add(Vector3 b) { float dx = b.x - pos.x, dz = b.z - pos.z; if (dx * dx + dz * dz < lim2) arr.Add(b); }
                 float r = RewindIn(t, s);
-                foreach (var b in bullets) { if (r >= 0 && !b.Rev) { float a = r - t, c = t + s - r; arr.Add(b.P + b.V * (a - Rev * c)); } else arr.Add(b.P + b.V * s); }
-                for (float te = nextArm; te <= t + s; te += ArmRate) { if (RewindAt(te)) continue; for (int ka = 0; ka < Arms; ka++) arr.Add(bossP + Dir(ArmAngle(te) + 120 * ka) * (Boss.BodyRadius + ArmSpeed * (t + s - te))); }
+                foreach (var b in bullets) { if (r >= 0 && !b.Rev) { float a = r - t, c = t + s - r; Add(b.P + b.V * (a - Rev * c)); } else Add(b.P + b.V * s); }
+                for (float te = nextArm; te <= t + s; te += ArmRate) { if (RewindAt(te)) continue; for (int ka = 0; ka < Arms; ka++) Add(bossP + Dir(ArmAngle(te) + 120 * ka) * (Boss.BodyRadius + ArmSpeed * (t + s - te))); }
                 foreach (var m in mines)
                 {
                     if (m.At > t + s || t + s - m.At > EchoShotLife) continue; float age = t + s - m.At;
-                    for (int k2 = 0; k2 < EchoShots; k2++) arr.Add(m.P + Dir(360f / EchoShots * k2 + 45 * (m.OwnerHour % 2)) * EchoShotSpeed * age);
+                    for (int k2 = 0; k2 < EchoShots; k2++) Add(m.P + Dir(360f / EchoShots * k2 + 45 * (m.OwnerHour % 2)) * EchoShotSpeed * age);
                 }
+                arr.Sort(ByX);
             }
+            myMines.Clear(); foreach (var m in mines) if (m.Owner == p) myMines.Add(m);
+            var crossedNow = Crossed(p);
+            const float Near = 0.5f + PR + BR;   // a bullet farther than this adds no risk
             // 0 safe, 1 a 50 hit (a bullet, the wall), 2 lethal or a wipe (my own echo, another's gap, off the plate on the beat, the edge)
             int Severity(Vector3 q, int k, ref float extra, out float mc)
             {
                 float s = (k + 1) * dtS; mc = 9;
                 float rq = (q - bossP).magnitude, rc = q.magnitude; if (rc > Bound - 0.1f || rq < Mathf.Min(Boss.BodyRadius + PR + 0.05f, r0 - 0.02f)) return 2;
-                foreach (var bp in pred[k]) { float c = (q - bp).magnitude - PR - BR; if (c < mc) mc = c; }
-                foreach (var m in mines) if (m.Owner == p && m.At > t + s - dtS - 0.02f && m.At <= t + s + 0.02f && (q - m.P).magnitude < EchoR + PR + 0.5f) return 2;
-                for (int ci = 0; ci < 3; ci++) { if (Crossed(p)[ci]) continue; int ch = CurtainHit(ci, q, t + s, hour, 0.2f); if (ch == 2) return 2; if (ch == 1) return 1; }
+                var ps = pred[k]; float m2 = float.MaxValue;
+                int lo = 0, hi = ps.Count; while (lo < hi) { int mid = (lo + hi) >> 1; if (ps[mid].x < q.x - Near) lo = mid + 1; else hi = mid; }
+                for (int i = lo; i < ps.Count && ps[i].x <= q.x + Near; i++) { var bp = ps[i]; float dx = q.x - bp.x, dz = q.z - bp.z, d2 = dx * dx + dz * dz; if (d2 < m2) m2 = d2; }
+                if (m2 != float.MaxValue) mc = Mathf.Min(9, Mathf.Sqrt(m2) - PR - BR);
+                foreach (var m in myMines) if (m.At > t + s - dtS - 0.02f && m.At <= t + s + 0.02f && (q - m.P).magnitude < EchoR + PR + 0.5f) return 2;
+                for (int ci = 0; ci < 3; ci++) { if (crossedNow[ci]) continue; int ch = CurtainHit(ci, q, t + s, hour, 0.2f); if (ch == 2) return 2; if (ch == 1) return 1; }
                 if (beatAt >= 0 && Mathf.Abs(t + s - beatAt) <= dtS * 0.6f && (q - goal).magnitude > OnPlate - 0.3f) return 2;
                 if (mc < 0.12f) return 1;
                 // leave my own echo spots early: a burst due within the next second costs, so the route is clear before the pocket closes
-                foreach (var m in mines) if (m.Owner == p && m.At > t + s && m.At <= t + s + 1f && (q - m.P).magnitude < EchoR + PR + 0.6f) extra += 1f;
+                foreach (var m in myMines) if (m.At > t + s && m.At <= t + s + 1f && (q - m.P).magnitude < EchoR + PR + 0.6f) extra += 1f;
                 int kb = Mathf.FloorToInt((t + s) / Beat) + 1; float tbb = kb * Beat - (t + s);
                 if (SoakHour(kb) != hour % Hours && tbb < 3 && (q - PlateOf(kb)).magnitude < OnPlate + EchoR + 0.3f) extra += 0.5f;   // keep my echoes off the next soaker's plate
                 return 0;
             }
-            var dirs = new List<Vector3>(); for (int k = 0; k < 24; k += 2) dirs.Add(Dir(15 * k));
+            dirs.Clear(); for (int k = 0; k < 24; k += 2) dirs.Add(Dir(15 * k));
             var tg = goal - pos; if (tg.magnitude > 1e-3f) dirs.Add(tg.normalized);
-            for (int ci = 0; ci < 3; ci++) if (!Crossed(p)[ci] && (CurtOn(ci, t) || CurtSoon(ci, t))) { var d = Dir(Curtains[ci].a); dirs.Add(d); dirs.Add(-d); }
-            var vels = new List<Vector3> { Vector3.zero };
+            for (int ci = 0; ci < 3; ci++) if (!crossedNow[ci] && (CurtOn(ci, t) || CurtSoon(ci, t))) { var d = Dir(Curtains[ci].a); dirs.Add(d); dirs.Add(-d); }
+            vels.Clear(); vels.Add(Vector3.zero);
             foreach (var d in dirs) { vels.Add(d * PlayerController.WalkSpeed); vels.Add(d * PlayerController.SprintSpeed); vels.Add(d * PlayerController.WalkSpeed * 0.4f); }
             // moves at the player's speed while its current action (or a tested press) slows it: a swing roots to its end
             var (slowFor, slowMs) = SlowOf(p); lastClean = true;
-            var beam = new List<(Vector3 q, Vector3 first, float risk, float score)> { (pos, Vector3.zero, 0f, 0f) };
+            beam.Clear(); beam.Add(new Node { Q = pos });
             (Vector3 v, float score)? fallback = null;
             for (int leg = 0; leg < Legs; leg++)
             {
-                var next = new List<(Vector3 q, Vector3 first, float risk, float score)>();
+                var next = grown; next.Clear();
                 foreach (var r in beam)
                     foreach (var v in vels)
                     {
-                        var q = r.q; float risk = r.risk; bool dead = false; int worst = 0;
+                        var q = r.Q; float risk = r.Risk; bool dead = false; int worst = 0;
                         for (int k2 = 0; k2 < Samples; k2++)
                         {
                             q += v * dtS * ((leg * Samples + k2) * dtS < slowFor ? slowMs : 1f); float extra = 0;
@@ -340,15 +360,16 @@ namespace LastBell.Run
                             if (sev > 0) { dead = true; worst = sev; break; }
                             risk += Mathf.Max(0, 0.5f - mc) * 2 + extra;
                         }
-                        var first = leg == 0 ? v : r.first;
+                        var first = leg == 0 ? v : r.First;
                         if (dead) { if (leg == 0) { float sc = risk + 1000 * worst + (q - goal).magnitude;   /* cornered: a 50 hit beats a lethal one */ if (fallback == null || sc < fallback.Value.score) fallback = (v, sc); } continue; }
-                        next.Add((q, first, risk, risk + (q - goal).magnitude * (urgent ? 1.6f : 0.8f) + (v.magnitude > PlayerController.WalkSpeed ? 0.15f : 0)));
+                        next.Add(new Node { Q = q, First = first, Risk = risk, Score = risk + (q - goal).magnitude * (urgent ? 1.6f : 0.8f) + (v.magnitude > PlayerController.WalkSpeed ? 0.15f : 0) });
                     }
                 if (next.Count == 0) { lastClean = false; if (leg == 0) { if (LogSteer) Debug.Log($"[open hour] {t:0.00}s {UltimateState.Roman[hour + 1]} cornered at ({pos.x:0.0},{pos.z:0.0}) goal ({goal.x:0.0},{goal.z:0.0}) urgent {urgent} · bullets {bullets.Count} · fallback {(fallback.HasValue ? fallback.Value.score.ToString("0") : "-")}"); return fallback?.v ?? Vector3.zero; } break; }
-                next.Sort((x, y) => x.score.CompareTo(y.score));
-                beam = next.GetRange(0, Mathf.Min(BeamW, next.Count));
+                next.Sort(ByScore);
+                if (next.Count > BeamW) next.RemoveRange(BeamW, next.Count - BeamW);
+                grown = beam; beam = next;
             }
-            return beam[0].first;
+            return beam[0].First;
         }
 
         // ---------------- presentation (stand-ins: brass / lavender / ivory bullet spheres, echo discs, plates, labels) ----------------
@@ -356,7 +377,10 @@ namespace LastBell.Run
         readonly List<Transform> pool = new List<Transform>();
         static Material brassB, revB, echoB, ivoryB, plateDim, plateHot, handM;
         float handYaw, handVel;
-        void Build()
+        // Prebuild: made hidden when combat starts (performance agent, 2 Nov: phase changes took 77-91 ms)
+        public override void Prebuild() { MakeObjects(); root.gameObject.SetActive(false); }
+        void Build() { MakeObjects(); root.gameObject.SetActive(true); }
+        void MakeObjects()
         {
             if (root) return;
             if (!brassB)

@@ -124,21 +124,34 @@ namespace LastBell.Run
             var ring = Spawn(d.Ring); Spawn(d.Line);
             ring.OnResolve = hz => { W.BossFx.ChimeResolve(hz.Origin, hz.Radius); W.BossFx.TollResolve(hz.Origin, 0.4f, hz.Radius); };
         }
-        void Fade(Debt d) { d.RingOutline?.Dismiss(); d.LineOutline?.Dismiss(); d.RingOutline = d.LineOutline = null; if (d.Flash) Object.Destroy(d.Flash.gameObject); d.Flash = null; }
+        void Fade(Debt d) { d.RingOutline?.Dismiss(); d.LineOutline?.Dismiss(); d.RingOutline = d.LineOutline = null; if (d.Flash) d.Flash.gameObject.SetActive(false); d.Flash = null; }
 
-        // the 1.5 s look of a paid debt: a bright porcelain ring of segments round the plate and a bar along its chime line
+        // the 1.5 s look of a paid debt: a bright porcelain ring of segments round the plate and a bar along its chime line.
+        // Pooled: four are made hidden at combat start (performance agent, 2 Nov: each payment built 29 objects, 34-43 ms in P1)
         static Material porcelain;
-        Transform FlashRing(Vector3 at, Hazard line)
+        readonly List<Transform> flashPool = new List<Transform>();
+        public override void Prebuild() { flashPool.RemoveAll(f => !f); while (flashPool.Count < 4) { var f = MakeFlash(); f.gameObject.SetActive(false); flashPool.Add(f); } }
+        Transform MakeFlash()
         {
             if (!porcelain) porcelain = Prim.Material(new Color(1f, 0.93f, 0.8f), 3f);
-            var root = new GameObject("Chime Debt (stand-in)").transform; root.SetParent(W.Root, false); root.position = new Vector3(at.x, 0, at.z);
+            var root = new GameObject("Chime Debt (stand-in)").transform; root.SetParent(W.Root, false);
             for (int i = 0; i < 28; i++)
             {
                 float deg = 360f * i / 28, a = deg * Mathf.Deg2Rad;
                 Seg(Prim.Make(PrimitiveKind.Cube, root, new Vector3(Mathf.Sin(a) * RingRadius, 0.08f, Mathf.Cos(a) * RingRadius), new Vector3(0.6f, 0.05f, 0.22f), Color.white, 0, Quaternion.Euler(0, deg, 0)));
             }
-            var bar = Prim.Make(PrimitiveKind.Cube, root, Vector3.zero, new Vector3(LineWidth, 0.04f, line.Length), Color.white);
-            bar.rotation = Quaternion.Euler(0, line.Yaw, 0); bar.position = new Vector3(at.x, 0.07f, at.z) + Sim.Dir(line.Yaw) * line.Length * 0.5f; Seg(bar);
+            Seg(Prim.Make(PrimitiveKind.Cube, root, Vector3.zero, new Vector3(LineWidth, 0.04f, 1f), Color.white));   // the bar: child 28
+            return root;
+        }
+        Transform FlashRing(Vector3 at, Hazard line)
+        {
+            Transform root = null;
+            foreach (var f in flashPool) if (f && !f.gameObject.activeSelf) { root = f; break; }
+            if (!root) { flashPool.RemoveAll(f => !f); root = MakeFlash(); flashPool.Add(root); }
+            root.gameObject.SetActive(true); root.position = new Vector3(at.x, 0, at.z);
+            var bar = root.GetChild(28);
+            bar.localScale = new Vector3(LineWidth, 0.04f, line.Length);
+            bar.rotation = Quaternion.Euler(0, line.Yaw, 0); bar.position = new Vector3(at.x, 0.07f, at.z) + Sim.Dir(line.Yaw) * line.Length * 0.5f;
             return root;
         }
         static void Seg(Transform t) { var r = t.GetComponent<Renderer>(); r.sharedMaterial = porcelain; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; }

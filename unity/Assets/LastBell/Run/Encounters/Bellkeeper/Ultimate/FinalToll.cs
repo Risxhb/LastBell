@@ -135,7 +135,7 @@ namespace LastBell.Run
         {
             Boss.ShowAttack(Name);
             t0 = Now; tolls = 0; seed = Cue.Seed % 997; nextArm = TollAt[4]; bullets.Clear(); debts.Clear(); plans.Clear(); ringHits.Clear();
-            Build();
+            using (BuildMarker.Auto()) Build();
             Hazard lane = null, half = null, mark = null, eLane = null; var shardTele = new bool[ShardCount]; var shardDone = new bool[ShardCount];
             while (true)
             {
@@ -207,7 +207,7 @@ namespace LastBell.Run
                     }
                 }
                 if (Boss.Ult.WipeCause != null) break;
-                Present(nt);
+                StepGhost(); Present(nt);
                 yield return 1;
             }
             bullets.Clear(); debts.Clear();
@@ -329,10 +329,10 @@ namespace LastBell.Run
         {
             vel = Vector3.zero;
             if (!Running || p.Down) return false;
-            if (plans.TryGetValue(p, out var cur) && Now < cur.Until) { vel = cur.V; return true; }
+            if (plans.TryGetValue(p, out var cur) && (Now < cur.Until || !SearchTurn(p))) { vel = cur.V; return true; }
             float t = T; var goal = GoalOf(p, t, skill, out string job);
             var v = job == "forgets its debt" ? Vector3.zero : Search(p, Sim.Flat(p.transform.position), t, goal);
-            plans[p] = new Plan { V = v, Until = Now + (skill == UltimateBot.Skill.Late ? 15 : 3), Job = job, Goal = goal };
+            plans[p] = new Plan { V = v, Until = Now + (skill == UltimateBot.Skill.Late ? 15 : 1), Job = job, Goal = goal };
             vel = v; return true;
         }
 
@@ -362,59 +362,107 @@ namespace LastBell.Run
         }
 
         readonly List<Vector3>[] pred = new List<Vector3>[16];
-        Vector3 Search(PlayerController p, Vector3 pos, float t, Vector3 goal)
+        readonly List<Vector3> dirs = new List<Vector3>(), vels = new List<Vector3>();
+        struct Node { public Vector3 Q, First; public float Risk, Score; }
+        List<Node> beam = new List<Node>(), grown = new List<Node>();
+        static readonly System.Comparison<Node> ByScore = (x, y) => x.Score.CompareTo(y.Score);
+        static readonly System.Comparison<Vector3> ByX = (a, b) => a.x.CompareTo(b.x);
+        struct SampleRule { public float Tq, RingR, EchoR; public int K, RingK; public bool Stand, EchoOn, Toll, EchoLane, OnPlateRule, SoakMine, Has2, InvMine; public Vector3 EchoAt, LaneD, ELaneD, EPos, PlatePos, InvD; }
+        readonly SampleRule[] rule = new SampleRule[16];
+        readonly Vector3[] shardP = new Vector3[ShardCount]; readonly float[] shardAt = new float[ShardCount];
+        // RingHit with the ring's radius and toll already known
+        int RingHitAt(int hour, Vector3 q, float R, int k, float margin, bool echo)
+        {
+            if (R < 0) return 0;
+            q = Sim.Flat(q); if (Mathf.Abs(q.magnitude - R) > RingHalf + PR) return 0;
+            float a = AngOf(q);
+            for (int j = 0; j < 4; j++) if (AngDiff(a, GapCentre(k, j) + (echo ? 45 : 0)) < GapHalf - margin * 20) return GapHour(k, j) == hour ? 0 : 2;
+            return 1;
+        }
+        static readonly Unity.Profiling.ProfilerMarker SearchMarker = new Unity.Profiling.ProfilerMarker("Ultimate.FinalToll.Search");
+        protected override int ReplanTicks => 3;   // still staggered by player (at most 2 searches a tick, was all 4 at once); 6 cost the party its kill
+        Vector3 Search(PlayerController p, Vector3 pos, float t, Vector3 goal) { using (SearchMarker.Auto()) return SearchRoutes(p, pos, t, goal); }
+        Vector3 SearchRoutes(PlayerController p, Vector3 pos, float t, Vector3 goal)
         {
             // 4 legs (0.8 s), as P3: at 9 m/s a sprinting bot could commit to a route across the clapper lane before it saw the toll
+            // 2 Nov (performance agent: up to 108 ms a frame at the end of P5): each bot on
+            // its own tick (SearchTurn), only the bullets a route could reach, reused lists
             const float Leg = 0.2f; const int Legs = 4, Samples = 4, BeamW = 12; float dtS = Leg / Samples; int N = Legs * Samples;
             int hour = HourOf(p);
             for (int s = 0; s < N; s++)
             {
                 float tq = t + (s + 1) * dtS; var arr = pred[s] ?? (pred[s] = new List<Vector3>()); arr.Clear();
-                foreach (var b in bullets) arr.Add(b.P + b.V * (tq - t));
-                for (float te = nextArm; te <= tq; te += ArmEvery) if (Firing(te)) for (int j = 0; j < 3; j++) arr.Add(Dir(ArmAng(te) + 120 * j) * (Boss.BodyRadius + ArmSpeed * (tq - te)));
-                int kq = Cur(tq); if (kq > tolls && kq < 13 && Has(kq, 3)) { var c = HammerAt(kq); for (int j = 0; j < 12; j++) arr.Add(c + Dir(30 * j + 7 * kq) * ShardSpeed * (tq - TollAt[kq])); }
+                // a bullet farther than a sprint can get by this sample, plus the 0.5 m risk margin, can't change the result
+                float lim = (s + 1) * dtS * PlayerController.SprintSpeed + PR + BR + 0.5f, lim2 = lim * lim;
+                void Add(Vector3 b) { float dx = b.x - pos.x, dz = b.z - pos.z; if (dx * dx + dz * dz < lim2) arr.Add(b); }
+                foreach (var b in bullets) Add(b.P + b.V * (tq - t));
+                for (float te = nextArm; te <= tq; te += ArmEvery) if (Firing(te)) for (int j = 0; j < 3; j++) Add(Dir(ArmAng(te) + 120 * j) * (Boss.BodyRadius + ArmSpeed * (tq - te)));
+                int kq = Cur(tq); if (kq > tolls && kq < 13 && Has(kq, 3)) { var c = HammerAt(kq); for (int j = 0; j < 12; j++) Add(c + Dir(30 * j + 7 * kq) * ShardSpeed * (tq - TollAt[kq])); }
+                arr.Sort(ByX);   // looked up by x below
+                // what the rules are at this sample, worked out once (they were recomputed in every check: 52 ms a search late in P5)
+                ref var R = ref rule[s]; R = default; R.Tq = tq;
+                R.Stand = tq >= TollAt[13] - 0.02f; if (R.Stand) continue;
+                R.EchoOn = EchoOn(tq); if (R.EchoOn) R.EchoAt = EchoAt(tq);
+                int k = Cur(tq + dtS * 0.7f); R.K = k;
+                R.Toll = k >= 1 && k < 13 && Mathf.Abs(tq - TollAt[k]) < dtS * 0.7f;
+                if (R.Toll)
+                {
+                    R.LaneD = Dir(LaneAng(k));
+                    R.EchoLane = k >= 9 && k <= 12; if (R.EchoLane) { R.ELaneD = Dir(EchoLaneAng(k)); R.EPos = EchoPos(k); }
+                    bool has0 = Has(k, 0); if (has0) R.PlatePos = PlatePos(k);
+                    R.OnPlateRule = has0 && HourPresent(Soaker(k));
+                    R.SoakMine = has0 && Soaker(k) == hour;
+                    R.Has2 = Has(k, 2); if (R.Has2) { R.InvD = Dir(InvAng(k)); R.InvMine = hour == InvHour(k); }
+                }
+                R.RingK = Cur(tq); R.RingR = RingR(tq); R.EchoR = EchoR(tq);
             }
             var (slowFor, ms) = SlowOf(p); lastClean = true;   // a swing roots to its end, not only the first leg
+            // the last stand's falling shards, once per search (each check worked out all 13: late P5 searches cost 20 ms, 2 Nov)
+            if (rule[N - 1].Stand) for (int n = 0; n < ShardCount; n++) { var sh = Shard(n); shardP[n] = sh.p; shardAt[n] = sh.at; }
+            const float Near = 0.5f + PR + BR;   // a bullet farther than this adds no risk
             int Dead(Vector3 q, int s, ref float risk)
             {
-                float tq = t + (s + 1) * dtS, r = q.magnitude;
+                ref var R = ref rule[s];
+                float tq = R.Tq, r = q.magnitude;
                 if (r > Bound) return 2;
                 float cb = r - Boss.BodyRadius - PR; if (cb < -0.05f) return 2; if (cb < 0.4f) risk += (0.4f - cb) * 2;
-                if (tq >= TollAt[13] - 0.02f)   // on my platform from XIII on, off the shards as they land
+                if (R.Stand)   // on my platform from XIII on, off the shards as they land
                 {
                     if ((q - PlatC(hour)).magnitude > PlatR - 0.25f) return 2;
-                    for (int n = 0; n < ShardCount; n++) { var sh = Shard(n); if (Mathf.Abs(tq - sh.at) < dtS * 0.7f && (q - sh.p).magnitude < ShardR + PR + 0.25f) return 2; }
+                    for (int n = 0; n < ShardCount; n++) if (Mathf.Abs(tq - shardAt[n]) < dtS * 0.7f && (q - shardP[n]).magnitude < ShardR + PR + 0.25f) return 2;
                     return 0;
                 }
-                if (EchoOn(tq)) { float ce = (q - EchoAt(tq)).magnitude - EchoRad - PR; if (ce < -0.05f) return 2; }
-                int k = Cur(tq + dtS * 0.7f);
-                if (k >= 1 && k < 13 && Mathf.Abs(tq - TollAt[k]) < dtS * 0.7f)
+                if (R.EchoOn) { float ce = (q - R.EchoAt).magnitude - EchoRad - PR; if (ce < -0.05f) return 2; }
+                if (R.Toll)
                 {
-                    if (InLane(k, q) || InEchoLane(k, q)) return 2;
-                    bool onPl = OnPlate(k, q, -0.3f);
-                    if (!onPl) foreach (var d in debts) if (d.At == k && (q - d.P).magnitude < DebtR + PR + 0.25f) return 2;
-                    if (Has(k, 2)) { float o = Vector3.Dot(q, Dir(InvAng(k))); if (hour == InvHour(k) ? o <= 0.9f : o >= -0.9f) return 2; }
-                    if (Has(k, 0) && Soaker(k) == hour && (q - PlatePos(k)).magnitude > PlateSize - 0.3f) return 2;
+                    if (Mathf.Abs(Cross(R.LaneD, q)) < LaneHalf + PR || (R.EchoLane && Mathf.Abs(Cross(R.ELaneD, q - R.EPos)) < LaneHalf + PR)) return 2;
+                    bool onPl = R.OnPlateRule && (q - R.PlatePos).magnitude < PlateSize - 0.3f;
+                    if (!onPl) foreach (var d in debts) if (d.At == R.K && (q - d.P).magnitude < DebtR + PR + 0.25f) return 2;
+                    if (R.Has2) { float o = Vector3.Dot(q, R.InvD); if (R.InvMine ? o <= 0.9f : o >= -0.9f) return 2; }
+                    if (R.SoakMine && (q - R.PlatePos).magnitude > PlateSize - 0.3f) return 2;
                 }
-                int rh = RingHit(hour, q, tq, 0.15f, false); if (rh != 0) return rh;
-                rh = RingHit(hour, q, tq, 0.15f, true); if (rh != 0) return rh;
-                float mc = 9; foreach (var b in pred[s]) { float cc = (q - b).magnitude - PR - BR; if (cc < mc) mc = cc; }
+                int rh = RingHitAt(hour, q, R.RingR, R.RingK, 0.15f, false); if (rh != 0) return rh;
+                rh = RingHitAt(hour, q, R.EchoR, R.RingK, 0.15f, true); if (rh != 0) return rh;
+                var ps = pred[s]; float m2 = float.MaxValue;
+                int lo = 0, hi = ps.Count; while (lo < hi) { int mid = (lo + hi) >> 1; if (ps[mid].x < q.x - Near) lo = mid + 1; else hi = mid; }
+                for (int i = lo; i < ps.Count && ps[i].x <= q.x + Near; i++) { var b = ps[i]; float dx = q.x - b.x, dz = q.z - b.z, d2 = dx * dx + dz * dz; if (d2 < m2) m2 = d2; }
+                float mc = m2 == float.MaxValue ? 9 : Mathf.Sqrt(m2) - PR - BR;
                 if (mc < 0.12f) return 1; if (mc < 0.5f) risk += (0.5f - mc) * 2;
                 return 0;
             }
-            var dirs = new List<Vector3>(); for (int j = 0; j < 16; j++) dirs.Add(Dir(22.5f * j));
+            dirs.Clear(); for (int j = 0; j < 16; j++) dirs.Add(Dir(22.5f * j));
             var tg = goal - pos; if (tg.magnitude > 1e-3f) dirs.Add(tg.normalized);
-            var vels = new List<Vector3> { Vector3.zero };
+            vels.Clear(); vels.Add(Vector3.zero);
             foreach (var d in dirs) { vels.Add(d * PlayerController.WalkSpeed); vels.Add(d * PlayerController.SprintSpeed); vels.Add(d * PlayerController.WalkSpeed * 0.4f); }
-            var beam = new List<(Vector3 q, Vector3 first, float risk, float score)> { (pos, Vector3.zero, 0f, 0f) };
+            beam.Clear(); beam.Add(new Node { Q = pos });
             Vector3 fallback = Vector3.zero; float fallbackScore = float.MaxValue;
             for (int leg = 0; leg < Legs; leg++)
             {
-                var next = new List<(Vector3 q, Vector3 first, float risk, float score)>();
+                var next = grown; next.Clear();
                 foreach (var r in beam)
                     foreach (var v in vels)
                     {
-                        var q = r.q; float risk = r.risk; int worst = 0;
+                        var q = r.Q; float risk = r.Risk; int worst = 0;
                         for (int s2 = 0; s2 < Samples; s2++)
                         {
                             q += ((leg * Samples + s2) * dtS < slowFor ? v * ms : v) * dtS;
@@ -425,7 +473,7 @@ namespace LastBell.Run
                             if (leg == 0) { float sc = 1000 * worst + (q - goal).magnitude; if (sc < fallbackScore) { fallbackScore = sc; fallback = v; } }
                             continue;
                         }
-                        next.Add((q, leg == 0 ? v : r.first, risk, risk + (q - goal).magnitude * 1.4f + (v.magnitude > PlayerController.WalkSpeed ? 0.1f : 0)));
+                        next.Add(new Node { Q = q, First = leg == 0 ? v : r.First, Risk = risk, Score = risk + (q - goal).magnitude * 1.4f + (v.magnitude > PlayerController.WalkSpeed ? 0.1f : 0) });
                     }
                 if (next.Count == 0)
                 {
@@ -433,10 +481,11 @@ namespace LastBell.Run
                     if (leg == 0) { if (Log) Debug.Log($"[final toll] {t:0.00}s {UltimateState.Roman[hour + 1]} cornered at ({pos.x:0.0},{pos.z:0.0}) goal ({goal.x:0.0},{goal.z:0.0})"); return fallback; }
                     break;
                 }
-                next.Sort((x, y) => x.score.CompareTo(y.score));
-                beam = next.GetRange(0, Mathf.Min(BeamW, next.Count));
+                next.Sort(ByScore);
+                if (next.Count > BeamW) next.RemoveRange(BeamW, next.Count - BeamW);
+                grown = beam; beam = next;
             }
-            return beam[0].first;
+            return beam[0].First;
         }
 
         // ---------------- presentation ----------------
@@ -454,7 +503,11 @@ namespace LastBell.Run
         const int BellPieces = 18;
         Transform hammer; readonly List<Transform> bellBits = new List<Transform>(); readonly Vector3[] platBase = new Vector3[4];
         readonly List<Renderer> ghostR = new List<Renderer>(); MaterialPropertyBlock ghostBlock; Vector3 echoWas; float echoMovedAt = -9; bool echoSeen, shattered;
-        void Build()
+        // Prebuild: the bell floor, clappers, platforms and shards are made hidden when combat starts (performance agent, 2 Nov:
+        // the P4 -> P5 change took 60 ms and 4.4 MB); Arm() does the cast-time part
+        public override void Prebuild() { MakeObjects(); root.gameObject.SetActive(false); ArenaVoid.Prepare(W.Root); }   // the void scan, kept for the cast
+        void Build() { MakeObjects(); root.gameObject.SetActive(true); Arm(); }
+        void MakeObjects()
         {
             if (root) return;
             if (!bellM)
@@ -467,20 +520,11 @@ namespace LastBell.Run
             }
             root = new GameObject("Final Toll (stand-in)").transform; root.SetParent(W.Root, false);
             floor = Prim.Make(PrimitiveKind.Cylinder, root, new Vector3(0, 0.02f, 0), new Vector3(23.4f, 0.01f, 23.4f), Color.white); Mat(floor, bellM);
-            ArenaVoid.Open(W.Root);   // the arena's own floor goes: below the bell's floor is the void
             floorModel = GearFloor.Model("FT_BellFloor", root, Vector3.zero, Quaternion.identity); if (floorModel) floor.gameObject.SetActive(false);
             for (int i = 0; i < 2; i++) { clappers[i] = GearFloor.Model("FT_Clapper", root, Vector3.up * ClapperPivot, Quaternion.identity); if (clappers[i]) { clappers[i].localScale = Vector3.one * ClapperScale; clappers[i].gameObject.SetActive(false); } }
             for (int n = 0; n < ShardCount; n++) { var fx = GearFloor.Model("FT_BellShard", root, Vector3.up * 30, Quaternion.identity); if (!fx) break; fx.gameObject.SetActive(false); fallers.Add(fx); landed[n] = false; }
             var prefab = Resources.Load<GameObject>("Ultimate/GB_GreatBell");
             if (prefab) { bellModel = Object.Instantiate(prefab, root, false).transform; bellModel.name = "the great bell"; var dome = bellModel.Find("Dome"); if (dome) dome.gameObject.SetActive(false); }
-            echo = new GameObject("the Echo Bellkeeper").transform; echo.SetParent(root, false);
-            if (!Ghost(echo))
-            {
-                Mat(Prim.Make(PrimitiveKind.Cylinder, echo, new Vector3(0, 1.4f, 0), new Vector3(EchoRad * 2, 1.4f, EchoRad * 2), Color.white), ghostM);
-                Mat(Prim.Make(PrimitiveKind.Sphere, echo, new Vector3(0, 3.1f, 0), Vector3.one * 1.3f, Color.white), ghostM);
-            }
-            echoLive = Prim.Make(PrimitiveKind.Cylinder, echo, new Vector3(0, 0.05f, 0), new Vector3(EchoRad * 2 + 0.7f, 0.02f, EchoRad * 2 + 0.7f), Color.white); Mat(echoLive, liveM);
-            echo.gameObject.SetActive(false);
             for (int h = 0; h < 4; h++) if (GearFloor.Model("FT_Platform", root, PlatC(h), Quaternion.FromToRotation(Vector3.left, PlatC(h).normalized)) is Transform pm) { plats[h] = pm; pm.gameObject.SetActive(false); } else { plats[h] = Prim.Make(PrimitiveKind.Cylinder, root, PlatC(h) + Vector3.up * 0.06f, new Vector3(PlatR * 2, 0.04f, PlatR * 2), Color.white); Mat(plats[h], platM); plats[h].gameObject.SetActive(false); }
             if (!ringGlowA) { ringGlowA = Fx(new Color(0.25f, 0.12f, 0.02f), new Color(1.9f, 1.35f, 0.55f), 0.85f); ringGlowB = Fx(new Color(0.02f, 0.07f, 0.16f), new Color(0.5f, 1.2f, 2.0f), 0.85f); }
             ringA = NewRing("the sound ring", ringM, ringGlowA); ringB = NewRing("the echo ring", echoM, ringGlowB);
@@ -488,23 +532,64 @@ namespace LastBell.Run
             hammer = GearFloor.Model("GF_Hammer", root, Vector3.up * 30, Quaternion.identity); if (hammer) { hammer.localScale = Vector3.one * HammerScale; hammer.gameObject.SetActive(false); }
             for (int n = 0; n < BellPieces; n++) { var bp = GearFloor.Model("FT_BellShard", root, Vector3.up * 30, Quaternion.identity); if (!bp) break; bp.localScale = Vector3.one * (1.4f + 0.5f * (n % 3)); bp.gameObject.SetActive(false); bellBits.Add(bp); }
             for (int h = 0; h < 4; h++) platBase[h] = plats[h] ? plats[h].position : Vector3.zero;
-            ghostR.Clear(); foreach (var r in echo.GetComponentsInChildren<Renderer>()) if (r.sharedMaterial == ghostFx) ghostR.Add(r);
-            echoSeen = false; shattered = false;
             plate = GearFloor.Model("FT_Plate", root, Vector3.zero, Quaternion.identity);
             if (!plate) { plate = Prim.Make(PrimitiveKind.Cylinder, root, Vector3.zero, new Vector3(PlateSize * 2, 0.03f, PlateSize * 2), Color.white); Mat(plate, plateM); }
             plate.gameObject.SetActive(false);
             mySpot = new GameObject("my spot").transform; mySpot.SetParent(root, false);
             Mat(Prim.Make(PrimitiveKind.Cylinder, mySpot, new Vector3(0, 1.6f, 0), new Vector3(0.12f, 1.6f, 0.12f), Color.white), spotM);
         }
-        // the Echo: a copy of the boss's own meshes (frozen in their pose) in the additive effect shader, its UVs remapped so the
-        // "pillar" shape glows teal-blue at the feet and fades up the body, with slow vertical ripples
-        bool Ghost(Transform into)
+        // at the cast: the arena's floor goes, and the Echo is a copy of the boss as it looks now (it changes form at 55 %)
+        void Arm()
         {
-            if (!Boss) return false;
+            using (VoidMarker.Auto()) ArenaVoid.Open(W.Root);   // the arena's own floor goes: below the bell's floor is the void
+            if (!echo)
+            {
+                echo = new GameObject("the Echo Bellkeeper").transform; echo.SetParent(root, false); echo.gameObject.SetActive(false);
+                ghostSteps = Ghost(echo).GetEnumerator(); StepGhost();
+            }
+            echoSeen = false; shattered = false;
+        }
+        // The Echo is copied over several ticks (performance agent, 2 Nov: copying it on the P5 cast tick was 13 ms and 4.4 MB): the
+        // skinned meshes are all baked on the first tick (one pose), then one mesh is copied per tick. It first shows at toll IX.
+        IEnumerator<bool> ghostSteps; bool ghostMade;
+        // late P4 (the plan, once the train runs wild): start the copy then, a part per tick, so the P5 cast only shows it. The boss
+        // has its second form by then (performance agent, 2 Nov: the cast-tick bake kept the P4 -> P5 frame at 22 ms)
+        public void PrebakeEcho()
+        {
+            if (!root || echo) return;
+            echo = new GameObject("the Echo Bellkeeper").transform; echo.SetParent(root, false); echo.gameObject.SetActive(false);
+            ghostSteps = Ghost(echo).GetEnumerator();
+        }
+        public void StepEchoBake() => StepGhost();
+        static readonly Unity.Profiling.ProfilerMarker BuildMarker = new Unity.Profiling.ProfilerMarker("Ultimate.FinalToll.Build"), VoidMarker = new Unity.Profiling.ProfilerMarker("Ultimate.FinalToll.ArenaVoid"),
+            EchoMarker = new Unity.Profiling.ProfilerMarker("Ultimate.FinalToll.EchoBake"), TeardownMarker = new Unity.Profiling.ProfilerMarker("Ultimate.FinalToll.Teardown");
+        void StepGhost()
+        {
+            if (ghostSteps == null) return;
+            using var mark = EchoMarker.Auto();
+            if (ghostSteps.MoveNext()) return;
+            bool made = ghostMade; ghostSteps = null;
+            if (!echo) return;
+            if (!made)
+            {
+                Mat(Prim.Make(PrimitiveKind.Cylinder, echo, new Vector3(0, 1.4f, 0), new Vector3(EchoRad * 2, 1.4f, EchoRad * 2), Color.white), ghostM);
+                Mat(Prim.Make(PrimitiveKind.Sphere, echo, new Vector3(0, 3.1f, 0), Vector3.one * 1.3f, Color.white), ghostM);
+            }
+            echoLive = Prim.Make(PrimitiveKind.Cylinder, echo, new Vector3(0, 0.05f, 0), new Vector3(EchoRad * 2 + 0.7f, 0.02f, EchoRad * 2 + 0.7f), Color.white); Mat(echoLive, liveM);
+            echo.gameObject.SetActive(false);
+            ghostR.Clear(); foreach (var r in echo.GetComponentsInChildren<Renderer>()) if (r.sharedMaterial == ghostFx) ghostR.Add(r);
+        }
+        void FinishGhost() { while (ghostSteps != null) StepGhost(); }
+        // the Echo: a copy of the boss's own meshes (frozen in their pose) in the additive effect shader, its UVs remapped so the
+        // "pillar" shape glows teal-blue at the feet and fades up the body, with slow vertical ripples. Yields true between
+        // ticks; its last value is whether it made any mesh.
+        IEnumerable<bool> Ghost(Transform into)
+        {
+            ghostMade = false; if (!Boss) yield break;
             if (!ghostFx)
             {
                 var sh = Shader.Find("LastBell/FX/ColorDissolve"); if (!sh) { var m0 = Resources.Load<Material>("Run/FX_ColorDissolve"); if (m0) sh = m0.shader; }
-                if (!sh) return false;
+                if (!sh) yield break;
                 ghostFx = new Material(sh) { name = "Echo ghost" }; ghostFx.SetFloat("_Mode", 2); ghostFx.SetColor("_ColorLow", new Color(0.02f, 0.07f, 0.16f)); ghostFx.SetColor("_ColorHigh", new Color(0.25f, 0.62f, 1.0f));
                 ghostFx.SetFloat("_Dissolve", 0); ghostFx.SetFloat("_Intensity", 0.16f);   // additive over every layer of the mesh: kept faint so it reads as a teal shape, not a white blob
                 ghostFx.SetVector("_NoiseScale", new Vector4(3, 6, 0, 0)); ghostFx.SetVector("_Scroll", new Vector4(0, 0.4f, 0, 0));
@@ -519,7 +604,9 @@ namespace LastBell.Run
                 var go = new GameObject(name); go.transform.SetParent(into, false);
                 go.AddComponent<MeshFilter>().sharedMesh = m; var mr = go.AddComponent<MeshRenderer>(); mr.sharedMaterial = ghostFx; mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; made++;
             }
+            // every part in this tick's pose first, then one copy per tick
             var bossInv = Boss.transform.worldToLocalMatrix;
+            var parts = new List<(Mesh mesh, Matrix4x4 toBoss, string name, bool baked)>();
             foreach (var r in Boss.GetComponentsInChildren<Renderer>())
             {
                 if (!r.enabled || !r.gameObject.activeInHierarchy) continue;
@@ -527,11 +614,17 @@ namespace LastBell.Run
                 {
                     // BakeMesh gives the posed mesh in the renderer's space without its scale; put that scale back
                     var baked = new Mesh(); sk.BakeMesh(baked, false);
-                    Add(baked, bossInv * Matrix4x4.TRS(sk.transform.position, sk.transform.rotation, Vector3.one), sk.name); Object.Destroy(baked);
+                    parts.Add((baked, bossInv * Matrix4x4.TRS(sk.transform.position, sk.transform.rotation, Vector3.one), sk.name, true));
                 }
-                else if (r is MeshRenderer && r.TryGetComponent<MeshFilter>(out var mf)) Add(mf.sharedMesh, bossInv * r.transform.localToWorldMatrix, r.name);
+                else if (r is MeshRenderer && r.TryGetComponent<MeshFilter>(out var mf)) parts.Add((mf.sharedMesh, bossInv * r.transform.localToWorldMatrix, r.name, false));
             }
-            return made > 0;
+            foreach (var (mesh, toBoss, name, baked) in parts)
+            {
+                yield return true;
+                if (into) Add(mesh, toBoss, name);
+                if (baked) Object.Destroy(mesh);
+            }
+            ghostMade = made > 0;
         }
         // the clapper over a lane: winds up over one end as the lane shows, swings through on the toll, rides up the far side
         void PlaceClapper(Transform c, Vector3 pivot, float laneAng, float rel)
@@ -629,7 +722,7 @@ namespace LastBell.Run
                 var d = Dir(a); bp.position = d * (BellWallR + sp * su) + Vector3.up * (y0 + 3f * su - 4.9f * su * su);
                 bp.rotation = Quaternion.AngleAxis(200f * su + 40 * i, Vector3.Cross(Vector3.up, d) + Vector3.up * 0.3f * (i % 2 == 0 ? 1 : -1));
             }
-            bool eo = EchoOn(t); echo.gameObject.SetActive(eo);
+            bool eo = EchoOn(t); if (eo) FinishGhost(); echo.gameObject.SetActive(eo);
             if (eo)
             {
                 // the Echo moves after each toll: it comes apart where it was and gathers where it goes (re-forming over 0.4 s,
@@ -701,11 +794,12 @@ namespace LastBell.Run
         }
         void Teardown()
         {
+            using var mark = TeardownMarker.Auto();
             if (root) Object.Destroy(root.gameObject);
             ArenaVoid.Close(); floorModel = null; clappers[0] = clappers[1] = null; shardPool.Clear(); fallers.Clear();
             ringA = ringB = null; hammer = null; bellBits.Clear(); ghostR.Clear();
             RunDirector.CameraPull = 0;
-            root = plate = mySpot = echo = echoLive = floor = bellModel = null; for (int h = 0; h < 4; h++) plats[h] = null; pool.Clear(); plans.Clear();
+            root = plate = mySpot = echo = echoLive = floor = bellModel = null; for (int h = 0; h < 4; h++) plats[h] = null; pool.Clear(); plans.Clear(); ghostSteps = null;
         }
 
         static GUIStyle nameStyle, bigStyle, midStyle;

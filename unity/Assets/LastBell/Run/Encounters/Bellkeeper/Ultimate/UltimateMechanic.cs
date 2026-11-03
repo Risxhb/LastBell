@@ -49,6 +49,14 @@ namespace LastBell.Run
         // ...and before a press that roots or slows it for `seconds` (at `scale`): does the route search still find a way with
         // no hit, standing that long first? (the searches count the whole root, not only their first leg)
         public virtual bool SafeToRoot(PlayerController p, float seconds, float scale) => true;
+        // Combat start: make this mechanic's scene objects now, hidden, so its cast only shows them (a phase change no longer
+        // builds a whole set: 60-91 ms hitches, performance agent 2 Nov). Cancel() still drops them; the cast then builds as before.
+        public virtual void Prebuild() { }
+        // the steered phases' replan rhythm (performance agent, 2 Nov: P4 at about 7 fps, all in the bots' route searches): each bot
+        // searches every ReplanTicks on its own tick, so at most one bot searches per tick. A route holds its first velocity for a
+        // 0.2 s leg anyway, so 0.1 s between searches stays inside what the search planned.
+        protected virtual int ReplanTicks => 6;   // P5 keeps 3 (FinalToll): at 6 its party lost the kill by 1 %
+        protected bool SearchTurn(PlayerController p) { int i = W.Players.IndexOf(p); return ((Now - i) % ReplanTicks + ReplanTicks) % ReplanTicks == 0; }
         // the route searches' slowdown: (seconds, scale) for the current action, or for a press being tested
         protected float rootTestFor = -1, rootTestScale = 1;
         protected bool lastClean;   // the last search found a route with no hit through every leg

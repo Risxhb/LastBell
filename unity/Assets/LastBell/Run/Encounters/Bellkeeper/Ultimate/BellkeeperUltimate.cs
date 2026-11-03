@@ -143,8 +143,10 @@ namespace LastBell.Run
             while (true) yield return 60;   // P5 never ends by itself: the boss dies or toll XIII wipes
         }
 
+        static readonly Unity.Profiling.ProfilerMarker BeginMarker = new Unity.Profiling.ProfilerMarker("Ultimate.Segment.Begin");
         void Begin(UltSegment s)
         {
+            using var mark = BeginMarker.Auto();   // the phase change: name, look, HUD
             Segment = s; SegmentStartTick = W.Tick; SegmentLoops = 0; pushFired = false;
             SegmentLog.Add((W.Tick, s));
             PlanLog.Add((W.Tick, "segment " + s));
@@ -192,7 +194,8 @@ namespace LastBell.Run
                     UltLaunch(mGear, C(4, "break"));   // The Floor Breaks (15 s), then the gear floor: a slam every 7.5 s
                     while (!Reached(s) || SecondsInSegment < V2P4MinSeconds + GearFloor.BreakLen) yield return 30;
                     mGear.GoWild();                     // The Train Runs Wild (15 s after the next slam), then the great bell falls
-                    while (mGear.Running) yield return 1;
+                    mFinal.PrebakeEcho();                // P5's Echo is copied from the boss while the train runs wild
+                    while (mGear.Running) { mFinal.StepEchoBake(); yield return 1; }
                     break;
                 default:
                     UltLaunch(mFinal, C(5, "p5"));   // Final Toll: the boss dies, or toll XIII wipes (the mechanic does it)
@@ -274,9 +277,24 @@ namespace LastBell.Run
         public override float NextPhaseFraction() => Mathf.Max(0.01f, SegEnd[(int)Segment] - 0.01f);
 
         static GUIStyle glyphStyle;
+        // The phases' labels share the skin's bold font at these sizes; P2 is the first to use → ✓ –. Measuring them once on the
+        // first frame loads the fonts and their OpenType tables then (performance agent, 2 Nov: a 79 ms font load at the P1 -> P2 change).
+        static bool fontsWarm;
+        // Every printable ASCII character plus the symbols, bold and regular: the first debt timer ("DEBT 6.0s": the '.') still
+        // loaded font tables at 18.6 s and 21.1 s with the shorter string (performance agent, 2 Nov)
+        static void WarmFonts()
+        {
+            var sb = new System.Text.StringBuilder("→ ✓ – ✕ · ");
+            for (char ch = ' '; ch <= '~'; ch++) sb.Append(ch);
+            var c = new GUIContent(sb.ToString());
+            var s = new GUIStyle(GUI.skin.label);
+            foreach (var fs in new[] { FontStyle.Bold, FontStyle.Normal })
+                foreach (int size in new[] { 15, 16, 17, 20, 22, 24, 32, 34, 40, 72 }) { s.fontStyle = fs; s.fontSize = size; s.CalcSize(c); }
+        }
         void OnGUI()
         {
             if (Ult == null || W == null || Dead) return;
+            if (!fontsWarm) { fontsWarm = true; WarmFonts(); }
             var cam = Camera.main; if (!cam) return;
             mRelay?.DrawGui(cam);
             mBroken?.DrawGui(cam);

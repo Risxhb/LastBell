@@ -50,8 +50,10 @@ namespace LastBell.Run
         public readonly List<(int tick, string what)> PlanLog = new List<(int, string)>();   // tests: launches, transitions, wipes
 
         // Starts an ability's Cast now: its first segment runs on this tick, so tick 0 of the ability is this tick.
+        static readonly Unity.Profiling.ProfilerMarker LaunchMarker = new Unity.Profiling.ProfilerMarker("Ultimate.Launch");
         public void Launch(BellkeeperAbility a)
         {
+            using var mark = LaunchMarker.Auto();   // a cast's first step runs here (its Build)
             if (a == null || Dead) return;
             if (a is UltimateMechanic m) m.TakeCue();
             a.Launched();
@@ -80,6 +82,7 @@ namespace LastBell.Run
         {
             StopAbilities();
             if (!TestIdle) FitHpToParty();   // the idle test target keeps its bar (a dummy for the run-loop and ally checks)
+            if (!TestIdle && PracticeAbility == null && Mechanics != null) foreach (var m in Mechanics) m.Prebuild();
             IEnumerator<int> plan = null; int wait = 0;
             while (true)
             {

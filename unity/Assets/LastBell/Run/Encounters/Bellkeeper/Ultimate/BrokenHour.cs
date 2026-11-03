@@ -110,10 +110,12 @@ namespace LastBell.Run
             {
                 while (Now < NextBeatTick)
                 {
+                    StepSolve();
                     if (count > 0 && Hours >= 4) StepPasses();   // the first beat's holder is dealt, not passed (players may start bunched)
                     if (slam == null && NextBeatTick - Now <= Sim.Ticks(SlamWarn + WarnLead)) slam = SpawnSlam();
                     Present(); yield return 1;
                 }
+                FinishSolve();   // never still solving on the beat (it takes a few ticks of the 3 s)
                 Resolve(); slam = null;
                 Advance(); Beats++;
                 settled.Clear();
@@ -224,9 +226,24 @@ namespace LastBell.Run
         static List<Vector3> grid, fine;   // 1 m grid for the SAFE pair, 0.5 m for the INVERTED spot (a thin band between the half line and 10 m from the plate)
         public bool Planned(PlayerController p, out Vector3 spot) { spot = default; if (!plan.TryGetValue(p, out var s)) return false; spot = s.Spot; return true; }
 
-        void SolvePlan(int now)
+        static readonly Unity.Profiling.ProfilerMarker SolveMarker = new Unity.Profiling.ProfilerMarker("Ultimate.BrokenHour.SolvePlan");
+        // The party plan is solved over several ticks (performance agent, 2 Nov: 83-86 ms on the beat frame with 4 bots): the solver
+        // yields every SolveSlice holder spots and the bots keep the last plan until the new one is complete. It plans as if it
+        // started SolveLead later, which covers the ticks it spreads over.
+        const int SolveSlice = 3; const float SolveLead = 0.3f;   // 3 spots a slice: about 6.7 ms (8 made 18 ms slices; 2 delivered the plan too late for the INVERTED pass, 2 Nov)
+        readonly Dictionary<PlayerController, Step> building = new Dictionary<PlayerController, Step>();
+        IEnumerator<int> solving;
+        void SolvePlan(int now) { solving = SolveParty(now).GetEnumerator(); StepSolve(); }
+        void StepSolve()
         {
-            plan.Clear();
+            if (solving == null) return;
+            using (SolveMarker.Auto()) if (!solving.MoveNext()) solving = null;
+        }
+        // tests and practice: finish a solve now
+        void FinishSolve() { while (solving != null) StepSolve(); }
+        IEnumerable<int> SolveParty(int now)
+        {
+            building.Clear();
             if (grid == null)
             {
                 grid = new List<Vector3>();
@@ -236,7 +253,7 @@ namespace LastBell.Run
                 for (int x = -22; x <= 22; x++) for (int z = -22; z <= 22; z++) { var q = new Vector3(x * 0.5f, 0, z * 0.5f); if (q.magnitude >= 2.4f && q.magnitude <= bound) fine.Add(q); }
             }
             int v = Beat, sh = SoakHour(count), ih = InvHour(count), left = NextBeatTick - now;
-            float secs = left / (float)Sim.Hz, walk = Mathf.Max(0.5f, secs - 0.4f) * PlayerController.WalkSpeed;
+            float secs = left / (float)Sim.Hz - SolveLead, walk = Mathf.Max(0.5f, secs - 0.4f) * PlayerController.WalkSpeed;
             // groups of four are planned one after another (each avoids the chains and spots already planned). With two
             // groups, if one finds no plan: plan them the other way round, then with tighter margins (chains 0.6 m apart)
             int groups = (W.Players.Count + 3) / 4;
@@ -245,21 +262,22 @@ namespace LastBell.Run
             for (int attempt = 0; attempt < orders.Length * 2 && !solved; attempt++)
             {
                 gapMin = attempt < orders.Length ? 1f : 0.6f; spaceMin = attempt < orders.Length ? 2.5f : 2.1f;
-                plan.Clear(); solved = true;
+                building.Clear(); solved = true;
                 var done = new List<(Vector3 a, Vector3 b)>(); var taken = new List<Vector3>();
                 foreach (int g in orders[attempt % orders.Length])
                 {
                     var grp = new PlayerController[4];
                     for (int k = 0; k < 4; k++) { int i = g * 4 + k; grp[k] = i < W.Players.Count && !W.Players[i].Down ? W.Players[i] : null; }
                     if (System.Array.IndexOf(grp, null) >= 0 || Hours < 4) { SimplePlan(grp, v, sh, ih); continue; }
-                    if (!SolveGroup(grp, g, v, sh, ih, now, secs, walk, done, taken)) { solved = false; break; }
+                    foreach (var w in SolveGroup(grp, g, v, sh, ih, now, secs, walk, done, taken)) yield return w;
+                    if (!groupSolved) { solved = false; break; }
                 }
             }
             gapMin = 1f; spaceMin = 2.5f;
             if (!solved)
             {
                 Debug.LogWarning($"Broken Hour: no party plan for beat {Beats + 1}; simple spots");
-                plan.Clear();
+                building.Clear();
                 for (int g = 0; g < groups; g++)
                 {
                     var grp = new PlayerController[4];
@@ -267,11 +285,14 @@ namespace LastBell.Run
                     SimplePlan(grp, v, sh, ih);
                 }
             }
+            plan.Clear(); foreach (var kv in building) plan[kv.Key] = kv.Value;
+            if (LogSolver) Debug.Log($"[broken hour] solved in {Now - now} ticks");
         }
         float gapMin = 1f, spaceMin = 2.5f;
         public static bool LogSolver;   // tests: why a beat found no plan, and every pass
 
-        bool SolveGroup(PlayerController[] grp, int g, int v, int sh, int ih, int now, float secs, float walk, List<(Vector3 a, Vector3 b)> done, List<Vector3> taken)
+        bool groupSolved;   // SolveGroup's result (it yields between slices)
+        IEnumerable<int> SolveGroup(PlayerController[] grp, int g, int v, int sh, int ih, int now, float secs, float walk, List<(Vector3 a, Vector3 b)> done, List<Vector3> taken)
         {
             Vector3 plateC = Plate(v), pl = plateC; var cur = new Vector3[4];
             for (int k = 0; k < 4; k++) cur[k] = Sim.Flat(grp[k].transform.position);
@@ -282,26 +303,49 @@ namespace LastBell.Run
             int nH = 0, nPair = 0, nGap = 0, nSpace = 0, nMeet = 0;
             var near = new List<Vector3>(); foreach (var q in grid) if (Vector3.Dot(q, HandDir(v)) > SolveMargin && (q - plateC).magnitude > OnPlate + 0.6f && FarFrom(q, taken) && OwnSide(q)) near.Add(q);
             float bestScore = float.MaxValue; Vector3 bh = default, ba = default, bb = default, bm = default; float btm = 0; bool found = false;
+            // the (pa, pb) pairs don't depend on the holder spot: listed once, in the same order (2 Nov: rebuilt per holder spot with a
+            // new array per pair, P2 froze for 160-200 ms and 6.5 MB every beat with bots)
+            // each side's spots filtered once (the filters ran near x near times), then paired in the same order
+            pairs.Clear(); sideA.Clear(); sideB.Clear();
+            foreach (var q in near)
+            {
+                if (!Near(q, v) || (q - plateC).magnitude <= OnPlate + 0.6f) continue;
+                if ((cur[ya] - q).magnitude <= walk) sideA.Add(q);
+                if ((cur[yb] - q).magnitude <= walk) sideB.Add(q);
+            }
+            foreach (var pa in sideA)
+            {
+                foreach (var pb in sideB)
+                {
+                    float dab = (pa - pb).magnitude; if (dab < ChainMin + ChainSlack || dab > ChainMax - ChainSlack) continue;
+                    // a lower bound on this pair's share of the score (travel + 0.15 x distance from centre): sorted, so a holder spot stops
+                    // at the first pair that can no longer beat the best (2 Nov: the full search still took 83 ms on the beat frame)
+                    float pc = (ya != x ? (cur[ya] - pa).magnitude : 0) + (yb != x ? (cur[yb] - pb).magnitude : 0) + 0.15f * (pa.magnitude + pb.magnitude);
+                    pairs.Add((pa, pb, pc, pairs.Count));
+                }
+            }
+            pairs.Sort((p1, p2) => p1.cost != p2.cost ? p1.cost.CompareTo(p2.cost) : p1.n.CompareTo(p2.n));
+            yield return 1;
+            var P = new Vector3[4];
             foreach (var ph in fine)
             {
                 if (Vector3.Dot(ph, HandDir(v)) > -SolveMargin || !FarFrom(ph, taken) || !OwnSide(ph)) continue; float dph = (ph - pl).magnitude;
                 if (dph < ChainMin + ChainSlack || dph > ChainMax - ChainSlack) continue;
                 nH++;
+                if (nH % SolveSlice == 0) yield return 1;
                 if (x < 0 && (cur[h] - ph).magnitude > walk) continue;
-                foreach (var pa in near)
+                float baseCost = (s != x ? (cur[s] - pl).magnitude : 0) + 0.15f * (pl.magnitude + ph.magnitude);
+                foreach (var (pa, pb, pc, _) in pairs)
                 {
-                    if (!Near(pa, v) || (pa - plateC).magnitude <= OnPlate + 0.6f || (cur[ya] - pa).magnitude > walk) continue;
-                    foreach (var pb in near)
+                    if (baseCost + pc - 1e-3f >= bestScore) break;   // every other term is >= 0
                     {
-                        if (!Near(pb, v) || (pb - plateC).magnitude <= OnPlate + 0.6f || (cur[yb] - pb).magnitude > walk) continue;
-                        float dab = (pa - pb).magnitude; if (dab < ChainMin + ChainSlack || dab > ChainMax - ChainSlack) continue;
                         nPair++;
                         if (SegGap(pl, ph, pa, pb) < gapMin) continue;   // chains at least 1 m apart: a bot's 0.25 m slack can't make them cross
                         bool bad = false;
                         foreach (var (ca, cb) in done) if (SegGap(pl, ph, ca, cb) < gapMin || SegGap(pa, pb, ca, cb) < gapMin) { bad = true; break; }
                         if (!bad) nGap++;
                         if (bad) continue;
-                        var P = new Vector3[4]; P[s] = pl; P[h] = ph; P[ya] = pa; P[yb] = pb;
+                        System.Array.Clear(P, 0, 4); P[s] = pl; P[h] = ph; P[ya] = pa; P[yb] = pb;
                         // spots at least 2.5 m apart (no stray touches), except across the plate
                         for (int i = 0; i < 4 && !bad; i++) for (int j = i + 1; j < 4; j++) if ((P[i] - P[j]).magnitude < spaceMin) { bad = true; break; }
                         if (!bad) nSpace++;
@@ -328,13 +372,16 @@ namespace LastBell.Run
                     }
                 }
             }
-            if (!found) { if (LogSolver) Debug.Log($"[broken hour] group {g} beat {Beats + 1}: no plan · holder spots {nH} · near {near.Count} · pairs {nPair} · clear chains {nGap} · spaced {nSpace} · meets {nMeet} · gap {gapMin} · passer {x}"); return false; }
-            plan[grp[s]] = new Step { Spot = pl }; plan[grp[h]] = new Step { Spot = bh }; plan[grp[ya]] = new Step { Spot = ba }; plan[grp[yb]] = new Step { Spot = bb };
-            if (x >= 0) { int mt = now + Sim.Ticks(btm); plan[grp[x]].Meet = bm; plan[grp[x]].MeetTick = mt; plan[grp[h]].Meet = bm; plan[grp[h]].MeetTick = mt; }
+            if (!found) { if (LogSolver) Debug.Log($"[broken hour] group {g} beat {Beats + 1}: no plan · holder spots {nH} · near {near.Count} · pairs {nPair} · clear chains {nGap} · spaced {nSpace} · meets {nMeet} · gap {gapMin} · passer {x}"); groupSolved = false; yield break; }
+            building[grp[s]] = new Step { Spot = pl }; building[grp[h]] = new Step { Spot = bh }; building[grp[ya]] = new Step { Spot = ba }; building[grp[yb]] = new Step { Spot = bb };
+            if (x >= 0) { int mt = now + Sim.Ticks(btm);
+                building[grp[x]].Meet = bm; building[grp[x]].MeetTick = mt; building[grp[h]].Meet = bm; building[grp[h]].MeetTick = mt; }
             done.Add((pl, bh)); done.Add((ba, bb)); taken.Add(bh); taken.Add(ba); taken.Add(bb);
-            return true;
+            groupSolved = true;
         }
 
+        readonly List<(Vector3 a, Vector3 b, float cost, int n)> pairs = new List<(Vector3, Vector3, float, int)>();
+        readonly List<Vector3> sideA = new List<Vector3>(), sideB = new List<Vector3>();
         static bool FarFrom(Vector3 q, List<Vector3> taken) { foreach (var t in taken) if ((q - t).magnitude < 2.5f) return false; return true; }   // (between groups always 2.5 m: a stray touch can't pass across groups anyway)
 
         // no full group (or a small party): the plate, the slam halves and the chains as plain spots
@@ -346,7 +393,7 @@ namespace LastBell.Run
                 var p = grp[k]; if (p == null) continue;
                 Vector3 spot = sh < 0 ? d * (Boss.BodyRadius + 0.6f) :   // the plate rests (solo): at the boss on the plate's half
                     k == sh ? Plate(v) : k == ih ? -d * 1.5f + side * 2.5f : k == (sh + 1) % 4 ? d * 3.5f - side * 1.8f : d * 3.0f - side * 8.6f;   // chains 8.9 m and 6.8 m, uncrossed
-                plan[p] = new Step { Spot = spot };
+                building[p] = new Step { Spot = spot };
             }
         }
 
@@ -371,7 +418,10 @@ namespace LastBell.Run
         static Material brassDim, brassHot, brassM, goldChain, blueChain, coralM, cobaltM, ivoryM, spotM, passM;
         float shownYaw, handVel;
 
-        void Build()
+        // Prebuild: made hidden when combat starts (performance agent, 2 Nov: phase changes took 77-91 ms)
+        public override void Prebuild() { MakeObjects(); root.gameObject.SetActive(false); }
+        void Build() { MakeObjects(); root.gameObject.SetActive(true); }
+        void MakeObjects()
         {
             if (root) return;
             if (!brassDim)
@@ -453,7 +503,7 @@ namespace LastBell.Run
         void Teardown()
         {
             if (root) Object.Destroy(root.gameObject);
-            root = pivot = mySpot = myMeet = null; chainBars.Clear(); auras.Clear(); plan.Clear();
+            root = pivot = mySpot = myMeet = null; chainBars.Clear(); auras.Clear(); plan.Clear(); solving = null;
             for (int i = 0; i < 4; i++) plates[i] = null;
         }
 
