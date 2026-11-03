@@ -93,6 +93,40 @@ namespace LastBell.Run
             Zenith.HungerBonus = Mathf.Min(15, 5 + 5 * c);   // 50, 55, 60 cap (78 on Hard): the hardest hit, never near a one-shot
             Zenith.HungerFloor = 3.0f + 0.5f * Mathf.Max(0, (W.Players.FindAll(p => p && !p.Down).Count + 1) / 2 - 1);
             foreach (var w in Zenith.Run()) yield return w;
+            StartDevour(c);
+        }
+
+        // ---- A17 Devour (accepted 2 Nov, Chzy18: "walking doesn't beat the pull"): when a Collapse lands he breathes the light
+        // in for DevourS and pulls every standing player toward him at 6.5, 7.0, then 7.5 m/s (Easy a fixed 6.5). Walking
+        // (6 m/s) loses to it, sprinting (9 m/s) wins. No damage, never a push, and it keeps acting through a dash (no
+        // immunity). It runs on the encounter tick, beside whatever block comes next, so the block timing is unchanged.
+        public const float DevourS = 2.0f, DevourEasy = 6.5f, DevourFirst = 6.5f, DevourStep = 0.5f, DevourCap = 7.5f;
+        public static float DevourSpeed(int cast, bool easy) => easy ? DevourEasy : Mathf.Min(DevourCap, DevourFirst + DevourStep * cast);
+        public int DevourLeft { get; private set; }     // ticks of pull still to come (test evidence)
+        public float DevourPull { get; private set; }   // m/s of the current or latest Devour
+        public int Devours { get; private set; }
+        void StartDevour(int cast)
+        {
+            if (Dead) return;
+            DevourPull = DevourSpeed(cast, W.Difficulty == Difficulty.Easy);
+            DevourLeft = Sim.Ticks(DevourS); Devours++;
+            RunHud.Banner("DEVOUR", new Color(0.95f, 0.78f, 0.4f), DevourS);
+        }
+        void StepDevour()
+        {
+            if (DevourLeft <= 0) return;
+            if (Dead || !W.CombatActive) { DevourLeft = 0; return; }
+            if (DevourLeft % Sim.Ticks(0.35f) == 0) W.BossFx.InhaleChevrons(Sim.Flat(transform.position), DevourPull * 0.7f, 0.7f);   // stand-in: the foundry's chevrons, in gold
+            DevourLeft--;
+            float step = DevourPull / Sim.Hz, stop = BodyRadius + PlayerController.Radius + 0.3f;
+            var players = W.Players;
+            for (int i = 0; i < players.Count; i++)
+            {
+                var p = players[i];
+                if (!p || p.Down) continue;
+                var to = Sim.Flat(transform.position - p.transform.position); float d = to.magnitude;
+                if (d > stop) p.Pull(to, Mathf.Min(step, d - stop), 1);   // stops at his feet, never through him
+            }
         }
         public IEnumerable<int> CollapseWithLances(int beams)
         {
@@ -241,7 +275,7 @@ namespace LastBell.Run
         }
 
         // tests: a fresh fight on the same boss (Solar Hunger count, the intermission, the clock)
-        public void DebugResetFight() { CollapseCasts = 0; IntermissionDone = false; FightTicks = 0; ClearPhasePools(); }
+        public void DebugResetFight() { CollapseCasts = 0; DevourLeft = 0; Devours = 0; IntermissionDone = false; FightTicks = 0; ClearPhasePools(); }
         public bool TestClock;                                    // tests: run the enrage clock while held
         public void DebugSetFightSeconds(float s) => FightTicks = Sim.Ticks(s);
 

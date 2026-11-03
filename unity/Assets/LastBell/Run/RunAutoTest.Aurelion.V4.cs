@@ -283,10 +283,21 @@ namespace LastBell.Run
             // Solar Hunger: each Collapse is hungrier
             yield return V2Setup(1, Difficulty.Medium, new[] { new Vector3(0, 0, 2.5f) }, 1, Vector3.zero);
             if (V2Boss == null) yield break;
-            var radii = new List<float>(); var dmg = new List<int>();
-            for (int i = 0; i < 4; i++) { yield return V3FireToppedUp(V2Boss.HungryCollapse(), 10); radii.Add(V2Boss.Zenith.Last.Inner); dmg.Add(V2Boss.Zenith.Last.Damage); }
+            var radii = new List<float>(); var dmg = new List<int>(); var pulls = new List<float>();
+            for (int i = 0; i < 4; i++) { yield return V3FireToppedUp(V2Boss.HungryCollapse(), 10); radii.Add(V2Boss.Zenith.Last.Inner); dmg.Add(V2Boss.Zenith.Last.Damage); pulls.Add(V2Boss.DevourPull); }
             V2Check("Solar Hunger: every Collapse shrinks its disc 0.5 m (to 3.0 m) and hits 5 harder (50 > 60)",
                 radii.SequenceEqual(new[] { 4.5f, 4.0f, 3.5f, 3.0f }) && dmg.SequenceEqual(new[] { 50, 55, 60, 60 }), $"radii {string.Join("/", radii)}, damage {string.Join("/", dmg)}");
+            // A17 Devour: after the 4th Collapse the 7.5 m/s pull runs; a player 9 m out loses 0.5 s x 7.5 m ~ 3.75 m standing still
+            {
+                var a = V2Boss; int left0 = a.DevourLeft;
+                V2Place(V2Main, new Vector3(0, 0, 9f)); float d0 = Sim.Flat(V2Main.transform.position - a.transform.position).magnitude;
+                yield return Until(() => a.DevourLeft <= left0 - 30 || a.DevourLeft == 0, 5, "Devour 0.5 s");
+                float d1 = Sim.Flat(V2Main.transform.position - a.transform.position).magnitude, hp = V2Main.Hp;
+                V2Check("Devour: every Collapse pulls everyone in for 2.0 s at 6.5 > 7.0 > 7.5 m/s (Easy fixed 6.5), faster than a walk, no damage",
+                    pulls.SequenceEqual(new[] { 6.5f, 7.0f, 7.5f, 7.5f }) && AurelionEncounter.DevourSpeed(3, true) == 6.5f && left0 >= Sim.Ticks(2.0f) - 2
+                    && Mathf.Abs((d0 - d1) - 3.75f) < 0.5f && AurelionEncounter.DevourCap < PlayerController.SprintSpeed && AurelionEncounter.DevourFirst > PlayerController.WalkSpeed,
+                    $"pulls {string.Join("/", pulls)}, ticks left {left0}, pulled {d0 - d1:0.00} m in 0.5 s, hp {hp}");
+            }
 
             // the 70 % flow: the intermission plays once, then Misalignment
             yield return V2Setup(1, Difficulty.Medium, new[] { new Vector3(0, 0, 9f) }, 1, Vector3.zero);

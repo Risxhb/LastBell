@@ -31,6 +31,7 @@ namespace LastBell.Run
         protected override void StepAlways()
         {
             V4Clock();
+            StepDevour();
             if (Light != null && W.CombatActive) Light.StepFalls();
             if (presenter) presenter.TickBoss(Current == "approach" || Current == "reposition" ? "Walk" : "Idle");
         }

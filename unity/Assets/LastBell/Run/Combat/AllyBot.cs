@@ -149,6 +149,8 @@ namespace LastBell.Run
             if (me.Hp < (Mode == BotMode.Passive ? 40 : 70) && me.Potions > 0 && tick % 30 == 0) inp.Potion = true;   // test bots: before a Hard kill hit (65) could down them
             // walk round his body, not into it: a straight line across the centre would pin the bot against him
             if (move != Vector3.zero) move = AroundBoss(pos, move, boss);
+            // Aurelion's Devour pulls faster than a walk: any move against it is a sprint
+            if (move != Vector3.zero && boss is AurelionEncounter da && da.DevourLeft > 0 && Vector3.Dot(move, Sim.Flat(bpos - pos)) < 0 && me.Stamina > 5) inp.Sprint = true;
             dMe = me; dDuty = duty; dThreat = threat?.Source; dBad = bad(pos); dMove = move; dPos = pos; dNote = spotNote; spotNote = 0;
             inp.Move = ToScreen(move);
             return inp;
