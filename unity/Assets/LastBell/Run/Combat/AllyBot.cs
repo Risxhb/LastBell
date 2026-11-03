@@ -163,6 +163,7 @@ namespace LastBell.Run
         // it set this tick's input.
         bool Scripted(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
         {
+            if (!(boss is AurelionEncounter) && Brand(me, boss, pos, ref inp)) return true;   // Aurelion keeps its own Sunspot job
             if (boss is ChimeboundOracleEncounter or) return Carillon(me, or, pos, ref inp);
             if (boss is PendulumSentinelEncounter ps) return Level(me, ps, pos, ref inp);
             if (!(boss is DialWardenEncounter dw)) return false;
@@ -241,6 +242,43 @@ namespace LastBell.Run
             if (Attacks && move == Vector3.zero && gap <= Range(me) + 1.85f) Attack(me, ref inp);
             if (me.Hp < (Mode == BotMode.Passive ? 40 : 70) && me.Potions > 0 && tick % 30 == 0) inp.Potion = true;
             if (move != Vector3.zero) move = AroundBoss(pos, move, ps);
+            inp.Move = ToScreen(move);
+            return true;
+        }
+
+        // a mark that follows this player and spares them (Crucivar's Ember Brand) leaves a burning pool where it lands: walk
+        // it to the floor's edge, clear of other pools and other players, before it stops following; a threat on the way
+        // is dodged first (the normal reading)
+        bool Brand(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
+        {
+            Hazard brand = null; var live = me.World.Hazards.Live;
+            for (int i = 0; i < live.Count && brand == null; i++)
+            {
+                var h = live[i];
+                if (h.Track != null && h.Age < h.LockAt && h.Shape == HazardShape.Circle && Spares(h, me)) brand = h;
+            }
+            if (brand == null) return false;
+            bad = Bad(me, boss);
+            if (bad(pos)) return false;
+            float rim = CombatWorld.PlayerBound - 1.2f, mine = Sim.YawTo(Vector3.zero, pos, 0);
+            Vector3 goal = pos; float bestCost = float.MaxValue;
+            for (int k = 0; k < 24; k++)
+            {
+                float yaw = mine + (k % 2 == 0 ? 1 : -1) * (k + 1) / 2 * 15f;
+                var q = Sim.Dir(yaw) * rim;
+                if (!CombatWorld.InPlayerBound(q, -0.3f)) q = Sim.Dir(yaw) * (rim - 2f);
+                bool ok = true;
+                for (int i = 0; i < live.Count && ok; i++) { var h = live[i]; if (h.BurnPerSecond > 0 && h.Contains(q)) ok = false; }
+                foreach (var p in me.World.Players) if (ok && p && p != me && !p.Down && Sim.Flat(p.transform.position - q).magnitude < brand.Radius + 1f) ok = false;
+                if (!ok) continue;
+                float c = Sim.Flat(q - pos).magnitude;
+                if (c < bestCost) { bestCost = c; goal = q; }
+            }
+            var v = Sim.Flat(goal - pos);
+            var move = v.magnitude < 0.3f ? Vector3.zero : v.normalized;
+            if (move != Vector3.zero && bad(pos + move * 0.6f)) return false;
+            if (v.magnitude > 2f && me.Stamina > 30) inp.Sprint = true;
+            if (move != Vector3.zero) move = AroundBoss(pos, move, boss);
             inp.Move = ToScreen(move);
             return true;
         }
@@ -404,7 +442,9 @@ namespace LastBell.Run
             for (int i = 0; i < live.Count; i++) { var h = live[i]; if (h.BurnPerSecond <= 0 && h.ResolveAt - h.Age <= ticks && (Hits(h, me, pos) || Hits(h, me, lunge))) return false; }
             return true;
         }
-        static bool Hits(Hazard h, PlayerController me, Vector3 q) => !h.Soak && (h.Contains(q) || SideOf(h, q)) && (h.Affects == null || h.Affects(me));
+        static bool Hits(Hazard h, PlayerController me, Vector3 q) => !h.Soak && (h.Contains(q) || SideOf(h, q)) && (h.Affects == null || h.Affects(me)) && !Spares(h, me);
+        // a shape that leaves out the player standing in it (an Ember Brand never hits its own carrier) is no danger to them
+        static bool Spares(Hazard h, PlayerController me) => h.Includes != null && h.Contains(me.transform.position) && !h.Includes(me);
         // a lane that strikes after its warning (a Toll Lane) can hit a little wider than it is drawn: keep a hand's width clear
         static bool SideOf(Hazard h, Vector3 q)
         {
