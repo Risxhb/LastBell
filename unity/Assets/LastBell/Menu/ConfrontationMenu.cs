@@ -48,9 +48,6 @@ namespace LastBell.Menu
         public Button VSyncControl { get; private set; }
         public Button FrameCapControl { get; private set; }
         public TestRushSetup Rush { get; private set; }
-#if LASTBELL_LAN_TEST
-        public LanMenuPanel LanPanel { get; private set; }
-#endif
         public bool Loading { get; private set; }
         public bool SettingsOpen => settings && settings.activeSelf;
         public bool StageHidden { get; private set; }
@@ -257,17 +254,8 @@ namespace LastBell.Menu
 
         // ---------------------------------------------------------------- actions
 #if LASTBELL_LAN_TEST
-        void OpenLan()
-        {
-            if(Loading||SettingsOpen||LanPanel)return;
-            navigation.interactable=navigation.blocksRaycasts=false;navigation.alpha=0;musicGroup.interactable=musicGroup.blocksRaycasts=false;musicGroup.alpha=0;
-            shade.enabled=false;LanPanel=new GameObject("LAN setup").AddComponent<LanMenuPanel>();LanPanel.Build(this,safe,SavedHeroSelection.Current);
-        }
-        public void CloseLan()
-        {
-            LanPanel=null;shade.enabled=true;navigation.interactable=navigation.blocksRaycasts=true;navigation.alpha=1;musicGroup.interactable=musicGroup.blocksRaycasts=true;musicGroup.alpha=1;
-            EventSystem.current.SetSelectedGameObject(RushButton.gameObject);
-        }
+        // Multiplayer opens the LAN lobby scene (LanLobbyScreen: name card, host/connect, lobby).
+        void OpenLan(){if(Loading||SettingsOpen)return;Loading=true;LanLobbyScreen.Open();}
 #endif
         public void StartRun(){if(Loading||SettingsOpen||Rush)return;Loading=MenuLaunch.Normal(SavedHeroSelection.Current);if(!Loading)message.text="Run scenes unavailable in this build.";}
         // Boss Rush opens in this scene (no separate hero-select scene): arena step, then the boss step.
@@ -477,9 +465,6 @@ namespace LastBell.Menu
             bool back=Keyboard.current?.escapeKey.wasPressedThisFrame==true||Gamepad.current?.buttonEast.wasPressedThisFrame==true;
             if(MenuFlowTest.Requested&&MenuSmokeTest.TestKeyboard!=null)back|=MenuSmokeTest.TestKeyboard.escapeKey.wasPressedThisFrame||MenuSmokeTest.TestGamepad.buttonEast.wasPressedThisFrame;
             if(back){
-#if LASTBELL_LAN_TEST
-                if(LanPanel)LanPanel.Back();else
-#endif
                 if(Rush)Rush.Back();else if(ResolutionListOpen)CloseResolutionList();else if(SettingsOpen)CloseSettings();}
             KeepResolutionInView();
             if(Loading){navigation.interactable=false;musicGroup.interactable=false;}

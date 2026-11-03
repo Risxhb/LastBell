@@ -11,6 +11,8 @@ namespace LastBell.Run.Networking
     {
         public static LanSessionCoordinator Instance { get; private set; }
         public static string LastError { get; private set; }
+        // The LAN lobby scene (Menu/LanLobbyScreen, LAN builds only). A session closing there stays there and shows why.
+        public const string LobbyScenePath = "Assets/LastBell/Menu/LanLobby.unity";
         public LanLobby Lobby { get; private set; }
         public bool Loading { get; private set; }
         public bool InFight { get; private set; }
@@ -85,7 +87,8 @@ namespace LastBell.Run.Networking
             if (host) { Destroy(host.gameObject); host = null; }
             else Lobby?.Dispose();
             Lobby = null; Instance = null;
-            if (returnToMenu && SceneManager.GetActiveScene().path != ConfrontationMenu.ScenePath) SceneManager.LoadScene(ConfrontationMenu.ScenePath);
+            var active = SceneManager.GetActiveScene().path;
+            if (returnToMenu && active != ConfrontationMenu.ScenePath && active != LobbyScenePath) SceneManager.LoadScene(ConfrontationMenu.ScenePath);
             Destroy(gameObject);
         }
         void OnDestroy()

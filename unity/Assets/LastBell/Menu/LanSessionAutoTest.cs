@@ -46,7 +46,7 @@ namespace LastBell.Menu
             LanSessionCoordinator session=null;
             // Names come from -lastbellProfile (Run-TwoProcess.ps1 passes Host, Client 1..3); never from the saved profile.
             string myName=LanProfile.Overridden ? LanProfile.Current : host ? "Host" : "Client";
-            try { session=LanSessionCoordinator.Open(host ? LanLobby.Host(Port(),LanMenuPanel.BuildId(),"Tollbreaker",myName) : LanLobby.Connect("127.0.0.1",Port(),LanMenuPanel.BuildId(),ClientClass,myName)); }
+            try { session=LanSessionCoordinator.Open(host ? LanLobby.Host(Port(),LanLobbyScreen.BuildId(),"Tollbreaker",myName) : LanLobby.Connect("127.0.0.1",Port(),LanLobbyScreen.BuildId(),ClientClass,myName)); }
             catch(Exception ex) { Check("open LAN: "+ex.Message,false); Finish(); yield break; }
             Debug.Log(host ? "[LAN smoke] HOST READY" : "[LAN smoke] CLIENT CONNECTING");
             int peerCount=PeerCount(); float until=Time.realtimeSinceStartup+90;
