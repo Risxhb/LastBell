@@ -82,6 +82,7 @@ namespace LastBell.Run
         IEnumerable<int> Block(string name, IEnumerable<int> body)
         {
             Blocks++; BlockLog.Add((phase, name, W.Tick));
+            AurelionTimeline.Note($"phase {phase} block {name}");
             foreach (var w in body) yield return w;
         }
         IEnumerable<int> V2Gap(float s)

@@ -62,6 +62,7 @@ namespace LastBell.Run
             // the orrery rings and the label glyphs are warmed here, before the fight (perf captures 3 Nov: first built, drawn
             // or lettered mid-fight, each spiked a frame)
             OrreryClosingFx.Warm(W); ZenithCollapseFx.Warm(W);
+            AurelionTimeline.Note("boss built (warm-ups)");
             gameObject.AddComponent<AurelionWarmUp>();
         }
 

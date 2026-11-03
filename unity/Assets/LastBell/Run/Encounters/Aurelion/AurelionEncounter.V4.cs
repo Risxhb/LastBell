@@ -322,6 +322,7 @@ namespace LastBell.Run
             if (phase >= 4) foreach (var h in Spots.Pools) W.Hazards.Cancel(h);   // Last Light starts on clean floor: only the slices burn
             if (phase >= 3) SecondForm = true;
             Current = "phase shift";
+            AurelionTimeline.Note($"phase shift to {phase}");
             SetPhase(phase == 2 ? "Misalignment" : phase == 3 ? "Exposed Meridian" : "Last Light");
             pose = Pose.Neutral; glowTarget = 2.5f; Clip("PhaseShift", 90);
             for (int i = 0; i < 90; i++) { if (i == 45) { W.Fx.Crescendo(transform.position, true, 0, false); Release(1.2f); } yield return 1; }

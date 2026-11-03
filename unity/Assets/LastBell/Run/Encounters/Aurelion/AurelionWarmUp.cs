@@ -37,3 +37,20 @@ namespace LastBell.Run
         }
     }
 }
+
+namespace LastBell.Run
+{
+    // -lastbellAurelionTimeline (performance captures, 3 Nov): logs block starts, phase changes, the planets' arrival and
+    // every dynamic font texture rebuild with the frame number, so a frame spike can be matched to what the fight did.
+    public static class AurelionTimeline
+    {
+        public static readonly bool On = System.Array.Exists(System.Environment.GetCommandLineArgs(), a => a.Equals("-lastbellAurelionTimeline", System.StringComparison.OrdinalIgnoreCase));
+        static bool hooked;
+        public static void Note(string what)
+        {
+            if (!On) return;
+            if (!hooked) { hooked = true; UnityEngine.Font.textureRebuilt += f => Note("font texture rebuilt: " + (f ? f.name : "?")); }
+            UnityEngine.Debug.Log($"[aurelion timeline] frame {UnityEngine.Time.frameCount} t {UnityEngine.Time.realtimeSinceStartup:F3} {what}");
+        }
+    }
+}

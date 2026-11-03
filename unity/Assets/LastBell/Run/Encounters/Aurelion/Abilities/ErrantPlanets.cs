@@ -33,6 +33,7 @@ namespace LastBell.Run
         public void Begin()
         {
             if (Live) return;
+            AurelionTimeline.Note("errant planets begin");
             int n = Easy ? 1 : Orbits.Length;
             for (int i = 0; i < n; i++)
             {
