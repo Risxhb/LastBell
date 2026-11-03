@@ -892,13 +892,14 @@ namespace LastBell.Areas.Area2.EditorTools
             Sector(brass, I, 13.88f, 13.98f, 0, TAU, 0, 0.01f, 256, ends: false);
             // the reference's heavy brass band at the floor's edge: a satin dark-brass ring with rivets (flat, 3 cm, still walkable)
             var band = G("CombatFloor/Inlays", mDarkBrass);
-            Sector(band, I, 13.62f, 13.86f, 0, TAU, 0, 0.03f, 256, ends: false);
-            for (int i = 0; i < 144; i++) Box(G("CombatFloor/Inlays", mBrass), TR(Polar(i / 144f * TAU, 13.74f, 0.03f), YawOut(i / 144f * TAU)), new Vector3(0.06f, 0.02f, 0.06f));
+            Sector(band, I, 13.45f, 13.86f, 0, TAU, 0, 0.03f, 256, ends: false);
+            for (int i = 0; i < 32; i++) Box(band, TR(Polar((i + 0.5f) / 32 * TAU, 13.38f, 0), YawOut((i + 0.5f) / 32 * TAU)), new Vector3(0.22f, 0.03f, 0.34f), new Vector3(0, 0.015f, 0));   // bracket tabs, like the reference's gear-toothed band
+            for (int i = 0; i < 144; i++) Box(G("CombatFloor/Inlays", mBrass), TR(Polar(i / 144f * TAU, 13.52f, 0.03f), YawOut(i / 144f * TAU)), new Vector3(0.06f, 0.02f, 0.06f));
             for (int k = 0; k < 4; k++)
             {
                 float a = k * PI / 2; var m = TR(Vector3.zero, YawOut(a)); bool ew = k % 2 == 0; // local +X points outward along the arm
-                Box(brass, m, new Vector3(10.4f - 2.75f, H, 0.09f), new Vector3((2.75f + 10.4f) / 2, H / 2, 0));
-                Box(brass, m, new Vector3(13.2f - 12.55f, H, 0.09f), new Vector3((12.55f + 13.2f) / 2, H / 2, 0));
+                Box(brass, m, new Vector3(10.4f - 2.75f, H, 0.16f), new Vector3((2.75f + 10.4f) / 2, H / 2, 0));
+                Box(brass, m, new Vector3(13.2f - 12.55f, H, 0.16f), new Vector3((12.55f + 13.2f) / 2, H / 2, 0));
                 float w = ew ? 0.95f : 0.75f;
                 Poly(brass, m, new[] { new Vector2(10.3f, 0), new Vector2(10.95f, w / 2), new Vector2(12.65f, 0), new Vector2(10.95f, -w / 2) }, 0, H, true, B);
                 Poly(dark, m, new[] { new Vector2(10.6f, 0), new Vector2(11.0f, w * 0.28f), new Vector2(12.2f, 0), new Vector2(11.0f, -w * 0.28f) }, 0, H + 0.004f, false);
@@ -928,6 +929,10 @@ namespace LastBell.Areas.Area2.EditorTools
         // Furnace rim: inner curb, rim base, and a single ring of separate gear-tooth blocks (big and small alternating,
         // 0.4 m gaps so the molten glow shows between them, heights ±15%), with brass edge trims, rivets, chain anchors
         // and small gauge and valve props.
+        // Merlons on the far (north, -Z) side of the ring are lower, so the gameplay camera sees the molten band behind
+        // them (the near side hides it anyway behind the floor's far edge only on the far side).
+        static float FarLow(float a) => Mathf.Lerp(1f, 0.65f, Smooth(0.15f, 0.75f, -Mathf.Sin(a)));
+
         static void BuildRim()
         {
             bevel = 0.07f;
@@ -960,7 +965,7 @@ namespace LastBell.Areas.Area2.EditorTools
                     {
                         bool big = j % 2 == 0; float w = big ? BIGW : SMALLW, mid = a0 + (at + w / 2) / 15.2f; at += w + gap;
                         Model("FurnaceRim", "SM_Area2_RimTooth_" + (big ? "Big_" : "Small_") + "ABC"[(n / 2) % 3],
-                            Radial(mid) * Matrix4x4.TRS(new Vector3(0, 0, 14.45f), Quaternion.identity, new Vector3(big ? BIGW / 2.1f : SMALLW / 1.3f, Rnd(0.86f, 1.14f), 1)));
+                            Radial(mid) * Matrix4x4.TRS(new Vector3(0, 0, 14.45f), Quaternion.identity, new Vector3(big ? BIGW / 2.1f : SMALLW / 1.3f, Rnd(0.86f, 1.14f) * FarLow(mid), 1)));
                         // molten slot in the gap after this tooth, open into the channel, so every gap glows from above
                         float ga = a0 + (at - gap / 2) / 15.2f, hw = gap * 0.4f / 15.2f;
                         if (j < cnt - 1) Sector(G("FurnaceRim", mGapMolten), I, 14.95f, ChannelIn + 0.05f, ga - hw, ga + hw, 0.035f, 0.035f, 3, inner: false, outer: false, ends: false);
