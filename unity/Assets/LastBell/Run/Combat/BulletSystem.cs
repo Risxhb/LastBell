@@ -17,6 +17,7 @@ namespace LastBell.Run
             public int Damage = 12;
             public int Colour;                    // 0 hurts everyone; otherwise only players whose colour matches (Two-Colour Choir)
             public string Source = "Bullet";
+            public string AttackId;               // its boss attack (BossAttackIcons), copied onto the hit
             public Action<Bullet> Split;          // runs when the fuse (Life) ends without a hit: seeds burst into petals
             public bool Dead;
         }
@@ -62,7 +63,7 @@ namespace LastBell.Run
                     b.Dead = true;
                     var h = new Hazard
                     {
-                        Source = b.Source, Shape = HazardShape.Circle, Kind = HazardKind.Strike, Radius = b.Radius,
+                        Source = b.Source, AttackId = b.AttackId, Shape = HazardShape.Circle, Kind = HazardKind.Strike, Radius = b.Radius,
                         Origin = b.Pos - b.Vel.normalized * 0.5f, Damage = b.Damage, Knockback = 0, Stun = 0, Flinch = false,
                     };
                     int hp0 = p.Hp; p.ReceiveHit(h);

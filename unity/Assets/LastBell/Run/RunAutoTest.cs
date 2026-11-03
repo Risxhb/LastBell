@@ -240,6 +240,7 @@ namespace LastBell.Run
             }
             if (OnlySylvara)
             {
+                BossAttackIconChecks();   // the catalog carries her icons
                 yield return SylvaraChecks();
                 Check("no errors or exceptions logged", errors == 0, errors + " logged");
                 Finish(); yield break;
@@ -735,8 +736,8 @@ namespace LastBell.Run
         {
             bool was = AllyBot.Attacks; AllyBot.Attacks = true; int keep = RunParty.Selected;
             var keepLevel = RunDifficulty.Selected;
-            // Tollbreaker solo on every level, plus one party run on Hard (1-4 players; test less, 1 Nov)
-            var runs = new (string cls, int allies, Difficulty level)[] { ("Tollbreaker", 0, Difficulty.Easy), ("Tollbreaker", 0, Difficulty.Medium), ("Tollbreaker", 0, Difficulty.Hard), ("Tollbreaker", 3, Difficulty.Hard) };
+            // Hard: Tollbreaker solo plus one party of 4 (test less, 1 Nov: the levels only scale damage)
+            var runs = new (string cls, int allies, Difficulty level)[] { ("Tollbreaker", 0, Difficulty.Hard), ("Tollbreaker", 3, Difficulty.Hard) };
             foreach (var (cls, allies, level) in runs)
             {
                 if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }
@@ -904,7 +905,7 @@ namespace LastBell.Run
             // her attack clips (proposal 2 Nov): a Conduct loop under the spirals, one-shots on the attacks
             Check("Sylvara conducts while a spiral runs", sy.LoopClip == "ConductLoop", sy.LoopClip);
             foreach (var c in new[] { "Toll", "CallWater", "PruningArc", "Seed" }) Check($"Sylvara P1 plays the {c} clip", sy.Clips.Contains(c));
-            var newClips = new[] { "ConductLoop", "StormLoop", "Toll", "CallWater", "Sow" };
+            var newClips = new[] { "ConductLoop", "StormLoop", "Toll", "CallWater", "Sow", "LanesLoop" };
             if (sy.Presenter && sy.Presenter.HasModel && newClips.All(sy.Presenter.Has)) Check("her model has every v3 attack clip", true);
             else Note("Sylvara: this model has no v3 attack clips (old sylvara-assets pack): every attack falls back to Idle");
             if (SylvaraProps.Has(SylvaraProps.Pod)) Check("Seed Pods drop the pod model onto their warnings", sy.PodModels > 0, sy.PodModels.ToString());
@@ -928,15 +929,18 @@ namespace LastBell.Run
                 Check("Two-Colour Choir: the other colour's bullet passes through you", !bulletsHit.Contains(ghost));
                 Check("Two-Colour Choir: your own colour's bullet hits you", bulletsHit.Contains(real));
             }
-            int c0 = sy.ColourOf(d.Player); bool swapped = false, p2Shot = false;
+            int c0 = sy.ColourOf(d.Player); bool swapped = false, p2Shot = false, laneBeat = false;
             float s2 = Time.time;
             while (Time.time - s2 < 12f && d.State == RunState.Combat)
             {
                 yield return Play(0.5f, () => false);
                 swapped |= sy.ColourOf(d.Player) != c0 && sy.ColourOf(d.Player) != 0;
+                laneBeat |= sy.LoopClip == "LanesLoop";   // the lanes fire for most of the loop
                 if (!p2Shot && d.World.Bullets.Count > 150) { p2Shot = true; yield return Shot("sylvara_v3_p2"); }
             }
             Check("Two-Colour Choir: a toll swaps the player's colour", swapped);
+            Check("Sylvara beats the Lanes loop while the lanes fire", laneBeat);
+            Check("the Phase 2 spiral shows the Two-Colour Choir icon", sy.AttackOf("Petal Spiral") == "sylvara.two_colour_choir");
             foreach (var id in new[] { "Colour Spiral", "Brass Lanes", "Cobalt Lanes", "Second Colour Spiral", "Root Ring", "Toll" })
                 Check($"Sylvara P2 uses {id}", sy.Order.Contains(id));
             if (SylvaraProps.Has(SylvaraProps.Root))
@@ -1012,6 +1016,7 @@ namespace LastBell.Run
             sy.DebugStartStorm(7);
             Check("enrage cap: Last Storm from 2:00 throws 14 seeds every 0.6 s", sy.LastStorm && sy.StormSeeds == 14 && Mathf.Abs(sy.StormEvery - 0.6f) < 0.001f);
             Check("Last Storm plays the Storm loop", sy.LoopClip == "StormLoop", sy.LoopClip);
+            Check("Last Storm's spiral and seeds show the Last Storm icon", new[] { "Petal Spiral", "Seed", "Seed Burst" }.All(s => sy.AttackOf(s) == "sylvara.last_storm"));
             yield return Play(3f, () => false);
             yield return Shot("sylvara_v3_last_storm");
 
@@ -1054,6 +1059,14 @@ namespace LastBell.Run
             Check("Sylvara: coloured bullets only hit their own colour", colourOk);
             Check("Sylvara: each ground or arc hazard hits at most once (R16)", hitsPerInstance.Values.All(n => n == 1), $"{hitsPerInstance.Count} instances hit");
             Note($"Sylvara v3: bot took {taken} damage ({bulletHits} bullet hits, {hitsPerInstance.Count} hazard hits), healed by the test; peak {maxBullets} bullets on screen, {d.World.Bullets.Fired} fired");
+            // attack icons (approved 2 Nov): every hit she dealt names its attack, and that attack has an icon
+            {
+                var w = d.World; var hits = Enumerable.Range(0, w.TakenLog.Count).Where(i => w.TakenLog[i].source != "Test Bullet").ToList();
+                var bare = hits.Where(i => w.TakenAttackIds[i] == null).Select(i => w.TakenLog[i].source).Distinct().ToList();
+                var ids = hits.Select(i => w.TakenAttackIds[i]).Where(id => id != null).Distinct().ToList();
+                Check("Sylvara: every hit carries her attack ID", hits.Count > 0 && bare.Count == 0, bare.Count == 0 ? $"{hits.Count} hits" : "no ID: " + string.Join(", ", bare));
+                Check("Sylvara: each attack hit has its icon and name", ids.All(id => BossAttackIcons.Icon(id) != null && BossAttackIcons.Get(id).bossName == "Sylvara"), string.Join(", ", ids));
+            }
 
             yield return KillDuringWindup("sylvara");   // Last Storm is still running: the watcher keeps the bot alive until she dies
             watching = false;

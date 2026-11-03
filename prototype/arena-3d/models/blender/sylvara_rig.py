@@ -419,6 +419,20 @@ def sow(t):
     })
     return ch
 
+LANES = 0.7
+def lanes(t):
+    # one beat, sped up in game so each cycle matches a lane volley (0.35 s Hard, 0.5 s Easy): the conduct pose with the
+    # fork arm held high drops in a short downbeat at the wrap (the volley) and lifts back; the chest bells nod with it.
+    b = math.exp(-6.0 * t / LANES) + math.exp(-18.0 * (1 - t / LANES))   # sharp drop into the wrap, slower lift after
+    ch = breath(0)
+    ch.update({
+        'hips_loc': (0, 0, -0.03 * b), 'spine': (-2 + 3 * b, 0, 0), 'chest': add(ch['chest'], (-4 + 6 * b, 0, 2)),
+        'head': (-2 + 4 * b, 0, 2),
+        'upperarm.R': (-92 + 26 * b, 30, 0), 'forearm.R': (-30 - 8 * b, 0, 0), 'hand.R': (-14 + 30 * b, 0, 0),
+        'upperarm.L': (-22, -22, 0), 'forearm.L': (-18, 0, 0), 'hand.L': (-12, 0, 0),
+    })
+    return ch
+
 def bake_clip(name, seconds, fn):
     frames = round(seconds * 30)
     act = bpy.data.actions.new(name); act.use_fake_user = True
@@ -436,7 +450,8 @@ acts = [bake_clip('Idle', 4.0, idle), bake_clip('Walk', WALK_CYCLE, walk),
         bake_clip('Procession', 2.45, procession), bake_clip('Bloom', 2.0, bloom), bake_clip('Vulnerable', 2.0, vulnerable),
         bake_clip('PhaseShift', 1.5, phase_shift), bake_clip('Defeat', 2.5, defeat),
         bake_clip('ConductLoop', CONDUCT, conduct), bake_clip('StormLoop', STORM, storm), bake_clip('Toll', TOLL, toll),
-        bake_clip('CallWater', CALL, call_water), bake_clip('Sow', SOW, sow)]
+        bake_clip('CallWater', CALL, call_water), bake_clip('Sow', SOW, sow),
+        bake_clip('LanesLoop', LANES, lanes)]
 print('CLIPS', [a.name for a in acts])
 arm.animation_data.action = acts[0]
 set_pose({})

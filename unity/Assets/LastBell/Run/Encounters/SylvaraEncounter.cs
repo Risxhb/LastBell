@@ -60,7 +60,8 @@ namespace LastBell.Run
         public int BudsBloomed { get; private set; }
         public readonly List<string> Order = new List<string>();   // attack starts, for tests
         // Her clips (presentation; proposal 2 Nov, ATTACK-VISUALS.md): one-shots go through Act, and the loop under them is
-        // Conduct while a spiral runs, Storm in Last Storm, else Idle. Clips the model lacks fall back to Idle.
+        // Conduct while a spiral runs (Lanes, a downbeat per volley, while P2 lanes fire), Storm in Last Storm, else Idle.
+        // Clips the model lacks fall back to Idle (Lanes falls back to Conduct).
         public readonly List<string> Clips = new List<string>();   // one-shots played, for tests
         int actUntil;
         void Act(string clip, float seconds)
@@ -68,11 +69,13 @@ namespace LastBell.Run
             Clips.Add(clip); actUntil = Age + Sim.Ticks(seconds);
             if (presenter) presenter.PlayOnce(clip, seconds);
         }
-        public string LoopClip => LastStorm ? "StormLoop" : (sp1 != null && sp1.On) || (sp2 != null && sp2.On) ? "ConductLoop" : "Idle";
+        public string LoopClip => LastStorm ? "StormLoop" : emit.Exists(e => e.On && e.Lane) ? "LanesLoop"
+            : (sp1 != null && sp1.On) || (sp2 != null && sp2.On) ? "ConductLoop" : "Idle";
+        const float LanesClip = 0.7f;   // LanesLoop is one 0.7 s beat, sped up so each beat lands on a lane volley
         float LoopT => (Age - loopStart) * Sim.Dt;
         public float P4Time => p4Start < 0 ? 0 : (Age - p4Start) * Sim.Dt;   // seconds since Phase 4 began (enrage clock)
 
-        sealed class Emitter { public bool On = true, Looping; public Action<float> Update; }
+        sealed class Emitter { public bool On = true, Looping, Lane; public Action<float> Update; }
         readonly List<Emitter> emit = new List<Emitter>();
         readonly List<(int at, Action fn)> later = new List<(int, Action)>();
         Emitter sp1, sp2;
@@ -316,7 +319,28 @@ namespace LastBell.Run
         void Later(float seconds, Action fn) => later.Add((Age + Mathf.Max(1, Sim.Ticks(seconds)), fn));
         Emitter Add(Emitter e) { emit.Add(e); return e; }
         void Shot(Vector3 at, float a, float v, int dmg = 12, float life = 6, int col = 0, string src = "Petal", float r = BulletArt.PetalHitRadius, Action<BulletSystem.Bullet> split = null) =>
-            W.Bullets.Fire(at, a, v, dmg, life, r, col, src, split);
+            W.Bullets.Fire(at, a, v, dmg, life, r, col, src, split).AttackId = AttackOf(src);
+        // the boss attack icon (BossAttackIcons, approved 2 Nov) a bullet or hazard belongs to. Sources repeat across phases, so
+        // the spiral is Two-Colour Choir in Phase 2 and the spiral and seeds are Last Storm once it starts. Choir Bud (the
+        // harmless bloom timer) has none.
+        public string AttackOf(string src)
+        {
+            if (LastStorm && (src == "Petal Spiral" || src == "Seed" || src == "Seed Burst")) return "sylvara.last_storm";
+            switch (src)
+            {
+                case "Petal Spiral": return phase == 2 ? "sylvara.two_colour_choir" : "sylvara.spiral_bloom";
+                case "Brass Lane": case "Cobalt Lane": return "sylvara.two_colour_choir";
+                case "Seed Pod": case "Feet Pod": case "Pod Petal": return "sylvara.seed_pods";
+                case "Waterfall Jet": return "sylvara.waterfall_jets";
+                case "Pruning Arc": case "Pruning Arc (back)": case "Arc Petal": return "sylvara.pruning_arc";
+                case "Toll Burst": return "sylvara.toll_burst";
+                case "Root Ring": return "sylvara.root_ring";
+                case "Bud Petal": return "sylvara.hollow_bloom";
+                case "Bud Bloom": return "sylvara.bud_bloom";
+                case "Seed": case "Seed Burst": return "sylvara.seed_storm";
+                default: return null;
+            }
+        }
         void PetalRing(Vector3 c, int n, float v, float off, float r0, int dmg = 12, string src = "Petal")
         {
             for (int i = 0; i < n; i++) { float a = off + i * Tau / n; Shot(c + On(a, r0), a, v, dmg, 6, 0, src); }
@@ -324,7 +348,7 @@ namespace LastBell.Run
         static float Rnd(float a, float b) => UnityEngine.Random.Range(a, b);
         static readonly System.Random look = new System.Random(31);   // presentation only, so props never shift the fight's rolls
         static float LookRnd(float a, float b) => a + (float)look.NextDouble() * (b - a);
-        Hazard Tune(Hazard h) { h.Stun = Stun; h.Knockback = 0; return h; }
+        Hazard Tune(Hazard h) { h.Stun = Stun; h.Knockback = 0; h.AttackId ??= AttackOf(h.Source); return h; }
         int FarCount { get { int n = W.Players.Count; return n <= 2 ? 1 : n <= 4 ? 2 : 3; } }
         public int BudCount { get { int n = W.Players.Count; return (n <= 2 ? 2 : n <= 4 ? 3 : 4) + (Hard ? 1 : 0); } }   // Hard: one more bud
         List<PlayerController> Farthest(int k)
@@ -445,7 +469,7 @@ namespace LastBell.Run
                 float a0 = AngOf(ts[i].transform.position), dir = i % 2 == 1 ? -1 : 1, span = 40 * Deg, start = a0 - dir * span / 2;
                 W.Hazards.Spawn(new Hazard
                 {
-                    Source = "Waterfall Jet", Shape = HazardShape.Cone, Kind = HazardKind.Strike, Origin = Vector3.zero, Yaw = YawOf(a0),
+                    Source = "Waterfall Jet", AttackId = AttackOf("Waterfall Jet"), Shape = HazardShape.Cone, Kind = HazardKind.Strike, Origin = Vector3.zero, Yaw = YawOf(a0),
                     Radius = R, HalfAngle = 20, LockAt = 0, ResolveAt = Sim.Ticks(warn), Damage = 0, HitOnResolve = false,
                 });
                 Later(warn, () =>
@@ -518,7 +542,7 @@ namespace LastBell.Run
         {
             var d = new Vector3(Mathf.Cos(travel), 0, Mathf.Sin(travel)); var pp = new Vector3(-d.z, 0, d.x);
             float acc = 0, off = 0;
-            var e = new Emitter { Looping = true };
+            var e = new Emitter { Looping = true, Lane = true };
             e.Update = dt =>
             {
                 if (LoopT >= until) { e.On = false; return; }
@@ -650,7 +674,9 @@ namespace LastBell.Run
         // ---------------- per tick ----------------
         protected override void StepAlways()
         {
-            if (presenter) presenter.TickBoss(Dead || phase == 0 ? "Idle" : LoopClip);
+            string loop = Dead || phase == 0 ? "Idle" : LoopClip;
+            if (loop == "LanesLoop" && presenter && !presenter.Has(loop)) loop = "ConductLoop";   // 2.0.0 pack and older
+            if (presenter) presenter.TickBoss(loop, loop == "LanesLoop" ? LanesClip / LanePeriod : 1);
             if (Dead || Current == "idle" || phase == 0) return;   // halted (party down) or not started
             for (int i = later.Count - 1; i >= 0; i--) if (Age >= later[i].at) { var fn = later[i].fn; later.RemoveAt(i); fn(); }
             for (int i = 0; i < emit.Count; i++) if (emit[i].On) emit[i].Update?.Invoke(Sim.Dt);
