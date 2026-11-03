@@ -4,7 +4,7 @@ Chzy18 said "P2 and 3 are too easy and p4 needs to start immediately when it hit
 
 ## Accepted
 - **Errant Planets (Phase 2).**
-  - Two planets (one on Easy), 1.6 m across, circle the arena on off-centre orbits at 4.5 m/s, in opposite directions. Their paths are drawn as faint gold rings.
+  - Two planets (one on Easy), 1.6 m across, circle the arena on off-centre orbits at 4.5 m/s, in opposite directions. Their paths are drawn as faint dark-red rings (gold ones vanished among the floor's own gold rings). Shots: `shots/01_aurelion_errant_planets_gamecam.png`, `shots/02_aurelion_falling_meridians_gamecam.png`.
   - Touching one deals 30 and knocks you back 1.5 m, at most once a second per player.
   - They run over every Phase 2 block except Total Eclipse.
   - Code: `ErrantPlanets.cs`.

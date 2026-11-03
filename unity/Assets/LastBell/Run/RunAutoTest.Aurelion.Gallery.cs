@@ -11,6 +11,7 @@ namespace LastBell.Run
     {
         static bool AurelionGallery => Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellAurelionGallery", StringComparison.OrdinalIgnoreCase));
         static bool DevourShots => Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellDevourShots", StringComparison.OrdinalIgnoreCase));
+        static bool ExtrasShots => Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellExtrasShots", StringComparison.OrdinalIgnoreCase));
 
         // Two passes: the fixed overhead view for the design docs, then the real gameplay camera, where the telegraph style
         // (Reference/Telegraph-Style v2: contour widths, luminance, the Skyward motif) has to be judged.
@@ -19,6 +20,15 @@ namespace LastBell.Run
         {
             if (SeveranceShots) { yield return SeveranceShotsAll(); yield break; }
             if (LastLightShots) { yield return LastLightShotsAll(); yield break; }
+            if (ExtrasShots)   // -lastbellExtrasShots: Errant Planets (Phase 2) and Falling Meridians (Phase 3), game camera
+            {
+                AurelionArgs.SoloOverride = null; RunDirector.ShotCamera = null; galleryCam = "_gamecam";
+                yield return V2Setup(1, Difficulty.Medium, new[] { new Vector3(-3, 0, -4f) }, 2, Vector3.zero);
+                if (V2Boss != null) { V2Boss.DebugSetPhaseV4(2); V2Boss.TestExtras = true; yield return V2Ticks(Sim.Ticks(1.5f)); yield return Shot("aurelion_errant_planets" + galleryCam); V2Boss.TestExtras = false; }
+                yield return V2Setup(1, Difficulty.Medium, new[] { new Vector3(-3, 0, -4f) }, 3, Vector3.zero);
+                if (V2Boss != null) { V2Boss.DebugSetPhaseV4(3); V2Boss.Meridians.Reset(); V2Boss.TestExtras = true; yield return V2Ticks(Sim.Ticks(FallingMeridians.EveryS) + Sim.Ticks(0.6f)); yield return Shot("aurelion_falling_meridians" + galleryCam); V2Boss.TestExtras = false; }
+                yield return V2Teardown(); yield break;
+            }
             if (DevourShots)   // -lastbellDevourShots: only Devour, 0.8 s into the pull, both cameras (the player 8 m out, standing still)
             {
                 AurelionArgs.SoloOverride = null;

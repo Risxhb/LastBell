@@ -21,7 +21,8 @@ namespace LastBell.Run
             (new Vector3(1.5f, 0, 1.0f), 7.0f, 1f, 0f),
             (new Vector3(-1.0f, 0, -1.5f), 9.5f, -1f, 180f),
         };
-        static readonly Color PathFill = new Color(0.9f, 0.7f, 0.35f, 0.0f), PathEdge = new Color(0.9f, 0.7f, 0.35f, 0.35f);
+        // coral, not gold: the Skyward floor already has gold rings, and a gold path vanished among them (2 Nov shots)
+        static readonly Color PathFill = new Color(0.45f, 0.16f, 0.13f, 0.0f), PathEdge = new Color(0.45f, 0.16f, 0.13f, 0.3f);   // dim: the path never hurts, only the planet
 
         sealed class Planet { public Hazard H; public BellkeeperFx.Telegraph Path; public int Orbit; public float Angle; public readonly Dictionary<PlayerController, int> At = new Dictionary<PlayerController, int>(); }
         readonly List<Planet> planets = new List<Planet>();
@@ -42,7 +43,7 @@ namespace LastBell.Run
                     Source = Name, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Pos(o, o.start), Radius = Radius,
                     LockAt = 0, ResolveAt = 1, ActiveTicks = 1 << 28, Damage = Damage, Knockback = 1.5f, Stun = 0,
                 });
-                p.Path = W.BossFx.Ring(o.r - 0.06f, o.r + 0.06f);
+                p.Path = W.BossFx.Ring(o.r - 0.05f, o.r + 0.05f);
                 p.Path.Tint(PathFill, PathEdge); p.Path.Progress(1); p.Path.Order = -2; p.Path.Place(o.centre, 0);
                 planets.Add(p);
             }
