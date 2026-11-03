@@ -361,11 +361,11 @@ namespace LastBell.Run
             foreach (var st in new[] { revealName, revealEpithet, resultPrimary, resultAction, display30, display36, display40, heading, eyebrow, eyebrowC,
                      labelGold, bodyC, bodyL, row15, numR, numC, small13, small13R, micro, microR, controls, chipSt, keySt, keyStL, cornerSt, stateSt, pill,
                      tab, floatSt, slotName, tipSt, descSt, microC, subC, rowLabel, microHead, btn, btnP, mapBtn, microWrap, meterHead })
-                if (st != null) { var s = st; warmQueue.Enqueue(() => WarmFont(s.font, s.fontSize, s.fontStyle)); }
+                if (st != null) EnqueueFont(st.font, st.fontSize, st.fontStyle);
             foreach (var st in new[] { revealName, revealEpithet, display30 })
-                foreach (var f in FitSteps) { var s = st; int size = FitSize(st, f); warmQueue.Enqueue(() => WarmFont(s.font, size, s.fontStyle)); }
+                foreach (var f in FitSteps) EnqueueFont(st.font, FitSize(st, f), st.fontStyle);
             // the overlays (caption 28/20, banner 46, world labels 30-54) use the skin font at fixed unscaled sizes
-            foreach (int size in new[] { 20, 28, 30, 34, 44, 46, 54 }) { int z = size; warmQueue.Enqueue(() => { WarmFont(null, z, FontStyle.Bold); WarmFont(null, z, FontStyle.Normal); }); }
+            foreach (int size in new[] { 20, 28, 30, 34, 44, 46, 54 }) { EnqueueFont(null, size, FontStyle.Bold); EnqueueFont(null, size, FontStyle.Normal); }
             // the boss block's mechanic rows (BossBlock): each attack and mechanic line is a long string laid out the first time
             // its hazard appears (perf report aurelion-eclipse-2026-11-03: 7.4 ms at Starfall Mirror), so lay them all out here
             if (row15 != null)
@@ -390,16 +390,29 @@ namespace LastBell.Run
             if (warmQueue.Count == 0 && UiTheme.FontLog)
                 Debug.Log($"[fontlog] HUD font warm-up done over {warmFrames} frames, {(System.Diagnostics.Stopwatch.GetTimestamp() - warmStarted) * 1000.0 / System.Diagnostics.Stopwatch.Frequency:0} ms wall");
         }
-        GUIStyle warmSt; static readonly GUIContent warmText = new GUIContent(WarmChars);
+        // one step for the ASCII set, then one per non-ASCII glyph: each fallback-font glyph costs 13-15 ms the first time,
+        // so batched into one step they froze single Ready frames for 50-170 ms (perf report aurelion-4p-2026-11-03, 10:20)
+        static readonly string[] WarmParts = SplitWarmChars();
+        static string[] SplitWarmChars()
+        {
+            var parts = new List<string>(); var ascii = new System.Text.StringBuilder();
+            foreach (char ch in WarmChars) { if (ch < 128) ascii.Append(ch); else parts.Add(ch.ToString()); }
+            parts.Insert(0, ascii.ToString()); return parts.ToArray();
+        }
+        void EnqueueFont(Font font, int size, FontStyle style)
+        {
+            foreach (var part in WarmParts) { var c = new GUIContent(part); warmQueue.Enqueue(() => WarmFont(font, size, style, c)); }
+        }
+        GUIStyle warmSt;
         static void WarmText(GUIStyle st, string text)
         {
             var c = new GUIContent(text); var sz = st.CalcSize(c);
             st.Draw(new Rect(0, 0, sz.x, sz.y), c, false, false, false, false);   // GUI.color is clear: nothing shows
         }
-        void WarmFont(Font font, int size, FontStyle style)
+        void WarmFont(Font font, int size, FontStyle style, GUIContent warmText)
         {
             if (font == null) font = GUI.skin.font;
-            if (font != null && font.dynamic) font.RequestCharactersInTexture(WarmChars, size, style);
+            if (font != null && font.dynamic) font.RequestCharactersInTexture(warmText.text, size, style);
             if (warmSt == null) warmSt = new GUIStyle(GUI.skin.label) { wordWrap = false, richText = false, clipping = TextClipping.Overflow };
             warmSt.font = font; warmSt.fontSize = size; warmSt.fontStyle = style;
             var sz = warmSt.CalcSize(warmText);

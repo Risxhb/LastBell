@@ -105,14 +105,15 @@ namespace LastBell
             Diamond(new Vector2(b.x, b.yMax), d, Gold); Diamond(new Vector2(b.xMax, b.yMax), d, Gold);
         }
         // Text with a 1 px (scaled) drop shadow at black 0.85.
-        // A fade goes through GUI.color, not the text colour: the text colour is part of the IMGUI text cache key, so a
-        // fading float laid its text out again every frame (perf report aurelion-4p-2026-11-03: "absorbed" 9.4 ms).
+        // The text is laid out in white and coloured through GUI.color: the text colour is part of the IMGUI text cache key,
+        // so a fading float laid its text out again every frame, and a label switching colour (a key going from muted to
+        // ivory) was laid out again the first time (perf report aurelion-4p-2026-11-03: "absorbed" 9.4 ms, "LMB" 6.8 ms).
         public static void Label(Rect r, string text, GUIStyle style, Color? color = null)
         {
             var keep = style.normal.textColor; var c = color ?? keep; float o = Mathf.Max(1, Mathf.Round(Scale));
-            var oldGui = GUI.color; GUI.color = new Color(oldGui.r, oldGui.g, oldGui.b, oldGui.a * c.a); c.a = 1;
-            style.normal.textColor = new Color(0, 0, 0, 0.85f); RawLabel(new Rect(r.x + o, r.y + o, r.width, r.height), text, style);
-            style.normal.textColor = c; RawLabel(r, text, style);
+            var oldGui = GUI.color; style.normal.textColor = Color.white;
+            GUI.color = new Color(0, 0, 0, 0.85f * c.a * oldGui.a); RawLabel(new Rect(r.x + o, r.y + o, r.width, r.height), text, style);
+            GUI.color = oldGui * c; RawLabel(r, text, style);
             style.normal.textColor = keep; GUI.color = oldGui;
         }
         // GUI.Label, timed under -lastbellFontLog: any text layout over FontLogMs is logged with its text, size and font, to
