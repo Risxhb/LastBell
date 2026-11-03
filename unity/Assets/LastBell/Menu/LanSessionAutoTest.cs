@@ -158,7 +158,7 @@ namespace LastBell.Menu
             Check("client sees its own class abilities go on cooldown",observedOwnCooldown);
             var fx=session.ClientView ? session.ClientView.Effects : null;
             if (fx!=null) Debug.Log("[LAN smoke] client effects: "+fx.Played+" played, "+fx.Failed+" failed: "+string.Join(", ",fx.PlayedMethods.OrderBy(m=>m)));
-            string[] bossSide={"Float","Shake","SweepResolve","TollResolve","ChargeTrail","ChargeLand","ChimeResolve","BossHit","PlayerHit","PotionHeal","ResetAll"};
+            string[] bossSide={"Float","Shake","SweepResolve","TollResolve","ChargeTrail","ChargeLand","ChimeResolve","BossHit","PlayerHit","PotionHeal","ResetAll","Crescendo"};
             string[] arcanist={"MissileTapCast","MissileChargeStart","Missile","BeamStart","Beam","SigilPlace","CometMark","GlyphGain"};
             Debug.Log("[LAN smoke] client prediction: drew its own character up to "+maxLead.ToString("0.00")+" m ahead of the host's last state");
             Check("client predicts its own movement (ahead of the host, within 3 m)",maxLead>0.05f && maxLead<3);
