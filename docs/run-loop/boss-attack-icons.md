@@ -55,11 +55,8 @@ Sub-hazards that one attack spawns (rims, crowns, blasts, stamps, echoes) inheri
 - `Hazards.cs` is edited on this branch too. If it conflicts, keep both sides: the new line is the `AttackId` field just below `Source`.
 - v3 adds attacks that aren't among the 20 (Reunion, Umbra and the scorch hazards). Leave them without an ID for now; they show as text. Ask Codex for icons if they stay.
 
-### Crucivar (`feature/crucivar-abilities-v2`)
-- `CrucivarAbility.Id` is already the full ID, but several abilities call `W.Hazards.Spawn` directly (Bellows Draw, for example). Set `AttackId = Id` in each `new Hazard { … }` there, or route them through one helper.
-- Today's names resolve through aliases: `Slag Rim`, `Slag Edge` and `Bellows Blast` go to Bellows Draw; `Pour`, `Pour II` and `Stamp N` go to The Great Casting; `Mould Press I–IV` resolve by name.
-- Anvil Sweep and Slag Spit aren't among the 20. They show as text.
-- `Hazards.cs` is edited on this branch too; keep both sides.
+### Crucivar
+- The v2/v3 abilities these icons were made for are retired (1 Nov 2026). The v4 fight has no approved icons yet; its warnings show as text.
 
 ### Sylvara (`feature/sylvara-abilities-v2`)
 - `SylvaraAbility.Id` is the short form (`verdant_canticle`), so use `h.AttackId ??= "sylvara." + Id;`. The natural place is `SylvaraEncounter.Tuned`/`Tune`, or each ability's spawn calls.

@@ -51,10 +51,7 @@ namespace LastBell.Run
         // ---------------- encounter hooks ----------------
         public void Ratchet(float k) { }                                   // the three hammer notches live in the Diebreaker clip
         public void HammerLand() { }
-        public void Hiss(bool on) { gaugeK = on ? 0.6f : 0; }
         public void Pour(bool on) { pouring = on; }
-        public void Gauge(float k) { gaugeK = k; }
-        public void Vents(bool frontBack, bool on) { fbTarget = frontBack; ventsOn = on; }
         // every vent at once (Bellows Draw's inhale): belly shutters, flank grilles and the back exhaust
         public void VentsAll(bool on) { ventsAll = on; }
         public void BeginPhase(int phase)
