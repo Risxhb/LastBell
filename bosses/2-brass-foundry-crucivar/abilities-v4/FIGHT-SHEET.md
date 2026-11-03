@@ -104,3 +104,8 @@ Chzy18's playtest found Phases 1 and 2 too easy, Phase 2 short on bullets, and u
 - **Checks:**
   - The escape check passes on Easy, Medium and Hard, with new rows for the second Backdraft, the pools, the tower slag and the dense lanes.
   - The v4 tests pass 76/76.
+
+## Solo bot runs and attack icons (2 Nov)
+- **Solo Tollbreaker runs** (`CrucivarWatch -crucivarMeasure -crucivarBots 1 -crucivarAllyBot`, with the Tollbreaker class merged in for testing). Easy clears all three phases in 268 s. Medium went down in Phase 2, and the new per-attack log shows why: Ring Wave bullets, six hits in five seconds. The shared ally bot only saw where each bullet was, not where it was going. It now looks 0.35 s ahead along a moving hazard's new `Drift` (bullets set it). Hard didn't run, because Unity hung at start-up. Medium and Hard need a rerun with the look-ahead before anyone reads them as balance numbers.
+- **Measure mode logs** the damage the bot took per attack and its last eight hits when the fight ends.
+- **Attack icons:** Codex's v4 icons (accepted by Chzy18, 2 Nov) are in the boss attack icon catalog. Every v4 hazard carries its `AttackId`, so the death recap, tooltips and the Down card show the icon with the attack name. See `docs/run-loop/boss-attack-icons.md`.
