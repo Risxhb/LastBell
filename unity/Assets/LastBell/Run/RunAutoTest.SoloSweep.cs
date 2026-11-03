@@ -7,8 +7,8 @@ using UnityEngine;
 
 namespace LastBell.Run
 {
-    // -lastbellSoloSweep: one class (-lastbellDemoClass, default the Tollbreaker) played by a Perfect bot against every
-    // practice boss, at 4x. Hard only by default (Chzy18, 1 Nov: the levels only scale damage); -lastbellSweepLevels
+    // -lastbellSoloSweep: one class (-lastbellDemoClass, default the Tollbreaker) played by a Perfect bot against the four
+    // main bosses (no minibosses), at 4x. Hard only by default (Chzy18, 1 Nov: the levels only scale damage); -lastbellSweepLevels
     // Easy,Medium,Hard picks others. -lastbellSweepAllies N adds N attacking bot allies (3 = a party of 4). A measurement,
     // not a pass/fail: each fight's result (win or loss, clear time, how far the boss got, what killed him, what hit him
     // most) goes in the report and in solo-sweep.txt.
@@ -29,6 +29,7 @@ namespace LastBell.Run
                 foreach (var level in levels)
                 {
                     string name = RunDirector.Bosses[e].Name;
+                    if (name.Contains("(practice)")) continue;   // minibosses are not swept (Chzy18, 2 Nov)
                     if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }
                     d.SelectDifficulty(level); d.SelectAllies(allies);
                     AllyBot.AllyMode = BotMode.Perfect; AllyBot.Attacks = true;

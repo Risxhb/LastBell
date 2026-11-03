@@ -19,7 +19,7 @@ namespace LastBell.Run
         static readonly List<Hazard> prevLive = new List<Hazard>(), ghosts = new List<Hazard>();
         static readonly List<int> ghostUntil = new List<int>();
         static CombatWorld world; static int tick = -1, scanTick = -999;
-        const int GhostTicks = 30, ScanEvery = 30;
+        const int GhostTicks = 30, ScanEvery = 5;
 
         public static void Update(CombatWorld w, BossEncounter boss)
         {
