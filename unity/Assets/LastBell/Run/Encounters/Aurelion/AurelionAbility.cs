@@ -46,7 +46,8 @@ namespace LastBell.Run
         protected int Phase => Boss.Phase;                         // 1 Perfect Order, 2 Misalignment, 3 Exposed Meridian
         protected bool SecondForm => Boss.SecondForm;              // Exposed Meridian (30 %)
         protected List<PlayerController> Standing() => W.Players.FindAll(p => p && !p.Down);
-        protected int N => Math.Max(1, Standing().Count);
+        // counted in place, not via Standing(): bots read it through WellRadius on every probe (perf 3 Nov: 0.5-1.4 MB a frame in Total Eclipse)
+        protected int N { get { int n = 0; var ps = W.Players; for (int i = 0; i < ps.Count; i++) if (ps[i] && !ps[i].Down) n++; return Math.Max(1, n); } }
         protected PlayerController Farthest(Vector3 from) => Standing().OrderByDescending(p => Sim.Flat(p.transform.position - from).sqrMagnitude).FirstOrDefault();
         protected PlayerController Nearest(Vector3 from) => Standing().OrderBy(p => Sim.Flat(p.transform.position - from).sqrMagnitude).FirstOrDefault();
         public const int LastLightCap = 90;   // the biggest hit Last Light's scaling may build, after the difficulty scale

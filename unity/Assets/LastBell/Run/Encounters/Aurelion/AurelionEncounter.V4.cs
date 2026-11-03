@@ -51,7 +51,7 @@ namespace LastBell.Run
         public int FightTicks { get; private set; }
         public bool IntermissionDone { get; private set; }
         public int CollapseCasts { get; private set; }
-        int Party => W.Players.FindAll(p => p && !p.Down).Count;
+        int Party { get { int n = 0; var ps = W.Players; for (int i = 0; i < ps.Count; i++) if (ps[i] && !ps[i].Down) n++; return n; } }
         public readonly List<Hazard> PhasePools = new List<Hazard>();
 
         public void Wipe(string cause)

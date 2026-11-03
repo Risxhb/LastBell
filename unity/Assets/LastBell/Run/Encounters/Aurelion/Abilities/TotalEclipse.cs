@@ -34,7 +34,7 @@ namespace LastBell.Run
         public int UmbraHits { get; private set; }
         readonly Dictionary<PlayerController, int> dark = new Dictionary<PlayerController, int>();
 
-        public bool InWell(Vector3 p) { foreach (var c in Wells) if (Sim.Flat(p - c).magnitude <= WellRadius - 0.1f) return true; return false; }
+        public bool InWell(Vector3 p) { float r = WellRadius - 0.1f; for (int i = 0; i < Wells.Count; i++) if (Sim.Flat(p - Wells[i]).magnitude <= r) return true; return false; }
         // bots: still inside a well s seconds from now, after the wells have turned on (the point turned back the same angle)
         public bool InWellAfter(Vector3 p, float s) => InWell(Centre + Quaternion.Euler(0, -WellSpin * s, 0) * (p - Centre));
 
