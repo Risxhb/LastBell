@@ -67,8 +67,9 @@ namespace LastBell.Run
         // Phase ticks only for bosses that change phase, at their real thresholds (fraction of max HP).
         static float[] PhaseTicks(BossEncounter b) =>
             b is BellkeeperEncounter ? new[] { 0.70f, 0.35f } :
-            b is AurelionEncounter ae ? ae.PhaseMarks :   // v4: 70 / 40 / 20 %, v2-v3: 65 / 30 %
-            b is CrucivarEncounter || b is SylvaraEncounter ? new[] { 0.65f, 0.30f } :
+            b is AurelionEncounter ae ? ae.PhaseMarks :   // 70 / 40 / 20 %
+            b is SylvaraEncounter ? new[] { 0.75f, 0.50f, 0.25f } :
+            b is CrucivarEncounter ? new[] { 0.65f, 0.30f } :
             b is TempoTyrantEncounter ? new[] { TempoTyrantEncounter.FrenzyAt } :
             b is ChimeboundOracleEncounter || b is DialWardenEncounter || b is PendulumSentinelEncounter ? new[] { 0.5f } : null;
         float hitFlash;
@@ -363,7 +364,8 @@ namespace LastBell.Run
             float y = r.y + pad;
             T(r.x, y, w, 44, UiTheme.Spaced("Down"), display36); y += 52;
             // a catalogued boss attack shows its 64 px icon, with the attack name and boss beside it (BossAttackIcons)
-            var wd = d.World; var ka = wd != null && wd.TakenLog.Count > 0 ? TakenAttack(wd, wd.TakenLog.Count - 1) : null; var ki = BossAttackIcons.Icon(ka);
+            // the last hit only if it took you to 0: a scripted wipe (Final Noon, an empty tower) downs you with its own cause
+            var wd = d.World; var ka = wd != null && wd.TakenLog.Count > 0 && wd.TakenLog[wd.TakenLog.Count - 1].hpAfter <= 0 ? TakenAttack(wd, wd.TakenLog.Count - 1) : null; var ki = BossAttackIcons.Icon(ka);
             if (ki != null) GUI.DrawTexture(S(r.x + pad, r.y + pad + 8, 64, 64), ki, ScaleMode.ScaleToFit, true);
             string a = "Struck by ", cause = ka != null ? ka.Label : d.DefeatCause ?? "?";
             float wa = Wv(bodyL, a), wc = Wv(bodyL, cause), x = r.x + w / 2 - (wa + wc) / 2;
@@ -400,6 +402,7 @@ namespace LastBell.Run
                         + 26 + 40 + 8 + 40 + 12
                         + 28 + mapNoteH + mapRows * 40 + (mapRows - 1) * rowGap + 12
                         + 28 + diffNoteH + 40 + 20
+                        + 26 + 40 + 20
                         + 44 + 20
                         + 26 + bossRows * 40 + (bossRows - 1) * rowGap + 16
                         + ctrlH + 16 + 40 + pad;
@@ -419,7 +422,7 @@ namespace LastBell.Run
             }
             y += 48;
             string desc = menuClass == 0
-                ? "Sword and shield. 1 Steel Rhythm (3-hit combo; hit 3 grants Opening) · 2 Sundering Blow · 3 Last Word · 4 hold Brace (frontal 60% reduction)."
+                ? "Two throwing axes. LMB Twin Hurl (tap, or hold to lodge) · 2 Grinding Toll · 3 Splitting Throw (his hits +40%) · 4 Call of Iron (recall through the boss) · 5 Bell Frenzy."
                 : menuClass == 1
                 ? "Bell staff. 1 Resonant Note (+Harmony) · 2 Bellstrike (2 charges, rings a bell) · 3 Harmonic Refrain (adds echoes) · 4 Crescendo (detonate) · 6 Mending Chorus (instant heal)."
                 : "Time magic. 1 Clockbolt (+Tick, max 3) · 2 Time Seal (2 charges, 6 s, ripe last 2 s) · 3 Arc Lance (3 Ticks: inscribes a seal) · 4 Convergence (detonate seals) · 6 Temporal Anchor (recast to return + shield).";
@@ -445,6 +448,18 @@ namespace LastBell.Run
                 bool on = (int)level == i;
                 if (GUI.Toggle(dr, on, (on ? "> " : "") + RunDifficulty.Names[i], btn) && !on) d.SelectDifficulty((Difficulty)i);
                 if (on) UiTheme.Border(dr, UiTheme.Gold, Px);
+            }
+            y += 60;
+
+            // bot allies (RunParty): Chzy18 wants the count in the menu for every test build
+            T(x, y, inner, 20, UiTheme.Spaced("Allies (bots)") + "   (A to switch)", eyebrow); y += 26;
+            int na = RunParty.MaxAllies + 1; float aw = (inner - (na - 1) * colGap) / na;
+            for (int i = 0; i < na; i++)
+            {
+                var ar = S(x + i * (aw + colGap), y, aw, 40);
+                bool on = RunParty.Selected == i;
+                if (GUI.Toggle(ar, on, (on ? "> " : "") + i, btn) && !on) d.SelectAllies(i);
+                if (on) UiTheme.Border(ar, UiTheme.Gold, Px);
             }
             y += 60;
             if (GUI.Button(S(r.x + W / 2 - 150, y, 300, 44), "START RUN  (Enter)", btnP)) d.StartRun(RunDirector.Classes[menuClass]);
@@ -576,7 +591,7 @@ namespace LastBell.Run
                 var mouse = Event.current.mousePosition;
                 for (int i = from; i < w.TakenLog.Count; i++)
                 {
-                    var e = w.TakenLog[i]; bool fatal = i == w.TakenLog.Count - 1;
+                    var e = w.TakenLog[i]; bool fatal = i == w.TakenLog.Count - 1 && e.hpAfter <= 0;
                     // a catalogued boss attack shows its icon (40 px on the killing blow, 22 px otherwise) and "Attack · Boss";
                     // the name always sits beside the icon, because several icons look alike at small sizes (BossAttackIcons)
                     var at = TakenAttack(w, i); var icon = BossAttackIcons.Icon(at);
@@ -730,7 +745,8 @@ namespace LastBell.Run
         // then the class's dash, then the potion. A missing icon falls back to the ability name.
         static readonly Dictionary<string, string[]> SlotIconNames = new Dictionary<string, string[]>
         {
-            ["Vanguard"] = new[] { "vanguard_steel_rhythm", "vanguard_sundering_blow", "vanguard_last_word", "vanguard_brace", "vanguard_dash" },
+            // Tollbreaker: stand-in icons (older steel-set art and the retired Arcanist set) until his own are drawn
+            ["Tollbreaker"] = new[] { "tollbreaker_twin_hurl", "arcanist_clockstep", "tollbreaker_splitting_throw", "tollbreaker_call_of_iron", "chimes-128", "tollbreaker_dash" },
             ["Chimesinger"] = new[] { "chimesinger_resonant_note", "chimesinger_bellstrike", "chimesinger_harmonic_refrain", "chimesinger_crescendo", "chimesinger_mending_chorus", "chimesinger_harmonic_step" },
             ["Arcanist"] = new[] { "arcanist_magic_missile", "arcanist_disintegrate", "arcanist_rune_sigil", "arcanist_comet", "arcanist_arcane_surge", "arcanist_blink" },
         };
@@ -1050,6 +1066,24 @@ namespace LastBell.Run
         // Mechanic markers over players' heads (PlayerController.Marks, MechanicIcons): 40 px icons side by side, each with its
         // name on a strip under it, because several look alike at this size. Placement approved by Chzy18 on October 24, 2026;
         // see docs/run-loop/mechanic-icons.md. Nothing is drawn until an encounter assigns a mark.
+        // white anti-aliased disc, tinted at draw time (backing for over-head markers)
+        static Texture2D markDisc;
+        static Texture2D MarkDisc
+        {
+            get
+            {
+                if (markDisc) return markDisc;
+                const int n = 64; markDisc = new Texture2D(n, n, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
+                var px = new Color[n * n];
+                for (int y = 0; y < n; y++) for (int x = 0; x < n; x++)
+                {
+                    float dx = x + 0.5f - n / 2f, dy = y + 0.5f - n / 2f, a = Mathf.Clamp01(n / 2f - Mathf.Sqrt(dx * dx + dy * dy));
+                    px[y * n + x] = new Color(1, 1, 1, a);
+                }
+                markDisc.SetPixels(px); markDisc.Apply(); return markDisc;
+            }
+        }
+
         void PlayerMarks()
         {
             var cam = Camera.main; if (!cam) return; float h = Screen.height, sz = UiTheme.V(40), gap = UiTheme.V(48);
@@ -1062,6 +1096,10 @@ namespace LastBell.Run
                 {
                     var m = MechanicIcons.Get(p.Marks[i]); if (m == null) continue;
                     var r = new Rect(x0 + i * (sz + gap), y0, sz, sz);
+                    // dark ink disc behind the marker so its thin ivory rim reads on light floors (Chzy18, 31 Oct)
+                    var gc = GUI.color; GUI.color = UiTheme.InkStrip;
+                    GUI.DrawTexture(new Rect(r.center.x - sz * 0.58f, r.center.y - sz * 0.58f, sz * 1.16f, sz * 1.16f), MarkDisc, ScaleMode.StretchToFill, true);
+                    GUI.color = gc;
                     var t = MechanicIcons.Icon(m); if (t != null) GUI.DrawTexture(r, t, ScaleMode.ScaleToFit, true);
                     float nw = slotName.CalcSize(new GUIContent(m.name)).x;
                     UiTheme.Fill(new Rect(r.center.x - nw / 2 - UiTheme.V(4), r.yMax + UiTheme.V(1), nw + UiTheme.V(8), UiTheme.V(17)), UiTheme.InkStrip);

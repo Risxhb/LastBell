@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using LastBell.Areas.Area1;
 using UnityEngine;
@@ -30,8 +31,11 @@ namespace LastBell.Run
             var go = new GameObject("Last Light floor fx"); go.transform.SetParent(world.Root, false);
             var fx = go.AddComponent<LastLightFloorFx>(); fx.lastLight = light;
             if (!fx.Split()) fx.enabled = false;
+            // readability A2: the camera keeps the boss in view with you for the whole phase (every arena, not only the Spire)
+            var boss = light.BossBody; Func<Vector3?> frame = () => boss ? boss.position : (Vector3?)null;
+            RunDirector.FrameAlso = frame;
             try { foreach (var w in run) yield return w; }
-            finally { fx.Restore(); Destroy(go); }
+            finally { fx.Restore(); Destroy(go); if (RunDirector.FrameAlso == frame) RunDirector.FrameAlso = null; }
         }
 
         void Awake() => mpb = new MaterialPropertyBlock();

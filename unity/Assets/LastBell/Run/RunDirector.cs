@@ -37,9 +37,9 @@ namespace LastBell.Run
         {
             new BossEntry("Bellkeeper", w => BossEncounter.Spawn<BellkeeperEncounter>(w, Vector3.zero, 0), final: true, phases: 3),
             // Skyward Spire area boss; authored practice map
-            new BossEntry("Aurelion (area 1)", w => BossEncounter.Spawn<AurelionEncounter>(w, new Vector3(0, 0, -1.5f), 0), map: AurelionMap, phases: AurelionArgs.V4 ? 4 : 3),   // v4 (the default set) adds Last Light
+            new BossEntry("Aurelion (area 1)", w => BossEncounter.Spawn<AurelionEncounter>(w, new Vector3(0, 0, -1.5f), 0), map: AurelionMap, phases: 4),   // v4 adds Last Light
             // Verdant Chimes area boss (graybox); authored practice map
-            new BossEntry("Sylvara (area 3)", w => BossEncounter.Spawn<SylvaraEncounter>(w, new Vector3(0, 0, -1.5f), 0), map: SylvaraMap, phases: 3),
+            new BossEntry("Sylvara (area 3)", w => BossEncounter.Spawn<SylvaraEncounter>(w, Vector3.zero, 0), map: SylvaraMap, phases: 4),
             // Brass Foundry area boss; authored practice map
             new BossEntry("Crucivar (area 2)", w => BossEncounter.Spawn<CrucivarEncounter>(w, new Vector3(0, 0, -1.5f), 0), map: CrucivarMap, phases: 3),
             // Metronome Court miniboss: explicit Practice entry only (inRun: false), so shuffled run slots are unchanged.
@@ -53,6 +53,9 @@ namespace LastBell.Run
             new BossEntry("Dial Warden (practice)", w => BossEncounter.Spawn<DialWardenEncounter>(w, new Vector3(0, 0, -1.5f), 0), inRun: false, map: AurelionMap, phases: 2),
             // Skyward Spire miniboss, practice only (docs/bosses/pendulum-sentinel.md, a proposal)
             new BossEntry("Pendulum Sentinel (practice)", w => BossEncounter.Spawn<PendulumSentinelEncounter>(w, new Vector3(0, 0, -1.5f), 0), inRun: false, map: AurelionMap, phases: 2),
+            // New-player tutorial (Run/Tutorial, docs/tutorial.md): a guided Tempo Tyrant fight on Metronome Court, practice only.
+            // Also LastBell.exe -lastbellTutorial. Kept last so the other entries' indices don't move.
+            new BossEntry(TutorialName, w => TutorialDirector.Attach(BossEncounter.Spawn<TempoTyrantEncounter>(w, new Vector3(0, 0, -2f), 0)), inRun: false, map: TempoTyrantMap),
         };
         // Catalog eligibility is stable; each run owns its shuffled sequence, with final encounters appended.
         public static readonly int[] RunOrder = Enumerable.Range(0, Bosses.Length).Where(i => Bosses[i].InRun).OrderBy(i => Bosses[i].Final).ToArray();
@@ -74,8 +77,11 @@ namespace LastBell.Run
         public const string TempoTyrantMap = "metronome-court";
         public static int ChimeboundOraclePractice => Array.FindIndex(Bosses, b => b.Name.StartsWith("Chimebound Oracle"));
         public static int DialWardenPractice => Array.FindIndex(Bosses, b => b.Name.StartsWith("Dial Warden"));
+        public const string TutorialName = "Tutorial (Tempo Tyrant)";
+        public static int TutorialPractice => Array.FindIndex(Bosses, b => b.Name == TutorialName);
         public static int PendulumSentinelPractice => Array.FindIndex(Bosses, b => b.Name.StartsWith("Pendulum Sentinel"));
-        public static readonly string[] Classes = { "Vanguard", "Chimesinger", "Arcanist" };
+        // The Tollbreaker took the Vanguard's place (Chzy18, 29 Oct), and the Vanguard was removed from the game (1 Nov).
+        public static readonly string[] Classes = { "Tollbreaker", "Chimesinger", "Arcanist" };
         const int IntroTicks = 120, ClearTicks = 180, DownedTicks = 100;
         public const int PracticeAutoReadyTicks = 45;   // 0.75 s in the arena before a practice fight starts
         // Automated suites (every one writes to -lastbellOut) drive Ready themselves, so they keep the manual start.
@@ -84,7 +90,7 @@ namespace LastBell.Run
 
         public RunState State { get; private set; } = RunState.Menu;
         public RunMode Mode { get; private set; }
-        public string ClassName { get; private set; } = "Vanguard";
+        public string ClassName { get; private set; } = "Tollbreaker";
         public Difficulty Difficulty { get; private set; } = Difficulty.Medium;   // copied from the menu at run start
         public int AllyCount { get; private set; }            // bot allies, copied from the menu at run start (RunParty); a retry keeps it
         public readonly List<PlayerController> Allies = new List<PlayerController>();
@@ -209,7 +215,7 @@ namespace LastBell.Run
 #endif
             if (State != RunState.Menu) return false;
             PracticePhase = mode == RunMode.Practice && encounter >= 0 && encounter < Bosses.Length ? Mathf.Clamp(phase, 1, Bosses[encounter].Phases) : 1;
-            Mode = mode; ClassName = Array.IndexOf(Classes, className) >= 0 ? className : "Vanguard";
+            Mode = mode; ClassName = Array.IndexOf(Classes, className) >= 0 ? className : Classes[0];
             Difficulty = RunDifficulty.Selected;
             AllyCount = Networking.LanHostRoster.Active != null ? Networking.LanHostRoster.Active.Remote.Count : RunParty.Selected;
             BuildRun(encounter);
@@ -401,7 +407,7 @@ namespace LastBell.Run
                     if (State == RunState.Combat && Boss && !Boss.Dead)
                     {
                         if (kb.f9Key.wasPressedThisFrame) Boss.DebugDefeat();
-                        if (kb.f8Key.wasPressedThisFrame) Boss.DebugSetHpFraction(Boss is SylvaraEncounter ? (Boss.Hp > Boss.MaxHp * 0.65f ? 0.64f : 0.29f) : Boss.NextPhaseFraction());
+                        if (kb.f8Key.wasPressedThisFrame) Boss.DebugSetHpFraction(Boss.NextPhaseFraction());
                     }
                 }
             }
@@ -411,6 +417,7 @@ namespace LastBell.Run
             SimSmoother.RestoreAll();   // ticks see exact sim poses
             while (acc >= Sim.Dt && guard++ < 8) { acc -= Sim.Dt; Tick(); SimSmoother.CaptureAll(); }
             SimSmoother.PresentAll(acc / Sim.Dt);   // draw between the last two ticks: smooth at any frame rate
+            World?.Bullets.Draw(World.Root);
         }
 
         void Tick()
@@ -464,7 +471,15 @@ namespace LastBell.Run
             if (!cam) cam = Camera.main; if (!cam) return;
             cam.orthographic = false;   // some arenas' own top-down view key (C) switches the camera to orthographic
             Vector3 target, look;
-            if (Player) { target = Player.transform.position + FollowOffset; look = Player.transform.position + Vector3.up; }
+            if (Player)
+            {
+                // an encounter can ask the camera to keep a second point in view too (Aurelion's Last Light: the boss with the
+                // remaining floor, readability A2): shift toward it and pull back with the distance, same angle
+                var at = Player.transform.position; float zoom = 1;
+                var also = FrameAlso?.Invoke();
+                if (also.HasValue) { var d = Vector3.ProjectOnPlane(also.Value - at, Vector3.up); at += d * 0.45f; zoom = 1 + 0.45f * Mathf.Clamp01((d.magnitude - 5f) / 20f); }
+                target = at + FollowOffset * zoom; look = at + Vector3.up;
+            }
             else { target = MenuCamPos; look = new Vector3(0, 0, 1); }
             cam.transform.position = Vector3.SmoothDamp(cam.transform.position, target, ref camVel, 0.12f);
             if (Player) cam.transform.rotation = Quaternion.LookRotation(-FollowOffset + Vector3.up);
@@ -473,6 +488,7 @@ namespace LastBell.Run
             if (ShotCamera.HasValue) { cam.transform.position = ShotCamera.Value.pos; cam.transform.rotation = Quaternion.LookRotation(ShotCamera.Value.look - ShotCamera.Value.pos); }
         }
         public static (Vector3 pos, Vector3 look)? ShotCamera;   // autotest gallery: a fixed overhead view of the whole arena
+        public static Func<Vector3?> FrameAlso;   // set by an encounter for one phase, cleared after; null = follow the player only
 
         // slot on the progress track: one per boss
         public int ProgressSlot => Math.Max(0, Array.IndexOf(EncounterOrder, Encounter));

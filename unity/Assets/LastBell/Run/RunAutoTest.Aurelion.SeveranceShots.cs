@@ -6,7 +6,7 @@ using UnityEngine;
 namespace LastBell.Run
 {
     // -lastbellSeveranceShots (with -lastbellAurelionGallery -lastbellAurelionOnly): Severance's "Night is a shadow" look
-    // (Chzy18 accepted 2026-10-28, work/severance-night-20261028) solo and with 4 and 8 players, an attacking Arcanist casting
+    // (Chzy18 accepted 2026-10-28, work/severance-night-20261028) solo and with 4 players (1-4 since 1 Nov), an attacking Arcanist casting
     // beside it in the parties, overhead and from the gameplay camera. Screenshots only; no checks.
     public sealed partial class RunAutoTest
     {
@@ -20,17 +20,15 @@ namespace LastBell.Run
             foreach (var cam in new[] { "", "_gamecam" })
             {
                 RunDirector.ShotCamera = cam == "" ? (new Vector3(0, 27, 17), new Vector3(0, 0, 1.5f)) : ((Vector3, Vector3)?)null;
-                foreach (int n in new[] { 1, 4, 8 }) yield return SeveranceShotsFor(n, cam);
+                foreach (int n in new[] { 1, 4 }) yield return SeveranceShotsFor(n, cam);
             }
             AllyBot.Attacks = attacks;
             RunDirector.ShotCamera = null;
             yield return V2Teardown();
-            AurelionArgs.SetOverride = null;
         }
 
         IEnumerator SeveranceShotsFor(int n, string cam)
         {
-            AurelionArgs.SetOverride = "v4";
             yield return V2Setup(n, Difficulty.Medium, null, 3, Vector3.zero);
             if (V2Boss == null) yield break;
             // every player is a Perfect bot so each takes its called side; in a party the last one is an attacking Arcanist

@@ -18,7 +18,7 @@ A browser prototype for settling how the classes and the Bellkeeper should look 
 
 WASD move · mouse aims (Vanguard) · 1 / left mouse basic (hold) · 2 / right mouse technique · 3 signature · 4 guard · 5 dash (every class) · 6 heal target (Healer) · hold Shift self-target · R restart · Esc menu (boss health, start phase, invulnerable, knockout rule, ally, range rings, Pendulum Strikes, mouse aim, sound). Gamepad: left stick move, right stick aim, A basic, X technique, Y signature, RB guard, B dash. Standard-layout gamepads only; other HID devices (pedals, flight sticks) are ignored.
 
-The Vanguard is the 2.0 redesign (Clockblade Combo, Pendulum/Reversal Rush, Final Hour, Resonant Guard counters); see `docs/design/vanguard-v2-implementation.md`. `?autoplay=vanguard&inv` runs a test bot.
+The Vanguard was removed from the game (2 Nov). This page still uses its old figure as a stand-in model; the Unity game's class is the Tollbreaker.
 
 ## Limits
 

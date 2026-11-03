@@ -137,7 +137,7 @@ namespace LastBell.Menu.EditorTools
             menu.CameraPosition=new Vector3(.6f,.75f,10.9f);menu.CameraTarget=new Vector3(-.6f,2.2f,-7);
             menu.HeroPosition=new Vector3(1.45f,0,8.3f);menu.BossPosition=new Vector3(0,0,-15);
             menu.Classes=new[]{
-                new ConfrontationMenu.Presentation{Class="Vanguard",Offset=new Vector3(.15f,0,0),Yaw=6,Scale=1},
+                new ConfrontationMenu.Presentation{Class="Tollbreaker",Offset=new Vector3(.15f,0,0),Yaw=6,Scale=1},
                 new ConfrontationMenu.Presentation{Class="Chimesinger",Offset=new Vector3(.1f,0,.15f),Yaw=4,Scale=.97f},
                 new ConfrontationMenu.Presentation{Class="Arcanist",Offset=new Vector3(0,0,.15f),Yaw=4,Scale=1}};
             EditorUtility.SetDirty(menu);

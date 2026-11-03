@@ -126,7 +126,7 @@ namespace LastBell.Run
             SimSmoother.Attach(go);   // drawn between ticks (smooth at 120 fps+); the sim pose is untouched
             pc.ClassName = className; pc.World = world;
             pc.Presenter = CharacterPresenter.ForPlayer(go.transform, className);
-            pc.Kit = className == "Chimesinger" ? new ChimesingerKit() : className == "Arcanist" ? new ArcanistKit() : (PlayerKit)new VanguardKit2();
+            pc.Kit = className == "Chimesinger" ? new ChimesingerKit() : className == "Arcanist" ? new ArcanistKit() : (PlayerKit)new TollbreakerKit();
             pc.Kit.Attach(pc);
             world.Players.Add(pc);
             return pc;
@@ -193,7 +193,7 @@ namespace LastBell.Run
             RunHud.Float(transform.position + Vector3.up * 2.4f, "-" + dmg, mult < 1 ? new Color(0.6f, 0.9f, 1f) : new Color(1f, 0.42f, 0.36f));
             World.BossFx.PlayerHit(transform.position);
             if (Hp == 0) { GoDown(); return; }
-            if (!noKnock)
+            if (!noKnock && h.Flinch)
             {
                 stun = h.Stun; knockDir = h.PushDir(transform.position); knockDist = h.Knockback * Shop.ItemHooks.F(this, "knockback", 1); knockTick = KnockTicks;
                 dashTick = 0; Kit.Interrupt();
@@ -228,6 +228,15 @@ namespace LastBell.Run
             World.ReportPlayerHit(this, h, dmg);
             RunHud.Float(transform.position + Vector3.up * 2.4f, "-" + dmg, new Color(1f, 0.42f, 0.36f));
             GoDown();
+        }
+
+        // Put the player somewhere else at once (Aurelion's Last Light fall, proposal): any knockback, pull or dash in
+        // progress ends, so nothing carries them back over the edge.
+        public void Relocate(Vector3 pos)
+        {
+            if (Down) return;
+            transform.position = World.Constrain(Sim.Flat(pos), Radius);
+            knockTick = 0; pullTick = 0; dashTick = 0;
         }
 
         // Forced movement with no damage, stun or interrupt (Crucivar's inhale). The player keeps control: the pull is
@@ -283,7 +292,7 @@ namespace LastBell.Run
             else if (dashTick > 0)
             {
                 dashTick--; vel = dashDir * (dashDist / DashTicks) * Sim.Hz;
-                if (dashTick == 0) { dashLock = DashRecover; Shop.ItemHooks.OnDashEnd(this); }
+                if (dashTick == 0) { dashLock = DashRecover; Kit.OnDashEnd(); Shop.ItemHooks.OnDashEnd(this); }
             }
             else
             {
@@ -367,6 +376,7 @@ namespace LastBell.Run
         public virtual bool CanDash() => true;
         public virtual bool CanJump() => true;
         public virtual void OnDash() { }
+        public virtual void OnDashEnd() { }                  // the dash has finished (Battle Spin)
         public virtual void Interrupt() { }                  // hit-stun or down: cancel unreleased actions
         public virtual void ClearTargetState() { }           // target died / encounter over: drop marks on the boss
         public abstract void ResetAll();                     // encounter start or fresh run

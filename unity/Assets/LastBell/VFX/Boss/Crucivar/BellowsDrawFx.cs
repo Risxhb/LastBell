@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace LastBell.VFX
 {
-    // Crucivar v2 Bellows Draw (abilities-v2/03-crucivar.bellows_draw.md). Presentation only: the encounter calls these on
+    // Crucivar blast and inhale effects, first built for the retired v2 Bellows Draw; v4 Backdraft and Anvil Quake use them. Presentation only: the encounter calls these on
     // its own ticks and the hazards' telegraphs are the hit shapes. The inhale chevrons are amber (forced movement, never
     // damage); the rim pour and the blast use molten slag and the danger coral.
     public sealed partial class BellkeeperFx
@@ -29,23 +29,6 @@ namespace LastBell.VFX
                     }, 0, Ink, Amber, Gold);
                 }
             }
-        }
-
-        // Slag Rim: the troughs tip and a molten front runs inward across the annulus; the standing pool is the edge hazard.
-        public void SlagRimPour(Vector3 centre, float inner, float outer)
-        {
-            var c = new Vector3(centre.x, 0.06f, centre.z);
-            Play(FxMeshes.Annulus(inner, outer), true, alphaMat, c, 0, 0.5f, (b, u) =>
-            {
-                b.mpb.SetFloat(PProgress, Mathf.Lerp(1.1f, -0.1f, Ease(Mathf.Clamp01(u / 0.35f))));   // U runs outward: front moves in
-                b.mpb.SetFloat(PWidth, 0.12f); b.mpb.SetFloat(PTail, 0.3f); b.mpb.SetFloat(PDissolve, Mathf.Clamp01((u - 0.35f) / 0.65f));
-            }, 0, Slag, Molten, Amber);
-            for (int i = 0; i < 16; i++)
-            {
-                float a = i * Mathf.PI * 2 / 16; var d = new Vector3(Mathf.Sin(a), 0, Mathf.Cos(a));
-                Sparks(c + d * (inner + 0.4f) + Vector3.up * 0.3f, Vector3.up - d * 0.4f, 4, 0.5f, 4.5f, 0.15f, 0.45f);
-            }
-            CameraShake.Shake(0.12f, 0.2f);
         }
 
         // Exhale: a point-blank blast through all four vents, a coral shock ring out to the circle's edge plus steam.

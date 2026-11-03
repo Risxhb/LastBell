@@ -23,7 +23,7 @@ namespace LastBell.Menu
         }
         // Defaults match the saved scene; ConfrontationMenuBuild.PolishPass writes the same values.
         public Presentation[] Classes = {
-            new Presentation { Class="Vanguard", Offset=new Vector3(.15f,0,0), Yaw=6 }, new Presentation { Class="Chimesinger", Offset=new Vector3(.1f,0,.15f), Yaw=4, Scale=.97f },
+            new Presentation { Class="Tollbreaker", Offset=new Vector3(.15f,0,0), Yaw=6 }, new Presentation { Class="Chimesinger", Offset=new Vector3(.1f,0,.15f), Yaw=4, Scale=.97f },
             new Presentation { Class="Arcanist", Offset=new Vector3(0,0,.15f), Yaw=4 } };
         public Vector3 HeroPosition = new Vector3(1.45f,0,8.3f), BossPosition = new Vector3(0,0,-15);
         public Vector3 CameraPosition = new Vector3(.6f,.75f,10.9f), CameraTarget = new Vector3(-.6f,2.2f,-7);

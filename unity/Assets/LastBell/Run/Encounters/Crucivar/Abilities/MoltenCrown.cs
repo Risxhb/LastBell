@@ -10,7 +10,7 @@ namespace LastBell.Run
     //        inside when a tower lands counts: too few = Molten Overflow (party wipe), extras farthest out take 50. Every
     //        landed tower leaves slag (20/s) for the phase. Even cycles hide the counts ("?"): remember the last cycle's.
     //        Solo: three one-player towers 1.6 s apart.
-    //  3.5  Casting Order: pours aimed through the players while they soak (lands 5.5-7.0)
+    //  B+3.4 Casting Order, after the towers and Backdraft (was 3.5 s, through the soakers; moved 11-01)
     //  B+0.2 Backdraft right after the last set lands (pull, then the 5 m blast)
     //  9.5  Ember Brand (pools last the phase)
     // 10.0  Crown Rise: the rim from the new edge out turns to molten crown (50/s) for good, 3.0 s warning:
@@ -26,7 +26,8 @@ namespace LastBell.Run
         public const float Cycle = 21.5f, Rise = 5f, SetGap = 1.6f, TowerRadius = 2f, ExtraDmg = 50, CrownWarn = 3f, EruptWarn = 5f;
         public const float CrownBurn = 50f, SlagBurn = 20f, HeatPerCrown = 0.15f, TurretEvery = 4f;
         public const float PressDelay = 2.0f, PressRadius = 2.2f, PressKnock = 1.5f;
-        public const int PressDamage = SecondPress.DamageV3;
+        public const int PressDamage = 35;   // Hard: Second Press (the v2 mechanic, 35 since v3)
+        public const float PressStun = 0.25f;
         public static readonly float[] Edges = { 13.7f, 11f, 9f, 7f, 6f };
 
         public sealed class Tower { public Hazard H; public int Need, Set; }
@@ -46,7 +47,7 @@ namespace LastBell.Run
         {
             if (n <= 1) return new[] { new[] { 1 }, new[] { 1 }, new[] { 1 } };
             int[] Split(int total, int parts) { var a = new int[parts]; for (int i = 0; i < total; i++) a[i % parts]++; return a.Where(x => x > 0).ToArray(); }
-            return new[] { Split(n, n >= 5 ? 4 : 2), Split(n, 2) };
+            return new[] { Split(n, 2), Split(n, 2) };   // 1-4 players (Chzy18 11-01): two towers per set
         }
 
         public IEnumerable<int> Run()
@@ -65,10 +66,12 @@ namespace LastBell.Run
                 if (!Boss) { running = false; yield break; }   // the encounter is gone (a restart)
                 for (int s = 0; s < sets.Length; s++)
                 {
-                    if (t == Sim.Ticks(SetGap * s)) RiseSet(sets[s], s);
+                    if (t == Sim.Ticks(SetGap * s)) RiseSet(sets[s], s, sets[0].Length);
                     if (Hard && t == Sim.Ticks(SetGap * s) + T(Rise) + 2 && fullest.TryGetValue(s, out var f)) Press(f.h.Origin);   // the set has landed
                 }
-                if (t == Sim.Ticks(3.5f)) { Boss.SetCurrent("Casting Order"); Boss.Rite.CastingOrder(); }
+                // after the towers and Backdraft (11-01): at 3.5 s the pours locked onto set B soakers who had to stay put
+                if (t == Sim.Ticks(lastLand + 3.4f)) { Boss.SetCurrent("Casting Order"); Boss.Rite.CastingOrder(); }
+                CoolTowerSpots();
                 if (t == Sim.Ticks(lastLand + 0.2f)) { Boss.SetCurrent("Backdraft"); draft = Boss.Rite.Backdraft().GetEnumerator(); draftWait = 0; }
                 if (draft != null && --draftWait <= 0) { if (draft.MoveNext()) draftWait = draft.Current; else draft = null; }
                 if (t == Sim.Ticks(9.5f)) { Boss.SetCurrent("Ember Brand"); Boss.Rite.EmberBrand(); }
@@ -84,7 +87,9 @@ namespace LastBell.Run
         }
 
         // ---------------- Mould Towers ----------------
-        void RiseSet(int[] needs, int set)
+        // set B sits halfway between set A's towers (180 / A's count off it): a straight 180 put an even count back on A's
+        // spots, so the A soakers stood still for B (escape check 31 Oct); solo keeps its own 120 step
+        void RiseSet(int[] needs, int set, int countA)
         {
             Boss.SetCurrent("Mould Towers");
             bool solo = Standing().Count <= 1;
@@ -92,12 +97,13 @@ namespace LastBell.Run
             var list = new List<Hazard>();
             for (int k = 0; k < needs.Length; k++)
             {
-                float yaw = k * 360f / needs.Length + set * 180f + 17f + Cycles * 40f + (solo ? set * 120f : 0);
+                float yaw = k * 360f / needs.Length + (solo ? set * 300f : set * 180f / countA) + 17f + Cycles * 40f;
                 int need = needs[k];
                 var h = new Hazard
                 {
                     Source = "Mould Tower " + (set == 0 ? "A" : set == 1 ? "B" : "C"), Shape = HazardShape.Circle, Kind = HazardKind.Ground,
                     Origin = Sim.Dir(yaw) * rad, Radius = TowerRadius, LockAt = 0, ResolveAt = T(Rise), ShareCount = need, Knockback = 0,
+                    Soak = true,   // a ring to stand in: AllyBot must not step out of it (Run loop and shop smoke run, 11-01)
                 };
                 h.Includes = p => h.Age < h.ResolveAt && h.Contains(p.transform.position);   // counts for the mould look; the landing is custom
                 h.OnResolve = hz => Land(hz, need, set);
@@ -110,6 +116,24 @@ namespace LastBell.Run
             Boss.Rig.Pour(true);
         }
 
+        // a rising mould cools any burning ground it touches (old slag, brand pools, pour channels), so soaking never means
+        // standing in burn (Chzy18 11-01: no unavoidable damage)
+        public int Cooled { get; private set; }
+        void CoolTowerSpots()
+        {
+            foreach (var tw in Towers)
+            {
+                if (!W.Hazards.Live.Contains(tw.H)) continue;
+                foreach (var b in W.Hazards.Live)
+                {
+                    if (b.BurnPerSecond <= 0 || b.Source == "Molten Crown" || b.ResolveAt <= b.Age + 1) continue;
+                    bool touches = b.Contains(tw.H.Origin);
+                    for (int k = 0; k < 8 && !touches; k++) touches = b.Contains(tw.H.Origin + Sim.Dir(k * 45f) * (TowerRadius + 0.5f));
+                    if (touches) { b.ResolveAt = b.Age + 1; Cooled++; }
+                }
+            }
+        }
+
         void Land(Hazard h, int need, int set)
         {
             var inside = Standing().Where(p => h.Contains(p.transform.position)).ToList();
@@ -120,7 +144,7 @@ namespace LastBell.Run
             Boss.Rite.Pools.Add(W.Hazards.Spawn(new Hazard
             {
                 Source = "Tower Slag", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = h.Origin, Radius = TowerRadius,
-                LockAt = 0, ResolveAt = Sim.Ticks(3600), BurnPerSecond = SlagBurn,
+                LockAt = T(ForgeRite.PoolArm), ResolveAt = Sim.Ticks(3600), BurnPerSecond = SlagBurn,   // heats first: the soakers step off
             }));
         }
 
@@ -130,7 +154,7 @@ namespace LastBell.Run
             wiping = true; Wipes++;
             W.Hazards.Spawn(new Hazard
             {
-                Source = why, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Vector3.zero, Radius = Rim + 1f,
+                Source = why, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Vector3.zero, Radius = Far + 1f,
                 LockAt = 0, ResolveAt = 1, ShareTotal = 1, WipeIfEmpty = true, Includes = _ => false,
             });
         }
@@ -142,7 +166,7 @@ namespace LastBell.Run
             var h = W.Hazards.Spawn(new Hazard
             {
                 Source = "Second Press", Shape = HazardShape.Circle, Kind = HazardKind.Strike, Origin = Flat(centre), Radius = PressRadius,
-                LockAt = 0, ResolveAt = T(PressDelay), Damage = PressDamage, Knockback = PressKnock, Stun = Sim.Ticks(SecondPress.StunSeconds),
+                LockAt = 0, ResolveAt = T(PressDelay), Damage = PressDamage, Knockback = PressKnock, Stun = Sim.Ticks(PressStun),
                 Push = p => -Flat(p),   // toward the centre, away from the crown
             });
             h.OnResolve = hz => { W.BossFx.DiebreakerResolve(hz.Origin, hz.Radius); Boss.Flare(1.2f); Boss.Rig?.HammerLand(); };
@@ -164,7 +188,7 @@ namespace LastBell.Run
                 W.BossFx.BellowsBlast(Vector3.zero, to);
                 W.Hazards.Spawn(new Hazard
                 {
-                    Source = "Molten Crown", Shape = HazardShape.Ring, Kind = HazardKind.Ground, Origin = Vector3.zero, Inner = to, Radius = Rim + 1f,
+                    Source = "Molten Crown", Shape = HazardShape.Ring, Kind = HazardKind.Ground, Origin = Vector3.zero, Inner = to, Radius = Far + 1f,
                     LockAt = 0, ResolveAt = Sim.Ticks(3600), BurnPerSecond = CrownBurn,
                 });
             };
@@ -175,10 +199,10 @@ namespace LastBell.Run
             Boss.SetCurrent("Furnace Eruption");
             var h = W.Hazards.Spawn(new Hazard
             {
-                Source = "Furnace Eruption", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Vector3.zero, Radius = Rim + 1f,
+                Source = "Furnace Eruption", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Vector3.zero, Radius = Far + 1f,
                 LockAt = 0, ResolveAt = T(EruptWarn), ShareTotal = 1, WipeIfEmpty = true, Includes = _ => false,
             });
-            h.OnResolve = _ => Wipes++;
+            h.OnResolve = _ => { Wipes++; W.BossFx.Eruption(Rim); };
         }
 
         // ---------------- heat and the lone turret ----------------

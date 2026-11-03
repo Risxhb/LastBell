@@ -10,8 +10,7 @@ namespace LastBell.Run
     // (partner distance outside the band) at resolve; presentation draws the chain.
     public enum HazardShape { Circle, Ring, Cone, Lane, Tether }
 
-    // Strike = a directed physical blow (Vanguard's Brace can mitigate it from the front).
-    // Ground = an eruption under the player (Brace never helps). Bellkeeper spec v0.2 §3, Vanguard #31 Brace rule.
+    // Strike = a directed physical blow. Ground = an eruption under the player. Bellkeeper spec v0.2 §3.
     public enum HazardKind { Strike, Ground }
 
     // One boss attack instance. Its geometry is the telegraph and the hit test (spec: "damage geometry is the
@@ -39,6 +38,9 @@ namespace LastBell.Run
         // > 0: a standing hazard (Crucivar's cooling slag). It deals this much per second to players inside while it
         // lives, with no knockback, and simply expires at ResolveAt (no resolve hit). Overlapping ones never multiply.
         public float BurnPerSecond;
+        // a hole you fall through (Aurelion's Last Light, the encounter drops you itself): ally bots never cross it, even
+        // where they would accept walking through a burn
+        public bool Pit;
         // Shared soak / line split (settled rule §5). ShareTotal > 0: the players inside at resolve split ShareTotal evenly
         // (missing players' shares fall on those inside; over-soaking lowers each share). ShareCount is the numeral shown
         // on the telegraph. WipeIfEmpty: nobody inside downs every standing player (an empty soak wipes the party).
@@ -54,6 +56,7 @@ namespace LastBell.Run
         public Func<Vector3, Vector3> Push;      // knockback direction override (Second Press pushes toward the arena centre)
         public float ClipRadius;                 // > 0: the telegraph is drawn only over the floor disc of this radius (presentation)
         public bool HitOnResolve = true;         // false: the owner deals the hits itself while the warning is up (a sweeping charge)
+        public bool Flinch = true;               // false: the hit deals damage only, with no stun, knockback or interrupt (hostile bullets)
         public bool Soak;                        // a ring to stand IN (a tower), not a shape to leave: bots and the HUD read it
 
         public int Age { get; internal set; }
@@ -98,7 +101,7 @@ namespace LastBell.Run
             var d = Sim.Flat(p - Origin); return d.sqrMagnitude > 1e-4f ? d.normalized : Sim.Dir(Yaw);
         }
 
-        // where the blow comes from, for Brace's frontal test
+        // where the blow comes from (frontal tests)
         public Vector3 IncomingFrom(Vector3 p) => Shape == HazardShape.Lane ? Origin + Sim.Dir(Yaw) * Mathf.Max(0, Vector3.Dot(Sim.Flat(p - Origin), Sim.Dir(Yaw)) - 1f) : Origin;
     }
 
@@ -128,7 +131,7 @@ namespace LastBell.Run
                 case HazardShape.Tether: h.Tele = fx.Circle(0.01f); h.Tele.Tint(Color.clear, Color.clear); break;   // the ability draws the chain
                 default: h.Tele = fx.Lane(h.Length, h.Width); break;
             }
-            // jump-clearable bars: warm coral with an amber edge (not cyan, which is the Vanguard's), plus the HUD's JUMP label
+            // jump-clearable bars: warm coral with an amber edge (not cyan, which is the Tollbreaker's), plus the HUD's JUMP label
             if (h.JumpClearable) h.Tele.Tint(JumpFill, JumpBorder);
             else if (h.BurnPerSecond > 0) h.Tele.Tint(SlagFill, SlagBorder);   // standing slag: molten, not the strike coral
             if (h.ClipRadius > 0) h.Tele.Clip(Vector3.zero, h.ClipRadius);

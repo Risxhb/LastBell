@@ -14,11 +14,6 @@ namespace LastBell.Run
         // semantic name -> clip names to try, in order (approved-kit name first, then reused older clips)
         static readonly Dictionary<string, string[]> Fallbacks = new Dictionary<string, string[]>
         {
-            ["SteelRhythm1"] = new[] { "SteelRhythm1", "Combo1" }, ["SteelRhythm2"] = new[] { "SteelRhythm2", "Combo2" },
-            ["SteelRhythm3"] = new[] { "SteelRhythm3", "Combo3" },
-            ["SunderingBlow"] = new[] { "SunderingBlow", "PendulumRush" }, ["LastWord"] = new[] { "LastWord", "ReversalRush", "FinalHour" },
-            ["BraceHold"] = new[] { "BraceHold", "Guard" }, ["BraceWalk"] = new[] { "BraceWalk", "BraceHold", "Guard" },
-            ["BraceRaise"] = new[] { "BraceRaise" }, ["BraceLower"] = new[] { "BraceLower" }, ["BraceHit"] = new[] { "BraceHit" },
             ["PhaseShift"] = new[] { "PhaseShift", "Vulnerable" }, ["Defeat"] = new[] { "Defeat", "Vulnerable" },
             // Arcanist arcane kit: the new clips first, then the closest clip of the earlier kit
             ["MissileTap"] = new[] { "MissileTap", "Clockbolt" }, ["MissileTap2"] = new[] { "MissileTap2", "Clockbolt2" },
@@ -27,8 +22,10 @@ namespace LastBell.Run
             ["DisintegrateEnd"] = new[] { "DisintegrateEnd", "Clockbolt" }, ["RuneSigil"] = new[] { "RuneSigil", "TimeSeal" },
             ["AstralOrb"] = new[] { "AstralOrb", "TemporalAnchor" }, ["ArcaneSurge"] = new[] { "ArcaneSurge", "AstralOrb", "TemporalAnchor" }, ["ArcaneComet"] = new[] { "ArcaneComet", "Convergence" },
             ["BlinkIn"] = new[] { "BlinkIn", "AnchorReturn" },
+            // Tollbreaker: Grinding Toll reuses his second throw until it has its own clip
+            ["GrindingToll"] = new[] { "GrindingToll", "TwinHurl2" },
         };
-        static readonly HashSet<string> Looping = new HashSet<string> { "Idle", "Run", "Sprint", "Walk", "Vulnerable", "BraceHold", "BraceWalk", "Guard", "Float" };
+        static readonly HashSet<string> Looping = new HashSet<string> { "Idle", "Run", "Sprint", "Walk", "Vulnerable", "Guard", "Float" };
 
         public Transform Visual { get; private set; }
         public bool HasModel { get; private set; }
@@ -38,7 +35,6 @@ namespace LastBell.Run
         AnimationClip[] clips; readonly Dictionary<string, int> index = new Dictionary<string, int>();
         float[] times, weights, speeds; int current = -1;
         string oneShot; float oneShotLeft;
-        int brace;                       // 0 off, 1 raised, 2 lowering
         string idleClip = "Idle";
 
         // locomotion inputs set by the controller each tick
@@ -49,8 +45,10 @@ namespace LastBell.Run
         readonly List<(Material m, Color c)> glow = new List<(Material, Color)>();
         public float GlowLevel = 1;
 
-        public static CharacterPresenter ForPlayer(Transform parent, string className) =>
-            Create(parent, className, className == "Chimesinger" ? 2f : 2.5f, 1f, 0, PlaceholderBody(className), className == "Arcanist");   // astrolabe / rune glow restored like the Vanguard's
+        public static CharacterPresenter ForPlayer(Transform parent, string className)
+        {
+            return Create(parent, className, className == "Chimesinger" ? 2f : 2.5f, 1f, 0, PlaceholderBody(className), className == "Arcanist");   // astrolabe / rune glow restored
+        }
 
         public static CharacterPresenter Create(Transform parent, string resource, float glowBoost, float metalScale, float yawOffset, System.Func<Transform, Transform> placeholder, bool castLayers = false)
         {
@@ -139,25 +137,16 @@ namespace LastBell.Run
         public void Dash() => PlayOnce("Dodge", 0.3f, 0.05f);
         public void Jump() => PlayOnce("Jump", 0.62f, 0.2f);
         public void Land() { if (!PlayOnce("Land", 0.2f)) { } }
-        public void Brace(int state)
-        {
-            brace = state;
-            if (state == 1) { if (!Action("BraceRaise", 6)) oneShotLeft = 0; }
-            else if (state == 2) { if (!Action("BraceLower", 9)) { oneShotLeft = 0; } }
-            else oneShotLeft = 0;
-        }
-        public void BraceHit() { if (!Action("BraceHit", 12)) flinch = 0.4f; }
         public void Hit() { if (!PlayOnce("Hit", 0.3f)) flinch = 1; }
         public void Down() { EndOverlay(); downTarget = 1; if (PlayOnce("Down", 0.8f)) { downTarget = 0; oneShotLeft = 9999; } }
         public void GetUp() { downTarget = 0; if (!PlayOnce("GetUp", 0.9f)) { downAmount = 1; } }
-        public void ResetPose() { downTarget = downAmount = 0; flinch = 0; brace = 0; oneShotLeft = 0; GlowLevel = 1; SetLoop(idleClip); EndOverlay(); SetHidden(false); }
+        public void ResetPose() { downTarget = downAmount = 0; flinch = 0; oneShotLeft = 0; GlowLevel = 1; SetLoop(idleClip); EndOverlay(); SetHidden(false); }
         public void SetIdleClip(string name) { idleClip = name; if (oneShotLeft <= 0) SetLoop(name); }
 
         // called on the combat tick by its owner; picks the locomotion loop when no one-shot is playing
         public void Tick(PlayerController pc)
         {
             if (oneShotLeft > 0) return;
-            if (brace == 1) { SetLoop(Locomotion > 0.3f ? "BraceWalk" : "BraceHold"); return; }
             if (Locomotion > 0.3f) SetLoop(Sprinting ? "Sprint" : "Run", Sprinting ? Locomotion / 6.5f : Locomotion / RunClipSpeed);
             else SetLoop(idleClip);
         }
@@ -301,7 +290,7 @@ namespace LastBell.Run
         // simple readable stand-in body if a character GLB is missing from Resources
         static System.Func<Transform, Transform> PlaceholderBody(string className) => host =>
         {
-            var col = className == "Chimesinger" ? new Color(0.92f, 0.9f, 0.85f) : className == "Arcanist" ? new Color(0.45f, 0.3f, 0.7f) : new Color(0.2f, 0.32f, 0.62f);
+            var col = className == "Tollbreaker" ? new Color(0.25f, 0.5f, 0.55f) : className == "Chimesinger" ? new Color(0.92f, 0.9f, 0.85f) : className == "Arcanist" ? new Color(0.45f, 0.3f, 0.7f) : new Color(0.2f, 0.32f, 0.62f);
             Prim.Make(PrimitiveKind.Capsule, host, new Vector3(0, 0.9f, 0), new Vector3(0.7f, 0.9f, 0.7f), col);
             Prim.Make(PrimitiveKind.Cube, host, new Vector3(0, 1.3f, 0.4f), new Vector3(0.2f, 0.2f, 0.5f), new Color(1f, 0.8f, 0.3f), 1.5f);
             return host;

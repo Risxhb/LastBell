@@ -46,6 +46,19 @@ namespace LastBell.Run
             Check("mechanic icon gives a sprite", MechanicIcons.IconSprite(MechanicIcons.TetherPartner) != null);
         }
 
+        // map tour: both team markers over the player's head on this arena's real floor (about 33 px at 900 p), so the thin
+        // ivory brass rim can be judged against ivory floors
+        IEnumerator TeamMarkShot(RunMaps.Map map, string label)
+        {
+            var p = d.Player; p.Marks.Clear();
+            p.Marks.Add(MechanicIcons.TeamBrass); p.Marks.Add(MechanicIcons.TeamCobalt);
+            yield return Wait(0.2f);
+            yield return Shot("map_" + map.Id + "_" + label);
+            Check($"map {map.Name}: team markers load for the floor check ({label})",
+                  MechanicIcons.Icon(MechanicIcons.TeamBrass) != null && MechanicIcons.Icon(MechanicIcons.TeamCobalt) != null && p.Marks.Count == 2);
+            p.Marks.Clear();
+        }
+
         // in a live practice fight: marks over the player's head, a hazard warning tagged with a mechanic, and the gallery
         IEnumerator MechanicIconInGameChecks()
         {

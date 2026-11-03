@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace LastBell.Run
 {
-    // Mould Press presentation (stand-in): a brass gear-tooth rim and a molten fill rising with the countdown on each
+    // Mould Towers presentation (Molten Crown; first built for the retired Mould Press, stand-in): a brass gear-tooth rim and a molten fill rising with the countdown on each
     // mould, a large ivory numeral (the headcount) with one tick per player inside, and a loud chime each second. The
     // coral/amber circle itself is the hazard's telegraph. Solo tower II is dimmed until tower I resolves. Each tower's
     // pieces leave the moment its hazard leaves W.Hazards.Live (resolve, boss death, ClearTransient); the whole object

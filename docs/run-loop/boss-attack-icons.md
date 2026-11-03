@@ -55,16 +55,11 @@ Sub-hazards that one attack spawns (rims, crowns, blasts, stamps, echoes) inheri
 - `Hazards.cs` is edited on this branch too. If it conflicts, keep both sides: the new line is the `AttackId` field just below `Source`.
 - v3 adds attacks that aren't among the 20 (Reunion, Umbra and the scorch hazards). Leave them without an ID for now; they show as text. Ask Codex for icons if they stay.
 
-### Crucivar (`feature/crucivar-abilities-v2`)
-- `CrucivarAbility.Id` is already the full ID, but several abilities call `W.Hazards.Spawn` directly (Bellows Draw, for example). Set `AttackId = Id` in each `new Hazard { … }` there, or route them through one helper.
-- Today's names resolve through aliases: `Slag Rim`, `Slag Edge` and `Bellows Blast` go to Bellows Draw; `Pour`, `Pour II` and `Stamp N` go to The Great Casting; `Mould Press I–IV` resolve by name.
-- Anvil Sweep and Slag Spit aren't among the 20. They show as text.
-- `Hazards.cs` is edited on this branch too; keep both sides.
+### Crucivar
+- The v2/v3 abilities these icons were made for are retired (1 Nov 2026). The v4 fight has no approved icons yet; its warnings show as text.
 
-### Sylvara (`feature/sylvara-abilities-v2`)
-- `SylvaraAbility.Id` is the short form (`verdant_canticle`), so use `h.AttackId ??= "sylvara." + Id;`. The natural place is `SylvaraEncounter.Tuned`/`Tune`, or each ability's spawn calls.
-- Today's names resolve: `Verdant Canticle I–III`, `Two Choirs`, `Listening Roots: Hush/Chorus/root ring` and `Refrain Seed bloom/burst` (the older `RefrainSeed …` spelling has an alias).
-- Antiphon's answer is spawned by Two Choirs' `ResolveVerse`, with `Source = "Two Choirs"`, so **its hits currently show as Two Choirs**. Setting `answer.AttackId = "sylvara.antiphon";` in `Antiphon.Step`, right after `verse.ResolveVerse(...)`, fixes that. It's the one real gap on any branch, and the fallback can't fix it.
+### Sylvara (`feature/sylvara-v3`)
+- The v3 bullet-hell fight replaced the v2 abilities, so their icon notes were removed (git history keeps them). The v3 hazards and bullets set no `AttackId` yet, and their attacks show as text. Icons for the v3 attacks are still to be designed.
 
 ### Bellkeeper (`feature/bellkeeper-abilities-v2`)
 - `BellkeeperAbility.Id` is the full ID, so add `h.AttackId ??= Id;` in `BellkeeperAbility.Spawn`.

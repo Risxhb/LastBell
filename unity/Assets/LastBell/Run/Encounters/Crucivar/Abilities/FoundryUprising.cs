@@ -23,14 +23,18 @@ namespace LastBell.Run
         public const float Rise = 2.5f, PathWarn = 2.0f, FireTime = 1.0f, Stagger = 1.3f, Deadline = 30f, SoloDeadline = 36f, EasyDeadline = 40f;
         public const float CastRing = 7.5f, CastRadius = 1.2f, CastHp = 300f, Painshare = 0.5f;   // FIGHT-SHEET.md: about 9 s of solo damage each
         public const float BulletRadius = 0.5f, LaneSpacing = 3.5f, LaneSpeed = 6f, RingSpeed = 5f, RingGapHalf = 8f, RingGapAt = 26f;
-        public const float SpiralTurn = 30f, SpiralSpeed = 6f, SpiralFor = 1.6f, SpiralEvery = 0.12f;
+        public const float SpiralTurn = 30f, SpiralSpeed = 6f, SpiralFor = 2.4f, SpiralEvery = 0.12f;
+        // denser since 11-01 (Chzy18: more bullets in Phase 2): 5 lanes of 8 (P3's lone turret keeps 3 of 5), a second Ring Wave
+        // on the same gaps 0.6 s behind the first, spiral arms 2.4 s (were 1.6) and half the rest between volleys
+        public const float DenseLaneSpacing = 2.6f, RingEcho = 0.6f;
+        public const int DenseLaneBullets = 8;
         public const int BulletDmg = 20;
         public enum Pattern { Lane, Ring, Spiral }
 
         public sealed class Turret
         {
             public int K; public Vector3 Pos; public bool Up = true; public BossPart Casting; public float CastMax;
-            public Pattern A, B; public int Shots, NextFire; public Transform Look, CastLook; public LineRenderer Chain;
+            public Pattern A, B; public int Shots, NextFire; public bool Dense = true; public Transform Look, CastLook; public LineRenderer Chain;
             public readonly List<Hazard> Pending = new List<Hazard>();
         }
 
@@ -41,23 +45,24 @@ namespace LastBell.Run
         public Hazard Flood { get; private set; }
         int total, spawned, t;
         readonly List<(Turret tu, float a0, int start)> spirals = new List<(Turret, float, int)>();
+        readonly List<(int at, System.Action fire)> later = new List<(int, System.Action)>();   // the second Ring Wave
 
-        public int TurretCount(int fighters) => fighters <= 3 ? 2 : fighters <= 6 ? 3 : 4;
+        public int TurretCount(int fighters) => fighters <= 3 ? 2 : 3;   // 1-4 players (Chzy18 11-01)
 
         public IEnumerable<int> Run()
         {
             Uprisings++;
-            Turrets.Clear(); Velocity.Clear(); spirals.Clear(); t = 0;
+            Turrets.Clear(); Velocity.Clear(); spirals.Clear(); later.Clear(); t = 0;
             int n = Mathf.Max(1, W.Players.Count);
             total = TurretCount(n); spawned = 0;
             if (n == 1) SpawnPair(0); else for (int k = 0; k < total; k++) SpawnPair(k);
             int deadline = Sim.Ticks(Easy ? EasyDeadline : n == 1 ? SoloDeadline : Deadline);
             Flood = W.Hazards.Spawn(new Hazard
             {
-                Source = "Pour Flood", Shape = HazardShape.Ring, Kind = HazardKind.Ground, Origin = Vector3.zero, Inner = Rim - 1.2f, Radius = Rim + Hazard.Margin + 0.5f,
+                Source = "Pour Flood", Shape = HazardShape.Ring, Kind = HazardKind.Ground, Origin = Vector3.zero, Inner = Rim - 1.2f, Radius = Far + Hazard.Margin + 0.5f,
                 LockAt = 0, ResolveAt = deadline, ShareTotal = 1, WipeIfEmpty = true, Includes = _ => false,   // nobody can soak it: it wipes
             });
-            Flood.OnResolve = _ => Floods++;   // counted here: the wipe can end the script before the loop sees it
+            Flood.OnResolve = hz => { Floods++; W.BossFx.RimFlood(hz.Inner, Rim); };   // counted here: the wipe can end the script before the loop sees it
             bool layered = Uprisings > 1;
             IEnumerator<int> draft = null; int draftWait = 0;
             for (t = 0; ; t++)
@@ -85,7 +90,7 @@ namespace LastBell.Run
         {
             var p = Uprisings >= 2 && tu.Shots % 2 == 1 ? tu.B : tu.A;
             tu.Shots++;
-            tu.NextFire = t + T(PathWarn) + Sim.Ticks(FireTime) + Sim.Ticks(Uprisings >= 3 ? 0.5f : 1.0f);
+            tu.NextFire = t + T(PathWarn) + Sim.Ticks(FireTime) + Sim.Ticks(Uprisings >= 3 ? 0.3f : 0.5f);
             return p;
         }
 
@@ -97,7 +102,7 @@ namespace LastBell.Run
             var tu = new Turret
             {
                 K = k, Pos = Sim.Dir(yaw) * (Rim + 0.4f), A = pats[(k + Uprisings - 1) % 3], B = pats[(k + Uprisings) % 3],
-                NextFire = t + Sim.Ticks(Rise + (W.Players.Count == 1 ? 0 : Stagger * k)), CastMax = CastHp * (1 + 0.7f * (Mathf.Max(1, W.Players.Count) - 1)),
+                NextFire = t + Sim.Ticks(Rise + (W.Players.Count == 1 ? 0 : Stagger * k)), CastMax = CastHp * (1 + 0.7f * (Fighters() - 1)),   // HP: passive menu bots don't count (Chzy18 10-31)
             };
             float hp = tu.CastMax;
             tu.Casting = new BossPart { Name = "Molten Casting " + Numeral(k), Pos = Sim.Dir(yaw + 180f) * CastRing, BodyRadius = CastRadius, HitHeight = 1.0f };
@@ -144,14 +149,16 @@ namespace LastBell.Run
             {
                 float yaw = baseYaw + (tu.Shots % 2 == 0 ? 12f : -12f);
                 var d = Sim.Dir(yaw); var side = Vector3.Cross(Vector3.up, d);
-                foreach (float o in new[] { -LaneSpacing, 0, LaneSpacing })
+                var offsets = tu.Dense ? new[] { -2 * DenseLaneSpacing, -DenseLaneSpacing, 0, DenseLaneSpacing, 2 * DenseLaneSpacing } : new[] { -LaneSpacing, 0, LaneSpacing };
+                int per = tu.Dense ? DenseLaneBullets : 5;
+                foreach (float o in offsets)
                 {
                     var start = tu.Pos + side * o;
                     float len = Exit(start, d);
                     if (len <= 0) continue;
                     Path(tu, "Lane Stream", HazardShape.Lane, start, yaw, len, BulletRadius * 2, 0, 0, warn, () =>
                     {
-                        for (int j = 0; j < 5; j++) Bullet(tu, start - d * (j * 1.2f), d * LaneSpeed, "Lane Stream bullet");
+                        for (int j = 0; j < per; j++) Bullet(tu, start - d * (j * 1.2f), d * LaneSpeed, "Lane Stream bullet");
                     });
                 }
             }
@@ -164,22 +171,28 @@ namespace LastBell.Run
                 void Shot()
                 {
                     if (spawnedBullets) return; spawnedBullets = true;
-                    for (float a = -90f; a <= 90f; a += 3.4f)
+                    void Wave()
                     {
-                        if (Mathf.Abs(Mathf.DeltaAngle(a, g1)) < RingGapHalf || Mathf.Abs(Mathf.DeltaAngle(a, g2)) < RingGapHalf) continue;
-                        Bullet(tu, tu.Pos, Sim.Dir(baseYaw + a) * RingSpeed, "Ring Wave bullet");
+                        if (!tu.Up) return;
+                        for (float a = -90f; a <= 90f; a += 3.4f)
+                        {
+                            if (Mathf.Abs(Mathf.DeltaAngle(a, g1)) < RingGapHalf || Mathf.Abs(Mathf.DeltaAngle(a, g2)) < RingGapHalf) continue;
+                            Bullet(tu, tu.Pos, Sim.Dir(baseYaw + a) * RingSpeed, "Ring Wave bullet");
+                        }
                     }
+                    Wave();
+                    if (tu.Dense) later.Add((t + Sim.Ticks(RingEcho), Wave));
                 }
-                Path(tu, "Ring Wave", HazardShape.Cone, tu.Pos, baseYaw, Rim * 2 + 1, 0, mid, 0, warn, Shot);
-                Path(tu, "Ring Wave", HazardShape.Cone, tu.Pos, baseYaw + RingGapAt + RingGapHalf + side, Rim * 2 + 1, 0, side, 0, warn, Shot);
-                Path(tu, "Ring Wave", HazardShape.Cone, tu.Pos, baseYaw - RingGapAt - RingGapHalf - side, Rim * 2 + 1, 0, side, 0, warn, Shot);
+                Path(tu, "Ring Wave", HazardShape.Cone, tu.Pos, baseYaw, Far * 2 + 1, 0, mid, 0, warn, Shot);
+                Path(tu, "Ring Wave", HazardShape.Cone, tu.Pos, baseYaw + RingGapAt + RingGapHalf + side, Far * 2 + 1, 0, side, 0, warn, Shot);
+                Path(tu, "Ring Wave", HazardShape.Cone, tu.Pos, baseYaw - RingGapAt - RingGapHalf - side, Far * 2 + 1, 0, side, 0, warn, Shot);
             }
             else
             {
                 float a0 = baseYaw - 60f + (tu.Shots % 2 == 0 ? 0 : 60f), sweep = SpiralTurn * SpiralFor;
                 bool started = false;
                 for (int k = 0; k < 3; k++)
-                    Path(tu, "Spiral Arm", HazardShape.Cone, tu.Pos, a0 + k * 120f + sweep / 2, Rim * 2 + 1, 0, sweep / 2 + 4f, 0, warn, () =>
+                    Path(tu, "Spiral Arm", HazardShape.Cone, tu.Pos, a0 + k * 120f + sweep / 2, Far * 2 + 1, 0, sweep / 2 + 4f, 0, warn, () =>
                     {
                         if (started) return; started = true;
                         spirals.Add((tu, a0, t));
@@ -190,6 +203,7 @@ namespace LastBell.Run
         void StepSpirals()
         {
             int every = Mathf.Max(1, Sim.Ticks(SpiralEvery)), dur = Sim.Ticks(SpiralFor);
+            for (int i = later.Count - 1; i >= 0; i--) if (t >= later[i].at) { var f = later[i].fire; later.RemoveAt(i); f(); }
             spirals.RemoveAll(sp => !sp.tu.Up || t - sp.start >= dur);
             foreach (var sp in spirals)
             {
@@ -222,20 +236,14 @@ namespace LastBell.Run
                 Source = name, Shape = HazardShape.Circle, Kind = HazardKind.Strike, Origin = at, Radius = BulletRadius,
                 ResolveAt = 1, ActiveTicks = ticks, LockAt = ticks + 2, Damage = BulletDmg, Knockback = 0.5f, Stun = 6,
             };
-            h.Track = hz => hz.Origin += vel * Sim.Dt;
+            h.Track = hz => { hz.Origin += vel * Sim.Dt; if (hz.Age % 8 == 4) W.BossFx.Ember(hz.Origin, vel); };
             h.OnSpent = hz => Velocity.Remove(hz);
             Velocity[h] = vel;
             W.Hazards.Spawn(h);
         }
 
         // distance along d from p until it leaves the arena (0 if it never enters)
-        static float Exit(Vector3 p, Vector3 d)
-        {
-            p = Flat(p); d = Flat(d).normalized;
-            float b = Vector3.Dot(p, d), c = p.sqrMagnitude - (Rim + Hazard.Margin) * (Rim + Hazard.Margin), disc = b * b - c;
-            if (disc <= 0) return 0;
-            return Mathf.Max(0, -b + Mathf.Sqrt(disc));
-        }
+        static float Exit(Vector3 p, Vector3 d) => WallDist(p, d);
 
         // a hazard that should go quietly: no hit, no wipe, cools like a slag pool this tick
         static void Cancel(Hazard h)
@@ -246,7 +254,7 @@ namespace LastBell.Run
         }
 
         // a lone turret with no casting (Molten Crown keeps one firing Lane Streams all phase)
-        public Turret LoneTurret(Vector3 pos) => new Turret { K = 0, Pos = pos, A = Pattern.Lane, B = Pattern.Lane };
+        public Turret LoneTurret(Vector3 pos) => new Turret { K = 0, Pos = pos, A = Pattern.Lane, B = Pattern.Lane, Dense = false };
         public void FireLane(Turret tu) { tu.Shots++; Fire(tu, Pattern.Lane); }
 
         public static string Numeral(int k) => new[] { "I", "II", "III", "IV" }[k];

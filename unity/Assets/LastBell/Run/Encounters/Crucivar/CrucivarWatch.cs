@@ -8,7 +8,7 @@ namespace LastBell.Run
 {
     // Watch mode: four bots play Crucivar in the Brass Foundry while you look on (practice only, never in a run):
     //   Unity.exe -projectPath unity -executeMethod LastBell.Run.EditorTools.CrucivarTestTools.PlayModeTest
-    //             -crucivarWatch [-lastbellAbilitySet v4] [-lastbellBossHp 0.4]
+    //             -crucivarWatch [-lastbellBossHp 0.4]
     // The boss runs its real schedule. Each bot is a real PlayerController on scripted input: it scores spots around
     // itself against every live hazard (where the jets will have turned to, Backdraft's pull, its own brand vs the
     // others, the pools), walks to the best one, dashes when a hit is about to land, and hits the boss in between.
@@ -27,7 +27,7 @@ namespace LastBell.Run
             if (d && !d.GetComponent<CrucivarWatch>()) d.gameObject.AddComponent<CrucivarWatch>();
         }
 
-        static readonly string[] Classes = { "Vanguard", "Vanguard", "Vanguard", "Vanguard" };
+        static readonly string[] Classes = { "Arcanist", "Chimesinger", "Arcanist", "Chimesinger" };   // Vanguard retired (Chzy18 11-02); Tollbreaker joins when it lands
         static readonly string[] Names = { "Bot 1", "Bot 2", "Bot 3", "Bot 4" };
 
         sealed class Bot : IInputSource
@@ -307,7 +307,7 @@ namespace LastBell.Run
             var boss = d.Boss as CrucivarEncounter;
             var lines = new List<string>
             {
-                $"WATCH MODE · set {CrucivarArgs.Set} · fight {fights} · {Time.time - fightStart:0}s · Tab: follow/overview",
+                $"WATCH MODE · fight {fights} · {Time.time - fightStart:0}s · Tab: follow/overview",
                 boss ? $"Crucivar {boss.Hp}/{boss.MaxHp} · {boss.Current}" + (boss.Rite != null ? $" · loop {boss.Rite.Loops}" : "") : "",
             };
             foreach (var b in bots) lines.Add($"{b.Name}: {b.Hits} hits, {b.Damage} damage, would have gone down {b.Downs}x");
