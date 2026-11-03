@@ -146,9 +146,20 @@ namespace LastBell.Run
                 if (d > stop) p.Pull(to, Mathf.Min(step, d - stop), 1);   // stops at his feet, never through him
             }
         }
+        // Zenith Collapse off the centre (3 Nov, done as recommended, review later: "is the centre too predictable?"): he walks
+        // to one of 8 spots 3.5 m out, picked at random, so the safe disc has to be read each cast. The disc (up to 5.5 m)
+        // still fits well inside the 13.9 m bound.
+        public const float CollapseOffset = 3.5f;
+        public Vector3 LastCollapseSpot { get; private set; }   // test evidence
+        IEnumerable<int> WalkToCollapseSpot()
+        {
+            LastCollapseSpot = Sim.Dir(UnityEngine.Random.Range(0, 8) * 45f) * CollapseOffset;
+            return WalkTo(LastCollapseSpot, CentreSpeed, Sim.Ticks(4.5f));
+        }
+
         public IEnumerable<int> CollapseWithLances(int beams)
         {
-            foreach (var w in WalkToCentre()) yield return w;
+            foreach (var w in WalkToCollapseSpot()) yield return w;
             // 3 beams, 1.2 s after the Collapse: inside the hungry disc beams 45 degrees apart leave no gap, so the answer is to
             // step out to where the gaps open (5 m) once the Collapse has landed
             beams = 3;
@@ -219,7 +230,7 @@ namespace LastBell.Run
 
         IEnumerable<int> SpotsThenCollapse()
         {
-            foreach (var w in WalkToCentre()) yield return w;
+            foreach (var w in WalkToCollapseSpot()) yield return w;
             foreach (var w in Paired(Spots.Run(), Spots.Duration(), HungryCollapse(), Zenith.Duration(), Sim.Ticks(2.5f))) yield return w;   // 2.5 s: rim to his feet (8 m) after the last blast
         }
 

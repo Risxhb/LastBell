@@ -5,7 +5,7 @@ using UnityEngine;
 namespace LastBell.Run
 {
     // 06 Zenith Collapse (aurelion.zenith_collapse), all difficulties, spec abilities-v2/ABILITIES-v2.1.md §1 (proposal).
-    // The Regent stands at the meridian (the phase plan walks him to the arena centre first) and the whole sky falls on
+    // The Regent stands at the meridian (the phase plan walks him to a spot 3.5 m off the centre first, 3 Nov) and the whole sky falls on
     // the dais except a disc of shade at his feet: a Ground annulus on the boss, inner radius 4.5 m (N <= 2), 5.5 m
     // (N 3-4) or 6.5 m (N >= 5), 5.0 m at N <= 2 in Phase 3, outer 30 m (past the bound). Locked at once, resolves 3.0 s
     // later (Hard 2.4 s, Easy 3.75 s). 45 damage, no knockback, 0.25 s stun. The "come close" move: ranged must run in;
