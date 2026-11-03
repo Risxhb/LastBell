@@ -22,6 +22,8 @@ namespace LastBell.Areas.Area1
         [SerializeField] View view = View.Gameplay;
         [Tooltip("Hazards are up: floor gold inlay dims.")]
         public bool quiet;
+        [Tooltip("Play mode: draw all ~840 cloud puffs as one merged mesh (one draw call), sorted back to front per camera.")]
+        public bool batchClouds = true;
 
         // Gameplay camera matches index.html (fov 44). Top-down matches skyward-spire.html?view=top: the reference is
         // 850 x 742 px, plaza centre at (437, 325), 16.3 px per metre, fov 8. x is mirrored from three.js (glTF import).
@@ -43,8 +45,12 @@ namespace LastBell.Areas.Area1
         readonly List<(Material m, float opacity, float phase)> cloudMats = new List<(Material, float, float)>();
         float floorLevel = 1;
         bool collected;
+        SkyCloudBatch cloudBatch;
+        public bool checkMode;   // SkyCloudBatchCheck: set the clouds up in edit mode, to render them both ways
+        public SkyCloudBatch CloudBatch => cloudBatch;
+        public void CollectNow() => Collect();
 
-        void OnEnable() { collected = false; ApplyView(); }
+        void OnEnable() { collected = false; ApplyView(); UnityEngine.Rendering.RenderPipelineManager.beginCameraRendering += SortClouds; }
 
         public View CurrentView => view;
         public void SetView(View v) { view = v; ApplyView(); }
@@ -77,15 +83,21 @@ namespace LastBell.Areas.Area1
         void Collect()
         {
             collected = true; banners.Clear(); rings.Clear(); occluders.Clear(); clouds.Clear(); floorMats.Clear(); breathers.Clear(); cloudMats.Clear();
-            if (!arenaRoot) return;
-            if (Application.isPlaying)                          // per-session copies of the cloud materials, so opacity can vary
+            cloudBatch?.Dispose(); cloudBatch = null;
+            if (!arenaRoot || !gameObject.scene.IsValid()) return;   // prefab assets (OnValidate on load): nothing to animate, and .material would log errors
+            var puffs = new List<(Renderer r, float opacityPhase)>();
+            if (Application.isPlaying || checkMode)             // per-session copies of the cloud materials, so opacity can vary
             {                                                   // without touching the saved assets
-                var copies = new Dictionary<Material, Material>();
+                var copies = new Dictionary<Material, (Material copy, float phase)>();
                 foreach (var r in arenaRoot.GetComponentsInChildren<Renderer>(true))
                 {
                     var m = r.sharedMaterial; if (!m || !m.HasProperty("_SoftDistance")) continue;
-                    if (!copies.TryGetValue(m, out var c)) { copies[m] = c = new Material(m); cloudMats.Add((c, m.GetFloat("_Opacity"), copies.Count * 1.9f)); }
-                    r.sharedMaterial = c;
+                    if (!copies.TryGetValue(m, out var c))
+                    {
+                        copies[m] = c = (batchClouds ? m : new Material(m), (copies.Count + 1) * 1.9f);
+                        if (!batchClouds) cloudMats.Add((c.copy, m.GetFloat("_Opacity"), c.phase));
+                    }
+                    if (batchClouds) puffs.Add((r, c.phase)); else r.sharedMaterial = c.copy;
                 }
             }
             var rnd = new System.Random(5);
@@ -106,6 +118,21 @@ namespace LastBell.Areas.Area1
                         if (Application.isPlaying && t.TryGetComponent(out Renderer r)) floorMats.Add(r.material); break;
                 }
             }
+            if (puffs.Count == 0) return;
+            // Hand every puff's motion to the merged mesh: same drift and breathing numbers as above, applied in the shader.
+            var drift = new Dictionary<Transform, (float angle, float radius, float speed)>();
+            foreach (var (c, a, rad, sp) in clouds) drift[c] = (a, rad, sp);
+            var breathe = new Dictionary<Transform, float>();
+            foreach (var (c, _, ph) in breathers) breathe[c] = ph;
+            cloudBatch = SkyCloudBatch.Build(puffs, drift, breathe, gameObject.scene, Time.time);
+            if (cloudBatch == null) { batchClouds = false; Collect(); return; }   // puffs it can't merge: animate them one by one as before
+            clouds.RemoveAll(c => cloudBatch.Covers(c.t));
+            breathers.RemoveAll(b => cloudBatch.Covers(b.t));
+        }
+
+        void SortClouds(UnityEngine.Rendering.ScriptableRenderContext _, Camera cam)
+        {
+            if (cloudBatch != null && cam && Application.isPlaying) cloudBatch.Sort(cam.transform.position, Time.time);
         }
 
         void Update()
@@ -115,13 +142,7 @@ namespace LastBell.Areas.Area1
             float t = Time.time, dt = Time.deltaTime;
             foreach (var (b, rest, ph) in banners) b.localRotation = rest * Quaternion.Euler(0, Mathf.Sin(t * 1.2f + ph) * 3.4f, 0);
             foreach (var (r, speed) in rings) r.localRotation = Quaternion.Euler(0, t * Mathf.Rad2Deg * speed, 0);
-            for (int i = 0; i < clouds.Count; i++)
-            {
-                var (c, a, rad, sp) = clouds[i]; a += sp * dt; clouds[i] = (c, a, rad, sp);
-                c.position = new Vector3(Mathf.Cos(a) * rad, c.position.y, Mathf.Sin(a) * rad);
-            }
-            foreach (var (c, s, ph) in breathers) c.localScale = s * (1 + Mathf.Sin(t * 0.25f + ph) * 0.03f);   // ±3% breathing
-            foreach (var (m, op, ph) in cloudMats) m.SetFloat("_Opacity", op * (0.92f + 0.08f * Mathf.Sin(t * 0.18f + ph)));
+            AnimateClouds(t, dt);
             floorLevel = Mathf.MoveTowards(floorLevel, quiet ? 0f : 1f, dt * 4);
             foreach (var m in floorMats)
                 if (m.HasProperty("emissiveFactor")) m.SetColor("emissiveFactor", new Color(1f, 0.85f, 0.63f) * 0.12f * floorLevel);
@@ -129,6 +150,18 @@ namespace LastBell.Areas.Area1
             if (Keyboard.current != null && Keyboard.current.tKey.wasPressedThisFrame)
                 SetView(view == View.Gameplay ? View.TopDown : View.Gameplay);
 #endif
+        }
+
+        public void AnimateClouds(float t, float dt)
+        {
+            for (int i = 0; i < clouds.Count; i++)
+            {
+                var (c, a, rad, sp) = clouds[i]; a += sp * dt; clouds[i] = (c, a, rad, sp);
+                c.position = new Vector3(Mathf.Cos(a) * rad, c.position.y, Mathf.Sin(a) * rad);
+            }
+            foreach (var (c, s, ph) in breathers) c.localScale = s * (1 + Mathf.Sin(t * 0.25f + ph) * 0.03f);   // ±3% breathing
+            foreach (var (m, op, ph) in cloudMats) m.SetFloat("_Opacity", op * (0.92f + 0.08f * Mathf.Sin(t * 0.18f + ph)));
+            cloudBatch?.Animate(t);
         }
 
         // The shared URP asset keeps shadows to 50 m; the top-down camera sits ~325 m up, so it borrows a longer range
@@ -142,7 +175,12 @@ namespace LastBell.Areas.Area1
         }
 
         void LateUpdate() { if (Application.isPlaying) UseLongShadows(view == View.TopDown); }
-        void OnDisable() { UseLongShadows(false); }
+        void OnDisable()
+        {
+            UseLongShadows(false);
+            UnityEngine.Rendering.RenderPipelineManager.beginCameraRendering -= SortClouds;
+            cloudBatch?.Dispose(); cloudBatch = null; collected = false;
+        }
         void OnApplicationQuit() { UseLongShadows(false); }
 
         void OnValidate() { ApplyView(); }
