@@ -10,6 +10,7 @@ namespace LastBell.Run
     public sealed partial class RunAutoTest
     {
         static bool AurelionGallery => Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellAurelionGallery", StringComparison.OrdinalIgnoreCase));
+        static bool DevourShots => Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellDevourShots", StringComparison.OrdinalIgnoreCase));
 
         // Two passes: the fixed overhead view for the design docs, then the real gameplay camera, where the telegraph style
         // (Reference/Telegraph-Style v2: contour widths, luminance, the Skyward motif) has to be judged.
@@ -18,6 +19,17 @@ namespace LastBell.Run
         {
             if (SeveranceShots) { yield return SeveranceShotsAll(); yield break; }
             if (LastLightShots) { yield return LastLightShotsAll(); yield break; }
+            if (DevourShots)   // -lastbellDevourShots: only Devour, 0.8 s into the pull, both cameras (the player 8 m out, standing still)
+            {
+                AurelionArgs.SoloOverride = null;
+                foreach (var cam in new[] { "", "_gamecam" })
+                {
+                    RunDirector.ShotCamera = null; if (cam == "") RunDirector.ShotCamera = (new Vector3(0, 27, 17), new Vector3(0, 0, 1.5f)); galleryCam = cam;
+                    yield return GalleryShot("devour", 1, b => AurelionEncounter.Together(b.HungryCollapse(), 0, new[] { Sim.Ticks(3f) }), Sim.Ticks(2.55f + 0.8f), new Vector3(-8, 0, 0));   // Medium Collapse 2.55 s, then 0.8 s of pull
+                }
+                RunDirector.ShotCamera = null;
+                yield return V2Teardown(); yield break;
+            }
             Note("---------- Aurelion ability gallery ----------");
             AurelionArgs.SoloOverride = null;
             RunDirector.ShotCamera = (new Vector3(0, 27, 17), new Vector3(0, 0, 1.5f)); galleryCam = "";

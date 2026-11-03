@@ -116,7 +116,7 @@ namespace LastBell.Run
         {
             if (DevourLeft <= 0) return;
             if (Dead || !W.CombatActive) { DevourLeft = 0; return; }
-            if (DevourLeft % Sim.Ticks(0.35f) == 0) W.BossFx.InhaleChevrons(Sim.Flat(transform.position), DevourPull * 0.7f, 0.7f);   // stand-in: the foundry's chevrons, in gold
+            if (DevourLeft % 3 == 0) W.BossFx.DevourDust(Sim.Flat(transform.position), DevourPull, AurelionAbility.Rim, BodyRadius);   // gold dust on 16 spokes, at the pull's speed
             DevourLeft--;
             float step = DevourPull / Sim.Hz, stop = BodyRadius + PlayerController.Radius + 0.3f;
             var players = W.Players;

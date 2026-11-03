@@ -49,6 +49,7 @@ namespace LastBell.VFX
             sparks = MakeParticles("Sparks", addMat, 1, Gold, Amber, 0.6f);
             dust = MakeParticles("Dust", alphaMat, 1, new Color(0.30f, 0.24f, 0.36f), new Color(0.62f, 0.52f, 0.66f), 0f);
             motes = MakeParticles("Motes", addMat, 1, Brass, Teal, 0f);
+            InitDevour();
             for (int i = 0; i < 12; i++) burstPool.Push(NewBurst());   // warm pool: no instantiation mid-fight (§11)
             CameraShake.Ensure();
         }

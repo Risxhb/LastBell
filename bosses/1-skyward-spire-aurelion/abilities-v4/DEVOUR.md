@@ -19,9 +19,9 @@ Devour follows every Zenith Collapse:
 
 It never plays in Total Eclipse or Last Light, which have no Collapse.
 
-## How it looks (grey box)
+## How it looks
 - A **DEVOUR** banner shows for the 2.0 s.
-- Gold-amber chevrons crawl in toward him. For now this is a stand-in that reuses the foundry's inhale chevrons; the gold dust on 16 spokes is still to come.
+- Gold dust streams in from the rim to his chest along 16 spokes, at the pull's own speed (`DevourFx.cs`).
 - There is no coral ground footprint, because the pull itself never hurts.
 
 ## Rules check
