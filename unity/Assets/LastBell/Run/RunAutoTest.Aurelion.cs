@@ -34,7 +34,7 @@ namespace LastBell.Run
             if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }   // the earlier practice section ends on Ready
             // his practice is fought in his own arena: from another map the button loads Skyward Spire first
             int spire = RunMaps.IndexOf(RunDirector.AurelionMap);
-            Check("Aurelion practice accepted from the menu", d.StartPractice("Vanguard", RunDirector.AurelionPractice));
+            Check("Aurelion practice accepted from the menu", d.StartPractice("Tollbreaker", RunDirector.AurelionPractice));
             yield return Until(() => RunMaps.Current == spire && RunDirector.Instance && RunDirector.Instance.State == RunState.Ready, 30, "Skyward Spire loaded for Aurelion");
             if (RunDirector.Instance != d) { directorLog.AddRange(d.Log); d = RunDirector.Instance; d.InputOverride = bot; bot.Clear(); }
             if (d.Player) d.Player.Input = bot;   // the new scene built the player before the bot was attached
@@ -142,9 +142,9 @@ namespace LastBell.Run
             d.SetPaused(true); d.RequestRetry(); d.RequestReady();
             yield return Until(() => d.State == RunState.Combat, 4, "Aurelion DPS combat");
             int dealt0 = d.World.DamageDealt; float t0 = Time.time;
-            yield return Fight(20f, VanguardRotation, 1.0f);
+            yield return Fight(20f, TollRotation, 3f);
             float dps = (d.World.DamageDealt - dealt0) / Mathf.Max(1, Time.time - t0);
-            Note($"Vanguard sustained DPS on Aurelion (moving, dodging): {dps:0.0} -> 150 s solo target = {dps * 150:0} HP (current MaxHp {d.Boss.MaxHp})");
+            Note($"Tollbreaker sustained DPS on Aurelion (moving, dodging): {dps:0.0} -> 150 s solo target = {dps * 150:0} HP (current MaxHp {d.Boss.MaxHp})");
 
             yield return KillDuringWindup("Aurelion");
             yield return Until(() => d.State == RunState.Results, 6, "Aurelion practice results");

@@ -61,9 +61,8 @@ namespace LastBell.Run.Shop
                     {
                         Run.Close();
                         foreach (var b in Run.Slots) b.ResetEncounter();
-                        Run.CrackUntil = -1; Run.BrandUntil = -1; Run.BrandOwner = null;
-                        ItemHooks.ClearEffects();
-                        d.Player.RefreshHealth(refillPotions: false);   // the shop's refill, now at the bought max HP (Grit, Glass Edge)
+                        Run.BrandUntil = -1; Run.BrandOwner = null;
+                        d.Player.RefreshHealth(refillPotions: false);   // the shop's refill, now at the bought max HP (Glass Edge)
                     }
                     break;
                 case RunState.Cleared:

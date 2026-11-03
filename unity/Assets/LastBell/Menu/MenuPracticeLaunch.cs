@@ -6,7 +6,7 @@ using UnityEngine;
 namespace LastBell.Menu
 {
     // Starts straight into one boss's practice, skipping the menus. For working on a boss:
-    //   LastBell.exe -lastbellPractice tempo-tyrant            (Vanguard, the boss's own arena)
+    //   LastBell.exe -lastbellPractice tempo-tyrant            (Tollbreaker, the boss's own arena)
     //   LastBell.exe -lastbellPractice oracle -lastbellClass Arcanist
     //   LastBell.exe -lastbellPractice bellkeeper -lastbellPhase 3   (starts in that HP phase; default 1)
     // The boss is matched by name, ignoring case, spaces, dashes and the "(practice)/(area n)" suffix; a unique prefix or

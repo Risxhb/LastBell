@@ -50,8 +50,8 @@ namespace LastBell.Run
         readonly Dictionary<PlayerController, int> behind = new Dictionary<PlayerController, int>();
         int pinRotation;
 
-        // HP = measured sustained DPS x 150 s (packet). First autotest measurement: Vanguard ~90 DPS while dodging -> 13 500.
-        void Awake() { MaxHp = AurelionArgs.V4 ? 12000 : 13500; BodyRadius = 1.1f;   // v4: Chzy18 2026-10-27 "beef up the health" (5-7 min target); was 10 000 (solo Vanguard 4:35, Arcanist 2:34 on Hard)
+        // HP = measured sustained DPS x 150 s (packet). First autotest measurement: the old melee class, ~90 DPS while dodging -> 13 500.
+        void Awake() { MaxHp = AurelionArgs.V4 ? 12000 : 13500; BodyRadius = 1.1f;   // v4: Chzy18 2026-10-27 "beef up the health" (5-7 min target); was 10 000 (solo melee class 4:35, Arcanist 2:34 on Hard)
             HitHeight = 2.6f; MarkHeight = 5.2f; }
 
         int PhaseFor() => Hp > MaxHp * 0.65f ? 1 : Hp > MaxHp * 0.30f ? 2 : 3;

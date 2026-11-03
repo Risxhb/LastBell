@@ -302,7 +302,7 @@ def attack(f, t):
     s.update(ik_leg(-1, STANCE_ANKLE_Y['R'] - 0.32 * lunge, hy, hz, spread=4 + 4 * lunge))
     s.update(ik_leg(1, STANCE_ANKLE_Y['L'] + 0.22 * lunge, hy, hz, spread=4 + 4 * lunge))
     return s
-# ---------------- Vanguard kit (docs/design/vanguard-v2-implementation.md) ----------------
+# ---------------- Vanguard kit (retired 2 Nov; this browser figure is a stand-in) ----------------
 # Each ability is a table of keyed channels over normalized time; move_pose turns them into a full-body pose with
 # both feet planted by IK. Channels (degrees unless noted):
 #   tw torso twist (+ = toward the shield side), lean forward, drop hips (m), hy hips forward/back (m, - = forward)
