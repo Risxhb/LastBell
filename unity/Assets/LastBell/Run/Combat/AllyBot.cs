@@ -62,7 +62,8 @@ namespace LastBell.Run
             for (int i = 0; i < live.Count; i++)   // indexed: a foreach over the IReadOnlyList allocates its enumerator
             {
                 var h = live[i];
-                if (h.Age >= (Mode == BotMode.Passive ? Mathf.Max(h.LockAt, 0) + reactTicks : 0) && Hits(h, me, pos) && h.ResolveAt - h.Age < left) { threat = h; left = h.ResolveAt - h.Age; }
+                int lands = Lands(h, boss);
+                if (h.Age >= (Mode == BotMode.Passive ? Mathf.Max(h.LockAt, 0) + reactTicks : 0) && Hits(h, me, pos) && lands < left) { threat = h; left = lands; }
             }
             // an orb heading here, or a strike still rolling where its warning was
             if (threat == null && (BotSight.OrbHits(pos, OrbAhead, OrbPad) || BotSight.GhostHits(me, pos))) { threat = Unseen; left = 20; }
@@ -248,7 +249,7 @@ namespace LastBell.Run
         }
 
         // a mark that follows this player and spares them (Crucivar's Ember Brand) leaves a burning pool where it lands: walk
-        // it out to a ring 11.5 m from the centre, clear of other pools and other players, before it stops following; a threat on the way
+        // it out to a ring 12.5 m from the centre, clear of other pools and other players, before it stops following; a threat on the way
         // is dodged first (the normal reading)
         bool Brand(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
         {
@@ -288,7 +289,7 @@ namespace LastBell.Run
         // the nearest gap about 6.5 m out, turning with them (shown jets first, the turn read from their yaw)
         Hazard spokeRef; float spokeYaw, spokeDir;
         static readonly float[] SpokeRadii = { 6.5f, 5.6f, 7.4f };   // near the hub a jet covers too wide an angle, far out the gap outruns a walk
-        const float BrandRing = 11.5f;   // where a brand is walked to: its pool (2 m) stays outside the ring the jet gaps are ridden on
+        const float BrandRing = 12.5f;   // where a brand is walked to: its pool (2 m) stays off the jet ring and leaves the inside of the quake's outer band
         bool Spokes(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
         {
             var live = me.World.Hazards.Live; var jets = new List<Hazard>();
@@ -335,6 +336,10 @@ namespace LastBell.Run
             inp.Move = ToScreen(move);
             return true;
         }
+
+        // ticks until a shape hurts: a strike when it lands, burning ground once it has heated (a pool that lasts until the
+        // phase ends burns now, not then). Aurelion keeps the landing time its tested routes were built on
+        static int Lands(Hazard h, BossEncounter boss) => h.BurnPerSecond > 0 && !(boss is AurelionEncounter) ? Mathf.Max(0, h.LockAt - h.Age) : h.ResolveAt - h.Age;
 
         static bool Jet(Hazard h) => h.Shape == HazardShape.Lane && h.Track != null && h.ActiveTicks > 0 && h.Damage > 0 && !h.Cancelled && h.Age < h.ResolveAt + h.ActiveTicks;
 
