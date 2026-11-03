@@ -21,7 +21,7 @@ namespace LastBell.Run.Networking
                 frame.Boss = new LanWorldFrame.BossState { X = pos.x, Y = pos.y, Z = pos.z, Yaw = SimSmoother.SimRotation(b.transform).eulerAngles.y, Hp = b.Hp, MaxHp = b.MaxHp, Dead = b.Dead, Phase = b.PhaseName, Attack = b.Current, Extra = b.HudExtra };
                 var presenter = b.GetComponentInChildren<CharacterPresenter>(true);
                 if (presenter) { frame.Boss.Clip = presenter.CurrentClip; frame.Boss.Overlay = presenter.OverlayClip; frame.Boss.ClipSpeed = presenter.NetworkClipSpeed; frame.Boss.OverlaySpeed = presenter.NetworkOverlaySpeed; frame.Boss.Hidden = presenter.Hidden; }
-                if (b is TempoTyrantEncounter tyrant && tyrant.Rig) { frame.Boss.PoseKind = 1; frame.Boss.Pose = (int)tyrant.Rig.Current; frame.Boss.Haste = tyrant.Rig.Haste; frame.Boss.Frenzy = tyrant.Rig.Frenzy; }
+                if (b is TempoTyrantEncounter tyrant && tyrant.Rig) { frame.Boss.PoseKind = 1; frame.Boss.Pose = (int)tyrant.Rig.Current; frame.Boss.Haste = tyrant.Rig.Haste; frame.Boss.Frenzy = tyrant.Rig.Frenzy; frame.Boss.Beat = tyrant.Clock.Beat; frame.Boss.BeatHaste = tyrant.Clock.State == Tempo.Haste; }
                 else if (b is ChimeboundOracleEncounter oracle && oracle.Rig) { frame.Boss.PoseKind = 2; frame.Boss.Pose = (int)oracle.Rig.Current; frame.Boss.Haste = oracle.Rig.Haste; }
             }
             for (int i = 0; i < world.Players.Count; i++)

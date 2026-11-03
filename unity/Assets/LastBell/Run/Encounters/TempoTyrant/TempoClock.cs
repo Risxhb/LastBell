@@ -63,6 +63,9 @@ namespace LastBell.Run
             return false;
         }
 
+        // LAN client replica: the host's clock state at the client's drawn time (the replica never steps the clock).
+        public void ApplyReplica(Tempo state, double beat) { State = state; Beat = beat; }
+
         // Called by the encounter at a complete attack-block boundary when Pending.
         public void BeginTransition() { if (!Transitioning) { Transitioning = true; TransitionTick = 0; } }
 

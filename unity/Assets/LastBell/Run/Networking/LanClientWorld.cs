@@ -42,6 +42,8 @@ namespace LastBell.Run.Networking
         const float TeleportDistance = 4f;
         readonly Dictionary<int, Actor> actors = new Dictionary<int, Actor>();
         readonly Track bossTrack = new Track();
+        readonly List<(double t, double beat, bool haste)> beats = new List<(double, double, bool)>();   // Tempo Tyrant clock samples by host time
+        double shownBeat; bool beatSet, shownHaste;   // the beat given to the replica's clock: smooth, so the music never chases jitter
         // Own-movement prediction: this client's character is drawn where the host has it plus the moves the host has not
         // applied yet (walk or sprint at the host's current speed factor), and eased onto the host's answer. Dashes, hits
         // and knockback still come from the host.
@@ -115,7 +117,7 @@ namespace LastBell.Run.Networking
             lastArrival = now;
             // a retry restarts the host's world tick: start every history again
             bool restarted = current != null && frame.Tick < current.Tick;
-            if (restarted) { foreach (var a in actors.Values) a.Track.Clear(); bossTrack.Clear(); clockSet = false; fxReplay.Reset(); playerFx.ResetAll(); }
+            if (restarted) { foreach (var a in actors.Values) a.Track.Clear(); bossTrack.Clear(); beats.Clear(); beatSet = false; clockSet = false; fxReplay.Reset(); playerFx.ResetAll(); }
             fxReplay.Enqueue(frame.Effects);
             double hostTime = frame.Tick * (double)Sim.Dt, offset = now - hostTime;
             if (!clockSet || Math.Abs(offset - clockOffset) > 0.5) { clockOffset = offset; clockSet = true; } else clockOffset += (offset - clockOffset) * 0.05;
@@ -144,6 +146,7 @@ namespace LastBell.Run.Networking
                 }
                 var b = frame.Boss;
                 bossTrack.Add(hostTime, new Vector3(b.X, b.Y, b.Z), b.Yaw, 0);
+                if (b.PoseKind == 1) { beats.Add((hostTime, b.Beat, b.BeatHaste)); if (beats.Count > 120) beats.RemoveRange(0, beats.Count - 120); }
                 boss.ApplyNetworkState(b.Hp, b.MaxHp, b.Dead, b.Phase, b.Attack, b.Extra);
                 if (bossPresenter) bossPresenter.ApplyNetworkPose(b.Clip,b.ClipSpeed,b.Overlay,b.OverlaySpeed,b.Hidden);
                 if (b.PoseKind==1 && boss is TempoTyrantEncounter tyrant && tyrant.Rig && Enum.IsDefined(typeof(TyrantPose),b.Pose))
@@ -241,6 +244,19 @@ namespace LastBell.Run.Networking
             {
                 bossTrack.At(renderTime, out var pos, out float yaw, out _);
                 boss.transform.SetPositionAndRotation(pos, Quaternion.Euler(0, yaw, 0));
+            }
+            // the Tempo Tyrant's music follows its clock: give the replica the host's beat at the drawn time, so the
+            // song lines up with what this screen shows (the beat runs on linearly between the host's samples)
+            if (boss is TempoTyrantEncounter tyrant && beats.Count > 0)
+            {
+                int i = beats.Count - 1; while (i > 0 && beats[i].t > renderTime) i--;
+                var s = beats[i]; double bpm = s.haste ? tyrant.Clock.HasteBpm : tyrant.Clock.NormalBpm;
+                double target = s.beat + Math.Max(0, renderTime - s.t) * bpm / 60.0;
+                // runs on at the tempo by wall time and eases toward the drawn beat (the drawn time wobbles with packet
+                // timing); jumps only on a tempo change, where the music crossfades anyway, or when far off
+                if (!beatSet || s.haste != shownHaste || Math.Abs(target - shownBeat) > 0.5) { shownBeat = target; shownHaste = s.haste; beatSet = true; }
+                else { float dt = Time.unscaledDeltaTime; shownBeat += dt * bpm / 60.0; shownBeat += (target - shownBeat) * (1 - Math.Exp(-dt / 1.5)); }
+                tyrant.Clock.ApplyReplica(shownHaste ? Tempo.Haste : Tempo.Normal, shownBeat);
             }
             // effects play when the drawn timeline reaches the tick the host made them on
             fxReplay.PlayUntil((int)Math.Floor(renderTime / Sim.Dt));

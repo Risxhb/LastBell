@@ -172,7 +172,7 @@ namespace LastBell.Run
         {
             if (stopped) return;
             var d = RunDirector.Instance;
-            bool fighting = boss && !boss.Dead && d != null && d.State == RunState.Combat && d.World != null && d.World.CombatActive;
+            bool fighting = boss && !boss.Dead && d != null && d.State == RunState.Combat && d.World != null && (d.World.CombatActive || RunHud.LanClientView);   // a LAN client's replica world never sets CombatActive
             if (!fighting) { if (fade < 1) EndFade(); return; }
             if (!d.Paused && Time.unscaledDeltaTime > 0.1f) { LongFrames++; lastLongFrame = Time.unscaledTime; }
             if (d.Paused && !pausedByUs) PauseStops++;

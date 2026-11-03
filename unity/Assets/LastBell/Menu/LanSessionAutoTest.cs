@@ -148,6 +148,7 @@ namespace LastBell.Menu
         {
             float until=Time.realtimeSinceStartup+100; bool observedCombat=false, observedDamage=false, observedResult=false, observedHazard=false, observedTelegraph=false, observedProjectile=false, observedHud=false, observedOwnCooldown=false;
             float combatSince=-1, combatTime=0; int combatFrames=0; bool shotCombat=false;
+            int musicExpected=0, musicPlaying=0; bool sawNormal=false; TempoTyrantAudio tempoAudio=null; string lastTrack="";
             bool rosterMatched=false; float maxLead=0; LanWorldFrame lastFrame=null; int snapshots=0, movedFrames=0; Vector3 lastSnapshotPos=Vector3.zero; Vector3 lastDrawn=Vector3.zero; bool haveDrawn=false;
             while (session && session.ClientView && Time.realtimeSinceStartup<until)
             {
@@ -166,6 +167,15 @@ namespace LastBell.Menu
                         var drawn=d.Boss.transform.position;
                         if (haveDrawn && (drawn-lastDrawn).sqrMagnitude>1e-8f) movedFrames++;
                         lastDrawn=drawn; haveDrawn=true;
+                    }
+                    // boss music: the client plays the fight's own track (both By My Measure versions for the Tempo Tyrant)
+                    if (d && d.Boss && state.RunState==(int)RunState.Combat && combatSince>=0 && Time.realtimeSinceStartup-combatSince>2 && MenuMusic.TrackFor(d.Boss)!=null)
+                    {
+                        var music=FindAnyObjectByType<MenuMusic>(); var clip=music && music.Source ? music.Source.clip : null;
+                        bool tyrant=d.Boss is TempoTyrantEncounter; musicExpected++;
+                        if (clip && music.Source.isPlaying && (clip.name==MenuMusic.TrackFor(d.Boss) || (tyrant && clip.name==TempoTyrantAudio.SlowTrack))) musicPlaying++;
+                        if (clip) lastTrack=clip.name;
+                        if (d.Boss is TempoTyrantEncounter t) { tempoAudio=t.Audio; sawNormal |= state.Boss!=null && !state.Boss.BeatHaste; }
                     }
                     observedCombat |= state.RunState==(int)RunState.Combat;
                     observedDamage |= state.Boss!=null && state.Boss.Hp<state.Boss.MaxHp;
@@ -188,6 +198,10 @@ namespace LastBell.Menu
             Check("client HUD shows the host's fight (health, cooldowns, boss)",observedHud);
             Check("client sees its own class abilities go on cooldown",observedOwnCooldown);
             Check("client draws every lobby player with their lobby name and class",rosterMatched);
+            Debug.Log("[LAN smoke] client music: boss track playing on "+musicPlaying+"/"+musicExpected+" combat frames (last: "+lastTrack+")"+(tempoAudio ? " · "+tempoAudio.StatusText : ""));
+            Check("client plays the boss music ("+lastTrack+")",musicExpected>0 && musicPlaying*20>=musicExpected*19);
+            if (tempoAudio) Check("client Tempo Tyrant music follows the host's tempo (locked"+(sawNormal?", switched versions":"")+", at most 2 calm corrections)",
+                tempoAudio.MusicLocked && (!sawNormal || tempoAudio.MusicSwaps>=1) && tempoAudio.CalmResyncs<=2);
             var fx=session.ClientView ? session.ClientView.Effects : null;
             if (fx!=null) Debug.Log("[LAN smoke] client effects: "+fx.Played+" played, "+fx.Failed+" failed: "+string.Join(", ",fx.PlayedMethods.OrderBy(m=>m)));
             string[] bossSide={"Float","Shake","SweepResolve","TollResolve","ChargeTrail","ChargeLand","ChimeResolve","BossHit","PlayerHit","PotionHeal","ResetAll","Crescendo"};

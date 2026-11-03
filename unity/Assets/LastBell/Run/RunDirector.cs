@@ -153,11 +153,15 @@ namespace LastBell.Run
         }
         public void ApplyLanState(RunState state, int stateTicks, bool victory, BossEncounter boss)
         {
+            // the replica never runs Go(): start or end the boss music here, as Go() does on the host
+            bool changed = state != State || boss != Boss;
             State = state; StateTicks = stateTicks; Victory = victory; Boss = boss;
+            if (changed) LastBell.Menu.MenuMusic.OnRunState(this, state);
         }
         public void DetachLanReplica()
         {
             World = null; Player = null; Boss = null; Allies.Clear(); State = RunState.Menu; StateTicks = 0; Victory = false;
+            LastBell.Menu.MenuMusic.OnRunState(this, RunState.Menu);
         }
 
         void Go(RunState s)

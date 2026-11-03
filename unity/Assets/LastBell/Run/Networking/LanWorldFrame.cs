@@ -22,6 +22,7 @@ namespace LastBell.Run.Networking
             public float X, Y, Z, Yaw; public int Hp, MaxHp; public bool Dead;
             public string Phase = "", Attack = "", Extra = "", Clip = "", Overlay = ""; public float ClipSpeed = 1, OverlaySpeed = 1;
             public int PoseKind, Pose; public bool Haste, Frenzy, Hidden;
+            public double Beat; public bool BeatHaste;   // Tempo Tyrant: TempoClock beat and tempo, so the client's music follows the host's
         }
         public sealed class HazardState
         {
@@ -72,7 +73,7 @@ namespace LastBell.Run.Networking
             {
                 w.Write(Tick); w.Write(RunState); w.Write(StateTicks); w.Write(Victory); w.Write(Boss != null);
                 section = "boss";
-                if (Boss != null) { Need(Boss.MaxHp > 0 && Boss.Hp >= 0 && Boss.Hp <= Boss.MaxHp && Boss.PoseKind >= 0 && Boss.PoseKind <= 2 && Boss.Pose >= 0 && Boss.Pose <= 64); Floats(w, Boss.X, Boss.Y, Boss.Z, Boss.Yaw); w.Write(Boss.Hp); w.Write(Boss.MaxHp); w.Write(Boss.Dead); Text(w, Boss.Phase); Text(w, Boss.Attack); Text(w, Boss.Extra); Text(w, Boss.Clip); Text(w, Boss.Overlay); Floats(w, Boss.ClipSpeed, Boss.OverlaySpeed); w.Write(Boss.PoseKind); w.Write(Boss.Pose); w.Write(Boss.Haste); w.Write(Boss.Frenzy); w.Write(Boss.Hidden); }
+                if (Boss != null) { Need(Boss.MaxHp > 0 && Boss.Hp >= 0 && Boss.Hp <= Boss.MaxHp && Boss.PoseKind >= 0 && Boss.PoseKind <= 2 && Boss.Pose >= 0 && Boss.Pose <= 64); Floats(w, Boss.X, Boss.Y, Boss.Z, Boss.Yaw); w.Write(Boss.Hp); w.Write(Boss.MaxHp); w.Write(Boss.Dead); Text(w, Boss.Phase); Text(w, Boss.Attack); Text(w, Boss.Extra); Text(w, Boss.Clip); Text(w, Boss.Overlay); Floats(w, Boss.ClipSpeed, Boss.OverlaySpeed); w.Write(Boss.PoseKind); w.Write(Boss.Pose); w.Write(Boss.Haste); w.Write(Boss.Frenzy); w.Write(Boss.Hidden); w.Write(Boss.Beat); w.Write(Boss.BeatHaste); }
                 section = "player"; w.Write(Players.Count); var ids = new HashSet<int>();
                 foreach (var p in Players)
                 {
@@ -159,7 +160,7 @@ namespace LastBell.Run.Networking
                     Need(result.Tick >= 0 && result.RunState >= 0 && result.RunState <= 6 && result.StateTicks >= 0);
                     if (r.ReadBoolean())
                     {
-                        var b = new BossState { X = Float(r), Y = Float(r), Z = Float(r), Yaw = Float(r), Hp = r.ReadInt32(), MaxHp = r.ReadInt32(), Dead = r.ReadBoolean(), Phase = Text(r), Attack = Text(r), Extra = Text(r), Clip = Text(r), Overlay = Text(r), ClipSpeed = Float(r), OverlaySpeed = Float(r), PoseKind = r.ReadInt32(), Pose = r.ReadInt32(), Haste = r.ReadBoolean(), Frenzy = r.ReadBoolean(), Hidden = r.ReadBoolean() };
+                        var b = new BossState { X = Float(r), Y = Float(r), Z = Float(r), Yaw = Float(r), Hp = r.ReadInt32(), MaxHp = r.ReadInt32(), Dead = r.ReadBoolean(), Phase = Text(r), Attack = Text(r), Extra = Text(r), Clip = Text(r), Overlay = Text(r), ClipSpeed = Float(r), OverlaySpeed = Float(r), PoseKind = r.ReadInt32(), Pose = r.ReadInt32(), Haste = r.ReadBoolean(), Frenzy = r.ReadBoolean(), Hidden = r.ReadBoolean(), Beat = r.ReadDouble(), BeatHaste = r.ReadBoolean() };
                         Need(b.MaxHp > 0 && b.Hp >= 0 && b.Hp <= b.MaxHp && b.PoseKind >= 0 && b.PoseKind <= 2 && b.Pose >= 0 && b.Pose <= 64); result.Boss = b;
                     }
                     int count = r.ReadInt32(); Need(count >= 1 && count <= LanLobby.Capacity); var ids = new HashSet<int>();
