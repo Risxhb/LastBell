@@ -118,10 +118,10 @@ namespace LastBell
         const double FontLogMs = 2;
         public static void RawLabel(Rect r, string text, GUIStyle style)
         {
-            if (!FontLog || Event.current.type != EventType.Repaint) { GUI.Label(r, text, style); return; }
+            if (!FontLog) { GUI.Label(r, text, style); return; }
             long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             GUI.Label(r, text, style);
-            LogSlowText(t0, "label", text, style);
+            LogSlowText(t0, "label (" + Event.current.type + ")", text, style);
         }
         public static void LogSlowText(long t0, string what, string text, GUIStyle style)
         {
