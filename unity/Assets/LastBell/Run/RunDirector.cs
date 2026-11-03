@@ -31,7 +31,11 @@ namespace LastBell.Run
             // Phases: how many HP phases the practice phase row offers (1 = Phase 1 only). It must match the encounter's
             // PhaseStarts; the autotest checks that for every entry.
             public readonly int Phases;
-            public BossEntry(string name, Func<CombatWorld, BossEncounter> spawn, bool inRun = true, string map = null, bool final = false, int phases = 1) { Name = name; Spawn = spawn; InRun = inRun; Map = map; Final = final; Phases = Math.Max(1, phases); }
+            // WarmUp (optional): runs on the Ready screen before this boss's intro, while nobody is fighting. Use it for
+            // first-use costs that would otherwise land in combat: draw the fight's labels once in each font and size, build
+            // pooled objects hidden, and so on. The boss doesn't exist yet; the world, the player and the allies do.
+            public readonly Action<CombatWorld> WarmUp;
+            public BossEntry(string name, Func<CombatWorld, BossEncounter> spawn, bool inRun = true, string map = null, bool final = false, int phases = 1, Action<CombatWorld> warmUp = null) { Name = name; Spawn = spawn; InRun = inRun; Map = map; Final = final; Phases = Math.Max(1, phases); WarmUp = warmUp; }
         }
         public static readonly BossEntry[] Bosses =
         {
@@ -148,6 +152,18 @@ namespace LastBell.Run
             LastBell.Menu.MenuMusic.OnRunState(this, s);
             KeyboardMouseInput.Blocked = s == RunState.Menu || s == RunState.Results;
             StateChanged?.Invoke(s);
+            if (s == RunState.Ready) WarmUpEncounter();
+        }
+
+        // Ready-screen warm-up (Chzy18, 2 Nov; perf report bellkeeper-ultimate-2026-11-02: first-use costs on the first combat
+        // frame). Runs the next boss's BossEntry.WarmUp, then ReadyWarmUp for shared code (HUD fonts and the like). A failing
+        // warm-up is logged and never blocks the run.
+        public static event Action<RunDirector, int> ReadyWarmUp;
+        void WarmUpEncounter()
+        {
+            if (World == null || Encounter < 0 || Encounter >= Bosses.Length) return;
+            try { Bosses[Encounter].WarmUp?.Invoke(World); } catch (Exception e) { Debug.LogException(e); }
+            try { ReadyWarmUp?.Invoke(this, Encounter); } catch (Exception e) { Debug.LogException(e); }
         }
 
         // ---------------- requests (UI / keyboard / tests) ----------------

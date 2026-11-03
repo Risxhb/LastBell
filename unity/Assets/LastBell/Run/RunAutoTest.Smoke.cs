@@ -53,11 +53,14 @@ namespace LastBell.Run
         {
             yield return PhaseToMenu();
             string tag = "smoke: " + LastBell.Menu.TestRushSetup.CardName(e);
+            int warmed = -1; Action<RunDirector, int> onWarm = (_, enc) => warmed = enc; RunDirector.ReadyWarmUp += onWarm;
             d.SelectAllies(allies);
             Check($"{tag}: practice accepted ({cls}{(allies > 0 ? $", {allies} allies" : "")})", d.StartPractice(cls, e));
             yield return Until(() => RunDirector.Instance && RunDirector.Instance.State == RunState.Ready && RunDirector.Instance.Encounter == e, 30, tag + " ready");
             if (RunDirector.Instance != d) { directorLog.AddRange(d.Log); d = RunDirector.Instance; d.InputOverride = bot; bot.Clear(); }
             if (d.Player) d.Player.Input = bot;   // a new scene built the player before the bot was attached
+            RunDirector.ReadyWarmUp -= onWarm;
+            Check($"{tag}: the Ready screen runs the encounter warm-up", warmed == e, $"warmed {warmed}");
             if (allies > 0) Check($"{tag}: a party of {allies + 1} spawns", d.World.Players.Count == allies + 1 && d.Allies.Count == allies, $"{d.World.Players.Count} players");
             d.RequestReady();
             yield return Until(() => d.State == RunState.Combat && d.Boss, 8, tag + " combat");
