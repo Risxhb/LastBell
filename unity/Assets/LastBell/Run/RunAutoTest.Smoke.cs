@@ -33,6 +33,8 @@ namespace LastBell.Run
             Check("smoke: allies back to solo", d.SelectAllies(0) && RunParty.Selected == 0);
             Check("smoke: every boss has a Boss Rush card name", Enumerable.Range(0, RunDirector.Bosses.Length).All(e => !string.IsNullOrEmpty(LastBell.Menu.TestRushSetup.CardName(e))));
             Check("smoke: skill-bar and potion icons load", RunDirector.Classes.All(c => RunHud.SlotIcon(c, 0) != null) && RunHud.Icon("potion") != null);
+            Note("smoke: shader warm-up: " + ShaderWarmUp.Status);
+            Check("smoke: the shader warm-up loads or is absent, never broken", !ShaderWarmUp.Status.StartsWith("could not"), ShaderWarmUp.Status);
             yield return Shot("smoke_menu");
 
             // every main boss: start, fight ~20 s with the bot, check it took damage (the potion check rides on the solo first fight)
