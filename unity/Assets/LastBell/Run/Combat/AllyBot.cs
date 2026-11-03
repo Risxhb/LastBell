@@ -60,7 +60,9 @@ namespace LastBell.Run
             tPos = bpos; tRad = brad;
             inp.Aim = bpos;
             BotSight.Update(w, boss);
-            if (Scripted(me, boss, pos, ref inp)) return inp;
+            dJob = null;
+            dNote = 0;
+            if (Scripted(me, boss, pos, ref inp)) { dMe = me; dPos = pos; return inp; }
 
             // 1) dodge: in a hazard that locked at least our reaction time ago (test bots: from its first tick) -> nearest
             // clear spot. A Perfect bot also heads for its memory job (next anchor, mark side) as soon as it is due.
@@ -172,9 +174,10 @@ namespace LastBell.Run
         // it set this tick's input.
         bool Scripted(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
         {
-            if (!(boss is AurelionEncounter) && Quake(me, boss, pos, ref inp)) return true;
-            if (!(boss is AurelionEncounter) && Brand(me, boss, pos, ref inp)) return true;   // Aurelion keeps its own Sunspot job
-            if (!(boss is AurelionEncounter) && Spokes(me, boss, pos, ref inp)) return true;
+            if (!(boss is AurelionEncounter) && Quake(me, boss, pos, ref inp)) { dJob = "quake"; return true; }
+            if (!(boss is AurelionEncounter) && Volley(me, boss, pos, ref inp)) { dJob = "volley"; return true; }
+            if (!(boss is AurelionEncounter) && Brand(me, boss, pos, ref inp)) { dJob = "brand"; return true; }   // Aurelion keeps its own Sunspot job
+            if (!(boss is AurelionEncounter) && Spokes(me, boss, pos, ref inp)) { dJob = "spokes"; return true; }
             if (boss is ChimeboundOracleEncounter or) return Carillon(me, or, pos, ref inp);
             if (boss is PendulumSentinelEncounter ps) return Level(me, ps, pos, ref inp);
             if (!(boss is DialWardenEncounter dw)) return false;
@@ -304,7 +307,7 @@ namespace LastBell.Run
                 var swap = cost; cost = next; next = swap; prevAt = at;
             }
             int best = -1; float bestCost = float.MaxValue;
-            for (int j = 0; j < n; j++) { if (cost[j] == float.MaxValue) continue; float c = cost[j] + 0.3f * Mathf.Abs(rMin + j * QuakeStep - pref); if (c < bestCost) { bestCost = c; best = j; } }
+            for (int j = 0; j < n; j++) { if (cost[j] == float.MaxValue) continue; float c = cost[j] + (brand ? 1.5f : 0.3f) * Mathf.Abs(rMin + j * QuakeStep - pref); if (c < bestCost) { bestCost = c; best = j; } }
             if (best < 0) return false;   // no plan in reach: the plain dodge
             for (int i = quakeBands.Count - 1; i > 0; i--) best = from[i, best];
             float rGoal = rMin + best * QuakeStep;
@@ -329,6 +332,7 @@ namespace LastBell.Run
             bad = Bad(me, boss, false, me.World.Tick + 1);   // round burning ground; the bands are planned above
             if (move != Vector3.zero && bad(pos + move * 0.6f)) move = Bend(pos, move);
             if (v.magnitude / PlayerController.WalkSpeed > t0 - 0.3f && me.Stamina > 10) inp.Sprint = true;
+            if (brand && me.Stamina > 5) for (int i = 0; i < live.Count; i++) { var h = live[i]; if (h.AttackId == "crucivar.backdraft" && h.Age >= Sim.Ticks(ForgeRite.PullFrom - 0.3f) && h.Age <= Sim.Ticks(ForgeRite.PullTo)) inp.Sprint = true; }
             if (move != Vector3.zero) move = AroundBoss(pos, move, boss);
             inp.Move = ToScreen(move);
             // in place with time to spare: keep throwing
@@ -336,6 +340,135 @@ namespace LastBell.Run
             return true;
         }
         const float BrandRadiusPad = 4f;   // a brand (3 m) and a hand: brand carriers keep this far from other players
+
+        // bullets (Crucivar's turret volleys: small moving circles that stun and knock you along their line): the plain dodge
+        // walks to the nearest spot clear now, and the next bullet of the column or ring crosses the walk (three bots went
+        // down to that within half a second, 11-03). While bullets can reach it, every few ticks it scores walking or
+        // sprinting each way (or standing) against where each bullet will be over the next VolleyLook s, plus the remembered
+        // paths still to fire, burning ground, strikes landing and its attack spot, the way the Sylvara bots steer; a dash
+        // when every way is hit. A brand carrier steers for the rim.
+        Vector3 volMove; bool volSprint, volOn, volReach, volDash; float volCost, volPull; int volTick = -99;
+        const float VolleyLook = 0.8f, VolleyStep = 0.05f, VolleyBuffer = 0.15f, VolleyPathCost = 30f, VolleyPathSoon = 1.6f, VolleySwing = 20f, VolleySprintFloor = 55f;   // a swing waits only for a bullet it would meet (50 and up)
+        static readonly List<Hazard> volNear = new List<Hazard>();
+        static Vector3[] Dirs16;
+        bool Volley(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
+        {
+            var shots = BotSight.Bullets; volNear.Clear();
+            float reach = PlayerController.SprintSpeed * VolleyLook + 1.5f;
+            for (int i = 0; i < shots.Count; i++)
+            {
+                var b = shots[i]; var a = Sim.Flat(b.Origin); var e = a + BotSight.ShotVel(b) * VolleyLook;
+                if (SegDist(Sim.Flat(pos), a, e) < reach) volNear.Add(b);
+            }
+            bad = Bad(me, boss, false, me.World.Tick + 45);
+            bool path = BotSight.GhostHits(me, pos);
+            if (volNear.Count == 0 && !path) { volOn = false; return false; }
+            pos = Sim.Flat(pos);
+            // home: the rim for a brand carrier, else the attack spot (or straight at the target)
+            Vector3 home = tPos; bool carrier = false;
+            var live = me.World.Hazards.Live;
+            for (int i = 0; i < live.Count && !carrier; i++) { var h = live[i]; if (h.Track != null && h.Age < h.LockAt && h.Shape == HazardShape.Circle && Spares(h, me)) carrier = true; }
+            if (carrier) home = (pos.magnitude > 0.1f ? pos.normalized : Vector3.forward) * Mathf.Min(BrandRing, CombatWorld.PlayerBound - 1.2f);
+            else if (Attacks && AttackSpot(me, boss, out var spot)) home = Sim.Flat(spot);
+            volReach = Attacks && !carrier; volPull = 0.6f;
+            // in a fan its bullets are still to cross: the nearest spot clear of every path is the goal (the look is too short
+            // to find a Ring Wave's gap metres away: the solo bot ran from the wall of bullets into the corner, 11-03)
+            if (path || bad(pos))
+            {
+                var esc = NearestClear(pos, boss, bad, out float need);
+                if (esc != Vector3.zero) { home = pos + esc * need; volReach = false; volPull = need > 6f ? 1f : 2f; }
+            }
+            if (!volOn || me.World.Tick - volTick >= 3 || me.Stunned > 0)
+            {
+                volOn = true; volTick = me.World.Tick;
+                if (Dirs16 == null) { Dirs16 = new Vector3[16]; for (int k = 0; k < 16; k++) Dirs16[k] = Sim.Dir(k * 22.5f); }
+                volDash = false; volSprint = false; volMove = Vector3.zero; volCost = VolleyCost(me, boss, pos, Vector3.zero, 0, home, VolleyLook);
+                bool canSprint = me.Stamina > VolleySprintFloor;   // keep enough for a dash when it gets cornered
+                for (int s = 0; s < (canSprint ? 2 : 1); s++)
+                {
+                    float v = s == 0 ? PlayerController.WalkSpeed : PlayerController.SprintSpeed;
+                    foreach (var d in Dirs16)
+                    {
+                        float c = VolleyCost(me, boss, pos, d, v, home, VolleyLook) + (s == 1 ? 4f : 0);
+                        if (c < volCost) { volCost = c; volMove = d; volSprint = s == 1; }
+                    }
+                }
+                // every way is hit: a 3 m dash (0.2 s) when its line and landing are clean
+                if (volCost >= 50 && !me.Dashing && me.Stamina >= PlayerController.DashCost)
+                {
+                    float dashSpeed = PlayerController.DashDistance / (PlayerController.DashTicks * Sim.Dt);
+                    foreach (var d in Dirs16)
+                    {
+                        float c = VolleyCost(me, boss, pos, d, dashSpeed, home, PlayerController.DashTicks * Sim.Dt) + 2f;
+                        if (c < volCost) { volCost = c; volMove = d; volSprint = false; inp.Dash = volDash = true; }
+                    }
+                }
+            }
+            inp.Sprint = volSprint;
+            // swing while standing is the plan and nothing comes near it
+            float gap = Sim.Flat(tPos - pos).magnitude - tRad;
+            if (Attacks && volMove == Vector3.zero && volCost < VolleySwing && gap <= Range(me) + 1.85f) Attack(me, ref inp);
+            if (me.Hp < (Mode == BotMode.Passive ? 40 : 70) && me.Potions > 0 && tick % 30 == 0) inp.Potion = true;
+            var move = volMove;
+            if (move != Vector3.zero) move = AroundBoss(pos, move, boss);
+            dMove = move; dSpot = home; dNote = 1;
+            inp.Move = ToScreen(move);
+            return true;
+        }
+
+        // moves at v along d for moveFor s, then stands, until VolleyLook
+        float VolleyCost(PlayerController me, BossEncounter boss, Vector3 pos, Vector3 d, float v, Vector3 home, float moveFor)
+        {
+            float cost = 0; var bp = Sim.Flat(boss.transform.position);
+            float body = boss.BodyRadius + PlayerController.Radius + 0.1f;
+            var live = me.World.Hazards.Live;
+            int steps = Mathf.RoundToInt(VolleyLook / VolleyStep);
+            Vector3 q = pos; bool stopped = false;
+            for (int k = 1; k <= steps; k++)
+            {
+                float t = k * VolleyStep;
+                // a walk into the wall or his body stops there, as the body does (scoring it as out made running into the wall
+                // look cheaper than any dodge once hits added up past that score, and a bot by the wall froze, 11-03)
+                var nq = pos + d * v * Mathf.Min(t, moveFor);
+                if (!stopped && (!CombatWorld.InPlayerBound(nq, -0.1f) || Sim.Flat(nq - bp).magnitude < body)) { stopped = true; cost += 3; }
+                if (!stopped) q = nq;
+                float early = 1.5f - t / VolleyLook;   // hits sooner are worse: less time to fix them later
+                for (int i = 0; i < volNear.Count; i++)
+                {
+                    var b = volNear[i]; var at = Sim.Flat(b.Origin) + BotSight.ShotVel(b) * t;
+                    float g = Sim.Flat(q - at).magnitude - (b.Radius + Hazard.Margin + VolleyBuffer);
+                    if (g < 0) cost += 100 * early;
+                    else if (g < 0.5f) cost += (0.5f - g) * 4;
+                }
+                if (k % 4 != 0) continue;
+                // every 0.2 s: burning ground and strikes landing about now; at the end, the paths still to fire (bullets that
+                // reach it after the look: a light cost, or it never stands to swing at a casting inside its turret's fan)
+                if (k == steps) { float arrive = BotSight.PathArrive(q) + t; if (arrive < VolleyPathSoon) cost += VolleyPathCost * Mathf.Clamp01((VolleyPathSoon - arrive) / (VolleyPathSoon - VolleyLook)); }
+                for (int i = 0; i < live.Count; i++)
+                {
+                    var h = live[i];
+                    if (h.Track != null && h.Shape == HazardShape.Circle && h.Radius <= 0.7f) continue;   // the bullets, above
+                    if (h.BurnPerSecond > 0) { if (h.Contains(q) && !h.Contains(pos)) cost += 25; else if (h.Contains(q)) cost += 8; continue; }
+                    if (!Hits(h, me, q)) continue;
+                    float lands = Lands(h, boss) / (float)Sim.Hz;
+                    if (BotSight.IsPath(h)) { if (k == steps) cost += VolleyPathCost; }
+                    else if (lands <= t + 0.15f && lands >= t - 0.25f) cost += 100;
+                    else if (k == steps && lands < t + 0.6f) cost += 60;   // standing there as it lands just after
+                }
+            }
+            // its spot, and (attacking, not carrying a brand) being in reach of the target: out of reach it never swings, and
+            // a casting sits inside its turret's fan (the solo bot circled one just out of reach until the Pour Flood, 11-03)
+            cost += Sim.Flat(q - home).magnitude * volPull;
+            if (volReach) cost += Mathf.Max(0, Sim.Flat(tPos - q).magnitude - tRad - (Range(me) + 1.5f)) * 4f;
+            return cost;
+        }
+
+        static float SegDist(Vector3 p, Vector3 a, Vector3 b)
+        {
+            var ab = b - a; float l = ab.sqrMagnitude;
+            float t = l < 1e-6f ? 0 : Mathf.Clamp01(Vector3.Dot(p - a, ab) / l);
+            return Sim.Flat(p - (a + ab * t)).magnitude;
+        }
 
         bool Brand(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
         {
@@ -346,8 +479,10 @@ namespace LastBell.Run
                 if (h.Track != null && h.Age < h.LockAt && h.Shape == HazardShape.Circle && Spares(h, me)) brand = h;
             }
             if (brand == null) return false;
-            bad = Bad(me, boss);
-            if (bad(pos)) return false;
+            // only what lands within 0.75 s is in the way: the other carriers' brands land with this one, so standing in one
+            // (the party starts bunched round him) left every carrier holding still and their pools filled the jet ring (11-03)
+            bad = Bad(me, boss, false, me.World.Tick + 45);
+            if (bad(pos)) { dJob = "brand-bad"; return false; }
             // Backdraft's pull (2 m inward just before the brand freezes) would leave the pool mid-arena: sprint straight out
             // against it (9 m/s against 5)
             for (int i = 0; i < live.Count; i++)
@@ -374,10 +509,12 @@ namespace LastBell.Run
                 float c = Sim.Flat(q - pos).magnitude;
                 if (c < bestCost) { bestCost = c; goal = q; }
             }
+            dSpot = goal; dNote = bestCost == float.MaxValue ? 2 : 1;
             var v = Sim.Flat(goal - pos);
             var move = v.magnitude < 0.3f ? Vector3.zero : v.normalized;
             if (move != Vector3.zero && bad(pos + move * 0.6f)) move = Bend(pos, move);
             if (v.magnitude > 2f && me.Stamina > 30) inp.Sprint = true;
+            dMove = move;
             if (move != Vector3.zero) move = AroundBoss(pos, move, boss);
             inp.Move = ToScreen(move);
             return true;
@@ -386,8 +523,8 @@ namespace LastBell.Run
         // jets turning round one hub (Crucivar's Furnace Spin) reach the wall, where they outrun a sprint: ride the middle of
         // the nearest gap about 6.5 m out, turning with them (shown jets first, the turn read from their yaw)
         Hazard spokeRef; float spokeYaw, spokeDir;
-        static readonly float[] SpokeRadii = { 6.5f, 5.6f, 7.4f, 4.8f, 8.3f };   // near the hub a jet covers too wide an angle, far out the gap outruns a walk
-        static readonly float[] SpokeShifts = { 0f, 8f, -8f, 14f, -14f };   // degrees off the gap's middle
+        static readonly float[] SpokeRadii = { 6.5f, 6.0f, 7.0f, 5.5f, 7.5f, 5.0f, 8.0f, 4.5f, 8.6f };   // near the hub a jet covers too wide an angle, far out the gap outruns a walk
+        static readonly float[] SpokeShifts = { 0f, 4f, -4f, 8f, -8f, 11f, -11f, 14f, -14f, 17f, -17f };   // degrees off the gap's middle
         const float BrandRing = 12.5f;   // where a brand is walked to: its pool (2 m) stays off the jet ring and leaves the inside of the quake's outer band
         bool Spokes(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
         {
@@ -399,6 +536,9 @@ namespace LastBell.Run
                     && (jets.Count == 0 || Sim.Flat(h.Origin - jets[0].Origin).magnitude < 0.1f)) jets.Add(h);
             }
             if (jets.Count < 3) { spokeRef = null; return false; }
+            // a brand still following this player: the plain dodge, then the brand job, take it out to the rim (riding the gap
+            // left its pool on the 6.5 m ring, where the riders then stood in it: a party ally went down to it, 11-03)
+            for (int i = 0; i < live.Count; i++) { var h = live[i]; if (h.Track != null && h.Age < h.LockAt && h.Shape == HazardShape.Circle && Spares(h, me)) return false; }
             var j0 = jets[0];
             if (spokeRef != j0) { spokeRef = j0; spokeYaw = j0.Yaw; spokeDir = 0; }
             else { float dy = Mathf.DeltaAngle(spokeYaw, j0.Yaw); if (Mathf.Abs(dy) > 0.01f) spokeDir = Mathf.Sign(dy); spokeYaw = j0.Yaw; }
@@ -538,10 +678,10 @@ namespace LastBell.Run
             }
         }
 
-        PlayerController dMe; int dDuty, dNote; string dThreat; bool dBad; Vector3 dMove, dPos;
+        PlayerController dMe; int dDuty, dNote; string dThreat, dJob; bool dBad; Vector3 dMove, dPos;
         string Describe()
         {
-            var s = $"duty {dDuty} threat {dThreat ?? "-"} bad {dBad} move ({dMove.x:0.0},{dMove.z:0.0}) at ({dPos.x:0.0},{dPos.z:0.0})"
+            var s = (dJob != null ? $"job {dJob} " : "") + (dJob == "volley" ? $"cost {volCost:0.0} near {volNear.Count} dash {volDash} " : "") + $"duty {dDuty} threat {dThreat ?? "-"} bad {dBad} move ({dMove.x:0.0},{dMove.z:0.0}) at ({dPos.x:0.0},{dPos.z:0.0})"
                 + (dNote == 1 ? $" spot ({dSpot.x:0.0},{dSpot.z:0.0})" : dNote == 2 ? " no spot" : "");
             var dtw = (dMe.World.Boss as AurelionEncounter)?.Towers?.NextFor(dMe, dMe.World.Tick);
             if (dtw != null && bad != null) { var c = dtw.At + (dPos - dtw.At).normalized * 1.0f; s += $" | tower spot ok {!bad(c)} covered by [{string.Join("/", System.Linq.Enumerable.Select(System.Linq.Enumerable.Where(dMe.World.Hazards.Live, h => h.Contains(c)), h => h.Source + (h.BurnPerSecond > 0 ? "(burn)" : "")))}]"; }

@@ -27,6 +27,9 @@ namespace LastBell.Run
         static readonly List<int> pathFrom = new List<int>();
         static readonly List<List<Hazard>> pathShots = new List<List<Hazard>>();   // the bullets that left each path
         static readonly HashSet<Hazard> seenShots = new HashSet<Hazard>();
+        // each flying bullet's velocity, from how far it moved since the last tick (a new one has none yet)
+        static readonly Dictionary<Hazard, (Vector3 at, int tick, Vector3 vel)> shotSeen = new Dictionary<Hazard, (Vector3, int, Vector3)>();
+        static readonly List<Hazard> shotGone = new List<Hazard>();
         // s before its bullets show; m past a spot before the wave has gone by; s a path keeps taking new bullets (a spiral fires 2.4 s)
         const float PathLead = 0.8f, PathPass = 1.2f, PathOwn = 2.6f, SoonS = 1.6f, ShotSpeed = 6f;
         static CombatWorld world; static int tick = -1, scanTick = -999;
@@ -34,7 +37,7 @@ namespace LastBell.Run
 
         public static void Update(CombatWorld w, BossEncounter boss)
         {
-            if (w != world) { world = w; tick = -1; scanTick = -999; seen.Clear(); pool.Clear(); Orbs.Clear(); prevLive.Clear(); ghosts.Clear(); ghostUntil.Clear(); paths.Clear(); pathFrom.Clear(); pathShots.Clear(); seenShots.Clear(); }
+            if (w != world) { world = w; tick = -1; scanTick = -999; seen.Clear(); pool.Clear(); Orbs.Clear(); prevLive.Clear(); ghosts.Clear(); ghostUntil.Clear(); paths.Clear(); pathFrom.Clear(); pathShots.Clear(); seenShots.Clear(); shotSeen.Clear(); }
             if (w.Tick == tick) return;
             tick = w.Tick;
             // orbs: the boss's pooled spheres, found by name under the arena root (rescanned now and then: the pool grows)
@@ -88,6 +91,14 @@ namespace LastBell.Run
                 for (int i = 0; i < paths.Count; i++) if (tick - pathFrom[i] <= Sim.Ticks(PathOwn) && InPath(paths[i], bullets[j].Origin)) pathShots[i].Add(bullets[j]);
             }
             seenShots.RemoveWhere(b => !bullets.Contains(b));
+            for (int j = 0; j < bullets.Count; j++)
+            {
+                var b = bullets[j]; var p = Sim.Flat(b.Origin);
+                if (shotSeen.TryGetValue(b, out var o) && tick > o.tick) shotSeen[b] = (p, tick, (p - o.at) * (Sim.Hz / (float)(tick - o.tick)));
+                else if (!shotSeen.ContainsKey(b)) shotSeen[b] = (p, tick, Vector3.zero);
+            }
+            shotGone.Clear(); foreach (var b in shotSeen.Keys) if (!bullets.Contains(b)) shotGone.Add(b);
+            foreach (var b in shotGone) shotSeen.Remove(b);
             for (int i = paths.Count - 1; i >= 0; i--)
             {
                 pathShots[i].RemoveAll(b => !bullets.Contains(b));
@@ -109,6 +120,9 @@ namespace LastBell.Run
             return false;
         }
 
+        public static IReadOnlyList<Hazard> Bullets => bullets;   // the small moving circles flying now (Crucivar's turret bullets)
+        public static Vector3 ShotVel(Hazard b) => shotSeen.TryGetValue(b, out var o) ? o.vel : Vector3.zero;
+
         public static bool GhostHits(PlayerController me, Vector3 q)
         {
             for (int i = 0; i < ghosts.Count; i++) { var h = ghosts[i]; if (h.Contains(q) && (h.Affects == null || h.Affects(me))) return true; }
@@ -120,6 +134,25 @@ namespace LastBell.Run
                 for (int j = 0; j < shots.Count; j++) { float b = Along(h, shots[j].Origin); if (b <= at + PathPass && at - b <= ShotSpeed * SoonS) return true; }
             }
             return false;
+        }
+
+        // seconds until the first wave of a remembered path still to pass q gets there (infinity if none): a ring's wall needs
+        // longer to leave than a lane, so a bot steering through bullets weighs how soon it comes
+        public static float PathArrive(Vector3 q)
+        {
+            float best = float.PositiveInfinity;
+            for (int i = 0; i < paths.Count; i++)
+            {
+                var h = paths[i]; if (!h.Contains(q)) continue;
+                float at = Along(h, q);
+                var shots = pathShots[i];
+                for (int j = 0; j < shots.Count; j++)
+                {
+                    float b = Along(h, shots[j].Origin); if (b > at + PathPass) continue;
+                    best = Mathf.Min(best, Mathf.Max(0, at - b) / Mathf.Max(1f, ShotVel(shots[j]).magnitude));
+                }
+            }
+            return best;
         }
 
         // a bullet preview (harmless itself) and whether its bullets would reach q within SoonS s of it ending
