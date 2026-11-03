@@ -113,6 +113,13 @@ for p in range(part.max() + 1):
     m = part == p
     if m.sum() < 200 and not fork[m].any(): W[m] = W[m].mean(0); small += 1
 print('RIGID_PIECES', small)
+# loose hook pieces hanging beside the front-left leg, just outside the claw box: they took leg weights and stayed behind
+# (or tore) whenever the branch hand lifted, so they ride with the hand (2 Nov, found on the attack-clip pose sheet)
+hooks = 0
+for p in range(part.max() + 1):
+    m = part == p; c = co[m].mean(0)
+    if m.sum() < 200 and c[0] > 1.25 and c[1] < -0.4 and 0.75 < c[2] < 1.7: W[m] = row(hand_L=1); hooks += 1
+print('HOOK_PIECES', hooks)
 # the mask is ivory stone: keep it rigid on the head
 mask = (z > 2.95) & (y < -0.45) & (np.abs(x - 0.12) < 0.35)
 W[mask] = row(head=1)
@@ -337,6 +344,81 @@ def defeat(t):
         'upperarm.L': (-8 * sit, 10 * sit, 0), 'forearm.L': (-25 * sit, 0, 0), 'hand.L': (20 * bow, 0, 0),
     }
 
+# ---- v3 attack clips (proposal, 2 Nov; docs/design/sylvara-v3/ATTACK-VISUALS.md) ----
+CONDUCT = 2.4
+def conduct(t):
+    # 2.4 s loop under every spiral: the tuning-fork arm is raised forward and draws a slow circle, the wrist leading,
+    # while the chest (and its bells) sways with it; the branch hand hangs open and low.
+    p = 2 * math.pi * t / CONDUCT; c, s = math.cos(p), math.sin(p)
+    ch = breath(t)
+    ch.update({
+        'hips_loc': (0.02 * s, 0, 0.02 * c), 'hips': (0, 0, 2 * s), 'spine': (-2, 0, 3 * s),
+        'chest': add(ch['chest'], (-4 + 2 * c, 0, 6 * s)), 'head': (-2 + 2 * c, 0, 5 * s),
+        'upperarm.R': (-78 + 14 * c, 28 + 14 * s, 0), 'forearm.R': (-30 + 10 * s, 0, 0), 'hand.R': (-10 - 14 * c, 0, 0),
+        'upperarm.L': (-22 - 4 * s, -22, 0), 'forearm.L': (-18, 0, 0), 'hand.L': (-12 + 4 * c, 0, 0),
+    })
+    return ch
+
+STORM = 1.2
+def storm(t):
+    # 1.2 s loop for Last Storm: both arms high and conducting fast in opposite circles, the chest thrown back and the
+    # mask raised to the sky, the shrine bobbing on its roots.
+    p = 2 * math.pi * t / STORM; c, s = math.cos(p), math.sin(p)
+    ch = breath(t)
+    ch.update({
+        'hips_loc': (0, 0, 0.05 * math.sin(2 * p)), 'hips': (-3, 0, 3 * s), 'spine': (-6, 0, 4 * s),
+        'chest': add(ch['chest'], (-10 + 3 * math.sin(2 * p), 0, 8 * s)), 'head': (-14, 0, 6 * s),
+        'upperarm.R': (-138 + 18 * c, 38 + 16 * s, 0), 'forearm.R': (-28 + 14 * s, 0, 0), 'hand.R': (-18 * c, 0, 0),
+        'upperarm.L': (-138 - 18 * c, -38 + 16 * s, 0), 'forearm.L': (-28 - 14 * s, 0, 0), 'hand.L': (18 * c, 0, 0),
+    })
+    return ch
+
+TOLL, TOLL_AT = 1.4, 1.0
+def toll(t):
+    # 1.4 s; the toll lands at 1.0 (the spin reversal / colour swap is 1 s after the warning): she draws up and back with
+    # both arms lifting, then lurches forward so the chest bells ring, arms snapping down, and settles.
+    up = key(t, [(0, 0), (0.85, 1.0), (TOLL_AT - 0.03, 1.0), (TOLL_AT + 0.06, -1.0), (1.25, -0.6), (TOLL, -0.1)])
+    ring = 0.6 * math.sin(2 * math.pi * 7 * max(0, t - TOLL_AT)) * max(0, 1 - (t - TOLL_AT) / 0.4) if t > TOLL_AT else 0
+    u, d = max(up, 0), max(-up, 0)
+    ch = breath(t)
+    ch.update({
+        'hips_loc': (0, -0.05 * d, 0.06 * u - 0.18 * d),
+        'hips': (6 * d, 0, 0), 'spine': (-5 * u + 10 * d, 0, 0),
+        'chest': add(ch['chest'], (-9 * u + 18 * d + 4 * ring, 0, 3 * ring)), 'head': (2 - 8 * u + 12 * d, 0, 0),
+        'upperarm.R': (-70 * u + 15 * d, 30 * u + 12 * d, 0), 'forearm.R': (-35 * u - 10 * d, 0, 0),
+        'upperarm.L': (-70 * u + 15 * d, -30 * u - 12 * d, 0), 'forearm.L': (-35 * u - 10 * d, 0, 0),
+    })
+    return ch
+
+CALL, CALL_AT = 1.9, 1.5
+def call_water(t):
+    # 1.9 s, played over the jets' warning (1.5 s at normal speed): the three-hook branch hand lifts high over her head
+    # toward the wall, the fork arm balancing low; at 1.5 (the pour) it pulls down hard and she leans into it.
+    up = key(t, [(0, 0), (1.1, 1.0), (CALL_AT - 0.04, 1.05), (CALL_AT + 0.1, -1.0), (CALL, -0.8)])
+    u, d = max(up, 0), max(-up, 0)
+    ch = breath(t)
+    ch.update({
+        'hips_loc': (0, -0.05 * d, 0.05 * u - 0.18 * d), 'hips': (5 * d, 0, -6 * u), 'spine': (-4 * u + 10 * d, 0, -5 * u + 4 * d),
+        'chest': add(ch['chest'], (-8 * u + 16 * d, 0, -8 * u + 6 * d)), 'head': (2 - 12 * u + 12 * d, 0, -6 * u),
+        'upperarm.L': (-150 * u - 55 * d, -30 * u - 10 * d, 0), 'forearm.L': (-25 * u - 35 * d, 0, 0), 'hand.L': (-20 * u + 35 * d, 0, 0),
+        'upperarm.R': (-20 * u, 20 * u, 0), 'forearm.R': (-15 * u, 0, 0),
+    })
+    return ch
+
+SOW, SOW_AT = 0.6, 0.22
+def sow(t):
+    # 0.6 s, the seeds leave at 0.22: a short chest pulse and both hands flicking outward, low and quick, back by 0.6.
+    pull = key(t, [(0, 0), (SOW_AT - 0.02, 1.0), (SOW_AT + 0.05, -1.0), (SOW, 0)])
+    u, d = max(pull, 0), max(-pull, 0)
+    ch = breath(t)
+    ch.update({
+        'hips_loc': (0, 0, -0.04 * u), 'spine': (4 * u - 4 * d, 0, 0), 'chest': add(ch['chest'], (6 * u - 8 * d, 0, 0)),
+        'head': (2 + 4 * u - 4 * d, 0, 0),
+        'upperarm.R': (-30 * u - 25 * d, -5 * u + 45 * d, 0), 'forearm.R': (-30 * u, 0, 0), 'hand.R': (10 * d, 0, 0),
+        'upperarm.L': (-30 * u - 25 * d, 5 * u - 45 * d, 0), 'forearm.L': (-30 * u, 0, 0), 'hand.L': (-10 * d, 0, 0),
+    })
+    return ch
+
 def bake_clip(name, seconds, fn):
     frames = round(seconds * 30)
     act = bpy.data.actions.new(name); act.use_fake_user = True
@@ -352,7 +434,9 @@ def bake_clip(name, seconds, fn):
 acts = [bake_clip('Idle', 4.0, idle), bake_clip('Walk', WALK_CYCLE, walk),
         bake_clip('PruningArc', 1.8, pruning_arc), bake_clip('Rootscript', 2.1, rootscript), bake_clip('Seed', 2.2, seed),
         bake_clip('Procession', 2.45, procession), bake_clip('Bloom', 2.0, bloom), bake_clip('Vulnerable', 2.0, vulnerable),
-        bake_clip('PhaseShift', 1.5, phase_shift), bake_clip('Defeat', 2.5, defeat)]
+        bake_clip('PhaseShift', 1.5, phase_shift), bake_clip('Defeat', 2.5, defeat),
+        bake_clip('ConductLoop', CONDUCT, conduct), bake_clip('StormLoop', STORM, storm), bake_clip('Toll', TOLL, toll),
+        bake_clip('CallWater', CALL, call_water), bake_clip('Sow', SOW, sow)]
 print('CLIPS', [a.name for a in acts])
 arm.animation_data.action = acts[0]
 set_pose({})

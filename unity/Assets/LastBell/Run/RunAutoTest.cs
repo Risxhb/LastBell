@@ -901,6 +901,12 @@ namespace LastBell.Run
             foreach (var id in new[] { "Petal Spiral", "Seed Pods", "Waterfall Jets", "Toll", "Feet Pod", "Pruning Arc", "Doubled Pods", "Second Spiral", "Triangle Pods" })
                 Check($"Sylvara P1 uses {id}", sy.Order.Contains(id));
             Check("Sylvara P1 fills the arena with bullets", d.World.Bullets.Fired > 300, $"{d.World.Bullets.Fired} fired, peak {d.World.Bullets.Peak}");
+            // her attack clips (proposal 2 Nov): a Conduct loop under the spirals, one-shots on the attacks
+            Check("Sylvara conducts while a spiral runs", sy.LoopClip == "ConductLoop", sy.LoopClip);
+            foreach (var c in new[] { "Toll", "CallWater", "PruningArc", "Seed" }) Check($"Sylvara P1 plays the {c} clip", sy.Clips.Contains(c));
+            var newClips = new[] { "ConductLoop", "StormLoop", "Toll", "CallWater", "Sow" };
+            if (sy.Presenter && sy.Presenter.HasModel && newClips.All(sy.Presenter.Has)) Check("her model has every v3 attack clip", true);
+            else Note("Sylvara: this model has no v3 attack clips (old sylvara-assets pack): every attack falls back to Idle");
             if (SylvaraProps.Has(SylvaraProps.Pod)) Check("Seed Pods drop the pod model onto their warnings", sy.PodModels > 0, sy.PodModels.ToString());
 
             // Phase 2: colours
@@ -969,6 +975,7 @@ namespace LastBell.Run
             yield return Play(14f, () => sy.Order.Contains("Pruning Arc"));
             foreach (var id in new[] { "Hollow Spiral", "Choir Buds", "Feet Pod", "Pruning Arc" })
                 Check($"Sylvara P3 uses {id}", sy.Order.Contains(id));
+            Check("Sylvara plays the Bloom clip when she plants Choir Buds", sy.Clips.Contains("Bloom"));
             Note($"Sylvara P3 buds: {sy.BudsCut} cut, {sy.BudsBloomed} bloomed");
 
             // Phase 4: seed storm and the enrage steps (timing accepted 29 Oct)
@@ -997,12 +1004,14 @@ namespace LastBell.Run
                 Check("Seed Storm frame is not washed out (bullet looks)", whiteShare < 0.2f && mean < 0.8f, $"mean {mean:0.00}, white {whiteShare:P0}");
             }
             Check("Seed Storm throws seeds", seed);
+            Check("Sylvara plays the Sow clip as she throws a seed ring", sy.Clips.Contains("Sow"));
             Check("seeds burst into petals when their fuse ends", burst);
             Check("Seed Storm loop 1: 8 seeds every 2.0 s", sy.StormSeeds == 8 && Mathf.Approximately(sy.StormEvery, 2.0f), $"{sy.StormSeeds} / {sy.StormEvery}");
             sy.DebugStartStorm(2);
             Check("enrage step: loop 3 throws 10 seeds every 1.8 s", sy.StormSeeds == 10 && Mathf.Abs(sy.StormEvery - 1.8f) < 0.001f, $"{sy.StormSeeds} / {sy.StormEvery}");
             sy.DebugStartStorm(7);
             Check("enrage cap: Last Storm from 2:00 throws 14 seeds every 0.6 s", sy.LastStorm && sy.StormSeeds == 14 && Mathf.Abs(sy.StormEvery - 0.6f) < 0.001f);
+            Check("Last Storm plays the Storm loop", sy.LoopClip == "StormLoop", sy.LoopClip);
             yield return Play(3f, () => false);
             yield return Shot("sylvara_v3_last_storm");
 

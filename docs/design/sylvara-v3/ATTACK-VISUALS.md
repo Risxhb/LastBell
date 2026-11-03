@@ -50,6 +50,8 @@ Status: **proposal**. Chzy18 asked on 1 Nov to "build out the animation and mode
 | Pruning Arc | PruningArc | keep it, and add the ribbon trail. |
 | Phase change, Defeat | PhaseShift, Defeat | keep them. |
 
+**Built 2 Nov (proposal, waiting for Chzy18's look review):** `ConductLoop` (2.4 s), `StormLoop` (1.2 s), `Toll` (1.4 s; the lurch lands 1.0 s in, on the spin reversal or colour swap), `CallWater` (1.9 s, stretched over the jets' warning; the pull lands as the water pours) and `Sow` (0.6 s, skipped while another one-shot plays and in Last Storm). Choir Buds play the existing `Bloom`. The loops end in "Loop" because the shared presenter repeats only those. The P2 lane downbeat is not built (it needs an additive layer). The same pass pins three loose hook pieces of the branch hand to the hand: they used to stay behind (or tear) whenever her left arm lifted, in the old Seed and Bloom clips too. The model is `sylvara-assets` art, so it needs a new pack version (2.0.0) before other machines see the clips; without it every attack falls back to Idle, as today.
+
 ## How it gets built
 1. **Clips:** add Conduct, Storm, Toll, Call Water and Sow to `prototype/arena-3d/models/blender/sylvara_rig.py`. Rebuild `Sylvara.glb` with `build-sylvara.ps1`, which uses the same Meshy source as today. Then show a contact sheet of the key poses for review.
 2. **Props:** model them in Blender by script, like the Area 4 props: petal, seed, bell-flower bud, seed pod, water column, root ring. Then show turntable renders for review.

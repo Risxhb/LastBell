@@ -59,6 +59,16 @@ namespace LastBell.Run
         public int BudsCut { get; private set; }
         public int BudsBloomed { get; private set; }
         public readonly List<string> Order = new List<string>();   // attack starts, for tests
+        // Her clips (presentation; proposal 2 Nov, ATTACK-VISUALS.md): one-shots go through Act, and the loop under them is
+        // Conduct while a spiral runs, Storm in Last Storm, else Idle. Clips the model lacks fall back to Idle.
+        public readonly List<string> Clips = new List<string>();   // one-shots played, for tests
+        int actUntil;
+        void Act(string clip, float seconds)
+        {
+            Clips.Add(clip); actUntil = Age + Sim.Ticks(seconds);
+            if (presenter) presenter.PlayOnce(clip, seconds);
+        }
+        public string LoopClip => LastStorm ? "StormLoop" : (sp1 != null && sp1.On) || (sp2 != null && sp2.On) ? "ConductLoop" : "Idle";
         float LoopT => (Age - loopStart) * Sim.Dt;
         public float P4Time => p4Start < 0 ? 0 : (Age - p4Start) * Sim.Dt;   // seconds since Phase 4 began (enrage clock)
 
@@ -212,7 +222,7 @@ namespace LastBell.Run
             if (to == 4) { p4Start = Age + (first ? 0 : TransTicks); P4Loop = 0; LastStorm = false; }
             if (first) yield break;
             Current = "phase shift";
-            presenter.PlayOnce("PhaseShift", TransTicks / (float)Sim.Hz);
+            Act("PhaseShift", TransTicks / (float)Sim.Hz);
             glowTarget = 3f;
             RunHud.Float(transform.position + Vector3.up * 5.4f, to == 3 ? "The mask splits" : PhaseNames[to - 1], Amber);
             for (int i = 0; i < TransTicks; i++)
@@ -327,6 +337,7 @@ namespace LastBell.Run
             RunHud.Float(transform.position + Vector3.up * 5.4f, text, Amber);
             W.Fx.Crescendo(transform.position, true, 0, false);
             Release(0.8f);
+            Act("Toll", 1.4f);   // the lurch lands 1.0 s in, on the reversal / colour swap
         }
 
         // Petal Spiral: arms from her rim, a petal per arm every `period`, gaps of (skipEvery - keep) steps; turns `w` rad/s
@@ -382,7 +393,7 @@ namespace LastBell.Run
         }
         void PodsOnFar(bool doubled = false)
         {
-            presenter.PlayOnce("Seed", 1.2f);
+            Act("Seed", 1.2f);
             if (W.Players.Count == 1) { var p = W.Players[0]; if (!p.Down) Pod(p, Vector3.zero, 2.5f, doubled); return; }
             foreach (var p in Farthest(FarCount)) Pod(p, Vector3.zero, 2.5f, doubled);
         }
@@ -397,7 +408,7 @@ namespace LastBell.Run
         }
         void RootRing(float r)
         {
-            presenter.PlayOnce("Rootscript", 2f);
+            Act("Rootscript", 2f);
             var h = Tune(new Hazard { Source = "Root Ring", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Radius = r, LockAt = 0, ResolveAt = Sim.Ticks(2), Damage = 18, Origin = Vector3.zero });
             h.OnResolve = hz => { W.BossFx.ChimeResolve(hz.Origin, hz.Radius); Release(); RootsErupt(hz.Origin, hz.Radius); };
             W.Hazards.Spawn(h);
@@ -426,6 +437,7 @@ namespace LastBell.Run
         void Jets()
         {
             float warn = JetWarn;
+            Act("CallWater", warn * 1.9f / 1.5f);   // the hand pulls down (1.5 of the clip's 1.9 s) as the water pours
             var ts = Standing.FindAll(p => Sim.Flat(p.transform.position).magnitude > 8);
             if (ts.Count == 0) ts = Farthest(1);
             for (int i = 0; i < ts.Count; i++)
@@ -457,7 +469,7 @@ namespace LastBell.Run
         void PruningArc()
         {
             float w = ArcExtra;
-            presenter.PlayOnce("PruningArc", 2.9f);
+            Act("PruningArc", 2.9f);
             var near = W.NearestStanding(Vector3.zero);
             float a = near ? AngOf(near.transform.position) : Rnd(0, Tau);
             var front = Tune(new Hazard
@@ -530,6 +542,7 @@ namespace LastBell.Run
         void PlantBuds(float life)
         {
             int n = BudCount; float a0 = Rnd(0, Tau);
+            Act("Bloom", 2f);   // one downbeat per bud
             for (int i = 0; i < n; i++)
             {
                 float a = a0 + i * Tau / n;
@@ -620,6 +633,8 @@ namespace LastBell.Run
         }
         void SeedRing(int n, float off, float fuse)
         {
+            if (!LastStorm && Age >= actUntil) Act("Sow", 0.6f);   // a short flick between other moves; Last Storm keeps Storm
+
             for (int i = 0; i < n; i++)
             {
                 float a = off + i * Tau / n;
@@ -635,7 +650,7 @@ namespace LastBell.Run
         // ---------------- per tick ----------------
         protected override void StepAlways()
         {
-            if (presenter) presenter.TickBoss("Idle");
+            if (presenter) presenter.TickBoss(Dead || phase == 0 ? "Idle" : LoopClip);
             if (Dead || Current == "idle" || phase == 0) return;   // halted (party down) or not started
             for (int i = later.Count - 1; i >= 0; i--) if (Age >= later[i].at) { var fn = later[i].fn; later.RemoveAt(i); fn(); }
             for (int i = 0; i < emit.Count; i++) if (emit[i].On) emit[i].Update?.Invoke(Sim.Dt);
