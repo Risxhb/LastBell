@@ -164,6 +164,7 @@ namespace LastBell.Run
         // it set this tick's input.
         bool Scripted(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
         {
+            if (!(boss is AurelionEncounter) && Quake(me, boss, pos, ref inp)) return true;
             if (!(boss is AurelionEncounter) && Brand(me, boss, pos, ref inp)) return true;   // Aurelion keeps its own Sunspot job
             if (!(boss is AurelionEncounter) && Spokes(me, boss, pos, ref inp)) return true;
             if (boss is ChimeboundOracleEncounter or) return Carillon(me, or, pos, ref inp);
@@ -251,6 +252,83 @@ namespace LastBell.Run
         // a mark that follows this player and spares them (Crucivar's Ember Brand) leaves a burning pool where it lands: walk
         // it out to a ring 12.5 m from the centre, clear of other pools and other players, before it stops following; a threat on the way
         // is dodged first (the normal reading)
+        // bands round one centre that land in turn (Crucivar's Anvil Quake and Hard Quake Echo): the plain dodge leaves the
+        // band landing next for the one after it. Plan the distance from the centre for every landing still shown (each a
+        // hand clear of its band edge, walking pace between them) and walk the first leg; a brand carrier ends far out
+        static readonly List<Hazard> quakeBands = new List<Hazard>();
+        const float QuakePad = 0.5f, QuakeStep = 0.25f, QuakePace = 6.5f;
+        bool Quake(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
+        {
+            var live = me.World.Hazards.Live; quakeBands.Clear();
+            for (int i = 0; i < live.Count; i++)
+            {
+                var h = live[i];
+                if (h.Kind == HazardKind.Strike && (h.Shape == HazardShape.Ring || h.Shape == HazardShape.Circle) && h.Track == null && h.Damage > 0 && !h.Cancelled
+                    && h.Age < h.ResolveAt && h.Radius >= 3f && (quakeBands.Count == 0 || Sim.Flat(h.Origin - quakeBands[0].Origin).magnitude < 0.1f)) quakeBands.Add(h);
+            }
+            if (quakeBands.Count < 2) return false;
+            quakeBands.Sort((x, y) => (x.ResolveAt - x.Age).CompareTo(y.ResolveAt - y.Age));
+            var hub = Sim.Flat(quakeBands[0].Origin); var off = Sim.Flat(pos - hub);
+            float r0 = off.magnitude, yaw = r0 > 0.1f ? Sim.YawTo(hub, pos, 0) : 0f;
+            float rMin = boss.BodyRadius + PlayerController.Radius + 0.15f, rMax = CombatWorld.PlayerBound - 0.4f - hub.magnitude;
+            int n = Mathf.FloorToInt((rMax - rMin) / QuakeStep) + 1;
+            bool brand = false;
+            for (int i = 0; i < live.Count && !brand; i++) { var h = live[i]; if (h.Track != null && h.Age < h.LockAt && h.Shape == HazardShape.Circle && Spares(h, me)) brand = true; }
+            float pref = brand ? BrandRing : 6.5f;
+            var dir = Sim.Dir(yaw);
+            bool Clear(Hazard h, float r) => !h.Contains(hub + dir * r) && !h.Contains(hub + dir * (r + QuakePad)) && !h.Contains(hub + dir * Mathf.Max(0, r - QuakePad));
+            // cost[j]: the shortest walk that stands at rMin + j * step for every landing so far; from[i][j] the step before
+            var cost = new float[n]; var next = new float[n]; var from = new int[quakeBands.Count, n];
+            int prevAt = 0;
+            for (int i = 0; i < quakeBands.Count; i++)
+            {
+                var h = quakeBands[i]; int at = h.ResolveAt - h.Age;
+                float reach = QuakePace * ((at - prevAt) / (float)Sim.Hz - (i == 0 ? 0.15f : 0f));
+                for (int j = 0; j < n; j++)
+                {
+                    float r = rMin + j * QuakeStep; next[j] = float.MaxValue; from[i, j] = -1;
+                    if (!Clear(h, r)) continue;
+                    if (i == 0) { float d = Mathf.Abs(r - r0); if (d <= reach || at == 0 && d < 0.01f) next[j] = d; continue; }
+                    int lo = Mathf.Max(0, j - Mathf.FloorToInt(reach / QuakeStep)), hi = Mathf.Min(n - 1, j + Mathf.FloorToInt(reach / QuakeStep));
+                    for (int k = lo; k <= hi; k++)
+                        if (cost[k] < float.MaxValue && cost[k] + Mathf.Abs(r - rMin - k * QuakeStep) < next[j]) { next[j] = cost[k] + Mathf.Abs(r - rMin - k * QuakeStep); from[i, j] = k; }
+                }
+                var swap = cost; cost = next; next = swap; prevAt = at;
+            }
+            int best = -1; float bestCost = float.MaxValue;
+            for (int j = 0; j < n; j++) { if (cost[j] == float.MaxValue) continue; float c = cost[j] + 0.3f * Mathf.Abs(rMin + j * QuakeStep - pref); if (c < bestCost) { bestCost = c; best = j; } }
+            if (best < 0) return false;   // no plan in reach: the plain dodge
+            for (int i = quakeBands.Count - 1; i > 0; i--) best = from[i, best];
+            float rGoal = rMin + best * QuakeStep;
+            float t0 = (quakeBands[0].ResolveAt - quakeBands[0].Age) / (float)Sim.Hz;
+            // the bearing: our own, or the nearest one clear of burning ground (and, with brands out, of the other players)
+            Vector3 goal = hub + dir * rGoal;
+            for (int k = 0; k < 13; k++)
+            {
+                var q = hub + Sim.Dir(yaw + (k % 2 == 0 ? 1 : -1) * (k + 1) / 2 * 10f) * rGoal;
+                // the walk there too: a radial walk inside a Pour Channel (a lane out from the same centre) burns all the way
+                bool ok = k == 0 || Sim.Flat(q - pos).magnitude <= QuakePace * (t0 - 0.15f);
+                for (int i = 0; i < live.Count && ok; i++)
+                {
+                    var h = live[i]; if (h.BurnPerSecond <= 0) continue;
+                    if (h.Contains(q) || h.Contains(Vector3.Lerp(pos, q, 0.35f)) || h.Contains(Vector3.Lerp(pos, q, 0.7f))) ok = false;
+                }
+                if (ok && brand) foreach (var p in me.World.Players) if (ok && p && p != me && !p.Down && Sim.Flat(p.transform.position - q).magnitude < BrandRadiusPad) ok = false;
+                if (ok) { goal = q; break; }
+            }
+            var v = Sim.Flat(goal - pos);
+            var move = v.magnitude < 0.2f ? Vector3.zero : v.normalized;
+            bad = Bad(me, boss, false, me.World.Tick + 1);   // round burning ground; the bands are planned above
+            if (move != Vector3.zero && bad(pos + move * 0.6f)) move = Bend(pos, move);
+            if (v.magnitude / PlayerController.WalkSpeed > t0 - 0.3f && me.Stamina > 10) inp.Sprint = true;
+            if (move != Vector3.zero) move = AroundBoss(pos, move, boss);
+            inp.Move = ToScreen(move);
+            // in place with time to spare: keep throwing
+            if (Attacks && v.magnitude < 0.5f && t0 > 0.5f && Sim.Flat(boss.transform.position - pos).magnitude - boss.BodyRadius <= Range(me) + 1.85f) Attack(me, ref inp);
+            return true;
+        }
+        const float BrandRadiusPad = 4f;   // a brand (3 m) and a hand: brand carriers keep this far from other players
+
         bool Brand(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
         {
             Hazard brand = null; var live = me.World.Hazards.Live;
@@ -262,6 +340,18 @@ namespace LastBell.Run
             if (brand == null) return false;
             bad = Bad(me, boss);
             if (bad(pos)) return false;
+            // Backdraft's pull (2 m inward just before the brand freezes) would leave the pool mid-arena: sprint straight out
+            // against it (9 m/s against 5)
+            for (int i = 0; i < live.Count; i++)
+            {
+                var h = live[i];
+                if (h.AttackId != "crucivar.backdraft" || h.Age < Sim.Ticks(ForgeRite.PullFrom - 0.3f) || h.Age > Sim.Ticks(ForgeRite.PullTo)) continue;
+                var outward = Sim.Flat(pos - h.Origin);
+                if (outward.magnitude < 0.1f || outward.magnitude > CombatWorld.PlayerBound - 0.8f) break;
+                var o = outward.normalized; if (bad(pos + o * 0.6f)) o = Bend(pos, o);
+                inp.Move = ToScreen(o); if (me.Stamina > 5) inp.Sprint = true;
+                return true;
+            }
             float rim = Mathf.Min(BrandRing, CombatWorld.PlayerBound - 1.2f), mine = Sim.YawTo(Vector3.zero, pos, 0);   // not the wall: back in to the jet gaps within the 1 s freeze
             Vector3 goal = pos; float bestCost = float.MaxValue;
             for (int k = 0; k < 24; k++)
@@ -288,7 +378,8 @@ namespace LastBell.Run
         // jets turning round one hub (Crucivar's Furnace Spin) reach the wall, where they outrun a sprint: ride the middle of
         // the nearest gap about 6.5 m out, turning with them (shown jets first, the turn read from their yaw)
         Hazard spokeRef; float spokeYaw, spokeDir;
-        static readonly float[] SpokeRadii = { 6.5f, 5.6f, 7.4f };   // near the hub a jet covers too wide an angle, far out the gap outruns a walk
+        static readonly float[] SpokeRadii = { 6.5f, 5.6f, 7.4f, 4.8f, 8.3f };   // near the hub a jet covers too wide an angle, far out the gap outruns a walk
+        static readonly float[] SpokeShifts = { 0f, 8f, -8f, 14f, -14f };   // degrees off the gap's middle
         const float BrandRing = 12.5f;   // where a brand is walked to: its pool (2 m) stays off the jet ring and leaves the inside of the quake's outer band
         bool Spokes(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
         {
@@ -317,12 +408,16 @@ namespace LastBell.Run
                     float a = yaws[k], b = k + 1 < yaws.Count ? yaws[k + 1] : yaws[0] + 360f, mid = (a + b) / 2f + spokeDir * 6f;
                     if (turning && Mathf.Repeat(mine - a, 360f) > b - a) continue;
                     foreach (float r in SpokeRadii)
+                    foreach (float da in SpokeShifts)
                     {
-                        var q = hub + Sim.Dir(mid) * r;
+                        // off the gap's middle (round a pool there) only while the shifted spot keeps a hand clear of both jets
+                        float at = mid + da;
+                        var q = hub + Sim.Dir(at) * r;
                         bool ok = CombatWorld.InPlayerBound(q, -0.3f);
-                        for (int i = 0; i < live.Count && ok && pass == 0; i++) { var h = live[i]; if ((h.BurnPerSecond > 0 || (h.Track != null && h.Includes != null && h.Age >= h.LockAt)) && (h.Contains(q) || h.Contains(hub + Sim.Dir(mid + spokeDir * 12f) * r))) ok = false; }
+                        for (int i = 0; i < jets.Count && ok && da != 0; i++) if (jets[i].Contains(q) || jets[i].Contains(hub + Sim.Dir(at + Mathf.Sign(da) * 5f) * r)) ok = false;
+                        for (int i = 0; i < live.Count && ok && pass == 0; i++) { var h = live[i]; if ((h.BurnPerSecond > 0 || (h.Track != null && h.Includes != null && h.Age >= h.LockAt)) && (h.Contains(q) || h.Contains(hub + Sim.Dir(at + spokeDir * 12f) * r))) ok = false; }
                         if (!ok) continue;
-                        float c = Sim.Flat(q - pos).magnitude + Mathf.Abs(r - 6.5f);
+                        float c = Sim.Flat(q - pos).magnitude + Mathf.Abs(r - 6.5f) + Mathf.Abs(da) * 0.05f;
                         if (c < bestCost) { bestCost = c; goal = q; }
                     }
                 }
