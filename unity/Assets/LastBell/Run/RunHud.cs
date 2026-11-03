@@ -193,6 +193,27 @@ namespace LastBell.Run
         static float Px => Mathf.Max(1, Mathf.Round(UiTheme.Scale));            // a crisp 1 px line at any scale
         static void F(float x, float y, float w, float h, Color c) => UiTheme.Fill(S(x, y, w, h), c);
         static void T(float x, float y, float w, float h, string t, GUIStyle st, Color? c = null) => UiTheme.Label(S(x, y, w, h), t, st, c);
+        // A ticking line ("beat in 7.4s · you (I): TICK · then TOCK"), left-aligned: one label per " · " part, and times over
+        // 3 s in whole seconds (rounded up), so the changing part repeats a few cached texts. Drawn whole, each new combination
+        // was a new IMGUI text handle, and Unity's ClearUnusedTextHandles cost 5-10 ms when it swept them (perf report
+        // bellkeeper-ultimate-2026-11-03, Update 12:25: the Ultimate's slam 6 frame).
+        static readonly string[] DotSep = { " · " };
+        static readonly System.Text.RegularExpressions.Regex Tenths = new System.Text.RegularExpressions.Regex(@"(d+.d)s");
+        static string WholeSeconds(string s) => s.IndexOf('.') < 0 ? s : Tenths.Replace(s, m =>
+        {
+            float v = float.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+            return v > 3 ? Mathf.CeilToInt(v) + "s" : m.Value;
+        });
+        static void TickLine(float x, float y, float h, string line, GUIStyle st, Color? c = null)
+        {
+            var parts = line.Split(DotSep, System.StringSplitOptions.None);
+            for (int i = 0; i < parts.Length; i++)
+            {
+                string part = (i > 0 ? " · " : "") + WholeSeconds(parts[i]);
+                float pw = Wv(st, part);
+                T(x, y, pw + 4, h, part, st, c); x += pw;
+            }
+        }
         static float Wv(GUIStyle st, string t)
         {
             long t0 = UiTheme.FontLog ? System.Diagnostics.Stopwatch.GetTimestamp() : 0;
