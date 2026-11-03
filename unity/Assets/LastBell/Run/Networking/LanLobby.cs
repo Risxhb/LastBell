@@ -11,7 +11,8 @@ namespace LastBell.Run.Networking
         // Total players in a LAN group, host included. Every LAN limit derives from this.
         public const int Capacity = 4;
         public const int MaxClients = Capacity - 1;
-        const byte Protocol = 3, Hello = 1, Snapshot = 2, ChooseClass = 3, StartFight = 4, InputFrame = 5, WorldFrame = 6, SceneReady = 7;
+        // Protocol 4 (Nov 3): player names and lobby Ready (SetReady); the host enforces every lobby rule.
+        const byte Protocol = 4, Hello = 1, Snapshot = 2, ChooseClass = 3, StartFight = 4, InputFrame = 5, WorldFrame = 6, SceneReady = 7, SetReadyMsg = 8;
         const int MaxMessagesPerPump = 64;
         // Mirrors RunDirector.Classes (kept Unity-free for the .NET harness); LanMenuAutoTest checks the two match.
         static readonly string[] Classes = { "Tollbreaker", "Chimesinger", "Arcanist" };
@@ -19,8 +20,9 @@ namespace LastBell.Run.Networking
         public static string DefaultClass => Classes[0];
         static readonly string[] Arenas = { "test", "skyward-spire", "brass-foundry", "verdant-chimes", "shattered-hour", "metronome-court" };
         static readonly string[] Encounters = { "Bellkeeper", "Aurelion", "Tempo Tyrant", "Chimebound Oracle", "Pendulum Sentinel" };
-        public sealed class Member { public int Id; public string ClassName; }
-        sealed class Peer { public IConnection Connection; public int Id; public bool Joined, Ready; public DateTime Deadline; public int LastInput = -1; }
+        // Ready = the player pressed Ready in the lobby (locks their class). Not the same as a client having loaded the arena.
+        public sealed class Member { public int Id; public string Name; public string ClassName; public bool Ready; }
+        sealed class Peer { public IConnection Connection; public int Id; public bool Joined, Loaded; public DateTime Deadline; public int LastInput = -1; }
         readonly List<Peer> peers = new List<Peer>();
         readonly List<Member> members = new List<Member>();
         readonly string build;
@@ -28,12 +30,13 @@ namespace LastBell.Run.Networking
         LanListener listener;
         IConnection server;
         bool helloSent, clientReadySent, disposed;
-        string localClass;
+        string localClass, localName;
+        bool? pendingReady;   // client: a Ready change sent but not yet confirmed by a roster snapshot
         public bool IsHost => host;
         public string Error { get; private set; }
         public bool Connected { get; private set; }
         public bool FightStarted { get; private set; }
-        public bool AllClientsReady => host && FightStarted && peers.Count > 0 && peers.TrueForAll(p => p.Joined && p.Ready);
+        public bool AllClientsReady => host && FightStarted && peers.Count > 0 && peers.TrueForAll(p => p.Joined && p.Loaded);
         public event Action<int, int, byte[]> InputReceived;
         public event Action<int, byte[]> WorldReceived;
         public event Action FightStarting;
@@ -43,26 +46,38 @@ namespace LastBell.Run.Networking
         public string Encounter { get; private set; } = Encounters[0];
         public IReadOnlyList<Member> Members => members.AsReadOnly();
         public int Revision { get; private set; }
+        // Bumped whenever the host changes the boss or arena (which clears everyone's Ready), so screens can say so.
+        public int SelectionRevision { get; private set; }
+        public Member Local => members.Find(m => m.Id == LocalId);
+        public bool LocalReady => pendingReady ?? (Local != null && Local.Ready);
+        public bool AllMembersReady => members.Count > 0 && members.TrueForAll(m => m.Ready);
+        // Host only: at least two players, everyone joined and Ready, no error. Start() checks the same.
+        public bool CanStart => !disposed && host && !FightStarted && Error == null && members.Count >= 2 && !peers.Exists(p => !p.Joined) && AllMembersReady;
+        // Why Start is unavailable, for the host's screen (null when it can start).
+        public string StartBlocker => !host ? "Only the host can start." : FightStarted ? "The fight has started." : Error != null ? Error
+            : members.Count < 2 ? "Need at least 2 players." : peers.Exists(p => !p.Joined) ? "A player is still joining."
+            : !AllMembersReady ? "Waiting for " + members.FindAll(m => !m.Ready).Count + " to ready." : null;
 
-        LanLobby(string buildId, string className, bool isHost)
+        LanLobby(string buildId, string className, string playerName, bool isHost)
         {
             if (string.IsNullOrEmpty(buildId) || buildId.Length > 80) throw new ArgumentException("Build ID must contain 1–80 characters.");
             if (!ValidClass(className)) throw new ArgumentException("Unknown class.");
-            build = buildId; localClass = className; host = isHost;
+            var problem = LanPlayerName.Problem(playerName); if (problem != null) throw new ArgumentException("Player name: " + problem);
+            build = buildId; localClass = className; localName = LanPlayerName.Normalize(playerName); host = isHost;
         }
         public static bool ValidClass(string value) => Array.IndexOf(Classes, value) >= 0;
         public static bool ValidArena(string value) => Array.IndexOf(Arenas, value) >= 0;
         public static bool ValidEncounter(string value) => Array.IndexOf(Encounters, value) >= 0;
-        public static LanLobby Host(int port, string buildId, string className)
+        public static LanLobby Host(int port, string buildId, string className, string playerName)
         {
-            var lobby = new LanLobby(buildId, className, true);
+            var lobby = new LanLobby(buildId, className, playerName, true);
             lobby.listener = new LanListener(port); lobby.LocalId = 0; lobby.Connected = true;
-            lobby.members.Add(new Member { Id = 0, ClassName = className });
+            lobby.members.Add(new Member { Id = 0, Name = lobby.localName, ClassName = className });
             return lobby;
         }
-        public static LanLobby Connect(string address, int port, string buildId, string className)
+        public static LanLobby Connect(string address, int port, string buildId, string className, string playerName)
         {
-            var lobby = new LanLobby(buildId, className, false);
+            var lobby = new LanLobby(buildId, className, playerName, false);
             lobby.server = LanConnection.Connect(address, port);
             return lobby;
         }
@@ -86,7 +101,7 @@ namespace LastBell.Run.Networking
         }
         public bool SetClass(string className)
         {
-            if (disposed || FightStarted || !ValidClass(className)) return false;
+            if (disposed || FightStarted || !ValidClass(className) || LocalReady) return false;   // Ready locks your class
             if (host) { localClass = className; members[0].ClassName = className; Broadcast(); return true; }
             if (!Connected || !Send(server, Pack(w => { w.Write(ChooseClass); w.Write(className); }))) return false;
             localClass = className; return true;
@@ -94,12 +109,25 @@ namespace LastBell.Run.Networking
         public bool SetSelection(string arena, string encounter)
         {
             if (disposed || FightStarted || !host || !ValidArena(arena) || !ValidEncounter(encounter)) return false;
-            Arena = arena; Encounter = encounter; Broadcast(); return true;
+            if (arena != Arena || encounter != Encounter)
+            {
+                // Everyone agreed to the old boss/arena: clear all Ready so nobody starts a fight they didn't choose.
+                Arena = arena; Encounter = encounter; SelectionRevision++;
+                foreach (var m in members) m.Ready = false;
+            }
+            Broadcast(); return true;
+        }
+        public bool SetReady(bool ready)
+        {
+            if (disposed || FightStarted || !Connected || Local == null) return false;
+            if (host) { members[0].Ready = ready; Broadcast(); return true; }
+            if (!Send(server, Pack(w => { w.Write(SetReadyMsg); w.Write(ready); }))) return false;
+            pendingReady = ready; return true;
         }
         // Combat integration owns the payload schemas. TCP preserves order, but sequence checks reject stale frames.
         public bool Start()
         {
-            if (disposed || !host || FightStarted || Error != null || members.Count < 2 || peers.Exists(p => !p.Joined)) return false;
+            if (disposed || !host || FightStarted || Error != null || !CanStart) return false;
             var frame = Pack(w => w.Write(StartFight));
             foreach (var peer in peers) if (!Send(peer.Connection, frame)) { Error = "Could not start: connection is not ready."; foreach (var other in peers) other.Connection.Dispose(); return false; }
             FightStarted = true; foreach (var peer in peers) peer.Deadline = DateTime.UtcNow.AddSeconds(90); FightStarting?.Invoke(); return true;
@@ -153,7 +181,7 @@ namespace LastBell.Run.Networking
                 var p = peers[i];
                 try
                 {
-                    if (p.Connection.State == ConnectionState.Failed || p.Connection.State == ConnectionState.Closed || ((!p.Joined || (FightStarted && !p.Ready)) && DateTime.UtcNow > p.Deadline)) throw new IOException("Peer disconnected or timed out.");
+                    if (p.Connection.State == ConnectionState.Failed || p.Connection.State == ConnectionState.Closed || ((!p.Joined || (FightStarted && !p.Loaded)) && DateTime.UtcNow > p.Deadline)) throw new IOException("Peer disconnected or timed out.");
                     int handled = 0;
                     while (handled++ < MaxMessagesPerPump && p.Connection.TryReceive(out var bytes))
                     {
@@ -163,23 +191,33 @@ namespace LastBell.Run.Networking
                             byte type = reader.ReadByte();
                             if (!p.Joined && type == Hello)
                             {
-                                byte protocol = reader.ReadByte(); string version = ReadText(reader, 80); string cls = ReadText(reader, 32); Complete(reader);
-                                if (protocol != Protocol || version != build || !ValidClass(cls)) throw new InvalidDataException("Incompatible client or class.");
-                                p.Joined = true; members.Add(new Member { Id = p.Id, ClassName = cls }); changed = true;
+                                byte protocol = reader.ReadByte(); string version = ReadText(reader, 80);
+                                if (protocol != Protocol || version != build) throw new InvalidDataException("Incompatible client.");
+                                string cls = ReadText(reader, 32), name = ReadText(reader, 64); Complete(reader);
+                                if (!ValidClass(cls) || !LanPlayerName.Valid(name)) throw new InvalidDataException("Invalid class or player name.");
+                                name = LanPlayerName.MakeUnique(LanPlayerName.Normalize(name), members.ConvertAll(m => m.Name));
+                                p.Joined = true; members.Add(new Member { Id = p.Id, Name = name, ClassName = cls }); changed = true;
                             }
                             else if (p.Joined && !FightStarted && type == ChooseClass)
                             {
                                 string cls = ReadText(reader, 32); Complete(reader);
                                 if (!ValidClass(cls)) throw new InvalidDataException("Unknown class.");
-                                members.Find(m => m.Id == p.Id).ClassName = cls; changed = true;
+                                var member = members.Find(m => m.Id == p.Id);
+                                if (!member.Ready) member.ClassName = cls;   // Ready locks the class; a refused change just resends the roster
+                                changed = true;
                             }
-                            else if (p.Joined && FightStarted && p.Ready && type == InputFrame)
+                            else if (p.Joined && FightStarted && p.Loaded && type == InputFrame)
                             {
                                 int sequence = reader.ReadInt32(); var payload = ReadPayload(reader, 256);
                                 if (sequence <= p.LastInput) throw new InvalidDataException("Out-of-order input.");
                                 p.LastInput = sequence; InputReceived?.Invoke(p.Id, sequence, payload);
                             }
-                            else if (p.Joined && FightStarted && type == SceneReady && !p.Ready) { Complete(reader); p.Ready = true; }
+                            else if (p.Joined && !FightStarted && type == SetReadyMsg)
+                            {
+                                bool ready = reader.ReadBoolean(); Complete(reader);
+                                members.Find(m => m.Id == p.Id).Ready = ready; changed = true;
+                            }
+                            else if (p.Joined && FightStarted && type == SceneReady && !p.Loaded) { Complete(reader); p.Loaded = true; }
                             else throw new InvalidDataException("Unexpected lobby message.");
                         }
                     }
@@ -200,7 +238,7 @@ namespace LastBell.Run.Networking
             foreach (var peer in peers)
             {
                 if (!peer.Joined) continue;
-                var data = Pack(w => { w.Write(Snapshot); w.Write(peer.Id); w.Write(Revision); w.Write(Arena); w.Write(Encounter); w.Write(members.Count); foreach (var m in members) { w.Write(m.Id); w.Write(m.ClassName); } });
+                var data = Pack(w => { w.Write(Snapshot); w.Write(peer.Id); w.Write(Revision); w.Write(SelectionRevision); w.Write(Arena); w.Write(Encounter); w.Write(members.Count); foreach (var m in members) { w.Write(m.Id); w.Write(m.Name); w.Write(m.ClassName); w.Write(m.Ready); } });
                 if (!Send(peer.Connection, data)) peer.Connection.Dispose();
             }
         }
@@ -210,7 +248,7 @@ namespace LastBell.Run.Networking
             if (server.State != ConnectionState.Connected) return;
             if (!helloSent)
             {
-                if (!Send(server, Pack(w => { w.Write(Hello); w.Write(Protocol); w.Write(build); w.Write(localClass); }))) { Error = "Could not send join request."; return; }
+                if (!Send(server, Pack(w => { w.Write(Hello); w.Write(Protocol); w.Write(build); w.Write(localClass); w.Write(localName); }))) { Error = "Could not send join request."; return; }
                 helloSent = true;
             }
             try
@@ -229,13 +267,19 @@ namespace LastBell.Run.Networking
                             lastWorld = tick; WorldReceived?.Invoke(tick, payload); continue;
                         }
                         if (type != Snapshot || FightStarted || bytes.Length > 1024) throw new InvalidDataException("Unexpected server message.");
-                        int id = reader.ReadInt32(), revision = reader.ReadInt32(); string arena = ReadText(reader, 40), encounter = ReadText(reader, 40); int count = reader.ReadInt32();
-                        if (id < 1 || id >= Capacity || revision < Revision || !ValidArena(arena) || !ValidEncounter(encounter) || count < 1 || count > Capacity) throw new InvalidDataException("Invalid lobby snapshot.");
+                        int id = reader.ReadInt32(), revision = reader.ReadInt32(), selection = reader.ReadInt32(); string arena = ReadText(reader, 40), encounter = ReadText(reader, 40); int count = reader.ReadInt32();
+                        if (id < 1 || id >= Capacity || revision < Revision || selection < SelectionRevision || !ValidArena(arena) || !ValidEncounter(encounter) || count < 1 || count > Capacity) throw new InvalidDataException("Invalid lobby snapshot.");
                         var updated = new List<Member>();
-                        for (int i = 0; i < count; i++) { int memberId = reader.ReadInt32(); string cls = ReadText(reader, 32); if (memberId < 0 || memberId >= Capacity || !ValidClass(cls) || updated.Exists(m => m.Id == memberId)) throw new InvalidDataException("Invalid roster."); updated.Add(new Member { Id = memberId, ClassName = cls }); }
+                        for (int i = 0; i < count; i++)
+                        {
+                            int memberId = reader.ReadInt32(); string name = ReadText(reader, LanPlayerName.MaxRosterLength), cls = ReadText(reader, 32); bool ready = reader.ReadBoolean();
+                            if (memberId < 0 || memberId >= Capacity || !ValidClass(cls) || !LanPlayerName.ValidRoster(name) || updated.Exists(m => m.Id == memberId)) throw new InvalidDataException("Invalid roster.");
+                            updated.Add(new Member { Id = memberId, Name = name, ClassName = cls, Ready = ready });
+                        }
                         Complete(reader);
                         if (!updated.Exists(m => m.Id == 0) || !updated.Exists(m => m.Id == id)) throw new InvalidDataException("Incomplete roster.");
-                        members.Clear(); members.AddRange(updated); LocalId = id; Revision = revision; Arena = arena; Encounter = encounter; Connected = true;
+                        members.Clear(); members.AddRange(updated); LocalId = id; Revision = revision; SelectionRevision = selection; Arena = arena; Encounter = encounter; Connected = true;
+                        if (pendingReady == members.Find(m => m.Id == id).Ready) pendingReady = null;
                     }
                 }
             }

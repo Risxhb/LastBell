@@ -25,6 +25,10 @@ namespace LastBell.Menu
         ConfrontationMenu owner; GameObject panel; InputField address, port; Text status, roster, selection, classLabel;
         Button hostButton, joinButton, startButton, classPrev, classNext; Button[] maps, encounters;
         LanSessionCoordinator session; string hero, error;
+        // Name card (LanProfile): shown before Host/Connect until the player has a saved name; Edit name reopens it.
+        GameObject nameCard; InputField nameField; Text nameError, playingAs; Button nameConfirm, editName, readyButton;
+        int seenSelection = -1; float selectionNoticeUntil;
+        public bool NameCardOpen => nameCard && nameCard.activeSelf;
         public void Build(ConfrontationMenu parent, Transform container, string selectedHero)
         {
             owner = parent; hero = selectedHero;
@@ -32,6 +36,8 @@ namespace LastBell.Menu
             panel = baseImage.gameObject; transform.SetParent(panel.transform, false);
             var t = panel.transform;
             MenuUI.Text("LAN MULTIPLAYER", t, new Vector2(.04f,.90f), new Vector2(.65f,.98f), 42, MenuUI.Ivory, TextAnchor.MiddleLeft);
+            playingAs = MenuUI.Text("", t, new Vector2(.50f,.90f), new Vector2(.78f,.98f), 20, MenuUI.Gold, TextAnchor.MiddleRight);
+            editName = MenuUI.Button("Edit name", t, new Vector2(.79f,.91f), new Vector2(.96f,.97f), () => OpenNameCard());
             MenuUI.Text("Class", t, new Vector2(.04f,.81f), new Vector2(.16f,.86f), 20, MenuUI.Gold, TextAnchor.MiddleLeft);
             classPrev = MenuUI.Button("<", t, new Vector2(.16f,.81f), new Vector2(.205f,.87f), () => ChangeClass(-1));
             classLabel = MenuUI.Text("", t, new Vector2(.205f,.81f), new Vector2(.355f,.87f), 22);
@@ -52,8 +58,50 @@ namespace LastBell.Menu
             for (int i = 0; i < encounters.Length; i++) { int n=i; int col=i%5,row=i/5; float x=.04f+col*.18f,y=.37f-row*.07f; encounters[i]=MenuUI.Button(TestRushSetup.CardName(i),t,new Vector2(x,y),new Vector2(x+.18f,y+.07f),()=>ChooseEncounter(n)); }
             roster = MenuUI.Text("", t, new Vector2(.04f,.13f), new Vector2(.69f,.29f), 18, MenuUI.Ivory, TextAnchor.UpperLeft);
             MenuUI.Button("Back", t, new Vector2(.04f,.035f), new Vector2(.22f,.105f), Close);
+            readyButton = MenuUI.Button("Ready", t, new Vector2(.45f,.035f), new Vector2(.68f,.105f), ToggleReady);
             startButton = MenuUI.Button("Start fight", t, new Vector2(.72f,.035f), new Vector2(.95f,.105f), StartFight);
-            EventSystem.current.SetSelectedGameObject(hostButton.gameObject); Refresh();
+            BuildNameCard(t);
+            if (LanProfile.Current == null) OpenNameCard(); else EventSystem.current.SetSelectedGameObject(hostButton.gameObject);
+            Refresh();
+        }
+        void BuildNameCard(Transform t)
+        {
+            var shade = MenuUI.Panel("Name card shade", t, Vector2.zero, Vector2.one, new Color(0,0,0,.72f)); shade.raycastTarget = true;
+            nameCard = shade.gameObject; var c = nameCard.transform;
+            MenuUI.Panel("Name card", c, new Vector2(.30f,.33f), new Vector2(.70f,.70f), new Color(.03f,.035f,.06f,1));
+            MenuUI.Text("CHOOSE A NAME", c, new Vector2(.33f,.62f), new Vector2(.67f,.68f), 30, MenuUI.Ivory);
+            MenuUI.Text("Other players see this name in the lobby and over your character. It's saved on this computer.", c, new Vector2(.33f,.555f), new Vector2(.67f,.615f), 16, MenuUI.Ivory);
+            nameField = Field(c, new Vector2(.36f,.48f), new Vector2(.64f,.54f), LanProfile.Saved ?? "");
+            nameField.characterLimit = LanPlayerName.MaxLength + 4;   // room to type spaces that get trimmed
+            nameError = MenuUI.Text("", c, new Vector2(.33f,.43f), new Vector2(.67f,.475f), 16, MenuUI.Gold);
+            MenuUI.Button("Back", c, new Vector2(.36f,.355f), new Vector2(.49f,.415f), Back);
+            nameConfirm = MenuUI.Button("Confirm", c, new Vector2(.51f,.355f), new Vector2(.64f,.415f), ConfirmName);
+            nameCard.SetActive(false);
+        }
+        void OpenNameCard()
+        {
+            if (session) return;   // the lobby already has your name; leave to change it
+            nameField.text = LanProfile.Current ?? LanProfile.Saved ?? ""; nameCard.SetActive(true); nameCard.transform.SetAsLastSibling();
+            EventSystem.current.SetSelectedGameObject(nameField.gameObject); nameField.ActivateInputField();
+        }
+        void ConfirmName()
+        {
+            if (LanProfile.Overridden) { error = "Name set by -lastbellProfile for this run; not saved."; nameCard.SetActive(false); return; }
+            var problem = LanProfile.Save(nameField.text);
+            if (problem != null) { nameError.text = problem; return; }
+            nameCard.SetActive(false); error = null; EventSystem.current.SetSelectedGameObject(hostButton.gameObject);
+        }
+        // Esc / B: closes the name card when a name exists, otherwise leaves Multiplayer.
+        public void Back()
+        {
+            if (NameCardOpen && LanProfile.Current != null) { nameCard.SetActive(false); EventSystem.current.SetSelectedGameObject(editName.gameObject); return; }
+            Close();
+        }
+        void ToggleReady()
+        {
+            if (!session || session.Lobby == null) return;
+            if (!session.Lobby.SetReady(!session.Lobby.LocalReady)) error = "Ready could not be changed.";
+            else error = null;
         }
         static InputField Field(Transform parent, Vector2 min, Vector2 max, string value)
         {
@@ -66,18 +114,21 @@ namespace LastBell.Menu
         void Host()
         {
             if (!Port(out int p)) return;
-            try { session=LanSessionCoordinator.Open(LanLobby.Host(p,BuildId(),hero)); error=null; }
+            if (LanProfile.Current == null) { OpenNameCard(); return; }
+            try { session=LanSessionCoordinator.Open(LanLobby.Host(p,BuildId(),hero,LanProfile.Current)); error=null; }
             catch (Exception e) { error="Could not host: "+e.Message; }
         }
         void Join()
         {
             if (!Port(out int p)) return;
-            try { session=LanSessionCoordinator.Open(LanLobby.Connect(address.text.Trim(),p,BuildId(),hero)); error=null; }
+            if (LanProfile.Current == null) { OpenNameCard(); return; }
+            try { session=LanSessionCoordinator.Open(LanLobby.Connect(address.text.Trim(),p,BuildId(),hero,LanProfile.Current)); error=null; }
             catch (Exception e) { error="Could not connect: "+e.Message; }
         }
         void ChangeClass(int direction)
         {
             int i=Array.IndexOf(RunDirector.Classes,hero); string next=RunDirector.Classes[(i+direction+RunDirector.Classes.Length)%RunDirector.Classes.Length];
+            if (session && session.Lobby.LocalReady) { error="Press Not ready to change class."; return; }
             if (session && !session.Lobby.SetClass(next)) { error="Class could not be changed."; return; }
             hero=next; error=null;
         }
@@ -91,22 +142,31 @@ namespace LastBell.Menu
             if (!session || !session.Lobby.IsHost) return;
             if (!session.Lobby.SetSelection(session.Lobby.Arena,TestRushSetup.CardName(i))) error="Encounter is unavailable.";
         }
-        void StartFight() { if (!session || !session.HostStart()) error="Wait for all players to connect before starting."; }
+        void StartFight() { if (!session || !session.HostStart()) error=session && session.Lobby != null ? session.Lobby.StartBlocker ?? "Could not start." : "Host a lobby first."; }
         public void Close() { if (session) session.Leave(); owner.CloseLan(); Destroy(panel); }
-        void Update() => Refresh();
+        void Update()
+        {
+            if (NameCardOpen && (UnityEngine.InputSystem.Keyboard.current?.enterKey.wasPressedThisFrame == true || UnityEngine.InputSystem.Keyboard.current?.numpadEnterKey.wasPressedThisFrame == true)) ConfirmName();
+            Refresh();
+        }
         void Refresh()
         {
             if (!panel) return;
             var lobby=session ? session.Lobby : null; bool connected=lobby!=null && lobby.Connected; bool hosting=connected && lobby.IsHost;
             hostButton.interactable=joinButton.interactable=lobby==null; address.interactable=port.interactable=lobby==null;
-            classPrev.interactable=classNext.interactable=lobby==null||connected;
+            classPrev.interactable=classNext.interactable=lobby==null||(connected&&!lobby.LocalReady);
+            string me=LanProfile.Current; playingAs.text=me==null?"No name yet":"Playing as "+(connected&&lobby.Local!=null?lobby.Local.Name:me);
+            editName.interactable=lobby==null;
+            if (NameCardOpen) { var problem=LanPlayerName.Problem(nameField.text); nameConfirm.interactable=problem==null; if (problem==null) nameError.text=""; else if (nameField.text.Length>0) nameError.text=problem; }
+            readyButton.interactable=connected && !session.Loading; readyButton.GetComponentInChildren<Text>().text=connected && lobby.LocalReady ? "Not ready" : "Ready";
+            if (connected && lobby.SelectionRevision!=seenSelection) { if (!hosting && seenSelection>=0) selectionNoticeUntil=Time.unscaledTime+4; seenSelection=lobby.SelectionRevision; }
             classLabel.text=hero.ToUpperInvariant();
             for(int i=0;i<maps.Length;i++) maps[i].interactable=hosting && RunMaps.InBuild(i);
             for(int i=0;i<encounters.Length;i++) encounters[i].interactable=hosting && LanLobby.ValidEncounter(TestRushSetup.CardName(i));
-            startButton.interactable=hosting && lobby.Members.Count>=2 && !session.Loading;
+            startButton.interactable=hosting && lobby.CanStart && !session.Loading;
             selection.text=connected ? "Arena: "+RunMaps.All[RunMaps.IndexOf(lobby.Arena)].Name+"   ·   Encounter: "+lobby.Encounter : "";
-            roster.text=connected ? "PLAYERS ("+lobby.Members.Count+" / "+LanLobby.Capacity+")\n"+string.Join("   ",lobby.Members.Select(m=>(m.Id==0?"Host":"Player "+m.Id)+": "+m.ClassName)) : "";
-            status.text=error ?? (lobby==null ? (LanSessionCoordinator.LastError ?? "Host or connect to a trusted local network.") : lobby.Error ?? (session.Loading ? "Loading arena…" : connected ? "Connected. The host selects the arena and encounter." : "Connecting…"));
+            roster.text=connected ? "PLAYERS ("+lobby.Members.Count+" / "+LanLobby.Capacity+")\n"+string.Join("\n",lobby.Members.Select(m=>(m.Id==0?"[Host] ":"")+m.Name+" · "+m.ClassName+(m.Ready?"  · READY":"  · not ready"))) : "";
+            status.text=error ?? (lobby==null ? (LanSessionCoordinator.LastError ?? "Host or connect to a trusted local network.") : lobby.Error ?? (session.Loading ? "Loading arena…" : !connected ? "Connecting…" : Time.unscaledTime<selectionNoticeUntil ? "The host changed the boss or arena. Press Ready again." : hosting ? (lobby.StartBlocker ?? "Everyone is ready. Start when you like.") : "Connected. The host selects the arena and encounter; press Ready when set."));
         }
     }
 }

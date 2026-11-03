@@ -147,15 +147,27 @@ static class Program
                 overflow?.Dispose();
             }
         }
-        using (var lobby = LanLobby.Host(port, "build-a", "Tollbreaker"))
+        Check(LanPlayerName.Normalize("  Bell   Ringer ") == "Bell Ringer", "player name: trimmed, repeated spaces collapsed");
+        Check(LanPlayerName.Valid("Ana") && LanPlayerName.Valid("Toll_Breaker-2") && LanPlayerName.Valid("ab"), "player name: letters, digits, space, _ and - accepted");
+        Check(!LanPlayerName.Valid("A") && !LanPlayerName.Valid("   ") && !LanPlayerName.Valid(null), "player name: too short or empty rejected");
+        Check(!LanPlayerName.Valid("Seventeen chars!!") && !LanPlayerName.Valid("abcdefghijklmnopq"), "player name: over 16 characters rejected");
+        foreach (var bad in new[] { "<b>Ana</b>", "Ana!", "Ãna", "Ana." }) Check(!LanPlayerName.Valid(bad), "player name: markup, symbols and non-ASCII rejected: " + bad + " -> " + LanPlayerName.Problem(bad));
+        Check(LanPlayerName.MakeUnique("Ana", new[] { "ana", "Ana (2)" }) == "Ana (3)" && LanPlayerName.MakeUnique("Bo", new[] { "Ana" }) == "Bo", "player name: host suffixes duplicates (ignoring case)");
+        Check(LanPlayerName.ValidRoster("Ana (2)") && LanPlayerName.ValidRoster("abcdefghijklmnop (4)") && !LanPlayerName.ValidRoster("Ana (1)") && !LanPlayerName.ValidRoster("Ana (x)") && !LanPlayerName.ValidRoster("<i>x</i>"), "player name: roster names allow only the host's suffix");
+        bool badNameRefused = false; try { LanLobby.Host(port, "build-a", "Tollbreaker", "<b>Ana</b>").Dispose(); } catch (ArgumentException) { badNameRefused = true; }
+        Check(badNameRefused, "an invalid local name can't open a lobby");
+        using (var lobby = LanLobby.Host(port, "build-a", "Tollbreaker", "Host"))
         {
             var clients = new LanLobby[LanLobby.MaxClients];
             try
             {
-                for (int i = 0; i < clients.Length; i++) clients[i] = LanLobby.Connect("127.0.0.1", port, "build-a", "Arcanist");
+                string[] joinNames = { "Ana", "ana", "Bo" };
+                for (int i = 0; i < clients.Length; i++) clients[i] = LanLobby.Connect("127.0.0.1", port, "build-a", "Arcanist", joinNames[i]);
                 bool TickUntil(Func<bool> condition) => Wait(() => { lobby.Pump(); foreach (var c in clients) c.Pump(); return condition(); });
                 Check(TickUntil(() => lobby.Members.Count == 4 && Array.TrueForAll(clients, c => c.Connected && c.Members.Count == 4)), "lobby admits host and three clients with complete roster");
-                using (var fourth = LanLobby.Connect("127.0.0.1", port, "build-a", "Tollbreaker"))
+                Check(Array.TrueForAll(clients, c => string.Join(",", System.Linq.Enumerable.OrderBy(System.Linq.Enumerable.Select(c.Members, m => m.Name.ToLowerInvariant()), n => n, StringComparer.Ordinal)) == "ana,ana (2),bo,host"), "names reach every client; the host suffixes a duplicate name (join order varies)");
+                Check(Array.TrueForAll(clients, c => System.Linq.Enumerable.All(c.Members, m => !m.Ready)) && !lobby.AllMembersReady, "everyone joins not ready");
+                using (var fourth = LanLobby.Connect("127.0.0.1", port, "build-a", "Tollbreaker", "Fourth"))
                 {
                     Check(TickUntil(() => { fourth.Pump(); return fourth.Error != null; }) && !fourth.Connected, "fourth client is rejected when the group is full");
                     Check(fourth.Error.Contains("full"), "rejected client is told the group may be full: " + fourth.Error);
@@ -166,15 +178,40 @@ static class Program
                 Check(clients[0].SetClass("Chimesinger"), "client requests class");
                 int memberId = clients[0].LocalId;
                 Check(TickUntil(() => Array.TrueForAll(clients, c => c.Arena == "metronome-court" && c.Encounter == "Tempo Tyrant" && System.Linq.Enumerable.Any(c.Members, m => m.Id == memberId && m.ClassName == "Chimesinger"))), "host selection and class propagate to all clients");
+                Check(clients[0].SetReady(true) && clients[0].LocalReady, "client readies");
+                Check(TickUntil(() => Array.TrueForAll(clients, c => System.Linq.Enumerable.Any(c.Members, m => m.Id == memberId && m.Ready))), "Ready reaches every client");
+                Check(!clients[0].SetClass("Arcanist"), "Ready locks the class");
+                Check(!lobby.CanStart && !lobby.Start() && lobby.StartBlocker.StartsWith("Waiting for"), "host can't start while players aren't ready: " + lobby.StartBlocker);
+                Check(lobby.SetReady(true) && clients[1].SetReady(true) && clients[2].SetReady(true), "everyone else readies");
+                Check(TickUntil(() => lobby.CanStart && Array.TrueForAll(clients, c => c.AllMembersReady)), "host can start once all four are ready");
+                int selection0 = clients[1].SelectionRevision;
+                Check(lobby.SetSelection("metronome-court", "Tempo Tyrant") && lobby.AllMembersReady, "re-choosing the same boss and arena keeps Ready");
+                Check(lobby.SetSelection("metronome-court", "Pendulum Sentinel") && !lobby.CanStart, "changing the boss clears Ready on the host");
+                Check(TickUntil(() => Array.TrueForAll(clients, c => c.SelectionRevision > selection0 && System.Linq.Enumerable.All(c.Members, m => !m.Ready) && !c.LocalReady)), "clients see the boss change and everyone un-readied");
+                Check(clients[0].SetClass("Arcanist") && TickUntil(() => System.Linq.Enumerable.Any(lobby.Members, m => m.Id == memberId && m.ClassName == "Arcanist")), "un-readied players can change class again");
+                Check(lobby.SetReady(true) && clients[0].SetReady(true) && clients[1].SetReady(true) && clients[2].SetReady(true) && TickUntil(() => lobby.CanStart), "all ready again");
                 clients[2].Dispose();
                 Check(TickUntil(() => lobby.Members.Count == 3 && clients[0].Members.Count == 3), "disconnect removes peer and updates roster");
-                using (var wrong = LanLobby.Connect("127.0.0.1", port, "different-build", "Tollbreaker"))
+                using (var wrong = LanLobby.Connect("127.0.0.1", port, "different-build", "Tollbreaker", "Wrong"))
                 {
                     Check(Wait(() => { lobby.Pump(); wrong.Pump(); return wrong.Error != null; }), "different build is rejected");
                     Check(lobby.Members.Count == 3, "rejected build never joins roster");
                 }
-                clients[2] = LanLobby.Connect("127.0.0.1", port, "build-a", "Tollbreaker");
+                Check(lobby.CanStart, "a player leaving doesn't un-ready the others");
+                var old = LanConnection.Connect("127.0.0.1", port);
+                try
+                {
+                    Check(Wait(() => old.State == ConnectionState.Connected), "protocol-3 client connects");
+                    using (var ms = new System.IO.MemoryStream()) using (var w = new System.IO.BinaryWriter(ms, Encoding.UTF8))
+                    { w.Write((byte)1); w.Write((byte)3); w.Write("build-a"); w.Write("Arcanist"); w.Flush(); old.Send(ms.ToArray()); }
+                    Check(TickUntil(() => old.State == ConnectionState.Closed || old.State == ConnectionState.Failed) && lobby.Members.Count == 3, "a protocol-3 client is refused and never joins");
+                }
+                finally { old.Dispose(); }
+                clients[2] = LanLobby.Connect("127.0.0.1", port, "build-a", "Tollbreaker", "Ana");
                 Check(TickUntil(() => lobby.Members.Count == 4 && clients[2].Connected && Array.TrueForAll(clients, c => c.Members.Count == 4)), "a freed slot can be filled again up to four players");
+                Check(System.Linq.Enumerable.Any(lobby.Members, m => m.Name == "Ana (3)" && !m.Ready) && !lobby.CanStart && lobby.StartBlocker == "Waiting for 1 to ready.", "a new joiner starts not ready, so Start locks again");
+                Check(System.Linq.Enumerable.Count(lobby.Members, m => m.Ready) == 3, "players already ready stay ready when someone joins");
+                Check(clients[2].SetReady(true) && TickUntil(() => lobby.CanStart), "Start unlocks when the joiner readies");
                 int inputFrom = -1, inputSeq = -1, worldTick = -1; byte[] inputData = null, worldData = null;
                 lobby.InputReceived += (id, seq, data) => { inputFrom = id; inputSeq = seq; inputData = data; };
                 clients[0].WorldReceived += (tick, data) => { worldTick = tick; worldData = data; };

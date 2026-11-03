@@ -18,7 +18,7 @@ $hostProc = $null; $clients = [System.Collections.Generic.List[System.Diagnostic
 $clientOutputs = [System.Collections.Generic.List[string]]::new()
 try {
     $common = @('-timestamps','-screen-fullscreen','0','-screen-width','1280','-screen-height','720','-lastbellLanPort',"$port",'-lastbellLanClientClass',$ClientClass)
-    $hostArgs = $common + @('-lastbellLanSmokeHost','-lastbellLanPeerCount',"$PeerCount",'-lastbellLanBoss',('"'+$Boss+'"'),'-lastbellLanArena',$Arena,'-lastbellOut',('"'+$hostOut+'"'),'-logFile',('"'+$hostLog+'"'))
+    $hostArgs = $common + @('-lastbellProfile','Host','-lastbellLanSmokeHost','-lastbellLanPeerCount',"$PeerCount",'-lastbellLanBoss',('"'+$Boss+'"'),'-lastbellLanArena',$Arena,'-lastbellOut',('"'+$hostOut+'"'),'-logFile',('"'+$hostLog+'"'))
     $hostProc = Start-Process -FilePath $Player -ArgumentList $hostArgs -WindowStyle Hidden -PassThru
     $deadline = [DateTime]::UtcNow.AddSeconds(75)
     $ready = $false
@@ -33,7 +33,7 @@ try {
         New-Item -ItemType Directory -Path $clientOut | Out-Null
         $clientOutputs.Add($clientOut)
         $clientLog = Join-Path $clientOut 'player.log'
-        $clientArgs = $common + @('-lastbellLanSmokeClient','-lastbellOut',('"'+$clientOut+'"'),'-logFile',('"'+$clientLog+'"'))
+        $clientArgs = $common + @('-lastbellProfile',"Client-$i",'-lastbellLanSmokeClient','-lastbellOut',('"'+$clientOut+'"'),'-logFile',('"'+$clientLog+'"'))
         $clients.Add((Start-Process -FilePath $Player -ArgumentList $clientArgs -WindowStyle Hidden -PassThru))
         if ($PeerCount -gt 1) { Start-Sleep -Milliseconds 500 }
     }

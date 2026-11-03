@@ -478,7 +478,7 @@ namespace LastBell.Menu
             if(MenuFlowTest.Requested&&MenuSmokeTest.TestKeyboard!=null)back|=MenuSmokeTest.TestKeyboard.escapeKey.wasPressedThisFrame||MenuSmokeTest.TestGamepad.buttonEast.wasPressedThisFrame;
             if(back){
 #if LASTBELL_LAN_TEST
-                if(LanPanel)LanPanel.Close();else
+                if(LanPanel)LanPanel.Back();else
 #endif
                 if(Rush)Rush.Back();else if(ResolutionListOpen)CloseResolutionList();else if(SettingsOpen)CloseSettings();}
             KeepResolutionInView();

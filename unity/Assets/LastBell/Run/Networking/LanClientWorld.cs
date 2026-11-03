@@ -285,8 +285,13 @@ namespace LastBell.Run.Networking
                 if (pair.Key == lobby.LocalId) continue;
                 var point = cam.WorldToScreenPoint(pair.Value.Player.transform.position + Vector3.up * (2.3f + pair.Value.ShownHeight));
                 if (point.z <= 0) continue;
-                GUI.Label(new Rect(point.x - 90, Screen.height - point.y - 24, 180, 24), pair.Key == 0 ? "Host" : "Player " + pair.Key, nameStyle);
+                GUI.Label(new Rect(point.x - 90, Screen.height - point.y - 24, 180, 24), NameOf(pair.Key), nameStyle);
             }
+        }
+        string NameOf(int id)
+        {
+            foreach (var m in lobby.Members) if (m.Id == id && !string.IsNullOrEmpty(m.Name)) return m.Name;
+            return id == 0 ? "Host" : "Player " + id;
         }
         void OnDestroy()
         {

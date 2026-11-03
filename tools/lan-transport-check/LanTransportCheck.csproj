@@ -9,6 +9,7 @@
     <Compile Include="UnityInputStubs.cs" />
     <Compile Include="../../unity/Assets/LastBell/Run/Networking/LanConnection.cs" Link="LanConnection.cs" />
     <Compile Include="../../unity/Assets/LastBell/Run/Networking/LanLobby.cs" Link="LanLobby.cs" />
+    <Compile Include="../../unity/Assets/LastBell/Run/Networking/LanPlayerName.cs" Link="LanPlayerName.cs" />
     <Compile Include="../../unity/Assets/LastBell/Run/Networking/LanInputFrame.cs" Link="LanInputFrame.cs" />
     <Compile Include="../../unity/Assets/LastBell/Run/Networking/LanUnityInput.cs" Link="LanUnityInput.cs" />
     <Compile Include="../../unity/Assets/LastBell/Run/Networking/LanHostRoster.cs" Link="LanHostRoster.cs" />

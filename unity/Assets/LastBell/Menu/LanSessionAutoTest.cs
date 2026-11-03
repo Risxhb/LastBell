@@ -44,7 +44,9 @@ namespace LastBell.Menu
         {
             yield return new WaitForSecondsRealtime(1);
             LanSessionCoordinator session=null;
-            try { session=LanSessionCoordinator.Open(host ? LanLobby.Host(Port(),LanMenuPanel.BuildId(),"Tollbreaker") : LanLobby.Connect("127.0.0.1",Port(),LanMenuPanel.BuildId(),ClientClass)); }
+            // Names come from -lastbellProfile (Run-TwoProcess.ps1 passes Host, Client 1..3); never from the saved profile.
+            string myName=LanProfile.Overridden ? LanProfile.Current : host ? "Host" : "Client";
+            try { session=LanSessionCoordinator.Open(host ? LanLobby.Host(Port(),LanMenuPanel.BuildId(),"Tollbreaker",myName) : LanLobby.Connect("127.0.0.1",Port(),LanMenuPanel.BuildId(),ClientClass,myName)); }
             catch(Exception ex) { Check("open LAN: "+ex.Message,false); Finish(); yield break; }
             Debug.Log(host ? "[LAN smoke] HOST READY" : "[LAN smoke] CLIENT CONNECTING");
             int peerCount=PeerCount(); float until=Time.realtimeSinceStartup+90;
@@ -52,13 +54,37 @@ namespace LastBell.Menu
             bool joined=session && session.Lobby != null && (host ? session.Lobby.Members.Count==peerCount+1 : session.Lobby.Connected);
             Check("host and client join lobby",joined);
             if (!joined) { Finish(); yield break; }
+            Check("lobby shows this player's name",session.Lobby.Local!=null && session.Lobby.Local.Name.StartsWith(myName,StringComparison.Ordinal));
             if (host)
             {
-                Check("host selects requested arena and encounter",session.Lobby.SetSelection(Argument("-lastbellLanArena","test"),Argument("-lastbellLanBoss","Bellkeeper")));
+                var lobby=session.Lobby; string arena=Argument("-lastbellLanArena","test"), boss=Argument("-lastbellLanBoss","Bellkeeper");
+                Check("every player arrives with a name",lobby.Members.All(m=>LanPlayerName.ValidRoster(m.Name)) && lobby.Members.Select(m=>m.Name).Distinct().Count()==lobby.Members.Count);
+                Check("host selects requested arena and encounter",lobby.SetSelection(arena,boss));
+                Check("host can't start before everyone is ready",!session.HostStart() && !lobby.CanStart);
+                until=Time.realtimeSinceStartup+60;
+                while (lobby.Members.Any(m=>m.Id!=0&&!m.Ready) && Time.realtimeSinceStartup<until) yield return null;
+                Check("clients press Ready",lobby.Members.All(m=>m.Id==0||m.Ready));
+                Check("host still can't start until the host is ready",!lobby.CanStart && lobby.SetReady(true) && lobby.CanStart);
+                // Change the boss and back: everyone is un-readied each time and must ready again.
+                string other=boss=="Bellkeeper"?"Tempo Tyrant":"Bellkeeper";
+                Check("changing the boss un-readies everyone",lobby.SetSelection(arena,other) && lobby.Members.All(m=>!m.Ready) && !lobby.CanStart);
+                Check("host returns to the requested boss",lobby.SetSelection(arena,boss) && lobby.SetReady(true));
+                until=Time.realtimeSinceStartup+60;
+                while (!lobby.CanStart && Time.realtimeSinceStartup<until) yield return null;
+                Check("everyone readies again after the boss change",lobby.CanStart);
                 Check("host begins session",session.HostStart());
             }
+            int clientSelections=0;
             until=Time.realtimeSinceStartup+90;
-            while (session && !session.InFight && Time.realtimeSinceStartup<until) yield return null;
+            while (session && !session.InFight && Time.realtimeSinceStartup<until)
+            {
+                // Automated client: press Ready whenever the host's lobby shows this player as not ready.
+                var lobby=session.Lobby;
+                if (!host && lobby!=null && lobby.Connected && !lobby.FightStarted && !lobby.LocalReady) lobby.SetReady(true);
+                if (!host && lobby!=null) clientSelections=Mathf.Max(clientSelections,lobby.SelectionRevision);
+                yield return null;
+            }
+            if (!host) Check("client saw the host change the boss (Ready cleared and pressed again)",clientSelections>=2);
             Check("both players load arena",session && session.InFight);
             if (!session || !session.InFight) { Finish(); yield break; }
             if (host) yield return HostFight(session); else yield return ClientFight(session);

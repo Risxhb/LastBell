@@ -22,7 +22,7 @@ namespace LastBell.Run.Networking
             foreach (var member in lobby.Members)
             {
                 if (member.Id == 0) continue;
-                remote.Add(new LanLobby.Member { Id = member.Id, ClassName = member.ClassName });
+                remote.Add(new LanLobby.Member { Id = member.Id, Name = member.Name, ClassName = member.ClassName, Ready = member.Ready });
                 inputs.Add(member.Id, new LanRemoteInput());
             }
             remote.Sort((a, b) => a.Id.CompareTo(b.Id));
