@@ -412,7 +412,8 @@ namespace LastBell.Run
         void WarmFont(Font font, int size, FontStyle style, GUIContent warmText)
         {
             if (font == null) font = GUI.skin.font;
-            if (font != null && font.dynamic) font.RequestCharactersInTexture(warmText.text, size, style);
+            // no Font.RequestCharactersInTexture: IMGUI lays text out through TextCore, and that legacy call only made the legacy
+            // font textures rebuild about 7 times per warm-up (smoke 24, -lastbellFontLog)
             if (warmSt == null) warmSt = new GUIStyle(GUI.skin.label) { wordWrap = false, richText = false, clipping = TextClipping.Overflow };
             warmSt.font = font; warmSt.fontSize = size; warmSt.fontStyle = style;
             var sz = warmSt.CalcSize(warmText);
