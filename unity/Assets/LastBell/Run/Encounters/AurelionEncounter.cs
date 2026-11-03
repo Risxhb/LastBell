@@ -59,6 +59,8 @@ namespace LastBell.Run
             PhaseName = "Perfect Order";
             presenter = CharacterPresenter.Create(transform, "Aurelion", 3f, 0.8f, 0, host => { BuildStandIn(host); return host; });
             BindAbilities();
+            // the orrery rings are built here, before the fight, and reused (perf capture 3 Nov: building them mid-fight spiked a frame)
+            OrreryClosingFx.Warm(W); ZenithCollapseFx.Warm(W);
         }
 
         void BuildStandIn(Transform host)

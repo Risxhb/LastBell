@@ -70,24 +70,50 @@ namespace LastBell.Run
         public float LeadRadius { get; private set; }
         public float MinRadiusSeen { get; private set; } = float.MaxValue;
 
-        public static ZenithCollapseFx Create(CombatWorld world, Hazard hazard)
+        // Pooled like OrreryClosingFx (perf capture 3 Nov): about 270 pieces are built once when the boss is built, and a
+        // cast reuses a hidden set instead of making and destroying them inside one tick.
+        static readonly List<ZenithCollapseFx> pool = new List<ZenithCollapseFx>();
+        public static void Warm(CombatWorld world) { if (Free(world) == null) Build(world).gameObject.SetActive(false); }
+        static ZenithCollapseFx Free(CombatWorld world)
+        {
+            pool.RemoveAll(f => f == null);
+            foreach (var f in pool) if (f.w == world && !f.gameObject.activeSelf) return f;
+            return null;
+        }
+        static ZenithCollapseFx Build(CombatWorld world)
         {
             var go = new GameObject("Zenith Collapse fx"); go.transform.SetParent(world.Root, false);
-            go.transform.position = new Vector3(hazard.Origin.x, 0.05f, hazard.Origin.z);
-            var fx = go.AddComponent<ZenithCollapseFx>(); fx.w = world; fx.h = hazard; fx.mat = Prim.Material(Gold, 1f);
-            float rim = AurelionAbility.Rim;
-            int n = Mathf.CeilToInt(2 * Mathf.PI * rim / 0.9f);
+            var fx = go.AddComponent<ZenithCollapseFx>(); fx.w = world; fx.mat = Prim.Material(Gold, 1f);
+            int n = Mathf.CeilToInt(2 * Mathf.PI * AurelionAbility.Rim / 0.9f);
             for (int j = 0; j < Rings; j++)
             {
-                var o = new Ring { Start = Mathf.Max(hazard.Inner + 0.5f, rim - j * Spread), Spin = j % 2 == 0 ? 1 : -1, Segs = new Transform[n] };
+                var o = new Ring { Spin = j % 2 == 0 ? 1 : -1, Segs = new Transform[n] };
                 o.Root = new GameObject("Zenith orrery ring").transform; o.Root.SetParent(go.transform, false);
                 for (int k = 0; k < n; k++)
                     fx.Share(o.Segs[k] = Prim.Make(PrimitiveKind.Cube, o.Root, Vector3.zero, Vector3.one, Gold, 0, Quaternion.Euler(0, k * 360f / n + 90, 0)));
                 o.Bead = Prim.Make(PrimitiveKind.Sphere, o.Root, Vector3.zero, Vector3.one * 0.3f, Gold);
                 fx.Share(o.Bead);
                 fx.rings.Add(o);
+            }
+            pool.Add(fx);
+            return fx;
+        }
+
+        public static ZenithCollapseFx Create(CombatWorld world, Hazard hazard)
+        {
+            var fx = Free(world) ?? Build(world);
+            fx.h = hazard; fx.fade = -1; fx.LeadRadius = 0; fx.MinRadiusSeen = float.MaxValue;
+            fx.transform.position = new Vector3(hazard.Origin.x, 0.05f, hazard.Origin.z);
+            fx.mat.SetColor("_EmissionColor", Gold * 0.4f);
+            float rim = AurelionAbility.Rim;
+            for (int j = 0; j < fx.rings.Count; j++)
+            {
+                var o = fx.rings[j];
+                o.Start = Mathf.Max(hazard.Inner + 0.5f, rim - j * Spread); o.Turn = 0;
+                o.Root.localRotation = Quaternion.identity;
                 fx.Place(o, o.Start);
             }
+            fx.gameObject.SetActive(true);
             Latest = fx;
             return fx;
         }
@@ -119,7 +145,7 @@ namespace LastBell.Run
                 fade -= dt * 1.6f;
                 mat.SetColor("_EmissionColor", Gold * Mathf.Max(0, fade) * 6f);
                 transform.position += Vector3.down * dt * 0.5f;
-                if (fade <= 0) Destroy(gameObject);
+                if (fade <= 0) gameObject.SetActive(false);   // back to the pool
                 return;
             }
             float k = Mathf.Clamp01(h.Age / (float)Mathf.Max(1, h.ResolveAt));
