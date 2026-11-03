@@ -81,7 +81,15 @@ namespace LastBell.Run
         // Pooled (perf capture 3 Nov: building ~170 pieces and their materials inside one tick cost a 24-29 ms frame early
         // in Phase 2). Warm builds one set when the boss is built; a cast reuses a hidden set and hides it again when done.
         static readonly List<OrreryClosingFx> pool = new List<OrreryClosingFx>();
-        public static void Warm(CombatWorld world) { if (Free(world) == null) Build(world).gameObject.SetActive(false); }
+        // the warm set is drawn for a couple of frames under the floor first, so its meshes and material upload before the
+        // fight (perf 3 Nov: built but first drawn mid-fight, it still cost a 24 ms GPU frame)
+        int warmFrames;
+        public static void Warm(CombatWorld world)
+        {
+            if (Free(world) != null) return;
+            var fx = Build(world); fx.warmFrames = 3;
+            foreach (var o in fx.rings) o.Root.position = new Vector3(0, -3f, 0);
+        }
         static OrreryClosingFx Free(CombatWorld world)
         {
             pool.RemoveAll(f => f == null);
@@ -101,7 +109,7 @@ namespace LastBell.Run
         public static void Create(CombatWorld world, Hazard rim, Hazard crown, int horizonTicks)
         {
             var fx = Free(world) ?? Build(world);
-            fx.horizon = horizonTicks;
+            fx.horizon = horizonTicks; fx.warmFrames = 0;
             fx.Begin(fx.rings[0], rim); fx.Begin(fx.rings[1], crown);
             fx.gameObject.SetActive(true);
         }
@@ -136,6 +144,7 @@ namespace LastBell.Run
 
         void Update()
         {
+            if (warmFrames > 0) { if (--warmFrames == 0) gameObject.SetActive(false); return; }
             float dt = Time.deltaTime;
             bool any = false;
             foreach (var o in rings)

@@ -73,7 +73,15 @@ namespace LastBell.Run
         // Pooled like OrreryClosingFx (perf capture 3 Nov): about 270 pieces are built once when the boss is built, and a
         // cast reuses a hidden set instead of making and destroying them inside one tick.
         static readonly List<ZenithCollapseFx> pool = new List<ZenithCollapseFx>();
-        public static void Warm(CombatWorld world) { if (Free(world) == null) Build(world).gameObject.SetActive(false); }
+        // drawn for a couple of frames under the floor first so it uploads before the fight (see OrreryClosingFx.Warm)
+        int warmFrames;
+        public static void Warm(CombatWorld world)
+        {
+            if (Free(world) != null) return;
+            var fx = Build(world); fx.warmFrames = 3;
+            fx.transform.position = new Vector3(0, -3f, 0);
+            foreach (var o in fx.rings) fx.Place(o, AurelionAbility.Rim - 1f);
+        }
         static ZenithCollapseFx Free(CombatWorld world)
         {
             pool.RemoveAll(f => f == null);
@@ -102,7 +110,7 @@ namespace LastBell.Run
         public static ZenithCollapseFx Create(CombatWorld world, Hazard hazard)
         {
             var fx = Free(world) ?? Build(world);
-            fx.h = hazard; fx.fade = -1; fx.LeadRadius = 0; fx.MinRadiusSeen = float.MaxValue;
+            fx.h = hazard; fx.fade = -1; fx.warmFrames = 0; fx.LeadRadius = 0; fx.MinRadiusSeen = float.MaxValue;
             fx.transform.position = new Vector3(hazard.Origin.x, 0.05f, hazard.Origin.z);
             fx.mat.SetColor("_EmissionColor", Gold * 0.4f);
             float rim = AurelionAbility.Rim;
@@ -137,6 +145,7 @@ namespace LastBell.Run
 
         void Update()
         {
+            if (warmFrames > 0) { if (--warmFrames == 0) gameObject.SetActive(false); return; }
             float dt = Time.deltaTime;
             bool live = w != null && w.Hazards.Live.Contains(h) && !h.Cancelled;
             if (!live && fade < 0) fade = h.Age >= h.ResolveAt ? 1f : 0.4f;   // resolved: flash; cleared early: dim

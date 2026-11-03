@@ -59,8 +59,10 @@ namespace LastBell.Run
             PhaseName = "Perfect Order";
             presenter = CharacterPresenter.Create(transform, "Aurelion", 3f, 0.8f, 0, host => { BuildStandIn(host); return host; });
             BindAbilities();
-            // the orrery rings are built here, before the fight, and reused (perf capture 3 Nov: building them mid-fight spiked a frame)
+            // the orrery rings and the label glyphs are warmed here, before the fight (perf captures 3 Nov: first built, drawn
+            // or lettered mid-fight, each spiked a frame)
             OrreryClosingFx.Warm(W); ZenithCollapseFx.Warm(W);
+            gameObject.AddComponent<AurelionWarmUp>();
         }
 
         void BuildStandIn(Transform host)
