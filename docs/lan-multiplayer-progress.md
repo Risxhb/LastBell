@@ -40,7 +40,7 @@ Goal (user): a client should play the game the way the host does.
 - Prediction drew the client's own character 0.2–0.9 m ahead of the host's last state while moving. The snapshot frame-rate log shows hosts at 21–44 fps on this machine.
 - The .NET harness passes 171/171 (two new effect wire checks).
 
-Not covered yet: the Tempo Tyrant's music (it follows the boss's beat clock, which the replica doesn't run), Aurelion's effect components (Last Light floor, Total Eclipse, Zenith Collapse, Orrery Closing), boss-specific HUD details that read private boss state, and effects any other boss draws without these entry points.
+Not covered yet: Aurelion's effect components (Last Light floor, Total Eclipse, Zenith Collapse, Orrery Closing), boss-specific HUD details that read private boss state, and effects any other boss draws without these entry points.
 
 ## November 2 (evening): client HUD, abilities and lag after the first playtest
 
@@ -120,3 +120,5 @@ The original `RunDirector` creates a local player and bot allies and advances it
 ## Check
 
 `dotnet run --project tools/lan-transport-check/LanTransportCheck.csproj` exercises actual host/client TCP sockets on loopback in one process, including framing/order, reply, invalid sizes, disconnect, connection failure and port reuse. It uses the installed .NET 10 SDK; this is not a Unity player test. The network sandbox denied the first loopback connection; the test passed outside it. Still needed: a Unity build, actual two-instance gameplay and a two-machine LAN test, including firewall and disconnect behavior.
+
+November 3, 2026 (later): LAN clients now play boss music (the replica's state changes reach `MenuMusic`), and the Tempo Tyrant's music follows the host's tempo from the beat sent in each world frame (`36c8adc`).
