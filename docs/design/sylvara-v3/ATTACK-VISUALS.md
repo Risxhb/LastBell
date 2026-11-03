@@ -64,4 +64,4 @@ Status: **proposal**. Chzy18 asked on 1 Nov to "build out the animation and mode
 ## Open questions
 1. **Petal look:** one petal shape for every phase, or a different shape per phase (round petal in P1, pointed in P4)?
 2. **Bell-flower buds:** should they be modelled from the reference sheet (Blender, like the arena props), or should Chzy18 run them through Meshy like the boss?
-3. **Second form (P3–P4):** the sheet shows the mask split open with turquoise light. That's a model change (a split mask mesh), not a clip. Include it in this pass, or keep it for later?
+3. **Second form (P3–P4):** done as recommended (2 Nov, review later): the mask is cut down its middle onto two hinge bones (`mask.L`, `mask.R`). From Phase 3 on, Unity swings each half 16° outward and slides it 9 cm apart over 1.5 s, after the clip has posed her, so every clip keeps it open. A turquoise core and light glow in the gap. Sheet: `visuals/second-form-mask.png` (rendered by `sylvara_mask_sheet.py`). It needs the next `sylvara-assets` pack; an older model keeps the mask shut.

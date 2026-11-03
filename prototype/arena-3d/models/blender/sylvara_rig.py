@@ -27,6 +27,9 @@ B = {  # name: (head, tail, parent, deform)
     'upperarm.L': ((0.8, -0.1, 3.1), (1.3, -0.25, 2.25), 'chest', True),
     'forearm.L': ((1.3, -0.25, 2.25), (1.6, -0.45, 1.6), 'upperarm.L', True),
     'hand.L': ((1.6, -0.45, 1.6), (1.75, -0.6, 0.85), 'forearm.L', True),
+    # the mask's two halves (second form, P3-P4): vertical hinges at each half's outer back edge; Unity swings them open
+    'mask.L': ((0.42, -0.52, 3.0), (0.42, -0.52, 3.6), 'head', True),
+    'mask.R': ((-0.18, -0.52, 3.0), (-0.18, -0.52, 3.6), 'head', True),
 }
 # four root legs: hip, knee, ankle (feet from sylvara_prep's FEET), and the knee's bend direction
 LEG = {
@@ -63,7 +66,7 @@ def verts():
 def distance_weights(c):
     D = np.full((len(c), len(names)), 1e9, np.float32)
     for n in names:
-        if n == 'head': continue          # the head only takes the mask (pinned below), not the torso around it
+        if n == 'head' or n.startswith('mask'): continue   # the head and mask bones only take the mask (pinned below)
         h, t = np.array(B[n][0], float), np.array(B[n][1], float); v = t - h
         u = np.clip(((c - h) @ v) / (v @ v), 0, 1)
         D[:, gi[n]] = np.linalg.norm(c - (h + u[:, None] * v), axis=1)
@@ -72,10 +75,15 @@ def distance_weights(c):
 # Each arm hangs along its front leg and the shell bridges them with faces, which stretch into sheets when an arm lifts.
 # Split the mesh along every edge where an arm face meets a leg face, then keep arm vertices off leg bones and back.
 dom = distance_weights(verts()).argmax(1)
-kind = np.where(arm_cols[dom], 1, np.where(leg_cols[dom], 2, 0))   # 1 arm, 2 leg, 0 body
+kind = np.where(arm_cols[dom], 1, np.where(leg_cols[dom], 2, 0))   # 1 arm, 2 leg, 0 body, 3/4 mask left/right half
+c0 = verts(); MASK_X = 0.12
+in_mask = (c0[:, 2] > 2.95) & (c0[:, 1] < -0.45) & (np.abs(c0[:, 0] - MASK_X) < 0.35)
+kind = np.where(in_mask, np.where(c0[:, 0] > MASK_X, 3, 4), kind)
 bm = bmesh.new(); bm.from_mesh(me); bm.faces.ensure_lookup_table()
-face_kind = {f.index: int(np.bincount([kind[v.index] for v in f.verts], minlength=3).argmax()) for f in bm.faces}
-seam = [e for e in bm.edges if len(e.link_faces) == 2 and {face_kind[f.index] for f in e.link_faces} == {1, 2}]
+face_kind = {f.index: int(np.bincount([kind[v.index] for v in f.verts], minlength=5).argmax()) for f in bm.faces}
+# ... and cut the mask free of the hood and down its middle, so its halves open without stretching faces
+def cut(ks): return ks == {1, 2} or (len(ks) == 2 and bool(ks & {3, 4}))
+seam = [e for e in bm.edges if len(e.link_faces) == 2 and cut({face_kind[f.index] for f in e.link_faces})]
 bmesh.ops.split_edges(bm, edges=seam)
 bm.faces.ensure_lookup_table(); bm.verts.ensure_lookup_table()
 vkinds = [{face_kind[f.index] for f in v.link_faces} for v in bm.verts]   # split keeps face indices
@@ -123,6 +131,9 @@ print('HOOK_PIECES', hooks)
 # the mask is ivory stone: keep it rigid on the head
 mask = (z > 2.95) & (y < -0.45) & (np.abs(x - 0.12) < 0.35)
 W[mask] = row(head=1)
+half_L = np.array([k == {3} for k in vkinds]); half_R = np.array([k == {4} for k in vkinds])
+W[half_L] = row(mask_L=1); W[half_R] = row(mask_R=1)
+print('MASK_HALVES', int(half_L.sum()), int(half_R.sum()))
 print('PINNED fork', int(fork.sum()), 'claw', int(claw.sum()), 'mask', int(mask.sum()))
 order = np.argsort(-W, 1); keep = np.zeros_like(W, bool); np.put_along_axis(keep, order[:, :4], True, 1)
 W = np.where(keep, W, 0); s = W.sum(1, keepdims=True); W = np.where(s > 0, W / np.maximum(s, 1e-6), 0)

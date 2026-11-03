@@ -158,6 +158,16 @@ namespace LastBell.Run
                 return host;
             });
             PhaseName = PhaseNames[0];
+            if (presenter && presenter.HasModel)
+            {
+                maskBoneL = FindDeep(presenter.transform, "mask.L"); maskBoneR = FindDeep(presenter.transform, "mask.R"); maskHead = FindDeep(presenter.transform, "head");
+                if (HasMaskBones)
+                {
+                    maskCore = Prim.Make(PrimitiveKind.Sphere, transform, Vector3.zero, Vector3.one * 0.1f, Turquoise, 1.6f);
+                    maskGlow = MakeLight("Mask Core", Turquoise, 0, 2.5f);
+                    maskCore.gameObject.SetActive(false); maskGlow.enabled = false;
+                }
+            }
             frontLight = MakeLight("Front Light", new Color(1f, 0.95f, 0.86f), FrontIntensity, 6.5f);
             rimLight = MakeLight("Rim Light", new Color(0.55f, 1f, 0.92f), RimIntensity, 6.5f);
             PlaceLights();
@@ -188,6 +198,39 @@ namespace LastBell.Run
             phase = 0; PhaseName = PhaseNames[n - 1];
             if (shoulderFlowers) shoulderFlowers.gameObject.SetActive(n >= 2);
             if (n >= 3 && maskL) { maskL.localPosition = new Vector3(-0.32f, 3.65f, 0.2f); maskR.localPosition = new Vector3(0.32f, 3.65f, 0.2f); }
+            maskTarget = MaskOpen = n >= 3 ? 1 : 0;
+        }
+
+        // Second form (P3-P4; done as recommended 2 Nov, review later): the model's mask halves (bones mask.L / mask.R from
+        // sylvara_rig.py) swing 16 degrees outward on their outer hinges and slide apart, and a turquoise core glows in the gap.
+        // Applied after the presenter has posed her, so every clip keeps the mask open. A model without the bones keeps it shut.
+        Transform maskBoneL, maskBoneR, maskHead, maskCore; Light maskGlow; float maskTarget, maskSign;
+        public float MaskOpen { get; private set; }
+        public bool HasMaskBones => maskBoneL && maskBoneR && maskHead;
+        static Transform FindDeep(Transform t, string name)
+        {
+            if (t.name == name) return t;
+            foreach (Transform c in t) { var f = FindDeep(c, name); if (f) return f; }
+            return null;
+        }
+        void LateUpdate()
+        {
+            if (!HasMaskBones) return;
+            MaskOpen = Mathf.MoveTowards(MaskOpen, maskTarget, Time.deltaTime / 1.5f);
+            Vector3 l = maskBoneL.position, r = maskBoneR.position, mid = (l + r) / 2, up = transform.up;
+            Vector3 side = Vector3.ProjectOnPlane(l - r, up), fwd = Vector3.ProjectOnPlane(mid - maskHead.position, up).normalized;
+            if (maskSign == 0)   // which way round the hinge opens the halves forward and out, whatever the import axes
+            {
+                var v = Vector3.ProjectOnPlane(mid - l, up);
+                maskSign = Vector3.Dot(Quaternion.AngleAxis(10, up) * v, fwd) > Vector3.Dot(v, fwd) ? 1 : -1;
+            }
+            float deg = 16 * MaskOpen; var slide = side * (0.15f * MaskOpen);   // 9 cm per half on her 0.6 m mask
+            maskBoneL.rotation = Quaternion.AngleAxis(maskSign * deg, up) * maskBoneL.rotation; maskBoneL.position = l + slide;
+            maskBoneR.rotation = Quaternion.AngleAxis(-maskSign * deg, up) * maskBoneR.rotation; maskBoneR.position = r - slide;
+            bool on = MaskOpen > 0.01f;
+            maskCore.gameObject.SetActive(on); maskGlow.enabled = on;
+            maskCore.position = mid + up * (0.42f * side.magnitude) - fwd * 0.03f; maskCore.localScale = Vector3.one * (0.3f * side.magnitude * MaskOpen);
+            maskGlow.transform.position = maskCore.position + fwd * 0.2f; maskGlow.intensity = 2.5f * MaskOpen;
         }
 
         // ---------------- schedule ----------------
@@ -231,6 +274,7 @@ namespace LastBell.Run
             for (int i = 0; i < TransTicks; i++)
             {
                 if (i == TransTicks / 2) { W.Fx.Crescendo(transform.position, true, 0, false); Release(1.5f); if (shoulderFlowers) shoulderFlowers.gameObject.SetActive(to >= 2); }
+                if (to >= 3) maskTarget = 1;   // the model's mask opens over 1.5 s (LateUpdate)
                 if (to >= 3 && maskL)
                 {
                     maskL.localPosition = Vector3.Lerp(maskL.localPosition, new Vector3(-0.32f, 3.65f, 0.2f), 0.05f);

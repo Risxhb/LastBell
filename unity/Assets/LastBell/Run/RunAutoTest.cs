@@ -980,6 +980,8 @@ namespace LastBell.Run
             foreach (var id in new[] { "Hollow Spiral", "Choir Buds", "Feet Pod", "Pruning Arc" })
                 Check($"Sylvara P3 uses {id}", sy.Order.Contains(id));
             Check("Sylvara plays the Bloom clip when she plants Choir Buds", sy.Clips.Contains("Bloom"));
+            if (sy.HasMaskBones) Check("the second form splits her mask open", sy.MaskOpen > 0.99f, sy.MaskOpen.ToString("0.00"));
+            else Note("Sylvara: this model has no mask bones (sylvara-assets 2.0.0 or older): the mask stays shut in the second form");
             Note($"Sylvara P3 buds: {sy.BudsCut} cut, {sy.BudsBloomed} bloomed");
 
             // Phase 4: seed storm and the enrage steps (timing accepted 29 Oct)
