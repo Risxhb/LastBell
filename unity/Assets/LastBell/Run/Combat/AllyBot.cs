@@ -46,10 +46,18 @@ namespace LastBell.Run
         {
             tick++;
             var inp = new PlayerInput();
-            var w = me.World; var boss = w.Boss;
+            var w = me.World; var boss = w.Boss; readWorld = w;
             Vector3 pos = me.transform.position, want;
             if (boss == null || !boss.Solid) { inp.Move = ToScreen(Vector3.zero); return inp; }
-            var bpos = Sim.Flat(boss.transform.position);
+            // the target: the boss, or while boss parts stand (Crucivar's castings, which must die before the Pour Flood) the
+            // first of them by name: the castings carry their numerals, and on Hard one sunk out of order sets every turret
+            // firing (a party went down to it, 11-03); hits land on whichever of them is nearest, so aim and reach follow it
+            var bpos = Sim.Flat(boss.transform.position); float brad = boss.BodyRadius;
+            BossPart first = null;
+            foreach (var part in w.Parts)
+                if (part.Alive && (first == null || string.CompareOrdinal(part.Name, first.Name) < 0)) first = part;
+            if (first != null) { bpos = Sim.Flat(first.Pos); brad = first.BodyRadius; }
+            tPos = bpos; tRad = brad;
             inp.Aim = bpos;
             BotSight.Update(w, boss);
             if (Scripted(me, boss, pos, ref inp)) return inp;
@@ -116,7 +124,7 @@ namespace LastBell.Run
                 // casters: the basic casts on the move (0.55-0.6 speed), so keep it going while repositioning (following a
                 // turning well, a far job) when nothing lands yet or the slower walk still has time to spare
                 if (Attacks && !inp.Dash && !me.Kit.Acting && tick - lastPress >= 6 && me.Kit.Cooldown01(0) <= 0.001f
-                    && Sim.Flat(bpos - pos).magnitude - boss.BodyRadius <= Range(me) + 1.85f
+                    && Sim.Flat(bpos - pos).magnitude - brad <= Range(me) + 1.85f
                     && (threat == null || move == Vector3.zero || need / (PlayerController.WalkSpeed * 0.55f) < t - 0.3f))
                 { inp.P0 = inp.H0 = true; lastPress = tick; }
                 castHold = 0;
@@ -125,7 +133,7 @@ namespace LastBell.Run
             {
                 // 2) hold a position round the boss at this class's range, on this ally's own angle
                 float ang = 360f * slot / of + 30f;
-                float dist = boss.BodyRadius + Range(me);
+                float dist = brad + Range(me);
                 want = bpos + Sim.Dir(ang) * dist;
                 // Total Eclipse: hold the edge of the nearest light well closest to him (melee still reaches from there)
                 if (boss is AurelionEncounter ae && ae.Eclipse != null && ae.Eclipse.Active && ae.Eclipse.Wells.Count > 0)
@@ -144,11 +152,11 @@ namespace LastBell.Run
                 var v = Sim.Flat(want - pos);
                 move = v.magnitude < (Attacks ? 0.15f : 0.4f) || castHold > 0 ? Vector3.zero : v.normalized;
                 // never walk into a live telegraph
-                if (move != Vector3.zero && bad(pos + move * 0.4f) && !bad(pos)) move = Vector3.zero;
+                if (move != Vector3.zero && bad(pos + move * 0.4f) && !bad(pos)) { move = Bend(pos, move); if (bad(pos + move * 0.4f)) move = Vector3.zero; }   // round it if a turned step is clear
                 if (castHold > 0) castHold--;
                 // 3) attack when in range (off: Chzy18 2026-10-22, "the bots are doing too much damage": they only do the
                 // mechanics). Set Attacks = true to bring the rotation back.
-                float gap = Sim.Flat(bpos - pos).magnitude - boss.BodyRadius;
+                float gap = Sim.Flat(bpos - pos).magnitude - brad;
                 if (Attacks && gap <= Range(me) + 1.85f) Attack(me, ref inp);
             }
             if (me.Hp < (Mode == BotMode.Passive ? 40 : 70) && me.Potions > 0 && tick % 30 == 0) inp.Potion = true;   // test bots: before a Hard kill hit (65) could down them
@@ -433,8 +441,11 @@ namespace LastBell.Run
         }
 
         // ticks until a shape hurts: a strike when it lands, burning ground once it has heated (a pool that lasts until the
-        // phase ends burns now, not then). Aurelion keeps the landing time its tested routes were built on
-        static int Lands(Hazard h, BossEncounter boss) => h.BurnPerSecond > 0 && !(boss is AurelionEncounter) ? Mathf.Max(0, h.LockAt - h.Age) : h.ResolveAt - h.Age;
+        // phase ends burns now, not then), and a strike already live (a flying bullet, a turning jet) now: a negative count
+        // made the oldest bullet the threat and left every younger one out of the dodge (a bot stepped into the next one in
+        // the same Lane Stream, 11-03). Aurelion keeps the landing time its tested routes were built on
+        static int Lands(Hazard h, BossEncounter boss) => boss is AurelionEncounter ? h.ResolveAt - h.Age
+            : h.BurnPerSecond > 0 ? Mathf.Max(0, h.LockAt - h.Age) : Mathf.Max(0, h.ResolveAt - h.Age);
 
         static bool Jet(Hazard h) => h.Shape == HazardShape.Lane && h.Track != null && h.ActiveTicks > 0 && h.Damage > 0 && !h.Cancelled && h.Age < h.ResolveAt + h.ActiveTicks;
 
@@ -608,7 +619,7 @@ namespace LastBell.Run
             for (int i = 0; i < live.Count; i++) { var h = live[i]; if (h.BurnPerSecond <= 0 && h.ResolveAt - h.Age <= ticks && (Hits(h, me, pos) || Hits(h, me, lunge))) return false; }
             return true;
         }
-        static bool Hits(Hazard h, PlayerController me, Vector3 q) => !h.Soak && (h.Contains(q) || SideOf(h, q)) && (h.Affects == null || h.Affects(me)) && !Spares(h, me);
+        static bool Hits(Hazard h, PlayerController me, Vector3 q) => !h.Soak && (h.Contains(q) || SideOf(h, q)) && (h.Affects == null || h.Affects(me)) && !Spares(h, me) && (!BotSight.IsPath(h) || BotSight.PathSoon(h, q));
         // a shape that leaves out the player standing in it (an Ember Brand never hits its own carrier) is no danger to them
         static bool Spares(Hazard h, PlayerController me) => h.Includes != null && (h.Track == null || h.Age < h.LockAt) && h.Contains(me.transform.position) && !h.Includes(me);   // a frozen brand is left: its pool forms there
         // a lane that strikes after its warning (a Toll Lane) can hit a little wider than it is drawn: keep a hand's width clear
@@ -749,10 +760,11 @@ namespace LastBell.Run
         }
 
         // the spot in attack reach of him (gap Range-1 .. Range+1.6: it stops within 0.15 m, inside the swing gate) nearest this bot that the current constraints allow
+        Vector3 tPos; float tRad;   // this tick's target (the boss or its first live part)
         bool AttackSpot(PlayerController me, BossEncounter boss, out Vector3 spot)
         {
-            var pos = me.transform.position; var bp = Sim.Flat(boss.transform.position);
-            float lo = boss.BodyRadius + PlayerController.Radius + Mathf.Max(0.2f, Range(me) - 1f), hi = boss.BodyRadius + Range(me) + 1.6f;
+            var pos = me.transform.position; var bp = tPos;
+            float lo = tRad + PlayerController.Radius + Mathf.Max(0.2f, Range(me) - 1f), hi = tRad + Range(me) + 1.6f;
             spot = pos; float best = float.MaxValue;
             var ecl = (boss as AurelionEncounter)?.Eclipse; bool turning = ecl != null && ecl.Active;   // a well spot must stay lit a while
             for (float r = lo; r <= hi; r += 0.3f)
@@ -765,9 +777,10 @@ namespace LastBell.Run
             return best < float.MaxValue;
         }
 
+        static CombatWorld readWorld;   // the world the bot read this tick (ThroughBurn has only the boss)
         static bool ThroughBurn(Vector3 from, Vector3 to, BossEncounter b)
         {
-            var w = (b as AurelionEncounter)?.World; if (w == null) return false;
+            var w = (b as AurelionEncounter)?.World ?? readWorld; if (w == null) return false;   // every boss since 11-03 (was Aurelion only: a Crucivar bot froze at a Brand Pool between it and its casting)
             var live = w.Hazards.Live;
             for (int j = 0; j < live.Count; j++)
             {
