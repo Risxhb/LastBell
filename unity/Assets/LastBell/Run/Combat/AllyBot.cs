@@ -419,6 +419,8 @@ namespace LastBell.Run
         const float VolleyLook = 0.8f, VolleyStep = 0.05f, VolleyBuffer = 0.15f, VolleyPathCost = 30f, VolleyPathSoon = 1.6f, VolleySwing = 20f, VolleySprintFloor = 55f;   // a swing waits only for a bullet it would meet (50 and up)
         const float VolleyJetRing = 8f;   // m from the jets' hub where they sweep at a walk (40 deg/s, WalkSpeed 6)
         bool volJets; Vector3 volHub;
+        const string SpiralPath = "Spiral Arm path";
+        const float SpiralOutrun = 10f, VolleySpiralFar = 90f;   // m from the turret where an arm (30 deg/s) passes 5.2 m/s, near a walk
         const float VolleyThrowReach = 7f;   // a Tollbreaker's axe throws, gap to the target (MaxRange 9 m less a margin)
         static readonly List<Hazard> volNear = new List<Hazard>();
         static Vector3[] Dirs16;
@@ -536,6 +538,11 @@ namespace LastBell.Run
                         else if (k == steps && JetAt(h, q, t + 0.5f, spin)) cost += 60;   // standing in its way as it comes round
                         continue;
                     }
+                    // a Spiral Arm's fan far from its turret: its arms sweep there faster than a walk (30 deg/s), so a bot that waits
+                    // to dodge them runs ahead of an arm into the wall (two bots were pinned at the far rim in the third uprising
+                    // by arms from across the arena, 11-04); leave that part of the fan while it is drawn
+                    if (h.Shape == HazardShape.Cone && h.Source == SpiralPath && Sim.Flat(q - h.Origin).magnitude > SpiralOutrun && h.Contains(q))
+                    { if (k == steps) cost += VolleySpiralFar; continue; }
                     if (!Hits(h, me, q)) continue;
                     float lands = Lands(h, boss) / (float)Sim.Hz;
                     if (BotSight.IsPath(h)) { if (k == steps) cost += VolleyPathCost; }
