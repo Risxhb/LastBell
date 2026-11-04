@@ -1,0 +1,81 @@
+using System.Collections;
+using System.Linq;
+using UnityEngine;
+
+namespace LastBell.Run
+{
+    // Revives (docs/proposals/revives-2026-11-04.md): a downed ally gets up after 3 s of a still ally beside them, a hit on
+    // the reviver starts it over, 20 s unrevived is dead (no revive), and a bot ally comes over to revive a downed player.
+    // Runs with the party checks (-lastbellPartyOnly). The boss's hazards are cleared every frame so only the test hurts.
+    public sealed partial class RunAutoTest
+    {
+        sealed class HoldStill : IInputSource { public PlayerInput Read(PlayerController who) => new PlayerInput { Aim = who.transform.position + Vector3.forward }; }
+
+        IEnumerator ReviveChecks()
+        {
+            Note("---------- revives ----------");
+            if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }
+            Check("revives: one ally selected", d.SelectAllies(1) && RunParty.Selected == 1);
+            d.StartPractice("Tollbreaker", 0); d.RequestReady();
+            yield return Until(() => d.State == RunState.Combat, 6, "revive practice combat");
+            if (d.State != RunState.Combat || d.Allies.Count != 1) { Check("revives: party practice started", false, $"{d.State}, {d.Allies.Count} allies"); yield break; }
+            var me = d.Player; var ally = d.Allies[0];
+            bool calm = true; IEnumerator Calm() { while (calm) { d.World.Hazards.ClearAll(); yield return null; } }
+            StartCoroutine(Calm());
+            me.Input = new HoldStill(); ally.Input = new HoldStill();
+            var w = d.World;
+
+            // 1) a still ally beside a downed one gets them up in 3 s, with 40 HP
+            me.transform.position = ally.transform.position + new Vector3(0.9f, 0, 0);
+            ally.ForceDown("revive test");
+            Check("revives: a downed ally is down, not dead", ally.Down && !ally.Dead);
+            Check("revives: the fight goes on while one player stands", d.State == RunState.Combat && w.AnyStanding);
+            int t0 = w.Tick;
+            yield return Until(() => !ally.Down, 8, "the ally revived");
+            float took = (w.Tick - t0) / (float)Sim.Hz;
+            Check("revives: a still ally beside them revives them in about 3 s", !ally.Down && took >= 2.9f && took <= 3.4f, $"{took:0.00} s");
+            Check("revives: revived with 40 HP and counted", ally.Hp == PlayerController.ReviveHp && ally.Revives == 1, $"hp {ally.Hp}, revives {ally.Revives}");
+            Check("revives: the GetUp clip plays (no placeholder)", ally.Presenter.CurrentClip == "GetUp", ally.Presenter.CurrentClip);
+
+            // 2) a hit on the reviver starts the revive over
+            ally.ForceDown("revive test");
+            yield return Until(() => ally.ReviveProgress > 0.45f, 4, "half a revive");
+            me.ReceiveHit(new Hazard { Source = "revive test hit", Damage = 5, Stun = 0, Knockback = 0, Origin = me.transform.position });
+            int hitTick = w.Tick; yield return Until(() => w.Tick >= hitTick + 2, 1, "two ticks");
+            Check("revives: a hit on the reviver resets the revive", ally.ReviveProgress < 0.1f, $"progress {ally.ReviveProgress:0.00}");
+            yield return Until(() => !ally.Down, 8, "the ally revived after the hit");
+            Check("revives: the revive finishes after the hit", !ally.Down && ally.Revives == 2);
+
+            // 3) moving away pauses it; 20 s unrevived is dead, and the dead can't be revived
+            me.transform.position = ally.transform.position + new Vector3(6f, 0, 0);
+            ally.ForceDown("revive test");
+            yield return Until(() => ally.Dead, PlayerController.BleedOutSeconds + 6, "bled out");
+            Check("revives: no revive from 6 m away", ally.ReviveProgress == 0, $"progress {ally.ReviveProgress:0.00}");
+            Check("revives: 20 s unrevived is dead", ally.Dead && Mathf.Abs(ally.DownedTicks / (float)Sim.Hz - PlayerController.BleedOutSeconds) < 0.1f, $"{ally.DownedTicks / (float)Sim.Hz:0.0} s");
+            Check("revives: the Death clip plays", ally.Presenter.CurrentClip == "Death", ally.Presenter.CurrentClip);
+            me.transform.position = ally.transform.position + new Vector3(0.9f, 0, 0);
+            int t1 = w.Tick; yield return Until(() => w.Tick >= t1 + Sim.Ticks(4f), 8, "4 s beside the dead ally");
+            Check("revives: the dead can't be revived", ally.Down && ally.Dead && ally.ReviveProgress == 0);
+
+            // 4) a bot ally walks over and revives a downed player (the player down, the ally a bot again)
+            d.Boss.DebugDefeat();
+            yield return Until(() => d.State == RunState.Results, 8, "revive practice results");
+            d.ReturnToMenu(); yield return null;
+            d.StartPractice("Tollbreaker", 0); d.RequestReady();
+            yield return Until(() => d.State == RunState.Combat, 6, "second revive practice combat");
+            me = d.Player; ally = d.Allies[0]; w = d.World;
+            Check("revives: each fight starts with everyone up", !ally.Down && !ally.Dead && !me.Down);
+            me.Input = new HoldStill();
+            ally.transform.position = me.transform.position + new Vector3(5f, 0, 0);
+            me.ForceDown("revive test");
+            int t2 = w.Tick;
+            yield return Until(() => !me.Down, 12, "the bot revived the player");
+            Check("revives: a bot ally comes over and revives the downed player", !me.Down && me.Revives == 1, $"{(w.Tick - t2) / (float)Sim.Hz:0.0} s");
+            calm = false;
+            if (d.Boss && !d.Boss.Dead) d.Boss.DebugDefeat();
+            yield return Until(() => d.State == RunState.Results, 8, "revive practice results");
+            d.ReturnToMenu(); yield return null;
+            d.SelectAllies(0);
+        }
+    }
+}

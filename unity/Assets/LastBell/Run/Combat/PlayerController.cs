@@ -104,6 +104,20 @@ namespace LastBell.Run
         public int PotionsDrunk { get; private set; }
         int sincePotion = 999;
         public bool Down { get; private set; }
+        // Revives (docs/proposals/revives-2026-11-04.md; built as recommended, 4 Nov): at 0 HP a player is downed, not out.
+        // A standing ally who stands still within ReviveRange for ReviveSeconds gets them up with ReviveHp (a hit on the
+        // reviver resets it; CombatWorld.StepRevives); after BleedOutSeconds unrevived they are dead for the rest of the fight.
+        // Solo is unchanged: nobody is left standing, so the fight is lost.
+        public const float BleedOutSeconds = 20f, ReviveSeconds = 3f, ReviveRange = 1.5f; public const int ReviveHp = 40;
+        public bool Dead { get; private set; }
+        public int DownedTicks { get; private set; }
+        public float ReviveProgress { get; internal set; }       // 0..1 while allies channel on this downed player
+        public PlayerController Reviving { get; internal set; }  // the downed ally this player is channelling on (this tick)
+        public int Revives { get; private set; }                  // times revived this fight
+        public int LastHurtTick { get; private set; } = -999;
+        // still, free and unhurt: standing next to a downed ally like this channels the revive
+        public bool CanChannelRevive => !Down && stun == 0 && knockTick == 0 && dashTick == 0 && pullTick == 0 && !Kit.Acting
+            && Last.Move.sqrMagnitude < 0.01f && !(Last.P0 || Last.P1 || Last.P2 || Last.P3 || Last.P4 || Last.Dash);
         public float Height { get; private set; }
         public bool Airborne => jumpTick >= 0;
         public bool Dashing => dashTick > 0;
@@ -136,6 +150,8 @@ namespace LastBell.Run
         {
             transform.SetPositionAndRotation(pos, Quaternion.Euler(0, yaw, 0));
             Stamina = MaxStaminaNow; dashTick = 0; dashLock = 0; jumpTick = -1; Height = 0; stun = 0; knockTick = 0; sinceSpend = 999; pullTick = 0;
+            if (Down) { Down = false; Dead = false; Hp = MaxHealth; }   // each fight starts with everyone up (dead ones included)
+            DownedTicks = 0; ReviveProgress = 0; Reviving = null; Revives = 0;
             Kit.ResetAll();
             Presenter.ResetPose();
             Marks.Clear();
@@ -168,7 +184,17 @@ namespace LastBell.Run
 
         // dev / test hook only
         public void DebugSetHp(int hp) { Hp = Mathf.Clamp(hp, 1, MaxHealth); }
-        public void DebugRevive() { if (!Down) return; Down = false; Hp = MaxHealth; Stamina = MaxStaminaNow; Presenter.ResetPose(); }
+        public void DebugRevive() { if (!Down) return; Down = false; Dead = false; Hp = MaxHealth; Stamina = MaxStaminaNow; Presenter.ResetPose(); }
+
+        // an ally's revive finished: up with ReviveHp and full stamina, no immunity afterwards (gpt/08)
+        public void Revive()
+        {
+            if (!Down || Dead) return;
+            Down = false; Hp = Mathf.Min(MaxHealth, ReviveHp); Stamina = MaxStaminaNow; DownedTicks = 0; ReviveProgress = 0; Revives++;
+            sincePotion = PotionLockout;   // free to drink at once
+            Presenter.GetUp();
+            RunHud.Float(transform.position + Vector3.up * 2.4f, "revived", new Color(0.55f, 1f, 0.75f));
+        }
 
         public void ReceiveHit(Hazard h) => ReceiveHit(h, h.Damage);
 
@@ -178,7 +204,7 @@ namespace LastBell.Run
             if (Down) return;
             float mult = Kit.Mitigation(h, out bool noKnock);
             int dmg = Mathf.RoundToInt(damage * mult * World.DamageTakenScale);   // difficulty scales the hit once, here
-            if (mult >= 1) dmg = Mathf.Max(1, dmg);   // a shield can absorb a hit completely; nothing else can
+            LastHurtTick = World.Tick;            if (mult >= 1) dmg = Mathf.Max(1, dmg);   // a shield can absorb a hit completely; nothing else can
             Hp = Mathf.Max(0, Hp - dmg);
             World.ReportPlayerHit(this, h, dmg);
             RunHud.Float(transform.position + Vector3.up * 2.4f, "-" + dmg, mult < 1 ? new Color(0.6f, 0.9f, 1f) : new Color(1f, 0.42f, 0.36f));
@@ -196,7 +222,7 @@ namespace LastBell.Run
         public void ReceiveBurn(Hazard h, int dmg)
         {
             if (Down || dmg <= 0) return;
-            Hp = Mathf.Max(0, Hp - dmg);
+            Hp = Mathf.Max(0, Hp - dmg); LastHurtTick = World.Tick;
             World.ReportPlayerHit(this, h, dmg);
             RunHud.Float(transform.position + Vector3.up * 2.4f, "-" + dmg, new Color(1f, 0.6f, 0.25f));
             if (Hp == 0) GoDown();
@@ -234,6 +260,7 @@ namespace LastBell.Run
         void GoDown()
         {
             Down = true; stun = 0; dashTick = 0; jumpTick = -1; Height = 0; pullTick = 0;
+            DownedTicks = 0; ReviveProgress = 0; Reviving = null;
             Kit.Interrupt(); Kit.ClearTargetState();
             Presenter.Down();
         }
@@ -248,7 +275,11 @@ namespace LastBell.Run
             var inp = Input != null && MovementEnabled ? Input.Read(this) : default;
             if (!AbilitiesEnabled) { inp.P0 = inp.P1 = inp.P2 = inp.P3 = inp.P4 = false; inp.H0 = inp.H1 = inp.H2 = inp.H3 = inp.H4 = false; inp.Dash = inp.Jump = inp.Potion = false; }
             Last = inp;
-            if (Down) { Presenter.Tick(this); return; }
+            if (Down)
+            {
+                if (!Dead && World.CombatActive && ++DownedTicks >= Sim.Ticks(BleedOutSeconds)) { Dead = true; ReviveProgress = 0; Presenter.Death(); }
+                Presenter.Tick(this); return;
+            }
             sinceSpend++; sincePotion++;
             if (inp.Potion && stun == 0) DrinkPotion();   // usable while moving or mid-action, not while stunned
             if (sinceSpend > Sim.Ticks(Shop.ItemHooks.RegenDelay(this, RegenDelay))) Stamina = Mathf.Min(MaxStaminaNow, Stamina + Regen * Sim.Dt);

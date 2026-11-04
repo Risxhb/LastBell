@@ -232,6 +232,7 @@ namespace LastBell.Run
                 Labels();
                 HazardLabels();
                 PlayerMarks();
+                DownedMarks();
                 if (ShowMechanicGallery) MechanicGallery();
                 switch (d.State)
                 {
@@ -1030,6 +1031,25 @@ namespace LastBell.Run
         // Mechanic markers over players' heads (PlayerController.Marks, MechanicIcons): 40 px icons side by side, each with its
         // name on a strip under it, because several look alike at this size. Placement approved by Chzy18 on October 24, 2026;
         // see docs/run-loop/mechanic-icons.md. Nothing is drawn until an encounter assigns a mark.
+        // Revives: over each downed player, the seconds left to revive them and the revive filling (green); DEAD once bled out
+        void DownedMarks()
+        {
+            var cam = Camera.main; if (!cam || d.World.Players.Count < 2) return; float h = Screen.height, w = UiTheme.V(96), bh = UiTheme.V(8);
+            foreach (var p in d.World.Players)
+            {
+                if (p == null || !p.Down) continue;
+                var s = cam.WorldToScreenPoint(p.transform.position + Vector3.up * 1.4f); if (s.z < 0) continue;
+                var r = new Rect(s.x - w / 2, h - s.y - UiTheme.V(30), w, UiTheme.V(20));
+                UiTheme.Fill(r, UiTheme.InkStrip);
+                string t = p.Dead ? "DEAD" : $"DOWN  {Mathf.CeilToInt(PlayerController.BleedOutSeconds - p.DownedTicks / (float)Sim.Hz)} s";
+                UiTheme.Label(r, t, slotName);
+                if (p.Dead) continue;
+                var bar = new Rect(r.x, r.yMax + UiTheme.V(2), w, bh);
+                UiTheme.Fill(bar, UiTheme.InkStrip);
+                UiTheme.Fill(new Rect(bar.x, bar.y, w * Mathf.Clamp01(p.ReviveProgress), bh), new Color(0.55f, 1f, 0.75f, 0.95f));
+            }
+        }
+
         void PlayerMarks()
         {
             var cam = Camera.main; if (!cam) return; float h = Screen.height, sz = UiTheme.V(40), gap = UiTheme.V(48);
