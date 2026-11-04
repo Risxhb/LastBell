@@ -474,7 +474,7 @@ namespace LastBell.Run
             var rs = RewindSoon(t);
             if (rs.HasValue || RewindAt(t))
             {
-                bigStyle.normal.textColor = RewindAt(t) ? new Color(1f, 0.6f, 0.45f) : Color.Lerp(new Color(1f, 0.4f, 0.3f), Color.white, Mathf.PingPong(Time.unscaledTime * 3, 1));
+                bigStyle.normal.textColor = RewindAt(t) ? new Color(1f, 0.6f, 0.45f) : Color.Lerp(new Color(1f, 0.4f, 0.3f), Color.white, Blink);
                 GUI.Label(new Rect(0, Screen.height * 0.2f, Screen.width, 60), RewindAt(t) ? "<< REWIND" : $"REWIND in {rs.Value:0.0}s", bigStyle);
             }
         }

@@ -85,6 +85,10 @@ namespace LastBell.Run
         // a world label (OnGUI), shadowed. Labels drawn in the same GUI pass don't overlap: one that would land on an earlier one moves
         // up a row (performance agent's screenshots, 2 Nov: two players side by side read "IV II gap IV" in P5). One copy for every phase.
         static readonly List<Rect> placed = new List<Rect>(); static int placedFrame = -1; static EventType placedEvent;
+        // Unity caches laid-out text per colour, so a label whose colour changes every frame makes a new cache entry each frame
+        // (performance agent, 3 Nov). Blinks and fades step through a few fixed values instead.
+        protected static float Steps(float t, int n = 6) => Mathf.Round(t * n) / n;
+        protected static float Blink => Steps(Mathf.PingPong(Time.unscaledTime * 3, 1));
         protected static void Label(Camera cam, Vector3 world, float height, string text, Color c, GUIStyle style)
         {
             var sp = cam.WorldToScreenPoint(new Vector3(world.x, height, world.z)); if (sp.z <= 0) return;

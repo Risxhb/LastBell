@@ -526,7 +526,7 @@ namespace LastBell.Run
         {
             if (!Running || NextBeatTick < 0 || p == null) return null;
             var partner = Partner(p);
-            string chain = partner != null && !partner.Down ? $" · chain to {UltimateState.Roman[HourOf(partner) + 1]} {(Sim.Flat(p.transform.position) - Sim.Flat(partner.transform.position)).magnitude:0.0} m" : "";
+            string chain = partner != null && !partner.Down ? $" · chain to {UltimateState.Roman[HourOf(partner) + 1]} {(Sim.Flat(p.transform.position) - Sim.Flat(partner.transform.position)).magnitude:0} m" : "";
             return $"beat in {Mathf.Max(0, (NextBeatTick - Now) / (float)Sim.Hz):0.0}s · you ({UltimateState.Roman[HourOf(p) + 1]}): {JobOf(p, out _)}{chain}" + (RewindAfterNext ? "   ·   REWIND after this beat" : "");
         }
         static GUIStyle nameStyle, bigStyle, spotStyle;
@@ -548,7 +548,7 @@ namespace LastBell.Run
             }
             if (RewindAfterNext)
             {
-                bigStyle.normal.textColor = Color.Lerp(new Color(1f, 0.45f, 0.35f), Color.white, Mathf.PingPong(Time.unscaledTime * 3, 1));
+                bigStyle.normal.textColor = Color.Lerp(new Color(1f, 0.45f, 0.35f), Color.white, Blink);
                 GUI.Label(new Rect(0, Screen.height * 0.2f, Screen.width, 60), "REWIND NEXT BEAT", bigStyle);
             }
         }

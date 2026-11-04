@@ -852,7 +852,7 @@ namespace LastBell.Run
         static void CrackedTitle(string text, float u)
         {
             if (titleStyle == null) titleStyle = new GUIStyle(GUI.skin.label) { fontSize = 72, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-            float a = u < 0.15f ? u / 0.15f : Mathf.Clamp01(1 - (u - 1.2f) / 0.6f), split = Mathf.SmoothStep(0, 1, Mathf.Clamp01((u - 0.25f) / 0.5f)) * 9f;
+            float a = Steps(u < 0.15f ? u / 0.15f : Mathf.Clamp01(1 - (u - 1.2f) / 0.6f), 10), split = Mathf.SmoothStep(0, 1, Mathf.Clamp01((u - 0.25f) / 0.5f)) * 9f;
             float y = Screen.height * 0.3f, h = 100, w = Screen.width;
             for (int half = 0; half < 2; half++)
             {

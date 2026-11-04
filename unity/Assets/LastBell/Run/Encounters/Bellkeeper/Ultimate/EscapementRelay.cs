@@ -320,7 +320,7 @@ namespace LastBell.Run
             }
             if (RewindAfterNext || Dir < 0)
             {
-                bool soon = RewindAfterNext; float blink = Mathf.PingPong(Time.unscaledTime * 3, 1);
+                bool soon = RewindAfterNext; float blink = Blink;
                 bigStyle.normal.textColor = soon ? Color.Lerp(new Color(1f, 0.45f, 0.35f), Color.white, blink) : new Color(1f, 0.6f, 0.5f, 0.7f);
                 GUI.Label(new Rect(0, Screen.height * 0.2f, Screen.width, 60), soon ? "REWIND NEXT BEAT" : "<< REWINDING", bigStyle);
             }
