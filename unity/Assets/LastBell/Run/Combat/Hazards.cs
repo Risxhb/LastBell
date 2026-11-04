@@ -131,6 +131,21 @@ namespace LastBell.Run
         static readonly Color SlagFill = new Color(0.95f, 0.36f, 0.08f), SlagBorder = new Color(2.4f, 1.2f, 0.35f);
         readonly Dictionary<PlayerController, float> burn = new Dictionary<PlayerController, float>();
 
+        // The raid warning look (Reference/Telegraph-Style v2, first shipped on Aurelion): an area motif inside a wide
+        // contour over an ink under-stroke; standing burns draw under everything, tracking warnings in the middle and a
+        // locked footprint on top (it is the one that will hit); a burn's fill counts down to its lock, then holds.
+        // Presentation only. Call after Spawn. motif 1 = light rays / orbital arcs / sun bars.
+        public const int RaidMotif = 1;
+        public static void RaidStyle(Hazard h, int motif = RaidMotif)
+        {
+            if (h.BurnPerSecond > 0) h.FillToLock = true;
+            if (h.Tele == null) return;
+            h.Tele.Motif(motif);
+            if (h.BurnPerSecond > 0) h.Tele.Order = -1;
+            else if (h.Locked) h.Tele.Order = 1;
+            else h.Tele.LockOnTop = true;
+        }
+
         public Hazard Spawn(Hazard h)
         {
             var fx = w.BossFx;
