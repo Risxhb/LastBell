@@ -25,7 +25,9 @@ namespace LastBell.Run
         public readonly BotMode Mode;
         // tests: what it decided last tick; only formatted when read, so a tick stores plain values and makes no strings
         public string DebugLine => dMe == null ? null : Describe();
-        public string Brief => dMe == null ? null : $"{dMe.ClassName.Substring(0, 2)} {dJob ?? "-"} gap {Sim.Flat(tPos - dMe.transform.position).magnitude - tRad:0.0} {(tick - lastPress < Sim.Hz ? "swing" : "idle")}";   // the sweep trace: job, gap to the target, pressed in the last second
+        public string Brief => dMe == null ? null : $"{dMe.ClassName.Substring(0, 2)} {dJob ?? "-"} gap {Sim.Flat(tPos - dMe.transform.position).magnitude - tRad:0.0} {(tick - lastPress < Sim.Hz ? "swing" : "idle")}{(revWhy != null && dJob == "volley" ? " " + revWhy : "")}{DownNote()}";
+        string revWhy;
+        string DownNote() { string s = ""; foreach (var p in dMe.World.Players) if (p && p != dMe && p.Down) s += $" d{dMe.World.Players.IndexOf(p)}:{Sim.Flat(p.transform.position - dMe.transform.position).magnitude:0}{(p.Dead ? "x" : "")}"; return s; }   // the sweep trace: job, gap to the target, pressed in the last second
         public float? HoldRange;          // tests: keep this gap to the boss instead of the class's range (8.5 = a ranged player)
         // bots are mechanics dummies by default: they move, dodge and spread, but never attack or heal. Launch switch
         // -lastbellAllyAttack turns their class rotation on (the boss then scales his HP for them, BossEncounter.Spawn).
@@ -463,7 +465,8 @@ namespace LastBell.Run
             // a downed ally: home is beside them, the bullets still dodged on the way and while it stands there (it only revived
             // with nothing landing near it, never so in an uprising: two bots bled out unrevived in a Hard party run, 11-04);
             // no swings there, an action stops the revive
-            Vector3 rs = Vector3.zero; bool revive = !carrier && ReviveSpot(me, pos, out rs) && !bad(rs) && BotSight.PathArrive(rs) > VolleyPathSoon;
+            Vector3 rs = Vector3.zero; bool found = !carrier && ReviveSpot(me, pos, out rs), revive = found && !bad(rs) && BotSight.PathArrive(rs) > VolleyPathSoon;
+            revWhy = !found ? null : revive ? "rv-on" : bad(rs) ? "rv-bad" : $"rv-path{BotSight.PathArrive(rs):0.0}";
             if (revive) { home = rs; volReach = false; volPull = 2f; }
             if (!volOn || me.World.Tick - volTick >= 3 || me.Stunned > 0)
             {
