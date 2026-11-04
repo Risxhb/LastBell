@@ -65,25 +65,25 @@ namespace LastBell.Run
             if (Log.Count < 4000) Log.Add(what);
         }
 
-        public void Tick() => Play(tick, "tick", 0.3f);
-        public void Ratchet() => Play(ratchet, "ratchet");
-        public void Swing() => Play(swing, "swing");
-        public void Whirl() => Play(whirl, "whirl");
-        public void Thud() => Play(thud, "thud");
-        public void Catch() => Play(catchBell, "catch");
-        public void Shatter() => Play(shatter, "shatter");
-        public void Stop() => Play(stop, "stop");
-        public void Boom() => Play(boom, "boom");
-        public void Creak() => Play(creak, "creak");
-        public void Rush() => Play(rush, "rush");
-        public void Crash() => Play(crash, "crash");
-        public void Shift() => Play(shift, "shift");
+        public void Tick() { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.BossPart, "PendulumSentinelAudio.Tick", new object[0]); Play(tick, "tick", 0.3f); }
+        public void Ratchet() { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.BossPart, "PendulumSentinelAudio.Ratchet", new object[0]); Play(ratchet, "ratchet"); }
+        public void Swing() { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.BossPart, "PendulumSentinelAudio.Swing", new object[0]); Play(swing, "swing"); }
+        public void Whirl() { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.BossPart, "PendulumSentinelAudio.Whirl", new object[0]); Play(whirl, "whirl"); }
+        public void Thud() { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.BossPart, "PendulumSentinelAudio.Thud", new object[0]); Play(thud, "thud"); }
+        public void Catch() { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.BossPart, "PendulumSentinelAudio.Catch", new object[0]); Play(catchBell, "catch"); }
+        public void Shatter() { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.BossPart, "PendulumSentinelAudio.Shatter", new object[0]); Play(shatter, "shatter"); }
+        public void Stop() { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.BossPart, "PendulumSentinelAudio.Stop", new object[0]); Play(stop, "stop"); }
+        public void Boom() { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.BossPart, "PendulumSentinelAudio.Boom", new object[0]); Play(boom, "boom"); }
+        public void Creak() { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.BossPart, "PendulumSentinelAudio.Creak", new object[0]); Play(creak, "creak"); }
+        public void Rush() { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.BossPart, "PendulumSentinelAudio.Rush", new object[0]); Play(rush, "rush"); }
+        public void Crash() { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.BossPart, "PendulumSentinelAudio.Crash", new object[0]); Play(crash, "crash"); }
+        public void Shift() { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.BossPart, "PendulumSentinelAudio.Shift", new object[0]); Play(shift, "shift"); }
         public void Level(bool on)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.BossPart, "PendulumSentinelAudio.Level", new object[] { on });
             if (!held) return;
             if (on) { held.clip = level; held.Play(); Played++; if (Log.Count < 4000) Log.Add("level"); }
             else held.Stop();
         }
-        public void StopAll() { if (src) src.Stop(); if (held) held.Stop(); }
+        public void StopAll() { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.BossPart, "PendulumSentinelAudio.StopAll", new object[0]); if (src) src.Stop(); if (held) held.Stop(); }
     }
 }

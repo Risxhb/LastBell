@@ -129,16 +129,22 @@ namespace LastBell.Run
         {
             base.Update();
             V2DevKeys();
-            if (presenter) presenter.GlowLevel = glowLevel;
+            PresentLook(phase, pose, Dead, glowLevel, Time.deltaTime);
+        }
+
+        // the body glow and the stand-in's pendulum, glaive, head, arcs, shutters and kneel: the host from its own state
+        // (Update), a LAN client's replica from the host's (ReplicaPresent)
+        void PresentLook(int ph, Pose ps, bool dead, float glow, float dt)
+        {
+            if (presenter) presenter.GlowLevel = glow;
             if (!body) return;
-            float dt = Time.deltaTime;
             // one idle pendulum beat; it stops on defeat
-            if (!Dead) swing += dt * 2.4f;
-            pendulum.localRotation = Quaternion.Euler(0, 0, Dead ? 0 : Mathf.Sin(swing) * 18f);
-            Prim.SetGlow(pendulumR, Gold * (0.6f + glowLevel * (phase == 3 ? 1.4f : 0.6f)));
+            if (!dead) swing += dt * 2.4f;
+            pendulum.localRotation = Quaternion.Euler(0, 0, dead ? 0 : Mathf.Sin(swing) * 18f);
+            Prim.SetGlow(pendulumR, Gold * (0.6f + glow * (ph == 3 ? 1.4f : 0.6f)));
 
             // glaive pose follows the attack (presentation only: the hazards decide hits)
-            Vector3 gEuler = pose == Pose.Neutral && !Dead ? new Vector3(0, 0, -18) : Vector3.zero;
+            Vector3 gEuler = ps == Pose.Neutral && !dead ? new Vector3(0, 0, -18) : Vector3.zero;
             glaive.localRotation = Quaternion.Slerp(glaive.localRotation, Quaternion.Euler(gEuler), dt * 8f);
             head.localRotation = Quaternion.Slerp(head.localRotation, Quaternion.identity, dt * 6f);
 
@@ -147,22 +153,39 @@ namespace LastBell.Run
             for (int a = 0; a < 3; a++)
             {
                 Quaternion target;
-                if (Dead) target = Quaternion.Euler(0, 0, a * 25f - 25f) * Quaternion.Euler(70, 0, 0);
-                else if (phase == 1) target = Quaternion.identity;
-                else if (phase == 2) target = Quaternion.Euler(Mathf.Sin(t * 0.7f + a * 2.1f) * 25f, Mathf.Sin(t * 0.5f + a) * 20f, Mathf.Sin(t * 0.9f + a) * 35f);
+                if (dead) target = Quaternion.Euler(0, 0, a * 25f - 25f) * Quaternion.Euler(70, 0, 0);
+                else if (ph == 1) target = Quaternion.identity;
+                else if (ph == 2) target = Quaternion.Euler(Mathf.Sin(t * 0.7f + a * 2.1f) * 25f, Mathf.Sin(t * 0.5f + a) * 20f, Mathf.Sin(t * 0.9f + a) * 35f);
                 else target = Quaternion.Euler(0, (a - 1) * 35f, Mathf.Sin(t * 0.6f + a) * 15f);
                 arcs[a].localRotation = Quaternion.Slerp(arcs[a].localRotation, target, dt * 3f);
-                arcs[a].localScale = Vector3.one * (phase == 3 && !Dead ? 1.25f : 1f);
+                arcs[a].localScale = Vector3.one * (ph == 3 && !dead ? 1.25f : 1f);
             }
-            shoulderL.localRotation = Quaternion.Slerp(shoulderL.localRotation, Quaternion.Euler(0, 0, phase >= 2 ? 16 : 0), dt * 4f);
-            float open = phase == 3 || pose == Pose.Exposed ? 1 : 0;
+            shoulderL.localRotation = Quaternion.Slerp(shoulderL.localRotation, Quaternion.Euler(0, 0, ph >= 2 ? 16 : 0), dt * 4f);
+            float open = ph == 3 || ps == Pose.Exposed ? 1 : 0;
             shutterL.localPosition = Vector3.Lerp(shutterL.localPosition, new Vector3(-0.11f - 0.26f * open, 2.95f, 0.43f), dt * 4f);
             shutterR.localPosition = Vector3.Lerp(shutterR.localPosition, new Vector3(0.11f + 0.26f * open, 2.95f, 0.43f), dt * 4f);
 
             // defeat: plants the glaive and kneels
-            kneel = Mathf.MoveTowards(kneel, Dead ? 1 : 0, dt * 1.2f);
+            kneel = Mathf.MoveTowards(kneel, dead ? 1 : 0, dt * 1.2f);
             body.localPosition = new Vector3(0, -0.9f * kneel, 0);
             body.localRotation = Quaternion.Euler(12f * kneel, 0, 0);
+        }
+
+        // LAN looks: Glow = body glow; Look[0] = phase (1-4), Look[1] = stand-in pose (0 neutral, 1 planted, 2 exposed).
+        // The swing, arc drift and easing run on the client's own clock. (Total Eclipse's umbra is a telegraph already.)
+        public int ReplicaPhase { get; private set; } = 1;   // LAN smoke tests: the phase the replica draws
+        public override void CaptureNetLook(Networking.LanWorldFrame.BossState into)
+        {
+            into.Glow = glowLevel;
+            into.Look.Add(phase); into.Look.Add((int)pose);
+        }
+        public override void ReplicaPresent(Networking.LanWorldFrame.BossState state, float dt)
+        {
+            var look = state.Look;
+            if (look.Count > 0) ReplicaPhase = Mathf.Clamp(Mathf.RoundToInt(look[0]), 1, 4);
+            var ps = Pose.Neutral;
+            if (look.Count > 1) { int k = Mathf.RoundToInt(look[1]); if (k == (int)Pose.Planted) ps = Pose.Planted; else if (k == (int)Pose.Exposed) ps = Pose.Exposed; }
+            PresentLook(ReplicaPhase, ps, state.Dead, state.Glow, dt);
         }
 
         protected override void OnDefeat()

@@ -45,6 +45,7 @@ namespace LastBell.Run
             public Handle glyph; public float glyphFill, glyphPulse = -9; public readonly Handle[] darts = new Handle[5];
             public readonly List<Handle> glyphArcs = new List<Handle>();   // the charge ring's arcs, one per dart
             public readonly List<Handle> lens = new List<Handle>(); public readonly List<Handle> beam = new List<Handle>();
+            public BossEncounter contactBoss; public Vector3 contactLocal, contactDir; public bool contactOnModel; public float contactAt = -9;   // the cached beam contact (SurfaceEnd)
             public Vector3 beamFrom, beamEnd; public int beamStep; public bool beamHit; public float beamStart, ashAcc, ashTail = -9, stepPulse = -9, shedAcc, shakeAt, debrisAt;
             // glyphs: the socket ring, one set of parts per glyph, when each finished arriving; the orbit angle; the Surge cast pull
             public readonly List<Handle> sockets = new List<Handle>(); public readonly Handle[][] glyphOrbs = new Handle[ArcanistKit.MaxGlyphs][];
@@ -321,7 +322,7 @@ namespace LastBell.Run
             arcMotes.Clear(); arcSparks.Clear(); ashFx.Clear(); embers.Clear(); flameFx.Clear();
         }
         public void ArcanistReset(PlayerController p)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "ArcanistReset", new object[] { p });
             if (!arcReady) return;
             if (arc.TryGetValue(p, out var s))
             {
@@ -344,6 +345,14 @@ namespace LastBell.Run
                 if (lightLeft[i] <= 0) { arcLights[i].enabled = false; continue; }
                 lightLeft[i] -= dt; float u = 1 - Mathf.Clamp01(lightLeft[i] / lightLife[i]);
                 arcLights[i].intensity = lightPeak[i] * (1 - u) * (1 - u);
+            }
+            // with an Arcanist in the fight, snapshot and sort the boss's model ahead of the first Disintegrate (and start
+            // the worker threads), so the first beam doesn't pay for it
+            if (arc.Count > 0 && (bossSurface == null || !bossSurface.boss) && Time.time >= surfaceWarmAt)
+            {
+                surfaceWarmAt = Time.time + 0.5f;
+                if (!threadsWarm && Application.platform != RuntimePlatform.WebGLPlayer) { threadsWarm = true; System.Threading.Tasks.Task.Run(() => { }); }
+                foreach (var kv in arc) if (kv.Key) { SurfaceOf(kv.Key.transform.position); break; }
             }
             // Disintegrate: energy stripping off the whole beam, harder at each step; at max charge a constant shake and
             // dark debris tearing off the boss
@@ -423,7 +432,7 @@ namespace LastBell.Run
 
         // ================================================================== E1 Magic Missile
         public void MissileTapCast(PlayerController p, Vector3 from, Vector3 dir)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "MissileTapCast", new object[] { p, from, dir });
             EnsureArc(); var at = HandPos(p);
             // a 0.25 m glyph disc at the palm and a short muzzle streak along the shot
             Arc(RingU(0.085f, 0.095f, 32), true, arcAdd, at, FaceCam(at), 0.1f, (b, u) =>
@@ -444,7 +453,7 @@ namespace LastBell.Run
         // the glyph ring at the casting hand (0.36 m): one arc per dart (3, or 5 in Surge), each lighting as its dart is
         // summoned, the newest with a pulse; the unlit arcs stay faint so the ring visibly fills by thirds
         public void MissileChargeStart(PlayerController p)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "MissileChargeStart", new object[] { p });
             var s = St(p); KillH(s.glyph); s.glyph = null; foreach (var h in s.glyphArcs) KillH(h); s.glyphArcs.Clear(); s.glyphFill = 0; s.glyphPulse = -9;
             var kit = Arcanist(p); int cap = kit != null ? kit.MissileCap : 3; bool gold = kit != null && kit.Surging;
             float span = 360f / cap, gap = cap > 3 ? 16 : 22;
@@ -471,7 +480,7 @@ namespace LastBell.Run
         }
 
         public void MissileSummon(PlayerController p, int n)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "MissileSummon", new object[] { p, n });
             var s = St(p); var kit = Arcanist(p); int cap = kit != null ? kit.MissileCap : 3; s.glyphFill = n / (float)cap; s.glyphPulse = Time.time;
             int i = n - 1; if (i < 0 || i >= s.darts.Length) return;
             KillH(s.darts[i]);
@@ -502,7 +511,7 @@ namespace LastBell.Run
         }
 
         public void MissileChargeCancel(PlayerController p)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "MissileChargeCancel", new object[] { p });
             var s = St(p); var hand = HandPos(p);
             for (int i = 0; i < s.darts.Length; i++)
             {
@@ -533,7 +542,7 @@ namespace LastBell.Run
         }
 
         public void MissileVolley(PlayerController p, int n)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "MissileVolley", new object[] { p, n });
             var s = St(p); var at = HandPos(p);
             // the ring flashes full, then erodes; one thin ring is thrown out from it
             foreach (var h in s.glyphArcs)
@@ -551,7 +560,7 @@ namespace LastBell.Run
         // a hovering dart hands over to its projectile (the darts launch 0.05 s apart)
         readonly Vector3[] launchFrom = new Vector3[5]; readonly float[] launchAt = { -9, -9, -9, -9, -9 };
         public void MissileLaunch(PlayerController p, int i)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "MissileLaunch", new object[] { p, i });
             var s = St(p); if (i < 0 || i >= s.darts.Length) return;
             if (s.darts[i] != null && s.darts[i].Alive(this)) { launchFrom[i] = s.darts[i].b.go.transform.position; launchAt[i] = Time.time; }
             KillH(s.darts[i]); s.darts[i] = null;
@@ -559,7 +568,7 @@ namespace LastBell.Run
 
         // a missile in flight: the dart drawn between ticks (extrapolated from the last tick), two short weaving ribbons
         public void Missile(ProjectileSystem.Projectile pr, bool charged, int index = 1, bool surged = false)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "Missile", new object[] { pr, charged, index, surged });
             EnsureArc();
             float tickAt = Time.time; Vector3 lastPos = pr.Pos;
             float phase = Random.value * 6.28f;
@@ -679,9 +688,24 @@ namespace LastBell.Run
         {
             public BossEncounter boss; public float bakedAt = -9;
             public readonly List<Piece> pieces = new List<Piece>();
-            public sealed class Piece { public Renderer r; public bool skinned; public Mesh baked; public readonly List<Vector3> v = new List<Vector3>(); public int[] t; public Matrix4x4 toBoss; public Bounds box; }
+            // cMin/cMax: boxes around each run of Chunk triangles, so a trace only tests the triangles near the beam (the
+            // Tempo Tyrant's sword alone is 170k triangles; testing them all every tick was the Disintegrate lag). The
+            // triangles are sorted by position once (Morton order), so each run is a small patch of his model.
+            // Front (v, t, cMin...) is what traces read; the worker thread fills the back (bv, bt, bMin...) from the
+            // latest pose and the main thread swaps them in once it is done, so sorting and boxing never stall a frame.
+            public sealed class Piece
+            {
+                public Renderer r; public bool skinned, sorted, failed; public Mesh baked;
+                public Vector3[] v, cMin, cMax; public int vn; public int[] t; public Matrix4x4 toBoss; public Bounds box;
+                public Vector3[] bv, bMin, bMax; public int bvn; public int[] bt; public Matrix4x4 bToBoss; public Bounds bBox;
+                public System.Threading.Tasks.Task job;
+            }
         }
-        BossSurface bossSurface;
+        BossSurface bossSurface; float surfaceWarmAt; static bool threadsWarm;
+        // test counters (RunAutoTest): beam contact cost per Beam call, and triangles tested vs the model's total
+        public static double SurfaceMsTotal, SurfaceMsWorst, BakeMsWorst, PoseMsWorst, ChunkMsWorst; public static int SurfaceCalls, SurfaceTraces; public static long SurfaceTrisTested, SurfaceTrisTotal;
+        static readonly System.Diagnostics.Stopwatch surfaceWatch = new System.Diagnostics.Stopwatch(), partWatch = new System.Diagnostics.Stopwatch();
+        static double beamMs0, beamWorst; static int beamCalls0; static long beamTested0, beamTotal0;
         BossSurface SurfaceOf(Vector3 near)
         {
             var bs = bossSurface;
@@ -699,8 +723,22 @@ namespace LastBell.Run
                 foreach (var r in best.GetComponentsInChildren<Renderer>(true))
                     if (r is SkinnedMeshRenderer || (r is MeshRenderer && r.GetComponent<MeshFilter>())) bs.pieces.Add(new BossSurface.Piece { r = r, skinned = r is SkinnedMeshRenderer });
             }
-            if (Time.time - bs.bakedAt >= 0.1f) { bs.bakedAt = Time.time; BakeSurface(bs); }
+            Harvest(bs);
+            if (Time.time - bs.bakedAt >= 0.1f) { bs.bakedAt = Time.time; var w = System.Diagnostics.Stopwatch.StartNew(); BakeSurface(bs); BakeMsWorst = System.Math.Max(BakeMsWorst, w.Elapsed.TotalMilliseconds); }
             return bs;
+        }
+        // swap in what the worker finished: its vertices, sorted triangles, chunk boxes and the pose they belong to
+        static void Harvest(BossSurface bs)
+        {
+            foreach (var pc in bs.pieces)
+            {
+                if (pc.job == null || !pc.job.IsCompleted) continue;
+                if (pc.job.IsFaulted) { pc.failed = true; pc.job = null; pc.vn = 0; continue; }
+                var v = pc.v; pc.v = pc.bv; pc.bv = v; pc.vn = pc.bvn;
+                var mn = pc.cMin; pc.cMin = pc.bMin; pc.bMin = mn; var mx = pc.cMax; pc.cMax = pc.bMax; pc.bMax = mx;
+                pc.t = pc.bt; pc.sorted = true; pc.toBoss = pc.bToBoss; pc.box = pc.bBox; pc.job = null;
+                if (!pc.skinned) pc.bv = null;   // a rigid part keeps only its one copy
+            }
         }
         // only his solid, visible body counts: hidden parts, glows and other see-through layers are skipped
         static void BakeSurface(BossSurface bs)
@@ -708,70 +746,171 @@ namespace LastBell.Run
             var w2b = bs.boss.transform.worldToLocalMatrix;
             foreach (var pc in bs.pieces)
             {
+                if (pc.failed) continue;
                 var r = pc.r; var m = r ? r.sharedMaterial : null;
-                if (!r || !r.enabled || !r.gameObject.activeInHierarchy || !m || m.renderQueue >= 2450) { pc.v.Clear(); continue; }
+                if (!r || !r.enabled || !r.gameObject.activeInHierarchy || !m || m.renderQueue >= 2450) { pc.vn = 0; continue; }
+                if (pc.job != null) continue;   // still working on the last snapshot: keep tracing the one before it
                 try
                 {
                     if (pc.skinned)
                     {
-                        var sk = (SkinnedMeshRenderer)r; if (!sk.sharedMesh) { pc.v.Clear(); continue; }
+                        var sk = (SkinnedMeshRenderer)r; if (!sk.sharedMesh) { pc.vn = 0; continue; }
                         if (!pc.baked) pc.baked = new Mesh { name = "FX_MS_BossSurface" };
-                        sk.BakeMesh(pc.baked, true); pc.baked.GetVertices(pc.v);
-                        if (pc.t == null) pc.t = pc.baked.triangles;
-                        pc.baked.RecalculateBounds(); pc.box = pc.baked.bounds;
-                        pc.toBoss = w2b * Matrix4x4.TRS(r.transform.position, r.transform.rotation, Vector3.one);
+                        partWatch.Restart();
+                        sk.BakeMesh(pc.baked, true);
+                        using (var md = Mesh.AcquireReadOnlyMeshData(pc.baked))
+                        {
+                            int n = md[0].vertexCount; if (pc.bv == null || pc.bv.Length < n) pc.bv = new Vector3[n];
+                            var na = new Unity.Collections.NativeArray<Vector3>(n, Unity.Collections.Allocator.Temp, Unity.Collections.NativeArrayOptions.UninitializedMemory);
+                            md[0].GetVertices(na); Unity.Collections.NativeArray<Vector3>.Copy(na, pc.bv, n); na.Dispose(); pc.bvn = n;
+                        }
+                        if (pc.bt == null) pc.bt = pc.baked.triangles;
+                        PoseMsWorst = System.Math.Max(PoseMsWorst, partWatch.Elapsed.TotalMilliseconds);
+                        pc.bToBoss = w2b * Matrix4x4.TRS(r.transform.position, r.transform.rotation, Vector3.one);
                     }
                     else
                     {
-                        var mesh = r.GetComponent<MeshFilter>().sharedMesh; if (!mesh || !mesh.isReadable) { pc.v.Clear(); continue; }
-                        if (pc.t == null) { mesh.GetVertices(pc.v); pc.t = mesh.triangles; pc.box = mesh.bounds; }
-                        pc.toBoss = w2b * r.transform.localToWorldMatrix;
+                        var mesh = r.GetComponent<MeshFilter>().sharedMesh; if (!mesh || !mesh.isReadable) { pc.vn = 0; continue; }
+                        var tb = w2b * r.transform.localToWorldMatrix;
+                        if (pc.cMin != null) { pc.toBoss = tb; pc.vn = pc.v.Length; continue; }   // a rigid part: built once, only its placement moves
+                        pc.bv = mesh.vertices; pc.bvn = pc.bv.Length; pc.bt = mesh.triangles; pc.bToBoss = tb;
                     }
-                    pc.box.Expand(0.05f);
+                    Launch(pc);
                 }
-                catch (System.Exception) { pc.v.Clear(); pc.t = null; }
+                catch (System.Exception) { pc.vn = 0; pc.failed = true; }
             }
         }
+        // sort (first time only) and box the back copy off the main thread; WebGL has no threads, so it runs inline there
+        static void Launch(BossSurface.Piece pc)
+        {
+            bool sort = !pc.sorted;
+            System.Action work = () =>
+            {
+                var w = System.Diagnostics.Stopwatch.StartNew();
+                if (sort) pc.bt = SortSpatially(pc.bv, pc.bvn, pc.bt);
+                BuildChunks(pc);
+                ChunkMsWorst = System.Math.Max(ChunkMsWorst, w.Elapsed.TotalMilliseconds);
+            };
+            if (Application.platform == RuntimePlatform.WebGLPlayer) { work(); pc.job = System.Threading.Tasks.Task.CompletedTask; }
+            else pc.job = System.Threading.Tasks.Task.Run(work);
+        }
+        // reorder the triangles along a Morton curve through their centres, so consecutive triangles are neighbours on the
+        // model and each chunk box stays small
+        static int[] SortSpatially(Vector3[] v, int n, int[] t)
+        {
+            int tris = t.Length / 3;
+            var mn = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue); var mx = -mn;
+            for (int i = 0; i < n; i++) { mn = Vector3.Min(mn, v[i]); mx = Vector3.Max(mx, v[i]); }
+            var size = mx - mn; size = new Vector3(Mathf.Max(size.x, 1e-4f), Mathf.Max(size.y, 1e-4f), Mathf.Max(size.z, 1e-4f));
+            var keys = new uint[tris]; var order = new int[tris];
+            for (int k = 0; k < tris; k++)
+            {
+                order[k] = k; int i0 = t[k * 3], i1 = t[k * 3 + 1], i2 = t[k * 3 + 2];
+                if (i0 >= n || i1 >= n || i2 >= n) { keys[k] = uint.MaxValue; continue; }
+                var c = (v[i0] + v[i1] + v[i2]) * (1f / 3) - mn;
+                keys[k] = Morton((uint)Mathf.Clamp(c.x / size.x * 1023, 0, 1023), (uint)Mathf.Clamp(c.y / size.y * 1023, 0, 1023), (uint)Mathf.Clamp(c.z / size.z * 1023, 0, 1023));
+            }
+            System.Array.Sort(keys, order);
+            var nt = new int[tris * 3];
+            for (int k = 0; k < tris; k++) { int o = order[k] * 3; nt[k * 3] = t[o]; nt[k * 3 + 1] = t[o + 1]; nt[k * 3 + 2] = t[o + 2]; }
+            return nt;
+        }
+        static uint Spread(uint x) { x &= 1023u; x = (x | (x << 16)) & 0x030000FF; x = (x | (x << 8)) & 0x0300F00F; x = (x | (x << 4)) & 0x030C30C3; return (x | (x << 2)) & 0x09249249; }
+        static uint Morton(uint x, uint y, uint z) => Spread(x) | (Spread(y) << 1) | (Spread(z) << 2);
+        const int Chunk = 32;   // triangles per chunk box
+        // the back copy's chunk boxes and overall box (worker thread: plain arrays and maths only)
+        static void BuildChunks(BossSurface.Piece pc)
+        {
+            var v = pc.bv; var t = pc.bt; int n = pc.bvn, end = t.Length / 3 * 3, cs = (t.Length / 3 + Chunk - 1) / Chunk;
+            if (pc.bMin == null || pc.bMin.Length != cs) { pc.bMin = new Vector3[cs]; pc.bMax = new Vector3[cs]; }
+            var cMin = pc.bMin; var cMax = pc.bMax;
+            float bx0 = float.MaxValue, by0 = float.MaxValue, bz0 = float.MaxValue, bx1 = float.MinValue, by1 = float.MinValue, bz1 = float.MinValue;
+            for (int c = 0; c < cs; c++)
+            {
+                float x0 = float.MaxValue, y0 = float.MaxValue, z0 = float.MaxValue, x1 = float.MinValue, y1 = float.MinValue, z1 = float.MinValue;
+                for (int i = c * Chunk * 3, e = System.Math.Min(end, (c + 1) * Chunk * 3); i < e; i++)
+                {
+                    int k = t[i]; if (k >= n) continue; var p = v[k];
+                    if (p.x < x0) x0 = p.x; if (p.x > x1) x1 = p.x; if (p.y < y0) y0 = p.y; if (p.y > y1) y1 = p.y; if (p.z < z0) z0 = p.z; if (p.z > z1) z1 = p.z;
+                }
+                cMin[c] = new Vector3(x0 - 0.001f, y0 - 0.001f, z0 - 0.001f); cMax[c] = new Vector3(x1 + 0.001f, y1 + 0.001f, z1 + 0.001f);
+                if (x0 < bx0) bx0 = x0; if (y0 < by0) by0 = y0; if (z0 < bz0) bz0 = z0; if (x1 > bx1) bx1 = x1; if (y1 > by1) by1 = y1; if (z1 > bz1) bz1 = z1;
+            }
+            var box = new Bounds(); box.SetMinMax(new Vector3(bx0, by0, bz0), new Vector3(bx1, by1, bz1)); box.Expand(0.05f); pc.bBox = box;
+        }
+        // does o + d*t (id = 1/d per axis) cross the box for some 0 <= t <= maxT
+        static bool RayBox(Vector3 o, Vector3 id, Vector3 mn, Vector3 mx, float maxT)
+        {
+            float a = (mn.x - o.x) * id.x, b = (mx.x - o.x) * id.x; float lo = a < b ? a : b, hi = a < b ? b : a;
+            a = (mn.y - o.y) * id.y; b = (mx.y - o.y) * id.y; float l2 = a < b ? a : b, h2 = a < b ? b : a; if (l2 > lo) lo = l2; if (h2 < hi) hi = h2;
+            a = (mn.z - o.z) * id.z; b = (mx.z - o.z) * id.z; l2 = a < b ? a : b; h2 = a < b ? b : a; if (l2 > lo) lo = l2; if (h2 < hi) hi = h2;
+            return hi >= (lo > 0 ? lo : 0) && lo <= maxT;
+        }
+        static float Inv(float x) => 1 / (Mathf.Abs(x) < 1e-12f ? (x < 0 ? -1e-12f : 1e-12f) : x);
         // the nearest point where o + d*t (d a unit vector, 0.05 < t < maxT) meets his drawn model, either side of a face
         static bool TraceSurface(BossSurface bs, Vector3 o, Vector3 d, float maxT, out float hitT)
         {
             hitT = maxT; bool any = false; var b2w = bs.boss.transform.localToWorldMatrix;
             foreach (var pc in bs.pieces)
             {
-                if (pc.v.Count == 0 || pc.t == null) continue;
+                if (pc.vn == 0 || pc.t == null || pc.cMin == null) continue;
+                SurfaceTrisTotal += pc.t.Length / 3;
                 var inv = (b2w * pc.toBoss).inverse; var lo = inv.MultiplyPoint3x4(o); var ld = inv.MultiplyVector(d);
-                if (ld.sqrMagnitude < 1e-12f || !pc.box.IntersectRay(new Ray(lo, ld))) continue;
-                var v = pc.v; var t = pc.t; int n = v.Count;
-                for (int i = 0; i + 2 < t.Length; i += 3)
+                if (ld.sqrMagnitude < 1e-12f) continue;
+                var idir = new Vector3(Inv(ld.x), Inv(ld.y), Inv(ld.z));
+                if (!RayBox(lo, idir, pc.box.min, pc.box.max, hitT)) continue;
+                var v = pc.v; var t = pc.t; int n = pc.vn, end = t.Length / 3 * 3; var cMin = pc.cMin; var cMax = pc.cMax;
+                for (int c = 0; c < cMin.Length; c++)
                 {
-                    int i0 = t[i], i1 = t[i + 1], i2 = t[i + 2]; if (i0 >= n || i1 >= n || i2 >= n) continue;
-                    var a = v[i0]; var e1 = v[i1] - a; var e2 = v[i2] - a;
-                    var pv = Vector3.Cross(ld, e2); float det = Vector3.Dot(e1, pv); if (det > -1e-10f && det < 1e-10f) continue;
-                    float id = 1 / det; var tv = lo - a; float u = Vector3.Dot(tv, pv) * id; if (u < 0 || u > 1) continue;
-                    var qv = Vector3.Cross(tv, e1); float w = Vector3.Dot(ld, qv) * id; if (w < 0 || u + w > 1) continue;
-                    float tt = Vector3.Dot(e2, qv) * id; if (tt > 0.05f && tt < hitT) { hitT = tt; any = true; }
+                    if (!RayBox(lo, idir, cMin[c], cMax[c], hitT)) continue;
+                    SurfaceTrisTested += Chunk;
+                    for (int i = c * Chunk * 3, e = System.Math.Min(end, (c + 1) * Chunk * 3); i < e; i += 3)
+                    {
+                        int i0 = t[i], i1 = t[i + 1], i2 = t[i + 2]; if (i0 >= n || i1 >= n || i2 >= n) continue;
+                        var a = v[i0]; var e1 = v[i1] - a; var e2 = v[i2] - a;
+                        var pv = Vector3.Cross(ld, e2); float det = Vector3.Dot(e1, pv); if (det > -1e-10f && det < 1e-10f) continue;
+                        float id = 1 / det; var tv = lo - a; float u = Vector3.Dot(tv, pv) * id; if (u < 0 || u > 1) continue;
+                        var qv = Vector3.Cross(tv, e1); float w = Vector3.Dot(ld, qv) * id; if (w < 0 || u + w > 1) continue;
+                        float tt = Vector3.Dot(e2, qv) * id; if (tt > 0.05f && tt < hitT) { hitT = tt; any = true; }
+                    }
                 }
             }
             return any;
         }
         // where the drawn beam ends: its own line onto his model; if that slips past him (between the legs, over a
-        // shoulder), toward his centre line at the contact height, then a little above and below; else the hit-body point
-        Vector3 SurfaceEnd(Vector3 from, Vector3 end)
+        // shoulder), toward his centre line at the contact height, then a little above and below; else the hit-body point.
+        // Traced once per pose snapshot (10 a second) or when the beam turns; in between, the last contact rides along with
+        // the boss and is projected onto the current beam.
+        Vector3 SurfaceEnd(ArcState s, Vector3 from, Vector3 end)
         {
             var bs = SurfaceOf(end); if (bs == null) return end;
-            var bp = bs.boss.transform.position; float reach = bs.boss.BodyRadius * 2 + 0.6f;
+            var dir = end - from; float dl = dir.magnitude; if (dl < 0.1f) return end; dir /= dl;
+            var btr = bs.boss.transform;
+            if (s.contactBoss == bs.boss && s.contactAt >= bs.bakedAt && Vector3.Dot(dir, s.contactDir) > 0.9986f)   // within 3 degrees
+            {
+                if (!s.contactOnModel) return end;
+                float along = Vector3.Dot(btr.TransformPoint(s.contactLocal) - from, dir);
+                if (along > 0.1f) return from + dir * along;
+            }
+            SurfaceTraces++;
+            s.contactBoss = bs.boss; s.contactAt = Time.time; s.contactDir = dir; s.contactOnModel = false;
+            var bp = btr.position; float reach = bs.boss.BodyRadius * 2 + 0.6f;
             for (int k = 0; k < 4; k++)
             {
                 var aim = k == 0 ? end : new Vector3(bp.x, end.y + (k == 2 ? 0.4f : k == 3 ? -0.4f : 0), bp.z);
                 var d = aim - from; float len = d.magnitude; if (len < 0.1f) continue; d /= len;
-                if (TraceSurface(bs, from, d, len + reach, out float t)) return from + d * t;
+                if (TraceSurface(bs, from, d, len + reach, out float t))
+                {
+                    var hitAt = from + d * t; s.contactOnModel = true; s.contactLocal = btr.InverseTransformPoint(hitAt);
+                    return hitAt;
+                }
             }
             return end;
         }
         static float SheathW(int step) => step == 1 ? 0.22f : step == 2 ? 0.32f : 0.46f;
         static float CoreW(int step) => step == 1 ? 0.035f : step == 2 ? 0.05f : 0.075f;
         public void BeamWindup(PlayerController p, int ticks)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "BeamWindup", new object[] { p, ticks });
             var s = St(p); foreach (var h in s.lens) KillH(h); s.lens.Clear();
             float life = ticks / (float)Sim.Hz;
             for (int k = 0; k < 3; k++)
@@ -800,9 +939,10 @@ namespace LastBell.Run
         }
 
         public void BeamStart(PlayerController p)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "BeamStart", new object[] { p });
             var s = St(p); foreach (var h in s.beam) KillH(h); s.beam.Clear();
             s.beamStart = Time.time; s.ashAcc = 0; s.shedAcc = 0; s.beamStep = 1;
+            beamMs0 = SurfaceMsTotal; beamCalls0 = SurfaceCalls; beamTested0 = SurfaceTrisTested; beamTotal0 = SurfaceTrisTotal; beamWorst = 0;
             // layers: 0 void sheath (dark, alpha), 1-2 ultraviolet rim lines on the sheath's edges, 3 bright core.
             // Turbulent, not tidy: the sheath's edges are eaten by fast noise, the core flickers in width, and at max charge
             // the whole beam is far heavier.
@@ -911,9 +1051,13 @@ namespace LastBell.Run
         }
 
         public void Beam(PlayerController p, Vector3 from, Vector3 dir, Vector3 end, int step, bool hit)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "Beam", new object[] { p, from, dir, end, step, hit });
             var s = St(p);
-            if (hit) end = SurfaceEnd(from, end);   // drawn on his armour, not his hit body (presentation only)
+            if (hit)
+            {
+                surfaceWatch.Restart(); end = SurfaceEnd(s, from, end);   // drawn on his armour, not his hit body (presentation only)
+                double ms = surfaceWatch.Elapsed.TotalMilliseconds; SurfaceMsTotal += ms; SurfaceCalls++; if (ms > SurfaceMsWorst) SurfaceMsWorst = ms; if (ms > beamWorst) beamWorst = ms;
+            }
             if (step > s.beamStep && s.beam.Count > 0)
             {
                 s.stepPulse = Time.time; var lensAt = s.rig ? s.rig.CorePos : HandPos(p) + dir * 0.42f;
@@ -938,8 +1082,11 @@ namespace LastBell.Run
             s.beamFrom = from; s.beamEnd = end; s.beamStep = step; s.beamHit = hit;
         }
         public void BeamEnd(PlayerController p, bool broken)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "BeamEnd", new object[] { p, broken });
             var s = St(p);
+            int calls = SurfaceCalls - beamCalls0;
+            if (calls > 0 && bossSurface != null && bossSurface.boss)
+                Debug.Log($"[arcanist] Disintegrate contact on {bossSurface.boss.GetType().Name}: {calls} traces, avg {(SurfaceMsTotal - beamMs0) / calls:0.000} ms, worst {beamWorst:0.00} ms, tested {SurfaceTrisTested - beamTested0} of {SurfaceTrisTotal - beamTotal0} triangles");
             var from = HandPos(p); var to = s.beamEnd; var d = to - from; float len = d.magnitude;
             foreach (var h in s.beam) KillH(h); s.beam.Clear();
             if (s.beamHit) s.ashTail = Time.time + 0.3f;
@@ -985,7 +1132,7 @@ namespace LastBell.Run
             LensApart(p, broken);
         }
         public void BeamCancel(PlayerController p)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "BeamCancel", new object[] { p });
             LensApart(p, true); var hand = HandPos(p);
             for (int k = 0; k < 12; k++) arcSparks.Emit(hand, Random.onUnitSphere * 2.5f, 0.05f, 0.25f);
         }
@@ -1245,7 +1392,7 @@ namespace LastBell.Run
 
         // ================================================================== E3 Rune Sigil
         public void SigilPlace(PlayerController p, int id, Vector3 pos, int armTicks, bool powered = true)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "SigilPlace", new object[] { p, id, pos, armTicks, powered });
             EnsureArc();
             float life = armTicks / (float)Sim.Hz, hold = life + 0.12f; float R = ArcanistKit.SigilRadius;
             var m = new MarkFx { pos = new Vector3(pos.x, 0.04f, pos.z), start = Time.time, life = life, ringYaw = Random.value * 360 };
@@ -1261,7 +1408,7 @@ namespace LastBell.Run
         }
 
         public void SigilExplode(int id, Vector3 pos, bool hit)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "SigilExplode", new object[] { id, pos, hit });
             if (!marks.TryGetValue(id, out var m)) return;
             marks.Remove(id); foreach (var h in m.parts) KillH(h);
             var c = new Vector3(pos.x, 0.04f, pos.z); float R = ArcanistKit.SigilRadius;
@@ -1327,7 +1474,7 @@ namespace LastBell.Run
             for (int j = 0; j < (m.weak ? 6 : 16); j++) arcSparks.Emit(c + Vector3.up * 0.4f, (Random.insideUnitSphere + Vector3.up * 0.8f) * 7f * k, 0.07f, 0.3f);
             CameraShake.Shake(m.weak ? 0.05f : 0.12f, 0.15f);
         }
-        public void SigilFade(int id) => FadeMark(id);
+        public void SigilFade(int id) { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "SigilFade", new object[] { id }); FadeMark(id); }
         void FadeMark(int id)
         {
             if (!marks.TryGetValue(id, out var m)) return;
@@ -1391,7 +1538,7 @@ namespace LastBell.Run
         }
 
         public void GlyphGain(PlayerController p, int count, Vector3 from)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "GlyphGain", new object[] { p, count, from });
             if (!p) return;
             var s = St(p); int i = count - 1; if (i < 0 || i >= ArcanistKit.MaxGlyphs) return;
             ArcanistTick(p); KillGlyph(s, i);
@@ -1460,7 +1607,7 @@ namespace LastBell.Run
 
         // a glyph spent on a rune: it leaves its socket and arcs into the rune's centre, landing with a gold flash
         public void GlyphSpend(PlayerController p, int remaining, Vector3 target)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "GlyphSpend", new object[] { p, remaining, target });
             if (!p) return;
             var s = St(p); int i = remaining; if (i < 0 || i >= ArcanistKit.MaxGlyphs) return;
             var from = s.glyphOrbs[i] != null && s.glyphOrbs[i][0].Alive(this) ? s.glyphOrbs[i][0].b.go.transform.position : GlyphSocket(p, s, i);
@@ -1525,7 +1672,7 @@ namespace LastBell.Run
         // the glyphs spent. Active (2 s per glyph): a gold foot ring, a chest ring that empties as the timer, a crown of the
         // spent glyphs, a faint rim of light on the body, rising motes; the last second flickers; the end folds inward.
         public void SurgeCharge(PlayerController p, int glyphs, int ticks)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "SurgeCharge", new object[] { p, glyphs, ticks });
             if (!p) return;
             var s = St(p); float life = ticks / (float)Sim.Hz; s.surgeCastLife = life * 0.85f; s.surgePull = Time.time; s.snapFrom = 0;
             if (s.rig) s.rig.SurgeCharge(life);   // the core brightens toward gold and the cage spins up as the glyphs arrive
@@ -1563,7 +1710,7 @@ namespace LastBell.Run
             var sq = GlyphSocket(p, s, i); for (int k = 0; k < 4; k++) { var off = Random.onUnitSphere * 0.3f; arcMotes.Emit(sq + off, -off / 0.1f, 0.06f, 0.1f); }
         }
         public void SurgeCancel(PlayerController p)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "SurgeCancel", new object[] { p });
             if (!p) return;
             var s = St(p);
             s.snapFrom = s.surgePull >= 0 ? Ease(Mathf.Clamp01((Time.time - s.surgePull) / s.surgeCastLife)) : 0; s.surgeSnap = Time.time; s.surgePull = -1;
@@ -1579,7 +1726,7 @@ namespace LastBell.Run
         }
 
         public void SurgeStart(PlayerController p, int glyphs, int ticks)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "SurgeStart", new object[] { p, glyphs, ticks });
             if (!p) return;
             var s = St(p);
             foreach (var h in s.surgeCast) KillH(h); s.surgeCast.Clear(); s.surgePull = -1; s.snapFrom = 0;
@@ -1734,7 +1881,7 @@ namespace LastBell.Run
         }
 
         public void SurgeEnd(PlayerController p)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "SurgeEnd", new object[] { p });
             if (!p || !arc.TryGetValue(p, out var s)) return;
             if (s.rig) s.rig.SurgeOff();
             if (s.surge.Count == 0) return;
@@ -1768,7 +1915,7 @@ namespace LastBell.Run
         // The mark is a large rune drawn over the whole fall (its outer ring is the timer); the comet itself starts far
         // up out of view and slams down in the last part of the fall, landing as the rune completes.
         public void CometMark(PlayerController p, int id, Vector3 pos, int fallTicks, bool powered = true)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "CometMark", new object[] { p, id, pos, fallTicks, powered });
             EnsureArc();
             float life = fallTicks / (float)Sim.Hz; float R = ArcanistKit.CometRadius, C = ArcanistKit.CometCore;
             var c = new Vector3(pos.x, 0.045f, pos.z);
@@ -1929,7 +2076,7 @@ namespace LastBell.Run
         }
 
         public void CometImpact(int id, Vector3 pos, bool hit, bool bull)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "CometImpact", new object[] { id, pos, hit, bull });
             if (!marks.TryGetValue(id, out var m)) return;
             marks.Remove(id);
             m.snuffAt = Time.time;
@@ -2065,7 +2212,7 @@ namespace LastBell.Run
             ArcLight(c + Vector3.up * 0.6f, CometViolet, (bull ? 16f : 13f) * kb, 8f * k, 0.3f);
             CameraShake.Shake(m.weak ? 0.3f : bull ? 0.8f : 0.55f, bull ? 0.45f : 0.38f);
         }
-        public void CometFade(int id) => FadeMark(id);
+        public void CometFade(int id) { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "CometFade", new object[] { id }); FadeMark(id); }
         // a few more embers lifting off the seams over the next second
         System.Collections.IEnumerator CraterEmbers(Vector3 c, float k)
         {
@@ -2113,7 +2260,7 @@ namespace LastBell.Run
 
         // ================================================================== E6 Blink
         public void BlinkOut(PlayerController p)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "BlinkOut", new object[] { p });
             var s = St(p); var at = p.transform.position; s.blinkFrom = at;
             Arc(DashedRing(0.5f, 0.54f, 6, 14, 10), true, arcAddFloor, new Vector3(at.x, 0.05f, at.z), Quaternion.Euler(0, Random.value * 60, 0), 0.15f, (b, u) =>
             {
@@ -2172,7 +2319,7 @@ namespace LastBell.Run
         }
 
         public void BlinkIn(PlayerController p)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "BlinkIn", new object[] { p });
             var s = St(p); var at = p.transform.position;
             if (s.thread != null && s.thread.Alive(this))
             {
@@ -2220,7 +2367,7 @@ namespace LastBell.Run
         }
 
         public void BlinkBlocked(PlayerController p)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "BlinkBlocked", new object[] { p });
             var s = St(p);
             if (s.thread != null) { KillH(s.thread); s.thread = null; }
             // the departure silhouette goes at once, so it never stands beside his body

@@ -27,7 +27,7 @@ namespace LastBell.Run
             if (d.State == RunState.Combat) yield return TollbreakerSolo(20f);
             if (d.State == RunState.Combat) { d.Boss.DebugDefeat(); yield return Until(() => d.State != RunState.Combat, 2, "tollbreaker boss defeated"); }
             yield return Until(() => d.State == RunState.Results, 8, "tollbreaker results");
-            Check("Tollbreaker run reaches victory", d.Victory && d.EncountersCleared == 4);
+            Check("Tollbreaker run reaches victory", d.Victory && d.EncountersCleared == d.EncounterOrder.Length);
             d.ReturnToMenu(); yield return null;
         }
 

@@ -17,7 +17,7 @@ namespace LastBell.Run
         const int N = 8;
         const float FallS = 1.4f, Drop = 4.5f, Shrink = 0.45f, Tilt = 16f, Lip = 0.45f, Tremble = 0.05f, HoleShade = 0.18f;
         static readonly Color LipColor = new Color(0.86f, 0.82f, 0.74f);
-        LastLight lastLight; Renderer floor; Material holeMat, holeDepthMat, lipMat;
+        List<Hazard> sectors; Renderer floor; Material holeMat, holeDepthMat, lipMat;
         readonly Transform[] pivot = new Transform[N];        // each slice hangs from a pivot at its middle, so it can tip and shrink
         readonly Vector3[] rest = new Vector3[N];
         readonly Renderer[] slab = new Renderer[N], hole = new Renderer[N], lip = new Renderer[N];   // lip[s]: the cut at yaw s*45+22.5
@@ -29,14 +29,32 @@ namespace LastBell.Run
         public static IEnumerable<int> During(CombatWorld world, LastLight light, IEnumerable<int> run)
         {
             var go = new GameObject("Last Light floor fx"); go.transform.SetParent(world.Root, false);
-            var fx = go.AddComponent<LastLightFloorFx>(); fx.lastLight = light;
+            var fx = go.AddComponent<LastLightFloorFx>(); fx.sectors = light.Sectors; fx.host = true;
             if (!fx.Split()) fx.enabled = false;
             // readability A2: the camera keeps the boss in view with you for the whole phase (every arena, not only the Spire)
             var boss = light.BossBody; Func<Vector3?> frame = () => boss ? boss.position : (Vector3?)null;
             RunDirector.FrameAlso = frame;
+            Networking.LanFx.Record?.Invoke(Networking.LanFxTarget.Replica, "LastLightBegin", new object[0]);
             try { foreach (var w in run) yield return w; }
-            finally { fx.Restore(); Destroy(go); if (RunDirector.FrameAlso == frame) RunDirector.FrameAlso = null; }
+            finally
+            {
+                fx.Restore(); Destroy(go); if (RunDirector.FrameAlso == frame) RunDirector.FrameAlso = null;
+                Networking.LanFx.Record?.Invoke(Networking.LanFxTarget.Replica, "LastLightEnd", new object[0]);
+            }
         }
+
+        // LAN client: the same floor, fed the host's sector hazards (stand-ins) one by one; End() puts the floor back
+        bool host; Func<Vector3?> clientFrame;
+        public static LastLightFloorFx Replica(CombatWorld world, Transform boss)
+        {
+            var go = new GameObject("Last Light floor fx (LAN)"); go.transform.SetParent(world.Root, false);
+            var fx = go.AddComponent<LastLightFloorFx>(); fx.sectors = new List<Hazard>();
+            if (!fx.Split()) fx.enabled = false;
+            fx.clientFrame = () => boss ? boss.position : (Vector3?)null; RunDirector.FrameAlso = fx.clientFrame;
+            return fx;
+        }
+        public void AddSector(Hazard h) => sectors?.Add(h);
+        public void End() { if (clientFrame != null && RunDirector.FrameAlso == clientFrame) RunDirector.FrameAlso = null; Restore(); Destroy(gameObject); }
 
         void Awake() => mpb = new MaterialPropertyBlock();
 
@@ -130,8 +148,12 @@ namespace LastBell.Run
 
         void LateUpdate()
         {
-            var secs = lastLight.Sectors;
-            for (; seen < secs.Count; seen++) { int s = SectorOf(secs[seen].Yaw); if (!fallen[s]) warn[s] = secs[seen]; }
+            var secs = sectors;
+            for (; seen < secs.Count; seen++)
+            {
+                if (host) Networking.LanFx.Record?.Invoke(Networking.LanFxTarget.Replica, "LastLightSector", new object[] { secs[seen].Id });
+                int s = SectorOf(secs[seen].Yaw); if (!fallen[s]) warn[s] = secs[seen];
+            }
             for (int s = 0; s < N; s++)
             {
                 if (!pivot[s]) continue;
@@ -175,7 +197,7 @@ namespace LastBell.Run
         }
 
         // also on destroy: a fight torn down mid-phase (back to the menu, a test reset) drops the script without disposing it
-        void OnDestroy() => Restore();
+        void OnDestroy() { if (clientFrame != null && RunDirector.FrameAlso == clientFrame) RunDirector.FrameAlso = null; Restore(); }
         void Restore()
         {
             if (floor) floor.enabled = true;

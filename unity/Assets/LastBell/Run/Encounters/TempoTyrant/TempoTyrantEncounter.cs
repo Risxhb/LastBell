@@ -45,10 +45,28 @@ namespace LastBell.Run
     public sealed partial class TempoTyrantEncounter : BossEncounter
     {
         public override string Id => "boss.tempo-tyrant";
-        public override string DisplayName => "The Tempo Tyrant";
-        public override string Lesson => "Follow the numbered 1-2-3 into cleared ground; the slow tempo is your opening";
+        public override string DisplayName => Overclocked ? "The Tempo Tyrant, Overclocked" : "The Tempo Tyrant";
+        public override string Lesson => Overclocked ? "Broken Cadence from half health, mirrored wakes in both tempos: no slow tempo is safe"
+            : "Follow the numbered 1-2-3 into cleared ground; the slow tempo is your opening";
         public override bool Placeholder => Rig == null || !Rig.HasModel;   // the Meshy model, unless Resources/Characters/TempoTyrant is missing
-        public override float NextPhaseFraction() => 0.19f;
+        public override float NextPhaseFraction() => Overclocked ? 0.49f : 0.19f;
+
+        // ---------------- Overclocked (the campaign's bonus fight after a Hard Bellkeeper win, Campaign.cs) ----------------
+        // The same kit pushed: more health, Broken Cadence from 50% instead of 20%, Falling Hours from 20% instead of 10%, and
+        // the Mirrored Wake in both tempos. Every overlap is still one of the route-checked Broken Cadence pairings, and a
+        // mirrored lane in Normal has more time than the Haste one that is already checked. Provisional numbers.
+        public bool Overclocked { get; private set; }
+        public const int OverclockedHp = 3600;
+        public const float OverclockedFrenzyAt = 0.5f, OverclockedOrbsAt = 0.2f;
+        static bool spawnOverclocked;
+        public static TempoTyrantEncounter SpawnOverclocked(CombatWorld w, Vector3 pos, float yaw)
+        {
+            spawnOverclocked = true;
+            try { return Spawn<TempoTyrantEncounter>(w, pos, yaw); } finally { spawnOverclocked = false; }
+        }
+        bool BelowFrenzy => Overclocked ? Hp * 2 < MaxHp : Hp * 5 < MaxHp;   // strictly below 50% / 20%
+        bool BelowOrbs => Overclocked ? Hp * 5 < MaxHp : Hp * 10 < MaxHp;    // strictly below 20% / 10%
+        bool MirrorTempo => Clock.State == Tempo.Haste || Overclocked;
 
         // ---------------- tunables (see the tunables table in the encounter doc) ----------------
         public const float CentreGate = 1.5f;                     // combo/crown start only this close to the arena centre
@@ -189,7 +207,14 @@ namespace LastBell.Run
         public string ForcedNext;   // dev/test hook only
         static readonly Atk[] Rotation = { Atk.Severance, Atk.Wake, Atk.Crown, Atk.Slices, Atk.Severance, Atk.Crown, Atk.Wake, Atk.Slices };
 
-        void Awake() { MaxHp = 2600; BodyRadius = 1.4f; HitHeight = 2.0f; MarkHeight = 4.4f; }
+        void Awake() { Overclocked = spawnOverclocked; MaxHp = Overclocked ? OverclockedHp : 2600; BodyRadius = 1.4f; HitHeight = 2.0f; MarkHeight = 4.4f; }
+
+        // LAN client: the host's HUD state for TempoTyrantHud (the replica never runs the script)
+        public void ApplyReplicaHud(bool frenzy, string announcement, List<Networking.LanWorldFrame.Number> numbers)
+        {
+            Frenzy = frenzy; Announcement = announcement ?? "";
+            Numbers.Clear(); foreach (var n in numbers) Numbers.Add((new Vector3(n.X, n.Y, n.Z), n.N, n.Imminent));
+        }
 
         protected override void Build()
         {
@@ -203,7 +228,7 @@ namespace LastBell.Run
 
         // practice phase row: Phase 2 is Broken Cadence (strictly below 20%), as at the end of its tell. The tempo still
         // alternates on its own clock, and Falling Hours still starts below 10%.
-        public override float[] PhaseStarts => new[] { 1f, 0.199f };
+        public override float[] PhaseStarts => Overclocked ? new[] { 1f, 0.499f } : new[] { 1f, 0.199f };
         public override int PhaseNumber => Frenzy ? 2 : 1;
         protected override void EnterPhase(int n)
         {
@@ -225,10 +250,10 @@ namespace LastBell.Run
             while (true)
             {
                 // ---- complete block boundary: queued state changes happen only here ----
-                if (!Frenzy && !FrenzyPending && Hp * 5 < MaxHp) FrenzyPending = true;   // strictly below 20%
+                if (!Frenzy && !FrenzyPending && BelowFrenzy) FrenzyPending = true;   // strictly below 20% (Overclocked: 50%)
                 if (FrenzyPending)
                     foreach (var w in FrenzyTell()) yield return w;
-                if (!OrbsOn && Hp * 10 < MaxHp)   // strictly below 10%: Falling Hours (TempoTyrantEncounter.Orbs.cs)
+                if (!OrbsOn && BelowOrbs)   // strictly below 10% (Overclocked: 20%): Falling Hours (TempoTyrantEncounter.Orbs.cs)
                     foreach (var w in OrbTell()) yield return w;
                 if (Clock.Pending)
                     foreach (var w in TempoTransition()) yield return w;
@@ -612,8 +637,8 @@ namespace LastBell.Run
             if (c == 0) LastMirror = null;
             BellkeeperFx.Telegraph mirrorPreview = null;
             var (mOrigin, mYaw) = MirrorLane(start, yaw);
-            bool mirror = Clock.State == Tempo.Haste && MirrorUseful(yaw);
-            if (Clock.State == Tempo.Haste && !mirror) MirrorSkips++;
+            bool mirror = MirrorTempo && MirrorUseful(yaw);
+            if (MirrorTempo && !mirror) MirrorSkips++;
             if (mirror)
             {
                 mirrorPreview = W.BossFx.Lane(travelLen, FissureWidth); mirrorPreview.Memory(); mirrorPreview.Place(mOrigin, mYaw);
@@ -648,7 +673,7 @@ namespace LastBell.Run
             int serial = ++fissureSerial;
             var f = new Hazard { Source = "Sundering Wake (eruption" + tag + ")", Shape = HazardShape.Lane, Kind = HazardKind.Ground, Origin = start, Yaw = yaw,
                 Length = travelLen, Width = FissureWidth, LockAt = 0, ResolveAt = fissureWarn, Damage = FissureDmg, Knockback = 1f };
-            f.OnResolve = hz => { FissureEruptions++; Fx.Streak(hz.Origin, hz.Yaw, 0, hz.Length, RimAmber, hz.Width * 0.5f); if (serial == fissureSerial) Rig.Fissure(false); };
+            f.OnResolve = hz => { FissureEruptions++; Fx.Streak(hz.Origin, hz.Yaw, 0, hz.Length, RimAmber, hz.Width * 0.5f); if (serial == fissureSerial) Fissure(false); };
             LastFissure = Live(f, true);
             if (mirror)
             {
@@ -660,7 +685,7 @@ namespace LastBell.Run
                 Announcement = "";
             }
             LastFissureResolveAge = Age + fissureWarn;
-            Rig.Fissure(true, start, end);
+            Fissure(true, start, end);
             Current = "Sundering Wake (backswing)";
             Rig.Pose(TyrantPose.Backswing, bs);
             for (int i = 0; i < bs; i++) { Windup(i / (float)bs); yield return 1; }
@@ -833,12 +858,32 @@ namespace LastBell.Run
             if (Rig) Rig.Glow = glowLevel;
         }
 
+        // ---------------- LAN looks ----------------
+        // The pose, haste and frenzy reach the replica's rig through LanClientWorld; the body glow comes in Glow. The wake's
+        // floor seam is a recorded call (TempoTyrantRig.Fissure), replayed on the replica's rig at the host's tick.
+        void Fissure(bool on, Vector3 from = default, Vector3 to = default)
+        {
+            if (NetRecording) NetFx("TempoTyrantRig.Fissure", on, from, to);
+            if (Rig) Rig.Fissure(on, from, to);
+        }
+        public int ReplicaFissures { get; private set; }   // LAN smoke tests: seam calls the replica replayed
+        public override void CaptureNetLook(Networking.LanWorldFrame.BossState into) { into.Glow = glowLevel; }
+        public override void ReplicaPresent(Networking.LanWorldFrame.BossState state, float dt) { if (Rig) Rig.Glow = state.Glow; }
+        public override bool ReplayNetEffect(string method, Networking.LanWorldFrame.EffectArg[] a, System.Func<int, PlayerController> player)
+        {
+            if (method != "TempoTyrantRig.Fissure" || a.Length != 3) return false;
+            var rig = Rig ? Rig : GetComponentInChildren<TempoTyrantRig>(true);
+            if (!rig) return false;
+            rig.Fissure(NetB(a[0]), NetV(a[1]), NetV(a[2])); ReplicaFissures++;
+            return true;
+        }
+
         protected override void OnDefeat()
         {
             Numbers.Clear(); Announcement = ""; PhaseName = "Defeated";
             SlicesActive = false; SafeSlice = -1; AltSafeParity = -1;
             ClearOrbs();
-            Rig.Fissure(false); Rig.Pose(TyrantPose.Defeat);
+            Fissure(false); Rig.Pose(TyrantPose.Defeat);
             if (Audio) Audio.StopAll();
             W.Fx.Crescendo(transform.position, true, 2, true);
         }

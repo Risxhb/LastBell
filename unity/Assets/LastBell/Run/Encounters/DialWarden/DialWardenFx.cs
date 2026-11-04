@@ -51,6 +51,7 @@ namespace LastBell.Run
         // a ring wall at radius r around `centre`, open where the gaps are (yaw centres, +-half degrees)
         public void Wave(int slot, Vector3 centre, float r, float[] gaps, float half, Color colour)
         {
+            if (Networking.LanFx.Record != null) { var g = new float[4]; int gn = gaps == null ? 0 : Mathf.Min(4, gaps.Length); for (int i = 0; i < gn; i++) g[i] = gaps[i]; var rec = Networking.LanFx.Record; if (rec != null) rec(Networking.LanFxTarget.BossPart, "DialWardenFx.Wave", new object[] { slot, centre, r, gn, g[0], g[1], g[2], g[3], half, colour }); }
             var w = waves[slot]; WaveFrames++;
             const float step = 2f, thick = DialWardenRoutes.WaveHalf, wall = 0.75f;
             int seg = Mathf.RoundToInt(360f / step);
@@ -74,8 +75,8 @@ namespace LastBell.Run
             w.mr.SetPropertyBlock(mpb);
             if (!w.on) { w.on = true; w.go.SetActive(true); }
         }
-        public void HideWave(int slot) { var w = waves[slot]; if (w != null && w.on) { w.on = false; w.go.SetActive(false); } }
-        public void HideAll() { for (int i = 0; i < waves.Length; i++) HideWave(i); HideWeights(); }
+        public void HideWave(int slot) { { var rec = Networking.LanFx.Record; if (rec != null) rec(Networking.LanFxTarget.BossPart, "DialWardenFx.HideWave", new object[] { slot }); }  var w = waves[slot]; if (w != null && w.on) { w.on = false; w.go.SetActive(false); } }
+        public void HideAll() { { var rec = Networking.LanFx.Record; if (rec != null) rec(Networking.LanFxTarget.BossPart, "DialWardenFx.HideAll", new object[] {  }); }  for (int i = 0; i < waves.Length; i++) HideWave(i); HideWeights(); }
 
         static void Quad(System.Collections.Generic.List<Vector3> v, System.Collections.Generic.List<Vector2> uv, System.Collections.Generic.List<int> tri,
             Vector3 a, Vector3 b, Vector3 c, Vector3 d, float u)
@@ -97,6 +98,7 @@ namespace LastBell.Run
         // u 0..1 along a throw arc from `from` to `to` (peak 3 m); u >= 1 rests on the floor
         public void Weight(int slot, Vector3 from, Vector3 to, float u)
         {
+            { var rec = Networking.LanFx.Record; if (rec != null) rec(Networking.LanFxTarget.BossPart, "DialWardenFx.Weight", new object[] { slot, from, to, u }); }
             ref Transform t = ref slot == 0 ? ref weight : ref weight2;
             if (!t) t = MakeWeight(slot == 0 ? "Counterweight (thrown)" : "Counterweight (falling star)");
             u = Mathf.Clamp01(u);
@@ -106,7 +108,24 @@ namespace LastBell.Run
         }
         // the second weight (below 50%) falls straight down from the sky
         public void Falling(int slot, Vector3 to, float u) => Weight(slot, to + Vector3.up * 14f, to, u);
-        public void HideWeights() { if (weight) weight.gameObject.SetActive(false); if (weight2) weight2.gameObject.SetActive(false); }
+        public void HideWeights() { { var rec = Networking.LanFx.Record; if (rec != null) rec(Networking.LanFxTarget.BossPart, "DialWardenFx.HideWeights", new object[] {  }); }  if (weight) weight.gameObject.SetActive(false); if (weight2) weight2.gameObject.SetActive(false); }
         public bool WeightShown => weight && weight.gameObject.activeSelf;
+            // LAN client: the host's calls, replayed on the replica boss
+        public bool Replay(string method, Networking.LanWorldFrame.EffectArg[] a)
+        {
+            switch (method)
+            {
+                case "DialWardenFx.Wave":
+                    if (a.Length != 10) return false;
+                    { int gn = Mathf.Clamp(a[3].I, 0, 4); var g = new float[gn]; for (int i = 0; i < gn; i++) g[i] = a[4 + i].X;
+                      Wave(a[0].I, new Vector3(a[1].X, a[1].Y, a[1].Z), a[2].X, g, a[8].X, new Color(a[9].X, a[9].Y, a[9].Z, a[9].W)); }
+                    return true;
+                case "DialWardenFx.HideWave": if (a.Length != 1) return false; HideWave(a[0].I); return true;
+                case "DialWardenFx.HideAll": HideAll(); return true;
+                case "DialWardenFx.Weight": if (a.Length != 4) return false; Weight(a[0].I, new Vector3(a[1].X, a[1].Y, a[1].Z), new Vector3(a[2].X, a[2].Y, a[2].Z), a[3].X); return true;
+                case "DialWardenFx.HideWeights": HideWeights(); return true;
+                default: return false;
+            }
+        }
     }
 }

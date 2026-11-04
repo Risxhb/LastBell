@@ -90,6 +90,8 @@ namespace LastBell.Run
         }
         static ZenithCollapseFx Build(CombatWorld world)
         {
+            // LAN: a host session records it; a client replays Create on its stand-in for the same hazard
+            if (!hazard.Replica) Networking.LanFx.Record?.Invoke(Networking.LanFxTarget.Replica, "ZenithCollapse", new object[] { hazard.Id });
             var go = new GameObject("Zenith Collapse fx"); go.transform.SetParent(world.Root, false);
             var fx = go.AddComponent<ZenithCollapseFx>(); fx.w = world; fx.mat = Prim.Material(Gold, 1f);
             int n = Mathf.CeilToInt(2 * Mathf.PI * AurelionAbility.Rim / 0.9f);
@@ -147,7 +149,7 @@ namespace LastBell.Run
         {
             if (warmFrames > 0) { if (--warmFrames == 0) gameObject.SetActive(false); return; }
             float dt = Time.deltaTime;
-            bool live = w != null && w.Hazards.Live.Contains(h) && !h.Cancelled;
+            bool live = Hazard.IsLive(w, h);
             if (!live && fade < 0) fade = h.Age >= h.ResolveAt ? 1f : 0.4f;   // resolved: flash; cleared early: dim
             if (fade >= 0)
             {
