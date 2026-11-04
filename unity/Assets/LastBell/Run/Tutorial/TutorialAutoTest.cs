@@ -50,7 +50,7 @@ namespace LastBell.Run
                 switch (t.StepId)
                 {
                     case "dash": inp.Move = TutorialBot.ToScreen(Vector3.right); if (tick % 20 == 0) inp.Dash = true; break;
-                    case "jump": if (tick % 20 == 0) inp.Jump = true; break;
+                    case "sprint": inp.Move = TutorialBot.ToScreen(Vector3.left); inp.Sprint = true; break;
                     case "potion": if (tick % 30 == 0) inp.Potion = true; break;
                     case "missile":
                         if (k != null && !k.Acting && tick % 40 == 0) { inp.P0 = inp.H0 = true; holding = true; }
@@ -83,9 +83,6 @@ namespace LastBell.Run
                         if (t.TetherPost.HasValue) goal = t.TetherPost.Value - t.TetherPost.Value.normalized * 8f;
                         break;
                 }
-                // low bars: jump as one is about to land on us
-                foreach (var h in me.World.Hazards.Live)
-                    if (h.JumpClearable && h.Contains(me.transform.position) && h.ResolveAt - h.Age == 10) inp.Jump = true;
                 if (goal.HasValue)
                 {
                     var to = Sim.Flat(goal.Value - pos);
@@ -202,7 +199,7 @@ namespace LastBell.Run
                 Note($"{r.Id,-14} tries {r.Tries}  {(r.Passed ? "handled" : "NOT handled")}  {r.Note}");
                 Check("step handled within " + TutorialDirector.MaxTries + " tries: " + r.Id, r.Passed, r.Note);
             }
-            string[] expected = { "welcome", "move", "dash", "jump", "potion", "arcanist", "missile", "disintegrate", "sigil", "comet", "surge", "rotation", "tempo", "severance", "wake", "crown", "slices", "rush", "lowbar", "allies", "soak", "spread", "burn", "marks", "tether", "follow", "hours", "finish" };
+            string[] expected = { "welcome", "move", "dash", "sprint", "potion", "arcanist", "missile", "disintegrate", "sigil", "comet", "surge", "rotation", "tempo", "severance", "wake", "crown", "slices", "rush", "allies", "soak", "spread", "burn", "marks", "tether", "follow", "hours", "finish" };
             var ran = t.Records.Select(r => r.Id).ToArray();
             Check("every Arcanist step ran, in order (Tollbreaker/Chimesinger note skipped)", ran.SequenceEqual(expected), string.Join(",", ran));
             Note($"mercy heals {t.MercyHeals}, revives {t.MercyRevives}; total {total:0}s");

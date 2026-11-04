@@ -240,7 +240,6 @@ namespace LastBell.Run
             if (act == Act.None) { act = Act.Chorus; t = 0; P.Presenter.Action("MendingChorus", ChorusAnim); }
         }
 
-        public override bool CanJump() => act == Act.None || act == Act.Chorus;
         // Harmonic Step cancels an unreleased cast (nothing spent) and keeps Harmony, bells and echoes.
         public override void OnDash() { act = Act.None; Velocity = Vector3.zero; W.Fx.NoteTrail(P); }
         public override void Interrupt() { act = Act.None; Velocity = Vector3.zero; }

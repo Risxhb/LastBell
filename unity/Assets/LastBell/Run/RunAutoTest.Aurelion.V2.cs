@@ -60,7 +60,6 @@ namespace LastBell.Run
                 var right = Vector3.Cross(Vector3.up, fwd);
                 r.Move = Vector2.ClampMagnitude(new Vector2(Vector3.Dot(move, right), Vector3.Dot(move, fwd)), 1);
                 if (dash) { r.Dash = true; dash = false; }
-                if (jump) { r.Jump = true; jump = false; }
                 return r;
             }
         }

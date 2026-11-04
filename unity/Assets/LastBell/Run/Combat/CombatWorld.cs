@@ -92,10 +92,33 @@ namespace LastBell.Run
             Tick++;
             using (PmPlayers.Auto()) foreach (var p in Players) p.Step();
             if (!CombatActive) return;
+            StepRevives();
             using (PmBoss.Auto()) if (Boss != null && !Boss.Dead) Boss.Step();
             using (PmProjectiles.Auto()) Projectiles.Step();
             Bullets.Step();
             using (PmHazards.Auto()) Hazards.Step();
+        }
+
+        // Revives (PlayerController): each downed player's revive fills while any standing ally beside them channels (stands
+        // still, free and unhurt), pauses while none does, and starts over when a reviver is hit. Two revivers are no faster.
+        void StepRevives()
+        {
+            foreach (var p in Players) p.Reviving = null;
+            foreach (var d in Players)
+            {
+                if (!d.Down || d.Dead) continue;
+                bool on = false, hurt = false;
+                foreach (var r in Players)
+                {
+                    if (r == d || r.Down || r.Reviving != null) continue;
+                    if (Sim.Flat(r.transform.position - d.transform.position).magnitude > PlayerController.ReviveRange) continue;
+                    if (r.LastHurtTick >= Tick - 1) hurt = true;   // (hazards land after this step: last tick counts)
+                    if (!r.CanChannelRevive) continue;
+                    r.Reviving = d; on = true;
+                }
+                if (hurt) d.ReviveProgress = 0;
+                else if (on && (d.ReviveProgress += 1f / Sim.Ticks(PlayerController.ReviveSeconds)) >= 0.999f) d.Revive();
+            }
         }
 
         // Clears everything an encounter can leave behind: hazards, projectiles, boss-owned effects. Called at every
