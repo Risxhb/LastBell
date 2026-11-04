@@ -1,7 +1,7 @@
 param(
     [Parameter(Mandatory=$true)][string]$Player,
     [Parameter(Mandatory=$true)][string]$OutputDirectory,
-    [ValidateSet('Bellkeeper','Aurelion','Tempo Tyrant','Chimebound Oracle','Pendulum Sentinel')][string]$Boss='Bellkeeper',
+    [ValidateSet('Bellkeeper','Aurelion','Crucivar','Sylvara','Tempo Tyrant','Chimebound Oracle','Pendulum Sentinel','Dial Warden','Escapement Twins','Rivet Cantor','Crucible Skater','Briar Metronome','Silt Carillon','Vesper Seedkeeper')][string]$Boss='Bellkeeper',
     [ValidateSet('test','skyward-spire','brass-foundry','verdant-chimes','shattered-hour','metronome-court')][string]$Arena='test',
     [ValidateRange(1,3)][int]$PeerCount=1,
     [ValidateSet('Tollbreaker','Chimesinger','Arcanist')][string]$ClientClass='Arcanist'
