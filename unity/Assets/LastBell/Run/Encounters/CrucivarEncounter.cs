@@ -43,6 +43,7 @@ namespace LastBell.Run
             presenter = CharacterPresenter.Create(transform, "Crucivar", 3f, 0.8f, 0, CrucivarRig.BuildPlaceholder);
             rig = presenter.Visual.gameObject.AddComponent<CrucivarRig>();
             rig.Bind(presenter.Visual);
+            presenter.PlayOnce("Intro", 2f);   // the run's 2 s intro (RunDirector.IntroTicks): rises from the gantry crouch, one hammer beat
             PhaseName = "Sealed Furnace";
             BindAbilities();
             W.Hazards.Spawned -= FoundryLook; W.Hazards.Spawned += FoundryLook;

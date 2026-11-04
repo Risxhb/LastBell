@@ -81,6 +81,7 @@ namespace LastBell.Run
         // ---------------- Ember Brand ----------------
         internal void EmberBrand()
         {
+            Boss.Presenter?.Action("EmberBrand", T(BrandLand));   // body clips are visual only (crucivar_v4_clips.py), stretched to the telegraph
             foreach (var p in Standing())
             {
                 var owner = p;
@@ -117,6 +118,7 @@ namespace LastBell.Run
             var origin = Flat(Boss.transform.position);
             float baseYaw = Boss.transform.eulerAngles.y + 45f, dir = loops % 2 == 1 ? 1f : -1f;
             int show = T(JetShow), sweep = Sim.Ticks(JetSweep);
+            Boss.Presenter?.Action(dir > 0 ? "FurnaceSpinCW" : "FurnaceSpinCCW", show + sweep);   // turns the way the jets sweep
             for (int k = 0; k < JetCount; k++)
             {
                 var h = new Hazard
@@ -139,6 +141,7 @@ namespace LastBell.Run
         // ---------------- Backdraft ----------------
         internal IEnumerable<int> Backdraft()
         {
+            Boss.Presenter?.Action("Backdraft", T(BlastAt));
             var centre = Flat(Boss.transform.position);
             var blast = W.Hazards.Spawn(new Hazard
             {
@@ -176,6 +179,7 @@ namespace LastBell.Run
                     : list.Skip(loops % list.Count).Concat(list.Take(loops % list.Count)).Take(4).ToList();
             }
             NumeralsShown = !memory;
+            Boss.Presenter?.Action("CastingOrder", T(PourLead + PourGap * 3 + 0.5f));   // four tips, one per pour I-IV (fewer pours: the first ones line up)
             var origin = Flat(Boss.transform.position);
             for (int k = 0; k < Order.Count; k++)
             {

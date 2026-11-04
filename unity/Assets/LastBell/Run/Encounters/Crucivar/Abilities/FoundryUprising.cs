@@ -63,11 +63,13 @@ namespace LastBell.Run
                 LockAt = 0, ResolveAt = deadline, ShareTotal = 1, WipeIfEmpty = true, Includes = _ => false,   // nobody can soak it: it wipes
             });
             Flood.OnResolve = hz => { Floods++; W.BossFx.RimFlood(hz.Inner, Rim); };   // counted here: the wipe can end the script before the loop sees it
+            Boss.Presenter?.Action("TurretCall", Sim.Ticks(Rise));   // visual only: the hammer lands as the turrets finish rising
             bool layered = Uprisings > 1;
             IEnumerator<int> draft = null; int draftWait = 0;
             for (t = 0; ; t++)
             {
                 if (t == Sim.Ticks(4f)) { Boss.SetCurrent("Ember Brand"); Boss.Rite.EmberBrand(); }
+                if (t == deadline - Sim.Ticks(2f) && Turrets.Any(x => x.Up)) Boss.Presenter?.Action("PourFlood", Sim.Ticks(2f));   // the flood is coming: arms up, down as it lands
                 if (layered && t == Sim.Ticks(11f)) { Boss.SetCurrent("Furnace Spin"); Boss.Rite.FurnaceSpin(); }
                 if (layered && t == Sim.Ticks(19f)) { Boss.SetCurrent("Backdraft"); draft = Boss.Rite.Backdraft().GetEnumerator(); draftWait = 0; }
                 if (draft != null && --draftWait <= 0) { if (draft.MoveNext()) draftWait = draft.Current; else draft = null; }

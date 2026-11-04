@@ -92,6 +92,7 @@ namespace LastBell.Run
         void RiseSet(int[] needs, int set, int countA)
         {
             Boss.SetCurrent("Mould Towers");
+            Boss.Presenter?.Action("MouldPress", T(Rise));   // visual only: the press comes down as the towers land
             bool solo = Standing().Count <= 1;
             float rad = Mathf.Min(5.5f, Edge - 2.6f);
             var list = new List<Hazard>();
@@ -176,6 +177,7 @@ namespace LastBell.Run
         void CrownRise()
         {
             Boss.SetCurrent("Crown Rise");
+            Boss.Presenter?.Action("CrownRise", T(CrownWarn));
             float from = Edge, to = Edges[Crowns + 1];
             var h = W.Hazards.Spawn(new Hazard
             {
@@ -197,6 +199,7 @@ namespace LastBell.Run
         void Eruption()
         {
             Boss.SetCurrent("Furnace Eruption");
+            Boss.Presenter?.Action("Eruption", T(EruptWarn));
             var h = W.Hazards.Spawn(new Hazard
             {
                 Source = "Furnace Eruption", AttackId = "crucivar.furnace_eruption", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Vector3.zero, Radius = Far + 1f,
