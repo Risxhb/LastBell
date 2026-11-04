@@ -14,6 +14,7 @@ namespace LastBell.Run
         SiltCarillonEncounter b;
         GUIStyle style, numeral, shadow;
         readonly StringBuilder sb = new StringBuilder();
+        readonly System.Collections.Generic.List<(Vector3 at, int need)> shown = new System.Collections.Generic.List<(Vector3 at, int need)>();
         static readonly string[] Roman = { "", "I", "II", "III", "IV", "V", "VI", "VII", "VIII" };
 
         public void Bind(SiltCarillonEncounter boss) { b = boss; }
@@ -29,15 +30,16 @@ namespace LastBell.Run
             if (!b || b.Dead) return;
             GUI.depth = 10;
             var cam = Camera.main;
-            if (cam && b.LiveBells.Count > 0)
+            if (cam) b.ShownBells(shown);
+            if (cam && shown.Count > 0)
             {
                 numeral ??= new GUIStyle(GUI.skin.label) { fontSize = 64, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
                 shadow ??= new GUIStyle(numeral);
                 numeral.normal.textColor = new Color(0.95f, 1f, 0.95f);
                 shadow.normal.textColor = new Color(0.05f, 0.12f, 0.1f, 0.85f);
-                foreach (var (h, need) in b.LiveBells)
+                foreach (var (at, need) in shown)
                 {
-                    var s = cam.WorldToScreenPoint(h.Origin + Vector3.up * 1.2f);
+                    var s = cam.WorldToScreenPoint(at + Vector3.up * 1.2f);
                     if (s.z <= 0) continue;
                     var r = new Rect(s.x - 80, Screen.height - s.y - 40, 160, 80);
                     string t = need >= 0 && need < Roman.Length ? Roman[need] : need.ToString();

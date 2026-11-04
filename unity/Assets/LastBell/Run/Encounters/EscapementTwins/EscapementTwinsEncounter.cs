@@ -477,9 +477,143 @@ namespace LastBell.Run
             W.Fx.Crescendo(transform.position, true, 2, true);
         }
 
+        // ---------------- LAN ----------------
+        // Host: Tock's spot and the Escape Wheel travel as props (Tock first: it is a damage target), the face glow, beat
+        // pulses and the phase as Look numbers. Client replica (never stepped): the built Tock follows its prop anchor and
+        // faces Tick (spins in the Shift, slumps on defeat); the Pallet spheres come from the players' replicated marks;
+        // the Counterpoise numerals from the hazard stand-ins (Source + ShareCount).
+        const byte PropTock = 0, PropWheel = 1;
+        readonly int tockNet = NextNetPropId--, wheelNet = NextNetPropId--;
+        public override void CaptureNetProps(List<Networking.LanWorldFrame.Prop> into)
+        {
+            into.Add(NetProp(tockNet, PropTock, TockPos));
+            if (wheel) into.Add(NetProp(wheelNet, PropWheel, wheel.position));
+        }
+        public override void CaptureNetLook(Networking.LanWorldFrame.BossState into)
+        {
+            into.Glow = glowLevel;
+            into.Look.Add(Phase2 ? 1 : 0); into.Look.Add(tickPulse); into.Look.Add(tockPulse);   // [0] phase 2, [1] Tick pulse, [2] Tock pulse
+        }
+
+        // client-side state and counters (two-process smoke tests read these)
+        public int NetFrames { get; private set; }          // ReplicaPresent calls
+        public int NetTockSynced { get; private set; }      // frames Tock followed the host's spot
+        public int NetMarkViews => replicaMarks.Count;      // Pallet spheres shown now
+        public int NetMarkViewsMade { get; private set; }
+        public int NetNumeralsMade { get; private set; }    // Counterpoise numerals built from stand-ins
+        public int NetWheelsMade { get; private set; }
+        Transform tockAnchor, replicaWheel;
+        bool replicaReady; float replicaSpin;
+        readonly Dictionary<PlayerController, (Transform view, int mark)> replicaMarks = new Dictionary<PlayerController, (Transform, int)>();
+        readonly Dictionary<Hazard, GameObject> replicaNumerals = new Dictionary<Hazard, GameObject>();
+        static readonly List<PlayerController> scratchPlayers = new List<PlayerController>();
+        static readonly List<Hazard> scratchHazards = new List<Hazard>();
+
+        public override Transform MakeNetProp(byte kind)
+        {
+            if (kind == PropTock)
+            {
+                // an empty anchor: the client moves it along the host's positions and the built Tock follows it
+                var a = new GameObject("Tock anchor (LAN)").transform; a.SetParent(transform.parent, false);
+                tockAnchor = a; return a;
+            }
+            if (kind == PropWheel)
+            {
+                var t = Prim.Make(PrimitiveKind.Cylinder, transform.parent, Vector3.zero, new Vector3(2.6f, 0.03f, 2.6f), Gold, 1.5f);
+                t.name = "Escape wheel (LAN)"; replicaWheel = t; NetWheelsMade++; return t;
+            }
+            return null;
+        }
+
+        public override void ReplicaPresent(Networking.LanWorldFrame.BossState state, float dt)
+        {
+            NetFrames++;
+            var look = state.Look;
+            bool phase2 = look.Count > 0 && look[0] > 0.5f;
+            float tp = look.Count > 1 ? look[1] : 0, kp = look.Count > 2 ? look[2] : 0;
+            if (tickFace) Prim.SetGlow(tickFace, Gold * (0.6f + 0.5f * state.Glow + 2f * tp));
+            if (tockFace) Prim.SetGlow(tockFace, Silver * (0.6f + 0.5f * state.Glow + 2f * kp));
+
+            // Tock: the host's spot, facing Tick; turning in the Shift; slumped once defeated
+            if (tockBody)
+            {
+                if (!replicaReady) { replicaReady = true; var s = tockBody.GetComponent<SimSmoother>(); if (s) s.enabled = false; }
+                if (tockAnchor && tockAnchor.gameObject.activeSelf)
+                {
+                    TockPos = Sim.Flat(tockAnchor.position); if (tockPart != null) tockPart.Pos = TockPos; NetTockSynced++;
+                }
+                replicaSpin = Current == "Shift" ? replicaSpin - 6f * Sim.Hz * dt : 0;
+                float face = Sim.YawTo(TockPos, Sim.Flat(transform.position), tockBody.eulerAngles.y);
+                tockBody.SetPositionAndRotation(TockPos, Quaternion.Euler(0, face + replicaSpin, 0));
+                if (tockFace) tockFace.transform.parent.localRotation = Quaternion.Euler(0, 0, Dead ? 8f : 0);
+            }
+            if (tickFace) tickFace.transform.parent.localRotation = Quaternion.Euler(0, 0, Dead ? -8f : 0);
+            if (replicaWheel) replicaWheel.Rotate(0, 90f * dt * (phase2 ? 1.6f : 1f), 0);
+            ReplicaMarks();
+            ReplicaNumerals();
+        }
+
+        // the brass / cobalt sphere over each marked player (the marks themselves arrive with the players)
+        void ReplicaMarks()
+        {
+            if (W == null) return;
+            foreach (var p in W.Players)
+            {
+                if (!p) continue;
+                int m = p.Marks.Contains(MechanicIcons.TeamBrass) ? 0 : p.Marks.Contains(MechanicIcons.TeamCobalt) ? 1 : -1;
+                replicaMarks.TryGetValue(p, out var e);
+                if (m < 0 || p.Down)
+                {
+                    if (e.view) Destroy(e.view.gameObject);
+                    replicaMarks.Remove(p); continue;
+                }
+                if (!e.view)
+                {
+                    e.view = Prim.Make(PrimitiveKind.Sphere, transform.parent, Vector3.zero, new Vector3(0.5f, 0.5f, 0.5f), m == 0 ? Brass : Cobalt, 2.5f);
+                    e.view.name = "Pallet marker (identity, LAN)"; e.mark = m; NetMarkViewsMade++;
+                }
+                else if (e.mark != m) { e.view.GetComponent<Renderer>().material = Prim.Material(m == 0 ? Brass : Cobalt, 2.5f); e.mark = m; }
+                e.view.position = p.transform.position + Vector3.up * 2.6f;
+                replicaMarks[p] = e;
+            }
+            scratchPlayers.Clear();
+            foreach (var kv in replicaMarks) if (!kv.Key || !W.Players.Contains(kv.Key)) scratchPlayers.Add(kv.Key);
+            foreach (var p in scratchPlayers) { if (replicaMarks[p].view) Destroy(replicaMarks[p].view.gameObject); replicaMarks.Remove(p); }
+        }
+
+        // a Roman numeral (players needed) over every live Counterpoise circle
+        void ReplicaNumerals()
+        {
+            if (W == null || W.Hazards == null) return;
+            var live = W.Hazards.Live;
+            for (int i = 0; i < live.Count; i++)
+            {
+                var h = live[i];
+                if (h == null || !h.Replica || h.Cancelled || h.Source != "Counterpoise" || replicaNumerals.ContainsKey(h)) continue;
+                replicaNumerals[h] = Numeral(h.Origin, h.ShareCount); NetNumeralsMade++;
+            }
+            scratchHazards.Clear();
+            foreach (var kv in replicaNumerals)
+            {
+                bool on = !kv.Key.Cancelled;
+                if (on) { on = false; for (int i = 0; i < live.Count; i++) if (live[i] == kv.Key) { on = true; break; } }
+                if (!on) scratchHazards.Add(kv.Key);
+                else if (kv.Value) kv.Value.transform.position = kv.Key.Origin + Vector3.up * 1.6f;
+            }
+            foreach (var h in scratchHazards) { if (replicaNumerals[h]) Destroy(replicaNumerals[h]); replicaNumerals.Remove(h); }
+        }
+
+        void ClearReplica()
+        {
+            foreach (var kv in replicaMarks) if (kv.Value.view) Destroy(kv.Value.view.gameObject);
+            replicaMarks.Clear();
+            foreach (var kv in replicaNumerals) if (kv.Value) Destroy(kv.Value);
+            replicaNumerals.Clear();
+        }
+
         void OnDestroy()
         {
-            ClearAll();
+            ClearAll(); ClearReplica();
             if (tockBody) Destroy(tockBody.gameObject);
         }
     }

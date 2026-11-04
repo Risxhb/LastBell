@@ -111,6 +111,7 @@ namespace LastBell.Run
             drum = Prim.Make(PrimitiveKind.Cylinder, host, new Vector3(-1.25f, 1.3f, 0.3f), new Vector3(1.2f, 0.25f, 1.2f), Cobalt, 0, Quaternion.Euler(0, 0, 90));
             mallet = Prim.Make(PrimitiveKind.Cylinder, host, new Vector3(1.25f, 1.6f, 0.4f), new Vector3(0.18f, 0.7f, 0.18f), Brass, 0, Quaternion.Euler(30, 0, 0));
             Prim.Make(PrimitiveKind.Sphere, mallet, new Vector3(0, 1.1f, 0), Vector3.one * 2.4f, Ivory);
+            gameObject.AddComponent<RivetCantorReplicaNumeral>().Bind(this);   // LAN client: draws the Chorus numeral (this boss is disabled there)
         }
 
         // ---------------- helpers ----------------
@@ -278,16 +279,22 @@ namespace LastBell.Run
 
         Transform Glyph(Call c)
         {
+            var g = MakeGlyph(c);
+            g.position = transform.position + Vector3.up * (4.3f + 0.75f * glyphs.Count);
+            glyphs.Add(g); glyphNet[g] = (NextNetPropId--, (byte)c);
+            return g;
+        }
+        Transform MakeGlyph(Call c)
+        {
             var g = new GameObject(c == Call.Chorus ? "Call glyph: Chorus" : "Call glyph: Solo").transform;
             g.SetParent(transform.parent, false);
             if (c == Call.Chorus) Prim.Make(PrimitiveKind.Cylinder, g, Vector3.zero, new Vector3(0.9f, 0.06f, 0.9f), Gold, 2.5f, Quaternion.Euler(90, 0, 0));
             else for (int i = 0; i < 4; i++) Prim.Make(PrimitiveKind.Sphere, g, new Vector3(-0.45f + 0.3f * i, 0, 0), Vector3.one * 0.22f, Ivory, 1.5f);
-            g.position = transform.position + Vector3.up * (4.3f + 0.75f * glyphs.Count);
-            glyphs.Add(g);
             return g;
         }
-        void DropGlyph(Transform g) { glyphs.Remove(g); if (g) Destroy(g.gameObject); }
-        void ClearGlyphs() { foreach (var g in glyphs) if (g) Destroy(g.gameObject); glyphs.Clear(); }
+        void DropGlyph(Transform g) { glyphs.Remove(g); glyphNet.Remove(g); if (g) Destroy(g.gameObject); }
+        void ClearGlyphs() { foreach (var g in glyphs) if (g) Destroy(g.gameObject); glyphs.Clear(); glyphNet.Clear(); }
+        readonly Dictionary<Transform, (int id, byte kind)> glyphNet = new Dictionary<Transform, (int, byte)>();   // LAN prop id and kind (Call) per glyph
         public int GlyphCount => glyphs.Count;
 
         // ================= 2. Rivet Run =================
@@ -482,6 +489,35 @@ namespace LastBell.Run
         }
 
         // ---------------- lifecycle ----------------
+        // ---------------- LAN ----------------
+        // props: the call glyphs over his head (kind 0 = Chorus, 1 = Solo, as Call). Looks: Look[0] = phase 2 (mask glow),
+        // Look[1..3] = mallet local euler, Look[4..6] = drum local position, Look[7] = body height scale (the Retuning squash).
+        public override void CaptureNetProps(List<Networking.LanWorldFrame.Prop> into)
+        {
+            foreach (var g in glyphs) if (g && glyphNet.TryGetValue(g, out var n)) into.Add(NetProp(n.id, n.kind, g.position));
+        }
+        public override Transform MakeNetProp(byte kind) => kind <= (byte)Call.Solo ? MakeGlyph((Call)kind) : null;
+        public override void CaptureNetLook(Networking.LanWorldFrame.BossState into)
+        {
+            into.Glow = glowLevel;
+            into.Look.Add(Phase2 ? 1 : 0);
+            var m = mallet ? mallet.localEulerAngles : Vector3.zero; into.Look.Add(m.x); into.Look.Add(m.y); into.Look.Add(m.z);
+            var d = drum ? drum.localPosition : Vector3.zero; into.Look.Add(d.x); into.Look.Add(d.y); into.Look.Add(d.z);
+            into.Look.Add(body ? body.localScale.y : 1.4f);
+        }
+        bool maskLit;
+        public override void ReplicaPresent(Networking.LanWorldFrame.BossState state, float dt)
+        {
+            var look = state.Look;
+            if (look.Count > 0 && look[0] > 0.5f && !maskLit && mask) { Prim.SetGlow(mask.GetComponent<Renderer>(), Gold * 1.5f); maskLit = true; }
+            if (look.Count >= 8)
+            {
+                if (mallet) mallet.localRotation = Quaternion.Euler(look[1], look[2], look[3]);
+                if (drum) drum.localPosition = new Vector3(look[4], look[5], look[6]);
+                if (body) body.localScale = new Vector3(2.0f, look[7], 2.0f);
+            }
+        }
+
         protected override void OnDefeat()
         {
             ClearGlyphs(); ClearMarks(); Pending = 0; Retuning = false; choruses.Clear(); ChorusNeed = -1;
@@ -512,7 +548,31 @@ namespace LastBell.Run
             NumeralTicks++; NumeralMin = Mathf.Min(NumeralMin, need); NumeralMax = Mathf.Max(NumeralMax, need);
         }
 
-        void OnGUI()
+        void OnGUI() => DrawChorusNumeral();
+
+        // LAN client: the replica is never stepped, so the soonest live "Chorus" stand-in gives the numeral (everyone standing,
+        // and who is inside it now at the drawn time), drawn by RivetCantorReplicaNumeral
+        public int ReplicaNumeralsShown { get; private set; }   // LAN test: frames a client drew the Chorus numeral
+        internal void ReplicaChorusGui()
+        {
+            if (!IsNetReplica || W == null) return;
+            if (Event.current.type == EventType.Layout)   // once per GUI frame
+            {
+                Hazard next = null;
+                foreach (var h in W.Hazards.Live)
+                    if (h != null && h.Replica && !h.Cancelled && h.Source == "Chorus" && h.Age < h.ResolveAt && (next == null || h.ResolveAt - h.Age < next.ResolveAt - next.Age)) next = h;
+                if (next == null || Dead) ChorusNeed = -1;
+                else
+                {
+                    int need = 0, inside = 0;
+                    foreach (var p in W.Players) if (p && !p.Down) { need++; if (next.Contains(p.transform.position)) inside++; }
+                    ChorusNeed = need; ChorusFilled = inside; chorusAt = next.Origin; ReplicaNumeralsShown++;
+                }
+            }
+            DrawChorusNumeral();
+        }
+
+        void DrawChorusNumeral()
         {
             if (ChorusNeed < 0) return;
             var cam = Camera.main; if (cam == null) return;
@@ -537,5 +597,14 @@ namespace LastBell.Run
                 GUI.color = old;
             }
         }
+    }
+
+    // LAN client: the Rivet Cantor replica is a disabled component, so its OnGUI never runs there; this enabled helper draws
+    // the Chorus numeral from the hazard stand-ins instead (does nothing on the host or offline).
+    public sealed class RivetCantorReplicaNumeral : MonoBehaviour
+    {
+        RivetCantorEncounter b;
+        public void Bind(RivetCantorEncounter boss) { b = boss; }
+        void OnGUI() { if (b && b.IsNetReplica) b.ReplicaChorusGui(); }
     }
 }

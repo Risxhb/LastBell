@@ -514,9 +514,7 @@ namespace LastBell.Run
             var hatch = W.BossFx.Circle(CombatWorld.PlayerBound + 0.6f); hatch.Tint(HatchFill, HatchBorder); hatch.Lock(); hatch.Place(Centre, 0); views.Add(hatch);
             var markViews = new List<BellkeeperFx.Telegraph>();
             foreach (var m in marks) { var t = W.BossFx.Circle(r); t.Tint(MarkFill, MarkBorder); t.Lock(); t.Place(m, 0); markViews.Add(t); views.Add(t); }
-            // the plumb line: from the pendulum's pivot (3.4 m, in front of the tower) straight down to the floor
-            plumbLine = Prim.Make(PrimitiveKind.Cylinder, transform, new Vector3(0, 1.7f, 0.45f), new Vector3(0.035f, 1.7f, 0.035f), PlumbGold, 3f);
-            plumbLine.name = "Plumb line";
+            plumbLine = MakePlumbLine();
             int total = Beats(Phase2 ? PlumbBeatsLow : PlumbBeatsHigh), driftT = drift ? Beats(DriftBeats) : 0; float sgn = rng.Next(2) == 0 ? -1 : 1;
             float perTick = DriftPerBeat / BeatTicks * sgn;
             for (int t = 0; t < total; t++)
@@ -636,6 +634,31 @@ namespace LastBell.Run
         {
             base.Update();
             if (presenter) presenter.GlowLevel = glowLevel;
+        }
+
+        // LAN looks: Glow = body glow; Look[0] = the Plumb Line is down (1/0), Look[1] = Phase 2 (1/0). The replica makes and
+        // removes its own plumb line from the flag (the floor marks are telegraphs, the props and sounds have their own paths).
+        public int ReplicaPlumbLines { get; private set; }   // LAN smoke tests: plumb lines the replica has shown
+        public override void CaptureNetLook(Networking.LanWorldFrame.BossState into)
+        {
+            into.Glow = glowLevel;
+            into.Look.Add(plumbLine ? 1 : 0); into.Look.Add(Phase2 ? 1 : 0);
+        }
+        public override void ReplicaPresent(Networking.LanWorldFrame.BossState state, float dt)
+        {
+            if (presenter) presenter.GlowLevel = state.Glow;
+            var look = state.Look;
+            bool plumb = !state.Dead && look.Count > 0 && look[0] > 0.5f;
+            if (plumb && !plumbLine) { plumbLine = MakePlumbLine(); ReplicaPlumbLines++; }
+            else if (!plumb && plumbLine) Destroy(plumbLine.gameObject);
+            if (look.Count > 1) Phase2 = look[1] > 0.5f;
+        }
+        // the plumb line: from the pendulum's pivot (3.4 m, in front of the tower) straight down to the floor
+        Transform MakePlumbLine()
+        {
+            var t = Prim.Make(PrimitiveKind.Cylinder, transform, new Vector3(0, 1.7f, 0.45f), new Vector3(0.035f, 1.7f, 0.035f), PlumbGold, 3f);
+            t.name = "Plumb line";
+            return t;
         }
 
         protected override void OnDefeat()

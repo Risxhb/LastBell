@@ -76,6 +76,18 @@ namespace LastBell.Run
         public int FallLive { get; private set; }
         public float LastBaseYaw { get; private set; }
         public IReadOnlyList<(Hazard h, int need)> LiveBells => bells;
+        // the bells the HUD numbers: the host's own list, or on a LAN client (a never-stepped replica, bells empty) the
+        // host's live "Sunken Bell" soaks, mirrored as hazard stand-ins
+        public void ShownBells(List<(Vector3 at, int need)> into)
+        {
+            into.Clear();
+            if (!IsNetReplica) { foreach (var (h, need) in bells) into.Add((h.Origin, need)); return; }
+            if (W == null) return;
+            foreach (var h in W.Hazards.Live)
+                if (h != null && h.Replica && !h.Cancelled && h.Soak && h.Source == "Sunken Bell") into.Add((h.Origin, h.ShareCount));
+            if (into.Count > 0) ReplicaNumeralsShown = Mathf.Max(ReplicaNumeralsShown, into.Count);
+        }
+        public int ReplicaNumeralsShown { get; private set; }   // LAN test: most bell numerals a client's HUD drew at once
         public bool FirstBells => firstBells;
 
         enum Atk { TideBells, Fall, Peal, TidePeal }
@@ -446,16 +458,35 @@ namespace LastBell.Run
         protected override void Update()
         {
             base.Update();
+            PresentLook(Drained, Dead, Current == "Shift", Phase2, glowLevel, Time.deltaTime);
+        }
+        // the slump in the Drained window, the shift wobble and the window/crown glow: the host from its own state, a LAN
+        // client's replica from the host's (ReplicaPresent)
+        void PresentLook(bool drained, bool dead, bool shift, bool phase2, float glow, float dt)
+        {
             if (!body) return;
-            slump = Mathf.MoveTowards(slump, Drained || Dead ? 1 : 0, Time.deltaTime * 2.5f);
-            shiftT = Current == "Shift" ? shiftT + Time.deltaTime : 0;
+            slump = Mathf.MoveTowards(slump, drained || dead ? 1 : 0, dt * 2.5f);
+            shiftT = shift ? shiftT + dt : 0;
             float wobble = shiftT > 0 ? Mathf.Sin(shiftT * 18f) * 4f : 0;
             body.localRotation = Quaternion.Euler(14f * slump + wobble, 0, 0);
             body.localPosition = new Vector3(0, -0.35f * slump, 0);
-            var glow = Window * (0.4f + glowLevel * (Phase2 ? 1.1f : 0.7f) * (1 - 0.8f * slump));
-            if (windowsL) Prim.SetGlow(windowsL, glow);
-            if (windowsR) Prim.SetGlow(windowsR, glow);
-            if (crown) Prim.SetGlow(crown, new Color(0.95f, 0.8f, 0.45f) * (0.5f + glowLevel * 0.5f));
+            var g = Window * (0.4f + glow * (phase2 ? 1.1f : 0.7f) * (1 - 0.8f * slump));
+            if (windowsL) Prim.SetGlow(windowsL, g);
+            if (windowsR) Prim.SetGlow(windowsR, g);
+            if (crown) Prim.SetGlow(crown, new Color(0.95f, 0.8f, 0.45f) * (0.5f + glow * 0.5f));
+        }
+        // LAN looks: Glow = core glow; Look[0] = phase 2 (1/0), Look[1] = Drained (1/0). The shift wobble follows the attack name.
+        public override void CaptureNetLook(Networking.LanWorldFrame.BossState into)
+        {
+            into.Glow = glowLevel;
+            into.Look.Add(Phase2 ? 1 : 0); into.Look.Add(Drained ? 1 : 0);
+        }
+        public override void ReplicaPresent(Networking.LanWorldFrame.BossState state, float dt)
+        {
+            var look = state.Look;
+            bool phase2 = look.Count > 0 && look[0] > 0.5f;
+            bool drained = look.Count > 1 ? look[1] > 0.5f : state.Attack == "Drained";
+            PresentLook(drained, state.Dead, state.Attack == "Shift", phase2, state.Glow, dt);
         }
 
         protected override void OnDefeat()

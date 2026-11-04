@@ -182,6 +182,140 @@ namespace LastBell.Run
             if (rig) rig.Heat = glowLevel;
         }
 
+        // ---------------- LAN ----------------
+        // Host: the uprising turrets and castings and the crown turret travel as props (their rise and sink are the host's
+        // positions); the glow and the phase as Look numbers; the CrucivarFx / BellowsDrawFx effects, the rig's Pour and
+        // VentsAll, the pour numerals and the Mould Tower overlay as recorded calls. Client replica (never stepped): the rig
+        // follows the glow (heat), the phase (insulation, fins) and defeat (shutdown), and the effects replay here.
+        internal static bool NetOn => NetRecording;
+        internal static void Net(string method, params object[] args) => NetFx(method, args);
+        internal static int NewNetId() => NextNetPropId--;
+        const byte PropTurret = 10, PropCasting = 20, PropCrownTurret = 30;
+
+        public override void CaptureNetProps(List<Networking.LanWorldFrame.Prop> into)
+        {
+            if (Uprising != null)
+                foreach (var tu in Uprising.Turrets)
+                {
+                    byte k = (byte)Mathf.Clamp(tu.K, 0, 3);
+                    if (tu.Look) into.Add(NetProp(tu.NetTurretId, (byte)(PropTurret + k), tu.Look.position));
+                    if (tu.CastLook) into.Add(NetProp(tu.NetCastId, (byte)(PropCasting + k), tu.CastLook.position));
+                }
+            if (Crown != null && Crown.TurretView) into.Add(NetProp(Crown.TurretNet, PropCrownTurret, Crown.TurretView.position));
+        }
+        public override void CaptureNetLook(Networking.LanWorldFrame.BossState into)
+        {
+            into.Glow = glowLevel;
+            into.Look.Add(phase);   // [0] phase 1-3
+        }
+        public override Transform MakeNetProp(byte kind)
+        {
+            var parent = transform.parent;
+            if (kind >= PropTurret && kind < PropTurret + 4)
+            { NetPropsMade++; return FoundryUprising.TurretLook(parent, FoundryUprising.Numeral(kind - PropTurret), "Lava turret (LAN)"); }
+            if (kind >= PropCasting && kind < PropCasting + 4)
+            {
+                NetPropsMade++;
+                var cast = FoundryUprising.CastingLook(parent, FoundryUprising.Numeral(kind - PropCasting), "Molten Casting (LAN)");
+                var chain = FoundryUprising.ChainLook(cast, "Casting chain (LAN)");
+                cast.gameObject.AddComponent<NetChain>().Line = chain;
+                return cast;
+            }
+            if (kind == PropCrownTurret) { NetPropsMade++; return FoundryUprising.TurretLook(parent, null, "Crown turret (LAN)"); }
+            return null;
+        }
+        // a client's casting view: the chain runs from the casting to its turret (across the arena on the rim)
+        sealed class NetChain : MonoBehaviour
+        {
+            public LineRenderer Line;
+            void LateUpdate()
+            {
+                if (!Line) return;
+                var at = transform.position;
+                Line.SetPosition(0, FoundryUprising.TurretFor(at) + Vector3.up * 0.4f); Line.SetPosition(1, new Vector3(at.x, 0.4f, at.z));
+            }
+        }
+
+        // client-side state and counters (two-process smoke tests read these)
+        public int NetFrames { get; private set; }
+        public int NetPropsMade { get; private set; }
+        public int NetEffects { get; private set; }          // recorded Crucivar calls replayed on this replica
+        public int NetMouldSets { get; private set; }        // Mould Tower overlays built from stand-ins
+        public int NetPourNumerals { get; private set; }
+        public int NetMissed { get; private set; }           // a recorded call whose stand-in was not found
+        int replicaPhase = 1; bool replicaDown;
+        readonly HashSet<Hazard> replicaMoulds = new HashSet<Hazard>();
+
+        public override void ReplicaPresent(Networking.LanWorldFrame.BossState state, float dt)
+        {
+            NetFrames++;
+            if (presenter) presenter.GlowLevel = state.Glow;
+            if (rig) rig.Heat = state.Glow;
+            int ph = state.Look.Count > 0 ? Mathf.Clamp(Mathf.RoundToInt(state.Look[0]), 1, 3) : replicaPhase;
+            if (ph > replicaPhase) { replicaPhase = ph; phase = ph; SecondForm = ph >= 2; if (rig) rig.BeginPhase(ph); }
+            if (Dead && !replicaDown) { replicaDown = true; if (rig) rig.Shutdown(); }
+            if (replicaMoulds.Count > 32) replicaMoulds.RemoveWhere(h => h.Cancelled);
+        }
+
+        public override bool ReplayNetEffect(string method, Networking.LanWorldFrame.EffectArg[] a, System.Func<int, PlayerController> player)
+        {
+            var fx = W != null ? W.BossFx : null;
+            bool ok = true;
+            switch (method)
+            {
+                case "CrucivarFx.DiebreakerResolve": if (fx == null || a.Length < 2) return false; fx.DiebreakerResolve(NetV(a[0]), NetF(a[1])); break;
+                case "CrucivarFx.SlagSplash": if (fx == null || a.Length < 2) return false; fx.SlagSplash(NetV(a[0]), NetF(a[1])); break;
+                case "CrucivarFx.StripStamp": if (fx == null || a.Length < 4) return false; fx.StripStamp(NetV(a[0]), NetF(a[1]), NetF(a[2]), NetF(a[3])); break;
+                case "CrucivarFx.FlameJet":   // the host records every second call: play it twice
+                    if (fx == null || a.Length < 4) return false;
+                    fx.FlameJet(NetV(a[0]), NetF(a[1]), NetF(a[2]), NetF(a[3])); fx.FlameJet(NetV(a[0]), NetF(a[1]), NetF(a[2]), NetF(a[3])); break;
+                case "CrucivarFx.RimFlood": if (fx == null || a.Length < 2) return false; fx.RimFlood(NetF(a[0]), NetF(a[1])); break;
+                case "CrucivarFx.Eruption": if (fx == null || a.Length < 1) return false; fx.Eruption(NetF(a[0])); break;
+                case "CrucivarFx.InhaleChevrons": if (fx == null || a.Length < 3) return false; fx.InhaleChevrons(NetV(a[0]), NetF(a[1]), NetF(a[2])); break;
+                case "CrucivarFx.BellowsBlast": if (fx == null || a.Length < 2) return false; fx.BellowsBlast(NetV(a[0]), NetF(a[1])); break;
+                case "CrucivarRig.Pour": if (!rig || a.Length < 1) return false; rig.Pour(NetB(a[0])); break;
+                case "CrucivarRig.VentsAll": if (!rig || a.Length < 1) return false; rig.VentsAll(NetB(a[0])); break;
+                case "Crucivar.PourNumeral":
+                {
+                    if (a.Length < 3 || W == null) return false;
+                    var who = NetP(a[0], player); var pour = ReplicaHazard(NetS(a[2]));
+                    if (!who || pour == null) { NetMissed++; return true; }
+                    ForgeRiteNumeral.Show(W, pour, who, Mathf.Clamp(NetI(a[1]), 1, 4)); NetPourNumerals++;
+                    break;
+                }
+                case "Crucivar.MouldTowers":
+                {
+                    if (a.Length < 2 || W == null) return false;
+                    string source = NetS(a[0]); var list = new List<Hazard>();
+                    var live = W.Hazards.Live;
+                    for (int i = 0; i < live.Count; i++)
+                    {
+                        var h = live[i];
+                        if (h != null && h.Replica && !h.Cancelled && h.Source == source && !replicaMoulds.Contains(h)) list.Add(h);
+                    }
+                    if (list.Count == 0) { NetMissed++; return true; }
+                    foreach (var h in list) replicaMoulds.Add(h);
+                    MouldPressFx.Show(W, list, false).HideCounts = NetB(a[1]); NetMouldSets++;
+                    break;
+                }
+                default: ok = false; break;
+            }
+            if (ok) NetEffects++;
+            return ok;
+        }
+        // the newest live stand-in with this source (one that has not landed yet first)
+        Hazard ReplicaHazard(string source)
+        {
+            Hazard best = null; var live = W.Hazards.Live;
+            for (int i = 0; i < live.Count; i++)
+            {
+                var h = live[i];
+                if (h == null || !h.Replica || h.Cancelled || h.Source != source) continue;
+                if (best == null || (h.Age < h.ResolveAt && best.Age >= best.ResolveAt)) best = h;
+            }
+            return best;
+        }
+
         protected override void OnDefeat()
         {
             // heat fades white/orange to red, kneels, a harmless final pour into its own crucible, locks solid

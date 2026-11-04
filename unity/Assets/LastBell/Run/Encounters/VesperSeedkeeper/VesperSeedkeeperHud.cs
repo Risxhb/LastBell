@@ -11,6 +11,7 @@ namespace LastBell.Run
     public sealed class VesperSeedkeeperHud : MonoBehaviour
     {
         public static bool ShowDiagnostics;
+        public static int ReplicaNumeralsShown;   // LAN test: most soak numerals a client drew at once from hazard stand-ins
         VesperSeedkeeperEncounter b;
         GUIStyle style, numeral, shadow;
         readonly StringBuilder sb = new StringBuilder();
@@ -50,11 +51,12 @@ namespace LastBell.Run
             numeral ??= new GUIStyle(GUI.skin.label) { fontSize = Mathf.RoundToInt(Screen.height * 0.04f), fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
             shadow ??= new GUIStyle(numeral);
             numeral.normal.textColor = new Color(1f, 0.96f, 0.86f); shadow.normal.textColor = new Color(0, 0, 0, 0.7f);
-            var live = w.Hazards.Live;
+            var live = w.Hazards.Live; int shownReplica = 0;
             for (int i = 0; i < live.Count; i++)
             {
                 var h = live[i];
-                if (!h.Soak || h.ShareCount <= 0 || h.Age >= h.ResolveAt) continue;
+                if (h == null || h.Cancelled || !h.Soak || h.ShareCount <= 0 || h.Age >= h.ResolveAt) continue;
+                if (h.Replica) shownReplica++;
                 var s = cam.WorldToScreenPoint(h.Origin + Vector3.up * 0.2f);
                 if (s.z <= 0) continue;
                 var r = new Rect(s.x - 40, Screen.height - s.y - 30, 80, 60);
@@ -62,6 +64,24 @@ namespace LastBell.Run
                 GUI.Label(new Rect(r.x + 2, r.y + 2, r.width, r.height), txt, shadow);
                 GUI.Label(r, txt, numeral);
             }
+            if (shownReplica > ReplicaNumeralsShown) ReplicaNumeralsShown = shownReplica;
+        }
+    }
+
+    // LAN client: a Vesper cord view. The host sends the cord at its stake; this stretches the glowing bar from the replica
+    // vessel (flat, 1 m up, as the host draws it) to the stake every frame.
+    public sealed class VesperNetCord : MonoBehaviour
+    {
+        Transform boss, bar;
+        public void Bind(Transform vessel, Transform view) { boss = vessel; bar = view; }
+        void LateUpdate()
+        {
+            if (!bar || !boss) return;
+            var from = Sim.Flat(boss.position); var to = Sim.Flat(transform.position);
+            var d = to - from;
+            bar.position = (from + to) / 2 + Vector3.up * 1.0f;
+            bar.rotation = Quaternion.LookRotation(d.sqrMagnitude > 1e-4f ? d : Vector3.forward);
+            bar.localScale = new Vector3(0.08f, 0.08f, d.magnitude);
         }
     }
 }

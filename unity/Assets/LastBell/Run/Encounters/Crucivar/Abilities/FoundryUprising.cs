@@ -35,6 +35,7 @@ namespace LastBell.Run
         {
             public int K; public Vector3 Pos; public bool Up = true; public BossPart Casting; public float CastMax;
             public Pattern A, B; public int Shots, NextFire; public bool Dense = true; public Transform Look, CastLook; public LineRenderer Chain;
+            public readonly int NetTurretId = CrucivarEncounter.NewNetId(), NetCastId = CrucivarEncounter.NewNetId();   // LAN prop ids
             public readonly List<Hazard> Pending = new List<Hazard>();
         }
 
@@ -262,25 +263,45 @@ namespace LastBell.Run
         // ---------------- stand-in looks ----------------
         void Build(Turret tu)
         {
-            var root = new GameObject("Lava turret " + Numeral(tu.K)).transform; root.SetParent(W.Root, false);
+            var root = TurretLook(W.Root, Numeral(tu.K), "Lava turret " + Numeral(tu.K));
             root.position = tu.Pos + Vector3.down * 2.2f;
-            Prim.Make(PrimitiveKind.Cylinder, root, Vector3.up * 1.1f, new Vector3(1.4f, 1.1f, 1.4f), new Color(0.22f, 0.19f, 0.17f));
-            Prim.Make(PrimitiveKind.Cylinder, root, Vector3.up * 2.3f, new Vector3(0.9f, 0.15f, 0.9f), new Color(1f, 0.55f, 0.18f), 2.5f);
-            Label(root, Numeral(tu.K), 3.2f);
             root.gameObject.AddComponent<Riser>().Init(Rise);
             tu.Look = root;
 
-            var cast = new GameObject("Molten Casting " + Numeral(tu.K)).transform; cast.SetParent(W.Root, false);
+            var cast = CastingLook(W.Root, Numeral(tu.K), "Molten Casting " + Numeral(tu.K));
             cast.position = tu.Casting.Pos;
-            Prim.Make(PrimitiveKind.Capsule, cast, Vector3.up * 1.0f, new Vector3(CastRadius * 2, 1.0f, CastRadius * 2), new Color(0.85f, 0.52f, 0.16f), 1.6f);
-            Label(cast, Numeral(tu.K), 2.6f);
             tu.CastLook = cast;
 
-            var chain = new GameObject("Casting chain " + Numeral(tu.K)).AddComponent<LineRenderer>(); chain.transform.SetParent(W.Root, false);
-            chain.positionCount = 2; chain.SetPosition(0, tu.Pos + Vector3.up * 0.4f); chain.SetPosition(1, tu.Casting.Pos + Vector3.up * 0.4f);
-            chain.startWidth = chain.endWidth = 0.09f; chain.sharedMaterial = Prim.Material(new Color(1f, 0.95f, 0.82f), 1.2f);
+            var chain = ChainLook(W.Root, "Casting chain " + Numeral(tu.K));
+            chain.SetPosition(0, tu.Pos + Vector3.up * 0.4f); chain.SetPosition(1, tu.Casting.Pos + Vector3.up * 0.4f);
             tu.Chain = chain;
         }
+
+        // the stand-in pieces, shared with the LAN client's prop views (CrucivarEncounter.MakeNetProp); numeral null: no label
+        public static Transform TurretLook(Transform parent, string numeral, string name)
+        {
+            var root = new GameObject(name).transform; root.SetParent(parent, false);
+            Prim.Make(PrimitiveKind.Cylinder, root, Vector3.up * 1.1f, new Vector3(1.4f, 1.1f, 1.4f), new Color(0.22f, 0.19f, 0.17f));
+            Prim.Make(PrimitiveKind.Cylinder, root, Vector3.up * 2.3f, new Vector3(0.9f, 0.15f, 0.9f), new Color(1f, 0.55f, 0.18f), 2.5f);
+            if (numeral != null) Label(root, numeral, 3.2f);
+            return root;
+        }
+        public static Transform CastingLook(Transform parent, string numeral, string name)
+        {
+            var cast = new GameObject(name).transform; cast.SetParent(parent, false);
+            Prim.Make(PrimitiveKind.Capsule, cast, Vector3.up * 1.0f, new Vector3(CastRadius * 2, 1.0f, CastRadius * 2), new Color(0.85f, 0.52f, 0.16f), 1.6f);
+            if (numeral != null) Label(cast, numeral, 2.6f);
+            return cast;
+        }
+        public static LineRenderer ChainLook(Transform parent, string name)
+        {
+            var chain = new GameObject(name).AddComponent<LineRenderer>(); chain.transform.SetParent(parent, false);
+            chain.positionCount = 2;
+            chain.startWidth = chain.endWidth = 0.09f; chain.sharedMaterial = Prim.Material(new Color(1f, 0.95f, 0.82f), 1.2f);
+            return chain;
+        }
+        // where a casting's turret stands: across the arena on the rim (SpawnPair puts the casting at yaw + 180)
+        public static Vector3 TurretFor(Vector3 casting) { var d = Sim.Flat(casting); return d.sqrMagnitude < 1e-4f ? Vector3.zero : -d.normalized * (Rim + 0.4f); }
 
         static void Label(Transform parent, string text, float height)
         {

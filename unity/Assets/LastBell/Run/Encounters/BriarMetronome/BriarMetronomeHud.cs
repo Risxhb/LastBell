@@ -23,7 +23,7 @@ namespace LastBell.Run
 
         void OnGUI()
         {
-            if (!ShowDiagnostics || !b || b.Dead) return;
+            if (!ShowDiagnostics || !b || b.Dead || RunHud.LanClientView) return;   // dev overlay: host only (a LAN client's replica is never stepped)
             GUI.depth = 10;
             style ??= new GUIStyle(GUI.skin.label) { fontSize = 14, richText = false };
             style.normal.textColor = new Color(0.85f, 1f, 0.85f);

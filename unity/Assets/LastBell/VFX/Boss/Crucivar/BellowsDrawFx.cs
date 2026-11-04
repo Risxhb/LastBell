@@ -11,6 +11,7 @@ namespace LastBell.VFX
         // toward it over `life` seconds. Call it every ~0.35 s while the inhale is telegraphed and live.
         public void InhaleChevrons(Vector3 centre, float slide, float life)
         {
+            if (NetCrucivarOn) NetCrucivar("InhaleChevrons", centre, slide, life);   // LAN: CrucivarFx.cs
             const int Spokes = 10; float[] radii = { 6.2f, 8.4f, 11.2f };
             float turn = Random.Range(0f, 360f / Spokes);
             for (int s = 0; s < Spokes; s++)
@@ -33,6 +34,11 @@ namespace LastBell.VFX
 
         // Exhale: a point-blank blast through all four vents, a coral shock ring out to the circle's edge plus steam.
         public void BellowsBlast(Vector3 centre, float radius)
+        {
+            if (NetCrucivarOn) NetCrucivar("BellowsBlast", centre, radius);
+            BellowsBlastFx(centre, radius);
+        }
+        void BellowsBlastFx(Vector3 centre, float radius)
         {
             var c = new Vector3(centre.x, 0.07f, centre.z);
             Play(FxMeshes.Annulus(0.8f, radius), true, alphaMat, c, 0, 0.45f, (b, u) =>

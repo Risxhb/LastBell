@@ -92,7 +92,7 @@ namespace LastBell.Run
         System.Random rng;
         readonly List<PlayerController> carriers = new List<PlayerController>();
         readonly List<Transform> props = new List<Transform>();       // placeholder cords, stake posts, seed orbs
-        readonly List<(Transform orb, PlayerController who)> seedOrbs = new List<(Transform, PlayerController)>();
+        readonly List<(Transform orb, PlayerController who, int net)> seedOrbs = new List<(Transform, PlayerController, int)>();   // net: LAN prop id
         BellkeeperFx.Telegraph dark;
         Transform visual, core, halo; Renderer coreR; float bob;
 
@@ -174,7 +174,7 @@ namespace LastBell.Run
         protected override void StepAlways()
         {
             // seed orbs ride over their carriers (presentation, host side)
-            foreach (var (orb, who) in seedOrbs) if (orb && who) orb.position = who.transform.position + Vector3.up * 2.9f;
+            foreach (var (orb, who, _) in seedOrbs) if (orb && who) orb.position = who.transform.position + Vector3.up * 2.9f;
             if (!Phase2 && !GatePending && Hp * 2 <= MaxHp) GatePending = true;
             if (presenter) presenter.TickBoss(Current == "reposition" ? "Walk" : loopClip);
         }
@@ -314,7 +314,7 @@ namespace LastBell.Run
             PendingSeeds++;
             who.Marks.Add(MechanicIcons.CarriedMark);
             var orb = Prop(PrimitiveKind.Sphere, who.transform.position + Vector3.up * 2.9f, Vector3.one * 0.45f, Gold, 4f, "Seed of light (stand-in)");
-            seedOrbs.Add((orb, who));
+            seedOrbs.Add((orb, who, NextNetPropId--));
             var h = new Hazard { Source = "Seedgift", MechanicId = MechanicIcons.SoakTower, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Sim.Flat(who.transform.position),
                 Radius = R.SeedRadius, LockAt = lockAt, ResolveAt = landAt, ShareTotal = total, ShareCount = share, Soak = true, Knockback = 0, Stun = 6 };
             bool done = false;
@@ -421,7 +421,7 @@ namespace LastBell.Run
             Clip("HaloTilt", Sim.Ticks(0.8f)); loopClip = "SweepLoop";
             var at = Sim.Flat(transform.position);
             int first = T(TideFirstSec), second = first + T(TideSecondSec);
-            if (halo) halo.localPosition = new Vector3(0, reversed ? 1.5f : 3.7f, 0);   // stand-in cue: halo dropped low = flood first
+            if (halo) halo.localPosition = new Vector3(0, reversed ? 1.5f : 3.7f, 0);   // stand-in cue: halo dropped low = flood first (LAN: ReplicaPresent, from the attack name)
             var ebb = new Hazard { Source = "Dusk Tide (ebb)", MechanicId = MechanicIcons.Ring, Shape = HazardShape.Ring, Kind = HazardKind.Ground, Origin = at, Inner = R.TideRadius,
                 Radius = R.Bound + 1.5f, LockAt = 0, ResolveAt = reversed ? second : first, Damage = TideDmg, Knockback = 0, Stun = 6, ClipRadius = R.Bound + 0.6f };
             ebb.OnResolve = hz => EbbHits += hz.Hit.Count;
@@ -474,11 +474,62 @@ namespace LastBell.Run
         protected override void Update()
         {
             base.Update();
-            bob += Time.deltaTime;
+            PresentLook(glowLevel, Time.deltaTime);
+        }
+        // bob, halo spin and core glow: the host from its own state, a LAN client's replica from the host's (ReplicaPresent)
+        void PresentLook(float glow, float dt)
+        {
+            bob += dt;
             if (visual) visual.localPosition = new Vector3(0, 0.6f + Mathf.Sin(bob * 1.3f) * 0.12f, 0);
-            if (halo) halo.Rotate(0, 25f * Time.deltaTime, 0, Space.Self);
-            if (coreR) Prim.SetGlow(coreR, Gold * (3f * glowLevel));
-            if (presenter) presenter.GlowLevel = glowLevel;
+            if (halo) halo.Rotate(0, 25f * dt, 0, Space.Self);
+            if (coreR) Prim.SetGlow(coreR, Gold * (3f * glow));
+            if (presenter) presenter.GlowLevel = glow;
+        }
+
+        // ---------------- LAN ----------------
+        // props: 0 = a cord stake post, 1 = a cord (sent at its stake; the view stretches from the vessel), 2 = a seed orb
+        public const byte NetStake = 0, NetCord = 1, NetSeed = 2;
+        public override void CaptureNetProps(List<Networking.LanWorldFrame.Prop> into)
+        {
+            foreach (var c in cords)
+            {
+                if (c.Done || c.Stake == null) continue;
+                if (c.Post) into.Add(NetProp(c.Stake.Id, NetStake, c.Post.position));
+                if (c.View && c.Lane != null) into.Add(NetProp(c.Lane.Id, NetCord, c.Stake.Origin));
+            }
+            foreach (var (orb, _, net) in seedOrbs) if (orb) into.Add(NetProp(net, NetSeed, orb.position));
+        }
+        public override Transform MakeNetProp(byte kind)
+        {
+            switch (kind)
+            {
+                case NetStake: { var t = Prim.Make(PrimitiveKind.Cylinder, transform.parent, Vector3.zero, new Vector3(0.35f, 0.5f, 0.35f), Cobalt, 0); t.name = "Cord stake (LAN)"; NoShadow(t); return t; }
+                case NetCord:
+                {
+                    var root = new GameObject("Vesper cord (LAN)").transform; root.SetParent(transform.parent, false);
+                    var bar = Prim.Make(PrimitiveKind.Cube, root, Vector3.zero, new Vector3(0.08f, 0.08f, 1f), CordGlow, 3f); NoShadow(bar);
+                    root.gameObject.AddComponent<VesperNetCord>().Bind(transform, bar);
+                    return root;
+                }
+                case NetSeed: { var t = Prim.Make(PrimitiveKind.Sphere, transform.parent, Vector3.zero, Vector3.one * 0.45f, Gold, 4f); t.name = "Seed of light (LAN)"; NoShadow(t); return t; }
+                default: return null;
+            }
+        }
+        static void NoShadow(Transform t) { var r = t ? t.GetComponent<MeshRenderer>() : null; if (r) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; }
+
+        // looks: Glow = core glow; Look[0] = phase 2 (petals open, 1/0). The halo drop follows the attack name, the tip-over Dead.
+        public override void CaptureNetLook(Networking.LanWorldFrame.BossState into)
+        {
+            into.Glow = glowLevel;
+            into.Look.Add(Phase2 ? 1 : 0);
+        }
+        public override void ReplicaPresent(Networking.LanWorldFrame.BossState state, float dt)
+        {
+            bool phase2 = state.Look.Count > 0 && state.Look[0] > 0.5f;
+            if (visual) visual.localScale = phase2 ? new Vector3(1.15f, 1.05f, 1.15f) : Vector3.one;
+            if (halo) halo.localPosition = new Vector3(0, state.Attack == "Dusk Tide (reversed)" ? 1.5f : 3.7f, 0);
+            PresentLook(state.Glow, dt);
+            if (visual) visual.localRotation = state.Dead ? Quaternion.Euler(70, 0, 0) : Quaternion.identity;
         }
 
         protected override void OnDefeat()

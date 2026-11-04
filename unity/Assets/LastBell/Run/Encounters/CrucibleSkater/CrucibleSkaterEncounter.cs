@@ -492,7 +492,7 @@ namespace LastBell.Run
         }
 
         // ---------------- thrown ladles (presentation) ----------------
-        sealed class Flying { public Transform View; public Vector3 From, To; public int Start, End; }
+        sealed class Flying { public int Net = NextNetPropId--; public Transform View; public Vector3 From, To; public int Start, End; }
         readonly List<Flying> ladles = new List<Flying>();
         public int LadleCount => ladles.Count;
         void Ladle(Vector3 from, Vector3 to, int start, int end)
@@ -518,11 +518,59 @@ namespace LastBell.Run
         protected override void Update()
         {
             base.Update();
+            PresentLook(spinRate, wobble, Dead, glowLevel, Time.deltaTime);
+        }
+        // spin, wobble, the defeat tilt and the crucible glow: the host from its own state, a LAN client's replica from the
+        // host's (ReplicaPresent)
+        void PresentLook(float rate, float wobbleK, bool dead, float glow, float dt)
+        {
             if (!spinner) return;
-            spin += spinRate * Time.deltaTime;
-            float wob = wobble > 0 ? Mathf.Sin(Time.time * 9f) * 9f * wobble : 0;
-            spinner.localRotation = Quaternion.Euler(wob, spin, Dead ? 70 : wob * 0.6f);
-            if (core) Prim.SetGlow(core, Molten * (1.2f + glowLevel * 1.4f));
+            spin += rate * dt;
+            float wob = wobbleK > 0 ? Mathf.Sin(Time.time * 9f) * 9f * wobbleK : 0;
+            spinner.localRotation = Quaternion.Euler(wob, spin, dead ? 70 : wob * 0.6f);
+            if (core) Prim.SetGlow(core, Molten * (1.2f + glow * 1.4f));
+        }
+
+        // ---------------- LAN ----------------
+        // props: 0 = a thrown ladle. Looks: Glow = crucible glow; Look[0] = spin rate (deg/s), Look[1] = wobble (0..1).
+        public override void CaptureNetProps(List<Networking.LanWorldFrame.Prop> into)
+        {
+            foreach (var f in ladles) if (f.View && f.View.gameObject.activeSelf) into.Add(NetProp(f.Net, 0, f.View.position));
+        }
+        public override Transform MakeNetProp(byte kind)
+        {
+            if (kind != 0) return null;
+            var t = Prim.Make(PrimitiveKind.Sphere, transform.parent, Vector3.zero, Vector3.one * 0.7f, Molten, 2f);
+            t.name = "Ladle of brass (LAN)"; return t;
+        }
+        public override void CaptureNetLook(Networking.LanWorldFrame.BossState into)
+        {
+            into.Glow = glowLevel;
+            into.Look.Add(spinRate); into.Look.Add(wobble);
+        }
+        // the soak numerals: the host's follow its own hazards; a client makes one for each mirrored pour / block ring
+        readonly HashSet<Hazard> replicaNumerals = new HashSet<Hazard>();
+        readonly List<Hazard> replicaGone = new List<Hazard>();
+        public int ReplicaNumeralsShown { get; private set; }   // LAN test: soak numerals this client replica has made
+        public override void ReplicaPresent(Networking.LanWorldFrame.BossState state, float dt)
+        {
+            var look = state.Look;
+            PresentLook(look.Count > 0 ? look[0] : 0, look.Count > 1 ? look[1] : 0, state.Dead, state.Glow, dt);
+            if (W == null) return;
+            var live = W.Hazards.Live;
+            if (!state.Dead)
+                for (int i = 0; i < live.Count; i++)
+                {
+                    var h = live[i];
+                    if (h == null || !h.Replica || h.Cancelled || !h.Soak || h.ShareCount <= 0 || replicaNumerals.Contains(h)) continue;
+                    bool pour = h.Source == "Crucible Toss";
+                    if (!pour && h.Source != "Body Check (block)") continue;
+                    replicaNumerals.Add(h); ReplicaNumeralsShown++;
+                    Numeral.Show(W, h, h.ShareCount.ToString(), pour ? 2.6f : 2.4f);
+                }
+            replicaGone.Clear();
+            foreach (var h in replicaNumerals) { bool inList = false; for (int i = 0; i < live.Count; i++) if (live[i] == h) { inList = true; break; } if (h.Cancelled || !inList) replicaGone.Add(h); }
+            foreach (var h in replicaGone) replicaNumerals.Remove(h);
         }
 
         protected override void OnDefeat()
@@ -551,7 +599,7 @@ namespace LastBell.Run
             }
             void Update()
             {
-                bool live = false; if (w != null) { var l = w.Hazards.Live; for (int i = 0; i < l.Count; i++) if (l[i] == h) { live = true; break; } }
+                bool live = false; if (w != null && h != null && !h.Cancelled) { var l = w.Hazards.Live; for (int i = 0; i < l.Count; i++) if (l[i] == h) { live = true; break; } }
                 if (!live) { Destroy(gameObject); return; }
                 transform.position = h.Origin + Vector3.up * height;
                 var cam = Camera.main; if (cam) transform.rotation = Quaternion.LookRotation(transform.position - cam.transform.position);

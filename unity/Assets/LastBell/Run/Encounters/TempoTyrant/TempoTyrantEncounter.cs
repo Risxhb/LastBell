@@ -655,7 +655,7 @@ namespace LastBell.Run
             int serial = ++fissureSerial;
             var f = new Hazard { Source = "Sundering Wake (eruption" + tag + ")", Shape = HazardShape.Lane, Kind = HazardKind.Ground, Origin = start, Yaw = yaw,
                 Length = travelLen, Width = FissureWidth, LockAt = 0, ResolveAt = fissureWarn, Damage = FissureDmg, Knockback = 1f };
-            f.OnResolve = hz => { FissureEruptions++; Fx.Streak(hz.Origin, hz.Yaw, 0, hz.Length, RimAmber, hz.Width * 0.5f); if (serial == fissureSerial) Rig.Fissure(false); };
+            f.OnResolve = hz => { FissureEruptions++; Fx.Streak(hz.Origin, hz.Yaw, 0, hz.Length, RimAmber, hz.Width * 0.5f); if (serial == fissureSerial) Fissure(false); };
             LastFissure = Live(f, true);
             if (mirror)
             {
@@ -667,7 +667,7 @@ namespace LastBell.Run
                 Announcement = "";
             }
             LastFissureResolveAge = Age + fissureWarn;
-            Rig.Fissure(true, start, end);
+            Fissure(true, start, end);
             Current = "Sundering Wake (backswing)";
             Rig.Pose(TyrantPose.Backswing, bs);
             for (int i = 0; i < bs; i++) { Windup(i / (float)bs); yield return 1; }
@@ -840,12 +840,32 @@ namespace LastBell.Run
             if (Rig) Rig.Glow = glowLevel;
         }
 
+        // ---------------- LAN looks ----------------
+        // The pose, haste and frenzy reach the replica's rig through LanClientWorld; the body glow comes in Glow. The wake's
+        // floor seam is a recorded call (TempoTyrantRig.Fissure), replayed on the replica's rig at the host's tick.
+        void Fissure(bool on, Vector3 from = default, Vector3 to = default)
+        {
+            if (NetRecording) NetFx("TempoTyrantRig.Fissure", on, from, to);
+            if (Rig) Rig.Fissure(on, from, to);
+        }
+        public int ReplicaFissures { get; private set; }   // LAN smoke tests: seam calls the replica replayed
+        public override void CaptureNetLook(Networking.LanWorldFrame.BossState into) { into.Glow = glowLevel; }
+        public override void ReplicaPresent(Networking.LanWorldFrame.BossState state, float dt) { if (Rig) Rig.Glow = state.Glow; }
+        public override bool ReplayNetEffect(string method, Networking.LanWorldFrame.EffectArg[] a, System.Func<int, PlayerController> player)
+        {
+            if (method != "TempoTyrantRig.Fissure" || a.Length != 3) return false;
+            var rig = Rig ? Rig : GetComponentInChildren<TempoTyrantRig>(true);
+            if (!rig) return false;
+            rig.Fissure(NetB(a[0]), NetV(a[1]), NetV(a[2])); ReplicaFissures++;
+            return true;
+        }
+
         protected override void OnDefeat()
         {
             Numbers.Clear(); Announcement = ""; PhaseName = "Defeated";
             SlicesActive = false; SafeSlice = -1; AltSafeParity = -1;
             ClearOrbs();
-            Rig.Fissure(false); Rig.Pose(TyrantPose.Defeat);
+            Fissure(false); Rig.Pose(TyrantPose.Defeat);
             if (Audio) Audio.StopAll();
             W.Fx.Crescendo(transform.position, true, 2, true);
         }

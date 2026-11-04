@@ -86,8 +86,14 @@ namespace LastBell.Run
         readonly Dictionary<PlayerController, int> colour = new Dictionary<PlayerController, int>();
         readonly HashSet<PlayerController> swapWarned = new HashSet<PlayerController>();
         readonly Dictionary<PlayerController, Transform> colourRings = new Dictionary<PlayerController, Transform>();
-        public int ColourOf(PlayerController p) => colour.TryGetValue(p, out int c) ? c : 0;
-        public bool SwapWarned(PlayerController p) => swapWarned.Contains(p);   // the ring is flickering: a toll swaps colours soon
+        // on a LAN client's replica the host's colours (ReplicaPresent) stand in for the fight's own
+        public int ColourOf(PlayerController p)
+        {
+            if (p == null) return 0;
+            if (colour.TryGetValue(p, out int c)) return c;
+            return netColour.TryGetValue(p, out int n) ? n : 0;
+        }
+        public bool SwapWarned(PlayerController p) => p != null && (swapWarned.Contains(p) || netWarned.Contains(p));   // the ring is flickering: a toll swaps colours soon
 
         Transform maskL, maskR, bellRoot, shoulderFlowers;
         readonly List<Transform> props = new List<Transform>();
@@ -238,6 +244,7 @@ namespace LastBell.Run
             W.Hazards.ClearAll();
             colour.Clear(); swapWarned.Clear();
             ClearProps();
+            if (NetRecording) NetFx("SylvaraEncounter.Clear");
         }
 
         List<(float at, Action fn)> Loop(int ph)
@@ -373,11 +380,10 @@ namespace LastBell.Run
             };
             // the pod model drops onto the warning in its last 0.4 s and lands on the resolve (proposal art)
             var pv = SylvaraProps.Spawn(SylvaraProps.Pod, transform.parent, h.Origin, LookRnd(0, 360));
-            if (pv)
-            {
-                PodModels++; props.Add(pv.transform); pv.Follow = () => h.Origin; pv.FallIn(PodLandIn(phase));
-                var land = h.OnResolve; h.OnResolve = hz => { land(hz); if (pv) pv.Land(); };
-            }
+            if (pv) { PodModels++; props.Add(pv.transform); pv.Follow = () => h.Origin; pv.FallIn(PodLandIn(phase)); }
+            if (NetRecording) NetFx("SylvaraEncounter.Pod", h.Origin, PodLandIn(phase));   // LAN: the replica drops its own pod model
+            var land = h.OnResolve;
+            h.OnResolve = hz => { land(hz); if (pv) pv.Land(); if (NetRecording) NetFx("SylvaraEncounter.PodLand", hz.Origin); };
             W.Hazards.Spawn(h);
         }
         void PodsOnFar(bool doubled = false)
@@ -409,6 +415,7 @@ namespace LastBell.Run
         public void DebugRoots() => RootsErupt(Vector3.zero, 3.5f);   // tests: the Root Ring's look alone, for a screenshot
         void RootsErupt(Vector3 c, float r)
         {
+            if (NetRecording) NetFx("SylvaraEncounter.Roots", c, r);   // LAN: the replica raises its own roots
             float a0 = LookRnd(0, Tau);
             for (int i = 0; i < RootPieces; i++)
             {
@@ -536,18 +543,27 @@ namespace LastBell.Run
                 if (W.Players.Count == 1) Later(i * 4f, () => SproutBud(a, life)); else SproutBud(a, life);
             }
         }
+        // the bell-flower model (proposal art), facing her; the cone and moss stand-in when the art isn't installed
+        Transform MakeBudView(Vector3 pos, out PropMotion view)
+        {
+            view = SylvaraProps.Spawn(SylvaraProps.Bud, transform.parent, pos, Mathf.Atan2(-pos.x, -pos.z) / Deg);
+            if (view) { BudModels++; props.Add(view.transform); view.Sprout(); return view.transform; }
+            var prop = Prim.Make(PrimitiveKind.Cone, transform.parent, pos + Vector3.up * 0.6f, new Vector3(0.8f, 1.2f, 0.8f), Ivory, 0.8f);
+            props.Add(prop);
+            props.Add(Prim.Make(PrimitiveKind.Sphere, prop, new Vector3(0, -0.3f, 0), new Vector3(1.6f, 0.5f, 1.6f), new Color(0.30f, 0.42f, 0.24f)));
+            return prop;
+        }
+        static void EndBudView(PropMotion view, Transform prop, bool bloom)
+        {
+            if (view) { if (bloom) view.Bloom(); else view.Wither(); }
+            else if (prop) prop.gameObject.SetActive(false);
+        }
+        static void PulseBud(Transform prop) { if (prop) prop.localScale = new Vector3(0.8f, 1.2f, 0.8f) * (1 + 0.06f * Mathf.Sin(Time.time * 6)); }
         void SproutBud(float a, float life)
         {
             var b = new Bud { Pos = On(a, 10), Born = Age, Life = life, Base = Rnd(0, Tau) };
-            // the bell-flower model (proposal art), facing her; the cone and moss stand-in when the art isn't installed
-            b.View = SylvaraProps.Spawn(SylvaraProps.Bud, transform.parent, b.Pos, Mathf.Atan2(-b.Pos.x, -b.Pos.z) / Deg);
-            if (b.View) { BudModels++; b.Prop = b.View.transform; props.Add(b.Prop); b.View.Sprout(); }
-            else
-            {
-                b.Prop = Prim.Make(PrimitiveKind.Cone, transform.parent, b.Pos + Vector3.up * 0.6f, new Vector3(0.8f, 1.2f, 0.8f), Ivory, 0.8f);
-                props.Add(b.Prop);
-                props.Add(Prim.Make(PrimitiveKind.Sphere, b.Prop, new Vector3(0, -0.3f, 0), new Vector3(1.6f, 0.5f, 1.6f), new Color(0.30f, 0.42f, 0.24f)));
-            }
+            b.Prop = MakeBudView(b.Pos, out b.View);
+            if (NetRecording) NetFx("SylvaraEncounter.Bud", b.Pos, life);   // LAN: the replica grows its own bud view
             b.Timer = W.Hazards.Spawn(new Hazard
             {
                 Source = "Choir Bud", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = b.Pos, Radius = 1.0f,
@@ -576,14 +592,16 @@ namespace LastBell.Run
                     KillBud(b); BudsCut++; W.Hazards.Cancel(b.Timer);
                     RunHud.Float(b.Pos + Vector3.up * 1.8f, "CUT", Turquoise);
                     W.Fx.Crescendo(b.Pos, true, 0, false);
-                    if (b.View) b.View.Wither(); else if (b.Prop) b.Prop.gameObject.SetActive(false);
+                    EndBudView(b.View, b.Prop, false);
+                    if (NetRecording) NetFx("SylvaraEncounter.BudEnd", b.Pos, false);
                 }
                 else if ((Age - b.Born) * Sim.Dt >= b.Life)
                 {
                     KillBud(b); BudsBloomed++;
                     RunHud.Float(b.Pos + Vector3.up * 1.8f, "BLOOM", Amber);
                     PetalRing(b.Pos, 20, 5, Rnd(0, Tau), 0.8f, 12, "Bud Bloom");
-                    if (b.View) b.View.Bloom(); else if (b.Prop) b.Prop.gameObject.SetActive(false);
+                    EndBudView(b.View, b.Prop, true);
+                    if (NetRecording) NetFx("SylvaraEncounter.BudEnd", b.Pos, true);
                 }
             };
             Add(e);
@@ -650,20 +668,26 @@ namespace LastBell.Run
         protected override void Update()
         {
             base.Update();
+            PresentLook(glowLevel, Dead, Time.deltaTime);
+            foreach (var b in buds) if (b.Alive) PulseBud(b.Prop);
+            DrawColourRings();
+        }
+        // lights, glow, bell sway and the stand-in's defeat sink: the host from its own state (Update), a LAN client's
+        // replica from the host's (ReplicaPresent)
+        void PresentLook(float glow, bool dead, float dt)
+        {
             PlaceLights();
-            if (Dead && frontLight)
+            if (dead && frontLight)
             {
-                frontLight.intensity = Mathf.MoveTowards(frontLight.intensity, FrontIntensity * 0.5f, Time.deltaTime * 2f);
-                rimLight.intensity = Mathf.MoveTowards(rimLight.intensity, RimIntensity * 0.3f, Time.deltaTime * 3f);
+                frontLight.intensity = Mathf.MoveTowards(frontLight.intensity, FrontIntensity * 0.5f, dt * 2f);
+                rimLight.intensity = Mathf.MoveTowards(rimLight.intensity, RimIntensity * 0.3f, dt * 3f);
             }
-            if (presenter) presenter.GlowLevel = glowLevel;
-            if (bellRoot && !Dead)
+            if (presenter) presenter.GlowLevel = glow;
+            if (bellRoot && !dead)
                 for (int b = 0; b < bellRoot.childCount; b++)
                     bellRoot.GetChild(b).localRotation = Quaternion.Euler(Mathf.Sin(Time.time * (1.3f + b * 0.37f)) * 8f, 0, Mathf.Cos(Time.time * (1.1f + b * 0.29f)) * 6f);
-            if (Dead && presenter && presenter.Visual && !presenter.HasModel)
-                presenter.Sink = Mathf.MoveTowards(presenter.Sink, 0.9f, Time.deltaTime * 0.6f);
-            foreach (var b in buds) if (b.Alive && b.Prop) b.Prop.localScale = new Vector3(0.8f, 1.2f, 0.8f) * (1 + 0.06f * Mathf.Sin(Time.time * 6));
-            DrawColourRings();
+            if (dead && presenter && presenter.Visual && !presenter.HasModel)
+                presenter.Sink = Mathf.MoveTowards(presenter.Sink, 0.9f, dt * 0.6f);
         }
 
         // Phase 2: a brass or cobalt ring under each player shows their colour; it flickers to the next colour during the
@@ -671,6 +695,7 @@ namespace LastBell.Run
         void DrawColourRings()
         {
             if (W == null) return;
+            int shown = 0;
             foreach (var p in W.Players)
             {
                 if (!p) continue;
@@ -683,20 +708,186 @@ namespace LastBell.Run
                     colourRings[p] = ring;
                 }
                 if (!ring.gameObject.activeSelf) ring.gameObject.SetActive(true);
-                bool flick = swapWarned.Contains(p) && Mathf.Repeat(Time.time * 6, 1) < 0.5f;
+                bool flick = SwapWarned(p) && Mathf.Repeat(Time.time * 6, 1) < 0.5f;
                 int show = flick ? (c == Brass ? Cobalt : Brass) : c;
                 var mr = ring.GetComponent<MeshRenderer>();
                 var want = show == Brass ? RingBrass : RingCobalt;
                 if (mr.material.GetColor("_BaseColor") != want) { mr.material.SetColor("_BaseColor", want); mr.material.SetColor("_EmissionColor", want * 2f); }
                 ring.position = Sim.Flat(p.transform.position) + Vector3.up * 0.04f;
+                shown++;
+            }
+            ColourRingsShown = shown;
+        }
+
+        // ---------------- LAN looks (the replica on a client is never stepped) ----------------
+        // Glow = body glow. Look: [0] phase (0-4), [1] the stand-in mask's half-gap (m), [2] shoulder flowers (1/0),
+        // [3] n, then n triples (lobby id, colour 0 none / 1 brass / 2 cobalt, toll warning 1/0). Pods, roots and buds are
+        // recorded calls (SylvaraEncounter.Pod / PodLand / Roots / Bud / BudEnd / Clear) replayed in ReplayNetEffect; the
+        // replica keeps its own views of them and drives them every frame here.
+        public int ColourRingsShown { get; private set; }   // colour rings drawn this frame (host and replica)
+        public int ReplicaPhase { get; private set; }       // LAN client: the phase the replica draws
+        public int NetColourRingsMax { get; private set; }  // LAN client: most colour rings shown at once
+        public int NetPods { get; private set; }            // LAN client: replayed prop calls, by kind
+        public int NetPodLands { get; private set; }
+        public int NetRoots { get; private set; }
+        public int NetBuds { get; private set; }
+        public int NetBudEnds { get; private set; }
+        public int NetBudsShown => netBuds.Count;
+        readonly Dictionary<PlayerController, int> netColour = new Dictionary<PlayerController, int>();
+        readonly HashSet<PlayerController> netWarned = new HashSet<PlayerController>();
+        sealed class NetBud { public Vector3 Pos; public float Age, Life; public PropMotion View; public Transform Prop; }
+        readonly List<NetBud> netBuds = new List<NetBud>();
+        readonly List<PropMotion> netPods = new List<PropMotion>();
+        const float MaskClosed = 0.13f;
+
+        public override void CaptureNetLook(Networking.LanWorldFrame.BossState into)
+        {
+            into.Glow = glowLevel;
+            into.Look.Add(phase);
+            into.Look.Add(maskL ? Mathf.Abs(maskL.localPosition.x) : MaskClosed);
+            into.Look.Add(shoulderFlowers && shoulderFlowers.gameObject.activeSelf ? 1 : 0);
+            var id = NetIdOf; int at = into.Look.Count; into.Look.Add(0);
+            if (id == null || W == null) return;
+            int n = 0;
+            foreach (var p in W.Players)
+            {
+                int c = ColourOf(p); if (c == 0) continue;
+                int pid = id(p); if (pid < 0) continue;
+                if (into.Look.Count + 3 > Networking.LanWorldFrame.MaxLook) break;
+                into.Look.Add(pid); into.Look.Add(c); into.Look.Add(swapWarned.Contains(p) ? 1 : 0); n++;
+            }
+            into.Look[at] = n;
+        }
+
+        public override void ReplicaPresent(Networking.LanWorldFrame.BossState state, float dt)
+        {
+            var L = state.Look;
+            ReplicaPhase = L.Count > 0 ? Mathf.Clamp(Mathf.RoundToInt(L[0]), 0, 4) : 0;
+            PresentLook(state.Glow, state.Dead, dt);
+            if (L.Count > 1 && maskL && maskR)
+            {
+                float half = Mathf.Clamp(L[1], 0, 1), x = Mathf.MoveTowards(Mathf.Abs(maskL.localPosition.x), half, dt * 0.8f);
+                maskL.localPosition = new Vector3(-x, 3.65f, 0.2f); maskR.localPosition = new Vector3(x, 3.65f, 0.2f);
+            }
+            if (L.Count > 2 && shoulderFlowers) { bool on = L[2] > 0.5f; if (shoulderFlowers.gameObject.activeSelf != on) shoulderFlowers.gameObject.SetActive(on); }
+            // the host's colours, by lobby id, on this computer's replica players
+            netColour.Clear(); netWarned.Clear();
+            var of = NetPlayerOf;
+            if (L.Count > 3 && of != null && !state.Dead)
+            {
+                int n = Mathf.Max(0, Mathf.RoundToInt(L[3]));
+                for (int i = 0; i < n && 4 + i * 3 + 2 < L.Count; i++)
+                {
+                    int c = Mathf.RoundToInt(L[4 + i * 3 + 1]); if (c != Brass && c != Cobalt) continue;
+                    var p = of(Mathf.RoundToInt(L[4 + i * 3])); if (!p) continue;
+                    netColour[p] = c; if (L[4 + i * 3 + 2] > 0.5f) netWarned.Add(p);
+                }
+            }
+            DrawColourRings();
+            NetColourRingsMax = Mathf.Max(NetColourRingsMax, ColourRingsShown);
+            // prop views: buds swell toward their bloom and pulse; a pod whose landing never arrived lands on its own
+            if (state.Dead) { ReplicaClear(); return; }
+            for (int i = netBuds.Count - 1; i >= 0; i--)
+            {
+                var b = netBuds[i]; b.Age += dt;
+                if (!b.Prop) { netBuds.RemoveAt(i); continue; }
+                if (b.View) b.View.Open = Mathf.Clamp01(b.Age / Mathf.Max(0.1f, b.Life));
+                PulseBud(b.Prop);
+                if (b.Age > b.Life + 2f) { EndBudView(b.View, b.Prop, true); netBuds.RemoveAt(i); }
+            }
+            for (int i = netPods.Count - 1; i >= 0; i--)
+            {
+                var pod = netPods[i];
+                if (!pod || pod.Now != PropMotion.Mode.Fall) { netPods.RemoveAt(i); continue; }
+                if (pod.LandsIn < -1f) { pod.Land(); netPods.RemoveAt(i); }
             }
         }
+
+        public override bool ReplayNetEffect(string method, Networking.LanWorldFrame.EffectArg[] a, System.Func<int, PlayerController> player)
+        {
+            switch (method)
+            {
+                case "SylvaraEncounter.Pod":
+                {
+                    if (a.Length != 2) return false;
+                    NetPods++;
+                    var pv = SylvaraProps.Spawn(SylvaraProps.Pod, transform.parent, NetV(a[0]), LookRnd(0, 360));
+                    if (pv)
+                    {
+                        PodModels++; props.Add(pv.transform); netPods.Add(pv);
+                        Vector3 last = Sim.Flat(NetV(a[0]));
+                        pv.Follow = () => last = ReplicaPodCentre(last);
+                        pv.FallIn(NetF(a[1]));
+                    }
+                    return true;
+                }
+                case "SylvaraEncounter.PodLand":
+                {
+                    if (a.Length != 1) return false;
+                    NetPodLands++;
+                    var at = Sim.Flat(NetV(a[0])); PropMotion best = null; float bd = 9f;
+                    foreach (var pod in netPods)
+                    {
+                        if (!pod || pod.Now != PropMotion.Mode.Fall) continue;
+                        float d = (Sim.Flat(pod.transform.position) - at).sqrMagnitude;
+                        if (d < bd) { bd = d; best = pod; }
+                    }
+                    if (best) { best.Follow = () => at; best.Land(); netPods.Remove(best); }
+                    return true;
+                }
+                case "SylvaraEncounter.Roots":
+                    if (a.Length != 2) return false;
+                    NetRoots++; RootsErupt(NetV(a[0]), NetF(a[1]));
+                    return true;
+                case "SylvaraEncounter.Bud":
+                {
+                    if (a.Length != 2) return false;
+                    NetBuds++;
+                    var b = new NetBud { Pos = NetV(a[0]), Life = NetF(a[1]) };
+                    b.Prop = MakeBudView(b.Pos, out b.View);
+                    netBuds.Add(b);
+                    return true;
+                }
+                case "SylvaraEncounter.BudEnd":
+                {
+                    if (a.Length != 2) return false;
+                    NetBudEnds++;
+                    var at = NetV(a[0]); NetBud best = null; float bd = 1f;
+                    foreach (var b in netBuds) { float d = Sim.Flat(b.Pos - at).sqrMagnitude; if (d < bd) { bd = d; best = b; } }
+                    if (best != null) { EndBudView(best.View, best.Prop, NetB(a[1])); netBuds.Remove(best); }
+                    return true;
+                }
+                case "SylvaraEncounter.Clear":
+                    ReplicaClear();
+                    return true;
+            }
+            return false;
+        }
+        void ReplicaClear() { netBuds.Clear(); netPods.Clear(); if (props.Count > 0) ClearProps(); }
+        // the pod's warning on this computer: the nearest seed or feet pod stand-in hazard (it tracks its target for 0.6 s)
+        Vector3 ReplicaPodCentre(Vector3 last)
+        {
+            if (W == null) return last;
+            Vector3 best = last; float bd = 16f;
+            foreach (var h in W.Hazards.Live)
+            {
+                if (h == null || !h.Replica || h.Cancelled || (h.Source != "Seed Pod" && h.Source != "Feet Pod")) continue;
+                float d = (Sim.Flat(h.Origin) - last).sqrMagnitude;
+                if (d < bd) { bd = d; best = Sim.Flat(h.Origin); }
+            }
+            return best;
+        }
+
+        // host test hooks (LAN smoke tests): seed pods on the farthest players and a wave of Choir Buds, now
+        public void DebugPods() { if (!Dead && W != null) PodsOnFar(); }
+        public void DebugBuds() { if (!Dead && W != null) PlantBuds(BloomAfter); }
 
         protected override void OnDefeat()
         {
             foreach (var e in emit) e.On = false;
             emit.Clear(); later.Clear(); foreach (var b in buds) KillBud(b); buds.Clear(); colour.Clear(); swapWarned.Clear();
             ClearProps();
+            if (NetRecording) NetFx("SylvaraEncounter.Clear");
             glowTarget = 0.3f; glowLevel = 2f;
             presenter.PlayOnce("Defeat", 2.5f);
             W.Fx.Crescendo(transform.position, true, 2, true);

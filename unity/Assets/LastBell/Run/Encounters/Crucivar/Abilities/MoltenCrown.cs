@@ -42,6 +42,8 @@ namespace LastBell.Run
         readonly Dictionary<int, (Hazard h, int inside)> fullest = new Dictionary<int, (Hazard, int)>();   // set -> fullest landed tower
         int Limit => Easy ? 4 : 3;   // the crown after this many is the eruption
         FoundryUprising.Turret turret; Transform turretLook; bool hooked, running, wiping;
+        public Transform TurretView => turretLook;                              // LAN: the crown turret travels as a prop
+        public readonly int TurretNet = CrucivarEncounter.NewNetId();
 
         public static int[][] Sets(int n)
         {
@@ -113,6 +115,7 @@ namespace LastBell.Run
             }
             var fx = MouldPressFx.Show(W, list, false);
             fx.HideCounts = CountsHidden;
+            if (CrucivarEncounter.NetOn && list.Count > 0) CrucivarEncounter.Net("Crucivar.MouldTowers", list[0].Source, CountsHidden);   // the client builds its own from the stand-ins
             Boss.Rig.Pour(true);
         }
 
@@ -217,9 +220,7 @@ namespace LastBell.Run
         {
             var pos = Sim.Dir(200f) * (Rim + 0.4f);
             turret = Boss.Uprising.LoneTurret(pos);
-            turretLook = new GameObject("Crown turret").transform; turretLook.SetParent(W.Root, false); turretLook.position = pos;
-            Prim.Make(PrimitiveKind.Cylinder, turretLook, Vector3.up * 1.1f, new Vector3(1.4f, 1.1f, 1.4f), new Color(0.22f, 0.19f, 0.17f));
-            Prim.Make(PrimitiveKind.Cylinder, turretLook, Vector3.up * 2.3f, new Vector3(0.9f, 0.15f, 0.9f), new Color(1f, 0.55f, 0.18f), 2.5f);
+            turretLook = FoundryUprising.TurretLook(W.Root, null, "Crown turret"); turretLook.position = pos;
             var part = new BossPart { Name = "crown turret look", Alive = false, OnCleared = _ => { if (turretLook) Object.Destroy(turretLook.gameObject); } };
             W.Parts.Add(part);   // not hittable; rides the parts list so the look goes with the encounter's transient state
         }

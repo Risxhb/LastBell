@@ -323,6 +323,7 @@ namespace LastBell.Run
         sealed class Graft
         {
             public int Season, Pen, Born, BloomAt; public Vector3 Pos; public float Hp; public bool Alive = true, Blooming;
+            public readonly int Net = NextNetPropId--;   // LAN prop id (stable while the graft's view lives)
             public BossPart Part; public Hazard Timer, Bloom; public Transform View;
         }
         readonly List<Graft> grafts = new List<Graft>();
@@ -357,10 +358,7 @@ namespace LastBell.Run
         {
             var g = new Graft { Season = season, Pen = season, Pos = R.GraftSpot(transform.position, Spoke0, season), Born = Age, Hp = GraftHp };
             g.BloomAt = Age + BloomTicks;
-            g.View = Prim.Make(PrimitiveKind.Cone, transform.parent, g.Pos + Vector3.up * 0.7f, new Vector3(0.9f, 1.4f, 0.9f), Leaf, 0.5f);
-            g.View.name = $"Season graft {R.Numeral(season)} (placeholder)";
-            Prim.Make(PrimitiveKind.Sphere, g.View, new Vector3(0, -0.45f, 0), new Vector3(1.8f, 0.4f, 1.8f), Moss);
-            Label(g.View, R.Numeral(season), 1.2f, Ivory, 0.14f);
+            g.View = GraftView(season, g.Pos + Vector3.up * 0.7f);
             // the bloom timer: a filling ring at its base (nobody is hit by it; Affects nobody)
             g.Timer = Spawn(new Hazard { Source = "Season Graft", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = g.Pos, Radius = R.GraftBody,
                 LockAt = 0, ResolveAt = BloomTicks, Damage = 0, HitOnResolve = false, Affects = _ => false });
@@ -379,6 +377,15 @@ namespace LastBell.Run
             g.Part.OnCleared = _ => { if (g.View) Destroy(g.View.gameObject); };
             W.Parts.Add(g.Part);
             grafts.Add(g);
+        }
+
+        Transform GraftView(int season, Vector3 at)
+        {
+            var v = Prim.Make(PrimitiveKind.Cone, transform.parent, at, new Vector3(0.9f, 1.4f, 0.9f), Leaf, 0.5f);
+            v.name = $"Season graft {R.Numeral(season)} (placeholder)";
+            Prim.Make(PrimitiveKind.Sphere, v, new Vector3(0, -0.45f, 0), new Vector3(1.8f, 0.4f, 1.8f), Moss);
+            Label(v, R.Numeral(season), 1.2f, Ivory, 0.14f);
+            return v;
         }
 
         void StepGrafts()
@@ -523,6 +530,136 @@ namespace LastBell.Run
             if (body) body.localRotation = Quaternion.Euler(0, 0, 12);
         }
 
+        // ---------------- LAN ----------------
+        // Host: grafts travel as props (kind = season), the beat, tempo, shears pose and each player's seasons (by lobby id:
+        // the host's and a client's player order differ) as Look numbers. Client replica (never stepped): the pendulum
+        // swings on the host's beat, the shears, body pulse and defeat tilt follow, the season numerals hang over the
+        // replica players, and every "Bramble hedge" stand-in gets its hedge wall.
+        // Look: [0] beat (index + fraction)  [1] BPM  [2..4] shears local euler  [5] numerals shown  [6] n  then n x (id, season bits)
+        public override void CaptureNetProps(List<Networking.LanWorldFrame.Prop> into)
+        {
+            foreach (var g in grafts) if (g.View) into.Add(NetProp(g.Net, (byte)Mathf.Clamp(g.Season, 0, 3), g.View.position));
+        }
+        public override void CaptureNetLook(Networking.LanWorldFrame.BossState into)
+        {
+            into.Glow = glowLevel;
+            var l = into.Look;
+            l.Add(BeatIndex + beatAge / (float)Mathf.Max(1, BeatTicks)); l.Add(Bpm);
+            var e = shears ? shears.localEulerAngles : Vector3.zero; l.Add(e.x); l.Add(e.y); l.Add(e.z);
+            l.Add(numerals.Count > 0 ? 1 : 0);
+            int at = l.Count; l.Add(0); int n = 0;
+            if (numerals.Count > 0 && NetIdOf != null && W != null)
+                foreach (var p in W.Players)
+                {
+                    if (!p || n >= 8) continue;
+                    int id = NetIdOf(p); if (id < 0) continue;
+                    int bits = 0; foreach (int s in SeasonsOf(p)) bits |= 1 << s;
+                    if (bits == 0) continue;
+                    l.Add(id); l.Add(bits); n++;
+                }
+            l[at] = n;
+        }
+        public override Transform MakeNetProp(byte kind)
+        {
+            if (kind > 3) return null;
+            NetGraftsMade++;
+            return GraftView(kind, Vector3.zero);
+        }
+
+        // client-side state and counters (two-process smoke tests read these)
+        public int NetFrames { get; private set; }
+        public int NetGraftsMade { get; private set; }
+        public int NetHedgesMade { get; private set; }
+        public int NetNumeralViews => replicaNumerals.Count;
+        double replicaBeat; bool replicaBeatSet;
+        readonly Dictionary<PlayerController, (Transform view, int bits)> replicaNumerals = new Dictionary<PlayerController, (Transform, int)>();
+        readonly Dictionary<Hazard, Transform> replicaHedges = new Dictionary<Hazard, Transform>();
+        static readonly List<PlayerController> scratchPlayers = new List<PlayerController>();
+        static readonly List<Hazard> scratchHazards = new List<Hazard>();
+        static readonly HashSet<PlayerController> scratchSeen = new HashSet<PlayerController>();
+
+        public override void ReplicaPresent(Networking.LanWorldFrame.BossState state, float dt)
+        {
+            NetFrames++;
+            var l = state.Look;
+            // the pendulum runs on at the host's tempo and eases toward the host's beat (snapshots come at 30 Hz)
+            if (l.Count > 1)
+            {
+                double target = l[0], bpm = Mathf.Max(1f, l[1]);
+                if (!replicaBeatSet || System.Math.Abs(target - replicaBeat) > 0.5) { replicaBeat = target; replicaBeatSet = true; }
+                else { replicaBeat += dt * bpm / 60.0; replicaBeat += (target - replicaBeat) * (1 - System.Math.Exp(-dt / 0.5)); }
+            }
+            if (pendulum && replicaBeatSet)
+                pendulum.localRotation = Quaternion.Euler(0, 0, Mathf.Sin((float)(replicaBeat * System.Math.PI) + Mathf.PI / 2) * 28f);
+            if (shears && l.Count > 4) shears.localRotation = Quaternion.Euler(l[2], l[3], l[4]);
+            if (body)
+            {
+                body.localScale = Vector3.one * (1 + 0.04f * (state.Glow - 1));
+                body.localRotation = Dead ? Quaternion.Euler(0, 0, 12) : Quaternion.identity;
+            }
+            ReplicaNumerals(l);
+            ReplicaHedges();
+        }
+
+        void ReplicaNumerals(List<float> l)
+        {
+            scratchSeen.Clear();
+            bool shown = l.Count > 6 && l[5] > 0.5f;
+            if (shown && NetPlayerOf != null)
+            {
+                int n = Mathf.Clamp(Mathf.RoundToInt(l[6]), 0, 8);
+                for (int k = 0; k < n && 8 + 2 * k < l.Count; k++)
+                {
+                    var p = NetPlayerOf(Mathf.RoundToInt(l[7 + 2 * k])); int bits = Mathf.RoundToInt(l[8 + 2 * k]);
+                    if (!p || bits == 0) continue;
+                    scratchSeen.Add(p);
+                    replicaNumerals.TryGetValue(p, out var e);
+                    if (!e.view || e.bits != bits)
+                    {
+                        if (e.view) Destroy(e.view.gameObject);
+                        var seasons = new List<string>(); for (int s = 0; s < 4; s++) if ((bits & (1 << s)) != 0) seasons.Add(R.Numeral(s));
+                        e.view = Label(p.transform, string.Join("+", seasons), 2.6f, Ivory, 0.12f); e.bits = bits;
+                        replicaNumerals[p] = e;
+                    }
+                    e.view.gameObject.SetActive(!p.Down);
+                }
+            }
+            scratchPlayers.Clear();
+            foreach (var kv in replicaNumerals) if (!kv.Key || !scratchSeen.Contains(kv.Key)) scratchPlayers.Add(kv.Key);
+            foreach (var p in scratchPlayers) { if (replicaNumerals[p].view) Destroy(replicaNumerals[p].view.gameObject); replicaNumerals.Remove(p); }
+        }
+
+        // one hedge wall per live "Bramble hedge" stand-in (origin, yaw, length and width come with it)
+        void ReplicaHedges()
+        {
+            if (W == null || W.Hazards == null) return;
+            var live = W.Hazards.Live;
+            for (int i = 0; i < live.Count; i++)
+            {
+                var h = live[i];
+                if (h == null || !h.Replica || h.Cancelled || h.Source != "Bramble hedge" || replicaHedges.ContainsKey(h)) continue;
+                var mid = h.Origin + Sim.Dir(h.Yaw) * (h.Length / 2) + Vector3.up * 0.45f;
+                var view = Prim.Make(PrimitiveKind.Cube, transform.parent, mid, new Vector3(h.Width * 0.8f, 0.9f, h.Length), Bramble, 0f, Quaternion.Euler(0, h.Yaw, 0));
+                view.name = "Hedge (placeholder, LAN)"; replicaHedges[h] = view; NetHedgesMade++;
+            }
+            scratchHazards.Clear();
+            foreach (var kv in replicaHedges)
+            {
+                bool on = !kv.Key.Cancelled;
+                if (on) { on = false; for (int i = 0; i < live.Count; i++) if (live[i] == kv.Key) { on = true; break; } }
+                if (!on) scratchHazards.Add(kv.Key);
+            }
+            foreach (var h in scratchHazards) { if (replicaHedges[h]) Destroy(replicaHedges[h].gameObject); replicaHedges.Remove(h); }
+        }
+
+        void ClearReplica()
+        {
+            foreach (var kv in replicaNumerals) if (kv.Value.view) Destroy(kv.Value.view.gameObject);
+            replicaNumerals.Clear();
+            foreach (var kv in replicaHedges) if (kv.Value) Destroy(kv.Value.gameObject);
+            replicaHedges.Clear();
+        }
+
         sealed class FaceCam : MonoBehaviour
         {
             void LateUpdate() { var cam = Camera.main; if (cam) transform.rotation = Quaternion.LookRotation(transform.position - cam.transform.position); }
@@ -534,6 +671,7 @@ namespace LastBell.Run
             foreach (var g in grafts) if (g.View) Destroy(g.View.gameObject);
             foreach (var kv in numerals) if (kv.Value) Destroy(kv.Value.gameObject);
             numerals.Clear();
+            ClearReplica();
         }
     }
 }

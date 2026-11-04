@@ -726,6 +726,19 @@ namespace LastBell.Run
             if (Rig) Rig.Glow = glowLevel;
         }
 
+        // LAN looks: Glow = the rig's body glow; Look[0] = Phase 2 (1/0), so the replica's orb views take the phase colour.
+        // Pose, haste and the clock reach the replica through LanClientWorld; the sounds are recorded calls.
+        public override void CaptureNetLook(Networking.LanWorldFrame.BossState into)
+        {
+            into.Glow = glowLevel;
+            into.Look.Add(Phase2 ? 1 : 0);
+        }
+        public override void ReplicaPresent(Networking.LanWorldFrame.BossState state, float dt)
+        {
+            if (Rig) Rig.Glow = state.Glow;
+            if (state.Look.Count > 0) Phase2 = state.Look[0] > 0.5f;
+        }
+
         protected override void OnDefeat()
         {
             ChainActive = false; ChainIndex = -1;

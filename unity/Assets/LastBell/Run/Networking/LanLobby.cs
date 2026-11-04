@@ -12,14 +12,16 @@ namespace LastBell.Run.Networking
         public const int Capacity = 4;
         public const int MaxClients = Capacity - 1;
         // Protocol 4 (Nov 3): player names and lobby Ready (SetReady); the host enforces every lobby rule.
-        const byte Protocol = 4, Hello = 1, Snapshot = 2, ChooseClass = 3, StartFight = 4, InputFrame = 5, WorldFrame = 6, SceneReady = 7, SetReadyMsg = 8;
+        const byte Protocol = 5, Hello = 1, Snapshot = 2, ChooseClass = 3, StartFight = 4, InputFrame = 5, WorldFrame = 6, SceneReady = 7, SetReadyMsg = 8;
         const int MaxMessagesPerPump = 64;
         // Mirrors RunDirector.Classes (kept Unity-free for the .NET harness); LanMenuAutoTest checks the two match.
         static readonly string[] Classes = { "Tollbreaker", "Chimesinger", "Arcanist" };
         public static IReadOnlyList<string> ClassList => Classes;
         public static string DefaultClass => Classes[0];
         static readonly string[] Arenas = { "test", "skyward-spire", "brass-foundry", "verdant-chimes", "shattered-hour", "metronome-court" };
-        static readonly string[] Encounters = { "Bellkeeper", "Aurelion", "Tempo Tyrant", "Chimebound Oracle", "Pendulum Sentinel" };
+        // every boss but the Tutorial (single-player by design), 4 Nov 2026
+        static readonly string[] Encounters = { "Bellkeeper", "Aurelion", "Crucivar", "Sylvara", "Tempo Tyrant", "Chimebound Oracle", "Pendulum Sentinel", "Dial Warden",
+            "Escapement Twins", "Rivet Cantor", "Crucible Skater", "Briar Metronome", "Silt Carillon", "Vesper Seedkeeper" };
         // Ready = the player pressed Ready in the lobby (locks their class). Not the same as a client having loaded the arena.
         public sealed class Member { public int Id; public string Name; public string ClassName; public bool Ready; }
         sealed class Peer { public IConnection Connection; public int Id; public bool Joined, Loaded; public DateTime Deadline; public int LastInput = -1; }

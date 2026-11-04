@@ -177,7 +177,33 @@ namespace LastBell.Menu
                 case PendulumSentinelEncounter p: p.ForcedNext="Weights"; return "Pendulum Sentinel Weights";
                 case ChimeboundOracleEncounter o: o.ForcedNext="Wells"; return "Chimebound Oracle Wells";
                 case AurelionEncounter a: a.TestHold=true; a.TestRun(AurelionShowcase(a,d.World)); return "Aurelion Zenith Collapse, Orrery Closing, Last Light";
+                case SiltCarillonEncounter s: s.ForcedNext="TideBells"; return "Silt Carillon Tide Bells (bell numerals)";
+                case VesperSeedkeeperEncounter v: v.ForcedNext="Cords"; return "Vesper Seedkeeper Cords (stakes, cords, numerals)";
+                case CrucibleSkaterEncounter c: c.ForcedNext="Toss"; return "Crucible Skater Toss (ladles, numerals)";
+                case RivetCantorEncounter r: r.ForcedNext="Verse"; return "Rivet Cantor Verse (glyphs, Chorus numeral)";
+                case DialWardenEncounter w: w.ForcedNext="Mainspring"; return "Dial Warden Mainspring (wave wall)";
+                case SylvaraEncounter sy: sy.DebugSetHpFraction(0.74f); sy.DebugRoots(); return "Sylvara phase 2 colours and Root Ring";
+                case EscapementTwinsEncounter et: et.ForcedNext="PalletLock"; return "Escapement Twins Pallet Lock (Tock, team marks)";
+                case BriarMetronomeEncounter bm: bm.ForcedNext="Hedge"; return "Briar Metronome Hedge (hedges, grafts)";
+                case CrucivarEncounter cv: cv.StartAtPhase(2); return "Crucivar Foundry Uprising (turrets, castings)";
                 default: return "none";
+            }
+        }
+        // what the client's replica boss drew that only the boss draws (numerals, prompts...): most at once, per boss
+        static int ReplicaShown(BossEncounter b)
+        {
+            switch (b)
+            {
+                case SiltCarillonEncounter s: return s.ReplicaNumeralsShown;
+                case VesperSeedkeeperEncounter _: return VesperSeedkeeperHud.ReplicaNumeralsShown;
+                case CrucibleSkaterEncounter c: return c.ReplicaNumeralsShown;
+                case RivetCantorEncounter r: return r.ReplicaNumeralsShown;
+                case SylvaraEncounter sy: return sy.NetRoots + sy.NetColourRingsMax;
+                case BellkeeperEncounter bk: return bk.ReplicaLookFrames;
+                case EscapementTwinsEncounter et: return et.NetTockSynced>0 ? et.NetTockSynced : 0;
+                case BriarMetronomeEncounter bm: return bm.NetNumeralViews + bm.NetHedgesMade;
+                case CrucivarEncounter cv: return cv.NetMissed>0 ? 0 : cv.NetEffects;
+                default: return -1;
             }
         }
         static IEnumerable<int> AurelionShowcase(AurelionEncounter a, CombatWorld w)
@@ -193,7 +219,7 @@ namespace LastBell.Menu
             float until=Time.realtimeSinceStartup+150; bool observedCombat=false, observedDamage=false, observedResult=false, observedHazard=false, observedTelegraph=false, observedProjectile=false, observedHud=false, observedOwnCooldown=false;
             float combatSince=-1, combatTime=0; int combatFrames=0; bool shotCombat=false;
             int musicExpected=0, musicPlaying=0; bool sawNormal=false; bool wantMusic=false, sawAurelion=false; bool sawProps=false, sawAnnouncement=false, shownAnnouncement=false, sawClock=false, clockMoved=false; double firstBeat=-1;
-            int numbersSent=0, numbersShown=0; TempoTyrantAudio tempoAudio=null; string lastTrack="";
+            int numbersSent=0, numbersShown=0, replicaShown=-1, bulletsSent=0; string bossName=""; TempoTyrantAudio tempoAudio=null; string lastTrack="";
             bool rosterMatched=false; float maxLead=0; LanWorldFrame lastFrame=null; int snapshots=0, movedFrames=0; Vector3 lastSnapshotPos=Vector3.zero; Vector3 lastDrawn=Vector3.zero; bool haveDrawn=false;
             while (session && session.ClientView && Time.realtimeSinceStartup<until)
             {
@@ -226,6 +252,7 @@ namespace LastBell.Menu
                     if (state.Boss!=null && state.RunState==(int)RunState.Combat && d && d.Boss)
                     {
                         sawProps |= state.Boss.Props.Count>0;
+                        replicaShown=Mathf.Max(replicaShown,ReplicaShown(d.Boss)); bulletsSent=Mathf.Max(bulletsSent,state.Bullets.Count); bossName=d.Boss.GetType().Name;
                         if (d.Boss is TempoTyrantEncounter ty)
                         {
                             if (!string.IsNullOrEmpty(state.Boss.Announcement)) { sawAnnouncement=true; shownAnnouncement |= ty.Announcement==state.Boss.Announcement; }
@@ -265,6 +292,9 @@ namespace LastBell.Menu
             Debug.Log("[LAN smoke] client boss presentation: props sent "+sawProps+", most drawn "+(view2?view2.PropsShown:0)+"; announcement sent "+sawAnnouncement+", shown "+shownAnnouncement
                 +"; strike numbers sent "+numbersSent+", shown "+numbersShown+"; clock "+(sawClock?(clockMoved?"moving":"still"):"none")+"; replayed Aurelion effects "+(view2?view2.ReplicaEffects:0));
             if (sawProps) Check("client draws the boss's orbs and thrown objects",view2 && view2.PropsShown>0);
+            Check("client boss looks run without errors",view2 && view2.LookFailures==0);
+            if (bulletsSent>0) Check("client draws the host's bullets ("+bulletsSent+" in one snapshot)",view2 && view2.BulletsSeen>0);
+            if (replicaShown>=0) Check("client draws the boss's own overlays ("+bossName+": "+replicaShown+")",replicaShown>0);
             if (sawAurelion) Check("client replays Aurelion's Zenith Collapse, Orrery Closing and Last Light",view2 && view2.ReplicaEffects>=3);
             if (sawAnnouncement) Check("client HUD shows the Tempo Tyrant's announcements",shownAnnouncement);
             if (numbersSent>0) Check("client HUD shows the Tempo Tyrant's strike numbers",numbersShown>0);
