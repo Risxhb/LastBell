@@ -436,7 +436,8 @@ namespace LastBell.Run
             if (path || bad(pos))
             {
                 var esc = NearestClear(pos, boss, bad, out float need);
-                if (esc != Vector3.zero) { home = pos + esc * need; volReach = false; volPull = need > 6f ? 1f : 2f; }
+                // not beside a turret: the clear spot there is where its next arms sweep (two bots were pinned so, 11-04)
+                if (esc != Vector3.zero && BotSight.TurretDist(pos + esc * need) >= TurretKeep) { home = pos + esc * need; volReach = false; volPull = need > 6f ? 1f : 2f; }
             }
             if (!volOn || me.World.Tick - volTick >= 3 || me.Stunned > 0)
             {
@@ -519,6 +520,7 @@ namespace LastBell.Run
             // its spot, and (attacking, not carrying a brand) being in reach of the target: out of reach it never swings, and
             // a casting sits inside its turret's fan (the solo bot circled one just out of reach until the Pour Flood, 11-03)
             cost += Sim.Flat(q - home).magnitude * volPull;
+            float turret = BotSight.TurretDist(q); if (turret < TurretKeep) cost += (TurretKeep - turret) * 8f;   // its spiral arms sweep the wall beside it
             if (volReach) cost += Mathf.Max(0, Sim.Flat(tPos - q).magnitude - tRad - (Range(me) + 1.5f)) * 4f;
             return cost;
         }
@@ -564,6 +566,7 @@ namespace LastBell.Run
                 if (!CombatWorld.InPlayerBound(q, -0.3f)) q = Sim.Dir(yaw) * (rim - 2f);
                 bool ok = true;
                 for (int i = 0; i < live.Count && ok; i++) { var h = live[i]; if ((h.BurnPerSecond > 0 || Jet(h)) && (h.Contains(q) || (Jet(h) && h.Contains((q + pos) / 2f)))) ok = false; }
+                if (ok && BotSight.TurretDist(q) < TurretKeep) ok = false;
                 foreach (var p in me.World.Players) if (ok && p && p != me && !p.Down && Sim.Flat(p.transform.position - q).magnitude < brand.Radius + 1f) ok = false;
                 if (!ok) continue;
                 float c = Sim.Flat(q - pos).magnitude;
@@ -585,6 +588,7 @@ namespace LastBell.Run
         Hazard spokeRef; float spokeYaw, spokeDir;
         static readonly float[] SpokeRadii = { 6.5f, 6.0f, 7.0f, 5.5f, 7.5f, 5.0f, 8.0f, 4.5f, 8.6f };   // near the hub a jet covers too wide an angle, far out the gap outruns a walk
         static readonly float[] SpokeShifts = { 0f, 4f, -4f, 8f, -8f, 11f, -11f, 14f, -14f, 17f, -17f };   // degrees off the gap's middle
+        const float TurretKeep = 5f;   // m kept from a turret firing (Crucivar's rim turrets)
         const float BrandRing = 12.5f;   // where a brand is walked to: its pool (2 m) stays off the jet ring and leaves the inside of the quake's outer band
         bool Spokes(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
         {
