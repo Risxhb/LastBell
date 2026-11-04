@@ -68,6 +68,8 @@ namespace LastBell.Run
             return best;
         }
 
+        bool Sliding(PlayerController p) => sliding.TryGetValue(p, out int until) && W.Tick < until;
+
         // every tick (AurelionEncounter.StepAlways) while v4 runs
         public void StepFalls()
         {
@@ -75,7 +77,7 @@ namespace LastBell.Run
             foreach (var p in W.Players)
             {
                 if (!p || p.Down || !OverHole(p.transform.position)) continue;
-                if (sliding.TryGetValue(p, out int until) && W.Tick < until) continue;   // already being carried out
+                if (Sliding(p)) continue;   // already being carried out
                 var from = p.transform.position; var to = Landing(from);
                 int before = p.Hp;
                 p.ReceiveHit(new Hazard { Source = FallSource, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = to, Radius = 0.1f, Damage = FallDamage, Stun = FallStun, Knockback = 0 });
@@ -97,6 +99,7 @@ namespace LastBell.Run
                 {
                     Source = Name, Shape = HazardShape.Cone, Kind = HazardKind.Ground, Origin = Centre, Yaw = Order[k], HalfAngle = Half,
                     Radius = Rim + 0.5f, LockAt = Sim.Ticks(WarnS), ResolveAt = Sim.Ticks(600f), BurnPerSecond = Burn, Knockback = 0, Pit = true,
+                    Affects = p => !Sliding(p),   // a fall's slide carries you out: no burn on the way
                 });
                 Sectors.Add(h); Boss.PhasePools.Add(h);
                 yield return Sim.Ticks(WarnS);
