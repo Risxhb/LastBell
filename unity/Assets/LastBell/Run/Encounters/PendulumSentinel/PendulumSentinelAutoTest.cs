@@ -159,7 +159,7 @@ namespace LastBell.Run
             float waitMenu = 0; while ((RunDirector.Instance == null || RunDirector.Instance.State != RunState.Menu) && waitMenu < 30) { waitMenu += Time.deltaTime; yield return null; }
             if (RunDirector.Instance == null) { Check("run scene loads", false, "no RunDirector after 30 s"); Finish(); yield break; }
             d = RunDirector.Instance;
-            Check("practice request accepted", d.StartPractice("Vanguard", enc));
+            Check("practice request accepted", d.StartPractice("Tollbreaker", enc));
             float t0 = 0; while ((RunDirector.Instance == null || RunDirector.Instance.State != RunState.Ready) && t0 < 30) { t0 += Time.deltaTime; yield return null; }
             d = RunDirector.Instance;
             Check("practice Ready on Skyward Spire", d && d.State == RunState.Ready && RunMaps.Current == map && d.Mode == RunMode.Practice && d.Encounter == enc);

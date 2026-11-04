@@ -18,44 +18,7 @@ Branch `feature/run-loop`. October 21, 2026 (overnight build). Status labels use
 | Materials | glTFast URP shaders. Emission strength is restored at runtime (×2.5 Vanguard, ×2 Chimesinger, ×5 Bellkeeper, plus metallic ×0.55 on the Bellkeeper), because glTFast drops `KHR_materials_emissive_strength`. |
 | Missing clips | Resolved through a fallback table (approved name first, then older clips). Anything still missing gets a labelled procedural placeholder on the visual pivot: Hit = 0.3 s flinch, Down = fall onto the back, GetUp = reverse. |
 
-## Vanguard — model: Rough production · rig: Rough production · animation: Rough production · VFX: Rough production
-
-- **Unity asset:** `unity/Assets/LastBell/Characters/Vanguard/Resources/Characters/Vanguard.glb` (JPEG textures, 3.9 MB, 40k tris)
-- **Browser asset:** `prototype/arena-3d/models/vanguard.glb` and `vanguard-glb.js`
-- **Editable source:** Meshy multi-view source `unity-session/prototype/arena-3d/models/upload/Meshy/Meshy_AI_This_will_be_a_charac_1021003259_texture.glb` (not committed: source upload). Scripts: `prototype/arena-3d/models/blender/prep.py` (decimate, glow mask) and `rig.py` (armature, weights, sword, all clips). The rebuilt rig is written to `vanguard_rig.blend` in the work folder.
-- **Rebuild:** `blender -b prep.py -- <meshy.glb> <work> 40000`, then `blender -b <work>/vanguard_prep.blend -P rig.py -- <work> <browser.glb> <Soldier.glb> <unity.glb>`. Soldier.glb is the three.js Mixamo run reference, not committed.
-- **Attachment points:** sword parented to `hand.R` (bone-parented mesh). The shield is skinned rigidly to `forearm.L`. Brace FX attach at the chest, 0.75 m forward.
-
-| Clip | Length | Loop | Gameplay use (ticks @60) | Markers (normalized) | Status |
-| --- | --- | --- | --- | --- | --- |
-| Idle | 2.03 s | yes | stance | — | Rough production |
-| Run | 0.73 s | yes | walk 6 m/s (clip stride 4.2 m/s, played ×1.43) | — | Rough production (Mixamo-retargeted legs) |
-| Sprint | 0.57 s | yes | sprint 9 m/s | — | Rough production |
-| Dodge | 0.60 s | no | dash 12 ticks, played 0.3 s from 0.05 | — | Rough production |
-| Jump | 1.20 s | no | 36-tick airtime, played from 0.2 | takeoff 0.22, land 0.76 | Rough production; no separate Land clip |
-| SteelRhythm1 / 2 | 0.33 s | no | 20 ticks, contact tick 8 | contact 0.45 | Rough production (same motion as Combo1/2) |
-| SteelRhythm3 | 0.47 s | no | 32 ticks, contact tick 15 | contact 0.5 | Rough production, heavier finisher |
-| SunderingBlow | 0.70 s | no | 42 ticks, release tick 20 | windup 0–0.35, release 0.48, recovery 0.75–1 | **New tonight**, rough production |
-| LastWord | 1.40 s | no | 84 ticks, release tick 48 (≈0.8 s windup) | planted windup 0.15–0.5, slam 0.57, committed hold to 0.85 | **New tonight**, rough production |
-| BraceRaise | 0.20 s | no | 6 ticks | — | **New tonight** |
-| BraceHold | 1.03 s | yes | held up to 90 ticks | — | **New tonight** |
-| BraceWalk | 0.73 s | yes | braced movement at 35 % speed | — | **New tonight** (mocap legs + held Brace upper body) |
-| BraceHit | 0.40 s | no | absorbed frontal strike (12 ticks) | impact 0.2 | **New tonight** |
-| BraceLower | 0.30 s | no | 9 ticks; the cooldown starts after it | — | **New tonight** |
-| Hit | 0.30 s | no | hit-stun 15 ticks | — | **New tonight** |
-| Down | 0.80 s | no | down / defeat, held | buckle 0–0.35, fall to 0.85 | **New tonight**, rough |
-| GetUp | 0.90 s | no | run start (revive in future co-op) | kneel 0.45 | **New tonight**, rough |
-| Combo1–3, DashAttack, PendulumRush, ReversalRush, FinalHour, Guard, Counter | — | — | **superseded kit**; still in the GLB but unused (the old `VanguardTestController` was removed Oct 21) | — | Legacy, not used by the run loop |
-
-Contact sheet: `run-loop-evidence/vanguard/kit-contact-sheet.png`.
-
-**VFX** (`Run/Combat/PlayerFx.cs`):
-- Steel Rhythm: cyan crescent at blade height across the hit arc. The third hit is wider and brighter, with a floor scuff.
-- Opening: a turning three-tick floor ring plus motes, so it reads by shape and not only by colour.
-- Sundering Blow: chop band plus a floor split. Empowered is gold, with more sparks and a screen shake.
-- Last Word: a ring that tightens over the windup, then slam pillar, dust ring and a shockwave that travels toward the cursor.
-- Brace: translucent rune disc in front while raised. An absorbed hit gives a short disc flash and sparks; there's no invulnerability flash.
-- Dash: cyan trail.
+Vanguard removed from the game (Chzy18, 2 Nov); its model and browser asset were deleted. Git history keeps them.
 
 ## Chimesinger — model: Rough production · animation: Rough production / Placeholder · VFX: Rough production
 

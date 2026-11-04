@@ -13157,7 +13157,7 @@ MonoBehaviour:
   OrbitDegreesPerSecond: 2
   FieldOfView: 40
   BossPosition: {x: 0, y: 0, z: -1.7}
-  VanguardPosition: {x: -1.6, y: 0, z: 1}
+  TollbreakerPosition: {x: -1.6, y: 0, z: 1}
   ArcanistPosition: {x: -5.2, y: 0, z: 4.3}
   ChimesingerPosition: {x: 5, y: 0, z: 3.8}
 --- !u!114 &2030384183

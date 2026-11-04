@@ -75,6 +75,10 @@ namespace LastBell.Run
         public int BeatIndex { get; private set; }
         public readonly Dictionary<PlayerController, IQteSource> QteSources = new Dictionary<PlayerController, IQteSource>();
         readonly KeyboardQte keyboard = new KeyboardQte();
+        readonly Dictionary<PlayerController, RemoteQte> remoteQte = new Dictionary<PlayerController, RemoteQte>();
+        // a LAN client's presses arrive late: judge them at the tick its screen showed, up to this far back, and close a
+        // remote prompt's window this much later
+        public const int NetLagTicks = 15;
 
         // hit counters
         public int BeamHits, WeightHits, OffBalanceHits, HandHits, BreakHits, WaveHits, ImplosionHits;
@@ -451,6 +455,13 @@ namespace LastBell.Run
         public ParryQte PromptFor(PlayerController p, out int sinceResult)
         {
             sinceResult = 0;
+            if (IsNetReplica)
+            {
+                int id = NetIdOf != null ? NetIdOf(p) : -1;
+                if (id < 0 || !netPrompts.TryGetValue(id, out var nq)) return null;
+                if (nq.Open) return nq;
+                sinceResult = NetTick - nq.ResultTick; return sinceResult <= 36 ? nq : null;
+            }
             if (p && braced.TryGetValue(p, out var b)) return b.q;
             if (p && lastPrompt.TryGetValue(p, out var q) && q.ResultTick >= 0) { sinceResult = Tick - q.ResultTick; return sinceResult <= 36 ? q : null; }
             return null;
@@ -459,6 +470,11 @@ namespace LastBell.Run
         IQteSource SourceFor(PlayerController p)
         {
             if (QteSources.TryGetValue(p, out var s)) return s;
+            if (p.Input is Networking.LanRemoteInput remote)
+            {
+                if (!remoteQte.TryGetValue(p, out var rq)) remoteQte[p] = rq = new RemoteQte(remote);
+                return rq;
+            }
             return p.Input is KeyboardMouseInput ? keyboard : null;
         }
 
@@ -519,8 +535,9 @@ namespace LastBell.Run
                 {
                     if (l.Qte == null || l.Resolved) continue;
                     var src = SourceFor(l.Player); drained.Clear(); src?.Drain(drained);
-                    foreach (var k in drained) { int before = l.Qte.Index; l.Qte.Press(k, Tick); if (l.Qte.Open || l.Qte.Result == ParryQte.Outcome.Success) { if (l.Qte.Index > before) Audio.Key(); } }
-                    l.Qte.Step(Tick);
+                    var remote = src as RemoteQte; int at = remote != null && remote.LastTick >= 0 ? Mathf.Clamp(remote.LastTick, Tick - NetLagTicks, Tick) : Tick;
+                    foreach (var k in drained) { int before = l.Qte.Index; l.Qte.Press(k, at); if (l.Qte.Open || l.Qte.Result == ParryQte.Outcome.Success) { if (l.Qte.Index > before) Audio.Key(); } }
+                    l.Qte.Step(remote != null ? Tick - NetLagTicks : Tick);
                     if (l.Qte.Open) continue;
                     l.Resolved = true; Unbrace(l.Player);
                     ParryLog.Add((Tick, l.Hour, l.Qte.Result.ToString(), l.Qte.Sequence.Length, l.Qte.FailReason));
@@ -748,6 +765,66 @@ namespace LastBell.Run
                 LaunchWave(w, Tick, true);
                 yield return Beats(MidnightEveryBeats);
             }
+        }
+
+        // ---------------- LAN ----------------
+        public int NetTick => IsNetReplica ? NetDrawnTick : Tick;
+        // Look: prompt count, then per prompt: lobby id, packed keys (base 5), key count, index, result, open, arrive,
+        // window, result tick, fail reason
+        const int PromptFields = 10;
+        readonly Dictionary<int, ParryQte> netPrompts = new Dictionary<int, ParryQte>();
+        readonly HashSet<int> netSeen = new HashSet<int>();
+        ParryQte netLocalShown;
+        public int NetPromptsShown { get; private set; }   // LAN smoke test: prompts this client has shown
+        public override void CaptureNetLook(Networking.LanWorldFrame.BossState into)
+        {
+            into.Glow = glowLevel;
+            int countAt = into.Look.Count; into.Look.Add(0); int n = 0;
+            foreach (var kv in lastPrompt)
+            {
+                var q = kv.Value; if (q == null || NetIdOf == null) continue;
+                if (!q.Open && (q.ResultTick < 0 || Tick - q.ResultTick > 40)) continue;
+                int id = NetIdOf(kv.Key); if (id < 0 || n >= 4) continue;
+                float packed = 0; for (int i = q.Sequence.Length - 1; i >= 0; i--) packed = packed * 5 + (int)q.Sequence[i];
+                into.Look.Add(id); into.Look.Add(packed); into.Look.Add(q.Sequence.Length); into.Look.Add(q.Index); into.Look.Add((int)q.Result);
+                into.Look.Add(q.OpenTick); into.Look.Add(q.ArriveTick); into.Look.Add(q.Window); into.Look.Add(q.ResultTick); into.Look.Add(System.Array.IndexOf(ParryQte.Reasons, q.FailReason));
+                n++;
+            }
+            into.Look[countAt] = n;
+        }
+        public override void ReplicaPresent(Networking.LanWorldFrame.BossState state, float dt)
+        {
+            if (presenter) presenter.GlowLevel = state.Glow;
+            var look = state.Look; netSeen.Clear();
+            int n = look.Count > 0 ? Mathf.Clamp((int)look[0], 0, 4) : 0;
+            for (int j = 0; j < n && 1 + (j + 1) * PromptFields <= look.Count; j++)
+            {
+                int o = 1 + j * PromptFields, id = (int)look[o], len = Mathf.Clamp((int)look[o + 2], 1, 8), open = (int)look[o + 5];
+                netSeen.Add(id);
+                if (!netPrompts.TryGetValue(id, out var q) || q.OpenTick != open || q.Sequence.Length != len)
+                {
+                    var seq = new QteKey[len]; float packed = look[o + 1];
+                    for (int i = 0; i < len; i++) { seq[i] = (QteKey)Mathf.Clamp((int)(packed % 5), 0, 4); packed = Mathf.Floor(packed / 5); }
+                    netPrompts[id] = q = new ParryQte(seq, open, (int)look[o + 6], (int)look[o + 7]);
+                }
+                q.SetNet((int)look[o + 3], (ParryQte.Outcome)Mathf.Clamp((int)look[o + 4], 0, 2), (int)look[o + 8], (int)look[o + 6], (int)look[o + 9]);
+            }
+            foreach (var id in new List<int>(netPrompts.Keys)) if (!netSeen.Contains(id)) netPrompts.Remove(id);
+            // this computer's own prompt: read W A S D / E and send them with the tick on screen
+            var me = RunDirector.Instance ? RunDirector.Instance.Player : null;
+            var mine = me ? PromptFor(me, out _) : null;
+            if (mine != null && mine.Open)
+            {
+                if (mine != netLocalShown) { netLocalShown = mine; keyboard.Begin(); NetPromptsShown++; }
+                keyboard.Poll(); drained.Clear(); keyboard.Drain(drained);
+                foreach (var k in drained) Networking.LanQteOut.Press((int)k, NetDrawnTick);
+            }
+        }
+        public override bool ReplayNetEffect(string method, Networking.LanWorldFrame.EffectArg[] a, System.Func<int, PlayerController> player)
+        {
+            if (method.StartsWith("DialWardenFx.", StringComparison.Ordinal)) return Fx && Fx.Replay(method, a);
+            if (method.StartsWith("DialWardenAudio.", StringComparison.Ordinal)) return Audio && Audio.Replay(method, a);
+            return false;
         }
 
         // ---------------- lifecycle ----------------

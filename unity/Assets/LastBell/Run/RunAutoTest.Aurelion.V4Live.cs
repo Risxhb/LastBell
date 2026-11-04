@@ -15,8 +15,8 @@ namespace LastBell.Run
 
         IEnumerator AurelionV4LiveFight()
         {
+            AurelionArgs.SoloOverride = null;
             Note("---------- Aurelion v4 live fight (menu > Hard > practice) ----------");
-            AurelionArgs.SetOverride = null; AurelionArgs.SoloOverride = null;
             if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }
             d.SelectDifficulty(Difficulty.Hard);
             var ally = new AllyBot(0, 1, BotMode.Perfect) { HoldRange = V3Ranged };
@@ -29,7 +29,7 @@ namespace LastBell.Run
             d.RequestReady();
             yield return Until(() => d.State == RunState.Combat, 15, "combat");
             var b = d.Boss as AurelionEncounter;
-            Check("v4 live: Aurelion uses the v4 set by default", b != null && AurelionArgs.V4, b == null ? "no boss" : "");
+            Check("v4 live: Aurelion uses the v4 set by default", b != null && b.PhaseStarts.Length == 4, b == null ? "no boss" : "");
             if (b == null) yield break;
             Note($"v4 live: boss HP {b.MaxHp}, difficulty {d.World.Difficulty}");
             bool was = AllyBot.Attacks; AllyBot.Attacks = true;

@@ -9,7 +9,7 @@ Area 1's shared arena: 3 minibosses and the area boss fight here. It is built fr
   - background materials swapped to `Shaders/SkyArchitecture.shader`, so towers, piers and the dais underside blend into cloud colour with depth, then dissolve deep inside the cloud
   - layered soft clouds (`Shaders/SkyCloud.shader`, an 8-shape 1024² atlas): a deep sea with noise-cut sky gaps, a waist cluster round every `CloudAnchor` exported with the GLB, and thin wisps. Clouds fade against scene depth, so they wrap towers without straight edges; the camera requests the depth texture itself
   - floor and invisible-wall colliders, 8 spawn points, post-processing and the camera
-  - a Vanguard for scale, and a hidden `Gameplay/TelegraphCheck` with placeholder warning shapes (not boss mechanics)
+  - a Tollbreaker for scale, and a hidden `Gameplay/TelegraphCheck` with placeholder warning shapes (not boss mechanics)
 - **Runtime:** `SkywardSpireArena.cs` sways the banners, turns the armillary rings, drifts the clouds and handles the views. Groups named `Occluder…` (camera-side towers) are hidden in the gameplay view. Clouds breathe (±3% scale) and vary in opacity. Set `quiet` while a warning is up to dim the floor's gold.
 - **Batch:** `Unity.exe -batchmode -projectPath unity -executeMethod LastBell.Areas.Area1.EditorTools.SkywardSpireBuilder.BatchBuildAndCapture` writes `Captures/topdown.png`, `gameplay.png`, `gameplay-telegraphs.png` and `abyss-closeup.png`.
 

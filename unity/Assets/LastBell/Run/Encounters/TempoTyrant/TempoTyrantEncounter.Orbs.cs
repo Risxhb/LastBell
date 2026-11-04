@@ -161,6 +161,17 @@ namespace LastBell.Run
             t.localScale = Vector3.one * size; t.position = at; t.gameObject.SetActive(true);
             return t;
         }
+        public override void CaptureNetProps(List<Networking.LanWorldFrame.Prop> into)
+        {
+            foreach (var d in drops) if (d.Orb) into.Add(NetProp(d.H.Id, 0, SimSmoother.SimPosition(d.Orb)));
+            foreach (var b in bouncers) if (b.Orb) into.Add(NetProp(b.H.Id, 1, SimSmoother.SimPosition(b.Orb)));
+        }
+        public override Transform MakeNetProp(byte kind)
+        {
+            var t = TakeOrb(Vector3.zero, kind == 0 ? 1.0f : BouncerRadius * 1.5f);
+            var smoother = t.GetComponent<SimSmoother>(); if (smoother) smoother.enabled = false;   // the client interpolates it
+            return t;
+        }
         void ReleaseOrb(Transform t) { if (!t) return; t.gameObject.SetActive(false); orbPool.Push(t); }
 
         void OnDestroy() { if (orbRoot) Destroy(orbRoot.gameObject); }

@@ -12,6 +12,7 @@ namespace LastBell.Run
         public Vector2 Move;          // camera-relative WASD, x right / y up the screen
         public Vector3 Aim;           // cursor on the floor (world)
         public bool Sprint, Jump, Dash, Potion;
+        public bool WorldMove;        // LAN remote players: Move is already world x / z (the client used its own camera)
         public bool P0, P1, P2, P3, P4;   // pressed this tick
         public bool H0, H1, H2, H3, H4;   // held
         public bool Pressed(int i) => i switch { 0 => P0, 1 => P1, 2 => P2, 3 => P3, _ => P4 };
@@ -95,8 +96,9 @@ namespace LastBell.Run
         // by the encounter; drawn by RunHud with the name beside each icon; cleared before each encounter
         public readonly List<string> Marks = new List<string>();
         public Shop.PlayerBuild Build;   // run items bought in the shop (null = none); read through Shop.ItemHooks
-        public int MaxHealth => Shop.ItemHooks.MaxHp(this, MaxHp);                              // MaxHp unless items change it
-        public float MaxStaminaNow => Shop.ItemHooks.F(this, "stamina.max", MaxStamina);
+        public int MaxHealth => netMaxHp > 0 ? netMaxHp : Shop.ItemHooks.MaxHp(this, MaxHp);                              // MaxHp unless items change it
+        public float MaxStaminaNow => netMaxStamina > 0 ? netMaxStamina : Shop.ItemHooks.F(this, "stamina.max", MaxStamina);
+        int netMaxHp; float netMaxStamina;   // LAN client replica: the host's maxima
 
         public int Hp { get; private set; } = MaxHp;
         public float Stamina { get; private set; } = MaxStamina;
@@ -124,7 +126,7 @@ namespace LastBell.Run
             SimSmoother.Attach(go);   // drawn between ticks (smooth at 120 fps+); the sim pose is untouched
             pc.ClassName = className; pc.World = world;
             pc.Presenter = CharacterPresenter.ForPlayer(go.transform, className);
-            pc.Kit = className == "Chimesinger" ? new ChimesingerKit() : className == "Arcanist" ? new ArcanistKit() : (PlayerKit)new VanguardKit2();
+            pc.Kit = className == "Chimesinger" ? new ChimesingerKit() : className == "Arcanist" ? new ArcanistKit() : (PlayerKit)new TollbreakerKit();
             pc.Kit.Attach(pc);
             world.Players.Add(pc);
             return pc;
@@ -150,6 +152,9 @@ namespace LastBell.Run
             if (refillPotions) Potions = MaxPotions + Shop.ItemHooks.ExtraPotions(this);
         }
 
+        // campaign travel: the potions left when the run moved to the next arena (RunDirector.ResumeCarried)
+        public void CarryPotions(int potions) => Potions = Mathf.Max(0, potions);
+
         bool DrinkPotion()
         {
             if (Down || Potions == 0 || Hp >= MaxHealth || sincePotion < PotionLockout) return false;
@@ -164,6 +169,13 @@ namespace LastBell.Run
             if (Down || amount <= 0) return;
             int h = Mathf.Min(amount, MaxHealth - Hp); if (h <= 0) return;
             Hp += h; RunHud.Float(transform.position + Vector3.up * 2.4f, "+" + h, new Color(0.55f, 1f, 0.75f));
+        }
+
+        // LAN client replica only: show the host's values (this copy never runs Step).
+        public void ApplyNetworkState(int hp, int maxHp, float stamina, float maxStamina, int potions, bool down)
+        {
+            netMaxHp = Mathf.Max(1, maxHp); netMaxStamina = Mathf.Max(1, maxStamina);
+            Hp = Mathf.Max(0, hp); Stamina = Mathf.Max(0, stamina); Potions = Mathf.Max(0, potions); Down = down;
         }
 
         // dev / test hook only
@@ -184,7 +196,7 @@ namespace LastBell.Run
             RunHud.Float(transform.position + Vector3.up * 2.4f, "-" + dmg, mult < 1 ? new Color(0.6f, 0.9f, 1f) : new Color(1f, 0.42f, 0.36f));
             World.BossFx.PlayerHit(transform.position);
             if (Hp == 0) { GoDown(); return; }
-            if (!noKnock)
+            if (!noKnock && h.Flinch)
             {
                 stun = h.Stun; knockDir = h.PushDir(transform.position); knockDist = h.Knockback * Shop.ItemHooks.F(this, "knockback", 1); knockTick = KnockTicks;
                 dashTick = 0; Kit.Interrupt();
@@ -219,6 +231,15 @@ namespace LastBell.Run
             World.ReportPlayerHit(this, h, dmg);
             RunHud.Float(transform.position + Vector3.up * 2.4f, "-" + dmg, new Color(1f, 0.42f, 0.36f));
             GoDown();
+        }
+
+        // Put the player somewhere else at once (Aurelion's Last Light fall, proposal): any knockback, pull or dash in
+        // progress ends, so nothing carries them back over the edge.
+        public void Relocate(Vector3 pos)
+        {
+            if (Down) return;
+            transform.position = World.Constrain(Sim.Flat(pos), Radius);
+            knockTick = 0; pullTick = 0; dashTick = 0;
         }
 
         // Forced movement with no damage, stun or interrupt (Crucivar's inhale). The player keeps control: the pull is
@@ -257,7 +278,7 @@ namespace LastBell.Run
             Vector3 fwd = cam ? Sim.Flat(cam.transform.forward).normalized : Vector3.forward;
             if (fwd.sqrMagnitude < 0.01f) fwd = Vector3.forward;
             Vector3 right = Vector3.Cross(Vector3.up, fwd);
-            Vector3 move = fwd * inp.Move.y + right * inp.Move.x;
+            Vector3 move = inp.WorldMove ? new Vector3(inp.Move.x, 0, inp.Move.y) : fwd * inp.Move.y + right * inp.Move.x;
 
             Vector3 vel = Vector3.zero; bool stepped = false;
             if (jumpTick >= 0)
@@ -274,7 +295,7 @@ namespace LastBell.Run
             else if (dashTick > 0)
             {
                 dashTick--; vel = dashDir * (dashDist / DashTicks) * Sim.Hz;
-                if (dashTick == 0) { dashLock = DashRecover; Shop.ItemHooks.OnDashEnd(this); }
+                if (dashTick == 0) { dashLock = DashRecover; Kit.OnDashEnd(); Shop.ItemHooks.OnDashEnd(this); }
             }
             else
             {
@@ -348,11 +369,17 @@ namespace LastBell.Run
         public abstract string Tooltip(int slot);           // PF-04: name, binding, effect, cooldown, conditions
         public abstract string ClassState();                // Opening / Harmony etc.
         public abstract void Step(PlayerInput inp);
+        // LAN client replica: the host's cooldowns, slot text and class state (null = this kit's own). The HUD reads Shown*.
+        public float[] NetCooldowns; public string[] NetSlotStates; public string NetClassState;
+        public float ShownCooldown(int slot) => NetCooldowns != null && slot < NetCooldowns.Length ? NetCooldowns[slot] : Cooldown01(slot);
+        public string ShownSlotState(int slot) => NetSlotStates != null && slot < NetSlotStates.Length ? NetSlotStates[slot] : SlotState(slot);
+        public string ShownClassState() => NetClassState ?? ClassState();
         public virtual void TickTimersOnly() { }             // cooldowns keep running while stunned or dashing
         public virtual bool Acting => false;                 // mid-action (bots: decide the next press when idle)
         public virtual bool CanDash() => true;
         public virtual bool CanJump() => true;
         public virtual void OnDash() { }
+        public virtual void OnDashEnd() { }                  // the dash has finished (Battle Spin)
         public virtual void Interrupt() { }                  // hit-stun or down: cancel unreleased actions
         public virtual void ClearTargetState() { }           // target died / encounter over: drop marks on the boss
         public abstract void ResetAll();                     // encounter start or fresh run

@@ -24,7 +24,7 @@ Shader "LastBell/FX/Telegraph"
         _Memory ("Inactive memory outline (dashed, unfilled)", Range(0, 1)) = 0
         _ClipRadius ("Floor clip radius (0 = off)", Float) = 0
         _ClipCentre ("Floor clip centre (world xz)", Vector) = (0, 0, 0, 0)
-        [Enum(PerShape,0,SkywardSpire,1,None,2)] _Motif ("Area motif (Telegraph-Style v2)", Float) = 0
+        [Enum(PerShape,0,SkywardSpire,1,None,2,BrassFoundry,3)] _Motif ("Area motif (Telegraph-Style v2)", Float) = 0
         _Shade ("State shade: solid fill opacity, 0 = off (Severance Night)", Range(0,1)) = 0
         _HoleCount ("Cut-out discs (_Holes: world xz + radius)", Float) = 0
     }
@@ -101,11 +101,30 @@ Shader "LastBell/FX/Telegraph"
                 }
                 return m * (0.35 + 0.65 * saturate(_Progress));
             }
+            // Brass Foundry motif (Reference/Telegraph-Style 02, settled 2026-10-23): a band of square gear teeth just inside
+            // every edge (alternating shallow and deep, about 1.1 m pitch along the edge), a rivet dot in each shallow tooth,
+            // and faint molten streaks along the timing direction. Teeth never change the plain contour (the caller keeps
+            // the border clear); contrast rises toward resolve.
+            float foundry (float2 p, float d)
+            {
+                float r = length(p), ang = atan2(p.x, p.y);
+                float s = _Shape > 2.5 ? p.y : ang * max(r, 0.5);             // distance along the nearest edge
+                float tooth = step(0.5, frac(s / 1.1));                        // 1 = deep tooth
+                float depth = -d;                                              // metres inside the edge
+                float teeth = step(0.22, depth) * step(depth, lerp(0.55, 0.95, tooth));
+                float2 rv = float2(frac(s / 1.1) - 0.25, (depth - 0.4) / 1.1);  // rivet in the middle of the shallow tooth
+                float rivet = (1 - tooth) * (1 - smoothstep(0.05, 0.08, length(rv) * 1.1)) * step(0.6, depth);
+                float along = _Shape > 2.5 ? p.y : r;                          // streaks run the way the fill grows
+                float across = _Shape > 2.5 ? p.x : ang * 2.2;
+                float streak = (1 - smoothstep(0.02, 0.07, abs(frac(across * 0.9) - 0.5))) * step(0.5, frac(along * 0.35 - _Time.y * 0.5)) * step(1.2, depth);
+                return max(max(teeth, rivet), streak * 0.45) * (0.35 + 0.65 * saturate(_Progress));
+            }
             float4 frag (v2f i) : SV_Target
             {
                 float d, u, ident; shape(i.p, d, u, ident);
                 if (_Motif > 0.5) ident = skyward(i.p);
                 if (_Motif > 1.5) ident = 0;
+                if (_Motif > 2.5) ident = foundry(i.p, d);
                 // optional cut-out discs (Aurelion's Umbra: the floor outside every light well); their edges are true boundaries
                 for (int k = 0; k < 6; k++) if (k < _HoleCount) d = max(d, _Holes[k].z - length(i.world.xz - _Holes[k].xy));
                 float aa = fwidth(d) * 1.2;

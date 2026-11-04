@@ -189,8 +189,8 @@ namespace LastBell.Run
             if (RunDirector.Instance == null) UnityEngine.SceneManagement.SceneManager.LoadScene(RunMaps.All[map].RunScene);
             while (RunDirector.Instance == null || RunDirector.Instance.State != RunState.Menu) yield return null;
             d = RunDirector.Instance;
-            if (RunMaps.Current != map) { Check("practice loads its arena", d.StartPractice("Vanguard", enc)); }
-            else Check("practice starts on its arena", d.StartPractice("Vanguard", enc));
+            if (RunMaps.Current != map) { Check("practice loads its arena", d.StartPractice("Tollbreaker", enc)); }
+            else Check("practice starts on its arena", d.StartPractice("Tollbreaker", enc));
             float t0 = 0; while ((RunDirector.Instance == null || RunDirector.Instance.State != RunState.Ready) && t0 < 30) { t0 += Time.deltaTime; yield return null; }
             d = RunDirector.Instance;
             Check("practice Ready on Metronome Court", d && d.State == RunState.Ready && RunMaps.Current == map && d.Mode == RunMode.Practice && d.Encounter == enc);
@@ -770,6 +770,8 @@ namespace LastBell.Run
                  d.Player.Hp >= hp - 40, $"ticks +{d.World.Tick - tick}");
             yield return Wait(0.3f);
             Check("resume resumes the music beat-locked", mus && mus.Source.isPlaying && Mathf.Abs(boss.Audio.LastMusicError) < TempoTyrantAudio.ResyncTolerance, boss.Audio.StatusText);
+            // Nov 3: the music used to jump 73 times a fight (40 on normal frames, a double stutter after most tempo changes)
+            Check("music: crossfaded tempo switches, no corrections on normal frames (only after frames over 0.1 s)", boss.Audio.MusicSwaps >= 2 && boss.Audio.CalmResyncs <= 1, boss.Audio.StatusText);
         }
 
         IEnumerator DefeatAndRetry()

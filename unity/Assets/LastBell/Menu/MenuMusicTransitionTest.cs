@@ -45,7 +45,7 @@ namespace LastBell.Menu
                 Check("playlist track plays " + i, IsMenuTrack(menu) && menu.isPlaying);
             }
             int menuSample = menu.timeSamples;
-            Check("launch run", MenuLaunch.Normal("Vanguard"));
+            Check("launch run", MenuLaunch.Normal("Tollbreaker"));
             yield return Until(() => RunDirector.Instance && RunDirector.Instance.State == RunState.Ready, 45, "run preparation");
             var d = RunDirector.Instance;
             if (!d) { Finish(hadVolume, savedVolume); yield break; }
@@ -111,7 +111,7 @@ namespace LastBell.Menu
             Check("menu return stops both boss sources", music.GetComponents<AudioSource>().Where(s => s != menu).All(s => !s.isPlaying && s.volume == 0));
             Check("single persistent owner and three reusable sources", FindObjectsByType<MenuMusic>().Length == 1 && music.GetComponents<AudioSource>().Length == 3);
             // Return to gameplay once more to check defeat and a same-boss retry.
-            Check("launch defeat check", MenuLaunch.Normal("Vanguard"));
+            Check("launch defeat check", MenuLaunch.Normal("Tollbreaker"));
             yield return Until(() => RunDirector.Instance && RunDirector.Instance.State == RunState.Ready, 45, "defeat preparation");
             d = RunDirector.Instance;
             d.RequestReady(); yield return Until(() => d.State == RunState.Combat, 4, "defeat combat");

@@ -69,15 +69,15 @@ namespace LastBell.Run
             if (Log.Count < 4000) Log.Add(what);
         }
 
-        public void Lane(int lane) => Play(laneClips[Mathf.Clamp(lane, 0, laneClips.Length - 1)], "lane " + lane, 0.8f);
-        public void Chain(int index) => Play(chainClips[Mathf.Clamp(index, 0, chainClips.Length - 1)], "chain " + index);
-        public void Soaked() => Play(soaked, "soaked");
-        public void Missed() => Play(missed, "missed");
-        public void Hum() => Play(hum, "hum", 0.9f);
-        public void Burst() => Play(burst, "burst", 0.8f);
-        public void Tick() => Play(tick, "tick", 0.7f);
-        public void Whoosh() => Play(whoosh, "whoosh");
-        public void Toll() => Play(toll, "toll");
-        public void StopAll() { if (src) src.Stop(); }
+        public void Lane(int lane) { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.BossPart, "ChimeboundOracleAudio.Lane", new object[] { lane }); Play(laneClips[Mathf.Clamp(lane, 0, laneClips.Length - 1)], "lane " + lane, 0.8f); }
+        public void Chain(int index) { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.BossPart, "ChimeboundOracleAudio.Chain", new object[] { index }); Play(chainClips[Mathf.Clamp(index, 0, chainClips.Length - 1)], "chain " + index); }
+        public void Soaked() { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.BossPart, "ChimeboundOracleAudio.Soaked", new object[0]); Play(soaked, "soaked"); }
+        public void Missed() { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.BossPart, "ChimeboundOracleAudio.Missed", new object[0]); Play(missed, "missed"); }
+        public void Hum() { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.BossPart, "ChimeboundOracleAudio.Hum", new object[0]); Play(hum, "hum", 0.9f); }
+        public void Burst() { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.BossPart, "ChimeboundOracleAudio.Burst", new object[0]); Play(burst, "burst", 0.8f); }
+        public void Tick() { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.BossPart, "ChimeboundOracleAudio.Tick", new object[0]); Play(tick, "tick", 0.7f); }
+        public void Whoosh() { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.BossPart, "ChimeboundOracleAudio.Whoosh", new object[0]); Play(whoosh, "whoosh"); }
+        public void Toll() { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.BossPart, "ChimeboundOracleAudio.Toll", new object[0]); Play(toll, "toll"); }
+        public void StopAll() { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.BossPart, "ChimeboundOracleAudio.StopAll", new object[0]); if (src) src.Stop(); }
     }
 }
