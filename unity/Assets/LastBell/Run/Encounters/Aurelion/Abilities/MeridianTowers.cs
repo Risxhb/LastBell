@@ -85,7 +85,7 @@ namespace LastBell.Run
             bool solo = party.Count == 1;
             var needs = NeedsFor(party.Count, Casts);
             var layout = Layouts[Casts++ % Layouts.Length];
-            Glow(1.3f); Flare(0.6f);
+            Glow(1.3f); Flare(0.6f); Clip("TowerCall", Duration() + 1);   // glaive planted, free hand raised; the fist closes as they resolve
             var labels = new List<RunHud.WorldLabel>();
             int owner = 0;
             for (int k = 0; k < needs.Length; k++)

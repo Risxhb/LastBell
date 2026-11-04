@@ -83,7 +83,7 @@ namespace LastBell.Run
 
         public IEnumerable<int> Run()
         {
-            Sectors.Clear(); Falls.Clear();
+            Sectors.Clear(); Falls.Clear(); Clip("LastLightCall", Sim.Ticks(2.5f));
             RunHud.Banner("LAST LIGHT — THE FLOOR IS FALLING", new Color(1f, 0.6f, 0.5f), 2.5f);
             for (int k = 0; k < Order.Length; k++)
             {

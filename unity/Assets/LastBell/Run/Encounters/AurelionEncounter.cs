@@ -58,6 +58,7 @@ namespace LastBell.Run
         {
             PhaseName = "Perfect Order";
             presenter = CharacterPresenter.Create(transform, "Aurelion", 3f, 0.8f, 0, host => { BuildStandIn(host); return host; });
+            Clip("Entrance", 120);   // the run intro (RunDirector.IntroTicks): he straightens and plants the glaive
             BindAbilities();
             // the orrery rings and the label glyphs are warmed here, before the fight (perf captures 3 Nov: first built, drawn
             // or lettered mid-fight, each spiked a frame)

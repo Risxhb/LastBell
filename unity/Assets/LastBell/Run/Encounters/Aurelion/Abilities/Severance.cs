@@ -75,7 +75,7 @@ namespace LastBell.Run
             var nightLbl = RunHud.Label(Vector3.zero, "NIGHT ☾", NightText, 30); var dayLbl = RunHud.Label(Vector3.zero, "DAY ☉", DayText, 30);
             PlaceNames(nightLbl, dayLbl);
             // 3 s to split before the sides lock: co-op, half the party is called Day and half Night (party order, alternating)
-            Splitting = true; planned.Clear();
+            Splitting = true; planned.Clear(); Clip("SeveranceSplit", Sim.Ticks(SplitS));   // glaive overhead along the line, brought down as the sides lock
             var party = Standing();
             for (int i = 0; i < party.Count; i++) planned[party[i]] = party.Count == 1 ? 0 : i % 2 == 0 ? -1 : 1;
             // co-op: each player's own call above them for the split (the banner alone names no one)

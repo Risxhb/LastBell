@@ -56,6 +56,7 @@ namespace LastBell.Run
             int cast = Casts++, total = Total, lead = Lead;
             bool two = second >= total + lead;
             ResolveTick = MarkTick + (two ? second : total - 1);
+            Clip("MarkCast", ResolveTick - MarkTick + 1);
             var labels = new List<RunHud.WorldLabel>();
             for (int i = 0; i < party.Count; i++)
             {

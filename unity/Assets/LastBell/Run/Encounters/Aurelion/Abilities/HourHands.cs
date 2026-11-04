@@ -37,6 +37,7 @@ namespace LastBell.Run
         public IEnumerable<int> Run()
         {
             Say(Name);
+            Clip("HourHands", Duration() + 1);   // the glaive levelled like a clock hand, struck as the spokes resolve
             var party = Standing();
             if (party.Count <= 1)
             {

@@ -43,7 +43,7 @@ namespace LastBell.Run
         public IEnumerable<int> Run()
         {
             Say(Name);
-            Spots.Clear(); Chained = false;
+            Spots.Clear(); Chained = false; Clip("SunspotsCast", First);   // fist to the chest, flung out at the first blast
             var party = Standing();
             int cast = Casts++;
             if (party.Count == 1) { Spots.Add(new Spot { Who = party[0], Index = 0 }); Spots.Add(new Spot { Who = party[0], Index = 1 }); }

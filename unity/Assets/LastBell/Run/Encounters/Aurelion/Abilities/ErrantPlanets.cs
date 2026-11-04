@@ -35,6 +35,7 @@ namespace LastBell.Run
         {
             if (Live) return;
             AurelionTimeline.Note("errant planets begin");
+            Boss.PlayClipIfIdle("PlanetsRelease", Sim.Ticks(1.5f));
             int n = Easy ? 1 : Orbits.Length;
             for (int i = 0; i < n; i++)
             {

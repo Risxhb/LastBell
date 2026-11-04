@@ -42,7 +42,7 @@ namespace LastBell.Run
         {
             Say(Name);
             Active = true; Broken = false; UmbraHits = 0; dark.Clear();
-            Boss.RaiseShield(ShieldFor());
+            Boss.RaiseShield(ShieldFor()); Clip("EclipseCall", Sim.Ticks(2.5f));   // arms fold, the halo sinks in front of him
             RunHud.Banner("TOTAL ECLIPSE — BREAK THE CORONA", new Color(1f, 0.85f, 0.5f), 2.5f);
             Glow(2f); Flare(1.5f);
             var rings = new List<BellkeeperFx.Telegraph>();
@@ -63,7 +63,7 @@ namespace LastBell.Run
             }
             foreach (var r in rings) r.Expire();
             Wells.Clear(); Active = false;
-            if (Broken) { RunHud.Banner("CORONA BROKEN", new Color(0.7f, 0.9f, 1f), 1.5f); Flare(2f); }
+            if (Broken) { RunHud.Banner("CORONA BROKEN", new Color(0.7f, 0.9f, 1f), 1.5f); Flare(2f); Clip("Stagger", Sim.Ticks(1.2f)); }
             else Boss.Wipe("Total Eclipse — the Corona Shield held");
             Boss.RaiseShield(0);
         }

@@ -36,7 +36,7 @@ namespace LastBell.Run
         {
             Say(Name);
             int win = WindowTicks;
-            Clip("MeridianAlignment", win);   // stand-in: glaive lifted straight up
+            Clip("ZenithCollapse", win);   // glaive lifted crosswise overhead, slammed down on the resolve tick
             Last = Spawn(new Hazard
             {
                 Source = Name, Shape = HazardShape.Ring, Kind = HazardKind.Ground, Origin = BossPos,

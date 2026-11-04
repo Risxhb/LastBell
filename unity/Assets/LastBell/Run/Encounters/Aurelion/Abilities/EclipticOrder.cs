@@ -78,7 +78,7 @@ namespace LastBell.Run
                 var rim = W.BossFx.Circle(r); rim.Place(Anchors[k], 0); rim.Motif(0); rim.Friendly(BrassRim); rim.Progress(1); rim.Order = 2; rims.Add(rim);
                 labels.Add(RunHud.Label(Anchors[k] + Vector3.up * 0.3f, Numerals[k], Ivory, 46));
             }
-            Glow(1.2f); Clip("MeridianAlignment", StrikeTick(count - 1));
+            Glow(1.2f); Clip("EclipticOrder", StrikeTick(count - 1));
 
             int t = 0;
             for (int k = 0; k < count; k++)

@@ -39,7 +39,7 @@ namespace LastBell.Run
             Say(Name);
             int warn = Warn();
             LastHorizon = Mathf.Max(0, horizonTicks);
-            Clip("MeridianAlignment", warn);
+            Clip("OrreryClosing", warn);   // arms spread, the halo turns; arms shut as the rings close
             var rim = Spawn(new Hazard
             {
                 Source = Name + " rim", Shape = HazardShape.Ring, Kind = HazardKind.Ground, Origin = Centre,

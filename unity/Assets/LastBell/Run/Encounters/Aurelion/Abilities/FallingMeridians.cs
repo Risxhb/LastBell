@@ -23,7 +23,7 @@ namespace LastBell.Run
         public void Step()
         {
             if (++clock < Sim.Ticks(EveryS)) return;
-            clock = 0; Casts++; Last.Clear();
+            clock = 0; Casts++; Last.Clear(); Boss.PlayClipIfIdle("MeridianFlick", Sim.Ticks(0.8f));
             var players = W.Players;
             for (int i = 0; i < players.Count; i++)
             {
