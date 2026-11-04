@@ -116,7 +116,7 @@ namespace LastBell.Run
         public int Revives { get; private set; }                  // times revived this fight
         public int LastHurtTick { get; private set; } = -999;
         // still, free and unhurt: standing next to a downed ally like this channels the revive
-        public bool CanChannelRevive => !Down && stun == 0 && knockTick == 0 && dashTick == 0 && pullTick == 0 && !Kit.Acting
+        public bool CanChannelRevive => !Down && stun == 0 && dashTick == 0 && pullTick == 0 && !Kit.Acting
             && Last.Move.sqrMagnitude < 0.01f && !(Last.P0 || Last.P1 || Last.P2 || Last.P3 || Last.P4 || Last.Dash);
         public float Height { get; private set; }
         public bool Airborne => jumpTick >= 0;
