@@ -57,6 +57,8 @@ namespace LastBell.Run
             new BossEntry("Escapement Twins (practice)", w => BossEncounter.Spawn<EscapementTwinsEncounter>(w, EscapementTwinsRules.TickAt(90f), 90f), inRun: false, map: CrucivarMap, phases: 2),
             // Brass Foundry miniboss, practice only, placeholder look (docs/bosses/crucible-skater.md, a proposal)
             new BossEntry("Crucible Skater (practice)", w => BossEncounter.Spawn<CrucibleSkaterEncounter>(w, new Vector3(0, 0, -2f), 0), inRun: false, map: CrucivarMap, phases: 2),
+            // Verdant Chimes miniboss, practice only (docs/bosses/briar-metronome.md, a proposal; placeholder body)
+            new BossEntry("Briar Metronome (practice)", w => BossEncounter.Spawn<BriarMetronomeEncounter>(w, new Vector3(0, 0, -1.5f), 0), inRun: false, map: SylvaraMap, phases: 2),
             // New-player tutorial (Run/Tutorial, docs/tutorial.md): a guided Tempo Tyrant fight on Metronome Court, practice only.
             // Also LastBell.exe -lastbellTutorial. Kept last so the other entries' indices don't move.
             new BossEntry(TutorialName, w => TutorialDirector.Attach(BossEncounter.Spawn<TempoTyrantEncounter>(w, new Vector3(0, 0, -2f), 0)), inRun: false, map: TempoTyrantMap),
@@ -90,6 +92,7 @@ namespace LastBell.Run
         public static int EscapementTwinsPractice => Array.FindIndex(Bosses, b => b.Name.StartsWith("Escapement Twins"));
         public static int RivetCantorPractice => Array.FindIndex(Bosses, b => b.Name.StartsWith("Rivet Cantor"));
         public static int CrucibleSkaterPractice => Array.FindIndex(Bosses, b => b.Name.StartsWith("Crucible Skater"));
+        public static int BriarMetronomePractice => Array.FindIndex(Bosses, b => b.Name.StartsWith("Briar Metronome"));
         // The Tollbreaker took the Vanguard's place (Chzy18, 29 Oct), and the Vanguard was removed from the game (1 Nov).
         public static readonly string[] Classes = { "Tollbreaker", "Chimesinger", "Arcanist" };
         const int IntroTicks = 120, ClearTicks = 180, DownedTicks = 100;

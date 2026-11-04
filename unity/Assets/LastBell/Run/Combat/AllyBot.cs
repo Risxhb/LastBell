@@ -19,6 +19,10 @@ namespace LastBell.Run
     //   to the next Ecliptic Order anchor as soon as the previous strike lands and keeps its Zenith Mark's side.
     public enum BotMode { Passive, Reflex, Perfect }
 
+    // A boss that hands bots a job the generic dodge and soak logic can't read (Briar Metronome: walk to your own season
+    // graft by the inner path, then cut it). Stand: where to be now (a waypoint is fine); Aim: what to swing at when near.
+    public interface IAllyBotJob { bool BotJob(PlayerController me, out Vector3 stand, out Vector3 aim); }
+
     public sealed class AllyBot : IInputSource
     {
         readonly int slot, of;            // this ally's index and the ally count (for its angle round the boss)
@@ -134,8 +138,21 @@ namespace LastBell.Run
                         float d = Sim.Flat(edge - pos).sqrMagnitude; if (d < best) { best = d; want = edge; }
                     }
                 }
+                // a job the boss hands out (IAllyBotJob: Briar Metronome's grafts): go there and cut what it names, even
+                // as a non-attacking menu bot (a mechanic, like Sylvara's Choir Buds)
+                Vector3 jobStand = default, jobAim = default;
+                bool job = boss is IAllyBotJob bj && bj.BotJob(me, out jobStand, out jobAim);
+                if (job)
+                {
+                    want = jobStand; inp.Aim = jobAim;
+                    if (Sim.Flat(jobAim - pos).magnitude <= 3.2f)
+                    {
+                        if (me.Kit is TollbreakerKit) Attack(me, ref inp);
+                        else inp.P0 = inp.H0 = tick % 6 == 0 || me.ClassName != "Arcanist";
+                    }
+                }
                 // attacking: the nearest spot in reach of him that every job and telegraph allows (inner disc edge, well edge, ...)
-                if (Attacks && AttackSpot(me, boss, out var spot)) { want = spot; spotNote = 1; dSpot = spot; } else spotNote = 2;
+                else if (Attacks && AttackSpot(me, boss, out var spot)) { want = spot; spotNote = 1; dSpot = spot; } else spotNote = 2;
                 var flat = new Vector2(want.x, want.z); float lim = CombatWorld.PlayerBound - 0.8f;
                 if (flat.magnitude > lim) { flat = flat.normalized * lim; want = new Vector3(flat.x, 0, flat.y); }
                 var v = Sim.Flat(want - pos);
@@ -146,7 +163,7 @@ namespace LastBell.Run
                 // 3) attack when in range (off: Chzy18 2026-10-22, "the bots are doing too much damage": they only do the
                 // mechanics). Set Attacks = true to bring the rotation back.
                 float gap = Sim.Flat(bpos - pos).magnitude - boss.BodyRadius;
-                if (Attacks && gap <= Range(me) + 1.85f) Attack(me, ref inp);
+                if (Attacks && !job && gap <= Range(me) + 1.85f) Attack(me, ref inp);
             }
             if (me.Hp < (Mode == BotMode.Passive ? 40 : 70) && me.Potions > 0 && tick % 30 == 0) inp.Potion = true;   // test bots: before a Hard kill hit (65) could down them
             // walk round his body, not into it: a straight line across the centre would pin the bot against him
