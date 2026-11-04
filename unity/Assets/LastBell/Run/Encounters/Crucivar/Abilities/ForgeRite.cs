@@ -187,7 +187,7 @@ namespace LastBell.Run
                 int resolve = T(PourLead + PourGap * k), lockAt = resolve - T(PourLockBefore);
                 var h = new Hazard
                 {
-                    Source = "Pour " + new[] { "I", "II", "III", "IV" }[k], AttackId = "crucivar.casting_order", Shape = HazardShape.Lane, Kind = HazardKind.Ground, Origin = origin,
+                    Source = "Pour " + new[] { "I", "II", "III", "IV" }[k], AttackId = "crucivar.casting_order", Shape = HazardShape.Lane, Kind = HazardKind.Strike, Origin = origin,
                     Width = PourWidth, LockAt = lockAt, ResolveAt = resolve, Damage = PourDmg, Knockback = 1f, Yaw = Boss.transform.eulerAngles.y,
                 };
                 Aim(h, target);
@@ -197,7 +197,7 @@ namespace LastBell.Run
                     W.BossFx.StripStamp(hz.Origin, hz.Yaw, hz.Length, hz.Width);
                     W.Hazards.Spawn(new Hazard
                     {
-                        Source = "Pour Channel", AttackId = "crucivar.casting_order", Shape = HazardShape.Lane, Kind = HazardKind.Ground, Origin = hz.Origin, Yaw = hz.Yaw,
+                        Source = "Pour Channel", AttackId = "crucivar.casting_order", Shape = HazardShape.Lane, Kind = HazardKind.Strike, Origin = hz.Origin, Yaw = hz.Yaw,
                         Length = hz.Length, Width = hz.Width, LockAt = 0, ResolveAt = Sim.Ticks(ChannelLife), BurnPerSecond = ChannelBurn,
                     });
                 };
@@ -246,7 +246,7 @@ namespace LastBell.Run
                 var h = W.Hazards.Spawn(new Hazard
                 {
                     Source = name, AttackId = name.StartsWith("Quake Echo") ? "crucivar.quake_echo" : "crucivar.anvil_quake",
-                    Shape = shape, Kind = HazardKind.Strike, Origin = origin, Inner = inner, Radius = outer,
+                    Shape = shape, Kind = HazardKind.Ground, Origin = origin, Inner = inner, Radius = outer,
                     LockAt = 0, ResolveAt = at, Damage = QuakeDmg, Knockback = 1f,
                 });
                 h.OnResolve = hz =>
