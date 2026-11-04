@@ -78,6 +78,26 @@ namespace LastBell.Run
         // the replica boss for a view of each kind and moves it along the host's positions.
         public virtual void CaptureNetProps(List<Networking.LanWorldFrame.Prop> into) { }
         public virtual Transform MakeNetProp(byte kind) => null;
+        // LAN looks (4 Nov 2026): what the boss shows that its own Update/LateUpdate draws (glow, phase looks, poses). The
+        // host fills the snapshot's Glow and Look numbers; a client's replica boss (disabled, never stepped) gets the newest
+        // state every frame and applies it. Each boss decides what its Look numbers mean.
+        public virtual void CaptureNetLook(Networking.LanWorldFrame.BossState into) { }
+        public virtual void ReplicaPresent(Networking.LanWorldFrame.BossState state, float dt) { }
+        // LAN effects a boss replays itself: on the host, NetFx("Boss.Method", args) records a call (arguments: Vector3, float,
+        // int, bool, string, Color, PlayerController, this boss); the client's replica gets it back here when its drawn time
+        // reaches that tick. Return false for an unknown method. Recording is null outside a host session.
+        protected static bool NetRecording => Networking.LanFx.Record != null;
+        protected static void NetFx(string method, params object[] args) { var r = Networking.LanFx.Record; if (r != null) r(Networking.LanFxTarget.BossPart, method, args); }
+        public virtual bool ReplayNetEffect(string method, Networking.LanWorldFrame.EffectArg[] args, System.Func<int, PlayerController> player) => false;
+        protected static Vector3 NetV(Networking.LanWorldFrame.EffectArg a) => new Vector3(a.X, a.Y, a.Z);
+        protected static float NetF(Networking.LanWorldFrame.EffectArg a) => a.X;
+        protected static int NetI(Networking.LanWorldFrame.EffectArg a) => a.I;
+        protected static bool NetB(Networking.LanWorldFrame.EffectArg a) => a.I != 0;
+        protected static string NetS(Networking.LanWorldFrame.EffectArg a) => a.S ?? "";
+        protected static Color NetC(Networking.LanWorldFrame.EffectArg a) => new Color(a.X, a.Y, a.Z, a.W);
+        protected static PlayerController NetP(Networking.LanWorldFrame.EffectArg a, System.Func<int, PlayerController> player) => a.Kind == Networking.LanWorldFrame.EffectArg.PlayerRef ? player(a.I) : null;
+        // on a LAN client the boss is a replica: drawn from the host's snapshots, never stepped
+        public bool IsNetReplica => !enabled && RunHud.LanClientView;
         protected static Networking.LanWorldFrame.Prop NetProp(int id, byte kind, Vector3 p) => new Networking.LanWorldFrame.Prop { Id = id, Kind = kind, X = p.x, Y = p.y, Z = p.z };
         protected static int NextNetPropId = -1;   // for props without a hazard of their own (negative: never a hazard Id)
         protected abstract IEnumerable<int> Script();         // the attack schedule; restarts when it ends

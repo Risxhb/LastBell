@@ -146,6 +146,10 @@ namespace LastBell.Run
             else h.Tele.LockOnTop = true;
         }
 
+        // LAN clients: the host's hazards as stand-ins (no telegraph, never stepped; the snapshot draws them), so HUDs and
+        // boss overlays that read Live (mechanic icons, JUMP labels, soak counts) work on clients too
+        public void AddReplica(Hazard h) { if (h != null && !live.Contains(h)) live.Add(h); }
+        public void RemoveReplica(Hazard h) { live.Remove(h); }
         public Hazard Spawn(Hazard h)
         {
             var fx = w.BossFx;

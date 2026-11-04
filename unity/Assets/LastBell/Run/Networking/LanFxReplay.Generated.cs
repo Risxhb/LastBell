@@ -862,7 +862,7 @@ namespace LastBell.Run.Networking
             if (m.StartsWith("TempoTyrantFx.", System.StringComparison.Ordinal)) return PlayTempoTyrantFx(m, a);
             if (m.StartsWith("ChimeboundOracleAudio.", System.StringComparison.Ordinal)) return PlayChimeboundOracleAudio(m, a);
             if (m.StartsWith("PendulumSentinelAudio.", System.StringComparison.Ordinal)) return PlayPendulumSentinelAudio(m, a);
-            return false;
+            var owner = boss(); return owner && owner.ReplayNetEffect(m, a, player);   // calls the boss records and replays itself (BossEncounter.NetFx)
         }
     }
 }

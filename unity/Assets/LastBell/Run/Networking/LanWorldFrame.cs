@@ -28,11 +28,14 @@ namespace LastBell.Run.Networking
             public string Announcement = "";   // Tempo Tyrant HUD banner
             public readonly List<Number> Numbers = new List<Number>();   // Tempo Tyrant strike numbers on the floor
             public readonly List<Prop> Props = new List<Prop>();         // boss-owned moving objects (orbs, thrown weights)
+            // presentation-only boss state (BossEncounter.CaptureNetLook / ReplicaPresent): body glow and up to MaxLook
+            // numbers whose meaning each boss defines (phase look, pose flags, counters)
+            public float Glow = 1; public readonly List<float> Look = new List<float>();
         }
         public struct Number { public float X, Y, Z; public int N; public bool Imminent; }
         // Id: stable while the object lives; Kind: which look the boss's MakeNetProp gives it
         public struct Prop { public int Id; public byte Kind; public float X, Y, Z; }
-        public const int MaxNumbers = 64, MaxProps = 256;
+        public const int MaxNumbers = 64, MaxProps = 256, MaxLook = 64;
         public sealed class HazardState
         {
             public int Id, Shape, Age, LockAt, ResolveAt, ActiveTicks, ShareCount;
@@ -45,6 +48,7 @@ namespace LastBell.Run.Networking
             public int Id, Shape, Order, Motif, HoleCount;
             public float Radius, Inner, HalfAngle, X, Z, Yaw, Progress, Shade, Memory, MaxFade, ClipRadius, ClipX, ClipZ;
             public float FillR, FillG, FillB, FillA, BorderR, BorderG, BorderB, BorderA;
+            public float FlashScale = 1, ScaleZ = 1;   // resolve-flash strength; lanes some bosses stretch while they live
             public bool Locked, Tinted, Spent, SpentFast;
             public readonly float[] Holes = new float[24];
         }
@@ -85,7 +89,8 @@ namespace LastBell.Run.Networking
                 if (Boss != null) { Need(Boss.MaxHp > 0 && Boss.Hp >= 0 && Boss.Hp <= Boss.MaxHp && Boss.PoseKind >= 0 && Boss.PoseKind <= 2 && Boss.Pose >= 0 && Boss.Pose <= 64); Floats(w, Boss.X, Boss.Y, Boss.Z, Boss.Yaw); w.Write(Boss.Hp); w.Write(Boss.MaxHp); w.Write(Boss.Dead); Text(w, Boss.Phase); Text(w, Boss.Attack); Text(w, Boss.Extra); Text(w, Boss.Clip); Text(w, Boss.Overlay); Floats(w, Boss.ClipSpeed, Boss.OverlaySpeed); w.Write(Boss.PoseKind); w.Write(Boss.Pose); w.Write(Boss.Haste); w.Write(Boss.Frenzy); w.Write(Boss.Hidden); w.Write(Boss.Beat); w.Write(Boss.BeatHaste); w.Write(Boss.Transitioning); w.Write(Boss.TransitionTick); w.Write(Boss.StateAge); Text(w, Boss.Announcement);
                     Need(Boss.Numbers.Count <= MaxNumbers && Boss.Props.Count <= MaxProps);
                     w.Write(Boss.Numbers.Count); foreach (var n in Boss.Numbers) { Floats(w, n.X, n.Y, n.Z); w.Write(n.N); w.Write(n.Imminent); }
-                    w.Write(Boss.Props.Count); foreach (var p in Boss.Props) { w.Write(p.Id); w.Write(p.Kind); Floats(w, p.X, p.Y, p.Z); } }
+                    w.Write(Boss.Props.Count); foreach (var p in Boss.Props) { w.Write(p.Id); w.Write(p.Kind); Floats(w, p.X, p.Y, p.Z); }
+                    Need(Boss.Look.Count <= MaxLook); Floats(w, Boss.Glow); w.Write((byte)Boss.Look.Count); foreach (float v in Boss.Look) Floats(w, v); }
                 section = "player"; w.Write(Players.Count); var ids = new HashSet<int>();
                 foreach (var p in Players)
                 {
@@ -108,7 +113,7 @@ namespace LastBell.Run.Networking
                 {
                     Need(t != null && t.Id > 0 && ids.Add(t.Id) && t.Shape >= 0 && t.Shape <= 3 && t.HoleCount >= 0 && t.HoleCount <= 6 && t.Radius >= 0 && t.Inner >= 0 && t.HalfAngle >= 0 && t.ClipRadius >= 0);
                     w.Write(t.Id); w.Write(t.Shape); w.Write(t.Order); w.Write(t.Motif); w.Write(t.HoleCount);
-                    Floats(w, t.Radius, t.Inner, t.HalfAngle, t.X, t.Z, t.Yaw, t.Progress, t.Shade, t.Memory, t.MaxFade, t.ClipRadius, t.ClipX, t.ClipZ, t.FillR, t.FillG, t.FillB, t.FillA, t.BorderR, t.BorderG, t.BorderB, t.BorderA);
+                    Floats(w, t.Radius, t.Inner, t.HalfAngle, t.X, t.Z, t.Yaw, t.Progress, t.Shade, t.Memory, t.MaxFade, t.ClipRadius, t.ClipX, t.ClipZ, t.FillR, t.FillG, t.FillB, t.FillA, t.BorderR, t.BorderG, t.BorderB, t.BorderA, t.FlashScale, t.ScaleZ);
                     w.Write(t.Locked); w.Write(t.Tinted); w.Write(t.Spent); w.Write(t.SpentFast);
                     for (int i = 0; i < t.HoleCount * 4; i++) { Need(Finite(t.Holes[i])); w.Write(t.Holes[i]); }
                 }
@@ -177,6 +182,7 @@ namespace LastBell.Run.Networking
                         for (int i = 0; i < numbers; i++) b.Numbers.Add(new Number { X = Float(r), Y = Float(r), Z = Float(r), N = r.ReadInt32(), Imminent = r.ReadBoolean() });
                         int props = r.ReadInt32(); Need(props >= 0 && props <= MaxProps);
                         for (int i = 0; i < props; i++) b.Props.Add(new Prop { Id = r.ReadInt32(), Kind = r.ReadByte(), X = Float(r), Y = Float(r), Z = Float(r) });
+                        b.Glow = Float(r); int look = r.ReadByte(); Need(look <= MaxLook); for (int i = 0; i < look; i++) b.Look.Add(Float(r));
                         Need(b.MaxHp > 0 && b.Hp >= 0 && b.Hp <= b.MaxHp && b.PoseKind >= 0 && b.PoseKind <= 2 && b.Pose >= 0 && b.Pose <= 64); result.Boss = b;
                     }
                     int count = r.ReadInt32(); Need(count >= 1 && count <= LanLobby.Capacity); var ids = new HashSet<int>();
@@ -197,7 +203,7 @@ namespace LastBell.Run.Networking
                     count = r.ReadInt32(); Need(count >= 0 && count <= MaxTelegraphs); ids.Clear();
                     for (int i = 0; i < count; i++)
                     {
-                        var t = new TelegraphState { Id = r.ReadInt32(), Shape = r.ReadInt32(), Order = r.ReadInt32(), Motif = r.ReadInt32(), HoleCount = r.ReadInt32(), Radius = Float(r), Inner = Float(r), HalfAngle = Float(r), X = Float(r), Z = Float(r), Yaw = Float(r), Progress = Float(r), Shade = Float(r), Memory = Float(r), MaxFade = Float(r), ClipRadius = Float(r), ClipX = Float(r), ClipZ = Float(r), FillR = Float(r), FillG = Float(r), FillB = Float(r), FillA = Float(r), BorderR = Float(r), BorderG = Float(r), BorderB = Float(r), BorderA = Float(r), Locked = r.ReadBoolean(), Tinted = r.ReadBoolean(), Spent = r.ReadBoolean(), SpentFast = r.ReadBoolean() };
+                        var t = new TelegraphState { Id = r.ReadInt32(), Shape = r.ReadInt32(), Order = r.ReadInt32(), Motif = r.ReadInt32(), HoleCount = r.ReadInt32(), Radius = Float(r), Inner = Float(r), HalfAngle = Float(r), X = Float(r), Z = Float(r), Yaw = Float(r), Progress = Float(r), Shade = Float(r), Memory = Float(r), MaxFade = Float(r), ClipRadius = Float(r), ClipX = Float(r), ClipZ = Float(r), FillR = Float(r), FillG = Float(r), FillB = Float(r), FillA = Float(r), BorderR = Float(r), BorderG = Float(r), BorderB = Float(r), BorderA = Float(r), FlashScale = Float(r), ScaleZ = Float(r), Locked = r.ReadBoolean(), Tinted = r.ReadBoolean(), Spent = r.ReadBoolean(), SpentFast = r.ReadBoolean() };
                         Need(t.Id > 0 && ids.Add(t.Id) && t.Shape >= 0 && t.Shape <= 3 && t.HoleCount >= 0 && t.HoleCount <= 6 && t.Radius >= 0 && t.Inner >= 0 && t.HalfAngle >= 0 && t.ClipRadius >= 0);
                         for (int j = 0; j < t.HoleCount * 4; j++) t.Holes[j] = Float(r);
                         result.Telegraphs.Add(t);

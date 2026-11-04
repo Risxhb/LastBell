@@ -30,6 +30,8 @@ namespace LastBell.Run.Networking
                     foreach (var (at, n, imminent) in tyrant.Numbers) { if (frame.Boss.Numbers.Count >= LanWorldFrame.MaxNumbers) break; frame.Boss.Numbers.Add(new LanWorldFrame.Number { X = at.x, Y = at.y, Z = at.z, N = n, Imminent = imminent }); } }
                 else if (b is ChimeboundOracleEncounter oracle && oracle.Rig) { frame.Boss.PoseKind = 2; frame.Boss.Pose = (int)oracle.Rig.Current; frame.Boss.Haste = oracle.Rig.Haste; frame.Boss.Frenzy = oracle.Enraged; Clock(frame.Boss, oracle.Clock); }
                 b.CaptureNetProps(frame.Boss.Props);
+                b.CaptureNetLook(frame.Boss);
+                if (frame.Boss.Look.Count > LanWorldFrame.MaxLook) frame.Boss.Look.RemoveRange(LanWorldFrame.MaxLook, frame.Boss.Look.Count - LanWorldFrame.MaxLook);
                 if (frame.Boss.Props.Count > LanWorldFrame.MaxProps) frame.Boss.Props.RemoveRange(LanWorldFrame.MaxProps, frame.Boss.Props.Count - LanWorldFrame.MaxProps);
             }
             for (int i = 0; i < world.Players.Count; i++)
@@ -40,7 +42,7 @@ namespace LastBell.Run.Networking
                 for (int slot = 0; slot < LanWorldFrame.Slots; slot++) { p.Cooldowns[slot] = Mathf.Clamp01(actor.Kit.Cooldown01(slot)); p.SlotStates[slot] = slot < actor.Kit.SlotNames.Length ? Clip(actor.Kit.SlotState(slot)) : ""; }
                 // for the client's own-movement prediction: which input this state includes, and how fast walking moves it now
                 p.AckInput = i == 0 ? -1 : roster.LastInput(p.Id);
-                p.MoveScale = actor.Down || actor.Stunned > 0 || actor.Dashing ? 0 : Mathf.Clamp(actor.Kit.MoveScale * Shop.ItemHooks.F(actor, "move.speed", 1), 0, 4);
+                p.MoveScale = actor.Down || actor.Stunned > 0 || actor.Dashing || !actor.MovementEnabled ? 0 : Mathf.Clamp(actor.Kit.MoveScale * Shop.ItemHooks.F(actor, "move.speed", 1), 0, 4);
                 p.Marks.AddRange(actor.Marks); frame.Players.Add(p);
             }
             foreach (var hazard in world.Hazards.Live)
@@ -53,7 +55,7 @@ namespace LastBell.Run.Networking
                 if (!source.go) continue;
                 var pos = source.go.transform.position; var clip = source.mpb.GetVector(ClipCentre);
                 var fill = source.mpb.GetColor(Fill); var border = source.mpb.GetColor(Border);
-                var t = new LanWorldFrame.TelegraphState { Id = source.networkId, Shape = source.networkShape, Order = source.mr.sortingOrder, Motif = Mathf.RoundToInt(source.mpb.GetFloat(Motif)), Radius = source.networkRadius, Inner = source.networkInner, HalfAngle = source.networkHalf, X = pos.x, Z = pos.z, Yaw = source.go.transform.eulerAngles.y, Progress = source.mpb.GetFloat(Progress), Shade = source.mpb.GetFloat(Shade), Memory = source.mpb.GetFloat(Memory), MaxFade = source.maxFade, ClipRadius = source.mpb.GetFloat(ClipRadius), ClipX = clip.x, ClipZ = clip.y, Locked = source.locked, Tinted = source.networkTinted, Spent = source.flash >= 0, SpentFast = source.SpentFast, FillR = fill.r, FillG = fill.g, FillB = fill.b, FillA = fill.a, BorderR = border.r, BorderG = border.g, BorderB = border.b, BorderA = border.a };
+                var t = new LanWorldFrame.TelegraphState { Id = source.networkId, Shape = source.networkShape, Order = source.mr.sortingOrder, Motif = Mathf.RoundToInt(source.mpb.GetFloat(Motif)), Radius = source.networkRadius, Inner = source.networkInner, HalfAngle = source.networkHalf, X = pos.x, Z = pos.z, Yaw = source.go.transform.eulerAngles.y, Progress = source.mpb.GetFloat(Progress), Shade = source.mpb.GetFloat(Shade), Memory = source.mpb.GetFloat(Memory), MaxFade = source.maxFade, ClipRadius = source.mpb.GetFloat(ClipRadius), ClipX = clip.x, ClipZ = clip.y, Locked = source.locked, Tinted = source.networkTinted, Spent = source.flash >= 0, SpentFast = source.SpentFast, FillR = fill.r, FillG = fill.g, FillB = fill.b, FillA = fill.a, BorderR = border.r, BorderG = border.g, BorderB = border.b, BorderA = border.a, FlashScale = source.FlashScale, ScaleZ = source.go.transform.localScale.z };
                 if (source.holeBuf != null)
                 {
                     t.HoleCount = Mathf.Clamp(Mathf.RoundToInt(source.mpb.GetFloat(HoleCount)), 0, 6);
@@ -61,9 +63,15 @@ namespace LastBell.Run.Networking
                 }
                 frame.Telegraphs.Add(t);
             }
+            // a busy fight (bullet hells) can outgrow one snapshot: keep the newest hazards and telegraphs within the caps
+            if (frame.Hazards.Count > HazardCap) { frame.Hazards.Sort((a, c) => a.Age.CompareTo(c.Age)); frame.Hazards.RemoveRange(HazardCap, frame.Hazards.Count - HazardCap); }
+            if (frame.Telegraphs.Count > TelegraphCap) frame.Telegraphs.RemoveRange(0, frame.Telegraphs.Count - TelegraphCap);
             foreach (var projectile in world.Projectiles.Live)
                 frame.Projectiles.Add(new LanWorldFrame.ProjectileState { Id = projectile.NetworkId, X = projectile.Pos.x, Y = projectile.Pos.y, Z = projectile.Pos.z, R = projectile.Color.r, G = projectile.Color.g, B = projectile.Color.b, A = projectile.Color.a });
+            if (frame.Projectiles.Count > LanWorldFrame.MaxProjectiles) frame.Projectiles.RemoveRange(0, frame.Projectiles.Count - LanWorldFrame.MaxProjectiles);
             return frame;
         }
+        // well under the wire limits (256 each), so the whole snapshot stays inside one message
+        public const int HazardCap = 160, TelegraphCap = 160;
     }
 }

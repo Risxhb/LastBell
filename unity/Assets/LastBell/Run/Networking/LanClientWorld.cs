@@ -73,6 +73,7 @@ namespace LastBell.Run.Networking
         public string Error => error ?? lobby?.Error;
         public LanWorldFrame Current => current;
         public LanFxReplay Effects => fxReplay;
+        public int LookFailures { get; private set; }
         public static LanClientWorld Create(LanLobby lobby)
         {
             if (lobby == null || lobby.IsHost || !lobby.FightStarted || !lobby.Connected) throw new InvalidOperationException("A started client lobby is required.");
@@ -273,6 +274,12 @@ namespace LastBell.Run.Networking
                 clock.ApplyReplica(shownHaste ? Tempo.Haste : Tempo.Normal, shownBeat, s.Transitioning, s.TransitionTick, age);
             }
             PresentProps(renderTime); PresentMirrors(renderTime);
+            // the boss's own looks (glow, phase looks, poses, overlays), from the newest host state
+            if (boss && current?.Boss != null)
+            {
+                try { boss.ReplicaPresent(current.Boss, Time.deltaTime); }
+                catch (Exception ex) { LookFailures++; if (LookFailures <= 5) Debug.LogWarning("[LAN] boss looks: " + ex); }
+            }
             // effects play when the drawn timeline reaches the tick the host made them on
             fxReplay.PlayUntil((int)Math.Floor(renderTime / Sim.Dt));
             if (director.State == RunState.Combat)
@@ -362,8 +369,9 @@ namespace LastBell.Run.Networking
             foreach (var s in hazards)
             {
                 mirrorSeen.Add(s.Id);
-                if (!mirrors.TryGetValue(s.Id, out var m)) { m = new HazardMirror { H = new Hazard { Replica = true, Source = s.Source } }; mirrors[s.Id] = m; }
+                if (!mirrors.TryGetValue(s.Id, out var m)) { m = new HazardMirror { H = new Hazard { Replica = true, Source = s.Source } }; mirrors[s.Id] = m; world.Hazards.AddReplica(m.H); }
                 var h = m.H;
+                h.MechanicId = string.IsNullOrEmpty(s.Mechanic) ? null : s.Mechanic; h.JumpClearable = s.JumpClearable; h.Soak = s.Soak; h.ShareCount = s.ShareCount; h.FillToLock = s.FillToLock;
                 h.Shape = (HazardShape)s.Shape; h.Origin = new Vector3(s.X, s.Y, s.Z); h.Yaw = s.Yaw; h.Radius = s.Radius; h.Inner = s.Inner; h.HalfAngle = s.HalfAngle;
                 h.Length = s.Length; h.Width = s.Width; h.LockAt = s.LockAt; h.ResolveAt = s.ResolveAt; h.ActiveTicks = s.ActiveTicks; h.ClipRadius = s.ClipRadius;
                 m.T = hostTime; m.Age = s.Age; m.GoneAt = -1;
@@ -376,14 +384,14 @@ namespace LastBell.Run.Networking
             foreach (var pair in mirrors)
             {
                 var m = pair.Value;
-                if (m.GoneAt >= 0 && renderTime >= m.GoneAt) { m.H.Cancelled = true; drop.Add(pair.Key); continue; }
+                if (m.GoneAt >= 0 && renderTime >= m.GoneAt) { m.H.Cancelled = true; world.Hazards.RemoveReplica(m.H); drop.Add(pair.Key); continue; }
                 m.H.Age = Math.Max(0, m.Age + (int)Math.Floor((renderTime - m.T) / Sim.Dt));
             }
             foreach (int id in drop) mirrors.Remove(id);
         }
         void ClearMirrors()
         {
-            foreach (var m in mirrors.Values) m.H.Cancelled = true;
+            foreach (var m in mirrors.Values) { m.H.Cancelled = true; world?.Hazards.RemoveReplica(m.H); }
             mirrors.Clear();
             if (lastLight) lastLight.End();
             lastLight = null;

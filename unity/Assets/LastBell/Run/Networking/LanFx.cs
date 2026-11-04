@@ -153,7 +153,7 @@ namespace LastBell.Run.Networking
             return null;
         }
         // a boss-specific effect or sound component on the replica boss (its Build() made the same ones as the host's)
-        T BossPart<T>() where T : Component { var b = boss(); return b ? b.GetComponent<T>() : null; }
+        T BossPart<T>() where T : Component { var b = boss(); return b ? b.GetComponentInChildren<T>(true) : null; }
         static Vector3 V(LanWorldFrame.EffectArg a) => new Vector3(a.X, a.Y, a.Z);
         static float F(LanWorldFrame.EffectArg a) => a.X;
         static int I(LanWorldFrame.EffectArg a) => a.I;

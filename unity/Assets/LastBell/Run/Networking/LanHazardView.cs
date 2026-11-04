@@ -48,6 +48,8 @@ namespace LastBell.Run.Networking
                     t.Holes(holes,holes.Length);
                 }
                 else if (t.holeBuf != null) t.Holes(new Vector4[0],0);
+                t.FlashScale = h.FlashScale;
+                var scale = t.go.transform.localScale; if (scale.z != h.ScaleZ) t.go.transform.localScale = new Vector3(scale.x, scale.y, h.ScaleZ);
                 if (h.Locked) t.Lock();
                 if (h.Spent && !entry.Spent) { t.SpentFast = h.SpentFast; t.Resolve(); entry.Spent = true; }
             }
