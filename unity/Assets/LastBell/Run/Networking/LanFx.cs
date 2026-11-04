@@ -33,7 +33,7 @@ namespace LastBell.Run.Networking
         {
             this.roster = roster; hook = Record; LanFx.Record = hook;
         }
-        public void Dispose() { if (LanFx.Record == hook) LanFx.Record = null; pending.Clear(); }
+        public void Dispose() { if (LanFx.Record == hook) LanFx.Record = null; pending.Clear(); BossEncounter.NetIdOf = null; BossEncounter.NetPlayerOf = null; }
         public void Clear() => pending.Clear();
         public void Drain(List<LanWorldFrame.Effect> into) { into.AddRange(pending); pending.Clear(); }
 
