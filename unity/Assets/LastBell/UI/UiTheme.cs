@@ -112,8 +112,11 @@ namespace LastBell
         {
             var keep = style.normal.textColor; var c = color ?? keep; float o = Mathf.Max(1, Mathf.Round(Scale));
             var oldGui = GUI.color; style.normal.textColor = Color.white;
-            GUI.color = new Color(0, 0, 0, 0.85f * c.a * oldGui.a); RawLabel(new Rect(r.x + o, r.y + o, r.width, r.height), text, style);
-            GUI.color = oldGui * c; RawLabel(r, text, style);
+            // GUI.color is multiplied into the IMGUI text colour too, so the alpha goes in 8 steps: a fading damage float made a
+            // new text handle every frame, and Unity's cleanup freed ~6,700 at once (perf report bellkeeper-ultimate, Update 20:00)
+            float a = Mathf.Ceil(c.a * oldGui.a * 8f) / 8f;
+            GUI.color = new Color(0, 0, 0, 0.85f * a); RawLabel(new Rect(r.x + o, r.y + o, r.width, r.height), text, style);
+            var tint = oldGui * c; tint.a = a; GUI.color = tint; RawLabel(r, text, style);
             style.normal.textColor = keep; GUI.color = oldGui;
         }
         // GUI.Label, timed under -lastbellFontLog: any text layout over FontLogMs is logged with its text, size and font, to

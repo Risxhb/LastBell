@@ -213,10 +213,14 @@ namespace LastBell.Run
         // Each time ("2.4s") is its own label, apart from the text around it ("slam 6 in "), so countdowns share about 30
         // number texts instead of one per name and tenth (perf report bellkeeper-ultimate-2026-11-03, Update 19:30). Spaces
         // at a segment's ends are drawn as gaps, so the widths don't depend on how trailing spaces are measured.
-        static readonly List<string> segs = new List<string>();
+        // cached per text (a kit builds its line fresh each frame, but only a few hundred distinct lines occur), so the
+        // regex and substrings don't allocate every frame
+        static readonly Dictionary<string, List<string>> segCache = new Dictionary<string, List<string>>();
         static List<string> TimeSegs(string s)
         {
-            segs.Clear(); int at = 0;
+            if (segCache.TryGetValue(s, out var hit)) return hit;
+            if (segCache.Count > 1024) segCache.Clear();
+            var segs = new List<string>(); segCache[s] = segs; int at = 0;
             foreach (System.Text.RegularExpressions.Match m in Tenths.Matches(s))
             {
                 if (m.Index > at) segs.Add(s.Substring(at, m.Index - at));
@@ -225,7 +229,12 @@ namespace LastBell.Run
             if (at < s.Length) segs.Add(s.Substring(at));
             return segs;
         }
-        static float SpaceW(GUIStyle st) => Wv(st, "a a") - Wv(st, "aa");
+        static readonly Dictionary<(GUIStyle, int), float> spaceW = new Dictionary<(GUIStyle, int), float>();
+        static float SpaceW(GUIStyle st)
+        {
+            if (!spaceW.TryGetValue((st, st.fontSize), out float w)) spaceW[(st, st.fontSize)] = w = Wv(st, "a a") - Wv(st, "aa");
+            return w;
+        }
         static float SegsWidth(GUIStyle st, List<string> sg)
         {
             float w = 0, sp = SpaceW(st);
