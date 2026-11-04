@@ -32,7 +32,9 @@ namespace LastBell.Run
         public override bool Placeholder => true;
         public override float NextPhaseFraction() => 0.49f;
         public const int Motif = 3;   // Telegraph-Style v2 area motif: Brass Foundry
-        public const int MaxHpMedium = 4200;
+        public const int MaxHpMedium = 8400;   // doubled after review (3 Nov); solo base, scaled for the party below
+        // co-op HP: 1 + 0.7 x (fighters - 1), the shared formula (BossEncounter.Spawn); passive bots don't count (review, 3 Nov)
+        protected override bool PartyScaled => true;
 
         static readonly Color Brass = new Color(0.78f, 0.6f, 0.3f), Ivory = new Color(0.94f, 0.9f, 0.8f), Cobalt = new Color(0.16f, 0.24f, 0.55f),
             Molten = new Color(1.0f, 0.55f, 0.15f), SoakRim = new Color(1.6f, 1.35f, 0.7f), BlockRim = new Color(1.5f, 1.5f, 1.3f);

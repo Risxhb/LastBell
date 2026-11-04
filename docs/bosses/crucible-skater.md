@@ -89,7 +89,7 @@ Range is punished by the band, Body Check (it aims at the farthest player) and F
   - Body Check becomes **Turns** (two quarries in a row).
   - Crucible Toss and Rink Lap come **together**. The pours land as the lap ends, inside the band's safe zone. That's the at-most-two overlap; the Pirouette comes after the pours land.
   - Rotation: Figure Carve → Turns → Toss + Lap/Pirouette.
-- **Max HP:** 4200 (not party-scaled; bots don't attack by default). This is a first guess; set it from measured DPS.
+- **Max HP:** 8400 solo base (doubled from 4200 in review, November 3), **party-scaled** with the shared formula: ×(1 + 0.7 per extra fighter), so 2 players 14 280, 3 players 20 160, 4 players 26 040. Bots that don't attack (the default) don't count. Still to be checked against measured DPS.
 
 ## Difficulty
 
@@ -110,10 +110,14 @@ Range is punished by the band, Body Check (it aims at the farthest player) and F
 - The earlier draft said "no dash required, survivable at 80% speed". This design is held to the standard rule instead (4.2 and 6 m/s after a 0.3 s reaction).
 - The empty-pour wipe follows the settled empty-soak rule. Its telegraph is the big numeral ring, and the fight introduces it in Phase 1 before Phase 2 layers it.
 
-## Open questions for review
+## Review answers (November 3, 2026)
 
-1. **HP and length:** 4200 is a guess. Solo with an Arcanist this lands around 45–70 s. Should it be longer (miniboss target 60–150 s)?
-2. **Body Check solo:** is "block yourself for the stagger" the right solo fallback, or should solo get only the dodge version?
-3. **Party-scaled HP** (`PartyScaled`): off, like the other practice minibosses. Turn it on once bots attack?
-4. **Run slot:** practice only for now. Which Brass Foundry miniboss slot should it take?
-5. **Model:** the old Meshy rig (`CrucibleSkater.glb`, a 2.4 m bowl on three legs) doesn't fit this smaller skater. Remodel, or adapt the design to the bowl?
+1. **HP:** doubled to 8400 (solo base).
+2. **Body Check solo** ("block yourself for the stagger"): kept as designed; the team will playtest it. **To test:** does solo blocking feel worth the 60 damage, or should solo get the dodge-only version?
+3. **Party-scaled HP:** on (`PartyScaled`, the shared 0.7 per extra fighter).
+4. **Run slot:** open. The gameplay loop isn't decided yet; several bosses will likely share each arena, so the skater stays practice-only on Brass Foundry for now.
+5. **Model:** remodel for this smaller skater (the old 2.4 m bowl-on-three-legs rig doesn't fit). Queued for the next usage reset; card on the lane board.
+
+## Still open
+
+- Bots in a party of 2 never block Body Check: the generic soak bot logic ignores that the ring excludes the quarry, so the lone ally never takes it. Blocking itself works (the test proves it with a placed player); fixing the bot is a shared `AllyBot` change.

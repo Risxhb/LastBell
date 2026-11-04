@@ -214,7 +214,8 @@ namespace LastBell.Run
             boss.Seed = 20261103 + n;
             d.World.Difficulty = Difficulty.Medium;
             yield return Until(() => d.State == RunState.Combat, 8, "combat");
-            Check("fight opens in phase 1 at full HP, placeholder stand-in, no ability text", !boss.Phase2 && boss.Hp == boss.MaxHp && boss.MaxHp == CrucibleSkaterEncounter.MaxHpMedium && boss.Placeholder && boss.Lesson == "" && boss.PhaseName == "" && boss.transform.Find("Crucible Skater (STAND-IN placeholder)"));
+            Check("fight opens in phase 1 at full HP, placeholder stand-in, no ability text", !boss.Phase2 && boss.Hp == boss.MaxHp && boss.MaxHp == ExpectedHp() && boss.Placeholder && boss.Lesson == "" && boss.PhaseName == "" && boss.transform.Find("Crucible Skater (STAND-IN placeholder)"));
+            Note($"boss HP {boss.MaxHp} (base {CrucibleSkaterEncounter.MaxHpMedium}, party-scaled; bots don't attack, so they don't add HP)");
             if (n == 2) RenderShot("stand_in", boss.transform.position + new Vector3(0, 2.2f, 5.5f), boss.transform.position + Vector3.up * 1.1f, 40);
 
             var steps = new List<Func<IEnumerator>> { () => CarveChecks(n, false), () => CheckChecks(n, 1), () => TossChecks(n, false), () => LapChecks(n, false), () => NaturalLoop(n) };
@@ -232,6 +233,14 @@ namespace LastBell.Run
             }
             Note($"bot hits taken this party: {string.Join(", ", hits.GroupBy(x => x.source).Select(g => $"{g.Key} {g.Count()}"))}");
             if (d.State == RunState.Results) d.ReturnToMenu();
+        }
+
+        // party-scaled HP (BossEncounter.Spawn): 1 + 0.7 per extra fighter; passive bots don't count, so a bot party keeps the base
+        int ExpectedHp()
+        {
+            int fighters = d.World.Players.Count(p => !(p.Input is AllyBot) || AllyBot.Attacks);
+            float party = 1 + 0.7f * Mathf.Max(0, fighters - 1);
+            return Mathf.Max(1, Mathf.RoundToInt(CrucibleSkaterEncounter.MaxHpMedium * BossEncounter.TestHpScale * party));
         }
 
         // ---------------- 1. Figure Carve ----------------
