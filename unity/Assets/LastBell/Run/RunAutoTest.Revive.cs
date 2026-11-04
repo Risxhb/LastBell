@@ -15,6 +15,7 @@ namespace LastBell.Run
         {
             Note("---------- revives ----------");
             if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }
+            Check("revives: the downed HUD art loads (three class bells, the prompt, a readable ring)", new[] { "tollbreaker", "chimesinger", "arcanist" }.All(c => RunHud.Icon("revive/downed-" + c)) && RunHud.Icon("revive/revive-prompt") && RunHud.Icon("revive/revive-ring") && RunHud.Icon("revive/revive-ring").isReadable);
             Check("revives: one ally selected", d.SelectAllies(1) && RunParty.Selected == 1);
             d.StartPractice("Tollbreaker", 0); d.RequestReady();
             yield return Until(() => d.State == RunState.Combat, 6, "revive practice combat");
@@ -43,6 +44,7 @@ namespace LastBell.Run
             // 2) a hit on the reviver starts the revive over
             ally.ForceDown("revive test");
             yield return Until(() => ally.ReviveProgress > 0.45f, 4, "half a revive");
+            yield return Shot("revive_hud_half");   // the downed bell in its half-filled ring, the prompt beside it
             me.ReceiveHit(new Hazard { Source = "revive test hit", Damage = 5, Stun = 0, Knockback = 0, Origin = me.transform.position });
             int hitTick = w.Tick; yield return Until(() => w.Tick >= hitTick + 2, 1, "two ticks");
             Check("revives: a hit on the reviver resets the revive", ally.ReviveProgress < 0.1f, $"progress {ally.ReviveProgress:0.00}");

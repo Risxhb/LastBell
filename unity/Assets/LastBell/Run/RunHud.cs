@@ -1018,23 +1018,59 @@ namespace LastBell.Run
         // Mechanic markers over players' heads (PlayerController.Marks, MechanicIcons): 40 px icons side by side, each with its
         // name on a strip under it, because several look alike at this size. Placement approved by Chzy18 on October 24, 2026;
         // see docs/run-loop/mechanic-icons.md. Nothing is drawn until an encounter assigns a mark.
-        // Revives: over each downed player, the seconds left to revive them and the revive filling (green); DEAD once bled out
+        // Revives: over each downed player, their class's downed bell (Codex's revive HUD art, work/revive-hud-20261104, ivory
+        // not gold: gold is the bosses' danger colour) inside the segmented ring, which fills clockwise ivory over slate as the
+        // revive runs, and the seconds left to revive them on a strip under it; DEAD (bell dimmed, no ring) once bled out.
+        // Beside a downed ally the local player sees the revive prompt (the hand) and what it takes: stand still.
         void DownedMarks()
         {
-            var cam = Camera.main; if (!cam || d.World.Players.Count < 2) return; float h = Screen.height, w = UiTheme.V(96), bh = UiTheme.V(8);
+            var cam = Camera.main; if (!cam || d.World.Players.Count < 2) return; float h = Screen.height, w = UiTheme.V(96), ring = UiTheme.V(64), bell = UiTheme.V(44);
+            var me = d.Player;
             foreach (var p in d.World.Players)
             {
                 if (p == null || !p.Down) continue;
                 var s = cam.WorldToScreenPoint(p.transform.position + Vector3.up * 1.4f); if (s.z < 0) continue;
-                var r = new Rect(s.x - w / 2, h - s.y - UiTheme.V(30), w, UiTheme.V(20));
+                float cx = s.x, cy = h - s.y - ring / 2 - UiTheme.V(6);
+                if (!p.Dead) { var rt = ReviveRing(p.ReviveProgress); if (rt) GUI.DrawTexture(new Rect(cx - ring / 2, cy - ring / 2, ring, ring), rt, ScaleMode.ScaleToFit, true); }
+                var mark = Icon("revive/downed-" + p.ClassName.ToLowerInvariant());
+                if (mark) { var c = GUI.color; if (p.Dead) GUI.color = new Color(1, 1, 1, 0.45f); GUI.DrawTexture(new Rect(cx - bell / 2, cy - bell / 2, bell, bell), mark, ScaleMode.ScaleToFit, true); GUI.color = c; }
+                var r = new Rect(cx - w / 2, cy + ring / 2 + UiTheme.V(2), w, UiTheme.V(20));
                 UiTheme.Fill(r, UiTheme.InkStrip);
                 string t = p.Dead ? "DEAD" : $"DOWN  {Mathf.CeilToInt(PlayerController.BleedOutSeconds - p.DownedTicks / (float)Sim.Hz)} s";
                 UiTheme.Label(r, t, slotName);
-                if (p.Dead) continue;
-                var bar = new Rect(r.x, r.yMax + UiTheme.V(2), w, bh);
-                UiTheme.Fill(bar, UiTheme.InkStrip);
-                UiTheme.Fill(new Rect(bar.x, bar.y, w * Mathf.Clamp01(p.ReviveProgress), bh), new Color(0.55f, 1f, 0.75f, 0.95f));
+                // the prompt: the local player beside them and up (the revive itself needs them still: PlayerController.CanChannelRevive)
+                if (p.Dead || me == null || me == p || me.Down || Sim.Flat(me.transform.position - p.transform.position).magnitude > PlayerController.ReviveRange) continue;
+                var hand = Icon("revive/revive-prompt"); float ps = UiTheme.V(36);
+                if (hand) GUI.DrawTexture(new Rect(cx + ring / 2 + UiTheme.V(4), cy - ps / 2, ps, ps), hand, ScaleMode.ScaleToFit, true);
+                var pr = new Rect(cx + ring / 2 + UiTheme.V(4) + ps, cy - UiTheme.V(10), UiTheme.V(110), UiTheme.V(20));
+                UiTheme.Fill(pr, UiTheme.InkStrip); UiTheme.Label(pr, "STAND STILL", slotName);
             }
+        }
+
+        // the ring with its first k of ReviveSteps segments ivory, the rest slate, built once per step from the art's alpha
+        // (clockwise from the top; the art itself is a half-filled still, so it is never stretched as a timer)
+        const int ReviveSteps = 30;
+        static Texture2D[] reviveRings;
+        static Texture2D ReviveRing(float progress)
+        {
+            reviveRings ??= new Texture2D[ReviveSteps + 1];
+            int k = Mathf.Clamp(Mathf.FloorToInt(progress * ReviveSteps + 0.001f), 0, ReviveSteps);
+            if (reviveRings[k]) return reviveRings[k];
+            var src = Icon("revive/revive-ring"); if (!src || !src.isReadable) return src;
+            var px = src.GetPixels32(); int n = src.width; var o = new Color32[px.Length];
+            var lit = new Color(0.96f, 0.92f, 0.82f); var dim = new Color(0.20f, 0.27f, 0.38f);
+            for (int y = 0; y < n; y++)
+                for (int x = 0; x < n; x++)
+                {
+                    int i = y * n + x; var c = px[i]; if (c.a == 0) { o[i] = c; continue; }
+                    float a = Mathf.Repeat(Mathf.Atan2(x - n / 2f + 0.5f, y - n / 2f + 0.5f) * Mathf.Rad2Deg, 360f);   // 0 at the top, clockwise
+                    float lum = (c.r + c.g + c.b) / (3f * 255f);
+                    var tint = a < 360f * k / ReviveSteps ? lit : dim;
+                    o[i] = (Color32)new Color(tint.r * (0.55f + 0.45f * lum), tint.g * (0.55f + 0.45f * lum), tint.b * (0.55f + 0.45f * lum), c.a / 255f);
+                }
+            var t = new Texture2D(n, n, TextureFormat.RGBA32, false) { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
+            t.SetPixels32(o); t.Apply(false, true);
+            return reviveRings[k] = t;
         }
 
         void PlayerMarks()
