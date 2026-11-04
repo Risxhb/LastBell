@@ -45,22 +45,7 @@ namespace LastBell.Run
         const float ReviveStand = 0.9f, ReviveReach = 14f;
         bool ReviveJob(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
         {
-            if (!ReviveSpot(me, pos, out var spot)) return false;
-            dJob = "revive"; dSpot = spot; dNote = 1;
-            var v = Sim.Flat(spot - Sim.Flat(pos));
-            if (v.magnitude < 0.3f) { dMove = Vector3.zero; inp.Move = ToScreen(Vector3.zero); return true; }   // beside them: hold still
-            var move = v.normalized; if (bad(pos + move * 0.6f)) move = Bend(pos, move);
-            if (v.magnitude > 3f && me.Stamina > 40) inp.Sprint = true;
-            move = AroundBoss(pos, move, boss); dMove = move; inp.Move = ToScreen(move);
-            return true;
-        }
-
-        // where to stand to revive: beside the nearest downed ally nobody else is reviving, the point within reach of them
-        // (16 around, 0.9 or 1.2 m out) nothing is about to land on that is nearest this bot; none: false (dodge first).
-        // A downed ally often lies in what downed them (a Pour Channel, 11-04), so the near side alone isn't enough.
-        bool ReviveSpot(PlayerController me, Vector3 pos, out Vector3 spot)
-        {
-            spot = pos; PlayerController best = null; float bd = ReviveReach;
+            PlayerController best = null; float bd = ReviveReach;
             foreach (var p in me.World.Players)
             {
                 if (p == me || !p || !p.Down || p.Dead) continue;
@@ -69,14 +54,16 @@ namespace LastBell.Run
                 if (!taken && dd < bd) { bd = dd; best = p; }
             }
             if (best == null) return false;
-            var at = Sim.Flat(best.transform.position); float bc = float.MaxValue;
-            for (int k = 0; k < 32; k++)
-            {
-                var q = at + Sim.Dir(k * 22.5f) * (k < 16 ? ReviveStand : 1.2f);
-                if (!CombatWorld.InPlayerBound(q, -0.3f) || bad(q)) continue;
-                float c = Sim.Flat(q - pos).sqrMagnitude; if (c < bc) { bc = c; spot = q; }
-            }
-            return bc < float.MaxValue;
+            var at = Sim.Flat(best.transform.position); var off = Sim.Flat(pos - at);
+            var spot = at + (off.magnitude > 0.1f ? off.normalized : Vector3.forward) * ReviveStand;
+            if (bad(spot)) return false;   // the ally lies in something about to land: dodge first
+            dJob = "revive"; dSpot = spot; dNote = 1;
+            var v = Sim.Flat(spot - Sim.Flat(pos));
+            if (v.magnitude < 0.3f) { dMove = Vector3.zero; inp.Move = ToScreen(Vector3.zero); return true; }   // beside them: hold still
+            var move = v.normalized; if (bad(pos + move * 0.6f)) move = Bend(pos, move);
+            if (v.magnitude > 3f && me.Stamina > 40) inp.Sprint = true;
+            move = AroundBoss(pos, move, boss); dMove = move; inp.Move = ToScreen(move);
+            return true;
         }
 
         float Range(PlayerController me) => HoldRange ?? (me.ClassName == "Tollbreaker" ? 3.5f : me.ClassName == "Chimesinger" ? 6.5f : 8.5f);
@@ -248,7 +235,7 @@ namespace LastBell.Run
         bool Scripted(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
         {
             if (!(boss is AurelionEncounter) && Quake(me, boss, pos, ref inp)) { dJob = "quake"; return true; }
-            if (!(boss is AurelionEncounter) && Volley(me, boss, pos, ref inp)) { dJob ??= "volley"; return true; }
+            if (!(boss is AurelionEncounter) && Volley(me, boss, pos, ref inp)) { dJob = "volley"; return true; }
             if (!(boss is AurelionEncounter) && Brand(me, boss, pos, ref inp)) { dJob = "brand"; return true; }   // Aurelion keeps its own Sunspot job
             if (!(boss is AurelionEncounter) && Spokes(me, boss, pos, ref inp)) { dJob = "spokes"; return true; }
             if (boss is ChimeboundOracleEncounter or) return Carillon(me, or, pos, ref inp);
