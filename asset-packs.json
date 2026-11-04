@@ -27,18 +27,18 @@
                   },
                   {
                       "name":  "sylvara-assets",
-                      "version":  3,
-                      "file":  "sylvara-assets-v3.zip",
+                      "version":  4,
+                      "file":  "sylvara-assets-v4.zip",
                       "source":  {
                                      "type":  "azure-universal",
                                      "organization":  "https://dev.azure.com/ChzandZum",
                                      "project":  "Last Bell",
                                      "feed":  "last-bell-assets",
                                      "package":  "sylvara-assets",
-                                     "packageVersion":  "3.0.0"
+                                     "packageVersion":  "4.0.0"
                                  },
-                      "sha256":  "561076e1d71460e7e4e2dac6556b3b64f3e98b1c0d4b4eeaace5b4fdeec12f2c",
-                      "size":  8268324,
+                      "sha256":  "1267b2884b401268bdd6810b22a39bb123ce4c0c74dd357bcabdcf3d01e99b4c",
+                      "size":  8317429,
                       "extractTo":  ".",
                       "paths":  [
                                     "unity/Assets/LastBell/Characters/Sylvara/Resources/Characters/Sylvara.glb",
