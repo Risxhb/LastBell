@@ -372,7 +372,9 @@ namespace LastBell.Run
             for (int i = quakeBands.Count - 1; i > 0; i--) best = from[i, best];
             float rGoal = rMin + best * QuakeStep;
             float t0 = (quakeBands[0].ResolveAt - quakeBands[0].Age) / (float)Sim.Hz;
-            // the bearing: our own, or the nearest one clear of burning ground (and, with brands out, of the other players)
+            // the bearing: our own, or the nearest one clear of burning ground, of other strikes still to land (a locked Casting
+            // Order pour: a Chimesinger bot stood in Pour IV planning the quake, took it and the channel, and Anvil Quake II
+            // downed her, 11-04) and, with brands out, of the other players
             Vector3 goal = hub + dir * rGoal;
             for (int k = 0; k < 13; k++)
             {
@@ -381,7 +383,12 @@ namespace LastBell.Run
                 bool ok = k == 0 || Sim.Flat(q - pos).magnitude <= QuakePace * (t0 - 0.15f);
                 for (int i = 0; i < live.Count && ok; i++)
                 {
-                    var h = live[i]; if (h.BurnPerSecond <= 0) continue;
+                    var h = live[i];
+                    if (h.BurnPerSecond <= 0)
+                    {
+                        if (h.Damage > 0 && !h.Cancelled && h.Age < h.ResolveAt && h.ActiveTicks == 0 && !quakeBands.Contains(h) && Hits(h, me, q)) ok = false;
+                        continue;
+                    }
                     if (h.Contains(q) || h.Contains(Vector3.Lerp(pos, q, 0.35f)) || h.Contains(Vector3.Lerp(pos, q, 0.7f))) ok = false;
                 }
                 if (ok && brand) foreach (var p in me.World.Players) if (ok && p && p != me && !p.Down && Sim.Flat(p.transform.position - q).magnitude < BrandRadiusPad) ok = false;
@@ -394,6 +401,7 @@ namespace LastBell.Run
             if (v.magnitude / PlayerController.WalkSpeed > t0 - 0.3f && me.Stamina > 10) inp.Sprint = true;
             if (brand && me.Stamina > 5) for (int i = 0; i < live.Count; i++) { var h = live[i]; if (h.AttackId == "crucivar.backdraft" && h.Age >= Sim.Ticks(ForgeRite.PullFrom - 0.3f) && h.Age <= Sim.Ticks(ForgeRite.PullTo)) inp.Sprint = true; }
             if (move != Vector3.zero) move = AroundBoss(pos, move, boss);
+            dMove = move; dSpot = goal; dNote = 1;
             inp.Move = ToScreen(move);
             // in place with time to spare: keep throwing
             if (Attacks && v.magnitude < 0.5f && t0 > 0.5f && Sim.Flat(boss.transform.position - pos).magnitude - boss.BodyRadius <= Range(me) + 1.85f) Attack(me, ref inp);
@@ -423,6 +431,7 @@ namespace LastBell.Run
             bad = Bad(me, boss, false, me.World.Tick + 45);
             bool path = BotSight.GhostHits(me, pos);
             if (volNear.Count == 0 && !path) { volOn = false; return false; }
+            { var lv = me.World.Hazards.Live; for (int i = 0; i < lv.Count; i++) if (Jet(lv[i])) { TrackSpin(lv[i]); break; } }   // the jets' turn, for VolleyCost
             pos = Sim.Flat(pos);
             // home: the rim for a brand carrier, else the attack spot (or straight at the target)
             Vector3 home = tPos; bool carrier = false;
@@ -510,6 +519,16 @@ namespace LastBell.Run
                     var h = live[i];
                     if (h.Track != null && h.Shape == HazardShape.Circle && h.Radius <= 0.7f) continue;   // the bullets, above
                     if (h.BurnPerSecond > 0) { if (h.Contains(q) && !h.Contains(pos)) cost += 25; else if (h.Contains(q)) cost += 8; continue; }
+                    // a Furnace Spin jet where it will have turned to (read where it is now, two bots dodging bullets were
+                    // swept by one in the second uprising, 11-04); one hit each, so a jet that has hit this player is done
+                    if (Jet(h))
+                    {
+                        if (h.Hit.Contains(me)) continue;
+                        float spin = spokeRef != null && Sim.Flat(spokeRef.Origin - h.Origin).magnitude < 0.1f ? spokeDir : 0;
+                        if (JetAt(h, q, t, spin)) cost += 100;
+                        else if (k == steps && JetAt(h, q, t + 0.5f, spin)) cost += 60;   // standing in its way as it comes round
+                        continue;
+                    }
                     if (!Hits(h, me, q)) continue;
                     float lands = Lands(h, boss) / (float)Sim.Hz;
                     if (BotSight.IsPath(h)) { if (k == steps) cost += VolleyPathCost; }
@@ -590,6 +609,29 @@ namespace LastBell.Run
         static readonly float[] SpokeShifts = { 0f, 4f, -4f, 8f, -8f, 11f, -11f, 14f, -14f, 17f, -17f };   // degrees off the gap's middle
         const float TurretKeep = 5f;   // m kept from a turret firing (Crucivar's rim turrets)
         const float BrandRing = 12.5f;   // where a brand is walked to: its pool (2 m) stays off the jet ring and leaves the inside of the quake's outer band
+        // the turn of a set of jets, read from its first jet's yaw tick to tick (0 until it has turned)
+        void TrackSpin(Hazard j0)
+        {
+            if (spokeRef != j0) { spokeRef = j0; spokeYaw = j0.Yaw; spokeDir = 0; }
+            else { float dy = Mathf.DeltaAngle(spokeYaw, j0.Yaw); if (Mathf.Abs(dy) > 0.01f) spokeDir = Mathf.Sign(dy); spokeYaw = j0.Yaw; }
+        }
+
+        // a jet t s from now: live from its landing (less a hand) to the end of its sweep, turned by then at JetTurnDeg/s
+        // (both ways while the turn is still unknown)
+        static bool JetAt(Hazard h, Vector3 q, float t, float dir)
+        {
+            float on = (h.ResolveAt - h.Age) / (float)Sim.Hz, end = (h.ResolveAt + h.ActiveTicks - h.Age) / (float)Sim.Hz;
+            if (t < on - 0.15f || t > end) return false;
+            float turned = Mathf.Max(0, t - Mathf.Max(0, on)) * ForgeRite.JetTurnDeg;
+            if (dir == 0 && turned > 0) return LaneAt(h, q, h.Yaw + turned) || LaneAt(h, q, h.Yaw - turned);
+            return LaneAt(h, q, h.Yaw + dir * turned);
+        }
+        static bool LaneAt(Hazard h, Vector3 q, float yaw)
+        {
+            var l = Quaternion.Euler(0, -yaw, 0) * Sim.Flat(q - h.Origin);
+            return Mathf.Abs(l.x) <= h.Width / 2 + Hazard.Margin + LanePad && l.z >= -Hazard.Margin && l.z <= h.Length + Hazard.Margin;
+        }
+
         bool Spokes(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
         {
             var live = me.World.Hazards.Live; var jets = new List<Hazard>();
@@ -604,8 +646,7 @@ namespace LastBell.Run
             // left its pool on the 6.5 m ring, where the riders then stood in it: a party ally went down to it, 11-03)
             for (int i = 0; i < live.Count; i++) { var h = live[i]; if (h.Track != null && h.Age < h.LockAt && h.Shape == HazardShape.Circle && Spares(h, me)) return false; }
             var j0 = jets[0];
-            if (spokeRef != j0) { spokeRef = j0; spokeYaw = j0.Yaw; spokeDir = 0; }
-            else { float dy = Mathf.DeltaAngle(spokeYaw, j0.Yaw); if (Mathf.Abs(dy) > 0.01f) spokeDir = Mathf.Sign(dy); spokeYaw = j0.Yaw; }
+            TrackSpin(j0);
             var hub = Sim.Flat(j0.Origin);
             var yaws = new List<float>(); foreach (var h in jets) yaws.Add(Mathf.Repeat(h.Yaw, 360f));
             yaws.Sort();
