@@ -66,10 +66,10 @@ namespace LastBell.Run
         bool follow; int fights; float fightStart;
         // -crucivarMeasure: no pacing; each phase runs a fixed number of loops (3 / 2 uprisings / 3 cycles), then the
         // boss is set just past the threshold; the log gets the players' damage per phase. Until then the boss is held just
-        // above the threshold, so the bots never cross it themselves. -crucivarBots n (1-8) sets the party; the editor quits after the fight.
+        // above the threshold, so the bots never cross it themselves. -crucivarBots n (1-4) sets the party; the editor quits after the fight.
         static bool Measure => Environment.GetCommandLineArgs().Any(a => a.Equals("-crucivarMeasure", StringComparison.OrdinalIgnoreCase));
         static bool UseAllyBot => Environment.GetCommandLineArgs().Any(a => a.Equals("-crucivarAllyBot", StringComparison.OrdinalIgnoreCase));
-        static int BotCount => int.TryParse(CrucivarArgs.Arg("-crucivarBots"), out int n) ? Mathf.Clamp(n, 1, 8) : 4;
+        static int BotCount => int.TryParse(CrucivarArgs.Arg("-crucivarBots"), out int n) ? Mathf.Clamp(n, 1, 4) : 4;
 
         void MeasureLog(int ph, int loops, float secs, int dealt, string note) =>
             Debug.Log($"[measure] bots {bots.Count} phase {ph}: {loops} loops in {secs:0.0}s, players dealt {dealt}, team dps {dealt / Mathf.Max(0.1f, secs):0.0}, per bot {dealt / Mathf.Max(0.1f, secs) / bots.Count:0.0}, downs {bots.Sum(b => b.Downs)}{note}");
