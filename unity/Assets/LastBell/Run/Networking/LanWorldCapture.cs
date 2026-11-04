@@ -18,6 +18,8 @@ namespace LastBell.Run.Networking
             if (!director || director.World == null || roster == null || director.World.Players.Count != roster.Remote.Count + 1)
                 throw new InvalidOperationException("The combat world does not match the LAN roster.");
             var world = director.World;
+            BossEncounter.NetIdOf = p => { int i = world.Players.IndexOf(p); return i == 0 ? 0 : i > 0 && i - 1 < roster.Remote.Count ? roster.Remote[i - 1].Id : -1; };
+            BossEncounter.NetPlayerOf = id => { if (id == 0) return world.Players.Count > 0 ? world.Players[0] : null; for (int i = 0; i < roster.Remote.Count; i++) if (roster.Remote[i].Id == id) return i + 1 < world.Players.Count ? world.Players[i + 1] : null; return null; };
             var frame = new LanWorldFrame { Tick = world.Tick, RunState = (int)director.State, StateTicks = director.StateTicks, Victory = director.Victory };
             if (director.Boss)
             {

@@ -110,6 +110,8 @@ namespace LastBell.Run.Networking
             hazardView = new LanHazardView(fx); localInput = new KeyboardMouseInput(); KeyboardMouseInput.Blocked = false;
             cam = Camera.main;
             lobby.WorldReceived += Receive;
+            BossEncounter.NetIdOf = p => { foreach (var a in actors) if (a.Value.Player == p) return a.Key; return -1; };
+            BossEncounter.NetPlayerOf = id => actors.TryGetValue(id, out var a) ? a.Player : null;
         }
         void Receive(int tick, byte[] payload)
         {
@@ -429,7 +431,7 @@ namespace LastBell.Run.Networking
         void OnDestroy()
         {
             if (lobby != null) lobby.WorldReceived -= Receive;
-            RunHud.LanClientView = false; RunHud.LanLeave = null;
+            RunHud.LanClientView = false; RunHud.LanLeave = null; BossEncounter.NetIdOf = null; BossEncounter.NetPlayerOf = null;
             if (director) director.DetachLanReplica();
             hazardView?.Clear();
             try { ClearProps(); ClearMirrors(); } catch (Exception ex) { Debug.Log("[LAN] client cleanup: " + ex.Message); }

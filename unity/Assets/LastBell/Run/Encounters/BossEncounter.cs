@@ -96,6 +96,10 @@ namespace LastBell.Run
         protected static string NetS(Networking.LanWorldFrame.EffectArg a) => a.S ?? "";
         protected static Color NetC(Networking.LanWorldFrame.EffectArg a) => new Color(a.X, a.Y, a.Z, a.W);
         protected static PlayerController NetP(Networking.LanWorldFrame.EffectArg a, System.Func<int, PlayerController> player) => a.Kind == Networking.LanWorldFrame.EffectArg.PlayerRef ? player(a.I) : null;
+        // LAN player identity, the same number on every computer (the lobby id): set by the host's capture and the client's
+        // replica world, null outside a session. Use it to send per-player looks (Look numbers keyed by id).
+        public static System.Func<PlayerController, int> NetIdOf;
+        public static System.Func<int, PlayerController> NetPlayerOf;
         // on a LAN client the boss is a replica: drawn from the host's snapshots, never stepped
         public bool IsNetReplica => !enabled && RunHud.LanClientView;
         protected static Networking.LanWorldFrame.Prop NetProp(int id, byte kind, Vector3 p) => new Networking.LanWorldFrame.Prop { Id = id, Kind = kind, X = p.x, Y = p.y, Z = p.z };
