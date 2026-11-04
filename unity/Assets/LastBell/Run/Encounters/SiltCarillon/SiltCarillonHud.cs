@@ -5,7 +5,7 @@ using UnityEngine.InputSystem;
 namespace LastBell.Run
 {
     // The Silt Carillon's screen layer (placeholder):
-    // - the big numeral over each sunken bell (how many players it wants), always on: an empty bell wipes the party, so
+    // - the big numeral over each sunken bell (how many players it wants), always on: an empty bell hits the whole party, so
     //   its count must be impossible to miss (content rules §5)
     // - development-only diagnostics, OFF by default; F7 (or the acceptance test) turns them on
     public sealed class SiltCarillonHud : MonoBehaviour

@@ -12,8 +12,8 @@ namespace LastBell.Run
     //                  the edge); below 50% Crosscurrent (three of six 60-degree sectors, then the other three).
     //                  Hard: Backwash (drained ground strikes once 1.5 beats after it drains).
     //   Sunken Bells   with a tide, bells surface on the dry ground: shared soaks with a numeral (solo I; 2 = I+I;
-    //                  3 = II+I; 4 = II+II). 60 split between those inside; an empty bell wipes the party (content rules
-    //                  §5). Every bell rung: the tide drains at once and the Carillon is Drained for 3.5 s (punish window).
+    //                  3 = II+I; 4 = II+II). 30 per player it wants, split between those inside; an empty bell hits
+    //                  the whole party for 35 (review 3 Nov 2026: a party-wide hit instead of the §5 wipe). Every bell rung: the tide drains at once and the Carillon is Drained for 3.5 s (punish window).
     //   Silt Fall      a drop follows every player, one per beat (4, 5 below 50%), locks 1.5 beats before it lands (1.75
     //                  at 116 BPM) and leaves a burning silt mound for 6 beats. Whoever stands still is hit.
     //   Drowned Peal   three bands (0-4.5, 4.5-9, 9-edge) land one after another, 1.5 beats apart: outgoing (A, B, C) or,
@@ -249,16 +249,28 @@ namespace LastBell.Run
                 var h = new Hazard
                 {
                     Source = "Sunken Bell", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = spots[i],
-                    Radius = SiltCarillonRules.BellRadius, LockAt = 0, ResolveAt = toll, Damage = SiltCarillonRules.BellTotal,
-                    ShareTotal = SiltCarillonRules.BellTotal, ShareCount = needs[i], WipeIfEmpty = true, Soak = true, Knockback = 0, Stun = 0,
+                    Radius = SiltCarillonRules.BellRadius, LockAt = 0, ResolveAt = toll, Damage = SiltCarillonRules.BellTotal(needs[i]),
+                    ShareTotal = SiltCarillonRules.BellTotal(needs[i]), ShareCount = needs[i], WipeIfEmpty = false, Soak = true, Knockback = 0, Stun = 0,
                 };
-                h.OnResolve = hz => { W.BossFx.ChimeResolve(hz.Origin, hz.Radius); CameraShake.Shake(0.1f, 0.15f); };
+                h.OnResolve = hz =>
+                {
+                    W.BossFx.ChimeResolve(hz.Origin, hz.Radius); CameraShake.Shake(0.1f, 0.15f);
+                    if (hz.Hit.Count == 0) DrownedToll(hz.Origin);   // nobody rang it
+                };
                 W.Hazards.Spawn(h);
                 HazardSystem.RaidStyle(h);
                 h.Tele.Friendly(BellRim);   // a goal to stand in: the thin friendly rim, plus the big numeral (SiltCarillonHud)
                 bells.Add((h, needs[i]));
             }
         }
+        // an empty bell: every standing player is hit (no knockback); the tide does not drain
+        void DrownedToll(Vector3 at)
+        {
+            var blow = new Hazard { Source = "Drowned Toll", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = at, Radius = 999, Damage = SiltCarillonRules.EmptyBellDmg, Knockback = 0, Stun = 6 };
+            foreach (var p in W.Players.ToArray()) if (!p.Down) { blow.Hit.Add(p); p.ReceiveHit(blow); }
+            W.BossFx.TollResolve(Centre, 0, CombatWorld.PlayerBound); CameraShake.Shake(0.2f, 0.3f);
+        }
+
         // the first resolve tick of each bell, before the hit test: who is inside it
         void OnResolving(Hazard h)
         {

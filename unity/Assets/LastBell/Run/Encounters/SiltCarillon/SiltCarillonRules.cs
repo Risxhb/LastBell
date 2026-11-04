@@ -46,7 +46,10 @@ namespace LastBell.Run
         }
 
         // ---------------- Sunken Bells ----------------
-        public const int BellTotal = 60;
+        // a bell's damage follows the players it wants: 30 each (I = 30, II = 60), split between whoever is inside; missing
+        // shares fall on those inside. An empty bell is a party-wide hit, not a wipe (review, 3 Nov 2026).
+        public const int BellPerPlayer = 30, EmptyBellDmg = 35;
+        public static int BellTotal(int need) => BellPerPlayer * Mathf.Max(1, need);
         public const float BellRadius = 1.6f, BellRingHigh = 4.5f, BellRingLow = 6f;
         // the bells toll this long after they surface (with the tide's warning): long enough for any player to reach the
         // farther bell from anywhere on the floor (the test checks it); the first set of the fight gets 3 beats more
@@ -65,7 +68,7 @@ namespace LastBell.Run
                 list.Add(phase2 ? Sim.Dir(SectorYaws(baseYaw, 1)[i]) * BellRingLow : Sim.Dir(baseYaw + i * 180f) * BellRingHigh);
             return list;
         }
-        public static int Share(int inside) => inside <= 0 ? 0 : Mathf.CeilToInt(BellTotal / (float)inside);
+        public static int Share(int need, int inside) => inside <= 0 ? 0 : Mathf.CeilToInt(BellTotal(need) / (float)inside);
 
         // ---------------- Silt Fall ----------------
         public const float DropRadius = 1.8f, MoundBeats = 6f, FollowBeats = 1f;

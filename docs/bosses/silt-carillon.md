@@ -1,6 +1,6 @@
 # The Silt Carillon
 
-**Proposal (November 3, 2026), not yet approved by Chzy18.** It replaces the earlier Silt Carillon design (Rising Silt rings, Triple Toll, Sediment, Aqueduct Fall), which stays in git history. The rigged Meshy model from that design (`prototype/arena-3d/models/rigged/minibosses/SiltCarillon.glb`) is not used yet: the practice build uses a primitive stand-in.
+**Proposal (November 3, 2026), not yet approved by Chzy18.** It replaces the earlier Silt Carillon design (Rising Silt rings, Triple Toll, Sediment, Aqueduct Fall), which stays in git history. The rigged Meshy model from that design (`prototype/arena-3d/models/rigged/minibosses/SiltCarillon.glb`) will not be used: the boss gets a new model (queued for the next usage reset), and until then the practice build uses a primitive stand-in.
 
 **Warden of the Drowned Steps.** A Verdant Chimes miniboss. Long ago it was the bell-tower that tolled the river's flood stages. The river silted it up, and now it rings the tide in itself. It is a squat dome of mossy ivory stone on a mud-caked base, with three sunken bells hanging under its arches. It barely moves. It controls the floor instead: mud rolls in and out across the arena, bells surface in the silt and have to be rung, and silt pours on anyone who stands still.
 
@@ -16,7 +16,7 @@
 - No dodge immunity, no jump or dash required: every warning passes the escape check walking at 4.2 m/s after a 0.3 s reaction.
 - No knockback on any of its hits (they would push players into the mud).
 - Danger is coral/amber; the bells you must stand in are ivory/teal friendly rims with a large numeral.
-- Shared soaks follow §5 exactly: shares split between the players inside, missing shares fall on those inside, one player alone survives from full HP, an **empty bell wipes the party**. The first bell set of the fight is introduced with a longer warning.
+- Shared soaks follow §5 for the split: shares are divided between the players inside, missing shares fall on those inside, and one player alone survives from full HP. **One deliberate exception (review, 3 Nov 2026):** an empty bell is a **party-wide hit**, not the §5 wipe. The first bell set of the fight is introduced with a longer warning.
 - Two HP phases (50%), a harmless 2 s transformation that waits for the current attack, no heal, no enrage.
 - At most two damaging patterns at once (the tide plus one other).
 - Major punish window: **Drained**, 3.5 s with nothing live, after every rung bell set.
@@ -39,7 +39,8 @@ As a tide rises, bells surface in the dry ground. Each is a shared soak with a l
 
 - **Where:** High Tide: two bells on opposite sides of the tower, 4.5 m out (the dry disc). Crosscurrent: in two of the three dry sectors, 6 m out. Radius 1.6 m (room for two).
 - **When:** they surface with the tide's warning and toll **8 beats** later above 50% (3 beats after the mud locks) and **10 beats** later below 50% (the farther bell of a pair is reachable from anywhere in that time). The first set of the fight gets 3 more beats, Easy 2 more.
-- **Damage:** **60** per bell, split between everyone inside. Fewer than the numeral: the missing shares fall on those inside (one player alone takes 60 and lives). **An empty bell wipes the party** (§5).
+- **Damage:** based on the number of players the bell wants: **30 per player** (a bell I deals 30, a bell II deals 60), split between everyone inside. Filled correctly, each ringer takes 30. Fewer than the numeral: the missing shares fall on those inside (one player alone in a II takes 60 and lives, 78 on Hard).
+- **Empty bell:** **Drowned Toll**, a party-wide hit of **35** to every standing player (two empty bells: 70, 91 on Hard, so a full-HP player survives). The set doesn't count as rung: the tide stays and there is no Drained window.
 - **Reward:** when every bell of the set has been rung, the tide drains at once and the Carillon is **Drained**: it slumps for **3.5 s** with nothing live. This is the major punish window.
 - **Melee and ranged:** a bell is somewhere specific, so nobody can just stay where they are.
 
@@ -106,10 +107,10 @@ The acceptance test checks these, plus a walker for each one:
 - Drowned Peal: across a band boundary into the band that just landed (0.6 m) in 1.5 beats at 116: 2.0 m.
 - Bells: from anywhere on the floor to the farther bell of a pair (18 m above 50%, 19.5 m below) in 8 beats at 96 BPM / 10 beats at 116 BPM: 19.7 / 20.5 m.
 
-## Open questions for review
+## Review answers (3 Nov 2026)
 
-1. **Empty bell = wipe.** That's what §5 requires of a shared soak, but it is harsh for a miniboss. Is a big party-wide hit acceptable instead?
-2. **Area motif:** the shader has no Verdant Chimes motif yet, so every warning uses the default raid motif (Skyward light rays). Should we add one?
-3. **Rest between attacks:** Drained is the only 3.5 s window. Should the Peal have a short recovery too?
-4. **Model:** use the old rigged Meshy model once its clips are remapped, or make a new one?
-5. **Run slot:** practice only for now. Which miniboss slot should it take in the Verdant Chimes run?
+1. **Empty bell:** a party-wide hit instead of a wipe, with soak damage based on the number of players (done above).
+2. **Area motif:** no change for now. **Suggestion kept for review:** a Verdant Chimes motif for the raid warnings (the shader has only Skyward Spire and Brass Foundry; every warning here uses the default Skyward light rays).
+3. **Rest after the Peal:** no. Drained stays the only 3.5 s window.
+4. **Model:** a **new** model. The old rigged Meshy model is not used. No modelling work has been done yet: it is queued on the lane board for the next usage reset. Until then the practice fight uses the primitive stand-in.
+5. **Run slot:** not decided. Gameplay placement is open, but bosses will most likely share arenas, so the Carillon keeps Sylvara's Verdant Chimes arena.

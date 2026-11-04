@@ -12,10 +12,10 @@ namespace LastBell.Run
     //    warning at every level and tempo.
     // 2. Solo practice on Verdant Chimes with a scripted walker (ordinary PlayerInput): each ability hits a player who
     //    stands still next to the boss and one who stands still at long range, and a walker who reads it takes nothing;
-    //    bells, Drained, Backwash (Hard), Easy timings, the 50% transformation, phase 2, and an empty bell wiping the party.
+    //    bells, Drained, Backwash (Hard), Easy timings, the 50% transformation, phase 2, and an empty bell hitting the party.
     // 3. The whole rotation of both phases with Perfect bot parties of 2 and 4 (the director's allies plus a bot player):
     //    every mechanic fires and resolves, every bell set is rung with the right numerals, nothing is left live between
-    //    attacks, no one is wiped, and defeat clears everything.
+    //    attacks, no bell is left empty, and defeat clears everything.
     // Labelled dev hooks: ForcedNext, boss HP fraction / defeat, player DebugSetHp, direct placement, extra roster players.
     // Writes silt-carillon-report.txt plus screenshots and exits 0 / 1.
     public sealed class SiltCarillonAutoTest : MonoBehaviour
@@ -188,8 +188,11 @@ namespace LastBell.Run
             Check("bells: solo I; 2 = I+I; 3 = II+I; 4 = II+II",
                 SiltCarillonRules.BellNeeds(1).SequenceEqual(new[] { 1 }) && SiltCarillonRules.BellNeeds(2).SequenceEqual(new[] { 1, 1 }) &&
                 SiltCarillonRules.BellNeeds(3).SequenceEqual(new[] { 2, 1 }) && SiltCarillonRules.BellNeeds(4).SequenceEqual(new[] { 2, 2 }));
-            Check($"bells: one player alone takes {SiltCarillonRules.BellTotal} and survives from full; a pair 30 each",
-                SiltCarillonRules.Share(1) == 60 && SiltCarillonRules.Share(2) == 30 && SiltCarillonRules.BellTotal < 100 && Mathf.RoundToInt(SiltCarillonRules.BellTotal * RunDifficulty.DamageTakenScale(Difficulty.Hard)) < 100);
+            Check("bells: 30 per player wanted (I = 30, II = 60); a pair in II takes 30 each, one player alone in II takes 60 and survives from full on Hard",
+                SiltCarillonRules.Share(1, 1) == 30 && SiltCarillonRules.Share(2, 2) == 30 && SiltCarillonRules.Share(2, 1) == 60 && SiltCarillonRules.Share(2, 3) == 20 &&
+                Mathf.RoundToInt(SiltCarillonRules.BellTotal(2) * RunDifficulty.DamageTakenScale(Difficulty.Hard)) < 100);
+            Check("an empty bell is a party-wide hit of 35; two empty bells together still leave a full-HP player standing on Hard",
+                SiltCarillonRules.EmptyBellDmg == 35 && Mathf.RoundToInt(2 * SiltCarillonRules.EmptyBellDmg * RunDifficulty.DamageTakenScale(Difficulty.Hard)) < 100);
             var hi = SiltCarillonRules.BellSpots(false, 30, 2); var lo = SiltCarillonRules.BellSpots(true, 30, 2);
             Check("bells: High Tide pair opposite at 4.5 m (inside the dry disc); Crosscurrent pair in dry sectors at 6 m",
                 hi.All(p => Mathf.Abs(p.magnitude - 4.5f) < 0.01f && p.magnitude + SiltCarillonRules.BellRadius < SiltCarillonRules.TideInner - Hazard.Margin) && Mathf.Abs(Vector3.Angle(hi[0], hi[1]) - 180) < 0.5f &&
@@ -247,7 +250,7 @@ namespace LastBell.Run
             goalFn = () => boss.LiveBells.Count > 0 ? boss.LiveBells[0].h.Origin : (Vector3?)null;
             yield return Until(() => boss.LiveBells.Count > 0, 15, "bells surface");
             var first = boss.LiveBells.Count > 0 ? boss.LiveBells[0].h : null;
-            Check("solo: one bell with numeral I, a wiping shared soak of 60", boss.LiveBells.Count == 1 && boss.LiveBells[0].need == 1 && first.ShareTotal == 60 && first.WipeIfEmpty && first.Soak && first.ShareCount == 1);
+            Check("solo: one bell with numeral I, a shared soak of 30 that does not wipe", boss.LiveBells.Count == 1 && boss.LiveBells[0].need == 1 && first.ShareTotal == 30 && !first.WipeIfEmpty && first.Soak && first.ShareCount == 1);
             Check("the opening bell tolls 11 beats after it surfaces (8 + 3 for the first set)", first != null && first.ResolveAt == 11 * 38, first != null ? first.ResolveAt + " ticks" : "");
             Check("the High Tide floods the ring from 7 m to the edge (burn 25/s after 5 beats), drawn in the raid look", d.World.Hazards.Live.Any(h => h.Source == "Silt Tide" && h.Shape == HazardShape.Ring && Mathf.Approximately(h.Inner, 7) && h.BurnPerSecond == 25 && h.LockAt == 190 && h.FillToLock));
             Check("no ability names in the boss panel: no live hazard carries a mechanic tag", d.World.Hazards.Live.All(h => string.IsNullOrEmpty(h.MechanicId)));
@@ -256,7 +259,7 @@ namespace LastBell.Run
             yield return Grab("solo_high_tide_bell_camera");
             yield return Until(() => boss.Drained, 15, "Drained");
             Check("the bell rung: the tide drains at once and it is Drained with nothing live", boss.BellSetLog.Count == 1 && boss.BellSetLog[0].allRung && boss.DrainLog.Any(x => x.early) && d.World.Hazards.Count == 0, $"{d.World.Hazards.Count} live");
-            Check("the lone ringer takes the full 60", HitsSince(start, "Sunken Bell", d.Player) == 1 && hits.Last(h => h.source == "Sunken Bell").dmg == 60);
+            Check("the lone ringer takes the bell's 30", HitsSince(start, "Sunken Bell", d.Player) == 1 && hits.Last(h => h.source == "Sunken Bell").dmg == 30);
             int hp = boss.Hp; boss.TakeHit(50, boss.transform.position + Vector3.up * 2);
             Check("Drained: it can be damaged (the punish window)", boss.Hp == hp - 50);
             RenderShot("solo_drained", new Vector3(0, 5, 9), new Vector3(0, 1.5f, 0), 45);
@@ -383,13 +386,15 @@ namespace LastBell.Run
             goalFn = null;
             Check("below 50%: five drops, locking 1.75 beats before they land", boss.DropsSpawned - ds == 5 && boss.FallLog.Last().lead == Mathf.RoundToInt(1.75f * 31));
 
-            // 7. an empty bell wipes the party (content rules §5)
+            // 7. an empty bell: a party-wide hit, the tide stays, no Drained window (review, 3 Nov 2026)
             Section("an empty bell");
-            PlaceMe(new Vector3(0, 0, -12.5f));   // far from any bell (they surface 4.5-6 m out)
-            yield return StartOf("TideBells");
-            yield return Until(() => d.State != RunState.Combat, 20, "the party is down");
-            Check("nobody in the bell: the party is wiped", d.Player.Down && boss.BellsEmpty >= 1 && hits.Any(h => h.source == "Sunken Bell" && h.who == d.Player));
-            yield return Until(() => d.State == RunState.Results, 10, "results after the wipe");
+            PlaceMe(new Vector3(0, 0, 3.0f)); start = d.World.Tick; int empty0 = boss.BellsEmpty, dr2 = boss.DrainedLog.Count, sets0 = boss.BellSetLog.Count;
+            // stay inside the dry ground but clear of every bell
+            goalFn = () => { foreach (var b in boss.LiveBells) { var away = -Sim.Flat(b.h.Origin).normalized * 3f; return away; } return null; };
+            yield return Block("TideBells", 40);
+            goalFn = null;
+            Check("nobody in the bell: everyone standing takes the 35 Drowned Toll, nobody is downed", boss.BellsEmpty == empty0 + 1 && HitsSince(start, "Drowned Toll", d.Player) == 1 && hits.Last(h => h.source == "Drowned Toll").dmg == 35 && !d.Player.Down && d.State == RunState.Combat);
+            Check("an unrung set does not drain the tide: no Drained window", boss.BellSetLog.Count == sets0 + 1 && !boss.BellSetLog.Last().allRung && boss.DrainedLog.Count == dr2);
         }
 
         // ---------------- bot parties ----------------
