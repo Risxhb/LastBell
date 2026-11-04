@@ -1,55 +1,201 @@
 {
-  "source": "ability-icons commit 0d0555a (art/mechanic-icons-20261022), approved by Chzy18 2026-10-23; ids, names, tags and shapes from docs/boss-attack-icons/<boss>/manifest.json; this copy carries only the 5 Aurelion attacks (Crucivar and Sylvara icons stay local until those bosses ship; normal Bellkeeper v2 is retired)",
-  "attacks": [
-    {
-      "id": "aurelion.meridian_lances",
-      "boss": "aurelion",
-      "bossName": "Aurelion",
-      "name": "Meridian Lances",
-      "tag": "Strike",
-      "shape": "Three or four full-arena crossing beams, 2.2 m wide.",
-      "icon": "aurelion_meridian_lances",
-      "aliases": []
-    },
-    {
-      "id": "aurelion.starfall_mirror",
-      "boss": "aurelion",
-      "bossName": "Aurelion",
-      "name": "Starfall Mirror",
-      "tag": "Ground",
-      "shape": "Player-centred circles plus reflections through arena centre; r 2.2 (1.8 at N≥5).",
-      "icon": "aurelion_starfall_mirror",
-      "aliases": []
-    },
-    {
-      "id": "aurelion.noon_shadow",
-      "boss": "aurelion",
-      "bossName": "Aurelion",
-      "name": "Noon Shadow",
-      "tag": "Ground",
-      "shape": "Half-arena cleave split by a straight line through arena centre.",
-      "icon": "aurelion_noon_shadow",
-      "aliases": []
-    },
-    {
-      "id": "aurelion.orrery_closing",
-      "boss": "aurelion",
-      "bossName": "Aurelion",
-      "name": "Orrery Closing",
-      "tag": "Ground",
-      "shape": "Outer rim annulus r≥8.5 plus filled crown circle r3.6 at boss; safe band between.",
-      "icon": "aurelion_orrery_closing",
-      "aliases": []
-    },
-    {
-      "id": "aurelion.hour_hands",
-      "boss": "aurelion",
-      "bossName": "Aurelion",
-      "name": "Hour Hands",
-      "tag": "Strike",
-      "shape": "Boss-to-rim radial lane spokes through player hours, 1.8 m wide; Hard only.",
-      "icon": "aurelion_hour_hands",
-      "aliases": []
-    }
-  ]
+    "source":  "ability-icons commit 0d0555a (art/mechanic-icons-20261022), approved by Chzy18 2026-10-23: the 5 Aurelion attacks; plus Codex\u0027s 11 Sylvara v3 icons (work/attack-icons-20261102), approved by Chzy18 2026-11-02. Icon bullet counts are approximate, so always show the name with the icon",
+    "attacks":  [
+                    {
+                        "id":  "aurelion.meridian_lances",
+                        "boss":  "aurelion",
+                        "bossName":  "Aurelion",
+                        "name":  "Meridian Lances",
+                        "tag":  "Strike",
+                        "shape":  "Three or four full-arena crossing beams, 2.2 m wide.",
+                        "icon":  "aurelion_meridian_lances",
+                        "aliases":  [
+
+                                    ]
+                    },
+                    {
+                        "id":  "aurelion.starfall_mirror",
+                        "boss":  "aurelion",
+                        "bossName":  "Aurelion",
+                        "name":  "Starfall Mirror",
+                        "tag":  "Ground",
+                        "shape":  "Player-centred circles plus reflections through arena centre; r 2.2 (1.8 at Nâ‰¥5).",
+                        "icon":  "aurelion_starfall_mirror",
+                        "aliases":  [
+
+                                    ]
+                    },
+                    {
+                        "id":  "aurelion.noon_shadow",
+                        "boss":  "aurelion",
+                        "bossName":  "Aurelion",
+                        "name":  "Noon Shadow",
+                        "tag":  "Ground",
+                        "shape":  "Half-arena cleave split by a straight line through arena centre.",
+                        "icon":  "aurelion_noon_shadow",
+                        "aliases":  [
+
+                                    ]
+                    },
+                    {
+                        "id":  "aurelion.orrery_closing",
+                        "boss":  "aurelion",
+                        "bossName":  "Aurelion",
+                        "name":  "Orrery Closing",
+                        "tag":  "Ground",
+                        "shape":  "Outer rim annulus râ‰¥8.5 plus filled crown circle r3.6 at boss; safe band between.",
+                        "icon":  "aurelion_orrery_closing",
+                        "aliases":  [
+
+                                    ]
+                    },
+                    {
+                        "id":  "aurelion.hour_hands",
+                        "boss":  "aurelion",
+                        "bossName":  "Aurelion",
+                        "name":  "Hour Hands",
+                        "tag":  "Strike",
+                        "shape":  "Boss-to-rim radial lane spokes through player hours, 1.8 m wide; Hard only.",
+                        "icon":  "aurelion_hour_hands",
+                        "aliases":  [
+
+                                    ]
+                    },
+                    {
+                        "id":  "sylvara.spiral_bloom",
+                        "boss":  "sylvara",
+                        "bossName":  "Sylvara",
+                        "name":  "Spiral Bloom",
+                        "tag":  "Strike",
+                        "shape":  "Petal bullets spiralling out from Sylvara in 3-6 arms; a toll can reverse the spin.",
+                        "icon":  "sylvara_spiral_bloom",
+                        "aliases":  [
+                                        "Petal Spiral"
+                                    ]
+                    },
+                    {
+                        "id":  "sylvara.seed_pods",
+                        "boss":  "sylvara",
+                        "bossName":  "Sylvara",
+                        "name":  "Seed Pods",
+                        "tag":  "Ground",
+                        "shape":  "A pod lands on a circle on the farthest players (or her feet) and bursts into a ring of petals.",
+                        "icon":  "sylvara_seed_pods",
+                        "aliases":  [
+                                        "Seed Pod",
+                                        "Feet Pod",
+                                        "Pod Petal"
+                                    ]
+                    },
+                    {
+                        "id":  "sylvara.waterfall_jets",
+                        "boss":  "sylvara",
+                        "bossName":  "Sylvara",
+                        "name":  "Waterfall Jets",
+                        "tag":  "Strike",
+                        "shape":  "Water drops pour in from the wall along a 40-degree wedge that sweeps sideways.",
+                        "icon":  "sylvara_waterfall_jets",
+                        "aliases":  [
+                                        "Waterfall Jet"
+                                    ]
+                    },
+                    {
+                        "id":  "sylvara.pruning_arc",
+                        "boss":  "sylvara",
+                        "bossName":  "Sylvara",
+                        "name":  "Pruning Arc",
+                        "tag":  "Ground",
+                        "shape":  "Front and back 120-degree cones from Sylvara, then a fan of petals; the sides are safe.",
+                        "icon":  "sylvara_pruning_arc",
+                        "aliases":  [
+                                        "Arc Petal"
+                                    ]
+                    },
+                    {
+                        "id":  "sylvara.two_colour_choir",
+                        "boss":  "sylvara",
+                        "bossName":  "Sylvara",
+                        "name":  "Two-Colour Choir",
+                        "tag":  "Strike",
+                        "shape":  "Brass and cobalt spirals and lanes: only petals of your own colour hurt you.",
+                        "icon":  "sylvara_two_colour_choir",
+                        "aliases":  [
+                                        "Brass Lane",
+                                        "Cobalt Lane"
+                                    ]
+                    },
+                    {
+                        "id":  "sylvara.toll_burst",
+                        "boss":  "sylvara",
+                        "bossName":  "Sylvara",
+                        "name":  "Toll Burst",
+                        "tag":  "Strike",
+                        "shape":  "A ring of 20 alternating brass and cobalt petals as the toll swaps every colour.",
+                        "icon":  "sylvara_toll_burst",
+                        "aliases":  [
+
+                                    ]
+                    },
+                    {
+                        "id":  "sylvara.root_ring",
+                        "boss":  "sylvara",
+                        "bossName":  "Sylvara",
+                        "name":  "Root Ring",
+                        "tag":  "Ground",
+                        "shape":  "A filled circle of roots around Sylvara that erupts after 2 s.",
+                        "icon":  "sylvara_root_ring",
+                        "aliases":  [
+
+                                    ]
+                    },
+                    {
+                        "id":  "sylvara.hollow_bloom",
+                        "boss":  "sylvara",
+                        "bossName":  "Sylvara",
+                        "name":  "Hollow Bloom",
+                        "tag":  "Strike",
+                        "shape":  "Each Choir Bud fires a 3-arm petal spiral until it is cut.",
+                        "icon":  "sylvara_hollow_bloom",
+                        "aliases":  [
+                                        "Bud Petal"
+                                    ]
+                    },
+                    {
+                        "id":  "sylvara.bud_bloom",
+                        "boss":  "sylvara",
+                        "bossName":  "Sylvara",
+                        "name":  "Bud Bloom",
+                        "tag":  "Strike",
+                        "shape":  "An uncut Choir Bud blooms into a ring of 20 petals.",
+                        "icon":  "sylvara_bud_bloom",
+                        "aliases":  [
+
+                                    ]
+                    },
+                    {
+                        "id":  "sylvara.seed_storm",
+                        "boss":  "sylvara",
+                        "bossName":  "Sylvara",
+                        "name":  "Seed Storm",
+                        "tag":  "Strike",
+                        "shape":  "Big seeds drift out and burst into 8 petals (10 on Hard).",
+                        "icon":  "sylvara_seed_storm",
+                        "aliases":  [
+                                        "Seed Burst",
+                                        "Seed"
+                                    ]
+                    },
+                    {
+                        "id":  "sylvara.last_storm",
+                        "boss":  "sylvara",
+                        "bossName":  "Sylvara",
+                        "name":  "Last Storm",
+                        "tag":  "Strike",
+                        "shape":  "The enrage at 2:00 into Phase 4: a dense spiral and constant seed rings.",
+                        "icon":  "sylvara_last_storm",
+                        "aliases":  [
+
+                                    ]
+                    }
+                ]
 }

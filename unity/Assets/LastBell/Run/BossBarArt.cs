@@ -10,6 +10,8 @@ namespace LastBell.Run
         static Texture2D ornL, ornR, liquid, ripple, smoke;
         static bool loaded, painted;
 
+        // the fallback textures are painted on the CPU: do it while the scene loads, not on the first HUD frame (15.9 ms)
+        public static void Warm() => Load();
         static void Load()
         {
             if (loaded && ornL && ornR && liquid && ripple && smoke) return;

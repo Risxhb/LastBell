@@ -185,7 +185,7 @@ namespace LastBell.Run
             RunHud.Float(transform.position + Vector3.up * 2.4f, "-" + dmg, mult < 1 ? new Color(0.6f, 0.9f, 1f) : new Color(1f, 0.42f, 0.36f));
             World.BossFx.PlayerHit(transform.position);
             if (Hp == 0) { GoDown(); return; }
-            if (!noKnock)
+            if (!noKnock && h.Flinch)
             {
                 stun = h.Stun; knockDir = h.PushDir(transform.position); knockDist = h.Knockback * Shop.ItemHooks.F(this, "knockback", 1); knockTick = KnockTicks;
                 dashTick = 0; Kit.Interrupt();
@@ -244,9 +244,13 @@ namespace LastBell.Run
             if (Input is KeyboardMouseInput km) km.Poll();
         }
 
+        // profiler scope (perf agent, 2 Nov): the input read, which is the whole think for an ally bot
+        static readonly Unity.Profiling.ProfilerMarker PmInput = new Unity.Profiling.ProfilerMarker("LastBell.Player.InputOrBotThink");
+
         public void Step()
         {
-            var inp = Input != null && MovementEnabled ? Input.Read(this) : default;
+            PlayerInput inp;
+            using (PmInput.Auto()) inp = Input != null && MovementEnabled ? Input.Read(this) : default;
             if (!AbilitiesEnabled) { inp.P0 = inp.P1 = inp.P2 = inp.P3 = inp.P4 = false; inp.H0 = inp.H1 = inp.H2 = inp.H3 = inp.H4 = false; inp.Dash = inp.Jump = inp.Potion = false; }
             Last = inp;
             if (Down) { Presenter.Tick(this); return; }

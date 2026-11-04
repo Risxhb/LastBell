@@ -31,7 +31,11 @@ namespace LastBell.Run
             // Phases: how many HP phases the practice phase row offers (1 = Phase 1 only). It must match the encounter's
             // PhaseStarts; the autotest checks that for every entry.
             public readonly int Phases;
-            public BossEntry(string name, Func<CombatWorld, BossEncounter> spawn, bool inRun = true, string map = null, bool final = false, int phases = 1) { Name = name; Spawn = spawn; InRun = inRun; Map = map; Final = final; Phases = Math.Max(1, phases); }
+            // WarmUp (optional): runs on the Ready screen before this boss's intro, while nobody is fighting. Use it for
+            // first-use costs that would otherwise land in combat: draw the fight's labels once in each font and size, build
+            // pooled objects hidden, and so on. The boss doesn't exist yet; the world, the player and the allies do.
+            public readonly Action<CombatWorld> WarmUp;
+            public BossEntry(string name, Func<CombatWorld, BossEncounter> spawn, bool inRun = true, string map = null, bool final = false, int phases = 1, Action<CombatWorld> warmUp = null) { Name = name; Spawn = spawn; InRun = inRun; Map = map; Final = final; Phases = Math.Max(1, phases); WarmUp = warmUp; }
         }
         public static readonly BossEntry[] Bosses =
         {
@@ -42,7 +46,7 @@ namespace LastBell.Run
             // Skyward Spire area boss; authored practice map
             new BossEntry("Aurelion (area 1)", w => BossEncounter.Spawn<AurelionEncounter>(w, new Vector3(0, 0, -1.5f), 0), map: AurelionMap, phases: AurelionArgs.V4 ? 4 : 3),   // v4 (the default set) adds Last Light
             // Verdant Chimes area boss (graybox); authored practice map
-            new BossEntry("Sylvara (area 3)", w => BossEncounter.Spawn<SylvaraEncounter>(w, new Vector3(0, 0, -1.5f), 0), map: SylvaraMap, phases: 3),
+            new BossEntry("Sylvara (area 3)", w => BossEncounter.Spawn<SylvaraEncounter>(w, Vector3.zero, 0), map: SylvaraMap, phases: 4),
             // Brass Foundry area boss; authored practice map
             new BossEntry("Crucivar (area 2)", w => BossEncounter.Spawn<CrucivarEncounter>(w, new Vector3(0, 0, -1.5f), 0), map: CrucivarMap, phases: 3),
             // Metronome Court miniboss: explicit Practice entry only (inRun: false), so shuffled run slots are unchanged.
@@ -153,6 +157,18 @@ namespace LastBell.Run
             LastBell.Menu.MenuMusic.OnRunState(this, s);
             KeyboardMouseInput.Blocked = s == RunState.Menu || s == RunState.Results;
             StateChanged?.Invoke(s);
+            if (s == RunState.Ready) WarmUpEncounter();
+        }
+
+        // Ready-screen warm-up (Chzy18, 2 Nov; perf report bellkeeper-ultimate-2026-11-02: first-use costs on the first combat
+        // frame). Runs the next boss's BossEntry.WarmUp, then ReadyWarmUp for shared code (HUD fonts and the like). A failing
+        // warm-up is logged and never blocks the run.
+        public static event Action<RunDirector, int> ReadyWarmUp;
+        void WarmUpEncounter()
+        {
+            if (World == null || Encounter < 0 || Encounter >= Bosses.Length) return;
+            try { Bosses[Encounter].WarmUp?.Invoke(World); } catch (Exception e) { Debug.LogException(e); }
+            try { ReadyWarmUp?.Invoke(this, Encounter); } catch (Exception e) { Debug.LogException(e); }
         }
 
         // ---------------- requests (UI / keyboard / tests) ----------------
@@ -393,22 +409,27 @@ namespace LastBell.Run
                     if (State == RunState.Combat && Boss && !Boss.Dead)
                     {
                         if (kb.f9Key.wasPressedThisFrame) Boss.DebugDefeat();
-                        if (kb.f8Key.wasPressedThisFrame) Boss.DebugSetHpFraction(Boss is SylvaraEncounter ? (Boss.Hp > Boss.MaxHp * 0.65f ? 0.64f : 0.29f) : Boss.NextPhaseFraction());
+                        if (kb.f8Key.wasPressedThisFrame) Boss.DebugSetHpFraction(Boss.NextPhaseFraction());
                     }
                 }
             }
             if (World == null || Paused) return;
             acc += Mathf.Min(Time.deltaTime, 0.1f);
             int guard = 0;
-            SimSmoother.RestoreAll();   // ticks see exact sim poses
-            while (acc >= Sim.Dt && guard++ < 8) { acc -= Sim.Dt; Tick(); SimSmoother.CaptureAll(); }
-            SimSmoother.PresentAll(acc / Sim.Dt);   // draw between the last two ticks: smooth at any frame rate
+            using (PmSmooth.Auto()) SimSmoother.RestoreAll();   // ticks see exact sim poses
+            while (acc >= Sim.Dt && guard++ < 8) { acc -= Sim.Dt; using (PmTick.Auto()) Tick(); using (PmSmooth.Auto()) SimSmoother.CaptureAll(); }
+            using (PmSmooth.Auto()) SimSmoother.PresentAll(acc / Sim.Dt);   // draw between the last two ticks: smooth at any frame rate
+            World?.Bullets.Draw(World.Root);
         }
+
+        // profiler scopes (perf agent, 2 Nov): a sim tick, the world step inside it, and the pose smoothing around it
+        static readonly Unity.Profiling.ProfilerMarker PmTick = new Unity.Profiling.ProfilerMarker("LastBell.Director.Tick"),
+            PmWorld = new Unity.Profiling.ProfilerMarker("LastBell.Director.WorldStep"), PmSmooth = new Unity.Profiling.ProfilerMarker("LastBell.Director.SimSmoother");
 
         void Tick()
         {
             int gen = Generation;
-            World.Step();
+            using (PmWorld.Auto()) World.Step();
             StateTicks++;
             if (State == RunState.Combat || State == RunState.Cleared || State == RunState.Downed) RunTicks++;
             if (gen != Generation) return;

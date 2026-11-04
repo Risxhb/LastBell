@@ -87,7 +87,7 @@ with 0 damage, 2 with one 50-damage hit). In the 5 test starts, 4 are clean kill
 echo's clapper on toll XI. Every scripted mistake wipes, including the new one, "XIII: II runs to the wrong platform".
 
 **Unity:** built (`FinalToll.cs`). Hits count ×1.25 inside the bell before XIII, then ×4 in the Last Stand. Perfect bots kill in the
-Last Stand (party of 4, trio and P1–P5 with 0 deaths; party of 8 with 1); the slow-reacting bots wipe when the bell falls.
+Last Stand (party of 4, trio and P1–P5 with 0 deaths); the slow-reacting bots wipe when the bell falls.
 
 ## Design rules check (gpt/08)
 

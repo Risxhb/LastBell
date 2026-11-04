@@ -84,21 +84,28 @@ namespace LastBell.Run
         public virtual void BeginCombat() { script = Script().GetEnumerator(); wait = 0; }
         public void Halt() { script = null; Current = "idle"; OnHalt(); }   // player defeat: stop attacking, keep standing
 
+        // profiler scopes (perf agent, 2 Nov): the per-tick state and the phase script
+        static readonly Unity.Profiling.ProfilerMarker PmAlways = new Unity.Profiling.ProfilerMarker("LastBell.Boss.StepAlways"),
+            PmScript = new Unity.Profiling.ProfilerMarker("LastBell.Boss.Script");
+
         public void Step()
         {
             if (Dead) return;
             Age++;
-            StepAlways();
+            using (PmAlways.Auto()) StepAlways();
             if (script == null) return;
             if (wait > 0) { wait--; return; }
-            // exactly one script step per tick: `yield return n` resumes n ticks later
-            if (!script.MoveNext())
+            using (PmScript.Auto())
             {
-                script = Script().GetEnumerator();
-                if (!script.MoveNext()) { script = null; return; }
+                // exactly one script step per tick: `yield return n` resumes n ticks later
+                if (!script.MoveNext())
+                {
+                    script = Script().GetEnumerator();
+                    if (!script.MoveNext()) { script = null; return; }
+                }
+                if (script == null) return;   // the step itself halted or defeated the boss (a wipe, the Ultimate slice ending)
+                wait = Mathf.Max(1, script.Current) - 1;
             }
-            if (script == null) return;   // the step itself halted or defeated the boss (a wipe, the Ultimate slice ending)
-            wait = Mathf.Max(1, script.Current) - 1;
         }
 
         public int TakeHit(int damage, Vector3 contact, bool hitFx = true)

@@ -29,13 +29,11 @@ Code: `unity/Assets/LastBell/Run/Encounters/Bellkeeper/Ultimate/BrokenHour.cs` a
 - On the first beat it is dealt directly, not passed.
 - Party sizes:
   - **Below 4 players:** INVERTED is dealt each beat, and it vanishes on beats with no partner hour.
-  - **5–8 players:** each group of four has its own chains and its own INVERTED. The two soakers share the plate, 0.8 m either side of its centre.
 
 ## Bot strat (the perfect bots)
 - A party plan per beat, the sim's solver in C#.
 - Spots sit 0.9 m inside their half. Chains sit 0.5 m inside 6–10 m and at least 1 m apart.
 - The touch has a meeting point and time; remembering it is the memory job.
-- With 8 players, each group keeps to its own side of the plate–boss line.
 - The run's own player gets the same plan as a teal beam, plus an orange touch disc.
 
 ## Bot results at lock (ult-v2-p2-7)

@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace LastBell.Run
 {
-    // Bot allies (RunParty, menu "Allies"): a party of 8 spawns with the classes spread; the bots are passive (they move,
+    // Bot allies (RunParty, menu "Allies"): a party of 4 (the most the game allows) spawns with the classes spread; the bots are passive (they move,
     // dodge and spread but never attack), so the boss keeps its solo HP and takes no damage from them.
     public sealed partial class RunAutoTest
     {
@@ -24,11 +24,11 @@ namespace LastBell.Run
             Check("allies: solo practice has one player", d.World.Players.Count == 1 && d.Allies.Count == 0);
             d.SetPaused(true); d.ReturnToMenu(); yield return null;
 
-            Check("allies: 7 selected", d.SelectAllies(7) && RunParty.Selected == 7);
-            d.StartPractice("Arcanist", 0); yield return PartyLoaded("party of 8");
-            Check("allies: a party of 8 spawns", d.World.Players.Count == 8 && d.Allies.Count == 7, $"{d.World.Players.Count} players");
+            Check("allies: 3 selected, more clamps to 3", d.SelectAllies(7) && RunParty.Selected == 3);
+            d.StartPractice("Arcanist", 0); yield return PartyLoaded("party of 4");
+            Check("allies: a party of 4 spawns", d.World.Players.Count == 4 && d.Allies.Count == 3, $"{d.World.Players.Count} players");
             var classes = d.World.Players.GroupBy(p => p.ClassName).ToDictionary(g => g.Key, g => g.Count());
-            Check("allies: classes spread across all three (no class more than 3 of 8)", classes.Count == 3 && classes.Values.Max() <= 3,
+            Check("allies: classes spread across all three (no class more than 2 of 4)", classes.Count == 3 && classes.Values.Max() <= 2,
                 string.Join(", ", classes.Select(kv => kv.Key + " " + kv.Value)));
             Check("allies: the first allies are the classes the player didn't pick", d.Allies[0].ClassName == "Tollbreaker" && d.Allies[1].ClassName == "Chimesinger");
             d.RequestReady();
@@ -39,8 +39,8 @@ namespace LastBell.Run
             yield return Survive(14f);
             Check("allies: the bots never attack (mechanics only)", d.World.DamageDealt == dealt0 && d.Boss.Hp == hp0, $"dealt {d.World.DamageDealt - dealt0}");
             int standing = d.Allies.Count(a => a && !a.Down);
-            Note($"allies after 14 s with the boss: {standing} of 7 standing, HP " + string.Join(" ", d.Allies.Select(a => a.ClassName[0] + ":" + a.Hp)));
-            Check("allies: most bots survive 14 s (they dodge)", standing >= 4, standing + " of 7");
+            Note($"allies after 14 s with the boss: {standing} of 3 standing, HP " + string.Join(" ", d.Allies.Select(a => a.ClassName[0] + ":" + a.Hp)));
+            Check("allies: most bots survive 14 s (they dodge)", standing >= 2, standing + " of 3");
             if (d.Boss && !d.Boss.Dead) { if (d.Boss.PhaseNumber < d.Boss.PhaseCount) d.Boss.StartAtPhase(d.Boss.PhaseCount); d.Boss.DebugDefeat(); }   // a miniboss holds at 50 % until its shift
             yield return Until(() => d.State == RunState.Results, 8, "party practice results");
             d.ReturnToMenu(); yield return null;

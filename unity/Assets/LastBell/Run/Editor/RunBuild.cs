@@ -99,7 +99,9 @@ namespace LastBell.Run.EditorTools
                 scenes = RunMaps.All.Select(m => m.RunScene).ToArray(),
                 locationPathName = OutPath(),
                 target = BuildTarget.StandaloneWindows64,
-                options = BuildOptions.None,
+                // -lastbellDevelopment: a development build, needed only to record the shader warm-up (Unity traces graphics
+                // states in development builds only; see ShaderWarmUp)
+                options = System.Environment.GetCommandLineArgs().Contains("-lastbellDevelopment") ? BuildOptions.Development : BuildOptions.None,
             };
             var report = BuildPipeline.BuildPlayer(opts);
             var s = report.summary;

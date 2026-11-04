@@ -28,7 +28,6 @@ Code: `unity/Assets/LastBell/Run/Encounters/Bellkeeper/Ultimate/EscapementRelay.
 | A ✕ empty | 999 cone (120°) on that side |
 
 - Party sizes:
-  - **5–8 players:** hours repeat, and the two holders of an hour share its job.
   - **Trio:** SOAK → WEIGHT L → CHAIN.
   - **Duo:** SOAK → CHAIN.
   - **Solo:** SOAK every beat.

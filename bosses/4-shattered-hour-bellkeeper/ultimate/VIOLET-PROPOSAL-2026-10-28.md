@@ -40,7 +40,6 @@ Nothing changes in the rules: radii, timings and who it hits all stay the same. 
 ## Checks once accepted
 - Autotest presentation checks: no hazard material within the audit's Arcanist hue band.
 - A capture of P2 and P3 at the gameplay camera with an Arcanist casting Comet and Sigil beside the cues.
-- An 8-player capture for INVERTED rings overlapping.
 
 ## Open questions for Chzy18
 1. Own-echo outline at 1.55 m (the true kill distance) or at the 1.1 m burst size?
