@@ -290,7 +290,7 @@ namespace LastBell.Run
         void ClearFight()
         {
             foreach (var e in emit) e.On = false;
-            emit.Clear(); later.Clear(); sp1 = sp2 = null;
+            emit.Clear(); spinDir.Clear(); later.Clear(); sp1 = sp2 = null;
             foreach (var b in buds) KillBud(b);
             buds.Clear();
             W.Bullets.ClearAll();
@@ -728,7 +728,7 @@ namespace LastBell.Run
             if (Dead || Current == "idle" || phase == 0) return;   // halted (party down) or not started
             for (int i = later.Count - 1; i >= 0; i--) if (Age >= later[i].at) { var fn = later[i].fn; later.RemoveAt(i); fn(); }
             for (int i = 0; i < emit.Count; i++) if (emit[i].On) emit[i].Update?.Invoke(Sim.Dt);
-            emit.RemoveAll(e => !e.On);
+            emit.RemoveAll(e => { if (e.On) return false; spinDir.Remove(e); return true; });   // retired spirals drop their reversal hook
         }
 
         void KillBud(Bud b) { b.Alive = false; if (b.Part != null) { b.Part.Alive = false; W.Parts.Remove(b.Part); } }
@@ -758,8 +758,10 @@ namespace LastBell.Run
             DrawColourRings();
         }
 
-        // Phase 2: a brass or cobalt ring under each player shows their colour; it flickers to the next colour during the
-        // 1 s toll warning.
+        // Phase 2: an open dotted brass or cobalt ring under each player shows their colour (friendly cues are thin and
+        // unfilled, so it never reads as a boss floor warning); it flickers to the next colour during the 1 s toll warning.
+        const int RingDots = 14;
+        Material ringBrassMat, ringCobaltMat;   // shared by every dot
         void DrawColourRings()
         {
             if (W == null) return;
@@ -771,15 +773,20 @@ namespace LastBell.Run
                 if (c == 0) { if (ring) ring.gameObject.SetActive(false); continue; }
                 if (!ring)
                 {
-                    ring = Prim.Make(PrimitiveKind.Cylinder, transform.parent, Vector3.zero, new Vector3(1.3f, 0.01f, 1.3f), RingBrass, 2f);
+                    ring = new GameObject("ColourRing").transform; ring.SetParent(transform.parent, false);
+                    for (int i = 0; i < RingDots; i++)
+                    {
+                        float a = i * Tau / RingDots;
+                        Prim.Make(PrimitiveKind.Cylinder, ring, new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * 0.7f, new Vector3(0.12f, 0.01f, 0.12f), RingBrass, 1.5f);
+                    }
                     colourRings[p] = ring;
                 }
                 if (!ring.gameObject.activeSelf) ring.gameObject.SetActive(true);
                 bool flick = swapWarned.Contains(p) && Mathf.Repeat(Time.time * 6, 1) < 0.5f;
                 int show = flick ? (c == Brass ? Cobalt : Brass) : c;
-                var mr = ring.GetComponent<MeshRenderer>();
-                var want = show == Brass ? RingBrass : RingCobalt;
-                if (mr.material.GetColor("_BaseColor") != want) { mr.material.SetColor("_BaseColor", want); mr.material.SetColor("_EmissionColor", want * 2f); }
+                if (!ringBrassMat) { ringBrassMat = Prim.Material(RingBrass, 1.5f); ringCobaltMat = Prim.Material(RingCobalt, 1.5f); }
+                var want = show == Brass ? ringBrassMat : ringCobaltMat;
+                foreach (var mr in ring.GetComponentsInChildren<MeshRenderer>()) if (mr.sharedMaterial != want) mr.sharedMaterial = want;
                 ring.position = Sim.Flat(p.transform.position) + Vector3.up * 0.04f;
             }
         }
@@ -787,7 +794,7 @@ namespace LastBell.Run
         protected override void OnDefeat()
         {
             foreach (var e in emit) e.On = false;
-            emit.Clear(); later.Clear(); foreach (var b in buds) KillBud(b); buds.Clear(); colour.Clear(); swapWarned.Clear();
+            emit.Clear(); spinDir.Clear(); later.Clear(); foreach (var b in buds) KillBud(b); buds.Clear(); colour.Clear(); swapWarned.Clear();
             ClearProps();
             glowTarget = 0.3f; glowLevel = 2f;
             presenter.PlayOnce("Defeat", 2.5f);
@@ -798,6 +805,7 @@ namespace LastBell.Run
         {
             ClearProps();
             foreach (var r in colourRings.Values) if (r) Destroy(r.gameObject);
+            if (ringBrassMat) { Destroy(ringBrassMat); Destroy(ringCobaltMat); }
         }
         public CharacterPresenter Presenter => presenter;
     }
