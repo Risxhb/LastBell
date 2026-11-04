@@ -1,5 +1,28 @@
 # LAN multiplayer: transport foundation (unfinished)
 
+## November 4: LAN is part of the main player, and every boss but the Tutorial plays over LAN
+
+User (3 Nov, night): the client should show everything the host sees, each computer running its own copy of the game, "just like how multiplayer should be".
+
+**Model (unchanged, and the usual one for co-op):** every computer runs its own full game and draws everything itself. The host runs the only fight simulation; clients send input (60 Hz) and receive the fight state and the host's effect calls (30 snapshots a second), draw it about 1.5 snapshots behind, and predict their own movement.
+
+**One player:** the `LASTBELL_LAN_TEST` gates are gone. The main menu has Start Run, Boss Rush, Multiplayer, Settings and Exit, and the main Windows build (`ConfrontationMenuBuild.BuildWindows`) includes the lobby scene. LAN encounter limits apply only while a LAN session runs (`RunDirector.Begin`).
+
+**Shared plumbing** (`BossEncounter`, `Run/Networking`):
+- `CaptureNetLook`/`ReplicaPresent`: a boss sends its presentation-only state (`BossState.Glow`, up to 64 `Look` numbers) and the client's replica applies it every frame.
+- `NetFx`/`ReplayNetEffect`: a boss records its own presentation calls and replays them itself (no generated switch needed).
+- Clients keep a stand-in for every host hazard in `World.Hazards.Live` (`HazardSystem.AddReplica`), so mechanic icons, JUMP labels and boss soak/tower numerals work on clients.
+- `NetIdOf`/`NetPlayerOf`: lobby ids for per-player looks. `NetDrawnTick`: the host tick a client is drawing.
+- Hostile bullets (`BulletSystem`, Sylvara) travel in the snapshot with their velocity (cap 600).
+- Snapshot caps (160 hazards, 160 telegraphs); rooted players aren't predicted; telegraphs carry flash scale and lane stretch.
+- Parry presses (Dial Warden) travel in the input with the tick the client saw; the host judges them there, within 15 ticks of lag. Protocol 5.
+
+**Per boss:** looks for Bellkeeper (shell and phase), Aurelion, Tempo Tyrant (glow, wake fissure), Oracle, Pendulum Sentinel (plumb line); Crucivar (effects, rig, turrets, castings, Mould Towers, pour numerals); Sylvara (bullets, colour rings, pods, roots, buds, phase looks); Dial Warden (parry prompt and input, wave wall, counterweights, sounds); Escapement Twins (Tock, team marks, Escape Wheel, Counterpoise numerals); Rivet Cantor (glyphs, Chorus numeral, poses); Crucible Skater (ladles, numerals); Briar Metronome (season numerals, hedges, grafts, pendulum); Silt Carillon (bell numerals); Vesper Seedkeeper (stakes, cords, seed orbs, numerals). The Tutorial stays single-player (its bots and checks assume one player).
+
+**Verified on `builds/lan-all-20261104/c2/LastBell.exe`** (0 errors / 67 warnings; evidence `build-evidence/lan-all-20261104/`; one Windows computer, automated players): .NET harness 208/208; LAN menu 49/49 and 40/40; two-process fights for all 14 bosses (Tempo Tyrant also with 3 clients), each forcing its showcase mechanic, 42–94 checks each, 0 failures, 0 exceptions. Client checks include boss looks with no errors, boss-drawn overlays on every new boss, and 291 Sylvara bullets drawn from one snapshot.
+
+Not verified: two real computers and people playing; the Dial Warden parry prompt on a client (the automated client never stands on a lit hour; the input path is covered by the harness); campaign runs over LAN (Multiplayer starts single boss fights).
+
 ## November 3: the LAN lobby (names, classes, Ready, start), on the Tollbreaker base
 
 Branch `feature/lan-lobby` (worktree `lan-lobby/` in the workspace), planned in the workspace's `docs/lan-lobby-plan-20261102.md`. The LAN work above was committed as of 3 Nov 00:28 and merged with Azure PRs 14–20 (Tollbreaker replaces Vanguard) and the Tutorial.
