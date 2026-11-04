@@ -27,14 +27,17 @@ namespace LastBell.Run
         public Transform BossBody => Body;   // presentation: the camera frames him during the phase (LastLightFloorFx)
 
         // ---- the fall (Chzy18 picked "B: Fall" over the 25/s burn and accepted 40 damage, review inbox, 1 Nov) ----
-        // Stepping onto a fallen slice drops you: you land back on the nearest standing floor at once and take FallDamage
+        // Stepping onto a fallen slice drops you: you take FallDamage and are carried back onto the nearest standing floor in
+        // SlideS (a forced slide, not a teleport: gpt/08 §2, Codex review MOVE-01, 4 Nov; it was instant until then). FallDamage is
         // (before the difficulty scale: Easy 24, Medium 40, Hard 52), never a one-shot from full health; two falls in a
         // row can kill. No way across a hole (no jumping in the game, Chzy18 2 Nov; a dash does not carry you over): walk round it.
         // The wedge keeps its burn rate for its look and for ally-bot avoidance, but in fall mode nobody stands in it
-        // long enough to burn (the fall moves you out on the tick you step in). The old burn-only mode was removed on 2 Nov.
+        // long enough to burn (the slide carries you out at once). The old burn-only mode was removed on 2 Nov.
         public const int FallDamage = 40;
         public const string FallSource = "Last Light — the fall";
         public static int FallStun => Sim.Ticks(0.6f);
+        public const float SlideS = 0.3f;
+        readonly Dictionary<PlayerController, int> sliding = new Dictionary<PlayerController, int>();   // until which tick a fall's slide runs
         public const float Footing = 1.0f;   // the apex where all eight wedges meet stays solid this far out
         public const float Clearance = 1.0f; // you land at least this far from every hole edge
         public readonly List<(PlayerController p, Vector3 from, Vector3 to, int damage)> Falls = new List<(PlayerController, Vector3, Vector3, int)>();
@@ -72,10 +75,11 @@ namespace LastBell.Run
             foreach (var p in W.Players)
             {
                 if (!p || p.Down || !OverHole(p.transform.position)) continue;
+                if (sliding.TryGetValue(p, out int until) && W.Tick < until) continue;   // already being carried out
                 var from = p.transform.position; var to = Landing(from);
-                p.Relocate(to);
                 int before = p.Hp;
                 p.ReceiveHit(new Hazard { Source = FallSource, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = to, Radius = 0.1f, Damage = FallDamage, Stun = FallStun, Knockback = 0 });
+                p.SlideTo(to, Sim.Ticks(SlideS)); sliding[p] = W.Tick + Sim.Ticks(SlideS);
                 Falls.Add((p, from, to, before - p.Hp));
                 RunHud.Float(to + Vector3.up * 3.0f, "FELL", new Color(0.7f, 0.85f, 1f));
             }
@@ -83,7 +87,7 @@ namespace LastBell.Run
 
         public IEnumerable<int> Run()
         {
-            Sectors.Clear(); Falls.Clear(); Clip("LastLightCall", Sim.Ticks(2.5f));
+            Sectors.Clear(); Falls.Clear(); sliding.Clear(); Clip("LastLightCall", Sim.Ticks(2.5f));
             RunHud.Banner("LAST LIGHT — THE FLOOR IS FALLING", new Color(1f, 0.6f, 0.5f), 2.5f);
             for (int k = 0; k < Order.Length; k++)
             {

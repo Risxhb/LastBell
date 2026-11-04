@@ -7,14 +7,15 @@ namespace LastBell.Run
     // Errant Planets (aurelion.errant_planets), v4 Phase 2 (Misalignment), accepted 2 Nov (Chzy18: "make it harder by giving
     // the players something to do/dodge"). Three planets (Easy one; two until 3 Nov), 1.6 m across, circle the arena on
     // off-centre orbits at 5.5 m/s (4.5 until 3 Nov: Chzy18 "I want them harder") in alternating directions over every Phase 2 block (not Total Eclipse). Their paths are drawn as faint rings,
-    // so a crossing can be timed. Touching one: 30 damage and a 1.5 m knockback, at most once a second per player.
+    // so a crossing can be timed. Touching one: 30 damage and a 1.5 m knockback. Each lap is its own hazard instance, so a planet hits
+    // a player at most once per lap (gpt/08 §2: once per hazard instance; it was once a second until 4 Nov, Codex review HIT-01).
     // The encounter calls Step every tick; the planet is a live Circle hazard whose origin moves, so bots dodge it.
     public sealed class ErrantPlanets : AurelionAbility
     {
         public override string Id => "aurelion.errant_planets";
         public override string Name => "Errant Planets";
 
-        public const float Radius = 0.8f, Speed = 5.5f, RehitS = 1.0f;
+        public const float Radius = 0.8f, Speed = 5.5f;
         public const int Damage = 30;
         static readonly (Vector3 centre, float r, float dir, float start)[] Orbits =
         {
@@ -25,7 +26,7 @@ namespace LastBell.Run
         // coral, not gold: the Skyward floor already has gold rings, and a gold path vanished among them (2 Nov shots)
         static readonly Color PathFill = new Color(0.45f, 0.16f, 0.13f, 0.0f), PathEdge = new Color(0.45f, 0.16f, 0.13f, 0.3f);   // dim: the path never hurts, only the planet
 
-        sealed class Planet { public Hazard H; public BellkeeperFx.Telegraph Path; public int Orbit; public float Angle; public readonly Dictionary<PlayerController, int> At = new Dictionary<PlayerController, int>(); }
+        sealed class Planet { public Hazard H; public BellkeeperFx.Telegraph Path; public int Orbit; public float Angle, Travelled; }
         readonly List<Planet> planets = new List<Planet>();
         public bool Live => planets.Count > 0;
         public int Count => planets.Count;
@@ -41,34 +42,34 @@ namespace LastBell.Run
             {
                 var o = Orbits[i];
                 var p = new Planet { Orbit = i, Angle = o.start };
-                p.H = Spawn(new Hazard
-                {
-                    Source = Name, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Pos(o, o.start), Radius = Radius,
-                    LockAt = 0, ResolveAt = 1, ActiveTicks = 1 << 28, Damage = Damage, Knockback = 1.5f, Stun = 0,
-                });
+                p.H = Lap(Pos(o, o.start));
                 p.Path = W.BossFx.Ring(o.r - 0.05f, o.r + 0.05f);
                 p.Path.Tint(PathFill, PathEdge); p.Path.Progress(1); p.Path.Order = -2; p.Path.Place(o.centre, 0);
                 planets.Add(p);
             }
         }
 
+        // one planet's hazard for one lap of its orbit
+        Hazard Lap(Vector3 at) => Spawn(new Hazard
+        {
+            Source = Name, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = at, Radius = Radius,
+            LockAt = 0, ResolveAt = 1, ActiveTicks = 1 << 28, Damage = Damage, Knockback = 1.5f, Stun = 0,
+        });
+        public int Laps { get; private set; }   // test evidence
+
         public void Step()
         {
-            int rehit = Sim.Ticks(RehitS);
             for (int i = 0; i < planets.Count; i++)
             {
                 var p = planets[i]; var o = Orbits[p.Orbit];
                 if (p.H.Cancelled) { End(); return; }
-                p.Angle += o.dir * Speed / o.r * Mathf.Rad2Deg / Sim.Hz;
+                float step = Speed / o.r * Mathf.Rad2Deg / Sim.Hz;
+                p.Angle += o.dir * step; p.Travelled += step;
                 p.H.Origin = Pos(o, p.Angle);
-                // once a second per player: a hit enters Hit (the hazard's once-per-instance rule), so let it go again later
-                foreach (var who in p.H.Hit) if (!p.At.ContainsKey(who)) p.At[who] = W.Tick;
-                foreach (var kv in p.At) if (W.Tick - kv.Value >= rehit) { p.H.Hit.Remove(kv.Key); stale.Add(kv.Key); }
-                foreach (var who in stale) p.At.Remove(who);
-                stale.Clear();
+                // a full lap: the planet comes round as a new hazard instance, so it may hit the same players once more
+                if (p.Travelled >= 360f) { p.Travelled -= 360f; var old = p.H; p.H = Lap(p.H.Origin); W.Hazards.Cancel(old); Laps++; }
             }
         }
-        readonly List<PlayerController> stale = new List<PlayerController>();
 
         public void End()
         {

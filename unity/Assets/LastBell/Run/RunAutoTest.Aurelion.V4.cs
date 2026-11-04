@@ -257,15 +257,18 @@ namespace LastBell.Run
                 V2Boss.ClearPhasePools(); V2Main.Relocate(new Vector3(0.5f, 0, 6f)); V2Main.DebugSetHp(PlayerController.MaxHp);
                 V2Begin(LastLightFloorFx.During(V2W, lf, lf.Run().Take(2)));   // ends on the first slice's lock tick
                 yield return V2WaitIdle(20);
-                yield return V2Ticks(10);
                 var fall = lf.Falls.Count > 0 ? lf.Falls[0] : default;
+                // a slide, not a teleport: on the fall's own tick or just after, the player has not reached the landing yet
+                bool slid = fall.p != null && Sim.Flat(V2Main.transform.position - fall.to).magnitude > 0.2f;
+                yield return V2Ticks(Sim.Ticks(LastLight.SlideS) + 10);
                 int want = Mathf.RoundToInt(LastLight.FallDamage * V2W.DamageTakenScale);
+                bool landedAt = fall.p != null && Sim.Flat(V2Main.transform.position - fall.to).magnitude < 0.3f;
                 bool landedClear = fall.p != null && !lf.OverHole(fall.to, LastLight.Clearance - 0.05f) && !lf.OverHole(V2Main.transform.position);
                 float moved = fall.p != null ? Sim.Flat(fall.to - fall.from).magnitude : -1;
                 yield return V2Ticks(30);
-                V2Check($"Last Light ({lv}): stepping onto a fallen slice drops you onto the nearest standing floor for {want}, never a one-shot",
-                    lf.Falls.Count == 1 && fall.damage == want && !V2Main.Down && V2Main.Hp == PlayerController.MaxHp - want && landedClear && moved < 4f,
-                    fall.p != null ? $"{fall.damage} damage, moved {moved:0.0} m to {fall.to}, hp {V2Main.Hp}, falls {lf.Falls.Count}" : "no fall");
+                V2Check($"Last Light ({lv}): stepping onto a fallen slice slides you onto the nearest standing floor for {want}, never a one-shot or a teleport",
+                    lf.Falls.Count == 1 && slid && landedAt && fall.damage == want && !V2Main.Down && V2Main.Hp == PlayerController.MaxHp - want && landedClear && moved < 4f,
+                    fall.p != null ? $"{fall.damage} damage, slid {slid}, landed {landedAt}, moved {moved:0.0} m to {fall.to}, hp {V2Main.Hp}, falls {lf.Falls.Count}" : "no fall");
                 V2Boss.ClearPhasePools();
                 yield return V2WaitIdle(20);
             }

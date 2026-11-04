@@ -112,7 +112,7 @@ namespace LastBell.Run
         public PlayerInput Last { get; private set; }
 
         int dashTick, dashLock, jumpTick = -1, stun, knockTick, sinceSpend = 999;
-        Vector3 dashDir, knockDir; float knockDist, dashDist = DashDistance;
+        Vector3 dashDir, knockDir; float knockDist, dashDist = DashDistance; int knockLen = KnockTicks;
         bool sprinting;
 
         public static PlayerController Spawn(CombatWorld world, string className, Vector3 pos, float yaw)
@@ -186,7 +186,7 @@ namespace LastBell.Run
             if (Hp == 0) { GoDown(); return; }
             if (!noKnock)
             {
-                stun = h.Stun; knockDir = h.PushDir(transform.position); knockDist = h.Knockback * Shop.ItemHooks.F(this, "knockback", 1); knockTick = KnockTicks;
+                stun = h.Stun; knockDir = h.PushDir(transform.position); knockDist = h.Knockback * Shop.ItemHooks.F(this, "knockback", 1); knockTick = knockLen = KnockTicks;
                 dashTick = 0; Kit.Interrupt();
                 Presenter.Hit();
             }
@@ -221,8 +221,17 @@ namespace LastBell.Run
             GoDown();
         }
 
-        // Put the player somewhere else at once (Aurelion's Last Light fall, proposal): any knockback, pull or dash in
-        // progress ends, so nothing carries them back over the edge.
+        // Carry the player to pos over `ticks` ticks (Aurelion's Last Light fall): a forced slide like a knockback, never a
+        // teleport (gpt/08 §2). Input, dash and pull stop meanwhile; the stun lasts at least as long as the slide.
+        public void SlideTo(Vector3 pos, int ticks)
+        {
+            if (Down || ticks <= 0) return;
+            var d = Sim.Flat(pos - transform.position);
+            dashTick = 0; pullTick = 0;
+            stun = Mathf.Max(stun, ticks); knockDir = d.normalized; knockDist = d.magnitude; knockTick = knockLen = ticks;
+        }
+
+        // Test setup only: put the player somewhere at once (no boss uses this; bosses never teleport players).
         public void Relocate(Vector3 pos)
         {
             if (Down) return;
@@ -282,7 +291,7 @@ namespace LastBell.Run
             if (stun > 0)
             {
                 stun--;
-                if (knockTick > 0) { knockTick--; vel = knockDir * (knockDist / KnockTicks) * Sim.Hz; }
+                if (knockTick > 0) { knockTick--; vel = knockDir * (knockDist / knockLen) * Sim.Hz; }
             }
             else if (dashTick > 0)
             {
