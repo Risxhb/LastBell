@@ -15,7 +15,7 @@ namespace LastBell.Run
             if (t && t.Jobs.TryGetValue(me, out var job))
             {
                 var to = Sim.Flat(job - me.transform.position);
-                inp.Dash = false; inp.Jump = false;
+                inp.Dash = false;
                 inp.Sprint = to.magnitude > 3f;
                 inp.Move = to.magnitude > 0.3f ? ToScreen(to.normalized) : Vector2.zero;
             }

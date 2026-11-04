@@ -426,7 +426,6 @@ namespace LastBell.Run
             W.Fx.SurgeStart(P, LastSurgeGlyphs, surgeTotal);
         }
 
-        public override bool CanJump() => act == Act.None || act == Act.Tap || act == Act.BlinkIn;
 
         // Blink (shared dash): cancels unreleased casts. A Disintegrate windup or a Surge cast before its release refunds;
         // a running beam breaks (glyphs already carved are kept).

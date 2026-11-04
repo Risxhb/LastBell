@@ -7,6 +7,7 @@
 ## Delivered
 
 - Five Vanguard, six Chimesinger, six Arcanist, and one shared potion icon.
+- **Since 2 Nov:** the Vanguard icons were deleted with the class. The Tollbreaker has his own (`tollbreaker_twin_hurl`, `tollbreaker_splitting_throw`, `tollbreaker_call_of_iron`, `tollbreaker_dash`).
 - PNG, 256 x 256, RGBA with real transparency. Centered proportional glyphs with at least 31 px clear padding (about 12%).
 - Exact requested filenames in `unity/Assets/LastBell/Run/Resources/Run/Icons/`.
 - Deterministic Unity GUIDs and Texture2D import settings: sRGB, bilinear, clamp, no mipmaps, alpha transparency, uncompressed, maximum 256 px. The current HUD is IMGUI; load with `Resources.Load<Texture2D>("Run/Icons/<filename-without-extension>")`.

@@ -238,8 +238,8 @@ namespace LastBell.Run
                 BannerText(); CaptionText();
                 Floats();
                 Labels();
-                HazardLabels();
                 PlayerMarks();
+                DownedMarks();
                 if (ShowMechanicGallery) MechanicGallery();
                 switch (d.State)
                 {
@@ -407,8 +407,8 @@ namespace LastBell.Run
             Dim();
             const float W = 720, pad = UiTheme.G3, inner = W - 2 * pad, colGap = 12, rowGap = 8;
             const string controlText =
-                "Controls: WASD move · mouse aims · LMB basic · 2 3 4 class actions · 5 Mending Chorus / Temporal Anchor · RMB dash · F potion · Space jump · Shift sprint · Esc pause\n" +
-                "Movement stamina: sprint, jump and dash share one bar. No invincibility frames (dodging does not make you immune). F drinks a potion (+40 HP).\nHealth refills before each boss; potions carry over between bosses and refill before the final boss. Retry restarts at the first boss.\n" +
+                "Controls: WASD move · mouse aims · LMB basic · 2 3 4 class actions · 5 Mending Chorus / Temporal Anchor · RMB dash · F potion · Shift sprint · Esc pause\n" +
+                "Movement stamina: sprint and dash share one bar. No invincibility frames (dodging does not make you immune). F drinks a potion (+40 HP).\nHealth refills before each boss; potions carry over between bosses and refill before the final boss. Retry restarts at the first boss.\n" +
                 "Only real boss encounters are offered (the stand-in minibosses were removed); Sylvara is practice only, in Verdant Chimes. Arcanist kit numbers are prototype tuning. Dev keys in combat: F9 defeat boss, F8 next phase.";
             const int perRow = 3;
             int mapRows = (RunMaps.All.Length + perRow - 1) / perRow, bossRows = (RunDirector.Bosses.Length + perRow - 1) / perRow;
@@ -781,8 +781,9 @@ namespace LastBell.Run
         // then the class's dash, then the potion. A missing icon falls back to the ability name.
         static readonly Dictionary<string, string[]> SlotIconNames = new Dictionary<string, string[]>
         {
-            // Tollbreaker: stand-in icons (older steel-set art and the retired Arcanist set) until his own are drawn
-            ["Tollbreaker"] = new[] { "tollbreaker_twin_hurl", "arcanist_clockstep", "tollbreaker_splitting_throw", "tollbreaker_call_of_iron", "chimes-128", "tollbreaker_dash" },
+            // Tollbreaker: Grinding Toll and Bell Frenzy show his own shop items' art (Long Grind: the spinning axe; Frenzied Hour:
+            // the bell and axes) until their ability icons are drawn; they were the retired Arcanist and Chimes art (PR review ICON-01)
+            ["Tollbreaker"] = new[] { "tollbreaker_twin_hurl", "items/long-grind-128", "tollbreaker_splitting_throw", "tollbreaker_call_of_iron", "items/frenzied-hour-128", "tollbreaker_dash" },
             ["Chimesinger"] = new[] { "chimesinger_resonant_note", "chimesinger_bellstrike", "chimesinger_harmonic_refrain", "chimesinger_crescendo", "chimesinger_mending_chorus", "chimesinger_harmonic_step" },
             ["Arcanist"] = new[] { "arcanist_magic_missile", "arcanist_disintegrate", "arcanist_rune_sigil", "arcanist_comet", "arcanist_arcane_surge", "arcanist_blink" },
         };
@@ -962,7 +963,7 @@ namespace LastBell.Run
             bool showTip = over >= 0 && !attacking && Time.unscaledTime - tipSince >= TipDelay;
             if (!showTip) { }
             else if (pr.Contains(Event.current.mousePosition)) Tooltip(x, top, $"POTION  [F]\n+{PlayerController.PotionHeal} HP, 1 s between drinks. {p.Potions}/{PlayerController.MaxPotions} left.\nPotions carry over between minibosses; health and potions refill before each area boss.");
-            else if (dr.Contains(Event.current.mousePosition)) Tooltip(x, top, "DASH  [RMB]\nShort burst (3 m in 0.2 s) in the move direction. Costs 30 stamina; sprint and jump share the bar.\nNo invincibility: get out of the shape before it resolves. Cancels basic attacks and unreleased windups.");
+            else if (dr.Contains(Event.current.mousePosition)) Tooltip(x, top, "DASH  [RMB]\nShort burst (3 m in 0.2 s) in the move direction. Costs 30 stamina; sprint shares the bar.\nNo invincibility: get out of the shape before it resolves. Cancels basic attacks and unreleased windups.");
             else if (hover >= 0) Tooltip(x, top, k.Tooltip(hover));
             if (ShowMeter && d.World != null) Meter(Right - MeterW, 260, d.World.EncounterMeter, "DAMAGE · this encounter", (d.World.Tick - d.World.SegmentStartTick) / 60f);
         }
@@ -1086,22 +1087,64 @@ namespace LastBell.Run
             GUI.matrix = m;
         }
 
-        void HazardLabels()
-        {
-            var cam = Camera.main; if (!cam) return; float h = Screen.height;
-            foreach (var hz in d.World.Hazards.Live)
-            {
-                if (!hz.JumpClearable) continue;
-                var mid = hz.Origin + Sim.Dir(hz.Yaw) * hz.Length * 0.5f;
-                var s = cam.WorldToScreenPoint(mid); if (s.z < 0) continue;
-                UiTheme.Fill(new Rect(s.x - UiTheme.V(36), h - s.y - UiTheme.V(14), UiTheme.V(72), UiTheme.V(28)), UiTheme.InkStrip);
-                UiTheme.Label(new Rect(s.x - UiTheme.V(60), h - s.y - UiTheme.V(15), UiTheme.V(120), UiTheme.V(30)), "JUMP", floatSt, UiTheme.Ivory);   // ivory on the ink strip, not a friendly cyan
-            }
-        }
-
         // Mechanic markers over players' heads (PlayerController.Marks, MechanicIcons): 40 px icons side by side, each with its
         // name on a strip under it, because several look alike at this size. Placement approved by Chzy18 on October 24, 2026;
         // see docs/run-loop/mechanic-icons.md. Nothing is drawn until an encounter assigns a mark.
+        // Revives: over each downed player, their class's downed bell (Codex's revive HUD art, work/revive-hud-20261104, ivory
+        // not gold: gold is the bosses' danger colour) inside the segmented ring, which fills clockwise ivory over slate as the
+        // revive runs, and the seconds left to revive them on a strip under it; DEAD (bell dimmed, no ring) once bled out.
+        // Beside a downed ally the local player sees the revive prompt (the hand) and what it takes: stand still.
+        void DownedMarks()
+        {
+            var cam = Camera.main; if (!cam || d.World.Players.Count < 2) return; float h = Screen.height, w = UiTheme.V(96), ring = UiTheme.V(64), bell = UiTheme.V(44);
+            var me = d.Player;
+            foreach (var p in d.World.Players)
+            {
+                if (p == null || !p.Down) continue;
+                var s = cam.WorldToScreenPoint(p.transform.position + Vector3.up * 1.4f); if (s.z < 0) continue;
+                float cx = s.x, cy = h - s.y - ring / 2 - UiTheme.V(6);
+                if (!p.Dead) { var rt = ReviveRing(p.ReviveProgress); if (rt) GUI.DrawTexture(new Rect(cx - ring / 2, cy - ring / 2, ring, ring), rt, ScaleMode.ScaleToFit, true); }
+                var mark = Icon("revive/downed-" + p.ClassName.ToLowerInvariant());
+                if (mark) { var c = GUI.color; if (p.Dead) GUI.color = new Color(1, 1, 1, 0.45f); GUI.DrawTexture(new Rect(cx - bell / 2, cy - bell / 2, bell, bell), mark, ScaleMode.ScaleToFit, true); GUI.color = c; }
+                var r = new Rect(cx - w / 2, cy + ring / 2 + UiTheme.V(2), w, UiTheme.V(20));
+                UiTheme.Fill(r, UiTheme.InkStrip);
+                string t = p.Dead ? "DEAD" : $"DOWN  {Mathf.CeilToInt(PlayerController.BleedOutSeconds - p.DownedTicks / (float)Sim.Hz)} s";
+                UiTheme.Label(r, t, slotName);
+                // the prompt: the local player beside them and up (the revive itself needs them still: PlayerController.CanChannelRevive)
+                if (p.Dead || me == null || me == p || me.Down || Sim.Flat(me.transform.position - p.transform.position).magnitude > PlayerController.ReviveRange) continue;
+                var hand = Icon("revive/revive-prompt"); float ps = UiTheme.V(36);
+                if (hand) GUI.DrawTexture(new Rect(cx + ring / 2 + UiTheme.V(4), cy - ps / 2, ps, ps), hand, ScaleMode.ScaleToFit, true);
+                var pr = new Rect(cx + ring / 2 + UiTheme.V(4) + ps, cy - UiTheme.V(10), UiTheme.V(110), UiTheme.V(20));
+                UiTheme.Fill(pr, UiTheme.InkStrip); UiTheme.Label(pr, "STAND STILL", slotName);
+            }
+        }
+
+        // the ring with its first k of ReviveSteps segments ivory, the rest slate, built once per step from the art's alpha
+        // (clockwise from the top; the art itself is a half-filled still, so it is never stretched as a timer)
+        const int ReviveSteps = 30;
+        static Texture2D[] reviveRings;
+        static Texture2D ReviveRing(float progress)
+        {
+            reviveRings ??= new Texture2D[ReviveSteps + 1];
+            int k = Mathf.Clamp(Mathf.FloorToInt(progress * ReviveSteps + 0.001f), 0, ReviveSteps);
+            if (reviveRings[k]) return reviveRings[k];
+            var src = Icon("revive/revive-ring"); if (!src || !src.isReadable) return src;
+            var px = src.GetPixels32(); int n = src.width; var o = new Color32[px.Length];
+            var lit = new Color(0.96f, 0.92f, 0.82f); var dim = new Color(0.20f, 0.27f, 0.38f);
+            for (int y = 0; y < n; y++)
+                for (int x = 0; x < n; x++)
+                {
+                    int i = y * n + x; var c = px[i]; if (c.a == 0) { o[i] = c; continue; }
+                    float a = Mathf.Repeat(Mathf.Atan2(x - n / 2f + 0.5f, y - n / 2f + 0.5f) * Mathf.Rad2Deg, 360f);   // 0 at the top, clockwise
+                    float lum = (c.r + c.g + c.b) / (3f * 255f);
+                    var tint = a < 360f * k / ReviveSteps ? lit : dim;
+                    o[i] = (Color32)new Color(tint.r * (0.55f + 0.45f * lum), tint.g * (0.55f + 0.45f * lum), tint.b * (0.55f + 0.45f * lum), c.a / 255f);
+                }
+            var t = new Texture2D(n, n, TextureFormat.RGBA32, false) { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
+            t.SetPixels32(o); t.Apply(false, true);
+            return reviveRings[k] = t;
+        }
+
         // white anti-aliased disc, tinted at draw time (backing for over-head markers)
         static Texture2D markDisc;
         static Texture2D MarkDisc
