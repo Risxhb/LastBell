@@ -1,5 +1,7 @@
 # Aurelion ability set v2.1: harder (proposal)
 
+> **Retired set (1 Nov).** Only v4 is played (`../abilities-v4/ABILITIES-v4.md`). This file stays because v4 reuses abilities and numbers defined here; its phase plans, Noon Shadow and escape checks no longer apply.
+
 **Status:** proposal, playtest-driven. **Base:** `ABILITIES.md` (v2), as built on `feature/aurelion-abilities-v2` at `681e7f8`.
 
 **Why:** Chzy18 playtested on 2026-10-22, solo, ranged, Hard, with 20 % boss HP. The feedback: *"way way too easy for hard difficulty. I had no problem dodging the mechanics."* He then chose three changes:

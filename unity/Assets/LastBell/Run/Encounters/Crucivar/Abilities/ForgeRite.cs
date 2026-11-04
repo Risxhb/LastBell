@@ -202,7 +202,11 @@ namespace LastBell.Run
                     });
                 };
                 W.Hazards.Spawn(h);
-                if (NumeralsShown) ForgeRiteNumeral.Show(W, h, target, k + 1);
+                if (NumeralsShown)
+                {
+                    ForgeRiteNumeral.Show(W, h, target, k + 1);
+                    if (CrucivarEncounter.NetOn) CrucivarEncounter.Net("Crucivar.PourNumeral", target, k + 1, h.Source);   // the client hangs it on the stand-in
+                }
             }
             Boss.Rig.Pour(true);
         }

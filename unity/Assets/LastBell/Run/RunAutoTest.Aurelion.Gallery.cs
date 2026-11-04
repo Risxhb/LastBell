@@ -25,17 +25,12 @@ namespace LastBell.Run
             RunDirector.ShotCamera = null; galleryCam = "_gamecam";
             yield return GalleryPass();
             yield return V2Teardown();
-            AurelionArgs.SetOverride = null;
         }
 
         IEnumerator GalleryPass()
         {
-            AurelionArgs.SetOverride = "v3";
             yield return GalleryShot("meridian_lances", 2, b => b.Lances.Run(4, 1, false), 80);
             yield return GalleryShot("starfall_mirror", 1, b => b.Starfall.Run(), 100, new Vector3(-5, 0, 2));
-            AurelionArgs.SetOverride = "v2";
-            yield return GalleryShot("noon_shadow_v2_only", 1, b => b.Noon.Run(false), 120);
-            AurelionArgs.SetOverride = "v3";
             yield return GalleryShot("orrery_closing", 2, b => b.Closing.Run(240), 100);
             yield return GalleryShot("orrery_horizon", 2, b => b.Closing.Run(240), 200);
             yield return GalleryShot("hour_hands", 2, b => b.Hands.Run(), 70);
@@ -44,7 +39,6 @@ namespace LastBell.Run
             yield return GalleryShot("ecliptic_order_2_strike", 1, b => b.Ecliptic.Run(3), Sim.Ticks(3.2f) - 8);
             yield return GalleryShot("zenith_marks_1_mark", 1, b => b.MarksWithLances(1), 60, new Vector3(-6, 0, 0));
             yield return GalleryShot("zenith_marks_2_verdict", 1, b => b.MarksWithLances(1), Sim.Ticks(3.0f) - 6);
-            AurelionArgs.SetOverride = "v4";
             yield return GalleryShot("meridian_towers", 1, b => b.Towers.Run(), Sim.Ticks(3.0f));   // the bot stands in each tower (an empty one wipes)
             yield return GalleryShot("sunspots", 1, b => b.Spots.Run(), Sim.Ticks(2.0f));
             yield return GalleryShot("severance", 3, b => b.Sever.Run(), Sim.Ticks(5.0f), wait: 45);
@@ -54,6 +48,20 @@ namespace LastBell.Run
             yield return GalleryShot("total_eclipse_umbra", 1, b => TotalEclipseFx.During(V2W, b.Eclipse, b.Eclipse.Run()), Sim.Ticks(4.0f), after: b => b.RaiseShield(0));
             yield return GalleryShot("last_light_warning", 1, b => b.Light.Run().Take(2), Sim.Ticks(LastLight.EveryS - LastLight.WarnS + 1.5f));
             yield return GalleryShot("last_light_burn", 1, b => b.Light.Run().Take(3), Sim.Ticks(LastLight.EveryS + 1.0f));
+            // the fall (proposal, 1 Nov): standing on the first slice as its warning ends, then landed on the nearest floor
+            yield return GalleryShot("last_light_fall_1_standing", 4, b => LastLightFloorFx.During(V2W, b.Light, b.Light.Run().Take(3)), Sim.Ticks(LastLight.EveryS - 0.5f), new Vector3(0.5f, 0, 6f));
+            yield return GalleryShot("last_light_fall_2_landed", 4, b => LastLightFloorFx.During(V2W, b.Light, b.Light.Run().Take(3)), Sim.Ticks(LastLight.EveryS + 0.35f), new Vector3(0.5f, 0, 6f));
+            // A16 (telegraph audit): Final Noon, the hard enrage: its 30 s warning banner, then the wipe, over Last Light
+            yield return GalleryShot("final_noon_warning", 4, b => NoonAt(b, AurelionEncounter.EnrageWarnS - 0.5f, LastLightFloorFx.During(V2W, b.Light, b.Light.Run().Take(2))), Sim.Ticks(1.0f), after: b => b.TestClock = false);
+            yield return GalleryShot("final_noon_wipe", 4, b => NoonAt(b, AurelionEncounter.EnrageS - 0.5f, LastLightFloorFx.During(V2W, b.Light, Hold(Sim.Ticks(1.5f) - 1))), Sim.Ticks(1.5f), after: b => b.TestClock = false);   // ends on the shot: the wipe sends the run to Results
+        }
+
+        static System.Collections.Generic.IEnumerable<int> Hold(int ticks) { yield return ticks; }
+        // runs the enrage clock from s seconds while the body plays (the gallery holds the boss, so the clock would stop)
+        static System.Collections.Generic.IEnumerable<int> NoonAt(AurelionEncounter b, float s, System.Collections.Generic.IEnumerable<int> body)
+        {
+            b.TestClock = true; b.DebugSetFightSeconds(s);
+            foreach (var w in body) yield return w;
         }
 
         // still: the player stands there (no bot), so a following shape stays on screen
@@ -67,7 +75,7 @@ namespace LastBell.Run
             V2Main.DebugSetHp(PlayerController.MaxHp);
             yield return Shot("aurelion_" + name + galleryCam);
             if (V2Boss != null) after?.Invoke(V2Boss);
-            yield return V2WaitIdle(wait);
+            if (d.State == RunState.Combat) yield return V2WaitIdle(wait);   // a wipe shot (Final Noon) has already sent the run to Results
             V3Unbot();
         }
     }

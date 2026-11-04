@@ -59,6 +59,8 @@ namespace LastBell.Menu
             if(ConfrontationMenu.StartRunEnabled){yield return Press(Key.DownArrow);Check("keyboard moves to Boss Rush",EventSystem.current.currentSelectedGameObject==menu.RushButton.gameObject);}
             else Check("Start Run greyed out, focus on Boss Rush",!menu.StartButton.IsInteractable()&&EventSystem.current.currentSelectedGameObject==menu.RushButton.gameObject);
             InputSystem.QueueStateEvent(pad,new GamepadState().WithButton(GamepadButton.DpadDown));yield return null;yield return null;InputSystem.QueueStateEvent(pad,new GamepadState());yield return null;yield return null;
+            Check("controller moves to Multiplayer",EventSystem.current.currentSelectedGameObject==menu.MultiplayerButton.gameObject);
+            InputSystem.QueueStateEvent(pad,new GamepadState().WithButton(GamepadButton.DpadDown));yield return null;yield return null;InputSystem.QueueStateEvent(pad,new GamepadState());yield return null;yield return null;
             Check("controller moves to Settings",EventSystem.current.currentSelectedGameObject==menu.SettingsButton.gameObject);
             yield return Press(Key.Enter);Check("keyboard opens settings",menu.SettingsOpen&&!menu.RushButton.IsInteractable());
             menu.CloseSettings();Check("settings focus returns",!menu.SettingsOpen&&EventSystem.current.currentSelectedGameObject==menu.SettingsButton.gameObject);

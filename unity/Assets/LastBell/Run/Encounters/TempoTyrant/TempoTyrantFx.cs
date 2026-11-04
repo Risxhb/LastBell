@@ -48,7 +48,7 @@ namespace LastBell.Run
 
         // horizontal cleave: an arc around the boss at blade-tip radius, sweeping from his side across his front
         public void Arc(Vector3 centre, float yaw, int side)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.BossPart, "TempoTyrantFx.Arc", new object[] { centre, yaw, side });
             var r = Take(); const int seg = 24; float radius = 3.6f, width = 0.22f, a0 = yaw + side * 100f, a1 = yaw - side * 10f;
             var v = new Vector3[(seg + 1) * 2]; var uv = new Vector2[v.Length]; var tri = new int[seg * 6];
             for (int i = 0; i <= seg; i++)
@@ -64,9 +64,9 @@ namespace LastBell.Run
         }
 
         // overhead strike: a straight streak ahead of him along the band's centre
-        public void Streak(Vector3 origin, float yaw, float start, float length) => Streak(origin, yaw, start, length, Hot, 0.32f);
+        public void Streak(Vector3 origin, float yaw, float start, float length) { /* records through the full overload */ Streak(origin, yaw, start, length, Hot, 0.32f); }
         public void Streak(Vector3 origin, float yaw, float start, float length, Color colour, float width)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.BossPart, "TempoTyrantFx.Streak", new object[] { origin, yaw, start, length, colour, width });
             var r = Take(); const int seg = 12; var f = Sim.Dir(yaw); var side = Vector3.Cross(Vector3.up, f);
             var v = new Vector3[(seg + 1) * 2]; var uv = new Vector2[v.Length]; var tri = new int[seg * 6];
             for (int i = 0; i <= seg; i++)
@@ -82,7 +82,7 @@ namespace LastBell.Run
 
         // a thin ring pulse on the floor (Crown edges, charge landing, frenzy tell): 0.15-0.25 s, never a lingering bowl
         public void Rim(Vector3 centre, float radius, Color colour, float life = 0.22f)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.BossPart, "TempoTyrantFx.Rim", new object[] { centre, radius, colour, life });
             var r = Take(); const int seg = 48; float width = 0.16f;
             var v = new Vector3[(seg + 1) * 2]; var uv = new Vector2[v.Length]; var tri = new int[seg * 6];
             for (int i = 0; i <= seg; i++)
