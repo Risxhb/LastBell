@@ -72,7 +72,7 @@ namespace LastBell.Run
                                 var dl = p.Input is AllyBot ab ? ab.DebugLine : null;
                                 q.Enqueue($"{(d.World.Tick - t0) / (float)Sim.Hz:0.00} p{d.World.Players.IndexOf(p)} ({p.transform.position.x:0.0},{p.transform.position.z:0.0}) hp {p.Hp} st {p.Stamina:0} stun {p.Stunned} {dl}");
                                 while (q.Count > 16) q.Dequeue();
-                                if (d.World.Players.Count == 1 && d.World.Tick - lastSolo >= 30) { lastSolo = d.World.Tick; var tgt = d.World.Parts.Where(bp => bp.Alive).OrderBy(bp => bp.Name, StringComparer.Ordinal).FirstOrDefault(); trace.Add("  solo " + q.Last() + (tgt != null ? $" | {tgt.Name} at ({tgt.Pos.x:0.0},{tgt.Pos.z:0.0}) gap {Sim.Flat(tgt.Pos - p.transform.position).magnitude - tgt.BodyRadius:0.0}" : "")); }
+                                if (d.World.Players.Count == 1 && d.World.Tick - lastSolo >= 30) { lastSolo = d.World.Tick; var tgt = d.World.Parts.Where(bp => bp.Alive).OrderBy(bp => bp.Name, StringComparer.Ordinal).FirstOrDefault(); trace.Add("  solo " + q.Last() + " [" + p.Kit.ClassState() + "]" + (tgt != null ? $" | {tgt.Name} at ({tgt.Pos.x:0.0},{tgt.Pos.z:0.0}) gap {Sim.Flat(tgt.Pos - p.transform.position).magnitude - tgt.BodyRadius:0.0}" : "")); }
                             }
                         foreach (var p in d.World.Players) if (p && p.Down && downs.Add(p)) trace.Add($"{(d.World.Tick - t0) / (float)Sim.Hz,6:0.0} P{lastPh} p{d.World.Players.IndexOf(p)} DOWN by {d.World.LastDamageSource}");
                         yield return null;
