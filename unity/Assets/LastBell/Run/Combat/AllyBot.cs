@@ -417,6 +417,7 @@ namespace LastBell.Run
         // when every way is hit. A brand carrier steers for the rim.
         Vector3 volMove; bool volSprint, volOn, volReach, volDash; float volCost, volPull; int volTick = -99;
         const float VolleyLook = 0.8f, VolleyStep = 0.05f, VolleyBuffer = 0.15f, VolleyPathCost = 30f, VolleyPathSoon = 1.6f, VolleySwing = 20f, VolleySprintFloor = 55f;   // a swing waits only for a bullet it would meet (50 and up)
+        const float VolleyThrowReach = 7f;   // a Tollbreaker's axe throws, gap to the target (MaxRange 9 m less a margin)
         static readonly List<Hazard> volNear = new List<Hazard>();
         static Vector3[] Dirs16;
         bool Volley(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
@@ -475,9 +476,12 @@ namespace LastBell.Run
                 }
             }
             inp.Sprint = volSprint;
-            // swing while standing is the plan and nothing comes near it
+            // swing while standing is the plan and nothing comes near it. A Tollbreaker throws from further than it stands (an axe
+            // flies 9 m): the solo bot stood 5.5 m off a casting among the bullets, just past its swing reach, with an axe lodged
+            // it never recalled, until the Pour Flood (11-04)
             float gap = Sim.Flat(tPos - pos).magnitude - tRad;
-            if (Attacks && volMove == Vector3.zero && volCost < VolleySwing && gap <= Range(me) + 1.85f) Attack(me, ref inp);
+            float swing = me.Kit is TollbreakerKit ? VolleyThrowReach : Range(me) + 1.85f;
+            if (Attacks && volMove == Vector3.zero && volCost < VolleySwing && gap <= swing) Attack(me, ref inp);
             if (me.Hp < (Mode == BotMode.Passive ? 40 : 70) && me.Potions > 0 && tick % 30 == 0) inp.Potion = true;
             var move = volMove;
             if (move != Vector3.zero) move = AroundBoss(pos, move, boss);
