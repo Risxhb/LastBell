@@ -16,7 +16,7 @@
 
 ## Measured damage (watch bots, 29 Oct)
 
-The watch bots are all Vanguard on scripted input. They dodge and use their abilities, but they're weaker than people: they crowd the melee ring and miss uptime. Measure mode runs a fixed number of loops per phase and logs the damage the players dealt. Logs: `test-out/m2/measure-1.log`, `-2.log`, `-4.log`.
+The 29 Oct watch bots were all Vanguard on scripted input (Vanguard was retired on 2 Nov; the bots now play Tollbreaker, Arcanist and Chimesinger on the shared ally bot). They dodge and use their abilities, but they're weaker than people: they crowd the melee ring and miss uptime. Measure mode runs a fixed number of loops per phase and logs the damage the players dealt. Logs: `test-out/m2/measure-1.log`, `-2.log`, `-4.log`.
 
 | Party | Phase 1 team DPS | Phase 2 team DPS (boss + castings) | Phase 3 team DPS |
 |---|---|---|---|
@@ -66,7 +66,7 @@ The difficulty damage scale is unchanged (damage scale only, per the difficulty 
 - `CrucivarWatch -crucivarMeasure -crucivarBots n`: the measure mode. It logs each phase once, holds the boss just above the threshold until the loops are done, and logs a partial phase if the fight ends first.
 
 ## Still to do (lane plan)
-- **Done 30 Oct:** both Hard extras are built. Azure `feature/confrontation-menu` is merged. v4 is the default Crucivar fight (Chzy18, 30 Oct): Run Loop, Test Rush and the start-phase picker all play v4, and `-lastbellAbilitySet v3` still plays v3. PR 12 merged; later work goes in a new PR.
+- **Done 30 Oct:** both Hard extras are built. Azure `feature/confrontation-menu` is merged. v4 is the default Crucivar fight (Chzy18, 30 Oct): Run Loop, Test Rush and the start-phase picker all play v4, and `-lastbellAbilitySet v3` still played v3 until 1 Nov (removed, see below). PR 12 merged; later work goes in a new PR.
 - **Done 31 Oct:**
   - Escape checks: `tools/encounter-escape/crucivar-v4-escape-check.ps1` has 0 failures on every difficulty. `V4BoundsTest` checks that nobody can leave the floor and that wall-reaching attacks cover the farthest spot, on the round floor and on the square key-art map. The square map's corners had been safe; now they aren't.
   - Mould Towers set B now lands between set A's towers. For 2 and 4 players it had landed on set A's own spots. Accepted by Chzy18 on 1 Nov.
