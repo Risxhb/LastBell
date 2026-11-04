@@ -45,9 +45,9 @@ namespace LastBell.Run
         // the nearest downed ally (not dead, within 14 m) nobody else is reviving: walk to a spot beside them that nothing is
         // about to land on and stand still there, so the revive channels (PlayerController: 3 s within 1.5 m)
         const float ReviveStand = 0.9f, ReviveReach = 14f;
-        bool ReviveJob(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
+        static bool ReviveSpot(PlayerController me, Vector3 pos, out Vector3 spot)
         {
-            PlayerController best = null; float bd = ReviveReach;
+            PlayerController best = null; float bd = ReviveReach; spot = Vector3.zero;
             foreach (var p in me.World.Players)
             {
                 if (p == me || !p || !p.Down || p.Dead) continue;
@@ -57,7 +57,12 @@ namespace LastBell.Run
             }
             if (best == null) return false;
             var at = Sim.Flat(best.transform.position); var off = Sim.Flat(pos - at);
-            var spot = at + (off.magnitude > 0.1f ? off.normalized : Vector3.forward) * ReviveStand;
+            spot = at + (off.magnitude > 0.1f ? off.normalized : Vector3.forward) * ReviveStand;
+            return true;
+        }
+        bool ReviveJob(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
+        {
+            if (!ReviveSpot(me, pos, out var spot)) return false;
             if (bad(spot)) return false;   // the ally lies in something about to land: dodge first
             dJob = "revive"; dSpot = spot; dNote = 1;
             var v = Sim.Flat(spot - Sim.Flat(pos));
@@ -455,6 +460,11 @@ namespace LastBell.Run
                 // not beside a turret: the clear spot there is where its next arms sweep (two bots were pinned so, 11-04)
                 if (esc != Vector3.zero && BotSight.TurretDist(pos + esc * need) >= TurretKeep) { home = pos + esc * need; volReach = false; volPull = need > 6f ? 1f : 2f; }
             }
+            // a downed ally: home is beside them, the bullets still dodged on the way and while it stands there (it only revived
+            // with nothing landing near it, never so in an uprising: two bots bled out unrevived in a Hard party run, 11-04);
+            // no swings there, an action stops the revive
+            Vector3 rs = Vector3.zero; bool revive = !carrier && ReviveSpot(me, pos, out rs) && !bad(rs) && BotSight.PathArrive(rs) > VolleyPathSoon;
+            if (revive) { home = rs; volReach = false; volPull = 2f; }
             if (!volOn || me.World.Tick - volTick >= 3 || me.Stunned > 0)
             {
                 volOn = true; volTick = me.World.Tick;
@@ -487,7 +497,7 @@ namespace LastBell.Run
             // it never recalled, until the Pour Flood (11-04)
             float gap = Sim.Flat(tPos - pos).magnitude - tRad;
             float swing = me.Kit is TollbreakerKit ? VolleyThrowReach : Range(me) + 1.85f;
-            if (Attacks && volMove == Vector3.zero && volCost < VolleySwing && gap <= swing) Attack(me, ref inp);
+            if (Attacks && !revive && volMove == Vector3.zero && volCost < VolleySwing && gap <= swing) Attack(me, ref inp);
             if (me.Hp < (Mode == BotMode.Passive ? 40 : 70) && me.Potions > 0 && tick % 30 == 0) inp.Potion = true;
             var move = volMove;
             if (move != Vector3.zero) move = AroundBoss(pos, move, boss);
