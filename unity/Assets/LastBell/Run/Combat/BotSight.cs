@@ -7,7 +7,7 @@ namespace LastBell.Run
     // - orbs: the glowing spheres a boss leaves flying (Pendulum Sentinel's counterweight orbs, the Oracle's well orbs).
     //   Weights lying on the floor are kept out of the same way, as still circles.
     //   Each one's velocity is how far its sphere moved since the last tick; a sphere just taken from the pool has none yet.
-    // - after-strikes: a hazard that hits after its warning goes (HitOnResolve false: a Toll Lane rolling down its runes)
+    // - after-strikes: a lane that hits after its warning goes (HitOnResolve false: a Toll Lane rolling down its runes)
     //   still counts for 0.5 s once its warning is gone.
     // - bullet paths: a harmless preview of where bullets will fly (Damage 0, a lane or a cone: Crucivar's turrets). Once
     //   it goes the bullets leave its origin, so its area is dangerous where the bullets in it have not passed yet and
@@ -75,6 +75,7 @@ namespace LastBell.Run
             {
                 var h = prevLive[i];
                 if (h.HitOnResolve || h.Cancelled || h.BurnPerSecond > 0 || h.Soak || h.Damage <= 0) continue;   // a soak or a marker is no strike
+                if (h.Shape != HazardShape.Lane) continue;   // only a lane rolls on: a slice the owner hits as it goes is done (the bot held off the next safe Spiral Slice, 11-04)
                 bool still = false; for (int j = 0; j < live.Count && !still; j++) still = live[j] == h;
                 if (!still) { ghosts.Add(h); ghostUntil.Add(tick + GhostTicks); }
             }
