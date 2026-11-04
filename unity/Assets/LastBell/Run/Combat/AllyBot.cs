@@ -419,8 +419,6 @@ namespace LastBell.Run
         const float VolleyLook = 0.8f, VolleyStep = 0.05f, VolleyBuffer = 0.15f, VolleyPathCost = 30f, VolleyPathSoon = 1.6f, VolleySwing = 20f, VolleySprintFloor = 55f;   // a swing waits only for a bullet it would meet (50 and up)
         const float VolleyJetRing = 8f;   // m from the jets' hub where they sweep at a walk (40 deg/s, WalkSpeed 6)
         bool volJets; Vector3 volHub;
-        const float VolleyRimKeep = 9f;   // m from the centre: past it the wall takes half the ways out, and a rim turret's arms are densest
-        bool volRim;
         const float VolleyThrowReach = 7f;   // a Tollbreaker's axe throws, gap to the target (MaxRange 9 m less a margin)
         static readonly List<Hazard> volNear = new List<Hazard>();
         static Vector3[] Dirs16;
@@ -443,7 +441,6 @@ namespace LastBell.Run
             var live = me.World.Hazards.Live;
             for (int i = 0; i < live.Count && !carrier; i++) { var h = live[i]; if (h.Track != null && h.Age < h.LockAt && h.Shape == HazardShape.Circle && Spares(h, me)) carrier = true; }
             if (carrier) volJets = false;   // its brand goes to the rim, jets or not
-            volRim = !carrier;
             if (carrier) home = (pos.magnitude > 0.1f ? pos.normalized : Vector3.forward) * Mathf.Min(BrandRing, CombatWorld.PlayerBound - 1.2f);
             else if (Attacks && AttackSpot(me, boss, out var spot)) home = Sim.Flat(spot);
             volReach = Attacks && !carrier; volPull = 0.6f;
@@ -553,9 +550,6 @@ namespace LastBell.Run
             // with Furnace Spin up, inside the ring where a jet comes round slower than a walk (out by the rim at 10-12 m they
             // outran the bots dodging bullets there: three went down in the second uprising, 11-04)
             if (volJets) { float out_ = Sim.Flat(q - volHub).magnitude - VolleyJetRing; if (out_ > 0) cost += out_ * 6f; }
-            // off the rim (not carrying a brand): every Spiral Arm hit and most jet hits of the third uprising came at 10-12 m,
-            // where the dodge had backed the bots against the wall with a turret beside them (11-04)
-            if (volRim) { float rimOut = q.magnitude - VolleyRimKeep; if (rimOut > 0) cost += rimOut * 6f; }
             if (volReach) cost += Mathf.Max(0, Sim.Flat(tPos - q).magnitude - tRad - (Range(me) + 1.5f)) * 4f;
             return cost;
         }
