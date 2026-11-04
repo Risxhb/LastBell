@@ -419,16 +419,20 @@ namespace LastBell.Run
         const float VolleyLook = 0.8f, VolleyStep = 0.05f, VolleyBuffer = 0.15f, VolleyPathCost = 30f, VolleyPathSoon = 1.6f, VolleySwing = 20f, VolleySprintFloor = 55f;   // a swing waits only for a bullet it would meet (50 and up)
         const float VolleyJetRing = 8f;   // m from the jets' hub where they sweep at a walk (40 deg/s, WalkSpeed 6)
         bool volJets; Vector3 volHub;
+        // with Spiral Arm bullets out it looks further: far from its turret an arm comes round faster than a walk, and in 0.8 s
+        // a bot saw only the next step ahead of it, ran with the arm and was pinned at the far wall (third uprising, 11-04)
+        const float VolleySpiralLook = 1.2f; float volLook = VolleyLook;
         const float VolleyThrowReach = 7f;   // a Tollbreaker's axe throws, gap to the target (MaxRange 9 m less a margin)
         static readonly List<Hazard> volNear = new List<Hazard>();
         static Vector3[] Dirs16;
         bool Volley(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
         {
             var shots = BotSight.Bullets; volNear.Clear();
-            float reach = PlayerController.SprintSpeed * VolleyLook + 1.5f;
+            volLook = VolleyLook; for (int i = 0; i < shots.Count; i++) if (shots[i].Source == "Spiral Arm bullet") { volLook = VolleySpiralLook; break; }
+            float reach = PlayerController.SprintSpeed * volLook + 1.5f;
             for (int i = 0; i < shots.Count; i++)
             {
-                var b = shots[i]; var a = Sim.Flat(b.Origin); var e = a + BotSight.ShotVel(b) * VolleyLook;
+                var b = shots[i]; var a = Sim.Flat(b.Origin); var e = a + BotSight.ShotVel(b) * volLook;
                 if (SegDist(Sim.Flat(pos), a, e) < reach) volNear.Add(b);
             }
             bad = Bad(me, boss, false, me.World.Tick + 45);
@@ -456,14 +460,14 @@ namespace LastBell.Run
             {
                 volOn = true; volTick = me.World.Tick;
                 if (Dirs16 == null) { Dirs16 = new Vector3[16]; for (int k = 0; k < 16; k++) Dirs16[k] = Sim.Dir(k * 22.5f); }
-                volDash = false; volSprint = false; volMove = Vector3.zero; volCost = VolleyCost(me, boss, pos, Vector3.zero, 0, home, VolleyLook);
+                volDash = false; volSprint = false; volMove = Vector3.zero; volCost = VolleyCost(me, boss, pos, Vector3.zero, 0, home, volLook);
                 bool canSprint = me.Stamina > VolleySprintFloor;   // keep enough for a dash when it gets cornered
                 for (int s = 0; s < (canSprint ? 2 : 1); s++)
                 {
                     float v = s == 0 ? PlayerController.WalkSpeed : PlayerController.SprintSpeed;
                     foreach (var d in Dirs16)
                     {
-                        float c = VolleyCost(me, boss, pos, d, v, home, VolleyLook) + (s == 1 ? 4f : 0);
+                        float c = VolleyCost(me, boss, pos, d, v, home, volLook) + (s == 1 ? 4f : 0);
                         if (c < volCost) { volCost = c; volMove = d; volSprint = s == 1; }
                     }
                 }
@@ -499,7 +503,7 @@ namespace LastBell.Run
             float cost = 0; var bp = Sim.Flat(boss.transform.position);
             float body = boss.BodyRadius + PlayerController.Radius + 0.1f;
             var live = me.World.Hazards.Live;
-            int steps = Mathf.RoundToInt(VolleyLook / VolleyStep);
+            int steps = Mathf.RoundToInt(volLook / VolleyStep);
             Vector3 q = pos; bool stopped = false;
             for (int k = 1; k <= steps; k++)
             {
@@ -509,7 +513,7 @@ namespace LastBell.Run
                 var nq = pos + d * v * Mathf.Min(t, moveFor);
                 if (!stopped && (!CombatWorld.InPlayerBound(nq, -0.1f) || Sim.Flat(nq - bp).magnitude < body)) { stopped = true; cost += 3; }
                 if (!stopped) q = nq;
-                float early = 1.5f - t / VolleyLook;   // hits sooner are worse: less time to fix them later
+                float early = 1.5f - t / volLook;   // hits sooner are worse: less time to fix them later
                 for (int i = 0; i < volNear.Count; i++)
                 {
                     var b = volNear[i]; var at = Sim.Flat(b.Origin) + BotSight.ShotVel(b) * t;
@@ -520,7 +524,7 @@ namespace LastBell.Run
                 if (k % 4 != 0) continue;
                 // every 0.2 s: burning ground and strikes landing about now; at the end, the paths still to fire (bullets that
                 // reach it after the look: a light cost, or it never stands to swing at a casting inside its turret's fan)
-                if (k == steps) { float arrive = BotSight.PathArrive(q) + t; if (arrive < VolleyPathSoon) cost += VolleyPathCost * Mathf.Clamp01((VolleyPathSoon - arrive) / (VolleyPathSoon - VolleyLook)); }
+                if (k == steps) { float arrive = BotSight.PathArrive(q) + t; if (arrive < VolleyPathSoon) cost += VolleyPathCost * Mathf.Clamp01((VolleyPathSoon - arrive) / (VolleyPathSoon - volLook)); }
                 for (int i = 0; i < live.Count; i++)
                 {
                     var h = live[i];
