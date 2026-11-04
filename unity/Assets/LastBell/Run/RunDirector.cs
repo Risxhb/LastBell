@@ -53,6 +53,8 @@ namespace LastBell.Run
             new BossEntry("Dial Warden (practice)", w => BossEncounter.Spawn<DialWardenEncounter>(w, new Vector3(0, 0, -1.5f), 0), inRun: false, map: AurelionMap, phases: 2),
             // Skyward Spire miniboss, practice only (docs/bosses/pendulum-sentinel.md, a proposal)
             new BossEntry("Pendulum Sentinel (practice)", w => BossEncounter.Spawn<PendulumSentinelEncounter>(w, new Vector3(0, 0, -1.5f), 0), inRun: false, map: AurelionMap, phases: 2),
+            // Brass Foundry miniboss, practice only (docs/bosses/escapement-twins.md, a proposal): two bodies, one bar
+            new BossEntry("Escapement Twins (practice)", w => BossEncounter.Spawn<EscapementTwinsEncounter>(w, EscapementTwinsRules.TickAt(90f), 90f), inRun: false, map: CrucivarMap, phases: 2),
             // New-player tutorial (Run/Tutorial, docs/tutorial.md): a guided Tempo Tyrant fight on Metronome Court, practice only.
             // Also LastBell.exe -lastbellTutorial. Kept last so the other entries' indices don't move.
             new BossEntry(TutorialName, w => TutorialDirector.Attach(BossEncounter.Spawn<TempoTyrantEncounter>(w, new Vector3(0, 0, -2f), 0)), inRun: false, map: TempoTyrantMap),
@@ -80,6 +82,7 @@ namespace LastBell.Run
         public const string TutorialName = "Tutorial (Tempo Tyrant)";
         public static int TutorialPractice => Array.FindIndex(Bosses, b => b.Name == TutorialName);
         public static int PendulumSentinelPractice => Array.FindIndex(Bosses, b => b.Name.StartsWith("Pendulum Sentinel"));
+        public static int EscapementTwinsPractice => Array.FindIndex(Bosses, b => b.Name.StartsWith("Escapement Twins"));
         // The Tollbreaker took the Vanguard's place (Chzy18, 29 Oct), and the Vanguard was removed from the game (1 Nov).
         public static readonly string[] Classes = { "Tollbreaker", "Chimesinger", "Arcanist" };
         const int IntroTicks = 120, ClearTicks = 180, DownedTicks = 100;
