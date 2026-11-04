@@ -906,7 +906,7 @@ namespace LastBell.Run
             // her attack clips (proposal 2 Nov): a Conduct loop under the spirals, one-shots on the attacks
             Check("Sylvara conducts while a spiral runs", sy.LoopClip == "ConductLoop", sy.LoopClip);
             foreach (var c in new[] { "Toll", "CallWater", "PruningArc", "Seed" }) Check($"Sylvara P1 plays the {c} clip", sy.Clips.Contains(c));
-            var newClips = new[] { "ConductLoop", "StormLoop", "Toll", "CallWater", "Sow", "LanesLoop" };
+            var newClips = new[] { "ConductLoop", "StormLoop", "Toll", "CallWater", "Sow", "LanesLoop", "Intro", "MaskSplit", "HollowLoop", "StormCall", "Stagger" };
             if (sy.Presenter && sy.Presenter.HasModel && newClips.All(sy.Presenter.Has)) Check("her model has every v3 attack clip", true);
             else Note("Sylvara: this model has no v3 attack clips (old sylvara-assets pack): every attack falls back to Idle");
             if (SylvaraProps.Has(SylvaraProps.Pod)) Check("Seed Pods drop the pod model onto their warnings", sy.PodModels > 0, sy.PodModels.ToString());
@@ -981,6 +981,9 @@ namespace LastBell.Run
             foreach (var id in new[] { "Hollow Spiral", "Choir Buds", "Feet Pod", "Pruning Arc" })
                 Check($"Sylvara P3 uses {id}", sy.Order.Contains(id));
             Check("Sylvara plays the Bloom clip when she plants Choir Buds", sy.Clips.Contains("Bloom"));
+            Check("the Hollow Spiral plays the open-mask loop (HollowLoop)", sy.LoopClip == "HollowLoop", sy.LoopClip);
+            if (sy.Presenter && sy.Presenter.Has("MaskSplit")) Check("the second form plays MaskSplit as the mask opens", sy.Clips.Contains("MaskSplit"));
+            Note($"Sylvara P3: Stagger played {sy.Clips.Count(c => c == "Stagger")}x (only on a bud cut while no other clip runs)");
             if (sy.HasMaskBones) Check("the second form splits her mask open", sy.MaskOpen > 0.99f, sy.MaskOpen.ToString("0.00"));
             else Note("Sylvara: this model has no mask bones (sylvara-assets 2.0.0 or older): the mask stays shut in the second form");
             Note($"Sylvara P3 buds: {sy.BudsCut} cut, {sy.BudsBloomed} bloomed");
@@ -1016,6 +1019,7 @@ namespace LastBell.Run
             Check("Seed Storm loop 1: 8 seeds every 2.0 s", sy.StormSeeds == 8 && Mathf.Approximately(sy.StormEvery, 2.0f), $"{sy.StormSeeds} / {sy.StormEvery}");
             sy.DebugStartStorm(2);
             Check("enrage step: loop 3 throws 10 seeds every 1.8 s", sy.StormSeeds == 10 && Mathf.Abs(sy.StormEvery - 1.8f) < 0.001f, $"{sy.StormSeeds} / {sy.StormEvery}");
+            if (sy.Presenter && sy.Presenter.Has("StormCall")) { sy.DebugLastStormWarning(); Check("the LAST STORM warning plays StormCall", sy.Clips.Contains("StormCall")); }
             sy.DebugStartStorm(7);
             Check("enrage cap: Last Storm from 2:00 throws 14 seeds every 0.6 s", sy.LastStorm && sy.StormSeeds == 14 && Mathf.Abs(sy.StormEvery - 0.6f) < 0.001f);
             Check("Last Storm plays the Storm loop", sy.LoopClip == "StormLoop", sy.LoopClip);
@@ -1044,6 +1048,7 @@ namespace LastBell.Run
                 sy.DebugStartStorm(2);
                 Check($"Sylvara {lv} P4: the same enrage steps (+2 seeds, 0.2 s sooner at loop 3)",
                     sy.StormSeeds == (e ? 8 : 10) && Mathf.Abs(sy.StormEvery - (e ? 2.3f : 1.8f)) < 0.001f, $"{sy.StormSeeds} / {sy.StormEvery}");
+            if (sy.Presenter && sy.Presenter.Has("StormCall")) { sy.DebugLastStormWarning(); Check("the LAST STORM warning plays StormCall", sy.Clips.Contains("StormCall")); }
                 sy.DebugStartStorm(7);
                 Check($"Sylvara {lv} P4: Last Storm {(e ? "12 seeds every 0.8 s (softer on Easy)" : "14 seeds every 0.6 s, as on Medium")}",
                     sy.LastStorm && sy.StormSeeds == (e ? 12 : 14) && Mathf.Abs(sy.StormEvery - (e ? 0.8f : 0.6f)) < 0.001f, $"{sy.StormSeeds} / {sy.StormEvery}");

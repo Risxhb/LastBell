@@ -63,14 +63,15 @@ namespace LastBell.Run
         // Conduct while a spiral runs (Lanes, a downbeat per volley, while P2 lanes fire), Storm in Last Storm, else Idle.
         // Clips the model lacks fall back to Idle (Lanes falls back to Conduct).
         public readonly List<string> Clips = new List<string>();   // one-shots played, for tests
-        int actUntil;
+        int actUntil; bool introPlayed;
+        bool Has(string clip) => presenter && presenter.Has(clip);   // newer clips need the newest sylvara-assets pack
         void Act(string clip, float seconds)
         {
             Clips.Add(clip); actUntil = Age + Sim.Ticks(seconds);
             if (presenter) presenter.PlayOnce(clip, seconds);
         }
         public string LoopClip => LastStorm ? "StormLoop" : emit.Exists(e => e.On && e.Lane) ? "LanesLoop"
-            : (sp1 != null && sp1.On) || (sp2 != null && sp2.On) ? "ConductLoop" : "Idle";
+            : (sp1 != null && sp1.On) || (sp2 != null && sp2.On) ? (phase == 3 ? "HollowLoop" : "ConductLoop") : "Idle";   // P3 pours from the open mask
         const float LanesClip = 0.7f;   // LanesLoop is one 0.7 s beat, sped up so each beat lands on a lane volley
         float LoopT => (Age - loopStart) * Sim.Dt;
         public float P4Time => p4Start < 0 ? 0 : (Age - p4Start) * Sim.Dt;   // seconds since Phase 4 began (enrage clock)
@@ -88,6 +89,7 @@ namespace LastBell.Run
         public int BudsAlive { get { int n = 0; foreach (var b in buds) if (b.Alive) n++; return n; } }
         public float BudHpAt(Vector3 pos) { foreach (var b in buds) if (b.Alive && (b.Pos - pos).sqrMagnitude < 0.01f) return b.Hp; return 0; }   // tests
         public List<Vector3> AliveBudPositions() { var l = new List<Vector3>(); foreach (var b in buds) if (b.Alive) l.Add(b.Pos); return l; }
+        public void DebugLastStormWarning() => Toll("LAST STORM in 3 s");   // test hook: loop 4's warning, without waiting
         // test hook: restart the Seed Storm as Phase 4 loop k would start it (k >= 5 = Last Storm), without waiting
         public void DebugStartStorm(int k)
         {
@@ -268,7 +270,7 @@ namespace LastBell.Run
             if (to == 4) { p4Start = Age + (first ? 0 : TransTicks); P4Loop = 0; LastStorm = false; }
             if (first) yield break;
             Current = "phase shift";
-            Act("PhaseShift", TransTicks / (float)Sim.Hz);
+            Act(to == 3 && Has("MaskSplit") ? "MaskSplit" : "PhaseShift", TransTicks / (float)Sim.Hz);   // hands to the face, flung apart as the mask opens
             glowTarget = 3f;
             RunHud.Float(transform.position + Vector3.up * 5.4f, to == 3 ? "The mask splits" : PhaseNames[to - 1], Amber);
             for (int i = 0; i < TransTicks; i++)
@@ -405,7 +407,8 @@ namespace LastBell.Run
             RunHud.Float(transform.position + Vector3.up * 5.4f, text, Amber);
             W.Fx.Crescendo(transform.position, true, 0, false);
             Release(0.8f);
-            Act("Toll", 1.4f);   // the lurch lands 1.0 s in, on the reversal / colour swap
+            if (text.StartsWith("LAST STORM") && Has("StormCall")) Act("StormCall", 3f);   // she gathers and rises into StormLoop
+            else Act("Toll", 1.4f);   // the lurch lands 1.0 s in, on the reversal / colour swap
         }
 
         // Petal Spiral: arms from her rim, a petal per arm every `period`, gaps of (skipEvery - keep) steps; turns `w` rad/s
@@ -655,6 +658,7 @@ namespace LastBell.Run
                 if (b.Hp <= 0)
                 {
                     KillBud(b); BudsCut++; W.Hazards.Cancel(b.Timer);
+                    if (Age >= actUntil && Has("Stagger")) Act("Stagger", 0.8f);   // she flinches when a bud is pruned; never mid-cast
                     RunHud.Float(b.Pos + Vector3.up * 1.8f, "CUT", Turquoise);
                     W.Fx.Crescendo(b.Pos, true, 0, false);
                     if (b.View) b.View.Wither(); else if (b.Prop) b.Prop.gameObject.SetActive(false);
@@ -719,8 +723,10 @@ namespace LastBell.Run
         protected override void StepAlways()
         {
             string loop = Dead || phase == 0 ? "Idle" : LoopClip;
-            if (loop == "LanesLoop" && presenter && !presenter.Has(loop)) loop = "ConductLoop";   // 2.0.0 pack and older
+            if ((loop == "LanesLoop" || loop == "HollowLoop") && !Has(loop)) loop = "ConductLoop";   // older packs
             if (presenter) presenter.TickBoss(loop, loop == "LanesLoop" ? LanesClip / LanePeriod : 1);
+            if (phase == 0 && !introPlayed && RunDirector.Instance != null && RunDirector.Instance.State == RunState.Intro && Has("Intro"))
+            { introPlayed = true; Act("Intro", 2f); }   // the run's 2 s intro card: she wakes and lifts the fork
             if (Dead || Current == "idle" || phase == 0) return;   // halted (party down) or not started
             for (int i = later.Count - 1; i >= 0; i--) if (Age >= later[i].at) { var fn = later[i].fn; later.RemoveAt(i); fn(); }
             for (int i = 0; i < emit.Count; i++) if (emit[i].On) emit[i].Update?.Invoke(Sim.Dt);
@@ -784,6 +790,7 @@ namespace LastBell.Run
             ClearProps();
             glowTarget = 0.3f; glowLevel = 2f;
             presenter.PlayOnce("Defeat", 2.5f);
+            maskTarget = 0;   // the mask closes as she bows
             W.Fx.Crescendo(transform.position, true, 2, true);
         }
         void OnDestroy()

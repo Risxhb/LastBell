@@ -286,26 +286,6 @@ def seed(t):
     })
     return ch
 
-def procession(t):
-    # 2.45 s: she gathers her four roots and lowers the shrine (to 1.8 s, the lane's resolve), then scuttles forward
-    # for 0.65 s (Unity moves her): fast alternating root steps under a forward-pitched body.
-    T, E = 1.8, 2.45
-    low = key(t, [(0, 0), (1.0, 1.0), (E, 1.0)])
-    run = 0 if t < T else min(1, (t - T) / 0.08)
-    q = max(0.0, t - T) * 6.0     # six steps per second while scuttling
-    def step(off):
-        u = (q + off) % 1.0
-        return (0.25 * math.cos(2 * math.pi * u) * run, 0.22 * max(0, math.sin(2 * math.pi * u)) * run)
-    ch = breath(t)
-    ch.update({
-        '_feet': {'FR': step(0), 'BL': step(0), 'FL': step(0.5), 'BR': step(0.5)},
-        'hips_loc': (0, -0.05 * low, -0.45 * low), 'hips': (8 * low + 6 * run, 0, 0),
-        'spine': (6 * low, 0, 0), 'chest': add(ch['chest'], (8 * low + 6 * run, 0, 0)), 'head': (2 - 10 * low, 0, 0),
-        'upperarm.R': (25 * low, 10 * low, 0), 'forearm.R': (-15 * low, 0, 0),
-        'upperarm.L': (25 * low, -10 * low, 0), 'forearm.L': (-15 * low, 0, 0),
-    })
-    return ch
-
 def bloom(t):
     # 2 s, from the start of Threefold Bloom: she conducts with the tuning fork raised, one downbeat per flower
     # (the flowers' warnings start 1.2 s apart), the branch hand opening toward the floor.
@@ -319,16 +299,6 @@ def bloom(t):
         'upperarm.L': (-40 * up, -45 * up, 0), 'forearm.L': (-10 * up, 0, 0), 'hand.L': (-20 * up, 0, 0),
     })
     return ch
-
-def vulnerable(t):
-    # 2 s loop (recoveries and the Bloom punish): the torso folds, the roots brace, the shrine sags and shudders.
-    p = 2 * math.pi * t / 2.0; sh = 0.7 * math.sin(7 * p) * (0.5 + 0.5 * math.sin(p))
-    return {
-        'hips_loc': (0, 0.04, -0.28 + 0.03 * math.sin(p)), 'hips': (5, 0, 0),
-        'spine': (10 + sh, 0, 0), 'chest': (16 + 2 * math.sin(p), 0, sh), 'head': (20, 0, 3 * math.sin(p)),
-        'upperarm.R': (-10, 6, 0), 'forearm.R': (-15, 0, 0), 'upperarm.L': (-10, -6, 0), 'forearm.L': (-20, 0, 0),
-        'hand.L': (12, 0, 0),
-    }
 
 def phase_shift(t):
     # 1.5 s, no damage: the shrine gathers, then throws its chest back with the arms flung wide (the bells spread and
@@ -444,6 +414,84 @@ def lanes(t):
     })
     return ch
 
+# ---- boss clips (done as recommended, 4 Nov): intro, the mask splitting, the open-mask spiral, Last Storm's call, a
+# flinch. No pose suggests an opening: she has no punish windows (gpt/08 §5).
+INTRO = 2.0
+def intro(t):
+    # 2 s, the run's intro card: she wakes from a low bow, the roots take her weight, the fork arm lifts toward the
+    # arena and the chest bells ring once at 1.45; ends near the conduct pose the first spiral starts in.
+    dorm = key(t, [(0, 1.0), (0.3, 1.0), (1.3, 0), (INTRO, 0)])
+    up = key(t, [(0, 0), (0.6, 0), (1.4, 1.0), (INTRO, 0.4)])
+    ring = 0.6 * math.sin(2 * math.pi * 7 * max(0, t - 1.45)) * max(0, 1 - (t - 1.45) / 0.4) if t > 1.45 else 0
+    ch = breath(t)
+    ch.update({
+        'hips_loc': (0, 0.06 * dorm, -0.5 * dorm), 'hips': (6 * dorm, 0, 0), 'spine': (10 * dorm - 3 * up, 0, 0),
+        'chest': add(ch['chest'], (16 * dorm - 6 * up + 4 * ring, 0, 3 * ring)), 'head': (2 + 24 * dorm - 8 * up, 0, 0),
+        'upperarm.R': (-10 * dorm - 90 * up, 8 + 22 * up, 0), 'forearm.R': (-20 * dorm - 28 * up, 0, 0), 'hand.R': (-12 * up, 0, 0),
+        'upperarm.L': (-10 * dorm - 30 * up, -8 - 18 * up, 0), 'forearm.L': (-25 * dorm - 15 * up, 0, 0), 'hand.L': (10 * dorm - 10 * up, 0, 0),
+    })
+    return ch
+
+SPLIT, SPLIT_AT = 1.5, 0.75
+def mask_split(t):
+    # 1.5 s, the shift into Phase 3 (the code opens the mask halves over the same 1.5 s): both hands come up to the
+    # face as she bows into them, then at 0.75 (the crescendo) fling apart and outward as the head tips back.
+    f = key(t, [(0, 0), (0.6, 1.0), (SPLIT_AT - 0.03, 1.0), (SPLIT_AT + 0.07, -1.0), (1.2, -0.8), (SPLIT, -0.5)])
+    u, d = max(f, 0), max(-f, 0)
+    ch = breath(t)
+    ch.update({
+        'hips_loc': (0, 0, -0.15 * u + 0.05 * d), 'spine': (5 * u - 6 * d, 0, 0),
+        'chest': add(ch['chest'], (8 * u - 10 * d, 0, 0)), 'head': (2 + 10 * u - 16 * d, 0, 0),
+        'upperarm.R': (-50 * u - 60 * d, -22 * u + 70 * d, 0), 'forearm.R': (-105 * u - 15 * d, 0, 0), 'hand.R': (-20 * u + 20 * d, 0, 0),
+        'upperarm.L': (-50 * u - 60 * d, 22 * u - 70 * d, 0), 'forearm.L': (-105 * u - 15 * d, 0, 0), 'hand.L': (-20 * u + 20 * d, 0, 0),
+    })
+    return ch
+
+HOLLOW = 2.4
+def hollow(t):
+    # 2.4 s loop under the Phase 3 Hollow Spiral, which pours from the open mask: the arms held wide and low with the
+    # hands turned out, the face tipped toward the arena, the shrine swaying slowly so the spiral seems to breathe.
+    p = 2 * math.pi * t / HOLLOW; c, s = math.cos(p), math.sin(p)
+    ch = breath(t)
+    ch.update({
+        'hips_loc': (0.02 * s, 0, 0.02 * c), 'hips': (0, 0, 2 * s), 'spine': (-3, 0, 2 * s),
+        'chest': add(ch['chest'], (-6 + 2 * c, 0, 4 * s)), 'head': (5 + 2 * c, 0, 3 * s),
+        'upperarm.R': (-30 + 6 * c, 72 + 6 * s, 0), 'forearm.R': (-15 + 6 * s, 0, 0), 'hand.R': (-30, 0, 0),
+        'upperarm.L': (-30 + 6 * c, -72 + 6 * s, 0), 'forearm.L': (-15 - 6 * s, 0, 0), 'hand.L': (-30, 0, 0),
+    })
+    return ch
+
+CALLSTORM, CALLSTORM_AT = 3.0, 2.85
+def storm_call(t):
+    # 3 s, under the "LAST STORM in 3 s" banner: she gathers low, then both arms sweep up to the storm pose while the
+    # shrine rises and the mask turns to the sky; the bells ring at 2.85 and StormLoop takes over.
+    up = key(t, [(0, 0), (0.5, -0.8), (0.8, -0.8), (2.6, 1.0), (CALLSTORM, 1.0)])
+    r, g = max(up, 0), max(-up, 0)
+    ring = 0.6 * math.sin(2 * math.pi * 7 * max(0, t - CALLSTORM_AT)) if t > CALLSTORM_AT else 0
+    ch = breath(t)
+    ch.update({
+        'hips_loc': (0, 0, 0.05 * r - 0.2 * g), 'hips': (-3 * r + 5 * g, 0, 0), 'spine': (-6 * r + 6 * g, 0, 0),
+        'chest': add(ch['chest'], (-10 * r + 12 * g + 4 * ring, 0, 3 * ring)), 'head': (2 - 16 * r + 10 * g, 0, 0),
+        'upperarm.R': (-140 * r + 15 * g, 36 * r + 10 * g, 0), 'forearm.R': (-28 * r - 30 * g, 0, 0),
+        'upperarm.L': (-140 * r + 15 * g, -36 * r - 10 * g, 0), 'forearm.L': (-28 * r - 30 * g, 0, 0),
+    })
+    return ch
+
+STAGGER = 0.8
+def stagger(t):
+    # 0.8 s, when one of her Choir Buds is cut: a short recoil back and to her left with a shiver through the chest
+    # bells, an arm jerking up, back to her stance by 0.8. It's a flinch, not an opening.
+    j = key(t, [(0, 0), (0.08, 1.0), (0.3, 0.7), (STAGGER, 0)])
+    w = 0.5 * math.sin(2 * math.pi * 6 * t) * j
+    ch = breath(t)
+    ch.update({
+        'hips_loc': (0, 0.12 * j, -0.1 * j), 'hips': (-7 * j, 0, 6 * j), 'spine': (-12 * j, 0, 8 * j),
+        'chest': add(ch['chest'], (-18 * j + 3 * w, 0, 14 * j)), 'head': (2 - 24 * j, 0, -18 * j),
+        'upperarm.R': (-60 * j, 45 * j, 0), 'forearm.R': (-60 * j, 0, 0),
+        'upperarm.L': (-35 * j, -40 * j, 0), 'forearm.L': (-45 * j, 0, 0),
+    })
+    return ch
+
 def bake_clip(name, seconds, fn):
     frames = round(seconds * 30)
     act = bpy.data.actions.new(name); act.use_fake_user = True
@@ -458,11 +506,12 @@ def bake_clip(name, seconds, fn):
 
 acts = [bake_clip('Idle', 4.0, idle), bake_clip('Walk', WALK_CYCLE, walk),
         bake_clip('PruningArc', 1.8, pruning_arc), bake_clip('Rootscript', 2.1, rootscript), bake_clip('Seed', 2.2, seed),
-        bake_clip('Procession', 2.45, procession), bake_clip('Bloom', 2.0, bloom), bake_clip('Vulnerable', 2.0, vulnerable),
-        bake_clip('PhaseShift', 1.5, phase_shift), bake_clip('Defeat', 2.5, defeat),
+        bake_clip('Bloom', 2.0, bloom), bake_clip('PhaseShift', 1.5, phase_shift), bake_clip('Defeat', 2.5, defeat),
         bake_clip('ConductLoop', CONDUCT, conduct), bake_clip('StormLoop', STORM, storm), bake_clip('Toll', TOLL, toll),
         bake_clip('CallWater', CALL, call_water), bake_clip('Sow', SOW, sow),
-        bake_clip('LanesLoop', LANES, lanes)]
+        bake_clip('LanesLoop', LANES, lanes), bake_clip('Intro', INTRO, intro), bake_clip('MaskSplit', SPLIT, mask_split),
+        bake_clip('HollowLoop', HOLLOW, hollow), bake_clip('StormCall', CALLSTORM, storm_call),
+        bake_clip('Stagger', STAGGER, stagger)]
 print('CLIPS', [a.name for a in acts])
 arm.animation_data.action = acts[0]
 set_pose({})
