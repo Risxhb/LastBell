@@ -209,6 +209,9 @@ namespace LastBell.Run
         // it set this tick's input.
         bool Scripted(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
         {
+            // a tower of the next set to fill (the generic soak job) comes first: a dropped Mould Tower is Molten Overflow, a party
+            // wipe, and the floor jobs below would hold the bot out of it (PR 14 + PR 19, 4 Nov); the soak path dodges on its own
+            if (OwnSoak(me, boss) != null) return false;
             if (!(boss is AurelionEncounter) && Quake(me, boss, pos, ref inp)) { dJob = "quake"; return true; }
             if (!(boss is AurelionEncounter) && Volley(me, boss, pos, ref inp)) { dJob = "volley"; return true; }
             if (!(boss is AurelionEncounter) && Brand(me, boss, pos, ref inp)) { dJob = "brand"; return true; }   // Aurelion keeps its own Sunspot job
