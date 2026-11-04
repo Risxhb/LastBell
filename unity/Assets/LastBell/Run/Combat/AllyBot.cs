@@ -50,11 +50,19 @@ namespace LastBell.Run
             Vector3 pos = me.transform.position, want;
             if (boss == null || !boss.Solid) { inp.Move = ToScreen(Vector3.zero); return inp; }
             // the target: the boss, or the nearest live boss part while any stands (Crucivar's castings, which must die
-            // before the Pour Flood); hits land on whichever of them is nearest, so aim and reach follow the target
+            // before the Pour Flood); hits land on whichever of them is nearest, so aim and reach follow the target.
+            // Parts with a kill order (Foundry castings: Hard punishes out-of-order kills with a Ring Wave from every
+            // turret) go lowest numeral first
             var bpos = Sim.Flat(boss.transform.position); float brad = boss.BodyRadius;
-            float bestPart = float.MaxValue;
+            BossPart pick = null, next = null; float bestPart = float.MaxValue;
             foreach (var part in w.Parts)
-                if (part.Alive) { float d = Sim.Flat(part.Pos - pos).sqrMagnitude; if (d < bestPart) { bestPart = d; bpos = Sim.Flat(part.Pos); brad = part.BodyRadius; } }
+                if (part.Alive)
+                {
+                    if (part.Order >= 0) { if (next == null || part.Order < next.Order) next = part; }
+                    else { float d = Sim.Flat(part.Pos - pos).sqrMagnitude; if (d < bestPart) { bestPart = d; pick = part; } }
+                }
+            if (next != null) pick = next;   // (splitting the party across castings was tried 4 Nov: half the damage, more bullet hits)
+            if (pick != null) { bpos = Sim.Flat(pick.Pos); brad = pick.BodyRadius; }
             tPos = bpos; tRad = brad;
             inp.Aim = bpos;
 

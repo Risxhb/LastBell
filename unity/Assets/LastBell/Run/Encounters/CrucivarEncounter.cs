@@ -153,7 +153,7 @@ namespace LastBell.Run
                     foreach (var w in Recover("Forge Rite (vents cooling)", "Vulnerable", Sim.Ticks(ForgeRite.Punish))) yield return w;
                 }
                 PhaseLoops++;
-                int want = PhaseFor();
+                int want = Mathf.Min(PhaseFor(), phase + 1);   // one phase per loop: a fast party that drops past 30 % in Phase 1 still gets the Foundry Uprising
                 if (want != phase) { phase = want; PhaseLoops = 0; Rite.ClearPools(); foreach (var w in Shift()) yield return w; }
             }
         }
