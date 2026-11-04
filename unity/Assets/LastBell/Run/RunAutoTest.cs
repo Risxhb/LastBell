@@ -85,6 +85,9 @@ namespace LastBell.Run
 
         IEnumerator Shot(string name)
         {
+            // batch mode (-batchmode) renders no frames, so WaitForEndOfFrame never returns and the suite hung at its first
+            // screenshot (Crucivar lane, 4 Nov): skip shots there
+            if (Application.isBatchMode) { Note("screenshot skipped (batch mode): " + name); yield break; }
             yield return new WaitForEndOfFrame();
             var path = Path.Combine(dir, $"{++shots:00}_{name}.png");
             var tex = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
@@ -98,6 +101,7 @@ namespace LastBell.Run
         // (tools: run-loop-logs/frames-to-mp4.py via Blender's bundled FFmpeg).
         IEnumerator Capture(string name, int frames)
         {
+            if (Application.isBatchMode) { Note("video skipped (batch mode): " + name); yield break; }
             var cdir = Path.Combine(dir, "frames_" + name); Directory.CreateDirectory(cdir);
             Time.captureFramerate = 60;
             for (int i = 0; i < frames; i++)

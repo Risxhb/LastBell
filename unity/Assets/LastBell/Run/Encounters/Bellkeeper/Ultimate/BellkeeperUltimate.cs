@@ -295,7 +295,7 @@ namespace LastBell.Run
         const int WarmSteps = 10 * 2 + 2 * 3;
         internal static bool FontsWarmed => warmStep >= WarmSteps;
         static string warmChars; static int warmStep;
-        static void WarmFontStep()
+        internal static void WarmFontStep()
         {
             if (warmChars == null)
             {
@@ -324,7 +324,7 @@ namespace LastBell.Run
         void OnGUI()
         {
             LogFontRebuilds();
-            if (Ult != null && warmStep < WarmSteps && Event.current.type == EventType.Repaint) WarmFontStep();
+            if (Ult != null && !readyWarmer && warmStep < WarmSteps && Event.current.type == EventType.Repaint) WarmFontStep();   // the Ready-screen helper steps instead while it runs
             if (Ult == null || W == null || Dead) return;
             var cam = Camera.main; if (!cam) return;
             if (fontLogOn) { TimedGui(cam); return; }

@@ -85,19 +85,49 @@ namespace LastBell.Run
         // the first combat tick was a 122 ms frame, 70 ms of it loading models from disk). The first Script() keeps what the intro built;
         // every later start (a restart, a halt) drops and rebuilds as before.
         // The phases' models are loaded in the background from the intro's first frame (Prebuild loading them was a 66 ms and a 36 ms
-        // intro frame, performance agent 3 Nov); Prebuild waits for them, then finds them already loaded. Until PR 21's Ready warm-up.
+        // intro frame, performance agent 3 Nov); Prebuild waits for them, then finds them already loaded.
         // every model in Ultimate/Resources/Ultimate (the first list missed P1's and P5's: two 30 ms loads were left, 3 Nov), and the FX material
         static readonly string[] IntroModels = { "CR_Hand", "CR_Plate", "FB_Floor", "FT_BellFloor", "FT_BellShard", "FT_Clapper", "FT_Plate", "FT_Platform",
             "GB_GreatBell", "GF_CentreGear", "GF_Core", "GF_Hammer", "GF_OuterGear", "GF_Pawl", "GF_Shard" };
-        readonly List<ResourceRequest> introLoads = new List<ResourceRequest>();
+        static readonly List<ResourceRequest> introLoads = new List<ResourceRequest>();
+        static void StartIntroLoads()
+        {
+            if (introLoads.Count > 0) return;
+            foreach (var name in IntroModels) introLoads.Add(Resources.LoadAsync<GameObject>("Ultimate/" + name));
+            introLoads.Add(Resources.LoadAsync<Material>("Run/FX_ColorDissolve"));
+        }
         bool begun; int introBuilt;
         void IntroPrebuild()   // from Update
         {
             if (begun || TestIdle || PracticeAbility != null || Mechanics == null || introBuilt >= Mechanics.Count) return;
-            if (introLoads.Count == 0) { foreach (var name in IntroModels) introLoads.Add(Resources.LoadAsync<GameObject>("Ultimate/" + name)); introLoads.Add(Resources.LoadAsync<Material>("Run/FX_ColorDissolve")); }
+            StartIntroLoads();
             if (!FontsWarmed || !introLoads.TrueForAll(r => r.isDone)) return;
             using (PrebuildMarker.Auto()) Mechanics[introBuilt++].Prebuild();
         }
+        // Ready-screen warm-up (PR 21's BossEntry.warmUp, run once as the Ready screen opens): the boss doesn't exist yet there, so the
+        // model loads start now and a small helper runs the font steps, one per repaint. The intro then finds both done; whatever
+        // the Ready screen didn't finish, the intro carries on.
+        public static void WarmUp(CombatWorld w)
+        {
+            StartIntroLoads();
+            if (!FontsWarmed && !readyWarmer) { var go = new GameObject("Ultimate warm-up") { hideFlags = HideFlags.HideAndDontSave }; readyWarmer = go.AddComponent<UltimateReadyWarmer>(); }
+        }
+        internal static UltimateReadyWarmer readyWarmer;
+    }
+
+    // Runs BellkeeperEncounter's font warm-up steps on the Ready screen, then removes itself.
+    internal sealed class UltimateReadyWarmer : MonoBehaviour
+    {
+        void OnGUI()
+        {
+            if (Event.current.type != EventType.Repaint) return;
+            if (BellkeeperEncounter.FontsWarmed) { Destroy(gameObject); return; }
+            BellkeeperEncounter.WarmFontStep();
+        }
+    }
+
+    public sealed partial class BellkeeperEncounter
+    {
         // One script step per tick: the plan, then every ability that was already running.
         protected override IEnumerable<int> Script()
         {

@@ -42,7 +42,7 @@ namespace LastBell.Run
             // the final boss is the Bellkeeper Ultimate (Chzy18, 30 Oct: the run's final slot spawns it at the run's level; v1
             // fight is retired, 1 Nov). Practice opens on the Throne;
             // a run's map comes from its first boss, so the map here never moves a run. Phases P1-P5.
-            new BossEntry("Bellkeeper", BellkeeperEncounter.SpawnUltimate, map: BellkeeperEncounter.ThroneMap, final: true, phases: 5),
+            new BossEntry("Bellkeeper", BellkeeperEncounter.SpawnUltimate, map: BellkeeperEncounter.ThroneMap, final: true, phases: 5, warmUp: BellkeeperEncounter.WarmUp),
             // Skyward Spire area boss; authored practice map
             new BossEntry("Aurelion (area 1)", w => BossEncounter.Spawn<AurelionEncounter>(w, new Vector3(0, 0, -1.5f), 0), map: AurelionMap, phases: AurelionArgs.V4 ? 4 : 3),   // v4 (the default set) adds Last Light
             // Verdant Chimes area boss (graybox); authored practice map
