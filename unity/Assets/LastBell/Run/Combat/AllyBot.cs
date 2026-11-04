@@ -964,7 +964,36 @@ namespace LastBell.Run
             // while a timed job is due, a shape that lands after it is not in the way yet: hold the job, dodge it afterwards
             int first = bFull ? Mathf.Min(due, soonest) : int.MaxValue;   // the job or the threat that lands first
             bIgnoreAfter = first == int.MaxValue ? int.MaxValue : first + 30;
+            Reaches(live);
             return badAt;
+        }
+
+        // each live hazard's centre and the squared distance past which Hits can't be true (its shape plus the lane side
+        // pad and the bullet look-ahead), so a probe skips it with one distance test. Crucivar Phase 2 (perf agent, 4 Nov):
+        // 4 bots probing ~1 900 points against 110-140 turret bullets took 15-25 ms a tick, and the catch-up ticks stacked
+        // into 100-228 ms frames
+        float[] rX = new float[64], rZ = new float[64], rR2 = new float[64]; int rN;
+        void Reaches(IReadOnlyList<Hazard> live)
+        {
+            rN = live.Count;
+            if (rX.Length < live.Count) { int n = Mathf.NextPowerOfTwo(live.Count); rX = new float[n]; rZ = new float[n]; rR2 = new float[n]; }
+            for (int i = 0; i < live.Count; i++)
+            {
+                var h = live[i]; float r;
+                switch (h.Shape)
+                {
+                    case HazardShape.Tether: r = -1f; break;   // Contains is always false
+                    case HazardShape.Circle: r = h.Radius + Hazard.Margin + Sim.Flat(h.Drift).magnitude * BulletLook; break;
+                    case HazardShape.Ring: case HazardShape.Cone: r = h.Radius + Hazard.Margin; break;
+                    default:
+                    {
+                        float l = Mathf.Max(h.Length, 0) + Hazard.Margin, wd = Mathf.Abs(h.Width) / 2 + Hazard.Margin;
+                        r = Mathf.Sqrt(l * l + wd * wd) + LanePad; break;
+                    }
+                }
+                r += 0.01f;   // rounding
+                rX[i] = h.Origin.x; rZ[i] = h.Origin.z; rR2[i] = r < 0 ? -1f : r * r;
+            }
         }
 
         bool BadAt(Vector3 q)
@@ -972,6 +1001,7 @@ namespace LastBell.Run
             // allowBurn (no clean spot left): with a place to be (a tower, a ring, a well, a mark), a burning pool is a cost
             for (int i = 0; i < bLive.Count; i++)
             {
+                if (i < rN) { float dx = q.x - rX[i], dz = q.z - rZ[i]; if (dx * dx + dz * dz > rR2[i]) continue; }   // out of its reach: Hits is false
                 var h = bLive[i];
                 if (h.BurnPerSecond <= 0 && bTick + (h.ResolveAt - h.Age) > bIgnoreAfter) continue;
                 if (Hits(h, bMe, q) && !(bAllowBurn && h.BurnPerSecond > 0 && bAnyJob && !h.Pit)) return true;
