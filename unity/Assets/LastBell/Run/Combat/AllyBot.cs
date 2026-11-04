@@ -419,6 +419,7 @@ namespace LastBell.Run
         Vector3 volMove; bool volSprint, volOn, volReach, volDash; float volCost, volPull; int volTick = -99;
         const float VolleyLook = 0.8f, VolleyStep = 0.05f, VolleyBuffer = 0.15f, VolleyPathCost = 30f, VolleyPathSoon = 1.6f, VolleySwing = 20f, VolleySprintFloor = 55f;   // a swing waits only for a bullet it would meet (50 and up)
         const float VolleyJetRing = 8f;   // m from the jets' hub where they sweep at a walk (40 deg/s, WalkSpeed 6)
+        const float VolleyJetHit = 200f;  // a jet step in the bullet dodge (a bullet step is 100)
         bool volJets; Vector3 volHub;
         const float VolleyThrowReach = 7f;   // a Tollbreaker's axe throws, gap to the target (MaxRange 9 m less a margin)
         static readonly List<Hazard> volNear = new List<Hazard>();
@@ -518,6 +519,17 @@ namespace LastBell.Run
                     if (g < 0) cost += 100 * early;
                     else if (g < 0.5f) cost += (0.5f - g) * 4;
                 }
+                // a Furnace Spin jet where it will have turned to, every step like a bullet and scored for its 39 to a bullet's 20
+                // (read every 0.2 s at a flat 100, a jet crossing cost less than one bullet, and the bots dodging bullets in the
+                // second and third uprisings walked into the jets: 7 of 13 downs over 4 Hard party runs, 11-04); one hit each, so
+                // a jet that has hit this player is done
+                for (int i = 0; i < live.Count; i++)
+                {
+                    var h = live[i]; if (!Jet(h) || h.Hit.Contains(me)) continue;
+                    float spin = spokeRef != null && Sim.Flat(spokeRef.Origin - h.Origin).magnitude < 0.1f ? spokeDir : 0;
+                    if (JetAt(h, q, t, spin)) cost += VolleyJetHit * early;
+                    else if (k == steps && JetAt(h, q, t + 0.5f, spin)) cost += 60;   // standing in its way as it comes round
+                }
                 if (k % 4 != 0) continue;
                 // every 0.2 s: burning ground and strikes landing about now; at the end, the paths still to fire (bullets that
                 // reach it after the look: a light cost, or it never stands to swing at a casting inside its turret's fan)
@@ -527,16 +539,7 @@ namespace LastBell.Run
                     var h = live[i];
                     if (h.Track != null && h.Shape == HazardShape.Circle && h.Radius <= 0.7f) continue;   // the bullets, above
                     if (h.BurnPerSecond > 0) { if (h.Contains(q) && !h.Contains(pos)) cost += 25; else if (h.Contains(q)) cost += 8; continue; }
-                    // a Furnace Spin jet where it will have turned to (read where it is now, two bots dodging bullets were
-                    // swept by one in the second uprising, 11-04); one hit each, so a jet that has hit this player is done
-                    if (Jet(h))
-                    {
-                        if (h.Hit.Contains(me)) continue;
-                        float spin = spokeRef != null && Sim.Flat(spokeRef.Origin - h.Origin).magnitude < 0.1f ? spokeDir : 0;
-                        if (JetAt(h, q, t, spin)) cost += 100;
-                        else if (k == steps && JetAt(h, q, t + 0.5f, spin)) cost += 60;   // standing in its way as it comes round
-                        continue;
-                    }
+                    if (Jet(h)) continue;   // the jets, above
                     if (!Hits(h, me, q)) continue;
                     float lands = Lands(h, boss) / (float)Sim.Hz;
                     if (BotSight.IsPath(h)) { if (k == steps) cost += VolleyPathCost; }
