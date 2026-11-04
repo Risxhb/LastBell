@@ -45,7 +45,7 @@ namespace LastBell.Run
         // which boss part to hit: the first in kill order (or by name where the encounter gives none). With three or more
         // bots the back half wears down the next casting meanwhile, so the party does not stand in one turret's fan, and
         // stops while it is within PartReserve of sinking (on Hard one sunk out of order sets every turret firing)
-        const float PartReserve = 0.15f, PartReserveMin = 60f;
+        const float PartReserve = 0.25f, PartReserveMin = 120f;   // axes and recalls land on whichever casting they touch: room for a stray one
         BossPart PartTarget(CombatWorld w)
         {
             BossPart first = null, next = null;
@@ -58,6 +58,17 @@ namespace LastBell.Run
             if (next != null && of >= 3 && slot >= of / 2 && BotSight.PartOrder(next) >= 0
                 && BotSight.PartHp(next) > Mathf.Max(PartReserveMin, BotSight.PartMaxHp(next) * PartReserve)) return next;
             return first;
+        }
+        // a casting held back for its turn standing nearer than the target: a swing or a recall could sink it out of order
+        static bool HeldNear(CombatWorld w, Vector3 pos, Vector3 target)
+        {
+            int low = int.MaxValue;
+            foreach (var p in w.Parts) if (p.Alive && BotSight.PartOrder(p) >= 0) low = Mathf.Min(low, BotSight.PartOrder(p));
+            float to = Sim.Flat(target - pos).magnitude;
+            foreach (var p in w.Parts)
+                if (p.Alive && BotSight.PartOrder(p) > low && BotSight.PartHp(p) <= Mathf.Max(PartReserveMin, BotSight.PartMaxHp(p) * PartReserve)
+                    && Sim.Flat(p.Pos - pos).magnitude - p.BodyRadius < to) return true;
+            return false;
         }
         static bool Before(BossPart a, BossPart b)
         {
@@ -715,6 +726,7 @@ namespace LastBell.Run
             // standing where it mustn't (a burning pool, off its job): the beam slows it to 0.2, so let go and walk
             if (me.Kit is ArcanistKit ak && ak.BeamActive) { if (Clear(me, 30) && (bad == null || !bad(me.transform.position))) inp.H1 = true; return; }
             if (tick - lastPress < 6) return;
+            if (me.World.Parts.Count > 1 && HeldNear(me.World, me.transform.position, tPos)) return;
             // the kit's own cooldowns (the reference policy; a private counter only ticked while attacking)
             System.Func<int, bool> ready = slot => me.Kit.Cooldown01(slot) <= 0.001f && tick >= skipUntil[slot];
             // a pressed ability's cooldown starts on release: wait for it (up to 1.5 s) instead of pressing again and restarting the
