@@ -8,17 +8,19 @@ Branch `feature/run-loop`. October 21, 2026 (overnight build). Status labels use
 
 | Item | Convention |
 | --- | --- |
-| Units / scale | Metres. Vanguard ≈ 1.8 m, Chimesinger ≈ 1.7 m, Bellkeeper ≈ 5 m. |
+| Units / scale | Metres. Tollbreaker ≈ 2.0 m, Chimesinger ≈ 1.7 m, Bellkeeper ≈ 5 m. |
 | Facing / pivot | Faces +Z in Unity (−Y in Blender), pivot between the feet on the floor. |
 | Rig | Blender armature built by script, exported as glTF with the animations as separate actions. Unity imports it with glTFast as a Mecanim-compatible prefab under `Resources/Characters/<Name>.glb`. |
 | Export | `export_animation_mode='ACTIONS'`, forced sampling, 30 fps. Unity copies use **JPEG** textures because glTFast can't be relied on for WebP; browser copies use WebP. |
 | Root motion | None in any clip. Gameplay moves the transform; `CharacterPresenter` stretches each clip to fill the gameplay duration it's given (`Action(clip, ticks)`). Dash, charge and lunge displacement come from code only, so movement is never applied twice. |
-| Playback | `Run/Combat/CharacterPresenter.cs` drives the clips through a `PlayableGraph` (no Animator Controller asset), with 0.08 s crossfades. Looping: Idle, Run, Sprint, Walk, Vulnerable, BraceHold, BraceWalk, Guard. Everything else is one-shot and holds its last frame until the next state. |
+| Playback | `Run/Combat/CharacterPresenter.cs` drives the clips through a `PlayableGraph` (no Animator Controller asset), with 0.08 s crossfades. Looping: Idle, Run, Sprint, Walk, Vulnerable. Everything else is one-shot and holds its last frame until the next state. |
 | Hit timing | Never from animation events. Contact, release and resolve ticks live in the kits and encounter scripts; the clips are authored so their contact pose lands on the same normalized time. |
-| Materials | glTFast URP shaders. Emission strength is restored at runtime (×2.5 Vanguard, ×2 Chimesinger, ×5 Bellkeeper, plus metallic ×0.55 on the Bellkeeper), because glTFast drops `KHR_materials_emissive_strength`. |
+| Materials | glTFast URP shaders. Emission strength is restored at runtime (×2 Chimesinger, ×5 Bellkeeper, plus metallic ×0.55 on the Bellkeeper), because glTFast drops `KHR_materials_emissive_strength`. |
 | Missing clips | Resolved through a fallback table (approved name first, then older clips). Anything still missing gets a labelled procedural placeholder on the visual pivot: Hit = 0.3 s flinch, Down = fall onto the back, GetUp = reverse. |
 
 Vanguard removed from the game (Chzy18, 2 Nov); its model and browser asset were deleted. Git history keeps them.
+
+**Tollbreaker** (`Characters/Tollbreaker/Resources/Characters/Tollbreaker.glb`, 2.0 m): Meshy model on a scripted rig (`tollbreaker_rig.py` in the prototype folder, not in Git). Clips: Idle, Run, Sprint, Jump, Dodge, TwinHurl, TwinHurl2, HurlHeavy, Catch, Catch2, GrindingToll, SplittingThrow, CallOfIron, BellFrenzy. Hit, Down, GetUp and Land are still procedural placeholders.
 
 ## Chimesinger — model: Rough production · animation: Rough production / Placeholder · VFX: Rough production
 
@@ -123,8 +125,7 @@ Contact sheet: `run-loop-evidence/bellkeeper-phase-defeat-sheet.png`.
 
 ## Known limitations
 
-- The Vanguard and Bellkeeper clips are procedural keyframes from the rig scripts, not hand-polished animation. The Down/GetUp silhouettes are rough.
-- Hand-to-weapon contact and mesh clearance haven't been measured for the new Vanguard clips. The Brace shield arm uses the existing `GUARD_ARM` targets.
+- The Tollbreaker and Bellkeeper clips are procedural keyframes from the rig scripts, not hand-polished animation. The Down/GetUp silhouettes are rough.
 - The Chimesinger in Unity is the pre-fix stand-in, and the grip fix is pending. The Chimesinger has no Hit/Down/GetUp clips yet.
 - There's no Land clip; landing is the tail of Jump.
 - No audio is in the build. Every mechanic is shown visually and named in the HUD while it warns.

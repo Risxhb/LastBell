@@ -58,19 +58,18 @@ Last updated October 25, 2026 by chzy18/claude. The latest change: the Bellkeepe
 
 ## 4. Classes
 
-- **Settled:** three starting classes with approved kits (#31, #36, #41). Don't redesign them inside a boss or arena brief.
-  - **Vanguard:** melee sword and shield.
-    - Abilities: Steel Rhythm (3-hit basic), Sundering Blow, Last Word (heavy finisher, about 0.8 s windup), hold-to-Brace, Clockstep dash.
+- **Settled:** three starting classes: **Tollbreaker, Chimesinger and Arcanist**. Don't redesign them inside a boss or arena brief. (The authoritative copy of these rules is `gpt/08-design-rules.md` in the workspace.)
+  - **Tollbreaker** (replaced the Vanguard; Chzy18, 2026-10-29): a mid-range berserker who throws two war axes. No defensive ability; survival comes from the dash and positioning.
+    - Axes are his resource: an axe in flight or lodged can't be thrown until it returns. Returning axes come back sooner when he stands close, so close range raises his damage.
+    - Abilities (keys): Twin Hurl (LMB: returning axes; hold to lodge one), Grinding Toll (2: the axe spins in place at the cursor for 2 s), Splitting Throw (3: lodges in the boss or the floor for 6 s), Call of Iron (4: recalls lodged axes in a straight line; damage grows with distance), Bell Frenzy (5: a 4 s empowerment), and the shared dash (RMB) with no invincibility.
+  - **Retired: Vanguard** (melee sword and shield; Chzy18, 2026-10-29). Deleted from the game on 1–2 Nov, and Brace with it.
   - **Chimesinger:** ranged sound-magic damage dealer with an immediate burst heal. This class replaced the old "Healer".
     - Abilities: Resonant Note, Bellstrike, Harmonic Refrain, Crescendo, Mending Chorus (heal), Harmonic Step dash.
-  - **Arcanist:** ranged time magic with timed setup.
-    - Abilities: Clockbolt, Time Seal, Arc Lance, Convergence, Temporal Anchor, Clockstep dash.
+  - **Arcanist:** ranged arcane glass cannon (Risx's redesign, accepted 2026-10-27; see `docs/design/arcanist-redesign.md`). No defensive ability; survival comes from Blink and positioning.
+    - Abilities (keys): Magic Missile (LMB), Disintegrate (2, builds glyphs), Rune Sigil (3), Arcane Comet (4), Arcane Surge (5), and Blink (RMB, the shared dash) with no invincibility.
 - **Settled:** the support class must keep **real damage output** as well as healing. A class that only heals is never acceptable.
-- **Settled:** no encounter may **require** a specific class, a healer, Brace or any one ability. Every party, including all duplicates of one class, must be able to clear.
-- **Settled:** Brace is **partial frontal mitigation** (about −60 %), not a block or immunity.
-  - It works on **Strike** hazards: cones, lanes, sweeps, bars.
-  - It never works on **Ground** hazards: rings, donuts, chime circles, ground eruptions.
-  - Tag every new attack as Strike or Ground.
+- **Settled:** no encounter may **require** a specific class, a healer or any one ability. Every party, including all duplicates of one class, must be able to clear.
+- **Settled:** Brace is **retired** along with the Vanguard (29 Oct). Still **tag every attack** as **Strike** (cones, lanes, sweeps, bars) or **Ground** (rings, donuts, chime circles, ground eruptions). The tag is kept for a possible future defensive ability and has no effect today. Every class must be able to survive each mechanic by moving.
 - **Settled:** phase changes don't clear player setup. Seals, bells and inscriptions persist and their timers keep running.
 - **Provisional:** all class damage numbers and cooldowns are prototype values.
 
@@ -104,7 +103,7 @@ Each rule below is settled unless it says otherwise.
   - This is about danger, not class requirements: every class must be able to survive each mechanic by moving.
 - **At most two damaging patterns overlap,** and only after the route is checked.
 - **Punish windows:**
-  - Every boss has at least one **3–4 s major recovery**, long enough for Vanguard's heavy attack and the casters' stationary casts.
+  - Every boss has at least one **3–4 s major recovery**, long enough for each class's biggest hit (the Tollbreaker's Bell Frenzy, the Arcanist's Comet and channel, the Chimesinger's Crescendo).
   - Don't uniformly speed attacks up to make a fight harder.
   - **Exception: slow casts (Risxhb, 2026-10-27).** If a mechanic takes a while to go off, shortening its warning is fine, as long as the §2 escape check still passes.
 - **No enrage timers.** No soft-enrage that slowly fills the floor. Pools and zones always expire.
