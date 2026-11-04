@@ -34,7 +34,7 @@ namespace LastBell.Menu
             int outputAt=Array.IndexOf(args,"-lastbellOut");output=outputAt>=0&&outputAt+1<args.Length?args[outputAt+1]:"E:/Collab/build-evidence/menu-flow-20261022";Directory.CreateDirectory(output);
             originalMenuStyle=MenuAppearance.Selected;menuPreferenceCaptured=true;
             Application.logMessageReceived+=Log;originalInput=InputSystem.settings;originalInputFlags=originalInput.hideFlags;originalInput.hideFlags=HideFlags.DontUnloadUnusedAsset;
-            testInput=Instantiate(originalInput);testInput.hideFlags=HideFlags.DontUnloadUnusedAsset;testInput.backgroundBehavior=InputSettings.BackgroundBehavior.IgnoreFocus;InputSystem.settings=testInput;MenuSmokeTest.EnableTestDevices();Debug.Log($"[menuflow] window focused={Application.isFocused}, test keyboard enabled={MenuSmokeTest.TestKeyboard?.enabled}");
+            testInput=Instantiate(originalInput);testInput.hideFlags=HideFlags.DontUnloadUnusedAsset;testInput.backgroundBehavior=InputSettings.BackgroundBehavior.IgnoreFocus;InputSystem.settings=testInput;if(args.Contains("-lastbellFlowUnfocused"))foreach(var dv in MenuSmokeTest.TestDevices)if(dv!=null)InputSystem.DisableDevice(dv);/* -lastbellFlowUnfocused: start with the test devices disabled, as an unfocused window leaves them */MenuSmokeTest.EnableTestDevices();Debug.Log($"[menuflow] window focused={Application.isFocused}, test keyboard enabled={MenuSmokeTest.TestKeyboard?.enabled}");
 #if UNITY_EDITOR
             testInput.editorInputBehaviorInPlayMode=InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
 #endif
