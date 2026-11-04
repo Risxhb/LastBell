@@ -709,8 +709,9 @@ namespace LastBell.Run
         // then the class's dash, then the potion. A missing icon falls back to the ability name.
         static readonly Dictionary<string, string[]> SlotIconNames = new Dictionary<string, string[]>
         {
-            // Tollbreaker: stand-in icons (older steel-set art and the retired Arcanist set) until his own are drawn
-            ["Tollbreaker"] = new[] { "tollbreaker_twin_hurl", "arcanist_clockstep", "tollbreaker_splitting_throw", "tollbreaker_call_of_iron", "chimes-128", "tollbreaker_dash" },
+            // Tollbreaker: Grinding Toll and Bell Frenzy show his own shop items' art (Long Grind: the spinning axe; Frenzied Hour:
+            // the bell and axes) until their ability icons are drawn; they were the retired Arcanist and Chimes art (PR review ICON-01)
+            ["Tollbreaker"] = new[] { "tollbreaker_twin_hurl", "items/long-grind-128", "tollbreaker_splitting_throw", "tollbreaker_call_of_iron", "items/frenzied-hour-128", "tollbreaker_dash" },
             ["Chimesinger"] = new[] { "chimesinger_resonant_note", "chimesinger_bellstrike", "chimesinger_harmonic_refrain", "chimesinger_crescendo", "chimesinger_mending_chorus", "chimesinger_harmonic_step" },
             ["Arcanist"] = new[] { "arcanist_magic_missile", "arcanist_disintegrate", "arcanist_rune_sigil", "arcanist_comet", "arcanist_arcane_surge", "arcanist_blink" },
         };
