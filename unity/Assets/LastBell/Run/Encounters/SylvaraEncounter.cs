@@ -725,8 +725,6 @@ namespace LastBell.Run
             string loop = Dead || phase == 0 ? "Idle" : LoopClip;
             if ((loop == "LanesLoop" || loop == "HollowLoop") && !Has(loop)) loop = "ConductLoop";   // older packs
             if (presenter) presenter.TickBoss(loop, loop == "LanesLoop" ? LanesClip / LanePeriod : 1);
-            if (phase == 0 && !introPlayed && RunDirector.Instance != null && RunDirector.Instance.State == RunState.Intro && Has("Intro"))
-            { introPlayed = true; Act("Intro", 2f); }   // the run's 2 s intro card: she wakes and lifts the fork
             if (Dead || Current == "idle" || phase == 0) return;   // halted (party down) or not started
             for (int i = later.Count - 1; i >= 0; i--) if (Age >= later[i].at) { var fn = later[i].fn; later.RemoveAt(i); fn(); }
             for (int i = 0; i < emit.Count; i++) if (emit[i].On) emit[i].Update?.Invoke(Sim.Dt);
@@ -742,6 +740,9 @@ namespace LastBell.Run
         {
             base.Update();
             PlaceLights();
+            // the run's 2 s intro card, before the sim runs (so not in StepAlways): she wakes and lifts the fork
+            if (phase == 0 && !introPlayed && RunDirector.Instance != null && RunDirector.Instance.State == RunState.Intro && Has("Intro"))
+            { introPlayed = true; Clips.Add("Intro"); presenter.PlayOnce("Intro", 2f); }
             if (Dead && frontLight)
             {
                 frontLight.intensity = Mathf.MoveTowards(frontLight.intensity, FrontIntensity * 0.5f, Time.deltaTime * 2f);

@@ -906,6 +906,7 @@ namespace LastBell.Run
             // her attack clips (proposal 2 Nov): a Conduct loop under the spirals, one-shots on the attacks
             Check("Sylvara conducts while a spiral runs", sy.LoopClip == "ConductLoop", sy.LoopClip);
             foreach (var c in new[] { "Toll", "CallWater", "PruningArc", "Seed" }) Check($"Sylvara P1 plays the {c} clip", sy.Clips.Contains(c));
+            if (sy.Presenter && sy.Presenter.Has("Intro")) Check("Sylvara wakes with the Intro clip on the intro card", sy.Clips.Contains("Intro"));
             var newClips = new[] { "ConductLoop", "StormLoop", "Toll", "CallWater", "Sow", "LanesLoop", "Intro", "MaskSplit", "HollowLoop", "StormCall", "Stagger" };
             if (sy.Presenter && sy.Presenter.HasModel && newClips.All(sy.Presenter.Has)) Check("her model has every v3 attack clip", true);
             else Note("Sylvara: this model has no v3 attack clips (old sylvara-assets pack): every attack falls back to Idle");
