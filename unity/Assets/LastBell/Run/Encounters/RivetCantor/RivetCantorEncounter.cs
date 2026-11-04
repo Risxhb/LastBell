@@ -9,7 +9,7 @@ namespace LastBell.Run
     // choirmaster with a drum: he sings a line and the floor answers it as rivets. Four mechanics:
     //
     //   Work-Song Verse   3 calls (4 below 50%), 3 beats apart; each call's telegraph appears as he sings it and resolves
-    //                     6 beats later. Chorus = a shared soak at his feet (70 split, empty wipes). Solo = a 2.6 m circle
+    //                     6 beats later. Chorus = a shared soak at his feet (70 split; empty: 80 to all). Solo = a 2.6 m circle
     //                     on every player that hurts only the others (spread). Hard: Encore (the last call sung twice).
     //   Rivet Run         an X of rivet lines popping outward from his feet, aimed at the nearest player, then a second X
     //                     aimed at the farthest player popping inward from the edge (after the first, or halfway below 50%).
@@ -33,8 +33,8 @@ namespace LastBell.Run
         // ---------------- tunables (Medium) ----------------
         public const float BpmHigh = 120f, BpmLow = 140f;
         public const int FoundryMotif = 3;   // FX_SH_Telegraph _Motif: BrassFoundry
-        public const int ChorusTotal = 70, SoloDmg = 40, RivetDmg = 35, ChainSnapDmg = 45, ChainWhipDmg = 40, PulseDmg = 50;
-        public const float ChorusRadius = 3.5f, SoloRadius = 2.6f, RivetRadius = 0.9f, RivetSpacing = 2f, ChainLength = 7f, WhipWidth = 1.0f;
+        public const int ChorusTotal = 70, EmptyChorusDmg = 80, SoloDmg = 40, RivetDmg = 35, ChainSnapDmg = 45, ChainWhipDmg = 40, PulseDmg = 50;
+        public const float ChorusRadius = 4f, SoloRadius = 2.6f, SoloFeetRadius = 2.5f, RivetRadius = 0.9f, RivetSpacing = 2f, ChainLength = 7f, WhipWidth = 1.0f;
         public const float DiscRadius = 5f, Ring2 = 8.5f, Ring3 = 12f;
         public const float CallGapBeats = 3f, PulseGapBeats = 1.5f, RivetStepBeats = 0.5f;
         public const int RetuneTicks = 210, ShiftTicks = 120;
@@ -83,7 +83,8 @@ namespace LastBell.Run
         public int Pending { get; private set; }         // this mechanic's hazards not yet resolved
 
         public int VerseCasts, RivetCasts, ChainCasts, HymnCasts;
-        public int ChorusResolves, ChorusEmpty, SoloResolves, SoloHits, RivetPops, RivetHits, ChainSnaps, ChainWhips, PulseHits;
+        public int ChorusResolves, ChorusEmpty, ChorusEmptyHits, SoloResolves, SoloHits, SoloFeetHits, RivetPops, RivetHits, ChainSnaps, ChainWhips, PulseHits;
+        public readonly List<string> ChainNumerals = new List<string>();   // the order numerals shown at the last chain cast
         public readonly List<(int tick, int inside, int standing, int share)> ChorusLog = new List<(int, int, int, int)>();
         public readonly List<(int tick, Call[] calls)> VerseLog = new List<(int, Call[])>();
         public readonly List<(int tick, int pairs, int drum, int snaps, int whips)> ChainLog = new List<(int, int, int, int, int)>();
@@ -175,6 +176,7 @@ namespace LastBell.Run
             var t = W.NearestStanding(transform.position);
             TurnTowards(faceYaw ?? (t ? YawAt(t) : transform.eulerAngles.y), 240);
             if (!Phase2 && !GatePending && ShiftStart < 0 && Hp * 2 <= MaxHp) GatePending = true;   // once only: not again during the Key Change
+            UpdateChorusNumeral();
             // the call glyphs float above his head, oldest lowest
             for (int i = 0; i < glyphs.Count; i++) if (glyphs[i]) glyphs[i].position = transform.position + Vector3.up * (4.3f + 0.75f * i);
         }
@@ -223,14 +225,23 @@ namespace LastBell.Run
                 {
                     Source = "Chorus", MechanicId = MechanicIcons.SoakTower, Shape = HazardShape.Circle, Kind = HazardKind.Ground,
                     Origin = Sim.Flat(transform.position), Radius = ChorusRadius, LockAt = 0, ResolveAt = echo,
-                    Soak = true, ShareTotal = ChorusTotal, ShareCount = standing, WipeIfEmpty = true, Knockback = 0, Stun = 6,
+                    Soak = true, ShareTotal = ChorusTotal, ShareCount = standing, Knockback = 0, Stun = 6,
                 };
                 h.OnResolve = hz =>
                 {
-                    int inside = hz.Hit.Count; ChorusResolves++; if (inside == 0) ChorusEmpty++;
+                    int inside = hz.Hit.Count; ChorusResolves++;
+                    FillChecks++; if (ChorusFilled == inside) FillMatches++;   // the slot ticks a tick earlier vs who was hit
+                    // empty: no wipe (review 11-03), a heavy hit on everyone standing instead
+                    if (inside == 0)
+                    {
+                        ChorusEmpty++;
+                        foreach (var p in Party()) { hz.Hit.Add(p); p.ReceiveHit(hz, EmptyChorusDmg); ChorusEmptyHits++; }
+                    }
                     ChorusLog.Add((Tick, inside, Standing, HazardSystem.ShareOf(hz, Mathf.Max(1, inside))));
                     DropGlyph(glyph); CameraShake.Shake(0.1f, 0.15f);
                 };
+                var spent = h.OnSpent; h.OnSpent = hz => { choruses.Remove(hz); spent?.Invoke(hz); };
+                choruses.Add(h);
                 Live(h);
                 h.Tele.Tint(ChorusFill, ChorusBorder);
             }
@@ -253,6 +264,15 @@ namespace LastBell.Run
                     Live(h);
                 }
                 if (party.Count == 0) DropGlyph(glyph);
+                // and off his feet: a Solo also hits everyone within 2.5 m of him (the 2.8-3.6 m band stays in the 4 m Chorus) (review 11-03: it matters solo too)
+                var feet = new Hazard
+                {
+                    Source = "Solo (his feet)", MechanicId = MechanicIcons.Spread, Shape = HazardShape.Circle, Kind = HazardKind.Ground,
+                    Origin = Sim.Flat(transform.position), Radius = SoloFeetRadius, LockAt = 0, ResolveAt = echo,
+                    Damage = SoloDmg, Knockback = 0, Stun = 6,
+                };
+                feet.OnResolve = hz => SoloFeetHits += hz.Hit.Count;
+                Live(feet);
             }
         }
 
@@ -345,20 +365,32 @@ namespace LastBell.Run
         void SpawnChains(int lockIn)
         {
             ChainCasts++;
-            var party = Party();
+            // pairs follow the order numerals (review 11-03): I-II and III-IV by party slot, shown over each player while
+            // chained. A player whose numeral partner is missing or down (player III of 3) is chained to the drum.
+            var slots = W.Players;
             int pairs = 0, drumChained = 0, snaps0 = ChainSnaps, whips0 = ChainWhips; int left = 0;
-            Action done = () => { if (--left == 0) ChainLog.Add((Tick, pairs, drumChained, ChainSnaps - snaps0, ChainWhips - whips0)); };
-            for (int i = 0; i < party.Count; i += 2)
+            var numbered = new List<(PlayerController p, string mark)>();
+            Action done = () =>
             {
-                if (i + 1 < party.Count)
+                if (--left > 0) return;
+                ChainLog.Add((Tick, pairs, drumChained, ChainSnaps - snaps0, ChainWhips - whips0));
+                foreach (var (p, m) in numbered) Unmark(p, m);
+            };
+            for (int i = 0; i < slots.Count; i += 2)
+            {
+                var a = slots[i]; var b = i + 1 < slots.Count ? slots[i + 1] : null;
+                bool aUp = a && !a.Down, bUp = b && !b.Down;
+                foreach (var (p, n) in new[] { (a, i + 1), (b, i + 2) })
+                    if (p && !p.Down) { var m = MechanicIcons.Order(n); if (m != null) { Mark(p, m); numbered.Add((p, m)); } }
+                if (aUp && bUp)
                 {
-                    var a = party[i]; var b = party[i + 1]; pairs++;
-                    left += 3;
+                    pairs++; left += 3;
                     Partner(a, b, lockIn, done); Partner(b, a, lockIn, done);
                     Whip(a, b, lockIn, done);
                 }
-                else { drumChained++; left++; DrumChain(party[i], lockIn, done); }
+                else if (aUp || bUp) { drumChained++; left++; DrumChain(aUp ? a : b, lockIn, done); }
             }
+            ChainNumerals.Clear(); foreach (var (p, m) in numbered) ChainNumerals.Add(m);
         }
 
         // the 7 m circle round `anchor` that hurts only `who`: the chain is too short if `who` is inside at lock
@@ -452,9 +484,58 @@ namespace LastBell.Run
         // ---------------- lifecycle ----------------
         protected override void OnDefeat()
         {
-            ClearGlyphs(); ClearMarks(); Pending = 0; Retuning = false;
+            ClearGlyphs(); ClearMarks(); Pending = 0; Retuning = false; choruses.Clear(); ChorusNeed = -1;
             W.Fx.Crescendo(transform.position, true, 2, true);
         }
-        void OnDestroy() { ClearGlyphs(); ClearMarks(); }
+        void OnDestroy() { ClearGlyphs(); ClearMarks(); choruses.Clear(); ChorusNeed = -1; }
+
+        // ---------------- the Chorus numeral (review 11-03) ----------------
+        // The soonest live Chorus shows how many players it needs (everyone standing, live, not the count at the call) as a big
+        // ivory numeral with one slot tick per player, filled for each player inside now: the Mould Press soak look. It sits
+        // just outside the rim on the camera's side (his body would hide it above him, and the 3-3.5 m band is where players
+        // stand between a Chorus and a Solo). Drawn in OnGUI by this host only: LAN clients see the soak, not the numeral yet.
+        readonly List<Hazard> choruses = new List<Hazard>();
+        public int ChorusNeed { get; private set; } = -1;    // -1: no Chorus live
+        public int ChorusFilled { get; private set; }
+        public int NumeralTicks, NumeralMin = int.MaxValue, NumeralMax, FillMatches, FillChecks;   // tests
+        Vector3 chorusAt; Vector3 camSide = Vector3.forward; GUIStyle numStyle;
+        static readonly Color InkShadow = new Color(0.05f, 0.04f, 0.03f, 0.85f);
+
+        void UpdateChorusNumeral()
+        {
+            Hazard next = null;
+            foreach (var h in choruses) if (h.Age < h.ResolveAt && (next == null || h.ResolveAt - h.Age < next.ResolveAt - next.Age)) next = h;
+            if (next == null || Dead) { ChorusNeed = -1; return; }
+            int need = 0, inside = 0;
+            foreach (var p in W.Players) if (p && !p.Down) { need++; if (next.Contains(p.transform.position)) inside++; }
+            ChorusNeed = need; ChorusFilled = inside; chorusAt = next.Origin;
+            NumeralTicks++; NumeralMin = Mathf.Min(NumeralMin, need); NumeralMax = Mathf.Max(NumeralMax, need);
+        }
+
+        void OnGUI()
+        {
+            if (ChorusNeed < 0) return;
+            var cam = Camera.main; if (cam == null) return;
+            // steady side: the flattened camera forward, smoothed, so shake or follow does not slide it round the rim
+            var fwd = Vector3.ProjectOnPlane(cam.transform.forward, Vector3.up);
+            if (fwd.sqrMagnitude > 1e-4f) camSide = Vector3.Slerp(camSide, -fwd.normalized, 0.15f);
+            var sp = cam.WorldToScreenPoint(chorusAt + camSide.normalized * (ChorusRadius + 0.4f) + Vector3.up * 0.3f);
+            if (sp.z <= 0) return;
+            if (numStyle == null) numStyle = new GUIStyle(GUI.skin.label) { fontSize = 56, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            var c = new Vector2(sp.x, Screen.height - sp.y);
+            var rect = new Rect(c.x - 50, c.y - 44, 100, 80);
+            string label = ChorusNeed.ToString();
+            numStyle.normal.textColor = InkShadow; GUI.Label(new Rect(rect.x + 3, rect.y + 3, rect.width, rect.height), label, numStyle);
+            numStyle.normal.textColor = Ivory; GUI.Label(rect, label, numStyle);
+            int slots = Mathf.Max(ChorusNeed, ChorusFilled);
+            float x0 = c.x - (slots * 18 - 6) / 2f;
+            for (int i = 0; i < slots; i++)
+            {
+                var old = GUI.color;
+                GUI.color = i < ChorusFilled ? Ivory : new Color(0.1f, 0.12f, 0.16f, 0.8f);
+                GUI.DrawTexture(new Rect(x0 + i * 18, c.y + 32, 12, 5), Texture2D.whiteTexture);
+                GUI.color = old;
+            }
+        }
     }
 }

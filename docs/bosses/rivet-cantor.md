@@ -5,7 +5,7 @@ mask, a resonant-gold chest core and a great foundry drum slung at his hip. He l
 *sings* each line of a verse, and a few beats later the floor sings it back as hammered rivets. Every mechanic is
 call-and-response: he calls, the party answers.
 
-- **Status:** proposal (November 3, 2026), replacing the earlier "Tuner of the Great Cast" draft (still in git
+- **Status:** proposal (November 3, 2026), review answers applied the same day (see "Review decisions"), replacing the earlier "Tuner of the Great Cast" draft (still in git
   history). Practice-only encounter in the current player, **placeholder visuals only** (primitive stand-in body, no
   Meshy model, no final FX or audio). Not in the run.
 - **Sources read:** `docs/design/content-rules.md` (this brief follows §5 and §10), `docs/bosses/pendulum-sentinel.md`,
@@ -27,7 +27,7 @@ call-and-response: he calls, the party answers.
   "score" players read; the floor telegraph for each answer appears at the same moment as its glyph.
 - **Tempo:** 120 BPM above 50 %, 140 BPM below. Every resolve lands on a beat.
 - **Raid indicators:** every warning is a real hit shape drawn with the shared Telegraph-Style v2 look
-  (`HazardSystem.RaidStyle`, Brass Foundry motif). Soaks show their numeral. Marks also tag the player
+  (`HazardSystem.RaidStyle`, Brass Foundry motif). The Chorus soak shows its numeral (see Work-Song Verse). Marks also tag the player
   (`PlayerController.Marks`) so the HUD names them.
 
 ## The four mechanics
@@ -36,24 +36,28 @@ call-and-response: he calls, the party answers.
 
 - **Tell:** he lifts the mallet and beats the drum's rim; each beat is one *call*.
 - **The calls:** 3 calls above 50 %, 4 below, **3 beats apart**. Each call is one of:
-  - **Chorus** (stack): a 3.5 m soak circle round his feet. It is a shared soak: **70 total**, split between everyone
-    inside (settled §5 rule). **Empty = party wipe**, so the telegraph shows the numeral and the gold glyph.
+  - **Chorus** (stack): a 4 m soak circle round his feet. It is a shared soak: **70 total**, split between everyone
+    inside (settled §5 rule). **Empty = a heavy hit, not a wipe:** if nobody is inside, everyone standing takes **80**.
+    The soonest Chorus shows a big ivory **numeral** (players needed: everyone standing, live) with one slot tick per
+    player, filled for each player inside, just outside the ring on the camera's side (the Mould Press soak look).
   - **Solo** (spread): a 2.6 m circle on every player. It never hurts its owner; anyone *else* inside it takes **40**.
+    Each Solo also strikes **his feet: everyone within 2.5 m of him takes 40**, so melee steps off him for every Solo (the 2.5–4 m band is in the Chorus and clear of his feet).
 - **The answer:** each call's telegraph appears the moment he sings it and resolves **6 beats later** (3 s at 120,
   2.6 s at 140). So the floor always lags the song by two calls: you are standing for call *n* while reading call
   *n + 2*.
 - **Verses are fixed, not random** (learnable): above 50 % they alternate *Chorus · Solo · Chorus* and
   *Solo · Chorus · Solo*; below 50 % *Chorus · Solo · Solo · Chorus* and *Solo · Chorus · Chorus · Solo*.
-- **Melee threat:** Solo marks force melee to fan out round him; a Chorus landing right after a Solo means stepping
-  back in on time. **Ranged threat:** every Chorus is at his feet, so ranged players must come in (from the edge that
+- **Melee threat:** every Solo forces melee off his feet (2.5 m) and to fan out round him; a Chorus landing right
+  after a Solo means stepping back in on time (the 2.5–4 m band). **Ranged threat:** every Chorus is at his feet, so ranged players must come in (from the edge that
   is ~9 m in 3 s, inside the 4.2 m/s escape check).
 - **Tag:** Ground (both).
 - **2 players:** both stack for Chorus (35 each); for Solo, stand on opposite sides of him.
 - **3 players:** Chorus 24 each. Solo: a triangle round him (melee front, ranged at ~5 m on the flanks).
 - **4 players:** Chorus 18 each. Solo: the four quarters round him; this is the tightest version, which is why Solo
   circles are 2.6 m and not larger.
-- **Solo (1 player, or bots):** Chorus takes the whole 70 (survivable from full). Solo marks have no one else to hit,
-  so they are harmless: a solo verse is "be at his feet on every Chorus beat".
+- **Solo (1 player, or bots):** Chorus takes the whole 70 (survivable from full); missing it costs 80. The Solo mark
+  has no one else to hit, but his feet still do: a solo verse is "in for every Chorus beat, out past 2.5 m for every
+  Solo beat".
 - **Hard — Encore:** the verse's last call is sung a second time, 3 beats later.
 
 ### 2. Rivet Run (sequential lines: the drum's echo in the floor)
@@ -75,8 +79,9 @@ call-and-response: he calls, the party answers.
 ### 3. Rivet Chains (stretch tethers)
 
 - **Tell:** he swings the mallet in a wide arc and sings one long note; brass chains snap between players.
-- **The pairs:** players are chained in pairs in party order (1–2, 3–4). An odd player is chained **to the drum** (to
-  him).
+- **The pairs:** players are chained by their **order numerals**, I–II and III–IV (party slots), and each chained
+  player shows their numeral while the chain is up. A player whose numeral partner is missing or down (III in a party
+  of 3) is chained **to the drum** (to him).
 - **The rule:** after **5 beats** each chain locks. A chain shorter than **7 m** snaps: both ends take **45** (the
   player chained to the drum takes 45 if within 7 m of him). The locked chain also whips along its length: anyone
   *else* standing on it takes **40**.
@@ -134,22 +139,26 @@ call-and-response: he calls, the party answers.
 | | 1 (solo) | 2 | 3 | 4 |
 |---|---|---|---|---|
 | Verse Chorus | take 70 alone | 35 each | 24 each | 18 each |
-| Verse Solo | harmless | opposite sides | triangle | quarters |
+| Verse Solo | off his feet (2.5 m) | opposite sides, off his feet | triangle | quarters |
 | Rivet Run | dodge | dodge | dodge | one per gap |
-| Chains | drum-chain: 7 m from him | one pair, opposite sides | pair + drum-chain (no crossing) | two pairs on perpendicular axes |
+| Chains | drum-chain: 7 m from him | I–II, opposite sides | I–II + III to the drum (no crossing) | I–II and III–IV on perpendicular axes |
 | Anvil Hymn | step in through pulses | same | same | same |
 
 Bot allies (0–3, Perfect mode) solve every mechanic: Chorus is a normal shared soak (the generic soak job), Solo and
 the chains are hazards that hit only *other* players, so bots keep out of them like any telegraph.
 
-## Open questions for review
+## Review decisions (November 3, 2026)
 
-1. Chorus wipes the party when empty (the settled soak rule). Is that the right weight for a *first* Area 2
-   miniboss, or should Chorus be a heavy hit (e.g. 80 to everyone) instead of a wipe?
-2. Solo marks are harmless to their owner, so solo players never feel them. Should a mark also hit its owner if they
-   stand within 3 m of him (a melee check), so Solo matters solo too?
-3. Rivet Chains pair players in party order. Should the pairing instead follow the ivory order numerals
-   (I–II, III–IV) once those markers are shown in-game?
-4. The model: the earlier Meshy rig (`RivetCantor.glb`, `rivet_cantor_rig.py`) has fork and dial clips for the old
-   design. Re-rig for drum and mallet, or a new model?
-5. Run slot: which of the three Brass Foundry miniboss slots should he take once he joins the run?
+1. **Empty Chorus:** a heavy hit (80 to everyone standing), not a wipe. Done.
+2. **Solo matters solo:** yes. Each Solo also hits everyone within 2.5 m of him (40); the Chorus grew to 4 m so the band between them (2.5–4 m) holds a whole party. Done.
+3. **Chain pairing:** by the order numerals I–II, III–IV, shown over the chained players. Done.
+4. **Model:** keep the earlier Meshy model and re-rig/animate it for the drum and mallet. Queued for the next usage
+   reset (lane board card); the fight keeps the stand-in until then.
+5. **Run slot:** none yet. Bosses will share arenas and the gameplay loop is not decided; he stays practice-only on the
+   Crucivar map.
+6. **LAN lobby:** add him to `LanLobby.Encounters` after all the miniboss work is done.
+7. **Minibosses card row** (fits 5): the menu gets adjusted, with graphics, once the bosses are done.
+8. **Chorus numeral:** added (above), after a critique pass: live count instead of the count at the call, slot ticks
+   for who is in, placed just outside the ring on a smoothed camera side, the soonest Chorus only, hidden on defeat.
+   Drawn by the host only; LAN clients see the soak ring without the numeral until the lobby work above.
+9. **Chains and standing still:** fine as is (chains threaten by geometry).

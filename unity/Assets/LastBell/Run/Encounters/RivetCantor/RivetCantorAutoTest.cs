@@ -200,6 +200,9 @@ namespace LastBell.Run
                 boss.ChorusResolves == chorusCalls && boss.ChorusEmpty == 0 && boss.ChorusLog.All(c => c.inside == size && c.share == Mathf.CeilToInt(RivetCantorEncounter.ChorusTotal / (float)size)),
                 string.Join("; ", boss.ChorusLog.Select(c => $"{c.inside}/{c.standing} in, {c.share} each")));
             Check($"[{size}p] Verse: every Solo resolved; the bots spread (Solo hits on others: {boss.SoloHits})", boss.SoloResolves == soloCalls && boss.SoloHits <= 1, $"{boss.SoloResolves}/{soloCalls} resolved");
+            Check($"[{size}p] Verse: the Chorus numeral showed the live party ({size}) whenever a Chorus was up", boss.NumeralTicks > 0 && boss.NumeralMin == size && boss.NumeralMax == size && boss.FillMatches == boss.FillChecks,
+                $"{boss.NumeralTicks} ticks, numeral {boss.NumeralMin}-{boss.NumeralMax}, fill ticks matched the soakers at {boss.FillMatches}/{boss.FillChecks} resolves");
+            Check($"[{size}p] Verse: on every Solo the bots got off his feet (2.5 m; hits {boss.SoloFeetHits})", boss.SoloFeetHits <= 1);
             int rivets = spawned.Count(s => s.h.Source == "Rivet");
             Check($"[{size}p] Rivet Run: three casts (one above 50%, plain and under chains below), every rivet popped ({rivets}); outward X aimed at the nearest, inward X at the farthest and never on top of the first",
                 boss.RivetCasts == 3 && boss.RivetLog.Count == 3 && boss.RivetPops == rivets && boss.RivetLog.All(r => { float a = Mathf.Abs(Mathf.DeltaAngle(r.aim1, r.aim2)) % 90f; return a >= 12f && a <= 78f; }),
@@ -210,6 +213,9 @@ namespace LastBell.Run
             Check($"[{size}p] Rivet Chains: twice, {size / 2} pair(s) and {size % 2} drum chain, every chain resolved",
                 boss.ChainLog.Count == 2 && boss.ChainLog.All(c => c.pairs == size / 2 && c.drum == size % 2),
                 string.Join("; ", boss.ChainLog.Select(c => $"{c.pairs} pairs, {c.drum} drum, {c.snaps} snaps, {c.whips} whips")));
+            var wantNumerals = Enumerable.Range(1, size).Select(MechanicIcons.Order).ToList();
+            Check($"[{size}p] Rivet Chains: pairs follow the order numerals, shown over each player while chained (I-II, III-IV)",
+                boss.ChainNumerals.SequenceEqual(wantNumerals) && d.World.Players.All(p => !p.Marks.Any(m => m.StartsWith("order_"))), string.Join(",", boss.ChainNumerals));
             Check($"[{size}p] Rivet Chains: the bots stretched their chains and kept off the others' (snaps {boss.ChainSnaps}, whips {boss.ChainWhips})", boss.ChainSnaps <= 1 && boss.ChainWhips <= 1);
             Check($"[{size}p] Anvil Hymn: twice, 4 pulses each, all resolved", boss.HymnCasts == 2 && spawned.Count(s => s.h.Source == "Anvil Hymn") == 8);
             Note($"[{size}p] Anvil Hymn hits on bots: {boss.PulseHits}");
@@ -248,7 +254,7 @@ namespace LastBell.Run
             yield return Until(() => boss.Current == "between blocks", 30, "first Verse ends");
             int c0 = boss.ChorusLog.Count;
             yield return Block("Verse");
-            Check("solo Verse: the Chorus is taken alone (70) and the Solo marks are harmless", boss.ChorusLog.Skip(c0).All(x => x.inside == 1 && x.share == RivetCantorEncounter.ChorusTotal) && boss.SoloHits == 0 && boss.ChorusEmpty == 0);
+            Check("solo Verse: the Chorus is taken alone (70), the Solo mark spares its owner and the bot left his feet for it", boss.ChorusLog.Skip(c0).All(x => x.inside == 1 && x.share == RivetCantorEncounter.ChorusTotal) && boss.SoloHits == 0 && boss.SoloFeetHits == 0 && boss.ChorusEmpty == 0);
             int ch0 = boss.ChainLog.Count;
             yield return Block("Chains");
             Check("solo Chains: chained to the drum, and the bot walked 7 m clear", boss.ChainLog.Count == ch0 + 1 && boss.ChainLog.Last().drum == 1 && boss.ChainLog.Last().pairs == 0 && boss.ChainLog.Last().snaps == 0);
@@ -264,12 +270,25 @@ namespace LastBell.Run
             // stand-still: a still player next to him and a still one at long range are both hit by Rivet Run and Anvil Hymn
             Section("stand-still danger (content rules §5)");
             yield return Until(() => boss.Current == "between blocks", 20, "between blocks");
-            var melee = d.Player; melee.Input = new Still();
+            var melee = d.Player; var botInput = melee.Input; melee.Input = new Still();
             var c = Sim.Flat(boss.transform.position);
+            // an empty Chorus is a heavy hit, not a wipe; a Solo hits whoever stays on his feet
+            Place(melee, c + new Vector3(0, 0, 8f));
+            int e0 = boss.ChorusEmpty, t0 = d.World.Tick;
+            yield return Block("Verse");
+            var emptyHits = hits.Where(h => h.tick >= t0 && h.source == "Chorus" && h.who == melee).ToList();
+            Check($"empty Chorus: no wipe, {RivetCantorEncounter.EmptyChorusDmg} to everyone standing", boss.ChorusEmpty > e0 && emptyHits.Count > 0 && emptyHits.All(h => h.dmg == RivetCantorEncounter.EmptyChorusDmg) && d.State == RunState.Combat,
+                $"empty {boss.ChorusEmpty - e0}, hits {string.Join("/", emptyHits.Select(h => h.dmg))}");
+            Place(melee, Sim.Flat(boss.transform.position) + new Vector3(0, 0, 1.8f));
+            t0 = d.World.Tick;
+            yield return Block("Verse");
+            Check("Solo: a still player at his feet (1.8 m) is hit by every Solo", Hits(t0, "Solo (his feet)", melee) > 0, $"hits {Hits(t0, "Solo (his feet)", melee)}");
+            yield return Until(() => boss.Current == "between blocks", 20, "between blocks");
+            c = Sim.Flat(boss.transform.position);
             Place(melee, c + new Vector3(0, 0, 2.6f));
             var ranged = PlayerController.Spawn(d.World, "Arcanist", d.World.Constrain(c + new Vector3(0, 0, -11f), PlayerController.Radius), 0);
             ranged.Input = new Still(); ranged.AbilitiesEnabled = false; extras.Add(ranged);
-            int t0 = d.World.Tick;
+            t0 = d.World.Tick;
             yield return Block("Rivets");
             Check("Rivet Run hits a still melee player (2.6 m) and a still ranged player (11 m)", Hits(t0, "Rivet", melee) > 0 && Hits(t0, "Rivet", ranged) > 0, $"melee {Hits(t0, "Rivet", melee)}, ranged {Hits(t0, "Rivet", ranged)}");
             Place(melee, Sim.Flat(boss.transform.position) + new Vector3(0, 0, 2.6f)); Place(ranged, Sim.Flat(boss.transform.position) + new Vector3(0, 0, -11f));
@@ -285,7 +304,7 @@ namespace LastBell.Run
             extras.Clear();
             boss.DebugDefeat();
             yield return null; yield return null;
-            Check("solo defeat: nothing left behind", d.World.Hazards.Count == 0 && boss.GlyphCount == 0);
+            Check("solo defeat: nothing left behind (no hazards, glyphs or Chorus numeral)", d.World.Hazards.Count == 0 && boss.GlyphCount == 0 && boss.ChorusNeed == -1);
         }
 
         void Finish()
