@@ -9,11 +9,14 @@ namespace LastBell.Run
     // hit and, when the killing blow is a catalogued attack, shows its icon (screenshots with the details tooltip pinned).
     public sealed partial class RunAutoTest
     {
-        // the Aurelion IDs among the 20 Chzy18 approved on 2026-10-23 (ability-icons 0d0555a) and the Crucivar v4 icons he
-        // accepted on 2026-11-02, written out here so the catalog can't drift unnoticed. Normal Bellkeeper v2 is retired.
+        // the Aurelion IDs among the 20 Chzy18 approved on 2026-10-23 (ability-icons 0d0555a), the 11 Sylvara v3 IDs approved on
+        // 2026-11-02 and the Crucivar v4 icons accepted on 2026-11-02 (both work/attack-icons-20261102), written out here so the
+        // catalog can't drift unnoticed. Normal Bellkeeper v2 is retired.
         static readonly string[] ApprovedAttackIds =
         {
             "aurelion.meridian_lances", "aurelion.starfall_mirror", "aurelion.noon_shadow", "aurelion.orrery_closing", "aurelion.hour_hands",
+            "sylvara.spiral_bloom", "sylvara.seed_pods", "sylvara.waterfall_jets", "sylvara.pruning_arc", "sylvara.two_colour_choir",
+            "sylvara.toll_burst", "sylvara.root_ring", "sylvara.hollow_bloom", "sylvara.bud_bloom", "sylvara.seed_storm", "sylvara.last_storm",
             "crucivar.ember_brand", "crucivar.furnace_spin", "crucivar.backdraft", "crucivar.casting_order", "crucivar.anvil_quake",
             "crucivar.quake_echo", "crucivar.foundry_uprising", "crucivar.lane_stream", "crucivar.ring_wave", "crucivar.spiral_arm",
             "crucivar.pour_flood", "crucivar.mould_towers", "crucivar.tower_slag", "crucivar.molten_crown", "crucivar.furnace_eruption",
@@ -41,6 +44,8 @@ namespace LastBell.Run
                 ("Brand Pool", "crucivar", "crucivar.ember_brand"), ("Crown Rise", "crucivar", "crucivar.molten_crown"),
                 ("Pour Flood", "crucivar", "crucivar.pour_flood"), ("Furnace Spin", "aurelion", null),
                 ("Bell Sweep", "bellkeeper", null), ("Leaning Bell", "bellkeeper", null), ("Meridian Lances", "sylvara", null),
+                ("Seed Pod", "sylvara", "sylvara.seed_pods"), ("Seed Burst", "sylvara", "sylvara.seed_storm"), ("Pruning Arc (back)", "sylvara", "sylvara.pruning_arc"),
+                ("Cobalt Lane", "sylvara", "sylvara.two_colour_choir"), ("Choir Bud", "sylvara", null),
             };
             var wrong = cases.Where(c => BossAttackIcons.Resolve(null, c.source, c.boss)?.id != c.id).Select(c => $"{c.boss}/{c.source}").ToList();
             Check("hazard sources resolve to the right boss attack (or none)", wrong.Count == 0, wrong.Count == 0 ? $"{cases.Length} cases" : string.Join(", ", wrong));

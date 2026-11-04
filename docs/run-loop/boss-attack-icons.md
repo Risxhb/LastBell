@@ -2,7 +2,7 @@
 
 Codex made 20 boss attack icons, one for each v2 attack of the four main bosses. Chzy18 approved all 20 on 23 October 2026 (ability-icons commit `0d0555a`). This page explains how the run loop shows them and what each boss branch needs to do.
 
-> **On the current player (`feature/confrontation-menu`, 26 October 2026):** this branch carries only **Aurelion's 5 icons**. Normal Bellkeeper v2 is retired. Crucivar's v4 icons (17 entries) come with Azure PR 19; see the Crucivar notes below. The per-boss notes below still describe the other bosses for when their icons come back.
+> **On the current player (`feature/confrontation-menu`, 26 October 2026):** this branch carries **Aurelion's 5 icons**, **Sylvara v3's 11** from PR 16 and **Crucivar v4's 17** from PR 19 (33 in all). Normal Bellkeeper v2 is retired. See the Crucivar notes below. The per-boss notes below still describe the other bosses for when their icons come back.
 >
 >  Risx removed the boss panel's attack warning rows on 24 October (telegraphs on the floor carry the warning). So on this player a boss attack icon shows in the death recap, the attack tooltip and the Down card. It appears in the boss panel only on a row for a hazard tagged with a mechanic (see `mechanic-icons.md`).
 
@@ -61,10 +61,8 @@ Sub-hazards that one attack spawns (rims, crowns, blasts, stamps, echoes) inheri
 - Tower Slag reuses the Ember Brand picture and Molten Overflow the Furnace Eruption picture, each under its own name. The icons sample bullet counts, so they're always drawn with the attack name, as everywhere else.
 - `crucivar.v4_attack_icons` in the Crucivar suite runs each phase solo on Hard and checks that every hazard and hit names a Crucivar attack with an icon.
 
-### Sylvara (`feature/sylvara-abilities-v2`)
-- `SylvaraAbility.Id` is the short form (`verdant_canticle`), so use `h.AttackId ??= "sylvara." + Id;`. The natural place is `SylvaraEncounter.Tuned`/`Tune`, or each ability's spawn calls.
-- Today's names resolve: `Verdant Canticle I–III`, `Two Choirs`, `Listening Roots: Hush/Chorus/root ring` and `Refrain Seed bloom/burst` (the older `RefrainSeed …` spelling has an alias).
-- Antiphon's answer is spawned by Two Choirs' `ResolveVerse`, with `Source = "Two Choirs"`, so **its hits currently show as Two Choirs**. Setting `answer.AttackId = "sylvara.antiphon";` in `Antiphon.Step`, right after `verse.ResolveVerse(...)`, fixes that. It's the one real gap on any branch, and the fallback can't fix it.
+### Sylvara (`feature/sylvara-v3`)
+- **Wired (2 Nov 2026).** Chzy18 approved Codex's 11 v3 icons (`work/attack-icons-20261102`); they are in the catalog as `sylvara.*`. Bullets carry an `AttackId` too (`BulletSystem.Bullet.AttackId`, copied onto the hit), and `SylvaraEncounter.AttackOf(source)` sets it on every bullet and hazard. Sources repeat across phases, so the choice uses context: the spiral is Two-Colour Choir in Phase 2, and the spiral and seeds are Last Storm once the enrage starts. The harmless Choir Bud bloom timer has no ID. The icons show approximate bullet counts, so the name always appears with them.
 
 ### Bellkeeper (`feature/bellkeeper-abilities-v2`)
 - `BellkeeperAbility.Id` is the full ID, so add `h.AttackId ??= Id;` in `BellkeeperAbility.Spawn`.
