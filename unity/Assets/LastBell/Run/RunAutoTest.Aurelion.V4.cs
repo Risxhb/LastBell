@@ -173,8 +173,8 @@ namespace LastBell.Run
             V3Bot(V2Main, BotMode.Perfect);
             yield return V3FireToppedUp(sv.Run(), 40);
             V2Check("solo: the perfect route stays ahead of the turning line and never crosses it", sv.Crossings == 0 && !V4Wiped, $"{sv.Crossings} crossings; hits {string.Join(", ", V2HitsOn(V2Main).Select(h => h.Source))}");
-            // 3 Nov: the halves' circles fall every 1.5 s on one half or the other, so about 9 in 15 s solo (one per beat)
-            V2Check("Severance halves: a circle falls at your feet on each beat (3 Nov)", sv.HalfCircles >= 6, $"{sv.HalfCircles} circles");
+            // 3 Nov: every 3 s a circle falls on Day and 1.5 s later on Night; solo you get your own half's beats, about 4-5 in 15 s
+            V2Check("Severance halves: a circle falls at your feet on your half's beat (3 Nov)", sv.HalfCircles >= 4, $"{sv.HalfCircles} circles");
             V3Unbot();
 
             // standing still just ahead of the line's sweep: it passes over you

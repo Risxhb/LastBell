@@ -20,7 +20,7 @@ namespace LastBell.Run
         {
             (new Vector3(1.5f, 0, 1.0f), 7.0f, 1f, 0f),
             (new Vector3(-1.0f, 0, -1.5f), 9.5f, -1f, 180f),
-            (Vector3.zero, 3.5f, 1f, 90f),   // 3 Nov: a tight inner orbit, through the middle of the dais
+            (Vector3.zero, 12.0f, 1f, 90f),  // 3 Nov: a wide orbit near the rim, clear of the Zenith Collapse disc (an inner one forced bots out of it)
         };
         // coral, not gold: the Skyward floor already has gold rings, and a gold path vanished among them (2 Nov shots)
         static readonly Color PathFill = new Color(0.45f, 0.16f, 0.13f, 0.0f), PathEdge = new Color(0.45f, 0.16f, 0.13f, 0.3f);   // dim: the path never hurts, only the planet
@@ -75,6 +75,18 @@ namespace LastBell.Run
             planets.Clear();
         }
         public override void Abort() => End();
+
+        // bots: is q in a planet's way now or within `seconds` (sampled every 0.2 s along its orbit)?
+        public bool Near(Vector3 q, float seconds, float pad)
+        {
+            for (int i = 0; i < planets.Count; i++)
+            {
+                var p = planets[i]; var o = Orbits[p.Orbit];
+                for (float t = 0; t <= seconds + 0.01f; t += 0.2f)
+                    if (Sim.Flat(q - Pos(o, p.Angle + o.dir * Speed / o.r * Mathf.Rad2Deg * t)).magnitude < Radius + pad) return true;
+            }
+            return false;
+        }
 
         static Vector3 Pos((Vector3 centre, float r, float dir, float start) o, float deg) => o.centre + Sim.Dir(deg) * o.r;
     }

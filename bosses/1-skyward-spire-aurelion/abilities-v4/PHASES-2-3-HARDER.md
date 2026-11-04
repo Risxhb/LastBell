@@ -34,7 +34,7 @@ Damage is unchanged; every change is something to dodge or less time.
   - **Each half now has its own danger.** Every 3 s a 2.5 m circle falls at the feet of everyone in Day; 1.5 s later one falls at the feet of everyone in Night. The circles use Falling Meridians' size, warning (1.2 s, Easy 1.5, Hard 1.0) and damage (30). So both halves keep moving, in turn, while staying on their side of the line. Solo, the circles follow whichever half you stand in.
   - Its Starfall and Lances patterns run back to back, with shorter gaps, to fit the 15 s.
 - **Phase 3:** Falling Meridians every 3.5 s (was 5 s). Windows ×0.75 (was ×0.8); on Medium the Collapse window is now 1.91 s.
-- **Phase 2:** three Errant Planets (Easy still one; was two) at 5.5 m/s (was 4.5). The third circles a tight 3.5 m orbit through the middle of the dais. Windows ×0.85 (was ×0.9); the Collapse window on Medium is 2.17 s.
+- **Phase 2:** three Errant Planets (Easy still one; was two) at 5.5 m/s (was 4.5). The third circles a wide 12 m orbit near the rim, clear of the Zenith Collapse disc. Windows ×0.85 (was ×0.9); the Collapse window on Medium is 2.17 s.
 - Code: `Severance.cs`, `FallingMeridians.cs`, `ErrantPlanets.cs`, `AurelionAbility.cs` (P2Window / P3Window).
 
 ### Open questions
