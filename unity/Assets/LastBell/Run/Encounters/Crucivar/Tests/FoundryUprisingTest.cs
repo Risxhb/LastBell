@@ -20,7 +20,7 @@ namespace LastBell.Run
             int c0 = t.W.Tick;
             t.Begin(up.Run());
             yield return t.Seconds(3f);
-            t.Check("4 players: three turrets, three castings as boss parts", up.Turrets.Count == 3 && t.W.Parts.Count(p => p.Alive) == 3, $"{up.Turrets.Count} turrets, {t.W.Parts.Count} parts");
+            t.Check("4 players: two turrets, two castings as boss parts", up.Turrets.Count == 2 && t.W.Parts.Count(p => p.Alive) == 2, $"{up.Turrets.Count} turrets, {t.W.Parts.Count} parts");
             t.Check("each casting sits 7.5 m out, across the arena from its turret", up.Turrets.All(x => Mathf.Abs(Sim.Flat(x.Casting.Pos).magnitude - FoundryUprising.CastRing) < 0.05f && Vector3.Dot(Sim.Flat(x.Pos).normalized, Sim.Flat(x.Casting.Pos).normalized) < -0.99f));
             t.Check("Pour Flood lands at 30 s", up.Flood != null && up.Flood.ResolveAt == Sim.Ticks(30f), $"{up.Flood?.ResolveAt}");
 
@@ -52,7 +52,8 @@ namespace LastBell.Run
             t.Check("killing every casting sinks every turret and ends the uprising", !t.Boss.TestBusy && up.Turrets.All(x => !x.Up) && !t.W.Parts.Any(p => p.Alive));
             // bullets already in flight still land: keep the still party standing (the denser volleys of 11-01 down it)
             for (s = 0; s < 2f; s += Time.deltaTime) { foreach (var p in t.Party) p.DebugSetHp(PlayerController.MaxHp); yield return null; }
-            t.Check("no flood once the turrets are down", t.Party.All(p => !p.Down) && up.Floods == 0);
+            // a still dummy can go down to bullets before the castings die (two turrets aim differently since 4 Nov); the check is the flood
+            t.Check("no flood once the turrets are down", up.Floods == 0 && !t.Hits.Any(h => h.Source == "Pour Flood"), $"floods {up.Floods}, down: {string.Join(",", t.Party.Where(p => p.Down).Select(p => t.Party.IndexOf(p)))}");
             t.Check("one hit per instance", t.OneHitPerInstance());
             yield return t.Shot("v4_foundry_uprising");
 

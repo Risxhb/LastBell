@@ -111,6 +111,7 @@ namespace LastBell.Run
         public void Note(string s) { lines.Add("      " + s); Debug.Log("[crucivar-test] " + s); }
         public IEnumerator Shot(string name)
         {
+            if (Application.isBatchMode) yield break;   // -batchmode (the default since 4 Nov): no end of frame to wait for; shots need a windowed run
             yield return new WaitForEndOfFrame();
             var tex = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
             tex.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0); tex.Apply();

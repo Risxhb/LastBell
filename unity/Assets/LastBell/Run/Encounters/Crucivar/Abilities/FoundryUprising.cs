@@ -6,7 +6,7 @@ namespace LastBell.Run
 {
     // Ability set v4, Phase 2 "Foundry Uprising" (proposal, abilities-v4/P2-FOUNDRY-UPRISING.md; Chzy18's turret add idea,
     // 2026-10-27, its own phase with the boss fighting). One Run is one uprising:
-    //   0.0  2-4 lava turrets rise from the rim (2.5 s, harmless), each with a Molten Casting poured 7.5 m out on the far
+    //   0.0  2 lava turrets rise from the rim (2.5 s, harmless), each with a Molten Casting poured 7.5 m out on the far
     //        side of the arena: same numeral, a chain between them. A casting is a BossPart (melee and ranged hit it);
     //        half the damage it takes also hits Crucivar (painshare). Killing it sinks its turret.
     //  2.5  turrets fire: every pattern first draws its real path for 2.0 s (Lane Stream, Ring Wave, Spiral Arm), then
@@ -47,7 +47,7 @@ namespace LastBell.Run
         readonly List<(Turret tu, float a0, int start)> spirals = new List<(Turret, float, int)>();
         readonly List<(int at, System.Action fire)> later = new List<(int, System.Action)>();   // the second Ring Wave
 
-        public int TurretCount(int fighters) => fighters <= 3 ? 2 : 3;   // 1-4 players (Chzy18 11-01)
+        public int TurretCount(int fighters) => 2;   // every party size (Chzy18 4 Nov: the third turret at 4 players was too much; was 3 at 4 since 11-01)
 
         public IEnumerable<int> Run()
         {

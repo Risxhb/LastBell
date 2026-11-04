@@ -84,7 +84,7 @@ The difficulty damage scale is unchanged (damage scale only, per the difficulty 
 v4 is the only Crucivar fight now. The packet's five attacks (v1), ability sets v2 and v3, their tests (the old "v1" suite and the v2/v3 checks), the v2/v3 escape check and `-lastbellAbilitySet` / `-lastbellAbility` for Crucivar were removed. The Crucivar autotest is now `CrucivarAutoTest` (`-crucivarTest`, was `CrucivarV2AutoTest` / `-crucivarV2Test`) and runs only the v4 checks (Chzy18, 1 Nov: no tests on retired boss versions). The Mould Towers look and the Hard Second Press numbers that v4 borrowed from v2 were kept.
 
 ## 1–4 players (Chzy18, 1 Nov)
-The game is now 1–4 players. Mould Towers use two towers per set for 2–4 players, Phase 2 has at most 3 turrets, and the 5–8-player layouts and tests are gone.
+The game is now 1–4 players. Mould Towers use two towers per set for 2–4 players, Phase 2 has two turrets at every party size (Chzy18, 4 Nov: three at 4 players was too much), and the 5–8-player layouts and tests are gone.
 
 ## Playtest changes, 1 Nov (proposal)
 Chzy18's playtest found Phases 1 and 2 too easy, Phase 2 short on bullets, and unavoidable damage in the soak and pool mechanics.
