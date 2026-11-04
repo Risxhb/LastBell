@@ -445,7 +445,7 @@ namespace LastBell.Run
             else if (Attacks && AttackSpot(me, boss, out var spot)) home = Sim.Flat(spot);
             volReach = Attacks && !carrier; volPull = 0.6f;
             // a downed ally to revive (no brand on this bot): their side is home, and no swing there (it breaks the channel)
-            bool reviving = !carrier && ReviveSpot(me, pos, out var reviveAt);
+            var reviveAt = Vector3.zero; bool reviving = !carrier && ReviveSpot(me, pos, out reviveAt);
             if (reviving) { home = reviveAt; volReach = false; volPull = 2f; dJob = "volley-revive"; }
             // in a fan its bullets are still to cross: the nearest spot clear of every path is the goal (the look is too short
             // to find a Ring Wave's gap metres away: the solo bot ran from the wall of bullets into the corner, 11-03)
