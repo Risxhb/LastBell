@@ -124,7 +124,9 @@ namespace LastBell.Run
         }
 
         // dev / test hook: defeat now (goes through the same path as a killing blow)
-        public void DebugDefeat() { if (!Dead) { HpFloor = 0; Hp = 1; TakeHit(1, transform.position + Vector3.up * HitHeight); } }
+        // A boss whose OnHurt holds HP (the Chimebound Oracle at 50% until his Grand Toll ends) still falls: the hold would
+        // otherwise refill him and the run tests, which now meet minibosses in runs, could never clear him.
+        public void DebugDefeat() { if (!Dead) { HpFloor = 0; Hp = 1; TakeHit(1, transform.position + Vector3.up * HitHeight); if (!Dead) { Hp = 0; Die(); } } }
         public virtual float NextPhaseFraction() => Hp > MaxHp * 0.7f ? 0.69f : 0.34f;   // F8: just below the next threshold
         public void DebugSetHpFraction(float f){ if (!Dead) Hp = Mathf.Clamp(Mathf.RoundToInt(MaxHp * f), 1, MaxHp); }
 

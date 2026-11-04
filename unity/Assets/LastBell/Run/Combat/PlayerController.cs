@@ -152,6 +152,9 @@ namespace LastBell.Run
             if (refillPotions) Potions = MaxPotions + Shop.ItemHooks.ExtraPotions(this);
         }
 
+        // campaign travel: the potions left when the run moved to the next arena (RunDirector.ResumeCarried)
+        public void CarryPotions(int potions) => Potions = Mathf.Max(0, potions);
+
         bool DrinkPotion()
         {
             if (Down || Potions == 0 || Hp >= MaxHealth || sincePotion < PotionLockout) return false;

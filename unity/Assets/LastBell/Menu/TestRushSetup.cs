@@ -153,6 +153,7 @@ namespace LastBell.Menu
 #endif
             if(!RunMaps.InBuild(map))return "Arena unavailable in this build.";
             if(!Preview(map))return "Current arena preview unavailable. Launch is disabled.";
+            if(encounter==Campaign.BonusIndex&&!Campaign.OverclockedUnlocked)return Campaign.LockedReason;   // campaign unlock
             // Current bosses create their own shapes/props and use shared arena bounds. BossEntry.Map is an authored
             // default, not a geometry dependency. New encounters requiring scene objects must add a capability check here.
             return null;
@@ -160,7 +161,7 @@ namespace LastBell.Menu
         void Refresh()
         {
             for(int i=0;i<mapLabels.Length;i++){mapLabels[i].text=RunMaps.All[i].Name+(Preview(i)?"":" (unavailable)");mapFocus[i].Chosen=i==MapIndex;}
-            for(int i=0;i<encounterLabels.Length;i++){encounterLabels[i].text=CardName(i);encounterFocus[i].Chosen=i==EncounterIndex;}
+            for(int i=0;i<encounterLabels.Length;i++){encounterLabels[i].text=CardName(i)+(i==Campaign.BonusIndex&&!Campaign.OverclockedUnlocked?" (locked)":"");encounterFocus[i].Chosen=i==EncounterIndex;}
             int phaseCount=PhasesOf(EncounterIndex);PhaseIndex=Mathf.Clamp(PhaseIndex,1,phaseCount);
             for(int p=0;p<PhaseButtons.Length;p++){PhaseButtons[p].gameObject.SetActive(p<phaseCount);phaseFocus[p].Chosen=p+1==PhaseIndex;}
             phaseNote.text=Spaced(phaseCount==1?"Phase 1 only":phaseCount.ToString("00")+" phases");
@@ -279,7 +280,7 @@ namespace LastBell.Menu
         // spaces; the Tutorial uses the Tempo Tyrant's.
         public static Texture2D Portrait(int encounter)
         {
-            var name=CardName(encounter);if(name.StartsWith("Tutorial"))name="Tempo Tyrant";
+            var name=CardName(encounter);if(name.StartsWith("Tutorial")||name.EndsWith("Tempo Tyrant"))name="Tempo Tyrant";
             return Resources.Load<Texture2D>("Menu/BossPortraits/"+new string(System.Array.FindAll(name.ToCharArray(),char.IsLetterOrDigit)));
         }
         // Fighter card: the boss's portrait under the arena card's frame (number, gold accent, focus). Boss cards show the

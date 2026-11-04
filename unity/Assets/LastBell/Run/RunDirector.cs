@@ -9,10 +9,12 @@ namespace LastBell.Run
     public enum RunState { Menu, Ready, Intro, Combat, Cleared, Downed, Results }
     public enum RunMode { Run, Practice }
 
-    // Run flow in the single arena:
-    //   Menu -> Ready (preparation) -> [Intro -> Combat -> Cleared] for each boss in Bosses -> Results (victory)
-    // Each fresh run shuffles Aurelion, Sylvara and Crucivar, then finishes with Bellkeeper.
-    // Removed stand-in minibosses and intermission remain absent. Practice fights only its selected boss.
+    // Run flow (the campaign, Campaign.cs):
+    //   Menu -> Ready (preparation) -> [Intro -> Combat -> Cleared] for each fight in EncounterOrder -> Results (victory)
+    // A run is the tutorial (first run only), then each area's three minibosses (shuffled) and its area boss, one arena at
+    // a time, then the Bellkeeper; a Hard Bellkeeper win appends the Overclocked Tempo Tyrant. When the next fight is in
+    // another arena the run travels (TravelTo): the state is carried across the scene load. The shop opens before area
+    // bosses and the Bellkeeper. Practice fights only its selected boss.
     //   any Combat -> Downed -> Results (defeat).  Results -> Retry (fresh run, encounter 1) or Menu.
     // Practice runs one chosen encounter with the same rules and never advances or unlocks the run.
     // Every transition goes through Go(), which bumps a generation number: timers and requests from an older state are
@@ -69,16 +71,14 @@ namespace LastBell.Run
             // Brass Foundry miniboss, practice only (docs/bosses/rivet-cantor.md, a proposal; placeholder visuals). After the
             // tutorial so the earlier entries' indices don't move.
             new BossEntry("Rivet Cantor (practice)", w => BossEncounter.Spawn<RivetCantorEncounter>(w, new Vector3(0, 0, -1.5f), 0), inRun: false, map: CrucivarMap, phases: 2),
+            // The campaign's bonus fight after a Hard Bellkeeper win (Campaign.cs); its Boss Rush card is locked until then.
+            // Phase 2 is Broken Cadence, which he enters below 50%. Kept last so the other entries' indices don't move.
+            new BossEntry(Campaign.BonusName, w => TempoTyrantEncounter.SpawnOverclocked(w, new Vector3(0, 0, -2f), 0), inRun: false, map: TempoTyrantMap, phases: 2),
         };
-        // Catalog eligibility is stable; each run owns its shuffled sequence, with final encounters appended.
+        // The area bosses and the final boss (InRun entries). Each run's own sequence is the campaign (Campaign.CreateOrder),
+        // which also puts each area's minibosses before its boss.
         public static readonly int[] RunOrder = Enumerable.Range(0, Bosses.Length).Where(i => Bosses[i].InRun).OrderBy(i => Bosses[i].Final).ToArray();
-        public static int[] CreateRunOrder(System.Random random = null)
-        {
-            random = random ?? new System.Random(Guid.NewGuid().GetHashCode());
-            var opening = RunOrder.Where(i => !Bosses[i].Final).ToArray();
-            for (int i = opening.Length - 1; i > 0; i--) { int j = random.Next(i + 1); int swap = opening[i]; opening[i] = opening[j]; opening[j] = swap; }
-            return opening.Concat(RunOrder.Where(i => Bosses[i].Final)).ToArray();
-        }
+        public static int[] CreateRunOrder(System.Random random = null) => Campaign.CreateOrder(random, Campaign.TutorialFirst);
         public int[] EncounterOrder { get; private set; } = (int[])RunOrder.Clone();
         public static int SylvaraPractice => Array.FindIndex(Bosses, b => b.Map == SylvaraMap);
         public const string SylvaraMap = "verdant-chimes";
@@ -121,6 +121,9 @@ namespace LastBell.Run
         public int StateTicks { get; private set; }
         public float IntroProgress => Mathf.Clamp01((float)StateTicks / IntroTicks);
         public bool Victory { get; private set; }
+        public bool BonusFight => Mode == RunMode.Run && Encounter == Campaign.BonusIndex;   // the Overclocked Tempo Tyrant
+        public bool BonusLost { get; private set; }   // downed in the bonus fight: the run was already won
+        public bool Travelling { get; private set; }  // a scene load to the next arena is under way
         public string DefeatCause { get; private set; }
         public int RunTicks { get; private set; }
         public int EncountersCleared { get; private set; }
@@ -198,8 +201,7 @@ namespace LastBell.Run
         public bool StartRun(string className) => StartRun(className, CreateRunOrder());
         public bool StartRun(string className, int[] order)
         {
-            if (State != RunState.Menu || order == null || order.Length != RunOrder.Length ||
-                !order.OrderBy(i => i).SequenceEqual(RunOrder.OrderBy(i => i)) || !Bosses[order[order.Length - 1]].Final) return false;
+            if (State != RunState.Menu || !Campaign.Valid(order)) return false;
             EncounterOrder = (int[])order.Clone();
             return Begin(RunMode.Run, className, EncounterOrder[0]);
         }
@@ -226,6 +228,7 @@ namespace LastBell.Run
         void Start()
         {
             if (LastBell.Menu.MenuLaunch.Consume(this)) { pendingPractice = null; return; }
+            if (Campaign.Pending != null && Instance == this) { ResumeCarried(); return; }
             if (pendingPractice == null || Instance != this) return;
             var (cls, enc, ph) = pendingPractice.Value; pendingPractice = null;
             Begin(RunMode.Practice, cls, enc, ph);
@@ -287,6 +290,14 @@ namespace LastBell.Run
         {
             if (State != RunState.Results && !Paused) return false;
             var mode = Mode; var cls = ClassName; int enc = Mode == RunMode.Practice ? practiceEncounter : EncounterOrder[0];
+            if (mode == RunMode.Run)
+            {
+                // a fresh run of the same campaign: no tutorial (it's been seen) and no bonus until it is earned again
+                var order = EncounterOrder.Where(i => i != Campaign.BonusIndex && i != TutorialPractice).ToArray();
+                if (Campaign.Valid(order)) EncounterOrder = order;
+                enc = EncounterOrder[0];
+                if (Campaign.Travel && TravelTo(enc, fresh: true)) return true;
+            }
             Teardown();
             Mode = mode; ClassName = cls; BuildRun(enc); Go(RunState.Ready);
             return true;
@@ -340,7 +351,7 @@ namespace LastBell.Run
                 Allies.Add(a);
             }
             Encounter = startEncounter; practiceEncounter = startEncounter;
-            RunTicks = 0; EncountersCleared = 0; Victory = false; DefeatCause = null;
+            RunTicks = 0; EncountersCleared = 0; Victory = false; BonusLost = false; DefeatCause = null;
             acc = 0;
         }
 
@@ -364,16 +375,16 @@ namespace LastBell.Run
             ApplyPracticePhase();   // the boss bar shows the chosen phase during the intro
             World.Boss = Boss;
             World.CombatActive = false;
-            // health policy (gpt/08 §3): every run boss after the first refills health, and an area's final boss also refills
-            // potions. Every boss in the run is an area boss for now (minibosses aren't in runs yet), so all of them refill both.
-            // A practice starts with a fresh player.
+            // health policy (gpt/08 §3): every run fight after the first refills health; potions carry over between minibosses
+            // and refill before an area boss and the final boss (Campaign.RefillsPotions). A practice starts with a fresh player.
             int pos = Array.IndexOf(EncounterOrder, index);
-            if (Mode == RunMode.Run && pos > 0) Player.RefreshHealth(refillPotions: true);
+            bool potions = Campaign.RefillsPotions(index);
+            if (Mode == RunMode.Run && pos > 0) Player.RefreshHealth(refillPotions: potions);
             Player.PrepareForEncounter(PlayerSocket, 180);
             Player.AbilitiesEnabled = false;
             for (int i = 0; i < Allies.Count; i++)
             {
-                if (Mode == RunMode.Run && pos > 0) Allies[i].RefreshHealth(refillPotions: pos == RunOrder.Length - 1);
+                if (Mode == RunMode.Run && pos > 0) Allies[i].RefreshHealth(refillPotions: potions);
                 Allies[i].PrepareForEncounter(AllySocket(i), 180); Allies[i].AbilitiesEnabled = false;
             }
             Go(RunState.Intro);
@@ -434,11 +445,12 @@ namespace LastBell.Run
                     }
                 }
             }
-            if (World == null || Paused) return;
+            if (World == null || Paused || Travelling) return;
             acc += Mathf.Min(Time.deltaTime, 0.1f);
             int guard = 0;
             SimSmoother.RestoreAll();   // ticks see exact sim poses
-            while (acc >= Sim.Dt && guard++ < 8) { acc -= Sim.Dt; Tick(); SimSmoother.CaptureAll(); }
+            while (acc >= Sim.Dt && guard++ < 8 && !Travelling && World != null) { acc -= Sim.Dt; Tick(); SimSmoother.CaptureAll(); }
+            if (World == null) return;
             SimSmoother.PresentAll(acc / Sim.Dt);   // draw between the last two ticks: smooth at any frame rate
             World?.Bullets.Draw(World.Root);
         }
@@ -469,6 +481,7 @@ namespace LastBell.Run
                     {
                         EndCombat(true);
                         EncountersCleared++;
+                        OnCleared();
                         Go(RunState.Cleared);
                     }
                     break;
@@ -478,15 +491,77 @@ namespace LastBell.Run
                         if (Boss) { Destroy(Boss.gameObject); Boss = null; World.Boss = null; }
                         if (Mode == RunMode.Practice) { Victory = true; Go(RunState.Results); }
                         else if (Array.IndexOf(EncounterOrder, Encounter) == EncounterOrder.Length - 1) { Victory = true; Go(RunState.Results); }
-                        // run shop: the intermission before the next boss is its preparation (Ready), where the shop opens
-                        else if (Shop.RunShopFlow.Enabled) { Encounter = EncounterOrder[Array.IndexOf(EncounterOrder, Encounter) + 1]; Go(RunState.Ready); }
-                        else BeginIntro(EncounterOrder[Array.IndexOf(EncounterOrder, Encounter) + 1]);
+                        else
+                        {
+                            int next = EncounterOrder[Array.IndexOf(EncounterOrder, Encounter) + 1];
+                            // another arena: carry the run into its scene, where it continues at Ready
+                            if (Campaign.Travel && TravelTo(next, fresh: false)) return;
+                            // run shop: the intermission before an area boss or the final boss is its preparation (Ready)
+                            if (Shop.RunShopFlow.Enabled && Campaign.ShopBefore(next)) { Encounter = next; Go(RunState.Ready); }
+                            else BeginIntro(next);
+                        }
                     }
                     break;
                 case RunState.Downed:
-                    if (StateTicks >= DownedTicks) { Victory = false; Go(RunState.Results); }
+                    // the bonus fight comes after the run is won: losing it still ends the run in victory
+                    if (StateTicks >= DownedTicks) { BonusLost = BonusFight; Victory = BonusLost; Go(RunState.Results); }
                     break;
             }
+        }
+
+        // ---------------- campaign ----------------
+        // A fight was won: save tutorial / unlock progress, and a Hard Bellkeeper win earns the bonus fight.
+        void OnCleared()
+        {
+            if (Encounter == TutorialPractice && !Campaign.TutorialDone) { Campaign.TutorialDone = true; Log.Add("campaign: tutorial done"); }
+            if (Mode != RunMode.Run || Encounter != Campaign.FinalIndex || Difficulty != Difficulty.Hard) return;
+            if (!Campaign.OverclockedUnlocked) { Campaign.OverclockedUnlocked = true; Log.Add("campaign: Overclocked Tempo Tyrant unlocked"); }
+            int bonus = Campaign.BonusIndex;
+            if (bonus >= 0 && Array.IndexOf(EncounterOrder, bonus) < 0 && Array.IndexOf(EncounterOrder, Encounter) == EncounterOrder.Length - 1)
+            { EncounterOrder = EncounterOrder.Concat(new[] { bonus }).ToArray(); Log.Add("campaign: bonus fight added"); }
+        }
+
+        // Loads the arena of `next` if it isn't this one; the new scene's director resumes the run (ResumeCarried).
+        // fresh: a Retry (a new run from fight 1). Returns false when the fight is on this map or its scene isn't built.
+        bool TravelTo(int next, bool fresh)
+        {
+            int map = RunMaps.IndexOf(Campaign.MapFor(next));
+            if (map < 0 || map == RunMaps.Current || !RunMaps.InBuild(map)) return false;
+            var c = new Campaign.Carry
+            {
+                ClassName = ClassName, Difficulty = Difficulty, AllyCount = AllyCount, Order = (int[])EncounterOrder.Clone(), Next = next,
+                RunsStarted = fresh ? RunsStarted + 1 : RunsStarted, RunTicks = fresh ? 0 : RunTicks, EncountersCleared = fresh ? 0 : EncountersCleared,
+                Fresh = fresh, Scene = RunMaps.All[map].RunScene,
+            };
+            if (!fresh && Player) { c.Potions = Player.Potions; c.AllyPotions = Allies.Select(a => a.Potions).ToArray(); }
+            if (!fresh && Shop.RunShopFlow.Instance) Shop.RunShopFlow.Instance.CarryForTravel();
+            else Shop.RunShopFlow.DropCarried();
+            Campaign.Pending = c;
+            Log.Add($"{Time.frameCount}: travel to {RunMaps.All[map].Id} for {Bosses[next].Name}{(fresh ? " (fresh run)" : "")}");
+            Debug.Log($"[run] travel -> {RunMaps.All[map].Id} · next {Bosses[next].Name}{(fresh ? " · fresh run" : "")}");
+            Travelling = true; Paused = false;
+            if (Boss) { Destroy(Boss.gameObject); Boss = null; }
+            Teardown();
+            RunMaps.Load(map);
+            return true;
+        }
+
+        // The new arena's director: rebuild the carried run and wait at Ready (the shop opens there before an area boss).
+        void ResumeCarried()
+        {
+            var c = Campaign.Pending; Campaign.Pending = null; pendingPractice = null;
+            var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene().path;
+            if (c.Scene != null && !string.Equals(scene, c.Scene, StringComparison.OrdinalIgnoreCase))
+            { Debug.LogError($"[run] travel: expected {c.Scene}, loaded {scene}"); Shop.RunShopFlow.DropCarried(); return; }
+            Mode = RunMode.Run; ClassName = c.ClassName; Difficulty = c.Difficulty; AllyCount = c.AllyCount;
+            EncounterOrder = c.Order; PracticePhase = 1;
+            RunsStarted = c.RunsStarted - 1;   // BuildRun counts this one
+            BuildRun(c.Next);
+            RunTicks = c.RunTicks; EncountersCleared = c.EncountersCleared;
+            if (c.Potions >= 0) Player.CarryPotions(c.Potions);
+            for (int i = 0; c.AllyPotions != null && i < Allies.Count && i < c.AllyPotions.Length; i++) Allies[i].CarryPotions(c.AllyPotions[i]);
+            Log.Add($"{Time.frameCount}: arrived at {RunMaps.CurrentName} for {Bosses[c.Next].Name}");
+            Go(RunState.Ready);
         }
 
         void LateUpdate()
