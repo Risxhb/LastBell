@@ -25,7 +25,7 @@ Chzy18 said "P2 and 3 are too easy and p4 needs to start immediately when it hit
 - **Melee and ranged:** both are in danger, since the planets cross every radius and the circles follow each player.
 - **1–4 players:** there is one circle per player, and the planets are the same for any party size.
 
-## Round 2: harder again, Severance faster (3 Nov, proposal, done as recommended)
+## Round 2: harder again, Severance faster (accepted 3 Nov)
 Chzy18 after a playtest: "I want them harder especially p3. The day night mechanic really doesn't do much at all. it is very slow."
 Damage is unchanged; every change is something to dodge or less time.
 - **Severance (Day and Night), Phase 3:**
