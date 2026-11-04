@@ -30,6 +30,7 @@ namespace LastBell.Run
         // -lastbellAllyAttack turns their class rotation on (the boss then scales his HP for them, BossEncounter.Spawn).
         public static bool Attacks = System.Array.Exists(System.Environment.GetCommandLineArgs(), a => a.Equals("-lastbellAllyAttack", System.StringComparison.OrdinalIgnoreCase));
         public static BotMode AllyMode = BotMode.Perfect;   // menu allies do every mechanic, memory ones included (Chzy18: "do the mechanics"); still no attacks
+        public static int StartDelay;   // tests: ticks a new bot stands still at the start (-lastbellSweepRepeat varies the fight with it)
         int tick, lastPress = -999, castHold;
         int pendingSlot = -1, pendingUntil;
         readonly int[] skipUntil = new int[6];
@@ -108,7 +109,7 @@ namespace LastBell.Run
             var inp = new PlayerInput();
             var w = me.World; var boss = w.Boss; readWorld = w;
             Vector3 pos = me.transform.position, want;
-            if (boss == null || !boss.Solid) { inp.Move = ToScreen(Vector3.zero); return inp; }
+            if (boss == null || !boss.Solid || tick <= StartDelay) { inp.Move = ToScreen(Vector3.zero); return inp; }
             // the target: the boss, or while boss parts stand (Crucivar's castings, which must die before the Pour Flood) the
             // first of them by name: the castings carry their numerals, and on Hard one sunk out of order sets every turret
             // firing (a party went down to it, 11-03); hits land on whichever of them is nearest, so aim and reach follow it
