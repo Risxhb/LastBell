@@ -55,7 +55,7 @@ namespace LastBell.Run
             float w = (n * Cap + (n - 1) * Gap + 2 * Pad) * s, h = (Cap + 2 * Pad) * s;
             float shake = q.Result == ParryQte.Outcome.Fail ? Mathf.Sin(sinceResult * 1.9f) * 6f * s * Mathf.Clamp01(1 - sinceResult / 18f) : 0;
             var box = new Rect(sp.x - w / 2 + shake, Screen.height - sp.y - h, w, h);
-            int now = b.Tick;
+            int now = b.NetTick;
             var old = GUI.color;
 
             // box: dark, thin gold edge; success flashes the edge bright, failure turns it red

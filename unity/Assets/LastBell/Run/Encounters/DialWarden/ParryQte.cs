@@ -70,6 +70,14 @@ namespace LastBell.Run
 
         public void Delay(int ticks) { if (Open && ticks > 0) ArriveTick += ticks; }
 
+        // LAN client: a display copy of the host's prompt follows the host's progress (never judged here)
+        public static readonly string[] Reasons = { "", "wrong key", "early", "late", "cancelled" };
+        public void SetNet(int index, Outcome result, int resultTick, int arriveTick, int reason)
+        {
+            Index = Mathf.Clamp(index, 0, Sequence.Length); Result = result; ResultTick = resultTick; ArriveTick = arriveTick;
+            FailReason = reason >= 0 && reason < Reasons.Length ? Reasons[reason] : "";
+        }
+
         // test / dev: settle it now (used when the event is withdrawn)
         public void Cancel(int tick) { if (Open) End(Outcome.Fail, "cancelled", tick); }
     }
@@ -79,6 +87,21 @@ namespace LastBell.Run
     {
         void Begin();                        // a prompt opened for this player
         void Drain(List<QteKey> into);       // presses since the last tick, in order
+    }
+
+    // A LAN client's presses, received by the host with the tick the client saw (LanInputFrame.Qte / QteTick).
+    public sealed class RemoteQte : IQteSource
+    {
+        readonly Networking.LanRemoteInput input;
+        public int LastTick { get; private set; } = -1;
+        public RemoteQte(Networking.LanRemoteInput remote) { input = remote; }
+        public void Begin() { input.TakeQte(out _); LastTick = -1; }   // presses from before the prompt don't count
+        public void Drain(List<QteKey> into)
+        {
+            byte bits = input.TakeQte(out int tick); if (bits == 0) return;
+            LastTick = tick;
+            for (int k = 0; k < 5; k++) if ((bits & (1 << k)) != 0) into.Add((QteKey)k);
+        }
     }
 
     // Local keyboard: W A S D or the arrow keys for directions, E to parry. Presses latch per rendered frame and are

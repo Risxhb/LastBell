@@ -20,11 +20,14 @@ namespace LastBell.Menu
         // (RunDirector.BossEntry.Phases); picking another boss goes back to Phase 1.
         public int PhaseIndex {get;private set;}=1;
         public Button[] PhaseButtons {get;private set;}
+        // Allies (bots) row (Chzy18, 24 Oct: every test build lets you pick 0-7 bots): one tab that cycles RunParty.Selected
+        public Button AlliesButton {get;private set;}
+        Text alliesLabel;TestRushFocus alliesFocus;
         public static int MaxPhases{get{int n=1;foreach(var b in RunDirector.Bosses)n=Mathf.Max(n,b.Phases);return n;}}
         public static int PhasesOf(int encounter)=>encounter>=0&&encounter<RunDirector.Bosses.Length?RunDirector.Bosses[encounter].Phases:1;
         // Boss step rows (Risxhb, October 25, 2026): Bosses, then Minibosses, each a row of cards like the arena step.
         // Buttons stay indexed by RunDirector.Bosses; only their placement follows these rows. The final boss is last.
-        public static readonly string[] MinibossPrefixes={"Chimebound Oracle","Dial Warden","Pendulum Sentinel"};
+        public static readonly string[] MinibossPrefixes={"Chimebound Oracle","Dial Warden","Pendulum Sentinel","Escapement Twins","Rivet Cantor","Crucible Skater","Briar Metronome","Silt Carillon","Vesper Seedkeeper"};
         public static bool IsMiniboss(int encounter)=>System.Array.Exists(MinibossPrefixes,p=>RunDirector.Bosses[encounter].Name.StartsWith(p));
         static readonly string[] BossOrder={"Aurelion","Crucivar","Sylvara","Tempo Tyrant"};
         public static int[] BossRow{get{
@@ -44,6 +47,7 @@ namespace LastBell.Menu
         GameObject arenaGroup,bossGroup;Button backButton;
         // Two steps on the main menu: arena first, then the boss (encounter) with hero, difficulty and launch.
         public bool BossStep {get;private set;}
+        int MiniPerRow=6;
         public Button ContinueButton {get;private set;}
         TestRushFocus[] mapFocus,encounterFocus;
         Image panelBase;MenuShowcase live;float stillAlpha=1;bool liveRequested;
@@ -89,9 +93,12 @@ namespace LastBell.Menu
             float bossCard=.92f/Mathf.Max(5,bossRow.Length);
             // rows sit 0.06 higher than before the phase row (Chzy18, October 29, 2026), so the phase tabs fit above the footer
             SectionLabel("Bosses",B,.655f,bossRow.Length);
-            for(int k=0;k<bossRow.Length;k++){int at=bossRow[k];float x=.04f+k*bossCard;EncounterButtons[at]=BossCard(at,k,B,new Vector2(x,.47f),new Vector2(x+bossCard,.65f),()=>SelectEncounter(at),out encounterLabels[at],out encounterFocus[at],out encounterArt[at]);}
+            for(int k=0;k<bossRow.Length;k++){int at=bossRow[k];float x=.04f+k*bossCard;EncounterButtons[at]=BossCard(at,k,false,B,new Vector2(x,.47f),new Vector2(x+bossCard,.65f),()=>SelectEncounter(at),out encounterLabels[at],out encounterFocus[at],out encounterArt[at]);}
+            // Fighter cards (Risx, 4 Nov 2026): minibosses are half a boss card's height at the same width, wrapping into
+            // rows of as many cards as the boss row holds.
             SectionLabel("Minibosses",B,.425f,miniRow.Length);
-            for(int k=0;k<miniRow.Length;k++){int at=miniRow[k];float x=.04f+k*bossCard;EncounterButtons[at]=BossCard(at,k,B,new Vector2(x,.24f),new Vector2(x+bossCard,.42f),()=>SelectEncounter(at),out encounterLabels[at],out encounterFocus[at],out encounterArt[at]);}
+            MiniPerRow=Mathf.Max(5,bossRow.Length);
+            for(int k=0;k<miniRow.Length;k++){int at=miniRow[k];int col=k%MiniPerRow,row=k/MiniPerRow;float x=.04f+col*bossCard,top=.42f-row*.096f;EncounterButtons[at]=BossCard(at,k,true,B,new Vector2(x,top-.084f),new Vector2(x+bossCard,top),()=>SelectEncounter(at),out encounterLabels[at],out encounterFocus[at],out encounterArt[at]);}
             // Phase row: one tab per phase of the selected boss, Phase 1 first
             MenuUI.Text(Spaced("Start Phase"),B,new Vector2(.035f,.195f),new Vector2(.5f,.227f),15,MenuUI.Gold,TextAnchor.MiddleLeft);
             phaseNote=MenuUI.Text("",B,new Vector2(.5f,.195f),new Vector2(.965f,.227f),UiTheme.SizeLabel,new Color(UiTheme.GoldLabel.r,UiTheme.GoldLabel.g,UiTheme.GoldLabel.b,.7f),TextAnchor.MiddleRight);
@@ -103,6 +110,7 @@ namespace LastBell.Menu
             backButton=TextButton("Main Menu",panel.transform,new Vector2(.035f,.035f),new Vector2(.19f,.105f),Back);backLabel=backButton.GetComponentInChildren<Text>();
             ContinueButton=PrimaryButton("Continue",A,new Vector2(.71f,.03f),new Vector2(.96f,.108f),Continue);
             LaunchButton=PrimaryButton("Launch Test Rush",B,new Vector2(.71f,.03f),new Vector2(.96f,.108f),Launch);
+            AlliesButton=Tab("Allies (bots)",B,new Vector2(.25f,.04f),new Vector2(.55f,.1f),CycleAllies,out alliesLabel,out alliesFocus);
 
             ShowStep(false);
             Refresh();
@@ -126,17 +134,23 @@ namespace LastBell.Menu
         public void SelectMap(int i){if(Loading||i<0||i>=MapButtons.Length)return;MapIndex=SavedMap=i;Refresh();}
         public void SelectEncounter(int i){if(Loading||i<0||i>=EncounterButtons.Length)return;if(i!=EncounterIndex)PhaseIndex=SavedPhase=1;EncounterIndex=SavedEncounter=i;Refresh();if(BossStep)LinkBossStep();}
         public void SelectPhase(int n){if(Loading||n<1||n>PhasesOf(EncounterIndex))return;PhaseIndex=SavedPhase=n;Refresh();}
+        public void CycleAllies(){if(Loading)return;RunParty.Selected=(RunParty.Selected+1)%(RunParty.MaxAllies+1);Refresh();}
         // the phase row holds only the selected boss's phases, so its links follow the selection
         void LinkBossStep()
         {
             var phases=new Button[PhasesOf(EncounterIndex)];System.Array.Copy(PhaseButtons,phases,phases.Length);
-            Link(System.Array.ConvertAll(BossRow,i=>EncounterButtons[i]),System.Array.ConvertAll(MinibossRow,i=>EncounterButtons[i]),phases,new[]{backButton,LaunchButton});
+            var rows=new System.Collections.Generic.List<Button[]>{System.Array.ConvertAll(BossRow,i=>EncounterButtons[i])};
+            var minis=MinibossRow;
+            for(int s=0;s<minis.Length;s+=MiniPerRow){var row=new Button[Mathf.Min(MiniPerRow,minis.Length-s)];for(int k=0;k<row.Length;k++)row[k]=EncounterButtons[minis[s+k]];rows.Add(row);}
+            rows.Add(phases);rows.Add(new[]{backButton,AlliesButton,LaunchButton});
+            Link(rows.ToArray());
         }
         public static string Incompatibility(int map,int encounter)
         {
             if(map<0||map>=RunMaps.All.Length||encounter<0||encounter>=RunDirector.Bosses.Length)return "Choose a valid map and encounter.";
             if(!RunMaps.InBuild(map))return "Arena unavailable in this build.";
             if(!Preview(map))return "Current arena preview unavailable. Launch is disabled.";
+            if(encounter==Campaign.BonusIndex&&!Campaign.OverclockedUnlocked)return Campaign.LockedReason;   // campaign unlock
             // Current bosses create their own shapes/props and use shared arena bounds. BossEntry.Map is an authored
             // default, not a geometry dependency. New encounters requiring scene objects must add a capability check here.
             return null;
@@ -144,10 +158,11 @@ namespace LastBell.Menu
         void Refresh()
         {
             for(int i=0;i<mapLabels.Length;i++){mapLabels[i].text=RunMaps.All[i].Name+(Preview(i)?"":" (unavailable)");mapFocus[i].Chosen=i==MapIndex;}
-            for(int i=0;i<encounterLabels.Length;i++){encounterLabels[i].text=CardName(i);encounterFocus[i].Chosen=i==EncounterIndex;if(encounterArt[i])encounterArt[i].texture=EncounterPreview(i,MapIndex);}
+            for(int i=0;i<encounterLabels.Length;i++){encounterLabels[i].text=CardName(i)+(i==Campaign.BonusIndex&&!Campaign.OverclockedUnlocked?" (locked)":"");encounterFocus[i].Chosen=i==EncounterIndex;}
             int phaseCount=PhasesOf(EncounterIndex);PhaseIndex=Mathf.Clamp(PhaseIndex,1,phaseCount);
             for(int p=0;p<PhaseButtons.Length;p++){PhaseButtons[p].gameObject.SetActive(p<phaseCount);phaseFocus[p].Chosen=p+1==PhaseIndex;}
             phaseNote.text=Spaced(phaseCount==1?"Phase 1 only":phaseCount.ToString("00")+" phases");
+            alliesLabel.text=Spaced("Allies (bots)")+"   "+RunParty.Selected;alliesFocus.Chosen=RunParty.Selected>0;
             // the arena step names the selected arena; the boss step shows only its card rows
             arenaTitle.text=RunMaps.All[MapIndex].Name.ToUpperInvariant();
             titleEyebrow.text=Spaced("Selected Arena");
@@ -258,17 +273,46 @@ namespace LastBell.Menu
             var own=RunDirector.Bosses[encounter].Map;int m=own!=null?RunMaps.IndexOf(own):map;
             return m>=0&&m<RunMaps.All.Length?Preview(m):null;
         }
-        // Same card frame as the arena step (number, gold accent, focus), for one encounter. Names only, no arena art
-        // (Risxhb, October 26, 2026): the art comes back once each boss has its own portrait.
-        Button BossCard(int encounter,int slot,Transform parent,Vector2 min,Vector2 max,UnityEngine.Events.UnityAction action,out Text label,out TestRushFocus focus,out RawImage art)
+        // A boss's portrait (Menu/Resources/Menu/BossPortraits, made by BossPortraitCapture): the card name without
+        // spaces; the Tutorial uses the Tempo Tyrant's.
+        public static Texture2D Portrait(int encounter)
         {
-            var (b,frame,f)=Base(CardName(encounter),parent,min,max,action,new Vector2(8,0));focus=f;f.Frame=frame;f.Grow=1.02f;f.ChosenEdge=UiTheme.GoldBright;f.FocusEdge=FocusGold;
+            var name=CardName(encounter);if(name.StartsWith("Tutorial")||name.EndsWith("Tempo Tyrant"))name="Tempo Tyrant";
+            return Resources.Load<Texture2D>("Menu/BossPortraits/"+new string(System.Array.FindAll(name.ToCharArray(),char.IsLetterOrDigit)));
+        }
+        // Fighter card: the boss's portrait under the arena card's frame (number, gold accent, focus). Boss cards show the
+        // whole body with the name along the bottom; half-height miniboss cards show the upper body with the name on the
+        // left. A boss without a portrait keeps the name-only card.
+        Button BossCard(int encounter,int slot,bool mini,Transform parent,Vector2 min,Vector2 max,UnityEngine.Events.UnityAction action,out Text label,out TestRushFocus focus,out RawImage art)
+        {
+            var (b,frame,f)=Base(CardName(encounter),parent,min,max,action,new Vector2(8,0));focus=f;f.Frame=frame;f.Grow=mini?1.03f:1.02f;f.ChosenEdge=UiTheme.GoldBright;f.FocusEdge=FocusGold;
             var inner=MenuUI.Rect("Card face",b.transform,Vector2.zero,Vector2.one,new Vector2(2,2));inner.gameObject.AddComponent<RectMask2D>();
             MenuUI.Panel("Card backing",inner,Vector2.zero,Vector2.one,new Color(.02f,.025f,.04f,1));
-            art=null;
-            MenuUI.Text((slot+1).ToString("00"),inner,new Vector2(.04f,.80f),new Vector2(.5f,.98f),14,MenuUI.Gold,TextAnchor.MiddleLeft);
-            label=MenuUI.Text("",inner,new Vector2(.06f,.2f),new Vector2(.94f,.8f),26,MenuUI.Ivory,TextAnchor.MiddleCenter);label.resizeTextForBestFit=true;label.resizeTextMinSize=14;label.resizeTextMaxSize=26;f.Label=label;Shadow(label,.9f);
-            var accent=MenuUI.Panel("Chosen accent",inner,Vector2.zero,new Vector2(1,0),MenuUI.Gold);accent.rectTransform.sizeDelta=new Vector2(0,4);accent.rectTransform.pivot=new Vector2(.5f,0);f.Accent=accent;
+            var portrait=Portrait(encounter);art=null;
+            if(portrait)
+            {
+                // half-height cards: the portrait sits in the right part of the card, zoomed to the head and shoulders
+                var holder=mini?MenuUI.Rect("Portrait frame",inner,new Vector2(.36f,0),Vector2.one):inner;
+                art=MenuUI.Rect("Fighter portrait",holder,Vector2.zero,Vector2.one).gameObject.AddComponent<RawImage>();art.texture=portrait;art.raycastTarget=false;
+                var fit=art.gameObject.AddComponent<AspectRatioFitter>();fit.aspectMode=AspectRatioFitter.AspectMode.EnvelopeParent;fit.aspectRatio=(float)portrait.width/portrait.height;f.Art=art;
+                if(mini){art.rectTransform.pivot=new Vector2(.5f,.66f);art.rectTransform.localScale=new Vector3(1.6f,1.6f,1);}
+                if(mini){var side=MenuUI.Rect("Name shade",inner,Vector2.zero,new Vector2(.6f,1)).gameObject.AddComponent<RawImage>();side.texture=strip;side.color=new Color(1,1,1,.95f);side.raycastTarget=false;}
+                else{var fade=MenuUI.Rect("Name shade",inner,Vector2.zero,new Vector2(1,.55f)).gameObject.AddComponent<RawImage>();fade.texture=cardFade;fade.raycastTarget=false;}
+            }
+            if(mini)
+            {
+                MenuUI.Text((slot+1).ToString("00"),inner,new Vector2(.04f,.62f),new Vector2(.3f,.96f),12,MenuUI.Gold,TextAnchor.MiddleLeft);
+                label=MenuUI.Text("",inner,new Vector2(.04f,.04f),portrait?new Vector2(.62f,.66f):new Vector2(.96f,.66f),20,MenuUI.Ivory,portrait?TextAnchor.MiddleLeft:TextAnchor.MiddleCenter);label.resizeTextMaxSize=20;
+            }
+            else
+            {
+                MenuUI.Text((slot+1).ToString("00"),inner,new Vector2(.04f,.80f),new Vector2(.5f,.98f),14,MenuUI.Gold,TextAnchor.MiddleLeft);
+                label=portrait?MenuUI.Text("",inner,new Vector2(.05f,.03f),new Vector2(.95f,.26f),22,MenuUI.Ivory,TextAnchor.MiddleLeft)
+                              :MenuUI.Text("",inner,new Vector2(.06f,.2f),new Vector2(.94f,.8f),26,MenuUI.Ivory,TextAnchor.MiddleCenter);
+                label.resizeTextMaxSize=portrait?22:26;
+            }
+            label.resizeTextForBestFit=true;label.resizeTextMinSize=11;f.Label=label;Shadow(label,.9f);
+            var accent=MenuUI.Panel("Chosen accent",inner,Vector2.zero,new Vector2(1,0),MenuUI.Gold);accent.rectTransform.sizeDelta=new Vector2(0,mini?3:4);accent.rectTransform.pivot=new Vector2(.5f,0);f.Accent=accent;
             return b;
         }
         Button Tab(string name,Transform parent,Vector2 min,Vector2 max,UnityEngine.Events.UnityAction action,out Text label,out TestRushFocus focus)

@@ -324,7 +324,8 @@ namespace LastBell.Menu.EditorTools
             var output=Environment.GetEnvironmentVariable("LASTBELL_WINDOWS_OUTPUT");
             if(string.IsNullOrEmpty(output))output="Builds/Player/LastBell.exe";
             Directory.CreateDirectory(Path.GetDirectoryName(output));
-            var report=BuildPipeline.BuildPlayer(new BuildPlayerOptions{scenes=MenuAppearance.BuildScenes,locationPathName=output,target=BuildTarget.StandaloneWindows64,options=BuildOptions.Development});
+            LanTestBuild.EnsureLobbyScene();   // Multiplayer is part of the main player (4 Nov 2026)
+            var report=BuildPipeline.BuildPlayer(new BuildPlayerOptions{scenes=LanTestBuild.Scenes,locationPathName=output,target=BuildTarget.StandaloneWindows64,options=BuildOptions.Development});
             Debug.Log($"Confrontation build: {report.summary.result}, {report.summary.totalErrors} errors/{report.summary.totalWarnings} warnings");
             foreach(var step in report.steps)foreach(var msg in step.messages)if(msg.type==LogType.Error||msg.type==LogType.Exception)Debug.Log("BUILD ERROR ["+step.name+"]: "+msg.content);
             if(Application.isBatchMode)EditorApplication.Exit(report.summary.result==BuildResult.Succeeded?0:1);

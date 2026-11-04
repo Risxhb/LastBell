@@ -19,6 +19,10 @@ namespace LastBell.Run
     //   to the next Ecliptic Order anchor as soon as the previous strike lands and keeps its Zenith Mark's side.
     public enum BotMode { Passive, Reflex, Perfect }
 
+    // A boss that hands bots a job the generic dodge and soak logic can't read (Briar Metronome: walk to your own season
+    // graft by the inner path, then cut it). Stand: where to be now (a waypoint is fine); Aim: what to swing at when near.
+    public interface IAllyBotJob { bool BotJob(PlayerController me, out Vector3 stand, out Vector3 aim); }
+
     public sealed class AllyBot : IInputSource
     {
         readonly int slot, of;            // this ally's index and the ally count (for its angle round the boss)
@@ -182,8 +186,21 @@ namespace LastBell.Run
                         float d = Sim.Flat(edge - pos).sqrMagnitude; if (d < best) { best = d; want = edge; }
                     }
                 }
+                // a job the boss hands out (IAllyBotJob: Briar Metronome's grafts): go there and cut what it names, even
+                // as a non-attacking menu bot (a mechanic, like Sylvara's Choir Buds)
+                Vector3 jobStand = default, jobAim = default;
+                bool job = boss is IAllyBotJob bj && bj.BotJob(me, out jobStand, out jobAim);
+                if (job)
+                {
+                    want = jobStand; inp.Aim = jobAim;
+                    if (Sim.Flat(jobAim - pos).magnitude <= 3.2f)
+                    {
+                        if (me.Kit is TollbreakerKit) Attack(me, ref inp);
+                        else inp.P0 = inp.H0 = tick % 6 == 0 || me.ClassName != "Arcanist";
+                    }
+                }
                 // attacking: the nearest spot in reach of him that every job and telegraph allows (inner disc edge, well edge, ...)
-                if (Attacks && AttackSpot(me, boss, out var spot)) { want = spot; spotNote = 1; dSpot = spot; } else spotNote = 2;
+                else if (Attacks && AttackSpot(me, boss, out var spot)) { want = spot; spotNote = 1; dSpot = spot; } else spotNote = 2;
                 var flat = new Vector2(want.x, want.z); float lim = CombatWorld.PlayerBound - 0.8f;
                 if (flat.magnitude > lim) { flat = flat.normalized * lim; want = new Vector3(flat.x, 0, flat.y); }
                 var v = Sim.Flat(want - pos);
@@ -194,7 +211,7 @@ namespace LastBell.Run
                 // 3) attack when in range (off: Chzy18 2026-10-22, "the bots are doing too much damage": they only do the
                 // mechanics). Set Attacks = true to bring the rotation back.
                 float gap = Sim.Flat(bpos - pos).magnitude - brad;
-                if (Attacks && gap <= Range(me) + 1.85f) Attack(me, ref inp);
+                if (Attacks && !job && gap <= Range(me) + 1.85f) Attack(me, ref inp);
             }
             if (me.Hp < (Mode == BotMode.Passive ? 40 : 70) && me.Potions > 0 && tick % 30 == 0) inp.Potion = true;   // test bots: before a Hard kill hit (65) could down them
             // walk round his body, not into it: a straight line across the centre would pin the bot against him
@@ -809,6 +826,64 @@ namespace LastBell.Run
         static readonly Hazard Unseen = new Hazard { Source = "orb / rolling strike" };   // the threat when it is not a live hazard
         const float OrbAhead = 0.5f, OrbPad = 0.25f;
 
+        // generic soak job (Project overview 11-01): any live hazard marked Soak is a tower to fill with its ShareCount (1 if
+        // none). Bosses with their own tower job (Aurelion's Meridian Towers, with owners and order) keep that one. Only the
+        // set that lands next counts: each of its towers takes its count of standing players, nearest first in player order,
+        // and keeps them until it lands, so every bot reads the same split; the rest keep out of those towers.
+        static readonly Dictionary<Hazard, List<PlayerController>> soakOwners = new Dictionary<Hazard, List<PlayerController>>();
+        static readonly List<Hazard> soakSet = new List<Hazard>(), soakStale = new List<Hazard>();
+        static readonly HashSet<PlayerController> soakTaken = new HashSet<PlayerController>();
+        static CombatWorld soakWorld; static int soakTick = -1;
+        const int SoakSetSpan = 6;   // towers landing within 0.1 s of the first are one set
+
+        static bool OwnSoakJob(BossEncounter boss) => !(boss is AurelionEncounter a && a.Towers != null);
+
+        static void SoakSet(CombatWorld w)
+        {
+            if (soakWorld == w && soakTick == w.Tick) return;
+            if (soakWorld != w) soakOwners.Clear();
+            soakWorld = w; soakTick = w.Tick; soakSet.Clear();
+            var live = w.Hazards.Live; int first = int.MaxValue;
+            for (int i = 0; i < live.Count; i++) { var h = live[i]; if (h.Soak && h.Age < h.ResolveAt) first = Mathf.Min(first, h.ResolveAt - h.Age); }
+            for (int i = 0; i < live.Count; i++) { var h = live[i]; if (h.Soak && h.Age < h.ResolveAt && h.ResolveAt - h.Age <= first + SoakSetSpan) soakSet.Add(h); }
+            soakStale.Clear();
+            foreach (var h in soakOwners.Keys) if (!soakSet.Contains(h)) soakStale.Add(h);
+            foreach (var h in soakStale) soakOwners.Remove(h);
+            if (soakSet.Count == 0) return;
+            soakSet.Sort((x, y) => x.Id.CompareTo(y.Id));
+            soakTaken.Clear();
+            foreach (var h in soakSet)
+            {
+                if (!soakOwners.TryGetValue(h, out var o)) soakOwners[h] = o = new List<PlayerController>();
+                for (int i = o.Count - 1; i >= 0; i--) if (!o[i] || o[i].Down) o.RemoveAt(i);
+                foreach (var p in o) soakTaken.Add(p);
+            }
+            foreach (var h in soakSet)
+            {
+                var o = soakOwners[h]; int need = Mathf.Max(1, h.ShareCount);
+                while (o.Count < need)
+                {
+                    PlayerController pick = null; float best = float.MaxValue;
+                    foreach (var p in w.Players)
+                    {
+                        if (!p || p.Down || soakTaken.Contains(p)) continue;
+                        float d = Sim.Flat(p.transform.position - h.Origin).sqrMagnitude;
+                        if (d < best) { best = d; pick = p; }
+                    }
+                    if (pick == null) break;
+                    o.Add(pick); soakTaken.Add(pick);
+                }
+            }
+        }
+
+        static Hazard OwnSoak(PlayerController me, BossEncounter boss)
+        {
+            if (!OwnSoakJob(boss)) return null;
+            SoakSet(me.World);
+            foreach (var h in soakSet) if (soakOwners[h].Contains(me)) return h;
+            return null;
+        }
+
         // where this bot must not stand now: inside any shape that would hit it; a Perfect bot also avoids anywhere outside
         // the next Ecliptic anchor's disc and the wrong side of its Zenith Mark (with a 0.35-0.4 m buffer); v4 jobs: its
         // Meridian Tower, a light well during Total Eclipse, its Severance side (and clear of the line's next 2 s of sweep)
@@ -818,8 +893,8 @@ namespace LastBell.Run
         System.Func<Vector3, bool> badAt;
         PlayerController bMe; AurelionEncounter bA; IReadOnlyList<Hazard> bLive;
         bool bFull, bAllowBurn, bAnyJob, bWells, bOthers; int bTick, bK, bSide, bIgnoreAfter; float bDisc; Vector3 bBp, bAnchor;
-        ZenithMarks.Marked bMine; MeridianTowers.Tower bTower; Sunspots.Spot bSpot;
-        CombatWorld jWorld; int jobsTick = -1; int jK, jSide; bool jWells, jOthers; ZenithMarks.Marked jMine; MeridianTowers.Tower jTower; Sunspots.Spot jSpot;
+        ZenithMarks.Marked bMine; MeridianTowers.Tower bTower; Sunspots.Spot bSpot; Hazard bSoak; bool bSoakOthers;
+        CombatWorld jWorld; int jobsTick = -1; int jK, jSide; bool jWells, jOthers, jSoakOthers; ZenithMarks.Marked jMine; MeridianTowers.Tower jTower; Sunspots.Spot jSpot; Hazard jSoak;
 
         System.Func<Vector3, bool> Bad(PlayerController me, BossEncounter boss, bool allowBurn = false, int soonest = int.MaxValue, bool jobs = true)
         {
@@ -841,10 +916,13 @@ namespace LastBell.Run
                 // co-op: an extra in someone else's tower is hit (MeridianTowers.InOtherTower, without its list per probe)
                 int standing = 0; foreach (var p in me.World.Players) if (p && !p.Down) standing++;
                 jOthers = a != null && a.Towers != null && a.Towers.Towers.Count >= 2 && standing >= 2;
+                jSoak = OwnSoak(me, boss);   // a generic soak tower (any boss without its own tower job)
+                jSoakOthers = OwnSoakJob(boss) && soakSet.Count > (jSoak != null ? 1 : 0);
             }
             int k = jobs ? jK : -1;
             var mine = jobs ? jMine : null;
             var tower = jobs ? jTower : null;
+            var soak = jobs ? jSoak : null;
             bool wells = jWells;
             int side = jSide;
             var spot = jobs ? jSpot : null;
@@ -855,15 +933,18 @@ namespace LastBell.Run
             if (mine != null) due = Mathf.Min(due, mine.ResolveTick);
             if (tower != null) due = Mathf.Min(due, tower.ResolveTick);
             if (spot != null) due = Mathf.Min(due, spot.DetonateTick);
+            if (soak != null) due = Mathf.Min(due, tick + soak.ResolveAt - soak.Age);
             if (k >= 0 && a.Ecliptic.StrikeAt(k) > due) k = -1;
             if (mine != null && mine.ResolveTick > due) mine = null;
             if (tower != null && tower.ResolveTick > due) tower = null;
             if (spot != null && spot.DetonateTick > due) spot = null;
+            if (soak != null && tick + soak.ResolveAt - soak.Age > due) soak = null;
             bLive = live; bA = a; bTick = tick; bAllowBurn = allowBurn;
-            bK = k; bMine = mine; bTower = tower; bSpot = spot; bWells = wells; bSide = side;
-            bAnyJob = tower != null || k >= 0 || wells || mine != null || spot != null;
-            bFull = !(k < 0 && mine == null && tower == null && spot == null && !wells && side == 0 && soonest == int.MaxValue);
+            bK = k; bMine = mine; bTower = tower; bSpot = spot; bWells = wells; bSide = side; bSoak = soak;
+            bAnyJob = tower != null || k >= 0 || wells || mine != null || spot != null || soak != null;
+            bFull = !(k < 0 && mine == null && tower == null && spot == null && soak == null && !wells && side == 0 && soonest == int.MaxValue);
             bOthers = bFull && jOthers;
+            bSoakOthers = jSoakOthers;
             bBp = Sim.Flat(boss.transform.position);
             bAnchor = k >= 0 ? a.Ecliptic.Anchors[k] : Vector3.zero;
             bDisc = k >= 0 ? a.Ecliptic.SafeRadius - Hazard.Margin - 0.2f : 0;
@@ -880,11 +961,19 @@ namespace LastBell.Run
             {
                 var h = bLive[i];
                 if (h.BurnPerSecond <= 0 && bTick + (h.ResolveAt - h.Age) > bIgnoreAfter) continue;
-                if (Hits(h, bMe, q) && !(bAllowBurn && h.BurnPerSecond > 0 && bAnyJob)) return true;
+                if (Hits(h, bMe, q) && !(bAllowBurn && h.BurnPerSecond > 0 && bAnyJob && !h.Pit)) return true;
             }
             if (BotSight.Orbs.Count > 0 && BotSight.OrbHits(q, OrbAhead, OrbPad)) return true;
             if (BotSight.GhostHits(bMe, q)) return true;
+            // generic soak: never stand in a tower of the next set that isn't mine (an extra is hit, or overfills it)
+            if (bSoakOthers)
+                for (int i = 0; i < soakSet.Count; i++)
+                {
+                    var t = soakSet[i];
+                    if (t != jSoak && Sim.Flat(q - t.Origin).magnitude <= t.Radius + Hazard.Margin + 0.3f) return true;
+                }
             if (!bFull) return false;
+            if (bSoak != null && Sim.Flat(q - bSoak.Origin).magnitude > bSoak.Radius - 0.4f) return true;
             var a = bA;
             if (bK >= 0 && Sim.Flat(q - bAnchor).magnitude > bDisc) return true;
             if (bMine != null)
@@ -921,9 +1010,10 @@ namespace LastBell.Run
         // light well, a Severance side) count as due now; -1 = none
         int Duty(PlayerController me, BossEncounter boss)
         {
-            if (!(boss is AurelionEncounter a)) return -1;
+            var sk = OwnSoak(me, boss);   // a generic soak tower, any boss
+            int t = me.World.Tick, best = sk != null ? sk.ResolveAt - sk.Age : -1;
+            if (!(boss is AurelionEncounter a)) return best;
             bool memory = Mode == BotMode.Perfect;
-            int t = me.World.Tick, best = -1;
             if (memory && a.Ecliptic != null) { int k = a.Ecliptic.NextStrike(t); if (k >= 0) best = a.Ecliptic.StrikeAt(k) - t; }
             var mk = memory && a.Marks != null ? a.Marks.Current(me, t) : null;
             if (mk != null) { int m = mk.ResolveTick - t; if (best < 0 || m < best) best = m; }
@@ -954,14 +1044,15 @@ namespace LastBell.Run
         }
 
         static CombatWorld readWorld;   // the world the bot read this tick (ThroughBurn has only the boss)
-        static bool ThroughBurn(Vector3 from, Vector3 to, BossEncounter b)
+        // pitsOnly: the fallback that accepts walking through burns still goes round a hole you fall through (Hazard.Pit)
+        static bool ThroughBurn(Vector3 from, Vector3 to, BossEncounter b, bool pitsOnly = false)
         {
             var w = (b as AurelionEncounter)?.World ?? readWorld; if (w == null) return false;   // every boss since 11-03 (was Aurelion only: a Crucivar bot froze at a Brand Pool between it and its casting)
             var live = w.Hazards.Live;
             for (int j = 0; j < live.Count; j++)
             {
                 var h = live[j];
-                if (h.BurnPerSecond <= 0 || h.Contains(from)) continue;   // already standing in it: leaving is fine
+                if (h.BurnPerSecond <= 0 || (pitsOnly && !h.Pit) || h.Contains(from)) continue;   // already standing in it: leaving is fine
                 for (int i = 1; i < 6; i++) if (h.Contains(Vector3.Lerp(from, to, i / 6f))) return true;
             }
             return false;
@@ -975,7 +1066,11 @@ namespace LastBell.Run
             var ahead = Sim.Flat(pos + move.normalized * 0.8f) - bp;
             if (ahead.magnitude >= clear) return move;   // stepping in toward him is fine (inside a Collapse disc, say)
             // heading into him: go round on the side the move already leans to (tangent), drifting outward a little
-            var tan = Vector3.Cross(Vector3.up, to.normalized); if (Vector3.Dot(tan, move) < 0) tan = -tan;
+            // a goal straight behind him: the lean's sign flips with noise every tick and the bot rocked in place against
+            // him (Vesper Seedkeeper, 2 players opposite each other); within ±15° of dead ahead keep turning one way
+            var tan = Vector3.Cross(Vector3.up, to.normalized);
+            float lean = Vector3.Dot(tan, move.normalized);
+            if (lean < -0.26f) tan = -tan;
             return (tan + to.normalized * 0.25f).normalized * move.magnitude;
         }
 
@@ -992,7 +1087,7 @@ namespace LastBell.Run
                     var dir = Dirs48[k]; var q = pos + dir * r;
                     if (!CombatWorld.InPlayerBound(q, -0.2f)) continue;
                     if (Sim.Flat(q - bp).magnitude < b.BodyRadius + PlayerController.Radius + 0.1f) continue;
-                    if (bad(q) || (avoidBurn && ThroughBurn(pos, q, b))) continue;   // go round burning pools, not through them
+                    if (bad(q) || ThroughBurn(pos, q, b, !avoidBurn)) continue;   // go round burning pools (always round a pit), not through them
                     need = r; return dir;
                 }
             need = 99; return Vector3.zero;

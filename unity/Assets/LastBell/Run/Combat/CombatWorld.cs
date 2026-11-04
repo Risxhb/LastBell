@@ -234,6 +234,8 @@ namespace LastBell.Run
     {
         public sealed class Projectile
         {
+            static int nextNetworkId;
+            public readonly int NetworkId = ++nextNetworkId; // presentation identity only; combat rules are unchanged
             public Vector3 Pos, Vel; public float Range, Travelled, Radius; public int Damage; public string Ability;
             public Action<int, Vector3> OnHit; public Color Color;
             // optional: turn toward the boss by up to Homing degrees per tick, after HomingDelay ticks of straight flight
@@ -245,6 +247,7 @@ namespace LastBell.Run
         readonly CombatWorld w; readonly List<Projectile> live = new List<Projectile>(), batch = new List<Projectile>();
         int clears;   // bumped by ClearAll, so a step can tell its batch was cancelled mid-dispatch
         public int Count => live.Count;
+        public IReadOnlyList<Projectile> Live => live;
         public ProjectileSystem(CombatWorld world) { w = world; }
 
         public void Fire(Projectile p) { live.Add(p); }
@@ -267,7 +270,7 @@ namespace LastBell.Run
                 }
                 var step = p.Vel * Sim.Dt;
                 p.Pos += step; p.Travelled += step.magnitude;
-                if (p.OnMove != null) p.OnMove(p); else w.Fx.ProjectileHead(p.Pos, p.Color);
+                if (p.OnMove != null) { Networking.LanFx.Projectile(p, "Move", false, p.Pos); p.OnMove(p); } else w.Fx.ProjectileHead(p.Pos, p.Color);
                 BossPart part = null;
                 foreach (var q in w.Parts) if (q.Alive && Sim.Flat(p.Pos - q.Pos).magnitude <= q.BodyRadius + p.Radius) { part = q; break; }
                 if (part != null)
@@ -275,7 +278,7 @@ namespace LastBell.Run
                     var contact = part.Pos + Sim.Flat(p.Pos - part.Pos).normalized * part.BodyRadius + Vector3.up * part.HitHeight;
                     live.Remove(p);
                     int dealt = w.DamagePart(part, p.Damage, contact, p.Ability);
-                    if (p.OnEnd != null) p.OnEnd(p, true, contact); else w.Fx.NoteImpact(contact, p.Color);
+                    if (p.OnEnd != null) { Networking.LanFx.Projectile(p, "End", true, contact); p.OnEnd(p, true, contact); } else w.Fx.NoteImpact(contact, p.Color);
                     p.OnHit?.Invoke(dealt, contact);
                     continue;
                 }
@@ -284,17 +287,17 @@ namespace LastBell.Run
                     var contact = b.transform.position + Sim.Flat(p.Pos - b.transform.position).normalized * b.BodyRadius + Vector3.up * b.HitHeight;
                     live.Remove(p);
                     int dealt = w.DamageBoss(p.Damage, contact, p.Ability, p.OnEnd == null);   // custom projectiles draw their own impact
-                    if (p.OnEnd != null) p.OnEnd(p, true, contact); else w.Fx.NoteImpact(contact, p.Color);
+                    if (p.OnEnd != null) { Networking.LanFx.Projectile(p, "End", true, contact); p.OnEnd(p, true, contact); } else w.Fx.NoteImpact(contact, p.Color);
                     p.OnHit?.Invoke(dealt, contact);
                     continue;
                 }
-                if (p.Travelled >= p.Range || !CombatWorld.InPlayerBound(p.Pos, 2)) { live.Remove(p); p.OnEnd?.Invoke(p, false, p.Pos); }
+                if (p.Travelled >= p.Range || !CombatWorld.InPlayerBound(p.Pos, 2)) { live.Remove(p); if (p.OnEnd != null) { Networking.LanFx.Projectile(p, "End", false, p.Pos); p.OnEnd(p, false, p.Pos); } }
             }
         }
         public void ClearAll()
         {
             var ending = live.ToArray(); live.Clear(); clears++;
-            foreach (var p in ending) p.OnEnd?.Invoke(p, false, p.Pos);
+            foreach (var p in ending) if (p.OnEnd != null) { Networking.LanFx.Projectile(p, "End", false, p.Pos); p.OnEnd(p, false, p.Pos); }
         }
     }
 }
