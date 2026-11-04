@@ -69,7 +69,7 @@ namespace LastBell.Menu
             Check("Start Run and Boss Rush are on the same menu (one player for everything)", Find(main, "Start Run") != null && Find(main, "Boss Rush") != null);
             Check("all three classes available", RunDirector.Classes.SequenceEqual(new[] { "Tollbreaker", "Chimesinger", "Arcanist" }));
             Check("LAN class list matches the game's, Tollbreaker first", LanLobby.ClassList.SequenceEqual(RunDirector.Classes) && LanLobby.DefaultClass == "Tollbreaker");
-            if (menu) menu.RushButton.onClick.Invoke();
+            if (menu) menu.MultiplayerButton.onClick.Invoke();
             yield return Until(() => LanLobbyScreen.Instance, 15); yield return Frames(3);
             var screen = LanLobbyScreen.Instance;
             Check("Multiplayer opens the LAN lobby scene", screen && SceneManager.GetActiveScene().path == LanLobbyScreen.ScenePath);

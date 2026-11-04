@@ -70,10 +70,16 @@ namespace LastBell.Run.Networking
             if (frame.Telegraphs.Count > TelegraphCap) frame.Telegraphs.RemoveRange(0, frame.Telegraphs.Count - TelegraphCap);
             foreach (var projectile in world.Projectiles.Live)
                 frame.Projectiles.Add(new LanWorldFrame.ProjectileState { Id = projectile.NetworkId, X = projectile.Pos.x, Y = projectile.Pos.y, Z = projectile.Pos.z, R = projectile.Color.r, G = projectile.Color.g, B = projectile.Color.b, A = projectile.Color.a });
+            foreach (var bullet in world.Bullets.Live)
+            {
+                if (bullet.Dead) continue;
+                if (frame.Bullets.Count >= BulletCap) break;
+                frame.Bullets.Add(new LanWorldFrame.BulletState { X = bullet.Pos.x, Z = bullet.Pos.z, VX = bullet.Vel.x, VZ = bullet.Vel.z, Radius = bullet.Radius, Colour = (byte)Mathf.Clamp(bullet.Colour, 0, 2), Water = bullet.Source == "Waterfall Jet" });
+            }
             if (frame.Projectiles.Count > LanWorldFrame.MaxProjectiles) frame.Projectiles.RemoveRange(0, frame.Projectiles.Count - LanWorldFrame.MaxProjectiles);
             return frame;
         }
         // well under the wire limits (256 each), so the whole snapshot stays inside one message
-        public const int HazardCap = 160, TelegraphCap = 160;
+        public const int HazardCap = 160, TelegraphCap = 160, BulletCap = 600;
     }
 }

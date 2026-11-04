@@ -33,5 +33,6 @@ namespace LastBell.Run.Networking
         readonly LanInputBuffer buffer = new LanInputBuffer();
         public bool Accept(byte[] bytes) => LanInputFrame.TryDecode(bytes, out var input) && buffer.Accept(input);
         public PlayerInput Read(PlayerController who) => LanUnityInput.Decode(buffer.Consume());
+        public byte TakeQte(out int tick) => buffer.TakeQte(out tick);
     }
 }

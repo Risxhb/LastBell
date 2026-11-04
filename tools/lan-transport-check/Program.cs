@@ -61,6 +61,24 @@ static class Program
         Check(LanWorldFrame.TryDecode(clockFrame.Encode(), out var clockBack) && clockBack.Boss.Beat == 41.25 && clockBack.Boss.BeatHaste && clockBack.Boss.Transitioning && clockBack.Boss.TransitionTick == 2
             && clockBack.Boss.StateAge == 600 && clockBack.Boss.Announcement == "TEMPO SLOWS" && clockBack.Boss.Numbers.Count == 1 && clockBack.Boss.Numbers[0].N == 3 && clockBack.Boss.Numbers[0].Imminent
             && clockBack.Boss.Props.Count == 1 && clockBack.Boss.Props[0].Id == -7 && clockBack.Boss.Props[0].Kind == 2 && clockBack.Boss.Props[0].Z == -3, "world snapshot round trips the boss clock, HUD text, numbers and props");
+        // boss looks, telegraph flash/stretch and hostile bullets (4 Nov 2026)
+        var lookFrame = new LanWorldFrame { Tick = 77, RunState = 3, Boss = new LanWorldFrame.BossState { Hp = 5, MaxHp = 10, Glow = 2.5f } };
+        lookFrame.Players.Add(worldPlayer); lookFrame.Boss.Look.Add(3); lookFrame.Boss.Look.Add(-1.5f);
+        var stretched = new LanWorldFrame.TelegraphState { Id = 5, Shape = 3, Radius = 4, Inner = 1, FlashScale = 0.4f, ScaleZ = 2.5f }; lookFrame.Telegraphs.Add(stretched);
+        lookFrame.Bullets.Add(new LanWorldFrame.BulletState { X = 1, Z = 2, VX = -3, VZ = 0.5f, Radius = 0.6f, Colour = 2, Water = true });
+        Check(LanWorldFrame.TryDecode(lookFrame.Encode(), out var lookBack) && lookBack.Boss.Glow == 2.5f && lookBack.Boss.Look.Count == 2 && lookBack.Boss.Look[1] == -1.5f
+            && lookBack.Telegraphs[0].FlashScale == 0.4f && lookBack.Telegraphs[0].ScaleZ == 2.5f && lookBack.Bullets.Count == 1 && lookBack.Bullets[0].VX == -3 && lookBack.Bullets[0].Colour == 2 && lookBack.Bullets[0].Water,
+            "world snapshot round trips boss looks, telegraph flash and stretch, and hostile bullets");
+        var tooManyLooks = new LanWorldFrame { Tick = 1, RunState = 3, Boss = new LanWorldFrame.BossState { Hp = 1, MaxHp = 1 } }; tooManyLooks.Players.Add(worldPlayer);
+        for (int i = 0; i <= LanWorldFrame.MaxLook; i++) tooManyLooks.Boss.Look.Add(i);
+        bool lookRejected; try { tooManyLooks.Encode(); lookRejected = false; } catch (System.IO.InvalidDataException) { lookRejected = true; }
+        Check(lookRejected, "world snapshot refuses more boss look numbers than the limit");
+        // parry presses travel with the input, with the tick the client was showing, and wait until the boss takes them
+        var qteIn = new LanInputFrame { Qte = 0x11, QteTick = 1234 };
+        Check(LanInputFrame.TryDecode(qteIn.Encode(), out var qteBack) && qteBack.Qte == 0x11 && qteBack.QteTick == 1234, "input round trips parry presses and their tick");
+        Check(!new LanInputFrame { Qte = 0x20 }.Valid, "input refuses unknown parry bits");
+        var qteBuffer = new LanInputBuffer(); qteBuffer.Accept(new LanInputFrame { Qte = 0x01, QteTick = 10 }); qteBuffer.Accept(new LanInputFrame { Qte = 0x10, QteTick = 12 }); qteBuffer.Accept(new LanInputFrame());
+        Check(qteBuffer.TakeQte(out int qteTick) == 0x11 && qteTick == 12 && qteBuffer.TakeQte(out _) == 0, "parry presses from several packets add up until taken, then clear");
         var tooMany = new LanWorldFrame { Tick = 1, RunState = 3, Boss = new LanWorldFrame.BossState { Hp = 1, MaxHp = 1 } }; tooMany.Players.Add(worldPlayer);
         for (int i = 0; i <= LanWorldFrame.MaxProps; i++) tooMany.Boss.Props.Add(new LanWorldFrame.Prop { Id = i });
         bool rejected; try { tooMany.Encode(); rejected = false; } catch (System.IO.InvalidDataException) { rejected = true; }

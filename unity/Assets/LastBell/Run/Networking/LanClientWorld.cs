@@ -182,6 +182,7 @@ namespace LastBell.Run.Networking
             }
             director.ApplyLanState(Enum.IsDefined(typeof(RunState), frame.RunState) ? (RunState)frame.RunState : RunState.Combat, frame.StateTicks, frame.Victory, boss);
             ReceiveMirrors(hostTime, frame.Hazards);
+            bulletTime = hostTime; bulletStates.Clear(); bulletStates.AddRange(frame.Bullets); BulletsSeen = Mathf.Max(BulletsSeen, bulletStates.Count);
             hazardView.Apply(frame);   // projectiles are drawn by the host's own recorded effect calls (LanFxReplay)
         }
         void Update()
@@ -202,6 +203,7 @@ namespace LastBell.Run.Networking
                 unacked.Add(new SentMove { Seq = inputSequence, Move = intent.Move, Sprint = intent.Sprint });
                 if (unacked.Count > 240) unacked.RemoveAt(0);
                 var packet = LanUnityInput.Encode(intent);
+                packet.Qte = LanQteOut.Take(out packet.QteTick);
                 if (!packet.Valid || !lobby.SendInput(inputSequence++, packet.Encode())) { error = "Could not send player input."; return; }
             }
         }
@@ -246,6 +248,7 @@ namespace LastBell.Run.Networking
             if (!clockSet) return;
             // draw this far behind the newest snapshot: 1.5 intervals covers a late packet without stepping
             double delay = Mathf.Clamp(interval * 1.5f + 0.01f, 0.03f, 0.35f), renderTime = Time.unscaledTime - clockOffset - delay;
+            BossEncounter.NetDrawnTick = Math.Max(0, (int)Math.Floor(renderTime / Sim.Dt));
             foreach (var pair in actors)
             {
                 var actor = pair.Value;
@@ -275,7 +278,7 @@ namespace LastBell.Run.Networking
                 int age = s.StateAge + (int)Math.Max(0, Math.Floor((renderTime - s.T) / Sim.Dt));
                 clock.ApplyReplica(shownHaste ? Tempo.Haste : Tempo.Normal, shownBeat, s.Transitioning, s.TransitionTick, age);
             }
-            PresentProps(renderTime); PresentMirrors(renderTime);
+            PresentProps(renderTime); PresentMirrors(renderTime); PresentBullets(renderTime);
             // the boss's own looks (glow, phase looks, poses, overlays), from the newest host state
             if (boss && current?.Boss != null)
             {
@@ -327,6 +330,23 @@ namespace LastBell.Run.Networking
                 if (point.z <= 0) continue;
                 GUI.Label(new Rect(point.x - 90, Screen.height - point.y - 24, 180, 24), NameOf(pair.Key), nameStyle);
             }
+        }
+        // ---------------- hostile bullets ----------------
+        readonly List<LanWorldFrame.BulletState> bulletStates = new List<LanWorldFrame.BulletState>();
+        double bulletTime;
+        public int BulletsSeen { get; private set; }   // most bullets one snapshot carried (LAN smoke test)
+        // each bullet flies straight: place it along its velocity at the drawn time and draw them like the host does
+        void PresentBullets(double renderTime)
+        {
+            var bullets = world.Bullets; bullets.SetReplicaCount(bulletStates.Count);
+            float since = (float)(renderTime - bulletTime);
+            for (int i = 0; i < bulletStates.Count; i++)
+            {
+                var s = bulletStates[i]; var b = bullets.Live[i];
+                b.Pos = new Vector3(s.X + s.VX * since, 0, s.Z + s.VZ * since); b.Vel = new Vector3(s.VX, 0, s.VZ);
+                b.Radius = s.Radius; b.Colour = s.Colour; b.Source = s.Water ? "Waterfall Jet" : "Bullet"; b.Dead = false;
+            }
+            bullets.Draw(world.Root);
         }
         // ---------------- boss props ----------------
         readonly HashSet<int> propSeen = new HashSet<int>();

@@ -98,6 +98,7 @@ namespace LastBell.Run
         protected static PlayerController NetP(Networking.LanWorldFrame.EffectArg a, System.Func<int, PlayerController> player) => a.Kind == Networking.LanWorldFrame.EffectArg.PlayerRef ? player(a.I) : null;
         // LAN player identity, the same number on every computer (the lobby id): set by the host's capture and the client's
         // replica world, null outside a session. Use it to send per-player looks (Look numbers keyed by id).
+        public static int NetDrawnTick;   // LAN client: the host tick this screen is drawing now
         public static System.Func<PlayerController, int> NetIdOf;
         public static System.Func<int, PlayerController> NetPlayerOf;
         // on a LAN client the boss is a replica: drawn from the host's snapshots, never stepped
