@@ -25,7 +25,7 @@ namespace LastBell.Run
         public readonly BotMode Mode;
         // tests: what it decided last tick; only formatted when read, so a tick stores plain values and makes no strings
         public string DebugLine => dMe == null ? null : Describe();
-        public string Brief => dMe == null ? null : $"{dMe.ClassName.Substring(0, 2)} {dJob ?? "-"} gap {Sim.Flat(tPos - dMe.transform.position).magnitude - tRad:0.0} {(tick - lastPress < Sim.Hz ? "swing" : "idle")}";   // the sweep trace: job, gap to the target, pressed in the last second
+        public string Brief => dMe == null ? null : $"{dMe.ClassName.Substring(0, 2)} {dJob ?? "-"} gap {Sim.Flat(tPos - dMe.transform.position).magnitude - tRad:0.0} {(tick - lastPress < Sim.Hz ? "swing" : "idle")}{(dJob == "volley" && volEsc != null ? " " + volEsc : "")}";   // the sweep trace: job, gap to the target, pressed in the last second
         public float? HoldRange;          // tests: keep this gap to the boss instead of the class's range (8.5 = a ranged player)
         // bots are mechanics dummies by default: they move, dodge and spread, but never attack or heal. Launch switch
         // -lastbellAllyAttack turns their class rotation on (the boss then scales his HP for them, BossEncounter.Spawn).
@@ -421,7 +421,7 @@ namespace LastBell.Run
         const float VolleyLook = 0.8f, VolleyStep = 0.05f, VolleyBuffer = 0.15f, VolleyPathCost = 30f, VolleyPathSoon = 1.6f, VolleySwing = 20f, VolleySprintFloor = 55f;   // a swing waits only for a bullet it would meet (50 and up)
         const float VolleyJetRing = 8f;   // m from the jets' hub where they sweep at a walk (40 deg/s, WalkSpeed 6)
         const float VolleyJetHit = 200f;  // a jet step in the bullet dodge (a bullet step is 100)
-        bool volJets; Vector3 volHub;
+        bool volJets; Vector3 volHub; string volEsc;   // volEsc: the sweep trace
         const float VolleyThrowReach = 7f;   // a Tollbreaker's axe throws, gap to the target (MaxRange 9 m less a margin)
         static readonly List<Hazard> volNear = new List<Hazard>();
         static Vector3[] Dirs16;
@@ -446,14 +446,14 @@ namespace LastBell.Run
             if (carrier) volJets = false;   // its brand goes to the rim, jets or not
             if (carrier) home = (pos.magnitude > 0.1f ? pos.normalized : Vector3.forward) * Mathf.Min(BrandRing, CombatWorld.PlayerBound - 1.2f);
             else if (Attacks && AttackSpot(me, boss, out var spot)) home = Sim.Flat(spot);
-            volReach = Attacks && !carrier; volPull = 0.6f;
+            volReach = Attacks && !carrier; volPull = 0.6f; volEsc = carrier ? "carry" : null;
             // in a fan its bullets are still to cross: the nearest spot clear of every path is the goal (the look is too short
             // to find a Ring Wave's gap metres away: the solo bot ran from the wall of bullets into the corner, 11-03)
             if (path || bad(pos))
             {
                 var esc = NearestClear(pos, boss, bad, out float need);
                 // not beside a turret: the clear spot there is where its next arms sweep (two bots were pinned so, 11-04)
-                if (esc != Vector3.zero && BotSight.TurretDist(pos + esc * need) >= TurretKeep) { home = pos + esc * need; volReach = false; volPull = need > 6f ? 1f : 2f; }
+                if (esc != Vector3.zero && BotSight.TurretDist(pos + esc * need) >= TurretKeep) { home = pos + esc * need; volReach = false; volPull = need > 6f ? 1f : 2f; volEsc = $"esc{need:0}"; }
             }
             if (!volOn || me.World.Tick - volTick >= 3 || me.Stunned > 0)
             {
