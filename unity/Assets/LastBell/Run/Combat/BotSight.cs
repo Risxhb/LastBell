@@ -35,10 +35,6 @@ namespace LastBell.Run
         public static readonly List<Vector3> Turrets = new List<Vector3>();
         static readonly List<int> turretTick = new List<int>();
         static readonly HashSet<Hazard> traced = new HashSet<Hazard>();
-        // the Spiral Arms fired or drawn: turret, first bearing (of three arms 120 deg apart) and the tick they start turning
-        static readonly List<(Vector3 at, float a0, int start)> spirals = new List<(Vector3, float, int)>();
-        const string SpiralFan = "Spiral Arm path";
-        const float SpiralFanPad = 4f, SpiralFlight = 5f, ArmHalf = 0.95f;   // a fan's half is the sweep's half + 4 deg; s a bullet crosses the arena; bullet + body + room
         // s before its bullets show; m past a spot before the wave has gone by; s a path keeps taking new bullets (a spiral fires 2.4 s)
         const float PathLead = 0.8f, PathPass = 1.2f, PathOwn = 2.6f, SoonS = 1.6f, ShotSpeed = 6f;
         static CombatWorld world; static int tick = -1, scanTick = -999;
@@ -46,7 +42,7 @@ namespace LastBell.Run
 
         public static void Update(CombatWorld w, BossEncounter boss)
         {
-            if (w != world) { world = w; tick = -1; scanTick = -999; seen.Clear(); pool.Clear(); Orbs.Clear(); prevLive.Clear(); ghosts.Clear(); ghostUntil.Clear(); paths.Clear(); pathFrom.Clear(); pathShots.Clear(); seenShots.Clear(); shotSeen.Clear(); Turrets.Clear(); turretTick.Clear(); traced.Clear(); spirals.Clear(); }
+            if (w != world) { world = w; tick = -1; scanTick = -999; seen.Clear(); pool.Clear(); Orbs.Clear(); prevLive.Clear(); ghosts.Clear(); ghostUntil.Clear(); paths.Clear(); pathFrom.Clear(); pathShots.Clear(); seenShots.Clear(); shotSeen.Clear(); Turrets.Clear(); turretTick.Clear(); traced.Clear(); }
             if (w.Tick == tick) return;
             tick = w.Tick;
             // orbs: the boss's pooled spheres, found by name under the arena root (rescanned now and then: the pool grows)
@@ -117,16 +113,6 @@ namespace LastBell.Run
                 if (near < 0) { Turrets.Add(from); turretTick.Add(tick); } else turretTick[near] = tick;
             }
             for (int i = Turrets.Count - 1; i >= 0; i--) if (tick - turretTick[i] > 12 * Sim.Hz) { Turrets.RemoveAt(i); turretTick.RemoveAt(i); }
-            // Spiral Arms: a drawn fan gives its spiral's turret, first bearing and start; from then the arms turn at a known
-            // rate, so when one will cross any spot is known before (and after) its bullets fly
-            for (int i = 0; i < live.Count; i++)
-            {
-                var h = live[i]; if (h.Shape != HazardShape.Cone || h.Source != SpiralFan || h.Age >= h.ResolveAt) continue;
-                var at = Sim.Flat(h.Origin); int start = tick + (h.ResolveAt - h.Age); float a0 = h.Yaw - (h.HalfAngle - SpiralFanPad);
-                bool dup = false; foreach (var s in spirals) if (Sim.Flat(s.at - at).magnitude < 0.5f && Mathf.Abs(s.start - start) <= 3) dup = true;
-                if (!dup) spirals.Add((at, a0, start));
-            }
-            spirals.RemoveAll(s => tick > s.start + Sim.Ticks(FoundryUprising.SpiralFor + SpiralFlight));
             for (int i = paths.Count - 1; i >= 0; i--)
             {
                 pathShots[i].RemoveAll(b => !bullets.Contains(b));
@@ -153,25 +139,6 @@ namespace LastBell.Run
         {
             float best = float.PositiveInfinity;
             for (int i = 0; i < Turrets.Count; i++) best = Mathf.Min(best, Sim.Flat(Turrets[i] - q).magnitude);
-            return best;
-        }
-
-        // seconds from now until a Spiral Arm crosses q (infinity if none will; up to 0.2 s ago counts), and whether that arm's
-        // bullet is still to be fired there: one fired at bearing b from the turret at te reaches distance R at te + R / speed
-        public static float SpiralArrive(Vector3 q, out bool unfired)
-        {
-            float best = float.PositiveInfinity; unfired = false; q = Sim.Flat(q);
-            float turn = FoundryUprising.SpiralTurn, sweep = FoundryUprising.SpiralTurn * FoundryUprising.SpiralFor;
-            for (int i = 0; i < spirals.Count; i++)
-            {
-                var s = spirals[i]; float r = Sim.Flat(q - s.at).magnitude; if (r < 0.5f) continue;
-                float tol = Mathf.Rad2Deg * Mathf.Asin(Mathf.Min(1f, ArmHalf / r));
-                float d = Mathf.Repeat(Sim.YawTo(s.at, q, 0) - s.a0 + tol, 120f) - tol;
-                if (d > sweep + tol) continue;
-                float te = (s.start - tick) / (float)Sim.Hz + Mathf.Max(0, d) / turn, arrive = te + r / FoundryUprising.SpiralSpeed;
-                if (arrive < -0.2f || arrive >= best) continue;
-                best = arrive; unfired = te > 0;
-            }
             return best;
         }
 

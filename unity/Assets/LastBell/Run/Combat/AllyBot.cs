@@ -420,10 +420,6 @@ namespace LastBell.Run
         const float VolleyLook = 0.8f, VolleyStep = 0.05f, VolleyBuffer = 0.15f, VolleyPathCost = 30f, VolleyPathSoon = 1.6f, VolleySwing = 20f, VolleySprintFloor = 55f;   // a swing waits only for a bullet it would meet (50 and up)
         const float VolleyJetRing = 8f;   // m from the jets' hub where they sweep at a walk (40 deg/s, WalkSpeed 6)
         bool volJets; Vector3 volHub;
-        // Spiral Arms (BotSight.SpiralArrive): far from its turret an arm comes round faster than a walk, and a bot seeing only
-        // 0.8 s of bullets ran ahead of one into the far wall (every third-uprising loss, 11-04). Its bullets still to be fired
-        // count as hits, and ending where an arm comes within VolleyArmSoon s costs up to VolleyArmCost
-        const float VolleyArmWake = 2f, VolleyArmSoon = 1.2f, VolleyArmCost = 70f;
         const float VolleyThrowReach = 7f;   // a Tollbreaker's axe throws, gap to the target (MaxRange 9 m less a margin)
         static readonly List<Hazard> volNear = new List<Hazard>();
         static Vector3[] Dirs16;
@@ -438,7 +434,7 @@ namespace LastBell.Run
             }
             bad = Bad(me, boss, false, me.World.Tick + 45);
             bool path = BotSight.GhostHits(me, pos);
-            if (volNear.Count == 0 && !path && BotSight.SpiralArrive(pos, out _) > VolleyArmWake) { volOn = false; return false; }
+            if (volNear.Count == 0 && !path) { volOn = false; return false; }
             volJets = false; { var lv = me.World.Hazards.Live; for (int i = 0; i < lv.Count; i++) if (Jet(lv[i])) { TrackSpin(lv[i]); volJets = true; volHub = Sim.Flat(lv[i].Origin); break; } }   // the jets' turn, for VolleyCost
             pos = Sim.Flat(pos);
             // home: the rim for a brand carrier, else the attack spot (or straight at the target)
@@ -526,9 +522,6 @@ namespace LastBell.Run
                 // every 0.2 s: burning ground and strikes landing about now; at the end, the paths still to fire (bullets that
                 // reach it after the look: a light cost, or it never stands to swing at a casting inside its turret's fan)
                 if (k == steps) { float arrive = BotSight.PathArrive(q) + t; if (arrive < VolleyPathSoon) cost += VolleyPathCost * Mathf.Clamp01((VolleyPathSoon - arrive) / (VolleyPathSoon - VolleyLook)); }
-                float arm = BotSight.SpiralArrive(q, out bool unfired);
-                if (unfired && Mathf.Abs(arm - t) < 0.12f) cost += 100 * early;
-                if (k == steps && arm > t + 0.1f && arm < t + VolleyArmSoon) cost += VolleyArmCost * (1 - (arm - t) / VolleyArmSoon);
                 for (int i = 0; i < live.Count; i++)
                 {
                     var h = live[i];
