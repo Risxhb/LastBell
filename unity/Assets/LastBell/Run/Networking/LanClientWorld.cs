@@ -42,7 +42,17 @@ namespace LastBell.Run.Networking
         const float TeleportDistance = 4f;
         readonly Dictionary<int, Actor> actors = new Dictionary<int, Actor>();
         readonly Track bossTrack = new Track();
-        readonly List<(double t, double beat, bool haste)> beats = new List<(double, double, bool)>();   // Tempo Tyrant clock samples by host time
+        struct BeatSample { public double T, Beat; public bool Haste, Transitioning; public int TransitionTick, StateAge; }
+        readonly List<BeatSample> beats = new List<BeatSample>();   // boss TempoClock samples by host time (Tempo Tyrant, Oracle)
+        // boss-drawn moving objects (orbs, thrown weights): one view each, moved along the host's positions
+        sealed class PropView { public Transform View; public byte Kind; public readonly Track Track = new Track(); public double GoneAt = -1; }
+        readonly Dictionary<int, PropView> props = new Dictionary<int, PropView>();
+        // stand-ins for the host's hazards, for effects that watch one (Aurelion's Zenith Collapse, Orrery Closing, Last Light)
+        sealed class HazardMirror { public Hazard H; public double T; public int Age; public double GoneAt = -1; }
+        readonly Dictionary<int, HazardMirror> mirrors = new Dictionary<int, HazardMirror>();
+        LastLightFloorFx lastLight;
+        public int PropsShown { get; private set; }            // diagnostics: most boss props drawn at once
+        public int ReplicaEffects { get; private set; }        // diagnostics: Aurelion effects started from the host's calls
         double shownBeat; bool beatSet, shownHaste;   // the beat given to the replica's clock: smooth, so the music never chases jitter
         // Own-movement prediction: this client's character is drawn where the host has it plus the moves the host has not
         // applied yet (walk or sprint at the host's current speed factor), and eased onto the host's answer. Dashes, hits
@@ -97,7 +107,7 @@ namespace LastBell.Run.Networking
             RunHud.LanClientView = true;
             RunHud.LanLeave = () => { if (LanSessionCoordinator.Instance) LanSessionCoordinator.Instance.Leave(); };
             if (hud) hud.enabled = true;
-            fxReplay = new LanFxReplay(playerFx, fx, id => actors.TryGetValue(id, out var a) ? a.Player : null, () => boss);
+            fxReplay = new LanFxReplay(playerFx, fx, id => actors.TryGetValue(id, out var a) ? a.Player : null, () => boss) { Replica = PlayReplica };
             hazardView = new LanHazardView(fx); localInput = new KeyboardMouseInput(); KeyboardMouseInput.Blocked = false;
             cam = Camera.main;
             lobby.WorldReceived += Receive;
@@ -117,7 +127,7 @@ namespace LastBell.Run.Networking
             lastArrival = now;
             // a retry restarts the host's world tick: start every history again
             bool restarted = current != null && frame.Tick < current.Tick;
-            if (restarted) { foreach (var a in actors.Values) a.Track.Clear(); bossTrack.Clear(); beats.Clear(); beatSet = false; clockSet = false; fxReplay.Reset(); playerFx.ResetAll(); }
+            if (restarted) { foreach (var a in actors.Values) a.Track.Clear(); bossTrack.Clear(); beats.Clear(); beatSet = false; clockSet = false; fxReplay.Reset(); playerFx.ResetAll(); ClearProps(); ClearMirrors(); }
             fxReplay.Enqueue(frame.Effects);
             double hostTime = frame.Tick * (double)Sim.Dt, offset = now - hostTime;
             if (!clockSet || Math.Abs(offset - clockOffset) > 0.5) { clockOffset = offset; clockSet = true; } else clockOffset += (offset - clockOffset) * 0.05;
@@ -146,7 +156,14 @@ namespace LastBell.Run.Networking
                 }
                 var b = frame.Boss;
                 bossTrack.Add(hostTime, new Vector3(b.X, b.Y, b.Z), b.Yaw, 0);
-                if (b.PoseKind == 1) { beats.Add((hostTime, b.Beat, b.BeatHaste)); if (beats.Count > 120) beats.RemoveRange(0, beats.Count - 120); }
+                if (b.PoseKind == 1 || b.PoseKind == 2)
+                {
+                    beats.Add(new BeatSample { T = hostTime, Beat = b.Beat, Haste = b.BeatHaste, Transitioning = b.Transitioning, TransitionTick = b.TransitionTick, StateAge = b.StateAge });
+                    if (beats.Count > 120) beats.RemoveRange(0, beats.Count - 120);
+                }
+                if (boss is TempoTyrantEncounter hud) hud.ApplyReplicaHud(b.Frenzy, b.Announcement, b.Numbers);
+                else if (boss is ChimeboundOracleEncounter enraged) enraged.ApplyReplica(b.Frenzy);
+                ReceiveProps(hostTime, b.Props);
                 boss.ApplyNetworkState(b.Hp, b.MaxHp, b.Dead, b.Phase, b.Attack, b.Extra);
                 if (bossPresenter) bossPresenter.ApplyNetworkPose(b.Clip,b.ClipSpeed,b.Overlay,b.OverlaySpeed,b.Hidden);
                 if (b.PoseKind==1 && boss is TempoTyrantEncounter tyrant && tyrant.Rig && Enum.IsDefined(typeof(TyrantPose),b.Pose))
@@ -163,6 +180,7 @@ namespace LastBell.Run.Networking
                 }
             }
             director.ApplyLanState(Enum.IsDefined(typeof(RunState), frame.RunState) ? (RunState)frame.RunState : RunState.Combat, frame.StateTicks, frame.Victory, boss);
+            ReceiveMirrors(hostTime, frame.Hazards);
             hazardView.Apply(frame);   // projectiles are drawn by the host's own recorded effect calls (LanFxReplay)
         }
         void Update()
@@ -247,17 +265,20 @@ namespace LastBell.Run.Networking
             }
             // the Tempo Tyrant's music follows its clock: give the replica the host's beat at the drawn time, so the
             // song lines up with what this screen shows (the beat runs on linearly between the host's samples)
-            if (boss is TempoTyrantEncounter tyrant && beats.Count > 0)
+            var clock = boss is TempoTyrantEncounter tyrant ? tyrant.Clock : boss is ChimeboundOracleEncounter oracle ? oracle.Clock : null;
+            if (clock != null && beats.Count > 0)
             {
-                int i = beats.Count - 1; while (i > 0 && beats[i].t > renderTime) i--;
-                var s = beats[i]; double bpm = s.haste ? tyrant.Clock.HasteBpm : tyrant.Clock.NormalBpm;
-                double target = s.beat + Math.Max(0, renderTime - s.t) * bpm / 60.0;
+                int i = beats.Count - 1; while (i > 0 && beats[i].T > renderTime) i--;
+                var s = beats[i]; double bpm = s.Haste ? clock.HasteBpm : clock.NormalBpm;
+                double target = s.Beat + Math.Max(0, renderTime - s.T) * bpm / 60.0;
                 // runs on at the tempo by wall time and eases toward the drawn beat (the drawn time wobbles with packet
                 // timing); jumps only on a tempo change, where the music crossfades anyway, or when far off
-                if (!beatSet || s.haste != shownHaste || Math.Abs(target - shownBeat) > 0.5) { shownBeat = target; shownHaste = s.haste; beatSet = true; }
+                if (!beatSet || s.Haste != shownHaste || Math.Abs(target - shownBeat) > 0.5) { shownBeat = target; shownHaste = s.Haste; beatSet = true; }
                 else { float dt = Time.unscaledDeltaTime; shownBeat += dt * bpm / 60.0; shownBeat += (target - shownBeat) * (1 - Math.Exp(-dt / 1.5)); }
-                tyrant.Clock.ApplyReplica(shownHaste ? Tempo.Haste : Tempo.Normal, shownBeat);
+                int age = s.StateAge + (int)Math.Max(0, Math.Floor((renderTime - s.T) / Sim.Dt));
+                clock.ApplyReplica(shownHaste ? Tempo.Haste : Tempo.Normal, shownBeat, s.Transitioning, s.TransitionTick, age);
             }
+            PresentProps(renderTime); PresentMirrors(renderTime);
             // effects play when the drawn timeline reaches the tick the host made them on
             fxReplay.PlayUntil((int)Math.Floor(renderTime / Sim.Dt));
             if (director.State == RunState.Combat)
@@ -304,6 +325,98 @@ namespace LastBell.Run.Networking
                 GUI.Label(new Rect(point.x - 90, Screen.height - point.y - 24, 180, 24), NameOf(pair.Key), nameStyle);
             }
         }
+        // ---------------- boss props ----------------
+        readonly HashSet<int> propSeen = new HashSet<int>();
+        void ReceiveProps(double hostTime, List<LanWorldFrame.Prop> list)
+        {
+            propSeen.Clear();
+            foreach (var p in list)
+            {
+                propSeen.Add(p.Id);
+                if (!props.TryGetValue(p.Id, out var view) || view.Kind != p.Kind)
+                {
+                    if (view != null && view.View) Destroy(view.View.gameObject);
+                    view = new PropView { Kind = p.Kind, View = boss ? boss.MakeNetProp(p.Kind) : null }; props[p.Id] = view;
+                    if (view.View) view.View.gameObject.SetActive(false);   // shown once the drawn time reaches it
+                }
+                view.GoneAt = -1; view.Track.Add(hostTime, new Vector3(p.X, p.Y, p.Z), 0, 0);
+            }
+            foreach (var pair in props) if (!propSeen.Contains(pair.Key) && pair.Value.GoneAt < 0) pair.Value.GoneAt = hostTime;
+        }
+        readonly List<int> drop = new List<int>();
+        void PresentProps(double renderTime)
+        {
+            drop.Clear(); int shown = 0;
+            foreach (var pair in props)
+            {
+                var v = pair.Value;
+                if (v.GoneAt >= 0 && renderTime >= v.GoneAt) { if (v.View) Destroy(v.View.gameObject); drop.Add(pair.Key); continue; }
+                if (!v.View || !v.Track.Ready) continue;
+                v.Track.At(renderTime, out var pos, out _, out _);
+                v.View.position = pos; if (!v.View.gameObject.activeSelf) v.View.gameObject.SetActive(true); shown++;
+            }
+            foreach (int id in drop) props.Remove(id);
+            PropsShown = Mathf.Max(PropsShown, shown);
+        }
+        void ClearProps() { foreach (var v in props.Values) if (v.View) Destroy(v.View.gameObject); props.Clear(); }
+
+        // ---------------- hazard stand-ins and Aurelion effects ----------------
+        readonly HashSet<int> mirrorSeen = new HashSet<int>();
+        void ReceiveMirrors(double hostTime, List<LanWorldFrame.HazardState> hazards)
+        {
+            mirrorSeen.Clear();
+            foreach (var s in hazards)
+            {
+                mirrorSeen.Add(s.Id);
+                if (!mirrors.TryGetValue(s.Id, out var m)) { m = new HazardMirror { H = new Hazard { Replica = true, Source = s.Source } }; mirrors[s.Id] = m; }
+                var h = m.H;
+                h.Shape = (HazardShape)s.Shape; h.Origin = new Vector3(s.X, s.Y, s.Z); h.Yaw = s.Yaw; h.Radius = s.Radius; h.Inner = s.Inner; h.HalfAngle = s.HalfAngle;
+                h.Length = s.Length; h.Width = s.Width; h.LockAt = s.LockAt; h.ResolveAt = s.ResolveAt; h.ActiveTicks = s.ActiveTicks; h.ClipRadius = s.ClipRadius;
+                m.T = hostTime; m.Age = s.Age; m.GoneAt = -1;
+            }
+            foreach (var pair in mirrors) if (!mirrorSeen.Contains(pair.Key) && pair.Value.GoneAt < 0) pair.Value.GoneAt = hostTime;
+        }
+        void PresentMirrors(double renderTime)
+        {
+            drop.Clear();
+            foreach (var pair in mirrors)
+            {
+                var m = pair.Value;
+                if (m.GoneAt >= 0 && renderTime >= m.GoneAt) { m.H.Cancelled = true; drop.Add(pair.Key); continue; }
+                m.H.Age = Math.Max(0, m.Age + (int)Math.Floor((renderTime - m.T) / Sim.Dt));
+            }
+            foreach (int id in drop) mirrors.Remove(id);
+        }
+        void ClearMirrors()
+        {
+            foreach (var m in mirrors.Values) m.H.Cancelled = true;
+            mirrors.Clear();
+            if (lastLight) lastLight.End();
+            lastLight = null;
+        }
+        Hazard Mirror(LanWorldFrame.EffectArg a) => a.Kind == LanWorldFrame.EffectArg.Integer && mirrors.TryGetValue(a.I, out var m) ? m.H : null;
+        // the host's LanFxTarget.Replica calls
+        bool PlayReplica(string method, LanWorldFrame.EffectArg[] a)
+        {
+            switch (method)
+            {
+                case "ZenithCollapse":
+                    { var h = a.Length == 1 ? Mirror(a[0]) : null; if (h == null) return false; ZenithCollapseFx.Create(world, h); ReplicaEffects++; return true; }
+                case "OrreryClosing":
+                    {
+                        if (a.Length != 3) return false;
+                        var rim = Mirror(a[0]); var crown = Mirror(a[1]); if (rim == null || crown == null) return false;
+                        OrreryClosingFx.Create(world, rim, crown, a[2].I); ReplicaEffects++; return true;
+                    }
+                case "LastLightBegin":
+                    if (lastLight) lastLight.End();
+                    lastLight = LastLightFloorFx.Replica(world, boss ? boss.transform : null); ReplicaEffects++; return true;
+                case "LastLightSector": { var h = a.Length == 1 ? Mirror(a[0]) : null; if (h == null || !lastLight) return false; lastLight.AddSector(h); return true; }
+                case "LastLightEnd": if (lastLight) lastLight.End(); lastLight = null; return true;
+                default: return false;
+            }
+        }
+
         // The lobby name and the drawn class of a player in this fight (name tags; diagnostics).
         public string ClassOf(int id) => actors.TryGetValue(id, out var a) && a.Player ? a.Player.ClassName : null;
         public string NameOf(int id)
@@ -317,6 +430,7 @@ namespace LastBell.Run.Networking
             RunHud.LanClientView = false; RunHud.LanLeave = null;
             if (director) director.DetachLanReplica();
             hazardView?.Clear();
+            try { ClearProps(); ClearMirrors(); } catch (Exception ex) { Debug.Log("[LAN] client cleanup: " + ex.Message); }
             // the scene may already have destroyed the replica boss and players; a cleanup error must not escape OnDestroy
             try { if (world != null) world.ClearTransient(); } catch (Exception ex) { Debug.Log("[LAN] client cleanup: " + ex.Message); }
             if (root) Destroy(root.gameObject);

@@ -431,6 +431,9 @@ namespace LastBell.Run
             }
         }
         void ClearOrbs() { foreach (var o in orbs) ReturnOrb(o); orbs.Clear(); }
+        public override void CaptureNetProps(List<Networking.LanWorldFrame.Prop> into) { foreach (var o in orbs) if (o.View) into.Add(NetProp(o.Src.Id, 0, o.View.position)); }
+        public override Transform MakeNetProp(byte kind) { var t = TakeOrbView(); t.name = "Oracle orb (LAN)"; return t; }
+        public void ApplyReplica(bool enraged) => Enraged = enraged;   // LAN client: the Metronome Court's frenzy light
 
         // spots on the floor at least `spacing` apart, the first within reach of the nearest player
         List<Vector3> WellSpots(int n, float spacing)

@@ -191,6 +191,13 @@ namespace LastBell.Run
 
         void Awake() { MaxHp = 2600; BodyRadius = 1.4f; HitHeight = 2.0f; MarkHeight = 4.4f; }
 
+        // LAN client: the host's HUD state for TempoTyrantHud (the replica never runs the script)
+        public void ApplyReplicaHud(bool frenzy, string announcement, List<Networking.LanWorldFrame.Number> numbers)
+        {
+            Frenzy = frenzy; Announcement = announcement ?? "";
+            Numbers.Clear(); foreach (var n in numbers) Numbers.Add((new Vector3(n.X, n.Y, n.Z), n.N, n.Imminent));
+        }
+
         protected override void Build()
         {
             Rig = TempoTyrantRig.Create(transform);

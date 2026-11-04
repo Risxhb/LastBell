@@ -101,6 +101,8 @@ namespace LastBell.Menu
             if (!d || d.World==null || d.Allies.Count!=PeerCount()) yield break;
             Vector3 initial=d.Allies[0].transform.position;
             if (d.State==RunState.Ready) d.RequestReady();
+            // the Pendulum Sentinel's opening hits often wipe the automated party first: throw its weights straight away
+            if (d.Boss is PendulumSentinelEncounter opener) opener.ForcedNext="Weights";
             float fightStart=Time.realtimeSinceStartup, until=fightStart+50; int hostFrames=0; bool moved=false, damaged=false, hazard=false, classAction=false, sawDowned=false, sawCleared=false;
             while (session && d && Time.realtimeSinceStartup<until)
             {
@@ -121,13 +123,35 @@ namespace LastBell.Menu
             Check("remote attack damages the host's actual boss",damaged);
             Check("host creates a live combat hazard",hazard);
             Check("remote player uses class abilities, not just the basic attack",classAction);
+            // the boss's own presentation the client must mirror: force the mechanics a short fight never reaches
+            if (session && d && d.State==RunState.Combat && d.Boss)
+            {
+                string forced=Showcase(d);
+                Debug.Log("[LAN smoke] host showcase: "+forced);
+                float showUntil=Time.realtimeSinceStartup+(d.Boss is AurelionEncounter ? 45 : 14);
+                while (session && d && d.State==RunState.Combat && Time.realtimeSinceStartup<showUntil)
+                {
+                    if (d.Boss is AurelionEncounter a && !a.TestBusy && Time.realtimeSinceStartup>showUntil-41) break;
+                    foreach (var p in d.World.Players) if (p && !p.Down) p.DebugSetHp(PlayerController.MaxHp);   // keep the party up while it plays
+                    yield return null;
+                }
+                if (d && d.Boss is AurelionEncounter held) held.TestHold=false;
+            }
             if (hazard) yield return new WaitForSecondsRealtime(1);
             bool diagnosticVictory = session && d && d.State==RunState.Combat && d.Boss;
             Debug.Log("[LAN smoke] trace after wait: state " + (d ? d.State.ToString() : "-") + " forcing kill " + diagnosticVictory);
             if (diagnosticVictory) d.Boss.DebugDefeat();
             // Some bosses (the Chimebound Oracle) shrug off the forced kill, so allow time for a real wipe or victory.
             until=Time.realtimeSinceStartup+45;
-            while (session && d && d.State!=RunState.Results && Time.realtimeSinceStartup<until) { sawDowned |= d.State==RunState.Downed; sawCleared |= d.State==RunState.Cleared; yield return null; }
+            float fallback=Time.realtimeSinceStartup+10; bool forcedWipe=false;
+            while (session && d && d.State!=RunState.Results && Time.realtimeSinceStartup<until)
+            {
+                sawDowned |= d.State==RunState.Downed; sawCleared |= d.State==RunState.Cleared;
+                // a boss that ignores the forced kill (the Chimebound Oracle holds its HP) and a party that won't fall: end it with a wipe
+                if (!forcedWipe && d.State==RunState.Combat && Time.realtimeSinceStartup>fallback && d.World!=null)
+                { forcedWipe=true; Debug.Log("[LAN smoke] forcing a party wipe to reach results"); foreach (var p in d.World.Players) if (p && !p.Down) p.ForceDown("LAN smoke test"); }
+                yield return null;
+            }
             Debug.Log("[LAN smoke] trace results wait ended: session " + (bool)session + " director " + (bool)d + " state " + (d ? d.State.ToString() : "-") + " timedOut " + (Time.realtimeSinceStartup >= until) + " downed " + sawDowned + " cleared " + sawCleared);
             // The forced kill can lose a race with a real party wipe; either way the outcome must match what happened.
             Check("host reaches results with correct outcome",d && d.State==RunState.Results && (d.Victory ? sawCleared && !sawDowned : sawDowned));
@@ -144,18 +168,40 @@ namespace LastBell.Menu
             yield return new WaitForSecondsRealtime(3);
             Check("session survives the retry",session && session.Lobby != null && session.Lobby.Error == null);
         }
+        // Forces the mechanics whose look only the boss draws: orbs and thrown weights, the Tempo Tyrant's banner and Falling
+        // Hours, Aurelion's Zenith Collapse, Orrery Closing and Last Light.
+        static string Showcase(RunDirector d)
+        {
+            switch (d.Boss)
+            {
+                case TempoTyrantEncounter t: t.DebugSetHpFraction(0.08f); return "Tempo Tyrant below 10% (Broken Cadence, Falling Hours)";
+                case PendulumSentinelEncounter p: p.ForcedNext="Weights"; return "Pendulum Sentinel Weights";
+                case ChimeboundOracleEncounter o: o.ForcedNext="Wells"; return "Chimebound Oracle Wells";
+                case AurelionEncounter a: a.TestHold=true; a.TestRun(AurelionShowcase(a,d.World)); return "Aurelion Zenith Collapse, Orrery Closing, Last Light";
+                default: return "none";
+            }
+        }
+        static IEnumerable<int> AurelionShowcase(AurelionEncounter a, CombatWorld w)
+        {
+            foreach (var t in a.HungryCollapse()) yield return t;
+            yield return Sim.Ticks(1f);
+            foreach (var t in a.Closing.Run(a.HorizonFor())) yield return t;
+            yield return Sim.Ticks(1f);
+            foreach (var t in LastLightFloorFx.During(w, a.Light, a.Light.Run().Take(3))) yield return t;
+        }
         IEnumerator ClientFight(LanSessionCoordinator session)
         {
-            float until=Time.realtimeSinceStartup+100; bool observedCombat=false, observedDamage=false, observedResult=false, observedHazard=false, observedTelegraph=false, observedProjectile=false, observedHud=false, observedOwnCooldown=false;
+            float until=Time.realtimeSinceStartup+150; bool observedCombat=false, observedDamage=false, observedResult=false, observedHazard=false, observedTelegraph=false, observedProjectile=false, observedHud=false, observedOwnCooldown=false;
             float combatSince=-1, combatTime=0; int combatFrames=0; bool shotCombat=false;
-            int musicExpected=0, musicPlaying=0; bool sawNormal=false; TempoTyrantAudio tempoAudio=null; string lastTrack="";
+            int musicExpected=0, musicPlaying=0; bool sawNormal=false; bool wantMusic=false, sawAurelion=false; bool sawProps=false, sawAnnouncement=false, shownAnnouncement=false, sawClock=false, clockMoved=false; double firstBeat=-1;
+            int numbersSent=0, numbersShown=0; TempoTyrantAudio tempoAudio=null; string lastTrack="";
             bool rosterMatched=false; float maxLead=0; LanWorldFrame lastFrame=null; int snapshots=0, movedFrames=0; Vector3 lastSnapshotPos=Vector3.zero; Vector3 lastDrawn=Vector3.zero; bool haveDrawn=false;
             while (session && session.ClientView && Time.realtimeSinceStartup<until)
             {
                 var state=session.ClientView.Current;
                 if (state!=null)
                 {
-                    var d=RunDirector.Instance; var me=state.Players.Find(p=>p.Id==session.Lobby.LocalId);
+                    var d=RunDirector.Instance; var me=session.Lobby!=null ? state.Players.Find(p=>p.Id==session.Lobby.LocalId) : null;
                     if (!rosterMatched) { var view=session.ClientView; rosterMatched=session.Lobby.Members.All(m=>view.NameOf(m.Id)==m.Name && view.ClassOf(m.Id)==m.ClassName); }
                     maxLead=Mathf.Max(maxLead,session.ClientView.PredictionLead);
                     // the normal RunHud draws the replica: the director holds this client's player, fed by the host's numbers
@@ -177,6 +223,20 @@ namespace LastBell.Menu
                         if (clip) lastTrack=clip.name;
                         if (d.Boss is TempoTyrantEncounter t) { tempoAudio=t.Audio; sawNormal |= state.Boss!=null && !state.Boss.BeatHaste; }
                     }
+                    // boss presentation that only the host computes: orbs, the Tempo Tyrant's HUD, the boss clock
+                    if (state.Boss!=null && state.RunState==(int)RunState.Combat && d && d.Boss)
+                    {
+                        sawProps |= state.Boss.Props.Count>0;
+                        if (d.Boss is TempoTyrantEncounter ty)
+                        {
+                            if (!string.IsNullOrEmpty(state.Boss.Announcement)) { sawAnnouncement=true; shownAnnouncement |= ty.Announcement==state.Boss.Announcement; }
+                            numbersSent=Mathf.Max(numbersSent,state.Boss.Numbers.Count); numbersShown=Mathf.Max(numbersShown,ty.Numbers.Count);
+                        }
+                        var clk = d.Boss is TempoTyrantEncounter t1 ? t1.Clock : d.Boss is ChimeboundOracleEncounter o1 ? o1.Clock : null;
+                        if (clk!=null) { sawClock=true; if (firstBeat<0) firstBeat=clk.Beat; else clockMoved |= clk.Beat>firstBeat+2; }
+                    }
+                    wantMusic |= d && d.Boss && MenuMusic.TrackFor(d.Boss)!=null;
+                    sawAurelion |= d && d.Boss is AurelionEncounter;
                     observedCombat |= state.RunState==(int)RunState.Combat;
                     observedDamage |= state.Boss!=null && state.Boss.Hp<state.Boss.MaxHp;
                     observedHazard |= state.Hazards.Count>0;
@@ -199,9 +259,17 @@ namespace LastBell.Menu
             Check("client sees its own class abilities go on cooldown",observedOwnCooldown);
             Check("client draws every lobby player with their lobby name and class",rosterMatched);
             Debug.Log("[LAN smoke] client music: boss track playing on "+musicPlaying+"/"+musicExpected+" combat frames (last: "+lastTrack+")"+(tempoAudio ? " · "+tempoAudio.StatusText : ""));
-            Check("client plays the boss music ("+lastTrack+")",musicExpected>0 && musicPlaying*20>=musicExpected*19);
+            if (wantMusic) Check("client plays the boss music ("+lastTrack+")",musicExpected>0 && musicPlaying*20>=musicExpected*19);
             if (tempoAudio) Check("client Tempo Tyrant music follows the host's tempo (locked"+(sawNormal?", switched versions":"")+", at most 2 calm corrections)",
                 tempoAudio.MusicLocked && (!sawNormal || tempoAudio.MusicSwaps>=1) && tempoAudio.CalmResyncs<=2);
+            var view2=session.ClientView;
+            Debug.Log("[LAN smoke] client boss presentation: props sent "+sawProps+", most drawn "+(view2?view2.PropsShown:0)+"; announcement sent "+sawAnnouncement+", shown "+shownAnnouncement
+                +"; strike numbers sent "+numbersSent+", shown "+numbersShown+"; clock "+(sawClock?(clockMoved?"moving":"still"):"none")+"; replayed Aurelion effects "+(view2?view2.ReplicaEffects:0));
+            if (sawProps) Check("client draws the boss's orbs and thrown objects",view2 && view2.PropsShown>0);
+            if (sawAurelion) Check("client replays Aurelion's Zenith Collapse, Orrery Closing and Last Light",view2 && view2.ReplicaEffects>=3);
+            if (sawAnnouncement) Check("client HUD shows the Tempo Tyrant's announcements",shownAnnouncement);
+            if (numbersSent>0) Check("client HUD shows the Tempo Tyrant's strike numbers",numbersShown>0);
+            if (sawClock) Check("client boss clock follows the host (Metronome Court, music, tempo HUD)",clockMoved);
             var fx=session.ClientView ? session.ClientView.Effects : null;
             if (fx!=null) Debug.Log("[LAN smoke] client effects: "+fx.Played+" played, "+fx.Failed+" failed: "+string.Join(", ",fx.PlayedMethods.OrderBy(m=>m)));
             string[] bossSide={"Float","Shake","SweepResolve","TollResolve","ChargeTrail","ChargeLand","ChimeResolve","BossHit","PlayerHit","PotionHeal","ResetAll","Crescendo"};

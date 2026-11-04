@@ -37,7 +37,7 @@ try {
         $clients.Add((Start-Process -FilePath $Player -ArgumentList $clientArgs -WindowStyle Hidden -PassThru))
         if ($PeerCount -gt 1) { Start-Sleep -Milliseconds 500 }
     }
-    $deadline = [DateTime]::UtcNow.AddSeconds(240)
+    $deadline = [DateTime]::UtcNow.AddSeconds(330)
     while ([DateTime]::UtcNow -lt $deadline) {
         $hostProc.Refresh(); foreach ($client in $clients) { $client.Refresh() }
         if ($hostProc.HasExited -and @($clients | Where-Object { -not $_.HasExited }).Count -eq 0) { break }

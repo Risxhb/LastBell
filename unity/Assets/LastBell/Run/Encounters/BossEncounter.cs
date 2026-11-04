@@ -74,6 +74,12 @@ namespace LastBell.Run
         }
 
         protected abstract void Build();                     // visuals (placeholder geometry or model)
+        // LAN: moving objects the boss draws itself (orbs, thrown weights). The host lists them every snapshot; a client asks
+        // the replica boss for a view of each kind and moves it along the host's positions.
+        public virtual void CaptureNetProps(List<Networking.LanWorldFrame.Prop> into) { }
+        public virtual Transform MakeNetProp(byte kind) => null;
+        protected static Networking.LanWorldFrame.Prop NetProp(int id, byte kind, Vector3 p) => new Networking.LanWorldFrame.Prop { Id = id, Kind = kind, X = p.x, Y = p.y, Z = p.z };
+        protected static int NextNetPropId = -1;   // for props without a hazard of their own (negative: never a hazard Id)
         protected abstract IEnumerable<int> Script();         // the attack schedule; restarts when it ends
         protected virtual void StepAlways() { }               // presentation-adjacent state on every tick
         protected virtual void OnDefeat() { }

@@ -6,7 +6,7 @@ using UnityEngine;
 namespace LastBell.Run.Networking
 {
     // Which effect family a recorded call belongs to. Values are on the wire (LanWorldFrame.Effect.Target).
-    public enum LanFxTarget : byte { Player = 0, Boss = 1, Hud = 2, Shake = 3, Projectile = 4, BossPart = 5 }
+    public enum LanFxTarget : byte { Player = 0, Boss = 1, Hud = 2, Shake = 3, Projectile = 4, BossPart = 5, Replica = 6 }   // Replica: effects a client rebuilds on hazard stand-ins (Aurelion)
 
     // Presentation calls for LAN clients. The effect entry points (PlayerFx, the shared BellkeeperFx hits, camera shake,
     // RunHud damage numbers, custom projectile moves and ends, and boss parts: TempoTyrantFx ribbons, Oracle and
@@ -90,6 +90,7 @@ namespace LastBell.Run.Networking
         readonly Func<int, PlayerController> player; readonly Func<BossEncounter> boss;
         readonly Dictionary<int, ProjectileSystem.Projectile> proxies = new Dictionary<int, ProjectileSystem.Projectile>();
         readonly Queue<LanWorldFrame.Effect> queue = new Queue<LanWorldFrame.Effect>();
+        public Func<string, LanWorldFrame.EffectArg[], bool> Replica;   // LanClientWorld: Aurelion effects on hazard stand-ins
         public int Played { get; private set; }
         public int Failed { get; private set; }
         public readonly HashSet<string> PlayedMethods = new HashSet<string>();   // diagnostics: which effects reached this client
@@ -116,6 +117,7 @@ namespace LastBell.Run.Networking
                     case LanFxTarget.Shake: ok = PlayShake(e.Method, e.Args); break;
                     case LanFxTarget.Projectile: ok = PlayProjectile(e.Method, e.Args); break;
                     case LanFxTarget.BossPart: ok = PlayBossPart(e.Method, e.Args); break;
+                    case LanFxTarget.Replica: ok = Replica != null && Replica(e.Method, e.Args); break;
                     default: ok = false; break;
                 }
             }

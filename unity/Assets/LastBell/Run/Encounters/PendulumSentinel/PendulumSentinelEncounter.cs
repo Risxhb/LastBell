@@ -363,7 +363,7 @@ namespace LastBell.Run
         }
 
         // ---------------- lying soaks ----------------
-        sealed class Soak { public Vector3 At; public int Start, Expire, Bounces; public float Angle0; public BellkeeperFx.Telegraph Ring; public List<BellkeeperFx.Telegraph> Arrows; public Transform View; }
+        sealed class Soak { public int Net = NextNetPropId--; public Vector3 At; public int Start, Expire, Bounces; public float Angle0; public BellkeeperFx.Telegraph Ring; public List<BellkeeperFx.Telegraph> Arrows; public Transform View; }
         readonly List<Soak> soaks = new List<Soak>();
 
         void StepSoaks()
@@ -465,7 +465,7 @@ namespace LastBell.Run
         void ClearOrbs() { foreach (var o in orbs) ReturnOrb(o); orbs.Clear(); }
 
         // ---------------- falling weights (presentation) ----------------
-        sealed class Falling { public Transform View; public Vector3 From, To; public int Start, End; }
+        sealed class Falling { public int Net = NextNetPropId--; public Transform View; public Vector3 From, To; public int Start, End; }
         readonly List<Falling> falling = new List<Falling>();
         void Fall(Vector3 from, Vector3 to, int start, int end)
         {
@@ -483,6 +483,17 @@ namespace LastBell.Run
                 if (f.View) { f.View.gameObject.SetActive(true); f.View.position = Vector3.Lerp(f.From, f.To, u) + Vector3.up * (12f * u * (1 - u) + 0.45f); }
                 if (Age > f.End + 20) { if (f.View) Destroy(f.View.gameObject); falling.RemoveAt(i); }
             }
+        }
+        public override void CaptureNetProps(List<Networking.LanWorldFrame.Prop> into)
+        {
+            foreach (var o in orbs) if (o.View && o.View.gameObject.activeSelf) into.Add(NetProp(o.Src.Id, 0, o.View.position));
+            foreach (var f in falling) if (f.View && f.View.gameObject.activeSelf) into.Add(NetProp(f.Net, 1, f.View.position));
+            foreach (var s in soaks) if (s.View) into.Add(NetProp(s.Net, 2, s.View.position));
+        }
+        public override Transform MakeNetProp(byte kind)
+        {
+            if (kind == 0) { var t = TakeOrbView(); t.name = "Counterweight orb (LAN)"; return t; }
+            return Prim.Make(PrimitiveKind.Sphere, transform.parent, Vector3.zero, Vector3.one * 0.9f, new Color(0.85f, 0.66f, 0.32f), kind == 1 ? 0.5f : 0.8f);
         }
         void ClearFalling() { foreach (var f in falling) if (f.View) Destroy(f.View.gameObject); falling.Clear(); }
 

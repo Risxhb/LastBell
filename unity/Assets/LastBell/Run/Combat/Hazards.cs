@@ -60,6 +60,17 @@ namespace LastBell.Run
         public bool Soak;                        // a ring to stand IN (a tower), not a shape to leave: bots and the HUD read it
 
         public int Age { get; internal set; }
+        // LAN client: a stand-in for a host hazard (LanClientWorld keeps its Age at the drawn time and cancels it when the
+        // host's is gone); presentation code that watches a hazard asks IsLive, not the world's list
+        public bool Replica;
+        public static bool IsLive(CombatWorld w, Hazard h)
+        {
+            if (h == null || h.Cancelled) return false;
+            if (h.Replica) return true;
+            if (w == null) return false;
+            var live = w.Hazards.Live; for (int i = 0; i < live.Count; i++) if (live[i] == h) return true;
+            return false;
+        }
         public bool Locked => Age >= LockAt;
         public bool Cancelled { get; internal set; }   // withdrawn before resolving (e.g. its recipient went down)
         internal BellkeeperFx.Telegraph Tele;

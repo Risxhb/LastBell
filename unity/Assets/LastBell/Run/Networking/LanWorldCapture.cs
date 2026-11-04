@@ -8,6 +8,10 @@ namespace LastBell.Run.Networking
     {
         static readonly int Progress = Shader.PropertyToID("_Progress"), Shade = Shader.PropertyToID("_Shade"), Memory = Shader.PropertyToID("_Memory"), Motif = Shader.PropertyToID("_Motif"), ClipRadius = Shader.PropertyToID("_ClipRadius"), ClipCentre = Shader.PropertyToID("_ClipCentre"), Fill = Shader.PropertyToID("_ColorFill"), Border = Shader.PropertyToID("_ColorBorder"), HoleCount = Shader.PropertyToID("_HoleCount");
         static string Clip128(string text) => text == null ? "" : text.Length <= 128 ? text : text.Substring(0, 128);
+        static void Clock(LanWorldFrame.BossState b, TempoClock c)
+        {
+            b.Beat = c.Beat; b.BeatHaste = c.State == Tempo.Haste; b.Transitioning = c.Transitioning; b.TransitionTick = c.TransitionTick; b.StateAge = c.StateAge;
+        }
         static string Clip(string text) => text == null ? "" : text.Length <= 32 ? text : text.Substring(0, 32);
         public static LanWorldFrame Capture(RunDirector director, LanHostRoster roster)
         {
@@ -21,8 +25,12 @@ namespace LastBell.Run.Networking
                 frame.Boss = new LanWorldFrame.BossState { X = pos.x, Y = pos.y, Z = pos.z, Yaw = SimSmoother.SimRotation(b.transform).eulerAngles.y, Hp = b.Hp, MaxHp = b.MaxHp, Dead = b.Dead, Phase = b.PhaseName, Attack = b.Current, Extra = b.HudExtra };
                 var presenter = b.GetComponentInChildren<CharacterPresenter>(true);
                 if (presenter) { frame.Boss.Clip = presenter.CurrentClip; frame.Boss.Overlay = presenter.OverlayClip; frame.Boss.ClipSpeed = presenter.NetworkClipSpeed; frame.Boss.OverlaySpeed = presenter.NetworkOverlaySpeed; frame.Boss.Hidden = presenter.Hidden; }
-                if (b is TempoTyrantEncounter tyrant && tyrant.Rig) { frame.Boss.PoseKind = 1; frame.Boss.Pose = (int)tyrant.Rig.Current; frame.Boss.Haste = tyrant.Rig.Haste; frame.Boss.Frenzy = tyrant.Rig.Frenzy; frame.Boss.Beat = tyrant.Clock.Beat; frame.Boss.BeatHaste = tyrant.Clock.State == Tempo.Haste; }
-                else if (b is ChimeboundOracleEncounter oracle && oracle.Rig) { frame.Boss.PoseKind = 2; frame.Boss.Pose = (int)oracle.Rig.Current; frame.Boss.Haste = oracle.Rig.Haste; }
+                if (b is TempoTyrantEncounter tyrant && tyrant.Rig) { frame.Boss.PoseKind = 1; frame.Boss.Pose = (int)tyrant.Rig.Current; frame.Boss.Haste = tyrant.Rig.Haste; frame.Boss.Frenzy = tyrant.Frenzy; Clock(frame.Boss, tyrant.Clock);
+                    frame.Boss.Announcement = Clip128(tyrant.Announcement);
+                    foreach (var (at, n, imminent) in tyrant.Numbers) { if (frame.Boss.Numbers.Count >= LanWorldFrame.MaxNumbers) break; frame.Boss.Numbers.Add(new LanWorldFrame.Number { X = at.x, Y = at.y, Z = at.z, N = n, Imminent = imminent }); } }
+                else if (b is ChimeboundOracleEncounter oracle && oracle.Rig) { frame.Boss.PoseKind = 2; frame.Boss.Pose = (int)oracle.Rig.Current; frame.Boss.Haste = oracle.Rig.Haste; frame.Boss.Frenzy = oracle.Enraged; Clock(frame.Boss, oracle.Clock); }
+                b.CaptureNetProps(frame.Boss.Props);
+                if (frame.Boss.Props.Count > LanWorldFrame.MaxProps) frame.Boss.Props.RemoveRange(LanWorldFrame.MaxProps, frame.Boss.Props.Count - LanWorldFrame.MaxProps);
             }
             for (int i = 0; i < world.Players.Count; i++)
             {

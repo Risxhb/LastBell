@@ -53,6 +53,18 @@ static class Program
         var worldBytes = world.Encode();
         Check(LanWorldFrame.TryDecode(worldBytes, out var decodedWorld) && decodedWorld.Tick == 75 && decodedWorld.Boss.Hp == 800 && decodedWorld.Boss.Pose == 3 && decodedWorld.Players[0].Clip == "Run" && decodedWorld.Players[0].Overlay == "Cast" && decodedWorld.Players[0].Marks[0] == "sun" && decodedWorld.Hazards[0].Inner == 2 && decodedWorld.Telegraphs[0].Holes[2] == 1.5f && decodedWorld.Telegraphs[0].FillR == 1.2f && decodedWorld.Projectiles[0].Z == 3, "world snapshot round trips actors, poses, hazards, telegraphs and projectiles");
         Check(!LanWorldFrame.TryDecode(worldBytes[..^1], out _) && !LanWorldFrame.TryDecode(new byte[0], out _), "truncated world snapshots rejected");
+        // boss clock, HUD text, strike numbers and boss props (orbs) for the client's replica
+        var clockFrame = new LanWorldFrame { Tick = 76, RunState = 3, Boss = new LanWorldFrame.BossState { Hp = 5, MaxHp = 10, PoseKind = 2, Beat = 41.25, BeatHaste = true, Transitioning = true, TransitionTick = 2, StateAge = 600, Announcement = "TEMPO SLOWS" } };
+        clockFrame.Players.Add(worldPlayer);
+        clockFrame.Boss.Numbers.Add(new LanWorldFrame.Number { X = 1, Z = -2, N = 3, Imminent = true });
+        clockFrame.Boss.Props.Add(new LanWorldFrame.Prop { Id = -7, Kind = 2, X = 4, Y = 0.9f, Z = -3 });
+        Check(LanWorldFrame.TryDecode(clockFrame.Encode(), out var clockBack) && clockBack.Boss.Beat == 41.25 && clockBack.Boss.BeatHaste && clockBack.Boss.Transitioning && clockBack.Boss.TransitionTick == 2
+            && clockBack.Boss.StateAge == 600 && clockBack.Boss.Announcement == "TEMPO SLOWS" && clockBack.Boss.Numbers.Count == 1 && clockBack.Boss.Numbers[0].N == 3 && clockBack.Boss.Numbers[0].Imminent
+            && clockBack.Boss.Props.Count == 1 && clockBack.Boss.Props[0].Id == -7 && clockBack.Boss.Props[0].Kind == 2 && clockBack.Boss.Props[0].Z == -3, "world snapshot round trips the boss clock, HUD text, numbers and props");
+        var tooMany = new LanWorldFrame { Tick = 1, RunState = 3, Boss = new LanWorldFrame.BossState { Hp = 1, MaxHp = 1 } }; tooMany.Players.Add(worldPlayer);
+        for (int i = 0; i <= LanWorldFrame.MaxProps; i++) tooMany.Boss.Props.Add(new LanWorldFrame.Prop { Id = i });
+        bool rejected; try { tooMany.Encode(); rejected = false; } catch (System.IO.InvalidDataException) { rejected = true; }
+        Check(rejected, "world snapshot refuses more boss props than the limit");
         // recorded effect calls travel with the snapshot: references, numbers, colours, text and projectiles
         var fxFrame = new LanWorldFrame { Tick = 9, RunState = 3 }; fxFrame.Players.Add(worldPlayer);
         fxFrame.Effects.Add(new LanWorldFrame.Effect { Tick = 8, Target = 0, Method = "Slash", Args = new[] {
