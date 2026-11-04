@@ -50,6 +50,7 @@ namespace LastBell.Run
             RunDirector d = null; float wait = 0;
             while ((d = RunDirector.Instance) == null || d.State != RunState.Combat || d.Player == null || d.Boss == null)
             {
+                if (d && d.State == RunState.Ready && wait > 2) d.RequestReady();   // area-boss practice waits in its shop
                 wait += Time.unscaledDeltaTime; if (wait > 60) { Log("no practice combat after 60 s"); Application.Quit(2); yield break; }
                 yield return null;
             }

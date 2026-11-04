@@ -68,21 +68,45 @@ namespace LastBell.Run
             if (Log.Count < 4000) Log.Add(what);
         }
 
-        public void Tick(bool loud) => Play(tick, loud ? "tick" : "tick soft", loud ? 0.9f : 0.25f);
-        public void Star(int i) => Play(stars[Mathf.Clamp(i, 0, stars.Length - 1)], "star " + i);
-        public void Zap() => Play(zap, "zap", 0.7f);
-        public void Whirl() => Play(whirl, "whirl");
-        public void Thud() => Play(thud, "thud");
-        public void Balanced() => Play(balanced, "balanced");
-        public void Unbalanced() => Play(unbalanced, "unbalanced");
-        public void Clang() => Play(clang, "clang");
-        public void Crack() => Play(crack, "crack");
-        public void Slam() => Play(slam, "slam");
-        public void Rumble() => Play(rumble, "rumble", 0.8f);
-        public void Implode() => Play(implode, "implode");
-        public void Key() => Play(key, "key", 0.8f);
-        public void Bad() => Play(bad, "bad");
-        public void Toll() => Play(toll, "toll");
-        public void StopAll() { if (src) src.Stop(); }
+        public void Tick(bool loud) { { var rec = Networking.LanFx.Record; if (rec != null) rec(Networking.LanFxTarget.BossPart, "DialWardenAudio.Tick", new object[] { loud }); } Play(tick, loud ? "tick" : "tick soft", loud ? 0.9f : 0.25f); }
+        public void Star(int i) { { var rec = Networking.LanFx.Record; if (rec != null) rec(Networking.LanFxTarget.BossPart, "DialWardenAudio.Star", new object[] { i }); } Play(stars[Mathf.Clamp(i, 0, stars.Length - 1)], "star " + i); }
+        public void Zap() { { var rec = Networking.LanFx.Record; if (rec != null) rec(Networking.LanFxTarget.BossPart, "DialWardenAudio.Zap", new object[] {  }); } Play(zap, "zap", 0.7f); }
+        public void Whirl() { { var rec = Networking.LanFx.Record; if (rec != null) rec(Networking.LanFxTarget.BossPart, "DialWardenAudio.Whirl", new object[] {  }); } Play(whirl, "whirl"); }
+        public void Thud() { { var rec = Networking.LanFx.Record; if (rec != null) rec(Networking.LanFxTarget.BossPart, "DialWardenAudio.Thud", new object[] {  }); } Play(thud, "thud"); }
+        public void Balanced() { { var rec = Networking.LanFx.Record; if (rec != null) rec(Networking.LanFxTarget.BossPart, "DialWardenAudio.Balanced", new object[] {  }); } Play(balanced, "balanced"); }
+        public void Unbalanced() { { var rec = Networking.LanFx.Record; if (rec != null) rec(Networking.LanFxTarget.BossPart, "DialWardenAudio.Unbalanced", new object[] {  }); } Play(unbalanced, "unbalanced"); }
+        public void Clang() { { var rec = Networking.LanFx.Record; if (rec != null) rec(Networking.LanFxTarget.BossPart, "DialWardenAudio.Clang", new object[] {  }); } Play(clang, "clang"); }
+        public void Crack() { { var rec = Networking.LanFx.Record; if (rec != null) rec(Networking.LanFxTarget.BossPart, "DialWardenAudio.Crack", new object[] {  }); } Play(crack, "crack"); }
+        public void Slam() { { var rec = Networking.LanFx.Record; if (rec != null) rec(Networking.LanFxTarget.BossPart, "DialWardenAudio.Slam", new object[] {  }); } Play(slam, "slam"); }
+        public void Rumble() { { var rec = Networking.LanFx.Record; if (rec != null) rec(Networking.LanFxTarget.BossPart, "DialWardenAudio.Rumble", new object[] {  }); } Play(rumble, "rumble", 0.8f); }
+        public void Implode() { { var rec = Networking.LanFx.Record; if (rec != null) rec(Networking.LanFxTarget.BossPart, "DialWardenAudio.Implode", new object[] {  }); } Play(implode, "implode"); }
+        public void Key() { { var rec = Networking.LanFx.Record; if (rec != null) rec(Networking.LanFxTarget.BossPart, "DialWardenAudio.Key", new object[] {  }); } Play(key, "key", 0.8f); }
+        public void Bad() { { var rec = Networking.LanFx.Record; if (rec != null) rec(Networking.LanFxTarget.BossPart, "DialWardenAudio.Bad", new object[] {  }); } Play(bad, "bad"); }
+        public void Toll() { { var rec = Networking.LanFx.Record; if (rec != null) rec(Networking.LanFxTarget.BossPart, "DialWardenAudio.Toll", new object[] {  }); } Play(toll, "toll"); }
+        public void StopAll() { { var rec = Networking.LanFx.Record; if (rec != null) rec(Networking.LanFxTarget.BossPart, "DialWardenAudio.StopAll", new object[0]); } if (src) src.Stop(); }
+        // LAN client: the host's sounds, replayed on the replica boss
+        public bool Replay(string method, Networking.LanWorldFrame.EffectArg[] a)
+        {
+            switch (method)
+            {
+                case "DialWardenAudio.Tick": if (a.Length != 1) return false; Tick(a[0].I != 0); return true;
+                case "DialWardenAudio.Star": if (a.Length != 1) return false; Star(a[0].I); return true;
+                case "DialWardenAudio.Zap": if (a.Length != 0) return false; Zap(); return true;
+                case "DialWardenAudio.Whirl": if (a.Length != 0) return false; Whirl(); return true;
+                case "DialWardenAudio.Thud": if (a.Length != 0) return false; Thud(); return true;
+                case "DialWardenAudio.Balanced": if (a.Length != 0) return false; Balanced(); return true;
+                case "DialWardenAudio.Unbalanced": if (a.Length != 0) return false; Unbalanced(); return true;
+                case "DialWardenAudio.Clang": if (a.Length != 0) return false; Clang(); return true;
+                case "DialWardenAudio.Crack": if (a.Length != 0) return false; Crack(); return true;
+                case "DialWardenAudio.Slam": if (a.Length != 0) return false; Slam(); return true;
+                case "DialWardenAudio.Rumble": if (a.Length != 0) return false; Rumble(); return true;
+                case "DialWardenAudio.Implode": if (a.Length != 0) return false; Implode(); return true;
+                case "DialWardenAudio.Key": if (a.Length != 0) return false; Key(); return true;
+                case "DialWardenAudio.Bad": if (a.Length != 0) return false; Bad(); return true;
+                case "DialWardenAudio.Toll": if (a.Length != 0) return false; Toll(); return true;
+                case "DialWardenAudio.StopAll": StopAll(); return true;
+                default: return false;
+            }
+        }
     }
 }

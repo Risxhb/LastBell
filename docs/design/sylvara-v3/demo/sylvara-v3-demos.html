@@ -1,0 +1,1629 @@
+<title>Sylvara Phase 1 Options</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one playable arena on the left, the option's rules, results and timeline on the right; stacks on phones.
+   Single dark look by choice: it is a game screen at night in the Verdant Chimes. */
+:root {
+  --bg: #0b1514;          /* wet stone at night */
+  --panel: #12201e;
+  --line: #24403b;
+  --fg: #dde8e3;
+  --muted: #8fa8a0;
+  --jade: #3fd6c4;        /* Sylvara's turquoise resonance, friendly marks */
+  --coral: #ff7a5c;       /* hostile */
+  --amber: #ffb547;       /* hostile flash */
+  --brass: #d9a441;
+  --cobalt: #5b84ff;
+  --display: "Marcellus", "Cormorant Garamond", Georgia, serif;
+  --body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+  color-scheme: dark;
+}
+html, body { background: var(--bg); color: var(--fg); }
+body { font-family: var(--body); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 1200px; margin: 0 auto; padding-block: 20px 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 16px; }
+header h1 { font-family: var(--display); font-weight: 400; font-size: clamp(26px, 4vw, 38px); margin: 0; letter-spacing: .01em; text-wrap: balance; }
+header p { margin: 4px 0 0; color: var(--muted); max-width: 70ch; }
+.bar { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+.group { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.group > span { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin-right: 4px; }
+button { font: inherit; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 11px; cursor: pointer; }
+button:hover { border-color: var(--jade); }
+button:focus-visible { outline: 2px solid var(--jade); outline-offset: 2px; }
+button[aria-pressed="true"] { background: #1c3a35; border-color: var(--jade); color: #fff; }
+.tabs button { font-family: var(--display); font-size: 16px; padding: 7px 14px; }
+.tabs button b { font-family: var(--mono); font-size: 12px; color: var(--jade); margin-right: 6px; font-weight: 600; }
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 18px; align-items: start; }
+@media (max-width: 920px) { .main { grid-template-columns: minmax(0, 1fr); } }
+.stage { position: relative; width: 100%; max-width: min(100%, 760px); aspect-ratio: 1; margin: 0 auto; }
+.stage canvas { width: 100%; height: 100%; display: block; touch-action: none; border-radius: 50%; }
+.hud { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; max-width: 760px; margin: 10px auto 0; }
+.meter { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; min-width: 0; }
+.meter label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
+.meter .v { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 18px; }
+.fillbar { height: 5px; background: #0a1211; border-radius: 3px; margin-top: 4px; overflow: hidden; }
+.fillbar i { display: block; height: 100%; width: 100%; background: var(--jade); transition: width .08s linear; }
+.side { display: grid; gap: 14px; min-width: 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; min-width: 0; }
+.card h2 { font-family: var(--display); font-weight: 400; font-size: 22px; margin: 0 0 2px; }
+.card h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); margin: 0 0 8px; font-weight: 700; }
+.pitch { color: var(--muted); margin: 0 0 10px; }
+dl { margin: 0; display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 6px 10px; }
+dt { font-size: 12px; color: var(--jade); font-weight: 700; padding-top: 1px; }
+dd { margin: 0; font-size: 14px; }
+#tl { width: 100%; height: 92px; display: block; }
+.now { font-family: var(--mono); font-size: 13px; color: var(--amber); min-height: 1.5em; margin-top: 6px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 5px 4px; border-bottom: 1px solid var(--line); }
+th { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); font-weight: 700; }
+td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+th.n { text-align: right; }
+.keys { font-size: 13px; color: var(--muted); }
+kbd { font-family: var(--mono); font-size: 12px; background: #0a1211; border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; color: var(--fg); }
+.foot { font-size: 13px; color: var(--muted); max-width: 90ch; }
+@media (prefers-reduced-motion: reduce) { .fillbar i { transition: none; } }
+.stages { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; min-width: 0; }
+.view { min-width: 0; border-radius: 10px; padding: 8px; border: 1px solid transparent; }
+.vtitle { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin: 0 4px 6px; }
+.vname { font-family: var(--display); font-size: 20px; }
+.vhint { font-size: 12px; color: var(--muted); }
+.view.active .vhint { color: var(--jade); }
+.main.compare { grid-template-columns: minmax(0, 1fr); }
+.main.compare .stages { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.main.compare .view.active { border-color: var(--jade); }
+.main.compare .side { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); align-items: start; }
+.main:not(.compare) #view1 { display: none; }
+.main:not(.compare) .vtitle { display: none; }
+@media (max-width: 760px) { .main.compare .stages { grid-template-columns: minmax(0, 1fr); } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Sylvara, bullet-hell phases</h1>
+    <p>Proposal demos for Chzy18. All four phases are picked: Spiral Bloom, Two-Colour Choir, Hollow Bloom and Seed Storm, with no punish windows anywhere. It opens on the full fight, all four phases back to back (about 105 s), accepted for the Unity build on 29 Oct. The "P4 enrage" row is the proposed Phase 4 enrage timing. Each phase is also in its own row below. Medium numbers in Verdant Chimes (13.5 m bound). You start on autopilot; press any move key to take over.</p>
+  </header>
+
+  <div class="bar">
+    <div class="group tabs" role="group" aria-label="Full fight"><span>Full fight</span>
+      <button id="optZ" data-opt="Z">Sylvara, all four phases</button>
+      <span style="margin-left:10px">Jump to</span>
+      <button data-jump="1">Phase 1</button><button data-jump="2">Phase 2</button><button data-jump="3">Phase 3</button><button data-jump="4">Phase 4</button>
+    </div>
+  </div>
+  <div class="bar">
+    <div class="group tabs" role="group" aria-label="Phase 4 enrage proposal"><span>P4 enrage</span>
+      <button id="optV" data-opt="V">Seed Storm, enrage</button>
+      <span style="margin-left:10px">Jump to</span>
+      <button data-seek="0">Loop 1</button><button data-seek="48">Loop 3</button><button data-seek="96">Loop 5</button><button data-seek="114">Last Storm</button>
+    </div>
+  </div>
+  <div class="bar">
+    <div class="group tabs" role="group" aria-label="Phase 4 new options"><span>Phase 4 new</span>
+      <button id="optR" data-opt="R">E · Requiem Bells</button>
+      <button id="optS" data-opt="S">F · Vine Sweep</button>
+      <button id="optT" data-opt="T">G · Seed Storm</button>
+      <button id="optU" data-opt="U">H · Orbiting Choir</button>
+    </div>
+  </div>
+  <div class="bar">
+    <div class="group tabs" role="group" aria-label="Phase 4 options"><span>Phase 4</span>
+      <button id="optN" data-opt="N">A · Overgrowth</button>
+      <button id="optO" data-opt="O">B · Final Chorus</button>
+      <button id="optP" data-opt="P">C · Last Bloom</button>
+      <button id="optQ" data-opt="Q">D · Rootfall</button>
+    </div>
+  </div>
+  <div class="bar">
+    <div class="group tabs" role="group" aria-label="Phase 3 options"><span>Phase 3</span>
+      <button id="optJ" data-opt="J">A · Hollow Bloom</button>
+      <button id="optK" data-opt="K">B · Mirror Choir</button>
+      <button id="optL" data-opt="L">C · Root Cage</button>
+      <button id="optM" data-opt="M">D · Shattered Refrain</button>
+    </div>
+  </div>
+  <div class="bar">
+    <div class="group tabs" role="group" aria-label="Phase 2 options"><span>Phase 2</span>
+      <button id="optF" data-opt="F"><b>6</b>A · Choir Buds</button>
+      <button id="optG" data-opt="G"><b>7</b>B · Two-Colour Choir</button>
+      <button id="optH" data-opt="H"><b>8</b>C · Seed Relay</button>
+      <button id="optI" data-opt="I"><b>9</b>D · Hush and Chorus</button>
+    </div>
+  </div>
+  <div class="bar">
+    <div class="group tabs" role="group" aria-label="Phase 1"><span>Phase 1</span>
+      <button id="optE" data-opt="E"><b>5</b>Spiral Bloom (accepted)</button>
+      <button id="optA" data-opt="A"><b>1</b>Petal Spiral</button>
+      <button id="optB" data-opt="B"><b>2</b>Seed Pods</button>
+      <button id="optC" data-opt="C"><b>3</b>Two-Colour Lanes</button>
+      <button id="optD" data-opt="D"><b>4</b>Root March</button>
+    </div>
+  </div>
+  <div class="bar">
+    <div class="group" role="group" aria-label="Players"><span>Players</span>
+      <button id="n1" data-n="1">1</button><button id="n2" data-n="2">2</button><button id="n4" data-n="4">4</button><button id="n8" data-n="8">8</button>
+    </div>
+    <div class="group" role="group" aria-label="Difficulty"><span>Level</span>
+      <button data-diff="E">Easy</button><button data-diff="M">Medium</button><button data-diff="H">Hard</button>
+    </div>
+    <div class="group" role="group" aria-label="Walk speed"><span>Walk</span>
+      <button id="w42" data-w="4.2">4.2 m/s</button><button id="w6" data-w="6">6 m/s</button>
+    </div>
+    <div class="group" role="group" aria-label="View"><span>View</span>
+      <button data-mode="single">One</button><button data-mode="compare">Side by side</button>
+    </div>
+    <div class="group"><span>Run</span>
+      <button id="auto" aria-pressed="true">Autopilot</button>
+      <button id="slow" aria-pressed="false">Half speed</button>
+      <button id="pause" aria-pressed="false">Pause</button>
+      <button id="restart">Restart loop</button>
+    </div>
+  </div>
+
+  <div class="main" id="main">
+    <div class="stages" id="stages">
+      <div class="view" id="view0">
+        <div class="vtitle"><span class="vname"></span><span class="vhint">Click this arena to control it</span></div>
+        <div class="stage"><canvas aria-label="Arena view: Sylvara at the centre, you are the turquoise-ringed dot"></canvas></div>
+        <div class="hud">
+          <div class="meter"><label>Health</label><div class="v hpv">100</div><div class="fillbar"><i class="hpb"></i></div></div>
+          <div class="meter"><label>Stamina</label><div class="v stv">100</div><div class="fillbar"><i class="stb" style="background:var(--brass)"></i></div></div>
+          <div class="meter"><label>This loop</label><div class="v lpv">0 dmg · 0 hits</div></div>
+        </div>
+      </div>
+      <div class="view" id="view1">
+        <div class="vtitle"><span class="vname"></span><span class="vhint">Click this arena to control it</span></div>
+        <div class="stage"><canvas aria-label="Second arena view for side-by-side comparison"></canvas></div>
+        <div class="hud">
+          <div class="meter"><label>Health</label><div class="v hpv">100</div><div class="fillbar"><i class="hpb"></i></div></div>
+          <div class="meter"><label>Stamina</label><div class="v stv">100</div><div class="fillbar"><i class="stb" style="background:var(--brass)"></i></div></div>
+          <div class="meter"><label>This loop</label><div class="v lpv">0 dmg · 0 hits</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="side">
+      <section class="card">
+        <h2 id="oname">Petal Spiral</h2>
+        <p class="pitch" id="opitch"></p>
+        <dl id="orules"></dl>
+      </section>
+      <section class="card">
+        <h3>The loop</h3>
+        <canvas id="tl" aria-label="Timeline of the loop"></canvas>
+        <div class="now" id="now"></div>
+      </section>
+      <section class="card">
+        <h3>Your results (last finished loop)</h3>
+        <table>
+          <thead><tr><th>Option</th><th class="n">Damage</th><th class="n">Hits</th><th class="n">Downs</th></tr></thead>
+          <tbody id="res"></tbody>
+        </table>
+        <p class="keys" style="margin:10px 0 0">Autopilot loops aren't counted.</p>
+      </section>
+      <section class="card keys">
+        <h3>Controls</h3>
+        <kbd>W A S D</kbd> or arrows move · <kbd>Shift</kbd> sprint 9 m/s · <kbd>Space</kbd> or right-click dash 3 m · <kbd>1</kbd>–<kbd>9</kbd> option · <kbd>P</kbd> pause · <kbd>R</kbd> restart.
+        On a phone, drag to move and tap to dash.
+      </section>
+    </div>
+  </div>
+
+  <p class="foot">Assumptions (proposal, Medium): player HP 100, player radius 0.4 m, bullet radius 0.35 m. Stamina 100, dash costs 30, sprint drains 25/s, and it regenerates 20/s after 0.75 s. No iframes and no post-hit immunity: each bullet and each ground hit lands once. Ground warnings are at least 2 s, with an outward-fill countdown inside a fixed coral outline, and turquoise dotted marks show safe gaps. Bots are simple dodgers, there only to show targeting at 2, 4 and 8 players. Hitting zero HP counts a down and refills, so the loop keeps going.</p>
+</div>
+
+<script>
+(() => {
+"use strict";
+const R = 13.5, BOSS_R = 1.6, PR = 0.4, BR = 0.35, TAU = Math.PI * 2;
+const COL = { coral: "#ff7a5c", amber: "#ffb547", jade: "#3fd6c4", brass: "#d9a441", cobalt: "#5b84ff" };
+const S = { opt: "A", N: 1, walk: 4.2, slow: false, paused: false, auto: true, diff: "M" };
+// Difficulty (proposal, 31 Oct): Medium is the accepted fight. Easy and Hard change each phase as listed in
+// DIFFICULTY-EXTRAS.md, on top of the build's damage scale (Easy x0.6, Hard x1.3). The Phase 4 enrage clock is the same on all three.
+const isE = () => S.diff === "E", isH = () => S.diff === "H";
+const DMG = () => ({ E: 0.6, M: 1, H: 1.3 })[S.diff];
+const results = {};
+let W = null;
+
+const rnd = (a, b) => a + Math.random() * (b - a);
+const hyp = Math.hypot;
+const angDiff = (a, b) => { let d = (a - b) % TAU; if (d > Math.PI) d -= TAU; if (d < -Math.PI) d += TAU; return d; };
+const kFor = n => ({ 1: 1, 2: 1, 4: 2, 8: 3 })[n];
+
+/* ---------- world ---------- */
+function makePlayers() {
+  const ps = [];
+  for (let i = 0; i < S.N; i++) {
+    const melee = i % 2 === 1;
+    const a = -Math.PI / 2 + i * (TAU / Math.max(S.N, 1)) * 0.999;
+    const hr = i === 0 ? 9 : (melee ? 3 : 10);
+    ps.push({ id: i, local: i === 0, x: Math.cos(a) * hr, y: Math.sin(a) * hr, homeA: a, homeR: hr,
+      hp: 100, st: 100, lastUse: -9, dashT: 0, dx: 0, dy: -1, flash: 0, colour: i % 2 ? "cobalt" : "brass",
+      mvx: 0, mvy: 0, nextColour: null });
+  }
+  return ps;
+}
+function newWorld(keepPlayers) {
+  const old = W;
+  W = { t: 0, loop: 1, players: keepPlayers && old && old.players.length === S.N ? old.players : makePlayers(),
+    bullets: [], haz: [], emit: [], later: [], marks: [], texts: [], ev: 0, punish: false, banner: null,
+    stats: { dmg: 0, hits: 0, downs: 0 }, manualLoop: !S.auto, spin: 0 };
+  clearExtras();
+  W.players.forEach(p => { p.hp = 100; p.st = 100; p.colour = p.id % 2 ? "cobalt" : "brass"; p.nextColour = null; });
+}
+// Phase 2 state: Choir Buds, the relay seed and its bed, Hush/Chorus cues, and an AI destination override.
+function clearExtras() { W.tOff = 0; W.zones = []; W.wedges = null; W.bloomT = null; W.buds = []; W.budsPlanned = 0; W.budLife = 12; W.noPunish = false; W.seed = null; W.bed = null; W.cue = null; W.aiHome = null; W.props = []; }
+function resetLoop() {
+  if (W.manualLoop) results[S.opt] = { ...W.stats };
+  renderResults();
+  W.bullets = []; W.haz = []; W.emit = []; W.later = []; W.marks = []; W.ev = 0; W.t = 0; W.loop++; W.punish = false; W.banner = null;
+  W.stats = { dmg: 0, hits: 0, downs: 0 }; W.manualLoop = !S.auto; clearExtras();
+  W.players.forEach(p => { p.hp = 100; p.colour = p.id % 2 ? "cobalt" : "brass"; p.nextColour = null; });
+}
+
+/* ---------- helpers ---------- */
+const later = (dt, fn) => W.later.push({ at: W.t + dt, fn });
+const far = k => [...W.players].sort((a, b) => hyp(b.x, b.y) - hyp(a.x, a.y)).slice(0, k);
+const near = () => [...W.players].sort((a, b) => hyp(a.x, a.y) - hyp(b.x, b.y))[0];
+function shot(x, y, ang, v, o = {}) {
+  W.bullets.push({ x, y, vx: Math.cos(ang) * v, vy: Math.sin(ang) * v, r: o.r ?? BR, dmg: o.dmg ?? 12, col: o.col ?? null, age: 0, life: o.life ?? 6, clip: !!o.clip, owner: o.owner ?? null, split: o.split ?? null });
+}
+function hazard(h) { h.t0 = W.t; h.res = W.t + h.warn; h.done = false; W.haz.push(h); return h; }
+function disc(cx, cy, r, warn, dmg, o = {}) { return hazard({ kind: "disc", cx, cy, r, warn, dmg, ...o }); }
+function lane(ox, oy, ang, len, w, warn, dmg) { return hazard({ kind: "lane", cx: ox, cy: oy, ang, len, w, warn, dmg }); }
+function cone(ang, reach, half, warn, dmg, o = {}) { return hazard({ kind: "cone", cx: 0, cy: 0, ang, reach, half, warn, dmg, ...o }); }
+function inside(h, x, y, pad = PR) {
+  const dx = x - h.cx, dy = y - h.cy;
+  if (h.kind === "disc") return hyp(dx, dy) - pad < h.r;
+  if (h.kind === "lane") {
+    const c = Math.cos(h.ang), s = Math.sin(h.ang), along = dx * c + dy * s, perp = -dx * s + dy * c;
+    return along > -pad && along < h.len + pad && Math.abs(perp) < h.w / 2 + pad;
+  }
+  if (h.kind === "cone") {
+    const d = hyp(dx, dy); if (d - pad > h.reach) return false; if (d < pad + 0.01) return true;
+    return Math.abs(angDiff(Math.atan2(dy, dx), h.ang)) < h.half + Math.asin(Math.min(1, pad / d));
+  }
+  return false;
+}
+function hurt(p, dmg) {
+  p.lastHit = W.t;
+  dmg = Math.round(dmg * DMG());
+  p.hp -= dmg; p.flash = 0.22;
+  W.texts.push({ x: p.x, y: p.y, s: "-" + dmg, t: 0.8 });
+  if (p.local) { W.stats.dmg += dmg; W.stats.hits++; }
+  if (p.hp <= 0) { p.hp = 100; if (p.local) W.stats.downs++; W.texts.push({ x: p.x, y: p.y + 0.8, s: "DOWN", t: 1.2, big: true }); }
+}
+function petalRing(cx, cy, n, v, off, r0, dmg = 12) {
+  for (let i = 0; i < n; i++) { const a = off + i * TAU / n; shot(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0, a, v, { dmg }); }
+}
+function toll(text, warnFor = 1) { W.banner = { s: text, until: W.t + warnFor + 0.6, at: W.t + warnFor }; }
+
+/* ---------- option A: Petal Spiral ---------- */
+function spiral(dir, arms, w, v, period, skipEvery, keep, cols) {
+  const e = { on: true, dir, base: rnd(0, TAU), acc: 0, c: 0 };
+  e.update = dt => {
+    e.base += e.dir * w * dt; e.acc += dt;
+    while (e.acc >= period) {
+      e.acc -= period; e.c++;
+      if (e.c % skipEvery < keep) for (let i = 0; i < arms; i++) { const a = e.base + i * TAU / arms; shot(Math.cos(a) * BOSS_R, Math.sin(a) * BOSS_R, a, v, { dmg: 10, life: 4, col: cols ? cols[i % cols.length] : null }); }
+    }
+  };
+  W.emit.push(e); return e;
+}
+function curtains() {
+  const targets = W.players.filter(p => hyp(p.x, p.y) > 8).map(p => Math.atan2(p.y, p.x));
+  while (targets.length < 2) targets.push(rnd(0, TAU));
+  targets.forEach(a => lane(Math.cos(a) * R, Math.sin(a) * R, a + Math.PI, 7, 2.0, 2.0, 15));
+}
+function rootRing(r, warn = 2) { disc(0, 0, r, warn, 18, { motif: "root" }); }
+const OPTA = {
+  name: "Petal Spiral", key: "A",
+  pitch: "Her three chest bells spin four arms of petals that curve out to the wall. A toll reverses the spin; at 16 s a second, counter-turning set joins.",
+  rules: [
+    ["Melee", "The arms are close together near her, so you weave through them. Root rings (r 3.2 m) push you out at 12 and 22 s."],
+    ["Ranged", "At 10 m you must walk about 2.6 m/s just to stay between arms, so stationary casts need timing. Waterfall curtains hit anyone past 8 m at 8 and 24 s."],
+    ["Solo / 8", "Same field for everyone. With 8 players, each player past 8 m gets their own curtain."],
+    ["Punish", "26.5–30 s: the bells go quiet."],
+  ],
+  events: [
+    { at: 0, label: "Spiral", fn: () => { W.sp1 = spiral(1, 4, 15 * Math.PI / 180, 5, 0.15, 9, 7); } },
+    { at: 6, label: "Curtains", fn: () => curtains() },
+    { at: 7, label: "Toll", fn: () => toll("TOLL: the spin reverses") },
+    { at: 8, label: "", fn: () => { W.sp1.dir *= -1; } },
+    { at: 10, label: "Root ring", fn: () => rootRing(3.2) },
+    { at: 16, label: "2nd set", fn: () => { W.sp2 = spiral(-1, 4, 20 * Math.PI / 180, 4, 0.18, 8, 5); } },
+    { at: 19, label: "Toll", fn: () => toll("TOLL: the spin reverses") },
+    { at: 20, label: "", fn: () => { W.sp1.dir *= -1; W.sp2.dir *= -1; } },
+    { at: 20.01, label: "Root ring", fn: () => rootRing(3.2) },
+    { at: 22, label: "Curtains", fn: () => curtains() },
+    { at: 26.5, label: "Punish", fn: () => { W.emit.forEach(e => e.on = false); W.punish = true; } },
+  ],
+};
+
+/* ---------- option B: Seed Pods ---------- */
+function pod(target, o = {}) {
+  const r = o.r ?? 2.5, n = 12, off = rnd(0, TAU), warn = o.warn ?? 2.5;
+  const h = disc(target ? target.x : o.x, target ? target.y : o.y, r, warn, 16, { motif: "pod", gaps: { n, off }, track: target && !o.noTrack ? { p: target, until: W.t + 0.6 } : null });
+  h.after = () => {
+    petalRing(h.cx, h.cy, n, 5.5, off, Math.max(r - 0.3, BOSS_R));
+    if (o.doubled) {
+      h.gaps = { n, off: off + Math.PI / n, second: true };
+      later(0.6, () => petalRing(h.cx, h.cy, n, 5.5, off + Math.PI / n, Math.max(r - 0.3, BOSS_R)));
+    }
+  };
+  return h;
+}
+function podsOnFar(o = {}) {
+  if (S.N === 1) { const m = o.solo ?? 2; for (let i = 0; i < m; i++) later(i * 0.8, () => pod(W.players[0], o)); }
+  else far(kFor(S.N)).forEach(p => pod(p, o));
+}
+const OPTB = {
+  name: "Seed Pods", key: "B",
+  pitch: "She lobs seed pods at the farthest players. Each lands on a 2.5 s circle, then bursts into 12 petals that fly to the wall. Turquoise ticks show the gaps between petals.",
+  rules: [
+    ["Melee", "A pod at her feet bursts point-blank at 6 s, and Pruning Arc (100° cone, 6.5 m) cuts the nearest player at 14 s."],
+    ["Ranged", "Pods target the farthest 1/1/2/3 players at 1/2/4/8. Standing far away gets a pod dropped on you."],
+    ["Solo / 8", "Solo: the pods come one after another, 0.8 s apart, all on you. At 8 players, three pods land at a time and the petal rings cross."],
+    ["Punish", "25.5–29.5 s: she stoops to replant."],
+  ],
+  events: [
+    { at: 0, label: "Pods", fn: () => podsOnFar({ solo: 2 }) },
+    { at: 6, label: "Feet + pod", fn: () => { pod(null, { x: 0, y: 0, r: 3.0 }); podsOnFar({ solo: 1 }); } },
+    { at: 12, label: "Arc", fn: () => { const t = near(); const h = cone(Math.atan2(t.y, t.x), 6.5, 50 * Math.PI / 180, 2.0, 16, { trackCone: { p: t, until: W.t + 0.3 } }); } },
+    { at: 13, label: "Doubled", fn: () => podsOnFar({ solo: 1, doubled: true }) },
+    { at: 19, label: "Triangle", fn: () => {
+      const a0 = Math.atan2(far(1)[0].y, far(1)[0].x);
+      for (let i = 0; i < 3; i++) { const a = a0 + i * TAU / 3; const go = () => pod(null, { x: Math.cos(a) * 7, y: Math.sin(a) * 7 }); S.N === 1 ? later(i * 0.8, go) : go(); }
+    } },
+    { at: 25.5, label: "Punish", fn: () => { W.punish = true; } },
+    { at: 29.5, label: "", fn: () => { W.punish = false; } },
+  ],
+};
+
+/* ---------- option C: Two-Colour Choir ---------- */
+function choirLanes(col, travelAng, driftDir, until, period = 0.3, gap = 2.4, v = 6) {
+  const d = { x: Math.cos(travelAng), y: Math.sin(travelAng) }, pp = { x: -d.y, y: d.x };
+  const e = { on: true, acc: 0, drift: 0 };
+  e.update = dt => {
+    if (W.t - (W.tOff || 0) >= until) { e.on = false; return; } // until is in the phase's own time
+    e.drift = (e.drift + driftDir * 0.4 * dt + gap) % gap; e.acc += dt;
+    while (e.acc >= period) {
+      e.acc -= period;
+      for (let o = -13.2 + e.drift; o < 13.5; o += gap) {
+        const back = Math.sqrt(Math.max(0, R * R - o * o));
+        shot(pp.x * o - d.x * back, pp.y * o - d.y * back, travelAng, v, { col, dmg: 12, life: 30 / v });
+      }
+    }
+  };
+  W.emit.push(e);
+}
+function colourToll(at) {
+  return [
+    { at: at - 1, label: "Toll", fn: () => { toll("TOLL: every colour swaps"); W.players.forEach(p => p.nextColour = p.colour === "brass" ? "cobalt" : "brass"); } },
+    { at, label: "", fn: () => W.players.forEach(p => { if (p.nextColour) { p.colour = p.nextColour; p.nextColour = null; } }) },
+  ];
+}
+const OPTC = {
+  name: "Two-Colour Lanes", key: "C",
+  pitch: "Brass and cobalt bells on the rim fire lanes of bullets across the whole arena. Only your own colour hurts you, and a toll swaps everyone's colour.",
+  rules: [
+    ["Melee", "The lanes run straight through her, so hugging her is no safer. Root ring at 20 s."],
+    ["Ranged", "No spot is clear of both colours, and the lanes drift 0.4 m/s, so you keep moving."],
+    ["Solo / 8", "Solo: your colour swaps every 4 s instead of 6. At 8 players, half are brass and half cobalt, and bodies crowd the safe lanes."],
+    ["Punish", "25.5–29.5 s: the choir falls silent."],
+  ],
+  events: null, // built per player count
+};
+function buildC() {
+  const ev = [
+    { at: 0, label: "Brass N", fn: () => choirLanes("brass", -Math.PI / 2, 1, 6) },
+    { at: 6, label: "Cobalt E", fn: () => choirLanes("cobalt", Math.PI, 1, 12) },
+    { at: 12, label: "Both", fn: () => { choirLanes("brass", -Math.PI / 2, -1, 20); choirLanes("cobalt", Math.PI, 1, 20); } },
+    { at: 18, label: "Root ring", fn: () => rootRing(3.5) },
+    { at: 20, label: "Both, S + W", fn: () => { choirLanes("brass", Math.PI / 2, 1, 25.5); choirLanes("cobalt", 0, -1, 25.5); } },
+    { at: 25.5, label: "Punish", fn: () => { W.punish = true; } },
+    { at: 29.5, label: "", fn: () => { W.punish = false; } },
+  ];
+  const tolls = S.N === 1 ? [4, 8, 12, 16, 20, 24] : [6, 12, 18, 24];
+  tolls.forEach(t => ev.push(...colourToll(t)));
+  return ev.sort((a, b) => a.at - b.at);
+}
+
+/* ---------- option D: Root March ---------- */
+function row(fromAng, gap, gapW = 2) {
+  const d = { x: -Math.cos(fromAng), y: -Math.sin(fromAng) }, pp = { x: -d.y, y: d.x };
+  const sx = Math.cos(fromAng) * 14.3, sy = Math.sin(fromAng) * 14.3;
+  W.marks.push({ kind: "row", fromAng, gap, gapW, until: W.t + 1.2 });
+  later(1.2, () => {
+    for (let s = -14; s <= 14.01; s += 0.7) {
+      if (Math.abs(s - gap) < gapW / 2 + BR) continue;
+      W.bullets.push({ x: sx + pp.x * s, y: sy + pp.y * s, vx: d.x * 3, vy: d.y * 3, r: BR, dmg: 12, col: null, age: 0, life: 10.5, clip: true });
+    }
+  });
+}
+const OPTD = {
+  name: "Root March", key: "D",
+  pitch: "Rows of thorns march in from the wall at 3 m/s, each with one 2 m gap shown in turquoise before it enters. Her chest bells pulse point-blank rings in between.",
+  rules: [
+    ["Melee", "Bell pulses (r 3.5 m) every 5 s from 8 s push you out into the rows."],
+    ["Ranged", "Every row starts at the wall, so the outer ring is where you meet it first. You have to walk to the gap."],
+    ["Solo / 8", "Same field for everyone. At 8 players the gap stays 2 m, so the party files through one at a time."],
+    ["Punish", "26–30 s: the roots settle."],
+  ],
+  events: [
+    { at: 0, label: "Row N", fn: () => row(Math.PI / 2, 2) },
+    { at: 4, label: "Row S", fn: () => row(-Math.PI / 2, -2) },
+    { at: 6, label: "Pulse", fn: () => rootRing(3.5) },
+    { at: 10, label: "4 rows", fn: () => { row(Math.PI / 2, -4); row(0, 4); row(-Math.PI / 2, -4); row(Math.PI, 4); } },
+    { at: 11, label: "Pulse", fn: () => rootRing(3.5) },
+    { at: 16, label: "Row W", fn: () => row(Math.PI, -2) },
+    { at: 16.01, label: "Pulse", fn: () => rootRing(3.5) },
+    { at: 20, label: "Seed burst", fn: () => pod(null, { x: 0, y: 0, r: 3.0 }) },
+    { at: 21, label: "Pulse", fn: () => rootRing(3.5) },
+    { at: 26, label: "Punish", fn: () => { W.punish = true; } },
+  ],
+};
+/* ---------- merged: Spiral Bloom (A + B) ---------- */
+// Waterfall jet: a solid stream from the wall to her rim whose source slides 40° along the wall over 2 s.
+// It starts 20° before the target, so the target walks back past the start edge or moves inward, where the sweep is slower.
+const DEG = Math.PI / 180;
+function jet(a0, dir) {
+  const span = 40 * DEG, start = a0 - dir * span / 2;
+  const warn = isE() ? 2.0 : 1.5;   // Easy: 2.0 s
+  W.marks.push({ kind: "jet", start, dir, span, until: W.t + warn });
+  later(warn, () => {
+    const e = { on: true, t: 0, acc: 0 };
+    e.update = dt => {
+      e.t += dt; if (e.t > 2) { e.on = false; return; }
+      const a = start + dir * span * (e.t / 2); e.acc += dt;
+      while (e.acc >= 0.07) { e.acc -= 0.07; shot(Math.cos(a) * (R - 0.1), Math.sin(a) * (R - 0.1), a + Math.PI, 9, { dmg: 14, life: (R - BOSS_R) / 9 }); }
+    };
+    W.emit.push(e);
+  });
+}
+function jets() {
+  let ts = W.players.filter(p => hyp(p.x, p.y) > 8);
+  if (!ts.length) ts = far(1);
+  ts.forEach((p, i) => jet(Math.atan2(p.y, p.x), i % 2 ? -1 : 1));
+}
+// Pruning Arc: front and back cuts telegraphed together (120° each, 8 m), the back one 0.8 s later.
+// Each cut throws a fan of 9 petals from its tip to the wall. The safe spots are the two 60° side slivers.
+function petalFan(a) { for (let i = 0; i < 9; i++) { const b = a - 60 * DEG + i * 15 * DEG; shot(Math.cos(b) * 8, Math.sin(b) * 8, b, 6, { dmg: 12 }); } }
+function pruningArc() {
+  const t = near();
+  const w = isE() ? 0.5 : 0;   // Easy: both cuts warn 0.5 s longer
+  const c1 = cone(Math.atan2(t.y, t.x), 8, 60 * DEG, 2.0 + w, 20, { trackCone: { p: t, until: W.t + 0.3 } });
+  const c2 = cone(c1.ang + Math.PI, 8, 60 * DEG, 2.8 + w, 20, { mirror: c1 });
+  c1.after = () => petalFan(c1.ang); c2.after = () => petalFan(c2.ang);
+}
+const OPTE = {
+  name: "Spiral Bloom (A + B)", key: "E", len: 30,
+  pitch: "Phase 1 as one fight, with no rest: the petal spiral never stops, seed pods land on top of it, waterfall jets sweep in from the wall, and Pruning Arc cuts front and back.",
+  rules: [
+    ["Melee", "A pod at her feet bursts point-blank at 12.5 s. Pruning Arc (13 s, 27 s) cuts 120° in front, then 120° behind 0.8 s later, 8 m long: stand in a side sliver. Inner arms throughout."],
+    ["Ranged", "Pods target the farthest 1/1/2/3 players. Waterfall jets (6 s, 18 s) sweep 40° along the wall from every player past 8 m, too fast to outwalk at the edge: step back past the start or move inward. Arc petals fly to the wall."],
+    ["Solo / 8", "Solo: pods come one after another, 0.8 s apart, all on you, and the jet aims at you. At 8 players, three pods land at a time and every far player gets a jet."],
+    ["Rest", "None in phase 1. The fight's 3–4 s punish window has to come in a later phase (settled rule)."],
+  ],
+  events: [
+    { at: 0, label: "Spiral", fn: () => { W.sp1 = spiral(1, 4, (isE() ? 12 : 15) * DEG, 5, 0.15, 9, 7); } },
+    { at: 3, label: "Pods", fn: () => podsOnFar(p1Pod({ solo: 1 })) },
+    { at: 6, label: "Jets", fn: () => jets() },
+    { at: 8, label: "Toll", fn: () => toll("TOLL: the spin reverses") },
+    { at: 9, label: "", fn: () => { W.sp1.dir *= -1; } },
+    { at: 10, label: "Feet pod", fn: () => pod(null, p1Pod({ x: 0, y: 0, r: 3.0 })) },
+    { at: 13, label: "Arc", fn: () => pruningArc() },
+    { at: 14.5, label: "Doubled", fn: () => podsOnFar(p1Pod({ solo: 1, doubled: true })) },
+    { at: 18, label: "Jets", fn: () => jets() },
+    { at: 21, label: "Toll", fn: () => toll("TOLL: the spin reverses") },
+    { at: 22, label: "2nd set", fn: () => { W.sp1.dir *= -1; W.sp2 = spiral(-1, 3, 20 * DEG, 4, 0.18, 8, 5); } },
+    { at: 23.5, label: "Triangle", fn: () => {
+      const a0 = Math.atan2(far(1)[0].y, far(1)[0].x);
+      for (let i = 0; i < 3; i++) { const a = a0 + i * TAU / 3; const go = () => pod(null, p1Pod({ x: Math.cos(a) * 7, y: Math.sin(a) * 7 })); S.N === 1 ? later(i * 0.8, go) : go(); }
+    } },
+    { at: 27, label: "Arc", fn: () => pruningArc() },
+  ],
+};
+// Phase 1 pods by level: Hard doubles every pod (a second ring 0.6 s later fills the first one's gaps); Easy warns 3.0 s
+function p1Pod(o) { if (isH()) o.doubled = true; if (isE()) o.warn = 3.0; return o; }
+/* ================= Phase 2 options ================= */
+const live = fn => () => { if (!W.punish) fn(); }; // skip a scheduled attack if the punish window has started
+function punishFor(sec, after) {
+  W.punish = true; W.emit.forEach(e => e.on = false); W.haz = W.haz.filter(h => h.done); W.bullets = []; W.marks = [];
+  later(sec, () => { W.punish = false; if (after) after(); });
+}
+
+/* ---------- F: Choir Buds ---------- */
+// Each bud is a boss part: stand within 3 m to cut it (30/s here; real damage comes from the class kits and is shared with Sylvara).
+// A bud left alive for 12 s blooms into two 24-petal rings. When every bud is gone she staggers for 3.5 s.
+function sproutBud(a) {
+  const b = { x: Math.cos(a) * 10, y: Math.sin(a) * 10, hp: 100, born: W.t, alive: true, base: rnd(0, TAU), acc: 0, life: W.budLife || 12 };
+  W.buds.push(b);
+  const e = { on: true };
+  e.update = dt => {
+    if (!b.alive) { e.on = false; return; }
+    b.base += 30 * DEG * dt; b.acc += dt;
+    while (b.acc >= 0.3) { b.acc -= 0.3; for (let i = 0; i < 3; i++) { const aa = b.base + i * TAU / 3; shot(b.x + Math.cos(aa) * 0.8, b.y + Math.sin(aa) * 0.8, aa, 4, { dmg: 10, life: 4 }); } }
+    for (const p of W.players) if (hyp(p.x - b.x, p.y - b.y) < 3) b.hp -= 30 * dt / Math.max(1, W.players.filter(q => hyp(q.x - b.x, q.y - b.y) < 3).length * 0.5);
+    if (b.hp <= 0) { b.alive = false; W.texts.push({ x: b.x, y: b.y + 1, s: "CUT", t: 1.0, big: true }); budsCheck(); }
+    else if (W.t - b.born >= b.life) {
+      b.alive = false; W.texts.push({ x: b.x, y: b.y + 1, s: "BLOOM", t: 1.2, big: true });
+      petalRing(b.x, b.y, 20, 5, rnd(0, TAU), 0.8, 12);
+      budsCheck();
+    }
+  };
+  W.emit.push(e);
+}
+function budsCheck() {
+  if (W.noPunish || W.punish || W.buds.length < W.budsPlanned || W.buds.some(b => b.alive)) return;
+  later(0.6, () => { if (!W.punish) { W.banner = { s: "She staggers", until: W.t + 3.5 }; punishFor(3.5, () => { W.sp1 = spiral(1, 3, 10 * DEG, 4.5, 0.17, 9, 7); }); } });
+}
+function plantBuds(life = 12) {
+  const n = { 1: 2, 2: 2, 4: 3, 8: 4 }[S.N] + (isH() ? 1 : 0), a0 = rnd(0, TAU); W.budsPlanned += n; W.budLife = life;   // Hard: one more bud per wave
+  for (let i = 0; i < n; i++) { const a = a0 + i * TAU / n; S.N === 1 ? later(i * 4, () => sproutBud(a)) : sproutBud(a); }
+  W.aiHome = p => {
+    const alive = W.buds.filter(b => b.alive); if (!alive.length) return null;
+    const b = alive[p.id % alive.length], a = Math.atan2(b.y, b.x);
+    return { x: b.x - Math.cos(a) * 1.8, y: b.y - Math.sin(a) * 1.8 };
+  };
+}
+const OPTF = {
+  name: "Choir Buds", key: "F", len: 26, phase: 2,
+  pitch: "She plants Choir Buds near the wall. Each bud is a turret with its own petal spiral, and damage to a bud also hits her. A bud left alive for 12 s blooms into a ring of 20 petals. Clear them all and she staggers.",
+  rules: [
+    ["Melee", "The feet pod (8 s) and Pruning Arc (14 s) keep coming while you're near her, and the slow main spiral never stops."],
+    ["Ranged", "The buds grow 10 m out, so someone has to walk to each one and stand within 3 m to cut it (30/s in this demo)."],
+    ["Solo / 8", "Buds: 2/2/3/4 at 1/2/4/8 players. Solo, they sprout one after another, 4 s apart, so you clear them in order."],
+    ["Punish", "3.5 s stagger as soon as the last bud is cut or blooms. Kill them fast to get it sooner."],
+  ],
+  events: [
+    { at: 0, label: "Spiral", fn: () => { W.sp1 = spiral(1, 3, 10 * DEG, 4.5, 0.17, 9, 7); } },
+    { at: 1, label: "Buds", fn: () => plantBuds() },
+    { at: 8, label: "Feet pod", fn: live(() => pod(null, { x: 0, y: 0, r: 3.0 })) },
+    { at: 14, label: "Arc", fn: live(() => pruningArc()) },
+    { at: 19, label: "Pods", fn: live(() => podsOnFar({ solo: 1 })) },
+  ],
+};
+
+/* ---------- G: Two-Colour Choir, spiral included ---------- */
+const OPTG = {
+  name: "Two-Colour Choir", key: "G", len: 21, phase: 2,
+  pitch: "Harder version. Six coloured spiral arms, a second counter-turning set from 10 s, brass and cobalt lanes crossing the arena, and a two-colour petal burst on every toll. Only your own colour hurts you, and each toll swaps it.",
+  rules: [
+    ["Melee", "Three of the six arms are always your colour, packed tight near her. Each toll fires a 20-petal two-colour burst point-blank, and a root ring lands at 12 s."],
+    ["Ranged", "Brass lanes come from the north (0–10 s) and then the south (14.5–20 s), cobalt lanes from the east (6–20 s). They fire every 0.35 s at 5 m/s, 3.4 m apart (29 Oct playtest), and drift 0.4 m/s, so the outer ring is never clear."],
+    ["Solo / 8", "Solo: your colour swaps every 4 s instead of 5, so you get one extra toll burst. At 8 players, half are brass and half cobalt, crowding the same safe lanes."],
+    ["Rest", "None (Chzy18, 28 Oct). The loop goes straight back into the spiral."],
+  ],
+  build: () => {
+    // numbers from the 29 Oct Unity playtest: lanes 5 m/s, 3.4 m apart, every 0.35 s; spirals 4.2 / 3.5 m/s; toll burst 4.5 m/s
+    // Easy: lanes every 0.5 s and no second set. Hard: the toll burst fires twice, 0.5 s apart.
+    const tollBurst = () => { const off = rnd(0, TAU); for (let i = 0; i < 20; i++) { const a = off + i * TAU / 20; shot(Math.cos(a) * BOSS_R, Math.sin(a) * BOSS_R, a, 4.5, { dmg: 12, col: i % 2 ? "cobalt" : "brass" }); } };
+    const lanes = (col, ang, drift, until) => choirLanes(col, ang, drift, until, isE() ? 0.5 : 0.35, 3.4, 5);
+    const ev = [
+      { at: 0, label: "Spiral ×6", fn: () => { W.sp1 = spiral(1, 6, 14 * DEG, 4.2, 0.17, 9, 7, ["brass", "cobalt"]); } },
+      { at: 0.01, label: "Brass N", fn: () => lanes("brass", -Math.PI / 2, 1, 10) },
+      { at: 6, label: "Cobalt E", fn: () => lanes("cobalt", Math.PI, 1, 20) },
+      { at: 10, label: "2nd set", fn: () => { if (!isE()) W.sp2 = spiral(-1, 4, 18 * DEG, 3.5, 0.22, 8, 5, ["cobalt", "brass"]); } },
+      { at: 12, label: "Root ring", fn: () => rootRing(3.5) },
+      { at: 14.5, label: "Brass S", fn: () => lanes("brass", Math.PI / 2, -1, 20) },
+    ];
+    (S.N === 1 ? [4, 8, 12, 16, 20] : [5, 10, 15, 20]).forEach(t => ev.push(...colourToll(t), { at: t + 0.02, label: "", fn: () => { tollBurst(); if (isH()) later(0.5, tollBurst); } }));
+    return ev.sort((a, b) => a.at - b.at);
+  },
+};
+
+/* ---------- H: Seed Relay ---------- */
+// The seed sits on the farthest player, slows them to 75 % and fires 12 petals from them every 2 s (not at the carrier).
+// Touch another player to pass it; the 10 s fuse never resets. A turquoise bed appears 9 m away on the far side:
+// carry or relay the seed into it and the 5 m bloom goes off there instead of on someone.
+function plantSeed() {
+  const p = far(1)[0], a = Math.atan2(p.y, p.x);
+  const s = W.seed = { h: p, end: W.t + 10, acc: 0, pass: W.t, warned: false };
+  later(2, () => { if (W.seed === s) W.bed = { x: -Math.cos(a) * 9, y: -Math.sin(a) * 9 }; });
+  W.aiHome = q => (W.seed && W.seed.h === q && W.bed ? W.bed : null);
+  const e = { on: true };
+  e.update = dt => {
+    if (W.seed !== s) { e.on = false; return; }
+    const h = s.h; s.acc += dt;
+    if (s.acc >= 2) { s.acc -= 2; const off = rnd(0, TAU); for (let i = 0; i < 12; i++) { const b = off + i * TAU / 12; shot(h.x + Math.cos(b) * 0.6, h.y + Math.sin(b) * 0.6, b, 5, { dmg: 12, owner: h }); } }
+    if (h.id !== undefined && W.t - s.pass > 1) {
+      for (const q of W.players) if (q !== h && hyp(q.x - h.x, q.y - h.y) < 2 * PR + 0.25) { s.h = q; s.pass = W.t; W.texts.push({ x: q.x, y: q.y + 1, s: "PASS", t: 0.9 }); break; }
+      if (W.bed && hyp(s.h.x - W.bed.x, s.h.y - W.bed.y) < 1.2) { s.h = { x: W.bed.x, y: W.bed.y }; W.texts.push({ x: W.bed.x, y: W.bed.y + 1, s: "PLANTED", t: 1.2, big: true }); W.bed = null; }
+    }
+    if (!s.warned && W.t >= s.end - 2) { s.warned = true; s.bloom = disc(s.h.x, s.h.y, 5, 2, 25); s.bloom.after = () => { petalRing(s.bloom.cx, s.bloom.cy, 16, 5.5, rnd(0, TAU), 0.6); W.seed = null; W.bed = null; }; }
+    if (s.bloom && !s.bloom.done && W.t < s.bloom.res - 0.3) { s.bloom.cx = s.h.x; s.bloom.cy = s.h.y; }
+  };
+  W.emit.push(e);
+}
+const OPTH = {
+  name: "Seed Relay", key: "H", len: 27, phase: 2,
+  pitch: "A seed lands on the farthest player. It slows them and fires petal rings from them every 2 s. Relay it by touch to the turquoise bed across the arena before the 10 s fuse runs out, while Root March rows sweep in from the wall.",
+  rules: [
+    ["Melee", "The carrier's petal rings and the marching rows pass through her. Players who stay near her get boxed in."],
+    ["Ranged", "The seed always picks the farthest player. The bed is on the opposite side, so the seed has to cross the arena."],
+    ["Solo / 8", "Solo: you carry it yourself at 75 % speed, about 18 m in 6 s. In groups, passing doesn't reset the fuse, so a chain of players gets it there fastest."],
+    ["Punish", "23–26.5 s, after the second bloom."],
+  ],
+  events: [
+    { at: 0, label: "Row N", fn: () => row(Math.PI / 2, rnd(-6, 6)) },
+    { at: 0.5, label: "Seed", fn: () => plantSeed() },
+    { at: 5, label: "Row E", fn: () => row(0, rnd(-6, 6)) },
+    { at: 12, label: "Row S", fn: () => row(-Math.PI / 2, rnd(-6, 6)) },
+    { at: 12.5, label: "Seed", fn: () => plantSeed() },
+    { at: 17, label: "Row W", fn: () => row(Math.PI, rnd(-6, 6)) },
+    { at: 23, label: "Punish", fn: () => punishFor(3.5) },
+  ],
+};
+
+/* ---------- I: Hush and Chorus ---------- */
+// The bell calls HUSH (anyone who moves more than 0.3 m in the 1 s window is hit) or CHORUS (anyone who moves less than 1 m is hit).
+// HUSH also brings a 3.2 m root ring at her feet, so melee must step out before stopping.
+function cue(kind) {
+  const c = W.cue = { kind, start: W.t + 2, end: W.t + 3, done: false };
+  W.banner = { s: kind === "HUSH" ? "HUSH: stand still" : "CHORUS: keep moving", until: W.t + 3 };
+  if (kind === "HUSH") rootRing(3.2);
+  W.players.forEach(p => { p.cueMove = 0; p.lx = p.x; p.ly = p.y; });
+  const e = { on: true };
+  e.update = () => {
+    if (W.cue !== c) { e.on = false; return; }
+    for (const p of W.players) { if (W.t >= c.start) p.cueMove += hyp(p.x - p.lx, p.y - p.ly); p.lx = p.x; p.ly = p.y; }
+    if (W.t >= c.end) {
+      c.done = true; e.on = false;
+      for (const p of W.players) if (kind === "HUSH" ? p.cueMove > 0.3 : p.cueMove < 1) { hurt(p, 20); W.texts.push({ x: p.x, y: p.y + 1.2, s: kind === "HUSH" ? "MOVED" : "STILL", t: 1 }); }
+    }
+  };
+  W.emit.push(e);
+}
+const OPTI = {
+  name: "Hush and Chorus", key: "I", len: 21, phase: 2,
+  pitch: "The bell calls HUSH (freeze for 1 s) or CHORUS (keep moving for 1 s), with a 2 s warning, while the spiral and seed pods keep coming. Pick your stopping spot between the arms.",
+  rules: [
+    ["Melee", "Every HUSH brings a 3.2 m root ring at her feet, so you step out first and then stop."],
+    ["Ranged", "Casters can only cast safely during HUSH, and pods drop on the farthest players between calls."],
+    ["Solo / 8", "Same calls for everyone. At 8 players, three pods land at a time, so finding a still spot gets crowded."],
+    ["Punish", "17.5–21 s, after the third call."],
+  ],
+  events: [
+    { at: 0, label: "Spiral", fn: () => { W.sp1 = spiral(1, 3, 12 * DEG, 4.5, 0.17, 9, 7); } },
+    { at: 1, label: "Pods", fn: () => podsOnFar({ solo: 1 }) },
+    { at: 4, label: "HUSH", fn: () => cue("HUSH") },
+    { at: 8, label: "Pods", fn: () => podsOnFar({ solo: 1, doubled: true }) },
+    { at: 10.5, label: "CHORUS", fn: () => cue("CHORUS") },
+    { at: 14.5, label: "HUSH", fn: () => cue("HUSH") },
+    { at: 17.5, label: "Punish", fn: () => punishFor(3.5) },
+  ],
+};
+/* ================= Phase 3 options: Hollow Refrain (second form) ================= */
+// Every Phase 3 loop opens with the harmless transformation: the mask splits. No punish windows anywhere (Chzy18, 28 Oct).
+const splitMask = { at: 0, label: "", fn: () => { W.noPunish = true; W.banner = { s: "The mask splits", until: W.t + 1.6 }; } };
+const tollBurst = (n = 10) => { const off = rnd(0, TAU); for (let i = 0; i < n; i++) { const a = off + i * TAU / n; shot(Math.cos(a) * BOSS_R, Math.sin(a) * BOSS_R, a, 5, { dmg: 12, col: i % 2 ? "cobalt" : "brass" }); } };
+const swapColours = () => W.players.forEach(p => { p.colour = p.colour === "brass" ? "cobalt" : "brass"; p.nextColour = null; });
+const warnSwap = () => W.players.forEach(p => p.nextColour = p.colour === "brass" ? "cobalt" : "brass");
+
+const OPTJ = {
+  name: "Hollow Bloom", key: "J", len: 24, phase: 3,
+  pitch: "The open mask fires a 4-arm petal spiral, and two waves of Choir Buds sprout near the wall, each firing its own spiral. A bud left alive for 12 s blooms into a 20-petal nova. Cut them inside the storm.",
+  rules: [
+    ["Melee", "Four arms turn slowly near her. The feet pod comes at 8 s and Pruning Arc at 15 s."],
+    ["Ranged", "Buds grow 10 m out, so someone walks to each and stands within 3 m to cut it. Pods hit the farthest players at 20 s."],
+    ["Solo / 8", "2/2/3/4 buds per wave at 1/2/4/8 players. Solo, they sprout one after another, 4 s apart."],
+    ["Rest", "None."],
+  ],
+  events: [
+    splitMask,
+    { at: 0.01, label: "Spiral ×4", fn: () => { W.sp1 = spiral(1, isE() ? 3 : 4, 10 * DEG, 4.5, 0.18, 9, 7); } },   // Easy: 3 arms
+    { at: 1, label: "Buds", fn: () => plantBuds(isE() ? 15 : 12) },   // Easy: buds bloom after 15 s
+    { at: 8, label: "Feet pod", fn: () => pod(null, { x: 0, y: 0, r: 3.0 }) },
+    { at: 12, label: "Buds", fn: () => plantBuds(isE() ? 15 : 12) },
+    { at: 15, label: "Arc", fn: () => pruningArc() },
+    { at: 20, label: "Pods", fn: () => podsOnFar({ solo: 1 }) },
+  ],
+};
+
+const OPTK = {
+  name: "Mirror Choir", key: "K", len: 21, phase: 3,
+  pitch: "Phase 2's colours return. Every toll swaps your colour and also calls HUSH (freeze for 1 s) or CHORUS (keep moving for 1 s) right after the swap, while your new colour's lanes and arms come at you.",
+  rules: [
+    ["Melee", "Every HUSH brings a 3.2 m root ring at her feet, and every toll fires a point-blank two-colour burst."],
+    ["Ranged", "The lanes cross the whole arena. During HUSH you must already be standing in a safe column of your new colour."],
+    ["Solo / 8", "Solo: tolls every 4 s instead of 5. At 8 players, four bodies share each colour's columns while frozen."],
+    ["Rest", "None."],
+  ],
+  build: () => {
+    const ev = [
+      splitMask,
+      { at: 0.01, label: "Spiral ×4", fn: () => { W.sp1 = spiral(1, 4, 10 * DEG, 4.5, 0.18, 9, 7, ["brass", "cobalt"]); } },
+      { at: 0.02, label: "Brass N", fn: () => choirLanes("brass", -Math.PI / 2, 1, 10, 0.45) },
+      { at: 5, label: "Cobalt E", fn: () => choirLanes("cobalt", Math.PI, 1, 20, 0.45) },
+      { at: 12, label: "Brass S", fn: () => choirLanes("brass", Math.PI / 2, -1, 20, 0.45) },
+    ];
+    (S.N === 1 ? [4, 8, 12, 16, 20] : [5, 10, 15, 20]).forEach((t, i) => {
+      const kind = i % 2 ? "CHORUS" : "HUSH";
+      ev.push(
+        { at: t - 2, label: kind, fn: () => cue(kind) },
+        { at: t - 1, label: "", fn: () => { warnSwap(); W.banner = { s: `TOLL, then ${kind === "HUSH" ? "HUSH: freeze" : "CHORUS: move"}`, until: W.t + 2 }; } },
+        { at: t, label: "", fn: () => { swapColours(); tollBurst(); } });
+    });
+    return ev.sort((a, b) => a.at - b.at);
+  },
+};
+
+const OPTL = {
+  name: "Root Cage", key: "L", len: 26, phase: 3,
+  pitch: "Thorn rows with 4 m gaps march in from the walls two at a time, while her spiral turns in the middle. Seeds land on the farthest player, slow them and fire petal rings from them. Relay each one into its bed across the cage before the fuse runs out.",
+  rules: [
+    ["Melee", "A 2-arm spiral turns near her, and every row passes through her."],
+    ["Ranged", "Rows start at the wall, and the seed always picks the farthest player."],
+    ["Solo / 8", "Solo: you carry the seed yourself at 75 % speed through the rows. In groups, relay it by touch, which doesn't reset the fuse."],
+    ["Rest", "None."],
+  ],
+  events: [
+    splitMask,
+    { at: 0.01, label: "Spiral", fn: () => { W.sp1 = spiral(1, 2, 10 * DEG, 4.5, 0.2, 9, 7); } },
+    { at: 0.02, label: "Rows N+S", fn: () => { row(Math.PI / 2, rnd(-5, 5), 4); row(-Math.PI / 2, rnd(-5, 5), 4); } },
+    { at: 1, label: "Seed", fn: () => plantSeed() },
+    { at: 5, label: "Rows E+W", fn: () => { row(0, rnd(-5, 5), 4); row(Math.PI, rnd(-5, 5), 4); } },
+    { at: 10, label: "Rows N+E", fn: () => { row(Math.PI / 2, rnd(-5, 5), 4); row(0, rnd(-5, 5), 4); } },
+    { at: 13, label: "Seed", fn: () => plantSeed() },
+    { at: 16, label: "Rows N+S", fn: () => { row(Math.PI / 2, rnd(-5, 5), 4); row(-Math.PI / 2, rnd(-5, 5), 4); } },
+    { at: 20, label: "Rows E+W", fn: () => { row(0, rnd(-5, 5), 4); row(Math.PI, rnd(-5, 5), 4); } },
+  ],
+};
+
+const OPTM = {
+  name: "Shattered Refrain", key: "M", len: 24, phase: 3,
+  pitch: "The final exam of Phases 1 and 2. The split mask fires two spirals at once: a 4-arm coloured one (only your colour hurts) and a 2-arm coral one that hurts everyone. Colour lanes, seed pods, a waterfall jet, Pruning Arc and colour tolls land on top.",
+  rules: [
+    ["Melee", "Two spirals turning opposite ways near her, the feet pod at 9 s and Pruning Arc at 19 s."],
+    ["Ranged", "Pods hit the farthest players, a waterfall jet sweeps from the wall at 6 s, and every toll fires a two-colour burst to the wall."],
+    ["Solo / 8", "Solo: pods one after another, all on you, and the jets aim at you. At 8 players, three pods at a time and a jet for every far player."],
+    ["Rest", "None."],
+  ],
+  events: [
+    splitMask,
+    { at: 0.01, label: "2 spirals", fn: () => { W.sp1 = spiral(1, 4, 10 * DEG, 4.5, 0.17, 9, 7, ["brass", "cobalt"]); W.sp2 = spiral(-1, 2, 8 * DEG, 4.5, 0.2, 9, 7); } },
+    { at: 0.02, label: "Brass N", fn: () => choirLanes("brass", -Math.PI / 2, 1, 10, 0.5) },
+    { at: 10, label: "Cobalt E", fn: () => choirLanes("cobalt", Math.PI, 1, 20, 0.5) },
+    { at: 3, label: "Pods", fn: () => podsOnFar({ solo: 1 }) },
+    { at: 5, label: "Toll", fn: () => { warnSwap(); toll("TOLL: every colour swaps"); } },
+    { at: 6, label: "Jets", fn: () => { swapColours(); tollBurst(); jets(); } },
+    { at: 9, label: "Feet pod", fn: () => pod(null, { x: 0, y: 0, r: 3.0 }) },
+    { at: 11, label: "Toll", fn: () => { warnSwap(); toll("TOLL: every colour swaps"); } },
+    { at: 12, label: "", fn: () => { swapColours(); tollBurst(); } },
+    { at: 13, label: "Doubled", fn: () => podsOnFar({ solo: 1, doubled: true }) },
+    { at: 17, label: "Toll", fn: () => { warnSwap(); toll("TOLL: every colour swaps"); } },
+    { at: 18, label: "", fn: () => { swapColours(); tollBurst(); } },
+    { at: 19, label: "Arc", fn: () => pruningArc() },
+    { at: 21, label: "Triangle", fn: () => {
+      const a0 = Math.atan2(far(1)[0].y, far(1)[0].x);
+      for (let i = 0; i < 3; i++) { const a = a0 + i * TAU / 3; const go = () => pod(null, { x: Math.cos(a) * 7, y: Math.sin(a) * 7 }); S.N === 1 ? later(i * 0.8, go) : go(); }
+    } },
+  ],
+};
+/* ================= Phase 4 options: the last phase ================= */
+// Zones are lasting floor hazards (thorn overgrowth, collapsed floor). Each one gets a 2 s fill warning, then hurts
+// anyone standing in it for 10 every 0.5 s until the loop ends. rIn/rOut are radii; a0/span (radians) make it a wedge.
+function zone(rIn, rOut, a0 = null, span = 0, warn = 2) { const z = { rIn, rOut, a0, span, warnAt: W.t, activeAt: W.t + warn }; W.zones.push(z); return z; }
+function inZone(z, x, y, pad = PR) {
+  const r = hyp(x, y); if (r + pad < z.rIn || r - pad > z.rOut) return false;
+  if (z.a0 === null) return true;
+  const rel = (Math.atan2(y, x) - z.a0 + TAU * 4) % TAU; return rel < z.span;
+}
+function zoneTicker() {
+  const e = { on: true, acc: 0 };
+  e.update = dt => {
+    e.acc += dt; if (e.acc < 0.5) return; e.acc -= 0.5;
+    for (const p of W.players) if (W.zones.some(z => W.t >= z.activeAt && inZone(z, p.x, p.y, -0.1))) hurt(p, 10);
+  };
+  W.emit.push(e);
+}
+
+/* ---------- N: Overgrowth ---------- */
+const OPTN = {
+  name: "Overgrowth", key: "N", len: 30, phase: 4,
+  pitch: "The garden takes the arena back. Every 6 s a ring of thorn roots grows in from the wall and stays, shrinking the floor from 13.5 m to 7 m. Her 4-arm spiral, seed pods and waterfall jets keep coming while you dodge in less and less space.",
+  rules: [
+    ["Melee", "Near her you have room, but the spiral is tight there and the feet pod lands at 18 s."],
+    ["Ranged", "The wall is the first thing to go. By 22 s everyone is within 7 m of her."],
+    ["Solo / 8", "Same shrink for everyone. At 8 players, eight bodies share the last 7 m, so pods and arms get crowded."],
+    ["Enrage", "The shrinking floor is the soft enrage. Thorns hurt 10 every 0.5 s."],
+  ],
+  events: [
+    { at: 0, label: "Spiral", fn: () => { W.noPunish = true; zoneTicker(); W.sp1 = spiral(1, 4, 10 * DEG, 4.5, 0.16, 9, 7); } },
+    { at: 2, label: "Pods", fn: () => podsOnFar({ solo: 1 }) },
+    { at: 4, label: "Thorns 11.5", fn: () => zone(11.5, R + 1) },
+    { at: 7, label: "Jets", fn: () => jets() },
+    { at: 10, label: "Thorns 10", fn: () => zone(10, 11.5) },
+    { at: 13, label: "Pods", fn: () => podsOnFar({ solo: 1 }) },
+    { at: 16, label: "Thorns 8.5", fn: () => zone(8.5, 10) },
+    { at: 19, label: "Jets", fn: () => jets() },
+    { at: 18, label: "Feet pod", fn: () => pod(null, { x: 0, y: 0, r: 3.0 }) },
+    { at: 22, label: "Thorns 7", fn: () => zone(7, 8.5) },
+    { at: 24, label: "Pods", fn: () => podsOnFar({ solo: 1 }) },
+  ],
+};
+
+/* ---------- O: Final Chorus ---------- */
+// One short slice of each earlier phase per 18 s cycle: spiral + pods, then the two colours, then buds and the Arc.
+// Every cycle her spiral gains an arm (3 → 6), which is the enrage.
+const OPTO = {
+  name: "Final Chorus", key: "O", len: 18, phase: 4,
+  pitch: "A callback to the whole fight in an 18 s cycle: spiral and seed pods, then the brass and cobalt lanes with a toll, then Choir Buds and Pruning Arc. Each cycle her spiral gains an arm, from 3 up to 6.",
+  rules: [
+    ["Melee", "The spiral gets denser every cycle, Pruning Arc lands at 15 s, and toll bursts fire point-blank."],
+    ["Ranged", "Pods hit the farthest players, colour lanes cross the arena, and buds grow 10 m out to be cut."],
+    ["Solo / 8", "As in the earlier phases: solo pods one after another, solo buds one after another, half the party brass and half cobalt."],
+    ["Enrage", "One more spiral arm per cycle (shown on the banner)."],
+  ],
+  events: [
+    { at: 0, label: "Spiral", fn: () => { W.noPunish = true; const arms = Math.min(6, 2 + W.loop); W.banner = { s: `Cycle ${W.loop}: ${arms} arms`, until: W.t + 1.5 }; W.sp1 = spiral(1, arms, 10 * DEG, 4.5, 0.17, 9, 7); } },
+    { at: 1, label: "Pods", fn: () => podsOnFar({ solo: 1 }) },
+    { at: 6, label: "Brass lanes", fn: () => choirLanes("brass", -Math.PI / 2, 1, 12, 0.45) },
+    { at: 8, label: "Toll", fn: () => { warnSwap(); toll("TOLL: every colour swaps"); } },
+    { at: 9, label: "", fn: () => { swapColours(); tollBurst(); } },
+    { at: 12, label: "Buds", fn: () => plantBuds(8) },
+    { at: 15, label: "Arc", fn: () => pruningArc() },
+  ],
+};
+
+/* ---------- P: Last Bloom ---------- */
+// A giant flower opens over her and fires rotating waves of petals. The bloom timer (top of the arena) wipes the party at 0.
+// It drains 1 s per second, minus up to half for the share of players who haven't been hit in the last 2 s (standing in for keeping damage on her).
+function petalWaves() {
+  const e = { on: true, acc: 0, rot: rnd(0, TAU) };
+  e.update = dt => {
+    e.acc += dt; if (e.acc < 1.0) return; e.acc -= 1.0; e.rot += 22 * DEG;
+    for (let i = 0; i < 24; i++) { if (i % 6 === 0) continue; const a = e.rot + i * TAU / 24; shot(Math.cos(a) * BOSS_R, Math.sin(a) * BOSS_R, a, 4.5, { dmg: 12 }); }
+  };
+  W.emit.push(e);
+}
+function bloomTimer() {
+  W.bloomT = 30;
+  const e = { on: true };
+  e.update = dt => {
+    if (W.bloomT === null) { e.on = false; return; }
+    const clean = W.players.filter(p => W.t - (p.lastHit ?? -9) > 2).length / W.players.length;
+    W.bloomT = Math.max(0, W.bloomT - dt * (1 - 0.5 * clean));
+    if (W.bloomT === 0) { e.on = false; W.banner = { s: "The bloom opens: party wiped", until: W.t + 2.5 }; W.players.forEach(p => hurt(p, 100)); W.bloomT = null; }
+  };
+  W.emit.push(e);
+}
+const OPTP = {
+  name: "Last Bloom", key: "P", len: 40, phase: 4,
+  pitch: "A giant flower opens over her and sweeps the arena with rotating waves of petals every second, each with four gaps, over a slow 2-arm spiral. A bloom timer counts down from 30. At zero it wipes the party. Every player who isn't getting hit slows it down.",
+  rules: [
+    ["Melee", "The waves start at her rim, so the gaps are narrow close in. Root rings land at 14 and 26 s."],
+    ["Ranged", "Pods hit the farthest players at 8, 20 and 32 s, and the waves reach the wall."],
+    ["Solo / 8", "The timer reads the share of clean players, so it scales with party size. A clean party gets 60 s, and a party that keeps getting hit gets 30."],
+    ["Enrage", "Hard: the bloom wipes everyone at 0, as the 26 Oct rules allow, with an unmissable timer."],
+  ],
+  events: [
+    { at: 0, label: "Flower", fn: () => { W.noPunish = true; petalWaves(); bloomTimer(); W.sp1 = spiral(-1, 2, 10 * DEG, 4.5, 0.2, 9, 7); } },
+    { at: 8, label: "Pods", fn: () => podsOnFar({ solo: 1 }) },
+    { at: 14, label: "Root ring", fn: () => rootRing(3.5) },
+    { at: 20, label: "Pods", fn: () => podsOnFar({ solo: 1 }) },
+    { at: 26, label: "Root ring", fn: () => rootRing(3.5) },
+    { at: 32, label: "Pods", fn: () => podsOnFar({ solo: 1, doubled: true }) },
+  ],
+};
+
+/* ---------- Q: Rootfall ---------- */
+// The outer floor is cut into eight 45° wedges (6 m to the wall), numbered 1–8 in the order they fall.
+// One falls every 3.5 s from 3 s, leaving two outer wedges and the inner 6 m disc.
+const OPTQ = {
+  name: "Rootfall", key: "Q", len: 30, phase: 4,
+  pitch: "The arena breaks apart. Eight numbered floor wedges fall one by one, each with a 2 s warning, and stay gone. A slow spiral and waterfall jets push you around what's left.",
+  rules: [
+    ["Melee", "The inner 6 m disc never falls, but the spiral is tight there and the feet pod lands at 16 s."],
+    ["Ranged", "Only the outer floor falls, and the jets aim at anyone past 8 m."],
+    ["Solo / 8", "The numbers show the order from the start, so the party plans where to stand next."],
+    ["Enrage", "The shrinking floor. Falling in hurts 10 every 0.5 s."],
+  ],
+  events: [
+    { at: 0, label: "Spiral", fn: () => {
+      W.noPunish = true; zoneTicker(); W.sp1 = spiral(1, 3, 10 * DEG, 4.5, 0.18, 9, 7);
+      const order = [0, 4, 2, 6, 1, 5].concat([3, 7]).map(i => i), base = rnd(0, TAU);
+      W.wedges = order.map((w, k) => ({ a0: base + w * TAU / 8, n: k + 1 }));
+      W.wedges.slice(0, 6).forEach((w, k) => later(3 + k * 3.5, () => zone(6, R + 1, w.a0, TAU / 8)));
+    } },
+    { at: 8, label: "Jets", fn: () => jets() },
+    { at: 16, label: "Feet pod", fn: () => pod(null, { x: 0, y: 0, r: 3.0 }) },
+    { at: 20, label: "Jets", fn: () => jets() },
+    { at: 24, label: "Pods", fn: () => podsOnFar({ solo: 1 }) },
+  ],
+};
+OPTC.build = buildC;
+/* ================= Phase 4, second set of options ================= */
+// Aimed fan: n petals spread around the direction to a player, from any emitter.
+function aimedFan(x, y, p, n = 5, spread = 12 * DEG, v = 6) {
+  const a = Math.atan2(p.y - y, p.x - x);
+  for (let i = 0; i < n; i++) shot(x, y, a + (i - (n - 1) / 2) * spread, v, { dmg: 12 });
+}
+
+/* ---------- R: Requiem Bells ---------- */
+// Three great bells hang near the wall and drift slowly around it. Every 1.5 s one rings and fires a 5-petal fan
+// at a player (taking turns), on top of her slow spiral. Aimed fire is new here: you dodge sideways, not through gaps.
+const OPTR = {
+  name: "Requiem Bells", key: "R", len: 24, phase: 4,
+  pitch: "Three great bells hang near the wall and drift around it. They take turns firing aimed 7-petal fans at players, one every second, while her slow spiral turns. Sidestep the aimed shots and keep the bells from boxing you in.",
+  rules: [
+    ["Melee", "Fans cross the whole arena, so they reach you beside her too. Root rings land at 8 and 18 s."],
+    ["Ranged", "The bells sit 12 m out, so ranged players stand closest to them and get the least time to react."],
+    ["Solo / 8", "Every fan aims at you solo. In groups the bells cycle through the players, so at 8 each player is targeted less often but the fans cross more."],
+    ["Enrage", "None yet. Proposal: one more bell every loop."],
+  ],
+  events: [
+    { at: 0, label: "Bells", fn: () => {
+      W.noPunish = true; W.sp1 = spiral(1, 3, 10 * DEG, 4.5, 0.2, 9, 7);
+      const base = rnd(0, TAU); W.props = [0, 1, 2].map(i => ({ a: base + i * TAU / 3, x: 0, y: 0 }));
+      const e = { on: true, acc: 0, k: 0 };
+      e.update = dt => {
+        for (const pr of W.props) { pr.a += 6 * DEG * dt; pr.x = Math.cos(pr.a) * 12; pr.y = Math.sin(pr.a) * 12; }
+        e.acc += dt; if (e.acc < 1.0) return; e.acc -= 1.0;
+        const pr = W.props[e.k % 3], p = W.players[e.k % W.players.length]; e.k++;
+        aimedFan(pr.x, pr.y, p, 7, 10 * DEG);
+      };
+      W.emit.push(e);
+    } },
+    { at: 4, label: "Pods", fn: () => podsOnFar({ solo: 1 }) },
+    { at: 8, label: "Root ring", fn: () => rootRing(3.5) },
+    { at: 14, label: "Pods", fn: () => podsOnFar({ solo: 1 }) },
+    { at: 18, label: "Root ring", fn: () => rootRing(3.5) },
+  ],
+};
+
+/* ---------- S: Vine Sweep ---------- */
+// Two vine beams (solid petal streams from her rim to the wall, opposite each other) rotate 18°/s. Every 3 s each beam
+// breaks for 0.6 s, sending a gap outward you can step through. The rotation reverses at 12 s.
+function vineBeams(dir) {
+  const e = { on: true, rot: rnd(0, TAU), acc: 0, t: 0, dir };
+  e.update = dt => {
+    e.t += dt; e.rot += e.dir * 18 * DEG * dt; e.acc += dt;
+    const broken = (e.t % 3) > 2.4;
+    while (e.acc >= 0.06) { e.acc -= 0.06; if (broken) continue; for (const k of [0, Math.PI]) { const a = e.rot + k; shot(Math.cos(a) * BOSS_R, Math.sin(a) * BOSS_R, a, 10, { dmg: 14, life: 1.4 }); } }
+  };
+  W.emit.push(e); return e;
+}
+const OPTS2 = {
+  name: "Vine Sweep", key: "S", len: 24, phase: 4,
+  pitch: "Two vine beams, solid streams of petals from her to the wall, sweep the arena like clock hands at 18°/s. Every 3 s each beam breaks for 0.6 s, and that gap is your chance to cross. The sweep reverses at 12 s, with seed pods on top.",
+  rules: [
+    ["Melee", "Near her the beams move slowly, so it's easy to stay ahead of them, but the feet pod lands at 9 s."],
+    ["Ranged", "At the wall the beams move about 4.2 m/s, as fast as you walk, so ranged players have to move inward or cross through a break."],
+    ["Solo / 8", "Same beams for everyone. Pods hit the farthest 1/1/2/3 players, so at 8 three players get pushed into the beams."],
+    ["Enrage", "None yet. Proposal: the beams speed up 2°/s every loop."],
+  ],
+  events: [
+    { at: 0, label: "Beams", fn: () => { W.noPunish = true; W.vines = vineBeams(1); } },
+    { at: 4, label: "Pods", fn: () => podsOnFar({ solo: 1 }) },
+    { at: 9, label: "Feet pod", fn: () => pod(null, { x: 0, y: 0, r: 3.0 }) },
+    { at: 11, label: "Toll", fn: () => toll("TOLL: the vines reverse") },
+    { at: 12, label: "", fn: () => { W.vines.dir *= -1; } },
+    { at: 16, label: "Pods", fn: () => podsOnFar({ solo: 1, doubled: true }) },
+    { at: 21, label: "Feet pod", fn: () => pod(null, { x: 0, y: 0, r: 3.0 }) },
+  ],
+};
+
+/* ---------- T: Seed Storm ---------- */
+// Big slow seeds (0.6 m) fly out in a ring of 6, then burst after 1.6–2.4 s into 8 petals each. Where they burst
+// depends on their fuse, so the storm fills the middle distance, not just the area near her.
+function seedRing(n, off, fuse) {
+  for (let i = 0; i < n; i++) {
+    const a = off + i * TAU / n;
+    shot(Math.cos(a) * BOSS_R, Math.sin(a) * BOSS_R, a, 3, { r: 0.6, dmg: 16, life: fuse, split: b => petalRing(b.x, b.y, isH() ? 10 : 8, 4.5, rnd(0, TAU), 0.3) });   // Hard: 10 petals per burst
+  }
+}
+const OPTT = {
+  name: "Seed Storm", key: "T", len: 24, phase: 4,
+  pitch: "She hurls rings of big, slow seeds. Each seed bursts after a short fuse into 8 petals, so the arena fills with bursts at different distances. Dodge the seed first, then the burst. A slow 2-arm spiral turns under it all.",
+  rules: [
+    ["Melee", "Short-fuse seeds burst about 6 m out, sending petals back toward her. The root ring lands at 12 s."],
+    ["Ranged", "Long-fuse seeds burst about 9 m out, and their petals reach the wall. Pods hit the farthest players."],
+    ["Solo / 8", "The same storm for everyone. At 8 players there's less room between the bursts."],
+    ["Enrage", "None yet. Proposal: one more seed per ring every loop."],
+  ],
+  events: [
+    { at: 0, label: "Storm", fn: () => {
+      W.noPunish = true; W.sp1 = spiral(-1, 2, 8 * DEG, 4.5, 0.22, 9, 7);
+      const e = { on: true, acc: 2.5, k: 0 };
+      const every = isE() ? 2.5 : 2.0, n = isE() ? 6 : 8;   // Easy: 6 seeds every 2.5 s
+      e.update = dt => { e.acc += dt; if (e.acc < every) return; e.acc -= every; e.k++; seedRing(n, rnd(0, TAU), e.k % 2 ? 1.6 : 2.4); };
+      W.emit.push(e);
+    } },
+    { at: 6, label: "Pods", fn: () => podsOnFar({ solo: 1 }) },
+    { at: 12, label: "Root ring", fn: () => rootRing(3.5) },
+    { at: 18, label: "Pods", fn: () => podsOnFar({ solo: 1 }) },
+  ],
+};
+
+/* ---------- V: Seed Storm with the enrage (proposal) ---------- */
+// Seed Storm as it would run past its first loop. Soft enrage: each new loop adds a seed per ring and rings come
+// 0.1 s sooner (8 seeds / 2.0 s → 12 / 1.6 s at loop 5). Hard enrage at 120 s: Last Storm, which wipes.
+const ENRAGE_AT = 120;
+const EASY_STORM = { n: 12, every: 0.8, arms: 3, v: 4.5, rate: 0.15 };
+// loop k (0-based): Medium 8 + k seeds every 2.0 - 0.1k s; Easy keeps the same steps from 6 seeds every 2.5 s. Last Storm is the same on all levels.
+const storm = k => isE() ? { n: 6 + k, every: 2.5 - 0.1 * k } : { n: 8 + k, every: 2.0 - 0.1 * k };
+const OPTV = {
+  name: "Seed Storm, enrage", key: "V", len: ENRAGE_AT + 15, phase: 4,
+  pitch: "Proposal for the Phase 4 enrage. The storm thickens every 24 s loop: one more seed per ring and rings 0.1 s sooner, up to 12 seeds every 1.6 s at loop 5. At 2:00 into Phase 4 comes Last Storm: 14-seed rings every 0.6 s and a 4-arm spiral, which wipes the party in seconds (slower on Easy).",
+  rules: [
+    ["Loops 1–5", "Loop 1: 8 seeds every 2.0 s. Loop 2: 9 / 1.9 s. Loop 3: 10 / 1.8 s. Loop 4: 11 / 1.7 s. Loop 5: 12 / 1.6 s."],
+    ["2:00", "Last Storm (hard enrage), with a 3 s banner first. Rings of 14 seeds every 0.6 s, plus a 4-arm spiral. Easy: 12 seeds every 0.8 s and a 3-arm spiral."],
+    ["Timing", "Phase 4 HP gets tuned so a normal party kills her in about 75–90 s, so most fights end in loop 4."],
+    ["Jump", "Use the Loop / Last Storm buttons to skip ahead."],
+  ],
+  build: () => {
+    const ev = [{ at: 0, label: "Loop 1", fn: () => {
+      W.noPunish = true; W.storm = storm(0); W.sp1 = spiral(-1, 2, 8 * DEG, 4.5, 0.22, 9, 7);
+      const e = { on: true, acc: 2.5, k: 0 };
+      e.update = dt => { e.acc += dt; if (e.acc < W.storm.every) return; e.acc -= W.storm.every; e.k++; seedRing(W.storm.n, rnd(0, TAU), e.k % 2 ? 1.6 : 2.4); };
+      W.emit.push(e);
+    } }];
+    for (let k = 0; k * 24 < ENRAGE_AT; k++) {
+      const t = k * 24;
+      if (k) ev.push({ at: t, label: `Loop ${k + 1}`, fn: () => { W.storm = storm(k); W.banner = { s: `The storm thickens: ${W.storm.n} seeds`, until: W.t + 1.5 }; } });
+      ev.push({ at: t + 6, label: "", fn: () => podsOnFar({ solo: 1 }) });
+      ev.push({ at: t + 12, label: "", fn: () => rootRing(3.5) });
+      ev.push({ at: t + 18, label: "", fn: () => podsOnFar({ solo: 1 }) });
+    }
+    ev.push({ at: ENRAGE_AT - 3, label: "", fn: () => toll("LAST STORM", 3) });
+    ev.push({ at: ENRAGE_AT, label: "Last Storm", fn: () => {
+      // Easy (accepted 31 Oct): fewer, slower seeds and a 3-arm spiral, so it downs a player in about twice the time
+      const e = EASY_STORM;
+      W.storm = isE() ? { n: e.n, every: e.every } : { n: 14, every: 0.6 }; if (W.sp1) W.sp1.on = false;
+      W.sp1 = isE() ? spiral(-1, e.arms, 10 * DEG, e.v, e.rate, 9, 7) : spiral(-1, 4, 12 * DEG, 5, 0.15, 9, 7);
+    } });
+    return ev.sort((a, b) => a.at - b.at);
+  },
+};
+
+/* ---------- U: Orbiting Choir ---------- */
+// Three choir bells orbit at 8 m (15°/s) and each fires a 10-petal ring every 1.8 s, staggered. The rings start
+// among the players instead of at her, so there is no single safe distance.
+const OPTU = {
+  name: "Orbiting Choir", key: "U", len: 24, phase: 4,
+  pitch: "Three choir bells orbit her at 8 m, each firing a 12-petal ring every 1.5 s, one after another. The rings start out among the players, not at her, so there's no safe distance. Feet pods and Pruning Arc keep melee busy.",
+  rules: [
+    ["Melee", "Rings from bells 8 m out reach her side within a second or two. Feet pods land at 6 and 18 s, and Pruning Arc at 12 s."],
+    ["Ranged", "The bells pass right through the outer ring, and their rings spread to the wall."],
+    ["Solo / 8", "The same bells for everyone. At 8 players, bodies crowd the gaps between ring petals."],
+    ["Enrage", "None yet. Proposal: the orbit tightens 1 m every loop."],
+  ],
+  events: [
+    { at: 0, label: "Choir", fn: () => {
+      W.noPunish = true; const base = rnd(0, TAU);
+      W.props = [0, 1, 2].map(i => ({ a: base + i * TAU / 3, x: 0, y: 0, acc: i * 0.6 }));
+      const e = { on: true };
+      e.update = dt => {
+        for (const pr of W.props) {
+          pr.a += 15 * DEG * dt; pr.x = Math.cos(pr.a) * 8; pr.y = Math.sin(pr.a) * 8; pr.acc += dt;
+          if (pr.acc >= 1.5) { pr.acc -= 1.5; petalRing(pr.x, pr.y, 12, 4.5, rnd(0, TAU), 0.7); }
+        }
+      };
+      W.emit.push(e);
+    } },
+    { at: 6, label: "Feet pod", fn: () => pod(null, { x: 0, y: 0, r: 3.0 }) },
+    { at: 12, label: "Arc", fn: () => pruningArc() },
+    { at: 18, label: "Feet pod", fn: () => pod(null, { x: 0, y: 0, r: 3.0 }) },
+  ],
+};
+/* ================= Full fight: the four picked phases back to back ================= */
+// In the game each phase ends on an HP threshold. Here each runs one loop, then a 1.5 s harmless transition
+// (bullets and warnings clear, the banner names the next phase) before the next one starts.
+const FULL = [["Spiral Bloom", OPTE, 30], ["Two-Colour Choir", OPTG, 21], ["Hollow Bloom", OPTJ, 24], ["Seed Storm", OPTT, 24]];
+const TRANS = 1.5;
+function phaseStart(n, name) {
+  return () => {
+    W.emit.forEach(e => e.on = false); W.haz = []; W.bullets = []; W.marks = []; W.later = [];
+    clearExtras(); W.tOff = W.t + TRANS; W.noPunish = true; W.sp1 = null; W.sp2 = null;
+    W.players.forEach(p => { p.colour = p.id % 2 ? "cobalt" : "brass"; p.nextColour = null; });
+    W.banner = { s: `Phase ${n}: ${name}`, until: W.t + TRANS };
+  };
+}
+const OPTZ = {
+  name: "Sylvara, all four phases", key: "Z", len: FULL.reduce((s, f) => s + f[2] + TRANS, 0), phase: 0,
+  pitch: "The whole fight as picked, back to back: Phase 1 Spiral Bloom, Phase 2 Two-Colour Choir, Phase 3 Hollow Bloom (the mask splits, second form) and Phase 4 Seed Storm. No punish windows. A short harmless transition between phases.",
+  rules: [
+    ["Phase 1", "Spiral Bloom, 30 s: the petal spiral, seed pods, waterfall jets and the front-and-back Pruning Arc."],
+    ["Phase 2", "Two-Colour Choir, 21 s: brass and cobalt arms and lanes. Only your colour hurts, and each toll swaps it."],
+    ["Phase 3", "Hollow Bloom, 24 s: the mask splits. A 4-arm spiral and two waves of Choir Buds to cut."],
+    ["Phase 4", "Seed Storm, 24 s: rings of big seeds that burst into petals, over a slow spiral."],
+    ["Level", "Easy and Hard (top bar), accepted 31 Oct, with a softer Last Storm on Easy. Hard adds one mechanic per phase: every pod doubled, a double toll burst, one more bud per wave, 10-petal seed bursts. Easy gives longer warnings and fewer bullets. Damage x0.6 / x1.3."],
+  ],
+  build: () => {
+    const ev = []; let t = 0;
+    FULL.forEach(([name, o, len], i) => {
+      ev.push({ at: t, label: `P${i + 1}`, fn: phaseStart(i + 1, name) });
+      (o.build ? o.build() : o.events).forEach(e => ev.push({ at: t + TRANS + e.at, label: "", fn: e.fn }));
+      t += len + TRANS;
+    });
+    return ev.sort((a, b) => a.at - b.at);
+  },
+};
+const OPTS = { A: OPTA, B: OPTB, C: OPTC, D: OPTD, E: OPTE, F: OPTF, G: OPTG, H: OPTH, I: OPTI, J: OPTJ, K: OPTK, L: OPTL, M: OPTM, N: OPTN, O: OPTO, P: OPTP, Q: OPTQ, R: OPTR, S: OPTS2, T: OPTT, U: OPTU, V: OPTV, Z: OPTZ };
+const loopLen = () => OPTS[S.opt].len || 30;
+const events = () => { const o = OPTS[S.opt]; return o.build ? (W.cEv ||= o.build()) : o.events; };
+
+/* ---------- AI (bots and autopilot) ---------- */
+const DIRS = Array.from({ length: 16 }, (_, i) => ({ x: Math.cos(i * TAU / 16), y: Math.sin(i * TAU / 16) })).concat([{ x: 0, y: 0 }]);
+function danger(p, x, y, vx, vy) {
+  let s = 0;
+  for (const b of W.bullets) {
+    if (b.owner === p || (b.col && b.col !== p.colour && !(p.nextColour && b.col === p.nextColour))) continue;
+    if (Math.abs(b.x - x) > 5 || Math.abs(b.y - y) > 5) continue;
+    for (const k of [0.12, 0.3, 0.55]) {
+      const bx = b.x + b.vx * k, by = b.y + b.vy * k;
+      if (b.clip && hyp(bx, by) > R) continue;
+      const d = hyp(x + vx * k - bx, y + vy * k - by);
+      if (d < b.r + PR + 0.3) s += 1 / k;
+    }
+  }
+  for (const z of W.zones) if (W.t > z.activeAt - 1.5 && inZone(z, x + vx * 0.4, y + vy * 0.4, PR + 0.3)) s += 8;
+  for (const m of W.marks) if (m.kind === "jet") {
+    const nx = x + vx * 0.4, ny = y + vy * 0.4, rel = angDiff(Math.atan2(ny, nx), m.start) * m.dir;
+    if (rel > -0.1 && rel < m.span + 0.1) s += 3;
+  }
+  for (const h of W.haz) {
+    if (h.done) continue; const left = h.res - W.t;
+    if (left < 1.8 && inside(h, x + vx * 0.4, y + vy * 0.4, PR + 0.35)) s += 6 * (2.2 - left);
+  }
+  return s;
+}
+function think(p, speed) {
+  if (S.opt === "A" || S.opt === "E") p.homeA += (W.sp1 && W.sp1.on ? W.sp1.dir : 0) * 15 * Math.PI / 180 / 60;
+  let hx = Math.cos(p.homeA) * p.homeR, hy = Math.sin(p.homeA) * p.homeR;
+  const ov = W.aiHome && W.aiHome(p); if (ov) { hx = ov.x; hy = ov.y; }
+  const cue = W.cue && !W.cue.done && W.t >= W.cue.start - 0.15 && W.t < W.cue.end ? W.cue.kind : null;
+  if (cue === "HUSH") { p.mvx = 0; p.mvy = 0; return { x: 0, y: 0, sprint: false }; }
+  let best = null, bs = Infinity;
+  for (const d of DIRS) {
+    const vx = d.x * speed, vy = d.y * speed, nx = p.x + vx * 0.4, ny = p.y + vy * 0.4;
+    let sc = danger(p, p.x, p.y, vx, vy) * 10 + hyp(nx - hx, ny - hy) * 0.12;
+    if (hyp(nx, ny) > R - PR - 0.2) sc += 30;
+    if (d.x === p.mvx && d.y === p.mvy) sc -= 0.05;
+    if (cue === "CHORUS" && !d.x && !d.y) sc += 50;
+    if (sc < bs) { bs = sc; best = d; }
+  }
+  p.mvx = best.x; p.mvy = best.y;
+  return { x: best.x, y: best.y, sprint: bs > 5 && p.st > 40 };
+}
+
+/* ---------- input ---------- */
+const keys = new Set(); let touch = null, wantDash = false;
+addEventListener("keydown", e => {
+  if (e.target.closest && e.target.closest("input,textarea,select")) return;
+  const k = e.key.toLowerCase();
+  if (["arrowup", "arrowdown", "arrowleft", "arrowright", " "].includes(k)) e.preventDefault();
+  if (k === " ") { wantDash = true; return; }
+  if (k === "p") { setPause(!S.paused); return; }
+  if (k === "r") { restart(); return; }
+  if ("123456789".includes(k) && k.length === 1) { setOpt("ABCDEFGHI"["123456789".indexOf(k)]); return; }
+  keys.add(k);
+  if (["w", "a", "s", "d", "arrowup", "arrowdown", "arrowleft", "arrowright"].includes(k) && active.auto) setAuto(false);
+});
+addEventListener("keyup", e => keys.delete(e.key.toLowerCase()));
+addEventListener("blur", () => keys.clear());
+/* Each arena is a view with its own world; the shared step/draw code runs against whichever view use() selects. */
+const views = [0, 1].map(i => {
+  const el = document.getElementById("view" + i), c = el.querySelector("canvas");
+  return { i, el, cv: c, ctx: c.getContext("2d"), opt: i ? "B" : "A", auto: true, W: null, px: 1, cx0: 0, cy0: 0, leaf: null, acc: 0 };
+});
+let active = views[0];
+const endTouch = e => {
+  if (!touch || e.pointerId !== touch.id) return;
+  if (performance.now() - touch.t0 < 220 && hyp(touch.x - touch.x0, touch.y - touch.y0) < 12) wantDash = true;
+  touch = null;
+};
+views.forEach(v => {
+  const c = v.cv;
+  c.addEventListener("contextmenu", e => e.preventDefault());
+  c.addEventListener("pointerdown", e => {
+    if (active !== v) { active = v; renderPanel(); }
+    if (e.pointerType === "mouse") { if (e.button === 2) wantDash = true; return; }
+    touch = { id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, t0: performance.now() };
+    c.setPointerCapture(e.pointerId); if (active.auto) setAuto(false);
+  });
+  c.addEventListener("pointermove", e => { if (touch && e.pointerId === touch.id) { touch.x = e.clientX; touch.y = e.clientY; } });
+  c.addEventListener("pointerup", endTouch); c.addEventListener("pointercancel", endTouch);
+});
+function inputDir() {
+  let x = 0, y = 0;
+  if (keys.has("w") || keys.has("arrowup")) y += 1;
+  if (keys.has("s") || keys.has("arrowdown")) y -= 1;
+  if (keys.has("a") || keys.has("arrowleft")) x -= 1;
+  if (keys.has("d") || keys.has("arrowright")) x += 1;
+  if (touch) { const dx = touch.x - touch.x0, dy = -(touch.y - touch.y0); if (hyp(dx, dy) > 10) { x = dx; y = dy; } }
+  const m = hyp(x, y); return m ? { x: x / m, y: y / m, sprint: keys.has("shift") } : { x: 0, y: 0, sprint: false };
+}
+
+/* ---------- step ---------- */
+const DT = 1 / 60;
+function step() {
+  const ev = events();
+  while (W.ev < ev.length && W.t >= ev[W.ev].at) ev[W.ev++].fn();
+  W.later = W.later.filter(l => { if (W.t >= l.at) { l.fn(); return false; } return true; });
+  W.emit = W.emit.filter(e => { if (e.on) e.update(DT); return e.on; });
+
+  for (const p of W.players) {
+    const ai = !p.local || S.auto;
+    const d = ai ? think(p, S.walk) : inputDir();
+    const t = W.t;
+    let dash = p.local && !S.auto && wantDash;
+    if (dash && p.st >= 30 && p.dashT <= 0) { p.st -= 30; p.lastUse = t; p.dashT = 0.2; if (d.x || d.y) { p.dx = d.x; p.dy = d.y; } }
+    let sp = S.walk * (W.seed && W.seed.h === p ? 0.75 : 1);
+    if (d.sprint && (d.x || d.y) && p.st > 0) { sp = 9; p.st -= 25 * DT; p.lastUse = t; }
+    if (p.dashT > 0) { p.dashT -= DT; p.x += p.dx * 15 * DT; p.y += p.dy * 15 * DT; }
+    else { p.x += d.x * sp * DT; p.y += d.y * sp * DT; if (d.x || d.y) { p.dx = d.x; p.dy = d.y; } }
+    if (t - p.lastUse > 0.75) p.st = Math.min(100, p.st + 20 * DT);
+    p.st = Math.max(0, p.st);
+    const r = hyp(p.x, p.y);
+    if (r > R - PR) { p.x *= (R - PR) / r; p.y *= (R - PR) / r; }
+    if (r < BOSS_R + PR && r > 0) { p.x *= (BOSS_R + PR) / r; p.y *= (BOSS_R + PR) / r; }
+    if (p.flash > 0) p.flash -= DT;
+  }
+
+  for (const h of W.haz) {
+    if (h.track && W.t < h.track.until) { h.cx = h.track.p.x; h.cy = h.track.p.y; }
+    if (h.trackCone && W.t < h.trackCone.until) h.ang = Math.atan2(h.trackCone.p.y, h.trackCone.p.x);
+    if (h.mirror && !h.done) h.ang = h.mirror.ang + Math.PI;
+    if (!h.done && W.t >= h.res) {
+      h.done = true; h.flashUntil = W.t + 0.25;
+      for (const p of W.players) if (inside(h, p.x, p.y)) hurt(p, h.dmg);
+      if (h.after) h.after();
+    }
+  }
+  W.haz = W.haz.filter(h => !h.done || W.t < h.flashUntil + (h.gaps ? 0.6 : 0));
+
+  for (const b of W.bullets) {
+    b.x += b.vx * DT; b.y += b.vy * DT; b.age += DT;
+    if (b.clip && hyp(b.x, b.y) > R) continue;
+    for (const p of W.players) {
+      if ((b.col && b.col !== p.colour) || b.owner === p) continue;
+      if (hyp(p.x - b.x, p.y - b.y) < b.r + PR) { hurt(p, b.dmg); b.dead = true; break; }
+    }
+  }
+  for (const b of W.bullets) if (b.split && !b.dead && b.age >= b.life) { b.dead = true; b.split(b); } // seeds burst when their fuse ends
+  W.bullets = W.bullets.filter(b => !b.dead && b.age < b.life && (b.clip || hyp(b.x, b.y) < R + 0.6));
+  W.marks = W.marks.filter(m => W.t < m.until);
+  W.texts = W.texts.filter(x => (x.t -= DT) > 0);
+  if (W.banner && W.t > W.banner.until) W.banner = null;
+
+  W.t += DT;
+  if (W.t >= loopLen()) resetLoop();
+}
+
+/* ---------- draw ---------- */
+let cv = null, ctx = null, px = 1, cx0 = 0, cy0 = 0, leaf = null;
+function use(v) {
+  V = v; W = v.W; S.opt = v.opt; S.auto = v.auto || v !== active;
+  cv = v.cv; ctx = v.ctx; px = v.px; cx0 = v.cx0; cy0 = v.cy0; leaf = v.leaf;
+}
+let V = null;
+function size(v) {
+  use(v);
+  const r = cv.getBoundingClientRect(), dpr = Math.min(devicePixelRatio || 1, 2);
+  if (!r.width) return;
+  cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+  px = (cv.width / 2 - 4 * dpr) / R; cx0 = cv.width / 2; cy0 = cv.height / 2;
+  const pc = document.createElement("canvas"); pc.width = pc.height = Math.round(18 * dpr);
+  const g = pc.getContext("2d"); g.strokeStyle = COL.coral; g.globalAlpha = 0.55; g.lineWidth = dpr;
+  g.beginPath(); g.ellipse(pc.width * 0.5, pc.height * 0.5, pc.width * 0.28, pc.height * 0.12, -0.7, 0, TAU); g.stroke();
+  leaf = ctx.createPattern(pc, "repeat");
+  Object.assign(v, { px, cx0, cy0, leaf });
+}
+const X = x => cx0 + x * px, Y = y => cy0 - y * px;
+function shapePath(h, scale = 1) {
+  ctx.beginPath();
+  if (h.kind === "disc") ctx.arc(X(h.cx), Y(h.cy), Math.max(0.01, h.r * scale) * px, 0, TAU);
+  else if (h.kind === "cone") { ctx.moveTo(X(h.cx), Y(h.cy)); ctx.arc(X(h.cx), Y(h.cy), h.reach * scale * px, -(h.ang + h.half), -(h.ang - h.half)); ctx.closePath(); }
+  else if (h.kind === "lane") {
+    const c = Math.cos(h.ang), s = Math.sin(h.ang), L = h.len * scale, w = h.w / 2;
+    const pts = [[0, -w], [L, -w], [L, w], [0, w]].map(([a, b]) => [h.cx + c * a - s * b, h.cy + s * a + c * b]);
+    ctx.moveTo(X(pts[0][0]), Y(pts[0][1])); pts.slice(1).forEach(q => ctx.lineTo(X(q[0]), Y(q[1]))); ctx.closePath();
+  }
+}
+function draw() {
+  const dpr = cv.width / cv.getBoundingClientRect().width || 1;
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  // floor
+  const g = ctx.createRadialGradient(cx0, cy0, 0, cx0, cy0, R * px);
+  g.addColorStop(0, "#1b302b"); g.addColorStop(1, "#122220");
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx0, cy0, R * px, 0, TAU); ctx.fill();
+  ctx.strokeStyle = "rgba(63,214,196,.10)"; ctx.lineWidth = dpr;
+  [4.5, 9].forEach(r => { ctx.beginPath(); ctx.arc(cx0, cy0, r * px, 0, TAU); ctx.stroke(); });
+  for (let i = 0; i < 12; i++) { const a = i * TAU / 12; ctx.beginPath(); ctx.moveTo(X(Math.cos(a) * 4.5), Y(Math.sin(a) * 4.5)); ctx.lineTo(X(Math.cos(a) * 9), Y(Math.sin(a) * 9)); ctx.stroke(); }
+  ctx.strokeStyle = "#2d5148"; ctx.lineWidth = 4 * dpr; ctx.beginPath(); ctx.arc(cx0, cy0, R * px, 0, TAU); ctx.stroke();
+  for (let i = 0; i < 6; i++) { // waterfall curtains on the rim
+    const a = i * TAU / 6 + 0.26; ctx.strokeStyle = "rgba(160,220,230,.35)"; ctx.lineWidth = 6 * dpr;
+    ctx.beginPath(); ctx.arc(cx0, cy0, (R + 0.05) * px, -a - 0.1, -a + 0.1); ctx.stroke();
+  }
+  const warning = W.haz.some(h => !h.done) || W.marks.length;
+  if (warning) { ctx.fillStyle = "rgba(0,0,0,.16)"; ctx.beginPath(); ctx.arc(cx0, cy0, R * px, 0, TAU); ctx.fill(); }
+
+  ctx.save(); ctx.beginPath(); ctx.arc(cx0, cy0, R * px, 0, TAU); ctx.clip();
+  // telegraphs
+  for (const h of W.haz) {
+    if (h.done) {
+      if (W.t < h.flashUntil) { shapePath(h); ctx.fillStyle = `rgba(255,181,71,${0.55 * (h.flashUntil - W.t) / 0.25})`; ctx.fill(); }
+    } else {
+      const p = Math.min(1, (W.t - h.t0) / (h.res - h.t0));
+      shapePath(h); ctx.fillStyle = "rgba(255,122,92,.07)"; ctx.fill();
+      ctx.save(); ctx.globalAlpha = 0.5; ctx.fillStyle = leaf; ctx.fill(); ctx.restore();
+      shapePath(h, p); ctx.fillStyle = "rgba(255,122,92,.26)"; ctx.fill();
+      shapePath(h); ctx.strokeStyle = COL.coral; ctx.lineWidth = 2 * dpr; ctx.stroke();
+    }
+    if (h.gaps) { // friendly: thin dotted turquoise ticks along each safe gap
+      ctx.save(); ctx.setLineDash([3 * dpr, 4 * dpr]); ctx.strokeStyle = COL.jade; ctx.lineWidth = 1.5 * dpr;
+      for (let i = 0; i < h.gaps.n; i++) {
+        const a = h.gaps.off + (i + 0.5) * TAU / h.gaps.n;
+        ctx.beginPath(); ctx.moveTo(X(h.cx + Math.cos(a) * (h.r + 0.3)), Y(h.cy + Math.sin(a) * (h.r + 0.3)));
+        ctx.lineTo(X(h.cx + Math.cos(a) * (h.r + 2.2)), Y(h.cy + Math.sin(a) * (h.r + 2.2))); ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+  for (const m of W.marks) if (m.kind === "jet") { // incoming waterfall jet: start line, swept wedge, sweep arrow
+    const end = m.start + m.dir * m.span, a0 = Math.min(m.start, end), a1 = Math.max(m.start, end);
+    ctx.beginPath(); ctx.moveTo(cx0, cy0); ctx.arc(cx0, cy0, R * px, -a1, -a0); ctx.closePath();
+    ctx.fillStyle = "rgba(255,122,92,.10)"; ctx.fill();
+    ctx.save(); ctx.setLineDash([5 * dpr, 4 * dpr]); ctx.strokeStyle = COL.coral; ctx.lineWidth = 2 * dpr;
+    ctx.beginPath(); ctx.moveTo(X(Math.cos(m.start) * BOSS_R), Y(Math.sin(m.start) * BOSS_R)); ctx.lineTo(X(Math.cos(m.start) * R), Y(Math.sin(m.start) * R)); ctx.stroke();
+    ctx.restore();
+    const ra = R - 0.7; ctx.strokeStyle = COL.amber; ctx.lineWidth = 3 * dpr;
+    ctx.beginPath(); ctx.arc(cx0, cy0, ra * px, -a1, -a0); ctx.stroke();
+    const ah = end, tx = -Math.sin(ah) * m.dir, ty = Math.cos(ah) * m.dir, ex = Math.cos(ah) * ra, ey = Math.sin(ah) * ra;
+    ctx.fillStyle = COL.amber; ctx.beginPath(); ctx.moveTo(X(ex + tx * 0.8), Y(ey + ty * 0.8));
+    ctx.lineTo(X(ex - Math.cos(ah) * 0.5), Y(ey - Math.sin(ah) * 0.5)); ctx.lineTo(X(ex + Math.cos(ah) * 0.5), Y(ey + Math.sin(ah) * 0.5)); ctx.fill();
+  }
+  for (const m of W.marks) if (m.kind === "row") { // incoming row preview at the wall, gap bracketed
+    const d = { x: -Math.cos(m.fromAng), y: -Math.sin(m.fromAng) }, pp = { x: -d.y, y: d.x };
+    const bx = Math.cos(m.fromAng) * 12.6, by = Math.sin(m.fromAng) * 12.6;
+    ctx.save(); ctx.setLineDash([5 * dpr, 5 * dpr]); ctx.strokeStyle = COL.coral; ctx.lineWidth = 2 * dpr;
+    ctx.beginPath(); ctx.moveTo(X(bx + pp.x * -14), Y(by + pp.y * -14)); ctx.lineTo(X(bx + pp.x * (m.gap - m.gapW / 2)), Y(by + pp.y * (m.gap - m.gapW / 2)));
+    ctx.moveTo(X(bx + pp.x * (m.gap + m.gapW / 2)), Y(by + pp.y * (m.gap + m.gapW / 2))); ctx.lineTo(X(bx + pp.x * 14), Y(by + pp.y * 14)); ctx.stroke();
+    ctx.strokeStyle = COL.jade; ctx.setLineDash([2 * dpr, 3 * dpr]); ctx.lineWidth = 1.5 * dpr;
+    for (const s of [m.gap - m.gapW / 2, m.gap + m.gapW / 2]) { ctx.beginPath(); ctx.moveTo(X(bx + pp.x * s), Y(by + pp.y * s)); ctx.lineTo(X(bx + pp.x * s + d.x * 2.5), Y(by + pp.y * s + d.y * 2.5)); ctx.stroke(); }
+    ctx.restore();
+  }
+  // Lasting floor zones: thorns or collapsed floor once active; coral outline with an outward fill while warning
+  const zonePath = (z, rOut) => {
+    ctx.beginPath();
+    if (z.a0 === null) { ctx.arc(cx0, cy0, Math.min(rOut, R) * px, 0, TAU); ctx.arc(cx0, cy0, z.rIn * px, 0, TAU, true); }
+    else { ctx.arc(cx0, cy0, Math.min(rOut, R) * px, -z.a0, -(z.a0 + z.span), true); ctx.arc(cx0, cy0, z.rIn * px, -(z.a0 + z.span), -z.a0, false); ctx.closePath(); }
+  };
+  for (const z of W.zones) {
+    if (W.t >= z.activeAt) { zonePath(z, z.rOut); ctx.fillStyle = "rgba(40,22,14,.88)"; ctx.fill(); ctx.save(); ctx.globalAlpha = 0.6; ctx.fillStyle = leaf; ctx.fill(); ctx.restore(); }
+    else {
+      const p = (W.t - z.warnAt) / (z.activeAt - z.warnAt);
+      zonePath(z, z.rOut); ctx.fillStyle = "rgba(255,122,92,.08)"; ctx.fill();
+      zonePath(z, z.rIn + (Math.min(z.rOut, R) - z.rIn) * p); ctx.fillStyle = "rgba(255,122,92,.28)"; ctx.fill();
+      zonePath(z, z.rOut); ctx.strokeStyle = COL.coral; ctx.lineWidth = 2 * dpr; ctx.stroke();
+    }
+  }
+  if (W.wedges) { // Rootfall order numbers on wedges still standing
+    ctx.fillStyle = "rgba(255,210,196,.85)"; ctx.font = `${14 * dpr}px "JetBrains Mono", monospace`; ctx.textAlign = "center";
+    for (const w of W.wedges) { const a = w.a0 + TAU / 16; if (!W.zones.some(z => z.a0 === w.a0 && W.t >= z.activeAt)) ctx.fillText(w.n <= 6 ? String(w.n) : "safe", X(Math.cos(a) * 10), Y(Math.sin(a) * 10)); }
+  }
+  ctx.restore();
+  if (W.bloomT !== null && W.bloomT !== undefined) {
+    ctx.fillStyle = W.bloomT < 8 ? COL.coral : COL.amber; ctx.font = `${20 * dpr}px "JetBrains Mono", monospace`; ctx.textAlign = "center";
+    ctx.fillText(`BLOOM ${W.bloomT.toFixed(1)}`, cx0, cy0 - (R - 1.6) * px);
+  }
+
+  // Bell emitters (Requiem Bells, Orbiting Choir): brass bell with a coral rim, since they fire hostile bullets
+  for (const pr of W.props) {
+    ctx.fillStyle = COL.brass; ctx.beginPath(); ctx.arc(X(pr.x), Y(pr.y), 0.7 * px, 0, TAU); ctx.fill();
+    ctx.strokeStyle = COL.coral; ctx.lineWidth = 2 * dpr; ctx.stroke();
+    ctx.fillStyle = "#3b2a10"; ctx.beginPath(); ctx.arc(X(pr.x), Y(pr.y), 0.25 * px, 0, TAU); ctx.fill();
+  }
+  // Choir Buds: bulb, cut range (friendly, dotted), HP arc, bloom timer
+  for (const b of W.buds) if (b.alive) {
+    const x = X(b.x), y = Y(b.y);
+    ctx.save(); ctx.setLineDash([3 * dpr, 5 * dpr]); ctx.strokeStyle = "rgba(63,214,196,.5)"; ctx.lineWidth = 1.2 * dpr;
+    ctx.beginPath(); ctx.arc(x, y, 3 * px, 0, TAU); ctx.stroke(); ctx.restore();
+    const age = Math.min(1, (W.t - b.born) / b.life);
+    ctx.strokeStyle = COL.coral; ctx.lineWidth = 3 * dpr; ctx.beginPath(); ctx.arc(x, y, 1.15 * px, -Math.PI / 2, -Math.PI / 2 + age * TAU); ctx.stroke();
+    ctx.fillStyle = "#5f9a62"; ctx.beginPath(); ctx.arc(x, y, 0.8 * px, 0, TAU); ctx.fill();
+    ctx.fillStyle = COL.jade; ctx.beginPath(); ctx.arc(x, y, 0.8 * px * Math.max(0, b.hp) / 100, 0, TAU); ctx.globalAlpha = 0.45; ctx.fill(); ctx.globalAlpha = 1;
+  }
+  // Seed bed (friendly target) and the seed on its carrier
+  if (W.bed) {
+    ctx.save(); ctx.setLineDash([4 * dpr, 4 * dpr]); ctx.strokeStyle = COL.jade; ctx.lineWidth = 2 * dpr;
+    ctx.beginPath(); ctx.arc(X(W.bed.x), Y(W.bed.y), 1.2 * px, 0, TAU); ctx.stroke(); ctx.restore();
+    ctx.fillStyle = COL.jade; ctx.font = `${11 * dpr}px "Atkinson Hyperlegible", sans-serif`; ctx.textAlign = "center"; ctx.fillText("BED", X(W.bed.x), Y(W.bed.y) + 4 * dpr);
+  }
+  if (W.seed) {
+    const h = W.seed.h, left = Math.max(0, W.seed.end - W.t);
+    ctx.fillStyle = COL.amber; ctx.beginPath(); ctx.arc(X(h.x), Y(h.y) - 1.1 * px, 0.35 * px, 0, TAU); ctx.fill();
+    ctx.fillStyle = "#fff"; ctx.font = `${12 * dpr}px "JetBrains Mono", monospace`; ctx.textAlign = "center";
+    ctx.fillText(left.toFixed(1), X(h.x), Y(h.y) - 1.7 * px);
+  }
+  if (W.cue && !W.cue.done && W.t >= W.cue.start) { // the 1 s judging window: tint the arena
+    ctx.fillStyle = W.cue.kind === "HUSH" ? "rgba(63,214,196,.10)" : "rgba(255,181,71,.10)";
+    ctx.beginPath(); ctx.arc(cx0, cy0, R * px, 0, TAU); ctx.fill();
+  }
+  // boss: four root legs, shrine body, mask and three chest bells
+  ctx.strokeStyle = "#6f7f73"; ctx.lineWidth = 5 * dpr; ctx.lineCap = "round";
+  for (let i = 0; i < 4; i++) { const a = Math.PI / 4 + i * Math.PI / 2; ctx.beginPath(); ctx.moveTo(X(Math.cos(a) * 0.9), Y(Math.sin(a) * 0.9)); ctx.quadraticCurveTo(X(Math.cos(a + 0.3) * 1.8), Y(Math.sin(a + 0.3) * 1.8), X(Math.cos(a) * 2.2), Y(Math.sin(a) * 2.2)); ctx.stroke(); }
+  ctx.fillStyle = W.punish ? "#4a6e66" : "#8f9a8e"; ctx.beginPath(); ctx.arc(cx0, cy0, BOSS_R * px, 0, TAU); ctx.fill();
+  if (W.punish) { ctx.strokeStyle = COL.jade; ctx.lineWidth = 3 * dpr; ctx.setLineDash([6 * dpr, 5 * dpr]); ctx.beginPath(); ctx.arc(cx0, cy0, (BOSS_R + 0.4) * px, 0, TAU); ctx.stroke(); ctx.setLineDash([]); }
+  ctx.fillStyle = "#e8e2d2"; ctx.beginPath(); ctx.ellipse(cx0, Y(0.45), 0.55 * px, 0.7 * px, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = "#55605a"; ctx.lineWidth = 1.5 * dpr; ctx.beginPath(); ctx.moveTo(cx0, Y(1.1)); ctx.lineTo(cx0, Y(-0.2)); ctx.stroke();
+  ctx.fillStyle = COL.jade; [-0.5, 0, 0.5].forEach(o => { ctx.beginPath(); ctx.arc(X(o), Y(-0.6), 0.16 * px, 0, TAU); ctx.fill(); });
+
+  // bullets: petals
+  const me = W.players[0];
+  for (const b of W.bullets) {
+    if (b.clip && hyp(b.x, b.y) > R) continue;
+    const a = Math.atan2(-b.vy, b.vx);
+    ctx.save(); ctx.translate(X(b.x), Y(b.y)); ctx.rotate(a);
+    const fill = b.col ? COL[b.col] : COL.coral;
+    ctx.globalAlpha = b.col && b.col !== me.colour ? 0.28 : 1;
+    ctx.fillStyle = fill; ctx.beginPath(); ctx.ellipse(0, 0, b.r * px * 1.25, b.r * px * 0.8, 0, 0, TAU); ctx.fill();
+    ctx.strokeStyle = b.col ? COL.coral : "#ffd2c4"; ctx.lineWidth = 1 * dpr; ctx.stroke();
+    ctx.restore();
+  }
+
+  // players
+  for (const p of W.players) {
+    const x = X(p.x), y = Y(p.y), r = PR * px;
+    if (S.opt === "C") {
+      ctx.strokeStyle = COL[p.colour]; ctx.lineWidth = 3 * dpr; ctx.beginPath(); ctx.arc(x, y, r + 3 * dpr, 0, TAU); ctx.stroke();
+      if (p.nextColour && Math.floor(W.t * 8) % 2) { ctx.strokeStyle = COL[p.nextColour]; ctx.beginPath(); ctx.arc(x, y, r + 7 * dpr, 0, TAU); ctx.stroke(); }
+    }
+    ctx.fillStyle = p.flash > 0 ? "#ff5a4a" : (p.local ? "#f2fbf8" : "#8aa3b8");
+    ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+    if (p.local) { ctx.strokeStyle = COL.jade; ctx.lineWidth = 2 * dpr; ctx.setLineDash([3 * dpr, 3 * dpr]); ctx.beginPath(); ctx.arc(x, y, r + 8 * dpr, 0, TAU); ctx.stroke(); ctx.setLineDash([]); }
+  }
+  // floating text
+  ctx.textAlign = "center";
+  for (const t of W.texts) {
+    ctx.globalAlpha = Math.min(1, t.t * 2); ctx.fillStyle = t.big ? COL.amber : "#ffd2c4";
+    ctx.font = `${(t.big ? 15 : 12) * dpr}px "JetBrains Mono", monospace`;
+    ctx.fillText(t.s, X(t.x), Y(t.y) - (0.9 - t.t) * 30 * dpr - 12 * dpr);
+  }
+  ctx.globalAlpha = 1;
+  if (W.banner || W.punish) {
+    const s = W.punish ? "PUNISH WINDOW" : W.banner.s;
+    ctx.font = `${17 * dpr}px Marcellus, Georgia, serif`;
+    ctx.fillStyle = W.punish ? COL.jade : COL.amber;
+    ctx.fillText(s, cx0, cy0 - 3.4 * px);
+  }
+  if (S.paused) { ctx.fillStyle = "rgba(0,0,0,.45)"; ctx.beginPath(); ctx.arc(cx0, cy0, R * px, 0, TAU); ctx.fill(); ctx.fillStyle = "#fff"; ctx.font = `${22 * dpr}px Marcellus, Georgia, serif`; ctx.fillText("Paused", cx0, cy0 + 7 * dpr); }
+}
+
+/* ---------- side panel ---------- */
+const tl = document.getElementById("tl"), tctx = tl.getContext("2d");
+function drawTL() {
+  const dpr = Math.min(devicePixelRatio || 1, 2), r = tl.getBoundingClientRect();
+  if (!r.width) return;
+  tl.width = Math.round(r.width * dpr); tl.height = Math.round(r.height * dpr);
+}
+function renderTL() {
+  const dpr = tl.width / (tl.getBoundingClientRect().width || 1), w = tl.width, h = tl.height, pad = 8 * dpr;
+  const LEN = loopLen(), x = t => pad + (w - 2 * pad) * t / LEN;
+  tctx.clearRect(0, 0, w, h);
+  const ev = events();
+  const pun = ev.find(e => e.label === "Punish");
+  if (pun) { tctx.fillStyle = "rgba(63,214,196,.16)"; tctx.fillRect(x(pun.at), 34 * dpr, x(Math.min(LEN, pun.at + 3.5)) - x(pun.at), 18 * dpr); }
+  tctx.strokeStyle = "#2d5148"; tctx.lineWidth = 2 * dpr; tctx.beginPath(); tctx.moveTo(x(0), 43 * dpr); tctx.lineTo(x(LEN), 43 * dpr); tctx.stroke();
+  tctx.font = `${10.5 * dpr}px "Atkinson Hyperlegible", sans-serif`; tctx.textAlign = "center";
+  let row = 0;
+  ev.filter(e => e.label).forEach(e => {
+    const xx = x(e.at), up = row++ % 2 === 0;
+    tctx.strokeStyle = e.label === "Punish" ? COL.jade : (e.label === "Toll" ? COL.amber : COL.coral);
+    tctx.beginPath(); tctx.moveTo(xx, 36 * dpr); tctx.lineTo(xx, 50 * dpr); tctx.stroke();
+    tctx.fillStyle = "#c9d8d2"; tctx.fillText(e.label, Math.min(Math.max(xx, 26 * dpr), w - 26 * dpr), up ? 26 * dpr : 68 * dpr);
+  });
+  tctx.fillStyle = "#8fa8a0"; tctx.textAlign = "left"; tctx.fillText("0 s", x(0), 86 * dpr); tctx.textAlign = "right"; tctx.fillText(LEN + " s", x(LEN), 86 * dpr);
+  tctx.fillStyle = "#fff"; tctx.fillRect(x(W.t) - dpr, 32 * dpr, 2 * dpr, 22 * dpr);
+  const cur = [...ev].reverse().find(e => e.label && e.at <= W.t);
+  document.querySelectorAll("[data-jump]").forEach(b => {
+    const n = +b.dataset.jump, t0 = FULL.slice(0, n - 1).reduce((s, f) => s + f[2] + TRANS, 0);
+    b.setAttribute("aria-pressed", S.opt === "Z" && W.t >= t0 && W.t < t0 + FULL[n - 1][2] + TRANS);
+  });
+  document.getElementById("now").textContent =`${W.t.toFixed(1).padStart(4, " ")} s · loop ${W.loop}${cur ? " · " + cur.label : ""}${S.auto ? " · autopilot" : ""}`;
+}
+function renderPanel() {
+  const o = OPTS[active.opt];
+  views.forEach(v => { v.el.querySelector(".vname").textContent = OPTS[v.opt].name; v.el.classList.toggle("active", v === active); });
+  document.getElementById("main").classList.toggle("compare", S.mode === "compare");
+  document.querySelectorAll("[data-mode]").forEach(b => b.setAttribute("aria-pressed", b.dataset.mode === S.mode));
+  document.getElementById("auto").setAttribute("aria-pressed", active.auto);
+  document.getElementById("oname").textContent = o.name;
+  document.getElementById("opitch").textContent = o.pitch;
+  document.getElementById("orules").innerHTML = o.rules.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+  document.querySelectorAll("[data-opt]").forEach(b => b.setAttribute("aria-pressed", b.dataset.opt === active.opt));
+  document.querySelectorAll("[data-n]").forEach(b => b.setAttribute("aria-pressed", +b.dataset.n === S.N));
+  document.querySelectorAll("[data-w]").forEach(b => b.setAttribute("aria-pressed", +b.dataset.w === S.walk));
+  document.querySelectorAll("[data-diff]").forEach(b => b.setAttribute("aria-pressed", b.dataset.diff === S.diff));
+}
+function renderResults() {
+  document.getElementById("res").innerHTML = "ZEGJTV".split("").map(k => {
+    const r = results[k];
+    return `<tr><td>${OPTS[k].name}</td><td class="n">${r ? r.dmg : "–"}</td><td class="n">${r ? r.hits : "–"}</td><td class="n">${r ? r.downs : "–"}</td></tr>`;
+  }).join("");
+}
+function renderHud(v) {
+  const p = W.players[0], q = s => v.el.querySelector(s);
+  q(".hpv").textContent = Math.round(p.hp);
+  q(".hpb").style.width = p.hp + "%";
+  q(".hpb").style.background = p.hp < 35 ? COL.coral : COL.jade;
+  q(".stv").textContent = Math.round(p.st);
+  q(".stb").style.width = p.st + "%";
+  q(".lpv").textContent = `${W.stats.dmg} dmg · ${W.stats.hits} hits`;
+}
+
+/* ---------- controls ---------- */
+const shown = () => S.mode === "compare" ? views : [views[0]];
+const inView = (v, fn) => { use(v); fn(); v.W = W; };
+function setOpt(k) { active.opt = k; inView(active, () => { newWorld(true); W.cEv = null; }); renderPanel(); }
+function restart() { views.forEach(v => inView(v, () => { newWorld(true); W.cEv = null; })); }
+function setAuto(on) { active.auto = on; inView(active, () => { if (!on) W.manualLoop = W.t < 1.5; }); renderPanel(); }
+function setPause(v) { S.paused = v; document.getElementById("pause").setAttribute("aria-pressed", v); }
+function setMode(m) { S.mode = m; if (m === "single") active = views[0]; renderPanel(); restart(); }
+document.querySelectorAll("[data-opt]").forEach(b => b.onclick = () => setOpt(b.dataset.opt));
+document.querySelectorAll("[data-n]").forEach(b => b.onclick = () => { S.N = +b.dataset.n; views.forEach(v => inView(v, () => newWorld(false))); renderPanel(); });
+document.querySelectorAll("[data-w]").forEach(b => b.onclick = () => { S.walk = +b.dataset.w; renderPanel(); });
+document.querySelectorAll("[data-diff]").forEach(b => b.onclick = () => { S.diff = b.dataset.diff; restart(); renderPanel(); });
+document.querySelectorAll("[data-mode]").forEach(b => b.onclick = () => setMode(b.dataset.mode));
+// Full fight: start the run at any phase. The jump lands on that phase's transition, so it starts clean.
+function jumpToPhase(n) {
+  active.opt = "Z";
+  inView(active, () => {
+    newWorld(true); W.cEv = null;
+    const t0 = FULL.slice(0, n - 1).reduce((s, f) => s + f[2] + TRANS, 0), ev = events();
+    W.t = t0; W.ev = ev.findIndex(e => e.at >= t0);
+  });
+  renderPanel();
+}
+document.querySelectorAll("[data-jump]").forEach(b => b.onclick = () => jumpToPhase(+b.dataset.jump));
+// Enrage demo: skip to a time. Earlier events still run (instantly, in order) so the storm has the right strength.
+function seekEnrage(t0) {
+  active.opt = "V";
+  inView(active, () => {
+    newWorld(true); W.cEv = null;
+    const ev = events(); W.ev = ev.findIndex(e => e.at > t0); if (W.ev < 0) W.ev = ev.length;
+    ev.slice(0, W.ev).forEach(e => { if (e.at === 0 || e.label.startsWith("Loop")) e.fn(); });
+    W.t = t0; W.banner = null;
+  });
+  renderPanel();
+}
+document.querySelectorAll("[data-seek]").forEach(b => b.onclick = () => seekEnrage(+b.dataset.seek));
+document.getElementById("auto").onclick = () => setAuto(!active.auto);
+document.getElementById("slow").onclick = e => { S.slow = !S.slow; e.currentTarget.setAttribute("aria-pressed", S.slow); };
+document.getElementById("pause").onclick = () => setPause(!S.paused);
+document.getElementById("restart").onclick = restart;
+
+/* ---------- loop ---------- */
+// #A..#D opens one option; #AB (any two letters) opens them side by side. Default: A and B side by side.
+{
+  const h = (location.hash || "").replace("#", "").toUpperCase().split("").filter(c => OPTS[c]);
+  S.mode = h.length >= 2 ? "compare" : "single";
+  views[0].opt = h[0] || "Z"; views[1].opt = h[1] || "T";
+}
+views.forEach(v => { W = null; inView(v, () => newWorld(false)); });
+renderPanel(); renderResults();
+views.forEach(v => new ResizeObserver(() => size(v)).observe(v.cv));
+new ResizeObserver(drawTL).observe(tl);
+let last = performance.now(), acc = 0;
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+function frame(now) {
+  let dt = Math.min(0.1, (now - last) / 1000); last = now;
+  const vs = shown();
+  if (!S.paused) {
+    acc += dt * (S.slow ? 0.5 : 1);
+    while (acc >= DT) { vs.forEach(v => inView(v, step)); wantDash = false; acc -= DT; }
+  }
+  vs.forEach(v => inView(v, () => { draw(); renderHud(v); }));
+  inView(active, renderTL);
+  requestAnimationFrame(frame);
+}
+if (reduce) S.slow = true, document.getElementById("slow").setAttribute("aria-pressed", "true");
+requestAnimationFrame(frame);
+window.__sylvara = { views, S, EASY_STORM, run: (v, sec) => { for (let i = 0; i < sec / DT; i++) inView(v, step); }, setOpt: k => { active = views[0]; setOpt(k); } }; // test hook
+})();
+</script>

@@ -770,6 +770,8 @@ namespace LastBell.Run
                  d.Player.Hp >= hp - 40, $"ticks +{d.World.Tick - tick}");
             yield return Wait(0.3f);
             Check("resume resumes the music beat-locked", mus && mus.Source.isPlaying && Mathf.Abs(boss.Audio.LastMusicError) < TempoTyrantAudio.ResyncTolerance, boss.Audio.StatusText);
+            // Nov 3: the music used to jump 73 times a fight (40 on normal frames, a double stutter after most tempo changes)
+            Check("music: crossfaded tempo switches, no corrections on normal frames (only after frames over 0.1 s)", boss.Audio.MusicSwaps >= 2 && boss.Audio.CalmResyncs <= 1, boss.Audio.StatusText);
         }
 
         IEnumerator DefeatAndRetry()

@@ -11,9 +11,21 @@ namespace LastBell.VFX
         static readonly Color Molten = new Color(2.4f, 0.9f, 0.25f), Slag = new Color(0.55f, 0.16f, 0.05f),
             Steam = new Color(1.6f, 1.55f, 1.45f), SteamLow = new Color(0.32f, 0.30f, 0.30f);
 
-        // Diebreaker: the hammer lands in its toothed circle. A flat brass flash and clang; no extra shockwave.
+        // LAN: on a host, each call is recorded as a boss-part effect ("CrucivarFx.<Method>") that CrucivarEncounter.
+        // ReplayNetEffect plays again on the client's replica. Record is null outside a host session (one null check).
+        // Ember (per bullet) is not recorded; FlameJet records every second call and the client plays it twice.
+        static bool NetCrucivarOn => LastBell.Run.Networking.LanFx.Record != null;
+        static void NetCrucivar(string method, params object[] args)
+        {
+            var r = LastBell.Run.Networking.LanFx.Record;
+            if (r != null) r(LastBell.Run.Networking.LanFxTarget.BossPart, "CrucivarFx." + method, args);
+        }
+        static int flameJetCalls;
+
+        // hammer landing (Anvil Quake's circle, Hard Second Press): A flat brass flash and clang; no extra shockwave.
         public void DiebreakerResolve(Vector3 centre, float radius)
         {
+            if (NetCrucivarOn) NetCrucivar("DiebreakerResolve", centre, radius);
             var c = new Vector3(centre.x, 0.06f, centre.z);
             Play(FxMeshes.Annulus(0.2f, radius), true, alphaMat, c, 0, 0.4f, (b, u) =>
             {
@@ -25,8 +37,13 @@ namespace LastBell.VFX
             CameraShake.Shake(0.34f, 0.3f);
         }
 
-        // Slag Cast: the arc of molten metal lands and splashes; the pool itself is the standing hazard's telegraph.
+        // molten splash (brand landing, tower landing, castings sinking); the pool itself is the standing hazard's telegraph.
         public void SlagSplash(Vector3 pos, float radius)
+        {
+            if (NetCrucivarOn) NetCrucivar("SlagSplash", pos, radius);
+            SlagSplashFx(pos, radius);
+        }
+        void SlagSplashFx(Vector3 pos, float radius)
         {
             var c = new Vector3(pos.x, 0.06f, pos.z);
             Play(cylinder, false, addMat, c, 0, 0.3f, (b, u) =>
@@ -38,27 +55,10 @@ namespace LastBell.VFX
             CameraShake.Shake(0.1f, 0.15f);
         }
 
-        // Pressure Release: a brief steam jet runs out through each locked sector, then clears fast.
-        public void SteamRelease(Vector3 origin, float yaw, float radius, float halfAngle)
-        {
-            Play(FxMeshes.Sector(1.2f, radius, halfAngle), true, alphaMat, origin + Vector3.up * 0.1f, yaw, 0.45f, (b, u) =>
-            {
-                b.mpb.SetFloat(PProgress, Mathf.Lerp(-0.1f, 1.15f, Ease(Mathf.Clamp01(u / 0.3f))));
-                b.mpb.SetFloat(PWidth, 0.25f); b.mpb.SetFloat(PTail, 0.6f); b.mpb.SetFloat(PDissolve, Mathf.Clamp01((u - 0.25f) / 0.75f));
-            }, 0, SteamLow, Steam, Ivory);
-            var rot = Quaternion.Euler(0, yaw, 0);
-            for (int i = 0; i < 5; i++)
-            {
-                float a = Mathf.Lerp(halfAngle, -halfAngle, i / 4f) * Mathf.Deg2Rad;
-                var d = rot * new Vector3(Mathf.Sin(a), 0, Mathf.Cos(a));
-                dust.Emit(origin + d * 1.6f + Vector3.up * 1.2f, d * 6f + Vector3.up * 0.8f, 1.6f, 0.45f, 0.4f);
-            }
-            CameraShake.Shake(0.12f, 0.2f);
-        }
-
-        // Casting Cycle: one die-stamp strip presses down, then the stamped metal cools (the strip is safe right after).
+        // a die-stamp strip presses down (the Casting Order pours), then the stamped metal cools (the strip is safe right after).
         public void StripStamp(Vector3 origin, float yaw, float length, float width)
         {
+            if (NetCrucivarOn) NetCrucivar("StripStamp", origin, yaw, length, width);
             Play(FxMeshes.Quad(-width / 2, width / 2, 0, length), true, alphaMat, origin + Vector3.up * 0.07f, yaw, 0.5f, (b, u) =>
             {
                 b.mpb.SetFloat(PProgress, Mathf.Lerp(-0.1f, 1.15f, Ease(Mathf.Clamp01(u / 0.2f))));
@@ -70,7 +70,51 @@ namespace LastBell.VFX
             CameraShake.Shake(0.2f, 0.22f);
         }
 
-        // Rail Ram braking at the lane end: reuses the charge trail and landing.
-        public void RamBrake(Vector3 pos) => ChargeLand(pos);
+        // ---------------- v4 fire (look pass, 31 Oct) ----------------
+        // Furnace Spin: flame licks along a live jet. Called every few ticks while it sweeps; the jet's telegraph stays the
+        // hit shape, these only rise out of it (short-lived, inside the lane).
+        public void FlameJet(Vector3 origin, float yaw, float length, float width)
+        {
+            if (NetCrucivarOn && (flameJetCalls++ & 1) == 0) NetCrucivar("FlameJet", origin, yaw, length, width);
+            var rot = Quaternion.Euler(0, yaw, 0);
+            for (float z = 2.2f; z < length; z += 1.6f)
+            {
+                var p = origin + rot * new Vector3(Random.Range(-0.35f, 0.35f) * width, 0.25f, z + Random.Range(-0.5f, 0.5f));
+                Sparks(p, Vector3.up * 1.2f + rot * Vector3.forward * 0.6f, 2, 0.5f, 3.2f, 0.2f, 0.35f);
+            }
+        }
+
+        // a turret's molten shot: a few embers trail behind the bullet (the moving circle is the hit shape)
+        public void Ember(Vector3 pos, Vector3 vel)
+        {
+            Sparks(new Vector3(pos.x, 0.35f, pos.z), -vel.normalized * 0.4f + Vector3.up * 0.6f, 1, 0.4f, 1.6f, 0.16f, 0.3f);
+        }
+
+        // Pour Flood: the rim ring lands as molten metal all round the arena
+        public void RimFlood(float inner, float outer)
+        {
+            if (NetCrucivarOn) NetCrucivar("RimFlood", inner, outer);
+            for (int k = 0; k < 24; k++)
+            {
+                var d = Quaternion.Euler(0, k * 15f, 0) * Vector3.forward;
+                Sparks(d * ((inner + outer) * 0.5f) + Vector3.up * 0.3f, Vector3.up, 6, 1.0f, 5.5f, 0.2f, 0.6f);
+            }
+            CameraShake.Shake(0.5f, 0.5f);
+        }
+
+        // Furnace Eruption: the whole floor erupts from the furnace outward
+        public void Eruption(float radius)
+        {
+            if (NetCrucivarOn) NetCrucivar("Eruption", radius);   // one call: the splash and blast inside are not recorded again
+            SlagSplashFx(Vector3.zero, radius * 0.5f);
+            BellowsBlastFx(Vector3.zero, radius);
+            for (int k = 0; k < 16; k++)
+            {
+                var d = Quaternion.Euler(0, k * 22.5f, 0) * Vector3.forward;
+                for (float r = 2f; r < radius; r += 3f) Sparks(d * r + Vector3.up * 0.3f, Vector3.up, 3, 0.8f, 7f, 0.22f, 0.7f);
+            }
+            CameraShake.Shake(0.7f, 0.8f);
+        }
+
     }
 }

@@ -67,7 +67,7 @@ namespace LastBell.Run
     // Horizon the rim ring stays down on its edge, the band turns a calmer coral with a pulsing border ("don't cross"),
     // and in its last second the ring blinks faster and dims before lifting away as the hazard expires. A hazard cleared
     // early (boss death, retry) just fades its ring.
-    sealed class OrreryClosingFx : MonoBehaviour
+    public sealed class OrreryClosingFx : MonoBehaviour
     {
         static readonly Color Gold = new Color(0.82f, 0.64f, 0.3f);
         const float EdgeInset = 0.3f;   // telegraph style: decor rings sit inside the hazard, continuous, never on the outline
@@ -80,6 +80,7 @@ namespace LastBell.Run
 
         public static void Create(CombatWorld world, Hazard rim, Hazard crown, int horizonTicks)
         {
+            if (!rim.Replica) Networking.LanFx.Record?.Invoke(Networking.LanFxTarget.Replica, "OrreryClosing", new object[] { rim.Id, crown.Id, horizonTicks });
             var go = new GameObject("Orrery Closing fx"); go.transform.SetParent(world.Root, false);
             var fx = go.AddComponent<OrreryClosingFx>(); fx.w = world; fx.horizon = horizonTicks;
             fx.Add(rim, rim.Inner + EdgeInset, 1, RimStartY);       // just inside each hazard, clear of its plain outline
@@ -114,7 +115,7 @@ namespace LastBell.Run
             {
                 var o = rings[i];
                 var h = o.H;
-                bool live = w != null && w.Hazards.Live.Contains(h) && !h.Cancelled;
+                bool live = Hazard.IsLive(w, h);
                 bool resolved = h.Age >= h.ResolveAt;
                 if (!live && o.Fade < 0) { o.Fade = resolved ? 1f : 0.4f; o.Edge?.Expire(); o.Edge = null; }   // resolved / expired: flash; cleared early: dim
                 if (o.Fade >= 0)
@@ -147,7 +148,8 @@ namespace LastBell.Run
                     if (h.Tele != null) h.Tele.Tint(CalmFill * Mathf.Lerp(0.55f, 1f, dim), CalmBorder * (0.6f + 0.8f * pulse));
                     // readability A5: the usable inside edge stays a continuous stroke above every transient fill (Hour Hands,
                     // stars, pools) for the whole Horizon; presentation only, the rim hazard owns the hit
-                    if (o.Edge == null && h.Shape == HazardShape.Ring) { o.Edge = w.BossFx.Ring(h.Inner, h.Inner + 0.22f); o.Edge.Motif(2); o.Edge.Progress(1); o.Edge.Order = 4; o.Edge.Place(h.Origin, 0); }
+                    if (o.Edge == null && h.Shape == HazardShape.Ring && !h.Replica) {   // a LAN client gets the host's edge telegraph
+                     o.Edge = w.BossFx.Ring(h.Inner, h.Inner + 0.22f); o.Edge.Motif(2); o.Edge.Progress(1); o.Edge.Order = 4; o.Edge.Place(h.Origin, 0); }
                     o.Edge?.Tint(CalmBorder, CalmBorder * (0.8f + 0.6f * pulse));
                 }
                 o.Root.rotation = Quaternion.Euler(0, o.Turn, 0);

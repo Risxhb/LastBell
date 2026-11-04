@@ -37,6 +37,9 @@ namespace LastBell.Run
         // > 0: a standing hazard (Crucivar's cooling slag). It deals this much per second to players inside while it
         // lives, with no knockback, and simply expires at ResolveAt (no resolve hit). Overlapping ones never multiply.
         public float BurnPerSecond;
+        // a hole you fall through (Aurelion's Last Light, the encounter drops you itself): ally bots never cross it, even
+        // where they would accept walking through a burn
+        public bool Pit;
         // Shared soak / line split (settled rule §5). ShareTotal > 0: the players inside at resolve split ShareTotal evenly
         // (missing players' shares fall on those inside; over-soaking lowers each share). ShareCount is the numeral shown
         // on the telegraph. WipeIfEmpty: nobody inside downs every standing player (an empty soak wipes the party).
@@ -52,9 +55,21 @@ namespace LastBell.Run
         public Func<Vector3, Vector3> Push;      // knockback direction override (Second Press pushes toward the arena centre)
         public float ClipRadius;                 // > 0: the telegraph is drawn only over the floor disc of this radius (presentation)
         public bool HitOnResolve = true;         // false: the owner deals the hits itself while the warning is up (a sweeping charge)
+        public bool Flinch = true;               // false: the hit deals damage only, with no stun, knockback or interrupt (hostile bullets)
         public bool Soak;                        // a ring to stand IN (a tower), not a shape to leave: bots and the HUD read it
 
         public int Age { get; internal set; }
+        // LAN client: a stand-in for a host hazard (LanClientWorld keeps its Age at the drawn time and cancels it when the
+        // host's is gone); presentation code that watches a hazard asks IsLive, not the world's list
+        public bool Replica;
+        public static bool IsLive(CombatWorld w, Hazard h)
+        {
+            if (h == null || h.Cancelled) return false;
+            if (h.Replica) return true;
+            if (w == null) return false;
+            var live = w.Hazards.Live; for (int i = 0; i < live.Count; i++) if (live[i] == h) return true;
+            return false;
+        }
         public bool Locked => Age >= LockAt;
         public bool Cancelled { get; internal set; }   // withdrawn before resolving (e.g. its recipient went down)
         internal BellkeeperFx.Telegraph Tele;
@@ -114,6 +129,25 @@ namespace LastBell.Run
         static readonly Color SlagFill = new Color(0.95f, 0.36f, 0.08f), SlagBorder = new Color(2.4f, 1.2f, 0.35f);
         readonly Dictionary<PlayerController, float> burn = new Dictionary<PlayerController, float>();
 
+        // The raid warning look (Reference/Telegraph-Style v2, first shipped on Aurelion): an area motif inside a wide
+        // contour over an ink under-stroke; standing burns draw under everything, tracking warnings in the middle and a
+        // locked footprint on top (it is the one that will hit); a burn's fill counts down to its lock, then holds.
+        // Presentation only. Call after Spawn. motif 1 = light rays / orbital arcs / sun bars.
+        public const int RaidMotif = 1;
+        public static void RaidStyle(Hazard h, int motif = RaidMotif)
+        {
+            if (h.BurnPerSecond > 0) h.FillToLock = true;
+            if (h.Tele == null) return;
+            h.Tele.Motif(motif);
+            if (h.BurnPerSecond > 0) h.Tele.Order = -1;
+            else if (h.Locked) h.Tele.Order = 1;
+            else h.Tele.LockOnTop = true;
+        }
+
+        // LAN clients: the host's hazards as stand-ins (no telegraph, never stepped; the snapshot draws them), so HUDs and
+        // boss overlays that read Live (mechanic icons, JUMP labels, soak counts) work on clients too
+        public void AddReplica(Hazard h) { if (h != null && !live.Contains(h)) live.Add(h); }
+        public void RemoveReplica(Hazard h) { live.Remove(h); }
         public Hazard Spawn(Hazard h)
         {
             var fx = w.BossFx;

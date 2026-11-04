@@ -150,10 +150,14 @@ namespace LastBell.Menu
                     ? countdown.IntroProgress : Mathf.MoveTowards(transition, 1, Time.unscaledDeltaTime / .45f));
             ApplyVolume();
         }
+        // A fight's own crossfade (TempoTyrantAudio swapping song versions) scales the boss track by this; 1 = untouched.
+        // BossLevel is the boss track's level without it, for the fight's fading-out tail source.
+        public float BossFade = 1;
+        public float BossLevel => Volume * envelope * bossMix;
         void ApplyVolume()
         {
             if (menu) menu.volume = Volume * envelope * menuMix;
-            if (boss) boss.volume = Volume * envelope * bossMix;
+            if (boss) boss.volume = Volume * envelope * bossMix * BossFade;
             if (previousBoss) previousBoss.volume = Volume * envelope * previousMix;
         }
         public void SetVolume(float value)
