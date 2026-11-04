@@ -37,7 +37,7 @@ namespace LastBell.Menu
         public CharacterPresenter Boss { get; private set; }
         public Transform BossWrapper { get; private set; }
         public Camera View { get; private set; }
-        public Button StartButton, RushButton, SettingsButton, ExitButton, PreviousButton, NextButton;
+        public Button StartButton, RushButton, MultiplayerButton, SettingsButton, ExitButton, PreviousButton, NextButton;
         public Button DifficultyButton { get; private set; }
         public Button MusicPlayButton { get; private set; }
         public Button MusicPauseButton { get; private set; }
@@ -88,14 +88,10 @@ namespace LastBell.Menu
             Boss=CharacterPresenter.Create(BossWrapper,"Bellkeeper2",2,.8f,0,null);Sanitize(Boss);
             SelectClass(SelectedIndex); BuildUI();
             EventSystem.current.SetSelectedGameObject((StartRunEnabled?StartButton:RushButton).gameObject);
-#if !LASTBELL_LAN_TEST
             if(ResumeBossRush){ResumeBossRush=false;BossRush();if(Rush)Rush.OpenBossStep();}
-#endif
             MenuFlowTest.Install();
-#if LASTBELL_LAN_TEST
             LanMenuAutoTest.Install(this);
             LanSessionAutoTest.Install();
-#endif
             if(ConfrontationMenuTest.Requested) gameObject.AddComponent<ConfrontationMenuTest>();
         }
         static void Sanitize(CharacterPresenter p)
@@ -135,13 +131,11 @@ namespace LastBell.Menu
             var panel=navigationRect=MenuUI.Rect("Right navigation",safe,new Vector2(.73f,.08f),new Vector2(.97f,.86f));navigation=panel.gameObject.AddComponent<CanvasGroup>();
             var logo=MenuUI.Panel("Last Bell logo",panel,new Vector2(-.1f,.73f),new Vector2(1.1f,1),Color.white);
             logo.sprite=Resources.Load<Sprite>("Menu/ConfrontationLogo");logo.preserveAspect=true;
-#if LASTBELL_LAN_TEST
-            RushButton=Nav("Multiplayer",panel,.45f,OpenLan,28);
-#else
-            StartButton=Nav("Start Run",panel,.51f,StartRun,28);RushButton=Nav("Boss Rush",panel,.40f,BossRush);
+            // One player for everything (4 Nov 2026): Start Run, Boss Rush and Multiplayer (the LAN lobby) on one menu.
+            StartButton=Nav("Start Run",panel,.58f,StartRun,28);RushButton=Nav("Boss Rush",panel,.48f,BossRush);
             StartButton.interactable=StartRunEnabled;   // greyed out: ConfrontationNavFocus dims a non-interactable label
-#endif
-            SettingsButton=Nav("Settings",panel,.29f,OpenSettings);ExitButton=Nav("Exit",panel,.18f,Exit);
+            MultiplayerButton=Nav("Multiplayer",panel,.38f,OpenLan);
+            SettingsButton=Nav("Settings",panel,.28f,OpenSettings);ExitButton=Nav("Exit",panel,.18f,Exit);
 #if UNITY_WEBGL && !UNITY_EDITOR
             ExitButton.GetComponentInChildren<Text>().text="Return to Menu";
 #endif
@@ -156,7 +150,7 @@ namespace LastBell.Menu
             difficultyNext=CycleArrow(diff.transform,true,16,new Color(MenuUI.Gold.r,MenuUI.Gold.g,MenuUI.Gold.b,.5f));
 
             BuildMusicPlayer();
-            var stack=new Selectable[]{PreviousButton,NextButton,StartButton,RushButton,SettingsButton,ExitButton,diff,MusicPlayButton}.Where(s=>s!=null&&(s!=StartButton||StartRunEnabled)).ToArray();
+            var stack=new Selectable[]{PreviousButton,NextButton,StartButton,RushButton,MultiplayerButton,SettingsButton,ExitButton,diff,MusicPlayButton}.Where(s=>s!=null&&(s!=StartButton||StartRunEnabled)).ToArray();
             for(int i=0;i<stack.Length;i++)stack[i].navigation=new Navigation{mode=Navigation.Mode.Explicit,selectOnDown=stack[(i+1)%stack.Length],selectOnUp=stack[(i+stack.Length-1)%stack.Length],selectOnLeft=i==0||i==1?PreviousButton:null,selectOnRight=i==0||i==1?NextButton:i==stack.Length-1?MusicPauseButton:null};
             // One menu song (Bittersweet Dawn, October 26, 2026): no skip button; Pause wraps right to Play.
             bool skip=MenuMusic.TrackCount>1;MusicNextButton.gameObject.SetActive(skip);
@@ -253,10 +247,8 @@ namespace LastBell.Menu
         }
 
         // ---------------------------------------------------------------- actions
-#if LASTBELL_LAN_TEST
         // Multiplayer opens the LAN lobby scene (LanLobbyScreen: name card, host/connect, lobby).
-        void OpenLan(){if(Loading||SettingsOpen)return;Loading=true;LanLobbyScreen.Open();}
-#endif
+        public void OpenLan(){if(Loading||SettingsOpen||Rush)return;Loading=true;LanLobbyScreen.Open();}
         public void StartRun(){if(Loading||SettingsOpen||Rush)return;Loading=MenuLaunch.Normal(SavedHeroSelection.Current);if(!Loading)message.text="Run scenes unavailable in this build.";}
         // Boss Rush opens in this scene (no separate hero-select scene): arena step, then the boss step.
         public void BossRush()

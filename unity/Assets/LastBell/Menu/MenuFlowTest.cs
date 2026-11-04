@@ -45,7 +45,7 @@ namespace LastBell.Menu
             var menu=FindAnyObjectByType<ConfrontationMenu>();
             Check("startup routes to the only main menu",menu&&!FindAnyObjectByType<MainMenu>()&&SceneUtility.GetScenePathByBuildIndex(0)==MainMenu.ScenePath);
             Check("old hero select is not in the build",!Application.CanStreamedLevelBeLoaded(HeroSelection.ScenePath));
-            Check("four primary actions",menu.StartButton && menu.RushButton && menu.SettingsButton && menu.ExitButton);
+            Check("five primary actions",menu.StartButton && menu.RushButton && menu.MultiplayerButton && menu.SettingsButton && menu.ExitButton);
             // Start Run is greyed out for players (October 27, 2026), so focus starts on Boss Rush.
             Check("Start Run greyed out",menu.StartButton.interactable==ConfrontationMenu.StartRunEnabled);
             Check("keyboard focus starts at the first live entry",EventSystem.current.currentSelectedGameObject==(ConfrontationMenu.StartRunEnabled?menu.StartButton:menu.RushButton).gameObject);
@@ -54,6 +54,7 @@ namespace LastBell.Menu
                 if(ConfrontationMenu.StartRunEnabled){yield return Press(Key.DownArrow);Check("keyboard down selects Boss Rush",EventSystem.current.currentSelectedGameObject==menu.RushButton.gameObject);}
                 else{yield return Press(Key.UpArrow);Check("keyboard up skips greyed-out Start Run",EventSystem.current.currentSelectedGameObject==menu.NextButton.gameObject);
                     yield return Press(Key.DownArrow);Check("keyboard down returns to Boss Rush",EventSystem.current.currentSelectedGameObject==menu.RushButton.gameObject);}
+                yield return Press(Key.DownArrow);Check("keyboard down selects Multiplayer",EventSystem.current.currentSelectedGameObject==menu.MultiplayerButton.gameObject);
                 yield return Press(Key.DownArrow);Check("keyboard down selects Settings",EventSystem.current.currentSelectedGameObject==menu.SettingsButton.gameObject);
                 yield return Press(Key.Enter);Check("keyboard submit opens Settings",menu.SettingsOpen);
                 yield return Press(Key.Escape);Check("keyboard Escape closes Settings",!menu.SettingsOpen);

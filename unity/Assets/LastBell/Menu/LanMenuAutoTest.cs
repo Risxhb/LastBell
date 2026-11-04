@@ -1,4 +1,3 @@
-#if LASTBELL_LAN_TEST
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -67,7 +66,7 @@ namespace LastBell.Menu
             var menu = FindFirstObjectByType<ConfrontationMenu>();
             var main = menu ? menu.Canvas.GetComponentsInChildren<Button>(true) : new Button[0];
             Check("Confrontation starts with Multiplayer", Find(main, "Multiplayer") != null);
-            Check("Start Run and Boss Rush are absent", Find(main, "Start Run") == null && Find(main, "Boss Rush") == null);
+            Check("Start Run and Boss Rush are on the same menu (one player for everything)", Find(main, "Start Run") != null && Find(main, "Boss Rush") != null);
             Check("all three classes available", RunDirector.Classes.SequenceEqual(new[] { "Tollbreaker", "Chimesinger", "Arcanist" }));
             Check("LAN class list matches the game's, Tollbreaker first", LanLobby.ClassList.SequenceEqual(RunDirector.Classes) && LanLobby.DefaultClass == "Tollbreaker");
             if (menu) menu.RushButton.onClick.Invoke();
@@ -204,4 +203,3 @@ namespace LastBell.Menu
         }
     }
 }
-#endif

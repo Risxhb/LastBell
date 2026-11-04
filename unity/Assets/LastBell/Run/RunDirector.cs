@@ -233,9 +233,8 @@ namespace LastBell.Run
 
         bool Begin(RunMode mode, string className, int encounter, int phase = 1)
         {
-#if LASTBELL_LAN_TEST
-            if (mode != RunMode.Practice || encounter < 0 || encounter >= Bosses.Length || !Networking.LanLobby.ValidEncounter(LastBell.Menu.TestRushSetup.CardName(encounter))) return false;
-#endif
+            // a LAN fight is one practice encounter the lobby allows
+            if (Networking.LanSessionCoordinator.Instance && (mode != RunMode.Practice || encounter < 0 || encounter >= Bosses.Length || !Networking.LanLobby.ValidEncounter(LastBell.Menu.TestRushSetup.CardName(encounter)))) return false;
             if (State != RunState.Menu) return false;
             PracticePhase = mode == RunMode.Practice && encounter >= 0 && encounter < Bosses.Length ? Mathf.Clamp(phase, 1, Bosses[encounter].Phases) : 1;
             Mode = mode; ClassName = Array.IndexOf(Classes, className) >= 0 ? className : Classes[0];

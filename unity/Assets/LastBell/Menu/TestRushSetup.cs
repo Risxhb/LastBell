@@ -148,9 +148,6 @@ namespace LastBell.Menu
         public static string Incompatibility(int map,int encounter)
         {
             if(map<0||map>=RunMaps.All.Length||encounter<0||encounter>=RunDirector.Bosses.Length)return "Choose a valid map and encounter.";
-#if LASTBELL_LAN_TEST
-            if(!LastBell.Run.Networking.LanLobby.ValidEncounter(CardName(encounter)))return "Encounter unavailable in this test.";
-#endif
             if(!RunMaps.InBuild(map))return "Arena unavailable in this build.";
             if(!Preview(map))return "Current arena preview unavailable. Launch is disabled.";
             // Current bosses create their own shapes/props and use shared arena bounds. BossEntry.Map is an authored

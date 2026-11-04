@@ -1,4 +1,3 @@
-#if LASTBELL_LAN_TEST
 using System;
 using System.IO;
 using LastBell.Run.Networking;
@@ -62,4 +61,3 @@ namespace LastBell.Menu
         }
     }
 }
-#endif

@@ -69,9 +69,7 @@ namespace LastBell.Run.Networking
         readonly System.Diagnostics.Stopwatch costWatch = new System.Diagnostics.Stopwatch();
         double receiveMs, presentMs; int statFrames, statSnapshots; long statBytes; float statSince = -1;
         Transform root; Camera cam; float inputAccumulator, lastArrival = -1, interval = 1f / 30; int inputSequence; string error;
-#if LASTBELL_LAN_TEST
         static readonly bool SmokeInput = Array.Exists(Environment.GetCommandLineArgs(), a => a.Equals("-lastbellLanSmokeClient", StringComparison.OrdinalIgnoreCase));
-#endif
         public string Error => error ?? lobby?.Error;
         public LanWorldFrame Current => current;
         public LanFxReplay Effects => fxReplay;
@@ -197,9 +195,7 @@ namespace LastBell.Run.Networking
                 inputAccumulator -= Sim.Dt;
                 var intent = localInput.Read(local.Player);
                 intent.Move = WorldMove(intent.Move);
-#if LASTBELL_LAN_TEST
                 if (SmokeInput) intent = SmokeIntent(local.Player);
-#endif
                 unacked.Add(new SentMove { Seq = inputSequence, Move = intent.Move, Sprint = intent.Sprint });
                 if (unacked.Count > 240) unacked.RemoveAt(0);
                 var packet = LanUnityInput.Encode(intent);
@@ -217,7 +213,6 @@ namespace LastBell.Run.Networking
             Vector3 right = Vector3.Cross(Vector3.up, fwd), move = fwd * screen.y + right * screen.x;
             return Vector2.ClampMagnitude(new Vector2(move.x, move.z), 1);
         }
-#if LASTBELL_LAN_TEST
         // Automated client: walk to the boss and use every ability slot in turn, so the host can check class actions arrive.
         PlayerInput SmokeIntent(PlayerController me)
         {
@@ -234,7 +229,6 @@ namespace LastBell.Run.Networking
             intent.P2 = phase == 60; intent.P3 = phase == 90; intent.P4 = phase == 110;
             return intent;
         }
-#endif
         void Stats()
         {
             float now = Time.unscaledTime; statFrames++;
