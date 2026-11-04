@@ -417,6 +417,8 @@ namespace LastBell.Run
         // when every way is hit. A brand carrier steers for the rim.
         Vector3 volMove; bool volSprint, volOn, volReach, volDash; float volCost, volPull; int volTick = -99;
         const float VolleyLook = 0.8f, VolleyStep = 0.05f, VolleyBuffer = 0.15f, VolleyPathCost = 30f, VolleyPathSoon = 1.6f, VolleySwing = 20f, VolleySprintFloor = 55f;   // a swing waits only for a bullet it would meet (50 and up)
+        const float VolleyJetRing = 8f;   // m from the jets' hub where they sweep at a walk (40 deg/s, WalkSpeed 6)
+        bool volJets; Vector3 volHub;
         const float VolleyThrowReach = 7f;   // a Tollbreaker's axe throws, gap to the target (MaxRange 9 m less a margin)
         static readonly List<Hazard> volNear = new List<Hazard>();
         static Vector3[] Dirs16;
@@ -432,12 +434,13 @@ namespace LastBell.Run
             bad = Bad(me, boss, false, me.World.Tick + 45);
             bool path = BotSight.GhostHits(me, pos);
             if (volNear.Count == 0 && !path) { volOn = false; return false; }
-            { var lv = me.World.Hazards.Live; for (int i = 0; i < lv.Count; i++) if (Jet(lv[i])) { TrackSpin(lv[i]); break; } }   // the jets' turn, for VolleyCost
+            volJets = false; { var lv = me.World.Hazards.Live; for (int i = 0; i < lv.Count; i++) if (Jet(lv[i])) { TrackSpin(lv[i]); volJets = true; volHub = Sim.Flat(lv[i].Origin); break; } }   // the jets' turn, for VolleyCost
             pos = Sim.Flat(pos);
             // home: the rim for a brand carrier, else the attack spot (or straight at the target)
             Vector3 home = tPos; bool carrier = false;
             var live = me.World.Hazards.Live;
             for (int i = 0; i < live.Count && !carrier; i++) { var h = live[i]; if (h.Track != null && h.Age < h.LockAt && h.Shape == HazardShape.Circle && Spares(h, me)) carrier = true; }
+            if (carrier) volJets = false;   // its brand goes to the rim, jets or not
             if (carrier) home = (pos.magnitude > 0.1f ? pos.normalized : Vector3.forward) * Mathf.Min(BrandRing, CombatWorld.PlayerBound - 1.2f);
             else if (Attacks && AttackSpot(me, boss, out var spot)) home = Sim.Flat(spot);
             volReach = Attacks && !carrier; volPull = 0.6f;
@@ -544,6 +547,9 @@ namespace LastBell.Run
             // a casting sits inside its turret's fan (the solo bot circled one just out of reach until the Pour Flood, 11-03)
             cost += Sim.Flat(q - home).magnitude * volPull;
             float turret = BotSight.TurretDist(q); if (turret < TurretKeep) cost += (TurretKeep - turret) * 8f;   // its spiral arms sweep the wall beside it
+            // with Furnace Spin up, inside the ring where a jet comes round slower than a walk (out by the rim at 10-12 m they
+            // outran the bots dodging bullets there: three went down in the second uprising, 11-04)
+            if (volJets) { float out_ = Sim.Flat(q - volHub).magnitude - VolleyJetRing; if (out_ > 0) cost += out_ * 6f; }
             if (volReach) cost += Mathf.Max(0, Sim.Flat(tPos - q).magnitude - tRad - (Range(me) + 1.5f)) * 4f;
             return cost;
         }
