@@ -230,7 +230,6 @@ namespace LastBell.Run
                 BannerText(); CaptionText();
                 Floats();
                 Labels();
-                HazardLabels();
                 PlayerMarks();
                 DownedMarks();
                 if (ShowMechanicGallery) MechanicGallery();
@@ -373,8 +372,8 @@ namespace LastBell.Run
             Dim();
             const float W = 720, pad = UiTheme.G3, inner = W - 2 * pad, colGap = 12, rowGap = 8;
             const string controlText =
-                "Controls: WASD move · mouse aims · LMB basic · 2 3 4 class actions · 5 Mending Chorus / Temporal Anchor · RMB dash · F potion · Space jump · Shift sprint · Esc pause\n" +
-                "Movement stamina: sprint, jump and dash share one bar. No invincibility frames (dodging does not make you immune). F drinks a potion (+40 HP).\nHealth refills before each boss; potions carry over between bosses and refill before the final boss. Retry restarts at the first boss.\n" +
+                "Controls: WASD move · mouse aims · LMB basic · 2 3 4 class actions · 5 Mending Chorus / Temporal Anchor · RMB dash · F potion · Shift sprint · Esc pause\n" +
+                "Movement stamina: sprint and dash share one bar. No invincibility frames (dodging does not make you immune). F drinks a potion (+40 HP).\nHealth refills before each boss; potions carry over between bosses and refill before the final boss. Retry restarts at the first boss.\n" +
                 "Only real boss encounters are offered (the stand-in minibosses were removed); Sylvara is practice only, in Verdant Chimes. Arcanist kit numbers are prototype tuning. Dev keys in combat: F9 defeat boss, F8 next phase.";
             const int perRow = 3;
             int mapRows = (RunMaps.All.Length + perRow - 1) / perRow, bossRows = (RunDirector.Bosses.Length + perRow - 1) / perRow;
@@ -891,7 +890,7 @@ namespace LastBell.Run
             bool showTip = over >= 0 && !attacking && Time.unscaledTime - tipSince >= TipDelay;
             if (!showTip) { }
             else if (pr.Contains(Event.current.mousePosition)) Tooltip(x, top, $"POTION  [F]\n+{PlayerController.PotionHeal} HP, 1 s between drinks. {p.Potions}/{PlayerController.MaxPotions} left.\nPotions carry over between minibosses; health and potions refill before each area boss.");
-            else if (dr.Contains(Event.current.mousePosition)) Tooltip(x, top, "DASH  [RMB]\nShort burst (3 m in 0.2 s) in the move direction. Costs 30 stamina; sprint and jump share the bar.\nNo invincibility: get out of the shape before it resolves. Cancels basic attacks and unreleased windups.");
+            else if (dr.Contains(Event.current.mousePosition)) Tooltip(x, top, "DASH  [RMB]\nShort burst (3 m in 0.2 s) in the move direction. Costs 30 stamina; sprint shares the bar.\nNo invincibility: get out of the shape before it resolves. Cancels basic attacks and unreleased windups.");
             else if (hover >= 0) Tooltip(x, top, k.Tooltip(hover));
             if (ShowMeter && d.World != null) Meter(Right - MeterW, 260, d.World.EncounterMeter, "DAMAGE · this encounter", (d.World.Tick - d.World.SegmentStartTick) / 60f);
         }
@@ -1013,19 +1012,6 @@ namespace LastBell.Run
             GUIUtility.RotateAroundPivot(Mathf.Atan2(v.y, v.x) * Mathf.Rad2Deg, a);
             UiTheme.Fill(new Rect(a.x, a.y - 1, len, 2), c);
             GUI.matrix = m;
-        }
-
-        void HazardLabels()
-        {
-            var cam = Camera.main; if (!cam) return; float h = Screen.height;
-            foreach (var hz in d.World.Hazards.Live)
-            {
-                if (!hz.JumpClearable) continue;
-                var mid = hz.Origin + Sim.Dir(hz.Yaw) * hz.Length * 0.5f;
-                var s = cam.WorldToScreenPoint(mid); if (s.z < 0) continue;
-                UiTheme.Fill(new Rect(s.x - UiTheme.V(36), h - s.y - UiTheme.V(14), UiTheme.V(72), UiTheme.V(28)), UiTheme.InkStrip);
-                UiTheme.Label(new Rect(s.x - UiTheme.V(60), h - s.y - UiTheme.V(15), UiTheme.V(120), UiTheme.V(30)), "JUMP", floatSt, UiTheme.Ivory);   // ivory on the ink strip, not a friendly cyan
-            }
         }
 
         // Mechanic markers over players' heads (PlayerController.Marks, MechanicIcons): 40 px icons side by side, each with its

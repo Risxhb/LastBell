@@ -253,7 +253,7 @@ namespace LastBell.Run
             P.Presenter.Action("CallOfIron", 20);
         }
 
-        Vector3 HandPos(int h) => P.transform.position + Vector3.up * (1.3f + P.Height) + P.transform.right * (h == 0 ? 0.35f : -0.35f);
+        Vector3 HandPos(int h) => P.transform.position + Vector3.up * 1.3f + P.transform.right * (h == 0 ? 0.35f : -0.35f);
         Vector3 AimDir()
         {
             var d = Sim.Flat(aim - P.transform.position);
