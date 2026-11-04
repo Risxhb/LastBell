@@ -264,7 +264,7 @@ namespace LastBell.Run
             yield return Until(() => d.State == RunState.Combat, 4, "combat 1");
             yield return Wait(0.3f);
             Check("repeated Ready starts exactly one encounter", d.EncounterStarts == starts0 + 1 && d.Encounter == d.EncounterOrder[0], $"starts {d.EncounterStarts - starts0}");
-            Check("run contains all four real bosses with Bellkeeper last", d.EncounterOrder.Length == 4 && d.EncounterOrder.Distinct().Count() == 4 && RunDirector.Bosses[d.EncounterOrder.Last()].Final && !d.Boss.Placeholder);
+            Check("run is a campaign (area minibosses then boss) with Bellkeeper last", Campaign.Valid(d.EncounterOrder) && d.EncounterOrder.Distinct().Count() == d.EncounterOrder.Length && RunDirector.Bosses[d.EncounterOrder.Last()].Final);
             Check("run starts at full health and potions", d.Player.Hp == PlayerController.MaxHp && d.Player.Potions == PlayerController.MaxPotions, $"hp {d.Player.Hp}, potions {d.Player.Potions}");
             yield return AdvanceToFinal();
             var bk = (BellkeeperEncounter)d.Boss;
@@ -347,7 +347,7 @@ namespace LastBell.Run
             yield return Wait(1.0f); yield return Shot("bellkeeper_defeat");
             Check("defeat opens the chest fully", bk.ShellAngle > 60, $"shell {bk.ShellAngle:0}°");
             yield return Until(() => d.State == RunState.Results, 6, "results 1");
-            Check("victory after all four bosses, Bellkeeper last", d.Victory && d.EncountersCleared == 4 && d.EncounterStarts == 4 && d.EncounterEnds == 4,
+            Check("victory after every campaign fight, Bellkeeper last", d.Victory && d.EncountersCleared == d.EncounterOrder.Length && d.EncounterStarts == d.EncounterOrder.Length && d.EncounterEnds == d.EncounterOrder.Length,
                 $"victory {d.Victory}, cleared {d.EncountersCleared}, starts {d.EncounterStarts}, ends {d.EncounterEnds}");
             yield return Shot("results_victory");
 
@@ -402,7 +402,7 @@ namespace LastBell.Run
             yield return Shot("chimesinger_bellkeeper");
             yield return TickRegressions();   // ends the fight with a real Resonant Note killing blow
             yield return Until(() => d.State == RunState.Results, 8, "results 4");
-            Check("Chimesinger run reaches victory", d.Victory && d.EncountersCleared == 4);
+            Check("Chimesinger run reaches victory", d.Victory && d.EncountersCleared == d.EncounterOrder.Length);
             d.ReturnToMenu(); yield return null;
 
             // ---------- run 5: Arcanist rotation and full victory ----------
@@ -553,7 +553,7 @@ namespace LastBell.Run
                 yield return Until(() => d.State != RunState.Combat, 2, "arcanist boss defeated");
             }
             yield return Until(() => d.State == RunState.Results, 8, "results 5");
-            Check("Arcanist run reaches victory", d.Victory && d.EncountersCleared == 4);
+            Check("Arcanist run reaches victory", d.Victory && d.EncountersCleared == d.EncounterOrder.Length);
             d.ReturnToMenu(); yield return null;
         }
 

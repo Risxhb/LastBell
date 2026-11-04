@@ -29,10 +29,10 @@ namespace LastBell.Menu
         public Vector3 CameraPosition = new Vector3(.6f,.75f,10.9f), CameraTarget = new Vector3(-.6f,2.2f,-7);
         // Set before loading this scene to reopen Boss Rush (e.g. "Test Setup" from a practice run).
         public static bool ResumeBossRush;
-        // Start Run is greyed out for players (Risxhb, October 27, 2026): shown but not clickable, skipped by keyboard and
-        // controller focus, which starts on Boss Rush. StartRun() still works when called from code (the run tests use it).
-        // Applies to Windows and the web demo alike. Set true to bring the button back.
-        public static bool StartRunEnabled = false;
+        // Start Run was greyed out for players from October 27, 2026 (Risxhb) until the campaign existed. It is back for the
+        // campaign (Risx, November 4, 2026; Run/Campaign.cs): tutorial, three arenas of minibosses and bosses, the Bellkeeper.
+        // Set false to grey it out again (shown but not clickable, skipped by keyboard and controller focus).
+        public static bool StartRunEnabled = true;
         public CharacterPresenter Hero { get; private set; }
         public CharacterPresenter Boss { get; private set; }
         public Transform BossWrapper { get; private set; }

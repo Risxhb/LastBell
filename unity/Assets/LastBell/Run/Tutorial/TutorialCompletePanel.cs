@@ -21,7 +21,8 @@ namespace LastBell.Run
             var missed = records.Where(r => !r.Passed).Select(r => r.Title).ToList();
             p.body = "The Tempo Tyrant falls. You've seen every mechanic in the game so far: read the shape, step out, punish.\n\n"
                 + (missed.Count == 0 ? "Every mechanic handled." : "To practise: " + string.Join(", ", missed) + ".")
-                + "\n\nNext: Boss Rush to fight any boss for real, or Retry (R) to run the tutorial again.";
+                + (director.Mode == RunMode.Run ? "\n\nNext: Skyward Spire. Three minibosses guard Aurelion."
+                    : "\n\nNext: Boss Rush to fight any boss for real, or Retry (R) to run the tutorial again.");
         }
 
         void OnDestroy() { if (Current == this) Current = null; }

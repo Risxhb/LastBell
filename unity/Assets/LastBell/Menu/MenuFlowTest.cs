@@ -129,8 +129,8 @@ namespace LastBell.Menu
             if(stage>=5)
             {
                 var permutations=Enumerable.Range(0,128).Select(seed=>RunDirector.CreateRunOrder(new System.Random(seed))).ToArray();
-                Check("all sampled orders contain each boss once and Bellkeeper last",permutations.All(order=>order.Length==4&&order.Distinct().Count()==4&&RunDirector.Bosses[order.Last()].Final));
-                Check("opening sequence is randomized",permutations.Select(order=>string.Join(",",order)).Distinct().Count()==6);
+                Check("all sampled orders are campaigns: area minibosses then boss, Bellkeeper last",permutations.All(order=>Campaign.Valid(order)&&order.Distinct().Count()==order.Length&&RunDirector.Bosses[order.Last()].Final));
+                Check("miniboss order is randomized",permutations.Select(order=>string.Join(",",order)).Distinct().Count()>6);
                 var original=RunDifficulty.Selected;
                 for(int hero=0;hero<RunDirector.Classes.Length;hero++)
                 {
@@ -144,13 +144,14 @@ namespace LastBell.Menu
                     if(d)
                     {
                         var order=(int[])d.EncounterOrder.Clone();
-                        Check("normal session has four bosses and final Bellkeeper "+hero,order.Length==4&&order.Distinct().Count()==4&&RunDirector.Bosses[order.Last()].Final);
-                        Check("normal initial map matches first boss "+hero,RunMaps.All[RunMaps.Current].Id==(RunDirector.Bosses[order[0]].Map??"test"));
+                        Check("normal session is a campaign with final Bellkeeper "+hero,Campaign.Valid(order)&&order.Distinct().Count()==order.Length&&RunDirector.Bosses[order.Last()].Final);
+                        Check("normal initial map matches first boss "+hero,RunMaps.All[RunMaps.Current].Id==Campaign.MapFor(order[0]));
                         d.RequestReady();d.RequestReady();MusicCheck("normal Intro "+hero,ExpectedMusic(order[0]));
                         if(stage>=8&&hero==0){yield return new WaitForSeconds(1.0f);yield return Shot("intro-"+RunDirector.Bosses[order[0]].Name.Split(' ')[0].ToLowerInvariant()+".png");yield return new WaitForSeconds(1.5f);}
                         else yield return new WaitForSeconds(2.5f);Check("intro starts one encounter "+hero,d.State==RunState.Combat&&d.EncounterStarts==1);
                         for(int slot=0;slot<order.Length;slot++)
                         {
+                            {float waited=0;while(waited<10&&d&&!(d.State==RunState.Combat&&d.ProgressSlot==slot)){waited+=Time.unscaledDeltaTime;yield return null;}}   // 13 fights: wait for each to start, not a fixed time
                             Check("normal sequence slot "+hero+"/"+slot,d.State==RunState.Combat&&d.Encounter==order[slot]&&d.ProgressSlot==slot&&d.EncounterStarts==slot+1);
                             MusicCheck("normal combat "+hero+"/"+slot,ExpectedMusic(order[slot]));
                             d.Boss.DebugDefeat();
@@ -158,9 +159,18 @@ namespace LastBell.Menu
                                 if(slot<order.Length-1){yield return new WaitForSeconds(2.2f);yield return Shot("intro-"+RunDirector.Bosses[order[slot+1]].Name.Split(' ')[0].ToLowerInvariant()+".png");yield return new WaitForSeconds(2.0f);}else yield return new WaitForSeconds(2.2f);}
                             else yield return new WaitForSeconds(slot==order.Length-1?3.5f:5.5f);
                         }
-                        Check("normal victory only after final Bellkeeper "+hero,d.State==RunState.Results&&d.Victory&&d.EncountersCleared==4&&d.EncounterEnds==4&&d.Boss==null);
+                        // Hard: the Bellkeeper win adds the Overclocked Tempo Tyrant bonus fight (Run/Campaign.cs)
+                        int lastFought=order.Last(),fights=order.Length;
+                        if(d.Difficulty==Difficulty.Hard)
+                        {
+                            {float waited=0;while(waited<10&&d&&!(d.State==RunState.Combat&&d.Encounter==Campaign.BonusIndex)){waited+=Time.unscaledDeltaTime;yield return null;}}
+                            Check("Hard Bellkeeper win adds the Overclocked bonus fight "+hero,d.State==RunState.Combat&&d.BonusFight&&d.EncounterOrder.Length==order.Length+1);
+                            if(d.Boss)d.Boss.DebugDefeat();lastFought=Campaign.BonusIndex;fights++;
+                            {float waited=0;while(waited<10&&d&&d.State!=RunState.Results){waited+=Time.unscaledDeltaTime;yield return null;}}
+                        }
+                        Check("normal victory only after final Bellkeeper "+hero,d.State==RunState.Results&&d.Victory&&d.EncountersCleared==fights&&d.EncounterEnds==fights&&d.Boss==null);
                         Check("normal retry preserves randomized order "+hero,d.RequestRetry()&&d.State==RunState.Ready&&d.Encounter==order[0]&&d.EncounterOrder.SequenceEqual(order)&&d.EncountersCleared==0&&d.RunsStarted==2);
-                        MusicCheck("normal retry "+hero,ExpectedMusic(order.Last()));d.SetPaused(true);d.ReturnToMenu();
+                        MusicCheck("normal retry "+hero,ExpectedMusic(lastFought));d.SetPaused(true);d.ReturnToMenu();
                     }
                     yield return SceneReady(()=>{var m=FindAnyObjectByType<ConfrontationMenu>();return m&&m.Canvas&&!m.Loading;});menu=FindAnyObjectByType<ConfrontationMenu>();Check("normal return cleans selection "+hero,menu&&!FindAnyObjectByType<HeroSelection>()&&!RunDirector.Instance);
                 }
@@ -310,7 +320,7 @@ namespace LastBell.Menu
         }
         // Practice-only minibosses past the table have no boss track yet; MusicCheck reports them as a GAP instead of crashing.
         static readonly string[] BossTracks={"The Unfinished Hour","Crown of the Meridian","Where the Last Flower Falls","Pressure Beneath the Brass","By My Measure (Haste)"};
-        static string ExpectedMusic(int encounter) => encounter<BossTracks.Length?BossTracks[encounter]:"(no track) "+RunDirector.Bosses[encounter].Name;
+        static string ExpectedMusic(int encounter) => encounter==Campaign.BonusIndex?ExpectedMusic(RunDirector.TempoTyrantPractice):encounter<BossTracks.Length?BossTracks[encounter]:"(no track) "+RunDirector.Bosses[encounter].Name;
         void MusicCheck(string label,string clip)
         {
             var owners=FindObjectsByType<MenuMusic>();var music=owners.Length==1?owners[0]:null;
