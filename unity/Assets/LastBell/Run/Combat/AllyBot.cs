@@ -421,6 +421,7 @@ namespace LastBell.Run
         const float VolleyLook = 0.8f, VolleyStep = 0.05f, VolleyBuffer = 0.15f, VolleyPathCost = 30f, VolleyPathSoon = 1.6f, VolleySwing = 20f, VolleySprintFloor = 55f;   // a swing waits only for a bullet it would meet (50 and up)
         const float VolleyJetRing = 8f;   // m from the jets' hub where they sweep at a walk (40 deg/s, WalkSpeed 6)
         const float VolleyJetHit = 200f;  // a jet step in the bullet dodge (a bullet step is 100)
+        const float VolleyFarPull = 2f;   // per m to its attack spot while out of reach (0.6 in reach)
         bool volJets; Vector3 volHub; string volEsc;   // volEsc: the sweep trace
         const float VolleyThrowReach = 7f;   // a Tollbreaker's axe throws, gap to the target (MaxRange 9 m less a margin)
         static readonly List<Hazard> volNear = new List<Hazard>();
@@ -447,6 +448,9 @@ namespace LastBell.Run
             if (carrier) home = (pos.magnitude > 0.1f ? pos.normalized : Vector3.forward) * Mathf.Min(BrandRing, CombatWorld.PlayerBound - 1.2f);
             else if (Attacks && AttackSpot(me, boss, out var spot)) home = Sim.Flat(spot);
             volReach = Attacks && !carrier; volPull = 0.6f; volEsc = carrier ? "carry" : null;
+            // out of its reach (back from carrying a brand out): a stronger pull home, or the bullets held it 13-15 m off its
+            // casting for about 5 s after each brand in a Hard party run (11-04)
+            if (volReach && Sim.Flat(tPos - pos).magnitude - tRad > (me.Kit is TollbreakerKit ? VolleyThrowReach : Range(me) + 1.85f)) volPull = VolleyFarPull;
             // in a fan its bullets are still to cross: the nearest spot clear of every path is the goal (the look is too short
             // to find a Ring Wave's gap metres away: the solo bot ran from the wall of bullets into the corner, 11-03)
             if (path || bad(pos))
