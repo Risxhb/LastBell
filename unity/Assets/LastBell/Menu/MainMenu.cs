@@ -130,7 +130,7 @@ namespace LastBell.Menu
             var strip = Image("Class strip", safeRoot, UiTheme.InkStrip); Place(strip.rectTransform, new Vector2(0.5f, 0.168f), new Vector2(560, 30));
             Rule(strip.transform, new Vector2(0.5f, 1), new Vector2(560, 1), UiTheme.GoldDim);
             Rule(strip.transform, new Vector2(0.5f, 0), new Vector2(560, 1), UiTheme.GoldDim);
-            Text("VANGUARD  /  ARCANIST  /  CHIMESINGER", strip.transform, UiTheme.SizeLabel, UiTheme.GoldLabel, new Vector2(0.5f, 0.5f), new Vector2(540, 26), true);
+            Text("TOLLBREAKER  /  ARCANIST  /  CHIMESINGER", strip.transform, UiTheme.SizeLabel, UiTheme.GoldLabel, new Vector2(0.5f, 0.5f), new Vector2(540, 26), true);
             Text("LAST BELL  /  WORK IN PROGRESS", safeRoot, UiTheme.SizeMicro, UiTheme.IvoryMicro, new Vector2(0.5f, 0.016f), new Vector2(900, 22));
             BuildMusicControls();
             BuildSettings(safeRoot);

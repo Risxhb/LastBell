@@ -9,7 +9,7 @@ namespace LastBell.Menu
     public sealed class TestRushSetup:MonoBehaviour
     {
         public static int SavedMap,SavedEncounter,SavedPhase=1;
-        public static string SavedHero="Vanguard";
+        public static string SavedHero="Tollbreaker";
         public int MapIndex {get;private set;}
         public int EncounterIndex {get;private set;}
         public string Hero {get;private set;}
