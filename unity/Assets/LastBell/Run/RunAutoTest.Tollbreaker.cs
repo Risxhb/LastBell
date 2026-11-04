@@ -155,8 +155,8 @@ namespace LastBell.Run
             k.TestTuning = null;
             yield return Until(() => !k.SplitActive, 7, "the split ends");
 
-            // his model has no Land or GetUp clip yet: both stay procedural
-            Check("presenter: every Tollbreaker action resolves to a clip (no placeholder)", !p.Presenter.Placeholders.Any(x => x != "Land" && x != "GetUp"), string.Join(",", p.Presenter.Placeholders));
+            // his model has every clip now, reactions included (Hit, Down, GetUp, Land since 4 Nov)
+            Check("presenter: every Tollbreaker action resolves to a clip (no placeholder)", p.Presenter.Placeholders.Count == 0, string.Join(",", p.Presenter.Placeholders));
             bot.Clear(); d.Boss.BeginCombat();
         }
 
