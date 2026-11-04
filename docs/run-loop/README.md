@@ -81,9 +81,9 @@ Gamepads aren't read: the user's rudder pedals register as a controller. UI clic
 
 | Character | Model | Rig | Animation | VFX |
 | --- | --- | --- | --- | --- |
-| **Tollbreaker** | Rough production (Meshy, 2.0 m) | Rough production (scripted armature; arms accepted by Chzy18 on 1 Nov) | Rough production: Twin Hurl, Hurl Heavy, Catch, Grinding Toll, Splitting Throw, Call of Iron, Bell Frenzy, Dodge, Jump. **Placeholder:** Hit / Down / GetUp / Land (procedural) | Rough production: thrown and lodged axes, Grinding Toll ring, Call of Iron line, Bell Frenzy |
-| **Chimesinger** | Rough production: the fixed export (grip, attached bell strands, tear fixes, follow-through on the coat, sleeves, bells and banners); see the asset manifest | Rough production | Approved-kit clips exist. **Placeholder:** Hit / Down / GetUp (procedural) until that session adds them | Rough production: note, bolt, bell mark with strength ring and echo pips, Refrain ripples, Crescendo burst, Chorus ring, note trail |
-| **Arcanist** | Rough production (Meshy body plus astrolabe, from the Arcanist session) | Rough production (robe cloth chains, astrolabe orbit bone) | Approved-kit clips from the Arcanist session. **Placeholder:** Hit / Down / GetUp | Rough production: bolt, seal dials (ripe ring and inscribed gem as shapes), Lance (normal and empowered), Convergence (early and perfect), Anchor marker / return / shield, Clockstep afterimage |
+| **Tollbreaker** | Rough production (Meshy, 2.0 m) | Rough production (scripted armature; arms accepted by Chzy18 on 1 Nov) | Rough production: Twin Hurl, Hurl Heavy, Catch, Grinding Toll, Splitting Throw, Call of Iron, Bell Frenzy, Dodge, Jump, Land, Hit, Down, GetUp | Rough production: thrown and lodged axes, Grinding Toll ring, Call of Iron line, Bell Frenzy |
+| **Chimesinger** | Rough production: the fixed export (grip, attached bell strands, tear fixes, follow-through on the coat, sleeves, bells and banners); see the asset manifest | Rough production | Approved-kit clips exist. Hit / Down / GetUp, and the revive clips (Downed, Revive, Death), since 4 Nov | Rough production: note, bolt, bell mark with strength ring and echo pips, Refrain ripples, Crescendo burst, Chorus ring, note trail |
+| **Arcanist** | Rough production (Meshy body plus astrolabe, from the Arcanist session) | Rough production (robe cloth chains, astrolabe orbit bone) | Approved-kit clips from the Arcanist session. Hit / Down / GetUp, and the revive clips (Downed, Revive, Death), since 4 Nov | Rough production: bolt, seal dials (ripe ring and inscribed gem as shapes), Lance (normal and empowered), Convergence (early and perfect), Anchor marker / return / shield, Clockstep afterimage |
 | **Bellkeeper** (= "Bellwarden") | Rough production (Meshy) | Rough production | Rough production. **New tonight:** PhaseShift, Defeat | Existing telegraphs and resolves; gold (non-danger) phase-shift and defeat bursts |
 | Minibosses ×3 | **Placeholder** (code-built) | none | none (scripted transforms) | shared telegraphs and resolves |
 
@@ -149,10 +149,13 @@ Screens and videos: `run-loop-evidence/autotest-7/*.png` and `*.mp4` (vanguard_k
 7. Mending Chorus and Temporal Anchor are on key **6**, because those classes have five actions plus a dash.
 8. Brace is retired. Hazards keep their `Strike` / `Ground` tags, which have no effect today.
 
+## Revives (4 Nov, built as recommended, review later)
+
+At 0 HP a player is **downed**: Down, then the Downed loop, with DOWN and the seconds left over them. An ally who stands still within 1.5 m for 3 s revives them with 40 HP (the reviver plays Revive; a hit on the reviver starts it over). After 20 s unrevived they are dead for the fight (Death). The party still loses when nobody stands, so solo is unchanged, and every fight starts with everyone up. Ally bots revive when nothing is landing on them and they have no job. Rules and open questions: `docs/proposals/revives-2026-11-04.md` in the workspace. Tests: the party suite (`-lastbellPartyOnly`).
+
 ## Known bugs and limits
 
-- The Chimesinger's Hit, Down and GetUp are procedural tilts.
-- The Down / GetUp silhouettes are rough. Land is the tail of Jump.
+- The reaction clips (Hit, Down, GetUp) and revive clips are rough first passes (4 Nov). The Chimesinger and Arcanist go down to their knees rather than flat, because the staff and robe cloth don't lie flat well. Only the Tollbreaker has a Land clip; the others land on the tail of Jump.
 - The camera follows closely, so the player can sit behind a tall boss for a moment.
 - The minibosses have no art and no animation.
 - There's no audio.
@@ -162,10 +165,9 @@ Screens and videos: `run-loop-evidence/autotest-7/*.png` and `*.mp4` (vanguard_k
 ## Next steps (highest priority first)
 
 1. **Human playtest** of this build: feel (PF-05) and readability. Decide the Bellkeeper D1–D6. (PF-01 and the health policy were settled on Oct 21.)
-2. Add the Chimesinger's Hit / Down / GetUp clips. The fixed GLB is in.
+2. Playtest revives (`docs/proposals/revives-2026-11-04.md`, built as recommended on 4 Nov): 20 s bleed-out, 3 s revive within 1.5 m, 40 HP.
 3. Author the **three miniboss** models and schedules (encounter lane #8), replacing the stand-ins without changing the run flow.
 4. Tune boss HP and damage toward the design fight lengths, and run the escape checker on the miniboss schedules.
-5. Hit / Down / GetUp (and Land) clips for the Tollbreaker, the Arcanist and the Chimesinger.
 6. Move the shared run/hazard code behind the foundation #6 contract (U3) when it lands.
 
 ## Media

@@ -20,7 +20,7 @@ Branch `feature/run-loop`. October 21, 2026 (overnight build). Status labels use
 
 Vanguard removed from the game (Chzy18, 2 Nov); its model and browser asset were deleted. Git history keeps them.
 
-**Tollbreaker** (`Characters/Tollbreaker/Resources/Characters/Tollbreaker.glb`, 2.0 m): Meshy model on a scripted rig (`tollbreaker_rig.py` in the prototype folder, not in Git). Clips: Idle, Run, Sprint, Jump, Dodge, TwinHurl, TwinHurl2, HurlHeavy, Catch, Catch2, GrindingToll, SplittingThrow, CallOfIron, BellFrenzy. Hit, Down, GetUp and Land are still procedural placeholders.
+**Tollbreaker** (`Characters/Tollbreaker/Resources/Characters/Tollbreaker.glb`, 2.0 m): Meshy model on a scripted rig (`tollbreaker_rig.py` in the prototype folder, not in Git). Clips: Idle, Run, Sprint, Jump, Land, Dodge, Hit, Down, GetUp, Downed, Revive, Death, TwinHurl, TwinHurl2, HurlHeavy, Catch, Catch2, GrindingToll, SplittingThrow, CallOfIron, BellFrenzy.
 
 ## Chimesinger — model: Rough production · animation: Rough production / Placeholder · VFX: Rough production
 
@@ -126,6 +126,6 @@ Contact sheet: `run-loop-evidence/bellkeeper-phase-defeat-sheet.png`.
 ## Known limitations
 
 - The Tollbreaker and Bellkeeper clips are procedural keyframes from the rig scripts, not hand-polished animation. The Down/GetUp silhouettes are rough.
-- The Chimesinger in Unity is the pre-fix stand-in, and the grip fix is pending. The Chimesinger has no Hit/Down/GetUp clips yet.
-- There's no Land clip; landing is the tail of Jump.
+- The Chimesinger in Unity is the pre-fix stand-in, and the grip fix is pending. Since 4 Nov she has Hit, Down, GetUp and the revive clips (Downed, Revive, Death); so does the Arcanist.
+- Only the Tollbreaker has a Land clip; the others land on the tail of Jump.
 - No audio is in the build. Every mechanic is shown visually and named in the HUD while it warns.
