@@ -30,7 +30,8 @@ namespace LastBell.Run
         // v4 Medium (Chzy18, 1 Nov: "make medium harder"): windows x0.85, halfway to Hard; the same floors apply
         protected int Win(float seconds, float floor = 0) { seconds *= PhaseWindow; return Sim.Ticks(Hard && !AurelionArgs.WindowsMedium ? Mathf.Max(seconds * HardWindow, floor) : MediumV4 ? Mathf.Max(seconds * MediumWindow, floor) : seconds * WarnScale); }
         // Phases 2 and 3 harder (Chzy18, 2 Nov: "P2 and 3 are too easy"): shorter windows, same floors (proposal; no damage: rejected)
-        public const float P2Window = 0.9f, P3Window = 0.8f;
+        // 3 Nov (Chzy18 "I want them harder especially p3"): x0.85 / x0.75, from x0.9 / x0.8
+        public const float P2Window = 0.85f, P3Window = 0.75f;
         protected float PhaseWindow => Boss.Phase == 2 ? P2Window : Boss.Phase == 3 ? P3Window : 1f;
         public const float HardWindow = 0.7f, MediumWindow = 0.85f;
         protected bool MediumV4 => W.Difficulty == Difficulty.Medium;

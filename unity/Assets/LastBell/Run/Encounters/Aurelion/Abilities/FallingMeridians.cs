@@ -4,7 +4,7 @@ using UnityEngine;
 namespace LastBell.Run
 {
     // Falling Meridians (aurelion.falling_meridians), v4 Phase 3 (Exposed Meridian), accepted 2 Nov (Chzy18: "make it harder
-    // by giving the players something to do/dodge"). Every 5 s each standing player gets a 2.5 m circle at their feet, locked
+    // by giving the players something to do/dodge"). Every 3.5 s (5 s until 3 Nov) each standing player gets a 2.5 m circle at their feet, locked
     // where they stood, landing 1.2 s later (Easy 1.5 s, Hard 1.0 s): 30 damage, so you keep moving. One per player, so it
     // reads the same for 1-4 players. The encounter calls Step every tick over the Phase 3 blocks, not during Severance.
     public sealed class FallingMeridians : AurelionAbility
@@ -12,7 +12,7 @@ namespace LastBell.Run
         public override string Id => "aurelion.falling_meridians";
         public override string Name => "Falling Meridians";
 
-        public const float Radius = 2.5f, EveryS = 5.0f, WarnS = 1.2f, WarnEasyS = 1.5f, WarnHardS = 1.0f;
+        public const float Radius = 2.5f, EveryS = 3.5f, WarnS = 1.2f, WarnEasyS = 1.5f, WarnHardS = 1.0f;
         public const int Damage = 30;
         public int Warn => Sim.Ticks(Easy ? WarnEasyS : Hard ? WarnHardS : WarnS);
         public int Casts { get; private set; }

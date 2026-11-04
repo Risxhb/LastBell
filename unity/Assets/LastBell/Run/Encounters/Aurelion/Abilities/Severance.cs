@@ -8,25 +8,31 @@ namespace LastBell.Run
     // L'ura's Severance (two dimensions; crossing kills, an empty side wipes), adapted: no one-shots, the line moves.
     //   - A meridian line (coral, hostile) splits the dais through the centre; the far half is Night (violet), the near half Day.
     //     Each player's side is where they stand when it lands.
-    //   - The line travels 270 degrees in 20 s (forward 135, then back 135 from 10 s, warned 1.5 s ahead): keep moving ahead of it.
+    //   - The line travels 24 degrees/s for 15 s, turning back at 5 s and again at 10 s (each turn warned 1 s ahead): keep moving
+    //     ahead of it. (Chzy18 3 Nov: "the day night mechanic really doesn't do much at all. it is very slow"; was 13.5 degrees/s
+    //     for 20 s with one turn, after a 3 s split.)
+    //   - Each half has its own danger (3 Nov): every 3 s a 2.5 m circle lands at the feet of everyone in Day, and 1.5 s later at
+    //     everyone in Night (Falling Meridians' size, warning and 30 damage), so both halves keep moving, in turn.
     //   - Crossing the line (by moving, or by letting it sweep over you) is a heavy hit (50) every time.
     //   - Co-op (N >= 2): if every standing player is on one side for 0.5 s, the other half falls: the party wipes.
-    //   - Patterns during it: Starfall Mirror at 2 s and 14 s, Meridian Lances (4 beams) at 8 s and 20 s (with the line,
-    //     three patterns). Solo: the empty-side rule never applies.
+    //   - Patterns during it: Starfall Mirror and Meridian Lances (4 beams) twice each, back to back. Solo: the empty-side rule
+    //     never applies; the circles follow whichever half you stand in.
     //   - Ends with Reunion (co-op only): a tower at the centre that every player must stand in (an empty one wipes).
     public sealed class Severance : AurelionAbility
     {
         public override string Id => "aurelion.severance";
         public override string Name => "Severance";
 
-        // Chzy18 2026-10-23 "Severance should move a lot faster": 270 degrees of travel in 20 s (13.5 degrees/s, about 3.3 m/s
-        // at the rim), turning back once at 10 s (warned 1.5 s ahead)
-        public const float LengthS = 20f, TurnDeg = 270f, EmptySideS = 0.5f, BackWarnS = 1.5f;
+        // Chzy18 2026-10-23 "Severance should move a lot faster", and again 3 Nov: 24 degrees/s (about 5.9 m/s at the rim, so near
+        // the rim you sprint; nearer the centre you walk), turning back at 5 s and 10 s, each turn warned 1 s ahead
+        public const float LengthS = 15f, DegPerS = 24f, LegS = 5f, EmptySideS = 0.5f, BackWarnS = 1.0f;
+        public const float HalfEveryS = 3f, HalfRadius = 2.5f;
+        public const int HalfDamage = 30;
         float yaw0; int lineTick;
-        // the line's yaw `t` seconds into the sweep: forward for the first half, then back the same way
-        public float YawAt(float t) { t = Mathf.Clamp(t, 0, LengthS); float w = TurnDeg / LengthS, half = LengthS / 2; return yaw0 + (t <= half ? w * t : w * half - w * (t - half)); }
+        // the line's yaw `t` seconds into the sweep: forward, back, forward, a leg of LegS each
+        public float YawAt(float t) { t = Mathf.Clamp(t, 0, LengthS); int leg = Mathf.Min(2, (int)(t / LegS)); float u = t - leg * LegS; return yaw0 + DegPerS * (leg == 1 ? LegS - u : u); }
         public float YawIn(float seconds) => Splitting ? LineYaw : YawAt(lineTick / (float)Sim.Hz + seconds);   // bots: where it will be
-        public const float SplitS = 3f;
+        public const float SplitS = 2f;   // 3 s until 3 Nov
         public bool Splitting { get; private set; }               // the 3 s before the sides lock
         readonly Dictionary<PlayerController, int> planned = new Dictionary<PlayerController, int>();
         public int Planned(PlayerController p) => planned.TryGetValue(p, out int s) ? s : 0;   // -1 Day, +1 Night, 0 free (solo)
@@ -45,6 +51,7 @@ namespace LastBell.Run
         public float LineYaw { get; private set; }                 // the line runs along LineYaw through the centre
         public int Crossings { get; private set; }
         public int Casts { get; private set; }
+        public int HalfCircles { get; private set; }   // test evidence: circles cast on the halves this cast
         readonly Dictionary<PlayerController, int> side = new Dictionary<PlayerController, int>();
 
         // +1 Night (left of the line's direction), -1 Day; 0 on the line itself
@@ -56,7 +63,7 @@ namespace LastBell.Run
         public IEnumerable<int> Run()
         {
             Say(Name);
-            Active = true; Crossings = 0; side.Clear();
+            Active = true; Crossings = 0; HalfCircles = 0; side.Clear();
             yaw0 = StartYaws[Casts++ % StartYaws.Length]; LineYaw = yaw0; lineTick = 0;
             // Telegraph style (audit F06): the line is the hostile part, two coral/amber half-strokes from the compass star whose
             // fill sweeps outward during the split (the countdown to the lock), then hold bright while it is live. Night is
@@ -86,11 +93,14 @@ namespace LastBell.Run
             for (int t = 0; t < len; t++)
             {
                 lineTick = t; LineYaw = YawAt(t / (float)Sim.Hz);
-                if (t == Sim.Ticks(LengthS / 2 - BackWarnS)) RunHud.Banner("THE LINE TURNS BACK", new Color(1f, 0.85f, 0.5f), BackWarnS);
+                if (t == Sim.Ticks(LegS - BackWarnS) || t == Sim.Ticks(2 * LegS - BackWarnS)) RunHud.Banner("THE LINE TURNS BACK", new Color(1f, 0.85f, 0.5f), BackWarnS);
                 PlaceLine(line);
                 night.Place(Centre, LineYaw - 90f);
                 PlaceNames(nightLbl, dayLbl);
                 Cross();
+                int every = Sim.Ticks(HalfEveryS);
+                if (t > 0 && t % every == 0) FallOnHalf(-1);                       // Day
+                if (t > every / 2 && (t - every / 2) % every == 0) FallOnHalf(1);  // Night, half a beat later
                 if (N >= 2)
                 {
                     bool day = false, nightOn = false;
@@ -109,14 +119,34 @@ namespace LastBell.Run
 
         IEnumerable<int> Patterns()
         {
-            yield return Sim.Ticks(2f);
-            foreach (var w in Boss.Starfall.Run(true)) yield return w;
             yield return Sim.Ticks(1f);
-            foreach (var w in Boss.Lances.Run(4, 1, false)) yield return w;
-            yield return Sim.Ticks(1.5f);
             foreach (var w in Boss.Starfall.Run(true)) yield return w;
-            yield return Sim.Ticks(1f);
+            yield return Sim.Ticks(0.5f);
             foreach (var w in Boss.Lances.Run(4, 1, false)) yield return w;
+            yield return Sim.Ticks(0.5f);
+            foreach (var w in Boss.Starfall.Run(true)) yield return w;
+            yield return Sim.Ticks(0.5f);
+            foreach (var w in Boss.Lances.Run(4, 1, false)) yield return w;
+        }
+
+        // a circle at the feet of every standing player in that half (-1 Day, +1 Night; solo: the half you stand in)
+        void FallOnHalf(int half)
+        {
+            var ps = W.Players;
+            for (int i = 0; i < ps.Count; i++)
+            {
+                var p = ps[i];
+                if (!p || p.Down) continue;
+                int s = N >= 2 ? Assigned(p) : SideOf(p.transform.position);
+                if (s != half) continue;
+                var h = Spawn(new Hazard
+                {
+                    Source = Name, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Sim.Flat(p.transform.position),
+                    Radius = HalfRadius, LockAt = 0, ResolveAt = Boss.Meridians.Warn, Damage = HalfDamage, Knockback = 0, Stun = 0,
+                });
+                h.OnResolve = hz => W.BossFx.ChimeResolve(hz.Origin, hz.Radius);
+                HalfCircles++;
+            }
         }
 
         void PlaceLine(BellkeeperFx.Telegraph[] line) { line[0].Place(Centre, LineYaw); line[1].Place(Centre, LineYaw + 180f); }
