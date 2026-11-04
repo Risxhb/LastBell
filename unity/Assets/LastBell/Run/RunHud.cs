@@ -208,11 +208,41 @@ namespace LastBell.Run
         {
             var parts = line.Split(DotSep, System.StringSplitOptions.None);
             for (int i = 0; i < parts.Length; i++)
+                x = DrawSegs(x, y, h, TimeSegs((i > 0 ? " · " : "") + parts[i]), st, c);
+        }
+        // Each time ("2.4s") is its own label, apart from the text around it ("slam 6 in "), so countdowns share about 30
+        // number texts instead of one per name and tenth (perf report bellkeeper-ultimate-2026-11-03, Update 19:30). Spaces
+        // at a segment's ends are drawn as gaps, so the widths don't depend on how trailing spaces are measured.
+        static readonly List<string> segs = new List<string>();
+        static List<string> TimeSegs(string s)
+        {
+            segs.Clear(); int at = 0;
+            foreach (System.Text.RegularExpressions.Match m in Tenths.Matches(s))
             {
-                string part = (i > 0 ? " · " : "") + WholeSeconds(parts[i]);
-                float pw = Wv(st, part);
-                T(x, y, pw + 4, h, part, st, c); x += pw;
+                if (m.Index > at) segs.Add(s.Substring(at, m.Index - at));
+                segs.Add(WholeSeconds(m.Value)); at = m.Index + m.Length;
             }
+            if (at < s.Length) segs.Add(s.Substring(at));
+            return segs;
+        }
+        static float SpaceW(GUIStyle st) => Wv(st, "a a") - Wv(st, "aa");
+        static float SegsWidth(GUIStyle st, List<string> sg)
+        {
+            float w = 0, sp = SpaceW(st);
+            foreach (var g in sg) { string tr = g.Trim(' '); w += (g.Length - tr.Length) * sp + (tr.Length > 0 ? Wv(st, tr) : 0); }
+            return w;
+        }
+        static float DrawSegs(float x, float y, float h, List<string> sg, GUIStyle st, Color? c = null)
+        {
+            float sp = SpaceW(st);
+            foreach (var g in sg)
+            {
+                string tr = g.TrimStart(' '); x += (g.Length - tr.Length) * sp;
+                string core = tr.TrimEnd(' ');
+                if (core.Length > 0) { float pw = Wv(st, core); T(x, y, pw + 4, h, core, st, c); x += pw; }
+                x += (tr.Length - core.Length) * sp;
+            }
+            return x;
         }
         static float Wv(GUIStyle st, string t)
         {
@@ -1026,15 +1056,17 @@ namespace LastBell.Run
             string cs = k.ClassState();
             if (!string.IsNullOrEmpty(cs))
             {
+                // drawn in segments with each time its own label (TimeSegs): the Tollbreaker's "SPLIT 4.1s  FRENZY 2.0s  AXES ..."
+                // was a new text every tenth and axe state, filling Unity's text cache (perf report, Update 19:30)
                 var parts = cs.Split(new[] { "   " }, System.StringSplitOptions.RemoveEmptyEntries);
                 float total = 0; var widths = new float[parts.Length];
-                for (int i = 0; i < parts.Length; i++) { parts[i] = parts[i].Trim(); widths[i] = Wv(pill, parts[i]) + 20; total += widths[i] + (i > 0 ? 8 : 0); }
+                for (int i = 0; i < parts.Length; i++) { parts[i] = parts[i].Trim(); widths[i] = SegsWidth(pill, TimeSegs(parts[i])) + 20; total += widths[i] + (i > 0 ? 8 : 0); }
                 float px = vw / 2 - total / 2, py = top - 10 - 24;
                 for (int i = 0; i < parts.Length; i++)
                 {
                     var pr2 = S(px, py, widths[i], 24);
                     UiTheme.Fill(pr2, A(UiTheme.InkDeep, 0.6f));
-                    T(px, py, widths[i], 24, parts[i], pill);
+                    DrawSegs(px + 8, py, 24, TimeSegs(parts[i]), pill);   // a segment is centred in its width + 4, so +8 puts it 10 in
                     px += widths[i] + 8;
                 }
             }
