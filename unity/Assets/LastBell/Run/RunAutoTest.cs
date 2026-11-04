@@ -602,6 +602,7 @@ namespace LastBell.Run
             Check("the Arcanist starts with no glyphs", k.Glyphs == 0, k.ClassState());
             int dis0 = MeterDamage("Disintegrate"); bool sawStep3 = false; int glyphsAtStep3 = -1;
             StartCoroutine(Capture("arcanist_disintegrate", 180));
+            PlayerFx.SurfaceMsTotal = PlayerFx.SurfaceMsWorst = PlayerFx.BakeMsWorst = PlayerFx.PoseMsWorst = PlayerFx.ChunkMsWorst = 0; PlayerFx.SurfaceCalls = PlayerFx.SurfaceTraces = 0; PlayerFx.SurfaceTrisTested = PlayerFx.SurfaceTrisTotal = 0;
             bot.press[1] = true; bot.hold[1] = true;
             float tt = 0; bool shotBeam = false;
             while (tt < 2.8f)
@@ -616,6 +617,10 @@ namespace LastBell.Run
             Check("a full Disintegrate deals 4x8 + 4x12 + 5x16 = 160", MeterDamage("Disintegrate") - dis0 == 160 && k.BeamDamage == 160, $"dealt {MeterDamage("Disintegrate") - dis0}");
             Check("each Disintegrate step that hits carves a glyph: 2 by step 3, 3 after a full channel", glyphsAtStep3 == 2 && k.Glyphs == 3, $"step 3 start {glyphsAtStep3}, end {k.Glyphs}");
             Check("Disintegrate cooldown starts when the beam ends", k.Cooldown01(1) > 0.85f, k.SlotState(1));
+            // the beam's contact on his model: chunked, it tests a few hundred triangles a trace, not all of them (the lag fix)
+            double avg = PlayerFx.SurfaceCalls > 0 ? PlayerFx.SurfaceMsTotal / PlayerFx.SurfaceCalls : -1;
+            Check("Disintegrate's contact trace stays cheap (under 0.3 ms a tick on average, no tick over 15 ms)", PlayerFx.SurfaceCalls > 0 && avg < 0.3 && PlayerFx.SurfaceMsWorst < 15,
+                $"{PlayerFx.SurfaceCalls} calls, {PlayerFx.SurfaceTraces} traces, avg {avg:0.000} ms, worst {PlayerFx.SurfaceMsWorst:0.00} ms (snapshot worst {PlayerFx.BakeMsWorst:0.00}: pose {PlayerFx.PoseMsWorst:0.00}, worker {PlayerFx.ChunkMsWorst:0.00}, off the main thread), tested {PlayerFx.SurfaceTrisTested} of {PlayerFx.SurfaceTrisTotal} triangles");
             yield return Shot("arcanist_glyphs_full");
             // ---- Arcane Surge: a dash before the release refunds it and keeps the glyphs
             bot.press[4] = true; yield return Wait(0.07f);
