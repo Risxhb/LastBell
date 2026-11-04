@@ -444,9 +444,6 @@ namespace LastBell.Run
             if (carrier) home = (pos.magnitude > 0.1f ? pos.normalized : Vector3.forward) * Mathf.Min(BrandRing, CombatWorld.PlayerBound - 1.2f);
             else if (Attacks && AttackSpot(me, boss, out var spot)) home = Sim.Flat(spot);
             volReach = Attacks && !carrier; volPull = 0.6f;
-            // a downed ally to revive (no brand on this bot): their side is home, and no swing there (it breaks the channel)
-            var reviveAt = Vector3.zero; bool reviving = !carrier && ReviveSpot(me, pos, out reviveAt);
-            if (reviving) { home = reviveAt; volReach = false; volPull = 2f; dJob = "volley-revive"; }
             // in a fan its bullets are still to cross: the nearest spot clear of every path is the goal (the look is too short
             // to find a Ring Wave's gap metres away: the solo bot ran from the wall of bullets into the corner, 11-03)
             if (path || bad(pos))
@@ -484,7 +481,7 @@ namespace LastBell.Run
             inp.Sprint = volSprint;
             // swing while standing is the plan and nothing comes near it
             float gap = Sim.Flat(tPos - pos).magnitude - tRad;
-            if (Attacks && !reviving && volMove == Vector3.zero && volCost < VolleySwing && gap <= Range(me) + 1.85f) Attack(me, ref inp);
+            if (Attacks && volMove == Vector3.zero && volCost < VolleySwing && gap <= Range(me) + 1.85f) Attack(me, ref inp);
             if (me.Hp < (Mode == BotMode.Passive ? 40 : 70) && me.Potions > 0 && tick % 30 == 0) inp.Potion = true;
             var move = volMove;
             if (move != Vector3.zero) move = AroundBoss(pos, move, boss);
