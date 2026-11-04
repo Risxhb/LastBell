@@ -393,8 +393,8 @@ namespace LastBell.Run
         static readonly System.Random look = new System.Random(31);   // presentation only, so props never shift the fight's rolls
         static float LookRnd(float a, float b) => a + (float)look.NextDouble() * (b - a);
         Hazard Tune(Hazard h) { h.Stun = Stun; h.Knockback = 0; h.AttackId ??= AttackOf(h.Source); return h; }
-        int FarCount { get { int n = W.Players.Count; return n <= 2 ? 1 : n <= 4 ? 2 : 3; } }
-        public int BudCount { get { int n = W.Players.Count; return (n <= 2 ? 2 : n <= 4 ? 3 : 4) + (Hard ? 1 : 0); } }   // Hard: one more bud
+        int FarCount => W.Players.Count <= 2 ? 1 : 2;   // 1-4 players
+        public int BudCount => (W.Players.Count <= 2 ? 2 : 3) + (Hard ? 1 : 0);   // Hard: one more bud
         List<PlayerController> Farthest(int k)
         {
             var s = Standing; s.Sort((a, b) => Sim.Flat(b.transform.position).sqrMagnitude.CompareTo(Sim.Flat(a.transform.position).sqrMagnitude));

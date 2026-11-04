@@ -23,7 +23,7 @@
 
 ## Players
 - **Solo:** pods come one after another, all on you. The storm is the same for everyone.
-- **Group:** at 8 players there's less room between bursts, and three pods land at a time.
+- **Group:** at 3–4 players two pods land at a time, and there's less room between bursts.
 
 ## Settled (dated)
 - **28 Oct:** Chzy18 turned down the first four Phase 4 options (Overgrowth, Final Chorus, Last Bloom, Rootfall) and the other new ones (Requiem Bells, Vine Sweep, Orbiting Choir). Seed Storm was picked.
@@ -54,7 +54,6 @@ Demo: the "P4 enrage" row, "Seed Storm, enrage" (option V), with Loop 1 / 3 / 5 
   |---|---|---|---|---|
   | 1 | 70 | 60 | 180 | ~1120 |
   | 4 | 130 | 145 | 105 | ~970 |
-  | 8 | 125 | 170 | 140 | ~770 |
 
   The soft steps stay under Phase 2's level (about 220/min). Last Storm downs a full-HP player in about 5–8 s.
 

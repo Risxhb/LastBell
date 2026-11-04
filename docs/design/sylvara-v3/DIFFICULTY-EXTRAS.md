@@ -15,7 +15,7 @@ Try it in the demo: `demo/sylvara-v3-demos.html`, **Level** row in the top bar. 
 |---|---|---|
 | 1 Spiral Bloom | **Every pod is Doubled.** A second ring fires 0.6 s after each pod, rotated half a step so it fills the first ring's gaps. On Medium only the 14.5 s pods do this. | Pods warn 3.0 s (was 2.5), jets warn 2.0 s (was 1.5), the Pruning Arc warns 2.5 / 3.3 s (was 2.0 / 2.8), and the spiral turns 12°/s (was 15). |
 | 2 Two-Colour Choir | **Double toll.** Each toll's 20-petal two-colour burst fires twice, 0.5 s apart. | Lanes fire every 0.5 s (Medium 0.35 s after the 29 Oct playtest), and the second counter-turning spiral set never joins. |
-| 3 Hollow Bloom | **One more Choir Bud per wave:** 3/3/4/5 at 1/2/4/8 players. | Buds bloom after 15 s (was 12), and the Hollow Spiral has 3 arms (was 4). |
+| 3 Hollow Bloom | **One more Choir Bud per wave:** 3/3/4/4 at 1/2/3/4 players. | Buds bloom after 15 s (was 12), and the Hollow Spiral has 3 arms (was 4). |
 | 4 Seed Storm | **Seeds burst into 10 petals** (was 8). | Seed rings start at 6 seeds every 2.5 s (Medium: 8 every 2.0 s). The enrage steps are the same: one more seed and 0.1 s sooner every 24 s loop. |
 
 - **Enrage:** the Phase 4 clock is the same on all three levels (accepted 29 Oct; the 31 Oct review kept it).
