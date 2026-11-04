@@ -144,12 +144,13 @@ namespace LastBell.Menu
             while (showcase.Elapsed < 13.05f) yield return null;
             yield return Shot("party-spell-release.png");
             // Compare after the first full cycle, once the existing spell pools/trails have warmed.
-            while (showcase.Elapsed < 81) yield return null;
+            float loop = showcase.Stages.Length * MenuShowcase.StageSeconds;   // one full rotation through every showcased arena
+            while (showcase.Elapsed < loop + 6) yield return null;
             yield return Shot("first-arena-rotation.png");
             int objects = menu.Battle.GetComponentsInChildren<Transform>().Length + FindAnyObjectByType<MenuFxLifetime>().GetComponentsInChildren<Transform>(true).Length;
             int materials = Resources.FindObjectsOfTypeAll<Material>().Length;
-            while (showcase.Elapsed < 156) yield return null;
-            Check("two complete arena rotations", showcase.Changes == 10 && showcase.CurrentStage == 0);
+            while (showcase.Elapsed < 2 * loop + 6) yield return null;
+            Check("two complete arena rotations", showcase.Changes == 2 * showcase.Stages.Length && showcase.CurrentStage == 0);
             Check("all actors travel independently", menu.Battle.ActorTravel.Take(menu.Battle.ActorCount).All(distance => distance > .1f) && menu.Battle.IndependentMotionFrames > 60);
             Check("casters plant without sliding during attacks", menu.Battle.PlantedCastFrames > 120 && menu.Battle.CastSlideFrames == 0);
             Check("all choreography clips available", menu.Battle.Presenters.All(p => p.Placeholders.Count == 0));
@@ -158,30 +159,8 @@ namespace LastBell.Menu
                 menu.Battle.GetComponentsInChildren<Transform>().Length + FindAnyObjectByType<MenuFxLifetime>().GetComponentsInChildren<Transform>(true).Length == objects);
             Check("bounded materials over five loops", Resources.FindObjectsOfTypeAll<Material>().Length <= materials + 2);
             yield return Shot("after-five-loops.png");
-            menu.StartButton.onClick.Invoke(); menu.StartRun();
-            Check("duplicate start guarded", menu.Loading);
-            float deadline = Time.realtimeSinceStartup + 45;
-            while (!FindAnyObjectByType<HeroSelection>() && Time.realtimeSinceStartup < deadline) yield return null;
-            yield return new WaitForSeconds(.5f);
-            var selection=FindAnyObjectByType<HeroSelection>();
-            Check("Start opens cinematic hero selection",selection&&!RunDirector.Instance&&!FindAnyObjectByType<MenuBattle>());
-            if(selection){selection.SelectHero(2);selection.ConfirmClass();selection.ConfirmClass();}
-            deadline=Time.realtimeSinceStartup+45;
-            while (!RunDirector.Instance && Time.realtimeSinceStartup < deadline) yield return null;
-            var director = RunDirector.Instance;
-            Check("Select Class enters fresh run Ready", director && director.State == RunState.Ready && director.Encounter==director.EncounterOrder[0]);
-            Check("menu music continues through run preparation", FindAnyObjectByType<MenuMusic>() && FindAnyObjectByType<MenuMusic>().Source.isPlaying && FindAnyObjectByType<MenuMusic>().Source == FindAnyObjectByType<MenuMusic>().MenuSource);
-            if (director)
-            {
-                yield return new WaitForSeconds(0.2f);
-                Check("fresh session preserves class", director.ClassName=="Arcanist" && director.RunsStarted == 1 && director.State == RunState.Ready);
-                director.SetPaused(true); director.ReturnToMenu();
-                deadline = Time.realtimeSinceStartup + 30;
-                while (!FindAnyObjectByType<MainMenu>() && Time.realtimeSinceStartup < deadline) yield return null;
-                yield return new WaitForSeconds(1);
-                Check("return creates one clean choreography", FindObjectsByType<MenuBattle>().Length == 1 && !RunDirector.Instance);
-                Check("return creates one menu music source", FindObjectsByType<MenuMusic>().Length == 1 && FindAnyObjectByType<MenuMusic>().Source.isPlaying);
-            }
+            // The showcase menu UI and its Start -> HeroSelection flow are retired (the Confrontation menu is the only main menu);
+            // starting, Boss Rush and returning to the main menu are covered by MenuFlowTest (-lastbellFlowStage).
             Check("zero runtime errors", errors.Count == 0);
             report.AddRange(errors); report.Add($"RESULT: {report.Count(l => l.StartsWith("PASS"))} passed, {failures} failed");
             File.WriteAllLines(Path.Combine(output, "menu-test-report.txt"), report);
