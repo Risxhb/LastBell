@@ -98,7 +98,6 @@ namespace LastBell.Run
         }
         static OrreryClosingFx Build(CombatWorld world)
         {
-            if (!rim.Replica) Networking.LanFx.Record?.Invoke(Networking.LanFxTarget.Replica, "OrreryClosing", new object[] { rim.Id, crown.Id, horizonTicks });
             var go = new GameObject("Orrery Closing fx"); go.transform.SetParent(world.Root, false);
             var fx = go.AddComponent<OrreryClosingFx>(); fx.w = world;
             fx.Add(OrreryClosing.RimInner + EdgeInset, 1, RimStartY, 0.25f);       // just inside each hazard, clear of its plain outline
@@ -109,6 +108,7 @@ namespace LastBell.Run
 
         public static void Create(CombatWorld world, Hazard rim, Hazard crown, int horizonTicks)
         {
+            if (!rim.Replica) Networking.LanFx.Record?.Invoke(Networking.LanFxTarget.Replica, "OrreryClosing", new object[] { rim.Id, crown.Id, horizonTicks });
             var fx = Free(world) ?? Build(world);
             fx.horizon = horizonTicks; fx.warmFrames = 0;
             fx.Begin(fx.rings[0], rim); fx.Begin(fx.rings[1], crown);

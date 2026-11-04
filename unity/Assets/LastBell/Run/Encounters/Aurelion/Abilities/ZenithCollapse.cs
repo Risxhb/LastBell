@@ -90,8 +90,6 @@ namespace LastBell.Run
         }
         static ZenithCollapseFx Build(CombatWorld world)
         {
-            // LAN: a host session records it; a client replays Create on its stand-in for the same hazard
-            if (!hazard.Replica) Networking.LanFx.Record?.Invoke(Networking.LanFxTarget.Replica, "ZenithCollapse", new object[] { hazard.Id });
             var go = new GameObject("Zenith Collapse fx"); go.transform.SetParent(world.Root, false);
             var fx = go.AddComponent<ZenithCollapseFx>(); fx.w = world; fx.mat = Prim.Material(Gold, 1f);
             int n = Mathf.CeilToInt(2 * Mathf.PI * AurelionAbility.Rim / 0.9f);
@@ -111,6 +109,8 @@ namespace LastBell.Run
 
         public static ZenithCollapseFx Create(CombatWorld world, Hazard hazard)
         {
+            // LAN: a host session records it; a client replays Create on its stand-in for the same hazard
+            if (!hazard.Replica) Networking.LanFx.Record?.Invoke(Networking.LanFxTarget.Replica, "ZenithCollapse", new object[] { hazard.Id });
             var fx = Free(world) ?? Build(world);
             fx.h = hazard; fx.fade = -1; fx.warmFrames = 0; fx.LeadRadius = 0; fx.MinRadiusSeen = float.MaxValue;
             fx.transform.position = new Vector3(hazard.Origin.x, 0.05f, hazard.Origin.z);
