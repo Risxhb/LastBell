@@ -1,6 +1,6 @@
 # Item catalogue
 
-**Status:** living catalogue, owned by the Items session. Classes: **Tollbreaker, Chimesinger and Arcanist**. The 20 Tollbreaker items (TB01–TB20) were accepted on 2026-11-01 (`docs/proposals/tollbreaker-items-2026-10-31.md`). The rest were accepted through the shop spec and build plan (slice 1) and the review inbox (Chzy18, 2026-10-28), with this catalogue's Temper values. The retired Vanguard's rows and cut items were deleted on 2026-11-02; they stay in git history. Only the 10 Toll slots are still proposals. New rows start as proposals. Written 2026-10-28.
+**Status:** living catalogue, owned by the Items session. Classes: **Tollbreaker, Chimesinger and Arcanist**. The 20 Tollbreaker items (TB01–TB20) were accepted on 2026-11-01 (`docs/proposals/tollbreaker-items-2026-10-31.md`). The rest were accepted through the shop spec and build plan (slice 1) and the review inbox (Chzy18, 2026-10-28), with this catalogue's Temper values. The retired Vanguard's rows and cut items were deleted on 2026-11-02; they stay in git history. The 10 Toll items (T01–T10, drafted 2026-11-05) are still proposals. New rows start as proposals. Written 2026-10-28.
 
 **Sources:** `AGENTS.md`; `gpt/08-design-rules.md` (§0.3, §1, §2, §3, §4); `docs/proposals/meta-shop-spec-2026-10-29.md` (final, §12 answers); `docs/proposals/meta-loot-and-toll-2026-10-29.md` §1.4–1.9 (the 70-item draft pool and the dropped list); `docs/design/run-shop-plan.md` §3 (item framework, slice 1); `unity/Assets/LastBell/Run/Shop/ItemCatalog.cs` (built values).
 
@@ -91,10 +91,33 @@
 | G08 | Formation | general | R | Party | +6% damage per ally within 5 m, up to +18% | +9% per ally, up to +27% | flat +6% (+9%) | built: ally range, damage hook | **built (96624b2, local, untested)** | accepted |
 | G09 | Fourth Choice | general | R | | **Shop version (final, balance pass 2026-11-02):** your stock has 7 slots instead of 6 for the rest of the run (+1 class slot) | — | works | new: stock size in ShopRun | **built (96624b2, local, untested)** | accepted |
 | G10 | Light Feet | general | C | | +10% move speed for 1 s after a dash | +15% | works | new: move speed buff | **built (96624b2, local, untested)** | accepted |
-| T01–T05 | *Toll IV items* | any | — | | 5 sidegrades, named after playtests and aimed at thin slots (Toll IV reward, spec §10) | | | | proposal (unnamed) | none |
-| T06–T10 | *Toll VII items* | any | — | | 5 more, named after playtests (Toll VII reward) | | | | proposal (unnamed) | none |
+| T01 | Overchannel | Arcanist | K | Toll IV | Each Disintegrate step that hits carves 2 glyphs instead of 1, but you lose 1 glyph every 3 s while you're not channelling | lose 1 every 4 s | works | new: glyph carve count, glyph fade timer | **proposal (drafted 5 Nov, tune after playtest)** | none |
+| T02 | Leaden Step | general | K | Toll IV | +15% damage, but each dash costs 45 stamina instead of 30. Dash distance and speed are unchanged | dash costs 40 | works | built: damage hook; new: dash stamina cost | **proposal (drafted 5 Nov, tune after playtest)** | none |
+| T03 | Double Toll | Chimesinger | R | Toll IV | Bellstrike tolls again 1 s later for 40% damage, but its cooldown is 20% longer | second toll 60% | works | new: delayed repeat, Bellstrike cooldown | **proposal (drafted 5 Nov, tune after playtest)** | none |
+| T04 | Short Split | Tollbreaker | R | Toll IV | Splitting Throw's bonus is +55% instead of +40%, but it lasts 4 s instead of 6 | +60% | works | built: `t.split.bonus`, `t.split.ticks`, `t.lodge.boss` | **proposal (drafted 5 Nov, tune after playtest)** | none |
+| T05 | Steady Breath | general | C | Toll IV | Stamina regenerates 15% faster, but sprinting drains 28/s instead of 25/s | +22% | works | built: sprint drain; new: stamina regen rate | **proposal (drafted 5 Nov, tune after playtest)** | none |
+| T06 | Lingering Rune | Arcanist | R | Toll VII | Rune Sigil goes off after 1.2 s instead of 0.8 s, and its rune stays 2 s more, hitting again for 40% if the boss is still inside (outline only) | second hit 60% | works | new: Sigil delay, lingering second hit | **proposal (drafted 5 Nov, tune after playtest)** | none |
+| T07 | Patient Bell | general | K | Toll VII | Your first hit on the boss after 2 s without hitting it deals +60%; all your other hits deal −10% | first hit +80% | works | built: damage hook; new: time since your last boss hit | **proposal (drafted 5 Nov, tune after playtest)** | none |
+| T08 | Low Note | Chimesinger | C | Toll VII | Resonant Note +12% damage, but its notes fly 15% slower | +18% | works | new: note projectile speed | **proposal (drafted 5 Nov, tune after playtest)** | none |
+| T09 | Long Toss | Tollbreaker | C | Toll VII | The held Twin Hurl throw lodges up to 12 m away instead of 9, but hits 26 instead of 30 | hits 28 | works | new: held-throw range; built: damage hook (held throw) | **proposal (drafted 5 Nov, tune after playtest)** | none |
+| T10 | Late Bloom | general | R | Toll VII | −6% damage in a fight's first phase, +10% in every later phase | +15% in later phases | works | built: damage hook; new: boss phase number | **proposal (drafted 5 Nov, tune after playtest)** | none |
 
-**Count:** 69 live items (20 Tollbreaker, 19 Chimesinger, 20 Arcanist, 10 general), plus 10 Toll slots that are still proposals.
+**Toll items: look notes for the icons** (accepted icon style and rarity frames, class accent or neutral brass for general items, no coral, amber or danger gold):
+
+| # | Look |
+|---|---|
+| T01 Overchannel | a beam splitting into two rune glyphs, with a third glyph crumbling away at the edge |
+| T02 Leaden Step | a boot with an iron bell-weight chained to the heel |
+| T03 Double Toll | a bell with two ripple rings, the outer one fainter |
+| T04 Short Split | an axe biting deep into a cracked bell plate, with a small half-empty hourglass |
+| T05 Steady Breath | a bellows breathing out an even, slow wave line |
+| T06 Lingering Rune | a rune circle outline with a second, ticking ring around it |
+| T07 Patient Bell | a hammer held still above a bell, with a small pause mark |
+| T08 Low Note | one thick, heavy note with a long trailing tail |
+| T09 Long Toss | an axe at the end of a long dotted line, stuck in a floor crack |
+| T10 Late Bloom | a bell-flower bud opening on a clock hand |
+
+**Count:** 69 live items (20 Tollbreaker, 19 Chimesinger, 20 Arcanist, 10 general), plus 10 Toll items (T01–T10) that are proposals: 5 join the pools at Toll IV and 5 more at Toll VII.
 - Built: 11 slice items (PR 10, not merged) and 38 pool items (local, untested).
 - Built: the 20 Tollbreaker items (Azure PR 14, 523232d, not merged).
 
@@ -145,10 +168,10 @@ Six decisions, accepted as one block (`docs/proposals/item-balance-pass-2026-11-
 - **Formation** (G08): unchanged. It is conditional, and with at most 4 players its 3-ally cap fits exactly.
 - **Fourth Choice** (G09): the shop version (+1 stock slot) is final.
 - **Resonant Rune** (A19): stays gated on a Chimesinger in the party. The loot doc's solo fallback is dropped.
-- **Toll IV and VII items**: named after playtests, aimed at the thin slots: the Arcanist has 1 Keystone, and the general pool has none.
+- **Toll IV and VII items**: aimed at the thin slots (the Arcanist had 1 Keystone and the general pool none). Chzy18 asked on 5 Nov for them to be drafted now: see `docs/proposals/toll-items-2026-11-05.md`.
 
 ## Open questions
 
-None right now. The Toll IV and VII items get named after playtests (decided 2026-11-02).
+1. The Toll items T01–T10 were drafted on 2026-11-05 and done as recommended. They're with Chzy18 for review, and the numbers get tuned after the playtest.
 
 *Settled 2026-10-28:* the Temper values were accepted as one block, along with Starfall's per-impact damage and the Tempers for yes/no items.
