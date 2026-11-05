@@ -246,11 +246,12 @@ const glowMat = new THREE.MeshBasicMaterial({ map: (() => { const t = tex(floorP
 glowMat.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', '#include <map_fragment>\n diffuseColor = vec4(vec3(0.25, 0.95, 0.85) * texture2D(map, vMapUv).b * 0.55, 1.0);'); };
 const glowLayer = add(new THREE.Mesh(new THREE.CircleGeometry(MOSAIC_R + 0.1, 96).rotateX(-Math.PI / 2), glowMat)); glowLayer.position.y = 0.01; glowLayer.userData.previewOnly = true;
 glowMat.map.repeat.set((MOSAIC_R + 0.1) / (R + 0.2), (MOSAIC_R + 0.1) / (R + 0.2)); glowMat.map.offset.set(0.5 - glowMat.map.repeat.x / 2, 0.5 - glowMat.map.repeat.y / 2);
-// flush brass gear ring around the medallion (turns slowly at runtime)
+// flush gear ring around the medallion (turns slowly at runtime), carved in dark stone: a gold ring at Sylvara's feet
+// would read as boss danger
 const gear = (() => { const sh = new THREE.Shape(), ro = MED_R + 0.2, ri = MED_R + 0.02, T = 36;
   for (let i = 0; i <= T * 4; i++) { const a = i / (T * 4) * Math.PI * 2, t = (i % 4 === 1 || i % 4 === 2) ? ro : ro - 0.1; i ? sh.lineTo(Math.cos(a) * t, Math.sin(a) * t) : sh.moveTo(Math.cos(a) * t, Math.sin(a) * t); }
   const hole = new THREE.Path(); hole.absarc(0, 0, ri, 0, Math.PI * 2, true); sh.holes.push(hole);
-  const m = add(new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: 0.02, bevelEnabled: false, curveSegments: 72 }).rotateX(-Math.PI / 2), BRASS_DK)); m.name = 'MedallionGear'; m.receiveShadow = true; return m; })();
+  const m = add(new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: 0.02, bevelEnabled: false, curveSegments: 72 }).rotateX(-Math.PI / 2), STONE_DK)); m.name = 'MedallionGear'; m.receiveShadow = true; return m; })();
 
 // ---- platform body: drum under the curb, ruined arcades around it, rock root into the abyss ----
 function paintBricks(W, Hh) {
