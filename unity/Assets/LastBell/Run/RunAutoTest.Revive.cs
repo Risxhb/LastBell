@@ -5,7 +5,7 @@ using UnityEngine;
 namespace LastBell.Run
 {
     // Revives (docs/proposals/revives-2026-11-04.md): a downed ally gets up after 3 s of a still ally beside them, a hit on
-    // the reviver starts it over, 20 s unrevived is dead (no revive), and a bot ally comes over to revive a downed player.
+    // the reviver starts it over, 30 s unrevived is dead (no revive), and a bot ally comes over to revive a downed player.
     // Runs with the party checks (-lastbellPartyOnly). The boss's hazards are cleared every frame so only the test hurts.
     public sealed partial class RunAutoTest
     {
@@ -55,12 +55,12 @@ namespace LastBell.Run
             }
             Check("revives: the revive finishes after the hit", !ally.Down && ally.Revives == 2);
 
-            // 3) moving away pauses it; 20 s unrevived is dead, and the dead can't be revived
+            // 3) moving away pauses it; 30 s unrevived is dead, and the dead can't be revived
             pinOff = new Vector3(6f, 0, 0); me.transform.position = ally.transform.position + pinOff;
             ally.ForceDown("revive test");
             yield return Until(() => ally.Dead, PlayerController.BleedOutSeconds + 6, "bled out");
             Check("revives: no revive from 6 m away", ally.ReviveProgress == 0, $"progress {ally.ReviveProgress:0.00}");
-            Check("revives: 20 s unrevived is dead", ally.Dead && Mathf.Abs(ally.DownedTicks / (float)Sim.Hz - PlayerController.BleedOutSeconds) < 0.1f, $"{ally.DownedTicks / (float)Sim.Hz:0.0} s");
+            Check("revives: 30 s unrevived is dead", ally.Dead && Mathf.Abs(ally.DownedTicks / (float)Sim.Hz - PlayerController.BleedOutSeconds) < 0.1f, $"{ally.DownedTicks / (float)Sim.Hz:0.0} s");
             Check("revives: the Death clip plays", ally.Presenter.CurrentClip == "Death", ally.Presenter.CurrentClip);
             pinOff = new Vector3(0.9f, 0, 0); me.transform.position = ally.transform.position + pinOff;
             int t1 = w.Tick; yield return Until(() => w.Tick >= t1 + Sim.Ticks(4f), 8, "4 s beside the dead ally");
