@@ -141,7 +141,8 @@ namespace LastBell.Run
                         // -crucivarWatchFrom p2: start just under 65 %, so Phase 2 comes after the first Forge Rite loop
                         if (fromP2 && ph == 1 && cb.Hp > cb.MaxHp * 0.645f) cb.DebugSetHpFraction(0.64f);
                         if (fromP3 && ph < 3 && cb.Hp > cb.MaxHp * 0.295f) cb.DebugSetHpFraction(0.29f);   // -crucivarWatchFrom p3: Phase 3 after the first loop
-                        float floor = cb.PhaseLoops < 2 ? (ph == 1 ? (fromP2 || fromP3 ? 0f : 0.66f) : ph == 2 ? (fromP3 ? 0f : 0.31f) : 0.02f) : 0f;
+                        // from p3 the boss sits under 30 % through Phases 1 and 2, so a floor there keeps the bots from killing it before Phase 3
+                        float floor = fromP3 && ph < 3 ? 0.15f : cb.PhaseLoops < 2 ? (ph == 1 ? (fromP2 ? 0f : 0.66f) : ph == 2 ? 0.31f : 0.02f) : 0f;
                         if (cb.Hp < cb.MaxHp * floor) cb.DebugSetHpFraction(floor);
                         int key = ph * 100 + cb.PhaseLoops;
                         if (key != logged)
