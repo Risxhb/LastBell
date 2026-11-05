@@ -1,6 +1,6 @@
 # Toll IV and VII items: 10 sidegrades
 
-**Status: proposal (drafted 5 Nov, tune after playtest). Done as recommended, review later.** Written by the Items session on 2026-11-05. Chzy18 asked through the overview for these to be drafted now, not after playtests.
+**Status: accepted by Chzy18 on 2026-11-05** (review inbox). Numbers get tuned after the playtest. Written by the Items session on 2026-11-05. Chzy18 asked through the overview for these to be drafted now, not after playtests.
 
 **Sources:**
 - `docs/design/items/CATALOGUE.md` (budgets and the 2 Nov balance pass, which names the thin slots)
@@ -54,5 +54,5 @@
 
 ## Open questions
 
-1. Accept the 10 items as drafted? They're done as recommended, so a rejection undoes them.
+1. *Answered 2026-11-05:* accepted as drafted.
 2. Should Patient Bell's 2 s gap be tuned per boss after the first playtest?
