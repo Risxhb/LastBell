@@ -66,6 +66,7 @@ namespace LastBell.Run
         IEnumerator DemoRecorder(string name)
         {
             var cdir = Path.Combine(dir, "frames_" + name); Directory.CreateDirectory(cdir);
+            if (NoFrames) { Note($"video frames {name}: skipped (batchmode)"); yield break; }
             Time.captureFramerate = 30; int i = 0;
             while (demoRecording)
             {
