@@ -51,12 +51,16 @@ namespace LastBell.Run
         // ---------------- encounter hooks ----------------
         public void Ratchet(float k) { }                                   // the three hammer notches live in the Diebreaker clip
         public void HammerLand() { }
-        public void Hiss(bool on) { gaugeK = on ? 0.6f : 0; }
-        public void Pour(bool on) { pouring = on; }
-        public void Gauge(float k) { gaugeK = k; }
-        public void Vents(bool frontBack, bool on) { fbTarget = frontBack; ventsOn = on; }
+        // LAN: a host records Pour and VentsAll (CrucivarEncounter.ReplayNetEffect calls them on the client's replica rig);
+        // BeginPhase, Shutdown and Heat follow the replicated phase, defeat and glow in CrucivarEncounter.ReplicaPresent
+        public void Pour(bool on) { NetRecord("CrucivarRig.Pour", on); pouring = on; }
         // every vent at once (Bellows Draw's inhale): belly shutters, flank grilles and the back exhaust
-        public void VentsAll(bool on) { ventsAll = on; }
+        public void VentsAll(bool on) { NetRecord("CrucivarRig.VentsAll", on); ventsAll = on; }
+        static void NetRecord(string method, bool on)
+        {
+            var r = Networking.LanFx.Record;
+            if (r != null) r(Networking.LanFxTarget.BossPart, method, new object[] { on });
+        }
         public void BeginPhase(int phase)
         {
             if (phase >= 2 && !shedding)

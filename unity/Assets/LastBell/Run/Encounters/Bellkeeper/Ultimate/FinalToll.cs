@@ -185,7 +185,7 @@ namespace LastBell.Run
                 // the last stand: the fall, the shards, the end
                 if (Standing(nt))
                 {
-                    foreach (var p in W.Players) if (!p.Down && p.Height < 0.05f && (Sim.Flat(p.transform.position) - PlatC(HourOf(p))).magnitude > PlatR) Hit(p, UltimateState.Lethal, "the fall");   // feet down off the platform: dashing too (no iframes)
+                    foreach (var p in W.Players) if (!p.Down && (Sim.Flat(p.transform.position) - PlatC(HourOf(p))).magnitude > PlatR) Hit(p, UltimateState.Lethal, "the fall");   // off the platform falls: dashing too (no iframes)
                     for (int n = 0; n < ShardCount; n++)
                     {
                         var sh = Shard(n);
@@ -259,6 +259,7 @@ namespace LastBell.Run
         sealed class Plan { public Vector3 V; public int Until; public string Job; public Vector3 Goal; }
         readonly Dictionary<PlayerController, Plan> plans = new Dictionary<PlayerController, Plan>();
         public string JobOf(PlayerController p) => plans.TryGetValue(p, out var pl) ? pl.Job : null;
+        public override string Job(PlayerController p) => JobOf(p);
         public static bool Log;   // tests: every time a bot finds no safe route
 
         // the nearest spot to 'to' clear of toll k's lane and debts, inside the bell, that passes need
@@ -319,6 +320,8 @@ namespace LastBell.Run
                 var E = EchoPos(k); float ea = AngOf(E) + (i % 2 == 1 ? 100 : -100) + ((i % 4) < 2 ? -20 : 20);
                 job = "→ ECHO"; return Clear(k, E + Dir(ea) * 4.5f, null);
             }
+            // nothing due: get a downed ally up, when the spot beside them is clear of the next lanes and debts
+            if (ReviveSpot(p, null, out var rs) && (Clear(k, rs, null) - rs).magnitude < 0.35f) { job = "revive"; return Clear(k, rs, null); }
             float a = (k < 13 ? LaneAng(k) : 0) + 90 + (i % 2 == 1 ? 0 : 180) + ((i % 4) < 2 ? -25 : 25);
             job = k >= 9 ? "→ BOSS" : "";
             return Clear(k, Dir(a) * 5.2f, null);

@@ -97,10 +97,33 @@ namespace LastBell.Run
             Tick++;
             using (PmPlayers.Auto()) { foreach (var p in Players) { Actor = p; p.Step(); } Actor = null; }
             if (!CombatActive) return;
+            StepRevives();
             using (PmBoss.Auto()) if (Boss != null && !Boss.Dead) Boss.Step();
             using (PmProjectiles.Auto()) Projectiles.Step();
             Bullets.Step();
             using (PmHazards.Auto()) Hazards.Step();
+        }
+
+        // Revives (PlayerController): each downed player's revive fills while any standing ally beside them channels (stands
+        // still, free and unhurt), pauses while none does, and starts over when a reviver is hit. Two revivers are no faster.
+        void StepRevives()
+        {
+            foreach (var p in Players) p.Reviving = null;
+            foreach (var d in Players)
+            {
+                if (!d.Down || d.Dead) continue;
+                bool on = false, hurt = false;
+                foreach (var r in Players)
+                {
+                    if (r == d || r.Down || r.Reviving != null) continue;
+                    if (Sim.Flat(r.transform.position - d.transform.position).magnitude > PlayerController.ReviveRange) continue;
+                    if (r.LastHurtTick >= Tick - 1) hurt = true;   // (hazards land after this step: last tick counts)
+                    if (!r.CanChannelRevive) continue;
+                    r.Reviving = d; on = true;
+                }
+                if (hurt) d.ReviveProgress = 0;
+                else if (on && (d.ReviveProgress += 1f / Sim.Ticks(PlayerController.ReviveSeconds)) >= 0.999f) d.Revive();
+            }
         }
 
         // Clears everything an encounter can leave behind: hazards, projectiles, boss-owned effects. Called at every
@@ -245,6 +268,8 @@ namespace LastBell.Run
     {
         public sealed class Projectile
         {
+            static int nextNetworkId;
+            public readonly int NetworkId = ++nextNetworkId; // presentation identity only; combat rules are unchanged
             public Vector3 Pos, Vel; public float Range, Travelled, Radius; public int Damage; public string Ability;
             public Action<int, Vector3> OnHit; public Color Color;
             public PlayerController Owner;   // who fired it (damage attribution); Fire fills it from the world's Actor
@@ -257,6 +282,7 @@ namespace LastBell.Run
         readonly CombatWorld w; readonly List<Projectile> live = new List<Projectile>(), batch = new List<Projectile>();
         int clears;   // bumped by ClearAll, so a step can tell its batch was cancelled mid-dispatch
         public int Count => live.Count;
+        public IReadOnlyList<Projectile> Live => live;
         public ProjectileSystem(CombatWorld world) { w = world; }
 
         public void Fire(Projectile p) { if (p.Owner == null) p.Owner = w.Actor; live.Add(p); }
@@ -279,7 +305,7 @@ namespace LastBell.Run
                 }
                 var step = p.Vel * Sim.Dt;
                 p.Pos += step; p.Travelled += step.magnitude;
-                if (p.OnMove != null) p.OnMove(p); else w.Fx.ProjectileHead(p.Pos, p.Color);
+                if (p.OnMove != null) { Networking.LanFx.Projectile(p, "Move", false, p.Pos); p.OnMove(p); } else w.Fx.ProjectileHead(p.Pos, p.Color);
                 BossPart part = null;
                 foreach (var q in w.Parts) if (q.Alive && Sim.Flat(p.Pos - q.Pos).magnitude <= q.BodyRadius + p.Radius) { part = q; break; }
                 if (part != null)
@@ -287,7 +313,7 @@ namespace LastBell.Run
                     var contact = part.Pos + Sim.Flat(p.Pos - part.Pos).normalized * part.BodyRadius + Vector3.up * part.HitHeight;
                     live.Remove(p);
                     int dealt = w.DamagePart(part, p.Damage, contact, p.Ability);
-                    if (p.OnEnd != null) p.OnEnd(p, true, contact); else w.Fx.NoteImpact(contact, p.Color);
+                    if (p.OnEnd != null) { Networking.LanFx.Projectile(p, "End", true, contact); p.OnEnd(p, true, contact); } else w.Fx.NoteImpact(contact, p.Color);
                     p.OnHit?.Invoke(dealt, contact);
                     continue;
                 }
@@ -301,17 +327,17 @@ namespace LastBell.Run
                     w.Actor = p.Owner;
                     int dealt = w.DamageBoss(p.Damage, contact, p.Ability, p.OnEnd == null);   // custom projectiles draw their own impact
                     w.Actor = null;
-                    if (p.OnEnd != null) p.OnEnd(p, true, contact); else w.Fx.NoteImpact(contact, p.Color);
+                    if (p.OnEnd != null) { Networking.LanFx.Projectile(p, "End", true, contact); p.OnEnd(p, true, contact); } else w.Fx.NoteImpact(contact, p.Color);
                     p.OnHit?.Invoke(dealt, contact);
                     continue;
                 }
-                if (p.Travelled >= p.Range || !CombatWorld.InPlayerBound(p.Pos, 2)) { live.Remove(p); p.OnEnd?.Invoke(p, false, p.Pos); }
+                if (p.Travelled >= p.Range || !CombatWorld.InPlayerBound(p.Pos, 2)) { live.Remove(p); if (p.OnEnd != null) { Networking.LanFx.Projectile(p, "End", false, p.Pos); p.OnEnd(p, false, p.Pos); } }
             }
         }
         public void ClearAll()
         {
             var ending = live.ToArray(); live.Clear(); clears++;
-            foreach (var p in ending) p.OnEnd?.Invoke(p, false, p.Pos);
+            foreach (var p in ending) if (p.OnEnd != null) { Networking.LanFx.Projectile(p, "End", false, p.Pos); p.OnEnd(p, false, p.Pos); }
         }
     }
 }

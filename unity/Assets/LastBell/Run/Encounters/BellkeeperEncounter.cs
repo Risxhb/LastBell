@@ -73,13 +73,16 @@ namespace LastBell.Run
         }
         static float Lerp3(float[] v, float p) => p <= 1 ? Mathf.Lerp(v[0], v[1], p) : Mathf.Lerp(v[1], v[2], p - 1);
 
-        void LateUpdate()
+        void LateUpdate() => PresentLook(phase, Dead, Current, Time.deltaTime);
+
+        // the shell and ring offsets for the eased phase look: the host from its own phase (LateUpdate), a LAN client's
+        // replica from the host's (ReplicaPresent -> ReplicaLate, also after the presenter has evaluated the clip)
+        void PresentLook(int targetPhase, bool dead, string current, float dt)
         {
             if (!lookBound) BindLook();
             if (!PhaseRigFound) return;
-            float dt = Time.deltaTime;
-            lookPhase = Mathf.MoveTowards(lookPhase, phase - 1, dt / 0.8f);    // the change plays across the 1.5 s shift
-            float open = Dead ? DefeatOpen : Current == "recovery" ? Mathf.Max(PunishOpen, Lerp3(ShellOpen, lookPhase)) : Lerp3(ShellOpen, lookPhase);
+            lookPhase = Mathf.MoveTowards(lookPhase, targetPhase - 1, dt / 0.8f);    // the change plays across the 1.5 s shift
+            float open = dead ? DefeatOpen : current == "recovery" ? Mathf.Max(PunishOpen, Lerp3(ShellOpen, lookPhase)) : Lerp3(ShellOpen, lookPhase);
             ShellAngle = Mathf.MoveTowards(ShellAngle, open, dt * (open > ShellAngle ? 120 : 60));
             RingSpread = Lerp3(RingOut, lookPhase);
             Vector3 up = transform.up, fwd = transform.forward, right = transform.right, c = transform.position;
@@ -105,13 +108,51 @@ namespace LastBell.Run
         {
             base.Update();
             IntroPrebuild();
-            if (presenter) presenter.GlowLevel = glowLevel * Lerp3(PhaseGlow, lookPhase);
-            if (Dead && presenter && presenter.Visual)
+            PresentBody(glowLevel, Dead, Time.deltaTime);
+        }
+        // phase glow and the defeat sink (presenter values: read by the presenter's next Update)
+        void PresentBody(float glow, bool dead, float dt)
+        {
+            if (presenter) presenter.GlowLevel = glow * Lerp3(PhaseGlow, lookPhase);
+            if (dead && presenter && presenter.Visual)
             {
                 // defeat: placeholder sink below the dial edge after the Defeat/Vulnerable pose
-                defeatT += Time.deltaTime;
-                if (defeatT > 1.2f) presenter.Sink = Mathf.MoveTowards(presenter.Sink, 1.5f, Time.deltaTime * 0.8f);
+                defeatT += dt;
+                if (defeatT > 1.2f) presenter.Sink = Mathf.MoveTowards(presenter.Sink, 1.5f, dt * 0.8f);
             }
+        }
+
+        // ---------------- LAN looks ----------------
+        // Glow = core glow (before the phase factor); Look[0] = phase (1-3), Look[1] = the host's eased look phase (0-2).
+        // The replica eases toward the phase itself and snaps to the host's look when it is far off (a practice start).
+        // The shell layering must follow the presenter's clip evaluation, so a small enabled helper calls it in LateUpdate.
+        int netPhase = 1; float netLook = -1, netGlow = 1; bool netDead; string netCurrent = "";
+        ReplicaLate replicaLate;
+        public int ReplicaLookFrames { get; private set; }   // LAN smoke tests: frames the replica drew the phase look
+        public override void CaptureNetLook(Networking.LanWorldFrame.BossState into)
+        {
+            into.Glow = glowLevel;
+            into.Look.Add(phase); into.Look.Add(lookPhase);
+        }
+        public override void ReplicaPresent(Networking.LanWorldFrame.BossState state, float dt)
+        {
+            var look = state.Look;
+            if (look.Count > 0) netPhase = Mathf.Clamp(Mathf.RoundToInt(look[0]), 1, 3);
+            if (look.Count > 1) netLook = Mathf.Clamp(look[1], 0, 2);
+            netGlow = state.Glow; netDead = state.Dead; netCurrent = state.Attack ?? "";
+            if (!replicaLate) { replicaLate = gameObject.AddComponent<ReplicaLate>(); replicaLate.Owner = this; }
+        }
+        void PresentReplica(float dt)
+        {
+            if (netLook >= 0 && Mathf.Abs(lookPhase - netLook) > 0.35f) lookPhase = netLook;
+            PresentLook(netPhase, netDead, netCurrent, dt);
+            PresentBody(netGlow, netDead, dt);
+            ReplicaLookFrames++;
+        }
+        sealed class ReplicaLate : MonoBehaviour
+        {
+            public BellkeeperEncounter Owner;
+            void LateUpdate() { if (Owner && Owner.IsNetReplica) Owner.PresentReplica(Time.deltaTime); }
         }
         float defeatT;
         protected override void OnDefeat()

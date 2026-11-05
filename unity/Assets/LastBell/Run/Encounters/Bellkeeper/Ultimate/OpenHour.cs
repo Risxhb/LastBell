@@ -199,6 +199,7 @@ namespace LastBell.Run
         readonly Dictionary<PlayerController, Plan> plans = new Dictionary<PlayerController, Plan>();
         public static bool LogSteer;   // tests: every time a bot finds no safe route
         public string JobOf(PlayerController p) => plans.TryGetValue(p, out var pl) ? pl.Job : null;
+        public override string Job(PlayerController p) => JobOf(p);
 
         // A velocity for bot p (world, m/s). skill: Late re-plans 0.25 s behind; Miss walks in to attack during a rewind.
         public override bool Steer(PlayerController p, UltimateBot.Skill skill, out Vector3 vel)
@@ -251,6 +252,8 @@ namespace LastBell.Run
                 urgent = true; job = "CURTAIN: gap " + UltimateState.Roman[h % 4 + 1];
                 return pp * off + d * along;
             }
+            // nothing due: get a downed ally up (the route search still dodges; the bot stands only while SafeToRoot allows)
+            if (UltimateMechanic.ReviveSpot(p, q => q.magnitude < Bound - 0.6f, out var rs)) { job = "revive"; return rs; }
             float[] rings = { 4.3f, 4.3f, 9.6f, 10.6f };   // I and II share a ring 120° apart (each passes the other's spot 4 s later: its echo is gone)
             int i = W.Players.IndexOf(p);
             float a = ArmAngle(t) + 60 + 120 * (h % 3);

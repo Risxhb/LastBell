@@ -55,6 +55,10 @@ namespace LastBell.Run
                 foreach (var m in boss.Mechanics)
                     if (m.Running && Steered(m, me, out var vel))
                     {
+                        // revives: the phase sent it beside a downed ally; stand still there (no presses) while the route search
+                        // finds standing safe, so the revive channels (PlayerController: 3 s within 1.5 m, a hit starts it over)
+                        bool still = m.Job(me) == "revive" && UltimateMechanic.BesideDowned(me) && m.SafeToRoot(me, 0.5f, 0f);
+                        if (still) vel = Vector3.zero;
                         inp.Move = ToScreen(vel / PlayerController.WalkSpeed);
                         inp.Sprint = vel.magnitude > PlayerController.WalkSpeed + 0.1f;
                         for (int i = 0; i < cd.Length; i++) if (cd[i] > 0) cd[i]--;
@@ -72,12 +76,12 @@ namespace LastBell.Run
                         {
                             // the phase names a target (P4: the nearest gear core or the boss) and whether the whole kit is safe
                             inp.Aim = aim + Vector3.up * 0.1f;
-                            if (Attacks && reach <= Reach(me) + 0.6f) { if (full && !slowsMe && pressNow && RootOk(-1)) Attack(me, ref inp, 0); else if (!slowsMe && pressNow && RootOk(0)) { inp.P0 = inp.H0 = true; lastPress = tick; } }
+                            if (Attacks && !still && reach <= Reach(me) + 0.6f) { if (full && !slowsMe && pressNow && RootOk(-1)) Attack(me, ref inp, 0); else if (!slowsMe && pressNow && RootOk(0)) { inp.P0 = inp.H0 = true; lastPress = tick; } }
                         }
                         else
                         {
                             float gap = Sim.Flat(bpos - pos).magnitude - boss.BodyRadius;
-                            if (Attacks && !slowsMe && gap <= Reach(me) + 1f && pressNow && RootOk(0)) { inp.P0 = inp.H0 = true; lastPress = tick; }
+                            if (Attacks && !still && !slowsMe && gap <= Reach(me) + 1f && pressNow && RootOk(0)) { inp.P0 = inp.H0 = true; lastPress = tick; }
                         }
                         if (me.Potions > 0 && me.Hp < DrinkBelow(me) && me.Hp < PlayerController.MaxHp) inp.Potion = tick % 4 == 0;
                         DebugLine = $"{m.Name}: v ({vel.x:0.0},{vel.z:0.0}) at ({pos.x:0.0},{pos.z:0.0})";
@@ -132,8 +136,14 @@ namespace LastBell.Run
                 if (hasTarget && (!had || Sim.Flat(target - old).magnitude > 2f)) Decisions++;
             }
 
+            // revives: a downed ally with a spot beside them that keeps every known rule: go there and stand still, no presses
+            bool reviving = UltimateMechanic.ReviveSpot(me, q => Satisfies(q, rules, int.MaxValue), out var reviveAt);
+            if (reviving) { target = reviveAt; hasTarget = true; }
+            bool channel = reviving && UltimateMechanic.BesideDowned(me) && Sim.Flat(target - pos).magnitude < 0.3f;
+
             Vector3 move = Vector3.zero;
-            if (hasTarget)
+            if (channel) { castHold = 0; beamHold = 0; }
+            else if (hasTarget)
             {
                 var to = Sim.Flat(target - pos); float dist = to.magnitude;
                 float left = rules.Count > 0 ? (rules[0].Tick - now) / (float)Sim.Hz : 9;
@@ -164,14 +174,14 @@ namespace LastBell.Run
             bool positioning = hasTarget && (Sim.Flat(target - pos).magnitude > 0.5f || (rules.Count > 0 && rules[0].Tick - now < (rules[0].Memory ? 90 : 30)));
             for (int i = 0; i < cd.Length; i++) if (cd[i] > 0) cd[i]--;
             // Chimesinger: Mending Chorus (burst heal round the caster) when it would top up a hurt ally or two (potions run out in P5)
-            if (Attacks && me.ClassName == "Chimesinger" && cd[4] == 0 && tick - lastPress >= 6)
+            if (Attacks && !channel && me.ClassName == "Chimesinger" && cd[4] == 0 && tick - lastPress >= 6)
             {
                 int hurt = 0; foreach (var p in w.Players) if (!p.Down && p.Hp < 65 && Sim.Flat(p.transform.position - pos).magnitude < 5.5f) hurt++;
                 if (hurt >= 2 || (hurt == 1 && me.Hp < 65)) { inp.P4 = true; cd[4] = 900; lastPress = tick; }
             }
             // the Arcanist's Disintegrate is held: keep holding while the spot is safe, let go the moment it has to move
             if (beamHold > 0) { if (positioning) beamHold = 0; else { inp.H1 = true; beamHold--; lastPress = tick; } }
-            else if (Attacks && !positioning && bossGap <= Reach(me) + 1.5f) Attack(me, ref inp, rules.Count == 0 ? 9999 : rules[0].Tick - now);
+            else if (Attacks && !positioning && !reviving && bossGap <= Reach(me) + 1.5f) Attack(me, ref inp, rules.Count == 0 ? 9999 : rules[0].Tick - now);
             if (move != Vector3.zero) move = AroundBoss(pos, move, boss, hasTarget ? target : (Vector3?)null);
             inp.Move = ToScreen(move);
             DebugLine = $"rules {rules.Count} first {(rules.Count > 0 ? rules[0].Why + " in " + (rules[0].Tick - now) : "-")} target {(hasTarget ? $"({target.x:0.0},{target.z:0.0})" : "-")} at ({pos.x:0.0},{pos.z:0.0})";

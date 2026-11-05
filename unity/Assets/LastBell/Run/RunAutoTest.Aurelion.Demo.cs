@@ -22,6 +22,7 @@ namespace LastBell.Run
         {
             ["Meridian Lances"] = "Beams through the whole arena, aimed at a player, then they lock: step sideways out of the beam.",
             ["Cascading Lances"] = "Two volleys of beams, the second turned 22.5 degrees: clear the first, then the second.",
+            ["Meridian Recall"] = "Hard: the last volley of beams fires again from where he stood, on the same lines: remember them and stand in a gap.",
             ["Starfall Mirror"] = "A star follows each player, with a mirror copy on the far side: step off your star, avoid every mirror.",
             ["Meridian Towers"] = "Stand in each numbered tower, in order, when it lands. An EMPTY TOWER WIPES THE PARTY.",
             ["Ecliptic Order"] = "Memorise the numbered rings before they go dark: the floor is struck everywhere except ring I, then II, then III.",
@@ -79,8 +80,8 @@ namespace LastBell.Run
 
         IEnumerator AurelionDemoFight()
         {
+            AurelionArgs.SoloOverride = null;
             Note("---------- Aurelion v4 demo: 4 perfect bots, Hard ----------");
-            AurelionArgs.SetOverride = null; AurelionArgs.SoloOverride = null;
             if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }
             // -lastbellDemoClass, -lastbellDemoLevel, -lastbellDemoAllies: the solo reference runs (Codex proposal 1) use the same fight
             string cls = AurelionArgs.Arg("-lastbellDemoClass") ?? "Arcanist";

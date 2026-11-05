@@ -38,7 +38,7 @@ namespace LastBell.Run
         string idleClip = "Idle";
 
         // locomotion inputs set by the controller each tick
-        public float Locomotion; public bool Sprinting; public float HeightOffset, Sink; public float RunClipSpeed = 4.2f;
+        public float Locomotion; public bool Sprinting; public float Sink; public float RunClipSpeed = 4.2f;
 
         // procedural placeholder state (Hit / Down / GetUp / missing model)
         float flinch, downAmount, downTarget, yaw;
@@ -135,18 +135,21 @@ namespace LastBell.Run
         void NotePlaceholder(string s) { if (!Placeholders.Contains(s)) Placeholders.Add(s); }
 
         public void Dash() => PlayOnce("Dodge", 0.3f, 0.05f);
-        public void Jump() => PlayOnce("Jump", 0.62f, 0.2f);
-        public void Land() { if (!PlayOnce("Land", 0.2f)) { } }
         public void Hit() { if (!PlayOnce("Hit", 0.3f)) flinch = 1; }
-        public void Down() { EndOverlay(); downTarget = 1; if (PlayOnce("Down", 0.8f)) { downTarget = 0; oneShotLeft = 9999; } }
-        public void GetUp() { downTarget = 0; if (!PlayOnce("GetUp", 0.9f)) { downAmount = 1; } }
-        public void ResetPose() { downTarget = downAmount = 0; flinch = 0; oneShotLeft = 0; GlowLevel = 1; SetLoop(idleClip); EndOverlay(); SetHidden(false); }
+        // downed: the Down fall, then the Downed loop (or its last frame held); dead: the Death clip, held
+        public void Down() { EndOverlay(); downTarget = 1; holdLoop = null; if (PlayOnce("Down", 0.8f)) { downTarget = 0; if (Has("Downed")) holdLoop = "Downed"; else oneShotLeft = 9999; } }
+        public void Death() { holdLoop = null; if (PlayOnce("Death", 0.8f)) oneShotLeft = 9999; }
+        public void GetUp() { downTarget = 0; holdLoop = null; if (!PlayOnce("GetUp", 0.9f)) { downAmount = 1; } }
+        string holdLoop;
+        public void ResetPose() { holdLoop = null; downTarget = downAmount = 0; flinch = 0; oneShotLeft = 0; GlowLevel = 1; SetLoop(idleClip); EndOverlay(); SetHidden(false); }
         public void SetIdleClip(string name) { idleClip = name; if (oneShotLeft <= 0) SetLoop(name); }
 
         // called on the combat tick by its owner; picks the locomotion loop when no one-shot is playing
         public void Tick(PlayerController pc)
         {
             if (oneShotLeft > 0) return;
+            if (holdLoop != null) { SetLoop(holdLoop); return; }
+            if (pc != null && pc.Reviving != null && Has("Revive")) { SetLoop("Revive"); return; }   // kneeling over a downed ally
             if (Locomotion > 0.3f) SetLoop(Sprinting ? "Sprint" : "Run", Sprinting ? Locomotion / 6.5f : Locomotion / RunClipSpeed);
             else SetLoop(idleClip);
         }
@@ -162,7 +165,7 @@ namespace LastBell.Run
             downAmount = Mathf.MoveTowards(downAmount, downTarget, dt / 0.45f);
             if (Visual != null)
             {
-                Visual.localPosition = new Vector3(0, HeightOffset - 0.25f * downAmount - Sink, 0);
+                Visual.localPosition = new Vector3(0, -0.25f * downAmount - Sink, 0);
                 Visual.localRotation = Quaternion.Euler(0, yaw, 0) * Quaternion.Euler(-12 * Mathf.Sin(flinch * Mathf.PI) - 82 * downAmount, 0, 0);
             }
             foreach (var (m, c) in glow) m.SetColor("emissiveFactor", c * GlowLevel);
@@ -267,6 +270,25 @@ namespace LastBell.Run
         }
 
         public string CurrentClip => current >= 0 && clips != null && current < clips.Length ? clips[current].name : "-";
+
+        // Presentation-only network state: this never changes the actor's gameplay or ability timing.
+        public float NetworkClipSpeed => current >= 0 && speeds != null && current < speeds.Length ? speeds[current] : 1;
+        public float NetworkOverlaySpeed => Overlaying ? ovSpeed : 1;
+        public void ApplyNetworkPose(string clip, float clipSpeed, string overlay, float overlaySpeed, bool hide)
+        {
+            if (index.TryGetValue(clip ?? "", out int i))
+            {
+                if (current != i) { current = i; times[i] = 0; }
+                speeds[i] = clipSpeed <= 0 ? 1 : Mathf.Clamp(clipSpeed, .05f, 20); oneShotLeft = .2f;
+            }
+            if (layered && index.TryGetValue(overlay ?? "", out int o))
+            {
+                if (ov != o) { ov = o; ovTimes[o] = 0; }
+                ovSpeed = Mathf.Clamp(overlaySpeed, .05f, 20); ovLoop = overlay.EndsWith("Loop"); ovLeft = .2f;
+            }
+            else if (layered) EndOverlay();
+            if (Hidden != hide) SetHidden(hide);
+        }
 
         // simple readable stand-in body if a character GLB is missing from Resources
         static System.Func<Transform, Transform> PlaceholderBody(string className) => host =>

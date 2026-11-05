@@ -81,6 +81,13 @@ namespace LastBell.Run
         }
 
         public void ClearAll() { live.Clear(); spawned.Clear(); view.Hide(); }
+        // LAN clients: the list holds the host's bullets (never stepped here); the client sets each one's place and look
+        // every frame and draws them.
+        public void SetReplicaCount(int n)
+        {
+            while (live.Count < n) live.Add(new Bullet());
+            if (live.Count > n) live.RemoveRange(n, live.Count - n);
+        }
         public void ResetStats() { Peak = 0; Fired = 0; }
 
         // presentation, every frame

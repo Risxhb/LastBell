@@ -4,8 +4,8 @@ using UnityEngine;
 namespace LastBell.Run
 {
     // How many bot allies fight beside the player (menu row, or  LastBell.exe -lastbellAllies 0..3). Chzy18 asked for
-    // allies on 2026-10-22 so co-op mechanics can be tested solo; 0 keeps the solo fight. The game is 1-4 players (Chzy18,
-    // 2026-11-01; it was 1-8), so at most 3 bots join. Per session only (not
+    // allies on 2026-10-22 so co-op mechanics can be tested solo; 0 keeps the solo fight. Parties are 1-4 players since
+    // 1 Nov (gpt/08 section 1), so at most 3 allies. Per session only (not
     // remembered): the main menu has no Allies control, so a saved count would silently add bots to games and to the
     // other test runs. A run copies it when it starts.
     public static class RunParty

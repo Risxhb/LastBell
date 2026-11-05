@@ -10,10 +10,9 @@ namespace LastBell.Run
     public sealed class ForgeRiteTest : CrucivarAbilityTest
     {
         public override string Id => "crucivar.v4_forge_rite";
-        public override string Set => "v4";
         public override int Order => 300;
 
-        public override IEnumerator Run(CrucivarV2AutoTest t)
+        public override IEnumerator Run(CrucivarAutoTest t)
         {
             yield return t.Setup(4, at: new[] { new Vector3(0, 0, 6), new Vector3(6, 0, -1.5f), new Vector3(0, 0, -9), new Vector3(-6, 0, -1.5f) });
             if (t.Boss == null) yield break;
@@ -33,7 +32,7 @@ namespace LastBell.Run
             c0 = t.Spawned("Ember Brand").Select(x => x.Tick).DefaultIfEmpty(c0).Min();
             int R(string src) => t.Spawned(src).Select(x => x.Tick - c0 + x.H.ResolveAt).DefaultIfEmpty(-1).Min();
             t.Check("Ember Brand: one per player, lands at 3.5 s", t.Spawned("Ember Brand").Count() == 8 && R("Ember Brand") >= 210 && R("Ember Brand") <= 212, $"{t.Spawned("Ember Brand").Count()} brands, {R("Ember Brand")}");
-            t.Check("Furnace Spin: four jets live from 3.5 s for 4 s", t.Spawned("Furnace Spin").Count() == 4 && t.Spawned("Furnace Spin").All(x => x.H.ActiveTicks == 240), $"{t.Spawned("Furnace Spin").Count()}");
+            t.Check("Furnace Spin: six jets live from 3.5 s for 4 s", t.Spawned("Furnace Spin").Count() == ForgeRite.JetCount && t.Spawned("Furnace Spin").All(x => x.H.ActiveTicks == 240), $"{t.Spawned("Furnace Spin").Count()}");
             var jet = t.Spawned("Furnace Spin").First().H;
             t.Check("Furnace Spin: the jets turned while live", Mathf.Abs(Mathf.DeltaAngle(jet.Yaw, t.Spawned("Furnace Spin").First().H.Yaw)) >= 0 && jet.Age > jet.ResolveAt);
             t.Check("Furnace Spin: every jet reaches the wall", t.Spawned("Furnace Spin").All(x => Mathf.Abs((Sim.Flat(x.H.Origin) + Sim.Dir(x.H.Yaw) * x.H.Length).magnitude - (CrucivarAbility.Rim + Hazard.Margin)) < 0.05f));
@@ -53,6 +52,9 @@ namespace LastBell.Run
                 $"{R("Anvil Quake I")}/{R("Anvil Quake II")}/{R("Anvil Quake III")}");
             t.Check("peak of live patterns is three or more", peak >= 3, $"peak {peak}");
             t.Check("still players get hit (brands on each other, jets, blast, quake)", t.Hits.Count > 0, $"{t.Hits.Count} hits");
+            t.Check("the brand stops following 1.0 s before it lands; its pool forms where it stopped", t.Spawned("Ember Brand").All(x => x.H.ResolveAt - x.H.LockAt == Sim.Ticks(ForgeRite.BrandFreeze)) && t.Spawned("Brand Pool").All(x => x.H.LockAt == 0));
+            var drafts = t.Spawned("Backdraft").Select(x => x.Tick - c0).ToList();
+            t.Check("a second Backdraft pulls during the second brand (from 14.0 s)", drafts.Count >= 2 && drafts.Max() - drafts.Min() >= Sim.Ticks(8.5f), string.Join("/", drafts));
             int pools = t.W.Hazards.Live.Count(h => h.Source == "Brand Pool");
             t.Check("brand pools outlast the loop", pools == 8, $"{pools} live");
             t.Boss.Rite.ClearPools();
@@ -76,6 +78,32 @@ namespace LastBell.Run
             t.Check("boss death cancels the loop's hazards", t.W.Hazards.Count == 0);
             yield return t.Seconds(1.5f);
             t.Check("no damage after the boss dies", t.Hits.Count == hits);
+            t.Check("Medium has no Quake Echo", !t.Spawns.Any(x => x.Source.StartsWith("Quake Echo")));
+
+            // Hard: Quake Echo, the bands again outside-in from 0.8 s after the outer band
+            yield return t.Setup(4, Difficulty.Hard, at: new[] { new Vector3(0, 0, 6), new Vector3(6, 0, -1.5f), new Vector3(0, 0, -9), new Vector3(-6, 0, -1.5f) });
+            if (t.Boss == null) yield break;
+            t.Begin(t.Boss.Rite.Loop());
+            for (s = 0; s < 30 && t.Boss.TestBusy; s += Time.deltaTime)
+            {
+                foreach (var p in t.Party) if (p.Hp < 60) p.DebugSetHp(PlayerController.MaxHp);
+                yield return null;
+            }
+            int At(string src) => t.Spawns.Where(x => x.Source == src).Select(x => x.Tick + x.H.ResolveAt).DefaultIfEmpty(-1).Min();
+            int outer = At("Anvil Quake III"), e3 = At("Quake Echo III"), e2 = At("Quake Echo II"), e1 = At("Quake Echo I");
+            t.Check("Hard: Quake Echo fires III / II / I at +0.8 / 1.6 / 2.4 s after the outer band", t.Boss.Rite.Echoes == 1 && outer > 0
+                && Math.Abs(e3 - outer - 48) <= 2 && Math.Abs(e2 - outer - 96) <= 2 && Math.Abs(e1 - outer - 144) <= 2, $"echoes {t.Boss.Rite.Echoes}, {e3 - outer}/{e2 - outer}/{e1 - outer}");
+            t.Check("Hard: the echo shows only once the outer band has landed", t.Spawned("Quake Echo").All(x => x.Tick >= outer - 1));
+            var ech = new[] { "Quake Echo I", "Quake Echo II", "Quake Echo III" }.Select(n => t.Spawns.FirstOrDefault(x => x.Source == n)?.H).ToArray();
+            if (ech.All(x => x != null))
+            {
+                var eo = Sim.Flat(ech[0].Origin); var wp = Vector3.right * (CrucivarAbility.Rim - 0.2f);
+                bool OnlyE(int i, Vector3 p) => Enumerable.Range(0, 3).All(k => ech[k].Contains(p) == (k == i));
+                t.Check("Hard: the echo bands match the quake bands", OnlyE(0, eo + Vector3.forward * 2f) && OnlyE(1, eo + Vector3.forward * 6.5f) && OnlyE(2, wp));
+            }
+            else t.Check("Hard: the echo bands match the quake bands", false, "missing echo");
+            t.Check("Hard: the loop runs to its end", !t.Boss.TestBusy);
+            t.Check("Hard: one hit per instance", t.OneHitPerInstance());
         }
     }
 }

@@ -118,7 +118,7 @@ namespace LastBell.Run
             Ult.Wipe("The hour runs out");
         }
         float PushFor(UltSegment s) => UltTimerFor(W.Difficulty) * PushBase[(int)s];
-        protected override int HpFloor => UltPlanActive ? Mathf.RoundToInt(MaxHp * SegEnd[(int)Segment]) : 0;
+        protected override int PhaseFloor => UltPlanActive ? Mathf.RoundToInt(MaxHp * SegEnd[(int)Segment]) : 0;
         bool Reached(UltSegment s) => Hp <= Mathf.RoundToInt(MaxHp * SegEnd[(int)s]);
 
         // ---------------- the plan ----------------

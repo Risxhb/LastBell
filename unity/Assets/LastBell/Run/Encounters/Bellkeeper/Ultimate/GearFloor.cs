@@ -126,8 +126,6 @@ namespace LastBell.Run
             }
             return "";
         }
-        // on the floor: feet down. A dash is on the floor too (no iframes, gpt/08): it only helps by carrying you out of the shape
-        static bool Grounded(PlayerController p) => p.Height < 0.05f;
 
         // ---------------- cast ----------------
         public override IEnumerable<int> Cast()
@@ -143,14 +141,14 @@ namespace LastBell.Run
             {
                 float t = T, nt = t + Sim.Dt;
                 for (int g = 0; g < 5; g++) spin[g] += Omega(g, t) * Sim.Dt * Mathf.Rad2Deg;
-                // the floor carries everyone standing on it
+                // the floor carries everyone on it, a downed body too (it rides its gear, so a reviver beside it can stand still)
                 foreach (var p in W.Players)
                 {
-                    if (p.Down || !Grounded(p)) continue;
+                    if (p.Dead) continue;
                     var v = FloorVel(p.transform.position, t);
                     if (v.sqrMagnitude > 0) p.transform.position = W.Constrain(p.transform.position + v * Sim.Dt, PlayerController.Radius);
                 }
-                foreach (var p in W.Players) { if (p.Down || !Grounded(p)) continue; var why = Deadly(p.transform.position, nt); if (why != "") Hit(p, UltimateState.Lethal, why); }
+                foreach (var p in W.Players) { if (p.Down) continue; var why = Deadly(p.transform.position, nt); if (why != "") Hit(p, UltimateState.Lethal, why); }
                 // shards
                 foreach (var s in shards) s.P += s.V * Sim.Dt;
                 foreach (var p in W.Players)
@@ -187,7 +185,7 @@ namespace LastBell.Run
                         wildSlams = ws; int sg = WildSlamGear(ws);
                         if (!launched[sg])
                         {
-                            foreach (var p in W.Players) if (!p.Down && GearAt(p.transform.position) == sg) Hit(p, UltimateState.Lethal, "the hammer");   // it falls from above: a jump or a dash is no shield
+                            foreach (var p in W.Players) if (!p.Down && GearAt(p.transform.position) == sg) Hit(p, UltimateState.Lethal, "the hammer");   // it falls from above: a dash is no shield
                             for (int j = 0; j < 12; j++) shards.Add(new Shard { P = GearCentre(sg), V = Dir(30 * j + 7 * ws) * ShardSpeed });
                             W.BossFx.TollResolve(GearCentre(sg), 0.5f, O_R); CameraShake.Shake(0.15f, 0.25f);
                         }
@@ -225,7 +223,7 @@ namespace LastBell.Run
                     using var slamMark = SlamMarker.Auto();
                     slams = ks; telegraphs.Clear();
                     var ss = SlamGears(ks);
-                    foreach (var p in W.Players) if (!p.Down && ss.Contains(GearAt(p.transform.position))) Hit(p, UltimateState.Lethal, "the hammer");   // from above: no jump or dash exemption
+                    foreach (var p in W.Players) if (!p.Down && ss.Contains(GearAt(p.transform.position))) Hit(p, UltimateState.Lethal, "the hammer");   // from above: no dash exemption
                     foreach (var g in ss) for (int j = 0; j < Shards; j++) shards.Add(new Shard { P = GearCentre(g), V = Dir(360f / Shards * j + 11 * ks) * ShardSpeed });
                     // the train jams if a gear is not held by its own player (Chzy18 25 Oct "force it": anyone else on it doesn't
                     // count, so the two-place rotation is the rule, not just the bots' strat)
@@ -245,7 +243,7 @@ namespace LastBell.Run
                     if (stop) break;
                     if (goWild) { wild = true; goWild = false; wildAt = nt; Boss.PlanLog.Add((Now, "the train runs wild")); }
                 }
-                if (Log && (Now - t0) % 30 == 0) foreach (var p in W.Players) if (!p.Down) Debug.Log($"[gear floor] {t:0.0}s {UltimateState.Roman[HourOf(p) + 1]} at ({p.transform.position.x:0.0},{p.transform.position.z:0.0}) h{p.Height:0.00}{(p.Dashing ? " dash" : "")} gear {GearAt(p.transform.position)} target {TargetOf(p, k, t)} job {JobOf(p)}");
+                if (Log && (Now - t0) % 30 == 0) foreach (var p in W.Players) if (!p.Down) Debug.Log($"[gear floor] {t:0.0}s {UltimateState.Roman[HourOf(p) + 1]} at ({p.transform.position.x:0.0},{p.transform.position.z:0.0}){(p.Dashing ? " dash" : "")} gear {GearAt(p.transform.position)} target {TargetOf(p, k, t)} job {JobOf(p)}");
                 if (Boss.Ult.WipeCause != null) break;
                 using (PresentMarker.Auto()) Present(nt);
                 yield return 1;
@@ -268,6 +266,7 @@ namespace LastBell.Run
         readonly Dictionary<PlayerController, Plan> plans = new Dictionary<PlayerController, Plan>();
         public static bool Log;   // tests: bot positions every 0.5 s, and every time a bot finds no safe route
         public string JobOf(PlayerController p) => plans.TryGetValue(p, out var pl) ? pl.Job : null;
+        public override string Job(PlayerController p) => JobOf(p);
         // the Tollbreaker parks against its core too (Chzy18 2 Nov, review inbox): its axes fly back sooner from close in
         static bool Melee(PlayerController p) => p.ClassName == "Tollbreaker";
 
@@ -288,6 +287,21 @@ namespace LastBell.Run
             Vector3 Park(int g) => g == 4
                 ? Dir(45 + 90 * (i % 4) + spin[4]) * 2.3f
                 : GearCentre(g) + Dir(90f * g + 180 + (SpinSign(t) > 0 ? 35 : -35)) * (Melee(p) ? HubR + PR + 0.5f : 2.6f);
+            // revives: get a downed ally up (a spot beside it, off its core), on any gear (5 Nov: each bot rides its own gear, so a
+            // body on a gear nobody else rides was left to bleed out). Free on the gear I need next; otherwise only while the trip
+            // there, the 3 s channel and the trip on to my next gear all fit before that gear needs me (the lock, or the next slam)
+            if (!wild && cur >= 0 && ReviveSpot(p, q => { int g = GearAt(q); return g >= 0 && (g == 4 || (q - GearCentre(g)).magnitude > HubR + PR + 0.2f); }, out var rs))
+            {
+                int rg = GearAt(rs); var pos0 = Sim.Flat(p.transform.position);
+                float due = breakMode && !locked ? -3 : k * Slam, walk = PlayerController.WalkSpeed * (t < 0 ? 0.8f : 0.6f);
+                float trip = Route(pos0, cur, rs, rg) + (rg == tg ? 0 : Route(rs, rg, Park(tg), tg)), left = PlayerController.ReviveSeconds;
+                foreach (var q in W.Players) if (q.Down && !q.Dead && Sim.Flat(q.transform.position - rs).magnitude < 1.2f) left *= 1 - q.ReviveProgress;   // a revive under way: only the rest of it
+                if (rg == tg || t + trip / walk + left + 1.5f < due)
+                {
+                    if (rg == cur) { job = "revive"; return rs; }
+                    job = "→ revive " + GN[rg]; tg = rg;   // cross to its gear the usual way (through the centre gear's mesh points)
+                }
+            }
             Vector3 goal = cur == tg ? Park(tg) : cur == 4 ? (tg == 4 ? Park(4) : MeshPoint(tg)) : cur < 0 ? Park(tg) : Dir(90f * cur) * 2.6f;   // else across the mesh point onto the centre gear's ring
             // the core (and the pawl behind it) block the straight line: go round the core first (the short route search can't see past it)
             if (cur >= 0 && cur < 4)
@@ -301,6 +315,15 @@ namespace LastBell.Run
                 }
             }
             return goal;
+        }
+
+        // walking distance from a on gear ga to b on gear gb: gears only meet at the centre gear's mesh points
+        static float Route(Vector3 a, int ga, Vector3 b, int gb)
+        {
+            if (ga == gb || ga < 0 || gb < 0) return (a - b).magnitude;
+            if (ga == 4) return (a - MeshPoint(gb)).magnitude + (MeshPoint(gb) - b).magnitude;
+            if (gb == 4) return (a - MeshPoint(ga)).magnitude + (MeshPoint(ga) - b).magnitude;
+            return (a - MeshPoint(ga)).magnitude + (MeshPoint(ga) - MeshPoint(gb)).magnitude + (MeshPoint(gb) - b).magnitude;
         }
 
         // The Train Runs Wild spins the floor at up to x2.2 and sprays shards from every hammer and torn gear: replan every 3 ticks

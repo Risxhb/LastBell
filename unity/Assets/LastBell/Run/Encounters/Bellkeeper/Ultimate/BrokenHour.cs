@@ -104,13 +104,15 @@ namespace LastBell.Run
             foreach (var p in W.Players) if (HourOf(p) == InvHour(0)) inverted.Add(p);
             Build();
             NextBeatTick = TickAt(Cue.At0(BeatSeconds));
-            SolvePlan(Now);
+            // the first solve's first slice waits a tick: on the launch tick, with Build, it made a 16.95 ms frame (performance agent,
+            // 4 Nov); SolveLead covers the tick
+            solving = SolveParty(Now).GetEnumerator(); bool launchTick = true;
             Hazard slam = null;
             while (true)
             {
                 while (Now < NextBeatTick)
                 {
-                    StepSolve();
+                    if (launchTick) launchTick = false; else StepSolve();
                     if (count > 0 && Hours >= 4) StepPasses();   // the first beat's holder is dealt, not passed (players may start bunched)
                     if (slam == null && NextBeatTick - Now <= Sim.Ticks(SlamWarn + WarnLead)) slam = SpawnSlam();
                     Present(); yield return 1;

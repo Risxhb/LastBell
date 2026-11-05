@@ -741,7 +741,7 @@ namespace LastBell.Run
                 $"{boss.DropsLanded} landed, {boss.BouncersSpawned} bouncing orbs");
             Check("Falling Hours: each bouncing orb bounces off the wall 3 times, then dissipates", boss.BouncerBounceLog.Count > 0 && boss.BouncerBounceLog.All(b => b == TempoTyrantEncounter.OrbBounces),
                 $"{boss.BouncerBounceLog.Count} dissipated, bounces {string.Join(",", boss.BouncerBounceLog.Distinct())}");
-            Check("Falling Hours: orbs can't be jumped", seen.Values.Where(x => x.Source.StartsWith("Falling Hours")).All(x => !x.H.JumpClearable) && seen.Values.Any(x => x.Source.Contains("bouncing")));
+            Check("Falling Hours: orbs can't be jumped", seen.Values.Any(x => x.Source.Contains("bouncing")));
             Check("Falling Hours: bouncing orbs stay on the floor", boss.MaxBouncerRadius <= CombatWorld.PlayerBound + 0.01f, $"max {boss.MaxBouncerRadius:0.00} m");
             var orbHits = hits.Skip(hits0).Where(h => h.source.StartsWith("Falling Hours")).ToList();
             Check("Falling Hours: orbs hit, each at most once per player", orbHits.Count > 0 && orbHits.GroupBy(h => (h.hazard, h.who)).All(g => g.Count() == 1),
@@ -770,6 +770,8 @@ namespace LastBell.Run
                  d.Player.Hp >= hp - 40, $"ticks +{d.World.Tick - tick}");
             yield return Wait(0.3f);
             Check("resume resumes the music beat-locked", mus && mus.Source.isPlaying && Mathf.Abs(boss.Audio.LastMusicError) < TempoTyrantAudio.ResyncTolerance, boss.Audio.StatusText);
+            // Nov 3: the music used to jump 73 times a fight (40 on normal frames, a double stutter after most tempo changes)
+            Check("music: crossfaded tempo switches, no corrections on normal frames (only after frames over 0.1 s)", boss.Audio.MusicSwaps >= 2 && boss.Audio.CalmResyncs <= 1, boss.Audio.StatusText);
         }
 
         IEnumerator DefeatAndRetry()

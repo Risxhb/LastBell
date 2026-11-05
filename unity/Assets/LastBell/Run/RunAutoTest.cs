@@ -30,19 +30,19 @@ namespace LastBell.Run
         sealed class Bot : IInputSource
         {
             public Vector3 MoveWorld; public Vector3 Aim; public bool Sprint;
-            public bool[] press = new bool[5]; public bool[] hold = new bool[5]; public bool dash, jump, potion;
+            public bool[] press = new bool[5]; public bool[] hold = new bool[5]; public bool dash, potion;
             public PlayerInput Read(PlayerController who)
             {
-                var r = new PlayerInput { Aim = Aim, Sprint = Sprint, Dash = dash, Jump = jump, Potion = potion,
+                var r = new PlayerInput { Aim = Aim, Sprint = Sprint, Dash = dash, Potion = potion,
                     P0 = press[0], P1 = press[1], P2 = press[2], P3 = press[3], P4 = press[4],
                     H0 = hold[0] || press[0], H1 = hold[1], H2 = hold[2], H3 = hold[3] || press[3], H4 = hold[4] };
                 var cam = Camera.main; var fwd = cam ? Sim.Flat(cam.transform.forward).normalized : Vector3.forward;
                 var right = Vector3.Cross(Vector3.up, fwd);
                 r.Move = Vector2.ClampMagnitude(new Vector2(Vector3.Dot(MoveWorld, right), Vector3.Dot(MoveWorld, fwd)), 1);
-                for (int i = 0; i < 5; i++) press[i] = false; dash = jump = potion = false;
+                for (int i = 0; i < 5; i++) press[i] = false; dash = potion = false;
                 return r;
             }
-            public void Clear() { MoveWorld = Vector3.zero; Sprint = false; for (int i = 0; i < 5; i++) { press[i] = hold[i] = false; } dash = jump = false; }
+            public void Clear() { MoveWorld = Vector3.zero; Sprint = false; for (int i = 0; i < 5; i++) { press[i] = hold[i] = false; } dash = false; }
         }
 
         RunDirector d; readonly Bot bot = new Bot();
@@ -226,7 +226,7 @@ namespace LastBell.Run
             d.InputOverride = bot;
             yield return Wait(1.0f);
             if (SmokeOnly) { yield return SmokeChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
-            if (PartyOnly) { yield return PartyChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
+            if (PartyOnly) { yield return PartyChecks(); yield return ReviveChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
             if (AurelionOnly) { yield return AurelionChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
             if (BellkeeperUltimateOnly) { yield return BellkeeperUltimateChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
             // -lastbellArcanistOnly: just the Arcanist run and its kit checks (skips the menu, map, other-class and boss suites)
@@ -275,7 +275,7 @@ namespace LastBell.Run
             yield return Until(() => d.State == RunState.Combat, 4, "combat 1");
             yield return Wait(0.3f);
             Check("repeated Ready starts exactly one encounter", d.EncounterStarts == starts0 + 1 && d.Encounter == d.EncounterOrder[0], $"starts {d.EncounterStarts - starts0}");
-            Check("run contains all four real bosses with Bellkeeper last", d.EncounterOrder.Length == 4 && d.EncounterOrder.Distinct().Count() == 4 && RunDirector.Bosses[d.EncounterOrder.Last()].Final && !d.Boss.Placeholder);
+            Check("run is a campaign (area minibosses then boss) with Bellkeeper last", Campaign.Valid(d.EncounterOrder) && d.EncounterOrder.Distinct().Count() == d.EncounterOrder.Length && RunDirector.Bosses[d.EncounterOrder.Last()].Final);
             Check("run starts at full health and potions", d.Player.Hp == PlayerController.MaxHp && d.Player.Potions == PlayerController.MaxPotions, $"hp {d.Player.Hp}, potions {d.Player.Potions}");
             yield return AdvanceToFinal();
             var bk = (BellkeeperEncounter)d.Boss;
@@ -301,7 +301,7 @@ namespace LastBell.Run
             d.Player.DebugSetHp(PlayerController.MaxHp);
             d.Boss.DebugDefeat();
             yield return Until(() => d.State == RunState.Results, 6, "results 1");
-            Check("victory after all four bosses, Bellkeeper last", d.Victory && d.EncountersCleared == 4 && d.EncounterStarts == 4 && d.EncounterEnds == 4,
+            Check("victory after every campaign fight, Bellkeeper last", d.Victory && d.EncountersCleared == d.EncounterOrder.Length && d.EncounterStarts == d.EncounterOrder.Length && d.EncounterEnds == d.EncounterOrder.Length,
                 $"victory {d.Victory}, cleared {d.EncountersCleared}, starts {d.EncounterStarts}, ends {d.EncounterEnds}");
             yield return Shot("results_victory");
 
@@ -356,7 +356,7 @@ namespace LastBell.Run
             yield return Shot("chimesinger_bellkeeper");
             yield return TickRegressions();   // ends the fight with a real Resonant Note killing blow
             yield return Until(() => d.State == RunState.Results, 8, "results 4");
-            Check("Chimesinger run reaches victory", d.Victory && d.EncountersCleared == 4);
+            Check("Chimesinger run reaches victory", d.Victory && d.EncountersCleared == d.EncounterOrder.Length);
             d.ReturnToMenu(); yield return null;
 
             // ---------- run 5: Arcanist rotation and full victory ----------
@@ -401,10 +401,12 @@ namespace LastBell.Run
                 yield return Shot("map_" + map.Id + "_combat");
                 Check($"map {map.Name}: Bellkeeper fight runs (boss takes damage, player stays on the floor)",
                     d.Boss && d.Boss.Hp < hp0 && CombatWorld.InPlayerBound(d.Player.transform.position, 0.01f), $"boss hp {hp0} -> {(d.Boss ? d.Boss.Hp : -1)}");
+                yield return TeamMarkShot(map, "team_marks");
                 bot.MoveWorld = Vector3.right; bot.Sprint = true; yield return Wait(3f); bot.Clear();
                 float reach = d.Player.transform.position.x;
                 Check($"map {map.Name}: player walks up to the wall (bound {map.Bound} m)", reach >= map.Bound - 0.3f && CombatWorld.InPlayerBound(d.Player.transform.position, 0.01f), $"reached x = {reach:0.00}");
                 yield return Shot("map_" + map.Id + "_wall");
+                yield return TeamMarkShot(map, "team_marks_edge");
                 d.Boss.DebugDefeat();
                 yield return Until(() => d.State == RunState.Results, 6, map.Name + " practice results");
                 d.ReturnToMenu();
@@ -415,6 +417,7 @@ namespace LastBell.Run
             yield return BellkeeperUltimateChecks();
             // ---------- area bosses (practice only for now) ----------
             yield return PartyChecks();
+            yield return ReviveChecks();
             yield return AurelionChecks();
 
             yield return SylvaraChecks();
@@ -508,7 +511,7 @@ namespace LastBell.Run
                 yield return Until(() => d.State != RunState.Combat, 2, "arcanist boss defeated");
             }
             yield return Until(() => d.State == RunState.Results, 8, "results 5");
-            Check("Arcanist run reaches victory", d.Victory && d.EncountersCleared == 4);
+            Check("Arcanist run reaches victory", d.Victory && d.EncountersCleared == d.EncounterOrder.Length);
             d.ReturnToMenu(); yield return null;
         }
 
@@ -557,6 +560,7 @@ namespace LastBell.Run
             Check("the Arcanist starts with no glyphs", k.Glyphs == 0, k.ClassState());
             int dis0 = MeterDamage("Disintegrate"); bool sawStep3 = false; int glyphsAtStep3 = -1;
             StartCoroutine(Capture("arcanist_disintegrate", 180));
+            PlayerFx.SurfaceMsTotal = PlayerFx.SurfaceMsWorst = PlayerFx.BakeMsWorst = PlayerFx.PoseMsWorst = PlayerFx.ChunkMsWorst = 0; PlayerFx.SurfaceCalls = PlayerFx.SurfaceTraces = 0; PlayerFx.SurfaceTrisTested = PlayerFx.SurfaceTrisTotal = 0;
             bot.press[1] = true; bot.hold[1] = true;
             float tt = 0; bool shotBeam = false;
             while (tt < 2.8f)
@@ -571,6 +575,10 @@ namespace LastBell.Run
             Check("a full Disintegrate deals 4x8 + 4x12 + 5x16 = 160", MeterDamage("Disintegrate") - dis0 == 160 && k.BeamDamage == 160, $"dealt {MeterDamage("Disintegrate") - dis0}");
             Check("each Disintegrate step that hits carves a glyph: 2 by step 3, 3 after a full channel", glyphsAtStep3 == 2 && k.Glyphs == 3, $"step 3 start {glyphsAtStep3}, end {k.Glyphs}");
             Check("Disintegrate cooldown starts when the beam ends", k.Cooldown01(1) > 0.85f, k.SlotState(1));
+            // the beam's contact on his model: chunked, it tests a few hundred triangles a trace, not all of them (the lag fix)
+            double avg = PlayerFx.SurfaceCalls > 0 ? PlayerFx.SurfaceMsTotal / PlayerFx.SurfaceCalls : -1;
+            Check("Disintegrate's contact trace stays cheap (under 0.3 ms a tick on average, no tick over 15 ms)", PlayerFx.SurfaceCalls > 0 && avg < 0.3 && PlayerFx.SurfaceMsWorst < 15,
+                $"{PlayerFx.SurfaceCalls} calls, {PlayerFx.SurfaceTraces} traces, avg {avg:0.000} ms, worst {PlayerFx.SurfaceMsWorst:0.00} ms (snapshot worst {PlayerFx.BakeMsWorst:0.00}: pose {PlayerFx.PoseMsWorst:0.00}, worker {PlayerFx.ChunkMsWorst:0.00}, off the main thread), tested {PlayerFx.SurfaceTrisTested} of {PlayerFx.SurfaceTrisTotal} triangles");
             yield return Shot("arcanist_glyphs_full");
             // ---- Arcane Surge: a dash before the release refunds it and keeps the glyphs
             bot.press[4] = true; yield return Wait(0.07f);

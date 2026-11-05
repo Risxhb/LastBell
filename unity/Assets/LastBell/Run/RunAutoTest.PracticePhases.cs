@@ -43,8 +43,11 @@ namespace LastBell.Run
             Check("practice phase: a run always starts in phase 1", d.StartRun("Tollbreaker") && d.PracticePhase == 1);
             yield return PhaseToMenu();
             for (int e = 0; e < RunDirector.Bosses.Length; e++)
+            {
+                if (RunDirector.Bosses[e].Name == RunDirector.TutorialName) continue;   // the tutorial is scripted (TutorialDirector): no phase row
                 if (Tested(e)) for (int n = 1; n <= RunDirector.Bosses[e].Phases; n++)
                     yield return PracticeAtPhase(e, n, n == RunDirector.Bosses[e].Phases);
+            }
             yield return PhaseToMenu();
             BellkeeperEncounter.TestIdle = idle; RunDirector.PracticeStaysOnMap = stay;
         }

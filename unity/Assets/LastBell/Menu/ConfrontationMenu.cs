@@ -29,15 +29,15 @@ namespace LastBell.Menu
         public Vector3 CameraPosition = new Vector3(.6f,.75f,10.9f), CameraTarget = new Vector3(-.6f,2.2f,-7);
         // Set before loading this scene to reopen Boss Rush (e.g. "Test Setup" from a practice run).
         public static bool ResumeBossRush;
-        // Start Run is greyed out for players (Risxhb, October 27, 2026): shown but not clickable, skipped by keyboard and
-        // controller focus, which starts on Boss Rush. StartRun() still works when called from code (the run tests use it).
-        // Applies to Windows and the web demo alike. Set true to bring the button back.
-        public static bool StartRunEnabled = false;
+        // Start Run was greyed out for players from October 27, 2026 (Risxhb) until the campaign existed. It is back for the
+        // campaign (Risx, November 4, 2026; Run/Campaign.cs): tutorial, three arenas of minibosses and bosses, the Bellkeeper.
+        // Set false to grey it out again (shown but not clickable, skipped by keyboard and controller focus).
+        public static bool StartRunEnabled = true;
         public CharacterPresenter Hero { get; private set; }
         public CharacterPresenter Boss { get; private set; }
         public Transform BossWrapper { get; private set; }
         public Camera View { get; private set; }
-        public Button StartButton, RushButton, SettingsButton, ExitButton, PreviousButton, NextButton;
+        public Button StartButton, RushButton, MultiplayerButton, SettingsButton, ExitButton, PreviousButton, NextButton;
         public Button DifficultyButton { get; private set; }
         public Button MusicPlayButton { get; private set; }
         public Button MusicPauseButton { get; private set; }
@@ -90,6 +90,8 @@ namespace LastBell.Menu
             EventSystem.current.SetSelectedGameObject((StartRunEnabled?StartButton:RushButton).gameObject);
             if(ResumeBossRush){ResumeBossRush=false;BossRush();if(Rush)Rush.OpenBossStep();}
             MenuFlowTest.Install();
+            LanMenuAutoTest.Install(this);
+            LanSessionAutoTest.Install();
             if(ConfrontationMenuTest.Requested) gameObject.AddComponent<ConfrontationMenuTest>();
         }
         static void Sanitize(CharacterPresenter p)
@@ -129,9 +131,11 @@ namespace LastBell.Menu
             var panel=navigationRect=MenuUI.Rect("Right navigation",safe,new Vector2(.73f,.08f),new Vector2(.97f,.86f));navigation=panel.gameObject.AddComponent<CanvasGroup>();
             var logo=MenuUI.Panel("Last Bell logo",panel,new Vector2(-.1f,.73f),new Vector2(1.1f,1),Color.white);
             logo.sprite=Resources.Load<Sprite>("Menu/ConfrontationLogo");logo.preserveAspect=true;
-            StartButton=Nav("Start Run",panel,.51f,StartRun,28);RushButton=Nav("Boss Rush",panel,.40f,BossRush);
+            // One player for everything (4 Nov 2026): Start Run, Boss Rush and Multiplayer (the LAN lobby) on one menu.
+            StartButton=Nav("Start Run",panel,.58f,StartRun,28);RushButton=Nav("Boss Rush",panel,.48f,BossRush);
             StartButton.interactable=StartRunEnabled;   // greyed out: ConfrontationNavFocus dims a non-interactable label
-            SettingsButton=Nav("Settings",panel,.29f,OpenSettings);ExitButton=Nav("Exit",panel,.18f,Exit);
+            MultiplayerButton=Nav("Multiplayer",panel,.38f,OpenLan);
+            SettingsButton=Nav("Settings",panel,.28f,OpenSettings);ExitButton=Nav("Exit",panel,.18f,Exit);
 #if UNITY_WEBGL && !UNITY_EDITOR
             ExitButton.GetComponentInChildren<Text>().text="Return to Menu";
 #endif
@@ -146,7 +150,7 @@ namespace LastBell.Menu
             difficultyNext=CycleArrow(diff.transform,true,16,new Color(MenuUI.Gold.r,MenuUI.Gold.g,MenuUI.Gold.b,.5f));
 
             BuildMusicPlayer();
-            var stack=new Selectable[]{PreviousButton,NextButton,StartButton,RushButton,SettingsButton,ExitButton,diff,MusicPlayButton}.Where(s=>s!=StartButton||StartRunEnabled).ToArray();
+            var stack=new Selectable[]{PreviousButton,NextButton,StartButton,RushButton,MultiplayerButton,SettingsButton,ExitButton,diff,MusicPlayButton}.Where(s=>s!=null&&(s!=StartButton||StartRunEnabled)).ToArray();
             for(int i=0;i<stack.Length;i++)stack[i].navigation=new Navigation{mode=Navigation.Mode.Explicit,selectOnDown=stack[(i+1)%stack.Length],selectOnUp=stack[(i+stack.Length-1)%stack.Length],selectOnLeft=i==0||i==1?PreviousButton:null,selectOnRight=i==0||i==1?NextButton:i==stack.Length-1?MusicPauseButton:null};
             // One menu song (Bittersweet Dawn, October 26, 2026): no skip button; Pause wraps right to Play.
             bool skip=MenuMusic.TrackCount>1;MusicNextButton.gameObject.SetActive(skip);
@@ -243,6 +247,8 @@ namespace LastBell.Menu
         }
 
         // ---------------------------------------------------------------- actions
+        // Multiplayer opens the LAN lobby scene (LanLobbyScreen: name card, host/connect, lobby).
+        public void OpenLan(){if(Loading||SettingsOpen||Rush)return;Loading=true;LanLobbyScreen.Open();}
         public void StartRun(){if(Loading||SettingsOpen||Rush)return;Loading=MenuLaunch.Normal(SavedHeroSelection.Current);if(!Loading)message.text="Run scenes unavailable in this build.";}
         // Boss Rush opens in this scene (no separate hero-select scene): arena step, then the boss step.
         public void BossRush()
@@ -450,7 +456,8 @@ namespace LastBell.Menu
             if(View.enabled)View.fieldOfView=Mathf.Clamp(42*Mathf.Max(1,1.77778f/View.aspect),42,62);
             bool back=Keyboard.current?.escapeKey.wasPressedThisFrame==true||Gamepad.current?.buttonEast.wasPressedThisFrame==true;
             if(MenuFlowTest.Requested&&MenuSmokeTest.TestKeyboard!=null)back|=MenuSmokeTest.TestKeyboard.escapeKey.wasPressedThisFrame||MenuSmokeTest.TestGamepad.buttonEast.wasPressedThisFrame;
-            if(back){if(Rush)Rush.Back();else if(ResolutionListOpen)CloseResolutionList();else if(SettingsOpen)CloseSettings();}
+            if(back){
+                if(Rush)Rush.Back();else if(ResolutionListOpen)CloseResolutionList();else if(SettingsOpen)CloseSettings();}
             KeepResolutionInView();
             if(Loading){navigation.interactable=false;musicGroup.interactable=false;}
         }

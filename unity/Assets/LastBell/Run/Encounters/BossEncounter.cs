@@ -36,10 +36,22 @@ namespace LastBell.Run
         }
         public virtual float[] HudMarks => null;       // phase thresholds drawn on the boss bar (fractions); null = the HUD's defaults
         public virtual string HudExtra => null;          // an extra boss-bar line (Aurelion v4: enrage clock, shield)
+        // LAN client replica (never stepped): the host's values for the HUD. netExtra null = this boss's own HudExtra.
+        string netExtra; bool netState;
+        public string HudExtraShown => netState ? (string.IsNullOrEmpty(netExtra) ? null : netExtra) : HudExtra;
+        public void ApplyNetworkState(int hp, int maxHp, bool dead, string phase, string attack, string extra)
+        {
+            MaxHp = Mathf.Max(1, maxHp); Hp = Mathf.Clamp(hp, 0, MaxHp); Dead = dead;
+            PhaseName = phase ?? ""; Current = attack ?? ""; netExtra = extra; netState = true;
+        }
         protected virtual bool PartyScaled => false;      // true: co-op HP 1 + PartyStep x (fighters - 1) (Aurelion v4 is tuned with it)
         protected virtual float PartyStep => 0.7f;        // the packets' provisional 0.7 per extra fighter
         public event Action<BossEncounter> Defeated;
         public event Action<BossEncounter, string> PhaseChanged;
+        // Tutorial hooks (Run/Tutorial): BeforeStep runs at the start of every combat tick, before the script; HpFloor > 0
+        // keeps HP from dropping below it (the tutorial boss can't die until told to). DebugDefeat ignores the floor.
+        public event Action<BossEncounter> BeforeStep;
+        public int HpFloor;
 
         protected CombatWorld W;
         IEnumerator<int> script; int wait;
@@ -74,6 +86,37 @@ namespace LastBell.Run
         }
 
         protected abstract void Build();                     // visuals (placeholder geometry or model)
+        // LAN: moving objects the boss draws itself (orbs, thrown weights). The host lists them every snapshot; a client asks
+        // the replica boss for a view of each kind and moves it along the host's positions.
+        public virtual void CaptureNetProps(List<Networking.LanWorldFrame.Prop> into) { }
+        public virtual Transform MakeNetProp(byte kind) => null;
+        // LAN looks (4 Nov 2026): what the boss shows that its own Update/LateUpdate draws (glow, phase looks, poses). The
+        // host fills the snapshot's Glow and Look numbers; a client's replica boss (disabled, never stepped) gets the newest
+        // state every frame and applies it. Each boss decides what its Look numbers mean.
+        public virtual void CaptureNetLook(Networking.LanWorldFrame.BossState into) { }
+        public virtual void ReplicaPresent(Networking.LanWorldFrame.BossState state, float dt) { }
+        // LAN effects a boss replays itself: on the host, NetFx("Boss.Method", args) records a call (arguments: Vector3, float,
+        // int, bool, string, Color, PlayerController, this boss); the client's replica gets it back here when its drawn time
+        // reaches that tick. Return false for an unknown method. Recording is null outside a host session.
+        protected static bool NetRecording => Networking.LanFx.Record != null;
+        protected static void NetFx(string method, params object[] args) { var r = Networking.LanFx.Record; if (r != null) r(Networking.LanFxTarget.BossPart, method, args); }
+        public virtual bool ReplayNetEffect(string method, Networking.LanWorldFrame.EffectArg[] args, System.Func<int, PlayerController> player) => false;
+        protected static Vector3 NetV(Networking.LanWorldFrame.EffectArg a) => new Vector3(a.X, a.Y, a.Z);
+        protected static float NetF(Networking.LanWorldFrame.EffectArg a) => a.X;
+        protected static int NetI(Networking.LanWorldFrame.EffectArg a) => a.I;
+        protected static bool NetB(Networking.LanWorldFrame.EffectArg a) => a.I != 0;
+        protected static string NetS(Networking.LanWorldFrame.EffectArg a) => a.S ?? "";
+        protected static Color NetC(Networking.LanWorldFrame.EffectArg a) => new Color(a.X, a.Y, a.Z, a.W);
+        protected static PlayerController NetP(Networking.LanWorldFrame.EffectArg a, System.Func<int, PlayerController> player) => a.Kind == Networking.LanWorldFrame.EffectArg.PlayerRef ? player(a.I) : null;
+        // LAN player identity, the same number on every computer (the lobby id): set by the host's capture and the client's
+        // replica world, null outside a session. Use it to send per-player looks (Look numbers keyed by id).
+        public static int NetDrawnTick;   // LAN client: the host tick this screen is drawing now
+        public static System.Func<PlayerController, int> NetIdOf;
+        public static System.Func<int, PlayerController> NetPlayerOf;
+        // on a LAN client the boss is a replica: drawn from the host's snapshots, never stepped
+        public bool IsNetReplica => !enabled && RunHud.LanClientView;
+        protected static Networking.LanWorldFrame.Prop NetProp(int id, byte kind, Vector3 p) => new Networking.LanWorldFrame.Prop { Id = id, Kind = kind, X = p.x, Y = p.y, Z = p.z };
+        protected static int NextNetPropId = -1;   // for props without a hazard of their own (negative: never a hazard Id)
         protected abstract IEnumerable<int> Script();         // the attack schedule; restarts when it ends
         protected virtual void StepAlways() { }               // presentation-adjacent state on every tick
         protected virtual void OnDefeat() { }
@@ -90,6 +133,8 @@ namespace LastBell.Run
 
         public void Step()
         {
+            if (Dead) return;
+            BeforeStep?.Invoke(this);
             if (Dead) return;
             Age++;
             using (PmAlways.Auto()) StepAlways();
@@ -114,8 +159,9 @@ namespace LastBell.Run
             damage = Mathf.RoundToInt(damage * DamageTakenScale(contact)); if (damage <= 0) return 0;
             damage = Absorb(damage);   // a shield (Aurelion v4 Corona Shield) takes its share first
             if (damage <= 0) { RunHud.Float(contact + Vector3.up * 0.5f, "absorbed", new Color(0.7f, 0.85f, 1f)); return 0; }
-            int floor = ignoreFloor ? 0 : Mathf.Clamp(HpFloor, 0, Hp);
+            int floor = ignoreFloor ? 0 : Mathf.Clamp(Mathf.Max(HpFloor, PhaseFloor), 0, Hp);
             int dealt = Mathf.Min(damage, Hp - floor);
+            if (dealt <= 0) { RunHud.Float(contact + Vector3.up * 0.5f, "held", new Color(0.7f, 0.85f, 1f)); return 0; }
             Hp -= dealt;
             RunHud.Float(contact + Vector3.up * 0.5f, dealt.ToString(), new Color(1f, 0.86f, 0.45f));
             if (hitFx) W.BossFx.BossHit(contact);   // abilities with their own impact effect skip the shared flash
@@ -126,10 +172,13 @@ namespace LastBell.Run
         }
 
         // dev / test hook: defeat now (goes through the same path as a killing blow)
-        public void DebugDefeat() { if (!Dead) { Hp = 1; ignoreFloor = true; TakeHit(1, transform.position + Vector3.up * HitHeight); ignoreFloor = false; } }
+        // A boss whose OnHurt holds HP (the Chimebound Oracle at 50% until his Grand Toll ends) still falls: the hold would
+        // otherwise refill him and the run tests, which now meet minibosses in runs, could never clear him.
+        public void DebugDefeat() { if (!Dead) { HpFloor = 0; Hp = 1; ignoreFloor = true; TakeHit(1, transform.position + Vector3.up * HitHeight); ignoreFloor = false; if (!Dead) { Hp = 0; Die(); } } }
         // Damage can't take Hp below this until the boss lowers it (the Bellkeeper Ultimate holds each phase's threshold
-        // until its transition, so a phase can't be skipped). 0 = no floor. DebugDefeat ignores it.
-        protected virtual int HpFloor => 0;
+        // until its transition, so a phase can't be skipped). 0 = no floor. Works with HpFloor (the tutorial's); the higher wins.
+        // DebugDefeat ignores both.
+        protected virtual int PhaseFloor => 0;
         // multiplies every hit this boss takes, by where it lands (the Bellkeeper Ultimate's P5: the bell resonates, only the
         // Bellkeeper that rang last takes damage, x4 in the last stand)
         protected virtual float DamageTakenScale(Vector3 contact) => 1f;
@@ -218,8 +267,8 @@ namespace LastBell.Run
         }
         protected Hazard Ring(string src, Vector3 at, float inner, float outer, int resolveAt, int dmg) =>
             W.Hazards.Spawn(new Hazard { Source = src, Shape = HazardShape.Ring, Kind = HazardKind.Ground, Origin = at, Inner = inner, Radius = outer, LockAt = 0, ResolveAt = resolveAt, Damage = dmg });
-        protected Hazard Lane(string src, Vector3 from, float yaw, float length, float width, int resolveAt, int dmg, bool jumpClear = false) =>
-            W.Hazards.Spawn(new Hazard { Source = src, Shape = HazardShape.Lane, Kind = HazardKind.Strike, Origin = from, Yaw = yaw, Length = length, Width = width, LockAt = 0, ResolveAt = resolveAt, Damage = dmg, JumpClearable = jumpClear });
+        protected Hazard Lane(string src, Vector3 from, float yaw, float length, float width, int resolveAt, int dmg) =>
+            W.Hazards.Spawn(new Hazard { Source = src, Shape = HazardShape.Lane, Kind = HazardKind.Strike, Origin = from, Yaw = yaw, Length = length, Width = width, LockAt = 0, ResolveAt = resolveAt, Damage = dmg });
         protected Hazard Marker(string src, float radius, int follow, int resolveAt, int dmg, float speed = 6f)
         {
             var h = new Hazard { Source = src, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Radius = radius, LockAt = follow, ResolveAt = resolveAt, Damage = dmg, Origin = Target() };

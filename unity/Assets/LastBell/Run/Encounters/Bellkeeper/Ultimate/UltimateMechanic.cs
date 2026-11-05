@@ -49,6 +49,35 @@ namespace LastBell.Run
         // ...and before a press that roots or slows it for `seconds` (at `scale`): does the route search still find a way with
         // no hit, standing that long first? (the searches count the whole root, not only their first leg)
         public virtual bool SafeToRoot(PlayerController p, float seconds, float scale) => true;
+        // ...and the steered bot's current job ("revive": UltimateBot stands still beside the downed ally when SafeToRoot allows)
+        public virtual string Job(PlayerController p) => null;
+
+        // Revives (PlayerController, accepted 4 Nov; AllyBot.ReviveJob for the other bosses): a bot with no job of its own goes to
+        // the nearest downed ally (not dead, within 14 m, nobody else channelling on them) and stands 0.9 m beside them, on its side
+        public const float ReviveStand = 0.9f, ReviveReach = 14f;
+        public static bool ReviveSpot(PlayerController me, Func<Vector3, bool> ok, out Vector3 spot)
+        {
+            spot = default; PlayerController best = null; var pos = Sim.Flat(me.transform.position); float bd = ReviveReach;
+            foreach (var p in me.World.Players)
+            {
+                if (p == me || !p || !p.Down || p.Dead) continue;
+                bool taken = false; foreach (var q in me.World.Players) if (q != me && q && !q.Down && q.Reviving == p) taken = true;   // two are no faster
+                float dd = Sim.Flat(p.transform.position - pos).magnitude;
+                if (!taken && dd < bd) { bd = dd; best = p; }
+            }
+            if (best == null) return false;
+            var at = Sim.Flat(best.transform.position); var off = pos - at;
+            spot = at + (off.magnitude > 0.1f ? off.normalized : Vector3.forward) * ReviveStand;
+            return ok == null || ok(spot);
+        }
+        // beside a downed ally, close enough to channel (PlayerController.ReviveRange, with a margin for the floor's drift)
+        public static bool BesideDowned(PlayerController me)
+        {
+            var pos = Sim.Flat(me.transform.position);
+            foreach (var p in me.World.Players)
+                if (p != me && p && p.Down && !p.Dead && Sim.Flat(p.transform.position - pos).magnitude < PlayerController.ReviveRange - 0.1f) return true;   // 0.2 short left a bot that stopped 1.3 m off a riding body walking
+            return false;
+        }
         // Combat start: make this mechanic's scene objects now, hidden, so its cast only shows them (a phase change no longer
         // builds a whole set: 60-91 ms hitches, performance agent 2 Nov). Cancel() still drops them; the cast then builds as before.
         public virtual void Prebuild() { }

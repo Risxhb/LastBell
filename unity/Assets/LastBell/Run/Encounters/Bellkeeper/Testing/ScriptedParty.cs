@@ -12,14 +12,13 @@ namespace LastBell.Run
         public float Speed = 4.2f;            // walking speed in m/s (the prototype escape speed; 6 = full walk)
         public bool Sprint;                   // hold sprint (9 m/s while stamina lasts)
         public bool DashNext;                 // dash once on the next tick, toward Goal (or facing)
-        public bool JumpNext;
         public Vector3 Aim;
         public Func<PlayerController, Vector3> Steer;   // optional: world-space move direction each tick (overrides Goal)
 
         public PlayerInput Read(PlayerController who)
         {
-            var r = new PlayerInput { Aim = Aim, Sprint = Sprint, Dash = DashNext, Jump = JumpNext };
-            DashNext = JumpNext = false;
+            var r = new PlayerInput { Aim = Aim, Sprint = Sprint, Dash = DashNext };
+            DashNext = false;
             Vector3 move = Vector3.zero;
             if (Steer != null) move = Steer(who);
             else if (Goal.HasValue)
@@ -44,7 +43,7 @@ namespace LastBell.Run
         {
             var p = PlayerController.Spawn(w, className, new Vector3(pos.x, 0, pos.z), 180);
             p.Input = new ScriptedPlayer();
-            p.AbilitiesEnabled = true;    // dash and jump need it; a scripted player never presses an ability
+            p.AbilitiesEnabled = true;    // the dash needs it; a scripted player never presses an ability
             p.Presenter.GetUp();
             return p;
         }
