@@ -49,7 +49,7 @@ namespace LastBell.Run
 
         // the nearest downed ally (not dead, within 14 m) nobody else is reviving: walk to a spot beside them that nothing is
         // about to land on and stand still there, so the revive channels (PlayerController: 3 s within 1.5 m)
-        const float ReviveStand = 0.9f, ReviveReach = 14f;   // (30 m was tried, 5 Nov: on Sylvara bots crossed her bullets and still never arrived)
+        const float ReviveStand = 0.9f, ReviveReach = 14f, SylvaraReviveReach = 40f;   // (30 m was tried, 5 Nov: on Sylvara bots crossed her bullets and still never arrived)
         bool ReviveJob(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
         {
             if (!ReviveSpot(me, pos, out var spot)) return false;
@@ -63,9 +63,19 @@ namespace LastBell.Run
             return true;
         }
 
-        static bool ReviveSpot(PlayerController me, Vector3 pos, out Vector3 spot)
+        // one bot per downed ally: the nearest, and one already on the way keeps it unless another is 4 m nearer (or two
+        // swapped back and forth as they moved, and neither arrived)
+        static bool NearestBot(PlayerController me, PlayerController downed, bool going)
         {
-            PlayerController best = null; float bd = ReviveReach; spot = default;
+            float mine = Sim.Flat(me.transform.position - downed.transform.position).magnitude - (going ? 4f : 0f);
+            foreach (var q in me.World.Players)
+                if (q != me && q != downed && q && !q.Down && q.Input is AllyBot ab && Sim.Flat(q.transform.position - downed.transform.position).magnitude - (ab.rvFor == downed && ab.dJob == "revive" ? 4f : 0f) < mine) return false;
+            return true;
+        }
+        static bool ReviveSpot(PlayerController me, Vector3 pos, out Vector3 spot) => ReviveSpot(me, pos, out spot, out _);
+        static bool ReviveSpot(PlayerController me, Vector3 pos, out Vector3 spot, out PlayerController best, float reach = ReviveReach)
+        {
+            best = null; float bd = reach; spot = default;
             foreach (var p in me.World.Players)
             {
                 if (p == me || !p || !p.Down || p.Dead) continue;
@@ -1191,7 +1201,8 @@ namespace LastBell.Run
         // close) and in Hollow Bloom stands next to a Choir Bud to cut it (one bud per bot, by slot). Every 3 ticks it
         // re-plans the cheapest path through the bullets and telegraphs 0.8 s ahead.
         Vector3 sylMove; bool sylSprint, sylOn, sylDash; float sylCost; Vector3 sylPos;
-        string SylvaraLine() => $"{(dJob == "revive" ? "revive " : "")}cost {sylCost:0.0} move ({sylMove.x:0.0},{sylMove.z:0.0}) sprint {sylSprint} dash {sylDash} at ({sylPos.x:0.0},{sylPos.z:0.0})";
+        int rvTick = -99; PlayerController rvFor; bool rvOk; Vector3 rvWp, rvStand;   // the revive route (ReviveRoute)
+        string SylvaraLine() => $"{(dJob == "revive" ? $"revive {(rvOk ? "route" : "wait")} to ({rvStand.x:0.0},{rvStand.z:0.0}) " : "")}cost {sylCost:0.0} move ({sylMove.x:0.0},{sylMove.z:0.0}) sprint {sylSprint} dash {sylDash} at ({sylPos.x:0.0},{sylPos.z:0.0})";
 
         PlayerInput ReadSylvara(PlayerController me, SylvaraEncounter sy)
         {
@@ -1211,15 +1222,34 @@ namespace LastBell.Run
             }
             // revives: the spot beside a downed ally is home instead (the steer still dodges, and holding still there
             // channels the revive; no swings, which would pause it). Her bots never revived before (5 Nov sweep: 0 of 6)
-            bool reviving = ReviveSpot(me, pos, out var rspot);
-            if (reviving) { home = rspot; reach = null; dJob = "revive"; } else if (dJob == "revive") dJob = null;
+            // anywhere on her floor: in phase 4 the party holds the four corners, 18-28 m apart, and the route crosses her bullets
+            // (only the bot nearest to them goes: the others keep their posts, or the whole party left them, 5 Nov)
+            bool reviving = ReviveSpot(me, pos, out var rspot, out var rwho, SylvaraReviveReach) && NearestBot(me, rwho, rvFor == rwho && dJob == "revive");
+            if (reviving)
+            {
+                // a planned way through her bullets (ReviveRoute), re-planned every 0.1 s: the waypoint until the spot is near
+                if (tick - rvTick >= 6 || rvFor != rwho) { rvOk = ReviveRoute.Plan(me, rwho.transform.position, out rvWp, out rvStand); rvTick = tick; rvFor = rwho; }
+                home = Sim.Flat(rvStand - pos).magnitude < 1.8f ? rvStand : rvWp; reach = null; dJob = "revive";
+            }
+            else if (dJob == "revive") dJob = null;
             var flat = new Vector2(home.x, home.z); float lim = CombatWorld.PlayerBound - 1f;
             if (!reviving && flat.magnitude > lim) { flat = flat.normalized * lim; home = new Vector3(flat.x, 0, flat.y); }   // (a revive spot is in bounds already: her square floor's corners are past this circle)
 
             if (tick % 3 == 1 || me.Dashing)
             {
-                sylMove = SylvaraSteer.Choose(me, pos, home, out sylSprint, out sylDash, out sylCost, reach);
+                sylMove = SylvaraSteer.Choose(me, pos, home, out sylSprint, out sylDash, out sylCost, reach, reviving ? SylvaraSteer.RevivePull : 0.35f);
                 sylPos = pos;
+                // in reach of the downed ally: hold still so the revive channels, unless standing here gets hit (a near miss
+                // is fine); small steps toward the exact spot kept pausing it (5 Nov)
+                if (reviving && Sim.Flat(rwho.transform.position - pos).magnitude <= PlayerController.ReviveRange - 0.15f && SylvaraSteer.HoldCost(me, pos) < 40f)
+                { sylMove = Vector3.zero; sylSprint = false; sylDash = false; }
+                // on a clear route, walk it while the step itself is clear: the steer's near-miss costs kept it a couple of
+                // metres short of the spot the route found
+                else if (reviving && rvOk && !sylDash && Sim.Flat(rvStand - pos).magnitude > 0.3f)
+                {
+                    var to = Sim.Flat((Sim.Flat(rvStand - pos).magnitude < 1.8f ? rvStand : rvWp) - pos);
+                    if (to.magnitude > 0.2f && SylvaraSteer.StepCost(me, pos, to.normalized, PlayerController.WalkSpeed) < 40f) { sylMove = to.normalized; sylSprint = false; }
+                }
                 if (sylDash) inp.Dash = true;
             }
             inp.Sprint = sylSprint;
@@ -1256,8 +1286,13 @@ namespace LastBell.Run
         static Vector3[] MakeDirs() { var d = new Vector3[16]; for (int i = 0; i < 16; i++) d[i] = Sim.Dir(i * 22.5f); return d; }
 
         // bud: a Choir Bud it is cutting; ending a move outside its 3 m reach costs more than a near miss (not a hit)
-        public static Vector3 Choose(PlayerController me, Vector3 pos, Vector3 home, out bool sprint, out bool dash, out float bestCost, Vector3? bud = null)
+        // how hard it heads home (cost per metre): a revive pulls harder, or bullets near its path kept a reviver 10 m off the
+        // downed ally for the whole bleed-out (5 Nov sweep)
+        static float HomePull = 0.35f;
+        public const float RevivePull = 1.2f;
+        public static Vector3 Choose(PlayerController me, Vector3 pos, Vector3 home, out bool sprint, out bool dash, out float bestCost, Vector3? bud = null, float homePull = 0.35f)
         {
+            HomePull = homePull;
             var w = me.World; var boss = w.Boss;
             int mine = w.Bullets.ColourOf != null ? w.Bullets.ColourOf(me) : 0;
             // its ring flickers before a toll swaps colours (the same warning a player sees): both colours count until the swap
@@ -1297,6 +1332,11 @@ namespace LastBell.Run
         }
 
         // moves at v along d for `moveFor` seconds (all of the horizon by default), then stands
+        // what standing still here costs (bullets and telegraphs only): call after Choose, which gathers the near bullets
+        public static float HoldCost(PlayerController me, Vector3 pos) => Cost(me, pos, Vector3.zero, 0, pos, me.World.Boss, null);
+        // the same for walking d at v (no pull home: the end of the walk is home)
+        public static float StepCost(PlayerController me, Vector3 pos, Vector3 d, float v) => Cost(me, pos, d, v, pos + d * v * Horizon, me.World.Boss, null);
+
         static float Cost(PlayerController me, Vector3 pos, Vector3 d, float v, Vector3 home, BossEncounter boss, Vector3? bud, float moveFor = Horizon)
         {
             float cost = 0; var bp = boss != null ? Sim.Flat(boss.transform.position) : Vector3.zero;
@@ -1336,7 +1376,7 @@ namespace LastBell.Run
                 float left = (h.ResolveAt - h.Age) * Sim.Dt;
                 cost += h.BurnPerSecond > 0 ? 60 : left < Horizon + 0.4f ? 150 : 25;
             }
-            cost += Sim.Flat(q - home).magnitude * 0.35f;
+            cost += Sim.Flat(q - home).magnitude * HomePull;
             if (bud.HasValue) { float past = Sim.Flat(q - bud.Value).magnitude - 2.6f; if (past > 0) cost += 6 + past * 2; }
             return cost;
         }
