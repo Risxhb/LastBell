@@ -15,7 +15,7 @@ namespace LastBell.Run
         const float FloatLife = 0.9f, FloatRise = 40;
         // x jitter (virtual px, -18..18) picked deterministically per float so simultaneous numbers stack in a column
         public static void Float(Vector3 world, string text, Color c)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Hud, "Float", new object[] { world, text, c });
             if (floats.Count >= 80) return;
             int h = (floatSeq++ + (text != null ? text.Length : 0)) & int.MaxValue;
             floats.Add(new FloatText { pos = world, text = text, color = c, jx = (h % 5 - 2) * 9f });
@@ -67,13 +67,19 @@ namespace LastBell.Run
         // Phase ticks only for bosses that change phase, at their real thresholds (fraction of max HP).
         static float[] PhaseTicks(BossEncounter b) =>
             b is BellkeeperEncounter ? new[] { 0.70f, 0.35f } :
-            b is AurelionEncounter ae ? ae.PhaseMarks :   // v4: 70 / 40 / 20 %, v2-v3: 65 / 30 %
-            b is CrucivarEncounter || b is SylvaraEncounter ? new[] { 0.65f, 0.30f } :
+            b is AurelionEncounter ae ? ae.PhaseMarks :   // 70 / 40 / 20 %
+            b is SylvaraEncounter ? new[] { 0.75f, 0.50f, 0.25f } :
+            b is CrucivarEncounter ? new[] { 0.65f, 0.30f } :
             b is TempoTyrantEncounter ? new[] { TempoTyrantEncounter.FrenzyAt } :
-            b is ChimeboundOracleEncounter || b is DialWardenEncounter || b is PendulumSentinelEncounter ? new[] { 0.5f } : null;
+            b is ChimeboundOracleEncounter || b is DialWardenEncounter || b is PendulumSentinelEncounter || b is EscapementTwinsEncounter || b is RivetCantorEncounter || b is CrucibleSkaterEncounter || b is BriarMetronomeEncounter || b is SiltCarillonEncounter ? new[] { 0.5f } : null;
         float hitFlash;
 
         void Awake() { d = GetComponent<RunDirector>(); }
+
+        // LAN client (LanClientWorld): the director holds a replica of the host's fight and never runs it. The HUD draws the
+        // replica; the menu, Retry and Main Menu shortcuts are the host's, so a client gets a waiting card and Leave instead.
+        public static bool LanClientView;
+        public static System.Action LanLeave;
 
         void Update()
         {
@@ -87,6 +93,7 @@ namespace LastBell.Run
             TickFade();
             var kb = Keyboard.current; if (kb == null || d == null) return;
             if (kb.tabKey.wasPressedThisFrame) ShowMeter = !ShowMeter;
+            if (LanClientView) return;
             if (d.State == RunState.Results)
             {
                 if (kb.rKey.wasPressedThisFrame) d.RequestRetry();
@@ -220,6 +227,7 @@ namespace LastBell.Run
         {
             // The legacy run menu is a standalone diagnostic only: when the main menu owns the session (a launch is pending or
             // the return bridge exists) the Menu state is a one-frame hand-off, so draw a plain ink frame instead of flashing it.
+            if (LanClientView && d.State == RunState.Menu) return;   // before the host's first snapshot
             if (d.State == RunState.Menu) { if (LastBell.Menu.MenuReturnBridge.Active || LastBell.Menu.MenuLaunch.Pending) UiTheme.Fill(new Rect(0, 0, Screen.width, Screen.height), UiTheme.InkDeep); else Menu(); return; }
             bool world = d.World != null;
             if (world)
@@ -230,18 +238,18 @@ namespace LastBell.Run
                 BannerText(); CaptionText();
                 Floats();
                 Labels();
-                HazardLabels();
                 PlayerMarks();
+                DownedMarks();
                 if (ShowMechanicGallery) MechanicGallery();
                 switch (d.State)
                 {
-                    case RunState.Ready: ReadyCard(); break;
+                    case RunState.Ready: if (!LanClientView) ReadyCard(); break;
                     case RunState.Intro: if (d.Boss != null) IntroCard(); break;
                     case RunState.Cleared: ClearedCard(); break;
                     case RunState.Downed: DownedCard(); break;
                 }
             }
-            if (d.State == RunState.Results) Results();
+            if (d.State == RunState.Results) { if (LanClientView) LanResults(); else Results(); }
             if (!world) return;
             if (d.Paused) Pause();
             // dev line: dimmed Micro, lifted clear of the "Development Build" watermark
@@ -254,6 +262,23 @@ namespace LastBell.Run
         float PanelH => 22 + 18 + TileH + CapH + 4;
         float PanelTop => UiTheme.VirtualHeight - UiTheme.G4 - PanelH;
 
+        // Campaign preparation card (Campaign.cs): which arena and fight is next, and what this stretch of the run holds.
+        string CampaignHead()
+        {
+            int pos = d.ProgressSlot;
+            return pos == 0 && d.Encounter == RunDirector.TutorialPractice ? "First, the tutorial" : Campaign.AreaName(d.Encounter);
+        }
+        string CampaignBody()
+        {
+            int enc = d.Encounter, area = Campaign.AreaOf(enc);
+            string next = Campaign.StageLabel(d.EncounterOrder, d.ProgressSlot) + ": " + RunDirector.Bosses[enc].Name.Split('(')[0].Trim() + ".";
+            if (area == Campaign.TutorialArea) return "A guided Tempo Tyrant fight on Metronome Court. Then three arenas of minibosses and their bosses, and the Bellkeeper.";
+            if (area == Campaign.FinalAreaIndex) return next + " The last bell. Win on Hard to face the Overclocked Tempo Tyrant.";
+            if (area == Campaign.BonusArea) return next + " The Tempo Tyrant, pushed to the limit. The run is already won.";
+            if (Campaign.IsAreaBoss(enc)) return next + " Health and potions refill before him.";
+            return next + " Health refills before every fight; potions carry over until the area boss.";
+        }
+
         void ReadyCard()
         {
             bool practice = d.Mode == RunMode.Practice;
@@ -261,8 +286,8 @@ namespace LastBell.Run
             if (practice) return;
             if (Shop.RunShopFlow.Showing) return;   // the intermission shop replaces the preparation card
             string eb = UiTheme.Spaced(RunDifficulty.Name(d.Difficulty));
-            string head = (practice ? "PRACTICE — " + RunDirector.Bosses[d.Encounter].Name : "PREPARATION").ToUpperInvariant();
-            string body = practice ? "Practice never advances the run." : d.EncounterOrder.Length == 1 ? "One fight: the Bellkeeper." : $"{d.EncounterOrder.Length} bosses in a row. Health refills before each boss; potions carry over until the final boss refills them.";
+            string head = (practice ? "PRACTICE — " + RunDirector.Bosses[d.Encounter].Name : CampaignHead()).ToUpperInvariant();
+            string body = practice ? "Practice never advances the run." : d.EncounterOrder.Length == 1 ? "One fight: the Bellkeeper." : CampaignBody();
             const float pad = UiTheme.G3;
             // body clamped to 2 lines: widen the card (not the text) until it fits
             float w = 640, twoLines = 2 * bodyC.lineHeight / UiTheme.Scale + 2;
@@ -315,7 +340,7 @@ namespace LastBell.Run
         {
             // timeline over the intro: name fades and settles in, rules grow, everything fades before combat starts
             float p = d.IntroProgress, inA = Ease(Mathf.Clamp01(p / 0.3f)), outA = 1 - Ease(Mathf.Clamp01((p - 0.82f) / 0.18f)), a = inA * outA;
-            string head = d.Mode == RunMode.Practice ? "Practice" : d.ProgressSlot < d.EncounterOrder.Length - 1 ? $"Boss {d.ProgressSlot + 1} of {d.EncounterOrder.Length}" : "Final boss";
+            string head = d.Mode == RunMode.Practice ? "Practice" : Campaign.StageLabel(d.EncounterOrder, d.ProgressSlot);
             string full = d.Boss.DisplayName; int comma = full.IndexOf(',');
             string name = (comma > 0 ? full.Substring(0, comma) : full).Trim(), epithet = comma > 0 ? full.Substring(comma + 1).Trim() : null;
             float vw = UiTheme.VirtualWidth, cx = vw / 2, maxW = Mathf.Min(vw, 1920) - 2 * 160, y0 = 300 + (1 - inA) * 14;
@@ -332,10 +357,19 @@ namespace LastBell.Run
             T(0, y + 34, vw, 18, $"Fight begins in {Mathf.Max(0, (120 - d.StateTicks) / 60f):0.0}s", microC, A(UiTheme.IvoryMicro, UiTheme.IvoryMicro.a * a));
         }
 
+        // the cleared card's next line: a new arena is named, and a Hard Bellkeeper win announces the bonus
+        string NextLine(int next)
+        {
+            string name = RunDirector.Bosses[next].Name.Split('(')[0].Trim();
+            if (next == Campaign.BonusIndex) return "The last bell has rung... and the Tempo Tyrant answers. Bonus: " + name;
+            bool newArea = Campaign.AreaOf(next) != Campaign.AreaOf(d.Encounter);
+            return newArea ? $"Onward to {Campaign.AreaName(next)}. Next: {name}" : "Next: " + name;
+        }
+
         void ClearedCard()
         {
             float a = Ease(Mathf.Clamp01(d.StateTicks / 40f));
-            string next = d.Mode == RunMode.Practice ? "Practice complete" : d.ProgressSlot == d.EncounterOrder.Length - 1 ? "The last bell has rung" : "Next: " + RunDirector.Bosses[d.EncounterOrder[d.ProgressSlot + 1]].Name;
+            string next = d.Mode == RunMode.Practice ? "Practice complete" : d.ProgressSlot == d.EncounterOrder.Length - 1 ? (d.BonusFight ? "Overclocked, and outplayed" : "The last bell has rung") : NextLine(d.EncounterOrder[d.ProgressSlot + 1]);
             string full = d.Boss ? d.Boss.DisplayName : "Boss"; int comma = full.IndexOf(',');
             string name = (comma > 0 ? full.Substring(0, comma) : full).Trim();
             float vw = UiTheme.VirtualWidth, cx = vw / 2, maxW = Mathf.Min(vw, 1920) - 2 * 160, y0 = 300;
@@ -356,7 +390,8 @@ namespace LastBell.Run
             float y = r.y + pad;
             T(r.x, y, w, 44, UiTheme.Spaced("Down"), display36); y += 52;
             // a catalogued boss attack shows its 64 px icon, with the attack name and boss beside it (BossAttackIcons)
-            var wd = d.World; var ka = wd != null && wd.TakenLog.Count > 0 ? TakenAttack(wd, wd.TakenLog.Count - 1) : null; var ki = BossAttackIcons.Icon(ka);
+            // the last hit only if it took you to 0: a scripted wipe (Final Noon, an empty tower) downs you with its own cause
+            var wd = d.World; var ka = wd != null && wd.TakenLog.Count > 0 && wd.TakenLog[wd.TakenLog.Count - 1].hpAfter <= 0 ? TakenAttack(wd, wd.TakenLog.Count - 1) : null; var ki = BossAttackIcons.Icon(ka);
             if (ki != null) GUI.DrawTexture(S(r.x + pad, r.y + pad + 8, 64, 64), ki, ScaleMode.ScaleToFit, true);
             string a = "Struck by ", cause = ka != null ? ka.Label : d.DefeatCause ?? "?";
             float wa = Wv(bodyL, a), wc = Wv(bodyL, cause), x = r.x + w / 2 - (wa + wc) / 2;
@@ -372,8 +407,8 @@ namespace LastBell.Run
             Dim();
             const float W = 720, pad = UiTheme.G3, inner = W - 2 * pad, colGap = 12, rowGap = 8;
             const string controlText =
-                "Controls: WASD move · mouse aims · LMB basic · 2 3 4 class actions · 5 Mending Chorus / Temporal Anchor · RMB dash · F potion · Space jump · Shift sprint · Esc pause\n" +
-                "Movement stamina: sprint, jump and dash share one bar. No invincibility frames (dodging does not make you immune). F drinks a potion (+40 HP).\nHealth refills before each boss; potions carry over between bosses and refill before the final boss. Retry restarts at the first boss.\n" +
+                "Controls: WASD move · mouse aims · LMB basic · 2 3 4 class actions · 5 Mending Chorus / Temporal Anchor · RMB dash · F potion · Shift sprint · Esc pause\n" +
+                "Movement stamina: sprint and dash share one bar. No invincibility frames (dodging does not make you immune). F drinks a potion (+40 HP).\nHealth refills before each boss; potions carry over between bosses and refill before the final boss. Retry restarts at the first boss.\n" +
                 "Only real boss encounters are offered (the stand-in minibosses were removed); Sylvara is practice only, in Verdant Chimes. Arcanist kit numbers are prototype tuning. Dev keys in combat: F9 defeat boss, F8 next phase.";
             const int perRow = 3;
             int mapRows = (RunMaps.All.Length + perRow - 1) / perRow, bossRows = (RunDirector.Bosses.Length + perRow - 1) / perRow;
@@ -393,6 +428,7 @@ namespace LastBell.Run
                         + 26 + 40 + 8 + 40 + 12
                         + 28 + mapNoteH + mapRows * 40 + (mapRows - 1) * rowGap + 12
                         + 28 + diffNoteH + 40 + 20
+                        + 26 + 40 + 20
                         + 44 + 20
                         + 26 + bossRows * 40 + (bossRows - 1) * rowGap + 16
                         + ctrlH + 16 + 40 + pad;
@@ -412,7 +448,7 @@ namespace LastBell.Run
             }
             y += 48;
             string desc = menuClass == 0
-                ? "Sword and shield. 1 Steel Rhythm (3-hit combo; hit 3 grants Opening) · 2 Sundering Blow · 3 Last Word · 4 hold Brace (frontal 60% reduction)."
+                ? "Two throwing axes. LMB Twin Hurl (tap, or hold to lodge) · 2 Grinding Toll · 3 Splitting Throw (his hits +40%) · 4 Call of Iron (recall through the boss) · 5 Bell Frenzy."
                 : menuClass == 1
                 ? "Bell staff. 1 Resonant Note (+Harmony) · 2 Bellstrike (2 charges, rings a bell) · 3 Harmonic Refrain (adds echoes) · 4 Crescendo (detonate) · 6 Mending Chorus (instant heal)."
                 : "Time magic. 1 Clockbolt (+Tick, max 3) · 2 Time Seal (2 charges, 6 s, ripe last 2 s) · 3 Arc Lance (3 Ticks: inscribes a seal) · 4 Convergence (detonate seals) · 6 Temporal Anchor (recast to return + shield).";
@@ -438,6 +474,18 @@ namespace LastBell.Run
                 bool on = (int)level == i;
                 if (GUI.Toggle(dr, on, (on ? "> " : "") + RunDifficulty.Names[i], btn) && !on) d.SelectDifficulty((Difficulty)i);
                 if (on) UiTheme.Border(dr, UiTheme.Gold, Px);
+            }
+            y += 60;
+
+            // bot allies (RunParty): Chzy18 wants the count in the menu for every test build
+            T(x, y, inner, 20, UiTheme.Spaced("Allies (bots)") + "   (A to switch)", eyebrow); y += 26;
+            int na = RunParty.MaxAllies + 1; float aw = (inner - (na - 1) * colGap) / na;
+            for (int i = 0; i < na; i++)
+            {
+                var ar = S(x + i * (aw + colGap), y, aw, 40);
+                bool on = RunParty.Selected == i;
+                if (GUI.Toggle(ar, on, (on ? "> " : "") + i, btn) && !on) d.SelectAllies(i);
+                if (on) UiTheme.Border(ar, UiTheme.Gold, Px);
             }
             y += 60;
             if (GUI.Button(S(r.x + W / 2 - 150, y, 300, 44), "START RUN  (Enter)", btnP)) d.StartRun(RunDirector.Classes[menuClass]);
@@ -498,6 +546,20 @@ namespace LastBell.Run
             F(centred ? x + w / 2 - 48 : x, y + 26, 96, 2, UiTheme.Gold);
         }
 
+        // LAN client results: the host decides Retry or Main Menu; the client can only wait or leave.
+        void LanResults()
+        {
+            Dim();
+            float vw = UiTheme.VirtualWidth, CW = 560, cx = vw / 2 - CW / 2, y = 220;
+            DrawBand(y - 120, 520, 1);
+            string head = d.Victory ? "VICTORY" : "DEFEAT";
+            T(cx, y, CW, 56, UiTheme.Spaced(head), display40, d.Victory ? UiTheme.Gold : UiTheme.Danger); y += 64;
+            F(cx + CW / 2 - 60, y, 120, 1.5f, UiTheme.Gold); y += 22;
+            const string body = "Waiting for the host to retry or leave.";
+            T(cx, y, CW, Hv(bodyC, body, CW) + 4, body, bodyC); y += 60;
+            if (StripButton(cx, y, CW, 44, "Leave session", resultAction)) LanLeave?.Invoke();
+        }
+
         void Results()
         {
             Dim();
@@ -505,7 +567,9 @@ namespace LastBell.Run
             var w = d.World;
             string head = d.Victory ? (practice ? "PRACTICE CLEARED" : "VICTORY") : "DEFEAT";
             string shown = head.Length <= 8 ? UiTheme.Spaced(head) : head;
-            string summary = d.Victory ? (practice ? "Practice result only: the run is unchanged." : "The Bellkeeper is silenced. The run is cleared.")
+            string summary = d.Victory ? (practice ? "Practice result only: the run is unchanged." : d.BonusLost ? "The Bellkeeper is silenced and the run is won. The Overclocked Tempo Tyrant kept time: his card waits in Boss Rush."
+                                       : d.BonusFight ? "The Overclocked Tempo Tyrant is broken. Nothing is left to ring." : "The Bellkeeper is silenced. The run is cleared."
+                                         + (d.Difficulty == Difficulty.Hard ? "" : " Win on Hard to face the Overclocked Tempo Tyrant."))
                                        : $"Downed by {d.DefeatCause} during {(d.Boss ? d.Boss.DisplayName : RunDirector.Bosses[d.Encounter].Name)}.";
             float secs = d.RunTicks / 60f;
             var rows = new List<(string, string)>
@@ -555,7 +619,7 @@ namespace LastBell.Run
                 var mouse = Event.current.mousePosition;
                 for (int i = from; i < w.TakenLog.Count; i++)
                 {
-                    var e = w.TakenLog[i]; bool fatal = i == w.TakenLog.Count - 1;
+                    var e = w.TakenLog[i]; bool fatal = i == w.TakenLog.Count - 1 && e.hpAfter <= 0;
                     // a catalogued boss attack shows its icon (40 px on the killing blow, 22 px otherwise) and "Attack · Boss";
                     // the name always sits beside the icon, because several icons look alike at small sizes (BossAttackIcons)
                     var at = TakenAttack(w, i); var icon = BossAttackIcons.Icon(at);
@@ -627,7 +691,15 @@ namespace LastBell.Run
                 T(x, y, tw, h - 2, t, tab);
                 return;
             }
-            for (int i = 0; i < d.EncounterOrder.Length; i++)
+            // campaign: one arena's stretch at a time, after its name
+            var (first, last) = Campaign.Cluster(d.EncounterOrder, d.ProgressSlot);
+            {
+                string area = UiTheme.Spaced(Campaign.AreaName(d.Encounter));
+                float aw = Wv(tab, area) + 24;
+                F(x, y, aw, h, A(UiTheme.InkDeep, 0.8f)); T(x, y, aw, h - 2, area, tab, UiTheme.GoldLabel);
+                x += aw + 4;
+            }
+            for (int i = first; i <= last; i++)
             {
                 int cur = d.ProgressSlot; bool done = i < cur || (i == cur && d.State == RunState.Cleared) || (d.State == RunState.Results && d.Victory);
                 bool now = !done && i == cur;
@@ -679,7 +751,7 @@ namespace LastBell.Run
             float yy = rowsY;
             if (!(b is TempoTyrantEncounter)) T(x + 10, yy, bw * 0.65f, rowH, b.PhaseName, row15, BA(UiTheme.Ivory));
             // Aurelion v4: the enrage clock and the Corona Shield (BossEncounter.HudExtra), right of the phase line
-            if (b.HudExtra != null) { var hx = UiTheme.Style(UiTheme.SizeNumeric, true, TextAnchor.MiddleRight, UiTheme.Ivory); T(x + bw * 0.35f, yy, bw * 0.65f - 10, rowH, b.HudExtra, hx, BA(UiTheme.Ivory)); }
+            if (b.HudExtraShown != null) { var hx = UiTheme.Style(UiTheme.SizeNumeric, true, TextAnchor.MiddleRight, UiTheme.Ivory); T(x + bw * 0.35f, yy, bw * 0.65f - 10, rowH, b.HudExtraShown, hx, BA(UiTheme.Ivory)); }
 
             // attack-name warning rows removed (Risxhb, October 24, 2026): telegraphs on the floor carry the warning.
             // Exception (Chzy18, October 24, 2026): a hazard tagged with a hostile mechanic (Hazard.MechanicId) gets one row with
@@ -709,7 +781,9 @@ namespace LastBell.Run
         // then the class's dash, then the potion. A missing icon falls back to the ability name.
         static readonly Dictionary<string, string[]> SlotIconNames = new Dictionary<string, string[]>
         {
-            ["Vanguard"] = new[] { "vanguard_steel_rhythm", "vanguard_sundering_blow", "vanguard_last_word", "vanguard_brace", "vanguard_dash" },
+            // Tollbreaker: Grinding Toll and Bell Frenzy show his own shop items' art (Long Grind: the spinning axe; Frenzied Hour:
+            // the bell and axes) until their ability icons are drawn; they were the retired Arcanist and Chimes art (PR review ICON-01)
+            ["Tollbreaker"] = new[] { "tollbreaker_twin_hurl", "items/long-grind-128", "tollbreaker_splitting_throw", "tollbreaker_call_of_iron", "items/frenzied-hour-128", "tollbreaker_dash" },
             ["Chimesinger"] = new[] { "chimesinger_resonant_note", "chimesinger_bellstrike", "chimesinger_harmonic_refrain", "chimesinger_crescendo", "chimesinger_mending_chorus", "chimesinger_harmonic_step" },
             ["Arcanist"] = new[] { "arcanist_magic_missile", "arcanist_disintegrate", "arcanist_rune_sigil", "arcanist_comet", "arcanist_arcane_surge", "arcanist_blink" },
         };
@@ -856,7 +930,7 @@ namespace LastBell.Run
             for (int i = 0; i < n; i++)
             {
                 string key = KeyFor(k.SlotKeys[i], preferMouseBasic, out bool hold);
-                var r = Tile(bx + i * (TileW + gap), by, key, hold, SlotIcon(p.ClassName, i), k.SlotNames[i], k.SlotState(i), k.Cooldown01(i), off);
+                var r = Tile(bx + i * (TileW + gap), by, key, hold, SlotIcon(p.ClassName, i), k.SlotNames[i], k.ShownSlotState(i), k.ShownCooldown(i), off);
                 if (r.Contains(Event.current.mousePosition)) hover = i;
             }
             bool dashReady = p.Stamina >= PlayerController.DashCost;
@@ -864,11 +938,11 @@ namespace LastBell.Run
                           p.ClassName == "Chimesinger" ? "Harmonic Step" : p.ClassName == "Arcanist" ? "Blink" : "Dash",
                           dashReady ? "" : "stamina", 0, off);
             var pr = Tile(bx + (n + 1) * (TileW + gap), by, "F", false, Icon("potion"), "Potion",
-                          p.Potions == 0 ? "no potions" : "", 0, off, p.Potions == 0 ? null : new string('●', p.Potions) + new string('○', PlayerController.MaxPotions - p.Potions));
+                          p.Potions == 0 ? "no potions" : "", 0, off, p.Potions == 0 ? null : new string('●', p.Potions) + new string('○', Mathf.Max(0, PlayerController.MaxPotions - p.Potions)));
             // the controls hint line was removed from the player HUD at Risxhb's request
 
             // class state (HARMONY / SEALS / TICKS ...) as quiet tags above the health bar
-            string cs = k.ClassState();
+            string cs = k.ShownClassState();
             if (!string.IsNullOrEmpty(cs))
             {
                 var parts = cs.Split(new[] { "   " }, System.StringSplitOptions.RemoveEmptyEntries);
@@ -889,7 +963,7 @@ namespace LastBell.Run
             bool showTip = over >= 0 && !attacking && Time.unscaledTime - tipSince >= TipDelay;
             if (!showTip) { }
             else if (pr.Contains(Event.current.mousePosition)) Tooltip(x, top, $"POTION  [F]\n+{PlayerController.PotionHeal} HP, 1 s between drinks. {p.Potions}/{PlayerController.MaxPotions} left.\nPotions carry over between minibosses; health and potions refill before each area boss.");
-            else if (dr.Contains(Event.current.mousePosition)) Tooltip(x, top, "DASH  [RMB]\nShort burst (3 m in 0.2 s) in the move direction. Costs 30 stamina; sprint and jump share the bar.\nNo invincibility: get out of the shape before it resolves. Cancels basic attacks and unreleased windups.");
+            else if (dr.Contains(Event.current.mousePosition)) Tooltip(x, top, "DASH  [RMB]\nShort burst (3 m in 0.2 s) in the move direction. Costs 30 stamina; sprint shares the bar.\nNo invincibility: get out of the shape before it resolves. Cancels basic attacks and unreleased windups.");
             else if (hover >= 0) Tooltip(x, top, k.Tooltip(hover));
             if (ShowMeter && d.World != null) Meter(Right - MeterW, 260, d.World.EncounterMeter, "DAMAGE · this encounter", (d.World.Tick - d.World.SegmentStartTick) / 60f);
         }
@@ -1013,22 +1087,82 @@ namespace LastBell.Run
             GUI.matrix = m;
         }
 
-        void HazardLabels()
-        {
-            var cam = Camera.main; if (!cam) return; float h = Screen.height;
-            foreach (var hz in d.World.Hazards.Live)
-            {
-                if (!hz.JumpClearable) continue;
-                var mid = hz.Origin + Sim.Dir(hz.Yaw) * hz.Length * 0.5f;
-                var s = cam.WorldToScreenPoint(mid); if (s.z < 0) continue;
-                UiTheme.Fill(new Rect(s.x - UiTheme.V(36), h - s.y - UiTheme.V(14), UiTheme.V(72), UiTheme.V(28)), UiTheme.InkStrip);
-                UiTheme.Label(new Rect(s.x - UiTheme.V(60), h - s.y - UiTheme.V(15), UiTheme.V(120), UiTheme.V(30)), "JUMP", floatSt, UiTheme.Ivory);   // ivory on the ink strip, not a friendly cyan
-            }
-        }
-
         // Mechanic markers over players' heads (PlayerController.Marks, MechanicIcons): 40 px icons side by side, each with its
         // name on a strip under it, because several look alike at this size. Placement approved by Chzy18 on October 24, 2026;
         // see docs/run-loop/mechanic-icons.md. Nothing is drawn until an encounter assigns a mark.
+        // Revives: over each downed player, their class's downed bell (Codex's revive HUD art, work/revive-hud-20261104, ivory
+        // not gold: gold is the bosses' danger colour) inside the segmented ring, which fills clockwise ivory over slate as the
+        // revive runs, and the seconds left to revive them on a strip under it; DEAD (bell dimmed, no ring) once bled out.
+        // Beside a downed ally the local player sees the revive prompt (the hand) and what it takes: stand still.
+        void DownedMarks()
+        {
+            var cam = Camera.main; if (!cam || d.World.Players.Count < 2) return; float h = Screen.height, w = UiTheme.V(96), ring = UiTheme.V(64), bell = UiTheme.V(44);
+            var me = d.Player;
+            foreach (var p in d.World.Players)
+            {
+                if (p == null || !p.Down) continue;
+                var s = cam.WorldToScreenPoint(p.transform.position + Vector3.up * 1.4f); if (s.z < 0) continue;
+                float cx = s.x, cy = h - s.y - ring / 2 - UiTheme.V(6);
+                if (!p.Dead) { var rt = ReviveRing(p.ReviveProgress); if (rt) GUI.DrawTexture(new Rect(cx - ring / 2, cy - ring / 2, ring, ring), rt, ScaleMode.ScaleToFit, true); }
+                var mark = Icon("revive/downed-" + p.ClassName.ToLowerInvariant());
+                if (mark) { var c = GUI.color; if (p.Dead) GUI.color = new Color(1, 1, 1, 0.45f); GUI.DrawTexture(new Rect(cx - bell / 2, cy - bell / 2, bell, bell), mark, ScaleMode.ScaleToFit, true); GUI.color = c; }
+                var r = new Rect(cx - w / 2, cy + ring / 2 + UiTheme.V(2), w, UiTheme.V(20));
+                UiTheme.Fill(r, UiTheme.InkStrip);
+                string t = p.Dead ? "DEAD" : $"DOWN  {Mathf.CeilToInt(PlayerController.BleedOutSeconds - p.DownedTicks / (float)Sim.Hz)} s";
+                UiTheme.Label(r, t, slotName);
+                // the prompt: the local player beside them and up (the revive itself needs them still: PlayerController.CanChannelRevive)
+                if (p.Dead || me == null || me == p || me.Down || Sim.Flat(me.transform.position - p.transform.position).magnitude > PlayerController.ReviveRange) continue;
+                var hand = Icon("revive/revive-prompt"); float ps = UiTheme.V(36);
+                if (hand) GUI.DrawTexture(new Rect(cx + ring / 2 + UiTheme.V(4), cy - ps / 2, ps, ps), hand, ScaleMode.ScaleToFit, true);
+                var pr = new Rect(cx + ring / 2 + UiTheme.V(4) + ps, cy - UiTheme.V(10), UiTheme.V(110), UiTheme.V(20));
+                UiTheme.Fill(pr, UiTheme.InkStrip); UiTheme.Label(pr, "STAND STILL", slotName);
+            }
+        }
+
+        // the ring with its first k of ReviveSteps segments ivory, the rest slate, built once per step from the art's alpha
+        // (clockwise from the top; the art itself is a half-filled still, so it is never stretched as a timer)
+        const int ReviveSteps = 30;
+        static Texture2D[] reviveRings;
+        static Texture2D ReviveRing(float progress)
+        {
+            reviveRings ??= new Texture2D[ReviveSteps + 1];
+            int k = Mathf.Clamp(Mathf.FloorToInt(progress * ReviveSteps + 0.001f), 0, ReviveSteps);
+            if (reviveRings[k]) return reviveRings[k];
+            var src = Icon("revive/revive-ring"); if (!src || !src.isReadable) return src;
+            var px = src.GetPixels32(); int n = src.width; var o = new Color32[px.Length];
+            var lit = new Color(0.96f, 0.92f, 0.82f); var dim = new Color(0.20f, 0.27f, 0.38f);
+            for (int y = 0; y < n; y++)
+                for (int x = 0; x < n; x++)
+                {
+                    int i = y * n + x; var c = px[i]; if (c.a == 0) { o[i] = c; continue; }
+                    float a = Mathf.Repeat(Mathf.Atan2(x - n / 2f + 0.5f, y - n / 2f + 0.5f) * Mathf.Rad2Deg, 360f);   // 0 at the top, clockwise
+                    float lum = (c.r + c.g + c.b) / (3f * 255f);
+                    var tint = a < 360f * k / ReviveSteps ? lit : dim;
+                    o[i] = (Color32)new Color(tint.r * (0.55f + 0.45f * lum), tint.g * (0.55f + 0.45f * lum), tint.b * (0.55f + 0.45f * lum), c.a / 255f);
+                }
+            var t = new Texture2D(n, n, TextureFormat.RGBA32, false) { filterMode = FilterMode.Bilinear, wrapMode = TextureWrapMode.Clamp };
+            t.SetPixels32(o); t.Apply(false, true);
+            return reviveRings[k] = t;
+        }
+
+        // white anti-aliased disc, tinted at draw time (backing for over-head markers)
+        static Texture2D markDisc;
+        static Texture2D MarkDisc
+        {
+            get
+            {
+                if (markDisc) return markDisc;
+                const int n = 64; markDisc = new Texture2D(n, n, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
+                var px = new Color[n * n];
+                for (int y = 0; y < n; y++) for (int x = 0; x < n; x++)
+                {
+                    float dx = x + 0.5f - n / 2f, dy = y + 0.5f - n / 2f, a = Mathf.Clamp01(n / 2f - Mathf.Sqrt(dx * dx + dy * dy));
+                    px[y * n + x] = new Color(1, 1, 1, a);
+                }
+                markDisc.SetPixels(px); markDisc.Apply(); return markDisc;
+            }
+        }
+
         void PlayerMarks()
         {
             var cam = Camera.main; if (!cam) return; float h = Screen.height, sz = UiTheme.V(40), gap = UiTheme.V(48);
@@ -1041,6 +1175,10 @@ namespace LastBell.Run
                 {
                     var m = MechanicIcons.Get(p.Marks[i]); if (m == null) continue;
                     var r = new Rect(x0 + i * (sz + gap), y0, sz, sz);
+                    // dark ink disc behind the marker so its thin ivory rim reads on light floors (Chzy18, 31 Oct)
+                    var gc = GUI.color; GUI.color = UiTheme.InkStrip;
+                    GUI.DrawTexture(new Rect(r.center.x - sz * 0.58f, r.center.y - sz * 0.58f, sz * 1.16f, sz * 1.16f), MarkDisc, ScaleMode.StretchToFill, true);
+                    GUI.color = gc;
                     var t = MechanicIcons.Icon(m); if (t != null) GUI.DrawTexture(r, t, ScaleMode.ScaleToFit, true);
                     float nw = slotName.CalcSize(new GUIContent(m.name)).x;
                     UiTheme.Fill(new Rect(r.center.x - nw / 2 - UiTheme.V(4), r.yMax + UiTheme.V(1), nw + UiTheme.V(8), UiTheme.V(17)), UiTheme.InkStrip);

@@ -17,7 +17,7 @@ namespace LastBell.Run
     //                              Towers + Lances > Hour Hands (Hard) > punish
     //   4 Last Light 15-0 %        the floor falls every 15 s (wipe at 120 s) beside Lances + Starfall,
     //                              Marks + Lances, Hour Hands; no punish, no Towers, Ecliptic, Collapse or Sunspots (they would burn)
-    // Zenith Collapse grows every cast (Solar Hunger). Final Noon wipes the party at 7:00 (warned at 6:30). Sunspot pools
+    // Zenith Collapse grows every cast (Solar Hunger). Final Noon wipes the party at 6:30 (warned at 6:00). Sunspot pools
     // last until the phase ends.
     public sealed partial class AurelionEncounter
     {
@@ -26,6 +26,7 @@ namespace LastBell.Run
         public TotalEclipse Eclipse { get; private set; }
         public Severance Sever { get; private set; }
         public LastLight Light { get; private set; }
+        public MeridianRecall Recall { get; private set; }
         void BindV4()
         {
             Towers = Register(new MeridianTowers());      // [ability: meridian_towers] (v4)
@@ -33,10 +34,11 @@ namespace LastBell.Run
             Eclipse = Register(new TotalEclipse());       // [ability: total_eclipse] (v4)
             Sever = Register(new Severance());            // [ability: severance] (v4)
             Light = Register(new LastLight());            // [ability: last_light] (v4)
+            Recall = Register(new MeridianRecall());      // [ability: meridian_recall] (v4, Hard only)
         }
 
         public const float V4P2At = 0.70f, V4P3At = 0.40f, V4P4At = 0.20f, EnrageS = 390f, EnrageWarnS = 360f;   // Final Noon at 6:30
-        public float[] PhaseMarks => AurelionArgs.V4 ? new[] { V4P2At, V4P3At, V4P4At } : new[] { V2P2At, V2P3At };
+        public float[] PhaseMarks => new[] { V4P2At, V4P3At, V4P4At };
 
         // ---- fight-ending wipes, the Corona Shield, pools that last until the phase ends, the enrage clock ----
         public string WipeCause { get; private set; }
@@ -68,7 +70,6 @@ namespace LastBell.Run
         {
             get
             {
-                if (!AurelionArgs.V4) return null;
                 int s = FightTicks / Sim.Hz;
                 string clock = $"{s / 60}:{s % 60:00} / {(int)EnrageS / 60}:{(int)EnrageS % 60:00}";
                 return ShieldHp > 0 ? $"CORONA SHIELD {ShieldHp}   ·   {clock}" : clock;
@@ -78,7 +79,7 @@ namespace LastBell.Run
         // called every tick (StepAlways): the enrage clock runs while the v4 script runs (not while tests hold him)
         void V4Clock()
         {
-            if (!AurelionArgs.V4 || (TestHold && !TestClock) || W == null || !W.CombatActive || Dead) return;
+            if ((TestHold && !TestClock) || W == null || !W.CombatActive || Dead) return;
             FightTicks++;
             if (FightTicks == Sim.Ticks(EnrageWarnS)) RunHud.Banner("FINAL NOON IN 30 SECONDS", new Color(1f, 0.85f, 0.45f), 3f);
             if (FightTicks == Sim.Ticks(EnrageS)) Wipe("Final Noon — the enrage");
@@ -120,6 +121,7 @@ namespace LastBell.Run
                 case 2:
                     // the whole fight harder (Chzy18 2026-10-22): three patterns per block
                     yield return Block("Sunspots + Starfall Mirror + Meridian Lances", Together(Together(Spots.Run(), Sim.Ticks(0.5f), Starfall.Run(true)), Sim.Ticks(2.0f), Lances.Run(3, 1, false))); yield return V2Gap(g);
+                    if (W.Difficulty == Difficulty.Hard) { yield return Block("Meridian Recall", Recall.Run()); yield return V2Gap(g); }   // Hard: that volley once more, on its own
                     yield return Block("Meridian Towers + Zenith Marks + Starfall Mirror", Paired(TowersThenMark(), Towers.Duration(), Starfall.Run(true), Starfall.Duration(true), Sim.Ticks(1.0f))); yield return V2Gap(g);
                     // co-op: no Starfall here (everyone shares the ring, so 4 stars and 4 mirrors would land on it: impossible, not hard)
                     if (Party == 1) yield return Block("Ecliptic Order + Meridian Lances + Starfall Mirror", Together(EclipticWithLances(), Sim.Ticks(5.0f), Starfall.Run(true)));
@@ -131,6 +133,7 @@ namespace LastBell.Run
                 case 3:
                     yield return Block("Severance", Sever.Run()); yield return V2Gap(g);
                     yield return Block("Cascading Lances + Starfall Mirror + Hour Hands", Together(LancesWithStarfall(4, 2, true), Sim.Ticks(1.0f), Hands.Run())); yield return V2Gap(g);
+                    if (W.Difficulty == Difficulty.Hard) { yield return Block("Meridian Recall", Recall.Run()); yield return V2Gap(g); }   // Hard: the cascade's turned volley once more
                     yield return Block("Sunspots + Zenith Collapse", SpotsThenCollapse()); yield return V2Gap(g);
                     yield return Block("Meridian Towers + Meridian Lances + Starfall Mirror", Paired(Paired(Towers.Run(), Towers.Duration(), Lances.Run(4, 1, false), Lances.Duration(4, 1, false), Sim.Ticks(1.0f)), Towers.Duration(), Starfall.Run(true), Starfall.Duration(true), Sim.Ticks(1.6f))); yield return V2Gap(g);
                     yield return Block("Zenith Marks + Meridian Lances", MarksWithLances(2));   // two-step, then the punish
@@ -143,6 +146,14 @@ namespace LastBell.Run
 
         // Towers + Zenith Marks: the mark resolves 1.5 s after the last tower (on the same tick, a SUN mark beside tower
         // II left a 0.5 m sliver). The conflict stays: your tower may sit in the wrong zone, so you finish it and run.
+        // the solo loop for Meridian Recall (F6 / -lastbellAbility): a volley, a short beat, then its replay
+        IEnumerable<int> LancesThenRecall()
+        {
+            foreach (var w in Lances.Run(3, 1, false)) yield return w;
+            yield return Sim.Ticks(0.5f);
+            foreach (var w in Recall.Run()) yield return w;
+        }
+
         public IEnumerable<int> TowersThenMark() => Paired(Towers.Run(), Towers.Duration(), Marks.Run(), Marks.Duration(), Sim.Ticks(1.5f));
 
         // Ecliptic Order (4 rings) + Lances: the beams land 0.2 s before ring II, while you stand at a ring and can side-step

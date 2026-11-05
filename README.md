@@ -1,6 +1,6 @@
 # Last Bell
 
-A clockwork-fantasy boss rush with real-time, isometric combat. Choose the Vanguard, Arcanist or Chimesinger, learn boss patterns, and fight through three minibosses before the final boss.
+A clockwork-fantasy boss rush with real-time, isometric combat. Choose the Tollbreaker, Arcanist or Chimesinger, learn boss patterns, and fight through three minibosses before the final boss.
 
 ## Play the demo
 

@@ -6,7 +6,7 @@ using UnityEngine;
 namespace LastBell.Menu
 {
     // Starts straight into one boss's practice, skipping the menus. For working on a boss:
-    //   LastBell.exe -lastbellPractice tempo-tyrant            (Vanguard, the boss's own arena)
+    //   LastBell.exe -lastbellPractice tempo-tyrant            (Tollbreaker, the boss's own arena)
     //   LastBell.exe -lastbellPractice oracle -lastbellClass Arcanist
     //   LastBell.exe -lastbellPractice bellkeeper -lastbellPhase 3   (starts in that HP phase; default 1)
     // The boss is matched by name, ignoring case, spaces, dashes and the "(practice)/(area n)" suffix; a unique prefix or
@@ -27,6 +27,8 @@ namespace LastBell.Menu
 
             var matches = Enumerable.Range(0, RunDirector.Bosses.Length)
                 .Where(i => wanted.Length > 0 && Key(RunDirector.Bosses[i].Name).Contains(wanted)).ToArray();
+            // several hits ("tempo": Tempo Tyrant and Overclocked Tempo Tyrant): a name that starts with it wins
+            if (matches.Length > 1) { var starts = matches.Where(i => Key(RunDirector.Bosses[i].Name).StartsWith(wanted)).ToArray(); if (starts.Length == 1) matches = starts; }
             string valid = string.Join(", ", RunDirector.Bosses.Select(b => b.Name));
             if (hero == null) { Debug.LogError($"-lastbellClass: unknown class. Use one of: {string.Join(", ", RunDirector.Classes)}"); return; }
             if (matches.Length != 1) { Debug.LogError($"-lastbellPractice: '{(at + 1 < args.Length ? args[at + 1] : "")}' matches {matches.Length} bosses. Use one of: {valid}"); return; }

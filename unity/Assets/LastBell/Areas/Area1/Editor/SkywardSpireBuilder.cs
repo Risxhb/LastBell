@@ -12,14 +12,14 @@ namespace LastBell.Areas.Area1.EditorTools
     // Last Bell > Area 1: Skyward Spire builds (once) and opens the Area 1 arena scene; Rebuild Area 1 regenerates it.
     // The solid arena comes from SkywardSpire.glb (exported from prototype/arena-3d/areas/area-1 by export-glb.mjs).
     // This adds what glTF can't carry: the day sky, fog and ambient light, the sun and a reflection probe, the cloud
-    // sea, colliders and spawn points, post-processing, the camera and a Vanguard for scale.
+    // sea, colliders and spawn points, post-processing, the camera and a Tollbreaker for scale.
     // Same pattern as Arenas/Editor/KeyArtArenaBuilder.cs.
     public static class SkywardSpireBuilder
     {
         const string Dir = "Assets/LastBell/Areas/Area1", Gen = Dir + "/Generated", Prefabs = Dir + "/Prefabs", Captures = Dir + "/Captures";
         const string KitPath = Dir + "/SkywardSpire_Kit.glb"; // everything but the floor, modelled in Blender (prototype/arena-3d/areas/area-1/blender/spire_kit.py)
         const string GlbPath = Dir + "/SkywardSpire.glb", ScenePath = Dir + "/SkywardSpire_Arena.unity", PrefabPath = Prefabs + "/LB_ENV_SkywardSpire_Arena.prefab";
-        const string VanguardPath = "Assets/LastBell/Characters/Vanguard/Resources/Characters/Vanguard.glb";
+        const string ScaleReferencePath = "Assets/LastBell/Characters/Tollbreaker/Resources/Characters/Tollbreaker.glb";
 
         // Layout (metres, Unity axes: x is mirrored from three.js; north is -z, the gameplay camera sits south at +z).
         const float R = 14f, Rail = 14.65f, Ledge = 15.6f, BridgeW = 4.2f;
@@ -106,10 +106,10 @@ namespace LastBell.Areas.Area1.EditorTools
                 var s = new GameObject("Spawn_" + i).transform; s.SetParent(spawns, false);
                 s.position = new Vector3(Mathf.Cos(a) * 10.5f, 0, Mathf.Sin(a) * 10.5f); s.LookAt(new Vector3(0, 0, 0));
             }
-            var vanguard = AssetDatabase.LoadAssetAtPath<GameObject>(VanguardPath);
-            if (vanguard)
+            var scaleRef = AssetDatabase.LoadAssetAtPath<GameObject>(ScaleReferencePath);
+            if (scaleRef)
             {
-                var v = (GameObject)PrefabUtility.InstantiatePrefab(vanguard); v.name = "ScaleReference_Vanguard";
+                var v = (GameObject)PrefabUtility.InstantiatePrefab(scaleRef); v.name = "ScaleReference_Tollbreaker";
                 v.transform.SetParent(gameplay, false); v.transform.position = FromThree(-3.5f, 0, 6.5f); v.transform.rotation = Quaternion.Euler(0, 180 + 36, 0);
             }
             BuildTelegraphCheck(gameplay);

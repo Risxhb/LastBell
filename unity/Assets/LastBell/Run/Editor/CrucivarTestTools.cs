@@ -6,9 +6,8 @@ namespace LastBell.Run.EditorTools
 {
     // Last Bell > Bosses > Crucivar in the Brass Foundry: opens the run loop's Brass Foundry map (building the run scenes
     // if they're missing), where Crucivar is the "Crucivar" practice button.
-    //   Unity.exe -projectPath unity -executeMethod LastBell.Run.EditorTools.CrucivarTestTools.PlayModeTest -crucivarTest -lastbellOut <dir>
-    // CrucivarAutoTest (ability set v1) exits the editor with 0 (all checks passed) or 1. Ability set v2:
-    //   Unity.exe -projectPath unity -executeMethod LastBell.Run.EditorTools.CrucivarTestTools.PlayModeTest -crucivarV2Test [-crucivarAbility <id>] -lastbellOut <dir>
+    // The v4 autotest (CrucivarAutoTest) exits the editor with 0 (all checks passed) or 1:
+    //   Unity.exe -projectPath unity -executeMethod LastBell.Run.EditorTools.CrucivarTestTools.PlayModeTest -crucivarTest [-crucivarAbility <id>] -lastbellOut <dir>
     public static class CrucivarTestTools
     {
         static string FoundryScene => RunMaps.All[RunMaps.IndexOf("brass-foundry")].RunScene;

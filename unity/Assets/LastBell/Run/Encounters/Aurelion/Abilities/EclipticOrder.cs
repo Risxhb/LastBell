@@ -43,7 +43,7 @@ namespace LastBell.Run
         public int Casts { get; private set; }
 
         public float SafeRadius => N <= 2 ? 3.0f : N <= 4 ? 3.5f : 4.5f;
-        int Reveal => Easy ? int.MaxValue : T(AurelionArgs.V4 ? RevealV4S : RevealS);
+        int Reveal => Easy ? int.MaxValue : T(RevealV4S);
         int First => T(FirstS);
         int Step => T(StepS);
         int Lead => Sim.Ticks(Easy ? LeadEasyS : LeadS);

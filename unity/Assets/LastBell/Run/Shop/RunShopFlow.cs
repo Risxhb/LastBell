@@ -53,7 +53,9 @@ namespace LastBell.Run.Shop
             {
                 case RunState.Ready:
                     if (!Enabled || (d.Mode == RunMode.Practice && !PracticeShopFor(d.Encounter))) { EndRun(); break; }
-                    if (Run == null || runId != d.RunsStarted) BeginRun();
+                    if (Run == null || runId != d.RunsStarted) { if (!AdoptCarried()) BeginRun(); }
+                    // campaign: minibosses have no shop (and a run arriving in a new arena waits at Ready); the wallet carries on
+                    if (d.Mode == RunMode.Run && !Campaign.ShopBefore(d.Encounter)) break;
                     OpenFor(d.Encounter);
                     break;
                 case RunState.Intro:
@@ -61,9 +63,8 @@ namespace LastBell.Run.Shop
                     {
                         Run.Close();
                         foreach (var b in Run.Slots) b.ResetEncounter();
-                        Run.CrackUntil = -1; Run.BrandUntil = -1; Run.BrandOwner = null;
-                        ItemHooks.ClearEffects();
-                        d.Player.RefreshHealth(refillPotions: false);   // the shop's refill, now at the bought max HP (Grit, Glass Edge)
+                        Run.BrandUntil = -1; Run.BrandOwner = null;
+                        d.Player.RefreshHealth(refillPotions: false);   // the shop's refill, now at the bought max HP (Glass Edge)
                     }
                     break;
                 case RunState.Cleared:
@@ -90,10 +91,27 @@ namespace LastBell.Run.Shop
         void BeginRun()
         {
             runId = d.RunsStarted; openedFor = -1;
-            Run = new ShopRun(SeedOverride ?? Guid.NewGuid().GetHashCode(), d.Mode == RunMode.Practice ? 1 : d.EncounterOrder.Length);
+            Run = new ShopRun(SeedOverride ?? Guid.NewGuid().GetHashCode(), d.Mode == RunMode.Practice ? 1 : Math.Max(1, d.EncounterOrder.Count(Campaign.ShopBefore)));
             d.Player.Build = Run.Add(d.ClassName);   // party bots / netcode add their slots here later
             ItemHooks.Run = Run;
             d.Log.Add($"shop: new run, seed {Run.Seed}");
+        }
+        // Campaign travel (RunDirector.TravelTo): the shop run (wallet, items) survives the scene load into the next arena
+        // and the new arena's shop adopts it for the same run.
+        static ShopRun carried; static int carriedRunId = -1;
+        public void CarryForTravel() { carried = Run; carriedRunId = runId; if (d.Player) d.Player.Build = null; }
+        public static void DropCarried() { carried = null; carriedRunId = -1; }
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ClearCarried() => DropCarried();
+        bool AdoptCarried()
+        {
+            if (carried == null || carriedRunId != d.RunsStarted || d.Mode != RunMode.Run) { DropCarried(); return false; }
+            Run = carried; runId = carriedRunId; openedFor = -1; DropCarried();
+            Run.BrandUntil = -1; Run.BrandOwner = null;
+            d.Player.Build = Run.Slot(0);
+            ItemHooks.Run = Run;
+            d.Log.Add($"shop: carried run, {Run.Slot(0).Chimes} Chimes, {Run.Slot(0).Items.Count} items");
+            return true;
         }
         void EndRun()
         {

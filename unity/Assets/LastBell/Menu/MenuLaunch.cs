@@ -17,7 +17,7 @@ namespace LastBell.Menu
         {
             if(pending!=null || Array.IndexOf(RunDirector.Classes,hero)<0 || RunDirector.RunOrder.Length==0)return false;
             var order=RunDirector.CreateRunOrder();int encounter=order[0];
-            int map=RunMaps.IndexOf(RunDirector.Bosses[encounter].Map??"test");
+            int map=RunMaps.IndexOf(Campaign.MapFor(encounter));   // the campaign's first arena (the tutorial's on a first run)
             if(!RunMaps.InBuild(map))return false;
             pending=new Request{Hero=hero,Scene=RunMaps.All[map].RunScene,Difficulty=RunDifficulty.Selected,Order=order};
             MenuReturnBridge.Ensure();MenuReturnBridge.TestSession=false;SceneManager.LoadSceneAsync(pending.Scene);return true;
