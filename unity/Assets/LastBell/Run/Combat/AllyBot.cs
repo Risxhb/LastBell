@@ -60,10 +60,13 @@ namespace LastBell.Run
                 if (first == null || Before(part, first)) { next = first; first = part; }
                 else if (next == null || Before(part, next)) next = part;
             }
-            if (next != null && of >= 3 && slot >= of / 2 && BotSight.PartOrder(next) >= 0
+            if (next != null && of >= 3 && slot >= of / 2 && BotSight.PartOrder(next) >= 0 && LiveParts(w) >= 3
                 && BotSight.PartHp(next) > Mathf.Max(PartReserveMin, BotSight.PartMaxHp(next) * PartReserve)) return next;
             return first;
         }
+        // with two castings up (every party size since 4 Nov) the whole party breaks the first: the lone bot left on it
+        // spent the second uprising dodging bullets 8 m off while the rest wore the next one down (Hard party sweep, 4 Nov)
+        static int LiveParts(CombatWorld w) { int n = 0; foreach (var p in w.Parts) if (p.Alive) n++; return n; }
         // a casting held back for its turn standing nearer than the target: a swing or a recall could sink it out of order
         static bool HeldNear(CombatWorld w, Vector3 pos, Vector3 target)
         {
