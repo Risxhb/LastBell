@@ -12,7 +12,6 @@ namespace LastBell.Run
     //   marks        a verdict only the marked player can be hit by (Affects), like Zenith Marks' SHADE / SUN
     //   tether       HazardShape.Tether with a 6-10 m band (Gear Chain), chained to a rim post
     //   following    a circle that tracks you, locks, then lands (a delayed circle)
-    //   low bar      a JumpClearable lane: jump it (the only height rule, R19)
     public sealed partial class TutorialDirector
     {
         Hazard Spawn(Hazard h) => W.Hazards.Spawn(h);
@@ -60,13 +59,6 @@ namespace LastBell.Run
             Source = "Following circle", MechanicId = MechanicIcons.DelayedCircle, Shape = HazardShape.Circle, Kind = HazardKind.Ground,
             Origin = Sim.Flat(who.transform.position), Radius = 2.4f, LockAt = lockAt, ResolveAt = resolve, Damage = 20, Knockback = 1f,
             Track = hz => { if (who) hz.Origin = Vector3.MoveTowards(hz.Origin, Sim.Flat(who.transform.position), 7f * Sim.Dt); },
-        });
-
-        Hazard LowBar(float z, int resolve) => Spawn(new Hazard
-        {
-            Source = "Low Bar", MechanicId = MechanicIcons.LowBar, Shape = HazardShape.Lane, Kind = HazardKind.Strike,
-            Origin = new Vector3(-Rim - 1f, 0, z), Yaw = 90f, Length = 2 * Rim + 2f, Width = 1.8f, LockAt = 0, ResolveAt = resolve,
-            Damage = 20, JumpClearable = true, Knockback = 1f, ClipRadius = Rim,
         });
 
         // ---- the chain drawing: a brass post at the rim and a bar to the player, green inside the band, coral outside ----

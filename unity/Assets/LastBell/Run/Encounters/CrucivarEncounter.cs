@@ -64,7 +64,7 @@ namespace LastBell.Run
         void FoundryLook(Hazard h)
         {
             if (!this || W == null || W.Boss != this || h.Tele == null) return;
-            if (h.ShareCount > 0 || h.BurnPerSecond > 0 || h.JumpClearable) return;
+            if (h.ShareCount > 0 || h.BurnPerSecond > 0) return;
             h.Tele.Motif(FoundryMotif);
         }
         void OnDestroy() { if (W != null && W.Hazards != null) W.Hazards.Spawned -= FoundryLook; }

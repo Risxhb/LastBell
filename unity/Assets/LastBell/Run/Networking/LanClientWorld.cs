@@ -256,7 +256,7 @@ namespace LastBell.Run.Networking
                 actor.Track.At(renderTime, out var pos, out float yaw, out float h);
                 if (pair.Key == lobby.LocalId && Predict(out var predicted)) { pos = predicted; actor.Track.At(double.MaxValue, out _, out yaw, out _); }
                 actor.Player.transform.SetPositionAndRotation(pos, Quaternion.Euler(0, yaw, 0));
-                actor.ShownHeight = h; actor.Player.Presenter.HeightOffset = h;
+                actor.ShownHeight = h;
             }
             if (boss && bossTrack.Ready)
             {
@@ -393,7 +393,7 @@ namespace LastBell.Run.Networking
                 mirrorSeen.Add(s.Id);
                 if (!mirrors.TryGetValue(s.Id, out var m)) { m = new HazardMirror { H = new Hazard { Replica = true, Source = s.Source } }; mirrors[s.Id] = m; world.Hazards.AddReplica(m.H); }
                 var h = m.H;
-                h.MechanicId = string.IsNullOrEmpty(s.Mechanic) ? null : s.Mechanic; h.JumpClearable = s.JumpClearable; h.Soak = s.Soak; h.ShareCount = s.ShareCount; h.FillToLock = s.FillToLock;
+                h.MechanicId = string.IsNullOrEmpty(s.Mechanic) ? null : s.Mechanic; h.Soak = s.Soak; h.ShareCount = s.ShareCount; h.FillToLock = s.FillToLock;
                 h.Shape = (HazardShape)s.Shape; h.Origin = new Vector3(s.X, s.Y, s.Z); h.Yaw = s.Yaw; h.Radius = s.Radius; h.Inner = s.Inner; h.HalfAngle = s.HalfAngle;
                 h.Length = s.Length; h.Width = s.Width; h.LockAt = s.LockAt; h.ResolveAt = s.ResolveAt; h.ActiveTicks = s.ActiveTicks; h.ClipRadius = s.ClipRadius;
                 m.T = hostTime; m.Age = s.Age; m.GoneAt = -1;

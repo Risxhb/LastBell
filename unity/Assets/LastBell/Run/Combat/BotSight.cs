@@ -7,7 +7,7 @@ namespace LastBell.Run
     // - orbs: the glowing spheres a boss leaves flying (Pendulum Sentinel's counterweight orbs, the Oracle's well orbs).
     //   Weights lying on the floor are kept out of the same way, as still circles.
     //   Each one's velocity is how far its sphere moved since the last tick; a sphere just taken from the pool has none yet.
-    // - after-strikes: a hazard that hits after its warning goes (HitOnResolve false: a Toll Lane rolling down its runes)
+    // - after-strikes: a lane that hits after its warning goes (HitOnResolve false: a Toll Lane rolling down its runes)
     //   still counts for 0.5 s once its warning is gone.
     // - bullet paths: a harmless preview of where bullets will fly (Damage 0, a lane or a cone: Crucivar's turrets). Once
     //   it goes the bullets leave its origin, so its area is dangerous where the bullets in it have not passed yet and
@@ -30,6 +30,11 @@ namespace LastBell.Run
         // each flying bullet's velocity, from how far it moved since the last tick (a new one has none yet)
         static readonly Dictionary<Hazard, (Vector3 at, int tick, Vector3 vel)> shotSeen = new Dictionary<Hazard, (Vector3, int, Vector3)>();
         static readonly List<Hazard> shotGone = new List<Hazard>();
+        // where the bullets come from (Crucivar's rim turrets), traced back from each bullet's speed and age: two brand carriers
+        // walked out to the wall beside one and its spiral arms, which sweep along the wall, pinned them there (11-04)
+        public static readonly List<Vector3> Turrets = new List<Vector3>();
+        static readonly List<int> turretTick = new List<int>();
+        static readonly HashSet<Hazard> traced = new HashSet<Hazard>();
         // s before its bullets show; m past a spot before the wave has gone by; s a path keeps taking new bullets (a spiral fires 2.4 s)
         const float PathLead = 0.8f, PathPass = 1.2f, PathOwn = 2.6f, SoonS = 1.6f, ShotSpeed = 6f;
         static CombatWorld world; static int tick = -1, scanTick = -999;
@@ -37,7 +42,7 @@ namespace LastBell.Run
 
         public static void Update(CombatWorld w, BossEncounter boss)
         {
-            if (w != world) { world = w; tick = -1; scanTick = -999; seen.Clear(); pool.Clear(); Orbs.Clear(); prevLive.Clear(); ghosts.Clear(); ghostUntil.Clear(); paths.Clear(); pathFrom.Clear(); pathShots.Clear(); seenShots.Clear(); shotSeen.Clear(); }
+            if (w != world) { world = w; tick = -1; scanTick = -999; seen.Clear(); pool.Clear(); Orbs.Clear(); prevLive.Clear(); ghosts.Clear(); ghostUntil.Clear(); paths.Clear(); pathFrom.Clear(); pathShots.Clear(); seenShots.Clear(); shotSeen.Clear(); Turrets.Clear(); turretTick.Clear(); traced.Clear(); }
             if (w.Tick == tick) return;
             tick = w.Tick;
             // orbs: the boss's pooled spheres, found by name under the arena root (rescanned now and then: the pool grows)
@@ -70,6 +75,7 @@ namespace LastBell.Run
             {
                 var h = prevLive[i];
                 if (h.HitOnResolve || h.Cancelled || h.BurnPerSecond > 0 || h.Soak || h.Damage <= 0) continue;   // a soak or a marker is no strike
+                if (h.Shape != HazardShape.Lane) continue;   // only a lane rolls on: a slice the owner hits as it goes is done (the bot held off the next safe Spiral Slice, 11-04)
                 bool still = false; for (int j = 0; j < live.Count && !still; j++) still = live[j] == h;
                 if (!still) { ghosts.Add(h); ghostUntil.Add(tick + GhostTicks); }
             }
@@ -98,7 +104,16 @@ namespace LastBell.Run
                 else if (!shotSeen.ContainsKey(b)) shotSeen[b] = (p, tick, Vector3.zero);
             }
             shotGone.Clear(); foreach (var b in shotSeen.Keys) if (!bullets.Contains(b)) shotGone.Add(b);
-            foreach (var b in shotGone) shotSeen.Remove(b);
+            foreach (var b in shotGone) { shotSeen.Remove(b); traced.Remove(b); }
+            for (int j = 0; j < bullets.Count; j++)
+            {
+                var b = bullets[j]; if (traced.Contains(b) || !shotSeen.TryGetValue(b, out var o) || o.vel.sqrMagnitude < 0.01f) continue;
+                traced.Add(b);
+                var from = o.at - o.vel * (b.Age / (float)Sim.Hz); int near = -1;
+                for (int i = 0; i < Turrets.Count && near < 0; i++) if (Sim.Flat(Turrets[i] - from).magnitude < 1.5f) near = i;
+                if (near < 0) { Turrets.Add(from); turretTick.Add(tick); } else turretTick[near] = tick;
+            }
+            for (int i = Turrets.Count - 1; i >= 0; i--) if (tick - turretTick[i] > 12 * Sim.Hz) { Turrets.RemoveAt(i); turretTick.RemoveAt(i); }
             for (int i = paths.Count - 1; i >= 0; i--)
             {
                 pathShots[i].RemoveAll(b => !bullets.Contains(b));
@@ -118,6 +133,14 @@ namespace LastBell.Run
                 if (Sim.Flat(q - (a + ab * u)).sqrMagnitude <= reach * reach) return true;
             }
             return false;
+        }
+
+        // metres to the nearest turret seen firing lately (infinity if none)
+        public static float TurretDist(Vector3 q)
+        {
+            float best = float.PositiveInfinity;
+            for (int i = 0; i < Turrets.Count; i++) best = Mathf.Min(best, Sim.Flat(Turrets[i] - q).magnitude);
+            return best;
         }
 
         public static IReadOnlyList<Hazard> Bullets => bullets;   // the small moving circles flying now (Crucivar's turret bullets)

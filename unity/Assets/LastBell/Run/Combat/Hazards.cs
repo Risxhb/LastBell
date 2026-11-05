@@ -33,7 +33,6 @@ namespace LastBell.Run
         public int LockAt, ResolveAt;
         public int ActiveTicks;                  // 0 or 1 = resolves on one tick; otherwise hits anyone inside for this many ticks from ResolveAt (R22)
         public int Damage;
-        public bool JumpClearable; public float ClearHeight = 0.35f;
         public float Knockback = 1.5f;
         public int Stun = 15;
         // > 0: a standing hazard (Crucivar's cooling slag). It deals this much per second to players inside while it
@@ -128,7 +127,6 @@ namespace LastBell.Run
         public event Action<Hazard> Spawned;   // tests record exact spawn ticks
         public event Action<Hazard> Resolving;   // the first resolve tick, before the hit test (telemetry: escape margins)
 
-        static readonly Color JumpFill = new Color(0.92f, 0.41f, 0.36f), JumpBorder = new Color(2.0f, 1.38f, 0.75f);   // coral #EB685D, warm edge #F1A65A (accepted 29 Oct)
         static readonly Color SlagFill = new Color(0.95f, 0.36f, 0.08f), SlagBorder = new Color(2.4f, 1.2f, 0.35f);
         readonly Dictionary<PlayerController, float> burn = new Dictionary<PlayerController, float>();
 
@@ -162,9 +160,7 @@ namespace LastBell.Run
                 case HazardShape.Tether: h.Tele = fx.Circle(0.01f); h.Tele.Tint(Color.clear, Color.clear); break;   // the ability draws the chain
                 default: h.Tele = fx.Lane(h.Length, h.Width); break;
             }
-            // jump-clearable bars: warm coral with an amber edge (not cyan, which is the Tollbreaker's), plus the HUD's JUMP label
-            if (h.JumpClearable) h.Tele.Tint(JumpFill, JumpBorder);
-            else if (h.BurnPerSecond > 0) h.Tele.Tint(SlagFill, SlagBorder);   // standing slag: molten, not the strike coral
+            if (h.BurnPerSecond > 0) h.Tele.Tint(SlagFill, SlagBorder);   // standing slag: molten, not the strike coral
             if (h.ClipRadius > 0) h.Tele.Clip(Vector3.zero, h.ClipRadius);
             h.Tele.Place(h.Origin, h.Yaw);
             if (h.LockAt <= 0) h.Tele.Lock();
@@ -208,7 +204,6 @@ namespace LastBell.Run
                     {
                         if (p.Down || h.Hit.Contains(p) || !h.Hits(p)) continue;
                         if (h.Affects != null && !h.Affects(p)) continue;
-                        if (h.JumpClearable && p.Height >= h.ClearHeight) continue;   // the only height rule (R19)
                         h.Hit.Add(p);
                         p.ReceiveHit(h);
                     }
@@ -224,7 +219,7 @@ namespace LastBell.Run
         {
             var inside = new List<PlayerController>();
             foreach (var p in w.Players)
-                if (!p.Down && !h.Hit.Contains(p) && h.Hits(p) && !(h.JumpClearable && p.Height >= h.ClearHeight)) inside.Add(p);
+                if (!p.Down && !h.Hit.Contains(p) && h.Hits(p)) inside.Add(p);
             if (inside.Count == 0)
             {
                 if (h.WipeIfEmpty) foreach (var p in w.Players.ToArray()) if (!p.Down) { h.Hit.Add(p); p.ForceDown(h); }

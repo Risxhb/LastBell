@@ -3,11 +3,11 @@
 Added October 26, 2026 for boss work. The Windows player can skip the menus and start one boss's practice fight:
 
 ```
-LastBell.exe -lastbellPractice <boss> [-lastbellClass Vanguard|Chimesinger|Arcanist]
+LastBell.exe -lastbellPractice <boss> [-lastbellClass Tollbreaker|Chimesinger|Arcanist]
 ```
 
 - **Boss names** are matched loosely: case, spaces, dashes and the `(practice)` / `(area n)` suffix are ignored, and any unique part of the name works. Examples: `tempo-tyrant`, `tempo`, `oracle`, `chimebound-oracle`, `aurelion`, `bellkeeper`.
-- **Class** defaults to Vanguard.
+- **Class** defaults to Tollbreaker.
 - It uses the same path as **Boss Rush → Launch Test Rush**: the boss's own arena loads, practice starts by itself after a short beat, and **Esc → Main Menu** returns to the normal menu.
 - An unknown or ambiguous name logs an error listing the valid bosses (see `player.log`) and leaves you on the main menu.
 - Test suites are unaffected: they don't pass this flag.
