@@ -6,8 +6,8 @@ namespace LastBell.Run
 {
     // Ability set v4, Phase 2 "Foundry Uprising" (proposal, abilities-v4/P2-FOUNDRY-UPRISING.md; Chzy18's turret add idea,
     // 2026-10-27, its own phase with the boss fighting). One Run is one uprising:
-    //   0.0  2 lava turrets rise from the rim (2.5 s, harmless), each with a Molten Casting poured 7.5 m out on the far
-    //        side of the arena: same numeral, a chain between them. A casting is a BossPart (melee and ranged hit it);
+    //   0.0  2 lava turrets rise from the rim (2.5 s, harmless), each with a Molten Casting poured 7.5 m out a quarter-turn round
+    //        from it (in its Ring Wave gap): same numeral, a chain between them. A casting is a BossPart (melee and ranged hit it);
     //        half the damage it takes also hits Crucivar (painshare). Killing it sinks its turret.
     //  2.5  turrets fire: every pattern first draws its real path for 2.0 s (Lane Stream, Ring Wave, Spiral Arm), then
     //        0.5 m bullets (Strike, 20, one hit each). Each turret repeats every 4 s; the turrets are staggered 1.3 s.
@@ -22,6 +22,10 @@ namespace LastBell.Run
 
         public const float Rise = 2.5f, PathWarn = 2.0f, FireTime = 1.0f, Stagger = 1.3f, Deadline = 30f, SoloDeadline = 36f, EasyDeadline = 40f;
         public const float CastRing = 7.5f, CastRadius = 1.2f, CastHp = 300f, CastStep = 0.5f, Painshare = 0.5f;   // FIGHT-SHEET.md: about 9 s of solo damage each; +0.5 per extra fighter (was 0.7 to 3 Nov)
+        // a casting stands a quarter-turn round from its turret (proposal, 5 Nov; was straight across): 7.5 m out at 90 deg is 28 deg
+        // off its turret's inward line, inside that turret's Ring Wave gap (26 +- 8 deg). Across the arena it sat on both turrets' inward
+        // line, where every Lane Stream and Ring Wave crossed it, and the Hard bot party broke none in time
+        public const float CastTurn = 90f;
         public const float BulletRadius = 0.5f, LaneSpacing = 3.5f, LaneSpeed = 6f, RingSpeed = 5f, RingGapHalf = 8f, RingGapAt = 26f;
         public const float SpiralTurn = 30f, SpiralSpeed = 6f, SpiralFor = 2.4f, SpiralEvery = 0.12f;
         // denser since 11-01 (Chzy18: more bullets in Phase 2): 5 lanes of 8 (P3's lone turret keeps 3 of 5), a second Ring Wave
@@ -135,7 +139,7 @@ namespace LastBell.Run
                 K = k, Pos = Sim.Dir(yaw) * (Rim + 0.4f), A = pats[(k + Uprisings - 1) % 3], B = pats[(k + Uprisings) % 3],
                 NextFire = t + Sim.Ticks(Rise + (W.Players.Count == 1 ? 0 : Stagger * k)), CastMax = CastHp * (1 + CastStep * (Fighters() - 1)),   // HP: passive menu bots don't count (Chzy18 10-31)
             };
-            var part = tu.Casting = new BossPart { Name = "Molten Casting " + Numeral(k), Pos = Sim.Dir(yaw + 180f) * CastRing, BodyRadius = CastRadius, HitHeight = 1.0f, Hp = tu.CastMax, MaxHp = tu.CastMax, Order = k };
+            var part = tu.Casting = new BossPart { Name = "Molten Casting " + Numeral(k), Pos = Sim.Dir(yaw + CastTurn) * CastRing, BodyRadius = CastRadius, HitHeight = 1.0f, Hp = tu.CastMax, MaxHp = tu.CastMax, Order = k };
             tu.Casting.TakeHit = (dmg, contact) =>
             {
                 if (!tu.Up) return 0;
@@ -362,8 +366,8 @@ namespace LastBell.Run
             chain.startWidth = chain.endWidth = 0.09f; chain.sharedMaterial = Prim.Material(new Color(1f, 0.95f, 0.82f), 1.2f);
             return chain;
         }
-        // where a casting's turret stands: across the arena on the rim (SpawnPair puts the casting at yaw + 180)
-        public static Vector3 TurretFor(Vector3 casting) { var d = Sim.Flat(casting); return d.sqrMagnitude < 1e-4f ? Vector3.zero : -d.normalized * (Rim + 0.4f); }
+        // where a casting's turret stands: on the rim a quarter-turn back (SpawnPair puts the casting at yaw + CastTurn)
+        public static Vector3 TurretFor(Vector3 casting) { var d = Sim.Flat(casting); return d.sqrMagnitude < 1e-4f ? Vector3.zero : Quaternion.Euler(0, -CastTurn, 0) * d.normalized * (Rim + 0.4f); }
 
         static void Label(Transform parent, string text, float height)
         {
