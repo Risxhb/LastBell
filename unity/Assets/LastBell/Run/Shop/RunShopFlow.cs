@@ -68,12 +68,13 @@ namespace LastBell.Run.Shop
                     }
                     break;
                 case RunState.Cleared:
-                    if (Run != null && d.Mode == RunMode.Run && d.Boss != null)   // practice never pays
+                    // practice and the tutorial never pay; a campaign miniboss pays 100 (spec §2), every other fight 150
+                    if (Run != null && d.Mode == RunMode.Run && d.Boss != null && d.Encounter != RunDirector.TutorialPractice)
                     {
                         bool final = RunDirector.Bosses[d.Encounter].Final;
                         int seconds = (d.World.Tick - d.World.SegmentStartTick) / Sim.Hz;
                         int before = Run.Slot(0).Earned;
-                        Run.PayClear(d.Boss.DisplayName.Split(',')[0].Trim(), final, d.World.Players.All(p => !p.Down), seconds);
+                        Run.PayClear(d.Boss.DisplayName.Split(',')[0].Trim(), final, d.World.Players.All(p => !p.Down), seconds, IsMiniboss(d.Encounter));
                         LastPopup = Run.Slot(0).Earned - before; popupAt = Time.unscaledTime;
                     }
                     break;
@@ -123,12 +124,16 @@ namespace LastBell.Run.Shop
         void OpenFor(int encounter)
         {
             if (openedFor == encounter + 1000 * d.RunsStarted) return;   // one visit per boss (Ready can't re-enter mid-visit)
+        static bool IsMiniboss(int encounter) => Campaign.Areas.Any(a => Array.IndexOf(a.MinibossIndices, encounter) >= 0);
+
             openedFor = encounter + 1000 * d.RunsStarted; openedAt = Time.frameCount;
             int pos = d.Mode == RunMode.Run ? Array.IndexOf(d.EncounterOrder, encounter) : 0;
             bool final = RunDirector.Bosses[encounter].Final;
             // health and potions refill at the shop before every boss after the first (gpt/08 §3: every run boss is an area boss)
             if (pos > 0) d.Player.RefreshHealth(refillPotions: true);
-            Run.OpenVisit(RunDirector.Bosses[encounter].Name, final, areaShop: !final);
+            // the 300 stand-in miniboss Chimes only where no minibosses were fought: practice, or a run order without them
+            bool standIn = d.Mode == RunMode.Practice || !d.EncounterOrder.Any(IsMiniboss);
+            Run.OpenVisit(RunDirector.Bosses[encounter].Name, final, areaShop: !final && standIn);
             LastRefusal = null;
             d.Log.Add($"shop: visit {Run.Visit} before {RunDirector.Bosses[encounter].Name}, {Run.Slot(0).Chimes} Chimes");
             botPending = BotBuys;   // the bot shops on the next frame, outside the director's state change
@@ -190,7 +195,7 @@ namespace LastBell.Run.Shop
         }
 
         // One screen, no scrolling or paging (Chzy18, 29 Oct): the panel height follows the content, worst case a full
-        // 8-player party (7 allies) and a long build, which still fits 1080 virtual px.
+        // 4-player party (3 allies; the game is 1-4 players since 1 Nov) and a long build, which fits 1080 virtual px.
         const float Pad = 24, HeadH = 102, CardH = 320, CardGap = 14, ChipW = 290, ChipH = 36, ChipGap = 8, AllyW = 368, AllyH = 64, FootH = 48;
         static int Rows(int n, int perRow) => n <= 0 ? 1 : (n + perRow - 1) / perRow;
 

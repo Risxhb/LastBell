@@ -49,7 +49,8 @@ namespace LastBell.Run.Shop
     {
         public const int StockSize = 6, MaxStock = 7, ClassSlots = 3, GeneralSlots = 2, SpecialSlot = 5, ExtraClassSlot = 6;
         public const int AreaBossPay = 150, MinibossPay = 100, BonusPay = 20, GiftCapPerVisit = 150, CoopTimerSeconds = 90;
-        // accepted by Chzy18 2026-10-28 (run-shop-plan §1): pay the area's 3 missing miniboss clears at its shop until minibosses join the run
+        // accepted by Chzy18 2026-10-28 (run-shop-plan §1): pay the area's 3 missing miniboss clears at its shop until minibosses
+        // join the run. Campaign runs (since 4 Nov) fight them and are paid per clear, so only a run without them gets the stand-in.
         public static bool StandInMinibossPay = true;
         // accepted by Chzy18 2026-10-28 (run-shop-plan §1): par times for the "cleared under par" bonus, seconds
         public const int AreaBossPar = 240, FinalBossPar = 360, MinibossPar = 150;
@@ -79,11 +80,11 @@ namespace LastBell.Run.Shop
             Ledger.Add($"{label}  +{amount}");
             Log.Add($"pay {amount} ({label})");
         }
-        public void PayClear(string boss, bool final, bool nobodyDown, int seconds)
+        public void PayClear(string boss, bool final, bool nobodyDown, int seconds, bool miniboss = false)
         {
-            Pay(AreaBossPay, boss + " cleared");
+            Pay(miniboss ? MinibossPay : AreaBossPay, boss + " cleared");
             if (nobodyDown) Pay(BonusPay, "Nobody went down");
-            if (seconds <= (final ? FinalBossPar : AreaBossPar)) Pay(BonusPay, "Under par time");
+            if (seconds <= (miniboss ? MinibossPar : final ? FinalBossPar : AreaBossPar)) Pay(BonusPay, "Under par time");
         }
 
         // ---------------- visits ----------------

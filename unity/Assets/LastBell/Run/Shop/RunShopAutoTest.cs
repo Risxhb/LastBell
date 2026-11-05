@@ -83,6 +83,19 @@ namespace LastBell.Run.Shop
         PlayerBuild Me => Run?.Slot(0);
         static void Grant(PlayerBuild b, string id, bool tempered = false)   // test setup only
         { if (!b.Has(id)) b.Items.Add(new PlayerBuild.Owned { Def = ItemCatalog.Get(id), Tempered = tempered }); }
+        // Campaign runs open with each area's minibosses (no shop before them): clear them with a debug defeat (routing only,
+        // no miniboss fight is tested) until the run stands at the next fight that has a shop.
+        IEnumerator ToShop(string what)
+        {
+            for (int n = 0; n < 16 && d.State != RunState.Results && !Campaign.ShopBefore(d.Encounter); n++)
+            {
+                yield return Until(() => d.State == RunState.Ready || d.State == RunState.Combat, 10, what);
+                if (Campaign.ShopBefore(d.Encounter)) break;
+                if (d.State == RunState.Ready) { d.RequestReady(); yield return Until(() => d.State == RunState.Combat, 6, what + ": miniboss start"); }
+                if (d.State == RunState.Combat) { int enc = d.Encounter; d.Boss.DebugDefeat(); yield return Until(() => d.Encounter != enc || d.State == RunState.Results, 10, what + ": past a miniboss"); }
+            }
+            yield return Until(() => d.State == RunState.Ready || d.State == RunState.Combat, 10, what);
+        }
         int Card(Func<ItemDef, bool> want) { for (int i = 0; i < ShopRun.StockSize; i++) if (Me.Stock[i] != null && want(Me.Stock[i])) return i; return -1; }
 
         IEnumerator Main()
@@ -108,12 +121,16 @@ namespace LastBell.Run.Shop
             var order = RunDirector.CreateRunOrder(new System.Random(7));
             Check("StartRun accepted", d.StartRun("Tollbreaker", order));
             yield return null;
-            Check("shop 1 opens at the first preparation", RunShopFlow.Showing && Run.Visit == 1 && d.Encounter == order[0], $"visit {Run?.Visit}");
-            Check("shop 1: 300 stand-in miniboss Chimes, nothing else", Me.Chimes == 300 && Run.Ledger.Count == 1, $"{Me.Chimes}");
+            Check("no shop before a miniboss", !RunShopFlow.Showing && !Campaign.ShopBefore(d.Encounter), $"{RunDirector.Bosses[d.Encounter].Name}");
+            yield return ToShop("shop 1");
+            Check("shop 1 opens before the first area boss", RunShopFlow.Showing && Run.Visit == 1 && d.Encounter == shops[0], $"visit {Run?.Visit}");
+            Check("shop 1: 3 miniboss clears paid 100 + 20 + 20 each, no stand-in", Me.Chimes == 420 && Run.Ledger.Count == 9, $"{Me.Chimes}: {string.Join(" | ", Run.Ledger)}");
             Check("shop 1: no Keystones in stock", Me.Stock.All(s => s == null || s.Tier != ItemTier.Keystone));
             Check("shop 1: class cards are the player's class, general cards are general",
                 Enumerable.Range(0, 3).All(i => Me.Stock[i] == null || Me.Stock[i].Class == "Tollbreaker") && Enumerable.Range(3, 2).All(i => Me.Stock[i] == null || Me.Stock[i].General));
+            // a campaign order (since 4 Nov): each area's 3 minibosses, then its boss; the shops are before the area bosses and the Bellkeeper
             Check("shop 1: the special card is a Rare", Me.Stock[ShopRun.SpecialSlot] == null || Me.Stock[ShopRun.SpecialSlot].Tier == ItemTier.Rare);
+            var shops = order.Where(Campaign.ShopBefore).ToArray();
             Check("player has the run build", d.Player.Build == Me && ItemHooks.Run == Run);
             yield return Shot("visit1");
 
@@ -128,6 +145,7 @@ namespace LastBell.Run.Shop
             Check("lock is free", Run.TryLock(0, lk, out _) && Me.Chimes == 210);
             Check("one lock per visit", !Run.TryLock(0, (lk + 1) % 6, out var why2), why2);
             Check("reroll costs 30", Run.TryReroll(0, out _) && Me.Chimes == 180, $"{Me.Chimes}");
+            Me.Chimes = 300;   // test setup: the old 300 start, so the price checks below keep their numbers
             Check("the locked card survives the reroll", Me.Stock[lk] == lockedDef);
             Check("the reroll refilled the sold slot", Me.Stock[c] != null && Me.Stock[c] != bought);
             Check("second reroll costs 45", Run.RerollPrice(Me) == 45 && Run.TryReroll(0, out _) && Me.Chimes == 135, $"{Me.Chimes}");
@@ -144,7 +162,7 @@ namespace LastBell.Run.Shop
             // ready: the shop closes and the boss starts with the build
             Check("Ready leaves the shop", RunShopFlow.Instance.Leave());
             yield return Until(() => d.State == RunState.Combat, 6, "combat 1");
-            Check("boss 1 starts after the shop", d.State == RunState.Combat && d.Encounter == order[0] && !Run.Open);
+            Check("boss 1 starts after the shop", d.State == RunState.Combat && d.Encounter == shops[0] && !Run.Open);
             Check("the build carries into the fight", d.Player.Build != null && d.Player.Build.Has(bought.Id));
             yield return TollbreakerHooks();
             var keepItems = Me.Items.ToList();
@@ -156,18 +174,19 @@ namespace LastBell.Run.Shop
             { float tp = 0; while (d.Player.Potions == PlayerController.MaxPotions && tp < 1) { tp += Time.deltaTime; yield return null; } }
             int potsSpent = PlayerController.MaxPotions - d.Player.Potions;
             // clear boss 1 -> Chimes -> shop 2
-            int before = Me.Chimes;
+            int before = Me.Chimes, earned1 = Me.Earned;
             d.Boss.DebugDefeat();
             yield return Until(() => d.State == RunState.Cleared, 4, "clear 1");
             yield return new WaitForSeconds(0.6f); yield return Shot("clear_popup");
-            yield return Until(() => d.State == RunState.Ready, 8, "shop 2");
+            Check("+Chimes popup shows the area boss clear's pay", RunShopFlow.Instance.LastPopup == 190, $"+{RunShopFlow.Instance.LastPopup}");
+            yield return Until(() => d.Encounter != shops[0], 8, "past boss 1");
+            yield return ToShop("shop 2");
             int got = Me.Chimes - before;
-            Check("+Chimes popup shows the clear's pay (without the stand-in)", RunShopFlow.Instance.LastPopup == 190, $"+{RunShopFlow.Instance.LastPopup}");
-            Check("clear pays 150 + nobody down 20 + under par 20 + stand-in 300", got == 150 + 20 + 20 + 300, $"+{got}: {string.Join(" | ", Run.Ledger)}");
-            Check("shop 2 opens before boss 2", RunShopFlow.Showing && Run.Visit == 2 && d.Encounter == order[1]);
+            Check("boss clear 150 + 20 + 20, then area 2's 3 minibosses 140 each", got == 190 + 420, $"+{got}: {string.Join(" | ", Run.Ledger)}");
+            Check("shop 2 opens before boss 2", RunShopFlow.Showing && Run.Visit == 2 && d.Encounter == shops[1]);
             Check("health refilled at the shop", d.Player.Hp == PlayerController.MaxHp);
             Check("potions refill before every area boss (gpt/08 §3), not only the last", potsSpent > 0 && d.Player.Potions == PlayerController.MaxPotions, $"spent {potsSpent}, now {d.Player.Potions}");
-            Check("no Chimes for a fight twice: none paid while the shop is open", Me.Earned == 300 + got);
+            Check("no Chimes for a fight twice: none paid while the shop is open", Me.Earned == earned1 + got);
             yield return Shot("visit2");
             // Keystone cap (test setup: two Keystones already counted)
             Me.Keystones = 2; Me.Chimes += 1000;
@@ -177,27 +196,29 @@ namespace LastBell.Run.Shop
             RunShopFlow.Instance.Leave();
             yield return Until(() => d.State == RunState.Combat, 6, "combat 2");
             d.Boss.DebugDefeat();
-            yield return Until(() => d.State == RunState.Ready, 8, "shop 3");
-            Check("shop 3 opens before boss 3", Run.Visit == 3 && d.Encounter == order[2]);
+            yield return Until(() => d.Encounter != shops[1], 8, "past boss 2");
+            yield return ToShop("shop 3");
+            Check("shop 3 opens before boss 3", Run.Visit == 3 && d.Encounter == shops[2]);
             RunShopFlow.Instance.Leave();
             yield return Until(() => d.State == RunState.Combat, 6, "combat 3");
             before = Me.Chimes;
             d.Boss.DebugDefeat();
-            yield return Until(() => d.State == RunState.Ready, 8, "final shop");
+            yield return Until(() => d.Encounter != shops[2], 8, "past boss 3");
+            yield return ToShop("final shop");
             Check("final shop before the Bellkeeper", Run.FinalShop && Run.Visit == 4 && RunDirector.Bosses[d.Encounter].Final);
             Check("final shop pays no stand-in", Me.Chimes - before == 190, $"+{Me.Chimes - before}");
             Check("final shop's special card is Rare or Keystone", Me.Stock[ShopRun.SpecialSlot] == null || Me.Stock[ShopRun.SpecialSlot].Tier != ItemTier.Common);
             Check("potions refill before the final boss too", d.Player.Potions == PlayerController.MaxPotions);
             yield return Shot("final");
-            // one screen (Chzy18, 29 Oct): worst case, a full party of 8 (7 allies) and a long build (test setup)
+            // one screen (Chzy18, 29 Oct): worst case, a full party of 4 (3 allies) and a long build (test setup)
             var extra = new List<string>();
             foreach (var def in ItemCatalog.All.Where(i => (i.Class == "Tollbreaker" || i.General) && !Me.Has(i.Id))) { Grant(Me, def.Id); extra.Add(def.Id); }
             string[] classes = RunDirector.Classes;
-            for (int j = 0; j < 7; j++) { var s = Run.Add(classes[j % 3], testSlot: true); s.Ready = j % 2 == 0; s.Chimes = 100 + 40 * j; Grant(s, ItemCatalog.All.First(i => i.Class == classes[j % 3]).Id); Grant(s, ItemCatalog.StrongBrew); }
+            for (int j = 0; j < RunParty.MaxAllies; j++) { var s = Run.Add(classes[j % 3], testSlot: true); s.Ready = j % 2 == 0; s.Chimes = 100 + 40 * j; Grant(s, ItemCatalog.All.First(i => i.Class == classes[j % 3]).Id); Grant(s, ItemCatalog.StrongBrew); }
             yield return null; yield return Shot("coop_full");
             var panel = RunShopFlow.Instance.LastPanel;
             Note($"screen {Screen.width}x{Screen.height}, panel {panel}, build {Me.Items.Count} items");
-            Check("one screen: 8 players and a long build fit 1080p with no scrolling", panel.yMin >= 0 && panel.yMax <= 1080 && panel.xMin >= 0 && panel.xMax <= UiTheme.VirtualWidth && Me.Items.Count >= 9, $"{panel}");
+            Check("one screen: 4 players and a long build fit 1080p with no scrolling", panel.yMin >= 0 && panel.yMax <= 1080 && panel.xMin >= 0 && panel.xMax <= UiTheme.VirtualWidth && Me.Items.Count >= 9, $"{panel}");
             Run.Slots.RemoveAll(s => s.TestSlot); Me.Items.RemoveAll(o => extra.Contains(o.Def.Id));
             yield return null; yield return Shot("final_solo");
             // Fourth Choice (test setup: owned): the next roll has 7 cards, the 7th a class card, still on one screen
@@ -214,11 +235,20 @@ namespace LastBell.Run.Shop
             yield return Until(() => d.State == RunState.Results, 10, "results");
             Check("victory", d.Victory);
             Check("run end: every item and Chime is gone", Run == null && ItemHooks.Run == null && (d.Player == null || d.Player.Build == null));
-            Check("retry: fresh shop 1, 300 Chimes, no items", d.RequestRetry() && Run != null && Run.Visit == 1 && Me.Chimes == 300 && Me.Items.Count == 0);
+            Check("retry accepted", d.RequestRetry());
+            yield return ToShop("retry shop 1");
+            Check("retry: fresh shop 1, 420 Chimes, no items", Run != null && Run.Visit == 1 && Me.Chimes == 420 && Me.Items.Count == 0, $"visit {Run?.Visit}, {Me?.Chimes}");
             d.SetPaused(true); d.ReturnToMenu(); yield return null;
 
             // ---------------- Chimesinger and Arcanist hooks ----------------
             yield return ClassRun("Chimesinger", Seq(ChimesingerHooks(), ChimesingerPool()));
+            // a clean campaign win earns the bonus fight (no shop before it): clear it too (debug defeat, routing only)
+            yield return Until(() => d.State == RunState.Results || d.State == RunState.Combat && d.Encounter == Campaign.BonusIndex, 10, "results or the bonus fight");
+            if (d.State == RunState.Combat && d.Encounter == Campaign.BonusIndex)
+            {
+                Check("no shop before the bonus fight", !RunShopFlow.Showing && d.Player.Build != null && d.Player.Build.Items.Count == items);
+                d.Boss.DebugDefeat();
+            }
             yield return ClassRun("Arcanist", Seq(ArcanistHooks(), ArcanistPool(), Act(GeneralPool)));
 
             // ---------------- the shop bot ----------------
@@ -227,11 +257,13 @@ namespace LastBell.Run.Shop
             yield return Until(() => d.State == RunState.Combat, 8, "bot leaves shop 1");
             Check("bot bought and readied in shop 1", d.State == RunState.Combat && d.Player.Build != null && d.Player.Build.Items.Count >= 1 && d.Log.Any(l => l.StartsWith("shop bot: bought")),
                 string.Join(" | ", d.Log.Where(l => l.StartsWith("shop bot"))));
-            d.Boss.DebugDefeat();
+            { int boss1 = d.Encounter; d.Boss.DebugDefeat(); yield return Until(() => d.Encounter != boss1, 8, "bot past boss 1"); }
+            yield return ToShop("bot shop 2");
             yield return Until(() => d.State == RunState.Combat && Run.Visit == 2, 12, "bot passes shop 2");
             Check("bot passes shop 2 by itself", d.State == RunState.Combat && Run.Visit == 2);
             foreach (var l in d.Log.Where(l => l.StartsWith("shop bot"))) Note(l);
             RunShopFlow.BotBuys = false;
+            yield return ToShop("bot shop 1");
             d.SetPaused(true); d.ReturnToMenu(); yield return null;
 
             yield return PracticeChecks();
@@ -278,6 +310,7 @@ namespace LastBell.Run.Shop
 
         // Pure model checks: seeds, co-op chip-in and its cap, party gating.
         void ModelChecks()
+            yield return ToShop(cls + " shop 1");   // the hook checks run on the first area boss, not a miniboss
         {
             string Stock(ShopRun r) => string.Join(",", r.Slot(0).Stock.Select(s => s?.Id ?? "-"));
             var a = new ShopRun(42, 4); a.Add("Arcanist"); a.OpenVisit("x", false, true);
