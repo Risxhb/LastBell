@@ -37,8 +37,13 @@ namespace LastBell.Run
         protected override float PartyStep => V4PartyStep;
         public static int V4MaxHp(int fighters) => Mathf.RoundToInt(V4Hp * (1 + V4PartyStep * Mathf.Max(0, fighters - 1)));
         // Ready-screen warm-up (BossEntry.WarmUp): the pour and turret numerals are the first TextMeshes of the fight, and
-        // loading the built-in font then cost a ~40 ms frame at ~9 s. Load it and rasterise every numeral glyph here instead.
-        public static void WarmUp(CombatWorld _) => Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf").RequestCharactersInTexture("IVX", 64, FontStyle.Bold);
+        // loading the built-in font then cost a ~40 ms frame at ~9 s. Load it and rasterise every numeral glyph here instead,
+        // and build the Mould Towers kits (pooled) so Phase 3's first towers build nothing in their tick.
+        public static void WarmUp(CombatWorld _)
+        {
+            Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf").RequestCharactersInTexture("IVX", 64, FontStyle.Bold);
+            MouldPressFx.WarmUp();
+        }
         void Awake() { MaxHp = V4Hp; BodyRadius = 1.7f; HitHeight = 2.0f; MarkHeight = 4.6f; }
 
         protected override void Build()
