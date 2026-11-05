@@ -18,11 +18,18 @@ namespace LastBell.Run
             if (t.Boss == null) yield break;
             var up = t.Boss.Uprising;
             int c0 = t.W.Tick;
+            var channel = t.W.Hazards.Spawn(new Hazard { Source = "Pour Channel", Shape = HazardShape.Lane, Kind = HazardKind.Strike, Origin = Vector3.zero, Yaw = 40f, Length = 14f, Width = 2.6f, LockAt = 0, ResolveAt = Sim.Ticks(10f), BurnPerSecond = 20f });
             t.Begin(up.Run());
             yield return t.Seconds(3f);
             t.Check("4 players: two turrets, two castings as boss parts", up.Turrets.Count == 2 && t.W.Parts.Count(p => p.Alive) == 2, $"{up.Turrets.Count} turrets, {t.W.Parts.Count} parts");
             t.Check("each casting sits 7.5 m out, across the arena from its turret", up.Turrets.All(x => Mathf.Abs(Sim.Flat(x.Casting.Pos).magnitude - FoundryUprising.CastRing) < 0.05f && Vector3.Dot(Sim.Flat(x.Pos).normalized, Sim.Flat(x.Casting.Pos).normalized) < -0.99f));
             t.Check("Pour Flood lands at 30 s", up.Flood != null && up.Flood.ResolveAt == Sim.Ticks(30f), $"{up.Flood?.ResolveAt}");
+            t.Check("the last Casting Order's Pour Channels drain as the turrets rise", up.Drained > 0 && !t.W.Hazards.Live.Contains(channel), $"drained {up.Drained}");
+            // burning ground on and around a casting cools at once, so breaking it never means standing in burn
+            int cooled0 = up.Cooled; var cpos = up.Turrets[0].Casting.Pos;
+            for (int k = 0; k < 6; k++) t.W.Hazards.Spawn(new Hazard { Source = "Test Slag", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = cpos + Sim.Dir(k * 60f) * 2.5f, Radius = 2f, LockAt = 0, ResolveAt = Sim.Ticks(1f), BurnPerSecond = 20f });
+            yield return t.Ticks(2);
+            t.Check("a standing casting cools the burning ground round it", up.Cooled - cooled0 >= 6 && !t.W.Hazards.Live.Any(b => b.Source == "Test Slag" && b.Age < b.ResolveAt - 1), $"cooled {up.Cooled - cooled0}");
 
             float s = 0;
             while (s < 9f) { foreach (var p in t.Party) if (p.Hp < 60) p.DebugSetHp(PlayerController.MaxHp); s += Time.deltaTime; yield return null; }

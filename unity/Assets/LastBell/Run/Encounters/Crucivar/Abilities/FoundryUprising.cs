@@ -55,6 +55,10 @@ namespace LastBell.Run
             Uprisings++;
             Turrets.Clear(); Velocity.Clear(); spirals.Clear(); later.Clear(); t = 0;
             int n = Mathf.Max(1, W.Players.Count);
+            // the castings are poured from the channels: the last Casting Order's Pour Channels drain as the turrets rise
+            // (proposal, 4 Nov). They ran centre to wall for the first 6 s of every uprising after the first, so no casting
+            // could be reached without crossing burn (four Hard bots lost the second uprising's Pour Flood to it)
+            foreach (var b in W.Hazards.Live) if (b.Source == "Pour Channel" && b.ResolveAt > b.Age + 1) { b.ResolveAt = b.Age + 1; Drained++; }
             total = TurretCount(n); spawned = 0;
             if (n == 1) SpawnPair(0); else for (int k = 0; k < total; k++) SpawnPair(k);
             int deadline = Sim.Ticks(Easy ? EasyDeadline : n == 1 ? SoloDeadline : Deadline);
@@ -76,6 +80,7 @@ namespace LastBell.Run
                 if (draft != null && --draftWait <= 0) { if (draft.MoveNext()) draftWait = draft.Current; else draft = null; }
                 foreach (var tu in Turrets.ToArray()) if (tu.Up && t >= tu.NextFire) Fire(tu, Next(tu));
                 StepSpirals();
+                CoolCastingSpots();
                 if (t % Sim.Hz == 0)
                 {
                     int left = Mathf.CeilToInt((deadline - t) / (float)Sim.Hz);
@@ -87,6 +92,29 @@ namespace LastBell.Run
                 yield return 1;
             }
             Boss.Label("Casting Heat");
+        }
+
+        // a standing casting keeps the ground it is fought on cool (proposal, 4 Nov; as the rising Mould Towers do, 11-01):
+        // burning ground (brand pools, pour channels) touching its ring out to CoolReach leaves, so breaking a casting never
+        // means standing in burn. Four Hard bots lost the second uprising's Pour Flood with Casting I ringed by slag.
+        public const float CoolReach = 2.6f;
+        public int Cooled { get; private set; }
+        public int Drained { get; private set; }   // Pour Channels drained as an uprising starts
+        void CoolCastingSpots()
+        {
+            foreach (var tu in Turrets)
+            {
+                if (!tu.Up) continue;
+                var c = tu.Casting.Pos;
+                foreach (var b in W.Hazards.Live)
+                {
+                    if (b.BurnPerSecond <= 0 || b == Flood || b.Source == "Molten Crown" || b.ResolveAt <= b.Age + 1) continue;
+                    bool touches = b.Contains(c);
+                    for (int k = 0; k < 12 && !touches; k++)
+                        touches = b.Contains(c + Sim.Dir(k * 30f) * (CastRadius + 1.2f)) || b.Contains(c + Sim.Dir(k * 30f + 15f) * (CastRadius + CoolReach));
+                    if (touches) { b.ResolveAt = b.Age + 1; Cooled++; }
+                }
+            }
         }
 
         Pattern Next(Turret tu)
