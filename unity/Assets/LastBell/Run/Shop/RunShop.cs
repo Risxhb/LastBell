@@ -20,7 +20,7 @@ namespace LastBell.Run.Shop
             public int ValourUntil = -1, CryUntil = -1, LightFeetUntil = -1, VolleyBoostUntil = -1, RivenUntil = -1, PaceUntil = -1;
             public float ValourPct, CryPct, Overflow;
             public bool GraceReady, BlinkReady, PaceNext;
-            public int PaceStacks, Notes, RingHits, StruckNotes, LastDashAt = -100000;
+            public int PaceStacks, Notes, RingHits, StruckNotes, LastDashAt = -100000, LastBossHit = -100000;   // LastBossHit: Patient Bell
             public readonly List<int> Taps = new List<int>();
         }
         public Live L { get; private set; } = new Live();
@@ -56,6 +56,7 @@ namespace LastBell.Run.Shop
         public const int AreaBossPar = 240, FinalBossPar = 360, MinibossPar = 150;
 
         public readonly int Seed;
+        public int Toll;                                  // the run's Toll (0 until the Toll ladder exists): gates the Toll items
         public readonly List<PlayerBuild> Slots = new List<PlayerBuild>();
         public int Visit { get; private set; }            // 1-based; 0 before the first shop
         public int TotalVisits { get; private set; }
@@ -105,9 +106,9 @@ namespace LastBell.Run.Shop
 
         // ---------------- stock (spec §3) ----------------
         bool Offerable(PlayerBuild s, ItemDef d) => CanOffer(s, d) && Array.IndexOf(s.Stock, d) < 0;
-        // whether this item may ever be stocked for this player now (held, owned, solo value, partner class, own class)
+        // whether this item may ever be stocked for this player now (held, owned, Toll, solo value, partner class, own class)
         public bool CanOffer(PlayerBuild s, ItemDef d) =>
-            !d.Held && !s.Has(d.Id) && (d.OfferedSolo || !Solo) &&
+            !d.Held && !s.Has(d.Id) && d.MinToll <= Toll && (d.OfferedSolo || !Solo) &&
             (d.PartnerClass == null || ClassInParty(d.PartnerClass)) &&
             (d.Class == null || d.Class == s.ClassName);
         bool KeystoneAllowed(PlayerBuild s) => Visit >= 2 && s.Keystones < ItemCatalog.KeystonesPerRun;

@@ -107,9 +107,17 @@ namespace LastBell.Run.Shop
             // accepted icons (29 Oct): all but three items, which wait for a redraw and stay text-only
             // accepted icons (29 and 31 Oct; the Tollbreaker's 20 on 1 Nov): every item has one
             bool IconOk(ItemDef i) => RunShopFlow.ItemIcon(i, true) != null && RunShopFlow.ItemIcon(i, false) != null;
-            Check("all 69 item icons load (64 and 128)", ItemCatalog.All.All(IconOk), $"{ItemCatalog.All.Count(IconOk)}");
+            var core = ItemCatalog.All.Where(i => i.MinToll == 0).ToList(); var toll = ItemCatalog.All.Where(i => i.MinToll > 0).ToList();
+            Check("all 69 item icons load (64 and 128)", core.All(IconOk), $"{core.Count(IconOk)}");
+            Note($"Toll item icons drawn so far: {toll.Count(IconOk)} of {toll.Count} (cards show text only until they land)");
             Check("no Vanguard items are left", !ItemCatalog.All.Any(i => i.Class == "Vanguard" || i.Id.StartsWith("v.")));
-            Check("the pool has 69 items: 20 Tollbreaker, 19 Chimesinger, 20 Arcanist, 10 general; none held", ItemCatalog.All.Length == 69 && ItemCatalog.All.Count(i => i.General) == 10 && RunDirector.Classes.All(c => ItemCatalog.All.Count(i => i.Class == c) == (c == "Chimesinger" ? 19 : 20)) && !ItemCatalog.All.Any(i => i.Held) && !ItemCatalog.All.Any(i => i.Id == "c.twin_bells"));
+            Check("the pool has 69 items: 20 Tollbreaker, 19 Chimesinger, 20 Arcanist, 10 general; none held", core.Count == 69 && core.Count(i => i.General) == 10 && RunDirector.Classes.All(c => core.Count(i => i.Class == c) == (c == "Chimesinger" ? 19 : 20)) && !ItemCatalog.All.Any(i => i.Held) && !ItemCatalog.All.Any(i => i.Id == "c.twin_bells"));
+            Check("10 Toll items: 5 at Toll IV, 5 at Toll VII; 2 per class and 4 general",
+                toll.Count == 10 && toll.Count(i => i.MinToll == 4) == 5 && toll.Count(i => i.MinToll == 7) == 5 && toll.Count(i => i.General) == 4 && RunDirector.Classes.All(c => toll.Count(i => i.Class == c) == 2));
+            // the Toll gate: a Toll 0 run never stocks them, Toll IV stocks the first 5, Toll VII all 10
+            bool Gate(int level, int min) { var r = new ShopRun(3, 4) { Toll = level }; var s = r.Add("Arcanist"); return r.CanOffer(s, ItemCatalog.Get(min == 4 ? ItemCatalog.Overchannel : ItemCatalog.LingeringRune)); }
+            Check("Toll gate: Toll IV items only from Toll IV, Toll VII items only from Toll VII", !Gate(0, 4) && Gate(4, 4) && !Gate(4, 7) && !Gate(6, 7) && Gate(7, 7) && Gate(7, 4));
+            Check("this run is at Toll 0 unless -lastbellToll says otherwise", RunShopFlow.TollLevel == 0);
             Check("Chimes coin and burst icons load", RunShopFlow.Coin != null && RunShopFlow.Burst != null && RunHud.Icon("chimes-128") != null && RunHud.Icon("chimes-burst-32") != null);
             RunShopFlow.SeedOverride = RunShopFlow.SeedOverride ?? 1234;
             RunShopFlow.BotBuys = false;
@@ -118,7 +126,9 @@ namespace LastBell.Run.Shop
             ModelChecks();
 
             // ---------------- run 1: Tollbreaker, the whole run through every shop ----------------
+            // a campaign order (since 4 Nov): each area's 3 minibosses, then its boss; the shops are before the area bosses and the Bellkeeper
             var order = RunDirector.CreateRunOrder(new System.Random(7));
+            var shops = order.Where(Campaign.ShopBefore).ToArray();
             Check("StartRun accepted", d.StartRun("Tollbreaker", order));
             yield return null;
             Check("no shop before a miniboss", !RunShopFlow.Showing && !Campaign.ShopBefore(d.Encounter), $"{RunDirector.Bosses[d.Encounter].Name}");
@@ -128,15 +138,14 @@ namespace LastBell.Run.Shop
             Check("shop 1: no Keystones in stock", Me.Stock.All(s => s == null || s.Tier != ItemTier.Keystone));
             Check("shop 1: class cards are the player's class, general cards are general",
                 Enumerable.Range(0, 3).All(i => Me.Stock[i] == null || Me.Stock[i].Class == "Tollbreaker") && Enumerable.Range(3, 2).All(i => Me.Stock[i] == null || Me.Stock[i].General));
-            // a campaign order (since 4 Nov): each area's 3 minibosses, then its boss; the shops are before the area bosses and the Bellkeeper
             Check("shop 1: the special card is a Rare", Me.Stock[ShopRun.SpecialSlot] == null || Me.Stock[ShopRun.SpecialSlot].Tier == ItemTier.Rare);
-            var shops = order.Where(Campaign.ShopBefore).ToArray();
             Check("player has the run build", d.Player.Build == Me && ItemHooks.Run == Run);
             yield return Shot("visit1");
 
             // buy, refusals
             int c = Card(x => x.Tier == ItemTier.Common);
             var bought = c >= 0 ? Me.Stock[c] : null;
+            Me.Chimes = 300;   // test setup: the old 300 start, so the price checks below keep their numbers
             Check("buy a Common for 90", c >= 0 && Run.TryBuy(0, c, out _) && Me.Chimes == 210 && Me.Has(bought.Id), $"{Me.Chimes}");
             Check("a sold card can't be bought twice", !Run.TryBuy(0, c, out var why1), why1);
             // lock and reroll
@@ -145,7 +154,6 @@ namespace LastBell.Run.Shop
             Check("lock is free", Run.TryLock(0, lk, out _) && Me.Chimes == 210);
             Check("one lock per visit", !Run.TryLock(0, (lk + 1) % 6, out var why2), why2);
             Check("reroll costs 30", Run.TryReroll(0, out _) && Me.Chimes == 180, $"{Me.Chimes}");
-            Me.Chimes = 300;   // test setup: the old 300 start, so the price checks below keep their numbers
             Check("the locked card survives the reroll", Me.Stock[lk] == lockedDef);
             Check("the reroll refilled the sold slot", Me.Stock[c] != null && Me.Stock[c] != bought);
             Check("second reroll costs 45", Run.RerollPrice(Me) == 45 && Run.TryReroll(0, out _) && Me.Chimes == 135, $"{Me.Chimes}");
@@ -232,6 +240,13 @@ namespace LastBell.Run.Shop
             yield return Until(() => d.State == RunState.Combat, 6, "Bellkeeper");
             Check("build kept into the Bellkeeper", d.Player.Build != null && d.Player.Build.Items.Count == items);
             d.Boss.DebugDefeat();
+            // a clean campaign win earns the bonus fight (no shop before it): clear it too (debug defeat, routing only)
+            yield return Until(() => d.State == RunState.Results || d.State == RunState.Combat && d.Encounter == Campaign.BonusIndex, 10, "results or the bonus fight");
+            if (d.State == RunState.Combat && d.Encounter == Campaign.BonusIndex)
+            {
+                Check("no shop before the bonus fight", !RunShopFlow.Showing && d.Player.Build != null && d.Player.Build.Items.Count == items);
+                d.Boss.DebugDefeat();
+            }
             yield return Until(() => d.State == RunState.Results, 10, "results");
             Check("victory", d.Victory);
             Check("run end: every item and Chime is gone", Run == null && ItemHooks.Run == null && (d.Player == null || d.Player.Build == null));
@@ -242,18 +257,12 @@ namespace LastBell.Run.Shop
 
             // ---------------- Chimesinger and Arcanist hooks ----------------
             yield return ClassRun("Chimesinger", Seq(ChimesingerHooks(), ChimesingerPool()));
-            // a clean campaign win earns the bonus fight (no shop before it): clear it too (debug defeat, routing only)
-            yield return Until(() => d.State == RunState.Results || d.State == RunState.Combat && d.Encounter == Campaign.BonusIndex, 10, "results or the bonus fight");
-            if (d.State == RunState.Combat && d.Encounter == Campaign.BonusIndex)
-            {
-                Check("no shop before the bonus fight", !RunShopFlow.Showing && d.Player.Build != null && d.Player.Build.Items.Count == items);
-                d.Boss.DebugDefeat();
-            }
             yield return ClassRun("Arcanist", Seq(ArcanistHooks(), ArcanistPool(), Act(GeneralPool)));
 
             // ---------------- the shop bot ----------------
             RunShopFlow.BotBuys = true;
             Check("bot run starts", d.StartRun("Arcanist"));
+            yield return ToShop("bot shop 1");
             yield return Until(() => d.State == RunState.Combat, 8, "bot leaves shop 1");
             Check("bot bought and readied in shop 1", d.State == RunState.Combat && d.Player.Build != null && d.Player.Build.Items.Count >= 1 && d.Log.Any(l => l.StartsWith("shop bot: bought")),
                 string.Join(" | ", d.Log.Where(l => l.StartsWith("shop bot"))));
@@ -263,7 +272,6 @@ namespace LastBell.Run.Shop
             Check("bot passes shop 2 by itself", d.State == RunState.Combat && Run.Visit == 2);
             foreach (var l in d.Log.Where(l => l.StartsWith("shop bot"))) Note(l);
             RunShopFlow.BotBuys = false;
-            yield return ToShop("bot shop 1");
             d.SetPaused(true); d.ReturnToMenu(); yield return null;
 
             yield return PracticeChecks();
@@ -302,6 +310,7 @@ namespace LastBell.Run.Shop
         {
             Check($"{cls} run starts", d.StartRun(cls));
             yield return null;
+            yield return ToShop(cls + " shop 1");   // the hook checks run on the first area boss, not a miniboss
             RunShopFlow.Instance.Leave();
             yield return Until(() => d.State == RunState.Combat, 6, cls + " combat");
             yield return checks;
@@ -310,7 +319,6 @@ namespace LastBell.Run.Shop
 
         // Pure model checks: seeds, co-op chip-in and its cap, party gating.
         void ModelChecks()
-            yield return ToShop(cls + " shop 1");   // the hook checks run on the first area boss, not a miniboss
         {
             string Stock(ShopRun r) => string.Join(",", r.Slot(0).Stock.Select(s => s?.Id ?? "-"));
             var a = new ShopRun(42, 4); a.Add("Arcanist"); a.OpenVisit("x", false, true);
@@ -488,6 +496,21 @@ namespace LastBell.Run.Shop
             Only(ItemCatalog.FrenziedHour); Check("Frenzied Hour: cooldown 18 s, lasts 3 s, side axes 35% (15 s tempered)",
                 ItemHooks.I(P, "t.frenzy.cd", 1800) == 1080 && ItemHooks.I(P, "t.frenzy.ticks", 240) == 180 && Close(ItemHooks.F(P, "t.fan.side", 0.5f), 0.35f)
                 && Tempered(ItemCatalog.FrenziedHour, () => ItemHooks.I(P, "t.frenzy.cd", 1800) == 900));
+            // Toll items (accepted 5 Nov)
+            Only(ItemCatalog.ShortSplit); Check("Short Split: bonus +55% (+60% tempered), the split and its boss lodge last 4 s",
+                Close(ItemHooks.F(P, "t.split.bonus", 1.4f), 1.55f) && ItemHooks.I(P, "t.split.ticks", 360) == 240 && ItemHooks.I(P, "t.lodge.boss", 360) == 240
+                && Tempered(ItemCatalog.ShortSplit, () => Close(ItemHooks.F(P, "t.split.bonus", 1.4f), 1.6f)));
+            Only(ItemCatalog.LongToss); Check("Long Toss: the held throw reaches 12 m and hits 26 (28 tempered)",
+                Close(ItemHooks.F(P, "t.held.range", 9), 12) && ItemHooks.I(P, "t.held.damage", 30) == 26 && Tempered(ItemCatalog.LongToss, () => ItemHooks.I(P, "t.held.damage", 30) == 28));
+            // Long Toss through the kit: a held throw at a floor spot 11.5 m to the side lodges there, not at 9 m
+            yield return Ready(); NearBoss(4f);
+            { var from = P.transform.position; var spot = from + Vector3.right * 11.5f; float th = 0; bot.press[0] = true; bot.hold[0] = true;
+              while (th < 0.7f) { bot.Aim = spot; KeepAlive(); th += Time.deltaTime; yield return null; }
+              bot.Clear(); yield return Wait(1f);
+              var lodged = tk.Axes.FirstOrDefault(a => a.State == TollbreakerKit.AxeState.Lodged && !a.InBoss);
+              float reach = lodged != null ? Sim.Flat(lodged.Pos - from).magnitude : 0;
+              Check("Long Toss: the held throw lodges 11.5 m away (past the old 9 m)", reach > 10.5f, $"{reach:0.0} m"); }
+            tk.ResetAll();
             // Battle Spin through the kit: a dash, then a tap that hits like the held throw
             Only(ItemCatalog.BattleSpin); yield return Ready(); NearBoss(3f);
             bot.dash = true; yield return Wait(0.5f); bot.Clear();
@@ -536,6 +559,13 @@ namespace LastBell.Run.Shop
             Check("Struck Together solo: every 6th note rings the bell for 30% of Bellstrike", MeterHas("Bellstrike (struck together)"));
             yield return Press(3, 0.8f);
             Check("Encore: Crescendo leaves the bell ringing with 1 echo", ck.Bell && ck.Echoes == 1, $"bell {ck.Bell}, echoes {ck.Echoes}");
+            // Toll items (accepted 5 Nov)
+            Only(ItemCatalog.LowNote); Check("Low Note: Resonant Note +12% damage, notes 15% slower", ItemHooks.Outgoing(d.World, 100, "ResonantNote") == 112 && Close(ItemHooks.F(P, "c.note.speed", 22), 18.7f));
+            Only(ItemCatalog.DoubleToll); Check("Double Toll: Bellstrike recharge 6 -> 7.2 s, second toll 40% (60% tempered)",
+                ItemHooks.I(P, "c.strike.recharge", 360) == 432 && Close(ItemHooks.F(P, "c.double_toll", 0), 0.4f) && Tempered(ItemCatalog.DoubleToll, () => Close(ItemHooks.F(P, "c.double_toll", 0), 0.6f)));
+            yield return Ready(); P.transform.position = new Vector3(0, 0, 6.5f); yield return Press(1, 0.5f);
+            bool early = MeterHas("Bellstrike (double toll)"); yield return Wait(1f);
+            Check("Double Toll: a Bellstrike hit tolls again 1 s later", ck.Bell && !early && MeterHas("Bellstrike (double toll)"), $"bell {ck.Bell}, early {early}");
             d.Boss.BeginCombat();
             yield return Smoke("Chimesinger", f => f % 50 == 0 ? 1 : f % 70 == 0 ? 2 : f % 113 == 0 ? 3 : f % 200 == 0 ? 4 : f % 83 == 0 ? 9 : 0);
         }
@@ -571,6 +601,25 @@ namespace LastBell.Run.Shop
             while (t < 1.4f) { four |= ak.Charging && ak.Missiles == 4; t += Time.deltaTime; yield return null; }
             bot.Clear(); yield return Wait(0.5f);
             Check("Split Missile: a full charge summons and fires 4", four && ak.LastVolley == 4, $"last volley {ak.LastVolley}");
+            // Toll items (accepted 5 Nov)
+            Only(ItemCatalog.Overchannel); Check("Overchannel: 2 glyphs per step that hits; one fades every 3 s (4 s tempered)",
+                ItemHooks.I(P, "a.dis.carve", 1) == 2 && ItemHooks.I(P, "a.glyph.fade", 0) == 180 && Tempered(ItemCatalog.Overchannel, () => ItemHooks.I(P, "a.glyph.fade", 0) == 240));
+            yield return Ready(); ak.DebugSetGlyphs(2); yield return Wait(3.4f);
+            Check("Overchannel: out of the beam, 1 of 2 glyphs fades after 3 s", ak.Glyphs == 1, $"{ak.Glyphs}");
+            yield return Ready(); P.transform.position = new Vector3(0, 0, 6.5f);
+            { float tc = 0; bot.press[1] = true; bot.hold[1] = true;
+              while (ak.Glyphs == 0 && tc < 2.4f) { bot.Aim = d.Boss.transform.position; KeepAlive(); tc += Time.deltaTime; yield return null; }
+              int first = ak.Glyphs; bot.Clear();
+              Check("Overchannel: the beam's first step that hits carves 2 glyphs at once", first == 2, $"{first}"); }
+            yield return Ready();
+            Only(ItemCatalog.LingeringRune); Check("Lingering Rune: Sigil goes off after 1.2 s, the rune's second hit 40% (60% tempered)",
+                ItemHooks.I(P, "a.sigil.arm", 48) == 72 && Close(ItemHooks.F(P, "a.sigil.linger", 0), 0.4f) && Tempered(ItemCatalog.LingeringRune, () => Close(ItemHooks.F(P, "a.sigil.linger", 0), 0.6f)));
+            yield return Ready(); ak.DebugSetGlyphs(1); P.transform.position = new Vector3(0, 0, 6.5f);
+            yield return Press(2, 0.5f);
+            bool arm72 = ak.Sigils.Count == 1 && ak.Sigils[0].Total == 72;
+            yield return Wait(3.2f);
+            Check("Lingering Rune: the Sigil arms for 1.2 s, then its rune goes off again 2 s later", arm72 && MeterHas("Rune Sigil") && MeterHas("Rune Sigil (lingering)") && ak.Sigils.Count == 0,
+                $"arm 1.2 s {arm72}, sigils left {ak.Sigils.Count}");
             d.Boss.BeginCombat();
             yield return Smoke("Arcanist", f => f % 140 == 0 ? 1 : f % 90 == 0 ? 2 : f % 170 == 0 ? 3 : f % 230 == 0 ? 4 : f % 77 == 0 ? 9 : 0);
         }
@@ -581,6 +630,19 @@ namespace LastBell.Run.Shop
             Only(ItemCatalog.SureFooting); Check("Sure Footing: knockback -30%, no Temper", Close(ItemHooks.F(P, "knockback", 1), 0.7f) && !ItemCatalog.Get(ItemCatalog.SureFooting).Tempered.HasValue);
             Only(ItemCatalog.Formation); Check("Formation solo: a flat +6%", ItemHooks.Outgoing(d.World, 100, "Magic Missile") == 106);
             Only(ItemCatalog.LightFeet); ItemHooks.OnDashEnd(P); Check("Light Feet: +10% move speed after a dash", Close(ItemHooks.F(P, "move.speed", 1), 1.1f));
+            // Toll items (accepted 5 Nov)
+            Only(ItemCatalog.LeadenStep); Check("Leaden Step: +15% damage, dashes cost 45 (40 tempered)",
+                ItemHooks.Outgoing(d.World, 100, "Magic Missile") == 115 && Close(ItemHooks.F(P, "dash.cost", 30), 45) && Tempered(ItemCatalog.LeadenStep, () => Close(ItemHooks.F(P, "dash.cost", 30), 40)));
+            Only(ItemCatalog.LeadenStep, ItemCatalog.LightStep); Check("Leaden Step on top of Light Step: 24 -> 39", Close(ItemHooks.F(P, "dash.cost", 30), 39));
+            Only(ItemCatalog.SteadyBreath); Check("Steady Breath: stamina regen +15% (+22% tempered), sprint drains 28/s",
+                Close(ItemHooks.F(P, "stamina.regen", 20), 23) && Close(ItemHooks.SprintCost(P, 25), 28) && Tempered(ItemCatalog.SteadyBreath, () => Close(ItemHooks.F(P, "stamina.regen", 20), 24.4f)));
+            Only(ItemCatalog.SteadyBreath, ItemCatalog.Sprinter); Check("Steady Breath on top of Sprinter: 21 -> 24/s", Close(ItemHooks.SprintCost(P, 25), 24));
+            Only(ItemCatalog.PatientBell);
+            var patient = new List<int> { ItemHooks.Outgoing(d.World, 100, "Magic Missile"), ItemHooks.Outgoing(d.World, 100, "Magic Missile") };
+            Me.L.LastBossHit = d.World.Tick - ItemHooks.PatientGap; patient.Add(ItemHooks.Outgoing(d.World, 100, "Magic Missile"));
+            Check("Patient Bell: the first hit after 2 s +60%, every other hit -10%", string.Join(",", patient) == "160,90,160", string.Join(",", patient));
+            Only(ItemCatalog.LateBloom); int ph = d.Boss.PhaseNumber;
+            Check($"Late Bloom: -6% in the first phase, +10% later (this fight is in phase {ph})", ItemHooks.Outgoing(d.World, 100, "Magic Missile") == (ph <= 1 ? 94 : 110));
             Me.Items.Clear(); Me.ResetEncounter();
         }
         bool Tempered(string id, Func<bool> check) { var o = Me.Get(id); o.Tempered = true; bool ok = check(); o.Tempered = false; return ok; }

@@ -300,7 +300,7 @@ namespace LastBell.Run
             }
             sinceSpend++; sincePotion++;
             if (inp.Potion && stun == 0) DrinkPotion();   // usable while moving or mid-action, not while stunned
-            if (sinceSpend > Sim.Ticks(Shop.ItemHooks.RegenDelay(this, RegenDelay))) Stamina = Mathf.Min(MaxStaminaNow, Stamina + Regen * Sim.Dt);
+            if (sinceSpend > Sim.Ticks(Shop.ItemHooks.RegenDelay(this, RegenDelay))) Stamina = Mathf.Min(MaxStaminaNow, Stamina + Shop.ItemHooks.F(this, "stamina.regen", Regen) * Sim.Dt);   // Steady Breath
 
             var cam = Camera.main;
             Vector3 fwd = cam ? Sim.Flat(cam.transform.forward).normalized : Vector3.forward;

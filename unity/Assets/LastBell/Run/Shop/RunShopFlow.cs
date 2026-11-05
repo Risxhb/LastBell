@@ -27,6 +27,8 @@ namespace LastBell.Run.Shop
         // -lastbellShopBot: a greedy buyer spends for slot 0 and readies up (playtest agent runs with items)
         public static bool BotBuys = Arg("-lastbellShopBot");
         public static int? SeedOverride = Arg("-lastbellSeed") ? ArgInt("-lastbellSeed", 0) : (int?)null;
+        // -lastbellToll N: the run's Toll until the Toll ladder exists (4 stocks the Toll IV items, 7 the Toll VII ones too)
+        public static int TollLevel = ArgInt("-lastbellToll", 0);
 
         public static RunShopFlow Instance { get; private set; }
         public static bool Showing => Instance && Instance.Run != null && Instance.Run.Open && Instance.d && Instance.d.State == RunState.Ready;
@@ -93,6 +95,7 @@ namespace LastBell.Run.Shop
         {
             runId = d.RunsStarted; openedFor = -1;
             Run = new ShopRun(SeedOverride ?? Guid.NewGuid().GetHashCode(), d.Mode == RunMode.Practice ? 1 : Math.Max(1, d.EncounterOrder.Count(Campaign.ShopBefore)));
+            Run.Toll = TollLevel;
             d.Player.Build = Run.Add(d.ClassName);   // party bots / netcode add their slots here later
             ItemHooks.Run = Run;
             d.Log.Add($"shop: new run, seed {Run.Seed}");
@@ -121,11 +124,11 @@ namespace LastBell.Run.Shop
             Run = null; ItemHooks.Run = null; runId = -1; openedFor = -1;
         }
 
+        static bool IsMiniboss(int encounter) => Campaign.Areas.Any(a => Array.IndexOf(a.MinibossIndices, encounter) >= 0);
+
         void OpenFor(int encounter)
         {
             if (openedFor == encounter + 1000 * d.RunsStarted) return;   // one visit per boss (Ready can't re-enter mid-visit)
-        static bool IsMiniboss(int encounter) => Campaign.Areas.Any(a => Array.IndexOf(a.MinibossIndices, encounter) >= 0);
-
             openedFor = encounter + 1000 * d.RunsStarted; openedAt = Time.frameCount;
             int pos = d.Mode == RunMode.Run ? Array.IndexOf(d.EncounterOrder, encounter) : 0;
             bool final = RunDirector.Bosses[encounter].Final;

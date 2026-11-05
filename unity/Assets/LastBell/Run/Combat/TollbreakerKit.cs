@@ -49,6 +49,8 @@ namespace LastBell.Run
         int FrenzyCdNow => NI("t.frenzy.cd", FrenzyCd);              // Frenzied Hour
         int FrenzyTicksNow => NI("t.frenzy.ticks", FrenzyTicks);     // Frenzied Hour
         float FanSideNow => N("t.fan.side", FanSide);                // Frenzied Hour
+        float HeldRangeNow => N("t.held.range", MaxRange);           // Long Toss
+        int HeldDamageNow => NI("t.held.damage", HeavyDamage);       // Long Toss
         public float SplitBonusNow => N("t.split.bonus", SplitBonus);   // Rooted Axe
         // behaviour switches (0 = off): Twin Split (second axe's damage %), Rooted Axe, Battle Spin
         float TwinSplitPct => N("t.twin_split", 0);
@@ -264,8 +266,8 @@ namespace LastBell.Run
         {
             act = Act.None;
             bool spin = !heavy && battleSpin; battleSpin = false;   // Battle Spin: this tap hits like the held throw, but doesn't lodge
-            var a = Launch(h, heavy ? Mathf.Clamp(Sim.Flat(aim - P.transform.position).magnitude, MinLodge, MaxRange) : MaxRange,
-                heavy || spin ? HeavyDamage : TapOut, heavy ? "Twin Hurl (held)" : spin ? "Twin Hurl (battle spin)" : "Twin Hurl");
+            var a = Launch(h, heavy ? Mathf.Clamp(Sim.Flat(aim - P.transform.position).magnitude, MinLodge, HeldRangeNow) : MaxRange,
+                heavy ? HeldDamageNow : spin ? HeavyDamage : TapOut, heavy ? "Twin Hurl (held)" : spin ? "Twin Hurl (battle spin)" : "Twin Hurl");
             a.Heavy = heavy; a.BattleSpin = spin; a.Frenzy = FrenzyActive && !heavy;
             Shop.ItemHooks.Cast(P, "t.release", a.Pos, a.Dir, a.ReleaseDistance, heavy ? 1 : 0);   // Close Quarters, Berserker's Pace
             nextThrow = W.Tick + Mathf.Max(0, ThrowInterval - CastTicks);
