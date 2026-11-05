@@ -162,8 +162,10 @@ function mossMound(x, y, z, r, flowers = 4) { blob(r * 0.55, MOSS_DK, x, y, z, 0
   for (let k = 0; k < 14; k++) { const a = rnd() * 6.28, d = rnd() * r; E3.set(-0.5 + rnd() * 0.6, rnd() * 6, (rnd() - 0.5) * 0.6); Q.setFromEuler(E3); const ls = 0.16 + rnd() * 0.12; M4.compose(V.set(x + Math.cos(a) * d, y + 0.1 + rnd() * r * 0.4, z + Math.sin(a) * d), Q, S.set(ls * 1.2, ls * 0.35, ls)); (rnd() < 0.5 ? leafLitM : ivyM).push(M4.clone()); }
   for (let k = 0; k < 4; k++) { const a = rnd() * 6.28; pushLeaf(x + Math.cos(a) * r * 0.8, y + 0.05, z + Math.sin(a) * r * 0.8, 0.16 + rnd() * 0.1, Math.cos(a), Math.sin(a)); } for (let i = 0; i < flowers; i++) { const a = rnd() * 6.28, d = rnd() * r * 0.8; pushM(flowerM, x + Math.cos(a) * d, y + r * 0.35, z + Math.sin(a) * d, 0.9 + rnd() * 0.6); } }
 
-// ---- floor painter: warm grey slab rings, turquoise mosaic, brass rings + cross + roundels + medallion. Writes three
-// canvases: albedo, height (Unity makes a normal map) and mask (R moss, G brass, B emissive mosaic grout) ----
+// ---- floor painter: warm grey slab rings, turquoise dial, aged-brass rings + cross + roundels + medallion. Writes three
+// canvases: albedo, height (Unity makes a normal map) and mask (R moss, G brass, B glow, now unused). Sylvara fires dense
+// coral, brass and cobalt bullets over this floor, so it stays quiet: large low-contrast dial panels instead of mosaic
+// tesserae, no grout glow, inlays a dull verdigris bronze that can never pass for a brass bullet, moss only at the rim ----
 function paintFloor(N, H) {
   const r = mulberry32(11), rings = [];
   let rr = MOSAIC_R + 0.18;
@@ -172,32 +174,31 @@ function paintFloor(N, H) {
     cuts.push(1); rings.push({ a: rr, b: rr + w, cuts, off: r() }); rr += w; }
   const [map, mc] = canvas2d(N), [bump, bc] = canvas2d(N), [mask, kc] = canvas2d(N);
   const mi = mc.createImageData(N, N), bi = bc.createImageData(N, N), ki = kc.createImageData(N, N), md = mi.data, bd = bi.data, kd = ki.data;
-  const TEAL = [[40, 92, 90], [50, 106, 102], [66, 118, 112], [32, 72, 74], [46, 100, 96]]; // around #2E6F6C // mid-value, desaturated: telegraphs must win
+  const TEAL = [[78, 116, 110], [84, 121, 115], [74, 111, 106], [81, 118, 112]]; // muted sage-turquoise: telegraphs and bullets must win
   for (let py = 0; py < N; py++) {
     const z = -H + (py + 0.5) / N * 2 * H;
     for (let px = 0; px < N; px++) {
       const x = -H + (px + 0.5) / N * 2 * H, o = (py * N + px) * 4, d = Math.hypot(x, z), th = Math.atan2(z, x);
       const n = fbm(x * 0.35, z * 0.35), fine = vnoise(x * 7, z * 7);
       let cr, cg, cb, h, moss = 0, glow = 0;
-      if (d < MOSAIC_R + 0.02) {                                       // mosaic: 11 cm tiles set in rings
-        const T = 0.11, ti = Math.floor(d / T), nt = Math.max(6, Math.round(Math.PI * 2 * (ti + 0.5) * T / T)), u = ((th + Math.PI) / (Math.PI * 2) + hash(ti, 3)) * nt, k = Math.floor(u);
+      if (d < MOSAIC_R + 0.02) {                                       // dial: large glazed panels (0.75 m rings, ~1.1 m arcs)
+        const T = 0.75, ti = Math.floor(d / T), nt = Math.max(4, Math.round(Math.PI * 2 * (ti + 0.5) * T / 1.1)), u = ((th + Math.PI) / (Math.PI * 2) + hash(ti, 3)) * nt, k = Math.floor(u);
         const ed = Math.min(d - ti * T, (ti + 1) * T - d, (u - k) * Math.PI * 2 * d / nt, (k + 1 - u) * Math.PI * 2 * d / nt), sid = hash(ti * 131 + k, 7);
-        const pal = TEAL[Math.floor(sid * TEAL.length)], v = (hash(k, ti) - 0.5) * 0.16 + (n - 0.5) * 0.18;
+        const pal = TEAL[Math.floor(sid * TEAL.length)], v = (n - 0.5) * 0.08 + (fine - 0.5) * 0.03;
         cr = pal[0] * (1 + v); cg = pal[1] * (1 + v); cb = pal[2] * (1 + v); h = 0.62;
-        if (sid > 0.975) { cr = 150; cg = 146; cb = 134; }                 // a few replaced stone tiles
-        if (ed < 0.012) { cr = 52; cg = 72; cb = 70; h = 0.45; glow = 1 - smooth(0, MOSAIC_R, d) * 0.3; }
+        if (ed < 0.014) { cr *= 0.88; cg *= 0.9; cb *= 0.9; h = 0.5; }
       } else {                                                         // slab rings
         let ri = 0; while (ri < rings.length - 1 && d > rings[ri].b) ri++;
         const g = rings[ri], cu = g.cuts; let u = (th + Math.PI) / (Math.PI * 2) + g.off; u -= Math.floor(u);
         let lo = 0, hi = cu.length - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (cu[m] <= u) lo = m; else hi = m; }
         const fa = (u - cu[lo]) * Math.PI * 2 * d, arcW = (cu[lo + 1] - cu[lo]) * Math.PI * 2 * d, edge = Math.min(d - g.a, g.b - d, fa, arcW - fa), sid = hash(ri * 31 + lo, 5);
-        const v = (sid - 0.5) * 0.18 + (n - 0.5) * 0.22 + (fine - 0.5) * 0.06, tn = hash(lo, ri * 7);
-        cr = (158 + tn * 6) * (1 + v); cg = (156 + tn * 5) * (1 + v); cb = (150 - tn * 3) * (1 + v);
+        const v = (sid - 0.5) * 0.09 + (n - 0.5) * 0.12 + (fine - 0.5) * 0.04, tn = hash(lo, ri * 7);
+        cr = (128 + tn * 6) * (1 + v); cg = (134 + tn * 5) * (1 + v); cb = (128 - tn * 3) * (1 + v); // sage-grey paving, mid value so glowing bullets pop
         h = 0.62 + 0.36 * smooth(0.012, 0.12, edge) + (sid - 0.5) * 0.12;
-        if (edge < 0.1) { const t = 1 - smooth(0.02, 0.1, edge); cr *= 1 - t * 0.14; cg *= 1 - t * 0.14; cb *= 1 - t * 0.16; }
-        moss = smooth(0.62, 0.8, n + (fine - 0.5) * 0.1) * smooth(11.2, R, d) * 0.7;
+        if (edge < 0.1) { const t = 1 - smooth(0.02, 0.1, edge); cr *= 1 - t * 0.07; cg *= 1 - t * 0.07; cb *= 1 - t * 0.08; }
+        moss = smooth(0.62, 0.8, n + (fine - 0.5) * 0.1) * smooth(PLAY_R - 0.5, R, d) * 0.7; // rim only: green seeds must not hide in moss
         if (moss > 0) { const mg = 0.78 + fine * 0.3; cr += (78 * mg - cr) * moss; cg += (104 * mg - cg) * moss; cb += (62 * mg - cb) * moss; }
-        if (edge < 0.016) { const m = Math.min(1, moss * 2 + smooth(11.5, H, d) * (0.6 + n * 0.6)); cr = 94 - m * 30; cg = 90 - m * 8; cb = 80 - m * 26; h = 0.22; moss = Math.max(moss, m * 0.8); }
+        if (edge < 0.016) { const m = Math.min(1, moss * 2 + smooth(PLAY_R - 0.3, H, d) * (0.6 + n * 0.6)); cr = 108 - m * 40; cg = 108 - m * 18; cb = 100 - m * 40; h = 0.32; moss = Math.max(moss, m * 0.8); }
       }
       md[o] = Math.min(255, cr); md[o + 1] = Math.min(255, cg); md[o + 2] = Math.min(255, cb); md[o + 3] = 255;
       const hb = Math.max(0, Math.min(255, h * 255)); bd[o] = bd[o + 1] = bd[o + 2] = hb; bd[o + 3] = 255;
@@ -208,12 +209,12 @@ function paintFloor(N, H) {
   const s = N / (2 * H), C = N / 2, P = (rad, a) => [C + Math.cos(a) * rad * s, C + Math.sin(a) * rad * s];
   // brass: drawn three times (albedo / height / mask) from the same layout
   function brass(g, mode) {
-    const col = (light, dark) => mode === 'map' ? (dark ? '#5d4520' : light) : mode === 'bump' ? (dark ? '#9a9a9a' : '#ffffff') : (dark ? 'rgb(0,90,0)' : 'rgb(0,255,0)');
+    const BRZ = '#8a8468', BRZ_FILL = '#827c62'; // aged bronze with verdigris: reads as inlay, never as a brass bullet
+    const col = (light, dark) => mode === 'map' ? (dark ? '#5a5747' : light) : mode === 'bump' ? (dark ? '#a8a8a8' : '#e8e8e8') : (dark ? 'rgb(0,40,0)' : 'rgb(0,90,0)');
     if (mode === 'mask') g.globalCompositeOperation = 'lighter';
     g.lineCap = 'butt';
-    const ring = (rad, w) => { g.strokeStyle = col(0, true); g.lineWidth = (w + 0.05) * s; g.beginPath(); g.arc(C, C, rad * s, 0, Math.PI * 2); g.stroke(); g.strokeStyle = col('#a8894a'); g.lineWidth = w * s; g.beginPath(); g.arc(C, C, rad * s, 0, Math.PI * 2); g.stroke();
-      if (mode === 'map') { g.strokeStyle = 'rgba(200,170,105,0.45)'; g.lineWidth = w * 0.25 * s; g.beginPath(); g.arc(C, C, (rad - w * 0.2) * s, 0, Math.PI * 2); g.stroke(); } };
-    const line = (r0, r1, a, w) => { const [x0, y0] = P(r0, a), [x1, y1] = P(r1, a); g.strokeStyle = col(0, true); g.lineWidth = (w + 0.05) * s; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke(); g.strokeStyle = col('#a8894a'); g.lineWidth = w * s; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke(); };
+    const ring = (rad, w) => { g.strokeStyle = col(0, true); g.lineWidth = (w + 0.05) * s; g.beginPath(); g.arc(C, C, rad * s, 0, Math.PI * 2); g.stroke(); g.strokeStyle = col(BRZ); g.lineWidth = w * s; g.beginPath(); g.arc(C, C, rad * s, 0, Math.PI * 2); g.stroke(); };
+    const line = (r0, r1, a, w) => { const [x0, y0] = P(r0, a), [x1, y1] = P(r1, a); g.strokeStyle = col(0, true); g.lineWidth = (w + 0.05) * s; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke(); g.strokeStyle = col(BRZ); g.lineWidth = w * s; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke(); };
     const disc = (cx, cy, rad, fill) => { g.fillStyle = col(0, true); g.beginPath(); g.arc(cx, cy, (rad + 0.04) * s, 0, Math.PI * 2); g.fill(); g.fillStyle = col(fill); g.beginPath(); g.arc(cx, cy, rad * s, 0, Math.PI * 2); g.fill(); };
     const star = (cx, cy, r0, r1, pts, w) => { g.strokeStyle = col(0, true); g.lineWidth = w * s; g.beginPath(); for (let i = 0; i <= pts * 2; i++) { const a = i / (pts * 2) * Math.PI * 2 - Math.PI / 2, rd = i % 2 ? r0 : r1, X = cx + Math.cos(a) * rd * s, Y = cy + Math.sin(a) * rd * s; i ? g.lineTo(X, Y) : g.moveTo(X, Y); } g.stroke(); };
     const engr = (cx, cy, rad, w) => { g.strokeStyle = col(0, true); g.lineWidth = w * s; g.beginPath(); g.arc(cx, cy, rad * s, 0, Math.PI * 2); g.stroke(); };
@@ -221,22 +222,19 @@ function paintFloor(N, H) {
     for (const a of EXITS) { line(MED_R, R + 0.25, a, 0.12); }
     for (const a of [Math.PI / 4, Math.PI * 0.75, Math.PI * 1.25, Math.PI * 1.75]) line(MED_R, INNER_R, a, 0.07); // spokes quartering the mosaic
     for (const a of EXITS) for (const [rad, rr2] of [[OUTER_R, 0.72], [MID_R, 0.6], [INNER_R, 0.42], [MOSAIC_R + 0.05, 0.34]]) {
-      const [cx, cy] = P(rad, a); disc(cx, cy, rr2, '#86703f'); engr(cx, cy, rr2 * 0.78, 0.03); star(cx, cy, rr2 * 0.22, rr2 * 0.66, 4, 0.025);
-      if (mode === 'map') { g.fillStyle = '#b39257'; g.beginPath(); g.arc(cx, cy, rr2 * 0.12 * s, 0, Math.PI * 2); g.fill(); }
+      const [cx, cy] = P(rad, a); disc(cx, cy, rr2, BRZ_FILL); engr(cx, cy, rr2 * 0.78, 0.03); star(cx, cy, rr2 * 0.22, rr2 * 0.66, 4, 0.025);
     }
     // medallion: brass compass rose with a gear-tooth edge (the 3D gear ring sits just outside it)
-    disc(C, C, MED_R, '#94783f'); engr(C, C, MED_R * 0.88, 0.04); engr(C, C, MED_R * 0.62, 0.03); engr(C, C, MED_R * 0.3, 0.03);
-    star(C, C, MED_R * 0.18, MED_R * 0.84, 8, 0.035); star(C, C, MED_R * 0.12, MED_R * 0.5, 4, 0.03);
-    for (let i = 0; i < 32; i++) { const a = i / 32 * Math.PI * 2, [x0, y0] = P(MED_R * 0.88, a), [x1, y1] = P(MED_R * (i % 4 ? 0.82 : 0.74), a); g.strokeStyle = col(0, true); g.lineWidth = 0.025 * s; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke(); }
-    if (mode === 'map') { g.fillStyle = '#d9b866'; g.beginPath(); g.arc(C, C, 0.16 * s, 0, Math.PI * 2); g.fill(); }
+    disc(C, C, MED_R, BRZ_FILL); engr(C, C, MED_R * 0.88, 0.04); engr(C, C, MED_R * 0.5, 0.03);
+    star(C, C, MED_R * 0.18, MED_R * 0.84, 8, 0.035);
     g.globalCompositeOperation = 'source-over';
   }
   brass(mc, 'map'); brass(bc, 'bump'); brass(kc, 'mask');
   // wear on the brass: soft dark patina blotches (albedo only)
-  for (let i = 0; i < 260; i++) { const a = r() * 6.28, d = r() * H, [X, Y] = P(d, a); mc.fillStyle = `rgba(60,48,26,${0.05 + r() * 0.08})`; mc.beginPath(); mc.arc(X, Y, (0.1 + r() * 0.3) * s, 0, Math.PI * 2); mc.fill(); }
+  for (let i = 0; i < 260; i++) { const a = r() * 6.28, d = r() * H, [X, Y] = P(d, a); mc.fillStyle = `rgba(60,58,44,${0.03 + r() * 0.05})`; mc.beginPath(); mc.arc(X, Y, (0.1 + r() * 0.3) * s, 0, Math.PI * 2); mc.fill(); }
   // cracks
-  for (let i = 0; i < 80; i++) { let x = (r() * 2 - 1) * H, z = (r() * 2 - 1) * H, a = r() * 6.28; const d0 = Math.hypot(x, z); if (d0 > H || d0 < MOSAIC_R + 0.4) continue;
-    mc.strokeStyle = 'rgba(60,54,44,0.5)'; mc.lineWidth = 1.6; bc.strokeStyle = 'rgba(40,40,40,0.7)'; bc.lineWidth = 1.6; mc.beginPath(); bc.beginPath(); mc.moveTo(C + x * s, C + z * s); bc.moveTo(C + x * s, C + z * s);
+  for (let i = 0; i < 40; i++) { let x = (r() * 2 - 1) * H, z = (r() * 2 - 1) * H, a = r() * 6.28; const d0 = Math.hypot(x, z); if (d0 > H || d0 < MOSAIC_R + 0.4) continue;
+    mc.strokeStyle = 'rgba(70,66,56,0.25)'; mc.lineWidth = 1.6; bc.strokeStyle = 'rgba(40,40,40,0.5)'; bc.lineWidth = 1.6; mc.beginPath(); bc.beginPath(); mc.moveTo(C + x * s, C + z * s); bc.moveTo(C + x * s, C + z * s);
     for (let k = 0; k < 3 + r() * 5; k++) { a += (r() - 0.5) * 1.3; x += Math.cos(a) * 0.2; z += Math.sin(a) * 0.2; mc.lineTo(C + x * s, C + z * s); bc.lineTo(C + x * s, C + z * s); } mc.stroke(); bc.stroke(); }
   return { map, bump, mask };
 }
