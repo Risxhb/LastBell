@@ -49,10 +49,23 @@ namespace LastBell.Run
 
         // the nearest downed ally (not dead, within 14 m) nobody else is reviving: walk to a spot beside them that nothing is
         // about to land on and stand still there, so the revive channels (PlayerController: 3 s within 1.5 m)
-        const float ReviveStand = 0.9f, ReviveReach = 14f;
+        const float ReviveStand = 0.9f, ReviveReach = 14f;   // (30 m was tried, 5 Nov: on Sylvara bots crossed her bullets and still never arrived)
         bool ReviveJob(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
         {
-            PlayerController best = null; float bd = ReviveReach;
+            if (!ReviveSpot(me, pos, out var spot)) return false;
+            if (bad(spot)) return false;   // the ally lies in something about to land: dodge first
+            dJob = "revive"; dSpot = spot; dNote = 1;
+            var v = Sim.Flat(spot - Sim.Flat(pos));
+            if (v.magnitude < 0.3f) { dMove = Vector3.zero; inp.Move = ToScreen(Vector3.zero); return true; }   // beside them: hold still
+            var move = v.normalized; if (bad(pos + move * 0.6f)) move = Bend(pos, move);
+            if (v.magnitude > 3f && me.Stamina > 40) inp.Sprint = true;
+            move = AroundBoss(pos, move, boss); dMove = move; inp.Move = ToScreen(move);
+            return true;
+        }
+
+        static bool ReviveSpot(PlayerController me, Vector3 pos, out Vector3 spot)
+        {
+            PlayerController best = null; float bd = ReviveReach; spot = default;
             foreach (var p in me.World.Players)
             {
                 if (p == me || !p || !p.Down || p.Dead) continue;
@@ -62,14 +75,8 @@ namespace LastBell.Run
             }
             if (best == null) return false;
             var at = Sim.Flat(best.transform.position); var off = Sim.Flat(pos - at);
-            var spot = at + (off.magnitude > 0.1f ? off.normalized : Vector3.forward) * ReviveStand;
-            if (bad(spot)) return false;   // the ally lies in something about to land: dodge first
-            dJob = "revive"; dSpot = spot; dNote = 1;
-            var v = Sim.Flat(spot - Sim.Flat(pos));
-            if (v.magnitude < 0.3f) { dMove = Vector3.zero; inp.Move = ToScreen(Vector3.zero); return true; }   // beside them: hold still
-            var move = v.normalized; if (bad(pos + move * 0.6f)) move = Bend(pos, move);
-            if (v.magnitude > 3f && me.Stamina > 40) inp.Sprint = true;
-            move = AroundBoss(pos, move, boss); dMove = move; inp.Move = ToScreen(move);
+            spot = at + (off.magnitude > 0.1f ? off.normalized : Vector3.forward) * ReviveStand;
+            if (!CombatWorld.InPlayerBound(spot, -0.5f)) spot = at + Sim.Flat(-at).normalized * ReviveStand;   // at the wall: the inner side
             return true;
         }
 
@@ -1184,7 +1191,7 @@ namespace LastBell.Run
         // close) and in Hollow Bloom stands next to a Choir Bud to cut it (one bud per bot, by slot). Every 3 ticks it
         // re-plans the cheapest path through the bullets and telegraphs 0.8 s ahead.
         Vector3 sylMove; bool sylSprint, sylOn, sylDash; float sylCost; Vector3 sylPos;
-        string SylvaraLine() => $"cost {sylCost:0.0} move ({sylMove.x:0.0},{sylMove.z:0.0}) sprint {sylSprint} dash {sylDash} at ({sylPos.x:0.0},{sylPos.z:0.0})";
+        string SylvaraLine() => $"{(dJob == "revive" ? "revive " : "")}cost {sylCost:0.0} move ({sylMove.x:0.0},{sylMove.z:0.0}) sprint {sylSprint} dash {sylDash} at ({sylPos.x:0.0},{sylPos.z:0.0})";
 
         PlayerInput ReadSylvara(PlayerController me, SylvaraEncounter sy)
         {
@@ -1202,8 +1209,12 @@ namespace LastBell.Run
                 var bud = buds[slot % buds.Count];
                 home = bud + Sim.Flat(pos - bud).normalized * 1.8f; target = bud; reach = bud;
             }
+            // revives: the spot beside a downed ally is home instead (the steer still dodges, and holding still there
+            // channels the revive; no swings, which would pause it). Her bots never revived before (5 Nov sweep: 0 of 6)
+            bool reviving = ReviveSpot(me, pos, out var rspot);
+            if (reviving) { home = rspot; reach = null; dJob = "revive"; } else if (dJob == "revive") dJob = null;
             var flat = new Vector2(home.x, home.z); float lim = CombatWorld.PlayerBound - 1f;
-            if (flat.magnitude > lim) { flat = flat.normalized * lim; home = new Vector3(flat.x, 0, flat.y); }
+            if (!reviving && flat.magnitude > lim) { flat = flat.normalized * lim; home = new Vector3(flat.x, 0, flat.y); }   // (a revive spot is in bounds already: her square floor's corners are past this circle)
 
             if (tick % 3 == 1 || me.Dashing)
             {
@@ -1217,7 +1228,7 @@ namespace LastBell.Run
             // the non-attacking menu bots; the boss herself only when attacks are on
             bool atBud = reach.HasValue && Sim.Flat(target - pos).magnitude <= 3.2f;
             // (Tollbreaker plays its rotation: a held Twin Hurl lodges the axe, and lodged axes need a recall)
-            if (atBud || Attacks && Sim.Flat(target - pos).magnitude <= Range(me) + sy.BodyRadius + 2f)
+            if (!reviving && (atBud || Attacks && Sim.Flat(target - pos).magnitude <= Range(me) + sy.BodyRadius + 2f))
             {
                 if (me.Kit is TollbreakerKit) Attack(me, ref inp);
                 else inp.P0 = inp.H0 = tick % 6 == 0 || me.ClassName != "Arcanist";
