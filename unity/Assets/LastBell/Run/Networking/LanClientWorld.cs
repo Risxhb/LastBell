@@ -38,7 +38,7 @@ namespace LastBell.Run.Networking
                 if (i > 1) samples.RemoveRange(0, i - 1);   // keep one sample behind the pair in use
             }
         }
-        sealed class Actor { public PlayerController Player; public bool Down; public readonly Track Track = new Track(); public float ShownHeight; public Vector3 LastSnapshot; }
+        sealed class Actor { public PlayerController Player; public bool Down, Dead; public readonly Track Track = new Track(); public float ShownHeight; public Vector3 LastSnapshot; }
         const float TeleportDistance = 4f;
         readonly Dictionary<int, Actor> actors = new Dictionary<int, Actor>();
         readonly Track bossTrack = new Track();
@@ -139,10 +139,11 @@ namespace LastBell.Run.Networking
                 actor.Track.Add(hostTime, pos, state.Yaw, state.Height);
                 p.Presenter.Locomotion = elapsedTicks > 0 ? Vector3.Distance(actor.LastSnapshot, pos) / (elapsedTicks * Sim.Dt) : 0;
                 actor.LastSnapshot = pos;
-                p.ApplyNetworkState(state.Hp, state.MaxHp, state.Stamina, state.MaxStamina, state.Potions, state.Down);
+                p.ApplyNetworkState(state.Hp, state.MaxHp, state.Stamina, state.MaxStamina, state.Potions, state.Down, state.Dead, state.DownedTicks, state.ReviveProgress);
                 p.Kit.NetCooldowns = state.Cooldowns; p.Kit.NetSlotStates = state.SlotStates; p.Kit.NetClassState = state.ClassState;
                 p.Marks.Clear(); p.Marks.AddRange(state.Marks);
-                if (state.Down != actor.Down) { if (state.Down) p.Presenter.Down(); else p.Presenter.GetUp(); actor.Down = state.Down; }
+                if (state.Down != actor.Down) { if (state.Down) p.Presenter.Down(); else p.Presenter.GetUp(); actor.Down = state.Down; actor.Dead = false; }
+                if (state.Down && state.Dead && !actor.Dead) { p.Presenter.Death(); actor.Dead = true; }
                 p.Presenter.ApplyNetworkPose(state.Clip,state.ClipSpeed,state.Overlay,state.OverlaySpeed,state.Hidden);
                 p.Presenter.Tick(p);
             }
