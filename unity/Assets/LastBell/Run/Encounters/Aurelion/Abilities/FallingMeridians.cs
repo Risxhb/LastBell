@@ -33,7 +33,9 @@ namespace LastBell.Run
             echo = Hard;
         }
 
-        // one circle at each standing player's feet
+        // one circle at each standing player's feet. Not aimed at a player who is reviving an ally (revive rule, 4 Nov: "No
+        // mechanic aims at them"; Codex Hard review AUR-TARGET, 6 Nov). Not immunity: a reviver standing in someone
+        // else's circle is still hit.
         List<Hazard> Wave(string source)
         {
             var made = new List<Hazard>();
@@ -41,7 +43,7 @@ namespace LastBell.Run
             for (int i = 0; i < players.Count; i++)
             {
                 var p = players[i];
-                if (!p || p.Down) continue;
+                if (!p || p.Down || p.Reviving != null) continue;
                 var h = Spawn(new Hazard
                 {
                     Source = source, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Sim.Flat(p.transform.position),

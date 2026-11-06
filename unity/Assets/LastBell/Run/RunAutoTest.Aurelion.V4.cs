@@ -233,6 +233,32 @@ namespace LastBell.Run
                 if (lv == Difficulty.Hard) V2Check("Hard: Falling Meridians echo 0.6 s after the wave; standing still is hit by both", echoes == 1 && hits == 2, $"echoes {echoes}, hits {hits}");
                 else V2Check("Medium: no echo", echoes == 0 && hits == 1, $"echoes {echoes}, hits {hits}");
             }
+            // 2b. revivers (AUR-TARGET, 6 Nov): neither the wave nor the echo aims at a player who is reviving, but a reviver
+            // standing in another player's circle is still hit (no immunity). A is down, B kneels beside A, C stands 1.5 m past B.
+            yield return V2Setup(3, Difficulty.Hard, new[] { new Vector3(0, 0, 7f), new Vector3(1f, 0, 7f), new Vector3(2.5f, 0, 7f) }, 3, Vector3.zero);
+            if (V2Boss == null) yield break;
+            {
+                var a = V2Boss; a.DebugSetPhaseV4(3); a.Meridians.Reset(); a.TestExtras = true;
+                PlayerController dn = V2Party[0], rv = V2Party[1], other = V2Party[2];
+                rv.DebugSetHp(PlayerController.MaxHp); other.DebugSetHp(PlayerController.MaxHp);
+                dn.ForceDown("meridian revive test");
+                int h0 = V2HitsOn(rv, "Falling Meridians").Count(), e0 = a.Meridians.Echoes;
+                bool aimedAtReviver = false, alwaysReviving = true; int circles = 0; var seen = new HashSet<Hazard>();
+                int span = Sim.Ticks(FallingMeridians.EveryS) + Sim.Ticks(FallingMeridians.EchoS) + a.Meridians.Warn + 3;
+                for (int end = V2W.Tick + span; V2W.Tick < end;)   // by sim tick (a frame can hold several)
+                {
+                    dn.ReviveProgress = 0;   // hold the revive open so B channels for the whole window
+                    yield return null;
+                    foreach (var h in V2W.Hazards.Live)
+                        if (h.Source.StartsWith("Falling Meridians") && seen.Add(h))
+                        { circles++; if (rv.Reviving != dn) alwaysReviving = false; if (Sim.Flat(h.Origin - rv.transform.position).magnitude < 0.5f) aimedAtReviver = true; }   // B is mid-revive as each circle is aimed
+                }
+                int hits = V2HitsOn(rv, "Falling Meridians").Count() - h0, echoes = a.Meridians.Echoes - e0;
+                a.TestExtras = false;
+                V2Check("Hard: Falling Meridians (wave and echo) never aim at a reviver; the other standing player gets both",
+                    alwaysReviving && echoes == 1 && circles == 2 && !aimedAtReviver, $"reviving {alwaysReviving}, echoes {echoes}, circles {circles}, aimed at reviver {aimedAtReviver}");
+                V2Check("a reviver inside another player's circle is still hit (no immunity)", hits == 2, $"hits {hits}");
+            }
             // 3. Hour Hands on Hard: each spoke has a mirror at its hour + 6; standing off both lines is never hit
             yield return V2Setup(1, Difficulty.Hard, new[] { new Vector3(0, 0, 8f) }, 2, Vector3.zero);
             if (V2Boss == null) yield break;
