@@ -10,6 +10,7 @@ namespace LastBell.Run
     // so a crossing can be timed. Touching one: 30 damage and a 1.5 m knockback. Each lap is its own hazard instance, so a planet hits
     // a player at most once per lap (gpt/08 §2: once per hazard instance; it was once a second until 4 Nov, Codex review HIT-01).
     // The encounter calls Step every tick; the planet is a live Circle hazard whose origin moves, so bots dodge it.
+    // Hard (5 Nov, done as recommended, review later): one planet on the wide rim orbit over Phase 1 as well (Begin(true)).
     public sealed class ErrantPlanets : AurelionAbility
     {
         public override string Id => "aurelion.errant_planets";
@@ -32,14 +33,16 @@ namespace LastBell.Run
         public int Count => planets.Count;
         public Vector3 PlanetAt(int i) => planets[i].H.Origin;   // test evidence
 
-        public void Begin()
+        public void Begin(bool rimOnly = false)
         {
-            if (Live) return;
+            int want = rimOnly || Easy ? 1 : Orbits.Length;
+            if (Live && Count == want && (planets[0].Orbit == 2) == rimOnly) return;
+            if (Live) End();
             AurelionTimeline.Note("errant planets begin");
             Boss.PlayClipIfIdle("PlanetsRelease", Sim.Ticks(1.5f));
-            int n = Easy ? 1 : Orbits.Length;
-            for (int i = 0; i < n; i++)
+            for (int k = 0; k < want; k++)
             {
+                int i = rimOnly ? 2 : k;   // the rim orbit stays clear of the Phase 1 towers, rings and Collapse disc
                 var o = Orbits[i];
                 var p = new Planet { Orbit = i, Angle = o.start };
                 p.H = Lap(Pos(o, o.start));

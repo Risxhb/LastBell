@@ -124,7 +124,8 @@ namespace LastBell.Run
         {
             bool fighting = Planets != null && Meridians != null && W.CombatActive && !Dead && Current != "phase shift"
                 && (!TestHold || TestExtras) && !AurelionArgs.Known(AurelionArgs.Solo);
-            if (fighting && phase == 2 && !(Eclipse != null && Eclipse.Active)) { Planets.Begin(); Planets.Step(); }
+            bool rim = phase == 1 && W.Difficulty == Difficulty.Hard;   // Hard (5 Nov): one planet on the rim orbit over Phase 1 too
+            if (fighting && (phase == 2 || rim) && !(Eclipse != null && Eclipse.Active)) { Planets.Begin(rim); Planets.Step(); }
             else if (Planets != null && Planets.Live) Planets.End();
             if (fighting && phase == 3 && !(Sever != null && Sever.Active)) Meridians.Step();
             else if (Meridians != null) Meridians.Reset();
