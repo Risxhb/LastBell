@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace LastBell.Run
 {
-    // Bot allies (RunParty, menu "Allies"): a party of 4 (the most the game allows) spawns with the classes spread; the bots are passive (they move,
+    // Bot allies (RunParty, menu "Allies"): a full party of 4 spawns with the classes spread; the bots are passive (they move,
     // dodge and spread but never attack), so the boss keeps its solo HP and takes no damage from them.
     public sealed partial class RunAutoTest
     {
@@ -22,13 +22,13 @@ namespace LastBell.Run
             Check("allies: solo practice has one player", d.World.Players.Count == 1 && d.Allies.Count == 0);
             d.SetPaused(true); d.ReturnToMenu(); yield return null;
 
-            Check("allies: 3 selected, more clamps to 3", d.SelectAllies(7) && RunParty.Selected == 3);
+            Check("allies: 3 selected (the most)", d.SelectAllies(RunParty.MaxAllies) && RunParty.Selected == 3);
             d.StartPractice("Arcanist", 0);
             Check("allies: a party of 4 spawns", d.World.Players.Count == 4 && d.Allies.Count == 3, $"{d.World.Players.Count} players");
             var classes = d.World.Players.GroupBy(p => p.ClassName).ToDictionary(g => g.Key, g => g.Count());
             Check("allies: classes spread across all three (no class more than 2 of 4)", classes.Count == 3 && classes.Values.Max() <= 2,
                 string.Join(", ", classes.Select(kv => kv.Key + " " + kv.Value)));
-            Check("allies: the first allies are the classes the player didn't pick", d.Allies[0].ClassName == "Vanguard" && d.Allies[1].ClassName == "Chimesinger");
+            Check("allies: the first allies are the classes the player didn't pick", d.Allies[0].ClassName == "Tollbreaker" && d.Allies[1].ClassName == "Chimesinger");
             d.RequestReady();
             yield return Until(() => d.State == RunState.Combat, 4, "party practice combat");
             Check("allies: passive bots don't raise the boss's HP (only fighting players count)", d.Boss && d.Boss.MaxHp == soloHp, $"solo {soloHp}, party {d.Boss?.MaxHp}");

@@ -6,7 +6,7 @@
 
 Menu → **Preparation** (Ready) → **Dial Warden** → **Pendulum Sentinel** → **Chimebound Oracle** → **Intermission** (future-shop placeholder, Continue) → **The Bellkeeper** (three HP phases) → **Results** (victory or defeat, with death recap and damage meter) → **Retry Run** (fresh run at encounter 1) or **Main Menu**. There's also **Practice** for any single encounter, which never advances a run, and a **Pause** menu (Esc) with Resume / Restart / Main Menu.
 
-It runs on any of five maps (see [Maps](#maps)); the default is the key-art test map, `Assets/LastBell/Run/RunArena.unity`, a copy of `KeyArtTestArena.unity` with a `RunDirector`. Three classes are selectable: **Vanguard** (approved four-slot kit), **Chimesinger** (approved DPS kit) and **Arcanist** (approved hard rotation, #41; added Oct 21 from the Arcanist session's handover).
+It runs on any of five maps (see [Maps](#maps)); the default is the key-art test map, `Assets/LastBell/Run/RunArena.unity`, a copy of `KeyArtTestArena.unity` with a `RunDirector`. Three classes are selectable: **Tollbreaker** (the berserker axe thrower who replaced the Vanguard; the Vanguard was removed from the game on 1 Nov 2026), **Chimesinger** (approved DPS kit) and **Arcanist** (approved hard rotation, #41; added Oct 21 from the Arcanist session's handover).
 
 ## Maps
 
@@ -20,7 +20,7 @@ The menu has a **Map** row (or press **[** / **]**) to pick which arena to test.
 | **Verdant Chimes** (Area 3) | `Areas/Area3/VerdantChimes_Arena.unity` | `Run/Maps/Run_VerdantChimes.unity` |
 | **Shattered Hour** (Area 4, final arena) | `Areas/Area4/ShatteredHour_FinalArena.unity` | `Run/Maps/Run_ShatteredHour.unity` |
 
-- The list lives in `Run/RunMaps.cs`. **Last Bell → Run Loop → Rebuild Run Scenes (all maps)** copies each source scene, hides the look-check props (`ScaleReference_Vanguard`, `TelegraphCheck`, `TelegraphTest`), adds a `RunDirector` and puts all five in the build settings. A missing source scene is generated with its area builder first.
+- The list lives in `Run/RunMaps.cs`. **Last Bell → Run Loop → Rebuild Run Scenes (all maps)** copies each source scene, hides the look-check props (`ScaleReference_Tollbreaker`, `TelegraphCheck`, `TelegraphTest`), adds a `RunDirector` and puts all five in the build settings. A missing source scene is generated with its area builder first.
 - Start on a given map from the command line: `LastBell.exe -lastbellMap brass-foundry` (ids: `test`, `skyward-spire`, `brass-foundry`, `verdant-chimes`, `shattered-hour`). This works with `-lastbellAutotest` too.
 - The arena art is owned by the four area sessions (Areas 1-4). After one of them rebuilds its arena, rerun Rebuild Run Scenes.
 
@@ -47,8 +47,8 @@ The menu has a **Difficulty** row: **Easy**, **Medium** or **Hard** (or press **
 | --- | --- |
 | WASD | move (camera-relative) |
 | Mouse | aim; every ability fires toward the cursor |
-| LMB only (hold to repeat) | Basic: Steel Rhythm / Resonant Note |
-| 2, 3, 4 | Vanguard: Sundering Blow, Last Word, **hold** Brace. Chimesinger: Bellstrike, Harmonic Refrain, Crescendo. Arcanist: Time Seal, Arc Lance, Convergence |
+| LMB only (hold to repeat) | Basic: Twin Hurl (tap; hold 0.5 s to lodge) / Resonant Note / Magic Missile |
+| 2, 3, 4, 5 | Tollbreaker: Grinding Toll, Splitting Throw, Call of Iron, Bell Frenzy. Chimesinger: Bellstrike, Harmonic Refrain, Crescendo. Arcanist: Time Seal, Arc Lance, Convergence |
 | 5 | Chimesinger: Mending Chorus · Arcanist: Temporal Anchor (press again to return) |
 | RMB only | dash (Clockstep / Harmonic Step) |
 | Space / Shift | jump / sprint (shared movement stamina) |
@@ -81,13 +81,16 @@ Gamepads aren't read: the user's rudder pedals register as a controller. UI clic
 
 | Character | Model | Rig | Animation | VFX |
 | --- | --- | --- | --- | --- |
-| **Vanguard** | Rough production (Meshy multi-view, decimated to 40k tris) | Rough production (scripted armature, heat weights) | Rough production. **New tonight:** SteelRhythm1–3, SunderingBlow, LastWord, BraceRaise / Hold / Walk / Hit / Lower, Hit, Down, GetUp. No placeholders are needed in the run except Land | Rough production: slashes, Opening ring, Sundering split, Last Word windup / slam / shockwave, Brace disc |
-| **Chimesinger** | Rough production: the fixed export (grip, attached bell strands, tear fixes, follow-through on the coat, sleeves, bells and banners); see the asset manifest | Rough production | Approved-kit clips exist. **Placeholder:** Hit / Down / GetUp (procedural) until that session adds them | Rough production: note, bolt, bell mark with strength ring and echo pips, Refrain ripples, Crescendo burst, Chorus ring, note trail |
-| **Arcanist** | Rough production (Meshy body plus astrolabe, from the Arcanist session) | Rough production (robe cloth chains, astrolabe orbit bone) | Approved-kit clips from the Arcanist session. **Placeholder:** Hit / Down / GetUp | Rough production: bolt, seal dials (ripe ring and inscribed gem as shapes), Lance (normal and empowered), Convergence (early and perfect), Anchor marker / return / shield, Clockstep afterimage |
+| **Tollbreaker** | Rough production (Meshy, 2.0 m) | Rough production (scripted armature; arms accepted by Chzy18 on 1 Nov) | Rough production: Twin Hurl, Hurl Heavy, Catch, Grinding Toll, Splitting Throw, Call of Iron, Bell Frenzy, Dodge, Jump, Land, Hit, Down, GetUp | Rough production: thrown and lodged axes, Grinding Toll ring, Call of Iron line, Bell Frenzy |
+| **Chimesinger** | Rough production: the fixed export (grip, attached bell strands, tear fixes, follow-through on the coat, sleeves, bells and banners); see the asset manifest | Rough production | Approved-kit clips exist. Hit / Down / GetUp, and the revive clips (Downed, Revive, Death), since 4 Nov | Rough production: note, bolt, bell mark with strength ring and echo pips, Refrain ripples, Crescendo burst, Chorus ring, note trail |
+| **Arcanist** | Rough production (Meshy body plus astrolabe, from the Arcanist session) | Rough production (robe cloth chains, astrolabe orbit bone) | Approved-kit clips from the Arcanist session. Hit / Down / GetUp, and the revive clips (Downed, Revive, Death), since 4 Nov | Rough production: bolt, seal dials (ripe ring and inscribed gem as shapes), Lance (normal and empowered), Convergence (early and perfect), Anchor marker / return / shield, Clockstep afterimage |
 | **Bellkeeper** (= "Bellwarden") | Rough production (Meshy) | Rough production | Rough production. **New tonight:** PhaseShift, Defeat | Existing telegraphs and resolves; gold (non-danger) phase-shift and defeat bursts |
 | Minibosses ×3 | **Placeholder** (code-built) | none | none (scripted transforms) | shared telegraphs and resolves |
 
 ## Tests actually run (evidence in `run-loop-evidence/`, not committed)
+
+This is the 21 Oct record. The Vanguard checks below were removed with the class on 1–2 Nov; the Tollbreaker has its own suite (`-lastbellTollbreakerOnly`, 32 checks).
+
 
 - **Windows player build:** succeeded seven times tonight (0 errors). The packaged exe launched and ran the full autotest each time.
 - **Autotest in the packaged build, latest run (build 15, after removing the old test code): 107/107 passed, 0 errors logged.** Copy: [media/autotest-report-build15.txt](media/autotest-report-build15.txt). Arcanist coverage: Tick cap, Clockstep cancelling an unfinished Lance with Ticks kept, seal placement and charges, the empowered Lance inscribing the oldest seal, two separate seals on one target, both ripe together, a perfect Convergence (300) against an early one (30) resolving exactly once, Anchor record and return, the shield absorbing a hit, and a full Arcanist run to victory. Video: media/arcanist_rotation.mp4. Build 7 (84/84) is kept for the media. It covers:
@@ -113,7 +116,7 @@ Screens and videos: `run-loop-evidence/autotest-7/*.png` and `*.mp4` (vanguard_k
 
 ## Playtest feedback (PF, wiki, October 21) addressed in this branch
 
-- **PF-02** (key 4 froze the Vanguard): in the old test controller, key 4 was the superseded 1.85 s Guard pose. In the run, key 4 is **hold-to-Brace**: it's capped at 1.5 s, you can walk slowly, it lowers on release, and its exit after interruption, death and reset is tested.
+- **PF-02** (key 4 froze the Vanguard): retired with the Vanguard and Brace (29 Oct).
 - **PF-03** skill bar: bindings, cooldown fill and seconds, charges, Opening / Harmony / bell state, and a dash slot.
 - **PF-04** hover tooltips on every skill, including the dash.
 - **Skill-bar icons** (Codex, #43 / PR #45, merged into this branch): 18 icons covering every class ability, the class dashes and the potion. Each tile shows the keybind, the icon, and a state line (seconds, charges, potions); a cooldown darkens the tile from the top. Screenshot: [media/skill-bar-icons.png](media/skill-bar-icons.png).
@@ -142,14 +145,17 @@ Screens and videos: `run-loop-evidence/autotest-7/*.png` and `*.mp4` (vanguard_k
    - Temporal Anchor: 4 s return window, 30-point shield for 2 s, 12 s cooldown.
 
    **Measured schedule:** Seal A → three bolts → empowered Lance → Seal B took **1.52 s**, leaving a **0.48 s shared ripe window** for Convergence. That's feasible but tight. The perfect payoff is 300 damage against 30 for an early detonation. Both need playtesting.
-6. Vanguard damage values (Steel Rhythm 22/22/42, Sundering 70 (+60 empowered), Last Word 140 + 90 shockwave) and frame timings are prototype.
+6. Tollbreaker kit numbers are provisional (`docs/proposals/axe-thrower-replaces-vanguard-2026-10-29.md`).
 7. Mending Chorus and Temporal Anchor are on key **6**, because those classes have five actions plus a dash.
-8. Brace mitigates `Strike` hazards (cones, lanes, bars) and never `Ground` ones (rings, chime circles).
+8. Brace is retired. Hazards keep their `Strike` / `Ground` tags, which have no effect today.
+
+## Revives (4 Nov, built as recommended, review later)
+
+At 0 HP a player is **downed**: Down, then the Downed loop, with DOWN and the seconds left over them. An ally who stands still within 1.5 m for 3 s revives them with 40 HP (the reviver plays Revive; a hit on the reviver starts it over). After 20 s unrevived they are dead for the fight (Death). The party still loses when nobody stands, so solo is unchanged, and every fight starts with everyone up. Ally bots revive when nothing is landing on them and they have no job. Rules and open questions: `docs/proposals/revives-2026-11-04.md` in the workspace. Tests: the party suite (`-lastbellPartyOnly`).
 
 ## Known bugs and limits
 
-- The Chimesinger's Hit, Down and GetUp are procedural tilts.
-- The Down / GetUp silhouettes are rough. Land is the tail of Jump.
+- The reaction clips (Hit, Down, GetUp) and revive clips are rough first passes (4 Nov). The Chimesinger and Arcanist go down to their knees rather than flat, because the staff and robe cloth don't lie flat well. Only the Tollbreaker has a Land clip; the others land on the tail of Jump.
 - The camera follows closely, so the player can sit behind a tall boss for a moment.
 - The minibosses have no art and no animation.
 - There's no audio.
@@ -158,13 +164,12 @@ Screens and videos: `run-loop-evidence/autotest-7/*.png` and `*.mp4` (vanguard_k
 
 ## Next steps (highest priority first)
 
-1. **Human playtest** of this build: feel (PF-05), Brace (PF-02) and readability. Decide the Bellkeeper D1–D6. (PF-01 and the health policy were settled on Oct 21.)
-2. Add the Chimesinger's Hit / Down / GetUp clips. The fixed GLB is in.
+1. **Human playtest** of this build: feel (PF-05) and readability. Decide the Bellkeeper D1–D6. (PF-01 and the health policy were settled on Oct 21.)
+2. Playtest revives (`docs/proposals/revives-2026-11-04.md`, built as recommended on 4 Nov): 20 s bleed-out, 3 s revive within 1.5 m, 40 HP.
 3. Author the **three miniboss** models and schedules (encounter lane #8), replacing the stand-ins without changing the run flow.
 4. Tune boss HP and damage toward the design fight lengths, and run the escape checker on the miniboss schedules.
-5. An animation polish pass on the Vanguard ability clips (contact clearance, Down / GetUp), and Hit / Down / GetUp for the Arcanist and the Chimesinger.
 6. Move the shared run/hazard code behind the foundation #6 contract (U3) when it lands.
 
 ## Media
 
-Screenshots, videos and contact sheets from the gameplay camera are in [media/](media/): menu, Dial Warden combat, Low Pendulum JUMP warning, intermission, Bellkeeper Final Toll, victory and defeat results (with death recap and meter), Chimesinger full setup, plus vanguard_kit.mp4, chimesinger_rotation.mp4, low_pendulum_jump.mp4, bellkeeper_defeat.mp4.
+Screenshots, videos and contact sheets from the gameplay camera are in [media/](media/): menu, Dial Warden combat, Low Pendulum JUMP warning, intermission, Bellkeeper Final Toll, victory and defeat results (with death recap and meter), Chimesinger full setup, plus chimesinger_rotation.mp4, low_pendulum_jump.mp4, bellkeeper_defeat.mp4.

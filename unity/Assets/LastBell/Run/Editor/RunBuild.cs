@@ -24,7 +24,7 @@ namespace LastBell.Run.EditorTools
         }
 
         // Look-check props the area builders leave in their scenes; they don't belong in a fight.
-        static readonly string[] StripNames = { "ScaleReference_Vanguard", "TelegraphCheck", "TelegraphTest" };
+        static readonly string[] StripNames = { "ScaleReference_Tollbreaker", "TelegraphCheck", "TelegraphTest" };
 
         // Arena scenes that are generated rather than committed (Area 2 ignores its ~47 MB scene and meshes) are built first.
         static readonly System.Collections.Generic.Dictionary<string, System.Action> SourceBuilders = new System.Collections.Generic.Dictionary<string, System.Action>

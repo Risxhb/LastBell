@@ -19,11 +19,15 @@ namespace LastBell.Run
         {
             BellkeeperEncounter _ => new[] { BellkeeperEncounter.Phase1, BellkeeperEncounter.Phase2, BellkeeperEncounter.Phase3 },
             AurelionEncounter _ => new[] { "Perfect Order", "Misalignment", "Exposed Meridian", "Last Light" },
-            SylvaraEncounter _ => new[] { "Dormant Choir", "Awakening Bloom", "Hollow Refrain" },
+            SylvaraEncounter _ => SylvaraEncounter.PhaseNames,
             CrucivarEncounter _ => new[] { "Sealed Furnace", "Casting Heat", "Open Pressure" },
             TempoTyrantEncounter _ => new[] { "Haste", "Broken Cadence · Haste" },
             _ => new[] { "", "" },
         };
+
+        // the 4 main bosses only (Chzy18, 2 Nov); Risx's miniboss phase checks run with -lastbellPhaseMinibosses (review TEST-01)
+        static bool PhaseMinibosses => Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellPhaseMinibosses", StringComparison.OrdinalIgnoreCase));
+        static bool MainBoss(int e) => RunDirector.Bosses[e].Final || Campaign.IsAreaBoss(e);
 
         IEnumerator PracticePhaseChecks()
         {
@@ -31,13 +35,17 @@ namespace LastBell.Run
             yield return PhaseToMenu();
             // out-of-range picks clamp to the boss's phases (the menu never offers them; -lastbellPhase refuses them)
             int bk = Array.FindIndex(RunDirector.Bosses, b => b.Final);
-            Check("practice phase: a pick past the last phase clamps to it", d.StartPractice("Vanguard", bk, 99) && d.PracticePhase == RunDirector.Bosses[bk].Phases, $"phase {d.PracticePhase}");
+            Check("practice phase: a pick past the last phase clamps to it", d.StartPractice("Tollbreaker", bk, 99) && d.PracticePhase == RunDirector.Bosses[bk].Phases, $"phase {d.PracticePhase}");
             yield return PhaseToMenu();
-            Check("practice phase: a run always starts in phase 1", d.StartRun("Vanguard") && d.PracticePhase == 1);
+            Check("practice phase: a run always starts in phase 1", d.StartRun("Tollbreaker") && d.PracticePhase == 1);
             yield return PhaseToMenu();
             for (int e = 0; e < RunDirector.Bosses.Length; e++)
-                if (Tested(e)) for (int n = 1; n <= RunDirector.Bosses[e].Phases; n++)
+            {
+                if (RunDirector.Bosses[e].Name == RunDirector.TutorialName) continue;   // the tutorial is scripted (TutorialDirector): no phase row
+                if (!MainBoss(e) && !PhaseMinibosses) continue;
+                for (int n = 1; n <= RunDirector.Bosses[e].Phases; n++)
                     yield return PracticeAtPhase(e, n, n == RunDirector.Bosses[e].Phases);
+            }
             yield return PhaseToMenu();
         }
 
@@ -54,7 +62,7 @@ namespace LastBell.Run
             yield return PhaseToMenu();
             var entry = RunDirector.Bosses[e];
             string tag = $"{LastBell.Menu.TestRushSetup.CardName(e)} phase {n}";
-            Check($"{tag}: practice accepted", d.StartPractice("Vanguard", e, n));
+            Check($"{tag}: practice accepted", d.StartPractice("Tollbreaker", e, n));
             yield return Until(() => RunDirector.Instance && RunDirector.Instance.State == RunState.Ready && RunDirector.Instance.Encounter == e, 30, tag + " ready");
             if (RunDirector.Instance != d) { directorLog.AddRange(d.Log); d = RunDirector.Instance; d.InputOverride = bot; bot.Clear(); }
             if (d.Player) d.Player.Input = bot;   // a new scene built the player before the bot was attached

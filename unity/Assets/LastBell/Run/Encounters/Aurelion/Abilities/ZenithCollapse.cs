@@ -22,7 +22,7 @@ namespace LastBell.Run
         public const int Damage = 45;
 
         public static float SafeRadius(int n, int phase) => n <= 2 ? (phase >= 3 ? 5.0f : 4.5f) : n <= 4 ? 5.5f : 6.5f;
-        public int WindowTicks => Sim.Ticks(Hard ? HardWindowS : WindowS * WarnScale);
+        public int WindowTicks => Sim.Ticks(Hard ? HardWindowS : MediumV4 ? WindowS * MediumWindow : WindowS * WarnScale);   // v4 Medium 2.55 s (1 Nov)
         // ticks from Run's first tick to its resolve tick (= when Run returns)
         public int Duration() => WindowTicks - 1;
 
@@ -72,6 +72,8 @@ namespace LastBell.Run
 
         public static ZenithCollapseFx Create(CombatWorld world, Hazard hazard)
         {
+            // LAN: a host session records it; a client replays Create on its stand-in for the same hazard
+            if (!hazard.Replica) Networking.LanFx.Record?.Invoke(Networking.LanFxTarget.Replica, "ZenithCollapse", new object[] { hazard.Id });
             var go = new GameObject("Zenith Collapse fx"); go.transform.SetParent(world.Root, false);
             go.transform.position = new Vector3(hazard.Origin.x, 0.05f, hazard.Origin.z);
             var fx = go.AddComponent<ZenithCollapseFx>(); fx.w = world; fx.h = hazard; fx.mat = Prim.Material(Gold, 1f);
@@ -112,7 +114,7 @@ namespace LastBell.Run
         void Update()
         {
             float dt = Time.deltaTime;
-            bool live = w != null && w.Hazards.Live.Contains(h) && !h.Cancelled;
+            bool live = Hazard.IsLive(w, h);
             if (!live && fade < 0) fade = h.Age >= h.ResolveAt ? 1f : 0.4f;   // resolved: flash; cleared early: dim
             if (fade >= 0)
             {

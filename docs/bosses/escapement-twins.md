@@ -1,89 +1,107 @@
 # The Escapement Twins
 
-**The Two Who Agree.** A Brass Foundry miniboss: two 3.8 m clock towers on one tracked plinth, with a sun face on the right tower (his right, -X) and a moon face on the left (+X). Between them sits a large gold escape wheel on a rocker bridge. One boss and one health bar. The two towers are an escapement: they lock and release in turn, tick and tock. Their fight is about polarity (sun or moon), the escape wheel's teeth, pairs that must agree, and a line where everyone shares the hit.
+**Status: proposal** (November 3, 2026). Practice-only Brass Foundry miniboss with placeholder bodies. Replaces the October 28 design (still in git history). Sources read: `docs/design/content-rules.md`, the old Escapement Twins design, Chzy18's Aurelion v4 (Meridian Towers, Zenith Marks, Ecliptic Order), Crucivar v4 (Casting Order, punish windows) and Sylvara v3 (Two-Colour Choir), and the Pendulum Sentinel / Chimebound Oracle encounters. Code: `unity/Assets/LastBell/Run/Encounters/EscapementTwins/`.
 
-- **Status:** design and rig only. No encounter code yet. The rigged model with every clip below is `prototype/arena-3d/models/rigged/minibosses/EscapementTwins.glb` (kept out of Unity's Resources until the encounter exists).
-- **Body:** Chzy18's Meshy model (`Meshy_AI_Celestial_Clockwork_C`), rigged in Blender with `prototype/arena-3d/models/blender/escapement_twins_rig.py`.
-- **Numbers:** first-pass targets for Medium, out of 100 player HP. Easy and Hard scale boss damage by ×0.6 and ×1.3.
+## Identity
 
-## Rules this fight follows
+An escapement is the part of a clock that locks and releases the gear train in turn: tick, tock. The Twins are its two pallets made into guardians:
 
-- **No ability text.** Names only in the F7 overlay.
-- **Everything lands on the tick:** 100 BPM above 50%, 120 BPM below. The escape wheel steps one tooth each beat.
-- **No jumping and no dash required.** Every mechanic is survivable walking at 80% speed.
-- **No knockback.**
-- **Sun is warm gold, moon is pale silver,** on the towers, the floor and the player markers. Shapes back up the colours: rays for the sun, a crescent for the moon.
+- **Tick** (brass and gold, a sun face) and **Tock** (cobalt and silver, a moon face). Two 3.6 m clock towers that stand about 12 m apart on one axis through the arena centre.
+- **One health bar.** Hitting either twin damages the same bar. Neither can die alone.
+- **The fight is about their link:** the party splits between them, each half answering to its own twin, and whenever the escapement swaps, everyone crosses over. When they lock together in the middle, that's the opening to punish.
+- **Placeholder look for now:** primitive towers (a brass one and a cobalt one, each with a face sphere and a pallet arm), a gold escape wheel between them during the Escape Wheel, and brass or cobalt markers over players' heads. No model, final effects or audio yet.
 
-## The four mechanics
+Every warning uses the raid indicator look (`HazardSystem.RaidStyle`). No ability text reaches players: names show only in the F7 diagnostics overlay.
 
-### 1. Day and Night (polarity)
+## Numbers
 
-- **Tell:** both towers turn their faces outward; the sun face blazes and the moon face glows.
-- **The floor:** the arena is split through the plinth into a gold sun half and a silver moon half.
-- **The marks:** every player gets a sun or moon mark over their head. Co-op splits the marks evenly.
-- **The ticks:** on each of 4 ticks, 3 beats apart, anyone standing in the half that does **not** match their mark takes **50**.
-- **The swaps:** after each tick, every player's mark flips. Players cross to the other half every time.
-- **Below 50%:** the dividing line also turns 45° after every tick, so players walk around the plinth as well.
+Medium, out of 100 player HP. Easy and Hard scale boss damage by ×0.6 and ×1.3 (the shared rule), plus the per-level changes listed under Difficulty.
 
-### 2. Escape Wheel (rotating spokes, whole floor)
+- **HP:** 3000, one bar. Not party-scaled (bots don't attack by default).
+- **Tempo:** 100 BPM above 50 % (a beat is 0.6 s), 120 BPM below (0.5 s). Every hit lands on a beat.
+- **Escape check:** every warning gives at least `distance / 4.2 m/s + 0.3 s` reaction from the worst start, and the autotest checks it.
 
-- **Tell:** the rocker bridge locks and the central wheel spins up with a ratchet.
-- **The spokes:** 12 spokes (thin 15° wedges) from the plinth to the edge, alternately gold and silver.
-- **Tick and tock:** on tick the gold spokes fire, on tock the silver ones: **45**. Between them, the whole wheel steps one tooth (15°) clockwise.
-- **What you do:** stand in a gap (each is 15° wide) and step one tooth clockwise per beat.
-- **Per cast:** 8 beats.
-- **Below 50%:** the wheel reverses after beat 4, shown by the pawls flipping 1 beat before.
+## Abilities
 
-### 3. Vesica (paired soak)
+Four abilities, in this order above 50 %: **Pallet Lock → Escape Wheel → Counterpoise → Lock and Release**, then repeat. Between abilities the twins' axis turns 45° (they walk round the centre), so the split is never in the same place twice.
 
-- **Tell:** each tower lowers its face toward the floor; two circles appear, a sun circle and a moon circle.
-- **Placement:**
-  - Solo and pairs: the circles (4 m) overlap in a lens about 1.5 m wide.
-  - With 3+ players they are 10 m apart, with no overlap.
-- **The landing:** 5 beats later, each circle must hold at least one player, landing on the same tick.
-  - Solo: stand in the lens, which counts for both.
-  - Co-op: split. Damage is **60**, shared among everyone in each circle.
-- **Fail:** an empty circle means a **Disagreement**: everyone takes **55**, and the next Day and Night is cast at once.
-- **Below 50%:** two Vesicas, 4 beats apart, turned 90° from each other.
+### 1. Pallet Lock (the split). Ground.
 
-### 4. Agreement (line stack)
+- **Tell:** every player gets a brass or cobalt marker over their head. A dotted brass disc (4.5 m) appears under Tick and a dotted cobalt disc under Tock. Those discs are identity, not hazards.
+- **The lock:** 8 beats later (4.8 s), each twin locks: everything **outside its disc** is hit, but only for players wearing **its** colour. Brass players must be on Tick's disc, cobalt players on Tock's. **50**.
+- **The swap:** as the first lock lands, every marker flips. The second lock lands 6 beats later (3.6 s). Everyone crosses to the other twin; the two groups pass each other in the middle.
+- **Below 50 %:** three locks (two swaps). The first comes 9 beats after the tell (4.5 s at 120 BPM), the swaps 7 beats apart (3.5 s).
+- **Melee threat:** hugging the wrong twin is a hit. **Ranged threat:** nobody may stay farther than 4.5 m from a twin, so the whole outer ring is unsafe.
+- **Party:**
+  - 2 players: one brass, one cobalt. They swap sides each lock.
+  - 3 players: two brass, one cobalt. The pair crosses one way and the single player the other.
+  - 4 players: two and two.
+  - Solo: one brass marker that flips each lock, so the player walks between the twins.
+- **Warning:** the longest swap walk is 12.3 m (far edge of one disc to inside the other): 2.9 s plus 0.3 s reaction, so 3.6 s and 3.5 s pass. The first lock can find a player on the far side of the arena, 15.5 m away: 4.0 s, so 4.8 s and 4.5 s pass.
 
-- **Tell:** both faces turn to look at the same player; a gold and silver line joins the plinth and that player.
-- **The beam:** 4 beats later a beam 2.5 m wide fires along the line to the arena edge. **90 damage, shared** among everyone in it.
-- **Solo:** the beam does 60 to a single player and can't be avoided. Instead, the player drops a **Sync** circle by standing still for 1 beat during the countdown, which halves it.
-- **Co-op:** everyone stacks in the line with the target. Anyone who leaves makes it hurt more for those who stayed.
-- **Below 50%:** two targets, two beams, at least 60° apart. The group splits into two stacks.
+### 2. Escape Wheel (alternating fans). Strike.
 
-## Phases, rotation and enrage
+- **Tell:** a gold escape wheel spins up on the floor between them.
+- **The fans:** Tick fires a fan of six 20° spokes from its own body to the floor's edge, 60° apart. Then Tock fires its own fan of six. They alternate: **6 volleys** above 50 %, 8 below. Each volley is shown the moment the previous one lands (only one fan is on the floor at a time), 1.5 s warning (2.0 s for the first, 1.3 s below 50 %). **40** per spoke.
+- **Aim:** each volley's first spoke points at the player **farthest** from that twin, and the fan steps one tooth (15°) each time. The two fans come from two different points, so a gap safe from Tick is rarely safe from Tock.
+- **Melee threat:** the spokes start at the twin's body (point-blank is always inside). **Ranged threat:** they reach the edge and the first spoke aims at the farthest player.
+- **Party:** nothing to assign; the farthest player is aimed at, so whoever stays back keeps moving. With 3–4 players the farthest from Tick and the farthest from Tock are usually different people.
+- **Solo:** the same; the spokes aim at you.
+- **Warning:** the worst escape is from the middle of a spoke at the far edge, 19.7 m from the twin that fires it: 3.7 m to the side, 1.19 s with reaction. 1.5 s and 1.3 s pass.
 
-- **Above 50%:** Escape Wheel → Day and Night → Agreement → Vesica, then repeat.
-- **At 50%:** HP holds. The towers tilt apart, the rocker bridge stretches, the beat goes from 100 to 120 BPM, and they cast an Escape Wheel that reverses.
-- **Below 50% (combinations):**
-  - Day and Night with Escape Wheel: the spokes fire on the ticks.
-  - Double Vesica.
-  - Agreement into Day and Night: the beam fires and the marks are given out at once.
-  - Escape Wheel (reverse).
-- **No enrage** (content rules §5). Its other parts still need checking against those rules (phase change, Hard mechanic, soaks) before it is built.
-- **Max HP:** 3800 (one health bar for both towers).
+### 3. Counterpoise (paired soaks). Ground.
+
+- **Tell:** the twins raise their pallet arms. Two numbered soak circles (3 m) appear, one just outside each twin (4 m beyond it, away from the centre).
+- **The landing:** both land together 7 beats later (4.2 s; 8 beats, 4.0 s, below 50 %). Each circle deals **75**, shared by everyone inside it. Nobody in a circle **wipes the party** (the settled empty-soak rule). The numeral shows how many it wants.
+- **Party:**
+  - 2 players: I and I (one each).
+  - 3 players: II on Tick's side, I on Tock's.
+  - 4 players: II and II.
+  - Solo: a single circle between the twins, total **70**.
+  - One player alone in a circle takes 75 (98 on Hard) and survives from full HP.
+- **Below 50 %:** two sets back to back. The second set is on the perpendicular axis (the floor's sides, not the twins' sides, 8 m out), 7 beats (3.5 s) after the first lands, so the pairs have to run.
+- **Melee threat:** the circles are 4 m behind each twin, so melee walks round them. **Ranged threat:** the circles sit 10 m out; everyone must be in one.
+- **Warning:** the worst walk into a circle is 14 m (from the edge of the floor on the perpendicular axis): 3.6 s, so 4.2 s and 4.0 s pass. The second set below 50 % is at most 12.8 m from the first: 3.35 s needed, 3.5 s given.
+- **Order:** Pallet Lock always comes before Counterpoise, so the party has just practised going to its twin.
+
+### 4. Lock and Release (the punish window). Strike, then Ground.
+
+- **Tell:** both twins lean in toward each other. A 3 m lane joins them, and a ring (from 7 m out to the edge) is shown round the meeting point.
+- **Lock:** 4 beats later (2.4 s) they slam together in the middle. Anyone in the lane takes **60** (Strike). Two beats later the shock ring lands, everyone farther than 7 m from the middle takes **55** (Ground). So: step out of the lane, then come in.
+- **Punish window:** locked together for **3.5 s**. Nothing is live, and both bodies are in the middle, side by side.
+- **Release:** they spring apart on a new axis (turned 90°). Their landing circles (2.5 m, **45**) are shown 2 beats before they leap.
+- **Hard (named extra), Recoil:** the paths they spring along are also hit (two 2.5 m lanes from the middle to each landing, **45**).
+- **Melee threat:** the lane between them and the landing circles. **Ranged threat:** the shock ring.
+- **Party:** no assignment. Everyone uses the punish window.
+- **Solo:** the same.
+- **Warning:** leaving the 3 m lane takes 1.8 m (0.73 s); the ring then needs at most 6.7 m in 2 beats plus the lane's lead (2.4 s + 1.2 s overall, 1.9 s needed).
+
+## Phases
+
+- **50 % shift:** the current ability finishes, then a 2 s harmless transformation: the twins stand back to back and spin. HP holds (no heal, same bar) and they stay hittable. The tempo goes from 100 to 120 BPM.
+- **Below 50 %:** the order becomes **Lock and Release → Pallet Lock (3 locks) → Escape Wheel (8 volleys) → Counterpoise (two sets)**.
+- **No enrage** (content rules §5).
+- **At most two damaging patterns overlap** (the lane and its ring, or the two Counterpoise circles). Each is checked by the autotest.
 
 ## Difficulty
 
 | | Easy | Medium | Hard |
 |---|---|---|---|
-| Day and Night tick spacing | 4 beats | 3 beats | 2 beats |
-| Escape Wheel spokes | 8 | 12 | 12, gaps 12° |
-| Vesica lens (solo) | 2.2 m | 1.5 m | 1.1 m |
-| Agreement countdown | 5 beats | 4 beats | 3 beats |
+| Pallet Lock warning | +2 beats | first 8, swaps 6 (9 and 7 below 50 %) | same |
+| Escape Wheel volley warning | 2.0 s | 1.5 s (1.3 s below 50 %) | same |
+| Counterpoise warning | +2 beats | 7 beats (8 below 50 %) | same |
+| Lock and Release | lane +1 beat | 4 beats | **Recoil** lanes |
+| Damage | ×0.6 | ×1 | ×1.3 |
 
-## Rig clips
+## Ally bots and tests
 
-The two towers lean and turn on their own bones; the escape wheel, the rocker arms and the track wheels spin.
+The mechanics are built from the shared hazard rules the ally bots already read. Pallet Lock rings only hit their own colour (`Hazard.Affects`), so bots step inside their own disc. Counterpoise circles are generic soaks (`Hazard.Soak`, `ShareCount`, `ShareTotal`, `WipeIfEmpty`), which bots fill nearest-first. The rest are ordinary shapes to dodge.
 
-| Clip | Use |
-|---|---|
-| Idle, Walk | Walk rolls the tracks |
-| FacesOut, PolarityLoop | Day and Night: faces turned outward, alternate towers bowing on the tick |
-| WheelSpin, WheelLoop, WheelReverse | Escape Wheel |
-| FacesDown, VesicaLoop | Vesica: both towers bowed toward the floor |
-| AgreeAim, AgreeFire | Agreement: both towers turn to one point, then recoil |
-| PhaseShift, Defeat | |
+`-escapementTwinsTest -lastbellOut <dir>` runs the fight with Perfect bots at party sizes 2 and 4. It checks that each ability fires and resolves, that the escape timing holds and the 50 % shift happens, and that nothing is left on the floor or thrown as an exception.
+
+## Open questions
+
+1. **Shared bar, two bodies:** should damage to the twins need to stay balanced (an "out of step" penalty)? It is not built: the content rules say not to add new mechanics nobody asked for.
+2. **Tock's body:** Tock is a damageable boss part. Players walk through it; only Tick blocks movement. Should Tock block too? That needs a small change to the shared `CombatWorld.Constrain`.
+3. **Run and LAN:** it is practice only (`inRun: false`) and not in the LAN lobby list. Should it join the Brass Foundry run pool once Crucivar's area has its minibosses?
+4. **Model:** the old Meshy model and rig (`prototype/arena-3d/models/rigged/minibosses/EscapementTwins.glb`) is one body. This design needs two separate towers, so the model should be split into two.
