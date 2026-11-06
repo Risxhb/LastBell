@@ -105,11 +105,11 @@ namespace LastBell.Run.Shop
             d = RunDirector.Instance; d.InputOverride = bot;
             Check("shop is on for this suite", RunShopFlow.Enabled);
             // accepted icons (29 Oct): all but three items, which wait for a redraw and stay text-only
-            // accepted icons (29 and 31 Oct; the Tollbreaker's 20 on 1 Nov): every item has one
+            // accepted icons (29 and 31 Oct; the Tollbreaker's 20 on 1 Nov), Toll items' 10 on 5 Nov: every item has one
             bool IconOk(ItemDef i) => RunShopFlow.ItemIcon(i, true) != null && RunShopFlow.ItemIcon(i, false) != null;
             var core = ItemCatalog.All.Where(i => i.MinToll == 0).ToList(); var toll = ItemCatalog.All.Where(i => i.MinToll > 0).ToList();
             Check("all 69 item icons load (64 and 128)", core.All(IconOk), $"{core.Count(IconOk)}");
-            Note($"Toll item icons drawn so far: {toll.Count(IconOk)} of {toll.Count} (cards show text only until they land)");
+            Check("all 10 Toll item icons load (64 and 128)", toll.All(IconOk), $"{toll.Count(IconOk)} of {toll.Count}");
             Check("no Vanguard items are left", !ItemCatalog.All.Any(i => i.Class == "Vanguard" || i.Id.StartsWith("v.")));
             Check("the pool has 69 items: 20 Tollbreaker, 19 Chimesinger, 20 Arcanist, 10 general; none held", core.Count == 69 && core.Count(i => i.General) == 10 && RunDirector.Classes.All(c => core.Count(i => i.Class == c) == (c == "Chimesinger" ? 19 : 20)) && !ItemCatalog.All.Any(i => i.Held) && !ItemCatalog.All.Any(i => i.Id == "c.twin_bells"));
             Check("10 Toll items: 5 at Toll IV, 5 at Toll VII; 2 per class and 4 general",
