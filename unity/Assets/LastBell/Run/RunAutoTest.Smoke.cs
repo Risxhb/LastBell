@@ -7,7 +7,7 @@ namespace LastBell.Run
 {
     // Quick smoke run (Chzy18, 2026-11-01: test less): about 5 minutes, for routine checks while building. The full
     // autotest stays the one check before a push. It covers: the menus answer, every boss on the practice list starts and
-    // fights about 20 s (each class takes a turn; the first fight is solo, the rest have a full party of 4 whose bots do the
+    // fights about 20 s (only the four main bosses unless -lastbellMinibosses; each class takes a turn; the first fight is solo, the rest have a full party of 4 whose bots do the
     // mechanics, since a lone bot can't soak), the Start Phase picker, a
     // potion, and no errors logged.
     //   LastBell.exe -lastbellAutotest -lastbellSmokeOnly -lastbellOut <dir>
@@ -15,6 +15,10 @@ namespace LastBell.Run
     {
         static bool SmokeOnly => Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellSmokeOnly", StringComparison.OrdinalIgnoreCase));
         const float SmokeFightSeconds = 20f;
+        // Only the four main bosses are tested by default (Chzy18, 2 Nov): Bellkeeper, Aurelion, Sylvara and Crucivar. The
+        // miniboss fights in the smoke run and the phase row stay in the code for Risx, behind -lastbellMinibosses.
+        static bool WithMinibosses => Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellMinibosses", StringComparison.OrdinalIgnoreCase));
+        static bool Tested(int e) => RunDirector.Bosses[e].InRun || WithMinibosses;
 
         IEnumerator SmokeChecks()
         {
@@ -29,11 +33,13 @@ namespace LastBell.Run
             Check("smoke: allies back to solo", d.SelectAllies(0) && RunParty.Selected == 0);
             Check("smoke: every boss has a Boss Rush card name", Enumerable.Range(0, RunDirector.Bosses.Length).All(e => !string.IsNullOrEmpty(LastBell.Menu.TestRushSetup.CardName(e))));
             Check("smoke: skill-bar and potion icons load", RunDirector.Classes.All(c => RunHud.SlotIcon(c, 0) != null) && RunHud.Icon("potion") != null);
+            Note("smoke: shader warm-up: " + ShaderWarmUp.Status);
+            Check("smoke: the shader warm-up loads or is absent, never broken", !ShaderWarmUp.Status.StartsWith("could not"), ShaderWarmUp.Status);
             yield return Shot("smoke_menu");
 
-            // every boss: start, fight ~20 s with the bot, check it took damage (the potion check rides on the solo first fight)
+            // every main boss: start, fight ~20 s with the bot, check it took damage (the potion check rides on the solo first fight)
             for (int e = 0; e < RunDirector.Bosses.Length; e++)
-                yield return SmokeFight(e, RunDirector.Classes[e % RunDirector.Classes.Length], allies: e == 0 ? 0 : RunParty.MaxAllies, potion: e == 0);
+                if (Tested(e)) yield return SmokeFight(e, RunDirector.Classes[e % RunDirector.Classes.Length], allies: e == 0 ? 0 : RunParty.MaxAllies, potion: e == 0);
 
             // Start Phase picker: the final boss's last phase (with a retry) and one area boss's last phase
             int bk = Array.FindIndex(RunDirector.Bosses, b => b.Final);
@@ -49,11 +55,14 @@ namespace LastBell.Run
         {
             yield return PhaseToMenu();
             string tag = "smoke: " + LastBell.Menu.TestRushSetup.CardName(e);
+            int warmed = -1; Action<RunDirector, int> onWarm = (_, enc) => warmed = enc; RunDirector.ReadyWarmUp += onWarm;
             d.SelectAllies(allies);
             Check($"{tag}: practice accepted ({cls}{(allies > 0 ? $", {allies} allies" : "")})", d.StartPractice(cls, e));
             yield return Until(() => RunDirector.Instance && RunDirector.Instance.State == RunState.Ready && RunDirector.Instance.Encounter == e, 30, tag + " ready");
             if (RunDirector.Instance != d) { directorLog.AddRange(d.Log); d = RunDirector.Instance; d.InputOverride = bot; bot.Clear(); }
             if (d.Player) d.Player.Input = bot;   // a new scene built the player before the bot was attached
+            RunDirector.ReadyWarmUp -= onWarm;
+            Check($"{tag}: the Ready screen runs the encounter warm-up", warmed == e, $"warmed {warmed}");
             if (allies > 0) Check($"{tag}: a party of {allies + 1} spawns", d.World.Players.Count == allies + 1 && d.Allies.Count == allies, $"{d.World.Players.Count} players");
             d.RequestReady();
             yield return Until(() => d.State == RunState.Combat && d.Boss, 8, tag + " combat");
