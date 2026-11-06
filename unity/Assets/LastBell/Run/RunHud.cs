@@ -335,7 +335,7 @@ namespace LastBell.Run
                 if (ShowMechanicGallery) MechanicGallery();
                 switch (d.State)
                 {
-                    case RunState.Ready: if (!LanClientView) ReadyCard(); break;
+                    case RunState.Ready: WarmReviveRings(); if (!LanClientView) ReadyCard(); break;
                     case RunState.Intro: if (d.Boss != null) IntroCard(); break;
                     case RunState.Cleared: ClearedCard(); break;
                     case RunState.Downed: DownedCard(); break;
@@ -1323,6 +1323,12 @@ namespace LastBell.Run
         // (clockwise from the top; the art itself is a half-filled still, so it is never stretched as a timer)
         const int ReviveSteps = 30;
         static Texture2D[] reviveRings;
+        // all the steps built on the Ready screen (party fights), so the first revive in combat builds nothing (review PERF-01)
+        void WarmReviveRings()
+        {
+            if (reviveRings != null && reviveRings[ReviveSteps] || d.World == null || d.World.Players.Count < 2) return;
+            for (int k = 0; k <= ReviveSteps; k++) ReviveRing(k / (float)ReviveSteps);
+        }
         static Texture2D ReviveRing(float progress)
         {
             reviveRings ??= new Texture2D[ReviveSteps + 1];

@@ -14,7 +14,8 @@ namespace LastBell.Run.Networking
         {
             public int Id, Hp, MaxHp, Potions; public float X, Y, Z, Yaw, Height, Stamina, MaxStamina;
             public int AckInput = -1; public float MoveScale = 1;   // newest input the host applied; walk-speed factor now (0 = stunned, dashing or rooted)
-            public bool Down, Hidden; public string ClassState = "", Clip = "", Overlay = ""; public float ClipSpeed = 1, OverlaySpeed = 1; public readonly float[] Cooldowns = new float[Slots]; public readonly string[] SlotStates = new string[Slots];
+            public bool Down, Dead, Hidden; public int DownedTicks; public float ReviveProgress;   // revives: bled out, ticks since the fall, channel 0..1
+            public string ClassState = "", Clip = "", Overlay = ""; public float ClipSpeed = 1, OverlaySpeed = 1; public readonly float[] Cooldowns = new float[Slots]; public readonly string[] SlotStates = new string[Slots];
             public readonly List<string> Marks = new List<string>();
         }
         public sealed class BossState
@@ -100,7 +101,7 @@ namespace LastBell.Run.Networking
                 foreach (var p in Players)
                 {
                     Need(p != null && p.Id >= 0 && p.Id < LanLobby.Capacity && ids.Add(p.Id) && p.MaxHp > 0 && p.Hp >= 0 && p.Hp <= p.MaxHp && p.Potions >= 0 && p.Marks.Count <= MaxMarks);
-                    w.Write(p.Id); Floats(w, p.X, p.Y, p.Z, p.Yaw, p.Height, p.Stamina, p.MaxStamina); w.Write(p.Hp); w.Write(p.MaxHp); w.Write(p.Potions); w.Write(p.Down); Text(w, p.ClassState); Text(w, p.Clip); Text(w, p.Overlay); Floats(w, p.ClipSpeed, p.OverlaySpeed); w.Write(p.Hidden); Need(p.AckInput >= -1 && p.MoveScale >= 0 && p.MoveScale <= 4); w.Write(p.AckInput); Floats(w, p.MoveScale);
+                    w.Write(p.Id); Floats(w, p.X, p.Y, p.Z, p.Yaw, p.Height, p.Stamina, p.MaxStamina); w.Write(p.Hp); w.Write(p.MaxHp); w.Write(p.Potions); w.Write(p.Down); Need(p.DownedTicks >= 0 && p.ReviveProgress >= 0 && p.ReviveProgress <= 1); w.Write(p.Dead); w.Write(p.DownedTicks); Floats(w, p.ReviveProgress); Text(w, p.ClassState); Text(w, p.Clip); Text(w, p.Overlay); Floats(w, p.ClipSpeed, p.OverlaySpeed); w.Write(p.Hidden); Need(p.AckInput >= -1 && p.MoveScale >= 0 && p.MoveScale <= 4); w.Write(p.AckInput); Floats(w, p.MoveScale);
                     foreach (var cooldown in p.Cooldowns) { Need(cooldown >= 0 && cooldown <= 1 && Finite(cooldown)); w.Write(cooldown); }
                     foreach (var slotState in p.SlotStates) Text(w, slotState);
                     w.Write(p.Marks.Count); foreach (string mark in p.Marks) Text(w, mark);
@@ -195,7 +196,7 @@ namespace LastBell.Run.Networking
                     int count = r.ReadInt32(); Need(count >= 1 && count <= LanLobby.Capacity); var ids = new HashSet<int>();
                     for (int i = 0; i < count; i++)
                     {
-                        var p = new Player { Id = r.ReadInt32(), X = Float(r), Y = Float(r), Z = Float(r), Yaw = Float(r), Height = Float(r), Stamina = Float(r), MaxStamina = Float(r), Hp = r.ReadInt32(), MaxHp = r.ReadInt32(), Potions = r.ReadInt32(), Down = r.ReadBoolean(), ClassState = Text(r), Clip = Text(r), Overlay = Text(r), ClipSpeed = Float(r), OverlaySpeed = Float(r), Hidden = r.ReadBoolean(), AckInput = r.ReadInt32(), MoveScale = Float(r) };
+                        var p = new Player { Id = r.ReadInt32(), X = Float(r), Y = Float(r), Z = Float(r), Yaw = Float(r), Height = Float(r), Stamina = Float(r), MaxStamina = Float(r), Hp = r.ReadInt32(), MaxHp = r.ReadInt32(), Potions = r.ReadInt32(), Down = r.ReadBoolean(), Dead = r.ReadBoolean(), DownedTicks = r.ReadInt32(), ReviveProgress = Float(r), ClassState = Text(r), Clip = Text(r), Overlay = Text(r), ClipSpeed = Float(r), OverlaySpeed = Float(r), Hidden = r.ReadBoolean(), AckInput = r.ReadInt32(), MoveScale = Float(r) };
                         Need(p.AckInput >= -1 && p.MoveScale >= 0 && p.MoveScale <= 4 && p.Id >= 0 && p.Id < LanLobby.Capacity && ids.Add(p.Id) && p.MaxHp > 0 && p.Hp >= 0 && p.Hp <= p.MaxHp && p.Potions >= 0);
                         for (int j = 0; j < Slots; j++) { p.Cooldowns[j] = Float(r); Need(p.Cooldowns[j] >= 0 && p.Cooldowns[j] <= 1); }
                         for (int j = 0; j < Slots; j++) p.SlotStates[j] = Text(r);

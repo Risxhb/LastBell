@@ -12,7 +12,13 @@ namespace LastBell.Run
         public static float[] UltHpScale =         { 0.8f,  0.9f,  1f };   // the bar, after the party fit
         public static float[] UltTimerScale =      { 1.2f,  1.1f,  1f };   // push timers
         public static float[] UltStandSeconds =    { 12f,   11f,   10f };  // P5's Last Stand before the bell falls
-        public static float[] UltWarnLead =        { 0.3f,  0f,    0f };   // lethal warnings show this much earlier; the hit lands when it always did
+        public static float[] UltWarnLead =        { 0.3f,  0.15f, 0f };   // lethal warnings show this much earlier; the hit lands when it always did (Medium 0.15 s since 5 Nov)
+
+        // what there is to dodge (Chzy18 5 Nov, gpt/08: difficulty changes the dodging, not just damage); Hard is the fight as built
+        public static float[] UltArmEvery =        { 1.05f, 0.9f,  0.75f };   // P3 Mainspring: seconds between spiral shots
+        public static float[] UltCurtainGap =      { 1.6f,  1.4f,  1.2f  };   // P3 Bell Curtain: half-width of each numbered gap (m)
+        public static bool[] UltDoubleSlam =       { false, false, true  };   // P4: every third hammer also hits a second gear
+        public static bool[] UltEchoRing =         { false, false, true  };   // P5 tolls X-XII: a second sound ring 0.8 s behind
 
         static int Lv(Difficulty d) => Mathf.Clamp((int)d, 0, 2);
         // the run-loop checks' idle sparring target (TestIdle) keeps the run-wide scale their exact-damage probes expect
@@ -20,6 +26,10 @@ namespace LastBell.Run
         float UltHpFor(Difficulty d) => UltHpScale[Lv(d)];
         float UltTimerFor(Difficulty d) => UltTimerScale[Lv(d)];
         public float UltStandFor => UltStandSeconds[Lv(W.Difficulty)];
+        public float UltArmEveryFor => UltArmEvery[Lv(W.Difficulty)];
+        public float UltCurtainGapFor => UltCurtainGap[Lv(W.Difficulty)];
+        public bool UltDoubleSlamFor => UltDoubleSlam[Lv(W.Difficulty)];
+        public bool UltEchoRingFor => UltEchoRing[Lv(W.Difficulty)];
         public float UltWarnLeadFor => UltWarnLead[Lv(W.Difficulty)];
     }
 }

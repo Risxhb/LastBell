@@ -116,6 +116,7 @@ namespace LastBell.Run
         public int DownedTicks { get; private set; }
         public float ReviveProgress { get; internal set; }       // 0..1 while allies channel on this downed player
         public PlayerController Reviving { get; internal set; }  // the downed ally this player is channelling on (this tick)
+        internal PlayerController WasReviving;                    // ...and last tick (CombatWorld.StepRevives)
         public int Revives { get; private set; }                  // times revived this fight
         public int LastHurtTick { get; private set; } = -999;
         // still, free and unhurt: standing next to a downed ally like this channels the revive
@@ -187,10 +188,11 @@ namespace LastBell.Run
         }
 
         // LAN client replica only: show the host's values (this copy never runs Step).
-        public void ApplyNetworkState(int hp, int maxHp, float stamina, float maxStamina, int potions, bool down)
+        public void ApplyNetworkState(int hp, int maxHp, float stamina, float maxStamina, int potions, bool down, bool dead, int downedTicks, float reviveProgress)
         {
             netMaxHp = Mathf.Max(1, maxHp); netMaxStamina = Mathf.Max(1, maxStamina);
             Hp = Mathf.Max(0, hp); Stamina = Mathf.Max(0, stamina); Potions = Mathf.Max(0, potions); Down = down;
+            Dead = down && dead; DownedTicks = down ? Mathf.Max(0, downedTicks) : 0; ReviveProgress = down ? Mathf.Clamp01(reviveProgress) : 0;
         }
 
         // dev / test hook only
