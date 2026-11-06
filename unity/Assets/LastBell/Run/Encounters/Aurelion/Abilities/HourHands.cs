@@ -12,6 +12,9 @@ namespace LastBell.Run
     // hit once. Solo: spoke II spawns on spoke I's lock tick and tracks your new hour. Run returns on the tick the last
     // spoke resolves. The phase plan only calls it on Hard (practice fires it on any level; Easy stretches it by 1.25).
     // Look: thin gold while it tracks, coral/amber with the lock flash when it locks.
+    // Hard (5 Nov, done as recommended, review later): every spoke has a mirror, the opposite hand (its hour + 6), tracking and
+    // resolving with it. Mirrors that land on an hour already struck are withdrawn on the lock, like shared hours, so each
+    // player is still hit at most once per hour; with 4 players at most 8 of the 12 hours strike, so a gap always stays.
     public sealed class HourHands : AurelionAbility
     {
         public override string Id => "aurelion.hour_hands";
@@ -43,16 +46,17 @@ namespace LastBell.Run
             {
                 var p = party.FirstOrDefault();
                 if (p == null) yield break;
-                Spoke(p, "I");
+                Spoke(p, "I"); if (Hard) Spoke(p, "I", true);
                 yield return LockTicks - 1;              // spoke I locks during this tick's hazard step
                 Say(Name);
                 var who = Standing().FirstOrDefault() ?? p;
-                Spoke(who, "II");
+                Spoke(who, "II"); if (Hard) Spoke(who, "II", true);
                 yield return ResolveTicks - 1;           // spoke II resolves this tick
                 yield break;
             }
 
             var spokes = party.Select(pl => Spoke(pl, null)).ToList();
+            if (Hard) spokes.AddRange(party.Select(pl => Spoke(pl, null, true)).ToList());   // mirrors after every own spoke: a shared hour keeps the own one
             yield return LockTicks;                      // every spoke locked on the previous tick: its hour is final
             Say(Name);
             // one spoke per hour: players sharing an hour share the first spoke on it
@@ -61,14 +65,14 @@ namespace LastBell.Run
             yield return ResolveTicks - 1 - LockTicks;   // the spokes resolve this tick
         }
 
-        Hazard Spoke(PlayerController target, string tag)
+        Hazard Spoke(PlayerController target, string tag, bool mirror = false)
         {
-            var from = BossPos;
+            var from = BossPos; float turn = mirror ? 180f : 0f;
             var h = new Hazard
             {
-                Source = tag == null ? Name : Name + " " + tag,
+                Source = (tag == null ? Name : Name + " " + tag) + (mirror ? " mirror" : ""),
                 Shape = HazardShape.Lane, Kind = HazardKind.Strike,
-                Origin = from, Yaw = HourOf(from, target.transform.position, Body.eulerAngles.y),
+                Origin = from, Yaw = Mathf.Repeat(HourOf(from, target.transform.position, Body.eulerAngles.y) + turn, 360f),
                 Length = Length, Width = Width,
                 LockAt = LockTicks, ResolveAt = ResolveTicks,
                 Damage = Damage, Knockback = 1.5f, Stun = Sim.Ticks(0.25f),
@@ -76,7 +80,7 @@ namespace LastBell.Run
             h.Track = x =>
             {
                 x.Origin = BossPos;
-                if (target && !target.Down) x.Yaw = HourOf(x.Origin, target.transform.position, x.Yaw);
+                if (target && !target.Down) x.Yaw = Mathf.Repeat(HourOf(x.Origin, target.transform.position, x.Yaw - turn) + turn, 360f);
             };
             // Telegraph style: the standard coral spoke from the start (a thin gold line would read as a friendly effect);
             // the shared lock flash marks the lock
