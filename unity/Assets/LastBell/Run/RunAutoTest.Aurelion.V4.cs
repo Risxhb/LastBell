@@ -26,6 +26,7 @@ namespace LastBell.Run
             if (V2Wants("aurelion.severance")) yield return V2Section("v4 Severance", V4Severance());
             if (V2Wants("aurelion.meridian_recall")) yield return V2Section("v4 Meridian Recall (Hard)", V4Recall());
             if (V2Wants("aurelion.v4_hard")) yield return V2Section("v4 Hard additions (5 Nov)", V4HardExtras());
+            if (AurelionAbilityFilter != null && AurelionAbilityFilter.Equals("aurelion.v4_seeds", StringComparison.OrdinalIgnoreCase)) yield return V2Section("v4 perfect route seed sweep", V4PerfectSeeds());
             if (V2Wants("aurelion.last_light")) yield return V2Section("v4 Last Light and the enrage", V4LastLight());
             if (V2Wants("aurelion.v4_fight")) yield return V2Section("v4 fight", V4Fight());
             if (V2Wants("aurelion.v4_dps")) yield return V2Section("v4 damage per second (boss HP tuning)", V4Dps());
@@ -163,6 +164,44 @@ namespace LastBell.Run
 
             // the solo loop: a volley, then its replay
             V2Check("the F6 / -lastbellAbility loop knows aurelion.meridian_recall", AurelionArgs.Known("aurelion.meridian_recall"));
+        }
+
+        // diagnosis only (-lastbellAbilityTest aurelion.v4_seeds [-lastbellSeeds N]): the Hard perfect route over Phases 1-3 with the
+        // Collapse spot drawn from seeds 1..N, one line each
+        public const int PerfectSeed = 4;   // a seed the Hard perfect route clears with no hit in the sweep
+        IEnumerator V4PerfectSeeds()
+        {
+            int n = int.TryParse(AurelionArgs.Arg("-lastbellSeeds") ?? "10", out int sn) ? sn : 10;
+            int fails = 0;
+            for (int seed = 1; seed <= n; seed++)
+            {
+                yield return V2Setup(1, Difficulty.Hard, new[] { new Vector3(0, 0, 9f) }, 1, Vector3.zero);
+                if (V2Boss == null) yield break;
+                UnityEngine.Random.InitState(seed);
+                V2Main.RefreshHealth(true); V2Boss.DebugResetFight();
+                V3Bot(V2Main, BotMode.Perfect);
+                var detail = new List<string>();
+                Action<PlayerController, Hazard, int> onHit = (p, h, dmg) =>
+                {
+                    if (p != V2Main || h.BurnPerSecond > 0) return;
+                    string blk = V2Boss.BlockLog.Count > 0 ? V2Boss.BlockLog[V2Boss.BlockLog.Count - 1].block : "?";
+                    detail.Add($"{h.Source} {dmg} in [{blk}] hp {p.Hp} @t{V2W.Tick} | {(p.Input as AllyBot)?.DebugLine}");
+                };
+                V2W.PlayerHit += onHit;
+                for (int ph = 1; ph <= 3 && !V2Main.Down && !V4Wiped; ph++)
+                {
+                    V2Boss.DebugSetPhase(ph);
+                    V2Begin(V2Boss.TestPhasePlan(ph));
+                    yield return Until(() => V2Boss == null || !V2Boss.TestBusy || V2Main.Down || d.State != RunState.Combat, 240, $"seed {seed} phase {ph}");
+                    V2Boss?.ClearPhasePools();
+                }
+                V2W.PlayerHit -= onHit;
+                bool down = V2Main.Down || V4Wiped; if (down) fails++;
+                Note($"seed {seed}: down {down}, potions {V2Main.PotionsDrunk}, hits {detail.Count}");
+                foreach (var x in detail) Note($"   seed {seed} hit: {x}");
+                V3Unbot();
+            }
+            Note($"seed sweep: {fails} of {n} perfect routes went down");
         }
 
         // ================================================================ Hard additions (5 Nov): more to dodge, Medium unchanged
@@ -447,6 +486,10 @@ namespace LastBell.Run
                 if (V2Boss == null) yield break;
                 V2Main.RefreshHealth(true);   // V2Setup restores HP, not potions
                 V2Boss.DebugResetFight();
+                // a fixed Collapse spot sequence (6 Nov): the spot is drawn from UnityEngine.Random, whose state earlier frame-timed
+                // effects change from run to run, and the perfect bot goes down on 2 of 12 seeds on Hard (Phase 3 rim chains:
+                // Lances stun, then its own Hour Hands spoke; -lastbellAbilityTest aurelion.v4_seeds). The check is the route, not the draw.
+                UnityEngine.Random.InitState(PerfectSeed);
                 int recallLog0 = V2Boss.BlockLog.Count;
                 V3Bot(V2Main, BotMode.Perfect);
                 var detail = new List<string>();
