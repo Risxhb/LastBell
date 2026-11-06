@@ -44,7 +44,7 @@ Try it in the demo: `demo/sylvara-v3-demos.html`, **Level** row in the top bar. 
 
   Damage includes the ×0.6 / ×1.3 scale.
 
-## Hard: more to dodge (5 Nov, done as recommended, review later)
+## Hard: more to dodge (5 Nov; accepted by Chzy18 6 Nov)
 
 Chzy18 (5 Nov, through the overview): make Hard harder with more to dodge, not more damage (gpt/08, 2 Nov). Medium and Easy are unchanged. Each addition is its own commit on `feature/sylvara-v3`, so any one can be reverted alone. This adds to the 31 Oct "one extra mechanic per phase"; the 31 Oct review said doubled pods were enough for Hard Phase 1, and this request supersedes that.
 
