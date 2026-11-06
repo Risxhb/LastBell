@@ -234,13 +234,24 @@ namespace LastBell.Run
 
         // Hard: Aimed Streams (proposal, 5 Nov). A Lane Stream's middle lane points at the nearest standing player when its
         // path is drawn (kept within AimClamp of straight in), then stays put for the 2.0 s warning: step out sideways
-        // or between the lanes. Every lava turret on Hard (Phase 2's and Molten Crown's).
+        // or between the lanes. Every lava turret on Hard (Phase 2's and Molten Crown's). No mechanic aims at a reviver
+        // (accepted revive rule; review CRU-TARGET, 6 Nov): a player channelling a revive is skipped, and with nobody else
+        // to aim at the stream keeps its usual angle. A reviver standing in the lanes is still hit.
         public const float AimClamp = 40f;
         public int Aimed { get; private set; }
-        float AimYaw(Turret tu, float baseYaw, float fallback)
+        public PlayerController AimTarget(Turret tu)
         {
             PlayerController near = null; float best = float.MaxValue;
-            foreach (var p in Standing()) { float dd = Flat(p.transform.position - tu.Pos).sqrMagnitude; if (dd < best) { best = dd; near = p; } }
+            foreach (var p in Standing())
+            {
+                if (p.Reviving != null || p.WasReviving != null) continue;   // an active reviver is never the target
+                float dd = Flat(p.transform.position - tu.Pos).sqrMagnitude; if (dd < best) { best = dd; near = p; }
+            }
+            return near;
+        }
+        float AimYaw(Turret tu, float baseYaw, float fallback)
+        {
+            var near = AimTarget(tu);
             if (near == null) return fallback;
             Aimed++;
             float off = Mathf.Clamp(Mathf.DeltaAngle(baseYaw, Sim.YawTo(tu.Pos, near.transform.position, baseYaw)), -AimClamp, AimClamp);

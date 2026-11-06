@@ -85,6 +85,20 @@ namespace LastBell.Run
             var lanes = t.Spawned("Lane Stream path").Where(x => Sim.Flat(x.H.Origin - tu0.Pos).magnitude < 6f).ToList();
             t.Check("Hard: Aimed Streams, a Lane Stream path runs through the player nearest its turret", up.Aimed > 0 && lanes.Any(x => x.H.Contains(nearP.transform.position)),
                 $"aimed {up.Aimed}, {lanes.Count} lane paths");
+            // no mechanic aims at a reviver (review CRU-TARGET): down another player beside the nearest one, who then channels
+            var fallen = t.Party.First(p => p != nearP && !p.Down);
+            t.Place(fallen, nearP.transform.position + new Vector3(0.8f, 0, 0));
+            fallen.ForceDown("Crucivar test: revive target");
+            for (int k = 0; k < 6; k++) { nearP.DebugSetHp(PlayerController.MaxHp); yield return null; }
+            var aimAt = up.AimTarget(tu0);
+            t.Check("Hard: Aimed Streams never targets an active reviver", nearP.Reviving == fallen && aimAt != null && aimAt != nearP,
+                $"reviving {(nearP.Reviving == fallen)}, target {(aimAt == null ? "none" : aimAt == nearP ? "the reviver" : "another player")}");
+            // no immunity: a reviver standing in a hazard is still hit
+            int hp0 = nearP.Hp;
+            t.W.Hazards.Spawn(new Hazard { Source = "Test Strike", Shape = HazardShape.Circle, Kind = HazardKind.Strike, Origin = nearP.transform.position, Radius = 1f, LockAt = 0, ResolveAt = 1, Damage = 10 });
+            yield return t.Ticks(3);
+            t.Check("a reviver in a hazard is still hit", nearP.Hp < hp0 || t.HitsOn(nearP).Any(h => h.Source == "Test Strike"), $"hp {hp0} -> {nearP.Hp}");
+            fallen.DebugRevive();
             t.W.DamagePart(up.Turrets[0].Casting, Mathf.RoundToInt(up.Turrets[0].CastMax * 0.6f), up.Turrets[0].Casting.Pos, "test");
             foreach (var p in t.Party) p.DebugSetHp(PlayerController.MaxHp);
             yield return t.Shot("v4_casting_bars_hard");
