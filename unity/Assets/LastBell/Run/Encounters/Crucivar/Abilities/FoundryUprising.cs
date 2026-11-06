@@ -306,6 +306,7 @@ namespace LastBell.Run
         // a lone turret with no casting (Molten Crown keeps one firing Lane Streams all phase)
         public Turret LoneTurret(Vector3 pos) => new Turret { K = 0, Pos = pos, A = Pattern.Lane, B = Pattern.Lane, Dense = false };
         public void FireLane(Turret tu) { tu.Shots++; Fire(tu, Pattern.Lane); }
+        public void FireRing(Turret tu) { tu.Shots++; Fire(tu, Pattern.Ring); }   // one wave: a lone turret isn't Dense
 
         public static string Numeral(int k) => new[] { "I", "II", "III", "IV" }[k];
 

@@ -19,6 +19,7 @@ namespace LastBell.Run
     // Hard (Second Press returns): 2.0 s after each set lands, the hammer re-stamps its fullest tower (r 2.2, 35, knocked
     // toward the centre), so whoever just soaked it has to step out.
     // all phase: one lava turret on the rim fires a Lane Stream every 4 s; heat adds 15 % to every hit and burn per crown.
+    // Hard (Crown Ring): the turret's volleys alternate Lane Stream and Ring Wave (one wave, the Phase 2 gaps and 2.0 s path).
     public sealed class MoltenCrown : CrucivarAbility
     {
         public override string Id => "crucivar.molten_crown";
@@ -39,6 +40,7 @@ namespace LastBell.Run
         public float Heat => 1f + HeatPerCrown * Crowns;
         public bool CountsHidden { get; private set; }
         public int Presses { get; private set; }   // Hard: Second Press re-stamps this phase
+        public int Rings { get; private set; }     // Hard: Crown Ring volleys this phase
         readonly Dictionary<int, (Hazard h, int inside)> fullest = new Dictionary<int, (Hazard, int)>();   // set -> fullest landed tower
         int Limit => Easy ? 4 : 3;   // the crown after this many is the eruption
         FoundryUprising.Turret turret; Transform turretLook; bool hooked, running, wiping;
@@ -80,7 +82,11 @@ namespace LastBell.Run
                 if (t == Sim.Ticks(10f)) { if (Crowns < Limit) CrownRise(); else Eruption(); }
                 if (Cycles > 1 && t == Sim.Ticks(13.5f)) { Boss.SetCurrent("Furnace Spin"); Boss.Rite.FurnaceSpin(); }
                 if (t == Sim.Ticks(18f)) { Boss.SetCurrent("Anvil Quake"); Boss.Rite.AnvilQuake(); }
-                if (t % Sim.Ticks(TurretEvery) == Sim.Ticks(2f) % Sim.Ticks(TurretEvery)) Boss.Uprising.FireLane(turret);
+                if (t % Sim.Ticks(TurretEvery) == Sim.Ticks(2f) % Sim.Ticks(TurretEvery))
+                {
+                    // Hard: Crown Ring (proposal, 5 Nov), every other volley is a Ring Wave through its two gaps
+                    if (Hard && turret.Shots % 2 == 1) { Boss.Uprising.FireRing(turret); Rings++; } else Boss.Uprising.FireLane(turret);
+                }
                 if (t % Sim.Hz == 0) Boss.Label($"Molten Crown {Cycles}  ·  edge {Edge:0.#} m  ·  heat x{Heat:0.00}" + (Crowns >= Limit ? "  ·  ERUPTION NEXT" : ""));
                 Towers.RemoveAll(x => !W.Hazards.Live.Contains(x.H));
                 yield return 1;
