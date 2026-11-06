@@ -108,8 +108,10 @@ namespace LastBell.Run
         // Revives (docs/proposals/revives-2026-11-04.md; built as recommended, 4 Nov): at 0 HP a player is downed, not out.
         // A standing ally who stands still within ReviveRange for ReviveSeconds gets them up with ReviveHp (a hit on the
         // reviver resets it; CombatWorld.StepRevives); after BleedOutSeconds unrevived they are dead for the rest of the fight.
+        // Bleed-out 30 s since 5 Nov (it was 20): in the Hard party sweep a revive that landed took 8-15 s from the fall, the
+        // channel pausing while the reviver dodged, and most 20 s downs bled out.
         // Solo is unchanged: nobody is left standing, so the fight is lost.
-        public const float BleedOutSeconds = 20f, ReviveSeconds = 3f, ReviveRange = 1.5f; public const int ReviveHp = 40;
+        public const float BleedOutSeconds = 30f, ReviveSeconds = 3f, ReviveRange = 1.5f; public const int ReviveHp = 40;
         public bool Dead { get; private set; }
         public int DownedTicks { get; private set; }
         public float ReviveProgress { get; internal set; }       // 0..1 while allies channel on this downed player
