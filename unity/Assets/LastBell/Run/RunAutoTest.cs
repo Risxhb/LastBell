@@ -1050,7 +1050,7 @@ namespace LastBell.Run
                 Check($"Sylvara {lv} P2: lanes every {(e ? 0.5f : 0.35f)} s, second spiral {(e ? "off" : "on")}, {(h ? "double" : "single")} toll",
                     Mathf.Approximately(sy.LanePeriod, e ? 0.5f : 0.35f) && sy.SecondColourSpiral == h && sy.DoubleToll == h && sy.ChoirPods == h && sy.MirrorJets == h);
                 Check($"Sylvara {lv} P3: {(h ? "one more bud" : "same buds")}, bloom {(e ? 15 : 12)} s, {(e ? 3 : 4)}-arm spiral",
-                    sy.BudCount == budBase + (h ? 1 : 0) && Mathf.Approximately(sy.BloomAfter, e ? 15 : 12) && sy.HollowArms == (e ? 3 : 4), $"{sy.BudCount} buds");
+                    sy.BudCount == budBase + (h ? 1 : 0) && Mathf.Approximately(sy.BloomAfter, e ? 15 : 12) && sy.HollowArms == (e ? 3 : 4) && sy.CounterSpiral == h, $"{sy.BudCount} buds");
                 sy.DebugStartStorm(0);
                 Check($"Sylvara {lv} P4: loop 1 {(e ? "6 seeds every 2.5" : "8 seeds every 2.0")} s, bursts of {(h ? 10 : 8)}",
                     sy.StormSeeds == (e ? 6 : 8) && Mathf.Abs(sy.StormEvery - (e ? 2.5f : 2.0f)) < 0.001f && sy.BurstPetals == (h ? 10 : 8), $"{sy.StormSeeds} / {sy.StormEvery} / {sy.BurstPetals}");
@@ -1069,6 +1069,7 @@ namespace LastBell.Run
                 int wedges = d.World.Hazards.Live.Count(hz => hz.Source == "Waterfall Jet");
                 Check("Sylvara Hard P1: each Waterfall Jet has a mirrored twin with its own warning", sy.MirrorJets && wedges >= 2 && wedges % 2 == 0, wedges + " wedges");
                 Check("Sylvara Hard P2: Seed Pods join the Choir at 16.5 s", sy.ChoirPods);
+                Check("Sylvara Hard P3: a counter spiral turns under the Hollow Spiral", sy.CounterSpiral);
                 d.World.Hazards.ClearAll();
             }
             {

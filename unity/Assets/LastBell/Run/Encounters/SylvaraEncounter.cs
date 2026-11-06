@@ -49,6 +49,7 @@ namespace LastBell.Run
         public bool PodDoubledIn(int ph) => ph == 1 && Hard;
         public bool MirrorJets => Hard;   // Hard (5 Nov, done as recommended): each jet pours a twin from the opposite wall
         public bool ChoirPods => Hard;    // Hard: Seed Pods on the farthest players at 16.5 s in Phase 2 (coral petals hit every colour)
+        public bool CounterSpiral => Hard;   // Hard: a 2-arm spiral turning the other way under the Hollow Spiral, same gaps
 
         CharacterPresenter presenter;
         int phase;
@@ -349,6 +350,7 @@ namespace LastBell.Run
                     float bloom = BloomAfter;   // Easy: buds bloom after 15 s and the spiral has 3 arms
                     At(0.01f, "Hollow Spiral", () => sp1 = Spiral(1, HollowArms, 10 * Deg, 4.5f, 0.18f, 9, 7));
                     At(1, "Choir Buds", () => PlantBuds(bloom));
+                    if (CounterSpiral) At(4, "Counter Spiral", () => sp2 = Spiral(-1, 2, 12 * Deg, 4f, 0.2f, 9, 7));   // Hard (5 Nov)
                     At(8, "Feet Pod", () => Pod(null, Vector3.zero, 3.0f));
                     At(12, "Choir Buds", () => PlantBuds(bloom));
                     At(15, "Pruning Arc", PruningArc);
