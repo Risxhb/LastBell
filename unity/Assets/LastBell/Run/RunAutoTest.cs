@@ -783,10 +783,19 @@ namespace LastBell.Run
                     Count(pendKey, -1, -pendDmg); Count(key, 1, pendDmg); lastKey[p] = key; pendP = null;
                 };
                 w.PlayerHit += onHaz; w.Bullets.Hit += onBul;
+                // reach (6 Nov): how often each class stands where its bot swings at her (Range + body + 2 m), and its mean distance
+                var reachN = new Dictionary<string, int[]>(); var reachD = new Dictionary<string, float>();
+                float SwingAt(string c) => (c == "Tollbreaker" ? 3.5f : c == "Chimesinger" ? 6.5f : 8.5f) + sy.BodyRadius + 2f;
                 while (d.State == RunState.Combat && d.World == w && (w.Tick - tick0) < Sim.Ticks(480))
                 {
                     last = w.Tick;
                     if (sy.PhaseName != phaseAt[phaseAt.Count - 1].name) phaseAt.Add((sy.PhaseName, w.Tick));
+                    foreach (var p in w.Players) if (!p.Down)
+                    {
+                        float dist = Sim.Flat(p.transform.position - sy.transform.position).magnitude; var c = p.ClassName;
+                        if (!reachN.TryGetValue(c, out var rn)) reachN[c] = rn = new int[2];
+                        rn[0]++; if (dist <= SwingAt(c)) rn[1]++; reachD[c] = (reachD.TryGetValue(c, out var ds) ? ds : 0) + dist;
+                    }
                     foreach (var p in w.Players) { if (p.Down && down.Add(p)) { downs++; if (lastKey.TryGetValue(p, out var lk)) Count(lk, 0, 0); if (lk != null) hitLog[lk][2]++; } else if (!p.Down) down.Remove(p); }
                     yield return null;
                 }
@@ -804,6 +813,8 @@ namespace LastBell.Run
                     + $" ({string.Join(", ", parts)}); {downs} downs; party DPS {(maxHp * (1 - (won ? 0 : hpLeft))) / Mathf.Max(1, secs):0}; buds {sy?.BudsCut ?? 0} cut, {sy?.BudsBloomed ?? 0} bloomed");
                 Check($"Sylvara clear run {cls} +{allies} {RunDifficulty.Name(level)}: the bots deal damage", won || hpLeft < 1f);
                 w.PlayerHit -= onHaz; w.Bullets.Hit -= onBul;
+                Note("  reach: " + string.Join(", ", reachN.Select(kv => $"{kv.Key} {kv.Value[1] * 100 / Mathf.Max(1, kv.Value[0])} % in swing range, mean {reachD[kv.Key] / Mathf.Max(1, kv.Value[0]):0.0} m")));
+                Note("  damage: " + string.Join(", ", w.EncounterMeter.Values.OrderByDescending(r => r.Damage).Select(r => $"{r.Ability} {r.Damage} ({r.Hits} hits)")));
                 var adds = new[] { SylvaraEncounter.MirrorTag, "Choir Pods", "Counter Spiral", "Storm Arc", "base" };
                 foreach (var a in adds)
                 {

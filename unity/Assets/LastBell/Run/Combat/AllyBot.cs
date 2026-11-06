@@ -35,6 +35,10 @@ namespace LastBell.Run
         // bots are mechanics dummies by default: they move, dodge and spread, but never attack or heal. Launch switch
         // -lastbellAllyAttack turns their class rotation on (the boss then scales his HP for them, BossEncounter.Spawn).
         public static bool Attacks = System.Array.Exists(System.Environment.GetCommandLineArgs(), a => a.Equals("-lastbellAllyAttack", System.StringComparison.OrdinalIgnoreCase));
+        // how hard its Sylvara spot pulls in Seed Storm (cost per metre; 0.35 elsewhere). At 0.35 the dodging drifted the
+        // Tollbreaker to the wall, 11 m out, in swing range 1 % of the time; 2.5 brought solo Phase 4 runs from 21 % of her
+        // HP left to 4-9 %, with a first clear (6 Nov, runs 51-52)
+        const float P4Pull = 2.5f;
         public static BotMode AllyMode = BotMode.Perfect;   // menu allies do every mechanic, memory ones included (Chzy18: "do the mechanics"); still no attacks
         public static int StartDelay;   // tests: ticks a new bot stands still at the start (-lastbellSweepRepeat varies the fight with it)
         int tick, lastPress = -999, castHold;
@@ -1242,7 +1246,7 @@ namespace LastBell.Run
 
             if (tick % 3 == 1 || me.Dashing)
             {
-                sylMove = SylvaraSteer.Choose(me, pos, home, out sylSprint, out sylDash, out sylCost, reach, BudStand(me) + 0.8f, reviving ? SylvaraSteer.RevivePull : 0.35f);
+                sylMove = SylvaraSteer.Choose(me, pos, home, out sylSprint, out sylDash, out sylCost, reach, BudStand(me) + 0.8f, reviving ? SylvaraSteer.RevivePull : sy.PhaseName == SylvaraEncounter.PhaseNames[3] ? P4Pull : 0.35f);
                 sylPos = pos;
                 // in reach of the downed ally: hold still so the revive channels, unless standing here gets hit (a near miss
                 // is fine); small steps toward the exact spot kept pausing it (5 Nov)
