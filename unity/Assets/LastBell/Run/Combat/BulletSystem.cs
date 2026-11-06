@@ -18,6 +18,7 @@ namespace LastBell.Run
             public int Colour;                    // 0 hurts everyone; otherwise only players whose colour matches (Two-Colour Choir)
             public string Source = "Bullet";
             public string AttackId;               // its boss attack (BossAttackIcons), copied onto the hit
+            public string Tag;                    // which Hard addition fired it (hit bookkeeping for the sweep), or null
             public Action<Bullet> Split;          // runs when the fuse (Life) ends without a hit: seeds burst into petals
             public bool Dead;
         }

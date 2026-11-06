@@ -762,11 +762,28 @@ namespace LastBell.Run
                 int n = allies + 1, maxHp = sy.MaxHp, downs = 0, tick0 = w.Tick, last = tick0;
                 Check($"Sylvara HP for {n} fighting players is the accepted table's {SylvaraEncounter.HpFor(n)}", maxHp == SylvaraEncounter.HpFor(n), maxHp.ToString());
                 var down = new HashSet<PlayerController>(); var phaseAt = new List<(string name, int tick)> { (sy.PhaseName, tick0) };
+                // hits per Hard addition (6 Nov): bullets and hazards made by one carry its name; the rest are "base". A down counts
+                // for the last hit before it. PlayerHit fires first for a bullet hit, then Bullets.Hit names its bullet.
+                var hitLog = new Dictionary<string, int[]>(); var lastKey = new Dictionary<PlayerController, string>();
+                PlayerController pendP = null; string pendKey = null; int pendDmg = 0;
+                void Count(string key, int n, int dmg) { if (!hitLog.TryGetValue(key, out var c)) hitLog[key] = c = new int[3]; c[0] += n; c[1] += dmg; }
+                Action<PlayerController, Hazard, int> onHaz = (p, h, dmg) =>
+                {
+                    string key = $"{(sy.HazardTag.TryGetValue(h, out var tg) ? tg : "base")} | {sy.PhaseName} | {h.Source}";
+                    Count(key, 1, dmg); lastKey[p] = key; pendP = p; pendKey = key; pendDmg = dmg;
+                };
+                Action<PlayerController, BulletSystem.Bullet, int> onBul = (p, b, dmg) =>
+                {
+                    if (pendP != p || pendKey == null || b.Tag == null) { pendP = null; return; }
+                    string key = $"{b.Tag} | {sy.PhaseName} | {b.Source}";
+                    Count(pendKey, -1, -pendDmg); Count(key, 1, pendDmg); lastKey[p] = key; pendP = null;
+                };
+                w.PlayerHit += onHaz; w.Bullets.Hit += onBul;
                 while (d.State == RunState.Combat && d.World == w && (w.Tick - tick0) < Sim.Ticks(480))
                 {
                     last = w.Tick;
                     if (sy.PhaseName != phaseAt[phaseAt.Count - 1].name) phaseAt.Add((sy.PhaseName, w.Tick));
-                    foreach (var p in w.Players) { if (p.Down && down.Add(p)) downs++; else if (!p.Down) down.Remove(p); }
+                    foreach (var p in w.Players) { if (p.Down && down.Add(p)) { downs++; if (lastKey.TryGetValue(p, out var lk)) Count(lk, 0, 0); if (lk != null) hitLog[lk][2]++; } else if (!p.Down) down.Remove(p); }
                     yield return null;
                 }
                 float secs = (last - tick0) / (float)Sim.Hz; bool won = d.State == RunState.Cleared || d.Victory || (sy && sy.Dead), wiped = d.State == RunState.Downed;
@@ -780,6 +797,15 @@ namespace LastBell.Run
                 Note($"Sylvara clear, {RunDifficulty.Name(level)}: {n} player{(n > 1 ? "s" : "")} ({cls} + {allies} bots), HP {maxHp}: {(won ? "cleared" : wiped ? $"wiped ({hpLeft:P0} left)" : $"not cleared ({hpLeft:P0} left)")} in {secs:0} s"
                     + $" ({string.Join(", ", parts)}); {downs} downs; party DPS {(maxHp * (1 - (won ? 0 : hpLeft))) / Mathf.Max(1, secs):0}; buds {sy?.BudsCut ?? 0} cut, {sy?.BudsBloomed ?? 0} bloomed");
                 Check($"Sylvara clear run {cls} +{allies} {RunDifficulty.Name(level)}: the bots deal damage", won || hpLeft < 1f);
+                w.PlayerHit -= onHaz; w.Bullets.Hit -= onBul;
+                var adds = new[] { SylvaraEncounter.MirrorTag, "Choir Pods", "Counter Spiral", "Storm Arc", "base" };
+                foreach (var a in adds)
+                {
+                    var rows = hitLog.Where(kv => kv.Key.StartsWith(a + " |") && kv.Value[0] > 0).ToList();
+                    Note($"  hits, {a}: {rows.Sum(r => r.Value[0])} hits, {rows.Sum(r => r.Value[1])} damage, {rows.Sum(r => r.Value[2])} downs");
+                }
+                foreach (var kv in hitLog.Where(kv => kv.Value[0] > 0).OrderByDescending(kv => kv.Value[1]).Take(12))
+                    Note($"    {kv.Key}: {kv.Value[0]} hits, {kv.Value[1]} damage, {kv.Value[2]} downs");
                 if (d.State == RunState.Combat && d.Boss) d.Boss.DebugDefeat();   // timed out: end it so the next run can start
                 yield return Until(() => d.State != RunState.Combat, 10, "clear run ends");
             }
