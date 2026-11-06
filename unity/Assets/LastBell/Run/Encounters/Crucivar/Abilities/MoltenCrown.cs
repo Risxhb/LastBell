@@ -19,6 +19,7 @@ namespace LastBell.Run
     // Hard (Second Press returns): 2.0 s after each set lands, the hammer re-stamps its fullest tower (r 2.2, 35, knocked
     // toward the centre), so whoever just soaked it has to step out.
     // all phase: one lava turret on the rim fires a Lane Stream every 4 s; heat adds 15 % to every hit and burn per crown.
+    // Hard (Quick Moulds): the towers land 4.0 s after they rise, not 5.0 s; Backdraft and the pours follow the landing.
     // Hard (Crown Ring): the turret's volleys alternate Lane Stream and Ring Wave (one wave, the Phase 2 gaps and 2.0 s path).
     public sealed class MoltenCrown : CrucivarAbility
     {
@@ -26,6 +27,9 @@ namespace LastBell.Run
 
         public const float Cycle = 21.5f, Rise = 5f, SetGap = 1.6f, TowerRadius = 2f, ExtraDmg = 50, CrownWarn = 3f, EruptWarn = 5f;
         public const float CrownBurn = 50f, SlagBurn = 20f, HeatPerCrown = 0.15f, TurretEvery = 4f;
+        // Hard: Quick Moulds (proposal, 5 Nov), the towers land 4.0 s after they rise (5.0 s), same look and counts
+        public const float HardRise = 4f;
+        float RiseTime => Hard ? HardRise : Rise;
         public const float PressDelay = 2.0f, PressRadius = 2.2f, PressKnock = 1.5f;
         public const int PressDamage = 35;   // Hard: Second Press (the v2 mechanic, 35 since v3)
         public const float PressStun = 0.25f;
@@ -61,7 +65,7 @@ namespace LastBell.Run
             if (!hooked) { hooked = true; W.Hazards.Spawned += ApplyHeat; }
             if (turret == null) BuildTurret();
             var sets = Sets(Mathf.Max(1, Standing().Count));
-            float lastLand = Rise + SetGap * (sets.Length - 1);
+            float lastLand = RiseTime + SetGap * (sets.Length - 1);
             IEnumerator<int> draft = null; int draftWait = 0;
             int end = Sim.Ticks(Cycle);
             running = true; wiping = false; fullest.Clear();
@@ -71,7 +75,7 @@ namespace LastBell.Run
                 for (int s = 0; s < sets.Length; s++)
                 {
                     if (t == Sim.Ticks(SetGap * s)) RiseSet(sets[s], s, sets[0].Length);
-                    if (Hard && t == Sim.Ticks(SetGap * s) + T(Rise) + 2 && fullest.TryGetValue(s, out var f)) Press(f.h.Origin);   // the set has landed
+                    if (Hard && t == Sim.Ticks(SetGap * s) + T(RiseTime) + 2 && fullest.TryGetValue(s, out var f)) Press(f.h.Origin);   // the set has landed
                 }
                 // after the towers and Backdraft (11-01): at 3.5 s the pours locked onto set B soakers who had to stay put
                 if (t == Sim.Ticks(lastLand + 3.4f)) { Boss.SetCurrent("Casting Order"); Boss.Rite.CastingOrder(); }
@@ -100,7 +104,7 @@ namespace LastBell.Run
         void RiseSet(int[] needs, int set, int countA)
         {
             Boss.SetCurrent("Mould Towers");
-            Boss.Presenter?.Action("MouldPress", T(Rise));   // visual only: the press comes down as the towers land
+            Boss.Presenter?.Action("MouldPress", T(RiseTime));   // visual only: the press comes down as the towers land
             bool solo = Standing().Count <= 1;
             float rad = Mathf.Min(5.5f, Edge - 2.6f);
             var list = new List<Hazard>();
@@ -111,7 +115,7 @@ namespace LastBell.Run
                 var h = new Hazard
                 {
                     Source = "Mould Tower " + (set == 0 ? "A" : set == 1 ? "B" : "C"), AttackId = "crucivar.mould_towers", Shape = HazardShape.Circle, Kind = HazardKind.Ground,
-                    Origin = Sim.Dir(yaw) * rad, Radius = TowerRadius, LockAt = 0, ResolveAt = T(Rise), ShareCount = need, Knockback = 0,
+                    Origin = Sim.Dir(yaw) * rad, Radius = TowerRadius, LockAt = 0, ResolveAt = T(RiseTime), ShareCount = need, Knockback = 0,
                     Soak = true,   // a ring to stand in: AllyBot must not step out of it (Run loop and shop smoke run, 11-01)
                 };
                 h.Includes = p => h.Age < h.ResolveAt && h.Contains(p.transform.position);   // counts for the mould look; the landing is custom

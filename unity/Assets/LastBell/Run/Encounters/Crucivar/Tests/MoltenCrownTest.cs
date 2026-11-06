@@ -49,6 +49,7 @@ namespace LastBell.Run
             t.Check("tower slag heats 1.0 s before it burns", t.Spawned("Tower Slag").All(x => x.H.LockAt == Sim.Ticks(ForgeRite.PoolArm)));
             t.Check("Backdraft right after set B", t.Spawned("Backdraft").Any());
             t.Check("the lava turret fires Lane Streams", t.Spawns.Any(x => x.Source == "Lane Stream bullet"));
+            t.Check("Medium: Mould Towers land 5.0 s after they rise", towers.All(x => x.H.ResolveAt == Sim.Ticks(MoltenCrown.Rise)), string.Join("/", towers.Select(x => x.H.ResolveAt)));
             t.Check("Medium: the crown turret fires only Lane Streams (no Crown Ring)", !t.Spawns.Any(x => x.Source.StartsWith("Ring Wave")), $"{t.Spawned("Ring Wave").Count()} ring spawns");
             t.Check("the crown rises to 11 m and burns for good", crown.Crowns == 1 && Mathf.Approximately(crown.Edge, 11f) && t.W.Hazards.Live.Any(h => h.Source == "Molten Crown" && h.BurnPerSecond > 0),
                 $"crowns {crown.Crowns}, edge {crown.Edge}");
@@ -95,6 +96,7 @@ namespace LastBell.Run
             // third cycle: nobody soaks, so the first tower to land wipes the party
             for (s = 0; s < 30f && t.Boss.TestBusy; s += Time.deltaTime) { foreach (var p in t.Party) p.DebugSetHp(PlayerController.MaxHp); yield return null; }   // keep the party up until the Hard cycle ends
             t.Check("the Hard cycle runs to its end", !t.Boss.TestBusy);
+            t.Check("Hard: Quick Moulds, the towers land 4.0 s after they rise", t.Spawned("Mould Tower").Any() && t.Spawned("Mould Tower").All(x => x.H.ResolveAt == Sim.Ticks(MoltenCrown.HardRise)), string.Join("/", t.Spawned("Mould Tower").Select(x => x.H.ResolveAt)));
             t.Check("Hard: Crown Ring, the crown turret alternates Lane Stream and Ring Wave", crown.Rings > 0 && t.Spawned("Ring Wave path").Any() && t.Spawned("Ring Wave bullet").Any() && t.Spawned("Lane Stream bullet").Any(),
                 $"rings {crown.Rings}, ring bullets {t.Spawned("Ring Wave bullet").Count()}");
             yield return t.Setup(4, at: new[] { new Vector3(0, 0, 4f), new Vector3(4, 0, 0), new Vector3(0, 0, -4f), new Vector3(-4, 0, 0) });
