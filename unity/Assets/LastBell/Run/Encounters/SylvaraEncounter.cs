@@ -47,6 +47,10 @@ namespace LastBell.Run
         public int HollowArms => Easy ? 3 : 4;
         public float PodLandIn(int ph) => ph == 1 && Easy ? 3.0f : 2.5f;
         public bool PodDoubledIn(int ph) => ph == 1 && Hard;
+        public bool MirrorJets => Hard;   // Hard (5 Nov, done as recommended): each jet pours a twin from the opposite wall
+        public bool ChoirPods => Hard;    // Hard: Seed Pods on the farthest players at 16.5 s in Phase 2 (coral petals hit every colour)
+        public bool CounterSpiral => Hard;   // Hard: a 2-arm spiral turning the other way under the Hollow Spiral, same gaps
+        public bool StormArc => Hard;   // Hard: a Pruning Arc at 15 s in each Seed Storm loop (not in Last Storm)
 
         CharacterPresenter presenter;
         int phase;
@@ -296,7 +300,7 @@ namespace LastBell.Run
         void ClearFight()
         {
             foreach (var e in emit) e.On = false;
-            emit.Clear(); later.Clear(); sp1 = sp2 = null;
+            emit.Clear(); spinDir.Clear(); later.Clear(); sp1 = sp2 = null;
             foreach (var b in buds) KillBud(b);
             buds.Clear();
             W.Bullets.ClearAll();
@@ -335,6 +339,7 @@ namespace LastBell.Run
                     if (SecondColourSpiral) At(10, "Second Colour Spiral", () => sp2 = Spiral(-1, 4, 18 * Deg, 3.5f, 0.22f, 8, 5, new[] { Cobalt, Brass }));
                     At(12, "Root Ring", () => RootRing(3.5f));
                     At(14.5f, "Brass Lanes", () => ChoirLanes(Brass, Mathf.PI / 2, -1, 20, lane));
+                    if (ChoirPods) At(16.5f, "Choir Pods", () => PodsOnFar());   // Hard (5 Nov): lands at 19 s, before the 20 s toll
                     foreach (float t in W.Players.Count == 1 ? new[] { 4f, 8, 12, 16, 20 } : new[] { 5f, 10, 15, 20 })
                     {
                         At(t - 1, "Toll", () => { Toll("TOLL: every colour swaps"); WarnSwap(); });
@@ -346,6 +351,7 @@ namespace LastBell.Run
                     float bloom = BloomAfter;   // Easy: buds bloom after 15 s and the spiral has 3 arms
                     At(0.01f, "Hollow Spiral", () => sp1 = Spiral(1, HollowArms, 10 * Deg, 4.5f, 0.18f, 9, 7));
                     At(1, "Choir Buds", () => PlantBuds(bloom));
+                    if (CounterSpiral) At(4, "Counter Spiral", () => sp2 = Spiral(-1, 2, 12 * Deg, 4f, 0.2f, 9, 7));   // Hard (5 Nov)
                     At(8, "Feet Pod", () => Pod(null, Vector3.zero, 3.0f));
                     At(12, "Choir Buds", () => PlantBuds(bloom));
                     At(15, "Pruning Arc", PruningArc);
@@ -355,6 +361,7 @@ namespace LastBell.Run
                     At(0, "Seed Storm", StartStorm);
                     At(6, "Seed Pods", () => PodsOnFar());
                     At(12, "Root Ring", () => RootRing(3.5f));
+                    if (StormArc && P4Loop < 5) At(15, "Storm Arc", PruningArc);   // Hard (5 Nov): both cuts land by 17.8 s, before the 18 s pods
                     At(18, "Seed Pods", () => PodsOnFar());
                     if (P4Loop == 4) At(LastStormAt - 4 * 24 - 3, "Toll", () => Toll("LAST STORM in 3 s"));
                     break;
@@ -494,6 +501,7 @@ namespace LastBell.Run
         // and sink, so the warning is never covered.
         public const int RootPieces = 10;
         public int PodModels, RootModels, BudModels;   // tests: prop models placed (0 when the art isn't installed)
+        public void DebugJets() => Jets();   // tests: one round of Waterfall Jets
         public void DebugRoots() => RootsErupt(Vector3.zero, 3.5f);   // tests: the Root Ring's look alone, for a screenshot
         void RootsErupt(Vector3 c, float r)
         {
@@ -511,6 +519,7 @@ namespace LastBell.Run
         // Waterfall Jets: one per player past 8 m (else the farthest). The wedge warns 1.5 s; then a solid stream (a drop
         // every 0.07 s at 9 m/s) pours from the wall to her rim while its source slides 40° along the wall over 2 s,
         // starting 20° before the target.
+        // Hard: each jet also pours from the opposite wall (its own wedge warning), sliding the other way.
         public float JetWarn => Easy ? 2.0f : 1.5f;   // Easy: 2.0 s
         void Jets()
         {
@@ -518,9 +527,12 @@ namespace LastBell.Run
             Act("CallWater", warn * 1.9f / 1.5f);   // the hand pulls down (1.5 of the clip's 1.9 s) as the water pours
             var ts = Standing.FindAll(p => Sim.Flat(p.transform.position).magnitude > 8);
             if (ts.Count == 0) ts = Farthest(1);
-            for (int i = 0; i < ts.Count; i++)
+            var aims = new List<float>(); foreach (var p in ts) aims.Add(AngOf(p.transform.position));
+            if (MirrorJets) for (int i = 0, n = aims.Count; i < n; i++) aims.Add(aims[i] + Mathf.PI);   // Hard twins
+            for (int i = 0; i < aims.Count; i++)
             {
-                float a0 = AngOf(ts[i].transform.position), dir = i % 2 == 1 ? -1 : 1, span = 40 * Deg, start = a0 - dir * span / 2;
+                int k = i < ts.Count ? i : i - ts.Count + 1;   // a twin slides opposite to its jet
+                float a0 = aims[i], dir = k % 2 == 1 ? -1 : 1, span = 40 * Deg, start = a0 - dir * span / 2;
                 W.Hazards.Spawn(new Hazard
                 {
                     Source = "Waterfall Jet", AttackId = AttackOf("Waterfall Jet"), Shape = HazardShape.Cone, Kind = HazardKind.Strike, Origin = Vector3.zero, Yaw = YawOf(a0),
@@ -746,7 +758,7 @@ namespace LastBell.Run
             if (Dead || Current == "idle" || phase == 0) return;   // halted (party down) or not started
             for (int i = later.Count - 1; i >= 0; i--) if (Age >= later[i].at) { var fn = later[i].fn; later.RemoveAt(i); fn(); }
             for (int i = 0; i < emit.Count; i++) if (emit[i].On) emit[i].Update?.Invoke(Sim.Dt);
-            emit.RemoveAll(e => !e.On);
+            emit.RemoveAll(e => { if (e.On) return false; spinDir.Remove(e); return true; });   // retired spirals drop their reversal hook
         }
 
         void KillBud(Bud b) { b.Alive = false; if (b.Part != null) { b.Part.Alive = false; W.Parts.Remove(b.Part); } }
@@ -758,6 +770,9 @@ namespace LastBell.Run
         {
             base.Update();
             PresentLook(glowLevel, Dead, Time.deltaTime);
+            // the run's 2 s intro card, before the sim runs (so not in StepAlways): she wakes and lifts the fork
+            if (phase == 0 && !introPlayed && RunDirector.Instance != null && RunDirector.Instance.State == RunState.Intro && Has("Intro"))
+            { introPlayed = true; Clips.Add("Intro"); presenter.PlayOnce("Intro", 2f); }
             foreach (var b in buds) if (b.Alive) PulseBud(b.Prop);
             DrawColourRings();
         }
@@ -766,9 +781,6 @@ namespace LastBell.Run
         void PresentLook(float glow, bool dead, float dt)
         {
             PlaceLights();
-            // the run's 2 s intro card, before the sim runs (so not in StepAlways): she wakes and lifts the fork
-            if (phase == 0 && !introPlayed && RunDirector.Instance != null && RunDirector.Instance.State == RunState.Intro && Has("Intro"))
-            { introPlayed = true; Clips.Add("Intro"); presenter.PlayOnce("Intro", 2f); }
             if (dead && frontLight)
             {
                 frontLight.intensity = Mathf.MoveTowards(frontLight.intensity, FrontIntensity * 0.5f, dt * 2f);
@@ -782,8 +794,10 @@ namespace LastBell.Run
                 presenter.Sink = Mathf.MoveTowards(presenter.Sink, 0.9f, dt * 0.6f);
         }
 
-        // Phase 2: a brass or cobalt ring under each player shows their colour; it flickers to the next colour during the
-        // 1 s toll warning.
+        // Phase 2: an open dotted brass or cobalt ring under each player shows their colour (friendly cues are thin and
+        // unfilled, so it never reads as a boss floor warning); it flickers to the next colour during the 1 s toll warning.
+        const int RingDots = 14;
+        Material ringBrassMat, ringCobaltMat;   // shared by every dot
         void DrawColourRings()
         {
             if (W == null) return;
@@ -796,15 +810,20 @@ namespace LastBell.Run
                 if (c == 0) { if (ring) ring.gameObject.SetActive(false); continue; }
                 if (!ring)
                 {
-                    ring = Prim.Make(PrimitiveKind.Cylinder, transform.parent, Vector3.zero, new Vector3(1.3f, 0.01f, 1.3f), RingBrass, 2f);
+                    ring = new GameObject("ColourRing").transform; ring.SetParent(transform.parent, false);
+                    for (int i = 0; i < RingDots; i++)
+                    {
+                        float a = i * Tau / RingDots;
+                        Prim.Make(PrimitiveKind.Cylinder, ring, new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * 0.7f, new Vector3(0.12f, 0.01f, 0.12f), RingBrass, 1.5f);
+                    }
                     colourRings[p] = ring;
                 }
                 if (!ring.gameObject.activeSelf) ring.gameObject.SetActive(true);
                 bool flick = SwapWarned(p) && Mathf.Repeat(Time.time * 6, 1) < 0.5f;
                 int show = flick ? (c == Brass ? Cobalt : Brass) : c;
-                var mr = ring.GetComponent<MeshRenderer>();
-                var want = show == Brass ? RingBrass : RingCobalt;
-                if (mr.material.GetColor("_BaseColor") != want) { mr.material.SetColor("_BaseColor", want); mr.material.SetColor("_EmissionColor", want * 2f); }
+                if (!ringBrassMat) { ringBrassMat = Prim.Material(RingBrass, 1.5f); ringCobaltMat = Prim.Material(RingCobalt, 1.5f); }
+                var want = show == Brass ? ringBrassMat : ringCobaltMat;
+                foreach (var mr in ring.GetComponentsInChildren<MeshRenderer>()) if (mr.sharedMaterial != want) mr.sharedMaterial = want;
                 ring.position = Sim.Flat(p.transform.position) + Vector3.up * 0.04f;
                 shown++;
             }
@@ -977,7 +996,7 @@ namespace LastBell.Run
         protected override void OnDefeat()
         {
             foreach (var e in emit) e.On = false;
-            emit.Clear(); later.Clear(); foreach (var b in buds) KillBud(b); buds.Clear(); colour.Clear(); swapWarned.Clear();
+            emit.Clear(); spinDir.Clear(); later.Clear(); foreach (var b in buds) KillBud(b); buds.Clear(); colour.Clear(); swapWarned.Clear();
             ClearProps();
             if (NetRecording) NetFx("SylvaraEncounter.Clear");
             glowTarget = 0.3f; glowLevel = 2f;
@@ -989,6 +1008,7 @@ namespace LastBell.Run
         {
             ClearProps();
             foreach (var r in colourRings.Values) if (r) Destroy(r.gameObject);
+            if (ringBrassMat) { Destroy(ringBrassMat); Destroy(ringCobaltMat); }
         }
         public CharacterPresenter Presenter => presenter;
     }

@@ -44,6 +44,19 @@ Try it in the demo: `demo/sylvara-v3-demos.html`, **Level** row in the top bar. 
 
   Damage includes the ×0.6 / ×1.3 scale.
 
+## Hard: more to dodge (5 Nov, done as recommended, review later)
+
+Chzy18 (5 Nov, through the overview): make Hard harder with more to dodge, not more damage (gpt/08, 2 Nov). Medium and Easy are unchanged. Each addition is its own commit on `feature/sylvara-v3`, so any one can be reverted alone. This adds to the 31 Oct "one extra mechanic per phase"; the 31 Oct review said doubled pods were enough for Hard Phase 1, and this request supersedes that.
+
+| Phase | Hard addition | Route out | Commit |
+|---|---|---|---|
+| 1 Spiral Bloom | **Mirrored Jets.** Every Waterfall Jet also pours from the opposite wall, sliding the other way, with its own 1.5 s wedge warning. | Each stream is a thin line that sweeps 40°; the wedge shows where. Up to 8 lines at 4 players, about 230 drops in all. | 39ec8b3 |
+| 2 Two-Colour Choir | **Choir Pods.** Seed Pods drop on the farthest players at 16.5 s and land at 19 s, before the 20 s toll. Their coral petals hit every colour. | The usual pod route: leave the 2.5 m circle; the 12-petal ring has 30° gaps. | 1b90383 |
+| 3 Hollow Bloom | **Counter Spiral.** From 4 s, a 2-arm spiral (12°/s, 4 m/s) turns the other way under the Hollow Spiral. | It keeps the same gap pattern (7 shots of every 9), so the crossing lanes still open. | a4a328b |
+| 4 Seed Storm | **Storm Arc.** A Pruning Arc at 15 s in each loop before Last Storm; both cuts land by 17.8 s, before the 18 s pods. | As in Phases 1 and 3: the 60° side slivers are safe. | 2109399 |
+
+No addition needs a jump, a class or immunity, and each works the same for 1 and 4 players (the jets and pods pick their targets by distance). Last Storm is unchanged.
+
 ## Open questions
 1. Hard Phase 1: doubled pods are enough (31 Oct review).
 2. Easy Last Storm: the numbers above were accepted on 31 Oct.
