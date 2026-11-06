@@ -13,12 +13,14 @@ namespace LastBell.Run
     // II. Co-op: ceil(N/2) carriers per cast, rotating, numerals I.. in order.
     //   Escape: a detonation's own carrier must leave 3.5 + 0.3 m in its 1.5 s visible window (the coral circle shows
     //   1.5 s ahead on the carrier's spot, locked): 3.8 m = 0.88 s at 6 m/s walking, 1.15 s at 4.2 m/s.
+    // Hard (5 Nov, done as recommended, review later): the blasts come 1.2 s apart with a 1.2 s warning (StepHardS, LockHardS),
+    // still longer than the 0.88 s walk out.
     public sealed class Sunspots : AurelionAbility
     {
         public override string Id => "aurelion.sunspots";
         public override string Name => "Sunspots";
 
-        public const float Blast = 3.5f, Pool = 3.0f, PoolBurn = 20f, FirstS = 3.0f, StepS = 1.5f, LockS = 1.5f;
+        public const float Blast = 3.5f, Pool = 3.0f, PoolBurn = 20f, FirstS = 3.0f, StepS = 1.5f, LockS = 1.5f, StepHardS = 1.2f, LockHardS = 1.2f;
         public const int Damage = 50;
         public const int PoolTicks = 60 * 75;   // 75 s, across phase changes (v4 "hard from the start")
         // the carrier label is identity text (ivory, audit F05): only the blast circle and pools wear the hostile palette
@@ -37,8 +39,8 @@ namespace LastBell.Run
         public const float RimDrop = 10.5f;   // where a carrier should be when its sigil goes off (metres from him)
 
         int First => T(FirstS);
-        int Step => T(StepS);
-        int Lock => T(LockS);
+        int Step => Hard ? Sim.Ticks(StepHardS) : T(StepS);
+        int Lock => Hard ? Sim.Ticks(LockHardS) : T(LockS);
 
         public IEnumerable<int> Run()
         {
