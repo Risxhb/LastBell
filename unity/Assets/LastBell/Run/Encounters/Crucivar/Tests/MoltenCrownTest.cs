@@ -99,6 +99,11 @@ namespace LastBell.Run
             t.Check("Hard: Quick Moulds, the towers land 4.0 s after they rise", t.Spawned("Mould Tower").Any() && t.Spawned("Mould Tower").All(x => x.H.ResolveAt == Sim.Ticks(MoltenCrown.HardRise)), string.Join("/", t.Spawned("Mould Tower").Select(x => x.H.ResolveAt)));
             t.Check("Hard: Crown Ring, the crown turret alternates Lane Stream and Ring Wave", crown.Rings > 0 && t.Spawned("Ring Wave path").Any() && t.Spawned("Ring Wave bullet").Any() && t.Spawned("Lane Stream bullet").Any(),
                 $"rings {crown.Rings}, ring bullets {t.Spawned("Ring Wave bullet").Count()}");
+            // Hard Crown Ring bullets can down a player during the cycle without a wipe; the fight then stays in Combat with the main
+            // player down, which stalls the next Setup. Let the last bullets land, then stand everyone back up.
+            for (s = 0; s < 3f; s += Time.deltaTime) { foreach (var p in t.Party) if (!p.Down) p.DebugSetHp(PlayerController.MaxHp); yield return null; }
+            t.W.ClearTransient();
+            foreach (var p in t.Party) p.DebugRevive();
             yield return t.Setup(4, at: new[] { new Vector3(0, 0, 4f), new Vector3(4, 0, 0), new Vector3(0, 0, -4f), new Vector3(-4, 0, 0) });
             if (t.Boss == null) yield break;
             crown = t.Boss.Crown;   // the last pour channels can down the idle party after the Hard cycle, which restarts the encounter
