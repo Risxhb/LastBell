@@ -370,7 +370,9 @@ namespace LastBell.Run
         }
 
         // ---------------- helpers ----------------
-        List<PlayerController> Standing => W.Players.FindAll(p => !p.Down);
+        // who her aimed attacks may pick: standing and not reviving (revive rule, accepted 4 Nov: no mechanic aims at a reviver;
+        // a reviver standing in a hazard is still hit). Every target picker below starts here, with an unaimed fallback.
+        List<PlayerController> Standing => W.Players.FindAll(p => !p.Down && p.Reviving == null);
         static Vector3 On(float a, float r) => new Vector3(Mathf.Cos(a) * r, 0, Mathf.Sin(a) * r);
         static float AngOf(Vector3 v) => Mathf.Atan2(v.z, v.x);
         static float YawOf(float a) => 90f - a * Mathf.Rad2Deg;   // floor angle -> Sim yaw (degrees, 0 = +z)
@@ -501,7 +503,9 @@ namespace LastBell.Run
         {
             Act("Seed", 1.2f);
             if (W.Players.Count == 1) { var p = W.Players[0]; if (!p.Down) Pod(p, Vector3.zero, 2.5f, doubled); return; }
-            foreach (var p in Farthest(FarCount)) Pod(p, Vector3.zero, 2.5f, doubled);
+            var far = Farthest(FarCount);
+            if (far.Count == 0) Pod(null, On(Rnd(0, Tau), 7), 2.5f, doubled);   // everyone standing is reviving: an unaimed pod
+            foreach (var p in far) Pod(p, Vector3.zero, 2.5f, doubled);
         }
         void TrianglePods()
         {
@@ -550,11 +554,13 @@ namespace LastBell.Run
             var ts = Standing.FindAll(p => Sim.Flat(p.transform.position).magnitude > 8);
             if (ts.Count == 0) ts = Farthest(1);
             var aims = new List<float>(); foreach (var p in ts) aims.Add(AngOf(p.transform.position));
+            if (aims.Count == 0) aims.Add(Rnd(0, Tau));   // everyone standing is reviving: one unaimed jet
+            int baseN = aims.Count;
             if (MirrorJets) for (int i = 0, n = aims.Count; i < n; i++) aims.Add(aims[i] + Mathf.PI);   // Hard twins
             for (int i = 0; i < aims.Count; i++)
             {
-                int k = i < ts.Count ? i : i - ts.Count + 1;   // a twin slides opposite to its jet
-                var tg0 = tagNow; if (i >= ts.Count) tagNow = MirrorTag;   // hit bookkeeping only
+                int k = i < baseN ? i : i - baseN + 1;   // a twin slides opposite to its jet
+                var tg0 = tagNow; if (i >= baseN) tagNow = MirrorTag;   // hit bookkeeping only
                 float a0 = aims[i], dir = k % 2 == 1 ? -1 : 1, span = 40 * Deg, start = a0 - dir * span / 2;
                 W.Hazards.Spawn(new Hazard
                 {
@@ -584,7 +590,7 @@ namespace LastBell.Run
         {
             float w = ArcExtra;
             Act("PruningArc", 2.9f);
-            var near = W.NearestStanding(Vector3.zero);
+            PlayerController near = null; foreach (var p in Standing) if (!near || Sim.Flat(p.transform.position).sqrMagnitude < Sim.Flat(near.transform.position).sqrMagnitude) near = p;
             float a = near ? AngOf(near.transform.position) : Rnd(0, Tau);
             var front = Tune(new Hazard
             {
