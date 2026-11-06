@@ -786,6 +786,8 @@ namespace LastBell.Run
                     foreach (var p in w.Players) { if (p.Down && down.Add(p)) { downs++; if (lastKey.TryGetValue(p, out var lk)) Count(lk, 0, 0); if (lk != null) hitLog[lk][2]++; } else if (!p.Down) down.Remove(p); }
                     yield return null;
                 }
+                // the last down ends combat on the same tick, before the loop sees it: count it for its last hit too
+                foreach (var p in w.Players) if (p.Down && down.Add(p)) { downs++; if (lastKey.TryGetValue(p, out var lk)) hitLog[lk][2]++; }
                 float secs = (last - tick0) / (float)Sim.Hz; bool won = d.State == RunState.Cleared || d.Victory || (sy && sy.Dead), wiped = d.State == RunState.Downed;
                 var parts = new List<string>();
                 for (int i = 0; i < phaseAt.Count; i++)
