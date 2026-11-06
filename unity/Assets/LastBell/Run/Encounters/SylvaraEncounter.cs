@@ -50,6 +50,7 @@ namespace LastBell.Run
         public bool MirrorJets => Hard;   // Hard (5 Nov, done as recommended): each jet pours a twin from the opposite wall
         public bool ChoirPods => Hard;    // Hard: Seed Pods on the farthest players at 16.5 s in Phase 2 (coral petals hit every colour)
         public bool CounterSpiral => Hard;   // Hard: a 2-arm spiral turning the other way under the Hollow Spiral, same gaps
+        public bool StormArc => Hard;   // Hard: a Pruning Arc at 15 s in each Seed Storm loop (not in Last Storm)
 
         CharacterPresenter presenter;
         int phase;
@@ -360,6 +361,7 @@ namespace LastBell.Run
                     At(0, "Seed Storm", StartStorm);
                     At(6, "Seed Pods", () => PodsOnFar());
                     At(12, "Root Ring", () => RootRing(3.5f));
+                    if (StormArc && P4Loop < 5) At(15, "Storm Arc", PruningArc);   // Hard (5 Nov): both cuts land by 17.8 s, before the 18 s pods
                     At(18, "Seed Pods", () => PodsOnFar());
                     if (P4Loop == 4) At(LastStormAt - 4 * 24 - 3, "Toll", () => Toll("LAST STORM in 3 s"));
                     break;

@@ -1053,7 +1053,7 @@ namespace LastBell.Run
                     sy.BudCount == budBase + (h ? 1 : 0) && Mathf.Approximately(sy.BloomAfter, e ? 15 : 12) && sy.HollowArms == (e ? 3 : 4) && sy.CounterSpiral == h, $"{sy.BudCount} buds");
                 sy.DebugStartStorm(0);
                 Check($"Sylvara {lv} P4: loop 1 {(e ? "6 seeds every 2.5" : "8 seeds every 2.0")} s, bursts of {(h ? 10 : 8)}",
-                    sy.StormSeeds == (e ? 6 : 8) && Mathf.Abs(sy.StormEvery - (e ? 2.5f : 2.0f)) < 0.001f && sy.BurstPetals == (h ? 10 : 8), $"{sy.StormSeeds} / {sy.StormEvery} / {sy.BurstPetals}");
+                    sy.StormSeeds == (e ? 6 : 8) && Mathf.Abs(sy.StormEvery - (e ? 2.5f : 2.0f)) < 0.001f && sy.BurstPetals == (h ? 10 : 8) && sy.StormArc == h, $"{sy.StormSeeds} / {sy.StormEvery} / {sy.BurstPetals}");
                 sy.DebugStartStorm(2);
                 Check($"Sylvara {lv} P4: the same enrage steps (+2 seeds, 0.2 s sooner at loop 3)",
                     sy.StormSeeds == (e ? 8 : 10) && Mathf.Abs(sy.StormEvery - (e ? 2.3f : 1.8f)) < 0.001f, $"{sy.StormSeeds} / {sy.StormEvery}");
@@ -1070,6 +1070,7 @@ namespace LastBell.Run
                 Check("Sylvara Hard P1: each Waterfall Jet has a mirrored twin with its own warning", sy.MirrorJets && wedges >= 2 && wedges % 2 == 0, wedges + " wedges");
                 Check("Sylvara Hard P2: Seed Pods join the Choir at 16.5 s", sy.ChoirPods);
                 Check("Sylvara Hard P3: a counter spiral turns under the Hollow Spiral", sy.CounterSpiral);
+                Check("Sylvara Hard P4: a Pruning Arc cuts through each Seed Storm loop", sy.StormArc);
                 d.World.Hazards.ClearAll();
             }
             {
