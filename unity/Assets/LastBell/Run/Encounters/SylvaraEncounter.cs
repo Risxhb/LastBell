@@ -48,6 +48,7 @@ namespace LastBell.Run
         public float PodLandIn(int ph) => ph == 1 && Easy ? 3.0f : 2.5f;
         public bool PodDoubledIn(int ph) => ph == 1 && Hard;
         public bool MirrorJets => Hard;   // Hard (5 Nov, done as recommended): each jet pours a twin from the opposite wall
+        public bool ChoirPods => Hard;    // Hard: Seed Pods on the farthest players at 16.5 s in Phase 2 (coral petals hit every colour)
 
         CharacterPresenter presenter;
         int phase;
@@ -336,6 +337,7 @@ namespace LastBell.Run
                     if (SecondColourSpiral) At(10, "Second Colour Spiral", () => sp2 = Spiral(-1, 4, 18 * Deg, 3.5f, 0.22f, 8, 5, new[] { Cobalt, Brass }));
                     At(12, "Root Ring", () => RootRing(3.5f));
                     At(14.5f, "Brass Lanes", () => ChoirLanes(Brass, Mathf.PI / 2, -1, 20, lane));
+                    if (ChoirPods) At(16.5f, "Choir Pods", () => PodsOnFar());   // Hard (5 Nov): lands at 19 s, before the 20 s toll
                     foreach (float t in W.Players.Count == 1 ? new[] { 4f, 8, 12, 16, 20 } : new[] { 5f, 10, 15, 20 })
                     {
                         At(t - 1, "Toll", () => { Toll("TOLL: every colour swaps"); WarnSwap(); });

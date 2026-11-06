@@ -1048,7 +1048,7 @@ namespace LastBell.Run
                 Check($"Sylvara {lv} P1: jets warn {(e ? 2.0f : 1.5f)} s, Pruning Arc {(e ? "2.5 / 3.3" : "2.0 / 2.8")} s",
                     Mathf.Approximately(sy.JetWarn, e ? 2.0f : 1.5f) && Mathf.Approximately(sy.ArcExtra, e ? 0.5f : 0));
                 Check($"Sylvara {lv} P2: lanes every {(e ? 0.5f : 0.35f)} s, second spiral {(e ? "off" : "on")}, {(h ? "double" : "single")} toll",
-                    Mathf.Approximately(sy.LanePeriod, e ? 0.5f : 0.35f) && sy.SecondColourSpiral == h && sy.DoubleToll == h);
+                    Mathf.Approximately(sy.LanePeriod, e ? 0.5f : 0.35f) && sy.SecondColourSpiral == h && sy.DoubleToll == h && sy.ChoirPods == h && sy.MirrorJets == h);
                 Check($"Sylvara {lv} P3: {(h ? "one more bud" : "same buds")}, bloom {(e ? 15 : 12)} s, {(e ? 3 : 4)}-arm spiral",
                     sy.BudCount == budBase + (h ? 1 : 0) && Mathf.Approximately(sy.BloomAfter, e ? 15 : 12) && sy.HollowArms == (e ? 3 : 4), $"{sy.BudCount} buds");
                 sy.DebugStartStorm(0);
@@ -1068,6 +1068,7 @@ namespace LastBell.Run
                 sy.DebugJets();
                 int wedges = d.World.Hazards.Live.Count(hz => hz.Source == "Waterfall Jet");
                 Check("Sylvara Hard P1: each Waterfall Jet has a mirrored twin with its own warning", sy.MirrorJets && wedges >= 2 && wedges % 2 == 0, wedges + " wedges");
+                Check("Sylvara Hard P2: Seed Pods join the Choir at 16.5 s", sy.ChoirPods);
                 d.World.Hazards.ClearAll();
             }
             {
