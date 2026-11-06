@@ -37,8 +37,11 @@ namespace LastBell.Run
         public static bool Attacks = System.Array.Exists(System.Environment.GetCommandLineArgs(), a => a.Equals("-lastbellAllyAttack", System.StringComparison.OrdinalIgnoreCase));
         // how hard its Sylvara spot pulls in Seed Storm (cost per metre; 0.35 elsewhere). At 0.35 the dodging drifted the
         // Tollbreaker to the wall, 11 m out, in swing range 1 % of the time; 2.5 brought solo Phase 4 runs from 21 % of her
-        // HP left to 4-9 %, with a first clear (6 Nov, runs 51-52)
+        // HP left to 4-9 %, with a first clear (6 Nov, run 51)
         const float P4Pull = 2.5f;
+        // in Seed Storm the Tollbreaker throws from 9 m (a Twin Hurl tap flies 9 m): even pulled home, the seeds keep it
+        // 9-10 m out. Phase 4 from its start then cleared 8 of 8 Hard runs, solo and 4 players (run 52; 2 of 8 without)
+        const float P4Throw = 9f;
         public static BotMode AllyMode = BotMode.Perfect;   // menu allies do every mechanic, memory ones included (Chzy18: "do the mechanics"); still no attacks
         public static int StartDelay;   // tests: ticks a new bot stands still at the start (-lastbellSweepRepeat varies the fight with it)
         int tick, lastPress = -999, castHold;
@@ -1267,7 +1270,7 @@ namespace LastBell.Run
             // the non-attacking menu bots; the boss herself only when attacks are on
             bool atBud = reach.HasValue && Sim.Flat(target - pos).magnitude <= BudStand(me) + 1.4f;
             // (Tollbreaker plays its rotation: a held Twin Hurl lodges the axe, and lodged axes need a recall)
-            if (!reviving && (atBud || Attacks && Sim.Flat(target - pos).magnitude <= Range(me) + sy.BodyRadius + 2f))
+            if (!reviving && (atBud || Attacks && Sim.Flat(target - pos).magnitude <= (me.ClassName == "Tollbreaker" && sy.PhaseName == SylvaraEncounter.PhaseNames[3] ? P4Throw : Range(me)) + sy.BodyRadius + 2f))
             {
                 if (me.Kit is TollbreakerKit) Attack(me, ref inp);
                 else inp.P0 = inp.H0 = tick % 6 == 0 || me.ClassName != "Arcanist";
