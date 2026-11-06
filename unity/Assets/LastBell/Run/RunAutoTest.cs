@@ -1063,6 +1063,14 @@ namespace LastBell.Run
                     sy.LastStorm && sy.StormSeeds == (e ? 12 : 14) && Mathf.Abs(sy.StormEvery - (e ? 0.8f : 0.6f)) < 0.001f, $"{sy.StormSeeds} / {sy.StormEvery}");
             }
             {
+                // Hard extras (5 Nov, done as recommended): more to dodge, not more damage
+                d.World.Difficulty = Difficulty.Hard; d.World.Hazards.ClearAll();
+                sy.DebugJets();
+                int wedges = d.World.Hazards.Live.Count(hz => hz.Source == "Waterfall Jet");
+                Check("Sylvara Hard P1: each Waterfall Jet has a mirrored twin with its own warning", sy.MirrorJets && wedges >= 2 && wedges % 2 == 0, wedges + " wedges");
+                d.World.Hazards.ClearAll();
+            }
+            {
                 // Hard live: a seed bursts into 10 petals
                 d.World.Difficulty = Difficulty.Hard; sy.DebugStartStorm(0);
                 yield return Play(4.5f, () => false);   // the first ring comes at 2.0 s and bursts 1.6 s later

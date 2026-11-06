@@ -47,6 +47,7 @@ namespace LastBell.Run
         public int HollowArms => Easy ? 3 : 4;
         public float PodLandIn(int ph) => ph == 1 && Easy ? 3.0f : 2.5f;
         public bool PodDoubledIn(int ph) => ph == 1 && Hard;
+        public bool MirrorJets => Hard;   // Hard (5 Nov, done as recommended): each jet pours a twin from the opposite wall
 
         CharacterPresenter presenter;
         int phase;
@@ -494,6 +495,7 @@ namespace LastBell.Run
         // and sink, so the warning is never covered.
         public const int RootPieces = 10;
         public int PodModels, RootModels, BudModels;   // tests: prop models placed (0 when the art isn't installed)
+        public void DebugJets() => Jets();   // tests: one round of Waterfall Jets
         public void DebugRoots() => RootsErupt(Vector3.zero, 3.5f);   // tests: the Root Ring's look alone, for a screenshot
         void RootsErupt(Vector3 c, float r)
         {
@@ -511,6 +513,7 @@ namespace LastBell.Run
         // Waterfall Jets: one per player past 8 m (else the farthest). The wedge warns 1.5 s; then a solid stream (a drop
         // every 0.07 s at 9 m/s) pours from the wall to her rim while its source slides 40° along the wall over 2 s,
         // starting 20° before the target.
+        // Hard: each jet also pours from the opposite wall (its own wedge warning), sliding the other way.
         public float JetWarn => Easy ? 2.0f : 1.5f;   // Easy: 2.0 s
         void Jets()
         {
@@ -518,9 +521,12 @@ namespace LastBell.Run
             Act("CallWater", warn * 1.9f / 1.5f);   // the hand pulls down (1.5 of the clip's 1.9 s) as the water pours
             var ts = Standing.FindAll(p => Sim.Flat(p.transform.position).magnitude > 8);
             if (ts.Count == 0) ts = Farthest(1);
-            for (int i = 0; i < ts.Count; i++)
+            var aims = new List<float>(); foreach (var p in ts) aims.Add(AngOf(p.transform.position));
+            if (MirrorJets) for (int i = 0, n = aims.Count; i < n; i++) aims.Add(aims[i] + Mathf.PI);   // Hard twins
+            for (int i = 0; i < aims.Count; i++)
             {
-                float a0 = AngOf(ts[i].transform.position), dir = i % 2 == 1 ? -1 : 1, span = 40 * Deg, start = a0 - dir * span / 2;
+                int k = i < ts.Count ? i : i - ts.Count + 1;   // a twin slides opposite to its jet
+                float a0 = aims[i], dir = k % 2 == 1 ? -1 : 1, span = 40 * Deg, start = a0 - dir * span / 2;
                 W.Hazards.Spawn(new Hazard
                 {
                     Source = "Waterfall Jet", AttackId = AttackOf("Waterfall Jet"), Shape = HazardShape.Cone, Kind = HazardKind.Strike, Origin = Vector3.zero, Yaw = YawOf(a0),
