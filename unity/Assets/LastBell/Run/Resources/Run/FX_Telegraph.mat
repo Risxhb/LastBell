@@ -30,14 +30,11 @@ Material:
     - _Fade: 1
     - _Flash: 0
     - _HalfAngle: 40
-    - _HoleCount: 0
     - _Inner: 1
     - _Lock: 0
     - _Memory: 0
-    - _Motif: 0
     - _Progress: 0
     - _Radius: 2
-    - _Shade: 0
     - _Shape: 0
     m_Colors:
     - _ClipCentre: {r: 0, g: 0, b: 0, a: 0}
