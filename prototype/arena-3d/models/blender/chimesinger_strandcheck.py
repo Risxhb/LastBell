@@ -1,7 +1,7 @@
 # blender -b -P chimesinger_strandcheck.py -- <Chimesinger.glb> <report.txt>
 # For every clip in the shipped Chimesinger model: do the bell strands stay attached? Edges of the body mesh that touch a
 # strand bone (the strands and the cord link up to the sleeve) are measured on every frame against their rest length; a
-# torn-off strand shows as an edge stretched far past rest. Also the gap from each strand's top to the sleeve cord.
+# torn-off strand shows as an edge stretched far past rest.
 # Bones: tassel.L/R and tassel2.L/R (chimesinger_rig.py). Stretch up to ~2x is cloth in the run clips; a tear is far past that.
 import bpy, sys, numpy as np
 argv = sys.argv[sys.argv.index('--') + 1:]

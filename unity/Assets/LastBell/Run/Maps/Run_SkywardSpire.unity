@@ -119,7 +119,7 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
---- !u!1 &1010592816
+--- !u!1 &675817433
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -127,8 +127,8 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 1010592818}
-  - component: {fileID: 1010592817}
+  - component: {fileID: 675817435}
+  - component: {fileID: 675817434}
   m_Layer: 0
   m_Name: Run Director
   m_TagString: Untagged
@@ -136,13 +136,13 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1010592817
+--- !u!114 &675817434
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1010592816}
+  m_GameObject: {fileID: 675817433}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 10d11a6e5b5b7d143a8565c4b7ffccd7, type: 3}
@@ -151,13 +151,13 @@ MonoBehaviour:
   EncounterStarts: 0
   EncounterEnds: 0
   Transitions: 0
---- !u!4 &1010592818
+--- !u!4 &675817435
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1010592816}
+  m_GameObject: {fileID: 675817433}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -174,10 +174,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
-    - target: {fileID: 430536509551142, guid: 27c1d7cfc9406824cb0e99bfb2a4e9e5, type: 3}
-      propertyPath: m_IsActive
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 94017745050144446, guid: 27c1d7cfc9406824cb0e99bfb2a4e9e5, type: 3}
       propertyPath: m_IsActive
       value: 0
@@ -261,4 +257,4 @@ SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
   - {fileID: 6889805511853556286}
-  - {fileID: 1010592818}
+  - {fileID: 675817435}
