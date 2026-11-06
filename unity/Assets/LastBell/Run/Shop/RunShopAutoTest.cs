@@ -72,6 +72,8 @@ namespace LastBell.Run.Shop
         void KeepAlive() { if (d && d.Player && !d.Player.Down && d.Player.Hp < d.Player.MaxHealth) d.Player.DebugSetHp(d.Player.MaxHealth); }
         IEnumerator Shot(string name)
         {
+            // -batchmode draws no frames: ReadPixels there logs an error each time, so pictures are skipped (checks go on)
+            if (Application.isBatchMode) { Note("screenshot shop_" + name + " skipped (batchmode)"); yield break; }
             yield return new WaitForEndOfFrame();
             var tex = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
             tex.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0); tex.Apply();
