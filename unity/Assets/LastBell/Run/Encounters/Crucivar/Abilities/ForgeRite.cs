@@ -10,6 +10,7 @@ namespace LastBell.Run
     //                           players inside; leaves a 2 m slag pool (20/s) where it stopped, until the phase ends (ClearPools)
     //   2.0  Furnace Spin       four flame jets to the wall (1.8 m wide) shown 1.5 s, then sweep round the boss for 4 s at 40 deg/s,
     //                           30 each, once per jet; the turn direction flips every loop
+    //        Spin Reversal (Hard) the jets stop 2.0 s into the sweep for 0.5 s (vents flare), then turn back for 1.5 s
     //   5.0  Backdraft          5 m blast round the boss at 3.0 s (45, 1.5 m push); everyone pulled 2 m inward at 1.6-2.0 s
     //   8.5  Casting Order      pours I-IV (2.6 m lanes to the wall) through each numbered player, locking 1.5 s before they
     //                           land 0.5 s apart at 10.5-12.0 s, 30 each; each leaves a channel burning 20/s for 10 s.
@@ -40,9 +41,14 @@ namespace LastBell.Run
         public const float QuakeFirst = 1.4f, QuakeGap = 0.8f, QuakeInner = 4f, QuakeMiddle = 9f;
         public const int QuakeDmg = 40;
         public const float EchoGap = 0.8f;   // Hard: Quake Echo
+        // Hard: Spin Reversal (proposal, 5 Nov). The jets turn 2.0 s, stop 0.5 s with the vents flaring, then turn back for the
+        // last 1.5 s (same 4 s live); the gap you ride reverses with them. Every Furnace Spin on Hard, every phase.
+        public const float ReverseAt = 2.0f, ReverseHold = 0.5f;
 
         int loops;
         public int Echoes { get; private set; }
+        public int Reversals { get; private set; }
+        public float SpinNet { get; private set; }   // degrees the last Furnace Spin's first jet turned in all (tests)
         public int Loops => loops;
         public readonly List<Hazard> Pools = new List<Hazard>();
         public List<PlayerController> Order { get; private set; } = new List<PlayerController>();
@@ -119,8 +125,11 @@ namespace LastBell.Run
             float baseYaw = Boss.transform.eulerAngles.y + 45f, dir = loops % 2 == 1 ? 1f : -1f;
             int show = T(JetShow), sweep = Sim.Ticks(JetSweep);
             Boss.Presenter?.Action(dir > 0 ? "FurnaceSpinCW" : "FurnaceSpinCCW", show + sweep);   // turns the way the jets sweep
+            bool reverse = Hard; int stop = Sim.Ticks(ReverseAt), back = Sim.Ticks(ReverseAt + ReverseHold);
+            SpinNet = 0;
             for (int k = 0; k < JetCount; k++)
             {
+                bool first = k == 0;
                 var h = new Hazard
                 {
                     Source = "Furnace Spin", AttackId = "crucivar.furnace_spin", Shape = HazardShape.Lane, Kind = HazardKind.Strike, Origin = origin, Yaw = baseYaw + 360f / JetCount * k,
@@ -130,7 +139,15 @@ namespace LastBell.Run
                 ToWall(h);
                 h.Track = hz =>
                 {
-                    if (hz.Age >= hz.ResolveAt) hz.Yaw += dir * JetTurnDeg * Sim.Dt; ToWall(hz);   // turns only once it is live, always reaches the wall
+                    if (hz.Age >= hz.ResolveAt)   // turns only once it is live, always reaches the wall
+                    {
+                        int live = hz.Age - hz.ResolveAt;
+                        float d = !reverse || live < stop ? dir : live < back ? 0 : -dir;
+                        hz.Yaw += d * JetTurnDeg * Sim.Dt;
+                        if (first) SpinNet += d * JetTurnDeg * Sim.Dt;
+                        if (first && reverse && live == stop) { Reversals++; Boss.Flare(1.2f); Boss.Rig.VentsAll(true); }   // the stop is the warning
+                    }
+                    ToWall(hz);
                     if (hz.Age >= hz.ResolveAt && (hz.Age - hz.ResolveAt) % 4 == 0) W.BossFx.FlameJet(hz.Origin, hz.Yaw, hz.Length, hz.Width);   // flames while it sweeps
                 };
                 W.Hazards.Spawn(h);
