@@ -25,6 +25,10 @@ namespace LastBell.Run
             _ => new[] { "", "" },
         };
 
+        // the 4 main bosses only (Chzy18, 2 Nov); Risx's miniboss phase checks run with -lastbellPhaseMinibosses (review TEST-01)
+        static bool PhaseMinibosses => Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellPhaseMinibosses", StringComparison.OrdinalIgnoreCase));
+        static bool MainBoss(int e) => RunDirector.Bosses[e].Final || Campaign.IsAreaBoss(e);
+
         IEnumerator PracticePhaseChecks()
         {
             Note("---- practice phase row ----");
@@ -38,6 +42,7 @@ namespace LastBell.Run
             for (int e = 0; e < RunDirector.Bosses.Length; e++)
             {
                 if (RunDirector.Bosses[e].Name == RunDirector.TutorialName) continue;   // the tutorial is scripted (TutorialDirector): no phase row
+                if (!MainBoss(e) && !PhaseMinibosses) continue;
                 for (int n = 1; n <= RunDirector.Bosses[e].Phases; n++)
                     yield return PracticeAtPhase(e, n, n == RunDirector.Bosses[e].Phases);
             }
