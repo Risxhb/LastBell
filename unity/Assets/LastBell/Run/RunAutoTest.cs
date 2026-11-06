@@ -747,11 +747,15 @@ namespace LastBell.Run
             var keepLevel = RunDifficulty.Selected;
             // Hard: Tollbreaker solo plus one party of 4 (test less, 1 Nov: the levels only scale damage)
             var runs = new (string cls, int allies, Difficulty level)[] { ("Tollbreaker", 0, Difficulty.Hard), ("Tollbreaker", 3, Difficulty.Hard) };
+            // -lastbellSylvaraClearPhase n starts each run in phase n (practice Start Phase row); -lastbellSylvaraClearRepeat k runs the set k times
+            int startPhase = int.TryParse(AurelionArgs.Arg("-lastbellSylvaraClearPhase"), out var sp) ? Mathf.Clamp(sp, 1, 4) : 1;
+            int repeats = int.TryParse(AurelionArgs.Arg("-lastbellSylvaraClearRepeat"), out var nr) ? Mathf.Clamp(nr, 1, 10) : 1;
+            runs = Enumerable.Repeat(runs, repeats).SelectMany(r => r).ToArray();
             foreach (var (cls, allies, level) in runs)
             {
                 if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }
                 d.SelectAllies(allies); d.SelectDifficulty(level);
-                if (!d.StartPractice(cls, RunDirector.SylvaraPractice)) { Check($"Sylvara clear run {cls} +{allies} starts", false); continue; }
+                if (!d.StartPractice(cls, RunDirector.SylvaraPractice, startPhase)) { Check($"Sylvara clear run {cls} +{allies} starts", false); continue; }
                 yield return Until(() => RunDirector.Instance && RunDirector.Instance.State == RunState.Ready, 30, "Verdant Chimes loaded for a clear run");
                 if (RunDirector.Instance != d) { directorLog.AddRange(d.Log); d = RunDirector.Instance; d.InputOverride = bot; bot.Clear(); }
                 d.RequestReady();
