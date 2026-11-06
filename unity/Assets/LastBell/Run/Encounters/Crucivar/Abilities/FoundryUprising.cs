@@ -16,6 +16,7 @@ namespace LastBell.Run
     // Solo: two turrets in sequence (the second rises when the first sinks), 36 s. Easy: paths 2.5 s, 40 s.
     // Each uprising steps up: the second alternates two patterns per turret, the third cuts the rest to 0.5 s.
     // Hard (Cast in Order): killing a casting out of numeral order makes every standing turret fire a Ring Wave at once.
+    // Hard (Aimed Streams): Lane Streams point at the nearest player as their path is drawn (AimYaw).
     public sealed class FoundryUprising : CrucivarAbility
     {
         public override string Id => "crucivar.foundry_uprising";
@@ -178,6 +179,7 @@ namespace LastBell.Run
             if (p == Pattern.Lane)
             {
                 float yaw = baseYaw + (tu.Shots % 2 == 0 ? 12f : -12f);
+                if (Hard) yaw = AimYaw(tu, baseYaw, yaw);   // Hard: Aimed Streams
                 var d = Sim.Dir(yaw); var side = Vector3.Cross(Vector3.up, d);
                 var offsets = tu.Dense ? new[] { -2 * DenseLaneSpacing, -DenseLaneSpacing, 0, DenseLaneSpacing, 2 * DenseLaneSpacing } : new[] { -LaneSpacing, 0, LaneSpacing };
                 int per = tu.Dense ? DenseLaneBullets : 5;
@@ -228,6 +230,21 @@ namespace LastBell.Run
                         spirals.Add((tu, a0, t));
                     });
             }
+        }
+
+        // Hard: Aimed Streams (proposal, 5 Nov). A Lane Stream's middle lane points at the nearest standing player when its
+        // path is drawn (kept within AimClamp of straight in), then stays put for the 2.0 s warning: step out sideways
+        // or between the lanes. Every lava turret on Hard (Phase 2's and Molten Crown's).
+        public const float AimClamp = 40f;
+        public int Aimed { get; private set; }
+        float AimYaw(Turret tu, float baseYaw, float fallback)
+        {
+            PlayerController near = null; float best = float.MaxValue;
+            foreach (var p in Standing()) { float dd = Flat(p.transform.position - tu.Pos).sqrMagnitude; if (dd < best) { best = dd; near = p; } }
+            if (near == null) return fallback;
+            Aimed++;
+            float off = Mathf.Clamp(Mathf.DeltaAngle(baseYaw, Sim.YawTo(tu.Pos, near.transform.position, baseYaw)), -AimClamp, AimClamp);
+            return baseYaw + off;
         }
 
         void StepSpirals()

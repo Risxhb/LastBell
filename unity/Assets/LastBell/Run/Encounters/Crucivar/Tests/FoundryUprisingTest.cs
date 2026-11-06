@@ -72,12 +72,19 @@ namespace LastBell.Run
             yield return t.Until(() => t.Party.All(p => p.Down), 6f, "flood");
             t.Check("an uprising left standing floods at 30 s and downs the whole party", t.Party.All(p => p.Down) && up.Floods == 1, $"down {t.Party.Count(p => p.Down)}/4, floods {up.Floods}");
 
+            t.Check("Medium has no Aimed Streams", up.Aimed == 0, $"aimed {up.Aimed}");
             // Hard: the casting that may die next is framed, the others dimmed (look check only)
             yield return t.Setup(4, Difficulty.Hard, at: new[] { new Vector3(0, 0, 3f), new Vector3(0, 0, -13f), new Vector3(9, 0, 0), new Vector3(-6, 0, 5) });
             if (t.Boss == null) yield break;
             up = t.Boss.Uprising;
             t.Begin(up.Run());
             yield return t.Seconds(3f);
+            // Hard: Aimed Streams, turret I opens with a Lane Stream whose middle lane runs through the nearest player
+            var tu0 = up.Turrets[0];
+            var nearP = t.Party.Where(p => !p.Down).OrderBy(p => Sim.Flat(p.transform.position - tu0.Pos).sqrMagnitude).First();
+            var lanes = t.Spawned("Lane Stream path").Where(x => Sim.Flat(x.H.Origin - tu0.Pos).magnitude < 6f).ToList();
+            t.Check("Hard: Aimed Streams, a Lane Stream path runs through the player nearest its turret", up.Aimed > 0 && lanes.Any(x => x.H.Contains(nearP.transform.position)),
+                $"aimed {up.Aimed}, {lanes.Count} lane paths");
             t.W.DamagePart(up.Turrets[0].Casting, Mathf.RoundToInt(up.Turrets[0].CastMax * 0.6f), up.Turrets[0].Casting.Pos, "test");
             foreach (var p in t.Party) p.DebugSetHp(PlayerController.MaxHp);
             yield return t.Shot("v4_casting_bars_hard");
