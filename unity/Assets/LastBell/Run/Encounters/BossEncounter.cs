@@ -23,6 +23,18 @@ namespace LastBell.Run
         public bool Solid => !Dead && W != null;
         public string PhaseName { get; protected set; } = "";
         public string Current { get; protected set; } = "";   // attack in progress, for the HUD / tests
+        public virtual string HudLine => null;         // extra boss-bar line (e.g. a push timer); null = none
+        // Extra hit bodies (the Bellkeeper Ultimate's P4 gear cores): solid like the body, and a player hit on one counts as
+        // a hit on the boss (the same bar). Body 0 is always the boss itself; other bosses offer none.
+        public virtual int ExtraBodies => 0;
+        public virtual void ExtraBody(int i, out Vector3 center, out float radius) { center = transform.position; radius = 0; }
+        public int BodyCount => 1 + ExtraBodies;
+        public void Body(int i, out Vector3 center, out float radius)
+        {
+            if (i == 0) { center = transform.position; radius = BodyRadius; }
+            else ExtraBody(i - 1, out center, out radius);
+        }
+        public virtual float[] HudMarks => null;       // phase thresholds drawn on the boss bar (fractions); null = the HUD's defaults
         public virtual string HudExtra => null;          // an extra boss-bar line (Aurelion v4: enrage clock, shield)
         // LAN client replica (never stepped): the host's values for the HUD. netExtra null = this boss's own HudExtra.
         string netExtra; bool netState;
@@ -109,10 +121,11 @@ namespace LastBell.Run
         protected virtual void StepAlways() { }               // presentation-adjacent state on every tick
         protected virtual void OnDefeat() { }
         protected virtual void OnHurt() { }
+        protected virtual void OnHalt() { }                   // the script was dropped (Halt): stop anything it started
         protected virtual int Absorb(int damage) => damage;   // returns what gets through to HP
 
         public virtual void BeginCombat() { script = Script().GetEnumerator(); wait = 0; }
-        public void Halt() { script = null; Current = "idle"; }   // player defeat: stop attacking, keep standing
+        public void Halt() { script = null; Current = "idle"; OnHalt(); }   // player defeat: stop attacking, keep standing
 
         // profiler scopes (perf agent, 2 Nov): the per-tick state and the phase script
         static readonly Unity.Profiling.ProfilerMarker PmAlways = new Unity.Profiling.ProfilerMarker("LastBell.Boss.StepAlways"),
@@ -135,6 +148,7 @@ namespace LastBell.Run
                     script = Script().GetEnumerator();
                     if (!script.MoveNext()) { script = null; return; }
                 }
+                if (script == null) return;   // the step itself halted or defeated the boss (a wipe, the Ultimate slice ending)
                 wait = Mathf.Max(1, script.Current) - 1;
             }
         }
@@ -142,9 +156,11 @@ namespace LastBell.Run
         public int TakeHit(int damage, Vector3 contact, bool hitFx = true)
         {
             if (Dead) return 0;
+            damage = Mathf.RoundToInt(damage * DamageTakenScale(contact)); if (damage <= 0) return 0;
             damage = Absorb(damage);   // a shield (Aurelion v4 Corona Shield) takes its share first
             if (damage <= 0) { RunHud.Float(contact + Vector3.up * 0.5f, "absorbed", new Color(0.7f, 0.85f, 1f)); return 0; }
-            int dealt = Mathf.Min(damage, Hp - Mathf.Clamp(HpFloor, 0, Hp));
+            int floor = ignoreFloor ? 0 : Mathf.Clamp(Mathf.Max(HpFloor, PhaseFloor), 0, Hp);
+            int dealt = Mathf.Min(damage, Hp - floor);
             if (dealt <= 0) { RunHud.Float(contact + Vector3.up * 0.5f, "held", new Color(0.7f, 0.85f, 1f)); return 0; }
             Hp -= dealt;
             RunHud.Float(contact + Vector3.up * 0.5f, dealt.ToString(), new Color(1f, 0.86f, 0.45f));
@@ -158,7 +174,17 @@ namespace LastBell.Run
         // dev / test hook: defeat now (goes through the same path as a killing blow)
         // A boss whose OnHurt holds HP (the Chimebound Oracle at 50% until his Grand Toll ends) still falls: the hold would
         // otherwise refill him and the run tests, which now meet minibosses in runs, could never clear him.
-        public void DebugDefeat() { if (!Dead) { HpFloor = 0; Hp = 1; TakeHit(1, transform.position + Vector3.up * HitHeight); if (!Dead) { Hp = 0; Die(); } } }
+        public void DebugDefeat() { if (!Dead) { HpFloor = 0; Hp = 1; ignoreFloor = true; TakeHit(1, transform.position + Vector3.up * HitHeight); ignoreFloor = false; if (!Dead) { Hp = 0; Die(); } } }
+        // Damage can't take Hp below this until the boss lowers it (the Bellkeeper Ultimate holds each phase's threshold
+        // until its transition, so a phase can't be skipped). 0 = no floor. Works with HpFloor (the tutorial's); the higher wins.
+        // DebugDefeat ignores both.
+        protected virtual int PhaseFloor => 0;
+        // multiplies every hit this boss takes, by where it lands (the Bellkeeper Ultimate's P5: the bell resonates, only the
+        // Bellkeeper that rang last takes damage, x4 in the last stand)
+        protected virtual float DamageTakenScale(Vector3 contact) => 1f;
+        // the run level's multiplier on this boss's damage to players; a boss may author its own table (the Bellkeeper Ultimate)
+        public virtual float PlayerDamageScale(Difficulty d) => RunDifficulty.DamageTakenScale(d);
+        bool ignoreFloor;
         public virtual float NextPhaseFraction() => Hp > MaxHp * 0.7f ? 0.69f : 0.34f;   // F8: just below the next threshold
         public void DebugSetHpFraction(float f){ if (!Dead) Hp = Mathf.Clamp(Mathf.RoundToInt(MaxHp * f), 1, MaxHp); }
 

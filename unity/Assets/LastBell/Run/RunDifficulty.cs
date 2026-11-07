@@ -17,9 +17,9 @@ namespace LastBell.Run
         public static readonly string[] Names = { "Easy", "Medium", "Hard" };
         public static readonly string[] Notes =
         {
-            "Boss attacks deal 60% damage. Same attacks and timings.",
-            "The intended fight: every boss as designed.",
-            "Boss attacks deal 130% damage. Same attacks and timings.",
+            "Boss attacks deal 60% damage. Same attacks and timings. Bellkeeper Ultimate: 55% damage, 80% HP, 20% longer timers, warnings 0.3 s earlier.",
+            "The intended fight: every boss as designed. Bellkeeper Ultimate: 75% damage, 90% HP, 10% longer timers.",
+            "Boss attacks deal 130% damage. Same attacks and timings. Bellkeeper Ultimate: its designed fight (100% damage).",
         };
         const string PrefKey = "LastBell.Run.Difficulty";
 

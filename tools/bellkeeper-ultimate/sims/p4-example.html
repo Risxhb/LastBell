@@ -1,0 +1,201 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Bellkeeper P4 example</title>
+<style>
+:root{--bg:#10162a;--panel:#182039;--ivory:#efe6cf;--brass:#c99a4b;--coral:#ff6a4d;--dim:#8d93ad}
+body{margin:0;background:var(--bg);color:var(--ivory);font-family:Segoe UI,Arial,sans-serif;display:flex;flex-direction:column;align-items:center}
+h1{font-size:20px;margin:12px 0 2px} .sub{color:var(--dim);font-size:13px;margin:0 16px 8px;max-width:840px;text-align:center;line-height:1.45}
+.wrap{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;padding:0 16px}
+canvas{background:#0b0f1c;border-radius:10px;max-width:96vw;height:auto}
+.side{max-width:300px;font-size:13px;line-height:1.5}
+.side h3{margin:6px 0 4px;font-size:14px;color:var(--brass)} .side p{margin:0 0 6px}
+.k{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:4px}
+.bar{display:flex;gap:10px;margin:8px 0;align-items:center;font-size:14px;flex-wrap:wrap;justify-content:center}
+button,select{background:#2a3358;color:var(--ivory);border:1px solid #445;border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit}
+#log{font-size:13px;color:var(--dim);max-width:840px;text-align:center;min-height:56px;padding:0 16px}
+#log b{color:var(--ivory)} .bad{color:var(--coral)!important}
+</style></head><body>
+<h1>Bellkeeper Ultimate v2 · P4 "The Unfinished Hour" example: the Gear Floor (simulation, not the game)</h1>
+<div class="sub">The floor is the clock's gear train: a small gear under the boss and four big gears (N, E, S, W) meshing with it, turning the other way. Between them is the pit. The gears carry you, so you're always walking: away from the spinning <b>hub</b> and the fixed <b>pawl</b> at each gear's outer edge. Every 6 s the hammer <b>slams</b> a random outer gear (it turns coral only 3 s before): be off it, and keep one player on each of the other three or the train <b>jams</b>. After every slam your gear changes, so all four cross through the middle, and the only crossings, the <b>mesh points</b>, bite in turn every 1.5 s. Each slam throws a ring of <b>brass shards</b> (50, two kill). Every third slam hits <b>two gears</b>, and then the gears reverse. Proposal, open to change.</div>
+<div class="wrap">
+<canvas id="c" width="760" height="760"></canvas>
+<div class="side">
+<h3>Your job each slam</h3>
+<p>Over your head: <b>→ N/E/S/W</b> (the gear to be on at the next slam) or <b>→ CENTRE</b> (your gear is the one being slammed: wait on the middle gear).</p>
+<p>The rule: your gear moves two places round each slam, so most slams you cross to the <i>opposite</i> gear, through the centre.</p>
+<h3>Kills</h3>
+<p><span class="k" style="background:#ff6a4d"></span>Standing on the slammed gear: 999. An outer gear left empty at a slam: <b>WIPE</b> (the train jams).</p>
+<p><span class="k" style="background:#c99a4b"></span><b>Cores</b>: each outer gear's hub. Hit it and the damage goes to the boss's bar; melee parks against it, where the floor barely moves.</p>
+<p><span class="k" style="background:#7a2a2a"></span>The pit between gears or a pawl: 999. Gears only touch at the mesh points next to the centre gear.</p>
+<h3>Mistake buttons</h3>
+<p>Restart with one bot making one mistake.</p>
+</div></div>
+<div class="bar"><button id="play">⏸ Pause</button><button id="re">↺ Restart perfect</button>
+<select id="mist"><option value="">inject a mistake…</option><option value="still">III stops walking (the gear carries it)</option><option value="stay">slam 4: the hammered gear's player stays on it</option><option value="jam">slam 3: a player waits on the centre (its gear is left empty)</option><option value="pit">I cuts across the pit between two gears</option></select>
+<label>Speed <select id="sp"><option>0.5</option><option selected>1</option><option>2</option></select></label><span id="clock"></span></div>
+<div id="log"></div>
+<script>
+// ---------------- the fight (pure: run headless by test-p4.js) ----------------
+const PR=0.45, SPEED=6, SPRINT=8.5, END=60, H=['I','II','III','IV'], GN=['N','E','S','W','CENTRE'];
+const C_R=3.6, O_R=4.0, O_D=7.2, BOSS_R=1.4, HUB_R=0.9, PAWL_IN=2.0, W0=0.95, SLAM=7.5, WARN=2.5, FLIP=3, LETHAL=999;
+// harder (Chzy18: "way easier than the previous phases"): the mesh points bite in turn, the hammer throws shards, every
+// third slam hits two gears, the gears turn 40 % faster and the hammer shows 2.5 s before
+const MELEE=[0,3], DPS_MELEE=45, DPS_RANGED=36;   // I and IV are Vanguards in this sim
+const BITE_EVERY=2.0, BITE_LEN=0.35, BITE_R=1.0, SHARDS=16, SHARD_SPEED=4, BR=0.22, SHARD_DMG=50;
+const dir=a=>[Math.sin(a*Math.PI/180),Math.cos(a*Math.PI/180)], add=(p,q,k=1)=>[p[0]+q[0]*k,p[1]+q[1]*k], sub=(p,q)=>[p[0]-q[0],p[1]-q[1]], dist=(p,q)=>Math.hypot(p[0]-q[0],p[1]-q[1]), len=p=>Math.hypot(p[0],p[1]);
+const GEARS=[0,90,180,270].map(a=>({c:dir(a).map(v=>v*O_D),r:O_R,a})).concat([{c:[0,0],r:C_R,a:null}]);
+// slams k = 1, 2, ...: the hammer picks an outer gear at random (seeded), shown only WARN s before it lands
+let SLAM_SEED=7;
+const slamGear=k=>{ let x=(k*2654435761+SLAM_SEED*40503)>>>0; x^=x>>>15; x=Math.imul(x,2246822519)>>>0; x^=x>>>13; return (x>>>0)%4; };
+const revealed=(k,t)=>t>=k*SLAM-WARN;
+// every third slam the hammer hits two gears (the second one the next gear round from the first)
+const slamGears=k=>k%3===0?[slamGear(k),(slamGear(k)+1+((k>>2)%3))%4]:[slamGear(k)];
+// mesh point g bites (lethal within 1 m) for 0.35 s in every 1.5 s, the four in turn
+const biting=(g,t)=>((t+g*BITE_EVERY/4)%BITE_EVERY+BITE_EVERY)%BITE_EVERY<BITE_LEN;
+function spinSign(t){const k=Math.floor(t/SLAM);return Math.floor(k/FLIP)%2?-1:1;}           // the gears reverse every FLIP slams
+const omegaOf=(g,t)=>spinSign(t)*(g===4?W0:-W0*C_R/O_R);                                      // central +, outer - (teeth speeds match)
+function gearAt(q){ let best=-1,bd=9; GEARS.forEach((G,i)=>{const d=dist(q,G.c)/G.r; if(d<=1&&d<bd){bd=d;best=i;}}); return best; }
+function floorVel(q,t){ const g=gearAt(q); if(g<0)return [0,0]; const G=GEARS[g], w=omegaOf(g,t), r=sub(q,G.c); return [-w*r[1],w*r[0]]; }
+// gear for hour h at slam k: two places round each slam; the player whose gear the hammer picks waits on the centre
+// (known only once the hammer shows, WARN s before)
+const targetOf=(h,k,t)=>{ const g=((h+2*k)%4+4)%4; return revealed(k,t)&&slamGears(k).includes(g)?4:g; };
+function pawl(g){ const G=GEARS[g], u=dir(G.a); return [add(G.c,u,PAWL_IN),add(G.c,u,O_R)]; }
+function segDist(p,a,b){const ab=sub(b,a),t=Math.max(0,Math.min(1,((p[0]-a[0])*ab[0]+(p[1]-a[1])*ab[1])/(ab[0]*ab[0]+ab[1]*ab[1])));return dist(p,add(a,ab,t));}
+// what kills a player standing at q (0 none; text = the cause)
+function deadly(q,t){
+  if(len(q)<BOSS_R+PR) return 'the boss';
+  const g=gearAt(q); if(g<0) return 'the pit';
+  for(let i=0;i<4;i++) if(biting(i,t)&&dist(q,meshPoint(i))<BITE_R+PR) return 'the teeth';
+  for(let i=0;i<4;i++){ const [a,b]=pawl(i); if(segDist(q,a,b)<PR+0.15) return 'a pawl'; }
+  return 0;
+}
+function newFight(mistake,jitter=0){
+  const F={t:0,mistake,pl:[],log:[],slams:0,wiped:null,deaths:0,hits:0,spin:[0,0,0,0,0],bul:[],dealt:[0,0,0,0]};
+  SLAM_SEED=7+Math.round(jitter*100);
+  for(let i=0;i<4;i++){const g=targetOf(i,1,99); const G=GEARS[g]; const p=g===4?dir(45+90*i).map(v=>v*2.3):add(G.c,dir(G.a+180+20+jitter*(i+1)),2.6); F.pl.push({i,p,dead:false,hp:100});}
+  return F;
+}
+function say(F,h){F.log.unshift(h);}
+function kill(F,p,why){ if(p.dead)return; p.dead=true; F.deaths++; say(F,`<span class="bad">✗ ${F.t.toFixed(1)}s ${H[p.i]} killed by ${why}</span>`); }
+function step(F,dt){
+  if(F.wiped)return; const t=F.t, nt=t+dt;
+  for(let g=0;g<5;g++) F.spin[g]+=omegaOf(g,t)*dt*180/Math.PI;
+  for(const p of F.pl){ if(p.dead)continue; const v=botVel(F,p); const fv=floorVel(p.p,t); p.p=add(p.p,add(v,fv),dt); p.v=v; }
+  // the cores are solid: nobody stands inside one
+  for(const p of F.pl){ if(p.dead)continue; for(let i=0;i<4;i++){ const d=sub(p.p,GEARS[i].c), l=len(d); if(l<HUB_R+PR) p.p=add(GEARS[i].c,d.map(x=>x/Math.max(l,1e-3)),HUB_R+PR); } }
+  // damage: a player in reach of a core or the boss hits it (a core passes it to the boss's bar); melee 1.2 m, ranged 6 m
+  for(const p of F.pl){ if(p.dead)continue; const melee=MELEE.includes(p.i), reach=melee?1.2:6; let best=len(p.p)-BOSS_R; for(let i=0;i<4;i++) best=Math.min(best,dist(p.p,GEARS[i].c)-HUB_R); if(best-PR<=reach) F.dealt[p.i]+=(melee?DPS_MELEE:DPS_RANGED)*dt; }
+  for(const p of F.pl){ if(p.dead)continue; const why=deadly(p.p,nt); if(why) kill(F,p,why); }
+  // hammer shards fly; a hit is 50 (two kill)
+  for(const b of F.bul) b.p=add(b.p,b.v,dt);
+  for(const p of F.pl) if(!p.dead) for(const b of F.bul) if(!b.gone&&dist(p.p,b.p)<PR+BR){ b.gone=true; p.hp-=SHARD_DMG; F.hits++; say(F,`<span class="bad">✗ ${nt.toFixed(1)}s ${H[p.i]} hit by a shard (50)</span>`); if(p.hp<=0) kill(F,p,'shards'); }
+  F.bul=F.bul.filter(b=>!b.gone&&len(b.p)<12.5);
+  const k=Math.floor(nt/SLAM);
+  if(k>=1&&k>F.slams){ F.slams=k; const ss=slamGears(k);
+    for(const p of F.pl) if(!p.dead&&ss.includes(gearAt(p.p))) kill(F,p,'the hammer');
+    for(const s of ss) for(let j=0;j<SHARDS;j++){ const d=dir(360/SHARDS*j+11*k); F.bul.push({p:GEARS[s].c.slice(),v:d.map(v=>v*SHARD_SPEED)}); }
+    const empty=[0,1,2,3].filter(g=>!ss.includes(g)&&!F.pl.some(p=>!p.dead&&gearAt(p.p)===g));
+    if(empty.length){F.wiped=`gear ${GN[empty[0]]} was empty: the train jams`; say(F,`<span class="bad">✗ slam ${k}: gear ${GN[empty[0]]} empty: WIPE</span>`);}
+    else say(F,`<b>slam ${k}</b> on ${ss.map(s=>GN[s]).join(' + ')} ✓${(k%FLIP===0)?' · <b>the gears reverse</b>':''}`); }
+  if(!F.wiped&&F.pl.some(p=>p.dead)) F.wiped='a player died';
+  F.t=nt;
+}
+// ---------------- the bots ----------------
+function meshPoint(g){ return dir(GEARS[g].a).map(v=>v*C_R); }   // where outer gear g touches the centre gear
+function goalOf(F,p){
+  const t=F.t, k=Math.floor(t/SLAM)+1; let tg=targetOf(p.i,k,t);
+  // mistakes (whoever it falls on): at slam 4 the player whose gear is hammered stays on it; at slam 3 the first player
+  // bound for an outer gear waits on the centre instead
+  const owner=[0,1,2,3].find(h=>slamGears(k).includes(((h+2*k)%4+4)%4));
+  if(F.mistake==='stay'&&k===4&&p.i===owner) tg=slamGear(k);
+  if(F.mistake==='jam'&&k===3&&p.i===[0,1,2,3].find(h=>!slamGears(k).includes(((h+2*k)%4+4)%4))) tg=4;
+  const cur=gearAt(p.p);
+  // a parking spot: the far side of the gear's ring from its pawl, 2.6 m off the hub (or a free angle on the centre ring)
+  const park=g=> g===4 ? dir(45+90*p.i+F.spin[4]).map(v=>v*2.3) : add(GEARS[g].c,dir(GEARS[g].a+180+(spinSign(t)>0?-35:35)),MELEE.includes(p.i)?HUB_R+PR+0.5:2.6);   // melee parks against its gear's core
+  let to, why='→ '+GN[tg];
+  if(cur===tg) to=park(tg);
+  else if(cur===4) to=tg===4?park(4):meshPoint(tg);
+  else to=dir(GEARS[cur].a).map(v=>v*2.6);   // across the mesh point onto the centre gear's ring (the mesh point itself still counts as the outer gear)
+  if(F.mistake==='pit'&&p.i===0&&k===2&&cur!==4) { to=GEARS[(cur+1)%4].c; why='cuts across'; }
+  return {to,why,tg,k};
+}
+function botVel(F,p){
+  const g=goalOf(F,p); p.job=g.why;
+  if(F.mistake==='still'&&p.i===2&&F.t>13) return [0,0];
+  if(F.mistake==='pit'&&p.i===0&&g.why==='cuts across'){ const d=sub(g.to,p.p),l=len(d); return l>0.1?d.map(x=>x/l*SPEED):[0,0]; }
+  if(!p.plan||F.t>=p.replan){ p.plan=search(F,p,g); p.replan=F.t+0.05; }
+  return p.plan;
+}
+const DIRS=[];for(let k=0;k<16;k++)DIRS.push(dir(22.5*k));
+function search(F,p,g){
+  const t=F.t, LEG=0.2, LEGS=3, S=4, dtS=LEG/S, BEAM=10, slamT=g.k*SLAM, ss=slamGears(g.k);
+  const vels=[[0,0]]; const tgv=sub(g.to,p.p), tl=len(tgv); const ds=DIRS.slice(); if(tl>1e-3)ds.push(tgv.map(x=>x/tl));
+  for(const d of ds) for(const sp of [SPEED,SPRINT,SPEED*0.4]) vels.push(d.map(x=>x*sp));
+  let beam=[{q:p.p,first:null,risk:0}];
+  for(let leg=0;leg<LEGS;leg++){ const next=[];
+    for(const r of beam) for(const v of vels){ let q=r.q, dead=false, risk=r.risk;
+      for(let s2=0;s2<S;s2++){ const tt=t+(leg*S+s2)*dtS; q=add(q,add(v,floorVel(q,tt)),dtS); const tq=tt+dtS;
+        if(deadly(q,tq)||len(q)<BOSS_R+PR+0.3||!GEARS.some(G=>dist(q,G.c)<=G.r-0.12)){dead=true;break;}   // (margins: round the boss, and 0.12 m inside a gear's edge)   // (a margin round the boss: the floor turns under a coarse prediction)
+        if(tq>=slamT-dtS*0.5&&tq<slamT+dtS*0.5&&ss.includes(gearAt(q))){dead=true;break;}
+        // shards: the live ones, and the ones the next slam will throw
+        let mc=9; for(const b of F.bul){ const c=dist(q,add(b.p,b.v,tq-t))-PR-BR; if(c<mc)mc=c; }
+        if(tq>slamT) for(const s of ss) for(let j=0;j<SHARDS;j++){ const c=dist(q,add(GEARS[s].c,dir(360/SHARDS*j+11*g.k),SHARD_SPEED*(tq-slamT)))-PR-BR; if(c<mc)mc=c; }
+        if(mc<0.12){dead=true;break;} if(mc<0.5)risk+=(0.5-mc)*2;
+        // a biting mesh point a moment before or after this sample: keep clear
+        for(let i=0;i<4;i++) if((biting(i,tq-0.08)||biting(i,tq+0.08))&&dist(q,meshPoint(i))<BITE_R+PR+0.1){dead=true;break;}
+        if(dead)break;
+        // margins: keep off the pawls, hubs and the pit's edge
+        const gq=gearAt(q); if(gq>=0){ const edge=GEARS[gq].r-dist(q,GEARS[gq].c); if(edge<0.6&&!(gq===4||dist(q,meshPoint(gq))<1.4))risk+=(0.6-edge)*3; }
+        for(let i=0;i<4;i++){ const [a,b]=pawl(i); const c=segDist(q,a,b)-PR; if(c<0.8)risk+=(0.8-c)*2; const hc=dist(q,GEARS[i].c)-HUB_R-PR; if(hc<0.6)risk+=(0.6-hc)*2; }
+      }
+      if(dead)continue;
+      next.push({q,first:r.first||v,risk,score:risk+dist(q,g.to)*1.2+(len(v)>SPEED?0.1:0)});
+    }
+    if(!next.length)break; next.sort((a,b)=>a.score-b.score); beam=next.slice(0,BEAM); }
+  return beam[0].first||[0,0];
+}
+function runHeadless(mistake,jitter=0){const F=newFight(mistake,jitter);while(F.t<END&&!F.wiped)step(F,1/60);return F;}
+if(typeof window==='undefined'){module.exports={runHeadless,END};}
+else{
+// ---------------- drawing ----------------
+const cv=document.getElementById('c'),g=cv.getContext('2d'),S=cv.width/2/12.2,CX=cv.width/2,CY=cv.height/2;
+const P=(x,y)=>[CX+x*S,CY-y*S], col=['#4f8fff','#47c98c','#ad7dff','#3fd0e0'], cls=['V','C','A','V'];
+let F,running=true,speed=1,mistake='';
+function reset(){F=newFight(mistake);}
+function gearDraw(i,coral){
+  const G=GEARS[i],[x,y]=P(...G.c),teeth=i===4?12:18;
+  g.beginPath(); for(let k=0;k<teeth*2;k++){const a=(F.spin[i]+k*180/teeth)*Math.PI/180, r=(k%2?G.r:G.r-0.25)*S; const px=x+Math.sin(a)*r, py=y-Math.cos(a)*r; k?g.lineTo(px,py):g.moveTo(px,py);} g.closePath();
+  g.fillStyle=coral>0?`rgba(255,106,77,${0.25+0.5*coral})`:(i===4?'#3a3020':'#2c2a3a'); g.fill(); g.strokeStyle='#c99a4b'; g.lineWidth=2; g.stroke();
+  for(let k=0;k<4;k++){const a=(F.spin[i]+90*k)*Math.PI/180; g.strokeStyle='rgba(201,154,75,.5)'; g.lineWidth=3; g.beginPath(); g.moveTo(x,y); g.lineTo(x+Math.sin(a)*(G.r-0.4)*S,y-Math.cos(a)*(G.r-0.4)*S); g.stroke();}
+  if(i<4){ g.fillStyle='#c99a4b'; g.beginPath(); g.arc(x,y,HUB_R*S,0,7); g.fill(); g.strokeStyle='#ffe2a0'; g.lineWidth=3; g.stroke(); g.fillStyle='#10162a'; g.font='bold 9px Segoe UI'; g.textAlign='center'; g.fillText('CORE',x,y+3); const [a,b]=pawl(i); g.strokeStyle='#ff6a4d'; g.lineWidth=7; g.beginPath(); g.moveTo(...P(...a)); g.lineTo(...P(...b)); g.stroke();
+    g.fillStyle='#efe6cf'; g.font='bold 16px Segoe UI'; g.textAlign='center'; const lp=P(...add(G.c,dir(G.a+90),3.3)); g.fillText(GN[i],lp[0],lp[1]+5); }
+}
+function draw(){
+ g.clearRect(0,0,cv.width,cv.height); const t=F.t, k=Math.floor(t/SLAM)+1, ss=slamGears(k), left=k*SLAM-t, sg=ss.map(s=>GN[s]).join(' + ');
+ g.fillStyle='#0b0f1c';g.fillRect(0,0,cv.width,cv.height); g.strokeStyle='#2a3150';g.lineWidth=2;g.beginPath();g.arc(CX,CY,11.7*S,0,7);g.stroke();
+ for(let i=0;i<5;i++) gearDraw(i,ss.includes(i)&&left<=WARN?1-left/WARN:0);
+ // the mesh points: dull, glowing as their bite comes, coral while biting
+ for(let i=0;i<4;i++){ const ph=((t+i*BITE_EVERY/4)%BITE_EVERY+BITE_EVERY)%BITE_EVERY, soon=BITE_EVERY-ph, [mx,my]=P(...meshPoint(i));
+   g.fillStyle=ph<BITE_LEN?'rgba(255,60,40,.85)':soon<0.5?`rgba(255,140,90,${0.2+0.5*(1-soon/0.5)})`:'rgba(201,154,75,.18)'; g.beginPath(); g.arc(mx,my,BITE_R*S,0,7); g.fill(); }
+ for(const b of F.bul){ const [x,y]=P(...b.p); g.fillStyle='#e3b45f'; g.beginPath(); g.arc(x,y,BR*S+1,0,7); g.fill(); }
+ g.fillStyle='#6b5428';g.beginPath();g.arc(CX,CY,BOSS_R*S,0,7);g.fill();g.strokeStyle='#c99a4b';g.lineWidth=3;g.stroke();
+ for(const p of F.pl){const [px,py]=P(...p.p); if(p.dead){g.fillStyle='#444';g.beginPath();g.arc(px,py,10,0,7);g.fill();continue;}
+  g.fillStyle=col[p.i];g.beginPath();g.arc(px,py,PR*S,0,7);g.fill();g.strokeStyle='#0b0f1c';g.lineWidth=2;g.stroke();g.fillStyle='#0b0f1c';g.font='bold 11px Segoe UI';g.textAlign='center';g.fillText(cls[p.i],px,py+4);
+  g.font='bold 13px Segoe UI';g.fillStyle=p.job==='→ CENTRE'?'#ffd27a':'#efe6cf';g.fillText(H[p.i]+' '+(p.job||''),px,py-16);}
+ g.fillStyle='#ff6a4d';g.font='bold 24px Segoe UI';g.textAlign='center';g.fillText(left<=WARN?`HAMMER → ${sg} in ${left.toFixed(1)}s`:`hammer in ${left.toFixed(1)}s · gear unknown${k%3===0?' · TWO gears':''}`,CX,36);
+ if(k%FLIP===0&&left<=WARN){g.fillStyle='#ffd27a';g.font='bold 18px Segoe UI';g.fillText('the gears reverse after this slam',CX,62);}
+ if(F.wiped){g.fillStyle='rgba(16,22,42,.85)';g.fillRect(0,CY-40,cv.width,80);g.fillStyle='#ff6a4d';g.font='bold 26px Segoe UI';g.fillText('WIPE — '+F.wiped,CX,CY+10);}
+ for(const p of F.pl) if(!p.dead&&p.hp<100){ const [px,py]=P(...p.p); g.fillStyle='#ff6a4d'; g.font='bold 12px Segoe UI'; g.fillText(p.hp+' hp',px,py+24); }
+ document.getElementById('clock').textContent=`t ${Math.min(t,END).toFixed(1)} s · slams ${F.slams} · damage I ${F.dealt[0]|0} II ${F.dealt[1]|0} III ${F.dealt[2]|0} IV ${F.dealt[3]|0} · hits ${F.hits} · deaths ${F.deaths}${t>=END&&!F.wiped?(F.hits?' · done: mistakes':' · done: clean, 0 damage'):''}`;
+ document.getElementById('log').innerHTML=F.log.slice(0,4).join('<br>');
+}
+let last=performance.now();
+function frame(now){const dt=Math.min(0.05,(now-last)/1000)*speed;last=now; if(running&&F.t<END&&!F.wiped){let n=Math.max(1,Math.round(dt*60));for(let i=0;i<n;i++)step(F,dt/n);} draw(); requestAnimationFrame(frame);}
+document.getElementById('play').onclick=e=>{running=!running;e.target.textContent=running?'⏸ Pause':'▶ Play';};
+document.getElementById('re').onclick=()=>{mistake='';document.getElementById('mist').value='';reset();running=true;document.getElementById('play').textContent='⏸ Pause';};
+document.getElementById('mist').onchange=e=>{mistake=e.target.value;reset();running=true;};
+document.getElementById('sp').onchange=e=>speed=+e.target.value;
+reset();
+{ const ff=+((location.hash.match(/t=([0-9.]+)/)||[])[1]||0); const mm=(location.hash.match(/m=([a-z]+)/)||[])[1]; if(mm){mistake=mm;reset();} while(F.t<ff&&!F.wiped) step(F,1/60); if(ff||mm) running=!/still/.test(location.hash.replace('m=still','')); }
+requestAnimationFrame(frame);
+}
+</script></body></html>
