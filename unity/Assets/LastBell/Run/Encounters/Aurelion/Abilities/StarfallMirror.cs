@@ -43,18 +43,18 @@ namespace LastBell.Run
         public IEnumerable<int> Run(bool fullWindow = false)
         {
             Say(Name); Casts++; Stars.Clear();
-            var party = Standing();
+            var party = Standing(); var aim = Aimable();   // stars on players not reviving; size and solo timing by everyone standing
             int follow = FollowTicks, resolve = ResolveTicks(fullWindow);
             float r = RadiusFor(party.Count);
             bool solo = party.Count <= 1;
             Clip("ZenithPins", solo ? follow + resolve : resolve);   // halo arcs tilt and point at every player
-            foreach (var p in party) Call(p, r, follow, resolve, 1);
+            foreach (var p in aim) Call(p, r, follow, resolve, 1);
             for (int i = 0; i < follow; i++) { Glow(i / (float)follow); yield return 1; }
             Flare(0.5f);
             if (solo)
             {
                 // star II hunts you from star I's lock: leave, avoid your reflection, leave again
-                foreach (var p in Standing()) Call(p, r, follow, resolve, 2);
+                foreach (var p in Aimable()) Call(p, r, follow, resolve, 2);
                 for (int i = 0; i < follow; i++) { Glow(i / (float)follow); yield return 1; }
                 Flare(0.5f);
             }
