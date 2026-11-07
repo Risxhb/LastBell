@@ -18,11 +18,16 @@ namespace LastBell.Run
             public int Colour;                    // 0 hurts everyone; otherwise only players whose colour matches (Two-Colour Choir)
             public string Source = "Bullet";
             public string AttackId;               // its boss attack (BossAttackIcons), copied onto the hit
+            public string Tag;                    // which Hard addition fired it (hit bookkeeping for the sweep), or null
             public Action<Bullet> Split;          // runs when the fuse (Life) ends without a hit: seeds burst into petals
+            // a seed that bursts into BurstRays petals at angle BurstOff (+ i * 360/n), rolled at launch: its last PreviewFor s
+            // show those exact rays at the burst point (presentation only; Sylvara P4, 7 Nov proposal)
+            public int BurstRays; public float BurstOff, BurstSpeed;
             public bool Dead;
         }
 
         public const float Height = 1.0f;         // drawn at chest height; the hit test is planar
+        public const float PreviewFor = 0.6f;     // a seed shows its burst rays for its last 0.6 s
         readonly CombatWorld w;
         readonly List<Bullet> live = new List<Bullet>(), spawned = new List<Bullet>();
         public int Count => live.Count;
@@ -104,6 +109,8 @@ namespace LastBell.Run
                 WaterC = new Color(0.86f, 0.92f, 0.94f), SeedFallback = new Color(0.30f, 0.45f, 0.38f);
             readonly List<Transform>[] pools = { new List<Transform>(), new List<Transform>(), new List<Transform>(), new List<Transform>(), new List<Transform>() };
             readonly int[] shown = new int[Kinds];
+            readonly List<Transform> rays = new List<Transform>(); int raysShown;   // seed burst previews: a dim track and a bright fill per ray
+            Material rayDim, rayFill;
             Material[][] mats;
             Transform parent;
 
@@ -121,7 +128,7 @@ namespace LastBell.Run
             public void Draw(Transform root, List<Bullet> bullets)
             {
                 if (!root) return;
-                if (!parent) { parent = new GameObject("Hostile Bullets").transform; parent.SetParent(root, false); foreach (var p in pools) p.Clear(); Array.Clear(shown, 0, Kinds); }
+                if (!parent) { parent = new GameObject("Hostile Bullets").transform; parent.SetParent(root, false); foreach (var p in pools) p.Clear(); Array.Clear(shown, 0, Kinds); rays.Clear(); raysShown = 0; }
                 mats ??= new[]
                 {
                     new[] { Prim.Material(Coral, 0.9f), Prim.Material(CoralCore, 3f) },   // low enough that the coral reads as coral, not white
@@ -131,6 +138,7 @@ namespace LastBell.Run
                     new[] { Prim.Material(WaterC, 0.8f), Prim.Material(Coral, 3f) },
                 };
                 var n = new int[Kinds]; float now = Time.time;
+                int nr = 0;
                 foreach (var b in bullets)
                 {
                     if (b.Dead) continue;
@@ -148,6 +156,8 @@ namespace LastBell.Run
                         float shiver = f > 0.75f ? 1 + 0.04f * Mathf.Sin(now * 60f) * (f - 0.75f) * 4 : 1;
                         t.localScale = Vector3.one * (b.Radius / 0.6f) * shiver;
                         var core = t.Find("Fuse"); if (core) core.localScale = Vector3.one * (0.55f + 0.4f * f * f);
+                        float left = b.Life - b.Age;
+                        if (b.BurstRays > 0 && left <= PreviewFor) nr = Preview(b, left, nr);
                     }
                     else
                     {
@@ -157,14 +167,48 @@ namespace LastBell.Run
                         t.localScale = Vector3.one * (b.Radius / (k == Water ? BulletArt.DropHitRadius : BulletArt.PetalHitRadius));
                     }
                 }
+                for (int i = nr; i < raysShown; i++) if (rays[i]) rays[i].gameObject.SetActive(false);
+                raysShown = nr;
                 for (int k = 0; k < Kinds; k++)
                 {
                     for (int i = n[k]; i < shown[k]; i++) if (pools[k][i]) pools[k][i].gameObject.SetActive(false);
                     shown[k] = n[k];
                 }
             }
+            // the burst preview: at the point the seed will burst, each of its rays as a dim floor track as far as its petal flies in
+            // the first 0.4 s (where the petals still touch: the ring has no gap until about 1.9 m), with a bright fill that runs
+            // out along the track as the fuse counts down, reaching the end at the burst
+            const float RayFrom = 0.3f, RayFor = 0.4f, RayWidth = 0.22f, RayY = 0.06f;
+            int Preview(Bullet b, float left, int nr)
+            {
+                rayDim ??= Prim.Material(new Color(1f, 0.40f, 0.26f) * 0.55f, 0.6f); rayFill ??= Prim.Material(new Color(1f, 0.70f, 0.45f), 3f);
+                var at = b.Pos + b.Vel * left; float len = b.BurstSpeed * RayFor, fill = Mathf.Clamp01(1 - left / PreviewFor);
+                for (int i = 0; i < b.BurstRays; i++)
+                {
+                    float a = b.BurstOff + i * Mathf.PI * 2 / b.BurstRays; var d = new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a));
+                    nr = Bar(nr, rayDim, at + d * (RayFrom + len * 0.5f), d, len, RayWidth, RayY);
+                    if (fill > 0.01f) nr = Bar(nr, rayFill, at + d * (RayFrom + len * fill * 0.5f), d, len * fill, RayWidth * 0.6f, RayY + 0.01f);
+                }
+                return nr;
+            }
+            int Bar(int nr, Material m, Vector3 mid, Vector3 dir, float len, float width, float y)
+            {
+                if (nr == rays.Count)
+                {
+                    var go = GameObject.CreatePrimitive(PrimitiveType.Quad); go.name = "Burst Ray"; UnityEngine.Object.Destroy(go.GetComponent<Collider>());
+                    go.transform.SetParent(parent, false); var r = go.GetComponent<MeshRenderer>(); r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; r.receiveShadows = false;
+                    rays.Add(go.transform);
+                }
+                var t = rays[nr]; if (!t.gameObject.activeSelf) t.gameObject.SetActive(true);
+                var mr = t.GetComponent<MeshRenderer>(); if (mr.sharedMaterial != m) mr.sharedMaterial = m;
+                t.position = new Vector3(mid.x, y, mid.z);
+                t.rotation = Quaternion.LookRotation(Vector3.down, dir);   // flat on the floor, long side along the ray
+                t.localScale = new Vector3(width, len, 1);
+                return nr + 1;
+            }
             public void Hide()
             {
+                for (int i = 0; i < raysShown && i < rays.Count; i++) if (rays[i]) rays[i].gameObject.SetActive(false); raysShown = 0;
                 for (int k = 0; k < Kinds; k++) { for (int i = 0; i < shown[k] && i < pools[k].Count; i++) if (pools[k][i]) pools[k][i].gameObject.SetActive(false); shown[k] = 0; }
             }
         }

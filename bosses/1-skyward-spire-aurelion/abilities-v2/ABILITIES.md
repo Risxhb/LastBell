@@ -1,5 +1,7 @@
 # Aurelion, the Meridian Regent: ability set v2 (proposal)
 
+> **Retired fight plan; ability brief still used.** The current fight is v4 (`abilities-v4/ABILITIES-v4.md`, Azure PR 15). Abilities defined here that v4 still uses keep their brief, but this document's phase plan, 5–8-player numbers and Vanguard notes are retired (1–4 players and the Tollbreaker since 1–2 Nov).
+
 > **Retired set (1 Nov).** Only v4 is played (`../abilities-v4/ABILITIES-v4.md`). This file stays because v4 reuses abilities and numbers defined here; its phase plans, Noon Shadow and escape checks no longer apply.
 
 **Status: proposal.** This is designed and escape-checked, but not built and not approved. Nothing here is human-approved until Chzy18 plays it.

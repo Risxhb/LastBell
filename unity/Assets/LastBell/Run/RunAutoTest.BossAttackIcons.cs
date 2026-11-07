@@ -9,12 +9,13 @@ namespace LastBell.Run
     // hit and, when the killing blow is a catalogued attack, shows its icon (screenshots with the details tooltip pinned).
     public sealed partial class RunAutoTest
     {
-        // the Aurelion IDs among the 20 Chzy18 approved on 2026-10-23 (ability-icons 0d0555a), the 11 Sylvara v3 IDs approved on
+        // the 5 original Aurelion IDs among the 20 Chzy18 approved on 2026-10-23 (ability-icons 0d0555a), the 3 Aurelion IDs added on 2026-11-07, the 11 Sylvara v3 IDs approved on
         // 2026-11-02 and the Crucivar v4 icons accepted on 2026-11-02 (both work/attack-icons-20261102), written out here so the
         // catalog can't drift unnoticed. Normal Bellkeeper v2 is retired.
         static readonly string[] ApprovedAttackIds =
         {
             "aurelion.meridian_lances", "aurelion.starfall_mirror", "aurelion.noon_shadow", "aurelion.orrery_closing", "aurelion.hour_hands",
+            "aurelion.errant_planets", "aurelion.falling_meridians", "aurelion.sunspots",   // 7 Nov (Codex attack-icons-20261106)
             "sylvara.spiral_bloom", "sylvara.seed_pods", "sylvara.waterfall_jets", "sylvara.pruning_arc", "sylvara.two_colour_choir",
             "sylvara.toll_burst", "sylvara.root_ring", "sylvara.hollow_bloom", "sylvara.bud_bloom", "sylvara.seed_storm", "sylvara.last_storm",
             "crucivar.ember_brand", "crucivar.furnace_spin", "crucivar.backdraft", "crucivar.casting_order", "crucivar.anvil_quake",

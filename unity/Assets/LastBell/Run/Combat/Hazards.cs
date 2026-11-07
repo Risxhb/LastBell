@@ -241,7 +241,7 @@ namespace LastBell.Run
                 Hazard src = null;
                 if (!p.Down)
                     foreach (var h in live)
-                        if (h.BurnPerSecond > 0 && h.Locked && (src == null || h.BurnPerSecond > src.BurnPerSecond) && h.Hits(p)) src = h;
+                        if (h.BurnPerSecond > 0 && h.Locked && (src == null || h.BurnPerSecond > src.BurnPerSecond) && h.Hits(p) && (h.Affects == null || h.Affects(p))) src = h;
                 if (src == null) { burn.Remove(p); continue; }
                 burn.TryGetValue(p, out float acc); acc += src.BurnPerSecond * Sim.Dt;
                 int dmg = Mathf.FloorToInt(acc); acc -= dmg; burn[p] = acc;

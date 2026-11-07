@@ -80,7 +80,7 @@ namespace LastBell.Run
         float LoopT => (Age - loopStart) * Sim.Dt;
         public float P4Time => p4Start < 0 ? 0 : (Age - p4Start) * Sim.Dt;   // seconds since Phase 4 began (enrage clock)
 
-        sealed class Emitter { public bool On = true, Looping, Lane; public Action<float> Update; }
+        sealed class Emitter { public bool On = true, Looping, Lane; public Action<float> Update; public string Tag; }
         readonly List<Emitter> emit = new List<Emitter>();
         readonly List<(int at, Action fn)> later = new List<(int, Action)>();
         Emitter sp1, sp2;
@@ -300,7 +300,7 @@ namespace LastBell.Run
         void ClearFight()
         {
             foreach (var e in emit) e.On = false;
-            emit.Clear(); spinDir.Clear(); later.Clear(); sp1 = sp2 = null;
+            emit.Clear(); spinDir.Clear(); later.Clear(); sp1 = sp2 = null; HazardTag.Clear(); tagNow = null;
             foreach (var b in buds) KillBud(b);
             buds.Clear();
             W.Bullets.ClearAll();
@@ -313,7 +313,7 @@ namespace LastBell.Run
         List<(float at, Action fn)> Loop(int ph)
         {
             var ev = new List<(float, Action)>();
-            void At(float t, string id, Action fn) => ev.Add((t, (Action)(() => { if (id != null) { Order.Add(id); Current = id; } fn(); })));
+            void At(float t, string id, Action fn) => ev.Add((t, (Action)(() => { if (id != null) { Order.Add(id); Current = id; } WithTag(id != null && HardAdds.Contains(id) ? id : tagNow, fn); })));
             switch (ph)
             {
                 case 1:   // Spiral Bloom
@@ -370,16 +370,40 @@ namespace LastBell.Run
         }
 
         // ---------------- helpers ----------------
-        List<PlayerController> Standing => W.Players.FindAll(p => !p.Down);
+        // who her aimed attacks may pick: standing and not reviving (revive rule, accepted 4 Nov: no mechanic aims at a reviver;
+        // a reviver standing in a hazard is still hit). Every target picker below starts here, with an unaimed fallback.
+        List<PlayerController> Standing => W.Players.FindAll(p => !p.Down && p.Reviving == null);
         static Vector3 On(float a, float r) => new Vector3(Mathf.Cos(a) * r, 0, Mathf.Sin(a) * r);
         static float AngOf(Vector3 v) => Mathf.Atan2(v.z, v.x);
         static float YawOf(float a) => 90f - a * Mathf.Rad2Deg;   // floor angle -> Sim yaw (degrees, 0 = +z)
         float Rim => BodyRadius;
         float R => CombatWorld.PlayerBound;
-        void Later(float seconds, Action fn) => later.Add((Age + Mathf.Max(1, Sim.Ticks(seconds)), fn));
-        Emitter Add(Emitter e) { emit.Add(e); return e; }
-        void Shot(Vector3 at, float a, float v, int dmg = 12, float life = 6, int col = 0, string src = "Petal", float r = BulletArt.PetalHitRadius, Action<BulletSystem.Bullet> split = null) =>
-            W.Bullets.Fire(at, a, v, dmg, life, r, col, src, split).AttackId = AttackOf(src);
+        void Later(float seconds, Action fn) { var tg = tagNow; later.Add((Age + Mathf.Max(1, Sim.Ticks(seconds)), tg == null ? fn : () => WithTag(tg, fn))); }
+        Emitter Add(Emitter e) { e.Tag ??= tagNow; emit.Add(e); return e; }
+        // hit bookkeeping for the sweep (6 Nov): bullets and hazards made by a Hard addition carry its name (Bullet.Tag,
+        // HazardTag), so the clear sweep can count hits per addition. Bookkeeping only: nothing in the fight reads it.
+        static readonly HashSet<string> HardAdds = new HashSet<string> { "Choir Pods", "Counter Spiral", "Storm Arc" };
+        public const string MirrorTag = "Mirrored Jets";
+        string tagNow;
+        public readonly Dictionary<Hazard, string> HazardTag = new Dictionary<Hazard, string>();
+        void WithTag(string tg, Action fn)
+        {
+            if (tg == null) { fn(); return; }
+            var k = tagNow; tagNow = tg; int n0 = W.Hazards.Live.Count;
+            try { fn(); }
+            finally
+            {
+                var live = W.Hazards.Live;
+                for (int i = n0; i < live.Count; i++)
+                {
+                    var h = live[i]; if (HazardTag.ContainsKey(h)) continue; HazardTag[h] = tg;
+                    var res = h.OnResolve; if (res != null) h.OnResolve = hz => WithTag(tg, () => res(hz));
+                }
+                tagNow = k;
+            }
+        }
+        BulletSystem.Bullet Shot(Vector3 at, float a, float v, int dmg = 12, float life = 6, int col = 0, string src = "Petal", float r = BulletArt.PetalHitRadius, Action<BulletSystem.Bullet> split = null)
+            { var b = W.Bullets.Fire(at, a, v, dmg, life, r, col, src, split); b.AttackId = AttackOf(src); b.Tag = tagNow; return b; }
         // the boss attack icon (BossAttackIcons, approved 2 Nov) a bullet or hazard belongs to. Sources repeat across phases, so
         // the spiral is Two-Colour Choir in Phase 2 and the spiral and seeds are Last Storm once it starts. Choir Bud (the
         // harmless bloom timer) has none.
@@ -479,7 +503,9 @@ namespace LastBell.Run
         {
             Act("Seed", 1.2f);
             if (W.Players.Count == 1) { var p = W.Players[0]; if (!p.Down) Pod(p, Vector3.zero, 2.5f, doubled); return; }
-            foreach (var p in Farthest(FarCount)) Pod(p, Vector3.zero, 2.5f, doubled);
+            var far = Farthest(FarCount);
+            if (far.Count == 0) Pod(null, On(Rnd(0, Tau), 7), 2.5f, doubled);   // everyone standing is reviving: an unaimed pod
+            foreach (var p in far) Pod(p, Vector3.zero, 2.5f, doubled);
         }
         void TrianglePods()
         {
@@ -528,10 +554,13 @@ namespace LastBell.Run
             var ts = Standing.FindAll(p => Sim.Flat(p.transform.position).magnitude > 8);
             if (ts.Count == 0) ts = Farthest(1);
             var aims = new List<float>(); foreach (var p in ts) aims.Add(AngOf(p.transform.position));
+            if (aims.Count == 0) aims.Add(Rnd(0, Tau));   // everyone standing is reviving: one unaimed jet
+            int baseN = aims.Count;
             if (MirrorJets) for (int i = 0, n = aims.Count; i < n; i++) aims.Add(aims[i] + Mathf.PI);   // Hard twins
             for (int i = 0; i < aims.Count; i++)
             {
-                int k = i < ts.Count ? i : i - ts.Count + 1;   // a twin slides opposite to its jet
+                int k = i < baseN ? i : i - baseN + 1;   // a twin slides opposite to its jet
+                var tg0 = tagNow; if (i >= baseN) tagNow = MirrorTag;   // hit bookkeeping only
                 float a0 = aims[i], dir = k % 2 == 1 ? -1 : 1, span = 40 * Deg, start = a0 - dir * span / 2;
                 W.Hazards.Spawn(new Hazard
                 {
@@ -550,6 +579,7 @@ namespace LastBell.Run
                     };
                     Add(e);
                 });
+                tagNow = tg0;
             }
         }
 
@@ -560,7 +590,7 @@ namespace LastBell.Run
         {
             float w = ArcExtra;
             Act("PruningArc", 2.9f);
-            var near = W.NearestStanding(Vector3.zero);
+            PlayerController near = null; foreach (var p in Standing) if (!near || Sim.Flat(p.transform.position).sqrMagnitude < Sim.Flat(near.transform.position).sqrMagnitude) near = p;
             float a = near ? AngOf(near.transform.position) : Rnd(0, Tau);
             var front = Tune(new Hazard
             {
@@ -740,12 +770,16 @@ namespace LastBell.Run
             for (int i = 0; i < n; i++)
             {
                 float a = off + i * Tau / n;
-                Shot(On(a, Rim), a, 3, 16, fuse, 0, "Seed", 0.6f, b =>
+                // its burst angle is rolled at launch, not at the burst, so its last 0.6 s can show the exact rays (BulletSystem
+                // preview; proposal 7 Nov, Seed Burst fairness review): same petals, speed, damage, fuse and schedule
+                float burstOff = Rnd(0, Tau); int rays = BurstPetals;   // both fixed at launch: the burst always matches its preview
+                var seed = Shot(On(a, Rim), a, 3, 16, fuse, 0, "Seed", 0.6f, b =>
                 {
                     int f0 = W.Bullets.Fired;
-                    PetalRing(b.Pos, BurstPetals, 4.5f, Rnd(0, Tau), 0.3f, 12, "Seed Burst");
+                    PetalRing(b.Pos, rays, 4.5f, burstOff, 0.3f, 12, "Seed Burst");
                     LastBurstFired = W.Bullets.Fired - f0;
                 });
+                seed.BurstRays = rays; seed.BurstOff = burstOff; seed.BurstSpeed = 4.5f;
             }
         }
 
@@ -757,7 +791,7 @@ namespace LastBell.Run
             if (presenter) presenter.TickBoss(loop, loop == "LanesLoop" ? LanesClip / LanePeriod : 1);
             if (Dead || Current == "idle" || phase == 0) return;   // halted (party down) or not started
             for (int i = later.Count - 1; i >= 0; i--) if (Age >= later[i].at) { var fn = later[i].fn; later.RemoveAt(i); fn(); }
-            for (int i = 0; i < emit.Count; i++) if (emit[i].On) emit[i].Update?.Invoke(Sim.Dt);
+            for (int i = 0; i < emit.Count; i++) if (emit[i].On) { var e = emit[i]; var k = tagNow; tagNow = e.Tag; e.Update?.Invoke(Sim.Dt); tagNow = k; }
             emit.RemoveAll(e => { if (e.On) return false; spinDir.Remove(e); return true; });   // retired spirals drop their reversal hook
         }
 

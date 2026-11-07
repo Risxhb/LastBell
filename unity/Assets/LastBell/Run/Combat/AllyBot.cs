@@ -35,6 +35,13 @@ namespace LastBell.Run
         // bots are mechanics dummies by default: they move, dodge and spread, but never attack or heal. Launch switch
         // -lastbellAllyAttack turns their class rotation on (the boss then scales his HP for them, BossEncounter.Spawn).
         public static bool Attacks = System.Array.Exists(System.Environment.GetCommandLineArgs(), a => a.Equals("-lastbellAllyAttack", System.StringComparison.OrdinalIgnoreCase));
+        // how hard its Sylvara spot pulls in Seed Storm (cost per metre; 0.35 elsewhere). At 0.35 the dodging drifted the
+        // Tollbreaker to the wall, 11 m out, in swing range 1 % of the time; 2.5 brought solo Phase 4 runs from 21 % of her
+        // HP left to 4-9 %, with a first clear (6 Nov, run 51)
+        const float P4Pull = 2.5f;
+        // in Seed Storm the Tollbreaker throws from 9 m (a Twin Hurl tap flies 9 m): even pulled home, the seeds keep it
+        // 9-10 m out. Phase 4 from its start then cleared 8 of 8 Hard runs, solo and 4 players (run 52; 2 of 8 without)
+        const float P4Throw = 9f;
         public static BotMode AllyMode = BotMode.Perfect;   // menu allies do every mechanic, memory ones included (Chzy18: "do the mechanics"); still no attacks
         public static int StartDelay;   // tests: ticks a new bot stands still at the start (-lastbellSweepRepeat varies the fight with it)
         int tick, lastPress = -999, castHold;
@@ -266,6 +273,8 @@ namespace LastBell.Run
             if (me.Hp < (Mode == BotMode.Passive ? 40 : 70) && me.Potions > 0 && tick % 30 == 0) inp.Potion = true;   // test bots: before a Hard kill hit (65) could down them
             // walk round his body, not into it: a straight line across the centre would pin the bot against him
             if (move != Vector3.zero) move = AroundBoss(pos, move, boss);
+            // Aurelion's Devour pulls faster than a walk: any move against it is a sprint
+            if (move != Vector3.zero && boss is AurelionEncounter da && da.DevourLeft > 0 && Vector3.Dot(move, Sim.Flat(bpos - pos)) < 0 && me.Stamina > 5) inp.Sprint = true;
             dMe = me; dDuty = duty; dThreat = threat?.Source; dBad = bad(pos); dMove = move; dPos = pos; dNote = spotNote; spotNote = 0;
             inp.Move = ToScreen(move);
             return inp;
@@ -1153,6 +1162,7 @@ namespace LastBell.Run
                     if (o.Who != bMe && o.Who && !o.Who.Down && !o.Done && Sim.Flat(o.Who.transform.position - q).magnitude < 4.5f) return true;
                 }
             }
+            if (a != null && a.Planets != null && a.Planets.Live && a.Planets.Near(q, 0.6f, 0.9f)) return true;   // where a planet is going (3 Nov: 5.5 m/s)
             if (bSide != 0 && (a.Sever.SideOfAt(q, a.Sever.LineYaw) != bSide || a.Sever.SideOfAt(q, a.Sever.YawIn(0.6f)) != bSide || a.Sever.SideOfAt(q, a.Sever.YawIn(1.2f)) != bSide || a.Sever.DistToLine(q) < 1.0f)) return true;
             return false;
         }
@@ -1288,7 +1298,7 @@ namespace LastBell.Run
 
             if (tick % 3 == 1 || me.Dashing)
             {
-                sylMove = SylvaraSteer.Choose(me, pos, home, out sylSprint, out sylDash, out sylCost, reach, BudStand(me) + 0.8f, reviving ? SylvaraSteer.RevivePull : 0.35f);
+                sylMove = SylvaraSteer.Choose(me, pos, home, out sylSprint, out sylDash, out sylCost, reach, BudStand(me) + 0.8f, reviving ? SylvaraSteer.RevivePull : sy.PhaseName == SylvaraEncounter.PhaseNames[3] ? P4Pull : 0.35f);
                 sylPos = pos;
                 // in reach of the downed ally: hold still so the revive channels, unless standing here gets hit (a near miss
                 // is fine); small steps toward the exact spot kept pausing it (5 Nov)
@@ -1309,7 +1319,7 @@ namespace LastBell.Run
             // the non-attacking menu bots; the boss herself only when attacks are on
             bool atBud = reach.HasValue && Sim.Flat(target - pos).magnitude <= BudStand(me) + 1.4f;
             // (Tollbreaker plays its rotation: a held Twin Hurl lodges the axe, and lodged axes need a recall)
-            if (!reviving && (atBud || Attacks && Sim.Flat(target - pos).magnitude <= Range(me) + sy.BodyRadius + 2f))
+            if (!reviving && (atBud || Attacks && Sim.Flat(target - pos).magnitude <= (me.ClassName == "Tollbreaker" && sy.PhaseName == SylvaraEncounter.PhaseNames[3] ? P4Throw : Range(me)) + sy.BodyRadius + 2f))
             {
                 if (me.Kit is TollbreakerKit) Attack(me, ref inp);
                 else inp.P0 = inp.H0 = tick % 6 == 0 || me.ClassName != "Arcanist";
