@@ -57,8 +57,7 @@ unity/*.slnx
 /unity/Assets/LastBell/Areas/Area3/Source/FloorHeight.png.meta
 /unity/Assets/LastBell/Areas/Area3/Source/FloorMask.png
 /unity/Assets/LastBell/Areas/Area3/Source/FloorMask.png.meta
-# <<< asset packs
-
-# Sylvara v3 attack props (Meshy art, cleaned by prototype/arena-3d/models/blender/sylvara_props_prep.py; not committed)
-/unity/Assets/LastBell/Characters/Sylvara/Resources/SylvaraProps/
+/unity/Assets/LastBell/Characters/Sylvara/Resources/SylvaraProps
 /unity/Assets/LastBell/Characters/Sylvara/Resources/SylvaraProps.meta
+/unity/Assets/LastBell/Characters/Sylvara/Resources/SylvaraProps.meta.meta
+# <<< asset packs
