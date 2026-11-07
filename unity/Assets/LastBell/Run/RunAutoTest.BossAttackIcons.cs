@@ -9,18 +9,21 @@ namespace LastBell.Run
     // hit and, when the killing blow is a catalogued attack, shows its icon (screenshots with the details tooltip pinned).
     public sealed partial class RunAutoTest
     {
-        // the Aurelion IDs among the 20 Chzy18 approved on 2026-10-23 (ability-icons 0d0555a), written out here so the catalog
-        // can't drift unnoticed. Crucivar and Sylvara icons stay local until those bosses ship; normal Bellkeeper v2 is retired.
+        // the Aurelion IDs among the 20 Chzy18 approved on 2026-10-23 (ability-icons 0d0555a) and the 11 Sylvara v3 IDs approved
+        // on 2026-11-02 (work/attack-icons-20261102), written out here so the catalog
+        // can't drift unnoticed. Crucivar icons stay local until that boss ships; normal Bellkeeper v2 is retired.
         static readonly string[] ApprovedAttackIds =
         {
             "aurelion.meridian_lances", "aurelion.starfall_mirror", "aurelion.noon_shadow", "aurelion.orrery_closing", "aurelion.hour_hands",
             "aurelion.errant_planets", "aurelion.falling_meridians", "aurelion.sunspots",   // 7 Nov (Codex attack-icons-20261106)
+            "sylvara.spiral_bloom", "sylvara.seed_pods", "sylvara.waterfall_jets", "sylvara.pruning_arc", "sylvara.two_colour_choir",
+            "sylvara.toll_burst", "sylvara.root_ring", "sylvara.hollow_bloom", "sylvara.bud_bloom", "sylvara.seed_storm", "sylvara.last_storm",
         };
 
         void BossAttackIconChecks()
         {
-            Check($"boss attack icon catalog lists exactly the {ApprovedAttackIds.Length} approved Aurelion IDs",
-                  BossAttackIcons.All.Count(x => x.boss == "aurelion") == ApprovedAttackIds.Length && ApprovedAttackIds.All(id => BossAttackIcons.Get(id) != null), $"{BossAttackIcons.All.Count(x => x.boss == "aurelion")} listed");
+            Check("boss attack icon catalog lists exactly the approved IDs",
+                  BossAttackIcons.All.Count == ApprovedAttackIds.Length && ApprovedAttackIds.All(id => BossAttackIcons.Get(id) != null), $"{BossAttackIcons.All.Count} listed");
             foreach (var id in ApprovedAttackIds)
             {
                 var a = BossAttackIcons.Get(id); var t = BossAttackIcons.Icon(id);
@@ -35,6 +38,8 @@ namespace LastBell.Run
                 ("Starfall Mirror II (reflection)", "aurelion", "aurelion.starfall_mirror"), ("Orrery Closing rim", "aurelion", "aurelion.orrery_closing"),
                 ("Meridian Lances", "aurelion", "aurelion.meridian_lances"), ("Hour Hands", "aurelion", "aurelion.hour_hands"),
                 ("Bell Sweep", "bellkeeper", null), ("Leaning Bell", "bellkeeper", null), ("Meridian Lances", "sylvara", null),
+                ("Seed Pod", "sylvara", "sylvara.seed_pods"), ("Seed Burst", "sylvara", "sylvara.seed_storm"), ("Pruning Arc (back)", "sylvara", "sylvara.pruning_arc"),
+                ("Cobalt Lane", "sylvara", "sylvara.two_colour_choir"), ("Choir Bud", "sylvara", null),
             };
             var wrong = cases.Where(c => BossAttackIcons.Resolve(null, c.source, c.boss)?.id != c.id).Select(c => $"{c.boss}/{c.source}").ToList();
             Check("hazard sources resolve to the right boss attack (or none)", wrong.Count == 0, wrong.Count == 0 ? $"{cases.Length} cases" : string.Join(", ", wrong));

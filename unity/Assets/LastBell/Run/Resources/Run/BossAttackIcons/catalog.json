@@ -1,5 +1,5 @@
 {
-  "source": "ability-icons commit 0d0555a (art/mechanic-icons-20261022), approved by Chzy18 2026-10-23; ids, names, tags and shapes from docs/boss-attack-icons/<boss>/manifest.json; this copy carries the Aurelion attacks (5 approved 2026-10-23; errant_planets, falling_meridians and sunspots added 2026-11-07 from Codex work/attack-icons-20261106) (Crucivar and Sylvara icons stay local until those bosses ship; normal Bellkeeper v2 is retired)",
+  "source": "ability-icons commit 0d0555a (art/mechanic-icons-20261022), approved by Chzy18 2026-10-23; ids, names, tags and shapes from docs/boss-attack-icons/<boss>/manifest.json; this copy carries the Aurelion attacks (5 approved 2026-10-23; errant_planets, falling_meridians and sunspots added 2026-11-07 from Codex work/attack-icons-20261106) plus Codex's 11 Sylvara v3 icons (work/attack-icons-20261102), approved by Chzy18 2026-11-02; icon bullet counts are approximate, so always show the name with the icon (Crucivar icons stay local until that boss ships; normal Bellkeeper v2 is retired)",
   "attacks": [
     {
       "id": "aurelion.meridian_lances",
@@ -79,6 +79,134 @@
       "tag": "Ground",
       "shape": "Sigils on carriers detonate in turn (3.5 m blast) and leave 3.0 m burning scorch pools; a blast that catches another carrier is a Solar Flare.",
       "icon": "aurelion_sunspots",
+      "aliases": []
+    },
+    {
+      "id": "sylvara.spiral_bloom",
+      "boss": "sylvara",
+      "bossName": "Sylvara",
+      "name": "Spiral Bloom",
+      "tag": "Strike",
+      "shape": "Petal bullets spiralling out from Sylvara in 3-6 arms; a toll can reverse the spin.",
+      "icon": "sylvara_spiral_bloom",
+      "aliases": [
+        "Petal Spiral"
+      ]
+    },
+    {
+      "id": "sylvara.seed_pods",
+      "boss": "sylvara",
+      "bossName": "Sylvara",
+      "name": "Seed Pods",
+      "tag": "Ground",
+      "shape": "A pod lands on a circle on the farthest players (or her feet) and bursts into a ring of petals.",
+      "icon": "sylvara_seed_pods",
+      "aliases": [
+        "Seed Pod",
+        "Feet Pod",
+        "Pod Petal"
+      ]
+    },
+    {
+      "id": "sylvara.waterfall_jets",
+      "boss": "sylvara",
+      "bossName": "Sylvara",
+      "name": "Waterfall Jets",
+      "tag": "Strike",
+      "shape": "Water drops pour in from the wall along a 40-degree wedge that sweeps sideways.",
+      "icon": "sylvara_waterfall_jets",
+      "aliases": [
+        "Waterfall Jet"
+      ]
+    },
+    {
+      "id": "sylvara.pruning_arc",
+      "boss": "sylvara",
+      "bossName": "Sylvara",
+      "name": "Pruning Arc",
+      "tag": "Ground",
+      "shape": "Front and back 120-degree cones from Sylvara, then a fan of petals; the sides are safe.",
+      "icon": "sylvara_pruning_arc",
+      "aliases": [
+        "Arc Petal"
+      ]
+    },
+    {
+      "id": "sylvara.two_colour_choir",
+      "boss": "sylvara",
+      "bossName": "Sylvara",
+      "name": "Two-Colour Choir",
+      "tag": "Strike",
+      "shape": "Brass and cobalt spirals and lanes: only petals of your own colour hurt you.",
+      "icon": "sylvara_two_colour_choir",
+      "aliases": [
+        "Brass Lane",
+        "Cobalt Lane"
+      ]
+    },
+    {
+      "id": "sylvara.toll_burst",
+      "boss": "sylvara",
+      "bossName": "Sylvara",
+      "name": "Toll Burst",
+      "tag": "Strike",
+      "shape": "A ring of 20 alternating brass and cobalt petals as the toll swaps every colour.",
+      "icon": "sylvara_toll_burst",
+      "aliases": []
+    },
+    {
+      "id": "sylvara.root_ring",
+      "boss": "sylvara",
+      "bossName": "Sylvara",
+      "name": "Root Ring",
+      "tag": "Ground",
+      "shape": "A filled circle of roots around Sylvara that erupts after 2 s.",
+      "icon": "sylvara_root_ring",
+      "aliases": []
+    },
+    {
+      "id": "sylvara.hollow_bloom",
+      "boss": "sylvara",
+      "bossName": "Sylvara",
+      "name": "Hollow Bloom",
+      "tag": "Strike",
+      "shape": "Each Choir Bud fires a 3-arm petal spiral until it is cut.",
+      "icon": "sylvara_hollow_bloom",
+      "aliases": [
+        "Bud Petal"
+      ]
+    },
+    {
+      "id": "sylvara.bud_bloom",
+      "boss": "sylvara",
+      "bossName": "Sylvara",
+      "name": "Bud Bloom",
+      "tag": "Strike",
+      "shape": "An uncut Choir Bud blooms into a ring of 20 petals.",
+      "icon": "sylvara_bud_bloom",
+      "aliases": []
+    },
+    {
+      "id": "sylvara.seed_storm",
+      "boss": "sylvara",
+      "bossName": "Sylvara",
+      "name": "Seed Storm",
+      "tag": "Strike",
+      "shape": "Big seeds drift out and burst into 8 petals (10 on Hard).",
+      "icon": "sylvara_seed_storm",
+      "aliases": [
+        "Seed Burst",
+        "Seed"
+      ]
+    },
+    {
+      "id": "sylvara.last_storm",
+      "boss": "sylvara",
+      "bossName": "Sylvara",
+      "name": "Last Storm",
+      "tag": "Strike",
+      "shape": "The enrage at 2:00 into Phase 4: a dense spiral and constant seed rings.",
+      "icon": "sylvara_last_storm",
       "aliases": []
     }
   ]

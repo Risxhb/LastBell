@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace LastBell.Run
 {
-    // Practice phase row (Chzy18, 29 Oct): every main boss (minibosses only with -lastbellMinibosses) starts in each phase it offers. For each boss
+    // Practice phase row (Chzy18, 29 Oct): every boss on the practice list starts in each phase it offers. For each boss
     // and phase: the director keeps the pick, the boss starts with HP inside that phase's band, the right phase number and
     // name, a full player, and no transition replays or heals in the first seconds. The last phase of each boss is also
     // retried, so a restarted fight comes back in the picked phase on a fresh boss.
