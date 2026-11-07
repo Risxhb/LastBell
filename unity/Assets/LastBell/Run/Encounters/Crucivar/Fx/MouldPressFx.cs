@@ -6,7 +6,7 @@ namespace LastBell.Run
     // Mould Towers presentation (Molten Crown; first built for the retired Mould Press, stand-in): a brass gear-tooth rim and a molten fill rising with the countdown on each
     // mould, a large ivory numeral (the headcount) with one tick per player inside, and a loud chime each second. The
     // coral/amber circle itself is the hazard's telegraph. Solo tower II is dimmed until tower I resolves. Each tower's
-    // pieces leave the moment its hazard leaves W.Hazards.Live (resolve, boss death, ClearTransient); the whole object
+    // pieces leave (back to the kit pool) the moment its hazard leaves W.Hazards.Live (resolve, boss death, ClearTransient); the whole object
     // removes itself when none is left. Nothing here decides timing or hits.
     public sealed class MouldPressFx : MonoBehaviour
     {
@@ -40,37 +40,74 @@ namespace LastBell.Run
 
         void Add(Hazard h, bool dim)
         {
+            var t = new Tower { H = h, Dim = dim, Root = TakeKit() };
+            t.Root.name = "Mould " + h.Source;
+            t.Root.transform.SetParent(transform, false);
+            t.Root.transform.position = new Vector3(h.Origin.x, 0, h.Origin.z);
+            var rt = t.Root.transform;
+            for (int i = 0; i < Teeth; i++)
+            {
+                float a = 360f * i / Teeth;
+                rt.GetChild(i).localPosition = Quaternion.Euler(0, a, 0) * Vector3.forward * (h.Radius + 0.12f) + Vector3.up * 0.09f;
+            }
+            t.Fill = rt.GetChild(Teeth);
+            t.Root.SetActive(true);
+            if (dim) h.Tele?.Tint(TeleFill * 0.45f, TeleBorder * 0.5f);
+            towers.Add(t);
+        }
+
+        // Tower kits (16 teeth and a fill) are pooled: building and destroying 17 pieces per tower in the cast's tick cost a
+        // 27 ms frame in Phase 3 (perf report crucivar-p3-2026-11-04). WarmUp builds the kits on the Ready screen.
+        static readonly Stack<GameObject> kits = new Stack<GameObject>();
+        static Transform pool;
+        static Mesh cubeMesh, cylMesh;
+
+        public static void WarmUp(int count = 4)
+        {
+            Chime();
+            var made = new List<GameObject>();
+            for (int i = 0; i < count; i++) made.Add(TakeKit());
+            foreach (var k in made) GiveKit(k);
+        }
+
+        static GameObject TakeKit()
+        {
+            while (kits.Count > 0) { var k = kits.Pop(); if (k) return k; }   // a scene change destroyed the pool
             if (toothMat == null)
             {
                 var lit = Shader.Find("Universal Render Pipeline/Lit"); var unlit = Shader.Find("Universal Render Pipeline/Unlit");
                 toothMat = new Material(lit); toothMat.color = BrassTooth; toothMat.SetFloat("_Metallic", 0.85f); toothMat.SetFloat("_Smoothness", 0.55f);
                 fillMat = new Material(unlit); fillMat.color = Molten;
             }
-            var t = new Tower { H = h, Dim = dim, Root = new GameObject("Mould " + h.Source) };
-            t.Root.transform.SetParent(transform, false);
-            t.Root.transform.position = new Vector3(h.Origin.x, 0, h.Origin.z);
+            if (cubeMesh == null) { cubeMesh = Resources.GetBuiltinResource<Mesh>("Cube.fbx"); cylMesh = Resources.GetBuiltinResource<Mesh>("Cylinder.fbx"); }
+            var root = new GameObject("Mould kit"); root.SetActive(false);
             for (int i = 0; i < Teeth; i++)
             {
-                var tooth = Piece(PrimitiveType.Cube, t.Root.transform, toothMat);
-                float a = 360f * i / Teeth;
-                tooth.localRotation = Quaternion.Euler(0, a, 0);
-                tooth.localPosition = Quaternion.Euler(0, a, 0) * Vector3.forward * (h.Radius + 0.12f) + Vector3.up * 0.09f;
+                var tooth = Piece(cubeMesh, root.transform, toothMat);
+                tooth.localRotation = Quaternion.Euler(0, 360f * i / Teeth, 0);
                 tooth.localScale = new Vector3(0.32f, 0.18f, 0.22f);
             }
-            t.Fill = Piece(PrimitiveType.Cylinder, t.Root.transform, fillMat);
-            t.Fill.localPosition = Vector3.up * 0.05f;
-            if (dim) h.Tele?.Tint(TeleFill * 0.45f, TeleBorder * 0.5f);
-            towers.Add(t);
+            Piece(cylMesh, root.transform, fillMat).localPosition = Vector3.up * 0.05f;
+            return root;
         }
 
-        static Transform Piece(PrimitiveType type, Transform parent, Material m)
+        static void GiveKit(GameObject k)
         {
-            var go = GameObject.CreatePrimitive(type);
-            Destroy(go.GetComponent<Collider>());
-            var r = go.GetComponent<MeshRenderer>(); r.sharedMaterial = m; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            if (!k) return;
+            if (pool == null) { var go = new GameObject("Mould kit pool"); go.SetActive(false); pool = go.transform; }
+            k.SetActive(false); k.transform.SetParent(pool, false);
+            kits.Push(k);
+        }
+
+        static Transform Piece(Mesh mesh, Transform parent, Material m)
+        {
+            var go = new GameObject("piece");
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var r = go.AddComponent<MeshRenderer>(); r.sharedMaterial = m; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             go.transform.SetParent(parent, false);
             return go.transform;
         }
+
 
         void Update() => Step();
 
@@ -79,7 +116,7 @@ namespace LastBell.Run
             for (int i = towers.Count - 1; i >= 0; i--)
             {
                 var t = towers[i];
-                if (w == null || !Contains(w.Hazards.Live, t.H)) { Destroy(t.Root); towers.RemoveAt(i); continue; }
+                if (w == null || !Contains(w.Hazards.Live, t.H)) { GiveKit(t.Root); towers.RemoveAt(i); continue; }
             }
             if (towers.Count == 0) { Destroy(gameObject); return; }
 

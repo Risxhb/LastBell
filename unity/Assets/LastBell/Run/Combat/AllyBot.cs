@@ -112,10 +112,13 @@ namespace LastBell.Run
                 if (first == null || Before(part, first)) { next = first; first = part; }
                 else if (next == null || Before(part, next)) next = part;
             }
-            if (next != null && of >= 3 && slot >= of / 2 && BotSight.PartOrder(next) >= 0
+            if (next != null && of >= 3 && slot >= of / 2 && BotSight.PartOrder(next) >= 0 && LiveParts(w) >= 3
                 && BotSight.PartHp(next) > Mathf.Max(PartReserveMin, BotSight.PartMaxHp(next) * PartReserve)) return next;
             return first;
         }
+        // with two castings up (every party size since 4 Nov) the whole party breaks the first: the lone bot left on it
+        // spent the second uprising dodging bullets 8 m off while the rest wore the next one down (Hard party sweep, 4 Nov)
+        static int LiveParts(CombatWorld w) { int n = 0; foreach (var p in w.Parts) if (p.Alive) n++; return n; }
         // a casting held back for its turn standing nearer than the target: a swing or a recall could sink it out of order
         static bool HeldNear(CombatWorld w, Vector3 pos, Vector3 target)
         {
@@ -282,6 +285,9 @@ namespace LastBell.Run
         // it set this tick's input.
         bool Scripted(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
         {
+            // a tower of the next set to fill (the generic soak job) comes first: a dropped Mould Tower is Molten Overflow, a party
+            // wipe, and the floor jobs below would hold the bot out of it (PR 14 + PR 19, 4 Nov); the soak path dodges on its own
+            if (OwnSoak(me, boss) != null) return false;
             if (!(boss is AurelionEncounter) && Quake(me, boss, pos, ref inp)) { dJob = "quake"; return true; }
             if (!(boss is AurelionEncounter) && Volley(me, boss, pos, ref inp)) { dJob = "volley"; return true; }
             if (!(boss is AurelionEncounter) && Brand(me, boss, pos, ref inp)) { dJob = "brand"; return true; }   // Aurelion keeps its own Sunspot job
@@ -382,7 +388,7 @@ namespace LastBell.Run
             for (int i = 0; i < live.Count; i++)
             {
                 var h = live[i];
-                if (h.Kind == HazardKind.Strike && (h.Shape == HazardShape.Ring || h.Shape == HazardShape.Circle) && h.Track == null && h.Damage > 0 && !h.Cancelled
+                if ((h.AttackId == "crucivar.anvil_quake" || h.AttackId == "crucivar.quake_echo") && (h.Shape == HazardShape.Ring || h.Shape == HazardShape.Circle) && h.Track == null && h.Damage > 0 && !h.Cancelled
                     && h.Age < h.ResolveAt && h.Radius >= 3f && (quakeBands.Count == 0 || Sim.Flat(h.Origin - quakeBands[0].Origin).magnitude < 0.1f)) quakeBands.Add(h);
             }
             if (quakeBands.Count < 2) return false;
@@ -926,7 +932,7 @@ namespace LastBell.Run
             for (int i = 0; i < live.Count; i++) { var h = live[i]; if (h.BurnPerSecond <= 0 && h.ResolveAt - h.Age <= ticks && (Hits(h, me, pos) || Hits(h, me, lunge))) return false; }
             return true;
         }
-        static bool Hits(Hazard h, PlayerController me, Vector3 q) => !h.Soak && (h.Contains(q) || SideOf(h, q)) && (h.Affects == null || h.Affects(me)) && !Spares(h, me) && (!BotSight.IsPath(h) || BotSight.PathSoon(h, q));
+        static bool Hits(Hazard h, PlayerController me, Vector3 q) => !h.Soak && (h.Contains(q) || SideOf(h, q) || Ahead(h, q)) && (h.Affects == null || h.Affects(me)) && !Spares(h, me) && (!BotSight.IsPath(h) || BotSight.PathSoon(h, q));
         // a shape that leaves out the player standing in it (an Ember Brand never hits its own carrier) is no danger to them
         static bool Spares(Hazard h, PlayerController me) => h.Includes != null && (h.Track == null || h.Age < h.LockAt) && h.Contains(me.transform.position) && !h.Includes(me);   // a frozen brand is left: its pool forms there
         // a lane that strikes after its warning (a Toll Lane) can hit a little wider than it is drawn: keep a hand's width clear
@@ -939,6 +945,16 @@ namespace LastBell.Run
         const float LanePad = 0.2f;
         static readonly Hazard Unseen = new Hazard { Source = "orb / rolling strike" };   // the threat when it is not a live hazard
         const float OrbAhead = 0.5f, OrbPad = 0.25f;
+        // a moving circle (a bullet with Drift) also covers the stretch it travels in the next BulletLook seconds: a bot that
+        // only sees where bullets are now walks into them (solo Tollbreaker on Crucivar Medium went down to Ring Wave, 11-02)
+        public const float BulletLook = 0.35f;
+        static bool Ahead(Hazard h, Vector3 q)
+        {
+            if (h.Shape != HazardShape.Circle || h.Drift.sqrMagnitude < 0.01f) return false;
+            var d = Sim.Flat(h.Drift) * BulletLook; var v = Sim.Flat(q - h.Origin);
+            float u = Mathf.Clamp01(Vector3.Dot(v, d) / d.sqrMagnitude);
+            return (v - d * u).magnitude <= h.Radius + Hazard.Margin;
+        }
 
         // generic soak job (Project overview 11-01): any live hazard marked Soak is a tower to fill with its ShareCount (1 if
         // none). Bosses with their own tower job (Aurelion's Meridian Towers, with owners and order) keep that one. Only the
@@ -1065,7 +1081,36 @@ namespace LastBell.Run
             // while a timed job is due, a shape that lands after it is not in the way yet: hold the job, dodge it afterwards
             int first = bFull ? Mathf.Min(due, soonest) : int.MaxValue;   // the job or the threat that lands first
             bIgnoreAfter = first == int.MaxValue ? int.MaxValue : first + 30;
+            Reaches(live);
             return badAt;
+        }
+
+        // each live hazard's centre and the squared distance past which Hits can't be true (its shape plus the lane side
+        // pad and the bullet look-ahead), so a probe skips it with one distance test. Crucivar Phase 2 (perf agent, 4 Nov):
+        // 4 bots probing ~1 900 points against 110-140 turret bullets took 15-25 ms a tick, and the catch-up ticks stacked
+        // into 100-228 ms frames
+        float[] rX = new float[64], rZ = new float[64], rR2 = new float[64]; int rN;
+        void Reaches(IReadOnlyList<Hazard> live)
+        {
+            rN = live.Count;
+            if (rX.Length < live.Count) { int n = Mathf.NextPowerOfTwo(live.Count); rX = new float[n]; rZ = new float[n]; rR2 = new float[n]; }
+            for (int i = 0; i < live.Count; i++)
+            {
+                var h = live[i]; float r;
+                switch (h.Shape)
+                {
+                    case HazardShape.Tether: r = -1f; break;   // Contains is always false
+                    case HazardShape.Circle: r = h.Radius + Hazard.Margin + Sim.Flat(h.Drift).magnitude * BulletLook; break;
+                    case HazardShape.Ring: case HazardShape.Cone: r = h.Radius + Hazard.Margin; break;
+                    default:
+                    {
+                        float l = Mathf.Max(h.Length, 0) + Hazard.Margin, wd = Mathf.Abs(h.Width) / 2 + Hazard.Margin;
+                        r = Mathf.Sqrt(l * l + wd * wd) + LanePad; break;
+                    }
+                }
+                r += 0.01f;   // rounding
+                rX[i] = h.Origin.x; rZ[i] = h.Origin.z; rR2[i] = r < 0 ? -1f : r * r;
+            }
         }
 
         bool BadAt(Vector3 q)
@@ -1073,6 +1118,7 @@ namespace LastBell.Run
             // allowBurn (no clean spot left): with a place to be (a tower, a ring, a well, a mark), a burning pool is a cost
             for (int i = 0; i < bLive.Count; i++)
             {
+                if (i < rN) { float dx = q.x - rX[i], dz = q.z - rZ[i]; if (dx * dx + dz * dz > rR2[i]) continue; }   // out of its reach: Hits is false
                 var h = bLive[i];
                 if (h.BurnPerSecond <= 0 && bTick + (h.ResolveAt - h.Age) > bIgnoreAfter) continue;
                 if (Hits(h, bMe, q) && !(bAllowBurn && h.BurnPerSecond > 0 && bAnyJob && !h.Pit)) return true;

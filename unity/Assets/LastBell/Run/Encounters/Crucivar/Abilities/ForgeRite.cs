@@ -10,6 +10,7 @@ namespace LastBell.Run
     //                           players inside; leaves a 2 m slag pool (20/s) where it stopped, until the phase ends (ClearPools)
     //   2.0  Furnace Spin       four flame jets to the wall (1.8 m wide) shown 1.5 s, then sweep round the boss for 4 s at 40 deg/s,
     //                           30 each, once per jet; the turn direction flips every loop
+    //        Spin Reversal (Hard) the jets stop 2.0 s into the sweep for 0.5 s (vents flare), then turn back for 1.5 s
     //   5.0  Backdraft          5 m blast round the boss at 3.0 s (45, 1.5 m push); everyone pulled 2 m inward at 1.6-2.0 s
     //   8.5  Casting Order      pours I-IV (2.6 m lanes to the wall) through each numbered player, locking 1.5 s before they
     //                           land 0.5 s apart at 10.5-12.0 s, 30 each; each leaves a channel burning 20/s for 10 s.
@@ -40,9 +41,14 @@ namespace LastBell.Run
         public const float QuakeFirst = 1.4f, QuakeGap = 0.8f, QuakeInner = 4f, QuakeMiddle = 9f;
         public const int QuakeDmg = 40;
         public const float EchoGap = 0.8f;   // Hard: Quake Echo
+        // Hard: Spin Reversal (proposal, 5 Nov). The jets turn 2.0 s, stop 0.5 s with the vents flaring, then turn back for the
+        // last 1.5 s (same 4 s live); the gap you ride reverses with them. Every Furnace Spin on Hard, every phase.
+        public const float ReverseAt = 2.0f, ReverseHold = 0.5f;
 
         int loops;
         public int Echoes { get; private set; }
+        public int Reversals { get; private set; }
+        public float SpinNet { get; private set; }   // degrees the last Furnace Spin's first jet turned in all (tests)
         public int Loops => loops;
         public readonly List<Hazard> Pools = new List<Hazard>();
         public List<PlayerController> Order { get; private set; } = new List<PlayerController>();
@@ -81,12 +87,13 @@ namespace LastBell.Run
         // ---------------- Ember Brand ----------------
         internal void EmberBrand()
         {
+            Boss.Presenter?.Action("EmberBrand", T(BrandLand));   // body clips are visual only (crucivar_v4_clips.py), stretched to the telegraph
             foreach (var p in Standing())
             {
                 var owner = p;
                 var h = new Hazard
                 {
-                    Source = "Ember Brand", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Flat(p.transform.position),
+                    Source = "Ember Brand", AttackId = "crucivar.ember_brand", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Flat(p.transform.position),
                     Radius = BrandRadius, LockAt = T(BrandLand - BrandFreeze), ResolveAt = T(BrandLand), Damage = BrandDmg, Knockback = 0,
                 };
                 h.Track = hz => { if (!owner.Down) hz.Origin = Flat(owner.transform.position); };   // until LockAt
@@ -96,7 +103,7 @@ namespace LastBell.Run
                     W.BossFx.SlagSplash(hz.Origin, hz.Radius);
                     Pools.Add(W.Hazards.Spawn(new Hazard
                     {
-                        Source = "Brand Pool", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = hz.Origin, Radius = PoolRadius,
+                        Source = "Brand Pool", AttackId = "crucivar.ember_brand", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = hz.Origin, Radius = PoolRadius,
                         LockAt = 0, ResolveAt = Sim.Ticks(3600), BurnPerSecond = PoolBurn,   // burns at once (the carrier left), lasts until the phase ends
                     }));
                 };
@@ -117,18 +124,30 @@ namespace LastBell.Run
             var origin = Flat(Boss.transform.position);
             float baseYaw = Boss.transform.eulerAngles.y + 45f, dir = loops % 2 == 1 ? 1f : -1f;
             int show = T(JetShow), sweep = Sim.Ticks(JetSweep);
+            Boss.Presenter?.Action(dir > 0 ? "FurnaceSpinCW" : "FurnaceSpinCCW", show + sweep);   // turns the way the jets sweep
+            bool reverse = Hard; int stop = Sim.Ticks(ReverseAt), back = Sim.Ticks(ReverseAt + ReverseHold);
+            SpinNet = 0;
             for (int k = 0; k < JetCount; k++)
             {
+                bool first = k == 0;
                 var h = new Hazard
                 {
-                    Source = "Furnace Spin", Shape = HazardShape.Lane, Kind = HazardKind.Strike, Origin = origin, Yaw = baseYaw + 360f / JetCount * k,
+                    Source = "Furnace Spin", AttackId = "crucivar.furnace_spin", Shape = HazardShape.Lane, Kind = HazardKind.Strike, Origin = origin, Yaw = baseYaw + 360f / JetCount * k,
                     Width = JetWidth, ResolveAt = show, ActiveTicks = sweep, LockAt = show + sweep + 1,
                     Damage = JetDmg, Knockback = 1f,
                 };
                 ToWall(h);
                 h.Track = hz =>
                 {
-                    if (hz.Age >= hz.ResolveAt) hz.Yaw += dir * JetTurnDeg * Sim.Dt; ToWall(hz);   // turns only once it is live, always reaches the wall
+                    if (hz.Age >= hz.ResolveAt)   // turns only once it is live, always reaches the wall
+                    {
+                        int live = hz.Age - hz.ResolveAt;
+                        float d = !reverse || live < stop ? dir : live < back ? 0 : -dir;
+                        hz.Yaw += d * JetTurnDeg * Sim.Dt;
+                        if (first) SpinNet += d * JetTurnDeg * Sim.Dt;
+                        if (first && reverse && live == stop) { Reversals++; Boss.Flare(1.2f); Boss.Rig.VentsAll(true); }   // the stop is the warning
+                    }
+                    ToWall(hz);
                     if (hz.Age >= hz.ResolveAt && (hz.Age - hz.ResolveAt) % 4 == 0) W.BossFx.FlameJet(hz.Origin, hz.Yaw, hz.Length, hz.Width);   // flames while it sweeps
                 };
                 W.Hazards.Spawn(h);
@@ -139,10 +158,11 @@ namespace LastBell.Run
         // ---------------- Backdraft ----------------
         internal IEnumerable<int> Backdraft()
         {
+            Boss.Presenter?.Action("Backdraft", T(BlastAt));
             var centre = Flat(Boss.transform.position);
             var blast = W.Hazards.Spawn(new Hazard
             {
-                Source = "Backdraft", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = centre, Radius = BlastRadius,
+                Source = "Backdraft", AttackId = "crucivar.backdraft", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = centre, Radius = BlastRadius,
                 LockAt = 0, ResolveAt = T(BlastAt), Damage = BlastDmg, Knockback = 1.5f,
             });
             blast.OnResolve = hz => { W.BossFx.BellowsBlast(hz.Origin, hz.Radius); Boss.Flare(1.3f); Boss.Rig.VentsAll(false); };
@@ -176,6 +196,7 @@ namespace LastBell.Run
                     : list.Skip(loops % list.Count).Concat(list.Take(loops % list.Count)).Take(4).ToList();
             }
             NumeralsShown = !memory;
+            Boss.Presenter?.Action("CastingOrder", T(PourLead + PourGap * 3 + 0.5f));   // four tips, one per pour I-IV (fewer pours: the first ones line up)
             var origin = Flat(Boss.transform.position);
             for (int k = 0; k < Order.Count; k++)
             {
@@ -183,7 +204,7 @@ namespace LastBell.Run
                 int resolve = T(PourLead + PourGap * k), lockAt = resolve - T(PourLockBefore);
                 var h = new Hazard
                 {
-                    Source = "Pour " + new[] { "I", "II", "III", "IV" }[k], Shape = HazardShape.Lane, Kind = HazardKind.Ground, Origin = origin,
+                    Source = "Pour " + new[] { "I", "II", "III", "IV" }[k], AttackId = "crucivar.casting_order", Shape = HazardShape.Lane, Kind = HazardKind.Strike, Origin = origin,
                     Width = PourWidth, LockAt = lockAt, ResolveAt = resolve, Damage = PourDmg, Knockback = 1f, Yaw = Boss.transform.eulerAngles.y,
                 };
                 Aim(h, target);
@@ -193,7 +214,7 @@ namespace LastBell.Run
                     W.BossFx.StripStamp(hz.Origin, hz.Yaw, hz.Length, hz.Width);
                     W.Hazards.Spawn(new Hazard
                     {
-                        Source = "Pour Channel", Shape = HazardShape.Lane, Kind = HazardKind.Ground, Origin = hz.Origin, Yaw = hz.Yaw,
+                        Source = "Pour Channel", AttackId = "crucivar.casting_order", Shape = HazardShape.Lane, Kind = HazardKind.Strike, Origin = hz.Origin, Yaw = hz.Yaw,
                         Length = hz.Length, Width = hz.Width, LockAt = 0, ResolveAt = Sim.Ticks(ChannelLife), BurnPerSecond = ChannelBurn,
                     });
                 };
@@ -245,7 +266,8 @@ namespace LastBell.Run
             {
                 var h = W.Hazards.Spawn(new Hazard
                 {
-                    Source = name, Shape = shape, Kind = HazardKind.Strike, Origin = origin, Inner = inner, Radius = outer,
+                    Source = name, AttackId = name.StartsWith("Quake Echo") ? "crucivar.quake_echo" : "crucivar.anvil_quake",
+                    Shape = shape, Kind = HazardKind.Ground, Origin = origin, Inner = inner, Radius = outer,
                     LockAt = 0, ResolveAt = at, Damage = QuakeDmg, Knockback = 1f,
                 });
                 h.OnResolve = hz =>

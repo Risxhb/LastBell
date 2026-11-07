@@ -1,5 +1,5 @@
 {
-  "source": "ability-icons commit 0d0555a (art/mechanic-icons-20261022), approved by Chzy18 2026-10-23; ids, names, tags and shapes from docs/boss-attack-icons/<boss>/manifest.json; this copy carries the Aurelion attacks (5 approved 2026-10-23; errant_planets, falling_meridians and sunspots added 2026-11-07 from Codex work/attack-icons-20261106) plus Codex's 11 Sylvara v3 icons (work/attack-icons-20261102), approved by Chzy18 2026-11-02; icon bullet counts are approximate, so always show the name with the icon (Crucivar icons stay local until that boss ships; normal Bellkeeper v2 is retired)",
+  "source": "ability-icons commit 0d0555a (art/mechanic-icons-20261022), approved by Chzy18 2026-10-23; ids, names, tags and shapes from docs/boss-attack-icons/<boss>/manifest.json; this copy carries the Aurelion attacks (5 approved 2026-10-23; errant_planets, falling_meridians and sunspots added 2026-11-07 from Codex work/attack-icons-20261106) plus Codex's 11 Sylvara v3 icons (work/attack-icons-20261102), approved by Chzy18 2026-11-02; icon bullet counts are approximate, so always show the name with the icon; Crucivar v4: Codex attack icons (work/attack-icons-20261102), accepted by Chzy18 2026-11-02; Tower Slag reuses the Ember Brand icon and Molten Overflow the Furnace Eruption icon, each with its own label (normal Bellkeeper v2 is retired)",
   "attacks": [
     {
       "id": "aurelion.meridian_lances",
@@ -207,6 +207,186 @@
       "tag": "Strike",
       "shape": "The enrage at 2:00 into Phase 4: a dense spiral and constant seed rings.",
       "icon": "sylvara_last_storm",
+      "aliases": []
+    },
+    {
+      "id": "crucivar.ember_brand",
+      "boss": "crucivar",
+      "bossName": "Crucivar",
+      "name": "Ember Brand",
+      "tag": "Ground",
+      "shape": "A brand follows its carrier, stops 1.0 s before it lands and leaves a burning pool until the phase ends.",
+      "icon": "crucivar_ember_brand",
+      "aliases": [
+        "Brand Pool"
+      ]
+    },
+    {
+      "id": "crucivar.furnace_spin",
+      "boss": "crucivar",
+      "bossName": "Crucivar",
+      "name": "Furnace Spin",
+      "tag": "Strike",
+      "shape": "Six furnace jets from the centre to the wall, turning between volleys.",
+      "icon": "crucivar_furnace_spin",
+      "aliases": []
+    },
+    {
+      "id": "crucivar.backdraft",
+      "boss": "crucivar",
+      "bossName": "Crucivar",
+      "name": "Backdraft",
+      "tag": "Ground",
+      "shape": "The furnace pulls inward, then a filled circle blasts round him.",
+      "icon": "crucivar_backdraft",
+      "aliases": []
+    },
+    {
+      "id": "crucivar.casting_order",
+      "boss": "crucivar",
+      "bossName": "Crucivar",
+      "name": "Casting Order",
+      "tag": "Ground",
+      "shape": "Numbered pour lanes from the furnace land in order and leave burning channels.",
+      "icon": "crucivar_casting_order",
+      "aliases": [
+        "Pour"
+      ]
+    },
+    {
+      "id": "crucivar.anvil_quake",
+      "boss": "crucivar",
+      "bossName": "Crucivar",
+      "name": "Anvil Quake",
+      "tag": "Strike",
+      "shape": "A centre disc, then two bands out to the wall, inside to outside.",
+      "icon": "crucivar_anvil_quake",
+      "aliases": []
+    },
+    {
+      "id": "crucivar.quake_echo",
+      "boss": "crucivar",
+      "bossName": "Crucivar",
+      "name": "Quake Echo",
+      "tag": "Strike",
+      "shape": "Hard: the quake bands fire again outside to inside.",
+      "icon": "crucivar_quake_echo",
+      "aliases": []
+    },
+    {
+      "id": "crucivar.foundry_uprising",
+      "boss": "crucivar",
+      "bossName": "Crucivar",
+      "name": "Foundry Uprising",
+      "tag": "Strike",
+      "shape": "Rim turrets rise, each chained to a casting; break the castings before the flood.",
+      "icon": "crucivar_foundry_uprising",
+      "aliases": []
+    },
+    {
+      "id": "crucivar.lane_stream",
+      "boss": "crucivar",
+      "bossName": "Crucivar",
+      "name": "Lane Stream",
+      "tag": "Strike",
+      "shape": "A turret fires parallel lanes of bullets across the floor.",
+      "icon": "crucivar_lane_stream",
+      "aliases": []
+    },
+    {
+      "id": "crucivar.ring_wave",
+      "boss": "crucivar",
+      "bossName": "Crucivar",
+      "name": "Ring Wave",
+      "tag": "Strike",
+      "shape": "A turret fires a half-ring fan of bullets with two gaps to stand in.",
+      "icon": "crucivar_ring_wave",
+      "aliases": [
+        "Cast in Order"
+      ]
+    },
+    {
+      "id": "crucivar.spiral_arm",
+      "boss": "crucivar",
+      "bossName": "Crucivar",
+      "name": "Spiral Arm",
+      "tag": "Strike",
+      "shape": "Three winding arms of bullets turn out from a turret.",
+      "icon": "crucivar_spiral_arm",
+      "aliases": []
+    },
+    {
+      "id": "crucivar.pour_flood",
+      "boss": "crucivar",
+      "bossName": "Crucivar",
+      "name": "Pour Flood",
+      "tag": "Ground",
+      "shape": "A turret still standing at the deadline floods the floor: the party goes down.",
+      "icon": "crucivar_pour_flood",
+      "aliases": []
+    },
+    {
+      "id": "crucivar.mould_towers",
+      "boss": "crucivar",
+      "bossName": "Crucivar",
+      "name": "Mould Towers",
+      "tag": "Ground",
+      "shape": "Towers to stand in; each needs its share of players, extras farthest out are hit.",
+      "icon": "crucivar_mould_towers",
+      "aliases": [
+        "Mould Tower"
+      ]
+    },
+    {
+      "id": "crucivar.tower_slag",
+      "boss": "crucivar",
+      "bossName": "Crucivar",
+      "name": "Tower Slag",
+      "tag": "Ground",
+      "shape": "A landed Mould Tower leaves burning slag on its spot.",
+      "icon": "crucivar_ember_brand",
+      "aliases": []
+    },
+    {
+      "id": "crucivar.molten_crown",
+      "boss": "crucivar",
+      "bossName": "Crucivar",
+      "name": "Molten Crown",
+      "tag": "Ground",
+      "shape": "The molten rim closes inward step by step, shrinking the safe ring.",
+      "icon": "crucivar_molten_crown",
+      "aliases": [
+        "Crown Rise"
+      ]
+    },
+    {
+      "id": "crucivar.furnace_eruption",
+      "boss": "crucivar",
+      "bossName": "Crucivar",
+      "name": "Furnace Eruption",
+      "tag": "Ground",
+      "shape": "The whole floor erupts when the crown closes: the party goes down.",
+      "icon": "crucivar_furnace_eruption",
+      "aliases": []
+    },
+    {
+      "id": "crucivar.molten_overflow",
+      "boss": "crucivar",
+      "bossName": "Crucivar",
+      "name": "Molten Overflow",
+      "tag": "Ground",
+      "shape": "A Mould Tower landed short of players: the whole floor overflows.",
+      "icon": "crucivar_furnace_eruption",
+      "aliases": []
+    },
+    {
+      "id": "crucivar.second_press",
+      "boss": "crucivar",
+      "bossName": "Crucivar",
+      "name": "Second Press",
+      "tag": "Strike",
+      "shape": "Hard: the fullest tower of each set stamps again 2.0 s after it lands.",
+      "icon": "crucivar_second_press",
       "aliases": []
     }
   ]
