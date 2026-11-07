@@ -877,7 +877,7 @@ namespace LastBell.Run
                 while (watching && d.World != null)
                 {
                     maxBullets = Mathf.Max(maxBullets, d.World.Bullets.Count);
-                    if (d.Player && d.Player.Hp < 45) d.Player.DebugSetHp(PlayerController.MaxHp);   // keep the schedule running; damage is noted
+                    if (d.Player && d.Player.Hp < 60) d.Player.DebugSetHp(PlayerController.MaxHp);   // keep the schedule running; damage is noted (60: three Hard petals at once are 48)
                     yield return null;
                 }
             }
