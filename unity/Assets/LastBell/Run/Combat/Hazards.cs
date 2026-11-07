@@ -168,8 +168,13 @@ namespace LastBell.Run
             return h;
         }
 
+        // profiler scopes (perf agent, 2 Nov: name the phase-2 garbage); a marker costs nothing outside the profiler
+        static readonly Unity.Profiling.ProfilerMarker PmTrack = new Unity.Profiling.ProfilerMarker("LastBell.Hazards.TrackAndTelegraph"),
+            PmBurn = new Unity.Profiling.ProfilerMarker("LastBell.Hazards.Burn"), PmResolve = new Unity.Profiling.ProfilerMarker("LastBell.Hazards.Resolve");
+
         public void Step()
         {
+            using (PmTrack.Auto())
             for (int i = 0; i < live.Count; i++)
             {
                 var h = live[i];
@@ -179,7 +184,8 @@ namespace LastBell.Run
                 h.Tele.Place(h.Origin, h.Yaw);
                 h.Tele.Progress(h.FillToLock ? (h.LockAt > 0 ? (float)h.Age / h.LockAt : 1) : (float)h.Age / Mathf.Max(1, h.ResolveAt));
             }
-            StepBurn();
+            using (PmBurn.Auto()) StepBurn();
+            using (PmResolve.Auto())
             for (int i = live.Count - 1; i >= 0; i--)
             {
                 var h = live[i];
@@ -234,7 +240,7 @@ namespace LastBell.Run
                 Hazard src = null;
                 if (!p.Down)
                     foreach (var h in live)
-                        if (h.BurnPerSecond > 0 && h.Locked && (src == null || h.BurnPerSecond > src.BurnPerSecond) && h.Hits(p)) src = h;
+                        if (h.BurnPerSecond > 0 && h.Locked && (src == null || h.BurnPerSecond > src.BurnPerSecond) && h.Hits(p) && (h.Affects == null || h.Affects(p))) src = h;
                 if (src == null) { burn.Remove(p); continue; }
                 burn.TryGetValue(p, out float acc); acc += src.BurnPerSecond * Sim.Dt;
                 int dmg = Mathf.FloorToInt(acc); acc -= dmg; burn[p] = acc;

@@ -5,7 +5,7 @@ using UnityEngine;
 namespace LastBell.Run
 {
     // 06 Zenith Collapse (aurelion.zenith_collapse), all difficulties, spec abilities-v2/ABILITIES-v2.1.md §1 (proposal).
-    // The Regent stands at the meridian (the phase plan walks him to the arena centre first) and the whole sky falls on
+    // The Regent stands at the meridian (the phase plan walks him to a spot 3.5 m off the centre first, 3 Nov) and the whole sky falls on
     // the dais except a disc of shade at his feet: a Ground annulus on the boss, inner radius 4.5 m (N <= 2), 5.5 m
     // (N 3-4) or 6.5 m (N >= 5), 5.0 m at N <= 2 in Phase 3, outer 30 m (past the bound). Locked at once, resolves 3.0 s
     // later (Hard 2.4 s, Easy 3.75 s). 45 damage, no knockback, 0.25 s stun. The "come close" move: ranged must run in;
@@ -22,7 +22,7 @@ namespace LastBell.Run
         public const int Damage = 45;
 
         public static float SafeRadius(int n, int phase) => n <= 2 ? (phase >= 3 ? 5.0f : 4.5f) : n <= 4 ? 5.5f : 6.5f;
-        public int WindowTicks => Sim.Ticks(Hard ? HardWindowS : MediumV4 ? WindowS * MediumWindow : WindowS * WarnScale);   // v4 Medium 2.55 s (1 Nov)
+        public int WindowTicks => Sim.Ticks((Hard ? HardWindowS : MediumV4 ? WindowS * MediumWindow : WindowS * WarnScale) * PhaseWindow);   // v4 Medium 2.55 s (1 Nov); x0.85 in Phase 2, x0.75 in Phase 3 (3 Nov)
         // ticks from Run's first tick to its resolve tick (= when Run returns)
         public int Duration() => WindowTicks - 1;
 
@@ -36,7 +36,7 @@ namespace LastBell.Run
         {
             Say(Name);
             int win = WindowTicks;
-            Clip("MeridianAlignment", win);   // stand-in: glaive lifted straight up
+            Clip("ZenithCollapse", win);   // glaive lifted crosswise overhead, slammed down on the resolve tick
             Last = Spawn(new Hazard
             {
                 Source = Name, Shape = HazardShape.Ring, Kind = HazardKind.Ground, Origin = BossPos,
@@ -70,26 +70,60 @@ namespace LastBell.Run
         public float LeadRadius { get; private set; }
         public float MinRadiusSeen { get; private set; } = float.MaxValue;
 
-        public static ZenithCollapseFx Create(CombatWorld world, Hazard hazard)
+        // Pooled like OrreryClosingFx (perf capture 3 Nov): about 270 pieces are built once when the boss is built, and a
+        // cast reuses a hidden set instead of making and destroying them inside one tick.
+        static readonly List<ZenithCollapseFx> pool = new List<ZenithCollapseFx>();
+        // drawn for a couple of frames under the floor first so it uploads before the fight (see OrreryClosingFx.Warm)
+        int warmFrames;
+        public static void Warm(CombatWorld world)
         {
-            // LAN: a host session records it; a client replays Create on its stand-in for the same hazard
-            if (!hazard.Replica) Networking.LanFx.Record?.Invoke(Networking.LanFxTarget.Replica, "ZenithCollapse", new object[] { hazard.Id });
+            if (Free(world) != null) return;
+            var fx = Build(world); fx.warmFrames = 3;
+            fx.transform.position = new Vector3(0, -3f, 0);
+            foreach (var o in fx.rings) fx.Place(o, AurelionAbility.Rim - 1f);
+        }
+        static ZenithCollapseFx Free(CombatWorld world)
+        {
+            pool.RemoveAll(f => f == null);
+            foreach (var f in pool) if (f.w == world && !f.gameObject.activeSelf) return f;
+            return null;
+        }
+        static ZenithCollapseFx Build(CombatWorld world)
+        {
             var go = new GameObject("Zenith Collapse fx"); go.transform.SetParent(world.Root, false);
-            go.transform.position = new Vector3(hazard.Origin.x, 0.05f, hazard.Origin.z);
-            var fx = go.AddComponent<ZenithCollapseFx>(); fx.w = world; fx.h = hazard; fx.mat = Prim.Material(Gold, 1f);
-            float rim = AurelionAbility.Rim;
-            int n = Mathf.CeilToInt(2 * Mathf.PI * rim / 0.9f);
+            var fx = go.AddComponent<ZenithCollapseFx>(); fx.w = world; fx.mat = Prim.Material(Gold, 1f);
+            int n = Mathf.CeilToInt(2 * Mathf.PI * AurelionAbility.Rim / 0.9f);
             for (int j = 0; j < Rings; j++)
             {
-                var o = new Ring { Start = Mathf.Max(hazard.Inner + 0.5f, rim - j * Spread), Spin = j % 2 == 0 ? 1 : -1, Segs = new Transform[n] };
+                var o = new Ring { Spin = j % 2 == 0 ? 1 : -1, Segs = new Transform[n] };
                 o.Root = new GameObject("Zenith orrery ring").transform; o.Root.SetParent(go.transform, false);
                 for (int k = 0; k < n; k++)
                     fx.Share(o.Segs[k] = Prim.Make(PrimitiveKind.Cube, o.Root, Vector3.zero, Vector3.one, Gold, 0, Quaternion.Euler(0, k * 360f / n + 90, 0)));
                 o.Bead = Prim.Make(PrimitiveKind.Sphere, o.Root, Vector3.zero, Vector3.one * 0.3f, Gold);
                 fx.Share(o.Bead);
                 fx.rings.Add(o);
+            }
+            pool.Add(fx);
+            return fx;
+        }
+
+        public static ZenithCollapseFx Create(CombatWorld world, Hazard hazard)
+        {
+            // LAN: a host session records it; a client replays Create on its stand-in for the same hazard
+            if (!hazard.Replica) Networking.LanFx.Record?.Invoke(Networking.LanFxTarget.Replica, "ZenithCollapse", new object[] { hazard.Id });
+            var fx = Free(world) ?? Build(world);
+            fx.h = hazard; fx.fade = -1; fx.warmFrames = 0; fx.LeadRadius = 0; fx.MinRadiusSeen = float.MaxValue;
+            fx.transform.position = new Vector3(hazard.Origin.x, 0.05f, hazard.Origin.z);
+            fx.mat.SetColor("_EmissionColor", Gold * 0.4f);
+            float rim = AurelionAbility.Rim;
+            for (int j = 0; j < fx.rings.Count; j++)
+            {
+                var o = fx.rings[j];
+                o.Start = Mathf.Max(hazard.Inner + 0.5f, rim - j * Spread); o.Turn = 0;
+                o.Root.localRotation = Quaternion.identity;
                 fx.Place(o, o.Start);
             }
+            fx.gameObject.SetActive(true);
             Latest = fx;
             return fx;
         }
@@ -113,6 +147,7 @@ namespace LastBell.Run
 
         void Update()
         {
+            if (warmFrames > 0) { if (--warmFrames == 0) gameObject.SetActive(false); return; }
             float dt = Time.deltaTime;
             bool live = Hazard.IsLive(w, h);
             if (!live && fade < 0) fade = h.Age >= h.ResolveAt ? 1f : 0.4f;   // resolved: flash; cleared early: dim
@@ -121,7 +156,7 @@ namespace LastBell.Run
                 fade -= dt * 1.6f;
                 mat.SetColor("_EmissionColor", Gold * Mathf.Max(0, fade) * 6f);
                 transform.position += Vector3.down * dt * 0.5f;
-                if (fade <= 0) Destroy(gameObject);
+                if (fade <= 0) gameObject.SetActive(false);   // back to the pool
                 return;
             }
             float k = Mathf.Clamp01(h.Age / (float)Mathf.Max(1, h.ResolveAt));

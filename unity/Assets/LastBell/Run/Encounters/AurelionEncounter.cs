@@ -31,6 +31,8 @@ namespace LastBell.Run
         protected override void StepAlways()
         {
             V4Clock();
+            StepDevour();
+            StepPhaseExtras();
             if (Light != null && W.CombatActive) Light.StepFalls();
             if (presenter) presenter.TickBoss(Current == "approach" || Current == "reposition" ? "Walk" : "Idle");
         }
@@ -56,7 +58,13 @@ namespace LastBell.Run
         {
             PhaseName = "Perfect Order";
             presenter = CharacterPresenter.Create(transform, "Aurelion", 3f, 0.8f, 0, host => { BuildStandIn(host); return host; });
+            Clip("Entrance", 120);   // the run intro (RunDirector.IntroTicks): he straightens and plants the glaive
             BindAbilities();
+            // the orrery rings and the label glyphs are warmed here, before the fight (perf captures 3 Nov: first built, drawn
+            // or lettered mid-fight, each spiked a frame)
+            OrreryClosingFx.Warm(W); ZenithCollapseFx.Warm(W);
+            AurelionTimeline.Note("boss built (warm-ups)");
+            gameObject.AddComponent<AurelionWarmUp>();
         }
 
         void BuildStandIn(Transform host)

@@ -14,12 +14,13 @@ namespace LastBell.Run
         static readonly string[] ApprovedAttackIds =
         {
             "aurelion.meridian_lances", "aurelion.starfall_mirror", "aurelion.noon_shadow", "aurelion.orrery_closing", "aurelion.hour_hands",
+            "aurelion.errant_planets", "aurelion.falling_meridians", "aurelion.sunspots",   // 7 Nov (Codex attack-icons-20261106)
         };
 
         void BossAttackIconChecks()
         {
-            Check("boss attack icon catalog lists exactly the 5 approved Aurelion IDs",
-                  BossAttackIcons.All.Count == 5 && ApprovedAttackIds.All(id => BossAttackIcons.Get(id) != null), $"{BossAttackIcons.All.Count} listed");
+            Check($"boss attack icon catalog lists exactly the {ApprovedAttackIds.Length} approved Aurelion IDs",
+                  BossAttackIcons.All.Count(x => x.boss == "aurelion") == ApprovedAttackIds.Length && ApprovedAttackIds.All(id => BossAttackIcons.Get(id) != null), $"{BossAttackIcons.All.Count(x => x.boss == "aurelion")} listed");
             foreach (var id in ApprovedAttackIds)
             {
                 var a = BossAttackIcons.Get(id); var t = BossAttackIcons.Icon(id);

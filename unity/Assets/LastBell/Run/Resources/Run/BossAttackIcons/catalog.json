@@ -1,5 +1,5 @@
 {
-  "source": "ability-icons commit 0d0555a (art/mechanic-icons-20261022), approved by Chzy18 2026-10-23; ids, names, tags and shapes from docs/boss-attack-icons/<boss>/manifest.json; this copy carries only the 5 Aurelion attacks (Crucivar and Sylvara icons stay local until those bosses ship; normal Bellkeeper v2 is retired)",
+  "source": "ability-icons commit 0d0555a (art/mechanic-icons-20261022), approved by Chzy18 2026-10-23; ids, names, tags and shapes from docs/boss-attack-icons/<boss>/manifest.json; this copy carries the Aurelion attacks (5 approved 2026-10-23; errant_planets, falling_meridians and sunspots added 2026-11-07 from Codex work/attack-icons-20261106) (Crucivar and Sylvara icons stay local until those bosses ship; normal Bellkeeper v2 is retired)",
   "attacks": [
     {
       "id": "aurelion.meridian_lances",
@@ -49,6 +49,36 @@
       "tag": "Strike",
       "shape": "Boss-to-rim radial lane spokes through player hours, 1.8 m wide; Hard only.",
       "icon": "aurelion_hour_hands",
+      "aliases": []
+    },
+    {
+      "id": "aurelion.errant_planets",
+      "boss": "aurelion",
+      "bossName": "Aurelion",
+      "name": "Errant Planets",
+      "tag": "Ground",
+      "shape": "Planets of r 0.8 circling the arena on fixed orbits (Phase 2; Hard: one on the 12 m rim in Phase 1); 30 once per lap.",
+      "icon": "aurelion_errant_planets",
+      "aliases": []
+    },
+    {
+      "id": "aurelion.falling_meridians",
+      "boss": "aurelion",
+      "bossName": "Aurelion",
+      "name": "Falling Meridians",
+      "tag": "Ground",
+      "shape": "A 2.5 m circle at each standing player's feet every 3.5 s in Phase 3; Hard adds an echo 0.6 s later.",
+      "icon": "aurelion_falling_meridians",
+      "aliases": []
+    },
+    {
+      "id": "aurelion.sunspots",
+      "boss": "aurelion",
+      "bossName": "Aurelion",
+      "name": "Sunspots",
+      "tag": "Ground",
+      "shape": "Sigils on carriers detonate in turn (3.5 m blast) and leave 3.0 m burning scorch pools; a blast that catches another carrier is a Solar Flare.",
+      "icon": "aurelion_sunspots",
       "aliases": []
     }
   ]

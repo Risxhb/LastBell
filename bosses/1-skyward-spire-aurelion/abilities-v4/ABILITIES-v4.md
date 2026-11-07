@@ -33,7 +33,7 @@ Sources:
 The designs below are original adaptations, not copies.
 
 
-> **This section matches the runtime** (`boss-aurelion`, branch `feature/aurelion-v3`, revision 038571a; aligned 2026-10-25 from the Codex solo study, proposal 3). Code is the source of truth; nothing was retuned to match older text. Everything below is still a **proposal** for Chzy18's approval. The older draft numbers (2 solo towers with shared damage, a 5 % shield, 15 % Last Light, the 7:00 enrage, a 120 s floor, a 25 s Severance with a solo swap) are retired.
+> **This section matches the runtime** (originally aligned on `feature/aurelion-v3` at 038571a, 2026-10-25; the fight now lives on `integrate/aurelion`, Azure PR 15. Phases 2-3 changes since then: `PHASES-2-3-HARDER.md` from the Codex solo study, proposal 3). Code is the source of truth; nothing was retuned to match older text. Everything below is still a **proposal** for Chzy18's approval. The older draft numbers (2 solo towers with shared damage, a 5 % shield, 15 % Last Light, the 7:00 enrage, a 120 s floor, a 25 s Severance with a solo swap) are retired.
 
 ## 2. Fight outline
 
@@ -69,10 +69,6 @@ The designs below are original adaptations, not copies.
 | 2 | 1 + 1 |
 | 3 | 1 + 2 |
 | 4 | 2 + 2, then 1 + 3 (alternating) |
-| 5 | 2 + 3 |
-| 6 | 3 + 3 |
-| 7 | 2 + 2 + 3 |
-| 8 | 3 + 3 + 2 |
 
 - If a tower's assigned player goes down after it rises, its count drops by one; a tower whose players are all down goes dark.
 - Layout: a 6.5 m ring round the centre, three authored layouts, towers ≥ 120° apart, radius 2.5 m.
@@ -99,15 +95,15 @@ The designs below are original adaptations, not copies.
 | Party | Wells |
 |---|---|
 | 1–4 players | 4 wells of 3.5 m |
-| 5–8 players | 6 wells of 3.0 m |
 
   The wells orbit 6 m from the centre at 15°/s. **Umbra:** outside every well for over 2 s deals 10 per second.
 - Lances (3 beams) and Starfall keep falling meanwhile.
 
 ### 3.5 Severance (`Severance.cs`), Phase 3
 
-1. **3 s split.** The line shows and the game calls SPLIT. Co-op players are told Day and Night alternately in party order.
-2. **20 s sweep.** The sides lock; the line travels **270°**: 135° one way in 10 s, then "THE LINE TURNS BACK" (1.5 s warning) and 135° back (about 3.3 m/s at the rim).
+1. **2 s split** (3 s until 3 Nov). The line shows and the game calls SPLIT. Co-op players are told Day and Night alternately in party order.
+2. **15 s sweep** (3 Nov; was 20 s with one turn). The sides lock; the line moves **24° a second** (about 5.9 m/s at the rim) and turns back at 5 s and 10 s ("THE LINE TURNS BACK", 1 s warning).
+   - **Each half has its own danger:** every 3 s a 2.5 m circle falls at the feet of everyone in Day, and 1.5 s later of everyone in Night (1.2 s warning, Easy 1.5, Hard 1.0; 30 damage). Solo, the circles follow the half you stand in.
 3. **Crossing** the line, or letting it sweep over you, is a heavy hit (50), every time.
 4. **Common partner schedule** for every party size: Starfall, Lances (4 beams), Starfall, Lances.
 5. **Co-op only:** all standing players on one side for 0.5 s = wipe, then the **Reunion** tower (4.5 m at the centre: empty = wipe, anyone outside takes 50).
@@ -181,7 +177,6 @@ The designs below are original adaptations, not copies.
 - **Unity demo:** four perfect attacking bots win at full HP on Hard in 4:55, 3 of 4 standing, with one slice of floor to spare.
 - **Codex headless solo study** (2026-10-25, `deliveries/.../aurelion-solo-20261025/REPORT.md`):
   - Arcanist and Chimesinger clear solo on Easy, Medium and Hard: 72/72 with a guarded input policy.
-  - Vanguard: **not yet demonstrated**, 0/180 across five bot policies. That's not proof of impossibility.
   - No unavoidable two-body requirement in the solo branches.
 
 ## 8. New systems (shared code kept small)
@@ -197,7 +192,7 @@ The designs below are original adaptations, not copies.
 
 ## 9. Open questions
 
-1. **Vanguard solo reference:** which successful input route is the reference per level? In progress in the Aurelion session (Codex proposal 1). Don't infer a melee damage ceiling from failed bot policies.
+1. **Melee solo reference:** the Tollbreaker (Vanguard's replacement since 2 Nov) is the melee reference; its Hard solo bot wins in 3:41 (3 Nov, round 2).
 2. Are the measured solo clear times the desired experience, given co-op first?
 3. Should Phase 4 keep no punish window?
 4. Easy: keep every wipe, or turn Easy's wipes into heavy hits?
