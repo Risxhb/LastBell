@@ -342,12 +342,16 @@ namespace LastBell.Run.Networking
             var bullets = world.Bullets; bullets.SetReplicaCount(bulletStates.Count);
             float since = (float)(renderTime - bulletTime);
             for (int i = 0; i < bulletStates.Count; i++)
-            {
-                var s = bulletStates[i]; var b = bullets.Live[i];
-                b.Pos = new Vector3(s.X + s.VX * since, 0, s.Z + s.VZ * since); b.Vel = new Vector3(s.VX, 0, s.VZ);
-                b.Radius = s.Radius; b.Colour = s.Colour; b.Source = s.Water ? "Waterfall Jet" : "Bullet"; b.Dead = false;
-            }
+                ApplyBullet(bulletStates[i], bullets.Live[i], since);
             bullets.Draw(world.Root);
+        }
+        // a replica bullet 'since' seconds after its snapshot; a seed also gets its fuse and burst preview, drawn as on the host
+        public static void ApplyBullet(LanWorldFrame.BulletState s, BulletSystem.Bullet b, float since)
+        {
+            b.Pos = new Vector3(s.X + s.VX * since, 0, s.Z + s.VZ * since); b.Vel = new Vector3(s.VX, 0, s.VZ);
+            b.Radius = s.Radius; b.Colour = s.Colour; b.Source = s.Water ? "Waterfall Jet" : "Bullet"; b.Dead = false;
+            b.BurstRays = s.Rays; b.BurstOff = s.Off; b.BurstSpeed = s.Speed;
+            if (s.Rays > 0) { b.Life = s.Life; b.Age = Mathf.Min(s.Age + Mathf.Max(0, since), s.Life); } else { b.Life = 6; b.Age = 0; }
         }
         // ---------------- boss props ----------------
         readonly HashSet<int> propSeen = new HashSet<int>();

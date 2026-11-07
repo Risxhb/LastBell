@@ -787,9 +787,10 @@ namespace LastBell.Run
                     Count(pendKey, -1, -pendDmg); Count(key, 1, pendDmg); lastKey[p] = key; pendP = null;
                 };
                 w.PlayerHit += onHaz; w.Bullets.Hit += onBul;
-                // reach (6 Nov): how often each class stands where its bot swings at her (Range + body + 2 m), and its mean distance
+                // reach (6 Nov): how often each class stands where its bot attacks her (the bot's own range for the phase, so the
+                // Tollbreaker's 9 m Seed Storm throw counts, + body + 2 m), and its mean distance
                 var reachN = new Dictionary<string, int[]>(); var reachD = new Dictionary<string, float>();
-                float SwingAt(string c) => (c == "Tollbreaker" ? 3.5f : c == "Chimesinger" ? 6.5f : 8.5f) + sy.BodyRadius + 2f;
+                float SwingAt(string c) => AllyBot.SylvaraAttackRange(c, sy.PhaseName) + sy.BodyRadius + 2f;
                 while (d.State == RunState.Combat && d.World == w && (w.Tick - tick0) < Sim.Ticks(480))
                 {
                     last = w.Tick;
@@ -1121,11 +1122,24 @@ namespace LastBell.Run
                 d.World.Hazards.ClearAll();
             }
             {
-                // Hard live: a seed bursts into 10 petals
-                d.World.Difficulty = Difficulty.Hard; sy.DebugStartStorm(0);
+                // Hard live: a seed bursts into 10 petals. A fresh bullet field, so only Hard seeds take part (seeds still flying
+                // from the Medium storm above would mix 8- and 10-ray bursts; review SYL-PREVIEW-TEST, 7 Nov)
+                d.World.Bullets.ClearAll(); d.World.Difficulty = Difficulty.Hard; sy.DebugStartStorm(0);
                 // burst preview (proposal 7 Nov): each seed carries its burst angle from launch, its last 0.6 s draws the rays,
                 // and the petals fly exactly along the previewed rays from the previewed point
                 var seeds = new Dictionary<BulletSystem.Bullet, (float off, Vector3 at, int rays)>(); int fresh = 0; bool rayShown = false, seedsCarry = true;
+                // LAN (review SYL-PREVIEW-NET): a previewing seed sent through a world frame reaches a client with its rays and fuse
+                int netChecked = 0; string netBad = null;
+                void NetRoundTrip(BulletSystem.Bullet b)
+                {
+                    var f = new Networking.LanWorldFrame(); f.Players.Add(new Networking.LanWorldFrame.Player { Id = 0, Hp = 1, MaxHp = 1 });
+                    f.Bullets.Add(Networking.LanWorldCapture.BulletOf(b));
+                    if (!Networking.LanWorldFrame.TryDecode(f.Encode(), out var got) || got.Bullets.Count != 1) { netBad = "frame did not decode"; return; }
+                    var c = new BulletSystem.Bullet(); Networking.LanClientWorld.ApplyBullet(got.Bullets[0], c, 0);
+                    bool ok = c.BurstRays == b.BurstRays && Mathf.Abs(Mathf.DeltaAngle(c.BurstOff * Mathf.Rad2Deg, b.BurstOff * Mathf.Rad2Deg)) < 0.01f
+                        && Mathf.Approximately(c.BurstSpeed, b.BurstSpeed) && Mathf.Abs((c.Life - c.Age) - (b.Life - b.Age)) < 0.001f && c.Radius >= 0.5f;
+                    netChecked++; if (!ok && netBad == null) netBad = $"client {c.BurstRays} rays / {c.Life - c.Age:0.000} s left vs host {b.BurstRays} / {b.Life - b.Age:0.000}";
+                }
                 bool sampling = true;
                 // petals live 6 s: ones from earlier steps are still flying, and their seeds were never sampled
                 var older = new HashSet<BulletSystem.Bullet>(d.World.Bullets.Live.Where(b => b.Source == "Seed Burst"));
@@ -1141,6 +1155,7 @@ namespace LastBell.Run
                                 seeds[b] = (b.BurstOff, b.Pos + b.Vel * (b.Life - b.Age), Mathf.Max(1, b.BurstRays));
                             }
                         rayShown |= GameObject.Find("Burst Ray") != null;
+                        if (netChecked < 3) foreach (var b in d.World.Bullets.Live) if (b.Source == "Seed" && !b.Dead && b.Life - b.Age <= BulletSystem.PreviewFor) { NetRoundTrip(b); break; }
                         yield return null;
                     }
                 }
@@ -1150,6 +1165,19 @@ namespace LastBell.Run
                 Check("Sylvara Hard P4: a seed bursts into 10 petals", sy.LastBurstFired == 10, sy.LastBurstFired.ToString());
                 Check("Sylvara P4 burst preview: every seed carries its 10 burst rays from launch", fresh > 0 && seedsCarry, $"{fresh} seeds");
                 Check("Sylvara P4 burst preview: the rays are drawn before the burst", rayShown);
+                Check("Sylvara P4 burst preview: a LAN client gets each seed's rays and fuse (world frame round trip)", netChecked > 0 && netBad == null, netBad ?? $"{netChecked} seeds");
+                // the drawn track is the petal's real hit corridor: full petal width, from the burst point past the 0.4 s reach
+                Check("Sylvara P4 burst preview: each ray track is a petal's full hit width (0.6 m), end caps included",
+                        Mathf.Approximately(BulletSystem.PreviewRayWidth, 2 * BulletArt.PetalHitRadius), $"{BulletSystem.PreviewRayWidth:0.00} m");
+                {
+                    // SYL-PREVIEW-COLD: Sylvara's Ready warm-up builds the bars and materials, so the first preview builds none
+                    var probeRoot = new GameObject("Prewarm Probe").transform; var probe = new BulletSystem(d.World);
+                    var sylEntry = RunDirector.Bosses.First(e => e.Map == RunDirector.SylvaraMap && e.InRun);
+                    probe.Prewarm(probeRoot); int built = probe.PreviewBars;
+                    Check("Sylvara P4 burst preview: the ray bars are built on the Ready screen (Sylvara's warm-up), before the fight",
+                        sylEntry.WarmUp != null && built >= BulletSystem.PrewarmBars, $"{built} bars");
+                    UnityEngine.Object.Destroy(probeRoot.gameObject);
+                }
                 int petals = 0, onRay = 0; var miss = new List<string>();
                 foreach (var p in d.World.Bullets.Live)
                 {
