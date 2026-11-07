@@ -30,11 +30,6 @@ unity/*.slnx
 # Asset packs: downloaded and built ZIPs (see docs/asset-packs.md)
 /.asset-packs/
 
-
-# Sylvara v3 attack props (Meshy art, cleaned by prototype/arena-3d/models/blender/sylvara_props_prep.py; not committed)
-/unity/Assets/LastBell/Characters/Sylvara/Resources/SylvaraProps/
-/unity/Assets/LastBell/Characters/Sylvara/Resources/SylvaraProps.meta
-
 # >>> asset packs (managed by tools/asset-packs; do not edit by hand)
 /unity/Assets/LastBell/Characters/Sylvara/Resources/Characters/Sylvara.glb
 /unity/Assets/LastBell/Characters/Sylvara/Resources/Characters/Sylvara.glb.meta
@@ -63,3 +58,7 @@ unity/*.slnx
 /unity/Assets/LastBell/Areas/Area3/Source/FloorMask.png
 /unity/Assets/LastBell/Areas/Area3/Source/FloorMask.png.meta
 # <<< asset packs
+
+# Sylvara v3 attack props (Meshy art, cleaned by prototype/arena-3d/models/blender/sylvara_props_prep.py; not committed)
+/unity/Assets/LastBell/Characters/Sylvara/Resources/SylvaraProps/
+/unity/Assets/LastBell/Characters/Sylvara/Resources/SylvaraProps.meta
