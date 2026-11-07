@@ -46,7 +46,7 @@ namespace LastBell.Run
                 if (!p || p.Down || p.Reviving != null) continue;
                 var h = Spawn(new Hazard
                 {
-                    Source = source, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Sim.Flat(p.transform.position),
+                    Source = source, AttackId = Id, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Sim.Flat(p.transform.position),
                     Radius = Radius, LockAt = 0, ResolveAt = Warn, Damage = Damage, Knockback = 0, Stun = 0,
                 });
                 h.OnResolve = hz => W.BossFx.ChimeResolve(hz.Origin, hz.Radius);

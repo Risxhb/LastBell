@@ -25,6 +25,7 @@ namespace LastBell.Run
             if (V2Wants("aurelion.total_eclipse")) yield return V2Section("v4 Total Eclipse", V4Eclipse());
             if (V2Wants("aurelion.severance")) yield return V2Section("v4 Severance", V4Severance());
             if (V2Wants("aurelion.meridian_recall")) yield return V2Section("v4 Meridian Recall (Hard)", V4Recall());
+            if (V2Wants("aurelion.v4_icons")) BossAttackIconChecks();   // the attack-icon catalog (7 Nov: 8 Aurelion icons)
             if (V2Wants("aurelion.v4_hard")) yield return V2Section("v4 Hard additions (5 Nov)", V4HardExtras());
             if (AurelionAbilityFilter != null && AurelionAbilityFilter.Equals("aurelion.v4_seeds", StringComparison.OrdinalIgnoreCase)) yield return V2Section("v4 perfect route seed sweep", V4PerfectSeeds());
             if (V2Wants("aurelion.last_light")) yield return V2Section("v4 Last Light and the enrage", V4LastLight());
@@ -215,8 +216,10 @@ namespace LastBell.Run
                 var a = V2Boss; a.DebugSetPhaseV4(1); a.TestExtras = true;
                 yield return V2Ticks(30);
                 int n = a.Planets.Count; float r = n > 0 ? Sim.Flat(a.Planets.PlanetAt(0)).magnitude : 0;
+                var ph = V2W.Hazards.Live.FirstOrDefault(h => h.Source == "Errant Planets");
                 a.TestExtras = false; yield return V2Ticks(2);
                 if (lv == Difficulty.Hard) V2Check("Hard: one Errant Planet on the rim orbit (12 m) in Phase 1", n == 1 && Mathf.Abs(r - 12f) < 0.3f, $"planets {n}, {r:0.0} m out");
+                if (lv == Difficulty.Hard) V4IconCheck("Errant Planets", "aurelion.errant_planets", ph);
                 else V2Check("Medium: no planets in Phase 1", n == 0, $"planets {n}");
             }
             // 2. Falling Meridians: on Hard an echo circle 0.6 s after the wave; standing still costs both
@@ -258,6 +261,7 @@ namespace LastBell.Run
                 V2Check("Hard: Falling Meridians (wave and echo) never aim at a reviver; the other standing player gets both",
                     alwaysReviving && echoes == 1 && circles == 2 && !aimedAtReviver, $"reviving {alwaysReviving}, echoes {echoes}, circles {circles}, aimed at reviver {aimedAtReviver}");
                 V2Check("a reviver inside another player's circle is still hit (no immunity)", hits == 2, $"hits {hits}");
+                V4IconCheck("Falling Meridians (wave and echo)", "aurelion.falling_meridians", seen.ToArray());
             }
             // 3. Hour Hands on Hard: each spoke has a mirror at its hour + 6; standing off both lines is never hit
             yield return V2Setup(1, Difficulty.Hard, new[] { new Vector3(0, 0, 8f) }, 2, Vector3.zero);
@@ -269,6 +273,7 @@ namespace LastBell.Run
                 float apart = own != null && mir != null ? Mathf.Abs(Mathf.DeltaAngle(own.Yaw, mir.Yaw)) : 0;
                 yield return V2WaitIdle(10);
                 V2Check("Hard: each Hour Hands spoke has a mirror on the opposite hour", own != null && mir != null && Mathf.Abs(apart - 180f) < 0.5f, $"own {own != null}, mirror {mir != null}, {apart:0} degrees apart");
+                V4IconCheck("Hour Hands (spoke and mirror)", "aurelion.hour_hands", own, mir);
             }
             // 4. Sunspots on Hard: 1.2 s between blasts (Medium 1.5 s)
             foreach (var lv in new[] { Difficulty.Medium, Difficulty.Hard })
@@ -277,10 +282,20 @@ namespace LastBell.Run
                 if (V2Boss == null) yield break;
                 var sp = V2Boss.Spots; V2Begin(sp.Run()); yield return V2Ticks(2);
                 int gap = sp.Spots.Count == 2 ? sp.Spots[1].DetonateTick - sp.Spots[0].DetonateTick : -1;
-                yield return V2WaitIdle(10); V2Boss.ClearPhasePools();
+                yield return V2WaitIdle(10); var spotHz = sp.Spots.SelectMany(s => new[] { s.Blast, s.Pool }).ToArray();
+                V2Boss.ClearPhasePools();
                 float want = lv == Difficulty.Hard ? Sunspots.StepHardS : Sunspots.StepS;
                 V2Check($"{lv}: Sunspots {want:0.0} s apart", gap == Sim.Ticks(want), $"{gap} ticks");
+                if (lv == Difficulty.Hard) V4IconCheck("Sunspots (blast and scorch)", "aurelion.sunspots", spotHz);
             }
+        }
+
+        // attack icons (7 Nov): every hazard of the attack carries its AttackId, which resolves to a catalogued 256 px icon
+        void V4IconCheck(string what, string id, params Hazard[] hz)
+        {
+            var a = BossAttackIcons.Resolve(hz.FirstOrDefault(), V2Boss); var t = a == null ? null : BossAttackIcons.Icon(a);
+            V2Check($"{what}: AttackId {id} on every hazard, with its icon", hz.Length > 0 && hz.All(h => h != null && h.AttackId == id) && a?.id == id && t != null,
+                $"{hz.Length} hazards, ids {string.Join("/", hz.Select(h => h?.AttackId ?? "null").Distinct())}, icon {(t != null)}");
         }
 
         // ================================================================ Severance

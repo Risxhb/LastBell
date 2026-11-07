@@ -70,7 +70,7 @@ namespace LastBell.Run
             var from = BossPos; float turn = mirror ? 180f : 0f;
             var h = new Hazard
             {
-                Source = (tag == null ? Name : Name + " " + tag) + (mirror ? " mirror" : ""),
+                Source = (tag == null ? Name : Name + " " + tag) + (mirror ? " mirror" : ""), AttackId = Id,
                 Shape = HazardShape.Lane, Kind = HazardKind.Strike,
                 Origin = from, Yaw = Mathf.Repeat(HourOf(from, target.transform.position, Body.eulerAngles.y) + turn, 360f),
                 Length = Length, Width = Width,

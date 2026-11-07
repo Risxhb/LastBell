@@ -70,7 +70,7 @@ namespace LastBell.Run
                 var spot = s;
                 s.Blast = Spawn(new Hazard
                 {
-                    Source = Name, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Sim.Flat(s.Who.transform.position), Radius = Blast,
+                    Source = Name, AttackId = Id, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Sim.Flat(s.Who.transform.position), Radius = Blast,
                     LockAt = 0, ResolveAt = Lock, Damage = Damage, Knockback = 0, Stun = 15,
                 });
                 s.Blast.OnResolve = hz => Detonate(spot);
@@ -106,7 +106,7 @@ namespace LastBell.Run
                 { Chained = true; Boss.Wipe("Solar Flare — a sunspot caught carrier " + Numerals[o.Index]); return; }
             s.Pool = Spawn(new Hazard
             {
-                Source = Name + " scorch", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = s.Blast.Origin, Radius = Pool,
+                Source = Name + " scorch", AttackId = Id, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = s.Blast.Origin, Radius = Pool,
                 LockAt = 0, ResolveAt = PoolTicks, BurnPerSecond = PoolBurn, Knockback = 0,
             });
             Pools.Add(s.Pool);   // pools last their full 75 s, across phase changes: the floor fills from the start

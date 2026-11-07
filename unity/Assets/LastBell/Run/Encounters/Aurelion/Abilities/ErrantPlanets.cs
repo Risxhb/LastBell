@@ -55,7 +55,7 @@ namespace LastBell.Run
         // one planet's hazard for one lap of its orbit
         Hazard Lap(Vector3 at) => Spawn(new Hazard
         {
-            Source = Name, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = at, Radius = Radius,
+            Source = Name, AttackId = Id, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = at, Radius = Radius,
             LockAt = 0, ResolveAt = 1, ActiveTicks = 1 << 28, Damage = Damage, Knockback = 1.5f, Stun = 0,
         });
         public int Laps { get; private set; }   // test evidence
