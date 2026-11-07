@@ -3,19 +3,18 @@
     "packs":  [
                   {
                       "name":  "current-player-assets",
-                      "version":  1,
-                      "file":  "current-player-assets-v1.zip",
+                      "version":  2,
+                      "file":  "current-player-assets-v2.zip",
                       "source":  {
                                      "type":  "azure-universal",
                                      "organization":  "https://dev.azure.com/ChzandZum",
                                      "project":  "Last Bell",
                                      "feed":  "last-bell-assets",
                                      "package":  "current-player-assets",
-                                     "packageVersion":  "1.0.0"
+                                     "packageVersion":  "2.0.0"
                                  },
-                      "url":  "https://github.com/Risxhb/collab/releases/download/current-player-assets-v1/current-player-assets-v1.zip",
-                      "sha256":  "af7d454d489fd6efbdb54f94898a3f74bb25cf46b793def159ecfbab8e0d3080",
-                      "size":  43806372,
+                      "sha256":  "aa72278b2054b64a0ec3dbbaead025be3d7542efa1e36a48f595453c60135564",
+                      "size":  73795957,
                       "extractTo":  ".",
                       "paths":  [
                                     "unity/Assets/LastBell/Areas/Area2/Generated",
@@ -23,7 +22,7 @@
                                     "unity/Assets/LastBell/Run/Maps/Run_BrassFoundry.unity",
                                     "unity/Assets/LastBell/Menu/Resources/Menu/MainMenu2.wav"
                                 ],
-                      "files":  210
+                      "files":  280
                   },
                   {
                       "name":  "sylvara-assets",

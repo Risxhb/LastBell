@@ -22,6 +22,8 @@ namespace LastBell.Areas.Area2.EditorTools
     {
         const string Dir = "Assets/LastBell/Areas/Area2", Gen = Dir + "/Generated", ScenePath = Dir + "/BrassFoundry_Arena.unity";
         const float R = 14f, PI = Mathf.PI, TAU = Mathf.PI * 2;
+        // the molten ring: from just behind the rim teeth to the outer wall, high enough to read from the gameplay camera
+        const float ChannelIn = 16.0f, ChannelOut = 18.65f, ChannelMid = (ChannelIn + ChannelOut) / 2, ChannelY = -0.7f;
         static readonly Matrix4x4 I = Matrix4x4.identity;
 
         [MenuItem("Last Bell/Area 2 – Brass Foundry", priority = 20)]
@@ -53,7 +55,7 @@ namespace LastBell.Areas.Area2.EditorTools
         static float Rnd(float a, float b) => a + (b - a) * Rnd();
 
         // materials
-        static Material mGapMolten, mStoneSolid, mCityRoof, mFloor, mSlate, mRimStone, mMasonry, mMasonryDark, mCity, mIron, mPlank, mBrass, mDarkBrass, mChain, mRoof, mAbyss;
+        static Material mInlay, mGapMolten, mStoneSolid, mCityRoof, mFloor, mSlate, mRimStone, mMasonry, mMasonryDark, mCity, mIron, mPlank, mBrass, mDarkBrass, mChain, mRoof, mAbyss;
         static Material mWindowWarm, mWindowHot, mFurnace, mHalo, mMolten, mRiver, mPool, mFall, mGlow, mGlowDim, mGlowCurtain, mUnderGlow, mEmber, mSpark, mHaze, mSmoke, mSteam;
         static Mesh lanternIron, lanternGlow;
 
@@ -335,7 +337,7 @@ namespace LastBell.Areas.Area2.EditorTools
         {
             switch (slot.Split(' ', '.')[0])
             {
-                case "Stone": return mStoneSolid; case "Masonry": return mMasonry; case "MasonryDark": return mMasonryDark;
+                case "Stone": return mStoneSolid; case "RimStone": return mRimStone; case "Masonry": return mMasonry; case "MasonryDark": return mMasonryDark;
                 case "Iron": return mIron; case "Brass": return mBrass; case "DarkBrass": return mDarkBrass; case "Plank": return mPlank;
                 case "Roof": return mRoof; case "Chain": return mChain; case "City": return mCity; case "CityRoof": return mCityRoof;
                 case "Slate": return mSlate; case "Glow": return mGlow; case "GlowDim": return mGlowDim; case "GlowWarm": return mWindowWarm;
@@ -435,9 +437,28 @@ namespace LastBell.Areas.Area2.EditorTools
             return parent;
         }
 
+        // Overwrites an existing asset in place, so its GUID survives a rebuild: the run scene, the menu showcase and the
+        // current-player-assets pack all reference Generated/ by GUID.
         static T SaveAsset<T>(T asset, string file) where T : Object
         {
             string path = Gen + "/" + file;
+            var existing = AssetDatabase.LoadAssetAtPath<T>(path);
+            if (existing && existing.GetType() == asset.GetType())
+            {
+                string name = asset.name;
+                if (asset is Mesh src && existing is Mesh dst)   // CopySerialized doesn't carry mesh data reliably: copy it explicitly
+                {
+                    dst.Clear(); dst.indexFormat = src.indexFormat;
+                    dst.SetVertices(src.vertices); dst.SetNormals(src.normals); dst.SetTangents(src.tangents); dst.SetUVs(0, src.uv);
+                    dst.subMeshCount = src.subMeshCount;
+                    for (int s = 0; s < src.subMeshCount; s++) dst.SetTriangles(src.GetTriangles(s), s, false);
+                    dst.RecalculateBounds();
+                }
+                else EditorUtility.CopySerialized(asset, existing);
+                existing.name = name;
+                EditorUtility.SetDirty(existing); Object.DestroyImmediate(asset);
+                return existing;
+            }
             AssetDatabase.DeleteAsset(path); AssetDatabase.CreateAsset(asset, path);
             return asset;
         }
@@ -663,13 +684,15 @@ namespace LastBell.Areas.Area2.EditorTools
         static Color32[] PaintSky(int W, int H)
         {
             var col = new Color32[W * H];
-            Color top = Hex(0x141010), mid = Hex(0x2A2220), hor = Hex(0x5A3426), glowC = Hex(0x8A4422), below = Hex(0x36302D), deep = Hex(0x1A1412);
+            // dark smoke overhead, an orange furnace glow rising from the lava city below the horizon (as in the reference)
+            Color top = Hex(0x100B0A), mid = Hex(0x2A1C18), hor = Hex(0x6A321C), glowC = Hex(0xB85A24), below = Hex(0x4A1E0E), deep = Hex(0x1C0A06);
             for (int y = 0; y < H; y++) for (int x = 0; x < W; x++)
             {
                 float e = ((y + 0.5f) / H - 0.5f) * PI, u = (float)x / W; Color c;
                 if (e > 0) { c = Color.Lerp(hor, mid, Smooth(0, 0.25f, e)); c = Color.Lerp(c, top, Smooth(0.25f, 1.0f, e)); }
                 else { c = Color.Lerp(hor, below, Smooth(0, 0.12f, -e)); c = Color.Lerp(c, deep, Smooth(0.15f, 1.2f, -e)); }
                 c = Color.Lerp(c, glowC, Smooth(0.09f, 0f, Mathf.Abs(e)) * (0.5f + 0.5f * Fbm(u * 18, 3, 18)));       // horizon glow
+                if (e < 0) c = Color.Lerp(c, glowC, 0.55f * Smooth(0.55f, 0.8f, Fbm(u * 14 + 9, -e * 9, 14)) * Smooth(0.6f, 0.05f, -e));   // patches of lava light in the city below
                 float bank = Fbm(u * 10, (e + 2) * 3, 10), bank2 = Fbm(u * 26 + 4, (e + 2) * 7, 26);
                 c *= 1 - 0.4f * Smooth(0.42f, 0.72f, bank) * Smooth(-0.05f, 0.45f, e) - 0.15f * Smooth(0.5f, 0.8f, bank2) * Smooth(0.0f, 0.3f, e);
                 col[y * W + x] = c;
@@ -775,7 +798,7 @@ namespace LastBell.Areas.Area2.EditorTools
             detailNormal = SaveTex("DetailPitting", 512, 512, PaintDetail(512), true, 0.05f);
             detailGrey = SaveTex("DetailNeutral", 4, 4, Enumerable.Repeat(new Color32(128, 128, 128, 255), 16).ToArray());
 
-            mFloor = Lit("FoundryFloor", floorA, floorN, Hex(0xD6D4D2), 0.05f, 1f, 0, 1f);
+            mFloor = Lit("FoundryFloor", floorA, floorN, Hex(0xC2BCB6), 0.05f, 1f, 0, 1f);   // a warmer, darker charcoal than the slate texture
             mFloor.SetTexture("_OcclusionMap", floorAO); mFloor.SetFloat("_OcclusionStrength", 1f); mFloor.EnableKeyword("_OCCLUSIONMAP");
             mFloor.SetTexture("_MetallicGlossMap", floorGloss); mFloor.SetFloat("_SmoothnessTextureChannel", 0); mFloor.EnableKeyword("_METALLICSPECGLOSSMAP");
             texelDensity["FoundryFloor"] = 4096 / (2 * R);
@@ -789,13 +812,16 @@ namespace LastBell.Areas.Area2.EditorTools
             texelDensity["DeckPlanks"] = Mathf.Min(1024 / 2f, 1024 / 6f);
             mBrass = Lit("Brass", brassA, null, Hex(0x7A5A2C), 0.85f, 0.5f, 4);
             mDarkBrass = Lit("DarkBrass", brassA, null, Hex(0x4E3820), 0.8f, 0.34f, 4);
+            // floor inlays: a desaturated aged bronze, a step below the trim brass, so telegraphs stay the brightest thing on the floor
+            mInlay = Lit("FloorInlayBronze", brassA, null, Hex(0x7A5E3C), 0.75f, 0.45f, 4);
             mChain = Lit("ChainIron", null, null, Hex(0x2C2724), 0.75f, 0.42f, 0);
             mRoof = Lit("RoofIron", ironA, ironN, Hex(0x4A4442), 0.5f, 0.25f, 2, 1f, true);
-            mAbyss = Lit("AbyssGround", null, null, Hex(0x0C0806), 0f, 0f, 0);
+            mAbyss = Unlit("AbyssGround", Hex(0x1E0904));   // the pit floor glows faintly, so the dark city reads as silhouettes against it
             mCityRoof = Lit("CityRoof", null, null, Hex(0x221C1A), 0.3f, 0.2f, 0);
             // flowing molten brass (Shaders/MoltenFlow.shader)
-            mMolten = Molten("MoltenChannel", moltenT, 0.35f, 0, new Vector2(16.75f, 18.65f), 3.0f, 0.5f, 0.3f, 0.03f, 2.2f); mMolten.SetFloat("_CorePeak", 3.0f); mMolten.SetColor("_HotColor", Hex(0xFFB060));
-            mGapMolten = Molten("MoltenGap", moltenT, 0.15f, 0, new Vector2(14.95f, 16.8f), 2.3f, 0.45f, 0.12f, 0f, 2.0f, 0.6f); mGapMolten.SetFloat("_CorePeak", 3.2f);
+            mMolten = Molten("MoltenChannel", moltenT, 0.35f, 0, new Vector2(ChannelIn, ChannelOut), 4.2f, 0.36f, 0.5f, 0.03f, 2.9f); mMolten.SetFloat("_CorePeak", 3.6f); mMolten.SetColor("_HotColor", Hex(0xFFC878));
+            mMolten.SetColor("_CrustColor", Hex(0x4A1606)); mMolten.SetColor("_CrustColor2", Hex(0x6E2408));   // softer crust: long molten bands, not leopard spots
+            mGapMolten = Molten("MoltenGap", moltenT, 0.15f, 0, new Vector2(14.95f, ChannelIn + 0.05f), 2.3f, 0.45f, 0.12f, 0f, 2.0f, 0.6f); mGapMolten.SetFloat("_CorePeak", 3.2f);
             mRiver = Molten("MoltenRiver", moltenT, 0.1f, 1, new Vector2(0, 2f), 3f, 0.6f, 0.05f, 0f, 0.7f); mRiver.SetFloat("_CorePeak", 2.4f);
             mPool = Molten("MoltenPool", moltenT, 0.05f, 0, new Vector2(0, 7f), 2.5f, 0.6f, 0.4f, 0f, 0.8f, 0.5f); mPool.SetFloat("_CorePeak", 2.6f);
             mFall = Molten("MoltenFall", moltenT, -3f, 1, new Vector2(0, 1.2f), 2.5f, 0.2f, 0.15f, 0f, 3f, 0, 1, 30.4f);
@@ -806,11 +832,11 @@ namespace LastBell.Areas.Area2.EditorTools
             var furnace = new Color32[8 * 128];
             for (int y = 0; y < 128; y++) { float t = y / 127f; Color c = Color.Lerp(Hex(0xFFB060), Hex(0xC8461A), Smooth(0, 0.45f, t)); c = Color.Lerp(c, Hex(0x2A0A04), Smooth(0.4f, 1f, t)); for (int x = 0; x < 8; x++) furnace[y * 8 + x] = c; }
             mFurnace = Unlit("FurnaceInterior", Hex(0xFFFFFF, 1.1f), SaveTex("FurnaceGradient", 8, 128, furnace, clamp: true)); mFurnace.mainTextureScale = new Vector2(1, 1 / 4.7f); glowMats.Add(mFurnace);
-            mHalo = Particle("FurnaceHalo", dot, Hex(0xFF6A20) * new Color(1, 1, 1, 0.3f), true);
+            mHalo = Particle("FurnaceHalo", dot, Hex(0xFF6A20) * new Color(1, 1, 1, 0.14f), true);
             mGlowCurtain = Particle("GlowCurtain", fade, Hex(0xFF7A26, 1.0f) * new Color(1, 1, 1, 0.5f), true);
             mGlowCurtain.mainTextureScale = new Vector2(1, 1 / 2.2f); mGlowCurtain.mainTextureOffset = new Vector2(0, 1.4f / 2.2f);
-            mUnderGlow = Particle("UnderDrumGlow", dot, Hex(0xFF6A20) * new Color(1, 1, 1, 0.16f), true);
-            mEmber = Particle("Ember", dot, Hex(0xFF8A3A, 2f), true);
+            mUnderGlow = Particle("UnderDrumGlow", dot, Hex(0xFF6A20) * new Color(1, 1, 1, 0.14f), true);
+            mEmber = Particle("Ember", dot, Hex(0xFF6A20, 1.6f), true);
             mSpark = Particle("Spark", dot, Hex(0xFFA050, 2.6f), true);
             mHaze = Particle("HeatHaze", dot, new Color(0.45f, 0.22f, 0.12f, 0.14f), false);
             mSmoke = Particle("Smoke", dot, new Color(0.16f, 0.12f, 0.1f, 0.3f), false);
@@ -861,9 +887,13 @@ namespace LastBell.Areas.Area2.EditorTools
         // 0.8 cm chamfer on the brass shapes.
         static void BuildInlays()
         {
-            var brass = G("CombatFloor/Inlays", mBrass); var dark = G("CombatFloor/Inlays", mSlate); var iron = G("CombatFloor/Inlays", mDarkBrass);
+            var brass = G("CombatFloor/Inlays", mInlay); var dark = G("CombatFloor/Inlays", mSlate); var iron = G("CombatFloor/Inlays", mDarkBrass);
             const float H = 0.012f, B = 0.008f;
             Sector(brass, I, 13.88f, 13.98f, 0, TAU, 0, 0.01f, 256, ends: false);
+            // the reference's heavy brass band at the floor's edge: a satin dark-brass ring with rivets (flat, 3 cm, still walkable)
+            var band = G("CombatFloor/Inlays", mDarkBrass);
+            Sector(band, I, 13.62f, 13.86f, 0, TAU, 0, 0.03f, 256, ends: false);
+            for (int i = 0; i < 144; i++) Box(G("CombatFloor/Inlays", mBrass), TR(Polar(i / 144f * TAU, 13.74f, 0.03f), YawOut(i / 144f * TAU)), new Vector3(0.06f, 0.02f, 0.06f));
             for (int k = 0; k < 4; k++)
             {
                 float a = k * PI / 2; var m = TR(Vector3.zero, YawOut(a)); bool ew = k % 2 == 0; // local +X points outward along the arm
@@ -908,22 +938,32 @@ namespace LastBell.Areas.Area2.EditorTools
                 Sector(stone, I, 14.0f, 14.4f, a0, a1, 0, 0.25f);                          // inner curb
                 Lathe(brass, I, new[] { new Vector2(13.98f, 0.25f), new Vector2(14.01f, 0.285f), new Vector2(14.08f, 0.305f), new Vector2(14.15f, 0.285f), new Vector2(14.18f, 0.25f) }, Mathf.CeilToInt((a1 - a0) * 14.1f / 0.3f), a0, a1); // half-round brass curb
                 for (float a = a0 + 0.04f; a < a1; a += 1.0f / 14.1f) Box(iron, Radial(a), new Vector3(0.05f, 0.03f, 0.05f), new Vector3(0, 0.305f, 14.08f));
-                Sector(stoneD, I, 14.4f, 16.8f, a0, a1, -1.7f, 0.02f, inner: false);       // rim base; its outer face is the channel's inner wall
-                for (float a = a0 + 0.08f; a < a1; a += 0.62f / 16.8f * 2.2f)              // corbels down the channel wall
-                    Box(stoneD, TR(Polar(a, 16.95f, -0.75f), YawOut(a)), new Vector3(0.35f, 0.5f, 0.45f));
+                Sector(stoneD, I, 14.4f, ChannelIn, a0, a1, -1.7f, 0.02f, inner: false);   // rim base; its outer face is the channel's inner wall
+                if (Modelled)   // the reference's continuous parapet under the merlons, with a dark brass cap band on its arena face
+                {
+                    float p0 = a0 + 0.02f, p1 = a1 - 0.02f;
+                    { float kb = bevel; bevel = 0; Sector(stone, I, 14.45f, 15.25f, p0, p1, 0.02f, 0.45f); bevel = kb; }
+                    Sector(dbrass, I, 14.41f, 14.52f, p0, p1, 0.36f, 0.48f, 0, ends: false);
+                }
             }
             int n = 0;
-            foreach (var (a0, a1) in Arcs(15.5f, 0.35f))
+            foreach (var (a0, a1) in Arcs(15.2f, 0.35f))
             {
-                if (Modelled) // one regular crown of identical Blender teeth, evenly spaced with lava in every gap
+                if (Modelled) // the reference's crown: big stepped teeth alternating with small ones, molten glow in every gap
                 {
-                    float arc = (a1 - a0) * 15.5f; int cnt = Mathf.Max(1, Mathf.RoundToInt(arc / 2.75f));
+                    const float BIGW = 2.45f, SMALLW = 1.5f, GAPW = 0.45f;   // the models (2.1 m / 1.3 m) are widened to these
+                    // big + small teeth, starting and ending on a big one, with the leftover arc shared out as equal gaps
+                    float arc = (a1 - a0) * 15.2f; int bigs = Mathf.Max(1, Mathf.FloorToInt((arc + SMALLW + GAPW) / (BIGW + SMALLW + 2 * GAPW)));
+                    int cnt = bigs * 2 - 1; float gap = (arc - bigs * BIGW - (bigs - 1) * SMALLW) / Mathf.Max(1, cnt - 1), at = 0;
+                    if (cnt == 1) at = (arc - BIGW) / 2;
                     for (int j = 0; j < cnt; j++, n++)
                     {
-                        Model("FurnaceRim", "SM_Area2_RimTooth_Big_" + "ABC"[n % 3], Radial(a0 + (a1 - a0) * (j + 0.5f) / cnt) * T(0, 0, 14.45f));
-                        // molten slot in the gap after this tooth, so every gap glows from above (outside the walkable floor)
-                        float ga = a0 + (a1 - a0) * (j + 1f) / cnt, hw = 0.42f / 15.8f;
-                        if (j < cnt - 1) Sector(G("FurnaceRim", mGapMolten), I, 14.95f, 16.8f, ga - hw, ga + hw, 0.035f, 0.035f, 3, inner: false, outer: false, ends: false);
+                        bool big = j % 2 == 0; float w = big ? BIGW : SMALLW, mid = a0 + (at + w / 2) / 15.2f; at += w + gap;
+                        Model("FurnaceRim", "SM_Area2_RimTooth_" + (big ? "Big_" : "Small_") + "ABC"[(n / 2) % 3],
+                            Radial(mid) * Matrix4x4.TRS(new Vector3(0, 0, 14.45f), Quaternion.identity, new Vector3(big ? BIGW / 2.1f : SMALLW / 1.3f, Rnd(0.86f, 1.14f), 1)));
+                        // molten slot in the gap after this tooth, open into the channel, so every gap glows from above
+                        float ga = a0 + (at - gap / 2) / 15.2f, hw = gap * 0.4f / 15.2f;
+                        if (j < cnt - 1) Sector(G("FurnaceRim", mGapMolten), I, 14.95f, ChannelIn + 0.05f, ga - hw, ga + hw, 0.035f, 0.035f, 3, inner: false, outer: false, ends: false);
                     }
                     continue;
                 }
@@ -961,18 +1001,18 @@ namespace LastBell.Areas.Area2.EditorTools
 
         static void BuildChannel()
         {
-            // the molten ring: 4 radial bands × 470 segments (~0.25 m) so the shader's undulation reads. UV u = arc length at the
-            // centre line (a · 17.7, the same at every radius, so the noise doesn't shear across the channel), v = r.
+            // the molten ring: 5 radial bands × 470 segments (~0.25 m) so the shader's undulation reads. UV u = arc length at the
+            // centre line (a · ChannelMid, the same at every radius, so the noise doesn't shear across the channel), v = r.
             var g = G("MoltenChannel", mMolten);
-            float[] rs = { 16.75f, 17.225f, 17.7f, 18.175f, 18.65f }; const int SEG = 470;
-            for (int b = 0; b < 4; b++) for (int i = 0; i < SEG; i++)
+            var rs = Enumerable.Range(0, 6).Select(b => Mathf.Lerp(ChannelIn, ChannelOut, b / 5f)).ToArray(); const int SEG = 470;
+            for (int b = 0; b < 5; b++) for (int i = 0; i < SEG; i++)
             {
                 float aa = TAU * i / SEG, ab = TAU * (i + 1) / SEG;
-                Quad(g, I, Polar(aa, rs[b], -1.4f), Polar(ab, rs[b], -1.4f), Polar(ab, rs[b + 1], -1.4f), Polar(aa, rs[b + 1], -1.4f), Vector3.up,
-                    new Vector2(aa * 17.7f, rs[b]), new Vector2(ab * 17.7f, rs[b]), new Vector2(ab * 17.7f, rs[b + 1]), new Vector2(aa * 17.7f, rs[b + 1]));
+                Quad(g, I, Polar(aa, rs[b], ChannelY), Polar(ab, rs[b], ChannelY), Polar(ab, rs[b + 1], ChannelY), Polar(aa, rs[b + 1], ChannelY), Vector3.up,
+                    new Vector2(aa * ChannelMid, rs[b]), new Vector2(ab * ChannelMid, rs[b]), new Vector2(ab * ChannelMid, rs[b + 1]), new Vector2(aa * ChannelMid, rs[b + 1]));
             }
             // a glow curtain rising off the molten (both faces)
-            foreach (var (c0, c1) in Arcs(17.7f, 0.6f)) Sector(G("MoltenChannel", mGlowCurtain), I, 17.7f, 17.7f, c0, c1, -1.4f, 0.8f, 0, top: false, ends: false);
+            foreach (var (c0, c1) in Arcs(ChannelMid, 0.6f)) Sector(G("MoltenChannel", mGlowCurtain), I, ChannelMid, ChannelMid, c0, c1, ChannelY, ChannelY + 2.2f, 0, top: false, ends: false);
             var lights = Child(root, "Lighting/ChannelLights");
             void Point(string name, Vector3 at, Color c, float intensity, float range, bool flicker)
             {
@@ -980,9 +1020,11 @@ namespace LastBell.Areas.Area2.EditorTools
                 l.type = LightType.Point; l.color = c; l.intensity = intensity; l.range = range; l.shadows = LightShadows.None; l.transform.position = at;
                 if (flicker) flickerLights.Add(l);
             }
-            for (int i = 0; i < 16; i++) Point("Molten Uplight", Polar((i + 0.5f) / 16 * TAU, 17.6f, -0.8f), Hex(0xFF7A1F), 14f, 7, true);
-            for (int i = 0; i < 16; i++) Point("Rim Glow", Polar(i / 16f * TAU, 17.3f, 0.5f), Hex(0xFF8A30), 9f, 4.5f, true);
-            for (int i = 0; i < 8; i++) Point("Rim Bounce", Polar((i + 0.5f) / 8 * TAU, 15.6f, 1.6f), Hex(0xFF7A2A), 2.2f, 2.2f, false);
+            for (int i = 0; i < 16; i++) Point("Molten Uplight", Polar((i + 0.5f) / 16 * TAU, i % 2 == 0 ? ChannelMid : ChannelIn + 0.35f, ChannelY + 0.5f), Hex(0xFF7A1F), i % 2 == 0 ? 14f : 9f, i % 2 == 0 ? 7f : 4.5f, true);   // odd ones light the merlons' backs
+            // half on the rim teeth's backs, half on the outer wall's face, so the masonry outside the ring catches the lava light too
+            for (int i = 0; i < 16; i++) Point("Rim Glow", Polar(i / 16f * TAU, i % 2 == 0 ? 17.0f : 18.2f, i % 2 == 0 ? 0.5f : 0.2f), Hex(0xFF8A30), i % 2 == 0 ? 9f : 7f, i % 2 == 0 ? 4.5f : 5.5f, true);
+            for (int i = 0; i < 8; i++) Point("Rim Bounce", Polar((i + 0.5f) / 8 * TAU, 14.9f, 1.3f), Hex(0xFF7A2A), 3.2f, 4.2f, false);   // warms the floor's outer 2–3 m (light only)
+            foreach (float deg in new[] { 45f, 135f }) Point("Tower Rim Light", Polar(deg * Mathf.Deg2Rad, 18.5f, 7f), Hex(0xFF8A3A), 6f, 9f, false);   // the camera-side towers catch the lava light
         }
 
         // Outer foundry wall: massive uneven segments, thick buttresses, pipe runs with brass flanges, dimly glowing furnace
@@ -1006,6 +1048,8 @@ namespace LastBell.Areas.Area2.EditorTools
                         Model("OuterWall", i % 3 == 0 ? "SM_Area2_Wall_Hatch" : i % 3 == 1 ? "SM_Area2_Wall_Buttress" : "SM_Area2_Wall_Vent",
                             Matrix4x4.TRS(Vector3.zero, Quaternion.LookRotation(Polar(am, 1)), new Vector3((b1 - b0) / (9f * Mathf.Deg2Rad), sy, 1)));
                         if (i % 3 == 2) steamVents.Add(Polar(am, 22f, (3.4f + 1.4f) * sy));
+                        // the reference's outer ring of blocks: a merlon on the first tier's lip, facing the arena across the lava
+                        Model("OuterWall", "SM_Area2_RimTooth_Small_" + "ABC"[i % 3], Radial(am) * Matrix4x4.TRS(new Vector3(0, 1.5f * sy, 18.7f), Quaternion.identity, new Vector3(1.25f, Rnd(0.85f, 1.15f), 0.95f)));
                         continue;
                     }
                     float h1 = Rnd(1.3f, 1.7f), h2 = h1 + Rnd(0.8f, 1.0f), h3 = h2 + Rnd(0.7f, 1.2f), e0 = b0 + 0.003f, e1 = b1 - 0.003f;
@@ -1068,6 +1112,7 @@ namespace LastBell.Areas.Area2.EditorTools
         // Corner towers: three stepped tiers with crenellated cornices, glowing slots on the cornice tops (readable from
         // above), a lantern stage with slit windows, a crown of merlons, a ring of machinery boxes, a ribbed iron dome and a
         // brass finial. The far pair carries a smoking chimney. Two heavy chains each, routed outward.
+        // (Their bases meet the outer edge of the molten ring, as in the reference.)
         static void BuildTowers()
         {
             bevel = 0.04f;
@@ -1075,9 +1120,9 @@ namespace LastBell.Areas.Area2.EditorTools
             var glow = G("Towers", mGlow); var glowDim = G("Towers", mGlowDim); var iron = G("Towers", mIron);
             foreach (var deg in new[] { 45f, 135f, 225f, 315f })
             {
-                float a = deg * Mathf.Deg2Rad; Vector3 c = Polar(a, Mathf.Sin(a) > 0 ? 21.5f : 20f); bool near = c.z > 0; float top = near ? 8f : 14f;
+                float a = deg * Mathf.Deg2Rad; Vector3 c = Polar(a, Mathf.Sin(a) > 0 ? 22.5f : 21.2f); bool near = c.z > 0; float top = near ? 8f : 14f;
                 float t1 = top * 0.45f, t2 = top * 0.72f, t3 = top * 0.88f; var m = TR(c, YawOut(a));
-                if (Model("Towers", near ? "SM_Area2_Tower_Near" : "SM_Area2_Tower_Far", TRQ(c, Quaternion.LookRotation(Polar(a, 1)))))
+                if (Model("Towers", near ? "SM_Area2_Tower_Near" : "SM_Area2_Tower_Far", Matrix4x4.TRS(c, Quaternion.LookRotation(Polar(a, 1)), Vector3.one * 1.1f)))
                 {
                     if (!near) smokeStacks.Add(c + Polar(a + PI, 3f) + Vector3.up * (t3 + 4.7f)); // the model's chimney faces the arena
                     foreach (float off in new[] { -0.4f, 0.4f }) { float b = a + off; Chain(c + Polar(b, 2.4f, t3 + 0.1f), Polar(b, 28, -14), 0.8f); }
@@ -1339,7 +1384,7 @@ namespace LastBell.Areas.Area2.EditorTools
             for (int k = 0; k < 8; k++)
             {
                 float a = k / 8f * TAU + Rnd(-0.25f, 0.25f), w = Rnd(1.0f, 1.6f), turn = (k % 2 == 0 ? 1 : -1) * Rnd(0.012f, 0.03f); var pts = new List<Vector3>();
-                for (float r = 14; r < 220; r += 4) { a += turn + Rnd(-0.04f, 0.04f); pts.Add(Polar(a, r, GROUND + 0.08f)); }   // starts under the drum, curving along the streets
+                for (float r = 38; r < 220; r += 4) { a += turn + Rnd(-0.04f, 0.04f); pts.Add(Polar(a, r, GROUND + 0.08f)); }   // starts out in the city, curving along the streets
                 // one continuous ribbon: each point's side vector averages its neighbouring segments, so there are no gaps
                 var sides = new Vector3[pts.Count];
                 for (int i = 0; i < pts.Count; i++) { var d = (pts[Mathf.Min(i + 1, pts.Count - 1)] - pts[Mathf.Max(i - 1, 0)]).normalized; sides[i] = Vector3.Cross(Vector3.up, d) * w / 2; riverPts.Add((pts[i], w)); }
@@ -1393,7 +1438,7 @@ namespace LastBell.Areas.Area2.EditorTools
                 Lantern(Child(root, "Chains/HangingLanterns"), p, 1f, true);
             }
             // warm light pooling under the arena drum
-            Quad(G("MoltenChannel", mUnderGlow), I, new Vector3(-30, -40, -30), new Vector3(30, -40, -30), new Vector3(30, -40, 30), new Vector3(-30, -40, 30), Vector3.up, Vector2.zero, Vector2.right, Vector2.one, Vector2.up);
+            Quad(G("MoltenChannel", mUnderGlow), I, new Vector3(-32, -40, -32), new Vector3(32, -40, -32), new Vector3(32, -40, 32), new Vector3(-32, -40, 32), Vector3.up, Vector2.zero, Vector2.right, Vector2.one, Vector2.up);
         }
 
         // Cage lantern: iron frame, glowing core, pyramid cap and spike. Shared meshes, separate objects so they can sway.
@@ -1440,9 +1485,9 @@ namespace LastBell.Areas.Area2.EditorTools
         static Camera BuildLightingAndCamera()
         {
             var sky = new Material(Shader.Find("Skybox/Panoramic")) { name = "FoundrySky" };
-            sky.SetTexture("_MainTex", SaveTex("SkyPanorama", 2048, 1024, PaintSky(2048, 1024))); sky.SetFloat("_Mapping", 1); sky.SetFloat("_Exposure", 1f);
+            sky.SetTexture("_MainTex", SaveTex("SkyPanorama", 2048, 1024, PaintSky(2048, 1024))); sky.SetFloat("_Mapping", 0); sky.SetFloat("_ImageType", 0);   // latitude-longitude, as PaintSky lays it out (elevation = v) sky.SetFloat("_Exposure", 1f);
             RenderSettings.skybox = SaveAsset(sky, "Materials/FoundrySky.mat");
-            RenderSettings.fog = true; RenderSettings.fogMode = FogMode.ExponentialSquared; RenderSettings.fogColor = Hex(0x3A2622); RenderSettings.fogDensity = 0.006f;
+            RenderSettings.fog = true; RenderSettings.fogMode = FogMode.ExponentialSquared; RenderSettings.fogColor = Hex(0x34201A); RenderSettings.fogDensity = 0.0045f;
             RenderSettings.ambientMode = AmbientMode.Trilight;
             RenderSettings.ambientSkyColor = Hex(0x4A4448, 1.0f); RenderSettings.ambientEquatorColor = Hex(0x3A2218, 0.9f); RenderSettings.ambientGroundColor = Hex(0xFF6A1A, 0.4f);
 
@@ -1457,10 +1502,10 @@ namespace LastBell.Areas.Area2.EditorTools
             Dir("Cool Fill", Hex(0x8098C8), 0.5f, new Vector3(40, 165, 0), false);
             Dir("Furnace Uplight", Hex(0xFF6A1A), 0.35f, new Vector3(-60, 30, 0), false);
             var pit = Child(lights, "PitGlow");
-            for (int i = 0; i < 12; i++)
+            for (int i = 0; i < 20; i++)   // lava light from below on the city blocks
             {
-                float a = Rnd() * TAU, r = Rnd(40, 130); var l = new GameObject("Pit Glow").AddComponent<Light>(); l.transform.SetParent(pit, false);
-                l.type = LightType.Point; l.color = Hex(0xFF5A18); l.intensity = 8; l.range = 16; l.shadows = LightShadows.None; l.transform.position = Polar(a, r, -44);
+                float a = (i + Rnd(0.1f, 0.9f)) / 20 * TAU, r = Rnd(32, 110); var l = new GameObject("Pit Glow").AddComponent<Light>(); l.transform.SetParent(pit, false);
+                l.type = LightType.Point; l.color = Hex(0xFF5A18); l.intensity = 12; l.range = 26; l.shadows = LightShadows.None; l.transform.position = Polar(a, r, -44);
             }
             for (int i = 0; i < 4; i++)
             {
@@ -1469,11 +1514,13 @@ namespace LastBell.Areas.Area2.EditorTools
             }
 
             var volume = new GameObject("Post").AddComponent<Volume>(); volume.transform.SetParent(lights, false); volume.isGlobal = true;
-            string path = Gen + "/BrassFoundryPost.asset"; AssetDatabase.DeleteAsset(path);
-            var profile = ScriptableObject.CreateInstance<VolumeProfile>(); AssetDatabase.CreateAsset(profile, path);
+            string path = Gen + "/BrassFoundryPost.asset";
+            var profile = AssetDatabase.LoadAssetAtPath<VolumeProfile>(path);   // reused in place to keep its GUID
+            if (profile) { foreach (var c in profile.components.ToList()) { profile.components.Remove(c); AssetDatabase.RemoveObjectFromAsset(c); Object.DestroyImmediate(c, true); } }
+            else { profile = ScriptableObject.CreateInstance<VolumeProfile>(); AssetDatabase.CreateAsset(profile, path); }
             profile.Add<Tonemapping>(true).mode.Override(TonemappingMode.ACES);
             var bloom = profile.Add<Bloom>(true); bloom.threshold.Override(1.05f); bloom.intensity.Override(0.6f); bloom.scatter.Override(0.62f);
-            var vig = profile.Add<Vignette>(true); vig.intensity.Override(0.25f); vig.color.Override(Hex(0x140806));
+            var vig = profile.Add<Vignette>(true); vig.intensity.Override(0.32f); vig.color.Override(Hex(0x140806));
             var ca = profile.Add<ColorAdjustments>(true); ca.contrast.Override(12f); ca.saturation.Override(-4f); ca.postExposure.Override(0.25f);
             foreach (var c in profile.components) { c.hideFlags = HideFlags.HideInInspector | HideFlags.HideInHierarchy; AssetDatabase.AddObjectToAsset(c, profile); }
             AssetDatabase.SaveAssets(); volume.sharedProfile = profile;
@@ -1495,9 +1542,9 @@ namespace LastBell.Areas.Area2.EditorTools
                 go.AddComponent<MeshFilter>(); var mr = go.AddComponent<MeshRenderer>(); mr.sharedMaterial = mat; mr.shadowCastingMode = ShadowCastingMode.Off; mr.receiveShadows = false;
                 var p = go.AddComponent<Area2Particles>(); setup(p); go.SetActive(true);
             }
-            Make("Embers", mEmber, p => { p.shape = Area2Particles.Shape.Ring; p.center = new Vector3(0, -1.3f, 0); p.radius = 17.7f; p.thickness = 1.4f; p.capacity = 400; p.rate = 55; p.lifetime = new Vector2(4, 8); p.size = new Vector2(0.05f, 0.12f); p.velocityMin = new Vector3(-0.15f, 0.7f, -0.15f); p.velocityMax = new Vector3(0.15f, 1.8f, 0.15f); p.wander = 0.25f; p.seed = 3; });
-            Make("ChannelHaze", mHaze, p => { p.shape = Area2Particles.Shape.Ring; p.center = new Vector3(0, -1.1f, 0); p.radius = 17.9f; p.thickness = 1.2f; p.capacity = 70; p.rate = 7; p.lifetime = new Vector2(7, 10); p.size = new Vector2(2.2f, 3.6f); p.grow = new Vector2(0.8f, 1.8f); p.velocityMin = new Vector3(0, 0.25f, 0); p.velocityMax = new Vector3(0, 0.55f, 0); p.wander = 0.15f; p.fadeIn = 0.3f; p.fadeOut = 0.5f; p.seed = 5; });
-            Make("ChannelSparks", mSpark, p => { p.shape = Area2Particles.Shape.Ring; p.center = new Vector3(0, -1.2f, 0); p.radius = 17.7f; p.thickness = 1.0f; p.capacity = 120; p.rate = 0; p.burstInterval = 2.4f; p.burstCount = 14; p.lifetime = new Vector2(0.6f, 1.1f); p.size = new Vector2(0.035f, 0.07f); p.velocityMin = new Vector3(-1.2f, 2f, -1.2f); p.velocityMax = new Vector3(1.2f, 4f, 1.2f); p.gravity = 6; p.fadeIn = 0.02f; p.seed = 7; });
+            Make("Embers", mEmber, p => { p.shape = Area2Particles.Shape.Ring; p.center = new Vector3(0, ChannelY + 0.1f, 0); p.radius = ChannelMid; p.thickness = 1.8f; p.capacity = 400; p.rate = 55; p.lifetime = new Vector2(4, 8); p.size = new Vector2(0.05f, 0.12f); p.velocityMin = new Vector3(-0.15f, 0.7f, -0.15f); p.velocityMax = new Vector3(0.15f, 1.8f, 0.15f); p.wander = 0.25f; p.seed = 3; });
+            Make("ChannelHaze", mHaze, p => { p.shape = Area2Particles.Shape.Ring; p.center = new Vector3(0, ChannelY + 0.3f, 0); p.radius = ChannelMid + 0.2f; p.thickness = 1.6f; p.capacity = 70; p.rate = 7; p.lifetime = new Vector2(7, 10); p.size = new Vector2(2.2f, 3.6f); p.grow = new Vector2(0.8f, 1.8f); p.velocityMin = new Vector3(0, 0.25f, 0); p.velocityMax = new Vector3(0, 0.55f, 0); p.wander = 0.15f; p.fadeIn = 0.3f; p.fadeOut = 0.5f; p.seed = 5; });
+            Make("ChannelSparks", mSpark, p => { p.shape = Area2Particles.Shape.Ring; p.center = new Vector3(0, ChannelY + 0.2f, 0); p.radius = ChannelMid; p.thickness = 1.4f; p.capacity = 120; p.rate = 0; p.burstInterval = 2.4f; p.burstCount = 14; p.lifetime = new Vector2(0.6f, 1.1f); p.size = new Vector2(0.035f, 0.07f); p.velocityMin = new Vector3(-1.2f, 2f, -1.2f); p.velocityMax = new Vector3(1.2f, 4f, 1.2f); p.gravity = 6; p.fadeIn = 0.02f; p.seed = 7; });
             Make("GateSparks", mSpark, p => { p.shape = Area2Particles.Shape.Box; p.center = new Vector3(0, 5.6f, -19.5f); p.boxSize = new Vector3(4, 0.2f, 0.5f); p.capacity = 80; p.rate = 0; p.burstInterval = 3.4f; p.burstCount = 18; p.lifetime = new Vector2(0.7f, 1.3f); p.size = new Vector2(0.03f, 0.06f); p.velocityMin = new Vector3(-1.5f, 0.5f, -0.2f); p.velocityMax = new Vector3(1.5f, 2.5f, 1.2f); p.gravity = 7; p.fadeIn = 0.02f; p.seed = 11; });
             int k = 0;
             foreach (var v in steamVents)
@@ -1554,8 +1601,8 @@ namespace LastBell.Areas.Area2.EditorTools
                 driver.SetView(BrassFoundryArena.View.Hero); Particles(0); Capture(Path.Combine(shots, "unity-hero.png"));
                 // close-ups: a rim stretch, a far tower, the furnace gate
                 void Shot(string file, Vector3 pos, Vector3 look, float fov) { cam.orthographic = false; cam.fieldOfView = fov; cam.transform.position = pos; cam.transform.LookAt(look); Particles(0); Capture(Path.Combine(shots, file)); }
-                Shot("unity-close-rim.png", Polar(160 * Mathf.Deg2Rad, 23f, 6.5f), Polar(158 * Mathf.Deg2Rad, 15.6f, 0.4f), 40);
-                Shot("unity-close-tower.png", Polar(292 * Mathf.Deg2Rad, 36f, 20f), Polar(315 * Mathf.Deg2Rad, 20f, 8f), 38);
+                Shot("unity-close-rim.png", Polar(30 * Mathf.Deg2Rad, 9f, 3.5f), Polar(30 * Mathf.Deg2Rad, 15.3f, 0.8f), 40);   // from the floor: teeth, gaps and the molten ring
+                Shot("unity-close-tower.png", Polar(292 * Mathf.Deg2Rad, 37f, 20f), Polar(315 * Mathf.Deg2Rad, 21.2f, 8f), 38);
                 Shot("unity-close-gate.png", new Vector3(0, 6.5f, -7.5f), new Vector3(0, 3f, -19.5f), 42);
                 // telegraph test: a coral-red disc on the floor (not saved into the scene)
                 driver.SetView(BrassFoundryArena.View.Gameplay); Particles(0);
@@ -1611,6 +1658,56 @@ namespace LastBell.Areas.Area2.EditorTools
             EditorApplication.Exit(code);
         }
 
+        // After an art change: refreshes only the Brass Foundry copies of the arena, keeping their GUIDs. The run scene is
+        // re-copied from the arena scene the way RunBuild does it (its .meta stays, so the build settings and the
+        // current-player-assets pack keep pointing at it), then the main menu's Brass Foundry showcase stage is re-baked.
+        // Unity.exe -batchmode -projectPath unity -executeMethod LastBell.Areas.Area2.EditorTools.BrassFoundryArenaBuilder.BatchRefreshCopies
+        public static void BatchRefreshCopies()
+        {
+            int code = 0;
+            try
+            {
+                const string runScene = "Assets/LastBell/Run/Maps/Run_BrassFoundry.unity";
+                File.Copy(ScenePath, runScene, true);
+                AssetDatabase.ImportAsset(runScene, ImportAssetOptions.ForceSynchronousImport);
+                var scene = EditorSceneManager.OpenScene(runScene, OpenSceneMode.Single);
+                var strip = new[] { "ScaleReference_Vanguard", "TelegraphCheck", "TelegraphTest" };   // RunBuild.StripNames
+                foreach (var r in scene.GetRootGameObjects())
+                    foreach (var t in r.GetComponentsInChildren<Transform>(true).Where(t => strip.Contains(t.name))) t.gameObject.SetActive(false);
+                new GameObject("Run Director").AddComponent<LastBell.Run.RunDirector>();
+                EditorSceneManager.SaveScene(scene);
+                LastBell.Menu.EditorTools.MenuShowcaseBuild.AddStage("brass-foundry", keepCasting: true);
+                LastBell.Menu.EditorTools.MenuShowcaseBuild.IsolateCopiedScenery();
+                Debug.Log("Area 2: run scene and showcase stage refreshed");
+            }
+            catch (System.Exception e) { Debug.LogException(e); code = 1; }
+            EditorApplication.Exit(code);
+        }
+
+        // Look-check shots of the saved scene without rebuilding it: -view "name px py pz lx ly lz fov", -top name (top view),
+        // -hide objectName (applies to the shots after it). All repeatable, in order.
+        public static void BatchViewShots()
+        {
+            int code = 0;
+            try
+            {
+                ShaderUtil.allowAsyncCompilation = false;
+                EditorSceneManager.OpenScene(ScenePath); var cam = Camera.main; BrassFoundryArena.SetTime(2.5f);
+                var args = System.Environment.GetCommandLineArgs();
+                for (int i = 0; i < args.Length - 1; i++)
+                {
+                    if (args[i] == "-hide") { foreach (var t in Object.FindObjectsByType<Transform>(FindObjectsInactive.Exclude)) if (t.name == args[i + 1]) t.gameObject.SetActive(false); continue; }
+                    if (args[i] == "-top") { Object.FindAnyObjectByType<BrassFoundryArena>().SetView(BrassFoundryArena.View.TopDown); Particles(0); Capture(Path.Combine(ShotsDir(), args[i + 1] + ".png"), 800, 800); continue; }
+                    if (args[i] != "-view") continue;
+                    var p = args[i + 1].Split(' '); float F(int k) => float.Parse(p[k], System.Globalization.CultureInfo.InvariantCulture);
+                    cam.orthographic = false; cam.fieldOfView = F(7); cam.transform.position = new Vector3(F(1), F(2), F(3)); cam.transform.LookAt(new Vector3(F(4), F(5), F(6)));
+                    Particles(0); Capture(Path.Combine(ShotsDir(), p[0] + ".png"));
+                }
+            }
+            catch (System.Exception e) { Debug.LogException(e); code = 1; }
+            EditorApplication.Exit(code);
+        }
+
         static string ShotsDir()
         {
             var args = System.Environment.GetCommandLineArgs(); int si = System.Array.IndexOf(args, "-shots");
@@ -1622,7 +1719,7 @@ namespace LastBell.Areas.Area2.EditorTools
         static void Particles(float seconds) { foreach (var p in Object.FindObjectsByType<Area2Particles>()) p.Simulate(seconds); }
 
         // Mean absolute pixel difference (0–255) between two gameplay frames inside a channel mask (rays that reach the
-        // molten surface at r 16.95–18.45) and a floor mask (rays that reach y = 0 at r <= 13).
+        // molten surface, 0.2 m inside both banks) and a floor mask (rays that reach y = 0 at r <= 13).
         static string FlowDiff(Color32[] a, Color32[] b, int w, int h, Camera cam)
         {
             double ch = 0, fl = 0; int nc = 0, nf = 0; cam.aspect = (float)w / h;
@@ -1634,8 +1731,8 @@ namespace LastBell.Areas.Area2.EditorTools
                 float d = (Mathf.Abs(ca.r - cb.r) + Mathf.Abs(ca.g - cb.g) + Mathf.Abs(ca.b - cb.b)) / 3f;
                 var p0 = ray.origin + ray.direction * ((0 - ray.origin.y) / ray.direction.y);
                 if (new Vector2(p0.x, p0.z).magnitude <= 13f) { fl += d; nf++; continue; }
-                var p1 = ray.origin + ray.direction * ((-1.41f - ray.origin.y) / ray.direction.y); float r1 = new Vector2(p1.x, p1.z).magnitude;
-                if (r1 > 16.95f && r1 < 18.45f) { ch += d; nc++; }
+                var p1 = ray.origin + ray.direction * ((ChannelY - 0.01f - ray.origin.y) / ray.direction.y); float r1 = new Vector2(p1.x, p1.z).magnitude;
+                if (r1 > ChannelIn + 0.2f && r1 < ChannelOut - 0.2f) { ch += d; nc++; }
             }
             double cm = nc > 0 ? ch / nc : 0, fm = nf > 0 ? fl / nf : 0; bool pass = cm > 4 && fm < 0.5;
             return $"Lava flow check (gameplay view, clock 0 vs 1 s): channel {cm:0.00}/255 over {nc} px, floor {fm:0.00}/255 over {nf} px -> {(pass ? "PASS" : "FAIL")} (need channel > 4, floor < 0.5)";
