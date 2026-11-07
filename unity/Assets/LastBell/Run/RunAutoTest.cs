@@ -1146,7 +1146,7 @@ namespace LastBell.Run
                 Check("Sylvara Hard P4: a seed bursts into 10 petals", sy.LastBurstFired == 10, sy.LastBurstFired.ToString());
                 Check("Sylvara P4 burst preview: every seed carries its 10 burst rays from launch", fresh > 0 && seedsCarry, $"{fresh} seeds");
                 Check("Sylvara P4 burst preview: the rays are drawn before the burst", rayShown);
-                int petals = 0, onRay = 0;
+                int petals = 0, onRay = 0; var miss = new List<string>();
                 foreach (var p in d.World.Bullets.Live)
                 {
                     if (p.Source != "Seed Burst" || p.Dead || older.Contains(p)) continue;
@@ -1156,10 +1156,21 @@ namespace LastBell.Run
                     {
                         float k = (pa - s.off) / (Mathf.PI * 2 / s.rays), dk = Mathf.Abs(k - Mathf.Round(k));
                         var from = s.at + new Vector3(Mathf.Cos(pa), 0, Mathf.Sin(pa)) * 0.3f;
-                        if (dk < 0.01f && Sim.Flat(start - from).magnitude < 0.15f) { onRay++; break; }
+                        if (dk < 0.01f && Sim.Flat(start - from).magnitude < 0.15f) { onRay++; goto matched; }
                     }
+                    {
+                        // unmatched: the nearest predicted burst point and the angle error there (diagnostics)
+                        float bd = float.MaxValue, berr = 0; int br = 0; float age = p.Age;
+                        foreach (var s in seeds.Values)
+                        {
+                            float dd = Sim.Flat(start - (s.at + new Vector3(Mathf.Cos(pa), 0, Mathf.Sin(pa)) * 0.3f)).magnitude;
+                            if (dd < bd) { bd = dd; float k = (pa - s.off) / (Mathf.PI * 2 / s.rays); berr = Mathf.Abs(k - Mathf.Round(k)) * 360f / s.rays; br = s.rays; }
+                        }
+                        if (miss.Count < 5) miss.Add($"{bd:0.00} m / {berr:0.0} deg / {br} rays / age {age:0.00} / r {Sim.Flat(start).magnitude:0.0}");
+                    }
+                    matched:;
                 }
-                Check("Sylvara P4 burst preview: the petals fly along the previewed rays from the previewed point", petals > 0 && onRay == petals, $"{onRay} of {petals}");
+                Check("Sylvara P4 burst preview: the petals fly along the previewed rays from the previewed point", petals > 0 && onRay == petals, $"{onRay} of {petals}" + (miss.Count > 0 ? "; misses: " + string.Join("; ", miss) : ""));
             }
             d.World.Difficulty = Difficulty.Medium; sy.DebugStartStorm(7);
 

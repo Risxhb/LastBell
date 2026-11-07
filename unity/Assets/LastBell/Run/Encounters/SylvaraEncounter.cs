@@ -772,14 +772,14 @@ namespace LastBell.Run
                 float a = off + i * Tau / n;
                 // its burst angle is rolled at launch, not at the burst, so its last 0.6 s can show the exact rays (BulletSystem
                 // preview; proposal 7 Nov, Seed Burst fairness review): same petals, speed, damage, fuse and schedule
-                float burstOff = Rnd(0, Tau);
+                float burstOff = Rnd(0, Tau); int rays = BurstPetals;   // both fixed at launch: the burst always matches its preview
                 var seed = Shot(On(a, Rim), a, 3, 16, fuse, 0, "Seed", 0.6f, b =>
                 {
                     int f0 = W.Bullets.Fired;
-                    PetalRing(b.Pos, BurstPetals, 4.5f, burstOff, 0.3f, 12, "Seed Burst");
+                    PetalRing(b.Pos, rays, 4.5f, burstOff, 0.3f, 12, "Seed Burst");
                     LastBurstFired = W.Bullets.Fired - f0;
                 });
-                seed.BurstRays = BurstPetals; seed.BurstOff = burstOff; seed.BurstSpeed = 4.5f;
+                seed.BurstRays = rays; seed.BurstOff = burstOff; seed.BurstSpeed = 4.5f;
             }
         }
 
