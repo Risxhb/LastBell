@@ -1121,15 +1121,19 @@ namespace LastBell.Run
                 d.World.Difficulty = Difficulty.Hard; sy.DebugStartStorm(0);
                 // burst preview (proposal 7 Nov): each seed carries its burst angle from launch, its last 0.6 s draws the rays,
                 // and the petals fly exactly along the previewed rays from the previewed point
-                var seeds = new Dictionary<BulletSystem.Bullet, (float off, Vector3 at)>(); bool rayShown = false, seedsCarry = true;
+                var seeds = new Dictionary<BulletSystem.Bullet, (float off, Vector3 at, int rays)>(); int fresh = 0; bool rayShown = false, seedsCarry = true;
                 bool sampling = true;
                 IEnumerator SampleSeeds()
                 {
                     while (sampling)
                     {
                         foreach (var b in d.World.Bullets.Live)
-                            if (b.Source == "Seed" && !b.Dead && b.Age < 0.1f && !seeds.ContainsKey(b))   // launched on Hard (older Medium seeds are still in flight)
-                            { seedsCarry &= b.BurstRays == 10 && Mathf.Approximately(b.BurstSpeed, 4.5f); seeds[b] = (b.BurstOff, b.Pos + b.Vel * (b.Life - b.Age)); }
+                            if (b.Source == "Seed" && !b.Dead && !seeds.ContainsKey(b))
+                            {
+                                // seeds launched on Hard carry 10 rays (older Medium seeds, still in flight, carry 8)
+                                if (b.Age < 0.1f) { fresh++; seedsCarry &= b.BurstRays == 10 && Mathf.Approximately(b.BurstSpeed, 4.5f); }
+                                seeds[b] = (b.BurstOff, b.Pos + b.Vel * (b.Life - b.Age), Mathf.Max(1, b.BurstRays));
+                            }
                         rayShown |= GameObject.Find("Burst Ray") != null;
                         yield return null;
                     }
@@ -1138,7 +1142,7 @@ namespace LastBell.Run
                 yield return Play(4.5f, () => false);   // the first ring comes at 2.0 s and bursts 1.6 s later
                 sampling = false;
                 Check("Sylvara Hard P4: a seed bursts into 10 petals", sy.LastBurstFired == 10, sy.LastBurstFired.ToString());
-                Check("Sylvara P4 burst preview: every seed carries its 10 burst rays from launch", seeds.Count > 0 && seedsCarry, $"{seeds.Count} seeds");
+                Check("Sylvara P4 burst preview: every seed carries its 10 burst rays from launch", fresh > 0 && seedsCarry, $"{fresh} seeds");
                 Check("Sylvara P4 burst preview: the rays are drawn before the burst", rayShown);
                 int petals = 0, onRay = 0;
                 foreach (var p in d.World.Bullets.Live)
@@ -1148,7 +1152,7 @@ namespace LastBell.Run
                     var start = p.Pos - p.Vel * p.Age; float pa = Mathf.Atan2(p.Vel.z, p.Vel.x);
                     foreach (var s in seeds.Values)
                     {
-                        float k = (pa - s.off) / (Mathf.PI * 2 / 10), dk = Mathf.Abs(k - Mathf.Round(k));
+                        float k = (pa - s.off) / (Mathf.PI * 2 / s.rays), dk = Mathf.Abs(k - Mathf.Round(k));
                         var from = s.at + new Vector3(Mathf.Cos(pa), 0, Mathf.Sin(pa)) * 0.3f;
                         if (dk < 0.01f && Sim.Flat(start - from).magnitude < 0.15f) { onRay++; break; }
                     }
