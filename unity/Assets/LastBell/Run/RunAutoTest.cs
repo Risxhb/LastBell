@@ -83,8 +83,11 @@ namespace LastBell.Run
         }
         void Note(string s) { lines.Add("      " + s); Debug.Log("[autotest] " + s); }
 
+        // -batchmode renders nothing, so WaitForEndOfFrame never fires there: picture steps are skipped and the checks go on
+        static bool NoFrames => Application.isBatchMode;
         IEnumerator Shot(string name)
         {
+            if (NoFrames) { Note("screenshot " + name + " skipped (batchmode)"); yield return null; yield break; }
             yield return new WaitForEndOfFrame();
             var path = Path.Combine(dir, $"{++shots:00}_{name}.png");
             var tex = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
@@ -99,6 +102,7 @@ namespace LastBell.Run
         IEnumerator Capture(string name, int frames)
         {
             var cdir = Path.Combine(dir, "frames_" + name); Directory.CreateDirectory(cdir);
+            if (NoFrames) { Note($"video frames {name}: skipped (batchmode)"); yield break; }
             Time.captureFramerate = 60;
             for (int i = 0; i < frames; i++)
             {
@@ -993,6 +997,8 @@ namespace LastBell.Run
                 burst |= d.World.Bullets.Live.Any(b => b.Source == "Seed Burst");
             }
             yield return Shot("sylvara_v3_p4");
+            if (NoFrames) Note("Seed Storm washout check skipped (batchmode)");
+            else
             {
                 // hundreds of bullet meshes on screen must not wash the frame out (a NaN normal once bloomed it to white)
                 yield return new WaitForEndOfFrame();

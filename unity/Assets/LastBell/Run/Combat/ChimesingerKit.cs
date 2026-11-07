@@ -35,6 +35,9 @@ namespace LastBell.Run
         public int BellLeft => bellLeft;   // bots
         readonly int[] echo = new int[4]; public int Echoes { get; private set; }   // 4 = the most any item allows (Great Bell)
         int EchoCap => Shop.ItemHooks.I(P, "c.echo.cap", MaxEchoes);                  // Third Echo, Great Bell
+        int StrikeRechargeNow => Shop.ItemHooks.I(P, "c.strike.recharge", StrikeRecharge);   // Double Toll
+        int tollLeft, tollDamage; Vector3 tollFrom;                                    // Double Toll: the second toll, 1 s after a Bellstrike hit
+        const int TollDelay = 60;
         public static int BaseNoteDamage => NoteDamage; public static float BaseNoteSpeed => NoteSpeed; public static int BaseStrikeDamage => StrikeDamage;   // item-fired notes and rings
         public int LastCrescendo { get; private set; }
 
@@ -42,7 +45,7 @@ namespace LastBell.Run
         public override string[] SlotKeys => new[] { "LMB", "2", "3", "4", "5" };
         public override float Cooldown01(int s) => s switch
         {
-            0 => noteCd / (float)NoteCd, 1 => charges > 0 ? 0 : recharge / (float)StrikeRecharge,
+            0 => noteCd / (float)NoteCd, 1 => charges > 0 ? 0 : recharge / (float)StrikeRechargeNow,
             2 => refrainCd / (float)RefrainCd, 3 => crescCd / (float)CrescCd, _ => chorusCd / (float)ChorusCd
         };
         public override string SlotState(int s) => s switch
@@ -70,7 +73,7 @@ namespace LastBell.Run
 
         public override void ResetAll()
         {
-            act = Act.None; t = 0; noteCd = refrainCd = crescCd = chorusCd = 0; charges = StrikeCharges; recharge = 0;
+            act = Act.None; t = 0; noteCd = refrainCd = crescCd = chorusCd = 0; charges = StrikeCharges; recharge = 0; tollLeft = 0;
             Harmony = 0; ClearBell(); LastCrescendo = 0; buffered = -1;
             MoveScale = 1; Velocity = Vector3.zero; FaceAim = false;
         }
@@ -81,10 +84,17 @@ namespace LastBell.Run
         void Timers()
         {
             if (noteCd > 0) noteCd--; if (refrainCd > 0) refrainCd--; if (crescCd > 0) crescCd--; if (chorusCd > 0) chorusCd--;
-            if (charges < StrikeCharges && --recharge <= 0) { charges++; recharge = charges < StrikeCharges ? StrikeRecharge : 0; }
+            if (charges < StrikeCharges && --recharge <= 0) { charges++; recharge = charges < StrikeCharges ? StrikeRechargeNow : 0; }
             if (bellLeft > 0 && --bellLeft == 0) ClearBell();   // ordinary expiry
             var b = W.Boss;
             if (Bell && (b == null || !b.Solid)) ClearBell();    // target died
+            // Double Toll: the ringing bell tolls again for a share of Bellstrike (no toll once the bell has stopped)
+            if (tollLeft > 0 && --tollLeft == 0 && Bell)
+            {
+                var at = b.transform.position + Vector3.up * b.HitHeight;
+                W.DamageBoss(tollDamage, at, "Bellstrike (double toll)");
+                W.Fx.Bellstrike(tollFrom, at, true, false);
+            }
             if (Bell) W.Fx.Bell(b, Strength, Echoes, bellLeft / (float)BellLife);
         }
         public override void TickTimersOnly() { Timers(); Velocity = Vector3.zero; }
@@ -158,7 +168,7 @@ namespace LastBell.Run
         void DoStrike()
         {
             // charge is spent on release even if it misses (prototype decision)
-            if (charges == StrikeCharges) recharge = StrikeRecharge;
+            if (charges == StrikeCharges) recharge = StrikeRechargeNow;
             charges--;
             var dir = Sim.Flat(aim - P.transform.position); dir = dir.sqrMagnitude > 0.1f ? dir.normalized : P.transform.forward;
             int dealt = W.LineBoss(P.transform.position, dir, StrikeRange, StrikeWidth, StrikeDamage, "Bellstrike", out var contact);
@@ -167,6 +177,8 @@ namespace LastBell.Run
             {
                 if (refresh && Strength < MaxStrength) { Strength++; for (int i = 0; i < Echoes; i++) echo[i] = Mathf.RoundToInt(echo[i] * StrengthStep); }
                 bellLeft = BellLife;
+                float share = Shop.ItemHooks.F(P, "c.double_toll", 0);
+                if (share > 0) { tollLeft = TollDelay; tollDamage = Mathf.Max(1, Mathf.RoundToInt(StrikeDamage * share)); tollFrom = P.transform.position + Vector3.up * 1.2f; }
             }
             W.Fx.Bellstrike(P.transform.position + Vector3.up * 1.2f, contact, dealt > 0, refresh);
         }
