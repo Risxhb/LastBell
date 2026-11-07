@@ -242,9 +242,8 @@ namespace LastBell.Run
         public PlayerController AimTarget(Turret tu)
         {
             PlayerController near = null; float best = float.MaxValue;
-            foreach (var p in Standing())
+            foreach (var p in Aimable())   // an active reviver is never the target
             {
-                if (p.Reviving != null || p.WasReviving != null) continue;   // an active reviver is never the target
                 float dd = Flat(p.transform.position - tu.Pos).sqrMagnitude; if (dd < best) { best = dd; near = p; }
             }
             return near;
