@@ -934,8 +934,8 @@ namespace LastBell.Run
                             yield return Shot("sylvara_props_choir_bud"); break;
                         }
                     }
-                    if (!seedShot && sy.PhaseName == "Seed Storm" && d.World.Bullets.Live.Any(b => b.Source == "Seed" && b.Age > b.Life * 0.6f && Sim.Flat(b.Pos - d.Player.transform.position).magnitude < 6f))
-                    { seedShot = true; yield return Shot("sylvara_props_storm_seeds"); }
+                    if (!seedShot && sy.PhaseName == "Seed Storm" && d.World.Bullets.Live.Any(b => b.Source == "Seed" && b.Life - b.Age < 0.3f && Sim.Flat(b.Pos - d.Player.transform.position).magnitude < 7f))
+                    { seedShot = true; yield return Shot("sylvara_props_storm_seeds"); }   // near the burst, so the ray preview shows too
                     yield return null;
                 }
             }
@@ -1128,7 +1128,7 @@ namespace LastBell.Run
                     while (sampling)
                     {
                         foreach (var b in d.World.Bullets.Live)
-                            if (b.Source == "Seed" && !b.Dead && !seeds.ContainsKey(b))
+                            if (b.Source == "Seed" && !b.Dead && b.Age < 0.1f && !seeds.ContainsKey(b))   // launched on Hard (older Medium seeds are still in flight)
                             { seedsCarry &= b.BurstRays == 10 && Mathf.Approximately(b.BurstSpeed, 4.5f); seeds[b] = (b.BurstOff, b.Pos + b.Vel * (b.Life - b.Age)); }
                         rayShown |= GameObject.Find("Burst Ray") != null;
                         yield return null;
