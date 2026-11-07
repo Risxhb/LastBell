@@ -402,8 +402,8 @@ namespace LastBell.Run
                 tagNow = k;
             }
         }
-        void Shot(Vector3 at, float a, float v, int dmg = 12, float life = 6, int col = 0, string src = "Petal", float r = BulletArt.PetalHitRadius, Action<BulletSystem.Bullet> split = null)
-            { var b = W.Bullets.Fire(at, a, v, dmg, life, r, col, src, split); b.AttackId = AttackOf(src); b.Tag = tagNow; }
+        BulletSystem.Bullet Shot(Vector3 at, float a, float v, int dmg = 12, float life = 6, int col = 0, string src = "Petal", float r = BulletArt.PetalHitRadius, Action<BulletSystem.Bullet> split = null)
+            { var b = W.Bullets.Fire(at, a, v, dmg, life, r, col, src, split); b.AttackId = AttackOf(src); b.Tag = tagNow; return b; }
         // the boss attack icon (BossAttackIcons, approved 2 Nov) a bullet or hazard belongs to. Sources repeat across phases, so
         // the spiral is Two-Colour Choir in Phase 2 and the spiral and seeds are Last Storm once it starts. Choir Bud (the
         // harmless bloom timer) has none.
@@ -770,12 +770,16 @@ namespace LastBell.Run
             for (int i = 0; i < n; i++)
             {
                 float a = off + i * Tau / n;
-                Shot(On(a, Rim), a, 3, 16, fuse, 0, "Seed", 0.6f, b =>
+                // its burst angle is rolled at launch, not at the burst, so its last 0.6 s can show the exact rays (BulletSystem
+                // preview; proposal 7 Nov, Seed Burst fairness review): same petals, speed, damage, fuse and schedule
+                float burstOff = Rnd(0, Tau);
+                var seed = Shot(On(a, Rim), a, 3, 16, fuse, 0, "Seed", 0.6f, b =>
                 {
                     int f0 = W.Bullets.Fired;
-                    PetalRing(b.Pos, BurstPetals, 4.5f, Rnd(0, Tau), 0.3f, 12, "Seed Burst");
+                    PetalRing(b.Pos, BurstPetals, 4.5f, burstOff, 0.3f, 12, "Seed Burst");
                     LastBurstFired = W.Bullets.Fired - f0;
                 });
+                seed.BurstRays = BurstPetals; seed.BurstOff = burstOff; seed.BurstSpeed = 4.5f;
             }
         }
 
