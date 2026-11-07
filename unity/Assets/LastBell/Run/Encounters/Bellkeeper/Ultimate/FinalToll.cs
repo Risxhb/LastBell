@@ -13,7 +13,7 @@ namespace LastBell.Run
     //             misses the plate.
     //   SOUND     a ring rushes in from the rim at 5 m/s to the boss with four gaps (I-IV; each hour's gap moves 60° a toll).
     //             Your own gap only: another hour's gap 999, the ring itself 50.
-    //   ECHO      tolls X-XII: a second ring 0.8 s behind, every gap 45° further round (same hours). Hard only (5 Nov).
+    //   ECHO      tolls X-XII: a second ring 0.8 s behind, every gap 45° further round (same hours).
     //   CALLBACKS PLATE (P1/P2: one player of the next hour soaks the plate by its last gap or WIPE; standing on it pays
     //             debts), DEBTS (P1: a 2 m ring under everyone that detonates next toll), INVERTED (P2: the half centred
     //             on the INVERTED hour's last gap slams: that hour inside, everyone else out), HAMMER (P4: 12 shards from a
@@ -71,9 +71,9 @@ namespace LastBell.Run
         static float GapCentre(int k, int j) => (45 + 90 * j + 30 * k) % 360;
         static int GapHour(int k, int j) => (j + k) % 4;
         static float GapOf(int k, int h, bool echo) { for (int j = 0; j < 4; j++) if (GapHour(k, j) == h) return (GapCentre(k, j) + (echo ? 45 : 0)) % 360; return 0; }
-        bool Echoes(int k) => k >= 10 && k <= 12 && Boss.UltEchoRingFor;   // Hard only (5 Nov): one ring a toll on Medium and Easy
+        static bool Echoes(int k) => k >= 10 && k <= 12;
         // where hour h last passed a ring before toll k (the echo's gap when that toll had one)
-        float LastGap(int k, int h) { int kk = k - 1; return kk < 1 ? 45 + 90 * h : GapOf(kk, h, Echoes(kk)); }
+        static float LastGap(int k, int h) { int kk = k - 1; return kk < 1 ? 45 + 90 * h : GapOf(kk, h, Echoes(kk)); }
         float InvAng(int k) => LastGap(k, InvHour(k));
         float PlateAng(int k) { float b = LastGap(k, Soaker(k)), a = LastGap(k, InvHour(k)), d = ((a - b) % 360 + 540) % 360 - 180; return b - (d >= 0 ? 20 : -20); }
         Vector3 PlatePos(int k) => Dir(PlateAng(k)) * PlateR;

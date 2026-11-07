@@ -7,13 +7,13 @@ namespace LastBell.Run
     // The Open Hour (`bellkeeper.ult_open_hour`), Bellkeeper Ultimate v2 P3 — proposal: bullet hell, built 2026-10-25 from the
     // browser simulation Chzy18 asked to see in Unity (tools/bellkeeper-ultimate/sims/p3-example.html); not human-approved.
     // One 60 s pattern, repeated until P3 ends (times below are seconds into the pattern):
-    //   MAINSPRING   three spiral arms of brass bullets from the boss: one shot per arm every 0.75 s (Hard; 0.9 Medium, 1.05 Easy) at 3.5 m/s; the arms
+    //   MAINSPRING   three spiral arms of brass bullets from the boss: one shot per arm every 0.75 s at 3.5 m/s; the arms
     //                turn 30°/s and reverse every 12 s. A bullet hit is 50 (two kill).
     //   REWOUND SHOT at 15, 30, 45: every bullet turns round and flies back into the boss at 1.5x speed (the arms pause 2 s).
     //                "REWIND" shows 1.5 s before.
     //   ECHO OF YOU  every 1 s each player leaves an echo where they stand; 2 s later it bursts (1.1 m): 999 to its owner
     //                only, and it throws four small bullets (2.5 m/s, 1 s) that hit anyone for 50. Never stand still.
-    //   BELL CURTAIN at 20, 38, 52: a wall of bullets sweeps the arena at 3 m/s with four 2.4 m gaps marked I–IV (Hard; 2.8 m Medium, 3.2 m Easy). Through
+    //   BELL CURTAIN at 20, 38, 52: a wall of bullets sweeps the arena at 3 m/s with four 2.4 m gaps marked I–IV. Through
     //                your own numeral: safe; another's: 999; the wall: 50. A plate beat that falls inside a sweep gives that
     //                beat's soaker the gap nearest its plate.
     //   PLATE        every 6 s the next hour (I, II, III, IV, ...) must be on the lit plate (r 7). Empty = WIPE.
@@ -25,11 +25,9 @@ namespace LastBell.Run
         public override string Name => "The Open Hour";
 
         public const string Source = "The Open Hour";
-        const float Loop = 60f, ArmSpeed = 3.5f, ArmTurn = 30f, ArmFlip = 12f, Rev = 1.5f, RewindPause = 2f, Warn = 1.5f,
+        const float Loop = 60f, ArmRate = 0.75f, ArmSpeed = 3.5f, ArmTurn = 30f, ArmFlip = 12f, Rev = 1.5f, RewindPause = 2f, Warn = 1.5f,
             EchoEvery = 1f, EchoDelay = 2f, EchoR = 1.1f, EchoShotSpeed = 2.5f, EchoShotLife = 1f,
-            CurtSpeed = 3f, Beat = 6f, PlateR = 7f, OnPlate = 1.6f, BR = 0.22f, PR = 0.45f;
-        float ArmRate => Boss.UltArmEveryFor;   // 0.75 s on Hard, 0.9 Medium, 1.05 Easy (5 Nov)
-        float GapHalf => Boss.UltCurtainGapFor;   // 1.2 m on Hard, 1.4 Medium, 1.6 Easy (5 Nov): the gaps stay 4.4 m apart
+            CurtSpeed = 3f, GapHalf = 1.2f, Beat = 6f, PlateR = 7f, OnPlate = 1.6f, BR = 0.22f, PR = 0.45f;
         const int Arms = 3, EchoShots = 4, BulletDamage = 50;
         static readonly float[] Rewinds = { 15, 30, 45 };
         static readonly float[] GapOff = { -6.6f, -2.2f, 2.2f, 6.6f };

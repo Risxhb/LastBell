@@ -11,7 +11,7 @@ namespace LastBell.Run
     // out) meshing with it and turning the other way. Everything else is the pit (999). The gears carry you, so you are
     // always walking: away from each outer gear's rim pawl (999). The gears only touch at the four mesh points beside the
     // centre gear, and those bite in turn (999 for 0.35 s in every 2 s).
-    // Every 7.5 s the HAMMER slams a random outer gear (shown 2.5 s before; every third slam two gears, on Hard only since 5 Nov): anyone on it 999,
+    // Every 7.5 s the HAMMER slams a random outer gear (shown 2.5 s before; every third slam two gears): anyone on it 999,
     // and it throws a ring of 16 brass shards (50, two kill). Each player belongs to a gear that moves two places round
     // after every slam (so most slams everyone crosses through the centre); the player whose gear is hammered waits on the
     // centre. A gear without ITS OWN player at a slam jams the train: WIPE (anyone else on it doesn't count). Every third slam the gears reverse.
@@ -95,7 +95,7 @@ namespace LastBell.Run
         List<int> SlamGears(int k)
         {
             var l = new List<int> { SlamGear(k) };
-            if (k % 3 == 0 && Boss.UltDoubleSlamFor) l.Add((SlamGear(k) + 1 + ((k >> 2) % 3)) % 4);
+            if (k % 3 == 0) l.Add((SlamGear(k) + 1 + ((k >> 2) % 3)) % 4);
             return l;
         }
         bool Revealed(int k, float t) => t >= k * Slam - (Warn + WarnLead);
