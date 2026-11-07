@@ -155,6 +155,7 @@ namespace LastBell.Run
         }
 
         public void TickBoss(string loop, float speed = 1) { if (oneShotLeft <= 0) SetLoop(loop, speed); }
+        public bool Busy => oneShotLeft > 0;   // a one-shot is still playing
 
         void Update()
         {

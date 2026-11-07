@@ -39,7 +39,7 @@ namespace LastBell.Run
             Say(cascade ? "Cascading Lances" : Name);
             Volleys.Clear(); SpawnTicks.Clear(); aims.Clear();
             beams = Mathf.Clamp(beams, 1, 8);
-            Glow(1.4f); Clip("MeridianAlignment", Lock1 + Window);   // stand-in: glaive raised to the zenith
+            Glow(1.4f); Clip("LanceCall", Lock1 + Window);   // glaive raised to the zenith, driven down as the volley lands
 
             // volley 1: through the farthest player
             int lock1 = Lock1, res1 = lock1 + Window;
