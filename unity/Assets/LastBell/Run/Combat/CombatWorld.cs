@@ -87,10 +87,36 @@ namespace LastBell.Run
             Tick++;
             foreach (var p in Players) p.Step();
             if (!CombatActive) return;
+            StepRevives();
             if (Boss != null && !Boss.Dead) Boss.Step();
             Projectiles.Step();
             Bullets.Step();
             Hazards.Step();
+        }
+
+        // Revives (PlayerController): each downed player's revive fills while any standing ally beside them channels (stands
+        // still, free and unhurt), pauses while none does, and starts over when a reviver is hit. Two revivers are no faster.
+        // Only a reviver's hit resets it: one channelling now, or last tick (a hit stops the channel that same tick), not an
+        // ally who is merely nearby fighting (review REV-01, 5 Nov).
+        void StepRevives()
+        {
+            foreach (var p in Players) { p.WasReviving = p.Reviving; p.Reviving = null; }
+            foreach (var d in Players)
+            {
+                if (!d.Down || d.Dead) continue;
+                bool on = false, hurt = false;
+                foreach (var r in Players)
+                {
+                    if (r == d || r.Down || r.Reviving != null) continue;
+                    if (Sim.Flat(r.transform.position - d.transform.position).magnitude > PlayerController.ReviveRange) continue;
+                    bool channels = r.CanChannelRevive;
+                    if (r.LastHurtTick >= Tick - 1 && (channels || r.WasReviving == d)) hurt = true;   // (hazards land after this step: last tick counts)
+                    if (!channels) continue;
+                    r.Reviving = d; on = true;
+                }
+                if (hurt) d.ReviveProgress = 0;
+                else if (on && (d.ReviveProgress += 1f / Sim.Ticks(PlayerController.ReviveSeconds)) >= 0.999f) d.Revive();
+            }
         }
 
         // Clears everything an encounter can leave behind: hazards, projectiles, boss-owned effects. Called at every

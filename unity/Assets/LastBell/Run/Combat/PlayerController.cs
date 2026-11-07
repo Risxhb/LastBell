@@ -11,7 +11,7 @@ namespace LastBell.Run
         public const int Slots = 5;   // 1 Basic, 2/3/4 class actions, 6 = Chimesinger's Mending Chorus
         public Vector2 Move;          // camera-relative WASD, x right / y up the screen
         public Vector3 Aim;           // cursor on the floor (world)
-        public bool Sprint, Jump, Dash, Potion;
+        public bool Sprint, Dash, Potion;
         public bool WorldMove;        // LAN remote players: Move is already world x / z (the client used its own camera)
         public bool P0, P1, P2, P3, P4;   // pressed this tick
         public bool H0, H1, H2, H3, H4;   // held
@@ -22,7 +22,7 @@ namespace LastBell.Run
     public interface IInputSource { PlayerInput Read(PlayerController who); }
 
     // Keyboard + mouse, the project's agreed bindings (WASD move; LMB basic only, RMB dash only, 2-5 class actions;
-    // Shift sprint, Space jump). Reads Input System devices directly like the existing test controllers. Gamepads are
+    // Shift sprint; no jump, Chzy18 2 Nov). Reads Input System devices directly like the existing test controllers. Gamepads are
     // not read: the user's rudder pedals register as a non-standard controller.
     public sealed class KeyboardMouseInput : IInputSource
     {
@@ -44,7 +44,6 @@ namespace LastBell.Run
             latched.P3 |= kb.digit4Key.wasPressedThisFrame;
             latched.P4 |= kb.digit5Key.wasPressedThisFrame;
             latched.Dash |= m != null && m.rightButton.wasPressedThisFrame;
-            latched.Jump |= kb.spaceKey.wasPressedThisFrame;
             latched.Potion |= kb.fKey.wasPressedThisFrame;
         }
 
@@ -72,16 +71,16 @@ namespace LastBell.Run
     }
 
     // Shared movement rules for every class (current design + Game-Design delegated defaults): walk 6 m/s, sprint 9 m/s,
-    // dash 3 m over 0.20 s, jump; one 100-point movement stamina (sprint 25/s, jump 20, dash 30, +20/s after 0.75 s).
+    // dash 3 m over 0.20 s, no jump (Chzy18, 2 Nov); one 100-point movement stamina (sprint 25/s, dash 30, +20/s after 0.75 s).
     // No invincibility frames anywhere. Hit-stun 0.25 s and 1.5 m knockback per boss hit (Bellkeeper spec v0.2 §5).
     // All values are provisional tuning.
     public sealed class PlayerController : MonoBehaviour
     {
         public const int MaxHp = 100;
         public const float MaxStamina = 100, WalkSpeed = 6f, SprintSpeed = 9f, TurnRate = 900f, Radius = 0.45f;
-        public const float SprintCost = 25f, JumpCost = 20f, DashCost = 30f, Regen = 20f, RegenDelay = 0.75f;
-        public const float DashDistance = 3f, JumpHeight = 0.8f;
-        public const int DashTicks = 12, DashRecover = 4, JumpTicks = 36, KnockTicks = 9;
+        public const float SprintCost = 25f, DashCost = 30f, Regen = 20f, RegenDelay = 0.75f;
+        public const float DashDistance = 3f;
+        public const int DashTicks = 12, DashRecover = 4, KnockTicks = 9;
         // Potions (F): 5 per refill, +40 HP each, 1 s between drinks (values from the earlier test fight).
         public const int MaxPotions = 5, PotionHeal = 40, PotionLockout = 60;
 
@@ -106,14 +105,29 @@ namespace LastBell.Run
         public int PotionsDrunk { get; private set; }
         int sincePotion = 999;
         public bool Down { get; private set; }
-        public float Height { get; private set; }
-        public bool Airborne => jumpTick >= 0;
+        // Revives (docs/proposals/revives-2026-11-04.md; built as recommended, 4 Nov): at 0 HP a player is downed, not out.
+        // A standing ally who stands still within ReviveRange for ReviveSeconds gets them up with ReviveHp (a hit on the
+        // reviver resets it; CombatWorld.StepRevives); after BleedOutSeconds unrevived they are dead for the rest of the fight.
+        // Bleed-out 30 s since 5 Nov (it was 20): in the Hard party sweep a revive that landed took 8-15 s from the fall, the
+        // channel pausing while the reviver dodged, and most 20 s downs bled out.
+        // Solo is unchanged: nobody is left standing, so the fight is lost.
+        public const float BleedOutSeconds = 30f, ReviveSeconds = 3f, ReviveRange = 1.5f; public const int ReviveHp = 40;
+        public bool Dead { get; private set; }
+        public int DownedTicks { get; private set; }
+        public float ReviveProgress { get; internal set; }       // 0..1 while allies channel on this downed player
+        public PlayerController Reviving { get; internal set; }  // the downed ally this player is channelling on (this tick)
+        internal PlayerController WasReviving;                    // ...and last tick (CombatWorld.StepRevives)
+        public int Revives { get; private set; }                  // times revived this fight
+        public int LastHurtTick { get; private set; } = -999;
+        // still, free and unhurt: standing next to a downed ally like this channels the revive
+        public bool CanChannelRevive => !Down && stun == 0 && dashTick == 0 && pullTick == 0 && !Kit.Acting
+            && Last.Move.sqrMagnitude < 0.01f && !(Last.P0 || Last.P1 || Last.P2 || Last.P3 || Last.P4 || Last.Dash);
         public bool Dashing => dashTick > 0;
         public int Stunned => stun;
         public Vector3 Facing => transform.forward;
         public PlayerInput Last { get; private set; }
 
-        int dashTick, dashLock, jumpTick = -1, stun, knockTick, sinceSpend = 999;
+        int dashTick, dashLock, stun, knockTick, sinceSpend = 999;
         Vector3 dashDir, knockDir; float knockDist, dashDist = DashDistance;
         bool sprinting;
 
@@ -137,7 +151,9 @@ namespace LastBell.Run
         public void PrepareForEncounter(Vector3 pos, float yaw)
         {
             transform.SetPositionAndRotation(pos, Quaternion.Euler(0, yaw, 0));
-            Stamina = MaxStaminaNow; dashTick = 0; dashLock = 0; jumpTick = -1; Height = 0; stun = 0; knockTick = 0; sinceSpend = 999; pullTick = 0;
+            Stamina = MaxStaminaNow; dashTick = 0; dashLock = 0; stun = 0; knockTick = 0; sinceSpend = 999; pullTick = 0;
+            if (Down) { Down = false; Dead = false; Hp = MaxHealth; }   // each fight starts with everyone up (dead ones included)
+            DownedTicks = 0; ReviveProgress = 0; Reviving = null; Revives = 0;
             Kit.ResetAll();
             Presenter.ResetPose();
             Marks.Clear();
@@ -172,15 +188,26 @@ namespace LastBell.Run
         }
 
         // LAN client replica only: show the host's values (this copy never runs Step).
-        public void ApplyNetworkState(int hp, int maxHp, float stamina, float maxStamina, int potions, bool down)
+        public void ApplyNetworkState(int hp, int maxHp, float stamina, float maxStamina, int potions, bool down, bool dead, int downedTicks, float reviveProgress)
         {
             netMaxHp = Mathf.Max(1, maxHp); netMaxStamina = Mathf.Max(1, maxStamina);
             Hp = Mathf.Max(0, hp); Stamina = Mathf.Max(0, stamina); Potions = Mathf.Max(0, potions); Down = down;
+            Dead = down && dead; DownedTicks = down ? Mathf.Max(0, downedTicks) : 0; ReviveProgress = down ? Mathf.Clamp01(reviveProgress) : 0;
         }
 
         // dev / test hook only
         public void DebugSetHp(int hp) { Hp = Mathf.Clamp(hp, 1, MaxHealth); }
-        public void DebugRevive() { if (!Down) return; Down = false; Hp = MaxHealth; Stamina = MaxStaminaNow; Presenter.ResetPose(); }
+        public void DebugRevive() { if (!Down) return; Down = false; Dead = false; Hp = MaxHealth; Stamina = MaxStaminaNow; Presenter.ResetPose(); }
+
+        // an ally's revive finished: up with ReviveHp and full stamina, no immunity afterwards (gpt/08)
+        public void Revive()
+        {
+            if (!Down || Dead) return;
+            Down = false; Hp = Mathf.Min(MaxHealth, ReviveHp); Stamina = MaxStaminaNow; DownedTicks = 0; ReviveProgress = 0; Revives++;
+            sincePotion = PotionLockout;   // free to drink at once
+            Presenter.GetUp();
+            RunHud.Float(transform.position + Vector3.up * 2.4f, "revived", new Color(0.55f, 1f, 0.75f));
+        }
 
         public void ReceiveHit(Hazard h) => ReceiveHit(h, h.Damage);
 
@@ -190,7 +217,7 @@ namespace LastBell.Run
             if (Down) return;
             float mult = Kit.Mitigation(h, out bool noKnock);
             int dmg = Mathf.RoundToInt(damage * mult * World.DamageTakenScale);   // difficulty scales the hit once, here
-            if (mult >= 1) dmg = Mathf.Max(1, dmg);   // a shield can absorb a hit completely; nothing else can
+            LastHurtTick = World.Tick;            if (mult >= 1) dmg = Mathf.Max(1, dmg);   // a shield can absorb a hit completely; nothing else can
             Hp = Mathf.Max(0, Hp - dmg);
             World.ReportPlayerHit(this, h, dmg);
             RunHud.Float(transform.position + Vector3.up * 2.4f, "-" + dmg, mult < 1 ? new Color(0.6f, 0.9f, 1f) : new Color(1f, 0.42f, 0.36f));
@@ -208,7 +235,7 @@ namespace LastBell.Run
         public void ReceiveBurn(Hazard h, int dmg)
         {
             if (Down || dmg <= 0) return;
-            Hp = Mathf.Max(0, Hp - dmg);
+            Hp = Mathf.Max(0, Hp - dmg); LastHurtTick = World.Tick;
             World.ReportPlayerHit(this, h, dmg);
             RunHud.Float(transform.position + Vector3.up * 2.4f, "-" + dmg, new Color(1f, 0.6f, 0.25f));
             if (Hp == 0) GoDown();
@@ -254,7 +281,8 @@ namespace LastBell.Run
 
         void GoDown()
         {
-            Down = true; stun = 0; dashTick = 0; jumpTick = -1; Height = 0; pullTick = 0;
+            Down = true; stun = 0; dashTick = 0; pullTick = 0;
+            DownedTicks = 0; ReviveProgress = 0; Reviving = null;
             Kit.Interrupt(); Kit.ClearTargetState();
             Presenter.Down();
         }
@@ -267,9 +295,13 @@ namespace LastBell.Run
         public void Step()
         {
             var inp = Input != null && MovementEnabled ? Input.Read(this) : default;
-            if (!AbilitiesEnabled) { inp.P0 = inp.P1 = inp.P2 = inp.P3 = inp.P4 = false; inp.H0 = inp.H1 = inp.H2 = inp.H3 = inp.H4 = false; inp.Dash = inp.Jump = inp.Potion = false; }
+            if (!AbilitiesEnabled) { inp.P0 = inp.P1 = inp.P2 = inp.P3 = inp.P4 = false; inp.H0 = inp.H1 = inp.H2 = inp.H3 = inp.H4 = false; inp.Dash = inp.Potion = false; }
             Last = inp;
-            if (Down) { Presenter.Tick(this); return; }
+            if (Down)
+            {
+                if (!Dead && World.CombatActive && ++DownedTicks >= Sim.Ticks(BleedOutSeconds)) { Dead = true; ReviveProgress = 0; Presenter.Death(); }
+                Presenter.Tick(this); return;
+            }
             sinceSpend++; sincePotion++;
             if (inp.Potion && stun == 0) DrinkPotion();   // usable while moving or mid-action, not while stunned
             if (sinceSpend > Sim.Ticks(Shop.ItemHooks.RegenDelay(this, RegenDelay))) Stamina = Mathf.Min(MaxStaminaNow, Stamina + Regen * Sim.Dt);
@@ -281,11 +313,6 @@ namespace LastBell.Run
             Vector3 move = inp.WorldMove ? new Vector3(inp.Move.x, 0, inp.Move.y) : fwd * inp.Move.y + right * inp.Move.x;
 
             Vector3 vel = Vector3.zero; bool stepped = false;
-            if (jumpTick >= 0)
-            {
-                jumpTick++; float u = (float)jumpTick / JumpTicks; Height = JumpHeight * 4 * u * (1 - u);
-                if (jumpTick >= JumpTicks) { jumpTick = -1; Height = 0; Presenter.Land(); }
-            }
 
             if (stun > 0)
             {
@@ -314,10 +341,6 @@ namespace LastBell.Run
                 }
                 else
                 {
-                    if (inp.Jump && jumpTick < 0 && Stamina >= JumpCost && Kit.CanJump())
-                    {
-                        Spend(JumpCost); jumpTick = 0; Presenter.Jump();
-                    }
                     Kit.Step(inp); stepped = true;
                     float scale = Kit.MoveScale;
                     sprinting = inp.Sprint && move.sqrMagnitude > 0.01f && scale >= 1 && Stamina > 0;
@@ -334,7 +357,6 @@ namespace LastBell.Run
             transform.position = pos;
             Presenter.Locomotion = stun > 0 || dashTick > 0 || !stepped ? 0 : (vel - Kit.Velocity).magnitude;
             Presenter.Sprinting = sprinting;
-            Presenter.HeightOffset = Height;
             Presenter.Tick(this);
         }
 
@@ -353,7 +375,7 @@ namespace LastBell.Run
     }
 
     // Class kit contract. A kit owns its abilities' cooldowns, contact ticks and class state; the controller owns
-    // movement, stamina, dash, jump, stun and health.
+    // movement, stamina, dash, stun and health.
     public abstract class PlayerKit
     {
         protected PlayerController P;
@@ -377,7 +399,6 @@ namespace LastBell.Run
         public virtual void TickTimersOnly() { }             // cooldowns keep running while stunned or dashing
         public virtual bool Acting => false;                 // mid-action (bots: decide the next press when idle)
         public virtual bool CanDash() => true;
-        public virtual bool CanJump() => true;
         public virtual void OnDash() { }
         public virtual void OnDashEnd() { }                  // the dash has finished (Battle Spin)
         public virtual void Interrupt() { }                  // hit-stun or down: cancel unreleased actions

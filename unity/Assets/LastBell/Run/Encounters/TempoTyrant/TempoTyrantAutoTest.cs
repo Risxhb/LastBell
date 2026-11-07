@@ -741,7 +741,7 @@ namespace LastBell.Run
                 $"{boss.DropsLanded} landed, {boss.BouncersSpawned} bouncing orbs");
             Check("Falling Hours: each bouncing orb bounces off the wall 3 times, then dissipates", boss.BouncerBounceLog.Count > 0 && boss.BouncerBounceLog.All(b => b == TempoTyrantEncounter.OrbBounces),
                 $"{boss.BouncerBounceLog.Count} dissipated, bounces {string.Join(",", boss.BouncerBounceLog.Distinct())}");
-            Check("Falling Hours: orbs can't be jumped", seen.Values.Where(x => x.Source.StartsWith("Falling Hours")).All(x => !x.H.JumpClearable) && seen.Values.Any(x => x.Source.Contains("bouncing")));
+            Check("Falling Hours: orbs can't be jumped", seen.Values.Any(x => x.Source.Contains("bouncing")));
             Check("Falling Hours: bouncing orbs stay on the floor", boss.MaxBouncerRadius <= CombatWorld.PlayerBound + 0.01f, $"max {boss.MaxBouncerRadius:0.00} m");
             var orbHits = hits.Skip(hits0).Where(h => h.source.StartsWith("Falling Hours")).ToList();
             Check("Falling Hours: orbs hit, each at most once per player", orbHits.Count > 0 && orbHits.GroupBy(h => (h.hazard, h.who)).All(g => g.Count() == 1),

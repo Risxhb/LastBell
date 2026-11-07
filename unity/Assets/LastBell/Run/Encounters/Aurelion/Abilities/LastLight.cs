@@ -71,7 +71,7 @@ namespace LastBell.Run
             if (Sectors.Count == 0) return;
             foreach (var p in W.Players)
             {
-                if (!p || p.Down || p.Height > 0 || !OverHole(p.transform.position)) continue;
+                if (!p || p.Down || !OverHole(p.transform.position)) continue;
                 var from = p.transform.position; var to = Landing(from);
                 p.Relocate(to);
                 int before = p.Hp;

@@ -39,7 +39,7 @@ namespace LastBell.Run.Networking
             for (int i = 0; i < world.Players.Count; i++)
             {
                 var actor = world.Players[i]; var pos = SimSmoother.SimPosition(actor.transform);
-                var p = new LanWorldFrame.Player { Id = i == 0 ? 0 : roster.Remote[i - 1].Id, X = pos.x, Y = pos.y, Z = pos.z, Yaw = SimSmoother.SimRotation(actor.transform).eulerAngles.y, Height = actor.Height, Hp = actor.Hp, MaxHp = actor.MaxHealth, Stamina = actor.Stamina, MaxStamina = actor.MaxStaminaNow, Potions = actor.Potions, Down = actor.Down, ClassState = Clip128(actor.Kit.ClassState()) };
+                var p = new LanWorldFrame.Player { Id = i == 0 ? 0 : roster.Remote[i - 1].Id, X = pos.x, Y = pos.y, Z = pos.z, Yaw = SimSmoother.SimRotation(actor.transform).eulerAngles.y, Hp = actor.Hp, MaxHp = actor.MaxHealth, Stamina = actor.Stamina, MaxStamina = actor.MaxStaminaNow, Potions = actor.Potions, Down = actor.Down, Dead = actor.Dead, DownedTicks = actor.DownedTicks, ReviveProgress = Mathf.Clamp01(actor.ReviveProgress), ClassState = Clip128(actor.Kit.ClassState()) };
                 p.Clip = actor.Presenter.CurrentClip; p.Overlay = actor.Presenter.OverlayClip; p.ClipSpeed = actor.Presenter.NetworkClipSpeed; p.OverlaySpeed = actor.Presenter.NetworkOverlaySpeed; p.Hidden = actor.Presenter.Hidden;
                 for (int slot = 0; slot < LanWorldFrame.Slots; slot++) { p.Cooldowns[slot] = Mathf.Clamp01(actor.Kit.Cooldown01(slot)); p.SlotStates[slot] = slot < actor.Kit.SlotNames.Length ? Clip(actor.Kit.SlotState(slot)) : ""; }
                 // for the client's own-movement prediction: which input this state includes, and how fast walking moves it now
@@ -50,7 +50,7 @@ namespace LastBell.Run.Networking
             foreach (var hazard in world.Hazards.Live)
             {
                 var pos = hazard.Origin;
-                frame.Hazards.Add(new LanWorldFrame.HazardState { Id = hazard.Id, Shape = (int)hazard.Shape, Age = hazard.Age, LockAt = hazard.LockAt, ResolveAt = hazard.ResolveAt, ActiveTicks = hazard.ActiveTicks, ShareCount = hazard.ShareCount, X = pos.x, Y = pos.y, Z = pos.z, Yaw = hazard.Yaw, Radius = hazard.Radius, Inner = hazard.Inner, HalfAngle = hazard.HalfAngle, Length = hazard.Length, Width = hazard.Width, ClipRadius = hazard.ClipRadius, JumpClearable = hazard.JumpClearable, Soak = hazard.Soak, FillToLock = hazard.FillToLock, Burn = hazard.BurnPerSecond > 0, Source = hazard.Source, Mechanic = hazard.MechanicId });
+                frame.Hazards.Add(new LanWorldFrame.HazardState { Id = hazard.Id, Shape = (int)hazard.Shape, Age = hazard.Age, LockAt = hazard.LockAt, ResolveAt = hazard.ResolveAt, ActiveTicks = hazard.ActiveTicks, ShareCount = hazard.ShareCount, X = pos.x, Y = pos.y, Z = pos.z, Yaw = hazard.Yaw, Radius = hazard.Radius, Inner = hazard.Inner, HalfAngle = hazard.HalfAngle, Length = hazard.Length, Width = hazard.Width, ClipRadius = hazard.ClipRadius, Soak = hazard.Soak, FillToLock = hazard.FillToLock, Burn = hazard.BurnPerSecond > 0, Source = hazard.Source, Mechanic = hazard.MechanicId });
             }
             foreach (var source in world.BossFx.LiveTelegraphs)
             {
