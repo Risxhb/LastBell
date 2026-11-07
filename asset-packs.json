@@ -1,74 +1,77 @@
 {
-    "schema":  1,
-    "packs":  [
-                  {
-                      "name":  "current-player-assets",
-                      "version":  2,
-                      "file":  "current-player-assets-v2.zip",
-                      "source":  {
-                                     "type":  "azure-universal",
-                                     "organization":  "https://dev.azure.com/ChzandZum",
-                                     "project":  "Last Bell",
-                                     "feed":  "last-bell-assets",
-                                     "package":  "current-player-assets",
-                                     "packageVersion":  "2.0.0"
-                                 },
-                      "sha256":  "aa72278b2054b64a0ec3dbbaead025be3d7542efa1e36a48f595453c60135564",
-                      "size":  73795957,
-                      "extractTo":  ".",
-                      "paths":  [
-                                    "unity/Assets/LastBell/Areas/Area2/Generated",
-                                    "unity/Assets/LastBell/Areas/Area2/BrassFoundry_Arena.unity",
-                                    "unity/Assets/LastBell/Run/Maps/Run_BrassFoundry.unity",
-                                    "unity/Assets/LastBell/Menu/Resources/Menu/MainMenu2.wav"
-                                ],
-                      "files":  280
-                  },
-                  {
-                      "name":  "sylvara-assets",
-                      "version":  4,
-                      "file":  "sylvara-assets-v4.zip",
-                      "source":  {
-                                     "type":  "azure-universal",
-                                     "organization":  "https://dev.azure.com/ChzandZum",
-                                     "project":  "Last Bell",
-                                     "feed":  "last-bell-assets",
-                                     "package":  "sylvara-assets",
-                                     "packageVersion":  "4.0.0"
-                                 },
-                      "sha256":  "1267b2884b401268bdd6810b22a39bb123ce4c0c74dd357bcabdcf3d01e99b4c",
-                      "size":  8317429,
-                      "extractTo":  ".",
-                      "paths":  [
-                                    "unity/Assets/LastBell/Characters/Sylvara/Resources/Characters/Sylvara.glb",
-                                    "unity/Assets/LastBell/Characters/Sylvara/Resources/SylvaraProps",
-                                    "unity/Assets/LastBell/Characters/Sylvara/Resources/SylvaraProps.meta",
-                                    "prototype/arena-3d/models/upload/sylvara-front.png",
-                                    "prototype/arena-3d/models/upload/sylvara-side.png",
-                                    "prototype/arena-3d/models/upload/sylvara-back.png"
-                                ],
-                      "files":  14
-                  },
-                  {
-                      "name":  "verdant-chimes-art",
-                      "version":  1,
-                      "file":  "verdant-chimes-art-v1.zip",
-                      "source":  {
-                                     "type":  "azure-universal",
-                                     "organization":  "https://dev.azure.com/ChzandZum",
-                                     "project":  "Last Bell",
-                                     "feed":  "last-bell-assets",
-                                     "package":  "verdant-chimes-art",
-                                     "packageVersion":  "1.0.0"
-                                 },
-                      "url":  "https://github.com/Risxhb/collab/releases/download/verdant-chimes-art-v1/verdant-chimes-art-v1.zip",
-                      "sha256":  "b46e3ea72820d56406062ba47000c7a91a81cdb3cc8823ffeebef94afad944b7",
-                      "size":  31813644,
-                      "extractTo":  ".",
-                      "paths":  [
-                                    "unity/Assets/LastBell/Areas/Area3/Source/VerdantChimes_Art.glb"
-                                ],
-                      "files":  2
-                  }
-              ]
+    "schema": 1,
+    "packs": [
+        {
+            "name": "current-player-assets",
+            "version": 2,
+            "file": "current-player-assets-v2.zip",
+            "source": {
+                "type": "azure-universal",
+                "organization": "https://dev.azure.com/ChzandZum",
+                "project": "Last Bell",
+                "feed": "last-bell-assets",
+                "package": "current-player-assets",
+                "packageVersion": "2.0.0"
+            },
+            "sha256": "aa72278b2054b64a0ec3dbbaead025be3d7542efa1e36a48f595453c60135564",
+            "size": 73795957,
+            "extractTo": ".",
+            "paths": [
+                "unity/Assets/LastBell/Areas/Area2/Generated",
+                "unity/Assets/LastBell/Areas/Area2/BrassFoundry_Arena.unity",
+                "unity/Assets/LastBell/Run/Maps/Run_BrassFoundry.unity",
+                "unity/Assets/LastBell/Menu/Resources/Menu/MainMenu2.wav"
+            ],
+            "files": 280
+        },
+        {
+            "name": "sylvara-assets",
+            "version": 4,
+            "file": "sylvara-assets-v4.zip",
+            "source": {
+                "type": "azure-universal",
+                "organization": "https://dev.azure.com/ChzandZum",
+                "project": "Last Bell",
+                "feed": "last-bell-assets",
+                "package": "sylvara-assets",
+                "packageVersion": "4.0.0"
+            },
+            "sha256": "1267b2884b401268bdd6810b22a39bb123ce4c0c74dd357bcabdcf3d01e99b4c",
+            "size": 8317429,
+            "extractTo": ".",
+            "paths": [
+                "unity/Assets/LastBell/Characters/Sylvara/Resources/Characters/Sylvara.glb",
+                "unity/Assets/LastBell/Characters/Sylvara/Resources/SylvaraProps",
+                "unity/Assets/LastBell/Characters/Sylvara/Resources/SylvaraProps.meta",
+                "prototype/arena-3d/models/upload/sylvara-front.png",
+                "prototype/arena-3d/models/upload/sylvara-side.png",
+                "prototype/arena-3d/models/upload/sylvara-back.png"
+            ],
+            "files": 14
+        },
+        {
+            "name": "verdant-chimes-art",
+            "version": 2,
+            "file": "verdant-chimes-art-v2.zip",
+            "source": {
+                "type": "azure-universal",
+                "organization": "https://dev.azure.com/ChzandZum",
+                "project": "Last Bell",
+                "feed": "last-bell-assets",
+                "package": "verdant-chimes-art",
+                "packageVersion": "2.0.0"
+            },
+            "sha256": "8f9883d1b0f45f808f420cb987434e97f4b6395913a7c2ce9e38f034c552b529",
+            "size": 80319506,
+            "extractTo": ".",
+            "paths": [
+                "unity/Assets/LastBell/Areas/Area3/Source/VerdantChimes_Art.glb",
+                "unity/Assets/LastBell/Areas/Area3/Source/VerdantChimes.glb",
+                "unity/Assets/LastBell/Areas/Area3/Source/FloorAlbedo.png",
+                "unity/Assets/LastBell/Areas/Area3/Source/FloorHeight.png",
+                "unity/Assets/LastBell/Areas/Area3/Source/FloorMask.png"
+            ],
+            "files": 10
+        }
+    ]
 }
