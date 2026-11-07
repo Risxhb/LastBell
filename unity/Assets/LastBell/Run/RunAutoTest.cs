@@ -1123,6 +1123,8 @@ namespace LastBell.Run
                 // and the petals fly exactly along the previewed rays from the previewed point
                 var seeds = new Dictionary<BulletSystem.Bullet, (float off, Vector3 at, int rays)>(); int fresh = 0; bool rayShown = false, seedsCarry = true;
                 bool sampling = true;
+                // petals live 6 s: ones from earlier steps are still flying, and their seeds were never sampled
+                var older = new HashSet<BulletSystem.Bullet>(d.World.Bullets.Live.Where(b => b.Source == "Seed Burst"));
                 IEnumerator SampleSeeds()
                 {
                     while (sampling)
@@ -1147,7 +1149,7 @@ namespace LastBell.Run
                 int petals = 0, onRay = 0;
                 foreach (var p in d.World.Bullets.Live)
                 {
-                    if (p.Source != "Seed Burst" || p.Dead) continue;
+                    if (p.Source != "Seed Burst" || p.Dead || older.Contains(p)) continue;
                     petals++;
                     var start = p.Pos - p.Vel * p.Age; float pa = Mathf.Atan2(p.Vel.z, p.Vel.x);
                     foreach (var s in seeds.Values)
