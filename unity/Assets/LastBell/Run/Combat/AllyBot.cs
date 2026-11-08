@@ -262,6 +262,8 @@ namespace LastBell.Run
             if (me.Hp < (Mode == BotMode.Passive ? 40 : 70) && me.Potions > 0 && tick % 30 == 0) inp.Potion = true;   // test bots: before a Hard kill hit (65) could down them
             // walk round his body, not into it: a straight line across the centre would pin the bot against him
             if (move != Vector3.zero) move = AroundBoss(pos, move, boss);
+            // Aurelion's Devour pulls faster than a walk: any move against it is a sprint
+            if (move != Vector3.zero && boss is AurelionEncounter da && da.DevourLeft > 0 && Vector3.Dot(move, Sim.Flat(bpos - pos)) < 0 && me.Stamina > 5) inp.Sprint = true;
             dMe = me; dDuty = duty; dThreat = threat?.Source; dBad = bad(pos); dMove = move; dPos = pos; dNote = spotNote; spotNote = 0;
             inp.Move = ToScreen(move);
             return inp;
@@ -1106,6 +1108,7 @@ namespace LastBell.Run
                     if (o.Who != bMe && o.Who && !o.Who.Down && !o.Done && Sim.Flat(o.Who.transform.position - q).magnitude < 4.5f) return true;
                 }
             }
+            if (a != null && a.Planets != null && a.Planets.Live && a.Planets.Near(q, 0.6f, 0.9f)) return true;   // where a planet is going (3 Nov: 5.5 m/s)
             if (bSide != 0 && (a.Sever.SideOfAt(q, a.Sever.LineYaw) != bSide || a.Sever.SideOfAt(q, a.Sever.YawIn(0.6f)) != bSide || a.Sever.SideOfAt(q, a.Sever.YawIn(1.2f)) != bSide || a.Sever.DistToLine(q) < 1.0f)) return true;
             return false;
         }

@@ -1,5 +1,7 @@
 # 05 — Hour Hands (`aurelion.hour_hands`) — Hard-only named mechanic — proposal
 
+> **Retired fight plan; ability brief still used.** The current fight is v4 (`abilities-v4/ABILITIES-v4.md`, Azure PR 15). Abilities defined here that v4 still uses keep their brief, but this document's phase plan, 5–8-player numbers and Vanguard notes are retired (1–4 players and the Tollbreaker since 1–2 Nov).
+
 **Status:** proposal. It is designed and escape-checked, but not built. The full set is in `ABILITIES.md` (same folder), and the escape check is `tools/encounter-escape/aurelion-v2-escape-check.ps1`.
 
 **Boss:** Aurelion, the Meridian Regent. **Arena:** Skyward Spire, play bound 13.9 m.
