@@ -103,6 +103,9 @@ namespace LastBell.Run
         // 320 covers 16 seeds previewing at once (ten rays, a track and a fill each; Last Storm's 14-seed rings stay under it)
         public const int PrewarmBars = 320;
         public void Prewarm(Transform root, int rayBars = PrewarmBars) => view.Prewarm(root, rayBars);
+        // the world (or LAN replica) is released: destroy the view's own materials. Clears and phase changes keep the pools.
+        public void Dispose() { live.Clear(); spawned.Clear(); view.Dispose(); }
+        public bool Disposed => view.Disposed;
 
         // Pooled per look (BulletArt): coral, brass and cobalt petals, the Storm Seed and the Waterfall Jet's water drops.
         // Shared materials per look, so hundreds of bullets stay cheap under the SRP batcher. Every look fits its hit circle.
@@ -118,6 +121,16 @@ namespace LastBell.Run
             readonly List<Transform> rays = new List<Transform>(); int raysShown;   // seed burst previews: a dim track and a bright fill per ray
             Material rayDim, rayFill;
             public int RayBars => rays.Count;
+            public bool Disposed => mats == null && rayDim == null && rayFill == null;
+            public void Dispose()
+            {
+                // the materials this view made (Prim.Material makes new ones); the objects go with the world's root
+                if (mats != null) foreach (var set in mats) foreach (var m in set) if (m) UnityEngine.Object.Destroy(m);
+                if (rayDim) UnityEngine.Object.Destroy(rayDim); if (rayFill) UnityEngine.Object.Destroy(rayFill);
+                mats = null; rayDim = rayFill = null;
+                if (parent) UnityEngine.Object.Destroy(parent.gameObject);
+                parent = null; foreach (var p in pools) p.Clear(); Array.Clear(shown, 0, Kinds); rays.Clear(); raysShown = 0;
+            }
             Material[][] mats;
             Transform parent;
 
