@@ -154,7 +154,7 @@ namespace LastBell.Run
                     var party = Party.ToList();
                     Check($"{tag}: party of {Allies + 1}, nobody down", party.Count == Allies + 1 && party.All(p => !p.Down && !p.Dead), string.Join(" ", party.Select(p => p.Down ? "down" : p.Dead ? "dead" : "up")));
                     if (pos > 0) Check($"{tag}: health refilled", party.All(p => p.Hp == p.MaxHealth), string.Join(" ", party.Select(p => $"{p.Hp}/{p.MaxHealth}")));
-                    if (Campaign.RefillsPotions(enc)) Check($"{tag}: potions refilled", party.All(p => p.Potions == PlayerController.MaxPotions), string.Join(" ", party.Select(p => p.Potions)));
+                    if (Campaign.RefillsPotions(enc)) Check($"{tag}: potions refilled", party.All(p => p.Potions == PlayerController.MaxPotions + Shop.ItemHooks.ExtraPotions(p)), string.Join(" ", party.Select(p => p.Potions)) + " (Spare Flask adds 1)");
                     else if (carried != null) Check($"{tag}: potions carried over", party.Select(p => p.Potions).SequenceEqual(carried), $"{string.Join(" ", carried)} -> {string.Join(" ", party.Select(p => p.Potions))}");
 
                     // ---- the fight ----
