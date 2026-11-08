@@ -404,7 +404,8 @@ namespace LastBell.Run
             yield return V2Setup(1, Difficulty.Medium, new[] { new Vector3(0, 0, -12f) }, 2, Vector3.zero);
             if (V2Boss == null) yield break;
             V2Begin(V2Boss.Eclipse.Run());
-            for (int t = 0; t < Sim.Ticks(4f) && !V4Wiped; t++) { if (V2Main && !V2Main.Down) V2Main.DebugSetHp(PlayerController.MaxHp); yield return V2Ticks(1); }
+            // held to its 25 s wipe (as in its own section), so the body ends before the next setup
+            float tt = 0; while (tt < 40 && !V4Wiped) { if (V2Main && !V2Main.Down) V2Main.DebugSetHp(PlayerController.MaxHp); tt += Time.deltaTime; yield return null; }
             var umbra = Enumerable.Range(0, V2W.TakenLog.Count).Where(i => V2W.TakenLog[i].source == "Umbra").Select(i => i < V2W.TakenAttackIds.Count ? V2W.TakenAttackIds[i] : null).ToList();
             V2Check("Total Eclipse: Umbra hits record aurelion.total_eclipse with its icon", umbra.Count > 0 && umbra.All(id => id == "aurelion.total_eclipse") && BossAttackIcons.Icon("aurelion.total_eclipse") != null, $"{umbra.Count} Umbra hits, ids {string.Join("/", umbra.Select(id => id ?? "null").Distinct())}");
 
