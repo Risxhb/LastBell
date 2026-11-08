@@ -396,10 +396,17 @@ namespace LastBell.Run
             yield return V4FamilyHazards("Meridian Towers", "aurelion.meridian_towers", 1, b => b.Towers.Run());
             yield return V4FamilyHazards("Zenith Marks", "aurelion.zenith_marks", 1, b => b.Marks.Run());
             yield return V4FamilyHazards("Ecliptic Order", "aurelion.ecliptic_order", 2, b => b.Ecliptic.Run(4));
-            yield return V4FamilyHazards("Total Eclipse", "aurelion.total_eclipse", 2, b => b.Eclipse.Run());
             yield return V4FamilyHazards("Meridian Recall", "aurelion.meridian_recall", 2, b => b.Lances.Run(4, 1, false).Concat(b.Recall.Run()));
             yield return V4FamilyHazards("Severance", "aurelion.severance", 3, b => b.Sever.Run());
             yield return V4FamilyHazards("Last Light", "aurelion.last_light", 4, b => LastLightFloorFx.During(V2W, b.Light, b.Light.Run().Take(2)));
+
+            // Total Eclipse spawns no hazards of its own (its Starfall and Lances carry theirs): its hit is Umbra, standing in the dark
+            yield return V2Setup(1, Difficulty.Medium, new[] { new Vector3(0, 0, -12f) }, 2, Vector3.zero);
+            if (V2Boss == null) yield break;
+            V2Begin(V2Boss.Eclipse.Run());
+            for (int t = 0; t < Sim.Ticks(4f) && !V4Wiped; t++) { if (V2Main && !V2Main.Down) V2Main.DebugSetHp(PlayerController.MaxHp); yield return V2Ticks(1); }
+            var umbra = Enumerable.Range(0, V2W.TakenLog.Count).Where(i => V2W.TakenLog[i].source == "Umbra").Select(i => i < V2W.TakenAttackIds.Count ? V2W.TakenAttackIds[i] : null).ToList();
+            V2Check("Total Eclipse: Umbra hits record aurelion.total_eclipse with its icon", umbra.Count > 0 && umbra.All(id => id == "aurelion.total_eclipse") && BossAttackIcons.Icon("aurelion.total_eclipse") != null, $"{umbra.Count} Umbra hits, ids {string.Join("/", umbra.Select(id => id ?? "null").Distinct())}");
 
             // a direct hit: standing still where Severance's line sweeps
             yield return V2Setup(1, Difficulty.Medium, new[] { new Vector3(0, 0, 0) }, 3, new Vector3(0, 0, -6f));
