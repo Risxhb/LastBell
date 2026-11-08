@@ -171,6 +171,7 @@ namespace LastBell.Run
             if (map >= 0) CombatWorld.SetPlayerBound(RunMaps.All[map].Bound, RunMaps.All[map].Square);
             if (!GetComponent<RunHud>()) gameObject.AddComponent<RunHud>();
             if (!GetComponent<Presentation.HitFeel>()) gameObject.AddComponent<Presentation.HitFeel>();   // damage numbers, hit-stop, hit vignette
+            if (!GetComponent<Presentation.BossMoments>()) gameObject.AddComponent<Presentation.BossMoments>();   // boss intro and defeat moments
             if (!GetComponent<Shop.RunShopFlow>()) gameObject.AddComponent<Shop.RunShopFlow>();   // intermission shop (docs/design/run-shop-plan.md)
             LastBell.Menu.MenuSettings.ApplyFrameRate();   // Settings: VSync (off by default) and FPS cap (120 by default)
             if (RunAutoTest.Requested) RunAutoTest.Launch();
