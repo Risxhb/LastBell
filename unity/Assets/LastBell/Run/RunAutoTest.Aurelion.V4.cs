@@ -27,6 +27,7 @@ namespace LastBell.Run
             if (V2Wants("aurelion.meridian_recall")) yield return V2Section("v4 Meridian Recall (Hard)", V4Recall());
             if (V2Wants("aurelion.v4_icons")) BossAttackIconChecks();   // the attack-icon catalog (7 Nov: 8 Aurelion icons)
             if (V2Wants("aurelion.v4_revivers")) yield return V2Section("v4 aimed attacks skip revivers (7 Nov)", V4Revivers());
+            if (V2Wants("aurelion.v4_graphics")) yield return V2Section("v4 graphics pass (8 Nov)", V4Graphics());
             if (V2Wants("aurelion.v4_hard")) yield return V2Section("v4 Hard additions (5 Nov)", V4HardExtras());
             if (AurelionAbilityFilter != null && AurelionAbilityFilter.Equals("aurelion.v4_seeds", StringComparison.OrdinalIgnoreCase)) yield return V2Section("v4 perfect route seed sweep", V4PerfectSeeds());
             if (V2Wants("aurelion.last_light")) yield return V2Section("v4 Last Light and the enrage", V4LastLight());
@@ -323,6 +324,65 @@ namespace LastBell.Run
                 else { ok = seen.Count > 0 && seen.All(h => Off(h.Yaw, c, 180f) < Off(h.Yaw, b, 180f)); info = $"{seen.Count} beams, {(seen.Count > 0 ? Off(seen.First().Yaw, c, 180f) : 0):0} degrees off C, {(seen.Count > 0 ? Off(seen.First().Yaw, b, 180f) : 0):0} off the reviver"; }
                 V2Check($"{which}: aimed at the standing player, not the one reviving", reviving && ok, $"reviving {reviving}; {info}");
             }
+        }
+
+        // graphics pass (8 Nov, presentation only): planet bodies ride their hazards at the hitbox size, towers get posts that
+        // go with them, Zenith Marks show glyphs, and the beam / Final Noon effects run without errors
+        IEnumerator V4Graphics()
+        {
+            yield return V2Setup(1, Difficulty.Medium, new[] { new Vector3(-3, 0, -4f) }, 2, Vector3.zero);
+            if (V2Boss == null) yield break;
+            var a = V2Boss;
+            a.DebugSetPhaseV4(2); a.TestExtras = true;
+            yield return V2Ticks(Sim.Ticks(0.5f));
+            int n = a.Planets.Count; bool on = n > 0; float worst = 0, size = 0;
+            for (int i = 0; i < n; i++)
+            {
+                var b = a.Planets.BodyOf(i); if (!b) { on = false; continue; }
+                worst = Mathf.Max(worst, Sim.Flat(b.position - a.Planets.PlanetAt(i)).magnitude);
+                size = b.GetChild(0).GetChild(0).localScale.x;
+            }
+            V2Check("Errant Planets: a planet body on every planet, on its hazard, the hitbox's size", on && worst < 0.3f && Mathf.Abs(size - ErrantPlanets.Radius * 2) < 0.01f, $"{n} planets, worst offset {worst:0.00} m, body {size:0.00} m");
+            var first = a.Planets.BodyOf(0);
+            a.TestExtras = false; yield return V2Ticks(3);
+            V2Check("Errant Planets: the bodies go when the planets end", !first && !a.Planets.Live, $"live {a.Planets.Live}");
+
+            yield return V2Setup(1, Difficulty.Medium, new[] { new Vector3(0, 0, 7f) }, 1, Vector3.zero);
+            if (V2Boss == null) yield break;
+            a = V2Boss; V3Bot(V2Main, BotMode.Perfect);
+            V2Begin(a.Towers.Run());
+            yield return V2Ticks(10);
+            var towers = a.Towers.Towers.ToList();
+            V2Check("Meridian Towers: every tower has its posts", towers.Count > 0 && towers.All(t => t.Posts), $"{towers.Count} towers, {towers.Count(t => t.Posts)} with posts");
+            yield return V2WaitIdle(20);
+            yield return V2Ticks(Sim.Ticks(1.0f));
+            V2Check("Meridian Towers: the posts go once their tower lands", towers.All(t => !t.Posts), $"{towers.Count(t => t.Posts)} left");
+            V3Unbot();
+
+            yield return V2Setup(2, Difficulty.Medium, new[] { new Vector3(-3, 0, 0), new Vector3(3, 0, 0) }, 1, Vector3.zero);
+            if (V2Boss == null) yield break;
+            a = V2Boss;
+            V2Begin(a.Marks.Run());
+            yield return V2Ticks(10);
+            var shown = a.Marks.Shown.ToList(); var marks = a.Marks.Marks.Where(m => m.Step == 0).ToList();
+            bool glyphs = shown.Count == marks.Count && shown.Count > 0;
+            for (int i = 0; i < shown.Count && glyphs; i++) glyphs = shown[i].Icon == (marks[i].Mark == ZenithMarks.Mark.Sun ? AurelionProps.SunGlyph : AurelionProps.ShadeGlyph);
+            V2Check("Zenith Marks: a sun or shade glyph over each player, matching the mark", glyphs, $"{shown.Count} markers, {marks.Count} marks: {string.Join("/", marks.Select(m => m.Mark))}");
+            yield return V2WaitIdle(10);
+
+            // the beams and Final Noon: presentation only, so it is enough that they run (the section fails on an exception);
+            // one player with the perfect bot, so nobody falls and the run stays in combat
+            yield return V2Setup(1, Difficulty.Medium, new[] { new Vector3(0, 0, 7f) }, 2, Vector3.zero);
+            if (V2Boss == null) yield break;
+            a = V2Boss; V3Bot(V2Main, BotMode.Perfect);
+            V2Begin(a.Lances.Run(4, 2, true).Concat(a.Recall.Run()).Concat(a.Hands.Run()));
+            yield return V2WaitIdle(20);
+            V3Unbot();
+            V2W.BossFx.FinalNoon(Vector3.zero, AurelionAbility.Rim);
+            yield return V2Ticks(Sim.Ticks(1.8f));
+            V2Check("beams (Lances, Recall, Hour Hands) and the Final Noon wash ran", true, $"recall beams {a.Recall.Replay.Count}");
+            float reach = AurelionAbility.ReachToRim(new Vector3(0, 0, 0), 0, 28f), off = AurelionAbility.ReachToRim(new Vector3(0, 0, 5f), 0, 28f);
+            V2Check("beam length: from his centre to the rim", Mathf.Abs(reach - AurelionAbility.Rim) < 0.01f && Mathf.Abs(off - (AurelionAbility.Rim - 5f)) < 0.01f, $"{reach:0.00} m from the centre, {off:0.00} m from 5 m north");
         }
 
         // attack icons (7 Nov): every hazard of the attack carries its AttackId, which resolves to a catalogued 256 px icon
