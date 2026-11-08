@@ -51,7 +51,7 @@ namespace LastBell.Run.Presentation
             if (LegacyLook) { RunHud.Float(at, amount.ToString(), new Color(1f, 0.86f, 0.45f)); return; }   // the pre-8 Nov float, for before/after
             if (LanFx.Record != null) LanFx.Record(LanFxTarget.Hud, "Damage", new object[] { at, amount, by });
             if (amount <= 0) return;
-            long a0 = Measuring ? GC.GetAllocatedBytesForCurrentThread() : 0;
+            long a0 = Measuring ? HitFeel.AllocNow() : 0;
             var dir = RunDirector.Instance; var local = dir ? dir.Player : null;
             var world = dir ? dir.World : null;
             Kind kind = by == null ? (world != null && world.Players.Count <= 1 ? Kind.Mine : Kind.Neutral) : by == local ? Kind.Mine : Kind.Ally;
@@ -59,7 +59,7 @@ namespace LastBell.Run.Presentation
             if (PresentationSettings.DamageNumbers) AddNumber(at, amount, by, kind, big, world);
             if (big && PresentationSettings.HitStop) Stop(kind == Kind.Ally ? StopAlly : StopMine);
             BossDamaged?.Invoke(at, amount, by, big);
-            if (Measuring) AllocBytes += GC.GetAllocatedBytesForCurrentThread() - a0;
+            if (Measuring) AllocBytes += Math.Max(0, HitFeel.AllocNow() - a0);
         }
 
         static void AddNumber(Vector3 at, int amount, PlayerController by, Kind kind, bool big, CombatWorld world)
@@ -113,10 +113,18 @@ namespace LastBell.Run.Presentation
 
         // allocation check (RunAutoTest.Presentation): bytes allocated inside this feature's per-frame and per-hit code
         public static bool Measuring; public static long AllocBytes; public static int MeasuredFrames;
+        // bytes allocated so far: the per-thread counter where the runtime reports it, else the managed heap in use (this Mono
+        // player reports 0 per thread). A collection in between reads negative and is ignored by the callers.
+        static int threadCounter = -1;
+        public static long AllocNow()
+        {
+            if (threadCounter < 0) { long t0 = GC.GetAllocatedBytesForCurrentThread(); var probe = new byte[8192]; threadCounter = GC.GetAllocatedBytesForCurrentThread() - t0 >= 8192 && probe.Length > 0 ? 1 : 0; }
+            return threadCounter == 1 ? GC.GetAllocatedBytesForCurrentThread() : GC.GetTotalMemory(false);
+        }
 
         void Update()
         {
-            long a0 = Measuring ? GC.GetAllocatedBytesForCurrentThread() : 0;
+            long a0 = Measuring ? HitFeel.AllocNow() : 0;
             float dt = Time.unscaledDeltaTime;
             if (Stopped && Time.unscaledTime >= stopUntil) CharacterPresenter.GlobalAnimScale = 1;
             for (int i = 0; i < PoolSize; i++)
@@ -128,7 +136,7 @@ namespace LastBell.Run.Presentation
             }
             if (flash > 0) { flashAge += dt; flash = Mathf.MoveTowards(flash, 0, dt / FlashLife); }
             WatchPlayers();
-            if (Measuring) { AllocBytes += GC.GetAllocatedBytesForCurrentThread() - a0; MeasuredFrames++; }
+            if (Measuring) { AllocBytes += Math.Max(0, HitFeel.AllocNow() - a0); MeasuredFrames++; }
         }
 
         void WatchPlayers()
@@ -209,12 +217,12 @@ namespace LastBell.Run.Presentation
         void OnGUI()
         {
             if (d == null || d.World == null || Event.current.type != EventType.Repaint) return;
-            long a0 = Measuring ? GC.GetAllocatedBytesForCurrentThread() : 0;
+            long a0 = Measuring ? HitFeel.AllocNow() : 0;
             GUI.depth = 5;   // under RunHud's panels and cards (depth 0)
             Styles();
             DrawPlayerFeedback();
             DrawNumbers();
-            if (Measuring) AllocBytes += GC.GetAllocatedBytesForCurrentThread() - a0;
+            if (Measuring) AllocBytes += Math.Max(0, HitFeel.AllocNow() - a0);
         }
 
         void DrawPlayerFeedback()

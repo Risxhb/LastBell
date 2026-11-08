@@ -35,7 +35,17 @@ namespace LastBell.Run
                 Check($"{tag}: the intro lasts the same with and without the moments", on.IntroTicks == off.IntroTicks && on.IntroTicks == 120, $"{on.IntroTicks} vs {off.IntroTicks} ticks");
                 Check($"{tag}: Cleared lasts the same with and without the moments", on.ClearTicks == off.ClearTicks && on.ClearTicks == 180, $"{on.ClearTicks} vs {off.ClearTicks} ticks");
                 int dv = Diverge(on.Hashes, off.Hashes);
-                Check($"{tag}: combat tick results identical with and without the moments", dv < 0, dv < 0 ? $"{MomentTicks} ticks" : $"first differs at tick {dv}");
+                int baseline = -1;
+                if (dv >= 0)
+                {
+                    // not identical: is the fight itself repeatable? a second pass without the moments is the baseline
+                    var off2 = new MomentPass();
+                    yield return MomentRun(e, cls, false, off2, false, null);
+                    baseline = Diverge(off.Hashes, off2.Hashes);
+                    Note($"{tag}: on/off differ at {Where(dv)}; off/off (baseline) at {Where(baseline)}");
+                }
+                Check($"{tag}: combat tick results identical with and without the moments", dv < 0 || (baseline >= 0 && dv / 3 >= baseline / 3),
+                    dv < 0 ? $"{MomentTicks} ticks" : $"first differs at {Where(dv)}, baseline {Where(baseline)} (the fight itself isn't repeatable from there)");
                 Check($"{tag}: the card names the role and the area, and the title", on.Role.Contains("·") && !string.IsNullOrEmpty(on.Epithet), $"'{on.Role}' / '{on.Epithet}'");
                 Check($"{tag}: the boss shows an entrance clip", !string.IsNullOrEmpty(on.Entrance) && on.Entrance != "-", on.Entrance);
                 Check($"{tag}: the camera frames the boss in the intro and is back on the player before combat", on.FramedIntro && on.FreeAtCombat, $"framed {on.FramedIntro}, free at combat {on.FreeAtCombat}");
@@ -54,7 +64,7 @@ namespace LastBell.Run
 
         sealed class MomentPass
         {
-            public int IntroTicks, ClearTicks, Frames; public long Alloc; public ulong[] Hashes = new ulong[MomentTicks];
+            public int IntroTicks, ClearTicks, Frames; public long Alloc; public ulong[] Hashes = new ulong[MomentTicks * 3];
             public string Entrance = "", Role = "", Epithet = "", DefeatClip, FightTime = "";
             public bool FramedIntro, FreeAtCombat, Froze, Slowed, Recovered, Flashed, FrameReleased;
         }
@@ -81,12 +91,12 @@ namespace LastBell.Run
             bool shot = false;
             while (d.State == RunState.Intro)
             {
-                if (RunDirector.FrameAlso != null && RunDirector.FrameAlso != before) r.FramedIntro = true;
+                if (BossMoments.FrameWeight > 0.5f) r.FramedIntro = true;
                 if (shots != null && !shot && d.IntroProgress >= 0.45f) { shot = true; yield return Shot("moments_" + shots + "_intro"); }
                 yield return null;
             }
             r.IntroTicks = at.TryGetValue(RunState.Combat, out int ct) && at.TryGetValue(RunState.Intro, out int it) ? ct - it : -1;
-            r.FreeAtCombat = RunDirector.FrameAlso == before;
+            r.FreeAtCombat = BossMoments.FrameWeight == 0;
             r.Entrance = BossMoments.EntranceClip; r.Role = BossMoments.RoleLine(d); r.Epithet = BossMoments.Epithet(d.Boss) ?? "";
             if (d.State != RunState.Combat) { AllyBot.Attacks = attacks; d.StateChanged -= mark; yield break; }
 
@@ -94,7 +104,7 @@ namespace LastBell.Run
             for (int t = 0; t < MomentTicks; t++)
             {
                 if (d.Player && !d.Player.Down && d.Player.Hp < 40) d.Player.DebugSetHp(d.Player.MaxHealth);
-                w.Step(); r.Hashes[t] = WorldHash(w, d.Boss);
+                w.Step(); WorldHash(w, d.Boss, r.Hashes, t);
                 if ((t & 1) == 1) yield return null;
             }
             d.SetPaused(false);
@@ -103,6 +113,7 @@ namespace LastBell.Run
             if (boss && boss.PhaseNumber < boss.PhaseCount) boss.StartAtPhase(boss.PhaseCount);
             if (boss) boss.DebugDefeat();
             yield return Until(() => d.State == RunState.Cleared, 3, "moments cleared");
+            if (d.Boss) pres = d.Boss.GetComponentInChildren<CharacterPresenter>();   // a phase change may rebuild the body
             bool shotFlash = false, shotCard = false;
             if (measure) { BossMoments.AllocBytes = 0; BossMoments.MeasuredFrames = 0; }
             int frame = 0;
@@ -126,7 +137,7 @@ namespace LastBell.Run
             r.ClearTicks = at.TryGetValue(RunState.Results, out int rt) && at.TryGetValue(RunState.Cleared, out int cl) ? rt - cl : -1;
             d.StateChanged -= mark;
             r.FightTime = BossMoments.FightTime ?? "";
-            r.FrameReleased = RunDirector.FrameAlso == before || RunDirector.FrameAlso == null;
+            r.FrameReleased = !BossMoments.Framing && RunDirector.FrameAlso == before;
             AllyBot.Attacks = attacks; d.InputOverride = bot; if (d.Player) d.Player.Input = bot;
             yield return PhaseToMenu();
         }

@@ -15,6 +15,7 @@ namespace LastBell.Run.Presentation
     // LAN clients poll the replicated run state each frame, so they get the same moments (the host's clips come through the
     // replicated pose; a client never starts a clip itself).
     // Sound lane hooks: IntroStarted, NameLanded, DefeatMoment (C# events, presentation thread).
+    [DefaultExecutionOrder(9500)]
     public sealed class BossMoments : MonoBehaviour
     {
         public static event Action<BossEncounter> IntroStarted, NameLanded, DefeatMoment;
@@ -26,7 +27,12 @@ namespace LastBell.Run.Presentation
         RunDirector d;
         RunState seenState = RunState.Menu; BossEncounter seenBoss; int combatStartTicks;
         float defeatAt = -1; bool landed, entranceChecked; CharacterPresenter bossPresenter;
-        Func<Vector3?> myFrame, savedFrame;
+        // camera framing: a translation added after the director's camera (and removed after rendering, like CameraShake), so
+        // the camera's rotation never changes. Movement input is mapped through the camera's flattened forward, and even a
+        // tiny pitch change rounds that vector differently, so RunDirector.FrameAlso (which pulls the offset back) is not used.
+        bool frameWant; Vector3 applied; Camera cam;
+        public static float FrameWeight { get; private set; }
+        public static bool Framing => Instance && Instance.frameWant;
 
         // read by RunHud's cards and the tests
         public static string EntranceClip { get; private set; }     // the clip the boss showed at its entrance ("" = none)
@@ -41,22 +47,40 @@ namespace LastBell.Run.Presentation
         public static int Intros, Defeats;
         public static BossMoments Instance { get; private set; }
 
-        void Awake() { d = GetComponent<RunDirector>(); Instance = this; myFrame = FrameBoss; }
-        void OnDestroy() { if (Instance == this) Instance = null; ReleaseFrame(); }
+        void Awake() { d = GetComponent<RunDirector>(); Instance = this; }
+        void OnEnable() => UnityEngine.Rendering.RenderPipelineManager.endCameraRendering += Restore;
+        void OnDisable() { UnityEngine.Rendering.RenderPipelineManager.endCameraRendering -= Restore; Unshift(); FrameWeight = 0; }
+        void OnDestroy() { if (Instance == this) Instance = null; }
+        void TakeFrame() => frameWant = true;
+        void ReleaseFrame() => frameWant = false;
+        void Restore(UnityEngine.Rendering.ScriptableRenderContext ctx, Camera c) { if (c == cam) Unshift(); }
+        void Unshift() { if (cam && applied != Vector3.zero) cam.transform.position -= applied; applied = Vector3.zero; }
 
-        Vector3? FrameBoss() { var b = d ? d.Boss : null; return b ? SimSmoother.SimPosition(b.transform) : (Vector3?)null; }
-        void TakeFrame() { if (RunDirector.FrameAlso != myFrame) { savedFrame = RunDirector.FrameAlso; RunDirector.FrameAlso = myFrame; } }
-        void ReleaseFrame() { if (RunDirector.FrameAlso == myFrame) RunDirector.FrameAlso = savedFrame; savedFrame = null; }
+        // after RunDirector.LateUpdate and before CameraShake (10000): shift toward the boss and back a little, eased
+        void LateUpdate()
+        {
+            Unshift();
+            float dt = Time.unscaledDeltaTime;
+            FrameWeight = Mathf.MoveTowards(FrameWeight, frameWant ? 1 : 0, dt / 0.4f);
+            cam = Camera.main;
+            var b = d ? d.Boss : null; var p = d ? d.Player : null;
+            if (FrameWeight <= 0 || !cam || !b || !p || RunDirector.ShotCamera.HasValue) return;
+            float w = FrameWeight * FrameWeight * (3 - 2 * FrameWeight);
+            var to = Vector3.ProjectOnPlane(SimSmoother.SimPosition(b.transform) - p.transform.position, Vector3.up);
+            applied = (Vector3.ClampMagnitude(to * 0.42f, 6f) - cam.transform.forward * 2.5f) * w;
+            cam.transform.position += applied;
+        }
 
         // allocation check (RunAutoTest.BossMoments)
         public static bool Measuring; public static long AllocBytes; public static int MeasuredFrames;
 
         void Update()
         {
+            Unshift();   // before RunDirector.LateUpdate reads the camera (a batch run renders nothing, so Restore never runs)
             if (d == null) return;
             var state = d.State; var boss = d.Boss;
             if (state != seenState || boss != seenBoss) { OnState(seenState, state, boss); seenState = state; seenBoss = boss; return; }
-            long a0 = Measuring ? GC.GetAllocatedBytesForCurrentThread() : 0;
+            long a0 = Measuring ? HitFeel.AllocNow() : 0;
             bool on = PresentationSettings.BossMoments;
             float dt = Time.unscaledDeltaTime;
             Flash = Mathf.MoveTowards(Flash, 0, dt / FlashLife);
@@ -77,7 +101,7 @@ namespace LastBell.Run.Presentation
                 }
                 if (on && boss) TakeFrame(); else ReleaseFrame();
             }
-            if (Measuring) { AllocBytes += GC.GetAllocatedBytesForCurrentThread() - a0; MeasuredFrames++; }
+            if (Measuring) { AllocBytes += Math.Max(0, HitFeel.AllocNow() - a0); MeasuredFrames++; }
         }
 
         void OnState(RunState from, RunState to, BossEncounter boss)
