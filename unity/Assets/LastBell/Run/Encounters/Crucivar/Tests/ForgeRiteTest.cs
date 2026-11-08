@@ -110,6 +110,26 @@ namespace LastBell.Run
             t.Check("Hard: the reversed jets still reach the wall and stay live 4 s", t.Spawned("Furnace Spin").All(x => x.H.ActiveTicks == 240 && Mathf.Abs((Sim.Flat(x.H.Origin) + Sim.Dir(x.H.Yaw) * x.H.Length).magnitude - (CrucivarAbility.Rim + Hazard.Margin)) < 0.05f));
             t.Check("Hard: the loop runs to its end", !t.Boss.TestBusy);
             t.Check("Hard: one hit per instance", t.OneHitPerInstance());
+
+            // no mechanic aims at a reviver (review CRU-TARGET-OTHER): player 1 kneels over a downed player 0, then a brand and an order go out
+            yield return t.Setup(4, at: new[] { new Vector3(0, 0, 6), new Vector3(0.8f, 0, 6), new Vector3(0, 0, -9), new Vector3(-6, 0, -1.5f) });
+            if (t.Boss == null) yield break;
+            var rv = t.Party[1];
+            t.Party[0].ForceDown("Crucivar test: revive target");
+            for (int k = 0; k < 6; k++) { rv.DebugSetHp(PlayerController.MaxHp); yield return null; }
+            int brands0 = t.Spawned("Ember Brand").Count(), unaimed0 = t.Boss.Rite.UnaimedPours;
+            t.Boss.Rite.EmberBrand();
+            t.Boss.Rite.CastingOrder();
+            yield return t.Ticks(1);
+            var brands = t.Spawned("Ember Brand").Skip(brands0).ToList();
+            var pourOnRv = t.Boss.Rite.Order.IndexOf(rv);
+            t.Check("Ember Brand gives an active reviver no brand (the other standing players still get one)", rv.Reviving == t.Party[0] && brands.Count == 2
+                && brands.All(b => Sim.Flat(b.H.Origin - rv.transform.position).magnitude > 1f), $"reviving {rv.Reviving == t.Party[0]}, brands {brands.Count}");
+            t.Check("Casting Order does not aim its pour at an active reviver (a fixed line instead, same pour count)", pourOnRv >= 0 && t.Boss.Rite.UnaimedPours - unaimed0 == 1
+                && t.Spawned("Pour ").Count(x => !x.Source.Contains("Channel")) >= t.Boss.Rite.Order.Count, $"order slot {pourOnRv}, unaimed {t.Boss.Rite.UnaimedPours - unaimed0}");
+            t.W.ClearTransient();
+            t.Party[0].DebugRevive();
         }
+
     }
 }

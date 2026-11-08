@@ -88,7 +88,10 @@ namespace LastBell.Run
         internal void EmberBrand()
         {
             Boss.Presenter?.Action("EmberBrand", T(BrandLand));   // body clips are visual only (crucivar_v4_clips.py), stretched to the telegraph
-            foreach (var p in Standing())
+            // revivers get no brand; with nobody else to brand, one untracked brand lands in front of him instead
+            var carriers = Aimable();
+            if (carriers.Count == 0 && Standing().Count > 0) { UnaimedBrand(); return; }
+            foreach (var p in carriers)
             {
                 var owner = p;
                 var h = new Hazard
@@ -96,7 +99,7 @@ namespace LastBell.Run
                     Source = "Ember Brand", AttackId = "crucivar.ember_brand", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Flat(p.transform.position),
                     Radius = BrandRadius, LockAt = T(BrandLand - BrandFreeze), ResolveAt = T(BrandLand), Damage = BrandDmg, Knockback = 0,
                 };
-                h.Track = hz => { if (!owner.Down) hz.Origin = Flat(owner.transform.position); };   // until LockAt
+                h.Track = hz => { if (!owner.Down && !Reviver(owner)) hz.Origin = Flat(owner.transform.position); };   // until LockAt; stays put while its carrier revives
                 h.Includes = q => q != owner && h.Contains(q.transform.position);   // the carrier is never hit by its own brand
                 h.OnResolve = hz =>
                 {
@@ -109,6 +112,28 @@ namespace LastBell.Run
                 };
                 W.Hazards.Spawn(h);
             }
+        }
+
+        public int UnaimedBrands { get; private set; }
+        void UnaimedBrand()
+        {
+            UnaimedBrands++;
+            var h = new Hazard
+            {
+                Source = "Ember Brand", AttackId = "crucivar.ember_brand", Shape = HazardShape.Circle, Kind = HazardKind.Ground,
+                Origin = Flat(Boss.transform.position) + Sim.Dir(Boss.transform.eulerAngles.y) * 6f,
+                Radius = BrandRadius, LockAt = 0, ResolveAt = T(BrandLand), Damage = BrandDmg, Knockback = 0,
+            };
+            h.OnResolve = hz =>
+            {
+                W.BossFx.SlagSplash(hz.Origin, hz.Radius);
+                Pools.Add(W.Hazards.Spawn(new Hazard
+                {
+                    Source = "Brand Pool", AttackId = "crucivar.ember_brand", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = hz.Origin, Radius = PoolRadius,
+                    LockAt = 0, ResolveAt = Sim.Ticks(3600), BurnPerSecond = PoolBurn,
+                }));
+            };
+            W.Hazards.Spawn(h);
         }
 
         // the phase ends: every brand pool cools at once
@@ -196,19 +221,23 @@ namespace LastBell.Run
                     : list.Skip(loops % list.Count).Concat(list.Take(loops % list.Count)).Take(4).ToList();
             }
             NumeralsShown = !memory;
+            // a pour whose player is reviving as it is cast (fresh or a memory recast) is not aimed: it takes a fixed line and
+            // shows no numeral; the pour count and timings stay the same
+            var targets = Order.Select(p => p != null && !Reviver(p) ? p : null).ToList();
             Boss.Presenter?.Action("CastingOrder", T(PourLead + PourGap * 3 + 0.5f));   // four tips, one per pour I-IV (fewer pours: the first ones line up)
             var origin = Flat(Boss.transform.position);
-            for (int k = 0; k < Order.Count; k++)
+            for (int k = 0; k < targets.Count; k++)
             {
-                var target = Order[k];
+                var target = targets[k];
                 int resolve = T(PourLead + PourGap * k), lockAt = resolve - T(PourLockBefore);
                 var h = new Hazard
                 {
                     Source = "Pour " + new[] { "I", "II", "III", "IV" }[k], AttackId = "crucivar.casting_order", Shape = HazardShape.Lane, Kind = HazardKind.Strike, Origin = origin,
                     Width = PourWidth, LockAt = lockAt, ResolveAt = resolve, Damage = PourDmg, Knockback = 1f, Yaw = Boss.transform.eulerAngles.y,
                 };
-                Aim(h, target);
-                h.Track = hz => { if (!target.Down) Aim(hz, target); };
+                if (target != null) Aim(h, target);
+                else { h.Yaw = Boss.transform.eulerAngles.y + 90f * k; ToWall(h); UnaimedPours++; }   // unaimed: a fixed line
+                h.Track = hz => { if (target != null && !target.Down && !Reviver(target)) Aim(hz, target); };   // never follows a reviver
                 h.OnResolve = hz =>
                 {
                     W.BossFx.StripStamp(hz.Origin, hz.Yaw, hz.Length, hz.Width);
@@ -219,7 +248,7 @@ namespace LastBell.Run
                     });
                 };
                 W.Hazards.Spawn(h);
-                if (NumeralsShown)
+                if (NumeralsShown && target != null)
                 {
                     ForgeRiteNumeral.Show(W, h, target, k + 1);
                     if (CrucivarEncounter.NetOn) CrucivarEncounter.Net("Crucivar.PourNumeral", target, k + 1, h.Source);   // the client hangs it on the stand-in
@@ -227,6 +256,8 @@ namespace LastBell.Run
             }
             Boss.Rig.Pour(true);
         }
+
+        public int UnaimedPours { get; private set; }
 
         // a lane from the boss that always ends at the arena wall
         static void ToWall(Hazard h) { float t = WallDist(h.Origin, Sim.Dir(h.Yaw)); h.Length = t > 0 ? t : Far * 2; }

@@ -1,5 +1,5 @@
 {
-  "source": "ability-icons commit 0d0555a (art/mechanic-icons-20261022), approved by Chzy18 2026-10-23; ids, names, tags and shapes from docs/boss-attack-icons/<boss>/manifest.json; this copy carries the Aurelion attacks (5 approved 2026-10-23; errant_planets, falling_meridians and sunspots added 2026-11-07 from Codex work/attack-icons-20261106) plus Codex's 11 Sylvara v3 icons (work/attack-icons-20261102), approved by Chzy18 2026-11-02; icon bullet counts are approximate, so always show the name with the icon; Crucivar v4: Codex attack icons (work/attack-icons-20261102), accepted by Chzy18 2026-11-02; Tower Slag reuses the Ember Brand icon and Molten Overflow the Furnace Eruption icon, each with its own label (normal Bellkeeper v2 is retired)",
+  "source": "ability-icons commit 0d0555a (art/mechanic-icons-20261022), approved by Chzy18 2026-10-23: the 5 original Aurelion attacks; Aurelion's errant_planets, falling_meridians and sunspots added 2026-11-07 (Codex work/attack-icons-20261106); Codex's 11 Sylvara v3 icons (work/attack-icons-20261102), approved by Chzy18 2026-11-02; Crucivar v4: Codex attack icons (work/attack-icons-20261102), accepted by Chzy18 2026-11-02; Tower Slag reuses the Ember Brand icon and Molten Overflow the Furnace Eruption icon, each with its own label. Icon bullet counts are approximate, so always show the name with the icon.",
   "attacks": [
     {
       "id": "aurelion.meridian_lances",
@@ -17,7 +17,7 @@
       "bossName": "Aurelion",
       "name": "Starfall Mirror",
       "tag": "Ground",
-      "shape": "Player-centred circles plus reflections through arena centre; r 2.2 (1.8 at N≥5).",
+      "shape": "Player-centred circles plus reflections through arena centre; r 2.2 (1.8 at Nâ‰¥5).",
       "icon": "aurelion_starfall_mirror",
       "aliases": []
     },
@@ -37,7 +37,7 @@
       "bossName": "Aurelion",
       "name": "Orrery Closing",
       "tag": "Ground",
-      "shape": "Outer rim annulus r≥8.5 plus filled crown circle r3.6 at boss; safe band between.",
+      "shape": "Outer rim annulus râ‰¥8.5 plus filled crown circle r3.6 at boss; safe band between.",
       "icon": "aurelion_orrery_closing",
       "aliases": []
     },

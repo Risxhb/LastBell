@@ -9,7 +9,7 @@ namespace LastBell.Run
     // hit and, when the killing blow is a catalogued attack, shows its icon (screenshots with the details tooltip pinned).
     public sealed partial class RunAutoTest
     {
-        // the Aurelion IDs among the 20 Chzy18 approved on 2026-10-23 (ability-icons 0d0555a), the 11 Sylvara v3 IDs approved on
+        // the 5 original Aurelion IDs among the 20 Chzy18 approved on 2026-10-23 (ability-icons 0d0555a), the 3 Aurelion IDs added on 2026-11-07, the 11 Sylvara v3 IDs approved on
         // 2026-11-02 and the Crucivar v4 icons accepted on 2026-11-02 (both work/attack-icons-20261102), written out here so the
         // catalog can't drift unnoticed. Normal Bellkeeper v2 is retired.
         static readonly string[] ApprovedAttackIds =
