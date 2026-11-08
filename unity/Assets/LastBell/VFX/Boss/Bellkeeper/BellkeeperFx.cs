@@ -29,6 +29,9 @@ namespace LastBell.VFX
         Mesh cylinder;
         FxParticles sparks, dust, motes;
         readonly List<Telegraph> telegraphs = new List<Telegraph>();
+        // Read-only presentation inventory for LAN replication; combat continues to own all timing and hit tests.
+        internal IReadOnlyList<Telegraph> LiveTelegraphs => telegraphs;
+        static int networkTelegraphId;
         readonly List<Burst> bursts = new List<Burst>();
         readonly Stack<Burst> burstPool = new Stack<Burst>();
         TrailRenderer trail;
@@ -49,6 +52,7 @@ namespace LastBell.VFX
             sparks = MakeParticles("Sparks", addMat, 1, Gold, Amber, 0.6f);
             dust = MakeParticles("Dust", alphaMat, 1, new Color(0.30f, 0.24f, 0.36f), new Color(0.62f, 0.52f, 0.66f), 0f);
             motes = MakeParticles("Motes", addMat, 1, Brass, Teal, 0f);
+            InitDevour();
             for (int i = 0; i < 12; i++) burstPool.Push(NewBurst());   // warm pool: no instantiation mid-fight (§11)
             CameraShake.Ensure();
         }
@@ -65,6 +69,9 @@ namespace LastBell.VFX
             internal GameObject go; internal MeshRenderer mr; internal MaterialPropertyBlock mpb = new MaterialPropertyBlock();
             internal float flash = -1, lockFlash, maxFade = 1;
             internal bool locked;
+            internal int networkId, networkShape;
+            internal float networkRadius, networkInner, networkHalf;
+            internal bool networkTinted;
             public float FlashScale = 1;   // per-telegraph resolve-flash strength (1 = shared default); presentation only
             // opt-in: on resolve the fill drops at once to a faint desaturated ivory and clears within 0.15 s, and the
             // telegraph sorts under live ones, so a spent area never looks more dangerous than the next live warning
@@ -75,7 +82,7 @@ namespace LastBell.VFX
             public void Lock() { if (!locked) { locked = true; lockFlash = 1; if (LockOnTop && mr.sortingOrder < 1) mr.sortingOrder = 1; } }
             public void Resolve() { flash = 0; }
             public void Expire() { if (flash < 0) flash = 0.1f; }   // fades out with no damage flash (cooled slag)
-            public void Tint(Color fill, Color border) { mpb.SetColor(PFill, fill); mpb.SetColor(PBorder, border); }
+            public void Tint(Color fill, Color border) { networkTinted = true; mpb.SetColor(PFill, fill); mpb.SetColor(PBorder, border); }
             // a state region, not a warning: a flat fill at this opacity (Severance's Night shadow); 0 = the normal telegraph fill
             public void Shade(float opacity) { mpb.SetFloat(PShade, Mathf.Clamp01(opacity)); }
             // area motif inside the shape (Reference/Telegraph-Style v2): 0 = the per-shape Bellkeeper identity, 1 = Skyward Spire
@@ -84,7 +91,7 @@ namespace LastBell.VFX
             public void Friendly(Color rim) { mpb.SetFloat(PMemory, 1); Tint(rim * 0.35f, rim); maxFade = 1; }
             // cut-out discs (x, z, radius in world metres, up to 6): the shape minus them; presentation only
             public void Holes(Vector4[] holes, int count) { if (holeBuf == null) holeBuf = new Vector4[6]; for (int k = 0; k < 6; k++) holeBuf[k] = k < count ? holes[k] : Vector4.zero; mpb.SetVectorArray(PHoles, holeBuf); mpb.SetFloat(PHoleCount, Mathf.Min(count, 6)); }
-            Vector4[] holeBuf;
+            internal Vector4[] holeBuf;
             // draw order among telegraphs (higher draws over lower): a persistent edge or a locked strike over tracking fills
             public int Order { get => mr.sortingOrder; set => mr.sortingOrder = value; }
             // opt-in: on its lock the telegraph moves above unlocked ones (Aurelion, readability A4: locked edges first)
@@ -93,6 +100,8 @@ namespace LastBell.VFX
             public void Memory() { mpb.SetFloat(PMemory, 1); Tint(new Color(0.35f, 0.38f, 0.45f), new Color(0.95f, 0.9f, 0.78f)); maxFade = 0.55f; }
             // removed without a resolve flash (the memory turning into its live warning, or being erased)
             public void Dismiss() { if (flash < 0) flash = 0.2f; }
+            // never drawn (a hazard with Hidden set); it still ages and is cleaned up like any telegraph
+            public void Hide() { go.SetActive(false); }
             // draw only over the floor disc (radius 0 = no clip); presentation only, the hazard owns the hit test
             public void Clip(Vector3 centre, float radius) { mpb.SetFloat(PClipRadius, radius); mpb.SetVector(PClipCentre, new Vector4(centre.x, centre.z, 0, 0)); }
         }
@@ -102,7 +111,7 @@ namespace LastBell.VFX
 
         Telegraph NewTelegraph(int shape, float radius, float inner, float half, Mesh quad)
         {
-            var t = new Telegraph { go = new GameObject("Telegraph") };
+            var t = new Telegraph { go = new GameObject("Telegraph"), networkId = ++networkTelegraphId, networkShape = shape, networkRadius = radius, networkInner = inner, networkHalf = half };
             t.go.transform.SetParent(transform, false);
             t.go.AddComponent<MeshFilter>().sharedMesh = quad;
             t.mr = t.go.AddComponent<MeshRenderer>(); t.mr.sharedMaterial = telegraphMat;
@@ -223,7 +232,7 @@ namespace LastBell.VFX
 
         // Bell Sweep: a bright arc front sweeps across the locked cone from the boss's right edge to its left, then erodes.
         public void SweepResolve(Vector3 origin, float yaw, float radius, float halfAngle)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Boss, "SweepResolve", new object[] { origin, yaw, radius, halfAngle });
             var mesh = FxMeshes.Sector(0.8f, radius, halfAngle);
             Play(mesh, true, alphaMat, origin + Vector3.up * 0.08f, yaw, 0.42f, (b, u) =>
             {
@@ -243,7 +252,7 @@ namespace LastBell.VFX
 
         // Hollow Toll: a shock front runs out through the annulus with a short rising wall, dust kicks up at the rim.
         public void TollResolve(Vector3 centre, float inner, float outer)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Boss, "TollResolve", new object[] { centre, inner, outer });
             var c = new Vector3(centre.x, 0.06f, centre.z);
             Play(FxMeshes.Annulus(inner, outer), true, alphaMat, c, 0, 0.5f, (b, u) =>
             {
@@ -263,7 +272,7 @@ namespace LastBell.VFX
 
         // Pendulum Charge: a flat streak follows the boss down the lane; the landing stomps a ring and dust.
         public void ChargeTrail(Transform boss, bool on)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Boss, "ChargeTrail", new object[] { boss, on });
             if (trail == null)
             {
                 var go = new GameObject("Charge trail"); go.transform.SetParent(transform, false);
@@ -282,7 +291,7 @@ namespace LastBell.VFX
             trail.emitting = on;
         }
         public void ChargeLand(Vector3 pos)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Boss, "ChargeLand", new object[] { pos });
             var c = new Vector3(pos.x, 0.06f, pos.z);
             Play(FxMeshes.Annulus(0.6f, 3.2f), true, alphaMat, c, 0, 0.4f, (b, u) =>
             {
@@ -296,7 +305,7 @@ namespace LastBell.VFX
 
         // Shattered Chime: a column of resonant light drops into the marker and shatters outward.
         public void ChimeResolve(Vector3 pos, float radius)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Boss, "ChimeResolve", new object[] { pos, radius });
             var c = new Vector3(pos.x, 0.06f, pos.z);
             Play(cylinder, false, addMat, c, 0, 0.35f, (b, u) =>
             {
@@ -315,7 +324,7 @@ namespace LastBell.VFX
 
         // A hit on the boss (impact table entry: melee on brass): gold sparks thrown back toward the attacker and a flash.
         public void BossHit(Vector3 point)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Boss, "BossHit", new object[] { point });
             sparks.Emit(point, Vector3.zero, 1.1f, 0.1f);
             var back = Camera.main ? -Camera.main.transform.forward : Vector3.up;
             Sparks(point, (back + Vector3.up * 0.5f).normalized, 12, 0.8f, 6, 0.12f, 0.35f);
@@ -323,7 +332,7 @@ namespace LastBell.VFX
 
         // The player is hit by a boss attack: a coral burst at their chest and a shake.
         public void PlayerHit(Vector3 feet)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Boss, "PlayerHit", new object[] { feet });
             var c = feet + Vector3.up * 1.0f;
             Play(cylinder, false, addMat, new Vector3(feet.x, 0.06f, feet.z), 0, 0.25f, (b, u) =>
             {
@@ -336,7 +345,7 @@ namespace LastBell.VFX
 
         // Potion: rising teal-gold rings around the player and motes drifting up (heal language: pulses, never a filled disc).
         public void PotionHeal(Transform who)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Boss, "PotionHeal", new object[] { who });
             var p = who.position;
             for (int k = 0; k < 3; k++)
             {
@@ -372,7 +381,7 @@ namespace LastBell.VFX
         float amp, time, dur; Vector3 applied; Camera cam;
         public static void Ensure() { if (inst == null) inst = new GameObject("Camera shake").AddComponent<CameraShake>(); }
         public static void Shake(float amplitude, float duration)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Shake, "Shake", new object[] { amplitude, duration });
             if (BellkeeperFx.NoScreenshake) return; Ensure();
             if (amplitude >= inst.amp * (1 - inst.time / Mathf.Max(0.01f, inst.dur))) { inst.amp = amplitude; inst.dur = duration; inst.time = 0; }
         }

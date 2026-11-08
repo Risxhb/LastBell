@@ -4,7 +4,7 @@
 # export and glTFast import that is local +Z in Unity, which is how BrassFoundryArenaBuilder places them. Every asset is
 # real topology: chamfered blocks (bevel on the sharp edges only), carved wear (chipped bevels and a few deeper chips on
 # stone), stepped profiles, recessed windows, riveted straps. Materials are slots named for the Unity materials they map
-# to (Stone, Masonry, MasonryDark, Iron, Brass, DarkBrass, Plank, Roof, Chain, City, CityRoof, Slate, Glow, GlowDim,
+# to (Stone, RimStone, Masonry, MasonryDark, Iron, Brass, DarkBrass, Plank, Roof, Chain, City, CityRoof, Slate, Glow, GlowDim,
 # GlowWarm, GlowHot, Furnace); UVs are box-projected in metres to match the project's tiling textures.
 import bpy, bmesh, math, os, random, sys, zlib
 from mathutils import Vector, Matrix
@@ -17,7 +17,7 @@ os.makedirs(OUT, exist_ok=True)
 TAU = math.tau
 
 MATDEF = {  # viewport/preview colours only; Unity remaps every slot by name
-    'Stone': ((0.42, 0.40, 0.38), 0, 0.8, None), 'Masonry': ((0.50, 0.47, 0.45), 0, 0.85, None),
+    'Stone': ((0.42, 0.40, 0.38), 0, 0.8, None), 'RimStone': ((0.45, 0.44, 0.43), 0, 0.8, None), 'Masonry': ((0.50, 0.47, 0.45), 0, 0.85, None),
     'MasonryDark': ((0.33, 0.31, 0.30), 0, 0.85, None), 'Iron': ((0.22, 0.21, 0.20), 0.6, 0.55, None),
     'Brass': ((0.55, 0.40, 0.18), 0.85, 0.45, None), 'DarkBrass': ((0.32, 0.22, 0.12), 0.8, 0.55, None),
     'Plank': ((0.28, 0.24, 0.20), 0.1, 0.8, None), 'Roof': ((0.20, 0.19, 0.19), 0.5, 0.6, None),
@@ -188,38 +188,33 @@ def done(a): ASSETS.append(a.build())
 
 
 # ---------------------------------------------------------------- rim teeth ----
-def tooth(name, W, D, H, variant):
-    """A gear tooth of the furnace rim: wedge (narrower outward), top rising outward, heavy carved chamfers."""
-    a = Asset(name); wi = W / 2.0; ch = min(0.6, H * 0.45)
+def tooth(name, W, D, H, tier, variant):
+    """A merlon of the furnace rim, as in the reference: a squat stone block (flaring slightly outward, like a gear tooth)
+    with a 45° chamfer on its arena-facing top edge, a narrower second tier stepped back on the outer half, and a brass
+    cap on that tier. No straps or lid seams (they read as crates)."""
+    a = Asset(name); wi = W * 0.84; ch = H * 0.32
     width = lambda y: wi + (W - wi) * (-y / D)
-    prof = [(0, 0), (-D, 0), (-D, H), (-ch, H), (0, H - ch)]
-    a.add(prism_bm(prof, width), 'Stone', bevel=0.035, wear=0.012, cuts=4, seg=1, chips=9)
-    y0 = -D * 0.5  # capstone: a lighter, separately cut tier on the outer half
-    a.add(prism_bm([(y0, H), (-D + 0.08, H), (-D + 0.08, H + 0.3), (y0 - 0.1, H + 0.3)], lambda y: width(y) - 0.12), 'Masonry', bevel=0.03, wear=0.01, cuts=2, seg=1, chips=3)
-    hi = H; ztop = lambda y: H
-    if variant == 'band':  # riveted brass strap over the top and down both flanks
-        y = -D * 0.55; w = width(y) + 0.06; z = ztop(y)
-        a.box('DarkBrass', (w, 0.34, 0.09), (0, y, z + 0.02), bevel=0.02)
-        for sx in (-1, 1):
-            a.box('DarkBrass', (0.09, 0.34, z - 0.05), (sx * w / 2, y, (z - 0.05) / 2 + 0.02), bevel=0.02)
-            for k in range(3): a.rivet('Brass', (sx * (w / 2 + 0.03), y, 0.25 + k * (z - 0.4) / 2))
-    elif variant == 'stack':  # a smaller block stacked on the outer half, brass corner caps on the inner edge
-        y0, y1 = -D * 0.42, -D + 0.12; w0, w1 = width(y0) * 0.66, width(y1) * 0.66; z0, z1 = ztop(y0) - 0.04, ztop(y1) - 0.04; h = H * 0.42
-        P = [V((-w0 / 2, y0, z0)), V((-w1 / 2, y1, z1)), V((w1 / 2, y1, z1)), V((w0 / 2, y0, z0)),
-             V((-w0 / 2, y0, z0 + h)), V((-w1 / 2, y1, z1 + h * 1.08)), V((w1 / 2, y1, z1 + h * 1.08)), V((w0 / 2, y0, z0 + h))]
-        a.add(hexa_bm(P), 'Stone', bevel=0.06, wear=0.025, cuts=2, chips=2)
-        for sx in (-1, 1): a.box('Brass', (0.2, 0.2, 0.18), (sx * (width(-ch) / 2 - 0.06), -ch - 0.08, H - 0.06), bevel=0.03)
-    elif variant == 'rivets':  # iron plate on the outer end, a rivet row on the arena face
-        a.box('Iron', (W * 0.6, 0.55, 0.06), (0, -D + 0.32, H + 0.01), bevel=0.02)
-        for k in range(5): a.rivet('Iron', ((k - 2) * wi * 0.17, 0.02, (H - ch) * 0.5))
-    elif variant == 'cap':  # brass cap plate across the outer top
-        a.box('DarkBrass', (W * 0.8, 0.4, 0.05), (0, -D + 0.25, H + 0.01), bevel=0.015)
-        for sx in (-1, 1): a.rivet('Brass', (sx * W * 0.3, -D + 0.25, H + 0.05))
+    a.add(prism_bm([(0, 0), (-D, 0), (-D, H), (-ch, H), (0, H - ch)], width), 'RimStone', bevel=0.04, wear=0.012, cuts=4, seg=1, chips=7)
+    a.box('DarkBrass', (wi + 0.04, 0.08, 0.1), (0, 0.0, 0.12), bevel=0.02)  # worn brass kick plate along the foot
+    if tier:  # stepped second tier on the outer part, its own chamfer facing the arena, then a brass cap
+        y0, d2, h2 = -D * 0.38, D * 0.56, tier; w2 = lambda y: width(y) * 0.72; c2 = h2 * 0.4
+        a.add(prism_bm([(y0, H - 0.02), (y0 - d2, H - 0.02), (y0 - d2, H + h2), (y0 - c2, H + h2), (y0, H + h2 - c2)], w2), 'RimStone', bevel=0.035, wear=0.01, cuts=2, seg=1, chips=3)
+        cap_y, cap_d = y0 - d2 * 0.55, d2 * 0.75
+        a.add(prism_bm([(cap_y + cap_d / 2, H + h2), (cap_y - cap_d / 2, H + h2), (cap_y - cap_d / 2, H + h2 + 0.09), (cap_y + cap_d / 2 - 0.05, H + h2 + 0.09)], lambda y: w2(y) + 0.06), 'DarkBrass', bevel=0.02)  # rough aged bronze, not polished
+        for sx in (-1, 1): a.rivet('Brass', (sx * (w2(cap_y) / 2 - 0.08), cap_y, H + h2 + 0.11))
+    if variant == 'rivets':  # an iron band with a rivet row across the arena face
+        a.box('Iron', (wi * 0.9, 0.05, 0.12), (0, 0.01, (H - ch) * 0.55), bevel=0.015)
+        for k in range(5): a.rivet('Brass', ((k - 2) * wi * 0.19, 0.04, (H - ch) * 0.55))
+    elif variant == 'caps':  # brass corner caps on the chamfer's ends
+        for sx in (-1, 1): a.box('Brass', (0.16, 0.2, 0.16), (sx * (width(-ch) / 2 - 0.05), -ch - 0.05, H - 0.04), bevel=0.03)
+    elif variant == 'gauge':  # a small pressure gauge on the outer top
+        a.add(cyl_bm(0.05, H, H + 0.25, 10), 'Iron', T(width(-D * 0.8) * 0.28, -D * 0.82, 0))
+        a.add(lathe_bm([(0.15, -0.025), (0.15, 0.025), (0.12, 0.03), (0, 0.03)], 18), 'Brass', T(width(-D * 0.8) * 0.28, -D * 0.82, H + 0.33) @ RX(math.pi / 2))
     done(a)
 
 
-for v, var in (('A', 'band'), ('B', 'rivets'), ('C', 'band')): tooth('SM_Area2_RimTooth_Big_' + v, 2.1, 2.55, 1.3, var)
-for v, var in (('A', 'plain'), ('B', 'cap'), ('C', 'rivets')): tooth('SM_Area2_RimTooth_Small_' + v, 1.3, 1.7, 0.9, var)
+for v, var in (('A', 'rivets'), ('B', 'caps'), ('C', 'rivets')): tooth('SM_Area2_RimTooth_Big_' + v, 2.1, 1.9, 1.45, 0.8, var)
+for v, var in (('A', 'plain'), ('B', 'gauge'), ('C', 'caps')): tooth('SM_Area2_RimTooth_Small_' + v, 1.3, 1.3, 1.1, 0, var)
 
 
 # ---------------------------------------------------------------- corner towers ----
@@ -356,7 +351,7 @@ def wall(name, kind):
         a.add(cyl_bm(pr, 0, L, 12, caps=False), 'Iron', M)
         for t in (0.02, 0.5, 0.98): a.add(cyl_bm(pr * 1.45, L * t - 0.06, L * t + 0.06, 12), 'DarkBrass', M)
     if kind == 'hatch':  # furnace hatch on the channel face: brass frame, dim glow, bars
-        M = T(*polar(0, 18.6, -0.55)) @ RZ(0)
+        M = T(*polar(0, 18.6, 0.55)) @ RZ(0)  # above the molten surface (y = -0.7)
         a.box('DarkBrass', (1.0, 0.12, 0.85), (0, 0.04, 0), M, bevel=0.02)
         a.box('GlowDim', (0.72, 0.04, 0.58), (0, 0.11, 0), M)
         for k in range(4): a.box('Iron', (0.05, 0.05, 0.6), (-0.27 + k * 0.18, 0.14, 0), M)

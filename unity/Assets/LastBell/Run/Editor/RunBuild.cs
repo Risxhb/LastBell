@@ -24,7 +24,7 @@ namespace LastBell.Run.EditorTools
         }
 
         // Look-check props the area builders leave in their scenes; they don't belong in a fight.
-        static readonly string[] StripNames = { "ScaleReference_Vanguard", "TelegraphCheck", "TelegraphTest" };
+        static readonly string[] StripNames = { "ScaleReference_Tollbreaker", "TelegraphCheck", "TelegraphTest" };
 
         // Arena scenes that are generated rather than committed (Area 2 ignores its ~47 MB scene and meshes) are built first.
         static readonly System.Collections.Generic.Dictionary<string, System.Action> SourceBuilders = new System.Collections.Generic.Dictionary<string, System.Action>
@@ -99,7 +99,9 @@ namespace LastBell.Run.EditorTools
                 scenes = RunMaps.All.Select(m => m.RunScene).ToArray(),
                 locationPathName = OutPath(),
                 target = BuildTarget.StandaloneWindows64,
-                options = BuildOptions.None,
+                // -lastbellDevelopment: a development build, needed only to record the shader warm-up (Unity traces graphics
+                // states in development builds only; see ShaderWarmUp)
+                options = System.Environment.GetCommandLineArgs().Contains("-lastbellDevelopment") ? BuildOptions.Development : BuildOptions.None,
             };
             var report = BuildPipeline.BuildPlayer(opts);
             var s = report.summary;

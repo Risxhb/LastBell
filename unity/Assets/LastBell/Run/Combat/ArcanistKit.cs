@@ -42,7 +42,7 @@ namespace LastBell.Run
             return Vector3.up * (1.8f + 0.28f * Mathf.Cos(a)) + t.right * (0.62f + 0.45f * Mathf.Sin(a)) - t.forward * 0.15f;
         }
 
-        public sealed class Mark { public int Id; public Vector3 Pos; public int Left, Total; public bool Powered; public float Scale = 1; }   // Scale: Starfall's share
+        public sealed class Mark { public int Id; public Vector3 Pos; public int Left, Total; public bool Powered; public float Scale = 1; public int Linger; }   // Scale: Starfall's share; Linger: a Lingering Rune's second hit
         readonly List<Mark> sigils = new List<Mark>(), comets = new List<Mark>();
         int markIds;
 
@@ -67,6 +67,7 @@ namespace LastBell.Run
         public bool BeamActive => act == Act.DisBeam;
         public int BeamStep => beamTicks < disStep ? 1 : beamTicks < 2 * disStep ? 2 : 3;
         int disStep = DisStepTicks;   // Quick Carving shortens the steps (read when the beam starts)
+        int fadeT;                    // Overchannel: ticks since the last glyph faded while not channelling
         public void ItemGainGlyph() => GainGlyph();   // Glyph Brand
         public Vector3 BeamDir => beamDir;
         public int BeamDamage { get; private set; }          // dealt by the current or last beam
@@ -133,7 +134,7 @@ namespace LastBell.Run
         public override void ResetAll()
         {
             act = Act.None; t = 0; tapCd = disCd = sigCd = comCd = surgeCd = 0; buffered = -1;
-            Missiles = 0; LastVolley = 0; beamTicks = 0; BeamDamage = 0; blinking = false; Glyphs = 0; surgeLeft = surgeTotal = 0;
+            Missiles = 0; LastVolley = 0; beamTicks = 0; BeamDamage = 0; blinking = false; Glyphs = 0; fadeT = 0; surgeLeft = surgeTotal = 0;
             LastSigil = LastComet = 0; LastCometBullseye = false; LastSigilPowered = LastCometPowered = false; LastSurgeGlyphs = 0;
             sigils.Clear(); comets.Clear();
             MoveScale = 1; Velocity = Vector3.zero; FaceAim = false;
@@ -155,11 +156,31 @@ namespace LastBell.Run
                 {
                     var s = sigils[i]; sigils.RemoveAt(i);
                     bool hit = live && Sim.Flat(b.transform.position - s.Pos).magnitude <= Shop.ItemHooks.F(P, "a.sigil.radius", SigRadius) + b.BodyRadius;   // Wide Sigil
+                    if (s.Linger > 0)   // Lingering Rune: the rune's second hit, 2 s after the first
+                    {
+                        if (hit) W.DamageBoss(s.Linger, b.transform.position + Vector3.up * b.HitHeight, s.Powered ? "Rune Sigil (lingering)" : "Rune Sigil (lingering) (no glyph)", false);
+                        W.Fx.SigilExplode(s.Id, s.Pos, hit);
+                        continue;
+                    }
                     int dmg = s.Powered ? SigDamage : Mathf.RoundToInt(SigDamage * Unpowered);
                     LastSigil = hit ? W.DamageBoss(dmg, b.transform.position + Vector3.up * b.HitHeight, s.Powered ? "Rune Sigil" : "Rune Sigil (no glyph)", false) : 0;
                     LastSigilPowered = s.Powered;
                     W.Fx.SigilExplode(s.Id, s.Pos, hit);
+                    // Lingering Rune: the same rune (outline, as cast) stays where it was placed and goes off again
+                    float linger = Shop.ItemHooks.F(P, "a.sigil.linger", 0);
+                    if (linger > 0 && W.Boss != null && W.Boss.Solid)
+                    {
+                        var l = new Mark { Id = ++markIds, Pos = s.Pos, Left = Shop.ItemHooks.LingerTicks, Total = Shop.ItemHooks.LingerTicks, Powered = s.Powered, Linger = Mathf.Max(1, Mathf.RoundToInt(dmg * linger)) };
+                        sigils.Add(l); W.Fx.SigilPlace(P, l.Id, l.Pos, l.Total, l.Powered);
+                    }
                 }
+            // Overchannel: while he isn't channelling Disintegrate, a glyph fades every few seconds
+            int fade = Shop.ItemHooks.I(P, "a.glyph.fade", 0);
+            if (fade > 0 && Glyphs > 0 && act != Act.DisWind && act != Act.DisBeam)
+            {
+                if (++fadeT >= fade) { fadeT = 0; Glyphs--; W.Fx.GlyphSpend(P, Glyphs, P.transform.position + OrbOffset(P.transform)); }
+            }
+            else fadeT = 0;
             for (int i = comets.Count - 1; i >= 0; i--)
                 if (--comets[i].Left <= 0)
                 {
@@ -235,7 +256,7 @@ namespace LastBell.Run
                     P.transform.rotation = Quaternion.LookRotation(beamDir);
                     BeamTick();
                     // each completed damage step that hit the boss carves a glyph
-                    if (beamTicks % disStep == 0) { if (stepHit) GainGlyph(); stepHit = false; }
+                    if (beamTicks % disStep == 0) { if (stepHit) for (int g = Shop.ItemHooks.I(P, "a.dis.carve", 1); g > 0; g--) GainGlyph(); stepHit = false; }   // Overchannel: 2
                     if (!inp.Held(1) || beamTicks >= DisMax) EndBeam(false);
                     break;
                 case Act.DisEnd:
@@ -391,7 +412,7 @@ namespace LastBell.Run
         void PlaceSigil()
         {
             sigCd = SigCd;
-            var at = ClampAim(SigRange); bool powered = SpendGlyph(at); int arm = Surging ? SigArmSurge : SigArm;
+            var at = ClampAim(SigRange); bool powered = SpendGlyph(at); int arm = Shop.ItemHooks.I(P, "a.sigil.arm", Surging ? SigArmSurge : SigArm);   // Lingering Rune: 1.2 s
             var s = new Mark { Id = ++markIds, Pos = at, Left = arm, Total = arm, Powered = powered };
             sigils.Add(s); W.Fx.SigilPlace(P, s.Id, at, arm, powered);
             // Twin Sigil: a powered cast places a second sigil a short way along the aim
@@ -426,7 +447,6 @@ namespace LastBell.Run
             W.Fx.SurgeStart(P, LastSurgeGlyphs, surgeTotal);
         }
 
-        public override bool CanJump() => act == Act.None || act == Act.Tap || act == Act.BlinkIn;
 
         // Blink (shared dash): cancels unreleased casts. A Disintegrate windup or a Surge cast before its release refunds;
         // a running beam breaks (glyphs already carved are kept).

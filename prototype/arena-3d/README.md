@@ -10,7 +10,7 @@ A browser prototype for settling how the classes and the Bellkeeper should look 
   - Arcanist: tall collar, split robe tails, floating astrolabe and lenses, straight-line teal beams, and a rooted cast that lifts the astrolabe overhead.
   - Healer, shown as a "Chime Warden": ivory mantle, halo, tuning-fork staff, hovering chimes, dotted friendly rings. It comes with a training ally to keep alive.
 - **The Bellkeeper** (art bible §10): hooded bell torso, ivory mask with a single focal glow, a visible pendulum core, segmented arms and a broken halo. It acts out idle, windup (turns toward the attack, coral surge), resolve and recovery.
-- **Encounter:** by default the Bellkeeper v1.0 design (HP phases, Pendulum Charge, Shattered Chime, The Final Toll; see `docs/design/bellkeeper-v1-prototype.md`). Esc → Encounter switches to the v0.1 solo timeline from `docs/design/bellkeeper.md` (Echo marks, Sanctuary Peal, 4:00 Final Hour enrage).
+- **Encounter:** by default the retired Bellkeeper v1.0 design (HP phases, Pendulum Charge, Shattered Chime, The Final Toll; the game now has only the Bellkeeper Ultimate). Esc → Encounter switches to the v0.1 solo timeline from `docs/design/bellkeeper.md` (Echo marks, Sanctuary Peal, 4:00 Final Hour enrage).
 - **Telegraphs** are drawn in a shader from the exact simulation geometry (art bible §11). Each has a geometry layer, an identity pattern and a timing pulse.
 - **Failure cards** state what failed and why, with a small arena diagram. Guarded, immune and warded outcomes never read as "avoided".
 
@@ -18,7 +18,7 @@ A browser prototype for settling how the classes and the Bellkeeper should look 
 
 WASD move · mouse aims (Vanguard) · 1 / left mouse basic (hold) · 2 / right mouse technique · 3 signature · 4 guard · 5 dash (every class) · 6 heal target (Healer) · hold Shift self-target · R restart · Esc menu (boss health, start phase, invulnerable, knockout rule, ally, range rings, Pendulum Strikes, mouse aim, sound). Gamepad: left stick move, right stick aim, A basic, X technique, Y signature, RB guard, B dash. Standard-layout gamepads only; other HID devices (pedals, flight sticks) are ignored.
 
-The Vanguard is the 2.0 redesign (Clockblade Combo, Pendulum/Reversal Rush, Final Hour, Resonant Guard counters); see `docs/design/vanguard-v2-implementation.md`. `?autoplay=vanguard&inv` runs a test bot.
+The Vanguard was removed from the game (2 Nov). This page still uses its old figure as a stand-in model; the Unity game's class is the Tollbreaker.
 
 ## Limits
 

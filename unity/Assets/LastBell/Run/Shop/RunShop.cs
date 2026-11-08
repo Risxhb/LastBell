@@ -17,10 +17,10 @@ namespace LastBell.Run.Shop
         // per-encounter item state (ItemHooks), rebuilt at every encounter start: class state resets (design rules §3)
         public sealed class Live
         {
-            public int Openings, ValourUntil = -1, RallyUntil = -1, LightFeetUntil = -1, VolleyBoostUntil = -1;
-            public float ValourPct, RallyPct, Overflow;
-            public bool MomentumReady, MomentumHit, GraceReady, BlinkReady, RhythmOn;
-            public int RhythmCombos, Notes, RingHits, StruckNotes, LastDashAt = -100000;
+            public int ValourUntil = -1, CryUntil = -1, LightFeetUntil = -1, VolleyBoostUntil = -1, RivenUntil = -1, PaceUntil = -1;
+            public float ValourPct, CryPct, Overflow;
+            public bool GraceReady, BlinkReady, PaceNext;
+            public int PaceStacks, Notes, RingHits, StruckNotes, LastDashAt = -100000, LastBossHit = -100000;   // LastBossHit: Patient Bell
             public readonly List<int> Taps = new List<int>();
         }
         public Live L { get; private set; } = new Live();
@@ -49,19 +49,20 @@ namespace LastBell.Run.Shop
     {
         public const int StockSize = 6, MaxStock = 7, ClassSlots = 3, GeneralSlots = 2, SpecialSlot = 5, ExtraClassSlot = 6;
         public const int AreaBossPay = 150, MinibossPay = 100, BonusPay = 20, GiftCapPerVisit = 150, CoopTimerSeconds = 90;
-        // accepted by Chzy18 2026-10-28 (run-shop-plan §1): pay the area's 3 missing miniboss clears at its shop until minibosses join the run
+        // accepted by Chzy18 2026-10-28 (run-shop-plan §1): pay the area's 3 missing miniboss clears at its shop until minibosses
+        // join the run. Campaign runs (since 4 Nov) fight them and are paid per clear, so only a run without them gets the stand-in.
         public static bool StandInMinibossPay = true;
         // accepted by Chzy18 2026-10-28 (run-shop-plan §1): par times for the "cleared under par" bonus, seconds
         public const int AreaBossPar = 240, FinalBossPar = 360, MinibossPar = 150;
 
         public readonly int Seed;
+        public int Toll;                                  // the run's Toll (0 until the Toll ladder exists): gates the Toll items
         public readonly List<PlayerBuild> Slots = new List<PlayerBuild>();
         public int Visit { get; private set; }            // 1-based; 0 before the first shop
         public int TotalVisits { get; private set; }
         public bool Open { get; private set; }
         public bool FinalShop { get; private set; }
         public string NextBoss { get; private set; }
-        public int CrackUntil = -1; public float CrackPct; // Cracked Armour, boss-wide
         public int BrandUntil = -1, BrandHits; public PlayerController BrandOwner;   // Glyph Brand, boss-wide
         public readonly List<string> Ledger = new List<string>();   // earnings since the last shop, shown on the screen
         public readonly List<string> Log = new List<string>();      // every accepted request (tests, playtest reports)
@@ -80,11 +81,11 @@ namespace LastBell.Run.Shop
             Ledger.Add($"{label}  +{amount}");
             Log.Add($"pay {amount} ({label})");
         }
-        public void PayClear(string boss, bool final, bool nobodyDown, int seconds)
+        public void PayClear(string boss, bool final, bool nobodyDown, int seconds, bool miniboss = false)
         {
-            Pay(AreaBossPay, boss + " cleared");
+            Pay(miniboss ? MinibossPay : AreaBossPay, boss + " cleared");
             if (nobodyDown) Pay(BonusPay, "Nobody went down");
-            if (seconds <= (final ? FinalBossPar : AreaBossPar)) Pay(BonusPay, "Under par time");
+            if (seconds <= (miniboss ? MinibossPar : final ? FinalBossPar : AreaBossPar)) Pay(BonusPay, "Under par time");
         }
 
         // ---------------- visits ----------------
@@ -105,9 +106,9 @@ namespace LastBell.Run.Shop
 
         // ---------------- stock (spec §3) ----------------
         bool Offerable(PlayerBuild s, ItemDef d) => CanOffer(s, d) && Array.IndexOf(s.Stock, d) < 0;
-        // whether this item may ever be stocked for this player now (held, owned, solo value, partner class, own class)
+        // whether this item may ever be stocked for this player now (held, owned, Toll, solo value, partner class, own class)
         public bool CanOffer(PlayerBuild s, ItemDef d) =>
-            !d.Held && !s.Has(d.Id) && (d.OfferedSolo || !Solo) &&
+            !d.Held && !s.Has(d.Id) && d.MinToll <= Toll && (d.OfferedSolo || !Solo) &&
             (d.PartnerClass == null || ClassInParty(d.PartnerClass)) &&
             (d.Class == null || d.Class == s.ClassName);
         bool KeystoneAllowed(PlayerBuild s) => Visit >= 2 && s.Keystones < ItemCatalog.KeystonesPerRun;

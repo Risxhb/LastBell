@@ -43,13 +43,14 @@ namespace LastBell.Run
         public int Casts { get; private set; }
 
         public float SafeRadius => N <= 2 ? 3.0f : N <= 4 ? 3.5f : 4.5f;
-        int Reveal => Easy ? int.MaxValue : T(AurelionArgs.V4 ? RevealV4S : RevealS);
+        int Reveal => Easy ? int.MaxValue : T(RevealV4S);
         int First => T(FirstS);
         int Step => T(StepS);
         int Lead => Sim.Ticks(Easy ? LeadEasyS : LeadS);
         public int StrikeTick(int k) => First + k * Step;           // ticks from the reveal
         public int StrikeAt(int k) => RevealTick + StrikeTick(k) - 1;   // world tick strike k resolves on
         // the strike still to come at world tick `tick` (its safe disc is where to stand), or -1 when no cast is running
+        public override void Abort() { RevealTick = -1; CueVisible = false; }
         public int NextStrike(int tick)
         {
             if (RevealTick < 0) return -1;
@@ -77,7 +78,7 @@ namespace LastBell.Run
                 var rim = W.BossFx.Circle(r); rim.Place(Anchors[k], 0); rim.Motif(0); rim.Friendly(BrassRim); rim.Progress(1); rim.Order = 2; rims.Add(rim);
                 labels.Add(RunHud.Label(Anchors[k] + Vector3.up * 0.3f, Numerals[k], Ivory, 46));
             }
-            Glow(1.2f); Clip("MeridianAlignment", StrikeTick(count - 1));
+            Glow(1.2f); Clip("EclipticOrder", StrikeTick(count - 1));
 
             int t = 0;
             for (int k = 0; k < count; k++)

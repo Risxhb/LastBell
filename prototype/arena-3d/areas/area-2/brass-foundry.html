@@ -26,12 +26,13 @@ body.clean #tabs { display: none; }
 <script type="module">
 // Look study for Area 2, The Brass Foundry (foundry-env.js). ?view=game uses the Bellkeeper arena's gameplay camera,
 // ?view=hero copies the reference board's main painting, ?view=top its top view, ?tele drops a sample attack telegraph on the floor to check
-// that decoration stays quieter than attacks, ?spawns marks eight player spots, ?clean hides the tabs.
+// that decoration stays quieter than attacks, ?spawns marks four player spots, ?clean hides the tabs.
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const Q = new URLSearchParams(location.search), VIEW = Q.get('view') || 'game';
 if (Q.has('clean')) document.body.classList.add('clean');
@@ -47,13 +48,13 @@ window.THREE = THREE;
 await loadScript('foundry-env.js');
 const env = window.buildFoundryEnv(THREE, scene);
 
-// ---- the Vanguard for scale (characters session's model, loaded read-only) ----
+// ---- the Tollbreaker for scale (characters session's model, loaded read-only; 2.0 m tall) ----
 const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: o.metal ? 0.4 : 0.75, metalness: o.metal ? 0.7 : 0, side: o.side || THREE.FrontSide });
-const Gl = (c, k) => new THREE.MeshBasicMaterial({ color: new THREE.Color(c).multiplyScalar(k), toneMapped: false });
 const hero = new THREE.Group(); hero.position.set(-3.5, 0, 5.5); hero.rotation.y = Math.PI * 0.8; scene.add(hero);
-await loadScript('../../vanguard-model.js');
-if (typeof window.buildVanguardModel === 'function') { const v = window.buildVanguardModel(M, Gl); const obj = v.root || v; obj.scale.setScalar(1.2); obj.traverse(o => { if (o.isMesh) o.castShadow = true; }); hero.add(obj); }
-else { const c = new THREE.Mesh(new THREE.CapsuleGeometry(0.35, 1, 4, 12), M(0x2050cc)); c.position.y = 0.85; hero.add(c); }
+await loadScript('../../models/tollbreaker-glb.js');
+const tbModel = window.TOLLBREAKER_GLB_B64 && await new Promise(res => new GLTFLoader().parse(Uint8Array.from(atob(window.TOLLBREAKER_GLB_B64), c => c.charCodeAt(0)).buffer, '', g => res(g.scene), () => res(null)));
+if (tbModel) { tbModel.traverse(o => { if (o.isMesh) o.castShadow = true; }); hero.add(tbModel); }
+else { const c = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 1.2, 4, 12), M(0x2050cc)); c.position.y = 1.0; hero.add(c); }
 
 // ---- sample telegraph: a coral-red danger disc with a bright edge, like the reference's in-game panel ----
 let tele = null;
@@ -63,9 +64,9 @@ if (Q.has('tele')) {
   const edge = new THREE.Mesh(new THREE.RingGeometry(3.82, 4, 96).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: new THREE.Color(0xff6a3a).multiplyScalar(2), transparent: true, opacity: 0.95, depthWrite: false, toneMapped: false }));
   tele.add(fill, edge); tele.userData = { fill, edge };
 }
-// ---- eight player spots on a 10 m ring (sizing check for co-op) ----
-if (Q.has('spawns')) for (let i = 0; i < 8; i++) {
-  const a = i / 8 * Math.PI * 2 + Math.PI / 8, m = new THREE.Mesh(new THREE.RingGeometry(0.45, 0.6, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x7ad8ff, toneMapped: false }));
+// ---- four player spots on a 10 m ring (sizing check for co-op) ----
+if (Q.has('spawns')) for (let i = 0; i < 4; i++) {
+  const a = i / 4 * Math.PI * 2 + Math.PI / 4, m = new THREE.Mesh(new THREE.RingGeometry(0.45, 0.6, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x7ad8ff, toneMapped: false }));
   m.position.set(Math.cos(a) * 10, 0.05, Math.sin(a) * 10); scene.add(m);
 }
 

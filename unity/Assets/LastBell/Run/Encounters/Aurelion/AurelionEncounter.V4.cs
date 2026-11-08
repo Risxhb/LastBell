@@ -17,7 +17,7 @@ namespace LastBell.Run
     //                              Towers + Lances > Hour Hands (Hard) > punish
     //   4 Last Light 15-0 %        the floor falls every 15 s (wipe at 120 s) beside Lances + Starfall,
     //                              Marks + Lances, Hour Hands; no punish, no Towers, Ecliptic, Collapse or Sunspots (they would burn)
-    // Zenith Collapse grows every cast (Solar Hunger). Final Noon wipes the party at 7:00 (warned at 6:30). Sunspot pools
+    // Zenith Collapse grows every cast (Solar Hunger). Final Noon wipes the party at 6:30 (warned at 6:00). Sunspot pools
     // last until the phase ends.
     public sealed partial class AurelionEncounter
     {
@@ -26,6 +26,9 @@ namespace LastBell.Run
         public TotalEclipse Eclipse { get; private set; }
         public Severance Sever { get; private set; }
         public LastLight Light { get; private set; }
+        public MeridianRecall Recall { get; private set; }
+        public ErrantPlanets Planets { get; private set; }
+        public FallingMeridians Meridians { get; private set; }
         void BindV4()
         {
             Towers = Register(new MeridianTowers());      // [ability: meridian_towers] (v4)
@@ -33,10 +36,13 @@ namespace LastBell.Run
             Eclipse = Register(new TotalEclipse());       // [ability: total_eclipse] (v4)
             Sever = Register(new Severance());            // [ability: severance] (v4)
             Light = Register(new LastLight());            // [ability: last_light] (v4)
+            Recall = Register(new MeridianRecall());      // [ability: meridian_recall] (v4, Hard only)
+            Planets = Register(new ErrantPlanets());      // [ability: errant_planets] (v4 Phase 2, 2 Nov)
+            Meridians = Register(new FallingMeridians()); // [ability: falling_meridians] (v4 Phase 3, 2 Nov)
         }
 
         public const float V4P2At = 0.70f, V4P3At = 0.40f, V4P4At = 0.20f, EnrageS = 390f, EnrageWarnS = 360f;   // Final Noon at 6:30
-        public float[] PhaseMarks => AurelionArgs.V4 ? new[] { V4P2At, V4P3At, V4P4At } : new[] { V2P2At, V2P3At };
+        public float[] PhaseMarks => new[] { V4P2At, V4P3At, V4P4At };
 
         // ---- fight-ending wipes, the Corona Shield, pools that last until the phase ends, the enrage clock ----
         public string WipeCause { get; private set; }
@@ -45,7 +51,7 @@ namespace LastBell.Run
         public int FightTicks { get; private set; }
         public bool IntermissionDone { get; private set; }
         public int CollapseCasts { get; private set; }
-        int Party => W.Players.FindAll(p => p && !p.Down).Count;
+        int Party { get { int n = 0; var ps = W.Players; for (int i = 0; i < ps.Count; i++) if (ps[i] && !ps[i].Down) n++; return n; } }
         public readonly List<Hazard> PhasePools = new List<Hazard>();
 
         public void Wipe(string cause)
@@ -68,7 +74,6 @@ namespace LastBell.Run
         {
             get
             {
-                if (!AurelionArgs.V4) return null;
                 int s = FightTicks / Sim.Hz;
                 string clock = $"{s / 60}:{s % 60:00} / {(int)EnrageS / 60}:{(int)EnrageS % 60:00}";
                 return ShieldHp > 0 ? $"CORONA SHIELD {ShieldHp}   ·   {clock}" : clock;
@@ -78,7 +83,7 @@ namespace LastBell.Run
         // called every tick (StepAlways): the enrage clock runs while the v4 script runs (not while tests hold him)
         void V4Clock()
         {
-            if (!AurelionArgs.V4 || (TestHold && !TestClock) || W == null || !W.CombatActive || Dead) return;
+            if ((TestHold && !TestClock) || W == null || !W.CombatActive || Dead) return;
             FightTicks++;
             if (FightTicks == Sim.Ticks(EnrageWarnS)) RunHud.Banner("FINAL NOON IN 30 SECONDS", new Color(1f, 0.85f, 0.45f), 3f);
             if (FightTicks == Sim.Ticks(EnrageS)) Wipe("Final Noon — the enrage");
@@ -92,10 +97,70 @@ namespace LastBell.Run
             Zenith.HungerBonus = Mathf.Min(15, 5 + 5 * c);   // 50, 55, 60 cap (78 on Hard): the hardest hit, never near a one-shot
             Zenith.HungerFloor = 3.0f + 0.5f * Mathf.Max(0, (W.Players.FindAll(p => p && !p.Down).Count + 1) / 2 - 1);
             foreach (var w in Zenith.Run()) yield return w;
+            StartDevour(c);
         }
+
+        // ---- A17 Devour (accepted 2 Nov, Chzy18: "walking doesn't beat the pull"): when a Collapse lands he breathes the light
+        // in for DevourS and pulls every standing player toward him at 6.5, 7.0, then 7.5 m/s (Easy a fixed 6.5). Walking
+        // (6 m/s) loses to it, sprinting (9 m/s) wins. No damage, never a push, and it keeps acting through a dash (no
+        // immunity). It runs on the encounter tick, beside whatever block comes next, so the block timing is unchanged.
+        public const float DevourS = 2.0f, DevourEasy = 6.5f, DevourFirst = 6.5f, DevourStep = 0.5f, DevourCap = 7.5f;
+        public static float DevourSpeed(int cast, bool easy) => easy ? DevourEasy : Mathf.Min(DevourCap, DevourFirst + DevourStep * cast);
+        public int DevourLeft { get; private set; }     // ticks of pull still to come (test evidence)
+        public float DevourPull { get; private set; }   // m/s of the current or latest Devour
+        public int Devours { get; private set; }
+        void StartDevour(int cast)
+        {
+            if (Dead) return;
+            DevourPull = DevourSpeed(cast, W.Difficulty == Difficulty.Easy);
+            DevourLeft = Sim.Ticks(DevourS); Devours++;
+            RunHud.Banner("DEVOUR", new Color(0.95f, 0.78f, 0.4f), DevourS);
+        }
+        // ---- Phases 2 and 3: something to dodge on top of every block (Chzy18, 2 Nov: not more damage) ----
+        // Errant Planets over Misalignment (not Total Eclipse), Falling Meridians over Exposed Meridian (not Severance). Off in the
+        // single-ability loop (F6) and while a test holds the script, unless the test turns them on.
+        public bool TestExtras;
+        void StepPhaseExtras()
+        {
+            bool fighting = Planets != null && Meridians != null && W.CombatActive && !Dead && Current != "phase shift"
+                && (!TestHold || TestExtras) && !AurelionArgs.Known(AurelionArgs.Solo);
+            bool rim = phase == 1 && W.Difficulty == Difficulty.Hard;   // Hard (5 Nov): one planet on the rim orbit over Phase 1 too
+            if (fighting && (phase == 2 || rim) && !(Eclipse != null && Eclipse.Active)) { Planets.Begin(rim); Planets.Step(); }
+            else if (Planets != null && Planets.Live) Planets.End();
+            if (fighting && phase == 3 && !(Sever != null && Sever.Active)) Meridians.Step();
+            else if (Meridians != null) Meridians.Reset();
+        }
+
+        void StepDevour()
+        {
+            if (DevourLeft <= 0) return;
+            if (Dead || !W.CombatActive) { DevourLeft = 0; return; }
+            if (DevourLeft % 3 == 0) W.BossFx.DevourDust(Sim.Flat(transform.position), DevourPull, AurelionAbility.Rim, BodyRadius);   // gold dust on 16 spokes, at the pull's speed
+            DevourLeft--;
+            float step = DevourPull / Sim.Hz, stop = BodyRadius + PlayerController.Radius + 0.3f;
+            var players = W.Players;
+            for (int i = 0; i < players.Count; i++)
+            {
+                var p = players[i];
+                if (!p || p.Down) continue;
+                var to = Sim.Flat(transform.position - p.transform.position); float d = to.magnitude;
+                if (d > stop) p.Pull(to, Mathf.Min(step, d - stop), 1);   // stops at his feet, never through him
+            }
+        }
+        // Zenith Collapse off the centre (3 Nov, done as recommended, review later: "is the centre too predictable?"): he walks
+        // to one of 8 spots 3.5 m out, picked at random, so the safe disc has to be read each cast. The disc (up to 5.5 m)
+        // still fits well inside the 13.9 m bound.
+        public const float CollapseOffset = 3.5f;
+        public Vector3 LastCollapseSpot { get; private set; }   // test evidence
+        IEnumerable<int> WalkToCollapseSpot()
+        {
+            LastCollapseSpot = Sim.Dir(UnityEngine.Random.Range(0, 8) * 45f) * CollapseOffset;
+            return WalkTo(LastCollapseSpot, CentreSpeed, Sim.Ticks(4.5f));
+        }
+
         public IEnumerable<int> CollapseWithLances(int beams)
         {
-            foreach (var w in WalkToCentre()) yield return w;
+            foreach (var w in WalkToCollapseSpot()) yield return w;
             // 3 beams, 1.2 s after the Collapse: inside the hungry disc beams 45 degrees apart leave no gap, so the answer is to
             // step out to where the gaps open (5 m) once the Collapse has landed
             beams = 3;
@@ -120,6 +185,7 @@ namespace LastBell.Run
                 case 2:
                     // the whole fight harder (Chzy18 2026-10-22): three patterns per block
                     yield return Block("Sunspots + Starfall Mirror + Meridian Lances", Together(Together(Spots.Run(), Sim.Ticks(0.5f), Starfall.Run(true)), Sim.Ticks(2.0f), Lances.Run(3, 1, false))); yield return V2Gap(g);
+                    if (W.Difficulty == Difficulty.Hard) { yield return Block("Meridian Recall", Recall.Run()); yield return V2Gap(g); }   // Hard: that volley once more, on its own
                     yield return Block("Meridian Towers + Zenith Marks + Starfall Mirror", Paired(TowersThenMark(), Towers.Duration(), Starfall.Run(true), Starfall.Duration(true), Sim.Ticks(1.0f))); yield return V2Gap(g);
                     // co-op: no Starfall here (everyone shares the ring, so 4 stars and 4 mirrors would land on it: impossible, not hard)
                     if (Party == 1) yield return Block("Ecliptic Order + Meridian Lances + Starfall Mirror", Together(EclipticWithLances(), Sim.Ticks(5.0f), Starfall.Run(true)));
@@ -131,6 +197,7 @@ namespace LastBell.Run
                 case 3:
                     yield return Block("Severance", Sever.Run()); yield return V2Gap(g);
                     yield return Block("Cascading Lances + Starfall Mirror + Hour Hands", Together(LancesWithStarfall(4, 2, true), Sim.Ticks(1.0f), Hands.Run())); yield return V2Gap(g);
+                    if (W.Difficulty == Difficulty.Hard) { yield return Block("Meridian Recall", Recall.Run()); yield return V2Gap(g); }   // Hard: the cascade's turned volley once more
                     yield return Block("Sunspots + Zenith Collapse", SpotsThenCollapse()); yield return V2Gap(g);
                     yield return Block("Meridian Towers + Meridian Lances + Starfall Mirror", Paired(Paired(Towers.Run(), Towers.Duration(), Lances.Run(4, 1, false), Lances.Duration(4, 1, false), Sim.Ticks(1.0f)), Towers.Duration(), Starfall.Run(true), Starfall.Duration(true), Sim.Ticks(1.6f))); yield return V2Gap(g);
                     yield return Block("Zenith Marks + Meridian Lances", MarksWithLances(2));   // two-step, then the punish
@@ -143,6 +210,14 @@ namespace LastBell.Run
 
         // Towers + Zenith Marks: the mark resolves 1.5 s after the last tower (on the same tick, a SUN mark beside tower
         // II left a 0.5 m sliver). The conflict stays: your tower may sit in the wrong zone, so you finish it and run.
+        // the solo loop for Meridian Recall (F6 / -lastbellAbility): a volley, a short beat, then its replay
+        IEnumerable<int> LancesThenRecall()
+        {
+            foreach (var w in Lances.Run(3, 1, false)) yield return w;
+            yield return Sim.Ticks(0.5f);
+            foreach (var w in Recall.Run()) yield return w;
+        }
+
         public IEnumerable<int> TowersThenMark() => Paired(Towers.Run(), Towers.Duration(), Marks.Run(), Marks.Duration(), Sim.Ticks(1.5f));
 
         // Ecliptic Order (4 rings) + Lances: the beams land 0.2 s before ring II, while you stand at a ring and can side-step
@@ -156,7 +231,7 @@ namespace LastBell.Run
 
         IEnumerable<int> SpotsThenCollapse()
         {
-            foreach (var w in WalkToCentre()) yield return w;
+            foreach (var w in WalkToCollapseSpot()) yield return w;
             foreach (var w in Paired(Spots.Run(), Spots.Duration(), HungryCollapse(), Zenith.Duration(), Sim.Ticks(2.5f))) yield return w;   // 2.5 s: rim to his feet (8 m) after the last blast
         }
 
@@ -197,7 +272,17 @@ namespace LastBell.Run
                 bool restart = false;
                 foreach (var step in solo != null ? new[] { SoloBlock(solo), V2Gap(1.5f) } : Plan(phase))
                 {
-                    foreach (var w in step) yield return w;
+                    // Last Light starts the tick he reaches 20 % (Chzy18, 2 Nov): the running block is cut off, its shapes
+                    // withdrawn with no damage; the earlier changes still wait for the block to end
+                    bool cut = false;
+                    using (var e = step.GetEnumerator())
+                        while (!cut && e.MoveNext())
+                            for (int n = Mathf.Max(1, e.Current); n > 0; n--)
+                            {
+                                if (phase == 3 && solo == null && V4PhaseFor() == 4) { cut = true; break; }
+                                yield return 1;
+                            }
+                    if (cut) AbortBlock();
                     int want = V4PhaseFor();
                     if (want > phase)
                     {
@@ -217,12 +302,28 @@ namespace LastBell.Run
             }
         }
 
+        // withdraws a block cut off mid-cast: every shape fades with no hit, the pull stops, labels and calls go, and each
+        // ability drops the jobs the bots would still walk to
+        public int Cuts { get; private set; }   // test evidence
+        void AbortBlock()
+        {
+            Cuts++;
+            var live = W.Hazards.Live;
+            for (int i = 0; i < live.Count; i++) W.Hazards.Cancel(live[i]);
+            W.BossFx.ClearTelegraphs();
+            W.Projectiles.ClearAll();
+            RunHud.ClearTransient();
+            DevourLeft = 0;
+            foreach (var a in abilities) a.Abort();
+        }
+
         IEnumerable<int> V4Shift()
         {
             Transitions++;
             if (phase >= 4) foreach (var h in Spots.Pools) W.Hazards.Cancel(h);   // Last Light starts on clean floor: only the slices burn
             if (phase >= 3) SecondForm = true;
             Current = "phase shift";
+            AurelionTimeline.Note($"phase shift to {phase}");
             SetPhase(phase == 2 ? "Misalignment" : phase == 3 ? "Exposed Meridian" : "Last Light");
             pose = Pose.Neutral; glowTarget = 2.5f; Clip("PhaseShift", 90);
             for (int i = 0; i < 90; i++) { if (i == 45) { W.Fx.Crescendo(transform.position, true, 0, false); Release(1.2f); } yield return 1; }
@@ -230,7 +331,7 @@ namespace LastBell.Run
         }
 
         // tests: a fresh fight on the same boss (Solar Hunger count, the intermission, the clock)
-        public void DebugResetFight() { CollapseCasts = 0; IntermissionDone = false; FightTicks = 0; ClearPhasePools(); }
+        public void DebugResetFight() { CollapseCasts = 0; DevourLeft = 0; Devours = 0; IntermissionDone = false; FightTicks = 0; ClearPhasePools(); }
         public bool TestClock;                                    // tests: run the enrage clock while held
         public void DebugSetFightSeconds(float s) => FightTicks = Sim.Ticks(s);
 

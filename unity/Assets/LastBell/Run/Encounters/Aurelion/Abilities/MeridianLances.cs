@@ -39,11 +39,11 @@ namespace LastBell.Run
             Say(cascade ? "Cascading Lances" : Name);
             Volleys.Clear(); SpawnTicks.Clear(); aims.Clear();
             beams = Mathf.Clamp(beams, 1, 8);
-            Glow(1.4f); Clip("MeridianAlignment", Lock1 + Window);   // stand-in: glaive raised to the zenith
+            Glow(1.4f); Clip("LanceCall", Lock1 + Window);   // glaive raised to the zenith, driven down as the volley lands
 
             // volley 1: through the farthest player
             int lock1 = Lock1, res1 = lock1 + Window;
-            var v1 = Volley(beams, AimAt(Farthest(BossPos)), lock1, res1, () => Farthest(BossPos));
+            var v1 = Volley(beams, AimAt(FarthestAim(BossPos)), lock1, res1, () => FarthestAim(BossPos));
             yield return res1 - 1;                                   // resumes on volley 1's resolve tick
             if (volleys < 2) yield break;
 
@@ -58,7 +58,7 @@ namespace LastBell.Run
             {
                 // volley 2: through the nearest player
                 int lock2 = Lock2, res2 = lock2 + Window;
-                Volley(beams, AimAt(Nearest(BossPos)), lock2, res2, () => Nearest(BossPos));
+                Volley(beams, AimAt(NearestAim(BossPos)), lock2, res2, () => NearestAim(BossPos));
                 yield return res2 - 1;
             }
         }

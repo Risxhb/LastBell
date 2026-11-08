@@ -28,6 +28,13 @@ namespace LastBell.Menu
             TestGamepad = InputSystem.AddDevice<Gamepad>("MenuTestGamepad");
             TestMouse = InputSystem.AddDevice<Mouse>("MenuTestMouse");
         }
+        // A player window without focus disables non-background devices when they are added (the default ResetAndDisable
+        // behaviour applies before a test switches to IgnoreFocus), so the arrow keys never reached the UI (Ultimate lane, 4 Nov:
+        // 4 keyboard checks failed with another window in front). Call after switching InputSystem.settings.
+        public static void EnableTestDevices()
+        {
+            foreach (var dv in TestDevices) if (dv != null && !dv.enabled) InputSystem.EnableDevice(dv);
+        }
         static bool started;
         readonly List<string> report = new List<string>();
         readonly List<string> errors = new List<string>();
@@ -64,6 +71,7 @@ namespace LastBell.Menu
             testInputSettings.editorInputBehaviorInPlayMode = InputSettings.EditorInputBehaviorInPlayMode.AllDeviceInputAlwaysGoesToGameView;
 #endif
             InputSystem.settings = testInputSettings;
+            EnableTestDevices();
             Screen.SetResolution(1600, 900, FullScreenMode.Windowed);
             menu = FindAnyObjectByType<MainMenu>();
             yield return new WaitForSeconds(2);

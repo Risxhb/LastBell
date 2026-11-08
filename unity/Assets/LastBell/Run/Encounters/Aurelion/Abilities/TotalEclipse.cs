@@ -9,7 +9,7 @@ namespace LastBell.Run
     //   - Corona Shield: absorbs 700 per fighting player (AurelionEncounter.Absorb): solo that is 700 in 25 s, 28 DPS while
     //     moving between wells (a ranged class does about 60 standing, RunAutoTest V4Dps). Break it within 25 s or Total
     //     Eclipse wipes the party (the damage-check / enrage exception). Breaking it ends the intermission at once.
-    //   - Light wells: 4 cobalt-rimmed circles of 3.5 m (6 of 3.0 m at N >= 5) orbit the centre at 6 m, 15 degrees/s.
+    //   - Light wells: 4 dotted cobalt circles of 3.5 m (6 of 3.0 m at N >= 5) orbit the centre at 6 m, 15 degrees/s.
     //     Umbra: a player outside every well for more than 2.0 s straight takes 10 every second after that (chip; it can't
     //     kill fast, it drains potions).
     //   - Meanwhile Meridian Lances (3 beams) every 6 s and Starfall Mirror after 2 s: with the Umbra, three patterns.
@@ -21,7 +21,7 @@ namespace LastBell.Run
         public const int ShieldPerFighter = 700;   // Chzy18 2026-10-23: sized by party, not HP (groups broke 3.5 % of HP in ~10 s)
         public const float LimitS = 25f, WellOrbit = 6f, WellSpin = 15f, UmbraGraceS = 2.0f;
         public const int UmbraDamage = 10;
-        static readonly Color WellFill = new Color(0.22f, 0.32f, 0.7f), WellRim = new Color(0.9f, 1.2f, 2.4f);
+        static readonly Color WellRim = new Color(0.6f, 0.9f, 2.2f);   // the towers' cobalt: a get-in goal, never a hostile coral
 
         // 700 per fighting player (players, and bot allies only when they attack): about 22 s for a party of 4 at the damage the
         // perfect bots deal while dodging, 28 damage per second solo
@@ -34,7 +34,7 @@ namespace LastBell.Run
         public int UmbraHits { get; private set; }
         readonly Dictionary<PlayerController, int> dark = new Dictionary<PlayerController, int>();
 
-        public bool InWell(Vector3 p) { foreach (var c in Wells) if (Sim.Flat(p - c).magnitude <= WellRadius - 0.1f) return true; return false; }
+        public bool InWell(Vector3 p) { float r = WellRadius - 0.1f; for (int i = 0; i < Wells.Count; i++) if (Sim.Flat(p - Wells[i]).magnitude <= r) return true; return false; }
         // bots: still inside a well s seconds from now, after the wells have turned on (the point turned back the same angle)
         public bool InWellAfter(Vector3 p, float s) => InWell(Centre + Quaternion.Euler(0, -WellSpin * s, 0) * (p - Centre));
 
@@ -42,11 +42,12 @@ namespace LastBell.Run
         {
             Say(Name);
             Active = true; Broken = false; UmbraHits = 0; dark.Clear();
-            Boss.RaiseShield(ShieldFor());
+            Boss.RaiseShield(ShieldFor()); Clip("EclipseCall", Sim.Ticks(2.5f));   // arms fold, the halo sinks in front of him
             RunHud.Banner("TOTAL ECLIPSE — BREAK THE CORONA", new Color(1f, 0.85f, 0.5f), 2.5f);
             Glow(2f); Flare(1.5f);
             var rings = new List<BellkeeperFx.Telegraph>();
-            for (int i = 0; i < WellCount; i++) { var r = W.BossFx.Ring(WellRadius - 0.15f, WellRadius); r.Tint(WellFill, WellRim); r.Progress(1); rings.Add(r); Wells.Add(Vector3.zero); }
+            // F05 (telegraph audit 24 Oct): safe wells use the nonhostile grammar, thin, dotted and unfilled like the towers
+            for (int i = 0; i < WellCount; i++) { var r = W.BossFx.Circle(WellRadius); r.Motif(0); r.Friendly(WellRim); r.Order = 2; r.Progress(1); rings.Add(r); Wells.Add(Vector3.zero); }
 
             // the other patterns run on their own schedule, stepped here one tick at a time
             var side = Schedule().GetEnumerator(); int sideWait = 0; bool sideOn = true;
@@ -62,7 +63,7 @@ namespace LastBell.Run
             }
             foreach (var r in rings) r.Expire();
             Wells.Clear(); Active = false;
-            if (Broken) { RunHud.Banner("CORONA BROKEN", new Color(0.7f, 0.9f, 1f), 1.5f); Flare(2f); }
+            if (Broken) { RunHud.Banner("CORONA BROKEN", new Color(0.7f, 0.9f, 1f), 1.5f); Flare(2f); Clip("Stagger", Sim.Ticks(1.2f)); }
             else Boss.Wipe("Total Eclipse — the Corona Shield held");
             Boss.RaiseShield(0);
         }

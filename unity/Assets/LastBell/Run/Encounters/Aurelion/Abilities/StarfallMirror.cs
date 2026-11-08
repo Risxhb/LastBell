@@ -9,7 +9,7 @@ namespace LastBell.Run
     // later. Its reflection through the arena centre, (-x, -z), is a second circle of the same size that tracks and locks
     // with it. 30 per circle, no knockback, 0.25 s stun. Solo: star II (and its mirror) is called on star I's lock and
     // runs the same 2.0 + 1.1 s. Run returns on the tick the last star resolves; it never assumes it runs alone (the
-    // phase plan starts it inside Noon Shadow, Orrery Closing and the Horizon).
+    // phase plan starts it beside Lances, Towers, Sunspots, Orrery Closing and the Horizon).
     // Ticks (Medium) are counted from the cast, as hazard Age: lock 120, resolve 186; solo star II spawns at 120, locks
     // at 240, resolves at 306. Easy stretches the follow and the window by 1.25. Hard (v2.1 §2) keeps the 2.0 s follow and
     // cuts the window x0.7 to 0.77 s (resolve 166; solo 286), except Run(fullWindow: true), the Lances pairing (v2.1 §3),
@@ -43,18 +43,18 @@ namespace LastBell.Run
         public IEnumerable<int> Run(bool fullWindow = false)
         {
             Say(Name); Casts++; Stars.Clear();
-            var party = Standing();
+            var party = Standing(); var aim = Aimable();   // stars on players not reviving; size and solo timing by everyone standing
             int follow = FollowTicks, resolve = ResolveTicks(fullWindow);
             float r = RadiusFor(party.Count);
             bool solo = party.Count <= 1;
             Clip("ZenithPins", solo ? follow + resolve : resolve);   // halo arcs tilt and point at every player
-            foreach (var p in party) Call(p, r, follow, resolve, 1);
+            foreach (var p in aim) Call(p, r, follow, resolve, 1);
             for (int i = 0; i < follow; i++) { Glow(i / (float)follow); yield return 1; }
             Flare(0.5f);
             if (solo)
             {
                 // star II hunts you from star I's lock: leave, avoid your reflection, leave again
-                foreach (var p in Standing()) Call(p, r, follow, resolve, 2);
+                foreach (var p in Aimable()) Call(p, r, follow, resolve, 2);
                 for (int i = 0; i < follow; i++) { Glow(i / (float)follow); yield return 1; }
                 Flare(0.5f);
             }

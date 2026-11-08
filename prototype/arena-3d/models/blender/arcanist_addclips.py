@@ -214,6 +214,8 @@ class RobeSim:
                             nrm = np.where(wrong[:, None], side, d / np.maximum(l, 1e-6)[:, None])
                             dist = np.where(wrong, rad + np.maximum(0, -np.sum(d * side, 1)), rad - l)
                             s.P[hit, k] += nrm[hit] * (dist[hit] / f_)[:, None]
+            # (addclips) the floor: a kneeling hem pools on it instead of sinking through (standing hems never reach it)
+            np.maximum(s.P[..., 2], 0.02, out=s.P[..., 2])
         s.P[:, 0] = T[:, 0]
     def write(s):
         # bone rotations from the simulated joints (minimal swing from the hips-carried rest direction)
@@ -238,6 +240,13 @@ def set_pose(pose):
         lowest = min((pbs[n].matrix @ pbs[n].bone.matrix_local.inverted() @ p).z for n, ps in SOLE.items() for p in ps)
         hb = pbs['hips']; M = hb.bone.matrix_local.to_3x3()
         hb.location = hb.location + M.inverted() @ Vector((0, 0, pose['_ground'] - lowest))
+    if '_floor' in pose:
+        # (addclips) like _ground, with the knees counted too: a kneel rests on its knees, a step on its boot
+        bpy.context.view_layer.update()
+        lowest = min([(pbs[n].matrix @ pbs[n].bone.matrix_local.inverted() @ p).z for n, ps in SOLE.items() for p in ps] +
+                     [pbs[f'shin.{n}'].head.z - 0.06 for n in 'LR'])   # (the kneecap's front, ~6 cm under the joint)
+        hb = pbs['hips']; M = hb.bone.matrix_local.to_3x3()
+        hb.location = hb.location + M.inverted() @ Vector((0, 0, pose['_floor'] - lowest))
     if '_orb' in pose:
         # the astrolabe: '_orb' is its target in chest space (offset from its rest spot), carried by the chest's position
         # and heading only (it floats level), plus its own spin '_spin' (deg about Z) and tilt '_otilt'
@@ -857,7 +866,80 @@ BLINK_IN = {
     'orb': [(0, (0.14, -0.02, -0.1)), (0.4, (-0.03, 0.03, 0.04)), (1, (0, 0, 0))], 'otilt': [(0, 25), (0.4, -10), (1, 0)]}
 BLINK_SPIN = spin_of([(0, 2400), (0.4, 1200), (1, 100)], 2)
 
+# ---------------- reactions: Hit, Down, GetUp (CharacterPresenter plays them for 0.3, 0.8 (then held), 0.9 s) ----------------
+def hit(f, t):
+    # a flinch: the chest snaps back and twists off the blow, head back, both hands flare; feet stay, the astrolabe jolts
+    a = key(t, [(0, 0), (0.25, 1), (1, 0)])
+    K = {'lean': [(0, -11 * a)] * 2, 'chest': [(0, -7 * a)] * 2, 'nod': [(0, -12 * a)] * 2, 'drop': [(0, 0.04 * a)] * 2, 'tw': [(0, -6 * a)] * 2,
+         'ru': [(0, tuple(slerpv(STANCE['ru'], (-0.55, -0.25, -0.8), a)))] * 2, 'lu': [(0, tuple(slerpv(STANCE['lu'], (0.55, -0.25, -0.8), a)))] * 2,
+         'flow': [(0, 16 * a)] * 2, 'flare': [(0, 4 * a)] * 2, 'orb': [(0, (0.0, 0.08 * a, 0.04 * a))] * 2, 'otilt': [(0, -12 * a)] * 2}
+    s = base_pose(0, K); s['_ground'] = 0.0
+    return s
+# Down and GetUp key the whole body: he drops to his knees and slumps forward, hands on his thighs, head down (the robe
+# hangs, so it stays clear of the floor), and gets up one foot first. hz hips height offset (m, from rest), hy hips back
+# (m), hp hips pitch (deg, + forward), sp/ch/hd spine, chest and head pitch, legs (thigh, knee, foot, flat 0..1)
+AR_HIPS = B['hips'][0][2]
+AR_STAND = {'hz': None, 'hy': 0.0, 'hp': 0.0, 'sp': 2.0, 'ch': 0.0, 'hd': 0.0, 'tR': -4.0, 'kR': 10.0, 'fR': 0.0, 'tL': -2.0, 'kL': 8.0, 'fL': 0.0, 'flat': 1.0,
+            'ru': STANCE['ru'], 'rf': STANCE['rf'], 'lu': STANCE['lu'], 'lf': STANCE['lf'], 'flow': 0.0, 'flare': 0.0, 'orb': (0.0, 0.0, 0.0), 'otilt': 0.0}
+AR_KNEEL = dict(AR_STAND, hz=0.5 - AR_HIPS, hy=0.08, hp=14.0, sp=16.0, ch=10.0, hd=28.0, tR=-10.0, kR=96.0, fR=72.0, tL=-6.0, kL=92.0, fL=72.0, flat=0.0,
+                ru=(-0.3, -0.5, -0.81), rf=(-0.1, -0.9, -0.42), lu=(0.3, -0.5, -0.81), lf=(0.1, -0.9, -0.42), orb=(0.0, 0.08, 0.0), otilt=10.0)
+def ar_body(t, keys):
+    v = {n: key(t, [(tt, STANCE_HZ if (n == 'hz' and x is None) else x) for tt, x in pts]) for n, pts in keys.items()}
+    hp = v['hp']
+    s = {'hips': {'loc': (0, v['hy'], v['hz']), 'rot': Rzyx(x=hp)}, 'spine': {'rot': Rzyx(x=v['sp'])}, 'chest': {'rot': Rzyx(x=v['ch'])},
+         'head': {'rot': Rzyx(x=v['hd'])}, '_flow': v['flow'], '_flare': v['flare'], '_orb': tuple(v['orb']), '_spin': 40 * t, '_otilt': v['otilt']}
+    def g(n, d=None):   # as base_pose's: a keyed channel, else the given default, else the stance
+        if n in v: return v[n]
+        if d is not None: return d
+        x = STANCE.get(n)
+        if isinstance(x, tuple): return Vector(x).normalized()
+        return x if x is not None else 0.0
+    s.update(arms_from(g))
+    s.update(leg(-1, v['tR'], v['kR'], foot=v['fR'], hip_pitch=hp, flat=v['flat'], spread=2))
+    s.update(leg(1, v['tL'], v['kL'], foot=v['fL'], hip_pitch=hp, flat=v['flat'], spread=2))
+    s['_floor'] = 0.0   # the lowest sole point or knee (a planted boot, or the knees of a kneel) on the floor
+    return s
+def ar_track(*frames): return {n: [(t, p[n]) for t, p in frames] for n in frames[0][1]}
+def down(f, t):
+    # the knees go, he drops onto them and slumps forward, head down; held there until GetUp
+    buckle = dict(AR_STAND, hz=STANCE_HZ - 0.2, hy=0.05, hp=-8.0, sp=-8.0, ch=-6.0, hd=-14.0, tR=-32.0, kR=60.0, tL=-26.0, kL=54.0, flat=1.0,
+                  ru=(-0.5, -0.3, -0.81), lu=(0.5, -0.3, -0.81), flow=20.0, flare=4.0, orb=(0.0, 0.1, 0.05), otilt=-15.0)
+    return ar_body(t, ar_track((0, AR_STAND), (0.3, buckle), (0.7, dict(AR_KNEEL, hz=0.46 - AR_HIPS, hd=36.0, flow=24.0, flare=5.0)), (1, AR_KNEEL)))
+def getup(f, t):
+    # the right foot comes forward, he pushes up off his knee and stands
+    step = dict(AR_KNEEL, hz=0.53 - AR_HIPS, hp=18.0, sp=10.0, hd=8.0, tR=-82.0, kR=88.0, fR=0.0, tL=-4.0, kL=92.0, fL=72.0, flat=0.0, flow=10.0,
+                ru=(-0.2, -0.75, -0.63), rf=(-0.05, -0.6, -0.8))
+    rise = dict(AR_STAND, hz=STANCE_HZ - 0.24, hy=0.02, hp=16.0, sp=8.0, ch=4.0, hd=-6.0, tR=-48.0, kR=64.0, fR=0.0, tL=-6.0, kL=58.0, fL=20.0, flat=0.6,
+                flow=14.0, orb=(0.0, 0.03, -0.08))
+    return ar_body(t, ar_track((0, AR_KNEEL), (0.35, step), (0.7, rise), (1, AR_STAND)))
+
+# revives (docs/proposals/revives-2026-11-04.md): Downed loops on the Down pose, Revive is the reviver's channel next to a
+# downed ally, Death goes slack from Downed
+def downed(f, t):
+    # slumped on his knees, breathing slowly (2 s loop)
+    b = math.sin(2 * math.pi * t)
+    p = dict(AR_KNEEL, sp=AR_KNEEL['sp'] + 2 * b, hd=AR_KNEEL['hd'] + 3 * b, flow=2.0)
+    return ar_body(t, ar_track((0, p), (1, p)))
+AR_REVIVE = dict(AR_KNEEL, hp=6.0, sp=10.0, ch=4.0, hd=30.0, ru=(-0.25, -0.8, -0.55), rf=(-0.05, -0.95, -0.3), lu=(0.25, -0.8, -0.55), lf=(0.05, -0.95, -0.3),
+                 orb=(0.0, -0.1, 0.05), otilt=-20.0)
+def revive(f, t):
+    # kneeling beside a downed ally, both palms held out low over them, pulsing; the astrolabe hangs over the hands (1.33 s loop)
+    b = math.sin(2 * math.pi * t)
+    p = dict(AR_REVIVE, rf=(-0.05, -0.95 + 0.03 * b, -0.3 - 0.1 * b), lf=(0.05, -0.95 + 0.03 * b, -0.3 - 0.1 * b), sp=AR_REVIVE['sp'] + 1.5 * b, flow=3.0 + 2 * b)
+    return ar_body(t, ar_track((0, p), (1, p)))
+def death(f, t):
+    # from Downed: the last breath out, the body folds forward over the knees and stays; the astrolabe sinks
+    slack = dict(AR_KNEEL, hp=30.0, sp=34.0, ch=18.0, hd=44.0, ru=(-0.25, -0.6, -0.76), rf=(-0.1, -0.85, -0.52), lu=(0.25, -0.6, -0.76), lf=(0.1, -0.85, -0.52),
+                 flow=6.0, orb=(0.0, 0.1, -0.15), otilt=30.0)
+    return ar_body(t, ar_track((0, AR_KNEEL), (0.6, slack), (1, slack)))
+
 NEW = {   # name: (frames, fn, loop, events)
+    'Downed': (60, downed, True, {}),
+    'Revive': (40, revive, True, {}),
+    'Death': (24, death, False, {}),
+    'Hit': (9, hit, False, {}),
+    'Down': (24, down, False, {}),
+    'GetUp': (27, getup, False, {}),
     'MissileTap': (8, clip(MISSILE_TAP, tap_extra), False, {'release': 0.35, 'recover': 0.55}),
     'MissileTap2': (8, clip(mirror2(MISSILE_TAP), tap_extra), False, {'release': 0.35, 'recover': 0.55}),
     'MissileCharge': (12, clip(MISSILE_CHARGE, with_spin(CHARGE_SPIN)), False, {'hold': 1.0}),

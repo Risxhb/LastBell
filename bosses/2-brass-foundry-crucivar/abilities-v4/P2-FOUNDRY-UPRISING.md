@@ -14,7 +14,7 @@
 
 ### Uprising: turrets and castings (R&S block 20 painshare, block 15 bullets, blocks 7/9 numerals and links)
 - **Turrets:**
-  - 2–4 turrets rise from the lava at fixed rim bays, 2.5 s rise, harmless.
+  - 2 turrets rise (every party size since 4 Nov) from the lava at fixed rim bays, 2.5 s rise, harmless.
   - Each gets an ivory numeral (I–IV).
   - They can't be damaged.
 - **Castings:**
@@ -76,7 +76,8 @@ He stays at the centre and keeps using Phase 1 attacks, so the bullet fire is la
 | 1 | 2, **in sequence** | the second rises when the first sinks; the timer gives each one 18 s |
 | 2 | 2 | one casting each, or both together |
 | 4 | 3 | one casting needs two people, or one fast pair clears two |
-| 8 | 4 | the group must split into four teams |
+
+The game is 1–4 players since 1 Nov (Chzy18), so there's no 8-player row.
 
 Casting HP scales like the boss, `1 + 0.7 × (fighters − 1)`, so splitting up is always the fastest way.
 
@@ -89,8 +90,8 @@ Casting HP scales like the boss, `1 + 0.7 × (fighters − 1)`, so splitting up 
 - **Easy:** paths drawn 2.5 s, timer 40 s, damage ×0.6.
 - **Hard (named extra: Cast in Order):** castings must die in numeral order. Killing one out of order makes every remaining turret fire a Ring Wave at once.
 
-## Escape check (to add to `crucivar-escape-check.ps1` once accepted)
-Worst cases to check:
+## Escape check (built 31 Oct)
+`tools/encounter-escape/crucivar-v4-escape-check.ps1` has 0 failures on Easy, Medium and Hard (worst: reaching a Ring Wave gap from the far rim, 3.3 s spare). The cone and pour lengths now run to the floor's farthest point, so the square key-art map has no safe corners. Cases first listed for it:
 - crossing a Lane Stream gap at 4.2 m/s while carrying a brand;
 - a Ring Wave gap lining up with a Furnace Spin jet;
 - the solo player's route to the second casting under a Spiral Arm.

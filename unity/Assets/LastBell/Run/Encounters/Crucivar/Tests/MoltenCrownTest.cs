@@ -10,22 +10,22 @@ namespace LastBell.Run
     public sealed class MoltenCrownTest : CrucivarAbilityTest
     {
         public override string Id => "crucivar.v4_molten_crown";
-        public override string Set => "v4";
         public override int Order => 320;
 
-        public override IEnumerator Run(CrucivarV2AutoTest t)
+        public override IEnumerator Run(CrucivarAutoTest t)
         {
             yield return t.Setup(4, at: new[] { new Vector3(0, 0, 4f), new Vector3(4, 0, 0), new Vector3(0, 0, -4f), new Vector3(-4, 0, 0) });
             if (t.Boss == null) yield break;
             var crown = t.Boss.Crown;
             t.Check("4 players: set A 2 + 2, set B 2 + 2", MoltenCrown.Sets(4).Length == 2 && MoltenCrown.Sets(4).All(s => s.SequenceEqual(new[] { 2, 2 })));
-            t.Check("8 players: set A four towers of 2, set B 4 + 4", MoltenCrown.Sets(8)[0].SequenceEqual(new[] { 2, 2, 2, 2 }) && MoltenCrown.Sets(8)[1].SequenceEqual(new[] { 4, 4 }));
+            t.Check("3 players: set A 2 + 1, set B 2 + 1", MoltenCrown.Sets(3)[0].SequenceEqual(new[] { 2, 1 }) && MoltenCrown.Sets(3)[1].SequenceEqual(new[] { 2, 1 }));
             t.Check("solo: three towers of one", MoltenCrown.Sets(1).Length == 3 && MoltenCrown.Sets(1).All(s => s.SequenceEqual(new[] { 1 })));
 
             t.Begin(crown.Run());
-            float s = 0; bool sawB = false;
+            float s = 0; bool sawB = false; float over = float.MinValue, reach = 0;
             while (s < 21f && t.Boss.TestBusy)
             {
+                foreach (var fx in Object.FindObjectsByType<MouldPressFx>(FindObjectsSortMode.None)) { over = Mathf.Max(over, fx.FillOverhang()); reach = Mathf.Max(reach, fx.FillReach()); }
                 foreach (var p in t.Party) if (p.Hp < 60) p.DebugSetHp(PlayerController.MaxHp);
                 // stand the party in the soonest set's towers, two each
                 var set = crown.Towers.Where(x => x.H.Age < x.H.ResolveAt).GroupBy(x => x.Set).OrderBy(g => g.Min(x => x.H.ResolveAt - x.H.Age)).FirstOrDefault();
@@ -40,27 +40,49 @@ namespace LastBell.Run
             }
             var towers = t.Spawned("Mould Tower").ToList();
             t.Check("two sets of two towers rise, set B 1.6 s after set A", towers.Count == 4 && sawB && towers.Max(x => x.Tick) - towers.Min(x => x.Tick) >= Sim.Ticks(1.6f) - 1, $"{towers.Count} towers");
+            var towA = towers.Where(x => x.Source == "Mould Tower A").ToList(); var towB = towers.Where(x => x.Source == "Mould Tower B").ToList();
+            float gapAB = towB.Count == 0 || towA.Count == 0 ? 0 : towB.Min(b => towA.Min(a => Sim.Flat(b.H.Origin - a.H.Origin).magnitude));
+            t.Check("set B lands between set A's towers, not on them (you soak A, then run to B)", gapAB >= MoltenCrown.TowerRadius * 2f, $"nearest A-B {gapAB:0.0} m");
             t.Check("filled towers land safe (no wipe) and leave slag", crown.Wipes == 0 && t.Spawned("Tower Slag").Count() == 4, $"wipes {crown.Wipes}, slag {t.Spawned("Tower Slag").Count()}");
-            t.Check("pours aimed through the party during the towers", t.Spawned("Pour I").Any());
+            var lastTower = towers.Max(x => x.Tick + x.H.ResolveAt);
+            t.Check("pours come after the towers have landed (no pour lands on a soaker who must stay)", t.Spawned("Pour I").Any() && t.Spawned("Pour ").Where(x => !x.Source.Contains("Channel")).All(x => x.Tick > lastTower),
+                string.Join("/", t.Spawned("Pour ").Select(x => x.Tick - lastTower)));
+            t.Check("tower slag heats 1.0 s before it burns", t.Spawned("Tower Slag").All(x => x.H.LockAt == Sim.Ticks(ForgeRite.PoolArm)));
             t.Check("Backdraft right after set B", t.Spawned("Backdraft").Any());
             t.Check("the lava turret fires Lane Streams", t.Spawns.Any(x => x.Source == "Lane Stream bullet"));
+            t.Check("Medium: Mould Towers land 5.0 s after they rise", towers.All(x => x.H.ResolveAt == Sim.Ticks(MoltenCrown.Rise)), string.Join("/", towers.Select(x => x.H.ResolveAt)));
+            t.Check("Medium: the crown turret fires only Lane Streams (no Crown Ring)", !t.Spawns.Any(x => x.Source.StartsWith("Ring Wave")), $"{t.Spawned("Ring Wave").Count()} ring spawns");
             t.Check("the crown rises to 11 m and burns for good", crown.Crowns == 1 && Mathf.Approximately(crown.Edge, 11f) && t.W.Hazards.Live.Any(h => h.Source == "Molten Crown" && h.BurnPerSecond > 0),
                 $"crowns {crown.Crowns}, edge {crown.Edge}");
             var quake = t.Spawned("Anvil Quake I").LastOrDefault();
             t.Check("heat: after one crown, Anvil Quake hits for 40 x 1.15", quake != null && quake.H.Damage == Mathf.RoundToInt(40 * 1.15f), quake == null ? "no quake" : $"{quake.H.Damage}");
+            t.Check("the rising mould fill grows to its soak circle and never past it (8 Nov playtest)", over <= 0.001f && reach >= 0.95f, $"overhang {over:0.00} m, reach {reach:0.00} of the radius");
             t.Check("one hit per instance", t.OneHitPerInstance());
             yield return t.Shot("v4_molten_crown");
 
             // second cycle, on Hard: the counts are hidden, and Second Press re-stamps the fullest tower of each set 2.0 s after it lands
             yield return t.Until(() => !t.Boss.TestBusy, 5f, "cycle 1 over");
             yield return t.Setup(4, Difficulty.Hard, at: new[] { new Vector3(0, 0, 4f), new Vector3(4, 0, 0), new Vector3(0, 0, -4f), new Vector3(-4, 0, 0) });
-            int presses0 = crown.Presses;
+            int presses0 = crown.Presses, cooled0 = crown.Cooled;
             t.Begin(crown.Run());
-            s = 0; bool hidden = false;
+            yield return t.Ticks(2);
+            // burning ground all round the tower ring: every piece that touches a rising tower cools at once
+            for (int k = 0; k < 24; k++) t.W.Hazards.Spawn(new Hazard { Source = "Test Slag", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Sim.Dir(k * 15f) * 5.5f, Radius = 2f, LockAt = 0, ResolveAt = Sim.Ticks(1f), BurnPerSecond = 20f });   // short-lived: it must not outlast this check
+            yield return t.Ticks(3);
+            bool Touch(Hazard b, Hazard tw) => b.Contains(tw.Origin) || Enumerable.Range(0, 8).Any(k => b.Contains(tw.Origin + Sim.Dir(k * 45f) * MoltenCrown.TowerRadius));
+            var pend = crown.Towers.Where(x => x.H.Age < x.H.ResolveAt).Select(x => x.H).ToList();
+            t.Check("a rising tower cools the burning ground on its spot (soaking never means standing in burn)", pend.Count > 0 && crown.Cooled > cooled0
+                && !t.W.Hazards.Live.Any(b => b.BurnPerSecond > 0 && b.Age < b.ResolveAt - 1 && pend.Any(tw => Touch(b, tw))), $"cooled {crown.Cooled - cooled0}, pending {pend.Count}");
+            s = 0; bool hidden = false, ghostOn = false, ghostOff = false;
             while (s < 12f && t.Boss.TestBusy)
             {
                 foreach (var p in t.Party) if (p.Hp < 60) p.DebugSetHp(PlayerController.MaxHp);
                 hidden |= crown.CountsHidden;
+                foreach (var tw in crown.Towers.Where(x => x.H.Age < x.H.ResolveAt))
+                {
+                    if (tw.H.Age < Sim.Ticks(0.5f) && MouldPressFx.GhostLeft(tw.H) >= 1f) ghostOn = true;
+                    if (tw.H.Age > Sim.Ticks(MouldPressFx.GhostSeconds) && MouldPressFx.GhostLeft(tw.H) <= 0f) ghostOff = true;
+                }
                 var set = crown.Towers.Where(x => x.H.Age < x.H.ResolveAt).GroupBy(x => x.Set).OrderBy(g => g.Min(x => x.H.ResolveAt - x.H.Age)).FirstOrDefault();
                 if (set != null)
                 {
@@ -70,6 +92,7 @@ namespace LastBell.Run
                 s += Time.deltaTime; yield return null;
             }
             t.Check("the second cycle hides the tower counts", hidden);
+            t.Check("hidden counts: last cycle's number shows faintly for the first 1.5 s, then only the \"?\"", ghostOn && ghostOff, $"ghost at rise {ghostOn}, gone later {ghostOff}");
             var press = t.Spawned("Second Press").ToList();
             var setA = t.Spawned("Mould Tower A").ToList();
             var first = setA.FirstOrDefault();
@@ -81,7 +104,17 @@ namespace LastBell.Run
             // third cycle: nobody soaks, so the first tower to land wipes the party
             for (s = 0; s < 30f && t.Boss.TestBusy; s += Time.deltaTime) { foreach (var p in t.Party) p.DebugSetHp(PlayerController.MaxHp); yield return null; }   // keep the party up until the Hard cycle ends
             t.Check("the Hard cycle runs to its end", !t.Boss.TestBusy);
+            t.Check("Hard: Quick Moulds, the towers land 4.0 s after they rise", t.Spawned("Mould Tower").Any() && t.Spawned("Mould Tower").All(x => x.H.ResolveAt == Sim.Ticks(MoltenCrown.HardRise)), string.Join("/", t.Spawned("Mould Tower").Select(x => x.H.ResolveAt)));
+            t.Check("Hard: Crown Ring, the crown turret alternates Lane Stream and Ring Wave", crown.Rings > 0 && t.Spawned("Ring Wave path").Any() && t.Spawned("Ring Wave bullet").Any() && t.Spawned("Lane Stream bullet").Any(),
+                $"rings {crown.Rings}, ring bullets {t.Spawned("Ring Wave bullet").Count()}");
+            // Hard Crown Ring bullets can down a player during the cycle without a wipe; the fight then stays in Combat with the main
+            // player down, which stalls the next Setup. Let the last bullets land, then stand everyone back up.
+            for (s = 0; s < 3f; s += Time.deltaTime) { foreach (var p in t.Party) if (!p.Down) p.DebugSetHp(PlayerController.MaxHp); yield return null; }
+            t.W.ClearTransient();
+            foreach (var p in t.Party) p.DebugRevive();
             yield return t.Setup(4, at: new[] { new Vector3(0, 0, 4f), new Vector3(4, 0, 0), new Vector3(0, 0, -4f), new Vector3(-4, 0, 0) });
+            if (t.Boss == null) yield break;
+            crown = t.Boss.Crown;   // the last pour channels can down the idle party after the Hard cycle, which restarts the encounter
             foreach (var p in t.Party) { p.DebugSetHp(PlayerController.MaxHp); t.Place(p, new Vector3(0, 0, 9.5f)); }
             t.Begin(crown.Run());
             yield return t.Until(() => t.Party.All(p => p.Down), 8f, "overflow");
