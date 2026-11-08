@@ -5,7 +5,7 @@ using UnityEngine;
 namespace LastBell.Run.Shop
 {
     public enum ItemTier { Common, Rare, Keystone }
-    [System.Flags] public enum ItemTag { None = 0, Crack = 1, Ring = 2, Glyph = 4, Party = 8 }
+    [System.Flags] public enum ItemTag { None = 0, Ring = 2, Glyph = 4, Party = 8 }
 
     // One run item (shop spec §11). Value is the item's number as written on the card; Tempered is its + version
     // (+50% of the effect, spec §4) or null when the item can't be tempered. Every effect lives in ItemHooks, keyed by Id.
@@ -17,6 +17,7 @@ namespace LastBell.Run.Shop
         public float Value2, Tempered2;     // a second number on the card ({w}), for items with two effects
         public bool OfferedSolo = true;     // items with no solo value are never stocked solo (spec §3)
         public string PartnerClass;         // cross-class combo: stocked only when this class is in the party (spec §3)
+        public int MinToll;                 // Toll items: stocked only on runs at this Toll or higher (4 = Toll IV, 7 = Toll VII)
         public bool Held;                   // accepted but never stocked: it can't do what its card says in the current build
         public string Effect, SoloNote;     // card text; SoloNote = the solo fallback, shown when playing alone
         public string TemperNote;           // what the + version adds, when it isn't just a bigger number
@@ -32,8 +33,8 @@ namespace LastBell.Run.Shop
         static string Ordinal(int n) => n + (n % 100 is 11 or 12 or 13 ? "th" : (n % 10) switch { 1 => "st", 2 => "nd", 3 => "rd", _ => "th" });
     }
 
-    // The 70-item pool (docs/design/items/CATALOGUE.md): slice 1 (15 items, run-shop-plan §3) plus the 55 accepted on
-    // 2026-10-28. Prices are Chzy18's starting prices (spec §12.2). Held items are defined but never stocked.
+    // The 69-item pool (docs/design/items/CATALOGUE.md): slice 1 (15 items, run-shop-plan §3) plus the 54 accepted on
+    // 2026-10-28; the Tollbreaker's 20 (accepted 2026-11-01) replaced the Vanguard's at the class swap; 10 Toll items (2026-11-05) on top. Prices are Chzy18's starting prices (spec §12.2). Held items are defined but never stocked.
     public static class ItemCatalog
     {
         public const int CommonPrice = 90, RarePrice = 150, KeystonePrice = 240, TemperPrice = 110;
@@ -41,14 +42,14 @@ namespace LastBell.Run.Shop
         public static int Price(ItemTier t) => t == ItemTier.Common ? CommonPrice : t == ItemTier.Rare ? RarePrice : KeystonePrice;
 
         // ids (ItemHooks switches on these)
-        public const string TemperedEdge = "v.tempered_edge", Countdown = "v.countdown", CrackedArmour = "v.cracked_armour", Oathbound = "v.oathbound";
+        public const string KeenEdge = "t.keen_edge", ShortFuse = "t.short_fuse", RivenIron = "t.riven_iron", RootedAxe = "t.rooted_axe";
         public const string HeavyBell = "c.heavy_bell", SwiftChorus = "c.swift_chorus", ChorusOfValour = "c.chorus_of_valour";
         public const string UnboundCast = "a.unbound_cast", LongSurge = "a.long_surge", PerpetualBeam = "a.perpetual_beam";
         public const string StrongBrew = "g.strong_brew", Sprinter = "g.sprinter", DeepBreath = "g.deep_breath", LoneBell = "g.lone_bell", SpareFlask = "g.spare_flask";
         // full pool
-        public const string QuickHands = "v.quick_hands", WideArc = "v.wide_arc", LongReach = "v.long_reach", Grit = "v.grit", ClockworkStep = "v.clockwork_step",
-            SteadyStance = "v.steady_stance", Momentum = "v.momentum", DoubleOpening = "v.double_opening", PendulumCut = "v.pendulum_cut", HeavyHour = "v.heavy_hour",
-            QuickVerdict = "v.quick_verdict", IronEcho = "v.iron_echo", SecondStep = "v.second_step", RhythmKeeper = "v.rhythm_keeper", Rally = "v.rally", TollOfSteel = "v.toll_of_steel";
+        public const string WideGrind = "t.wide_grind", LongGrind = "t.long_grind", QuickCatch = "t.quick_catch", HeavyHaft = "t.heavy_haft", IronPull = "t.iron_pull",
+            BattleSpin = "t.battle_spin", CloseQuarters = "t.close_quarters", DeepSplit = "t.deep_split", TwinSplit = "t.twin_split", QuickGrind = "t.quick_grind",
+            RingingReturn = "t.ringing_return", Backswing = "t.backswing", AnchorLine = "t.anchor_line", BerserkersPace = "t.berserkers_pace", WarCry = "t.war_cry", FrenziedHour = "t.frenzied_hour";
         public const string BrightNote = "c.bright_note", WideRefrain = "c.wide_refrain", LongRefrain = "c.long_refrain", WideChorus = "c.wide_chorus", LightStep = "c.light_step",
             GraceNote = "c.grace_note", Chord = "c.chord", ThirdEcho = "c.third_echo", Fortissimo = "c.fortissimo", Encore = "c.encore",
             NoteTrail = "c.note_trail", Overflow = "c.overflow", SharedRinging = "c.shared_ringing", StruckTogether = "c.struck_together", GreatBell = "c.great_bell", ChoirLeader = "c.choir_leader";
@@ -56,19 +57,21 @@ namespace LastBell.Run.Shop
             BlinkCharge = "a.blink_charge", FarBlink = "a.far_blink", GlassEdge = "a.glass_edge", FourthGlyph = "a.fourth_glyph", MissileVolley = "a.missile_volley", TwinSigil = "a.twin_sigil",
             HastyComet = "a.hasty_comet", GreatComet = "a.great_comet", Starfall = "a.starfall", SurgeEcho = "a.surge_echo", GlyphBrand = "a.glyph_brand", ResonantRune = "a.resonant_rune";
         public const string LongLungs = "g.long_lungs", SureFooting = "g.sure_footing", Formation = "g.formation", FourthChoice = "g.fourth_choice", LightFeet = "g.light_feet";
+        // Toll items (docs/proposals/toll-items-2026-11-05.md, accepted 5 Nov): stocked only on runs at Toll IV / VII or higher
+        public const string Overchannel = "a.overchannel", LeadenStep = "g.leaden_step", DoubleToll = "c.double_toll", ShortSplit = "t.short_split", SteadyBreath = "g.steady_breath",
+            LingeringRune = "a.lingering_rune", PatientBell = "g.patient_bell", LowNote = "c.low_note", LongToss = "t.long_toss", LateBloom = "g.late_bloom";
 
         public static readonly ItemDef[] All =
         {
-            // ---- Vanguard ----
-            new ItemDef { Id = TemperedEdge, Name = "Tempered Edge", Class = "Vanguard", Tier = ItemTier.Common, Value = 20, Tempered = 30,
-                Effect = "Steel Rhythm hit 3 deals +{v}% damage." },
-            new ItemDef { Id = Countdown, Name = "Countdown", Class = "Vanguard", Tier = ItemTier.Common, Value = 20, Tempered = 30,
-                Effect = "Last Word cooldown -{v}%." },
-            new ItemDef { Id = CrackedArmour, Name = "Cracked Armour", Class = "Vanguard", Tier = ItemTier.Rare, Tags = ItemTag.Crack, Value = 15, Tempered = 22.5f,
-                Effect = "Sundering Blow cracks the boss for 4 s. Everyone's heavy hits on it deal +{v}%: Last Word, Bellstrike, Crescendo, Rune Sigil, Arcane Comet.",
-                SoloNote = "Solo: applies to your own Last Word." },
-            new ItemDef { Id = Oathbound, Name = "Oathbound", Class = "Vanguard", Tier = ItemTier.Keystone, Value = 3, Tempered = 2,
-                Effect = "Sundering Blow can't be empowered. Every {v} Openings you earn reset Last Word's cooldown." },
+            // ---- Tollbreaker (TB01, TB02, TB17 and TB20 took the old slice slots at the class swap, Chzy18 1 Nov) ----
+            new ItemDef { Id = KeenEdge, Name = "Keen Edge", Class = "Tollbreaker", Tier = ItemTier.Common, Value = 20, Tempered = 30,
+                Effect = "Twin Hurl's outward hit deals +{v}% damage." },
+            new ItemDef { Id = ShortFuse, Name = "Short Fuse", Class = "Tollbreaker", Tier = ItemTier.Common, Value = 20, Tempered = 30,
+                Effect = "Splitting Throw cooldown -{v}%." },
+            new ItemDef { Id = RivenIron, Name = "Riven Iron", Class = "Tollbreaker", Tier = ItemTier.Rare, Value = 15, Tempered = 22.5f,
+                Effect = "An axe Call of Iron sends through the boss cracks it for 4 s: your own Splitting Throw and Call of Iron hits on it deal +{v}%. Personal only." },
+            new ItemDef { Id = RootedAxe, Name = "Rooted Axe", Class = "Tollbreaker", Tier = ItemTier.Keystone, Value = 25, Tempered = 30,
+                Effect = "Splitting Throw's axe stays in the boss until Call of Iron, and the split lasts as long, but the bonus is +{v}% instead of +40% and Call of Iron's cooldown is 9 s." },
             // ---- Chimesinger ----
             new ItemDef { Id = HeavyBell, Name = "Heavy Bell", Class = "Chimesinger", Tier = ItemTier.Common, Value = 20, Tempered = 30,
                 Effect = "Bellstrike deals +{v}% damage." },
@@ -90,45 +93,45 @@ namespace LastBell.Run.Shop
                 Effect = "Sprint drains {v}/s instead of 25/s." },
             new ItemDef { Id = DeepBreath, Name = "Deep Breath", Tier = ItemTier.Common, Value = 0.6f, Tempered = 0.53f,
                 Effect = "Stamina starts regenerating {v} s after use instead of 0.75 s." },
-            new ItemDef { Id = LoneBell, Name = "Lone Bell", Tier = ItemTier.Rare, Value = 15, Tempered = 22.5f,
+            new ItemDef { Id = LoneBell, Name = "Lone Bell", Tier = ItemTier.Rare, Value = 12, Tempered = 18,
                 Effect = "+{v}% damage while no ally is within 8 m." },
             new ItemDef { Id = SpareFlask, Name = "Spare Flask", Tier = ItemTier.Rare, Value = 1, Tempered = null,
                 Effect = "+{v} potion at each refill. Potions still carry over between minibosses." },
 
             // ======== full pool (Chzy18 accepted all 55 on 2026-10-28; docs/design/items/CATALOGUE.md, Items session) ========
-            // ---- Vanguard ----
-            new ItemDef { Id = QuickHands, Name = "Quick Hands", Class = "Vanguard", Tier = ItemTier.Common, Value = 0.3f, Tempered = 0.45f,
-                Effect = "The combo window between Steel Rhythm hits is {v} s longer, so you can step between hits." },
-            new ItemDef { Id = WideArc, Name = "Wide Arc", Class = "Vanguard", Tier = ItemTier.Common, Value = 30, Tempered = 45,
-                Effect = "Steel Rhythm hit 3 cleaves a {v}% wider arc." },
-            new ItemDef { Id = LongReach, Name = "Long Reach", Class = "Vanguard", Tier = ItemTier.Common, Value = 1.5f, Tempered = 2.25f,
-                Effect = "Sundering Blow range +{v} m." },
-            new ItemDef { Id = Grit, Name = "Grit", Class = "Vanguard", Tier = ItemTier.Common, Value = 8, Tempered = 12,
-                Effect = "+{v}% max HP (counts toward the +20% cap)." },
-            new ItemDef { Id = ClockworkStep, Name = "Clockwork Step", Class = "Vanguard", Tier = ItemTier.Common, Value = 3.6f, Tempered = 3.9f,
-                Effect = "Clockstep distance 3 -> {v} m. No invincibility." },
-            new ItemDef { Id = SteadyStance, Name = "Steady Stance", Class = "Vanguard", Tier = ItemTier.Common, Value = 50, Tempered = 75,
-                Effect = "Brace's movement slow is cut by {v}%. Mitigation is unchanged." },
-            new ItemDef { Id = Momentum, Name = "Momentum", Class = "Vanguard", Tier = ItemTier.Common, Value = 0, Tempered = 15,
-                Effect = "After Clockstep, your next Steel Rhythm hit counts as hit 3.", TemperNote = "That hit also deals +15% damage." },
-            new ItemDef { Id = DoubleOpening, Name = "Double Opening", Class = "Vanguard", Tier = ItemTier.Rare, Value = 0, Tempered = 15,
-                Effect = "Opening stacks to 2. Sundering Blow spends both for a wider split impact.", TemperNote = "A double-spent Sundering Blow deals +15% damage." },
-            new ItemDef { Id = PendulumCut, Name = "Pendulum Cut", Class = "Vanguard", Tier = ItemTier.Rare, Value = 1, Tempered = 1.5f,
-                Effect = "Sundering Blow's line keeps cutting for {v} s." },
-            new ItemDef { Id = HeavyHour, Name = "Heavy Hour", Class = "Vanguard", Tier = ItemTier.Rare, Value = 45, Tempered = 67,
-                Effect = "Last Word windup 0.8 -> 1.1 s, +{v}% damage and a wider fan." },
-            new ItemDef { Id = QuickVerdict, Name = "Quick Verdict", Class = "Vanguard", Tier = ItemTier.Rare, Value = -20, Tempered = -10,
-                Effect = "Last Word windup 0.8 -> 0.5 s, {v}% damage." },
-            new ItemDef { Id = IronEcho, Name = "Iron Echo", Class = "Vanguard", Tier = ItemTier.Rare, Value = 50, Tempered = 75,
-                Effect = "Last Word's fan repeats 0.6 s later for {v}% damage." },
-            new ItemDef { Id = SecondStep, Name = "Second Step", Class = "Vanguard", Tier = ItemTier.Rare, Value = 20, Tempered = 15,
-                Effect = "A dash within 1.5 s of another dash costs {v} stamina instead of 30." },
-            new ItemDef { Id = RhythmKeeper, Name = "Rhythm Keeper", Class = "Vanguard", Tier = ItemTier.Rare, Value = 10, Tempered = 15,
-                Effect = "Three full Steel Rhythm combos in a row without being hit: +{v}% damage until you're hit." },
-            new ItemDef { Id = Rally, Name = "Rally", Class = "Vanguard", Tier = ItemTier.Rare, Tags = ItemTag.Party, Value = 10, Tempered = 15,
-                Effect = "A Last Word hit gives allies within 6 m +{v}% damage for 4 s.", SoloNote = "Solo: gives it to you." },
-            new ItemDef { Id = TollOfSteel, Name = "Toll of Steel", Class = "Vanguard", Tier = ItemTier.Keystone, Value = 40, Tempered = 60,
-                Effect = "Steel Rhythm becomes 4 hits, and hit 4 sends a small Last Word fan ({v}%). Opening now comes from hit 4, not hit 3." },
+            // ---- Tollbreaker (docs/proposals/tollbreaker-items-2026-10-31.md, accepted 1 Nov) ----
+            new ItemDef { Id = WideGrind, Name = "Wide Grind", Class = "Tollbreaker", Tier = ItemTier.Common, Value = 30, Tempered = 45,
+                Effect = "Grinding Toll's ring is {v}% wider." },
+            new ItemDef { Id = LongGrind, Name = "Long Grind", Class = "Tollbreaker", Tier = ItemTier.Common, Value = 2.5f, Tempered = 2.8f,
+                Effect = "Grinding Toll spins {v} s instead of 2 s." },
+            new ItemDef { Id = QuickCatch, Name = "Quick Catch", Class = "Tollbreaker", Tier = ItemTier.Common, Value = 20, Tempered = 30,
+                Effect = "Returning axes fly {v}% faster." },
+            new ItemDef { Id = HeavyHaft, Name = "Heavy Haft", Class = "Tollbreaker", Tier = ItemTier.Common, Value = 20, Tempered = 30,
+                Effect = "The held (lodging) Twin Hurl throw deals +{v}% damage." },
+            new ItemDef { Id = IronPull, Name = "Iron Pull", Class = "Tollbreaker", Tier = ItemTier.Common, Value = 1.6f, Tempered = 2.4f, Value2 = 125, Tempered2 = 132,
+                Effect = "Call of Iron deals +{v} per metre, and its cap per axe is {w} instead of 110." },
+            new ItemDef { Id = BattleSpin, Name = "Battle Spin", Class = "Tollbreaker", Tier = ItemTier.Common, Value = 0, Tempered = 15,
+                Effect = "After a dash, your next Twin Hurl tap hits like a held throw (30) without lodging.", TemperNote = "That hit also deals +15% damage." },
+            new ItemDef { Id = CloseQuarters, Name = "Close Quarters", Class = "Tollbreaker", Tier = ItemTier.Common, Value = 12, Tempered = 18,
+                Effect = "Twin Hurl hits deal +{v}% while you're within 4 m of the boss." },
+            new ItemDef { Id = DeepSplit, Name = "Deep Split", Class = "Tollbreaker", Tier = ItemTier.Rare, Value = 8, Tempered = 9,
+                Effect = "Splitting Throw's bonus lasts {v} s instead of 6 (the axe stays lodged to match)." },
+            new ItemDef { Id = TwinSplit, Name = "Twin Split", Class = "Tollbreaker", Tier = ItemTier.Rare, Value = 50, Tempered = 75,
+                Effect = "With both axes in hand, Splitting Throw throws both; the second lodges beside the first for {v}% damage. The bonus doesn't stack, and both hands are empty until Call of Iron." },
+            new ItemDef { Id = QuickGrind, Name = "Quick Grind", Class = "Tollbreaker", Tier = ItemTier.Rare, Value = 0.3f, Tempered = 0.27f,
+                Effect = "Grinding Toll hits every {v} s instead of 0.4 s." },
+            new ItemDef { Id = RingingReturn, Name = "Ringing Return", Class = "Tollbreaker", Tier = ItemTier.Rare, Value = 2, Tempered = 3,
+                Effect = "Each axe Call of Iron sends through the boss takes {v} s off Splitting Throw's cooldown." },
+            new ItemDef { Id = Backswing, Name = "Backswing", Class = "Tollbreaker", Tier = ItemTier.Rare, Value = 6, Tempered = 7,
+                Effect = "Returning Twin Hurl axes hit for {v} instead of 3." },
+            new ItemDef { Id = AnchorLine, Name = "Anchor Line", Class = "Tollbreaker", Tier = ItemTier.Rare, Value = 20, Tempered = 30, Value2 = 12, Tempered2 = 12,
+                Effect = "Floor-lodged axes last {w} s instead of 8, and Call of Iron from the floor deals +{v}%." },
+            new ItemDef { Id = BerserkersPace, Name = "Berserker's Pace", Class = "Tollbreaker", Tier = ItemTier.Rare, Value = 2, Tempered = 3, Value2 = 10, Tempered2 = 15,
+                Effect = "Each Twin Hurl hit thrown from within 4 m adds +{v}% damage for 3 s, up to +{w}%. Lost when you're hit." },
+            new ItemDef { Id = WarCry, Name = "War Cry", Class = "Tollbreaker", Tier = ItemTier.Rare, Tags = ItemTag.Party, Value = 10, Tempered = 15,
+                Effect = "Bell Frenzy gives allies within 6 m +{v}% damage while it lasts.", SoloNote = "Solo: gives it to you." },
+            new ItemDef { Id = FrenziedHour, Name = "Frenzied Hour", Class = "Tollbreaker", Tier = ItemTier.Keystone, Value = 18, Tempered = 15,
+                Effect = "Bell Frenzy cooldown 30 -> {v} s, but it lasts 3 s instead of 4 and the fan's side axes deal 35%." },
             // ---- Chimesinger ----
             new ItemDef { Id = BrightNote, Name = "Bright Note", Class = "Chimesinger", Tier = ItemTier.Common, Value = 10, Tempered = 15, Value2 = 15, Tempered2 = 22,
                 Effect = "Resonant Note +{v}% damage and +{w}% projectile speed." },
@@ -177,7 +180,7 @@ namespace LastBell.Run.Shop
                 Effect = "After Blink, your next Magic Missile is instantly fully charged.", TemperNote = "That volley deals +15% damage." },
             new ItemDef { Id = FarBlink, Name = "Far Blink", Class = "Arcanist", Tier = ItemTier.Common, Value = 0.6f, Tempered = 0.9f,
                 Effect = "Blink distance +{v} m. No invincibility." },
-            new ItemDef { Id = GlassEdge, Name = "Glass Edge", Class = "Arcanist", Tier = ItemTier.Common, Value = 12, Tempered = 18,
+            new ItemDef { Id = GlassEdge, Name = "Glass Edge", Class = "Arcanist", Tier = ItemTier.Common, Value = 8, Tempered = 12,
                 Effect = "+{v}% damage and -8% max HP." },
             new ItemDef { Id = FourthGlyph, Name = "Fourth Glyph", Class = "Arcanist", Tier = ItemTier.Rare, Value = 4, Tempered = null,
                 Effect = "Glyphs cap at {v}." },
@@ -209,6 +212,30 @@ namespace LastBell.Run.Shop
                 Effect = "Your shop stock has {v} cards instead of 6 for the rest of the run (one more class card)." },
             new ItemDef { Id = LightFeet, Name = "Light Feet", Tier = ItemTier.Common, Value = 10, Tempered = 15,
                 Effect = "+{v}% move speed for 1 s after a dash." },
+
+            // ======== Toll items (Chzy18 accepted all 10 on 2026-11-05; sidegrades: each trades something away) ========
+            // ---- Toll IV ----
+            new ItemDef { Id = Overchannel, Name = "Overchannel", Class = "Arcanist", Tier = ItemTier.Keystone, MinToll = 4, Value = 3, Tempered = 4, Value2 = 2, Tempered2 = 2,
+                Effect = "Each Disintegrate step that hits carves {w} glyphs instead of 1, but you lose 1 glyph every {v} s while you're not channelling." },
+            new ItemDef { Id = LeadenStep, Name = "Leaden Step", Tier = ItemTier.Keystone, MinToll = 4, Value = 45, Tempered = 40, Value2 = 15, Tempered2 = 15,
+                Effect = "+{w}% damage, but each dash costs {v} stamina instead of 30. Dash distance and speed are unchanged." },
+            new ItemDef { Id = DoubleToll, Name = "Double Toll", Class = "Chimesinger", Tier = ItemTier.Rare, MinToll = 4, Value = 40, Tempered = 60, Value2 = 20, Tempered2 = 20,
+                Effect = "Bellstrike tolls again 1 s later for {v}% damage, but its recharge is {w}% longer." },
+            new ItemDef { Id = ShortSplit, Name = "Short Split", Class = "Tollbreaker", Tier = ItemTier.Rare, MinToll = 4, Value = 55, Tempered = 60,
+                Effect = "Splitting Throw's bonus is +{v}% instead of +40%, but it lasts 4 s instead of 6 (the axe stays lodged as long)." },
+            new ItemDef { Id = SteadyBreath, Name = "Steady Breath", Tier = ItemTier.Common, MinToll = 4, Value = 15, Tempered = 22, Value2 = 28, Tempered2 = 28,
+                Effect = "Stamina regenerates {v}% faster, but sprinting drains {w}/s instead of 25/s." },
+            // ---- Toll VII ----
+            new ItemDef { Id = LingeringRune, Name = "Lingering Rune", Class = "Arcanist", Tier = ItemTier.Rare, MinToll = 7, Value = 40, Tempered = 60,
+                Effect = "Rune Sigil goes off after 1.2 s instead of 0.8 s, and its rune stays 2 s more, hitting again for {v}% if the boss is still inside." },
+            new ItemDef { Id = PatientBell, Name = "Patient Bell", Tier = ItemTier.Keystone, MinToll = 7, Value = 60, Tempered = 80, Value2 = 10, Tempered2 = 10,
+                Effect = "Your first hit on the boss after 2 s without hitting it deals +{v}%; all your other hits deal -{w}%." },
+            new ItemDef { Id = LowNote, Name = "Low Note", Class = "Chimesinger", Tier = ItemTier.Common, MinToll = 7, Value = 12, Tempered = 18, Value2 = 15, Tempered2 = 15,
+                Effect = "Resonant Note +{v}% damage, but its notes fly {w}% slower." },
+            new ItemDef { Id = LongToss, Name = "Long Toss", Class = "Tollbreaker", Tier = ItemTier.Common, MinToll = 7, Value = 26, Tempered = 28, Value2 = 12, Tempered2 = 12,
+                Effect = "The held Twin Hurl throw lodges up to {w} m away instead of 9, but hits {v} instead of 30." },
+            new ItemDef { Id = LateBloom, Name = "Late Bloom", Tier = ItemTier.Rare, MinToll = 7, Value = 10, Tempered = 15, Value2 = 6, Tempered2 = 6,
+                Effect = "-{w}% damage in a fight's first phase, +{v}% in every later phase." },
         };
 
         static Dictionary<string, ItemDef> byId;

@@ -16,7 +16,7 @@
 
 ## Measured damage (watch bots, 29 Oct)
 
-The watch bots are all Vanguard on scripted input. They dodge and use their abilities, but they're weaker than people: they crowd the melee ring and miss uptime. Measure mode runs a fixed number of loops per phase and logs the damage the players dealt. Logs: `test-out/m2/measure-1.log`, `-2.log`, `-4.log`.
+The 29 Oct watch bots were all Vanguard on scripted input (Vanguard was retired on 2 Nov; the bots now play Tollbreaker, Arcanist and Chimesinger on the shared ally bot). They dodge and use their abilities, but they're weaker than people: they crowd the melee ring and miss uptime. Measure mode runs a fixed number of loops per phase and logs the damage the players dealt. Logs: `test-out/m2/measure-1.log`, `-2.log`, `-4.log`.
 
 | Party | Phase 1 team DPS | Phase 2 team DPS (boss + castings) | Phase 3 team DPS |
 |---|---|---|---|
@@ -41,13 +41,14 @@ The watch bots are all Vanguard on scripted input. They dodge and use their abil
 - **Target:** gpt/08 gives area bosses about 3–4 min. You asked for a fight close to Aurelion's difficulty, so I aimed at the long end: about 4 min solo. Aurelion is the 5–7 min exception, with base 12000 and +1.25 per fighter.
 - **Eruption margin, solo:** Phase 3 takes about 65 s, and the eruption comes at about 90 s. That leaves one spare cycle. If you lose much damage to downs, you'll see the eruption.
 - **The step is 0.9, not Aurelion's 1.25:** more players also bring more towers and more castings, and the bots show that damage doesn't scale perfectly. With people who scale linearly, 4 players finish a bit faster than solo.
-- The step uses everyone in the fight when the boss spawns.
+- The step counts the fighters present when the boss spawns. Passive menu bots aren't counted (the shared rule, 31 Oct).
 
 ## Casting HP (built)
 
-**300 per casting, +0.7 per extra player** (it was a 150 demo value). `FoundryUprising.CastHp`.
+**300 per casting, +0.5 per extra player** (it was a 150 demo value; the step was 0.7 until 3 Nov). `FoundryUprising.CastHp`.
 - **Solo:** two castings in a row, each about 9 s of damage at 35 DPS. With the rise, they're done in about 22 s of the 36 s timer.
-- **4 players:** three castings of 930 HP. At the bots' 117 DPS that takes about 24 s of the 30 s, which is tight. If people find it too tight, lower the per-player step before the base HP.
+- **4 players:** three castings of 750 HP (2250 in all; 930 with the old 0.7 step). At the 31 Oct bots' 117 DPS that takes about 24 s of the 30 s, which is tight. If people find it too tight, lower the per-player step before the base HP.
+- **3 Nov, denser bullets (Hard, 4 bots, Tollbreaker lane trace):** the bots now do about 86 DPS on the castings, so 2790 HP needs about 32 s against the 30 s flood even with no downs; they lose at the Pour Flood with the boss at 54%. Changed the same day (accepted by Chzy18, 3 Nov): the step is now 0.5, so 2250 HP takes about 26 s at that pace, 4 s inside the flood, with the Pour Flood timer and the layout unchanged. If a 4-player playtest finds it too easy, go back to 0.7.
 
 ## Easy and Hard
 
@@ -55,9 +56,9 @@ The difficulty damage scale is unchanged (damage scale only, per the difficulty 
 
 | Phase | Easy | Hard (named extra) |
 |---|---|---|
-| 1 Forge Rite | warnings ×1.25 | none yet: **open question 3** |
+| 1 Forge Rite | warnings ×1.25 | **Quake Echo**: after Anvil Quake's outer band lands, the bands fire again outside-in at +0.8 / 1.6 / 2.4 s (accepted and built 30 Oct; Phase 1 only) |
 | 2 Foundry Uprising | paths drawn 2.5 s, Pour Flood timer 40 s, damage ×0.6 | **Cast in Order**: castings must die in numeral order; killing one out of order makes every turret fire a Ring Wave at once (built) |
-| 3 Molten Crown | towers rise 6.0 s ahead, crown warned 4.0 s, eruption on the 5th crown (built), damage ×0.6 | **Second Press**: the fullest tower in each set re-stamps 2.0 s after landing (built 30 Oct, proposal) |
+| 3 Molten Crown | towers rise 6.0 s ahead, crown warned 4.0 s, eruption on the 5th crown (built), damage ×0.6 | **Second Press**: the fullest tower in each set re-stamps 2.0 s after landing (built 30 Oct) |
 
 ## Built and tested
 - `CrucivarEncounter`: v4 HP 8500, PartyStep 0.9, and the helper `V4MaxHp(players)`. `ForgeRiteTest` checks 8500 solo and 31450 for 4 players.
@@ -65,14 +66,47 @@ The difficulty damage scale is unchanged (damage scale only, per the difficulty 
 - `CrucivarWatch -crucivarMeasure -crucivarBots n`: the measure mode. It logs each phase once, holds the boss just above the threshold until the loops are done, and logs a partial phase if the fight ends first.
 
 ## Still to do (lane plan)
-1. Hard extra for Phase 1 (Second Press for Phase 3 is built).
-2. Escape checks for v4 (worst cases are listed in each phase doc).
-3. The telegraph look and the fire VFX pass.
-4. Merge Azure `feature/confrontation-menu`. That fixes the old controls. Then check that the party count at boss spawn includes the menu bots, rebuild, and run the autotest under the lock.
-5. One Azure PR into `feature/confrontation-menu`, after your OK through the review inbox.
+- **Done 30 Oct:** both Hard extras are built. Azure `feature/confrontation-menu` is merged. v4 is the default Crucivar fight (Chzy18, 30 Oct): Run Loop, Test Rush and the start-phase picker all play v4, and `-lastbellAbilitySet v3` still played v3 until 1 Nov (removed, see below). PR 12 merged; later work goes in a new PR.
+- **Done 31 Oct:**
+  - Escape checks: `tools/encounter-escape/crucivar-v4-escape-check.ps1` has 0 failures on every difficulty. `V4BoundsTest` checks that nobody can leave the floor and that wall-reaching attacks cover the farthest spot, on the round floor and on the square key-art map. The square map's corners had been safe; now they aren't.
+  - Mould Towers set B now lands between set A's towers. For 2 and 4 players it had landed on set A's own spots. Accepted by Chzy18 on 1 Nov.
+  - Telegraph look and fire VFX: the Brass Foundry motif on plain warnings, flame along Furnace Spin, embers on bullets, the Pour Flood lava wave and the eruption fill.
+  - Open question 4 settled (below).
+- Next: a playtest of the full v4 fight with people.
 
 ## Open questions
 1. ~~Fight length~~: settled 29 Oct, keep about 4 min solo.
 2. PartyStep 0.9: should co-op be longer than solo (Aurelion's 1.25) or about the same?
-3. Phase 1 Hard: does it need a named extra, or is the damage scale enough?
-4. Should passive menu bots count toward the HP, as Aurelion's do not?
+3. ~~Phase 1 Hard~~: settled 30 Oct, Quake Echo.
+4. ~~Menu bots and HP~~: settled 31 Oct. Crucivar uses the shared `BossEncounter.Spawn` rule: passive menu bots don't raise the boss or casting HP, while mechanic counts keep scaling with everyone standing.
+
+## Older sets retired (Chzy18, 1 Nov)
+v4 is the only Crucivar fight now. The packet's five attacks (v1), ability sets v2 and v3, their tests (the old "v1" suite and the v2/v3 checks), the v2/v3 escape check and `-lastbellAbilitySet` / `-lastbellAbility` for Crucivar were removed. The Crucivar autotest is now `CrucivarAutoTest` (`-crucivarTest`, was `CrucivarV2AutoTest` / `-crucivarV2Test`) and runs only the v4 checks (Chzy18, 1 Nov: no tests on retired boss versions). The Mould Towers look and the Hard Second Press numbers that v4 borrowed from v2 were kept.
+
+## 1–4 players (Chzy18, 1 Nov)
+The game is now 1–4 players. Mould Towers use two towers per set for 2–4 players, Phase 2 has two turrets at every party size (Chzy18, 4 Nov: three at 4 players was too much), and the 5–8-player layouts and tests are gone.
+
+## Playtest changes, 1 Nov (proposal)
+Chzy18's playtest found Phases 1 and 2 too easy, Phase 2 short on bullets, and unavoidable damage in the soak and pool mechanics.
+- **No unavoidable damage:**
+  - Ember Brand stops following its carrier 1.0 s (1.25 s on Easy) before it lands, so the carrier walks off before the pool forms. (A first try had the pool heat 1.0 s under the carrier; Chzy18 found the pop jarring, so it was replaced the same day.)
+  - Tower slag heats for 1.0 s (1.25 s on Easy) before it burns, so the soakers can step off.
+  - A rising Mould Tower cools any burning ground on its spot (old slag, brand pools, pour channels).
+  - Phase 3 Casting Order moved from 3.5 s to after the towers and Backdraft. Its pours had locked onto set B soakers who had to stay in their tower.
+- **Phase 1 harder:**
+  - Furnace Spin has 6 jets (was 4), so the gaps are 60° apart.
+  - A second Backdraft starts at 14.0 s, pulling the second-brand carriers back in while they walk out.
+- **Phase 2 more bullets:**
+  - Lane Stream fires 5 lanes of 8 bullets (was 3 of 5), 2.6 m apart with a 1.0 m safe strip between them.
+  - Ring Wave fires a second wave on the same gaps 0.6 s later.
+  - Spiral Arm runs 2.4 s (was 1.6).
+  - The rest between volleys is halved (0.5 s, 0.3 s from the third uprising).
+  - Phase 3's lone lava turret is unchanged.
+- **Checks:**
+  - The escape check passes on Easy, Medium and Hard, with new rows for the second Backdraft, the pools, the tower slag and the dense lanes.
+  - The v4 tests pass 76/76.
+
+## Solo bot runs and attack icons (2 Nov)
+- **Solo Tollbreaker runs** (`CrucivarWatch -crucivarMeasure -crucivarBots 1 -crucivarAllyBot`, with the Tollbreaker class merged in for testing). Easy clears all three phases in 268 s. Medium went down in Phase 2, and the new per-attack log shows why: Ring Wave bullets, six hits in five seconds. The shared ally bot only saw where each bullet was, not where it was going. It now looks 0.35 s ahead along a moving hazard's new `Drift` (bullets set it). With the look-ahead, solo Hard clears all three phases in 266 s (3 Nov). The bot was topped up 30 times: 1 in Phase 1, 8 in Phase 2, 21 in Phase 3. Its biggest damage sources are Furnace Spin (555), Lane Stream bullets (410) and Anvil Quake II (216), so jet dodging is the bot's next weak spot. These are bot numbers, not balance numbers.
+- **Measure mode logs** the damage the bot took per attack and its last eight hits when the fight ends.
+- **Attack icons:** Codex's v4 icons (accepted by Chzy18, 2 Nov) are in the boss attack icon catalog. Every v4 hazard carries its `AttackId`, so the death recap, tooltips and the Down card show the icon with the attack name. See `docs/run-loop/boss-attack-icons.md`.

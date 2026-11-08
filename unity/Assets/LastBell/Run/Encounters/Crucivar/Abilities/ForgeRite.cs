@@ -6,10 +6,11 @@ namespace LastBell.Run
 {
     // Ability set v4, Phase 1 "Forge Rite" (proposal; Chzy18 picked it from the browser trials on 2026-10-26). One loop of
     // 20.5 s, Medium numbers; Easy stretches every warning by 1.25. Up to three things are live at once (pools included).
-    //   0.0  Ember Brand        3 m brand follows each player, lands 3.5 s: 30 Ground to OTHER players inside; leaves a 2 m
-    //                           slag pool (20/s) under the carrier that lasts until the phase ends (ClearPools)
+    //   0.0  Ember Brand        3 m brand follows each player and stops 1.0 s before it lands at 3.5 s: 30 Ground to OTHER
+    //                           players inside; leaves a 2 m slag pool (20/s) where it stopped, until the phase ends (ClearPools)
     //   2.0  Furnace Spin       four flame jets to the wall (1.8 m wide) shown 1.5 s, then sweep round the boss for 4 s at 40 deg/s,
     //                           30 each, once per jet; the turn direction flips every loop
+    //        Spin Reversal (Hard) the jets stop 2.0 s into the sweep for 0.5 s (vents flare), then turn back for 1.5 s
     //   5.0  Backdraft          5 m blast round the boss at 3.0 s (45, 1.5 m push); everyone pulled 2 m inward at 1.6-2.0 s
     //   8.5  Casting Order      pours I-IV (2.6 m lanes to the wall) through each numbered player, locking 1.5 s before they
     //                           land 0.5 s apart at 10.5-12.0 s, 30 each; each leaves a channel burning 20/s for 10 s.
@@ -17,6 +18,7 @@ namespace LastBell.Run
     //  11.0  Anvil Quake        inner circle (0-4 m) at 1.4 s, middle band (4-9 m) at 2.2 s, outer band (9 m to the wall) at
     //                           3.0 s, 40 each, Strike, all shown at once; lands after the last pour (Chzy18 10-27 replaced
     //                           the Hammerfall cleave, which came down right after the pours and could be out-ranged)
+    //        Quake Echo (Hard)  as the outer band lands the bands show again and fire outside-in at +0.8 / 1.6 / 2.4 s
     //  13.5  Ember Brand        again
     //  17.5  punish window      3.0 s (the encounter plays it)
     public sealed class ForgeRite : CrucivarAbility
@@ -25,6 +27,10 @@ namespace LastBell.Run
 
         public const float LoopLength = 20.5f, Punish = 3.0f;
         public const float BrandRadius = 3f, BrandLand = 3.5f, PoolRadius = 2f, PoolBurn = 20f;
+        // the brand stops following 1.0 s before it lands, so the carrier walks off before the pool forms (Chzy18 11-01: a pool
+        // popping under you felt like a hit). Tower slag still heats PoolArm before it burns (no unavoidable damage).
+        public const float BrandFreeze = 1.0f, PoolArm = 1.0f;
+        public const int JetCount = 6;   // since 11-01 (Chzy18: Phase 1 too easy), was 4
         public const int BrandDmg = 30;
         public const float JetWidth = 1.8f, JetShow = 1.5f, JetSweep = 4f, JetTurnDeg = 40f;
         public const int JetDmg = 30;
@@ -34,8 +40,15 @@ namespace LastBell.Run
         public const int PourDmg = 30;
         public const float QuakeFirst = 1.4f, QuakeGap = 0.8f, QuakeInner = 4f, QuakeMiddle = 9f;
         public const int QuakeDmg = 40;
+        public const float EchoGap = 0.8f;   // Hard: Quake Echo
+        // Hard: Spin Reversal (proposal, 5 Nov). The jets turn 2.0 s, stop 0.5 s with the vents flaring, then turn back for the
+        // last 1.5 s (same 4 s live); the gap you ride reverses with them. Every Furnace Spin on Hard, every phase.
+        public const float ReverseAt = 2.0f, ReverseHold = 0.5f;
 
         int loops;
+        public int Echoes { get; private set; }
+        public int Reversals { get; private set; }
+        public float SpinNet { get; private set; }   // degrees the last Furnace Spin's first jet turned in all (tests)
         public int Loops => loops;
         public readonly List<Hazard> Pools = new List<Hazard>();
         public List<PlayerController> Order { get; private set; } = new List<PlayerController>();
@@ -61,36 +74,66 @@ namespace LastBell.Run
             foreach (var w in Until(8.5f)) yield return w;
             Boss.SetCurrent("Casting Order"); CastingOrder();
             foreach (var w in Until(11.0f)) yield return w;
-            Boss.SetCurrent("Anvil Quake"); AnvilQuake();
+            Boss.SetCurrent("Anvil Quake"); AnvilQuake(echo: Hard);
             foreach (var w in Until(13.5f)) yield return w;
             Boss.SetCurrent("Ember Brand"); EmberBrand();
+            // second Backdraft (11-01): its pull drags the brand carriers back in while they walk their brands out
+            foreach (var w in Until(14.0f)) yield return w;
+            Boss.SetCurrent("Backdraft");
+            foreach (var w in Backdraft()) { t += w; yield return w; }
             foreach (var w in Until(17.5f)) yield return w;
         }
 
         // ---------------- Ember Brand ----------------
         internal void EmberBrand()
         {
-            foreach (var p in Standing())
+            Boss.Presenter?.Action("EmberBrand", T(BrandLand));   // body clips are visual only (crucivar_v4_clips.py), stretched to the telegraph
+            // revivers get no brand; with nobody else to brand, one untracked brand lands in front of him instead
+            var carriers = Aimable();
+            if (carriers.Count == 0 && Standing().Count > 0) { UnaimedBrand(); return; }
+            foreach (var p in carriers)
             {
                 var owner = p;
                 var h = new Hazard
                 {
-                    Source = "Ember Brand", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Flat(p.transform.position),
-                    Radius = BrandRadius, LockAt = T(BrandLand), ResolveAt = T(BrandLand), Damage = BrandDmg, Knockback = 0,
+                    Source = "Ember Brand", AttackId = "crucivar.ember_brand", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Flat(p.transform.position),
+                    Radius = BrandRadius, LockAt = T(BrandLand - BrandFreeze), ResolveAt = T(BrandLand), Damage = BrandDmg, Knockback = 0,
                 };
-                h.Track = hz => { if (!owner.Down) hz.Origin = Flat(owner.transform.position); };
+                h.Track = hz => { if (!owner.Down && !Reviver(owner)) hz.Origin = Flat(owner.transform.position); };   // until LockAt; stays put while its carrier revives
                 h.Includes = q => q != owner && h.Contains(q.transform.position);   // the carrier is never hit by its own brand
                 h.OnResolve = hz =>
                 {
                     W.BossFx.SlagSplash(hz.Origin, hz.Radius);
                     Pools.Add(W.Hazards.Spawn(new Hazard
                     {
-                        Source = "Brand Pool", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = hz.Origin, Radius = PoolRadius,
-                        LockAt = 0, ResolveAt = Sim.Ticks(3600), BurnPerSecond = PoolBurn,   // lasts until the phase ends
+                        Source = "Brand Pool", AttackId = "crucivar.ember_brand", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = hz.Origin, Radius = PoolRadius,
+                        LockAt = 0, ResolveAt = Sim.Ticks(3600), BurnPerSecond = PoolBurn,   // burns at once (the carrier left), lasts until the phase ends
                     }));
                 };
                 W.Hazards.Spawn(h);
             }
+        }
+
+        public int UnaimedBrands { get; private set; }
+        void UnaimedBrand()
+        {
+            UnaimedBrands++;
+            var h = new Hazard
+            {
+                Source = "Ember Brand", AttackId = "crucivar.ember_brand", Shape = HazardShape.Circle, Kind = HazardKind.Ground,
+                Origin = Flat(Boss.transform.position) + Sim.Dir(Boss.transform.eulerAngles.y) * 6f,
+                Radius = BrandRadius, LockAt = 0, ResolveAt = T(BrandLand), Damage = BrandDmg, Knockback = 0,
+            };
+            h.OnResolve = hz =>
+            {
+                W.BossFx.SlagSplash(hz.Origin, hz.Radius);
+                Pools.Add(W.Hazards.Spawn(new Hazard
+                {
+                    Source = "Brand Pool", AttackId = "crucivar.ember_brand", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = hz.Origin, Radius = PoolRadius,
+                    LockAt = 0, ResolveAt = Sim.Ticks(3600), BurnPerSecond = PoolBurn,
+                }));
+            };
+            W.Hazards.Spawn(h);
         }
 
         // the phase ends: every brand pool cools at once
@@ -106,16 +149,32 @@ namespace LastBell.Run
             var origin = Flat(Boss.transform.position);
             float baseYaw = Boss.transform.eulerAngles.y + 45f, dir = loops % 2 == 1 ? 1f : -1f;
             int show = T(JetShow), sweep = Sim.Ticks(JetSweep);
-            for (int k = 0; k < 4; k++)
+            Boss.Presenter?.Action(dir > 0 ? "FurnaceSpinCW" : "FurnaceSpinCCW", show + sweep);   // turns the way the jets sweep
+            bool reverse = Hard; int stop = Sim.Ticks(ReverseAt), back = Sim.Ticks(ReverseAt + ReverseHold);
+            SpinNet = 0;
+            for (int k = 0; k < JetCount; k++)
             {
+                bool first = k == 0;
                 var h = new Hazard
                 {
-                    Source = "Furnace Spin", Shape = HazardShape.Lane, Kind = HazardKind.Strike, Origin = origin, Yaw = baseYaw + 90f * k,
+                    Source = "Furnace Spin", AttackId = "crucivar.furnace_spin", Shape = HazardShape.Lane, Kind = HazardKind.Strike, Origin = origin, Yaw = baseYaw + 360f / JetCount * k,
                     Width = JetWidth, ResolveAt = show, ActiveTicks = sweep, LockAt = show + sweep + 1,
                     Damage = JetDmg, Knockback = 1f,
                 };
                 ToWall(h);
-                h.Track = hz => { if (hz.Age >= hz.ResolveAt) hz.Yaw += dir * JetTurnDeg * Sim.Dt; ToWall(hz); };   // turns only once it is live, always reaches the wall
+                h.Track = hz =>
+                {
+                    if (hz.Age >= hz.ResolveAt)   // turns only once it is live, always reaches the wall
+                    {
+                        int live = hz.Age - hz.ResolveAt;
+                        float d = !reverse || live < stop ? dir : live < back ? 0 : -dir;
+                        hz.Yaw += d * JetTurnDeg * Sim.Dt;
+                        if (first) SpinNet += d * JetTurnDeg * Sim.Dt;
+                        if (first && reverse && live == stop) { Reversals++; Boss.Flare(1.2f); Boss.Rig.VentsAll(true); }   // the stop is the warning
+                    }
+                    ToWall(hz);
+                    if (hz.Age >= hz.ResolveAt && (hz.Age - hz.ResolveAt) % 4 == 0) W.BossFx.FlameJet(hz.Origin, hz.Yaw, hz.Length, hz.Width);   // flames while it sweeps
+                };
                 W.Hazards.Spawn(h);
             }
             Boss.Rig.VentsAll(true);
@@ -124,10 +183,11 @@ namespace LastBell.Run
         // ---------------- Backdraft ----------------
         internal IEnumerable<int> Backdraft()
         {
+            Boss.Presenter?.Action("Backdraft", T(BlastAt));
             var centre = Flat(Boss.transform.position);
             var blast = W.Hazards.Spawn(new Hazard
             {
-                Source = "Backdraft", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = centre, Radius = BlastRadius,
+                Source = "Backdraft", AttackId = "crucivar.backdraft", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = centre, Radius = BlastRadius,
                 LockAt = 0, ResolveAt = T(BlastAt), Damage = BlastDmg, Knockback = 1.5f,
             });
             blast.OnResolve = hz => { W.BossFx.BellowsBlast(hz.Origin, hz.Radius); Boss.Flare(1.3f); Boss.Rig.VentsAll(false); };
@@ -161,61 +221,84 @@ namespace LastBell.Run
                     : list.Skip(loops % list.Count).Concat(list.Take(loops % list.Count)).Take(4).ToList();
             }
             NumeralsShown = !memory;
+            // a pour whose player is reviving as it is cast (fresh or a memory recast) is not aimed: it takes a fixed line and
+            // shows no numeral; the pour count and timings stay the same
+            var targets = Order.Select(p => p != null && !Reviver(p) ? p : null).ToList();
+            Boss.Presenter?.Action("CastingOrder", T(PourLead + PourGap * 3 + 0.5f));   // four tips, one per pour I-IV (fewer pours: the first ones line up)
             var origin = Flat(Boss.transform.position);
-            for (int k = 0; k < Order.Count; k++)
+            for (int k = 0; k < targets.Count; k++)
             {
-                var target = Order[k];
+                var target = targets[k];
                 int resolve = T(PourLead + PourGap * k), lockAt = resolve - T(PourLockBefore);
                 var h = new Hazard
                 {
-                    Source = "Pour " + new[] { "I", "II", "III", "IV" }[k], Shape = HazardShape.Lane, Kind = HazardKind.Ground, Origin = origin,
+                    Source = "Pour " + new[] { "I", "II", "III", "IV" }[k], AttackId = "crucivar.casting_order", Shape = HazardShape.Lane, Kind = HazardKind.Strike, Origin = origin,
                     Width = PourWidth, LockAt = lockAt, ResolveAt = resolve, Damage = PourDmg, Knockback = 1f, Yaw = Boss.transform.eulerAngles.y,
                 };
-                Aim(h, target);
-                h.Track = hz => { if (!target.Down) Aim(hz, target); };
+                if (target != null) Aim(h, target);
+                else { h.Yaw = Boss.transform.eulerAngles.y + 90f * k; ToWall(h); UnaimedPours++; }   // unaimed: a fixed line
+                h.Track = hz => { if (target != null && !target.Down && !Reviver(target)) Aim(hz, target); };   // never follows a reviver
                 h.OnResolve = hz =>
                 {
                     W.BossFx.StripStamp(hz.Origin, hz.Yaw, hz.Length, hz.Width);
                     W.Hazards.Spawn(new Hazard
                     {
-                        Source = "Pour Channel", Shape = HazardShape.Lane, Kind = HazardKind.Ground, Origin = hz.Origin, Yaw = hz.Yaw,
+                        Source = "Pour Channel", AttackId = "crucivar.casting_order", Shape = HazardShape.Lane, Kind = HazardKind.Strike, Origin = hz.Origin, Yaw = hz.Yaw,
                         Length = hz.Length, Width = hz.Width, LockAt = 0, ResolveAt = Sim.Ticks(ChannelLife), BurnPerSecond = ChannelBurn,
                     });
                 };
                 W.Hazards.Spawn(h);
-                if (NumeralsShown) ForgeRiteNumeral.Show(W, h, target, k + 1);
+                if (NumeralsShown && target != null)
+                {
+                    ForgeRiteNumeral.Show(W, h, target, k + 1);
+                    if (CrucivarEncounter.NetOn) CrucivarEncounter.Net("Crucivar.PourNumeral", target, k + 1, h.Source);   // the client hangs it on the stand-in
+                }
             }
             Boss.Rig.Pour(true);
         }
 
+        public int UnaimedPours { get; private set; }
+
         // a lane from the boss that always ends at the arena wall
-        static void ToWall(Hazard h) => h.Length = GreatCasting.RayToCircle(h.Origin, Sim.Dir(h.Yaw), Rim + Hazard.Margin, out float t) ? t : Rim * 2;
+        static void ToWall(Hazard h) { float t = WallDist(h.Origin, Sim.Dir(h.Yaw)); h.Length = t > 0 ? t : Far * 2; }
 
         void Aim(Hazard h, PlayerController target)
         {
             var d = Flat(target.transform.position - h.Origin);
             if (d.sqrMagnitude > 0.01f) h.Yaw = Sim.YawTo(h.Origin, target.transform.position, h.Yaw);
-            h.Length = GreatCasting.RayToCircle(h.Origin, Sim.Dir(h.Yaw), Rim + Hazard.Margin, out float t) ? t : Rim * 2;
+            ToWall(h);
         }
 
         // ---------------- Anvil Quake ----------------
         // three bands from the anvil out to the wall, all shown at once, landing inner -> middle -> outer: step into a band
         // that has already gone off (in toward the boss once the inner ring has landed)
-        internal void AnvilQuake()
+        internal void AnvilQuake(bool echo = false)   // echo: Phase 1's Hard extra only (Phase 2 reuses the quake without it)
         {
             Boss.Rig.Pour(false);
             var origin = Flat(Boss.transform.position);
-            float wall = Rim + origin.magnitude + Hazard.Margin;
+            float wall = Far + origin.magnitude + Hazard.Margin;
             Spawn("Anvil Quake I", HazardShape.Circle, 0, QuakeInner, T(QuakeFirst));
             Spawn("Anvil Quake II", HazardShape.Ring, QuakeInner, QuakeMiddle, T(QuakeFirst + QuakeGap));
-            Spawn("Anvil Quake III", HazardShape.Ring, QuakeMiddle, wall, T(QuakeFirst + 2 * QuakeGap));   // reaches the wall: no out-ranging
+            var outerBand = Spawn("Anvil Quake III", HazardShape.Ring, QuakeMiddle, wall, T(QuakeFirst + 2 * QuakeGap));   // reaches the wall: no out-ranging
             Boss.Presenter.PlayOnce("Diebreaker", T(QuakeFirst) / (float)Sim.Hz);
+            // Hard (Chzy18 accepted 10-30): Quake Echo. Once the outer band lands the bands show again and fire outside-in,
+            // 0.8 s apart from 0.8 s later, so stepping inward is no longer safe for the rest of the quake
+            if (echo)
+                outerBand.OnResolve += hz =>
+                {
+                    if (!Boss) return;
+                    Echoes++;
+                    Spawn("Quake Echo III", HazardShape.Ring, QuakeMiddle, wall, T(EchoGap));
+                    Spawn("Quake Echo II", HazardShape.Ring, QuakeInner, QuakeMiddle, T(2 * EchoGap));
+                    Spawn("Quake Echo I", HazardShape.Circle, 0, QuakeInner, T(3 * EchoGap));
+                };
 
-            void Spawn(string name, HazardShape shape, float inner, float outer, int at)
+            Hazard Spawn(string name, HazardShape shape, float inner, float outer, int at)
             {
                 var h = W.Hazards.Spawn(new Hazard
                 {
-                    Source = name, Shape = shape, Kind = HazardKind.Strike, Origin = origin, Inner = inner, Radius = outer,
+                    Source = name, AttackId = name.StartsWith("Quake Echo") ? "crucivar.quake_echo" : "crucivar.anvil_quake",
+                    Shape = shape, Kind = HazardKind.Ground, Origin = origin, Inner = inner, Radius = outer,
                     LockAt = 0, ResolveAt = at, Damage = QuakeDmg, Knockback = 1f,
                 });
                 h.OnResolve = hz =>
@@ -223,6 +306,7 @@ namespace LastBell.Run
                     if (hz.Shape == HazardShape.Circle) W.BossFx.DiebreakerResolve(hz.Origin, hz.Radius); else W.BossFx.BellowsBlast(hz.Origin, hz.Radius);
                     Boss.Flare(1f);
                 };
+                return h;
             }
         }
     }

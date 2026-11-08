@@ -39,7 +39,7 @@ namespace LastBell.Run
             Say(Name);
             int warn = Warn();
             LastHorizon = Mathf.Max(0, horizonTicks);
-            Clip("MeridianAlignment", warn);
+            Clip("OrreryClosing", warn);   // arms spread, the halo turns; arms shut as the rings close
             var rim = Spawn(new Hazard
             {
                 Source = Name + " rim", Shape = HazardShape.Ring, Kind = HazardKind.Ground, Origin = Centre,
@@ -67,38 +67,74 @@ namespace LastBell.Run
     // Horizon the rim ring stays down on its edge, the band turns a calmer coral with a pulsing border ("don't cross"),
     // and in its last second the ring blinks faster and dims before lifting away as the hazard expires. A hazard cleared
     // early (boss death, retry) just fades its ring.
-    sealed class OrreryClosingFx : MonoBehaviour
+    public sealed class OrreryClosingFx : MonoBehaviour
     {
         static readonly Color Gold = new Color(0.82f, 0.64f, 0.3f);
         const float EdgeInset = 0.3f;   // telegraph style: decor rings sit inside the hazard, continuous, never on the outline
         static readonly Color CalmFill = new Color(0.78f, 0.36f, 0.30f), CalmBorder = new Color(1.6f, 0.75f, 0.45f);
         const float RimStartY = 3.5f, CrownStartY = 3.4f;
 
-        sealed class Ring { public Hazard H; public Transform Root, Bead; public Material Mat; public float Spin, Turn, R, StartY, Fade = -1; public LastBell.VFX.BellkeeperFx.Telegraph Edge; }
+        sealed class Ring { public Hazard H; public Transform Root, Bead; public Material Mat; public float Spin, Turn, R, StartY, Fade = -1; public bool Done; public LastBell.VFX.BellkeeperFx.Telegraph Edge; }
         readonly List<Ring> rings = new List<Ring>();
         CombatWorld w; int horizon;
 
-        public static void Create(CombatWorld world, Hazard rim, Hazard crown, int horizonTicks)
+        // Pooled (perf capture 3 Nov: building ~170 pieces and their materials inside one tick cost a 24-29 ms frame early
+        // in Phase 2). Warm builds one set when the boss is built; a cast reuses a hidden set and hides it again when done.
+        static readonly List<OrreryClosingFx> pool = new List<OrreryClosingFx>();
+        // the warm set is drawn for a couple of frames under the floor first, so its meshes and material upload before the
+        // fight (perf 3 Nov: built but first drawn mid-fight, it still cost a 24 ms GPU frame)
+        int warmFrames;
+        public static void Warm(CombatWorld world)
+        {
+            if (Free(world) != null) return;
+            var fx = Build(world); fx.warmFrames = 3;
+            foreach (var o in fx.rings) o.Root.position = new Vector3(0, -3f, 0);
+        }
+        static OrreryClosingFx Free(CombatWorld world)
+        {
+            pool.RemoveAll(f => f == null);
+            foreach (var f in pool) if (f.w == world && !f.gameObject.activeSelf) return f;
+            return null;
+        }
+        static OrreryClosingFx Build(CombatWorld world)
         {
             var go = new GameObject("Orrery Closing fx"); go.transform.SetParent(world.Root, false);
-            var fx = go.AddComponent<OrreryClosingFx>(); fx.w = world; fx.horizon = horizonTicks;
-            fx.Add(rim, rim.Inner + EdgeInset, 1, RimStartY);       // just inside each hazard, clear of its plain outline
-            fx.Add(crown, crown.Radius - EdgeInset, -1.6f, CrownStartY);
+            var fx = go.AddComponent<OrreryClosingFx>(); fx.w = world;
+            fx.Add(OrreryClosing.RimInner + EdgeInset, 1, RimStartY, 0.25f);       // just inside each hazard, clear of its plain outline
+            fx.Add(OrreryClosing.CrownRadius - EdgeInset, -1.6f, CrownStartY, -0.25f);
+            pool.Add(fx);
+            return fx;
         }
 
-        void Add(Hazard h, float r, float spin, float startY)
+        public static void Create(CombatWorld world, Hazard rim, Hazard crown, int horizonTicks)
         {
-            var o = new Ring { H = h, Spin = spin, R = r, StartY = startY, Mat = Prim.Material(Gold, 1f) };
+            if (!rim.Replica) Networking.LanFx.Record?.Invoke(Networking.LanFxTarget.Replica, "OrreryClosing", new object[] { rim.Id, crown.Id, horizonTicks });
+            var fx = Free(world) ?? Build(world);
+            fx.horizon = horizonTicks; fx.warmFrames = 0;
+            fx.Begin(fx.rings[0], rim); fx.Begin(fx.rings[1], crown);
+            fx.gameObject.SetActive(true);
+        }
+
+        void Begin(Ring o, Hazard h)
+        {
+            o.H = h; o.Turn = 0; o.Fade = -1; o.Done = false; o.Edge = null;
+            o.Root.position = new Vector3(h.Origin.x, o.StartY, h.Origin.z); o.Root.rotation = Quaternion.identity;
+            o.Bead.localPosition = new Vector3(0, 0.18f, o.R);
+            o.Mat.SetColor("_EmissionColor", Gold * 0.4f);
+            o.Root.gameObject.SetActive(true);
+        }
+
+        // side: the clock ticks' offset from the ring (the rim's point out into the danger, the crown's point in)
+        void Add(float r, float spin, float startY, float side)
+        {
+            var o = new Ring { Spin = spin, R = r, StartY = startY, Mat = Prim.Material(Gold, 1f) };
             o.Root = new GameObject("Orrery ring").transform; o.Root.SetParent(transform, false);
-            o.Root.position = new Vector3(h.Origin.x, startY, h.Origin.z);
             int n = Mathf.Max(12, Mathf.CeilToInt(2 * Mathf.PI * r / 0.6f));
             for (int k = 0; k < n; k++)
             {
                 float ang = k * 360f / n;
                 Share(Prim.Make(PrimitiveKind.Cube, o.Root, Quaternion.Euler(0, ang, 0) * new Vector3(0, 0, r), new Vector3(2 * Mathf.PI * r / n * 1.02f, 0.05f, 0.07f), Gold, 0, Quaternion.Euler(0, ang + 90, 0)), o.Mat);
             }
-            // clock ticks just inside the edge (the rim's point out into the danger, the crown's point in)
-            float side = h.Shape == HazardShape.Ring ? 0.25f : -0.25f;
             for (int k = 0; k < 12; k++)
                 Share(Prim.Make(PrimitiveKind.Cube, o.Root, Quaternion.Euler(0, k * 30, 0) * new Vector3(0, 0.04f, r + side), new Vector3(k % 3 == 0 ? 0.14f : 0.08f, 0.08f, k % 3 == 0 ? 0.6f : 0.35f), Gold, 0, Quaternion.Euler(0, k * 30, 0)), o.Mat);
             o.Bead = Prim.Make(PrimitiveKind.Sphere, o.Root, new Vector3(0, 0.18f, r), Vector3.one * 0.3f, Gold);
@@ -109,12 +145,15 @@ namespace LastBell.Run
 
         void Update()
         {
+            if (warmFrames > 0) { if (--warmFrames == 0) gameObject.SetActive(false); return; }
             float dt = Time.deltaTime;
-            for (int i = rings.Count - 1; i >= 0; i--)
+            bool any = false;
+            foreach (var o in rings)
             {
-                var o = rings[i];
+                if (o.Done) continue;
+                any = true;
                 var h = o.H;
-                bool live = w != null && w.Hazards.Live.Contains(h) && !h.Cancelled;
+                bool live = Hazard.IsLive(w, h);
                 bool resolved = h.Age >= h.ResolveAt;
                 if (!live && o.Fade < 0) { o.Fade = resolved ? 1f : 0.4f; o.Edge?.Expire(); o.Edge = null; }   // resolved / expired: flash; cleared early: dim
                 if (o.Fade >= 0)
@@ -123,7 +162,7 @@ namespace LastBell.Run
                     o.Mat.SetColor("_EmissionColor", Gold * Mathf.Max(0, o.Fade) * 6f);
                     // the crown sinks into the floor; an expired Horizon lifts away
                     o.Root.position += (h.Shape == HazardShape.Ring && horizon > 0 && resolved ? Vector3.up : Vector3.down) * dt * 0.6f;
-                    if (o.Fade <= 0) { Destroy(o.Root.gameObject); Destroy(o.Mat); rings.RemoveAt(i); }
+                    if (o.Fade <= 0) { o.Done = true; o.Root.gameObject.SetActive(false); }
                     continue;
                 }
                 var p = o.Root.position;
@@ -147,13 +186,14 @@ namespace LastBell.Run
                     if (h.Tele != null) h.Tele.Tint(CalmFill * Mathf.Lerp(0.55f, 1f, dim), CalmBorder * (0.6f + 0.8f * pulse));
                     // readability A5: the usable inside edge stays a continuous stroke above every transient fill (Hour Hands,
                     // stars, pools) for the whole Horizon; presentation only, the rim hazard owns the hit
-                    if (o.Edge == null && h.Shape == HazardShape.Ring) { o.Edge = w.BossFx.Ring(h.Inner, h.Inner + 0.22f); o.Edge.Motif(2); o.Edge.Progress(1); o.Edge.Order = 4; o.Edge.Place(h.Origin, 0); }
+                    if (o.Edge == null && h.Shape == HazardShape.Ring && !h.Replica) {   // a LAN client gets the host's edge telegraph
+                     o.Edge = w.BossFx.Ring(h.Inner, h.Inner + 0.22f); o.Edge.Motif(2); o.Edge.Progress(1); o.Edge.Order = 4; o.Edge.Place(h.Origin, 0); }
                     o.Edge?.Tint(CalmBorder, CalmBorder * (0.8f + 0.6f * pulse));
                 }
                 o.Root.rotation = Quaternion.Euler(0, o.Turn, 0);
                 o.Bead.localPosition = Quaternion.Euler(0, o.Turn * 2.5f, 0) * new Vector3(0, 0.18f, o.R);
             }
-            if (rings.Count == 0) Destroy(gameObject);
+            if (!any) gameObject.SetActive(false);   // back to the pool
         }
 
         void OnDestroy()

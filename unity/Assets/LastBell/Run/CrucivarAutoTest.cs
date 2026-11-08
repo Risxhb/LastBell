@@ -4,308 +4,257 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace LastBell.Run
 {
-    // Acceptance run for Crucivar inside the real game, started with  -crucivarTest -lastbellOut <folder>  (editor Play
-    // Mode via CrucivarTestTools.PlayModeTest, or a player). Same approach as RunAutoTest: it only uses the director's
-    // public requests, a bot that sends ordinary PlayerInput, and the labelled dev hooks (boss HP fraction / defeat,
-    // player DebugSetHp to keep the bot standing). It checks the packet's numbers against what the hazards actually do,
-    // captures screenshots of every attack's telegraph, writes crucivar-report.txt and exits 0 (all passed) or 1.
+    // Acceptance run for Crucivar's v4 fight inside the real game (Brass Foundry practice). Only the current fight is
+    // tested (Chzy18 11-01: no tests on retired boss versions; the old v1 suite of this name and the v2/v3 checks are gone):
+    //   Unity.exe -projectPath unity -executeMethod LastBell.Run.EditorTools.CrucivarTestTools.PlayModeTest
+    //             -crucivarTest [-crucivarAbility <id>] -lastbellOut <dir>
+    // It holds Crucivar's schedule (TestHold) and runs every CrucivarAbilityTest (one per ability in
+    // Encounters/Crucivar/Tests), optionally only the one whose Id matches -crucivarAbility.
+    // Extra party members are real PlayerControllers driven by scripted input, so hits, stamina, dash and knockback all
+    // go through the normal code. Writes crucivar-report.txt and screenshots, exits 0 (all passed) or 1.
     public sealed class CrucivarAutoTest : MonoBehaviour
     {
         public static bool Requested => Environment.GetCommandLineArgs().Any(a => a.Equals("-crucivarTest", StringComparison.OrdinalIgnoreCase));
-        static string OutDir
-        {
-            get
-            {
-                var args = Environment.GetCommandLineArgs();
-                int i = Array.FindIndex(args, a => a.Equals("-lastbellOut", StringComparison.OrdinalIgnoreCase));
-                return i >= 0 && i + 1 < args.Length ? args[i + 1] : Path.Combine(Application.persistentDataPath, "crucivar-test");
-            }
-        }
+        static string OutDir => CrucivarArgs.Arg("-lastbellOut") ?? Path.Combine(Application.persistentDataPath, "crucivar-test");
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Boot()
         {
             if (!Requested) return;
+            // a built player starts at the main menu, whose live backdrop has a RunDirector of its own: driving that one
+            // froze the player at Ready (Tollbreaker lane, 11-03). Load the Brass Foundry run map first, as the editor run does.
+            string foundry = RunMaps.All[RunMaps.IndexOf("brass-foundry")].RunScene;
+            if (SceneManager.GetActiveScene().path != foundry) { SceneManager.sceneLoaded += OnFoundry; SceneManager.LoadScene(foundry); return; }
+            Attach();
+        }
+        static void OnFoundry(Scene s, LoadSceneMode m) { SceneManager.sceneLoaded -= OnFoundry; Attach(); }
+        static void Attach()
+        {
             var d = FindAnyObjectByType<RunDirector>();
             if (d && !d.GetComponent<CrucivarAutoTest>()) d.gameObject.AddComponent<CrucivarAutoTest>();
         }
 
-        sealed class Bot : IInputSource
+        // ---------------- scripted input ----------------
+        // Steers toward a target at a set speed (4.2 m/s = the prototype walk, 6 = design walk), or holds still. Dash()
+        // presses dash once on the next tick, in the steering direction.
+        public sealed class Scripted : IInputSource
         {
-            public Vector3 MoveWorld; public Vector3 Aim; public bool Sprint;
+            public Vector3? Target; public float Speed = 4.2f; public Vector3 Aim; public bool Sprint;
+            public Vector3 Heading;   // used when Target is null: constant direction (zero = stand still)
+            bool dash;
+            public void Dash() => dash = true;
+            public void Stop() { Target = null; Heading = Vector3.zero; Sprint = false; }
+            public void Go(Vector3 to, float speed = 4.2f) { Target = Sim.Flat(to); Speed = speed; }
             public PlayerInput Read(PlayerController who)
             {
                 var r = new PlayerInput { Aim = Aim, Sprint = Sprint };
+                Vector3 move = Heading;
+                if (Target.HasValue)
+                {
+                    var to = Target.Value - Sim.Flat(who.transform.position);
+                    float step = Speed * Sim.Dt;
+                    move = to.magnitude <= Mathf.Max(0.05f, step) ? Vector3.zero : to.normalized * Mathf.Clamp01(Speed / PlayerController.WalkSpeed);
+                }
                 var cam = Camera.main; var fwd = cam ? Sim.Flat(cam.transform.forward).normalized : Vector3.forward;
                 var right = Vector3.Cross(Vector3.up, fwd);
-                r.Move = Vector2.ClampMagnitude(new Vector2(Vector3.Dot(MoveWorld, right), Vector3.Dot(MoveWorld, fwd)), 1);
+                r.Move = Vector2.ClampMagnitude(new Vector2(Vector3.Dot(move, right), Vector3.Dot(move, fwd)), 1);
+                if (dash) { r.Dash = true; dash = false; }
                 return r;
             }
         }
 
-        // every hazard instance seen, with the combat tick it appeared on
-        sealed class Seen { public Hazard H; public string Source; public int Spawn, Resolve, Phase; public bool Resolved; }
+        public sealed class HitRec { public PlayerController P; public Hazard H; public string Source; public int Damage, Tick; }
+        public sealed class SpawnRec { public Hazard H; public string Source; public int Tick; }
 
-        RunDirector d; readonly Bot bot = new Bot();
-        readonly List<string> lines = new List<string>(); int pass, fail, errors, shots;
-        readonly Dictionary<int, Seen> seen = new Dictionary<int, Seen>();
-        readonly List<(string source, int dmg, int tick)> hits = new List<(string, int, int)>();
-        readonly HashSet<string> tasted = new HashSet<string>(), shotTaken = new HashSet<string>();
-        readonly List<string> attackOrder = new List<string>();
-        int maxStrikesLive; string dir;
-        CrucivarEncounter boss;
+        public RunDirector D { get; private set; }
+        public CombatWorld W => D.World;
+        public CrucivarEncounter Boss { get; private set; }
+        public PlayerController Main => D.Player;
+        public readonly List<PlayerController> Party = new List<PlayerController>();
+        public readonly List<HitRec> Hits = new List<HitRec>();
+        public readonly List<SpawnRec> Spawns = new List<SpawnRec>();
+        readonly Dictionary<PlayerController, Scripted> inputs = new Dictionary<PlayerController, Scripted>();
+        readonly Scripted mainInput = new Scripted();
+        readonly List<string> lines = new List<string>();
+        int pass, fail, errors, shots; string dir, section = "";
+        CombatWorld hooked;
 
         void Start()
         {
-            d = GetComponent<RunDirector>(); dir = OutDir; Directory.CreateDirectory(dir);
-            CrucivarArgs.SetOverride = "v1";   // this suite checks the original five attacks; v2 has CrucivarV2AutoTest
+            D = GetComponent<RunDirector>(); dir = OutDir; Directory.CreateDirectory(dir);
             Application.logMessageReceived += OnLog;
             Application.runInBackground = true;
-            StartCoroutine(Main());
+            StartCoroutine(MainLoop());
         }
         void OnDestroy() { Application.logMessageReceived -= OnLog; }
-        // editor-internal errors (search indexing, importers) are not the game's; only runtime ones count
+        // heartbeat every 5 real seconds: a stuck run shows whether frames still run and what the suite waits on
+        float beat; string waiting = "";
+        void Update()
+        {
+            if (Time.realtimeSinceStartup < beat) return;
+            beat = Time.realtimeSinceStartup + 5;
+            Debug.Log($"[crucivar-test] beat f{Time.frameCount} dt {Time.deltaTime:0.000} scale {Time.timeScale} state {D?.State} paused {D?.Paused} tick {W?.Tick} [{section}] {waiting}");
+        }
         void OnLog(string msg, string stack, LogType t) { if ((t == LogType.Exception || t == LogType.Error) && !(stack ?? "").Contains("UnityEditor.")) { errors++; lines.Add("      LOG " + t + ": " + msg); } }
 
-        void Check(string name, bool ok, string detail = "")
+        // ---------------- reporting ----------------
+        public void Check(string name, bool ok, string detail = "")
         {
             if (ok) pass++; else fail++;
-            var line = $"{(ok ? "PASS" : "FAIL")}  {name}{(string.IsNullOrEmpty(detail) ? "" : "  — " + detail)}";
+            var line = $"{(ok ? "PASS" : "FAIL")}  [{section}] {name}{(string.IsNullOrEmpty(detail) ? "" : "  — " + detail)}";
             lines.Add(line); Debug.Log("[crucivar-test] " + line);
         }
-        void Note(string s) { lines.Add("      " + s); Debug.Log("[crucivar-test] " + s); }
-
-        IEnumerator Shot(string name)
+        public void Note(string s) { lines.Add("      " + s); Debug.Log("[crucivar-test] " + s); }
+        public IEnumerator Shot(string name)
         {
+            if (Application.isBatchMode) yield break;   // -batchmode (the default since 4 Nov): no end of frame to wait for; shots need a windowed run
             yield return new WaitForEndOfFrame();
             var tex = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
             tex.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0); tex.Apply();
             File.WriteAllBytes(Path.Combine(dir, $"{++shots:00}_{name}.png"), tex.EncodeToPNG()); Destroy(tex);
         }
-        IEnumerator Capture(string name, int frames)
+        public int Failures => fail;
+        const float TestBudget = 600;   // real seconds per ability test, well above the longest one
+        void WriteReport(string tag) => File.WriteAllLines(Path.Combine(dir, "crucivar-report.txt"), new[] { $"Crucivar autotest: {pass} passed, {fail} failed {tag}".TrimEnd() }.Concat(lines));
+
+        // ---------------- waiting ----------------
+        public IEnumerator Seconds(float s) { float t = 0; while (t < s) { t += Time.deltaTime; yield return null; } }
+        public IEnumerator Ticks(int n) { int end = W.Tick + n; float guard = 0; while (W != null && W.Tick < end && guard < n / 20f + 10) { guard += Time.deltaTime; yield return null; } }
+        public IEnumerator Until(Func<bool> cond, float timeout, string what)
         {
-            var cdir = Path.Combine(dir, "frames_" + name); Directory.CreateDirectory(cdir);
-            Time.captureFramerate = 60;
-            for (int i = 0; i < frames; i++)
-            {
-                yield return new WaitForEndOfFrame();
-                var tex = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
-                tex.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0); tex.Apply();
-                File.WriteAllBytes(Path.Combine(cdir, $"{i:0000}.jpg"), tex.EncodeToJPG(85)); Destroy(tex);
-            }
-            Time.captureFramerate = 0;
-        }
-        IEnumerator Wait(float s) { float t = 0; while (t < s) { t += Time.deltaTime; yield return null; } }
-        IEnumerator Until(Func<bool> cond, float timeout, string what)
-        {
+            waiting = what;
             float t = 0; while (!cond() && t < timeout) { t += Time.deltaTime; yield return null; }
+            waiting = "";
             if (!cond()) Check("reached: " + what, false, $"timed out after {timeout}s");
         }
 
-        // ---------------- observation, every frame while fighting ----------------
-        void Observe()
+        // ---------------- setup ----------------
+        // Fresh combat with a held Crucivar, `players` party members (the director's player first), everyone standing with
+        // full HP and stamina at the given spots (default: a ring 5 m south of the centre), scripted input idle.
+        public IEnumerator Setup(int players, Difficulty level = Difficulty.Medium, Vector3[] at = null, float hpFraction = 0.9f)
         {
-            var w = d.World; if (w == null) return;
-            int strikes = 0; var live = new HashSet<string>();
-            foreach (var h in w.Hazards.Live)
+            yield return EnsureCombat();
+            if (Boss == null) yield break;
+            Boss.TestHold = true;
+            yield return Until(() => !Boss.TestBusy, 20, "previous test body finished");
+            W.ClearTransient();
+            W.Difficulty = level;
+            Boss.DebugSetHpFraction(hpFraction);
+            Boss.transform.SetPositionAndRotation(new Vector3(0, 0, -1.5f), Quaternion.identity);
+            while (Party.Count > players) { var p = Party[Party.Count - 1]; Party.RemoveAt(Party.Count - 1); W.Players.Remove(p); inputs.Remove(p); Destroy(p.gameObject); }
+            if (Party.Count == 0) { Party.Add(Main); inputs[Main] = mainInput; }
+            while (Party.Count < players)
             {
-                if (!seen.ContainsKey(h.Id))
+                var p = PlayerController.Spawn(W, Party.Count % 2 == 1 ? "Chimesinger" : "Arcanist", new Vector3(0, 0, 5), 180);   // no Vanguard (retired 11-02)
+                var s = new Scripted(); p.Input = s; inputs[p] = s; p.AbilitiesEnabled = false; Party.Add(p);
+            }
+            for (int i = 0; i < Party.Count; i++)
+            {
+                var p = Party[i];
+                p.DebugRevive();
+                var pos = at != null && i < at.Length ? at[i] : new Vector3(0, 0, 5) + Quaternion.Euler(0, 360f * i / Mathf.Max(1, players), 0) * Vector3.right * (players > 1 ? 1.5f : 0);
+                p.PrepareForEncounter(pos, 180);
+                p.DebugSetHp(PlayerController.MaxHp);
+                p.AbilitiesEnabled = false;
+                In(p).Stop();
+            }
+            Hits.Clear(); Spawns.Clear();
+            yield return Ticks(2);
+        }
+
+        public Scripted In(PlayerController p) => inputs[p];
+        public void Place(PlayerController p, Vector3 pos) { pos.y = 0; p.transform.position = pos; }
+
+        // Runs a body on Crucivar's script (one tick per step, exactly like a scheduled attack) and waits for it to end.
+        public IEnumerator Fire(IEnumerable<int> body, float timeout = 30)
+        {
+            Begin(body);
+            yield return WaitIdle(timeout);
+        }
+        // Starts a body and returns at once, so the test can steer players while it runs.
+        public void Begin(IEnumerable<int> body) { Boss.TestRun(body); }
+        public IEnumerator WaitIdle(float timeout = 30) { yield return Until(() => Boss == null || !Boss.TestBusy, timeout, "ability finished"); }
+
+        // ---------------- queries ----------------
+        public IEnumerable<HitRec> HitsOn(PlayerController p, string sourcePrefix = null) => Hits.Where(h => h.P == p && (sourcePrefix == null || h.Source.StartsWith(sourcePrefix)));
+        public bool WasHit(PlayerController p, string sourcePrefix = null) => HitsOn(p, sourcePrefix).Any();
+        public IEnumerable<SpawnRec> Spawned(string sourcePrefix) => Spawns.Where(s => s.Source.StartsWith(sourcePrefix));
+        // no instance hit the same player twice
+        public bool OneHitPerInstance() => Hits.Where(h => h.H.BurnPerSecond <= 0).GroupBy(h => (h.P, h.H.Id)).All(g => g.Count() == 1);
+
+        // Kills Crucivar now (the same path as a killing blow); the practice then ends, and the next Setup restarts it.
+        public void KillBoss() { Boss.DebugDefeat(); }
+
+        IEnumerator EnsureCombat()
+        {
+            for (int attempt = 0; attempt < 3; attempt++)
+            {
+                if (D.State == RunState.Combat && D.Boss is CrucivarEncounter b && !b.Dead && !Main.Down) { Hook(); Boss = b; yield break; }
+                if (D.State == RunState.Combat || D.State == RunState.Downed || D.State == RunState.Cleared) yield return Until(() => D.State == RunState.Results, 12, "results after a wipe/defeat");
+                if (D.State == RunState.Results) { Party.Clear(); inputs.Clear(); D.RequestRetry(); }
+                if (D.State == RunState.Menu) { D.InputOverride = mainInput; D.StartPractice("Arcanist", RunDirector.CrucivarPractice); }
+                yield return Until(() => D.State == RunState.Ready, 8, "ready");
+                D.RequestReady();
+                if (D.Boss is CrucivarEncounter nb) nb.TestHold = true;   // before the script's first step
+                yield return Until(() => D.State == RunState.Combat, 10, "combat");
+            }
+            Boss = D.Boss as CrucivarEncounter;
+            Check("practice combat with Crucivar", Boss != null && D.State == RunState.Combat);
+        }
+
+        void Hook()
+        {
+            if (hooked == W) return;
+            hooked = W;
+            W.PlayerHit += (p, h, dmg) => Hits.Add(new HitRec { P = p, H = h, Source = h.Source, Damage = dmg, Tick = W.Tick });
+            W.Hazards.Spawned += h => Spawns.Add(new SpawnRec { H = h, Source = h.Source, Tick = W.Tick });
+        }
+
+        // ---------------- the run ----------------
+        IEnumerator MainLoop()
+        {
+            Note($"Crucivar autotest · Unity {Application.unityVersion} · {SystemInfo.graphicsDeviceName} · {DateTime.Now:yyyy-MM-dd HH:mm}");
+            D.InputOverride = mainInput;
+            yield return Seconds(1.0f);
+            Check("boots into the menu", D.State == RunState.Menu);
+            string only = CrucivarArgs.Arg("-crucivarAbility");
+            var tests = typeof(CrucivarAbilityTest).Assembly.GetTypes()
+                .Where(t => !t.IsAbstract && typeof(CrucivarAbilityTest).IsAssignableFrom(t))
+                .Select(t => (CrucivarAbilityTest)Activator.CreateInstance(t))
+                .Where(t => only == null || t.Id == only || t.Id.StartsWith(only + "_"))
+                .OrderBy(t => t.Order).ThenBy(t => t.Id).ToList();
+            Note("tests: " + string.Join(", ", tests.Select(t => t.Id)));
+            Check("found the requested tests", tests.Count > 0, only ?? "all");
+            foreach (var t in tests)
+            {
+                section = t.Id; int before = fail;
+                Note($"---- {t.Id} ----");
+                // nested waits (Setup, Until, Ticks...) run on this stack, not Unity's, so an exception in one is caught here
+                // instead of silently ending the suite with the editor left open; a test past its budget is stopped
+                var stack = new Stack<IEnumerator>(); stack.Push(t.Run(this));
+                float start = Time.realtimeSinceStartup;
+                while (stack.Count > 0)
                 {
-                    string family = Family(h.Source);
-                    seen[h.Id] = new Seen { H = h, Source = h.Source, Spawn = w.Tick - h.Age, Resolve = h.ResolveAt, Phase = boss ? boss.PhaseIndex : 0 };
-                    if (h.BurnPerSecond <= 0 && (attackOrder.Count == 0 || attackOrder[attackOrder.Count - 1] != family)) attackOrder.Add(family);
+                    if (Time.realtimeSinceStartup - start > TestBudget) { Check($"test finished within {TestBudget / 60:0} min", false, $"stopped after {Time.realtimeSinceStartup - start:0} s"); break; }
+                    var e = stack.Peek(); object cur;
+                    try { if (!e.MoveNext()) { stack.Pop(); continue; } cur = e.Current; }
+                    catch (Exception ex) { Check("test body ran without an exception", false, ex.GetType().Name + ": " + ex.Message); break; }
+                    if (cur is IEnumerator inner) { stack.Push(inner); continue; }
+                    yield return cur;
                 }
-                if (h.BurnPerSecond <= 0) live.Add(Family(h.Source));
+                if (Boss != null) Boss.TestHold = true;
+                Note($"{t.Id}: {(fail == before ? "all passed" : (fail - before) + " failed")}");
+                WriteReport("(running)");   // a stuck run still shows which test it reached
             }
-            strikes = live.Count;
-            maxStrikesLive = Mathf.Max(maxStrikesLive, strikes + (w.Hazards.Live.Any(h => h.BurnPerSecond > 0) ? 1 : 0));
-            foreach (var s in seen.Values) if (!s.Resolved && !w.Hazards.Live.Contains(s.H)) s.Resolved = true;
-        }
-        static string Family(string src) => src.StartsWith("Casting Cycle") ? "Casting Cycle" : src;
-
-        // the bot: hold ~5 m from the body, stand in the first instance of each attack once (to measure its damage),
-        // otherwise step out of anything that resolves soon and out of slag pools
-        IEnumerator Fight(float seconds, Func<bool> until, bool taste = true)
-        {
-            float t = 0;
-            while (t < seconds && d.State == RunState.Combat && !until())
-            {
-                Observe();
-                var p = d.Player; var b = d.Boss;
-                if (p && b)
-                {
-                    if (p.Hp < 45) p.DebugSetHp(100);
-                    var to = Sim.Flat(b.transform.position - p.transform.position); float dist = to.magnitude - b.BodyRadius;
-                    bot.Aim = b.transform.position;
-                    bot.MoveWorld = dist > 5.5f ? to.normalized * 0.6f : dist < 3.5f ? -to.normalized : Vector3.Cross(Vector3.up, to.normalized) * 0.4f;
-                    if (new Vector2(p.transform.position.x, p.transform.position.z).magnitude > 9.5f) bot.MoveWorld = -p.transform.position.normalized;
-                    bot.Sprint = false;
-                    var pos = p.transform.position;
-                    foreach (var h in d.World.Hazards.Live)
-                    {
-                        if (!h.Contains(pos)) continue;
-                        string fam = Family(h.Source);
-                        if (taste && !tasted.Contains(fam)) { bot.MoveWorld = Vector3.zero; break; }
-                        if (h.BurnPerSecond <= 0 && h.ResolveAt - h.Age > 50) continue;
-                        bot.MoveWorld = Escape(h, pos); bot.Sprint = true; break;
-                    }
-                }
-                t += Time.deltaTime; yield return null;
-            }
-            bot.MoveWorld = Vector3.zero; bot.Sprint = false;
-        }
-        static Vector3 Escape(Hazard h, Vector3 pos)
-        {
-            var away = Sim.Flat(pos - h.Origin); if (away.sqrMagnitude < 0.01f) away = Vector3.right; away.Normalize();
-            if (h.Shape == HazardShape.Lane) return h.PushDir(pos);
-            if (h.Shape == HazardShape.Cone) { var side = Vector3.Cross(Vector3.up, Sim.Dir(h.Yaw)); return (Vector3.Dot(away, side) >= 0 ? side : -side); }
-            return away;
-        }
-
-        IEnumerator ShotWhenTelegraphed(params string[] families)
-        {
-            // a screenshot of each attack family once, about halfway through its warning
-            while (d.State == RunState.Combat)
-            {
-                foreach (var h in d.World.Hazards.Live)
-                {
-                    string fam = Family(h.Source);
-                    if (h.BurnPerSecond > 0 || shotTaken.Contains(fam) || h.Age < h.ResolveAt / 2) continue;
-                    shotTaken.Add(fam);
-                    yield return Shot(fam.Replace(' ', '_').ToLowerInvariant());
-                }
-                yield return null;
-            }
-        }
-
-        // ---------------- the scenario ----------------
-        IEnumerator Main()
-        {
-            Note($"Crucivar autotest · Unity {Application.unityVersion} · {SystemInfo.graphicsDeviceName} · {DateTime.Now:yyyy-MM-dd HH:mm} · scene {UnityEngine.SceneManagement.SceneManager.GetActiveScene().name}");
-            d.InputOverride = bot;
-            yield return Wait(1.0f);
-            Check("boots into the menu", d.State == RunState.Menu);
-            yield return Shot("menu");
-            Check("practice starts", d.StartPractice("Vanguard", RunDirector.CrucivarPractice));
-            yield return Wait(0.3f); d.RequestReady();
-            yield return Until(() => d.State == RunState.Combat, 6, "combat");
-            boss = d.Boss as CrucivarEncounter;
-            Check("the practice slot spawns Crucivar", boss != null, d.Boss ? d.Boss.GetType().Name : "none");
-            if (boss == null) { Finish(); yield break; }
-            Check("Crucivar uses its model, not the placeholder", !boss.Placeholder);
-            string[] clips = { "Idle", "Walk", "Diebreaker", "HammerLodged", "SlagCast", "RailRam", "ReleaseFrontBack", "ReleaseSides", "CastingCycle", "Vulnerable", "PhaseShift", "Defeat" };
-            var missing = clips.Where(c => !boss.Presenter.Has(c)).ToArray();
-            Check("all body clips are in the model", missing.Length == 0, missing.Length == 0 ? $"{clips.Length} clips" : "missing " + string.Join(", ", missing));
-            d.World.PlayerHit += (p, h, dmg) => { hits.Add((h.Source, dmg, d.World.Tick)); tasted.Add(Family(h.Source)); };
-            yield return Shot("intro");
-            StartCoroutine(ShotWhenTelegraphed());
-
-            // Phase 1: isolated hammer, slag, vent and ram attacks
-            var p1 = new[] { "Diebreaker", "Slag Cast", "Pressure Release", "Rail Ram" };
-            yield return Fight(60, () => p1.All(a => seen.Values.Any(s => s.Source == a && s.Resolved)));
-            Check("phase 1 uses Diebreaker, Slag Cast, Pressure Release and Rail Ram", p1.All(a => seen.Values.Any(s => s.Source == a)),
-                  "seen: " + string.Join(", ", seen.Values.Select(s => Family(s.Source)).Distinct()));
-            Check("phase 1 has no Casting Cycle", !seen.Values.Any(s => s.Phase == 1 && Family(s.Source) == "Casting Cycle"));
-            // let the first pools cool before checking expiry
-            yield return Fight(4, () => false);
-
-            // Phase 2: Casting Heat
-            boss.DebugSetHpFraction(boss.NextPhaseFraction());
-            yield return Fight(15, () => boss.PhaseIndex == 2);
-            Check("phase 2 starts below 65 %", boss.PhaseIndex == 2 && boss.PhaseName == "Casting Heat", boss.PhaseName);
-            yield return Wait(1.0f);
-            yield return Shot("phase2_insulation_shed");
-            bool capturing = false;
-            yield return Fight(60, () =>
-            {
-                if (!capturing && d.World.Hazards.Live.Any(h => h.Source == "Casting Cycle 1")) { capturing = true; StartCoroutine(Capture("casting_cycle", 260)); }
-                return seen.Values.Count(s => s.Phase == 2 && s.Source.StartsWith("Casting Cycle") && s.Resolved) >= 3;
-            });
-            var strips = seen.Values.Where(s => s.Source.StartsWith("Casting Cycle")).OrderBy(s => s.Spawn).Take(3).ToList();
-            Check("Casting Cycle lays three numbered strips", strips.Count == 3 && strips.Select(s => s.Source).SequenceEqual(new[] { "Casting Cycle 1", "Casting Cycle 2", "Casting Cycle 3" }),
-                  string.Join(", ", strips.Select(s => s.Source)));
-            if (strips.Count == 3)
-            {
-                var res = strips.Select(s => s.Spawn + s.Resolve).ToArray();
-                Check("each strip warns 1.8 s and the next resolves 0.6 s later", strips.All(s => s.Resolve == 108) && res[1] - res[0] == 36 && res[2] - res[1] == 36,
-                      $"warn {strips[0].Resolve}/{strips[1].Resolve}/{strips[2].Resolve} ticks, resolves at +{res[1] - res[0]} / +{res[2] - res[1]}");
-                var hz = strips.Select(s => s.H).ToArray();
-                Check("strips are 2 m wide and parallel with a body-sized cold corridor between them",
-                      hz.All(h => Mathf.Approximately(h.Width, 2f)) && Mathf.Abs(Mathf.DeltaAngle(hz[0].Yaw, hz[2].Yaw)) < 0.1f &&
-                      Vector3.Distance(hz[0].Origin, hz[1].Origin) - 2f - 2 * Hazard.Margin >= 0.9f,
-                      $"spacing {Vector3.Distance(hz[0].Origin, hz[1].Origin):0.00} m");
-            }
-            Check("Slag Cast comes before Casting in phase 2", attackOrder.IndexOf("Slag Cast", Math.Max(0, attackOrder.IndexOf("Casting Cycle") - 3)) >= 0);
-            yield return Fight(3, () => false);
-
-            // Phase 3: Open Pressure
-            boss.DebugSetHpFraction(boss.NextPhaseFraction());
-            yield return Fight(15, () => boss.PhaseIndex == 3);
-            Check("phase 3 starts below 30 %", boss.PhaseIndex == 3 && boss.PhaseName == "Open Pressure", boss.PhaseName);
-            yield return Wait(1.2f);
-            yield return Shot("phase3_open_pressure");
-            yield return Fight(60, () => seen.Values.Count(s => s.Phase == 3 && s.Source == "Casting Cycle 3" && s.Resolved) >= 1);
-            int cast3 = seen.Values.Where(s => s.Phase == 3 && s.Source == "Casting Cycle 1").Select(s => s.Spawn).DefaultIfEmpty(-1).Min();
-            int ram3 = seen.Values.Where(s => s.Phase == 3 && s.Source == "Rail Ram" && s.Spawn < cast3).Select(s => s.Spawn).DefaultIfEmpty(-1).Max();
-            Check("phase 3 rams to a new spot right before Casting", cast3 > 0 && ram3 > 0 && cast3 - ram3 <= 36 + 108 + 150 + 2, $"ram at {ram3}, casting at {cast3}");
-
-            // numbers: damage per attack, pool behaviour, overlap
-            var spec = new Dictionary<string, int> { ["Diebreaker"] = 18, ["Slag Cast"] = 10, ["Rail Ram"] = 16, ["Pressure Release"] = 12, ["Casting Cycle"] = 14 };
-            foreach (var kv in spec)
-            {
-                var got = hits.Where(h => Family(h.source) == kv.Key).Select(h => h.dmg).Distinct().ToArray();
-                if (got.Length == 0) Note($"{kv.Key}: no hit landed on the bot (damage not measured)");
-                else Check($"{kv.Key} deals {kv.Value}", got.All(g => g == kv.Value), "hits: " + string.Join("/", got));
-            }
-            var burns = hits.Where(h => h.source == "Slag Pool").ToList();
-            if (burns.Count > 0)
-            {
-                // 4/s in whole HP: at most one point per 15 ticks while standing in any number of pools
-                var ticks = burns.Select(b => b.tick).ToArray(); int minGap = int.MaxValue;
-                for (int i = 1; i < ticks.Length; i++) minGap = Math.Min(minGap, ticks[i] - ticks[i - 1]);
-                Check("slag pools burn 4/s and never stack", burns.All(b => b.dmg == 1) && (ticks.Length < 2 || minGap >= 15), $"{burns.Count} burn ticks, min gap {minGap}");
-            }
-            else Note("slag pools: the bot never stood in one (burn not measured)");
-            var pools = seen.Values.Where(s => s.Source == "Slag Pool").ToList();
-            Check("slag pools last 3 s, then cool and disappear", pools.Count > 0 && pools.All(s => s.Resolve <= 180) && pools.Where(s => d.World.Tick - s.Spawn > 200).All(s => s.Resolved),
-                  $"{pools.Count} pools");
-            Check("never more than two damaging patterns at once", maxStrikesLive <= 2, $"max {maxStrikesLive}");
-            var w = seen.Values.GroupBy(s => Family(s.Source)).ToDictionary(g => g.Key, g => g.First().Resolve);
-            Check("warning times match the packet (1.8 / 2.0 / 1.8 / 1.7 s)",
-                  w.TryGetValue("Diebreaker", out var a1) && a1 == 108 && w.TryGetValue("Slag Cast", out var a2) && a2 == 120 &&
-                  w.TryGetValue("Rail Ram", out var a3) && a3 == 108 && w.TryGetValue("Pressure Release", out var a4) && a4 == 102,
-                  string.Join(", ", w.Select(kv => $"{kv.Key} {kv.Value}")));
-            Note("attack order: " + string.Join(" > ", attackOrder));
-
-            // defeat cancels everything in the killing tick
-            yield return Fight(20, () => d.World.Hazards.Live.Any(h => h.BurnPerSecond <= 0 && h.Age < h.ResolveAt - 10), false);
-            int hp0 = d.Player.Hp, pending = d.World.Hazards.Count;
-            yield return Shot("before_defeat");
-            boss.DebugDefeat();
-            Check("defeat cancels pending hazards and pools", d.World.Hazards.Count == 0, $"{pending} -> {d.World.Hazards.Count}");
-            Check("defeated Crucivar stops colliding", !boss.Solid);
-            yield return Wait(1.6f);
-            yield return Shot("defeat");
-            Check("no damage after defeat", d.Player.Hp == hp0, $"{hp0} -> {d.Player.Hp}");
-            yield return Until(() => d.State == RunState.Results, 8, "practice results");
-            Check("practice ends in a practice result", d.State == RunState.Results && d.Victory && d.Mode == RunMode.Practice);
+            section = "suite";
             Check("no errors or exceptions logged", errors == 0, $"{errors}");
-            Finish();
-        }
-
-        void Finish()
-        {
-            lines.Insert(0, $"Crucivar autotest: {pass} passed, {fail} failed");
-            File.WriteAllLines(Path.Combine(dir, "crucivar-report.txt"), lines);
+            WriteReport("");
             Debug.Log($"[crucivar-test] done: {pass} passed, {fail} failed");
-            StartCoroutine(Quit());
-        }
-        IEnumerator Quit()
-        {
-            yield return Wait(0.5f);
+            yield return Seconds(0.5f);
 #if UNITY_EDITOR
             UnityEditor.EditorApplication.isPlaying = false;
             UnityEditor.EditorApplication.Exit(fail == 0 ? 0 : 1);
@@ -313,5 +262,13 @@ namespace LastBell.Run
             Application.Quit(fail == 0 ? 0 : 1);
 #endif
         }
+    }
+
+    // One test per phase or check (Encounters/Crucivar/Tests/<Name>Test.cs).
+    public abstract class CrucivarAbilityTest
+    {
+        public abstract string Id { get; }
+        public virtual int Order => 0;
+        public abstract IEnumerator Run(CrucivarAutoTest t);
     }
 }

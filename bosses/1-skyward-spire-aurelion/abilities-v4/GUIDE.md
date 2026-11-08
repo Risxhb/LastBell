@@ -2,14 +2,14 @@
 
 A player's guide to the current v4 fight on every difficulty.
 
-**Proven beatable:** four perfect bots killed him at full HP in **5:00** on Medium (4 of 4 standing) and **5:45** on Hard (3 of 4); eight killed him on Hard in **5:04** (8 of 8). Solo bots killed him on every level with every class: Vanguard (Easy 4:17, Medium 5:48, Hard 5:32), Chimesinger (4:13, 4:00, 4:06) and Arcanist (4:36, 4:37, 4:33), using Risx's controls and Arcanist glyph kit (27 Oct); see **Playing solo**. (The video `aurelion-v4-win.mp4` shows an earlier 5:06 version.)
+**Proven beatable:** four perfect bots killed him at full HP in **5:00** on Medium (4 of 4 standing) and **5:45** on Hard (3 of 4), before the 3 Nov round 2 made Phases 2-3 harder (after it, the Hard solo Tollbreaker bot wins in 3:41 and a Hard 4-bot party got him to 8 %). Solo bots killed him on every level with every class: Chimesinger (4:13, 4:00, 4:06) and Arcanist (4:36, 4:37, 4:33), using Risx's controls and Arcanist glyph kit (27 Oct); see **Playing solo**. (The video `aurelion-v4-win.mp4` shows an earlier 5:06 version.)
 
 **Numbers:**
 - Damage is quoted for Medium. Hard is ×1.3, Easy ×0.6.
 - Light hits: 30 (39 on Hard).
 - Heavy hits: 50 (65 on Hard).
 - You have 100 HP and 5 potions (+40 each, 1 s apart, key F).
-- His HP: 12,000 solo, +1.25 x 12,000 for each extra fighter (4 players 57,000, 8 players 117,000). Aim: a 5-7 minute fight.
+- His HP: 12,000 solo, +1.25 x 12,000 for each extra fighter (4 players 57,000). Aim: a 5-7 minute fight.
 - In Last Light no hit lands above 90, however many slices have fallen.
 
 ## The five rules that win the fight
@@ -30,6 +30,7 @@ A player's guide to the current v4 fight on every difficulty.
 | **Cascading Lances** (Phase 3) | Two volleys; the second is turned 22.5° | Clear the first, then the second. |
 | **Starfall Mirror** | A red circle follows you; a copy lands mirrored through the centre | Step off your star when it locks. Never stand on anyone's mirror. Co-op: don't stand opposite a partner through the centre. |
 | **Hour Hands** (every level, Phase 2+) | A gold clock hand per player sweeps out from him | Step off your own hand. |
+| **Meridian Recall** (Hard only, Phases 2 and 3) | The last Lances volley comes back: the same red beams, locked at once, from **where he stood when he fired it** | He replays it once, 3.5 s after it appears. Heavy hit (65 on Hard). Remember the old lines and stand in a gap between them; he may have moved, so read the beams, not him. |
 
 ### Heavy hits: be in the right place
 
@@ -47,7 +48,7 @@ A player's guide to the current v4 fight on every difficulty.
 |---|---|---|
 | **Meridian Towers** | a tower is **short of players** when it lands | Each tower shows **dots: exactly that many players must be inside it at the moment it lands** (it rises 5.0 s early). **No damage when done right.** Extra players in a tower take a **heavy hit**. **Solo:** three towers of one, 2.5 s apart (I → II → III): be in each as it lands, then run to the next. **Co-op:** towers land together and their dots add up to the party (4 players: 2+2 or 1+3). Assigned when they rise in party order; stay out of towers that aren't yours. |
 | **Total Eclipse** (intermission at 70 %) | his **Corona Shield** (gold number on his bar) isn't broken in **25 s** | The shield is **700 per fighting player** (700 solo, 2,800 for 4), so it takes the whole party about 22 s. Stay inside the **blue light wells** (3.5 m, orbiting slowly) and attack non-stop. Out of a well for over 2 s, you burn 10 a second. |
-| **Severance** (Phase 3) | co-op: one half has nobody in it | A gold line appears and the game calls **"SPLIT"**. You have 3 s: odd players go Day, even players go Night. Then it locks and **sweeps fast: 135° one way in 10 s, then "THE LINE TURNS BACK" (1.5 s warning) and 135° back** (about 3.3 m/s at the rim). Crossing it, or letting it sweep over you, is a heavy hit. Run ahead of it, and be ready to reverse. Co-op ends in the **Reunion** tower (4.5 m at the centre): everyone in. **Solo:** no side is assigned and there is no Reunion, but crossings still hit. |
+| **Severance** (Phase 3) | co-op: one half has nobody in it | A gold line appears and the game calls **"SPLIT"**. You have 2 s: odd players go Day, even players go Night. Then it locks and **sweeps fast, about 5.9 m/s at the rim, turning back twice** ("THE LINE TURNS BACK", 1 s warning). Every 3 s a circle drops at the feet of everyone in Day, then 1.5 s later on everyone in Night: step out of it without crossing the line. Crossing it, or letting it sweep over you, is a heavy hit. Run ahead of it, and be ready to reverse. Co-op ends in the **Reunion** tower (4.5 m at the centre): everyone in. **Solo:** no side is assigned and there is no Reunion, but crossings still hit. |
 | **Last Light** (Phase 4, below 20 %) | the 8th slice falls (88 s into Phase 4) | **The soft enrage.** A 45° slice burns for good every **12 s** (every **10 s** from the 5th), with a 3 s warning, in a fixed order: 0°, 180°, 90°, 270°, then the diagonals. **Every fallen slice makes all his attacks 10 % stronger** ("THE LIGHT WANES"). Kill him before the room is gone. |
 
 ## Phase by phase
@@ -76,6 +77,7 @@ Order:
 
 Order:
 1. Sunspots + Starfall + Lances
+   - Hard: **Meridian Recall** of that volley
 2. Towers + Marks + Starfall
 3. Ecliptic + Lances (+ Starfall solo)
 4. Collapse + Lances
@@ -87,8 +89,9 @@ Order:
 ### Phase 3: Exposed Meridian (40–20 %), the second form
 
 Order:
-1. **Severance** (3 s split, then a 20 s sweep that turns back at 10 s; Reunion in co-op)
+1. **Severance** (2 s split, then a 15 s sweep that turns back at 5 s and 10 s, with circles on each half; Reunion in co-op)
 2. Cascading Lances + Starfall + Hour Hands
+   - Hard: **Meridian Recall** of the turned volley
 3. Sunspots + Collapse
 4. Towers + Lances + Starfall
 5. two-step Marks + Lances
@@ -114,8 +117,8 @@ Everything above applies; these are the solo differences.
 | Severance | no side is called and there is no Reunion; crossing the line still hits |
 | Last Light | starts at 20 %; the 8th slice falls 88 s in, Final Noon at 6:30 |
 
-**Melee (Vanguard):**
-- Every swing roots you. Don't start a Sunder or Last Word when a shape is about to land on you; a basic is the safe filler.
+**Melee (Tollbreaker):**
+- Don't start a long swing or a throw when a shape is about to land on you; a basic is the safe filler.
 - Eclipse: attack from the **inner edge** of a well, the side nearest him, and drift with it as it turns.
 - Ecliptic Order: stand on the **inner edge** of the safe ring so he is in reach.
 - Towers: keep swinging and leave late; walk around him, not through him.
@@ -127,7 +130,7 @@ Everything above applies; these are the solo differences.
 
 | | Easy | Medium | Hard |
 |---|---|---|---|
-| Vanguard | 4:17, Corona in 17.8 s | 5:48, 17.2 s | 5:32, 14.7 s |
+| Tollbreaker (3 Nov, round 2) | | | 3:41 |
 | Chimesinger | 4:13, 14.1 s | 4:00, 17.8 s | 4:06, 18.1 s |
 | Arcanist (glyph kit) | 4:36, 23.6 s | 4:37, 20.0 s | 4:33, 12.6 s |
 
@@ -156,11 +159,12 @@ All of them ended with 2 to 6 slices fallen in Last Light, well before the 8th.
 | "Total Eclipse — tower II was short" | Be inside as it lands, then run; co-op, get the dot count right and stay out of other towers. |
 | "Solar Flare" | Sunspot carriers stood within 3.5 m of each other: spread at the edge. |
 | "Total Eclipse — the Corona Shield held" | Attack from inside the wells; don't stop to reposition. |
-| "Severance — the Day half fell" | Split during the 3 s warning, as called. |
+| "Severance — the Day half fell" | Split during the 2 s warning, as called. |
 | "Final Noon" | Too slow: punish every open chest; save cooldowns for the shield and Last Light. |
 
 ## Practice
 
 - **F6** loops one ability.
 - **F8** skips a phase.
+- **Start Phase** (Test Rush, boss step): start the fight in Phase 1, 2, 3 or 4 (Last Light) with full health and potions.
 - `-lastbellBossHp 0.2` runs the whole fight in about a minute.

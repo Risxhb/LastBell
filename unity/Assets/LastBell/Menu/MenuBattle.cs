@@ -16,7 +16,7 @@ namespace LastBell.Menu
         [Range(25, 60)] public float FieldOfView = 40;
         public Vector2 ScreenOffsetDegrees;   // yaw, pitch applied after looking at CameraTarget (per-stage framing)
         public Vector3 BossPosition = new Vector3(0, 0, -1.7f);
-        public Vector3 VanguardPosition = new Vector3(-1.6f, 0, 1);
+        public Vector3 TollbreakerPosition = new Vector3(-1.6f, 0, 1);
         public Vector3 ArcanistPosition = new Vector3(-5.2f, 0, 4.3f);
         public Vector3 ChimesingerPosition = new Vector3(5, 0, 3.8f);
         public string BossResource = "Bellkeeper2";
@@ -61,7 +61,6 @@ namespace LastBell.Menu
             CreateCastPool();
             previousNoShake = BellkeeperFx.NoScreenshake; BellkeeperFx.NoScreenshake = true;
             spellFx = MenuFxLifetime.Acquire();
-            spellFx.Player.Shield(actors[1].Pose, 0, false);
             spellFx.Player.DashTrail(actors[1].Pose);
             spellFx.Boss.ChargeTrail(actors[0].Root, false);
             // Fixed-size reusable effect pool. No allocations/spawns per cycle.
@@ -91,7 +90,7 @@ namespace LastBell.Menu
             // A 15-second wipe never pays the cost of instantiating an eight-player cast.
             foreach (string resource in new[] { "Bellkeeper2", "Aurelion", "Crucivar", "Sylvara" })
                 bossPool.Add(resource, Spawn(resource, BossPosition, true));
-            string[] classes = { "Vanguard", "Arcanist", "Chimesinger" };
+            string[] classes = { "Tollbreaker", "Arcanist", "Chimesinger" };
             for (int i = 0; i < 8; i++) partyPool.Add(Spawn(classes[i % 3], Vector3.zero));
             ActivateCast();
         }
@@ -105,7 +104,7 @@ namespace LastBell.Menu
             for (int i = 0; i < PartySize; i++)
             {
                 float angle = (i - 3) * 2.39996f + StageIndex;
-                var home = i == 0 ? VanguardPosition : i == 1 ? ArcanistPosition : i == 2 ? ChimesingerPosition
+                var home = i == 0 ? TollbreakerPosition : i == 1 ? ArcanistPosition : i == 2 ? ChimesingerPosition
                     : P(Mathf.Cos(angle) * 7, Mathf.Sin(angle) * 7);
                 ResetActor(partyPool[i], home); actors.Add(partyPool[i]);
             }
@@ -183,28 +182,28 @@ namespace LastBell.Menu
                     if (Crossed(t, at))
                     {
                         var a = actors[i]; string role = a.Root.name;
-                        string clip = role.StartsWith("Vanguard") ? "SunderingBlow" : role.StartsWith("Arcanist") ? "DisintegrateStart" : "Bellstrike";
+                        string clip = role.StartsWith("Tollbreaker") ? "SplittingThrow" : role.StartsWith("Arcanist") ? "DisintegrateStart" : "Bellstrike";
                         a.PlantedUntil = Elapsed + .65f;
                         a.Root.LookAt(new Vector3(actors[0].Root.position.x, 0, actors[0].Root.position.z));
                         a.Presenter.PlayOnce(clip, .65f); Bolt(i, role.StartsWith("Arcanist") ? Violet : Gold); SpellsPresented++;
                     }
             }
             // Attack releases are separated from animation cues so bolts/impacts match contact poses.
-            Cue(t, 0.5f, 1, "SteelRhythm1", 0.5f); Cue(t, 1.1f, 1, "SteelRhythm2", 0.5f);
-            Cue(t, 1.8f, 1, "SteelRhythm3", 0.7f); Cue(t, 3, 1, "SunderingBlow", 0.85f);
+            Cue(t, 0.5f, 1, "TwinHurl", 0.4f); Cue(t, 1.1f, 1, "TwinHurl2", 0.4f);
+            Cue(t, 1.8f, 1, "HurlHeavy", 0.7f); Cue(t, 3, 1, "SplittingThrow", 0.85f);
             Cue(t, 1.0f, 2, "RuneSigil", 0.3f); Cue(t, 4, 2, "DisintegrateStart", 0.35f); Cue(t, 4.35f, 2, "DisintegrateHold", 1.25f); Cue(t, 9.75f, 2, "ArcaneComet", 0.4f);
             Cue(t, 2.5f, 3, "Bellstrike", 0.7f); Cue(t, 5.2f, 3, "HarmonicRefrain", 0.8f);
             Cue(t, 7.1f, 0, "BellSweep", 2.6f);
             Cue(t, 7.8f, 1, "Dodge", 0.5f); Cue(t, 8, 2, "Dodge", 0.5f);
-            Cue(t, 11.8f, 1, "LastWord", 1.6f); Cue(t, 12.3f, 3, "Crescendo", 1.1f);
+            Cue(t, 11.8f, 1, "BellFrenzy", 1.0f); Cue(t, 12.3f, 3, "Crescendo", 1.1f);
             Cue(t, 14.5f, 0, "HollowToll", 2.6f);
-            Cue(t, 14.9f, 1, "BraceRaise", 0.2f); Cue(t, 15.2f, 1, "BraceHold", 1.1f);
-            Cue(t, 16.5f, 1, "BraceLower", 0.4f); Cue(t, 17, 3, "MendingChorus", 0.8f);
+            Cue(t, 14.9f, 1, "GrindingToll", 0.6f);
+            Cue(t, 16.5f, 1, "CallOfIron", 0.5f); Cue(t, 17, 3, "MendingChorus", 0.8f);
             Cue(t, 17.8f, 0, "PendulumCharge", 1.4f);
             Cue(t, 19.2f, 0, "ShatteredChime", 3.1f);
             Cue(t, 24.4f, 0, "Vulnerable", 3);
-            Cue(t, 24.8f, 1, "SteelRhythm1", 0.5f); Cue(t, 25.4f, 1, "SteelRhythm2", 0.5f);
-            Cue(t, 26.1f, 1, "SteelRhythm3", 0.7f); Cue(t, 27.2f, 1, "SunderingBlow", 0.85f);
+            Cue(t, 24.8f, 1, "TwinHurl", 0.4f); Cue(t, 25.4f, 1, "TwinHurl2", 0.4f);
+            Cue(t, 26.1f, 1, "HurlHeavy", 0.7f); Cue(t, 27.2f, 1, "SplittingThrow", 0.85f);
             Cue(t, 26.1f, 2, "RuneSigil", 0.3f); Cue(t, 28, 2, "DisintegrateStart", 0.35f); Cue(t, 28.35f, 2, "DisintegrateHold", 1.25f);
             Cue(t, 29.5f, 2, "Convergence", 0.8f); Cue(t, 30.2f, 3, "Crescendo", 1.1f);
             // Interleaved ranged basics, rather than every actor attacking on the same beat.
@@ -227,7 +226,7 @@ namespace LastBell.Menu
             previous = t;
         }
         static readonly float[] BasicTimes = { 0.8f, 3.1f, 5.9f, 10.4f, 13.3f, 17.7f, 23, 25.2f, 31.8f, 34 };
-        static readonly float[] SlashTimes = { 0.72f, 1.32f, 2.15f, 25.02f, 25.62f, 26.45f };
+        static readonly float[] HurlTimes = { 0.72f, 1.32f, 2.15f, 25.02f, 25.62f, 26.45f };
         static readonly float[] RouteTimes = { 0, 4.4f, 6.6f, 10, 11.5f, 17.8f, 18.4f, 19.2f, 27.6f, 31.5f, 34, 36 };
         static readonly Vector3[] RouteOffsets = { P(0,0), P(0,0), P(3,1), P(3,1), P(2,3.5f), P(2,3.5f),
             P(2,3.5f), P(-3,3.5f), P(-3,3.5f), P(-2,-1), P(-2,-1), P(0,0) };
@@ -256,16 +255,17 @@ namespace LastBell.Menu
         void SpellCues(float t)
         {
             var fx = spellFx.Player; var bossFx = spellFx.Boss; var target = actors[0].Root;
-            var vanguard = actors[1].Pose; var arcanist = actors[2].Pose; var chime = actors[3].Pose;
+            var toll = actors[1].Pose; var arcanist = actors[2].Pose; var chime = actors[3].Pose;
             var hit = target.position + Vector3.up * 2.2f;
-            foreach (float at in SlashTimes)
-                if (Crossed(t, at)) { fx.Slash(vanguard, 3.1f, 120, at == 2.15f || at == 26.45f, at == 1.32f || at == 25.62f); SpellsPresented++; bossFx.BossHit(hit); }
-            if (Crossed(t, 3.4f) || Crossed(t, 27.6f)) { fx.Sunder(vanguard, 3.3f, true, true); SpellsPresented++; }
-            if (Crossed(t, 11.8f)) fx.UltWindup(vanguard, 48);
-            if (Crossed(t, 12.7f)) { fx.UltSlam(vanguard, vanguard.transform.position + vanguard.transform.forward * 2.5f); SpellsPresented++; }
-            if (Crossed(t, 15.2f)) fx.Shield(vanguard, 0, true);
-            if (Crossed(t, 16.5f)) fx.Shield(vanguard, 0, false);
-            if (Crossed(t, 7.8f)) fx.DashTrail(vanguard);
+            // Tollbreaker: thrown axes (thin cyan, his kit look), the lodged split, Bell Frenzy's fan, Grinding Toll and Call of Iron
+            foreach (float at in HurlTimes)
+                if (Crossed(t, at)) { Bolt(1, Teal, 0.04f); SpellsPresented++; bossFx.BossHit(hit); }
+            if (Crossed(t, 3.4f) || Crossed(t, 27.6f)) { Bolt(1, Teal, 0.07f); Ring(target.position, 1.6f, Teal, 0.9f); SpellsPresented++; }
+            if (Crossed(t, 11.9f)) Ring(toll.transform.position, 1.4f, Teal, 0.6f);
+            if (Crossed(t, 12.3f) || Crossed(t, 12.7f) || Crossed(t, 13.1f)) { Bolt(1, Teal, 0.04f); SpellsPresented++; }
+            if (Crossed(t, 15.1f)) { Ring(Vector3.Lerp(toll.transform.position, target.position, 0.7f), 0.75f, Teal, 2f); SpellsPresented++; }
+            if (Crossed(t, 16.6f)) { Bolt(1, Teal, 0.06f); SpellsPresented++; }
+            if (Crossed(t, 7.8f)) fx.DashTrail(toll);
             // Arcanist (arcane kit): Blink, Rune Sigil, Disintegrate and Arcane Comet, presentation only
             if (Crossed(t, 7.8f)) fx.BlinkOut(arcanist);
             if (Crossed(t, 8.0f)) fx.BlinkIn(arcanist);

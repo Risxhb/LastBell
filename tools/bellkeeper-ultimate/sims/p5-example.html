@@ -1,0 +1,367 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Bellkeeper P5 example</title>
+<style>
+:root{--bg:#10162a;--panel:#182039;--ivory:#efe6cf;--brass:#c99a4b;--coral:#ff6a4d;--dim:#8d93ad}
+body{margin:0;background:var(--bg);color:var(--ivory);font-family:Segoe UI,Arial,sans-serif;display:flex;flex-direction:column;align-items:center}
+h1{font-size:20px;margin:12px 0 2px} .sub{color:var(--dim);font-size:13px;margin:0 16px 8px;max-width:860px;text-align:center;line-height:1.45}
+.wrap{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;padding:0 16px}
+canvas{background:#0b0f1c;border-radius:10px;max-width:96vw;height:auto}
+.side{max-width:310px;font-size:13px;line-height:1.5}
+.side h3{margin:6px 0 4px;font-size:14px;color:var(--brass)} .side p{margin:0 0 6px}
+.bar{display:flex;gap:10px;margin:8px 0;align-items:center;font-size:14px;flex-wrap:wrap;justify-content:center}
+button,select{background:#2a3358;color:var(--ivory);border:1px solid #445;border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit}
+button.on{background:#c99a4b;color:#10162a;font-weight:700}
+#log{font-size:13px;color:var(--dim);max-width:860px;text-align:center;min-height:56px;padding:0 16px}
+#log b{color:var(--ivory)} .bad{color:var(--coral)!important}
+</style></head><body>
+<h1>Bellkeeper Ultimate v2 · the end of the fight (simulation, not the game)</h1>
+<div class="sub">Three pieces, played by 4 perfect bots: the transition from P3 into P4, the transition from P4 into P5, and P5 itself. Pick one below. Proposal, open to change.</div>
+<div class="bar"><button id="s0">T · P3 → P4 · The Floor Breaks</button><button id="s1">T · P4 → P5 · The Train Runs Wild</button><button id="s2">P5 · Final Toll</button><button id="all">▶ Play all three in a row</button></div>
+<div class="wrap">
+<canvas id="c" width="760" height="760"></canvas>
+<div class="side" id="side"></div></div>
+<div class="bar"><button id="play">⏸ Pause</button><button id="re">↺ Restart perfect</button>
+<select id="mist"></select>
+<label>Speed <select id="sp"><option>0.5</option><option selected>1</option><option>2</option></select></label><span id="clock"></span></div>
+<div id="log"></div>
+<script>
+// ======================= shared =======================
+const PR=0.45, BR=0.22, SPEED=6, SPRINT=8.5, R_ARENA=11.6, BOSS_R=1.4, LETHAL=999, H=['I','II','III','IV'], GN=['N','E','S','W','CENTRE'];
+const dir=a=>[Math.sin(a*Math.PI/180),Math.cos(a*Math.PI/180)], add=(p,q,k=1)=>[p[0]+q[0]*k,p[1]+q[1]*k], sub=(p,q)=>[p[0]-q[0],p[1]-q[1]], dist=(p,q)=>Math.hypot(p[0]-q[0],p[1]-q[1]), len=p=>Math.hypot(p[0],p[1]), dot=(p,q)=>p[0]*q[0]+p[1]*q[1];
+const angOf=p=>(Math.atan2(p[0],p[1])*180/Math.PI+360)%360, angDiff=(a,b)=>{let d=((a-b)%360+540)%360-180;return Math.abs(d);};
+function hash(k,s){ let x=(k*2654435761+s*40503)>>>0; x^=x>>>15; x=Math.imul(x,2246822519)>>>0; x^=x>>>13; return x>>>0; }
+// gear layout (P4)
+const C_R=3.6, O_R=4.0, O_D=7.2, HUB_R=0.9;
+const GEARS=[0,90,180,270].map(a=>({c:dir(a).map(v=>v*O_D),r:O_R,a})).concat([{c:[0,0],r:C_R,a:null}]);
+function gearAt(q){ let best=-1,bd=9; GEARS.forEach((G,i)=>{const d=dist(q,G.c)/G.r; if(d<=1&&d<bd){bd=d;best=i;}}); return best; }
+const meshPoint=g=>dir(GEARS[g].a).map(v=>v*C_R);
+
+// A fight: scene-specific rules + shared bots. scene: {name, end, init(F), step(F,t,nt), danger(F,p,q,tq,dtS) -> 0 / 1 (a 50 hit) / 2 (lethal),
+// bullets(F,tq) -> predicted bullet positions, goal(F,p) -> {to, why}, floorVel(F,q,t) (optional), draw(g,F)}
+function newFight(scene,mistake,jitter=0){
+  const F={scene,t:0,mistake,pl:[],log:[],wiped:null,deaths:0,hits:0,bul:[],seed:7+Math.round(jitter*100),spin:[0,0,0,0,0],fx:[]};
+  for(let i=0;i<4;i++) F.pl.push({i,p:dir(45+90*i+jitter*(i+1)).map(v=>v*5.2),dead:false,hp:100});
+  scene.init(F); return F;
+}
+function say(F,h){F.log.unshift(h);}
+function hurt(F,p,dmg,why){ if(p.dead)return; p.hp-=dmg; F.hits++; say(F,`<span class="bad">✗ ${F.t.toFixed(1)}s ${H[p.i]} hit by ${why}${dmg<LETHAL?' (50)':''}</span>`); if(p.hp<=0){p.dead=true;F.deaths++;} }
+function step(F,dt){
+  if(F.wiped||F.won)return; const t=F.t, nt=t+dt, S=F.scene;
+  for(const p of F.pl){ if(p.dead)continue; const v=botVel(F,p); const fv=S.floorVel?S.floorVel(F,p.p,t):[0,0]; p.p=add(p.p,add(v,fv),dt); const r=len(p.p); if(r>R_ARENA)p.p=p.p.map(x=>x*R_ARENA/r); if(r<BOSS_R+PR)p.p=p.p.map(x=>x*(BOSS_R+PR)/Math.max(r,1e-3)); }
+  for(const b of F.bul) b.p=add(b.p,b.v,dt);
+  for(const p of F.pl) if(!p.dead) for(const b of F.bul) if(!b.gone&&dist(p.p,b.p)<PR+BR){ b.gone=true; hurt(F,p,50,b.what||'a shard'); }
+  F.bul=F.bul.filter(b=>!b.gone&&len(b.p)<12.6&&!(b.life&&nt-b.born>b.life)&&!(b.die&&b.die(b)));
+  S.step(F,t,nt);
+  if(!F.wiped&&F.pl.some(p=>p.dead)) F.wiped='a player died';
+  F.t=nt;
+}
+// ---------------- bots: a 3-leg route search (0.2 s legs) against the scene's dangers ----------------
+const DIRS=[];for(let k=0;k<16;k++)DIRS.push(dir(22.5*k));
+function botVel(F,p){
+  const g=F.scene.goal(F,p); p.job=g.why;
+  if(g.raw) return g.raw;   // a mistake: walks straight, no planning
+  if(!p.plan||F.t>=p.replan){ p.plan=search(F,p,g); p.replan=F.t+0.05; }
+  return p.plan;
+}
+function search(F,p,g){
+  const S=F.scene, t=F.t, LEG=0.2, LEGS=3, SM=4, dtS=LEG/SM, BEAM=10;
+  const pred=[]; for(let k=1;k<=LEGS*SM;k++) pred.push(S.bullets(F,t+k*dtS));
+  const vels=[[0,0]]; const tg=sub(g.to,p.p), tl=len(tg); const ds=DIRS.slice(); if(tl>1e-3)ds.push(tg.map(x=>x/tl));
+  for(const d of ds) for(const sp of [SPEED,SPRINT,SPEED*0.4]) vels.push(d.map(x=>x*sp));
+  let beam=[{q:p.p,first:null,risk:0}], fallback=null;
+  for(let leg=0;leg<LEGS;leg++){ const next=[];
+    for(const r of beam) for(const v of vels){ let q=r.q, risk=r.risk, worst=0;
+      for(let s=0;s<SM;s++){ const k=leg*SM+s, tq=t+(k+1)*dtS; const fv=S.floorVel?S.floorVel(F,q,tq-dtS):[0,0]; q=add(q,add(v,fv),dtS);
+        if(len(q)>R_ARENA-0.15||len(q)<BOSS_R+PR+0.3){worst=2;break;}
+        const d=S.danger(F,p,q,tq,dtS); if(d){worst=d;break;}
+        let mc=9; for(const b of pred[k]){ const c=dist(q,b)-PR-BR; if(c<mc)mc=c; } if(mc<0.12){worst=1;break;} if(mc<0.5)risk+=(0.5-mc)*2; }
+      if(worst){ if(leg===0){ const sc=1000*worst+dist(q,g.to); if(!fallback||sc<fallback.sc)fallback={v,sc}; } continue; }
+      next.push({q,first:r.first||v,risk,score:risk+dist(q,g.to)*1.4+(len(v)>SPEED?0.1:0)}); }
+    if(!next.length){ if(leg===0) return fallback?fallback.v:[0,0]; break; } next.sort((a,b)=>a.score-b.score); beam=next.slice(0,BEAM); }
+  return beam[0].first||[0,0];
+}
+
+// ======================= scene 0: T P3 -> P4 · The Floor Breaks (15 s) =======================
+// The bullet hell peaks (the Mainspring fires faster) while the floor cracks along the gear outlines and falls in two
+// waves: at 6 s everything beyond 9 m between the gears, at 10 s everything that isn't a gear. At 12 s the gears lock: each
+// player must stand on their first gear (hour h -> gear h+2, as P4's first slam deals it) or the train jams (WIPE). At 15 s
+// the gears turn: P4 begins.
+const T1={name:'T · P3 → P4 · The Floor Breaks',end:15.5,
+  side:`<h3>The Floor Breaks (15 s)</h3><p>P3's bullet hell peaks: the three spiral arms fire twice as fast.</p><p>The floor <b>cracks along the gear outlines</b> (it glows first) and falls into the pit in two waves: the outer edges between the gears at <b>6 s</b>, then everything that isn't a gear at <b>10 s</b>.</p><p>At <b>12 s</b> the gears lock: be on <b>your first gear</b> (shown over your head) or the train jams: WIPE. At 15 s they start turning, and P4 is on.</p><h3>Kills</h3><p>The pit (999), a spiral bullet (50).</p>`,
+  mistakes:[['','inject a mistake…'],['slow','II keeps weaving and runs for its gear too late'],['wrong','III picks the wrong gear']],
+  init(F){ F.nextArm=0.5; },
+  firstGear:p=>((p.i+2)%4+4)%4,
+  floorOk(q,t){ if(gearAt(q)>=0) return true; if(t>=10) return false; if(t>=6&&len(q)>9) return false; return true; },
+  armAngle:t=>40*t,
+  step(F,t,nt){
+    while(F.nextArm<=nt){ for(let k=0;k<3;k++){ const d=dir(this.armAngle(F.nextArm)+120*k); F.bul.push({p:d.map(v=>v*BOSS_R),v:d.map(v=>v*4),what:'a spiral bullet'}); } F.nextArm+=0.38; }
+    for(const p of F.pl) if(!p.dead&&!this.floorOk(p.p,nt)){ p.hp=0; p.dead=true; F.deaths++; say(F,`<span class="bad">✗ ${nt.toFixed(1)}s ${H[p.i]} fell into the pit</span>`); }
+    if(t<12&&nt>=12){ const empty=[0,1,2,3].filter(g=>!F.pl.some(p=>!p.dead&&gearAt(p.p)===g)); if(empty.length){F.wiped=`gear ${GN[empty[0]]} has nobody when the gears lock: the train jams`; say(F,`<span class="bad">✗ 12.0s gear ${GN[empty[0]]} empty: WIPE</span>`);} else say(F,'<b>12 s</b>: every gear held ✓ the gears lock'); }
+    if(t<6&&nt>=6) say(F,'<b>6 s</b>: the outer floor falls'); if(t<10&&nt>=10) say(F,'<b>10 s</b>: only the gears are left');
+  },
+  bullets(F,tq){ const out=F.bul.map(b=>add(b.p,b.v,tq-F.t)); for(let te=F.nextArm;te<=tq;te+=0.38) for(let k=0;k<3;k++) out.push(dir(this.armAngle(te)+120*k).map(v=>v*(BOSS_R+4*(tq-te)))); return out; },
+  danger(F,p,q,tq){ if(!this.floorOk(q,tq+0.15)) return 2; if(tq>11.2&&tq<12.3&&gearAt(q)!==this.firstGear(p)&&!(F.mistake==='wrong'&&p.i===2)) return 0; return 0; },
+  goal(F,p){ let g=this.firstGear(p); if(F.mistake==='wrong'&&p.i===2) g=(g+1)%4; const G=GEARS[g], park=add(G.c,dir(G.a+180+25*(p.i%2?1:-1)),2.4);
+    const late=F.mistake==='slow'&&p.i===1&&F.t<10.3;
+    if(F.t>=4&&!late) return {to:park,why:'→ gear '+GN[g]};
+    return {to:dir(this.armAngle(F.t)+60+120*(p.i%3)).map(v=>v*[4.6,4.6,6.4,6.4][p.i]),why:'WEAVE · then gear '+GN[g]}; },
+  draw(g,F,P,S){ const t=F.t;
+    // the floor: intact / glowing cracks / gone
+    g.fillStyle='#262d48'; g.beginPath(); g.arc(...P(0,0),R_ARENA*S,0,7); g.fill();
+    const wave1=t>=6, wave2=t>=10;
+    if(wave1){ g.fillStyle='#05070d'; g.beginPath(); g.arc(...P(0,0),R_ARENA*S,0,7); g.arc(...P(0,0),9*S,0,7,true); g.fill(); }
+    if(wave2){ g.fillStyle='#05070d'; g.beginPath(); g.arc(...P(0,0),R_ARENA*S,0,7); g.fill(); }
+    GEARS.forEach((G,i)=>{ const [x,y]=P(...G.c); g.fillStyle=i===4?'#3a3020':'#2c2a3a'; g.beginPath(); g.arc(x,y,G.r*S,0,7); g.fill(); g.strokeStyle=t<12?(((t>4&&t<6)||(t>8&&t<10))&&Math.floor(t*6)%2?'#ff9a6b':'#c99a4b'):'#ffd27a'; g.lineWidth=3; g.stroke();
+      if(i<4){ g.fillStyle='#efe6cf'; g.font='bold 16px Segoe UI'; g.textAlign='center'; const lp=P(...add(G.c,dir(G.a+90),3.0)); g.fillText(GN[i],lp[0],lp[1]+5); } });
+    if(t<6){ g.fillStyle='#ffd27a'; g.font='bold 22px Segoe UI'; g.textAlign='center'; g.fillText(`the floor cracks · outer floor falls in ${(6-t).toFixed(1)}s`,...P(0,-11.85)); }
+    else if(t<10){ g.fillStyle='#ff9a6b'; g.font='bold 22px Segoe UI'; g.textAlign='center'; g.fillText(`everything but the gears falls in ${(10-t).toFixed(1)}s`,...P(0,-11.85)); }
+    else if(t<12){ g.fillStyle='#ff6a4d'; g.font='bold 22px Segoe UI'; g.textAlign='center'; g.fillText(`the gears lock in ${(12-t).toFixed(1)}s: be on YOUR gear`,...P(0,-11.85)); }
+    else { g.fillStyle='#ffd27a'; g.font='bold 22px Segoe UI'; g.textAlign='center'; g.fillText(t<15?`the gears turn in ${(15-t).toFixed(1)}s · P4`:'P4 · The Unfinished Hour',...P(0,-11.85)); }
+  }
+};
+
+// ======================= scene 1: T P4 -> P5 · The Train Runs Wild (15 s) =======================
+// The gears spin faster each second (x1.0 -> x2.2) and the hammer slams every 2.5 s (shown 1.5 s before), with shards.
+// Then the outer gears tear loose one by one in hour order, N -> E -> S -> W at 9, 10.5, 12 and 13.5 s (their cores flash 2 s
+// before): anyone on a gear when it launches goes with it (999), and each launch sprays a fan of shards. Everyone ends on
+// the centre gear; at 15 s the great bell crashes down over the arena and P5 begins inside it.
+const T2={name:'T · P4 → P5 · The Train Runs Wild',end:15.5,
+  side:`<h3>The Train Runs Wild (15 s)</h3><p>The gears spin <b>faster every second</b>, and the hammer slams a random gear every <b>2.5 s</b> (shown 1.5 s before) with shards (50).</p><p>Then the outer gears <b>tear loose in hour order</b>: N, E, S, W at 9, 10.5, 12 and 13.5 s (their cores flash first). Anyone still on a gear when it launches goes with it (999), and each launch sprays shards.</p><p>Everyone ends packed on the centre gear as <b>the great bell crashes down</b> over the arena: P5 begins inside it.</p><h3>Kills</h3><p>The pit, a pawl, the hammer, a launching gear (999); shards (50).</p>`,
+  mistakes:[['','inject a mistake…'],['ride','IV stays on its gear (E) as it tears loose'],['pawl','I stops walking (the faster gears carry it)']],
+  init(F){ F.slamsDone=0; F.launched=[false,false,false,false]; for(const p of F.pl){ const G=GEARS[(p.i+2)%4]; p.p=add(G.c,dir(G.a+180-30),HUB_R+PR+0.7); } },
+  speedK:t=>1+1.2*Math.min(1,t/12),
+  spinSign:()=>1,
+  omega(g,t){ return this.speedK(t)*(g===4?0.95:-0.95*C_R/O_R); },
+  floorVel(F,q,t){ const g=gearAt(q); if(g<0||(g<4&&F.launched[g]))return [0,0]; const w=this.omega(g,t), r=sub(q,GEARS[g].c); return [-w*r[1],w*r[0]]; },
+  slamT:k=>2.5*k, slamGear(F,k){ return hash(k,F.seed)%4; },
+  launchT:g=>9+1.5*g,
+  pawl(g){ const G=GEARS[g], u=dir(G.a); return [add(G.c,u,2.0),add(G.c,u,O_R)]; },
+  segD(p,a,b){const ab=sub(b,a),t=Math.max(0,Math.min(1,((p[0]-a[0])*ab[0]+(p[1]-a[1])*ab[1])/(ab[0]*ab[0]+ab[1]*ab[1])));return dist(p,add(a,ab,t));},
+  onGround(F,q,t){ const g=gearAt(q); if(g<0) return false; if(g<4&&t>=this.launchT(g)) return false; return true; },
+  step(F,t,nt){ for(let g=0;g<5;g++) F.spin[g]+=(g<4&&F.launched[g]?0:this.omega(g,t))*(nt-t)*180/Math.PI;
+    for(const p of F.pl){ if(p.dead)continue; const g=gearAt(p.p);
+      if(!this.onGround(F,p.p,nt)){ p.hp=0;p.dead=true;F.deaths++; say(F,`<span class="bad">✗ ${nt.toFixed(1)}s ${H[p.i]} ${g>=0?'went with gear '+GN[g]:'fell into the pit'}</span>`); continue; }
+      for(let i=0;i<4;i++){ if(F.launched[i])continue; const [a,b]=this.pawl(i); if(this.segD(p.p,a,b)<PR+0.15){ hurt(F,p,LETHAL,'a pawl'); } } }
+    const k=Math.floor(nt/2.5); if(k>=1&&k>F.slamsDone&&nt<9){ F.slamsDone=k; const s=this.slamGear(F,k); for(const p of F.pl) if(!p.dead&&gearAt(p.p)===s) hurt(F,p,LETHAL,'the hammer'); for(let j=0;j<12;j++){const d=dir(30*j+7*k); F.bul.push({p:GEARS[s].c.slice(),v:d.map(v=>v*4)});} say(F,`<b>slam</b> on ${GN[s]}`); }
+    for(let g=0;g<4;g++) if(!F.launched[g]&&nt>=this.launchT(g)){ F.launched[g]=true; for(let j=-2;j<=2;j++){const d=dir(GEARS[g].a+180+24*j); F.bul.push({p:GEARS[g].c.slice(),v:d.map(v=>v*5)});} say(F,`<b>gear ${GN[g]}</b> tears loose`); }
+    if(t<15&&nt>=15) say(F,'<b>15 s</b>: the great bell falls · P5');
+  },
+  bullets(F,tq){ const out=F.bul.map(b=>add(b.p,b.v,tq-F.t)); const k=Math.floor(tq/2.5); if(k>=1&&k>F.slamsDone&&tq<9){ const s=this.slamGear(F,k), te=2.5*k; for(let j=0;j<12;j++) out.push(add(GEARS[s].c,dir(30*j+7*k),4*(tq-te))); }
+    for(let g=0;g<4;g++){ const te=this.launchT(g); if(!F.launched[g]&&tq>te) for(let j=-2;j<=2;j++) out.push(add(GEARS[g].c,dir(GEARS[g].a+180+24*j),5*(tq-te))); } return out; },
+  danger(F,p,q,tq){ if(!this.onGround(F,q,tq+0.25)) return 2; const g=gearAt(q); if(!GEARS.some((G,i)=>(i===4||!F.launched[i]&&tq<this.launchT(i)-0.2)&&dist(q,G.c)<=G.r-0.12)) return 2;
+    for(let i=0;i<4;i++){ if(F.launched[i])continue; const [a,b]=this.pawl(i); if(this.segD(q,a,b)<PR+0.4) return 2; if(dist(q,GEARS[i].c)<HUB_R+PR+0.05) return 2; }
+    const k=Math.floor(tq/2.5); if(tq>=1.5&&tq<9){ const kk=Math.round(tq/2.5); if(Math.abs(tq-2.5*kk)<0.06&&gearAt(q)===this.slamGear(F,kk)) return 2; } return 0; },
+  goal(F,p){ const t=F.t, my=(p.i+2)%4;
+    if(F.mistake==='pawl'&&p.i===0&&t>3) return {to:p.p,why:'stands still',raw:[0,0]};
+    if(F.mistake==='ride'&&p.i===3&&t>3) return {to:p.p,why:'rides gear '+GN[my],raw:[0,0]};
+    const leave=t>=6.5||(t>this.launchT(my)-3); const rideLong=F.mistake==='ride'&&p.i===3;
+    if(!leave||(rideLong&&t<this.launchT(my)+0.2)){ const G=GEARS[my]; let to=add(G.c,dir(G.a+180-30),HUB_R+PR+0.7); const k=Math.ceil(t/2.5); if(t<9&&2.5*k-t<1.5&&this.slamGear(F,k)===my) to=dir(G.a).map(v=>v*2.2); return {to,why:'gear '+GN[my]}; }
+    const cur=gearAt(p.p); if(cur>=0&&cur<4) return {to:dir(GEARS[cur].a).map(v=>v*2.4),why:'→ CENTRE'};
+    return {to:dir(45+90*p.i+F.spin[4]).map(v=>v*2.4),why:'CENTRE'}; },
+  draw(g,F,P,S){ const t=F.t;
+    g.fillStyle='#05070d'; g.beginPath(); g.arc(...P(0,0),R_ARENA*S,0,7); g.fill();
+    GEARS.forEach((G,i)=>{ if(i<4&&F.launched[i]){ const fly=(t-this.launchT(i)); if(fly>1.2)return; const c=add(G.c,dir(G.a),fly*8); const [x,y]=P(...c); g.globalAlpha=Math.max(0,1-fly); g.fillStyle='#2c2a3a'; g.beginPath(); g.arc(x,y,G.r*S*(1+fly*0.5),0,7); g.fill(); g.globalAlpha=1; return; }
+      const [x,y]=P(...G.c), teeth=i===4?12:18; g.beginPath(); for(let k=0;k<teeth*2;k++){const a=(F.spin[i]+k*180/teeth)*Math.PI/180, r=(k%2?G.r:G.r-0.25)*S; const px=x+Math.sin(a)*r, py=y-Math.cos(a)*r; k?g.lineTo(px,py):g.moveTo(px,py);} g.closePath();
+      const kk=Math.ceil(t/2.5), hot=i<4&&t<9&&2.5*kk-t<1.5&&this.slamGear(F,kk)===i;
+      g.fillStyle=hot?'rgba(255,106,77,.6)':(i===4?'#3a3020':'#2c2a3a'); g.fill(); g.strokeStyle='#c99a4b'; g.lineWidth=2; g.stroke();
+      if(i<4){ const warn=t>this.launchT(i)-2; g.fillStyle=warn&&Math.floor(t*6)%2?'#ff6a4d':'#c99a4b'; g.beginPath(); g.arc(x,y,HUB_R*S,0,7); g.fill(); const [a,b]=this.pawl(i); g.strokeStyle='#ff6a4d'; g.lineWidth=7; g.beginPath(); g.moveTo(...P(...a)); g.lineTo(...P(...b)); g.stroke();
+        g.fillStyle='#efe6cf'; g.font='bold 16px Segoe UI'; g.textAlign='center'; const lp=P(...add(G.c,dir(G.a+90),3.0)); g.fillText(GN[i]+(warn?' · LAUNCH '+Math.max(0,this.launchT(i)-t).toFixed(1):''),lp[0],lp[1]+5); } });
+    if(t>13.5){ const f=Math.min(1,(t-13.5)/1.5); g.strokeStyle=`rgba(201,154,75,${f})`; g.lineWidth=14; g.beginPath(); g.arc(...P(0,0),(R_ARENA+6*(1-f))*S,0,7); g.stroke(); }
+    g.fillStyle='#ffd27a'; g.font='bold 22px Segoe UI'; g.textAlign='center'; g.fillText(t<9?`gears ×${this.speedK(t).toFixed(1)} · hammer every 2.5 s`:t<15?'the gears tear loose: get to the CENTRE':'THE GREAT BELL FALLS · P5',...P(0,-11.85)); }
+};
+
+// ======================= scene 2: P5 · Final Toll (13 tolls that speed up) =======================
+// Inside the great bell. The bell tolls at TT[k]: every 4 s for I-VI, every 3.5 s for VII-IX, every 3 s for X-XII; XIII
+// (46.5 s) is the hard enrage. Each toll:
+//   CLAPPER   the boss strikes a 3 m lane straight across the bell, at a random angle shown 1.6 s before (999 on the toll)
+//   SOUND     a ring rushes inward from the rim at 5 m/s all the way to the boss, with four gaps marked I-IV; each hour's
+//             gap moves 60° a toll; through your own gap only (another's: 999; the ring itself: 50)
+//   CALLBACKS PLATE (the next hour soaks the lit plate or WIPE), DEBTS (a ring under everyone, detonating next toll),
+//             INVERTED (the far half slams: the INVERTED hour inside, everyone else out), HAMMER (12 shards from the rim).
+//             One per toll for I-VI (in that order), two per toll for VII-IX, all four for X-XII.
+//   ECHO      from toll X a second ring follows 1 s behind the first, every gap 45° further round (same hours)
+//   BULLETS   from toll IV, P3's Mainspring is back: three spiral arms fire from the boss between sound rings (50 a bullet).
+//   THE ECHO BELLKEEPER  toll IX on: a ghost Bellkeeper strikes its own clapper lane through itself, 6.5 m out across the boss from
+//             each toll's plate (it moves after every toll).
+//             The two share one bar, and only the one that RANG LAST takes damage (IX echo, X boss, XI echo, XII boss).
+//   LAST STAND  toll XIII shatters the bell: only four platforms stay (one per hour, 3.8 m out; shown from XII). Off your
+//             own platform is the fall (999); bell shards drop on the platforms (shown 1 s, 999). Every hit counts x4 for
+//             10 s; if the boss still stands at the end, the bell falls on you (WIPE).
+const TT=[0,4,8,12,16,20,24,27.5,31,34.5,38,41.5,45,48.5], ROMAN=['','I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII','XIII'], KN=['PLATE','DEBTS','INVERTED','HAMMER'];
+const T3={name:'P5 · Final Toll',end:59,
+  side:`<h3>Final Toll: inside the great bell</h3><p>The bell tolls, and <b>keeps speeding up</b>: every 4 s (I–VI), then 3.5 s (VII–XII). <b>XIII shatters the bell</b> into the last stand (below).</p><p>Every toll:</p><p>🔔 <b>Clapper</b>: a 3 m lane straight across the bell at a random angle, shown 1.6 s before (999 on the toll).</p><p>🔊 <b>Sound ring</b>: rushes in from the rim to the boss with gaps I–IV; your gap moves 60° each toll. Through <i>your</i> gap only (another's: 999).</p><p>🔊🔊 <b>The echo</b>: from toll X a second ring (blue) follows <b>0.8 s behind</b> the first, every gap 45° further round. Thread your gap, then step to your next one.</p><p>🔁 <b>Callbacks</b> that <b>stack</b>: one a toll for I–VI (plate → debts → INVERTED → hammer), <b>two</b> a toll for VII–IX, <b>all four</b> for X–XII. The plate lies by the soaker's last gap and the INVERTED half is centred on the INVERTED hour's gap: the rings lead you to your job. Standing on the lit plate pays any debt (P1).</p><p>🌀 <b>Mainspring</b>: from toll IV, P3's three spiral arms fire from the boss between sound rings (50 a bullet).</p><p>👥 <b>The Echo Bellkeeper</b>: from toll IX a ghost Bellkeeper (blue) strikes its own lane, and moves after every toll. Only the one that <b>rang last</b> takes damage (gold <b>LIVE</b>): swap every toll.</p><p>💥 <b>Last Stand</b>: XIII shatters the bell. Be on <b>your</b> platform (shown from XII), dodge the falling shards, and finish it in <b>10 s</b> at <b>×4</b> damage, or the bell falls on you (WIPE).</p>`,
+  mistakes:[['','inject a mistake…'],['gap','toll III: II takes I’s gap'],['debt','toll VII: III forgets its debt and stays'],['inv','toll VII: the INVERTED player stays out of the slam'],['plat','XIII: II runs to the wrong platform']],
+  init(F){ F.hp=100; F.tolls=0; F.debts=[]; F.nextArm=16; this._F=F; },
+  cur(t){ let k=0; while(k<13&&TT[k+1]<=t) k++; return k; },   // tolls already rung
+  STAND:10, ER:1.0,
+  echoPos(F,k){ return dir(this.plateA(Math.min(12,Math.max(9,k)))+180).map(v=>v*6.5); },   // it rings toll k from across the boss from that toll's plate
+  echoAt(F,t){ return this.echoPos(F,Math.min(12,this.cur(t)+1)); },   // after each toll it moves to where it rings next
+  echoOn(t){ return t>=TT[9]&&t<TT[13]; },
+  live(F,t){ const c=this.cur(t); return t>=TT[13]?'boss':c>=9&&c%2===1?'echo':'boss'; },   // the one that rang last
+  liveBody(F,t){ return this.live(F,t)==='echo'?{c:this.echoAt(F,t),r:this.ER}:{c:[0,0],r:BOSS_R}; },
+  // the echo's clapper: its own lane through itself, turned until it misses the plate
+  echoLaneA(F,k){ let a=hash(k,F.seed+21)%180; if(this.kinds(k).includes(0)){ const pl=sub(dir(this.plateA(k)).map(v=>v*5.5),this.echoPos(F,k)); for(let n=0;n<26;n++){ const d=dir(a); if(Math.abs(d[0]*pl[1]-d[1]*pl[0])>1.5+PR+1.8) break; a=(a+7)%180; } } return a; },
+  echoLaneHit(F,k,q,m=0){ if(k<9||k>12) return false; const d=dir(this.echoLaneA(F,k)), r=sub(q,this.echoPos(F,k)); return Math.abs(d[0]*r[1]-d[1]*r[0])<1.5+PR+m; },
+  platC(h){ return dir(45+90*h).map(v=>v*3.4); }, PLAT:1.9,   // touching the boss, so a melee lunge ends on it
+  shard(F,n){ const h=n%4, c=this.platC(h), a=hash(n,F.seed+31)%360, r=0.7+(hash(n,F.seed+37)%100)/100*0.5; return {at:TT[13]+0.9+0.75*n, p:add(c,dir(a),r), h}; },
+  shardHit(F,q,tq,m=0){ for(let n=0;n<13;n++){ const sh=this.shard(F,n); if(Math.abs(tq-sh.at)<1/60*0.7+0.001&&dist(q,sh.p)<0.9+PR+m) return true; } return false; },
+  // the clapper: a random angle, turned until its lane misses the plate (when there is one)
+  laneA(F,k){ let a=hash(k,F.seed+3)%180; if(k>=1&&k<13&&this.kinds(k).includes(0)){ const pl=dir(this.plateA(k)).map(v=>v*5.5); for(let n=0;n<26;n++){ const d=dir(a); if(Math.abs(d[0]*pl[1]-d[1]*pl[0])>1.5+PR+1.8) break; a=(a+7)%180; } } return a; },
+  // where hour h last passed a ring before toll k (the echo's gap when that toll had one)
+  lastGap(k,h){ const kk=k-1; if(kk<1) return 45+90*h; const cs=kk>=10&&kk<=12?this.gap2Centres(kk):this.gapCentres(kk); return cs[cs.findIndex((x,j)=>this.gapHour(kk,j)===h)]; },
+  invAng(k){ return this.lastGap(k,this.invHour(k)); },   // centred on the INVERTED hour's gap: its two neighbours are on the edge, one step out
+  invDir(k){ return dir(this.invAng(k)); },
+  kinds(k){ const b=(k-1)%4; return k<=6?[b]:k<=9?[b,(b+2)%4]:[0,1,2,3]; },
+  soaker:k=>(k-1)%4, invHour:k=>k%4,
+  plateA(k){ const b=this.lastGap(k,this.soaker(k)), a=this.lastGap(k,this.invHour(k)), d=((a-b)%360+540)%360-180; return b-(d>=0?20:-20); },   // by the soaker's last gap, 20° clear of the INVERTED half
+  gapCentres(k){ return [0,1,2,3].map(j=>(45+90*j+30*k)%360); },
+  gapHour(k,j){ return (j+k)%4; },
+  GAP:16,
+  ringR(F,t){ const k=this.cur(t); if(k<1) return -1; const r=R_ARENA-5*(t-TT[k]); return r>BOSS_R+0.3?r:-1; },
+  ring2V(F,t){ const k=this.cur(t); return k<10||k>12?-1:R_ARENA-5*(t-TT[k]-0.8); },   // from toll X: the echo, 0.8 s behind the first ring (may still be outside the rim)
+  ring2R(F,t){ const r=this.ring2V(F,t); return r>BOSS_R+0.3&&r<=R_ARENA?r:-1; },
+  gap2Centres(k){ return this.gapCentres(k).map(c=>(c+45)%360); },
+  gap2Hour(k,j){ return this.gapHour(k,j); },   // each hour's echo gap is its first gap, 45° further round
+  laneHit(F,k,q){ const d=dir(this.laneA(F,k)); return Math.abs(d[0]*q[1]-d[1]*q[0])<1.5+PR; },
+  ringHit(F,p,q,t,margin=0,belief=false){ const R=this.ringR(F,t); if(R<0) return 0; if(Math.abs(len(q)-R)>0.3+PR) return 0; const k=this.cur(t), a=angOf(q), cs=this.gapCentres(k);
+    const j=cs.findIndex(c=>angDiff(a,c)<this.GAP-margin*20); if(j<0) return 1; const hr=(belief&&F.mistake==='gap'&&p.i===1&&k===3)?0:p.i; return this.gapHour(k,j)===hr?0:2; },
+  ring2Hit(F,p,q,t,margin=0){ const R=this.ring2R(F,t); if(R<0) return 0; if(Math.abs(len(q)-R)>0.3+PR) return 0; const k=this.cur(t), a=angOf(q), cs=this.gap2Centres(k);
+    const j=cs.findIndex(c=>angDiff(a,c)<this.GAP-margin*20); if(j<0) return 1; return this.gap2Hour(k,j)===p.i?0:2; },
+  armA:t=>35*t,
+  firing(F,t){ const k=this.cur(t); return t>=16&&this.ringR(F,t)<0&&this.ring2R(F,t)<0&&k<13&&TT[k+1]-t>0.8; },   // between the sound ring and 0.8 s before the next toll
+  step(F,t,nt){
+    // damage: each player in reach of the LIVE body chips it (melee 1.2 m, ranged 6 m from its surface); x4 in the last stand
+    { const b=this.liveBody(F,nt); let n=0; for(const p of F.pl){ if(p.dead) continue; const reach=dist(p.p,b.c)-b.r-PR; if(reach<=((p.i===0||p.i===3)?1.2:6)) n++; }
+      F.hp-=(nt-t)*n*(nt>=TT[13]?4:1)*100/(4*55); }
+    if(F.hp<=0&&!F.won){ F.hp=0; F.won=true; say(F,'<b>'+nt.toFixed(1)+' s: THE LAST BELL · the Bellkeeper falls</b>'); return; }
+    while(F.nextArm<=nt){ if(this.firing(F,F.nextArm)) for(let j=0;j<3;j++){ const d=dir(this.armA(F.nextArm)+120*j); F.bul.push({p:d.map(v=>v*BOSS_R),v:d.map(v=>v*3.5),what:'a spiral bullet'}); } F.nextArm+=0.45; }
+    const k=this.cur(nt);
+    if(k>=1&&k>F.tolls){ F.tolls=k;
+      if(k>=13){ say(F,'<b>XIII</b>: the bell shatters · LAST STAND'); F.debts=[];
+        for(const p of F.pl) if(!p.dead&&dist(p.p,this.platC(p.i))>this.PLAT) hurt(F,p,LETHAL,dist(p.p,this.platC(p.i))>this.PLAT&&[0,1,2,3].some(h=>dist(p.p,this.platC(h))<=this.PLAT)?'another hour\'s platform':'the fall');
+        return; }
+      for(const p of F.pl) if(!p.dead&&this.echoLaneHit(F,k,p.p)) hurt(F,p,LETHAL,'the echo\'s clapper');
+      const ks=this.kinds(k);
+      for(const p of F.pl) if(!p.dead&&this.laneHit(F,k,p.p)) hurt(F,p,LETHAL,'the clapper');
+      const onPlate=q=>this.kinds(k).includes(0)&&dist(q,dir(this.plateA(k)).map(v=>v*5.5))<1.6;   // the plate pays debts (P1)
+      for(const d of F.debts) if(d.at===k) for(const p of F.pl) if(!p.dead&&!onPlate(p.p)&&dist(p.p,d.p)<2+PR) hurt(F,p,LETHAL,`${H[d.owner]}'s debt`);
+      F.debts=F.debts.filter(d=>d.at>k);
+      if(ks.includes(0)){ const pl=dir(this.plateA(k)).map(v=>v*5.5), s=this.soaker(k), sp=F.pl[s]; if(sp.dead||dist(sp.p,pl)>1.6){F.wiped='the plate was empty';say(F,`<span class="bad">✗ toll ${ROMAN[k]}: ${H[s]} not on the plate: WIPE</span>`);return;} }
+      if(ks.includes(2)){ const d=this.invDir(k), ih=this.invHour(k); for(const p of F.pl){ if(p.dead)continue; const far=dot(p.p,d)>0.6, near=dot(p.p,d)<-0.6; if(p.i===ih?!far:!near) hurt(F,p,LETHAL,p.i===ih?'the bell (inverted)':'the slam'); } }
+      if(ks.includes(3)){ const c=dir(hash(k,F.seed+9)%360).map(v=>v*9); for(let j=0;j<12;j++){const d=dir(30*j+7*k); F.bul.push({p:c.slice(),v:d.map(v=>v*4),what:'a hammer shard'});} }
+      if(ks.includes(1)) for(const p of F.pl) if(!p.dead) F.debts.push({p:p.p.slice(),at:k+1,owner:p.i});
+      say(F,`<b>toll ${ROMAN[k]}</b>: ${ks.map(x=>KN[x]).join(' + ')} ✓`);
+    }
+    if(nt>=TT[13]){ for(let n=0;n<13;n++){ const sh=this.shard(F,n); if(t<sh.at&&nt>=sh.at) for(const p of F.pl) if(!p.dead&&dist(p.p,sh.p)<0.9+PR) hurt(F,p,LETHAL,'a falling shard'); }
+      for(const p of F.pl) if(!p.dead&&t>=TT[13]&&dist(p.p,this.platC(p.i))>this.PLAT) hurt(F,p,LETHAL,'the fall');
+      if(nt>=TT[13]+this.STAND&&!F.won){ F.wiped='the last stand: the bell falls'; say(F,'<span class="bad">the bell falls: WIPE</span>'); }
+      return; }
+    for(const p of F.pl) if(!p.dead){ const kk=this.cur(nt), h=this.ringHit(F,p,p.p,nt); if(h&&p.ringHit!==kk){ p.ringHit=kk; hurt(F,p,h===2?LETHAL:50,h===2?'another\'s gap':'the sound ring'); }
+      const h2=this.ring2Hit(F,p,p.p,nt); if(h2&&p.ring2Hit!==kk){ p.ring2Hit=kk; hurt(F,p,h2===2?LETHAL:50,h2===2?'another\'s echo gap':'the echo ring'); } }
+  },
+  bullets(F,tq){ const out=F.bul.map(b=>add(b.p,b.v,tq-F.t)); for(let te=F.nextArm;te<=tq;te+=0.45) if(this.firing(F,te)) for(let j=0;j<3;j++) out.push(dir(this.armA(te)+120*j).map(v=>v*(BOSS_R+3.5*(tq-te))));
+    const k=this.cur(tq); if(k>F.tolls&&k<13&&this.kinds(k).includes(3)){ const c=dir(hash(k,F.seed+9)%360).map(v=>v*9); for(let j=0;j<12;j++) out.push(add(c,dir(30*j+7*k),4*(tq-TT[k]))); }
+    return out; },
+  danger(F,p,q,tq,dtS){
+    if(tq>=TT[13]-0.02){ if(dist(q,this.platC(p.i))>this.PLAT-0.25) return 2; for(let n=0;n<13;n++){ const sh=this.shard(F,n); if(Math.abs(tq-sh.at)<dtS*0.7&&dist(q,sh.p)<0.9+PR+0.25) return 2; } return 0; }
+    const k=this.cur(tq+dtS*0.7); if(k>=1&&k<13&&Math.abs(tq-TT[k])<dtS*0.7){ const ks=this.kinds(k); if(this.laneHit(F,k,q)||this.echoLaneHit(F,k,q)) return 2;
+      const onPl=ks.includes(0)&&dist(q,dir(this.plateA(k)).map(v=>v*5.5))<1.3;
+      if(!onPl&&F.debts.some(d=>d.at===k&&dist(q,d.p)<2+PR+0.25)) return 2;
+      if(ks.includes(2)){ const d=this.invDir(k); const far=dot(q,d)>0.9, near=dot(q,d)<-0.9; if(p.i===this.invHour(k)?!far:!near) return 2; }
+      if(ks.includes(0)&&this.soaker(k)===p.i&&dist(q,dir(this.plateA(k)).map(v=>v*5.5))>1.3) return 2; }
+    return this.ringHit(F,p,q,tq,0.15,true)||this.ring2Hit(F,p,q,tq,0.15); },
+  goal(F,p){ const t=F.t, c=this.cur(t), k=c+1, ks=this.kinds(Math.min(k,12)), left=TT[Math.min(k,13)]-t;
+    const myPlat=F.mistake==='plat'&&p.i===1?this.platC(2):this.platC(p.i);
+    if(t>=TT[13]){ // the last stand: stay on your platform, off the next shards, as close to the boss as it allows
+      let to=add(myPlat,myPlat.map(v=>-v/len(myPlat)),(p.i===0||p.i===3)?1.1:0.4);
+      // the next shards on my platform: the spot on it nearest that wish, clear of them
+      const due=[]; for(let n=0;n<13;n++){ const sh=this.shard(F,n); if(sh.h===p.i&&sh.at>t-0.05&&sh.at-t<1.3) due.push(sh.p); }
+      if(due.length){ let best=null,bd=1e9; for(const r of [0,0.5,0.9,1.25,1.45]) for(let j=0;j<(r?16:1);j++){ const c4=add(myPlat,dir(22.5*j),r); if(due.some(q=>dist(c4,q)<0.9+PR+0.35)) continue; const d=dist(c4,to); if(d<bd){bd=d;best=c4;} } if(best) to=best; }
+      return {to,why:'platform '+H[p.i]}; }
+    if(F.mistake==='debt'&&p.i===2&&k===7) return {to:p.p,why:'forgets its debt',raw:[0,0]};
+    const R2=this.ring2V(F,t), myR=len(p.p), R1=this.ringR(F,t);
+    if(R2>BOSS_R+0.3&&R2>myR-1.2&&!(R1>0&&R1>myR-1.2)&&(R2-myR)/5<2.4){ { const j=this.gap2Centres(c).findIndex((x,jj)=>this.gap2Hour(c,jj)===p.i); return {to:dir(this.gap2Centres(c)[j]).map(v=>v*Math.max(2.5,Math.min(10.5,myR))),why:'echo gap '+H[p.i]}; } }
+    const R=this.ringR(F,t); if(R>0&&R>myR-1.2&&(R-myR)/5<2.4){ let j=this.gapCentres(c).findIndex((x,jj)=>this.gapHour(c,jj)===(F.mistake==='gap'&&p.i===1&&c===3?0:p.i)); return {to:dir(this.gapCentres(c)[j]).map(v=>v*Math.max(2.5,Math.min(10.5,myR))),why:'gap '+H[p.i]}; }
+    const side=dir(this.invAng(k)+90);
+    // the nearest spot to 'to' that is out of the clapper's lane and the debts due, inside the arena, and passes need()
+    const laneD=dir(this.laneA(F,k)), need0=()=>true;
+    const clear=(to,need=need0)=>{ for(let n=0;n<=7;n++) for(let a=0;a<(n?12:1);a++){ const cc=add(to,dir(30*a+15*n),n*0.9); if(len(cc)<10.5&&len(cc)>2.6&&need(cc)&&(k>=13||Math.abs(laneD[0]*cc[1]-laneD[1]*cc[0])>1.5+PR+0.6)&&!this.echoLaneHit(F,k,cc,0.6)&&F.debts.every(db=>db.at!==k||dist(cc,db.p)>2+PR+0.6)) return cc; } return to; };
+    if(k===13) return {to:myPlat,why:'→ platform '+H[F.mistake==='plat'&&p.i===1?2:p.i]};
+    if(ks.includes(0)&&this.soaker(k)===p.i&&left<2.6) return {to:dir(this.plateA(k)).map(v=>v*5.5),why:'SOAK'};
+    if(ks.includes(2)){ const d=this.invDir(k);
+      if(p.i===this.invHour(k)&&!(F.mistake==='inv'&&k===7)) return {to:clear(d.map(v=>v*5),cc=>dot(cc,d)>1.4),why:'INVERTED'}; const o=dot(p.p,d), st=o>-1.6?add(p.p,d,-(o+1.8)):p.p.slice(), r=len(st), st2=r<2.8?st.map(v=>v*2.8/Math.max(r,1e-3)):r>10?st.map(v=>v*10/r):st; return {to:clear(st2,cc=>dot(cc,d)<-1.4),why:'out of the slam'}; }   // the nearest spot out of the half, not the far side
+    const nextLive=k>=9&&k<=12&&k%2===1?'echo':this.live(F,t);   // swap to the body that rings next as its toll lands
+    if(nextLive==='echo'){ const E=this.echoPos(F,k), a=angOf(E)+(p.i%2?100:-100)+(p.i<2?-20:20), lr=(p.i===0||p.i===3)?this.ER+PR+0.7:4.5;
+      return {to:clear(add(E,dir(a),lr)),why:(p.i===0||p.i===3?'melee':'ranged')+' → ECHO'}; }
+    const a=this.laneA(F,k)+90+(p.i%2?0:180)+(p.i<2?-25:25), lr=(p.i===0||p.i===3)?2.8:5.2;
+    return {to:clear(dir(a).map(v=>v*lr)),why:(p.i===0||p.i===3?'melee':'ranged')+(k>=9?' → BOSS':'')}; },
+  draw(g,F,P,S){ const t=F.t, c=this.cur(t), k=c+1, kc=Math.min(k,12), ks=this.kinds(kc), left=TT[Math.min(k,13)]-t;
+    const grd=g.createRadialGradient(...P(0,0),2*S,...P(0,0),R_ARENA*S); grd.addColorStop(0,'#3a2c18'); grd.addColorStop(1,'#1c1610');
+    g.fillStyle=grd; g.beginPath(); g.arc(...P(0,0),R_ARENA*S,0,7); g.fill(); g.strokeStyle=k>=10?'#ff9a6b':'#c99a4b'; g.lineWidth=6; g.stroke();
+    if(k<13&&(left<1.6||(c>=1&&t-TT[c]<0.25))){ const kk=left<1.6?k:c, d=dir(this.laneA(F,kk)), n=[-d[1],d[0]]; const q4=[add(d.map(v=>v*12),n,1.5),add(d.map(v=>v*12),n,-1.5),add(d.map(v=>-v*12),n,-1.5),add(d.map(v=>-v*12),n,1.5)];
+      g.fillStyle=left<1.6?`rgba(255,106,77,${0.2+0.5*(1-left/1.6)})`:'rgba(255,240,200,.7)'; g.beginPath(); q4.forEach((q,i)=>i?g.lineTo(...P(...q)):g.moveTo(...P(...q))); g.closePath(); g.fill(); }
+    if(t>=TT[13]){ g.fillStyle='#05070d'; g.beginPath(); g.arc(...P(0,0),R_ARENA*S,0,7); g.fill(); }
+    if(t>=TT[12]){ for(let h=0;h<4;h++){ const c4=this.platC(h); g.fillStyle=t>=TT[13]?'#3a2c18':'rgba(255,210,122,.18)'; g.beginPath(); g.arc(...P(...c4),this.PLAT*S,0,7); g.fill(); g.strokeStyle=t>=TT[13]?'#c99a4b':(Math.floor(t*4)%2?'#ffd27a':'#c99a4b'); g.lineWidth=3; g.stroke(); g.fillStyle='#ffd27a'; g.font='bold 14px Segoe UI'; g.textAlign='center'; g.fillText(H[h],...P(...add(c4,dir(45+90*h),2.2))); } }
+    if(t>=TT[13]) for(let n=0;n<13;n++){ const sh=this.shard(F,n); if(t<sh.at&&sh.at-t<1.0){ g.fillStyle=`rgba(255,106,77,${0.25+0.5*(1-(sh.at-t))})`; g.beginPath(); g.arc(...P(...sh.p),0.9*S,0,7); g.fill(); } }
+    if(k>=9&&k<13&&(left<1.6||(c>=9&&t-TT[c]<0.25))){ const kk=left<1.6?k:c, d=dir(this.echoLaneA(F,kk)), n=[-d[1],d[0]], E=this.echoPos(F,kk); const q4=[add(add(E,d,14),n,1.5),add(add(E,d,14),n,-1.5),add(add(E,d,-14),n,-1.5),add(add(E,d,-14),n,1.5)];
+      g.save(); g.beginPath(); g.arc(...P(0,0),R_ARENA*S,0,7); g.clip(); g.fillStyle=left<1.6?`rgba(120,200,255,${0.2+0.45*(1-left/1.6)})`:'rgba(220,240,255,.7)'; g.beginPath(); q4.forEach((q,i)=>i?g.lineTo(...P(...q)):g.moveTo(...P(...q))); g.closePath(); g.fill(); g.restore(); }
+    if(k<13&&ks.includes(2)){ const d=this.invDir(k), ang=Math.atan2(-d[1],d[0]); g.fillStyle=left<1.2?'rgba(255,106,77,.35)':'rgba(182,124,255,.12)'; g.beginPath(); g.moveTo(...P(0,0)); g.arc(...P(0,0),R_ARENA*S,ang-Math.PI/2,ang+Math.PI/2); g.closePath(); g.fill(); g.fillStyle='#c9a2ff'; g.font='bold 14px Segoe UI'; g.textAlign='center'; g.fillText(H[this.invHour(k)]+' INVERTED: inside the slam',...P(...d.map(v=>v*8))); }
+    if(k<13&&ks.includes(0)){ const pl=dir(this.plateA(k)).map(v=>v*5.5); g.fillStyle='#e3b45f'; g.beginPath(); g.arc(...P(...pl),1.6*S,0,7); g.fill(); g.fillStyle='#10162a'; g.font='bold 12px Segoe UI'; g.textAlign='center'; g.fillText(H[this.soaker(k)]+' SOAK',...P(...pl)); }
+    if(k<13&&ks.includes(3)&&left<1.6){ const cc=dir(hash(k,F.seed+9)%360).map(v=>v*9); g.strokeStyle='#ffd27a'; g.lineWidth=3; g.beginPath(); g.arc(...P(...cc),(0.6+0.6*(1-left/1.6))*S,0,7); g.stroke(); }
+    for(const d of F.debts){ const live=d.at===k&&left<1.2; g.strokeStyle=live?'#ff6a4d':'rgba(239,230,207,.7)'; g.setLineDash(live?[]:[6,4]); g.lineWidth=2; g.beginPath(); g.arc(...P(...d.p),2*S,0,7); g.stroke(); g.setLineDash([]); if(live){g.fillStyle='rgba(255,106,77,.3)';g.fill();} }
+    const R2=this.ring2R(F,t); if(R2>0){ const cs=this.gap2Centres(c); g.strokeStyle='#9fe0ff'; g.lineWidth=0.6*S;
+      for(let a=0;a<360;a+=2){ if(cs.some(x=>angDiff(a+1,x)<this.GAP))continue; g.beginPath(); g.moveTo(...P(...dir(a).map(v=>v*R2))); g.lineTo(...P(...dir(a+2).map(v=>v*R2))); g.stroke(); }
+      cs.forEach((x,j)=>{ g.fillStyle='#9fe0ff'; g.font='bold 15px Segoe UI'; g.textAlign='center'; g.fillText(H[this.gap2Hour(c,j)],...P(...dir(x).map(v=>v*(R2+0.9)))); }); }
+    const R=this.ringR(F,t); if(R>0){ const cs=this.gapCentres(c); g.strokeStyle='#ffe2a0'; g.lineWidth=0.6*S;
+      for(let a=0;a<360;a+=2){ if(cs.some(x=>angDiff(a+1,x)<this.GAP))continue; g.beginPath(); g.moveTo(...P(...dir(a).map(v=>v*R))); g.lineTo(...P(...dir(a+2).map(v=>v*R))); g.stroke(); }
+      cs.forEach((x,j)=>{ g.fillStyle='#ffd27a'; g.font='bold 15px Segoe UI'; g.textAlign='center'; g.fillText(H[this.gapHour(c,j)],...P(...dir(x).map(v=>v*(R+0.9)))); }); }
+    else if(k<13){ const cs=this.gapCentres(k); cs.forEach((x,j)=>{ g.fillStyle='rgba(255,210,122,.5)'; g.font='bold 13px Segoe UI'; g.textAlign='center'; g.fillText(H[this.gapHour(k,j)],...P(...dir(x).map(v=>v*11.1))); }); }
+    // the two Bellkeepers and which one is LIVE
+    if(this.echoOn(t)){ const E=this.echoAt(F,t), lv=this.live(F,t); g.fillStyle='rgba(120,190,255,.45)'; g.beginPath(); g.arc(...P(...E),this.ER*S,0,7); g.fill(); g.strokeStyle=lv==='echo'?'#ffd27a':'#9fe0ff'; g.lineWidth=lv==='echo'?5:2; g.stroke();
+      g.font='bold 14px Segoe UI'; g.textAlign='center'; g.fillStyle=lv==='echo'?'#ffd27a':'#9fe0ff'; g.fillText(lv==='echo'?'ECHO · LIVE':'echo',...P(E[0],E[1]+1.6)); g.fillStyle=lv==='boss'?'#ffd27a':'rgba(239,230,207,.6)'; g.fillText(lv==='boss'?'BOSS · LIVE':'boss',...P(0,2.3)); }
+    if(t>=TT[13]){ g.fillStyle='#ffd27a'; g.font='bold 14px Segoe UI'; g.textAlign='center'; g.fillText('BOSS · ×4',...P(0,2.3)); }
+    g.fillStyle=k>=10?'#ff6a4d':'#ffd27a'; g.font='bold 22px Segoe UI'; g.textAlign='center';
+    if(t>=TT[13]){ g.fillText(`LAST STAND · ${Math.max(0,TT[13]+this.STAND-t).toFixed(1)}s · hits ×4 · stay on your platform`,...P(0,-11.85)); return; }
+    g.fillText(k>=13?`XIII in ${left.toFixed(1)}s · THE BELL SHATTERS: get to your platform`:`toll ${ROMAN[k]} in ${left.toFixed(1)}s · ${ks.map(x=>KN[x]).join(' + ')}${t>=16?' · MAINSPRING':''}`,...P(0,-11.85)); }
+};
+
+const SCENES=[T1,T2,T3];
+function runHeadless(si,mistake,jitter=0){const F=newFight(SCENES[si],mistake,jitter);while(F.t<F.scene.end&&!F.wiped&&!F.won)step(F,1/60);return F;}
+if(typeof window==='undefined'){module.exports={runHeadless,SCENES};}
+else{
+// ---------------- drawing ----------------
+const cv=document.getElementById('c'),g=cv.getContext('2d'),S=cv.width/2/12.2,CX=cv.width/2,CY=cv.height/2;
+const P=(x,y)=>[CX+x*S,CY-y*S], col=['#4f8fff','#47c98c','#ad7dff','#3fd0e0'], cls=['V','C','A','V'];
+let si=+((location.hash.match(/s=(\d)/)||[])[1]||2), F, running=true, speed=1, mistake='';
+function pick(i){ si=i; mistake=''; [0,1,2].forEach(j=>document.getElementById('s'+j).className=j===i?'on':''); document.getElementById('side').innerHTML=SCENES[i].side+'<h3>Mistake menu</h3><p>Restart with one bot making one mistake.</p>';
+  const m=document.getElementById('mist'); m.innerHTML=SCENES[i].mistakes.map(([v,l])=>`<option value="${v}">${l}</option>`).join(''); reset(); }
+function reset(){F=newFight(SCENES[si],mistake);}
+function draw(){
+ g.clearRect(0,0,cv.width,cv.height); g.fillStyle='#0b0f1c'; g.fillRect(0,0,cv.width,cv.height);
+ F.scene.draw(g,F,P,S);
+ for(const b of F.bul){ const [x,y]=P(...b.p); g.fillStyle='#e3b45f'; g.beginPath(); g.arc(x,y,BR*S+1,0,7); g.fill(); }
+ g.fillStyle='#6b5428'; g.beginPath(); g.arc(CX,CY,BOSS_R*S,0,7); g.fill(); g.strokeStyle='#c99a4b'; g.lineWidth=3; g.stroke();
+ for(const p of F.pl){ const [px,py]=P(...p.p); if(p.dead){g.fillStyle='#444';g.beginPath();g.arc(px,py,10,0,7);g.fill();continue;}
+  g.fillStyle=col[p.i]; g.beginPath(); g.arc(px,py,PR*S,0,7); g.fill(); g.strokeStyle='#0b0f1c'; g.lineWidth=2; g.stroke(); g.fillStyle='#0b0f1c'; g.font='bold 11px Segoe UI'; g.textAlign='center'; g.fillText(cls[p.i],px,py+4);
+  g.font='bold 12px Segoe UI'; g.fillStyle='#efe6cf'; g.fillText(H[p.i]+' '+(p.job||''),px,py-16); if(p.hp<100){g.fillStyle='#ff6a4d';g.fillText(p.hp+' hp',px,py+26);} }
+ if(F.hp!==undefined){ g.fillStyle='#2a2030'; g.fillRect(CX-200,14,400,14); g.fillStyle='#ff6a4d'; g.fillRect(CX-200,14,400*F.hp/100*1,14); g.strokeStyle='#c99a4b'; g.strokeRect(CX-200,14,400,14); g.fillStyle='#efe6cf'; g.font='bold 12px Segoe UI'; g.textAlign='center'; g.fillText('Bellkeeper '+(F.hp*0.35).toFixed(1)+' %  ·  '+(F.t>=TT[13]?'LAST STAND':'break it in the last stand'),CX,25); }
+ if(F.won){ const f=Math.min(1,(performance.now()%2000)/2000); g.strokeStyle='rgba(255,226,160,'+(1-f)+')'; g.lineWidth=8; g.beginPath(); g.arc(CX,CY,(1.4+10*f)*S,0,7); g.stroke(); g.fillStyle='rgba(16,22,42,.8)'; g.fillRect(0,CY-46,cv.width,92); g.fillStyle='#ffd27a'; g.font='bold 30px Segoe UI'; g.textAlign='center'; g.fillText('THE LAST BELL',CX,CY-6); g.font='bold 16px Segoe UI'; g.fillStyle='#efe6cf'; g.fillText('the Bellkeeper falls · the great bell cracks open',CX,CY+22); }
+ if(F.wiped){ g.fillStyle='rgba(16,22,42,.85)'; g.fillRect(0,CY-40,cv.width,80); g.fillStyle='#ff6a4d'; g.font='bold 24px Segoe UI'; g.textAlign='center'; g.fillText('WIPE — '+F.wiped,CX,CY+9); }
+ document.getElementById('clock').textContent=`t ${Math.min(F.t,F.scene.end).toFixed(1)} s · hits ${F.hits} · deaths ${F.deaths}${(F.t>=F.scene.end||F.won)&&!F.wiped?(F.hits?' · done: mistakes':' · done: clean, 0 damage'):''}`;
+ document.getElementById('log').innerHTML=F.log.slice(0,4).join('<br>');
+}
+let last=performance.now();
+let chain=false, doneAt=0;
+function frame(now){const dt=Math.min(0.05,(now-last)/1000)*speed;last=now;
+ if(chain&&!F.wiped&&(F.t>=F.scene.end||F.won)&&si<2){ if(!doneAt)doneAt=now; else if(now-doneAt>1500){ doneAt=0; pick(si+1); running=true; } } if(running&&F.t<F.scene.end&&!F.wiped&&!F.won){let n=Math.max(1,Math.round(dt*60));for(let i=0;i<n;i++)step(F,dt/n);} draw(); requestAnimationFrame(frame);}
+[0,1,2].forEach(j=>document.getElementById('s'+j).onclick=()=>{chain=false;pick(j);running=true;});
+document.getElementById('all').onclick=()=>{chain=true;doneAt=0;pick(0);running=true;};
+document.getElementById('play').onclick=e=>{running=!running;e.target.textContent=running?'⏸ Pause':'▶ Play';};
+document.getElementById('re').onclick=()=>{mistake='';document.getElementById('mist').value='';reset();running=true;document.getElementById('play').textContent='⏸ Pause';};
+document.getElementById('mist').onchange=e=>{mistake=e.target.value;reset();running=true;};
+document.getElementById('sp').onchange=e=>speed=+e.target.value;
+pick(si);
+{ const ff=+((location.hash.match(/t=([0-9.]+)/)||[])[1]||0); const mm=(location.hash.match(/m=([a-z]+)/)||[])[1]; if(mm){mistake=mm;reset();} while(F.t<ff&&!F.wiped&&!F.won) step(F,1/60); if(ff||mm) running=!/still/.test(location.hash); }
+requestAnimationFrame(frame);
+}
+</script></body></html>

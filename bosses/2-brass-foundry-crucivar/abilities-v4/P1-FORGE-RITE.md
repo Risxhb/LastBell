@@ -12,7 +12,7 @@
 
 | t (s) | Mechanic | Shape | Kind | Warning | Damage | Melee threat | Ranged threat |
 |---|---|---|---|---|---|---|---|
-| 0.0 | **Ember Brand** | 3 m circle on each player, follows them | Ground | 3.5 s | 30 to anyone else inside | brands drop in the melee ring | carriers drift to the edge, and pools there box ranged players in |
+| 0.0 | **Ember Brand** | 3 m circle on each player, follows them until 1.0 s before it lands, then stays put | Ground | 3.5 s | 30 to anyone else inside | brands drop in the melee ring | carriers drift to the edge, and pools there box ranged players in |
 | | brand pool | 2 m circle under the carrier | Ground | — | 20/s burn | — | — |
 | 2.0 | **Furnace Spin** | 4 lanes, 1.8 m wide, boss to the wall, 90° apart, sweeping 40°/s for 4 s; the direction flips each loop | Strike | 1.5 s | 30 per jet | the gap near the body is narrow | the gap at the wall moves 9.8 m/s, so ranged must come within about 6 m |
 | 5.0 | **Backdraft** | everyone pulled 2 m in (1.6–2.0 s), then a 5 m blast at 3.0 s | Ground | 3.0 s | 45 + 1.5 m push | the blast | the pull drags edge players toward it |
@@ -28,6 +28,7 @@
 
 ## Settled for this phase (dated)
 - **26 Oct:** Ember Brand pools last until the phase ends. The phase change clears them.
+- **1 Nov (proposal):** the brand stops following 1.0 s before it lands, so the carrier walks off before its pool forms. The pool then burns at once.
 - **27 Oct:** the jets reach the wall, so out-ranging doesn't work.
 - **27 Oct:** Hammerfall (front/back cleave plus slam) was removed as unfair right after the pours. Anvil Quake replaces it, landing after the last pour.
 - **27 Oct:** the boss stands at the arena centre. Following the Furnace Spin gap at mid-range is the intended dodge.
@@ -36,7 +37,7 @@
 
 ## Not done yet
 - **Easy:** for now, every warning is only stretched by 1.25.
-- **Hard:** no named extra mechanic yet.
-- **Escape-check numbers:** the v4 entries aren't in `crucivar-escape-check.ps1` yet.
-- **Telegraph look and fire VFX:** still placeholder shapes.
+- **Hard (named extra: Quake Echo, accepted by Chzy18 30 Oct over Reversing Spin and Brand Flare):** as Anvil Quake's outer band lands, the three bands show again and fire outside-in at +0.8 / 1.6 / 2.4 s (40 each, same bands). Stepping inward after the outer band is no longer safe; step back out once the outer echo has gone off. It threatens melee and ranged alike. **Built 30 Oct;** `ForgeRiteTest` checks it.
+- **Escape check (31 Oct):** `tools/encounter-escape/crucivar-v4-escape-check.ps1`, 0 failures on Easy, Medium and Hard. Furnace Spin can't be followed at the wall (the gap moves 9.6 m/s there), but walking in to 8.6 m in the 1.5 s warning passes. The square key-art map's corners were out of reach of the quake and jets; everything that should reach the wall now sizes to the floor's farthest point.
+- **Telegraph look and fire VFX (31 Oct):** every plain v4 warning uses the Brass Foundry motif (Telegraph-Style 02: gear teeth inside the edge, rivets, molten streaks). Soak, burn and jump warnings keep their own looks. Furnace Spin throws flame along its jets, bullets shed embers, Pour Flood rolls a lava wave in from the rim and the eruption fills the floor.
 - **Co-op rules:** N = 2/8 rules are still to be written. The prototype scales brands and numerals by party size, but only N = 4 has been watched.

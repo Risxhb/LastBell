@@ -12,10 +12,14 @@ namespace LastBell.Run.Shop
     {
         public static ShopRun Run;   // the current run's shop state (RunShopFlow sets it; null = no items)
 
-        const int BuffTicks = 240;   // Cracked Armour, Chorus of Valour, Rally: 4 s
-        const float LoneBellRange = 8f, FormationRange = 5f, RallyRange = 6f;
+        const int BuffTicks = 240;   // Riven Iron, Chorus of Valour: 4 s
+        const int PaceTicks = 180;   // Berserker's Pace: 3 s
+        const float LoneBellRange = 8f, FormationRange = 5f, WarCryRange = 6f, CloseRange = 4f;
         const int MaxHpCapPct = 20;  // shop spec §8: items give at most +20% max HP
         const float KnockbackCapPct = 30;   // shop spec §8: knockback reduction capped at -30%
+        const float DashCost = 30, SprintBase = 25, ShortSplitShare = 4f / 6f;   // Leaden Step, Steady Breath, Short Split
+        public const int PatientGap = 120;  // Patient Bell: 2 s without a hit on the boss
+        public const int LingerTicks = 120; // Lingering Rune: the rune stays 2 s more
 
         static PlayerBuild B(PlayerController p) => p != null ? p.Build : null;
         static int Tick(PlayerController p) => p.World.Tick;
@@ -25,7 +29,7 @@ namespace LastBell.Run.Shop
         static string ClassOf(string ability)
         {
             if (ability == null) return null;
-            if (ability.StartsWith("SteelRhythm") || ability.StartsWith("SunderingBlow") || ability.StartsWith("LastWord") || ability.StartsWith("Pendulum Cut")) return "Vanguard";
+            if (ability.StartsWith("Twin Hurl") || ability.StartsWith("Grinding Toll") || ability.StartsWith("Splitting Throw") || ability.StartsWith("Call of Iron")) return "Tollbreaker";
             if (ability.StartsWith("ResonantNote") || ability.StartsWith("Bellstrike") || ability.StartsWith("HarmonicRefrain") || ability.StartsWith("Crescendo")) return "Chimesinger";
             if (ability.StartsWith("Magic Missile") || ability.StartsWith("Disintegrate") || ability.StartsWith("Rune Sigil") || ability.StartsWith("Arcane Comet")) return "Arcanist";
             return null;
@@ -36,7 +40,7 @@ namespace LastBell.Run.Shop
             foreach (var p in w.Players) if (p.ClassName == cls) return p;
             return null;
         }
-        static bool Heavy(string a) => a.StartsWith("LastWord") || a.StartsWith("Bellstrike") || a.StartsWith("Crescendo") || a.StartsWith("Rune Sigil") || a.StartsWith("Arcane Comet");
+        static bool Heavy(string a) => a.StartsWith("Splitting Throw") || a == "Twin Hurl (held)" || a.StartsWith("Bellstrike") || a.StartsWith("Crescendo") || a.StartsWith("Rune Sigil") || a.StartsWith("Arcane Comet");
 
         // ---------------- numbers ----------------
         // A shared number for one player. Keys name the number at its point of use; the default is the caller's own.
@@ -47,28 +51,39 @@ namespace LastBell.Run.Shop
             switch (key)
             {
                 // controller (every class)
-                case "dash.distance": { float d = v; if (b.Has(ClockworkStep)) d = Mathf.Max(d, b.V(ClockworkStep)); return d + b.V(FarBlink); }
-                case "dash.cost":
-                {
-                    float c = b.Has(LightStep) ? b.V(LightStep) : v;
-                    if (b.Has(SecondStep) && Tick(p) - b.L.LastDashAt <= Sim.Ticks(1.5f)) c = Mathf.Min(c, b.V(SecondStep));   // Second Step: a quick second dash is cheaper (no iframes)
-                    return c;
-                }
+                case "dash.distance": return v + b.V(FarBlink);
+                case "dash.cost": return (b.Has(LightStep) ? b.V(LightStep) : v) + (b.Has(LeadenStep) ? b.V(LeadenStep) - DashCost : 0);   // Leaden Step adds on top
                 case "stamina.max": return v + b.V(LongLungs);
+                case "stamina.regen": return v * (1 + b.V(SteadyBreath) / 100f);
                 case "knockback": return v * (1 - Mathf.Min(KnockbackCapPct, b.V(SureFooting)) / 100f);
                 case "move.speed": return b.L.LightFeetUntil > Tick(p) ? v * (1 + b.V(LightFeet) / 100f) : v;
-                // Vanguard
-                case "v.combo.window": return v + Sim.Ticks(b.V(QuickHands));
-                case "v.hit3.arc": return v * (1 + b.V(WideArc) / 100f);
-                case "v.sunder.reach": return v + b.V(LongReach);
-                case "v.sunder.double_arc": return v * 1.6f;   // Double Opening's wider split impact
-                case "v.brace.move": return b.Has(SteadyStance) ? 1 - (1 - v) * (1 - b.V(SteadyStance) / 100f) : v;
-                case "v.opening.stacks": return b.Has(DoubleOpening) ? 2 : v;
-                case "v.ult.windup": { float t = v; if (b.Has(HeavyHour)) t += Sim.Ticks(0.3f); if (b.Has(QuickVerdict)) t -= Sim.Ticks(0.3f); return t; }
-                case "v.ult.fan": return b.Has(HeavyHour) ? v * 1.4f : v;
-                case "v.combo.length": return b.Has(TollOfSteel) ? 4 : v;
+                // Tollbreaker (TollbreakerKit reads these "t.*" keys)
+                case "t.split.cd": return v * (1 - b.V(ShortFuse) / 100f);
+                case "t.toll.radius": return v * (1 + b.V(WideGrind) / 100f);
+                case "t.toll.spin": return b.Has(LongGrind) ? Sim.Ticks(b.V(LongGrind)) : v;
+                case "t.toll.every": return b.Has(QuickGrind) ? Sim.Ticks(b.V(QuickGrind)) : v;
+                case "t.return.speed": return v * (1 + b.V(QuickCatch) / 100f);
+                case "t.tap.back": return b.Has(Backswing) ? b.V(Backswing) : v;
+                case "t.call.per_m": return v + b.V(IronPull);
+                case "t.call.max": return b.Has(IronPull) ? b.V2(IronPull) : v;
+                case "t.call.cd": return b.Has(RootedAxe) ? Sim.Ticks(9) : v;
+                // Short Split: the split and its boss lodge last 4 s instead of 6 (two thirds of whatever Deep Split makes them)
+                case "t.split.ticks": return (b.Has(DeepSplit) ? Sim.Ticks(b.V(DeepSplit)) : v) * (b.Has(ShortSplit) ? ShortSplitShare : 1);
+                case "t.lodge.boss": return (b.Has(DeepSplit) ? Mathf.Max(v, Sim.Ticks(b.V(DeepSplit))) : v) * (b.Has(ShortSplit) ? ShortSplitShare : 1);
+                case "t.held.range": return b.Has(LongToss) ? b.V2(LongToss) : v;
+                case "t.held.damage": return b.Has(LongToss) ? b.V(LongToss) : v;
+                case "t.lodge.floor": return b.Has(AnchorLine) ? Sim.Ticks(b.V2(AnchorLine)) : v;
+                case "t.frenzy.cd": return b.Has(FrenziedHour) ? Sim.Ticks(b.V(FrenziedHour)) : v;
+                case "t.frenzy.ticks": return b.Has(FrenziedHour) ? Sim.Ticks(3) : v;
+                case "t.fan.side": return b.Has(FrenziedHour) ? 0.35f : v;
+                case "t.split.bonus": return (b.Has(RootedAxe) ? 1 + b.V(RootedAxe) / 100f : v) + (b.Has(ShortSplit) ? (b.V(ShortSplit) - 40) / 100f : 0);
+                case "t.twin_split": return b.Has(TwinSplit) ? b.V(TwinSplit) : v;
+                case "t.rooted": return b.Has(RootedAxe) ? 1 : v;
+                case "t.battle_spin": return b.Has(BattleSpin) ? 1 : v;
                 // Chimesinger
-                case "c.note.speed": return v * (1 + b.V2(BrightNote) / 100f);
+                case "c.note.speed": return v * (1 + b.V2(BrightNote) / 100f) * (1 - b.V2(LowNote) / 100f);
+                case "c.strike.recharge": return v * (1 + b.V2(DoubleToll) / 100f);
+                case "c.double_toll": return b.V(DoubleToll) / 100f;
                 case "c.refrain.half": return v * (1 + b.V(WideRefrain) / 100f);
                 case "c.refrain.range": return v + b.V(LongRefrain);
                 case "c.chorus.radius": return v * (1 + b.V(WideChorus) / 100f);
@@ -89,6 +104,10 @@ namespace LastBell.Run.Shop
                 case "a.comet.radius": return b.Has(GreatComet) ? v * 1.25f : v;
                 case "a.starfall": return b.Has(Starfall) ? b.V(Starfall) / 100f : v;
                 case "a.surge_end_glyphs": return v + b.V(SurgeEcho);
+                case "a.dis.carve": return b.Has(Overchannel) ? b.V2(Overchannel) : v;
+                case "a.glyph.fade": return b.Has(Overchannel) ? Sim.Ticks(b.V(Overchannel)) : v;   // 0 = glyphs never fade
+                case "a.sigil.arm": return b.Has(LingeringRune) ? v * 1.5f : v;                    // 0.8 -> 1.2 s (Surge's 0.4 -> 0.6 s)
+                case "a.sigil.linger": return b.V(LingeringRune) / 100f;
             }
             return v;
         }
@@ -96,7 +115,7 @@ namespace LastBell.Run.Shop
         public static int MaxHp(PlayerController p, int baseHp)
         {
             var b = B(p); if (b == null) return baseHp;
-            float pct = Mathf.Min(MaxHpCapPct, b.V(Grit)) - (b.Has(GlassEdge) ? 8 : 0);
+            float pct = -(b.Has(GlassEdge) ? 8 : 0);   // no Tollbreaker item gives max HP (catalogue rule check)
             return Mathf.RoundToInt(baseHp * (1 + pct / 100f));
         }
 
@@ -109,12 +128,24 @@ namespace LastBell.Run.Shop
             if (b != null)
             {
                 var L = b.L; int now = w.Tick;
-                if (ability == "SteelRhythm3") pct += b.V(TemperedEdge);
-                if (ability.StartsWith("SteelRhythm") && L.MomentumHit) { L.MomentumHit = false; pct += b.V(Momentum); }
-                if (ability == "SunderingBlow++") pct += b.V(DoubleOpening);
-                if (ability.StartsWith("LastWord")) pct += b.V(HeavyHour) + b.V(QuickVerdict);
+                if (p.Kit is TollbreakerKit tk)
+                {
+                    var h = tk.Hitting; bool hurl = ability.StartsWith("Twin Hurl") && ability != "Twin Hurl (fan)";   // the fan's projectiles carry no hit context
+                    if (ability == "Twin Hurl" && !h.Return) pct += b.V(KeenEdge);
+                    if (ability == "Twin Hurl (held)") pct += b.V(HeavyHaft);
+                    if (ability == "Twin Hurl (battle spin)") pct += b.V(BattleSpin);
+                    if (hurl && h.ReleaseDistance <= CloseRange) pct += b.V(CloseQuarters);
+                    if (ability == "Call of Iron" && h.FromFloor) pct += b.V(AnchorLine);
+                    if (L.RivenUntil > now && (ability == "Call of Iron" || ability.StartsWith("Splitting Throw"))) pct += b.V(RivenIron);
+                    if (hurl && b.Has(BerserkersPace) && h.ReleaseDistance <= CloseRange)
+                    {
+                        if (L.PaceUntil <= now) L.PaceStacks = 0;   // the stacks fall off 3 s after the last close hit
+                        L.PaceNext = true;                       // Dealt adds the stack once the hit lands
+                    }
+                    if (L.PaceUntil > now) pct += Mathf.Min(b.V2(BerserkersPace), b.V(BerserkersPace) * L.PaceStacks);
+                }
                 if (ability == "Bellstrike") pct += b.V(HeavyBell);
-                if (ability.StartsWith("ResonantNote")) pct += b.V(BrightNote);
+                if (ability.StartsWith("ResonantNote")) pct += b.V(BrightNote) + b.V(LowNote);
                 if (ability.StartsWith("Arcane Comet")) pct += b.V(HastyComet) + b.V(GreatComet);
                 if (ability == "Magic Missile (charged)" && L.VolleyBoostUntil > now) pct += b.V(BlinkCharge);
                 if (ability == "Magic Missile (volley)") pct += b.V(MissileVolley);
@@ -127,12 +158,13 @@ namespace LastBell.Run.Shop
                 }
                 if (b.Has(LoneBell) && AlliesNear(w, p, LoneBellRange) == 0) pct += b.V(LoneBell);
                 if (b.Has(Formation)) pct += Run.Solo ? b.V(Formation) : Mathf.Min(b.V2(Formation), b.V(Formation) * AlliesNear(w, p, FormationRange));
-                if (L.RhythmOn) pct += b.V(RhythmKeeper);
+                pct += b.V2(LeadenStep);
+                // Patient Bell: the first hit after a 2 s gap is the big one; every hit restarts the gap
+                if (b.Has(PatientBell)) { pct += now - L.LastBossHit >= PatientGap ? b.V(PatientBell) : -b.V2(PatientBell); L.LastBossHit = now; }
+                if (b.Has(LateBloom) && w.Boss != null) pct += w.Boss.PhaseNumber <= 1 ? -b.V2(LateBloom) : b.V(LateBloom);
                 if (L.ValourUntil > now) pct += L.ValourPct;
-                if (L.RallyUntil > now) pct += L.RallyPct;
+                if (L.CryUntil > now) pct += L.CryPct;
             }
-            // Cracked Armour: everyone's heavy hits; solo, only the Vanguard's own Last Word
-            if (Run.CrackUntil > w.Tick && Heavy(ability) && (!Run.Solo || ability.StartsWith("LastWord"))) pct += Run.CrackPct;
             if (scale == 1 && pct == 0) return damage;
             return Mathf.Max(1, Mathf.RoundToInt(damage * scale * (1 + pct / 100f)));
         }
@@ -147,13 +179,8 @@ namespace LastBell.Run.Shop
                 var owner = Owner(w, ability); var b = B(owner); int now = w.Tick;
                 if (b != null)
                 {
-                    if (ability.StartsWith("SunderingBlow") && b.Has(CrackedArmour)) { Run.CrackUntil = now + BuffTicks; Run.CrackPct = b.V(CrackedArmour); }
-                    // Rhythm Keeper: the combo's last hit landing counts a full combo; three in a row without being hit
-                    if (b.Has(RhythmKeeper) && ability == "SteelRhythm" + I(owner, "v.combo.length", 3) && ++b.L.RhythmCombos >= 3) b.L.RhythmOn = true;
-                    if (ability == "LastWord" && b.Has(Rally))
-                        foreach (var a in w.Players)
-                            if (!a.Down && a.Build != null && Sim.Flat(a.transform.position - owner.transform.position).magnitude <= RallyRange)
-                            { a.Build.L.RallyUntil = now + BuffTicks; a.Build.L.RallyPct = Mathf.Max(a.Build.L.RallyPct, b.V(Rally)); }
+                    // Berserker's Pace: a close Twin Hurl hit landed (Outgoing marked it); the 3 s restart with each stack
+                    if (b.L.PaceNext) { b.L.PaceNext = false; b.L.PaceStacks++; b.L.PaceUntil = now + PaceTicks; }
                     if (ability.StartsWith("Arcane Comet") && b.Has(GlyphBrand)) { Run.BrandUntil = now + 300; Run.BrandOwner = owner; Run.BrandHits = 0; }
                     if (ability.StartsWith("Rune Sigil") && b.Has(ResonantRune))
                         foreach (var c in w.Players) if (c.Kit is ChimesingerKit ck && ck.Bell) ck.ItemAddEcho();
@@ -190,7 +217,7 @@ namespace LastBell.Run.Shop
         public static void OnDash(PlayerController p)
         {
             var b = B(p); if (b == null) return;
-            b.L.MomentumReady = b.Has(Momentum); b.L.GraceReady = b.Has(GraceNote); b.L.BlinkReady = b.Has(BlinkCharge); b.L.LastDashAt = Tick(p);
+            b.L.GraceReady = b.Has(GraceNote); b.L.BlinkReady = b.Has(BlinkCharge); b.L.LastDashAt = Tick(p);
         }
         public static void OnDashEnd(PlayerController p)
         {
@@ -206,14 +233,7 @@ namespace LastBell.Run.Shop
         public static void OnPlayerHit(PlayerController p)
         {
             var b = B(p); if (b == null) return;
-            b.L.RhythmCombos = 0; b.L.RhythmOn = false;
-        }
-
-        // Vanguard: Momentum turns the next basic into hit 3 (consumed here)
-        public static bool TakeMomentum(PlayerController p)
-        {
-            var b = B(p); if (b == null || !b.L.MomentumReady) return false;
-            b.L.MomentumReady = false; b.L.MomentumHit = true; return true;
+            b.L.PaceStacks = 0; b.L.PaceUntil = -1; b.L.PaceNext = false;   // Berserker's Pace is lost when you're hit
         }
 
         // Chimesinger: a Resonant Note leaving the staff. Returns its damage (Grace Note) and fires Chord's side notes.
@@ -251,21 +271,22 @@ namespace LastBell.Run.Shop
             q.Clear(); return true;
         }
 
-        // A kit ability released (Pendulum Cut, Iron Echo, Toll of Steel's fan, Blink Charge's volley). a/b are the
-        // kit's own numbers for that ability (reach and arc, or wave damage and width).
+        // A kit event (Blink Charge's volley; the Tollbreaker's recall hit and Bell Frenzy). a/bw are the kit's own numbers
+        // for it: the recall hit's damage and 1 when it came from the floor, or Bell Frenzy's length in ticks.
         public static void Cast(PlayerController p, string key, Vector3 origin, Vector3 dir, float a, float bw)
         {
             var b = B(p); if (b == null) return;
             switch (key)
             {
-                case "v.sunder":
-                    if (b.Has(PendulumCut)) effects.Add(new Effect { Owner = p, Pos = origin, Dir = dir, A = a, B = bw, Left = Sim.Ticks(b.V(PendulumCut)), Every = 15, Damage = 10, Ability = "Pendulum Cut" });
+                case "t.recall.hit":   // an axe Call of Iron sent through the boss
+                    if (b.Has(RingingReturn) && p.Kit is TollbreakerKit tk) tk.ReduceCooldown(2, Sim.Ticks(b.V(RingingReturn)));
+                    if (b.Has(RivenIron)) b.L.RivenUntil = Tick(p) + BuffTicks;   // personal: only his own hits read it
                     break;
-                case "v.lastword":
-                    if (b.Has(IronEcho)) effects.Add(new Effect { Owner = p, Wave = true, Pos = origin, Dir = dir, B = bw, Delay = Sim.Ticks(0.6f), Damage = Mathf.RoundToInt(a * b.V(IronEcho) / 100f), Ability = "LastWordWave (echo)" });
-                    break;
-                case "v.hit4":
-                    if (b.Has(TollOfSteel)) effects.Add(new Effect { Owner = p, Wave = true, Pos = origin, Dir = dir, B = bw * 0.7f, Damage = Mathf.RoundToInt(a * b.V(TollOfSteel) / 100f), Ability = "SteelRhythm4 fan" });
+                case "t.frenzy":   // War Cry: allies within 6 m for Bell Frenzy's length (solo: himself)
+                    if (b.Has(WarCry))
+                        foreach (var o in p.World.Players)
+                            if ((o != p || Run.Solo) && !o.Down && o.Build != null && Sim.Flat(o.transform.position - p.transform.position).magnitude <= WarCryRange)
+                            { o.Build.L.CryUntil = Tick(p) + Mathf.RoundToInt(a); o.Build.L.CryPct = Mathf.Max(o.Build.L.CryPct, b.V(WarCry)); }
                     break;
                 case "a.volley":
                     if (b.L.BlinkReady) { b.L.BlinkReady = false; b.L.VolleyBoostUntil = Tick(p) + 30; }
@@ -273,57 +294,13 @@ namespace LastBell.Run.Shop
             }
         }
 
-        // ---------------- timed item hits (CombatWorld.Step, combat ticks only) ----------------
-        sealed class Effect
-        {
-            public PlayerController Owner; public bool Wave, Hit; public Vector3 Pos, Dir; public float A, B, Travel;
-            public int Left, Every, Delay, Damage, Age; public string Ability;
-        }
-        static readonly List<Effect> effects = new List<Effect>();
-        const float WaveSpeed = 18f, WaveRange = 8f;   // the Last Word shockwave's own numbers
-        public static void Step(CombatWorld w)
-        {
-            for (int i = effects.Count - 1; i >= 0; i--)
-            {
-                var e = effects[i];
-                if (e.Owner == null || e.Owner.World != w) { effects.RemoveAt(i); continue; }
-                if (e.Delay > 0) { e.Delay--; continue; }
-                var boss = w.Boss;
-                if (e.Wave)
-                {
-                    float d = WaveSpeed * Sim.Dt; e.Pos += e.Dir * d; e.Travel += d;
-                    w.Fx.Shockwave(e.Pos, e.Dir, e.B);
-                    if (!e.Hit && boss != null && boss.Solid && Sim.Flat(boss.transform.position - e.Pos).magnitude <= boss.BodyRadius + e.B / 2)
-                    {
-                        e.Hit = true;
-                        w.DamageBoss(e.Damage, boss.transform.position - Sim.Flat(boss.transform.position - e.Pos).normalized * boss.BodyRadius + Vector3.up * boss.HitHeight, e.Ability);
-                    }
-                    if (e.Travel >= WaveRange) effects.RemoveAt(i);
-                }
-                else
-                {
-                    if (++e.Age % e.Every == 0) w.StrikeBoss(e.Owner, e.Pos, e.Dir, e.A, e.B, e.Damage, e.Ability);
-                    if (e.Age >= e.Left) effects.RemoveAt(i);
-                }
-            }
-        }
-        public static void ClearEffects() { effects.Clear(); }
-
         // ---------------- kits ----------------
-        // ability cooldowns, in ticks (Countdown: Last Word; Swift Chorus: Mending Chorus)
+        // ability cooldowns, in ticks (Swift Chorus: Mending Chorus; Short Fuse goes through "t.split.cd")
         public static int Cooldown(PlayerController p, string ability, int ticks)
         {
             var b = B(p); if (b == null) return ticks;
-            float cut = ability == "LastWord" ? b.V(Countdown) : ability == "MendingChorus" ? b.V(SwiftChorus) : 0;
+            float cut = ability == "MendingChorus" ? b.V(SwiftChorus) : 0;
             return cut > 0 ? Mathf.RoundToInt(ticks * (1 - cut / 100f)) : ticks;
-        }
-        // Oathbound: Sundering Blow can't be empowered, and every Nth Opening resets Last Word (returns true to reset)
-        public static bool SunderEmpowerable(PlayerController p) => !(B(p)?.Has(Oathbound) ?? false);
-        public static bool OnOpening(PlayerController p)
-        {
-            var b = B(p); if (b == null || !b.Has(Oathbound)) return false;
-            b.L.Openings++;
-            return b.L.Openings % Mathf.Max(1, Mathf.RoundToInt(b.V(Oathbound))) == 0;
         }
         // Mending Chorus touching an ally (the caster too), before the heal: Chorus of Valour, and Overflow's overheal
         public static void ChorusTouched(PlayerController caster, PlayerController ally, int heal)
@@ -347,7 +324,11 @@ namespace LastBell.Run.Shop
         // ---------------- general (PlayerController) ----------------
         public static int PotionHeal(PlayerController p, int heal) { var b = B(p); return b != null && b.Has(StrongBrew) ? Mathf.RoundToInt(b.V(StrongBrew)) : heal; }
         public static int ExtraPotions(PlayerController p) { var b = B(p); return b != null ? Mathf.RoundToInt(b.V(SpareFlask)) : 0; }
-        public static float SprintCost(PlayerController p, float cost) { var b = B(p); return b != null && b.Has(Sprinter) ? b.V(Sprinter) : cost; }
+        public static float SprintCost(PlayerController p, float cost)
+        {
+            var b = B(p); if (b == null) return cost;
+            return (b.Has(Sprinter) ? b.V(Sprinter) : cost) + (b.Has(SteadyBreath) ? b.V2(SteadyBreath) - SprintBase : 0);   // Steady Breath adds on top
+        }
         public static float RegenDelay(PlayerController p, float delay) { var b = B(p); return b != null && b.Has(DeepBreath) ? b.V(DeepBreath) : delay; }
     }
 }

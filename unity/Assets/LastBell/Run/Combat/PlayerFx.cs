@@ -9,10 +9,10 @@ namespace LastBell.Run
     // here decides hits or timing. Rules kept from the guidelines:
     //  - floor-level player effects render below boss telegraphs (queue 3040 < telegraph 3050), so danger stays visible;
     //  - airborne arcs are short additive bands that clear within ~0.3 s;
-    //  - state that matters (Opening, bell strength, echoes) also reads by shape/count, not colour alone.
+    //  - state that matters (bell strength, echoes) also reads by shape/count, not colour alone.
     public sealed partial class PlayerFx : MonoBehaviour
     {
-        public static readonly Color VanCyan = new Color(0.45f, 1.7f, 2.1f), VanGold = new Color(2.0f, 1.45f, 0.6f),
+        public static readonly Color TollCyan = new Color(0.45f, 1.7f, 2.1f), SteelGold = new Color(2.0f, 1.45f, 0.6f),
             NoteGold = new Color(2.2f, 1.6f, 0.65f), Ivory = new Color(1.9f, 1.85f, 1.6f), Heal = new Color(0.6f, 1.9f, 1.1f),
             Ink = new Color(0.06f, 0.09f, 0.15f), Navy = new Color(0.12f, 0.18f, 0.42f), Violet = new Color(1.1f, 0.7f, 2.0f);
         static readonly int PMode = Shader.PropertyToID("_Mode"), PLow = Shader.PropertyToID("_ColorLow"), PHigh = Shader.PropertyToID("_ColorHigh"),
@@ -29,17 +29,13 @@ namespace LastBell.Run
 
         // persistent indicators
         Transform bell; Transform[] echoPips = new Transform[2]; Transform strengthRing; Renderer bellBody;
-        readonly Dictionary<PlayerController, Transform> shields = new Dictionary<PlayerController, Transform>();
-        readonly Dictionary<PlayerController, (Burst b, int id)> openings = new Dictionary<PlayerController, (Burst, int)>();
         readonly Dictionary<PlayerController, TrailRenderer> trails = new Dictionary<PlayerController, TrailRenderer>();
-        Burst ultCharge; int ultId;
 
         public void ResetAll()
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "ResetAll", new object[0]);
             for (int i = live.Count - 1; i >= 0; i--) { var b = live[i]; if (b.owns) Destroy(b.mf.sharedMesh); b.go.SetActive(false); pool.Push(b); }
             live.Clear();
-            foreach (var s in shields.Values) if (s) Destroy(s.gameObject);
-            shields.Clear(); openings.Clear(); trails.Clear(); ultCharge = null;
+            trails.Clear();
             if (bell) bell.gameObject.SetActive(false);
             ResetArcanist();
             sparks.Clear(); motes.Clear();
@@ -65,7 +61,7 @@ namespace LastBell.Run
             addFloor = new Material(sh) { renderQueue = FloorQueue };
             alphaFloor = new Material(sh) { renderQueue = FloorQueue }; alphaFloor.SetFloat(PSrc, 1); alphaFloor.SetFloat(PDst, 10);
             cyl = FxMeshes.Cylinder(); disk = FxMeshes.Sector(0.05f, 1f, 180f, 40, true, "FX_MS_Disk");
-            var sm = new Material(add); sm.SetFloat(PMode, 1); sm.SetColor(PLow, VanGold); sm.SetColor(PHigh, Ivory); sm.SetFloat(PDissolve, 0);
+            var sm = new Material(add); sm.SetFloat(PMode, 1); sm.SetColor(PLow, SteelGold); sm.SetColor(PHigh, Ivory); sm.SetFloat(PDissolve, 0);
             sparks = FxParticles.Create(transform, "Player sparks", sm, 500, 6f, 1.5f, 0.05f);
             var mm = new Material(add); mm.SetFloat(PMode, 1); mm.SetColor(PLow, NoteGold); mm.SetColor(PHigh, Ivory); mm.SetFloat(PDissolve, 0);
             motes = FxParticles.Create(transform, "Player motes", mm, 700, 0f, 2.2f, 0f);
@@ -105,8 +101,6 @@ namespace LastBell.Run
                 if (b.follow) b.go.transform.position = b.follow.position + b.offset;
                 b.anim(b, b.life >= 9000 ? b.t : b.t / b.life); b.mr.SetPropertyBlock(b.mpb);
             }
-            foreach (var kv in shields)
-                if (kv.Value && kv.Key) kv.Value.SetPositionAndRotation(kv.Key.transform.position + kv.Key.transform.forward * 0.75f + Vector3.up * (1.15f + kv.Key.Height), kv.Key.transform.rotation);
         }
 
         void Spray(Vector3 pos, Vector3 dir, int n, float spread, float speed, float size, float life, FxParticles into = null)
@@ -119,141 +113,9 @@ namespace LastBell.Run
             }
         }
 
-        // ------------------------------------------------------------ Vanguard
-        // Steel Rhythm: a flat crescent at blade height sweeping across the hit arc; the third cut is wider, brighter
-        // and leaves a floor scuff (under the telegraphs).
-        public void Slash(PlayerController p, float reach, float arc, bool heavy, bool backhand)
-        {
-            var pos = p.transform.position + Vector3.up * (1.0f + p.Height);
-            var mesh = FxMeshes.Sector(reach * 0.35f, reach, arc / 2, 32);
-            float yaw = p.transform.eulerAngles.y;
-            var rot = Quaternion.Euler(0, yaw, 0) * Quaternion.Euler(backhand ? 6 : -6, 0, backhand ? 180 : 0);
-            Play(mesh, true, add, pos, rot, heavy ? 0.28f : 0.18f, (b, u) =>
-            {
-                b.mpb.SetFloat(PProgress, Mathf.Lerp(-0.1f, 1.2f, Ease(Mathf.Clamp01(u / 0.55f))));
-                b.mpb.SetFloat(PWidth, heavy ? 0.18f : 0.1f); b.mpb.SetFloat(PTail, heavy ? 0.55f : 0.35f);
-                b.mpb.SetFloat(PDissolve, Mathf.Clamp01((u - 0.4f) / 0.6f)); b.mpb.SetFloat(PIntensity, heavy ? 1.3f : 0.9f);
-            }, 0, Ink, VanCyan, heavy ? VanGold : Ivory);
-            if (heavy)
-            {
-                var f = p.transform.position + p.transform.forward * reach * 0.6f;
-                Play(FxMeshes.Annulus(0.2f, 1.3f), true, alphaFloor, new Vector3(f.x, 0.05f, f.z), Quaternion.identity, 0.3f, (b, u) =>
-                {
-                    b.mpb.SetFloat(PProgress, Mathf.Lerp(0, 1.1f, Ease(u))); b.mpb.SetFloat(PDissolve, Mathf.Clamp01((u - 0.3f) / 0.7f));
-                }, 0, Ink, VanCyan, VanGold);
-            }
-        }
-
-        // Sundering Blow: a short heavy downward cleave; empowered adds a gold split along the floor and more sparks.
-        public void Sunder(PlayerController p, float reach, bool empowered, bool hit)
-        {
-            var f = p.transform.forward; var c = p.transform.position + f * reach * 0.75f;
-            var mesh = FxMeshes.Sector(0.3f, reach, 18, 16);
-            Play(mesh, true, add, p.transform.position + Vector3.up * 0.9f, Quaternion.Euler(0, p.transform.eulerAngles.y, 0) * Quaternion.Euler(-35, 0, 0), 0.25f, (b, u) =>
-            {
-                b.mpb.SetFloat(PProgress, Mathf.Lerp(-0.1f, 1.2f, Ease(Mathf.Clamp01(u / 0.4f))));
-                b.mpb.SetFloat(PWidth, 0.25f); b.mpb.SetFloat(PTail, 0.6f); b.mpb.SetFloat(PDissolve, Mathf.Clamp01((u - 0.35f) / 0.65f));
-                b.mpb.SetFloat(PIntensity, empowered ? 1.6f : 1.0f);
-            }, 0, Ink, empowered ? VanGold : VanCyan, Ivory);
-            var lane = FxMeshes.Quad(-0.25f, 0.25f, 0, reach + (empowered ? 1.5f : 0.4f));
-            Play(lane, true, addFloor, new Vector3(p.transform.position.x, 0.05f, p.transform.position.z) + f * 0.5f, Quaternion.Euler(0, p.transform.eulerAngles.y, 0), 0.4f, (b, u) =>
-            {
-                b.mpb.SetFloat(PDissolve, Mathf.Clamp01(u)); b.mpb.SetFloat(PIntensity, empowered ? 1.4f : 0.6f);
-            }, 2, Ink, empowered ? VanGold : VanCyan, Ivory);
-            Spray(c + Vector3.up * 0.4f, Vector3.up, empowered ? 30 : 14, 0.9f, empowered ? 7 : 5, 0.15f, 0.45f);
-            if (empowered) CameraShake.Shake(0.2f, 0.22f);
-        }
-
-        // Last Word: the blade gathers light over the windup (a shrinking ring around the player), then the overhead
-        // slam and a travelling shockwave.
-        public void UltWindup(PlayerController p, int ticks)
-        {
-            Kill(ultCharge, ultId);
-            float life = ticks / (float)Sim.Hz;
-            ultCharge = Play(FxMeshes.Annulus(0.85f, 1f), true, addFloor, new Vector3(p.transform.position.x, 0.05f, p.transform.position.z), Quaternion.identity, life, (b, u) =>
-            {
-                float r = Mathf.Lerp(2.6f, 0.9f, u); b.go.transform.localScale = new Vector3(r, 1, r);
-                b.mpb.SetFloat(PIntensity, 0.5f + u); b.mpb.SetFloat(PDissolve, 0); b.mpb.SetFloat(PProgress, 0.5f);
-            }, 2, Ink, VanGold, Ivory, p.transform);
-            ultId = ultCharge.id;
-        }
-        public void UltCancel(PlayerController p) { Kill(ultCharge, ultId); ultCharge = null; }
-        public void UltSlam(PlayerController p, Vector3 at)
-        {
-            ultCharge = null;
-            var c = new Vector3(at.x, 0.05f, at.z);
-            Play(FxMeshes.Annulus(0.2f, 2.2f), true, alphaFloor, c, Quaternion.identity, 0.45f, (b, u) =>
-            {
-                b.mpb.SetFloat(PProgress, Mathf.Lerp(0, 1.1f, Ease(u))); b.mpb.SetFloat(PWidth, 0.2f); b.mpb.SetFloat(PDissolve, Mathf.Clamp01((u - 0.3f) / 0.7f));
-            }, 0, Ink, VanGold, Ivory);
-            Play(cyl, false, add, c, Quaternion.identity, 0.35f, (b, u) =>
-            {
-                float r = Mathf.Lerp(0.3f, 1.4f, Ease(u)); b.go.transform.localScale = new Vector3(r, Mathf.Lerp(3.5f, 0.5f, u), r);
-                b.mpb.SetFloat(PDissolve, u); b.mpb.SetFloat(PIntensity, 1.2f);
-            }, 2, Ink, VanGold, Ivory);
-            Spray(c + Vector3.up * 0.3f, Vector3.up, 40, 1.1f, 8, 0.18f, 0.6f);
-            CameraShake.Shake(0.35f, 0.35f);
-        }
-        float lastWave;
-        public void Shockwave(Vector3 pos, Vector3 dir, float width)
-        {
-            if (Time.time - lastWave < 0.03f) return; lastWave = Time.time;
-            var yaw = Quaternion.LookRotation(dir).eulerAngles.y;
-            Play(FxMeshes.Sector(0.1f, width / 2, 70, 16), true, addFloor, new Vector3(pos.x, 0.06f, pos.z), Quaternion.Euler(0, yaw, 0), 0.25f, (b, u) =>
-            {
-                b.mpb.SetFloat(PProgress, 0.5f); b.mpb.SetFloat(PDissolve, Mathf.Clamp01(u)); b.mpb.SetFloat(PIntensity, 1.2f);
-            }, 2, Ink, VanGold, Ivory);
-            Spray(pos + Vector3.up * 0.2f, Vector3.up + dir, 3, 0.6f, 4, 0.12f, 0.35f);
-        }
-
-        // Brace: a translucent rune disc in front of the shield arm while raised; a hit flashes it (controlled impact,
-        // not a parry/invulnerability flash).
-        public void Shield(PlayerController p, int kind, bool on)
-        {
-            if (!shields.TryGetValue(p, out var s) || s == null)
-            {
-                var go = new GameObject("Brace shield"); go.transform.SetParent(transform, false);
-                var disc = new GameObject("disc"); disc.transform.SetParent(go.transform, false);
-                disc.transform.localRotation = Quaternion.Euler(-90, 0, 0); disc.transform.localScale = new Vector3(0.75f, 0.75f, 0.75f);
-                disc.AddComponent<MeshFilter>().sharedMesh = disk;
-                var mr = disc.AddComponent<MeshRenderer>(); mr.sharedMaterial = add; mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-                var mpb = new MaterialPropertyBlock(); mpb.SetFloat(PMode, 2); mpb.SetColor(PLow, Ink); mpb.SetColor(PHigh, VanCyan); mpb.SetColor(PEdge, Ivory);
-                mpb.SetFloat(PIntensity, 0.35f); mpb.SetFloat(PDissolve, 0.35f); mr.SetPropertyBlock(mpb);
-                s = go.transform; shields[p] = s; go.SetActive(false);
-            }
-            if (kind == 1 && on)
-            {
-                var at = s.position + s.forward * 0.1f;
-                Spray(at, s.forward + Vector3.up * 0.3f, 18, 0.6f, 5, 0.13f, 0.35f);
-                Play(cyl, false, add, at, s.rotation * Quaternion.Euler(90, 0, 0), 0.18f, (b, u) =>
-                {
-                    float r = Mathf.Lerp(0.5f, 1.0f, u); b.go.transform.localScale = new Vector3(r, 0.05f, r);
-                    b.mpb.SetFloat(PDissolve, u); b.mpb.SetFloat(PIntensity, 1.1f);
-                }, 2, Ink, VanCyan, Ivory);
-                return;
-            }
-            s.gameObject.SetActive(on);
-        }
-
-        // Opening: a slow-turning ring of three cyan ticks under the Vanguard (a shape, not only a colour) + rising motes
-        public void Opening(PlayerController p, bool on)
-        {
-            if (openings.TryGetValue(p, out var o)) { Kill(o.b, o.id); openings.Remove(p); }
-            if (!on) return;
-            var tick = FxMeshes.Sector(0.85f, 1.05f, 160, 48, true);
-            var ob = Play(tick, true, addFloor, new Vector3(p.transform.position.x, 0.05f, p.transform.position.z), Quaternion.identity, 9999, (bb, time) =>
-            {
-                bb.go.transform.rotation = Quaternion.Euler(0, time * 90, 0);
-                bb.mpb.SetFloat(PIntensity, 0.7f + 0.3f * Mathf.Sin(time * 6)); bb.mpb.SetFloat(PDissolve, 0.15f);
-                if (UnityEngine.Random.value < 0.25f) motes.Emit(bb.go.transform.position + UnityEngine.Random.insideUnitSphere * 0.6f + Vector3.up * 0.6f, Vector3.up * 1.2f, 0.12f, 0.6f);
-            }, 2, Ink, VanCyan, Ivory, p.transform);
-            openings[p] = (ob, ob.id);
-            Spray(p.transform.position + Vector3.up * 1.2f, Vector3.up, 16, 0.8f, 4, 0.14f, 0.5f);
-        }
-
         // ------------------------------------------------------------ shared
         public void DashTrail(PlayerController p)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "DashTrail", new object[] { p });
             if (p.ClassName == "Arcanist") return;   // Blink draws its own departure, thread and arrival (PlayerFx.Arcanist)
             if (!trails.TryGetValue(p, out var tr) || tr == null)
             {
@@ -261,7 +123,7 @@ namespace LastBell.Run
                 tr = go.AddComponent<TrailRenderer>(); tr.time = 0.22f; tr.minVertexDistance = 0.1f; tr.widthMultiplier = 0.9f;
                 tr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
                 var m = new Material(add); m.SetFloat(PMode, 0); m.SetColor(PLow, Ink);
-                m.SetColor(PHigh, p.ClassName == "Chimesinger" ? NoteGold : p.ClassName == "Arcanist" ? TimeTeal : VanCyan); m.SetFloat(PProgress, 0); m.SetFloat(PWidth, 0.05f); m.SetFloat(PTail, 0.6f); m.SetFloat(PDissolve, 0);
+                m.SetColor(PHigh, p.ClassName == "Chimesinger" ? NoteGold : p.ClassName == "Arcanist" ? TimeTeal : TollCyan); m.SetFloat(PProgress, 0); m.SetFloat(PWidth, 0.05f); m.SetFloat(PTail, 0.6f); m.SetFloat(PDissolve, 0);
                 tr.sharedMaterial = m; trails[p] = tr;
             }
             tr.Clear(); tr.emitting = true;
@@ -271,15 +133,15 @@ namespace LastBell.Run
 
         // ------------------------------------------------------------ Chimesinger
         // Resonant Note: a small gold note with a short glittering tail (projectile drawn on the combat tick)
-        public void NoteCast(Vector3 at, Vector3 dir) { Spray(at, dir, 6, 0.4f, 3, 0.12f, 0.25f, motes); }
+        public void NoteCast(Vector3 at, Vector3 dir) { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "NoteCast", new object[] { at, dir }); Spray(at, dir, 6, 0.4f, 3, 0.12f, 0.25f, motes); }
         public void ProjectileHead(Vector3 pos, Color c)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "ProjectileHead", new object[] { pos, c });
             motes.Emit(pos, Vector3.zero, 0.42f, 0.06f);
             motes.Emit(pos + UnityEngine.Random.insideUnitSphere * 0.08f, UnityEngine.Random.insideUnitSphere * 0.3f, 0.16f, 0.3f);
         }
-        public void NoteImpact(Vector3 pos, Color c) { Spray(pos, Vector3.up, 8, 1f, 3, 0.12f, 0.3f, motes); }
+        public void NoteImpact(Vector3 pos, Color c) { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "NoteImpact", new object[] { pos, c }); Spray(pos, Vector3.up, 8, 1f, 3, 0.12f, 0.3f, motes); }
         public void NoteTrail(PlayerController p)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "NoteTrail", new object[] { p });
             // Harmonic Step: fading golden notes along the path (the trail renderer is shared with every dash)
             for (int i = 0; i < 10; i++) motes.Emit(p.transform.position + UnityEngine.Random.insideUnitSphere * 0.4f + Vector3.up * 1f, Vector3.up * 0.5f, 0.2f, 0.7f);
         }
@@ -287,7 +149,7 @@ namespace LastBell.Run
         // Bellstrike: a bright straight bolt to the target; a new bell drops in with one ring, a refresh rings twice
         // and tightens the strength ring.
         public void Bellstrike(Vector3 from, Vector3 to, bool hit, bool refresh)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "Bellstrike", new object[] { from, to, hit, refresh });
             var d = Sim.Flat(to - from); float len = d.magnitude; if (len < 0.1f) return;
             var lane = FxMeshes.Quad(-0.12f, 0.12f, 0, len);
             Play(lane, true, add, from, Quaternion.LookRotation(d), 0.16f, (b, u) => { b.mpb.SetFloat(PDissolve, u); b.mpb.SetFloat(PIntensity, 1.4f); }, 2, Ink, NoteGold, Ivory);
@@ -308,7 +170,7 @@ namespace LastBell.Run
         // The ringing bell above the boss. Size/ring encode strength (0-2), orbiting pips encode echoes (0-2),
         // the bell's glow dims as it nears expiry.
         public void Bell(BossEncounter boss, int strength, int echoes, float life01)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "Bell", new object[] { boss, strength, echoes, life01 });
             if (boss == null || !boss.Solid)
             {
                 if (bell) bell.gameObject.SetActive(false); return;
@@ -339,7 +201,7 @@ namespace LastBell.Run
             Prim.SetGlow(bellBody, new Color(0.95f, 0.75f, 0.3f) * (0.15f + 0.6f * life01));
         }
         public void EchoAdded(BossEncounter boss, int echoes)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "EchoAdded", new object[] { boss, echoes });
             if (boss == null) return;
             var at = boss.transform.position + Vector3.up * boss.MarkHeight;
             Spray(at, Vector3.up, 10 * echoes, 0.9f, 3, 0.18f, 0.5f, motes);
@@ -347,7 +209,7 @@ namespace LastBell.Run
 
         // Harmonic Refrain: a directional wave of three expanding gold arcs (ripples), clearly different from the bolt
         public void Refrain(PlayerController p, float range, float half, bool hit)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "Refrain", new object[] { p, range, half, hit });
             float yaw = p.transform.eulerAngles.y;
             for (int k = 0; k < 3; k++)
             {
@@ -363,7 +225,7 @@ namespace LastBell.Run
 
         // Crescendo: the bell collapses into a column and bursts; a full setup adds a second shock ring and more light
         public void Crescendo(Vector3 at, bool bellDetonated, int echoes, bool full)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "Crescendo", new object[] { at, bellDetonated, echoes, full });
             var c = new Vector3(at.x, 0.05f, at.z);
             Play(cyl, false, add, c, Quaternion.identity, full ? 0.55f : 0.4f, (b, u) =>
             {
@@ -387,7 +249,7 @@ namespace LastBell.Run
         // Mending Chorus: one immediate expanding ring of the heal radius + rising notes on everyone healed. No lingering
         // disc: the ring has cleared within 0.5 s (no sanctuary / shield implied).
         public void Chorus(Vector3 at, float radius)
-        {
+        { if (LastBell.Run.Networking.LanFx.Record != null) LastBell.Run.Networking.LanFx.Record(LastBell.Run.Networking.LanFxTarget.Player, "Chorus", new object[] { at, radius });
             var c = new Vector3(at.x, 0.05f, at.z);
             Play(FxMeshes.Annulus(0.85f, 1f), true, addFloor, c, Quaternion.identity, 0.45f, (b, u) =>
             {

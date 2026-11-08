@@ -27,6 +27,8 @@ namespace LastBell.Run.Shop
         // -lastbellShopBot: a greedy buyer spends for slot 0 and readies up (playtest agent runs with items)
         public static bool BotBuys = Arg("-lastbellShopBot");
         public static int? SeedOverride = Arg("-lastbellSeed") ? ArgInt("-lastbellSeed", 0) : (int?)null;
+        // -lastbellToll N: the run's Toll until the Toll ladder exists (4 stocks the Toll IV items, 7 the Toll VII ones too)
+        public static int TollLevel = ArgInt("-lastbellToll", 0);
 
         public static RunShopFlow Instance { get; private set; }
         public static bool Showing => Instance && Instance.Run != null && Instance.Run.Open && Instance.d && Instance.d.State == RunState.Ready;
@@ -53,7 +55,9 @@ namespace LastBell.Run.Shop
             {
                 case RunState.Ready:
                     if (!Enabled || (d.Mode == RunMode.Practice && !PracticeShopFor(d.Encounter))) { EndRun(); break; }
-                    if (Run == null || runId != d.RunsStarted) BeginRun();
+                    if (Run == null || runId != d.RunsStarted) { if (!AdoptCarried()) BeginRun(); }
+                    // campaign: minibosses have no shop (and a run arriving in a new arena waits at Ready); the wallet carries on
+                    if (d.Mode == RunMode.Run && !Campaign.ShopBefore(d.Encounter)) break;
                     OpenFor(d.Encounter);
                     break;
                 case RunState.Intro:
@@ -61,18 +65,18 @@ namespace LastBell.Run.Shop
                     {
                         Run.Close();
                         foreach (var b in Run.Slots) b.ResetEncounter();
-                        Run.CrackUntil = -1; Run.BrandUntil = -1; Run.BrandOwner = null;
-                        ItemHooks.ClearEffects();
-                        d.Player.RefreshHealth(refillPotions: false);   // the shop's refill, now at the bought max HP (Grit, Glass Edge)
+                        Run.BrandUntil = -1; Run.BrandOwner = null;
+                        d.Player.RefreshHealth(refillPotions: false);   // the shop's refill, now at the bought max HP (Glass Edge)
                     }
                     break;
                 case RunState.Cleared:
-                    if (Run != null && d.Mode == RunMode.Run && d.Boss != null)   // practice never pays
+                    // practice and the tutorial never pay; a campaign miniboss pays 100 (spec §2), every other fight 150
+                    if (Run != null && d.Mode == RunMode.Run && d.Boss != null && d.Encounter != RunDirector.TutorialPractice)
                     {
                         bool final = RunDirector.Bosses[d.Encounter].Final;
                         int seconds = (d.World.Tick - d.World.SegmentStartTick) / Sim.Hz;
                         int before = Run.Slot(0).Earned;
-                        Run.PayClear(d.Boss.DisplayName.Split(',')[0].Trim(), final, d.World.Players.All(p => !p.Down), seconds);
+                        Run.PayClear(d.Boss.DisplayName.Split(',')[0].Trim(), final, d.World.Players.All(p => !p.Down), seconds, IsMiniboss(d.Encounter));
                         LastPopup = Run.Slot(0).Earned - before; popupAt = Time.unscaledTime;
                     }
                     break;
@@ -90,10 +94,28 @@ namespace LastBell.Run.Shop
         void BeginRun()
         {
             runId = d.RunsStarted; openedFor = -1;
-            Run = new ShopRun(SeedOverride ?? Guid.NewGuid().GetHashCode(), d.Mode == RunMode.Practice ? 1 : d.EncounterOrder.Length);
+            Run = new ShopRun(SeedOverride ?? Guid.NewGuid().GetHashCode(), d.Mode == RunMode.Practice ? 1 : Math.Max(1, d.EncounterOrder.Count(Campaign.ShopBefore)));
+            Run.Toll = TollLevel;
             d.Player.Build = Run.Add(d.ClassName);   // party bots / netcode add their slots here later
             ItemHooks.Run = Run;
             d.Log.Add($"shop: new run, seed {Run.Seed}");
+        }
+        // Campaign travel (RunDirector.TravelTo): the shop run (wallet, items) survives the scene load into the next arena
+        // and the new arena's shop adopts it for the same run.
+        static ShopRun carried; static int carriedRunId = -1;
+        public void CarryForTravel() { carried = Run; carriedRunId = runId; if (d.Player) d.Player.Build = null; }
+        public static void DropCarried() { carried = null; carriedRunId = -1; }
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ClearCarried() => DropCarried();
+        bool AdoptCarried()
+        {
+            if (carried == null || carriedRunId != d.RunsStarted || d.Mode != RunMode.Run) { DropCarried(); return false; }
+            Run = carried; runId = carriedRunId; openedFor = -1; DropCarried();
+            Run.BrandUntil = -1; Run.BrandOwner = null;
+            d.Player.Build = Run.Slot(0);
+            ItemHooks.Run = Run;
+            d.Log.Add($"shop: carried run, {Run.Slot(0).Chimes} Chimes, {Run.Slot(0).Items.Count} items");
+            return true;
         }
         void EndRun()
         {
@@ -101,6 +123,8 @@ namespace LastBell.Run.Shop
             if (d.Player) d.Player.Build = null;
             Run = null; ItemHooks.Run = null; runId = -1; openedFor = -1;
         }
+
+        static bool IsMiniboss(int encounter) => Campaign.Areas.Any(a => Array.IndexOf(a.MinibossIndices, encounter) >= 0);
 
         void OpenFor(int encounter)
         {
@@ -110,7 +134,9 @@ namespace LastBell.Run.Shop
             bool final = RunDirector.Bosses[encounter].Final;
             // health and potions refill at the shop before every boss after the first (gpt/08 §3: every run boss is an area boss)
             if (pos > 0) d.Player.RefreshHealth(refillPotions: true);
-            Run.OpenVisit(RunDirector.Bosses[encounter].Name, final, areaShop: !final);
+            // the 300 stand-in miniboss Chimes only where no minibosses were fought: practice, or a run order without them
+            bool standIn = d.Mode == RunMode.Practice || !d.EncounterOrder.Any(IsMiniboss);
+            Run.OpenVisit(RunDirector.Bosses[encounter].Name, final, areaShop: !final && standIn);
             LastRefusal = null;
             d.Log.Add($"shop: visit {Run.Visit} before {RunDirector.Bosses[encounter].Name}, {Run.Slot(0).Chimes} Chimes");
             botPending = BotBuys;   // the bot shops on the next frame, outside the director's state change
@@ -172,7 +198,7 @@ namespace LastBell.Run.Shop
         }
 
         // One screen, no scrolling or paging (Chzy18, 29 Oct): the panel height follows the content, worst case a full
-        // 8-player party (7 allies) and a long build, which still fits 1080 virtual px.
+        // 4-player party (3 allies; the game is 1-4 players since 1 Nov) and a long build, which fits 1080 virtual px.
         const float Pad = 24, HeadH = 102, CardH = 320, CardGap = 14, ChipW = 290, ChipH = 36, ChipGap = 8, AllyW = 368, AllyH = 64, FootH = 48;
         static int Rows(int n, int perRow) => n <= 0 ? 1 : (n + perRow - 1) / perRow;
 

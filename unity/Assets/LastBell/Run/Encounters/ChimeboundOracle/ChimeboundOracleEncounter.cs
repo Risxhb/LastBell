@@ -431,6 +431,9 @@ namespace LastBell.Run
             }
         }
         void ClearOrbs() { foreach (var o in orbs) ReturnOrb(o); orbs.Clear(); }
+        public override void CaptureNetProps(List<Networking.LanWorldFrame.Prop> into) { foreach (var o in orbs) if (o.View) into.Add(NetProp(o.Src.Id, 0, o.View.position)); }
+        public override Transform MakeNetProp(byte kind) { var t = TakeOrbView(); t.name = "Oracle orb (LAN)"; return t; }
+        public void ApplyReplica(bool enraged) => Enraged = enraged;   // LAN client: the Metronome Court's frenzy light
 
         // spots on the floor at least `spacing` apart, the first within reach of the nearest player
         List<Vector3> WellSpots(int n, float spacing)
@@ -721,6 +724,19 @@ namespace LastBell.Run
         {
             base.Update();
             if (Rig) Rig.Glow = glowLevel;
+        }
+
+        // LAN looks: Glow = the rig's body glow; Look[0] = Phase 2 (1/0), so the replica's orb views take the phase colour.
+        // Pose, haste and the clock reach the replica through LanClientWorld; the sounds are recorded calls.
+        public override void CaptureNetLook(Networking.LanWorldFrame.BossState into)
+        {
+            into.Glow = glowLevel;
+            into.Look.Add(Phase2 ? 1 : 0);
+        }
+        public override void ReplicaPresent(Networking.LanWorldFrame.BossState state, float dt)
+        {
+            if (Rig) Rig.Glow = state.Glow;
+            if (state.Look.Count > 0) Phase2 = state.Look[0] > 0.5f;
         }
 
         protected override void OnDefeat()

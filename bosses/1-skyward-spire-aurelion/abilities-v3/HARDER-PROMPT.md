@@ -1,5 +1,9 @@
 # Prompt: make Aurelion much, much harder (ability set v3)
 
+> **Retired prompt; kept because code comments cite its sections.** The current fight is v4 (`abilities-v4/ABILITIES-v4.md`, Azure PR 15): 1–4 players, the Tollbreaker in place of the Vanguard.
+
+> **Retired set (1 Nov).** Only v4 is played (`../abilities-v4/ABILITIES-v4.md`). This file stays because v4 reuses abilities and numbers defined here; its phase plans, Noon Shadow and escape checks no longer apply.
+
 *A prompt for the Aurelion session, or a fresh session, in the Last Bell repo. Paste it as-is.*
 
 ## 1. Who you are and where things stand
