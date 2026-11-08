@@ -164,6 +164,7 @@ function Invoke-AzArtifact([string[]]$Arguments) {
     $oldPat = $env:AZURE_DEVOPS_EXT_PAT
     $oldConfig = $env:AZURE_CONFIG_DIR
     $oldExtensions = $env:AZURE_EXTENSION_DIR
+    $oldTool = $env:AZURE_DEVOPS_EXT_ARTIFACTTOOL_OVERRIDE_PATH
     $cleanConfig = $null
     $previous = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
@@ -178,6 +179,16 @@ function Invoke-AzArtifact([string[]]$Arguments) {
             if (-not $oldExtensions) {
                 $extensions = Join-Path $env:USERPROFILE '.azure\cliextensions'
                 if (Test-Path $extensions -PathType Container) { $env:AZURE_EXTENSION_DIR = $extensions }
+            }
+            # The azure-devops extension looks for ArtifactTool inside AZURE_CONFIG_DIR, so the fresh profile has none
+            # and publish/download fail with "[WinError 2] The system cannot find the file specified". Point it at the
+            # newest copy already cached in the user's normal profile.
+            if (-not $oldTool) {
+                $tools = Join-Path $env:USERPROFILE '.azure\azuredevops\cli\tools\artifacttool'
+                $cached = Get-ChildItem -LiteralPath $tools -Directory -Filter 'ArtifactTool_*' -ErrorAction SilentlyContinue |
+                    Where-Object { Test-Path (Join-Path $_.FullName 'artifacttool.exe') -PathType Leaf } |
+                    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+                if ($cached) { $env:AZURE_DEVOPS_EXT_ARTIFACTTOOL_OVERRIDE_PATH = $cached.FullName }
             }
         } else {
             & $az account show --output none --only-show-errors *> $null
@@ -199,6 +210,7 @@ function Invoke-AzArtifact([string[]]$Arguments) {
         $env:AZURE_DEVOPS_EXT_PAT = $oldPat
         $env:AZURE_CONFIG_DIR = $oldConfig
         $env:AZURE_EXTENSION_DIR = $oldExtensions
+        $env:AZURE_DEVOPS_EXT_ARTIFACTTOOL_OVERRIDE_PATH = $oldTool
         if ($cleanConfig) {
             $resolved = [IO.Path]::GetFullPath($cleanConfig)
             $tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
