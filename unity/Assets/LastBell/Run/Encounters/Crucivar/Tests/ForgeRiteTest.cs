@@ -127,6 +127,15 @@ namespace LastBell.Run
                 && brands.All(b => Sim.Flat(b.H.Origin - rv.transform.position).magnitude > 1f), $"reviving {rv.Reviving == t.Party[0]}, brands {brands.Count}");
             t.Check("Casting Order does not aim its pour at an active reviver (a fixed line instead, same pour count)", pourOnRv >= 0 && t.Boss.Rite.UnaimedPours - unaimed0 == 1
                 && t.Spawned("Pour ").Count(x => !x.Source.Contains("Channel")) >= t.Boss.Rite.Order.Count, $"order slot {pourOnRv}, unaimed {t.Boss.Rite.UnaimedPours - unaimed0}");
+            // a downed player's ground cools (proposal, 8 Nov): a pool under them and one beside them leave, one across the floor stays
+            var dp = Sim.Flat(t.Party[0].transform.position);
+            Hazard Pool(Vector3 at) { var h = new Hazard { Source = "Brand Pool", AttackId = "crucivar.ember_brand", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = at, Radius = ForgeRite.PoolRadius, LockAt = 0, ResolveAt = Sim.Ticks(3600), BurnPerSecond = ForgeRite.PoolBurn }; t.W.Hazards.Spawn(h); return h; }
+            int cooled0 = t.Boss.Rite.DownCooled;
+            var under = Pool(dp + Vector3.right * 0.5f); var beside = Pool(dp + Vector3.left * 3.5f); var far = Pool(new Vector3(-11, 0, -8));
+            yield return t.Ticks(3);
+            bool Gone(Hazard h) => !t.W.Hazards.Live.Contains(h);
+            t.Check("a downed player's ground cools: a pool under them and one reaching their revive ring leave, one across the floor stays",
+                Gone(under) && Gone(beside) && !Gone(far) && t.Boss.Rite.DownCooled - cooled0 == 2, $"under {Gone(under)}, beside {Gone(beside)}, far {Gone(far)}, cooled {t.Boss.Rite.DownCooled - cooled0}");
             t.W.ClearTransient();
             t.Party[0].DebugRevive();
         }

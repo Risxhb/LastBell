@@ -136,6 +136,30 @@ namespace LastBell.Run
             W.Hazards.Spawn(h);
         }
 
+        // a downed player's ground cools (proposal, 8 Nov, done as recommended): burning ground (brand pools, Pour Channels)
+        // reaching within DownCool of a downed player leaves, as it does beside a casting or under a rising Mould Tower. A
+        // burn tick is a hit and resets a revive, and a 2 m pool outlasts the phase while revive reach is 1.5 m, so a player
+        // downed in a pool could not be revived at all (8 Nov Hard party sweeps: every revive "bad all round", 0 revives)
+        public const float DownCool = PlayerController.ReviveRange + 0.6f;
+        public int DownCooled { get; private set; }
+        public void CoolUnderDowned()
+        {
+            foreach (var p in W.Players)
+            {
+                if (!p || !p.Down || p.Dead) continue;
+                var c = Flat(p.transform.position);
+                var live = W.Hazards.Live;
+                for (int i = 0; i < live.Count; i++)
+                {
+                    var b = live[i];
+                    if (b.BurnPerSecond <= 0 || b.Source == "Molten Crown" || b.Source == "Pour Flood" || b.ResolveAt <= b.Age + 1) continue;
+                    bool touches = b.Contains(c);
+                    for (int k = 0; k < 12 && !touches; k++) touches = b.Contains(c + Sim.Dir(k * 30f) * DownCool);
+                    if (touches) { b.ResolveAt = b.Age + 1; DownCooled++; }
+                }
+            }
+        }
+
         // the phase ends: every brand pool cools at once
         public void ClearPools()
         {

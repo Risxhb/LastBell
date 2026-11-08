@@ -178,6 +178,7 @@ namespace LastBell.Run
         // ---------------- presentation ----------------
         protected override void StepAlways()
         {
+            if (Rite != null && !Dead) Rite.CoolUnderDowned();   // a downed player can be revived out of a pool (every phase; sim, before the presenter check)
             if (!presenter) return;
             bool walking = Current == "approach" || Current == "reposition";
             presenter.TickBoss(walking ? "Walk" : "Idle");
