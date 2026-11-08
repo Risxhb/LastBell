@@ -962,6 +962,7 @@ namespace LastBell.Run
             // her attack clips (proposal 2 Nov): a Conduct loop under the spirals, one-shots on the attacks
             Check("Sylvara conducts while a spiral runs", sy.LoopClip == "ConductLoop", sy.LoopClip);
             foreach (var c in new[] { "Toll", "CallWater", "PruningArc", "Seed" }) Check($"Sylvara P1 plays the {c} clip", sy.Clips.Contains(c));
+            Check("Sylvara P1: every pod cast plays the Seed clip, the Feet and Triangle Pods too (4 casts)", sy.Clips.Count(c => c == "Seed") >= 4, sy.Clips.Count(c => c == "Seed") + "x");
             if (sy.Presenter && sy.Presenter.Has("Intro")) Check("Sylvara wakes with the Intro clip on the intro card", sy.Clips.Contains("Intro"));
             var newClips = new[] { "ConductLoop", "StormLoop", "Toll", "CallWater", "Sow", "LanesLoop", "Intro", "MaskSplit", "HollowLoop", "StormCall", "Stagger" };
             if (sy.Presenter && sy.Presenter.HasModel && newClips.All(sy.Presenter.Has)) Check("her model has every v3 attack clip", true);
@@ -1135,10 +1136,20 @@ namespace LastBell.Run
                     var f = new Networking.LanWorldFrame(); f.Players.Add(new Networking.LanWorldFrame.Player { Id = 0, Hp = 1, MaxHp = 1 });
                     f.Bullets.Add(Networking.LanWorldCapture.BulletOf(b));
                     if (!Networking.LanWorldFrame.TryDecode(f.Encode(), out var got) || got.Bullets.Count != 1) { netBad = "frame did not decode"; return; }
-                    var c = new BulletSystem.Bullet(); Networking.LanClientWorld.ApplyBullet(got.Bullets[0], c, 0);
-                    bool ok = c.BurstRays == b.BurstRays && Mathf.Abs(Mathf.DeltaAngle(c.BurstOff * Mathf.Rad2Deg, b.BurstOff * Mathf.Rad2Deg)) < 0.01f
-                        && Mathf.Approximately(c.BurstSpeed, b.BurstSpeed) && Mathf.Abs((c.Life - c.Age) - (b.Life - b.Age)) < 0.001f && c.Radius >= 0.5f;
-                    netChecked++; if (!ok && netBad == null) netBad = $"client {c.BurstRays} rays / {c.Life - c.Age:0.000} s left vs host {b.BurstRays} / {b.Life - b.Age:0.000}";
+                    // drawn at the snapshot's time, 60 ms behind it (the client's usual render delay at 30 Hz) and 30 ms ahead: the
+                    // seed's place and fuse move together, so the previewed burst point stays the host's (review SYL-LAN-TIME)
+                    var hostAt = b.Pos + b.Vel * (b.Life - b.Age);
+                    foreach (float lag in new[] { 0f, -0.06f, 0.03f })
+                    {
+                        var c = new BulletSystem.Bullet(); Networking.LanClientWorld.ApplyBullet(got.Bullets[0], c, lag);
+                        float expectLeft = Mathf.Clamp(b.Life - b.Age - lag, 0, b.Life);
+                        var at = c.Pos + c.Vel * (c.Life - c.Age);
+                        bool ok = c.BurstRays == b.BurstRays && Mathf.Abs(Mathf.DeltaAngle(c.BurstOff * Mathf.Rad2Deg, b.BurstOff * Mathf.Rad2Deg)) < 0.01f
+                            && Mathf.Approximately(c.BurstSpeed, b.BurstSpeed) && Mathf.Abs((c.Life - c.Age) - expectLeft) < 0.001f
+                            && Sim.Flat(at - hostAt).magnitude < 0.005f && c.Radius >= 0.5f;
+                        if (!ok && netBad == null) netBad = $"at {lag * 1000:0} ms: client {c.BurstRays} rays / {c.Life - c.Age:0.000} s left / centre off {Sim.Flat(at - hostAt).magnitude:0.000} m vs host {b.BurstRays} / {b.Life - b.Age:0.000}";
+                    }
+                    netChecked++;
                 }
                 bool sampling = true;
                 // petals live 6 s: ones from earlier steps are still flying, and their seeds were never sampled
@@ -1165,7 +1176,7 @@ namespace LastBell.Run
                 Check("Sylvara Hard P4: a seed bursts into 10 petals", sy.LastBurstFired == 10, sy.LastBurstFired.ToString());
                 Check("Sylvara P4 burst preview: every seed carries its 10 burst rays from launch", fresh > 0 && seedsCarry, $"{fresh} seeds");
                 Check("Sylvara P4 burst preview: the rays are drawn before the burst", rayShown);
-                Check("Sylvara P4 burst preview: a LAN client gets each seed's rays and fuse (world frame round trip)", netChecked > 0 && netBad == null, netBad ?? $"{netChecked} seeds");
+                Check("Sylvara P4 burst preview: a LAN client gets each seed's rays and fuse, and draws the host's burst point at its render delay (world frame round trip)", netChecked > 0 && netBad == null, netBad ?? $"{netChecked} seeds");
                 // the drawn track is the petal's real hit corridor: full petal width, from the burst point past the 0.4 s reach
                 Check("Sylvara P4 burst preview: each ray track is a petal's full hit width (0.6 m), end caps included",
                         Mathf.Approximately(BulletSystem.PreviewRayWidth, 2 * BulletArt.PetalHitRadius), $"{BulletSystem.PreviewRayWidth:0.00} m");
@@ -1176,7 +1187,8 @@ namespace LastBell.Run
                     probe.Prewarm(probeRoot); int built = probe.PreviewBars;
                     Check("Sylvara P4 burst preview: the ray bars are built on the Ready screen (Sylvara's warm-up), before the fight",
                         sylEntry.WarmUp != null && built >= BulletSystem.PrewarmBars, $"{built} bars");
-                    UnityEngine.Object.Destroy(probeRoot.gameObject);
+                    probe.Dispose(); UnityEngine.Object.Destroy(probeRoot.gameObject);
+                    Check("Sylvara P4 burst preview: releasing a bullet view destroys its own materials", probe.Disposed && probe.PreviewBars == 0);
                 }
                 int petals = 0, onRay = 0; var miss = new List<string>();
                 foreach (var p in d.World.Bullets.Live)

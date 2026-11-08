@@ -322,7 +322,7 @@ namespace LastBell.Run
                     At(6, "Waterfall Jets", Jets);
                     At(8, "Toll", () => Toll("TOLL: the spin reverses"));
                     At(9, null, () => Reverse(sp1));
-                    At(10, "Feet Pod", () => Pod(null, Vector3.zero, 3.0f));
+                    At(10, "Feet Pod", FeetPod);
                     At(13, "Pruning Arc", PruningArc);
                     At(14.5f, "Doubled Pods", () => PodsOnFar(doubled: true));
                     At(18, "Waterfall Jets", Jets);
@@ -352,7 +352,7 @@ namespace LastBell.Run
                     At(0.01f, "Hollow Spiral", () => sp1 = Spiral(1, HollowArms, 10 * Deg, 4.5f, 0.18f, 9, 7));
                     At(1, "Choir Buds", () => PlantBuds(bloom));
                     if (CounterSpiral) At(4, "Counter Spiral", () => sp2 = Spiral(-1, 2, 12 * Deg, 4f, 0.2f, 9, 7));   // Hard (5 Nov)
-                    At(8, "Feet Pod", () => Pod(null, Vector3.zero, 3.0f));
+                    At(8, "Feet Pod", FeetPod);
                     At(12, "Choir Buds", () => PlantBuds(bloom));
                     At(15, "Pruning Arc", PruningArc);
                     At(20, "Seed Pods", () => PodsOnFar());
@@ -507,8 +507,11 @@ namespace LastBell.Run
             if (far.Count == 0) Pod(null, On(Rnd(0, Tau), 7), 2.5f, doubled);   // everyone standing is reviving: an unaimed pod
             foreach (var p in far) Pod(p, Vector3.zero, 2.5f, doubled);
         }
+        // the pods without a cast of their own reuse her Seed clip (graphics audit 8 Nov; presentation only)
+        void FeetPod() { Act("Seed", 1.2f); Pod(null, Vector3.zero, 3.0f); }
         void TrianglePods()
         {
+            Act("Seed", 1.2f);
             var f = Farthest(1); float a0 = f.Count > 0 ? AngOf(f[0].transform.position) : Rnd(0, Tau);
             for (int i = 0; i < 3; i++)
             {
@@ -727,6 +730,7 @@ namespace LastBell.Run
                     KillBud(b); BudsBloomed++;
                     RunHud.Float(b.Pos + Vector3.up * 1.8f, "BLOOM", Amber);
                     PetalRing(b.Pos, 20, 5, Rnd(0, Tau), 0.8f, 12, "Bud Bloom");
+                    if (Age >= actUntil) Act("Bloom", 2f);   // she conducts the bloom (reuses Bloom; graphics audit 8 Nov); never mid-cast
                     EndBudView(b.View, b.Prop, true);
                     if (NetRecording) NetFx("SylvaraEncounter.BudEnd", b.Pos, true);
                 }
