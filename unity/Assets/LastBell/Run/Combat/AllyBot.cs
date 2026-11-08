@@ -176,6 +176,7 @@ namespace LastBell.Run
             // first of them by name: the castings carry their numerals, and on Hard one sunk out of order sets every turret
             // firing (a party went down to it, 11-03); hits land on whichever of them is nearest, so aim and reach follow it
             var first = PartTarget(w);
+            tPart = first != null;
             if (first != null) { bpos = Sim.Flat(first.Pos); brad = first.BodyRadius; }
             tPos = bpos; tRad = brad;
             inp.Aim = bpos;
@@ -508,6 +509,8 @@ namespace LastBell.Run
         const float VolleyJetOut = 22f;
         const float VolleyJetHit = 200f;  // a jet step in the bullet dodge (a bullet step is 100)
         bool volJets; Vector3 volHub; string volEsc;   // volEsc: the sweep trace
+        const float VolleyReachPart = 10f;   // per m out of reach of a casting (the boss: 4)
+        const float VolleyEscPart = 6f;      // m: with a casting up, no longer run to a spot clear of every path (they ran 18-20 m off)
         const float VolleyThrowReach = 7f;   // a Tollbreaker's axe throws, gap to the target (MaxRange 9 m less a margin)
         static readonly List<Hazard> volNear = new List<Hazard>();
         static Vector3[] Dirs16;
@@ -539,7 +542,7 @@ namespace LastBell.Run
             {
                 var esc = NearestClear(pos, boss, bad, out float need);
                 // not beside a turret: the clear spot there is where its next arms sweep (two bots were pinned so, 11-04)
-                if (esc != Vector3.zero && BotSight.TurretDist(pos + esc * need) >= TurretKeep) { home = pos + esc * need; volReach = false; volPull = need > 6f ? 1f : 2f; volEsc = $"esc{need:0}"; }
+                if (esc != Vector3.zero && (!tPart || need <= VolleyEscPart) && BotSight.TurretDist(pos + esc * need) >= TurretKeep) { home = pos + esc * need; volReach = false; volPull = need > 6f ? 1f : 2f; volEsc = $"esc{need:0}"; }
             }
             if (!volOn || me.World.Tick - volTick >= 3 || me.Stunned > 0)
             {
@@ -648,7 +651,9 @@ namespace LastBell.Run
                 float out_ = Sim.Flat(q - volHub).magnitude - VolleyJetRing;
                 if (out_ > 0) cost += out_ * VolleyJetOut;
             }
-            if (volReach) cost += Mathf.Max(0, Sim.Flat(tPos - q).magnitude - tRad - (Range(me) + 1.5f)) * 4f;
+            // a casting (the Pour Flood comes at 30 s) weighs more: at 4 the bots that took their brands to the wall stood
+            // there out of reach among the paths and a casting at 123 HP stood 6 s (8 Nov Hard sweep: 3 of 4 fights lost to the flood)
+            if (volReach) cost += Mathf.Max(0, Sim.Flat(tPos - q).magnitude - tRad - (Range(me) + 1.5f)) * (tPart ? VolleyReachPart : 4f);
             return cost;
         }
 
@@ -1242,7 +1247,7 @@ namespace LastBell.Run
         }
 
         // the spot in attack reach of him (gap Range-1 .. Range+1.6: it stops within 0.15 m, inside the swing gate) nearest this bot that the current constraints allow
-        Vector3 tPos; float tRad;   // this tick's target (the boss or its first live part)
+        Vector3 tPos; float tRad; bool tPart;   // this tick's target (the boss or its first live part)
         bool AttackSpot(PlayerController me, BossEncounter boss, out Vector3 spot)
         {
             var pos = me.transform.position; var bp = tPos;
