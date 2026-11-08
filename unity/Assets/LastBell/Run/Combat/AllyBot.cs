@@ -1221,7 +1221,7 @@ namespace LastBell.Run
         string SylvaraLine() => $"{(dJob == "revive" ? $"revive {(rvOk ? "route" : "wait")} to ({rvStand.x:0.0},{rvStand.z:0.0}) " : "")}cost {sylCost:0.0} move ({sylMove.x:0.0},{sylMove.z:0.0}) sprint {sylSprint} dash {sylDash} at ({sylPos.x:0.0},{sylPos.z:0.0})";
 
         // how far from its Choir Bud it stands to cut it: Tollbreaker throws from 6 m (a tap flies 9 m), outside the thick of
-        // the bud's own petals; the others stand next to it
+        // the bud's own petals; the others stand next to it (5 m was tried, 8 Nov: more blooms and Bud Petal hits)
         static float BudStand(PlayerController me) => me.ClassName == "Tollbreaker" ? 6f : 1.8f;
 
         PlayerInput ReadSylvara(PlayerController me, SylvaraEncounter sy)
@@ -1363,12 +1363,20 @@ namespace LastBell.Run
             float body = boss != null ? boss.BodyRadius + PlayerController.Radius + 0.1f : 0;
             Vector3 q = pos;
             int steps = Mathf.RoundToInt(Horizon / Step);
+            // A move into her body margin or past the wall margin is blocked. Its cost is 800 plus the hits it met before that, so
+            // it is the last resort: a flat 400/500 made walking into her look cheaper than a path with a few hits, and bots
+            // stood pressed to her body in Seed Burst after Seed Burst (8 Nov diagnostic: hits at cost 401-402 and 507-509).
+            // (Scoring the blocked move on along the wall instead drew the bots out to 12 m with half the swings, runs 71-73.)
+            // Already inside a margin (her body pushes a player out to radius + 0.45, inside the 0.1 margin): only moves that go
+            // deeper are blocked, or every move was, and a Tollbreaker that touched her froze there.
+            float startBody = boss != null ? Sim.Flat(pos - bp).magnitude : 0, startOut = Sim.Flat(pos).magnitude;
+            bool inBody = boss != null && startBody < body, outside = !CombatWorld.InPlayerBound(pos, -0.3f);
             for (int k = 1; k <= steps; k++)
             {
                 float t = k * Step;
                 q = pos + d * v * Mathf.Min(t, moveFor);
-                if (!CombatWorld.InPlayerBound(q, -0.3f)) return 500 + k;
-                if (boss != null && Sim.Flat(q - bp).magnitude < body) return 400 + k;
+                if (!CombatWorld.InPlayerBound(q, -0.3f) && (!outside || Sim.Flat(q).magnitude > startOut + 0.01f)) return 900 + k + cost;
+                if (boss != null && Sim.Flat(q - bp).magnitude < (inBody ? startBody - 0.01f : body)) return 800 + k + cost;
                 float early = 1.5f - t / Horizon;   // hits sooner are worse: there is less time to fix them later
                 foreach (var b in near)
                 {
@@ -1383,9 +1391,27 @@ namespace LastBell.Run
                     {
                         // a seed bursts into a ring of petals: its ring hits like any bullet for 1 s after the burst, with the
                         // same near-miss margin (Tollbreaker lane, 2 Nov: seed bursts were the last hit in lost Hard runs)
-                        var at = b.Pos + b.Vel * fuse; float since = t - fuse;
-                        float ring = 4.5f * since, gap = Mathf.Abs(Sim.Flat(q - at).magnitude - ring) - (BulletArt.PetalHitRadius + Hazard.Margin + Buffer);
-                        if (since < 1f) { if (gap < 0) cost += 100 * early; else if (gap < 0.6f) cost += (0.6f - gap) * 4; }
+                        var at = b.Pos + b.Vel * fuse; float since = t - fuse, hit = BulletArt.PetalHitRadius + Hazard.Margin + Buffer;
+                        if (since >= 1f) continue;
+                        if (b.BurstRays > 0)
+                        {
+                            // its rays are fixed at launch (the preview a player sees): score the petals where they will be, so
+                            // the gaps between rays count as safe. A solid ring made every spot near a seed look hit, and in a
+                            // Seed Storm the bots could not tell a gap from a petal (8 Nov full run: 3 of 4 wipes to Seed Burst)
+                            float rr = BulletSystem.BurstFrom + b.BurstSpeed * since, best = float.MaxValue;
+                            for (int i = 0; i < b.BurstRays; i++)
+                            {
+                                float a = b.BurstOff + i * Mathf.PI * 2 / b.BurstRays;
+                                best = Mathf.Min(best, Sim.Flat(q - (at + new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * rr)).magnitude);
+                            }
+                            float gap = best - hit;
+                            if (gap < 0) cost += 100 * early; else if (gap < 0.6f) cost += (0.6f - gap) * 4;
+                        }
+                        else
+                        {
+                            float ring = 4.5f * since, gap = Mathf.Abs(Sim.Flat(q - at).magnitude - ring) - hit;
+                            if (gap < 0) cost += 100 * early; else if (gap < 0.6f) cost += (0.6f - gap) * 4;
+                        }
                     }
                 }
             }

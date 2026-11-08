@@ -780,7 +780,7 @@ namespace LastBell.Run
                 var seed = Shot(On(a, Rim), a, 3, 16, fuse, 0, "Seed", 0.6f, b =>
                 {
                     int f0 = W.Bullets.Fired;
-                    PetalRing(b.Pos, rays, 4.5f, burstOff, 0.3f, 12, "Seed Burst");
+                    PetalRing(b.Pos, rays, 4.5f, burstOff, BulletSystem.BurstFrom, 12, "Seed Burst");
                     LastBurstFired = W.Bullets.Fired - f0;
                 });
                 seed.BurstRays = rays; seed.BurstOff = burstOff; seed.BurstSpeed = 4.5f;
