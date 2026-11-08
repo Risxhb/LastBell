@@ -15,6 +15,8 @@ namespace LastBell.Run
         {
             "aurelion.meridian_lances", "aurelion.starfall_mirror", "aurelion.noon_shadow", "aurelion.orrery_closing", "aurelion.hour_hands",
             "aurelion.errant_planets", "aurelion.falling_meridians", "aurelion.sunspots",   // 7 Nov (Codex attack-icons-20261106)
+            "aurelion.zenith_collapse", "aurelion.meridian_towers", "aurelion.total_eclipse", "aurelion.severance", "aurelion.last_light",
+            "aurelion.ecliptic_order", "aurelion.zenith_marks", "aurelion.meridian_recall",   // 8 Nov (Codex attack-icons-20261108)
         };
 
         void BossAttackIconChecks()
@@ -34,6 +36,7 @@ namespace LastBell.Run
             {
                 ("Starfall Mirror II (reflection)", "aurelion", "aurelion.starfall_mirror"), ("Orrery Closing rim", "aurelion", "aurelion.orrery_closing"),
                 ("Meridian Lances", "aurelion", "aurelion.meridian_lances"), ("Hour Hands", "aurelion", "aurelion.hour_hands"),
+                ("Reunion", "aurelion", "aurelion.meridian_towers"), ("Umbra", "aurelion", "aurelion.total_eclipse"), ("Meridian Recall", "aurelion", "aurelion.meridian_recall"),
                 ("Bell Sweep", "bellkeeper", null), ("Leaning Bell", "bellkeeper", null), ("Meridian Lances", "sylvara", null),
             };
             var wrong = cases.Where(c => BossAttackIcons.Resolve(null, c.source, c.boss)?.id != c.id).Select(c => $"{c.boss}/{c.source}").ToList();
