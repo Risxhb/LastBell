@@ -61,6 +61,7 @@ namespace LastBell.Run
         protected Hazard Spawn(Hazard h)
         {
             if (string.IsNullOrEmpty(h.Source) || h.Source == "Hazard") h.Source = Name;
+            if (string.IsNullOrEmpty(h.AttackId)) h.AttackId = Id;   // the attack family icon (8 Nov: every Aurelion hazard carries its ability id)
             h.Damage = V3Tier(h.Damage);
             // v4 Last Light, the soft enrage: every fallen slice makes his attacks 10 % stronger
             // capped so a hit never lands above 90 after the difficulty scale (no one-shots, design rules 5): Hard 69 x 1.3

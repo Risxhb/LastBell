@@ -577,17 +577,27 @@ namespace LastBell.Run
         void DownedCard()
         {
             const float w = 560, pad = UiTheme.G3;
-            var r = Card(w, pad + 44 + 8 + 26 + pad, 270, false, UiTheme.Danger);
+            // a catalogued boss attack shows its 64 px icon, with the attack name and boss beside it (BossAttackIcons)
+            // the last hit only if it took you to 0 and is the defeat cause; a scripted wipe (an empty tower, Severance, Last
+            // Light) downs you with its own cause, and shows its family's icon with the attack name and boss on a second line
+            // (8 Nov icons). The enrage has no family: text only.
+            var wd = d.World; BossAttackIcons.Attack ka = null; bool scripted = false;
+            if (wd != null)
+            {
+                int n = wd.TakenLog.Count;
+                if (n > 0 && wd.TakenLog[n - 1].hpAfter <= 0 && wd.TakenLog[n - 1].source == wd.LastDamageSource) ka = TakenAttack(wd, n - 1);
+                else { ka = BossAttackIcons.Get(wd.LastDamageAttackId); scripted = ka != null; }
+            }
+            var r = Card(w, pad + 44 + 8 + 26 + (scripted ? 26 : 0) + pad, 270, false, UiTheme.Danger);
             float y = r.y + pad;
             T(r.x, y, w, 44, UiTheme.Spaced("Down"), display36); y += 52;
-            // a catalogued boss attack shows its 64 px icon, with the attack name and boss beside it (BossAttackIcons)
-            // the last hit only if it took you to 0: a scripted wipe (Final Noon, an empty tower) downs you with its own cause
-            var wd = d.World; var ka = wd != null && wd.TakenLog.Count > 0 && wd.TakenLog[wd.TakenLog.Count - 1].hpAfter <= 0 ? TakenAttack(wd, wd.TakenLog.Count - 1) : null; var ki = BossAttackIcons.Icon(ka);
+            var ki = BossAttackIcons.Icon(ka);
             if (ki != null) GUI.DrawTexture(S(r.x + pad, r.y + pad + 8, 64, 64), ki, ScaleMode.ScaleToFit, true);
-            string a = "Struck by ", cause = ka != null ? ka.Label : d.DefeatCause ?? "?";
+            string a = "Struck by ", cause = ka != null && !scripted ? ka.Label : d.DefeatCause ?? "?";
             float wa = Wv(bodyL, a), wc = Wv(bodyL, cause), x = r.x + w / 2 - (wa + wc) / 2;
             T(x, y, wa + 2, 26, a, bodyL, UiTheme.Ivory);
             T(x + wa, y, wc + 2, 26, cause, bodyL, UiTheme.Gold);
+            if (scripted) T(r.x, y + 26, w, 26, ka.Label, bodyC, UiTheme.IvoryMuted);
         }
 
         // ---------------------------------------------------------------------------------------------------------

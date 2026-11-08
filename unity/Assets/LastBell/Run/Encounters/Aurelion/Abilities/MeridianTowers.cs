@@ -140,9 +140,9 @@ namespace LastBell.Run
                 if (t.Posts) t.Posts.Land();
                 t.In.Clear();
                 foreach (var p in W.Players) if (p && !p.Down && hz.Contains(p.transform.position)) t.In.Add(p);
-                if (t.In.Count == 0) { Failed = true; Boss.Wipe("Reunion — nobody came back"); return; }
+                if (t.In.Count == 0) { Failed = true; Boss.Wipe("Reunion — nobody came back", Id); return; }
                 foreach (var p in W.Players)
-                    if (p && !p.Down && !t.In.Contains(p)) p.ReceiveHit(new Hazard { Source = "Reunion", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = p.transform.position, Damage = 50, Knockback = 0, Stun = 15 });
+                    if (p && !p.Down && !t.In.Contains(p)) p.ReceiveHit(new Hazard { Source = "Reunion", AttackId = Id, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = p.transform.position, Damage = 50, Knockback = 0, Stun = 15 });
                 W.BossFx.ChimeResolve(Centre, ReunionR);
             };
             t.H = Spawn(h); if (t.H.Tele != null) { t.H.Tele.Motif(0); t.H.Tele.Friendly(CobaltRim); t.H.Tele.Order = 2; }
@@ -169,13 +169,13 @@ namespace LastBell.Run
             {
                 Failed = true;
                 string which = Towers.Count > 1 && Standing().Count == 1 ? "tower " + Numerals[t.Index] : "a tower";
-                Boss.Wipe($"Total Eclipse — {which} was short ({t.In.Count} of {need})");
+                Boss.Wipe($"Total Eclipse — {which} was short ({t.In.Count} of {need})", Id);
                 return;
             }
             // extras: players beyond the count, the farthest from its centre first
             var extra = t.In.OrderBy(p => Sim.Flat(p.transform.position - t.At).sqrMagnitude).Skip(need).ToList();
             foreach (var p in extra)
-                p.ReceiveHit(new Hazard { Source = Name, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = t.At, Damage = ExtraDamage, Knockback = 0, Stun = 15 });
+                p.ReceiveHit(new Hazard { Source = Name, AttackId = Id, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = t.At, Damage = ExtraDamage, Knockback = 0, Stun = 15 });
             W.BossFx.ChimeResolve(t.At, Radius);
         }
     }

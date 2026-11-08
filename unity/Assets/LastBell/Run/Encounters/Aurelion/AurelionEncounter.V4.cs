@@ -54,14 +54,15 @@ namespace LastBell.Run
         int Party { get { int n = 0; var ps = W.Players; for (int i = 0; i < ps.Count; i++) if (ps[i] && !ps[i].Down) n++; return n; } }
         public readonly List<Hazard> PhasePools = new List<Hazard>();
 
-        public void Wipe(string cause)
+        // attackId: the family icon the death recap shows beside the cause (8 Nov icons); null = the cause text alone (the enrage)
+        public void Wipe(string cause, string attackId = null)
         {
             if (WipeCause != null || Dead) return;
             WipeCause = cause;
             RunHud.Banner(cause.ToUpper(), new Color(1f, 0.45f, 0.38f), 4f);
             // Final Noon (the enrage or Last Light's last slice): the noon sun falls on the arena (8 Nov graphics pass, presentation only)
             if (cause.StartsWith("Final Noon") && W.BossFx) W.BossFx.FinalNoon(Sim.Flat(transform.position), AurelionAbility.Rim);
-            foreach (var p in W.Players) if (p && !p.Down) p.ForceDown(cause);
+            foreach (var p in W.Players) if (p && !p.Down) p.ForceDown(cause, attackId);
         }
         public void RaiseShield(int hp) { ShieldHp = ShieldMax = Mathf.Max(0, hp); }
         protected override int Absorb(int damage)

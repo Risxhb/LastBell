@@ -1,5 +1,5 @@
 {
-  "source": "ability-icons commit 0d0555a (art/mechanic-icons-20261022), approved by Chzy18 2026-10-23; ids, names, tags and shapes from docs/boss-attack-icons/<boss>/manifest.json; this copy carries the Aurelion attacks (5 approved 2026-10-23; errant_planets, falling_meridians and sunspots added 2026-11-07 from Codex work/attack-icons-20261106) (Crucivar and Sylvara icons stay local until those bosses ship; normal Bellkeeper v2 is retired)",
+  "source": "ability-icons commit 0d0555a (art/mechanic-icons-20261022), approved by Chzy18 2026-10-23; ids, names, tags and shapes from docs/boss-attack-icons/<boss>/manifest.json; this copy carries the Aurelion attacks (5 approved 2026-10-23; errant_planets, falling_meridians and sunspots added 2026-11-07 from Codex work/attack-icons-20261106) (zenith_collapse, meridian_towers, total_eclipse, severance, last_light, ecliptic_order, zenith_marks and meridian_recall added 2026-11-08 from Codex work/attack-icons-20261108, done as recommended, review later) (Crucivar and Sylvara icons stay local until those bosses ship; normal Bellkeeper v2 is retired)",
   "attacks": [
     {
       "id": "aurelion.meridian_lances",
@@ -79,6 +79,86 @@
       "tag": "Ground",
       "shape": "Sigils on carriers detonate in turn (3.5 m blast) and leave 3.0 m burning scorch pools; a blast that catches another carrier is a Solar Flare.",
       "icon": "aurelion_sunspots",
+      "aliases": []
+    },
+    {
+      "id": "aurelion.zenith_collapse",
+      "boss": "aurelion",
+      "bossName": "Aurelion",
+      "name": "Zenith Collapse",
+      "tag": "Ground",
+      "shape": "Collapsing outer annulus with an inner shade disc.",
+      "icon": "aurelion_zenith_collapse",
+      "aliases": []
+    },
+    {
+      "id": "aurelion.meridian_towers",
+      "boss": "aurelion",
+      "bossName": "Aurelion",
+      "name": "Meridian Towers",
+      "tag": "Ground",
+      "shape": "Shared circular towers and Reunion soak.",
+      "icon": "aurelion_meridian_towers",
+      "aliases": ["Reunion"]
+    },
+    {
+      "id": "aurelion.total_eclipse",
+      "boss": "aurelion",
+      "bossName": "Aurelion",
+      "name": "Total Eclipse",
+      "tag": "Ground",
+      "shape": "Corona Shield and orbiting light wells against Umbra.",
+      "icon": "aurelion_total_eclipse",
+      "aliases": ["Umbra"]
+    },
+    {
+      "id": "aurelion.severance",
+      "boss": "aurelion",
+      "bossName": "Aurelion",
+      "name": "Severance",
+      "tag": "Ground",
+      "shape": "Day/night side assignments separated by a rotating meridian.",
+      "icon": "aurelion_severance",
+      "aliases": []
+    },
+    {
+      "id": "aurelion.last_light",
+      "boss": "aurelion",
+      "bossName": "Aurelion",
+      "name": "Last Light",
+      "tag": "Ground",
+      "shape": "Permanent falling floor sectors and the last-light fall.",
+      "icon": "aurelion_last_light",
+      "aliases": ["Final Noon"]
+    },
+    {
+      "id": "aurelion.ecliptic_order",
+      "boss": "aurelion",
+      "bossName": "Aurelion",
+      "name": "Ecliptic Order",
+      "tag": "Ground",
+      "shape": "Remembered sequence of safe anchor discs in an arena-wide verdict.",
+      "icon": "aurelion_ecliptic_order",
+      "aliases": []
+    },
+    {
+      "id": "aurelion.zenith_marks",
+      "boss": "aurelion",
+      "bossName": "Aurelion",
+      "name": "Zenith Marks",
+      "tag": "Ground",
+      "shape": "Sun/shade distance marks and their delayed verdicts.",
+      "icon": "aurelion_zenith_marks",
+      "aliases": []
+    },
+    {
+      "id": "aurelion.meridian_recall",
+      "boss": "aurelion",
+      "bossName": "Aurelion",
+      "name": "Meridian Recall",
+      "tag": "Strike",
+      "shape": "Locked replay of the previous crossing Meridian Lances.",
+      "icon": "aurelion_meridian_recall",
       "aliases": []
     }
   ]
