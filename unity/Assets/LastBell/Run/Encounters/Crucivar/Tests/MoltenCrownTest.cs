@@ -22,9 +22,10 @@ namespace LastBell.Run
             t.Check("solo: three towers of one", MoltenCrown.Sets(1).Length == 3 && MoltenCrown.Sets(1).All(s => s.SequenceEqual(new[] { 1 })));
 
             t.Begin(crown.Run());
-            float s = 0; bool sawB = false;
+            float s = 0; bool sawB = false; float over = float.MinValue, reach = 0;
             while (s < 21f && t.Boss.TestBusy)
             {
+                foreach (var fx in Object.FindObjectsByType<MouldPressFx>(FindObjectsSortMode.None)) { over = Mathf.Max(over, fx.FillOverhang()); reach = Mathf.Max(reach, fx.FillReach()); }
                 foreach (var p in t.Party) if (p.Hp < 60) p.DebugSetHp(PlayerController.MaxHp);
                 // stand the party in the soonest set's towers, two each
                 var set = crown.Towers.Where(x => x.H.Age < x.H.ResolveAt).GroupBy(x => x.Set).OrderBy(g => g.Min(x => x.H.ResolveAt - x.H.Age)).FirstOrDefault();
@@ -55,6 +56,7 @@ namespace LastBell.Run
                 $"crowns {crown.Crowns}, edge {crown.Edge}");
             var quake = t.Spawned("Anvil Quake I").LastOrDefault();
             t.Check("heat: after one crown, Anvil Quake hits for 40 x 1.15", quake != null && quake.H.Damage == Mathf.RoundToInt(40 * 1.15f), quake == null ? "no quake" : $"{quake.H.Damage}");
+            t.Check("the rising mould fill grows to its soak circle and never past it (8 Nov playtest)", over <= 0.001f && reach >= 0.95f, $"overhang {over:0.00} m, reach {reach:0.00} of the radius");
             t.Check("one hit per instance", t.OneHitPerInstance());
             yield return t.Shot("v4_molten_crown");
 

@@ -128,7 +128,9 @@ namespace LastBell.Run
             {
                 var h = t.H;
                 float k = t.Dim ? 0 : Mathf.Clamp01((float)h.Age / Mathf.Max(1, h.ResolveAt));
-                float d = 2 * h.Radius * 0.9f * Mathf.Max(0.05f, k);
+                // the fill grows to exactly the soak radius and never past it (8 Nov playtest: it outgrew the circle, because
+                // the built-in cylinder is wider than the 1 m the old scale assumed); sized from the mesh's own bounds
+                float d = FillScale(h.Radius * Mathf.Max(0.05f, k));
                 t.Fill.localScale = new Vector3(d, 0.02f + 0.06f * k, d);
                 t.Inside = 0;
                 foreach (var p in w.Players) if (!p.Down && h.Hits(p)) t.Inside++;
@@ -145,6 +147,13 @@ namespace LastBell.Run
             }
         }
 
+        // the fill's world radius for a given scale: the mesh's own half width times the scale
+        public static float FillRadius(float scale) => (cylMesh != null ? cylMesh.bounds.extents.x : 0.5f) * scale;
+        public static float FillScale(float radius) => radius / (cylMesh != null ? Mathf.Max(0.01f, cylMesh.bounds.extents.x) : 0.5f);
+        // for the test: how far past its soak circle any fill reaches now (<= 0: inside), and the fullest fill / radius
+        public float FillOverhang() { float o = float.MinValue; foreach (var t in towers) o = Mathf.Max(o, FillRadius(t.Fill.localScale.x) - t.H.Radius); return o; }
+        public float FillReach() { float r = 0; foreach (var t in towers) r = Mathf.Max(r, FillRadius(t.Fill.localScale.x) / t.H.Radius); return r; }
+
         static bool Contains(IReadOnlyList<Hazard> live, Hazard h) { for (int i = 0; i < live.Count; i++) if (live[i] == h) return true; return false; }
 
         void OnGUI()
@@ -158,11 +167,7 @@ namespace LastBell.Run
                 var c = new Vector2(sp.x, Screen.height - sp.y);
                 float a = t.Dim ? 0.4f : 1f;
                 var rect = new Rect(c.x - 50, c.y - 44, 100, 80);
-                string label = HideCounts ? "?" : t.H.ShareCount.ToString();
-                numStyle.normal.textColor = InkShadow * new Color(1, 1, 1, a);
-                GUI.Label(new Rect(rect.x + 3, rect.y + 3, rect.width, rect.height), label, numStyle);
-                numStyle.normal.textColor = new Color(Ivory.r, Ivory.g, Ivory.b, a);
-                GUI.Label(rect, label, numStyle);
+                Numeral(rect, HideCounts ? "?" : t.H.ShareCount.ToString(), a);
                 // one slot per needed player: thin ivory tick when filled, dark when empty
                 int slots = HideCounts ? t.Inside : Mathf.Max(t.H.ShareCount, t.Inside);
                 float x0 = c.x - (slots * 18 - 6) / 2f;
@@ -175,6 +180,15 @@ namespace LastBell.Run
                     GUI.color = old;
                 }
             }
+        }
+
+        static void Numeral(Rect rect, string label, float alpha)
+        {
+            if (alpha <= 0.01f) return;
+            numStyle.normal.textColor = InkShadow * new Color(1, 1, 1, alpha);
+            GUI.Label(new Rect(rect.x + 3, rect.y + 3, rect.width, rect.height), label, numStyle);
+            numStyle.normal.textColor = new Color(Ivory.r, Ivory.g, Ivory.b, alpha);
+            GUI.Label(rect, label, numStyle);
         }
 
         // a struck-bell partial stack, made once (no audio assets in the project yet)
