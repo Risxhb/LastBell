@@ -1304,6 +1304,9 @@ namespace LastBell.Run
         const float SprintReserve = 25f;   // stamina above the dash cost that a sprint for less than a hit may not spend
         static readonly List<BulletSystem.Bullet> near = new List<BulletSystem.Bullet>();
         static readonly List<(Vector3 pos, float aim, float next)> volleys = new List<(Vector3, float, float)>();
+        static int swapMine; static bool swapBoth; static float swapAt;
+        const float SwapSlack = 0.15f;   // s either side of the swap where both colours count
+        static readonly List<(Vector3 at, float r0, float land, bool twice)> pods = new List<(Vector3, float, float, bool)>();
         static readonly Vector3[] dirs = MakeDirs();
         static Vector3[] MakeDirs() { var d = new Vector3[16]; for (int i = 0; i < 16; i++) d[i] = Sim.Dir(i * 22.5f); return d; }
 
@@ -1319,6 +1322,9 @@ namespace LastBell.Run
             int mine = w.Bullets.ColourOf != null ? w.Bullets.ColourOf(me) : 0;
             // its ring flickers before a toll swaps colours (the same warning a player sees): both colours count until the swap
             bool both = w.Boss is SylvaraEncounter sy && sy.SwapWarned(me);
+            // ...but each only on its side of the swap: both colours for the whole look left no clean move in the lanes
+            // (8 Nov Phase 2 runs: about half the Brass/Cobalt Lane hits came during the warning, plans at 300-700)
+            swapMine = mine; swapBoth = both; swapAt = both ? ((SylvaraEncounter)w.Boss).SwapIn : 0;
             // bullets that can reach anywhere it could be within the horizon
             near.Clear();
             float reach = PlayerController.SprintSpeed * Horizon + 1.2f;
@@ -1335,6 +1341,20 @@ namespace LastBell.Run
             {
                 sb.BudVolleys(volleys);
                 for (int i = volleys.Count - 1; i >= 0; i--) if (Sim.Flat(volleys[i].pos - pos).magnitude > reach + SylvaraEncounter.BudFrom + 1f) volleys.RemoveAt(i);
+            }
+            // Seed and Feet Pods landing within the horizon: their petal rings start just inside the circle, so a bot standing
+            // just outside it is hit as they appear (8 Nov full run: Pod Petal ended two Sylvara tries, at 46 % and 1 %)
+            pods.Clear();
+            if (w.Boss is SylvaraEncounter sp)
+            {
+                bool doubled = sp.PodDoubledIn(sp.PhaseNumber);
+                foreach (var h in w.Hazards.Live)
+                {
+                    if ((h.Source != "Seed Pod" && h.Source != "Feet Pod") || h.Origin.sqrMagnitude < 0.01f) continue;
+                    float land = (h.ResolveAt - h.Age) * Sim.Dt;
+                    if (land < -0.05f || land > Horizon || Sim.Flat(h.Origin - pos).magnitude > reach + h.Radius + 1f) continue;
+                    pods.Add((Sim.Flat(h.Origin), h.Radius - SylvaraEncounter.PodInset, land, doubled));
+                }
             }
             sprint = false; dash = false;
             var best = Vector3.zero; bestCost = Cost(me, pos, Vector3.zero, 0, home, boss, bud, budReach);
@@ -1393,6 +1413,7 @@ namespace LastBell.Run
                 float early = 1.5f - t / Horizon;   // hits sooner are worse: there is less time to fix them later
                 foreach (var b in near)
                 {
+                    if (swapBoth && b.Colour != 0 && (b.Colour == swapMine ? t > swapAt + SwapSlack : t < swapAt - SwapSlack)) continue;
                     float fuse = b.Split != null ? b.Life - b.Age : float.MaxValue;
                     if (t <= fuse)
                     {
@@ -1438,6 +1459,16 @@ namespace LastBell.Run
                             float gap = Sim.Flat(q - (vl.pos + new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * r)).magnitude - (BulletArt.PetalHitRadius + Hazard.Margin + Buffer);
                             if (gap < 0) cost += 100 * early; else if (gap < 0.6f) cost += (0.6f - gap) * 4;
                         }
+                    }
+                // pod rings not fired yet (12 petals 30° apart: scored as a solid ring for their first 0.6 s, then they are
+                // bullets it can see)
+                foreach (var pd in pods)
+                    for (int ring = 0; ring < (pd.twice ? 2 : 1); ring++)
+                    {
+                        float since = t - pd.land - ring * SylvaraEncounter.PodSecondAfter;
+                        if (since < 0 || since >= 0.6f) continue;
+                        float gap = Mathf.Abs(Sim.Flat(q - pd.at).magnitude - (pd.r0 + SylvaraEncounter.PodPetalSpeed * since)) - (BulletArt.PetalHitRadius + Hazard.Margin + Buffer);
+                        if (gap < 0) cost += 100 * early; else if (gap < 0.6f) cost += (0.6f - gap) * 4;
                     }
             }
             // telegraphs that land within the horizon (plus a little) where it ends up

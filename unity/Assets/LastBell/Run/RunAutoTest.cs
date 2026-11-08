@@ -750,7 +750,9 @@ namespace LastBell.Run
             bool was = AllyBot.Attacks; AllyBot.Attacks = true; int keep = RunParty.Selected;
             var keepLevel = RunDifficulty.Selected;
             // Hard: Tollbreaker solo plus one party of 4 (test less, 1 Nov: the levels only scale damage)
-            var runs = new (string cls, int allies, Difficulty level)[] { ("Tollbreaker", 0, Difficulty.Hard), ("Tollbreaker", 3, Difficulty.Hard) };
+            // (-lastbellSylvaraClearMedium: the same runs on Medium, the bots' baseline)
+            var lvl = Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellSylvaraClearMedium", StringComparison.OrdinalIgnoreCase)) ? Difficulty.Medium : Difficulty.Hard;
+            var runs = new (string cls, int allies, Difficulty level)[] { ("Tollbreaker", 0, lvl), ("Tollbreaker", 3, lvl) };
             // -lastbellSylvaraClearPhase n starts each run in phase n (practice Start Phase row); -lastbellSylvaraClearRepeat k runs the set k times
             int startPhase = int.TryParse(AurelionArgs.Arg("-lastbellSylvaraClearPhase"), out var sp) ? Mathf.Clamp(sp, 1, 4) : 1;
             int repeats = int.TryParse(AurelionArgs.Arg("-lastbellSylvaraClearRepeat"), out var nr) ? Mathf.Clamp(nr, 1, 10) : 1;
@@ -773,7 +775,7 @@ namespace LastBell.Run
                 // hits per Hard addition (6 Nov): bullets and hazards made by one carry its name; the rest are "base". A down counts
                 // for the last hit before it. PlayerHit fires first for a bullet hit, then Bullets.Hit names its bullet.
                 var hitLog = new Dictionary<string, int[]>(); var lastKey = new Dictionary<PlayerController, string>();
-                PlayerController pendP = null; string pendKey = null; int pendDmg = 0, burstWhy = 0, budWhy = 0;
+                PlayerController pendP = null; string pendKey = null; int pendDmg = 0, burstWhy = 0; var whyBy = new Dictionary<string, int>();
                 void Count(string key, int n, int dmg) { if (!hitLog.TryGetValue(key, out var c)) hitLog[key] = c = new int[3]; c[0] += n; c[1] += dmg; }
                 Action<PlayerController, Hazard, int> onHaz = (p, h, dmg) =>
                 {
@@ -787,10 +789,12 @@ namespace LastBell.Run
                     if (b.Source == "Seed Burst" && burstWhy++ < 12)
                         Note($"  burst hit @{(w.Tick - tick0) / (float)Sim.Hz:0.0}s {p.ClassName} hp {p.Hp} stamina {p.Stamina:0} petal age {b.Age:0.00} from her {Sim.Flat(p.transform.position - sy.transform.position).magnitude:0.00} replan {ReplanCost(p):0.0} | {(p.Input as AllyBot)?.DebugLine}");
                     // the same for Bud Petal (Hollow Bloom wipes): how far from the nearest bud, and the plan
-                    if (b.Source == "Bud Petal" && budWhy++ < 12)
+                    if ((b.Source == "Bud Petal" || b.Source == "Pod Petal" || b.Source.EndsWith(" Lane")) && (whyBy.TryGetValue(b.Source, out var nw) ? nw : 0) < 10)
                     {
+                        whyBy[b.Source] = nw + 1;
+                        bool swap = sy.SwapWarned(p); int mine = w.Bullets.ColourOf != null ? w.Bullets.ColourOf(p) : 0;
                         float nb = 99; foreach (var bq in sy.AliveBudPositions()) nb = Mathf.Min(nb, Sim.Flat(p.transform.position - bq).magnitude);
-                        Note($"  bud hit @{(w.Tick - tick0) / (float)Sim.Hz:0.0}s {p.ClassName} hp {p.Hp} stamina {p.Stamina:0} petal age {b.Age:0.00} bud {nb:0.0} m replan {ReplanCost(p):0.0} | {(p.Input as AllyBot)?.DebugLine}");
+                        Note($"  {b.Source} hit @{(w.Tick - tick0) / (float)Sim.Hz:0.0}s {p.ClassName} colour {b.Colour}/{mine}{(swap ? " swap" : "")} hp {p.Hp} stamina {p.Stamina:0} petal age {b.Age:0.00} bud {nb:0.0} m replan {ReplanCost(p):0.0} | {(p.Input as AllyBot)?.DebugLine}");
                     }
                     float ReplanCost(PlayerController pl) { var pp = Sim.Flat(pl.transform.position); SylvaraSteer.Choose(pl, pp, pp, out _, out _, out float c); return c; }
                     if (pendP != p || pendKey == null || b.Tag == null) { pendP = null; return; }

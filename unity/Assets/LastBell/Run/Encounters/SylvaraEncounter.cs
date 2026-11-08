@@ -347,7 +347,7 @@ namespace LastBell.Run
                     if (ChoirPods) At(16.5f, "Choir Pods", () => PodsOnFar());   // Hard (5 Nov): lands at 19 s, before the 20 s toll
                     foreach (float t in W.Players.Count == 1 ? new[] { 4f, 8, 12, 16, 20 } : new[] { 5f, 10, 15, 20 })
                     {
-                        At(t - 1, "Toll", () => { Toll("TOLL: every colour swaps"); WarnSwap(); });
+                        At(t - SwapWarnFor, "Toll", () => { Toll("TOLL: every colour swaps"); WarnSwap(); });
                         At(t, null, SwapColours);
                         At(t + 0.02f, null, () => { TollBurst(); if (DoubleToll) Later(0.5f, TollBurst); });   // Hard: double toll
                     }
@@ -478,6 +478,8 @@ namespace LastBell.Run
 
         // Seed Pod: a 2.5 m circle on the target, tracking 0.6 s, lands at 2.5 s, then 12 petals; doubled = a second ring
         // 0.6 s later rotated half a step into the first ring's gaps. Phase 1 pods: every one doubled on Hard, 3.0 s on Easy.
+        // its petals start PodInset inside the circle at PodPetalSpeed m/s; a doubled pod fires its second ring PodSecondAfter s later
+        public const float PodInset = 0.3f, PodPetalSpeed = 5.5f, PodSecondAfter = 0.6f;
         void Pod(PlayerController target, Vector3 at, float r = 2.5f, bool doubled = false)
         {
             const int n = 12; float off = Rnd(0, Tau);
@@ -492,9 +494,9 @@ namespace LastBell.Run
             h.OnResolve = hz =>
             {
                 W.BossFx.ChimeResolve(hz.Origin, hz.Radius); Release(0.5f);
-                float r0 = Mathf.Max(r - 0.3f, hz.Origin.sqrMagnitude < 0.01f ? Rim : 0);
-                PetalRing(hz.Origin, n, 5.5f, off, r0, 12, "Pod Petal");
-                if (doubled) { var o = hz.Origin; Later(0.6f, () => PetalRing(o, n, 5.5f, off + Mathf.PI / n, r0, 12, "Pod Petal")); }
+                float r0 = Mathf.Max(r - PodInset, hz.Origin.sqrMagnitude < 0.01f ? Rim : 0);
+                PetalRing(hz.Origin, n, PodPetalSpeed, off, r0, 12, "Pod Petal");
+                if (doubled) { var o = hz.Origin; Later(PodSecondAfter, () => PetalRing(o, n, PodPetalSpeed, off + Mathf.PI / n, r0, 12, "Pod Petal")); }
             };
             // the pod model drops onto the warning in its last 0.4 s and lands on the resolve (proposal art)
             var pv = SylvaraProps.Spawn(SylvaraProps.Pod, transform.parent, h.Origin, LookRnd(0, 360));
@@ -628,7 +630,11 @@ namespace LastBell.Run
             colour.Clear();
             for (int i = 0; i < W.Players.Count; i++) colour[W.Players[i]] = i % 2 == 0 ? Brass : Cobalt;
         }
-        void WarnSwap() { swapWarned.Clear(); foreach (var p in W.Players) swapWarned.Add(p); }
+        void WarnSwap() { swapWarned.Clear(); foreach (var p in W.Players) swapWarned.Add(p); swapDue = W.Tick + Sim.Ticks(SwapWarnFor); }
+        public const float SwapWarnFor = 1f;   // the toll warns this long before the swap (At(t - 1) / At(t) above)
+        int swapDue;
+        // seconds until a warned swap lands (bots: their own colour hurts until then, the other one after)
+        public float SwapIn => Mathf.Max(0, (swapDue - W.Tick) * Sim.Dt);
         void SwapColours()
         {
             swapWarned.Clear();
