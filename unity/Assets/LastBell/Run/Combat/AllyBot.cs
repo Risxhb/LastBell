@@ -536,6 +536,8 @@ namespace LastBell.Run
             // re-plan every 3 ticks: the home and escape search below only feed the plan, so they run with it (same choices). Run
             // every tick, NearestClear (up to 28 m x 48 ways, each a full hazard test)
             // cost ~8.5 ms a frame early in Phase 3 with 75-142 hazards live (perf run, dc77bd8, 8 Nov)
+            // not staggered by slot: plans on the bot's own tick of three lost Phase 3 in the Hard sweep (8% -> 45% boss HP left,
+            // 8 Nov), as the bots' plans then react to bullets a tick apart; all 4 on one tick is the 8-9 ms bot-run peak
             if (!volOn || me.World.Tick - volTick >= 3 || me.Stunned > 0)
             {
                 volTick = me.World.Tick; volOn = true;
