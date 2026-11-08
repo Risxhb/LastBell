@@ -34,7 +34,9 @@ namespace LastBell.Run.Presentation
         public static float DefeatSeconds => Instance && Instance.defeatAt >= 0 ? Time.unscaledTime - Instance.defeatAt : -1;
         public static float Flash { get; private set; }
         // card strings, built once per intro or defeat (RunHud draws them every frame without building text)
-        public static string IntroRoleSpaced { get; private set; } = "", IntroEpithet { get; private set; }, FightTimeLine { get; private set; } = "";
+        public static string IntroRoleSpaced { get; private set; } = "";
+        public static string IntroEpithet { get; private set; }
+        public static string FightTimeLine { get; private set; } = "";
         public static readonly string DefeatedSpaced = UiTheme.Spaced("Defeated");
         public static int Intros, Defeats;
         public static BossMoments Instance { get; private set; }
