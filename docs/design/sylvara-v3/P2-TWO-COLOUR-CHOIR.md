@@ -22,12 +22,12 @@
 | each toll | **Toll** | everyone's colour swaps: a 1 s warning (your ring blinks the next colour), then a **Toll Burst** of 20 petals at 5 m/s from her rim, alternating colours | 1 s | 12 | point-blank | the ring reaches the wall |
 
 - **Tolls:** 5, 10, 15 and 20 s in groups; 4, 8, 12, 16 and 20 s solo.
-- **Peak density:** about 470 bullets at once in the demo, at 1, 4 and 8 players.
+- **Peak density:** about 470 bullets at once in the demo, at 1 and 4 players.
 - **Always a route:** each colour has lanes in only one direction at a time, so there's always a column between your colour's lanes. Your colour's arms pass through that column, so you weave along it.
 
 ## Players
 - **Solo:** your colour swaps every 4 s instead of 5, so there's one more toll burst. Everything else is the same.
-- **Group:** half the party is brass and half cobalt. At 8 players, four bodies share each colour's safe columns. Toll swaps flip which columns are safe for everyone at the same moment.
+- **Group:** half the party is brass and half cobalt. At 4 players, two bodies share each colour's safe columns. Toll swaps flip which columns are safe for everyone at the same moment.
 
 ## Settled for this phase (dated)
 - **28 Oct:** Phase 2 is the Two-Colour Choir (option B). Chzy18 picked it over Choir Buds, Seed Relay and Hush and Chorus.
