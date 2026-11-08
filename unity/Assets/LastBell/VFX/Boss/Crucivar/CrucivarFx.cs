@@ -56,6 +56,32 @@ namespace LastBell.VFX
             CameraShake.Shake(0.1f, 0.15f);
         }
 
+        // Molten Overflow (an empty Mould Tower: the party wipes): the mould bursts, a molten wave runs out from it over the
+        // whole floor, then cools; sparks along the wave front and a heavy shake. Graphics audit 8 Nov: it had no effect.
+        public void MoltenOverflow(Vector3 from, float radius)
+        {
+            if (NetCrucivarOn) NetCrucivar("MoltenOverflow", from, radius);
+            var c = new Vector3(from.x, 0.05f, from.z);
+            SlagSplashFx(c, 2.6f);
+            float reach = radius + new Vector2(from.x, from.z).magnitude;   // from the tower to the far wall
+            Play(cylinder, false, addMat, c, 0, 1.1f, (b, u) =>
+            {
+                float r = reach * Ease(Mathf.Clamp01(u / 0.7f)); b.go.transform.localScale = new Vector3(Mathf.Max(0.1f, r), 0.35f * (1 - u), Mathf.Max(0.1f, r));
+                b.mpb.SetFloat(PDissolve, Mathf.Clamp01((u - 0.45f) / 0.55f)); b.mpb.SetFloat(PIntensity, 1.1f);
+            }, 2, Slag, Molten, Amber);
+            Play(FxMeshes.Annulus(0, 1f), true, alphaMat, c, 0, 1.4f, (b, u) =>
+            {
+                float r = reach * Ease(Mathf.Clamp01(u / 0.7f)); b.go.transform.localScale = new Vector3(r, 1, r);
+                b.mpb.SetFloat(PProgress, 1.1f); b.mpb.SetFloat(PWidth, 1f); b.mpb.SetFloat(PTail, 0.5f); b.mpb.SetFloat(PDissolve, Mathf.Clamp01((u - 0.5f) / 0.5f));
+            }, 0, Slag, Molten, Amber);
+            for (int k = 0; k < 16; k++)
+            {
+                var d = Quaternion.Euler(0, k * 22.5f, 0) * Vector3.forward;
+                Sparks(c + d * 2.4f + Vector3.up * 0.3f, d * 0.8f + Vector3.up, 6, 0.8f, 7, 0.2f, 0.6f);
+            }
+            CameraShake.Shake(0.55f, 0.55f);
+        }
+
         // a die-stamp strip presses down (the Casting Order pours), then the stamped metal cools (the strip is safe right after).
         public void StripStamp(Vector3 origin, float yaw, float length, float width)
         {

@@ -280,6 +280,7 @@ namespace LastBell.Run
                     fx.FlameJet(NetV(a[0]), NetF(a[1]), NetF(a[2]), NetF(a[3])); fx.FlameJet(NetV(a[0]), NetF(a[1]), NetF(a[2]), NetF(a[3])); break;
                 case "CrucivarFx.RimFlood": if (fx == null || a.Length < 2) return false; fx.RimFlood(NetF(a[0]), NetF(a[1])); break;
                 case "CrucivarFx.Eruption": if (fx == null || a.Length < 1) return false; fx.Eruption(NetF(a[0])); break;
+                case "CrucivarFx.MoltenOverflow": if (fx == null || a.Length < 2) return false; fx.MoltenOverflow(NetV(a[0]), NetF(a[1])); break;
                 case "CrucivarFx.InhaleChevrons": if (fx == null || a.Length < 3) return false; fx.InhaleChevrons(NetV(a[0]), NetF(a[1]), NetF(a[2])); break;
                 case "CrucivarFx.BellowsBlast": if (fx == null || a.Length < 2) return false; fx.BellowsBlast(NetV(a[0]), NetF(a[1])); break;
                 case "CrucivarRig.Pour": if (!rig || a.Length < 1) return false; rig.Pour(NetB(a[0])); break;
