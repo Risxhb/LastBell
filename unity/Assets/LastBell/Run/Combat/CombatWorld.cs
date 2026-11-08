@@ -50,7 +50,7 @@ namespace LastBell.Run
         public int Tick { get; private set; }
         public bool CombatActive;                  // abilities, boss scripts and hazards only run while true
         public Difficulty Difficulty = Difficulty.Medium;   // fixed for the run (RunDirector); bosses may author per level
-        public float DamageTakenScale => RunDifficulty.DamageTakenScale(Difficulty);
+        public float DamageTakenScale => Boss != null ? Boss.PlayerDamageScale(Difficulty) : RunDifficulty.DamageTakenScale(Difficulty);
 
         // statistics for the results screen
         public int DamageDealt, DamageTaken;
@@ -70,6 +70,11 @@ namespace LastBell.Run
 
         public event Action<PlayerController, Hazard, int> PlayerHit;   // tests and HUD listen
 
+        // Damage attribution: the player whose step (or projectile) is dealing damage right now, and the damage each player
+        // has dealt in this world.
+        public PlayerController Actor { get; internal set; }
+        public readonly Dictionary<PlayerController, int> DealtBy = new Dictionary<PlayerController, int>();
+
         // The effect layers are created once by the director and reset between runs (re-creating them crashed the
         // player natively in Mesh.set_colors on retry, see handoff).
         public CombatWorld(Transform root, BellkeeperFx bossFx, PlayerFx fx)
@@ -82,15 +87,46 @@ namespace LastBell.Run
             Bullets = new BulletSystem(this) { Bound = PlayerBound + 0.6f };
         }
 
+        // profiler scopes (perf agent, 2 Nov): one per part of the combat tick
+        static readonly Unity.Profiling.ProfilerMarker PmPlayers = new Unity.Profiling.ProfilerMarker("LastBell.World.Players"),
+            PmBoss = new Unity.Profiling.ProfilerMarker("LastBell.World.Boss"), PmProjectiles = new Unity.Profiling.ProfilerMarker("LastBell.World.Projectiles"),
+            PmHazards = new Unity.Profiling.ProfilerMarker("LastBell.World.Hazards");
+
         public void Step()
         {
             Tick++;
-            foreach (var p in Players) p.Step();
+            using (PmPlayers.Auto()) { foreach (var p in Players) { Actor = p; p.Step(); } Actor = null; }
             if (!CombatActive) return;
-            if (Boss != null && !Boss.Dead) Boss.Step();
-            Projectiles.Step();
+            StepRevives();
+            using (PmBoss.Auto()) if (Boss != null && !Boss.Dead) Boss.Step();
+            using (PmProjectiles.Auto()) Projectiles.Step();
             Bullets.Step();
-            Hazards.Step();
+            using (PmHazards.Auto()) Hazards.Step();
+        }
+
+        // Revives (PlayerController): each downed player's revive fills while any standing ally beside them channels (stands
+        // still, free and unhurt), pauses while none does, and starts over when a reviver is hit. Two revivers are no faster.
+        // Only a reviver's hit resets it: one channelling now, or last tick (a hit stops the channel that same tick), not an
+        // ally who is merely nearby fighting (review REV-01, 5 Nov).
+        void StepRevives()
+        {
+            foreach (var p in Players) { p.WasReviving = p.Reviving; p.Reviving = null; }
+            foreach (var d in Players)
+            {
+                if (!d.Down || d.Dead) continue;
+                bool on = false, hurt = false;
+                foreach (var r in Players)
+                {
+                    if (r == d || r.Down || r.Reviving != null) continue;
+                    if (Sim.Flat(r.transform.position - d.transform.position).magnitude > PlayerController.ReviveRange) continue;
+                    bool channels = r.CanChannelRevive;
+                    if (r.LastHurtTick >= Tick - 1 && (channels || r.WasReviving == d)) hurt = true;   // (hazards land after this step: last tick counts)
+                    if (!channels) continue;
+                    r.Reviving = d; on = true;
+                }
+                if (hurt) d.ReviveProgress = 0;
+                else if (on && (d.ReviveProgress += 1f / Sim.Ticks(PlayerController.ReviveSeconds)) >= 0.999f) d.Revive();
+            }
         }
 
         // Clears everything an encounter can leave behind: hazards, projectiles, boss-owned effects. Called at every
@@ -131,13 +167,14 @@ namespace LastBell.Run
                 if (dist > reach + r) return false;
                 return arcDeg >= 360 || dist <= r || Vector3.Angle(forward, to) <= arcDeg / 2 + Mathf.Rad2Deg * Mathf.Atan2(r, dist);
             }
-            var b = Boss; float best = float.MaxValue; BossPart hit = null;
-            bool boss = b != null && b.Solid && In(b.transform.position, b.BodyRadius, out best);
-            if (!boss) best = float.MaxValue;
+            // the nearest body in reach and in the arc: the boss, or an extra body he offers (same bar), or a separate part
+            var b = Boss; float best = float.MaxValue; BossPart hit = null; bool boss = false; Vector3 bc = default; float br = 0;
+            if (b != null && b.Solid)
+                for (int i = 0; i < b.BodyCount; i++) { b.Body(i, out var c, out float r); if (r > 0 && In(c, r, out float dd) && dd < best) { best = dd; boss = true; bc = c; br = r; } }
             foreach (var part in Parts) if (part.Alive && In(part.Pos, part.BodyRadius, out float d) && d < best) { best = d; hit = part; }
             if (hit != null) return DamagePart(hit, damage, hit.Pos - Sim.Flat(hit.Pos - origin).normalized * hit.BodyRadius + Vector3.up * hit.HitHeight, ability);
             if (!boss) return 0;
-            var contact = b.transform.position - Sim.Flat(b.transform.position - origin).normalized * b.BodyRadius + Vector3.up * b.HitHeight;
+            var contact = bc - Sim.Flat(bc - origin).normalized * br + Vector3.up * b.HitHeight;
             return DamageBoss(damage, contact, ability);
         }
 
@@ -151,13 +188,14 @@ namespace LastBell.Run
                 var to = Sim.Flat(pos - origin); along = Vector3.Dot(to, f); float side = (to - f * along).magnitude;
                 return along >= -r && along <= length + r && side <= width / 2 + r;
             }
-            var b = Boss; float best = float.MaxValue; BossPart hit = null;
-            bool boss = b != null && b.Solid && On(b.transform.position, b.BodyRadius, out best);
-            if (!boss) best = float.MaxValue;
+            // the first body along the line: the boss, or an extra body he offers (same bar), or a separate part
+            var b = Boss; float best = float.MaxValue; BossPart hit = null; bool boss = false; float br = 0;
+            if (b != null && b.Solid)
+                for (int i = 0; i < b.BodyCount; i++) { b.Body(i, out var c, out float r); if (r > 0 && On(c, r, out float aa) && aa < best) { best = aa; boss = true; br = r; } }
             foreach (var part in Parts) if (part.Alive && On(part.Pos, part.BodyRadius, out float a) && a < best) { best = a; hit = part; }
             if (hit != null) { contact = origin + f * Mathf.Max(0, best - hit.BodyRadius) + Vector3.up * hit.HitHeight; return DamagePart(hit, damage, contact, ability); }
             if (!boss) return 0;
-            contact = origin + f * Mathf.Max(0, best - b.BodyRadius) + Vector3.up * b.HitHeight;
+            contact = origin + f * Mathf.Max(0, best - br) + Vector3.up * b.HitHeight;
             return DamageBoss(damage, contact, ability, hitFx);
         }
 
@@ -168,6 +206,7 @@ namespace LastBell.Run
             int dealt = b.TakeHit(damage, contact, hitFx);
             Shop.ItemHooks.Dealt(this, ability, dealt);
             DamageDealt += dealt;
+            if (Actor != null && dealt > 0) { DealtBy.TryGetValue(Actor, out int had); DealtBy[Actor] = had + dealt; }
             if (dealt > 0) { Add(RunMeter, ability, dealt); Add(EncounterMeter, ability, dealt); }
             return dealt;
         }
@@ -177,6 +216,7 @@ namespace LastBell.Run
             if (part == null || !part.Alive || damage <= 0 || part.TakeHit == null) return 0;
             int dealt = part.TakeHit(damage, contact);
             DamageDealt += dealt;
+            if (Actor != null && dealt > 0) { DealtBy.TryGetValue(Actor, out int had); DealtBy[Actor] = had + dealt; }
             if (dealt > 0) { Add(RunMeter, ability, dealt); Add(EncounterMeter, ability, dealt); }
             return dealt;
         }
@@ -202,14 +242,16 @@ namespace LastBell.Run
             }
             var b = Boss;
             if (b != null && b.Solid)
-            {
-                var d = Sim.Flat(pos - b.transform.position); float min = b.BodyRadius + bodyRadius;
-                if (d.magnitude < min)
+                for (int i = 0; i < b.BodyCount; i++)   // the boss's body and any extra bodies are solid
                 {
-                    var n = d.sqrMagnitude > 1e-4f ? d.normalized : -b.transform.forward;
-                    var p = b.transform.position + n * min; pos.x = p.x; pos.z = p.z;
+                    b.Body(i, out var c, out float r); if (r <= 0) continue;
+                    var d = Sim.Flat(pos - c); float min = r + bodyRadius;
+                    if (d.magnitude < min)
+                    {
+                        var n = d.sqrMagnitude > 1e-4f ? d.normalized : -b.transform.forward;
+                        var p = c + n * min; pos.x = p.x; pos.z = p.z;
+                    }
                 }
-            }
             return pos;
         }
     }
@@ -220,6 +262,8 @@ namespace LastBell.Run
         public string Name = "part";
         public Vector3 Pos; public float BodyRadius = 1f, HitHeight = 1f;
         public bool Alive = true;
+        public float Hp, MaxHp;                   // read-only for bots and HUD; the encounter keeps them current (0 if unused)
+        public int Order = -1;                    // kill order where the encounter has one (Foundry castings: numeral, 0 first), else -1
         public Func<int, Vector3, int> TakeHit;   // returns the damage dealt
         public Action<BossPart> OnCleared;        // encounter end / transition: remove its look
     }
@@ -233,6 +277,7 @@ namespace LastBell.Run
             public readonly int NetworkId = ++nextNetworkId; // presentation identity only; combat rules are unchanged
             public Vector3 Pos, Vel; public float Range, Travelled, Radius; public int Damage; public string Ability;
             public Action<int, Vector3> OnHit; public Color Color;
+            public PlayerController Owner;   // who fired it (damage attribution); Fire fills it from the world's Actor
             // optional: turn toward the boss by up to Homing degrees per tick, after HomingDelay ticks of straight flight
             public float Homing; public int HomingDelay, Age;
             // optional custom presentation (Arcanist): OnMove replaces the shared head each tick, OnEnd(hit, at) replaces
@@ -245,7 +290,7 @@ namespace LastBell.Run
         public IReadOnlyList<Projectile> Live => live;
         public ProjectileSystem(CombatWorld world) { w = world; }
 
-        public void Fire(Projectile p) { live.Add(p); }
+        public void Fire(Projectile p) { if (p.Owner == null) p.Owner = w.Actor; live.Add(p); }
 
         // Steps a snapshot: a killing blow runs BossEncounter.Die -> ClearTransient -> ClearAll, which empties live (and
         // cancels pending hazards on the same tick) mid-loop. A projectile leaves live before its hit is dispatched, and
@@ -277,11 +322,16 @@ namespace LastBell.Run
                     p.OnHit?.Invoke(dealt, contact);
                     continue;
                 }
-                if (b != null && b.Solid && Sim.Flat(p.Pos - b.transform.position).magnitude <= b.BodyRadius + p.Radius)
+                int hitBody = -1; Vector3 hc = default; float hr = 0;
+                if (b != null && b.Solid)
+                    for (int bi = 0; bi < b.BodyCount && hitBody < 0; bi++) { b.Body(bi, out hc, out hr); if (hr > 0 && Sim.Flat(p.Pos - hc).magnitude <= hr + p.Radius) hitBody = bi; }
+                if (hitBody >= 0)
                 {
-                    var contact = b.transform.position + Sim.Flat(p.Pos - b.transform.position).normalized * b.BodyRadius + Vector3.up * b.HitHeight;
+                    var contact = hc + Sim.Flat(p.Pos - hc).normalized * hr + Vector3.up * b.HitHeight;
                     live.Remove(p);
+                    w.Actor = p.Owner;
                     int dealt = w.DamageBoss(p.Damage, contact, p.Ability, p.OnEnd == null);   // custom projectiles draw their own impact
+                    w.Actor = null;
                     if (p.OnEnd != null) { Networking.LanFx.Projectile(p, "End", true, contact); p.OnEnd(p, true, contact); } else w.Fx.NoteImpact(contact, p.Color);
                     p.OnHit?.Invoke(dealt, contact);
                     continue;

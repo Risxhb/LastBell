@@ -54,6 +54,8 @@ namespace LastBell.Run
         public void Glow(float k) => Windup(k);
         public void Flare(float f = 1) => Release(f);
         public void PlayClip(string name, int ticks) => Clip(name, ticks);
+        // the passive Phase 2-3 gestures (planets, falling circles) never cut off an attack wind-up
+        public void PlayClipIfIdle(string name, int ticks) { if (presenter && !presenter.Busy) Clip(name, ticks); }
         public Hazard Track(Hazard h) => h;
         public int HorizonFor() => W.Difficulty == Difficulty.Hard ? HorizonTicksHard : HorizonTicks;
         // the block log (test evidence): (phase, block name, world tick)
@@ -82,6 +84,7 @@ namespace LastBell.Run
         IEnumerable<int> Block(string name, IEnumerable<int> body)
         {
             Blocks++; BlockLog.Add((phase, name, W.Tick));
+            AurelionTimeline.Note($"phase {phase} block {name}");
             foreach (var w in body) yield return w;
         }
         IEnumerable<int> V2Gap(float s)

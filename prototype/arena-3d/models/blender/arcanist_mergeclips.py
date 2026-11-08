@@ -5,6 +5,7 @@
 # (4-byte aligned). Channels target the original joint nodes by name, every joint gets translation / rotation / scale
 # like the exporter's clips; rotations are LINEAR per frame, constant channels are 2-key STEP (as the exporter writes
 # them). Always merge into the original (pre-merge) GLB: clips whose names already exist are refused.
+# 'append' (4th argument) adds further clips to an already-merged GLB instead, as long as no new name exists there yet.
 # Keys start at t = 0 (the exporter's clips start at 1/30), so normalised clip time equals the authored t.
 import json, struct, sys, numpy as np
 ORIGINAL = {'AnchorReturn', 'ArcLance', 'Clockbolt', 'Clockbolt2', 'Convergence', 'Dodge', 'Idle', 'Jump', 'Run', 'Sprint',
@@ -22,10 +23,12 @@ def write_glb(p, J, B):
     B = bytes(B) + b'\0' * (-len(B) % 4)
     out = struct.pack('<III', 0x46546C67, 2, 12 + 8 + len(js) + 8 + len(B)) + struct.pack('<II', len(js), 0x4E4F534A) + js + struct.pack('<II', len(B), 0x004E4942) + B
     open(p, 'wb').write(out)
-def merge(src, clips_path, dst):
+def merge(src, clips_path, dst, append=False):
     J, B = read_glb(src); clips = json.load(open(clips_path))
     names = {a['name'] for a in J['animations']}
-    if names != ORIGINAL: raise SystemExit(f'not the original clip set: {sorted(names - ORIGINAL)}')
+    if append:
+        if not ORIGINAL <= names or names & set(clips): raise SystemExit(f'cannot append: {sorted(names & set(clips))} already there')
+    elif names != ORIGINAL: raise SystemExit(f'not the original clip set: {sorted(names - ORIGINAL)}')
     nid = {n['name']: i for i, n in enumerate(J['nodes'])}
     joints = [J['nodes'][j]['name'] for j in J['skins'][0]['joints']]
     def add(arr, typ, minmax=False):
@@ -57,5 +60,5 @@ def merge(src, clips_path, dst):
     J['buffers'][0]['byteLength'] = len(B) + (-len(B) % 4)
     write_glb(dst, J, B)
 if __name__ == '__main__':
-    merge(*sys.argv[1:4])
+    merge(*sys.argv[1:4], append=len(sys.argv) > 4 and sys.argv[4] == 'append')
     print('MERGED', sys.argv[3])

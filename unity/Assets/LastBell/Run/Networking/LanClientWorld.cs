@@ -38,7 +38,7 @@ namespace LastBell.Run.Networking
                 if (i > 1) samples.RemoveRange(0, i - 1);   // keep one sample behind the pair in use
             }
         }
-        sealed class Actor { public PlayerController Player; public bool Down; public readonly Track Track = new Track(); public float ShownHeight; public Vector3 LastSnapshot; }
+        sealed class Actor { public PlayerController Player; public bool Down, Dead; public readonly Track Track = new Track(); public float ShownHeight; public Vector3 LastSnapshot; }
         const float TeleportDistance = 4f;
         readonly Dictionary<int, Actor> actors = new Dictionary<int, Actor>();
         readonly Track bossTrack = new Track();
@@ -139,10 +139,11 @@ namespace LastBell.Run.Networking
                 actor.Track.Add(hostTime, pos, state.Yaw, state.Height);
                 p.Presenter.Locomotion = elapsedTicks > 0 ? Vector3.Distance(actor.LastSnapshot, pos) / (elapsedTicks * Sim.Dt) : 0;
                 actor.LastSnapshot = pos;
-                p.ApplyNetworkState(state.Hp, state.MaxHp, state.Stamina, state.MaxStamina, state.Potions, state.Down);
+                p.ApplyNetworkState(state.Hp, state.MaxHp, state.Stamina, state.MaxStamina, state.Potions, state.Down, state.Dead, state.DownedTicks, state.ReviveProgress);
                 p.Kit.NetCooldowns = state.Cooldowns; p.Kit.NetSlotStates = state.SlotStates; p.Kit.NetClassState = state.ClassState;
                 p.Marks.Clear(); p.Marks.AddRange(state.Marks);
-                if (state.Down != actor.Down) { if (state.Down) p.Presenter.Down(); else p.Presenter.GetUp(); actor.Down = state.Down; }
+                if (state.Down != actor.Down) { if (state.Down) p.Presenter.Down(); else p.Presenter.GetUp(); actor.Down = state.Down; actor.Dead = false; }
+                if (state.Down && state.Dead && !actor.Dead) { p.Presenter.Death(); actor.Dead = true; }
                 p.Presenter.ApplyNetworkPose(state.Clip,state.ClipSpeed,state.Overlay,state.OverlaySpeed,state.Hidden);
                 p.Presenter.Tick(p);
             }
@@ -256,7 +257,7 @@ namespace LastBell.Run.Networking
                 actor.Track.At(renderTime, out var pos, out float yaw, out float h);
                 if (pair.Key == lobby.LocalId && Predict(out var predicted)) { pos = predicted; actor.Track.At(double.MaxValue, out _, out yaw, out _); }
                 actor.Player.transform.SetPositionAndRotation(pos, Quaternion.Euler(0, yaw, 0));
-                actor.ShownHeight = h; actor.Player.Presenter.HeightOffset = h;
+                actor.ShownHeight = h;
             }
             if (boss && bossTrack.Ready)
             {
@@ -341,12 +342,16 @@ namespace LastBell.Run.Networking
             var bullets = world.Bullets; bullets.SetReplicaCount(bulletStates.Count);
             float since = (float)(renderTime - bulletTime);
             for (int i = 0; i < bulletStates.Count; i++)
-            {
-                var s = bulletStates[i]; var b = bullets.Live[i];
-                b.Pos = new Vector3(s.X + s.VX * since, 0, s.Z + s.VZ * since); b.Vel = new Vector3(s.VX, 0, s.VZ);
-                b.Radius = s.Radius; b.Colour = s.Colour; b.Source = s.Water ? "Waterfall Jet" : "Bullet"; b.Dead = false;
-            }
+                ApplyBullet(bulletStates[i], bullets.Live[i], since);
             bullets.Draw(world.Root);
+        }
+        // a replica bullet 'since' seconds after its snapshot; a seed also gets its fuse and burst preview, drawn as on the host
+        public static void ApplyBullet(LanWorldFrame.BulletState s, BulletSystem.Bullet b, float since)
+        {
+            b.Pos = new Vector3(s.X + s.VX * since, 0, s.Z + s.VZ * since); b.Vel = new Vector3(s.VX, 0, s.VZ);
+            b.Radius = s.Radius; b.Colour = s.Colour; b.Source = s.Water ? "Waterfall Jet" : "Bullet"; b.Dead = false;
+            b.BurstRays = s.Rays; b.BurstOff = s.Off; b.BurstSpeed = s.Speed;
+            if (s.Rays > 0) { b.Life = s.Life; b.Age = Mathf.Min(s.Age + Mathf.Max(0, since), s.Life); } else { b.Life = 6; b.Age = 0; }
         }
         // ---------------- boss props ----------------
         readonly HashSet<int> propSeen = new HashSet<int>();
@@ -393,7 +398,7 @@ namespace LastBell.Run.Networking
                 mirrorSeen.Add(s.Id);
                 if (!mirrors.TryGetValue(s.Id, out var m)) { m = new HazardMirror { H = new Hazard { Replica = true, Source = s.Source } }; mirrors[s.Id] = m; world.Hazards.AddReplica(m.H); }
                 var h = m.H;
-                h.MechanicId = string.IsNullOrEmpty(s.Mechanic) ? null : s.Mechanic; h.JumpClearable = s.JumpClearable; h.Soak = s.Soak; h.ShareCount = s.ShareCount; h.FillToLock = s.FillToLock;
+                h.MechanicId = string.IsNullOrEmpty(s.Mechanic) ? null : s.Mechanic; h.Soak = s.Soak; h.ShareCount = s.ShareCount; h.FillToLock = s.FillToLock;
                 h.Shape = (HazardShape)s.Shape; h.Origin = new Vector3(s.X, s.Y, s.Z); h.Yaw = s.Yaw; h.Radius = s.Radius; h.Inner = s.Inner; h.HalfAngle = s.HalfAngle;
                 h.Length = s.Length; h.Width = s.Width; h.LockAt = s.LockAt; h.ResolveAt = s.ResolveAt; h.ActiveTicks = s.ActiveTicks; h.ClipRadius = s.ClipRadius;
                 m.T = hostTime; m.Age = s.Age; m.GoneAt = -1;

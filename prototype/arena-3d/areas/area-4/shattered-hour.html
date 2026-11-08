@@ -35,6 +35,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const Q = new URLSearchParams(location.search), VIEW = Q.get('view') || 'game';
 if (Q.has('clean')) document.body.classList.add('clean');
@@ -340,14 +341,14 @@ const key = new THREE.DirectionalLight(0xffcf96, 2.0); key.position.set(-8, 30, 
 key.shadow.mapSize.set(4096, 4096); Object.assign(key.shadow.camera, { left: -24, right: 24, top: 24, bottom: -24, near: 1, far: 90 }); key.shadow.bias = -0.0004; scene.add(key);
 const fill = new THREE.DirectionalLight(0x6f7cff, 0.7); fill.position.set(18, 14, 24); scene.add(fill);
 
-// ---- a Vanguard for scale (characters session's model, loaded read-only) ----
+// ---- the Tollbreaker for scale (characters session's model, loaded read-only; 2.0 m tall) ----
 window.THREE = THREE;
 const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: o.metal ? 0.4 : 0.75, metalness: o.metal ? 0.7 : 0, side: o.side || THREE.FrontSide });
-const Gl = (c, k) => new THREE.MeshBasicMaterial({ color: new THREE.Color(c).multiplyScalar(k), toneMapped: false });
 const hero = new THREE.Group(); hero.position.set(-4.5, 0, 4.2); hero.rotation.y = Math.PI * 0.85; scene.add(hero);
-await new Promise(res => { const s = document.createElement('script'); s.src = '../../vanguard-model.js'; s.onload = res; s.onerror = res; document.head.appendChild(s); });
-if (typeof window.buildVanguardModel === 'function') { const v = window.buildVanguardModel(M, Gl); const obj = v.root || v; obj.scale.setScalar(1.2); obj.traverse(o => { if (o.isMesh) o.castShadow = true; }); hero.add(obj); }
-else { const c = new THREE.Mesh(new THREE.CapsuleGeometry(0.35, 1, 4, 12), M(0x2050cc)); c.position.y = 0.85; hero.add(c); }
+await new Promise(res => { const s = document.createElement('script'); s.src = '../../models/tollbreaker-glb.js'; s.onload = res; s.onerror = res; document.head.appendChild(s); });
+const tbModel = window.TOLLBREAKER_GLB_B64 && await new Promise(res => new GLTFLoader().parse(Uint8Array.from(atob(window.TOLLBREAKER_GLB_B64), c => c.charCodeAt(0)).buffer, '', g => res(g.scene), () => res(null)));
+if (tbModel) { tbModel.traverse(o => { if (o.isMesh) o.castShadow = true; }); hero.add(tbModel); }
+else { const c = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 1.2, 4, 12), M(0x2050cc)); c.position.y = 1.0; hero.add(c); }
 
 // ---- post ----
 const composer = new EffectComposer(renderer);

@@ -48,7 +48,7 @@ namespace LastBell.VFX
             var c = new Vector3(pos.x, 0.06f, pos.z);
             Play(cylinder, false, addMat, c, 0, 0.3f, (b, u) =>
             {
-                float r = radius * Mathf.Lerp(0.5f, 1.05f, Ease(u)); b.go.transform.localScale = new Vector3(r, 0.9f * (1 - u), r);
+                float r = radius * Mathf.Lerp(0.5f, 1f, Ease(u));   // stops at the circle, never past it (8 Nov playtest) b.go.transform.localScale = new Vector3(r, 0.9f * (1 - u), r);
                 b.mpb.SetFloat(PDissolve, u); b.mpb.SetFloat(PIntensity, 0.8f);
             }, 2, Slag, Molten, Amber);
             Sparks(c + Vector3.up * 0.3f, Vector3.up, 22, 1.4f, 5, 0.15f, 0.55f);

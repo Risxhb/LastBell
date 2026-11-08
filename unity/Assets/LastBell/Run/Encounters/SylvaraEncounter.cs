@@ -47,6 +47,10 @@ namespace LastBell.Run
         public int HollowArms => Easy ? 3 : 4;
         public float PodLandIn(int ph) => ph == 1 && Easy ? 3.0f : 2.5f;
         public bool PodDoubledIn(int ph) => ph == 1 && Hard;
+        public bool MirrorJets => Hard;   // Hard (5 Nov, done as recommended): each jet pours a twin from the opposite wall
+        public bool ChoirPods => Hard;    // Hard: Seed Pods on the farthest players at 16.5 s in Phase 2 (coral petals hit every colour)
+        public bool CounterSpiral => Hard;   // Hard: a 2-arm spiral turning the other way under the Hollow Spiral, same gaps
+        public bool StormArc => Hard;   // Hard: a Pruning Arc at 15 s in each Seed Storm loop (not in Last Storm)
 
         CharacterPresenter presenter;
         int phase;
@@ -59,10 +63,24 @@ namespace LastBell.Run
         public int BudsCut { get; private set; }
         public int BudsBloomed { get; private set; }
         public readonly List<string> Order = new List<string>();   // attack starts, for tests
+        // Her clips (presentation; proposal 2 Nov, ATTACK-VISUALS.md): one-shots go through Act, and the loop under them is
+        // Conduct while a spiral runs (Lanes, a downbeat per volley, while P2 lanes fire), Storm in Last Storm, else Idle.
+        // Clips the model lacks fall back to Idle (Lanes falls back to Conduct).
+        public readonly List<string> Clips = new List<string>();   // one-shots played, for tests
+        int actUntil; bool introPlayed;
+        bool Has(string clip) => presenter && presenter.Has(clip);   // newer clips need the newest sylvara-assets pack
+        void Act(string clip, float seconds)
+        {
+            Clips.Add(clip); actUntil = Age + Sim.Ticks(seconds);
+            if (presenter) presenter.PlayOnce(clip, seconds);
+        }
+        public string LoopClip => LastStorm ? "StormLoop" : emit.Exists(e => e.On && e.Lane) ? "LanesLoop"
+            : (sp1 != null && sp1.On) || (sp2 != null && sp2.On) ? (phase == 3 ? "HollowLoop" : "ConductLoop") : "Idle";   // P3 pours from the open mask
+        const float LanesClip = 0.7f;   // LanesLoop is one 0.7 s beat, sped up so each beat lands on a lane volley
         float LoopT => (Age - loopStart) * Sim.Dt;
         public float P4Time => p4Start < 0 ? 0 : (Age - p4Start) * Sim.Dt;   // seconds since Phase 4 began (enrage clock)
 
-        sealed class Emitter { public bool On = true, Looping; public Action<float> Update; }
+        sealed class Emitter { public bool On = true, Looping, Lane; public Action<float> Update; public string Tag; }
         readonly List<Emitter> emit = new List<Emitter>();
         readonly List<(int at, Action fn)> later = new List<(int, Action)>();
         Emitter sp1, sp2;
@@ -75,6 +93,7 @@ namespace LastBell.Run
         public int BudsAlive { get { int n = 0; foreach (var b in buds) if (b.Alive) n++; return n; } }
         public float BudHpAt(Vector3 pos) { foreach (var b in buds) if (b.Alive && (b.Pos - pos).sqrMagnitude < 0.01f) return b.Hp; return 0; }   // tests
         public List<Vector3> AliveBudPositions() { var l = new List<Vector3>(); foreach (var b in buds) if (b.Alive) l.Add(b.Pos); return l; }
+        public void DebugLastStormWarning() => Toll("LAST STORM in 3 s");   // test hook: loop 4's warning, without waiting
         // test hook: restart the Seed Storm as Phase 4 loop k would start it (k >= 5 = Last Storm), without waiting
         public void DebugStartStorm(int k)
         {
@@ -151,6 +170,16 @@ namespace LastBell.Run
                 return host;
             });
             PhaseName = PhaseNames[0];
+            if (presenter && presenter.HasModel)
+            {
+                maskBoneL = FindDeep(presenter.transform, "mask.L"); maskBoneR = FindDeep(presenter.transform, "mask.R"); maskHead = FindDeep(presenter.transform, "head");
+                if (HasMaskBones)
+                {
+                    maskCore = Prim.Make(PrimitiveKind.Sphere, transform, Vector3.zero, Vector3.one * 0.1f, Turquoise, 1.6f);
+                    maskGlow = MakeLight("Mask Core", Turquoise, 0, 2.5f);
+                    maskCore.gameObject.SetActive(false); maskGlow.enabled = false;
+                }
+            }
             frontLight = MakeLight("Front Light", new Color(1f, 0.95f, 0.86f), FrontIntensity, 6.5f);
             rimLight = MakeLight("Rim Light", new Color(0.55f, 1f, 0.92f), RimIntensity, 6.5f);
             PlaceLights();
@@ -181,6 +210,39 @@ namespace LastBell.Run
             phase = 0; PhaseName = PhaseNames[n - 1];
             if (shoulderFlowers) shoulderFlowers.gameObject.SetActive(n >= 2);
             if (n >= 3 && maskL) { maskL.localPosition = new Vector3(-0.32f, 3.65f, 0.2f); maskR.localPosition = new Vector3(0.32f, 3.65f, 0.2f); }
+            maskTarget = MaskOpen = n >= 3 ? 1 : 0;
+        }
+
+        // Second form (P3-P4; done as recommended 2 Nov, review later): the model's mask halves (bones mask.L / mask.R from
+        // sylvara_rig.py) swing 16 degrees outward on their outer hinges and slide apart, and a turquoise core glows in the gap.
+        // Applied after the presenter has posed her, so every clip keeps the mask open. A model without the bones keeps it shut.
+        Transform maskBoneL, maskBoneR, maskHead, maskCore; Light maskGlow; float maskTarget, maskSign;
+        public float MaskOpen { get; private set; }
+        public bool HasMaskBones => maskBoneL && maskBoneR && maskHead;
+        static Transform FindDeep(Transform t, string name)
+        {
+            if (t.name == name) return t;
+            foreach (Transform c in t) { var f = FindDeep(c, name); if (f) return f; }
+            return null;
+        }
+        void LateUpdate()
+        {
+            if (!HasMaskBones) return;
+            MaskOpen = Mathf.MoveTowards(MaskOpen, maskTarget, Time.deltaTime / 1.5f);
+            Vector3 l = maskBoneL.position, r = maskBoneR.position, mid = (l + r) / 2, up = transform.up;
+            Vector3 side = Vector3.ProjectOnPlane(l - r, up), fwd = Vector3.ProjectOnPlane(mid - maskHead.position, up).normalized;
+            if (maskSign == 0)   // which way round the hinge opens the halves forward and out, whatever the import axes
+            {
+                var v = Vector3.ProjectOnPlane(mid - l, up);
+                maskSign = Vector3.Dot(Quaternion.AngleAxis(10, up) * v, fwd) > Vector3.Dot(v, fwd) ? 1 : -1;
+            }
+            float deg = 16 * MaskOpen; var slide = side * (0.15f * MaskOpen);   // 9 cm per half on her 0.6 m mask
+            maskBoneL.rotation = Quaternion.AngleAxis(maskSign * deg, up) * maskBoneL.rotation; maskBoneL.position = l + slide;
+            maskBoneR.rotation = Quaternion.AngleAxis(-maskSign * deg, up) * maskBoneR.rotation; maskBoneR.position = r - slide;
+            bool on = MaskOpen > 0.01f;
+            maskCore.gameObject.SetActive(on); maskGlow.enabled = on;
+            maskCore.position = mid + up * (0.42f * side.magnitude) - fwd * 0.03f; maskCore.localScale = Vector3.one * (0.3f * side.magnitude * MaskOpen);
+            maskGlow.transform.position = maskCore.position + fwd * 0.2f; maskGlow.intensity = 2.5f * MaskOpen;
         }
 
         // ---------------- schedule ----------------
@@ -218,12 +280,13 @@ namespace LastBell.Run
             if (to == 4) { p4Start = Age + (first ? 0 : TransTicks); P4Loop = 0; LastStorm = false; }
             if (first) yield break;
             Current = "phase shift";
-            presenter.PlayOnce("PhaseShift", TransTicks / (float)Sim.Hz);
+            Act(to == 3 && Has("MaskSplit") ? "MaskSplit" : "PhaseShift", TransTicks / (float)Sim.Hz);   // hands to the face, flung apart as the mask opens
             glowTarget = 3f;
             RunHud.Float(transform.position + Vector3.up * 5.4f, to == 3 ? "The mask splits" : PhaseNames[to - 1], Amber);
             for (int i = 0; i < TransTicks; i++)
             {
                 if (i == TransTicks / 2) { W.Fx.Crescendo(transform.position, true, 0, false); Release(1.5f); if (shoulderFlowers) shoulderFlowers.gameObject.SetActive(to >= 2); }
+                if (to >= 3) maskTarget = 1;   // the model's mask opens over 1.5 s (LateUpdate)
                 if (to >= 3 && maskL)
                 {
                     maskL.localPosition = Vector3.Lerp(maskL.localPosition, new Vector3(-0.32f, 3.65f, 0.2f), 0.05f);
@@ -237,7 +300,7 @@ namespace LastBell.Run
         void ClearFight()
         {
             foreach (var e in emit) e.On = false;
-            emit.Clear(); later.Clear(); sp1 = sp2 = null;
+            emit.Clear(); spinDir.Clear(); later.Clear(); sp1 = sp2 = null; HazardTag.Clear(); tagNow = null;
             foreach (var b in buds) KillBud(b);
             buds.Clear();
             W.Bullets.ClearAll();
@@ -250,7 +313,7 @@ namespace LastBell.Run
         List<(float at, Action fn)> Loop(int ph)
         {
             var ev = new List<(float, Action)>();
-            void At(float t, string id, Action fn) => ev.Add((t, (Action)(() => { if (id != null) { Order.Add(id); Current = id; } fn(); })));
+            void At(float t, string id, Action fn) => ev.Add((t, (Action)(() => { if (id != null) { Order.Add(id); Current = id; } WithTag(id != null && HardAdds.Contains(id) ? id : tagNow, fn); })));
             switch (ph)
             {
                 case 1:   // Spiral Bloom
@@ -276,6 +339,7 @@ namespace LastBell.Run
                     if (SecondColourSpiral) At(10, "Second Colour Spiral", () => sp2 = Spiral(-1, 4, 18 * Deg, 3.5f, 0.22f, 8, 5, new[] { Cobalt, Brass }));
                     At(12, "Root Ring", () => RootRing(3.5f));
                     At(14.5f, "Brass Lanes", () => ChoirLanes(Brass, Mathf.PI / 2, -1, 20, lane));
+                    if (ChoirPods) At(16.5f, "Choir Pods", () => PodsOnFar());   // Hard (5 Nov): lands at 19 s, before the 20 s toll
                     foreach (float t in W.Players.Count == 1 ? new[] { 4f, 8, 12, 16, 20 } : new[] { 5f, 10, 15, 20 })
                     {
                         At(t - 1, "Toll", () => { Toll("TOLL: every colour swaps"); WarnSwap(); });
@@ -287,6 +351,7 @@ namespace LastBell.Run
                     float bloom = BloomAfter;   // Easy: buds bloom after 15 s and the spiral has 3 arms
                     At(0.01f, "Hollow Spiral", () => sp1 = Spiral(1, HollowArms, 10 * Deg, 4.5f, 0.18f, 9, 7));
                     At(1, "Choir Buds", () => PlantBuds(bloom));
+                    if (CounterSpiral) At(4, "Counter Spiral", () => sp2 = Spiral(-1, 2, 12 * Deg, 4f, 0.2f, 9, 7));   // Hard (5 Nov)
                     At(8, "Feet Pod", () => Pod(null, Vector3.zero, 3.0f));
                     At(12, "Choir Buds", () => PlantBuds(bloom));
                     At(15, "Pruning Arc", PruningArc);
@@ -296,6 +361,7 @@ namespace LastBell.Run
                     At(0, "Seed Storm", StartStorm);
                     At(6, "Seed Pods", () => PodsOnFar());
                     At(12, "Root Ring", () => RootRing(3.5f));
+                    if (StormArc && P4Loop < 5) At(15, "Storm Arc", PruningArc);   // Hard (5 Nov): both cuts land by 17.8 s, before the 18 s pods
                     At(18, "Seed Pods", () => PodsOnFar());
                     if (P4Loop == 4) At(LastStormAt - 4 * 24 - 3, "Toll", () => Toll("LAST STORM in 3 s"));
                     break;
@@ -304,16 +370,61 @@ namespace LastBell.Run
         }
 
         // ---------------- helpers ----------------
-        List<PlayerController> Standing => W.Players.FindAll(p => !p.Down);
+        // who her aimed attacks may pick: standing and not reviving (revive rule, accepted 4 Nov: no mechanic aims at a reviver;
+        // a reviver standing in a hazard is still hit). Every target picker below starts here, with an unaimed fallback.
+        List<PlayerController> Standing => W.Players.FindAll(p => !p.Down && p.Reviving == null);
         static Vector3 On(float a, float r) => new Vector3(Mathf.Cos(a) * r, 0, Mathf.Sin(a) * r);
         static float AngOf(Vector3 v) => Mathf.Atan2(v.z, v.x);
         static float YawOf(float a) => 90f - a * Mathf.Rad2Deg;   // floor angle -> Sim yaw (degrees, 0 = +z)
         float Rim => BodyRadius;
         float R => CombatWorld.PlayerBound;
-        void Later(float seconds, Action fn) => later.Add((Age + Mathf.Max(1, Sim.Ticks(seconds)), fn));
-        Emitter Add(Emitter e) { emit.Add(e); return e; }
-        void Shot(Vector3 at, float a, float v, int dmg = 12, float life = 6, int col = 0, string src = "Petal", float r = BulletArt.PetalHitRadius, Action<BulletSystem.Bullet> split = null) =>
-            W.Bullets.Fire(at, a, v, dmg, life, r, col, src, split);
+        void Later(float seconds, Action fn) { var tg = tagNow; later.Add((Age + Mathf.Max(1, Sim.Ticks(seconds)), tg == null ? fn : () => WithTag(tg, fn))); }
+        Emitter Add(Emitter e) { e.Tag ??= tagNow; emit.Add(e); return e; }
+        // hit bookkeeping for the sweep (6 Nov): bullets and hazards made by a Hard addition carry its name (Bullet.Tag,
+        // HazardTag), so the clear sweep can count hits per addition. Bookkeeping only: nothing in the fight reads it.
+        static readonly HashSet<string> HardAdds = new HashSet<string> { "Choir Pods", "Counter Spiral", "Storm Arc" };
+        public const string MirrorTag = "Mirrored Jets";
+        string tagNow;
+        public readonly Dictionary<Hazard, string> HazardTag = new Dictionary<Hazard, string>();
+        void WithTag(string tg, Action fn)
+        {
+            if (tg == null) { fn(); return; }
+            var k = tagNow; tagNow = tg; int n0 = W.Hazards.Live.Count;
+            try { fn(); }
+            finally
+            {
+                var live = W.Hazards.Live;
+                for (int i = n0; i < live.Count; i++)
+                {
+                    var h = live[i]; if (HazardTag.ContainsKey(h)) continue; HazardTag[h] = tg;
+                    var res = h.OnResolve; if (res != null) h.OnResolve = hz => WithTag(tg, () => res(hz));
+                }
+                tagNow = k;
+            }
+        }
+        BulletSystem.Bullet Shot(Vector3 at, float a, float v, int dmg = 12, float life = 6, int col = 0, string src = "Petal", float r = BulletArt.PetalHitRadius, Action<BulletSystem.Bullet> split = null)
+            { var b = W.Bullets.Fire(at, a, v, dmg, life, r, col, src, split); b.AttackId = AttackOf(src); b.Tag = tagNow; return b; }
+        // the boss attack icon (BossAttackIcons, approved 2 Nov) a bullet or hazard belongs to. Sources repeat across phases, so
+        // the spiral is Two-Colour Choir in Phase 2 and the spiral and seeds are Last Storm once it starts. Choir Bud (the
+        // harmless bloom timer) has none.
+        public string AttackOf(string src)
+        {
+            if (LastStorm && (src == "Petal Spiral" || src == "Seed" || src == "Seed Burst")) return "sylvara.last_storm";
+            switch (src)
+            {
+                case "Petal Spiral": return phase == 2 ? "sylvara.two_colour_choir" : "sylvara.spiral_bloom";
+                case "Brass Lane": case "Cobalt Lane": return "sylvara.two_colour_choir";
+                case "Seed Pod": case "Feet Pod": case "Pod Petal": return "sylvara.seed_pods";
+                case "Waterfall Jet": return "sylvara.waterfall_jets";
+                case "Pruning Arc": case "Pruning Arc (back)": case "Arc Petal": return "sylvara.pruning_arc";
+                case "Toll Burst": return "sylvara.toll_burst";
+                case "Root Ring": return "sylvara.root_ring";
+                case "Bud Petal": return "sylvara.hollow_bloom";
+                case "Bud Bloom": return "sylvara.bud_bloom";
+                case "Seed": case "Seed Burst": return "sylvara.seed_storm";
+                default: return null;
+            }
+        }
         void PetalRing(Vector3 c, int n, float v, float off, float r0, int dmg = 12, string src = "Petal")
         {
             for (int i = 0; i < n; i++) { float a = off + i * Tau / n; Shot(c + On(a, r0), a, v, dmg, 6, 0, src); }
@@ -321,9 +432,9 @@ namespace LastBell.Run
         static float Rnd(float a, float b) => UnityEngine.Random.Range(a, b);
         static readonly System.Random look = new System.Random(31);   // presentation only, so props never shift the fight's rolls
         static float LookRnd(float a, float b) => a + (float)look.NextDouble() * (b - a);
-        Hazard Tune(Hazard h) { h.Stun = Stun; h.Knockback = 0; return h; }
-        int FarCount { get { int n = W.Players.Count; return n <= 2 ? 1 : n <= 4 ? 2 : 3; } }
-        public int BudCount { get { int n = W.Players.Count; return (n <= 2 ? 2 : n <= 4 ? 3 : 4) + (Hard ? 1 : 0); } }   // Hard: one more bud
+        Hazard Tune(Hazard h) { h.Stun = Stun; h.Knockback = 0; h.AttackId ??= AttackOf(h.Source); return h; }
+        int FarCount => W.Players.Count <= 2 ? 1 : 2;   // 1-4 players
+        public int BudCount => (W.Players.Count <= 2 ? 2 : 3) + (Hard ? 1 : 0);   // Hard: one more bud
         List<PlayerController> Farthest(int k)
         {
             var s = Standing; s.Sort((a, b) => Sim.Flat(b.transform.position).sqrMagnitude.CompareTo(Sim.Flat(a.transform.position).sqrMagnitude));
@@ -334,6 +445,8 @@ namespace LastBell.Run
             RunHud.Float(transform.position + Vector3.up * 5.4f, text, Amber);
             W.Fx.Crescendo(transform.position, true, 0, false);
             Release(0.8f);
+            if (text.StartsWith("LAST STORM") && Has("StormCall")) Act("StormCall", 3f);   // she gathers and rises into StormLoop
+            else Act("Toll", 1.4f);   // the lurch lands 1.0 s in, on the reversal / colour swap
         }
 
         // Petal Spiral: arms from her rim, a petal per arm every `period`, gaps of (skipEvery - keep) steps; turns `w` rad/s
@@ -388,9 +501,11 @@ namespace LastBell.Run
         }
         void PodsOnFar(bool doubled = false)
         {
-            presenter.PlayOnce("Seed", 1.2f);
+            Act("Seed", 1.2f);
             if (W.Players.Count == 1) { var p = W.Players[0]; if (!p.Down) Pod(p, Vector3.zero, 2.5f, doubled); return; }
-            foreach (var p in Farthest(FarCount)) Pod(p, Vector3.zero, 2.5f, doubled);
+            var far = Farthest(FarCount);
+            if (far.Count == 0) Pod(null, On(Rnd(0, Tau), 7), 2.5f, doubled);   // everyone standing is reviving: an unaimed pod
+            foreach (var p in far) Pod(p, Vector3.zero, 2.5f, doubled);
         }
         void TrianglePods()
         {
@@ -403,7 +518,7 @@ namespace LastBell.Run
         }
         void RootRing(float r)
         {
-            presenter.PlayOnce("Rootscript", 2f);
+            Act("Rootscript", 2f);
             var h = Tune(new Hazard { Source = "Root Ring", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Radius = r, LockAt = 0, ResolveAt = Sim.Ticks(2), Damage = 18, Origin = Vector3.zero });
             h.OnResolve = hz => { W.BossFx.ChimeResolve(hz.Origin, hz.Radius); Release(); RootsErupt(hz.Origin, hz.Radius); };
             W.Hazards.Spawn(h);
@@ -412,6 +527,7 @@ namespace LastBell.Run
         // and sink, so the warning is never covered.
         public const int RootPieces = 10;
         public int PodModels, RootModels, BudModels;   // tests: prop models placed (0 when the art isn't installed)
+        public void DebugJets() => Jets();   // tests: one round of Waterfall Jets
         public void DebugRoots() => RootsErupt(Vector3.zero, 3.5f);   // tests: the Root Ring's look alone, for a screenshot
         void RootsErupt(Vector3 c, float r)
         {
@@ -429,18 +545,26 @@ namespace LastBell.Run
         // Waterfall Jets: one per player past 8 m (else the farthest). The wedge warns 1.5 s; then a solid stream (a drop
         // every 0.07 s at 9 m/s) pours from the wall to her rim while its source slides 40° along the wall over 2 s,
         // starting 20° before the target.
+        // Hard: each jet also pours from the opposite wall (its own wedge warning), sliding the other way.
         public float JetWarn => Easy ? 2.0f : 1.5f;   // Easy: 2.0 s
         void Jets()
         {
             float warn = JetWarn;
+            Act("CallWater", warn * 1.9f / 1.5f);   // the hand pulls down (1.5 of the clip's 1.9 s) as the water pours
             var ts = Standing.FindAll(p => Sim.Flat(p.transform.position).magnitude > 8);
             if (ts.Count == 0) ts = Farthest(1);
-            for (int i = 0; i < ts.Count; i++)
+            var aims = new List<float>(); foreach (var p in ts) aims.Add(AngOf(p.transform.position));
+            if (aims.Count == 0) aims.Add(Rnd(0, Tau));   // everyone standing is reviving: one unaimed jet
+            int baseN = aims.Count;
+            if (MirrorJets) for (int i = 0, n = aims.Count; i < n; i++) aims.Add(aims[i] + Mathf.PI);   // Hard twins
+            for (int i = 0; i < aims.Count; i++)
             {
-                float a0 = AngOf(ts[i].transform.position), dir = i % 2 == 1 ? -1 : 1, span = 40 * Deg, start = a0 - dir * span / 2;
+                int k = i < baseN ? i : i - baseN + 1;   // a twin slides opposite to its jet
+                var tg0 = tagNow; if (i >= baseN) tagNow = MirrorTag;   // hit bookkeeping only
+                float a0 = aims[i], dir = k % 2 == 1 ? -1 : 1, span = 40 * Deg, start = a0 - dir * span / 2;
                 W.Hazards.Spawn(new Hazard
                 {
-                    Source = "Waterfall Jet", Shape = HazardShape.Cone, Kind = HazardKind.Strike, Origin = Vector3.zero, Yaw = YawOf(a0),
+                    Source = "Waterfall Jet", AttackId = AttackOf("Waterfall Jet"), Shape = HazardShape.Cone, Kind = HazardKind.Strike, Origin = Vector3.zero, Yaw = YawOf(a0),
                     Radius = R, HalfAngle = 20, LockAt = 0, ResolveAt = Sim.Ticks(warn), Damage = 0, HitOnResolve = false,
                 });
                 Later(warn, () =>
@@ -455,6 +579,7 @@ namespace LastBell.Run
                     };
                     Add(e);
                 });
+                tagNow = tg0;
             }
         }
 
@@ -464,8 +589,8 @@ namespace LastBell.Run
         void PruningArc()
         {
             float w = ArcExtra;
-            presenter.PlayOnce("PruningArc", 2.9f);
-            var near = W.NearestStanding(Vector3.zero);
+            Act("PruningArc", 2.9f);
+            PlayerController near = null; foreach (var p in Standing) if (!near || Sim.Flat(p.transform.position).sqrMagnitude < Sim.Flat(near.transform.position).sqrMagnitude) near = p;
             float a = near ? AngOf(near.transform.position) : Rnd(0, Tau);
             var front = Tune(new Hazard
             {
@@ -513,7 +638,7 @@ namespace LastBell.Run
         {
             var d = new Vector3(Mathf.Cos(travel), 0, Mathf.Sin(travel)); var pp = new Vector3(-d.z, 0, d.x);
             float acc = 0, off = 0;
-            var e = new Emitter { Looping = true };
+            var e = new Emitter { Looping = true, Lane = true };
             e.Update = dt =>
             {
                 if (LoopT >= until) { e.On = false; return; }
@@ -537,6 +662,7 @@ namespace LastBell.Run
         void PlantBuds(float life)
         {
             int n = BudCount; float a0 = Rnd(0, Tau);
+            Act("Bloom", 2f);   // one downbeat per bud
             for (int i = 0; i < n; i++)
             {
                 float a = a0 + i * Tau / n;
@@ -590,6 +716,7 @@ namespace LastBell.Run
                 if (b.Hp <= 0)
                 {
                     KillBud(b); BudsCut++; W.Hazards.Cancel(b.Timer);
+                    if (Age >= actUntil && Has("Stagger")) Act("Stagger", 0.8f);   // she flinches when a bud is pruned; never mid-cast
                     RunHud.Float(b.Pos + Vector3.up * 1.8f, "CUT", Turquoise);
                     W.Fx.Crescendo(b.Pos, true, 0, false);
                     EndBudView(b.View, b.Prop, false);
@@ -638,26 +765,34 @@ namespace LastBell.Run
         }
         void SeedRing(int n, float off, float fuse)
         {
+            if (!LastStorm && Age >= actUntil) Act("Sow", 0.6f);   // a short flick between other moves; Last Storm keeps Storm
+
             for (int i = 0; i < n; i++)
             {
                 float a = off + i * Tau / n;
-                Shot(On(a, Rim), a, 3, 16, fuse, 0, "Seed", 0.6f, b =>
+                // its burst angle is rolled at launch, not at the burst, so its last 0.6 s can show the exact rays (BulletSystem
+                // preview; proposal 7 Nov, Seed Burst fairness review): same petals, speed, damage, fuse and schedule
+                float burstOff = Rnd(0, Tau); int rays = BurstPetals;   // both fixed at launch: the burst always matches its preview
+                var seed = Shot(On(a, Rim), a, 3, 16, fuse, 0, "Seed", 0.6f, b =>
                 {
                     int f0 = W.Bullets.Fired;
-                    PetalRing(b.Pos, BurstPetals, 4.5f, Rnd(0, Tau), 0.3f, 12, "Seed Burst");
+                    PetalRing(b.Pos, rays, 4.5f, burstOff, 0.3f, 12, "Seed Burst");
                     LastBurstFired = W.Bullets.Fired - f0;
                 });
+                seed.BurstRays = rays; seed.BurstOff = burstOff; seed.BurstSpeed = 4.5f;
             }
         }
 
         // ---------------- per tick ----------------
         protected override void StepAlways()
         {
-            if (presenter) presenter.TickBoss("Idle");
+            string loop = Dead || phase == 0 ? "Idle" : LoopClip;
+            if ((loop == "LanesLoop" || loop == "HollowLoop") && !Has(loop)) loop = "ConductLoop";   // older packs
+            if (presenter) presenter.TickBoss(loop, loop == "LanesLoop" ? LanesClip / LanePeriod : 1);
             if (Dead || Current == "idle" || phase == 0) return;   // halted (party down) or not started
             for (int i = later.Count - 1; i >= 0; i--) if (Age >= later[i].at) { var fn = later[i].fn; later.RemoveAt(i); fn(); }
-            for (int i = 0; i < emit.Count; i++) if (emit[i].On) emit[i].Update?.Invoke(Sim.Dt);
-            emit.RemoveAll(e => !e.On);
+            for (int i = 0; i < emit.Count; i++) if (emit[i].On) { var e = emit[i]; var k = tagNow; tagNow = e.Tag; e.Update?.Invoke(Sim.Dt); tagNow = k; }
+            emit.RemoveAll(e => { if (e.On) return false; spinDir.Remove(e); return true; });   // retired spirals drop their reversal hook
         }
 
         void KillBud(Bud b) { b.Alive = false; if (b.Part != null) { b.Part.Alive = false; W.Parts.Remove(b.Part); } }
@@ -668,7 +803,13 @@ namespace LastBell.Run
         protected override void Update()
         {
             base.Update();
+            // the run's 2 s intro card, before the sim runs (so not in StepAlways): she wakes and lifts the fork
+            if (phase == 0 && !introPlayed && RunDirector.Instance != null && RunDirector.Instance.State == RunState.Intro && Has("Intro"))
+            { introPlayed = true; Clips.Add("Intro"); presenter.PlayOnce("Intro", 2f); }
             PresentLook(glowLevel, Dead, Time.deltaTime);
+            // the run's 2 s intro card, before the sim runs (so not in StepAlways): she wakes and lifts the fork
+            if (phase == 0 && !introPlayed && RunDirector.Instance != null && RunDirector.Instance.State == RunState.Intro && Has("Intro"))
+            { introPlayed = true; Clips.Add("Intro"); presenter.PlayOnce("Intro", 2f); }
             foreach (var b in buds) if (b.Alive) PulseBud(b.Prop);
             DrawColourRings();
         }
@@ -690,8 +831,10 @@ namespace LastBell.Run
                 presenter.Sink = Mathf.MoveTowards(presenter.Sink, 0.9f, dt * 0.6f);
         }
 
-        // Phase 2: a brass or cobalt ring under each player shows their colour; it flickers to the next colour during the
-        // 1 s toll warning.
+        // Phase 2: an open dotted brass or cobalt ring under each player shows their colour (friendly cues are thin and
+        // unfilled, so it never reads as a boss floor warning); it flickers to the next colour during the 1 s toll warning.
+        const int RingDots = 14;
+        Material ringBrassMat, ringCobaltMat;   // shared by every dot
         void DrawColourRings()
         {
             if (W == null) return;
@@ -704,15 +847,20 @@ namespace LastBell.Run
                 if (c == 0) { if (ring) ring.gameObject.SetActive(false); continue; }
                 if (!ring)
                 {
-                    ring = Prim.Make(PrimitiveKind.Cylinder, transform.parent, Vector3.zero, new Vector3(1.3f, 0.01f, 1.3f), RingBrass, 2f);
+                    ring = new GameObject("ColourRing").transform; ring.SetParent(transform.parent, false);
+                    for (int i = 0; i < RingDots; i++)
+                    {
+                        float a = i * Tau / RingDots;
+                        Prim.Make(PrimitiveKind.Cylinder, ring, new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * 0.7f, new Vector3(0.12f, 0.01f, 0.12f), RingBrass, 1.5f);
+                    }
                     colourRings[p] = ring;
                 }
                 if (!ring.gameObject.activeSelf) ring.gameObject.SetActive(true);
                 bool flick = SwapWarned(p) && Mathf.Repeat(Time.time * 6, 1) < 0.5f;
                 int show = flick ? (c == Brass ? Cobalt : Brass) : c;
-                var mr = ring.GetComponent<MeshRenderer>();
-                var want = show == Brass ? RingBrass : RingCobalt;
-                if (mr.material.GetColor("_BaseColor") != want) { mr.material.SetColor("_BaseColor", want); mr.material.SetColor("_EmissionColor", want * 2f); }
+                if (!ringBrassMat) { ringBrassMat = Prim.Material(RingBrass, 1.5f); ringCobaltMat = Prim.Material(RingCobalt, 1.5f); }
+                var want = show == Brass ? ringBrassMat : ringCobaltMat;
+                foreach (var mr in ring.GetComponentsInChildren<MeshRenderer>()) if (mr.sharedMaterial != want) mr.sharedMaterial = want;
                 ring.position = Sim.Flat(p.transform.position) + Vector3.up * 0.04f;
                 shown++;
             }
@@ -885,17 +1033,19 @@ namespace LastBell.Run
         protected override void OnDefeat()
         {
             foreach (var e in emit) e.On = false;
-            emit.Clear(); later.Clear(); foreach (var b in buds) KillBud(b); buds.Clear(); colour.Clear(); swapWarned.Clear();
+            emit.Clear(); spinDir.Clear(); later.Clear(); foreach (var b in buds) KillBud(b); buds.Clear(); colour.Clear(); swapWarned.Clear();
             ClearProps();
             if (NetRecording) NetFx("SylvaraEncounter.Clear");
             glowTarget = 0.3f; glowLevel = 2f;
             presenter.PlayOnce("Defeat", 2.5f);
+            maskTarget = 0;   // the mask closes as she bows
             W.Fx.Crescendo(transform.position, true, 2, true);
         }
         void OnDestroy()
         {
             ClearProps();
             foreach (var r in colourRings.Values) if (r) Destroy(r.gameObject);
+            if (ringBrassMat) { Destroy(ringBrassMat); Destroy(ringCobaltMat); }
         }
         public CharacterPresenter Presenter => presenter;
     }

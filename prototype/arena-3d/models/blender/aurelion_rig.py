@@ -6,7 +6,8 @@
 # Clip timing matches AurelionEncounter (Unity stretches each clip to the attack's length, so the strike frame lands
 # on the hazard's resolve tick): MeridianCut 3.1 s (strike 1.6), ZenithPins 3.15 s (lock 1.3, strike 1.75),
 # ProcessionalThrust 4.4 s (lunge 1.7-2.2), CrownReversal 3.3 s (snap 1.5), MeridianAlignment 3.8 s (pulses 2.0, 3.8),
-# OpenChest 2 s loop, PhaseShift 1.5 s, Defeat 2.5 s, Idle 4 s loop, Walk 1.4 s loop.
+# OpenChest 2 s loop, PhaseShift 1.5 s, Defeat 2.5 s, Idle 4 s loop, Walk 1.4 s loop. The v4 wind-ups (4 Nov) strike on
+# their last frame; see the v4 clips section.
 import bpy, sys, os, math, numpy as np
 from mathutils import Vector, Euler, Matrix
 args = sys.argv[sys.argv.index('--') + 1:]
@@ -159,8 +160,9 @@ def plant_feet(feet=None):
         H = th.head.copy(); A = a0 + Vector((0, dy, dz))
         L1, L2 = (k0 - h0).length, (a0 - k0).length
         d = min((A - H).length, L1 + L2 - 1e-4); u = (A - H).normalized()
-        pole = (k0 - h0) - (k0 - h0).project(a0 - h0)
-        if pole.length < 1e-4: pole = Vector((0, -1, 0))
+        # knees bend forward (-Y): the rest knee lies almost on the hip-ankle line, so its own offset gave an
+        # unstable pole that buckled the knees inward whenever the hips dropped (4 Nov contact sheets)
+        pole = Vector((0, -1, 0))
         v = (pole - pole.project(u)).normalized()
         ca = max(-1, min(1, (L1 * L1 + d * d - L2 * L2) / (2 * L1 * d)))
         K = H + L1 * (ca * u + math.sqrt(1 - ca * ca) * v)
@@ -389,11 +391,231 @@ def defeat(t):
         'halo': (25 * slump, 0, 8 * slump), 'halo_loc': (0, 0.1 * slump, -0.45 * slump),
     }
 
+# ---------------- v4 clips (4 Nov, Chzy18 "Also do boss clips"): one wind-up per v4 attack ----------------
+# Visual only. Unity stretches each to the attack's own window (Action(name, ticks)), so every strike sits on the
+# clip's LAST frame = the hazard's resolve tick; nothing here changes timing or damage. Lengths are nominal.
+def strike(t, T, rise=0.12):
+    # 0 until T - rise, then a fast ease to 1 at T (the strike lands on the last frame)
+    return 0.0 if t < T - rise else smooth((t - (T - rise)) / rise)
+
+def entrance(t):
+    # 2 s, the intro: head bowed and halo low, he straightens, lifts the glaive across his body and plants it; the
+    # halo rings as he rises
+    T = 2.0; rise = key(t, [(0, 0), (1.3, 1.0), (T, 1.0)]); plant = snap(t, 1.45, 0.08, 0.5)
+    ch = base_pose(t)
+    ch.update({
+        'hips_loc': (0, 0, -0.35 * (1 - rise) - 0.05 * plant), 'spine': (14 * (1 - rise), 0, 0),
+        'chest': add(ch['chest'], (12 * (1 - rise), 0, 0)), 'head': (1.5 + 30 * (1 - rise), 0, 0),
+        'upperarm.R': (key(t, [(0, -10), (0.9, -55), (1.4, -20), (T, 0)]), key(t, [(0, 10), (0.9, 30), (T, 0)]), 0),
+        'glaive': (key(t, [(0, 70), (0.9, 20), (1.4, 0), (T, 0)]), key(t, [(0, -60), (0.9, -20), (1.4, 0)]), 0),
+        'upperarm.L': (key(t, [(0, 10), (1.0, -25), (T, 0)]), key(t, [(0, 0), (1.0, -30), (T, 0)]), 0),
+        'halo_loc': (0, 0, -0.4 * (1 - rise) + 0.06 * plant),
+        'halo.L': (0, ring(t, 1.45, 10, 1.6, 2.5), 0), 'halo.R': (0, -ring(t, 1.45, 10, 1.6, 2.5), 0),
+    })
+    return ch
+
+def lance_call(t):
+    # Meridian Lances / Recall / Cascading: the glaive is raised to the zenith and held while the beams line up, then
+    # driven down and forward on the last frame (the volley lands)
+    T = 3.0; up = key(t, [(0, 0), (0.7, 1.0), (T, 1.0)]); s = strike(t, T, 0.15)
+    ch = base_pose(t)
+    ch.update({
+        'upperarm.R': (-150 * up + 110 * s, -15 * up, 0), 'forearm.R': (-20 * up + 10 * s, 0, 0),
+        'glaive': (-8 * up + 78 * s, 0, 0),
+        'upperarm.L': (-40 * up + 20 * s, -40 * up, 0), 'forearm.L': (-30 * up, 0, 0),
+        'chest': add(ch['chest'], (-8 * up + 16 * s, 0, 0)), 'head': (1.5 - 14 * up + 12 * s, 0, 0),
+        'hips_loc': (0, 0, -0.05 * up - 0.12 * s),
+        'halo_loc': (0, 0, 0.18 * up), 'halo.L': (0, 14 * up, 0), 'halo.R': (0, -14 * up, 0),
+        'pendulum': (0, 16 * math.sin(2 * math.pi * t) * (1 - up) + 26 * up * math.sin(4 * math.pi * t), 0),
+    })
+    return ch
+
+def zenith_collapse(t):
+    # the sky falls: both hands lift the glaive crosswise over his head as he rises onto his toes, then slam it down
+    # on the last frame (the annulus resolves; the safe disc is at his feet)
+    T = 3.0; up = key(t, [(0, 0), (1.0, 1.0), (T, 1.0)]); s = strike(t, T, 0.14)
+    ch = base_pose(t)
+    ch.update({
+        'hips_loc': (0, 0, 0.06 * up - 0.3 * s), 'spine': (-6 * up + 14 * s, 0, 0),
+        'chest': add(ch['chest'], (-10 * up + 22 * s, 0, 0)), 'head': (1.5 - 18 * up + 20 * s, 0, 0),
+        'upperarm.R': (-165 * up + 120 * s, -25 * up, 0), 'forearm.R': (-25 * up, 0, 0),
+        'upperarm.L': (-160 * up + 115 * s, 35 * up, 0), 'forearm.L': (-35 * up, 0, 0),
+        'glaive': (5 * up + 95 * s, -85 * up * (1 - s), 0),
+        'halo_loc': (0, 0, 0.3 * up - 0.25 * s), 'halo': (-20 * up + 30 * s, 0, 0),
+        'halo.L': (0, 25 * up - 30 * s, 0), 'halo.R': (0, -25 * up + 30 * s, 0),
+    })
+    return ch
+
+def orrery_closing(t):
+    # the orrery: arms spread wide and the halo turns, faster and faster, as the rings slide; on the last frame his
+    # arms sweep shut in front of him (the rim and the crown close)
+    T = 3.0; o = key(t, [(0, 0), (0.6, 1.0), (T, 1.0)]); s = strike(t, T, 0.18)
+    ch = base_pose(t)
+    ch.update({
+        'upperarm.L': (-25 * o - 50 * s, -75 * o * (1 - s) + 10 * s, 0), 'forearm.L': (-10 * o - 30 * s, 0, 0),
+        'upperarm.R': (-20 * o - 40 * s, 65 * o * (1 - s) - 10 * s, 0), 'forearm.R': (-10 * o, 0, 0),
+        'glaive': (0, 30 * o * (1 - s), 0),
+        'chest': add(ch['chest'], (-6 * o + 10 * s, 0, 0)), 'head': (1.5 - 6 * o, 0, 0),
+        'halo': (0, 0, 60 * (t / T) ** 2), 'halo_loc': (0, 0, 0.12 * o),
+        'halo.L': (0, 20 * o - 30 * s, 0), 'halo.R': (0, -20 * o + 30 * s, 0),
+    })
+    return ch
+
+def ecliptic_order(t):
+    # the conductor: the free hand marks three beats across the dais (left, centre, right), the last and hardest on
+    # the final frame (the final strike lands)
+    T = 3.0; beats = (0.9, 1.9)
+    turn = key(t, [(0, 0), (0.9, -22), (1.9, 0), (T - 0.1, 22), (T, 22)])
+    hit = sum(snap(t, b, 0.06, 0.3) for b in beats) + strike(t, T, 0.1)
+    ch = base_pose(t)
+    ch.update({
+        'chest': add(ch['chest'], (4 * hit, 0, turn)), 'head': (1.5 + 6 * hit, 0, turn * 1.2),
+        'upperarm.L': (-95 + 40 * hit, -20, 0), 'forearm.L': (-30 + 20 * hit, 0, 0), 'hand.L': (-20 * hit, 0, 0),
+        'upperarm.R': (-10, 8, 0), 'glaive': (0, 0, 0),
+        'halo.L': (0, 8 * hit, 0), 'halo.R': (0, -8 * hit, 0),
+    })
+    return ch
+
+def hour_hands(t):
+    # the clock: the glaive levelled like a clock hand, sweeping round in ticked steps, struck on the last frame
+    T = 3.0; lvl = key(t, [(0, 0), (0.5, 1.0), (T, 1.0)]); s = strike(t, T, 0.1)
+    step = math.floor(t / 0.25) * 0.25; sweep = -45 + 90 * min(1, step / (T - 0.25))
+    ch = base_pose(t)
+    ch.update({
+        'hips': (0, 0, 0.3 * sweep * lvl), 'chest': add(ch['chest'], (6 * s, 0, 0.6 * sweep * lvl)),
+        'head': (1.5, 0, 0.5 * sweep * lvl),
+        'upperarm.R': (-55 * lvl, 20 * lvl, 0), 'forearm.R': (-30 * lvl, 0, 0),
+        'glaive': (88 * lvl + 8 * s, 0, sweep * lvl),
+        'upperarm.L': (-15 * lvl, -25 * lvl, 0),
+        'pendulum': (0, 30 * math.sin(2 * math.pi * t / 0.5) * lvl, 0),
+    })
+    return ch
+
+def tower_call(t):
+    # the towers rise: he plants the glaive butt-first and lifts his open free hand high, held; the fist closes on the
+    # last frame (the towers resolve)
+    T = 2.5; plant = snap(t, 0.4, 0.06, 0.5); up = key(t, [(0, 0), (0.9, 1.0), (T, 1.0)]); s = strike(t, T, 0.12)
+    ch = base_pose(t)
+    ch.update({
+        'upperarm.R': (-20 * up, 8 * up, 0), 'forearm.R': (-15 * up, 0, 0),
+        'hips_loc': (0, 0, -0.08 * plant - 0.1 * s),
+        'upperarm.L': (-150 * up + 30 * s, -20 * up, 0), 'forearm.L': (-10 * up - 40 * s, 0, 0), 'hand.L': (-30 * s, 0, 0),
+        'chest': add(ch['chest'], (-8 * up + 10 * s, 0, 0)), 'head': (1.5 - 15 * up + 10 * s, 0, 0),
+        'halo_loc': (0, 0, 0.15 * up), 'halo.L': (0, 10 * up + ring(t, T - 0.05, 8, 2, 4), 0),
+    })
+    return ch
+
+def sunspots_cast(t):
+    # the sun's spots: free fist drawn to his chest as it brightens, then flung out on the last frame (the first spot)
+    T = 2.0; draw = key(t, [(0, 0), (0.8, 1.0), (T, 1.0)]); s = strike(t, T, 0.12)
+    ch = base_pose(t)
+    ch.update({
+        'upperarm.L': (-60 * draw * (1 - s) - 50 * s, -10 * draw - 80 * s, 0), 'forearm.L': (-100 * draw * (1 - s), 0, 0),
+        'hand.L': (-20 * draw, 0, 0),
+        'chest': add(ch['chest'], (6 * draw - 10 * s, 0, -10 * draw + 14 * s)), 'head': (1.5 + 8 * draw - 8 * s, 0, 0),
+        'hips_loc': (0, 0, -0.06 * draw),
+        'pendulum': (0, ring(t, T - 0.05, 30, 2.0, 3), 0),
+    })
+    return ch
+
+def mark_cast(t):
+    # Zenith Marks: both arms point down and out at the two marks (shade and sun), halo arcs split apart, snapped on
+    # the last frame
+    T = 2.0; m = key(t, [(0, 0), (0.6, 1.0), (T, 1.0)]); s = strike(t, T, 0.1)
+    ch = base_pose(t)
+    ch.update({
+        'upperarm.L': (-45 * m, -50 * m, 0), 'forearm.L': (-10 * m, 0, 0), 'hand.L': (-15 * s, 0, 0),
+        'upperarm.R': (-30 * m, 45 * m, 0), 'glaive': (0, 25 * m, 0),
+        'chest': add(ch['chest'], (-5 * m + 6 * s, 0, 0)), 'head': (1.5 + 10 * m, 0, 0),
+        'halo.L': (0, 28 * m, 0), 'halo.R': (0, -28 * m, 0), 'halo_loc': (0, 0, 0.1 * m),
+    })
+    return ch
+
+def eclipse_call(t):
+    # Total Eclipse: he raises his free hand to his brow, leans in and the halo sinks in front of him like a shield (the Corona)
+    T = 2.5; f = key(t, [(0, 0), (0.9, 1.0), (T, 1.0)])
+    ch = base_pose(t)
+    ch.update({
+        'hips_loc': (0, 0, -0.1 * f), 'spine': (6 * f, 0, 0), 'chest': add(ch['chest'], (8 * f, 0, 0)), 'head': (1.5 + 12 * f, 0, 0),
+        'upperarm.L': (-70 * f, -10 * f, 0), 'forearm.L': (-95 * f, 0, 0),
+        'upperarm.R': (-45 * f, 10 * f, 0), 'forearm.R': (-40 * f, 0, 0), 'glaive': (0, -25 * f, 0),
+        'halo': (40 * f, 0, 0), 'halo_loc': (0, -0.3 * f, -0.2 * f),
+        'halo.L': (0, -15 * f, 0), 'halo.R': (0, 15 * f, 0),
+    })
+    return ch
+
+def stagger(t):
+    # the Corona breaks: he is knocked back a half step, arms thrown wide, halo rattling, and recovers
+    T = 1.2; k = key(t, [(0, 0), (0.12, 1.0), (0.5, 0.8), (T, 0)])
+    ch = base_pose(t)
+    ch.update({
+        'hips_loc': (0, 0.2 * k, -0.12 * k), 'spine': (-10 * k, 0, 0), 'chest': add(ch['chest'], (-16 * k, 0, 6 * k)),
+        'head': (1.5 - 20 * k, 0, -8 * k),
+        'upperarm.L': (-25 * k, -55 * k, 0), 'upperarm.R': (-15 * k, 40 * k, 0), 'glaive': (-20 * k, 15 * k, 0),
+        'halo.L': (0, ring(t, 0.05, 25, 3, 3), 0), 'halo.R': (0, -ring(t, 0.05, 25, 3, 3), 0),
+        'pendulum': (0, ring(t, 0.05, 40, 1.5, 2), 0),
+    })
+    return ch
+
+def severance_split(t):
+    # Severance: the glaive raised horizontally over his head, the blade along the coming line; brought down on the
+    # last frame (the sides lock)
+    T = 2.0; up = key(t, [(0, 0), (0.7, 1.0), (T, 1.0)]); s = strike(t, T, 0.14)
+    ch = base_pose(t)
+    ch.update({
+        'upperarm.R': (-150 * up + 100 * s, -20 * up, 0), 'forearm.R': (-30 * up, 0, 0),
+        'upperarm.L': (-145 * up + 95 * s, 25 * up, 0), 'forearm.L': (-30 * up, 0, 0),
+        'glaive': (95 * s, -88 * up * (1 - s), 0),
+        'chest': add(ch['chest'], (-8 * up + 18 * s, 0, 0)), 'head': (1.5 - 12 * up + 14 * s, 0, 0),
+        'hips_loc': (0, 0, 0.04 * up - 0.2 * s),
+        'halo.L': (0, 18 * up, 0), 'halo.R': (0, -18 * up, 0),
+    })
+    return ch
+
+def last_light_call(t):
+    # Last Light: he raises the glaive high, the chest throws open and the halo arcs break wide; the pendulum runs wild
+    T = 2.5; r = key(t, [(0, 0), (0.8, 1.0), (T, 1.0)]); s = strike(t, 1.6, 0.1)
+    ch = base_pose(t)
+    ch.update({
+        'upperarm.R': (-160 * r, -10 * r, 0), 'forearm.R': (-15 * r, 0, 0), 'glaive': (-10 * r, 0, 0),
+        'upperarm.L': (-30 * r, -70 * r, 0),
+        'spine': (-6 * r, 0, 0), 'chest': add(ch['chest'], (-14 * r, 0, 0)), 'head': (1.5 - 20 * r, 0, 0),
+        'halo.L': (0, 40 * s, 0), 'halo.R': (0, -40 * s, 0), 'halo_loc': (0, 0.1 * r, 0.3 * r),
+        'pendulum': (0, 40 * math.sin(2 * math.pi * t / 0.6) * r, 0),
+    })
+    return ch
+
+def planets_release(t):
+    # Errant Planets: the free hand opens upward and flicks the planets out; the halo arcs flick after it
+    T = 1.5; o = key(t, [(0, 0), (0.5, 1.0), (1.0, 1.0), (T, 0)]); f = snap(t, 0.55, 0.06, 0.5)
+    ch = base_pose(t)
+    ch.update({
+        'upperarm.L': (-70 * o - 30 * f, -40 * o, 0), 'forearm.L': (-40 * o + 30 * f, 0, 0), 'hand.L': (-30 * f, 0, 0),
+        'chest': add(ch['chest'], (-4 * o, 0, 6 * o)), 'head': (1.5 - 8 * o, 0, 8 * o),
+        'halo.L': (0, ring(t, 0.6, 15, 2, 3), 0), 'halo.R': (0, -ring(t, 0.7, 15, 2, 3), 0),
+    })
+    return ch
+
+def meridian_flick(t):
+    # Falling Meridians: a short downward beat of the free hand and a nod (a circle falls at each player's feet)
+    T = 0.8; f = snap(t, 0.3, 0.1, 0.45)
+    ch = base_pose(t)
+    ch.update({
+        'upperarm.L': (-40 * f, -20 * f, 0), 'forearm.L': (-20 * f, 0, 0), 'hand.L': (-35 * f, 0, 0),
+        'head': (1.5 + 8 * f, 0, 0), 'halo.L': (0, 6 * f, 0), 'halo.R': (0, -6 * f, 0),
+    })
+    return ch
+
 acts = [bake_clip('Idle', 4.0, idle, loop=True), bake_clip('Walk', WALK_CYCLE, walk, loop=True),
         bake_clip('MeridianCut', 3.1, meridian_cut), bake_clip('ZenithPins', 3.15, zenith_pins),
         bake_clip('ProcessionalThrust', 4.4, processional_thrust), bake_clip('CrownReversal', 3.3, crown_reversal),
         bake_clip('MeridianAlignment', 3.8, meridian_alignment), bake_clip('OpenChest', 2.0, open_chest, loop=True),
-        bake_clip('PhaseShift', 1.5, phase_shift), bake_clip('Defeat', 2.5, defeat)]
+        bake_clip('PhaseShift', 1.5, phase_shift), bake_clip('Defeat', 2.5, defeat),
+        bake_clip('Entrance', 2.0, entrance), bake_clip('LanceCall', 3.0, lance_call), bake_clip('ZenithCollapse', 3.0, zenith_collapse),
+        bake_clip('OrreryClosing', 3.0, orrery_closing), bake_clip('EclipticOrder', 3.0, ecliptic_order), bake_clip('HourHands', 3.0, hour_hands),
+        bake_clip('TowerCall', 2.5, tower_call), bake_clip('SunspotsCast', 2.0, sunspots_cast), bake_clip('MarkCast', 2.0, mark_cast),
+        bake_clip('EclipseCall', 2.5, eclipse_call), bake_clip('Stagger', 1.2, stagger), bake_clip('SeveranceSplit', 2.0, severance_split),
+        bake_clip('LastLightCall', 2.5, last_light_call), bake_clip('PlanetsRelease', 1.5, planets_release), bake_clip('MeridianFlick', 0.8, meridian_flick)]
 print('CLIPS', [a.name for a in acts])
 arm.animation_data.action = acts[0]
 set_pose({})

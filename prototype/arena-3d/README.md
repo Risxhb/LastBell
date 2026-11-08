@@ -10,7 +10,7 @@ A browser prototype for settling how the classes and the Bellkeeper should look 
   - Arcanist: tall collar, split robe tails, floating astrolabe and lenses, straight-line teal beams, and a rooted cast that lifts the astrolabe overhead.
   - Healer, shown as a "Chime Warden": ivory mantle, halo, tuning-fork staff, hovering chimes, dotted friendly rings. It comes with a training ally to keep alive.
 - **The Bellkeeper** (art bible §10): hooded bell torso, ivory mask with a single focal glow, a visible pendulum core, segmented arms and a broken halo. It acts out idle, windup (turns toward the attack, coral surge), resolve and recovery.
-- **Encounter:** by default the Bellkeeper v1.0 design (HP phases, Pendulum Charge, Shattered Chime, The Final Toll; see `docs/design/bellkeeper-v1-prototype.md`). Esc → Encounter switches to the v0.1 solo timeline from `docs/design/bellkeeper.md` (Echo marks, Sanctuary Peal, 4:00 Final Hour enrage).
+- **Encounter:** by default the retired Bellkeeper v1.0 design (HP phases, Pendulum Charge, Shattered Chime, The Final Toll; the game now has only the Bellkeeper Ultimate). Esc → Encounter switches to the v0.1 solo timeline from `docs/design/bellkeeper.md` (Echo marks, Sanctuary Peal, 4:00 Final Hour enrage).
 - **Telegraphs** are drawn in a shader from the exact simulation geometry (art bible §11). Each has a geometry layer, an identity pattern and a timing pulse.
 - **Failure cards** state what failed and why, with a small arena diagram. Guarded, immune and warded outcomes never read as "avoided".
 

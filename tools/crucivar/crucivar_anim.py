@@ -206,15 +206,17 @@ def bake(name, seconds, fn, loop=False):
     act.frame_range = (1, frames + 1)
     return act
 
-acts = [bake('Idle', 4.0, idle, True), bake('Walk', WALK, walk, True),
+# HELPERS_ONLY (crucivar_v4_clips.py): load the pose helpers and clip functions without baking
+if not globals().get("HELPERS_ONLY"):
+  acts = [bake('Idle', 4.0, idle, True), bake('Walk', WALK, walk, True),
         bake('Diebreaker', 1.8, diebreaker), bake('HammerLodged', 2.4, hammer_lodged),
         bake('SlagCast', 2.0, slag_cast), bake('RailRam', 2.4, rail_ram),
         bake('ReleaseFrontBack', 1.7, release(False)), bake('ReleaseSides', 1.7, release(True)),
         bake('CastingCycle', CAST, casting), bake('Vulnerable', 2.0, vulnerable, True),
         bake('PhaseShift', 1.5, phase_shift), bake('Defeat', 3.0, defeat)]
-print('CLIPS', [a.name for a in acts])
-arm.animation_data.action = acts[0]
-apply(base(0)); plant({})
+  print('CLIPS', [a.name for a in acts])
+  arm.animation_data.action = acts[0]
+  apply(base(0)); plant({})
 
 # ---------------- optional preview renders (turnaround + attack poses) ----------------
 def render_set(outdir):

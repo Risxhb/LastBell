@@ -42,7 +42,7 @@ namespace LastBell.Run
             if (Remembered.Count == 0) yield break;
             Say(Name);
             int res = Duration;
-            Glow(1.4f); Clip("MeridianAlignment", res);
+            Glow(1.4f); Clip("LanceCall", res);
             for (int i = 0; i + 1 < Remembered.Count; i += 2)
             {
                 var a = Lane(Remembered[i], res); var o = Lane(Remembered[i + 1], res); bool flare = i == 0;

@@ -40,9 +40,8 @@ namespace LastBell.Run
         {
             public Vector3? Target; public float Speed = 4.2f; public Vector3 Aim; public bool Sprint;
             public Vector3 Heading;   // used when Target is null: constant direction (zero = stand still)
-            bool dash, jump;
+            bool dash;
             public void Dash() => dash = true;
-            public void Jump() => jump = true;
             public void Stop() { Target = null; Heading = Vector3.zero; Sprint = false; }
             public void Go(Vector3 to, float speed = 4.2f) { Target = Sim.Flat(to); Speed = speed; }
             public void Walk(Vector3 dir, float speed = 4.2f) { Target = null; Heading = Sim.Flat(dir).normalized * Mathf.Clamp01(speed / PlayerController.WalkSpeed); }
@@ -60,7 +59,6 @@ namespace LastBell.Run
                 var right = Vector3.Cross(Vector3.up, fwd);
                 r.Move = Vector2.ClampMagnitude(new Vector2(Vector3.Dot(move, right), Vector3.Dot(move, fwd)), 1);
                 if (dash) { r.Dash = true; dash = false; }
-                if (jump) { r.Jump = true; jump = false; }
                 return r;
             }
         }
@@ -116,7 +114,7 @@ namespace LastBell.Run
                 var pos = at != null && i < at.Length ? at[i] : new Vector3(0, 0, 5) + Sim.Dir(90 + 360f * i / Mathf.Max(1, players)) * (players > 1 ? 1.5f : 0);
                 p.PrepareForEncounter(new Vector3(pos.x, 0, pos.z), 180);
                 p.DebugSetHp(PlayerController.MaxHp);
-                p.AbilitiesEnabled = true;   // dash and jump need it; V2Input never presses an ability
+                p.AbilitiesEnabled = true;   // the dash needs it; V2Input never presses an ability
                 V2In(p).Stop(); V2In(p).Aim = bp;
             }
             V2Hits.Clear(); V2Spawns.Clear();

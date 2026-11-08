@@ -30,19 +30,19 @@ namespace LastBell.Run
         sealed class Bot : IInputSource
         {
             public Vector3 MoveWorld; public Vector3 Aim; public bool Sprint;
-            public bool[] press = new bool[5]; public bool[] hold = new bool[5]; public bool dash, jump, potion;
+            public bool[] press = new bool[5]; public bool[] hold = new bool[5]; public bool dash, potion;
             public PlayerInput Read(PlayerController who)
             {
-                var r = new PlayerInput { Aim = Aim, Sprint = Sprint, Dash = dash, Jump = jump, Potion = potion,
+                var r = new PlayerInput { Aim = Aim, Sprint = Sprint, Dash = dash, Potion = potion,
                     P0 = press[0], P1 = press[1], P2 = press[2], P3 = press[3], P4 = press[4],
                     H0 = hold[0] || press[0], H1 = hold[1], H2 = hold[2], H3 = hold[3] || press[3], H4 = hold[4] };
                 var cam = Camera.main; var fwd = cam ? Sim.Flat(cam.transform.forward).normalized : Vector3.forward;
                 var right = Vector3.Cross(Vector3.up, fwd);
                 r.Move = Vector2.ClampMagnitude(new Vector2(Vector3.Dot(MoveWorld, right), Vector3.Dot(MoveWorld, fwd)), 1);
-                for (int i = 0; i < 5; i++) press[i] = false; dash = jump = potion = false;
+                for (int i = 0; i < 5; i++) press[i] = false; dash = potion = false;
                 return r;
             }
-            public void Clear() { MoveWorld = Vector3.zero; Sprint = false; for (int i = 0; i < 5; i++) { press[i] = hold[i] = false; } dash = jump = false; }
+            public void Clear() { MoveWorld = Vector3.zero; Sprint = false; for (int i = 0; i < 5; i++) { press[i] = hold[i] = false; } dash = false; }
         }
 
         RunDirector d; readonly Bot bot = new Bot();
@@ -83,8 +83,11 @@ namespace LastBell.Run
         }
         void Note(string s) { lines.Add("      " + s); Debug.Log("[autotest] " + s); }
 
+        // -batchmode renders nothing, so WaitForEndOfFrame never fires there: picture steps are skipped and the checks go on
+        static bool NoFrames => Application.isBatchMode;
         IEnumerator Shot(string name)
         {
+            if (NoFrames) { Note("screenshot " + name + " skipped (batchmode)"); yield return null; yield break; }
             yield return new WaitForEndOfFrame();
             var path = Path.Combine(dir, $"{++shots:00}_{name}.png");
             var tex = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
@@ -99,6 +102,7 @@ namespace LastBell.Run
         IEnumerator Capture(string name, int frames)
         {
             var cdir = Path.Combine(dir, "frames_" + name); Directory.CreateDirectory(cdir);
+            if (NoFrames) { Note($"video frames {name}: skipped (batchmode)"); yield break; }
             Time.captureFramerate = 60;
             for (int i = 0; i < frames; i++)
             {
@@ -221,10 +225,15 @@ namespace LastBell.Run
             Note($"Last Bell autotest · {Application.version} · Unity {Application.unityVersion} · {SystemInfo.graphicsDeviceName} · {DateTime.Now:yyyy-MM-dd HH:mm}");
             d.InputOverride = bot;
             yield return Wait(1.0f);
-            if (PartyOnly) { yield return PartyChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
+            if (SmokeOnly) { yield return SmokeChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
+            if (PartyOnly) { yield return PartyChecks(); yield return ReviveChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
             if (AurelionOnly) { yield return AurelionChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
+            if (BellkeeperUltimateOnly) { yield return BellkeeperUltimateChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
             // -lastbellArcanistOnly: just the Arcanist run and its kit checks (skips the menu, map, other-class and boss suites)
             if (ArcanistOnly) { yield return ArcanistRun(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
+            // The run-loop checks below use the Ultimate as a passive final target (no plan) and practise on the current map; the
+            // archived v1 Bellkeeper they used to fight is retired (Chzy18, 1 Nov). The Ultimate's own section turns both off.
+            BellkeeperEncounter.TestIdle = true; RunDirector.PracticeStaysOnMap = true;
             if (SoloSweepOn) { yield return SoloSweep(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
             if (TollbreakerOnly) { yield return TollbreakerRun(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
             Check($"boots into the menu on a run map ({RunMaps.CurrentName})", d.State == RunState.Menu && RunMaps.Current >= 0);
@@ -240,6 +249,8 @@ namespace LastBell.Run
             }
             if (OnlySylvara)
             {
+                RunDirector.PracticeStaysOnMap = false;   // her practice runs on her own map, not the passive-target setup above
+                BossAttackIconChecks();   // the catalog carries her icons
                 yield return SylvaraChecks();
                 Check("no errors or exceptions logged", errors == 0, errors + " logged");
                 Finish(); yield break;
@@ -285,67 +296,10 @@ namespace LastBell.Run
             Check("F potion heals +40 and spends one", d.Player.Hp == 90 && d.Player.Potions == PlayerController.MaxPotions - 1, $"hp {d.Player.Hp}, potions {d.Player.Potions}");
             bot.potion = true; yield return Wait(0.1f);
             Check("potion lockout: no second drink within 1 s", d.Player.Potions == PlayerController.MaxPotions - 1);
-            d.Boss.DebugSetHpFraction(0.95f); d.Boss.BeginCombat();   // test setup: phase 1 again after the kit checks
-            d.Player.DebugSetHp(PlayerController.MaxHp);   // test setup: the rest of this run checks phases, not survival
-            Check("Bellkeeper resumes in Last Guardian after the kit checks", d.Boss.PhaseName == BellkeeperEncounter.Phase1, d.Boss.PhaseName);
-            Check("Bellkeeper uses its model", bk.Presenter != null && bk.Presenter.HasModel);
-            Check("Bellkeeper 2.0 rig has the shell halves and three rings", bk.PhaseRigFound);
-            StartCoroutine(Capture("bellkeeper_fight", 300));
-            fight = StartCoroutine(Fight(4.5f, TollRotation, 3f));
-            yield return WaitAlive(2.5f); yield return Shot("combat_bellkeeper"); yield return WaitAlive(2.2f);
-            StopCoroutine(fight); bot.Clear();
-            // The Unfinished Hour (spec v0.3 §3.1, §4.1): phase 1 records one footprint, then replays it alone
-            yield return Survive(8, () => bk.HasMemory);
-            Check("phase 1 records a footprint and shows its inactive outline", bk.HasMemory);
-            Check("Last Guardian look: shell closed, rings compact", bk.ShellAngle < 2 && bk.RingSpread < 0.01f, $"shell {bk.ShellAngle:0}°, rings {bk.RingSpread:0.00} m");
-            yield return Shot("bellkeeper_memory_outline");
+            // the archived v1 Bellkeeper is only the run's final target here: no checks of its own fight (Chzy18, 1 Nov: test only
+            // the current boss versions; the Ultimate has its own checks)
             d.Player.DebugSetHp(PlayerController.MaxHp);
-            yield return Survive(14, () => bk.LiveEcho != null);
-            var echo1 = bk.LiveEcho;
-            Check("phase 1 replays the memory as an isolated echo", echo1 != null && d.World.Hazards.Count == 1 && !bk.HasMemory,
-                $"echo {echo1 != null}, live hazards {d.World.Hazards.Count}");
-            Check("the echo warns for 90 ticks", echo1 != null && echo1.ResolveAt == 90 && echo1.LockAt == 0);
-            yield return Survive(1.0f); yield return Shot("bellkeeper_unfinished_hour");
-            yield return Survive(2, () => bk.EchoesResolved > 0);
-            Check("the echo resolves once and the memory is erased", bk.EchoesResolved == 1 && !bk.HasMemory && bk.LiveEcho == null);
-            yield return Survive(0.2f);
-            Check("the chest opens after the echo", d.Boss.Current == "recovery", d.Boss.Current);
-            d.Player.DebugSetHp(PlayerController.MaxHp);
-            d.Boss.DebugSetHpFraction(0.69f);
-            yield return Survive(16, () => d.Boss.PhaseName == BellkeeperEncounter.Phase2);
-            Check("phase 2 queued and entered", d.Boss.PhaseName == BellkeeperEncounter.Phase2);
-            yield return null; yield return null;
-            Check("Bellkeeper plays PhaseShift on the transition", bk.Presenter.CurrentClip == "PhaseShift", bk.Presenter.CurrentClip);
-            yield return Survive(3f); yield return Shot("bellkeeper_phase2");
-            Check("Broken Hour look: shell parted, rings offset", bk.ShellAngle >= 10 && bk.RingSpread > 0.15f, $"shell {bk.ShellAngle:0}°, rings {bk.RingSpread:0.00} m");
-            d.Boss.DebugSetHpFraction(0.34f);
-            d.Player.DebugSetHp(PlayerController.MaxHp);
-            yield return Survive(22, () => d.Boss.PhaseName == BellkeeperEncounter.Phase3);
-            Check("phase 3 queued and entered", d.Boss.PhaseName == BellkeeperEncounter.Phase3);
-            yield return Survive(2.5f); yield return Shot("bellkeeper_final_toll");
-            Check("Final Toll look: chest open, rings spread", bk.ShellAngle >= 38 && bk.RingSpread > 0.35f, $"shell {bk.ShellAngle:0}°, rings {bk.RingSpread:0.00} m");
-            // spec v0.3 §4.3: the Final Toll remembers its own March and replays it with the paired Bell Sweep
-            d.Player.DebugSetHp(PlayerController.MaxHp);
-            yield return Survive(6, () => bk.LiveEcho != null);
-            var echo3 = bk.LiveEcho;
-            Check("the Final Toll replays its March lane", echo3 != null && echo3.Shape == HazardShape.Lane && echo3.Damage == 30);
-            Check("the echo stays where the March started, not on the boss",
-                echo3 != null && Sim.Flat(echo3.Origin - d.Boss.transform.position).magnitude > 1f,
-                echo3 == null ? "" : $"{Sim.Flat(echo3.Origin - d.Boss.transform.position).magnitude:0.0} m");
-            yield return Survive(1, () => bk.LastFinalSweep != null);
-            var sw = bk.LastFinalSweep;
-            Check("the paired Bell Sweep resolves on the same tick as the echo",
-                echo3 != null && sw != null && echo3.ResolveAt - echo3.Age == sw.ResolveAt - sw.Age,
-                echo3 == null || sw == null ? "" : $"echo {echo3.ResolveAt - echo3.Age}, sweep {sw.ResolveAt - sw.Age}");
-            Check("never more than two damaging patterns at once", d.World.Hazards.Count <= 2, d.World.Hazards.Count.ToString());
-            yield return Shot("bellkeeper_final_toll_pairing");
-            yield return Survive(2, () => bk.LiveEcho == null);
-            d.Player.DebugSetHp(PlayerController.MaxHp);
-            yield return KillDuringWindup("bellkeeper", "bellkeeper_defeat");
-            Check("Bellkeeper plays Defeat", bk.Presenter.CurrentClip == "Defeat", bk.Presenter.CurrentClip);
-            Check("defeat erases the memory and every hazard", !bk.HasMemory && bk.LiveEcho == null && d.World.Hazards.Count == 0);
-            yield return Wait(1.0f); yield return Shot("bellkeeper_defeat");
-            Check("defeat opens the chest fully", bk.ShellAngle > 60, $"shell {bk.ShellAngle:0}°");
+            d.Boss.DebugDefeat();
             yield return Until(() => d.State == RunState.Results, 6, "results 1");
             Check("victory after every campaign fight, Bellkeeper last", d.Victory && d.EncountersCleared == d.EncounterOrder.Length && d.EncounterStarts == d.EncounterOrder.Length && d.EncounterEnds == d.EncounterOrder.Length,
                 $"victory {d.Victory}, cleared {d.EncountersCleared}, starts {d.EncounterStarts}, ends {d.EncounterEnds}");
@@ -458,8 +412,12 @@ namespace LastBell.Run
                 d.ReturnToMenu();
             }
             Check("map tour returns to the starting map", RunMaps.Current == startMap);
+            // ---------- the Bellkeeper Ultimate (proposal) ----------
+            BellkeeperEncounter.TestIdle = false; RunDirector.PracticeStaysOnMap = false;   // from here on: the real fights
+            yield return BellkeeperUltimateChecks();
             // ---------- area bosses (practice only for now) ----------
             yield return PartyChecks();
+            yield return ReviveChecks();
             yield return AurelionChecks();
 
             yield return SylvaraChecks();
@@ -742,13 +700,17 @@ namespace LastBell.Run
         {
             bool was = AllyBot.Attacks; AllyBot.Attacks = true; int keep = RunParty.Selected;
             var keepLevel = RunDifficulty.Selected;
-            // Tollbreaker solo on every level, plus one party run on Hard (1-4 players; test less, 1 Nov)
-            var runs = new (string cls, int allies, Difficulty level)[] { ("Tollbreaker", 0, Difficulty.Easy), ("Tollbreaker", 0, Difficulty.Medium), ("Tollbreaker", 0, Difficulty.Hard), ("Tollbreaker", 3, Difficulty.Hard) };
+            // Hard: Tollbreaker solo plus one party of 4 (test less, 1 Nov: the levels only scale damage)
+            var runs = new (string cls, int allies, Difficulty level)[] { ("Tollbreaker", 0, Difficulty.Hard), ("Tollbreaker", 3, Difficulty.Hard) };
+            // -lastbellSylvaraClearPhase n starts each run in phase n (practice Start Phase row); -lastbellSylvaraClearRepeat k runs the set k times
+            int startPhase = int.TryParse(AurelionArgs.Arg("-lastbellSylvaraClearPhase"), out var sp) ? Mathf.Clamp(sp, 1, 4) : 1;
+            int repeats = int.TryParse(AurelionArgs.Arg("-lastbellSylvaraClearRepeat"), out var nr) ? Mathf.Clamp(nr, 1, 10) : 1;
+            runs = Enumerable.Repeat(runs, repeats).SelectMany(r => r).ToArray();
             foreach (var (cls, allies, level) in runs)
             {
                 if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }
                 d.SelectAllies(allies); d.SelectDifficulty(level);
-                if (!d.StartPractice(cls, RunDirector.SylvaraPractice)) { Check($"Sylvara clear run {cls} +{allies} starts", false); continue; }
+                if (!d.StartPractice(cls, RunDirector.SylvaraPractice, startPhase)) { Check($"Sylvara clear run {cls} +{allies} starts", false); continue; }
                 yield return Until(() => RunDirector.Instance && RunDirector.Instance.State == RunState.Ready, 30, "Verdant Chimes loaded for a clear run");
                 if (RunDirector.Instance != d) { directorLog.AddRange(d.Log); d = RunDirector.Instance; d.InputOverride = bot; bot.Clear(); }
                 d.RequestReady();
@@ -759,13 +721,42 @@ namespace LastBell.Run
                 int n = allies + 1, maxHp = sy.MaxHp, downs = 0, tick0 = w.Tick, last = tick0;
                 Check($"Sylvara HP for {n} fighting players is the accepted table's {SylvaraEncounter.HpFor(n)}", maxHp == SylvaraEncounter.HpFor(n), maxHp.ToString());
                 var down = new HashSet<PlayerController>(); var phaseAt = new List<(string name, int tick)> { (sy.PhaseName, tick0) };
+                // hits per Hard addition (6 Nov): bullets and hazards made by one carry its name; the rest are "base". A down counts
+                // for the last hit before it. PlayerHit fires first for a bullet hit, then Bullets.Hit names its bullet.
+                var hitLog = new Dictionary<string, int[]>(); var lastKey = new Dictionary<PlayerController, string>();
+                PlayerController pendP = null; string pendKey = null; int pendDmg = 0;
+                void Count(string key, int n, int dmg) { if (!hitLog.TryGetValue(key, out var c)) hitLog[key] = c = new int[3]; c[0] += n; c[1] += dmg; }
+                Action<PlayerController, Hazard, int> onHaz = (p, h, dmg) =>
+                {
+                    string key = $"{(sy.HazardTag.TryGetValue(h, out var tg) ? tg : "base")} | {sy.PhaseName} | {h.Source}";
+                    Count(key, 1, dmg); lastKey[p] = key; pendP = p; pendKey = key; pendDmg = dmg;
+                };
+                Action<PlayerController, BulletSystem.Bullet, int> onBul = (p, b, dmg) =>
+                {
+                    if (pendP != p || pendKey == null || b.Tag == null) { pendP = null; return; }
+                    string key = $"{b.Tag} | {sy.PhaseName} | {b.Source}";
+                    Count(pendKey, -1, -pendDmg); Count(key, 1, pendDmg); lastKey[p] = key; pendP = null;
+                };
+                w.PlayerHit += onHaz; w.Bullets.Hit += onBul;
+                // reach (6 Nov): how often each class stands where its bot attacks her (the bot's own range for the phase, so the
+                // Tollbreaker's 9 m Seed Storm throw counts, + body + 2 m), and its mean distance
+                var reachN = new Dictionary<string, int[]>(); var reachD = new Dictionary<string, float>();
+                float SwingAt(string c) => AllyBot.SylvaraAttackRange(c, sy.PhaseName) + sy.BodyRadius + 2f;
                 while (d.State == RunState.Combat && d.World == w && (w.Tick - tick0) < Sim.Ticks(480))
                 {
                     last = w.Tick;
                     if (sy.PhaseName != phaseAt[phaseAt.Count - 1].name) phaseAt.Add((sy.PhaseName, w.Tick));
-                    foreach (var p in w.Players) { if (p.Down && down.Add(p)) downs++; else if (!p.Down) down.Remove(p); }
+                    foreach (var p in w.Players) if (!p.Down)
+                    {
+                        float dist = Sim.Flat(p.transform.position - sy.transform.position).magnitude; var c = p.ClassName;
+                        if (!reachN.TryGetValue(c, out var rn)) reachN[c] = rn = new int[2];
+                        rn[0]++; if (dist <= SwingAt(c)) rn[1]++; reachD[c] = (reachD.TryGetValue(c, out var ds) ? ds : 0) + dist;
+                    }
+                    foreach (var p in w.Players) { if (p.Down && down.Add(p)) { downs++; if (lastKey.TryGetValue(p, out var lk)) Count(lk, 0, 0); if (lk != null) hitLog[lk][2]++; } else if (!p.Down) down.Remove(p); }
                     yield return null;
                 }
+                // the last down ends combat on the same tick, before the loop sees it: count it for its last hit too
+                foreach (var p in w.Players) if (p.Down && down.Add(p)) { downs++; if (lastKey.TryGetValue(p, out var lk)) hitLog[lk][2]++; }
                 float secs = (last - tick0) / (float)Sim.Hz; bool won = d.State == RunState.Cleared || d.Victory || (sy && sy.Dead), wiped = d.State == RunState.Downed;
                 var parts = new List<string>();
                 for (int i = 0; i < phaseAt.Count; i++)
@@ -777,6 +768,17 @@ namespace LastBell.Run
                 Note($"Sylvara clear, {RunDifficulty.Name(level)}: {n} player{(n > 1 ? "s" : "")} ({cls} + {allies} bots), HP {maxHp}: {(won ? "cleared" : wiped ? $"wiped ({hpLeft:P0} left)" : $"not cleared ({hpLeft:P0} left)")} in {secs:0} s"
                     + $" ({string.Join(", ", parts)}); {downs} downs; party DPS {(maxHp * (1 - (won ? 0 : hpLeft))) / Mathf.Max(1, secs):0}; buds {sy?.BudsCut ?? 0} cut, {sy?.BudsBloomed ?? 0} bloomed");
                 Check($"Sylvara clear run {cls} +{allies} {RunDifficulty.Name(level)}: the bots deal damage", won || hpLeft < 1f);
+                w.PlayerHit -= onHaz; w.Bullets.Hit -= onBul;
+                Note("  reach: " + string.Join(", ", reachN.Select(kv => $"{kv.Key} {kv.Value[1] * 100 / Mathf.Max(1, kv.Value[0])} % in swing range, mean {reachD[kv.Key] / Mathf.Max(1, kv.Value[0]):0.0} m")));
+                Note("  damage: " + string.Join(", ", w.EncounterMeter.Values.OrderByDescending(r => r.Damage).Select(r => $"{r.Ability} {r.Damage} ({r.Hits} hits)")));
+                var adds = new[] { SylvaraEncounter.MirrorTag, "Choir Pods", "Counter Spiral", "Storm Arc", "base" };
+                foreach (var a in adds)
+                {
+                    var rows = hitLog.Where(kv => kv.Key.StartsWith(a + " |") && kv.Value[0] > 0).ToList();
+                    Note($"  hits, {a}: {rows.Sum(r => r.Value[0])} hits, {rows.Sum(r => r.Value[1])} damage, {rows.Sum(r => r.Value[2])} downs");
+                }
+                foreach (var kv in hitLog.Where(kv => kv.Value[0] > 0).OrderByDescending(kv => kv.Value[1]).Take(12))
+                    Note($"    {kv.Key}: {kv.Value[0]} hits, {kv.Value[1]} damage, {kv.Value[2]} downs");
                 if (d.State == RunState.Combat && d.Boss) d.Boss.DebugDefeat();   // timed out: end it so the next run can start
                 yield return Until(() => d.State != RunState.Combat, 10, "clear run ends");
             }
@@ -831,7 +833,7 @@ namespace LastBell.Run
                 while (watching && d.World != null)
                 {
                     maxBullets = Mathf.Max(maxBullets, d.World.Bullets.Count);
-                    if (d.Player && d.Player.Hp < 45) d.Player.DebugSetHp(PlayerController.MaxHp);   // keep the schedule running; damage is noted
+                    if (d.Player && d.Player.Hp < 60) d.Player.DebugSetHp(PlayerController.MaxHp);   // keep the schedule running; damage is noted (60: three Hard petals at once are 48)
                     yield return null;
                 }
             }
@@ -888,8 +890,8 @@ namespace LastBell.Run
                             yield return Shot("sylvara_props_choir_bud"); break;
                         }
                     }
-                    if (!seedShot && sy.PhaseName == "Seed Storm" && d.World.Bullets.Live.Any(b => b.Source == "Seed" && b.Age > b.Life * 0.6f && Sim.Flat(b.Pos - d.Player.transform.position).magnitude < 6f))
-                    { seedShot = true; yield return Shot("sylvara_props_storm_seeds"); }
+                    if (!seedShot && sy.PhaseName == "Seed Storm" && d.World.Bullets.Live.Any(b => b.Source == "Seed" && b.Life - b.Age < 0.3f && Sim.Flat(b.Pos - d.Player.transform.position).magnitude < 7f))
+                    { seedShot = true; yield return Shot("sylvara_props_storm_seeds"); }   // near the burst, so the ray preview shows too
                     yield return null;
                 }
             }
@@ -908,6 +910,13 @@ namespace LastBell.Run
             foreach (var id in new[] { "Petal Spiral", "Seed Pods", "Waterfall Jets", "Toll", "Feet Pod", "Pruning Arc", "Doubled Pods", "Second Spiral", "Triangle Pods" })
                 Check($"Sylvara P1 uses {id}", sy.Order.Contains(id));
             Check("Sylvara P1 fills the arena with bullets", d.World.Bullets.Fired > 300, $"{d.World.Bullets.Fired} fired, peak {d.World.Bullets.Peak}");
+            // her attack clips (proposal 2 Nov): a Conduct loop under the spirals, one-shots on the attacks
+            Check("Sylvara conducts while a spiral runs", sy.LoopClip == "ConductLoop", sy.LoopClip);
+            foreach (var c in new[] { "Toll", "CallWater", "PruningArc", "Seed" }) Check($"Sylvara P1 plays the {c} clip", sy.Clips.Contains(c));
+            if (sy.Presenter && sy.Presenter.Has("Intro")) Check("Sylvara wakes with the Intro clip on the intro card", sy.Clips.Contains("Intro"));
+            var newClips = new[] { "ConductLoop", "StormLoop", "Toll", "CallWater", "Sow", "LanesLoop", "Intro", "MaskSplit", "HollowLoop", "StormCall", "Stagger" };
+            if (sy.Presenter && sy.Presenter.HasModel && newClips.All(sy.Presenter.Has)) Check("her model has every v3 attack clip", true);
+            else Note("Sylvara: this model has no v3 attack clips (old sylvara-assets pack): every attack falls back to Idle");
             if (SylvaraProps.Has(SylvaraProps.Pod)) Check("Seed Pods drop the pod model onto their warnings", sy.PodModels > 0, sy.PodModels.ToString());
 
             // Phase 2: colours
@@ -929,15 +938,18 @@ namespace LastBell.Run
                 Check("Two-Colour Choir: the other colour's bullet passes through you", !bulletsHit.Contains(ghost));
                 Check("Two-Colour Choir: your own colour's bullet hits you", bulletsHit.Contains(real));
             }
-            int c0 = sy.ColourOf(d.Player); bool swapped = false, p2Shot = false;
+            int c0 = sy.ColourOf(d.Player); bool swapped = false, p2Shot = false, laneBeat = false;
             float s2 = Time.time;
             while (Time.time - s2 < 12f && d.State == RunState.Combat)
             {
                 yield return Play(0.5f, () => false);
                 swapped |= sy.ColourOf(d.Player) != c0 && sy.ColourOf(d.Player) != 0;
+                laneBeat |= sy.LoopClip == "LanesLoop";   // the lanes fire for most of the loop
                 if (!p2Shot && d.World.Bullets.Count > 150) { p2Shot = true; yield return Shot("sylvara_v3_p2"); }
             }
             Check("Two-Colour Choir: a toll swaps the player's colour", swapped);
+            Check("Sylvara beats the Lanes loop while the lanes fire", laneBeat);
+            Check("the Phase 2 spiral shows the Two-Colour Choir icon", sy.AttackOf("Petal Spiral") == "sylvara.two_colour_choir");
             foreach (var id in new[] { "Colour Spiral", "Brass Lanes", "Cobalt Lanes", "Second Colour Spiral", "Root Ring", "Toll" })
                 Check($"Sylvara P2 uses {id}", sy.Order.Contains(id));
             if (SylvaraProps.Has(SylvaraProps.Root))
@@ -976,6 +988,12 @@ namespace LastBell.Run
             yield return Play(14f, () => sy.Order.Contains("Pruning Arc"));
             foreach (var id in new[] { "Hollow Spiral", "Choir Buds", "Feet Pod", "Pruning Arc" })
                 Check($"Sylvara P3 uses {id}", sy.Order.Contains(id));
+            Check("Sylvara plays the Bloom clip when she plants Choir Buds", sy.Clips.Contains("Bloom"));
+            Check("the Hollow Spiral plays the open-mask loop (HollowLoop)", sy.LoopClip == "HollowLoop", sy.LoopClip);
+            if (sy.Presenter && sy.Presenter.Has("MaskSplit")) Check("the second form plays MaskSplit as the mask opens", sy.Clips.Contains("MaskSplit"));
+            Note($"Sylvara P3: Stagger played {sy.Clips.Count(c => c == "Stagger")}x (only on a bud cut while no other clip runs)");
+            if (sy.HasMaskBones) Check("the second form splits her mask open", sy.MaskOpen > 0.99f, sy.MaskOpen.ToString("0.00"));
+            else Note("Sylvara: this model has no mask bones (sylvara-assets 2.0.0 or older): the mask stays shut in the second form");
             Note($"Sylvara P3 buds: {sy.BudsCut} cut, {sy.BudsBloomed} bloomed");
 
             // Phase 4: seed storm and the enrage steps (timing accepted 29 Oct)
@@ -992,6 +1010,8 @@ namespace LastBell.Run
                 burst |= d.World.Bullets.Live.Any(b => b.Source == "Seed Burst");
             }
             yield return Shot("sylvara_v3_p4");
+            if (NoFrames) Note("Seed Storm washout check skipped (batchmode)");
+            else
             {
                 // hundreds of bullet meshes on screen must not wash the frame out (a NaN normal once bloomed it to white)
                 yield return new WaitForEndOfFrame();
@@ -1004,12 +1024,16 @@ namespace LastBell.Run
                 Check("Seed Storm frame is not washed out (bullet looks)", whiteShare < 0.2f && mean < 0.8f, $"mean {mean:0.00}, white {whiteShare:P0}");
             }
             Check("Seed Storm throws seeds", seed);
+            Check("Sylvara plays the Sow clip as she throws a seed ring", sy.Clips.Contains("Sow"));
             Check("seeds burst into petals when their fuse ends", burst);
             Check("Seed Storm loop 1: 8 seeds every 2.0 s", sy.StormSeeds == 8 && Mathf.Approximately(sy.StormEvery, 2.0f), $"{sy.StormSeeds} / {sy.StormEvery}");
             sy.DebugStartStorm(2);
             Check("enrage step: loop 3 throws 10 seeds every 1.8 s", sy.StormSeeds == 10 && Mathf.Abs(sy.StormEvery - 1.8f) < 0.001f, $"{sy.StormSeeds} / {sy.StormEvery}");
+            if (sy.Presenter && sy.Presenter.Has("StormCall")) { sy.DebugLastStormWarning(); Check("the LAST STORM warning plays StormCall", sy.Clips.Contains("StormCall")); }
             sy.DebugStartStorm(7);
             Check("enrage cap: Last Storm from 2:00 throws 14 seeds every 0.6 s", sy.LastStorm && sy.StormSeeds == 14 && Mathf.Abs(sy.StormEvery - 0.6f) < 0.001f);
+            Check("Last Storm plays the Storm loop", sy.LoopClip == "StormLoop", sy.LoopClip);
+            Check("Last Storm's spiral and seeds show the Last Storm icon", new[] { "Petal Spiral", "Seed", "Seed Burst" }.All(s => sy.AttackOf(s) == "sylvara.last_storm"));
             yield return Play(3f, () => false);
             yield return Shot("sylvara_v3_last_storm");
 
@@ -1025,24 +1049,113 @@ namespace LastBell.Run
                 Check($"Sylvara {lv} P1: jets warn {(e ? 2.0f : 1.5f)} s, Pruning Arc {(e ? "2.5 / 3.3" : "2.0 / 2.8")} s",
                     Mathf.Approximately(sy.JetWarn, e ? 2.0f : 1.5f) && Mathf.Approximately(sy.ArcExtra, e ? 0.5f : 0));
                 Check($"Sylvara {lv} P2: lanes every {(e ? 0.5f : 0.35f)} s, second spiral {(e ? "off" : "on")}, {(h ? "double" : "single")} toll",
-                    Mathf.Approximately(sy.LanePeriod, e ? 0.5f : 0.35f) && sy.SecondColourSpiral == h && sy.DoubleToll == h);
+                    Mathf.Approximately(sy.LanePeriod, e ? 0.5f : 0.35f) && sy.SecondColourSpiral == h && sy.DoubleToll == h && sy.ChoirPods == h && sy.MirrorJets == h);
                 Check($"Sylvara {lv} P3: {(h ? "one more bud" : "same buds")}, bloom {(e ? 15 : 12)} s, {(e ? 3 : 4)}-arm spiral",
-                    sy.BudCount == budBase + (h ? 1 : 0) && Mathf.Approximately(sy.BloomAfter, e ? 15 : 12) && sy.HollowArms == (e ? 3 : 4), $"{sy.BudCount} buds");
+                    sy.BudCount == budBase + (h ? 1 : 0) && Mathf.Approximately(sy.BloomAfter, e ? 15 : 12) && sy.HollowArms == (e ? 3 : 4) && sy.CounterSpiral == h, $"{sy.BudCount} buds");
                 sy.DebugStartStorm(0);
                 Check($"Sylvara {lv} P4: loop 1 {(e ? "6 seeds every 2.5" : "8 seeds every 2.0")} s, bursts of {(h ? 10 : 8)}",
-                    sy.StormSeeds == (e ? 6 : 8) && Mathf.Abs(sy.StormEvery - (e ? 2.5f : 2.0f)) < 0.001f && sy.BurstPetals == (h ? 10 : 8), $"{sy.StormSeeds} / {sy.StormEvery} / {sy.BurstPetals}");
+                    sy.StormSeeds == (e ? 6 : 8) && Mathf.Abs(sy.StormEvery - (e ? 2.5f : 2.0f)) < 0.001f && sy.BurstPetals == (h ? 10 : 8) && sy.StormArc == h, $"{sy.StormSeeds} / {sy.StormEvery} / {sy.BurstPetals}");
                 sy.DebugStartStorm(2);
                 Check($"Sylvara {lv} P4: the same enrage steps (+2 seeds, 0.2 s sooner at loop 3)",
                     sy.StormSeeds == (e ? 8 : 10) && Mathf.Abs(sy.StormEvery - (e ? 2.3f : 1.8f)) < 0.001f, $"{sy.StormSeeds} / {sy.StormEvery}");
+            if (sy.Presenter && sy.Presenter.Has("StormCall")) { sy.DebugLastStormWarning(); Check("the LAST STORM warning plays StormCall", sy.Clips.Contains("StormCall")); }
                 sy.DebugStartStorm(7);
                 Check($"Sylvara {lv} P4: Last Storm {(e ? "12 seeds every 0.8 s (softer on Easy)" : "14 seeds every 0.6 s, as on Medium")}",
                     sy.LastStorm && sy.StormSeeds == (e ? 12 : 14) && Mathf.Abs(sy.StormEvery - (e ? 0.8f : 0.6f)) < 0.001f, $"{sy.StormSeeds} / {sy.StormEvery}");
             }
             {
-                // Hard live: a seed bursts into 10 petals
-                d.World.Difficulty = Difficulty.Hard; sy.DebugStartStorm(0);
+                // Hard extras (5 Nov, done as recommended): more to dodge, not more damage
+                d.World.Difficulty = Difficulty.Hard; d.World.Hazards.ClearAll();
+                sy.DebugJets();
+                int wedges = d.World.Hazards.Live.Count(hz => hz.Source == "Waterfall Jet");
+                Check("Sylvara Hard P1: each Waterfall Jet has a mirrored twin with its own warning", sy.MirrorJets && wedges >= 2 && wedges % 2 == 0, wedges + " wedges");
+                Check("Sylvara Hard P2: Seed Pods join the Choir at 16.5 s", sy.ChoirPods);
+                Check("Sylvara Hard P3: a counter spiral turns under the Hollow Spiral", sy.CounterSpiral);
+                Check("Sylvara Hard P4: a Pruning Arc cuts through each Seed Storm loop", sy.StormArc);
+                d.World.Hazards.ClearAll();
+            }
+            {
+                // Hard live: a seed bursts into 10 petals. A fresh bullet field, so only Hard seeds take part (seeds still flying
+                // from the Medium storm above would mix 8- and 10-ray bursts; review SYL-PREVIEW-TEST, 7 Nov)
+                d.World.Bullets.ClearAll(); d.World.Difficulty = Difficulty.Hard; sy.DebugStartStorm(0);
+                // burst preview (proposal 7 Nov): each seed carries its burst angle from launch, its last 0.6 s draws the rays,
+                // and the petals fly exactly along the previewed rays from the previewed point
+                var seeds = new Dictionary<BulletSystem.Bullet, (float off, Vector3 at, int rays)>(); int fresh = 0; bool rayShown = false, seedsCarry = true;
+                // LAN (review SYL-PREVIEW-NET): a previewing seed sent through a world frame reaches a client with its rays and fuse
+                int netChecked = 0; string netBad = null;
+                void NetRoundTrip(BulletSystem.Bullet b)
+                {
+                    var f = new Networking.LanWorldFrame(); f.Players.Add(new Networking.LanWorldFrame.Player { Id = 0, Hp = 1, MaxHp = 1 });
+                    f.Bullets.Add(Networking.LanWorldCapture.BulletOf(b));
+                    if (!Networking.LanWorldFrame.TryDecode(f.Encode(), out var got) || got.Bullets.Count != 1) { netBad = "frame did not decode"; return; }
+                    var c = new BulletSystem.Bullet(); Networking.LanClientWorld.ApplyBullet(got.Bullets[0], c, 0);
+                    bool ok = c.BurstRays == b.BurstRays && Mathf.Abs(Mathf.DeltaAngle(c.BurstOff * Mathf.Rad2Deg, b.BurstOff * Mathf.Rad2Deg)) < 0.01f
+                        && Mathf.Approximately(c.BurstSpeed, b.BurstSpeed) && Mathf.Abs((c.Life - c.Age) - (b.Life - b.Age)) < 0.001f && c.Radius >= 0.5f;
+                    netChecked++; if (!ok && netBad == null) netBad = $"client {c.BurstRays} rays / {c.Life - c.Age:0.000} s left vs host {b.BurstRays} / {b.Life - b.Age:0.000}";
+                }
+                bool sampling = true;
+                // petals live 6 s: ones from earlier steps are still flying, and their seeds were never sampled
+                var older = new HashSet<BulletSystem.Bullet>(d.World.Bullets.Live.Where(b => b.Source == "Seed Burst"));
+                IEnumerator SampleSeeds()
+                {
+                    while (sampling)
+                    {
+                        foreach (var b in d.World.Bullets.Live)
+                            if (b.Source == "Seed" && !b.Dead && !seeds.ContainsKey(b))
+                            {
+                                // seeds launched on Hard carry 10 rays (older Medium seeds, still in flight, carry 8)
+                                if (b.Age < 0.1f) { fresh++; seedsCarry &= b.BurstRays == 10 && Mathf.Approximately(b.BurstSpeed, 4.5f); }
+                                seeds[b] = (b.BurstOff, b.Pos + b.Vel * (b.Life - b.Age), Mathf.Max(1, b.BurstRays));
+                            }
+                        rayShown |= GameObject.Find("Burst Ray") != null;
+                        if (netChecked < 3) foreach (var b in d.World.Bullets.Live) if (b.Source == "Seed" && !b.Dead && b.Life - b.Age <= BulletSystem.PreviewFor) { NetRoundTrip(b); break; }
+                        yield return null;
+                    }
+                }
+                StartCoroutine(SampleSeeds());
                 yield return Play(4.5f, () => false);   // the first ring comes at 2.0 s and bursts 1.6 s later
+                sampling = false;
                 Check("Sylvara Hard P4: a seed bursts into 10 petals", sy.LastBurstFired == 10, sy.LastBurstFired.ToString());
+                Check("Sylvara P4 burst preview: every seed carries its 10 burst rays from launch", fresh > 0 && seedsCarry, $"{fresh} seeds");
+                Check("Sylvara P4 burst preview: the rays are drawn before the burst", rayShown);
+                Check("Sylvara P4 burst preview: a LAN client gets each seed's rays and fuse (world frame round trip)", netChecked > 0 && netBad == null, netBad ?? $"{netChecked} seeds");
+                // the drawn track is the petal's real hit corridor: full petal width, from the burst point past the 0.4 s reach
+                Check("Sylvara P4 burst preview: each ray track is a petal's full hit width (0.6 m), end caps included",
+                        Mathf.Approximately(BulletSystem.PreviewRayWidth, 2 * BulletArt.PetalHitRadius), $"{BulletSystem.PreviewRayWidth:0.00} m");
+                {
+                    // SYL-PREVIEW-COLD: Sylvara's Ready warm-up builds the bars and materials, so the first preview builds none
+                    var probeRoot = new GameObject("Prewarm Probe").transform; var probe = new BulletSystem(d.World);
+                    var sylEntry = RunDirector.Bosses.First(e => e.Map == RunDirector.SylvaraMap && e.InRun);
+                    probe.Prewarm(probeRoot); int built = probe.PreviewBars;
+                    Check("Sylvara P4 burst preview: the ray bars are built on the Ready screen (Sylvara's warm-up), before the fight",
+                        sylEntry.WarmUp != null && built >= BulletSystem.PrewarmBars, $"{built} bars");
+                    UnityEngine.Object.Destroy(probeRoot.gameObject);
+                }
+                int petals = 0, onRay = 0; var miss = new List<string>();
+                foreach (var p in d.World.Bullets.Live)
+                {
+                    if (p.Source != "Seed Burst" || p.Dead || older.Contains(p)) continue;
+                    petals++;
+                    var start = p.Pos - p.Vel * p.Age; float pa = Mathf.Atan2(p.Vel.z, p.Vel.x);
+                    foreach (var s in seeds.Values)
+                    {
+                        float k = (pa - s.off) / (Mathf.PI * 2 / s.rays), dk = Mathf.Abs(k - Mathf.Round(k));
+                        var from = s.at + new Vector3(Mathf.Cos(pa), 0, Mathf.Sin(pa)) * 0.3f;
+                        if (dk < 0.01f && Sim.Flat(start - from).magnitude < 0.15f) { onRay++; goto matched; }
+                    }
+                    {
+                        // unmatched: the nearest predicted burst point and the angle error there (diagnostics)
+                        float bd = float.MaxValue, berr = 0; int br = 0; float age = p.Age;
+                        foreach (var s in seeds.Values)
+                        {
+                            float dd = Sim.Flat(start - (s.at + new Vector3(Mathf.Cos(pa), 0, Mathf.Sin(pa)) * 0.3f)).magnitude;
+                            if (dd < bd) { bd = dd; float k = (pa - s.off) / (Mathf.PI * 2 / s.rays); berr = Mathf.Abs(k - Mathf.Round(k)) * 360f / s.rays; br = s.rays; }
+                        }
+                        if (miss.Count < 5) miss.Add($"{bd:0.00} m / {berr:0.0} deg / {br} rays / age {age:0.00} / r {Sim.Flat(start).magnitude:0.0}");
+                    }
+                    matched:;
+                }
+                Check("Sylvara P4 burst preview: the petals fly along the previewed rays from the previewed point", petals > 0 && onRay == petals, $"{onRay} of {petals}" + (miss.Count > 0 ? "; misses: " + string.Join("; ", miss) : ""));
             }
             d.World.Difficulty = Difficulty.Medium; sy.DebugStartStorm(7);
 
@@ -1052,6 +1165,14 @@ namespace LastBell.Run
             Check("Sylvara: coloured bullets only hit their own colour", colourOk);
             Check("Sylvara: each ground or arc hazard hits at most once (R16)", hitsPerInstance.Values.All(n => n == 1), $"{hitsPerInstance.Count} instances hit");
             Note($"Sylvara v3: bot took {taken} damage ({bulletHits} bullet hits, {hitsPerInstance.Count} hazard hits), healed by the test; peak {maxBullets} bullets on screen, {d.World.Bullets.Fired} fired");
+            // attack icons (approved 2 Nov): every hit she dealt names its attack, and that attack has an icon
+            {
+                var w = d.World; var hits = Enumerable.Range(0, w.TakenLog.Count).Where(i => w.TakenLog[i].source != "Test Bullet").ToList();
+                var bare = hits.Where(i => w.TakenAttackIds[i] == null).Select(i => w.TakenLog[i].source).Distinct().ToList();
+                var ids = hits.Select(i => w.TakenAttackIds[i]).Where(id => id != null).Distinct().ToList();
+                Check("Sylvara: every hit carries her attack ID", hits.Count > 0 && bare.Count == 0, bare.Count == 0 ? $"{hits.Count} hits" : "no ID: " + string.Join(", ", bare));
+                Check("Sylvara: each attack hit has its icon and name", ids.All(id => BossAttackIcons.Icon(id) != null && BossAttackIcons.Get(id).bossName == "Sylvara"), string.Join(", ", ids));
+            }
 
             yield return KillDuringWindup("sylvara");   // Last Storm is still running: the watcher keeps the bot alive until she dies
             watching = false;

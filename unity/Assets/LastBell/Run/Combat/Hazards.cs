@@ -26,13 +26,13 @@ namespace LastBell.Run
         public HazardShape Shape;
         public HazardKind Kind = HazardKind.Strike;
         public Vector3 Origin;
+        public Vector3 Drift;                    // m/s, for a hazard its ability moves (bullets): AllyBot looks ahead along it
         public float Yaw;
         public float Radius, Inner, HalfAngle;   // circle/ring/cone
         public float Length, Width;              // lane
         public int LockAt, ResolveAt;
         public int ActiveTicks;                  // 0 or 1 = resolves on one tick; otherwise hits anyone inside for this many ticks from ResolveAt (R22)
         public int Damage;
-        public bool JumpClearable; public float ClearHeight = 0.35f;
         public float Knockback = 1.5f;
         public int Stun = 15;
         // > 0: a standing hazard (Crucivar's cooling slag). It deals this much per second to players inside while it
@@ -56,6 +56,7 @@ namespace LastBell.Run
         public Func<Vector3, Vector3> Push;      // knockback direction override (Second Press pushes toward the arena centre)
         public float ClipRadius;                 // > 0: the telegraph is drawn only over the floor disc of this radius (presentation)
         public bool HitOnResolve = true;         // false: the owner deals the hits itself while the warning is up (a sweeping charge)
+        public bool Hidden;                      // no floor telegraph (an arena-wide raidwide the boss shows with its own effects)
         public bool Flinch = true;               // false: the hit deals damage only, with no stun, knockback or interrupt (hostile bullets)
         public bool Soak;                        // a ring to stand IN (a tower), not a shape to leave: bots and the HUD read it
 
@@ -127,7 +128,6 @@ namespace LastBell.Run
         public event Action<Hazard> Spawned;   // tests record exact spawn ticks
         public event Action<Hazard> Resolving;   // the first resolve tick, before the hit test (telemetry: escape margins)
 
-        static readonly Color JumpFill = new Color(0.92f, 0.41f, 0.36f), JumpBorder = new Color(2.0f, 1.38f, 0.75f);   // coral #EB685D, warm edge #F1A65A (accepted 29 Oct)
         static readonly Color SlagFill = new Color(0.95f, 0.36f, 0.08f), SlagBorder = new Color(2.4f, 1.2f, 0.35f);
         readonly Dictionary<PlayerController, float> burn = new Dictionary<PlayerController, float>();
 
@@ -161,19 +161,23 @@ namespace LastBell.Run
                 case HazardShape.Tether: h.Tele = fx.Circle(0.01f); h.Tele.Tint(Color.clear, Color.clear); break;   // the ability draws the chain
                 default: h.Tele = fx.Lane(h.Length, h.Width); break;
             }
-            // jump-clearable bars: warm coral with an amber edge (not cyan, which is the Tollbreaker's), plus the HUD's JUMP label
-            if (h.JumpClearable) h.Tele.Tint(JumpFill, JumpBorder);
-            else if (h.BurnPerSecond > 0) h.Tele.Tint(SlagFill, SlagBorder);   // standing slag: molten, not the strike coral
+            if (h.BurnPerSecond > 0) h.Tele.Tint(SlagFill, SlagBorder);   // standing slag: molten, not the strike coral
             if (h.ClipRadius > 0) h.Tele.Clip(Vector3.zero, h.ClipRadius);
             h.Tele.Place(h.Origin, h.Yaw);
             if (h.LockAt <= 0) h.Tele.Lock();
+            if (h.Hidden) h.Tele.Hide();
             live.Add(h);
             Spawned?.Invoke(h);
             return h;
         }
 
+        // profiler scopes (perf agent, 2 Nov: name the phase-2 garbage); a marker costs nothing outside the profiler
+        static readonly Unity.Profiling.ProfilerMarker PmTrack = new Unity.Profiling.ProfilerMarker("LastBell.Hazards.TrackAndTelegraph"),
+            PmBurn = new Unity.Profiling.ProfilerMarker("LastBell.Hazards.Burn"), PmResolve = new Unity.Profiling.ProfilerMarker("LastBell.Hazards.Resolve");
+
         public void Step()
         {
+            using (PmTrack.Auto())
             for (int i = 0; i < live.Count; i++)
             {
                 var h = live[i];
@@ -183,7 +187,8 @@ namespace LastBell.Run
                 h.Tele.Place(h.Origin, h.Yaw);
                 h.Tele.Progress(h.FillToLock ? (h.LockAt > 0 ? (float)h.Age / h.LockAt : 1) : (float)h.Age / Mathf.Max(1, h.ResolveAt));
             }
-            StepBurn();
+            using (PmBurn.Auto()) StepBurn();
+            using (PmResolve.Auto())
             for (int i = live.Count - 1; i >= 0; i--)
             {
                 var h = live[i];
@@ -201,7 +206,6 @@ namespace LastBell.Run
                     {
                         if (p.Down || h.Hit.Contains(p) || !h.Hits(p)) continue;
                         if (h.Affects != null && !h.Affects(p)) continue;
-                        if (h.JumpClearable && p.Height >= h.ClearHeight) continue;   // the only height rule (R19)
                         h.Hit.Add(p);
                         p.ReceiveHit(h);
                     }
@@ -217,7 +221,7 @@ namespace LastBell.Run
         {
             var inside = new List<PlayerController>();
             foreach (var p in w.Players)
-                if (!p.Down && !h.Hit.Contains(p) && h.Hits(p) && !(h.JumpClearable && p.Height >= h.ClearHeight)) inside.Add(p);
+                if (!p.Down && !h.Hit.Contains(p) && h.Hits(p)) inside.Add(p);
             if (inside.Count == 0)
             {
                 if (h.WipeIfEmpty) foreach (var p in w.Players.ToArray()) if (!p.Down) { h.Hit.Add(p); p.ForceDown(h); }
@@ -239,7 +243,7 @@ namespace LastBell.Run
                 Hazard src = null;
                 if (!p.Down)
                     foreach (var h in live)
-                        if (h.BurnPerSecond > 0 && h.Locked && (src == null || h.BurnPerSecond > src.BurnPerSecond) && h.Hits(p)) src = h;
+                        if (h.BurnPerSecond > 0 && h.Locked && (src == null || h.BurnPerSecond > src.BurnPerSecond) && h.Hits(p) && (h.Affects == null || h.Affects(p))) src = h;
                 if (src == null) { burn.Remove(p); continue; }
                 burn.TryGetValue(p, out float acc); acc += src.BurnPerSecond * Sim.Dt;
                 int dmg = Mathf.FloorToInt(acc); acc -= dmg; burn[p] = acc;
