@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace LastBell.Run
 {
-    // Practice phase row (Chzy18, 29 Oct): every boss on the practice list starts in each phase it offers. For each boss
+    // Practice phase row (Chzy18, 29 Oct): every main boss (minibosses only with -lastbellMinibosses) starts in each phase it offers. For each boss
     // and phase: the director keeps the pick, the boss starts with HP inside that phase's band, the right phase number and
     // name, a full player, and no transition replays or heals in the first seconds. The last phase of each boss is also
     // retried, so a restarted fight comes back in the picked phase on a fresh boss.
@@ -25,6 +25,10 @@ namespace LastBell.Run
             _ => new[] { "", "" },
         };
 
+        // the 4 main bosses only (Chzy18, 2 Nov); Risx's miniboss phase checks run with -lastbellPhaseMinibosses (review TEST-01)
+        static bool PhaseMinibosses => Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellPhaseMinibosses", StringComparison.OrdinalIgnoreCase));
+        static bool MainBoss(int e) => RunDirector.Bosses[e].Final || Campaign.IsAreaBoss(e);
+
         IEnumerator PracticePhaseChecks()
         {
             Note("---- practice phase row ----");
@@ -36,8 +40,12 @@ namespace LastBell.Run
             Check("practice phase: a run always starts in phase 1", d.StartRun("Tollbreaker") && d.PracticePhase == 1);
             yield return PhaseToMenu();
             for (int e = 0; e < RunDirector.Bosses.Length; e++)
+            {
+                if (RunDirector.Bosses[e].Name == RunDirector.TutorialName) continue;   // the tutorial is scripted (TutorialDirector): no phase row
+                if (!MainBoss(e) && !PhaseMinibosses) continue;
                 for (int n = 1; n <= RunDirector.Bosses[e].Phases; n++)
                     yield return PracticeAtPhase(e, n, n == RunDirector.Bosses[e].Phases);
+            }
             yield return PhaseToMenu();
         }
 

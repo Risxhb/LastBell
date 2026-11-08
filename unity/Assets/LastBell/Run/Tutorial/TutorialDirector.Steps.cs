@@ -21,7 +21,7 @@ namespace LastBell.Run
             S("welcome", "Basics", "Welcome to Last Bell", Welcome),
             S("move", "Basics", "Move", Move),
             S("dash", "Basics", "Dash", Dash),
-            S("jump", "Basics", "Sprint and jump", Jump),
+            S("sprint", "Basics", "Sprint", Sprint),
             S("potion", "Basics", "Potions", Potion),
             // ---- class: Arcanist ----
             S("arcanist", "Arcanist", "The Arcanist", ArcanistIntro, arcanist: true),
@@ -39,7 +39,6 @@ namespace LastBell.Run
             S("crown", "Tempo Tyrant", "Hollow Crown", () => BossDrill("Crown")),
             S("slices", "Tempo Tyrant", "Spiral Slices", () => BossDrill("Slices")),
             S("rush", "Tempo Tyrant", "Closing Rush", RushDrill),
-            S("lowbar", "Mechanics", "Low bars: jump", LowBarDrill),
             // ---- shared mechanics, with the bot allies ----
             S("allies", "Party", "Your allies", AlliesIntro),
             S("soak", "Party", "Soak towers", SoakDrill),
@@ -165,11 +164,11 @@ namespace LastBell.Run
             foreach (var w in Until(() => Player.Dashing || (Player.Kit is ArcanistKit a && a.Blinking))) yield return w;
             Status = "Good."; yield return 60;
         }
-        IEnumerable<int> Jump()
+        IEnumerable<int> Sprint()
         {
-            Show("Basics", "Sprint and jump", "Hold <b>Shift</b> to sprint. Press <b>Space</b> to jump: low bars (coral with a warm edge) can be jumped. Jump now.", "");
+            Show("Basics", "Sprint", "Hold <b>Shift</b> while moving to sprint. It shares the stamina bar with your dash. There is no jump: every attack is dodged on foot. Sprint now.", "");
             yield return 30; Snap(StepId);
-            foreach (var w in Until(() => Player.Airborne)) yield return w;
+            foreach (var w in Until(() => Player.Presenter.Sprinting)) yield return w;
             Status = "Good."; yield return 60;
         }
         IEnumerable<int> Potion()
@@ -279,19 +278,6 @@ namespace LastBell.Run
             }
             boss.Halt(); SetGoal(null);
             for (int g = 0; g < 6 * Sim.Hz && W.Hazards.Count > 0; g++) yield return 1;
-        }
-
-        IEnumerable<int> LowBarDrill() => Drill("Low bars: jump",
-            "A <b>low bar</b> (coral with a warm edge, marked JUMP) sweeps the whole floor and can't be walked around in time. <b>Jump (Space)</b> just as its fill completes. Two are coming.",
-            LowBarAttempt, () => HitVerdict());
-        IEnumerable<int> LowBarAttempt()
-        {
-            for (int n = 0; n < 2; n++)
-            {
-                LowBar(Player.transform.position.z, 150);
-                yield return 100; if (n == 0) Snap(StepId);
-                yield return 70;
-            }
         }
 
         // ---------------- shared mechanics with the allies ----------------
@@ -410,7 +396,7 @@ namespace LastBell.Run
         IEnumerable<int> Hours()
         {
             foreach (var w in Page("Broken Cadence and Falling Hours",
-                "Below 20% health he enters <b>Broken Cadence</b>: his attacks chain, each starting while the last is still landing. Below 10% <b>the Hours fall</b>: orbs drop onto the floor and burst into bouncing orbs (you can't jump those) faster and faster until he dies.\n\nHe'll take you there now. Survive one chain."))
+                "Below 20% health he enters <b>Broken Cadence</b>: his attacks chain, each starting while the last is still landing. Below 10% <b>the Hours fall</b>: orbs drop onto the floor and burst into bouncing orbs faster and faster until he dies.\n\nHe'll take you there now. Survive one chain."))
                 yield return w;
             Show("Finale", "Survive", "Dodge his chained attacks and the falling orbs.", "");
             boss.HpFloor = Mathf.CeilToInt(boss.MaxHp * 0.03f);

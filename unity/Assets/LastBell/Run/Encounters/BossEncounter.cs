@@ -234,8 +234,8 @@ namespace LastBell.Run
         }
         protected Hazard Ring(string src, Vector3 at, float inner, float outer, int resolveAt, int dmg) =>
             W.Hazards.Spawn(new Hazard { Source = src, Shape = HazardShape.Ring, Kind = HazardKind.Ground, Origin = at, Inner = inner, Radius = outer, LockAt = 0, ResolveAt = resolveAt, Damage = dmg });
-        protected Hazard Lane(string src, Vector3 from, float yaw, float length, float width, int resolveAt, int dmg, bool jumpClear = false) =>
-            W.Hazards.Spawn(new Hazard { Source = src, Shape = HazardShape.Lane, Kind = HazardKind.Strike, Origin = from, Yaw = yaw, Length = length, Width = width, LockAt = 0, ResolveAt = resolveAt, Damage = dmg, JumpClearable = jumpClear });
+        protected Hazard Lane(string src, Vector3 from, float yaw, float length, float width, int resolveAt, int dmg) =>
+            W.Hazards.Spawn(new Hazard { Source = src, Shape = HazardShape.Lane, Kind = HazardKind.Strike, Origin = from, Yaw = yaw, Length = length, Width = width, LockAt = 0, ResolveAt = resolveAt, Damage = dmg });
         protected Hazard Marker(string src, float radius, int follow, int resolveAt, int dmg, float speed = 6f)
         {
             var h = new Hazard { Source = src, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Radius = radius, LockAt = follow, ResolveAt = resolveAt, Damage = dmg, Origin = Target() };

@@ -17,6 +17,7 @@ namespace LastBell.Run.Shop
         public float Value2, Tempered2;     // a second number on the card ({w}), for items with two effects
         public bool OfferedSolo = true;     // items with no solo value are never stocked solo (spec §3)
         public string PartnerClass;         // cross-class combo: stocked only when this class is in the party (spec §3)
+        public int MinToll;                 // Toll items: stocked only on runs at this Toll or higher (4 = Toll IV, 7 = Toll VII)
         public bool Held;                   // accepted but never stocked: it can't do what its card says in the current build
         public string Effect, SoloNote;     // card text; SoloNote = the solo fallback, shown when playing alone
         public string TemperNote;           // what the + version adds, when it isn't just a bigger number
@@ -33,7 +34,7 @@ namespace LastBell.Run.Shop
     }
 
     // The 69-item pool (docs/design/items/CATALOGUE.md): slice 1 (15 items, run-shop-plan §3) plus the 54 accepted on
-    // 2026-10-28; the Tollbreaker's 20 (accepted 2026-11-01) replaced the Vanguard's at the class swap. Prices are Chzy18's starting prices (spec §12.2). Held items are defined but never stocked.
+    // 2026-10-28; the Tollbreaker's 20 (accepted 2026-11-01) replaced the Vanguard's at the class swap; 10 Toll items (2026-11-05) on top. Prices are Chzy18's starting prices (spec §12.2). Held items are defined but never stocked.
     public static class ItemCatalog
     {
         public const int CommonPrice = 90, RarePrice = 150, KeystonePrice = 240, TemperPrice = 110;
@@ -56,6 +57,9 @@ namespace LastBell.Run.Shop
             BlinkCharge = "a.blink_charge", FarBlink = "a.far_blink", GlassEdge = "a.glass_edge", FourthGlyph = "a.fourth_glyph", MissileVolley = "a.missile_volley", TwinSigil = "a.twin_sigil",
             HastyComet = "a.hasty_comet", GreatComet = "a.great_comet", Starfall = "a.starfall", SurgeEcho = "a.surge_echo", GlyphBrand = "a.glyph_brand", ResonantRune = "a.resonant_rune";
         public const string LongLungs = "g.long_lungs", SureFooting = "g.sure_footing", Formation = "g.formation", FourthChoice = "g.fourth_choice", LightFeet = "g.light_feet";
+        // Toll items (docs/proposals/toll-items-2026-11-05.md, accepted 5 Nov): stocked only on runs at Toll IV / VII or higher
+        public const string Overchannel = "a.overchannel", LeadenStep = "g.leaden_step", DoubleToll = "c.double_toll", ShortSplit = "t.short_split", SteadyBreath = "g.steady_breath",
+            LingeringRune = "a.lingering_rune", PatientBell = "g.patient_bell", LowNote = "c.low_note", LongToss = "t.long_toss", LateBloom = "g.late_bloom";
 
         public static readonly ItemDef[] All =
         {
@@ -89,7 +93,7 @@ namespace LastBell.Run.Shop
                 Effect = "Sprint drains {v}/s instead of 25/s." },
             new ItemDef { Id = DeepBreath, Name = "Deep Breath", Tier = ItemTier.Common, Value = 0.6f, Tempered = 0.53f,
                 Effect = "Stamina starts regenerating {v} s after use instead of 0.75 s." },
-            new ItemDef { Id = LoneBell, Name = "Lone Bell", Tier = ItemTier.Rare, Value = 15, Tempered = 22.5f,
+            new ItemDef { Id = LoneBell, Name = "Lone Bell", Tier = ItemTier.Rare, Value = 12, Tempered = 18,
                 Effect = "+{v}% damage while no ally is within 8 m." },
             new ItemDef { Id = SpareFlask, Name = "Spare Flask", Tier = ItemTier.Rare, Value = 1, Tempered = null,
                 Effect = "+{v} potion at each refill. Potions still carry over between minibosses." },
@@ -176,7 +180,7 @@ namespace LastBell.Run.Shop
                 Effect = "After Blink, your next Magic Missile is instantly fully charged.", TemperNote = "That volley deals +15% damage." },
             new ItemDef { Id = FarBlink, Name = "Far Blink", Class = "Arcanist", Tier = ItemTier.Common, Value = 0.6f, Tempered = 0.9f,
                 Effect = "Blink distance +{v} m. No invincibility." },
-            new ItemDef { Id = GlassEdge, Name = "Glass Edge", Class = "Arcanist", Tier = ItemTier.Common, Value = 12, Tempered = 18,
+            new ItemDef { Id = GlassEdge, Name = "Glass Edge", Class = "Arcanist", Tier = ItemTier.Common, Value = 8, Tempered = 12,
                 Effect = "+{v}% damage and -8% max HP." },
             new ItemDef { Id = FourthGlyph, Name = "Fourth Glyph", Class = "Arcanist", Tier = ItemTier.Rare, Value = 4, Tempered = null,
                 Effect = "Glyphs cap at {v}." },
@@ -208,6 +212,30 @@ namespace LastBell.Run.Shop
                 Effect = "Your shop stock has {v} cards instead of 6 for the rest of the run (one more class card)." },
             new ItemDef { Id = LightFeet, Name = "Light Feet", Tier = ItemTier.Common, Value = 10, Tempered = 15,
                 Effect = "+{v}% move speed for 1 s after a dash." },
+
+            // ======== Toll items (Chzy18 accepted all 10 on 2026-11-05; sidegrades: each trades something away) ========
+            // ---- Toll IV ----
+            new ItemDef { Id = Overchannel, Name = "Overchannel", Class = "Arcanist", Tier = ItemTier.Keystone, MinToll = 4, Value = 3, Tempered = 4, Value2 = 2, Tempered2 = 2,
+                Effect = "Each Disintegrate step that hits carves {w} glyphs instead of 1, but you lose 1 glyph every {v} s while you're not channelling." },
+            new ItemDef { Id = LeadenStep, Name = "Leaden Step", Tier = ItemTier.Keystone, MinToll = 4, Value = 45, Tempered = 40, Value2 = 15, Tempered2 = 15,
+                Effect = "+{w}% damage, but each dash costs {v} stamina instead of 30. Dash distance and speed are unchanged." },
+            new ItemDef { Id = DoubleToll, Name = "Double Toll", Class = "Chimesinger", Tier = ItemTier.Rare, MinToll = 4, Value = 40, Tempered = 60, Value2 = 20, Tempered2 = 20,
+                Effect = "Bellstrike tolls again 1 s later for {v}% damage, but its recharge is {w}% longer." },
+            new ItemDef { Id = ShortSplit, Name = "Short Split", Class = "Tollbreaker", Tier = ItemTier.Rare, MinToll = 4, Value = 55, Tempered = 60,
+                Effect = "Splitting Throw's bonus is +{v}% instead of +40%, but it lasts 4 s instead of 6 (the axe stays lodged as long)." },
+            new ItemDef { Id = SteadyBreath, Name = "Steady Breath", Tier = ItemTier.Common, MinToll = 4, Value = 15, Tempered = 22, Value2 = 28, Tempered2 = 28,
+                Effect = "Stamina regenerates {v}% faster, but sprinting drains {w}/s instead of 25/s." },
+            // ---- Toll VII ----
+            new ItemDef { Id = LingeringRune, Name = "Lingering Rune", Class = "Arcanist", Tier = ItemTier.Rare, MinToll = 7, Value = 40, Tempered = 60,
+                Effect = "Rune Sigil goes off after 1.2 s instead of 0.8 s, and its rune stays 2 s more, hitting again for {v}% if the boss is still inside." },
+            new ItemDef { Id = PatientBell, Name = "Patient Bell", Tier = ItemTier.Keystone, MinToll = 7, Value = 60, Tempered = 80, Value2 = 10, Tempered2 = 10,
+                Effect = "Your first hit on the boss after 2 s without hitting it deals +{v}%; all your other hits deal -{w}%." },
+            new ItemDef { Id = LowNote, Name = "Low Note", Class = "Chimesinger", Tier = ItemTier.Common, MinToll = 7, Value = 12, Tempered = 18, Value2 = 15, Tempered2 = 15,
+                Effect = "Resonant Note +{v}% damage, but its notes fly {w}% slower." },
+            new ItemDef { Id = LongToss, Name = "Long Toss", Class = "Tollbreaker", Tier = ItemTier.Common, MinToll = 7, Value = 26, Tempered = 28, Value2 = 12, Tempered2 = 12,
+                Effect = "The held Twin Hurl throw lodges up to {w} m away instead of 9, but hits {v} instead of 30." },
+            new ItemDef { Id = LateBloom, Name = "Late Bloom", Tier = ItemTier.Rare, MinToll = 7, Value = 10, Tempered = 15, Value2 = 6, Tempered2 = 6,
+                Effect = "-{w}% damage in a fight's first phase, +{v}% in every later phase." },
         };
 
         static Dictionary<string, ItemDef> byId;

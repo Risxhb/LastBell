@@ -30,19 +30,19 @@ namespace LastBell.Run
         sealed class Bot : IInputSource
         {
             public Vector3 MoveWorld; public Vector3 Aim; public bool Sprint;
-            public bool[] press = new bool[5]; public bool[] hold = new bool[5]; public bool dash, jump, potion;
+            public bool[] press = new bool[5]; public bool[] hold = new bool[5]; public bool dash, potion;
             public PlayerInput Read(PlayerController who)
             {
-                var r = new PlayerInput { Aim = Aim, Sprint = Sprint, Dash = dash, Jump = jump, Potion = potion,
+                var r = new PlayerInput { Aim = Aim, Sprint = Sprint, Dash = dash, Potion = potion,
                     P0 = press[0], P1 = press[1], P2 = press[2], P3 = press[3], P4 = press[4],
                     H0 = hold[0] || press[0], H1 = hold[1], H2 = hold[2], H3 = hold[3] || press[3], H4 = hold[4] };
                 var cam = Camera.main; var fwd = cam ? Sim.Flat(cam.transform.forward).normalized : Vector3.forward;
                 var right = Vector3.Cross(Vector3.up, fwd);
                 r.Move = Vector2.ClampMagnitude(new Vector2(Vector3.Dot(MoveWorld, right), Vector3.Dot(MoveWorld, fwd)), 1);
-                for (int i = 0; i < 5; i++) press[i] = false; dash = jump = potion = false;
+                for (int i = 0; i < 5; i++) press[i] = false; dash = potion = false;
                 return r;
             }
-            public void Clear() { MoveWorld = Vector3.zero; Sprint = false; for (int i = 0; i < 5; i++) { press[i] = hold[i] = false; } dash = jump = false; }
+            public void Clear() { MoveWorld = Vector3.zero; Sprint = false; for (int i = 0; i < 5; i++) { press[i] = hold[i] = false; } dash = false; }
         }
 
         RunDirector d; readonly Bot bot = new Bot();
@@ -83,8 +83,11 @@ namespace LastBell.Run
         }
         void Note(string s) { lines.Add("      " + s); Debug.Log("[autotest] " + s); }
 
+        // -batchmode renders nothing, so WaitForEndOfFrame never fires there: picture steps are skipped and the checks go on
+        static bool NoFrames => Application.isBatchMode;
         IEnumerator Shot(string name)
         {
+            if (NoFrames) { Note("screenshot " + name + " skipped (batchmode)"); yield return null; yield break; }
             yield return new WaitForEndOfFrame();
             var path = Path.Combine(dir, $"{++shots:00}_{name}.png");
             var tex = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
@@ -99,6 +102,7 @@ namespace LastBell.Run
         IEnumerator Capture(string name, int frames)
         {
             var cdir = Path.Combine(dir, "frames_" + name); Directory.CreateDirectory(cdir);
+            if (NoFrames) { Note($"video frames {name}: skipped (batchmode)"); yield break; }
             Time.captureFramerate = 60;
             for (int i = 0; i < frames; i++)
             {
@@ -221,7 +225,8 @@ namespace LastBell.Run
             Note($"Last Bell autotest · {Application.version} · Unity {Application.unityVersion} · {SystemInfo.graphicsDeviceName} · {DateTime.Now:yyyy-MM-dd HH:mm}");
             d.InputOverride = bot;
             yield return Wait(1.0f);
-            if (PartyOnly) { yield return PartyChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
+            if (SmokeOnly) { yield return SmokeChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
+            if (PartyOnly) { yield return PartyChecks(); yield return ReviveChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
             if (AurelionOnly) { yield return AurelionChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
             // -lastbellArcanistOnly: just the Arcanist run and its kit checks (skips the menu, map, other-class and boss suites)
             if (ArcanistOnly) { yield return ArcanistRun(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
@@ -460,6 +465,7 @@ namespace LastBell.Run
             Check("map tour returns to the starting map", RunMaps.Current == startMap);
             // ---------- area bosses (practice only for now) ----------
             yield return PartyChecks();
+            yield return ReviveChecks();
             yield return AurelionChecks();
 
             yield return SylvaraChecks();
@@ -992,6 +998,8 @@ namespace LastBell.Run
                 burst |= d.World.Bullets.Live.Any(b => b.Source == "Seed Burst");
             }
             yield return Shot("sylvara_v3_p4");
+            if (NoFrames) Note("Seed Storm washout check skipped (batchmode)");
+            else
             {
                 // hundreds of bullet meshes on screen must not wash the frame out (a NaN normal once bloomed it to white)
                 yield return new WaitForEndOfFrame();
