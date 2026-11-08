@@ -92,6 +92,11 @@ namespace LastBell.Run
         readonly List<Bud> buds = new List<Bud>();
         public int BudsAlive { get { int n = 0; foreach (var b in buds) if (b.Alive) n++; return n; } }
         public float BudHpAt(Vector3 pos) { foreach (var b in buds) if (b.Alive && (b.Pos - pos).sqrMagnitude < 0.01f) return b.Hp; return 0; }   // tests
+        // a Choir Bud fires 3 Bud Petals every BudEvery s from BudFrom m out, its aim turning BudTurn rad/s
+        public const float BudEvery = 0.3f, BudFrom = 0.8f, BudSpeed = 4f, BudTurn = 30 * Mathf.Deg2Rad;
+        // the volleys still to come, for the bots' steer (a petal hits on the tick it appears, too fast to see and dodge):
+        // each live bud's position, aim now and seconds to its next volley
+        public void BudVolleys(List<(Vector3 pos, float aim, float next)> into) { into.Clear(); foreach (var b in buds) if (b.Alive) into.Add((b.Pos, b.Base, BudEvery - b.Acc)); }
         public List<Vector3> AliveBudPositions() { var l = new List<Vector3>(); foreach (var b in buds) if (b.Alive) l.Add(b.Pos); return l; }
         public void DebugLastStormWarning() => Toll("LAST STORM in 3 s");   // test hook: loop 4's warning, without waiting
         // test hook: restart the Seed Storm as Phase 4 loop k would start it (k >= 5 = Last Storm), without waiting
@@ -714,8 +719,8 @@ namespace LastBell.Run
             {
                 if (!b.Alive) { e.On = false; return; }
                 if (b.View) b.View.Open = Mathf.Clamp01((Age - b.Born) * Sim.Dt / b.Life);
-                b.Base += 30 * Deg * dt; b.Acc += dt;
-                while (b.Acc >= 0.3f) { b.Acc -= 0.3f; for (int i = 0; i < 3; i++) { float aa = b.Base + i * Tau / 3; Shot(b.Pos + On(aa, 0.8f), aa, 4, 10, 4, 0, "Bud Petal"); } }
+                b.Base += BudTurn * dt; b.Acc += dt;
+                while (b.Acc >= BudEvery) { b.Acc -= BudEvery; for (int i = 0; i < 3; i++) { float aa = b.Base + i * Tau / 3; Shot(b.Pos + On(aa, BudFrom), aa, BudSpeed, 10, 4, 0, "Bud Petal"); } }
                 if (b.Hp <= 0)
                 {
                     KillBud(b); BudsCut++; W.Hazards.Cancel(b.Timer);

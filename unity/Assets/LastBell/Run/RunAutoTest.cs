@@ -773,7 +773,7 @@ namespace LastBell.Run
                 // hits per Hard addition (6 Nov): bullets and hazards made by one carry its name; the rest are "base". A down counts
                 // for the last hit before it. PlayerHit fires first for a bullet hit, then Bullets.Hit names its bullet.
                 var hitLog = new Dictionary<string, int[]>(); var lastKey = new Dictionary<PlayerController, string>();
-                PlayerController pendP = null; string pendKey = null; int pendDmg = 0, burstWhy = 0;
+                PlayerController pendP = null; string pendKey = null; int pendDmg = 0, burstWhy = 0, budWhy = 0;
                 void Count(string key, int n, int dmg) { if (!hitLog.TryGetValue(key, out var c)) hitLog[key] = c = new int[3]; c[0] += n; c[1] += dmg; }
                 Action<PlayerController, Hazard, int> onHaz = (p, h, dmg) =>
                 {
@@ -786,6 +786,12 @@ namespace LastBell.Run
                     // cost (100 and up = it saw no clean move), stamina and the petal's age (a young one was still a seed)
                     if (b.Source == "Seed Burst" && burstWhy++ < 12)
                         Note($"  burst hit @{(w.Tick - tick0) / (float)Sim.Hz:0.0}s {p.ClassName} hp {p.Hp} stamina {p.Stamina:0} petal age {b.Age:0.00} from her {Sim.Flat(p.transform.position - sy.transform.position).magnitude:0.00} replan {ReplanCost(p):0.0} | {(p.Input as AllyBot)?.DebugLine}");
+                    // the same for Bud Petal (Hollow Bloom wipes): how far from the nearest bud, and the plan
+                    if (b.Source == "Bud Petal" && budWhy++ < 12)
+                    {
+                        float nb = 99; foreach (var bq in sy.AliveBudPositions()) nb = Mathf.Min(nb, Sim.Flat(p.transform.position - bq).magnitude);
+                        Note($"  bud hit @{(w.Tick - tick0) / (float)Sim.Hz:0.0}s {p.ClassName} hp {p.Hp} stamina {p.Stamina:0} petal age {b.Age:0.00} bud {nb:0.0} m replan {ReplanCost(p):0.0} | {(p.Input as AllyBot)?.DebugLine}");
+                    }
                     float ReplanCost(PlayerController pl) { var pp = Sim.Flat(pl.transform.position); SylvaraSteer.Choose(pl, pp, pp, out _, out _, out float c); return c; }
                     if (pendP != p || pendKey == null || b.Tag == null) { pendP = null; return; }
                     string key = $"{b.Tag} | {sy.PhaseName} | {b.Source}";

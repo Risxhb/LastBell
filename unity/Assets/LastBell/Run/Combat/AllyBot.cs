@@ -1301,7 +1301,9 @@ namespace LastBell.Run
     public static class SylvaraSteer
     {
         const float Horizon = 0.8f, Step = 0.05f, Buffer = 0.25f;
+        const float SprintReserve = 25f;   // stamina above the dash cost that a sprint for less than a hit may not spend
         static readonly List<BulletSystem.Bullet> near = new List<BulletSystem.Bullet>();
+        static readonly List<(Vector3 pos, float aim, float next)> volleys = new List<(Vector3, float, float)>();
         static readonly Vector3[] dirs = MakeDirs();
         static Vector3[] MakeDirs() { var d = new Vector3[16]; for (int i = 0; i < 16; i++) d[i] = Sim.Dir(i * 22.5f); return d; }
 
@@ -1326,15 +1328,26 @@ namespace LastBell.Run
                 var end = b.Pos + b.Vel * Horizon;
                 if (SegDist(pos, b.Pos, end) < reach + (b.Split != null ? 3f : 0f)) near.Add(b);
             }
+            // Choir Bud volleys still to come, from the buds within reach (8 Nov full runs: most Bud Petal hits were petals
+            // 0.02 s old on a bot 0.4-1.6 m from a bud; they appear on top of it, so the steer has to see them coming)
+            volleys.Clear();
+            if (w.Boss is SylvaraEncounter sb)
+            {
+                sb.BudVolleys(volleys);
+                for (int i = volleys.Count - 1; i >= 0; i--) if (Sim.Flat(volleys[i].pos - pos).magnitude > reach + SylvaraEncounter.BudFrom + 1f) volleys.RemoveAt(i);
+            }
             sprint = false; dash = false;
             var best = Vector3.zero; bestCost = Cost(me, pos, Vector3.zero, 0, home, boss, bud, budReach);
             bool canSprint = me.Stamina > PlayerController.SprintCost;
+            // near the dash reserve, a sprint has to save a hit: sprints for near misses and the pull home left it under the
+            // dash cost when a Seed Storm closed every walk (8 Nov: most Phase 4 burst hits came at 0-29 stamina, no dash)
+            float sprintFee = me.Stamina < PlayerController.DashCost + SprintReserve ? 30f : 0.6f;
             for (int s = 0; s < (canSprint ? 2 : 1); s++)
             {
                 float v = s == 0 ? PlayerController.WalkSpeed : PlayerController.SprintSpeed;
                 foreach (var d in dirs)
                 {
-                    float c = Cost(me, pos, d, v, home, boss, bud, budReach) + (s == 1 ? 0.6f : 0);
+                    float c = Cost(me, pos, d, v, home, boss, bud, budReach) + (s == 1 ? sprintFee : 0);
                     if (c < bestCost) { bestCost = c; best = d; sprint = s == 1; }
                 }
             }
@@ -1414,6 +1427,18 @@ namespace LastBell.Run
                         }
                     }
                 }
+                // bud petals fired after now: 3 arms per volley, aimed where the bud's turning aim will be
+                foreach (var vl in volleys)
+                    for (float fired = vl.next; fired < t; fired += SylvaraEncounter.BudEvery)
+                    {
+                        float r = SylvaraEncounter.BudFrom + SylvaraEncounter.BudSpeed * (t - fired), aim = vl.aim + SylvaraEncounter.BudTurn * fired;
+                        for (int i = 0; i < 3; i++)
+                        {
+                            float a = aim + i * Mathf.PI * 2 / 3;
+                            float gap = Sim.Flat(q - (vl.pos + new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * r)).magnitude - (BulletArt.PetalHitRadius + Hazard.Margin + Buffer);
+                            if (gap < 0) cost += 100 * early; else if (gap < 0.6f) cost += (0.6f - gap) * 4;
+                        }
+                    }
             }
             // telegraphs that land within the horizon (plus a little) where it ends up
             foreach (var h in me.World.Hazards.Live)
