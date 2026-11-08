@@ -1098,6 +1098,7 @@ namespace LastBell.Run
 
         System.Func<Vector3, bool> Bad(PlayerController me, BossEncounter boss, bool allowBurn = false, int soonest = int.MaxValue, bool jobs = true)
         {
+            badVer++;   // NearestClear's memo: a new Bad() is a new question
             if (badAt == null) badAt = BadAt;
             var live = me.World.Hazards.Live;
             // visible jobs (a tower, a light well, a Severance side) for every bot, the allies included; the memory jobs (the
@@ -1306,7 +1307,21 @@ namespace LastBell.Run
         }
 
         static Vector3[] Dirs48;
+        // one search per question a tick: the dodge path asked the same one twice (the escape-time probe, then the move, with the
+        // same Bad() while a threat stands), each a full search when nothing is clear (perf deep profile on 69df1cba, Phase 3:
+        // ~45% + ~45% of a bot's re-plan tick, 8 Nov). Keyed on the bot's Bad() count, so a rebuilt bad() searches again
+        int badVer, ncTick = -1, ncVer; Vector3 ncPos, ncDir; float ncNeed, ncMax; bool ncBurn; BossEncounter ncBoss;
         static Vector3 NearestClear(Vector3 pos, BossEncounter b, System.Func<Vector3, bool> bad, out float need, bool avoidBurn = true, float maxR = 28f)
+        {
+            var bot = bad.Target as AllyBot;
+            if (bot == null || bad != bot.badAt || bot.bMe == null) return NearestClearSearch(pos, b, bad, out need, avoidBurn, maxR);
+            int tick = bot.bMe.World.Tick;
+            if (bot.ncTick == tick && bot.ncVer == bot.badVer && bot.ncPos == pos && bot.ncBurn == avoidBurn && bot.ncMax == maxR && bot.ncBoss == b) { need = bot.ncNeed; return bot.ncDir; }
+            var dir = NearestClearSearch(pos, b, bad, out need, avoidBurn, maxR);
+            bot.ncTick = tick; bot.ncVer = bot.badVer; bot.ncPos = pos; bot.ncBurn = avoidBurn; bot.ncMax = maxR; bot.ncBoss = b; bot.ncNeed = need; bot.ncDir = dir;
+            return dir;
+        }
+        static Vector3 NearestClearSearch(Vector3 pos, BossEncounter b, System.Func<Vector3, bool> bad, out float need, bool avoidBurn, float maxR)
         {
             var bp = b.transform.position;
             if (Dirs48 == null) { Dirs48 = new Vector3[48]; for (int k = 0; k < 48; k++) Dirs48[k] = Sim.Dir(k * 7.5f); }
