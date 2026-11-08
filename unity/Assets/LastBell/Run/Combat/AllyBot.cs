@@ -396,7 +396,7 @@ namespace LastBell.Run
                 if ((h.AttackId == "crucivar.anvil_quake" || h.AttackId == "crucivar.quake_echo") && (h.Shape == HazardShape.Ring || h.Shape == HazardShape.Circle) && h.Track == null && h.Damage > 0 && !h.Cancelled
                     && h.Age < h.ResolveAt && h.Radius >= 3f && (quakeBands.Count == 0 || Sim.Flat(h.Origin - quakeBands[0].Origin).magnitude < 0.1f)) quakeBands.Add(h);
             }
-            if (quakeBands.Count < 2) return false;
+            if (quakeBands.Count == 0) return false;
             quakeBands.Sort((x, y) => (x.ResolveAt - x.Age).CompareTo(y.ResolveAt - y.Age));
             var hub = Sim.Flat(quakeBands[0].Origin); var off = Sim.Flat(pos - hub);
             float r0 = off.magnitude, yaw = r0 > 0.1f ? Sim.YawTo(hub, pos, 0) : 0f;
@@ -404,6 +404,10 @@ namespace LastBell.Run
             int n = Mathf.FloorToInt((rMax - rMin) / QuakeStep) + 1;
             bool brand = false;
             for (int i = 0; i < live.Count && !brand; i++) { var h = live[i]; if (h.Track != null && h.Age < h.LockAt && h.Shape == HazardShape.Circle && Spares(h, me)) brand = true; }
+            // one band left: the plain dodge does, except for a brand carrier. Hard's Quake Echo shows as the outer band lands, and
+            // the plain dodge had walked carriers from 10 m deep inside, where the echo then held them as the brand froze: pools on
+            // the Furnace Spin ring (8 Nov sweeps: Brand Pool the most damage taken, and bots riding the jet gaps pinned in it)
+            if (quakeBands.Count < 2 && !brand) return false;
             float pref = brand ? BrandRing : 6.5f;
             var dir = Sim.Dir(yaw);
             bool Clear(Hazard h, float r) => !h.Contains(hub + dir * r) && !h.Contains(hub + dir * (r + QuakePad)) && !h.Contains(hub + dir * Mathf.Max(0, r - QuakePad));
@@ -477,6 +481,9 @@ namespace LastBell.Run
         Vector3 volMove; bool volSprint, volOn, volReach, volDash; float volCost, volPull; int volTick = -99;
         const float VolleyLook = 0.8f, VolleyStep = 0.05f, VolleyBuffer = 0.15f, VolleyPathCost = 30f, VolleyPathSoon = 1.6f, VolleySwing = 20f, VolleySprintFloor = 55f;   // a swing waits only for a bullet it would meet (50 and up)
         const float VolleyJetRing = 8f;   // m from the jets' hub where they sweep at a walk (40 deg/s, WalkSpeed 6)
+        // m past that ring: 6 left bots by the rim taking bullets over walking in; at 5 m out (the rim) it now outweighs one bullet
+        // hit, since a jet there is a sure hit (8 Nov full runs: Hard bots wiped to Furnace Spin layered on the volleys)
+        const float VolleyJetOut = 22f;
         const float VolleyJetHit = 200f;  // a jet step in the bullet dodge (a bullet step is 100)
         bool volJets; Vector3 volHub; string volEsc;   // volEsc: the sweep trace
         const float VolleyThrowReach = 7f;   // a Tollbreaker's axe throws, gap to the target (MaxRange 9 m less a margin)
@@ -494,7 +501,7 @@ namespace LastBell.Run
             bad = Bad(me, boss, false, me.World.Tick + 45);
             bool path = BotSight.GhostHits(me, pos);
             if (volNear.Count == 0 && !path) { volOn = false; return false; }
-            volJets = false; { var lv = me.World.Hazards.Live; for (int i = 0; i < lv.Count; i++) if (Jet(lv[i])) { TrackSpin(lv[i]); volJets = true; volHub = Sim.Flat(lv[i].Origin); break; } }   // the jets' turn, for VolleyCost
+            volJets = false; { var lv = me.World.Hazards.Live; for (int i = 0; i < lv.Count; i++) if (Jet(lv[i])) { TrackSpin(lv[i], me.World.Difficulty == Difficulty.Hard); volJets = true; volHub = Sim.Flat(lv[i].Origin); break; } }   // the jets' turn, for VolleyCost
             pos = Sim.Flat(pos);
             // home: the rim for a brand carrier, else the attack spot (or straight at the target)
             Vector3 home = tPos; bool carrier = false;
@@ -517,7 +524,9 @@ namespace LastBell.Run
                 volOn = true; volTick = me.World.Tick;
                 if (Dirs16 == null) { Dirs16 = new Vector3[16]; for (int k = 0; k < 16; k++) Dirs16[k] = Sim.Dir(k * 22.5f); }
                 volDash = false; volSprint = false; volMove = Vector3.zero; volCost = VolleyCost(me, boss, pos, Vector3.zero, 0, home, VolleyLook);
-                bool canSprint = me.Stamina > VolleySprintFloor;   // keep enough for a dash when it gets cornered
+                // keep enough for a dash when it gets cornered; but out past the jet ring with jets up, get in first (a Hard bot out
+                // by the rim with 8 stamina walked among the bullets until the jets came round at 10 m/s, 8 Nov full run)
+                bool canSprint = me.Stamina > VolleySprintFloor || (volJets && me.Stamina > 5 && Sim.Flat(pos - volHub).magnitude > VolleyJetRing + 1f);
                 for (int s = 0; s < (canSprint ? 2 : 1); s++)
                 {
                     float v = s == 0 ? PlayerController.WalkSpeed : PlayerController.SprintSpeed;
@@ -584,9 +593,10 @@ namespace LastBell.Run
                 for (int i = 0; i < live.Count; i++)
                 {
                     var h = live[i]; if (!Jet(h) || h.Hit.Contains(me)) continue;
-                    float spin = spokeRef != null && Sim.Flat(spokeRef.Origin - h.Origin).magnitude < 0.1f ? spokeDir : 0;
-                    if (JetAt(h, q, t, spin)) cost += VolleyJetHit * early;
-                    else if (k == steps && JetAt(h, q, t + 0.5f, spin)) cost += 60;   // standing in its way as it comes round
+                    float spin = spokeRef != null && Sim.Flat(spokeRef.Origin - h.Origin).magnitude < 0.1f ? spokeFirst : 0;
+                    bool rev = me.World.Difficulty == Difficulty.Hard;   // Hard's Spin Reversal
+                    if (JetAt(h, q, t, spin, rev)) cost += VolleyJetHit * early;
+                    else if (k == steps && JetAt(h, q, t + 0.5f, spin, rev)) cost += 60;   // standing in its way as it comes round
                 }
                 if (k % 4 != 0) continue;
                 // every 0.2 s: burning ground and strikes landing about now; at the end, the paths still to fire (bullets that
@@ -611,7 +621,11 @@ namespace LastBell.Run
             float turret = BotSight.TurretDist(q); if (turret < TurretKeep) cost += (TurretKeep - turret) * 8f;   // its spiral arms sweep the wall beside it
             // with Furnace Spin up, inside the ring where a jet comes round slower than a walk (out by the rim at 10-12 m they
             // outran the bots dodging bullets there: three went down in the second uprising, 11-04)
-            if (volJets) { float out_ = Sim.Flat(q - volHub).magnitude - VolleyJetRing; if (out_ > 0) cost += out_ * 6f; }
+            if (volJets)
+            {
+                float out_ = Sim.Flat(q - volHub).magnitude - VolleyJetRing;
+                if (out_ > 0) cost += out_ * VolleyJetOut;
+            }
             if (volReach) cost += Mathf.Max(0, Sim.Flat(tPos - q).magnitude - tRad - (Range(me) + 1.5f)) * 4f;
             return cost;
         }
@@ -676,28 +690,40 @@ namespace LastBell.Run
 
         // jets turning round one hub (Crucivar's Furnace Spin) reach the wall, where they outrun a sprint: ride the middle of
         // the nearest gap about 6.5 m out, turning with them (shown jets first, the turn read from their yaw)
-        Hazard spokeRef; float spokeYaw, spokeDir;
+        Hazard spokeRef; float spokeYaw, spokeDir, spokeFirst;   // spokeDir: the way they turn now; spokeFirst: the way they set off
         static readonly float[] SpokeRadii = { 6.5f, 6.0f, 7.0f, 5.5f, 7.5f, 5.0f, 8.0f, 4.5f, 8.6f };   // near the hub a jet covers too wide an angle, far out the gap outruns a walk
         static readonly float[] SpokeShifts = { 0f, 4f, -4f, 8f, -8f, 11f, -11f, 14f, -14f, 17f, -17f };   // degrees off the gap's middle
         const float TurretKeep = 5f;   // m kept from a turret firing (Crucivar's rim turrets)
         const float BrandRing = 12.5f;   // where a brand is walked to: its pool (2 m) stays off the jet ring and leaves the inside of the quake's outer band
         // the turn of a set of jets, read from its first jet's yaw tick to tick (0 until it has turned)
-        void TrackSpin(Hazard j0)
+        // (rev: Hard's Spin Reversal, so a turn first seen after the jets came back is the opposite of the way they set off)
+        void TrackSpin(Hazard j0, bool rev)
         {
-            if (spokeRef != j0) { spokeRef = j0; spokeYaw = j0.Yaw; spokeDir = 0; }
-            else { float dy = Mathf.DeltaAngle(spokeYaw, j0.Yaw); if (Mathf.Abs(dy) > 0.01f) spokeDir = Mathf.Sign(dy); spokeYaw = j0.Yaw; }
+            if (spokeRef != j0) { spokeRef = j0; spokeYaw = j0.Yaw; spokeDir = 0; spokeFirst = 0; }
+            else
+            {
+                float dy = Mathf.DeltaAngle(spokeYaw, j0.Yaw); spokeYaw = j0.Yaw;
+                if (Mathf.Abs(dy) <= 0.01f) return;
+                spokeDir = Mathf.Sign(dy);
+                if (spokeFirst == 0) spokeFirst = rev && j0.Age - j0.ResolveAt > Sim.Ticks(ForgeRite.ReverseAt) ? -spokeDir : spokeDir;
+            }
         }
 
-        // a jet t s from now: live from its landing (less a hand) to the end of its sweep, turned by then at JetTurnDeg/s
-        // (both ways while the turn is still unknown)
-        static bool JetAt(Hazard h, Vector3 q, float t, float dir)
+        // a jet t s from now: live from its landing (less a hand) to the end of its sweep, turned by then as SpinTurned says
+        // (both ways while the turn is still unknown). dir is the way it set off. On Hard the jets stop 2 s in and turn back
+        // (Spin Reversal, 5 Nov): read as one steady turn, the bots riding a gap or dodging bullets stepped into the jet
+        // coming back (four Hard bots wiped to Furnace Spin in Phase 2 in both 8 Nov full runs)
+        static bool JetAt(Hazard h, Vector3 q, float t, float dir, bool rev)
         {
             float on = (h.ResolveAt - h.Age) / (float)Sim.Hz, end = (h.ResolveAt + h.ActiveTicks - h.Age) / (float)Sim.Hz;
             if (t < on - 0.15f || t > end) return false;
-            float turned = Mathf.Max(0, t - Mathf.Max(0, on)) * ForgeRite.JetTurnDeg;
-            if (dir == 0 && turned > 0) return LaneAt(h, q, h.Yaw + turned) || LaneAt(h, q, h.Yaw - turned);
+            float turned = SpinTurned(Mathf.Max(0, t - on), rev) - SpinTurned(Mathf.Max(0, -on), rev);
+            if (dir == 0 && turned != 0) return LaneAt(h, q, h.Yaw + turned) || LaneAt(h, q, h.Yaw - turned);
             return LaneAt(h, q, h.Yaw + dir * turned);
         }
+        // degrees a jet has turned the way it set off, live s into its sweep (Hard: turn, stop, turn back)
+        static float SpinTurned(float live, bool rev) => !rev ? live * ForgeRite.JetTurnDeg
+            : (Mathf.Min(live, ForgeRite.ReverseAt) - Mathf.Max(0, live - ForgeRite.ReverseAt - ForgeRite.ReverseHold)) * ForgeRite.JetTurnDeg;
         static bool LaneAt(Hazard h, Vector3 q, float yaw)
         {
             var l = Quaternion.Euler(0, -yaw, 0) * Sim.Flat(q - h.Origin);
@@ -718,7 +744,9 @@ namespace LastBell.Run
             // left its pool on the 6.5 m ring, where the riders then stood in it: a party ally went down to it, 11-03)
             for (int i = 0; i < live.Count; i++) { var h = live[i]; if (h.Track != null && h.Age < h.LockAt && h.Shape == HazardShape.Circle && Spares(h, me)) return false; }
             var j0 = jets[0];
-            TrackSpin(j0);
+            bool rev = me.World.Difficulty == Difficulty.Hard; TrackSpin(j0, rev);
+            // the way to lean in the gap: ahead of the jet behind; on Hard from just before the stop, ahead of the jet that will come back
+            float lean = rev && spokeFirst != 0 && j0.Age - j0.ResolveAt >= Sim.Ticks(ForgeRite.ReverseAt - 0.4f) ? -spokeFirst : spokeDir;
             var hub = Sim.Flat(j0.Origin);
             var yaws = new List<float>(); foreach (var h in jets) yaws.Add(Mathf.Repeat(h.Yaw, 360f));
             yaws.Sort();
@@ -730,7 +758,7 @@ namespace LastBell.Run
             for (int pass = 0; pass < 2 && bestCost == float.MaxValue; pass++)
                 for (int k = 0; k < yaws.Count; k++)
                 {
-                    float a = yaws[k], b = k + 1 < yaws.Count ? yaws[k + 1] : yaws[0] + 360f, mid = (a + b) / 2f + spokeDir * 6f;
+                    float a = yaws[k], b = k + 1 < yaws.Count ? yaws[k + 1] : yaws[0] + 360f, mid = (a + b) / 2f + lean * 6f;
                     if (turning && Mathf.Repeat(mine - a, 360f) > b - a) continue;
                     foreach (float r in SpokeRadii)
                     foreach (float da in SpokeShifts)
@@ -740,7 +768,7 @@ namespace LastBell.Run
                         var q = hub + Sim.Dir(at) * r;
                         bool ok = CombatWorld.InPlayerBound(q, -0.3f);
                         for (int i = 0; i < jets.Count && ok && da != 0; i++) if (jets[i].Contains(q) || jets[i].Contains(hub + Sim.Dir(at + Mathf.Sign(da) * 5f) * r)) ok = false;
-                        for (int i = 0; i < live.Count && ok && pass == 0; i++) { var h = live[i]; if ((h.BurnPerSecond > 0 || (h.Track != null && h.Includes != null && h.Age >= h.LockAt)) && (h.Contains(q) || h.Contains(hub + Sim.Dir(at + spokeDir * 12f) * r))) ok = false; }
+                        for (int i = 0; i < live.Count && ok && pass == 0; i++) { var h = live[i]; if ((h.BurnPerSecond > 0 || (h.Track != null && h.Includes != null && h.Age >= h.LockAt)) && (h.Contains(q) || h.Contains(hub + Sim.Dir(at + lean * 12f) * r))) ok = false; }
                         if (!ok) continue;
                         float c = Sim.Flat(q - pos).magnitude + Mathf.Abs(r - 6.5f) + Mathf.Abs(da) * 0.05f;
                         if (c < bestCost) { bestCost = c; goal = q; }
