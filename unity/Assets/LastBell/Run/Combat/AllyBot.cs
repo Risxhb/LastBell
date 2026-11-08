@@ -529,9 +529,9 @@ namespace LastBell.Run
             if (volNear.Count == 0 && !path) { volOn = false; return false; }
             volJets = false; { var lv = me.World.Hazards.Live; for (int i = 0; i < lv.Count; i++) if (Jet(lv[i])) { TrackSpin(lv[i], me.World.Difficulty == Difficulty.Hard); volJets = true; volHub = Sim.Flat(lv[i].Origin); break; } }   // the jets' turn, for VolleyCost
             pos = Sim.Flat(pos);
-            bool carrier = false;
+            bool carrier = false; Hazard carried = null;
             var live = me.World.Hazards.Live;
-            for (int i = 0; i < live.Count && !carrier; i++) { var h = live[i]; if (h.Track != null && h.Age < h.LockAt && h.Shape == HazardShape.Circle && Spares(h, me)) carrier = true; }
+            for (int i = 0; i < live.Count && !carrier; i++) { var h = live[i]; if (h.Track != null && h.Age < h.LockAt && h.Shape == HazardShape.Circle && Spares(h, me)) { carrier = true; carried = h; } }
             if (carrier) volJets = false;   // its brand goes to the rim, jets or not
             // re-plan every 3 ticks: the home and escape search below only feed the plan, so they run with it (same choices). Run
             // every tick, NearestClear (up to 28 m x 48 ways, each a full hazard test)
@@ -543,7 +543,7 @@ namespace LastBell.Run
                 volTick = me.World.Tick; volOn = true;
                 // home: the rim for a brand carrier, else the attack spot (or straight at the target)
                 var home = tPos;
-                if (carrier) home = (pos.magnitude > 0.1f ? pos.normalized : Vector3.forward) * Mathf.Min(BrandRing, CombatWorld.PlayerBound - 1.2f);
+                if (carrier) home = CastingBrandSpot(me, pos, carried, out var cs) ? cs : (pos.magnitude > 0.1f ? pos.normalized : Vector3.forward) * Mathf.Min(BrandRing, CombatWorld.PlayerBound - 1.2f);
                 else if (Attacks && AttackSpot(me, boss, out var spot)) home = Sim.Flat(spot);
                 volReach = Attacks && !carrier; volPull = 0.6f; volEsc = carrier ? "carry" : null;
                 // in a fan its bullets are still to cross: the nearest spot clear of every path is the goal (the look is too short
@@ -703,7 +703,8 @@ namespace LastBell.Run
             }
             float rim = Mathf.Min(BrandRing, CombatWorld.PlayerBound - 1.2f), mine = Sim.YawTo(Vector3.zero, pos, 0);   // not the wall: back in to the jet gaps within the 1 s freeze
             Vector3 goal = pos; float bestCost = float.MaxValue;
-            for (int k = 0; k < 24; k++)
+            if (CastingBrandSpot(me, pos, brand, out var cspot)) { goal = cspot; bestCost = Sim.Flat(cspot - pos).magnitude; }
+            for (int k = 0; k < 24 && bestCost == float.MaxValue; k++)
             {
                 float yaw = mine + (k % 2 == 0 ? 1 : -1) * (k + 1) / 2 * 15f;
                 var q = Sim.Dir(yaw) * rim;
@@ -734,6 +735,31 @@ namespace LastBell.Run
         static readonly float[] SpokeShifts = { 0f, 4f, -4f, 8f, -8f, 11f, -11f, 14f, -14f, 17f, -17f };   // degrees off the gap's middle
         const float TurretKeep = 5f;   // m kept from a turret firing (Crucivar's rim turrets)
         const float BrandRing = 12.5f;   // where a brand is walked to: its pool (2 m) stays off the jet ring and leaves the inside of the quake's outer band
+        // a Foundry Uprising's Ember Brand (4 s in, on every player): still on the brand ring, but at the spot on it nearest the
+        // casting being fought, not straight out from wherever the carrier stood. All four carriers left the castings as the
+        // volleys began and were caught out by the rim with no stamina (8 Nov Hard sweeps and full runs: uprising 3 lost in 3
+        // of 4 fights). Dropping by the casting itself was worse (a pool by a casting that breaks first stays mid-fight). Not
+        // where another player stands, burns or a jet sweeps, nor by a turret; the nearest such spot to the casting
+        bool CastingBrandSpot(PlayerController me, Vector3 pos, Hazard brand, out Vector3 spot)
+        {
+            spot = Vector3.zero;
+            if (!tPart || brand == null) return false;
+            var live = me.World.Hazards.Live; var c = Sim.Flat(tPos); float best = float.MaxValue;
+            float rim = Mathf.Min(BrandRing, CombatWorld.PlayerBound - 1.2f), cy = Sim.YawTo(Vector3.zero, c, 0);
+            for (int k = 0; k < 24; k++)
+            {
+                var q = Sim.Dir(cy + (k % 2 == 0 ? 1 : -1) * (k + 1) / 2 * 10f) * rim;
+                if (!CombatWorld.InPlayerBound(q, -0.3f)) continue;
+                bool ok = true;
+                for (int i = 0; i < live.Count && ok; i++) { var h = live[i]; if ((h.BurnPerSecond > 0 || Jet(h)) && h.Contains(q)) ok = false; }
+                if (ok && BotSight.TurretDist(q) < TurretKeep) ok = false;
+                foreach (var p in me.World.Players) if (ok && p && p != me && !p.Down && Sim.Flat(p.transform.position - q).magnitude < brand.Radius + 1f) ok = false;
+                if (!ok) continue;
+                float d = Sim.Flat(q - c).magnitude;
+                if (d < best) { best = d; spot = q; }
+            }
+            return best < float.MaxValue;
+        }
         // the turn of a set of jets, read from its first jet's yaw tick to tick (0 until it has turned)
         // (rev: Hard's Spin Reversal, so a turn first seen after the jets came back is the opposite of the way they set off)
         void TrackSpin(Hazard j0, bool rev)
