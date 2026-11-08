@@ -221,7 +221,7 @@ namespace LastBell.Run
         {
             var parent = transform.parent;
             if (kind >= PropTurret && kind < PropTurret + 4)
-            { NetPropsMade++; return FoundryUprising.TurretLook(parent, FoundryUprising.Numeral(kind - PropTurret), "Lava turret (LAN)"); }
+            { NetPropsMade++; FoundryProps.SlugView.Ensure(W); return FoundryUprising.TurretLook(parent, FoundryUprising.Numeral(kind - PropTurret), "Lava turret (LAN)"); }
             if (kind >= PropCasting && kind < PropCasting + 4)
             {
                 NetPropsMade++;
@@ -230,18 +230,18 @@ namespace LastBell.Run
                 cast.gameObject.AddComponent<NetChain>().Line = chain;
                 return cast;
             }
-            if (kind == PropCrownTurret) { NetPropsMade++; return FoundryUprising.TurretLook(parent, null, "Crown turret (LAN)"); }
+            if (kind == PropCrownTurret) { NetPropsMade++; FoundryProps.SlugView.Ensure(W); return FoundryUprising.TurretLook(parent, null, "Crown turret (LAN)"); }
             return null;
         }
         // a client's casting view: the chain runs from the casting to its turret (across the arena on the rim)
         sealed class NetChain : MonoBehaviour
         {
-            public LineRenderer Line;
+            public FoundryProps.Chain Line;
             void LateUpdate()
             {
                 if (!Line) return;
                 var at = transform.position;
-                Line.SetPosition(0, FoundryUprising.TurretFor(at) + Vector3.up * 0.4f); Line.SetPosition(1, new Vector3(at.x, 0.4f, at.z));
+                Line.SetEnds(FoundryUprising.TurretFor(at) + Vector3.up * 0.4f, new Vector3(at.x, 0.4f, at.z));
             }
         }
 
