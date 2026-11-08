@@ -123,7 +123,7 @@ namespace LastBell.Run.Presentation
                 bossPresenter = boss.GetComponentInChildren<CharacterPresenter>();
                 int secs = Mathf.Max(0, d.RunTicks - combatStartTicks) / Sim.Hz;
                 FightTime = combatStartTicks > 0 || d.RunTicks > 0 ? $"{secs / 60}:{secs % 60:00}" : "";
-                FightTimeLine = FightTime.Length > 0 ? "Fight time " + FightTime : "";
+                FightTimeLine = secs > 0 ? "Fight time " + FightTime : "";
                 if (IntroRoleSpaced.Length == 0) { IntroRoleSpaced = UiTheme.Spaced(RoleLine(d)); IntroEpithet = Epithet(boss); }
                 if (on)
                 {

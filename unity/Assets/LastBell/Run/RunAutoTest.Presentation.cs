@@ -39,10 +39,11 @@ namespace LastBell.Run
                 string cls = RunDirector.Classes[e % RunDirector.Classes.Length], tag = "hit feel: " + LastBell.Menu.TestRushSetup.CardName(e);
                 var a = new ulong[SameTicks * 3]; var b = new ulong[SameTicks * 3]; var c = new ulong[SameTicks * 3];
                 int shownA = 0, stopsA = 0, stopsC = 0, shownC = 0; long alloc = 0; int frames = 0;
-                yield return SamePass(e, cls, a, true, measure: counter, shots: e == RunDirector.AurelionPractice ? "after" : null);
+                yield return SamePass(e, cls, a, true, measure: counter, shots: null);
                 shownA = HitFeel.NumbersShown; stopsA = HitFeel.Stops; alloc = HitFeel.AllocBytes; frames = HitFeel.MeasuredFrames;
+                Note($"{tag}: allocation split: styles {HitFeel.AllocStyles}, vignette {HitFeel.AllocFeedback}, numbers {HitFeel.AllocNumbers} bytes; {HitFeel.LabelsDrawn} digits drawn, {HitFeel.GlyphDraws} numbers through the glyph atlas");
                 yield return SamePass(e, cls, b, true, false, null);
-                yield return SamePass(e, cls, c, false, false, e == RunDirector.AurelionPractice ? "before" : null);
+                yield return SamePass(e, cls, c, false, false, null);
                 shownC = HitFeel.NumbersShown; stopsC = HitFeel.Stops;
                 int ab = Diverge(a, b), ac = Diverge(a, c);
                 Note($"{tag}: hashes over {SameTicks} ticks: on/on diverge at {Where(ab)}, on/old at {Where(ac)}");
@@ -56,6 +57,7 @@ namespace LastBell.Run
                 else Check($"{tag}: the fight is deterministic run to run (baseline for the next check)", true);
                 Check($"{tag}: tick results identical with the feature and with the old look", ac < 0 || (ab >= 0 && ac >= ab), ac < 0 ? "every tick" : $"first differs at tick {ac} (baseline {ab})");
                 if (counter) Check($"{tag}: nothing in the feature allocates per frame or per hit", alloc == 0 && frames > 0, $"{alloc} bytes over {frames} frames{(NoFrames ? " (batchmode: Update and hits; OnGUI drawing is measured in a windowed run)" : " (Update, hits and OnGUI)")}");
+                if (e == RunDirector.AurelionPractice && !NoFrames) { yield return ShotPass(e, cls, false); yield return ShotPass(e, cls, true); }   // pictures last: they reset the counters
             }
             PresentationSettings.TestOff = false; HitFeel.LegacyLook = false;   // the last pass was the old look
             Check("hit feel: big hits stopped the frame in the real fights", totalStops > 0, totalStops + " hit-stops");
@@ -124,12 +126,35 @@ namespace LastBell.Run
                 if (d.Player && !d.Player.Down && d.Player.Hp < 40) d.Player.DebugSetHp(d.Player.MaxHealth);   // test setup: the run keeps going
                 w.Step();
                 WorldHash(w, d.Boss, hashes, t);
-                if (measure && t == 120) { HitFeel.AllocBytes = 0; HitFeel.MeasuredFrames = 0; HitFeel.Measuring = true; }   // after warm-up
+                if (measure && t == 120) { HitFeel.AllocBytes = HitFeel.AllocStyles = HitFeel.AllocFeedback = HitFeel.AllocNumbers = 0; HitFeel.LabelsDrawn = 0; HitFeel.GlyphDraws = 0; HitFeel.MeasuredFrames = 0; HitFeel.Measuring = true; }   // after warm-up
                 if (shots != null && t == 600) { HitFeel.Measuring = false; yield return Shot("hitfeel_" + shots + "_fight"); HitFeel.Measuring = measure; }
                 if ((t & 1) == 1) yield return null;
             }
             HitFeel.Measuring = false;
             if (shots != null) yield return PlayerHitShot(shots);
+            AllyBot.Attacks = attacks; d.InputOverride = bot; if (d.Player) d.Player.Input = bot;
+            yield return PhaseToMenu();
+        }
+
+        // Pictures only (windowed runs): the fight on the director's own clock, unpaused, with the old look (before) or the
+        // feature (after), the same party and seed, a picture after 6 s of fighting and one of the player hit.
+        IEnumerator ShotPass(int e, string cls, bool on)
+        {
+            PresentationSettings.TestOff = !on; HitFeel.LegacyLook = !on;
+            yield return PhaseToMenu();
+            d.SelectAllies(RunParty.MaxAllies);
+            if (!d.StartPractice(cls, e)) yield break;
+            yield return Until(() => RunDirector.Instance && RunDirector.Instance.State == RunState.Ready && RunDirector.Instance.Encounter == e, 30, "hit feel shots ready");
+            if (RunDirector.Instance != d) { directorLog.AddRange(d.Log); d = RunDirector.Instance; d.InputOverride = bot; bot.Clear(); }
+            var me = new AllyBot(RunParty.MaxAllies, RunParty.MaxAllies + 1, BotMode.Perfect);
+            d.InputOverride = me; if (d.Player) d.Player.Input = me;
+            bool attacks = AllyBot.Attacks; AllyBot.Attacks = true;
+            d.RequestReady();
+            yield return Until(() => d.State == RunState.Combat && d.Boss, 10, "hit feel shots combat");
+            UnityEngine.Random.InitState(9001);
+            float t = 0; while (t < 6f && d.State == RunState.Combat) { KeepAlive(); t += Time.deltaTime; yield return null; }
+            string label = on ? "after" : "before";
+            if (d.State == RunState.Combat) { yield return Shot("hitfeel_" + label + "_fight"); yield return PlayerHitShot(label); }
             AllyBot.Attacks = attacks; d.InputOverride = bot; if (d.Player) d.Player.Input = bot;
             yield return PhaseToMenu();
         }
@@ -141,7 +166,8 @@ namespace LastBell.Run
             d.Player.DebugSetHp(d.Player.MaxHealth);
             d.World.Hazards.Spawn(new Hazard { Source = "Test hit", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = d.Player.transform.position, Radius = 1.5f, ResolveAt = 2, Damage = 45 });
             for (int i = 0; i < 3; i++) d.World.Step();
-            yield return null; yield return null;
+            yield return Wait(0.1f);   // past the 60 ms white contact, into the coral
+            Note($"hit feel picture {label}: flash level {HitFeel.FlashLevel:0.00}, hits on you so far {HitFeel.Flashes}, your hp {(d.Player ? d.Player.Hp : -1)}");
             yield return Shot("hitfeel_" + label + "_player_hit");
         }
 

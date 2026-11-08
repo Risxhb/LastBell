@@ -34,6 +34,7 @@ namespace LastBell.Run.Presentation
 
         RunDirector d;
         void Awake() { d = GetComponent<RunDirector>(); }
+        void Start() { Vignette(); }   // built before the fight, not on the first hit
         void OnDisable() { CharacterPresenter.GlobalAnimScale = 1; }
 
         // ---------------- damage numbers ----------------
@@ -108,11 +109,13 @@ namespace LastBell.Run.Presentation
 
         // ---------------- player feedback ----------------
         static float flash, flashAge; static bool flashWhite;
+        public static float FlashLevel => flash;
         CombatWorld seenWorld; PlayerController seenLocal; int localHp = -1;
         readonly PlayerController[] seenPlayers = new PlayerController[8]; readonly bool[] seenDown = new bool[8];
 
         // allocation check (RunAutoTest.Presentation): bytes allocated inside this feature's per-frame and per-hit code
         public static bool Measuring; public static long AllocBytes; public static int MeasuredFrames;
+        public static long AllocStyles, AllocFeedback, AllocNumbers; public static int LabelsDrawn;   // OnGUI split (windowed runs)
         // bytes allocated so far: the per-thread counter where the runtime reports it, else the managed heap in use (this Mono
         // player reports 0 per thread). A collection in between reads negative and is ignored by the callers.
         static int threadCounter = -1;
@@ -174,21 +177,24 @@ namespace LastBell.Run.Presentation
 
         // ---------------- drawing ----------------
         static readonly string[] Digits = { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9" };
+        // one GUIContent per digit, text set once: GUI.Label(Rect, string, style) refills a shared GUIContent each call, and in
+        // Unity 6 setting its text builds a new string (about 100 bytes per label); passing our own content builds nothing
+        static readonly GUIContent[] DigitContent = System.Array.ConvertAll(Digits, s => new GUIContent(s));
         GUIStyle stMine, stBig, stAlly; int styleH = -1;
         readonly float[] wMine = new float[10], wBig = new float[10], wAlly = new float[10];
         readonly int[] digitBuf = new int[8];
         static Texture2D vignette;
         static readonly Color Coral = new Color(0.92f, 0.41f, 0.36f), Contact = new Color(1f, 0.95f, 0.88f),
-            NumIvory = new Color(0.96f, 0.92f, 0.82f), NumGold = new Color(0.965f, 0.79f, 0.41f), NumAlly = new Color(0.86f, 0.84f, 0.8f, 0.62f),
+            NumIvory = new Color(0.96f, 0.92f, 0.82f), NumGold = new Color(0.965f, 0.79f, 0.41f), NumAlly = new Color(0.86f, 0.84f, 0.8f, 0.78f),
             DownInk = new Color(0.06f, 0.07f, 0.09f, 0.3f);
 
         void Styles()
         {
             if (styleH == Screen.height && stMine != null) return;
             styleH = Screen.height;
-            stMine = UiTheme.Style(24, true, TextAnchor.MiddleLeft, Color.white);
-            stBig = UiTheme.Style(32, true, TextAnchor.MiddleLeft, Color.white);
-            stAlly = UiTheme.Style(17, true, TextAnchor.MiddleLeft, Color.white);
+            stMine = UiTheme.Style(30, true, TextAnchor.MiddleLeft, Color.white);
+            stBig = UiTheme.Style(40, true, TextAnchor.MiddleLeft, Color.white);
+            stAlly = UiTheme.Style(21, true, TextAnchor.MiddleLeft, Color.white);
             for (int i = 0; i < 10; i++)
             {
                 var gc = new GUIContent(Digits[i]);
@@ -207,7 +213,7 @@ namespace LastBell.Run.Presentation
                 {
                     float u = (x + 0.5f) / N * 2 - 1, v = (y + 0.5f) / N * 2 - 1;
                     float r = Mathf.Sqrt(u * u * 0.85f + v * v);   // a little wider than tall
-                    float a = Mathf.SmoothStep(0, 1, Mathf.InverseLerp(0.62f, 1.25f, r));
+                    float a = Mathf.SmoothStep(0, 1, Mathf.InverseLerp(0.45f, 1.15f, r));
                     px[y * N + x] = new Color32(255, 255, 255, (byte)(a * 255));
                 }
             vignette.SetPixels32(px); vignette.Apply(false, true);
@@ -220,9 +226,11 @@ namespace LastBell.Run.Presentation
             long a0 = Measuring ? HitFeel.AllocNow() : 0;
             GUI.depth = 5;   // under RunHud's panels and cards (depth 0)
             Styles();
+            long a1 = Measuring ? AllocNow() : 0;
             DrawPlayerFeedback();
+            long a2 = Measuring ? AllocNow() : 0;
             DrawNumbers();
-            if (Measuring) AllocBytes += Math.Max(0, HitFeel.AllocNow() - a0);
+            if (Measuring) { long a3 = AllocNow(); AllocBytes += Math.Max(0, a3 - a0); AllocStyles += Math.Max(0, a1 - a0); AllocFeedback += Math.Max(0, a2 - a1); AllocNumbers += Math.Max(0, a3 - a2); }
         }
 
         void DrawPlayerFeedback()
@@ -234,7 +242,7 @@ namespace LastBell.Run.Presentation
             {
                 var c = flashWhite && flashAge < 0.06f ? Color.Lerp(Contact, Coral, flashAge / 0.06f) : Coral;
                 if (flashAge >= 0.06f) flashWhite = false;
-                c.a = 0.6f * flash; GUI.color = c;
+                c.a = 0.75f * flash; GUI.color = c;
                 GUI.DrawTexture(full, Vignette(), ScaleMode.StretchToFill, true);
             }
             GUI.color = old;
@@ -256,22 +264,74 @@ namespace LastBell.Run.Presentation
                     var col = n.Kind == Kind.Ally ? NumAlly : n.Big ? NumGold : n.Kind == Kind.Neutral ? new Color(NumIvory.r, NumIvory.g, NumIvory.b, 0.8f) : NumIvory;
                     float t = Mathf.Clamp01(n.Age / Life), ease = 1 - (1 - t) * (1 - t);
                     col.a *= 1 - Mathf.Clamp01((n.Age - (Life - 0.3f)) / 0.3f);
-                    float x = s.x + UiTheme.V(n.Column * 34f), y = h - s.y - UiTheme.V(Rise * ease + 10f * n.Pop + 18f);
+                    float x = s.x + UiTheme.V(n.Column * 44f), y = h - s.y - UiTheme.V(Rise * ease + 10f * n.Pop + 18f);
                     DrawValue(x, y, n.Value, st, widths, col);
                 }
         }
 
+        // UiTheme.Label for a cached GUIContent: a 1 px shadow, white text tinted through GUI.color, alpha in 8 steps (the same
+        // text-cache rules as the rest of the HUD)
+        static void Digit(Rect r, GUIContent content, GUIStyle style, Color c)
+        {
+            var keep = style.normal.textColor; float o = Mathf.Max(1, Mathf.Round(UiTheme.Scale));
+            var oldGui = GUI.color; style.normal.textColor = Color.white;
+            float a = Mathf.Ceil(c.a * oldGui.a * 8f) / 8f;
+            GUI.color = new Color(0, 0, 0, 0.85f * a); GUI.Label(new Rect(r.x + o, r.y + o, r.width, r.height), content, style);
+            var tint = oldGui * c; tint.a = a; GUI.color = tint; GUI.Label(r, content, style);
+            style.normal.textColor = keep; GUI.color = oldGui;
+        }
+
         // the value centred on x, one cached digit text at a time
+        // The digits as quads from the font's own glyph atlas (the font material's text shader), with the same 1 px shadow and
+        // 8-step alpha as UiTheme.Label. In Unity 6 every IMGUI text draw allocates (about 100 bytes a label, even with a cached
+        // GUIContent), and a fight shows thousands of digits, so the numbers skip the text system. False (then the labels draw
+        // instead) if the font isn't dynamic or a glyph is packed rotated.
+        const string DigitChars = "0123456789";
+        readonly CharacterInfo[] glyph = new CharacterInfo[10];
+        public static int GlyphDraws;   // tests: the glyph path is the one in use
+        bool Glyphs(float cx, float cy, int count, GUIStyle st, Color c)
+        {
+            var font = st.font; if (!font || !font.dynamic || !font.material) return false;
+            int size = st.fontSize;
+            font.RequestCharactersInTexture(DigitChars, size, FontStyle.Normal);   // keeps them in the atlas; a rebuild moves UVs, so read them each draw
+            var tex = font.material.mainTexture; if (!tex) return false;
+            float total = 0;
+            for (int i = 0; i < 10; i++)
+            {
+                if (!font.GetCharacterInfo(DigitChars[i], out glyph[i], size, FontStyle.Normal)) return false;
+                if (glyph[i].uvTopLeft.x != glyph[i].uvBottomLeft.x) return false;   // rotated in the atlas
+            }
+            for (int i = 0; i < count; i++) total += glyph[digitBuf[i]].advance;
+            float o = Mathf.Max(1, Mathf.Round(UiTheme.Scale)), a = Mathf.Ceil(c.a * GUI.color.a * 8f) / 8f;
+            float baseline = cy + size * 0.36f;   // the digits' optical centre on cy
+            var tint = c; tint.a = a; var shadow = new Color(0.04f, 0.05f, 0.09f, 0.9f * a);   // a Deep Ink outline: readable on bright floors
+            for (int pass = 0; pass < 5; pass++)
+            {
+                float x = cx - total / 2, ox = pass == 4 ? 0 : (pass & 1) == 0 ? -o : o, oy = pass == 4 ? 0 : pass < 2 ? -o : o;
+                for (int i = count - 1; i >= 0; i--)
+                {
+                    var g = glyph[digitBuf[i]];
+                    var r = new Rect(x + g.minX + ox, baseline - g.maxY + oy, g.glyphWidth, g.glyphHeight);
+                    var uv = new Rect(g.uvBottomLeft.x, g.uvBottomLeft.y, g.uvTopRight.x - g.uvBottomLeft.x, g.uvTopRight.y - g.uvBottomLeft.y);
+                    Graphics.DrawTexture(r, tex, uv, 0, 0, 0, 0, pass == 4 ? tint : shadow, font.material);
+                    x += g.advance;
+                }
+            }
+            GlyphDraws++; LabelsDrawn += count;
+            return true;
+        }
+
         void DrawValue(float cx, float cy, int value, GUIStyle st, float[] widths, Color c)
         {
             int count = 0;
             do { digitBuf[count++] = value % 10; value /= 10; } while (value > 0 && count < digitBuf.Length);
+            if (Glyphs(cx, cy, count, st, c)) return;
             float total = 0; for (int i = 0; i < count; i++) total += widths[digitBuf[i]];
             float x = cx - total / 2, hh = st.fontSize * 1.4f;
             for (int i = count - 1; i >= 0; i--)
             {
                 int dg = digitBuf[i];
-                UiTheme.Label(new Rect(x, cy - hh / 2, widths[dg] + 2, hh), Digits[dg], st, c);
+                Digit(new Rect(x, cy - hh / 2, widths[dg] + 2, hh), DigitContent[dg], st, c); LabelsDrawn++;
                 x += widths[dg];
             }
         }
