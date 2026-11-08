@@ -105,9 +105,15 @@ namespace LastBell.Run
             Build();
             NextBeatTick = TickAt(Cue.At0(BeatSeconds));
             ShowBeat(true);
+            bool swung = false;   // this beat's PendulumCharge clip
             while (true)
             {
-                while (Now < NextBeatTick) { Present(); yield return 1; }
+                while (Now < NextBeatTick)
+                {
+                    if (!swung && NextBeatTick - Now <= Sim.Ticks(1.4f)) { swung = true; CastClip("PendulumCharge", (NextBeatTick - Now) / (float)Sim.Hz); }
+                    Present(); yield return 1;
+                }
+                swung = false;
                 Resolve(Beat);
                 Advance(); Beats++;
                 NextBeatTick += Sim.Ticks(BeatSeconds);
@@ -240,8 +246,10 @@ namespace LastBell.Run
             Mat(Prim.Make(PrimitiveKind.Cube, pivot, new Vector3(0, 4.2f, 3.0f), new Vector3(0.4f, 0.2f, 6.0f), Color.white), brassM);
             Mat(Prim.Make(PrimitiveKind.Cone, pivot, new Vector3(0, 4.2f, 6.4f), new Vector3(1.1f, 0.9f, 1.1f), Color.white, 0, Quaternion.Euler(90, 0, 0)), brassM);
             foreach (float side in new[] { -1f, 1f })   // the counterweight ✕ (pivot-local: x = 90° right of the hand), 2.6 m wide
-                for (int s = -1; s <= 1; s += 2)
-                    Mat(Prim.Make(PrimitiveKind.Cube, pivot, new Vector3(side * WeightRadius, 0.06f, 0), new Vector3(0.32f, 0.03f, 2.2f), Color.white, 0, Quaternion.Euler(0, 45 * s, 0)), ivory);
+            {
+                var x = UltMarkMesh.Make(UltMarkMesh.Cross, pivot, ivory, "counterweight ✕");   // pointed brass-cut arms and a hub (was two Prim bars)
+                x.localPosition = new Vector3(side * WeightRadius, 0.06f, 0); x.localScale = new Vector3(2.2f, 1, 2.2f);
+            }
             foreach (float side in new[] { -1f, 1f })   // ...and a ring showing exactly where it counts
                 Mat(Prim.Make(PrimitiveKind.Cylinder, pivot, new Vector3(side * WeightRadius, 0.04f, 0), new Vector3(WeightSize * 2, 0.01f, WeightSize * 2), Color.white), brassDim);
             for (int k = -7; k <= 7; k++)   // the chain zone: a band from 9 m to the edge on the far half
@@ -279,10 +287,10 @@ namespace LastBell.Run
             foreach (var p in W.Players)
             {
                 if (p.Down || DutyOf(p, Beat) != 1) continue;
-                if (chains.Count <= n) chains.Add(Prim.Make(PrimitiveKind.Cube, root, Vector3.zero, Vector3.one, Color.white));
+                if (chains.Count <= n) chains.Add(UltMarkMesh.Make(UltMarkMesh.Chain, root, brassM, "chain"));   // links (was a Prim bar)
                 var c = chains[n++]; c.gameObject.SetActive(true);
                 var q = Sim.Flat(p.transform.position); float len = q.magnitude;
-                c.position = q * 0.5f + Vector3.up * 0.9f; c.rotation = Quaternion.LookRotation(len > 0.01f ? q : Vector3.forward); c.localScale = new Vector3(0.1f, 0.1f, len);
+                c.position = q * 0.5f + Vector3.up * 0.9f; c.rotation = Quaternion.LookRotation(len > 0.01f ? q : Vector3.forward); c.localScale = new Vector3(0.3f, 0.3f, len);
                 Mat(c, ChainOk(q, Beat) ? brassM : coralM);
             }
             for (int i = n; i < chains.Count; i++) chains[i].gameObject.SetActive(false);

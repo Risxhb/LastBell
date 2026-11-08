@@ -28,6 +28,7 @@ namespace LastBell.Run
             if (UltWants("bots_v2_seeds")) yield return UltV2SeedSweep();
             if (UltWants("v2_fight")) yield return UltV2FightChecks();
             if (UltWants("bots_revive")) yield return UltReviveChecks();
+            if (BkFilter == "ult_shots") yield return UltShots();   // asked for only (screenshots)
             if (UltWants("bots_p1v2")) yield return UltP1V2Checks();
             if (UltWants("bots_p1v2_video")) yield return UltP1V2Video();
             if (UltWants("bots_p1v2_watch")) yield return UltP1V2Watch();

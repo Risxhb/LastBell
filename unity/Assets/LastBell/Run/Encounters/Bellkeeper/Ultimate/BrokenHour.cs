@@ -114,7 +114,7 @@ namespace LastBell.Run
                 {
                     if (launchTick) launchTick = false; else StepSolve();
                     if (count > 0 && Hours >= 4) StepPasses();   // the first beat's holder is dealt, not passed (players may start bunched)
-                    if (slam == null && NextBeatTick - Now <= Sim.Ticks(SlamWarn + WarnLead)) slam = SpawnSlam();
+                    if (slam == null && NextBeatTick - Now <= Sim.Ticks(SlamWarn + WarnLead)) { slam = SpawnSlam(); CastClip("BellSweep", (NextBeatTick - Now) / (float)Sim.Hz); }
                     Present(); yield return 1;
                 }
                 FinishSolve();   // never still solving on the beat (it takes a few ticks of the 3 s)
@@ -467,10 +467,10 @@ namespace LastBell.Run
             foreach (var (a, b) in Chains())
             {
                 if (a.Down || b.Down) continue;
-                if (chainBars.Count <= n) chainBars.Add(Prim.Make(PrimitiveKind.Cube, root, Vector3.zero, Vector3.one, Color.white));
+                if (chainBars.Count <= n) chainBars.Add(UltMarkMesh.Make(UltMarkMesh.Chain, root, goldChain, "chain"));   // links (was a Prim bar)
                 var c = chainBars[n++]; c.gameObject.SetActive(true);
                 Vector3 pa = Sim.Flat(a.transform.position), pb = Sim.Flat(b.transform.position), dv = pb - pa; float L = dv.magnitude;
-                c.position = (pa + pb) * 0.5f + Vector3.up * 0.9f; c.rotation = Quaternion.LookRotation(L > 0.01f ? dv : Vector3.forward); c.localScale = new Vector3(0.1f, 0.1f, L);
+                c.position = (pa + pb) * 0.5f + Vector3.up * 0.9f; c.rotation = Quaternion.LookRotation(L > 0.01f ? dv : Vector3.forward); c.localScale = new Vector3(0.3f, 0.3f, L);
                 Mat(c, L > ChainMax || L < ChainMin ? coralM : HourOf(a) % 2 == 0 ? goldChain : blueChain);
             }
             for (int i = n; i < chainBars.Count; i++) chainBars[i].gameObject.SetActive(false);

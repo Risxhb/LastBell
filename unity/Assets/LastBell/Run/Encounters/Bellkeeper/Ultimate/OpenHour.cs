@@ -110,11 +110,12 @@ namespace LastBell.Run
             bullets.Clear(); ClearMines(); crossed.Clear(); plans.Clear();
             DealGaps(0);
             Build();
+            CastClip("EchoTell", EchoDelay);   // Echo of You starts
             while (true)
             {
                 float t = T, nt = t + Sim.Dt;
                 int li = Mathf.FloorToInt(nt / Loop);
-                if (li != loopIndex) { loopIndex = li; DealGaps(li * Loop); crossed.Clear(); }
+                if (li != loopIndex) { loopIndex = li; DealGaps(li * Loop); crossed.Clear(); CastClip("EchoTell", EchoDelay); }
                 if (stop && !CurtOn(0, nt) && !CurtOn(1, nt) && !CurtOn(2, nt)) break;   // P3 is over: end now (not inside a curtain sweep)
                 StepFight(t, nt);
                 if (Boss.Ult.WipeCause != null) break;
@@ -128,6 +129,10 @@ namespace LastBell.Run
         void StepFight(float t, float nt)
         {
             var bossP = Sim.Flat(Boss.transform.position);
+            // cast clips (presentation only): HollowToll from REWIND to the rewind, BellSweep as each Bell Curtain starts
+            float lt = TL(t), ln = lt + (nt - t);
+            foreach (var r in Rewinds) if (lt < r - Warn && ln >= r - Warn) CastClip("HollowToll", Warn);
+            foreach (var c in Curtains) if (lt < c.at && ln >= c.at) CastClip("BellSweep", 2.6f);
             // the Mainspring (paused while rewinding)
             while (nextArm <= nt)
             {
@@ -390,7 +395,8 @@ namespace LastBell.Run
             if (!brassB)
             {
                 brassB = Prim.Material(new Color(1f, 0.78f, 0.35f), 2.2f); revB = Prim.Material(new Color(1f, 0.55f, 0.4f), 2.4f);
-                echoB = Prim.Material(new Color(1f, 0.86f, 0.78f), 2.0f);   // echo shots: warm ivory, coral glow (no Arcanist violet, gpt/08 §4) ivoryB = Prim.Material(new Color(0.97f, 0.95f, 0.88f), 2.2f);
+                echoB = Prim.Material(new Color(1f, 0.86f, 0.78f), 2.0f);   // echo shots: warm ivory, coral glow (no Arcanist violet, gpt/08 §4)
+                ivoryB = Prim.Material(new Color(0.97f, 0.95f, 0.88f), 2.2f);   // the Bell Curtain (this sat inside the comment above from 28 Oct to 8 Nov: the curtain had no material)
                 plateDim = Prim.Material(new Color(0.55f, 0.43f, 0.2f), 0.35f); plateHot = Prim.Material(new Color(1f, 0.8f, 0.4f), 2.2f);
                 handM = Prim.Material(new Color(0.9f, 0.7f, 0.32f), 1.4f);
             }
@@ -411,7 +417,7 @@ namespace LastBell.Run
             int n = 0;
             void Ball(Vector3 p, Material m, float size)
             {
-                if (pool.Count <= n) { var tr = Prim.Make(PrimitiveKind.Sphere, root, Vector3.zero, Vector3.one, Color.white); Mat(tr, m); pool.Add(tr); }
+                if (pool.Count <= n) pool.Add(UltBulletMesh.Make(root, m));   // a small brass bell (was a Prim sphere; same size)
                 var b = pool[n++]; b.gameObject.SetActive(true); b.position = new Vector3(p.x, 0.9f, p.z); b.localScale = Vector3.one * size;
                 var rr = b.GetComponent<Renderer>(); if (rr.sharedMaterial != m) rr.sharedMaterial = m;
             }

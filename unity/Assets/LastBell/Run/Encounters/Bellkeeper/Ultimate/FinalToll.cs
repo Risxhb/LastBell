@@ -159,6 +159,7 @@ namespace LastBell.Run
                     if (lane == null && left <= Show)
                     {
                         float yaw = LaneAng(k) + 180;   // Sim.Dir(yaw) = Dir(plan angle)
+                        CastClip(k == 9 ? "EchoTell" : "HollowToll", left);   // toll IX: the Echo appears
                         lane = Spawn(new Hazard { Source = Source + ": the clapper", Shape = HazardShape.Lane, Kind = HazardKind.Strike, Origin = -Sim.Dir(yaw) * 12f, Yaw = yaw, Length = 24, Width = LaneHalf * 2, LockAt = 0, ResolveAt = UltShapes.ResolveIn(Mathf.Max(1, Sim.Ticks(left))), Damage = 0, Knockback = 0, Stun = 0, HitOnResolve = false });
                         int kl = k; lane.OnResolve = hz => { W.BossFx.TollResolve(Vector3.zero, 0.6f, 11f); W.BossFx.UltClapperStrike(Vector3.zero, Dir(LaneAng(kl)), 22f); CameraShake.Shake(0.2f, 0.3f); };
                     }
@@ -800,7 +801,7 @@ namespace LastBell.Run
                     var vv = Sim.Flat(b.V); if (vv.sqrMagnitude > 0.01f) sx.rotation = Quaternion.FromToRotation(Vector3.left, vv.normalized) * Quaternion.Euler(Time.time * 360f, 0, 0);
                     continue;
                 }
-                if (pool.Count <= n) { var tr = Prim.Make(PrimitiveKind.Sphere, root, Vector3.zero, Vector3.one * BR * 2.2f, Color.white); Mat(tr, bulletM); pool.Add(tr); }
+                if (pool.Count <= n) { var tr = UltBulletMesh.Make(root, bulletM); tr.localScale = Vector3.one * BR * 2.2f; pool.Add(tr); }   // a small bell (was a Prim sphere; same size)
                 var x = pool[n++]; x.gameObject.SetActive(true); x.position = new Vector3(b.P.x, 0.9f, b.P.z);
             }
             for (int i = n; i < pool.Count; i++) pool[i].gameObject.SetActive(false);
