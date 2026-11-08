@@ -106,6 +106,14 @@ namespace LastBell.Run
         void OnDestroy() { if (graph.IsValid()) graph.Destroy(); }
 
         public bool Has(string semantic) => Resolve(semantic) >= 0;
+        public bool HasClip(string exact) => index.ContainsKey(exact);   // this name only, no fallback (Presentation: entrances)
+        // Presentation clocks (Presentation lane, 8 Nov): clip time only. GlobalAnimScale is the hit-stop (0 for a few frames,
+        // HitFeel), TimeScale this character's own slow motion (the boss's defeat moment, BossMoments). Neither touches the
+        // sim, oneShotLeft or Busy: a one-shot still ends on its real-time schedule, so gameplay reads are unchanged.
+        public static float GlobalAnimScale = 1;
+        public float TimeScale = 1;
+        // keep the current one-shot on its last frame until the next PlayOnce/ResetPose (the boss's Defeat clip during Cleared)
+        public void HoldOneShot() { if (oneShotLeft > 0) oneShotLeft = 9999; }
         int Resolve(string semantic)
         {
             if (index.TryGetValue(semantic, out int i)) return i;
@@ -171,12 +179,13 @@ namespace LastBell.Run
             }
             foreach (var (m, c) in glow) m.SetColor("emissiveFactor", c * GlowLevel);
             if (!graph.IsValid() || clips.Length == 0) return;
+            float adt = dt * GlobalAnimScale * TimeScale;   // clip time on the presentation clocks (above)
             for (int i = 0; i < clips.Length; i++)
             {
                 weights[i] = Mathf.MoveTowards(weights[i], i == current ? 1 : 0, dt / 0.08f);
                 if (weights[i] <= 0) continue;
                 float len = clips[i].length;
-                times[i] += dt * (speeds[i] <= 0 ? 1 : speeds[i]);
+                times[i] += adt * (speeds[i] <= 0 ? 1 : speeds[i]);
                 // named loops, plus any clip whose name ends in "Loop" (the Dial Warden's held poses: SkyLoop, HandLoop ...)
                 float t = Looping.Contains(clips[i].name) || clips[i].name.EndsWith("Loop") ? Mathf.Repeat(times[i], len) : Mathf.Min(times[i], len);
                 mixer.GetInput(i).SetTime(t);

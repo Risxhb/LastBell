@@ -20,7 +20,7 @@ namespace LastBell.Run
             int h = (floatSeq++ + (text != null ? text.Length : 0)) & int.MaxValue;
             floats.Add(new FloatText { pos = world, text = text, color = c, jx = (h % 5 - 2) * 9f });
         }
-        public static void ClearTransient() { floats.Clear(); labels.Clear(); banner = null; }
+        public static void ClearTransient() { floats.Clear(); labels.Clear(); banner = null; Presentation.HitFeel.ClearTransient(); }
         // a big centre-screen call (Aurelion v4: wipes, the enrage warning) for `seconds` of real time
         static string banner; static Color bannerColor; static float bannerUntil;
         public static void Banner(string text, Color c, float seconds) { banner = text; bannerColor = c; bannerUntil = Time.unscaledTime + seconds; }
