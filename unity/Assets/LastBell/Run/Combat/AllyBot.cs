@@ -30,7 +30,8 @@ namespace LastBell.Run
         public readonly BotMode Mode;
         // tests: what it decided last tick; only formatted when read, so a tick stores plain values and makes no strings
         public string DebugLine => sylOn ? SylvaraLine() : dMe == null ? null : Describe();
-        public string Brief => dMe == null ? null : $"{dMe.ClassName.Substring(0, 2)} {dJob ?? "-"} gap {Sim.Flat(tPos - dMe.transform.position).magnitude - tRad:0.0} {(tick - lastPress < Sim.Hz ? "swing" : "idle")}{(dJob == "volley" && volEsc != null ? " " + volEsc : "")}";   // the sweep trace: job, gap to the target, pressed in the last second
+        public string Brief => dMe == null ? null : $"{dMe.ClassName.Substring(0, 2)} {dJob ?? "-"} gap {Sim.Flat(tPos - dMe.transform.position).magnitude - tRad:0.0} {(tick - lastPress < Sim.Hz ? "swing" : "idle")}{(dJob == "volley" && volEsc != null ? " " + volEsc : "")}{(rvWhy != null ? " rv:" + rvWhy : "")}";   // the sweep trace: job, gap to the target, pressed in the last second
+        string rvWhy;   // the sweep trace: why a downed ally in reach is not being revived (threat, duty, bad all round)
         public float? HoldRange;          // tests: keep this gap to the boss instead of the class's range (8.5 = a ranged player)
         // bots are mechanics dummies by default: they move, dodge and spread, but never attack or heal. Launch switch
         // -lastbellAllyAttack turns their class rotation on (the boss then scales his HP for them, BossEncounter.Spawn).
@@ -59,8 +60,12 @@ namespace LastBell.Run
         const float ReviveStand = 0.9f, ReviveReach = 14f, SylvaraReviveReach = 40f;   // (30 m was tried, 5 Nov: on Sylvara bots crossed her bullets and still never arrived)
         bool ReviveJob(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
         {
-            if (!ReviveSpot(me, pos, out var spot)) return false;
-            if (bad(spot)) return false;   // the ally lies in something about to land: dodge first
+            if (!ReviveSpot(me, pos, out var spot, out var downed)) { rvWhy = "none in reach"; return false; }
+            // the spot on our side is in something: any other spot still in revive reach round them that is clear, the nearest.
+            // Crucivar's allies go down in or beside a brand pool or Pour Channel, which kept the one spot burning for the whole
+            // bleed-out, and nobody revived (8 Nov Hard party sweeps: 0 revives in Phase 1, the party short at the castings)
+            if (bad(spot)) spot = ClearReviveSpot(me, pos, downed);
+            if (float.IsNaN(spot.x)) { rvWhy = "bad all round"; return false; }   // the ally lies in something about to land, all round: dodge first
             dJob = "revive"; dSpot = spot; dNote = 1;
             var v = Sim.Flat(spot - Sim.Flat(pos));
             if (v.magnitude < 0.3f) { dMove = Vector3.zero; inp.Move = ToScreen(Vector3.zero); return true; }   // beside them: hold still
@@ -78,6 +83,21 @@ namespace LastBell.Run
             foreach (var q in me.World.Players)
                 if (q != me && q != downed && q && !q.Down && q.Input is AllyBot ab && Sim.Flat(q.transform.position - downed.transform.position).magnitude - (ab.rvFor == downed && ab.dJob == "revive" ? 4f : 0f) < mine) return false;
             return true;
+        }
+        static readonly Vector3 NoSpot = new Vector3(float.NaN, 0, float.NaN);
+        static readonly float[] ReviveRings = { 0.9f, 1.15f, 1.35f };   // all inside ReviveRange (1.5 m) less a hand
+        Vector3 ClearReviveSpot(PlayerController me, Vector3 pos, PlayerController downed)
+        {
+            var at = Sim.Flat(downed.transform.position); Vector3 best = NoSpot; float bd = float.MaxValue;
+            foreach (float r in ReviveRings)
+                for (int k = 0; k < 16; k++)
+                {
+                    var q = at + Sim.Dir(k * 22.5f) * r;
+                    if (!CombatWorld.InPlayerBound(q, -0.3f) || bad(q)) continue;
+                    float d = Sim.Flat(q - pos).magnitude;
+                    if (d < bd) { bd = d; best = q; }
+                }
+            return best;
         }
         static bool ReviveSpot(PlayerController me, Vector3 pos, out Vector3 spot) => ReviveSpot(me, pos, out spot, out _);
         static bool ReviveSpot(PlayerController me, Vector3 pos, out Vector3 spot, out PlayerController best, float reach = ReviveReach)
@@ -144,6 +164,7 @@ namespace LastBell.Run
         public PlayerInput Read(PlayerController me)
         {
             tick++;
+            rvWhy = null;
             var inp = new PlayerInput();
             var w = me.World; var boss = w.Boss; readWorld = w;
             Vector3 pos = me.transform.position, want;
@@ -200,6 +221,7 @@ namespace LastBell.Run
             }
             if (threat == null && duty >= 0 && bad(pos)) left = duty;
             // revives: nothing landing here soon and no job of its own: get a downed ally up
+            rvWhy = threat != null ? "threat " + threat.Source : duty >= 0 ? "duty" : null;
             if (threat == null && duty < 0 && ReviveJob(me, boss, pos, ref inp)) { dMe = me; dPos = pos; return inp; }
             Vector3 move;
             if (threat != null || (duty >= 0 && bad(pos)))
