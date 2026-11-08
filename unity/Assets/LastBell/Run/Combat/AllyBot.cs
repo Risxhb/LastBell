@@ -508,7 +508,7 @@ namespace LastBell.Run
         // hit, since a jet there is a sure hit (8 Nov full runs: Hard bots wiped to Furnace Spin layered on the volleys)
         const float VolleyJetOut = 22f;
         const float VolleyJetHit = 200f;  // a jet step in the bullet dodge (a bullet step is 100)
-        bool volJets; Vector3 volHub; string volEsc;   // volEsc: the sweep trace
+        bool volJets; Vector3 volHub, volHome; string volEsc;   // volEsc: the sweep trace
         const float VolleyReachPart = 10f;   // per m out of reach of a casting (the boss: 4)
         const float VolleyEscPart = 6f;      // m: with a casting up, no longer run to a spot clear of every path (they ran 18-20 m off)
         const float VolleyThrowReach = 7f;   // a Tollbreaker's axe throws, gap to the target (MaxRange 9 m less a margin)
@@ -528,27 +528,32 @@ namespace LastBell.Run
             if (volNear.Count == 0 && !path) { volOn = false; return false; }
             volJets = false; { var lv = me.World.Hazards.Live; for (int i = 0; i < lv.Count; i++) if (Jet(lv[i])) { TrackSpin(lv[i], me.World.Difficulty == Difficulty.Hard); volJets = true; volHub = Sim.Flat(lv[i].Origin); break; } }   // the jets' turn, for VolleyCost
             pos = Sim.Flat(pos);
-            // home: the rim for a brand carrier, else the attack spot (or straight at the target)
-            Vector3 home = tPos; bool carrier = false;
+            bool carrier = false;
             var live = me.World.Hazards.Live;
             for (int i = 0; i < live.Count && !carrier; i++) { var h = live[i]; if (h.Track != null && h.Age < h.LockAt && h.Shape == HazardShape.Circle && Spares(h, me)) carrier = true; }
             if (carrier) volJets = false;   // its brand goes to the rim, jets or not
-            if (carrier) home = (pos.magnitude > 0.1f ? pos.normalized : Vector3.forward) * Mathf.Min(BrandRing, CombatWorld.PlayerBound - 1.2f);
-            else if (Attacks && AttackSpot(me, boss, out var spot)) home = Sim.Flat(spot);
-            volReach = Attacks && !carrier; volPull = 0.6f; volEsc = carrier ? "carry" : null;
-            // in a fan its bullets are still to cross: the nearest spot clear of every path is the goal (the look is too short
-            // to find a Ring Wave's gap metres away: the solo bot ran from the wall of bullets into the corner, 11-03)
-            if (path || bad(pos))
-            {
-                var esc = NearestClear(pos, boss, bad, out float need);
-                // not beside a turret: the clear spot there is where its next arms sweep (two bots were pinned so, 11-04)
-                if (esc != Vector3.zero && (!tPart || need <= VolleyEscPart) && BotSight.TurretDist(pos + esc * need) >= TurretKeep) { home = pos + esc * need; volReach = false; volPull = need > 6f ? 1f : 2f; volEsc = $"esc{need:0}"; }
-            }
+            // re-plan every 3 ticks: the home and escape search below only feed the plan, so they run with it (same choices). Run
+            // every tick, NearestClear (up to 28 m x 48 ways, each a full hazard test)
+            // cost ~8.5 ms a frame early in Phase 3 with 75-142 hazards live (perf run, dc77bd8, 8 Nov)
             if (!volOn || me.World.Tick - volTick >= 3 || me.Stunned > 0)
             {
-                volOn = true; volTick = me.World.Tick;
+                volTick = me.World.Tick; volOn = true;
+                // home: the rim for a brand carrier, else the attack spot (or straight at the target)
+                var home = tPos;
+                if (carrier) home = (pos.magnitude > 0.1f ? pos.normalized : Vector3.forward) * Mathf.Min(BrandRing, CombatWorld.PlayerBound - 1.2f);
+                else if (Attacks && AttackSpot(me, boss, out var spot)) home = Sim.Flat(spot);
+                volReach = Attacks && !carrier; volPull = 0.6f; volEsc = carrier ? "carry" : null;
+                // in a fan its bullets are still to cross: the nearest spot clear of every path is the goal (the look is too short
+                // to find a Ring Wave's gap metres away: the solo bot ran from the wall of bullets into the corner, 11-03)
+                if (path || bad(pos))
+                {
+                    var esc = NearestClear(pos, boss, bad, out float need);
+                    // not beside a turret: the clear spot there is where its next arms sweep (two bots were pinned so, 11-04)
+                    if (esc != Vector3.zero && (!tPart || need <= VolleyEscPart) && BotSight.TurretDist(pos + esc * need) >= TurretKeep) { home = pos + esc * need; volReach = false; volPull = need > 6f ? 1f : 2f; volEsc = $"esc{need:0}"; }
+                }
+                volHome = home;
                 if (Dirs16 == null) { Dirs16 = new Vector3[16]; for (int k = 0; k < 16; k++) Dirs16[k] = Sim.Dir(k * 22.5f); }
-                volDash = false; volSprint = false; volMove = Vector3.zero; volCost = VolleyCost(me, boss, pos, Vector3.zero, 0, home, VolleyLook);
+                volDash = false; volSprint = false; volMove = Vector3.zero; volCost = VolleyCost(me, boss, pos, Vector3.zero, 0, volHome, VolleyLook);
                 // keep enough for a dash when it gets cornered; but out past the jet ring with jets up, get in first (a Hard bot out
                 // by the rim with 8 stamina walked among the bullets until the jets came round at 10 m/s, 8 Nov full run)
                 bool canSprint = me.Stamina > VolleySprintFloor || (volJets && me.Stamina > 5 && Sim.Flat(pos - volHub).magnitude > VolleyJetRing + 1f);
@@ -557,7 +562,7 @@ namespace LastBell.Run
                     float v = s == 0 ? PlayerController.WalkSpeed : PlayerController.SprintSpeed;
                     foreach (var d in Dirs16)
                     {
-                        float c = VolleyCost(me, boss, pos, d, v, home, VolleyLook) + (s == 1 ? 4f : 0);
+                        float c = VolleyCost(me, boss, pos, d, v, volHome, VolleyLook) + (s == 1 ? 4f : 0);
                         if (c < volCost) { volCost = c; volMove = d; volSprint = s == 1; }
                     }
                 }
@@ -567,7 +572,7 @@ namespace LastBell.Run
                     float dashSpeed = PlayerController.DashDistance / (PlayerController.DashTicks * Sim.Dt);
                     foreach (var d in Dirs16)
                     {
-                        float c = VolleyCost(me, boss, pos, d, dashSpeed, home, PlayerController.DashTicks * Sim.Dt) + 2f;
+                        float c = VolleyCost(me, boss, pos, d, dashSpeed, volHome, PlayerController.DashTicks * Sim.Dt) + 2f;
                         if (c < volCost) { volCost = c; volMove = d; volSprint = false; inp.Dash = volDash = true; }
                     }
                 }
@@ -582,7 +587,7 @@ namespace LastBell.Run
             if (me.Hp < (Mode == BotMode.Passive ? 40 : 70) && me.Potions > 0 && tick % 30 == 0) inp.Potion = true;
             var move = volMove;
             if (move != Vector3.zero) move = AroundBoss(pos, move, boss);
-            dMove = move; dSpot = home; dNote = 1;
+            dMove = move; dSpot = volHome; dNote = 1;
             inp.Move = ToScreen(move);
             return true;
         }
