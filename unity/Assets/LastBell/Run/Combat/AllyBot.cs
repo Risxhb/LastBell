@@ -513,6 +513,7 @@ namespace LastBell.Run
         const float VolleyEscPart = 6f;      // m: with a casting up, no longer run to a spot clear of every path (they ran 18-20 m off)
         const float VolleyThrowReach = 7f;   // a Tollbreaker's axe throws, gap to the target (MaxRange 9 m less a margin)
         static readonly List<Hazard> volNear = new List<Hazard>();
+        static readonly List<Hazard> volJetList = new List<Hazard>();
         static Vector3[] Dirs16;
         bool Volley(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
         {
@@ -547,7 +548,9 @@ namespace LastBell.Run
                 // to find a Ring Wave's gap metres away: the solo bot ran from the wall of bullets into the corner, 11-03)
                 if (path || bad(pos))
                 {
-                    var esc = NearestClear(pos, boss, bad, out float need);
+                    // with a casting up a spot past VolleyEscPart is not taken, so the search stops there (same choice; it ran to 28 m:
+                    // ~2.5 ms a bot on a Phase 2 re-plan with 95-136 hazards, perf 8 Nov)
+                    var esc = NearestClear(pos, boss, bad, out float need, true, tPart ? VolleyEscPart : 28f);
                     // not beside a turret: the clear spot there is where its next arms sweep (two bots were pinned so, 11-04)
                     if (esc != Vector3.zero && (!tPart || need <= VolleyEscPart) && BotSight.TurretDist(pos + esc * need) >= TurretKeep) { home = pos + esc * need; volReach = false; volPull = need > 6f ? 1f : 2f; volEsc = $"esc{need:0}"; }
                 }
@@ -599,6 +602,7 @@ namespace LastBell.Run
             float body = boss.BodyRadius + PlayerController.Radius + 0.1f;
             var live = me.World.Hazards.Live;
             int steps = Mathf.RoundToInt(VolleyLook / VolleyStep);
+            volJetList.Clear(); for (int i = 0; i < live.Count; i++) if (Jet(live[i])) volJetList.Add(live[i]);   // once, not every step over every hazard (perf 8 Nov)
             Vector3 q = pos; bool stopped = false;
             for (int k = 1; k <= steps; k++)
             {
@@ -620,9 +624,9 @@ namespace LastBell.Run
                 // (read every 0.2 s at a flat 100, a jet crossing cost less than one bullet, and the bots dodging bullets in the
                 // second and third uprisings walked into the jets: 7 of 13 downs over 4 Hard party runs, 11-04); one hit each, so
                 // a jet that has hit this player is done
-                for (int i = 0; i < live.Count; i++)
+                for (int i = 0; i < volJetList.Count; i++)
                 {
-                    var h = live[i]; if (!Jet(h) || h.Hit.Contains(me)) continue;
+                    var h = volJetList[i]; if (h.Hit.Contains(me)) continue;
                     float spin = spokeRef != null && Sim.Flat(spokeRef.Origin - h.Origin).magnitude < 0.1f ? spokeFirst : 0;
                     bool rev = me.World.Difficulty == Difficulty.Hard;   // Hard's Spin Reversal
                     if (JetAt(h, q, t, spin, rev)) cost += VolleyJetHit * early;
@@ -635,6 +639,7 @@ namespace LastBell.Run
                 for (int i = 0; i < live.Count; i++)
                 {
                     var h = live[i];
+                    if (i < rN) { float dx = q.x - rX[i], dz = q.z - rZ[i]; if (dx * dx + dz * dz > rR2[i]) continue; }   // out of its reach: no burn, no hit (as BadAt; perf 8 Nov)
                     if (h.Track != null && h.Shape == HazardShape.Circle && h.Radius <= 0.7f) continue;   // the bullets, above
                     if (h.BurnPerSecond > 0) { if (h.Contains(q) && !h.Contains(pos)) cost += 25; else if (h.Contains(q)) cost += 8; continue; }
                     if (Jet(h)) continue;   // the jets, above
@@ -1301,13 +1306,13 @@ namespace LastBell.Run
         }
 
         static Vector3[] Dirs48;
-        static Vector3 NearestClear(Vector3 pos, BossEncounter b, System.Func<Vector3, bool> bad, out float need, bool avoidBurn = true)
+        static Vector3 NearestClear(Vector3 pos, BossEncounter b, System.Func<Vector3, bool> bad, out float need, bool avoidBurn = true, float maxR = 28f)
         {
             var bp = b.transform.position;
             if (Dirs48 == null) { Dirs48 = new Vector3[48]; for (int k = 0; k < 48; k++) Dirs48[k] = Sim.Dir(k * 7.5f); }
             // nearest ring first, stopping at the first clear point (every ring keeps all 48 directions: at 15° beyond 8 m a Hard
             // Ecliptic disc fell between the rays and every solo Hard bot died at 6 s)
-            for (float r = 0.2f; r <= 28f; r += r < 8f ? 0.2f : 0.5f)   // the whole arena: a tower can be 20 m away
+            for (float r = 0.2f; r <= maxR; r += r < 8f ? 0.2f : 0.5f)   // the whole arena (28 m): a tower can be 20 m away
                 for (int k = 0; k < 48; k++)
                 {
                     var dir = Dirs48[k]; var q = pos + dir * r;
