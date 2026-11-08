@@ -141,7 +141,7 @@ namespace LastBell.Run
             W.BossFx.ChimeResolve(plate, PlateSize);
             // solo on a ✕ beat: the plate rests and the ✕ is the duty (checked below)
             int soloDuty = k == 1 && players.Count > 0 ? DutyOf(players[0], b) : 0;
-            if (soloDuty == 0 && onPlate == 0) { Fail(b, "empty plate"); Ult.Wipe("The escapement skips (empty plate)"); return; }
+            if (soloDuty == 0 && onPlate == 0) { Fail(b, "empty plate"); Ult.Wipe("The escapement skips (empty plate)", Id); return; }
             if (soloDuty == 0 && onPlate > Mathf.Max(1, soakers))
             {
                 clean = false; Fail(b, "too many on the plate");

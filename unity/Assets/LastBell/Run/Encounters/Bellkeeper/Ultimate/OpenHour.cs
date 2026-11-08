@@ -187,7 +187,7 @@ namespace LastBell.Run
                 int s = SoakHour(kb); var pl = PlateOf(kb); bool on = false;
                 foreach (var p in W.Players) if (!p.Down && HourOf(p) == s && (Sim.Flat(p.transform.position) - pl).magnitude <= OnPlate) on = true;
                 W.BossFx.ChimeResolve(pl, OnPlate);
-                if (!on) { Fails.Add($"beat {kb}: plate empty"); Ult.Wipe("The open hour (empty plate)"); return; }
+                if (!on) { Fails.Add($"beat {kb}: plate empty"); Ult.Wipe("The open hour (empty plate)", Id); return; }
                 BeatsClean++;
             }
         }
@@ -196,7 +196,7 @@ namespace LastBell.Run
         {
             if (LogSteer) Debug.Log($"[open hour] {T:0.00}s {UltimateState.Roman[HourOf(p) + 1]} hit by {what} at ({p.transform.position.x:0.0},{p.transform.position.z:0.0}) job {JobOf(p)} · {p.ClassName} hp {p.Hp} slow {(p.Kit != null ? p.Kit.SlowLeft : 0):0.00}");
             Fails.Add($"{T:0.0}s {UltimateState.Roman[HourOf(p) + 1]}: {what}");
-            p.ReceiveHit(new Hazard { Source = Source + ": " + what, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Sim.Flat(p.transform.position), Radius = 0.5f, Damage = dmg, Knockback = 0, Stun = 0 });
+            p.ReceiveHit(new Hazard { Source = Source + ": " + what, AttackId = Id, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Sim.Flat(p.transform.position), Radius = 0.5f, Damage = dmg, Knockback = 0, Stun = 0 });
         }
 
         // ---------------- the bots: a short route search (UltimateBot asks Steer while this runs) ----------------

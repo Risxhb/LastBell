@@ -62,6 +62,81 @@
                                     ]
                     },
                     {
+                        "id":  "bellkeeper.ult_escapement_relay",
+                        "boss":  "bellkeeper",
+                        "bossName":  "Bellkeeper",
+                        "name":  "Escapement Relay",
+                        "tag":  "Mixed",
+                        "shape":  "Hour plate, pendulum lane and tipping-bell cone duties.",
+                        "icon":  "bellkeeper_ult_escapement_relay",
+                        "aliases":  [
+                                        "Escapement Relay"
+                                    ]
+                    },
+                    {
+                        "id":  "bellkeeper.ult_chime_debts",
+                        "boss":  "bellkeeper",
+                        "bossName":  "Bellkeeper",
+                        "name":  "Chime Debts",
+                        "tag":  "Ground",
+                        "shape":  "Remembered personal circle and lane debt.",
+                        "icon":  "bellkeeper_ult_chime_debts",
+                        "aliases":  [
+                                        "Chime Debts",
+                                        "Chime Debt"
+                                    ]
+                    },
+                    {
+                        "id":  "bellkeeper.ult_broken_hour",
+                        "boss":  "bellkeeper",
+                        "bossName":  "Bellkeeper",
+                        "name":  "Broken Hour",
+                        "tag":  "Mixed",
+                        "shape":  "Plate duty, bell slam, chained Gear Train and INVERTED identity.",
+                        "icon":  "bellkeeper_ult_broken_hour",
+                        "aliases":  [
+                                        "Broken Hour"
+                                    ]
+                    },
+                    {
+                        "id":  "bellkeeper.ult_open_hour",
+                        "boss":  "bellkeeper",
+                        "bossName":  "Bellkeeper",
+                        "name":  "The Open Hour",
+                        "tag":  "Ground",
+                        "shape":  "Spiral bullets, rewind, personal echoes and moving curtain gaps.",
+                        "icon":  "bellkeeper_ult_open_hour",
+                        "aliases":  [
+                                        "The Open Hour",
+                                        "Open Hour"
+                                    ]
+                    },
+                    {
+                        "id":  "bellkeeper.ult_gear_floor",
+                        "boss":  "bellkeeper",
+                        "bossName":  "Bellkeeper",
+                        "name":  "The Gear Floor",
+                        "tag":  "Ground",
+                        "shape":  "Moving gears, biting pawls, hammer/shards and the floor transitions.",
+                        "icon":  "bellkeeper_ult_gear_floor",
+                        "aliases":  [
+                                        "The Gear Floor",
+                                        "Gear Floor"
+                                    ]
+                    },
+                    {
+                        "id":  "bellkeeper.ult_final_toll",
+                        "boss":  "bellkeeper",
+                        "bossName":  "Bellkeeper",
+                        "name":  "Final Toll",
+                        "tag":  "Mixed",
+                        "shape":  "Clapper lanes, sound rings, Echo Bellkeeper and Last Stand.",
+                        "icon":  "bellkeeper_ult_final_toll",
+                        "aliases":  [
+                                        "Final Toll"
+                                    ]
+                    },
+                    {
                         "id":  "sylvara.spiral_bloom",
                         "boss":  "sylvara",
                         "bossName":  "Sylvara",

@@ -62,7 +62,8 @@ namespace LastBell.Run
         // made itself (numerals, after-images). Its hazards are already gone or about to be cleared by the encounter.
         public virtual void Cancel() { Spawned.Clear(); }
 
-        protected Hazard Spawn(Hazard h) { W.Hazards.Spawn(h); Spawned.Add(h); Boss.NotifySpawned(this, h); return h; }
+        // the hazard carries this ability's runtime ID unless it names its own (BossAttackIcons: the death recap icon)
+        protected Hazard Spawn(Hazard h) { h.AttackId ??= Id; W.Hazards.Spawn(h); Spawned.Add(h); Boss.NotifySpawned(this, h); return h; }
         protected int StandingCount { get { int n = 0; foreach (var p in W.Players) if (!p.Down) n++; return n; } }
     }
 
@@ -74,8 +75,8 @@ namespace LastBell.Run
             if (string.IsNullOrWhiteSpace(key)) return null;
             var k = key.Trim().ToLowerInvariant().Replace('-', '_').Replace(' ', '_');
             if (k.StartsWith("bellkeeper.")) k = k.Substring("bellkeeper.".Length);
-            if (k.StartsWith("ultimate.")) k = "ult_" + k.Substring("ultimate.".Length);   // ULTIMATE.md ids: ultimate.ledger = ult_ledger
-            if (k.StartsWith("the_")) k = k.Substring(4);
+            if (k.StartsWith("ultimate.")) k = "ult_" + k.Substring("ultimate.".Length);   // ULTIMATE.md ids: ultimate.ledger = ult_ledger
+            if (k.StartsWith("the_")) k = k.Substring(4);
             return k;
         }
     }

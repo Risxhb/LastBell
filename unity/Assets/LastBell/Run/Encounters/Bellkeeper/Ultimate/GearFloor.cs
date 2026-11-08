@@ -171,7 +171,7 @@ namespace LastBell.Run
                         {
                             bool assigned = false, held = false;
                             foreach (var p in W.Players) { if (p.Down || (HourOf(p) + 2) % 4 != g) continue; assigned = true; if (GearAt(p.transform.position) == g) held = true; }
-                            if (assigned && !held) { Jams++; Fails.Add($"the lock: gear {GN[g]} empty"); Ult.Wipe($"The gear train jams (gear {GN[g]} empty)"); break; }
+                            if (assigned && !held) { Jams++; Fails.Add($"the lock: gear {GN[g]} empty"); Ult.Wipe($"The gear train jams (gear {GN[g]} empty)", Id); break; }
                         }
                         if (Boss.Ult.WipeCause != null) break;
                     }
@@ -240,7 +240,7 @@ namespace LastBell.Run
                             assigned = true; who = UltimateState.Roman[HourOf(p) + 1];
                             if (GearAt(p.transform.position) == g) held = true;
                         }
-                        if (assigned && !held) { Jams++; Fails.Add($"slam {ks}: gear {GN[g]} without {who}"); Ult.Wipe($"The gear train jams (gear {GN[g]} needs {who})"); break; }
+                        if (assigned && !held) { Jams++; Fails.Add($"slam {ks}: gear {GN[g]} without {who}"); Ult.Wipe($"The gear train jams (gear {GN[g]} needs {who})", Id); break; }
                     }
                     Boss.PlanLog.Add((Now, $"gear slam {ks} {string.Join("+", ss.ConvertAll(g => GN[g]))}"));
                     if (stop) break;
@@ -261,7 +261,7 @@ namespace LastBell.Run
         {
             if (Log) Debug.Log($"[gear floor] {T:0.00}s {UltimateState.Roman[HourOf(p) + 1]} hit by {what} at ({p.transform.position.x:0.0},{p.transform.position.z:0.0}) job {JobOf(p)} · {p.ClassName} hp {p.Hp} slow {(p.Kit != null ? p.Kit.SlowLeft : 0):0.00}");
             Fails.Add($"{T:0.0}s {UltimateState.Roman[HourOf(p) + 1]}: {what}");
-            p.ReceiveHit(new Hazard { Source = Source + ": " + what, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Sim.Flat(p.transform.position), Radius = 0.5f, Damage = dmg, Knockback = 0, Stun = 0 });
+            p.ReceiveHit(new Hazard { Source = Source + ": " + what, AttackId = Id, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Sim.Flat(p.transform.position), Radius = 0.5f, Damage = dmg, Knockback = 0, Stun = 0 });
         }
 
         // ---------------- bots ----------------

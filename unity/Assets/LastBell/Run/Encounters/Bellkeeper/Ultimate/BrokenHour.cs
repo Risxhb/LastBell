@@ -181,11 +181,11 @@ namespace LastBell.Run
             }
             Boss.Face(Quaternion.LookRotation(HandDir(v)).eulerAngles.y);
             W.BossFx.ChimeResolve(plate, 1.6f);
-            if (onPlate == 0 && sh >= 0) { Fail("plate empty"); Ult.Wipe("The hour breaks (empty plate)"); return; }
+            if (onPlate == 0 && sh >= 0) { Fail("plate empty"); Ult.Wipe("The hour breaks (empty plate)", Id); return; }
             // the right INVERTED holders
             bool right = true;
             foreach (var p in W.Players) if (!p.Down && (HourOf(p) == ih) != inverted.Contains(p)) right = false;
-            if (!right) { Debug.Log($"[broken hour] wrong holder on beat {Beats + 1}: holds " + string.Join(",", Holders()) + " · should " + string.Join(",", W.Players.FindAll(q => !q.Down && HourOf(q) == ih).ConvertAll(q => W.Players.IndexOf(q)))); Fail("wrong INVERTED holder"); Ult.Wipe("The bell rings inverted (wrong holder)"); return; }
+            if (!right) { Debug.Log($"[broken hour] wrong holder on beat {Beats + 1}: holds " + string.Join(",", Holders()) + " · should " + string.Join(",", W.Players.FindAll(q => !q.Down && HourOf(q) == ih).ConvertAll(q => W.Players.IndexOf(q)))); Fail("wrong INVERTED holder"); Ult.Wipe("The bell rings inverted (wrong holder)", Id); return; }
             // the slam
             foreach (var p in W.Players)
             {
@@ -199,7 +199,7 @@ namespace LastBell.Run
             {
                 if (a.Down || b.Down) continue;
                 float L = (Sim.Flat(a.transform.position) - Sim.Flat(b.transform.position)).magnitude;
-                if (L > ChainMax) { Fail($"chain {Roman(a)}–{Roman(b)} snaps"); Ult.Wipe("The gear train snaps"); return; }
+                if (L > ChainMax) { Fail($"chain {Roman(a)}–{Roman(b)} snaps"); Ult.Wipe("The gear train snaps", Id); return; }
                 if (L < ChainMin) { clean = false; Fail($"chain {Roman(a)}–{Roman(b)} grinds"); Hit(a, SmallDamage, "the gears grind"); Hit(b, SmallDamage, "the gears grind"); }
             }
             for (int i = 0; i < chains.Count; i++)
@@ -218,7 +218,7 @@ namespace LastBell.Run
         void Fail(string why) { Fails.Add($"beat {Beats + 1}: {why}"); Boss.PlanLog.Add((Now, "broken hour fail " + why)); }
         void Hit(PlayerController p, int dmg, string what)
         {
-            var h = new Hazard { Source = Source + ": " + what, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Sim.Flat(p.transform.position), Radius = 0.5f, Damage = dmg, Knockback = 0, Stun = 0 };
+            var h = new Hazard { Source = Source + ": " + what, AttackId = Id, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Sim.Flat(p.transform.position), Radius = 0.5f, Damage = dmg, Knockback = 0, Stun = 0 };
             p.ReceiveHit(h);
         }
 

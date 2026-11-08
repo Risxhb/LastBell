@@ -10,13 +10,16 @@ namespace LastBell.Run
     public sealed partial class RunAutoTest
     {
         // the Aurelion IDs among the 20 Chzy18 approved on 2026-10-23 (ability-icons 0d0555a) and the 11 Sylvara v3 IDs approved
-        // on 2026-11-02 (work/attack-icons-20261102), written out here so the catalog
+        // on 2026-11-02 (work/attack-icons-20261102), plus the 6 Bellkeeper Ultimate family icons (work/attack-icons-20261108, done as
+        // recommended 8 Nov, review later), written out here so the catalog
         // can't drift unnoticed. Crucivar icons stay local until that boss ships; normal Bellkeeper v2 is retired.
         static readonly string[] ApprovedAttackIds =
         {
             "aurelion.meridian_lances", "aurelion.starfall_mirror", "aurelion.noon_shadow", "aurelion.orrery_closing", "aurelion.hour_hands",
             "sylvara.spiral_bloom", "sylvara.seed_pods", "sylvara.waterfall_jets", "sylvara.pruning_arc", "sylvara.two_colour_choir",
             "sylvara.toll_burst", "sylvara.root_ring", "sylvara.hollow_bloom", "sylvara.bud_bloom", "sylvara.seed_storm", "sylvara.last_storm",
+            "bellkeeper.ult_escapement_relay", "bellkeeper.ult_chime_debts", "bellkeeper.ult_broken_hour", "bellkeeper.ult_open_hour",
+            "bellkeeper.ult_gear_floor", "bellkeeper.ult_final_toll",
         };
 
         void BossAttackIconChecks()

@@ -193,7 +193,7 @@ namespace LastBell.Run
                         if (!shardTele[n] && nt >= sh.at - (1f + WarnLead)) { shardTele[n] = true; Spawn(new Hazard { Source = Source + ": a falling shard", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = sh.p, Radius = ShardR, LockAt = 0, ResolveAt = UltShapes.ResolveIn(Mathf.Max(1, Sim.Ticks(sh.at - t))), Damage = 0, Knockback = 0, Stun = 0, HitOnResolve = false }); }
                         if (!shardDone[n] && nt >= sh.at) { shardDone[n] = true; foreach (var p in W.Players) if (!p.Down && (Sim.Flat(p.transform.position) - sh.p).magnitude < ShardR + PR) Hit(p, UltimateState.Lethal, "a falling shard"); }
                     }
-                    if (nt >= TollAt[13] + Stand) { Fails.Add("the bell falls"); Ult.Wipe("The bell falls"); break; }
+                    if (nt >= TollAt[13] + Stand) { Fails.Add("the bell falls"); Ult.Wipe("The bell falls", Id); break; }
                 }
                 // the rings
                 foreach (var p in W.Players)
@@ -229,7 +229,7 @@ namespace LastBell.Run
             if (Has(k, 0) && HourPresent(Soaker(k)))
             {
                 bool held = false; foreach (var p in W.Players) if (!p.Down && HourOf(p) == Soaker(k) && OnPlate(k, p.transform.position)) held = true;
-                if (!held) { Fails.Add($"toll {k}: plate empty"); Ult.Wipe("The plate was empty"); return; }
+                if (!held) { Fails.Add($"toll {k}: plate empty"); Ult.Wipe("The plate was empty", Id); return; }
             }
             if (Has(k, 2))
             {
@@ -253,7 +253,7 @@ namespace LastBell.Run
         void Hit(PlayerController p, int dmg, string what)
         {
             Fails.Add($"{T:0.0}s {UltimateState.Roman[HourOf(p) + 1]}: {what}");
-            p.ReceiveHit(new Hazard { Source = Source + ": " + what, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Sim.Flat(p.transform.position), Radius = 0.5f, Damage = dmg, Knockback = 0, Stun = 0 });
+            p.ReceiveHit(new Hazard { Source = Source + ": " + what, AttackId = Id, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Sim.Flat(p.transform.position), Radius = 0.5f, Damage = dmg, Knockback = 0, Stun = 0 });
         }
 
         // ---------------- bots ----------------
