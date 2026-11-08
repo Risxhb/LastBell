@@ -75,8 +75,8 @@ namespace LastBell.Run
             if (string.IsNullOrWhiteSpace(key)) return null;
             var k = key.Trim().ToLowerInvariant().Replace('-', '_').Replace(' ', '_');
             if (k.StartsWith("bellkeeper.")) k = k.Substring("bellkeeper.".Length);
-            if (k.StartsWith("ultimate.")) k = "ult_" + k.Substring("ultimate.".Length);   // ULTIMATE.md ids: ultimate.ledger = ult_ledger
-            if (k.StartsWith("the_")) k = k.Substring(4);
+            if (k.StartsWith("ultimate.")) k = "ult_" + k.Substring("ultimate.".Length);   // ULTIMATE.md ids: ultimate.ledger = ult_ledger
+            if (k.StartsWith("the_")) k = k.Substring(4);
             return k;
         }
     }
