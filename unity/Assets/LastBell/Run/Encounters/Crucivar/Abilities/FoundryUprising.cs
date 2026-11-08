@@ -75,6 +75,8 @@ namespace LastBell.Run
             for (t = 0; ; t++)
             {
                 if (t == Sim.Ticks(4f)) { Boss.SetCurrent("Ember Brand"); Boss.Rite.EmberBrand(); }
+                // between his own attacks he works the pour, feeding the castings (CastingCycle, unused to 8 Nov; visual only)
+                if ((t == Sim.Ticks(8f) || (!layered && t == Sim.Ticks(16f))) && Turrets.Any(x => x.Up)) Boss.Presenter?.Action("CastingCycle", Sim.Ticks(3f));
                 if (t == deadline - Sim.Ticks(2f) && Turrets.Any(x => x.Up)) Boss.Presenter?.Action("PourFlood", Sim.Ticks(2f));   // the flood is coming: arms up, down as it lands
                 if (layered && t == Sim.Ticks(11f)) { Boss.SetCurrent("Furnace Spin"); Boss.Rite.FurnaceSpin(); }
                 if (layered && t == Sim.Ticks(19f)) { Boss.SetCurrent("Backdraft"); draft = Boss.Rite.Backdraft().GetEnumerator(); draftWait = 0; }
