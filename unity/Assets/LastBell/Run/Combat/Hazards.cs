@@ -26,6 +26,7 @@ namespace LastBell.Run
         public HazardShape Shape;
         public HazardKind Kind = HazardKind.Strike;
         public Vector3 Origin;
+        public Vector3 Drift;                    // m/s, for a hazard its ability moves (bullets): AllyBot looks ahead along it
         public float Yaw;
         public float Radius, Inner, HalfAngle;   // circle/ring/cone
         public float Length, Width;              // lane

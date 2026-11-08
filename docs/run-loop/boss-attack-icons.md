@@ -2,7 +2,7 @@
 
 Codex made 20 boss attack icons, one for each v2 attack of the four main bosses. Chzy18 approved all 20 on 23 October 2026 (ability-icons commit `0d0555a`). This page explains how the run loop shows them and what each boss branch needs to do.
 
-> **On the current player (`feature/confrontation-menu`, 26 October 2026):** this branch carries **Aurelion's 5 icons**, plus **Sylvara v3's 11** from PR 16. The Crucivar icons stay local until that boss ships, and normal Bellkeeper v2 is retired. The per-boss notes below still describe the other bosses for when their icons come back.
+> **On the current player (`feature/confrontation-menu`, 26 October 2026):** this branch carries **Aurelion's 5 icons**, **Sylvara v3's 11** from PR 16 and **Crucivar v4's 17** from PR 19 (33 in all). Normal Bellkeeper v2 is retired. See the Crucivar notes below. The per-boss notes below still describe the other bosses for when their icons come back.
 >
 >  Risx removed the boss panel's attack warning rows on 24 October (telegraphs on the floor carry the warning). So on this player a boss attack icon shows in the death recap, the attack tooltip and the Down card. It appears in the boss panel only on a row for a hazard tagged with a mechanic (see `mechanic-icons.md`).
 
@@ -56,7 +56,10 @@ Sub-hazards that one attack spawns (rims, crowns, blasts, stamps, echoes) inheri
 - v3 adds attacks that aren't among the 20 (Reunion, Umbra and the scorch hazards). Leave them without an ID for now; they show as text. Ask Codex for icons if they stay.
 
 ### Crucivar
-- The v2/v3 abilities these icons were made for are retired (1 Nov 2026). The v4 fight has no approved icons yet; its warnings show as text.
+- The v2/v3 icons are retired with those abilities (1 Nov 2026).
+- **v4 (Azure PR 19):** Codex's v4 icons, accepted by Chzy18 on 2 Nov 2026 (`work/attack-icons-20261102/crucivar/`). The catalog has 17 Crucivar entries, and every v4 hazard sets `AttackId` directly in its ability: Ember Brand (and Brand Pool), Furnace Spin, Backdraft, Casting Order (Pour I–IV, Pour Channel), Anvil Quake, Quake Echo, Foundry Uprising, Lane Stream, Ring Wave, Spiral Arm (paths and bullets), Pour Flood, Mould Towers, Tower Slag, Molten Crown (and Crown Rise), Furnace Eruption, Molten Overflow and Second Press.
+- Tower Slag reuses the Ember Brand picture and Molten Overflow the Furnace Eruption picture, each under its own name. The icons sample bullet counts, so they're always drawn with the attack name, as everywhere else.
+- `crucivar.v4_attack_icons` in the Crucivar suite runs each phase solo on Hard and checks that every hazard and hit names a Crucivar attack with an icon.
 
 ### Sylvara (`feature/sylvara-v3`)
 - **Wired (2 Nov 2026).** Chzy18 approved Codex's 11 v3 icons (`work/attack-icons-20261102`); they are in the catalog as `sylvara.*`. Bullets carry an `AttackId` too (`BulletSystem.Bullet.AttackId`, copied onto the hit), and `SylvaraEncounter.AttackOf(source)` sets it on every bullet and hazard. Sources repeat across phases, so the choice uses context: the spiral is Two-Colour Choir in Phase 2, and the spiral and seeds are Last Storm once the enrage starts. The harmless Choir Bud bloom timer has no ID. The icons show approximate bullet counts, so the name always appears with them.

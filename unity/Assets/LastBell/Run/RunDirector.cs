@@ -48,7 +48,7 @@ namespace LastBell.Run
             new BossEntry("Sylvara (area 3)", w => BossEncounter.Spawn<SylvaraEncounter>(w, Vector3.zero, 0), map: SylvaraMap, phases: 4,
                 warmUp: w => w.Bullets.Prewarm(w.Root)),   // the Seed Storm burst-preview bars and materials (review SYL-PREVIEW-COLD)
             // Brass Foundry area boss; authored practice map
-            new BossEntry("Crucivar (area 2)", w => BossEncounter.Spawn<CrucivarEncounter>(w, new Vector3(0, 0, -1.5f), 0), map: CrucivarMap, phases: 3),
+            new BossEntry("Crucivar (area 2)", w => BossEncounter.Spawn<CrucivarEncounter>(w, new Vector3(0, 0, -1.5f), 0), map: CrucivarMap, phases: 3, warmUp: CrucivarEncounter.WarmUp),
             // Metronome Court miniboss: explicit Practice entry only (inRun: false), so shuffled run slots are unchanged.
             // Run integration point for later review: set inRun to true here (docs/metronome-arena/tempo-tyrant.md).
             // Phase 2 is Broken Cadence (below 20%).
