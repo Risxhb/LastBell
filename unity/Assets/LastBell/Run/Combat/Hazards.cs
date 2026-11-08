@@ -56,6 +56,7 @@ namespace LastBell.Run
         public Func<Vector3, Vector3> Push;      // knockback direction override (Second Press pushes toward the arena centre)
         public float ClipRadius;                 // > 0: the telegraph is drawn only over the floor disc of this radius (presentation)
         public bool HitOnResolve = true;         // false: the owner deals the hits itself while the warning is up (a sweeping charge)
+        public bool Hidden;                      // no floor telegraph (an arena-wide raidwide the boss shows with its own effects)
         public bool Flinch = true;               // false: the hit deals damage only, with no stun, knockback or interrupt (hostile bullets)
         public bool Soak;                        // a ring to stand IN (a tower), not a shape to leave: bots and the HUD read it
 
@@ -164,6 +165,7 @@ namespace LastBell.Run
             if (h.ClipRadius > 0) h.Tele.Clip(Vector3.zero, h.ClipRadius);
             h.Tele.Place(h.Origin, h.Yaw);
             if (h.LockAt <= 0) h.Tele.Lock();
+            if (h.Hidden) h.Tele.Hide();
             live.Add(h);
             Spawned?.Invoke(h);
             return h;
