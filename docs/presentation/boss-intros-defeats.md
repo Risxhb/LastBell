@@ -37,7 +37,8 @@ Cleared 180 (checked by the suite).
 - **Name card.** Eyebrow line with role and area: "Area boss · The Skyward Spire", "Final boss · The Throne of the Final
   Toll", "Practice · The Verdant Chimes" (minibosses in a run keep their stage label). The Bellkeeper gets his title from
   `gpt/04-bosses.md`: "Sovereign of the Shattered Hour". Cinematic bars slide in and out within the intro.
-- **Entrance.** The camera frames the boss together with the player (the existing `RunDirector.FrameAlso` hook) until
+- **Entrance.** The camera slides toward the boss and back a little (a translation only, added after the director's camera
+  and removed after rendering; its rotation never changes, because movement input goes through the camera's forward) until
   75 % of the intro, so it is back on the player before combat. Aurelion, Crucivar and Sylvara keep their own entrance clips.
   A boss whose code starts none plays its first existing clip of `Entrance`, `Intro`, `PhaseShift` (for the Bellkeeper:
   his transformation clip, if his model has it).
@@ -55,3 +56,13 @@ Cleared 180 (checked by the suite).
 1. Should the Bellkeeper's entrance use a dedicated clip later (the model has none named `Entrance`/`Intro`)?
 2. Is "Sovereign of the Shattered Hour" the title you want on his card?
 3. Should the defeat camera also pull back a little (`RunDirector.CameraPull`), or is framing enough?
+
+## 4. Checks (8 Nov)
+
+- `-lastbellBossMomentsOnly` (47 checks, batch and windowed): for each main boss with the moments on and off, the intro
+  lasts 120 ticks and Cleared 180; the first 600 combat ticks hash the same (Aurelion, Sylvara, Crucivar exactly; the
+  Bellkeeper Ultimate's own bots differ run to run even with everything off, so it is held to that baseline); card lines,
+  entrance clip, freeze → slow motion → recovery, held Defeat clip, flash and released framing; 0 bytes allocated per frame.
+- `-lastbellHitFeelOnly` (30 checks): numbers, merge, cap, no stacking, identical ticks with the old look, 0 bytes per
+  frame (windowed, including drawing) and per hit (5000 hits).
+- `-lastbellSmokeOnly` 47/0. Playtest build menu test 111/0.
