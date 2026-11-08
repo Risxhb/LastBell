@@ -17,6 +17,9 @@ namespace LastBell.Run.Shop
         const float LoneBellRange = 8f, FormationRange = 5f, WarCryRange = 6f, CloseRange = 4f;
         const int MaxHpCapPct = 20;  // shop spec §8: items give at most +20% max HP
         const float KnockbackCapPct = 30;   // shop spec §8: knockback reduction capped at -30%
+        const float DashCost = 30, SprintBase = 25, ShortSplitShare = 4f / 6f;   // Leaden Step, Steady Breath, Short Split
+        public const int PatientGap = 120;  // Patient Bell: 2 s without a hit on the boss
+        public const int LingerTicks = 120; // Lingering Rune: the rune stays 2 s more
 
         static PlayerBuild B(PlayerController p) => p != null ? p.Build : null;
         static int Tick(PlayerController p) => p.World.Tick;
@@ -49,8 +52,9 @@ namespace LastBell.Run.Shop
             {
                 // controller (every class)
                 case "dash.distance": return v + b.V(FarBlink);
-                case "dash.cost": return b.Has(LightStep) ? b.V(LightStep) : v;
+                case "dash.cost": return (b.Has(LightStep) ? b.V(LightStep) : v) + (b.Has(LeadenStep) ? b.V(LeadenStep) - DashCost : 0);   // Leaden Step adds on top
                 case "stamina.max": return v + b.V(LongLungs);
+                case "stamina.regen": return v * (1 + b.V(SteadyBreath) / 100f);
                 case "knockback": return v * (1 - Mathf.Min(KnockbackCapPct, b.V(SureFooting)) / 100f);
                 case "move.speed": return b.L.LightFeetUntil > Tick(p) ? v * (1 + b.V(LightFeet) / 100f) : v;
                 // Tollbreaker (TollbreakerKit reads these "t.*" keys)
@@ -63,18 +67,23 @@ namespace LastBell.Run.Shop
                 case "t.call.per_m": return v + b.V(IronPull);
                 case "t.call.max": return b.Has(IronPull) ? b.V2(IronPull) : v;
                 case "t.call.cd": return b.Has(RootedAxe) ? Sim.Ticks(9) : v;
-                case "t.split.ticks": return b.Has(DeepSplit) ? Sim.Ticks(b.V(DeepSplit)) : v;
-                case "t.lodge.boss": return b.Has(DeepSplit) ? Mathf.Max(v, Sim.Ticks(b.V(DeepSplit))) : v;
+                // Short Split: the split and its boss lodge last 4 s instead of 6 (two thirds of whatever Deep Split makes them)
+                case "t.split.ticks": return (b.Has(DeepSplit) ? Sim.Ticks(b.V(DeepSplit)) : v) * (b.Has(ShortSplit) ? ShortSplitShare : 1);
+                case "t.lodge.boss": return (b.Has(DeepSplit) ? Mathf.Max(v, Sim.Ticks(b.V(DeepSplit))) : v) * (b.Has(ShortSplit) ? ShortSplitShare : 1);
+                case "t.held.range": return b.Has(LongToss) ? b.V2(LongToss) : v;
+                case "t.held.damage": return b.Has(LongToss) ? b.V(LongToss) : v;
                 case "t.lodge.floor": return b.Has(AnchorLine) ? Sim.Ticks(b.V2(AnchorLine)) : v;
                 case "t.frenzy.cd": return b.Has(FrenziedHour) ? Sim.Ticks(b.V(FrenziedHour)) : v;
                 case "t.frenzy.ticks": return b.Has(FrenziedHour) ? Sim.Ticks(3) : v;
                 case "t.fan.side": return b.Has(FrenziedHour) ? 0.35f : v;
-                case "t.split.bonus": return b.Has(RootedAxe) ? 1 + b.V(RootedAxe) / 100f : v;
+                case "t.split.bonus": return (b.Has(RootedAxe) ? 1 + b.V(RootedAxe) / 100f : v) + (b.Has(ShortSplit) ? (b.V(ShortSplit) - 40) / 100f : 0);
                 case "t.twin_split": return b.Has(TwinSplit) ? b.V(TwinSplit) : v;
                 case "t.rooted": return b.Has(RootedAxe) ? 1 : v;
                 case "t.battle_spin": return b.Has(BattleSpin) ? 1 : v;
                 // Chimesinger
-                case "c.note.speed": return v * (1 + b.V2(BrightNote) / 100f);
+                case "c.note.speed": return v * (1 + b.V2(BrightNote) / 100f) * (1 - b.V2(LowNote) / 100f);
+                case "c.strike.recharge": return v * (1 + b.V2(DoubleToll) / 100f);
+                case "c.double_toll": return b.V(DoubleToll) / 100f;
                 case "c.refrain.half": return v * (1 + b.V(WideRefrain) / 100f);
                 case "c.refrain.range": return v + b.V(LongRefrain);
                 case "c.chorus.radius": return v * (1 + b.V(WideChorus) / 100f);
@@ -95,6 +104,10 @@ namespace LastBell.Run.Shop
                 case "a.comet.radius": return b.Has(GreatComet) ? v * 1.25f : v;
                 case "a.starfall": return b.Has(Starfall) ? b.V(Starfall) / 100f : v;
                 case "a.surge_end_glyphs": return v + b.V(SurgeEcho);
+                case "a.dis.carve": return b.Has(Overchannel) ? b.V2(Overchannel) : v;
+                case "a.glyph.fade": return b.Has(Overchannel) ? Sim.Ticks(b.V(Overchannel)) : v;   // 0 = glyphs never fade
+                case "a.sigil.arm": return b.Has(LingeringRune) ? v * 1.5f : v;                    // 0.8 -> 1.2 s (Surge's 0.4 -> 0.6 s)
+                case "a.sigil.linger": return b.V(LingeringRune) / 100f;
             }
             return v;
         }
@@ -132,7 +145,7 @@ namespace LastBell.Run.Shop
                     if (L.PaceUntil > now) pct += Mathf.Min(b.V2(BerserkersPace), b.V(BerserkersPace) * L.PaceStacks);
                 }
                 if (ability == "Bellstrike") pct += b.V(HeavyBell);
-                if (ability.StartsWith("ResonantNote")) pct += b.V(BrightNote);
+                if (ability.StartsWith("ResonantNote")) pct += b.V(BrightNote) + b.V(LowNote);
                 if (ability.StartsWith("Arcane Comet")) pct += b.V(HastyComet) + b.V(GreatComet);
                 if (ability == "Magic Missile (charged)" && L.VolleyBoostUntil > now) pct += b.V(BlinkCharge);
                 if (ability == "Magic Missile (volley)") pct += b.V(MissileVolley);
@@ -145,6 +158,10 @@ namespace LastBell.Run.Shop
                 }
                 if (b.Has(LoneBell) && AlliesNear(w, p, LoneBellRange) == 0) pct += b.V(LoneBell);
                 if (b.Has(Formation)) pct += Run.Solo ? b.V(Formation) : Mathf.Min(b.V2(Formation), b.V(Formation) * AlliesNear(w, p, FormationRange));
+                pct += b.V2(LeadenStep);
+                // Patient Bell: the first hit after a 2 s gap is the big one; every hit restarts the gap
+                if (b.Has(PatientBell)) { pct += now - L.LastBossHit >= PatientGap ? b.V(PatientBell) : -b.V2(PatientBell); L.LastBossHit = now; }
+                if (b.Has(LateBloom) && w.Boss != null) pct += w.Boss.PhaseNumber <= 1 ? -b.V2(LateBloom) : b.V(LateBloom);
                 if (L.ValourUntil > now) pct += L.ValourPct;
                 if (L.CryUntil > now) pct += L.CryPct;
             }
@@ -307,7 +324,11 @@ namespace LastBell.Run.Shop
         // ---------------- general (PlayerController) ----------------
         public static int PotionHeal(PlayerController p, int heal) { var b = B(p); return b != null && b.Has(StrongBrew) ? Mathf.RoundToInt(b.V(StrongBrew)) : heal; }
         public static int ExtraPotions(PlayerController p) { var b = B(p); return b != null ? Mathf.RoundToInt(b.V(SpareFlask)) : 0; }
-        public static float SprintCost(PlayerController p, float cost) { var b = B(p); return b != null && b.Has(Sprinter) ? b.V(Sprinter) : cost; }
+        public static float SprintCost(PlayerController p, float cost)
+        {
+            var b = B(p); if (b == null) return cost;
+            return (b.Has(Sprinter) ? b.V(Sprinter) : cost) + (b.Has(SteadyBreath) ? b.V2(SteadyBreath) - SprintBase : 0);   // Steady Breath adds on top
+        }
         public static float RegenDelay(PlayerController p, float delay) { var b = B(p); return b != null && b.Has(DeepBreath) ? b.V(DeepBreath) : delay; }
     }
 }

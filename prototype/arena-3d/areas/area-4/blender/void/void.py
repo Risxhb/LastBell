@@ -4,7 +4,8 @@
 #                   brass-banded capitals, pointed arches with an inner order and spandrels, a moulded entablature
 #                   with string course and cornice, broken ends (3- and 4-arch variants) and a rock underside.
 #                   Arches face ±Y (Unity ±Z). Slots: 0 dark stone, 1 brass, 2 stone cap.
-#   Rock_0..5       convex-hull void rocks (20-40 planar facets, flat top, tapered keel). Slots: 0 rock, 1 lit top.
+#   Rock_0..5       void rocks in three families: tilted slabs (0, 1), split-shard clusters with a carved niche (2, 3),
+#                   faceted boulders (4, 5); each with a tapered keel. Slots: 0 rock, 1 lit top.
 #   SpireChunk_0..3 inverted broken spires with stepped rock ledges and a hull of dressed stone on top. Slots: 0 rock, 1 dark stone, 2 lit top.
 #   Chain_Link / Chain_Link_Low  oval forged link (long axis +Y = Unity +Z, length 1.04 m before builder scaling).
 #   Hanging_Bell    small cousin of the hero bell (same profile at 0.32 scale, painted-bronze UVs), crown, lip band,
@@ -51,20 +52,68 @@ def arcade(arches, variant):
 
 arcades = [arcade(2, 0), arcade(3, 1), arcade(4, 2)]
 
-# rocks: convex hull of ~25 points, so 20-40 planar facets; a flat, slightly tilted top and a tapered underside
-rocks = []
-for i in range(6):
-    rr = random.Random(100 + i); sx, sy = 1 + 0.2 * (i % 3), 0.8 + 0.15 * (i % 2); bm = bmesh.new(); top = 0.35 + 0.1 * (i % 2); tilt = rr.uniform(-0.12, 0.12)
-    for k in range(11 + i % 3):   # top rim
-        a = k / (11 + i % 3) * 2 * math.pi + rr.uniform(-0.25, 0.25); r = rr.uniform(0.8, 1.0)
-        x, y = math.cos(a) * r * sx, math.sin(a) * r * sy; bm.verts.new((x, y, top + tilt * x + rr.uniform(-0.04, 0.04)))
-    for k in range(8 + i % 3):   # waist
-        a = rr.uniform(0, 2 * math.pi); r = rr.uniform(0.85, 1.05); bm.verts.new((math.cos(a) * r * sx, math.sin(a) * r * sy, rr.uniform(-0.15, 0.15)))
-    for k in range(4):           # tapered keel
-        bm.verts.new((rr.uniform(-0.3, 0.3) * sx, rr.uniform(-0.25, 0.25) * sy, -0.7 - 0.35 * k - 0.2 * (i % 3)))
+# rocks: three silhouette families from the approved rock-family concept (Reference/Codex-Corrections-20261025/16):
+#   Rock_0/1 tilted slabs with an overhang and hanging shards; Rock_2/3 clusters of tall split shards, one carrying a
+#   carved pointed-arch niche (ruin remnant); Rock_4/5 heavy faceted boulders. All float, so each has a tapered keel.
+def hull(name, pts, mat):
+    bm = bmesh.new()
+    for p in pts: bm.verts.new(p)
     bmesh.ops.convex_hull(bm, input=bm.verts); bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-    bmesh.ops.dissolve_limit(bm, angle_limit=math.radians(4), verts=bm.verts, edges=bm.edges)
-    o = lb._obj('Rock_%d' % i, bm, ROCK); o.data.materials.append(TOP); lb.bevel(o, 0.04, 1, 60); top_slot(o, 1); lb.cube_uv(o, 4.0); rocks.append(lb.finish(o))
+    bmesh.ops.dissolve_limit(bm, angle_limit=math.radians(3), verts=bm.verts, edges=bm.edges)
+    return lb._obj(name, bm, mat)
+
+def keel(rr, cx, cy, w, z0, depth):
+    pts = [(cx + math.cos(a) * w * rr.uniform(0.7, 1.0), cy + math.sin(a) * w * 0.8 * rr.uniform(0.7, 1.0), z0) for a in (k * 2 * math.pi / 7 + rr.uniform(-0.2, 0.2) for k in range(7))]
+    pts += [(cx + rr.uniform(-0.15, 0.15) * w, cy + rr.uniform(-0.15, 0.15) * w, z0 - depth * f) for f in (0.55, 1.0)]
+    return hull('keel', pts, ROCK)
+
+def slab(i):
+    rr = random.Random(200 + i); parts = []; sx, sy, t = 1.2, 0.8, 0.28; tilt = 0.25 + 0.1 * i
+    top = []
+    for k in range(12):
+        a = k / 12 * 2 * math.pi + rr.uniform(-0.18, 0.18); r = rr.uniform(0.82, 1.0); x, y = math.cos(a) * r * sx, math.sin(a) * r * sy
+        top += [(x, y, t + tilt * x + rr.uniform(-0.03, 0.03)), (x * 0.9, y * 0.9, -t + tilt * x * 0.8 + rr.uniform(-0.06, 0.06))]
+    parts.append(hull('slab', top, ROCK))
+    for k in range(4 + i):   # hanging shards under the overhang
+        x, y = rr.uniform(-0.8, 0.9) * sx, rr.uniform(-0.6, 0.6) * sy; L = rr.uniform(0.35, 0.9)
+        parts.append(lb.cone('drip', rr.uniform(0.12, 0.22), L, 4 + k % 2, (x, y, -t + tilt * x * 0.8 + 0.05), ROCK, (math.pi + rr.uniform(-0.2, 0.2), rr.uniform(-0.2, 0.2), rr.uniform(0, 3))))
+    for k in range(2):       # fallen blocks resting on the slab
+        x, y = rr.uniform(-0.6, 0.4) * sx, rr.uniform(-0.4, 0.4) * sy; s = rr.uniform(0.18, 0.3); z = t + tilt * x
+        parts.append(hull('block', [(x + rr.uniform(-s, s), y + rr.uniform(-s, s), z + rr.uniform(0, s * 1.4)) for _ in range(10)], ROCK))
+    parts.append(keel(rr, 0.1, 0, 0.7, -t * 0.5, 1.1))
+    return parts
+
+def shards(i):
+    rr = random.Random(300 + i); parts = []
+    spots = [(0, 0, 0.42, 2.2), (0.55, 0.15, 0.3, 1.5), (-0.5, 0.2, 0.28, 1.25), (0.15, -0.45, 0.22, 0.95)]
+    for k, (x, y, w, h) in enumerate(spots[:3 + i]):
+        n = 5 + k % 3; pts = []
+        for j in range(n):
+            a = j / n * 2 * math.pi + rr.uniform(-0.2, 0.2); px, py = x + math.cos(a) * w * rr.uniform(0.85, 1.1), y + math.sin(a) * w * 0.8 * rr.uniform(0.85, 1.1)
+            pts += [(px, py, 0), (px * 0.97 + x * 0.03, py * 0.97 + y * 0.03, h * rr.uniform(0.82, 1.0) + (px - x) * rr.uniform(-0.6, 0.6))]   # split, slanted tops
+        parts.append(hull('shard', pts, ROCK))
+    # ruin remnant: a carved pointed-arch niche on the front of the tallest shard (faces -Y, Unity -Z)
+    parts.append(lb.pointed_arch('niche', 0.5, 0.75, 0.07, 0.08, (0, -0.36, 0.55), ROCK, segs=5))
+    parts.append(lb.box('niche_sill', (0.56, 0.12, 0.07), (0, -0.36, 0.5), ROCK))
+    parts.append(hull('base', [(math.cos(a) * 1.0 * rr.uniform(0.8, 1.0), math.sin(a) * 0.75 * rr.uniform(0.8, 1.0), z) for a in (k * 0.7 for k in range(9)) for z in (0.08, -0.32)], ROCK))
+    parts.append(keel(rr, 0, 0, 0.75, -0.25, 1.2))
+    return parts
+
+def boulder(i):
+    rr = random.Random(400 + i); parts = []
+    for k, (cx, cy, cz, r) in enumerate([(0, 0, 0.1, 0.95), (0.7, 0.2, -0.05, 0.62), (-0.55, -0.25, -0.12, 0.5)][:2 + i]):
+        n = 36; pts = []
+        for j in range(n):   # fibonacci sphere, squashed and jittered: rounded but faceted
+            z = 1 - 2 * (j + 0.5) / n; rad = math.sqrt(1 - z * z); a = j * 2.39996
+            f = rr.uniform(0.85, 1.05)
+            pts.append((cx + math.cos(a) * rad * r * 1.1 * f, cy + math.sin(a) * rad * r * 0.95 * f, cz + z * r * 0.78 * f))
+        parts.append(hull('boulder', pts, ROCK))
+    parts.append(keel(rr, 0.1, 0, 0.6, -0.45, 0.9))
+    return parts
+
+rocks = []
+for i, parts in enumerate([slab(0), slab(1), shards(0), shards(1), boulder(0), boulder(1)]):
+    o = lb.join(parts, 'Rock_%d' % i, [ROCK, TOP]); lb.bevel(o, 0.025, 1, 60); top_slot(o, 1); lb.cube_uv(o, 4.0); rocks.append(lb.finish(o))
 
 chunks = []
 for i in range(4):

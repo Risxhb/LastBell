@@ -46,13 +46,18 @@ namespace LastBell.Run
         {
             Say(Name);
             Spots.Clear(); Chained = false; Clip("SunspotsCast", First);   // fist to the chest, flung out at the first blast
-            var party = Standing();
+            var party = Standing(); var aim = Aimable();
             int cast = Casts++;
-            if (party.Count == 1) { Spots.Add(new Spot { Who = party[0], Index = 0 }); Spots.Add(new Spot { Who = party[0], Index = 1 }); }
-            else
+            // carriers are picked from players not reviving (AUR-TARGET-OTHER, 7 Nov); the count still follows everyone standing, so the
+            // timing matches Duration. With fewer aimable players than sigils, one carries several (as solo); with none, no sigil.
+            if (aim.Count > 0)
             {
-                int carriers = (party.Count + 1) / 2;
-                for (int k = 0; k < carriers; k++) Spots.Add(new Spot { Who = party[(cast * carriers + k) % party.Count], Index = k });
+                if (party.Count == 1) { Spots.Add(new Spot { Who = aim[0], Index = 0 }); Spots.Add(new Spot { Who = aim[0], Index = 1 }); }
+                else
+                {
+                    int carriers = (party.Count + 1) / 2;
+                    for (int k = 0; k < carriers; k++) Spots.Add(new Spot { Who = aim[(cast * carriers + k) % aim.Count], Index = k });
+                }
             }
             int start = W.Tick;
             for (int k = 0; k < Spots.Count; k++) Spots[k].DetonateTick = start + First + k * Step - 1;
@@ -75,7 +80,7 @@ namespace LastBell.Run
                 });
                 s.Blast.OnResolve = hz => Detonate(spot);
             }
-            int end = First + (Spots.Count - 1) * Step - 1;
+            int end = Spots.Count > 0 ? First + (Spots.Count - 1) * Step - 1 : Duration();
             while (t < end) { Relabel(labels); t++; yield return 1; }
             foreach (var l in labels.Values) l.Hide();
         }

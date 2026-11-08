@@ -17,7 +17,7 @@ namespace LastBell.Run
         // the phase names each boss shows at the start of each phase (minibosses show no phase text by design)
         static string[] ExpectedPhaseNames(BossEncounter b) => b switch
         {
-            BellkeeperEncounter _ => new[] { BellkeeperEncounter.Phase1, BellkeeperEncounter.Phase2, BellkeeperEncounter.Phase3 },
+            BellkeeperEncounter _ => BellkeeperEncounter.SegmentNames,   // the Ultimate: P1-P5
             AurelionEncounter _ => new[] { "Perfect Order", "Misalignment", "Exposed Meridian", "Last Light" },
             SylvaraEncounter _ => SylvaraEncounter.PhaseNames,
             CrucivarEncounter _ => new[] { "Sealed Furnace", "Casting Heat", "Open Pressure" },
@@ -32,10 +32,17 @@ namespace LastBell.Run
         IEnumerator PracticePhaseChecks()
         {
             Note("---- practice phase row ----");
+            // the run-loop checks keep the Ultimate idle and practise on the current map; the phase row checks what the menu spawns
+            bool idle = BellkeeperEncounter.TestIdle, stay = RunDirector.PracticeStaysOnMap; BellkeeperEncounter.TestIdle = false; RunDirector.PracticeStaysOnMap = false;
             yield return PhaseToMenu();
             // out-of-range picks clamp to the boss's phases (the menu never offers them; -lastbellPhase refuses them)
             int bk = Array.FindIndex(RunDirector.Bosses, b => b.Final);
-            Check("practice phase: a pick past the last phase clamps to it", d.StartPractice("Tollbreaker", bk, 99) && d.PracticePhase == RunDirector.Bosses[bk].Phases, $"phase {d.PracticePhase}");
+            // the final entry fights on the Throne, so the pick may load that map: read the new scene's director
+            bool clampOk = d.StartPractice("Tollbreaker", bk, 99);
+            yield return Until(() => RunDirector.Instance && RunDirector.Instance.State == RunState.Ready && RunDirector.Instance.Encounter == bk, 30, "clamp ready");
+            if (RunDirector.Instance != d) { directorLog.AddRange(d.Log); d = RunDirector.Instance; d.InputOverride = bot; bot.Clear(); }
+            if (d.Player) d.Player.Input = bot;
+            Check("practice phase: a pick past the last phase clamps to it", clampOk && d.PracticePhase == RunDirector.Bosses[bk].Phases, $"phase {d.PracticePhase}");
             yield return PhaseToMenu();
             Check("practice phase: a run always starts in phase 1", d.StartRun("Tollbreaker") && d.PracticePhase == 1);
             yield return PhaseToMenu();
@@ -47,6 +54,7 @@ namespace LastBell.Run
                     yield return PracticeAtPhase(e, n, n == RunDirector.Bosses[e].Phases);
             }
             yield return PhaseToMenu();
+            BellkeeperEncounter.TestIdle = idle; RunDirector.PracticeStaysOnMap = stay;
         }
 
         IEnumerator PhaseToMenu()

@@ -26,13 +26,14 @@ body.clean #tabs { display: none; }
 <script type="module">
 // Look study for Area 3, The Verdant Chimes (verdant-env.js). ?view=game uses the gameplay camera from arena-look.html;
 // ?view=angle and ?view=top match the board's angle and top studies. ?quiet dims decoration as during a telegraph,
-// ?rings draws the playable edge, ?clean hides the tabs, ?nohero drops the Vanguard used for scale.
+// ?rings draws the playable edge, ?clean hides the tabs, ?nohero drops the Tollbreaker used for scale.
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const Q = new URLSearchParams(location.search), VIEW = Q.get('view') || 'game';
 if (Q.has('clean')) document.body.classList.add('clean');
@@ -52,15 +53,14 @@ if (Q.has('rings')) {
   ring.position.y = 0.03; scene.add(ring);
 }
 
-// ---- the Vanguard for scale (characters session's model, loaded read-only) ----
+// ---- the Tollbreaker for scale (characters session's model, loaded read-only; 2.0 m tall) ----
 const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: o.metal ? 0.4 : 0.75, metalness: o.metal ? 0.7 : 0, side: o.side || THREE.FrontSide });
-const Gl = (c, k) => new THREE.MeshBasicMaterial({ color: new THREE.Color(c).multiplyScalar(k), toneMapped: false });
 if (!Q.has('nohero')) {
-  window.THREE = THREE;
   const hero = new THREE.Group(); hero.position.set(-3.5, 0, 5); hero.rotation.y = Math.PI * 0.8; scene.add(hero);
-  await loadScript('../../vanguard-model.js');
-  if (typeof window.buildVanguardModel === 'function') { const v = window.buildVanguardModel(M, Gl); const obj = v.root || v; obj.scale.setScalar(1.2); obj.traverse(o => { if (o.isMesh) o.castShadow = true; }); hero.add(obj); }
-  else { const c = new THREE.Mesh(new THREE.CapsuleGeometry(0.35, 1, 4, 12), M(0x2050cc)); c.position.y = 0.85; hero.add(c); }
+  await loadScript('../../models/tollbreaker-glb.js');
+  const tbModel = window.TOLLBREAKER_GLB_B64 && await new Promise(res => new GLTFLoader().parse(Uint8Array.from(atob(window.TOLLBREAKER_GLB_B64), c => c.charCodeAt(0)).buffer, '', g => res(g.scene), () => res(null)));
+  if (tbModel) { tbModel.traverse(o => { if (o.isMesh) o.castShadow = true; }); hero.add(tbModel); }
+  else { const c = new THREE.Mesh(new THREE.CapsuleGeometry(0.4, 1.2, 4, 12), M(0x2050cc)); c.position.y = 1.0; hero.add(c); }
 }
 
 // ---- frame, after the Windblown teardown (research/windblown-artstyle.html §3, §7): MSAA scene -> depth/normal

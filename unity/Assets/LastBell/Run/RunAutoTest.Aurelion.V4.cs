@@ -26,6 +26,7 @@ namespace LastBell.Run
             if (V2Wants("aurelion.severance")) yield return V2Section("v4 Severance", V4Severance());
             if (V2Wants("aurelion.meridian_recall")) yield return V2Section("v4 Meridian Recall (Hard)", V4Recall());
             if (V2Wants("aurelion.v4_icons")) BossAttackIconChecks();   // the attack-icon catalog (7 Nov: 8 Aurelion icons)
+            if (V2Wants("aurelion.v4_revivers")) yield return V2Section("v4 aimed attacks skip revivers (7 Nov)", V4Revivers());
             if (V2Wants("aurelion.v4_hard")) yield return V2Section("v4 Hard additions (5 Nov)", V4HardExtras());
             if (AurelionAbilityFilter != null && AurelionAbilityFilter.Equals("aurelion.v4_seeds", StringComparison.OrdinalIgnoreCase)) yield return V2Section("v4 perfect route seed sweep", V4PerfectSeeds());
             if (V2Wants("aurelion.last_light")) yield return V2Section("v4 Last Light and the enrage", V4LastLight());
@@ -287,6 +288,40 @@ namespace LastBell.Run
                 float want = lv == Difficulty.Hard ? Sunspots.StepHardS : Sunspots.StepS;
                 V2Check($"{lv}: Sunspots {want:0.0} s apart", gap == Sim.Ticks(want), $"{gap} ticks");
                 if (lv == Difficulty.Hard) V4IconCheck("Sunspots (blast and scorch)", "aurelion.sunspots", spotHz);
+            }
+        }
+
+        // AUR-TARGET-OTHER (Codex, 7 Nov): Starfall Mirror, Sunspots, Hour Hands and Meridian Lances never aim at a player who
+        // is reviving. A is down at 12 o'clock, B kneels beside A (and is the farthest player), C stands at 3 o'clock.
+        IEnumerator V4Revivers()
+        {
+            var at = new[] { new Vector3(0, 0, 7f), new Vector3(1f, 0, 7.1f), new Vector3(7f, 0, 0) };
+            float Off(float yaw, Vector3 p, float period) { float d = Mathf.Abs(Mathf.DeltaAngle(yaw, Mathf.Atan2(p.x, p.z) * Mathf.Rad2Deg)) % period; return Mathf.Min(d, period - d); }
+            foreach (var which in new[] { "Starfall Mirror", "Sunspots", "Hour Hands", "Meridian Lances" })
+            {
+                yield return V2Setup(3, Difficulty.Hard, at, 3, Vector3.zero);
+                if (V2Boss == null) yield break;
+                var a = V2Boss; PlayerController dn = V2Party[0], rv = V2Party[1], other = V2Party[2];
+                foreach (var p in V2Party) p.DebugSetHp(PlayerController.MaxHp);
+                dn.ForceDown("aim revive test");
+                for (int end = V2W.Tick + 3; V2W.Tick < end;) { dn.ReviveProgress = 0; yield return null; }   // B is channelling before the cast
+                IEnumerable<int> body = which == "Starfall Mirror" ? a.Starfall.Run() : which == "Sunspots" ? a.Spots.Run() : which == "Hour Hands" ? a.Hands.Run() : a.Lances.Run(1, 1, false);
+                V2Begin(body);
+                var seen = new HashSet<Hazard>(); bool reviving = true;
+                for (int end = V2W.Tick + Sim.Ticks(8f); V2W.Tick < end && a.TestBusy;)
+                {
+                    dn.ReviveProgress = 0; yield return null;
+                    if (rv.Reviving != dn) reviving = false;
+                    foreach (var h in V2W.Hazards.Live) if (h.Source.StartsWith(which) && !h.Source.Contains("scorch")) seen.Add(h);
+                }
+                yield return V2WaitIdle(10); a.ClearPhasePools();
+                Vector3 b = Sim.Flat(rv.transform.position), c = Sim.Flat(other.transform.position);
+                bool ok; string info;
+                if (which == "Starfall Mirror") { ok = a.Starfall.Stars.Count > 0 && a.Starfall.Stars.All(s => s.Who == other); info = $"stars on {string.Join("/", a.Starfall.Stars.Select(s => s.Who == rv ? "reviver" : s.Who == other ? "C" : "?"))}"; }
+                else if (which == "Sunspots") { ok = /* 2 standing: one sigil */ a.Spots.Spots.Count == 1 && a.Spots.Spots.All(s => s.Who == other); info = $"{a.Spots.Spots.Count} sigils on {string.Join("/", a.Spots.Spots.Select(s => s.Who == rv ? "reviver" : s.Who == other ? "C" : "?"))}"; }
+                else if (which == "Hour Hands") { ok = seen.Count > 0 && seen.All(h => Off(h.Yaw, b, 360f) > 15f); info = $"{seen.Count} spokes, nearest {(seen.Count > 0 ? seen.Min(h => Off(h.Yaw, b, 360f)) : 0):0} degrees off the reviver"; }
+                else { ok = seen.Count > 0 && seen.All(h => Off(h.Yaw, c, 180f) < Off(h.Yaw, b, 180f)); info = $"{seen.Count} beams, {(seen.Count > 0 ? Off(seen.First().Yaw, c, 180f) : 0):0} degrees off C, {(seen.Count > 0 ? Off(seen.First().Yaw, b, 180f) : 0):0} off the reviver"; }
+                V2Check($"{which}: aimed at the standing player, not the one reviving", reviving && ok, $"reviving {reviving}; {info}");
             }
         }
 

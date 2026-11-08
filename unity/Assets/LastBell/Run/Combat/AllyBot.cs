@@ -97,7 +97,12 @@ namespace LastBell.Run
             return true;
         }
 
-        float Range(PlayerController me) => HoldRange ?? (me.ClassName == "Tollbreaker" ? 3.5f : me.ClassName == "Chimesinger" ? 6.5f : 8.5f);
+        float Range(PlayerController me) => HoldRange ?? ClassRange(me.ClassName);
+        static float ClassRange(string cls) => cls == "Tollbreaker" ? 3.5f : cls == "Chimesinger" ? 6.5f : 8.5f;
+        // how far from Sylvara's body edge (plus 2 m) a bot of this class attacks her: its class range, and in Seed Storm the
+        // Tollbreaker throws from P4Throw. Shared with the suite's reach sampler (review SYL-REACH-METRIC, 7 Nov).
+        public static float SylvaraAttackRange(string cls, string phase) => cls == "Tollbreaker" && phase == SylvaraEncounter.PhaseNames[3] ? P4Throw : ClassRange(cls);
+        float SylvaraAttackRange(PlayerController me, string phase) => HoldRange.HasValue && !(me.ClassName == "Tollbreaker" && phase == SylvaraEncounter.PhaseNames[3]) ? HoldRange.Value : SylvaraAttackRange(me.ClassName, phase);
 
         // which boss part to hit: the first in kill order (or by name where the encounter gives none). With three or more
         // bots the back half wears down the next casting meanwhile, so the party does not stand in one turret's fan, and
@@ -1319,7 +1324,7 @@ namespace LastBell.Run
             // the non-attacking menu bots; the boss herself only when attacks are on
             bool atBud = reach.HasValue && Sim.Flat(target - pos).magnitude <= BudStand(me) + 1.4f;
             // (Tollbreaker plays its rotation: a held Twin Hurl lodges the axe, and lodged axes need a recall)
-            if (!reviving && (atBud || Attacks && Sim.Flat(target - pos).magnitude <= (me.ClassName == "Tollbreaker" && sy.PhaseName == SylvaraEncounter.PhaseNames[3] ? P4Throw : Range(me)) + sy.BodyRadius + 2f))
+            if (!reviving && (atBud || Attacks && Sim.Flat(target - pos).magnitude <= SylvaraAttackRange(me, sy.PhaseName) + sy.BodyRadius + 2f))
             {
                 if (me.Kit is TollbreakerKit) Attack(me, ref inp);
                 else inp.P0 = inp.H0 = tick % 6 == 0 || me.ClassName != "Arcanist";
