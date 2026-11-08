@@ -86,6 +86,7 @@ namespace LastBell.Run
             };
             // Telegraph style: the standard coral spoke from the start (a thin gold line would read as a friendly effect);
             // the shared lock flash marks the lock
+            h.OnResolve = x => Beam(x);   // a light beam down the spoke as it strikes (8 Nov graphics pass)
             return Spawn(h);
         }
     }

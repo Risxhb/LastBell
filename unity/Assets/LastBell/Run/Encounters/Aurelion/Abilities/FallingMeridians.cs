@@ -28,7 +28,7 @@ namespace LastBell.Run
             ++clock;
             if (echo && clock == Sim.Ticks(EchoS)) { echo = false; Echoes++; Wave(Name + " echo"); }
             if (clock < Sim.Ticks(EveryS)) return;
-            clock = 0; Casts++; Last.Clear(); Boss.PlayClipIfIdle("MeridianFlick", Sim.Ticks(0.8f));
+            clock = 0; Casts++; Last.Clear(); Boss.PlayClipIfIdle("MeridianFlick", Sim.Ticks(0.8f), Warn);   // waits for a wind-up to end, until the circles land
             foreach (var h in Wave(Name)) Last.Add(h);
             echo = Hard;
         }

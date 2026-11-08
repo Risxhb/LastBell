@@ -41,7 +41,7 @@ namespace LastBell.Run
             Meridians = Register(new FallingMeridians()); // [ability: falling_meridians] (v4 Phase 3, 2 Nov)
         }
 
-        public const float V4P2At = 0.70f, V4P3At = 0.40f, V4P4At = 0.20f, EnrageS = 390f, EnrageWarnS = 360f;   // Final Noon at 6:30
+        public const float V4P2At = 0.70f, V4P3At = 0.40f, V4P4At = 0.20f, EnrageS = 390f, EnrageWarnS = 360f, FinalNoonLunge = 1.7f;   // Final Noon at 6:30
         public float[] PhaseMarks => new[] { V4P2At, V4P3At, V4P4At };
 
         // ---- fight-ending wipes, the Corona Shield, pools that last until the phase ends, the enrage clock ----
@@ -59,6 +59,8 @@ namespace LastBell.Run
             if (WipeCause != null || Dead) return;
             WipeCause = cause;
             RunHud.Banner(cause.ToUpper(), new Color(1f, 0.45f, 0.38f), 4f);
+            // Final Noon (the enrage or Last Light's last slice): the noon sun falls on the arena (8 Nov graphics pass, presentation only)
+            if (cause.StartsWith("Final Noon") && W.BossFx) W.BossFx.FinalNoon(Sim.Flat(transform.position), AurelionAbility.Rim);
             foreach (var p in W.Players) if (p && !p.Down) p.ForceDown(cause);
         }
         public void RaiseShield(int hp) { ShieldHp = ShieldMax = Mathf.Max(0, hp); }
@@ -86,6 +88,8 @@ namespace LastBell.Run
             if ((TestHold && !TestClock) || W == null || !W.CombatActive || Dead) return;
             FightTicks++;
             if (FightTicks == Sim.Ticks(EnrageWarnS)) RunHud.Banner("FINAL NOON IN 30 SECONDS", new Color(1f, 0.85f, 0.45f), 3f);
+            // ProcessionalThrust (8 Nov graphics pass, an unused clip): the lunge (1.7 s into it) lands on the Final Noon tick
+            if (FightTicks == Sim.Ticks(EnrageS - FinalNoonLunge)) Clip("ProcessionalThrust", Sim.Ticks(4.4f));
             if (FightTicks == Sim.Ticks(EnrageS)) Wipe("Final Noon — the enrage");
         }
 
@@ -115,6 +119,7 @@ namespace LastBell.Run
             DevourPull = DevourSpeed(cast, W.Difficulty == Difficulty.Easy);
             DevourLeft = Sim.Ticks(DevourS); Devours++;
             RunHud.Banner("DEVOUR", new Color(0.95f, 0.78f, 0.4f), DevourS);
+            Clip("CrownReversal", Sim.Ticks(3.3f));   // he breathes in, the halo fans out and snaps (8 Nov graphics pass, an unused clip); the next block's own clip cuts it
         }
         // ---- Phases 2 and 3: something to dodge on top of every block (Chzy18, 2 Nov: not more damage) ----
         // Errant Planets over Misalignment (not Total Eclipse), Falling Meridians over Exposed Meridian (not Severance). Off in the

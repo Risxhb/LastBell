@@ -33,9 +33,16 @@ namespace LastBell.Run
             public Vector3 At; public Hazard H; public int Index, ResolveTick, Need;
             public readonly List<PlayerController> In = new List<PlayerController>(), Owners = new List<PlayerController>();
             public bool Resolved;
+            public AurelionProps.TowerPosts Posts;   // presentation (8 Nov graphics pass)
         }
         public readonly List<Tower> Towers = new List<Tower>();   // test evidence: the last cast
-        public override void Abort() => Towers.Clear();
+        public override void Abort() { foreach (var t in Towers) if (t.Posts) UnityEngine.Object.Destroy(t.Posts.gameObject); Towers.Clear(); }
+        // the tower prop (8 Nov graphics pass, presentation only): brass posts on its edge and a cobalt column that grows to the landing
+        void Dress(Tower t, float radius, int landTicks)
+        {
+            t.Posts = AurelionProps.Tower(W.Root, t.At, radius, landTicks);
+            W.BossFx.TowerColumn(t.At, radius, landTicks / (float)Sim.Hz);
+        }
         public int Casts { get; private set; }
         public bool Failed { get; private set; }                 // the last cast had a tower short of players (party wiped)
 
@@ -104,6 +111,7 @@ namespace LastBell.Run
                 // a soak, not a hazard: a thin dotted unfilled cobalt outline, "get in" (no Skyward rays or coral fill: those mean "get out")
                 if (t.H.Tele != null) { t.H.Tele.Motif(0); t.H.Tele.Friendly(CobaltRim); t.H.Tele.Order = 2; }
                 labels.Add(RunHud.Label(t.At + Vector3.up * 0.4f, solo ? Numerals[k] : Dots(t.Need), Ivory, solo ? 54 : 46));
+                Dress(t, Radius, resolveAt);
                 Towers.Add(t);
             }
             int last = Duration();
@@ -129,6 +137,7 @@ namespace LastBell.Run
             var h = new Hazard { Source = "Reunion", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Centre, Radius = ReunionR, LockAt = 0, ResolveAt = at, Damage = 0, Knockback = 0, Stun = 0, HitOnResolve = false, Soak = true };
             h.OnResolve = hz =>
             {
+                if (t.Posts) t.Posts.Land();
                 t.In.Clear();
                 foreach (var p in W.Players) if (p && !p.Down && hz.Contains(p.transform.position)) t.In.Add(p);
                 if (t.In.Count == 0) { Failed = true; Boss.Wipe("Reunion — nobody came back"); return; }
@@ -137,6 +146,7 @@ namespace LastBell.Run
                 W.BossFx.ChimeResolve(Centre, ReunionR);
             };
             t.H = Spawn(h); if (t.H.Tele != null) { t.H.Tele.Motif(0); t.H.Tele.Friendly(CobaltRim); t.H.Tele.Order = 2; }
+            Dress(t, ReunionR, at);
             var label = RunHud.Label(Centre + Vector3.up * 0.4f, "REUNION", Ivory, 44);
             Towers.Add(t);
             yield return at - 1;
@@ -149,6 +159,7 @@ namespace LastBell.Run
         void Resolve(Tower t)
         {
             t.Resolved = true;
+            if (t.Posts) t.Posts.Land();
             t.In.Clear();
             foreach (var p in W.Players) if (p && !p.Down && t.H.Contains(p.transform.position)) t.In.Add(p);
             // co-op: a player who went down since it rose lowers its count (the tower goes dark with its soaker)

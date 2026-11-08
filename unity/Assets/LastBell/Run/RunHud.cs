@@ -29,7 +29,9 @@ namespace LastBell.Run
         public static string CaptionTitle, CaptionBody;
         // a world-space label that stays until its owner hides it (Aurelion v3: Ecliptic numerals, SUN / SHADE marks);
         // with `follow`, Pos is an offset above that transform (a moving player)
-        public sealed class WorldLabel { public Vector3 Pos; public Transform Follow; public string Text; public Color Color; public int Size; public bool Hidden; public void Hide() => Hidden = true; }
+        // Icon (optional): drawn as a glyph of 2 x Size px instead of the text, with Next (smaller, after a chevron) for a
+        // two-step mark (Aurelion Zenith Marks, 8 Nov graphics pass); Text stays set for logs and tests
+        public sealed class WorldLabel { public Vector3 Pos; public Transform Follow; public string Text; public Color Color; public int Size; public bool Hidden; public Texture2D Icon, Next, Then; public void Hide() => Hidden = true; }
         static readonly List<WorldLabel> labels = new List<WorldLabel>();
         public static WorldLabel Label(Vector3 world, string text, Color c, int size = 34, Transform follow = null)
         {
@@ -1259,6 +1261,19 @@ namespace LastBell.Run
             {
                 if (l.Hidden || (l.Follow == null && !ReferenceEquals(l.Follow, null))) continue;
                 var s = cam.WorldToScreenPoint(l.Follow ? l.Follow.position + l.Pos : l.Pos); if (s.z < 0) continue;
+                if (l.Icon)
+                {
+                    float g = UiTheme.V(l.Size * 2), gn = g * 0.6f, ga = g * 0.35f;
+                    float total = l.Next ? g + ga + gn : g;
+                    float x0 = Mathf.Clamp(s.x - total / 2, 10, Screen.width - total - 10), y0 = Mathf.Clamp(h - s.y - g / 2, top, Mathf.Max(top, bottom - g)) ;
+                    GUI.DrawTexture(new Rect(x0, y0, g, g), l.Icon, ScaleMode.ScaleToFit, true);
+                    if (l.Next)
+                    {
+                        if (l.Then) GUI.DrawTexture(new Rect(x0 + g, y0 + (g - ga) / 2, ga, ga), l.Then, ScaleMode.ScaleToFit, true);
+                        GUI.DrawTexture(new Rect(x0 + g + ga, y0 + (g - gn) / 2, gn, gn), l.Next, ScaleMode.ScaleToFit, true);
+                    }
+                    continue;
+                }
                 lab.fontSize = l.Size; long t0 = UiTheme.FontLog ? System.Diagnostics.Stopwatch.GetTimestamp() : 0;
                 float wide = Mathf.Max(200, lab.CalcSize(new GUIContent(l.Text)).x + 8);
                 if (UiTheme.FontLog) UiTheme.LogSlowText(t0, "label size", l.Text, lab);
