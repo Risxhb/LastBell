@@ -141,7 +141,7 @@ namespace LastBell.Run
                         {
                             var run = Shop.RunShopFlow.Instance.Run; var me = run.Slot(0);
                             int stock = me.Stock.Take(me.StockCount).Count(x => x != null); int chimes = me.Chimes, owned = me.Items.Count;
-                            Check($"{tag}: shop has stock for the player", stock > 0 && run.Slots.Count == Allies + 1, $"{stock} cards, {run.Slots.Count} slots, {chimes} Chimes");
+                            Check($"{tag}: shop has stock for the player", stock > 0, $"{stock} cards, {chimes} Chimes (bot allies have no shop slot: {run.Slots.Count} slot)");
                             yield return Until(() => !Shop.RunShopFlow.Showing || d.State != RunState.Ready, 200, tag + " shop closes");
                             Note($"{tag}: shop visit {run.Visit}: {chimes} Chimes -> {me.Chimes}, items {owned} -> {me.Items.Count}: {string.Join(", ", me.Items.Select(o => o.Def.Name))}");
                         }
@@ -176,7 +176,7 @@ namespace LastBell.Run
                         if (b.PhaseNumber < b.PhaseCount) b.StartAtPhase(b.PhaseCount);   // a miniboss holds at 50 % until its shift
                         b.DebugDefeat();
                     }
-                    yield return Until(() => d.State != RunState.Combat, 15, "end of " + tag);
+                    yield return Until(() => d.State != RunState.Combat && d.State != RunState.Downed, 30, "end of " + tag);   // a wipe goes Combat -> Downed -> Results
                     float gs = Time.time - t0, ws = Time.realtimeSinceStartup - w0;
                     party = Party.ToList();
                     int used = party.Select((p, i) => i < drunk0.Length ? p.PotionsDrunk - drunk0[i] : 0).Sum(), revives = party.Sum(p => p.Revives);
