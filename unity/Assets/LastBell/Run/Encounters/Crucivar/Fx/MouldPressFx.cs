@@ -167,11 +167,7 @@ namespace LastBell.Run
                 var c = new Vector2(sp.x, Screen.height - sp.y);
                 float a = t.Dim ? 0.4f : 1f;
                 var rect = new Rect(c.x - 50, c.y - 44, 100, 80);
-                // hidden cycle (proposal, 8 Nov playtest: "?" alone confused at first): for the first GhostSeconds the
-                // mould shows last cycle's count, dimmed, fading into the "?", so the "?" reads as "same as before"
-                float g = HideCounts ? GhostLeft(t.H) : 0;
-                if (g > 0) Numeral(rect, t.H.ShareCount.ToString(), a * 0.55f * g);
-                Numeral(rect, HideCounts ? "?" : t.H.ShareCount.ToString(), a * (1 - g));
+                Numeral(rect, HideCounts ? "?" : t.H.ShareCount.ToString(), a);
                 // one slot per needed player: thin ivory tick when filled, dark when empty
                 int slots = HideCounts ? t.Inside : Mathf.Max(t.H.ShareCount, t.Inside);
                 float x0 = c.x - (slots * 18 - 6) / 2f;
@@ -185,10 +181,6 @@ namespace LastBell.Run
                 }
             }
         }
-
-        public const float GhostSeconds = 1.5f;
-        // 1 while the ghost shows, easing to 0 over its last half second
-        public static float GhostLeft(Hazard h) => Mathf.Clamp01((GhostSeconds - h.Age * Sim.Dt) / 0.5f);
 
         static void Numeral(Rect rect, string label, float alpha)
         {
