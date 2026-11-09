@@ -8,7 +8,7 @@ Code: `unity/Assets/LastBell/Run/Encounters/CrucibleSkater/`. Launch: `Play Cruc
 
 **The Crucible Skater, pour-runner of the Brass Foundry.** A small, quick brass figure (about 1.7 m, shorter than a hero) on two long skate blades, with a little crucible of glowing brass balanced on its head and an ivory mask. The foundry floor is its rink. Everything it does is a figure it skates, and the blades leave hot brass behind them that cools and fades. It doesn't overpower the party: it out-skates them. The party decides **where its route goes** (who it skates through, where the trails end up), **whether it gets to finish a run** (someone steps in front of it) and **who it chases next** (each player takes a turn as its target).
 
-Look (placeholder now): weathered brass body, ivory mask, cobalt cavity in the blade housings, a resonant-gold molten core in the crucible. Coral only on its warnings. Final model, FX and audio are open (no Meshy model yet).
+Look: weathered brass body, ivory mask, cobalt cavity in the blade housings, a resonant-gold molten core in the crucible. Coral only on its warnings. Model (9 Nov art pass): a scripted Blender automaton figure skater with 20 clips (`Characters/CrucibleSkater`), and a ladle prop (`Characters/CrucibleLadle`); report in `build-evidence/miniboss-art-20261109/crucible-skater/report.md`. FX and audio are still open.
 
 ## Rules this fight follows
 
@@ -101,8 +101,8 @@ Range is punished by the band, Body Check (it aims at the farthest player) and F
 
 ## Placeholders and open work
 
-- Body: code-built primitives (capsule body, ivory mask sphere, crucible cylinder, two blade bars), named "STAND-IN". No Meshy model, no animation clips, no final FX or audio (the shared `BossFx` resolve flashes only).
-- Thrown ladles are simple spheres; trails are plain slag telegraphs.
+- Body: the rigged CrucibleSkater model (20 clips); the code-built "STAND-IN" primitives remain as the fallback when the model is missing. No final FX or audio (the shared `BossFx` resolve flashes only).
+- Thrown ladles use the CrucibleLadle model (sphere fallback), on the host and LAN clients; trails are plain slag telegraphs.
 
 ## Conflicts with the content rules
 

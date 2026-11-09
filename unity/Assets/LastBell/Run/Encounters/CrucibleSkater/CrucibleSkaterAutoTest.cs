@@ -76,6 +76,29 @@ namespace LastBell.Run
             File.WriteAllBytes(Path.Combine(dir, $"{++shots:00}_{party}p_{name}.png"), tex.EncodeToPNG());
             Destroy(tex); rt.Release(); Destroy(rt); Destroy(go);
         }
+        // in-game frames for the art critic (9 Nov): each clip once, at its tell/strike frame, from the gameplay and a close camera
+        static readonly Dictionary<string, float> StrikeAt = new Dictionary<string, float>
+        {
+            ["CarveCrouch"] = 0.85f, ["CarveTurn"] = 0.05f, ["CheckWindup"] = 0.7f, ["Trip"] = 0.5f, ["TossRaise"] = 0.55f, ["TossFlick"] = 0.2f,
+            ["Reheat"] = 1.0f, ["Defeat"] = 2.4f,
+        };
+        IEnumerator ClipFrames(CharacterPresenter pr, Transform t)
+        {
+            var seen = new HashSet<string>();
+            while (pr && t && seen.Count < CrucibleSkaterEncounter.ClipNames.Length)
+            {
+                string c = pr.CurrentClip;
+                if (c != "-" && seen.Add(c))
+                {
+                    yield return new WaitForSeconds(StrikeAt.TryGetValue(c, out var s) ? s : 0.25f);
+                    if (!pr || !t) yield break;
+                    var b = t.position;
+                    RenderShot($"clip_{c}_game", b + new Vector3(0, 11f, -14f), b + Vector3.up * 1.4f, 40);
+                    RenderShot($"clip_{c}_close", b + t.forward * 4.6f + Vector3.up * 1.7f, b + Vector3.up * 0.85f, 40);
+                }
+                yield return null;
+            }
+        }
         void Overhead(string name) => RenderShot(name, new Vector3(0, 30, 15), new Vector3(0, 0, -0.5f), 52);
         IEnumerator Game(string name)
         {
@@ -214,9 +237,18 @@ namespace LastBell.Run
             boss.Seed = 20261103 + n;
             d.World.Difficulty = Difficulty.Medium;
             yield return Until(() => d.State == RunState.Combat, 8, "combat");
-            Check("fight opens in phase 1 at full HP, placeholder stand-in, no ability text", !boss.Phase2 && boss.Hp == boss.MaxHp && boss.MaxHp == ExpectedHp() && boss.Placeholder && boss.Lesson == "" && boss.PhaseName == "" && boss.transform.Find("Crucible Skater (STAND-IN placeholder)"));
+            Check("fight opens in phase 1 at full HP, no ability text", !boss.Phase2 && boss.Hp == boss.MaxHp && boss.MaxHp == ExpectedHp() && boss.Lesson == "" && boss.PhaseName == "");
+            if (boss.Presenter && boss.Presenter.HasModel)
+            {
+                var missing = CrucibleSkaterEncounter.ClipNames.Where(c => !boss.Presenter.HasClip(c)).ToList();
+                Check($"the rigged model is loaded with all {CrucibleSkaterEncounter.ClipNames.Length} clips, not a placeholder", !boss.Placeholder && missing.Count == 0 && boss.transform.Find("Crucible Skater"),
+                    missing.Count > 0 ? "missing: " + string.Join(", ", missing) : "");
+                Check("the ladle model is in the build", Resources.Load<GameObject>("Characters/CrucibleLadle") != null);
+                if (n == 2) StartCoroutine(ClipFrames(boss.Presenter, boss.transform));
+            }
+            else Check("no model in this build: the labelled stand-in is used (Placeholder)", boss.Placeholder && boss.transform.Find("Crucible Skater (STAND-IN placeholder)"));
             Note($"boss HP {boss.MaxHp} (base {CrucibleSkaterEncounter.MaxHpMedium}, party-scaled; bots don't attack, so they don't add HP)");
-            if (n == 2) RenderShot("stand_in", boss.transform.position + new Vector3(0, 2.2f, 5.5f), boss.transform.position + Vector3.up * 1.1f, 40);
+            if (n == 2) RenderShot("body_front", boss.transform.position + new Vector3(0, 2.2f, 5.5f), boss.transform.position + Vector3.up * 1.1f, 40);
 
             var steps = new List<Func<IEnumerator>> { () => CarveChecks(n, false), () => CheckChecks(n, 1), () => TossChecks(n, false), () => LapChecks(n, false), () => NaturalLoop(n) };
             if (n == 2) steps.Add(StillChecks);
