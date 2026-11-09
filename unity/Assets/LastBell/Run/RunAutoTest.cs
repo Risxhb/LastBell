@@ -1007,15 +1007,15 @@ namespace LastBell.Run
             {
                 // buds are boss parts: standing next to one does nothing, the class's attacks cut it, and the damage also hits her
                 int cut0 = sy.BudsCut; var at = buds[0] - buds[0].normalized * 1.5f;
-                float t3 = Time.time;
-                while (Time.time - t3 < 1f) { bot.Clear(); d.Player.transform.position = at; yield return null; }
+                int t3 = d.World.Tick;   // sim ticks, not real seconds: a slow frame (9 Nov: the base logs every hit on the player) gave the taps fewer ticks
+                while (d.World.Tick - t3 < Sim.Ticks(1f)) { bot.Clear(); d.Player.transform.position = at; yield return null; }
                 Check("standing next to a Choir Bud without attacking does not cut it", sy.BudsCut == cut0 && sy.BudHpAt(buds[0]) >= SylvaraEncounter.BudHp);
                 d.Player.Kit.ClearTargetState();   // the held attacks above left Tollbreaker's axes lodged (back after 6-8 s): start with both in hand
-                int hpBoss = d.Boss.Hp; t3 = Time.time;
+                int hpBoss = d.Boss.Hp; t3 = d.World.Tick;
                 // Tollbreaker taps (a held Twin Hurl lodges); a tap stays pending until a sim tick reads it, or a fast frame rate drops it
-                while (sy.BudsCut == cut0 && Time.time - t3 < 8f) { bool tap = bot.press[0]; bot.Clear(); bot.Aim = buds[0]; bot.hold[0] = d.ClassName != "Tollbreaker"; bot.press[0] = tap || Time.frameCount % 6 == 0; d.Player.transform.position = at; yield return null; }
+                int pt = -99; while (sy.BudsCut == cut0 && d.World.Tick - t3 < Sim.Ticks(8f)) { bool tap = bot.press[0]; bot.Clear(); bot.Aim = buds[0]; bot.hold[0] = d.ClassName != "Tollbreaker"; if (!tap && d.World.Tick - pt >= 6) { tap = true; pt = d.World.Tick; } bot.press[0] = tap; d.Player.transform.position = at; yield return null; }
                 bot.Clear();
-                float cutIn = Time.time - t3;
+                float cutIn = (d.World.Tick - t3) / (float)Sim.Hz;
                 Check("attacking a Choir Bud cuts it in a few seconds (class damage)", sy.BudsCut > cut0 && cutIn < 6f, $"{d.ClassName} {cutIn:0.0}s");
                 Check("damage to a Choir Bud also hits Sylvara", hpBoss - d.Boss.Hp >= SylvaraEncounter.BudHp * 0.9f, $"{hpBoss - d.Boss.Hp}");
                 Note($"Sylvara: {d.ClassName} cut a {SylvaraEncounter.BudHp} HP Choir Bud in {cutIn:0.0}s");
