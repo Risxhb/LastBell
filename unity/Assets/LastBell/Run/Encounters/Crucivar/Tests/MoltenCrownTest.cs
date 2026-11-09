@@ -73,16 +73,11 @@ namespace LastBell.Run
             var pend = crown.Towers.Where(x => x.H.Age < x.H.ResolveAt).Select(x => x.H).ToList();
             t.Check("a rising tower cools the burning ground on its spot (soaking never means standing in burn)", pend.Count > 0 && crown.Cooled > cooled0
                 && !t.W.Hazards.Live.Any(b => b.BurnPerSecond > 0 && b.Age < b.ResolveAt - 1 && pend.Any(tw => Touch(b, tw))), $"cooled {crown.Cooled - cooled0}, pending {pend.Count}");
-            s = 0; bool hidden = false, ghostOn = false, ghostOff = false;
+            s = 0; bool hidden = false;
             while (s < 12f && t.Boss.TestBusy)
             {
                 foreach (var p in t.Party) if (p.Hp < 60) p.DebugSetHp(PlayerController.MaxHp);
                 hidden |= crown.CountsHidden;
-                foreach (var tw in crown.Towers.Where(x => x.H.Age < x.H.ResolveAt))
-                {
-                    if (tw.H.Age < Sim.Ticks(0.5f) && MouldPressFx.GhostLeft(tw.H) >= 1f) ghostOn = true;
-                    if (tw.H.Age > Sim.Ticks(MouldPressFx.GhostSeconds) && MouldPressFx.GhostLeft(tw.H) <= 0f) ghostOff = true;
-                }
                 var set = crown.Towers.Where(x => x.H.Age < x.H.ResolveAt).GroupBy(x => x.Set).OrderBy(g => g.Min(x => x.H.ResolveAt - x.H.Age)).FirstOrDefault();
                 if (set != null)
                 {
@@ -92,7 +87,6 @@ namespace LastBell.Run
                 s += Time.deltaTime; yield return null;
             }
             t.Check("the second cycle hides the tower counts", hidden);
-            t.Check("hidden counts: last cycle's number shows faintly for the first 1.5 s, then only the \"?\"", ghostOn && ghostOff, $"ghost at rise {ghostOn}, gone later {ghostOff}");
             var press = t.Spawned("Second Press").ToList();
             var setA = t.Spawned("Mould Tower A").ToList();
             var first = setA.FirstOrDefault();

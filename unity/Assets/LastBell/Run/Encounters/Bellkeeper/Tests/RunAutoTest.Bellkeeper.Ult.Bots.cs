@@ -21,6 +21,7 @@ namespace LastBell.Run
             public readonly Dictionary<BellkeeperEncounter.UltSegment, int> Decisions = new Dictionary<BellkeeperEncounter.UltSegment, int>();
             public readonly List<string> DeathLines = new List<string>();
             public int Dealt; public float Hp01;
+            public string[] Clips = new string[0];   // the boss's cast clips played (graphics audit, 8 Nov)
             public override string ToString() =>
                 $"{Label}: {(Killed ? "KILL" : Wiped ? "WIPE (" + Cause + ")" : "time cap")} at {Ticks / 3600}:{Ticks / 60 % 60:00} · boss {Hp01:P1} left · " +
                 $"deaths {Deaths} · potions {Potions} · segments {string.Join(" ", Segments.Select(s => $"{s.seg}@{s.tick / 60f:0}s"))}";
@@ -73,6 +74,7 @@ namespace LastBell.Run
             f.Killed = bk.Dead; f.Wiped = !d.World.AnyStanding; f.Cause = bk.Ult.WipeCause ?? d.World.LastDamageSource;
             f.Ticks = d.World.Tick - t0; f.Deaths = down.Count; f.Potions = d.World.Players.Sum(p => p.PotionsDrunk) - potions0;
             f.Dealt = d.World.DealtBy.Values.Sum(); f.Hp01 = bk.Hp / (float)bk.MaxHp;
+            f.Clips = bk.UltClipsPlayed.OrderBy(c => c).ToArray();
             ultLast = f;
             Note(f.ToString());
             foreach (var l in f.DeathLines.Take(6)) Note("   " + l);

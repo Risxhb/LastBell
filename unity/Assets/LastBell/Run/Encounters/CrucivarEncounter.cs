@@ -221,7 +221,7 @@ namespace LastBell.Run
         {
             var parent = transform.parent;
             if (kind >= PropTurret && kind < PropTurret + 4)
-            { NetPropsMade++; return FoundryUprising.TurretLook(parent, FoundryUprising.Numeral(kind - PropTurret), "Lava turret (LAN)"); }
+            { NetPropsMade++; FoundryProps.SlugView.Ensure(W); return FoundryUprising.TurretLook(parent, FoundryUprising.Numeral(kind - PropTurret), "Lava turret (LAN)"); }
             if (kind >= PropCasting && kind < PropCasting + 4)
             {
                 NetPropsMade++;
@@ -230,18 +230,18 @@ namespace LastBell.Run
                 cast.gameObject.AddComponent<NetChain>().Line = chain;
                 return cast;
             }
-            if (kind == PropCrownTurret) { NetPropsMade++; return FoundryUprising.TurretLook(parent, null, "Crown turret (LAN)"); }
+            if (kind == PropCrownTurret) { NetPropsMade++; FoundryProps.SlugView.Ensure(W); return FoundryUprising.TurretLook(parent, null, "Crown turret (LAN)"); }
             return null;
         }
         // a client's casting view: the chain runs from the casting to its turret (across the arena on the rim)
         sealed class NetChain : MonoBehaviour
         {
-            public LineRenderer Line;
+            public FoundryProps.Chain Line;
             void LateUpdate()
             {
                 if (!Line) return;
                 var at = transform.position;
-                Line.SetPosition(0, FoundryUprising.TurretFor(at) + Vector3.up * 0.4f); Line.SetPosition(1, new Vector3(at.x, 0.4f, at.z));
+                Line.SetEnds(FoundryUprising.TurretFor(at) + Vector3.up * 0.4f, new Vector3(at.x, 0.4f, at.z));
             }
         }
 
@@ -280,6 +280,7 @@ namespace LastBell.Run
                     fx.FlameJet(NetV(a[0]), NetF(a[1]), NetF(a[2]), NetF(a[3])); fx.FlameJet(NetV(a[0]), NetF(a[1]), NetF(a[2]), NetF(a[3])); break;
                 case "CrucivarFx.RimFlood": if (fx == null || a.Length < 2) return false; fx.RimFlood(NetF(a[0]), NetF(a[1])); break;
                 case "CrucivarFx.Eruption": if (fx == null || a.Length < 1) return false; fx.Eruption(NetF(a[0])); break;
+                case "CrucivarFx.MoltenOverflow": if (fx == null || a.Length < 2) return false; fx.MoltenOverflow(NetV(a[0]), NetF(a[1])); break;
                 case "CrucivarFx.InhaleChevrons": if (fx == null || a.Length < 3) return false; fx.InhaleChevrons(NetV(a[0]), NetF(a[1]), NetF(a[2])); break;
                 case "CrucivarFx.BellowsBlast": if (fx == null || a.Length < 2) return false; fx.BellowsBlast(NetV(a[0]), NetF(a[1])); break;
                 case "CrucivarRig.Pour": if (!rig || a.Length < 1) return false; rig.Pour(NetB(a[0])); break;

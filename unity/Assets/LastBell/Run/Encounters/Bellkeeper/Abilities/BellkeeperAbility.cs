@@ -62,7 +62,8 @@ namespace LastBell.Run
         // made itself (numerals, after-images). Its hazards are already gone or about to be cleared by the encounter.
         public virtual void Cancel() { Spawned.Clear(); }
 
-        protected Hazard Spawn(Hazard h) { W.Hazards.Spawn(h); Spawned.Add(h); Boss.NotifySpawned(this, h); return h; }
+        // the hazard carries this ability's runtime ID unless it names its own (BossAttackIcons: the death recap icon)
+        protected Hazard Spawn(Hazard h) { h.AttackId ??= Id; W.Hazards.Spawn(h); Spawned.Add(h); Boss.NotifySpawned(this, h); return h; }
         protected int StandingCount { get { int n = 0; foreach (var p in W.Players) if (!p.Down) n++; return n; } }
     }
 

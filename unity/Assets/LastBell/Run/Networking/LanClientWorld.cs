@@ -93,6 +93,9 @@ namespace LastBell.Run.Networking
             fx = BellkeeperFx.Create(); fx.transform.SetParent(root, false);
             playerFx = PlayerFx.Create(root);
             world = new CombatWorld(root, fx, playerFx);
+            // the host builds Sylvara's Seed Burst preview bars on its Ready screen; the replica never passes Ready, so build
+            // them here, before the first snapshot (review SYL-CLIENT-COLD, 8 Nov)
+            if (lobby.Encounter == "Sylvara") world.Bullets.Prewarm(world.Root);
             foreach (var member in lobby.Members.OrderBy(m => m.Id))
             {
                 var player = PlayerController.Spawn(world, member.ClassName, Vector3.zero, 180);
@@ -349,10 +352,14 @@ namespace LastBell.Run.Networking
         // a replica bullet 'since' seconds after its snapshot; a seed also gets its fuse and burst preview, drawn as on the host
         public static void ApplyBullet(LanWorldFrame.BulletState s, BulletSystem.Bullet b, float since)
         {
-            b.Pos = new Vector3(s.X + s.VX * since, 0, s.Z + s.VZ * since); b.Vel = new Vector3(s.VX, 0, s.VZ);
+            // 'since' is signed: the drawn time is usually a little behind the newest snapshot. A seed's place and fuse use the
+            // same time (clamped to its launch and its burst), so its preview centre and countdown match the seed drawn
+            // (review SYL-LAN-TIME, 8 Nov)
+            float t = s.Rays > 0 ? Mathf.Clamp(since, -s.Age, s.Life - s.Age) : since;
+            b.Pos = new Vector3(s.X + s.VX * t, 0, s.Z + s.VZ * t); b.Vel = new Vector3(s.VX, 0, s.VZ);
             b.Radius = s.Radius; b.Colour = s.Colour; b.Source = s.Water ? "Waterfall Jet" : "Bullet"; b.Dead = false;
             b.BurstRays = s.Rays; b.BurstOff = s.Off; b.BurstSpeed = s.Speed;
-            if (s.Rays > 0) { b.Life = s.Life; b.Age = Mathf.Min(s.Age + Mathf.Max(0, since), s.Life); } else { b.Life = 6; b.Age = 0; }
+            if (s.Rays > 0) { b.Life = s.Life; b.Age = s.Age + t; } else { b.Life = 6; b.Age = 0; }
         }
         // ---------------- boss props ----------------
         readonly HashSet<int> propSeen = new HashSet<int>();
@@ -463,6 +470,7 @@ namespace LastBell.Run.Networking
             try { ClearProps(); ClearMirrors(); } catch (Exception ex) { Debug.Log("[LAN] client cleanup: " + ex.Message); }
             // the scene may already have destroyed the replica boss and players; a cleanup error must not escape OnDestroy
             try { if (world != null) world.ClearTransient(); } catch (Exception ex) { Debug.Log("[LAN] client cleanup: " + ex.Message); }
+            try { world?.Bullets.Dispose(); } catch (Exception ex) { Debug.Log("[LAN] client cleanup: " + ex.Message); }
             if (root) Destroy(root.gameObject);
         }
     }

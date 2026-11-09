@@ -124,7 +124,7 @@ namespace LastBell.Run
         // ---------------- the plan ----------------
         IEnumerable<int> UltimatePlan()
         {
-            UltPlanActive = true; pushFired = false;
+            UltPlanActive = true; pushFired = false; UltClipsPlayed.Clear();
             Ult.ResetAll(); mRelay.ResetBeats(); mBroken.ResetBeats(); mOpen.ResetCounts(); mGear.ResetCounts(); mFinal.ResetCounts();
             FitHpToParty();
             var start = pickedSegment ?? (IsPractice && RequestedSegment.HasValue ? RequestedSegment.Value : UltSegment.P1);
@@ -133,7 +133,7 @@ namespace LastBell.Run
             for (var s = start; s <= UltSegment.P5; s++)
             {
                 if (s == UltSegment.P3 && start < UltSegment.P3) foreach (var w in SecondForm()) yield return w;
-                Begin(s);
+                Begin(s, s != start);
                 foreach (var w in RunSegment(s)) yield return w;
                 // the transition waits for the current moves to finish (rules: no transition mid-telegraph)
                 while (running.Count > 0 || W.Hazards.Count > 0) yield return 1;
@@ -144,7 +144,7 @@ namespace LastBell.Run
         }
 
         static readonly Unity.Profiling.ProfilerMarker BeginMarker = new Unity.Profiling.ProfilerMarker("Ultimate.Segment.Begin");
-        void Begin(UltSegment s)
+        void Begin(UltSegment s, bool broke)
         {
             using var mark = BeginMarker.Auto();   // the phase change: name, look, HUD
             Segment = s; SegmentStartTick = W.Tick; SegmentLoops = 0; pushFired = false;
@@ -153,6 +153,8 @@ namespace LastBell.Run
             phase = SegLook[(int)s];
             Ult.Reset();
             if (PhaseName != SegmentNames[(int)s]) SetPhase(SegmentNames[(int)s]);   // the opening segment (P1, or the picked phase) already shows its name: no phase change
+            // the boss reels as its phase breaks (P3 has the second form; P4 opens with the floor breaking)
+            if (broke && (s == UltSegment.P2 || s == UltSegment.P5)) UltCastClip("Vulnerable", 2f);
         }
 
         // ---------------- practice phase row (Test Rush "Start Phase", -lastbellPractice ... -lastbellPhase N) ----------------
@@ -211,6 +213,17 @@ namespace LastBell.Run
             SegmentLoops++;
             if (!IsRunning(mRelay)) UltLaunch(mRelay, C(1, "p1", 6));
             foreach (var w in Timeline(36, (12f, (Action)(() => UltLaunch(mDebts, C(1, "p1", 6, 9, 12, 15)))))) yield return w;
+        }
+
+        // Cast clips (graphics audit, 8 Nov; presentation only): the mechanics call this at their telegraphs. Bellkeeper2's clips:
+        //   PendulumCharge  P1 every relay beat            BellSweep       P2 slam, P3 Bell Curtain, P4 hammer
+        //   ShatteredChime  P1 Chime Debts, P4 floor breaks HollowToll      P3 rewind, P4 the great bell, P5 every toll
+        //   EchoTell        P3 Echo of You, P5 the Echo     Vulnerable      the phase breaks into P2 and P5
+        public readonly HashSet<string> UltClipsPlayed = new HashSet<string>();   // tests
+        public void UltCastClip(string clip, float seconds)
+        {
+            if (UltLook.Old || !presenter || !presenter.Has(clip)) return;
+            presenter.PlayOnce(clip, Mathf.Max(0.4f, seconds)); UltClipsPlayed.Add(clip);
         }
 
         // second form at 55 %: a harmless 2 s transformation, same bar, no heal

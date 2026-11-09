@@ -384,6 +384,7 @@ namespace LastBell.Run
         void Teardown()
         {
             if (World != null) World.ClearTransient();
+            World?.Bullets.Dispose();   // the bullet view's own materials (review SYL-RAY-MATERIALS, 8 Nov)
             if (bossFx) bossFx.ResetAll(); if (playerFx) playerFx.ResetAll();
             if (scopeParent) Destroy(scopeParent.gameObject);
             Allies.Clear();
