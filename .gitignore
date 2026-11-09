@@ -30,11 +30,6 @@ unity/*.slnx
 # Asset packs: downloaded and built ZIPs (see docs/asset-packs.md)
 /.asset-packs/
 
-
-# Sylvara v3 attack props (Meshy art, cleaned by prototype/arena-3d/models/blender/sylvara_props_prep.py; not committed)
-/unity/Assets/LastBell/Characters/Sylvara/Resources/SylvaraProps/
-/unity/Assets/LastBell/Characters/Sylvara/Resources/SylvaraProps.meta
-
 # >>> asset packs (managed by tools/asset-packs; do not edit by hand)
 /unity/Assets/LastBell/Characters/Sylvara/Resources/Characters/Sylvara.glb
 /unity/Assets/LastBell/Characters/Sylvara/Resources/Characters/Sylvara.glb.meta
@@ -54,9 +49,6 @@ unity/*.slnx
 /unity/Assets/LastBell/Menu/Resources/Menu/MainMenu2.wav.meta
 /unity/Assets/LastBell/Areas/Area3/Source/VerdantChimes_Art.glb
 /unity/Assets/LastBell/Areas/Area3/Source/VerdantChimes_Art.glb.meta
-/unity/Assets/LastBell/Characters/Sylvara/Resources/SylvaraProps
-/unity/Assets/LastBell/Characters/Sylvara/Resources/SylvaraProps.meta
-/unity/Assets/LastBell/Characters/Sylvara/Resources/SylvaraProps.meta.meta
 /unity/Assets/LastBell/Areas/Area3/Source/VerdantChimes.glb
 /unity/Assets/LastBell/Areas/Area3/Source/VerdantChimes.glb.meta
 /unity/Assets/LastBell/Areas/Area3/Source/FloorAlbedo.png
@@ -65,4 +57,7 @@ unity/*.slnx
 /unity/Assets/LastBell/Areas/Area3/Source/FloorHeight.png.meta
 /unity/Assets/LastBell/Areas/Area3/Source/FloorMask.png
 /unity/Assets/LastBell/Areas/Area3/Source/FloorMask.png.meta
+/unity/Assets/LastBell/Characters/Sylvara/Resources/SylvaraProps
+/unity/Assets/LastBell/Characters/Sylvara/Resources/SylvaraProps.meta
+/unity/Assets/LastBell/Characters/Sylvara/Resources/SylvaraProps.meta.meta
 # <<< asset packs

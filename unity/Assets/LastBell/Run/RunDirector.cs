@@ -413,7 +413,8 @@ namespace LastBell.Run
                 if (Mode == RunMode.Run && pos > 0) Allies[i].RefreshHealth(refillPotions: potions);
                 Allies[i].PrepareForEncounter(AllySocket(i), 180); Allies[i].AbilitiesEnabled = false;
                 if (ultimate) UltimateParty.Drive(Allies[i], i + 1, Allies.Count + 1);
-                else if (!(Allies[i].Input is AllyBot)) Allies[i].Input = new AllyBot(i, Allies.Count, AllyBot.AllyMode);
+                // after an Ultimate fight, its strat bots go back to AllyBot; other drivers (the tutorial's bots, LAN players) stay
+                else if (Allies[i].Input == null || Allies[i].Input is UltimateBot) Allies[i].Input = new AllyBot(i, Allies.Count, AllyBot.AllyMode);
             }
             Go(RunState.Intro);
         }
