@@ -20,7 +20,8 @@ namespace LastBell.Run
     //
     // 50%: he finishes the current mechanic, then a 2 s harmless Key Change (damageable, no heal); 120 -> 140 BPM.
     // Below 50% the chains lock under a Rivet Run (the one two-pattern overlap). No enrage (content rules §5).
-    // Placeholder visuals only: primitive stand-in body, call glyphs above his head, no audio.
+    // Visuals: the rigged model (Characters/RivetCantor, 9 Nov clips) when present, else a labelled primitive stand-in;
+    // call glyphs above his head, no audio. Strike clips land their strike frame on the gameplay tick (BossClipCues).
     // Every warning goes through Live(), which applies the shared raid look (HazardSystem.RaidStyle, Brass Foundry motif).
     public sealed class RivetCantorEncounter : BossEncounter
     {
@@ -29,6 +30,14 @@ namespace LastBell.Run
         public override string Lesson => "";
         public override float NextPhaseFraction() => 0.49f;
         protected override bool PartyScaled => true;
+        // the rigged model when Resources/Characters/RivetCantor(.glb) is in the project, else the labelled stand-in
+        public override bool Placeholder => !presenter || !presenter.HasModel;
+        CharacterPresenter presenter; BossClipCues cues; public CharacterPresenter Presenter => presenter; public BossClipCues Cues => cues;
+        public static readonly string[] ClipNames = { "Idle", "Walk", "ChorusCall", "SoloCall", "VerseLoop", "HammerRaise", "HammerLoop",
+            "ForkPlant", "ForkLoop", "ForkStrike", "DrumSlam", "DialLoop", "PhaseShift", "Defeat" };
+        // clip lengths and strike frames (seconds), as keyed in rivet_cantor_rig.py
+        const float CallLen = 1.2f, CallStrike = 0.35f, RaiseLen = 0.8f, PlantLen = 1.2f, YankLen = 1.0f, YankStrike = 0.55f, SlamLen = 2.2f, SlamStrike = 1.4f;
+        float BeatSpeed => Bpm / 120f;   // VerseLoop and HammerLoop are keyed at 120 BPM (one tap or blow per beat)
 
         // ---------------- tunables (Medium) ----------------
         public const float BpmHigh = 120f, BpmLow = 140f;
@@ -100,18 +109,25 @@ namespace LastBell.Run
 
         void Awake() { MaxHp = 3600; BodyRadius = 1.3f; HitHeight = 2.2f; MarkHeight = 4.6f; }
 
-        // ---------------- placeholder body ----------------
+        // ---------------- body ----------------
         protected override void Build()
         {
             PhaseName = "";
-            var host = new GameObject("Rivet Cantor (STAND-IN, labelled placeholder)").transform; host.SetParent(transform, false);
+            presenter = CharacterPresenter.Create(transform, "RivetCantor", 1.5f, 1f, 0, h => { BuildStandIn(h); return h; });
+            cues = new BossClipCues(presenter);
+            gameObject.AddComponent<RivetCantorReplicaNumeral>().Bind(this);   // LAN client: draws the Chorus numeral (this boss is disabled there)
+        }
+
+        // a labelled code-built stand-in, used only when the rigged model is missing
+        void BuildStandIn(Transform parent)
+        {
+            var host = new GameObject("Rivet Cantor (STAND-IN, labelled placeholder)").transform; host.SetParent(parent, false);
             body = Prim.Make(PrimitiveKind.Cylinder, host, new Vector3(0, 1.4f, 0), new Vector3(2.0f, 1.4f, 2.0f), Brass);
             Prim.Make(PrimitiveKind.Sphere, host, new Vector3(0, 1.7f, 0.85f), Vector3.one * 0.55f, Gold, 1.5f);   // the core
             mask = Prim.Make(PrimitiveKind.Sphere, host, new Vector3(0, 3.1f, 0.1f), new Vector3(0.9f, 1.0f, 0.8f), Ivory);
             drum = Prim.Make(PrimitiveKind.Cylinder, host, new Vector3(-1.25f, 1.3f, 0.3f), new Vector3(1.2f, 0.25f, 1.2f), Cobalt, 0, Quaternion.Euler(0, 0, 90));
             mallet = Prim.Make(PrimitiveKind.Cylinder, host, new Vector3(1.25f, 1.6f, 0.4f), new Vector3(0.18f, 0.7f, 0.18f), Brass, 0, Quaternion.Euler(30, 0, 0));
             Prim.Make(PrimitiveKind.Sphere, mallet, new Vector3(0, 1.1f, 0), Vector3.one * 2.4f, Ivory);
-            gameObject.AddComponent<RivetCantorReplicaNumeral>().Bind(this);   // LAN client: draws the Chorus numeral (this boss is disabled there)
         }
 
         // ---------------- helpers ----------------
@@ -180,7 +196,10 @@ namespace LastBell.Run
             UpdateChorusNumeral();
             // the call glyphs float above his head, oldest lowest
             for (int i = 0; i < glyphs.Count; i++) if (glyphs[i]) glyphs[i].position = transform.position + Vector3.up * (4.3f + 0.75f * i);
+            cues?.Step(Current == "reposition");
         }
+        protected override void Update() { base.Update(); if (presenter) presenter.GlowLevel = glowLevel; }
+        protected override void OnHalt() { cues?.Clear(); if (cues != null) cues.Loop = "Idle"; }
 
         public override float[] PhaseStarts => new[] { 1f, 0.5f };
         public override int PhaseNumber => Phase2 ? 2 : 1;
@@ -190,6 +209,7 @@ namespace LastBell.Run
         {
             GatePending = false; Current = "Key Change"; Log("Key Change"); ShiftStart = Tick; HpAtShiftStart = Hp; faceYaw = null;
             CameraShake.Shake(0.12f, 0.3f); Windup(1);
+            cues.Clear(); cues.Play("PhaseShift", ShiftTicks); cues.Loop = "Idle";
             yield return ShiftTicks;   // harmless: nothing spawns and he stays damageable
             Phase2 = true; Release(1.5f); ShiftEnd = Tick;
             if (mask) Prim.SetGlow(mask.GetComponent<Renderer>(), Gold * 1.5f);
@@ -204,17 +224,23 @@ namespace LastBell.Run
             var calls = VersePattern(Phase2, verseIndex++, Hard);
             VerseLog.Add((Tick, calls));
             int gap = Beats(CallGapBeats), echo = Beats(EchoBeats);
+            // each call's strike frame (the fork on the drum / the stamp) lands on the tick its glyph and telegraph appear
+            cues.LoopAt(0, "VerseLoop", BeatSpeed);
+            cues.Strike(CallClip(calls[0]), 0, CallStrike, CallLen);
             for (int k = 0; k < calls.Length; k++)
             {
                 Sing(calls[k], echo);
+                if (k + 1 < calls.Length) cues.Strike(CallClip(calls[k + 1]), gap, CallStrike, CallLen);
                 if (mallet) mallet.localRotation = Quaternion.Euler(k % 2 == 0 ? -40 : 30, 0, 0);
                 Release(0.5f);
                 if (k < calls.Length - 1) for (int t = 0; t < gap; t++) { Windup((t + 1) / (float)gap); yield return 1; }
             }
             Current = "Work-Song Verse (echo)";
             foreach (var w in WaitPending()) yield return w;
+            cues.Loop = "Idle";
             Current = "Work-Song Verse (end)";
         }
+        static string CallClip(Call c) => c == Call.Chorus ? "ChorusCall" : "SoloCall";
 
         void Sing(Call c, int echo)
         {
@@ -306,6 +332,8 @@ namespace LastBell.Run
             float aim1 = YawAt(W.NearestStanding(transform.position));
             int first = Beats(RivetFirstBeats), step = Beats(RivetStepBeats);
             faceYaw = aim1;
+            // the drum rises overhead and comes down on the first pop, then one blow per beat while the rivets march
+            cues.Strike("HammerRaise", first, RaiseLen, RaiseLen); cues.LoopAt(first, "HammerLoop", BeatSpeed);
             // the first X: outward from his feet, aimed at the nearest player
             int set1Count = 0;
             for (int l = 0; l < 4; l++)
@@ -338,6 +366,7 @@ namespace LastBell.Run
                 SpawnChains(lockIn);
             }
             foreach (var w in WaitPending()) yield return w;
+            cues.Loop = "Idle";
             if (mallet) mallet.localRotation = Quaternion.identity;
             faceYaw = null; Current = "Rivet Run (end)";
         }
@@ -362,8 +391,11 @@ namespace LastBell.Run
             if (mallet) mallet.localRotation = Quaternion.Euler(0, 0, 70);
             int lockIn = Beats(ChainBeats);
             SpawnChains(lockIn);
+            // the fork is driven into the floor as the chains appear, hums while they tighten, and is wrenched out on the lock
+            cues.Play("ForkPlant", Mathf.RoundToInt(PlantLen * Sim.Hz)); cues.LoopAt(0, "ForkLoop");
+            cues.Strike("ForkStrike", lockIn, YankStrike, YankLen);
             for (int t = 0; t < lockIn; t++) { Windup((t + 1) / (float)lockIn); yield return 1; }
-            Release(1f);
+            Release(1f); cues.Loop = "Idle";
             foreach (var w in WaitPending()) yield return w;
             if (mallet) mallet.localRotation = Quaternion.identity;
             Current = "Rivet Chains (end)";
@@ -464,6 +496,9 @@ namespace LastBell.Run
             Pulse(new Hazard { Shape = HazardShape.Ring, Origin = c, Inner = DiscRadius, Radius = Ring2 }, tell + gap);
             Pulse(new Hazard { Shape = HazardShape.Ring, Origin = c, Inner = Ring2, Radius = Ring3 }, tell + 2 * gap);
             Pulse(new Hazard { Shape = HazardShape.Ring, Origin = c, Inner = Ring3, Radius = edge }, tell + 3 * gap);
+            // the drum hauled overhead and slammed down on the disc, then a blow on each ring (one HammerLoop cycle = 2 rings)
+            cues.Strike("DrumSlam", tell, SlamStrike, SlamLen);
+            cues.At(tell + gap, "HammerLoop", 2 * gap); cues.At(tell + 3 * gap, "HammerLoop", 2 * gap);
             if (drum) drum.localPosition = new Vector3(0, 4.0f, 0.2f);
             for (int t = 0; t < tell; t++) { Windup((t + 1) / (float)tell); yield return 1; }
             if (drum) drum.localPosition = new Vector3(0, 1.0f, 1.0f);
@@ -471,9 +506,10 @@ namespace LastBell.Run
             foreach (var w in WaitPending()) yield return w;
             // Retuning: the drum skin split, he re-tensions it. Nothing is live (the major punish window).
             Current = "Retuning"; Retuning = true; int from = Tick;
+            cues.Clear(); cues.Loop = "DialLoop"; cues.Play("DialLoop", 2 * Sim.Hz);   // kneeling over the drum, retuning it
             if (body) body.localScale = new Vector3(2.0f, 1.0f, 2.0f);
             yield return RetuneTicks;
-            RetuneLog.Add((from, Tick, W.Hazards.Count)); Retuning = false;
+            RetuneLog.Add((from, Tick, W.Hazards.Count)); Retuning = false; cues.Loop = "Idle";
             if (body) body.localScale = new Vector3(2.0f, 1.4f, 2.0f);
             if (drum) drum.localPosition = new Vector3(-1.25f, 1.3f, 0.3f);
             Current = "Anvil Hymn (end)";
@@ -521,6 +557,8 @@ namespace LastBell.Run
         protected override void OnDefeat()
         {
             ClearGlyphs(); ClearMarks(); Pending = 0; Retuning = false; choruses.Clear(); ChorusNeed = -1;
+            cues?.Clear();
+            if (presenter) presenter.Action("Defeat", 150);
             W.Fx.Crescendo(transform.position, true, 2, true);
         }
         void OnDestroy() { ClearGlyphs(); ClearMarks(); choruses.Clear(); ChorusNeed = -1; }

@@ -73,6 +73,30 @@ namespace LastBell.Run
         void Note(string s) { lines.Add("      " + s); Debug.Log("[briar-metronome-test] " + s); }
         void Section(string s) { lines.Add(""); lines.Add("== " + s); }
 
+        // in-game frames for the animation critic (9 Nov): each clip once, at its strike frame, from the gameplay and a close camera
+        static readonly Dictionary<string, float> StrikeAt = new Dictionary<string, float>
+        {
+            ["CutIn"] = 0.75f, ["CutOut"] = 0.75f, ["CutAcross"] = 0.75f, ["BladePlant"] = 0.6f, ["MantleShake"] = 0.5f,
+            ["OrbThrow"] = 0.35f, ["PhaseShift"] = 1.0f, ["Defeat"] = 2.3f,
+        };
+        IEnumerator ClipFrames(CharacterPresenter pr, Transform t)
+        {
+            var seen = new HashSet<string>();
+            while (pr && t && seen.Count < 17)
+            {
+                string c = pr.CurrentClip;
+                if (c != "-" && seen.Add(c))
+                {
+                    yield return new WaitForSeconds(StrikeAt.TryGetValue(c, out var s) ? s : 0.4f);
+                    if (!pr || !t) yield break;
+                    var b = t.position;
+                    RenderShot($"clip_{c}_game", b + new Vector3(0, 11f, -14f), b + Vector3.up * 1.4f, 40);
+                    RenderShot($"clip_{c}_close", b + t.forward * 7f + Vector3.up * 2.6f, b + Vector3.up * 1.8f, 40);
+                }
+                yield return null;
+            }
+        }
+
         void RenderShot(string name, Vector3 pos, Vector3 look, float fov, int w = 1280, int h = 720)
         {
             var go = new GameObject("capture camera"); var cam = go.AddComponent<Camera>();
@@ -155,10 +179,17 @@ namespace LastBell.Run
             d = RunDirector.Instance;
             Check("practice Ready on Verdant Chimes", d && d.State == RunState.Ready && RunMaps.Current == map && d.Mode == RunMode.Practice && d.Encounter == enc);
             yield return BeginFight(20261103, false);
-            Check("fight opens in phase 1 at 108 BPM (33-tick beat), placeholder body, no ability text",
-                !boss.Phase2 && boss.BeatTicks == 33 && boss.Placeholder && boss.PhaseName == "" && boss.Lesson == "" && !BriarMetronomeHud.ShowDiagnostics);
+            Check("fight opens in phase 1 at 108 BPM (33-tick beat), no ability text",
+                !boss.Phase2 && boss.BeatTicks == 33 && boss.PhaseName == "" && boss.Lesson == "" && !BriarMetronomeHud.ShowDiagnostics);
+            if (boss.Presenter && boss.Presenter.HasModel)
+            {
+                var missing = BriarMetronomeEncounter.ClipNames.Where(c => !boss.Presenter.Has(c)).ToList();
+                Check($"the rigged model is loaded with all {BriarMetronomeEncounter.ClipNames.Length} clips", !boss.Placeholder && missing.Count == 0, missing.Count > 0 ? "missing: " + string.Join(", ", missing) : "");
+                StartCoroutine(ClipFrames(boss.Presenter, boss.transform));
+            }
+            else Check("no rigged model in this build: the labelled stand-in is used (Placeholder)", boss.Placeholder && GameObject.Find("Briar Metronome (STAND-IN, labelled placeholder)"));
             yield return Until(() => Sim.Flat(boss.transform.position).magnitude < 0.35f, 8, "walks to the centre");
-            RenderShot("standin_front", new Vector3(0, 3.4f, 8.5f), new Vector3(0, 2f, 0), 42);
+            RenderShot("body_front", new Vector3(0, 3.4f, 8.5f), new Vector3(0, 2f, 0), 42);
 
             yield return SoloDanger();
             yield return Party(2);
