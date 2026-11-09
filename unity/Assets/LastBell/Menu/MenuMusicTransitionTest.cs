@@ -51,14 +51,34 @@ namespace LastBell.Menu
             if (!d) { Finish(hadVolume, savedVolume); yield break; }
             Check("initial preparation retains menu playback", music.Source == menu && menu.isPlaying && menu.timeSamples > menuSample);
             var order = (int[])d.EncounterOrder.Clone();
+            Check("missing wing folder gives no songs and no exception", MenuMusic.WingTracks("No Such Wing").Length == 0);
             d.RequestReady();
+            string previousWing = null; AudioSource previousSource = null; AudioClip previousClip = null; float previousTime = 0;
             for (int fight = 0; fight < order.Length; fight++)
             {
                 yield return Until(() => d.State == RunState.Intro, 8, "countdown " + fight);
+                yield return null;   // let one LateUpdate apply the intro
                 var incoming = music.Source;
+                string wing = MenuMusic.WingFor(d.Boss);
+                if (wing != null && wing == previousWing)
+                {
+                    // wing music: the next miniboss of the same area keeps the song and its position
+                    Check("wing song continues into next miniboss " + fight, incoming == previousSource && incoming.clip == previousClip && incoming.isPlaying && incoming.time >= previousTime && music.Wing == wing);
+                    yield return Until(() => d.State == RunState.Combat, 4, "wing combat " + fight);
+                    yield return new WaitForEndOfFrame();
+                    Check("wing song back to full volume in combat " + fight, Close(incoming.volume, music.Volume));
+                    yield return ClearFight(fight, incoming, true);
+                    previousTime = incoming.time;
+                    if (fight < order.Length - 1) yield return Until(() => d.State == RunState.Intro, 5, "next boss countdown " + fight);
+                    continue;
+                }
                 var outgoing = music.GetComponents<AudioSource>().FirstOrDefault(s => s != menu && s != incoming && s.isPlaying);
-                Check("correct incoming boss track " + fight, incoming != menu && incoming.clip && incoming.clip.name == MenuMusic.TrackFor(d.Boss) && incoming.isPlaying);
-                if (fight > 0) Check("previous boss still plays at next countdown " + fight, outgoing && outgoing.volume > .4f);
+                string expected = wing != null ? MenuMusic.WingTracks(wing).FirstOrDefault()?.name : MenuMusic.TrackFor(d.Boss);
+                Check("correct incoming track " + fight + " (" + expected + ")", incoming != menu && incoming.clip && incoming.clip.name == expected && incoming.isPlaying);
+                if (previousWing != null && wing == null) Check("area boss switches from wing song to its own track " + fight, incoming != previousSource && outgoing == previousSource);
+                if (wing != null && fight > 0) Check("new area starts its own wing song " + fight, music.Wing == wing && incoming.clip != previousClip);
+                // a ducked wing song fades out from its ducked level
+                if (fight > 0) Check("previous track still plays at next countdown " + fight, outgoing && outgoing.volume > (previousWing != null ? .2f : .4f));
                 yield return Until(() => d.StateTicks >= 28, 3, "partial fade " + fight);
                 yield return new WaitForEndOfFrame();
                 Check("partial fade follows countdown " + fight, Close(incoming.volume, music.Volume * d.IntroProgress) && incoming.volume > .05f && incoming.volume < music.Volume - .05f);
@@ -80,17 +100,15 @@ namespace LastBell.Menu
                     yield return new WaitForEndOfFrame();
                     if (d.State != RunState.Intro) break;
                     followsTicks &= Close(incoming.volume, music.Volume * d.IntroProgress);
-                    conserved &= Close(music.GetComponents<AudioSource>().Sum(s => s.volume), music.Volume);
+                    float sum = music.GetComponents<AudioSource>().Sum(s => s.volume);
+                    conserved &= previousWing != null ? sum <= music.Volume + .015f : Close(sum, music.Volume);
                     trace.Add(string.Format(CultureInfo.InvariantCulture, "{0},{1},{2:F4},{3:F4},{4:F4},{5:F4}", fight, d.StateTicks, d.IntroProgress, incoming.volume, outgoing ? outgoing.volume : 0, menu.volume));
                 }
                 Check("fade tracks every sampled countdown tick " + fight, followsTicks && conserved);
                 Check("full boss volume exactly at combat entry " + fight, d.State == RunState.Combat && incoming.isPlaying && Close(incoming.volume, music.Volume));
                 Check("outgoing sources silent at zero " + fight, !menu.isPlaying && (!outgoing || !outgoing.isPlaying) && music.GetComponents<AudioSource>().Where(s => s != incoming).All(s => s.volume == 0));
-                int combatSample = incoming.timeSamples;
-                d.Boss.DebugDefeat();
-                yield return Until(() => d.State == RunState.Cleared, 3, "boss clear " + fight);
-                yield return new WaitForSecondsRealtime(.35f);
-                Check("boss track continues through clear " + fight, music.Source == incoming && incoming.isPlaying && incoming.timeSamples > combatSample && Close(incoming.volume, music.Volume));
+                yield return ClearFight(fight, incoming, wing != null);
+                previousWing = wing; previousSource = incoming; previousClip = incoming.clip; previousTime = incoming.time;
                 if (fight < order.Length - 1)
                     yield return Until(() => d.State == RunState.Intro, 5, "next boss countdown " + fight);
             }
@@ -117,17 +135,19 @@ namespace LastBell.Menu
             d.RequestReady(); yield return Until(() => d.State == RunState.Combat, 4, "defeat combat");
             last = music.Source; d.Player.ReceiveHit(new Hazard { Source = "Music validation", Kind = HazardKind.Ground, Damage = 999999 });
             yield return Until(() => d.State == RunState.Downed, 3, "downed");
-            Check("downed retains boss track", music.Source == last && last.isPlaying && Close(last.volume, music.Volume));
+            bool wingFirst = MenuMusic.WingFor(d.Boss) != null;
+            Check("downed retains boss track", music.Source == last && last.isPlaying && (wingFirst ? last.volume > .05f : Close(last.volume, music.Volume)));
             yield return Until(() => d.State == RunState.Results, 4, "defeat results");
             Check("defeat results retain boss track", !d.Victory && music.Source == last && last.isPlaying);
             d.RequestRetry(); yield return new WaitForSecondsRealtime(.2f);
             Check("defeat retry retains boss track", music.Source == last && last.isPlaying);
             d.RequestReady(); yield return new WaitForEndOfFrame();
-            Check("same boss retry begins silent incoming track", music.Source != last && music.Source.clip == last.clip && music.Source.isPlaying && last.isPlaying && music.Source.volume < last.volume);
+            if (wingFirst) Check("same wing retry keeps the wing song", music.Source == last && last.isPlaying);
+            else Check("same boss retry begins silent incoming track", music.Source != last && music.Source.clip == last.clip && music.Source.isPlaying && last.isPlaying && music.Source.volume < last.volume);
             yield return Until(() => d.StateTicks >= 25, 3, "interrupted retry countdown");
             d.SetPaused(true); Check("retry during countdown accepted", d.RequestRetry());
             last = music.Source; yield return new WaitForSecondsRealtime(.6f);
-            Check("interrupted countdown settles on boss music in preparation", d.State == RunState.Ready && music.Source == last && last.isPlaying && Close(last.volume, music.Volume) && !menu.isPlaying);
+            Check("interrupted countdown settles on boss music in preparation", d.State == RunState.Ready && music.Source == last && last.isPlaying && (wingFirst ? last.volume > .05f : Close(last.volume, music.Volume)) && !menu.isPlaying);
             d.RequestReady();
             yield return Until(() => d.State == RunState.Combat, 4, "retry combat");
             d.SetPaused(true); MenuReturnBridge.Return(false);
@@ -140,6 +160,17 @@ namespace LastBell.Menu
             Check("manual menu resume remains available", !music.UserPaused && menu.isPlaying);
             Check("zero runtime errors", errors.Count == 0);
             Finish(hadVolume, savedVolume);
+        }
+        IEnumerator ClearFight(int fight, AudioSource incoming, bool wing)
+        {
+            var d = RunDirector.Instance;
+            int combatSample = incoming.timeSamples;
+            d.Boss.DebugDefeat();
+            yield return Until(() => d.State == RunState.Cleared, 3, "boss clear " + fight);
+            yield return new WaitForSecondsRealtime(.35f);
+            // the wing song ducks between fights; a boss track stays at full volume
+            Check("track continues through clear " + fight, music.Source == incoming && incoming.isPlaying && incoming.timeSamples > combatSample &&
+                (wing ? incoming.volume < music.Volume - .05f && incoming.volume > music.Volume * MenuMusic.WingDuck - .015f : Close(incoming.volume, music.Volume)));
         }
         static bool IsMenuTrack(AudioSource source) => source.clip && new[] { "BittersweetDawn", "TheHeroRises", "MainMenu2", "MainMenuOpening", "MainMenuMusic" }.Contains(source.clip.name);
         static bool Close(float a, float b) => Mathf.Abs(a - b) < .015f;
