@@ -220,7 +220,7 @@ namespace LastBell.Run.Shop
             new ItemDef { Id = LeadenStep, Name = "Leaden Step", Tier = ItemTier.Keystone, MinToll = 4, Value = 45, Tempered = 40, Value2 = 15, Tempered2 = 15,
                 Effect = "+{w}% damage, but each dash costs {v} stamina instead of 30. Dash distance and speed are unchanged." },
             new ItemDef { Id = DoubleToll, Name = "Double Toll", Class = "Chimesinger", Tier = ItemTier.Rare, MinToll = 4, Value = 40, Tempered = 60, Value2 = 20, Tempered2 = 20,
-                Effect = "Bellstrike tolls again 1 s later for {v}% damage, but its recharge is {w}% longer." },
+                Effect = "Bellstrike tolls again 1 s later for {v}% damage if its bell is still ringing then, but its recharge is {w}% longer." },
             new ItemDef { Id = ShortSplit, Name = "Short Split", Class = "Tollbreaker", Tier = ItemTier.Rare, MinToll = 4, Value = 55, Tempered = 60,
                 Effect = "Splitting Throw's bonus is +{v}% instead of +40%, but it lasts 4 s instead of 6 (the axe stays lodged as long)." },
             new ItemDef { Id = SteadyBreath, Name = "Steady Breath", Tier = ItemTier.Common, MinToll = 4, Value = 15, Tempered = 22, Value2 = 28, Tempered2 = 28,

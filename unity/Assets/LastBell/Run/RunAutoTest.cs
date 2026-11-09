@@ -233,11 +233,10 @@ namespace LastBell.Run
             if (BellkeeperUltimateOnly) { yield return BellkeeperUltimateChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
             // -lastbellArcanistOnly: just the Arcanist run and its kit checks (skips the menu, map, other-class and boss suites)
             if (ArcanistOnly) { yield return ArcanistRun(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
-            // The run-loop checks below use the Ultimate as a passive final target (no plan) and practise on the current map; the
-            // archived v1 Bellkeeper they used to fight is retired (Chzy18, 1 Nov). The Ultimate's own section turns both off.
-            BellkeeperEncounter.TestIdle = true; RunDirector.PracticeStaysOnMap = true;
-            if (SoloSweepOn) { yield return SoloSweep(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
-            if (TollbreakerOnly) { yield return TollbreakerRun(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
+            // Real fights (bot sweeps, clear runs, a boss's own suite) keep the run-loop setup off: the live Ultimate, and each
+            // boss in its own arena. Only the run-loop checks further down turn it on (RunLoopTargets, 9 Nov).
+            if (SoloSweepOn) { RunLoopTargets(false); yield return SoloSweep(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
+            if (TollbreakerOnly) { RunLoopTargets(true); yield return TollbreakerRun(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
             Check($"boots into the menu on a run map ({RunMaps.CurrentName})", d.State == RunState.Menu && RunMaps.Current >= 0);
             for (int i = 0; i < RunMaps.All.Length; i++)
                 Check($"map selectable: {RunMaps.All[i].Name}", RunMaps.InBuild(i), RunMaps.All[i].RunScene);
@@ -251,12 +250,14 @@ namespace LastBell.Run
             }
             if (OnlySylvara)
             {
-                RunDirector.PracticeStaysOnMap = false;   // her practice runs on her own map, not the passive-target setup above
                 BossAttackIconChecks();   // the catalog carries her icons
                 yield return SylvaraChecks();
                 Check("no errors or exceptions logged", errors == 0, errors + " logged");
                 Finish(); yield break;
             }
+            // The run-loop checks below use the Ultimate as a passive final target (no plan) and practise on the current map; the
+            // archived v1 Bellkeeper they used to fight is retired (Chzy18, 1 Nov). The Ultimate's own section turns both off.
+            RunLoopTargets(true);
             foreach (var cls in RunDirector.Classes)
             {
                 int slots = 6, found = 0;
@@ -415,7 +416,7 @@ namespace LastBell.Run
             }
             Check("map tour returns to the starting map", RunMaps.Current == startMap);
             // ---------- the Bellkeeper Ultimate (proposal) ----------
-            BellkeeperEncounter.TestIdle = false; RunDirector.PracticeStaysOnMap = false;   // from here on: the real fights
+            RunLoopTargets(false);   // from here on: the real fights
             yield return BellkeeperUltimateChecks();
             // ---------- area bosses (practice only for now) ----------
             yield return PartyChecks();
