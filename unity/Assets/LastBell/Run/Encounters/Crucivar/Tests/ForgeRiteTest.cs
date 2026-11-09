@@ -116,7 +116,8 @@ namespace LastBell.Run
             if (t.Boss == null) yield break;
             var rv = t.Party[1];
             t.Party[0].ForceDown("Crucivar test: revive target");
-            for (int k = 0; k < 6; k++) { rv.DebugSetHp(PlayerController.MaxHp); yield return null; }
+            // wait on the sim, not frames: on a busy PC six frames can pass before the revive has started (9 Nov merge preview)
+            yield return t.Until(() => { rv.DebugSetHp(PlayerController.MaxHp); return rv.Reviving == t.Party[0]; }, 3f, "reviver channelling");
             int brands0 = t.Spawned("Ember Brand").Count(), unaimed0 = t.Boss.Rite.UnaimedPours;
             t.Boss.Rite.EmberBrand();
             t.Boss.Rite.CastingOrder();
