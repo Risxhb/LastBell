@@ -476,6 +476,7 @@ namespace LastBell.Run
         // band landing next for the one after it. Plan the distance from the centre for every landing still shown (each a
         // hand clear of its band edge, walking pace between them) and walk the first leg; a brand carrier ends far out
         static readonly List<Hazard> quakeBands = new List<Hazard>();
+        static readonly List<Hazard> quakeJets = new List<Hazard>();
         const float QuakePad = 0.5f, QuakeStep = 0.25f, QuakePace = 6.5f;
         bool Quake(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
         {
@@ -532,11 +533,28 @@ namespace LastBell.Run
             // Order pour: a Chimesinger bot stood in Pour IV planning the quake, took it and the channel, and Anvil Quake II
             // downed her, 11-04) and, with brands out, of the other players
             Vector3 goal = hub + dir * rGoal; bool found = false;
+            // and of a Furnace Spin jet turning over it before the last band lands: a strike already live was never checked,
+            // and a Phase 3 bot stood still planning the quake as a jet swept onto it (51 to down; 3 of 21 traced jet hits, 9 Nov)
+            quakeJets.Clear(); for (int i = 0; i < live.Count; i++) if (Jet(live[i])) quakeJets.Add(live[i]);
+            bool jRev = me.World.Difficulty == Difficulty.Hard;
+            float qEnd = (quakeBands[quakeBands.Count - 1].ResolveAt - quakeBands[quakeBands.Count - 1].Age) / (float)Sim.Hz + 0.3f;
+            if (quakeJets.Count > 0) TrackSpin(quakeJets[0], jRev);
+            bool JetSwept(Vector3 q)
+            {
+                foreach (var h in quakeJets)
+                {
+                    if (h.Hit.Contains(me)) continue;
+                    float spin = spokeRef != null && Sim.Flat(spokeRef.Origin - h.Origin).magnitude < 0.1f ? spokeFirst : 0;
+                    for (float t = 0; t <= qEnd; t += 0.1f) if (JetAt(h, q, t, spin, jRev)) return true;
+                }
+                return false;
+            }
             for (int k = 0; k < 13 && !found; k++)
             {
                 var q = hub + Sim.Dir(yaw + (k % 2 == 0 ? 1 : -1) * (k + 1) / 2 * 10f) * rGoal;
                 // the walk there too: a radial walk inside a Pour Channel (a lane out from the same centre) burns all the way
                 bool ok = k == 0 || Sim.Flat(q - pos).magnitude <= QuakePace * (t0 - 0.15f);
+                if (ok && quakeJets.Count > 0 && JetSwept(q)) ok = false;
                 for (int i = 0; i < live.Count && ok; i++)
                 {
                     var h = live[i];
@@ -554,6 +572,7 @@ namespace LastBell.Run
             // holding the planned spot in a pool (a Hard bot stood still in a brand pool at 8 m for 1.2 s planning the quake, 23 hp
             // to down; 8 Nov sweep after the downed-ground cooling was rejected)
             if (!found) for (int i = 0; i < live.Count; i++) { var h = live[i]; if (h.BurnPerSecond > 0 && h.Contains(goal)) return false; }
+            if (!found && quakeJets.Count > 0 && JetSwept(goal)) return false;   // every bearing in a jet's way: the gap riding (Spokes) does
             var v = Sim.Flat(goal - pos);
             var move = v.magnitude < 0.2f ? Vector3.zero : v.normalized;
             bad = Bad(me, boss, false, me.World.Tick + 1);   // round burning ground; the bands are planned above
