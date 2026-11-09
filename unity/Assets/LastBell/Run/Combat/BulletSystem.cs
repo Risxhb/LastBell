@@ -28,6 +28,7 @@ namespace LastBell.Run
 
         public const float Height = 1.0f;         // drawn at chest height; the hit test is planar
         public const float PreviewFor = 0.6f;     // a seed shows its burst rays for its last 0.6 s
+        public const float BurstFrom = 0.3f;      // a seed's petals start 0.3 m out from where it bursts (the preview and the bots read it)
         public const float PreviewRayWidth = 2 * BulletArt.PetalHitRadius;   // each ray track is a petal's full hit width
         public int PreviewBars => view.RayBars;   // pooled preview bars (built ahead by Prewarm)
         readonly CombatWorld w;
@@ -103,6 +104,9 @@ namespace LastBell.Run
         // 320 covers 16 seeds previewing at once (ten rays, a track and a fill each; Last Storm's 14-seed rings stay under it)
         public const int PrewarmBars = 320;
         public void Prewarm(Transform root, int rayBars = PrewarmBars) => view.Prewarm(root, rayBars);
+        // the world (or LAN replica) is released: destroy the view's own materials. Clears and phase changes keep the pools.
+        public void Dispose() { live.Clear(); spawned.Clear(); view.Dispose(); }
+        public bool Disposed => view.Disposed;
 
         // Pooled per look (BulletArt): coral, brass and cobalt petals, the Storm Seed and the Waterfall Jet's water drops.
         // Shared materials per look, so hundreds of bullets stay cheap under the SRP batcher. Every look fits its hit circle.
@@ -118,6 +122,16 @@ namespace LastBell.Run
             readonly List<Transform> rays = new List<Transform>(); int raysShown;   // seed burst previews: a dim track and a bright fill per ray
             Material rayDim, rayFill;
             public int RayBars => rays.Count;
+            public bool Disposed => mats == null && rayDim == null && rayFill == null;
+            public void Dispose()
+            {
+                // the materials this view made (Prim.Material makes new ones); the objects go with the world's root
+                if (mats != null) foreach (var set in mats) foreach (var m in set) if (m) UnityEngine.Object.Destroy(m);
+                if (rayDim) UnityEngine.Object.Destroy(rayDim); if (rayFill) UnityEngine.Object.Destroy(rayFill);
+                mats = null; rayDim = rayFill = null;
+                if (parent) UnityEngine.Object.Destroy(parent.gameObject);
+                parent = null; foreach (var p in pools) p.Clear(); Array.Clear(shown, 0, Kinds); rays.Clear(); raysShown = 0;
+            }
             Material[][] mats;
             Transform parent;
 
@@ -197,7 +211,7 @@ namespace LastBell.Run
             // PetalHitRadius, with the circle's reach past both ends) as a dim floor track over the first 0.4 s of its flight (where
             // the petals still nearly touch), with a bright fill of the same width that runs out along it as the fuse counts down,
             // reaching the end at the burst. The track is the hit footprint, not a thin guide line (review SYL-PREVIEW-SHAPE, 7 Nov).
-            public const float RayFrom = 0.3f, RayFor = 0.4f, RayWidth = PreviewRayWidth, RayY = 0.06f;
+            public const float RayFrom = BurstFrom, RayFor = 0.4f, RayWidth = PreviewRayWidth, RayY = 0.06f;
             int Preview(Bullet b, float left, int nr)
             {
                 var at = b.Pos + b.Vel * left; float travel = b.BurstSpeed * RayFor, fill = Mathf.Clamp01(1 - left / PreviewFor);

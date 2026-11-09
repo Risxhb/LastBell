@@ -3,18 +3,18 @@
     "packs":  [
                   {
                       "name":  "current-player-assets",
-                      "version":  2,
-                      "file":  "current-player-assets-v2.zip",
+                      "version":  3,
+                      "file":  "current-player-assets-v3.zip",
                       "source":  {
                                      "type":  "azure-universal",
                                      "organization":  "https://dev.azure.com/ChzandZum",
                                      "project":  "Last Bell",
                                      "feed":  "last-bell-assets",
                                      "package":  "current-player-assets",
-                                     "packageVersion":  "2.0.0"
+                                     "packageVersion":  "3.0.0"
                                  },
-                      "sha256":  "aa72278b2054b64a0ec3dbbaead025be3d7542efa1e36a48f595453c60135564",
-                      "size":  73795957,
+                      "sha256":  "b162baa67fa44d192810ff1c54338c916e821cf4cc309b5b6f010b7f711ff7fb",
+                      "size":  74216459,
                       "extractTo":  ".",
                       "paths":  [
                                     "unity/Assets/LastBell/Areas/Area2/Generated",

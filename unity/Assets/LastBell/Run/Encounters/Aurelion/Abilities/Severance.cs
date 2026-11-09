@@ -106,7 +106,7 @@ namespace LastBell.Run
                     bool day = false, nightOn = false;
                     foreach (var p in Standing()) { if (Assigned(p) > 0) nightOn = true; else day = true; }
                     empty = day && nightOn ? 0 : empty + 1;
-                    if (empty > Sim.Ticks(EmptySideS)) { Boss.Wipe("Severance — the " + (day ? "Night" : "Day") + " half fell"); break; }
+                    if (empty > Sim.Ticks(EmptySideS)) { Boss.Wipe("Severance — the " + (day ? "Night" : "Day") + " half fell", Id); break; }
                 }
                 if (on) { if (wait > 0) wait--; else if (side2.MoveNext()) wait = Mathf.Max(1, side2.Current) - 1; else on = false; }
                 yield return 1;
@@ -162,7 +162,7 @@ namespace LastBell.Run
                 int now = SideOf(p.transform.position);
                 if (now == 0 || !side.TryGetValue(p, out int was) || now == was) continue;
                 side[p] = now; Crossings++;
-                p.ReceiveHit(new Hazard { Source = Name, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = p.transform.position, Damage = Damage, Knockback = 0, Stun = 15 });
+                p.ReceiveHit(new Hazard { Source = Name, AttackId = Id, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = p.transform.position, Damage = Damage, Knockback = 0, Stun = 15 });
             }
         }
     }

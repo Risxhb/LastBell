@@ -36,11 +36,12 @@ namespace LastBell.Run
         public int Wipes { get; private set; }
         // Ends the attempt for the whole party (push timer, enrage, a mechanic that wipes): a lethal hit on every standing
         // player. The director then sees nobody standing and goes to Downed, as for any defeat.
-        public void Wipe(string cause)
+        // attackId: the mechanic whose failure wiped (its icon in the death recap); null for global causes (the push timer), shown as text
+        public void Wipe(string cause, string attackId = null)
         {
             WipeCause = cause; Wipes++;
             boss.PlanLog.Add((W.Tick, "wipe " + cause));
-            var h = new Hazard { Source = cause, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Radius = 99, Damage = Lethal * 10, Knockback = 0, Stun = 0 };
+            var h = new Hazard { Source = cause, AttackId = attackId, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Radius = 99, Damage = Lethal * 10, Knockback = 0, Stun = 0 };
             foreach (var p in W.Players.ToArray()) if (!p.Down) p.ReceiveHit(h);
         }
 

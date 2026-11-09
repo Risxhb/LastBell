@@ -288,6 +288,7 @@ namespace LastBell.Run
                 {
                     if (!Boss) return;
                     Echoes++;
+                    Boss.Presenter?.Action("HammerLodged", T(3 * EchoGap));   // the hammer is stuck in the floor while the bands echo back (visual only)
                     Spawn("Quake Echo III", HazardShape.Ring, QuakeMiddle, wall, T(EchoGap));
                     Spawn("Quake Echo II", HazardShape.Ring, QuakeInner, QuakeMiddle, T(2 * EchoGap));
                     Spawn("Quake Echo I", HazardShape.Circle, 0, QuakeInner, T(3 * EchoGap));

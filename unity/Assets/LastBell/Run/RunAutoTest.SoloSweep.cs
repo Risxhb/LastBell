@@ -22,6 +22,10 @@ namespace LastBell.Run
         static bool SoloSweepOn => Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellSoloSweep", StringComparison.OrdinalIgnoreCase));
         const float SweepFightCap = 480f;   // fight seconds before a fight is called a timeout
 
+        // The run-loop checks fight the Ultimate as a passive final target (TestIdle) and practise on the map they are touring
+        // (PracticeStaysOnMap). Real fights (sweeps, clear runs, the bosses' suites) need both off. The one switch for both (9 Nov).
+        static void RunLoopTargets(bool on) { BellkeeperEncounter.TestIdle = on; RunDirector.PracticeStaysOnMap = on; }
+
         IEnumerator SoloSweep()
         {
             string cls = AurelionArgs.Arg("-lastbellDemoClass") ?? "Tollbreaker";
@@ -53,6 +57,10 @@ namespace LastBell.Run
                     yield return Until(() => RunDirector.Instance && RunDirector.Instance.State == RunState.Ready, 30, $"{name} practice ready");
                     if (RunDirector.Instance != d) { directorLog.AddRange(d.Log); d = RunDirector.Instance; }
                     d.InputOverride = me; if (d.Player) d.Player.Input = me;
+                    // a sweep is a real fight: the boss's own arena, and the live Ultimate rather than the run-loop checks' idle target (9 Nov)
+                    var arena = RunDirector.Bosses[e].Map;
+                    if (arena != null) Check($"sweep {name}: loads its own arena ({arena})", RunMaps.Current == RunMaps.IndexOf(arena), RunMaps.CurrentName);
+                    Check($"sweep {name}: run-loop test setup off (live boss, no stay-on-map)", !BellkeeperEncounter.TestIdle && !RunDirector.PracticeStaysOnMap);
                     d.RequestReady();
                     yield return Until(() => d.State == RunState.Combat, 15, $"{name} combat");
                     if (d.State != RunState.Combat || !d.Boss) { rows.Add($"{name} | {level}{(repeats > 1 ? " #" + rep : "")} | no fight | - | - | {d.State}"); continue; }

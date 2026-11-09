@@ -27,11 +27,12 @@ namespace LastBell.Run
         // coral, not gold: the Skyward floor already has gold rings, and a gold path vanished among them (2 Nov shots)
         static readonly Color PathFill = new Color(0.45f, 0.16f, 0.13f, 0.0f), PathEdge = new Color(0.45f, 0.16f, 0.13f, 0.3f);   // dim: the path never hurts, only the planet
 
-        sealed class Planet { public Hazard H; public BellkeeperFx.Telegraph Path; public int Orbit; public float Angle, Travelled; }
+        sealed class Planet { public Hazard H; public BellkeeperFx.Telegraph Path; public Transform Body; public int Orbit; public float Angle, Travelled; }
         readonly List<Planet> planets = new List<Planet>();
         public bool Live => planets.Count > 0;
         public int Count => planets.Count;
         public Vector3 PlanetAt(int i) => planets[i].H.Origin;   // test evidence
+        public Transform BodyOf(int i) => planets[i].Body;          // test evidence (8 Nov graphics pass)
 
         public void Begin(bool rimOnly = false)
         {
@@ -48,6 +49,8 @@ namespace LastBell.Run
                 p.H = Lap(Pos(o, o.start));
                 p.Path = W.BossFx.Ring(o.r - 0.05f, o.r + 0.05f);
                 p.Path.Tint(PathFill, PathEdge); p.Path.Progress(1); p.Path.Order = -2; p.Path.Place(o.centre, 0);
+                // the planet itself (8 Nov graphics pass, presentation only): a code-built body the size of the hitbox, riding the hazard
+                p.Body = AurelionProps.Planet(W.Root, Radius); p.Body.position = p.H.Origin;
                 planets.Add(p);
             }
         }
@@ -69,6 +72,7 @@ namespace LastBell.Run
                 float step = Speed / o.r * Mathf.Rad2Deg / Sim.Hz;
                 p.Angle += o.dir * step; p.Travelled += step;
                 p.H.Origin = Pos(o, p.Angle);
+                if (p.Body) p.Body.position = p.H.Origin;
                 // a full lap: the planet comes round as a new hazard instance, so it may hit the same players once more
                 if (p.Travelled >= 360f) { p.Travelled -= 360f; var old = p.H; p.H = Lap(p.H.Origin); W.Hazards.Cancel(old); Laps++; }
             }
@@ -76,7 +80,7 @@ namespace LastBell.Run
 
         public void End()
         {
-            foreach (var p in planets) { W.Hazards.Cancel(p.H); p.Path.Expire(); }
+            foreach (var p in planets) { W.Hazards.Cancel(p.H); p.Path.Expire(); if (p.Body) UnityEngine.Object.Destroy(p.Body.gameObject); }
             planets.Clear();
         }
         public override void Abort() => End();

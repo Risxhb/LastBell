@@ -153,7 +153,7 @@ namespace LastBell.Run
             var inside = Standing().Where(p => h.Contains(p.transform.position)).ToList();
             if (!fullest.TryGetValue(set, out var f) || inside.Count > f.inside) fullest[set] = (h, inside.Count);
             W.BossFx.SlagSplash(h.Origin, h.Radius);
-            if (inside.Count < need) { Wipe("Molten Overflow"); return; }
+            if (inside.Count < need) { Wipe("Molten Overflow", h.Origin); return; }
             foreach (var p in inside.OrderByDescending(p => Flat(p.transform.position).magnitude).Take(inside.Count - need)) p.ReceiveHit(h, Mathf.RoundToInt(ExtraDmg * Heat));
             Boss.Rite.Pools.Add(W.Hazards.Spawn(new Hazard
             {
@@ -162,10 +162,12 @@ namespace LastBell.Run
             }));
         }
 
-        void Wipe(string why)
+        void Wipe(string why, Vector3 from)
         {
             if (wiping) return;   // two short towers landing together are one wipe
             wiping = true; Wipes++;
+            W.BossFx.MoltenOverflow(from, Far);   // the mould bursts and a molten wave runs over the floor (look only)
+            Boss.Presenter?.Action("ReleaseSides", Sim.Ticks(1.7f));   // the side vents blow as it floods
             W.Hazards.Spawn(new Hazard
             {
                 Source = why, AttackId = "crucivar.molten_overflow", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Vector3.zero, Radius = Far + 1f,
@@ -177,6 +179,7 @@ namespace LastBell.Run
         void Press(Vector3 centre)
         {
             Boss.SetCurrent("Second Press"); Presses++;
+            Boss.Presenter?.Action("SlagCast", T(PressDelay));   // the crucible rises, tracks and flings as the press lands (visual only)
             var h = W.Hazards.Spawn(new Hazard
             {
                 Source = "Second Press", AttackId = "crucivar.second_press", Shape = HazardShape.Circle, Kind = HazardKind.Strike, Origin = Flat(centre), Radius = PressRadius,

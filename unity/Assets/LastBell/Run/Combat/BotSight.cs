@@ -50,7 +50,7 @@ namespace LastBell.Run
             if (root && tick - scanTick >= ScanEvery)
             {
                 scanTick = tick; pool.Clear();
-                for (int i = 0; i < root.childCount; i++) { var c = root.GetChild(i); if (c.name.EndsWith(" orb") || c.name.EndsWith("(lying)")) pool.Add(c); }
+                for (int i = 0; i < root.childCount; i++) { var c = root.GetChild(i); if (c.name.EndsWith(" orb", System.StringComparison.Ordinal) || c.name.EndsWith("(lying)", System.StringComparison.Ordinal)) pool.Add(c); }
             }
             Orbs.Clear();
             for (int i = 0; i < pool.Count; i++)
@@ -59,7 +59,7 @@ namespace LastBell.Run
                 if (!seen.TryGetValue(t, out var o))
                 {
                     // a weight lying on the floor (Pendulum Sentinel): whoever steps inside its circle takes all its damage
-                    o = new Orb { T = t, Tick = -999, Fixed = t.name.EndsWith("(lying)") ? PendulumSentinelRules.WeightRadius + Hazard.Margin - PlayerController.Radius : 0 };
+                    o = new Orb { T = t, Tick = -999, Fixed = t.name.EndsWith("(lying)", System.StringComparison.Ordinal) ? PendulumSentinelRules.WeightRadius + Hazard.Margin - PlayerController.Radius : 0 };
                     seen[t] = o;
                 }
                 if (!t.gameObject.activeInHierarchy) { o.Tick = -999; continue; }

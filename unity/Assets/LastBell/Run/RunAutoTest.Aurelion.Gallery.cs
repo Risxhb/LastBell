@@ -20,6 +20,7 @@ namespace LastBell.Run
         {
             if (SeveranceShots) { yield return SeveranceShotsAll(); yield break; }
             if (LastLightShots) { yield return LastLightShotsAll(); yield break; }
+            if (GraphicsShots) { yield return GraphicsShotsAll(); yield break; }
             if (ExtrasShots)   // -lastbellExtrasShots: Errant Planets (Phase 2) and Falling Meridians (Phase 3), game camera
             {
                 AurelionArgs.SoloOverride = null; RunDirector.ShotCamera = null; galleryCam = "_gamecam";
@@ -87,11 +88,12 @@ namespace LastBell.Run
         }
 
         // still: the player stands there (no bot), so a following shape stays on screen
-        IEnumerator GalleryShot(string name, int phase, Func<AurelionEncounter, System.Collections.Generic.IEnumerable<int>> body, int afterTicks, Vector3? still = null, float wait = 20, Action<AurelionEncounter> after = null)
+        IEnumerator GalleryShot(string name, int phase, Func<AurelionEncounter, System.Collections.Generic.IEnumerable<int>> body, int afterTicks, Vector3? still = null, float wait = 20, Action<AurelionEncounter> after = null, Func<AurelionEncounter, int> at = null)
         {
             yield return V2Setup(1, Difficulty.Medium, new[] { still ?? new Vector3(0, 0, 7f) }, phase, Vector3.zero);
             if (V2Boss == null) yield break;
             if (still == null) V3Bot(V2Main, BotMode.Perfect);
+            if (at != null) afterTicks = at(V2Boss);   // the shot tick read from the boss (resolve frames, 8 Nov graphics pass)
             V2Begin(body(V2Boss));
             yield return V2Ticks(afterTicks);
             V2Main.DebugSetHp(PlayerController.MaxHp);

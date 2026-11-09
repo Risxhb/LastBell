@@ -578,6 +578,14 @@ namespace LastBell.Run.Networking
                     }
                     return false;
                 }
+                case "Damage":   // added by hand (Presentation lane, 8 Nov): HitFeel.BossDamage(contact, amount, dealer)
+                {
+                    if (a.Length == 3)
+                    {
+                        Presentation.HitFeel.BossDamage(V(a[0]), I(a[1]), P(a[2])); return true;
+                    }
+                    return false;
+                }
                 default: return false;
             }
         }

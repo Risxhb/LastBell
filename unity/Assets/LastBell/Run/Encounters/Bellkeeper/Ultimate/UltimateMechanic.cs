@@ -35,6 +35,10 @@ namespace LastBell.Run
         protected int LaunchTick => LastCastTick;
         protected int TickAt(float seconds) => LastCastTick + Sim.Ticks(seconds);
 
+        // The boss model's cast clip for this moment (Bellkeeper2.glb; graphics audit 8 Nov), stretched to end on the resolve.
+        // Presentation only: nothing in the fight reads it.
+        protected void CastClip(string clip, float seconds) => Boss.UltCastClip(clip, seconds);
+
         // Spawn on this mechanic's behalf from shared code (UltimateState lanes): tests see it in Spawned.
         public Hazard SpawnShared(Hazard h) => Spawn(h);
 
