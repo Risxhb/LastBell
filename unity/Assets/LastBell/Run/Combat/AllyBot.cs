@@ -221,7 +221,9 @@ namespace LastBell.Run
             BotSight.Update(w, boss);
             dJob = null;
             dNote = 0;
-            if (Scripted(me, boss, pos, ref inp)) { dMe = me; dPos = pos; return inp; }
+            // the floor jobs (quake, brand, spokes, revive) drink too: only the volley plan and the plain path did, and a Hard bot
+            // at 30 HP rode a jet gap through a brand pool to its down without drinking (9 Nov Brass Foundry sweep)
+            if (Scripted(me, boss, pos, ref inp)) { if (me.Hp < (Mode == BotMode.Passive ? 40 : 70) && me.Potions > 0 && tick % 30 == 0) inp.Potion = true; dMe = me; dPos = pos; return inp; }
 
             // 1) dodge: in a hazard that locked at least our reaction time ago (test bots: from its first tick) -> nearest
             // clear spot. A Perfect bot also heads for its memory job (next anchor, mark side) as soon as it is due.
@@ -261,7 +263,7 @@ namespace LastBell.Run
             if (threat == null && duty >= 0 && bad(pos)) left = duty;
             // revives: nothing landing here soon and no job of its own: get a downed ally up
             rvWhy = threat != null ? "threat " + threat.Source : duty >= 0 ? "duty" : null;
-            if (threat == null && duty < 0 && ReviveJob(me, boss, pos, ref inp)) { dMe = me; dPos = pos; return inp; }
+            if (threat == null && duty < 0 && ReviveJob(me, boss, pos, ref inp)) { if (me.Hp < (Mode == BotMode.Passive ? 40 : 70) && me.Potions > 0 && tick % 30 == 0) inp.Potion = true; dMe = me; dPos = pos; return inp; }
             Vector3 move;
             if (threat != null || (duty >= 0 && bad(pos)))
             {
