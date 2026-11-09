@@ -461,8 +461,8 @@ namespace LastBell.Run
             // the bearing: our own, or the nearest one clear of burning ground, of other strikes still to land (a locked Casting
             // Order pour: a Chimesinger bot stood in Pour IV planning the quake, took it and the channel, and Anvil Quake II
             // downed her, 11-04) and, with brands out, of the other players
-            Vector3 goal = hub + dir * rGoal;
-            for (int k = 0; k < 13; k++)
+            Vector3 goal = hub + dir * rGoal; bool found = false;
+            for (int k = 0; k < 13 && !found; k++)
             {
                 var q = hub + Sim.Dir(yaw + (k % 2 == 0 ? 1 : -1) * (k + 1) / 2 * 10f) * rGoal;
                 // the walk there too: a radial walk inside a Pour Channel (a lane out from the same centre) burns all the way
@@ -478,8 +478,12 @@ namespace LastBell.Run
                     if (h.Contains(q) || h.Contains(Vector3.Lerp(pos, q, 0.35f)) || h.Contains(Vector3.Lerp(pos, q, 0.7f))) ok = false;
                 }
                 if (ok && brand) foreach (var p in me.World.Players) if (ok && p && p != me && !p.Down && Sim.Flat(p.transform.position - q).magnitude < BrandRadiusPad) ok = false;
-                if (ok) { goal = q; break; }
+                if (ok) { goal = q; found = true; }
             }
+            // no bearing at that distance is clear of burn: the plain dodge, which weighs the bands against the burn, rather than
+            // holding the planned spot in a pool (a Hard bot stood still in a brand pool at 8 m for 1.2 s planning the quake, 23 hp
+            // to down; 8 Nov sweep after the downed-ground cooling was rejected)
+            if (!found) for (int i = 0; i < live.Count; i++) { var h = live[i]; if (h.BurnPerSecond > 0 && h.Contains(goal)) return false; }
             var v = Sim.Flat(goal - pos);
             var move = v.magnitude < 0.2f ? Vector3.zero : v.normalized;
             bad = Bad(me, boss, false, me.World.Tick + 1);   // round burning ground; the bands are planned above
@@ -836,6 +840,9 @@ namespace LastBell.Run
                         for (int i = 0; i < live.Count && ok && pass == 0; i++) { var h = live[i]; if ((h.BurnPerSecond > 0 || (h.Track != null && h.Includes != null && h.Age >= h.LockAt)) && (h.Contains(q) || h.Contains(hub + Sim.Dir(at + lean * 12f) * r))) ok = false; }
                         if (!ok) continue;
                         float c = Sim.Flat(q - pos).magnitude + Mathf.Abs(r - 6.5f) + Mathf.Abs(da) * 0.05f;
+                        // every spot burns somewhere: the one standing in the fewest pools, not the nearest burning one (a Hard
+                        // bot rode a gap 3 s inside a brand pool to its down, with the downed-ground cooling rejected, 8 Nov)
+                        if (pass == 1) for (int i = 0; i < live.Count; i++) { var h = live[i]; if (h.BurnPerSecond > 0) { if (h.Contains(q)) c += 20f; else if (h.Contains(hub + Sim.Dir(at + lean * 12f) * r)) c += 5f; } }
                         if (c < bestCost) { bestCost = c; goal = q; }
                     }
                 }
