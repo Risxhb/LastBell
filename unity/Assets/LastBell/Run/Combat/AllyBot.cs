@@ -61,6 +61,10 @@ namespace LastBell.Run
         const float CrucivarReviveReach = 30f;   // the whole Brass Foundry floor (9 Nov: allies down 16-22 m off bled out)
         // drink below this. On Crucivar 60, so a 40 hp potion is never part wasted: at 70 the Hard bots reached his Phase 3
         // with 0-1 potions each (9 Nov sweep); the other bosses keep 70
+        // on Crucivar on the first tick it is not stunned: tried every 0.5 s, a bot stunned on that tick waited another 0.5 s, and
+        // a Lane Stream or Ring Wave chain (26 a bullet, each one stunning) downed 26 of 66 with potions left (Hard sweep, 9 Nov).
+        // The game's own 1 s between drinks stops a second one
+        bool Drink(PlayerController me, BossEncounter boss) => me.Hp < DrinkAt(boss) && me.Potions > 0 && (boss is CrucivarEncounter ? me.Stunned == 0 : tick % 30 == 0);
         int DrinkAt(BossEncounter boss) => Mode == BotMode.Passive ? 40 : boss is CrucivarEncounter ? 60 : 70;
         // a Crucivar casting up (the Pour Flood comes at 30 s): the standing bots break it, and walk to a downed ally only once
         // they have been down CastingReviveAfter (bleed-out 30 s) or the castings are gone. In the 9 Nov Hard sweep every flood
@@ -233,7 +237,7 @@ namespace LastBell.Run
             dNote = 0;
             // the floor jobs (quake, brand, spokes, revive) drink too: only the volley plan and the plain path did, and a Hard bot
             // at 30 HP rode a jet gap through a brand pool to its down without drinking (9 Nov Brass Foundry sweep)
-            if (Scripted(me, boss, pos, ref inp)) { if (me.Hp < DrinkAt(boss) && me.Potions > 0 && tick % 30 == 0) inp.Potion = true; dMe = me; dPos = pos; return inp; }
+            if (Scripted(me, boss, pos, ref inp)) { if (Drink(me, boss)) inp.Potion = true; dMe = me; dPos = pos; return inp; }
 
             // 1) dodge: in a hazard that locked at least our reaction time ago (test bots: from its first tick) -> nearest
             // clear spot. A Perfect bot also heads for its memory job (next anchor, mark side) as soon as it is due.
@@ -276,7 +280,7 @@ namespace LastBell.Run
             if (threat == null && duty >= 0 && bad(pos)) left = duty;
             // revives: nothing landing here soon and no job of its own: get a downed ally up
             rvWhy = threat != null ? "threat " + threat.Source : duty >= 0 ? "duty" : null;
-            if (threat == null && landsHere == null && duty < 0 && ReviveJob(me, boss, pos, ref inp)) { if (me.Hp < DrinkAt(boss) && me.Potions > 0 && tick % 30 == 0) inp.Potion = true; dMe = me; dPos = pos; return inp; }
+            if (threat == null && landsHere == null && duty < 0 && ReviveJob(me, boss, pos, ref inp)) { if (Drink(me, boss)) inp.Potion = true; dMe = me; dPos = pos; return inp; }
             Vector3 move;
             if (threat != null || (duty >= 0 && bad(pos)))
             {
@@ -359,7 +363,7 @@ namespace LastBell.Run
                 float gap = Sim.Flat(bpos - pos).magnitude - brad;
                 if (Attacks && !job && gap <= Range(me) + 1.85f) Attack(me, ref inp);
             }
-            if (me.Hp < DrinkAt(boss) && me.Potions > 0 && tick % 30 == 0) inp.Potion = true;   // test bots: before a Hard kill hit (65) could down them
+            if (Drink(me, boss)) inp.Potion = true;   // test bots: before a Hard kill hit (65) could down them
             // walk round his body, not into it: a straight line across the centre would pin the bot against him
             if (move != Vector3.zero) move = AroundBoss(pos, move, boss);
             // Aurelion's Devour pulls faster than a walk: any move against it is a sprint
@@ -404,7 +408,7 @@ namespace LastBell.Run
             // swing only while the route holds still (a planted throw would leave it behind)
             float gap = Sim.Flat(boss.transform.position - pos).magnitude - boss.BodyRadius;
             if (Attacks && still && move == Vector3.zero && gap <= Range(me) + 1.85f) Attack(me, ref inp);
-            if (me.Hp < DrinkAt(boss) && me.Potions > 0 && tick % 30 == 0) inp.Potion = true;
+            if (Drink(me, boss)) inp.Potion = true;
             if (move != Vector3.zero) move = AroundBoss(pos, move, boss);
             inp.Move = ToScreen(move);
             return true;
@@ -665,7 +669,7 @@ namespace LastBell.Run
             float gap = Sim.Flat(tPos - pos).magnitude - tRad;
             float swing = me.Kit is TollbreakerKit ? VolleyThrowReach : Range(me) + 1.85f;
             if (Attacks && !volRevive && volMove == Vector3.zero && volCost < VolleySwing && gap <= swing) Attack(me, ref inp);
-            if (me.Hp < DrinkAt(boss) && me.Potions > 0 && tick % 30 == 0) inp.Potion = true;
+            if (Drink(me, boss)) inp.Potion = true;
             var move = volMove;
             if (move != Vector3.zero) move = AroundBoss(pos, move, boss);
             dMove = move; dSpot = volHome; dNote = 1;
