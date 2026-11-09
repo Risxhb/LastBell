@@ -15,11 +15,14 @@ namespace LastBell.Run
         {
             Note("---------- revives ----------");
             if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }
+            // practice slot 0 is the Bellkeeper Ultimate: use its idle test target, so its plan (Escapement Relay kills) and its
+            // strat bots (they never revive) stay out of these checks, which run after the real fights are switched on
+            bool idle = BellkeeperEncounter.TestIdle, stay = RunDirector.PracticeStaysOnMap; BellkeeperEncounter.TestIdle = true; RunDirector.PracticeStaysOnMap = true;
             Check("revives: the downed HUD art loads (three class bells, the prompt, a readable ring)", new[] { "tollbreaker", "chimesinger", "arcanist" }.All(c => RunHud.Icon("revive/downed-" + c)) && RunHud.Icon("revive/revive-prompt") && RunHud.Icon("revive/revive-ring") && RunHud.Icon("revive/revive-ring").isReadable);
             Check("revives: one ally selected", d.SelectAllies(1) && RunParty.Selected == 1);
             d.StartPractice("Tollbreaker", 0); d.RequestReady();
             yield return Until(() => d.State == RunState.Combat, 6, "revive practice combat");
-            if (d.State != RunState.Combat || d.Allies.Count != 1) { Check("revives: party practice started", false, $"{d.State}, {d.Allies.Count} allies"); yield break; }
+            if (d.State != RunState.Combat || d.Allies.Count != 1) { Check("revives: party practice started", false, $"{d.State}, {d.Allies.Count} allies"); BellkeeperEncounter.TestIdle = idle; RunDirector.PracticeStaysOnMap = stay; yield break; }
             var me = d.Player; var ally = d.Allies[0];
             // calm: no boss hazards; pinned: the reviver held beside the downed ally (the boss walking through shoves them)
             bool calm = true; PlayerController pinA = null, pinB = null; Vector3 pinOff = Vector3.zero;
@@ -90,6 +93,7 @@ namespace LastBell.Run
             yield return Until(() => d.State == RunState.Results, 8, "revive practice results");
             d.ReturnToMenu(); yield return null;
             d.SelectAllies(0);
+            BellkeeperEncounter.TestIdle = idle; RunDirector.PracticeStaysOnMap = stay;
         }
     }
 }
