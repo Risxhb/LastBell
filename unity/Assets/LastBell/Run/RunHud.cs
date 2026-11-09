@@ -20,7 +20,7 @@ namespace LastBell.Run
             int h = (floatSeq++ + (text != null ? text.Length : 0)) & int.MaxValue;
             floats.Add(new FloatText { pos = world, text = text, color = c, jx = (h % 5 - 2) * 9f });
         }
-        public static void ClearTransient() { floats.Clear(); labels.Clear(); banner = null; }
+        public static void ClearTransient() { floats.Clear(); labels.Clear(); banner = null; Presentation.HitFeel.ClearTransient(); }
         // a big centre-screen call (Aurelion v4: wipes, the enrage warning) for `seconds` of real time
         static string banner; static Color bannerColor; static float bannerUntil;
         public static void Banner(string text, Color c, float seconds) { banner = text; bannerColor = c; bannerUntil = Time.unscaledTime + seconds; }
@@ -526,12 +526,16 @@ namespace LastBell.Run
         {
             // timeline over the intro: name fades and settles in, rules grow, everything fades before combat starts
             float p = d.IntroProgress, inA = Ease(Mathf.Clamp01(p / 0.3f)), outA = 1 - Ease(Mathf.Clamp01((p - 0.82f) / 0.18f)), a = inA * outA;
-            string head = d.Mode == RunMode.Practice ? "Practice" : Campaign.StageLabel(d.EncounterOrder, d.ProgressSlot);
+            // boss moments (Presentation lane, 8 Nov): cinematic bars, a role and area line, and every boss's title
+            bool moments = Presentation.PresentationSettings.BossMoments;
+            if (moments) Letterbox(p);
             string full = d.Boss.DisplayName; int comma = full.IndexOf(',');
-            string name = (comma > 0 ? full.Substring(0, comma) : full).Trim(), epithet = comma > 0 ? full.Substring(comma + 1).Trim() : null;
+            string name = (comma > 0 ? full.Substring(0, comma) : full).Trim(), epithet = moments ? Presentation.BossMoments.IntroEpithet : comma > 0 ? full.Substring(comma + 1).Trim() : null;
             float vw = UiTheme.VirtualWidth, cx = vw / 2, maxW = Mathf.Min(vw, 1920) - 2 * 160, y0 = 300 + (1 - inA) * 14;
             DrawBand(y0 - 70, 300, a);
-            T(0, y0 - 46, vw, 22, UiTheme.Spaced(head), eyebrowC, A(UiTheme.GoldLabel, UiTheme.GoldLabel.a * a));
+            string head = moments && Presentation.BossMoments.IntroRoleSpaced.Length > 0 ? Presentation.BossMoments.IntroRoleSpaced
+                : UiTheme.Spaced(d.Mode == RunMode.Practice ? "Practice" : Campaign.StageLabel(d.EncounterOrder, d.ProgressSlot));
+            T(0, y0 - 46, vw, 22, head, eyebrowC, A(UiTheme.GoldLabel, UiTheme.GoldLabel.a * a));
             string big = UiTheme.Spaced(name);
             var nameSt = Fit(revealName, big, maxW);
             T(0, y0, vw, 84, big, nameSt, A(UiTheme.Ivory, a));
@@ -552,8 +556,20 @@ namespace LastBell.Run
             return newArea ? $"Onward to {Campaign.AreaName(next)}. Next: {name}" : "Next: " + name;
         }
 
+        // ink bars top and bottom during the intro: in by 0.15, out from 0.82 (the boss moments)
+        void Letterbox(float p)
+        {
+            float k = Ease(Mathf.Clamp01(p / 0.15f)) * (1 - Ease(Mathf.Clamp01((p - 0.82f) / 0.18f)));
+            if (k <= 0.001f) return;
+            float vw = UiTheme.VirtualWidth, vh = UiTheme.VirtualHeight, bh = 72 * k;
+            var ink = A(UiTheme.InkDeep, 0.94f); var rule = A(UiTheme.Gold, 0.55f * k);
+            F(0, 0, vw, bh, ink); F(0, vh - bh, vw, bh, ink);
+            F(0, bh, vw, 1.5f, rule); F(0, vh - bh - 1.5f, vw, 1.5f, rule);
+        }
+
         void ClearedCard()
         {
+            if (Presentation.PresentationSettings.BossMoments) { DefeatedCard(); return; }
             float a = Ease(Mathf.Clamp01(d.StateTicks / 40f));
             string next = d.Mode == RunMode.Practice ? "Practice complete" : d.ProgressSlot == d.EncounterOrder.Length - 1 ? (d.BonusFight ? "Overclocked, and outplayed" : "The last bell has rung") : NextLine(d.EncounterOrder[d.ProgressSlot + 1]);
             string full = d.Boss ? d.Boss.DisplayName : "Boss"; int comma = full.IndexOf(',');
@@ -567,6 +583,37 @@ namespace LastBell.Run
             Rules(cx, y0 + 42, half, Ease(Mathf.Clamp01(d.StateTicks / 60f)), A(UiTheme.Gold, 0.85f * a));
             T(0, y0 + 90, vw, 36, UiTheme.Spaced("Falls silent"), revealEpithet, A(UiTheme.Ivory, a));
             T(0, y0 + 136, vw, 24, next, bodyC, A(UiTheme.IvoryMuted, UiTheme.IvoryMuted.a * a));
+        }
+
+        // The boss moments' card (Presentation lane, 8 Nov): it waits for the kill's freeze, flash and slow motion (0.65 s), then
+        // the role line, the name in gold, "Defeated", the fight time and the next fight
+        BossEncounter defeatFor; string defeatNext, defeatName; static readonly GUIContent measureText = new GUIContent();
+        void DefeatedCard()
+        {
+            float a = Ease(Mathf.Clamp01((d.StateTicks - 40) / 28f));
+            if (a <= 0.001f) return;
+            // the card's text is built once per boss (no text built per frame)
+            if (defeatFor != d.Boss || defeatNext == null)
+            {
+                defeatFor = d.Boss;
+                defeatNext = d.Mode == RunMode.Practice ? "Practice complete" : d.ProgressSlot == d.EncounterOrder.Length - 1 ? (d.BonusFight ? "Overclocked, and outplayed" : "The last bell has rung") : NextLine(d.EncounterOrder[d.ProgressSlot + 1]);
+                string full = d.Boss ? d.Boss.DisplayName : "Boss"; int comma = full.IndexOf(',');
+                defeatName = UiTheme.Spaced((comma > 0 ? full.Substring(0, comma) : full).Trim());
+            }
+            string next = defeatNext, big = defeatName;
+            float vw = UiTheme.VirtualWidth, cx = vw / 2, maxW = Mathf.Min(vw, 1920) - 2 * 160, y0 = 300 - (1 - a) * 10;
+            DrawBand(y0 - 70, 300, a);
+            var role = Presentation.BossMoments.IntroRoleSpaced;
+            if (role.Length > 0) T(0, y0 - 46, vw, 22, role, eyebrowC, A(UiTheme.GoldLabel, UiTheme.GoldLabel.a * a));
+            var nameSt = Fit(revealName, big, maxW);
+            T(0, y0, vw, 84, big, nameSt, A(UiTheme.Gold, a));
+            measureText.text = big;
+            float half = Mathf.Min(maxW, nameSt.CalcSize(measureText).x / UiTheme.Scale) / 2;
+            Rules(cx, y0 + 42, half, Ease(Mathf.Clamp01((d.StateTicks - 40) / 50f)), A(UiTheme.Gold, 0.85f * a));
+            T(0, y0 + 90, vw, 40, Presentation.BossMoments.DefeatedSpaced, display36, A(UiTheme.Ivory, a));
+            T(0, y0 + 138, vw, 24, next, bodyC, A(UiTheme.IvoryMuted, UiTheme.IvoryMuted.a * a));
+            var time = Presentation.BossMoments.FightTimeLine;
+            if (time.Length > 0) T(0, y0 + 168, vw, 18, time, microC, A(UiTheme.IvoryMicro, UiTheme.IvoryMicro.a * a));
         }
 
         void DownedCard()
