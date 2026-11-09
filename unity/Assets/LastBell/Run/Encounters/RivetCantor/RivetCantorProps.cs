@@ -117,11 +117,14 @@ namespace LastBell.Run
         public enum State { Live, Snap, Lash }
         public State Now { get; private set; } = State.Live;
         public Func<Vector3> EndA, EndB;
+        // the boss's body: links inside it are hidden (2p partners stand on opposite sides of him, so a straight chain
+        // passes through his torso; in-game check 9 Nov). Presentation only: the whip lane is still the straight line.
+        public Func<Vector3> BodyCentre; public float BodyRadius, BodyHeight;
         public bool HasModel { get; private set; }
         public int LinkCount => links.Count;
         public float CurrentSag { get; private set; }
         public static readonly List<RivetChainView> Live = new List<RivetChainView>();   // tests
-        public static int Spawned, Snapped, Lashed, MaxLinksSeen;                           // tests
+        public static int Spawned, Snapped, Lashed, MaxLinksSeen, MaxHiddenInBody;          // tests
         public static float MinSagSeen = 99, MaxSagSeen;
 
         readonly List<Transform> links = new List<Transform>();
@@ -205,6 +208,8 @@ namespace LastBell.Run
             MaxLinksSeen = Mathf.Max(MaxLinksSeen, n);
             for (int i = 0; i < links.Count; i++) links[i].gameObject.SetActive(i < n);
             Vector3 side = Vector3.Cross(flat.sqrMagnitude > 1e-4f ? flat.normalized : Vector3.forward, Vector3.up);
+            Vector3 bc = BodyCentre != null ? BodyCentre() : Vector3.zero; int hidden = 0;
+            Func<Vector3, bool> inBody = q => BodyCentre != null && q.y < BodyHeight && new Vector2(q.x - bc.x, q.z - bc.z).sqrMagnitude < BodyRadius * BodyRadius;
             for (int i = 0; i < n; i++)
             {
                 float u = (i + 0.5f) / n;
@@ -215,7 +220,9 @@ namespace LastBell.Run
                 var up = (i % 2 == 0) ? Vector3.up : side;   // alternate links turn 90 degrees
                 if (Mathf.Abs(Vector3.Dot(tan.normalized, up)) > 0.98f) up = side.sqrMagnitude > 0 ? side : Vector3.right;
                 links[i].SetPositionAndRotation(p, Quaternion.LookRotation(tan, up));
+                if (inBody(p)) { links[i].gameObject.SetActive(false); hidden++; }
             }
+            MaxHiddenInBody = Mathf.Max(MaxHiddenInBody, hidden);
             // shackles hang under each end, the eye toward the other end
             var dir = flat.sqrMagnitude > 1e-4f ? flat.normalized : Vector3.forward;
             shA.SetPositionAndRotation(a, Quaternion.LookRotation(dir, Vector3.up));

@@ -301,7 +301,7 @@ namespace LastBell.Run
             int chainEnds = boss.ChainLog.Sum(c => c.pairs + c.drum);
             Check($"[{size}p] props: one hanging chain per chained pair or drum chain ({RivetChainView.Spawned - chains0} of {chainEnds}), each snapped or lashed at its lock",
                 boss.ChainViewsMade - made0 == chainEnds && RivetChainView.Spawned - chains0 == chainEnds && RivetChainView.Snapped + RivetChainView.Lashed - locks0 == chainEnds && RivetChainView.MaxLinksSeen > 0,
-                $"snapped {RivetChainView.Snapped}, lashed {RivetChainView.Lashed}, most links {RivetChainView.MaxLinksSeen}, sag seen {RivetChainView.MinSagSeen:0.00}-{RivetChainView.MaxSagSeen:0.00} m");
+                $"snapped {RivetChainView.Snapped}, lashed {RivetChainView.Lashed}, most links {RivetChainView.MaxLinksSeen} (up to {RivetChainView.MaxHiddenInBody} hidden inside him), sag seen {RivetChainView.MinSagSeen:0.00}-{RivetChainView.MaxSagSeen:0.00} m");
             Check($"[{size}p] Anvil Hymn: twice, 4 pulses each, all resolved", boss.HymnCasts == 2 && spawned.Count(s => s.h.Source == "Anvil Hymn") == 8);
             Note($"[{size}p] Anvil Hymn hits on bots: {boss.PulseHits}");
             Check($"[{size}p] Retuning: 3.5 s with nothing live and nothing spawned (the punish window)",

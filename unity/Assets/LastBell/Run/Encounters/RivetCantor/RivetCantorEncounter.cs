@@ -405,10 +405,13 @@ namespace LastBell.Run
             Func<Vector3> rawA = () => { if (rec.A && !rec.A.Down) rec.LastA = rec.A.transform.position; return rec.LastA; };
             Func<Vector3> rawB = () => { if (rec.Drum) rec.LastB = DrumPoint(); else if (rec.B && !rec.B.Down) rec.LastB = rec.B.transform.position; return rec.LastB; };
             rec.View = RivetChainView.Create(transform.parent, () => WaistEnd(rawA(), rec.LastB), () => rec.Drum ? rawB() : WaistEnd(rawB(), rec.LastA));
+            HideInBody(rec.View);
             chains.RemoveAll(c => !c.View);
             chains.Add(rec); ChainViewsMade++;
             return rec;
         }
+        // links inside his body are hidden (the drum end of a drum chain sits at his hand, outside BodyRadius)
+        void HideInBody(RivetChainView v) { if (!v) return; v.BodyCentre = () => this ? transform.position : Vector3.zero; v.BodyRadius = BodyRadius; v.BodyHeight = HitHeight + 0.6f; }
         static Vector3 WaistEnd(Vector3 self, Vector3 other)
         {
             var d = other - self; d.y = 0;
@@ -658,7 +661,7 @@ namespace LastBell.Run
                     rc.View = RivetChainView.Create(transform.parent,
                         () => WaistEnd(SnapToPlayer(e.A), e.Drum ? DrumPoint() : SnapToPlayer(e.B)),
                         () => e.Drum ? DrumPoint() : WaistEnd(SnapToPlayer(e.B), SnapToPlayer(e.A)));
-                    ReplicaChainsShown++;
+                    HideInBody(rc.View); ReplicaChainsShown++;
                 }
                 if (rc.View && st != RivetChainView.State.Live) rc.View.Lock(st == RivetChainView.State.Snap);
             }
