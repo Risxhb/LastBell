@@ -629,7 +629,11 @@ namespace LastBell.Run
             if (wd != null)
             {
                 int n = wd.TakenLog.Count;
-                if (n > 0 && wd.TakenLog[n - 1].hpAfter <= 0 && wd.TakenLog[n - 1].source == wd.LastDamageSource) ka = TakenAttack(wd, n - 1);
+                if (n > 0 && wd.TakenLog[n - 1].hpAfter <= 0 && wd.TakenLog[n - 1].source == wd.LastDamageSource)
+                {
+                    ka = TakenAttack(wd, n - 1);
+                    scripted = NamesOwnCause(wd.TakenLog[n - 1].source, ka);
+                }
                 else { ka = BossAttackIcons.Get(wd.LastDamageAttackId); scripted = ka != null; }
             }
             var r = Card(w, pad + 44 + 8 + 26 + (scripted ? 26 : 0) + pad, 270, false, UiTheme.Danger);
@@ -889,6 +893,15 @@ namespace LastBell.Run
         // Boss attack icons in the recap (BossAttackIcons): the attack ID recorded per hit, parallel to TakenLog.
         // PinRecapTooltip shows the killing blow's details without a mouse (autotest screenshots).
         public static bool PinRecapTooltip;
+        // A lethal hit that names its own cause, not just its attack (a Bellkeeper Ultimate wipe: "The escapement skips (empty
+        // plate)"), keeps that text on the downed card, with its family's icon and name on the second line like a ForceDown wipe.
+        internal static bool NamesOwnCause(string source, BossAttackIcons.Attack a)
+        {
+            if (a == null || string.IsNullOrEmpty(source) || string.Equals(source, a.name, System.StringComparison.OrdinalIgnoreCase)) return false;
+            if (a.aliases != null) foreach (var al in a.aliases) if (string.Equals(source, al, System.StringComparison.OrdinalIgnoreCase)) return false;
+            return true;
+        }
+
         static BossAttackIcons.Attack TakenAttack(CombatWorld w, int i) => i < w.TakenAttackIds.Count ? BossAttackIcons.Get(w.TakenAttackIds[i]) : null;
 
         // Boss attack details (virtual units): the 64 px icon with the attack name, boss and tag beside it, then its shape.
