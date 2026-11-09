@@ -756,9 +756,15 @@ namespace LastBell.Run
             // -lastbellSylvaraClearPhase n starts each run in phase n (practice Start Phase row); -lastbellSylvaraClearRepeat k runs the set k times
             int startPhase = int.TryParse(AurelionArgs.Arg("-lastbellSylvaraClearPhase"), out var sp) ? Mathf.Clamp(sp, 1, 4) : 1;
             int repeats = int.TryParse(AurelionArgs.Arg("-lastbellSylvaraClearRepeat"), out var nr) ? Mathf.Clamp(nr, 1, 10) : 1;
+            // -lastbellSylvaraClearParty: the party of 4 only; -lastbellSylvaraClearSeed s seeds her rolls per run (s, s+1, ...)
+            // so a before/after comparison meets the same fights (9 Nov: bots should clear full Hard fights, 8 of 10 seeds)
+            if (Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellSylvaraClearParty", StringComparison.OrdinalIgnoreCase))) runs = runs.Where(r => r.allies > 0).ToArray();
+            int? seed0 = int.TryParse(AurelionArgs.Arg("-lastbellSylvaraClearSeed"), out var sd) ? sd : (int?)null; int runNo = 0;
             runs = Enumerable.Repeat(runs, repeats).SelectMany(r => r).ToArray();
             foreach (var (cls, allies, level) in runs)
             {
+                if (seed0.HasValue) { UnityEngine.Random.InitState(seed0.Value + runNo); Note($"Sylvara clear seed {seed0.Value + runNo}"); }
+                runNo++;
                 if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }
                 d.SelectAllies(allies); d.SelectDifficulty(level);
                 if (!d.StartPractice(cls, RunDirector.SylvaraPractice, startPhase)) { Check($"Sylvara clear run {cls} +{allies} starts", false); continue; }
@@ -809,14 +815,27 @@ namespace LastBell.Run
                 while (d.State == RunState.Combat && d.World == w && (w.Tick - tick0) < Sim.Ticks(480))
                 {
                     last = w.Tick;
-                    if (sy.PhaseName != phaseAt[phaseAt.Count - 1].name) phaseAt.Add((sy.PhaseName, w.Tick));
+                    if (sy.PhaseName != phaseAt[phaseAt.Count - 1].name)
+                    {
+                        phaseAt.Add((sy.PhaseName, w.Tick));
+                        // where the party stands at each phase (9 Nov: full Hard fights were lost late): HP and potions
+                        Note($"  {sy.PhaseName} @{(w.Tick - tick0) / (float)Sim.Hz:0}s: " + string.Join(", ", w.Players.Select(q => q.Down ? "down" : $"{q.Hp} hp {q.Potions} pots")));
+                    }
                     foreach (var p in w.Players) if (!p.Down)
                     {
                         float dist = Sim.Flat(p.transform.position - sy.transform.position).magnitude; var c = p.ClassName;
                         if (!reachN.TryGetValue(c, out var rn)) reachN[c] = rn = new int[2];
                         rn[0]++; if (dist <= SwingAt(c)) rn[1]++; reachD[c] = (reachD.TryGetValue(c, out var ds) ? ds : 0) + dist;
                     }
-                    foreach (var p in w.Players) { if (p.Down && down.Add(p)) { downs++; if (lastKey.TryGetValue(p, out var lk)) Count(lk, 0, 0); if (lk != null) hitLog[lk][2]++; } else if (!p.Down) down.Remove(p); }
+                    foreach (var p in w.Players)
+                    {
+                        if (p.Down && down.Add(p))
+                        {
+                            downs++; if (lastKey.TryGetValue(p, out var lk)) Count(lk, 0, 0); if (lk != null) hitLog[lk][2]++;
+                            Note($"  down @{(w.Tick - tick0) / (float)Sim.Hz:0.0}s {sy.PhaseName} {sy.Hp * 100 / maxHp}% left, by {lk ?? "?"}, {p.Potions} pots left, {w.Players.Count(q => !q.Down)} standing");
+                        }
+                        else if (!p.Down) down.Remove(p);
+                    }
                     yield return null;
                 }
                 // the last down ends combat on the same tick, before the loop sees it: count it for its last hit too
