@@ -96,6 +96,23 @@ namespace LastBell.Run
             return true;
         }
 
+        // Crucivar: the nearest bot to a downed ally goes to them before its next floor job while nothing lands on it within 1 s.
+        // Phase 1 runs quake, brand and spokes jobs back to back, so the plain revive (after the jobs) never ran and both
+        // allies down to Anvil Quake III bled out (9 Nov Brass Foundry sweep, fight #9). Not with a brand to carry, jets
+        // turning or bullets near (the volley plan heads for the ally itself)
+        bool ReviveFirst(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
+        {
+            if (!ReviveSpot(me, pos, out _, out var who, CrucivarReviveReach) || !NearestBot(me, who, rvFor == who && dJob == "revive")) return false;
+            var live = me.World.Hazards.Live;
+            for (int i = 0; i < live.Count; i++) { var h = live[i]; if (Jet(h) || (h.Track != null && h.Age < h.LockAt && Spares(h, me))) return false; }
+            var shots = BotSight.Bullets; var p = Sim.Flat(pos);
+            for (int i = 0; i < shots.Count; i++) { var a = Sim.Flat(shots[i].Origin); if (SegDist(p, a, a + BotSight.ShotVel(shots[i]) * 1f) < 3f) return false; }
+            bad = Bad(me, boss, false, me.World.Tick + Sim.Hz);
+            if (bad(pos)) return false;   // dodge first
+            rvFor = who;
+            return ReviveJob(me, boss, pos, ref inp);
+        }
+
         // one bot per downed ally: the nearest, and one already on the way keeps it unless another is 4 m nearer (or two
         // swapped back and forth as they moved, and neither arrived)
         static bool NearestBot(PlayerController me, PlayerController downed, bool going)
@@ -346,6 +363,7 @@ namespace LastBell.Run
             // wipe, and the floor jobs below would hold the bot out of it (PR 14 + PR 19, 4 Nov); the soak path dodges on its own
             if (OwnSoak(me, boss) != null) return false;
             if (!(boss is AurelionEncounter) && FinishRevive(me, boss, pos, ref inp)) { dJob = "revive"; return true; }
+            if (boss is CrucivarEncounter && ReviveFirst(me, boss, pos, ref inp)) return true;
             if (!(boss is AurelionEncounter) && Quake(me, boss, pos, ref inp)) { dJob = "quake"; return true; }
             if (!(boss is AurelionEncounter) && Volley(me, boss, pos, ref inp)) { dJob = "volley"; return true; }
             if (!(boss is AurelionEncounter) && Brand(me, boss, pos, ref inp)) { dJob = "brand"; return true; }   // Aurelion keeps its own Sunspot job
