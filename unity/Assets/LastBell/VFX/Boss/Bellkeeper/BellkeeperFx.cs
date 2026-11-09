@@ -52,6 +52,7 @@ namespace LastBell.VFX
             sparks = MakeParticles("Sparks", addMat, 1, Gold, Amber, 0.6f);
             dust = MakeParticles("Dust", alphaMat, 1, new Color(0.30f, 0.24f, 0.36f), new Color(0.62f, 0.52f, 0.66f), 0f);
             motes = MakeParticles("Motes", addMat, 1, Brass, Teal, 0f);
+            InitDevour();
             for (int i = 0; i < 12; i++) burstPool.Push(NewBurst());   // warm pool: no instantiation mid-fight (§11)
             CameraShake.Ensure();
         }
@@ -99,6 +100,8 @@ namespace LastBell.VFX
             public void Memory() { mpb.SetFloat(PMemory, 1); Tint(new Color(0.35f, 0.38f, 0.45f), new Color(0.95f, 0.9f, 0.78f)); maxFade = 0.55f; }
             // removed without a resolve flash (the memory turning into its live warning, or being erased)
             public void Dismiss() { if (flash < 0) flash = 0.2f; }
+            // never drawn (a hazard with Hidden set); it still ages and is cleaned up like any telegraph
+            public void Hide() { go.SetActive(false); }
             // draw only over the floor disc (radius 0 = no clip); presentation only, the hazard owns the hit test
             public void Clip(Vector3 centre, float radius) { mpb.SetFloat(PClipRadius, radius); mpb.SetVector(PClipCentre, new Vector4(centre.x, centre.z, 0, 0)); }
         }

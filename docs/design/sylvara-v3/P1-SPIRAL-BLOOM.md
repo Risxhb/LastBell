@@ -2,7 +2,7 @@
 
 **Status: accepted (Chzy18, 28 Oct 2026).** It has been played only in the browser demo. Built in Unity on `feature/sylvara-v3` (see README.md for what is built and what is design only).
 - Demo: `bosses/3-verdant-chimes-sylvara/phase1-demos/sylvara-phase1-demos.html` (option 5, "Spiral Bloom"). Published privately at https://claude.ai/artifact/45LQCHGWZK7WMcAtheEw6T.
-- v3 is a full bullet-hell rework. It replaces the v2 set (Canticle, Two Choirs, Listening Roots, Refrain Seed, Antiphon) as the plan. v2 stays on `feature/sylvara-abilities-v2` for parts.
+- v3 is a full bullet-hell rework. It replaces the v2 set (Canticle, Two Choirs, Listening Roots, Refrain Seed, Antiphon) as the plan.
 
 ## Phase
 - **HP band:** 100–? %. The thresholds get set once every phase is accepted. Four phases, no intermission (Chzy18, 29 Oct).
@@ -14,7 +14,7 @@
 | t (s) | Mechanic | Shape | Kind | Warning | Damage | Melee threat | Ranged threat |
 |---|---|---|---|---|---|---|---|
 | 0 → | **Petal Spiral** | 4 arms from her rim, petals at 5 m/s, one every 0.15 s, gaps every 9th–7th petal; spins 15°/s | bullets | travel time | 10 per petal | arms are tight near her | at 10 m you walk about 2.6 m/s just to stay between arms |
-| 3 | **Seed Pods** | 2.5 m circle on the farthest 1/1/2/3 players (N 1/2/4/8), tracks 0.6 s; bursts into 12 petals at 5.5 m/s; turquoise ticks mark the gaps | Ground + bullets | 2.5 s | 16 + 12/petal | rings cross the inner area | pods are dropped on you |
+| 3 | **Seed Pods** | 2.5 m circle on the farthest 1/1/2/2 players (1/2/3/4 players), tracks 0.6 s; bursts into 12 petals at 5.5 m/s; turquoise ticks mark the gaps | Ground + bullets | 2.5 s | 16 + 12/petal | rings cross the inner area | pods are dropped on you |
 | 6 | **Waterfall Jets** | a solid stream (every 0.07 s, 9 m/s) from the wall to her rim; the source slides 40° along the wall over 2 s, starting 20° before the target | bullets | 1.5 s wedge + arrow | 14 per drop | — | one per player past 8 m (else the farthest); at the edge the sweep outruns walking, so step back past its start or move inward |
 | 8–9 | **Toll** | the spin reverses | — | 1 s banner | — | | |
 | 10 | **Feet Pod** | 3.0 m circle at her centre, then 12 petals point-blank | Ground + bullets | 2.5 s | 16 + 12 | yes | petals reach the wall |
@@ -27,7 +27,7 @@
 
 - **Overlap:** the spiral always runs, plus up to two other patterns. The 26 Oct rules allow this as long as a route exists.
 - **Solo:** pods come one after another, 0.8 s apart, all on you (2 at 3 s, 1 each later; the triangle is sequential). The jet aims at you.
-- **Group:** at 8 players, three pods land at a time and each far player gets their own jet.
+- **Group:** at 3–4 players, two pods land at a time, and each player past 8 m gets their own jet.
 
 ## Settled for this phase (dated)
 - **28 Oct:** the fight is full bullet hell, with as many phases as the other main bosses.

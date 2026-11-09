@@ -74,10 +74,17 @@ namespace LastBell.Run.Networking
             {
                 if (bullet.Dead) continue;
                 if (frame.Bullets.Count >= BulletCap) break;
-                frame.Bullets.Add(new LanWorldFrame.BulletState { X = bullet.Pos.x, Z = bullet.Pos.z, VX = bullet.Vel.x, VZ = bullet.Vel.z, Radius = bullet.Radius, Colour = (byte)Mathf.Clamp(bullet.Colour, 0, 2), Water = bullet.Source == "Waterfall Jet" });
+                frame.Bullets.Add(BulletOf(bullet));
             }
             if (frame.Projectiles.Count > LanWorldFrame.MaxProjectiles) frame.Projectiles.RemoveRange(0, frame.Projectiles.Count - LanWorldFrame.MaxProjectiles);
             return frame;
+        }
+        // one hostile bullet on the wire; a seed with a burst preview also carries its fuse and rays (Protocol 7)
+        public static LanWorldFrame.BulletState BulletOf(BulletSystem.Bullet bullet)
+        {
+            var s = new LanWorldFrame.BulletState { X = bullet.Pos.x, Z = bullet.Pos.z, VX = bullet.Vel.x, VZ = bullet.Vel.z, Radius = bullet.Radius, Colour = (byte)Mathf.Clamp(bullet.Colour, 0, 2), Water = bullet.Source == "Waterfall Jet" };
+            if (bullet.BurstRays > 0 && bullet.Life > 0) { s.Rays = (byte)Mathf.Clamp(bullet.BurstRays, 0, LanWorldFrame.MaxRays); s.Off = bullet.BurstOff; s.Speed = Mathf.Max(0, bullet.BurstSpeed); s.Age = Mathf.Clamp(bullet.Age, 0, bullet.Life); s.Life = bullet.Life; }
+            return s;
         }
         // well under the wire limits (256 each), so the whole snapshot stays inside one message
         public const int HazardCap = 160, TelegraphCap = 160, BulletCap = 600;

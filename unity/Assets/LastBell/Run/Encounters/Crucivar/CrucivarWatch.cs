@@ -8,7 +8,9 @@ namespace LastBell.Run
 {
     // Watch mode: four bots play Crucivar in the Brass Foundry while you look on (practice only, never in a run):
     //   Unity.exe -projectPath unity -executeMethod LastBell.Run.EditorTools.CrucivarTestTools.PlayModeTest
-    //             -crucivarWatch [-lastbellBossHp 0.4]
+    //             -crucivarWatch [-lastbellBossHp 0.4] [-crucivarAllyBot]
+    // -crucivarAllyBot hands every bot to the shared AllyBot (Perfect, attacking), which knows each class kit (Tollbreaker
+    // included); the watch logging, pacing and measure mode stay the same.
     // The boss runs its real schedule. Each bot is a real PlayerController on scripted input: it scores spots around
     // itself against every live hazard (where the jets will have turned to, Backdraft's pull, its own brand vs the
     // others, the pools), walks to the best one, dashes when a hit is about to land, and hits the boss in between.
@@ -27,15 +29,22 @@ namespace LastBell.Run
             if (d && !d.GetComponent<CrucivarWatch>()) d.gameObject.AddComponent<CrucivarWatch>();
         }
 
-        static readonly string[] Classes = { "Arcanist", "Chimesinger", "Arcanist", "Chimesinger" };   // Vanguard retired (Chzy18 11-02); Tollbreaker joins when it lands
+        // Vanguard retired (Chzy18 11-02); Tollbreaker leads once its kit is in the build (PR 14), Arcanist/Chimesinger until then
+        static readonly string[] Classes = typeof(PlayerKit).Assembly.GetType("LastBell.Run.TollbreakerKit") != null
+            ? new[] { "Tollbreaker", "Arcanist", "Chimesinger", "Tollbreaker" }
+            : new[] { "Arcanist", "Chimesinger", "Arcanist", "Chimesinger" };
         static readonly string[] Names = { "Bot 1", "Bot 2", "Bot 3", "Bot 4" };
 
         sealed class Bot : IInputSource
         {
             public string Name; public PlayerController P; public Vector3 Goal; public bool Dash, Attack; public Vector3 Aim, Target; public float TargetRadius; public Vector3? Tower;
             public float NextPlan; public int Hits, Damage, Downs;
+            public readonly Dictionary<string, int> BySource = new Dictionary<string, int>();   // measure: damage taken per attack
+            public readonly List<string> Last = new List<string>();                               // measure: the last hits, newest last
+            public AllyBot Ally;   // -crucivarAllyBot: the shared bot drives
             public PlayerInput Read(PlayerController who)
             {
+                if (Ally != null) return Ally.Read(who);
                 var r = new PlayerInput { Aim = Aim };
                 var to = Sim.Flat(Goal - who.transform.position);
                 Vector3 move = to.magnitude < 0.15f ? Vector3.zero : to.normalized;
@@ -57,9 +66,10 @@ namespace LastBell.Run
         bool follow; int fights; float fightStart;
         // -crucivarMeasure: no pacing; each phase runs a fixed number of loops (3 / 2 uprisings / 3 cycles), then the
         // boss is set just past the threshold; the log gets the players' damage per phase. Until then the boss is held just
-        // above the threshold, so the bots never cross it themselves. -crucivarBots n (1-8) sets the party; the editor quits after the fight.
+        // above the threshold, so the bots never cross it themselves. -crucivarBots n (1-4) sets the party; the editor quits after the fight.
         static bool Measure => Environment.GetCommandLineArgs().Any(a => a.Equals("-crucivarMeasure", StringComparison.OrdinalIgnoreCase));
-        static int BotCount => int.TryParse(CrucivarArgs.Arg("-crucivarBots"), out int n) ? Mathf.Clamp(n, 1, 8) : 4;
+        static bool UseAllyBot => Environment.GetCommandLineArgs().Any(a => a.Equals("-crucivarAllyBot", StringComparison.OrdinalIgnoreCase));
+        static int BotCount => int.TryParse(CrucivarArgs.Arg("-crucivarBots"), out int n) ? Mathf.Clamp(n, 1, 4) : 4;
 
         void MeasureLog(int ph, int loops, float secs, int dealt, string note) =>
             Debug.Log($"[measure] bots {bots.Count} phase {ph}: {loops} loops in {secs:0.0}s, players dealt {dealt}, team dps {dealt / Mathf.Max(0.1f, secs):0.0}, per bot {dealt / Mathf.Max(0.1f, secs) / bots.Count:0.0}, downs {bots.Sum(b => b.Downs)}{note}");
@@ -77,7 +87,8 @@ namespace LastBell.Run
             while (true)
             {
                 bots.Clear();
-                var lead = new Bot { Name = Names[0] };
+                if (UseAllyBot) AllyBot.Attacks = true;
+                var lead = new Bot { Name = Names[0], Ally = UseAllyBot ? new AllyBot(0, BotCount, BotMode.Perfect) : null };
                 d.InputOverride = lead;
                 if (d.State == RunState.Results) d.RequestRetry();
                 if (d.State == RunState.Menu) d.StartPractice(Classes[0], RunDirector.CrucivarPractice);
@@ -89,14 +100,15 @@ namespace LastBell.Run
                 for (int i = 1; i < BotCount; i++)
                 {
                     var p = PlayerController.Spawn(w, Classes[i % Classes.Length], new Vector3(-4.5f + 1.5f * i, 0, 6f), 180);
-                    var b = new Bot { Name = "Bot " + (i + 1), P = p };
+                    var b = new Bot { Name = "Bot " + (i + 1), P = p, Ally = UseAllyBot ? new AllyBot(i, BotCount, BotMode.Perfect) : null };
                     p.Input = b; p.AbilitiesEnabled = true; bots.Add(b);
                 }
                 foreach (var b in bots) b.Goal = b.P.transform.position;
                 if (hooked != w)
                 {
                     hooked = w;
-                    w.PlayerHit += (p, h, dmg) => { var b = bots.FirstOrDefault(x => x.P == p); if (b != null) { b.Hits++; b.Damage += dmg; } };
+                    w.PlayerHit += (p, h, dmg) => { var b = bots.FirstOrDefault(x => x.P == p); if (b != null) { b.Hits++; b.Damage += dmg; var src = h?.Source ?? "?"; b.BySource[src] = (b.BySource.TryGetValue(src, out var v) ? v : 0) + dmg;
+                        b.Last.Add($"{Time.time - fightStart:0.0}s {src} -{dmg} (hp {p.Hp})"); if (b.Last.Count > 8) b.Last.RemoveAt(0); } };
                 }
                 fights++; fightStart = Time.time;
                 int logged = 0, mPhase = 1, mDealt0 = w.DamageDealt; float mT0 = Time.time; bool mDone = false, mLogged = false;
@@ -129,7 +141,8 @@ namespace LastBell.Run
                         // -crucivarWatchFrom p2: start just under 65 %, so Phase 2 comes after the first Forge Rite loop
                         if (fromP2 && ph == 1 && cb.Hp > cb.MaxHp * 0.645f) cb.DebugSetHpFraction(0.64f);
                         if (fromP3 && ph < 3 && cb.Hp > cb.MaxHp * 0.295f) cb.DebugSetHpFraction(0.29f);   // -crucivarWatchFrom p3: Phase 3 after the first loop
-                        float floor = cb.PhaseLoops < 2 ? (ph == 1 ? (fromP2 || fromP3 ? 0f : 0.66f) : ph == 2 ? (fromP3 ? 0f : 0.31f) : 0.02f) : 0f;
+                        // from p3 the boss sits under 30 % through Phases 1 and 2, so a floor there keeps the bots from killing it before Phase 3
+                        float floor = fromP3 && ph < 3 ? 0.15f : cb.PhaseLoops < 2 ? (ph == 1 ? (fromP2 ? 0f : 0.66f) : ph == 2 ? 0.31f : 0.02f) : 0f;
                         if (cb.Hp < cb.MaxHp * floor) cb.DebugSetHpFraction(floor);
                         int key = ph * 100 + cb.PhaseLoops;
                         if (key != logged)
@@ -143,6 +156,11 @@ namespace LastBell.Run
                 if (Measure)
                 {
                     if (!mDone && !mLogged) MeasureLog(mPhase, (d.Boss as CrucivarEncounter)?.PhaseLoops ?? 0, Time.time - mT0, w.DamageDealt - mDealt0, " (partial: the fight ended first)");
+                    foreach (var b in bots)
+                    {
+                        Debug.Log($"[measure] {b.Name} damage taken by attack: " + string.Join(", ", b.BySource.OrderByDescending(kv => kv.Value).Select(kv => $"{kv.Key} {kv.Value}")));
+                        Debug.Log($"[measure] {b.Name} last hits: " + string.Join(" | ", b.Last) + $" · down {b.P.Down}");
+                    }
                     Debug.Log($"[measure] fight over after {Time.time - fightStart:0}s · phase {((d.Boss as CrucivarEncounter)?.PhaseIndex ?? 0)} · " + (mDone ? "measured all phases" : "ended early (wipe?)"));
 #if UNITY_EDITOR
                     UnityEditor.EditorApplication.Exit(0);

@@ -37,7 +37,7 @@ Warning windows: Medium is 0.85 × the base time (since 1 Nov, halfway to Hard),
 ## New in this build
 
 - **Meridian Recall (Hard only):** he fires his last Lances volley again, once, from where he stood when he first fired it, on the same lines. The beams show locked for 3.5 s, then hit for 65. Stand in a gap between the old lines.
-- **Last Light's floor falls:** each slice trembles through its warning, then drops into the sky below. **Step onto a hole and you fall:** you land at once on the nearest standing floor and take 40 (Easy 24, Hard 52). One fall never kills from full health; two in a row can. A jump carries you over a hole; a dash does not.
+- **Last Light's floor falls:** each slice trembles through its warning, then drops into the sky below. **Step onto a hole and you fall:** you land at once on the nearest standing floor and take 40 (Easy 24, Hard 52). One fall never kills from full health; two in a row can. There is no way across a hole (no jumping in the game); a dash does not carry you over, so walk round it.
 - **Start Phase** row in Boss Rush (step 6 above).
 - **Allies (bots)** button in Boss Rush, beside Launch Test Rush: click it to cycle 0–7 bots.
 - **Total Eclipse wells** are now thin, dotted cobalt circles with no fill, like the towers: places to stand in, not things to dodge.

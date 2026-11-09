@@ -136,6 +136,27 @@ namespace LastBell.Run
             return s.Trim();
         }
 
+        // bots (ported from the Vanguard, 2 Nov): how long a press slows its thrower, and how much. Twin Hurl x0.6 for its cast,
+        // Grinding Toll and Bell Frenzy x0.5, Splitting Throw roots for its whole windup and throw; Call of Iron is instant
+        public override float SlowLeft => act switch
+        {
+            Act.Throw => Mathf.Max(0, CastTicks - t) / (float)Sim.Hz, Act.Toll => (TollCast - t) / (float)Sim.Hz,
+            Act.Split => (SplitTotal - t) / (float)Sim.Hz, Act.Frenzy => (FrenzyCast - t) / (float)Sim.Hz, _ => 0
+        };
+        public override float RootFor(int slot)
+        {
+            if (slot < 0) return Mathf.Max(Mathf.Max(RootFor(0), RootFor(1)), Mathf.Max(RootFor(2), RootFor(4)));
+            return slot switch
+            {
+                0 => SlowLeft + CastTicks / (float)Sim.Hz,
+                1 => tollCd > 0 ? 0 : SlowLeft + TollCast / (float)Sim.Hz,
+                2 => splitCd > 0 ? 0 : SlowLeft + SplitTotal / (float)Sim.Hz,
+                4 => frenzyCd > 0 ? 0 : SlowLeft + FrenzyCast / (float)Sim.Hz,
+                _ => 0
+            };
+        }
+        public override float RootScale(int slot) => slot switch { 0 => 0.6f, 1 => 0.5f, 4 => 0.5f, 3 => 1, _ => 0 };
+
         public override void ResetAll()
         {
             act = Act.None; t = 0; buffered = -1; nextThrow = 0; emptyFlash = 0; callArmed = false; lastHand = 1;
@@ -305,9 +326,14 @@ namespace LastBell.Run
                 if (q.Alive && Sim.Flat(pos - q.Pos).magnitude <= q.BodyRadius + radius)
                 { part = q; contact = q.Pos + Sim.Flat(pos - q.Pos).normalized * q.BodyRadius + Vector3.up * q.HitHeight; return true; }
             var b = W.Boss;
-            if (b == null || !b.Solid || Sim.Flat(pos - b.transform.position).magnitude > b.BodyRadius + radius) return false;
-            contact = b.transform.position + Sim.Flat(pos - b.transform.position).normalized * b.BodyRadius + Vector3.up * b.HitHeight;
-            return true;
+            if (b == null || !b.Solid) return false;
+            for (int i = 0; i < b.BodyCount; i++)   // the body and any extra bodies (the Ultimate's P4 gear cores) count as the boss
+            {
+                b.Body(i, out var c, out float r); if (r <= 0 || Sim.Flat(pos - c).magnitude > r + radius) continue;
+                contact = c + Sim.Flat(pos - c).normalized * r + Vector3.up * b.HitHeight;
+                return true;
+            }
+            return false;
         }
         void Context(Axe a, string ability, bool recall)
         {

@@ -35,6 +35,13 @@ namespace LastBell.Run
         // bots are mechanics dummies by default: they move, dodge and spread, but never attack or heal. Launch switch
         // -lastbellAllyAttack turns their class rotation on (the boss then scales his HP for them, BossEncounter.Spawn).
         public static bool Attacks = System.Array.Exists(System.Environment.GetCommandLineArgs(), a => a.Equals("-lastbellAllyAttack", System.StringComparison.OrdinalIgnoreCase));
+        // how hard its Sylvara spot pulls in Seed Storm (cost per metre; 0.35 elsewhere). At 0.35 the dodging drifted the
+        // Tollbreaker to the wall, 11 m out, in swing range 1 % of the time; 2.5 brought solo Phase 4 runs from 21 % of her
+        // HP left to 4-9 %, with a first clear (6 Nov, run 51)
+        const float P4Pull = 2.5f;
+        // in Seed Storm the Tollbreaker throws from 9 m (a Twin Hurl tap flies 9 m): even pulled home, the seeds keep it
+        // 9-10 m out. Phase 4 from its start then cleared 8 of 8 Hard runs, solo and 4 players (run 52; 2 of 8 without)
+        const float P4Throw = 9f;
         public static BotMode AllyMode = BotMode.Perfect;   // menu allies do every mechanic, memory ones included (Chzy18: "do the mechanics"); still no attacks
         public static int StartDelay;   // tests: ticks a new bot stands still at the start (-lastbellSweepRepeat varies the fight with it)
         int tick, lastPress = -999, castHold;
@@ -90,7 +97,12 @@ namespace LastBell.Run
             return true;
         }
 
-        float Range(PlayerController me) => HoldRange ?? (me.ClassName == "Tollbreaker" ? 3.5f : me.ClassName == "Chimesinger" ? 6.5f : 8.5f);
+        float Range(PlayerController me) => HoldRange ?? ClassRange(me.ClassName);
+        static float ClassRange(string cls) => cls == "Tollbreaker" ? 3.5f : cls == "Chimesinger" ? 6.5f : 8.5f;
+        // how far from Sylvara's body edge (plus 2 m) a bot of this class attacks her: its class range, and in Seed Storm the
+        // Tollbreaker throws from P4Throw. Shared with the suite's reach sampler (review SYL-REACH-METRIC, 7 Nov).
+        public static float SylvaraAttackRange(string cls, string phase) => cls == "Tollbreaker" && phase == SylvaraEncounter.PhaseNames[3] ? P4Throw : ClassRange(cls);
+        float SylvaraAttackRange(PlayerController me, string phase) => HoldRange.HasValue && !(me.ClassName == "Tollbreaker" && phase == SylvaraEncounter.PhaseNames[3]) ? HoldRange.Value : SylvaraAttackRange(me.ClassName, phase);
 
         // which boss part to hit: the first in kill order (or by name where the encounter gives none). With three or more
         // bots the back half wears down the next casting meanwhile, so the party does not stand in one turret's fan, and
@@ -105,10 +117,13 @@ namespace LastBell.Run
                 if (first == null || Before(part, first)) { next = first; first = part; }
                 else if (next == null || Before(part, next)) next = part;
             }
-            if (next != null && of >= 3 && slot >= of / 2 && BotSight.PartOrder(next) >= 0
+            if (next != null && of >= 3 && slot >= of / 2 && BotSight.PartOrder(next) >= 0 && LiveParts(w) >= 3
                 && BotSight.PartHp(next) > Mathf.Max(PartReserveMin, BotSight.PartMaxHp(next) * PartReserve)) return next;
             return first;
         }
+        // with two castings up (every party size since 4 Nov) the whole party breaks the first: the lone bot left on it
+        // spent the second uprising dodging bullets 8 m off while the rest wore the next one down (Hard party sweep, 4 Nov)
+        static int LiveParts(CombatWorld w) { int n = 0; foreach (var p in w.Parts) if (p.Alive) n++; return n; }
         // a casting held back for its turn standing nearer than the target: a swing or a recall could sink it out of order
         static bool HeldNear(CombatWorld w, Vector3 pos, Vector3 target)
         {
@@ -133,11 +148,12 @@ namespace LastBell.Run
             var w = me.World; var boss = w.Boss; readWorld = w;
             Vector3 pos = me.transform.position, want;
             if (boss == null || !boss.Solid || tick <= StartDelay) { inp.Move = ToScreen(Vector3.zero); return inp; }
-            if (boss is SylvaraEncounter sy) return ReadSylvara(me, sy);
+            var bpos = Sim.Flat(boss.transform.position); float brad = boss.BodyRadius;
+            tPos = bpos; tRad = brad;
+            if (boss is SylvaraEncounter sy) return ReadSylvara(me, sy);   // her own path picks her or a Choir Bud itself
             // the target: the boss, or while boss parts stand (Crucivar's castings, which must die before the Pour Flood) the
             // first of them by name: the castings carry their numerals, and on Hard one sunk out of order sets every turret
             // firing (a party went down to it, 11-03); hits land on whichever of them is nearest, so aim and reach follow it
-            var bpos = Sim.Flat(boss.transform.position); float brad = boss.BodyRadius;
             var first = PartTarget(w);
             if (first != null) { bpos = Sim.Flat(first.Pos); brad = first.BodyRadius; }
             tPos = bpos; tRad = brad;
@@ -262,6 +278,8 @@ namespace LastBell.Run
             if (me.Hp < (Mode == BotMode.Passive ? 40 : 70) && me.Potions > 0 && tick % 30 == 0) inp.Potion = true;   // test bots: before a Hard kill hit (65) could down them
             // walk round his body, not into it: a straight line across the centre would pin the bot against him
             if (move != Vector3.zero) move = AroundBoss(pos, move, boss);
+            // Aurelion's Devour pulls faster than a walk: any move against it is a sprint
+            if (move != Vector3.zero && boss is AurelionEncounter da && da.DevourLeft > 0 && Vector3.Dot(move, Sim.Flat(bpos - pos)) < 0 && me.Stamina > 5) inp.Sprint = true;
             dMe = me; dDuty = duty; dThreat = threat?.Source; dBad = bad(pos); dMove = move; dPos = pos; dNote = spotNote; spotNote = 0;
             inp.Move = ToScreen(move);
             return inp;
@@ -272,6 +290,9 @@ namespace LastBell.Run
         // it set this tick's input.
         bool Scripted(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
         {
+            // a tower of the next set to fill (the generic soak job) comes first: a dropped Mould Tower is Molten Overflow, a party
+            // wipe, and the floor jobs below would hold the bot out of it (PR 14 + PR 19, 4 Nov); the soak path dodges on its own
+            if (OwnSoak(me, boss) != null) return false;
             if (!(boss is AurelionEncounter) && Quake(me, boss, pos, ref inp)) { dJob = "quake"; return true; }
             if (!(boss is AurelionEncounter) && Volley(me, boss, pos, ref inp)) { dJob = "volley"; return true; }
             if (!(boss is AurelionEncounter) && Brand(me, boss, pos, ref inp)) { dJob = "brand"; return true; }   // Aurelion keeps its own Sunspot job
@@ -372,7 +393,7 @@ namespace LastBell.Run
             for (int i = 0; i < live.Count; i++)
             {
                 var h = live[i];
-                if (h.Kind == HazardKind.Strike && (h.Shape == HazardShape.Ring || h.Shape == HazardShape.Circle) && h.Track == null && h.Damage > 0 && !h.Cancelled
+                if ((h.AttackId == "crucivar.anvil_quake" || h.AttackId == "crucivar.quake_echo") && (h.Shape == HazardShape.Ring || h.Shape == HazardShape.Circle) && h.Track == null && h.Damage > 0 && !h.Cancelled
                     && h.Age < h.ResolveAt && h.Radius >= 3f && (quakeBands.Count == 0 || Sim.Flat(h.Origin - quakeBands[0].Origin).magnitude < 0.1f)) quakeBands.Add(h);
             }
             if (quakeBands.Count < 2) return false;
@@ -916,7 +937,7 @@ namespace LastBell.Run
             for (int i = 0; i < live.Count; i++) { var h = live[i]; if (h.BurnPerSecond <= 0 && h.ResolveAt - h.Age <= ticks && (Hits(h, me, pos) || Hits(h, me, lunge))) return false; }
             return true;
         }
-        static bool Hits(Hazard h, PlayerController me, Vector3 q) => !h.Soak && (h.Contains(q) || SideOf(h, q)) && (h.Affects == null || h.Affects(me)) && !Spares(h, me) && (!BotSight.IsPath(h) || BotSight.PathSoon(h, q));
+        static bool Hits(Hazard h, PlayerController me, Vector3 q) => !h.Soak && (h.Contains(q) || SideOf(h, q) || Ahead(h, q)) && (h.Affects == null || h.Affects(me)) && !Spares(h, me) && (!BotSight.IsPath(h) || BotSight.PathSoon(h, q));
         // a shape that leaves out the player standing in it (an Ember Brand never hits its own carrier) is no danger to them
         static bool Spares(Hazard h, PlayerController me) => h.Includes != null && (h.Track == null || h.Age < h.LockAt) && h.Contains(me.transform.position) && !h.Includes(me);   // a frozen brand is left: its pool forms there
         // a lane that strikes after its warning (a Toll Lane) can hit a little wider than it is drawn: keep a hand's width clear
@@ -929,6 +950,16 @@ namespace LastBell.Run
         const float LanePad = 0.2f;
         static readonly Hazard Unseen = new Hazard { Source = "orb / rolling strike" };   // the threat when it is not a live hazard
         const float OrbAhead = 0.5f, OrbPad = 0.25f;
+        // a moving circle (a bullet with Drift) also covers the stretch it travels in the next BulletLook seconds: a bot that
+        // only sees where bullets are now walks into them (solo Tollbreaker on Crucivar Medium went down to Ring Wave, 11-02)
+        public const float BulletLook = 0.35f;
+        static bool Ahead(Hazard h, Vector3 q)
+        {
+            if (h.Shape != HazardShape.Circle || h.Drift.sqrMagnitude < 0.01f) return false;
+            var d = Sim.Flat(h.Drift) * BulletLook; var v = Sim.Flat(q - h.Origin);
+            float u = Mathf.Clamp01(Vector3.Dot(v, d) / d.sqrMagnitude);
+            return (v - d * u).magnitude <= h.Radius + Hazard.Margin;
+        }
 
         // generic soak job (Project overview 11-01): any live hazard marked Soak is a tower to fill with its ShareCount (1 if
         // none). Bosses with their own tower job (Aurelion's Meridian Towers, with owners and order) keep that one. Only the
@@ -1055,7 +1086,36 @@ namespace LastBell.Run
             // while a timed job is due, a shape that lands after it is not in the way yet: hold the job, dodge it afterwards
             int first = bFull ? Mathf.Min(due, soonest) : int.MaxValue;   // the job or the threat that lands first
             bIgnoreAfter = first == int.MaxValue ? int.MaxValue : first + 30;
+            Reaches(live);
             return badAt;
+        }
+
+        // each live hazard's centre and the squared distance past which Hits can't be true (its shape plus the lane side
+        // pad and the bullet look-ahead), so a probe skips it with one distance test. Crucivar Phase 2 (perf agent, 4 Nov):
+        // 4 bots probing ~1 900 points against 110-140 turret bullets took 15-25 ms a tick, and the catch-up ticks stacked
+        // into 100-228 ms frames
+        float[] rX = new float[64], rZ = new float[64], rR2 = new float[64]; int rN;
+        void Reaches(IReadOnlyList<Hazard> live)
+        {
+            rN = live.Count;
+            if (rX.Length < live.Count) { int n = Mathf.NextPowerOfTwo(live.Count); rX = new float[n]; rZ = new float[n]; rR2 = new float[n]; }
+            for (int i = 0; i < live.Count; i++)
+            {
+                var h = live[i]; float r;
+                switch (h.Shape)
+                {
+                    case HazardShape.Tether: r = -1f; break;   // Contains is always false
+                    case HazardShape.Circle: r = h.Radius + Hazard.Margin + Sim.Flat(h.Drift).magnitude * BulletLook; break;
+                    case HazardShape.Ring: case HazardShape.Cone: r = h.Radius + Hazard.Margin; break;
+                    default:
+                    {
+                        float l = Mathf.Max(h.Length, 0) + Hazard.Margin, wd = Mathf.Abs(h.Width) / 2 + Hazard.Margin;
+                        r = Mathf.Sqrt(l * l + wd * wd) + LanePad; break;
+                    }
+                }
+                r += 0.01f;   // rounding
+                rX[i] = h.Origin.x; rZ[i] = h.Origin.z; rR2[i] = r < 0 ? -1f : r * r;
+            }
         }
 
         bool BadAt(Vector3 q)
@@ -1063,6 +1123,7 @@ namespace LastBell.Run
             // allowBurn (no clean spot left): with a place to be (a tower, a ring, a well, a mark), a burning pool is a cost
             for (int i = 0; i < bLive.Count; i++)
             {
+                if (i < rN) { float dx = q.x - rX[i], dz = q.z - rZ[i]; if (dx * dx + dz * dz > rR2[i]) continue; }   // out of its reach: Hits is false
                 var h = bLive[i];
                 if (h.BurnPerSecond <= 0 && bTick + (h.ResolveAt - h.Age) > bIgnoreAfter) continue;
                 if (Hits(h, bMe, q) && !(bAllowBurn && h.BurnPerSecond > 0 && bAnyJob && !h.Pit)) return true;
@@ -1106,6 +1167,7 @@ namespace LastBell.Run
                     if (o.Who != bMe && o.Who && !o.Who.Down && !o.Done && Sim.Flat(o.Who.transform.position - q).magnitude < 4.5f) return true;
                 }
             }
+            if (a != null && a.Planets != null && a.Planets.Live && a.Planets.Near(q, 0.6f, 0.9f)) return true;   // where a planet is going (3 Nov: 5.5 m/s)
             if (bSide != 0 && (a.Sever.SideOfAt(q, a.Sever.LineYaw) != bSide || a.Sever.SideOfAt(q, a.Sever.YawIn(0.6f)) != bSide || a.Sever.SideOfAt(q, a.Sever.YawIn(1.2f)) != bSide || a.Sever.DistToLine(q) < 1.0f)) return true;
             return false;
         }
@@ -1198,11 +1260,15 @@ namespace LastBell.Run
         }
 
         // Sylvara v3: bullet-hell steering (SylvaraSteer). It holds its own angle round her (casters at range, Vanguard
-        // close) and in Hollow Bloom stands next to a Choir Bud to cut it (one bud per bot, by slot). Every 3 ticks it
+        // close) and in Hollow Bloom cuts a Choir Bud (one bud per bot, by slot; BudStand). Every 3 ticks it
         // re-plans the cheapest path through the bullets and telegraphs 0.8 s ahead.
         Vector3 sylMove; bool sylSprint, sylOn, sylDash; float sylCost; Vector3 sylPos;
         int rvTick = -99; PlayerController rvFor; bool rvOk; Vector3 rvWp, rvStand;   // the revive route (ReviveRoute)
         string SylvaraLine() => $"{(dJob == "revive" ? $"revive {(rvOk ? "route" : "wait")} to ({rvStand.x:0.0},{rvStand.z:0.0}) " : "")}cost {sylCost:0.0} move ({sylMove.x:0.0},{sylMove.z:0.0}) sprint {sylSprint} dash {sylDash} at ({sylPos.x:0.0},{sylPos.z:0.0})";
+
+        // how far from its Choir Bud it stands to cut it: Tollbreaker throws from 6 m (a tap flies 9 m), outside the thick of
+        // the bud's own petals; the others stand next to it
+        static float BudStand(PlayerController me) => me.ClassName == "Tollbreaker" ? 6f : 1.8f;
 
         PlayerInput ReadSylvara(PlayerController me, SylvaraEncounter sy)
         {
@@ -1218,7 +1284,7 @@ namespace LastBell.Run
             if (buds.Count > 0)
             {
                 var bud = buds[slot % buds.Count];
-                home = bud + Sim.Flat(pos - bud).normalized * 1.8f; target = bud; reach = bud;
+                home = bud + Sim.Flat(pos - bud).normalized * BudStand(me); target = bud; reach = bud;
             }
             // revives: the spot beside a downed ally is home instead (the steer still dodges, and holding still there
             // channels the revive; no swings, which would pause it). Her bots never revived before (5 Nov sweep: 0 of 6)
@@ -1237,7 +1303,7 @@ namespace LastBell.Run
 
             if (tick % 3 == 1 || me.Dashing)
             {
-                sylMove = SylvaraSteer.Choose(me, pos, home, out sylSprint, out sylDash, out sylCost, reach, reviving ? SylvaraSteer.RevivePull : 0.35f);
+                sylMove = SylvaraSteer.Choose(me, pos, home, out sylSprint, out sylDash, out sylCost, reach, BudStand(me) + 0.8f, reviving ? SylvaraSteer.RevivePull : sy.PhaseName == SylvaraEncounter.PhaseNames[3] ? P4Pull : 0.35f);
                 sylPos = pos;
                 // in reach of the downed ally: hold still so the revive channels, unless standing here gets hit (a near miss
                 // is fine); small steps toward the exact spot kept pausing it (5 Nov)
@@ -1256,9 +1322,9 @@ namespace LastBell.Run
             inp.Aim = target;
             // Choir Buds are a mechanic (boss parts that must be cut), so every bot swings its basic attack at its bud, even
             // the non-attacking menu bots; the boss herself only when attacks are on
-            bool atBud = reach.HasValue && Sim.Flat(target - pos).magnitude <= 3.2f;
+            bool atBud = reach.HasValue && Sim.Flat(target - pos).magnitude <= BudStand(me) + 1.4f;
             // (Tollbreaker plays its rotation: a held Twin Hurl lodges the axe, and lodged axes need a recall)
-            if (!reviving && (atBud || Attacks && Sim.Flat(target - pos).magnitude <= Range(me) + sy.BodyRadius + 2f))
+            if (!reviving && (atBud || Attacks && Sim.Flat(target - pos).magnitude <= SylvaraAttackRange(me, sy.PhaseName) + sy.BodyRadius + 2f))
             {
                 if (me.Kit is TollbreakerKit) Attack(me, ref inp);
                 else inp.P0 = inp.H0 = tick % 6 == 0 || me.ClassName != "Arcanist";
@@ -1285,12 +1351,12 @@ namespace LastBell.Run
         static readonly Vector3[] dirs = MakeDirs();
         static Vector3[] MakeDirs() { var d = new Vector3[16]; for (int i = 0; i < 16; i++) d[i] = Sim.Dir(i * 22.5f); return d; }
 
-        // bud: a Choir Bud it is cutting; ending a move outside its 3 m reach costs more than a near miss (not a hit)
+        // bud: a Choir Bud it is cutting; ending a move outside budReach costs more than a near miss (not a hit)
         // how hard it heads home (cost per metre): a revive pulls harder, or bullets near its path kept a reviver 10 m off the
         // downed ally for the whole bleed-out (5 Nov sweep)
         static float HomePull = 0.35f;
         public const float RevivePull = 1.2f;
-        public static Vector3 Choose(PlayerController me, Vector3 pos, Vector3 home, out bool sprint, out bool dash, out float bestCost, Vector3? bud = null, float homePull = 0.35f)
+        public static Vector3 Choose(PlayerController me, Vector3 pos, Vector3 home, out bool sprint, out bool dash, out float bestCost, Vector3? bud = null, float budReach = 2.6f, float homePull = 0.35f)
         {
             HomePull = homePull;
             var w = me.World; var boss = w.Boss;
@@ -1307,14 +1373,14 @@ namespace LastBell.Run
                 if (SegDist(pos, b.Pos, end) < reach + (b.Split != null ? 3f : 0f)) near.Add(b);
             }
             sprint = false; dash = false;
-            var best = Vector3.zero; bestCost = Cost(me, pos, Vector3.zero, 0, home, boss, bud);
+            var best = Vector3.zero; bestCost = Cost(me, pos, Vector3.zero, 0, home, boss, bud, budReach);
             bool canSprint = me.Stamina > PlayerController.SprintCost;
             for (int s = 0; s < (canSprint ? 2 : 1); s++)
             {
                 float v = s == 0 ? PlayerController.WalkSpeed : PlayerController.SprintSpeed;
                 foreach (var d in dirs)
                 {
-                    float c = Cost(me, pos, d, v, home, boss, bud) + (s == 1 ? 0.6f : 0);
+                    float c = Cost(me, pos, d, v, home, boss, bud, budReach) + (s == 1 ? 0.6f : 0);
                     if (c < bestCost) { bestCost = c; best = d; sprint = s == 1; }
                 }
             }
@@ -1324,7 +1390,7 @@ namespace LastBell.Run
                 float dashSpeed = PlayerController.DashDistance / (PlayerController.DashTicks * Sim.Dt);
                 foreach (var d in dirs)
                 {
-                    float c = Cost(me, pos, d, dashSpeed, home, boss, bud, PlayerController.DashTicks * Sim.Dt) + 2f;
+                    float c = Cost(me, pos, d, dashSpeed, home, boss, bud, budReach, PlayerController.DashTicks * Sim.Dt) + 2f;
                     if (c < bestCost) { bestCost = c; best = d; dash = true; sprint = false; }
                 }
             }
@@ -1333,11 +1399,11 @@ namespace LastBell.Run
 
         // moves at v along d for `moveFor` seconds (all of the horizon by default), then stands
         // what standing still here costs (bullets and telegraphs only): call after Choose, which gathers the near bullets
-        public static float HoldCost(PlayerController me, Vector3 pos) => Cost(me, pos, Vector3.zero, 0, pos, me.World.Boss, null);
+        public static float HoldCost(PlayerController me, Vector3 pos) => Cost(me, pos, Vector3.zero, 0, pos, me.World.Boss, null, 0);
         // the same for walking d at v (no pull home: the end of the walk is home)
-        public static float StepCost(PlayerController me, Vector3 pos, Vector3 d, float v) => Cost(me, pos, d, v, pos + d * v * Horizon, me.World.Boss, null);
+        public static float StepCost(PlayerController me, Vector3 pos, Vector3 d, float v) => Cost(me, pos, d, v, pos + d * v * Horizon, me.World.Boss, null, 0);
 
-        static float Cost(PlayerController me, Vector3 pos, Vector3 d, float v, Vector3 home, BossEncounter boss, Vector3? bud, float moveFor = Horizon)
+        static float Cost(PlayerController me, Vector3 pos, Vector3 d, float v, Vector3 home, BossEncounter boss, Vector3? bud, float budReach, float moveFor = Horizon)
         {
             float cost = 0; var bp = boss != null ? Sim.Flat(boss.transform.position) : Vector3.zero;
             float body = boss != null ? boss.BodyRadius + PlayerController.Radius + 0.1f : 0;
@@ -1361,10 +1427,11 @@ namespace LastBell.Run
                     }
                     else
                     {
-                        // a seed bursts into a ring of petals: keep clear of the burst point and its ring for a moment
+                        // a seed bursts into a ring of petals: its ring hits like any bullet for 1 s after the burst, with the
+                        // same near-miss margin (Tollbreaker lane, 2 Nov: seed bursts were the last hit in lost Hard runs)
                         var at = b.Pos + b.Vel * fuse; float since = t - fuse;
                         float ring = 4.5f * since, gap = Mathf.Abs(Sim.Flat(q - at).magnitude - ring) - (BulletArt.PetalHitRadius + Hazard.Margin + Buffer);
-                        if (since < 0.6f && gap < 0) cost += 40 * early;
+                        if (since < 1f) { if (gap < 0) cost += 100 * early; else if (gap < 0.6f) cost += (0.6f - gap) * 4; }
                     }
                 }
             }
@@ -1377,7 +1444,7 @@ namespace LastBell.Run
                 cost += h.BurnPerSecond > 0 ? 60 : left < Horizon + 0.4f ? 150 : 25;
             }
             cost += Sim.Flat(q - home).magnitude * HomePull;
-            if (bud.HasValue) { float past = Sim.Flat(q - bud.Value).magnitude - 2.6f; if (past > 0) cost += 6 + past * 2; }
+            if (bud.HasValue) { float past = Sim.Flat(q - bud.Value).magnitude - budReach; if (past > 0) cost += 6 + past * 2; }
             return cost;
         }
 

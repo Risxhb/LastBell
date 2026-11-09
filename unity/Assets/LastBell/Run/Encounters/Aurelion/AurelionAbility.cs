@@ -19,6 +19,8 @@ namespace LastBell.Run
         protected AurelionEncounter Boss { get; private set; }
         protected CombatWorld W { get; private set; }
         public void Bind(AurelionEncounter boss, CombatWorld world) { Boss = boss; W = world; }
+        // Last Light cuts the running block off at 20 % (Chzy18, 2 Nov): drop any state the bots or the HUD would still read
+        public virtual void Abort() { }
 
         // Easy stretches every warning, track and window by 1.25 (ABILITIES.md §5); gaps and the punish stay as authored.
         public float WarnScale => W.Difficulty == Difficulty.Easy ? 1.25f : 1f;
@@ -26,7 +28,11 @@ namespace LastBell.Run
         // v2.1 §2: on Hard every lock-to-hit WINDOW is x0.7 (never below `floor`, e.g. Orrery's 2.0 s); tracks stay as on
         // Medium (use T for them). Easy stretches windows like every warning (x1.25).
         // v4 Medium (Chzy18, 1 Nov: "make medium harder"): windows x0.85, halfway to Hard; the same floors apply
-        protected int Win(float seconds, float floor = 0) => Sim.Ticks(Hard && !AurelionArgs.WindowsMedium ? Mathf.Max(seconds * HardWindow, floor) : MediumV4 ? Mathf.Max(seconds * MediumWindow, floor) : seconds * WarnScale);
+        protected int Win(float seconds, float floor = 0) { seconds *= PhaseWindow; return Sim.Ticks(Hard && !AurelionArgs.WindowsMedium ? Mathf.Max(seconds * HardWindow, floor) : MediumV4 ? Mathf.Max(seconds * MediumWindow, floor) : seconds * WarnScale); }
+        // Phases 2 and 3 harder (Chzy18, 2 Nov: "P2 and 3 are too easy"): shorter windows, same floors (proposal; no damage: rejected)
+        // 3 Nov (Chzy18 "I want them harder especially p3"): x0.85 / x0.75, from x0.9 / x0.8
+        public const float P2Window = 0.85f, P3Window = 0.75f;
+        protected float PhaseWindow => Boss.Phase == 2 ? P2Window : Boss.Phase == 3 ? P3Window : 1f;
         public const float HardWindow = 0.7f, MediumWindow = 0.85f;
         protected bool MediumV4 => W.Difficulty == Difficulty.Medium;
         // v3 damage tiers (HARDER-PROMPT target 5): every hit is punish (<= 30) or kill (>= 50) at Medium, nothing between:
@@ -41,7 +47,14 @@ namespace LastBell.Run
         protected int Phase => Boss.Phase;                         // 1 Perfect Order, 2 Misalignment, 3 Exposed Meridian
         protected bool SecondForm => Boss.SecondForm;              // Exposed Meridian (30 %)
         protected List<PlayerController> Standing() => W.Players.FindAll(p => p && !p.Down);
-        protected int N => Math.Max(1, Standing().Count);
+        // counted in place, not via Standing(): bots read it through WellRadius on every probe (perf 3 Nov: 0.5-1.4 MB a frame in Total Eclipse)
+        protected int N { get { int n = 0; var ps = W.Players; for (int i = 0; i < ps.Count; i++) if (ps[i] && !ps[i].Down) n++; return Math.Max(1, n); } }
+        // aim targets: standing and not reviving an ally (revive rule, 4 Nov: "No mechanic aims at them"; Codex AUR-TARGET-OTHER,
+        // 7 Nov). Only who an attack is aimed at: counts, soaks, timings and collisions still use every standing player, so a
+        // reviver inside someone else's hazard is still hit.
+        protected List<PlayerController> Aimable() => W.Players.FindAll(p => p && !p.Down && p.Reviving == null);
+        protected PlayerController FarthestAim(Vector3 from) => Aimable().OrderByDescending(p => Sim.Flat(p.transform.position - from).sqrMagnitude).FirstOrDefault();
+        protected PlayerController NearestAim(Vector3 from) => Aimable().OrderBy(p => Sim.Flat(p.transform.position - from).sqrMagnitude).FirstOrDefault();
         protected PlayerController Farthest(Vector3 from) => Standing().OrderByDescending(p => Sim.Flat(p.transform.position - from).sqrMagnitude).FirstOrDefault();
         protected PlayerController Nearest(Vector3 from) => Standing().OrderBy(p => Sim.Flat(p.transform.position - from).sqrMagnitude).FirstOrDefault();
         public const int LastLightCap = 90;   // the biggest hit Last Light's scaling may build, after the difficulty scale

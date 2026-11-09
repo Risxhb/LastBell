@@ -18,11 +18,18 @@ namespace LastBell.Run
             if (t.Boss == null) yield break;
             var up = t.Boss.Uprising;
             int c0 = t.W.Tick;
+            var channel = t.W.Hazards.Spawn(new Hazard { Source = "Pour Channel", Shape = HazardShape.Lane, Kind = HazardKind.Strike, Origin = Vector3.zero, Yaw = 40f, Length = 14f, Width = 2.6f, LockAt = 0, ResolveAt = Sim.Ticks(10f), BurnPerSecond = 20f });
             t.Begin(up.Run());
             yield return t.Seconds(3f);
-            t.Check("4 players: three turrets, three castings as boss parts", up.Turrets.Count == 3 && t.W.Parts.Count(p => p.Alive) == 3, $"{up.Turrets.Count} turrets, {t.W.Parts.Count} parts");
+            t.Check("4 players: two turrets, two castings as boss parts", up.Turrets.Count == 2 && t.W.Parts.Count(p => p.Alive) == 2, $"{up.Turrets.Count} turrets, {t.W.Parts.Count} parts");
             t.Check("each casting sits 7.5 m out, across the arena from its turret", up.Turrets.All(x => Mathf.Abs(Sim.Flat(x.Casting.Pos).magnitude - FoundryUprising.CastRing) < 0.05f && Vector3.Dot(Sim.Flat(x.Pos).normalized, Sim.Flat(x.Casting.Pos).normalized) < -0.99f));
             t.Check("Pour Flood lands at 30 s", up.Flood != null && up.Flood.ResolveAt == Sim.Ticks(30f), $"{up.Flood?.ResolveAt}");
+            t.Check("the last Casting Order's Pour Channels drain as the turrets rise", up.Drained > 0 && !t.W.Hazards.Live.Contains(channel), $"drained {up.Drained}");
+            // burning ground on and around a casting cools at once, so breaking it never means standing in burn
+            int cooled0 = up.Cooled; var cpos = up.Turrets[0].Casting.Pos;
+            for (int k = 0; k < 6; k++) t.W.Hazards.Spawn(new Hazard { Source = "Test Slag", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = cpos + Sim.Dir(k * 60f) * 2.5f, Radius = 2f, LockAt = 0, ResolveAt = Sim.Ticks(1f), BurnPerSecond = 20f });
+            yield return t.Ticks(2);
+            t.Check("a standing casting cools the burning ground round it", up.Cooled - cooled0 >= 6 && !t.W.Hazards.Live.Any(b => b.Source == "Test Slag" && b.Age < b.ResolveAt - 1), $"cooled {up.Cooled - cooled0}");
 
             float s = 0;
             while (s < 9f) { foreach (var p in t.Party) if (p.Hp < 60) p.DebugSetHp(PlayerController.MaxHp); s += Time.deltaTime; yield return null; }
@@ -43,13 +50,17 @@ namespace LastBell.Run
             int boss0 = t.Boss.Hp;
             int dealt = t.W.DamagePart(first.Casting, 100, first.Casting.Pos, "test");
             t.Check("painshare: half the damage to a casting also hits Crucivar", dealt == 100 && boss0 - t.Boss.Hp == 50, $"dealt {dealt}, boss -{boss0 - t.Boss.Hp}");
+            t.Check("each casting shows its HP and kill order to bots (Hp, MaxHp, Order)", Mathf.Approximately(first.Casting.MaxHp, first.CastMax) && Mathf.Approximately(first.Casting.Hp, first.CastMax - 100) && up.Turrets.All(x => x.Casting.Order == x.K),
+                $"{first.Casting.Hp}/{first.Casting.MaxHp}, order {string.Join(",", up.Turrets.Select(x => x.Casting.Order))}");
+            yield return t.Shot("v4_casting_bars");   // casting I at -100 HP: the bars under the numerals
 
             foreach (var x in up.Turrets.ToList()) t.W.DamagePart(x.Casting, 99999, x.Casting.Pos, "test");
             yield return t.Until(() => !t.Boss.TestBusy, 3f, "uprising over");
             t.Check("killing every casting sinks every turret and ends the uprising", !t.Boss.TestBusy && up.Turrets.All(x => !x.Up) && !t.W.Parts.Any(p => p.Alive));
             // bullets already in flight still land: keep the still party standing (the denser volleys of 11-01 down it)
             for (s = 0; s < 2f; s += Time.deltaTime) { foreach (var p in t.Party) p.DebugSetHp(PlayerController.MaxHp); yield return null; }
-            t.Check("no flood once the turrets are down", t.Party.All(p => !p.Down) && up.Floods == 0);
+            // a still dummy can go down to bullets before the castings die (two turrets aim differently since 4 Nov); the check is the flood
+            t.Check("no flood once the turrets are down", up.Floods == 0 && !t.Hits.Any(h => h.Source == "Pour Flood"), $"floods {up.Floods}, down: {string.Join(",", t.Party.Where(p => p.Down).Select(p => t.Party.IndexOf(p)))}");
             t.Check("one hit per instance", t.OneHitPerInstance());
             yield return t.Shot("v4_foundry_uprising");
 
@@ -60,6 +71,40 @@ namespace LastBell.Run
             while (s < 28f) { foreach (var p in t.Party) p.DebugSetHp(PlayerController.MaxHp); s += Time.deltaTime; yield return null; }
             yield return t.Until(() => t.Party.All(p => p.Down), 6f, "flood");
             t.Check("an uprising left standing floods at 30 s and downs the whole party", t.Party.All(p => p.Down) && up.Floods == 1, $"down {t.Party.Count(p => p.Down)}/4, floods {up.Floods}");
+
+            t.Check("Medium has no Aimed Streams", up.Aimed == 0, $"aimed {up.Aimed}");
+            // Hard: the casting that may die next is framed, the others dimmed (look check only)
+            yield return t.Setup(4, Difficulty.Hard, at: new[] { new Vector3(0, 0, 3f), new Vector3(0, 0, -13f), new Vector3(9, 0, 0), new Vector3(-6, 0, 5) });
+            if (t.Boss == null) yield break;
+            up = t.Boss.Uprising;
+            t.Begin(up.Run());
+            yield return t.Seconds(3f);
+            // Hard: Aimed Streams, turret I opens with a Lane Stream whose middle lane runs through the nearest player
+            var tu0 = up.Turrets[0];
+            var nearP = t.Party.Where(p => !p.Down).OrderBy(p => Sim.Flat(p.transform.position - tu0.Pos).sqrMagnitude).First();
+            var lanes = t.Spawned("Lane Stream path").Where(x => Sim.Flat(x.H.Origin - tu0.Pos).magnitude < 6f).ToList();
+            t.Check("Hard: Aimed Streams, a Lane Stream path runs through the player nearest its turret", up.Aimed > 0 && lanes.Any(x => x.H.Contains(nearP.transform.position)),
+                $"aimed {up.Aimed}, {lanes.Count} lane paths");
+            // no mechanic aims at a reviver (review CRU-TARGET): down another player beside the nearest one, who then channels
+            var fallen = t.Party.First(p => p != nearP && !p.Down);
+            t.Place(fallen, nearP.transform.position + new Vector3(0.8f, 0, 0));
+            fallen.ForceDown("Crucivar test: revive target");
+            for (int k = 0; k < 6; k++) { nearP.DebugSetHp(PlayerController.MaxHp); yield return null; }
+            var aimAt = up.AimTarget(tu0);
+            t.Check("Hard: Aimed Streams never targets an active reviver", nearP.Reviving == fallen && aimAt != null && aimAt != nearP,
+                $"reviving {(nearP.Reviving == fallen)}, target {(aimAt == null ? "none" : aimAt == nearP ? "the reviver" : "another player")}");
+            // no immunity: a reviver standing in a hazard is still hit
+            int hp0 = nearP.Hp;
+            t.W.Hazards.Spawn(new Hazard { Source = "Test Strike", Shape = HazardShape.Circle, Kind = HazardKind.Strike, Origin = nearP.transform.position, Radius = 1f, LockAt = 0, ResolveAt = 1, Damage = 10 });
+            yield return t.Ticks(3);
+            t.Check("a reviver in a hazard is still hit", nearP.Hp < hp0 || t.HitsOn(nearP).Any(h => h.Source == "Test Strike"), $"hp {hp0} -> {nearP.Hp}");
+            fallen.DebugRevive();
+            t.W.DamagePart(up.Turrets[0].Casting, Mathf.RoundToInt(up.Turrets[0].CastMax * 0.6f), up.Turrets[0].Casting.Pos, "test");
+            foreach (var p in t.Party) p.DebugSetHp(PlayerController.MaxHp);
+            yield return t.Shot("v4_casting_bars_hard");
+            foreach (var x in up.Turrets.ToList()) t.W.DamagePart(x.Casting, 99999, x.Casting.Pos, "test");   // in order, so nothing fires
+            yield return t.Until(() => !t.Boss.TestBusy, 3f, "Hard uprising over");
+            t.Check("Hard: killing the castings in order ends the uprising", !t.Boss.TestBusy && up.Turrets.All(x => !x.Up));
         }
     }
 }
