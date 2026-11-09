@@ -91,7 +91,7 @@ namespace LastBell.Run
         int rotHigh, rotLow, tidesLow;
         System.Random rng;
         readonly List<PlayerController> carriers = new List<PlayerController>();
-        readonly List<Transform> props = new List<Transform>();       // placeholder cords, stake posts, seed orbs
+        readonly List<Transform> props = new List<Transform>();       // cords, stake posts, seed orbs (VesperProps)
         readonly List<(Transform orb, PlayerController who, int net)> seedOrbs = new List<(Transform, PlayerController, int)>();   // net: LAN prop id
         BellkeeperFx.Telegraph dark;
         Transform visual, core, halo; Renderer coreR; float bob;
@@ -174,7 +174,7 @@ namespace LastBell.Run
         protected override void StepAlways()
         {
             // seed orbs ride over their carriers (presentation, host side)
-            foreach (var (orb, who, _) in seedOrbs) if (orb && who) orb.position = who.transform.position + Vector3.up * 2.9f;
+            foreach (var (orb, who, _) in seedOrbs) if (orb && who) orb.position = who.transform.position + Vector3.up * VesperProps.SeedHeight;
             if (!Phase2 && !GatePending && Hp * 2 <= MaxHp) GatePending = true;
             if (presenter) presenter.TickBoss(Current == "reposition" ? "Walk" : loopClip);
         }
@@ -232,7 +232,7 @@ namespace LastBell.Run
                 Live(c.Lane, StrikeFill, StrikeBorder);
                 c.Stake = new Hazard { Source = "Vesper Cords (stake)", MechanicId = MechanicIcons.SoakTower, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = at,
                     Radius = R.StakeRadius, LockAt = 0, ResolveAt = resolve, Damage = 0, HitOnResolve = false, Soak = true, ShareCount = 1, Knockback = 0, Stun = 0 };
-                c.View = CordProp(boss, at); c.Post = Prop(PrimitiveKind.Cylinder, at + Vector3.up * 0.5f, new Vector3(0.35f, 0.5f, 0.35f), Cobalt, 0, "Cord stake (stand-in)");
+                c.View = AddProp(VesperProps.MakeCord(transform.parent, transform, at, "Vesper cord")); c.Post = AddProp(VesperProps.MakeStake(transform.parent, transform, at, "Cord stake"));
                 c.Stake.OnResolve = hz =>
                 {
                     bool on = false;
@@ -313,7 +313,7 @@ namespace LastBell.Run
         {
             PendingSeeds++;
             who.Marks.Add(MechanicIcons.CarriedMark);
-            var orb = Prop(PrimitiveKind.Sphere, who.transform.position + Vector3.up * 2.9f, Vector3.one * 0.45f, Gold, 4f, "Seed of light (stand-in)");
+            var orb = AddProp(VesperProps.MakeSeed(transform.parent, who.transform.position + Vector3.up * VesperProps.SeedHeight, "Seed of light"));
             seedOrbs.Add((orb, who, NextNetPropId--));
             var h = new Hazard { Source = "Seedgift", MechanicId = MechanicIcons.SoakTower, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Sim.Flat(who.transform.position),
                 Radius = R.SeedRadius, LockAt = lockAt, ResolveAt = landAt, ShareTotal = total, ShareCount = share, Soak = true, Knockback = 0, Stun = 6 };
@@ -453,20 +453,8 @@ namespace LastBell.Run
         }
         void OpenPetals() { if (visual) visual.localScale = new Vector3(1.15f, 1.05f, 1.15f); }
 
-        // ---------------- placeholder props ----------------
-        Transform Prop(PrimitiveKind kind, Vector3 at, Vector3 scale, Color c, float glow, string name)
-        {
-            var t = Prim.Make(kind, transform.parent, at, scale, c, glow); t.name = name;
-            t.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            props.Add(t); return t;
-        }
-        Transform CordProp(Vector3 from, Vector3 to)
-        {
-            var mid = (from + to) / 2 + Vector3.up * 1.0f; var d = Sim.Flat(to - from);
-            var t = Prop(PrimitiveKind.Cube, mid, new Vector3(0.08f, 0.08f, d.magnitude), CordGlow, 3f, "Vesper cord (stand-in)");
-            t.rotation = Quaternion.LookRotation(d.sqrMagnitude > 1e-4f ? d : Vector3.forward);
-            return t;
-        }
+        // ---------------- props (VesperProps: the Blender models, or the labelled primitives without them) ----------------
+        Transform AddProp(Transform t) { props.Add(t); return t; }
         void KillProp(Transform t) { if (t) { props.Remove(t); Destroy(t.gameObject); } }
         void ClearProps() { foreach (var t in props) if (t) Destroy(t.gameObject); props.Clear(); seedOrbs.Clear(); }
 
@@ -503,19 +491,12 @@ namespace LastBell.Run
         {
             switch (kind)
             {
-                case NetStake: { var t = Prim.Make(PrimitiveKind.Cylinder, transform.parent, Vector3.zero, new Vector3(0.35f, 0.5f, 0.35f), Cobalt, 0); t.name = "Cord stake (LAN)"; NoShadow(t); return t; }
-                case NetCord:
-                {
-                    var root = new GameObject("Vesper cord (LAN)").transform; root.SetParent(transform.parent, false);
-                    var bar = Prim.Make(PrimitiveKind.Cube, root, Vector3.zero, new Vector3(0.08f, 0.08f, 1f), CordGlow, 3f); NoShadow(bar);
-                    root.gameObject.AddComponent<VesperNetCord>().Bind(transform, bar);
-                    return root;
-                }
-                case NetSeed: { var t = Prim.Make(PrimitiveKind.Sphere, transform.parent, Vector3.zero, Vector3.one * 0.45f, Gold, 4f); t.name = "Seed of light (LAN)"; NoShadow(t); return t; }
+                case NetStake: return VesperProps.MakeStake(transform.parent, transform, Vector3.zero, "Cord stake (LAN)");
+                case NetCord: return VesperProps.MakeCord(transform.parent, transform, Vector3.zero, "Vesper cord (LAN)");   // sent at its stake; runs from the replica vessel
+                case NetSeed: return VesperProps.MakeSeed(transform.parent, Vector3.zero, "Seed of light (LAN)");
                 default: return null;
             }
         }
-        static void NoShadow(Transform t) { var r = t ? t.GetComponent<MeshRenderer>() : null; if (r) r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; }
 
         // looks: Glow = core glow; Look[0] = phase 2 (petals open, 1/0). The halo drop follows the attack name, the tip-over Dead.
         public override void CaptureNetLook(Networking.LanWorldFrame.BossState into)

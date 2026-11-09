@@ -65,8 +65,11 @@ namespace LastBell.Run
         void Note(string s) { lines.Add("      " + s); Debug.Log("[vesper-seedkeeper-test] " + s); }
         void Section(string s) { lines.Add(""); lines.Add("== " + s); }
 
-        void RenderShot(string name, Vector3 pos, Vector3 look, float fov, int w = 1280, int h = 720)
+        // hidePlayers: the close prop shots hide the party's renderers for that one render (players stand on the stakes)
+        void RenderShot(string name, Vector3 pos, Vector3 look, float fov, int w = 1280, int h = 720, bool hidePlayers = false)
         {
+            var hidden = new List<Renderer>();
+            if (hidePlayers) foreach (var p in d.World.Players) if (p) foreach (var r in p.GetComponentsInChildren<Renderer>()) if (r.enabled) { r.enabled = false; hidden.Add(r); }
             var go = new GameObject("capture camera"); var cam = go.AddComponent<Camera>();
             if (Camera.main) cam.CopyFrom(Camera.main);
             cam.fieldOfView = fov; cam.aspect = w / (float)h; cam.orthographic = false;
@@ -77,6 +80,7 @@ namespace LastBell.Run
             RenderTexture.active = prev; cam.targetTexture = null;
             File.WriteAllBytes(Path.Combine(dir, $"{++shots:00}_{name}.png"), tex.EncodeToPNG());
             Destroy(tex); rt.Release(); Destroy(rt); Destroy(go);
+            foreach (var r in hidden) if (r) r.enabled = true;
         }
         IEnumerator Shot(string name)
         {
@@ -250,6 +254,26 @@ namespace LastBell.Run
             boss.ForcedNext = "Cords";
             yield return Until(() => boss.PendingCords > 0, 20, "cords out");
             yield return Wait(4.5f); Overhead($"{tag}_cords");
+            if (party == 2)
+            {
+                bool all = VesperProps.HasAll;
+                var stakeView = GameObject.Find("Cord stake"); var cordView = GameObject.Find("Vesper cord");
+                Check(all ? "props: stakes and cords use the Blender models (no primitive fallbacks)" : "props: no prop models in this build, the labelled primitives are used",
+                    stakeView && cordView && (all ? VesperProps.FallbacksMade == 0 && stakeView.transform.Find(VesperProps.Stake) && cordView.transform.Find(VesperProps.Cord)
+                                                  : VesperProps.ModelsMade == 0), $"models {VesperProps.ModelsMade}, fallbacks {VesperProps.FallbacksMade}");
+            }
+            if (party == 4)
+            {
+                // art pass frames: the game camera, then a close look at one stake with its cord back to the vessel
+                yield return Shot($"{tag}_cords_game_camera");
+                var parts = boss.LiveStakeParts();
+                if (parts.Count > 0)
+                {
+                    var sp = Sim.Flat(parts[0].Pos); var outward = sp.sqrMagnitude > 0.01f ? sp.normalized : Vector3.forward;
+                    var side = Vector3.Cross(Vector3.up, outward);
+                    RenderShot($"{tag}_cords_close_stake", sp + outward * 2.6f + side * 1.6f + Vector3.up * 1.7f, sp - outward * 1.2f + Vector3.up * 0.8f, 40, hidePlayers: true);
+                }
+            }
             yield return BetweenBlocks();
             var cords = boss.CordLog.Skip(c0).ToList();
             Check($"{tag} Vesper Cords: {party} stakes and cords, all resolved", cords.Count == 1 && cords[0].stakes == party, string.Join(",", cords.Select(c => $"w{c.wave}:{c.severed}/{c.stakes}")));
@@ -329,7 +353,16 @@ namespace LastBell.Run
             Check($"{tag} Seedgift: {R.Seeds(party)} seed(s), carriers marked", carriers == R.Seeds(party) && boss.Carriers.All(c => c.Marks.Contains(MechanicIcons.CarriedMark)), $"{carriers} carriers");
             yield return Wait(2.5f);
             foreach (var p in d.World.Players) if (p.Input is AllyBot ab) Note($"{tag} Seedgift +2.5 s {p.ClassName}{(boss.Carriers.Contains(p) ? " (carrier)" : "")}: {ab.DebugLine}");
-            if (party == 4 && !tag.Contains("P2")) { yield return Wait(1.7f); Overhead($"{tag}_seedgift_stacks"); }
+            if (party == 4 && !tag.Contains("P2"))
+            {
+                yield return Wait(1.7f); Overhead($"{tag}_seedgift_stacks");
+                yield return Shot($"{tag}_seedgift_game_camera");
+                if (boss.Carriers.Count > 0 && boss.Carriers[0])
+                {
+                    var seed = boss.Carriers[0].transform.position + Vector3.up * VesperProps.SeedHeight; var o = Sim.Flat(seed); var outward = o.sqrMagnitude > 0.01f ? o.normalized : Vector3.forward;
+                    RenderShot($"{tag}_seedgift_close_seed", seed + outward * 2.4f + Vector3.Cross(Vector3.up, outward) * 1.2f + Vector3.up * 0.4f, seed + Vector3.down * 0.5f, 40, hidePlayers: true);
+                }
+            }
             yield return Until(() => boss.NightActive, 15, "nightfall");
             if (party == 4 && !tag.Contains("P2")) { yield return Wait(3.0f); Overhead($"{tag}_nightfall"); yield return Shot($"{tag}_nightfall_game_camera"); }
             yield return BetweenBlocks();
@@ -386,7 +419,7 @@ namespace LastBell.Run
             boss.DebugDefeat();
             yield return null;
             Check($"{tag} defeat mid-Seedgift: hazards, props and carried marks gone in the killing tick", boss.Dead && d.World.Hazards.Count == 0 && boss.PendingSeeds == 0 &&
-                d.World.Players.All(p => !p.Marks.Contains(MechanicIcons.CarriedMark)) && !GameObject.Find("Seed of light (stand-in)"));
+                d.World.Players.All(p => !p.Marks.Contains(MechanicIcons.CarriedMark)) && !GameObject.Find("Seed of light") && !GameObject.Find("Seed of light (stand-in)"));
             yield return Until(() => d.State == RunState.Results, 8, tag + " results");
             Check($"{tag}: practice ends in victory", d.State == RunState.Results && d.Victory);
         }
