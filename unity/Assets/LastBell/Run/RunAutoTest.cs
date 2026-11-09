@@ -945,6 +945,18 @@ namespace LastBell.Run
 
             // Phase 1: one full loop
             bool p1Shot = false;
+            // a doubled pod's second ring, after its hazard resolves, stays readable for bots until it fires (review SYL-SECOND-POD)
+            bool pendSeen = false, pendOk = true; var pend = new List<(Vector3 at, float r0, float land, bool twice)>();
+            IEnumerator WatchPods()
+            {
+                while (d.World != null && d.State == RunState.Combat && !sy.Order.Contains("Triangle Pods"))
+                {
+                    pend.Clear(); sy.PendingPodRings(pend);
+                    foreach (var q in pend) { pendSeen = true; pendOk &= q.land >= 0 && q.land <= SylvaraEncounter.PodSecondAfter + 0.02f && q.r0 > 0; }
+                    yield return null;
+                }
+            }
+            StartCoroutine(WatchPods());
             float s1 = Time.time;
             while (Time.time - s1 < 34f && d.State == RunState.Combat && !sy.Order.Contains("Triangle Pods"))
             {
@@ -957,6 +969,7 @@ namespace LastBell.Run
             foreach (var id in new[] { "Petal Spiral", "Seed Pods", "Waterfall Jets", "Toll", "Feet Pod", "Pruning Arc", "Doubled Pods", "Second Spiral", "Triangle Pods" })
                 Check($"Sylvara P1 uses {id}", sy.Order.Contains(id));
             Check("Sylvara P1 fills the arena with bullets", d.World.Bullets.Fired > 300, $"{d.World.Bullets.Fired} fired, peak {d.World.Bullets.Peak}");
+            Check("a doubled pod's second ring stays visible to bots until it fires", pendSeen && pendOk, $"seen {pendSeen}");
             // her attack clips (proposal 2 Nov): a Conduct loop under the spirals, one-shots on the attacks
             Check("Sylvara conducts while a spiral runs", sy.LoopClip == "ConductLoop", sy.LoopClip);
             foreach (var c in new[] { "Toll", "CallWater", "PruningArc", "Seed" }) Check($"Sylvara P1 plays the {c} clip", sy.Clips.Contains(c));

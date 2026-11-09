@@ -83,6 +83,11 @@ namespace LastBell.Run
         sealed class Emitter { public bool On = true, Looping, Lane; public Action<float> Update; public string Tag; }
         readonly List<Emitter> emit = new List<Emitter>();
         readonly List<(int at, Action fn)> later = new List<(int, Action)>();
+        // a doubled pod's second ring between its first ring and its own spawn: the hazard is gone by then, so bots read it here
+        readonly List<(Vector3 at, float r0, int fire)> podRings = new List<(Vector3, float, int)>();
+        public void PendingPodRings(List<(Vector3 at, float r0, float land, bool twice)> into) { foreach (var p in podRings) if (p.fire >= Age) into.Add((p.at, p.r0, (p.fire - Age) * Sim.Dt, false)); }
+        // where a pod's petal ring starts (its circle less PodInset; a pod on her centre starts at her rim)
+        public float PodR0(Vector3 origin, float r) => Mathf.Max(r - PodInset, Sim.Flat(origin).sqrMagnitude < 0.01f ? Rim : 0);
         Emitter sp1, sp2;
 
         sealed class Bud { public Vector3 Pos; public float Hp = BudHp, Life, Base, Acc; public int Born; public bool Alive = true; public Transform Prop; public PropMotion View; public Hazard Timer; public BossPart Part; }
@@ -305,7 +310,7 @@ namespace LastBell.Run
         void ClearFight()
         {
             foreach (var e in emit) e.On = false;
-            emit.Clear(); spinDir.Clear(); later.Clear(); sp1 = sp2 = null; HazardTag.Clear(); tagNow = null;
+            emit.Clear(); spinDir.Clear(); later.Clear(); podRings.Clear(); sp1 = sp2 = null; HazardTag.Clear(); tagNow = null;
             foreach (var b in buds) KillBud(b);
             buds.Clear();
             W.Bullets.ClearAll();
@@ -494,9 +499,14 @@ namespace LastBell.Run
             h.OnResolve = hz =>
             {
                 W.BossFx.ChimeResolve(hz.Origin, hz.Radius); Release(0.5f);
-                float r0 = Mathf.Max(r - PodInset, hz.Origin.sqrMagnitude < 0.01f ? Rim : 0);
+                float r0 = PodR0(hz.Origin, r);
                 PetalRing(hz.Origin, n, PodPetalSpeed, off, r0, 12, "Pod Petal");
-                if (doubled) { var o = hz.Origin; Later(PodSecondAfter, () => PetalRing(o, n, PodPetalSpeed, off + Mathf.PI / n, r0, 12, "Pod Petal")); }
+                if (doubled)
+                {
+                    var ring = (hz.Origin, r0, Age + Mathf.Max(1, Sim.Ticks(PodSecondAfter)));   // the tick Later fires on
+                    podRings.Add(ring);
+                    Later(PodSecondAfter, () => { podRings.Remove(ring); PetalRing(ring.Item1, n, PodPetalSpeed, off + Mathf.PI / n, ring.Item2, 12, "Pod Petal"); });
+                }
             };
             // the pod model drops onto the warning in its last 0.4 s and lands on the resolve (proposal art)
             var pv = SylvaraProps.Spawn(SylvaraProps.Pod, transform.parent, h.Origin, LookRnd(0, 360));
@@ -1045,7 +1055,7 @@ namespace LastBell.Run
         protected override void OnDefeat()
         {
             foreach (var e in emit) e.On = false;
-            emit.Clear(); spinDir.Clear(); later.Clear(); foreach (var b in buds) KillBud(b); buds.Clear(); colour.Clear(); swapWarned.Clear();
+            emit.Clear(); spinDir.Clear(); later.Clear(); podRings.Clear(); foreach (var b in buds) KillBud(b); buds.Clear(); colour.Clear(); swapWarned.Clear();
             ClearProps();
             if (NetRecording) NetFx("SylvaraEncounter.Clear");
             glowTarget = 0.3f; glowLevel = 2f;
