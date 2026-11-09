@@ -62,9 +62,16 @@ namespace LastBell.Run
         // drink below this. On Crucivar 60, so a 40 hp potion is never part wasted: at 70 the Hard bots reached his Phase 3
         // with 0-1 potions each (9 Nov sweep); the other bosses keep 70
         int DrinkAt(BossEncounter boss) => Mode == BotMode.Passive ? 40 : boss is CrucivarEncounter ? 60 : 70;
+        // a Crucivar casting up (the Pour Flood comes at 30 s): the standing bots break it, and walk to a downed ally only once
+        // they have been down CastingReviveAfter (bleed-out 30 s) or the castings are gone. In the 9 Nov Hard sweep every flood
+        // came after 1-2 downs: the party's damage fell from 60-150 to 15-25 a second, far more than one bot's share, as the
+        // others walked to revive, were held off by the bullets and stood idle
+        const float CastingReviveAfter = 18f;
+        bool CastingFirst(BossEncounter boss, PlayerController downed) => boss is CrucivarEncounter && tPart && downed != null && downed.DownedTicks < Sim.Ticks(CastingReviveAfter);
         bool ReviveJob(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
         {
             if (!ReviveSpot(me, pos, out var spot, out var downed, boss is CrucivarEncounter ? CrucivarReviveReach : ReviveReach)) { rvWhy = "none in reach"; return false; }
+            if (CastingFirst(boss, downed) && downed.ReviveProgress <= 0 && Sim.Flat(spot - pos).magnitude > 1.5f) { rvWhy = "casting first"; return false; }
             // the spot on our side is in something: any other spot still in revive reach round them that is clear, the nearest.
             // Crucivar's allies go down in or beside a brand pool or Pour Channel, which kept the one spot burning for the whole
             // bleed-out, and nobody revived (8 Nov Hard party sweeps: 0 revives in Phase 1, the party short at the castings)
@@ -608,7 +615,7 @@ namespace LastBell.Run
                 if (carrier) home = CastingBrandSpot(me, pos, carried, out var cs) ? cs : (pos.magnitude > 0.1f ? pos.normalized : Vector3.forward) * Mathf.Min(BrandRing, CombatWorld.PlayerBound - 1.2f);
                 // a downed ally anywhere on the floor (the nearest bot to them): their side is home, the plan still dodges the bullets
                 // (9 Nov Brass Foundry sweeps: allies down 16-22 m off were never revived while the turrets fired)
-                else if (ReviveSpot(me, pos, out var rs, out var rwho, CrucivarReviveReach) && NearestBot(me, rwho, rvFor == rwho)) { home = Sim.Flat(rs); rvFor = rwho; volRevive = true; }
+                else if (ReviveSpot(me, pos, out var rs, out var rwho, CrucivarReviveReach) && NearestBot(me, rwho, rvFor == rwho) && !(CastingFirst(boss, rwho) && rwho.ReviveProgress <= 0)) { home = Sim.Flat(rs); rvFor = rwho; volRevive = true; }
                 else if (Attacks && AttackSpot(me, boss, out var spot)) home = Sim.Flat(spot);
                 volReach = Attacks && !carrier; volPull = 0.6f; volEsc = carrier ? "carry" : null;
                 if (volRevive) { volReach = false; volPull = 1.2f; volEsc = "rv"; }
