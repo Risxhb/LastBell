@@ -76,6 +76,34 @@ namespace LastBell.Run
                 long m = HitFeel.AllocNow() - m0;
                 Check("hit feel: 5000 hits on the boss allocate nothing", m <= 0, m + " bytes");
                 HitFeel.ClearTransient();
+                // the same with a LAN host recording (review PRES-LAN-ALLOC, 9 Nov): typed, pooled damage effects, drained
+                // every 10 hits as the host's snapshots do; one dealer's hits in one tick travel as one effect
+                var cap = new Networking.LanFxCapture(null);
+                try
+                {
+                    var drained = new System.Collections.Generic.List<Networking.LanWorldFrame.Effect>(64);
+                    int effects = 0, sum = 0, want = 0;
+                    for (int i = 0; i < 200; i++) { HitFeel.BossDamage(new Vector3(i % 7, 0, 0), 10, (i & 1) == 0 ? d.Player : null); if (i % 10 == 9) { drained.Clear(); cap.Drain(drained); } }
+                    GC.Collect(); m0 = HitFeel.AllocNow();
+                    for (int i = 0; i < 5000; i++)
+                    {
+                        int amount = 10 + i % 300; want += amount;
+                        HitFeel.BossDamage(new Vector3(i % 7, 0, 0), amount, (i & 1) == 0 ? d.Player : null);
+                        if (i % 10 == 9) { drained.Clear(); cap.Drain(drained); effects += drained.Count; for (int k = 0; k < drained.Count; k++) sum += drained[k].Args[1].I; }
+                    }
+                    m = HitFeel.AllocNow() - m0;
+                    Check("hit feel: 5000 LAN-recorded hits allocate nothing", m <= 0 && effects > 0, $"{m} bytes, {effects} effects");
+                    Check("hit feel: LAN damage effects carry every point of damage", sum == want && effects <= 1000, $"{sum} of {want} in {effects} effects");
+                }
+                finally { cap.Dispose(); HitFeel.ClearTransient(); }
+            }
+            // a LAN client's intro card names the replicated boss's arena (review PRES-LAN-CARD, 9 Nov)
+            {
+                int keep = d.Encounter;
+                d.SetLanEncounter(RunDirector.SylvaraPractice); string sylvara = BossMoments.RoleLine(d);
+                d.SetLanEncounter(RunDirector.BellkeeperUltimatePractice); string bell = BossMoments.RoleLine(d);
+                d.SetLanEncounter(keep);
+                Check("hit feel: a LAN client's card names the replicated boss's arena", sylvara != bell && !sylvara.Contains("Throne"), $"'{sylvara}' / '{bell}'");
             }
             PresentationSettings.TestOff = false; HitFeel.LegacyLook = false;
             yield return PhaseToMenu();

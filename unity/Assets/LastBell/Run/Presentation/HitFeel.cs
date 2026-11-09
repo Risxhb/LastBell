@@ -50,9 +50,9 @@ namespace LastBell.Run.Presentation
         public static void BossDamage(Vector3 at, int amount, PlayerController by)
         {
             if (LegacyLook) { RunHud.Float(at, amount.ToString(), new Color(1f, 0.86f, 0.45f)); return; }   // the pre-8 Nov float, for before/after
-            if (LanFx.Record != null) LanFx.Record(LanFxTarget.Hud, "Damage", new object[] { at, amount, by });
-            if (amount <= 0) return;
-            long a0 = Measuring ? HitFeel.AllocNow() : 0;
+            long a0 = Measuring ? HitFeel.AllocNow() : 0;   // measured across the whole call, the LAN recording included
+            LanFx.RecordDamage?.Invoke(at, amount, by);       // typed and pooled (LanFxCapture), so a hit allocates nothing
+            if (amount <= 0) { if (Measuring) AllocBytes += Math.Max(0, HitFeel.AllocNow() - a0); return; }
             var dir = RunDirector.Instance; var local = dir ? dir.Player : null;
             var world = dir ? dir.World : null;
             Kind kind = by == null ? (world != null && world.Players.Count <= 1 ? Kind.Mine : Kind.Neutral) : by == local ? Kind.Mine : Kind.Ally;

@@ -184,6 +184,8 @@ namespace LastBell.Run
         {
             World = world; Player = local; Allies.Clear(); Allies.AddRange(others); Mode = RunMode.Practice;
         }
+        // LAN client: the replicated boss's index, so cards that name the arena (BossMoments.RoleLine) match the host's fight
+        public void SetLanEncounter(int index) { if (index >= 0 && index < Bosses.Length) Encounter = index; }
         public void ApplyLanState(RunState state, int stateTicks, bool victory, BossEncounter boss)
         {
             // the replica never runs Go(): start or end the boss music here, as Go() does on the host
