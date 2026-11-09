@@ -699,6 +699,9 @@ namespace LastBell.Run
         IEnumerator SylvaraClearTimes()
         {
             bool was = AllyBot.Attacks; AllyBot.Attacks = true; int keep = RunParty.Selected;
+            // her own arena: the run-loop setup (confrontation-menu, 9 Nov) keeps practice on the menu map, and the clear runs
+            // after the merge fought her on the key-art dais (a square floor whose corners are out of her bullets and her reach)
+            bool stayOnMap = RunDirector.PracticeStaysOnMap; RunDirector.PracticeStaysOnMap = false;
             var keepLevel = RunDifficulty.Selected;
             // Hard: Tollbreaker solo plus one party of 4 (test less, 1 Nov: the levels only scale damage)
             // (-lastbellSylvaraClearMedium: the same runs on Medium, the bots' baseline)
@@ -720,6 +723,7 @@ namespace LastBell.Run
                 d.SelectAllies(allies); d.SelectDifficulty(level);
                 if (!d.StartPractice(cls, RunDirector.SylvaraPractice, startPhase)) { Check($"Sylvara clear run {cls} +{allies} starts", false); continue; }
                 yield return Until(() => RunDirector.Instance && RunDirector.Instance.State == RunState.Ready, 30, "Verdant Chimes loaded for a clear run");
+                Check("Sylvara clear run is on Verdant Chimes", RunMaps.CurrentName == "Verdant Chimes", RunMaps.CurrentName);
                 if (RunDirector.Instance != d) { directorLog.AddRange(d.Log); d = RunDirector.Instance; d.InputOverride = bot; bot.Clear(); }
                 d.RequestReady();
                 yield return Until(() => d.State == RunState.Combat, 4, "clear run combat");
@@ -763,9 +767,18 @@ namespace LastBell.Run
                 // Tollbreaker's 9 m Seed Storm throw counts, + body + 2 m), and its mean distance
                 var reachN = new Dictionary<string, int[]>(); var reachD = new Dictionary<string, float>();
                 float SwingAt(string c) => AllyBot.SylvaraAttackRange(c, sy.PhaseName) + sy.BodyRadius + 2f;
+                int planAt = tick0;
                 while (d.State == RunState.Combat && d.World == w && (w.Tick - tick0) < Sim.Ticks(480))
                 {
                     last = w.Tick;
+                    // every 5 s in the first two runs: where each bot is, where it wants to be and its plan (9 Nov: party bots held
+                    // the edge of her floor after the confrontation-menu merge)
+                    if (runNo <= 2 && w.Tick >= planAt)
+                    {
+                        planAt = w.Tick + Sim.Ticks(5);
+                        foreach (var p in w.Players) if (!p.Down && p.Input is AllyBot ab)
+                            Note($"  plan @{(w.Tick - tick0) / (float)Sim.Hz:0}s {sy.PhaseName} {p.ClassName} {Sim.Flat(p.transform.position - sy.transform.position).magnitude:0.0} m | {ab.DebugLine}");
+                    }
                     if (sy.PhaseName != phaseAt[phaseAt.Count - 1].name)
                     {
                         phaseAt.Add((sy.PhaseName, w.Tick));
@@ -816,7 +829,7 @@ namespace LastBell.Run
                 if (d.State == RunState.Combat && d.Boss) d.Boss.DebugDefeat();   // timed out: end it so the next run can start
                 yield return Until(() => d.State != RunState.Combat, 10, "clear run ends");
             }
-            AllyBot.Attacks = was; d.SelectDifficulty(keepLevel);
+            AllyBot.Attacks = was; d.SelectDifficulty(keepLevel); RunDirector.PracticeStaysOnMap = stayOnMap;
             if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }
             d.SelectAllies(keep);
         }
