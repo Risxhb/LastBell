@@ -508,10 +508,10 @@ namespace LastBell.Run
                 {
                     float r = rMin + j * QuakeStep; next[j] = float.MaxValue; from[i, j] = -1;
                     if (!Clear(h, r)) continue;
-                    // its own step is always in reach (standing takes no time): with under 0.15 s to the landing the reach fell under
+                    // its own step (or the next: it stops up to 0.2 m short of a spot) is always in reach: with under 0.15 s to the landing the reach fell under
                     // half a step, no plan was left, and the brand job or plain dodge walked it into the band landing (all 5 traced
                     // Phase 1 quake hits, Hard sweep 9 Nov; quake bands were the most Phase 1 damage, 6 500 over 16 fights)
-                    if (i == 0) { float d = Mathf.Abs(r - r0); if (d <= Mathf.Max(reach, QuakeStep * 0.5f + 0.01f)) next[j] = d; continue; }
+                    if (i == 0) { float d = Mathf.Abs(r - r0); if (d <= Mathf.Max(reach, QuakeStep + 0.01f)) next[j] = d; continue; }
                     int lo = Mathf.Max(0, j - Mathf.FloorToInt(reach / QuakeStep)), hi = Mathf.Min(n - 1, j + Mathf.FloorToInt(reach / QuakeStep));
                     for (int k = lo; k <= hi; k++)
                         if (cost[k] < float.MaxValue && cost[k] + Mathf.Abs(r - rMin - k * QuakeStep) < next[j]) { next[j] = cost[k] + Mathf.Abs(r - rMin - k * QuakeStep); from[i, j] = k; }
