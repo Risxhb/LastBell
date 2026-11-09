@@ -15,12 +15,12 @@
 |---|---|---|---|---|---|---|
 | 0 | **The mask splits** | harmless transformation, 1.6 s banner | — | — | | |
 | 0 → | **Hollow Spiral** | 4 arms from the open mask, 4.5 m/s, a petal every 0.18 s, gaps every 9th–7th, turning 10°/s | travel | 10 | the arms are tight near her | the arms sweep the outer ring |
-| 1 | **Choir Buds, wave 1** | 2/2/3/4 buds (N 1/2/4/8), 10 m out and evenly spaced. Each bud fires its own 3-arm spiral (4 m/s, every 0.3 s, turning 30°/s). Solo: they sprout one after another, 4 s apart | coral ring timer around each bud | 10 per petal | — | someone has to walk out and cut each bud |
+| 1 | **Choir Buds, wave 1** | 2/2/3/3 buds (1/2/3/4 players; one more on Hard), 10 m out and evenly spaced. Each bud fires its own 3-arm spiral (4 m/s, every 0.3 s, turning 30°/s). Solo: they sprout one after another, 4 s apart | coral ring timer around each bud | 10 per petal | — | someone has to walk out and cut each bud |
 | | bud bloom | a bud left alive for 12 s bursts into 20 petals at 5 m/s | the bud's timer ring | 12 | | |
 | 8 | **Feet Pod** | 3.0 m circle at her centre, then 12 petals point-blank (as in Phase 1) | 2.5 s | 16 + 12 | yes | the petals reach the wall |
 | 12 | **Choir Buds, wave 2** | as wave 1 | | | | |
 | 15 | **Pruning Arc** | a 120° cut in front, then 120° behind 0.8 s later, 8 m long, each throwing a fan of 9 petals (as in Phase 1) | 2.0 / 2.8 s | 20 + 12 | the side slivers are the only safe ground | the petal fans |
-| 20 | **Seed Pods** | on the farthest 1/1/2/3 players (as in Phase 1) | 2.5 s | 16 + 12 | | dropped on you |
+| 20 | **Seed Pods** | on the farthest 1/1/2/2 players (as in Phase 1) | 2.5 s | 16 + 12 | | dropped on you |
 
 - **Cutting a bud:** the demo cuts a bud at 30/s while you stand within 3 m (100 HP). In Unity (built 31 Oct) buds take real class damage: each bud is a boss part with 120 HP, the nearest live part takes the hit (melee, lines and projectiles alike), and every point dealt to a bud also comes off Sylvara. Standing next to a bud no longer cuts it. Party bots walk out and attack buds. The autotest checks that one player attacking a bud cuts it in under 6 s.
 - **Peak density in the demo:** about 150–220 bullets.
@@ -28,7 +28,7 @@
 
 ## Players
 - **Solo:** buds sprout one at a time, 4 s apart, so you cut them in order. Pods come one after another, all on you.
-- **Group:** buds are spread evenly around the wall, so the party splits up to cut them. At 8 players, 4 buds per wave, each with its own spiral.
+- **Group:** buds are spread evenly around the wall, so the party splits up to cut them. At 3–4 players, 3 buds per wave (4 on Hard), each with its own spiral.
 
 ## Settled for this phase (dated)
 - **28 Oct:** Phase 3 is Hollow Bloom (option A). The others were Mirror Choir, Root Cage and Shattered Refrain.

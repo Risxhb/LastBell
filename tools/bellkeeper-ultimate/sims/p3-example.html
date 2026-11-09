@@ -1,0 +1,223 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Bellkeeper P3 example</title>
+<style>
+:root{--bg:#10162a;--panel:#182039;--ivory:#efe6cf;--brass:#c99a4b;--coral:#ff6a4d;--dim:#8d93ad}
+body{margin:0;background:var(--bg);color:var(--ivory);font-family:Segoe UI,Arial,sans-serif;display:flex;flex-direction:column;align-items:center}
+h1{font-size:20px;margin:12px 0 2px} .sub{color:var(--dim);font-size:13px;margin:0 16px 8px;max-width:840px;text-align:center;line-height:1.45}
+.wrap{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;padding:0 16px}
+canvas{background:var(--panel);border-radius:10px;max-width:96vw;height:auto}
+.side{max-width:300px;font-size:13px;line-height:1.5}
+.side h3{margin:6px 0 4px;font-size:14px;color:var(--brass)} .side p{margin:0 0 6px}
+.k{display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:-1px;margin-right:4px}
+.bar{display:flex;gap:10px;margin:8px 0;align-items:center;font-size:14px;flex-wrap:wrap;justify-content:center}
+button,select{background:#2a3358;color:var(--ivory);border:1px solid #445;border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit}
+#log{font-size:13px;color:var(--dim);max-width:840px;text-align:center;min-height:56px;padding:0 16px}
+#log b{color:var(--ivory)} .bad{color:var(--coral)!important}
+</style></head><body>
+<h1>Bellkeeper Ultimate v2 · P3 "The Open Hour" example (simulation, not the game)</h1>
+<div class="sub">Bullet hell. 4 perfect bots weave through the <b>Mainspring</b> (three spiral arms of brass bullets that reverse every 12 s), survive the <b>Rewound Shot</b> (every 15 s every bullet flies back along its own path), never meet their own <b>Echo</b> (where you stood 2 s ago bursts: 999 to you, and its four shots hit anyone), cross each <b>Bell Curtain</b> through the gap with their own numeral, and keep the <b>plates</b> soaked every 6 s. Bullets 50 (two kill), a burst or a wrong gap 999, an empty plate wipes. Proposal, open to change.</div>
+<div class="wrap">
+<canvas id="c" width="760" height="760"></canvas>
+<div class="side">
+<h3>What you see</h3>
+<p><span class="k" style="background:#e3b45f"></span><b>Brass bullets</b>: the Mainspring arms. Ride the gaps between arms; they reverse direction every 12 s.</p>
+<p><span class="k" style="background:#ff6a4d"></span><b>REWIND</b>: a warning 1.5 s before. Then every bullet turns round and flies back into the boss at 1.5x speed: the gap you came through is a wall again, and next to the boss is the worst place to be.</p>
+<p><span class="k" style="border:2px solid #b67cff;width:9px;height:9px"></span><b>Echoes</b>: a ring under where each player stood 2 s ago, filling up until it bursts: the burst kills its owner, and its four small shots hit anyone. Keep moving; never double back.</p>
+<p><span class="k" style="background:#efe6cf"></span><b>Bell Curtain</b>: a wall sweeping the whole arena with four gaps marked I–IV. Pass through <i>your</i> numeral; another's gap is 999.</p>
+<p><span class="k" style="background:#c99a4b;border-radius:3px"></span><b>Plate</b>: every 6 s the next hour must be on the lit plate.</p>
+<h3>Mistake buttons</h3>
+<p>Restart with one bot making one mistake.</p>
+</div></div>
+<div class="bar"><button id="play">⏸ Pause</button><button id="re">↺ Restart perfect</button>
+<select id="mist"><option value="">inject a mistake…</option><option value="rewind">II ignores the rewind and walks in to attack</option><option value="still">III stands still to attack</option><option value="gap">IV takes I's curtain gap</option><option value="late">the beat-4 soaker is late</option></select>
+<label>Speed <select id="sp"><option>0.5</option><option selected>1</option><option>2</option></select></label><span id="clock"></span></div>
+<div id="log"></div>
+<script>
+// ---------------- the fight (pure: also run headless by test-p3.js) ----------------
+const R_ARENA=11.6, BOSS_R=1.6, PR=0.45, BR=0.22, SPEED=6, SPRINT=8.5, END=60;
+const REV=1.5, ARMS=3, ARM_RATE=0.75, ARM_SPEED=3.5, ARM_TURN=30, ARM_FLIP=12, REWINDS=[15,30,45], REWIND_PAUSE=2, WARN=1.5;
+const ECHO_EVERY=1.0, ECHO_DELAY=2, ECHO_R=1.1, ECHO_SHOTS=4, ECHO_SHOT_SPEED=2.5, ECHO_SHOT_LIFE=1.0;
+const CURTAINS=[{at:20,a:0},{at:38,a:90},{at:52,a:225}], CURT_SPEED=3, GAP_HALF=1.2, GAP_OFF=[-6.6,-2.2,2.2,6.6], CURT_ORDER=[[2,0,3,1],[1,3,0,2],[3,1,2,0]];
+const BEAT=6, PLATE_R=7, ON_PLATE=1.6, BULLET_DMG=50, LETHAL=999;
+const H=['I','II','III','IV'];
+const dir=a=>[Math.sin(a*Math.PI/180),Math.cos(a*Math.PI/180)], add=(p,q,k=1)=>[p[0]+q[0]*k,p[1]+q[1]*k], dist=(p,q)=>Math.hypot(p[0]-q[0],p[1]-q[1]), len=p=>Math.hypot(p[0],p[1]), dot=(p,q)=>p[0]*q[0]+p[1]*q[1];
+function armAngle(t){ // the arms turn 30°/s and reverse every 12 s (angle is continuous)
+  let a=0,s=0; while(s+ARM_FLIP<=t){a+=(Math.floor(s/ARM_FLIP)%2?-1:1)*ARM_TURN*ARM_FLIP;s+=ARM_FLIP;} return a+(Math.floor(s/ARM_FLIP)%2?-1:1)*ARM_TURN*(t-s);
+}
+const rewindAt=t=>REWINDS.find(r=>t>=r&&t<r+REWIND_PAUSE), rewindSoon=t=>REWINDS.find(r=>t<r&&t>=r-WARN);
+function curtainLine(c,t){const s=-12.5+CURT_SPEED*(t-c.at);return s;} // signed distance of the wall along its sweep direction
+const curtainOn=(c,t)=>t>=c.at&&curtainLine(c,t)<=12.5;
+function plateOf(k){return dir(90*k).map(v=>v*PLATE_R);} // beat k (1..) at t=6k
+// a curtain's gaps (gap index -> hour): the soaker of a beat that falls inside the sweep gets the gap nearest its plate (else no
+// route: on the plate at the beat, and the wall over the plate a moment later), the rest as CURT_ORDER
+const orderCache={};
+function curtainOrder(ci){ if(orderCache[ci])return orderCache[ci]; const c=CURTAINS[ci], base=CURT_ORDER[ci].slice(), d=dir(c.a), perp=[d[1],-d[0]], end=c.at+25/CURT_SPEED;
+  for(let k=Math.ceil(c.at/BEAT);k*BEAT<=end;k++){ const s=(k-1)%4, o=dot(plateOf(k),perp); let gi=0; GAP_OFF.forEach((x,i)=>{if(Math.abs(x-o)<Math.abs(GAP_OFF[gi]-o))gi=i;}); const cur=base.indexOf(s); [base[gi],base[cur]]=[base[cur],base[gi]]; }
+  return orderCache[ci]=base; }
+function newFight(mistake,jitter=0){
+  const F={t:0,mistake,pl:[],bul:[],mines:[],nextArm:3,nextEcho:2,log:[],fails:0,wiped:null,hits:0,beatsDone:0,gaps:[]};
+  for(let i=0;i<4;i++) F.pl.push({i,p:dir(45+90*i+jitter*(i+1)).map(v=>v*(5+jitter*0.1)),hp:100,dead:false,crossed:{},slot:45+90*i,still:0});
+  return F;
+}
+function say(F,html){F.log.unshift(html);}
+function hit(F,p,dmg,what){ if(p.dead)return; p.hp-=dmg; F.hits++; say(F,`<span class="bad">✗ ${F.t.toFixed(1)}s ${H[p.i]} hit by ${what} (${dmg})</span>`); if(p.hp<=0){p.dead=true; say(F,`<span class="bad">✗ ${H[p.i]} dies</span>`);} }
+// where the bullets will be at time t+dt (as the perfect bots predict: they know the rewind schedule)
+function bulletAt(b,t,dt,knowsRewind){
+  const r=knowsRewind&&!b.rev?REWINDS.find(r=>r>t&&r<=t+dt):undefined;
+  if(r===undefined) return [b.p[0]+b.v[0]*dt,b.p[1]+b.v[1]*dt];
+  const a=r-t, c=t+dt-r; return [b.p[0]+b.v[0]*(a-REV*c),b.p[1]+b.v[1]*(a-REV*c)];   // out until the rewind, then back at 1.5x speed
+}
+function curtainHitsAt(c,q,t,hour,margin=0){ // 0 = safe, 1 = wall, 2 = wrong gap (at time t, a player at q); the bots plan with a margin
+  if(!curtainOn(c,t))return 0; const d=dir(c.a), s=curtainLine(c,t); if(Math.abs(dot(q,d)-s)>PR+BR+margin)return 0;
+  const perp=[d[1],-d[0]], o=dot(q,perp); const g=GAP_OFF.findIndex(x=>Math.abs(o-x)<GAP_HALF-PR*0.6-margin);
+  if(g<0)return 1; return c.order[g]===hour?0:2;
+}
+function step(F,dt){
+  if(F.wiped)return; const t=F.t, nt=t+dt;
+  // spawn: the Mainspring (paused while rewinding)
+  while(F.nextArm<=nt){ const ta=F.nextArm; if(!rewindAt(ta)) for(let k=0;k<ARMS;k++){const a=armAngle(ta)+120*k,d=dir(a);F.bul.push({p:d.map(v=>v*BOSS_R),v:d.map(v=>v*ARM_SPEED),kind:'spring',born:ta});} F.nextArm+=ARM_RATE; }
+  // rewinds: every live bullet turns round
+  for(const r of REWINDS) if(t<r&&nt>=r){ for(const b of F.bul){b.v=[-REV*b.v[0],-REV*b.v[1]];b.rev=true;} say(F,`<b>REWIND</b>: every bullet flies back along its path`); }
+  // echoes: where you stood bursts 2 s later
+  while(F.nextEcho<=nt){ for(const p of F.pl) if(!p.dead) F.mines.push({p:p.p.slice(),at:F.nextEcho+ECHO_DELAY,owner:p.i}); F.nextEcho+=ECHO_EVERY; }
+  // curtains: assign the gaps when each starts
+  // move bots
+  for(const p of F.pl) if(!p.dead) moveBot(F,p,dt);
+  // bullets fly
+  for(const b of F.bul) b.p=add(b.p,b.v,dt);
+  F.bul=F.bul.filter(b=>len(b.p)<13&&!(b.rev&&b.kind==='spring'&&len(b.p)<BOSS_R*0.8)&&!(b.kind==='echo'&&nt-b.born>ECHO_SHOT_LIFE));
+  // hits: bullets
+  for(const p of F.pl) if(!p.dead) for(const b of F.bul) if(!b.gone&&dist(p.p,b.p)<PR+BR){ b.gone=true; hit(F,p,BULLET_DMG,b.kind==='spring'?'a Mainspring bullet':'an echo bullet'); }
+  F.bul=F.bul.filter(b=>!b.gone);
+  // echo bursts
+  for(const m of F.mines) if(!m.done&&nt>=m.at){ m.done=true; for(const p of F.pl) if(!p.dead&&p.i===m.owner&&dist(p.p,m.p)<ECHO_R+PR) hit(F,p,LETHAL,`its own echo burst`); /* the burst kills its owner; its shots hit anyone */ for(let k=0;k<ECHO_SHOTS;k++){const d=dir(360/ECHO_SHOTS*k+45*(m.owner%2));F.bul.push({p:m.p.slice(),v:d.map(v=>v*ECHO_SHOT_SPEED),kind:'echo',born:nt});} }
+  F.mines=F.mines.filter(m=>!m.done||nt-m.at<0.3);
+  // curtains
+  CURTAINS.forEach((c,ci)=>{ c.order=curtainOrder(ci); if(!curtainOn(c,nt))return; for(const p of F.pl){ if(p.dead||p.crossed[ci])continue; const h=curtainHitsAt(c,p.p,nt,p.i); const d=dir(c.a); if(dot(p.p,d)<curtainLine(c,nt)-PR-BR){p.crossed[ci]=true; continue;} if(h===1){p.crossed[ci]=true;hit(F,p,BULLET_DMG,'the Bell Curtain');} if(h===2){p.crossed[ci]=true;hit(F,p,LETHAL,'the wrong curtain gap');} } });
+  // plate beats
+  const k=Math.floor(nt/BEAT); if(k>=1&&k>F.beatsDone&&nt>=k*BEAT){ F.beatsDone=k; const s=(k-1)%4, pl=plateOf(k), sp=F.pl[s];
+    if(sp.dead||dist(sp.p,pl)>ON_PLATE){F.wiped='the plate was empty'; say(F,`<span class="bad">✗ beat ${k}: ${H[s]} not on the plate: WIPE</span>`);} else say(F,`<b>beat ${k}</b>: ${H[s]} soaks ✓`); }
+  if(!F.wiped&&F.pl.some(p=>p.dead)) F.wiped='a player died';
+  F.t=nt;
+}
+// ---------------- the bots: weave by looking 0.6 s ahead ----------------
+function goalOf(F,p){
+  const t=F.t, k=Math.floor(t/BEAT)+1, s=(k-1)%4, tb=k*BEAT-t;
+  // the soaker: heads for the plate in time to stand on it for the last ~1.6 s (shuffling on it: its own echo bursts after 2 s)
+  const late=F.mistake==='late'&&k===4;
+  // a curtain still to cross takes priority over the plate when the plate is already behind its wall, or the wall
+  // sweeps over the plate before the beat (cross through your gap first, then soak)
+  let crossFirst=false;
+  if(s===p.i) CURTAINS.forEach((c,ci)=>{ if(p.crossed[ci]||t<c.at-3||!(t<c.at||curtainOn(c,t)))return; const d=dir(c.a), pl=plateOf(k), sw=curtainLine(c,Math.max(t,c.at)), atPlate=dot(pl,d);
+    if(dot(p.p,d)<sw-1)return; if(atPlate<sw||c.at+(atPlate+12.5)/CURT_SPEED<=k*BEAT+0.3)crossFirst=true; });
+  if(s===p.i&&!crossFirst){ const pl=plateOf(k), need=dist(p.p,pl)/SPEED+1.6; if(tb<=need+(late?-3.5:0)) return {to:pl,urgent:true,why:`SOAK in ${tb.toFixed(1)}s`,beatAt:k*BEAT}; }
+  // a curtain coming: line up with my gap just ahead of the wall, and let it pass
+  for(let ci=0;ci<CURTAINS.length;ci++){ const c=CURTAINS[ci]; c.order=curtainOrder(ci); if(p.crossed[ci]||t<c.at-3||!(t<c.at||curtainOn(c,t)))continue;
+    const d=dir(c.a), perp=[d[1],-d[0]], s0=curtainLine(c,Math.max(t,c.at)), my=dot(p.p,d);
+    if(my<s0-1)continue;
+    let g=c.order.indexOf(p.i); if(F.mistake==='gap'&&p.i===3&&ci===0) g=c.order.indexOf(0);
+    // commit only when the wall is near: the time to slide sideways into my gap, plus 1.2 s (no waiting about: my echo)
+    { const wallNow0=t<c.at?-12.5-(c.at-t)*CURT_SPEED:s0, tContact=(my-wallNow0)/CURT_SPEED, side=Math.abs(dot(p.p,perp)-GAP_OFF[g]); if(tContact>side/SPEED*1.6+1.5)continue; }
+    // meet the wall in my gap and come out behind it (waiting for it is no good: my echo bursts after 2 s)
+    const off=GAP_OFF[g], lim=Math.sqrt(Math.max(0,9.3*9.3-off*off)), wallNow=t<c.at?-12.5:s0;
+    const along=Math.max(-lim,Math.min(lim,wallNow-1.5));
+    const to=add(perp.map(v=>v*off),d,along);
+    return {to,urgent:true,why:`CURTAIN gap ${H[c.order[g]]}`,curtain:{c,g}}; }
+  // otherwise weave round the boss with the arms (between them), on my own quarter
+  // each player rides its own ring between the arms, clear of the plates (r 5.4-8.6): nobody walks into another's echoes
+  const a=armAngle(t)+60+120*(p.i%3), r=[4.8,3.4,9.6,10.6][p.i];
+  return {to:dir(a).map(v=>v*r),urgent:false,why:'WEAVE'};
+}
+const CANDS=[]; for(let k=0;k<24;k++){CANDS.push(dir(15*k));}
+function moveBot(F,p,dt){
+  const g=goalOf(F,p); p.job=g.why;
+  if(F.mistake==='still'&&p.i===2&&F.t>24&&F.t<27){p.still+=dt;return;}   // stands to attack: its own echo catches it
+  if(F.mistake==='rewind'&&p.i===1&&rewindAt(F.t)!==undefined){ const to=p.p.map(x=>x*(BOSS_R+PR+0.2)/len(p.p)), v=[to[0]-p.p[0],to[1]-p.p[1]], l=len(v); if(l>0.05)p.p=add(p.p,v,Math.min(1,SPEED*dt/l)); p.job='attacks the boss'; return; }   // ignores the rewind: walks in to attack while every bullet flies back into the boss
+  const knows=!(F.mistake==='rewind'&&p.i===1);
+  if(!p.plan||F.t>=p.replan){ p.plan=choose(F,p,g,knows); p.replan=F.t+0.05; }
+  const v=p.plan; p.p=add(p.p,v,dt);
+  const r=len(p.p); if(r>R_ARENA)p.p=p.p.map(x=>x*R_ARENA/r); if(r<BOSS_R+PR)p.p=p.p.map(x=>x*(BOSS_R+PR)/r);
+}
+// A short route search: 3 legs of 0.2 s (a speed and a direction each), keeping the best 10 routes after each leg.
+// Every bullet's position is predicted once per sample time (0.05 s apart); a route that touches a bullet, a bursting
+// echo, the curtain outside my gap or the arena edge is out.
+function choose(F,p,g,knows){
+  const t=F.t, LEG=0.2, LEGS=3, SAMPLES=4, dtS=LEG/SAMPLES, N=LEGS*SAMPLES, BEAM=10;
+  const pred=[]; for(let k=1;k<=N;k++){ const s=k*dtS, arr=[]; for(const b of F.bul) arr.push(bulletAt(b,t,s,knows||b.rev));
+    for(let te=F.nextArm;te<=t+s;te+=ARM_RATE){ if(rewindAt(te))continue; for(let ka=0;ka<ARMS;ka++) arr.push(dir(armAngle(te)+120*ka).map(v=>v*(BOSS_R+ARM_SPEED*(t+s-te)))); }   // the arms' next shots too
+    for(const m of F.mines) if(m.at<=t+s&&t+s-m.at<=ECHO_SHOT_LIFE){ const age=t+s-m.at; for(let k2=0;k2<ECHO_SHOTS;k2++) arr.push(add(m.p,dir(360/ECHO_SHOTS*k2+45*(m.owner%2)),ECHO_SHOT_SPEED*age)); }
+    pred.push(arr); }
+  const hourFor=ci=>F.mistake==='gap'&&p.i===3&&ci===0?0:p.i;
+  let extra=0;
+  function cost(q,k){ // k = sample index (time (k+1)*dtS); returns [dead, clearance]
+    const s=(k+1)*dtS, rq=len(q); if(rq>R_ARENA-0.1||rq<BOSS_R+PR+0.05) return [true,0];
+    let mc=9; for(const bp of pred[k]){ const c=dist(q,bp)-PR-BR; if(c<mc)mc=c; } if(mc<0.12) return [true,mc];
+    for(const m of F.mines) if(m.owner===p.i&&m.at>t+s-dtS-0.02&&m.at<=t+s+0.02&&dist(q,m.p)<ECHO_R+PR+0.5) return [true,0];
+    for(let ci=0;ci<CURTAINS.length;ci++){ if(p.crossed[ci])continue; if(curtainHitsAt(CURTAINS[ci],q,t+s,hourFor(ci),0.2)) return [true,0]; }
+    { const kb=Math.floor((t+s)/BEAT)+1, tb=kb*BEAT-(t+s); if((kb-1)%4!==p.i&&tb<3&&dist(q,plateOf(kb))<ON_PLATE+ECHO_R+0.3) extra+=0.5; }   // keep my echoes off the next soaker's plate
+    if(g.beatAt!==undefined&&Math.abs(t+s-g.beatAt)<=dtS*0.6&&dist(q,g.to)>ON_PLATE-0.3) return [true,0];   // the soaker must be on the plate on the beat
+    return [false,mc];
+  }
+  const dirs=CANDS.filter((d,i)=>i%2===0); const tg=[g.to[0]-p.p[0],g.to[1]-p.p[1]], tl=len(tg); if(tl>1e-3)dirs.push(tg.map(x=>x/tl));
+  CURTAINS.forEach((c,ci)=>{ if(!p.crossed[ci]&&(curtainOn(c,t)||(t>=c.at-3&&t<c.at))){const d=dir(c.a);dirs.push(d.map(x=>-x));dirs.push(d);} });
+  const vels=[[0,0]]; for(const d of dirs) for(const sp of [SPEED,SPRINT,SPEED*0.4]) vels.push(d.map(x=>x*sp));
+  let beam=[{q:p.p,first:null,risk:0}]; const fallback=[];
+  for(let leg=0;leg<LEGS;leg++){
+    const next=[];
+    for(const r of beam) for(const v of vels){
+      let q=r.q, dead=false, risk=r.risk;
+      for(let k2=0;k2<SAMPLES;k2++){ q=add(q,v,dtS); extra=0; const [d,mc]=cost(q,leg*SAMPLES+k2); if(d){dead=true;break;} risk+=Math.max(0,0.5-mc)*2+extra; }
+      if(dead){ if(leg===0) fallback.push({first:v,score:risk+1000+dist(q,g.to)}); continue; }
+      next.push({q,first:r.first||v,risk,score:risk+dist(q,g.to)*(g.urgent?1.6:0.8)+(len(v)>SPEED?0.15:0)});
+    }
+    if(!next.length){ if(leg===0){ F.cornered=(F.cornered||0)+1; fallback.sort((a,b)=>a.score-b.score); return fallback.length?fallback[0].first:[0,0]; } break; }
+    next.sort((a,b)=>a.score-b.score); beam=next.slice(0,BEAM);
+  }
+  return beam[0].first||[0,0];
+}
+function runHeadless(mistake,jitter=0){const F=newFight(mistake,jitter);while(F.t<END&&!F.wiped)step(F,1/60);return F;}
+if(typeof window==='undefined'){module.exports={runHeadless,END};}
+else{
+// ---------------- drawing ----------------
+const cv=document.getElementById('c'),g=cv.getContext('2d'),S=cv.width/2/12.4,CX=cv.width/2,CY=cv.height/2;
+const P=(x,y)=>[CX+x*S,CY-y*S], col=['#4f8fff','#47c98c','#ad7dff','#3fd0e0'], cls=['V','C','A','V'];
+let F,running=true,speed=1,mistake='';
+function reset(){F=newFight(mistake);}
+function draw(){
+ g.clearRect(0,0,cv.width,cv.height); const t=F.t;
+ g.fillStyle='#212a47';g.beginPath();g.arc(CX,CY,12*S,0,7);g.fill();g.strokeStyle='#55608a';g.lineWidth=2;g.stroke();
+ const k=Math.floor(t/BEAT)+1, s=(k-1)%4;
+ [0,90,180,270].forEach(pa=>{const [x,y]=P(...dir(pa).map(v=>v*PLATE_R));const lit=((90*k)%360+360)%360===pa;g.beginPath();g.arc(x,y,ON_PLATE*S,0,7);g.fillStyle=lit?'#e3b45f':'#4a3d22';g.fill();if(lit){g.fillStyle='#10162a';g.font='bold 12px Segoe UI';g.textAlign='center';g.fillText(H[s]+' SOAK',x,y+4);}});
+ const [hx,hy]=P(...dir(90*k).map(v=>v*6));g.strokeStyle='#c99a4b';g.lineWidth=5;g.beginPath();g.moveTo(CX,CY);g.lineTo(hx,hy);g.stroke();
+ // echoes: rings filling toward their burst
+ for(const m of F.mines){const [x,y]=P(...m.p);const left=m.at-t;if(left<0){g.fillStyle='rgba(182,124,255,.55)';g.beginPath();g.arc(x,y,ECHO_R*S,0,7);g.fill();continue;}
+  const f=1-left/ECHO_DELAY;g.strokeStyle=`rgba(182,124,255,${0.15+0.6*f})`;g.lineWidth=2;g.beginPath();g.arc(x,y,ECHO_R*S,0,7);g.stroke();if(f>0.6){g.fillStyle=`rgba(182,124,255,${(f-0.6)*0.7})`;g.beginPath();g.arc(x,y,ECHO_R*S*f,0,7);g.fill();}}
+ // curtains
+ CURTAINS.forEach((c,ci)=>{c.order=curtainOrder(ci); const soon=t>=c.at-3&&t<c.at; if(!soon&&!curtainOn(c,t))return; const d=dir(c.a),perp=[d[1],-d[0]],s0=soon?-12.5:curtainLine(c,t);
+  for(let o=-12.4;o<=12.4;o+=0.62){ if(GAP_OFF.some(x=>Math.abs(o-x)<GAP_HALF))continue; const q=add(perp.map(v=>v*o),d,s0); if(len(q)>12.2)continue; const [x,y]=P(...q); g.fillStyle=soon?'rgba(239,230,207,.25)':'#efe6cf';g.beginPath();g.arc(x,y,BR*S+1,0,7);g.fill();}
+  GAP_OFF.forEach((x,gi)=>{const q=add(perp.map(v=>v*x),d,s0+(soon?3:0));if(len(q)>12.4&&!soon)return;const qq=soon?add(perp.map(v=>v*x),d,-9.5):q;const [px,py]=P(...qq);g.fillStyle='#ffd27a';g.font='bold 14px Segoe UI';g.textAlign='center';g.fillText(H[c.order[gi]],px,py+5);});
+  if(soon){g.fillStyle='#efe6cf';g.font='bold 15px Segoe UI';g.textAlign='center';const q=dir(c.a).map(v=>v*-10.8);const [px,py]=P(...q);g.fillText('CURTAIN in '+(c.at-t).toFixed(1)+'s',px,py);} });
+ // bullets
+ for(const b of F.bul){const [x,y]=P(...b.p);g.fillStyle=b.kind==='spring'?(b.rev?'#ff9a6b':'#e3b45f'):'#d9b8ff';g.beginPath();g.arc(x,y,BR*S+1,0,7);g.fill();}
+ g.fillStyle='#6b5428';g.beginPath();g.arc(CX,CY,BOSS_R*S,0,7);g.fill();g.strokeStyle='#c99a4b';g.lineWidth=3;g.stroke();
+ for(const p of F.pl){const [px,py]=P(...p.p); if(p.dead){g.fillStyle='#444';g.beginPath();g.arc(px,py,10,0,7);g.fill();continue;}
+  g.fillStyle=col[p.i];g.beginPath();g.arc(px,py,PR*S,0,7);g.fill();g.strokeStyle='#0b0f1c';g.lineWidth=2;g.stroke();g.fillStyle='#0b0f1c';g.font='bold 11px Segoe UI';g.textAlign='center';g.fillText(cls[p.i],px,py+4);
+  g.font='bold 12px Segoe UI';g.fillStyle=p.job&&p.job.startsWith('SOAK')?'#e3b45f':p.job&&p.job.startsWith('CURTAIN')?'#ffd27a':'#efe6cf';g.fillText(H[p.i]+' '+(p.job||''),px,py-16);
+  if(p.hp<100){g.fillStyle='#ff6a4d';g.fillText(p.hp+' hp',px,py+26);}}
+ const rs=rewindSoon(t), ra=rewindAt(t); if(rs!==undefined||ra!==undefined){g.fillStyle=ra!==undefined?'#ff9a6b':'#ff6a4d';g.font='bold 30px Segoe UI';g.textAlign='center';g.fillText(ra!==undefined?'◄◄ REWIND':'REWIND in '+(rs-t).toFixed(1)+'s',CX,70);}
+ const frac=(t%BEAT)/BEAT;g.strokeStyle='#c99a4b';g.lineWidth=4;g.beginPath();g.arc(52,52,22,-Math.PI/2,-Math.PI/2+frac*6.283);g.stroke();g.fillStyle='#efe6cf';g.font='bold 12px Segoe UI';g.textAlign='center';g.fillText('plate',52,49);g.fillText(String(k),52,65);
+ if(F.wiped){g.fillStyle='rgba(16,22,42,.8)';g.fillRect(0,CY-40,cv.width,80);g.fillStyle='#ff6a4d';g.font='bold 30px Segoe UI';g.fillText('WIPE — '+F.wiped,CX,CY+10);}
+ document.getElementById('clock').textContent=`t ${Math.min(t,END).toFixed(1)} s · hits ${F.hits} · bullets ${F.bul.length}${t>=END&&!F.wiped?' · done: '+(F.hits?'mistakes':'clean, 0 damage'):''}`;
+ document.getElementById('log').innerHTML=F.log.slice(0,4).join('<br>');
+}
+let last=performance.now();
+function frame(now){const dt=Math.min(0.05,(now-last)/1000)*speed;last=now; if(running&&F.t<END&&!F.wiped){let n=Math.max(1,Math.round(dt*60));for(let i=0;i<n;i++)step(F,dt/n);} draw(); requestAnimationFrame(frame);}
+document.getElementById('play').onclick=e=>{running=!running;e.target.textContent=running?'⏸ Pause':'▶ Play';};
+document.getElementById('re').onclick=()=>{mistake='';document.getElementById('mist').value='';reset();running=true;document.getElementById('play').textContent='⏸ Pause';};
+document.getElementById('mist').onchange=e=>{mistake=e.target.value;reset();running=true;};
+document.getElementById('sp').onchange=e=>speed=+e.target.value;
+reset();
+{ const ff=+((location.hash.match(/t=([0-9.]+)/)||[])[1]||0); const mm=(location.hash.match(/m=([a-z]+)/)||[])[1]; if(mm){mistake=mm;reset();} while(F.t<ff&&!F.wiped) step(F,1/60); if(ff||mm) running=!/still/.test(location.hash); }
+requestAnimationFrame(frame);
+}
+</script></body></html>

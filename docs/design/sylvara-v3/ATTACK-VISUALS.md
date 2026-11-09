@@ -50,6 +50,17 @@ Status: **proposal**. Chzy18 asked on 1 Nov to "build out the animation and mode
 | Pruning Arc | PruningArc | keep it, and add the ribbon trail. |
 | Phase change, Defeat | PhaseShift, Defeat | keep them. |
 
+**Built 2 Nov (accepted by Chzy18, 2 Nov):** `ConductLoop` (2.4 s), `StormLoop` (1.2 s), `Toll` (1.4 s; the lurch lands 1.0 s in, on the spin reversal or colour swap), `CallWater` (1.9 s, stretched over the jets' warning; the pull lands as the water pours) and `Sow` (0.6 s, skipped while another one-shot plays and in Last Storm). Choir Buds play the existing `Bloom`. The loops end in "Loop" because the shared presenter repeats only those. The P2 lane downbeat (accepted 2 Nov) is `LanesLoop`, one 0.7 s beat played while the lanes fire and sped up so each downbeat lands on a lane volley (0.35 s Hard, 0.5 s Easy); a model without it plays Conduct. It is a synced loop rather than an additive accent, so the shared presenter needs no new layer (pose sheet: `visuals/lanes-downbeat-poses.png`). The same pass pins three loose hook pieces of the branch hand to the hand: they used to stay behind (or tear) whenever her left arm lifted, in the old Seed and Bloom clips too. The model and the four attack props ship in `sylvara-assets` 2.0.0 (published 2 Nov; `LanesLoop` is in 3.0.0, published 3 Nov); with the old 1.0.0 pack every attack falls back to Idle and the props show stand-ins.
+
+**Boss clips (accepted 4 Nov):** five more clips, presentation only, with no change to bullet timing or patterns. None of them suggests an opening: she has no punish windows. Sheet: [visuals/boss-clips-poses.png](visuals/boss-clips-poses.png).
+- `Intro` (2 s, on the run's intro card): she wakes from a low bow, the roots take her weight, the fork arm lifts and the chest bells ring once.
+- `MaskSplit` (1.5 s, the shift into Phase 3; the other shifts keep `PhaseShift`): both hands come up to the face, then fling apart at the crescendo as the mask halves open.
+- `HollowLoop` (2.4 s loop under the Phase 3 Hollow Spiral, which pours from the open mask): arms held wide and low, the face tipped toward the arena.
+- `StormCall` (3 s, under the "LAST STORM in 3 s" warning, in place of `Toll`): she gathers low, then sweeps both arms up into the Storm loop.
+- `Stagger` (0.8 s, when a Choir Bud is cut and no other clip is playing): a short recoil back and to one side; she is back in stance by 0.8 s.
+- On death the split mask closes as she bows (`Defeat`). The unused v2 clips `Vulnerable` and `Procession` were deleted from her model.
+- Every new clip falls back to the clip it replaces (or to none) on an older `sylvara-assets` pack; the clips are in 4.0.0.
+
 ## How it gets built
 1. **Clips:** add Conduct, Storm, Toll, Call Water and Sow to `prototype/arena-3d/models/blender/sylvara_rig.py`. Rebuild `Sylvara.glb` with `build-sylvara.ps1`, which uses the same Meshy source as today. Then show a contact sheet of the key poses for review.
 2. **Props:** model them in Blender by script, like the Area 4 props: petal, seed, bell-flower bud, seed pod, water column, root ring. Then show turntable renders for review.
@@ -62,4 +73,4 @@ Status: **proposal**. Chzy18 asked on 1 Nov to "build out the animation and mode
 ## Open questions
 1. **Petal look:** one petal shape for every phase, or a different shape per phase (round petal in P1, pointed in P4)?
 2. **Bell-flower buds:** should they be modelled from the reference sheet (Blender, like the arena props), or should Chzy18 run them through Meshy like the boss?
-3. **Second form (P3–P4):** the sheet shows the mask split open with turquoise light. That's a model change (a split mask mesh), not a clip. Include it in this pass, or keep it for later?
+3. **Second form (P3–P4):** done as recommended (2 Nov, review later): the mask is cut down its middle onto two hinge bones (`mask.L`, `mask.R`). From Phase 3 on, Unity swings each half 16° outward and slides it 9 cm apart over 1.5 s, after the clip has posed her, so every clip keeps it open. A turquoise core and light glow in the gap. Sheet: `visuals/second-form-mask.png` (rendered by `sylvara_mask_sheet.py`). It ships in `sylvara-assets` 3.0.0 (published 3 Nov, with `LanesLoop`); an older model keeps the mask shut.

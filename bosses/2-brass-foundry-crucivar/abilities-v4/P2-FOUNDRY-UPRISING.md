@@ -14,7 +14,7 @@
 
 ### Uprising: turrets and castings (R&S block 20 painshare, block 15 bullets, blocks 7/9 numerals and links)
 - **Turrets:**
-  - 2–4 turrets rise from the lava at fixed rim bays, 2.5 s rise, harmless.
+  - 2 turrets rise (every party size since 4 Nov) from the lava at fixed rim bays, 2.5 s rise, harmless.
   - Each gets an ivory numeral (I–IV).
   - They can't be damaged.
 - **Castings:**

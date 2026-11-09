@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace LastBell.Run
 {
@@ -24,6 +25,15 @@ namespace LastBell.Run
         static void Boot()
         {
             if (!Requested) return;
+            // a built player starts at the main menu, whose live backdrop has a RunDirector of its own: driving that one
+            // froze the player at Ready (Tollbreaker lane, 11-03). Load the Brass Foundry run map first, as the editor run does.
+            string foundry = RunMaps.All[RunMaps.IndexOf("brass-foundry")].RunScene;
+            if (SceneManager.GetActiveScene().path != foundry) { SceneManager.sceneLoaded += OnFoundry; SceneManager.LoadScene(foundry); return; }
+            Attach();
+        }
+        static void OnFoundry(Scene s, LoadSceneMode m) { SceneManager.sceneLoaded -= OnFoundry; Attach(); }
+        static void Attach()
+        {
             var d = FindAnyObjectByType<RunDirector>();
             if (d && !d.GetComponent<CrucivarAutoTest>()) d.gameObject.AddComponent<CrucivarAutoTest>();
         }
@@ -81,6 +91,14 @@ namespace LastBell.Run
             StartCoroutine(MainLoop());
         }
         void OnDestroy() { Application.logMessageReceived -= OnLog; }
+        // heartbeat every 5 real seconds: a stuck run shows whether frames still run and what the suite waits on
+        float beat; string waiting = "";
+        void Update()
+        {
+            if (Time.realtimeSinceStartup < beat) return;
+            beat = Time.realtimeSinceStartup + 5;
+            Debug.Log($"[crucivar-test] beat f{Time.frameCount} dt {Time.deltaTime:0.000} scale {Time.timeScale} state {D?.State} paused {D?.Paused} tick {W?.Tick} [{section}] {waiting}");
+        }
         void OnLog(string msg, string stack, LogType t) { if ((t == LogType.Exception || t == LogType.Error) && !(stack ?? "").Contains("UnityEditor.")) { errors++; lines.Add("      LOG " + t + ": " + msg); } }
 
         // ---------------- reporting ----------------
@@ -93,19 +111,24 @@ namespace LastBell.Run
         public void Note(string s) { lines.Add("      " + s); Debug.Log("[crucivar-test] " + s); }
         public IEnumerator Shot(string name)
         {
+            if (Application.isBatchMode) yield break;   // -batchmode (the default since 4 Nov): no end of frame to wait for; shots need a windowed run
             yield return new WaitForEndOfFrame();
             var tex = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
             tex.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0); tex.Apply();
             File.WriteAllBytes(Path.Combine(dir, $"{++shots:00}_{name}.png"), tex.EncodeToPNG()); Destroy(tex);
         }
         public int Failures => fail;
+        const float TestBudget = 600;   // real seconds per ability test, well above the longest one
+        void WriteReport(string tag) => File.WriteAllLines(Path.Combine(dir, "crucivar-report.txt"), new[] { $"Crucivar autotest: {pass} passed, {fail} failed {tag}".TrimEnd() }.Concat(lines));
 
         // ---------------- waiting ----------------
         public IEnumerator Seconds(float s) { float t = 0; while (t < s) { t += Time.deltaTime; yield return null; } }
         public IEnumerator Ticks(int n) { int end = W.Tick + n; float guard = 0; while (W != null && W.Tick < end && guard < n / 20f + 10) { guard += Time.deltaTime; yield return null; } }
         public IEnumerator Until(Func<bool> cond, float timeout, string what)
         {
+            waiting = what;
             float t = 0; while (!cond() && t < timeout) { t += Time.deltaTime; yield return null; }
+            waiting = "";
             if (!cond()) Check("reached: " + what, false, $"timed out after {timeout}s");
         }
 
@@ -210,20 +233,26 @@ namespace LastBell.Run
             {
                 section = t.Id; int before = fail;
                 Note($"---- {t.Id} ----");
-                var e = t.Run(this);
-                while (true)
+                // nested waits (Setup, Until, Ticks...) run on this stack, not Unity's, so an exception in one is caught here
+                // instead of silently ending the suite with the editor left open; a test past its budget is stopped
+                var stack = new Stack<IEnumerator>(); stack.Push(t.Run(this));
+                float start = Time.realtimeSinceStartup;
+                while (stack.Count > 0)
                 {
-                    object cur;
-                    try { if (!e.MoveNext()) break; cur = e.Current; }
+                    if (Time.realtimeSinceStartup - start > TestBudget) { Check($"test finished within {TestBudget / 60:0} min", false, $"stopped after {Time.realtimeSinceStartup - start:0} s"); break; }
+                    var e = stack.Peek(); object cur;
+                    try { if (!e.MoveNext()) { stack.Pop(); continue; } cur = e.Current; }
                     catch (Exception ex) { Check("test body ran without an exception", false, ex.GetType().Name + ": " + ex.Message); break; }
+                    if (cur is IEnumerator inner) { stack.Push(inner); continue; }
                     yield return cur;
                 }
+                if (Boss != null) Boss.TestHold = true;
                 Note($"{t.Id}: {(fail == before ? "all passed" : (fail - before) + " failed")}");
+                WriteReport("(running)");   // a stuck run still shows which test it reached
             }
             section = "suite";
             Check("no errors or exceptions logged", errors == 0, $"{errors}");
-            lines.Insert(0, $"Crucivar autotest: {pass} passed, {fail} failed");
-            File.WriteAllLines(Path.Combine(dir, "crucivar-report.txt"), lines);
+            WriteReport("");
             Debug.Log($"[crucivar-test] done: {pass} passed, {fail} failed");
             yield return Seconds(0.5f);
 #if UNITY_EDITOR

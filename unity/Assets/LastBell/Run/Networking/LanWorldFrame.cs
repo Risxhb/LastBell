@@ -56,8 +56,9 @@ namespace LastBell.Run.Networking
         public sealed class ProjectileState { public int Id; public float X, Y, Z, R, G, B, A; }
         // hostile bullets (BulletSystem: Sylvara's petals, seeds and water): place and velocity, so a client draws them
         // moving between snapshots; look = hit radius, colour and water
-        public struct BulletState { public float X, Z, VX, VZ, Radius; public byte Colour; public bool Water; }
-        public const int MaxBullets = 640;
+        // a Sylvara seed also carries its fuse (Age of Life) and its burst preview (Rays petals at Off rad, Speed m/s; Protocol 7)
+        public struct BulletState { public float X, Z, VX, VZ, Radius; public byte Colour; public bool Water; public byte Rays; public float Off, Speed, Age, Life; }
+        public const int MaxBullets = 640, MaxRays = 32;
         public readonly List<BulletState> Bullets = new List<BulletState>();
         // One recorded presentation call on the host (LanFx): which effect method ran, on which tick, with which arguments.
         // Players, the boss and projectiles travel as references the client maps to its replica objects.
@@ -126,7 +127,7 @@ namespace LastBell.Run.Networking
                 section = "projectile"; w.Write(Projectiles.Count); ids.Clear();
                 foreach (var p in Projectiles) { Need(p != null && p.Id > 0 && ids.Add(p.Id)); w.Write(p.Id); Floats(w, p.X, p.Y, p.Z, p.R, p.G, p.B, p.A); }
                 section = "bullet"; Need(Bullets.Count <= MaxBullets); w.Write((short)Bullets.Count);
-                foreach (var b in Bullets) { Need(b.Radius >= 0 && b.Colour <= 2); Floats(w, b.X, b.Z, b.VX, b.VZ, b.Radius); w.Write(b.Colour); w.Write(b.Water); }
+                foreach (var b in Bullets) { Need(b.Radius >= 0 && b.Colour <= 2 && b.Rays <= MaxRays); Floats(w, b.X, b.Z, b.VX, b.VZ, b.Radius); w.Write(b.Colour); w.Write(b.Water); w.Write(b.Rays); if (b.Rays > 0) Floats(w, b.Off, b.Speed, b.Age, b.Life); }
                 section = "effect"; Need(Effects.Count <= MaxEffects); w.Write(Effects.Count);
                 foreach (var e in Effects)
                 {
@@ -219,7 +220,7 @@ namespace LastBell.Run.Networking
                     count = r.ReadInt32(); Need(count >= 0 && count <= MaxProjectiles); ids.Clear();
                     for (int i = 0; i < count; i++) { var p = new ProjectileState { Id = r.ReadInt32(), X = Float(r), Y = Float(r), Z = Float(r), R = Float(r), G = Float(r), B = Float(r), A = Float(r) }; Need(p.Id > 0 && ids.Add(p.Id)); result.Projectiles.Add(p); }
                     count = r.ReadInt16(); Need(count >= 0 && count <= MaxBullets);
-                    for (int i = 0; i < count; i++) { var b = new BulletState { X = Float(r), Z = Float(r), VX = Float(r), VZ = Float(r), Radius = Float(r), Colour = r.ReadByte(), Water = r.ReadBoolean() }; Need(b.Radius >= 0 && b.Colour <= 2); result.Bullets.Add(b); }
+                    for (int i = 0; i < count; i++) { var b = new BulletState { X = Float(r), Z = Float(r), VX = Float(r), VZ = Float(r), Radius = Float(r), Colour = r.ReadByte(), Water = r.ReadBoolean(), Rays = r.ReadByte() }; Need(b.Radius >= 0 && b.Colour <= 2 && b.Rays <= MaxRays); if (b.Rays > 0) { b.Off = Float(r); b.Speed = Float(r); b.Age = Float(r); b.Life = Float(r); Need(b.Speed >= 0 && b.Age >= 0 && b.Life > 0); } result.Bullets.Add(b); }
                     count = r.ReadInt32(); Need(count >= 0 && count <= MaxEffects);
                     for (int i = 0; i < count; i++)
                     {

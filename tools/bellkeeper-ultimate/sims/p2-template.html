@@ -1,0 +1,122 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Bellkeeper P2 example</title>
+<style>
+:root{--bg:#10162a;--panel:#182039;--ivory:#efe6cf;--brass:#c99a4b;--coral:#ff6a4d;--dim:#8d93ad}
+body{margin:0;background:var(--bg);color:var(--ivory);font-family:Segoe UI,Arial,sans-serif;display:flex;flex-direction:column;align-items:center}
+h1{font-size:20px;margin:12px 0 2px} .sub{color:var(--dim);font-size:13px;margin:0 16px 8px;max-width:820px;text-align:center;line-height:1.45}
+.wrap{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;padding:0 16px}
+canvas{background:var(--panel);border-radius:10px;max-width:96vw;height:auto}
+.side{max-width:300px;font-size:13px;line-height:1.5}
+.side h3{margin:6px 0 4px;font-size:14px;color:var(--brass)} .side p{margin:0 0 6px}
+.k{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:4px}
+.bar{display:flex;gap:10px;margin:8px 0;align-items:center;font-size:14px;flex-wrap:wrap;justify-content:center}
+button,select{background:#2a3358;color:var(--ivory);border:1px solid #445;border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit}
+#log{font-size:13px;color:var(--dim);max-width:820px;text-align:center;min-height:56px;padding:0 16px}
+#log b{color:var(--ivory)} .bad{color:var(--coral)!important}
+</style></head><body>
+<h1>Bellkeeper Ultimate v2 · P2 "Broken Hour" example (simulation, not the game)</h1>
+<div class="sub">4 perfect bots. Every 3 s the P1 hand ticks to the next plate and three rules resolve on the same tick: <b>the plate</b> (the next hour soaks it), the <b>Inverted Bell</b> (the bell slams the half away from the plate: everyone must be on the plate's half, except the INVERTED player, who must be inside the slam) and the <b>Gear Train</b> (I–III and II–IV are chained: each chain 6–10 m, and the chains may not cross). INVERTED is always the soaker's partner, so every beat it must be <b>passed by touch</b> to the next one. The P1 rewinds return. Proposal, open to change.</div>
+<div class="wrap">
+<canvas id="c" width="760" height="760"></canvas>
+<div class="side">
+<h3>Read each beat</h3>
+<p><span class="k" style="background:#e3b45f"></span><b>SOAK</b>: the lit plate (hours take turns I, II, III, IV).</p>
+<p><span class="k" style="background:#b67cff"></span><b>INVERTED</b>: stand <i>inside</i> the slam (the far half), and keep your chain 6–10 m from your partner on the plate.</p>
+<p><span class="k" style="background:#efe6cf"></span><b>SAFE</b>: stay on the plate's half, chain 6–10 m, don't cross the other chain.</p>
+<p><span class="k" style="background:#ff9a6b"></span><b>PASS</b>: you hold INVERTED now and must touch the next holder before the beat (it jumps to whoever you touch first, then can't move again for 1 s).</p>
+<h3>Fails</h3>
+<p>Plate empty, a chain over 10 m, or the wrong INVERTED holder: <b class="bad">WIPE</b>. Wrong half: 999. Chain under 6 m or chains crossed: 60.</p>
+<h3>Mistake buttons</h3>
+<p>Restart with one bot making one mistake, to see what it costs.</p>
+</div></div>
+<div class="bar"><button id="play">⏸ Pause</button><button id="re">↺ Restart perfect</button>
+<select id="mist"><option value="">inject a mistake…</option><option value="pass">beat 5: the holder forgets to pass</option><option value="half">beat 8: a SAFE player stands in the slam</option><option value="chain">beat 11: a pair stretches its chain to 11 m</option></select>
+<label>Speed <select id="sp"><option>0.5</option><option selected>1</option><option>2</option></select></label><span id="clock"></span></div>
+<div id="log"></div>
+<script>
+const DATA=__PLAN__;
+const {BEAT,SPEED,SPRINT,PLATE_R,CH_MIN,CH_MAX,TOUCH,ON_PLATE,plan}=DATA;
+const cv=document.getElementById('c'),g=cv.getContext('2d'),S=cv.width/2/12.6,CX=cv.width/2,CY=cv.height/2;
+const P=(x,y)=>[CX+x*S,CY-y*S], col=['#4f8fff','#47c98c','#ad7dff','#3fd0e0'], cls=['V','C','A','V'], H=['I','II','III','IV'];
+const dir=a=>[Math.sin(a*Math.PI/180),Math.cos(a*Math.PI/180)], dist=(p,q)=>Math.hypot(p[0]-q[0],p[1]-q[1]), dot=(p,q)=>p[0]*q[0]+p[1]*q[1];
+const T0=3, END=T0+BEAT*(plan.length-1)+1.2;
+let invLock=0,t,pos,inv,running=true,speed=1,log=[],fails=0,checked,mistake='',dead,wiped;
+const start=[[0,6],[5,-1],[0,-5],[-5,1]];
+function cross(a,b,c,d){const o=(p,q,r)=>Math.sign((q[0]-p[0])*(r[1]-p[1])-(q[1]-p[1])*(r[0]-p[0]));return o(a,b,c)!==o(a,b,d)&&o(c,d,a)!==o(c,d,b);}
+function reset(){invLock=0;t=0;pos=start.map(p=>p.slice());inv=plan[0].holder;log=[];fails=0;checked=-1;dead=[false,false,false,false];wiped=null;}
+// where player i is at time tt (the bots' route): beat b's interval is [T0+BEAT*(b-1), T0+BEAT*b]
+function target(i,tt){
+ if(tt<=T0){const p0=plan[0].P[i];return lerp(start[i],p0,Math.min(1,tt/T0));}
+ let b=Math.min(plan.length-1,Math.ceil((tt-T0)/BEAT)); const s=plan[b], prev=plan[b-1].P[i], to=s.P[i], t0=T0+BEAT*(b-1), dt=tt-t0;
+ let mis=(mistake==='pass'&&b===5&&i===s.passFrom), M=s.M&&(i===s.passFrom||i===s.holder)&&!mis?s.M:null;
+ let dest=to;
+ if(mistake==='half'&&b===8&&i!==s.soaker&&i!==s.holder&&i!==s.passFrom){const d=dir(s.hand);dest=[-d[0]*4,-d[1]*4];}
+ if(mistake==='chain'&&b===11&&i===(s.soaker+1)%4){const o=s.P[(i+2)%4],v=[to[0]-o[0],to[1]-o[1]],L=Math.hypot(...v)||1;dest=[o[0]+v[0]/L*11,o[1]+v[1]/L*11];}
+ if(M){const m=M.at, legA=dist(prev,m), legB=dist(m,dest), tm=M.t; // sprint to the meeting point, wait, sprint to the spot
+  if(dt<=tm) return lerp(prev,m,Math.min(1,Math.max(0,(dt-0.0)*SPRINT/Math.max(legA,1e-3))));
+  return lerp(m,dest,Math.min(1,(dt-tm)*SPRINT/Math.max(legB,1e-3)));}
+ const read=0.4; if(dt<read) return prev; return lerp(prev,dest,Math.min(1,(dt-read)*SPEED/Math.max(dist(prev,dest),1e-3)));
+}
+function lerp(a,b,k){return [a[0]+(b[0]-a[0])*k,a[1]+(b[1]-a[1])*k];}
+function step(){
+ if(wiped)return;
+ for(let i=0;i<4;i++) if(!dead[i]) pos[i]=target(i,t);
+ // INVERTED jumps to the first other player it touches (between beats)
+ if(t>=invLock) for(let i=0;i<4;i++) if(i!==inv&&!dead[i]&&dist(pos[i],pos[inv])<=TOUCH){ const was=inv; inv=i; invLock=t+1.0; log.unshift(`${H[was]} touches ${H[i]}: INVERTED passes to ${H[i]}`); break; }
+ // beat ticks
+ const b=Math.floor((t-T0)/BEAT+1e-6); if(t>=T0&&b>checked&&b<plan.length){checked=b; resolve(b);}
+}
+function resolve(b){
+ const s=plan[b], pl=dir(s.hand).map(v=>v*PLATE_R), d=dir(s.hand), f=[];
+ if(dist(pos[s.soaker],pl)>ON_PLATE){f.push('plate empty: WIPE');wiped='plate empty';}
+ if(inv!==s.holder){f.push(`${H[inv]} holds INVERTED, ${H[s.holder]} should: WIPE`);wiped='wrong INVERTED holder';}
+ for(let i=0;i<4;i++){if(dead[i])continue;const far=dot(pos[i],d)<-0.6,near=dot(pos[i],d)>0.6; if(i===inv?!far:!near){f.push(`${H[i]} ${i===inv?'INVERTED outside the slam':'in the slam'}: 999`);dead[i]=true;}}
+ for(const [a,c] of [[0,2],[1,3]]){const L=dist(pos[a],pos[c]); if(L>CH_MAX){f.push(`chain ${H[a]}–${H[c]} ${L.toFixed(1)} m snaps: WIPE`);wiped='a chain snapped';} else if(L<CH_MIN) f.push(`chain ${H[a]}–${H[c]} ${L.toFixed(1)} m grinds: 60 each`);}
+ if(cross(pos[0],pos[2],pos[1],pos[3])) f.push('chains cross: 60 to all');
+ if(!wiped&&dead.some(x=>x)) wiped='a player died: the next beat has an empty job';
+ fails+=f.length;
+ const nb=plan[b+1], rew=nb&&plan[b+2]&&Math.sign(plan[b+2].v-nb.v)!==Math.sign(nb.v-s.v);
+ log.unshift(`<b>beat ${b+1}</b>: ${H[s.soaker]} soaks · ${H[s.holder]} INVERTED in the slam · ${f.length?'<span class="bad">✗ '+f.join(' · ')+'</span>':'✓ clean'}${rew?' · <b>REWIND next beat</b>':''}`);
+}
+function draw(){
+ g.clearRect(0,0,cv.width,cv.height);
+ g.fillStyle='#212a47';g.beginPath();g.arc(CX,CY,12*S,0,7);g.fill();g.strokeStyle='#55608a';g.lineWidth=2;g.stroke();
+ let b=t<T0?0:Math.min(plan.length-1,Math.ceil((t-T0)/BEAT+1e-6)); if(t>=T0&&(t-T0)%BEAT<1e-6)b=Math.min(plan.length-1,b);
+ const s=plan[b], d=dir(s.hand), toBeat=(T0+BEAT*b)-t;
+ // the slam: the half away from the plate (coral in the last 1.2 s, dashed line always)
+ const nx=-d[1],ny=d[0];
+ g.save();g.beginPath();g.arc(CX,CY,12*S,0,7);g.clip();
+ const a0=Math.atan2(-(-d[1]),-d[0]);
+ g.beginPath();const ang=Math.atan2(d[1],d[0]);g.moveTo(CX,CY);g.arc(CX,CY,12*S,-(ang+Math.PI/2)+Math.PI,-(ang+Math.PI/2)+2*Math.PI);g.closePath();
+ g.fillStyle=toBeat<1.2&&toBeat>-0.3?'rgba(255,106,77,'+(0.15+0.3*(1-toBeat/1.2))+')':'rgba(239,230,207,0.04)';g.fill();g.restore();
+ g.setLineDash([8,6]);g.strokeStyle='#efe6cf';g.lineWidth=2;g.beginPath();g.moveTo(...P(nx*12,ny*12));g.lineTo(...P(-nx*12,-ny*12));g.stroke();g.setLineDash([]);
+ // plates + hand
+ [0,90,180,270].forEach(pa=>{const [x,y]=P(...dir(pa).map(v=>v*PLATE_R));const lit=((s.hand%360)+360)%360===pa;g.beginPath();g.arc(x,y,ON_PLATE*S,0,7);g.fillStyle=lit?'#e3b45f':'#5a4a2a';g.fill();if(lit){g.fillStyle='#10162a';g.font='bold 13px Segoe UI';g.textAlign='center';g.fillText('PLATE',x,y+4);}});
+ const [hx,hy]=P(...d.map(v=>v*6));g.strokeStyle='#c99a4b';g.lineWidth=6;g.beginPath();g.moveTo(CX,CY);g.lineTo(hx,hy);g.stroke();
+ g.fillStyle='#6b5428';g.beginPath();g.arc(CX,CY,1.6*S,0,7);g.fill();g.strokeStyle='#c99a4b';g.lineWidth=3;g.stroke();
+ // chains
+ [[0,2,'#e3b45f'],[1,3,'#6fa8ff']].forEach(([a,c,cc])=>{if(dead[a]||dead[c])return;const L=dist(pos[a],pos[c]);g.strokeStyle=L>CH_MAX||L<CH_MIN?'#ff2f3c':cc;g.lineWidth=3;g.setLineDash([5,4]);g.beginPath();g.moveTo(...P(...pos[a]));g.lineTo(...P(...pos[c]));g.stroke();g.setLineDash([]);
+  const m=P((pos[a][0]+pos[c][0])/2,(pos[a][1]+pos[c][1])/2);g.fillStyle=g.strokeStyle;g.font='11px Segoe UI';g.textAlign='center';g.fillText(L.toFixed(1)+' m',m[0],m[1]-5);});
+ // meeting point for the pass
+ if(s.M&&t>=T0+BEAT*(b-1)&&t<T0+BEAT*(b-1)+s.M.t+0.3){const [mx,my]=P(...s.M.at);g.strokeStyle='#ff9a6b';g.lineWidth=2;g.beginPath();g.arc(mx,my,TOUCH*S,0,7);g.stroke();}
+ // players
+ for(let i=0;i<4;i++){const [px,py]=P(...pos[i]); if(dead[i]){g.fillStyle='#444';g.beginPath();g.arc(px,py,10,0,7);g.fill();continue;}
+  if(i===inv){g.strokeStyle='#b67cff';g.lineWidth=4;g.beginPath();g.arc(px,py,17,0,7);g.stroke();}
+  g.fillStyle=col[i];g.beginPath();g.arc(px,py,11,0,7);g.fill();g.strokeStyle='#0b0f1c';g.lineWidth=2;g.stroke();
+  g.fillStyle='#0b0f1c';g.font='bold 12px Segoe UI';g.textAlign='center';g.fillText(cls[i],px,py+4);
+  const job=i===s.soaker?['SOAK','#e3b45f']:i===s.holder?['INVERTED','#c9a2ff']:(i===s.passFrom&&inv===i)?['PASS → '+H[s.holder],'#ff9a6b']:['SAFE','#efe6cf'];
+  g.font='bold 13px Segoe UI';g.fillStyle=job[1];g.fillText(H[i]+' '+job[0],px,py-20);}
+ // beat ring
+ const frac=t<T0?t/T0:((t-T0)%BEAT)/BEAT;g.strokeStyle='#c99a4b';g.lineWidth=4;g.beginPath();g.arc(56,56,24,-Math.PI/2,-Math.PI/2+frac*6.283);g.stroke();g.fillStyle='#efe6cf';g.font='bold 13px Segoe UI';g.textAlign='center';g.fillText('beat',56,52);g.fillText(String(b+1),56,70);
+ if(wiped){g.fillStyle='rgba(16,22,42,.8)';g.fillRect(0,CY-40,cv.width,80);g.fillStyle='#ff6a4d';g.font='bold 30px Segoe UI';g.fillText('WIPE — '+wiped,CX,CY+10);}
+ document.getElementById('clock').textContent=`t ${Math.min(t,END).toFixed(1)} s · beats ${Math.max(0,checked+1)}/${plan.length} · rule breaks ${fails}${t>=END&&!wiped?' · done: '+(fails?'mistakes':'clean, 0 damage'):''}`;
+ document.getElementById('log').innerHTML=log.slice(0,4).join('<br>');
+}
+let last=performance.now();
+function frame(now){const dt=Math.min(0.05,(now-last)/1000)*speed;last=now; if(running&&t<END&&!wiped){let k=Math.ceil(dt/(1/120));for(let i=0;i<k;i++){t+=dt/k;step();}} draw(); requestAnimationFrame(frame);}
+document.getElementById('play').onclick=e=>{running=!running;e.target.textContent=running?'⏸ Pause':'▶ Play';};
+document.getElementById('re').onclick=()=>{mistake='';document.getElementById('mist').value='';reset();running=true;document.getElementById('play').textContent='⏸ Pause';};
+document.getElementById('mist').onchange=e=>{mistake=e.target.value;reset();running=true;};
+document.getElementById('sp').onchange=e=>speed=+e.target.value;
+reset(); { const ff=+((location.hash.match(/t=([0-9.]+)/)||[])[1]||0); const mm=(location.hash.match(/m=([a-z]+)/)||[])[1]; if(mm){mistake=mm;reset();} while(t<ff&&!wiped){t+=1/120;step();} } requestAnimationFrame(frame);
+</script></body></html>

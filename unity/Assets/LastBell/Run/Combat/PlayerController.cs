@@ -128,7 +128,7 @@ namespace LastBell.Run
         public PlayerInput Last { get; private set; }
 
         int dashTick, dashLock, stun, knockTick, sinceSpend = 999;
-        Vector3 dashDir, knockDir; float knockDist, dashDist = DashDistance;
+        Vector3 dashDir, knockDir; float knockDist, dashDist = DashDistance; int knockLen = KnockTicks;
         bool sprinting;
 
         public static PlayerController Spawn(CombatWorld world, string className, Vector3 pos, float yaw)
@@ -217,15 +217,17 @@ namespace LastBell.Run
             if (Down) return;
             float mult = Kit.Mitigation(h, out bool noKnock);
             int dmg = Mathf.RoundToInt(damage * mult * World.DamageTakenScale);   // difficulty scales the hit once, here
-            LastHurtTick = World.Tick;            if (mult >= 1) dmg = Mathf.Max(1, dmg);   // a shield can absorb a hit completely; nothing else can
+            LastHurtTick = World.Tick;
+            if (mult >= 1 && damage > 0) dmg = Mathf.Max(1, dmg);   // a shield can absorb a hit completely; nothing else can (a 0-damage hazard is a push only)
             Hp = Mathf.Max(0, Hp - dmg);
             World.ReportPlayerHit(this, h, dmg);
+            if (World.Players.Count > 0 && World.Players[0] == this) Debug.Log($"[hit] you: {h.Source} -{dmg} at ({transform.position.x:0.0},{transform.position.z:0.0}) hp {Hp}");   // playtests: what hit the player
             RunHud.Float(transform.position + Vector3.up * 2.4f, "-" + dmg, mult < 1 ? new Color(0.6f, 0.9f, 1f) : new Color(1f, 0.42f, 0.36f));
             World.BossFx.PlayerHit(transform.position);
             if (Hp == 0) { GoDown(); return; }
             if (!noKnock && h.Flinch)
             {
-                stun = h.Stun; knockDir = h.PushDir(transform.position); knockDist = h.Knockback * Shop.ItemHooks.F(this, "knockback", 1); knockTick = KnockTicks;
+                stun = h.Stun; knockDir = h.PushDir(transform.position); knockDist = h.Knockback * Shop.ItemHooks.F(this, "knockback", 1); knockTick = knockLen = KnockTicks;
                 dashTick = 0; Kit.Interrupt();
                 Presenter.Hit();
             }
@@ -260,8 +262,17 @@ namespace LastBell.Run
             GoDown();
         }
 
-        // Put the player somewhere else at once (Aurelion's Last Light fall, proposal): any knockback, pull or dash in
-        // progress ends, so nothing carries them back over the edge.
+        // Carry the player to pos over `ticks` ticks (Aurelion's Last Light fall): a forced slide like a knockback, never a
+        // teleport (gpt/08 §2). Input, dash and pull stop meanwhile; the stun lasts at least as long as the slide.
+        public void SlideTo(Vector3 pos, int ticks)
+        {
+            if (Down || ticks <= 0) return;
+            var d = Sim.Flat(pos - transform.position);
+            dashTick = 0; pullTick = 0;
+            stun = Mathf.Max(stun, ticks); knockDir = d.normalized; knockDist = d.magnitude; knockTick = knockLen = ticks;
+        }
+
+        // Test setup only: put the player somewhere at once (no boss uses this; bosses never teleport players).
         public void Relocate(Vector3 pos)
         {
             if (Down) return;
@@ -292,9 +303,13 @@ namespace LastBell.Run
             if (Input is KeyboardMouseInput km) km.Poll();
         }
 
+        // profiler scope (perf agent, 2 Nov): the input read, which is the whole think for an ally bot
+        static readonly Unity.Profiling.ProfilerMarker PmInput = new Unity.Profiling.ProfilerMarker("LastBell.Player.InputOrBotThink");
+
         public void Step()
         {
-            var inp = Input != null && MovementEnabled ? Input.Read(this) : default;
+            PlayerInput inp;
+            using (PmInput.Auto()) inp = Input != null && MovementEnabled ? Input.Read(this) : default;
             if (!AbilitiesEnabled) { inp.P0 = inp.P1 = inp.P2 = inp.P3 = inp.P4 = false; inp.H0 = inp.H1 = inp.H2 = inp.H3 = inp.H4 = false; inp.Dash = inp.Potion = false; }
             Last = inp;
             if (Down)
@@ -304,7 +319,7 @@ namespace LastBell.Run
             }
             sinceSpend++; sincePotion++;
             if (inp.Potion && stun == 0) DrinkPotion();   // usable while moving or mid-action, not while stunned
-            if (sinceSpend > Sim.Ticks(Shop.ItemHooks.RegenDelay(this, RegenDelay))) Stamina = Mathf.Min(MaxStaminaNow, Stamina + Regen * Sim.Dt);
+            if (sinceSpend > Sim.Ticks(Shop.ItemHooks.RegenDelay(this, RegenDelay))) Stamina = Mathf.Min(MaxStaminaNow, Stamina + Shop.ItemHooks.F(this, "stamina.regen", Regen) * Sim.Dt);   // Steady Breath
 
             var cam = Camera.main;
             Vector3 fwd = cam ? Sim.Flat(cam.transform.forward).normalized : Vector3.forward;
@@ -317,7 +332,7 @@ namespace LastBell.Run
             if (stun > 0)
             {
                 stun--;
-                if (knockTick > 0) { knockTick--; vel = knockDir * (knockDist / KnockTicks) * Sim.Hz; }
+                if (knockTick > 0) { knockTick--; vel = knockDir * (knockDist / knockLen) * Sim.Hz; }
             }
             else if (dashTick > 0)
             {
@@ -383,6 +398,12 @@ namespace LastBell.Run
         public float MoveScale { get; protected set; } = 1;   // 1 free, 0 rooted, between = slowed
         public Vector3 Velocity { get; protected set; }      // extra displacement authored by the kit (lunges)
         public bool FaceAim { get; protected set; }
+        // Bots: how long the current action still holds MoveScale (s), and how long a press on a slot would root or slow the
+        // player from now (slot -1: the longest ready press). A route search slows every step inside that time, not only its
+        // first leg; the default (0.2 s while slowed, no press roots) is what the searches assumed before (31 Oct).
+        public virtual float SlowLeft => MoveScale < 1 ? 0.2f : 0;
+        public virtual float RootFor(int slot) => 0;
+        public virtual float RootScale(int slot) => 1;
         public void Attach(PlayerController p) { P = p; }
         public abstract string[] SlotNames { get; }
         public abstract string[] SlotKeys { get; }

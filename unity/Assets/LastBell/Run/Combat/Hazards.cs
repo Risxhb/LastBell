@@ -26,6 +26,7 @@ namespace LastBell.Run
         public HazardShape Shape;
         public HazardKind Kind = HazardKind.Strike;
         public Vector3 Origin;
+        public Vector3 Drift;                    // m/s, for a hazard its ability moves (bullets): AllyBot looks ahead along it
         public float Yaw;
         public float Radius, Inner, HalfAngle;   // circle/ring/cone
         public float Length, Width;              // lane
@@ -55,6 +56,7 @@ namespace LastBell.Run
         public Func<Vector3, Vector3> Push;      // knockback direction override (Second Press pushes toward the arena centre)
         public float ClipRadius;                 // > 0: the telegraph is drawn only over the floor disc of this radius (presentation)
         public bool HitOnResolve = true;         // false: the owner deals the hits itself while the warning is up (a sweeping charge)
+        public bool Hidden;                      // no floor telegraph (an arena-wide raidwide the boss shows with its own effects)
         public bool Flinch = true;               // false: the hit deals damage only, with no stun, knockback or interrupt (hostile bullets)
         public bool Soak;                        // a ring to stand IN (a tower), not a shape to leave: bots and the HUD read it
 
@@ -163,13 +165,19 @@ namespace LastBell.Run
             if (h.ClipRadius > 0) h.Tele.Clip(Vector3.zero, h.ClipRadius);
             h.Tele.Place(h.Origin, h.Yaw);
             if (h.LockAt <= 0) h.Tele.Lock();
+            if (h.Hidden) h.Tele.Hide();
             live.Add(h);
             Spawned?.Invoke(h);
             return h;
         }
 
+        // profiler scopes (perf agent, 2 Nov: name the phase-2 garbage); a marker costs nothing outside the profiler
+        static readonly Unity.Profiling.ProfilerMarker PmTrack = new Unity.Profiling.ProfilerMarker("LastBell.Hazards.TrackAndTelegraph"),
+            PmBurn = new Unity.Profiling.ProfilerMarker("LastBell.Hazards.Burn"), PmResolve = new Unity.Profiling.ProfilerMarker("LastBell.Hazards.Resolve");
+
         public void Step()
         {
+            using (PmTrack.Auto())
             for (int i = 0; i < live.Count; i++)
             {
                 var h = live[i];
@@ -179,7 +187,8 @@ namespace LastBell.Run
                 h.Tele.Place(h.Origin, h.Yaw);
                 h.Tele.Progress(h.FillToLock ? (h.LockAt > 0 ? (float)h.Age / h.LockAt : 1) : (float)h.Age / Mathf.Max(1, h.ResolveAt));
             }
-            StepBurn();
+            using (PmBurn.Auto()) StepBurn();
+            using (PmResolve.Auto())
             for (int i = live.Count - 1; i >= 0; i--)
             {
                 var h = live[i];
@@ -234,7 +243,7 @@ namespace LastBell.Run
                 Hazard src = null;
                 if (!p.Down)
                     foreach (var h in live)
-                        if (h.BurnPerSecond > 0 && h.Locked && (src == null || h.BurnPerSecond > src.BurnPerSecond) && h.Hits(p)) src = h;
+                        if (h.BurnPerSecond > 0 && h.Locked && (src == null || h.BurnPerSecond > src.BurnPerSecond) && h.Hits(p) && (h.Affects == null || h.Affects(p))) src = h;
                 if (src == null) { burn.Remove(p); continue; }
                 burn.TryGetValue(p, out float acc); acc += src.BurnPerSecond * Sim.Dt;
                 int dmg = Mathf.FloorToInt(acc); acc -= dmg; burn[p] = acc;

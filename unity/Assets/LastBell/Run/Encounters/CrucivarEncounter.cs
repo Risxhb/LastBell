@@ -36,6 +36,14 @@ namespace LastBell.Run
         protected override bool PartyScaled => true;
         protected override float PartyStep => V4PartyStep;
         public static int V4MaxHp(int fighters) => Mathf.RoundToInt(V4Hp * (1 + V4PartyStep * Mathf.Max(0, fighters - 1)));
+        // Ready-screen warm-up (BossEntry.WarmUp): the pour and turret numerals are the first TextMeshes of the fight, and
+        // loading the built-in font then cost a ~40 ms frame at ~9 s. Load it and rasterise every numeral glyph here instead,
+        // and build the Mould Towers kits (pooled) so Phase 3's first towers build nothing in their tick.
+        public static void WarmUp(CombatWorld _)
+        {
+            Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf").RequestCharactersInTexture("IVX", 64, FontStyle.Bold);
+            MouldPressFx.WarmUp();
+        }
         void Awake() { MaxHp = V4Hp; BodyRadius = 1.7f; HitHeight = 2.0f; MarkHeight = 4.6f; }
 
         protected override void Build()
@@ -43,6 +51,7 @@ namespace LastBell.Run
             presenter = CharacterPresenter.Create(transform, "Crucivar", 3f, 0.8f, 0, CrucivarRig.BuildPlaceholder);
             rig = presenter.Visual.gameObject.AddComponent<CrucivarRig>();
             rig.Bind(presenter.Visual);
+            presenter.PlayOnce("Intro", 2f);   // the run's 2 s intro (RunDirector.IntroTicks): rises from the gantry crouch, one hammer beat
             PhaseName = "Sealed Furnace";
             BindAbilities();
             W.Hazards.Spawned -= FoundryLook; W.Hazards.Spawned += FoundryLook;
@@ -153,7 +162,7 @@ namespace LastBell.Run
                     foreach (var w in Recover("Forge Rite (vents cooling)", "Vulnerable", Sim.Ticks(ForgeRite.Punish))) yield return w;
                 }
                 PhaseLoops++;
-                int want = PhaseFor();
+                int want = Mathf.Min(PhaseFor(), phase + 1);   // one phase per loop: a fast party that drops past 30 % in Phase 1 still gets the Foundry Uprising
                 if (want != phase) { phase = want; PhaseLoops = 0; Rite.ClearPools(); foreach (var w in Shift()) yield return w; }
             }
         }

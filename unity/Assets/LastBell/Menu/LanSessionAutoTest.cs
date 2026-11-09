@@ -71,6 +71,9 @@ namespace LastBell.Menu
                 until=Time.realtimeSinceStartup+60;
                 while (!lobby.CanStart && Time.realtimeSinceStartup<until) yield return null;
                 Check("everyone readies again after the boss change",lobby.CanStart);
+                // the Bellkeeper is the Ultimate now: its jobs (Escapement Relay first) wipe an automated party before any plain
+                // hazard appears, so the smoke fight practises Chime Debts alone (hazards, no wipe); the full fight is not covered here
+                BellkeeperEncounter.AbilityOverride = boss=="Bellkeeper" ? UltimateMechanics.ChimeDebts : null;
                 Check("host begins session",session.HostStart());
             }
             int clientSelections=0;
