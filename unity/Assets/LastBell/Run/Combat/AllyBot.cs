@@ -1260,15 +1260,47 @@ namespace LastBell.Run
         }
 
         // Sylvara v3: bullet-hell steering (SylvaraSteer). It holds its own angle round her (casters at range, Vanguard
-        // close) and in Hollow Bloom cuts a Choir Bud (one bud per bot, by slot; BudStand). Every 3 ticks it
+        // close) and in Hollow Bloom cuts its own Choir Bud (BudFor, BudStand). Every 3 ticks it
         // re-plans the cheapest path through the bullets and telegraphs 0.8 s ahead.
-        Vector3 sylMove; bool sylSprint, sylOn, sylDash, sylSwing = true; float sylCost; Vector3 sylPos;
+        Vector3 sylMove; bool sylSprint, sylOn, sylDash; float sylCost; Vector3 sylPos, sylHome;
         int rvTick = -99; PlayerController rvFor; bool rvOk; Vector3 rvWp, rvStand;   // the revive route (ReviveRoute)
-        string SylvaraLine() => $"{(dJob == "revive" ? $"revive {(rvOk ? "route" : "wait")} to ({rvStand.x:0.0},{rvStand.z:0.0}) " : "")}cost {sylCost:0.0} move ({sylMove.x:0.0},{sylMove.z:0.0}) sprint {sylSprint} dash {sylDash} at ({sylPos.x:0.0},{sylPos.z:0.0})";
+        string SylvaraLine() => $"{(dJob == "revive" ? $"revive {(rvOk ? "route" : "wait")} to ({rvStand.x:0.0},{rvStand.z:0.0}) " : "")}cost {sylCost:0.0} move ({sylMove.x:0.0},{sylMove.z:0.0}) sprint {sylSprint} dash {sylDash} at ({sylPos.x:0.0},{sylPos.z:0.0}) home ({sylHome.x:0.0},{sylHome.z:0.0})";
 
         // how far from its Choir Bud it stands to cut it: Tollbreaker throws from 6 m (a tap flies 9 m), outside the thick of
         // the bud's own petals; the others stand next to it (5 m was tried, 8 Nov: more blooms and Bud Petal hits)
         static float BudStand(PlayerController me) => me.ClassName == "Tollbreaker" ? 6f : 1.8f;
+
+        // Choir Bud owners: each bud keeps one bot (a free standing bot nearest to it when it sprouts, else the nearest), and a
+        // bot with no bud of its own fights Sylvara. Picking buds[slot % count] sent a bot whose bud was cut across the arena
+        // to a bud another bot was already cutting, and Hollow Bloom ran 72 s against Spiral Bloom's 28 for the same
+        // quarter of her HP (9 Nov full Hard fights)
+        static readonly Dictionary<Vector3, PlayerController> budOwner = new Dictionary<Vector3, PlayerController>();
+        static CombatWorld budWorld; static int budTick = -1;
+        static Vector3? BudFor(PlayerController me, List<Vector3> buds)
+        {
+            var w = me.World;
+            if (budWorld != w) { budOwner.Clear(); budWorld = w; budTick = -1; }
+            if (budTick != w.Tick)
+            {
+                budTick = w.Tick;
+                foreach (var k in new List<Vector3>(budOwner.Keys)) if (!buds.Contains(k) || budOwner[k] == null || budOwner[k].Down) budOwner.Remove(k);
+                foreach (var b in buds)
+                {
+                    if (budOwner.ContainsKey(b)) continue;
+                    PlayerController pick = null; float best = float.MaxValue; bool pickFree = false;
+                    foreach (var p in w.Players)
+                    {
+                        if (p.Down || !(p.Input is AllyBot)) continue;
+                        bool free = !budOwner.ContainsValue(p); float dd = Sim.Flat(p.transform.position - b).magnitude;
+                        if ((free && !pickFree) || (free == pickFree && dd < best)) { pick = p; best = dd; pickFree = free; }
+                    }
+                    if (pick != null) budOwner[b] = pick;
+                }
+            }
+            Vector3? mine = null; float near = float.MaxValue;
+            foreach (var kv in budOwner) if (kv.Value == me) { float dd = Sim.Flat(me.transform.position - kv.Key).magnitude; if (dd < near) { near = dd; mine = kv.Key; } }
+            return mine;
+        }
 
         PlayerInput ReadSylvara(PlayerController me, SylvaraEncounter sy)
         {
@@ -1280,11 +1312,11 @@ namespace LastBell.Run
             // where it wants to be: its own angle round her, or next to its Choir Bud
             float ang = 360f * slot / of + 30f;
             var home = bp + Sim.Dir(ang) * (sy.BodyRadius + Range(me) + 0.5f);
-            if (SylvaraSteer.P4Radius > 0 && sy.PhaseNumber == 4) home = bp + Sim.Dir(ang) * SylvaraSteer.P4Radius;
             var buds = sy.AliveBudPositions();
-            if (buds.Count > 0)
+            var myBud = BudFor(me, buds);
+            if (myBud.HasValue)
             {
-                var bud = buds[slot % buds.Count];
+                var bud = myBud.Value;
                 // on the bud's inner side: buds grow 10 m out, and a bot on the outer side was pinned to the wall by her
                 // spiral and the bud's own petals (9 Nov full Hard fights: most Bud Petal hits at 11-12 m from her, under 30
                 // stamina)
@@ -1311,7 +1343,7 @@ namespace LastBell.Run
             if (tick % 3 == 1 || me.Dashing)
             {
                 sylMove = SylvaraSteer.Choose(me, pos, home, out sylSprint, out sylDash, out sylCost, reach, BudStand(me) + 0.8f, reviving ? SylvaraSteer.RevivePull : sy.PhaseName == SylvaraEncounter.PhaseNames[3] ? P4Pull : 0.35f);
-                sylPos = pos;
+                sylPos = pos; sylHome = home;
                 // in reach of the downed ally: hold still so the revive channels, unless standing here gets hit (a near miss
                 // is fine); small steps toward the exact spot kept pausing it (5 Nov)
                 if (reviving && Sim.Flat(rwho.transform.position - pos).magnitude <= PlayerController.ReviveRange - 0.15f && SylvaraSteer.HoldCost(me, pos) < 40f)
@@ -1324,8 +1356,6 @@ namespace LastBell.Run
                     if (to.magnitude > 0.2f && SylvaraSteer.StepCost(me, pos, to.normalized, PlayerController.WalkSpeed) < 40f) { sylMove = to.normalized; sylSprint = false; }
                 }
                 if (sylDash) inp.Dash = true;
-                // swing only while its move stays clean at attack speed (9 Nov full Hard fights: burst and bud hits came mid-swing)
-                sylSwing = SylvaraSteer.SwingCheck <= 0 || (!sylDash && !me.Dashing && SylvaraSteer.ClearAt(me, pos, sylMove, (sylSprint ? PlayerController.SprintSpeed : PlayerController.WalkSpeed) * SylvaraSteer.SwingSlow));
             }
             inp.Sprint = sylSprint;
             inp.Aim = target;
@@ -1333,7 +1363,7 @@ namespace LastBell.Run
             // the non-attacking menu bots; the boss herself only when attacks are on
             bool atBud = reach.HasValue && Sim.Flat(target - pos).magnitude <= BudStand(me) + 1.4f;
             // (Tollbreaker plays its rotation: a held Twin Hurl lodges the axe, and lodged axes need a recall)
-            if (!reviving && sylSwing && (atBud || Attacks && Sim.Flat(target - pos).magnitude <= SylvaraAttackRange(me, sy.PhaseName) + sy.BodyRadius + 2f))
+            if (!reviving && (atBud || Attacks && Sim.Flat(target - pos).magnitude <= SylvaraAttackRange(me, sy.PhaseName) + sy.BodyRadius + 2f))
             {
                 if (me.Kit is TollbreakerKit) Attack(me, ref inp);
                 else inp.P0 = inp.H0 = tick % 6 == 0 || me.ClassName != "Arcanist";
@@ -1358,18 +1388,7 @@ namespace LastBell.Run
     public static class SylvaraSteer
     {
         const float Step = 0.05f, Buffer = 0.25f;
-        static float Horizon = 0.8f;   // how far ahead it looks (s); Phase 4 can look further (HorizonP4)
-        // test knobs (9 Nov tuning, Phase 4 Seed Storm): -lastbellBotP4Horizon s, -lastbellBotP4Radius m (0 = by class)
-        public static readonly float HorizonP4 = Knob("-lastbellBotP4Horizon", 0.8f), P4Radius = Knob("-lastbellBotP4Radius", 0f), SwingCheck = Knob("-lastbellBotSwingCheck", 1f);
-        // every attack slows its player (Twin Hurl 0.6, casts down to 0.2; Splitting Throw roots): is the planned move still
-        // clean at that speed? The steer plans at full speed, so a swing mid-dodge walked the bot into the bullets it saw
-        public const float SwingSlow = 0.5f;
-        public static bool ClearAt(PlayerController me, Vector3 pos, Vector3 d, float v) { Cost(me, pos, d, v, pos, me.World.Boss, null, 0); return firstHit > 90; }
-        static float Knob(string arg, float dflt)
-        {
-            var a = System.Environment.GetCommandLineArgs(); int i = System.Array.FindIndex(a, x => x.Equals(arg, System.StringComparison.OrdinalIgnoreCase));
-            return i >= 0 && i + 1 < a.Length && float.TryParse(a[i + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : dflt;
-        }
+        const float Horizon = 0.8f;
         const float SprintReserve = 40f;   // stamina above the dash cost that a sprint for less than a hit may not spend (25 until 9 Nov)
         const float DashFree = 80f, DashSoon = 0.35f;   // see Choose: when it dashes for a hit it sees coming
         static float firstHit;   // the first hit (s) on the path Cost last scored; 99 when it meets none
@@ -1390,7 +1409,6 @@ namespace LastBell.Run
         {
             HomePull = homePull;
             var w = me.World; var boss = w.Boss;
-            Horizon = boss is SylvaraEncounter s4 && s4.PhaseNumber == 4 ? HorizonP4 : 0.8f;
             int mine = w.Bullets.ColourOf != null ? w.Bullets.ColourOf(me) : 0;
             // its ring flickers before a toll swaps colours (the same warning a player sees): both colours count until the swap
             bool both = w.Boss is SylvaraEncounter sy && sy.SwapWarned(me);
