@@ -12,7 +12,8 @@ namespace LastBell.Run
         public override int Order => 360;
 
         static readonly string[] Clips = { "Idle", "Walk", "Intro", "EmberBrand", "FurnaceSpinCW", "FurnaceSpinCCW", "Backdraft", "CastingOrder",
-            "Diebreaker", "TurretCall", "PourFlood", "MouldPress", "CrownRise", "Eruption", "Vulnerable", "PhaseShift", "Defeat" };
+            "Diebreaker", "TurretCall", "PourFlood", "MouldPress", "CrownRise", "Eruption", "Vulnerable", "PhaseShift", "Defeat",
+            "SlagCast", "HammerLodged", "CastingCycle", "ReleaseSides" };   // wired 8 Nov: Second Press, Quake Echo, the uprising pour, Molten Overflow
 
         public override IEnumerator Run(CrucivarAutoTest t)
         {

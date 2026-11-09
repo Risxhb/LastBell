@@ -35,7 +35,7 @@ namespace LastBell.Run
         public sealed class Turret
         {
             public int K; public Vector3 Pos; public bool Up = true; public BossPart Casting; public float CastMax;
-            public Pattern A, B; public int Shots, NextFire; public bool Dense = true; public Transform Look, CastLook; public LineRenderer Chain;
+            public Pattern A, B; public int Shots, NextFire; public bool Dense = true; public Transform Look, CastLook; public FoundryProps.Chain Chain;
             public readonly int NetTurretId = CrucivarEncounter.NewNetId(), NetCastId = CrucivarEncounter.NewNetId();   // LAN prop ids
             public readonly List<Hazard> Pending = new List<Hazard>();
         }
@@ -75,6 +75,8 @@ namespace LastBell.Run
             for (t = 0; ; t++)
             {
                 if (t == Sim.Ticks(4f)) { Boss.SetCurrent("Ember Brand"); Boss.Rite.EmberBrand(); }
+                // between his own attacks he works the pour, feeding the castings (CastingCycle, unused to 8 Nov; visual only)
+                if ((t == Sim.Ticks(8f) || (!layered && t == Sim.Ticks(16f))) && Turrets.Any(x => x.Up)) Boss.Presenter?.Action("CastingCycle", Sim.Ticks(3f));
                 if (t == deadline - Sim.Ticks(2f) && Turrets.Any(x => x.Up)) Boss.Presenter?.Action("PourFlood", Sim.Ticks(2f));   // the flood is coming: arms up, down as it lands
                 if (layered && t == Sim.Ticks(11f)) { Boss.SetCurrent("Furnace Spin"); Boss.Rite.FurnaceSpin(); }
                 if (layered && t == Sim.Ticks(19f)) { Boss.SetCurrent("Backdraft"); draft = Boss.Rite.Backdraft().GetEnumerator(); draftWait = 0; }
@@ -297,7 +299,12 @@ namespace LastBell.Run
             h.OnSpent = hz => Velocity.Remove(hz);
             Velocity[h] = vel;
             W.Hazards.Spawn(h);
+            // the shot is a molten slug (FoundryProps.SlugView, graphics audit 8 Nov); its ground circle stays the hit shape, in ember
+            h.Tele?.Tint(ShotFill, ShotBorder);
+            FoundryProps.SlugView.Ensure(W);
         }
+
+        static readonly Color ShotFill = new Color(0.5f, 0.16f, 0.05f, 0.55f), ShotBorder = new Color(1.5f, 0.55f, 0.18f);
 
         // "Ring Wave bullet" -> "crucivar.ring_wave" (boss attack icons)
         static string Attack(string name) => name.StartsWith("Lane Stream") ? "crucivar.lane_stream" : name.StartsWith("Ring Wave") ? "crucivar.ring_wave" : "crucivar.spiral_arm";
@@ -320,7 +327,7 @@ namespace LastBell.Run
 
         public static string Numeral(int k) => new[] { "I", "II", "III", "IV" }[k];
 
-        // ---------------- stand-in looks ----------------
+        // ---------------- looks (code-built brass-foundry props, FoundryProps; were Prim stand-ins to 8 Nov) ----------------
         void Build(Turret tu)
         {
             var root = TurretLook(W.Root, Numeral(tu.K), "Lava turret " + Numeral(tu.K));
@@ -334,7 +341,7 @@ namespace LastBell.Run
             tu.CastLook = cast;
 
             var chain = ChainLook(W.Root, "Casting chain " + Numeral(tu.K));
-            chain.SetPosition(0, tu.Pos + Vector3.up * 0.4f); chain.SetPosition(1, tu.Casting.Pos + Vector3.up * 0.4f);
+            chain.SetEnds(tu.Pos + Vector3.up * 0.4f, tu.Casting.Pos + Vector3.up * 0.4f);
             tu.Chain = chain;
         }
 
@@ -367,28 +374,23 @@ namespace LastBell.Run
             }
         }
 
-        // the stand-in pieces, shared with the LAN client's prop views (CrucivarEncounter.MakeNetProp); numeral null: no label
+        // the looks, shared with the LAN client's prop views (CrucivarEncounter.MakeNetProp); numeral null: no label
         public static Transform TurretLook(Transform parent, string numeral, string name)
         {
-            var root = new GameObject(name).transform; root.SetParent(parent, false);
-            Prim.Make(PrimitiveKind.Cylinder, root, Vector3.up * 1.1f, new Vector3(1.4f, 1.1f, 1.4f), new Color(0.22f, 0.19f, 0.17f));
-            Prim.Make(PrimitiveKind.Cylinder, root, Vector3.up * 2.3f, new Vector3(0.9f, 0.15f, 0.9f), new Color(1f, 0.55f, 0.18f), 2.5f);
+            var root = FoundryProps.Turret(parent, name);
             if (numeral != null) Label(root, numeral, 3.2f);
             return root;
         }
         public static Transform CastingLook(Transform parent, string numeral, string name)
         {
-            var cast = new GameObject(name).transform; cast.SetParent(parent, false);
-            Prim.Make(PrimitiveKind.Capsule, cast, Vector3.up * 1.0f, new Vector3(CastRadius * 2, 1.0f, CastRadius * 2), new Color(0.85f, 0.52f, 0.16f), 1.6f);
+            var cast = FoundryProps.Casting(parent, name, CastRadius);
             if (numeral != null) Label(cast, numeral, 2.6f);
             return cast;
         }
-        public static LineRenderer ChainLook(Transform parent, string name)
+        public static FoundryProps.Chain ChainLook(Transform parent, string name)
         {
-            var chain = new GameObject(name).AddComponent<LineRenderer>(); chain.transform.SetParent(parent, false);
-            chain.positionCount = 2;
-            chain.startWidth = chain.endWidth = 0.09f; chain.sharedMaterial = Prim.Material(new Color(1f, 0.95f, 0.82f), 1.2f);
-            return chain;
+            var go = new GameObject(name); go.transform.SetParent(parent, false);   // the chain keeps itself at world zero and builds in world space
+            return go.AddComponent<FoundryProps.Chain>();
         }
         // where a casting's turret stands: across the arena on the rim (SpawnPair puts the casting at yaw + 180)
         public static Vector3 TurretFor(Vector3 casting) { var d = Sim.Flat(casting); return d.sqrMagnitude < 1e-4f ? Vector3.zero : -d.normalized * (Rim + 0.4f); }

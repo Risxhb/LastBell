@@ -23,6 +23,9 @@ namespace LastBell.Run
             yield return t.Seconds(3f);
             t.Check("4 players: two turrets, two castings as boss parts", up.Turrets.Count == 2 && t.W.Parts.Count(p => p.Alive) == 2, $"{up.Turrets.Count} turrets, {t.W.Parts.Count} parts");
             t.Check("each casting sits 7.5 m out, across the arena from its turret", up.Turrets.All(x => Mathf.Abs(Sim.Flat(x.Casting.Pos).magnitude - FoundryUprising.CastRing) < 0.05f && Vector3.Dot(Sim.Flat(x.Pos).normalized, Sim.Flat(x.Casting.Pos).normalized) < -0.99f));
+            t.Check("the turrets, castings and chains are foundry props (no stand-in primitives)", up.Turrets.All(x => x.Look && x.Look.GetComponent<FoundryProps.FaceCentre>() && x.CastLook
+                && !x.Look.GetComponentsInChildren<MeshFilter>().Any(m => m.sharedMesh && m.sharedMesh.name.StartsWith("Prim_")) && x.Chain && x.Chain.Links >= 20),
+                string.Join(" / ", up.Turrets.Select(x => $"links {(x.Chain ? x.Chain.Links : 0)}")));
             t.Check("Pour Flood lands at 30 s", up.Flood != null && up.Flood.ResolveAt == Sim.Ticks(30f), $"{up.Flood?.ResolveAt}");
             t.Check("the last Casting Order's Pour Channels drain as the turrets rise", up.Drained > 0 && !t.W.Hazards.Live.Contains(channel), $"drained {up.Drained}");
             // burning ground on and around a casting cools at once, so breaking it never means standing in burn
@@ -32,7 +35,14 @@ namespace LastBell.Run
             t.Check("a standing casting cools the burning ground round it", up.Cooled - cooled0 >= 6 && !t.W.Hazards.Live.Any(b => b.Source == "Test Slag" && b.Age < b.ResolveAt - 1), $"cooled {up.Cooled - cooled0}");
 
             float s = 0;
-            while (s < 9f) { foreach (var p in t.Party) if (p.Hp < 60) p.DebugSetHp(PlayerController.MaxHp); s += Time.deltaTime; yield return null; }
+            int slugs = 0;
+            while (s < 9f)
+            {
+                foreach (var p in t.Party) if (p.Hp < 60) p.DebugSetHp(PlayerController.MaxHp);
+                foreach (var v in Object.FindObjectsByType<FoundryProps.SlugView>(FindObjectsSortMode.None)) slugs = Mathf.Max(slugs, v.Drawn);
+                s += Time.deltaTime; yield return null;
+            }
+            t.Check("every turret shot in flight carries a molten slug", slugs > 0 && slugs >= t.W.Hazards.Live.Count(FoundryProps.SlugView.IsShot) - 0, $"most slugs in one frame {slugs}");
             var path = t.Spawned("Lane Stream path").Concat(t.Spawned("Ring Wave path")).Concat(t.Spawned("Spiral Arm path")).OrderBy(x => x.Tick).FirstOrDefault();
             var bullet = t.Spawns.Where(x => x.Source.EndsWith("bullet")).OrderBy(x => x.Tick).FirstOrDefault();
             t.Check("every pattern draws its path at least 2.0 s before the first bullet", path != null && bullet != null && path.H.ResolveAt >= Sim.Ticks(2f) && bullet.Tick - path.Tick >= Sim.Ticks(2f) - 1,
