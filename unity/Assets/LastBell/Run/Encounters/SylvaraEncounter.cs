@@ -92,6 +92,11 @@ namespace LastBell.Run
         readonly List<Bud> buds = new List<Bud>();
         public int BudsAlive { get { int n = 0; foreach (var b in buds) if (b.Alive) n++; return n; } }
         public float BudHpAt(Vector3 pos) { foreach (var b in buds) if (b.Alive && (b.Pos - pos).sqrMagnitude < 0.01f) return b.Hp; return 0; }   // tests
+        // a Choir Bud fires 3 Bud Petals every BudEvery s from BudFrom m out, its aim turning BudTurn rad/s
+        public const float BudEvery = 0.3f, BudFrom = 0.8f, BudSpeed = 4f, BudTurn = 30 * Mathf.Deg2Rad;
+        // the volleys still to come, for the bots' steer (a petal hits on the tick it appears, too fast to see and dodge):
+        // each live bud's position, aim now and seconds to its next volley
+        public void BudVolleys(List<(Vector3 pos, float aim, float next)> into) { into.Clear(); foreach (var b in buds) if (b.Alive) into.Add((b.Pos, b.Base, BudEvery - b.Acc)); }
         public List<Vector3> AliveBudPositions() { var l = new List<Vector3>(); foreach (var b in buds) if (b.Alive) l.Add(b.Pos); return l; }
         public void DebugLastStormWarning() => Toll("LAST STORM in 3 s");   // test hook: loop 4's warning, without waiting
         // test hook: restart the Seed Storm as Phase 4 loop k would start it (k >= 5 = Last Storm), without waiting
@@ -322,7 +327,7 @@ namespace LastBell.Run
                     At(6, "Waterfall Jets", Jets);
                     At(8, "Toll", () => Toll("TOLL: the spin reverses"));
                     At(9, null, () => Reverse(sp1));
-                    At(10, "Feet Pod", () => Pod(null, Vector3.zero, 3.0f));
+                    At(10, "Feet Pod", FeetPod);
                     At(13, "Pruning Arc", PruningArc);
                     At(14.5f, "Doubled Pods", () => PodsOnFar(doubled: true));
                     At(18, "Waterfall Jets", Jets);
@@ -342,7 +347,7 @@ namespace LastBell.Run
                     if (ChoirPods) At(16.5f, "Choir Pods", () => PodsOnFar());   // Hard (5 Nov): lands at 19 s, before the 20 s toll
                     foreach (float t in W.Players.Count == 1 ? new[] { 4f, 8, 12, 16, 20 } : new[] { 5f, 10, 15, 20 })
                     {
-                        At(t - 1, "Toll", () => { Toll("TOLL: every colour swaps"); WarnSwap(); });
+                        At(t - SwapWarnFor, "Toll", () => { Toll("TOLL: every colour swaps"); WarnSwap(); });
                         At(t, null, SwapColours);
                         At(t + 0.02f, null, () => { TollBurst(); if (DoubleToll) Later(0.5f, TollBurst); });   // Hard: double toll
                     }
@@ -352,7 +357,7 @@ namespace LastBell.Run
                     At(0.01f, "Hollow Spiral", () => sp1 = Spiral(1, HollowArms, 10 * Deg, 4.5f, 0.18f, 9, 7));
                     At(1, "Choir Buds", () => PlantBuds(bloom));
                     if (CounterSpiral) At(4, "Counter Spiral", () => sp2 = Spiral(-1, 2, 12 * Deg, 4f, 0.2f, 9, 7));   // Hard (5 Nov)
-                    At(8, "Feet Pod", () => Pod(null, Vector3.zero, 3.0f));
+                    At(8, "Feet Pod", FeetPod);
                     At(12, "Choir Buds", () => PlantBuds(bloom));
                     At(15, "Pruning Arc", PruningArc);
                     At(20, "Seed Pods", () => PodsOnFar());
@@ -473,6 +478,8 @@ namespace LastBell.Run
 
         // Seed Pod: a 2.5 m circle on the target, tracking 0.6 s, lands at 2.5 s, then 12 petals; doubled = a second ring
         // 0.6 s later rotated half a step into the first ring's gaps. Phase 1 pods: every one doubled on Hard, 3.0 s on Easy.
+        // its petals start PodInset inside the circle at PodPetalSpeed m/s; a doubled pod fires its second ring PodSecondAfter s later
+        public const float PodInset = 0.3f, PodPetalSpeed = 5.5f, PodSecondAfter = 0.6f;
         void Pod(PlayerController target, Vector3 at, float r = 2.5f, bool doubled = false)
         {
             const int n = 12; float off = Rnd(0, Tau);
@@ -487,9 +494,9 @@ namespace LastBell.Run
             h.OnResolve = hz =>
             {
                 W.BossFx.ChimeResolve(hz.Origin, hz.Radius); Release(0.5f);
-                float r0 = Mathf.Max(r - 0.3f, hz.Origin.sqrMagnitude < 0.01f ? Rim : 0);
-                PetalRing(hz.Origin, n, 5.5f, off, r0, 12, "Pod Petal");
-                if (doubled) { var o = hz.Origin; Later(0.6f, () => PetalRing(o, n, 5.5f, off + Mathf.PI / n, r0, 12, "Pod Petal")); }
+                float r0 = Mathf.Max(r - PodInset, hz.Origin.sqrMagnitude < 0.01f ? Rim : 0);
+                PetalRing(hz.Origin, n, PodPetalSpeed, off, r0, 12, "Pod Petal");
+                if (doubled) { var o = hz.Origin; Later(PodSecondAfter, () => PetalRing(o, n, PodPetalSpeed, off + Mathf.PI / n, r0, 12, "Pod Petal")); }
             };
             // the pod model drops onto the warning in its last 0.4 s and lands on the resolve (proposal art)
             var pv = SylvaraProps.Spawn(SylvaraProps.Pod, transform.parent, h.Origin, LookRnd(0, 360));
@@ -507,8 +514,11 @@ namespace LastBell.Run
             if (far.Count == 0) Pod(null, On(Rnd(0, Tau), 7), 2.5f, doubled);   // everyone standing is reviving: an unaimed pod
             foreach (var p in far) Pod(p, Vector3.zero, 2.5f, doubled);
         }
+        // the pods without a cast of their own reuse her Seed clip (graphics audit 8 Nov; presentation only)
+        void FeetPod() { Act("Seed", 1.2f); Pod(null, Vector3.zero, 3.0f); }
         void TrianglePods()
         {
+            Act("Seed", 1.2f);
             var f = Farthest(1); float a0 = f.Count > 0 ? AngOf(f[0].transform.position) : Rnd(0, Tau);
             for (int i = 0; i < 3; i++)
             {
@@ -620,7 +630,11 @@ namespace LastBell.Run
             colour.Clear();
             for (int i = 0; i < W.Players.Count; i++) colour[W.Players[i]] = i % 2 == 0 ? Brass : Cobalt;
         }
-        void WarnSwap() { swapWarned.Clear(); foreach (var p in W.Players) swapWarned.Add(p); }
+        void WarnSwap() { swapWarned.Clear(); foreach (var p in W.Players) swapWarned.Add(p); swapDue = W.Tick + Sim.Ticks(SwapWarnFor); }
+        public const float SwapWarnFor = 1f;   // the toll warns this long before the swap (At(t - 1) / At(t) above)
+        int swapDue;
+        // seconds until a warned swap lands (bots: their own colour hurts until then, the other one after)
+        public float SwapIn => Mathf.Max(0, (swapDue - W.Tick) * Sim.Dt);
         void SwapColours()
         {
             swapWarned.Clear();
@@ -711,8 +725,8 @@ namespace LastBell.Run
             {
                 if (!b.Alive) { e.On = false; return; }
                 if (b.View) b.View.Open = Mathf.Clamp01((Age - b.Born) * Sim.Dt / b.Life);
-                b.Base += 30 * Deg * dt; b.Acc += dt;
-                while (b.Acc >= 0.3f) { b.Acc -= 0.3f; for (int i = 0; i < 3; i++) { float aa = b.Base + i * Tau / 3; Shot(b.Pos + On(aa, 0.8f), aa, 4, 10, 4, 0, "Bud Petal"); } }
+                b.Base += BudTurn * dt; b.Acc += dt;
+                while (b.Acc >= BudEvery) { b.Acc -= BudEvery; for (int i = 0; i < 3; i++) { float aa = b.Base + i * Tau / 3; Shot(b.Pos + On(aa, BudFrom), aa, BudSpeed, 10, 4, 0, "Bud Petal"); } }
                 if (b.Hp <= 0)
                 {
                     KillBud(b); BudsCut++; W.Hazards.Cancel(b.Timer);
@@ -727,6 +741,7 @@ namespace LastBell.Run
                     KillBud(b); BudsBloomed++;
                     RunHud.Float(b.Pos + Vector3.up * 1.8f, "BLOOM", Amber);
                     PetalRing(b.Pos, 20, 5, Rnd(0, Tau), 0.8f, 12, "Bud Bloom");
+                    if (Age >= actUntil) Act("Bloom", 2f);   // she conducts the bloom (reuses Bloom; graphics audit 8 Nov); never mid-cast
                     EndBudView(b.View, b.Prop, true);
                     if (NetRecording) NetFx("SylvaraEncounter.BudEnd", b.Pos, true);
                 }
@@ -776,7 +791,7 @@ namespace LastBell.Run
                 var seed = Shot(On(a, Rim), a, 3, 16, fuse, 0, "Seed", 0.6f, b =>
                 {
                     int f0 = W.Bullets.Fired;
-                    PetalRing(b.Pos, rays, 4.5f, burstOff, 0.3f, 12, "Seed Burst");
+                    PetalRing(b.Pos, rays, 4.5f, burstOff, BulletSystem.BurstFrom, 12, "Seed Burst");
                     LastBurstFired = W.Bullets.Fired - f0;
                 });
                 seed.BurstRays = rays; seed.BurstOff = burstOff; seed.BurstSpeed = 4.5f;
@@ -807,9 +822,6 @@ namespace LastBell.Run
             if (phase == 0 && !introPlayed && RunDirector.Instance != null && RunDirector.Instance.State == RunState.Intro && Has("Intro"))
             { introPlayed = true; Clips.Add("Intro"); presenter.PlayOnce("Intro", 2f); }
             PresentLook(glowLevel, Dead, Time.deltaTime);
-            // the run's 2 s intro card, before the sim runs (so not in StepAlways): she wakes and lifts the fork
-            if (phase == 0 && !introPlayed && RunDirector.Instance != null && RunDirector.Instance.State == RunState.Intro && Has("Intro"))
-            { introPlayed = true; Clips.Add("Intro"); presenter.PlayOnce("Intro", 2f); }
             foreach (var b in buds) if (b.Alive) PulseBud(b.Prop);
             DrawColourRings();
         }
