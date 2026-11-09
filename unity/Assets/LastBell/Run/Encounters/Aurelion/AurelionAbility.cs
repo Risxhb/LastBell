@@ -61,6 +61,7 @@ namespace LastBell.Run
         protected Hazard Spawn(Hazard h)
         {
             if (string.IsNullOrEmpty(h.Source) || h.Source == "Hazard") h.Source = Name;
+            if (string.IsNullOrEmpty(h.AttackId)) h.AttackId = Id;   // the attack family icon (8 Nov: every Aurelion hazard carries its ability id)
             h.Damage = V3Tier(h.Damage);
             // v4 Last Light, the soft enrage: every fallen slice makes his attacks 10 % stronger
             // capped so a hit never lands above 90 after the difficulty scale (no one-shots, design rules 5): Hard 69 x 1.3
@@ -87,6 +88,15 @@ namespace LastBell.Run
         protected void Glow(float k) => Boss.Glow(k);
         protected void Flare(float f = 1) => Boss.Flare(f);
         protected void Clip(string name, int ticks) => Boss.PlayClip(name, ticks);
+        // a lane hazard's resolve, drawn as a beam from its origin to where it leaves the arena (8 Nov graphics pass,
+        // presentation only: called from OnResolve, after the hit test)
+        protected void Beam(Hazard h, bool heavy = false) => W.BossFx.BeamResolve(h.Origin, h.Yaw, ReachToRim(h.Origin, h.Yaw, h.Length), h.Width, heavy);
+        public static float ReachToRim(Vector3 from, float yaw, float length)
+        {
+            var o = Sim.Flat(from - Centre); var d = Sim.Dir(yaw);
+            float b = Vector3.Dot(o, d), c = o.sqrMagnitude - Rim * Rim, disc = b * b - c;
+            return disc < 0 ? Mathf.Min(length, Rim) : Mathf.Clamp(-b + Mathf.Sqrt(disc), 0.5f, length);
+        }
 
         // arena: Skyward Spire is round, bound 13.9 m, centred on the origin (RunMaps.cs); the boss stays inside 9.5 m
         public static float Rim => CombatWorld.PlayerBound;

@@ -10,8 +10,8 @@ namespace LastBell.Run
     public sealed partial class RunAutoTest
     {
         // the 5 original Aurelion IDs among the 20 Chzy18 approved on 2026-10-23 (ability-icons 0d0555a), the 3 Aurelion IDs added on 2026-11-07, the 11 Sylvara v3 IDs approved on
-        // 2026-11-02 and the Crucivar v4 icons accepted on 2026-11-02 (both work/attack-icons-20261102), written out here so the
-        // catalog can't drift unnoticed. Normal Bellkeeper v2 is retired.
+        // 2026-11-02 and the Crucivar v4 icons accepted on 2026-11-02 (both work/attack-icons-20261102), the 8 Aurelion IDs and the 6 Bellkeeper Ultimate family icons
+        // added on 2026-11-08 (work/attack-icons-20261108), written out here so the catalog can't drift unnoticed. Normal Bellkeeper v2 is retired.
         static readonly string[] ApprovedAttackIds =
         {
             "aurelion.meridian_lances", "aurelion.starfall_mirror", "aurelion.noon_shadow", "aurelion.orrery_closing", "aurelion.hour_hands",
@@ -22,6 +22,10 @@ namespace LastBell.Run
             "crucivar.quake_echo", "crucivar.foundry_uprising", "crucivar.lane_stream", "crucivar.ring_wave", "crucivar.spiral_arm",
             "crucivar.pour_flood", "crucivar.mould_towers", "crucivar.tower_slag", "crucivar.molten_crown", "crucivar.furnace_eruption",
             "crucivar.molten_overflow", "crucivar.second_press",
+            "aurelion.zenith_collapse", "aurelion.meridian_towers", "aurelion.total_eclipse", "aurelion.severance", "aurelion.last_light",
+            "aurelion.ecliptic_order", "aurelion.zenith_marks", "aurelion.meridian_recall",   // 8 Nov (Codex attack-icons-20261108)
+            "bellkeeper.ult_escapement_relay", "bellkeeper.ult_chime_debts", "bellkeeper.ult_broken_hour", "bellkeeper.ult_open_hour",
+            "bellkeeper.ult_gear_floor", "bellkeeper.ult_final_toll",
         };
 
         void BossAttackIconChecks()
@@ -44,6 +48,7 @@ namespace LastBell.Run
                 ("Pour III", "crucivar", "crucivar.casting_order"), ("Ring Wave bullet", "crucivar", "crucivar.ring_wave"),
                 ("Brand Pool", "crucivar", "crucivar.ember_brand"), ("Crown Rise", "crucivar", "crucivar.molten_crown"),
                 ("Pour Flood", "crucivar", "crucivar.pour_flood"), ("Furnace Spin", "aurelion", null),
+                ("Reunion", "aurelion", "aurelion.meridian_towers"), ("Umbra", "aurelion", "aurelion.total_eclipse"), ("Meridian Recall", "aurelion", "aurelion.meridian_recall"),
                 ("Bell Sweep", "bellkeeper", null), ("Leaning Bell", "bellkeeper", null), ("Meridian Lances", "sylvara", null),
                 ("Seed Pod", "sylvara", "sylvara.seed_pods"), ("Seed Burst", "sylvara", "sylvara.seed_storm"), ("Pruning Arc (back)", "sylvara", "sylvara.pruning_arc"),
                 ("Cobalt Lane", "sylvara", "sylvara.two_colour_choir"), ("Choir Bud", "sylvara", null),

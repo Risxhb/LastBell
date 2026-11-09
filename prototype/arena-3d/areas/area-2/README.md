@@ -159,3 +159,23 @@ The rim and moat now follow the reference rather than the earlier critic's "wedg
   - Brass that reads as raised metal.
   - Chain pylons at the gantry and bridge mouths.
   - Real silhouette buildings in place of the flat city cards.
+
+### 3 Nov art pass 2 (proposal: done as recommended, waiting for Chzy18's review)
+
+This pass is on branch `feature/area2-art-2`, on top of PR 23. It's local only until it's accepted. If it's rejected, drop the branch.
+- **Merlons:** a riveted brass strap across each big merlon's arena face, crisper edges (less wear, fewer chips), and lower merlons on the far (north) half, so the lava band shows there too.
+- **City:** the far horizon silhouettes are now the Blender foundry buildings, scaled up, instead of plain cards.
+- **Gantries:** gate pillars with small cage lanterns at both gantry mouths, as at the entry bridge. The lanterns have no lights of their own, to stay inside the light budget.
+- **Haze:** a slow orange haze rises out of the abyss around the drum.
+- **Floor bronze:** wider cardinal straps and a broader edge band with 32 bracket tabs. It stays matte, with no glow.
+- **Checks:**
+  - Lava flow: 15.7 against 0.00.
+  - Occlusion: 0 of 128 blocked.
+  - Budget: 875 k triangles and 88 lights.
+- **Critic:** 7.7 → 7.8 → 7.9 / 10. Open items:
+  - The rim should be a regular, machined crown.
+  - The lava should be mostly crust, with light only in seams.
+  - The backdrop should be a layered city with depth haze.
+  - The floor needs tonal panels.
+  - The merlon UV seams need fixing.
+- **When it's accepted:** run `BatchRefreshCopies` (run scene and menu showcase), publish `current-player-assets` v3, then push.

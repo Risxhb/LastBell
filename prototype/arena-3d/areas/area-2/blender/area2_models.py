@@ -194,15 +194,19 @@ def tooth(name, W, D, H, tier, variant):
     cap on that tier. No straps or lid seams (they read as crates)."""
     a = Asset(name); wi = W * 0.84; ch = H * 0.32
     width = lambda y: wi + (W - wi) * (-y / D)
-    a.add(prism_bm([(0, 0), (-D, 0), (-D, H), (-ch, H), (0, H - ch)], width), 'RimStone', bevel=0.04, wear=0.012, cuts=4, seg=1, chips=7)
+    a.add(prism_bm([(0, 0), (-D, 0), (-D, H), (-ch, H), (0, H - ch)], width), 'RimStone', bevel=0.045, wear=0.005, cuts=4, seg=1, chips=3)  # crisp chiselled edges, a few clean chips
     a.box('DarkBrass', (wi + 0.04, 0.08, 0.1), (0, 0.0, 0.12), bevel=0.02)  # worn brass kick plate along the foot
+    if tier:  # big merlons: a riveted brass strap across the arena face at mid-height
+        zs = (H - ch) * 0.5
+        a.box('DarkBrass', (wi + 0.05, 0.07, 0.16), (0, 0.015, zs), bevel=0.02)
+        for k in range(4): a.rivet('Brass', ((k - 1.5) * wi * 0.26, 0.055, zs))
     if tier:  # stepped second tier on the outer part, its own chamfer facing the arena, then a brass cap
         y0, d2, h2 = -D * 0.38, D * 0.56, tier; w2 = lambda y: width(y) * 0.72; c2 = h2 * 0.4
         a.add(prism_bm([(y0, H - 0.02), (y0 - d2, H - 0.02), (y0 - d2, H + h2), (y0 - c2, H + h2), (y0, H + h2 - c2)], w2), 'RimStone', bevel=0.035, wear=0.01, cuts=2, seg=1, chips=3)
         cap_y, cap_d = y0 - d2 * 0.55, d2 * 0.75
         a.add(prism_bm([(cap_y + cap_d / 2, H + h2), (cap_y - cap_d / 2, H + h2), (cap_y - cap_d / 2, H + h2 + 0.09), (cap_y + cap_d / 2 - 0.05, H + h2 + 0.09)], lambda y: w2(y) + 0.06), 'DarkBrass', bevel=0.02)  # rough aged bronze, not polished
         for sx in (-1, 1): a.rivet('Brass', (sx * (w2(cap_y) / 2 - 0.08), cap_y, H + h2 + 0.11))
-    if variant == 'rivets':  # an iron band with a rivet row across the arena face
+    if variant == 'rivets' and not tier:  # an iron band with a rivet row across the arena face
         a.box('Iron', (wi * 0.9, 0.05, 0.12), (0, 0.01, (H - ch) * 0.55), bevel=0.015)
         for k in range(5): a.rivet('Brass', ((k - 2) * wi * 0.19, 0.04, (H - ch) * 0.55))
     elif variant == 'caps':  # brass corner caps on the chamfer's ends

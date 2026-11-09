@@ -51,6 +51,7 @@ namespace LastBell.Run
             {
                 // volley 2, cascade: volley 1's lines turned 22.5°, locked at once
                 int res2 = Cascade;
+                CutClip(res2);
                 Volley(beams, v1.Yaw + CascadeTurn, 0, res2, null);
                 yield return res2 - 1;
             }
@@ -58,12 +59,17 @@ namespace LastBell.Run
             {
                 // volley 2: through the nearest player
                 int lock2 = Lock2, res2 = lock2 + Window;
+                CutClip(res2);
                 Volley(beams, AimAt(NearestAim(BossPos)), lock2, res2, () => NearestAim(BossPos));
                 yield return res2 - 1;
             }
         }
 
         // the timings at the current difficulty, in ticks: tracks (to the lock), the lock-to-hit window, the cascade's warning
+        // volley 2 plays MeridianCut (8 Nov graphics pass, an unused clip): its cut lands 1.6 s into its 3.1 s, so the clip is
+        // stretched to put that frame on volley 2's resolve tick
+        public const float CutStrike = 1.6f / 3.1f;
+        void CutClip(int resolveIn) => Clip("MeridianCut", Mathf.Max(1, Mathf.RoundToInt(resolveIn / CutStrike)));
         int Lock1 => T(Track1S);
         int Lock2 => Hard ? T(Track2HardS) : T(Track2S);
         int Window => Win(WindowS);
@@ -122,8 +128,8 @@ namespace LastBell.Run
                 // one hit per beam: both halves resolve on the same tick, and whichever is tested first hands its hits to
                 // the other in its OnResolve, which runs before the other half's hit test
                 var a = pair[0]; var o = pair[1]; bool flare = b == 0;
-                a.OnResolve = hz => { if (flare) Flare(0.8f); foreach (var p in a.Hit) o.Hit.Add(p); };
-                o.OnResolve = hz => { foreach (var p in o.Hit) a.Hit.Add(p); };
+                a.OnResolve = hz => { if (flare) Flare(0.8f); foreach (var p in a.Hit) o.Hit.Add(p); Beam(hz); };
+                o.OnResolve = hz => { foreach (var p in o.Hit) a.Hit.Add(p); Beam(hz); };
                 list.Add(Spawn(a)); list.Add(Spawn(o));
             }
             Volleys.Add(list); SpawnTicks.Add(W.Tick); aims.Add(aim);

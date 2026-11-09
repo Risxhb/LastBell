@@ -27,6 +27,8 @@ namespace LastBell.Run
             if (V2Wants("aurelion.meridian_recall")) yield return V2Section("v4 Meridian Recall (Hard)", V4Recall());
             if (V2Wants("aurelion.v4_icons")) BossAttackIconChecks();   // the attack-icon catalog (7 Nov: 8 Aurelion icons)
             if (V2Wants("aurelion.v4_revivers")) yield return V2Section("v4 aimed attacks skip revivers (7 Nov)", V4Revivers());
+            if (V2Wants("aurelion.v4_graphics")) yield return V2Section("v4 graphics pass (8 Nov)", V4Graphics());
+            if (V2Wants("aurelion.v4_family_icons")) yield return V2Section("v4 attack family icons (8 Nov)", V4FamilyIcons());
             if (V2Wants("aurelion.v4_hard")) yield return V2Section("v4 Hard additions (5 Nov)", V4HardExtras());
             if (AurelionAbilityFilter != null && AurelionAbilityFilter.Equals("aurelion.v4_seeds", StringComparison.OrdinalIgnoreCase)) yield return V2Section("v4 perfect route seed sweep", V4PerfectSeeds());
             if (V2Wants("aurelion.last_light")) yield return V2Section("v4 Last Light and the enrage", V4LastLight());
@@ -323,6 +325,134 @@ namespace LastBell.Run
                 else { ok = seen.Count > 0 && seen.All(h => Off(h.Yaw, c, 180f) < Off(h.Yaw, b, 180f)); info = $"{seen.Count} beams, {(seen.Count > 0 ? Off(seen.First().Yaw, c, 180f) : 0):0} degrees off C, {(seen.Count > 0 ? Off(seen.First().Yaw, b, 180f) : 0):0} off the reviver"; }
                 V2Check($"{which}: aimed at the standing player, not the one reviving", reviving && ok, $"reviving {reviving}; {info}");
             }
+        }
+
+        // graphics pass (8 Nov, presentation only): planet bodies ride their hazards at the hitbox size, towers get posts that
+        // go with them, Zenith Marks show glyphs, and the beam / Final Noon effects run without errors
+        IEnumerator V4Graphics()
+        {
+            yield return V2Setup(1, Difficulty.Medium, new[] { new Vector3(-3, 0, -4f) }, 2, Vector3.zero);
+            if (V2Boss == null) yield break;
+            var a = V2Boss;
+            a.DebugSetPhaseV4(2); a.TestExtras = true;
+            yield return V2Ticks(Sim.Ticks(0.5f));
+            int n = a.Planets.Count; bool on = n > 0; float worst = 0, size = 0;
+            for (int i = 0; i < n; i++)
+            {
+                var b = a.Planets.BodyOf(i); if (!b) { on = false; continue; }
+                worst = Mathf.Max(worst, Sim.Flat(b.position - a.Planets.PlanetAt(i)).magnitude);
+                size = b.GetChild(0).GetChild(0).localScale.x;
+            }
+            V2Check("Errant Planets: a planet body on every planet, on its hazard, the hitbox's size", on && worst < 0.3f && Mathf.Abs(size - ErrantPlanets.Radius * 2) < 0.01f, $"{n} planets, worst offset {worst:0.00} m, body {size:0.00} m");
+            var first = a.Planets.BodyOf(0);
+            a.TestExtras = false; yield return V2Ticks(3);
+            V2Check("Errant Planets: the bodies go when the planets end", !first && !a.Planets.Live, $"live {a.Planets.Live}");
+
+            yield return V2Setup(1, Difficulty.Medium, new[] { new Vector3(0, 0, 7f) }, 1, Vector3.zero);
+            if (V2Boss == null) yield break;
+            a = V2Boss; V3Bot(V2Main, BotMode.Perfect);
+            V2Begin(a.Towers.Run());
+            yield return V2Ticks(10);
+            var towers = a.Towers.Towers.ToList();
+            V2Check("Meridian Towers: every tower has its posts", towers.Count > 0 && towers.All(t => t.Posts), $"{towers.Count} towers, {towers.Count(t => t.Posts)} with posts");
+            yield return V2WaitIdle(20);
+            yield return V2Ticks(Sim.Ticks(1.0f));
+            V2Check("Meridian Towers: the posts go once their tower lands", towers.All(t => !t.Posts), $"{towers.Count(t => t.Posts)} left");
+            V3Unbot();
+
+            yield return V2Setup(2, Difficulty.Medium, new[] { new Vector3(-3, 0, 0), new Vector3(3, 0, 0) }, 1, Vector3.zero);
+            if (V2Boss == null) yield break;
+            a = V2Boss;
+            V2Begin(a.Marks.Run());
+            yield return V2Ticks(10);
+            var shown = a.Marks.Shown.ToList(); var marks = a.Marks.Marks.Where(m => m.Step == 0).ToList();
+            bool glyphs = shown.Count == marks.Count && shown.Count > 0;
+            for (int i = 0; i < shown.Count && glyphs; i++) glyphs = shown[i].Icon == (marks[i].Mark == ZenithMarks.Mark.Sun ? AurelionProps.SunGlyph : AurelionProps.ShadeGlyph);
+            V2Check("Zenith Marks: a sun or shade glyph over each player, matching the mark", glyphs, $"{shown.Count} markers, {marks.Count} marks: {string.Join("/", marks.Select(m => m.Mark))}");
+            yield return V2WaitIdle(10);
+
+            // the beams and Final Noon: presentation only, so it is enough that they run (the section fails on an exception);
+            // one player with the perfect bot, so nobody falls and the run stays in combat
+            yield return V2Setup(1, Difficulty.Medium, new[] { new Vector3(0, 0, 7f) }, 2, Vector3.zero);
+            if (V2Boss == null) yield break;
+            a = V2Boss; V3Bot(V2Main, BotMode.Perfect);
+            V2Begin(a.Lances.Run(4, 2, true).Concat(a.Recall.Run()).Concat(a.Hands.Run()));
+            yield return V2WaitIdle(20);
+            V3Unbot();
+            V2W.BossFx.FinalNoon(Vector3.zero, AurelionAbility.Rim);
+            yield return V2Ticks(Sim.Ticks(1.8f));
+            V2Check("beams (Lances, Recall, Hour Hands) and the Final Noon wash ran", true, $"recall beams {a.Recall.Replay.Count}");
+            float reach = AurelionAbility.ReachToRim(new Vector3(0, 0, 0), 0, 28f), off = AurelionAbility.ReachToRim(new Vector3(0, 0, 5f), 0, 28f);
+            V2Check("beam length: from his centre to the rim", Mathf.Abs(reach - AurelionAbility.Rim) < 0.01f && Mathf.Abs(off - (AurelionAbility.Rim - 5f)) < 0.01f, $"{reach:0.00} m from the centre, {off:0.00} m from 5 m north");
+        }
+
+        // ================================================================ attack family icons (8 Nov)
+        // Codex's 8 family icons (work/attack-icons-20261108, done as recommended, review later): every hazard an Aurelion
+        // ability spawns carries its ability id (AurelionAbility.Spawn), the direct hits (Severance's crossing, tower extras,
+        // Reunion, Umbra, the Last Light fall) set it too, and a scripted wipe passes its family to the death recap.
+        IEnumerator V4FamilyIcons()
+        {
+            yield return V4FamilyHazards("Zenith Collapse", "aurelion.zenith_collapse", 1, b => b.Zenith.Run());
+            yield return V4FamilyHazards("Meridian Towers", "aurelion.meridian_towers", 1, b => b.Towers.Run());
+            yield return V4FamilyHazards("Zenith Marks", "aurelion.zenith_marks", 1, b => b.Marks.Run());
+            yield return V4FamilyHazards("Ecliptic Order", "aurelion.ecliptic_order", 2, b => b.Ecliptic.Run(4));
+            yield return V4FamilyHazards("Meridian Recall", "aurelion.meridian_recall", 2, b => b.Lances.Run(4, 1, false).Concat(b.Recall.Run()));
+            yield return V4FamilyHazards("Severance", "aurelion.severance", 3, b => b.Sever.Run());
+            yield return V4FamilyHazards("Last Light", "aurelion.last_light", 4, b => LastLightFloorFx.During(V2W, b.Light, b.Light.Run().Take(2)));
+
+            // Total Eclipse spawns no hazards of its own (its Starfall and Lances carry theirs): its hit is Umbra, standing in the dark
+            yield return V2Setup(1, Difficulty.Medium, new[] { new Vector3(0, 0, -12f) }, 2, Vector3.zero);
+            if (V2Boss == null) yield break;
+            V2Begin(V2Boss.Eclipse.Run());
+            // held to its 25 s wipe (as in its own section), so the body ends before the next setup
+            float tt = 0; while (tt < 40 && !V4Wiped) { if (V2Main && !V2Main.Down) V2Main.DebugSetHp(PlayerController.MaxHp); tt += Time.deltaTime; yield return null; }
+            var umbra = Enumerable.Range(0, V2W.TakenLog.Count).Where(i => V2W.TakenLog[i].source == "Umbra").Select(i => i < V2W.TakenAttackIds.Count ? V2W.TakenAttackIds[i] : null).ToList();
+            V2Check("Total Eclipse: Umbra hits record aurelion.total_eclipse with its icon", umbra.Count > 0 && umbra.All(id => id == "aurelion.total_eclipse") && BossAttackIcons.Icon("aurelion.total_eclipse") != null, $"{umbra.Count} Umbra hits, ids {string.Join("/", umbra.Select(id => id ?? "null").Distinct())}");
+
+            // a direct hit: standing still where Severance's line sweeps
+            yield return V2Setup(1, Difficulty.Medium, new[] { new Vector3(0, 0, 0) }, 3, new Vector3(0, 0, -6f));
+            if (V2Boss == null) yield break;
+            V2Place(V2Main, Sim.Dir(Severance_NextYaw(V2Boss.Sever) + 30f) * 8f);
+            yield return V3FireToppedUp(V2Boss.Sever.Run(), 40);
+            var sev = Enumerable.Range(0, V2W.TakenLog.Count).Where(i => V2W.TakenLog[i].source.StartsWith("Severance")).Select(i => i < V2W.TakenAttackIds.Count ? V2W.TakenAttackIds[i] : null).ToList();
+            V2Check("a direct hit (Severance's crossing) records aurelion.severance in the death recap", sev.Count > 0 && sev.All(id => id == "aurelion.severance"), $"{sev.Count} hits, ids {string.Join("/", sev.Select(id => id ?? "null").Distinct())}");
+
+            // a scripted wipe: an empty tower downs the party with its own cause and the Meridian Towers family
+            yield return V2Setup(1, Difficulty.Medium, new[] { new Vector3(0, 0, -12f) }, 1, Vector3.zero);
+            if (V2Boss == null) yield break;
+            yield return V4FireUntilWipe(V2Boss.Towers.Run());
+            V2Check("a tower wipe keeps its family for the recap icon (aurelion.meridian_towers)", V4Wiped && V2W.LastDamageAttackId == "aurelion.meridian_towers" && V2W.LastDamageSource == V2Boss.WipeCause && BossAttackIcons.Icon(V2W.LastDamageAttackId) != null, $"{V2Boss.WipeCause} -> {V2W.LastDamageAttackId ?? "null"}");
+
+            // the enrage has no family: text only
+            yield return V2Setup(1, Difficulty.Medium, new[] { new Vector3(0, 0, 9f) }, 2, Vector3.zero);
+            if (V2Boss == null) yield break;
+            V2Boss.TestClock = true; V2Boss.DebugSetFightSeconds(AurelionEncounter.EnrageS - 1f);
+            yield return Until(() => V4Wiped, 10, "the 6:30 enrage");
+            V2Check("the enrage wipe carries no attack family (cause text only)", V4Wiped && V2W.LastDamageAttackId == null, V2W.LastDamageAttackId ?? "null");
+            if (V2Boss) V2Boss.TestClock = false;
+        }
+
+        // runs one ability solo with the perfect bot (HP topped up) and checks every hazard seen carries an attack id, and
+        // that the family's own hazards carry its id with a catalogued icon
+        IEnumerator V4FamilyHazards(string what, string id, int phase, Func<AurelionEncounter, IEnumerable<int>> run)
+        {
+            yield return V2Setup(1, Difficulty.Medium, new[] { new Vector3(0, 0, 7f) }, phase, Vector3.zero);
+            if (V2Boss == null) yield break;
+            V3Bot(V2Main, BotMode.Perfect);
+            var seen = new HashSet<Hazard>();
+            V2Begin(run(V2Boss));
+            for (int t = 0; t < Sim.Ticks(40f) && V2Boss != null && V2Boss.TestBusy && !V4Wiped; t++)
+            {
+                foreach (var h in V2W.Hazards.Live) seen.Add(h);
+                if (V2Main && !V2Main.Down) V2Main.DebugSetHp(PlayerController.MaxHp);
+                yield return V2Ticks(1);
+            }
+            V3Unbot();
+            var mine = seen.Where(h => h.AttackId == id).ToList();
+            var bare = seen.Where(h => string.IsNullOrEmpty(h.AttackId)).Select(h => h.Source).Distinct().ToList();
+            var icon = BossAttackIcons.Icon(id);
+            V2Check($"{what}: its hazards carry {id} with its icon, and none lacks an attack id", mine.Count > 0 && bare.Count == 0 && icon != null && BossAttackIcons.Resolve(mine[0], V2Boss)?.id == id,
+                $"{seen.Count} hazards, {mine.Count} {id}; ids {string.Join("/", seen.Select(h => h.AttackId ?? "null").Distinct())}{(bare.Count > 0 ? "; without: " + string.Join(", ", bare) : "")}; icon {(icon != null)}");
         }
 
         // attack icons (7 Nov): every hazard of the attack carries its AttackId, which resolves to a catalogued 256 px icon

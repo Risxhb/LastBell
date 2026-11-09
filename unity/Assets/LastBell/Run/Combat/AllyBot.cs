@@ -1437,15 +1437,47 @@ namespace LastBell.Run
         }
 
         // Sylvara v3: bullet-hell steering (SylvaraSteer). It holds its own angle round her (casters at range, Vanguard
-        // close) and in Hollow Bloom cuts a Choir Bud (one bud per bot, by slot; BudStand). Every 3 ticks it
+        // close) and in Hollow Bloom cuts its own Choir Bud (BudFor, BudStand). Every 3 ticks it
         // re-plans the cheapest path through the bullets and telegraphs 0.8 s ahead.
-        Vector3 sylMove; bool sylSprint, sylOn, sylDash; float sylCost; Vector3 sylPos;
+        Vector3 sylMove; bool sylSprint, sylOn, sylDash; float sylCost; Vector3 sylPos, sylHome;
         int rvTick = -99; PlayerController rvFor; bool rvOk; Vector3 rvWp, rvStand;   // the revive route (ReviveRoute)
-        string SylvaraLine() => $"{(dJob == "revive" ? $"revive {(rvOk ? "route" : "wait")} to ({rvStand.x:0.0},{rvStand.z:0.0}) " : "")}cost {sylCost:0.0} move ({sylMove.x:0.0},{sylMove.z:0.0}) sprint {sylSprint} dash {sylDash} at ({sylPos.x:0.0},{sylPos.z:0.0})";
+        string SylvaraLine() => $"{(dJob == "revive" ? $"revive {(rvOk ? "route" : "wait")} to ({rvStand.x:0.0},{rvStand.z:0.0}) " : "")}cost {sylCost:0.0} move ({sylMove.x:0.0},{sylMove.z:0.0}) sprint {sylSprint} dash {sylDash} at ({sylPos.x:0.0},{sylPos.z:0.0}) home ({sylHome.x:0.0},{sylHome.z:0.0})";
 
         // how far from its Choir Bud it stands to cut it: Tollbreaker throws from 6 m (a tap flies 9 m), outside the thick of
-        // the bud's own petals; the others stand next to it
+        // the bud's own petals; the others stand next to it (5 m was tried, 8 Nov: more blooms and Bud Petal hits)
         static float BudStand(PlayerController me) => me.ClassName == "Tollbreaker" ? 6f : 1.8f;
+
+        // Choir Bud owners: each bud keeps one bot (a free standing bot nearest to it when it sprouts, else the nearest), and a
+        // bot with no bud of its own fights Sylvara. Picking buds[slot % count] sent a bot whose bud was cut across the arena
+        // to a bud another bot was already cutting, and Hollow Bloom ran 72 s against Spiral Bloom's 28 for the same
+        // quarter of her HP (9 Nov full Hard fights)
+        static readonly Dictionary<Vector3, PlayerController> budOwner = new Dictionary<Vector3, PlayerController>();
+        static CombatWorld budWorld; static int budTick = -1;
+        static Vector3? BudFor(PlayerController me, List<Vector3> buds)
+        {
+            var w = me.World;
+            if (budWorld != w) { budOwner.Clear(); budWorld = w; budTick = -1; }
+            if (budTick != w.Tick)
+            {
+                budTick = w.Tick;
+                foreach (var k in new List<Vector3>(budOwner.Keys)) if (!buds.Contains(k) || budOwner[k] == null || budOwner[k].Down) budOwner.Remove(k);
+                foreach (var b in buds)
+                {
+                    if (budOwner.ContainsKey(b)) continue;
+                    PlayerController pick = null; float best = float.MaxValue; bool pickFree = false;
+                    foreach (var p in w.Players)
+                    {
+                        if (p.Down || !(p.Input is AllyBot)) continue;
+                        bool free = !budOwner.ContainsValue(p); float dd = Sim.Flat(p.transform.position - b).magnitude;
+                        if ((free && !pickFree) || (free == pickFree && dd < best)) { pick = p; best = dd; pickFree = free; }
+                    }
+                    if (pick != null) budOwner[b] = pick;
+                }
+            }
+            Vector3? mine = null; float near = float.MaxValue;
+            foreach (var kv in budOwner) if (kv.Value == me) { float dd = Sim.Flat(me.transform.position - kv.Key).magnitude; if (dd < near) { near = dd; mine = kv.Key; } }
+            return mine;
+        }
 
         PlayerInput ReadSylvara(PlayerController me, SylvaraEncounter sy)
         {
@@ -1458,10 +1490,17 @@ namespace LastBell.Run
             float ang = 360f * slot / of + 30f;
             var home = bp + Sim.Dir(ang) * (sy.BodyRadius + Range(me) + 0.5f);
             var buds = sy.AliveBudPositions();
-            if (buds.Count > 0)
+            var myBud = BudFor(me, buds);
+            if (myBud.HasValue)
             {
-                var bud = buds[slot % buds.Count];
-                home = bud + Sim.Flat(pos - bud).normalized * BudStand(me); target = bud; reach = bud;
+                var bud = myBud.Value;
+                // on the bud's inner side: buds grow 10 m out, and a bot on the outer side was pinned to the wall by her
+                // spiral and the bud's own petals (9 Nov full Hard fights: most Bud Petal hits at 11-12 m from her, under 30
+                // stamina)
+                var side = Sim.Flat(pos - bud).normalized - Sim.Flat(bud - bp).normalized * 1.5f;
+                home = bud + (side.sqrMagnitude > 0.01f ? side.normalized : -Sim.Flat(bud - bp).normalized) * BudStand(me); target = bud; reach = bud;
+                var hf = new Vector2(home.x, home.z); float hl = CombatWorld.PlayerBound - 2.5f;
+                if (hf.magnitude > hl) { hf = hf.normalized * hl; home = new Vector3(hf.x, 0, hf.y); }
             }
             // revives: the spot beside a downed ally is home instead (the steer still dodges, and holding still there
             // channels the revive; no swings, which would pause it). Her bots never revived before (5 Nov sweep: 0 of 6)
@@ -1481,7 +1520,7 @@ namespace LastBell.Run
             if (tick % 3 == 1 || me.Dashing)
             {
                 sylMove = SylvaraSteer.Choose(me, pos, home, out sylSprint, out sylDash, out sylCost, reach, BudStand(me) + 0.8f, reviving ? SylvaraSteer.RevivePull : sy.PhaseName == SylvaraEncounter.PhaseNames[3] ? P4Pull : 0.35f);
-                sylPos = pos;
+                sylPos = pos; sylHome = home;
                 // in reach of the downed ally: hold still so the revive channels, unless standing here gets hit (a near miss
                 // is fine); small steps toward the exact spot kept pausing it (5 Nov)
                 if (reviving && Sim.Flat(rwho.transform.position - pos).magnitude <= PlayerController.ReviveRange - 0.15f && SylvaraSteer.HoldCost(me, pos) < 40f)
@@ -1506,7 +1545,9 @@ namespace LastBell.Run
                 if (me.Kit is TollbreakerKit) Attack(me, ref inp);
                 else inp.P0 = inp.H0 = tick % 6 == 0 || me.ClassName != "Arcanist";
             }
-            if (me.Hp < 70 && me.Potions > 0 && tick % 30 == 0) inp.Potion = true;
+            // at 60, not 70: her hits are 13-21, so a drink at 61-69 spilled up to 9 of its 40 (9 Nov: the party reached Seed
+            // Storm with 0-2 potions in most full Hard fights)
+            if (me.Hp <= 60 && me.Potions > 0 && tick % 30 == 0) inp.Potion = true;
             inp.Move = ToScreen(sylMove);
             return inp;
         }
@@ -1523,8 +1564,16 @@ namespace LastBell.Run
     // this player in the next 0.8 s.
     public static class SylvaraSteer
     {
-        const float Horizon = 0.8f, Step = 0.05f, Buffer = 0.25f;
+        const float Step = 0.05f, Buffer = 0.25f;
+        const float Horizon = 0.8f;
+        const float SprintReserve = 40f;   // stamina above the dash cost that a sprint for less than a hit may not spend (25 until 9 Nov)
+        const float DashFree = 80f, DashSoon = 0.35f;   // see Choose: when it dashes for a hit it sees coming
+        static float firstHit;   // the first hit (s) on the path Cost last scored; 99 when it meets none
         static readonly List<BulletSystem.Bullet> near = new List<BulletSystem.Bullet>();
+        static readonly List<(Vector3 pos, float aim, float next)> volleys = new List<(Vector3, float, float)>();
+        static int swapMine; static bool swapBoth; static float swapAt;
+        const float SwapSlack = 0.15f;   // s either side of the swap where both colours count
+        static readonly List<(Vector3 at, float r0, float land, bool twice)> pods = new List<(Vector3, float, float, bool)>();
         static readonly Vector3[] dirs = MakeDirs();
         static Vector3[] MakeDirs() { var d = new Vector3[16]; for (int i = 0; i < 16; i++) d[i] = Sim.Dir(i * 22.5f); return d; }
 
@@ -1540,6 +1589,9 @@ namespace LastBell.Run
             int mine = w.Bullets.ColourOf != null ? w.Bullets.ColourOf(me) : 0;
             // its ring flickers before a toll swaps colours (the same warning a player sees): both colours count until the swap
             bool both = w.Boss is SylvaraEncounter sy && sy.SwapWarned(me);
+            // ...but each only on its side of the swap: both colours for the whole look left no clean move in the lanes
+            // (8 Nov Phase 2 runs: about half the Brass/Cobalt Lane hits came during the warning, plans at 300-700)
+            swapMine = mine; swapBoth = both; swapAt = both ? ((SylvaraEncounter)w.Boss).SwapIn : 0;
             // bullets that can reach anywhere it could be within the horizon
             near.Clear();
             float reach = PlayerController.SprintSpeed * Horizon + 1.2f;
@@ -1549,20 +1601,48 @@ namespace LastBell.Run
                 var end = b.Pos + b.Vel * Horizon;
                 if (SegDist(pos, b.Pos, end) < reach + (b.Split != null ? 3f : 0f)) near.Add(b);
             }
+            // Choir Bud volleys still to come, from the buds within reach (8 Nov full runs: most Bud Petal hits were petals
+            // 0.02 s old on a bot 0.4-1.6 m from a bud; they appear on top of it, so the steer has to see them coming)
+            volleys.Clear();
+            if (w.Boss is SylvaraEncounter sb)
+            {
+                sb.BudVolleys(volleys);
+                for (int i = volleys.Count - 1; i >= 0; i--) if (Sim.Flat(volleys[i].pos - pos).magnitude > reach + SylvaraEncounter.BudFrom + 1f) volleys.RemoveAt(i);
+            }
+            // Seed and Feet Pods landing within the horizon: their petal rings start just inside the circle, so a bot standing
+            // just outside it is hit as they appear (8 Nov full run: Pod Petal ended two Sylvara tries, at 46 % and 1 %)
+            pods.Clear();
+            if (w.Boss is SylvaraEncounter sp)
+            {
+                bool doubled = sp.PodDoubledIn(sp.PhaseNumber);
+                foreach (var h in w.Hazards.Live)
+                {
+                    if ((h.Source != "Seed Pod" && h.Source != "Feet Pod") || h.Origin.sqrMagnitude < 0.01f) continue;
+                    float land = (h.ResolveAt - h.Age) * Sim.Dt;
+                    if (land < -0.05f || land > Horizon || Sim.Flat(h.Origin - pos).magnitude > reach + h.Radius + 1f) continue;
+                    pods.Add((Sim.Flat(h.Origin), h.Radius - SylvaraEncounter.PodInset, land, doubled));
+                }
+            }
             sprint = false; dash = false;
-            var best = Vector3.zero; bestCost = Cost(me, pos, Vector3.zero, 0, home, boss, bud, budReach);
+            var best = Vector3.zero; bestCost = Cost(me, pos, Vector3.zero, 0, home, boss, bud, budReach); float bestHit = firstHit;
             bool canSprint = me.Stamina > PlayerController.SprintCost;
+            // near the dash reserve, a sprint has to save a hit: sprints for near misses and the pull home left it under the
+            // dash cost when a Seed Storm closed every walk (8 Nov: most Phase 4 burst hits came at 0-29 stamina, no dash)
+            float sprintFee = me.Stamina < PlayerController.DashCost + SprintReserve ? 30f : 0.6f;
             for (int s = 0; s < (canSprint ? 2 : 1); s++)
             {
                 float v = s == 0 ? PlayerController.WalkSpeed : PlayerController.SprintSpeed;
                 foreach (var d in dirs)
                 {
-                    float c = Cost(me, pos, d, v, home, boss, bud, budReach) + (s == 1 ? 0.6f : 0);
-                    if (c < bestCost) { bestCost = c; best = d; sprint = s == 1; }
+                    float c = Cost(me, pos, d, v, home, boss, bud, budReach) + (s == 1 ? sprintFee : 0);
+                    if (c < bestCost) { bestCost = c; best = d; sprint = s == 1; bestHit = firstHit; }
                 }
             }
-            // every path is hit: a 3 m dash (0.2 s) clears it when its line and landing are clean
-            if (bestCost >= 50 && !me.Dashing && me.Stamina >= PlayerController.DashCost)
+            // every path is hit: a 3 m dash (0.2 s) clears it when its line and landing are clean. With stamina to spare it
+            // dashes for any hit it sees; under DashFree only for one that is close (DashSoon): a re-plan 0.05 s later often
+            // finds a walk round a later one, and dashes for far hits left it under the dash cost when a near one came
+            // (9 Nov full Hard fights: 84 of 96 Seed Burst hits came at under 30 stamina)
+            if (bestCost >= 50 && !me.Dashing && me.Stamina >= PlayerController.DashCost && (me.Stamina >= DashFree || bestHit <= DashSoon || bestCost >= 800))
             {
                 float dashSpeed = PlayerController.DashDistance / (PlayerController.DashTicks * Sim.Dt);
                 foreach (var d in dirs)
@@ -1580,37 +1660,87 @@ namespace LastBell.Run
         // the same for walking d at v (no pull home: the end of the walk is home)
         public static float StepCost(PlayerController me, Vector3 pos, Vector3 d, float v) => Cost(me, pos, d, v, pos + d * v * Horizon, me.World.Boss, null, 0);
 
-        static float Cost(PlayerController me, Vector3 pos, Vector3 d, float v, Vector3 home, BossEncounter boss, Vector3? bud, float budReach, float moveFor = Horizon)
+        static float Cost(PlayerController me, Vector3 pos, Vector3 d, float v, Vector3 home, BossEncounter boss, Vector3? bud, float budReach, float moveFor = -1)
         {
-            float cost = 0; var bp = boss != null ? Sim.Flat(boss.transform.position) : Vector3.zero;
+            if (moveFor < 0) moveFor = Horizon;
+            float cost = 0; firstHit = 99; var bp = boss != null ? Sim.Flat(boss.transform.position) : Vector3.zero;
             float body = boss != null ? boss.BodyRadius + PlayerController.Radius + 0.1f : 0;
             Vector3 q = pos;
             int steps = Mathf.RoundToInt(Horizon / Step);
+            // A move into her body margin or past the wall margin is blocked. Its cost is 800 plus the hits it met before that, so
+            // it is the last resort: a flat 400/500 made walking into her look cheaper than a path with a few hits, and bots
+            // stood pressed to her body in Seed Burst after Seed Burst (8 Nov diagnostic: hits at cost 401-402 and 507-509).
+            // (Scoring the blocked move on along the wall instead drew the bots out to 12 m with half the swings, runs 71-73.)
+            // Already inside a margin (her body pushes a player out to radius + 0.45, inside the 0.1 margin): only moves that go
+            // deeper are blocked, or every move was, and a Tollbreaker that touched her froze there.
+            float startBody = boss != null ? Sim.Flat(pos - bp).magnitude : 0, startOut = Sim.Flat(pos).magnitude;
+            bool inBody = boss != null && startBody < body, outside = !CombatWorld.InPlayerBound(pos, -0.3f);
             for (int k = 1; k <= steps; k++)
             {
                 float t = k * Step;
                 q = pos + d * v * Mathf.Min(t, moveFor);
-                if (!CombatWorld.InPlayerBound(q, -0.3f)) return 500 + k;
-                if (boss != null && Sim.Flat(q - bp).magnitude < body) return 400 + k;
+                if (!CombatWorld.InPlayerBound(q, -0.3f) && (!outside || Sim.Flat(q).magnitude > startOut + 0.01f)) return 900 + k + cost;
+                if (boss != null && Sim.Flat(q - bp).magnitude < (inBody ? startBody - 0.01f : body)) return 800 + k + cost;
                 float early = 1.5f - t / Horizon;   // hits sooner are worse: there is less time to fix them later
                 foreach (var b in near)
                 {
+                    if (swapBoth && b.Colour != 0 && (b.Colour == swapMine ? t > swapAt + SwapSlack : t < swapAt - SwapSlack)) continue;
                     float fuse = b.Split != null ? b.Life - b.Age : float.MaxValue;
                     if (t <= fuse)
                     {
                         float gap = Sim.Flat(q - (b.Pos + b.Vel * t)).magnitude - (b.Radius + Hazard.Margin + Buffer);
-                        if (gap < 0) cost += 100 * early;
+                        if (gap < 0) { cost += 100 * early; if (t < firstHit) firstHit = t; }
                         else if (gap < 0.6f) cost += (0.6f - gap) * 4;
                     }
                     else
                     {
                         // a seed bursts into a ring of petals: its ring hits like any bullet for 1 s after the burst, with the
                         // same near-miss margin (Tollbreaker lane, 2 Nov: seed bursts were the last hit in lost Hard runs)
-                        var at = b.Pos + b.Vel * fuse; float since = t - fuse;
-                        float ring = 4.5f * since, gap = Mathf.Abs(Sim.Flat(q - at).magnitude - ring) - (BulletArt.PetalHitRadius + Hazard.Margin + Buffer);
-                        if (since < 1f) { if (gap < 0) cost += 100 * early; else if (gap < 0.6f) cost += (0.6f - gap) * 4; }
+                        var at = b.Pos + b.Vel * fuse; float since = t - fuse, hit = BulletArt.PetalHitRadius + Hazard.Margin + Buffer;
+                        if (since >= 1f) continue;
+                        if (b.BurstRays > 0)
+                        {
+                            // its rays are fixed at launch (the preview a player sees): score the petals where they will be, so
+                            // the gaps between rays count as safe. A solid ring made every spot near a seed look hit, and in a
+                            // Seed Storm the bots could not tell a gap from a petal (8 Nov full run: 3 of 4 wipes to Seed Burst)
+                            float rr = BulletSystem.BurstFrom + b.BurstSpeed * since, best = float.MaxValue;
+                            for (int i = 0; i < b.BurstRays; i++)
+                            {
+                                float a = b.BurstOff + i * Mathf.PI * 2 / b.BurstRays;
+                                best = Mathf.Min(best, Sim.Flat(q - (at + new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * rr)).magnitude);
+                            }
+                            float gap = best - hit;
+                            if (gap < 0) { cost += 100 * early; if (t < firstHit) firstHit = t; } else if (gap < 0.6f) cost += (0.6f - gap) * 4;
+                        }
+                        else
+                        {
+                            float ring = 4.5f * since, gap = Mathf.Abs(Sim.Flat(q - at).magnitude - ring) - hit;
+                            if (gap < 0) { cost += 100 * early; if (t < firstHit) firstHit = t; } else if (gap < 0.6f) cost += (0.6f - gap) * 4;
+                        }
                     }
                 }
+                // bud petals fired after now: 3 arms per volley, aimed where the bud's turning aim will be
+                foreach (var vl in volleys)
+                    for (float fired = vl.next; fired < t; fired += SylvaraEncounter.BudEvery)
+                    {
+                        float r = SylvaraEncounter.BudFrom + SylvaraEncounter.BudSpeed * (t - fired), aim = vl.aim + SylvaraEncounter.BudTurn * fired;
+                        for (int i = 0; i < 3; i++)
+                        {
+                            float a = aim + i * Mathf.PI * 2 / 3;
+                            float gap = Sim.Flat(q - (vl.pos + new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * r)).magnitude - (BulletArt.PetalHitRadius + Hazard.Margin + Buffer);
+                            if (gap < 0) { cost += 100 * early; if (t < firstHit) firstHit = t; } else if (gap < 0.6f) cost += (0.6f - gap) * 4;
+                        }
+                    }
+                // pod rings not fired yet (12 petals 30° apart: scored as a solid ring for their first 0.6 s, then they are
+                // bullets it can see)
+                foreach (var pd in pods)
+                    for (int ring = 0; ring < (pd.twice ? 2 : 1); ring++)
+                    {
+                        float since = t - pd.land - ring * SylvaraEncounter.PodSecondAfter;
+                        if (since < 0 || since >= 0.6f) continue;
+                        float gap = Mathf.Abs(Sim.Flat(q - pd.at).magnitude - (pd.r0 + SylvaraEncounter.PodPetalSpeed * since)) - (BulletArt.PetalHitRadius + Hazard.Margin + Buffer);
+                        if (gap < 0) { cost += 100 * early; if (t < firstHit) firstHit = t; } else if (gap < 0.6f) cost += (0.6f - gap) * 4;
+                    }
             }
             // telegraphs that land within the horizon (plus a little) where it ends up
             foreach (var h in me.World.Hazards.Live)
@@ -1619,6 +1749,7 @@ namespace LastBell.Run
                 if (!hurts || !h.Contains(q)) continue;
                 float left = (h.ResolveAt - h.Age) * Sim.Dt;
                 cost += h.BurnPerSecond > 0 ? 60 : left < Horizon + 0.4f ? 150 : 25;
+                if (h.BurnPerSecond > 0 || left < Horizon) firstHit = Mathf.Min(firstHit, Mathf.Max(0, left));
             }
             cost += Sim.Flat(q - home).magnitude * HomePull;
             if (bud.HasValue) { float past = Sim.Flat(q - bud.Value).magnitude - budReach; if (past > 0) cost += 6 + past * 2; }

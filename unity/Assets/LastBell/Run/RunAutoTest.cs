@@ -226,16 +226,17 @@ namespace LastBell.Run
             d.InputOverride = bot;
             yield return Wait(1.0f);
             if (SmokeOnly) { yield return SmokeChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
+            if (HitFeelOnly) { yield return HitFeelChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
+            if (BossMomentsOnly) { yield return BossMomentsChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
             if (PartyOnly) { yield return PartyChecks(); yield return ReviveChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
             if (AurelionOnly) { yield return AurelionChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
             if (BellkeeperUltimateOnly) { yield return BellkeeperUltimateChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
             // -lastbellArcanistOnly: just the Arcanist run and its kit checks (skips the menu, map, other-class and boss suites)
             if (ArcanistOnly) { yield return ArcanistRun(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
-            // The run-loop checks below use the Ultimate as a passive final target (no plan) and practise on the current map; the
-            // archived v1 Bellkeeper they used to fight is retired (Chzy18, 1 Nov). The Ultimate's own section turns both off.
-            BellkeeperEncounter.TestIdle = true; RunDirector.PracticeStaysOnMap = true;
-            if (SoloSweepOn) { yield return SoloSweep(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
-            if (TollbreakerOnly) { yield return TollbreakerRun(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
+            // Real fights (bot sweeps, clear runs, a boss's own suite) keep the run-loop setup off: the live Ultimate, and each
+            // boss in its own arena. Only the run-loop checks further down turn it on (RunLoopTargets, 9 Nov).
+            if (SoloSweepOn) { RunLoopTargets(false); yield return SoloSweep(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
+            if (TollbreakerOnly) { RunLoopTargets(true); yield return TollbreakerRun(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
             Check($"boots into the menu on a run map ({RunMaps.CurrentName})", d.State == RunState.Menu && RunMaps.Current >= 0);
             for (int i = 0; i < RunMaps.All.Length; i++)
                 Check($"map selectable: {RunMaps.All[i].Name}", RunMaps.InBuild(i), RunMaps.All[i].RunScene);
@@ -249,12 +250,14 @@ namespace LastBell.Run
             }
             if (OnlySylvara)
             {
-                RunDirector.PracticeStaysOnMap = false;   // her practice runs on her own map, not the passive-target setup above
                 BossAttackIconChecks();   // the catalog carries her icons
                 yield return SylvaraChecks();
                 Check("no errors or exceptions logged", errors == 0, errors + " logged");
                 Finish(); yield break;
             }
+            // The run-loop checks below use the Ultimate as a passive final target (no plan) and practise on the current map; the
+            // archived v1 Bellkeeper they used to fight is retired (Chzy18, 1 Nov). The Ultimate's own section turns both off.
+            RunLoopTargets(true);
             foreach (var cls in RunDirector.Classes)
             {
                 int slots = 6, found = 0;
@@ -413,7 +416,7 @@ namespace LastBell.Run
             }
             Check("map tour returns to the starting map", RunMaps.Current == startMap);
             // ---------- the Bellkeeper Ultimate (proposal) ----------
-            BellkeeperEncounter.TestIdle = false; RunDirector.PracticeStaysOnMap = false;   // from here on: the real fights
+            RunLoopTargets(false);   // from here on: the real fights
             yield return BellkeeperUltimateChecks();
             // ---------- area bosses (practice only for now) ----------
             yield return PartyChecks();
@@ -699,19 +702,31 @@ namespace LastBell.Run
         IEnumerator SylvaraClearTimes()
         {
             bool was = AllyBot.Attacks; AllyBot.Attacks = true; int keep = RunParty.Selected;
+            // her own arena: the run-loop setup (confrontation-menu, 9 Nov) keeps practice on the menu map, and the clear runs
+            // after the merge fought her on the key-art dais (a square floor whose corners are out of her bullets and her reach)
+            bool stayOnMap = RunDirector.PracticeStaysOnMap; RunDirector.PracticeStaysOnMap = false;
             var keepLevel = RunDifficulty.Selected;
             // Hard: Tollbreaker solo plus one party of 4 (test less, 1 Nov: the levels only scale damage)
-            var runs = new (string cls, int allies, Difficulty level)[] { ("Tollbreaker", 0, Difficulty.Hard), ("Tollbreaker", 3, Difficulty.Hard) };
+            // (-lastbellSylvaraClearMedium: the same runs on Medium, the bots' baseline)
+            var lvl = Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellSylvaraClearMedium", StringComparison.OrdinalIgnoreCase)) ? Difficulty.Medium : Difficulty.Hard;
+            var runs = new (string cls, int allies, Difficulty level)[] { ("Tollbreaker", 0, lvl), ("Tollbreaker", 3, lvl) };
             // -lastbellSylvaraClearPhase n starts each run in phase n (practice Start Phase row); -lastbellSylvaraClearRepeat k runs the set k times
             int startPhase = int.TryParse(AurelionArgs.Arg("-lastbellSylvaraClearPhase"), out var sp) ? Mathf.Clamp(sp, 1, 4) : 1;
             int repeats = int.TryParse(AurelionArgs.Arg("-lastbellSylvaraClearRepeat"), out var nr) ? Mathf.Clamp(nr, 1, 10) : 1;
+            // -lastbellSylvaraClearParty: the party of 4 only; -lastbellSylvaraClearSeed s seeds her rolls per run (s, s+1, ...)
+            // so a before/after comparison meets the same fights (9 Nov: bots should clear full Hard fights, 8 of 10 seeds)
+            if (Environment.GetCommandLineArgs().Any(a => a.Equals("-lastbellSylvaraClearParty", StringComparison.OrdinalIgnoreCase))) runs = runs.Where(r => r.allies > 0).ToArray();
+            int? seed0 = int.TryParse(AurelionArgs.Arg("-lastbellSylvaraClearSeed"), out var sd) ? sd : (int?)null; int runNo = 0;
             runs = Enumerable.Repeat(runs, repeats).SelectMany(r => r).ToArray();
             foreach (var (cls, allies, level) in runs)
             {
+                if (seed0.HasValue) { UnityEngine.Random.InitState(seed0.Value + runNo); Note($"Sylvara clear seed {seed0.Value + runNo}"); }
+                runNo++;
                 if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }
                 d.SelectAllies(allies); d.SelectDifficulty(level);
                 if (!d.StartPractice(cls, RunDirector.SylvaraPractice, startPhase)) { Check($"Sylvara clear run {cls} +{allies} starts", false); continue; }
                 yield return Until(() => RunDirector.Instance && RunDirector.Instance.State == RunState.Ready, 30, "Verdant Chimes loaded for a clear run");
+                Check("Sylvara clear run is on Verdant Chimes", RunMaps.CurrentName == "Verdant Chimes", RunMaps.CurrentName);
                 if (RunDirector.Instance != d) { directorLog.AddRange(d.Log); d = RunDirector.Instance; d.InputOverride = bot; bot.Clear(); }
                 d.RequestReady();
                 yield return Until(() => d.State == RunState.Combat, 4, "clear run combat");
@@ -724,7 +739,7 @@ namespace LastBell.Run
                 // hits per Hard addition (6 Nov): bullets and hazards made by one carry its name; the rest are "base". A down counts
                 // for the last hit before it. PlayerHit fires first for a bullet hit, then Bullets.Hit names its bullet.
                 var hitLog = new Dictionary<string, int[]>(); var lastKey = new Dictionary<PlayerController, string>();
-                PlayerController pendP = null; string pendKey = null; int pendDmg = 0;
+                PlayerController pendP = null; string pendKey = null; int pendDmg = 0, burstWhy = 0; var whyBy = new Dictionary<string, int>();
                 void Count(string key, int n, int dmg) { if (!hitLog.TryGetValue(key, out var c)) hitLog[key] = c = new int[3]; c[0] += n; c[1] += dmg; }
                 Action<PlayerController, Hazard, int> onHaz = (p, h, dmg) =>
                 {
@@ -733,6 +748,19 @@ namespace LastBell.Run
                 };
                 Action<PlayerController, BulletSystem.Bullet, int> onBul = (p, b, dmg) =>
                 {
+                    // why a bot met a burst petal (8 Nov full run: Seed Burst ended 3 of 4 lost Hard runs): its last plan's
+                    // cost (100 and up = it saw no clean move), stamina and the petal's age (a young one was still a seed)
+                    if (b.Source == "Seed Burst" && burstWhy++ < 12)
+                        Note($"  burst hit @{(w.Tick - tick0) / (float)Sim.Hz:0.0}s {p.ClassName} hp {p.Hp} stamina {p.Stamina:0} petal age {b.Age:0.00} from her {Sim.Flat(p.transform.position - sy.transform.position).magnitude:0.00} replan {ReplanCost(p):0.0} | {(p.Input as AllyBot)?.DebugLine}");
+                    // the same for Bud Petal (Hollow Bloom wipes): how far from the nearest bud, and the plan
+                    if ((b.Source == "Bud Petal" || b.Source == "Pod Petal" || b.Source.EndsWith(" Lane")) && (whyBy.TryGetValue(b.Source, out var nw) ? nw : 0) < 10)
+                    {
+                        whyBy[b.Source] = nw + 1;
+                        bool swap = sy.SwapWarned(p); int mine = w.Bullets.ColourOf != null ? w.Bullets.ColourOf(p) : 0;
+                        float nb = 99; foreach (var bq in sy.AliveBudPositions()) nb = Mathf.Min(nb, Sim.Flat(p.transform.position - bq).magnitude);
+                        Note($"  {b.Source} hit @{(w.Tick - tick0) / (float)Sim.Hz:0.0}s {p.ClassName} colour {b.Colour}/{mine}{(swap ? " swap" : "")} hp {p.Hp} stamina {p.Stamina:0} petal age {b.Age:0.00} bud {nb:0.0} m replan {ReplanCost(p):0.0} | {(p.Input as AllyBot)?.DebugLine}");
+                    }
+                    float ReplanCost(PlayerController pl) { var pp = Sim.Flat(pl.transform.position); SylvaraSteer.Choose(pl, pp, pp, out _, out _, out float c); return c; }
                     if (pendP != p || pendKey == null || b.Tag == null) { pendP = null; return; }
                     string key = $"{b.Tag} | {sy.PhaseName} | {b.Source}";
                     Count(pendKey, -1, -pendDmg); Count(key, 1, pendDmg); lastKey[p] = key; pendP = null;
@@ -742,17 +770,39 @@ namespace LastBell.Run
                 // Tollbreaker's 9 m Seed Storm throw counts, + body + 2 m), and its mean distance
                 var reachN = new Dictionary<string, int[]>(); var reachD = new Dictionary<string, float>();
                 float SwingAt(string c) => AllyBot.SylvaraAttackRange(c, sy.PhaseName) + sy.BodyRadius + 2f;
+                int planAt = tick0;
                 while (d.State == RunState.Combat && d.World == w && (w.Tick - tick0) < Sim.Ticks(480))
                 {
                     last = w.Tick;
-                    if (sy.PhaseName != phaseAt[phaseAt.Count - 1].name) phaseAt.Add((sy.PhaseName, w.Tick));
+                    // every 5 s in the first two runs: where each bot is, where it wants to be and its plan (9 Nov: party bots held
+                    // the edge of her floor after the confrontation-menu merge)
+                    if (runNo <= 2 && w.Tick >= planAt)
+                    {
+                        planAt = w.Tick + Sim.Ticks(5);
+                        foreach (var p in w.Players) if (!p.Down && p.Input is AllyBot ab)
+                            Note($"  plan @{(w.Tick - tick0) / (float)Sim.Hz:0}s {sy.PhaseName} {p.ClassName} {Sim.Flat(p.transform.position - sy.transform.position).magnitude:0.0} m | {ab.DebugLine}");
+                    }
+                    if (sy.PhaseName != phaseAt[phaseAt.Count - 1].name)
+                    {
+                        phaseAt.Add((sy.PhaseName, w.Tick));
+                        // where the party stands at each phase (9 Nov: full Hard fights were lost late): HP and potions
+                        Note($"  {sy.PhaseName} @{(w.Tick - tick0) / (float)Sim.Hz:0}s: " + string.Join(", ", w.Players.Select(q => q.Down ? "down" : $"{q.Hp} hp {q.Potions} pots")));
+                    }
                     foreach (var p in w.Players) if (!p.Down)
                     {
                         float dist = Sim.Flat(p.transform.position - sy.transform.position).magnitude; var c = p.ClassName;
                         if (!reachN.TryGetValue(c, out var rn)) reachN[c] = rn = new int[2];
                         rn[0]++; if (dist <= SwingAt(c)) rn[1]++; reachD[c] = (reachD.TryGetValue(c, out var ds) ? ds : 0) + dist;
                     }
-                    foreach (var p in w.Players) { if (p.Down && down.Add(p)) { downs++; if (lastKey.TryGetValue(p, out var lk)) Count(lk, 0, 0); if (lk != null) hitLog[lk][2]++; } else if (!p.Down) down.Remove(p); }
+                    foreach (var p in w.Players)
+                    {
+                        if (p.Down && down.Add(p))
+                        {
+                            downs++; if (lastKey.TryGetValue(p, out var lk)) Count(lk, 0, 0); if (lk != null) hitLog[lk][2]++;
+                            Note($"  down @{(w.Tick - tick0) / (float)Sim.Hz:0.0}s {sy.PhaseName} {sy.Hp * 100 / maxHp}% left, by {lk ?? "?"}, {p.Potions} pots left, {w.Players.Count(q => !q.Down)} standing");
+                        }
+                        else if (!p.Down) down.Remove(p);
+                    }
                     yield return null;
                 }
                 // the last down ends combat on the same tick, before the loop sees it: count it for its last hit too
@@ -782,7 +832,7 @@ namespace LastBell.Run
                 if (d.State == RunState.Combat && d.Boss) d.Boss.DebugDefeat();   // timed out: end it so the next run can start
                 yield return Until(() => d.State != RunState.Combat, 10, "clear run ends");
             }
-            AllyBot.Attacks = was; d.SelectDifficulty(keepLevel);
+            AllyBot.Attacks = was; d.SelectDifficulty(keepLevel); RunDirector.PracticeStaysOnMap = stayOnMap;
             if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }
             d.SelectAllies(keep);
         }
@@ -913,6 +963,7 @@ namespace LastBell.Run
             // her attack clips (proposal 2 Nov): a Conduct loop under the spirals, one-shots on the attacks
             Check("Sylvara conducts while a spiral runs", sy.LoopClip == "ConductLoop", sy.LoopClip);
             foreach (var c in new[] { "Toll", "CallWater", "PruningArc", "Seed" }) Check($"Sylvara P1 plays the {c} clip", sy.Clips.Contains(c));
+            Check("Sylvara P1: every pod cast plays the Seed clip, the Feet and Triangle Pods too (4 casts)", sy.Clips.Count(c => c == "Seed") >= 4, sy.Clips.Count(c => c == "Seed") + "x");
             if (sy.Presenter && sy.Presenter.Has("Intro")) Check("Sylvara wakes with the Intro clip on the intro card", sy.Clips.Contains("Intro"));
             var newClips = new[] { "ConductLoop", "StormLoop", "Toll", "CallWater", "Sow", "LanesLoop", "Intro", "MaskSplit", "HollowLoop", "StormCall", "Stagger" };
             if (sy.Presenter && sy.Presenter.HasModel && newClips.All(sy.Presenter.Has)) Check("her model has every v3 attack clip", true);
@@ -972,15 +1023,15 @@ namespace LastBell.Run
             {
                 // buds are boss parts: standing next to one does nothing, the class's attacks cut it, and the damage also hits her
                 int cut0 = sy.BudsCut; var at = buds[0] - buds[0].normalized * 1.5f;
-                float t3 = Time.time;
-                while (Time.time - t3 < 1f) { bot.Clear(); d.Player.transform.position = at; yield return null; }
+                int t3 = d.World.Tick;   // sim ticks, not real seconds: a slow frame (9 Nov: the base logs every hit on the player) gave the taps fewer ticks
+                while (d.World.Tick - t3 < Sim.Ticks(1f)) { bot.Clear(); d.Player.transform.position = at; yield return null; }
                 Check("standing next to a Choir Bud without attacking does not cut it", sy.BudsCut == cut0 && sy.BudHpAt(buds[0]) >= SylvaraEncounter.BudHp);
                 d.Player.Kit.ClearTargetState();   // the held attacks above left Tollbreaker's axes lodged (back after 6-8 s): start with both in hand
-                int hpBoss = d.Boss.Hp; t3 = Time.time;
+                int hpBoss = d.Boss.Hp; t3 = d.World.Tick;
                 // Tollbreaker taps (a held Twin Hurl lodges); a tap stays pending until a sim tick reads it, or a fast frame rate drops it
-                while (sy.BudsCut == cut0 && Time.time - t3 < 8f) { bool tap = bot.press[0]; bot.Clear(); bot.Aim = buds[0]; bot.hold[0] = d.ClassName != "Tollbreaker"; bot.press[0] = tap || Time.frameCount % 6 == 0; d.Player.transform.position = at; yield return null; }
+                int pt = -99; while (sy.BudsCut == cut0 && d.World.Tick - t3 < Sim.Ticks(8f)) { bool tap = bot.press[0]; bot.Clear(); bot.Aim = buds[0]; bot.hold[0] = d.ClassName != "Tollbreaker"; if (!tap && d.World.Tick - pt >= 6) { tap = true; pt = d.World.Tick; } bot.press[0] = tap; d.Player.transform.position = at; yield return null; }
                 bot.Clear();
-                float cutIn = Time.time - t3;
+                float cutIn = (d.World.Tick - t3) / (float)Sim.Hz;
                 Check("attacking a Choir Bud cuts it in a few seconds (class damage)", sy.BudsCut > cut0 && cutIn < 6f, $"{d.ClassName} {cutIn:0.0}s");
                 Check("damage to a Choir Bud also hits Sylvara", hpBoss - d.Boss.Hp >= SylvaraEncounter.BudHp * 0.9f, $"{hpBoss - d.Boss.Hp}");
                 Note($"Sylvara: {d.ClassName} cut a {SylvaraEncounter.BudHp} HP Choir Bud in {cutIn:0.0}s");
@@ -1088,10 +1139,20 @@ namespace LastBell.Run
                     var f = new Networking.LanWorldFrame(); f.Players.Add(new Networking.LanWorldFrame.Player { Id = 0, Hp = 1, MaxHp = 1 });
                     f.Bullets.Add(Networking.LanWorldCapture.BulletOf(b));
                     if (!Networking.LanWorldFrame.TryDecode(f.Encode(), out var got) || got.Bullets.Count != 1) { netBad = "frame did not decode"; return; }
-                    var c = new BulletSystem.Bullet(); Networking.LanClientWorld.ApplyBullet(got.Bullets[0], c, 0);
-                    bool ok = c.BurstRays == b.BurstRays && Mathf.Abs(Mathf.DeltaAngle(c.BurstOff * Mathf.Rad2Deg, b.BurstOff * Mathf.Rad2Deg)) < 0.01f
-                        && Mathf.Approximately(c.BurstSpeed, b.BurstSpeed) && Mathf.Abs((c.Life - c.Age) - (b.Life - b.Age)) < 0.001f && c.Radius >= 0.5f;
-                    netChecked++; if (!ok && netBad == null) netBad = $"client {c.BurstRays} rays / {c.Life - c.Age:0.000} s left vs host {b.BurstRays} / {b.Life - b.Age:0.000}";
+                    // drawn at the snapshot's time, 60 ms behind it (the client's usual render delay at 30 Hz) and 30 ms ahead: the
+                    // seed's place and fuse move together, so the previewed burst point stays the host's (review SYL-LAN-TIME)
+                    var hostAt = b.Pos + b.Vel * (b.Life - b.Age);
+                    foreach (float lag in new[] { 0f, -0.06f, 0.03f })
+                    {
+                        var c = new BulletSystem.Bullet(); Networking.LanClientWorld.ApplyBullet(got.Bullets[0], c, lag);
+                        float expectLeft = Mathf.Clamp(b.Life - b.Age - lag, 0, b.Life);
+                        var at = c.Pos + c.Vel * (c.Life - c.Age);
+                        bool ok = c.BurstRays == b.BurstRays && Mathf.Abs(Mathf.DeltaAngle(c.BurstOff * Mathf.Rad2Deg, b.BurstOff * Mathf.Rad2Deg)) < 0.01f
+                            && Mathf.Approximately(c.BurstSpeed, b.BurstSpeed) && Mathf.Abs((c.Life - c.Age) - expectLeft) < 0.001f
+                            && Sim.Flat(at - hostAt).magnitude < 0.005f && c.Radius >= 0.5f;
+                        if (!ok && netBad == null) netBad = $"at {lag * 1000:0} ms: client {c.BurstRays} rays / {c.Life - c.Age:0.000} s left / centre off {Sim.Flat(at - hostAt).magnitude:0.000} m vs host {b.BurstRays} / {b.Life - b.Age:0.000}";
+                    }
+                    netChecked++;
                 }
                 bool sampling = true;
                 // petals live 6 s: ones from earlier steps are still flying, and their seeds were never sampled
@@ -1118,7 +1179,7 @@ namespace LastBell.Run
                 Check("Sylvara Hard P4: a seed bursts into 10 petals", sy.LastBurstFired == 10, sy.LastBurstFired.ToString());
                 Check("Sylvara P4 burst preview: every seed carries its 10 burst rays from launch", fresh > 0 && seedsCarry, $"{fresh} seeds");
                 Check("Sylvara P4 burst preview: the rays are drawn before the burst", rayShown);
-                Check("Sylvara P4 burst preview: a LAN client gets each seed's rays and fuse (world frame round trip)", netChecked > 0 && netBad == null, netBad ?? $"{netChecked} seeds");
+                Check("Sylvara P4 burst preview: a LAN client gets each seed's rays and fuse, and draws the host's burst point at its render delay (world frame round trip)", netChecked > 0 && netBad == null, netBad ?? $"{netChecked} seeds");
                 // the drawn track is the petal's real hit corridor: full petal width, from the burst point past the 0.4 s reach
                 Check("Sylvara P4 burst preview: each ray track is a petal's full hit width (0.6 m), end caps included",
                         Mathf.Approximately(BulletSystem.PreviewRayWidth, 2 * BulletArt.PetalHitRadius), $"{BulletSystem.PreviewRayWidth:0.00} m");
@@ -1129,7 +1190,8 @@ namespace LastBell.Run
                     probe.Prewarm(probeRoot); int built = probe.PreviewBars;
                     Check("Sylvara P4 burst preview: the ray bars are built on the Ready screen (Sylvara's warm-up), before the fight",
                         sylEntry.WarmUp != null && built >= BulletSystem.PrewarmBars, $"{built} bars");
-                    UnityEngine.Object.Destroy(probeRoot.gameObject);
+                    probe.Dispose(); UnityEngine.Object.Destroy(probeRoot.gameObject);
+                    Check("Sylvara P4 burst preview: releasing a bullet view destroys its own materials", probe.Disposed && probe.PreviewBars == 0);
                 }
                 int petals = 0, onRay = 0; var miss = new List<string>();
                 foreach (var p in d.World.Bullets.Live)

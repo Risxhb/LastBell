@@ -55,7 +55,21 @@ namespace LastBell.Run
         public void Flare(float f = 1) => Release(f);
         public void PlayClip(string name, int ticks) => Clip(name, ticks);
         // the passive Phase 2-3 gestures (planets, falling circles) never cut off an attack wind-up
-        public void PlayClipIfIdle(string name, int ticks) { if (presenter && !presenter.Busy) Clip(name, ticks); }
+        // 8 Nov graphics pass: when he is busy the gesture waits (up to `within` ticks, the rest of its own length) and plays as
+        // soon as the wind-up ends, instead of being dropped; it still never cuts a wind-up, whose strike frame is timed
+        public void PlayClipIfIdle(string name, int ticks, int within = -1)
+        {
+            if (presenter && !presenter.Busy) { Clip(name, ticks); pendingClip = null; return; }
+            pendingClip = name; pendingTicks = ticks; pendingUntil = W.Tick + (within < 0 ? ticks : within);
+        }
+        string pendingClip; int pendingTicks, pendingUntil;
+        void StepPendingClip()
+        {
+            if (pendingClip == null || !presenter) return;
+            int left = pendingUntil - W.Tick;
+            if (left <= 0 || Dead) { pendingClip = null; return; }
+            if (!presenter.Busy) { Clip(pendingClip, Mathf.Min(pendingTicks, Mathf.Max(left, Sim.Ticks(0.4f)))); pendingClip = null; }
+        }
         public Hazard Track(Hazard h) => h;
         public int HorizonFor() => W.Difficulty == Difficulty.Hard ? HorizonTicksHard : HorizonTicks;
         // the block log (test evidence): (phase, block name, world tick)

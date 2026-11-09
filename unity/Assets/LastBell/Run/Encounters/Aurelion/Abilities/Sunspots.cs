@@ -108,7 +108,7 @@ namespace LastBell.Run
             // chain reaction: the blast caught another carrier whose own sigil has not gone off yet
             foreach (var o in Spots)
                 if (!o.Done && o.Who != s.Who && o.Who && !o.Who.Down && s.Blast.Contains(o.Who.transform.position))
-                { Chained = true; Boss.Wipe("Solar Flare — a sunspot caught carrier " + Numerals[o.Index]); return; }
+                { Chained = true; Boss.Wipe("Solar Flare — a sunspot caught carrier " + Numerals[o.Index], Id); return; }
             s.Pool = Spawn(new Hazard
             {
                 Source = Name + " scorch", AttackId = Id, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = s.Blast.Origin, Radius = Pool,

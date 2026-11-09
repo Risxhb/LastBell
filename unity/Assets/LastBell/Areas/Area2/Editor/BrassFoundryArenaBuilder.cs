@@ -892,13 +892,14 @@ namespace LastBell.Areas.Area2.EditorTools
             Sector(brass, I, 13.88f, 13.98f, 0, TAU, 0, 0.01f, 256, ends: false);
             // the reference's heavy brass band at the floor's edge: a satin dark-brass ring with rivets (flat, 3 cm, still walkable)
             var band = G("CombatFloor/Inlays", mDarkBrass);
-            Sector(band, I, 13.62f, 13.86f, 0, TAU, 0, 0.03f, 256, ends: false);
-            for (int i = 0; i < 144; i++) Box(G("CombatFloor/Inlays", mBrass), TR(Polar(i / 144f * TAU, 13.74f, 0.03f), YawOut(i / 144f * TAU)), new Vector3(0.06f, 0.02f, 0.06f));
+            Sector(band, I, 13.45f, 13.86f, 0, TAU, 0, 0.03f, 256, ends: false);
+            for (int i = 0; i < 32; i++) Box(band, TR(Polar((i + 0.5f) / 32 * TAU, 13.38f, 0), YawOut((i + 0.5f) / 32 * TAU)), new Vector3(0.22f, 0.03f, 0.34f), new Vector3(0, 0.015f, 0));   // bracket tabs, like the reference's gear-toothed band
+            for (int i = 0; i < 144; i++) Box(G("CombatFloor/Inlays", mBrass), TR(Polar(i / 144f * TAU, 13.52f, 0.03f), YawOut(i / 144f * TAU)), new Vector3(0.06f, 0.02f, 0.06f));
             for (int k = 0; k < 4; k++)
             {
                 float a = k * PI / 2; var m = TR(Vector3.zero, YawOut(a)); bool ew = k % 2 == 0; // local +X points outward along the arm
-                Box(brass, m, new Vector3(10.4f - 2.75f, H, 0.09f), new Vector3((2.75f + 10.4f) / 2, H / 2, 0));
-                Box(brass, m, new Vector3(13.2f - 12.55f, H, 0.09f), new Vector3((12.55f + 13.2f) / 2, H / 2, 0));
+                Box(brass, m, new Vector3(10.4f - 2.75f, H, 0.16f), new Vector3((2.75f + 10.4f) / 2, H / 2, 0));
+                Box(brass, m, new Vector3(13.2f - 12.55f, H, 0.16f), new Vector3((12.55f + 13.2f) / 2, H / 2, 0));
                 float w = ew ? 0.95f : 0.75f;
                 Poly(brass, m, new[] { new Vector2(10.3f, 0), new Vector2(10.95f, w / 2), new Vector2(12.65f, 0), new Vector2(10.95f, -w / 2) }, 0, H, true, B);
                 Poly(dark, m, new[] { new Vector2(10.6f, 0), new Vector2(11.0f, w * 0.28f), new Vector2(12.2f, 0), new Vector2(11.0f, -w * 0.28f) }, 0, H + 0.004f, false);
@@ -928,6 +929,10 @@ namespace LastBell.Areas.Area2.EditorTools
         // Furnace rim: inner curb, rim base, and a single ring of separate gear-tooth blocks (big and small alternating,
         // 0.4 m gaps so the molten glow shows between them, heights ±15%), with brass edge trims, rivets, chain anchors
         // and small gauge and valve props.
+        // Merlons on the far (north, -Z) side of the ring are lower, so the gameplay camera sees the molten band behind
+        // them (the near side hides it anyway behind the floor's far edge only on the far side).
+        static float FarLow(float a) => Mathf.Lerp(1f, 0.65f, Smooth(0.15f, 0.75f, -Mathf.Sin(a)));
+
         static void BuildRim()
         {
             bevel = 0.07f;
@@ -960,7 +965,7 @@ namespace LastBell.Areas.Area2.EditorTools
                     {
                         bool big = j % 2 == 0; float w = big ? BIGW : SMALLW, mid = a0 + (at + w / 2) / 15.2f; at += w + gap;
                         Model("FurnaceRim", "SM_Area2_RimTooth_" + (big ? "Big_" : "Small_") + "ABC"[(n / 2) % 3],
-                            Radial(mid) * Matrix4x4.TRS(new Vector3(0, 0, 14.45f), Quaternion.identity, new Vector3(big ? BIGW / 2.1f : SMALLW / 1.3f, Rnd(0.86f, 1.14f), 1)));
+                            Radial(mid) * Matrix4x4.TRS(new Vector3(0, 0, 14.45f), Quaternion.identity, new Vector3(big ? BIGW / 2.1f : SMALLW / 1.3f, Rnd(0.86f, 1.14f) * FarLow(mid), 1)));
                         // molten slot in the gap after this tooth, open into the channel, so every gap glows from above
                         float ga = a0 + (at - gap / 2) / 15.2f, hw = gap * 0.4f / 15.2f;
                         if (j < cnt - 1) Sector(G("FurnaceRim", mGapMolten), I, 14.95f, ChannelIn + 0.05f, ga - hw, ga + hw, 0.035f, 0.035f, 3, inner: false, outer: false, ends: false);
@@ -1256,6 +1261,9 @@ namespace LastBell.Areas.Area2.EditorTools
                 foreach (float s in new[] { -1f, 1f })
                 {
                     Parapet(m, 18.9f, 33.5f, s * 2.62f, grp, s > 0);
+                    // gate pillars with small cage lanterns at the gantry mouth, as at the entry bridge (lanterns without lights: light budget)
+                    var gm = m * T(17.2f, 0, s * 3.3f);
+                    if (Model(grp, "SM_Area2_GatePillar", gm * Matrix4x4.Rotate(Quaternion.LookRotation(Vector3.right)))) Lantern(Child(root, grp + "/Lanterns"), gm.MultiplyPoint3x4(new Vector3(0, 4.85f, 0)), 0.35f, false);
                     // suspension pylon: tall square masonry with brass bands and a pyramid cap; two chains to the deck rail
                     var pm = m * T(26f, 0, s * 3.45f);
                     if (!Model(grp, "SM_Area2_Pylon", pm))
@@ -1426,7 +1434,9 @@ namespace LastBell.Areas.Area2.EditorTools
             }
             for (int i = 0; i < 26; i++) // far silhouettes on the horizon
             {
-                float a = Rnd() * TAU, r = Rnd(170, 250), w = Rnd(6, 14), top = Rnd(15, 60); var m = TR(Polar(a, r, 0), Rnd(0, 90));
+                float a = Rnd() * TAU, r = Rnd(170, 250), w = Rnd(6, 14), top = Rnd(15, 60), yaw = Rnd(0, 90); var m = TR(Polar(a, r, 0), yaw);
+                // real foundry silhouettes (stacks, sawtooth roofs, lit windows) instead of plain cards
+                if (Model(grp, "SM_Area2_City_" + "ABCDEF"[i % 6], Matrix4x4.TRS(Polar(a, r, GROUND), Quaternion.Euler(0, yaw, 0), new Vector3(w / 6f, (top - GROUND) / 12f, w / 6f)))) continue;
                 Box(city, m, new Vector3(w, top - GROUND, w), new Vector3(0, (top + GROUND) / 2, 0));
                 Box(city, m, new Vector3(w * 0.6f, 8, w * 0.6f), new Vector3(0, top + 4, 0));
                 if (Rnd() < 0.5f) Lathe(iron, m * Matrix4x4.Rotate(Quaternion.Euler(0, 45, 0)), new[] { new Vector2(w * 0.45f, top + 8), new Vector2(0, top + 8 + w) }, 4);
@@ -1551,6 +1561,8 @@ namespace LastBell.Areas.Area2.EditorTools
                 Make("SteamVent", mSteam, p => { p.shape = Area2Particles.Shape.Point; p.center = v; p.capacity = 30; p.rate = 0.4f; p.burstInterval = 4.5f; p.burstCount = 6; p.lifetime = new Vector2(2.5f, 3.5f); p.size = new Vector2(0.6f, 1.1f); p.grow = new Vector2(0.7f, 3f); p.velocityMin = new Vector3(-0.3f, 1.2f, -0.3f); p.velocityMax = new Vector3(0.3f, 2.2f, 0.3f); p.wander = 0.3f; p.fadeIn = 0.1f; p.seed = 20 + k++; });
             foreach (var s in smokeStacks)
                 Make("ChimneySmoke", mSmoke, p => { p.shape = Area2Particles.Shape.Point; p.center = s; p.capacity = 28; p.rate = 1.6f; p.lifetime = new Vector2(10, 14); p.size = new Vector2(2.5f, 4f); p.grow = new Vector2(0.8f, 2.6f); p.velocityMin = new Vector3(0.2f, 1.8f, -0.2f); p.velocityMax = new Vector3(0.6f, 2.8f, 0.2f); p.wander = 0.4f; p.fadeIn = 0.15f; p.fadeOut = 0.5f; p.seed = 40 + k++; });
+            // a slow orange haze rising out of the abyss around the drum, so depth reads as glowing smoke, not a flat colour
+            Make("AbyssHaze", mUnderGlow, p => { p.shape = Area2Particles.Shape.Ring; p.center = new Vector3(0, -18, 0); p.radius = 34; p.thickness = 22; p.capacity = 40; p.rate = 2; p.lifetime = new Vector2(16, 22); p.size = new Vector2(16, 26); p.grow = new Vector2(0.9f, 1.4f); p.velocityMin = new Vector3(-0.2f, 0.25f, -0.2f); p.velocityMax = new Vector3(0.2f, 0.6f, 0.2f); p.fadeIn = 0.35f; p.fadeOut = 0.45f; p.seed = 95; });
             Make("SmokeBanks", mSmoke, p => { p.shape = Area2Particles.Shape.Box; p.center = new Vector3(0, -36, 0); p.boxSize = new Vector3(240, 8, 240); p.capacity = 70; p.rate = 3.5f; p.lifetime = new Vector2(18, 24); p.size = new Vector2(18, 34); p.grow = new Vector2(0.9f, 1.3f); p.velocityMin = new Vector3(-0.4f, 0, -0.4f); p.velocityMax = new Vector3(0.4f, 0.15f, 0.4f); p.fadeIn = 0.3f; p.fadeOut = 0.4f; p.seed = 90; });
         }
 
