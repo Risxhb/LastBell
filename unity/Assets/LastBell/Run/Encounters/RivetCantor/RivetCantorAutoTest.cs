@@ -187,6 +187,45 @@ namespace LastBell.Run
             }
         }
 
+        // art pass 9 Nov: in-game frames of the props (gameplay camera = RunDirector.FollowOffset from the player, and a close
+        // camera), plus what the chain views did, for the critic and the report
+        IEnumerator PropFrames()
+        {
+            bool rivetShot = false, chainShot = false, lockShot = false;
+            float until = Time.time + 150;
+            while (boss && !boss.Dead && Time.time < until && !(rivetShot && chainShot && lockShot))
+            {
+                var me = d.World.Players.Count > 0 ? d.World.Players[0] : null;
+                if (!rivetShot && RivetPop.Live.Count >= 4 && me)
+                {
+                    rivetShot = true;
+                    yield return new WaitForSeconds(0.1f);
+                    var at = me.transform.position;
+                    RenderShot("prop_rivet_game", at + new Vector3(0, 13f, 9.7f), at + Vector3.up, 44);
+                    var pop = RivetPop.Live.Count > 0 ? RivetPop.Live[RivetPop.Live.Count - 1] : null;
+                    if (pop) { var pp = pop.transform.position; var dir = Sim.Flat(pp).sqrMagnitude > 0.1f ? Sim.Flat(pp).normalized : Vector3.forward; RenderShot("prop_rivet_close", pp + dir * 3.2f + Vector3.Cross(dir, Vector3.up) * 2.2f + Vector3.up * 2.2f, pp + Vector3.up * 0.25f, 40); }
+                }
+                var live = RivetChainView.Live.FirstOrDefault(c => c.Now == RivetChainView.State.Live);
+                if (!chainShot && live && me && boss.Current.StartsWith("Rivet Chains"))
+                {
+                    chainShot = true;
+                    yield return new WaitForSeconds(1.2f);   // the bots start stretching their chains
+                    var at = me.transform.position;
+                    RenderShot("prop_chain_game", at + new Vector3(0, 13f, 9.7f), at + Vector3.up, 44);
+                    if (live) { var a = live.EndA(); var b = live.EndB(); var mid = (a + b) * 0.5f; var side = Vector3.Cross(Sim.Flat(b - a).normalized, Vector3.up);
+                        RenderShot("prop_chain_close", mid + side * 4.5f + Vector3.up * 2.4f, mid + Vector3.down * 0.3f, 40); }
+                }
+                var locked = RivetChainView.Live.FirstOrDefault(c => c.Now != RivetChainView.State.Live);
+                if (!lockShot && locked && me)
+                {
+                    lockShot = true;
+                    var at = me.transform.position;
+                    RenderShot($"prop_chain_lock_{locked.Now}", at + new Vector3(0, 13f, 9.7f), at + Vector3.up, 44);
+                }
+                yield return null;
+            }
+        }
+
         IEnumerator PartyFight(int size, int enc, int map)
         {
             Section($"party of {size} (Perfect bots, the player too)");
@@ -198,8 +237,17 @@ namespace LastBell.Run
                 var missing = RivetCantorEncounter.ClipNames.Where(c => !boss.Presenter.Has(c)).ToList();
                 Check($"[{size}p] the rigged model is loaded with all {RivetCantorEncounter.ClipNames.Length} clips", !boss.Placeholder && missing.Count == 0, missing.Count > 0 ? "missing: " + string.Join(", ", missing) : "");
                 if (size == 2) StartCoroutine(ClipFrames(boss.Presenter, boss.transform, StrikeAt));
+                // art pass 9 Nov: the tuning fork was cut from the body and a mallet bone-parented to hand.L (rivet_cantor_mallet.py)
+                var mallet = boss.Presenter.Visual.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == "Mallet");
+                Check($"[{size}p] the mallet (not the old fork) is in his left hand", mallet && mallet.GetComponentsInParent<Transform>(true).Any(t => t.name == "hand.L") && mallet.GetComponentInChildren<Renderer>(),
+                    mallet ? "parent " + (mallet.parent ? mallet.parent.name : "-") : "no Mallet node");
             }
             else Check($"[{size}p] no rigged model in this build: the labelled stand-in is used (Placeholder)", boss.Placeholder && GameObject.Find("Rivet Cantor (STAND-IN, labelled placeholder)"));
+            // art pass 9 Nov: the rivet and chain props are models (primitive fallbacks only when the GLBs are missing)
+            Check($"[{size}p] props: RivetHead, ChainLink and ChainShackle models are in this build", RivetCantorProps.HasAll,
+                $"rivet {RivetCantorProps.Has(RivetCantorProps.Rivet)}, link {RivetCantorProps.Has(RivetCantorProps.Link)}, shackle {RivetCantorProps.Has(RivetCantorProps.Shackle)}");
+            int pops0 = RivetPop.Spawned, mpops0 = RivetPop.ModelSpawned, chains0 = RivetChainView.Spawned, locks0 = RivetChainView.Snapped + RivetChainView.Lashed, made0 = boss.ChainViewsMade;
+            if (size == 2) StartCoroutine(PropFrames());
             yield return Until(() => Sim.Flat(boss.transform.position).magnitude < 0.35f, 8, "walks to the centre");
             RenderShot($"{size}p_body", new Vector3(0, 4f, 9.5f), new Vector3(0, 2f, 0), 40);
 
@@ -248,6 +296,12 @@ namespace LastBell.Run
             Check($"[{size}p] Rivet Chains: pairs follow the order numerals, shown over each player while chained (I-II, III-IV)",
                 boss.ChainNumerals.SequenceEqual(wantNumerals) && d.World.Players.All(p => !p.Marks.Any(m => m.StartsWith("order_"))), string.Join(",", boss.ChainNumerals));
             Check($"[{size}p] Rivet Chains: the bots stretched their chains and kept off the others' (snaps {boss.ChainSnaps}, whips {boss.ChainWhips})", boss.ChainSnaps <= 1 && boss.ChainWhips <= 1);
+            Check($"[{size}p] props: a rivet head punched up for every rivet pop ({RivetPop.Spawned - pops0} of {boss.RivetPops}), from the model",
+                RivetPop.Spawned - pops0 == boss.RivetPops && (RivetPop.ModelSpawned - mpops0 == RivetPop.Spawned - pops0 || !RivetCantorProps.HasAll));
+            int chainEnds = boss.ChainLog.Sum(c => c.pairs + c.drum);
+            Check($"[{size}p] props: one hanging chain per chained pair or drum chain ({RivetChainView.Spawned - chains0} of {chainEnds}), each snapped or lashed at its lock",
+                boss.ChainViewsMade - made0 == chainEnds && RivetChainView.Spawned - chains0 == chainEnds && RivetChainView.Snapped + RivetChainView.Lashed - locks0 == chainEnds && RivetChainView.MaxLinksSeen > 0,
+                $"snapped {RivetChainView.Snapped}, lashed {RivetChainView.Lashed}, most links {RivetChainView.MaxLinksSeen}, sag seen {RivetChainView.MinSagSeen:0.00}-{RivetChainView.MaxSagSeen:0.00} m");
             Check($"[{size}p] Anvil Hymn: twice, 4 pulses each, all resolved", boss.HymnCasts == 2 && spawned.Count(s => s.h.Source == "Anvil Hymn") == 8);
             Note($"[{size}p] Anvil Hymn hits on bots: {boss.PulseHits}");
             Check($"[{size}p] Retuning: 3.5 s with nothing live and nothing spawned (the punish window)",
@@ -269,8 +323,9 @@ namespace LastBell.Run
             yield return Until(() => boss.Current.StartsWith("Rivet Run") && boss.Pending > 10, 20, "Rivet Run warnings up");
             boss.DebugDefeat();
             yield return null; yield return null;
-            Check($"[{size}p] defeat mid-Rivet Run: every hazard cancelled, no glyphs or player marks left",
-                d.World.Hazards.Count == 0 && boss.GlyphCount == 0 && d.World.Players.All(p => p.Marks.Count == 0) && boss.Dead);
+            Check($"[{size}p] defeat mid-Rivet Run: every hazard cancelled, no glyphs, props or player marks left",
+                d.World.Hazards.Count == 0 && boss.GlyphCount == 0 && d.World.Players.All(p => p.Marks.Count == 0) && boss.Dead && RivetPop.Live.Count == 0 && RivetChainView.Live.Count == 0,
+                $"pops {RivetPop.Live.Count}, chains {RivetChainView.Live.Count}");
             yield return Until(() => d.State == RunState.Cleared || d.State == RunState.Results, 10, "victory routing");
             Check($"[{size}p] defeat routes to Cleared/Results", d.State == RunState.Cleared || d.State == RunState.Results, d.State.ToString());
             yield return Until(() => d.State == RunState.Results, 15, "results");

@@ -295,6 +295,8 @@ namespace LastBell.Menu
             Debug.Log("[LAN smoke] client boss presentation: props sent "+sawProps+", most drawn "+(view2?view2.PropsShown:0)+"; announcement sent "+sawAnnouncement+", shown "+shownAnnouncement
                 +"; strike numbers sent "+numbersSent+", shown "+numbersShown+"; clock "+(sawClock?(clockMoved?"moving":"still"):"none")+"; replayed Aurelion effects "+(view2?view2.ReplicaEffects:0));
             if (sawProps) Check("client draws the boss's orbs and thrown objects",view2 && view2.PropsShown>0);
+            var rivetReplica=FindAnyObjectByType<RivetCantorEncounter>(FindObjectsInactive.Include);   // art pass 9 Nov: his rivet and chain props
+            if (rivetReplica) Debug.Log("[LAN smoke] client Rivet Cantor props: rivet pops drawn "+RivetPop.Spawned+" ("+RivetPop.ModelSpawned+" from the model), chains drawn "+rivetReplica.ReplicaChainsShown+" (locks: "+RivetChainView.Snapped+" snapped, "+RivetChainView.Lashed+" lashed)");
             Check("client boss looks run without errors",view2 && view2.LookFailures==0);
             if (bulletsSent>0) Check("client draws the host's bullets ("+bulletsSent+" in one snapshot)",view2 && view2.BulletsSeen>0);
             if (replicaShown>=0) Check("client draws the boss's own overlays ("+bossName+": "+replicaShown+")",replicaShown>0);

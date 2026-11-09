@@ -379,8 +379,66 @@ namespace LastBell.Run
                 Origin = at, Radius = RivetRadius, LockAt = 0, ResolveAt = resolve, Damage = RivetDmg, Knockback = 0, Stun = 6,
                 ClipRadius = CombatWorld.PlayerBound + 0.6f,
             };
-            h.OnResolve = hz => { RivetPops++; RivetHits += hz.Hit.Count; };
+            h.OnResolve = hz => { RivetPops++; RivetHits += hz.Hit.Count; SpawnPop(hz.Origin); };
             Live(h);
+        }
+
+        // ---------------- props (art pass 9 Nov: RivetCantorProps.cs) ----------------
+        // a rivet head punches up where a rivet warning has just resolved (never before: it must not cover a live warning)
+        readonly List<(RivetPop pop, int id)> pops = new List<(RivetPop, int)>();
+        void SpawnPop(Vector3 at)
+        {
+            pops.RemoveAll(x => !x.pop);
+            pops.Add((RivetPop.Create(transform.parent, at), NextNetPropId--));
+        }
+
+        // the chains: one view per chained pair (or player and drum), ends at the players' waists and the drum
+        sealed class ChainRec { public int Id; public RivetChainView View; public PlayerController A, B; public bool Drum; public Vector3 LastA, LastB; }
+        readonly List<ChainRec> chains = new List<ChainRec>();
+        static int chainSeq;
+        public int ChainViewsMade { get; private set; }   // tests
+
+        ChainRec StartChain(PlayerController a, PlayerController b)
+        {
+            var rec = new ChainRec { Id = ++chainSeq, A = a, B = b, Drum = b == null };
+            rec.LastA = a ? a.transform.position : transform.position; rec.LastB = b ? b.transform.position : DrumPoint();
+            Func<Vector3> rawA = () => { if (rec.A && !rec.A.Down) rec.LastA = rec.A.transform.position; return rec.LastA; };
+            Func<Vector3> rawB = () => { if (rec.Drum) rec.LastB = DrumPoint(); else if (rec.B && !rec.B.Down) rec.LastB = rec.B.transform.position; return rec.LastB; };
+            rec.View = RivetChainView.Create(transform.parent, () => WaistEnd(rawA(), rec.LastB), () => rec.Drum ? rawB() : WaistEnd(rawB(), rec.LastA));
+            chains.RemoveAll(c => !c.View);
+            chains.Add(rec); ChainViewsMade++;
+            return rec;
+        }
+        static Vector3 WaistEnd(Vector3 self, Vector3 other)
+        {
+            var d = other - self; d.y = 0;
+            return new Vector3(self.x, 0, self.z) + Vector3.up * RivetCantorProps.WaistHeight + (d.sqrMagnitude > 1e-4f ? d.normalized * RivetCantorProps.SideOffset : Vector3.zero);
+        }
+
+        // the drum's centre: the rig's drum hand (rivet_cantor_rig.py: the drum centre is 0.70 m along hand.R), else the
+        // stand-in drum, else his hip
+        Transform drumBone; bool drumSearched;
+        public Vector3 DrumPoint()
+        {
+            if (!drumSearched) { drumSearched = true; if (presenter && presenter.HasModel) drumBone = FindDeep(presenter.Visual, "hand.R"); }
+            if (drumBone) return drumBone.position + drumBone.up * 0.70f * drumBone.lossyScale.y;
+            if (drum) return drum.position;
+            return transform.position + Vector3.up * 1.2f;
+        }
+        static Transform FindDeep(Transform t, string name)
+        {
+            if (t.name == name) return t;
+            foreach (Transform c in t) { var f = FindDeep(c, name); if (f) return f; }
+            return null;
+        }
+        void ClearProps()
+        {
+            foreach (var (p, _) in pops) if (p) Destroy(p.gameObject);
+            pops.Clear();
+            foreach (var c in chains) if (c.View) Destroy(c.View.gameObject);
+            chains.Clear();
+            foreach (var v in replicaChains.Values) if (v.View) Destroy(v.View.gameObject);
+            replicaChains.Clear();
         }
 
         // ================= 3. Rivet Chains =================
@@ -466,7 +524,12 @@ namespace LastBell.Run
             float baseLen = h.Length;
             // the lane mesh is built at its spawn length: stretch it with the chain (presentation only; the hit test reads Length)
             h.Track = hz => { if (!a || !b) return; place(hz); if (hz.Tele != null && hz.Tele.go) hz.Tele.go.transform.localScale = new Vector3(1, 1, hz.Length / baseLen); };
-            h.OnResolve = hz => { ChainWhips += hz.Hit.Count; done(); };
+            var chain = StartChain(a, b);
+            h.OnResolve = hz =>
+            {
+                ChainWhips += hz.Hit.Count; done();
+                if (chain.View) chain.View.Lock(a && b && Sim.Flat(a.transform.position - b.transform.position).magnitude < ChainLength);
+            };
             Live(h);
         }
 
@@ -478,7 +541,12 @@ namespace LastBell.Run
                 Origin = Sim.Flat(transform.position), Radius = ChainLength - Hazard.Margin, LockAt = 0, ResolveAt = lockIn,
                 Damage = ChainSnapDmg, Knockback = 0, Stun = 6, Affects = q => q == who,
             };
-            h.OnResolve = hz => { ChainSnaps += hz.Hit.Count; Unmark(who, MechanicIcons.StretchTether); done(); };
+            var chain = StartChain(who, null);
+            h.OnResolve = hz =>
+            {
+                ChainSnaps += hz.Hit.Count; Unmark(who, MechanicIcons.StretchTether); done();
+                if (chain.View) chain.View.Lock(who && Sim.Flat(who.transform.position - transform.position).magnitude < ChainLength);
+            };
             Mark(who, MechanicIcons.StretchTether);
             Live(h);
             h.Tele.Tint(ChainFill, ChainBorder);
@@ -526,13 +594,19 @@ namespace LastBell.Run
 
         // ---------------- lifecycle ----------------
         // ---------------- LAN ----------------
-        // props: the call glyphs over his head (kind 0 = Chorus, 1 = Solo, as Call). Looks: Look[0] = phase 2 (mask glow),
-        // Look[1..3] = mallet local euler, Look[4..6] = drum local position, Look[7] = body height scale (the Retuning squash).
+        // props: the call glyphs over his head (kind 0 = Chorus, 1 = Solo, as Call) and the rivet pops (kind 2, the RivetHead
+        // model). Looks: Look[0] = phase 2 (mask glow), Look[1..3] = mallet local euler, Look[4..6] = drum local position,
+        // Look[7] = body height scale (the Retuning squash), Look[8] = chains shown (max 4), then 6 per chain: id, end A x/z,
+        // end B x/z (players' feet; the drum for a drum chain), flags (1 = B is the drum, + 2 x RivetChainView.State).
+        public const byte NetRivetPop = 2;
+        const int MaxNetChains = 4;
         public override void CaptureNetProps(List<Networking.LanWorldFrame.Prop> into)
         {
             foreach (var g in glyphs) if (g && glyphNet.TryGetValue(g, out var n)) into.Add(NetProp(n.id, n.kind, g.position));
+            foreach (var (p, id) in pops) if (p) into.Add(NetProp(id, NetRivetPop, p.transform.position));
         }
-        public override Transform MakeNetProp(byte kind) => kind <= (byte)Call.Solo ? MakeGlyph((Call)kind) : null;
+        public override Transform MakeNetProp(byte kind) => kind <= (byte)Call.Solo ? MakeGlyph((Call)kind)
+            : kind == NetRivetPop ? RivetPop.Create(transform.parent, Vector3.zero).transform : null;
         public override void CaptureNetLook(Networking.LanWorldFrame.BossState into)
         {
             into.Glow = glowLevel;
@@ -540,8 +614,21 @@ namespace LastBell.Run
             var m = mallet ? mallet.localEulerAngles : Vector3.zero; into.Look.Add(m.x); into.Look.Add(m.y); into.Look.Add(m.z);
             var d = drum ? drum.localPosition : Vector3.zero; into.Look.Add(d.x); into.Look.Add(d.y); into.Look.Add(d.z);
             into.Look.Add(body ? body.localScale.y : 1.4f);
+            chains.RemoveAll(c => !c.View);
+            int n = Mathf.Min(chains.Count, MaxNetChains); into.Look.Add(n);
+            for (int i = 0; i < n; i++)
+            {
+                var c = chains[i];
+                into.Look.Add(c.Id); into.Look.Add(c.LastA.x); into.Look.Add(c.LastA.z); into.Look.Add(c.LastB.x); into.Look.Add(c.LastB.z);
+                into.Look.Add((c.Drum ? 1 : 0) + 2 * (int)c.View.Now);
+            }
         }
         bool maskLit;
+        // LAN client: chains drawn from the Look, their player ends snapped to the nearest drawn player (smooth at any net rate)
+        sealed class ReplicaChain { public RivetChainView View; public Vector3 A, B; public bool Drum; }
+        readonly Dictionary<int, ReplicaChain> replicaChains = new Dictionary<int, ReplicaChain>();
+        readonly List<int> chainGone = new List<int>();
+        public int ReplicaChainsShown { get; private set; }   // LAN test: chain views a client built
         public override void ReplicaPresent(Networking.LanWorldFrame.BossState state, float dt)
         {
             var look = state.Look;
@@ -552,16 +639,51 @@ namespace LastBell.Run
                 if (drum) drum.localPosition = new Vector3(look[4], look[5], look[6]);
                 if (body) body.localScale = new Vector3(2.0f, look[7], 2.0f);
             }
+            chainGone.Clear(); chainGone.AddRange(replicaChains.Keys);
+            int n = look.Count >= 9 ? Mathf.Clamp(Mathf.RoundToInt(look[8]), 0, MaxNetChains) : 0;
+            for (int i = 0; i < n && look.Count >= 9 + 6 * (i + 1); i++)
+            {
+                int o = 9 + 6 * i, id = Mathf.RoundToInt(look[o]), flags = Mathf.RoundToInt(look[o + 5]);
+                bool isDrum = (flags & 1) != 0; var st = (RivetChainView.State)(flags >> 1);
+                chainGone.Remove(id);
+                if (!replicaChains.TryGetValue(id, out var rc))
+                {
+                    if (st != RivetChainView.State.Live) continue;   // joined after the lock: nothing to show
+                    rc = new ReplicaChain(); replicaChains[id] = rc;
+                }
+                rc.A = new Vector3(look[o + 1], 0, look[o + 2]); rc.B = new Vector3(look[o + 3], 0, look[o + 4]); rc.Drum = isDrum;
+                if (!rc.View && st == RivetChainView.State.Live)
+                {
+                    var e = rc;   // the view reads its ends from this record for as long as it lives
+                    rc.View = RivetChainView.Create(transform.parent,
+                        () => WaistEnd(SnapToPlayer(e.A), e.Drum ? DrumPoint() : SnapToPlayer(e.B)),
+                        () => e.Drum ? DrumPoint() : WaistEnd(SnapToPlayer(e.B), SnapToPlayer(e.A)));
+                    ReplicaChainsShown++;
+                }
+                if (rc.View && st != RivetChainView.State.Live) rc.View.Lock(st == RivetChainView.State.Snap);
+            }
+            foreach (int id in chainGone)
+            {
+                var v = replicaChains[id].View;
+                if (v && v.Now == RivetChainView.State.Live) Destroy(v.gameObject);   // a locked one finishes its snap/lash on its own
+                replicaChains.Remove(id);
+            }
+        }
+        Vector3 SnapToPlayer(Vector3 at)
+        {
+            Vector3 best = at; float bd = 1.5f * 1.5f;
+            if (W != null) foreach (var p in W.Players) if (p) { var d = p.transform.position - at; d.y = 0; if (d.sqrMagnitude < bd) { bd = d.sqrMagnitude; best = p.transform.position; } }
+            return best;
         }
 
         protected override void OnDefeat()
         {
-            ClearGlyphs(); ClearMarks(); Pending = 0; Retuning = false; choruses.Clear(); ChorusNeed = -1;
+            ClearGlyphs(); ClearMarks(); ClearProps(); Pending = 0; Retuning = false; choruses.Clear(); ChorusNeed = -1;
             cues?.Clear();
             if (presenter) presenter.Action("Defeat", 150);
             W.Fx.Crescendo(transform.position, true, 2, true);
         }
-        void OnDestroy() { ClearGlyphs(); ClearMarks(); choruses.Clear(); ChorusNeed = -1; }
+        void OnDestroy() { ClearGlyphs(); ClearMarks(); ClearProps(); choruses.Clear(); ChorusNeed = -1; }
 
         // ---------------- the Chorus numeral (review 11-03) ----------------
         // The soonest live Chorus shows how many players it needs (everyone standing, live, not the count at the call) as a big
