@@ -1,5 +1,5 @@
 {
-  "source": "ability-icons commit 0d0555a (art/mechanic-icons-20261022), approved by Chzy18 2026-10-23: the 5 original Aurelion attacks; Aurelion's errant_planets, falling_meridians and sunspots added 2026-11-07 (Codex work/attack-icons-20261106); Aurelion's zenith_collapse, meridian_towers, total_eclipse, severance, last_light, ecliptic_order, zenith_marks and meridian_recall added 2026-11-08 (Codex work/attack-icons-20261108); Codex's 11 Sylvara v3 icons (work/attack-icons-20261102), approved by Chzy18 2026-11-02; Crucivar v4: Codex attack icons (work/attack-icons-20261102), accepted by Chzy18 2026-11-02; Tower Slag reuses the Ember Brand icon and Molten Overflow the Furnace Eruption icon, each with its own label. Icon bullet counts are approximate, so always show the name with the icon.",
+  "source": "ability-icons commit 0d0555a (art/mechanic-icons-20261022), approved by Chzy18 2026-10-23: the 5 original Aurelion attacks; Aurelion's errant_planets, falling_meridians and sunspots added 2026-11-07 (Codex work/attack-icons-20261106); Aurelion's zenith_collapse, meridian_towers, total_eclipse, severance, last_light, ecliptic_order, zenith_marks and meridian_recall added 2026-11-08 (Codex work/attack-icons-20261108); Codex's 11 Sylvara v3 icons (work/attack-icons-20261102), approved by Chzy18 2026-11-02; Crucivar v4: Codex attack icons (work/attack-icons-20261102), accepted by Chzy18 2026-11-02; Tower Slag reuses the Ember Brand icon and Molten Overflow the Furnace Eruption icon, each with its own label; the 6 Bellkeeper Ultimate family icons added 2026-11-08 (Codex work/attack-icons-20261108, done as recommended, review later). Icon bullet counts are approximate, so always show the name with the icon.",
   "attacks": [
     {
       "id": "aurelion.meridian_lances",
@@ -474,6 +474,81 @@
       "shape": "Hard: the fullest tower of each set stamps again 2.0 s after it lands.",
       "icon": "crucivar_second_press",
       "aliases": []
+    },
+    {
+      "id": "bellkeeper.ult_escapement_relay",
+      "boss": "bellkeeper",
+      "bossName": "Bellkeeper",
+      "name": "Escapement Relay",
+      "tag": "Mixed",
+      "shape": "Hour plate, pendulum lane and tipping-bell cone duties.",
+      "icon": "bellkeeper_ult_escapement_relay",
+      "aliases": [
+        "Escapement Relay"
+      ]
+    },
+    {
+      "id": "bellkeeper.ult_chime_debts",
+      "boss": "bellkeeper",
+      "bossName": "Bellkeeper",
+      "name": "Chime Debts",
+      "tag": "Ground",
+      "shape": "Remembered personal circle and lane debt.",
+      "icon": "bellkeeper_ult_chime_debts",
+      "aliases": [
+        "Chime Debts",
+        "Chime Debt"
+      ]
+    },
+    {
+      "id": "bellkeeper.ult_broken_hour",
+      "boss": "bellkeeper",
+      "bossName": "Bellkeeper",
+      "name": "Broken Hour",
+      "tag": "Mixed",
+      "shape": "Plate duty, bell slam, chained Gear Train and INVERTED identity.",
+      "icon": "bellkeeper_ult_broken_hour",
+      "aliases": [
+        "Broken Hour"
+      ]
+    },
+    {
+      "id": "bellkeeper.ult_open_hour",
+      "boss": "bellkeeper",
+      "bossName": "Bellkeeper",
+      "name": "The Open Hour",
+      "tag": "Ground",
+      "shape": "Spiral bullets, rewind, personal echoes and moving curtain gaps.",
+      "icon": "bellkeeper_ult_open_hour",
+      "aliases": [
+        "The Open Hour",
+        "Open Hour"
+      ]
+    },
+    {
+      "id": "bellkeeper.ult_gear_floor",
+      "boss": "bellkeeper",
+      "bossName": "Bellkeeper",
+      "name": "The Gear Floor",
+      "tag": "Ground",
+      "shape": "Moving gears, biting pawls, hammer/shards and the floor transitions.",
+      "icon": "bellkeeper_ult_gear_floor",
+      "aliases": [
+        "The Gear Floor",
+        "Gear Floor"
+      ]
+    },
+    {
+      "id": "bellkeeper.ult_final_toll",
+      "boss": "bellkeeper",
+      "bossName": "Bellkeeper",
+      "name": "Final Toll",
+      "tag": "Mixed",
+      "shape": "Clapper lanes, sound rings, Echo Bellkeeper and Last Stand.",
+      "icon": "bellkeeper_ult_final_toll",
+      "aliases": [
+        "Final Toll"
+      ]
     }
   ]
 }

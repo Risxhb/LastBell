@@ -10,8 +10,8 @@ namespace LastBell.Run
     public sealed partial class RunAutoTest
     {
         // the 5 original Aurelion IDs among the 20 Chzy18 approved on 2026-10-23 (ability-icons 0d0555a), the 3 Aurelion IDs added on 2026-11-07, the 11 Sylvara v3 IDs approved on
-        // 2026-11-02 and the Crucivar v4 icons accepted on 2026-11-02 (both work/attack-icons-20261102), written out here so the
-        // catalog can't drift unnoticed. Normal Bellkeeper v2 is retired.
+        // 2026-11-02 and the Crucivar v4 icons accepted on 2026-11-02 (both work/attack-icons-20261102), the 8 Aurelion IDs and the 6 Bellkeeper Ultimate family icons
+        // added on 2026-11-08 (work/attack-icons-20261108), written out here so the catalog can't drift unnoticed. Normal Bellkeeper v2 is retired.
         static readonly string[] ApprovedAttackIds =
         {
             "aurelion.meridian_lances", "aurelion.starfall_mirror", "aurelion.noon_shadow", "aurelion.orrery_closing", "aurelion.hour_hands",
@@ -24,6 +24,8 @@ namespace LastBell.Run
             "crucivar.molten_overflow", "crucivar.second_press",
             "aurelion.zenith_collapse", "aurelion.meridian_towers", "aurelion.total_eclipse", "aurelion.severance", "aurelion.last_light",
             "aurelion.ecliptic_order", "aurelion.zenith_marks", "aurelion.meridian_recall",   // 8 Nov (Codex attack-icons-20261108)
+            "bellkeeper.ult_escapement_relay", "bellkeeper.ult_chime_debts", "bellkeeper.ult_broken_hour", "bellkeeper.ult_open_hour",
+            "bellkeeper.ult_gear_floor", "bellkeeper.ult_final_toll",
         };
 
         void BossAttackIconChecks()
