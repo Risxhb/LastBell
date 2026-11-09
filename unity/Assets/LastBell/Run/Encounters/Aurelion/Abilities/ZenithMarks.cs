@@ -7,7 +7,7 @@ namespace LastBell.Run
     // v3-02 Zenith Marks (aurelion.zenith_marks), abilities-v3/ABILITIES-v3.md (proposal). Source: FFXIV debuff
     // resolution (DSR Wroth Flames, TOP Hello World): your position must suit a mark that resolves with a later pattern.
     // Run() marks every standing player SHADE (be within 5.5 m of his centre) or SUN (be beyond 8.5 m) 3.0 s before it
-    // resolves (Easy 4.0 s). The mark is an ivory/cobalt word over the player (friendly identity). The verdict is a coral
+    // resolves (Easy 4.0 s). The mark is a glyph over the player (a gold sun or a cobalt crescent; words until the 8 Nov graphics pass). The verdict is a coral
     // Ground shape for that player only (Hazard.Affects): SHADE = a ring from 5.5 m out past the rim, SUN = a disc of
     // 8.5 m round him. It shows only 0.35 s before it lands (Easy 1.0 s): 50, no knockback, 0.25 s stun.
     // Solo alternates SUN / SHADE per cast (SUN first: the block before, Zenith Collapse, pulls you in); N >= 2 splits the standing players in half, rotating per cast.
@@ -32,6 +32,7 @@ namespace LastBell.Run
         public int MarkTick { get; private set; }
         public int Casts { get; private set; }
         public bool CueVisible { get; private set; }
+        public readonly List<RunHud.WorldLabel> Shown = new List<RunHud.WorldLabel>();   // test evidence: the last cast's markers
 
         int Total => Easy ? Sim.Ticks(MarkEasyS) : Sim.Ticks(MarkS);
         int Lead => Sim.Ticks(Easy ? LeadEasyS : LeadS);
@@ -45,13 +46,14 @@ namespace LastBell.Run
         public static Mark SoloMark(int cast) => cast % 2 == 0 ? Mark.Sun : Mark.Shade;   // SUN first: Zenith Collapse has just pulled you in
         static Mark Flip(Mark m) => m == Mark.Shade ? Mark.Sun : Mark.Shade;
         static string Word(Mark m) => m == Mark.Shade ? "SHADE" : "SUN";
+        static Texture2D Glyph(Mark m) => m == Mark.Shade ? AurelionProps.ShadeGlyph : AurelionProps.SunGlyph;
 
         // second >= 0: a two-step read (Misalignment, one step per Lances volley): every player's mark flips for a second
         // verdict resolving `second` ticks after Run's first tick. Both steps show from the start ("SHADE > SUN"); the
         // first word drops when it resolves.
         public IEnumerable<int> Run(int second = -1)
         {
-            Marks.Clear(); MarkTick = W.Tick; CueVisible = true;
+            Marks.Clear(); Shown.Clear(); MarkTick = W.Tick; CueVisible = true;
             var party = Standing();
             int cast = Casts++, total = Total, lead = Lead;
             bool two = second >= total + lead;
@@ -62,7 +64,10 @@ namespace LastBell.Run
             {
                 var m = party.Count == 1 ? SoloMark(cast) : ((i + cast) % 2 == 0 ? Mark.Shade : Mark.Sun);
                 Marks.Add(new Marked { Who = party[i], Mark = m, Step = 0, ResolveTick = MarkTick + total - 1 });
-                labels.Add(RunHud.Label(Vector3.up * 2.4f, two ? Word(m) + " > " + Word(Flip(m)) : Word(m), m == Mark.Shade ? ShadeText : SunText, 30, party[i].transform));
+                var l = RunHud.Label(Vector3.up * 2.4f, two ? Word(m) + " > " + Word(Flip(m)) : Word(m), m == Mark.Shade ? ShadeText : SunText, 30, party[i].transform);
+                // glyphs, not words (8 Nov graphics pass): a gold sun or a cobalt crescent, the next mark small after a chevron
+                l.Icon = Glyph(m); if (two) { l.Next = Glyph(Flip(m)); l.Then = AurelionProps.ArrowGlyph; }
+                labels.Add(l); Shown.Add(l);
             }
             if (two) for (int i = 0; i < party.Count; i++) Marks.Add(new Marked { Who = party[i], Mark = Flip(Marks[i].Mark), Step = 1, ResolveTick = ResolveTick });
 
@@ -72,7 +77,7 @@ namespace LastBell.Run
             Flare(0.8f);
             if (two)
             {
-                for (int i = 0; i < labels.Count; i++) { labels[i].Text = Word(Marks[party.Count + i].Mark); labels[i].Color = Marks[party.Count + i].Mark == Mark.Shade ? ShadeText : SunText; }
+                for (int i = 0; i < labels.Count; i++) { var mk = Marks[party.Count + i].Mark; labels[i].Text = Word(mk); labels[i].Color = mk == Mark.Shade ? ShadeText : SunText; labels[i].Icon = Glyph(mk); labels[i].Next = null; }
                 yield return second - (total - 1) - lead + 1;        // step 1's verdicts appear `lead` before its resolve
                 Verdicts(1, lead);
                 yield return lead - 1;                               // step 1's resolve tick

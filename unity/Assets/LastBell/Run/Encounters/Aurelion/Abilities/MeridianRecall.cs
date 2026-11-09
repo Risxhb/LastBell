@@ -42,12 +42,12 @@ namespace LastBell.Run
             if (Remembered.Count == 0) yield break;
             Say(Name);
             int res = Duration;
-            Glow(1.4f); Clip("LanceCall", res);
+            Glow(1.4f); Clip("MeridianAlignment", res);   // glaive planted, the rings charge: pulse II (the end of the clip) on the resolve tick (8 Nov graphics pass; was LanceCall)
             for (int i = 0; i + 1 < Remembered.Count; i += 2)
             {
                 var a = Lane(Remembered[i], res); var o = Lane(Remembered[i + 1], res); bool flare = i == 0;
-                a.OnResolve = hz => { if (flare) Flare(0.8f); foreach (var p in a.Hit) o.Hit.Add(p); };
-                o.OnResolve = hz => { foreach (var p in o.Hit) a.Hit.Add(p); };
+                a.OnResolve = hz => { if (flare) Flare(0.8f); foreach (var p in a.Hit) o.Hit.Add(p); Beam(hz, true); };
+                o.OnResolve = hz => { foreach (var p in o.Hit) a.Hit.Add(p); Beam(hz, true); };
                 Replay.Add(Spawn(a)); Replay.Add(Spawn(o));
             }
             yield return res - 1;                                    // resumes on the resolve tick

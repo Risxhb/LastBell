@@ -29,7 +29,9 @@ namespace LastBell.Run
         public static string CaptionTitle, CaptionBody;
         // a world-space label that stays until its owner hides it (Aurelion v3: Ecliptic numerals, SUN / SHADE marks);
         // with `follow`, Pos is an offset above that transform (a moving player)
-        public sealed class WorldLabel { public Vector3 Pos; public Transform Follow; public string Text; public Color Color; public int Size; public bool Hidden; public void Hide() => Hidden = true; }
+        // Icon (optional): drawn as a glyph of 2 x Size px instead of the text, with Next (smaller, after a chevron) for a
+        // two-step mark (Aurelion Zenith Marks, 8 Nov graphics pass); Text stays set for logs and tests
+        public sealed class WorldLabel { public Vector3 Pos; public Transform Follow; public string Text; public Color Color; public int Size; public bool Hidden; public Texture2D Icon, Next, Then; public void Hide() => Hidden = true; }
         static readonly List<WorldLabel> labels = new List<WorldLabel>();
         public static WorldLabel Label(Vector3 world, string text, Color c, int size = 34, Transform follow = null)
         {
@@ -619,17 +621,27 @@ namespace LastBell.Run
         void DownedCard()
         {
             const float w = 560, pad = UiTheme.G3;
-            var r = Card(w, pad + 44 + 8 + 26 + pad, 270, false, UiTheme.Danger);
+            // a catalogued boss attack shows its 64 px icon, with the attack name and boss beside it (BossAttackIcons)
+            // the last hit only if it took you to 0 and is the defeat cause; a scripted wipe (an empty tower, Severance, Last
+            // Light) downs you with its own cause, and shows its family's icon with the attack name and boss on a second line
+            // (8 Nov icons). The enrage has no family: text only.
+            var wd = d.World; BossAttackIcons.Attack ka = null; bool scripted = false;
+            if (wd != null)
+            {
+                int n = wd.TakenLog.Count;
+                if (n > 0 && wd.TakenLog[n - 1].hpAfter <= 0 && wd.TakenLog[n - 1].source == wd.LastDamageSource) ka = TakenAttack(wd, n - 1);
+                else { ka = BossAttackIcons.Get(wd.LastDamageAttackId); scripted = ka != null; }
+            }
+            var r = Card(w, pad + 44 + 8 + 26 + (scripted ? 26 : 0) + pad, 270, false, UiTheme.Danger);
             float y = r.y + pad;
             T(r.x, y, w, 44, UiTheme.Spaced("Down"), display36); y += 52;
-            // a catalogued boss attack shows its 64 px icon, with the attack name and boss beside it (BossAttackIcons)
-            // the last hit only if it took you to 0: a scripted wipe (Final Noon, an empty tower) downs you with its own cause
-            var wd = d.World; var ka = wd != null && wd.TakenLog.Count > 0 && wd.TakenLog[wd.TakenLog.Count - 1].hpAfter <= 0 ? TakenAttack(wd, wd.TakenLog.Count - 1) : null; var ki = BossAttackIcons.Icon(ka);
+            var ki = BossAttackIcons.Icon(ka);
             if (ki != null) GUI.DrawTexture(S(r.x + pad, r.y + pad + 8, 64, 64), ki, ScaleMode.ScaleToFit, true);
-            string a = "Struck by ", cause = ka != null ? ka.Label : d.DefeatCause ?? "?";
+            string a = "Struck by ", cause = ka != null && !scripted ? ka.Label : d.DefeatCause ?? "?";
             float wa = Wv(bodyL, a), wc = Wv(bodyL, cause), x = r.x + w / 2 - (wa + wc) / 2;
             T(x, y, wa + 2, 26, a, bodyL, UiTheme.Ivory);
             T(x + wa, y, wc + 2, 26, cause, bodyL, UiTheme.Gold);
+            if (scripted) T(r.x, y + 26, w, 26, ka.Label, bodyC, UiTheme.IvoryMuted);
         }
 
         // ---------------------------------------------------------------------------------------------------------
@@ -1306,6 +1318,19 @@ namespace LastBell.Run
             {
                 if (l.Hidden || (l.Follow == null && !ReferenceEquals(l.Follow, null))) continue;
                 var s = cam.WorldToScreenPoint(l.Follow ? l.Follow.position + l.Pos : l.Pos); if (s.z < 0) continue;
+                if (l.Icon)
+                {
+                    float g = UiTheme.V(l.Size * 2), gn = g * 0.6f, ga = g * 0.35f;
+                    float total = l.Next ? g + ga + gn : g;
+                    float x0 = Mathf.Clamp(s.x - total / 2, 10, Screen.width - total - 10), y0 = Mathf.Clamp(h - s.y - g / 2, top, Mathf.Max(top, bottom - g)) ;
+                    GUI.DrawTexture(new Rect(x0, y0, g, g), l.Icon, ScaleMode.ScaleToFit, true);
+                    if (l.Next)
+                    {
+                        if (l.Then) GUI.DrawTexture(new Rect(x0 + g, y0 + (g - ga) / 2, ga, ga), l.Then, ScaleMode.ScaleToFit, true);
+                        GUI.DrawTexture(new Rect(x0 + g + ga, y0 + (g - gn) / 2, gn, gn), l.Next, ScaleMode.ScaleToFit, true);
+                    }
+                    continue;
+                }
                 lab.fontSize = l.Size; long t0 = UiTheme.FontLog ? System.Diagnostics.Stopwatch.GetTimestamp() : 0;
                 float wide = Mathf.Max(200, lab.CalcSize(new GUIContent(l.Text)).x + 8);
                 if (UiTheme.FontLog) UiTheme.LogSlowText(t0, "label size", l.Text, lab);

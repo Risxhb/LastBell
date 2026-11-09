@@ -22,6 +22,8 @@ namespace LastBell.Run
             "crucivar.quake_echo", "crucivar.foundry_uprising", "crucivar.lane_stream", "crucivar.ring_wave", "crucivar.spiral_arm",
             "crucivar.pour_flood", "crucivar.mould_towers", "crucivar.tower_slag", "crucivar.molten_crown", "crucivar.furnace_eruption",
             "crucivar.molten_overflow", "crucivar.second_press",
+            "aurelion.zenith_collapse", "aurelion.meridian_towers", "aurelion.total_eclipse", "aurelion.severance", "aurelion.last_light",
+            "aurelion.ecliptic_order", "aurelion.zenith_marks", "aurelion.meridian_recall",   // 8 Nov (Codex attack-icons-20261108)
         };
 
         void BossAttackIconChecks()
@@ -44,6 +46,7 @@ namespace LastBell.Run
                 ("Pour III", "crucivar", "crucivar.casting_order"), ("Ring Wave bullet", "crucivar", "crucivar.ring_wave"),
                 ("Brand Pool", "crucivar", "crucivar.ember_brand"), ("Crown Rise", "crucivar", "crucivar.molten_crown"),
                 ("Pour Flood", "crucivar", "crucivar.pour_flood"), ("Furnace Spin", "aurelion", null),
+                ("Reunion", "aurelion", "aurelion.meridian_towers"), ("Umbra", "aurelion", "aurelion.total_eclipse"), ("Meridian Recall", "aurelion", "aurelion.meridian_recall"),
                 ("Bell Sweep", "bellkeeper", null), ("Leaning Bell", "bellkeeper", null), ("Meridian Lances", "sylvara", null),
                 ("Seed Pod", "sylvara", "sylvara.seed_pods"), ("Seed Burst", "sylvara", "sylvara.seed_storm"), ("Pruning Arc (back)", "sylvara", "sylvara.pruning_arc"),
                 ("Cobalt Lane", "sylvara", "sylvara.two_colour_choir"), ("Choir Bud", "sylvara", null),
