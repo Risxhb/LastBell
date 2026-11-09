@@ -76,26 +76,6 @@ namespace LastBell.Run
                 long m = HitFeel.AllocNow() - m0;
                 Check("hit feel: 5000 hits on the boss allocate nothing", m <= 0, m + " bytes");
                 HitFeel.ClearTransient();
-                // the same with a LAN host recording (review PRES-LAN-ALLOC, 9 Nov): typed, pooled damage effects, drained
-                // every 10 hits as the host's snapshots do; one dealer's hits in one tick travel as one effect
-                var cap = new Networking.LanFxCapture(null);
-                try
-                {
-                    var drained = new System.Collections.Generic.List<Networking.LanWorldFrame.Effect>(64);
-                    int effects = 0, sum = 0, want = 0;
-                    for (int i = 0; i < 200; i++) { HitFeel.BossDamage(new Vector3(i % 7, 0, 0), 10, (i & 1) == 0 ? d.Player : null); if (i % 10 == 9) { drained.Clear(); cap.Drain(drained); } }
-                    GC.Collect(); m0 = HitFeel.AllocNow();
-                    for (int i = 0; i < 5000; i++)
-                    {
-                        int amount = 10 + i % 300; want += amount;
-                        HitFeel.BossDamage(new Vector3(i % 7, 0, 0), amount, (i & 1) == 0 ? d.Player : null);
-                        if (i % 10 == 9) { drained.Clear(); cap.Drain(drained); effects += drained.Count; for (int k = 0; k < drained.Count; k++) sum += drained[k].Args[1].I; }
-                    }
-                    m = HitFeel.AllocNow() - m0;
-                    Check("hit feel: 5000 LAN-recorded hits allocate nothing", m <= 0 && effects > 0, $"{m} bytes, {effects} effects");
-                    Check("hit feel: LAN damage effects carry every point of damage", sum == want && effects <= 1000, $"{sum} of {want} in {effects} effects");
-                }
-                finally { cap.Dispose(); HitFeel.ClearTransient(); }
             }
             // a LAN client's intro card names the replicated boss's arena (review PRES-LAN-CARD, 9 Nov)
             {
@@ -105,6 +85,7 @@ namespace LastBell.Run
                 d.SetLanEncounter(keep);
                 Check("hit feel: a LAN client's card names the replicated boss's arena", sylvara != bell && !sylvara.Contains("Throne"), $"'{sylvara}' / '{bell}'");
             }
+            if (counter) yield return LanDamageChecks();
             PresentationSettings.TestOff = false; HitFeel.LegacyLook = false;
             yield return PhaseToMenu();
             d.SelectAllies(0);
@@ -131,6 +112,37 @@ namespace LastBell.Run
         // One pass: a practice of boss e with a full party of Perfect bots (the player too, attacks on), stepped by hand two
         // ticks per frame from the first combat tick with a fixed random seed, hashing the world after every tick. Between the
         // ticks the frame runs normally, so every presentation Update, OnGUI and hit-stop runs as in play.
+        // review PRES-LAN-ALLOC (9 Nov): BossDamage with a LAN host recording, in a live practice so the capture has a world
+        IEnumerator LanDamageChecks()
+        {
+            yield return PhaseToMenu();
+            d.SelectAllies(1);
+            if (!d.StartPractice(RunDirector.Classes[0], RunDirector.AurelionPractice)) { Check("hit feel: LAN practice accepted", false); yield break; }
+            yield return Until(() => RunDirector.Instance && RunDirector.Instance.State == RunState.Ready, 30, "LAN damage ready");
+            if (RunDirector.Instance != d) { directorLog.AddRange(d.Log); d = RunDirector.Instance; d.InputOverride = bot; bot.Clear(); }
+            long m0, m;
+            // the same with a LAN host recording (review PRES-LAN-ALLOC, 9 Nov): typed, pooled damage effects, drained
+            // every 10 hits as the host's snapshots do; one dealer's hits in one tick travel as one effect
+            var cap = new Networking.LanFxCapture(null);
+            try
+            {
+                var drained = new System.Collections.Generic.List<Networking.LanWorldFrame.Effect>(64);
+                int effects = 0, sum = 0, want = 0;
+                for (int i = 0; i < 200; i++) { HitFeel.BossDamage(new Vector3(i % 7, 0, 0), 10, (i & 1) == 0 ? d.Player : null); if (i % 10 == 9) { drained.Clear(); cap.Drain(drained); } }
+                GC.Collect(); m0 = HitFeel.AllocNow();
+                for (int i = 0; i < 5000; i++)
+                {
+                    int amount = 10 + i % 300; want += amount;
+                    HitFeel.BossDamage(new Vector3(i % 7, 0, 0), amount, (i & 1) == 0 ? d.Player : null);
+                    if (i % 10 == 9) { drained.Clear(); cap.Drain(drained); effects += drained.Count; for (int k = 0; k < drained.Count; k++) sum += drained[k].Args[1].I; }
+                }
+                m = HitFeel.AllocNow() - m0;
+                Check("hit feel: 5000 LAN-recorded hits allocate nothing", m <= 0 && effects > 0, $"{m} bytes, {effects} effects");
+                Check("hit feel: LAN damage effects carry every point of damage", sum == want && effects <= 1000, $"{sum} of {want} in {effects} effects");
+            }
+            finally { cap.Dispose(); HitFeel.ClearTransient(); }
+        }
+
         IEnumerator SamePass(int e, string cls, ulong[] hashes, bool on, bool measure, string shots)
         {
             PresentationSettings.TestOff = !on; HitFeel.LegacyLook = !on;
