@@ -217,9 +217,11 @@ namespace LastBell.Run
             if (Down) return;
             float mult = Kit.Mitigation(h, out bool noKnock);
             int dmg = Mathf.RoundToInt(damage * mult * World.DamageTakenScale);   // difficulty scales the hit once, here
-            LastHurtTick = World.Tick;            if (mult >= 1) dmg = Mathf.Max(1, dmg);   // a shield can absorb a hit completely; nothing else can
+            LastHurtTick = World.Tick;
+            if (mult >= 1 && damage > 0) dmg = Mathf.Max(1, dmg);   // a shield can absorb a hit completely; nothing else can (a 0-damage hazard is a push only)
             Hp = Mathf.Max(0, Hp - dmg);
             World.ReportPlayerHit(this, h, dmg);
+            if (World.Players.Count > 0 && World.Players[0] == this) Debug.Log($"[hit] you: {h.Source} -{dmg} at ({transform.position.x:0.0},{transform.position.z:0.0}) hp {Hp}");   // playtests: what hit the player
             RunHud.Float(transform.position + Vector3.up * 2.4f, "-" + dmg, mult < 1 ? new Color(0.6f, 0.9f, 1f) : new Color(1f, 0.42f, 0.36f));
             World.BossFx.PlayerHit(transform.position);
             if (Hp == 0) { GoDown(); return; }
@@ -317,7 +319,7 @@ namespace LastBell.Run
             }
             sinceSpend++; sincePotion++;
             if (inp.Potion && stun == 0) DrinkPotion();   // usable while moving or mid-action, not while stunned
-            if (sinceSpend > Sim.Ticks(Shop.ItemHooks.RegenDelay(this, RegenDelay))) Stamina = Mathf.Min(MaxStaminaNow, Stamina + Regen * Sim.Dt);
+            if (sinceSpend > Sim.Ticks(Shop.ItemHooks.RegenDelay(this, RegenDelay))) Stamina = Mathf.Min(MaxStaminaNow, Stamina + Shop.ItemHooks.F(this, "stamina.regen", Regen) * Sim.Dt);   // Steady Breath
 
             var cam = Camera.main;
             Vector3 fwd = cam ? Sim.Flat(cam.transform.forward).normalized : Vector3.forward;
@@ -396,6 +398,12 @@ namespace LastBell.Run
         public float MoveScale { get; protected set; } = 1;   // 1 free, 0 rooted, between = slowed
         public Vector3 Velocity { get; protected set; }      // extra displacement authored by the kit (lunges)
         public bool FaceAim { get; protected set; }
+        // Bots: how long the current action still holds MoveScale (s), and how long a press on a slot would root or slow the
+        // player from now (slot -1: the longest ready press). A route search slows every step inside that time, not only its
+        // first leg; the default (0.2 s while slowed, no press roots) is what the searches assumed before (31 Oct).
+        public virtual float SlowLeft => MoveScale < 1 ? 0.2f : 0;
+        public virtual float RootFor(int slot) => 0;
+        public virtual float RootScale(int slot) => 1;
         public void Attach(PlayerController p) { P = p; }
         public abstract string[] SlotNames { get; }
         public abstract string[] SlotKeys { get; }

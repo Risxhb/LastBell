@@ -22,9 +22,10 @@ namespace LastBell.Run
             t.Check("solo: three towers of one", MoltenCrown.Sets(1).Length == 3 && MoltenCrown.Sets(1).All(s => s.SequenceEqual(new[] { 1 })));
 
             t.Begin(crown.Run());
-            float s = 0; bool sawB = false;
+            float s = 0; bool sawB = false; float over = float.MinValue, reach = 0;
             while (s < 21f && t.Boss.TestBusy)
             {
+                foreach (var fx in Object.FindObjectsByType<MouldPressFx>(FindObjectsSortMode.None)) { over = Mathf.Max(over, fx.FillOverhang()); reach = Mathf.Max(reach, fx.FillReach()); }
                 foreach (var p in t.Party) if (p.Hp < 60) p.DebugSetHp(PlayerController.MaxHp);
                 // stand the party in the soonest set's towers, two each
                 var set = crown.Towers.Where(x => x.H.Age < x.H.ResolveAt).GroupBy(x => x.Set).OrderBy(g => g.Min(x => x.H.ResolveAt - x.H.Age)).FirstOrDefault();
@@ -49,10 +50,13 @@ namespace LastBell.Run
             t.Check("tower slag heats 1.0 s before it burns", t.Spawned("Tower Slag").All(x => x.H.LockAt == Sim.Ticks(ForgeRite.PoolArm)));
             t.Check("Backdraft right after set B", t.Spawned("Backdraft").Any());
             t.Check("the lava turret fires Lane Streams", t.Spawns.Any(x => x.Source == "Lane Stream bullet"));
+            t.Check("Medium: Mould Towers land 5.0 s after they rise", towers.All(x => x.H.ResolveAt == Sim.Ticks(MoltenCrown.Rise)), string.Join("/", towers.Select(x => x.H.ResolveAt)));
+            t.Check("Medium: the crown turret fires only Lane Streams (no Crown Ring)", !t.Spawns.Any(x => x.Source.StartsWith("Ring Wave")), $"{t.Spawned("Ring Wave").Count()} ring spawns");
             t.Check("the crown rises to 11 m and burns for good", crown.Crowns == 1 && Mathf.Approximately(crown.Edge, 11f) && t.W.Hazards.Live.Any(h => h.Source == "Molten Crown" && h.BurnPerSecond > 0),
                 $"crowns {crown.Crowns}, edge {crown.Edge}");
             var quake = t.Spawned("Anvil Quake I").LastOrDefault();
             t.Check("heat: after one crown, Anvil Quake hits for 40 x 1.15", quake != null && quake.H.Damage == Mathf.RoundToInt(40 * 1.15f), quake == null ? "no quake" : $"{quake.H.Damage}");
+            t.Check("the rising mould fill grows to its soak circle and never past it (8 Nov playtest)", over <= 0.001f && reach >= 0.95f, $"overhang {over:0.00} m, reach {reach:0.00} of the radius");
             t.Check("one hit per instance", t.OneHitPerInstance());
             yield return t.Shot("v4_molten_crown");
 
@@ -69,11 +73,16 @@ namespace LastBell.Run
             var pend = crown.Towers.Where(x => x.H.Age < x.H.ResolveAt).Select(x => x.H).ToList();
             t.Check("a rising tower cools the burning ground on its spot (soaking never means standing in burn)", pend.Count > 0 && crown.Cooled > cooled0
                 && !t.W.Hazards.Live.Any(b => b.BurnPerSecond > 0 && b.Age < b.ResolveAt - 1 && pend.Any(tw => Touch(b, tw))), $"cooled {crown.Cooled - cooled0}, pending {pend.Count}");
-            s = 0; bool hidden = false;
+            s = 0; bool hidden = false, ghostOn = false, ghostOff = false;
             while (s < 12f && t.Boss.TestBusy)
             {
                 foreach (var p in t.Party) if (p.Hp < 60) p.DebugSetHp(PlayerController.MaxHp);
                 hidden |= crown.CountsHidden;
+                foreach (var tw in crown.Towers.Where(x => x.H.Age < x.H.ResolveAt))
+                {
+                    if (tw.H.Age < Sim.Ticks(0.5f) && MouldPressFx.GhostLeft(tw.H) >= 1f) ghostOn = true;
+                    if (tw.H.Age > Sim.Ticks(MouldPressFx.GhostSeconds) && MouldPressFx.GhostLeft(tw.H) <= 0f) ghostOff = true;
+                }
                 var set = crown.Towers.Where(x => x.H.Age < x.H.ResolveAt).GroupBy(x => x.Set).OrderBy(g => g.Min(x => x.H.ResolveAt - x.H.Age)).FirstOrDefault();
                 if (set != null)
                 {
@@ -83,6 +92,7 @@ namespace LastBell.Run
                 s += Time.deltaTime; yield return null;
             }
             t.Check("the second cycle hides the tower counts", hidden);
+            t.Check("hidden counts: last cycle's number shows faintly for the first 1.5 s, then only the \"?\"", ghostOn && ghostOff, $"ghost at rise {ghostOn}, gone later {ghostOff}");
             var press = t.Spawned("Second Press").ToList();
             var setA = t.Spawned("Mould Tower A").ToList();
             var first = setA.FirstOrDefault();
@@ -94,6 +104,14 @@ namespace LastBell.Run
             // third cycle: nobody soaks, so the first tower to land wipes the party
             for (s = 0; s < 30f && t.Boss.TestBusy; s += Time.deltaTime) { foreach (var p in t.Party) p.DebugSetHp(PlayerController.MaxHp); yield return null; }   // keep the party up until the Hard cycle ends
             t.Check("the Hard cycle runs to its end", !t.Boss.TestBusy);
+            t.Check("Hard: Quick Moulds, the towers land 4.0 s after they rise", t.Spawned("Mould Tower").Any() && t.Spawned("Mould Tower").All(x => x.H.ResolveAt == Sim.Ticks(MoltenCrown.HardRise)), string.Join("/", t.Spawned("Mould Tower").Select(x => x.H.ResolveAt)));
+            t.Check("Hard: Crown Ring, the crown turret alternates Lane Stream and Ring Wave", crown.Rings > 0 && t.Spawned("Ring Wave path").Any() && t.Spawned("Ring Wave bullet").Any() && t.Spawned("Lane Stream bullet").Any(),
+                $"rings {crown.Rings}, ring bullets {t.Spawned("Ring Wave bullet").Count()}");
+            // Hard Crown Ring bullets can down a player during the cycle without a wipe; the fight then stays in Combat with the main
+            // player down, which stalls the next Setup. Let the last bullets land, then stand everyone back up.
+            for (s = 0; s < 3f; s += Time.deltaTime) { foreach (var p in t.Party) if (!p.Down) p.DebugSetHp(PlayerController.MaxHp); yield return null; }
+            t.W.ClearTransient();
+            foreach (var p in t.Party) p.DebugRevive();
             yield return t.Setup(4, at: new[] { new Vector3(0, 0, 4f), new Vector3(4, 0, 0), new Vector3(0, 0, -4f), new Vector3(-4, 0, 0) });
             if (t.Boss == null) yield break;
             crown = t.Boss.Crown;   // the last pour channels can down the idle party after the Hard cycle, which restarts the encounter

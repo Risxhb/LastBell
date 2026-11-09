@@ -818,6 +818,9 @@ namespace LastBell.Run
         protected override void Update()
         {
             base.Update();
+            // the run's 2 s intro card, before the sim runs (so not in StepAlways): she wakes and lifts the fork
+            if (phase == 0 && !introPlayed && RunDirector.Instance != null && RunDirector.Instance.State == RunState.Intro && Has("Intro"))
+            { introPlayed = true; Clips.Add("Intro"); presenter.PlayOnce("Intro", 2f); }
             PresentLook(glowLevel, Dead, Time.deltaTime);
             // the run's 2 s intro card, before the sim runs (so not in StepAlways): she wakes and lifts the fork
             if (phase == 0 && !introPlayed && RunDirector.Instance != null && RunDirector.Instance.State == RunState.Intro && Has("Intro"))

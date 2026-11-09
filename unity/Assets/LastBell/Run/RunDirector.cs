@@ -41,14 +41,17 @@ namespace LastBell.Run
         }
         public static readonly BossEntry[] Bosses =
         {
-            new BossEntry("Bellkeeper", w => BossEncounter.Spawn<BellkeeperEncounter>(w, Vector3.zero, 0), final: true, phases: 3),
+            // the final boss is the Bellkeeper Ultimate (Chzy18, 30 Oct: the run's final slot spawns it at the run's level; v1
+            // fight is retired, 1 Nov). Practice opens on the Throne;
+            // a run's map comes from its first boss, so the map here never moves a run. Phases P1-P5.
+            new BossEntry("Bellkeeper", BellkeeperEncounter.SpawnUltimate, map: BellkeeperEncounter.ThroneMap, final: true, phases: 5, warmUp: BellkeeperEncounter.WarmUp),
             // Skyward Spire area boss; authored practice map
             new BossEntry("Aurelion (area 1)", w => BossEncounter.Spawn<AurelionEncounter>(w, new Vector3(0, 0, -1.5f), 0), map: AurelionMap, phases: 4),   // v4 adds Last Light
             // Verdant Chimes area boss (graybox); authored practice map
             new BossEntry("Sylvara (area 3)", w => BossEncounter.Spawn<SylvaraEncounter>(w, Vector3.zero, 0), map: SylvaraMap, phases: 4,
                 warmUp: w => w.Bullets.Prewarm(w.Root)),   // the Seed Storm burst-preview bars and materials (review SYL-PREVIEW-COLD)
             // Brass Foundry area boss; authored practice map
-            new BossEntry("Crucivar (area 2)", w => BossEncounter.Spawn<CrucivarEncounter>(w, new Vector3(0, 0, -1.5f), 0), map: CrucivarMap, phases: 3),
+            new BossEntry("Crucivar (area 2)", w => BossEncounter.Spawn<CrucivarEncounter>(w, new Vector3(0, 0, -1.5f), 0), map: CrucivarMap, phases: 3, warmUp: CrucivarEncounter.WarmUp),
             // Metronome Court miniboss: explicit Practice entry only (inRun: false), so shuffled run slots are unchanged.
             // Run integration point for later review: set inRun to true here (docs/metronome-arena/tempo-tyrant.md).
             // Phase 2 is Broken Cadence (below 20%).
@@ -84,6 +87,7 @@ namespace LastBell.Run
         // which also puts each area's minibosses before its boss.
         public static readonly int[] RunOrder = Enumerable.Range(0, Bosses.Length).Where(i => Bosses[i].InRun).OrderBy(i => Bosses[i].Final).ToArray();
         public static int[] CreateRunOrder(System.Random random = null) => Campaign.CreateOrder(random, Campaign.TutorialFirst);
+        public static int BellkeeperUltimatePractice => Array.FindIndex(Bosses, b => b.Final);   // the final entry is the Ultimate (30 Oct)
         public int[] EncounterOrder { get; private set; } = (int[])RunOrder.Clone();
         public static int SylvaraPractice => Array.FindIndex(Bosses, b => b.Map == SylvaraMap);
         public const string SylvaraMap = "verdant-chimes";
@@ -234,6 +238,7 @@ namespace LastBell.Run
         {
             encounter = Mathf.Clamp(encounter, 0, Bosses.Length - 1);
             var map = Bosses[encounter].Map;
+            if (PracticeStaysOnMap) map = null;   // tests: the run-loop checks practise on the map they are touring
             if (map != null && State == RunState.Menu)
             {
                 int v = RunMaps.IndexOf(map);
@@ -242,6 +247,7 @@ namespace LastBell.Run
             return Begin(RunMode.Practice, className, encounter, phase);
         }
         static (string cls, int enc, int phase)? pendingPractice;   // survives the scene load
+        public static bool PracticeStaysOnMap;   // tests only (run-loop checks); the menu always takes a boss to its own arena
         void Start()
         {
             if (LastBell.Menu.MenuLaunch.Consume(this)) { pendingPractice = null; return; }
@@ -399,10 +405,15 @@ namespace LastBell.Run
             if (Mode == RunMode.Run && pos > 0) Player.RefreshHealth(refillPotions: potions);
             Player.PrepareForEncounter(PlayerSocket, 180);
             Player.AbilitiesEnabled = false;
+            // the Bellkeeper Ultimate's menu allies are its Perfect strat bots (mechanics and attacks); elsewhere AllyBot
+            bool ultimate = Boss is BellkeeperEncounter && !BellkeeperEncounter.TestIdle;   // the idle test target keeps passive allies
             for (int i = 0; i < Allies.Count; i++)
             {
                 if (Mode == RunMode.Run && pos > 0) Allies[i].RefreshHealth(refillPotions: potions);
                 Allies[i].PrepareForEncounter(AllySocket(i), 180); Allies[i].AbilitiesEnabled = false;
+                if (ultimate) UltimateParty.Drive(Allies[i], i + 1, Allies.Count + 1);
+                // after an Ultimate fight, its strat bots go back to AllyBot; other drivers (the tutorial's bots, LAN players) stay
+                else if (Allies[i].Input == null || Allies[i].Input is UltimateBot) Allies[i].Input = new AllyBot(i, Allies.Count, AllyBot.AllyMode);
             }
             Go(RunState.Intro);
         }
@@ -530,6 +541,9 @@ namespace LastBell.Run
             }
         }
 
+        // 0..1: the camera eases up and back from the player (the Ultimate's stage transitions, Chzy18 26 Oct: a 1-2 s pull-back
+        // is an allowed exception to the fixed gameplay camera). Mechanics set it; 0 = the normal view.
+        public static float CameraPull;
         // ---------------- campaign ----------------
         // A fight was won: save tutorial / unlock progress, and a Hard Bellkeeper win earns the bonus fight.
         void OnCleared()
@@ -590,18 +604,19 @@ namespace LastBell.Run
             if (!cam) cam = Camera.main; if (!cam) return;
             cam.orthographic = false;   // some arenas' own top-down view key (C) switches the camera to orthographic
             Vector3 target, look;
+            float pull = Mathf.SmoothStep(0, 1, Mathf.Clamp01(CameraPull)); var offset = FollowOffset * (1 + 1.1f * pull) + Vector3.up * 10f * pull;
             if (Player)
             {
                 // an encounter can ask the camera to keep a second point in view too (Aurelion's Last Light: the boss with the
                 // remaining floor, readability A2): shift toward it and pull back with the distance, same angle
-                var at = Player.transform.position; float zoom = 1;
+                var at = Player.transform.position;
                 var also = FrameAlso?.Invoke();
-                if (also.HasValue) { var d = Vector3.ProjectOnPlane(also.Value - at, Vector3.up); at += d * 0.45f; zoom = 1 + 0.45f * Mathf.Clamp01((d.magnitude - 5f) / 20f); }
-                target = at + FollowOffset * zoom; look = at + Vector3.up;
+                if (also.HasValue) { var d = Vector3.ProjectOnPlane(also.Value - at, Vector3.up); at += d * 0.45f; offset *= 1 + 0.45f * Mathf.Clamp01((d.magnitude - 5f) / 20f); }
+                target = at + offset; look = at + Vector3.up;
             }
             else { target = MenuCamPos; look = new Vector3(0, 0, 1); }
             cam.transform.position = Vector3.SmoothDamp(cam.transform.position, target, ref camVel, 0.12f);
-            if (Player) cam.transform.rotation = Quaternion.LookRotation(-FollowOffset + Vector3.up);
+            if (Player) cam.transform.rotation = Quaternion.LookRotation(-offset + Vector3.up);
             else cam.transform.rotation = Quaternion.LookRotation(look - MenuCamPos);
             cam.fieldOfView = 44;
             if (ShotCamera.HasValue) { cam.transform.position = ShotCamera.Value.pos; cam.transform.rotation = Quaternion.LookRotation(ShotCamera.Value.look - ShotCamera.Value.pos); }

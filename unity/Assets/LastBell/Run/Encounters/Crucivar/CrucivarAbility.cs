@@ -20,6 +20,10 @@ namespace LastBell.Run
         protected bool Hard => W.Difficulty == Difficulty.Hard;
         protected bool Easy => W.Difficulty == Difficulty.Easy;
         protected List<PlayerController> Standing() => W.Players.FindAll(p => !p.Down);
+        // No mechanic aims at a reviver (accepted revive rule; reviews CRU-TARGET and CRU-TARGET-OTHER): a player channelling a
+        // revive, this tick or last, is never picked or followed as a target. Aiming only: a reviver in a hazard is still hit.
+        public static bool Reviver(PlayerController p) => p != null && (p.Reviving != null || p.WasReviving != null);
+        protected List<PlayerController> Aimable() => W.Players.FindAll(p => !p.Down && !Reviver(p));
         // players who deal damage, for HP scaling (BossEncounter.Spawn's rule): passive menu bots only do the mechanics
         protected int Fighters() { int f = 0; foreach (var p in W.Players) if (!(p.Input is AllyBot) || AllyBot.Attacks) f++; return Mathf.Max(1, f); }
         protected static Vector3 Flat(Vector3 v) => Sim.Flat(v);

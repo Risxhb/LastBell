@@ -129,3 +129,33 @@ Built from `BRASS-FOUNDRY-UNITY-PROMPT.md` and `ref-brass-foundry-topdown.webp` 
   - The city skyline should be more varied.
 
   No sculpt or texture bakes were made: the assets use the project's tiling textures.
+
+### 2 Nov art pass (accepted as a task by Chzy18 through the review inbox)
+
+The rim and moat now follow the reference rather than the earlier critic's "wedge" idea.
+- **Molten ring:** wider (r 16.0–18.65 m) and higher (y −0.7). It starts right behind the rim teeth, so from the gameplay camera it reads as one continuous glowing band. The lava has larger, softer bands and a brighter orange-white core. Constants: `ChannelIn`, `ChannelOut`, `ChannelY`.
+- **Rim:** big stepped merlons alternate with small ones, in large-block rim stone with aged-bronze caps. They sit on a continuous low parapet with a brass cap band, and lava glows in every gap. A second ring of small merlons stands on the outer wall's first tier, across the lava.
+- **Towers:** slightly larger, with their bases at the moat's outer edge.
+- **Floor:** a riveted dark-brass band at the edge, a warmer slate, and inlays in their own `FloorInlayBronze` material (desaturated, a step below the trim brass).
+- **Light and sky:**
+  - The sky panorama now uses latitude–longitude mapping. It was "6 frames", which showed a stretched horizon band as a flat rust wash below the arena.
+  - Below the horizon, the sky glows orange in patches.
+  - The pit floor glows faintly, so the city reads as silhouettes.
+  - More pit lights.
+  - Half the moat lights now light the merlon backs and the outer wall.
+  - Two rim lights on the camera-side towers.
+  - Warm light on the floor's outer ring (light only, no glow).
+  - The embers are orange.
+- **GUID-stable rebuilds:** `SaveAsset` now overwrites meshes, materials and the post profile in place, so a rebuild keeps every `Generated/` GUID. The run scene, the menu showcase and the current-player-assets pack reference those GUIDs.
+- **Copies:** `BatchRefreshCopies` re-copies the run scene (keeping its .meta) and re-bakes only the Brass Foundry stage of the main-menu showcase. `BatchViewShots` renders look-check views of the saved scene.
+- **Checks:**
+  - Lava flow: 16.2 against 0.00. The run scene gives 16.2 too.
+  - Occlusion: 0 of 128 blocked.
+  - Budget: 851 k triangles, 115 renderers, 33 materials, 97.6 MB of textures and 88 lights.
+- **Critic loop:** 7.3 → 7.4 → 7.6 → 7.7 → 7.7 / 10, against 7.2 before. It did not reach 8. Open items:
+  - Crisper bevels and brass straps on the merlons.
+  - Depth haze, heat shimmer and a vignette into the abyss.
+  - A darker crust edge and brighter cracks in the lava.
+  - Brass that reads as raised metal.
+  - Chain pylons at the gantry and bridge mouths.
+  - Real silhouette buildings in place of the flat city cards.

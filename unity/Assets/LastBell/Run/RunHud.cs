@@ -56,17 +56,14 @@ namespace LastBell.Run
 
         static readonly Dictionary<string, string> Hints = new Dictionary<string, string>
         {
-            ["Shattered Chime"] = "move: the marker follows you, then locks",
-            ["Bell Sweep"] = "leave the cone", ["Bell Sweep (Final Toll)"] = "leave the cone (heavy)", ["Hollow Toll"] = "inside the inner circle or outside the ring",
             ["Meridian Cut"] = "it follows you, then locks: DASH out (or stay beyond the tip)", ["Zenith Pins"] = "it follows you, then locks: DASH off your circle",
             ["Processional Thrust"] = "step sideways before the blade reaches you", ["Crown Reversal"] = "leave his back: go to the flank",
             ["Meridian Alignment"] = "ring I: stand close inside it or far outside", ["Meridian Alignment II"] = "ring II: hug him or get outside it",
-            [BellkeeperEncounter.March] = "step sideways out of the lane",
-            [BellkeeperEncounter.Echo] = "it repeats where it struck before, not where the boss stands",
+            [ChimeDebts.Source] = "a paid debt detonates: be outside the ring", [ChimeDebts.Source + " line"] = "and outside its line to the boss",
         };
         // Phase ticks only for bosses that change phase, at their real thresholds (fraction of max HP).
         static float[] PhaseTicks(BossEncounter b) =>
-            b is BellkeeperEncounter ? new[] { 0.70f, 0.35f } :
+            b.HudMarks != null ? b.HudMarks :   // an encounter's own thresholds (the Bellkeeper Ultimate: its five phases)
             b is AurelionEncounter ae ? ae.PhaseMarks :   // 70 / 40 / 20 %
             b is SylvaraEncounter ? new[] { 0.75f, 0.50f, 0.25f } :
             b is CrucivarEncounter ? new[] { 0.65f, 0.30f } :
@@ -942,6 +939,9 @@ namespace LastBell.Run
             // Aurelion v4: the enrage clock and the Corona Shield (BossEncounter.HudExtra), right of the phase line
             // (numR is the same style; building a new GUIStyle here every frame made every layout of the ticking shield text a cold one)
             if (b.HudExtraShown != null) T(x + bw * 0.35f, yy, bw * 0.65f - 10, rowH, b.HudExtraShown, numR, BA(UiTheme.Ivory));
+            // an encounter's own lines under it (the Bellkeeper Ultimate: segment, push timer and the player's job this beat)
+            var extra = b.HudLine;
+            if (!string.IsNullOrEmpty(extra)) foreach (var line in extra.Split('\n')) { yy += rowH; TickLine(x + 10, yy, rowH, line, row15, BA(UiTheme.Ivory)); }
 
             // attack-name warning rows removed (Risxhb, October 24, 2026): telegraphs on the floor carry the warning.
             // Exception (Chzy18, October 24, 2026): a hazard tagged with a hostile mechanic (Hazard.MechanicId) gets one row with

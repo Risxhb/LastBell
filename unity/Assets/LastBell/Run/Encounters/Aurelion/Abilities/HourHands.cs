@@ -42,21 +42,23 @@ namespace LastBell.Run
             Say(Name);
             Clip("HourHands", Duration() + 1);   // the glaive levelled like a clock hand, struck as the spokes resolve
             var party = Standing();
+            var aim = Aimable();   // spokes through players not reviving (AUR-TARGET-OTHER, 7 Nov); the timing still follows everyone standing
             if (party.Count <= 1)
             {
-                var p = party.FirstOrDefault();
-                if (p == null) yield break;
+                if (party.Count == 0) yield break;
+                var p = aim.FirstOrDefault();
+                if (p == null) { yield return Duration(); yield break; }
                 Spoke(p, "I"); if (Hard) Spoke(p, "I", true);
                 yield return LockTicks - 1;              // spoke I locks during this tick's hazard step
                 Say(Name);
-                var who = Standing().FirstOrDefault() ?? p;
-                Spoke(who, "II"); if (Hard) Spoke(who, "II", true);
+                var who = Aimable().FirstOrDefault();   // none if you are reviving by now: no spoke II
+                if (who) { Spoke(who, "II"); if (Hard) Spoke(who, "II", true); }
                 yield return ResolveTicks - 1;           // spoke II resolves this tick
                 yield break;
             }
 
-            var spokes = party.Select(pl => Spoke(pl, null)).ToList();
-            if (Hard) spokes.AddRange(party.Select(pl => Spoke(pl, null, true)).ToList());   // mirrors after every own spoke: a shared hour keeps the own one
+            var spokes = aim.Select(pl => Spoke(pl, null)).ToList();
+            if (Hard) spokes.AddRange(aim.Select(pl => Spoke(pl, null, true)).ToList());   // mirrors after every own spoke: a shared hour keeps the own one
             yield return LockTicks;                      // every spoke locked on the previous tick: its hour is final
             Say(Name);
             // one spoke per hour: players sharing an hour share the first spoke on it

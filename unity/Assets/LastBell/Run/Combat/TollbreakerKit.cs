@@ -49,6 +49,8 @@ namespace LastBell.Run
         int FrenzyCdNow => NI("t.frenzy.cd", FrenzyCd);              // Frenzied Hour
         int FrenzyTicksNow => NI("t.frenzy.ticks", FrenzyTicks);     // Frenzied Hour
         float FanSideNow => N("t.fan.side", FanSide);                // Frenzied Hour
+        float HeldRangeNow => N("t.held.range", MaxRange);           // Long Toss
+        int HeldDamageNow => NI("t.held.damage", HeavyDamage);       // Long Toss
         public float SplitBonusNow => N("t.split.bonus", SplitBonus);   // Rooted Axe
         // behaviour switches (0 = off): Twin Split (second axe's damage %), Rooted Axe, Battle Spin
         float TwinSplitPct => N("t.twin_split", 0);
@@ -133,6 +135,27 @@ namespace LastBell.Run
             if (AxesInHand < 2 || s.Length > 0) s += $"AXES  R {Pip(Axes[0])} / L {Pip(Axes[1])}";
             return s.Trim();
         }
+
+        // bots (ported from the Vanguard, 2 Nov): how long a press slows its thrower, and how much. Twin Hurl x0.6 for its cast,
+        // Grinding Toll and Bell Frenzy x0.5, Splitting Throw roots for its whole windup and throw; Call of Iron is instant
+        public override float SlowLeft => act switch
+        {
+            Act.Throw => Mathf.Max(0, CastTicks - t) / (float)Sim.Hz, Act.Toll => (TollCast - t) / (float)Sim.Hz,
+            Act.Split => (SplitTotal - t) / (float)Sim.Hz, Act.Frenzy => (FrenzyCast - t) / (float)Sim.Hz, _ => 0
+        };
+        public override float RootFor(int slot)
+        {
+            if (slot < 0) return Mathf.Max(Mathf.Max(RootFor(0), RootFor(1)), Mathf.Max(RootFor(2), RootFor(4)));
+            return slot switch
+            {
+                0 => SlowLeft + CastTicks / (float)Sim.Hz,
+                1 => tollCd > 0 ? 0 : SlowLeft + TollCast / (float)Sim.Hz,
+                2 => splitCd > 0 ? 0 : SlowLeft + SplitTotal / (float)Sim.Hz,
+                4 => frenzyCd > 0 ? 0 : SlowLeft + FrenzyCast / (float)Sim.Hz,
+                _ => 0
+            };
+        }
+        public override float RootScale(int slot) => slot switch { 0 => 0.6f, 1 => 0.5f, 4 => 0.5f, 3 => 1, _ => 0 };
 
         public override void ResetAll()
         {
@@ -264,8 +287,8 @@ namespace LastBell.Run
         {
             act = Act.None;
             bool spin = !heavy && battleSpin; battleSpin = false;   // Battle Spin: this tap hits like the held throw, but doesn't lodge
-            var a = Launch(h, heavy ? Mathf.Clamp(Sim.Flat(aim - P.transform.position).magnitude, MinLodge, MaxRange) : MaxRange,
-                heavy || spin ? HeavyDamage : TapOut, heavy ? "Twin Hurl (held)" : spin ? "Twin Hurl (battle spin)" : "Twin Hurl");
+            var a = Launch(h, heavy ? Mathf.Clamp(Sim.Flat(aim - P.transform.position).magnitude, MinLodge, HeldRangeNow) : MaxRange,
+                heavy ? HeldDamageNow : spin ? HeavyDamage : TapOut, heavy ? "Twin Hurl (held)" : spin ? "Twin Hurl (battle spin)" : "Twin Hurl");
             a.Heavy = heavy; a.BattleSpin = spin; a.Frenzy = FrenzyActive && !heavy;
             Shop.ItemHooks.Cast(P, "t.release", a.Pos, a.Dir, a.ReleaseDistance, heavy ? 1 : 0);   // Close Quarters, Berserker's Pace
             nextThrow = W.Tick + Mathf.Max(0, ThrowInterval - CastTicks);
@@ -303,9 +326,14 @@ namespace LastBell.Run
                 if (q.Alive && Sim.Flat(pos - q.Pos).magnitude <= q.BodyRadius + radius)
                 { part = q; contact = q.Pos + Sim.Flat(pos - q.Pos).normalized * q.BodyRadius + Vector3.up * q.HitHeight; return true; }
             var b = W.Boss;
-            if (b == null || !b.Solid || Sim.Flat(pos - b.transform.position).magnitude > b.BodyRadius + radius) return false;
-            contact = b.transform.position + Sim.Flat(pos - b.transform.position).normalized * b.BodyRadius + Vector3.up * b.HitHeight;
-            return true;
+            if (b == null || !b.Solid) return false;
+            for (int i = 0; i < b.BodyCount; i++)   // the body and any extra bodies (the Ultimate's P4 gear cores) count as the boss
+            {
+                b.Body(i, out var c, out float r); if (r <= 0 || Sim.Flat(pos - c).magnitude > r + radius) continue;
+                contact = c + Sim.Flat(pos - c).normalized * r + Vector3.up * b.HitHeight;
+                return true;
+            }
+            return false;
         }
         void Context(Axe a, string ability, bool recall)
         {

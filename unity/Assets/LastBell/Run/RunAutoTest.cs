@@ -83,11 +83,11 @@ namespace LastBell.Run
         }
         void Note(string s) { lines.Add("      " + s); Debug.Log("[autotest] " + s); }
 
+        // -batchmode renders nothing, so WaitForEndOfFrame never fires there: picture steps are skipped and the checks go on
+        static bool NoFrames => Application.isBatchMode;
         IEnumerator Shot(string name)
         {
-            // batch mode (-batchmode) renders no frames, so WaitForEndOfFrame never returns and the suite hung at its first
-            // screenshot (Crucivar lane, 4 Nov): skip shots there
-            if (Application.isBatchMode) { Note("screenshot skipped (batch mode): " + name); yield break; }
+            if (NoFrames) { Note("screenshot " + name + " skipped (batchmode)"); yield return null; yield break; }
             yield return new WaitForEndOfFrame();
             var path = Path.Combine(dir, $"{++shots:00}_{name}.png");
             var tex = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
@@ -101,8 +101,8 @@ namespace LastBell.Run
         // (tools: run-loop-logs/frames-to-mp4.py via Blender's bundled FFmpeg).
         IEnumerator Capture(string name, int frames)
         {
-            if (Application.isBatchMode) { Note("video skipped (batch mode): " + name); yield break; }
             var cdir = Path.Combine(dir, "frames_" + name); Directory.CreateDirectory(cdir);
+            if (NoFrames) { Note($"video frames {name}: skipped (batchmode)"); yield break; }
             Time.captureFramerate = 60;
             for (int i = 0; i < frames; i++)
             {
@@ -228,8 +228,12 @@ namespace LastBell.Run
             if (SmokeOnly) { yield return SmokeChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
             if (PartyOnly) { yield return PartyChecks(); yield return ReviveChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
             if (AurelionOnly) { yield return AurelionChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
+            if (BellkeeperUltimateOnly) { yield return BellkeeperUltimateChecks(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
             // -lastbellArcanistOnly: just the Arcanist run and its kit checks (skips the menu, map, other-class and boss suites)
             if (ArcanistOnly) { yield return ArcanistRun(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
+            // The run-loop checks below use the Ultimate as a passive final target (no plan) and practise on the current map; the
+            // archived v1 Bellkeeper they used to fight is retired (Chzy18, 1 Nov). The Ultimate's own section turns both off.
+            BellkeeperEncounter.TestIdle = true; RunDirector.PracticeStaysOnMap = true;
             if (SoloSweepOn) { yield return SoloSweep(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
             if (TollbreakerOnly) { yield return TollbreakerRun(); Check("no errors or exceptions logged", errors == 0, errors + " logged"); Finish(); yield break; }
             Check($"boots into the menu on a run map ({RunMaps.CurrentName})", d.State == RunState.Menu && RunMaps.Current >= 0);
@@ -245,6 +249,7 @@ namespace LastBell.Run
             }
             if (OnlySylvara)
             {
+                RunDirector.PracticeStaysOnMap = false;   // her practice runs on her own map, not the passive-target setup above
                 BossAttackIconChecks();   // the catalog carries her icons
                 yield return SylvaraChecks();
                 Check("no errors or exceptions logged", errors == 0, errors + " logged");
@@ -291,67 +296,10 @@ namespace LastBell.Run
             Check("F potion heals +40 and spends one", d.Player.Hp == 90 && d.Player.Potions == PlayerController.MaxPotions - 1, $"hp {d.Player.Hp}, potions {d.Player.Potions}");
             bot.potion = true; yield return Wait(0.1f);
             Check("potion lockout: no second drink within 1 s", d.Player.Potions == PlayerController.MaxPotions - 1);
-            d.Boss.DebugSetHpFraction(0.95f); d.Boss.BeginCombat();   // test setup: phase 1 again after the kit checks
-            d.Player.DebugSetHp(PlayerController.MaxHp);   // test setup: the rest of this run checks phases, not survival
-            Check("Bellkeeper resumes in Last Guardian after the kit checks", d.Boss.PhaseName == BellkeeperEncounter.Phase1, d.Boss.PhaseName);
-            Check("Bellkeeper uses its model", bk.Presenter != null && bk.Presenter.HasModel);
-            Check("Bellkeeper 2.0 rig has the shell halves and three rings", bk.PhaseRigFound);
-            StartCoroutine(Capture("bellkeeper_fight", 300));
-            fight = StartCoroutine(Fight(4.5f, TollRotation, 3f));
-            yield return WaitAlive(2.5f); yield return Shot("combat_bellkeeper"); yield return WaitAlive(2.2f);
-            StopCoroutine(fight); bot.Clear();
-            // The Unfinished Hour (spec v0.3 §3.1, §4.1): phase 1 records one footprint, then replays it alone
-            yield return Survive(8, () => bk.HasMemory);
-            Check("phase 1 records a footprint and shows its inactive outline", bk.HasMemory);
-            Check("Last Guardian look: shell closed, rings compact", bk.ShellAngle < 2 && bk.RingSpread < 0.01f, $"shell {bk.ShellAngle:0}°, rings {bk.RingSpread:0.00} m");
-            yield return Shot("bellkeeper_memory_outline");
+            // the archived v1 Bellkeeper is only the run's final target here: no checks of its own fight (Chzy18, 1 Nov: test only
+            // the current boss versions; the Ultimate has its own checks)
             d.Player.DebugSetHp(PlayerController.MaxHp);
-            yield return Survive(14, () => bk.LiveEcho != null);
-            var echo1 = bk.LiveEcho;
-            Check("phase 1 replays the memory as an isolated echo", echo1 != null && d.World.Hazards.Count == 1 && !bk.HasMemory,
-                $"echo {echo1 != null}, live hazards {d.World.Hazards.Count}");
-            Check("the echo warns for 90 ticks", echo1 != null && echo1.ResolveAt == 90 && echo1.LockAt == 0);
-            yield return Survive(1.0f); yield return Shot("bellkeeper_unfinished_hour");
-            yield return Survive(2, () => bk.EchoesResolved > 0);
-            Check("the echo resolves once and the memory is erased", bk.EchoesResolved == 1 && !bk.HasMemory && bk.LiveEcho == null);
-            yield return Survive(0.2f);
-            Check("the chest opens after the echo", d.Boss.Current == "recovery", d.Boss.Current);
-            d.Player.DebugSetHp(PlayerController.MaxHp);
-            d.Boss.DebugSetHpFraction(0.69f);
-            yield return Survive(16, () => d.Boss.PhaseName == BellkeeperEncounter.Phase2);
-            Check("phase 2 queued and entered", d.Boss.PhaseName == BellkeeperEncounter.Phase2);
-            yield return null; yield return null;
-            Check("Bellkeeper plays PhaseShift on the transition", bk.Presenter.CurrentClip == "PhaseShift", bk.Presenter.CurrentClip);
-            yield return Survive(3f); yield return Shot("bellkeeper_phase2");
-            Check("Broken Hour look: shell parted, rings offset", bk.ShellAngle >= 10 && bk.RingSpread > 0.15f, $"shell {bk.ShellAngle:0}°, rings {bk.RingSpread:0.00} m");
-            d.Boss.DebugSetHpFraction(0.34f);
-            d.Player.DebugSetHp(PlayerController.MaxHp);
-            yield return Survive(22, () => d.Boss.PhaseName == BellkeeperEncounter.Phase3);
-            Check("phase 3 queued and entered", d.Boss.PhaseName == BellkeeperEncounter.Phase3);
-            yield return Survive(2.5f); yield return Shot("bellkeeper_final_toll");
-            Check("Final Toll look: chest open, rings spread", bk.ShellAngle >= 38 && bk.RingSpread > 0.35f, $"shell {bk.ShellAngle:0}°, rings {bk.RingSpread:0.00} m");
-            // spec v0.3 §4.3: the Final Toll remembers its own March and replays it with the paired Bell Sweep
-            d.Player.DebugSetHp(PlayerController.MaxHp);
-            yield return Survive(6, () => bk.LiveEcho != null);
-            var echo3 = bk.LiveEcho;
-            Check("the Final Toll replays its March lane", echo3 != null && echo3.Shape == HazardShape.Lane && echo3.Damage == 30);
-            Check("the echo stays where the March started, not on the boss",
-                echo3 != null && Sim.Flat(echo3.Origin - d.Boss.transform.position).magnitude > 1f,
-                echo3 == null ? "" : $"{Sim.Flat(echo3.Origin - d.Boss.transform.position).magnitude:0.0} m");
-            yield return Survive(1, () => bk.LastFinalSweep != null);
-            var sw = bk.LastFinalSweep;
-            Check("the paired Bell Sweep resolves on the same tick as the echo",
-                echo3 != null && sw != null && echo3.ResolveAt - echo3.Age == sw.ResolveAt - sw.Age,
-                echo3 == null || sw == null ? "" : $"echo {echo3.ResolveAt - echo3.Age}, sweep {sw.ResolveAt - sw.Age}");
-            Check("never more than two damaging patterns at once", d.World.Hazards.Count <= 2, d.World.Hazards.Count.ToString());
-            yield return Shot("bellkeeper_final_toll_pairing");
-            yield return Survive(2, () => bk.LiveEcho == null);
-            d.Player.DebugSetHp(PlayerController.MaxHp);
-            yield return KillDuringWindup("bellkeeper", "bellkeeper_defeat");
-            Check("Bellkeeper plays Defeat", bk.Presenter.CurrentClip == "Defeat", bk.Presenter.CurrentClip);
-            Check("defeat erases the memory and every hazard", !bk.HasMemory && bk.LiveEcho == null && d.World.Hazards.Count == 0);
-            yield return Wait(1.0f); yield return Shot("bellkeeper_defeat");
-            Check("defeat opens the chest fully", bk.ShellAngle > 60, $"shell {bk.ShellAngle:0}°");
+            d.Boss.DebugDefeat();
             yield return Until(() => d.State == RunState.Results, 6, "results 1");
             Check("victory after every campaign fight, Bellkeeper last", d.Victory && d.EncountersCleared == d.EncounterOrder.Length && d.EncounterStarts == d.EncounterOrder.Length && d.EncounterEnds == d.EncounterOrder.Length,
                 $"victory {d.Victory}, cleared {d.EncountersCleared}, starts {d.EncounterStarts}, ends {d.EncounterEnds}");
@@ -464,6 +412,9 @@ namespace LastBell.Run
                 d.ReturnToMenu();
             }
             Check("map tour returns to the starting map", RunMaps.Current == startMap);
+            // ---------- the Bellkeeper Ultimate (proposal) ----------
+            BellkeeperEncounter.TestIdle = false; RunDirector.PracticeStaysOnMap = false;   // from here on: the real fights
+            yield return BellkeeperUltimateChecks();
             // ---------- area bosses (practice only for now) ----------
             yield return PartyChecks();
             yield return ReviveChecks();
@@ -1094,6 +1045,8 @@ namespace LastBell.Run
                 burst |= d.World.Bullets.Live.Any(b => b.Source == "Seed Burst");
             }
             yield return Shot("sylvara_v3_p4");
+            if (NoFrames) Note("Seed Storm washout check skipped (batchmode)");
+            else
             {
                 // hundreds of bullet meshes on screen must not wash the frame out (a NaN normal once bloomed it to white)
                 yield return new WaitForEndOfFrame();

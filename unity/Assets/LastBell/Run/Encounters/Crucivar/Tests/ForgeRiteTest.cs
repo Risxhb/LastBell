@@ -39,6 +39,7 @@ namespace LastBell.Run
             var jets = t.Spawned("Furnace Spin").Select(x => x.H).ToList();
             t.Check("Furnace Spin: from the arena centre, every jet the same length", jets.All(x => Sim.Flat(x.Origin).magnitude < 0.05f) && jets.Max(x => x.Length) - jets.Min(x => x.Length) < 0.05f,
                 string.Join("/", jets.Select(x => $"{Sim.Flat(x.Origin).magnitude:0.00}:{x.Length:0.0}")));
+            t.Check("Medium: the jets turn one way for the whole 4 s (no Spin Reversal)", t.Boss.Rite.Reversals == 0 && Mathf.Abs(Mathf.Abs(t.Boss.Rite.SpinNet) - ForgeRite.JetTurnDeg * ForgeRite.JetSweep) < 2f, $"{t.Boss.Rite.SpinNet:0.0} deg");
             var q = new[] { "Anvil Quake I", "Anvil Quake II", "Anvil Quake III" }.Select(n => t.Spawns.First(x => x.Source == n).H).ToArray();
             var o = Sim.Flat(q[0].Origin); var wallPt = Vector3.right * (CrucivarAbility.Rim - 0.2f);
             bool Only(int i, Vector3 p) => Enumerable.Range(0, 3).All(k => q[k].Contains(p) == (k == i));
@@ -102,8 +103,33 @@ namespace LastBell.Run
                 t.Check("Hard: the echo bands match the quake bands", OnlyE(0, eo + Vector3.forward * 2f) && OnlyE(1, eo + Vector3.forward * 6.5f) && OnlyE(2, wp));
             }
             else t.Check("Hard: the echo bands match the quake bands", false, "missing echo");
+            // Hard: Spin Reversal, 2.0 s one way, 0.5 s still, 1.5 s back: 80 - 60 = 20 degrees net
+            float net = ForgeRite.JetTurnDeg * (ForgeRite.ReverseAt - (ForgeRite.JetSweep - ForgeRite.ReverseAt - ForgeRite.ReverseHold));
+            t.Check("Hard: Spin Reversal stops the jets at 2.0 s for 0.5 s, then turns them back", t.Boss.Rite.Reversals == 1 && Mathf.Abs(Mathf.Abs(t.Boss.Rite.SpinNet) - net) < 2f,
+                $"reversals {t.Boss.Rite.Reversals}, net {t.Boss.Rite.SpinNet:0.0} deg (want {net:0})");
+            t.Check("Hard: the reversed jets still reach the wall and stay live 4 s", t.Spawned("Furnace Spin").All(x => x.H.ActiveTicks == 240 && Mathf.Abs((Sim.Flat(x.H.Origin) + Sim.Dir(x.H.Yaw) * x.H.Length).magnitude - (CrucivarAbility.Rim + Hazard.Margin)) < 0.05f));
             t.Check("Hard: the loop runs to its end", !t.Boss.TestBusy);
             t.Check("Hard: one hit per instance", t.OneHitPerInstance());
+
+            // no mechanic aims at a reviver (review CRU-TARGET-OTHER): player 1 kneels over a downed player 0, then a brand and an order go out
+            yield return t.Setup(4, at: new[] { new Vector3(0, 0, 6), new Vector3(0.8f, 0, 6), new Vector3(0, 0, -9), new Vector3(-6, 0, -1.5f) });
+            if (t.Boss == null) yield break;
+            var rv = t.Party[1];
+            t.Party[0].ForceDown("Crucivar test: revive target");
+            for (int k = 0; k < 6; k++) { rv.DebugSetHp(PlayerController.MaxHp); yield return null; }
+            int brands0 = t.Spawned("Ember Brand").Count(), unaimed0 = t.Boss.Rite.UnaimedPours;
+            t.Boss.Rite.EmberBrand();
+            t.Boss.Rite.CastingOrder();
+            yield return t.Ticks(1);
+            var brands = t.Spawned("Ember Brand").Skip(brands0).ToList();
+            var pourOnRv = t.Boss.Rite.Order.IndexOf(rv);
+            t.Check("Ember Brand gives an active reviver no brand (the other standing players still get one)", rv.Reviving == t.Party[0] && brands.Count == 2
+                && brands.All(b => Sim.Flat(b.H.Origin - rv.transform.position).magnitude > 1f), $"reviving {rv.Reviving == t.Party[0]}, brands {brands.Count}");
+            t.Check("Casting Order does not aim its pour at an active reviver (a fixed line instead, same pour count)", pourOnRv >= 0 && t.Boss.Rite.UnaimedPours - unaimed0 == 1
+                && t.Spawned("Pour ").Count(x => !x.Source.Contains("Channel")) >= t.Boss.Rite.Order.Count, $"order slot {pourOnRv}, unaimed {t.Boss.Rite.UnaimedPours - unaimed0}");
+            t.W.ClearTransient();
+            t.Party[0].DebugRevive();
         }
+
     }
 }
