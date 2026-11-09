@@ -20,7 +20,7 @@ namespace LastBell.Run
             int h = (floatSeq++ + (text != null ? text.Length : 0)) & int.MaxValue;
             floats.Add(new FloatText { pos = world, text = text, color = c, jx = (h % 5 - 2) * 9f });
         }
-        public static void ClearTransient() { floats.Clear(); labels.Clear(); banner = null; }
+        public static void ClearTransient() { floats.Clear(); labels.Clear(); banner = null; Presentation.HitFeel.ClearTransient(); }
         // a big centre-screen call (Aurelion v4: wipes, the enrage warning) for `seconds` of real time
         static string banner; static Color bannerColor; static float bannerUntil;
         public static void Banner(string text, Color c, float seconds) { banner = text; bannerColor = c; bannerUntil = Time.unscaledTime + seconds; }
@@ -29,7 +29,9 @@ namespace LastBell.Run
         public static string CaptionTitle, CaptionBody;
         // a world-space label that stays until its owner hides it (Aurelion v3: Ecliptic numerals, SUN / SHADE marks);
         // with `follow`, Pos is an offset above that transform (a moving player)
-        public sealed class WorldLabel { public Vector3 Pos; public Transform Follow; public string Text; public Color Color; public int Size; public bool Hidden; public void Hide() => Hidden = true; }
+        // Icon (optional): drawn as a glyph of 2 x Size px instead of the text, with Next (smaller, after a chevron) for a
+        // two-step mark (Aurelion Zenith Marks, 8 Nov graphics pass); Text stays set for logs and tests
+        public sealed class WorldLabel { public Vector3 Pos; public Transform Follow; public string Text; public Color Color; public int Size; public bool Hidden; public Texture2D Icon, Next, Then; public void Hide() => Hidden = true; }
         static readonly List<WorldLabel> labels = new List<WorldLabel>();
         public static WorldLabel Label(Vector3 world, string text, Color c, int size = 34, Transform follow = null)
         {
@@ -526,12 +528,16 @@ namespace LastBell.Run
         {
             // timeline over the intro: name fades and settles in, rules grow, everything fades before combat starts
             float p = d.IntroProgress, inA = Ease(Mathf.Clamp01(p / 0.3f)), outA = 1 - Ease(Mathf.Clamp01((p - 0.82f) / 0.18f)), a = inA * outA;
-            string head = d.Mode == RunMode.Practice ? "Practice" : Campaign.StageLabel(d.EncounterOrder, d.ProgressSlot);
+            // boss moments (Presentation lane, 8 Nov): cinematic bars, a role and area line, and every boss's title
+            bool moments = Presentation.PresentationSettings.BossMoments;
+            if (moments) Letterbox(p);
             string full = d.Boss.DisplayName; int comma = full.IndexOf(',');
-            string name = (comma > 0 ? full.Substring(0, comma) : full).Trim(), epithet = comma > 0 ? full.Substring(comma + 1).Trim() : null;
+            string name = (comma > 0 ? full.Substring(0, comma) : full).Trim(), epithet = moments ? Presentation.BossMoments.IntroEpithet : comma > 0 ? full.Substring(comma + 1).Trim() : null;
             float vw = UiTheme.VirtualWidth, cx = vw / 2, maxW = Mathf.Min(vw, 1920) - 2 * 160, y0 = 300 + (1 - inA) * 14;
             DrawBand(y0 - 70, 300, a);
-            T(0, y0 - 46, vw, 22, UiTheme.Spaced(head), eyebrowC, A(UiTheme.GoldLabel, UiTheme.GoldLabel.a * a));
+            string head = moments && Presentation.BossMoments.IntroRoleSpaced.Length > 0 ? Presentation.BossMoments.IntroRoleSpaced
+                : UiTheme.Spaced(d.Mode == RunMode.Practice ? "Practice" : Campaign.StageLabel(d.EncounterOrder, d.ProgressSlot));
+            T(0, y0 - 46, vw, 22, head, eyebrowC, A(UiTheme.GoldLabel, UiTheme.GoldLabel.a * a));
             string big = UiTheme.Spaced(name);
             var nameSt = Fit(revealName, big, maxW);
             T(0, y0, vw, 84, big, nameSt, A(UiTheme.Ivory, a));
@@ -552,8 +558,20 @@ namespace LastBell.Run
             return newArea ? $"Onward to {Campaign.AreaName(next)}. Next: {name}" : "Next: " + name;
         }
 
+        // ink bars top and bottom during the intro: in by 0.15, out from 0.82 (the boss moments)
+        void Letterbox(float p)
+        {
+            float k = Ease(Mathf.Clamp01(p / 0.15f)) * (1 - Ease(Mathf.Clamp01((p - 0.82f) / 0.18f)));
+            if (k <= 0.001f) return;
+            float vw = UiTheme.VirtualWidth, vh = UiTheme.VirtualHeight, bh = 72 * k;
+            var ink = A(UiTheme.InkDeep, 0.94f); var rule = A(UiTheme.Gold, 0.55f * k);
+            F(0, 0, vw, bh, ink); F(0, vh - bh, vw, bh, ink);
+            F(0, bh, vw, 1.5f, rule); F(0, vh - bh - 1.5f, vw, 1.5f, rule);
+        }
+
         void ClearedCard()
         {
+            if (Presentation.PresentationSettings.BossMoments) { DefeatedCard(); return; }
             float a = Ease(Mathf.Clamp01(d.StateTicks / 40f));
             string next = d.Mode == RunMode.Practice ? "Practice complete" : d.ProgressSlot == d.EncounterOrder.Length - 1 ? (d.BonusFight ? "Overclocked, and outplayed" : "The last bell has rung") : NextLine(d.EncounterOrder[d.ProgressSlot + 1]);
             string full = d.Boss ? d.Boss.DisplayName : "Boss"; int comma = full.IndexOf(',');
@@ -569,20 +587,61 @@ namespace LastBell.Run
             T(0, y0 + 136, vw, 24, next, bodyC, A(UiTheme.IvoryMuted, UiTheme.IvoryMuted.a * a));
         }
 
+        // The boss moments' card (Presentation lane, 8 Nov): it waits for the kill's freeze, flash and slow motion (0.65 s), then
+        // the role line, the name in gold, "Defeated", the fight time and the next fight
+        BossEncounter defeatFor; string defeatNext, defeatName; static readonly GUIContent measureText = new GUIContent();
+        void DefeatedCard()
+        {
+            float a = Ease(Mathf.Clamp01((d.StateTicks - 40) / 28f));
+            if (a <= 0.001f) return;
+            // the card's text is built once per boss (no text built per frame)
+            if (defeatFor != d.Boss || defeatNext == null)
+            {
+                defeatFor = d.Boss;
+                defeatNext = d.Mode == RunMode.Practice ? "Practice complete" : d.ProgressSlot == d.EncounterOrder.Length - 1 ? (d.BonusFight ? "Overclocked, and outplayed" : "The last bell has rung") : NextLine(d.EncounterOrder[d.ProgressSlot + 1]);
+                string full = d.Boss ? d.Boss.DisplayName : "Boss"; int comma = full.IndexOf(',');
+                defeatName = UiTheme.Spaced((comma > 0 ? full.Substring(0, comma) : full).Trim());
+            }
+            string next = defeatNext, big = defeatName;
+            float vw = UiTheme.VirtualWidth, cx = vw / 2, maxW = Mathf.Min(vw, 1920) - 2 * 160, y0 = 300 - (1 - a) * 10;
+            DrawBand(y0 - 70, 300, a);
+            var role = Presentation.BossMoments.IntroRoleSpaced;
+            if (role.Length > 0) T(0, y0 - 46, vw, 22, role, eyebrowC, A(UiTheme.GoldLabel, UiTheme.GoldLabel.a * a));
+            var nameSt = Fit(revealName, big, maxW);
+            T(0, y0, vw, 84, big, nameSt, A(UiTheme.Gold, a));
+            measureText.text = big;
+            float half = Mathf.Min(maxW, nameSt.CalcSize(measureText).x / UiTheme.Scale) / 2;
+            Rules(cx, y0 + 42, half, Ease(Mathf.Clamp01((d.StateTicks - 40) / 50f)), A(UiTheme.Gold, 0.85f * a));
+            T(0, y0 + 90, vw, 40, Presentation.BossMoments.DefeatedSpaced, display36, A(UiTheme.Ivory, a));
+            T(0, y0 + 138, vw, 24, next, bodyC, A(UiTheme.IvoryMuted, UiTheme.IvoryMuted.a * a));
+            var time = Presentation.BossMoments.FightTimeLine;
+            if (time.Length > 0) T(0, y0 + 168, vw, 18, time, microC, A(UiTheme.IvoryMicro, UiTheme.IvoryMicro.a * a));
+        }
+
         void DownedCard()
         {
             const float w = 560, pad = UiTheme.G3;
-            var r = Card(w, pad + 44 + 8 + 26 + pad, 270, false, UiTheme.Danger);
+            // a catalogued boss attack shows its 64 px icon, with the attack name and boss beside it (BossAttackIcons)
+            // the last hit only if it took you to 0 and is the defeat cause; a scripted wipe (an empty tower, Severance, Last
+            // Light) downs you with its own cause, and shows its family's icon with the attack name and boss on a second line
+            // (8 Nov icons). The enrage has no family: text only.
+            var wd = d.World; BossAttackIcons.Attack ka = null; bool scripted = false;
+            if (wd != null)
+            {
+                int n = wd.TakenLog.Count;
+                if (n > 0 && wd.TakenLog[n - 1].hpAfter <= 0 && wd.TakenLog[n - 1].source == wd.LastDamageSource) ka = TakenAttack(wd, n - 1);
+                else { ka = BossAttackIcons.Get(wd.LastDamageAttackId); scripted = ka != null; }
+            }
+            var r = Card(w, pad + 44 + 8 + 26 + (scripted ? 26 : 0) + pad, 270, false, UiTheme.Danger);
             float y = r.y + pad;
             T(r.x, y, w, 44, UiTheme.Spaced("Down"), display36); y += 52;
-            // a catalogued boss attack shows its 64 px icon, with the attack name and boss beside it (BossAttackIcons)
-            // the last hit only if it took you to 0: a scripted wipe (Final Noon, an empty tower) downs you with its own cause
-            var wd = d.World; var ka = wd != null && wd.TakenLog.Count > 0 && wd.TakenLog[wd.TakenLog.Count - 1].hpAfter <= 0 ? TakenAttack(wd, wd.TakenLog.Count - 1) : null; var ki = BossAttackIcons.Icon(ka);
+            var ki = BossAttackIcons.Icon(ka);
             if (ki != null) GUI.DrawTexture(S(r.x + pad, r.y + pad + 8, 64, 64), ki, ScaleMode.ScaleToFit, true);
-            string a = "Struck by ", cause = ka != null ? ka.Label : d.DefeatCause ?? "?";
+            string a = "Struck by ", cause = ka != null && !scripted ? ka.Label : d.DefeatCause ?? "?";
             float wa = Wv(bodyL, a), wc = Wv(bodyL, cause), x = r.x + w / 2 - (wa + wc) / 2;
             T(x, y, wa + 2, 26, a, bodyL, UiTheme.Ivory);
             T(x + wa, y, wc + 2, 26, cause, bodyL, UiTheme.Gold);
+            if (scripted) T(r.x, y + 26, w, 26, ka.Label, bodyC, UiTheme.IvoryMuted);
         }
 
         // ---------------------------------------------------------------------------------------------------------
@@ -1259,6 +1318,19 @@ namespace LastBell.Run
             {
                 if (l.Hidden || (l.Follow == null && !ReferenceEquals(l.Follow, null))) continue;
                 var s = cam.WorldToScreenPoint(l.Follow ? l.Follow.position + l.Pos : l.Pos); if (s.z < 0) continue;
+                if (l.Icon)
+                {
+                    float g = UiTheme.V(l.Size * 2), gn = g * 0.6f, ga = g * 0.35f;
+                    float total = l.Next ? g + ga + gn : g;
+                    float x0 = Mathf.Clamp(s.x - total / 2, 10, Screen.width - total - 10), y0 = Mathf.Clamp(h - s.y - g / 2, top, Mathf.Max(top, bottom - g)) ;
+                    GUI.DrawTexture(new Rect(x0, y0, g, g), l.Icon, ScaleMode.ScaleToFit, true);
+                    if (l.Next)
+                    {
+                        if (l.Then) GUI.DrawTexture(new Rect(x0 + g, y0 + (g - ga) / 2, ga, ga), l.Then, ScaleMode.ScaleToFit, true);
+                        GUI.DrawTexture(new Rect(x0 + g + ga, y0 + (g - gn) / 2, gn, gn), l.Next, ScaleMode.ScaleToFit, true);
+                    }
+                    continue;
+                }
                 lab.fontSize = l.Size; long t0 = UiTheme.FontLog ? System.Diagnostics.Stopwatch.GetTimestamp() : 0;
                 float wide = Mathf.Max(200, lab.CalcSize(new GUIContent(l.Text)).x + 8);
                 if (UiTheme.FontLog) UiTheme.LogSlowText(t0, "label size", l.Text, lab);

@@ -33,6 +33,7 @@ namespace LastBell.Run
             V4Clock();
             StepDevour();
             StepPhaseExtras();
+            StepPendingClip();
             if (Light != null && W.CombatActive) Light.StepFalls();
             if (presenter) presenter.TickBoss(Current == "approach" || Current == "reposition" ? "Walk" : "Idle");
         }

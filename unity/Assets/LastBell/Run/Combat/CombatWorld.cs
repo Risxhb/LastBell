@@ -55,6 +55,7 @@ namespace LastBell.Run
         // statistics for the results screen
         public int DamageDealt, DamageTaken;
         public string LastDamageSource;
+        public string LastDamageAttackId;   // the boss attack ID behind LastDamageSource, or null (BossAttackIcons; a scripted wipe passes its family)
         // PF-06 death recap and PF-07 meter (first pass): every resolved hit, once, from the authoritative tick
         public readonly List<(int tick, string source, int damage, int hpAfter)> TakenLog = new List<(int, string, int, int)>();
         public readonly List<string> TakenAttackIds = new List<string>();   // parallel to TakenLog: the boss attack ID, or null (BossAttackIcons)
@@ -225,7 +226,7 @@ namespace LastBell.Run
         {
             DamageTaken += dmg; LastDamageSource = h.Source;
             TakenLog.Add((Tick, h.Source, dmg, p.Hp));
-            TakenAttackIds.Add(BossAttackIcons.Resolve(h, Boss)?.id);
+            TakenAttackIds.Add(LastDamageAttackId = BossAttackIcons.Resolve(h, Boss)?.id);
             Shop.ItemHooks.OnPlayerHit(p);   // Rhythm Keeper resets
             PlayerHit?.Invoke(p, h, dmg);
         }

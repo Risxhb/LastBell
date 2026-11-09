@@ -28,6 +28,7 @@ namespace LastBell.Run
             if (UltWants("bots_v2_seeds")) yield return UltV2SeedSweep();
             if (UltWants("v2_fight")) yield return UltV2FightChecks();
             if (UltWants("bots_revive")) yield return UltReviveChecks();
+            if (BkFilter == "ult_shots") yield return UltShots();   // asked for only (screenshots)
             if (UltWants("bots_p1v2")) yield return UltP1V2Checks();
             if (UltWants("bots_p1v2_video")) yield return UltP1V2Video();
             if (UltWants("bots_p1v2_watch")) yield return UltP1V2Watch();
@@ -107,6 +108,7 @@ namespace LastBell.Run
         IEnumerator UltScaffoldChecks()
         {
             BellkeeperEncounter.AbilityOverride = null;
+            BossAttackIconChecks();   // the catalog carries the six Ultimate family icons (8 Nov)
             int ue = RunDirector.BellkeeperUltimatePractice;
             Check("Ultimate: the run's final entry \"Bellkeeper\" is the Ultimate (practice on the Throne, last in every run)",
                   ue >= 0 && RunDirector.Bosses[ue].Name == "Bellkeeper" && RunDirector.Bosses[ue].InRun && RunDirector.Bosses[ue].Map == BellkeeperEncounter.ThroneMap
@@ -148,6 +150,10 @@ namespace LastBell.Run
                 int t = UltStepAliveUntil(() => a.Casts > 0, 300);
                 bool alone = bk.Abilities.All(x => x == a || x.Casts == 0) || !a.Built;   // a built mechanic may call partners
                 Check($"Ultimate practice hook -lastbellAbility {a.Key}: fires {a.Name}", bk.PracticeAbility == a && t >= 0 && alone, $"cast after {t} ticks");
+                // attack icons (Codex, 8 Nov): each mechanic family has its icon, and its hazards carry its ID for the death recap
+                UltStepAliveUntil(() => a.Spawned.Count > 0, Sim.Ticks(20f));   // the first hazard of the cast (the Open Hour has none: its bullets hit directly, with its ID)
+                Check($"Ultimate attack icon: {a.Name} has its family icon and stamps its hazards", BossAttackIcons.Icon(a.Id) != null && (a.Spawned.Count > 0 || a is OpenHour) && a.Spawned.All(h => h.AttackId == a.Id),
+                      $"{BossAttackIcons.Get(a.Id)?.Label ?? "not in catalog"} · {a.Spawned.Count} hazards");
             }
 
             // shared systems the current fight uses: wipes (solo and four players)
@@ -161,6 +167,11 @@ namespace LastBell.Run
             if (bk == null) yield break;
             bk.Ult.Wipe("Wipe probe");
             Check("wipe: solo goes down too", d.Player.Down);
+            // a mechanic's wipe keeps its family for the death recap icon; a global cause (the push timer) stays text
+            yield return UltStart();
+            if (bk == null) yield break;
+            bk.Ult.Wipe("Wipe probe", UltimateMechanics.GearFloor);
+            Check("wipe: a mechanic's wipe shows its attack icon in the death recap", d.World.TakenAttackIds.Count > 0 && d.World.TakenAttackIds[d.World.TakenAttackIds.Count - 1] == UltimateMechanics.GearFloor);
 
             // boss death mid-plan cancels hazards and statuses
             yield return UltStart();

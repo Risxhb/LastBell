@@ -64,7 +64,7 @@ namespace LastBell.Run
             foreach (var r in rings) r.Expire();
             Wells.Clear(); Active = false;
             if (Broken) { RunHud.Banner("CORONA BROKEN", new Color(0.7f, 0.9f, 1f), 1.5f); Flare(2f); Clip("Stagger", Sim.Ticks(1.2f)); }
-            else Boss.Wipe("Total Eclipse — the Corona Shield held");
+            else Boss.Wipe("Total Eclipse — the Corona Shield held", Id);
             Boss.RaiseShield(0);
         }
 
@@ -91,7 +91,7 @@ namespace LastBell.Run
                 if (d > grace && (d - grace) % Sim.Hz == 1)
                 {
                     UmbraHits++;
-                    p.ReceiveHit(new Hazard { Source = "Umbra", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = p.transform.position, Damage = UmbraDamage, Knockback = 0, Stun = 0 });
+                    p.ReceiveHit(new Hazard { Source = "Umbra", AttackId = Id, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = p.transform.position, Damage = UmbraDamage, Knockback = 0, Stun = 0 });
                 }
             }
         }

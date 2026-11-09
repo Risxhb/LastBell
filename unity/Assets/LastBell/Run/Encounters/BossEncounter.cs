@@ -163,7 +163,7 @@ namespace LastBell.Run
             int dealt = Mathf.Min(damage, Hp - floor);
             if (dealt <= 0) { RunHud.Float(contact + Vector3.up * 0.5f, "held", new Color(0.7f, 0.85f, 1f)); return 0; }
             Hp -= dealt;
-            RunHud.Float(contact + Vector3.up * 0.5f, dealt.ToString(), new Color(1f, 0.86f, 0.45f));
+            Presentation.HitFeel.BossDamage(contact + Vector3.up * 0.5f, dealt, W.Actor);   // damage numbers and hit-stop (presentation)
             if (hitFx) W.BossFx.BossHit(contact);   // abilities with their own impact effect skip the shared flash
             glowLevel = Mathf.Max(glowLevel, 2f);
             OnHurt();

@@ -45,6 +45,7 @@ namespace LastBell.Run
         public override IEnumerable<int> Cast()
         {
             Boss.ShowAttack(Name);
+            CastClip("ShatteredChime", 1.5f);   // the debts are dealt (before the next relay beat's swing)
             Clear();
             var at = Cue.At ?? new float[0];
             var relay = Boss.UltRelay;

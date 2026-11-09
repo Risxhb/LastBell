@@ -30,7 +30,8 @@ namespace LastBell.Run
         public readonly BotMode Mode;
         // tests: what it decided last tick; only formatted when read, so a tick stores plain values and makes no strings
         public string DebugLine => sylOn ? SylvaraLine() : dMe == null ? null : Describe();
-        public string Brief => dMe == null ? null : $"{dMe.ClassName.Substring(0, 2)} {dJob ?? "-"} gap {Sim.Flat(tPos - dMe.transform.position).magnitude - tRad:0.0} {(tick - lastPress < Sim.Hz ? "swing" : "idle")}{(dJob == "volley" && volEsc != null ? " " + volEsc : "")}";   // the sweep trace: job, gap to the target, pressed in the last second
+        public string Brief => dMe == null ? null : $"{dMe.ClassName.Substring(0, 2)} {dJob ?? "-"} gap {Sim.Flat(tPos - dMe.transform.position).magnitude - tRad:0.0} {(tick - lastPress < Sim.Hz ? "swing" : "idle")}{(dJob == "volley" && volEsc != null ? " " + volEsc : "")}{(rvWhy != null ? " rv:" + rvWhy : "")}";   // the sweep trace: job, gap to the target, pressed in the last second
+        string rvWhy;   // the sweep trace: why a downed ally in reach is not being revived (threat, duty, bad all round)
         public float? HoldRange;          // tests: keep this gap to the boss instead of the class's range (8.5 = a ranged player)
         // bots are mechanics dummies by default: they move, dodge and spread, but never attack or heal. Launch switch
         // -lastbellAllyAttack turns their class rotation on (the boss then scales his HP for them, BossEncounter.Spawn).
@@ -59,8 +60,12 @@ namespace LastBell.Run
         const float ReviveStand = 0.9f, ReviveReach = 14f, SylvaraReviveReach = 40f;   // (30 m was tried, 5 Nov: on Sylvara bots crossed her bullets and still never arrived)
         bool ReviveJob(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
         {
-            if (!ReviveSpot(me, pos, out var spot)) return false;
-            if (bad(spot)) return false;   // the ally lies in something about to land: dodge first
+            if (!ReviveSpot(me, pos, out var spot, out var downed)) { rvWhy = "none in reach"; return false; }
+            // the spot on our side is in something: any other spot still in revive reach round them that is clear, the nearest.
+            // Crucivar's allies go down in or beside a brand pool or Pour Channel, which kept the one spot burning for the whole
+            // bleed-out, and nobody revived (8 Nov Hard party sweeps: 0 revives in Phase 1, the party short at the castings)
+            if (bad(spot)) spot = ClearReviveSpot(me, pos, downed);
+            if (float.IsNaN(spot.x)) { rvWhy = "bad all round"; return false; }   // the ally lies in something about to land, all round: dodge first
             dJob = "revive"; dSpot = spot; dNote = 1;
             var v = Sim.Flat(spot - Sim.Flat(pos));
             if (v.magnitude < 0.3f) { dMove = Vector3.zero; inp.Move = ToScreen(Vector3.zero); return true; }   // beside them: hold still
@@ -78,6 +83,21 @@ namespace LastBell.Run
             foreach (var q in me.World.Players)
                 if (q != me && q != downed && q && !q.Down && q.Input is AllyBot ab && Sim.Flat(q.transform.position - downed.transform.position).magnitude - (ab.rvFor == downed && ab.dJob == "revive" ? 4f : 0f) < mine) return false;
             return true;
+        }
+        static readonly Vector3 NoSpot = new Vector3(float.NaN, 0, float.NaN);
+        static readonly float[] ReviveRings = { 0.9f, 1.15f, 1.35f };   // all inside ReviveRange (1.5 m) less a hand
+        Vector3 ClearReviveSpot(PlayerController me, Vector3 pos, PlayerController downed)
+        {
+            var at = Sim.Flat(downed.transform.position); Vector3 best = NoSpot; float bd = float.MaxValue;
+            foreach (float r in ReviveRings)
+                for (int k = 0; k < 16; k++)
+                {
+                    var q = at + Sim.Dir(k * 22.5f) * r;
+                    if (!CombatWorld.InPlayerBound(q, -0.3f) || bad(q)) continue;
+                    float d = Sim.Flat(q - pos).magnitude;
+                    if (d < bd) { bd = d; best = q; }
+                }
+            return best;
         }
         static bool ReviveSpot(PlayerController me, Vector3 pos, out Vector3 spot) => ReviveSpot(me, pos, out spot, out _);
         static bool ReviveSpot(PlayerController me, Vector3 pos, out Vector3 spot, out PlayerController best, float reach = ReviveReach)
@@ -144,6 +164,7 @@ namespace LastBell.Run
         public PlayerInput Read(PlayerController me)
         {
             tick++;
+            rvWhy = null;
             var inp = new PlayerInput();
             var w = me.World; var boss = w.Boss; readWorld = w;
             Vector3 pos = me.transform.position, want;
@@ -155,6 +176,7 @@ namespace LastBell.Run
             // first of them by name: the castings carry their numerals, and on Hard one sunk out of order sets every turret
             // firing (a party went down to it, 11-03); hits land on whichever of them is nearest, so aim and reach follow it
             var first = PartTarget(w);
+            tPart = first != null;
             if (first != null) { bpos = Sim.Flat(first.Pos); brad = first.BodyRadius; }
             tPos = bpos; tRad = brad;
             inp.Aim = bpos;
@@ -200,6 +222,7 @@ namespace LastBell.Run
             }
             if (threat == null && duty >= 0 && bad(pos)) left = duty;
             // revives: nothing landing here soon and no job of its own: get a downed ally up
+            rvWhy = threat != null ? "threat " + threat.Source : duty >= 0 ? "duty" : null;
             if (threat == null && duty < 0 && ReviveJob(me, boss, pos, ref inp)) { dMe = me; dPos = pos; return inp; }
             Vector3 move;
             if (threat != null || (duty >= 0 && bad(pos)))
@@ -396,7 +419,7 @@ namespace LastBell.Run
                 if ((h.AttackId == "crucivar.anvil_quake" || h.AttackId == "crucivar.quake_echo") && (h.Shape == HazardShape.Ring || h.Shape == HazardShape.Circle) && h.Track == null && h.Damage > 0 && !h.Cancelled
                     && h.Age < h.ResolveAt && h.Radius >= 3f && (quakeBands.Count == 0 || Sim.Flat(h.Origin - quakeBands[0].Origin).magnitude < 0.1f)) quakeBands.Add(h);
             }
-            if (quakeBands.Count < 2) return false;
+            if (quakeBands.Count == 0) return false;
             quakeBands.Sort((x, y) => (x.ResolveAt - x.Age).CompareTo(y.ResolveAt - y.Age));
             var hub = Sim.Flat(quakeBands[0].Origin); var off = Sim.Flat(pos - hub);
             float r0 = off.magnitude, yaw = r0 > 0.1f ? Sim.YawTo(hub, pos, 0) : 0f;
@@ -404,6 +427,10 @@ namespace LastBell.Run
             int n = Mathf.FloorToInt((rMax - rMin) / QuakeStep) + 1;
             bool brand = false;
             for (int i = 0; i < live.Count && !brand; i++) { var h = live[i]; if (h.Track != null && h.Age < h.LockAt && h.Shape == HazardShape.Circle && Spares(h, me)) brand = true; }
+            // one band left: the plain dodge does, except for a brand carrier. Hard's Quake Echo shows as the outer band lands, and
+            // the plain dodge had walked carriers from 10 m deep inside, where the echo then held them as the brand froze: pools on
+            // the Furnace Spin ring (8 Nov sweeps: Brand Pool the most damage taken, and bots riding the jet gaps pinned in it)
+            if (quakeBands.Count < 2 && !brand) return false;
             float pref = brand ? BrandRing : 6.5f;
             var dir = Sim.Dir(yaw);
             bool Clear(Hazard h, float r) => !h.Contains(hub + dir * r) && !h.Contains(hub + dir * (r + QuakePad)) && !h.Contains(hub + dir * Mathf.Max(0, r - QuakePad));
@@ -434,8 +461,8 @@ namespace LastBell.Run
             // the bearing: our own, or the nearest one clear of burning ground, of other strikes still to land (a locked Casting
             // Order pour: a Chimesinger bot stood in Pour IV planning the quake, took it and the channel, and Anvil Quake II
             // downed her, 11-04) and, with brands out, of the other players
-            Vector3 goal = hub + dir * rGoal;
-            for (int k = 0; k < 13; k++)
+            Vector3 goal = hub + dir * rGoal; bool found = false;
+            for (int k = 0; k < 13 && !found; k++)
             {
                 var q = hub + Sim.Dir(yaw + (k % 2 == 0 ? 1 : -1) * (k + 1) / 2 * 10f) * rGoal;
                 // the walk there too: a radial walk inside a Pour Channel (a lane out from the same centre) burns all the way
@@ -451,8 +478,12 @@ namespace LastBell.Run
                     if (h.Contains(q) || h.Contains(Vector3.Lerp(pos, q, 0.35f)) || h.Contains(Vector3.Lerp(pos, q, 0.7f))) ok = false;
                 }
                 if (ok && brand) foreach (var p in me.World.Players) if (ok && p && p != me && !p.Down && Sim.Flat(p.transform.position - q).magnitude < BrandRadiusPad) ok = false;
-                if (ok) { goal = q; break; }
+                if (ok) { goal = q; found = true; }
             }
+            // no bearing at that distance is clear of burn: the plain dodge, which weighs the bands against the burn, rather than
+            // holding the planned spot in a pool (a Hard bot stood still in a brand pool at 8 m for 1.2 s planning the quake, 23 hp
+            // to down; 8 Nov sweep after the downed-ground cooling was rejected)
+            if (!found) for (int i = 0; i < live.Count; i++) { var h = live[i]; if (h.BurnPerSecond > 0 && h.Contains(goal)) return false; }
             var v = Sim.Flat(goal - pos);
             var move = v.magnitude < 0.2f ? Vector3.zero : v.normalized;
             bad = Bad(me, boss, false, me.World.Tick + 1);   // round burning ground; the bands are planned above
@@ -477,10 +508,16 @@ namespace LastBell.Run
         Vector3 volMove; bool volSprint, volOn, volReach, volDash; float volCost, volPull; int volTick = -99;
         const float VolleyLook = 0.8f, VolleyStep = 0.05f, VolleyBuffer = 0.15f, VolleyPathCost = 30f, VolleyPathSoon = 1.6f, VolleySwing = 20f, VolleySprintFloor = 55f;   // a swing waits only for a bullet it would meet (50 and up)
         const float VolleyJetRing = 8f;   // m from the jets' hub where they sweep at a walk (40 deg/s, WalkSpeed 6)
+        // m past that ring: 6 left bots by the rim taking bullets over walking in; at 5 m out (the rim) it now outweighs one bullet
+        // hit, since a jet there is a sure hit (8 Nov full runs: Hard bots wiped to Furnace Spin layered on the volleys)
+        const float VolleyJetOut = 22f;
         const float VolleyJetHit = 200f;  // a jet step in the bullet dodge (a bullet step is 100)
-        bool volJets; Vector3 volHub; string volEsc;   // volEsc: the sweep trace
+        bool volJets; Vector3 volHub, volHome; string volEsc;   // volEsc: the sweep trace
+        const float VolleyReachPart = 10f;   // per m out of reach of a casting (the boss: 4)
+        const float VolleyEscPart = 6f;      // m: with a casting up, no longer run to a spot clear of every path (they ran 18-20 m off)
         const float VolleyThrowReach = 7f;   // a Tollbreaker's axe throws, gap to the target (MaxRange 9 m less a margin)
         static readonly List<Hazard> volNear = new List<Hazard>();
+        static readonly List<Hazard> volJetList = new List<Hazard>();
         static Vector3[] Dirs16;
         bool Volley(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
         {
@@ -494,36 +531,47 @@ namespace LastBell.Run
             bad = Bad(me, boss, false, me.World.Tick + 45);
             bool path = BotSight.GhostHits(me, pos);
             if (volNear.Count == 0 && !path) { volOn = false; return false; }
-            volJets = false; { var lv = me.World.Hazards.Live; for (int i = 0; i < lv.Count; i++) if (Jet(lv[i])) { TrackSpin(lv[i]); volJets = true; volHub = Sim.Flat(lv[i].Origin); break; } }   // the jets' turn, for VolleyCost
+            volJets = false; { var lv = me.World.Hazards.Live; for (int i = 0; i < lv.Count; i++) if (Jet(lv[i])) { TrackSpin(lv[i], me.World.Difficulty == Difficulty.Hard); volJets = true; volHub = Sim.Flat(lv[i].Origin); break; } }   // the jets' turn, for VolleyCost
             pos = Sim.Flat(pos);
-            // home: the rim for a brand carrier, else the attack spot (or straight at the target)
-            Vector3 home = tPos; bool carrier = false;
+            bool carrier = false; Hazard carried = null;
             var live = me.World.Hazards.Live;
-            for (int i = 0; i < live.Count && !carrier; i++) { var h = live[i]; if (h.Track != null && h.Age < h.LockAt && h.Shape == HazardShape.Circle && Spares(h, me)) carrier = true; }
+            for (int i = 0; i < live.Count && !carrier; i++) { var h = live[i]; if (h.Track != null && h.Age < h.LockAt && h.Shape == HazardShape.Circle && Spares(h, me)) { carrier = true; carried = h; } }
             if (carrier) volJets = false;   // its brand goes to the rim, jets or not
-            if (carrier) home = (pos.magnitude > 0.1f ? pos.normalized : Vector3.forward) * Mathf.Min(BrandRing, CombatWorld.PlayerBound - 1.2f);
-            else if (Attacks && AttackSpot(me, boss, out var spot)) home = Sim.Flat(spot);
-            volReach = Attacks && !carrier; volPull = 0.6f; volEsc = carrier ? "carry" : null;
-            // in a fan its bullets are still to cross: the nearest spot clear of every path is the goal (the look is too short
-            // to find a Ring Wave's gap metres away: the solo bot ran from the wall of bullets into the corner, 11-03)
-            if (path || bad(pos))
-            {
-                var esc = NearestClear(pos, boss, bad, out float need);
-                // not beside a turret: the clear spot there is where its next arms sweep (two bots were pinned so, 11-04)
-                if (esc != Vector3.zero && BotSight.TurretDist(pos + esc * need) >= TurretKeep) { home = pos + esc * need; volReach = false; volPull = need > 6f ? 1f : 2f; volEsc = $"esc{need:0}"; }
-            }
+            // re-plan every 3 ticks: the home and escape search below only feed the plan, so they run with it (same choices). Run
+            // every tick, NearestClear (up to 28 m x 48 ways, each a full hazard test)
+            // cost ~8.5 ms a frame early in Phase 3 with 75-142 hazards live (perf run, dc77bd8, 8 Nov)
+            // not staggered by slot: plans on the bot's own tick of three lost Phase 3 in the Hard sweep (8% -> 45% boss HP left,
+            // 8 Nov), as the bots' plans then react to bullets a tick apart; all 4 on one tick is the 8-9 ms bot-run peak
             if (!volOn || me.World.Tick - volTick >= 3 || me.Stunned > 0)
             {
-                volOn = true; volTick = me.World.Tick;
+                volTick = me.World.Tick; volOn = true;
+                // home: the rim for a brand carrier, else the attack spot (or straight at the target)
+                var home = tPos;
+                if (carrier) home = CastingBrandSpot(me, pos, carried, out var cs) ? cs : (pos.magnitude > 0.1f ? pos.normalized : Vector3.forward) * Mathf.Min(BrandRing, CombatWorld.PlayerBound - 1.2f);
+                else if (Attacks && AttackSpot(me, boss, out var spot)) home = Sim.Flat(spot);
+                volReach = Attacks && !carrier; volPull = 0.6f; volEsc = carrier ? "carry" : null;
+                // in a fan its bullets are still to cross: the nearest spot clear of every path is the goal (the look is too short
+                // to find a Ring Wave's gap metres away: the solo bot ran from the wall of bullets into the corner, 11-03)
+                if (path || bad(pos))
+                {
+                    // with a casting up a spot past VolleyEscPart is not taken, so the search stops there (same choice; it ran to 28 m:
+                    // ~2.5 ms a bot on a Phase 2 re-plan with 95-136 hazards, perf 8 Nov)
+                    var esc = NearestClear(pos, boss, bad, out float need, true, tPart ? VolleyEscPart : 28f);
+                    // not beside a turret: the clear spot there is where its next arms sweep (two bots were pinned so, 11-04)
+                    if (esc != Vector3.zero && (!tPart || need <= VolleyEscPart) && BotSight.TurretDist(pos + esc * need) >= TurretKeep) { home = pos + esc * need; volReach = false; volPull = need > 6f ? 1f : 2f; volEsc = $"esc{need:0}"; }
+                }
+                volHome = home;
                 if (Dirs16 == null) { Dirs16 = new Vector3[16]; for (int k = 0; k < 16; k++) Dirs16[k] = Sim.Dir(k * 22.5f); }
-                volDash = false; volSprint = false; volMove = Vector3.zero; volCost = VolleyCost(me, boss, pos, Vector3.zero, 0, home, VolleyLook);
-                bool canSprint = me.Stamina > VolleySprintFloor;   // keep enough for a dash when it gets cornered
+                volDash = false; volSprint = false; volMove = Vector3.zero; volCost = VolleyCost(me, boss, pos, Vector3.zero, 0, volHome, VolleyLook);
+                // keep enough for a dash when it gets cornered; but out past the jet ring with jets up, get in first (a Hard bot out
+                // by the rim with 8 stamina walked among the bullets until the jets came round at 10 m/s, 8 Nov full run)
+                bool canSprint = me.Stamina > VolleySprintFloor || (volJets && me.Stamina > 5 && Sim.Flat(pos - volHub).magnitude > VolleyJetRing + 1f);
                 for (int s = 0; s < (canSprint ? 2 : 1); s++)
                 {
                     float v = s == 0 ? PlayerController.WalkSpeed : PlayerController.SprintSpeed;
                     foreach (var d in Dirs16)
                     {
-                        float c = VolleyCost(me, boss, pos, d, v, home, VolleyLook) + (s == 1 ? 4f : 0);
+                        float c = VolleyCost(me, boss, pos, d, v, volHome, VolleyLook) + (s == 1 ? 4f : 0);
                         if (c < volCost) { volCost = c; volMove = d; volSprint = s == 1; }
                     }
                 }
@@ -533,7 +581,7 @@ namespace LastBell.Run
                     float dashSpeed = PlayerController.DashDistance / (PlayerController.DashTicks * Sim.Dt);
                     foreach (var d in Dirs16)
                     {
-                        float c = VolleyCost(me, boss, pos, d, dashSpeed, home, PlayerController.DashTicks * Sim.Dt) + 2f;
+                        float c = VolleyCost(me, boss, pos, d, dashSpeed, volHome, PlayerController.DashTicks * Sim.Dt) + 2f;
                         if (c < volCost) { volCost = c; volMove = d; volSprint = false; inp.Dash = volDash = true; }
                     }
                 }
@@ -548,7 +596,7 @@ namespace LastBell.Run
             if (me.Hp < (Mode == BotMode.Passive ? 40 : 70) && me.Potions > 0 && tick % 30 == 0) inp.Potion = true;
             var move = volMove;
             if (move != Vector3.zero) move = AroundBoss(pos, move, boss);
-            dMove = move; dSpot = home; dNote = 1;
+            dMove = move; dSpot = volHome; dNote = 1;
             inp.Move = ToScreen(move);
             return true;
         }
@@ -560,6 +608,7 @@ namespace LastBell.Run
             float body = boss.BodyRadius + PlayerController.Radius + 0.1f;
             var live = me.World.Hazards.Live;
             int steps = Mathf.RoundToInt(VolleyLook / VolleyStep);
+            volJetList.Clear(); for (int i = 0; i < live.Count; i++) if (Jet(live[i])) volJetList.Add(live[i]);   // once, not every step over every hazard (perf 8 Nov)
             Vector3 q = pos; bool stopped = false;
             for (int k = 1; k <= steps; k++)
             {
@@ -581,12 +630,13 @@ namespace LastBell.Run
                 // (read every 0.2 s at a flat 100, a jet crossing cost less than one bullet, and the bots dodging bullets in the
                 // second and third uprisings walked into the jets: 7 of 13 downs over 4 Hard party runs, 11-04); one hit each, so
                 // a jet that has hit this player is done
-                for (int i = 0; i < live.Count; i++)
+                for (int i = 0; i < volJetList.Count; i++)
                 {
-                    var h = live[i]; if (!Jet(h) || h.Hit.Contains(me)) continue;
-                    float spin = spokeRef != null && Sim.Flat(spokeRef.Origin - h.Origin).magnitude < 0.1f ? spokeDir : 0;
-                    if (JetAt(h, q, t, spin)) cost += VolleyJetHit * early;
-                    else if (k == steps && JetAt(h, q, t + 0.5f, spin)) cost += 60;   // standing in its way as it comes round
+                    var h = volJetList[i]; if (h.Hit.Contains(me)) continue;
+                    float spin = spokeRef != null && Sim.Flat(spokeRef.Origin - h.Origin).magnitude < 0.1f ? spokeFirst : 0;
+                    bool rev = me.World.Difficulty == Difficulty.Hard;   // Hard's Spin Reversal
+                    if (JetAt(h, q, t, spin, rev)) cost += VolleyJetHit * early;
+                    else if (k == steps && JetAt(h, q, t + 0.5f, spin, rev)) cost += 60;   // standing in its way as it comes round
                 }
                 if (k % 4 != 0) continue;
                 // every 0.2 s: burning ground and strikes landing about now; at the end, the paths still to fire (bullets that
@@ -595,6 +645,7 @@ namespace LastBell.Run
                 for (int i = 0; i < live.Count; i++)
                 {
                     var h = live[i];
+                    if (i < rN) { float dx = q.x - rX[i], dz = q.z - rZ[i]; if (dx * dx + dz * dz > rR2[i]) continue; }   // out of its reach: no burn, no hit (as BadAt; perf 8 Nov)
                     if (h.Track != null && h.Shape == HazardShape.Circle && h.Radius <= 0.7f) continue;   // the bullets, above
                     if (h.BurnPerSecond > 0) { if (h.Contains(q) && !h.Contains(pos)) cost += 25; else if (h.Contains(q)) cost += 8; continue; }
                     if (Jet(h)) continue;   // the jets, above
@@ -611,8 +662,14 @@ namespace LastBell.Run
             float turret = BotSight.TurretDist(q); if (turret < TurretKeep) cost += (TurretKeep - turret) * 8f;   // its spiral arms sweep the wall beside it
             // with Furnace Spin up, inside the ring where a jet comes round slower than a walk (out by the rim at 10-12 m they
             // outran the bots dodging bullets there: three went down in the second uprising, 11-04)
-            if (volJets) { float out_ = Sim.Flat(q - volHub).magnitude - VolleyJetRing; if (out_ > 0) cost += out_ * 6f; }
-            if (volReach) cost += Mathf.Max(0, Sim.Flat(tPos - q).magnitude - tRad - (Range(me) + 1.5f)) * 4f;
+            if (volJets)
+            {
+                float out_ = Sim.Flat(q - volHub).magnitude - VolleyJetRing;
+                if (out_ > 0) cost += out_ * VolleyJetOut;
+            }
+            // a casting (the Pour Flood comes at 30 s) weighs more: at 4 the bots that took their brands to the wall stood
+            // there out of reach among the paths and a casting at 123 HP stood 6 s (8 Nov Hard sweep: 3 of 4 fights lost to the flood)
+            if (volReach) cost += Mathf.Max(0, Sim.Flat(tPos - q).magnitude - tRad - (Range(me) + 1.5f)) * (tPart ? VolleyReachPart : 4f);
             return cost;
         }
 
@@ -650,7 +707,8 @@ namespace LastBell.Run
             }
             float rim = Mathf.Min(BrandRing, CombatWorld.PlayerBound - 1.2f), mine = Sim.YawTo(Vector3.zero, pos, 0);   // not the wall: back in to the jet gaps within the 1 s freeze
             Vector3 goal = pos; float bestCost = float.MaxValue;
-            for (int k = 0; k < 24; k++)
+            if (CastingBrandSpot(me, pos, brand, out var cspot)) { goal = cspot; bestCost = Sim.Flat(cspot - pos).magnitude; }
+            for (int k = 0; k < 24 && bestCost == float.MaxValue; k++)
             {
                 float yaw = mine + (k % 2 == 0 ? 1 : -1) * (k + 1) / 2 * 15f;
                 var q = Sim.Dir(yaw) * rim;
@@ -676,28 +734,65 @@ namespace LastBell.Run
 
         // jets turning round one hub (Crucivar's Furnace Spin) reach the wall, where they outrun a sprint: ride the middle of
         // the nearest gap about 6.5 m out, turning with them (shown jets first, the turn read from their yaw)
-        Hazard spokeRef; float spokeYaw, spokeDir;
+        Hazard spokeRef; float spokeYaw, spokeDir, spokeFirst;   // spokeDir: the way they turn now; spokeFirst: the way they set off
         static readonly float[] SpokeRadii = { 6.5f, 6.0f, 7.0f, 5.5f, 7.5f, 5.0f, 8.0f, 4.5f, 8.6f };   // near the hub a jet covers too wide an angle, far out the gap outruns a walk
         static readonly float[] SpokeShifts = { 0f, 4f, -4f, 8f, -8f, 11f, -11f, 14f, -14f, 17f, -17f };   // degrees off the gap's middle
         const float TurretKeep = 5f;   // m kept from a turret firing (Crucivar's rim turrets)
         const float BrandRing = 12.5f;   // where a brand is walked to: its pool (2 m) stays off the jet ring and leaves the inside of the quake's outer band
-        // the turn of a set of jets, read from its first jet's yaw tick to tick (0 until it has turned)
-        void TrackSpin(Hazard j0)
+        // a Foundry Uprising's Ember Brand (4 s in, on every player): still on the brand ring, but at the spot on it nearest the
+        // casting being fought, not straight out from wherever the carrier stood. All four carriers left the castings as the
+        // volleys began and were caught out by the rim with no stamina (8 Nov Hard sweeps and full runs: uprising 3 lost in 3
+        // of 4 fights). Dropping by the casting itself was worse (a pool by a casting that breaks first stays mid-fight). Not
+        // where another player stands, burns or a jet sweeps, nor by a turret; the nearest such spot to the casting
+        bool CastingBrandSpot(PlayerController me, Vector3 pos, Hazard brand, out Vector3 spot)
         {
-            if (spokeRef != j0) { spokeRef = j0; spokeYaw = j0.Yaw; spokeDir = 0; }
-            else { float dy = Mathf.DeltaAngle(spokeYaw, j0.Yaw); if (Mathf.Abs(dy) > 0.01f) spokeDir = Mathf.Sign(dy); spokeYaw = j0.Yaw; }
+            spot = Vector3.zero;
+            if (!tPart || brand == null) return false;
+            var live = me.World.Hazards.Live; var c = Sim.Flat(tPos); float best = float.MaxValue;
+            float rim = Mathf.Min(BrandRing, CombatWorld.PlayerBound - 1.2f), cy = Sim.YawTo(Vector3.zero, c, 0);
+            for (int k = 0; k < 24; k++)
+            {
+                var q = Sim.Dir(cy + (k % 2 == 0 ? 1 : -1) * (k + 1) / 2 * 10f) * rim;
+                if (!CombatWorld.InPlayerBound(q, -0.3f)) continue;
+                bool ok = true;
+                for (int i = 0; i < live.Count && ok; i++) { var h = live[i]; if ((h.BurnPerSecond > 0 || Jet(h)) && h.Contains(q)) ok = false; }
+                if (ok && BotSight.TurretDist(q) < TurretKeep) ok = false;
+                foreach (var p in me.World.Players) if (ok && p && p != me && !p.Down && Sim.Flat(p.transform.position - q).magnitude < brand.Radius + 1f) ok = false;
+                if (!ok) continue;
+                float d = Sim.Flat(q - c).magnitude;
+                if (d < best) { best = d; spot = q; }
+            }
+            return best < float.MaxValue;
+        }
+        // the turn of a set of jets, read from its first jet's yaw tick to tick (0 until it has turned)
+        // (rev: Hard's Spin Reversal, so a turn first seen after the jets came back is the opposite of the way they set off)
+        void TrackSpin(Hazard j0, bool rev)
+        {
+            if (spokeRef != j0) { spokeRef = j0; spokeYaw = j0.Yaw; spokeDir = 0; spokeFirst = 0; }
+            else
+            {
+                float dy = Mathf.DeltaAngle(spokeYaw, j0.Yaw); spokeYaw = j0.Yaw;
+                if (Mathf.Abs(dy) <= 0.01f) return;
+                spokeDir = Mathf.Sign(dy);
+                if (spokeFirst == 0) spokeFirst = rev && j0.Age - j0.ResolveAt > Sim.Ticks(ForgeRite.ReverseAt) ? -spokeDir : spokeDir;
+            }
         }
 
-        // a jet t s from now: live from its landing (less a hand) to the end of its sweep, turned by then at JetTurnDeg/s
-        // (both ways while the turn is still unknown)
-        static bool JetAt(Hazard h, Vector3 q, float t, float dir)
+        // a jet t s from now: live from its landing (less a hand) to the end of its sweep, turned by then as SpinTurned says
+        // (both ways while the turn is still unknown). dir is the way it set off. On Hard the jets stop 2 s in and turn back
+        // (Spin Reversal, 5 Nov): read as one steady turn, the bots riding a gap or dodging bullets stepped into the jet
+        // coming back (four Hard bots wiped to Furnace Spin in Phase 2 in both 8 Nov full runs)
+        static bool JetAt(Hazard h, Vector3 q, float t, float dir, bool rev)
         {
             float on = (h.ResolveAt - h.Age) / (float)Sim.Hz, end = (h.ResolveAt + h.ActiveTicks - h.Age) / (float)Sim.Hz;
             if (t < on - 0.15f || t > end) return false;
-            float turned = Mathf.Max(0, t - Mathf.Max(0, on)) * ForgeRite.JetTurnDeg;
-            if (dir == 0 && turned > 0) return LaneAt(h, q, h.Yaw + turned) || LaneAt(h, q, h.Yaw - turned);
+            float turned = SpinTurned(Mathf.Max(0, t - on), rev) - SpinTurned(Mathf.Max(0, -on), rev);
+            if (dir == 0 && turned != 0) return LaneAt(h, q, h.Yaw + turned) || LaneAt(h, q, h.Yaw - turned);
             return LaneAt(h, q, h.Yaw + dir * turned);
         }
+        // degrees a jet has turned the way it set off, live s into its sweep (Hard: turn, stop, turn back)
+        static float SpinTurned(float live, bool rev) => !rev ? live * ForgeRite.JetTurnDeg
+            : (Mathf.Min(live, ForgeRite.ReverseAt) - Mathf.Max(0, live - ForgeRite.ReverseAt - ForgeRite.ReverseHold)) * ForgeRite.JetTurnDeg;
         static bool LaneAt(Hazard h, Vector3 q, float yaw)
         {
             var l = Quaternion.Euler(0, -yaw, 0) * Sim.Flat(q - h.Origin);
@@ -718,7 +813,9 @@ namespace LastBell.Run
             // left its pool on the 6.5 m ring, where the riders then stood in it: a party ally went down to it, 11-03)
             for (int i = 0; i < live.Count; i++) { var h = live[i]; if (h.Track != null && h.Age < h.LockAt && h.Shape == HazardShape.Circle && Spares(h, me)) return false; }
             var j0 = jets[0];
-            TrackSpin(j0);
+            bool rev = me.World.Difficulty == Difficulty.Hard; TrackSpin(j0, rev);
+            // the way to lean in the gap: ahead of the jet behind; on Hard from just before the stop, ahead of the jet that will come back
+            float lean = rev && spokeFirst != 0 && j0.Age - j0.ResolveAt >= Sim.Ticks(ForgeRite.ReverseAt - 0.4f) ? -spokeFirst : spokeDir;
             var hub = Sim.Flat(j0.Origin);
             var yaws = new List<float>(); foreach (var h in jets) yaws.Add(Mathf.Repeat(h.Yaw, 360f));
             yaws.Sort();
@@ -730,7 +827,7 @@ namespace LastBell.Run
             for (int pass = 0; pass < 2 && bestCost == float.MaxValue; pass++)
                 for (int k = 0; k < yaws.Count; k++)
                 {
-                    float a = yaws[k], b = k + 1 < yaws.Count ? yaws[k + 1] : yaws[0] + 360f, mid = (a + b) / 2f + spokeDir * 6f;
+                    float a = yaws[k], b = k + 1 < yaws.Count ? yaws[k + 1] : yaws[0] + 360f, mid = (a + b) / 2f + lean * 6f;
                     if (turning && Mathf.Repeat(mine - a, 360f) > b - a) continue;
                     foreach (float r in SpokeRadii)
                     foreach (float da in SpokeShifts)
@@ -740,9 +837,12 @@ namespace LastBell.Run
                         var q = hub + Sim.Dir(at) * r;
                         bool ok = CombatWorld.InPlayerBound(q, -0.3f);
                         for (int i = 0; i < jets.Count && ok && da != 0; i++) if (jets[i].Contains(q) || jets[i].Contains(hub + Sim.Dir(at + Mathf.Sign(da) * 5f) * r)) ok = false;
-                        for (int i = 0; i < live.Count && ok && pass == 0; i++) { var h = live[i]; if ((h.BurnPerSecond > 0 || (h.Track != null && h.Includes != null && h.Age >= h.LockAt)) && (h.Contains(q) || h.Contains(hub + Sim.Dir(at + spokeDir * 12f) * r))) ok = false; }
+                        for (int i = 0; i < live.Count && ok && pass == 0; i++) { var h = live[i]; if ((h.BurnPerSecond > 0 || (h.Track != null && h.Includes != null && h.Age >= h.LockAt)) && (h.Contains(q) || h.Contains(hub + Sim.Dir(at + lean * 12f) * r))) ok = false; }
                         if (!ok) continue;
                         float c = Sim.Flat(q - pos).magnitude + Mathf.Abs(r - 6.5f) + Mathf.Abs(da) * 0.05f;
+                        // every spot burns somewhere: the one standing in the fewest pools, not the nearest burning one (a Hard
+                        // bot rode a gap 3 s inside a brand pool to its down, with the downed-ground cooling rejected, 8 Nov)
+                        if (pass == 1) for (int i = 0; i < live.Count; i++) { var h = live[i]; if (h.BurnPerSecond > 0) { if (h.Contains(q)) c += 20f; else if (h.Contains(hub + Sim.Dir(at + lean * 12f) * r)) c += 5f; } }
                         if (c < bestCost) { bestCost = c; goal = q; }
                     }
                 }
@@ -1033,6 +1133,7 @@ namespace LastBell.Run
 
         System.Func<Vector3, bool> Bad(PlayerController me, BossEncounter boss, bool allowBurn = false, int soonest = int.MaxValue, bool jobs = true)
         {
+            badVer++;   // NearestClear's memo: a new Bad() is a new question
             if (badAt == null) badAt = BadAt;
             var live = me.World.Hazards.Live;
             // visible jobs (a tower, a light well, a Severance side) for every bot, the allies included; the memory jobs (the
@@ -1192,7 +1293,7 @@ namespace LastBell.Run
         }
 
         // the spot in attack reach of him (gap Range-1 .. Range+1.6: it stops within 0.15 m, inside the swing gate) nearest this bot that the current constraints allow
-        Vector3 tPos; float tRad;   // this tick's target (the boss or its first live part)
+        Vector3 tPos; float tRad; bool tPart;   // this tick's target (the boss or its first live part)
         bool AttackSpot(PlayerController me, BossEncounter boss, out Vector3 spot)
         {
             var pos = me.transform.position; var bp = tPos;
@@ -1241,13 +1342,27 @@ namespace LastBell.Run
         }
 
         static Vector3[] Dirs48;
-        static Vector3 NearestClear(Vector3 pos, BossEncounter b, System.Func<Vector3, bool> bad, out float need, bool avoidBurn = true)
+        // one search per question a tick: the dodge path asked the same one twice (the escape-time probe, then the move, with the
+        // same Bad() while a threat stands), each a full search when nothing is clear (perf deep profile on 69df1cba, Phase 3:
+        // ~45% + ~45% of a bot's re-plan tick, 8 Nov). Keyed on the bot's Bad() count, so a rebuilt bad() searches again
+        int badVer, ncTick = -1, ncVer; Vector3 ncPos, ncDir; float ncNeed, ncMax; bool ncBurn; BossEncounter ncBoss;
+        static Vector3 NearestClear(Vector3 pos, BossEncounter b, System.Func<Vector3, bool> bad, out float need, bool avoidBurn = true, float maxR = 28f)
+        {
+            var bot = bad.Target as AllyBot;
+            if (bot == null || bad != bot.badAt || bot.bMe == null) return NearestClearSearch(pos, b, bad, out need, avoidBurn, maxR);
+            int tick = bot.bMe.World.Tick;
+            if (bot.ncTick == tick && bot.ncVer == bot.badVer && bot.ncPos == pos && bot.ncBurn == avoidBurn && bot.ncMax == maxR && bot.ncBoss == b) { need = bot.ncNeed; return bot.ncDir; }
+            var dir = NearestClearSearch(pos, b, bad, out need, avoidBurn, maxR);
+            bot.ncTick = tick; bot.ncVer = bot.badVer; bot.ncPos = pos; bot.ncBurn = avoidBurn; bot.ncMax = maxR; bot.ncBoss = b; bot.ncNeed = need; bot.ncDir = dir;
+            return dir;
+        }
+        static Vector3 NearestClearSearch(Vector3 pos, BossEncounter b, System.Func<Vector3, bool> bad, out float need, bool avoidBurn, float maxR)
         {
             var bp = b.transform.position;
             if (Dirs48 == null) { Dirs48 = new Vector3[48]; for (int k = 0; k < 48; k++) Dirs48[k] = Sim.Dir(k * 7.5f); }
             // nearest ring first, stopping at the first clear point (every ring keeps all 48 directions: at 15° beyond 8 m a Hard
             // Ecliptic disc fell between the rays and every solo Hard bot died at 6 s)
-            for (float r = 0.2f; r <= 28f; r += r < 8f ? 0.2f : 0.5f)   // the whole arena: a tower can be 20 m away
+            for (float r = 0.2f; r <= maxR; r += r < 8f ? 0.2f : 0.5f)   // the whole arena (28 m): a tower can be 20 m away
                 for (int k = 0; k < 48; k++)
                 {
                     var dir = Dirs48[k]; var q = pos + dir * r;

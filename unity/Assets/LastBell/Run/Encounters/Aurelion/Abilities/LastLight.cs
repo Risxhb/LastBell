@@ -80,7 +80,7 @@ namespace LastBell.Run
                 if (Sliding(p)) continue;   // already being carried out
                 var from = p.transform.position; var to = Landing(from);
                 int before = p.Hp;
-                p.ReceiveHit(new Hazard { Source = FallSource, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = to, Radius = 0.1f, Damage = FallDamage, Stun = FallStun, Knockback = 0 });
+                p.ReceiveHit(new Hazard { Source = FallSource, AttackId = Id, Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = to, Radius = 0.1f, Damage = FallDamage, Stun = FallStun, Knockback = 0 });
                 p.SlideTo(to, Sim.Ticks(SlideS)); sliding[p] = W.Tick + Sim.Ticks(SlideS);
                 Falls.Add((p, from, to, before - p.Hp));
                 RunHud.Float(to + Vector3.up * 3.0f, "FELL", new Color(0.7f, 0.85f, 1f));
@@ -106,7 +106,7 @@ namespace LastBell.Run
                 Flare(0.8f);
                 RunHud.Banner($"THE LIGHT WANES — HIS ATTACKS +{Mathf.RoundToInt(DamagePerSlice * 100 * Fallen)} %", new Color(1f, 0.6f, 0.5f), 1.5f);
             }
-            Boss.Wipe("Final Noon — the last light went out");
+            Boss.Wipe("Final Noon — the last light went out", Id);
             while (true) yield return 60;
         }
     }

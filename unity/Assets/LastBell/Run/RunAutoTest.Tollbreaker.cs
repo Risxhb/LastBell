@@ -160,18 +160,21 @@ namespace LastBell.Run
             bot.Clear(); d.Boss.BeginCombat();
         }
 
-        // spec rotation (§Rotation), frame-based like the other suites: split, grind, recall, throw; frenzy once
-        int tbFrame;
+        // spec rotation (§Rotation): split, grind, recall, throw; frenzy once after 2 s. One decision per sim tick, not per
+        // frame: a batch-mode player runs uncapped frames, where per-frame presses can pile several abilities into one tick
+        // (nightly 9 Nov, the first batch-mode night, saw no Splitting Throw in the run fight).
+        int tbFrame, tbTick = -1;
         int TollRotation(int f)
         {
-            var k = d.Player ? d.Player.Kit as TollbreakerKit : null; if (k == null) return -1;
-            tbFrame++;
+            var k = d.Player ? d.Player.Kit as TollbreakerKit : null; if (k == null || d.World == null) return -1;
+            if (d.World.Tick == tbTick) return -1;
+            tbTick = d.World.Tick; tbFrame++;
             if (k.Acting) return -1;
             if (k.Cooldown01(4) <= 0 && k.AxesStuck == 0 && tbFrame > 120) return 4;
             if (k.Cooldown01(2) <= 0 && k.AxesInHand > 0 && !k.SplitActive) return 2;
-            if (k.Cooldown01(1) <= 0 && k.AxesInHand > 0 && f % 3 == 0) return 1;
+            if (k.Cooldown01(1) <= 0 && k.AxesInHand > 0 && tbFrame % 3 == 0) return 1;
             if (k.Cooldown01(3) <= 0 && k.AxesStuck > 0 && (k.AxesInHand == 0 || !k.SplitActive)) return 3;
-            return f % 6 == 0 ? 0 : -1;
+            return tbFrame % 6 == 0 ? 0 : -1;
         }
 
         IEnumerator TollbreakerSolo(float seconds)

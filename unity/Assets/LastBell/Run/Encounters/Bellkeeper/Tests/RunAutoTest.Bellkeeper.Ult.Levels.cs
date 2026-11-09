@@ -36,8 +36,12 @@ namespace LastBell.Run
                     table.AppendLine($"   {level,-6} {r.label,-17} {row}");
                     // required: solo for every class and the Perfect party, on every level
                     if (r.mustWin) Check($"Ultimate v2 levels: {label} clears", f != null && f.Killed, f?.ToString());
+                    // a full fight plays every Bellkeeper2 cast clip at its attack (graphics audit, 8 Nov; presentation only)
+                    if (r.n == 4 && f != null && f.Killed)
+                        Check($"Ultimate v2 levels: {label}: the boss plays its six cast clips", BossCastClips.All(c => f.Clips.Contains(c)), string.Join(", ", f.Clips));
                 }
             Note("Ultimate v2 level sweep:\n" + table);
         }
+        static readonly string[] BossCastClips = { "BellSweep", "EchoTell", "HollowToll", "PendulumCharge", "ShatteredChime", "Vulnerable" };
     }
 }

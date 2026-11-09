@@ -2,7 +2,7 @@
 # -lastbellPortrait, which frames the boss when the fight starts, saves a PNG and quits. Rebuild afterwards so the
 # player picks up the new Resources/Menu/BossPortraits images.
 param([Parameter(Mandatory)][string]$Exe,
-      [string]$Out="F:\Last Bell\Collab\builds\rebuild-20261102\src\unity\Assets\LastBell\Menu\Resources\Menu\BossPortraits",
+      [string]$Out="F:\Last Bell\Collab\azure-incoming\unity\Assets\LastBell\Menu\Resources\Menu\BossPortraits",
       [string[]]$Only=@())
 $bosses=[ordered]@{
   'aurelion'='Aurelion'; 'crucivar'='Crucivar'; 'sylvara'='Sylvara'; 'tempo-tyrant'='TempoTyrant'; 'bellkeeper'='Bellkeeper';

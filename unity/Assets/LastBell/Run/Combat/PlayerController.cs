@@ -245,10 +245,10 @@ namespace LastBell.Run
 
         // a party-wide wipe mechanic (Aurelion v4: an empty tower, Final Noon): down now, whatever the HP. Not a hit: no
         // shield or mitigation applies, and it is reported as the defeat cause.
-        public void ForceDown(string cause)
+        public void ForceDown(string cause, string attackId = null)
         {
             if (Down) return;
-            Hp = 0; World.LastDamageSource = cause;
+            Hp = 0; World.LastDamageSource = cause; World.LastDamageAttackId = attackId;
             GoDown();
         }
 
