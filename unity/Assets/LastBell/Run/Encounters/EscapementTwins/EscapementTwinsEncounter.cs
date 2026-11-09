@@ -23,6 +23,8 @@ namespace LastBell.Run
     // 50%: the current ability finishes, then a 2 s harmless shift; 100 -> 120 BPM and a new order. No enrage.
     // Bodies: the rigged towers (Characters/EscapementTick and EscapementTock, split from the 26 Oct model on 9 Nov) and the
     // escape-wheel prop (Characters/EscapementWheel), each with a labelled primitive stand-in when its model is missing.
+    // Props (9 Nov art pass, EscapementTwinsProps): a brass sun / cobalt moon marker over each marked player and a
+    // counterweight with a Roman numeral over each Counterpoise circle, with the old sphere / TextMesh as fallbacks.
     // Each tower turns its clock face to the camera (presentation only; gameplay rotation is unchanged). Strike clips land
     // their strike frame on the gameplay tick (BossClipCues). Every warning uses the raid look (HazardSystem.RaidStyle).
     // No ability text: PhaseName and Lesson stay empty, names live only in the F7 overlay.
@@ -96,7 +98,7 @@ namespace LastBell.Run
         Renderer tickFace, tockFace;
         BossPart tockPart;
         float tickPulse, tockPulse;
-        readonly Dictionary<PlayerController, Transform> markViews = new Dictionary<PlayerController, Transform>();
+        readonly Dictionary<PlayerController, (Transform view, int mark)> markViews = new Dictionary<PlayerController, (Transform, int)>();
         readonly List<BellkeeperFx.Telegraph> rims = new List<BellkeeperFx.Telegraph>();
         readonly List<GameObject> numerals = new List<GameObject>();
 
@@ -277,18 +279,28 @@ namespace LastBell.Run
         void SetMark(PlayerController p, int m)
         {
             marks[p] = m;
-            if (!markViews.TryGetValue(p, out var v) || !v)
+            markViews.TryGetValue(p, out var e);
+            if (!e.view || e.mark != m)
             {
-                v = Prim.Make(PrimitiveKind.Sphere, transform.parent, p.transform.position + Vector3.up * 2.6f, new Vector3(0.5f, 0.5f, 0.5f), Brass, 2f);
-                v.name = "Pallet marker (identity)";
-                markViews[p] = v;
+                if (e.view) Destroy(e.view.gameObject);
+                markViews[p] = (MarkView(m, p.transform.position + Vector3.up * 2.6f, "Pallet marker (identity)"), m);
             }
-            v.GetComponent<Renderer>().material = Prim.Material(m == 0 ? Brass : Cobalt, 2.5f);
             p.Marks.Remove(MechanicIcons.TeamBrass); p.Marks.Remove(MechanicIcons.TeamCobalt); p.Marks.Add(m == 0 ? MechanicIcons.TeamBrass : MechanicIcons.TeamCobalt);
+        }
+        // the marker over a marked player: the brass sun / cobalt moon model (it faces the camera and pops in, so a flip
+        // reads as a new marker), else the labelled glowing sphere
+        public int MarkModelsMade { get; private set; }
+        Transform MarkView(int m, Vector3 at, string label)
+        {
+            var v = EscapementTwinsProps.Mark(m, transform.parent, at);
+            if (v) { MarkModelsMade++; v.name = label + (m == 0 ? " sun" : " moon"); return v; }
+            v = Prim.Make(PrimitiveKind.Sphere, transform.parent, at, new Vector3(0.5f, 0.5f, 0.5f), m == 0 ? Brass : Cobalt, 2.5f);
+            v.name = label + " (stand-in)";
+            return v;
         }
         void ClearMarks()
         {
-            foreach (var kv in markViews) if (kv.Value) Destroy(kv.Value.gameObject);
+            foreach (var kv in markViews) if (kv.Value.view) Destroy(kv.Value.view.gameObject);
             foreach (var p in marks.Keys) if (p) { p.Marks.Remove(MechanicIcons.TeamBrass); p.Marks.Remove(MechanicIcons.TeamCobalt); }
             markViews.Clear(); marks.Clear();
         }
@@ -379,11 +391,18 @@ namespace LastBell.Run
             yield return Beats(1);
         }
         static readonly string[] Roman = { "", "I", "II", "III", "IV" };
+        // the Counterpoise weight with its Roman numeral hung over the circle (bottom edge 1.3 m up, facing the camera), else
+        // the labelled TextMesh numeral (centred 1.6 m up)
+        public int WeightModelsMade { get; private set; }
+        const float WeightLift = 1.3f, TextLift = 1.6f;
+        static float NumeralLift(GameObject g) => g.GetComponent<EscapementPropFacing>() ? WeightLift : TextLift;
         GameObject Numeral(Vector3 at, int n)
         {
-            var go = new GameObject("Counterpoise numeral");
+            var w = EscapementTwinsProps.WeightFor(n, transform.parent, at + Vector3.up * WeightLift);
+            if (w) { WeightModelsMade++; w.name = "Counterpoise weight " + Roman[Mathf.Clamp(n, 0, Roman.Length - 1)]; return w.gameObject; }
+            var go = new GameObject("Counterpoise numeral (stand-in)");
             go.transform.SetParent(transform.parent, false);
-            go.transform.position = at + Vector3.up * 1.6f;
+            go.transform.position = at + Vector3.up * TextLift;
             var text = go.AddComponent<TextMesh>();
             text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             go.GetComponent<MeshRenderer>().sharedMaterial = text.font.material;
@@ -497,7 +516,7 @@ namespace LastBell.Run
             if (tockFace) Prim.SetGlow(tockFace, Silver * (0.6f + 0.5f * glowLevel + 2f * tockPulse));
             if (wheelSpin) wheelSpin.Rotate(0, 90f * Time.deltaTime * (Phase2 ? 1.6f : 1f), 0);
             PresentModels(glowLevel, tickPulse, tockPulse);
-            foreach (var kv in markViews) if (kv.Key && kv.Value) kv.Value.position = kv.Key.transform.position + Vector3.up * 2.6f;
+            foreach (var kv in markViews) if (kv.Key && kv.Value.view) kv.Value.view.position = kv.Key.transform.position + Vector3.up * 2.6f;
         }
 
         // the escape wheel: the rigged prop (it shows WheelLoop by default, so a LAN client's copy turns too), else a gold disc
@@ -583,9 +602,10 @@ namespace LastBell.Run
         // client-side state and counters (two-process smoke tests read these)
         public int NetFrames { get; private set; }          // ReplicaPresent calls
         public int NetTockSynced { get; private set; }      // frames Tock followed the host's spot
-        public int NetMarkViews => replicaMarks.Count;      // Pallet spheres shown now
+        public int NetMarkViews => replicaMarks.Count;      // Pallet markers shown now
         public int NetMarkViewsMade { get; private set; }
-        public int NetNumeralsMade { get; private set; }    // Counterpoise numerals built from stand-ins
+        public int NetMarkModelsMade { get; private set; }  // ...of which sun / moon models (not the sphere stand-in)
+        public int NetNumeralsMade { get; private set; }    // Counterpoise weights (or numeral stand-ins) built from hazard stand-ins
         public int NetWheelsMade { get; private set; }
         public int NetTockClips { get; private set; }       // frames Tock's rigged clip was applied from the host
         Transform tockAnchor, replicaWheel;
@@ -660,12 +680,14 @@ namespace LastBell.Run
                     if (e.view) Destroy(e.view.gameObject);
                     replicaMarks.Remove(p); continue;
                 }
-                if (!e.view)
+                if (!e.view || e.mark != m)
                 {
-                    e.view = Prim.Make(PrimitiveKind.Sphere, transform.parent, Vector3.zero, new Vector3(0.5f, 0.5f, 0.5f), m == 0 ? Brass : Cobalt, 2.5f);
-                    e.view.name = "Pallet marker (identity, LAN)"; e.mark = m; NetMarkViewsMade++;
+                    // the same sun / moon model as on the host (or its sphere stand-in); a flip builds the other one
+                    if (e.view) Destroy(e.view.gameObject);
+                    int before = MarkModelsMade;
+                    e.view = MarkView(m, p.transform.position + Vector3.up * 2.6f, "Pallet marker (identity, LAN)"); e.mark = m; NetMarkViewsMade++;
+                    if (MarkModelsMade > before) NetMarkModelsMade++;
                 }
-                else if (e.mark != m) { e.view.GetComponent<Renderer>().material = Prim.Material(m == 0 ? Brass : Cobalt, 2.5f); e.mark = m; }
                 e.view.position = p.transform.position + Vector3.up * 2.6f;
                 replicaMarks[p] = e;
             }
@@ -691,7 +713,7 @@ namespace LastBell.Run
                 bool on = !kv.Key.Cancelled;
                 if (on) { on = false; for (int i = 0; i < live.Count; i++) if (live[i] == kv.Key) { on = true; break; } }
                 if (!on) scratchHazards.Add(kv.Key);
-                else if (kv.Value) kv.Value.transform.position = kv.Key.Origin + Vector3.up * 1.6f;
+                else if (kv.Value) kv.Value.transform.position = kv.Key.Origin + Vector3.up * NumeralLift(kv.Value);
             }
             foreach (var h in scratchHazards) { if (replicaNumerals[h]) Destroy(replicaNumerals[h]); replicaNumerals.Remove(h); }
         }

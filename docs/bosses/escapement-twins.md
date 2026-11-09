@@ -1,6 +1,6 @@
 # The Escapement Twins
 
-**Status: proposal** (November 3, 2026). Practice-only Brass Foundry miniboss with placeholder bodies. Replaces the October 28 design (still in git history). Sources read: `docs/design/content-rules.md`, the old Escapement Twins design, Chzy18's Aurelion v4 (Meridian Towers, Zenith Marks, Ecliptic Order), Crucivar v4 (Casting Order, punish windows) and Sylvara v3 (Two-Colour Choir), and the Pendulum Sentinel / Chimebound Oracle encounters. Code: `unity/Assets/LastBell/Run/Encounters/EscapementTwins/`.
+**Status: proposal** (November 3, 2026). Practice-only Brass Foundry miniboss (models and props since 9 Nov; see Identity). Replaces the October 28 design (still in git history). Sources read: `docs/design/content-rules.md`, the old Escapement Twins design, Chzy18's Aurelion v4 (Meridian Towers, Zenith Marks, Ecliptic Order), Crucivar v4 (Casting Order, punish windows) and Sylvara v3 (Two-Colour Choir), and the Pendulum Sentinel / Chimebound Oracle encounters. Code: `unity/Assets/LastBell/Run/Encounters/EscapementTwins/`.
 
 ## Identity
 
@@ -9,7 +9,7 @@ An escapement is the part of a clock that locks and releases the gear train in t
 - **Tick** (brass and gold, a sun face) and **Tock** (cobalt and silver, a moon face). Two 3.6 m clock towers that stand about 12 m apart on one axis through the arena centre.
 - **One health bar.** Hitting either twin damages the same bar. Neither can die alone.
 - **The fight is about their link:** the party splits between them, each half answering to its own twin, and whenever the escapement swaps, everyone crosses over. When they lock together in the middle, that's the opening to punish.
-- **Placeholder look for now:** primitive towers (a brass one and a cobalt one, each with a face sphere and a pallet arm), a gold escape wheel between them during the Escape Wheel, and brass or cobalt markers over players' heads. No model, final effects or audio yet.
+- **Look (9 Nov 2026):** rigged Tick and Tock towers and an escape-wheel prop (split from the 26 Oct Meshy model); over each marked player a brass **sun** or cobalt **moon** medallion (different shapes, so colour-blind players can tell them apart); over each Counterpoise circle a clock counterweight showing its Roman numeral. All are models (`Characters/EscapementTick|Tock|Wheel`, `Characters/EscapementTwinsProps`) with the old primitives as fallbacks when a model is missing. Final effects and audio are still to come. Art prompts and critic scores: `build-evidence/miniboss-art-20261109/escapement-twins/`.
 
 Every warning uses the raid indicator look (`HazardSystem.RaidStyle`). No ability text reaches players: names show only in the F7 diagnostics overlay.
 
@@ -104,4 +104,4 @@ The mechanics are built from the shared hazard rules the ally bots already read.
 1. **Shared bar, two bodies:** should damage to the twins need to stay balanced (an "out of step" penalty)? It is not built: the content rules say not to add new mechanics nobody asked for.
 2. **Tock's body:** Tock is a damageable boss part. Players walk through it; only Tick blocks movement. Should Tock block too? That needs a small change to the shared `CombatWorld.Constrain`.
 3. **Run and LAN:** it is practice only (`inRun: false`) and not in the LAN lobby list. Should it join the Brass Foundry run pool once Crucivar's area has its minibosses?
-4. **Model:** the old Meshy model and rig (`prototype/arena-3d/models/rigged/minibosses/EscapementTwins.glb`) is one body. This design needs two separate towers, so the model should be split into two.
+4. **Model:** done on 9 Nov (split into Tick, Tock and the wheel). Both towers still share one brass texture, tinted warm or cool in code; the design calls Tock "cobalt and silver", so a cobalt repaint of Tock's texture is still open.
