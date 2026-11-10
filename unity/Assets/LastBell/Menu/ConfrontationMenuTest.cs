@@ -21,8 +21,6 @@ namespace LastBell.Menu
         // Opt-in: framing captures and checks only, skipping scene transitions.
         static bool CaptureOnly=>Environment.GetCommandLineArgs().Contains("-lastbellConfrontationCaptureOnly");
         static bool launched;
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-        static void Prepare(){if(Requested)MenuAppearance.Selected=MenuStyle.Alternative;}
         readonly List<string> report=new List<string>(),errors=new List<string>();
         int failures;
         string output,originalHero;
@@ -89,7 +87,7 @@ namespace LastBell.Menu
             if(!CaptureOnly){
             // Boss Rush lives on this menu: arena step, boss step, Back returns to the menu with the stage restored.
             menu.SelectClass(2);menu.BossRush();yield return null;
-            Check("Boss Rush opens on the main menu",menu.Rush&&menu.Rush.Hero==RunDirector.Classes[2]&&!menu.Rush.BossStep&&!FindAnyObjectByType<HeroSelection>());
+            Check("Boss Rush opens on the main menu",menu.Rush&&menu.Rush.Hero==RunDirector.Classes[2]&&!menu.Rush.BossStep);
             float liveUntil=Time.realtimeSinceStartup+15;while(menu.Rush&&!menu.Rush.LiveBackdrop&&Time.realtimeSinceStartup<liveUntil)yield return null;
             Check("Boss Rush shows the live arena backdrop",menu.Rush&&menu.Rush.LiveBackdrop&&menu.StageHidden&&!menu.View.enabled);
             yield return new WaitForSecondsRealtime(1);yield return Capture("boss-rush-arena.png");
@@ -106,7 +104,7 @@ namespace LastBell.Menu
             Check("Start Run retains selected class",RunDirector.Instance&&RunDirector.Instance.ClassName==RunDirector.Classes[2]&&!MenuLaunch.Pending);
             Check("preview actors unloaded",!FindAnyObjectByType<ConfrontationMenu>()&&!GameObject.Find("Bellwarden presentation — exact 2x"));
             if(RunDirector.Instance){RunDirector.Instance.SetPaused(true);RunDirector.Instance.ReturnToMenu();}yield return SceneReady(()=>FindAnyObjectByType<ConfrontationMenu>()?.Hero!=null);
-            Check("gameplay returns only to selected alternative",MenuAppearance.Selected==MenuStyle.Alternative&&!FindAnyObjectByType<MainMenu>()&&SceneManager.sceneCount==1);
+            Check("gameplay returns only to the main menu",SceneManager.GetActiveScene().path==ConfrontationMenu.ScenePath&&!FindAnyObjectByType<MainMenu>()&&SceneManager.sceneCount==1);
             for(int i=0;i<2;i++)
             {
                 SceneManager.LoadScene(ConfrontationMenu.ScenePath);yield return SceneReady(()=>FindAnyObjectByType<ConfrontationMenu>()?.Hero!=null);
@@ -138,7 +136,7 @@ namespace LastBell.Menu
             else Check("single menu song loops with no skip button",!menu.MusicNextButton.gameObject.activeSelf&&menu.Music.MenuSource.loop&&menu.Music.MenuSource.clip&&menu.Music.MenuSource.clip.name=="BittersweetDawn");
             // the old Showcase menu is never presented: its startup scene routes here
             SceneManager.LoadScene(MainMenu.ScenePath);yield return SceneReady(()=>FindAnyObjectByType<ConfrontationMenu>()?.Hero!=null);
-            Check("startup routes to the only main menu",!FindAnyObjectByType<MainMenu>()&&SceneManager.sceneCount==1&&MenuAppearance.Selected==MenuStyle.Alternative);
+            Check("startup routes to the only main menu",!FindAnyObjectByType<MainMenu>()&&SceneManager.sceneCount==1&&SceneManager.GetActiveScene().path==ConfrontationMenu.ScenePath);
             Check("one persistent audio owner after navigation",FindObjectsByType<MenuMusic>(FindObjectsSortMode.None).Length==1);
             }
             SavedHeroSelection.Current=originalHero;InputSystem.settings=oldSettings;InputSystem.RemoveDevice(keyboard);InputSystem.RemoveDevice(pad);Destroy(testSettings);

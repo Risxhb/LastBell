@@ -20,8 +20,6 @@ namespace LastBell.Menu
         readonly List<string> errors=new List<string>();
         string output;InputSettings originalInput,testInput;
         HideFlags originalInputFlags;
-        MenuStyle originalMenuStyle;
-        bool menuPreferenceCaptured;
         public static void Install()
         {
             if(installed || !Environment.GetCommandLineArgs().Contains("-lastbellFlowStage")) return;
@@ -32,7 +30,6 @@ namespace LastBell.Menu
         {
             var args=Environment.GetCommandLineArgs();int stage=int.Parse(args[Array.IndexOf(args,"-lastbellFlowStage")+1]);
             int outputAt=Array.IndexOf(args,"-lastbellOut");output=outputAt>=0&&outputAt+1<args.Length?args[outputAt+1]:"E:/Collab/build-evidence/menu-flow-20261022";Directory.CreateDirectory(output);
-            originalMenuStyle=MenuAppearance.Selected;menuPreferenceCaptured=true;
             Application.logMessageReceived+=Log;originalInput=InputSystem.settings;originalInputFlags=originalInput.hideFlags;originalInput.hideFlags=HideFlags.DontUnloadUnusedAsset;
             testInput=Instantiate(originalInput);testInput.hideFlags=HideFlags.DontUnloadUnusedAsset;testInput.backgroundBehavior=InputSettings.BackgroundBehavior.IgnoreFocus;InputSystem.settings=testInput;if(args.Contains("-lastbellFlowUnfocused"))foreach(var dv in MenuSmokeTest.TestDevices)if(dv!=null)InputSystem.DisableDevice(dv);/* -lastbellFlowUnfocused: start with the test devices disabled, as an unfocused window leaves them */MenuSmokeTest.EnableTestDevices();Debug.Log($"[menuflow] window focused={Application.isFocused}, test keyboard enabled={MenuSmokeTest.TestKeyboard?.enabled}");
 #if UNITY_EDITOR
@@ -44,7 +41,7 @@ namespace LastBell.Menu
             yield return SceneReady(()=>{var m=FindAnyObjectByType<ConfrontationMenu>();return m&&m.Canvas;});
             var menu=FindAnyObjectByType<ConfrontationMenu>();
             Check("startup routes to the only main menu",menu&&!FindAnyObjectByType<MainMenu>()&&SceneUtility.GetScenePathByBuildIndex(0)==MainMenu.ScenePath);
-            Check("old hero select is not in the build",!Application.CanStreamedLevelBeLoaded(HeroSelection.ScenePath));
+            Check("old hero select is not in the build",!Application.CanStreamedLevelBeLoaded("Assets/LastBell/Menu/HeroSelection.unity"));
             Check("five primary actions",menu.StartButton && menu.RushButton && menu.MultiplayerButton && menu.SettingsButton && menu.ExitButton);
             // Start Run is greyed out for players (October 27, 2026), so focus starts on Boss Rush.
             Check("Start Run greyed out",menu.StartButton.interactable==ConfrontationMenu.StartRunEnabled);
@@ -65,7 +62,7 @@ namespace LastBell.Menu
             {
                 var menuSource=menu.Music.Source;
                 menu.SelectClass(0);menu.BossRush();yield return null;var setup=menu.Rush;
-                Check("Boss Rush opens on the main menu",setup&&!setup.BossStep&&setup.MapButtons.Length==RunMaps.All.Length&&setup.EncounterButtons.Length==RunDirector.Bosses.Length&&!FindAnyObjectByType<HeroSelection>());
+                Check("Boss Rush opens on the main menu",setup&&!setup.BossStep&&setup.MapButtons.Length==RunMaps.All.Length&&setup.EncounterButtons.Length==RunDirector.Bosses.Length);
                 MusicCheck("test setup","MainMenuMusic");
                 Check("menu music survives into Boss Rush",FindAnyObjectByType<MenuMusic>().Source==menuSource&&menuSource.isPlaying);
                 if(stage>=8)
@@ -172,7 +169,7 @@ namespace LastBell.Menu
                         Check("normal retry preserves randomized order "+hero,d.RequestRetry()&&d.State==RunState.Ready&&d.Encounter==order[0]&&d.EncounterOrder.SequenceEqual(order)&&d.EncountersCleared==0&&d.RunsStarted==2);
                         MusicCheck("normal retry "+hero,ExpectedMusic(lastFought));d.SetPaused(true);d.ReturnToMenu();
                     }
-                    yield return SceneReady(()=>{var m=FindAnyObjectByType<ConfrontationMenu>();return m&&m.Canvas&&!m.Loading;});menu=FindAnyObjectByType<ConfrontationMenu>();Check("normal return cleans selection "+hero,menu&&!FindAnyObjectByType<HeroSelection>()&&!RunDirector.Instance);
+                    yield return SceneReady(()=>{var m=FindAnyObjectByType<ConfrontationMenu>();return m&&m.Canvas&&!m.Loading;});menu=FindAnyObjectByType<ConfrontationMenu>();Check("normal return cleans selection "+hero,menu&&!RunDirector.Instance);
                 }
                 RunDifficulty.Selected=original;
             }
@@ -220,15 +217,12 @@ namespace LastBell.Menu
             report.Add($"RESULT: {report.Count(s=>s.StartsWith("PASS"))} passed, {failed} failed");
             File.WriteAllLines(Path.Combine(output,"stage"+stage+".txt"),report);
             Application.logMessageReceived-=Log;
-            RestoreMenuPreference();
 #if UNITY_EDITOR
             UnityEditor.EditorApplication.Exit(failed==0?0:1);
 #else
             Application.Quit(failed==0?0:1);
 #endif
         }
-        void RestoreMenuPreference(){if(menuPreferenceCaptured){MenuAppearance.Selected=originalMenuStyle;menuPreferenceCaptured=false;}}
-        void OnDestroy(){RestoreMenuPreference();}
         IEnumerator SceneReady(Func<bool> ready)
         {
             float deadline=Time.realtimeSinceStartup+30;

@@ -67,7 +67,6 @@ namespace LastBell.Menu
         Image shade;
         Sprite gradientSprite, stripSprite;
 
-        void Awake(){MenuAppearance.Enter(MenuStyle.Alternative,gameObject);}
         void Start()
         {
             MenuLaunch.Clear(); MenuReturnBridge.TestSession=false;

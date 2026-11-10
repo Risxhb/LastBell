@@ -65,23 +65,6 @@ namespace LastBell.Menu.EditorTools
             File.WriteAllText("E:/Collab/build-evidence/menu-flow-20261022/build-result.txt",result);Debug.Log("Local menu flow build: "+result);
             if(Application.isBatchMode)EditorApplication.Exit(report.summary.result==BuildResult.Succeeded?0:1);
         }
-        public static void PrepareSelection()
-        {
-            // Copy the existing environment, never regenerate the source arena or the existing menu.
-            if (!File.Exists(HeroSelection.ScenePath))
-            {
-                AssetDatabase.CopyAsset(MainMenu.ScenePath, HeroSelection.ScenePath);
-                var scene = EditorSceneManager.OpenScene(HeroSelection.ScenePath);
-                foreach (var root in scene.GetRootGameObjects())
-                    if (root.GetComponent<MainMenu>()) Object.DestroyImmediate(root);
-                new GameObject("Hero selection").AddComponent<HeroSelection>();
-                EditorSceneManager.SaveScene(scene);
-            }
-            var scenes = EditorBuildSettings.scenes.Where(s => s.path != MainMenu.ScenePath && s.path != HeroSelection.ScenePath);
-            EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(MainMenu.ScenePath,true), new EditorBuildSettingsScene(HeroSelection.ScenePath,true) }.Concat(scenes).ToArray();
-            AssetDatabase.SaveAssets();
-            if (Application.isBatchMode) EditorApplication.Exit(0);
-        }
         // Preview scenes need their runtime initialization; batch single-camera rendering cannot initialize every URP volume stack.
         public static void CaptureMapPreviews()
         {

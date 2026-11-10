@@ -291,7 +291,7 @@ namespace LastBell.Menu.EditorTools
             var renderers=root.GetComponentsInChildren<Renderer>(true);var b=new Bounds(root.position,Vector3.zero);foreach(var r in renderers)b.Encapsulate(r.bounds);return b;
         }
         [MenuItem("Last Bell/Alternative Menu/Preview in Play Mode")]
-        public static void Preview(){Open();MenuAppearance.Selected=MenuStyle.Alternative;EditorApplication.isPlaying=true;}
+        public static void Preview(){Open();EditorApplication.isPlaying=true;}
         public static void ValidatePlayMode(){ConfigureLogo();EditorSceneManager.OpenScene(ConfrontationMenu.ScenePath);EditorApplication.playModeStateChanged+=FocusGame;EditorApplication.isPlaying=true;}
         static void ConfigureLogo()
         {

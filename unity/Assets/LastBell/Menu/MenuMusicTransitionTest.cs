@@ -34,7 +34,7 @@ namespace LastBell.Menu
             Directory.CreateDirectory(output); Application.logMessageReceived += Log;
             bool hadVolume = PlayerPrefs.HasKey("LastBell.Menu.MusicVolume");
             float savedVolume = MenuMusic.Ensure().Volume;
-            yield return Until(() => FindAnyObjectByType<ConfrontationMenu>()?.StartButton || FindAnyObjectByType<MainMenu>()?.StartButton, 45, "initial menu");
+            yield return Until(() => FindAnyObjectByType<ConfrontationMenu>()?.StartButton, 45, "initial menu");
             music = MenuMusic.Ensure(); music.SetVolume(.5f); music.ResumeTrack();
             yield return new WaitForSecondsRealtime(1);
             var menu = music.MenuSource;
@@ -105,7 +105,7 @@ namespace LastBell.Menu
             Check("retry crossfades from previous boss", music.Source != last && last.isPlaying && music.Source.isPlaying && music.Source.volume > 0 && last.volume > 0);
             int previousIndex = music.TrackIndex;
             d.SetPaused(true); Check("return during countdown accepted", MenuReturnBridge.Return(false));
-            yield return Until(() => !RunDirector.Instance && (FindAnyObjectByType<ConfrontationMenu>()?.StartButton || FindAnyObjectByType<MainMenu>()?.StartButton), 45, "main menu return");
+            yield return Until(() => !RunDirector.Instance && (FindAnyObjectByType<ConfrontationMenu>()?.StartButton), 45, "main menu return");
             yield return new WaitForSecondsRealtime(.7f);
             Check("main menu starts next playlist track", music.Source == menu && IsMenuTrack(menu) && menu.isPlaying && music.TrackIndex == (previousIndex + 1) % MenuMusic.TrackCount && menu.time < 8 && Close(menu.volume, music.Volume));
             Check("menu return stops both boss sources", music.GetComponents<AudioSource>().Where(s => s != menu).All(s => !s.isPlaying && s.volume == 0));
