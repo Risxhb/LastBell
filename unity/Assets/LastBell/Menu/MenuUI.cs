@@ -7,9 +7,109 @@ using UnityEngine.InputSystem.UI;
 namespace LastBell.Menu
 {
     // Shared code-built uGUI kit. Visual tokens come from LastBell.UiTheme so menus and the combat HUD match.
+    // The main-menu language (Row, Chooser, Header, SideGradient, NavFocus) is described in docs/ui/ui-kit.md.
     internal static class MenuUI
     {
-        public static readonly Color Gold=UiTheme.Gold, Ivory=UiTheme.Ivory, Ink=new Color(.025f,.035f,.065f,.97f);
+        public static readonly Color Gold=UiTheme.Gold, Ivory=UiTheme.Ivory, Ink=UiTheme.Ink;
+
+        // ---------------------------------------------------------------- main-menu language
+        static Sprite stripSprite, sideSprite;
+        public static Sprite StripSprite=>stripSprite?stripSprite:stripSprite=Sprite.Create(UiTheme.StripTexture,new UnityEngine.Rect(0,0,128,1),Vector2.one*.5f);
+        public static Sprite SideGradientSprite=>sideSprite?sideSprite:sideSprite=Sprite.Create(UiTheme.SideGradient,new UnityEngine.Rect(0,0,128,1),Vector2.one*.5f);
+        // Soft dark gradient over the live scene, clear at min.x and near-opaque from ~43 % across (the main menu's right side).
+        public static Image SideGradient(Transform parent,Vector2 min,Vector2 max,string name="Right contrast gradient")
+        {var g=Panel(name,parent,min,max,Color.white);g.sprite=SideGradientSprite;return g;}
+        // Highlight strip behind a control (first child, so the label/glyph draws over it): Gold .26 band fading at both ends,
+        // 1 px Gold .55 edges, 28 px past each side. Hidden until NavFocus shows it.
+        public static Image Strip(Transform parent)
+        {
+            var s=Panel("Highlight strip",parent,Vector2.zero,Vector2.one,UiTheme.StripFill);
+            s.sprite=StripSprite;s.rectTransform.offsetMin=new Vector2(-28,2);s.rectTransform.offsetMax=new Vector2(28,-2);s.transform.SetAsFirstSibling();
+            var top=Panel("Strip edge",s.transform,new Vector2(0,1),new Vector2(1,1),UiTheme.StripEdge);top.sprite=StripSprite;top.rectTransform.pivot=new Vector2(.5f,1);top.rectTransform.sizeDelta=new Vector2(0,1);
+            var bottom=Panel("Strip edge",s.transform,new Vector2(0,0),new Vector2(1,0),UiTheme.StripEdge);bottom.sprite=StripSprite;bottom.rectTransform.pivot=new Vector2(.5f,0);bottom.rectTransform.sizeDelta=new Vector2(0,1);
+            s.enabled=false;top.enabled=bottom.enabled=false;return s;
+        }
+        public static readonly Vector2 RowInset=new Vector2(9,7);
+        // Text row (the main menu's only button language): transparent hit area, SemiBold label in RestLabel (the first Text
+        // child; tests read it) and the highlight strip on focus or hover. The main action on a screen uses 28 px, others 24.
+        // inset: hit-area inset inside min..max (the main menu uses RowInset; Boss Rush's footer uses zero).
+        public static Button Row(string label,Transform parent,Vector2 min,Vector2 max,UnityAction action,int size=24,Vector2? inset=null)
+        {
+            var r=Rect(label,parent,min,max,inset??RowInset);var im=r.gameObject.AddComponent<Image>();im.color=new Color(0,0,0,0);im.raycastTarget=true;
+            var b=r.gameObject.AddComponent<Button>();b.targetGraphic=im;Tint(b);
+            var t=Text(label,r,Vector2.zero,Vector2.one,size);t.font=UiTheme.SemiBold;
+            t.resizeTextForBestFit=true;t.resizeTextMinSize=13;t.resizeTextMaxSize=size;
+            var focus=r.gameObject.AddComponent<NavFocus>();focus.Label=t;focus.Strip=Strip(r);
+            b.onClick.AddListener(action);return b;
+        }
+        // Drawn chevron button (no glyphs, so it shows in WebGL): Ivory at rest, GoldBright on focus, no strip. Callers place it.
+        public static Button ChevronButton(Transform parent,bool next,UnityAction action)
+        {
+            var b=Row(next?"Next class":"Previous class",parent,new Vector2(0,.63f),new Vector2(1,.72f),action);
+            var focus=b.GetComponent<NavFocus>();Object.DestroyImmediate(focus.Strip.gameObject);focus.Strip=null;
+            b.GetComponentInChildren<Text>().text="";focus.Label=null;
+            var icon=Rect("Class arrow",b.transform,Vector2.zero,Vector2.one,new Vector2(8,8)).gameObject.AddComponent<ClassSelectionArrow>();
+            icon.Next=next;icon.color=Ivory;icon.raycastTarget=false;focus.Icon=icon;
+            return b;
+        }
+        // Small non-interactive chevron centred on the parent's middle (a cycling row's cue); callers position it.
+        public static RectTransform Chevron(Transform parent,bool next,float size,Color color)
+        {
+            var a=Rect(next?"Cycle next":"Cycle previous",parent,new Vector2(.5f,.5f),new Vector2(.5f,.5f)).gameObject.AddComponent<ClassSelectionArrow>();
+            a.Next=next;a.color=color;a.raycastTarget=false;a.rectTransform.sizeDelta=new Vector2(size,size);return a.rectTransform;
+        }
+        // Chooser: a value label between two drawn chevron buttons that hug the rendered text (call Place every frame).
+        public static Chooser Chooser(Transform parent,string value,Vector2 min,Vector2 max,int size,UnityAction previous,UnityAction next,float hitSize=44)
+        {
+            var c=new Chooser{Label=Text(value,parent,min,max,size,UiTheme.Ivory),Anchor=new Vector2(.5f,(min.y+max.y)*.5f)};
+            c.Previous=ChevronButton(parent,false,previous);FitBox(c.Previous,new Vector2(min.x+.09f,c.Anchor.y),hitSize);
+            c.Next=ChevronButton(parent,true,next);FitBox(c.Next,new Vector2(max.x-.09f,c.Anchor.y),hitSize);
+            return c;
+        }
+        // Fixed square hit box (canvas units) centred on an anchor point.
+        public static void FitBox(Selectable b,Vector2 at,float size){var r=(RectTransform)b.transform;r.anchorMin=r.anchorMax=at;r.pivot=new Vector2(.5f,.5f);r.sizeDelta=new Vector2(size,size);r.anchoredPosition=Vector2.zero;}
+        // Header: spaced Gold eyebrow, Ivory title, 96x2 Gold rule under the title. Exact rects (the main menu's screens differ);
+        // the box overload lays out in Settings' proportions for new screens.
+        public static Header Header(Transform parent,string eyebrow,string title,Vector2 eyebrowMin,Vector2 eyebrowMax,Vector2 titleMin,Vector2 titleMax,Vector2 ruleAt,int titleSize=52,int titleMinSize=28,int eyebrowSize=14,TextAnchor alignment=TextAnchor.MiddleLeft)
+        {
+            var h=new Header();
+            h.Eyebrow=Text(UiTheme.Spaced(eyebrow),parent,eyebrowMin,eyebrowMax,eyebrowSize,Gold,alignment);
+            h.Title=Text(title,parent,titleMin,titleMax,titleSize,UiTheme.Ivory,alignment);h.Title.resizeTextForBestFit=true;h.Title.resizeTextMinSize=titleMinSize;h.Title.resizeTextMaxSize=titleSize;
+            h.Rule=Panel("Title rule",parent,ruleAt,ruleAt,Gold);
+            float px=alignment==TextAnchor.MiddleCenter||alignment==TextAnchor.UpperCenter||alignment==TextAnchor.LowerCenter?.5f:0;
+            h.Rule.rectTransform.pivot=new Vector2(px,.5f);h.Rule.rectTransform.sizeDelta=new Vector2(UiTheme.RuleWidth,UiTheme.RuleHeight);
+            return h;
+        }
+        public static Header Header(Transform parent,string eyebrow,string title,Vector2 min,Vector2 max,int titleSize=52,TextAnchor alignment=TextAnchor.MiddleLeft)
+        {
+            float H=max.y-min.y;float Y(float f)=>min.y+H*f;bool centre=alignment==TextAnchor.MiddleCenter;
+            return Header(parent,eyebrow,title,new Vector2(min.x,Y(.72f)),new Vector2(max.x,Y(1)),new Vector2(min.x,Y(.07f)),new Vector2(max.x,Y(.72f)),new Vector2(centre?(min.x+max.x)*.5f:min.x,min.y),titleSize,Mathf.Min(28,titleSize),14,alignment);
+        }
+        // Distance from a label's centre to its rendered left edge (canvas units), allowing for best-fit shrink.
+        public static float HalfWidth(Text label)
+        {
+            // fontSizeUsedForBestFit is in screen pixels, so remove the canvas scale before comparing.
+            float scale=label.canvas?label.canvas.scaleFactor:1;
+            float fit=label.resizeTextForBestFit?label.cachedTextGenerator.fontSizeUsedForBestFit/Mathf.Max(1f,label.fontSize*scale):1;
+            return Mathf.Min(label.preferredWidth*Mathf.Clamp01(fit>0?fit:1),label.rectTransform.rect.width)*.5f;
+        }
+        // Wrap-around keyboard/controller navigation down a column (and optional left/right links per item).
+        public static void LinkColumn(Selectable[] items,System.Func<int,Selectable> left=null,System.Func<int,Selectable> right=null)
+        {
+            for(int i=0;i<items.Length;i++)items[i].navigation=new Navigation{mode=Navigation.Mode.Explicit,selectOnDown=items[(i+1)%items.Length],selectOnUp=items[(i+items.Length-1)%items.Length],selectOnLeft=left?.Invoke(i),selectOnRight=right?.Invoke(i)};
+        }
+        // Explicit grid navigation (rows of different lengths): up/down picks the proportionally nearest item. No wrap.
+        public static void LinkGrid(params Selectable[][] rows)
+        {
+            for(int r=0;r<rows.Length;r++)for(int i=0;i<rows[r].Length;i++)
+            {
+                var row=rows[r];float frac=row.Length>1?i/(float)(row.Length-1):.5f;
+                Selectable Near(int k)=>k<0||k>=rows.Length?null:rows[k][Mathf.RoundToInt(frac*(rows[k].Length-1))];
+                row[i].navigation=new Navigation{mode=Navigation.Mode.Explicit,selectOnLeft=i>0?row[i-1]:null,selectOnRight=i<row.Length-1?row[i+1]:null,selectOnUp=Near(r-1),selectOnDown=Near(r+1)};
+            }
+        }
+
+        // ---------------------------------------------------------------- base helpers
         public static RectTransform Rect(string name,Transform parent,Vector2 min,Vector2 max,Vector2 inset=default)
         {
             var r=new GameObject(name,typeof(RectTransform)).GetComponent<RectTransform>(); r.SetParent(parent,false);
@@ -82,7 +182,82 @@ namespace LastBell.Menu
         }
     }
 
-    // Focus cue shared by code-built menus: a drawn diamond and underline plus warm fill / bright edge, so focus never
+    // A chooser's parts (MenuUI.Chooser): the value label and the two chevron buttons that hug it.
+    public sealed class Chooser
+    {
+        public Text Label; public Button Previous, Next; public Vector2 Anchor;
+        // Chevrons sit half the rendered label width + gap from the centre, kept inside the parent column. Call every frame
+        // (the label's text and the canvas size change).
+        public void Place(float gap=32,float margin=22)
+        {
+            var parent=Label?Label.rectTransform.parent as RectTransform:null;if(!parent||!Previous||!Next)return;
+            float limit=Mathf.Max(margin,parent.rect.width*.5f-margin);
+            float x=Mathf.Clamp(Label.preferredWidth*.5f+gap,margin,limit);
+            foreach(var b in new[]{Previous,Next})
+            {
+                var r=(RectTransform)b.transform;r.anchorMin=r.anchorMax=Anchor;
+                r.anchoredPosition=new Vector2(b==Next?x:-x,0);
+            }
+        }
+    }
+    // A header's parts (MenuUI.Header).
+    public sealed class Header
+    {
+        public Text Eyebrow, Title; public Image Rule;
+        public void SetActive(bool on){if(Eyebrow)Eyebrow.gameObject.SetActive(on);if(Title)Title.gameObject.SetActive(on);if(Rule)Rule.gameObject.SetActive(on);}
+    }
+
+    // The one focus cue of the main-menu language (replaces ConfrontationNavFocus and TestRushFocus).
+    //  Row:  text row / icon button. Focus or hover shows the highlight strip and turns the label/icon GoldBright; a
+    //        disabled row's label drops to 35 % alpha.
+    //  Card: picture card. Chosen = GoldBright frame + gold accent + Gold label; focus = GoldDim frame, brighter art,
+    //        Ivory label, a slight grow; rest = faint frame, darkened art, muted label.
+    //  Tab:  text tab. Same states as Card with an underline as the frame and a diamond as the chosen accent.
+    public sealed class NavFocus : MonoBehaviour, ISelectHandler, IDeselectHandler, IPointerEnterHandler, IPointerExitHandler
+    {
+        public enum Kind { Row, Card, Tab }
+        public Kind Mode = Kind.Row;
+        // Row
+        public Text Label; public Graphic Icon; public Image Strip;
+        public Color Rest = UiTheme.RestLabel;
+        public Color IconRest = UiTheme.Ivory;
+        // Card / Tab
+        public Graphic Frame, Art, Accent, CardLabel;
+        public bool Chosen; public float Grow = 1;
+        public Color ChosenEdge = UiTheme.Gold, FocusEdge = new Color(UiTheme.GoldDim.r, UiTheme.GoldDim.g, UiTheme.GoldDim.b, .6f);
+        Selectable owner;
+        bool selected, hovered, live;
+        public bool Focused => hovered || selected || EventSystem.current && EventSystem.current.currentSelectedGameObject == gameObject;
+        void Awake() { owner = GetComponent<Selectable>(); }
+        void OnEnable() { if (Mode == Kind.Row) Refresh(); }
+        void Start() { if (Mode == Kind.Row) Refresh(); }
+        void OnDisable() { hovered = false; }
+        public void OnSelect(BaseEventData data) { selected = true; if (Mode == Kind.Row) Refresh(); }
+        public void OnDeselect(BaseEventData data) { selected = false; if (Mode == Kind.Row) Refresh(); }
+        public void OnPointerEnter(PointerEventData data) { hovered = true; if (Mode == Kind.Row) Refresh(); }
+        public void OnPointerExit(PointerEventData data) { hovered = false; if (Mode == Kind.Row) Refresh(); }
+        void LateUpdate()
+        {
+            if (Mode == Kind.Row) { bool l = !owner || owner.IsInteractable(); if (l != live) Refresh(); return; }
+            bool interactable = !owner || owner.interactable; bool on = Focused && interactable;
+            if (Frame) Frame.color = Chosen ? ChosenEdge : on ? FocusEdge : UiTheme.RuleFaint;
+            if (Art) Art.color = Chosen ? Color.white : on ? new Color(.85f, .85f, .88f) : new Color(.42f, .42f, .48f);
+            if (CardLabel) CardLabel.color = Chosen ? UiTheme.Gold : on ? UiTheme.Ivory : UiTheme.RestLabelMuted;
+            if (Accent) Accent.enabled = Chosen;
+            float target = on ? Grow : 1; var s = transform.localScale.x; s = Mathf.MoveTowards(s, target, Time.unscaledDeltaTime * .6f); transform.localScale = new Vector3(s, s, 1);
+        }
+        void Refresh()
+        {
+            live = !owner || owner.IsInteractable(); bool on = (selected || hovered) && live;
+            if (Label) Label.color = !live ? new Color(Rest.r, Rest.g, Rest.b, .35f) : on ? UiTheme.GoldBright : Rest;
+            if (Strip) { Strip.enabled = on; foreach (var e in Strip.GetComponentsInChildren<Image>(true)) if (e != Strip) e.enabled = on; }
+            if (Icon) Icon.color = on ? UiTheme.GoldBright : IconRest;
+        }
+    }
+
+    // Focus cue for the older boxed house button (MenuUI.Button: LAN lobby, Showcase menu, Hero Selection). The main-menu
+    // language uses NavFocus; this goes when those screens move to text rows.
+    // A drawn diamond and underline plus warm fill / bright edge, so focus never
     // relies on colour alone. Optional parts may be null (older callers only set Marker).
     public sealed class MenuFocus : MonoBehaviour, ISelectHandler, IDeselectHandler, IPointerEnterHandler, IPointerExitHandler
     {
@@ -108,10 +283,10 @@ namespace LastBell.Menu
             if (Underline) Underline.SetActive(on);
             if (Primary)
             {
-                if (Fill) Fill.color = !live ? new Color(.22f, .2f, .17f, .9f) : on ? UiTheme.GoldBright : UiTheme.Gold;
+                if (Fill) Fill.color = !live ? UiTheme.DisabledFill : on ? UiTheme.GoldBright : UiTheme.Gold;
                 if (Edge) Edge.effectColor = on ? UiTheme.Ivory : UiTheme.GoldBright;
                 if (Stroke) Stroke.color = on ? UiTheme.Ivory : UiTheme.GoldBright;
-                if (Label) Label.color = live ? new Color(.07f, .05f, .02f) : new Color(.6f, .57f, .5f);
+                if (Label) Label.color = live ? UiTheme.PrimaryInk : UiTheme.DisabledLabel;
                 return;
             }
             if (Fill) Fill.color = on ? UiTheme.FocusFill : new Color(UiTheme.Ink.r, UiTheme.Ink.g, UiTheme.Ink.b, .85f);

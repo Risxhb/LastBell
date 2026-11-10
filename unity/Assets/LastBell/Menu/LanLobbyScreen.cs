@@ -92,11 +92,11 @@ namespace LastBell.Menu
             if (!LanLobby.ValidClass(hero)) hero = LanLobby.DefaultClass;   // first-ever default: Tollbreaker
             try { MenuMusic.Ensure().PlayMenu(); } catch (Exception ex) { Debug.LogWarning("[LAN] lobby music: " + ex.Message); }
             var view = Camera.main;
-            if (view) { view.clearFlags = CameraClearFlags.SolidColor; view.backgroundColor = new Color(.012f, .014f, .026f, 1); view.cullingMask = 0; }
+            if (view) { view.clearFlags = CameraClearFlags.SolidColor; view.backgroundColor = UiTheme.Backdrop; view.cullingMask = 0; }
             key = new GameObject("Lobby key light").AddComponent<Light>(); key.type = LightType.Directional; key.intensity = 1.3f;
             key.color = new Color(1f, .95f, .88f); key.transform.rotation = Quaternion.Euler(28, 160, 0);
             canvas = MenuUI.Canvas(transform); root = (RectTransform)canvas.transform;
-            MenuUI.Panel("Backdrop", root, Vector2.zero, Vector2.one, new Color(.012f, .014f, .026f, 1));
+            MenuUI.Panel("Backdrop", root, Vector2.zero, Vector2.one, UiTheme.Backdrop);
             title = MenuUI.Text("LAN MULTIPLAYER", root, new Vector2(.04f, .90f), new Vector2(.5f, .98f), 42, MenuUI.Ivory, TextAnchor.MiddleLeft);
             playingAs = MenuUI.Text("", root, new Vector2(.48f, .91f), new Vector2(.78f, .97f), 20, MenuUI.Gold, TextAnchor.MiddleRight);
             EditNameButton = MenuUI.Button("Edit name", root, new Vector2(.79f, .91f), new Vector2(.96f, .97f), () => OpenNameCard());

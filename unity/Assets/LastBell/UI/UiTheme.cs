@@ -33,6 +33,19 @@ namespace LastBell
         public static readonly Color FocusFill = new Color(0.10f, 0.08f, 0.05f, 0.95f);
         public static readonly Color PressedFill = new Color(0.05f, 0.04f, 0.02f, 0.95f);
         public static readonly Color ModalDim = new Color(0, 0, 0, 0.55f);
+        // ---- main-menu language (ConfrontationMenu; docs/ui/ui-kit.md) ----
+        public static readonly Color RestLabel = new Color(0.93f, 0.88f, 0.76f, 0.74f);      // text row at rest
+        public static readonly Color RestLabelMuted = new Color(0.93f, 0.88f, 0.76f, 0.62f); // card / tab label at rest
+        public static readonly Color RuleFaint = new Color(0.93f, 0.88f, 0.76f, 0.16f);      // footer rules, card and tab edges
+        public static readonly Color PrimaryInk = new Color(0.07f, 0.05f, 0.02f, 1f);        // dark text on a gold fill
+        public static readonly Color DisabledFill = new Color(0.22f, 0.20f, 0.17f, 0.90f);   // a gold fill when disabled
+        public static readonly Color DisabledLabel = new Color(0.60f, 0.57f, 0.50f, 1f);     // its label
+        public static readonly Color Backdrop = new Color(0.012f, 0.014f, 0.026f, 1f);       // opaque navy behind full-screen menus
+        public static readonly Color GradientInk = new Color(0.008f, 0.008f, 0.022f, 1f);    // the side contrast gradient's ink
+        public static readonly Color BandInk = new Color(0.01f, 0.012f, 0.025f, 1f);         // the centre band's ink
+        public static readonly Color StripFill = new Color(0.88f, 0.72f, 0.43f, 0.26f);      // focus highlight strip (Gold .26)
+        public static readonly Color StripEdge = new Color(0.88f, 0.72f, 0.43f, 0.55f);      // its 1 px top/bottom edges (Gold .55)
+        public const float RuleWidth = 96, RuleHeight = 2;                                      // the gold rule under a title
 
         // ---- type ramp at 1080p (Inter; SemiBold replaces fake bold) ----
         public const int SizeDisplay = 36, SizeHeading = 22, SizeLabel = 13, SizeBody = 17, SizeNumeric = 15, SizeMicro = 12;
@@ -51,6 +64,33 @@ namespace LastBell
 
         // Spaced capitals for eyebrows and display titles ("B O S S   R U S H"); the legacy Text/IMGUI have no tracking.
         public static string Spaced(string s) => string.Join("   ", System.Array.ConvertAll(s.ToUpperInvariant().Split(' '), w => string.Join(" ", w.ToCharArray())));
+
+        // ---- shared gradient textures (built once, never destroyed; tint with GUI.color / Graphic.color) ----
+        static Texture2D strip, side, centre;
+        // Highlight strip, 128x1 white: alpha rises over the first 22 % and falls over the last 32 % (main menu rows).
+        public static Texture2D StripTexture => strip ? strip : strip = Horizontal(u => new Color(1, 1, 1,
+            Mathf.SmoothStep(0, 1, Mathf.Clamp01(u / .22f)) * Mathf.SmoothStep(0, 1, Mathf.Clamp01((1 - u) / .32f))));
+        // Side contrast gradient, 128x1 GradientInk: clear at the left edge, ~0.985 from 43 % across (main menu right side).
+        // Draw it mirrored (uv x 1..0) for a left-hand column.
+        public static Texture2D SideGradient => side ? side : side = Horizontal(u => new Color(GradientInk.r, GradientInk.g, GradientInk.b,
+            Mathf.SmoothStep(0, .985f, Mathf.Clamp01(u * 2.3f))));
+        // Centre band, 1x64 BandInk: 0.78 * sin^2 from top to bottom (Results, boss reveals); dark in the middle, clear at both edges.
+        public static Texture2D CentreBand
+        {
+            get
+            {
+                if (centre) return centre;
+                centre = new Texture2D(1, 64, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave, wrapMode = TextureWrapMode.Clamp };
+                for (int y = 0; y < 64; y++) { float a = Mathf.Sin(y / 63f * Mathf.PI); centre.SetPixel(0, y, new Color(BandInk.r, BandInk.g, BandInk.b, 0.78f * a * a)); }
+                centre.Apply(); return centre;
+            }
+        }
+        static Texture2D Horizontal(System.Func<float, Color> at)
+        {
+            var t = new Texture2D(128, 1, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave, wrapMode = TextureWrapMode.Clamp };
+            for (int i = 0; i < 128; i++) t.SetPixel(i, 0, at(i / 127f));
+            t.Apply(); return t;
+        }
 
         // =====================================================================================================
         // IMGUI (combat HUD). Lay out in virtual 1080p units and convert with V()/R(); styles from Style() are
@@ -171,7 +211,7 @@ namespace LastBell
             st.border = new RectOffset(2, 2, 2, 2); st.padding = new RectOffset(8, 8, 2, 2); st.margin = new RectOffset(0, 0, 0, 0);
             Color restFill = primary ? Gold : new Color(Ink.r, Ink.g, Ink.b, 0.85f), restEdge = primary ? GoldBright : GoldDim;
             Color hoverFill = primary ? GoldBright : FocusFill, hoverEdge = GoldBright;
-            Color text = primary ? new Color(0.07f, 0.05f, 0.02f) : new Color(Ivory.r, Ivory.g, Ivory.b, 0.85f), textHot = primary ? text : Ivory;
+            Color text = primary ? PrimaryInk : new Color(Ivory.r, Ivory.g, Ivory.b, 0.85f), textHot = primary ? text : Ivory;
             st.normal.background = Tile(restFill, restEdge); st.normal.textColor = text;
             st.hover.background = Tile(hoverFill, hoverEdge); st.hover.textColor = textHot;
             st.focused.background = st.hover.background; st.focused.textColor = textHot;
