@@ -40,6 +40,9 @@ namespace LastBell.Run
             BellkeeperEncounter.PushTimersOn = pushOn;
             var classes = PartyClasses.Skip(1).ToArray();
             var bots = UltimateParty.Fill(d.World, n, skill, n > 1 ? new[] { cls0 }.Concat(classes).ToArray() : new[] { cls0 });
+            // -lastbellUltViaAllyBot: the same party through the shared AllyBot (what other suites and tests drive players with)
+            if (AurelionArgs.Arg("-lastbellUltViaAllyBot") != null && skill == UltimateBot.Skill.Perfect)
+                for (int i = 0; i < d.World.Players.Count; i++) { var ab = new AllyBot(i, d.World.Players.Count, BotMode.Perfect); d.World.Players[i].Input = ab; bots[i] = ab.Ultimate; }
             // the seed also turns the party's starting spots round the boss
             var turn = Quaternion.Euler(0, (BellkeeperEncounter.SeedOffset * 47) % 360, 0);
             foreach (var p in d.World.Players) BkPlace(p, turn * p.transform.position);

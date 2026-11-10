@@ -49,6 +49,13 @@ namespace LastBell.Run
         int pendingSlot = -1, pendingUntil;
         readonly int[] skipUntil = new int[6];
 
+        // On the Bellkeeper Ultimate this bot plays as his strat bot (built on first use; this bot's angle slot and party size;
+        // a Passive bot is Late by 0.25 s). It attacks, as the director's Ultimate allies do: his push timer needs the damage.
+        // -lastbellNoUltHandoff (tests: the before run) keeps the old behaviour: the general steering, no Ultimate duties
+        public static bool UltimateHandoff = !System.Array.Exists(System.Environment.GetCommandLineArgs(), a => a.Equals("-lastbellNoUltHandoff", System.StringComparison.OrdinalIgnoreCase));
+        UltimateBot ult;
+        public UltimateBot Ultimate => ult ??= new UltimateBot { Mode = Mode == BotMode.Passive ? UltimateBot.Skill.Late : UltimateBot.Skill.Perfect, Slot = slot, Of = of };
+
         public AllyBot(int index, int count, BotMode mode = BotMode.Passive)
         {
             slot = index; of = Mathf.Max(1, count); Mode = mode;
@@ -259,6 +266,9 @@ namespace LastBell.Run
             var bpos = Sim.Flat(boss.transform.position); float brad = boss.BodyRadius;
             tPos = bpos; tRad = brad;
             if (boss is SylvaraEncounter sy) return ReadSylvara(me, sy);   // her own path picks her or a Choir Bud itself
+            // the Bellkeeper Ultimate: its strat bot plays every duty (plates, spots, debts, INVERTED, the floor, the tolls), as
+            // for the menu allies the director hands it (bots learn the Ultimate, 10 Nov); the idle sparring target is not him
+            if (UltimateHandoff && boss is BellkeeperEncounter && !BellkeeperEncounter.TestIdle) return Ultimate.Read(me);
             // the target: the boss, or while boss parts stand (Crucivar's castings, which must die before the Pour Flood) the
             // first of them by name: the castings carry their numerals, and on Hard one sunk out of order sets every turret
             // firing (a party went down to it, 11-03); hits land on whichever of them is nearest, so aim and reach follow it
