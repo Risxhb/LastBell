@@ -28,6 +28,17 @@ carry), `RunDirector.cs` (flow), `TempoTyrantEncounter.cs` (Overclocked). Branch
 - HUD: the track shows one arena's stretch at a time; intro/cleared/preparation cards name the arena and stage
   ("Brass Foundry · Miniboss 2 of 3", "Area boss", "Final boss", "Bonus fight").
 
+## Music
+
+- **Wing music** (`MenuMusic.WingFor` / `WingTracks`): each area's three minibosses share 1–2 songs from
+  `Resources/Menu/WingMusic/<area>/` (played in file-name order, A → B → A with a 2 s crossfade; one song loops).
+  The song starts at the area's first miniboss intro and keeps playing, never restarting, through fights, rewards and the
+  shop; outside combat it ducks to 60% and comes back up at the next intro. A practice of one miniboss plays its wing.
+- **Area, final and bonus bosses** keep their own track (`MenuMusic.TrackFor`); the boss intro crossfades from the wing song.
+- LAN clients take the same path (`RunDirector.ApplyLanState`); the wing is matched by the boss's name.
+- An empty wing folder means no music for those fights (one warning per area). New songs in those folders import as
+  Streaming / Vorbis (`Menu/Editor/WingMusicImport.cs`). Suno prompts: `audio/wing-music-prompts.md` in the workspace.
+
 ## Overclocked Tempo Tyrant (provisional numbers)
 
 Same kit, pushed: 3600 HP (from 2600), Broken Cadence from 50% (from 20%), Falling Hours from 20% (from 10%), and the
