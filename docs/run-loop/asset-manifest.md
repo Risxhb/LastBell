@@ -24,12 +24,14 @@ Vanguard removed from the game (Chzy18, 2 Nov); its model and browser asset were
 
 ## Chimesinger — model: Rough production · animation: Rough production / Placeholder · VFX: Rough production
 
-- **Unity asset:** `unity/Assets/LastBell/Characters/Chimesinger/Resources/Characters/Chimesinger.glb`, the JPEG export of `chimesinger_rig.py` at unity-session 6c42645 (Oct 21). It includes:
+- **Unity asset:** `unity/Assets/LastBell/Characters/Chimesinger/Resources/Characters/Chimesinger.glb`, the JPEG export of `chimesinger_rig.py` at unity-session 9b9c32c (Oct 23). It includes:
   - a per-finger grip solved against the shaft, with the staff rigid in the fist;
   - bell strands joined to the sleeves;
   - seam and weight fixes, so the coat no longer tears;
-  - follow-through: the coat panels, sleeves, bell strands and both staff banners are baked damped springs.
-- **Mesh QA:** `chimesinger_qa.py` finds 0 staff/body overlap in every clip, with at least 13 mm clearance.
+  - follow-through: the coat panels, sleeves, bell strands and both staff banners are baked damped springs;
+  - heavy, well-damped bells that collide with the robe and body (the coat gives way under a strand's top), and the free arm held clear of the robe in Run / Sprint;
+  - sleeves and bells hanging still in Idle.
+- **Mesh QA:** `chimesinger_qa.py` finds 0 staff/body overlap in every clip, with at least 8 mm clearance.
 - **Owner:** the "Chimesinger animation fixes" session. By agreement it also owns Hit / Down / GetUp, which are not made yet.
 - **Editable source:** `prototype/arena-3d/models/blender/chimesinger_prep.py`, `chimesinger_rig.py`, `chimesinger_hands.py` and `chimesinger_qa.py`, plus the Meshy body and staff uploads in `unity-session/prototype/arena-3d/models/upload/Meshy/`. To rebuild, run `models/build-chimesinger.ps1`.
 - **Attachment points:**

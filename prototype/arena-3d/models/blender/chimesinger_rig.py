@@ -6,6 +6,7 @@
 # needs exact aiming, so 'staff points here, forearm points there' is easier to author and to read back.
 import bpy, sys, os, math, collections, numpy as np
 from mathutils import Vector, Matrix, Euler, Quaternion
+from mathutils.bvhtree import BVHTree
 args = sys.argv[sys.argv.index('--') + 1:]
 work, out_glb = args[0], args[1]
 sc = bpy.context.scene; sc.render.fps = 30
@@ -476,7 +477,8 @@ def secondary(pose):
             pose[f'sleeve.{n}'] = {'rot': delta(f'forearm.{n}').inverted() @ R(x=swing * 0.4)}
         if f'tassel.{n}' in pose: continue
         D = delta(f'forearm.{n}') @ pose[f'sleeve.{n}']['rot']        # the sleeve drape's world rotation (its parent)
-        pose[f'tassel.{n}'] = {'rot': D.inverted() @ R(x=swing)}; pose[f'tassel2.{n}'] = {'rot': R(x=swing * 0.5)}
+        out_ = -(1 if n == 'L' else -1) * pose.get('_bell_out', 8.0)       # hung a little outward, clear of the coat
+        pose[f'tassel.{n}'] = {'rot': D.inverted() @ R(y=out_) @ R(x=swing)}; pose[f'tassel2.{n}'] = {'rot': R(x=swing * 0.5)}
     for n in CLOTH:
         v = pose[n]; pb = pbs[n]; M = pb.bone.matrix_local.to_3x3()
         pb.rotation_quaternion = (M.inverted() @ v['rot'] @ M).to_quaternion()
@@ -504,7 +506,7 @@ DYN = {}
 for n in 'LR':
     DYN.update({f'skirtF.{n}': (2.2, 0.35, 15, 0), f'skirtF2.{n}': (1.7, 0.25, 22, 0),
                 f'skirtB.{n}': (2.2, 0.35, 15, 0), f'skirtB2.{n}': (1.7, 0.25, 22, 0),
-                f'sleeve.{n}': (1.6, 0.25, 15, 0), f'tassel.{n}': (1.2, 0.2, 30, 0), f'tassel2.{n}': (1.1, 0.18, 40, 0)})
+                f'sleeve.{n}': (1.6, 0.25, 15, 0), f'tassel.{n}': (1.8, 0.6, 12, 0), f'tassel2.{n}': (3.0, 0.8, 8, 0)})     # (heavy metal bells: well damped; the lower run follows the upper, no whip)
 for nm, _ in BANNERS: DYN[nm] = (2.0, 0.3, 20, 0)
 # a banner swings out, away from the shaft, freely; toward the shaft (the fist and forearm) and across the ring plane
 # (her head and arm in the two-handed swings) only a few degrees: (outward unit in the bone's rest frame, deg in, deg across)
@@ -522,7 +524,118 @@ BREEZE = {'skirt': 0.035, 'sleeve': 0.03, 'tassel': 0.045, 'banner': 0.07}
 def _breeze(n, ph):
     k = BREEZE[next(b for b in BREEZE if n.startswith(b))]; s = sum(map(ord, n)) * 0.37     # each part its own phase
     return Vector((math.sin(ph + s) + 0.4 * math.sin(2 * ph + 1.3 * s), 0.6 * math.sin(ph + 2.1 + s) + 0.3 * math.sin(3 * ph + s), 0)) * k
-def _follow(frames, loop, rec, base):
+# The bell strands also collide with her body (not the arms they hang from). Two colliders, rebuilt from the posed
+# mesh every frame:
+#  - legs, hips and torso: a radial profile around the hips' upright axis (farthest reach per 3 cm x 5 deg cell);
+#  - each coat panel segment: a heightfield in that bone's own frame (the panel's outward reach per 3 x 3 cm cell), so a
+#    strand stays on the panel's outer side even when the panel swings up. (A profile around the hips would call the
+#    space under a lifted panel solid.)
+# Every substep each strand is pushed clear of both. The test points are real strand vertices (the bells sit up to
+# 5 cm off the bone line), skinned as blended between the strand's two bones.
+STRAND_GAP = 0.012
+COLL_STEP, COLL_SUB = math.radians(1.0), math.radians(2.5)
+PROF_H0, PROF_DH, PROF_NH, PROF_NT = -0.95, 0.03, 56, 72
+PANELS_C = [b for b in B if b.startswith('skirt')]
+PAN_C, PAN_Y0, PAN_L0, PAN_NL, PAN_DEPTH = 0.03, -0.06, -0.3, 20, 0.1
+PAN_NY = int((max(ad.bones[b].length for b in PANELS_C) + 0.12) / PAN_C) + 1
+STRAND_PTS = {}
+_gname0 = {g.index: g.name for g in body.vertex_groups}
+_dom0 = np.array([_gname0[max(v.groups, key=lambda g: g.weight).group] if v.groups else '' for v in body.data.vertices])
+# per strand bone: (points in the upper bone's frame, points in the lower bone's frame or None, their weights). The upper
+# bone tests every strand point, carrying the lower part rigidly (points near the joint move only with it); the lower
+# bone tests the points it moves, skinned as blended between the two.
+for _s in 'LR':
+    _t1, _t2 = f'tassel.{_s}', f'tassel2.{_s}'; _g1, _g2 = body.vertex_groups[_t1].index, body.vertex_groups[_t2].index
+    _w = np.zeros((len(body.data.vertices), 2))
+    for _v in body.data.vertices:
+        for _g in _v.groups:
+            if _g.group == _g1: _w[_v.index, 0] = _g.weight
+            elif _g.group == _g2: _w[_v.index, 1] = _g.weight
+    _A1, _A2 = np.array(ad.bones[_t1].matrix_local.inverted()), np.array(ad.bones[_t2].matrix_local.inverted())
+    for _bn, _sel in ((_t1, _w.sum(1) > 0.5), (_t2, (_w.sum(1) > 0.5) & (_w[:, 1] >= 0.001))):
+        _idx = np.nonzero(_sel)[0]; _idx = _idx[np.argsort(-np.array([body.data.vertices[int(i)].co.z for i in _idx]))]
+        _idx = _idx[np.linspace(0, len(_idx) - 1, 96).astype(int)]
+        _co = np.array([body.data.vertices[int(i)].co[:] for i in _idx]); _ww = _w[_idx] / _w[_idx].sum(1, keepdims=True)
+        STRAND_PTS[_bn] = (_co @ _A1[:3, :3].T + _A1[:3, 3], (_co @ _A2[:3, :3].T + _A2[:3, 3]) if _bn == _t2 else None,
+                           _ww[:, 0], _ww[:, 1])
+# the sleeve drapes collide too (points in the sleeve bone's frame). A sleeve already rests against her hip and belt
+# pouch when she stands, so a sleeve point may sit no deeper than it does in the standing pose (SLEEVE_BASE, filled in
+# before the clips are baked).
+SLEEVE_BASE = {}
+for _s in 'LR':
+    _sn = f'sleeve.{_s}'; _idx = np.nonzero(_dom0 == _sn)[0]
+    _idx = _idx[np.argsort(-np.array([body.data.vertices[int(i)].co.z for i in _idx]))]; _idx = _idx[np.linspace(0, len(_idx) - 1, 96).astype(int)]
+    _A = np.array(ad.bones[_sn].matrix_local.inverted()); _co = np.array([body.data.vertices[int(i)].co[:] for i in _idx])
+    STRAND_PTS[_sn] = (_co @ _A[:3, :3].T + _A[:3, 3], None, np.ones(len(_idx)), np.zeros(len(_idx)))
+# each coat panel segment's outward and lateral axes in its bone frame (rest): away from the hips' axis
+PAN_AX = {}
+for _b in PANELS_C:
+    _ix = np.nonzero(_dom0 == _b)[0]       # (a segment that owns no vertex outright: its bone's middle)
+    _c = np.array([body.data.vertices[int(i)].co[:] for i in _ix]).mean(0) if len(_ix) else np.array((ad.bones[_b].head_local + ad.bones[_b].tail_local) / 2)
+    _ol = ad.bones[_b].matrix_local.to_3x3().inverted() @ Vector((_c[0], _c[1] + 0.04, 0)).normalized()
+    _ol = (_ol - Vector((0, 1, 0)) * _ol.y).normalized(); PAN_AX[_b] = (np.array(_ol), np.array(Vector((0, 1, 0)).cross(_ol)))
+# the coat yields to the strands' tops: a panel segment may not swing out past the top of a strand (where it hangs from
+# the sleeve hem and cannot move out of the way itself). Each panel segment's rest heightfield in its own frame, and the
+# strand points within STRAND_TOP of each strand's head (upper bone frame).
+STRAND_TOP = 0.12
+TOP_PTS = {}
+for _s in 'LR':
+    _l1 = STRAND_PTS[f'tassel.{_s}'][0]; TOP_PTS[f'tassel.{_s}'] = _l1[_l1[:, 1] < STRAND_TOP]
+def _dilate(H, fill):
+    Hp = np.pad(H, 1, constant_values=fill); Hd = H.copy()
+    for di in (-1, 0, 1):
+        for dj in (-1, 0, 1): Hd = np.maximum(Hd, Hp[1 + di:1 + di + H.shape[0], 1 + dj:1 + dj + H.shape[1]])
+    return Hd
+PAN_REST = {}
+for _b in PANELS_C:
+    _ix = np.nonzero(_dom0 == _b)[0]; o_, lat_ = PAN_AX[_b]
+    if not len(_ix): continue
+    _A = np.array(ad.bones[_b].matrix_local.inverted()); _l = np.array([body.data.vertices[int(i)].co[:] for i in _ix]) @ _A[:3, :3].T + _A[:3, 3]
+    _yi = np.clip(((_l[:, 1] - PAN_Y0) / PAN_C).astype(int), 0, PAN_NY - 1); _li = np.clip(((_l @ lat_ - PAN_L0) / PAN_C).astype(int), 0, PAN_NL - 1)
+    _H = np.full((PAN_NY, PAN_NL), -np.inf); np.maximum.at(_H, (_yi, _li), _l @ o_); PAN_REST[_b] = _dilate(_H, -np.inf)
+_COLL = []
+def _body_profile():
+    """The posed body (without the arms, hands and strands): the radial profile of legs, hips and torso around the
+    hips' axis, and a heightfield per coat panel segment in its own frame."""
+    if not _COLL:
+        armish = ('tassel', 'sleeve', 'forearm', 'upperarm', 'hand') + tuple(f for f in hands.FINGERS) + ('thumb',)
+        _COLL.append(np.array([not str(d).startswith(armish + ('skirt',)) for d in _dom0]))
+        _COLL.append({b: _dom0 == b for b in PANELS_C})
+    dg = bpy.context.evaluated_depsgraph_get(); ev = body.evaluated_get(dg); m = ev.to_mesh()
+    ca = np.empty(len(m.vertices) * 3); m.vertices.foreach_get('co', ca); ev.to_mesh_clear(); ca = ca.reshape(-1, 3)
+    Mw = np.array(pbs['hips'].matrix); Mi = np.linalg.inv(Mw); c = ca[_COLL[0]]
+    l = c @ Mi[:3, :3].T + Mi[:3, 3]; r = np.hypot(l[:, 0], l[:, 2])
+    hi = np.clip(((l[:, 1] - PROF_H0) / PROF_DH).astype(int), 0, PROF_NH - 1)
+    ti = ((np.arctan2(l[:, 2], l[:, 0]) + math.pi) / (2 * math.pi) * PROF_NT).astype(int) % PROF_NT
+    R = np.zeros((PROF_NH, PROF_NT)); np.maximum.at(R, (hi, ti), r)
+    Rw = np.concatenate([R[:, -1:], R, R[:, :1]], 1); R = _dilate(Rw, 0.0)[:, 1:-1]       # (heading wraps around)
+    pans = []
+    for b in PANELS_C:
+        Mb = np.array(pbs[b].matrix); Mbi = np.linalg.inv(Mb); o, lat = PAN_AX[b]
+        l = ca[_COLL[1][b]] @ Mbi[:3, :3].T + Mbi[:3, 3]
+        yi = np.clip(((l[:, 1] - PAN_Y0) / PAN_C).astype(int), 0, PAN_NY - 1); li = np.clip(((l @ lat - PAN_L0) / PAN_C).astype(int), 0, PAN_NL - 1)
+        H = np.full((PAN_NY, PAN_NL), -np.inf); np.maximum.at(H, (yi, li), l @ o)
+        pans.append((Mbi, Mb[:3, :3] @ o, _dilate(H, -np.inf), o, lat))
+    return Mw, Mi, R, pans
+def _prof_push(prof, P):
+    """(k, 3) points -> (world pushes that put each STRAND_GAP clear of the body and the coat panels, their lengths)."""
+    Mw, Mi, R, pans = prof; out = np.zeros_like(P); best = np.zeros(len(P))
+    l = P @ Mi[:3, :3].T + Mi[:3, 3]; r = np.hypot(l[:, 0], l[:, 2])
+    hi = np.clip(((l[:, 1] - PROF_H0) / PROF_DH).astype(int), 0, PROF_NH - 1)
+    ti = ((np.arctan2(l[:, 2], l[:, 0]) + math.pi) / (2 * math.pi) * PROF_NT).astype(int) % PROF_NT
+    Rc = R[hi, ti]; mag = np.where((Rc > 0) & (r < Rc + STRAND_GAP), Rc + STRAND_GAP - r, 0.0)
+    if mag.max() > 0:
+        rd = np.stack([l[:, 0], np.zeros(len(l)), l[:, 2]], 1) / np.maximum(r, 1e-6)[:, None]
+        upd = mag > best; out[upd] = (rd @ Mw[:3, :3].T)[upd] * mag[upd, None]; best[upd] = mag[upd]
+    for Mbi, ow, H, o, lat in pans:
+        l = P @ Mbi[:3, :3].T + Mbi[:3, 3]; ox = l @ o
+        yi = np.floor((l[:, 1] - PAN_Y0) / PAN_C).astype(int); li = np.floor((l @ lat - PAN_L0) / PAN_C).astype(int)
+        ok = (yi >= 0) & (yi < PAN_NY) & (li >= 0) & (li < PAN_NL)
+        Hc = np.full(len(P), -np.inf); Hc[ok] = H[yi[ok], li[ok]]
+        mag = np.where(np.isfinite(Hc) & (ox < Hc + STRAND_GAP) & (ox > Hc - PAN_DEPTH), Hc + STRAND_GAP - ox, 0.0)
+        upd = mag > best; out[upd] = ow[None, :] * mag[upd, None]; best[upd] = mag[upd]
+    return out, best
+def _follow(frames, loop, rec, base, bvh=None):
     """rec[f][bone] = posed matrix (armature space) of each loose bone and its parent at frame f; base[f][bone] = the
     keyed target rotation. Keys the springs' rotations over the targets."""
     SUB = 8; h = 1.0 / sc.render.fps / SUB
@@ -531,7 +644,7 @@ def _follow(frames, loop, rec, base):
         hd = Ct.to_translation(); d = (Ct.to_3x3() @ Vector((0, 1, 0))).normalized()
         if g: d = (d * (1 - g) + DOWN * g).normalized()
         return hd, d, hd + d * L
-    st = {}
+    st = {}; last = {}            # last: the previous substep's loose bone matrices (the coat reads the strands' tops)
     for n in DYN_ORDER:
         (_, _, _, g), L = par[n]; _, _, tt = tgt(rec[0][n], g, L); st[n] = [tt.copy(), tt.copy()]
     def step(fa, fb):
@@ -553,10 +666,48 @@ def _follow(frames, loop, rec, base):
                     ol, din, dac = BAN_LIM[n]; o = Ct.to_3x3() @ ol; o = (o - d * d.dot(o)).normalized(); e2 = d.cross(o)
                     a_ = max(-math.sin(math.radians(din)), dn.dot(o)); b_ = max(-math.sin(math.radians(dac)), min(math.sin(math.radians(dac)), dn.dot(e2)))
                     dn = (d * math.sqrt(max(0.0, 1 - a_ * a_ - b_ * b_)) + o * a_ + e2 * b_).normalized()
-                q = hd + dn * L; st[n] = [q, p]
+                q0 = hd + dn * L
+                if bvh is not None and n in PAN_REST and all(t_ in last for t_ in TOP_PTS):
+                    # the coat panel yields: rotate it in until no strand top sits under its outer surface
+                    o_, lat_ = PAN_AX[n]; H_ = PAN_REST[n]; R3 = Ct.to_3x3(); d0_ = (R3 @ Vector((0, 1, 0))).normalized()
+                    tops = np.concatenate([TOP_PTS[t_] @ np.array(last[t_])[:3, :3].T + np.array(last[t_])[:3, 3] for t_ in TOP_PTS if t_ in last])
+                    for _it in range(6):
+                        Rn = np.array(d0_.rotation_difference(dn).to_matrix() @ R3); lc = (tops - np.array(hd)) @ Rn
+                        ox = lc @ o_; yi = np.floor((lc[:, 1] - PAN_Y0) / PAN_C).astype(int); li = np.floor((lc @ lat_ - PAN_L0) / PAN_C).astype(int)
+                        ok = (yi >= 0) & (yi < PAN_NY) & (li >= 0) & (li < PAN_NL); Hc = np.full(len(lc), -np.inf); Hc[ok] = H_[yi[ok], li[ok]]
+                        deficit = np.where(np.isfinite(Hc) & (ox < Hc + STRAND_GAP) & (ox > Hc - PAN_DEPTH) & (lc[:, 1] > 0.3 * L), Hc + STRAND_GAP - ox, 0.0)
+                        if deficit.max() <= 0: break
+                        j = int(np.argmax(deficit)); stp = Vector(Rn @ o_) * (-deficit[j] * L / lc[j, 1])
+                        ang_ = math.atan2(stp.length, L)
+                        if ang_ > COLL_STEP * 2: stp *= COLL_STEP * 2 / ang_
+                        dn = (dn * L + stp).normalized()
+                if bvh is not None and n in STRAND_PTS:
+                    T = bvh[fb] if a > 0.5 else bvh[fa]; R3 = Ct.to_3x3(); d0_ = (R3 @ Vector((0, 1, 0))).normalized()
+                    L1, L2, W1, W2 = STRAND_PTS[n]; hdn = np.array(hd); dn_start = dn.copy()
+                    if L2 is not None:
+                        C1 = np.array(cur[pn]); base1 = (L1 @ C1[:3, :3].T + C1[:3, 3]) * W1[:, None]; wf = np.maximum(W2, 0.3)
+                    for _it in range(8):
+                        Rn = np.array(d0_.rotation_difference(dn).to_matrix() @ R3)
+                        rel = (L1 if L2 is None else L2) @ Rn.T
+                        pts = hdn + rel if L2 is None else base1 + (hdn + rel) * W2[:, None]
+                        pv, mag = _prof_push(T, pts)
+                        if n in SLEEVE_BASE:
+                            m2 = np.maximum(0.0, mag - SLEEVE_BASE[n]); pv = pv * (m2 / np.maximum(mag, 1e-9))[:, None]; mag = m2
+                        if mag.max() <= 0: break
+                        # gentle: only points well down the bone steer it (one near its head would need a huge turn
+                        # for a small push and makes the strand thrash), by their average push, at most COLL_STEP a
+                        # pass and COLL_SUB a substep; the spring does the rest
+                        kk = rel @ np.array(dn); use = (kk > 0.3 * L) & (mag > 0)
+                        if not use.any(): break
+                        tp = pv[use] * (L / kk[use] / (1.0 if L2 is None else wf[use]))[:, None]
+                        stp = Vector(tp.mean(0)); ang_ = math.atan2(stp.length, L)
+                        if ang_ > COLL_STEP: stp *= COLL_STEP / ang_
+                        dn = (dn * L + stp).normalized()
+                        if dn_start.angle(dn, 0.0) > COLL_SUB: dn = dn_start.slerp(dn, COLL_SUB / dn_start.angle(dn)).normalized(); break
+                q = hd + dn * L; st[n] = [q, p + (q - q0)]          # (a push-out adds no velocity)
                 d0 = (Ct.to_3x3() @ Vector((0, 1, 0))).normalized()
                 Cn = Matrix.Translation(hd) @ d0.rotation_difference(dn).to_matrix().to_4x4() @ Ct.to_3x3().to_4x4()
-                cur[n] = Cn
+                cur[n] = Cn; last[n] = Cn
                 if s == SUB: out[n] = ((Pnew @ REL[n]).inverted() @ Cn).to_quaternion()
         return out
     if loop:
@@ -580,7 +731,8 @@ def _follow(frames, loop, rec, base):
             pbs[n].rotation_quaternion = q; pbs[n].keyframe_insert('rotation_quaternion', frame=f + 1, group=n)
 LG_TRACE, LG_BY_CLIP = [], {}      # left hand on the staff (0..1) per baked frame, for chimesinger_qa.py
 BASE_BY_CLIP = {}                  # the loose bones' target rotations per baked frame (the contact pass falls back to them)
-def bake(name, frames, fn, loop):
+def bake(name, frames, fn, loop, still=()):
+    """still: loose bones (name prefixes) that keep their hanging targets in this clip, with no follow-through."""
     act = bpy.data.actions.new(name); act.use_fake_user = True
     arm.animation_data_create(); arm.animation_data.action = act
     LG_TRACE.clear(); rec, base = [], []
@@ -592,7 +744,17 @@ def bake(name, frames, fn, loop):
         bpy.context.view_layer.update()
         rec.append({n: pbs[n].matrix.copy() for n in set(DYN_ORDER) | set(DYN_PAR.values())})
         base.append({n: pbs[n].rotation_quaternion.copy() for n in DYN_ORDER})
-    _follow(frames, loop, rec, base); BASE_BY_CLIP[name] = base
+    _follow(frames, loop, rec, base)
+    # then twice more with the body posed as keyed (coat panels included), so the strands collide with what is really
+    # there; the coat yields to the strands' tops in the same passes, so the second one collides with the yielded coat
+    for _pass in range(2):
+        bvh = []
+        for f in range(len(rec)): sc.frame_set(f + 1); bvh.append(_body_profile())
+        _follow(frames, loop, rec, base, bvh)
+    for n in [b for b in DYN_ORDER if b.startswith(tuple(still))] if still else []:
+        for f, bq in enumerate(base):
+            pbs[n].rotation_quaternion = bq[n]; pbs[n].keyframe_insert('rotation_quaternion', frame=f + 1, group=n)
+    BASE_BY_CLIP[name] = base
     act.frame_range = (1, frames + (1 if loop else 0)); LG_BY_CLIP[name] = [round(v, 3) for v in LG_TRACE]
     return act
 
@@ -1056,6 +1218,7 @@ MOCAP = load_mocap(args[2]) if len(args) > 2 and os.path.exists(args[2]) else No
 # by 5 cm on every frame of the mocap stride (searched against the mesh-level overlap / clearance check)
 RUN_R = {False: ((-1.0, -0.489, -0.747), (-0.733, -0.893, -0.433), (0.332, -0.913, 0.132)),
          True: ((-0.961, -0.258, -0.655), (-0.756, -0.907, -0.386), (0.553, -0.967, 0.166))}
+LOCO_L_OUT = tuple(float(v) for v in os.environ.get('CHIME_LOUT', '0.40,0.55').split(','))   # free arm's outward lean (upper, fore)
 def run_arms(s, sprinting, Dc):
     # Staff carried level at her right side, bell end forward, steady (a few degrees of bob).
     # Free left arm: a runner's swing in the sagittal plane, opposite the legs (s < 0 = right foot forward = left arm
@@ -1067,11 +1230,12 @@ def run_arms(s, sprinting, Dc):
     # the staff rocks with the stride (counter to the right leg) and bobs on each footfall
     sw, bob = (0.16, 0.06) if sprinting else (0.12, 0.05)
     out, _, _ = arm_R(w((ru[0], ru[1] + 0.08 * s, ru[2])), w((rf[0], rf[1] + sw * 0.6 * s, rf[2] + bob * abs(s))), w((sd[0], sd[1] + sw * s, sd[2])))
-    amp = 38 if sprinting else 30
+    amp = 32 if sprinting else 26
     ph = math.radians(-amp * s)                                   # upper arm pitch, + = forward
-    bend = math.radians((85 if sprinting else 75) + 15 * max(0.0, -s))
-    lu = (0.14, -math.sin(ph), -math.cos(ph))
-    lf = (0.14, -math.sin(ph + bend), -math.cos(ph + bend))
+    bend = math.radians((70 if sprinting else 62) + 8 * max(0.0, -s))     # (folds little: the hand stays out at her side, off the robe)
+    # (held out from her side: the wide sleeve and the bell strand under it swing clear of the robe)
+    lu = (LOCO_L_OUT[0], -math.sin(ph), -math.cos(ph))
+    lf = (LOCO_L_OUT[1], -math.sin(ph + bend), -math.cos(ph + bend))
     al, _, _ = arm_dirs('L', w(lu), w(lf))
     out.update(al); out.update(fist('R', 1.0)); out.update(fist('L', 0.45)); out['staff'] = staff_pose(); return out
 if MOCAP:
@@ -1081,7 +1245,7 @@ if MOCAP:
         pose = mocap_pose(MREST, MSMP[i], stride=1.3 if sprinting else 0.9, lean=24 if sprinting else 8)
         set_pose(dict(pose)); Dc = delta('hips').inverted() @ delta('chest')   # (a copy: secondary() fills in cloth for the arms-less pose)
         pose.update(run_arms(MPH[i], sprinting, Dc))
-        pose.update({'_flow': (32 if sprinting else 20) + 6 * math.sin(2 * p), '_swing': (30 if sprinting else 18) + 8 * math.sin(2 * p + 1.2)})
+        pose.update({'_flow': (16 if sprinting else 9) + 4 * math.sin(2 * p), '_swing': (14 if sprinting else 8) + 4 * math.sin(2 * p + 1.2), '_bell_out': 14.0})
         return pose
     run = lambda f, t: loco(t, False); sprint = lambda f, t: loco(t, True)
 else:
@@ -1089,7 +1253,14 @@ else:
 RUN_FRAMES, SPRINT_FRAMES = MN, round(MN / 1.3)
 if os.environ.get('CHIME_EXPLORE'):     # authoring: run a pose experiment with the rig set up, then stop
     exec(open(os.environ['CHIME_EXPLORE']).read()); raise SystemExit(0)
-acts = [bake('Idle', 60, idle, True), bake('Run', RUN_FRAMES, run, True), bake('Sprint', SPRINT_FRAMES, sprint, True),
+# the sleeves' standing-pose depth in the body (see SLEEVE_BASE)
+set_pose(idle(0, 0.0)); bpy.context.view_layer.update(); _pf = _body_profile()
+for _s in 'LR':
+    _sn = f'sleeve.{_s}'; _M = np.array(pbs[_sn].matrix); _P = STRAND_PTS[_sn][0] @ _M[:3, :3].T + _M[:3, 3]
+    SLEEVE_BASE[_sn] = _prof_push(_pf, _P)[1] + 0.005
+print('SLEEVE_BASE', {k: round(float(v.max()) * 1000) for k, v in SLEEVE_BASE.items()}, 'mm deepest standing')
+# (standing: the sleeves and bells hang still)
+acts = [bake('Idle', 60, idle, True, still=('sleeve', 'tassel')), bake('Run', RUN_FRAMES, run, True), bake('Sprint', SPRINT_FRAMES, sprint, True),
         bake('Dodge', 14, dodge, False), bake('Jump', 36, jump, False)]
 acts += [bake(name, frames, K if callable(K) else kit_pose(K), False) for name, (frames, K) in KIT.items()]
 # ---------------- contact pass: the follow-through never swings a loose part into the staff or its banners ----------
