@@ -19,14 +19,22 @@ namespace LastBell.Run
     //   Ripening        a 4 m seed follows every player and bursts on everyone else (spread), leaving a bramble patch; the
     //                   metronome weight follows the farthest player and lands (two weights below 50%).
     //
-    // Placeholder look only: primitives, no model, no audio. Every warning wears the raid look (HazardSystem.RaidStyle).
+    // Visuals: the rigged model (Characters/BriarMetronome, 9 Nov clips) when present, else a labelled primitive stand-in; no
+    // audio. Each cut's strike frame lands on its own resolve (BossClipCues). Every warning wears the raid look (HazardSystem.RaidStyle).
     // No ability text reaches players (PhaseName and Lesson stay empty); names live in the F7 diagnostics.
     public sealed class BriarMetronomeEncounter : BossEncounter, IAllyBotJob
     {
         public override string Id => "boss.briar-metronome";
         public override string DisplayName => "The Briar Metronome";
         public override string Lesson => "";
-        public override bool Placeholder => true;
+        // the rigged model when Resources/Characters/BriarMetronome(.glb) is in the project, else the labelled stand-in
+        public override bool Placeholder => !presenter || !presenter.HasModel;
+        CharacterPresenter presenter; BossClipCues cues; public CharacterPresenter Presenter => presenter; public BossClipCues Cues => cues;
+        public static readonly string[] ClipNames = { "Idle", "Walk", "TempoLoop", "CutIn", "CutOut", "CutAcross", "BladePlant", "PlantLoop",
+            "MantleShake", "RootedLoop", "OrbWhirl", "WhirlLoop", "OrbThrow", "PhaseShift", "Defeat" };
+        // clip lengths and strike frames (seconds), as keyed in briar_metronome_rig.py
+        const float CutLen = 1.2f, CutStrike = 0.75f, PlantLen = 1.0f, PlantStrike = 0.6f, ShakeLen = 1.2f, WhirlLen = 0.8f, ThrowLen = 1.0f, ThrowRelease = 0.35f;
+        float? faceYaw;   // the Across cut turns it toward its cone
         public override float NextPhaseFraction() => 0.49f;
 
         // ---------------- tunables (Medium) ----------------
@@ -95,16 +103,17 @@ namespace LastBell.Run
 
         protected override void Build()
         {
-            BuildStandIn();
+            presenter = CharacterPresenter.Create(transform, "BriarMetronome", 1.5f, 1f, 0, h => { BuildStandIn(h); return h; });
+            cues = new BossClipCues(presenter);
             gameObject.AddComponent<BriarMetronomeHud>().Bind(this);
             PhaseName = "";
             R.Bound = CombatWorld.PlayerBound;
         }
 
         // primitive stand-in (placeholder): bark trunk, moss mantle, ivory mask, a brass pendulum in the chest, shears
-        void BuildStandIn()
+        void BuildStandIn(Transform parent)
         {
-            body = new GameObject("Briar Metronome (STAND-IN, labelled placeholder)").transform; body.SetParent(transform, false);
+            body = new GameObject("Briar Metronome (STAND-IN, labelled placeholder)").transform; body.SetParent(parent, false);
             Prim.Make(PrimitiveKind.Cylinder, body, new Vector3(0, 1.4f, 0), new Vector3(1.6f, 1.4f, 1.6f), Bark);
             Prim.Make(PrimitiveKind.Sphere, body, new Vector3(0, 3.0f, 0), new Vector3(2.3f, 1.2f, 2.3f), Moss);
             Prim.Make(PrimitiveKind.Sphere, body, new Vector3(0, 3.5f, 0.55f), new Vector3(0.7f, 0.85f, 0.4f), Ivory);
@@ -201,7 +210,10 @@ namespace LastBell.Run
             if (++beatAge >= BeatTicks) { beatAge = 0; BeatIndex++; }
             StepGrafts();
             if (!Phase2 && !GatePending && Hp * 2 <= MaxHp) GatePending = true;
+            if (faceYaw.HasValue) TurnTowards(faceYaw.Value, 240);
+            cues?.Step(Current == "reposition");
         }
+        protected override void OnHalt() { cues?.Clear(); if (cues != null) cues.Loop = "Idle"; faceYaw = null; }
 
         public override float[] PhaseStarts => new[] { 1f, 0.5f };
         public override int PhaseNumber => Phase2 ? 2 : 1;
@@ -222,6 +234,7 @@ namespace LastBell.Run
             // cut k is drawn when cut k-2 lands (the first two at once), so the current and the next are always on the floor;
             // it locks (and draws on top) when the cut before it lands
             int spawned = 0, total = at[chain.Count - 1];
+            cues.LoopAt(0, "TempoLoop", Bpm / BpmHigh);   // swaying on the beat between cuts (keyed at 108 BPM)
             for (int t = 0; t <= total; t++)
             {
                 while (spawned < chain.Count && (spawned < 2 || t >= at[spawned - 2]))
@@ -229,14 +242,16 @@ namespace LastBell.Run
                     int k = spawned++;
                     int lockAt = k == 0 ? 0 : at[k - 1] - t;
                     SpawnCut(chain[k], lockAt, at[k] - t, spacing);
+                    cues.Strike(CutClip(chain[k]), at[k] - t, CutStrike, CutLen);   // each cut keyed from its own resolve
                 }
                 // the shears open on the beat; the pendulum is drawn by Update
                 Windup((t % spacing) / (float)spacing);
                 yield return 1;
             }
-            Current = "Pruning Tempo (recovery)";
+            Current = "Pruning Tempo (recovery)"; cues.Loop = "Idle"; faceYaw = null;
             yield return Beats(1);
         }
+        static string CutClip(R.Cut c) => c == R.Cut.In ? "CutIn" : c == R.Cut.Out ? "CutOut" : "CutAcross";
 
         void SpawnCut(R.Cut cut, int lockAt, int resolveAt, int spacing)
         {
@@ -247,6 +262,7 @@ namespace LastBell.Run
             {
                 // aimed at the farthest player when it is drawn (two cuts ahead), then fixed: you see where it will cut
                 var f = Farthest(transform.position); if (f) h.Yaw = Sim.YawTo(transform.position, f.transform.position, h.Yaw);
+                faceYaw = h.Yaw;   // presentation: it turns to face the cone it will chop along
             }
             h.OnResolve = hz =>
             {
@@ -276,6 +292,7 @@ namespace LastBell.Run
                 LockAt = 0, ResolveAt = collar, Damage = CollarDmg };
             c.OnResolve = hz => { CollarHits += hz.Hit.Count; CameraShake.Shake(0.1f, 0.15f); };
             Spawn(c);
+            cues.Strike("BladePlant", collar, PlantStrike, PlantLen); cues.LoopAt(collar, "PlantLoop");   // the blade lands with the Root Collar
             // four hedges, every section shown now, growing 3 m per beat from HedgeDelay beats
             var sections = R.Sections(CombatWorld.PlayerBound);
             int grow0 = Beats(HedgeDelayBeats);
@@ -302,9 +319,10 @@ namespace LastBell.Run
             yield return 1;
             for (int guard = 0; guard < 600 && W.Hazards.Count > 0; guard++) yield return 1;
             Current = "Rooted"; Rooted = true; Release(1.2f);
+            cues.Clear(); cues.Loop = "RootedLoop";
             int from0 = Tick, live0 = W.Hazards.Count;
             yield return RootedTicks;
-            RootedLog.Add((from0, Tick, live0)); Rooted = false;
+            RootedLog.Add((from0, Tick, live0)); Rooted = false; cues.Loop = "Idle";
             if (shears) shears.localRotation = Quaternion.identity;
             Current = "Hedgerow (recovery)";
         }
@@ -342,6 +360,7 @@ namespace LastBell.Run
         {
             GraftCasts++;
             Current = "Season Grafts";
+            cues.Play("MantleShake", Mathf.RoundToInt(ShakeLen * Sim.Hz));   // it shakes its mantle and the grafts sprout
             int n = W.Players.Count;
             foreach (int season in R.GraftSeasons(n)) Sprout(season);
             while (true)
@@ -491,6 +510,9 @@ namespace LastBell.Run
         {
             if (target == null) return null;
             int follow = Beats(low ? WeightFollowBeatsLow : WeightFollowBeatsHigh), land = follow + Beats(low ? WeightLockBeatsLow : WeightLockBeatsHigh);
+            // the orb whirled overhead while the weight follows, hurled on the lock
+            cues.Play("OrbWhirl", Mathf.RoundToInt(WhirlLen * Sim.Hz)); cues.LoopAt(0, "WhirlLoop");
+            cues.Strike("OrbThrow", follow, ThrowRelease, ThrowLen); cues.LoopAt(follow, "Idle");
             var h = new Hazard { Source = "Metronome Weight", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = Sim.Flat(target.transform.position), Radius = R.WeightRadius,
                 LockAt = follow, ResolveAt = land, Damage = WeightDmg };
             h.Track = hz => { if (target && !target.Down) hz.Origin = Vector3.MoveTowards(hz.Origin, Sim.Flat(target.transform.position), R.WeightFollow * Sim.Dt); };
@@ -504,6 +526,7 @@ namespace LastBell.Run
             GatePending = false;
             Current = "Shift"; Log("Shift"); ShiftStart = Tick; HpAtShiftStart = Hp;
             CameraShake.Shake(0.1f, 0.3f);
+            cues.Clear(); faceYaw = null; cues.Play("PhaseShift", ShiftTicks); cues.Loop = "Idle";
             yield return ShiftTicks;   // harmless: nothing is spawned, it stays damageable
             Phase2 = true; beatAge = 0; Release(1.5f); ShiftEnd = Tick;
             Log("tempo -> " + Bpm);
@@ -520,12 +543,15 @@ namespace LastBell.Run
                 pendulum.localRotation = Quaternion.Euler(0, 0, Mathf.Sin(beats + Mathf.PI / 2) * 28f);
             }
             if (body) body.localScale = Vector3.one * (1 + 0.04f * (glowLevel - 1));
+            if (presenter) presenter.GlowLevel = glowLevel;
             foreach (var kv in numerals) if (kv.Value) kv.Value.gameObject.SetActive(kv.Key && !kv.Key.Down);
         }
 
         protected override void OnDefeat()
         {
             ClearGrafts(); ClearHedgeProps(); hedgeBurns.Clear(); hedgeGrowing = 0; Rooted = false;
+            cues?.Clear(); faceYaw = null;
+            if (presenter) presenter.Action("Defeat", 150);
             W.Fx.Crescendo(transform.position, true, 2, true);
             if (body) body.localRotation = Quaternion.Euler(0, 0, 12);
         }

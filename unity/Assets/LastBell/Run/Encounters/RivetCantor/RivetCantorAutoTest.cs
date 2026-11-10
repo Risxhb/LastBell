@@ -163,14 +163,45 @@ namespace LastBell.Run
             yield return Until(() => d.State == RunState.Combat, 8, "combat");
         }
 
+        // in-game frames for the animation critic (9 Nov): each clip once, at its strike frame, from the gameplay and a close camera
+        static readonly Dictionary<string, float> StrikeAt = new Dictionary<string, float>
+        {
+            ["ChorusCall"] = 0.35f, ["SoloCall"] = 0.35f, ["HammerRaise"] = 0.78f, ["HammerLoop"] = 0.02f, ["ForkPlant"] = 0.8f,
+            ["ForkStrike"] = 0.55f, ["DrumSlam"] = 1.4f, ["PhaseShift"] = 1.0f, ["Defeat"] = 2.3f,
+        };
+        IEnumerator ClipFrames(CharacterPresenter pr, Transform t, Dictionary<string, float> strikeAt)
+        {
+            var seen = new HashSet<string>();
+            while (pr && t && seen.Count < 16)
+            {
+                string c = pr.CurrentClip;
+                if (c != "-" && seen.Add(c))
+                {
+                    yield return new WaitForSeconds(strikeAt.TryGetValue(c, out var s) ? s : 0.4f);
+                    if (!pr || !t) yield break;
+                    var b = t.position;
+                    RenderShot($"clip_{c}_game", b + new Vector3(0, 11f, -14f), b + Vector3.up * 1.2f, 40);
+                    RenderShot($"clip_{c}_close", b + t.forward * 6.5f + Vector3.up * 2.4f, b + Vector3.up * 1.6f, 40);
+                }
+                yield return null;
+            }
+        }
+
         IEnumerator PartyFight(int size, int enc, int map)
         {
             Section($"party of {size} (Perfect bots, the player too)");
             yield return Practice(size, enc, map);
             if (boss == null) yield break;
-            Check($"[{size}p] opens in phase 1 at 120 BPM, placeholder body, no ability text", !boss.Phase2 && Mathf.Approximately(boss.Bpm, 120) && boss.BeatTicks == 30 && boss.Placeholder && boss.PhaseName == "" && boss.Lesson == "");
+            Check($"[{size}p] opens in phase 1 at 120 BPM, no ability text", !boss.Phase2 && Mathf.Approximately(boss.Bpm, 120) && boss.BeatTicks == 30 && boss.PhaseName == "" && boss.Lesson == "");
+            if (boss.Presenter && boss.Presenter.HasModel)
+            {
+                var missing = RivetCantorEncounter.ClipNames.Where(c => !boss.Presenter.Has(c)).ToList();
+                Check($"[{size}p] the rigged model is loaded with all {RivetCantorEncounter.ClipNames.Length} clips", !boss.Placeholder && missing.Count == 0, missing.Count > 0 ? "missing: " + string.Join(", ", missing) : "");
+                if (size == 2) StartCoroutine(ClipFrames(boss.Presenter, boss.transform, StrikeAt));
+            }
+            else Check($"[{size}p] no rigged model in this build: the labelled stand-in is used (Placeholder)", boss.Placeholder && GameObject.Find("Rivet Cantor (STAND-IN, labelled placeholder)"));
             yield return Until(() => Sim.Flat(boss.transform.position).magnitude < 0.35f, 8, "walks to the centre");
-            RenderShot($"{size}p_standin", new Vector3(0, 4f, 9.5f), new Vector3(0, 2f, 0), 40);
+            RenderShot($"{size}p_body", new Vector3(0, 4f, 9.5f), new Vector3(0, 2f, 0), 40);
 
             // phase 1: one whole rotation in its natural order
             yield return Until(() => boss.BlockLog.Any(s => s.EndsWith(" Hymn")), 120, "phase 1 rotation reaches Anvil Hymn");
