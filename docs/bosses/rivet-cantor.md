@@ -6,8 +6,9 @@ mask, a resonant-gold chest core and a great foundry drum slung at his hip. He l
 call-and-response: he calls, the party answers.
 
 - **Status:** proposal (November 3, 2026), review answers applied the same day (see "Review decisions"), replacing the earlier "Tuner of the Great Cast" draft (still in git
-  history). Practice-only encounter in the current player, **placeholder visuals only** (primitive stand-in body, no
-  Meshy model, no final FX or audio). Not in the run.
+  history). Practice-only encounter in the current player. **Rigged model** since November 10, 2026
+  (`Characters/RivetCantor/Resources/Characters/RivetCantor.glb`, 14 clips; the 26 Oct rig re-keyed for this design,
+  strike frames timed to gameplay ticks by `BossClipCues`). No final FX or audio. Not in the run.
 - **Sources read:** `docs/design/content-rules.md` (this brief follows §5 and §10), `docs/bosses/pendulum-sentinel.md`,
   and Chzy18's merged bosses for ideas: Aurelion v4 (Meridian Tower soaks, Zenith Marks, Ecliptic Order), Crucivar v4
   (Forge Rite loop, Casting Order, Ember Brand, punish windows), Sylvara v3 (Two-Colour Choir, Pruning Arc).
@@ -20,8 +21,8 @@ call-and-response: he calls, the party answers.
 
 - 3.2 m tall against a 1.8 m human: a broad brass bell-shaped torso, ivory mask, gold chest core, the drum at his left
   hip (cobalt skin, brass hoops) and a rivet-headed mallet in his right hand.
-- **Placeholder:** brass cylinder body, ivory sphere head, cobalt drum disc, mallet cylinder. Labelled
-  "STAND-IN" in the hierarchy.
+- **Model:** the rigged Rivet Cantor GLB (drum and mallet animated). If the model can't load, the old primitive
+  stand-in (brass cylinder body, ivory sphere head, cobalt drum disc, mallet cylinder, labelled "STAND-IN") is used.
 - **The call queue:** while he sings a verse, one glyph per call floats above his head, oldest lowest:
   a gold disc for *Chorus*, four ivory beads for *Solo*. A glyph disappears when the floor answers it. This is the
   "score" players read; the floor telegraph for each answer appears at the same moment as its glyph.
@@ -152,8 +153,7 @@ the chains are hazards that hit only *other* players, so bots keep out of them l
 1. **Empty Chorus:** a heavy hit (80 to everyone standing), not a wipe. Done.
 2. **Solo matters solo:** yes. Each Solo also hits everyone within 2.5 m of him (40); the Chorus grew to 4 m so the band between them (2.5–4 m) holds a whole party. Done.
 3. **Chain pairing:** by the order numerals I–II, III–IV, shown over the chained players. Done.
-4. **Model:** keep the earlier Meshy model and re-rig/animate it for the drum and mallet. Queued for the next usage
-   reset (lane board card); the fight keeps the stand-in until then.
+4. **Model:** keep the earlier Meshy model and re-rig/animate it for the drum and mallet. Done (November 9, 2026, `feature/miniboss-models`); in the main player since November 10.
 5. **Run slot:** none yet. Bosses will share arenas and the gameplay loop is not decided; he stays practice-only on the
    Crucivar map.
 6. **LAN lobby:** add him to `LanLobby.Encounters` after all the miniboss work is done.

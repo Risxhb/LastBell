@@ -73,6 +73,34 @@ namespace LastBell.Run
             File.WriteAllBytes(Path.Combine(dir, $"{++shots:00}_{name}.png"), tex.EncodeToPNG());
             Destroy(tex); rt.Release(); Destroy(rt); Destroy(go);
         }
+        // in-game frames for the animation critic (9 Nov): each clip of either tower (and the wheel) once, at its key frame,
+        // from the gameplay camera and a close camera on that body
+        static readonly Dictionary<string, float> StrikeAt = new Dictionary<string, float>
+        {
+            ["FacesDown"] = 0.5f, ["AgreeAim"] = 1.1f, ["AgreeFire"] = 0.15f, ["FacesOut"] = 0.15f, ["Stagger"] = 1.0f, ["PhaseShift"] = 1.0f,
+            ["WheelSpin"] = 0.6f, ["WheelReverse"] = 0.1f,
+        };
+        IEnumerator ClipFrames()
+        {
+            var seen = new HashSet<string>();
+            while (boss && seen.Count < 18)
+            {
+                foreach (var (tag, pr) in new[] { ("tick", boss.TickPresenter), ("tock", boss.TockPresenter), ("wheel", boss.WheelPresenter) })
+                {
+                    if (!pr || !pr.HasModel) continue;
+                    string c = pr.CurrentClip;
+                    if (c == "-" || !seen.Add(tag + c)) continue;
+                    yield return new WaitForSeconds(StrikeAt.TryGetValue(c, out var s) ? s : 0.4f);
+                    if (!pr) continue;
+                    var b = pr.transform.position;
+                    RenderShot($"clip_{tag}_{c}_game", b + new Vector3(0, 11f, -14f), b + Vector3.up * 1.5f, 40);
+                    RenderShot($"clip_{tag}_{c}_close", b + new Vector3(0, 3f, -8f), b + Vector3.up * 1.8f, 40);
+                    break;
+                }
+                yield return null;
+            }
+        }
+
         void Overhead(string name) => RenderShot(name, new Vector3(0, 30, 15), new Vector3(0, 0, -0.5f), 50);
         IEnumerator Snap(string name) { yield return new WaitForEndOfFrame(); Overhead(name); }
 
@@ -176,7 +204,15 @@ namespace LastBell.Run
             Check($"{n}p: two bodies, one bar: Tock is a live boss part", d.World.Parts.Contains(boss.TockPart) && boss.TockPart.Alive);
             if (n == 2 && full)
             {
-                RenderShot("twins_placeholder", new Vector3(0, 6f, 13f), new Vector3(0, 1.8f, 0), 45);
+                // the rigged towers (9 Nov), or both labelled stand-ins when the models are missing
+                if (boss.TickPresenter && boss.TickPresenter.HasModel && boss.TockPresenter && boss.TockPresenter.HasModel)
+                {
+                    var missing = EscapementTwinsEncounter.ClipNames.Where(c => !boss.TickPresenter.Has(c) || !boss.TockPresenter.Has(c)).ToList();
+                    Check($"both rigged towers are loaded with all {EscapementTwinsEncounter.ClipNames.Length} clips", !boss.Placeholder && missing.Count == 0, missing.Count > 0 ? "missing: " + string.Join(", ", missing) : "");
+                    StartCoroutine(ClipFrames());
+                }
+                else Check("no rigged towers in this build: the labelled stand-ins are used (Placeholder)", boss.Placeholder && GameObject.Find("Tick (STAND-IN placeholder)") && GameObject.Find("Tock (STAND-IN placeholder)"));
+                RenderShot("twins_bodies", new Vector3(0, 6f, 13f), new Vector3(0, 1.8f, 0), 45);
                 int hp0 = boss.Hp; int dealt = d.World.DamagePart(boss.TockPart, 25, boss.TockPos + Vector3.up, "test");
                 Check("hitting Tock damages the shared bar", dealt == 25 && boss.Hp == hp0 - 25, $"dealt {dealt}, {hp0} -> {boss.Hp}");
                 Check("fight opens in phase 1 at 100 BPM, no ability text", !boss.Phase2 && Mathf.Approximately(boss.Bpm, 100) && boss.PhaseName == "" && boss.Lesson == "");

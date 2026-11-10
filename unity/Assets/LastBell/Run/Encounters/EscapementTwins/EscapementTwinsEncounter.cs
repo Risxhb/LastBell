@@ -21,14 +21,29 @@ namespace LastBell.Run
     //                     Hard: Recoil, the spring paths are lanes too.
     //
     // 50%: the current ability finishes, then a 2 s harmless shift; 100 -> 120 BPM and a new order. No enrage.
-    // Placeholder bodies only (primitives); every warning uses the raid look (HazardSystem.RaidStyle). No ability text:
-    // PhaseName and Lesson stay empty, names live only in the F7 overlay.
+    // Bodies: the rigged towers (Characters/EscapementTick and EscapementTock, split from the 26 Oct model on 9 Nov) and the
+    // escape-wheel prop (Characters/EscapementWheel), each with a labelled primitive stand-in when its model is missing.
+    // Each tower turns its clock face to the camera (presentation only; gameplay rotation is unchanged). Strike clips land
+    // their strike frame on the gameplay tick (BossClipCues). Every warning uses the raid look (HazardSystem.RaidStyle).
+    // No ability text: PhaseName and Lesson stay empty, names live only in the F7 overlay.
     public sealed class EscapementTwinsEncounter : BossEncounter
     {
         public override string Id => "boss.escapement-twins";
         public override string DisplayName => "The Escapement Twins";
         public override string Lesson => "";
-        public override bool Placeholder => true;
+        // the rigged towers when both models are in the project, else the labelled stand-ins
+        public override bool Placeholder => !tickPresenter || !tickPresenter.HasModel || !tockPresenter || !tockPresenter.HasModel;
+        CharacterPresenter tickPresenter, tockPresenter, wheelPresenter; BossClipCues tickCues, tockCues, wheelCues;
+        Transform tickPivot, tockPivot, wheelSpin;
+        public CharacterPresenter TickPresenter => tickPresenter;
+        public CharacterPresenter TockPresenter => tockPresenter;
+        public CharacterPresenter WheelPresenter => wheelPresenter;
+        public static readonly string[] ClipNames = { "Idle", "Walk", "PolarityLoop", "FacesDown", "AgreeAim", "AgreeFire", "VesicaLoop",
+            "FacesOut", "Stagger", "PhaseShift", "Defeat" };
+        public static readonly string[] WheelClipNames = { "Idle", "WheelSpin", "WheelLoop", "WheelReverse" };
+        // clip lengths and strike frames (seconds), as keyed in escapement_twins_rig.py
+        const float StompLen = 0.8f, StompAt = 0.5f, AimLen = 1.2f, AimAt = 1.1f, FireLen = 0.6f, FireAt = 0.1f, SpringLen = 0.8f, SpringAt = 0.15f;
+        IEnumerable<BossClipCues> BothCues { get { if (tickCues != null) yield return tickCues; if (tockCues != null) yield return tockCues; } }
         public override float NextPhaseFraction() => 0.49f;
 
         public const int MaxHpMedium = 3000;
@@ -90,13 +105,18 @@ namespace LastBell.Run
         protected override void Build()
         {
             PhaseName = "";
-            tickFace = Tower(transform, "Tick (STAND-IN placeholder)", Brass, Gold);
+            tickPivot = new GameObject("Tick facing").transform; tickPivot.SetParent(transform, false);
+            tickPresenter = CharacterPresenter.Create(tickPivot, "EscapementTick", 1.5f, 1f, 0, h => { tickFace = Tower(h, "Tick (STAND-IN placeholder)", Brass, Gold); return h; });
+            tickCues = new BossClipCues(tickPresenter); Tint(tickPresenter, TickTint);
             var go = new GameObject("Tock");
             go.transform.SetParent(transform.parent, false);
             TockPos = R.TockAt(Axis);
             go.transform.SetPositionAndRotation(TockPos, Quaternion.Euler(0, Sim.YawTo(TockPos, TickPos, 0), 0));
             tockBody = go.transform;
-            tockFace = Tower(tockBody, "Tock (STAND-IN placeholder)", Cobalt, Silver);
+            // Tock's presenter lives under its own body (not this boss's children), so LAN capture picks Tick's presenter
+            tockPivot = new GameObject("Tock facing").transform; tockPivot.SetParent(tockBody, false);
+            tockPresenter = CharacterPresenter.Create(tockPivot, "EscapementTock", 1.5f, 1f, 0, h => { tockFace = Tower(h, "Tock (STAND-IN placeholder)", Cobalt, Silver); return h; });
+            tockCues = new BossClipCues(tockPresenter); Tint(tockPresenter, TockTint);
             SimSmoother.Attach(go);
             tockPart = new BossPart { Name = "Tock", Pos = TockPos, BodyRadius = BodyRadius, HitHeight = HitHeight };
             tockPart.TakeHit = (dmg, contact) => TakeHit(dmg, contact);   // one health bar for both
@@ -174,7 +194,13 @@ namespace LastBell.Run
             if (Age % BeatTicks == 0) { BeatIndex++; if (BeatIndex % 2 == 0) tickPulse = 1; else tockPulse = 1; }
             if (!Phase2 && !GatePending && Hp * 2 <= MaxHp) GatePending = true;
             if (!Dead && W != null && tockPart != null && !W.Parts.Contains(tockPart)) W.Parts.Add(tockPart);   // Tock is hittable all fight
+            bool walking = Current == "reposition";
+            foreach (var c in BothCues) c.Step(walking);
+            wheelCues?.Step(false);
         }
+        protected override void OnHalt() { foreach (var c in BothCues) { c.Clear(); c.Loop = "Idle"; } }
+        void LoopBoth(string loop, float speed = 1) { foreach (var c in BothCues) c.LoopAt(0, loop, speed); }
+        void StrikeBoth(string clip, int inTicks, float at, float len) { foreach (var c in BothCues) c.Strike(clip, inTicks, at, len); }
 
         public override float[] PhaseStarts => new[] { 1f, 0.5f };
         public override int PhaseNumber => Phase2 ? 2 : 1;
@@ -207,9 +233,11 @@ namespace LastBell.Run
             AssignMarks();
             var brassRim = Rim(TickPos, R.DiscRadius, BrassRim); var cobaltRim = Rim(TockPos, R.DiscRadius, CobaltRim);
             int locks = R.Locks(Phase2);
+            LoopBoth("PolarityLoop", Bpm / R.BpmHigh);   // each tower bows on its own beat while the lock winds up
             for (int k = 0; k < locks; k++)
             {
                 int warn = Beats(k == 0 ? R.FirstLockBeats(Phase2, Level) : R.SwapLockBeats(Phase2, Level));
+                StrikeBoth("FacesDown", warn, StompAt, StompLen);   // both stomp as their locks land
                 int brass = 0, cobalt = 0; foreach (var m in marks.Values) if (m == 0) brass++; else cobalt++;
                 LockLog.Add((Tick, k + 1, brass, cobalt, warn));
                 var a = LockRing(TickPos, 0, warn); var b = LockRing(TockPos, 1, warn);
@@ -218,7 +246,7 @@ namespace LastBell.Run
                 Release(1f); LocksResolved++;
                 if (k < locks - 1) { FlipMarks(); Swaps++; Current = $"Pallet Lock (swap {k + 1})"; }
             }
-            ClearMarks(); brassRim.Dismiss(); cobaltRim.Dismiss(); rims.Remove(brassRim); rims.Remove(cobaltRim);
+            ClearMarks(); brassRim.Dismiss(); cobaltRim.Dismiss(); rims.Remove(brassRim); rims.Remove(cobaltRim); LoopBoth("Idle");
             Current = "Pallet Lock (recovery)";
             yield return Beats(1);
         }
@@ -275,8 +303,8 @@ namespace LastBell.Run
         {
             Current = "Escape Wheel"; WheelCasts++;
             var mid = (TickPos + TockPos) / 2;
-            wheel = Prim.Make(PrimitiveKind.Cylinder, transform.parent, mid + Vector3.up * 0.05f, new Vector3(2.6f, 0.03f, 2.6f), Gold, 1.5f);
-            wheel.name = "Escape wheel (placeholder)";
+            wheel = MakeWheel(mid); wheel.name = "Escape wheel";
+            wheelCues = new BossClipCues(wheelPresenter); wheelCues.Loop = "WheelLoop"; wheelCues.Play("WheelSpin", Sim.Ticks(0.8f));
             int volleys = R.Volleys(Phase2);
             for (int v = 0; v < volleys; v++)
             {
@@ -286,6 +314,10 @@ namespace LastBell.Run
                 float yaw = far ? Sim.YawTo(origin, far.transform.position, 0) : (fromTick ? Axis : Axis + 180f);
                 int warn = Sim.Ticks(R.VolleySeconds(v, Phase2, Level));
                 VolleyLog.Add((Tick, v + 1, fromTick, yaw, warn));
+                // the firing tower rears back (aimed by the last 0.1 s) and snaps forward as its fan lands; the wheel kicks back
+                var fc = fromTick ? tickCues : tockCues;
+                fc.Strike("AgreeAim", warn - Sim.Ticks(FireAt), AimAt, AimLen); fc.Strike("AgreeFire", warn, FireAt, FireLen);
+                wheelCues?.Strike("WheelReverse", warn, 0.05f, 0.6f);
                 var fan = new List<Hazard>();
                 for (int i = 0; i < R.Spokes; i++)
                 {
@@ -302,6 +334,7 @@ namespace LastBell.Run
                 VolleysResolved++; CameraShake.Shake(0.06f, 0.1f);
             }
             if (wheel) Destroy(wheel.gameObject);
+            wheel = null; wheelPresenter = null; wheelCues = null; wheelSpin = null;
             Current = "Escape Wheel (recovery)";
             yield return Beats(1);
         }
@@ -337,6 +370,7 @@ namespace LastBell.Run
                     numerals.Add(Numeral(at, need));
                 }
                 Current = s == 0 ? "Counterpoise" : "Counterpoise (second set)";
+                LoopBoth("VesicaLoop"); StrikeBoth("FacesOut", warn, SpringAt, SpringLen); foreach (var c in BothCues) c.LoopAt(warn, "Idle");
                 for (int t = 0; t < warn && set.Exists(IsLive); t++) { Windup((t + 1) / (float)warn); yield return 1; }
                 while (set.Exists(IsLive)) yield return 1;
                 Release(1.2f); ClearNumerals();
@@ -380,6 +414,7 @@ namespace LastBell.Run
                 OnResolve = hz => { ShockHits += hz.Hit.Count; CameraShake.Shake(0.15f, 0.25f); },
             });
             // lean in, then slam: the last 12 ticks of the warning they slide together and meet as the lane lands
+            StrikeBoth("FacesDown", warn, StompAt, StompLen);
             int slide = Mathf.Min(12, warn - 1);
             for (int t = 0; t < warn && IsLive(lane); t++)
             {
@@ -398,6 +433,7 @@ namespace LastBell.Run
             while (IsLive(lane) || IsLive(ring)) yield return 1;
             // the punish window: locked together, nothing live
             Current = "Lock and Release (locked)"; Locked = true;
+            foreach (var c in BothCues) { c.Clear(); c.Play("Stagger", Sim.Ticks(R.PunishSeconds)); }   // reeling: the punish window
             int from = Tick;
             yield return Sim.Ticks(R.PunishSeconds);
             PunishLog.Add((from, Tick)); Locked = false;
@@ -405,6 +441,7 @@ namespace LastBell.Run
             float axis = Axis + 90f; Vector3 la = R.TickAt(axis), lb = R.TockAt(axis);
             int leap = Beats(R.LeapBeats);
             Current = "Lock and Release (release)";
+            StrikeBoth("FacesOut", leap, SpringAt, SpringLen);
             var landing = new List<Hazard>();
             foreach (var at in new[] { la, lb })
             {
@@ -439,6 +476,7 @@ namespace LastBell.Run
             GatePending = false;
             Current = "Shift"; Log("Shift"); ShiftStart = Tick; HpAtShiftStart = Hp;
             CameraShake.Shake(0.12f, 0.3f);
+            foreach (var c in BothCues) { c.Clear(); c.Play("PhaseShift", R.ShiftTicks); c.Loop = "Idle"; }
             for (int t = 0; t < R.ShiftTicks; t++)   // harmless: nothing spawns and both stay damageable
             {
                 transform.Rotate(0, 6f, 0); if (tockBody) tockBody.Rotate(0, -6f, 0);
@@ -457,8 +495,45 @@ namespace LastBell.Run
             tickPulse = Mathf.MoveTowards(tickPulse, 0, Time.deltaTime * 3f); tockPulse = Mathf.MoveTowards(tockPulse, 0, Time.deltaTime * 3f);
             if (tickFace) Prim.SetGlow(tickFace, Gold * (0.6f + 0.5f * glowLevel + 2f * tickPulse));
             if (tockFace) Prim.SetGlow(tockFace, Silver * (0.6f + 0.5f * glowLevel + 2f * tockPulse));
-            if (wheel) wheel.Rotate(0, 90f * Time.deltaTime * (Phase2 ? 1.6f : 1f), 0);
+            if (wheelSpin) wheelSpin.Rotate(0, 90f * Time.deltaTime * (Phase2 ? 1.6f : 1f), 0);
+            PresentModels(glowLevel, tickPulse, tockPulse);
             foreach (var kv in markViews) if (kv.Key && kv.Value) kv.Value.position = kv.Key.transform.position + Vector3.up * 2.6f;
+        }
+
+        // the escape wheel: the rigged prop (it shows WheelLoop by default, so a LAN client's copy turns too), else a gold disc
+        Transform MakeWheel(Vector3 at)
+        {
+            var root = new GameObject("Escape wheel").transform; root.SetParent(transform.parent, false); root.position = Sim.Flat(at);
+            wheelPresenter = CharacterPresenter.Create(root, "EscapementWheel", 1.5f, 1f, 0, h =>
+            {
+                wheelSpin = Prim.Make(PrimitiveKind.Cylinder, h, Vector3.up * 0.05f, new Vector3(2.6f, 0.03f, 2.6f), Gold, 1.5f);
+                wheelSpin.name = "Escape wheel (placeholder)"; return h;
+            });
+            if (wheelPresenter.HasModel) wheelPresenter.SetIdleClip("WheelLoop");
+            return root;
+        }
+
+        // the split towers share one texture: a warm tint on Tick (sun) and a cool one on Tock (moon) tells them apart at range
+        static readonly Color TickTint = new Color(1.0f, 0.9f, 0.7f), TockTint = new Color(0.68f, 0.8f, 1.0f);
+        static void Tint(CharacterPresenter p, Color c)
+        {
+            if (!p || !p.HasModel) return;
+            foreach (var r in p.GetComponentsInChildren<Renderer>())
+                foreach (var m in r.materials) if (m.HasProperty("baseColorFactor")) m.SetColor("baseColorFactor", m.GetColor("baseColorFactor") * c);
+        }
+
+        // presentation on host and LAN client alike: each tower and the wheel turn their faces to this machine's camera,
+        // and the clock faces glow with the beat pulses
+        void PresentModels(float glow, float tickP, float tockP)
+        {
+            var cam = Camera.main;
+            if (cam)
+            {
+                void Face(Transform t) { if (!t) return; var d = Sim.Flat(cam.transform.position - t.position); if (d.sqrMagnitude > 0.01f) t.rotation = Quaternion.LookRotation(d); }
+                Face(tickPivot); Face(tockPivot); if (wheelPresenter && wheelPresenter.HasModel) Face(wheelPresenter.transform.parent);
+            }
+            if (tickPresenter) tickPresenter.GlowLevel = 0.6f + 0.5f * glow + 1.5f * tickP;
+            if (tockPresenter) tockPresenter.GlowLevel = 0.6f + 0.5f * glow + 1.5f * tockP;
         }
 
         void ClearAll()
@@ -466,14 +541,21 @@ namespace LastBell.Run
             ClearMarks(); ClearNumerals();
             foreach (var r in rims) r.Dismiss(); rims.Clear();
             if (wheel) Destroy(wheel.gameObject);
+            wheel = null; wheelPresenter = null; wheelCues = null; wheelSpin = null;
             Locked = false;
         }
 
         protected override void OnDefeat()
         {
             ClearAll();
-            if (tockBody) tockBody.Rotate(0, 0, 8f);   // a placeholder slump
-            transform.Rotate(0, 0, -8f);
+            foreach (var c in BothCues) c.Clear();
+            if (tickPresenter) tickPresenter.Action("Defeat", 150);
+            if (tockPresenter) tockPresenter.Action("Defeat", 150);
+            if (Placeholder)
+            {
+                if (tockBody) tockBody.Rotate(0, 0, 8f);   // a placeholder slump
+                transform.Rotate(0, 0, -8f);
+            }
             W.Fx.Crescendo(transform.position, true, 2, true);
         }
 
@@ -493,6 +575,9 @@ namespace LastBell.Run
         {
             into.Glow = glowLevel;
             into.Look.Add(Phase2 ? 1 : 0); into.Look.Add(tickPulse); into.Look.Add(tockPulse);   // [0] phase 2, [1] Tick pulse, [2] Tock pulse
+            // [3] Tock's clip (index in ClipNames, -1 none) and [4] its speed: Tick's clip travels as the boss's own presenter
+            into.Look.Add(tockPresenter ? Array.IndexOf(ClipNames, tockPresenter.CurrentClip) : -1);
+            into.Look.Add(tockPresenter ? tockPresenter.NetworkClipSpeed : 1);
         }
 
         // client-side state and counters (two-process smoke tests read these)
@@ -502,6 +587,7 @@ namespace LastBell.Run
         public int NetMarkViewsMade { get; private set; }
         public int NetNumeralsMade { get; private set; }    // Counterpoise numerals built from stand-ins
         public int NetWheelsMade { get; private set; }
+        public int NetTockClips { get; private set; }       // frames Tock's rigged clip was applied from the host
         Transform tockAnchor, replicaWheel;
         bool replicaReady; float replicaSpin;
         readonly Dictionary<PlayerController, (Transform view, int mark)> replicaMarks = new Dictionary<PlayerController, (Transform, int)>();
@@ -519,7 +605,7 @@ namespace LastBell.Run
             }
             if (kind == PropWheel)
             {
-                var t = Prim.Make(PrimitiveKind.Cylinder, transform.parent, Vector3.zero, new Vector3(2.6f, 0.03f, 2.6f), Gold, 1.5f);
+                var t = MakeWheel(Vector3.zero);   // the rigged wheel (or its stand-in), as on the host
                 t.name = "Escape wheel (LAN)"; replicaWheel = t; NetWheelsMade++; return t;
             }
             return null;
@@ -548,7 +634,14 @@ namespace LastBell.Run
                 if (tockFace) tockFace.transform.parent.localRotation = Quaternion.Euler(0, 0, Dead ? 8f : 0);
             }
             if (tickFace) tickFace.transform.parent.localRotation = Quaternion.Euler(0, 0, Dead ? -8f : 0);
-            if (replicaWheel) replicaWheel.Rotate(0, 90f * dt * (phase2 ? 1.6f : 1f), 0);
+            if (wheelSpin) wheelSpin.Rotate(0, 90f * dt * (phase2 ? 1.6f : 1f), 0);
+            // Tock's clip from the host (Tick's arrives as the boss presenter's own pose)
+            if (tockPresenter && look.Count > 4)
+            {
+                int ci = Mathf.RoundToInt(look[3]);
+                if (ci >= 0 && ci < ClipNames.Length) { tockPresenter.ApplyNetworkPose(ClipNames[ci], look[4], null, 1, false); if (tockPresenter.HasModel) NetTockClips++; }
+            }
+            PresentModels(state.Glow, tp, kp);
             ReplicaMarks();
             ReplicaNumerals();
         }
