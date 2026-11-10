@@ -158,15 +158,26 @@ namespace LastBell.Run
         // revived them: 5 of 45 downs bled out and "bad all round" held revives ~100 s over 16 Hard fights (9 Nov). With nothing
         // else about to land there, the nearest bot revives from the burn (3 s at 20/s), with the health or a potion for it
         PlayerController burnRv;
-        static bool BurnReviveOk(PlayerController me, BossEncounter boss) => boss is CrucivarEncounter && me.Hp + (me.Potions > 0 ? PlayerController.PotionHeal : 0) >= 75;
-        // nothing but burning ground here for `within` ticks: no strike landing, no live jet, no turret path
+        static bool BurnReviveOk(PlayerController me, BossEncounter boss) => boss is CrucivarEncounter;
+        // the health a revive from q costs: the strongest burn there for the whole channel (burns never add up), plus a hand.
+        // It was a fixed 75 (Brand Pool, 20/s), whatever burned there (review CRU-REVIVE-BURN, 10 Nov)
+        const int BurnReviveSpare = 15;
+        static bool BurnReviveAfford(PlayerController me, Vector3 q)
+        {
+            float rate = 0; var live = me.World.Hazards.Live;
+            for (int i = 0; i < live.Count; i++) { var h = live[i]; if (h.BurnPerSecond > rate && h.Contains(q) && (h.Affects == null || h.Affects(me))) rate = h.BurnPerSecond; }
+            return me.Hp + (me.Potions > 0 ? PlayerController.PotionHeal : 0) >= rate * PlayerController.ReviveSeconds + BurnReviveSpare;
+        }
+        // nothing but burning ground that keeps a revive going (Brand Pool, RI-152) here for `within` ticks: no strike landing,
+        // no live jet, no turret path, and no burn that resets a revive (a Pour Channel: its ticks restart the channel, so a
+        // bot reviving from one never finished; review CRU-REVIVE-BURN, 10 Nov)
         bool StrikeFree(PlayerController me, BossEncounter boss, Vector3 q, int within)
         {
             var live = me.World.Hazards.Live;
             for (int i = 0; i < live.Count; i++)
             {
                 var h = live[i];
-                if (h.BurnPerSecond > 0) continue;
+                if (h.BurnPerSecond > 0) { if (!h.BurnKeepsRevive && h.Contains(q) && (h.Affects == null || h.Affects(me))) return false; continue; }
                 if (Jet(h)) { if (h.Contains(q)) return false; continue; }
                 if (h.Damage > 0 && !h.Cancelled && Lands(h, boss) <= within && Hits(h, me, q)) return false;
             }
@@ -180,7 +191,7 @@ namespace LastBell.Run
                 for (int k = 0; k < 16; k++)
                 {
                     var q = at + Sim.Dir(k * 22.5f) * r;
-                    if (!CombatWorld.InPlayerBound(q, -0.3f) || !StrikeFree(me, boss, q, need)) continue;
+                    if (!CombatWorld.InPlayerBound(q, -0.3f) || !StrikeFree(me, boss, q, need) || !BurnReviveAfford(me, q)) continue;
                     float d = Sim.Flat(q - pos).magnitude;
                     if (d < bd) { bd = d; best = q; }
                 }

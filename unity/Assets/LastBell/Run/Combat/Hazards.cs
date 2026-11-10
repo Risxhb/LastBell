@@ -244,14 +244,21 @@ namespace LastBell.Run
         {
             foreach (var p in w.Players)
             {
-                Hazard src = null;
+                // src: the highest rate, for the damage; resets: any of the burns it stands in resets a revive. Decided from the one
+                // source, an older Brand Pool (BurnKeepsRevive, RI-152) under a Pour Channel at the same 20/s hid the channel's reset
+                // (review CRU-BURN-OVERLAP, 10 Nov)
+                Hazard src = null; bool resets = false;
                 if (!p.Down)
                     foreach (var h in live)
-                        if (h.BurnPerSecond > 0 && h.Locked && (src == null || h.BurnPerSecond > src.BurnPerSecond) && h.Hits(p) && (h.Affects == null || h.Affects(p))) src = h;
+                        if (h.BurnPerSecond > 0 && h.Locked && h.Hits(p) && (h.Affects == null || h.Affects(p)))
+                        {
+                            if (src == null || h.BurnPerSecond > src.BurnPerSecond) src = h;
+                            if (!h.BurnKeepsRevive) resets = true;
+                        }
                 if (src == null) { burn.Remove(p); continue; }
                 burn.TryGetValue(p, out float acc); acc += src.BurnPerSecond * Sim.Dt;
                 int dmg = Mathf.FloorToInt(acc); acc -= dmg; burn[p] = acc;
-                if (dmg > 0) p.ReceiveBurn(src, dmg);
+                if (dmg > 0) p.ReceiveBurn(src, dmg, resets);
             }
         }
 
