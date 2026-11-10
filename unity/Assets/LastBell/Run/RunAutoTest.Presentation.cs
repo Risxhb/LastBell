@@ -85,6 +85,7 @@ namespace LastBell.Run
                 d.SetLanEncounter(keep);
                 Check("hit feel: a LAN client's card names the replicated boss's arena", sylvara != bell && !sylvara.Contains("Throne"), $"'{sylvara}' / '{bell}'");
             }
+            yield return FlashSafetyChecks();
             if (counter) yield return LanDamageChecks();
             PresentationSettings.TestOff = false; HitFeel.LegacyLook = false;
             yield return PhaseToMenu();
@@ -112,6 +113,100 @@ namespace LastBell.Run
         // One pass: a practice of boss e with a full party of Perfect bots (the player too, attacks on), stepped by hand two
         // ticks per frame from the first combat tick with a fixed random seed, hashing the world after every tick. Between the
         // ticks the frame runs normally, so every presentation Update, OnGUI and hit-stop runs as in play.
+        // The hit flash and the down grey-out never cover a warning (review note, 10 Nov): for each main boss on Hard with a
+        // party of four bots, every frame that shows telegraphs, boss bullets or hostile projectiles builds the overlay mask
+        // and checks each one's screen spot is left out; a windowed run also checks what OnGUI actually drew (no quad on a
+        // blocked cell, never above MaxFlashAlpha) and takes a gallery, flash forced on, at the busiest moment of each fight.
+        const float FlashFightSeconds = 14f;
+        IEnumerator FlashSafetyChecks()
+        {
+            var keepLevel = RunDifficulty.Selected;
+            int framesAll = 0, spotsAll = 0, missesAll = 0;
+            HitFeel.TintMask.MaxAlphaDrawn = 0; HitFeel.TintMask.BlockedDraws = 0;
+            for (int e = 0; e < RunDirector.Bosses.Length; e++)
+            {
+                if (!RunDirector.Bosses[e].InRun) continue;
+                string tag = "hit feel: " + LastBell.Menu.TestRushSetup.CardName(e);
+                yield return PhaseToMenu();
+                d.SelectDifficulty(Difficulty.Hard); d.SelectAllies(RunParty.MaxAllies);
+                BellkeeperEncounter.PushTimersOn = false;   // the Ultimate: no timer wipe while we watch its warnings
+                if (!d.StartPractice(RunDirector.Classes[e % RunDirector.Classes.Length], e)) { Check(tag + ": flash practice accepted", false); continue; }
+                yield return Until(() => RunDirector.Instance && RunDirector.Instance.State == RunState.Ready && RunDirector.Instance.Encounter == e, 30, "flash ready");
+                if (RunDirector.Instance != d) { directorLog.AddRange(d.Log); d = RunDirector.Instance; d.InputOverride = bot; bot.Clear(); }
+                var me = new AllyBot(RunParty.MaxAllies, RunParty.MaxAllies + 1, BotMode.Perfect);
+                d.InputOverride = me; if (d.Player) d.Player.Input = me;
+                bool attacks = AllyBot.Attacks; AllyBot.Attacks = true;
+                d.RequestReady();
+                yield return Until(() => d.State == RunState.Combat && d.Boss, 10, "flash combat");
+                int frames = 0, spots = 0, misses = 0, busiest = 0; float t = 0; bool shot = false;
+                // the Ultimate: bots cannot do its plate duties, so its scripted wipe ends a bot fight within seconds, before any
+                // floor warning; there the boss is halted (as its own suite does) and real-shape telegraphs are laid in its arena
+                var ult = d.Boss as BellkeeperEncounter; float nextLay = 0;
+                if (ult) ult.Halt();
+                var cam = Camera.main;
+                while ((t < FlashFightSeconds || (frames < 120 && t < 45f)) && d.State == RunState.Combat)   // a slow opener: up to 45 s for some warnings
+                {
+                    var w = d.World;
+                    // everyone stays up: this checks the overlay over the warnings, not survival
+                    foreach (var p in w.Players) if (p && !p.Down && p.Hp < 60) p.DebugSetHp(p.MaxHealth);
+                    if (ult && t >= nextLay) { nextLay = t + 0.75f; LayTestTelegraphs(w, (int)(t * 4)); }
+                    int live = Warnings(w);
+                    if (live > 0 && cam)
+                    {
+                        frames++;
+                        HitFeel.TintMask.Build(w, cam, Screen.width, Screen.height);
+                        foreach (var h in w.Hazards.Live)
+                            if (h != null && !h.Cancelled && h.Shape != HazardShape.Tether && OnScreen(cam, h.Origin, out var g)) { spots++; if (!HitFeel.TintMask.BlockedAt(g)) misses++; }
+                        foreach (var b in w.Bullets.Live)
+                            if (OnScreen(cam, b.Pos, out var g)) { spots++; if (!HitFeel.TintMask.BlockedAt(g)) misses++; }
+                        if (!NoFrames && (int)(t * 4) % 2 == 0) HitFeel.TestFlash(1);   // half the time a full flash is on screen
+                    }
+                    // the gallery: the busiest moment after the first few seconds, flash full on, then the 8 Nov look for comparison
+                    if (!NoFrames && !shot && t > 6f && live >= Math.Max(3, busiest))
+                    {
+                        shot = true; string name = "flashsafe_" + RunDirector.Bosses[e].Name.Split(' ')[0].ToLowerInvariant();
+                        // not paused: the pause card would cover the picture
+                        HitFeel.TestFlash(1); yield return Shot(name + "_after");
+                        HitFeel.UnmaskedLook = true; HitFeel.TestFlash(1); yield return Shot(name + "_before");
+                        HitFeel.UnmaskedLook = false;
+                        Note($"{tag}: gallery at {t:0.0} s with {live} warnings on screen");
+                    }
+                    busiest = Math.Max(busiest, live);
+                    t += Time.deltaTime; yield return null;
+                }
+                Note($"{tag}: flash safety ran {t:0.0} s, left in state {d.State} ({d.DefeatCause}), hazards {d.World?.Hazards.Count}, camera {(cam ? cam.name : "none")}");
+                Check($"{tag}: (Hard, 4 players) every warning on screen is kept clear of the hit flash", frames > 0 && misses == 0, $"{spots} warning spots over {frames} frames, {misses} under the flash; busiest {busiest}");
+                framesAll += frames; spotsAll += spots; missesAll += misses;
+                AllyBot.Attacks = attacks; d.InputOverride = bot; if (d.Player) d.Player.Input = bot;
+            }
+            HitFeel.UnmaskedLook = false; HitFeel.ClearTransient(); BellkeeperEncounter.PushTimersOn = true;
+            yield return PhaseToMenu();
+            d.SelectDifficulty(keepLevel); d.SelectAllies(0);
+            if (!NoFrames) Check("hit feel: the drawn flash never covers a warning and never goes above its cap", HitFeel.TintMask.BlockedDraws == 0 && HitFeel.TintMask.MaxAlphaDrawn <= HitFeel.MaxFlashAlpha + 1e-4f && HitFeel.TintMask.MaxAlphaDrawn > 0,
+                $"{HitFeel.TintMask.BlockedDraws} quads on warnings, peak alpha {HitFeel.TintMask.MaxAlphaDrawn:0.000} (cap {HitFeel.MaxFlashAlpha})");
+            Note($"hit feel: flash safety over {framesAll} frames, {spotsAll} warning spots, {missesAll} under the flash");
+        }
+        static void LayTestTelegraphs(CombatWorld w, int k)
+        {
+            var rnd = new System.Random(k);
+            Vector3 At() => new Vector3((float)(rnd.NextDouble() * 16 - 8), 0, (float)(rnd.NextDouble() * 16 - 8));
+            w.Hazards.Spawn(new Hazard { Source = "Flash test circle", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = At(), Radius = 2f, ResolveAt = 50, Damage = 0 });
+            w.Hazards.Spawn(new Hazard { Source = "Flash test lane", Shape = HazardShape.Lane, Kind = HazardKind.Ground, Origin = At(), Yaw = k * 37 % 360, Length = 9, Width = 2, ResolveAt = 50, Damage = 0 });
+            w.Hazards.Spawn(new Hazard { Source = "Flash test cone", Shape = HazardShape.Cone, Kind = HazardKind.Ground, Origin = At(), Yaw = k * 53 % 360, Radius = 5, HalfAngle = 30, ResolveAt = 50, Damage = 0 });
+        }
+        static int Warnings(CombatWorld w)
+        {
+            int n = w.Bullets.Live.Count;
+            foreach (var h in w.Hazards.Live) if (h != null && !h.Cancelled && h.Shape != HazardShape.Tether) n++;
+            foreach (var p in w.Projectiles.Live) if (p.Owner == null) n++;
+            return n;
+        }
+        static bool OnScreen(Camera cam, Vector3 p, out Vector2 gui)
+        {
+            var q = cam.WorldToScreenPoint(p); gui = new Vector2(q.x, Screen.height - q.y);
+            return q.z > 0.01f && q.x >= 0 && q.y >= 0 && q.x < Screen.width && q.y < Screen.height;
+        }
+
         // review PRES-LAN-ALLOC (9 Nov): BossDamage with a LAN host recording, in a live practice so the capture has a world
         IEnumerator LanDamageChecks()
         {

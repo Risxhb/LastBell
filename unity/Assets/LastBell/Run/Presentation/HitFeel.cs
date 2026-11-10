@@ -15,6 +15,9 @@ namespace LastBell.Run.Presentation
     //     ends, so stops never stack or chain. The sim tick, positions, hazards and timers keep running exactly as before.
     //   * Hit vignette. When your own character loses HP the screen edge flashes Ember Coral (a short white contact first),
     //     stronger for bigger hits; while you are down the screen greys a little (gpt/06 "Outcome feedback").
+    //     Telegraph-safe by construction (10 Nov, review note): both overlays are drawn through a grid of screen cells
+    //     (TintMask) and never touch a cell showing a live telegraph, a boss bullet or a hostile projectile (two rings
+    //     of cells around them fade in as a feather), and the flash never goes above MaxFlashAlpha anywhere.
     // No invincibility of any kind: nothing here reads or writes gameplay state other than reading HP, Down and the boss.
     // LAN: BossDamage is recorded for clients (LanFx Hud "Damage") and replayed there; downs and the local player's hits are
     // read from the replica's own HP each frame, so a client gets the same feedback for its own character.
@@ -235,17 +238,127 @@ namespace LastBell.Run.Presentation
 
         void DrawPlayerFeedback()
         {
-            var me = d.Player; var full = new Rect(0, 0, Screen.width, Screen.height);
+            var me = d.Player;
+            bool down = me && me.Down && PresentationSettings.HitFlash, flashing = flash > 0.01f;
+            if (!down && !flashing) return;
             var old = GUI.color;
-            if (me && me.Down && PresentationSettings.HitFlash) { GUI.color = DownInk; GUI.DrawTexture(full, Texture2D.whiteTexture); }
-            if (flash > 0.01f)
+            TintMask.Build(UnmaskedLook ? null : d.World, Camera.main, Screen.width, Screen.height);
+            if (down) TintMask.Draw(Texture2D.whiteTexture, DownInk, false);
+            if (flashing)
             {
                 var c = flashWhite && flashAge < 0.06f ? Color.Lerp(Contact, Coral, flashAge / 0.06f) : Coral;
                 if (flashAge >= 0.06f) flashWhite = false;
-                c.a = 0.75f * flash; GUI.color = c;
-                GUI.DrawTexture(full, Vignette(), ScaleMode.StretchToFill, true);
+                c.a = (UnmaskedLook ? 0.75f : MaxFlashAlpha) * flash;
+                TintMask.Draw(Vignette(), c, true);
             }
             GUI.color = old;
+        }
+        // autotest only: the 8 Nov look (no mask, peak 0.75) for before/after pictures; and a flash on demand for galleries
+        public static bool UnmaskedLook;
+        public static void TestFlash(float k) { flash = Mathf.Clamp01(k); flashAge = 0.1f; flashWhite = false; }
+        public const float MaxFlashAlpha = 0.55f;   // the flash's peak opacity at the very edge (0.75 before 10 Nov)
+
+        // The screen as a grid of cells. Build marks every cell that a live telegraph, a boss bullet or a hostile projectile
+        // covers (a conservative screen box per shape); Draw paints a full-screen overlay row by row, one quad per run of
+        // equal cells, and leaves every marked cell out. Nothing allocates.
+        public static class TintMask
+        {
+            public const int Cols = 48, Rows = 27;
+            static readonly byte[] cells = new byte[Cols * Rows];   // 0 clear, 1 outer feather (0.6), 2 inner feather (0.25), 3 blocked (nothing drawn)
+            static float sw = 1, sh = 1;
+            public static int Blocked { get; private set; }
+            public static float MaxAlphaDrawn { get; set; }          // tests: the most any drawn cell was given (<= MaxFlashAlpha)
+            public static int BlockedDraws { get; set; }             // tests: quads drawn over a blocked cell (must stay 0)
+            public static byte Cell(int c, int r) => cells[r * Cols + c];
+            public static bool BlockedAt(Vector2 gui)
+            {
+                int c = (int)(gui.x / sw * Cols), r = (int)(gui.y / sh * Rows);
+                return c >= 0 && c < Cols && r >= 0 && r < Rows && cells[r * Cols + c] == Block;
+            }
+
+            public static void Build(CombatWorld w, Camera cam, float width, float height)
+            {
+                Array.Clear(cells, 0, cells.Length); Blocked = 0; sw = Mathf.Max(1, width); sh = Mathf.Max(1, height);
+                if (w == null || !cam) return;
+                var hz = w.Hazards.Live;
+                for (int i = 0; i < hz.Count; i++)
+                {
+                    var h = hz[i];
+                    // a tether is a chain between players, drawn by its ability, not a floor shape
+                    if (h == null || h.Cancelled || h.Shape == HazardShape.Tether) continue;
+                    // a lane: its length in every direction (conservative)
+                    float r = h.Shape == HazardShape.Lane ? Mathf.Max(h.Length, h.Width) : h.Radius;
+                    Box(cam, h.Origin, Mathf.Max(0.5f, r), 0);
+                }
+                var bl = w.Bullets.Live;
+                for (int i = 0; i < bl.Count; i++) Box(cam, bl[i].Pos, bl[i].Radius + 0.35f, 1);
+                var pr = w.Projectiles.Live;
+                for (int i = 0; i < pr.Count; i++) if (pr[i].Owner == null) Box(cam, pr[i].Pos, pr[i].Radius + 0.35f, 1);
+                // feather: two rings of cells around the blocked ones fade in (0.25, then 0.6)
+                for (int r = 0; r < Rows; r++)
+                    for (int c = 0; c < Cols; c++)
+                        if (cells[r * Cols + c] == 0 && NextTo(c, r, Block)) cells[r * Cols + c] = 2;
+                for (int r = 0; r < Rows; r++)
+                    for (int c = 0; c < Cols; c++)
+                        if (cells[r * Cols + c] == 0 && NextTo(c, r, 2)) cells[r * Cols + c] = 1;
+            }
+            const byte Block = 3;
+            static bool NextTo(int c, int r, byte level)
+            {
+                for (int dr = -1; dr <= 1; dr++)
+                    for (int dc = -1; dc <= 1; dc++)
+                    {
+                        int rr = r + dr, cc = c + dc;
+                        if (rr >= 0 && rr < Rows && cc >= 0 && cc < Cols && cells[rr * Cols + cc] == level) return true;
+                    }
+                return false;
+            }
+
+            // a floor shape of radius r around p, with height for bodies and bullets: the screen box of its eight corners
+            static void Box(Camera cam, Vector3 p, float r, float lift)
+            {
+                float x0 = float.MaxValue, y0 = float.MaxValue, x1 = float.MinValue, y1 = float.MinValue;
+                for (int k = 0; k < 8; k++)
+                {
+                    var q = cam.WorldToScreenPoint(new Vector3(p.x + ((k & 1) == 0 ? -r : r), p.y + ((k & 4) == 0 ? -0.2f : 1.2f + lift), p.z + ((k & 2) == 0 ? -r : r)));
+                    // a shape reaching behind the camera (an arena-wide ring): it can cover any part of the screen, so all of it
+                    if (q.z <= 0.01f) { x0 = y0 = -1; x1 = sw + 1; y1 = sh + 1; break; }
+                    float gy = sh - q.y;
+                    x0 = Mathf.Min(x0, q.x); x1 = Mathf.Max(x1, q.x); y0 = Mathf.Min(y0, gy); y1 = Mathf.Max(y1, gy);
+                }
+                if (x1 < 0 || y1 < 0 || x0 > sw || y0 > sh) return;
+                int c0 = Mathf.Max(0, (int)(x0 / sw * Cols)), c1 = Mathf.Min(Cols - 1, (int)(x1 / sw * Cols));
+                int r0 = Mathf.Max(0, (int)(y0 / sh * Rows)), r1 = Mathf.Min(Rows - 1, (int)(y1 / sh * Rows));
+                for (int r2 = r0; r2 <= r1; r2++)
+                    for (int c = c0; c <= c1; c++)
+                        if (cells[r2 * Cols + c] != Block) { cells[r2 * Cols + c] = Block; Blocked++; }
+            }
+
+            // one quad per run of equal cells in a row: the texture's matching part (vignette) or the plain tint
+            public static void Draw(Texture tex, Color tint, bool mapTexture)
+            {
+                float cw = sw / Cols, ch = sh / Rows, full = tint.a;
+                for (int r = 0; r < Rows; r++)
+                {
+                    int c = 0;
+                    while (c < Cols)
+                    {
+                        byte v = cells[r * Cols + c]; int e = c + 1;
+                        while (e < Cols && cells[r * Cols + e] == v) e++;
+                        if (v == Block) { c = e; continue; }
+                        float a = v == 0 ? full : v == 1 ? full * 0.6f : full * 0.25f;
+                        if (!UnmaskedLook && a > MaxAlphaDrawn) MaxAlphaDrawn = a;
+                        for (int k = c; k < e; k++) if (cells[r * Cols + k] == Block) BlockedDraws++;
+                        tint.a = a; GUI.color = tint;
+                        // whole-pixel edges, so neighbouring quads meet exactly (no hairline seams)
+                        float x0 = Mathf.Round(c * cw), y0 = Mathf.Round(r * ch);
+                        var rect = new Rect(x0, y0, Mathf.Round(e * cw) - x0, Mathf.Round((r + 1) * ch) - y0);
+                        if (mapTexture) GUI.DrawTextureWithTexCoords(rect, tex, new Rect(rect.x / sw, 1f - rect.yMax / sh, rect.width / sw, rect.height / sh), true);
+                        else GUI.DrawTexture(rect, tex);
+                        c = e;
+                    }
+                }
+            }
         }
 
         void DrawNumbers()
