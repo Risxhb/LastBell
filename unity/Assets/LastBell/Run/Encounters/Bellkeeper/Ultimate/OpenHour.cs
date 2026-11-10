@@ -401,7 +401,7 @@ namespace LastBell.Run
                 handM = Prim.Material(new Color(0.9f, 0.7f, 0.32f), 1.4f);
             }
             root = new GameObject("The Open Hour (stand-in)").transform; root.SetParent(W.Root, false);
-            for (int i = 0; i < 4; i++) { var t = Prim.Make(PrimitiveKind.Cylinder, root, Dir(90 * i) * PlateR + Vector3.up * 0.04f, new Vector3(3.2f, 0.02f, 3.2f), Color.white); plates[i] = t.GetComponent<Renderer>(); Mat(t, plateDim); UltArt.DressPlate(t); }
+            for (int i = 0; i < 4; i++) { var t = UltMarkMesh.Mark(PrimitiveKind.Cylinder, UltMarkMesh.Dial, root, Dir(90 * i) * PlateR + Vector3.up * 0.04f, new Vector3(3.2f, 0.02f, 3.2f)); plates[i] = t.GetComponent<Renderer>(); Mat(t, plateDim); UltArt.DressPlate(t); }
             hand = new GameObject("hand").transform; hand.SetParent(root, false);
             Mat(Prim.Make(PrimitiveKind.Cube, hand, new Vector3(0, 0.06f, 3.6f), new Vector3(0.45f, 0.03f, 4.6f), Color.white), plateHot);
             UltArt.DressHand(hand);
