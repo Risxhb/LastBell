@@ -1,5 +1,12 @@
 # LAN multiplayer: transport foundation (unfinished)
 
+## November 10: LAN ships in the main player (one player, one build path)
+
+- There is one Windows player for everything: Start Run, Boss Rush and Multiplayer. `Play-Last Bell LAN/` is to be replaced by a README pointing at `Play-Last Bell/` when the new player is swapped in.
+- One build path: `LanTestBuild.BuildWindows` now only calls `ConfrontationMenuBuild.BuildWindows` (the `LASTBELL_LAN_TEST` define is gone from the build too; no code used it since November 4). `LASTBELL_LAN_OUTPUT` still sets the output path for older scripts.
+- Nothing network-related runs until the player opens Multiplayer: sockets open only from the lobby's Host/Connect (`LanConnection`), so the game's LAN code triggers the Windows Firewall prompt only when someone hosts. Caveat: the player is a Unity Development build (`BuildOptions.Development`, since the first Confrontation build), and Unity's player connection listens on TCP 0.0.0.0:55000 at startup, so Windows can still ask at first launch (Block rules exist for this morning's and earlier test players that never hosted). Removing that needs a non-Development build: a separate decision. Test hooks (`-lastbellLanMenuTest`, `-lastbellLanSmokeHost`/`-lastbellLanSmokeClient`) stay inactive without their flags.
+- First build with this: branch `integrate/rebuild-20261110`, test player `builds/rebuild-20261110b/player` (see `docs/current-handoffs.md`, 10 Nov).
+
 ## November 4: LAN is part of the main player, and every boss but the Tutorial plays over LAN
 
 User (3 Nov, night): the client should show everything the host sees, each computer running its own copy of the game, "just like how multiplayer should be".

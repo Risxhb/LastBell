@@ -10,6 +10,9 @@
 # Clips: Idle 4 s loop, Walk 1.6 s loop, CutIn 1.2 s / CutOut 1.2 s / CutAcross 1.2 s (tell held to 0.7, strike 0.75),
 #        BladePlant 1.0 s (plant 0.6), PlantLoop 2 s loop, OrbWhirl 0.8 s, WhirlLoop 1.0 s loop, OrbThrow 1.0 s
 #        (release 0.35), MantleShake 1.2 s, PhaseShift 2.0 s, Defeat 2.5 s (held)
+# 9 Nov 2026 (3 Nov design; prompts in build-evidence/miniboss-models-20261109/briar/prompts.md): + TempoLoop 1.11 s loop
+#        (2 beats at 108 BPM, sway peaks on each beat), RootedLoop 2 s loop (the punish window), MantleShake re-keyed with
+#        the blade planted (the grafts sprout during the Hedgerow).
 import bpy, sys, os, math
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from miniboss_rig_lib import *
@@ -62,112 +65,169 @@ WALK = 1.6
 def walk(t):
     ph = 2 * math.pi * t / WALK; s = math.sin(ph); lift = lambda q: max(0.0, math.sin(q))
     ch = base(t, WALK, 2)
-    ch['rot'].update({'thigh.R': (-18 * s, 0, 0), 'shin.R': (22 * lift(ph + math.pi), 0, 0), 'foot.R': (8 * s, 0, 0),
-                      'thigh.L': (18 * s, 0, 0), 'shin.L': (22 * lift(ph), 0, 0), 'foot.L': (-8 * s, 0, 0),
-                      'hips': (0, 2 * s, 5 * s), 'chest': (6, -2 * s, -6 * s)})
-    ch['loc']['hips'] = (0, 0, -0.04 + 0.05 * abs(math.cos(ph)))
-    ch['aim']['upperarm.R'] = add(REST['upperarm.R'], (0, 0.15 * s, 0)); ch['aim']['upperarm.L'] = add(REST['upperarm.L'], (0, -0.15 * s, 0))
-    ch['aim']['orb'] = add(REST['orb'], (0, 0.25 * s, 0))
+    ch['rot'].update({'thigh.R': (-30 * s - 18 * lift(ph + math.pi), 0, 0), 'shin.R': (48 * lift(ph + math.pi), 0, 0), 'foot.R': (10 * s, 0, 0),
+                      'thigh.L': (30 * s - 18 * lift(ph), 0, 0), 'shin.L': (48 * lift(ph), 0, 0), 'foot.L': (-10 * s, 0, 0),
+                      'hips': (0, 5 * s, 8 * s), 'chest': (8, -6 * s, -12 * s)})
+    ch['loc']['hips'] = (0.05 * s, 0, -0.06 + 0.08 * abs(math.cos(ph)))
+    ch['aim']['upperarm.R'] = add(REST['upperarm.R'], (0, 0.22 * s, 0.1)); ch['aim']['upperarm.L'] = add(REST['upperarm.L'], (0, -0.22 * s, 0))
+    ch['aim']['blade'] = add(REST['blade'], (-0.15, -0.1, 0.25))   # point carried just off the floor
+    ch['aim']['orb'] = add(REST['orb'], (0, 0.4 * s, 0))
     return ch
-
 # Pruning Cuts. Each: the tell pose by 0.55 (held to 0.7), the strike at 0.75, follow-through to 1.2.
 T_TELL, T_HIT = 0.55, 0.75
-def cut(t, tell, strike, twist_tell, twist_hit, crouch_hit=0.0):
+def cut(t, tell, strike, twist_tell, twist_hit, crouch_hit=0.0, crouch_tell=0.3, lean_tell=4, lean_hit=4):
     # tell / strike: (upperarm, forearm, blade) directions; twist: chest turn (deg, + toward its left)
     u = key(t, [(0, 0), (T_TELL, 1.0), (0.7, 1.0)]); h = key(t, [(0.7, 0), (T_HIT, 1.0), (1.0, 1.0), (1.2, 0.6)])
-    ch = crouch(base(t), 0.3 * u + crouch_hit * h)
+    ch = crouch(base(t), crouch_tell * u * (1 - h) + crouch_hit * h)
     for n, a, b in zip(('upperarm.R', 'forearm.R', 'blade'), tell, strike):
         ch['aim'][n] = nrm(add(scale(REST[n], (1 - u) * (1 - h)), scale(a, u * (1 - h)), scale(b, h)))
-    ch['rot']['chest'] = (4 * u, 0, twist_tell * u * (1 - h) + twist_hit * h)
-    ch['rot']['hips'] = (0, 0, 0.4 * (twist_tell * u * (1 - h) + twist_hit * h))
+    tw = twist_tell * u * (1 - h) + twist_hit * h
+    ch['rot']['chest'] = (lean_tell * u * (1 - h) + lean_hit * h, 0, tw)
+    ch['rot']['hips'] = (0, 0, 0.45 * tw)
     return ch
-IN_TELL = ((-0.2, -0.6, -0.75), (0.75, -0.6, -0.1), (0.95, -0.2, 0.2))        # blade pulled in across the chest
+IN_TELL = ((-0.4, -0.3, 0.86), (0.75, -0.45, 0.48), (0.95, -0.2, 0.15))      # coiled: elbow at head height, the blade flat across the chest
 IN_HIT = ((-0.95, -0.25, -0.1), (-0.98, 0.1, 0.0), (-0.9, 0.4, -0.15))       # flung wide, reaching far
-OUT_TELL = ((-0.6, 0.6, -0.5), (-0.6, 0.75, -0.2), (-0.4, 0.85, -0.35))       # swept back wide and low
-OUT_HIT = ((-0.7, -0.6, -0.35), (0.2, -0.95, -0.2), (0.8, -0.5, -0.35))       # a close low sweep round the front
-ACROSS_TELL = ((-0.35, 0.1, 0.93), (-0.1, 0.2, 0.97), (0.1, 0.5, 0.86))       # raised high
-ACROSS_HIT = ((-0.2, -0.85, -0.5), (0.15, -0.9, -0.4), (0.35, -0.75, -0.55))  # brought down across the front
-def cut_in(t): return cut(t, IN_TELL, IN_HIT, 35, -50)
-def cut_out(t): return cut(t, OUT_TELL, OUT_HIT, -40, 60, 0.4)
-def cut_across(t): return cut(t, ACROSS_TELL, ACROSS_HIT, -10, 25, 0.5)
-
+OUT_TELL = ((-0.3, 0.6, -0.75), (-0.2, 0.75, -0.62), (-0.2, 0.85, -0.5))     # swept back and low behind the right hip, point trailing
+OUT_HIT = ((-0.55, -0.6, -0.58), (0.6, -0.75, -0.25), (0.85, -0.3, -0.45))   # a close low sweep round the front, elbow bent, at the knees
+ACROSS_TELL = ((-0.35, 0.1, 0.93), (-0.1, 0.2, 0.97), (0.1, 0.5, 0.86))      # raised high
+ACROSS_HIT = ((0.45, -0.75, -0.5), (0.3, -0.85, -0.42), (0.05, -0.5, -0.86)) # chopped straight down in front, on the centre line
+def cut_in(t): return cut(t, IN_TELL, IN_HIT, 45, -50, 0.2, 0.25, 8, 4)
+def cut_out(t):
+    ch = cut(t, OUT_TELL, OUT_HIT, -20, 50, 0.0, 0.0, 22, 26)
+    u = key(t, [(0, 0), (T_TELL, 1.0), (1.0, 1.0), (1.2, 0.5)]); return sink(ch, 0.45 * u)
+def cut_across(t):
+    ch = cut(t, ACROSS_TELL, ACROSS_HIT, -10, 25, 0.0, 0.0, -18, 34)
+    h = key(t, [(0.7, 0), (T_HIT, 1.0), (1.0, 1.0), (1.2, 0.6)]); return sink(ch, 0.4 * h)
+# the blade planted in front of it, both hands on the grip (two-bone IK to the grip)
 # Overgrowth: the blade driven point-down into the floor in front of it, then leant on
 PL = ((-0.25, -0.75, -0.6), (-0.05, -0.8, -0.6), (0.05, -0.25, -0.97))
 def blade_plant(t):
     T = 0.6
-    u = key(t, [(0, 0), (0.4, -0.5), (T, 1.0), (1.0, 1.0)]); up = max(0, -u); dn = max(0, u)
-    ch = crouch(base(t), 0.8 * dn)
-    for n, d, a in zip(('upperarm.R', 'forearm.R', 'blade'), PL, ACROSS_TELL):
-        ch['aim'][n] = nrm(add(scale(REST[n], 1 - up - dn), scale(a, up), scale(d, dn)))
-    ch['rot']['chest'] = (18 * dn + ring(t, T, 4, 3, 4), 0, 10 * dn)
+    u = key(t, [(0, 0), (0.4, -1.0), (T, 1.0), (1.0, 1.0)]); up = max(0, -u); dn = max(0, u)
+    ch = crouch(base(t), 0.9 * dn)
+    if dn > 0:
+        planted(ch, 34 * dn + ring(t, T, 4, 3, 4))
+        if dn < 1:   # coming down from overhead
+            ch['ik'].clear()
+            for n, a in zip(('upperarm.R', 'forearm.R', 'blade'), ACROSS_TELL): ch['aim'][n] = mixd(a, ((0.25, -0.85, -0.45), (0.2, -0.9, -0.4), PLANT_D)[('upperarm.R', 'forearm.R', 'blade').index(n)], dn)
+    else:
+        for n, a in zip(('upperarm.R', 'forearm.R', 'blade'), ACROSS_TELL): ch['aim'][n] = mixd(REST[n], a, up)
+        ch['rot']['chest'] = (-10 * up, 0, 0)
     return ch
-def plant_loop(t):
+def plant_loop(t):   # leaning on the planted blade like a cane, the orb hand resting on its left knee, out of the legs
     p = 2 * math.pi * t / 2.0
-    ch = crouch(base(t, 2.0, 4), 0.8)
-    for n, d in zip(('upperarm.R', 'forearm.R', 'blade'), PL): ch['aim'][n] = d
-    ch['rot']['chest'] = (18 + 1.5 * math.sin(p), 0, 10); ch['rot']['head'] = (8, 0, 6 * math.sin(p))
+    ch = planted(sink(base(t, 2.0, 4), 0.3), 40 + 2 * math.sin(p))
+    ch['ik'].pop(('upperarm.L', 'forearm.L'), None)
+    ch['aim']['upperarm.L'] = (0.55, -0.4, -0.73); ch['aim']['forearm.L'] = (0.2, -0.65, -0.73); ch['aim']['orb'] = (0.6, -0.2, -0.77)
+    ch['rot']['head'] = (10, 0, 7 * math.sin(p))
     return ch
-
 # Weight of Seasons: the orb whirled overhead on its chain, faster, then hurled forward
-def whirl(t, rate):
+def whirl(t, rate):   # the whole arm circles nearly vertical overhead, the orb flying wide on its chain
     a = 2 * math.pi * rate * t
-    return {'upperarm.L': (0.45, -0.05, 0.89), 'forearm.L': (0.15 + 0.12 * math.cos(a), 0.12 * math.sin(a), 0.98),
-            'orb': (math.cos(a), math.sin(a), 0.15)}
+    return {'upperarm.L': nrm((0.25 + 0.3 * math.cos(a), 0.3 * math.sin(a), 0.9)), 'forearm.L': nrm((0.2 + 0.6 * math.cos(a), 0.6 * math.sin(a), 0.75)),
+            'orb': (math.cos(a), math.sin(a), 0.0)}
 def orb_whirl(t):
     u = key(t, [(0, 0), (0.6, 1.0), (0.8, 1.0)])
     ch = base(t); w = whirl(t, 1.5 * u)
     for n in ('upperarm.L', 'forearm.L', 'orb'): ch['aim'][n] = nrm(add(scale(REST[n], 1 - u), scale(w[n], u)))
-    ch['rot']['chest'] = (-6 * u, 0, -8 * u); ch['rot']['head'] = (-10 * u, 0, 0)
+    ch['rot']['chest'] = (-8 * u, -10 * u, -8 * u); ch['rot']['head'] = (-22 * u, 0, 0)
     return ch
 def whirl_loop(t):
     ch = base(t, 1.0, 2); w = whirl(t, 2.0)
     for n in ('upperarm.L', 'forearm.L', 'orb'): ch['aim'][n] = w[n]
-    ch['rot']['chest'] = (-6, 0, -8 + 3 * math.sin(2 * math.pi * 2 * t)); ch['rot']['head'] = (-10, 0, 0)
+    ch['rot']['chest'] = (-8, -10, -8 + 3 * math.sin(2 * math.pi * 2 * t)); ch['rot']['head'] = (-22, 0, 0)
     return ch
-def orb_throw(t):
+def orb_throw(t):   # a lunge forward: the left root steps out, the arm straightens forward and hurls the orb, the blade counter-swings back
     T = 0.35
-    ch = crouch(base(t), 0.4 * key(t, [(0, 0), (T, 1.0), (1.0, 0.3)]))
+    k = key(t, [(0, 0), (T, 1.0), (0.6, 1.0), (1.0, 0.0)])
+    ch = crouch(base(t), 0.5 * k)
+    ch['rot']['thigh.L'] = (-12 - 34 * k, 0, 0); ch['rot']['shin.L'] = (12 + 20 * k, 0, 0)
+    ch['loc']['hips'] = add(ch['loc']['hips'], (0, -0.3 * k, -0.08 * k))
     w = whirl(0.0, 2.0)
-    fling = {'upperarm.L': (0.3, -0.9, 0.3), 'forearm.L': (0.1, -0.98, 0.1), 'orb': (0.0, -0.98, -0.15)}
+    fling = {'upperarm.L': (0.1, -0.97, 0.2), 'forearm.L': (0.05, -0.98, 0.15), 'orb': (0.0, -0.99, 0.1)}
     for n in ('upperarm.L', 'forearm.L', 'orb'): ch['aim'][n] = dirs(t, [(0, w[n]), (T, fling[n]), (0.6, fling[n]), (1.0, REST[n])])
-    ch['rot']['chest'] = (key(t, [(0, -6), (T, 14), (1.0, 4)]), 0, key(t, [(0, -8), (T, 22), (1.0, 0)]))
+    for n, d in (('upperarm.R', (-0.4, 0.85, -0.35)), ('forearm.R', (-0.3, 0.9, -0.3))): ch['aim'][n] = mixd(REST[n], d, k)
+    ch['rot']['chest'] = (key(t, [(0, -8), (T, 28), (1.0, 4)]), 0, key(t, [(0, -8), (T, -12), (1.0, 0)]))
     return ch
-
-# Lost Seasons: the mantle shaken, petals falling (a shiver from the shoulders down)
-def mantle_shake(t):
+# Season Grafts sprout: the mantle shaken hard while the blade stays planted (starts and ends in PlantLoop's pose)
+def mantle_shake(t):   # grafts sprout: still gripping the planted blade, it throws its head and chest up and shakes, the orb rattling at its side
     s = key(t, [(0, 0), (0.2, 1.0), (0.9, 1.0), (1.2, 0)])
-    ch = base(t)
-    ch['rot']['chest'] = (4 * s * math.sin(2 * math.pi * 7 * t), 3 * s * math.sin(2 * math.pi * 9 * t), 5 * s * math.sin(2 * math.pi * 6 * t))
-    ch['rot']['head'] = (-10 * s, 0, 4 * s * math.sin(2 * math.pi * 5 * t))
-    ch['aim']['upperarm.R'] = add(REST['upperarm.R'], (-0.3 * s, 0, 0.3 * s)); ch['aim']['upperarm.L'] = add(REST['upperarm.L'], (0.3 * s, 0, 0.3 * s))
+    ch = plant_loop(0.0)
+    ch['rot']['chest'] = (40 * (1 - s) - 26 * s + 8 * s * math.sin(2 * math.pi * 7 * t), 6 * s * math.sin(2 * math.pi * 9 * t), 9 * s * math.sin(2 * math.pi * 6 * t))
+    ch['rot']['head'] = (-34 * s, 0, 10 * s * math.sin(2 * math.pi * 5 * t))
+    ch['aim']['orb'] = add((0.6, -0.2, -0.77), (0.35 * s * math.sin(2 * math.pi * 6 * t), 0.35 * s * math.cos(2 * math.pi * 6 * t), 0))
+    return ch
+# Pruning Tempo between cuts: the blade held ready low across the front, swaying side to side on each beat
+READY = ((-0.1, -0.7, -0.7), (0.6, -0.7, -0.4), (0.55, -0.6, -0.58))   # the blade 45 degrees across the front, point ahead of the feet
+TEMPO = 1.11
+def tempo_loop(t):
+    ph = (t % (TEMPO / 2)) / (TEMPO / 2); side = 1 if t < TEMPO / 2 else -1
+    sway = math.sin(math.pi * ph) * side; dip = snap(ph, 0.5, 0.18, 0.3)
+    ch = sink(base(t, TEMPO, 2), 0.12 + 0.18 * dip)
+    for n, d in zip(('upperarm.R', 'forearm.R', 'blade'), READY): ch['aim'][n] = d
+    ch['loc']['hips'] = add(ch['loc']['hips'], (0.3 * sway, 0, 0))
+    ch['rot']['chest'] = (10 + 6 * dip, 22 * sway, -8 * sway); ch['rot']['hips'] = (0, -8 * sway, 0)
+    ch['rot']['head'] = (8 * dip, -10 * sway, 0)
+    ch['aim']['orb'] = add(REST['orb'], (0.7 * sway, 0, 0)); ch['aim']['forearm.L'] = add(REST['forearm.L'], (0.3 * sway, 0, 0))
+    return ch
+# Rooted (punish window): the blade pulled out, hanging limp with its point on the floor; slumped, head drooped
+def rooted_loop(t):   # spent: collapsed forward onto its right knee, head below the shoulders, the blade dragging behind, orb on the floor
+    p = 2 * math.pi * t / 2.0
+    ch = sink(base(t, 2.0, 2), 0.7)
+    ch['rot']['thigh.R'] = (-80, 0, 0); ch['rot']['shin.R'] = (125, 0, 0)
+    for n, d in zip(('upperarm.R', 'forearm.R', 'blade'), ((-0.25, 0.35, -0.9), (-0.15, 0.6, -0.78), (-0.15, 0.92, -0.35))): ch['aim'][n] = d
+    ch['aim']['upperarm.L'] = (0.3, -0.3, -0.9); ch['aim']['forearm.L'] = (0.2, -0.35, -0.9); ch['aim']['orb'] = (0.1, -0.2, -0.97)
+    ch['rot']['chest'] = (55 + 4 * math.sin(p), 0, -6); ch['rot']['head'] = (35 + 3 * math.sin(p + 1), 0, 8)
+    ch['rot']['pendulum'] = (0, 12 * math.sin(p), 0)
     return ch
 
 def phase_shift(t):
-    s = key(t, [(0, 0), (0.6, 1.0), (1.5, 1.0), (2.0, 0)])
+    s = key(t, [(0, 0), (0.6, 1.0), (1.5, 1.0), (2.0, 0)]); jd = 3 * math.sin(2 * math.pi * 6 * t) * s
     ch = base(t)
-    ch['rot']['chest'] = (-14 * s + 2 * math.sin(40 * t) * s, 0, 0); ch['rot']['head'] = (-20 * s, 0, 0)
-    ch['rot']['pendulum'] = (0, 45 * s * math.sin(2 * math.pi * 3 * t), 0)
-    for n, d in (('upperarm.R', (-0.9, 0.0, 0.45)), ('forearm.R', (-0.8, -0.1, 0.6)), ('upperarm.L', (0.9, 0.0, 0.45)), ('forearm.L', (0.8, -0.1, 0.6))):
+    ch['rot']['chest'] = (-30 * s + jd, 0, 0); ch['rot']['head'] = (-30 * s, 0, 0)
+    ch['rot']['pendulum'] = (0, 60 * s * math.sin(2 * math.pi * 3 * t), 0)
+    ch['loc']['hips'] = (0, 0, 0.03 * jd / 3)
+    for n, d in (('upperarm.R', (-0.97, 0.0, 0.25)), ('forearm.R', (-0.9, -0.1, 0.42)), ('blade', (-0.6, -0.3, 0.75)),
+                 ('upperarm.L', (0.97, 0.0, 0.25)), ('forearm.L', (0.9, -0.1, 0.42))):
         ch['aim'][n] = dirs(t, [(0, REST[n]), (0.6, d), (1.5, d), (2.0, REST[n])])
     return ch
 
-def defeat(t):
+def defeat(t):   # sinks right down into its roots and folds forward, mask to the floor; blade and orb laid down on the floor
     k = key(t, [(0, 0), (1.3, 1.0), (2.5, 1.0)]); slump = key(t, [(0, 0), (0.8, 0), (2.1, 1.0), (2.5, 1.0)])
-    ch = crouch(base(t), 1.7 * k)
-    ch['rot']['chest'] = (28 * slump, 0, -8 * slump); ch['rot']['head'] = (24 * slump, 0, 0)
+    ch = sink(base(t), 1.0 * k)
+    ch['rot']['chest'] = (62 * slump, -12 * slump, -6 * slump); ch['rot']['head'] = (32 * slump, -8 * slump, 0)
     ch['rot']['pendulum'] = (0, ring(t, 0.3, 25, 1.0, 1.2), 0)
-    for n, d in (('upperarm.R', (-0.3, -0.3, -0.9)), ('forearm.R', (-0.2, -0.5, -0.85)), ('blade', (-0.55, -0.83, -0.05)),
-                 ('upperarm.L', (0.3, -0.3, -0.9)), ('forearm.L', (0.2, -0.5, -0.85)), ('orb', (0.1, -0.3, -0.95))):
+    for n, d in (('upperarm.R', (-0.5, -0.4, -0.77)), ('forearm.R', (-0.6, -0.5, -0.62)), ('blade', (-0.95, -0.3, -0.05)),
+                 ('upperarm.L', (0.5, -0.4, -0.77)), ('forearm.L', (0.55, -0.5, -0.67)), ('orb', (0.7, -0.5, -0.5))):
         ch['aim'][n] = dirs(t, [(0, REST[n]), (2.0, d)])
+    return ch
+
+PROBE = ['blade', 'orb', 'forearm.R', 'forearm.L']
+PLANT_TIP = (0.0, -1.35, 0.0); PLANT_D = nrm((0.08, -0.3, -0.95)); BLADE_LEN = 1.86
+PLANT_W = add(PLANT_TIP, scale(PLANT_D, -BLADE_LEN)); GRIP_L = add(PLANT_W, (0.16, 0.0, -0.08))
+def planted(ch, lean=34):
+    ch.setdefault('ik', {})[('upperarm.R', 'forearm.R')] = (PLANT_W, (-1, 0.3, 0)); ch['aim']['blade'] = PLANT_D
+    ch['ik'][('upperarm.L', 'forearm.L')] = (GRIP_L, (1, 0.3, 0)); ch['aim']['orb'] = (0.05, -0.2, -0.98)
+    ch['rot']['chest'] = (lean, 0, 0)
+    return ch
+def mixd(a, b, u): return nrm(add(scale(a, 1 - u), scale(b, u)))
+
+def sink(ch, h, knees=1.0):   # drop the hips by h metres and fold the long root legs to match (crouch alone barely moves them)
+    ch['loc']['hips'] = add(ch['loc'].get('hips', (0, 0, 0)), (0, 0, -h))
+    for s in 'RL':
+        ch['rot']['thigh.' + s] = (-60 * h * knees, 0, 0); ch['rot']['shin.' + s] = (110 * h * knees, 0, 0); ch['rot']['foot.' + s] = (-45 * h * knees, 0, 0)
     return ch
 
 rig.bake('Idle', 4.0, idle); rig.bake('Walk', WALK, walk)
 rig.bake('CutIn', 1.2, cut_in); rig.bake('CutOut', 1.2, cut_out); rig.bake('CutAcross', 1.2, cut_across)
 rig.bake('BladePlant', 1.0, blade_plant); rig.bake('PlantLoop', 2.0, plant_loop)
 rig.bake('OrbWhirl', 0.8, orb_whirl); rig.bake('WhirlLoop', 1.0, whirl_loop); rig.bake('OrbThrow', 1.0, orb_throw)
-rig.bake('MantleShake', 1.2, mantle_shake); rig.bake('PhaseShift', 2.0, phase_shift); rig.bake('Defeat', 2.5, defeat)
+rig.bake('MantleShake', 1.2, mantle_shake); rig.bake('TempoLoop', TEMPO, tempo_loop); rig.bake('RootedLoop', 2.0, rooted_loop); rig.bake('PhaseShift', 2.0, phase_shift); rig.bake('Defeat', 2.5, defeat)
+SHOTS = [('Idle', 0), ('TempoLoop', 0.28), ('CutIn', 0.62), ('CutIn', 0.8), ('CutOut', 0.62), ('CutOut', 0.8),
+         ('CutAcross', 0.62), ('CutAcross', 0.8), ('BladePlant', 0.6), ('PlantLoop', 0.5), ('MantleShake', 0.5), ('RootedLoop', 0.5),
+         ('OrbWhirl', 0.6), ('WhirlLoop', 0.2), ('OrbThrow', 0.35), ('PhaseShift', 1.0), ('Defeat', 2.5), ('Walk', 0.4)]
 if '--preview' in args:
-    rig.preview(work, [('Idle', 0), ('Walk', 0.4), ('CutIn', 0.6), ('CutIn', 0.8), ('CutOut', 0.6),
-                       ('CutAcross', 0.6), ('PlantLoop', 0), ('WhirlLoop', 0.2), ('OrbThrow', 0.4), ('Defeat', 2.5)],
-                cam=(-4.6, -7.6, 3.8), target=(0, -0.2, 1.7))
+    rig.preview(work, SHOTS, cam=(-4.6, -7.6, 3.8), target=(0, -0.2, 1.7))
+    if '--gameplay' in args:   # the gameplay camera: ~14 m back, ~11 m up, 40 degrees
+        rig.preview(work, SHOTS, cam=(-5.0, -13.5, 11.0), target=(0, 0, 1.4), sheet='poses_sheet_gameplay.png')
 rig.export(work, 'briar_metronome', out_glb)
