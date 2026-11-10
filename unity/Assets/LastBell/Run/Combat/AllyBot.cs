@@ -80,11 +80,14 @@ namespace LastBell.Run
             // Crucivar's allies go down in or beside a brand pool or Pour Channel, which kept the one spot burning for the whole
             // bleed-out, and nobody revived (8 Nov Hard party sweeps: 0 revives in Phase 1, the party short at the castings)
             if (bad(spot)) spot = ClearReviveSpot(me, pos, downed);
+            bool inBurn = false;
+            if (float.IsNaN(spot.x) && BurnReviveOk(me, boss)) { spot = BurnReviveSpot(me, boss, pos, downed); inBurn = !float.IsNaN(spot.x); }
             if (float.IsNaN(spot.x)) { rvWhy = "bad all round"; return false; }   // the ally lies in something about to land, all round: dodge first
+            burnRv = inBurn ? downed : null;
             dJob = "revive"; dSpot = spot; dNote = 1;
             var v = Sim.Flat(spot - Sim.Flat(pos));
             if (v.magnitude < 0.3f) { dMove = Vector3.zero; inp.Move = ToScreen(Vector3.zero); return true; }   // beside them: hold still
-            var move = v.normalized; if (bad(pos + move * 0.6f)) move = Bend(pos, move);
+            var move = v.normalized; if (inBurn ? !StrikeFree(me, boss, pos + move * 0.6f, Sim.Hz) : bad(pos + move * 0.6f)) move = Bend(pos, move);
             if (v.magnitude > 3f && me.Stamina > 40) inp.Sprint = true;
             move = AroundBoss(pos, move, boss); dMove = move; inp.Move = ToScreen(move);
             return true;
@@ -104,7 +107,7 @@ namespace LastBell.Run
             for (int i = 0; i < live.Count; i++) { var h = live[i]; if (h.Track != null && h.Age < h.LockAt && Spares(h, me)) return false; }   // a brand on me: carry it out
             int need = Mathf.CeilToInt((1f - d.ReviveProgress) * PlayerController.ReviveSeconds * Sim.Hz) + 9;
             var b = Bad(me, boss, false, me.World.Tick + need);
-            if (b(pos) || BotSight.OrbHits(pos, OrbAhead, OrbPad) || BotSight.GhostHits(me, pos)) return false;
+            if ((b(pos) && !(burnRv == d && StrikeFree(me, boss, pos, need))) || BotSight.OrbHits(pos, OrbAhead, OrbPad) || BotSight.GhostHits(me, pos)) return false;
             bad = b; rvFor = d; dSpot = pos; dNote = 1;
             inp.Move = ToScreen(Vector3.zero); dMove = Vector3.zero;
             return true;
@@ -122,7 +125,7 @@ namespace LastBell.Run
             var shots = BotSight.Bullets; var p = Sim.Flat(pos);
             for (int i = 0; i < shots.Count; i++) { var a = Sim.Flat(shots[i].Origin); if (SegDist(p, a, a + BotSight.ShotVel(shots[i]) * 1f) < 3f) return false; }
             bad = Bad(me, boss, false, me.World.Tick + Sim.Hz);
-            if (bad(pos)) return false;   // dodge first
+            if (bad(pos) && !(burnRv == who && StrikeFree(me, boss, pos, Sim.Hz))) return false;   // dodge first (not out of the burn it revives from)
             rvFor = who;
             return ReviveJob(me, boss, pos, ref inp);
         }
@@ -146,6 +149,38 @@ namespace LastBell.Run
                 {
                     var q = at + Sim.Dir(k * 22.5f) * r;
                     if (!CombatWorld.InPlayerBound(q, -0.3f) || bad(q)) continue;
+                    float d = Sim.Flat(q - pos).magnitude;
+                    if (d < bd) { bd = d; best = q; }
+                }
+            return best;
+        }
+        // Crucivar: an ally down inside a brand pool (it lasts the phase) has every spot in revive reach burning, and nobody
+        // revived them: 5 of 45 downs bled out and "bad all round" held revives ~100 s over 16 Hard fights (9 Nov). With nothing
+        // else about to land there, the nearest bot revives from the burn (3 s at 20/s), with the health or a potion for it
+        PlayerController burnRv;
+        static bool BurnReviveOk(PlayerController me, BossEncounter boss) => boss is CrucivarEncounter && me.Hp + (me.Potions > 0 ? PlayerController.PotionHeal : 0) >= 75;
+        // nothing but burning ground here for `within` ticks: no strike landing, no live jet, no turret path
+        bool StrikeFree(PlayerController me, BossEncounter boss, Vector3 q, int within)
+        {
+            var live = me.World.Hazards.Live;
+            for (int i = 0; i < live.Count; i++)
+            {
+                var h = live[i];
+                if (h.BurnPerSecond > 0) continue;
+                if (Jet(h)) { if (h.Contains(q)) return false; continue; }
+                if (h.Damage > 0 && !h.Cancelled && Lands(h, boss) <= within && Hits(h, me, q)) return false;
+            }
+            return !BotSight.GhostHits(me, q);
+        }
+        Vector3 BurnReviveSpot(PlayerController me, BossEncounter boss, Vector3 pos, PlayerController downed)
+        {
+            var at = Sim.Flat(downed.transform.position); Vector3 best = NoSpot; float bd = float.MaxValue;
+            int need = Sim.Ticks(1.5f);   // a revive keeps its progress while the reviver steps away unhurt: clear for a start, not all 3 s (Phase 1 lands a quake band or pour every few seconds)
+            foreach (float r in ReviveRings)
+                for (int k = 0; k < 16; k++)
+                {
+                    var q = at + Sim.Dir(k * 22.5f) * r;
+                    if (!CombatWorld.InPlayerBound(q, -0.3f) || !StrikeFree(me, boss, q, need)) continue;
                     float d = Sim.Flat(q - pos).magnitude;
                     if (d < bd) { bd = d; best = q; }
                 }
