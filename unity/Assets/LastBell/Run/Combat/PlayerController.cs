@@ -237,7 +237,7 @@ namespace LastBell.Run
         public void ReceiveBurn(Hazard h, int dmg)
         {
             if (Down || dmg <= 0) return;
-            Hp = Mathf.Max(0, Hp - dmg); LastHurtTick = World.Tick;
+            Hp = Mathf.Max(0, Hp - dmg); if (!h.BurnKeepsRevive) LastHurtTick = World.Tick;
             World.ReportPlayerHit(this, h, dmg);
             RunHud.Float(transform.position + Vector3.up * 2.4f, "-" + dmg, new Color(1f, 0.6f, 0.25f));
             if (Hp == 0) GoDown();

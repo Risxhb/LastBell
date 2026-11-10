@@ -38,6 +38,10 @@ namespace LastBell.Run
         // > 0: a standing hazard (Crucivar's cooling slag). It deals this much per second to players inside while it
         // lives, with no knockback, and simply expires at ResolveAt (no resolve hit). Overlapping ones never multiply.
         public float BurnPerSecond;
+        // a standing burn that still hurts a reviver but does not reset the revive (Crucivar's Brand Pool, proposal 9 Nov: a
+        // branded player who goes down lies in their own pool for the rest of the phase, and every burn tick reset any revive,
+        // so they always bled out). Strikes still reset a revive; every other burn still does
+        public bool BurnKeepsRevive;
         // a hole you fall through (Aurelion's Last Light, the encounter drops you itself): ally bots never cross it, even
         // where they would accept walking through a burn
         public bool Pit;
