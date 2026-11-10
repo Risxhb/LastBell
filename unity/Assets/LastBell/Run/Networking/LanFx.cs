@@ -15,6 +15,9 @@ namespace LastBell.Run.Networking
     public static class LanFx
     {
         public static Action<LanFxTarget, string, object[]> Record;
+        // Boss damage numbers (HitFeel.BossDamage), the most frequent call: typed and pooled, so a hit allocates nothing.
+        // Replays as Hud "Damage" (contact, amount, dealer), the same as a Record call would.
+        public static Action<Vector3, int, PlayerController> RecordDamage;
         public static void Projectile(ProjectileSystem.Projectile p, string method, bool hit, Vector3 at)
         {
             if (Record != null) Record(LanFxTarget.Projectile, method, new object[] { p, hit, at });
@@ -28,14 +31,55 @@ namespace LastBell.Run.Networking
         readonly LanHostRoster roster;
         readonly List<LanWorldFrame.Effect> pending = new List<LanWorldFrame.Effect>();
         readonly Action<LanFxTarget, string, object[]> hook;
+        readonly Action<Vector3, int, PlayerController> damageHook;
+        // damage effects are reused: those handed out by one Drain are encoded and dropped in the same LateUpdate
+        // (LanHostFightPump), so they go back to the pool on the next Drain or Clear
+        readonly Stack<LanWorldFrame.Effect> damagePool = new Stack<LanWorldFrame.Effect>();
+        readonly List<LanWorldFrame.Effect> damageOut = new List<LanWorldFrame.Effect>();
         public int Dropped { get; private set; }
         public LanFxCapture(LanHostRoster roster)
         {
-            this.roster = roster; hook = Record; LanFx.Record = hook;
+            this.roster = roster; hook = Record; LanFx.Record = hook; damageHook = RecordDamage; LanFx.RecordDamage = damageHook;
         }
-        public void Dispose() { if (LanFx.Record == hook) LanFx.Record = null; pending.Clear(); BossEncounter.NetIdOf = null; BossEncounter.NetPlayerOf = null; }
-        public void Clear() => pending.Clear();
-        public void Drain(List<LanWorldFrame.Effect> into) { into.AddRange(pending); pending.Clear(); }
+        public void Dispose()
+        {
+            if (LanFx.Record == hook) LanFx.Record = null;
+            if (LanFx.RecordDamage == damageHook) LanFx.RecordDamage = null;
+            pending.Clear(); BossEncounter.NetIdOf = null; BossEncounter.NetPlayerOf = null;
+        }
+        public void Clear() { pending.Clear(); Recycle(); }
+        public void Drain(List<LanWorldFrame.Effect> into)
+        {
+            Recycle();
+            for (int i = 0; i < pending.Count; i++) if (IsDamage(pending[i])) damageOut.Add(pending[i]);
+            into.AddRange(pending); pending.Clear();
+        }
+        void Recycle() { for (int i = 0; i < damageOut.Count; i++) damagePool.Push(damageOut[i]); damageOut.Clear(); }
+        const string DamageMethod = "Damage";
+        static bool IsDamage(LanWorldFrame.Effect e) => e.Target == (byte)LanFxTarget.Hud && ReferenceEquals(e.Method, DamageMethod);
+
+        void RecordDamage(Vector3 at, int amount, PlayerController by)
+        {
+            var d = RunDirector.Instance; var w = d ? d.World : null;
+            if (w == null || !Finite(at.x) || !Finite(at.y) || !Finite(at.z)) return;
+            int tick = Mathf.Max(0, w.Tick), who = by ? PlayerId(w, by) : -1;
+            if (by && who < 0) { Dropped++; return; }
+            // the same dealer's hits within one tick travel as one number (the client merges them anyway)
+            for (int i = pending.Count - 1; i >= 0 && pending[i].Tick == tick; i--)
+            {
+                var p = pending[i];
+                if (!IsDamage(p) || p.Args[2].I != who || p.Args[2].Kind != (by ? LanWorldFrame.EffectArg.PlayerRef : LanWorldFrame.EffectArg.None)) continue;
+                p.Args[0].X = at.x; p.Args[0].Y = at.y; p.Args[0].Z = at.z; p.Args[1].I = Math.Min(p.Args[1].I + amount, 999999);
+                return;
+            }
+            var e = damagePool.Count > 0 ? damagePool.Pop() : new LanWorldFrame.Effect { Method = DamageMethod, Args = new LanWorldFrame.EffectArg[3] };
+            e.Tick = tick; e.Target = (byte)LanFxTarget.Hud; e.Method = DamageMethod;
+            e.Args[0] = new LanWorldFrame.EffectArg { Kind = LanWorldFrame.EffectArg.Vector, X = at.x, Y = at.y, Z = at.z };
+            e.Args[1] = new LanWorldFrame.EffectArg { Kind = LanWorldFrame.EffectArg.Integer, I = amount };
+            e.Args[2] = by ? new LanWorldFrame.EffectArg { Kind = LanWorldFrame.EffectArg.PlayerRef, I = who } : new LanWorldFrame.EffectArg { Kind = LanWorldFrame.EffectArg.None, I = -1 };
+            if (pending.Count >= MaxPending) { pending.RemoveAt(0); Dropped++; }
+            pending.Add(e);
+        }
 
         void Record(LanFxTarget target, string method, object[] args)
         {
@@ -51,7 +95,7 @@ namespace LastBell.Run.Networking
         {
             int index = w.Players.IndexOf(p);
             if (index == 0) return 0;
-            return index > 0 && index - 1 < roster.Remote.Count ? roster.Remote[index - 1].Id : -1;
+            return index > 0 && roster != null && index - 1 < roster.Remote.Count ? roster.Remote[index - 1].Id : -1;   // no roster: autotest
         }
         static bool Finite(float f) => !float.IsNaN(f) && !float.IsInfinity(f) && Math.Abs(f) <= 10000;
 
