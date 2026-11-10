@@ -136,12 +136,14 @@ namespace LastBell.Run
         {
             if (!porcelain) porcelain = Prim.Material(new Color(1f, 0.93f, 0.8f), 3f);
             var root = new GameObject("Chime Debt (stand-in)").transform; root.SetParent(W.Root, false);
-            for (int i = 0; i < 28; i++)
-            {
-                float deg = 360f * i / 28, a = deg * Mathf.Deg2Rad;
-                Seg(Prim.Make(PrimitiveKind.Cube, root, new Vector3(Mathf.Sin(a) * RingRadius, 0.08f, Mathf.Cos(a) * RingRadius), new Vector3(0.6f, 0.05f, 0.22f), Color.white, 0, Quaternion.Euler(0, deg, 0)));
-            }
-            Seg(Prim.Make(PrimitiveKind.Cube, root, Vector3.zero, new Vector3(LineWidth, 0.04f, 1f), Color.white));   // the bar: child 28
+            if (UltLook.PrimMarks)   // the 28 Prim segments the scalloped ring replaced (before/after screenshots)
+                for (int i = 0; i < 28; i++)
+                {
+                    float deg = 360f * i / 28, a = deg * Mathf.Deg2Rad;
+                    Seg(Prim.Make(PrimitiveKind.Cube, root, new Vector3(Mathf.Sin(a) * RingRadius, 0.08f, Mathf.Cos(a) * RingRadius), new Vector3(0.6f, 0.05f, 0.22f), Color.white, 0, Quaternion.Euler(0, deg, 0)));
+                }
+            else Seg(UltMarkMesh.Mark(PrimitiveKind.Cube, UltMarkMesh.DebtRing(RingRadius), root, new Vector3(0, 0.08f, 0), Vector3.one));   // one porcelain rim, 28 lobes
+            Seg(UltMarkMesh.Mark(PrimitiveKind.Cube, UltMarkMesh.Bar, root, Vector3.zero, new Vector3(LineWidth, 0.04f, 1f)));   // the bar: the last child
             return root;
         }
         Transform FlashRing(Vector3 at, Hazard line)
@@ -150,7 +152,7 @@ namespace LastBell.Run
             foreach (var f in flashPool) if (f && !f.gameObject.activeSelf) { root = f; break; }
             if (!root) { flashPool.RemoveAll(f => !f); root = MakeFlash(); flashPool.Add(root); }
             root.gameObject.SetActive(true); root.position = new Vector3(at.x, 0, at.z);
-            var bar = root.GetChild(28);
+            var bar = root.GetChild(root.childCount - 1);
             bar.localScale = new Vector3(LineWidth, 0.04f, line.Length);
             bar.rotation = Quaternion.Euler(0, line.Yaw, 0); bar.position = new Vector3(at.x, 0.07f, at.z) + Sim.Dir(line.Yaw) * line.Length * 0.5f;
             return root;

@@ -156,6 +156,7 @@ namespace LastBell.Run.Networking
                 {
                     int index = Array.FindIndex(RunDirector.Bosses, b => b.Name.StartsWith(lobby.Encounter, StringComparison.Ordinal));
                     if (index < 0) { error = "Encounter missing from this build."; return; }
+                    director.SetLanEncounter(index);   // the intro card's role and arena line read the director's encounter
                     boss = RunDirector.Bosses[index].Spawn(world); boss.enabled = false; world.Boss = boss; bossPresenter = boss.GetComponentInChildren<CharacterPresenter>(true);
                     var smoother = boss.GetComponent<SimSmoother>(); if (smoother) smoother.enabled = false;
                 }

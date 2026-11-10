@@ -99,7 +99,8 @@ namespace LastBell.Run
             var fallen = t.Party.First(p => p != nearP && !p.Down);
             t.Place(fallen, nearP.transform.position + new Vector3(0.8f, 0, 0));
             fallen.ForceDown("Crucivar test: revive target");
-            for (int k = 0; k < 6; k++) { nearP.DebugSetHp(PlayerController.MaxHp); yield return null; }
+            // wait on the sim, not frames: on a busy PC six frames can pass before the revive has started (9 Nov merge preview)
+            yield return t.Until(() => { nearP.DebugSetHp(PlayerController.MaxHp); return nearP.Reviving == fallen; }, 3f, "reviver channelling");
             var aimAt = up.AimTarget(tu0);
             t.Check("Hard: Aimed Streams never targets an active reviver", nearP.Reviving == fallen && aimAt != null && aimAt != nearP,
                 $"reviving {(nearP.Reviving == fallen)}, target {(aimAt == null ? "none" : aimAt == nearP ? "the reviver" : "another player")}");

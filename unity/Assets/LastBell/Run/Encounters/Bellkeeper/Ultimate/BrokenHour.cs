@@ -438,20 +438,20 @@ namespace LastBell.Run
             root = new GameObject("Broken Hour (stand-in)").transform; root.SetParent(W.Root, false);
             for (int i = 0; i < 4; i++)
             {
-                var t = Prim.Make(PrimitiveKind.Cylinder, root, PlanDir(90 * i) * PlateRadius + Vector3.up * 0.04f, new Vector3(3.2f, 0.02f, 3.2f), Color.white);
+                var t = UltMarkMesh.Mark(PrimitiveKind.Cylinder, UltMarkMesh.Dial, root, PlanDir(90 * i) * PlateRadius + Vector3.up * 0.04f, new Vector3(3.2f, 0.02f, 3.2f));
                 plates[i] = t.GetComponent<Renderer>(); plates[i].sharedMaterial = brassDim; UltArt.DressPlate(t);
             }
             pivot = new GameObject("hand").transform; pivot.SetParent(root, false);
             Mat(Prim.Make(PrimitiveKind.Cube, pivot, new Vector3(0, 0.06f, 3.6f), new Vector3(0.45f, 0.03f, 4.6f), Color.white), brassHot);
             Mat(Prim.Make(PrimitiveKind.Cube, pivot, new Vector3(0, 4.2f, 3.0f), new Vector3(0.4f, 0.2f, 6.0f), Color.white), brassM);
             Mat(Prim.Make(PrimitiveKind.Cone, pivot, new Vector3(0, 4.2f, 6.4f), new Vector3(1.1f, 0.9f, 1.1f), Color.white, 0, Quaternion.Euler(90, 0, 0)), brassM);
-            Mat(Prim.Make(PrimitiveKind.Cube, pivot, new Vector3(0, 0.05f, 0), new Vector3(23f, 0.03f, 0.12f), Color.white), brassM);   // the half line
+            Mat(UltMarkMesh.Mark(PrimitiveKind.Cube, UltMarkMesh.Rule, pivot, new Vector3(0, 0.05f, 0), new Vector3(23f, 0.03f, 0.12f), Quaternion.identity), brassM);   // the half line
             UltArt.DressHand(pivot);
             mySpot = new GameObject("my spot").transform; mySpot.SetParent(root, false);
-            Mat(Prim.Make(PrimitiveKind.Cylinder, mySpot, new Vector3(0, 0.07f, 0), new Vector3(1.1f, 0.02f, 1.1f), Color.white), spotM);
-            Mat(Prim.Make(PrimitiveKind.Cylinder, mySpot, new Vector3(0, 1.6f, 0), new Vector3(0.12f, 1.6f, 0.12f), Color.white), spotM);
+            Mat(UltMarkMesh.Mark(PrimitiveKind.Cylinder, UltMarkMesh.Dial, mySpot, new Vector3(0, 0.07f, 0), new Vector3(1.1f, 0.02f, 1.1f)), spotM);
+            Mat(UltMarkMesh.Mark(PrimitiveKind.Cylinder, UltMarkMesh.Beacon, mySpot, new Vector3(0, 1.6f, 0), new Vector3(0.12f, 1.6f, 0.12f)), spotM);
             myMeet = new GameObject("my touch point").transform; myMeet.SetParent(root, false);
-            Mat(Prim.Make(PrimitiveKind.Cylinder, myMeet, new Vector3(0, 0.08f, 0), new Vector3(1.4f, 0.02f, 1.4f), Color.white), passM);
+            Mat(UltMarkMesh.Mark(PrimitiveKind.Cylinder, UltMarkMesh.Dial, myMeet, new Vector3(0, 0.08f, 0), new Vector3(1.4f, 0.02f, 1.4f)), passM);
         }
         static void Mat(Transform t, Material m) { var r = t.GetComponent<Renderer>(); r.sharedMaterial = m; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; }
 
@@ -482,12 +482,17 @@ namespace LastBell.Run
                 {
                     // a thin unfilled cobalt ring (r 0.95) of 20 segments and four ivory ticks pointing in, like an upside-down bell rim
                     var t = new GameObject("INVERTED mark").transform; t.SetParent(root, false);
-                    for (int s2 = 0; s2 < 20; s2++)
+                    if (!UltLook.PrimMarks)   // one cobalt ring and four ivory clapper tongues (10 Nov; same radii and colours)
+                    {
+                        Mat(UltMarkMesh.Mark(PrimitiveKind.Cube, UltMarkMesh.InvRing, t, Vector3.zero, Vector3.one), cobaltM);
+                        Mat(UltMarkMesh.Mark(PrimitiveKind.Cube, UltMarkMesh.InvTicks, t, Vector3.zero, Vector3.one), ivoryM);
+                    }
+                    else for (int s2 = 0; s2 < 20; s2++)
                     {
                         float a = 18f * s2 * Mathf.Deg2Rad; var o = new Vector3(Mathf.Sin(a), 0, Mathf.Cos(a)) * 0.95f;
                         Mat(Prim.Make(PrimitiveKind.Cube, t, o, new Vector3(0.07f, 0.02f, 0.3f), Color.white, 0, Quaternion.Euler(0, 18f * s2 + 90, 0)), cobaltM);
                     }
-                    for (int s2 = 0; s2 < 4; s2++)
+                    if (UltLook.PrimMarks) for (int s2 = 0; s2 < 4; s2++)
                     {
                         float a = 90f * s2 * Mathf.Deg2Rad; var o = new Vector3(Mathf.Sin(a), 0, Mathf.Cos(a)) * 0.72f;
                         Mat(Prim.Make(PrimitiveKind.Cube, t, o, new Vector3(0.08f, 0.025f, 0.36f), Color.white, 0, Quaternion.Euler(0, 90f * s2, 0)), ivoryM);

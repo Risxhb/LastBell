@@ -11,16 +11,7 @@ namespace LastBell.Run
     {
         sealed class HoldStill : IInputSource { public PlayerInput Read(PlayerController who) => new PlayerInput { Aim = who.transform.position + Vector3.forward }; }
 
-        // The practice boss is the idle sparring target (TestIdle): the live Bellkeeper Ultimate's wipes hit players directly
-        // (the hazard clearing can't stop them) and it drives allies with its strat bots, not the AllyBot this test checks.
         IEnumerator ReviveChecks()
-        {
-            bool idle = BellkeeperEncounter.TestIdle; BellkeeperEncounter.TestIdle = true;
-            yield return ReviveChecksIdle();
-            BellkeeperEncounter.TestIdle = idle;
-        }
-
-        IEnumerator ReviveChecksIdle()
         {
             Note("---------- revives ----------");
             if (d.State != RunState.Menu) { d.SetPaused(true); d.ReturnToMenu(); yield return null; }

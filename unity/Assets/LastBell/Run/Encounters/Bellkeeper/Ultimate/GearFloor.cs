@@ -530,7 +530,7 @@ namespace LastBell.Run
                 }
             }
             mySpot = new GameObject("my spot").transform; mySpot.SetParent(root, false);
-            Mat(Prim.Make(PrimitiveKind.Cylinder, mySpot, new Vector3(0, 1.6f, 0), new Vector3(0.12f, 1.6f, 0.12f), Color.white), spotM);
+            Mat(UltMarkMesh.Mark(PrimitiveKind.Cylinder, UltMarkMesh.Beacon, mySpot, new Vector3(0, 1.6f, 0), new Vector3(0.12f, 1.6f, 0.12f)), spotM);
             for (int i = 0; i < 2; i++) { hammers[i] = Model("GF_Hammer", root, Vector3.zero, Quaternion.identity); if (hammers[i]) hammers[i].gameObject.SetActive(false); }
             for (int g = 0; g < 4; g++) { partBase[g].Clear(); foreach (var x in gearParts[g]) partBase[g].Add(x ? (x.position, x.rotation) : (Vector3.zero, Quaternion.identity)); }
             bell = Model("GB_GreatBell", root, Vector3.up * 60, Quaternion.identity); if (bell) bell.gameObject.SetActive(false);

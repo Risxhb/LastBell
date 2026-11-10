@@ -9,7 +9,8 @@ namespace LastBell.Run
     // the mechanics' own distance checks.
     // The graphics pass of 8 Nov can be switched off for before/after screenshots (-lastbellTestAbility ult_shots): Old = the
     // Prim spheres and bars, no cast clips.
-    public static class UltLook { public static bool Old; }
+    // OldMarks: only the 10 Nov marker pass off (the Prim plates, posts, half line, debt rings and INVERTED marks it replaced)
+    public static class UltLook { public static bool Old, OldMarks; public static bool PrimMarks => Old || OldMarks; }
 
     public static class UltBulletMesh
     {

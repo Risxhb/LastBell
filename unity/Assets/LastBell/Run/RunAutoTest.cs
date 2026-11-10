@@ -948,6 +948,18 @@ namespace LastBell.Run
 
             // Phase 1: one full loop
             bool p1Shot = false;
+            // a doubled pod's second ring, after its hazard resolves, stays readable for bots until it fires (review SYL-SECOND-POD)
+            bool pendSeen = false, pendOk = true; var pend = new List<(Vector3 at, float r0, float land, bool twice)>();
+            IEnumerator WatchPods()
+            {
+                while (d.World != null && d.State == RunState.Combat && !sy.Order.Contains("Triangle Pods"))
+                {
+                    pend.Clear(); sy.PendingPodRings(pend);
+                    foreach (var q in pend) { pendSeen = true; pendOk &= q.land >= 0 && q.land <= SylvaraEncounter.PodSecondAfter + 0.02f && q.r0 > 0; }
+                    yield return null;
+                }
+            }
+            StartCoroutine(WatchPods());
             float s1 = Time.time;
             while (Time.time - s1 < 34f && d.State == RunState.Combat && !sy.Order.Contains("Triangle Pods"))
             {
@@ -960,6 +972,7 @@ namespace LastBell.Run
             foreach (var id in new[] { "Petal Spiral", "Seed Pods", "Waterfall Jets", "Toll", "Feet Pod", "Pruning Arc", "Doubled Pods", "Second Spiral", "Triangle Pods" })
                 Check($"Sylvara P1 uses {id}", sy.Order.Contains(id));
             Check("Sylvara P1 fills the arena with bullets", d.World.Bullets.Fired > 300, $"{d.World.Bullets.Fired} fired, peak {d.World.Bullets.Peak}");
+            Check("a doubled pod's second ring stays visible to bots until it fires", pendSeen && pendOk, $"seen {pendSeen}");
             // her attack clips (proposal 2 Nov): a Conduct loop under the spirals, one-shots on the attacks
             Check("Sylvara conducts while a spiral runs", sy.LoopClip == "ConductLoop", sy.LoopClip);
             foreach (var c in new[] { "Toll", "CallWater", "PruningArc", "Seed" }) Check($"Sylvara P1 plays the {c} clip", sy.Clips.Contains(c));
@@ -979,6 +992,13 @@ namespace LastBell.Run
             yield return Until(() => sy.Current != "phase shift", 3, "phase 2 transition over");
             int mine = sy.ColourOf(d.Player), other = mine == SylvaraEncounter.Brass ? SylvaraEncounter.Cobalt : SylvaraEncounter.Brass;
             Check("the player has a colour in Phase 2", mine == SylvaraEncounter.Brass || mine == SylvaraEncounter.Cobalt, mine.ToString());
+            {
+                yield return null;
+                var cr = sy.transform.parent ? sy.transform.parent.Find("ColourRing") : null;
+                var mf = cr ? cr.GetComponent<MeshFilter>() : null;
+                Check("the Phase 2 colour ring is one built dashed-ring mesh, not primitive dots", mf && mf.sharedMesh == SylvaraEncounter.ColourRingMesh && cr.childCount == 0,
+                    cr ? (mf ? mf.sharedMesh.name : "no mesh") + ", " + cr.childCount + " children" : "no ring");
+            }
             {
                 // a still bullet on the player: the other colour passes through, their own colour hits
                 d.Player.DebugSetHp(PlayerController.MaxHp);

@@ -58,21 +58,76 @@ namespace LastBell.Run
         // the nearest downed ally (not dead, within 14 m) nobody else is reviving: walk to a spot beside them that nothing is
         // about to land on and stand still there, so the revive channels (PlayerController: 3 s within 1.5 m)
         const float ReviveStand = 0.9f, ReviveReach = 14f, SylvaraReviveReach = 40f;   // (30 m was tried, 5 Nov: on Sylvara bots crossed her bullets and still never arrived)
+        const float CrucivarReviveReach = 30f;   // the whole Brass Foundry floor (9 Nov: allies down 16-22 m off bled out)
+        // drink below this. On Crucivar 60, so a 40 hp potion is never part wasted: at 70 the Hard bots reached his Phase 3
+        // with 0-1 potions each (9 Nov sweep); the other bosses keep 70
+        // on Crucivar on the first tick it is not stunned: tried every 0.5 s, a bot stunned on that tick waited another 0.5 s, and
+        // a Lane Stream or Ring Wave chain (26 a bullet, each one stunning) downed 26 of 66 with potions left (Hard sweep, 9 Nov).
+        // The game's own 1 s between drinks stops a second one
+        bool Drink(PlayerController me, BossEncounter boss) => me.Hp < DrinkAt(boss) && me.Potions > 0 && (boss is CrucivarEncounter ? me.Stunned == 0 : tick % 30 == 0);
+        int DrinkAt(BossEncounter boss) => Mode == BotMode.Passive ? 40 : boss is CrucivarEncounter ? 60 : 70;
+        // a Crucivar casting up (the Pour Flood comes at 30 s): the standing bots break it, and walk to a downed ally only once
+        // they have been down CastingReviveAfter (bleed-out 30 s) or the castings are gone. In the 9 Nov Hard sweep every flood
+        // came after 1-2 downs: the party's damage fell from 60-150 to 15-25 a second, far more than one bot's share, as the
+        // others walked to revive, were held off by the bullets and stood idle
+        const float CastingReviveAfter = 18f;
+        bool CastingFirst(BossEncounter boss, PlayerController downed) => boss is CrucivarEncounter && tPart && downed != null && downed.DownedTicks < Sim.Ticks(CastingReviveAfter);
         bool ReviveJob(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
         {
-            if (!ReviveSpot(me, pos, out var spot, out var downed)) { rvWhy = "none in reach"; return false; }
+            if (!ReviveSpot(me, pos, out var spot, out var downed, boss is CrucivarEncounter ? CrucivarReviveReach : ReviveReach)) { rvWhy = "none in reach"; return false; }
+            if (CastingFirst(boss, downed) && downed.ReviveProgress <= 0 && Sim.Flat(spot - pos).magnitude > 1.5f) { rvWhy = "casting first"; return false; }
             // the spot on our side is in something: any other spot still in revive reach round them that is clear, the nearest.
             // Crucivar's allies go down in or beside a brand pool or Pour Channel, which kept the one spot burning for the whole
             // bleed-out, and nobody revived (8 Nov Hard party sweeps: 0 revives in Phase 1, the party short at the castings)
             if (bad(spot)) spot = ClearReviveSpot(me, pos, downed);
+            bool inBurn = false;
+            if (float.IsNaN(spot.x) && BurnReviveOk(me, boss)) { spot = BurnReviveSpot(me, boss, pos, downed); inBurn = !float.IsNaN(spot.x); }
             if (float.IsNaN(spot.x)) { rvWhy = "bad all round"; return false; }   // the ally lies in something about to land, all round: dodge first
+            burnRv = inBurn ? downed : null;
             dJob = "revive"; dSpot = spot; dNote = 1;
             var v = Sim.Flat(spot - Sim.Flat(pos));
             if (v.magnitude < 0.3f) { dMove = Vector3.zero; inp.Move = ToScreen(Vector3.zero); return true; }   // beside them: hold still
-            var move = v.normalized; if (bad(pos + move * 0.6f)) move = Bend(pos, move);
+            var move = v.normalized; if (inBurn ? !StrikeFree(me, boss, pos + move * 0.6f, Sim.Hz) : bad(pos + move * 0.6f)) move = Bend(pos, move);
             if (v.magnitude > 3f && me.Stamina > 40) inp.Sprint = true;
             move = AroundBoss(pos, move, boss); dMove = move; inp.Move = ToScreen(move);
             return true;
+        }
+
+        // a revive already under way is finished before the next floor job (quake, volley, brand, spokes): the 9 Nov Brass
+        // Foundry sweeps left revives at 72-89 % for the next job, the ally bled out and a Mould Tower or the castings went
+        // short. Hold still while nothing lands on this spot before the channel is done (and not while carrying a brand)
+        bool FinishRevive(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
+        {
+            PlayerController d = null;
+            foreach (var p in me.World.Players)
+                if (p && p != me && p.Down && !p.Dead && Sim.Flat(p.transform.position - pos).magnitude <= PlayerController.ReviveRange - 0.1f && (me.Reviving == p || p.ReviveProgress > 0f)) { d = p; break; }
+            if (d == null) return false;
+            foreach (var q in me.World.Players) if (q != me && q && !q.Down && q.Reviving == d) return false;   // two are no faster
+            var live = me.World.Hazards.Live;
+            for (int i = 0; i < live.Count; i++) { var h = live[i]; if (h.Track != null && h.Age < h.LockAt && Spares(h, me)) return false; }   // a brand on me: carry it out
+            int need = Mathf.CeilToInt((1f - d.ReviveProgress) * PlayerController.ReviveSeconds * Sim.Hz) + 9;
+            var b = Bad(me, boss, false, me.World.Tick + need);
+            if ((b(pos) && !(burnRv == d && StrikeFree(me, boss, pos, need))) || BotSight.OrbHits(pos, OrbAhead, OrbPad) || BotSight.GhostHits(me, pos)) return false;
+            bad = b; rvFor = d; dSpot = pos; dNote = 1;
+            inp.Move = ToScreen(Vector3.zero); dMove = Vector3.zero;
+            return true;
+        }
+
+        // Crucivar: the nearest bot to a downed ally goes to them before its next floor job while nothing lands on it within 1 s.
+        // Phase 1 runs quake, brand and spokes jobs back to back, so the plain revive (after the jobs) never ran and both
+        // allies down to Anvil Quake III bled out (9 Nov Brass Foundry sweep, fight #9). Not with a brand to carry, jets
+        // turning or bullets near (the volley plan heads for the ally itself)
+        bool ReviveFirst(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
+        {
+            if (!ReviveSpot(me, pos, out _, out var who, CrucivarReviveReach) || !NearestBot(me, who, rvFor == who && dJob == "revive")) return false;
+            var live = me.World.Hazards.Live;
+            for (int i = 0; i < live.Count; i++) { var h = live[i]; if (Jet(h) || (h.Track != null && h.Age < h.LockAt && Spares(h, me))) return false; }
+            var shots = BotSight.Bullets; var p = Sim.Flat(pos);
+            for (int i = 0; i < shots.Count; i++) { var a = Sim.Flat(shots[i].Origin); if (SegDist(p, a, a + BotSight.ShotVel(shots[i]) * 1f) < 3f) return false; }
+            bad = Bad(me, boss, false, me.World.Tick + Sim.Hz);
+            if (bad(pos) && !(burnRv == who && StrikeFree(me, boss, pos, Sim.Hz))) return false;   // dodge first (not out of the burn it revives from)
+            rvFor = who;
+            return ReviveJob(me, boss, pos, ref inp);
         }
 
         // one bot per downed ally: the nearest, and one already on the way keeps it unless another is 4 m nearer (or two
@@ -81,7 +136,7 @@ namespace LastBell.Run
         {
             float mine = Sim.Flat(me.transform.position - downed.transform.position).magnitude - (going ? 4f : 0f);
             foreach (var q in me.World.Players)
-                if (q != me && q != downed && q && !q.Down && q.Input is AllyBot ab && Sim.Flat(q.transform.position - downed.transform.position).magnitude - (ab.rvFor == downed && ab.dJob == "revive" ? 4f : 0f) < mine) return false;
+                if (q != me && q != downed && q && !q.Down && q.Input is AllyBot ab && Sim.Flat(q.transform.position - downed.transform.position).magnitude - (ab.rvFor == downed && (ab.dJob == "revive" || ab.volRevive) ? 4f : 0f) < mine) return false;
             return true;
         }
         static readonly Vector3 NoSpot = new Vector3(float.NaN, 0, float.NaN);
@@ -94,6 +149,38 @@ namespace LastBell.Run
                 {
                     var q = at + Sim.Dir(k * 22.5f) * r;
                     if (!CombatWorld.InPlayerBound(q, -0.3f) || bad(q)) continue;
+                    float d = Sim.Flat(q - pos).magnitude;
+                    if (d < bd) { bd = d; best = q; }
+                }
+            return best;
+        }
+        // Crucivar: an ally down inside a brand pool (it lasts the phase) has every spot in revive reach burning, and nobody
+        // revived them: 5 of 45 downs bled out and "bad all round" held revives ~100 s over 16 Hard fights (9 Nov). With nothing
+        // else about to land there, the nearest bot revives from the burn (3 s at 20/s), with the health or a potion for it
+        PlayerController burnRv;
+        static bool BurnReviveOk(PlayerController me, BossEncounter boss) => boss is CrucivarEncounter && me.Hp + (me.Potions > 0 ? PlayerController.PotionHeal : 0) >= 75;
+        // nothing but burning ground here for `within` ticks: no strike landing, no live jet, no turret path
+        bool StrikeFree(PlayerController me, BossEncounter boss, Vector3 q, int within)
+        {
+            var live = me.World.Hazards.Live;
+            for (int i = 0; i < live.Count; i++)
+            {
+                var h = live[i];
+                if (h.BurnPerSecond > 0) continue;
+                if (Jet(h)) { if (h.Contains(q)) return false; continue; }
+                if (h.Damage > 0 && !h.Cancelled && Lands(h, boss) <= within && Hits(h, me, q)) return false;
+            }
+            return !BotSight.GhostHits(me, q);
+        }
+        Vector3 BurnReviveSpot(PlayerController me, BossEncounter boss, Vector3 pos, PlayerController downed)
+        {
+            var at = Sim.Flat(downed.transform.position); Vector3 best = NoSpot; float bd = float.MaxValue;
+            int need = Sim.Ticks(1.5f);   // a revive keeps its progress while the reviver steps away unhurt: clear for a start, not all 3 s (Phase 1 lands a quake band or pour every few seconds)
+            foreach (float r in ReviveRings)
+                for (int k = 0; k < 16; k++)
+                {
+                    var q = at + Sim.Dir(k * 22.5f) * r;
+                    if (!CombatWorld.InPlayerBound(q, -0.3f) || !StrikeFree(me, boss, q, need)) continue;
                     float d = Sim.Flat(q - pos).magnitude;
                     if (d < bd) { bd = d; best = q; }
                 }
@@ -183,7 +270,9 @@ namespace LastBell.Run
             BotSight.Update(w, boss);
             dJob = null;
             dNote = 0;
-            if (Scripted(me, boss, pos, ref inp)) { dMe = me; dPos = pos; return inp; }
+            // the floor jobs (quake, brand, spokes, revive) drink too: only the volley plan and the plain path did, and a Hard bot
+            // at 30 HP rode a jet gap through a brand pool to its down without drinking (9 Nov Brass Foundry sweep)
+            if (Scripted(me, boss, pos, ref inp)) { if (boss is CrucivarEncounter && Drink(me, boss)) inp.Potion = true; dMe = me; dPos = pos; return inp; }
 
             // 1) dodge: in a hazard that locked at least our reaction time ago (test bots: from its first tick) -> nearest
             // clear spot. A Perfect bot also heads for its memory job (next anchor, mark side) as soon as it is due.
@@ -202,6 +291,9 @@ namespace LastBell.Run
             if (threat != null && !bad(pos)) threat = null;   // a shape that lands after its job: not in the way yet
             // dodge whatever lands first: shapes landing more than 0.5 s after it are not in the way yet (Perfect / Reflex only)
             if (threat != null && Mode != BotMode.Passive) bad = Bad(me, boss, false, w.Tick + left);
+            // a shape landing here, even with time to spare: no walk to a revive from inside it (it walked deeper into a Pour
+            // Channel at 27 hp and 3 stamina, then walked out through it, 9 Nov Brass Foundry P3)
+            var landsHere = boss is CrucivarEncounter ? threat : null;   // Crucivar only: the other bosses' bots are tuned without it
             // attacking bots keep swinging until the escape (walk, plus a root still running) leaves 0.75 s to spare, and plan
             // round only the shapes landing within 1.25 s; they look again every tick
             if (Attacks && Mode != BotMode.Passive)
@@ -223,12 +315,20 @@ namespace LastBell.Run
             if (threat == null && duty >= 0 && bad(pos)) left = duty;
             // revives: nothing landing here soon and no job of its own: get a downed ally up
             rvWhy = threat != null ? "threat " + threat.Source : duty >= 0 ? "duty" : null;
-            if (threat == null && duty < 0 && ReviveJob(me, boss, pos, ref inp)) { dMe = me; dPos = pos; return inp; }
+            if (threat == null && landsHere == null && duty < 0 && ReviveJob(me, boss, pos, ref inp)) { if (boss is CrucivarEncounter && Drink(me, boss)) inp.Potion = true; dMe = me; dPos = pos; return inp; }
             Vector3 move;
             if (threat != null || (duty >= 0 && bad(pos)))
             {
                 move = NearestClear(pos, boss, bad, out float need);
                 if (move == Vector3.zero && need > 90) { bad = Bad(me, boss, true, threat != null ? w.Tick + left : int.MaxValue); move = NearestClear(pos, boss, bad, out need, false); }   // no clean spot: take the burn
+                // still nothing clear, with a soak tower to fill: into the tower anyway. A short tower is a party wipe (Molten
+                // Overflow); a bullet is 30. The 9 Nov Brass Foundry sweeps froze soakers in slag while a Hard Ring Wave's path
+                // crossed their Mould Tower B, every spot in it "hit", and the party wiped at 10-17 % boss HP left
+                if (move == Vector3.zero && need > 90 && OwnSoak(me, boss) is Hazard sk)
+                {
+                    var to = Sim.Flat(sk.Origin - pos); float inR = sk.Radius - 0.6f;
+                    if (to.magnitude > inR) { move = to.normalized; need = to.magnitude - inR; }
+                }
                 float t = left / (float)Sim.Hz;
                 // attacking: dodge into a clear spot still in reach of him when it can be reached in time (walking, a sprint at most)
                 if (Attacks && move != Vector3.zero && AttackSpot(me, boss, out var keep))
@@ -298,7 +398,7 @@ namespace LastBell.Run
                 float gap = Sim.Flat(bpos - pos).magnitude - brad;
                 if (Attacks && !job && gap <= Range(me) + 1.85f) Attack(me, ref inp);
             }
-            if (me.Hp < (Mode == BotMode.Passive ? 40 : 70) && me.Potions > 0 && tick % 30 == 0) inp.Potion = true;   // test bots: before a Hard kill hit (65) could down them
+            if (Drink(me, boss)) inp.Potion = true;   // test bots: before a Hard kill hit (65) could down them
             // walk round his body, not into it: a straight line across the centre would pin the bot against him
             if (move != Vector3.zero) move = AroundBoss(pos, move, boss);
             // Aurelion's Devour pulls faster than a walk: any move against it is a sprint
@@ -316,6 +416,8 @@ namespace LastBell.Run
             // a tower of the next set to fill (the generic soak job) comes first: a dropped Mould Tower is Molten Overflow, a party
             // wipe, and the floor jobs below would hold the bot out of it (PR 14 + PR 19, 4 Nov); the soak path dodges on its own
             if (OwnSoak(me, boss) != null) return false;
+            if (boss is CrucivarEncounter && FinishRevive(me, boss, pos, ref inp)) { dJob = "revive"; return true; }
+            if (boss is CrucivarEncounter && ReviveFirst(me, boss, pos, ref inp)) return true;
             if (!(boss is AurelionEncounter) && Quake(me, boss, pos, ref inp)) { dJob = "quake"; return true; }
             if (!(boss is AurelionEncounter) && Volley(me, boss, pos, ref inp)) { dJob = "volley"; return true; }
             if (!(boss is AurelionEncounter) && Brand(me, boss, pos, ref inp)) { dJob = "brand"; return true; }   // Aurelion keeps its own Sunspot job
@@ -341,7 +443,7 @@ namespace LastBell.Run
             // swing only while the route holds still (a planted throw would leave it behind)
             float gap = Sim.Flat(boss.transform.position - pos).magnitude - boss.BodyRadius;
             if (Attacks && still && move == Vector3.zero && gap <= Range(me) + 1.85f) Attack(me, ref inp);
-            if (me.Hp < (Mode == BotMode.Passive ? 40 : 70) && me.Potions > 0 && tick % 30 == 0) inp.Potion = true;
+            if (Drink(me, boss)) inp.Potion = true;
             if (move != Vector3.zero) move = AroundBoss(pos, move, boss);
             inp.Move = ToScreen(move);
             return true;
@@ -364,7 +466,7 @@ namespace LastBell.Run
             if (v.magnitude > 3f && me.Stamina > 30) inp.Sprint = true;
             float gap = Sim.Flat(or.transform.position - pos).magnitude - or.BodyRadius;
             if (Attacks && move == Vector3.zero && gap <= Range(me) + 1.85f) Attack(me, ref inp);
-            if (me.Hp < (Mode == BotMode.Passive ? 40 : 70) && me.Potions > 0 && tick % 30 == 0) inp.Potion = true;
+            if (me.Hp < DrinkAt(or) && me.Potions > 0 && tick % 30 == 0) inp.Potion = true;
             if (move != Vector3.zero) move = AroundBoss(pos, move, or);
             inp.Move = ToScreen(move);
             return true;
@@ -396,7 +498,7 @@ namespace LastBell.Run
             if (v.magnitude > 3f && me.Stamina > 30) inp.Sprint = true;
             float gap = Sim.Flat(ps.transform.position - pos).magnitude - ps.BodyRadius;
             if (Attacks && move == Vector3.zero && gap <= Range(me) + 1.85f) Attack(me, ref inp);
-            if (me.Hp < (Mode == BotMode.Passive ? 40 : 70) && me.Potions > 0 && tick % 30 == 0) inp.Potion = true;
+            if (me.Hp < DrinkAt(ps) && me.Potions > 0 && tick % 30 == 0) inp.Potion = true;
             if (move != Vector3.zero) move = AroundBoss(pos, move, ps);
             inp.Move = ToScreen(move);
             return true;
@@ -409,6 +511,7 @@ namespace LastBell.Run
         // band landing next for the one after it. Plan the distance from the centre for every landing still shown (each a
         // hand clear of its band edge, walking pace between them) and walk the first leg; a brand carrier ends far out
         static readonly List<Hazard> quakeBands = new List<Hazard>();
+        static readonly List<Hazard> quakeJets = new List<Hazard>();
         const float QuakePad = 0.5f, QuakeStep = 0.25f, QuakePace = 6.5f;
         bool Quake(PlayerController me, BossEncounter boss, Vector3 pos, ref PlayerInput inp)
         {
@@ -445,7 +548,10 @@ namespace LastBell.Run
                 {
                     float r = rMin + j * QuakeStep; next[j] = float.MaxValue; from[i, j] = -1;
                     if (!Clear(h, r)) continue;
-                    if (i == 0) { float d = Mathf.Abs(r - r0); if (d <= reach || at == 0 && d < 0.01f) next[j] = d; continue; }
+                    // its own step (or the next: it stops up to 0.2 m short of a spot) is always in reach: with under 0.15 s to the landing the reach fell under
+                    // half a step, no plan was left, and the brand job or plain dodge walked it into the band landing (all 5 traced
+                    // Phase 1 quake hits, Hard sweep 9 Nov; quake bands were the most Phase 1 damage, 6 500 over 16 fights)
+                    if (i == 0) { float d = Mathf.Abs(r - r0); if (d <= Mathf.Max(reach, QuakeStep + 0.01f)) next[j] = d; continue; }
                     int lo = Mathf.Max(0, j - Mathf.FloorToInt(reach / QuakeStep)), hi = Mathf.Min(n - 1, j + Mathf.FloorToInt(reach / QuakeStep));
                     for (int k = lo; k <= hi; k++)
                         if (cost[k] < float.MaxValue && cost[k] + Mathf.Abs(r - rMin - k * QuakeStep) < next[j]) { next[j] = cost[k] + Mathf.Abs(r - rMin - k * QuakeStep); from[i, j] = k; }
@@ -462,11 +568,28 @@ namespace LastBell.Run
             // Order pour: a Chimesinger bot stood in Pour IV planning the quake, took it and the channel, and Anvil Quake II
             // downed her, 11-04) and, with brands out, of the other players
             Vector3 goal = hub + dir * rGoal; bool found = false;
+            // and of a Furnace Spin jet turning over it before the last band lands: a strike already live was never checked,
+            // and a Phase 3 bot stood still planning the quake as a jet swept onto it (51 to down; 3 of 21 traced jet hits, 9 Nov)
+            quakeJets.Clear(); for (int i = 0; i < live.Count; i++) if (Jet(live[i])) quakeJets.Add(live[i]);
+            bool jRev = me.World.Difficulty == Difficulty.Hard;
+            float qEnd = (quakeBands[quakeBands.Count - 1].ResolveAt - quakeBands[quakeBands.Count - 1].Age) / (float)Sim.Hz + 0.3f;
+            if (quakeJets.Count > 0) TrackSpin(quakeJets[0], jRev);
+            bool JetSwept(Vector3 q)
+            {
+                foreach (var h in quakeJets)
+                {
+                    if (h.Hit.Contains(me)) continue;
+                    float spin = spokeRef != null && Sim.Flat(spokeRef.Origin - h.Origin).magnitude < 0.1f ? spokeFirst : 0;
+                    for (float t = 0; t <= qEnd; t += 0.1f) if (JetAt(h, q, t, spin, jRev)) return true;
+                }
+                return false;
+            }
             for (int k = 0; k < 13 && !found; k++)
             {
                 var q = hub + Sim.Dir(yaw + (k % 2 == 0 ? 1 : -1) * (k + 1) / 2 * 10f) * rGoal;
                 // the walk there too: a radial walk inside a Pour Channel (a lane out from the same centre) burns all the way
                 bool ok = k == 0 || Sim.Flat(q - pos).magnitude <= QuakePace * (t0 - 0.15f);
+                if (ok && quakeJets.Count > 0 && JetSwept(q)) ok = false;
                 for (int i = 0; i < live.Count && ok; i++)
                 {
                     var h = live[i];
@@ -480,10 +603,23 @@ namespace LastBell.Run
                 if (ok && brand) foreach (var p in me.World.Players) if (ok && p && p != me && !p.Down && Sim.Flat(p.transform.position - q).magnitude < BrandRadiusPad) ok = false;
                 if (ok) { goal = q; found = true; }
             }
+            // none in reach, and the planned spot is under a strike still to land (a Casting Order pour aimed at the bot): step
+            // along the same ring, out of reach or not, to the nearest bearing clear of strikes and burn. Holding the spot took
+            // the pour (41 of 45 pour hits came on the quake spot, Hard sweep 9 Nov); dropping the plan instead lost 4 more fights
+            bool Struck(Vector3 q) { for (int i = 0; i < live.Count; i++) { var h = live[i]; if (h.BurnPerSecond <= 0 && h.Damage > 0 && !h.Cancelled && h.Age < h.ResolveAt && h.ActiveTicks == 0 && !quakeBands.Contains(h) && Hits(h, me, q)) return true; } return false; }
+            if (!found && Struck(goal))
+                for (int k = 1; k < 7 && !found; k++)
+                {
+                    var q = hub + Sim.Dir(yaw + (k % 2 == 0 ? 1 : -1) * (k + 1) / 2 * 10f) * rGoal;
+                    bool ok = !Struck(q) && !(quakeJets.Count > 0 && JetSwept(q));
+                    for (int i = 0; i < live.Count && ok; i++) { var h = live[i]; if (h.BurnPerSecond > 0 && (h.Contains(q) || h.Contains(Vector3.Lerp(pos, q, 0.5f)))) ok = false; }
+                    if (ok) { goal = q; found = true; }
+                }
             // no bearing at that distance is clear of burn: the plain dodge, which weighs the bands against the burn, rather than
             // holding the planned spot in a pool (a Hard bot stood still in a brand pool at 8 m for 1.2 s planning the quake, 23 hp
             // to down; 8 Nov sweep after the downed-ground cooling was rejected)
             if (!found) for (int i = 0; i < live.Count; i++) { var h = live[i]; if (h.BurnPerSecond > 0 && h.Contains(goal)) return false; }
+            if (!found && quakeJets.Count > 0 && JetSwept(goal)) return false;   // every bearing in a jet's way: the gap riding (Spokes) does
             var v = Sim.Flat(goal - pos);
             var move = v.magnitude < 0.2f ? Vector3.zero : v.normalized;
             bad = Bad(me, boss, false, me.World.Tick + 1);   // round burning ground; the bands are planned above
@@ -505,6 +641,7 @@ namespace LastBell.Run
         // sprinting each way (or standing) against where each bullet will be over the next VolleyLook s, plus the remembered
         // paths still to fire, burning ground, strikes landing and its attack spot, the way the Sylvara bots steer; a dash
         // when every way is hit. A brand carrier steers for the rim.
+        bool volRevive;   // the volley plan heads for a downed ally (its home is the revive spot)
         Vector3 volMove; bool volSprint, volOn, volReach, volDash; float volCost, volPull; int volTick = -99;
         const float VolleyLook = 0.8f, VolleyStep = 0.05f, VolleyBuffer = 0.15f, VolleyPathCost = 30f, VolleyPathSoon = 1.6f, VolleySwing = 20f, VolleySprintFloor = 55f;   // a swing waits only for a bullet it would meet (50 and up)
         const float VolleyJetRing = 8f;   // m from the jets' hub where they sweep at a walk (40 deg/s, WalkSpeed 6)
@@ -547,9 +684,14 @@ namespace LastBell.Run
                 volTick = me.World.Tick; volOn = true;
                 // home: the rim for a brand carrier, else the attack spot (or straight at the target)
                 var home = tPos;
+                volRevive = false;
                 if (carrier) home = CastingBrandSpot(me, pos, carried, out var cs) ? cs : (pos.magnitude > 0.1f ? pos.normalized : Vector3.forward) * Mathf.Min(BrandRing, CombatWorld.PlayerBound - 1.2f);
+                // a downed ally anywhere on the floor (the nearest bot to them): their side is home, the plan still dodges the bullets
+                // (9 Nov Brass Foundry sweeps: allies down 16-22 m off were never revived while the turrets fired)
+                else if (boss is CrucivarEncounter && ReviveSpot(me, pos, out var rs, out var rwho, CrucivarReviveReach) && NearestBot(me, rwho, rvFor == rwho) && !(CastingFirst(boss, rwho) && rwho.ReviveProgress <= 0)) { home = Sim.Flat(rs); rvFor = rwho; volRevive = true; }
                 else if (Attacks && AttackSpot(me, boss, out var spot)) home = Sim.Flat(spot);
                 volReach = Attacks && !carrier; volPull = 0.6f; volEsc = carrier ? "carry" : null;
+                if (volRevive) { volReach = false; volPull = 1.2f; volEsc = "rv"; }
                 // in a fan its bullets are still to cross: the nearest spot clear of every path is the goal (the look is too short
                 // to find a Ring Wave's gap metres away: the solo bot ran from the wall of bullets into the corner, 11-03)
                 if (path || bad(pos))
@@ -592,8 +734,8 @@ namespace LastBell.Run
             // it never recalled, until the Pour Flood (11-04)
             float gap = Sim.Flat(tPos - pos).magnitude - tRad;
             float swing = me.Kit is TollbreakerKit ? VolleyThrowReach : Range(me) + 1.85f;
-            if (Attacks && volMove == Vector3.zero && volCost < VolleySwing && gap <= swing) Attack(me, ref inp);
-            if (me.Hp < (Mode == BotMode.Passive ? 40 : 70) && me.Potions > 0 && tick % 30 == 0) inp.Potion = true;
+            if (Attacks && !volRevive && volMove == Vector3.zero && volCost < VolleySwing && gap <= swing) Attack(me, ref inp);
+            if (Drink(me, boss)) inp.Potion = true;
             var move = volMove;
             if (move != Vector3.zero) move = AroundBoss(pos, move, boss);
             dMove = move; dSpot = volHome; dNote = 1;
@@ -647,7 +789,7 @@ namespace LastBell.Run
                     var h = live[i];
                     if (i < rN) { float dx = q.x - rX[i], dz = q.z - rZ[i]; if (dx * dx + dz * dz > rR2[i]) continue; }   // out of its reach: no burn, no hit (as BadAt; perf 8 Nov)
                     if (h.Track != null && h.Shape == HazardShape.Circle && h.Radius <= 0.7f) continue;   // the bullets, above
-                    if (h.BurnPerSecond > 0) { if (h.Contains(q) && !h.Contains(pos)) cost += 25; else if (h.Contains(q)) cost += 8; continue; }
+                    if (h.BurnPerSecond > 0) { float hot = boss is CrucivarEncounter ? Mathf.Max(1f, h.BurnPerSecond / 20f) : 1f; if (h.Contains(q) && !h.Contains(pos)) cost += 25 * hot; else if (h.Contains(q)) cost += 8 * hot; continue; }   // scaled by the burn: the Molten Crown (50/s) cost the same as a brand pool (20/s), and a Hard bot escaping a volley ran into the crown and went down (9 Nov)
                     if (Jet(h)) continue;   // the jets, above
                     if (!Hits(h, me, q)) continue;
                     float lands = Lands(h, boss) / (float)Sim.Hz;
@@ -1558,8 +1700,13 @@ namespace LastBell.Run
                     if ((h.Source != "Seed Pod" && h.Source != "Feet Pod") || h.Origin.sqrMagnitude < 0.01f) continue;
                     float land = (h.ResolveAt - h.Age) * Sim.Dt;
                     if (land < -0.05f || land > Horizon || Sim.Flat(h.Origin - pos).magnitude > reach + h.Radius + 1f) continue;
-                    pods.Add((Sim.Flat(h.Origin), h.Radius - SylvaraEncounter.PodInset, land, doubled));
+                    pods.Add((Sim.Flat(h.Origin), sp.PodR0(h.Origin, h.Radius), land, doubled));
                 }
+                // ...and a doubled pod's second ring after its hazard is gone (review SYL-SECOND-POD, 9 Nov: between the first
+                // ring and the second the steer forgot it)
+                int had = pods.Count; sp.PendingPodRings(pods);
+                for (int i = pods.Count - 1; i >= had; i--)
+                    if (pods[i].land > Horizon || Sim.Flat(pods[i].at - pos).magnitude > reach + pods[i].r0 + 4f) pods.RemoveAt(i);
             }
             sprint = false; dash = false;
             var best = Vector3.zero; bestCost = Cost(me, pos, Vector3.zero, 0, home, boss, bud, budReach); float bestHit = firstHit;

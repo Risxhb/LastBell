@@ -237,7 +237,7 @@ namespace LastBell.Run
             root = new GameObject("Escapement Relay (stand-in)").transform; root.SetParent(W.Root, false);
             for (int i = 0; i < 4; i++)
             {
-                var t = Prim.Make(PrimitiveKind.Cylinder, root, PlanDir(90 * i) * PlateRadius + Vector3.up * 0.04f, new Vector3(PlateSize * 2, 0.02f, PlateSize * 2), Color.white);
+                var t = UltMarkMesh.Mark(PrimitiveKind.Cylinder, UltMarkMesh.Dial, root, PlanDir(90 * i) * PlateRadius + Vector3.up * 0.04f, new Vector3(PlateSize * 2, 0.02f, PlateSize * 2));
                 plates[i] = t.GetComponent<Renderer>(); plates[i].sharedMaterial = brassDim; UltArt.DressPlate(t);
             }
             pivot = new GameObject("hand").transform; pivot.SetParent(root, false); pivot.localPosition = Vector3.zero;
@@ -251,8 +251,13 @@ namespace LastBell.Run
                 x.localPosition = new Vector3(side * WeightRadius, 0.06f, 0); x.localScale = new Vector3(2.2f, 1, 2.2f);
             }
             foreach (float side in new[] { -1f, 1f })   // ...and a ring showing exactly where it counts
-                Mat(Prim.Make(PrimitiveKind.Cylinder, pivot, new Vector3(side * WeightRadius, 0.04f, 0), new Vector3(WeightSize * 2, 0.01f, WeightSize * 2), Color.white), brassDim);
-            for (int k = -7; k <= 7; k++)   // the chain zone: a band from 9 m to the edge on the far half
+                Mat(UltMarkMesh.Mark(PrimitiveKind.Cylinder, UltMarkMesh.Dial, pivot, new Vector3(side * WeightRadius, 0.04f, 0), new Vector3(WeightSize * 2, 0.01f, WeightSize * 2)), brassDim);
+            if (!UltLook.PrimMarks)   // one smooth band and its ivory inner edge over the same bearings the 15 Prim tiles spanned (10 Nov)
+            {
+                Mat(UltMarkMesh.Mark(PrimitiveKind.Cube, UltMarkMesh.ArcBand(ChainMin, 11.5f, 90f, 270f), pivot, new Vector3(0, 0.03f, 0), Vector3.one), chainBand);
+                Mat(UltMarkMesh.Mark(PrimitiveKind.Cube, UltMarkMesh.ArcBand(ChainMin - 0.07f, ChainMin + 0.07f, 90f, 270f), pivot, new Vector3(0, 0.05f, 0), Vector3.one), ivory);
+            }
+            else for (int k = -7; k <= 7; k++)   // the chain zone: a band from 9 m to the edge on the far half
             {
                 float deg = 180 + 12 * k, a = deg * Mathf.Deg2Rad, mid = (ChainMin + 11.5f) / 2;
                 Mat(Prim.Make(PrimitiveKind.Cube, pivot, new Vector3(Mathf.Sin(a) * mid, 0.03f, Mathf.Cos(a) * mid), new Vector3(2.1f, 0.02f, 11.5f - ChainMin), Color.white, 0, Quaternion.Euler(0, deg, 0)), chainBand);
@@ -261,8 +266,8 @@ namespace LastBell.Run
             UltArt.DressHand(pivot);
             // practice aid: a beam on the run's own player's spot
             mySpot = new GameObject("my spot").transform; mySpot.SetParent(root, false);
-            Mat(Prim.Make(PrimitiveKind.Cylinder, mySpot, new Vector3(0, 0.07f, 0), new Vector3(1.1f, 0.02f, 1.1f), Color.white), spotM);
-            Mat(Prim.Make(PrimitiveKind.Cylinder, mySpot, new Vector3(0, 1.6f, 0), new Vector3(0.12f, 1.6f, 0.12f), Color.white), spotM);
+            Mat(UltMarkMesh.Mark(PrimitiveKind.Cylinder, UltMarkMesh.Dial, mySpot, new Vector3(0, 0.07f, 0), new Vector3(1.1f, 0.02f, 1.1f)), spotM);
+            Mat(UltMarkMesh.Mark(PrimitiveKind.Cylinder, UltMarkMesh.Beacon, mySpot, new Vector3(0, 1.6f, 0), new Vector3(0.12f, 1.6f, 0.12f)), spotM);
         }
         static void Mat(Transform t, Material m) { var r = t.GetComponent<Renderer>(); r.sharedMaterial = m; r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; }
 

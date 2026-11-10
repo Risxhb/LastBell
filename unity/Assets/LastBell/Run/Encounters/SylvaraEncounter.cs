@@ -83,6 +83,11 @@ namespace LastBell.Run
         sealed class Emitter { public bool On = true, Looping, Lane; public Action<float> Update; public string Tag; }
         readonly List<Emitter> emit = new List<Emitter>();
         readonly List<(int at, Action fn)> later = new List<(int, Action)>();
+        // a doubled pod's second ring between its first ring and its own spawn: the hazard is gone by then, so bots read it here
+        readonly List<(Vector3 at, float r0, int fire)> podRings = new List<(Vector3, float, int)>();
+        public void PendingPodRings(List<(Vector3 at, float r0, float land, bool twice)> into) { foreach (var p in podRings) if (p.fire >= Age) into.Add((p.at, p.r0, (p.fire - Age) * Sim.Dt, false)); }
+        // where a pod's petal ring starts (its circle less PodInset; a pod on her centre starts at her rim)
+        public float PodR0(Vector3 origin, float r) => Mathf.Max(r - PodInset, Sim.Flat(origin).sqrMagnitude < 0.01f ? Rim : 0);
         Emitter sp1, sp2;
 
         sealed class Bud { public Vector3 Pos; public float Hp = BudHp, Life, Base, Acc; public int Born; public bool Alive = true; public Transform Prop; public PropMotion View; public Hazard Timer; public BossPart Part; }
@@ -305,7 +310,7 @@ namespace LastBell.Run
         void ClearFight()
         {
             foreach (var e in emit) e.On = false;
-            emit.Clear(); spinDir.Clear(); later.Clear(); sp1 = sp2 = null; HazardTag.Clear(); tagNow = null;
+            emit.Clear(); spinDir.Clear(); later.Clear(); podRings.Clear(); sp1 = sp2 = null; HazardTag.Clear(); tagNow = null;
             foreach (var b in buds) KillBud(b);
             buds.Clear();
             W.Bullets.ClearAll();
@@ -494,9 +499,14 @@ namespace LastBell.Run
             h.OnResolve = hz =>
             {
                 W.BossFx.ChimeResolve(hz.Origin, hz.Radius); Release(0.5f);
-                float r0 = Mathf.Max(r - PodInset, hz.Origin.sqrMagnitude < 0.01f ? Rim : 0);
+                float r0 = PodR0(hz.Origin, r);
                 PetalRing(hz.Origin, n, PodPetalSpeed, off, r0, 12, "Pod Petal");
-                if (doubled) { var o = hz.Origin; Later(PodSecondAfter, () => PetalRing(o, n, PodPetalSpeed, off + Mathf.PI / n, r0, 12, "Pod Petal")); }
+                if (doubled)
+                {
+                    var ring = (hz.Origin, r0, Age + Mathf.Max(1, Sim.Ticks(PodSecondAfter)));   // the tick Later fires on
+                    podRings.Add(ring);
+                    Later(PodSecondAfter, () => { podRings.Remove(ring); PetalRing(ring.Item1, n, PodPetalSpeed, off + Mathf.PI / n, ring.Item2, 12, "Pod Petal"); });
+                }
             };
             // the pod model drops onto the warning in its last 0.4 s and lands on the resolve (proposal art)
             var pv = SylvaraProps.Spawn(SylvaraProps.Pod, transform.parent, h.Origin, LookRnd(0, 360));
@@ -843,10 +853,31 @@ namespace LastBell.Run
                 presenter.Sink = Mathf.MoveTowards(presenter.Sink, 0.9f, dt * 0.6f);
         }
 
-        // Phase 2: an open dotted brass or cobalt ring under each player shows their colour (friendly cues are thin and
+        // Phase 2: an open dashed brass or cobalt ring under each player shows their colour (friendly cues are thin and
         // unfilled, so it never reads as a boss floor warning); it flickers to the next colour during the 1 s toll warning.
-        const int RingDots = 14;
-        Material ringBrassMat, ringCobaltMat;   // shared by every dot
+        // One built mesh per player (graphics audit 8 Nov: it was 14 cylinder dots): 14 flat arc dashes on a 0.7 m ring and a
+        // faint hairline inside them, so the colour reads as one ring; it turns slowly. Presentation only.
+        public const int RingDots = 14;
+        const float RingSpin = 25f;   // degrees per second
+        Material ringBrassMat, ringCobaltMat;   // shared by every ring
+        static Mesh colourRingMesh;
+        public static Mesh ColourRingMesh
+        {
+            get
+            {
+                if (colourRingMesh) return colourRingMesh;
+                float span = 360f / RingDots;
+                var parts = new CombineInstance[RingDots + 1];
+                for (int k = 0; k < RingDots; k++)
+                    parts[k] = new CombineInstance { mesh = VFX.FxMeshes.Sector(0.64f, 0.76f, (span - 9f) / 2, 6), transform = Matrix4x4.Rotate(Quaternion.Euler(0, k * span, 0)) };
+                parts[RingDots] = new CombineInstance { mesh = VFX.FxMeshes.Annulus(0.6f, 0.615f, 72), transform = Matrix4x4.identity };
+                var m = new Mesh { name = "Sylvara_ColourRing" }; m.CombineMeshes(parts, true, true);
+                foreach (var p in parts) Destroy(p.mesh);
+                var n = new Vector3[m.vertexCount]; for (int i = 0; i < n.Length; i++) n[i] = Vector3.up; m.normals = n;
+                m.RecalculateBounds();
+                return colourRingMesh = m;
+            }
+        }
         void DrawColourRings()
         {
             if (W == null) return;
@@ -860,11 +891,9 @@ namespace LastBell.Run
                 if (!ring)
                 {
                     ring = new GameObject("ColourRing").transform; ring.SetParent(transform.parent, false);
-                    for (int i = 0; i < RingDots; i++)
-                    {
-                        float a = i * Tau / RingDots;
-                        Prim.Make(PrimitiveKind.Cylinder, ring, new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * 0.7f, new Vector3(0.12f, 0.01f, 0.12f), RingBrass, 1.5f);
-                    }
+                    ring.gameObject.AddComponent<MeshFilter>().sharedMesh = ColourRingMesh;
+                    var rr = ring.gameObject.AddComponent<MeshRenderer>();
+                    rr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; rr.receiveShadows = false;
                     colourRings[p] = ring;
                 }
                 if (!ring.gameObject.activeSelf) ring.gameObject.SetActive(true);
@@ -874,6 +903,7 @@ namespace LastBell.Run
                 var want = show == Brass ? ringBrassMat : ringCobaltMat;
                 foreach (var mr in ring.GetComponentsInChildren<MeshRenderer>()) if (mr.sharedMaterial != want) mr.sharedMaterial = want;
                 ring.position = Sim.Flat(p.transform.position) + Vector3.up * 0.04f;
+                ring.rotation = Quaternion.Euler(0, Time.time * RingSpin, 0);
                 shown++;
             }
             ColourRingsShown = shown;
@@ -1045,7 +1075,7 @@ namespace LastBell.Run
         protected override void OnDefeat()
         {
             foreach (var e in emit) e.On = false;
-            emit.Clear(); spinDir.Clear(); later.Clear(); foreach (var b in buds) KillBud(b); buds.Clear(); colour.Clear(); swapWarned.Clear();
+            emit.Clear(); spinDir.Clear(); later.Clear(); podRings.Clear(); foreach (var b in buds) KillBud(b); buds.Clear(); colour.Clear(); swapWarned.Clear();
             ClearProps();
             if (NetRecording) NetFx("SylvaraEncounter.Clear");
             glowTarget = 0.3f; glowLevel = 2f;

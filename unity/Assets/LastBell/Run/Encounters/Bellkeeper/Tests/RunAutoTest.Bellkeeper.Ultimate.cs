@@ -172,6 +172,9 @@ namespace LastBell.Run
             if (bk == null) yield break;
             bk.Ult.Wipe("Wipe probe", UltimateMechanics.GearFloor);
             Check("wipe: a mechanic's wipe shows its attack icon in the death recap", d.World.TakenAttackIds.Count > 0 && d.World.TakenAttackIds[d.World.TakenAttackIds.Count - 1] == UltimateMechanics.GearFloor);
+            var gearFloor = BossAttackIcons.Get(UltimateMechanics.GearFloor);
+            Check("wipe: the downed card keeps the wipe's own cause beside its family icon", RunHud.NamesOwnCause("Wipe probe", gearFloor)
+                && !RunHud.NamesOwnCause(gearFloor?.name, gearFloor) && !RunHud.NamesOwnCause("Wipe probe", null), gearFloor?.Label);
 
             // boss death mid-plan cancels hazards and statuses
             yield return UltStart();
