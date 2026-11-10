@@ -125,7 +125,7 @@ namespace LastBell.Menu
             d.SetPaused(true); Check("return during countdown accepted", MenuReturnBridge.Return(false));
             yield return Until(() => !RunDirector.Instance && (FindAnyObjectByType<ConfrontationMenu>()?.StartButton || FindAnyObjectByType<MainMenu>()?.StartButton), 45, "main menu return");
             yield return new WaitForSecondsRealtime(.7f);
-            Check("main menu starts next playlist track", music.Source == menu && IsMenuTrack(menu) && menu.isPlaying && music.TrackIndex == (previousIndex + 1) % MenuMusic.TrackCount && menu.time < 8 && Close(menu.volume, music.Volume));
+            Check("main menu starts next playlist track" + $" (menu source {music.Source == menu}, clip {(menu.clip ? menu.clip.name : "none")}, playing {menu.isPlaying}, track {music.TrackIndex} after {previousIndex}, at {menu.time:F1} s, volume {menu.volume:F3}/{music.Volume:F3})", music.Source == menu && IsMenuTrack(menu) && menu.isPlaying && music.TrackIndex == (previousIndex + 1) % MenuMusic.TrackCount && menu.time < 8 && Close(menu.volume, music.Volume));
             Check("menu return stops both boss sources", music.GetComponents<AudioSource>().Where(s => s != menu).All(s => !s.isPlaying && s.volume == 0));
             Check("single persistent owner and three reusable sources", FindObjectsByType<MenuMusic>().Length == 1 && music.GetComponents<AudioSource>().Length == 3);
             // Return to gameplay once more to check defeat and a same-boss retry.
