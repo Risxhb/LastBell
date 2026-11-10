@@ -32,7 +32,7 @@ namespace LastBell.Menu
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Hook()
         {
-            // The scene file holds only a camera and a light, so the editor (without LASTBELL_LAN_TEST) can create it;
+            // The scene file holds only a camera and a light;
             // the screen adds itself whenever that scene loads.
             if (hooked) return; hooked = true;
             SceneManager.sceneLoaded += (scene, mode) => { if (scene.path == ScenePath) new GameObject("LAN lobby").AddComponent<LanLobbyScreen>(); };

@@ -2,9 +2,9 @@
 
 **Keeper of the Garden's Time.** A Verdant Chimes miniboss. Sylvara's garden grows wild; the Briar Metronome keeps it in time. It is a tall gardener-clock of brass roots and wood with a metronome pendulum in its chest and long pruning shears. It does three things, always on its beat: it **prunes** the space around it, it **grows hedges** that pen the garden into beds, and it **tends the players as seasons**. Each player is a season (I Spring, II Summer, III Autumn, IV Winter), and the season decides which growths are theirs.
 
-- **Status:** proposal (content rules §0.2), practice only (`inRun: false`), on the Verdant Chimes map. Placeholder body (primitives), no model, no final FX or audio. Practice: `LastBell.exe -lastbellPractice briar` or `Play Briar Metronome Practice.cmd`.
+- **Status:** proposal (content rules §0.2), practice only (`inRun: false`), on the Verdant Chimes map. **Rigged model** since November 10, 2026 (`Characters/BriarMetronome/Resources/Characters/BriarMetronome.glb`, 15 clips including TempoLoop and RootedLoop; strike frames timed by `BossClipCues`, primitive stand-in only if the model can't load). No final FX or audio. Practice: `LastBell.exe -lastbellPractice briar` or `Play Briar Metronome Practice.cmd`.
 - **Code:** `unity/Assets/LastBell/Run/Encounters/BriarMetronome/` (`BriarMetronomeEncounter`, pure rules in `BriarMetronomeRules`, the acceptance test `BriarMetronomeAutoTest`, F7 diagnostics).
-- **Replaces** the old design (In/Out cuts, Overgrowth, Weight of Seasons, Lost Seasons seed puzzle). The old text and rig notes stay in git history. The rigged model `prototype/arena-3d/models/rigged/minibosses/BriarMetronome.glb` can replace the placeholder later.
+- **Replaces** the old design (In/Out cuts, Overgrowth, Weight of Seasons, Lost Seasons seed puzzle). The old text and rig notes stay in git history. The 26 Oct rig was re-keyed for this design and now replaces the old primitive body.
 - **Numbers** are for **Medium**, out of 100 player HP. Easy and Hard scale boss damage ×0.6 and ×1.3 (the shared rule) and change the things listed under Difficulty.
 
 ## How it differs from Sylvara
