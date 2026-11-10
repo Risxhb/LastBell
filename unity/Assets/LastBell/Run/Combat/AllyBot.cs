@@ -603,6 +603,18 @@ namespace LastBell.Run
                 if (ok && brand) foreach (var p in me.World.Players) if (ok && p && p != me && !p.Down && Sim.Flat(p.transform.position - q).magnitude < BrandRadiusPad) ok = false;
                 if (ok) { goal = q; found = true; }
             }
+            // none in reach, and the planned spot is under a strike still to land (a Casting Order pour aimed at the bot): step
+            // along the same ring, out of reach or not, to the nearest bearing clear of strikes and burn. Holding the spot took
+            // the pour (41 of 45 pour hits came on the quake spot, Hard sweep 9 Nov); dropping the plan instead lost 4 more fights
+            bool Struck(Vector3 q) { for (int i = 0; i < live.Count; i++) { var h = live[i]; if (h.BurnPerSecond <= 0 && h.Damage > 0 && !h.Cancelled && h.Age < h.ResolveAt && h.ActiveTicks == 0 && !quakeBands.Contains(h) && Hits(h, me, q)) return true; } return false; }
+            if (!found && Struck(goal))
+                for (int k = 1; k < 7 && !found; k++)
+                {
+                    var q = hub + Sim.Dir(yaw + (k % 2 == 0 ? 1 : -1) * (k + 1) / 2 * 10f) * rGoal;
+                    bool ok = !Struck(q) && !(quakeJets.Count > 0 && JetSwept(q));
+                    for (int i = 0; i < live.Count && ok; i++) { var h = live[i]; if (h.BurnPerSecond > 0 && (h.Contains(q) || h.Contains(Vector3.Lerp(pos, q, 0.5f)))) ok = false; }
+                    if (ok) { goal = q; found = true; }
+                }
             // no bearing at that distance is clear of burn: the plain dodge, which weighs the bands against the burn, rather than
             // holding the planned spot in a pool (a Hard bot stood still in a brand pool at 8 m for 1.2 s planning the quake, 23 hp
             // to down; 8 Nov sweep after the downed-ground cooling was rejected)
