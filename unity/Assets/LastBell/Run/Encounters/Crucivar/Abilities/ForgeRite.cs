@@ -107,7 +107,7 @@ namespace LastBell.Run
                     Pools.Add(W.Hazards.Spawn(new Hazard
                     {
                         Source = "Brand Pool", AttackId = "crucivar.ember_brand", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = hz.Origin, Radius = PoolRadius,
-                        LockAt = 0, ResolveAt = Sim.Ticks(3600), BurnPerSecond = PoolBurn,   // burns at once (the carrier left), lasts until the phase ends
+                        LockAt = 0, ResolveAt = Sim.Ticks(3600), BurnPerSecond = PoolBurn, BurnKeepsRevive = true,   // burns at once (the carrier left), lasts until the phase ends
                     }));
                 };
                 W.Hazards.Spawn(h);
@@ -130,7 +130,7 @@ namespace LastBell.Run
                 Pools.Add(W.Hazards.Spawn(new Hazard
                 {
                     Source = "Brand Pool", AttackId = "crucivar.ember_brand", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = hz.Origin, Radius = PoolRadius,
-                    LockAt = 0, ResolveAt = Sim.Ticks(3600), BurnPerSecond = PoolBurn,
+                    LockAt = 0, ResolveAt = Sim.Ticks(3600), BurnPerSecond = PoolBurn, BurnKeepsRevive = true,
                 }));
             };
             W.Hazards.Spawn(h);
