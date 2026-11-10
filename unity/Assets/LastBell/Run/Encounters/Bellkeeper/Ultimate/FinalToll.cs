@@ -534,10 +534,10 @@ namespace LastBell.Run
             for (int n = 0; n < BellPieces; n++) { var bp = GearFloor.Model("FT_BellShard", root, Vector3.up * 30, Quaternion.identity); if (!bp) break; bp.localScale = Vector3.one * (1.4f + 0.5f * (n % 3)); bp.gameObject.SetActive(false); bellBits.Add(bp); }
             for (int h = 0; h < 4; h++) platBase[h] = plats[h] ? plats[h].position : Vector3.zero;
             plate = GearFloor.Model("FT_Plate", root, Vector3.zero, Quaternion.identity);
-            if (!plate) { plate = Prim.Make(PrimitiveKind.Cylinder, root, Vector3.zero, new Vector3(PlateSize * 2, 0.03f, PlateSize * 2), Color.white); Mat(plate, plateM); }
+            if (!plate) { plate = UltMarkMesh.Mark(PrimitiveKind.Cylinder, UltMarkMesh.Dial, root, Vector3.zero, new Vector3(PlateSize * 2, 0.03f, PlateSize * 2)); Mat(plate, plateM); }
             plate.gameObject.SetActive(false);
             mySpot = new GameObject("my spot").transform; mySpot.SetParent(root, false);
-            Mat(Prim.Make(PrimitiveKind.Cylinder, mySpot, new Vector3(0, 1.6f, 0), new Vector3(0.12f, 1.6f, 0.12f), Color.white), spotM);
+            Mat(UltMarkMesh.Mark(PrimitiveKind.Cylinder, UltMarkMesh.Beacon, mySpot, new Vector3(0, 1.6f, 0), new Vector3(0.12f, 1.6f, 0.12f)), spotM);
         }
         // at the cast: the arena's floor goes, and the Echo is a copy of the boss as it looks now (it changes form at 55 %)
         void Arm()
