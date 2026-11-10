@@ -1558,8 +1558,13 @@ namespace LastBell.Run
                     if ((h.Source != "Seed Pod" && h.Source != "Feet Pod") || h.Origin.sqrMagnitude < 0.01f) continue;
                     float land = (h.ResolveAt - h.Age) * Sim.Dt;
                     if (land < -0.05f || land > Horizon || Sim.Flat(h.Origin - pos).magnitude > reach + h.Radius + 1f) continue;
-                    pods.Add((Sim.Flat(h.Origin), h.Radius - SylvaraEncounter.PodInset, land, doubled));
+                    pods.Add((Sim.Flat(h.Origin), sp.PodR0(h.Origin, h.Radius), land, doubled));
                 }
+                // ...and a doubled pod's second ring after its hazard is gone (review SYL-SECOND-POD, 9 Nov: between the first
+                // ring and the second the steer forgot it)
+                int had = pods.Count; sp.PendingPodRings(pods);
+                for (int i = pods.Count - 1; i >= had; i--)
+                    if (pods[i].land > Horizon || Sim.Flat(pods[i].at - pos).magnitude > reach + pods[i].r0 + 4f) pods.RemoveAt(i);
             }
             sprint = false; dash = false;
             var best = Vector3.zero; bestCost = Cost(me, pos, Vector3.zero, 0, home, boss, bud, budReach); float bestHit = firstHit;
