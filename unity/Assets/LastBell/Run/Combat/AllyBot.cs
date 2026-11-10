@@ -272,7 +272,7 @@ namespace LastBell.Run
             dNote = 0;
             // the floor jobs (quake, brand, spokes, revive) drink too: only the volley plan and the plain path did, and a Hard bot
             // at 30 HP rode a jet gap through a brand pool to its down without drinking (9 Nov Brass Foundry sweep)
-            if (Scripted(me, boss, pos, ref inp)) { if (Drink(me, boss)) inp.Potion = true; dMe = me; dPos = pos; return inp; }
+            if (Scripted(me, boss, pos, ref inp)) { if (boss is CrucivarEncounter && Drink(me, boss)) inp.Potion = true; dMe = me; dPos = pos; return inp; }
 
             // 1) dodge: in a hazard that locked at least our reaction time ago (test bots: from its first tick) -> nearest
             // clear spot. A Perfect bot also heads for its memory job (next anchor, mark side) as soon as it is due.
@@ -315,7 +315,7 @@ namespace LastBell.Run
             if (threat == null && duty >= 0 && bad(pos)) left = duty;
             // revives: nothing landing here soon and no job of its own: get a downed ally up
             rvWhy = threat != null ? "threat " + threat.Source : duty >= 0 ? "duty" : null;
-            if (threat == null && landsHere == null && duty < 0 && ReviveJob(me, boss, pos, ref inp)) { if (Drink(me, boss)) inp.Potion = true; dMe = me; dPos = pos; return inp; }
+            if (threat == null && landsHere == null && duty < 0 && ReviveJob(me, boss, pos, ref inp)) { if (boss is CrucivarEncounter && Drink(me, boss)) inp.Potion = true; dMe = me; dPos = pos; return inp; }
             Vector3 move;
             if (threat != null || (duty >= 0 && bad(pos)))
             {
@@ -416,7 +416,7 @@ namespace LastBell.Run
             // a tower of the next set to fill (the generic soak job) comes first: a dropped Mould Tower is Molten Overflow, a party
             // wipe, and the floor jobs below would hold the bot out of it (PR 14 + PR 19, 4 Nov); the soak path dodges on its own
             if (OwnSoak(me, boss) != null) return false;
-            if (!(boss is AurelionEncounter) && FinishRevive(me, boss, pos, ref inp)) { dJob = "revive"; return true; }
+            if (boss is CrucivarEncounter && FinishRevive(me, boss, pos, ref inp)) { dJob = "revive"; return true; }
             if (boss is CrucivarEncounter && ReviveFirst(me, boss, pos, ref inp)) return true;
             if (!(boss is AurelionEncounter) && Quake(me, boss, pos, ref inp)) { dJob = "quake"; return true; }
             if (!(boss is AurelionEncounter) && Volley(me, boss, pos, ref inp)) { dJob = "volley"; return true; }
@@ -688,7 +688,7 @@ namespace LastBell.Run
                 if (carrier) home = CastingBrandSpot(me, pos, carried, out var cs) ? cs : (pos.magnitude > 0.1f ? pos.normalized : Vector3.forward) * Mathf.Min(BrandRing, CombatWorld.PlayerBound - 1.2f);
                 // a downed ally anywhere on the floor (the nearest bot to them): their side is home, the plan still dodges the bullets
                 // (9 Nov Brass Foundry sweeps: allies down 16-22 m off were never revived while the turrets fired)
-                else if (ReviveSpot(me, pos, out var rs, out var rwho, CrucivarReviveReach) && NearestBot(me, rwho, rvFor == rwho) && !(CastingFirst(boss, rwho) && rwho.ReviveProgress <= 0)) { home = Sim.Flat(rs); rvFor = rwho; volRevive = true; }
+                else if (boss is CrucivarEncounter && ReviveSpot(me, pos, out var rs, out var rwho, CrucivarReviveReach) && NearestBot(me, rwho, rvFor == rwho) && !(CastingFirst(boss, rwho) && rwho.ReviveProgress <= 0)) { home = Sim.Flat(rs); rvFor = rwho; volRevive = true; }
                 else if (Attacks && AttackSpot(me, boss, out var spot)) home = Sim.Flat(spot);
                 volReach = Attacks && !carrier; volPull = 0.6f; volEsc = carrier ? "carry" : null;
                 if (volRevive) { volReach = false; volPull = 1.2f; volEsc = "rv"; }
@@ -789,7 +789,7 @@ namespace LastBell.Run
                     var h = live[i];
                     if (i < rN) { float dx = q.x - rX[i], dz = q.z - rZ[i]; if (dx * dx + dz * dz > rR2[i]) continue; }   // out of its reach: no burn, no hit (as BadAt; perf 8 Nov)
                     if (h.Track != null && h.Shape == HazardShape.Circle && h.Radius <= 0.7f) continue;   // the bullets, above
-                    if (h.BurnPerSecond > 0) { float hot = Mathf.Max(1f, h.BurnPerSecond / 20f); if (h.Contains(q) && !h.Contains(pos)) cost += 25 * hot; else if (h.Contains(q)) cost += 8 * hot; continue; }   // scaled by the burn: the Molten Crown (50/s) cost the same as a brand pool (20/s), and a Hard bot escaping a volley ran into the crown and went down (9 Nov)
+                    if (h.BurnPerSecond > 0) { float hot = boss is CrucivarEncounter ? Mathf.Max(1f, h.BurnPerSecond / 20f) : 1f; if (h.Contains(q) && !h.Contains(pos)) cost += 25 * hot; else if (h.Contains(q)) cost += 8 * hot; continue; }   // scaled by the burn: the Molten Crown (50/s) cost the same as a brand pool (20/s), and a Hard bot escaping a volley ran into the crown and went down (9 Nov)
                     if (Jet(h)) continue;   // the jets, above
                     if (!Hits(h, me, q)) continue;
                     float lands = Lands(h, boss) / (float)Sim.Hz;
