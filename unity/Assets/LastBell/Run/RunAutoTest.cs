@@ -993,6 +993,13 @@ namespace LastBell.Run
             int mine = sy.ColourOf(d.Player), other = mine == SylvaraEncounter.Brass ? SylvaraEncounter.Cobalt : SylvaraEncounter.Brass;
             Check("the player has a colour in Phase 2", mine == SylvaraEncounter.Brass || mine == SylvaraEncounter.Cobalt, mine.ToString());
             {
+                yield return null;
+                var cr = sy.transform.parent ? sy.transform.parent.Find("ColourRing") : null;
+                var mf = cr ? cr.GetComponent<MeshFilter>() : null;
+                Check("the Phase 2 colour ring is one built dashed-ring mesh, not primitive dots", mf && mf.sharedMesh == SylvaraEncounter.ColourRingMesh && cr.childCount == 0,
+                    cr ? (mf ? mf.sharedMesh.name : "no mesh") + ", " + cr.childCount + " children" : "no ring");
+            }
+            {
                 // a still bullet on the player: the other colour passes through, their own colour hits
                 d.Player.DebugSetHp(PlayerController.MaxHp);
                 var ghost = d.World.Bullets.Fire(d.Player.transform.position, 0, 0, 12, 0.25f, 0.35f, other, "Test Bullet");

@@ -853,10 +853,31 @@ namespace LastBell.Run
                 presenter.Sink = Mathf.MoveTowards(presenter.Sink, 0.9f, dt * 0.6f);
         }
 
-        // Phase 2: an open dotted brass or cobalt ring under each player shows their colour (friendly cues are thin and
+        // Phase 2: an open dashed brass or cobalt ring under each player shows their colour (friendly cues are thin and
         // unfilled, so it never reads as a boss floor warning); it flickers to the next colour during the 1 s toll warning.
-        const int RingDots = 14;
-        Material ringBrassMat, ringCobaltMat;   // shared by every dot
+        // One built mesh per player (graphics audit 8 Nov: it was 14 cylinder dots): 14 flat arc dashes on a 0.7 m ring and a
+        // faint hairline inside them, so the colour reads as one ring; it turns slowly. Presentation only.
+        public const int RingDots = 14;
+        const float RingSpin = 25f;   // degrees per second
+        Material ringBrassMat, ringCobaltMat;   // shared by every ring
+        static Mesh colourRingMesh;
+        public static Mesh ColourRingMesh
+        {
+            get
+            {
+                if (colourRingMesh) return colourRingMesh;
+                float span = 360f / RingDots;
+                var parts = new CombineInstance[RingDots + 1];
+                for (int k = 0; k < RingDots; k++)
+                    parts[k] = new CombineInstance { mesh = VFX.FxMeshes.Sector(0.64f, 0.76f, (span - 9f) / 2, 6), transform = Matrix4x4.Rotate(Quaternion.Euler(0, k * span, 0)) };
+                parts[RingDots] = new CombineInstance { mesh = VFX.FxMeshes.Annulus(0.6f, 0.615f, 72), transform = Matrix4x4.identity };
+                var m = new Mesh { name = "Sylvara_ColourRing" }; m.CombineMeshes(parts, true, true);
+                foreach (var p in parts) Destroy(p.mesh);
+                var n = new Vector3[m.vertexCount]; for (int i = 0; i < n.Length; i++) n[i] = Vector3.up; m.normals = n;
+                m.RecalculateBounds();
+                return colourRingMesh = m;
+            }
+        }
         void DrawColourRings()
         {
             if (W == null) return;
@@ -870,11 +891,9 @@ namespace LastBell.Run
                 if (!ring)
                 {
                     ring = new GameObject("ColourRing").transform; ring.SetParent(transform.parent, false);
-                    for (int i = 0; i < RingDots; i++)
-                    {
-                        float a = i * Tau / RingDots;
-                        Prim.Make(PrimitiveKind.Cylinder, ring, new Vector3(Mathf.Cos(a), 0, Mathf.Sin(a)) * 0.7f, new Vector3(0.12f, 0.01f, 0.12f), RingBrass, 1.5f);
-                    }
+                    ring.gameObject.AddComponent<MeshFilter>().sharedMesh = ColourRingMesh;
+                    var rr = ring.gameObject.AddComponent<MeshRenderer>();
+                    rr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off; rr.receiveShadows = false;
                     colourRings[p] = ring;
                 }
                 if (!ring.gameObject.activeSelf) ring.gameObject.SetActive(true);
@@ -884,6 +903,7 @@ namespace LastBell.Run
                 var want = show == Brass ? ringBrassMat : ringCobaltMat;
                 foreach (var mr in ring.GetComponentsInChildren<MeshRenderer>()) if (mr.sharedMaterial != want) mr.sharedMaterial = want;
                 ring.position = Sim.Flat(p.transform.position) + Vector3.up * 0.04f;
+                ring.rotation = Quaternion.Euler(0, Time.time * RingSpin, 0);
                 shown++;
             }
             ColourRingsShown = shown;
