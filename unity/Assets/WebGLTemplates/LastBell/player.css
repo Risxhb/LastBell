@@ -1,1 +1,159 @@
-:root{color-scheme:dark;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#eee6d6;background:#0b101b}*{box-sizing:border-box}body{margin:0}header,main,footer{width:min(1440px,94vw);margin:auto}header{height:78px;display:flex;align-items:center;gap:24px;font-size:11px;letter-spacing:.15em}a{color:inherit;text-decoration:none}header .title{color:#e9c178;font-family:Georgia,serif;letter-spacing:.26em;font-size:21px}header>span{color:#9a9fae}header>a:last-child{margin-left:auto;color:#c9b68e}#player{position:relative;aspect-ratio:16/9;background:#060a11;border:1px solid #4c422e;overflow:hidden}canvas{display:block;width:100%;height:100%;outline:none}#cover{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:20px;background:radial-gradient(ellipse at 50% 30%,#263347,#101722 60%,#080d15)}[hidden]{display:none!important}.eyebrow{font-size:11px;letter-spacing:.3em;color:#ccac70}h1{font:clamp(32px,6vw,84px) Georgia,serif;letter-spacing:.2em;margin:18px 0 0;color:#f0d5a0}#cover>p:not(.eyebrow){color:#b0b7c5;font-size:14px}button{font:inherit;color:#f4e7cd;background:#30291d;border:1px solid #ac8951;padding:12px 30px;cursor:pointer}button:hover{background:#4c3e27}button:focus-visible,summary:focus-visible,a:focus-visible{outline:2px solid #e6bd70;outline-offset:4px}button:disabled{opacity:.5;cursor:default}#play{margin:16px 0;font-size:16px;min-width:180px}#status{max-width:640px;overflow-wrap:anywhere}progress{width:min(360px,75%);height:7px;accent-color:#e6bd70;margin:16px}.toolbar{min-height:62px;display:flex;align-items:center;gap:12px;justify-content:space-between;color:#a9b0be;font-size:12px}.toolbar button{padding:8px 18px}details{border-top:1px solid #2c303a;padding:22px 0;color:#a9b0be;font-size:13px;line-height:1.8}summary{cursor:pointer;color:#dfceac}details p{max-width:850px}.news{border-top:1px solid #2c303a;padding:26px 0 30px;color:#a9b0be;font-size:13px;line-height:1.7}.news h2{margin:0;font:400 20px Georgia,serif;letter-spacing:.12em;color:#e9c178}.news-date{margin:2px 0 14px;font-size:11px;letter-spacing:.15em;color:#777f91}.news-lead{max-width:850px;margin:0 0 22px;color:#cfd4dd}.news-lead strong,.changes strong{color:#dfceac;font-weight:600}.news h3{margin:0 0 12px;font-size:11px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:#ccac70}.abilities{list-style:none;margin:0 0 10px;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(320px,100%),1fr));gap:12px}.abilities li{background:#0f1521;border:1px solid #2c303a;border-left:2px solid #7f6aa8;padding:14px 16px}.ability-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:6px}.ability-name{font:400 16px Georgia,serif;letter-spacing:.04em;color:#f0d5a0}kbd{flex:none;font:600 10px/1 system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#e9c178;border:1px solid #4c422e;background:#191712;padding:5px 8px}.abilities p{margin:0 0 4px}.abilities p:last-child{margin:0}.news-note{margin:0 0 24px;font-size:12px;color:#777f91}.changes{margin:0;padding-left:18px;max-width:900px}.changes li{margin-bottom:6px}.changes li::marker{color:#ac8951}footer{border-top:1px solid #252a34;padding:24px 0 32px;color:#b99b65;font-size:10px;letter-spacing:.2em}footer span{float:right;color:#777f91}@media(max-width:650px){header{height:66px;gap:12px}header>span{display:none}.eyebrow{font-size:8px}h1{margin:5px 0}#cover>p:not(.eyebrow){font-size:11px;margin:8px 0}#play{margin:5px 0;padding:8px 20px;font-size:13px}#status{font-size:10px!important}.toolbar{font-size:10px}}
+/* Last Bell web player. Same visual language as the game's menus (Assets/LastBell/UI/UiTheme.cs, docs/ui/ui-kit.md):
+   Inter, the UiTheme palette, text rows with the gold highlight strip, the side contrast gradient, 96x2 gold title rules
+   and the house frame (GoldDim border, gold L-brackets and diamonds). */
+@font-face{font-family:Inter;font-weight:400;font-display:swap;src:url(assets/Inter-Regular.woff2) format("woff2")}
+@font-face{font-family:Inter;font-weight:600;font-display:swap;src:url(assets/Inter-SemiBold.woff2) format("woff2")}
+:root{
+  color-scheme:dark;
+  --backdrop:rgb(3,4,7);            /* Backdrop */
+  --gradient-ink:2,2,6;             /* GradientInk */
+  --ink:rgba(6,9,17,.92);           /* Ink */
+  --ink-deep:rgba(3,4,8,.97);       /* InkDeep */
+  --ivory:rgb(245,235,209);         /* Ivory */
+  --ivory-body:rgba(245,235,209,.9);
+  --ivory-muted:rgba(245,235,209,.7);
+  --ivory-micro:rgba(245,235,209,.45);
+  --rest:rgba(237,224,194,.74);     /* RestLabel */
+  --rule-faint:rgba(237,224,194,.16);
+  --gold:rgb(224,184,110);          /* Gold */
+  --gold-label:rgba(224,184,110,.8);
+  --gold-bright:rgb(255,219,143);   /* GoldBright */
+  --gold-dim:rgba(224,184,110,.35);
+  --strip:rgba(224,184,110,.26);    /* StripFill */
+  --strip-edge:rgba(224,184,110,.55);
+  --danger:rgb(255,115,89);
+  font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;
+  color:var(--ivory-body);
+  background:var(--backdrop);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--backdrop);overflow-x:hidden}
+[hidden]{display:none!important}
+a{color:inherit;text-decoration:none}
+header,main,footer{width:min(1440px,calc(100vw - 32px));margin:auto}
+
+/* ---- the highlight strip: Gold .26, fades over the first 22 % and last 32 %, 1 px Gold .55 edges ---- */
+.strip-bg,#play,.toolbar button:hover:not(:disabled),.toolbar button:focus-visible,summary:hover,summary:focus-visible,.row-link:hover,.row-link:focus-visible{
+  background:
+    linear-gradient(90deg,transparent,var(--strip-edge) 22%,var(--strip-edge) 68%,transparent) top/100% 1px no-repeat,
+    linear-gradient(90deg,transparent,var(--strip-edge) 22%,var(--strip-edge) 68%,transparent) bottom/100% 1px no-repeat,
+    linear-gradient(90deg,transparent,var(--strip) 22%,var(--strip) 68%,transparent);
+}
+
+/* ---- text rows: no boxes; RestLabel at rest, GoldBright on hover/focus ---- */
+button{font:inherit;font-weight:600;color:var(--rest);background:none;border:0;padding:10px 32px;cursor:pointer;transition:color .12s}
+button:hover:not(:disabled),button:focus-visible{color:var(--gold-bright)}
+button:disabled{color:rgba(237,224,194,.26);cursor:default}
+:focus-visible{outline:none}
+canvas:focus-visible{outline:none}
+
+/* ---- page header ---- */
+header{height:84px;display:flex;align-items:center;gap:28px;border-bottom:1px solid var(--rule-faint)}
+header .title{display:block;line-height:0}
+header .title img{height:42px;width:auto}
+header>span{font-size:11px;font-weight:600;letter-spacing:.32em;text-transform:uppercase;color:var(--gold-label)}
+.row-link{margin-left:auto;font-size:14px;font-weight:600;color:var(--rest);padding:9px 26px;transition:color .12s}
+.row-link:hover,.row-link:focus-visible{color:var(--gold-bright)}
+main{padding-top:28px}
+
+/* ---- the player, in the house frame ---- */
+.frame{position:relative;width:min(100%,calc((100vh - 172px) * 16 / 9));min-width:min(100%,560px);margin:0 auto}
+.toolbar{width:min(100%,max(calc((100vh - 172px) * 16 / 9),560px));margin-left:auto;margin-right:auto}
+.frame::before{content:"";position:absolute;inset:-4px;pointer-events:none;z-index:2;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Cg fill='rgb(224,184,110)'%3E%3Crect x='2' y='2' width='10' height='2'/%3E%3Crect x='2' y='2' width='2' height='10'/%3E%3Cpath d='M2 0L4.8 2.8 2 5.6-.8 2.8z'/%3E%3C/g%3E%3C/svg%3E") left top/16px no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Cg fill='rgb(224,184,110)' transform='matrix(-1 0 0 1 16 0)'%3E%3Crect x='2' y='2' width='10' height='2'/%3E%3Crect x='2' y='2' width='2' height='10'/%3E%3Cpath d='M2 0L4.8 2.8 2 5.6-.8 2.8z'/%3E%3C/g%3E%3C/svg%3E") right top/16px no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Cg fill='rgb(224,184,110)' transform='matrix(1 0 0 -1 0 16)'%3E%3Crect x='2' y='2' width='10' height='2'/%3E%3Crect x='2' y='2' width='2' height='10'/%3E%3Cpath d='M2 0L4.8 2.8 2 5.6-.8 2.8z'/%3E%3C/g%3E%3C/svg%3E") left bottom/16px no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Cg fill='rgb(224,184,110)' transform='matrix(-1 0 0 -1 16 16)'%3E%3Crect x='2' y='2' width='10' height='2'/%3E%3Crect x='2' y='2' width='2' height='10'/%3E%3Cpath d='M2 0L4.8 2.8 2 5.6-.8 2.8z'/%3E%3C/g%3E%3C/svg%3E") right bottom/16px no-repeat}
+#player{position:relative;aspect-ratio:16/9;background:var(--ink-deep);border:1px solid var(--gold-dim);box-shadow:0 0 0 1px rgba(0,0,0,.5) inset,3px 4px 0 rgba(0,0,0,.3);overflow:hidden;container-type:inline-size}
+canvas{display:block;width:100%;height:100%;outline:none}
+
+/* ---- start screen: the Confrontation menu scene, its right-hand gradient and a centred column ---- */
+#cover{position:absolute;inset:0;background:var(--backdrop);overflow:hidden}
+#cover .scene{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:left center;animation:settle 1.6s ease-out both}
+#cover::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(90deg,rgba(var(--gradient-ink),0) 58%,rgba(var(--gradient-ink),.3) 64%,rgba(var(--gradient-ink),.75) 69%,rgba(var(--gradient-ink),.985) 72.5%)}
+.column{position:absolute;z-index:1;top:0;bottom:0;right:2.5%;width:25%;display:flex;flex-direction:column;align-items:center;text-align:center;padding:8.5% 0 2.4%;animation:rise .9s .15s ease-out both}
+#cover h1{margin:0;width:97%;line-height:0}
+#cover h1 img{width:100%;height:auto;filter:drop-shadow(0 2px 6px rgba(0,0,0,.6))}
+.eyebrow{margin:7% 0 0;font-size:11px;font-size:clamp(9px,.95cqw,14px);font-weight:600;letter-spacing:.32em;text-transform:uppercase;color:rgba(224,184,110,.72)}
+.tagline{margin:.6em 0 0;font-size:14px;font-size:clamp(11px,1.25cqw,18px);color:var(--rest)}
+#play{display:block;width:100%;margin:8% 0 0;padding:.5em 0;font-size:20px;font-size:clamp(14px,1.75cqw,26px);color:var(--ivory)}
+#play:hover:not(:disabled),#play:focus-visible{color:var(--gold-bright);filter:brightness(1.15)}
+#status{margin:6% 0 0;max-width:100%;font-size:12px;font-size:clamp(10px,.95cqw,14px);line-height:1.55;color:var(--ivory-muted);overflow-wrap:anywhere}
+/* the Settings slider: a dark trough with a gold fill */
+progress{-webkit-appearance:none;appearance:none;width:82%;height:4px;margin:5% 0 0;border:0;background:rgba(0,0,0,.65);box-shadow:0 0 0 1px var(--rule-faint);color:var(--gold)}
+progress::-webkit-progress-bar{background:rgba(0,0,0,.65)}
+progress::-webkit-progress-value{background:linear-gradient(90deg,rgba(224,184,110,.55),var(--gold-bright))}
+progress::-moz-progress-bar{background:linear-gradient(90deg,rgba(224,184,110,.55),var(--gold-bright))}
+.cover-footer{margin:auto 0 0;font-size:9px;font-size:clamp(8px,.72cqw,11px);font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--gold-label)}
+.cover-footer i{font-style:normal;margin:0 .6em;color:var(--ivory-micro)}
+@keyframes settle{from{opacity:0;transform:scale(1.03)}to{opacity:1;transform:none}}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){#cover .scene,.column{animation:none}}
+
+@container (max-width:900px){.eyebrow,.cover-footer{white-space:nowrap;letter-spacing:.16em}.cover-footer i{margin:0 .3em}}
+/* narrow players: the column takes the whole frame over a darker scene */
+@container (max-width:620px){
+  #cover::after{background:linear-gradient(90deg,rgba(var(--gradient-ink),.35),rgba(var(--gradient-ink),.82) 40%,rgba(var(--gradient-ink),.82) 60%,rgba(var(--gradient-ink),.35))}
+  #cover .scene{object-position:30% center}
+  .column{right:0;left:0;width:auto;padding:5% 8% 3%;justify-content:center}
+  #cover h1{width:min(46%,240px)}
+  .eyebrow{margin-top:3%;font-size:8px}
+  .tagline{display:none}
+  #play{width:min(70%,260px);margin-top:4%;font-size:15px;padding:.35em 0}
+  #status{margin-top:3%;font-size:10px;line-height:1.4}
+  progress{margin-top:3%}
+  .cover-footer{display:none}
+}
+
+/* ---- toolbar under the player ---- */
+.toolbar{min-height:64px;margin-top:10px;display:flex;align-items:center;gap:12px;justify-content:space-between;color:var(--ivory-muted);font-size:13px}
+#hint{letter-spacing:.02em}
+.toolbar button{font-size:15px;padding:9px 30px}
+
+/* ---- sections: eyebrow, Ivory title, 96x2 gold rule ---- */
+.news,details{border-top:1px solid var(--rule-faint)}
+.news{padding:40px 0 34px;color:var(--ivory-muted);font-size:14px;line-height:1.7}
+.news h2{margin:0;font-size:30px;font-weight:600;letter-spacing:.01em;color:var(--ivory)}
+.news-date{margin:6px 0 22px;font-size:11px;font-weight:600;letter-spacing:.3em;text-transform:uppercase;color:var(--gold-label)}
+.news-date::after{content:"";display:block;width:96px;height:2px;margin-top:16px;background:var(--gold)}
+.news-lead{max-width:860px;margin:0 0 28px;font-size:16px;color:var(--ivory-body)}
+.news-lead strong,.changes strong,.abilities strong{color:var(--ivory);font-weight:600}
+.news h3{margin:34px 0 14px;font-size:11px;font-weight:600;letter-spacing:.3em;text-transform:uppercase;color:var(--gold-label)}
+.changes{margin:0;padding:0;list-style:none;max-width:920px}
+.changes li{position:relative;margin-bottom:8px;padding-left:22px}
+.changes li::before{content:"";position:absolute;left:3px;top:.68em;width:6px;height:6px;background:var(--gold);transform:rotate(45deg)}
+/* ability cards: the InfoStrip (ink with a 3 px gold left bar) */
+.abilities{list-style:none;margin:0 0 12px;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(320px,100%),1fr));gap:12px}
+.abilities li{background:var(--ink);border:1px solid var(--rule-faint);border-left:3px solid var(--gold);padding:16px 18px}
+.ability-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:6px}
+.ability-name{font-size:16px;font-weight:600;color:var(--ivory)}
+kbd{flex:none;font:600 10px/1 Inter,system-ui,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:var(--gold-bright);border:1px solid var(--gold-dim);background:var(--ink-deep);padding:5px 8px}
+.abilities p{margin:0 0 4px}
+.abilities p:last-child{margin:0}
+.news-note{margin:4px 0 0;font-size:12px;color:var(--ivory-micro)}
+
+/* ---- Controls & about: a text row with a drawn chevron ---- */
+details{padding:18px 0 26px;color:var(--ivory-muted);font-size:14px;line-height:1.8}
+summary{display:inline-flex;align-items:center;gap:14px;list-style:none;cursor:pointer;padding:10px 40px 10px 8px;font-size:16px;font-weight:600;color:var(--rest);transition:color .12s}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"";width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);transition:transform .15s}
+details[open] summary::before{transform:rotate(45deg) translate(-2px,-2px)}
+summary:hover,summary:focus-visible{color:var(--gold-bright)}
+details p{max-width:860px;margin:14px 0 0 8px}
+
+footer{display:flex;justify-content:space-between;border-top:1px solid var(--rule-faint);padding:24px 0 34px;color:var(--gold-label);font-size:10px;font-weight:600;letter-spacing:.3em;text-transform:uppercase}
+footer span{color:var(--ivory-micro)}
+
+@media(max-width:650px){
+  header{height:64px;gap:12px}
+  header .title img{height:30px}
+  header>span{display:none}
+  .row-link{padding:8px 14px;font-size:13px}
+  main{padding-top:18px}
+  .toolbar{font-size:11px}
+  .toolbar button{padding:8px 16px;font-size:13px}
+  .news h2{font-size:24px}
+  footer{letter-spacing:.18em}
+}
