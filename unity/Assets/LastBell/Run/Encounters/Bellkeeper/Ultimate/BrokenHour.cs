@@ -536,17 +536,12 @@ namespace LastBell.Run
             string chain = partner != null && !partner.Down ? $" · chain to {UltimateState.Roman[HourOf(partner) + 1]} {(Sim.Flat(p.transform.position) - Sim.Flat(partner.transform.position)).magnitude:0} m" : "";
             return $"beat in {Mathf.Max(0, (NextBeatTick - Now) / (float)Sim.Hz):0.0}s · you ({UltimateState.Roman[HourOf(p) + 1]}): {JobOf(p, out _)}{chain}" + (RewindAfterNext ? "   ·   REWIND after this beat" : "");
         }
-        static GUIStyle nameStyle, bigStyle, spotStyle;
         public void DrawGui(Camera cam)
         {
             if (!Running || NextBeatTick < 0 || cam == null) return;
-            if (nameStyle == null)
-            {
-                nameStyle = new GUIStyle(GUI.skin.label) { fontSize = 17, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-                spotStyle = new GUIStyle(nameStyle) { fontSize = 16 }; bigStyle = new GUIStyle(nameStyle) { fontSize = 40 };
-            }
+            var nameStyle = EncounterCallouts.Styles.Tag; var spotStyle = nameStyle;
             Label(cam, Plate(Beat), 0.3f, "PLATE", EscapementRelay.DutyColors[0], spotStyle);
-            Label(cam, -HandDir(Beat) * 9.5f, 0.3f, "SLAM (INVERTED here)", new Color(1f, 0.55f, 0.45f), spotStyle);
+            Label(cam, -HandDir(Beat) * 9.5f, 0.3f, "SLAM (INVERTED here)", UiTheme.Danger, spotStyle);
             for (int i = 0; i < W.Players.Count; i++)
             {
                 var p = W.Players[i]; if (p.Down) continue;
@@ -555,8 +550,7 @@ namespace LastBell.Run
             }
             if (RewindAfterNext)
             {
-                bigStyle.normal.textColor = Color.Lerp(new Color(1f, 0.45f, 0.35f), Color.white, Blink);
-                GUI.Label(new Rect(0, Screen.height * 0.2f, Screen.width, 60), "REWIND NEXT BEAT", bigStyle);
+                EncounterCallouts.Banner(0.2f, "REWIND NEXT BEAT", Color.Lerp(UiTheme.Danger, UiTheme.Ivory, Blink));
             }
         }
 

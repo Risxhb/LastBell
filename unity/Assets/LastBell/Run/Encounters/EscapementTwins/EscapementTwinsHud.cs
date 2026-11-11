@@ -10,7 +10,6 @@ namespace LastBell.Run
     {
         public static bool ShowDiagnostics;
         EscapementTwinsEncounter b;
-        GUIStyle style;
         readonly StringBuilder sb = new StringBuilder();
 
         public void Bind(EscapementTwinsEncounter boss) { b = boss; }
@@ -25,15 +24,13 @@ namespace LastBell.Run
         {
             if (!ShowDiagnostics || !b || b.Dead || RunHud.LanClientView) return;   // dev overlay: host only (a LAN client's replica is never stepped)
             GUI.depth = 10;
-            style ??= new GUIStyle(GUI.skin.label) { fontSize = 14, richText = false };
-            style.normal.textColor = new Color(0.85f, 0.95f, 1f);
             sb.Clear();
             sb.AppendLine("[DEV] Escapement Twins (F7)");
             sb.AppendLine($"{(b.Phase2 ? "Phase 2" : "Phase 1")}   {b.Bpm:0} BPM   beat {b.BeatIndex}   axis {b.Axis:0}   {b.Level}");
             sb.AppendLine("Now: " + b.Current);
             sb.AppendLine($"Pallet Lock: {b.LocksResolved} locks, {b.Swaps} swaps, {b.LockHits} hits   Escape Wheel: {b.VolleysResolved} volleys, {b.SpokeHits} hits");
             sb.AppendLine($"Counterpoise: {b.SoaksResolved} circles, {b.SoakPlayers} soakers, {b.SoakEmpty} empty   Lock and Release: lane {b.LaneHits}, shock {b.ShockHits}, landing {b.LandHits}, recoil {b.RecoilHits}, punish windows {b.PunishLog.Count}");
-            GUI.Label(new Rect(16, Screen.height * 0.30f, 820, 160), sb.ToString(), style);
+            EncounterCallouts.Diagnostics(sb.ToString(), 820);
         }
     }
 }

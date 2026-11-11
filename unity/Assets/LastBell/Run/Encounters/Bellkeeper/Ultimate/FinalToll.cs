@@ -819,36 +819,32 @@ namespace LastBell.Run
             root = plate = mySpot = echo = echoLive = floor = bellModel = null; for (int h = 0; h < 4; h++) plats[h] = null; pool.Clear(); plans.Clear(); ghostSteps = null;
         }
 
-        static GUIStyle nameStyle, bigStyle, midStyle;
+        // the echo ring's own blue (its hour numerals, the echo tag): a mechanic colour, not a UI token
+        static readonly Color EchoBlue = new Color(0.65f, 0.9f, 1f);
         public void DrawGui(Camera cam)
         {
             if (!Running || cam == null || !root) return;
-            if (nameStyle == null)
-            {
-                nameStyle = new GUIStyle(GUI.skin.label) { fontSize = 16, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-                midStyle = new GUIStyle(nameStyle) { fontSize = 22 }; bigStyle = new GUIStyle(nameStyle) { fontSize = 32 };
-            }
+            var nameStyle = EncounterCallouts.Styles.Tag; var midStyle = EncounterCallouts.Styles.TagLarge;
             float t = T; int c = Cur(t), k = c + 1; float left = NextAt(k) - t;
             // gap numerals on each ring (or at the rim, for the next toll)
             float R1 = RingR(t), R2 = EchoR(t);
             for (int j = 0; j < 4; j++)
             {
-                if (R1 > 0) Label(cam, Dir(GapCentre(c, j)) * (R1 + 0.9f), 0.4f, UltimateState.Roman[GapHour(c, j) + 1], new Color(1f, 0.85f, 0.5f), midStyle);
-                else if (k < 13) Label(cam, Dir(GapCentre(k, j)) * 11.0f, 0.4f, UltimateState.Roman[GapHour(k, j) + 1], new Color(1f, 0.85f, 0.5f, 0.6f), nameStyle);
-                if (R2 > 0) Label(cam, Dir(GapCentre(c, j) + 45) * (R2 + 0.9f), 0.4f, UltimateState.Roman[GapHour(c, j) + 1], new Color(0.65f, 0.9f, 1f), midStyle);
+                if (R1 > 0) Label(cam, Dir(GapCentre(c, j)) * (R1 + 0.9f), 0.4f, UltimateState.Roman[GapHour(c, j) + 1], UiTheme.GoldBright, midStyle);
+                else if (k < 13) Label(cam, Dir(GapCentre(k, j)) * 11.0f, 0.4f, UltimateState.Roman[GapHour(k, j) + 1], EncounterCallouts.Alpha(UiTheme.GoldBright, 0.6f), nameStyle);
+                if (R2 > 0) Label(cam, Dir(GapCentre(c, j) + 45) * (R2 + 0.9f), 0.4f, UltimateState.Roman[GapHour(c, j) + 1], EchoBlue, midStyle);
             }
-            if (EchoOn(t)) { Label(cam, EchoAt(t), 4.2f, EchoLive(t) ? "ECHO · LIVE" : "echo", EchoLive(t) ? new Color(1f, 0.85f, 0.45f) : new Color(0.65f, 0.85f, 1f), midStyle); Label(cam, Vector3.zero, 4.6f, EchoLive(t) ? "boss" : "BOSS · LIVE", EchoLive(t) ? new Color(0.9f, 0.88f, 0.8f, 0.7f) : new Color(1f, 0.85f, 0.45f), midStyle); }
-            if (t >= TollAt[12]) for (int h = 0; h < 4; h++) Label(cam, PlatC(h) + PlatC(h).normalized * 2.3f, 0.4f, "platform " + UltimateState.Roman[h + 1], new Color(1f, 0.85f, 0.5f), nameStyle);
-            if (k < 13 && Has(k, 0) && HourPresent(Soaker(k))) Label(cam, PlatePos(k), 0.6f, UltimateState.Roman[Soaker(k) + 1] + " SOAK", new Color(1f, 0.85f, 0.5f), nameStyle);
-            if (k < 13 && Has(k, 2)) Label(cam, Dir(InvAng(k)) * 8f, 0.6f, UltimateState.Roman[InvHour(k) + 1] + " INVERTED: inside", new Color(0.97f, 0.94f, 0.86f), nameStyle);   // ivory, like P2 (no Arcanist violet, accepted 28 Oct)
+            if (EchoOn(t)) { Label(cam, EchoAt(t), 4.2f, EchoLive(t) ? "ECHO · LIVE" : "echo", EchoLive(t) ? UiTheme.GoldBright : EchoBlue, midStyle); Label(cam, Vector3.zero, 4.6f, EchoLive(t) ? "boss" : "BOSS · LIVE", EchoLive(t) ? UiTheme.IvoryMuted : UiTheme.GoldBright, midStyle); }
+            if (t >= TollAt[12]) for (int h = 0; h < 4; h++) Label(cam, PlatC(h) + PlatC(h).normalized * 2.3f, 0.4f, "platform " + UltimateState.Roman[h + 1], UiTheme.GoldBright, nameStyle);
+            if (k < 13 && Has(k, 0) && HourPresent(Soaker(k))) Label(cam, PlatePos(k), 0.6f, UltimateState.Roman[Soaker(k) + 1] + " SOAK", UiTheme.GoldBright, nameStyle);
+            if (k < 13 && Has(k, 2)) Label(cam, Dir(InvAng(k)) * 8f, 0.6f, UltimateState.Roman[InvHour(k) + 1] + " INVERTED: inside", UiTheme.Ivory, nameStyle);   // ivory, like P2 (no Arcanist violet, accepted 28 Oct)
             for (int i = 0; i < W.Players.Count; i++)
             {
                 var p = W.Players[i]; if (p.Down) continue;
-                Label(cam, p.transform.position, 2.9f, (i == 0 ? "YOU " : "") + UltimateState.Roman[HourOf(p) + 1] + (JobOf(p) != null ? "  · " + JobOf(p) : ""), Color.white, nameStyle);
+                Label(cam, p.transform.position, 2.9f, (i == 0 ? "YOU " : "") + UltimateState.Roman[HourOf(p) + 1] + (JobOf(p) != null ? "  · " + JobOf(p) : ""), UiTheme.Ivory, nameStyle);
             }
             string text = Standing(t) ? $"LAST STAND · {TollAt[13] + Stand - t:0.0}s · hits x{StandScale:0} · stay on your platform" : k >= 13 ? $"XIII in {left:0.0}s · THE BELL SHATTERS: get to your platform" : $"toll {UltimateState.Roman[k]} in {left:0.0}s · {string.Join(" + ", System.Array.ConvertAll(Kinds(k), x => KN[x]))}" + (Echoes(k) ? " · ECHO" : "") + (t >= TollAt[4] ? " · MAINSPRING" : "");
-            bigStyle.normal.textColor = k >= 10 ? new Color(1f, 0.42f, 0.3f) : new Color(1f, 0.85f, 0.55f);
-            GUI.Label(new Rect(0, Screen.height * 0.17f, Screen.width, 50), text, bigStyle);
+            EncounterCallouts.Banner(0.17f, text, k >= 10 ? UiTheme.Danger : UiTheme.GoldBright);
             float su = t - TollAt[13]; if (su >= 0 && su < 1.8f) CrackedTitle("THE LAST BELL", su);
         }
         // XIII's title: the words crack along a slanted line, the two halves sliding apart, then fade

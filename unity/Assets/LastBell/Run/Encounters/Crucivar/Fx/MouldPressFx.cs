@@ -11,8 +11,6 @@ namespace LastBell.Run
     // removes itself when none is left. Nothing here decides timing or hits.
     public sealed class MouldPressFx : MonoBehaviour
     {
-        static readonly Color Ivory = new Color(1f, 0.95f, 0.82f),
-            InkShadow = new Color(0.063f, 0.094f, 0.145f, 0.9f);
         // the telegraph shader's own defaults (FX_SH_Telegraph), restored when a dimmed tower wakes
         static readonly Color TeleFill = new Color(0.92f, 0.41f, 0.36f), TeleBorder = new Color(1.25f, 0.5f, 0.36f);
 
@@ -24,7 +22,6 @@ namespace LastBell.Run
         AudioSource audioSrc;
         int lastSecond = -1;
         static AudioClip chime;
-        static GUIStyle numStyle;
 
         public static MouldPressFx Show(CombatWorld world, List<Hazard> hazards, bool sequential)
         {
@@ -145,36 +142,25 @@ namespace LastBell.Run
         void OnGUI()
         {
             var cam = Camera.main; if (cam == null) return;
-            if (numStyle == null) numStyle = new GUIStyle(GUI.skin.label) { fontSize = 64, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
             foreach (var t in towers)
             {
                 var sp = cam.WorldToScreenPoint(t.H.Origin + Vector3.up * 2.6f);
                 if (sp.z <= 0) continue;
                 var c = new Vector2(sp.x, Screen.height - sp.y);
                 float a = t.Dim ? 0.4f : 1f;
-                var rect = new Rect(c.x - 50, c.y - 44, 100, 80);
-                Numeral(rect, HideCounts ? "?" : t.H.ShareCount.ToString(), a);
+                EncounterCallouts.Numeral(new Vector2(c.x, c.y - UiTheme.V(4)), HideCounts ? "?" : t.H.ShareCount.ToString(), a);
                 // one slot per needed player: thin ivory tick when filled, dark when empty
                 int slots = HideCounts ? t.Inside : Mathf.Max(t.H.ShareCount, t.Inside);
-                float x0 = c.x - (slots * 18 - 6) / 2f;
-                for (int i = 0; i < slots; i++)
-                {
-                    var r = new Rect(x0 + i * 18, c.y + 36, 12, 5);
-                    var old = GUI.color;
-                    GUI.color = i < t.Inside ? new Color(Ivory.r, Ivory.g, Ivory.b, a) : new Color(0.1f, 0.12f, 0.16f, 0.8f * a);
-                    GUI.DrawTexture(r, Texture2D.whiteTexture);
-                    GUI.color = old;
-                }
+                SlotTicks(c.x, c.y + UiTheme.V(36), slots, t.Inside, a);
             }
         }
 
-        static void Numeral(Rect rect, string label, float alpha)
+        // the soak's player slots under its numeral (shared with the Rivet Cantor's Chorus): filled Ivory, empty ink
+        public static void SlotTicks(float cx, float y, int slots, int filled, float alpha = 1)
         {
-            if (alpha <= 0.01f) return;
-            numStyle.normal.textColor = InkShadow * new Color(1, 1, 1, alpha);
-            GUI.Label(new Rect(rect.x + 3, rect.y + 3, rect.width, rect.height), label, numStyle);
-            numStyle.normal.textColor = new Color(Ivory.r, Ivory.g, Ivory.b, alpha);
-            GUI.Label(rect, label, numStyle);
+            float step = UiTheme.V(18), w = UiTheme.V(12), h = Mathf.Max(2, UiTheme.V(5)), x0 = cx - (slots * step - (step - w)) / 2f;
+            for (int i = 0; i < slots; i++)
+                UiTheme.Fill(new Rect(x0 + i * step, y, w, h), i < filled ? EncounterCallouts.Alpha(UiTheme.Ivory, alpha) : EncounterCallouts.Alpha(UiTheme.InkDeep, 0.8f * alpha));
         }
 
         // a struck-bell partial stack, made once (no audio assets in the project yet)

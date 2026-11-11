@@ -9,8 +9,8 @@ namespace LastBell.Run
     public sealed class TutorialCompletePanel : MonoBehaviour
     {
         public static TutorialCompletePanel Current { get; private set; }
-        RunDirector d; string body = "";
-        GUIStyle sTitle, sBody, sSection; float styledFor = -1; static Texture2D panelTex;
+        RunDirector d; string lead = "", tail = "", body = ""; bool practice; InputHints.Device bodyFor; bool built;
+        GUIStyle sTitle, sBody; int styledFor = -1; readonly GUIContent measure = new GUIContent();
 
         public static void Show(RunDirector director, IReadOnlyList<TutorialDirector.Record> records)
         {
@@ -19,34 +19,51 @@ namespace LastBell.Run
             p.d = director; Current = p;
             int drills = records.Count(r => r.Tries > 1 || !r.Passed);
             var missed = records.Where(r => !r.Passed).Select(r => r.Title).ToList();
-            p.body = "The Tempo Tyrant falls. You've seen every mechanic in the game so far: read the shape, step out, punish.\n\n"
-                + (missed.Count == 0 ? "Every mechanic handled." : "To practise: " + string.Join(", ", missed) + ".")
-                + (director.Mode == RunMode.Run ? "\n\nNext: Skyward Spire. Three minibosses guard Aurelion."
-                    : "\n\nNext: Boss Rush to fight any boss for real, or Retry (R) to run the tutorial again.");
+            p.lead = "The Tempo Tyrant falls. You've seen every mechanic in the game so far: read the shape, step out, punish.\n\n"
+                + (missed.Count == 0 ? "Every mechanic handled." : "To practise: " + string.Join(", ", missed) + ".");
+            p.practice = director.Mode != RunMode.Run; p.built = false;
+            p.tail = p.practice ? "" : "\n\nNext: Skyward Spire. Three minibosses guard Aurelion.";
         }
 
         void OnDestroy() { if (Current == this) Current = null; }
 
+        // The retry hint comes from InputHints ("Retry (R)"; no key on a gamepad, where Retry is a focusable row), so the
+        // body is rebuilt when the last device used changes.
+        string Body()
+        {
+            if (built && bodyFor == InputHints.Last) return body;
+            built = true; bodyFor = InputHints.Last;
+            var retry = InputHints.Key(HintAction.Retry);
+            return body = lead + (practice
+                ? "\n\nNext: Boss Rush to fight any boss for real, or " + (retry.Length > 0 ? "Retry (" + retry + ")" : "Retry") + " to run the tutorial again."
+                : tail);
+        }
+
+        // Same card as the tutorial's instruction panel (TutorialDirector): UiImgui.InfoStrip, spaced Gold eyebrow, Ivory
+        // title, 96x2 Gold rule, theme body text. Left side, beside the centred Results band.
         void OnGUI()
         {
             if (!d || (d.State != RunState.Cleared && d.State != RunState.Results)) { if (d && d.State != RunState.Combat) Destroy(this); return; }
             GUI.depth = -20;
-            float k = Screen.height / 1080f;
-            if (!Mathf.Approximately(styledFor, k))
+            if (styledFor != Screen.height)
             {
-                styledFor = k;
-                sSection = new GUIStyle(GUI.skin.label) { fontSize = Mathf.RoundToInt(15 * k), fontStyle = FontStyle.Bold, normal = { textColor = new Color(0.93f, 0.74f, 0.38f) } };
-                sTitle = new GUIStyle(GUI.skin.label) { fontSize = Mathf.RoundToInt(30 * k), fontStyle = FontStyle.Bold, normal = { textColor = new Color(1f, 0.86f, 0.5f) } };
-                sBody = new GUIStyle(GUI.skin.label) { fontSize = Mathf.RoundToInt(19 * k), wordWrap = true, normal = { textColor = new Color(0.92f, 0.9f, 0.86f) } };
+                styledFor = Screen.height;
+                sTitle = UiTheme.Style(TutorialDirector.TitleSize, true, TextAnchor.UpperLeft, UiTheme.Ivory, true);
+                sBody = UiTheme.Style(UiTheme.SizeBody, false, TextAnchor.UpperLeft, UiTheme.IvoryBody, true);
             }
-            if (!panelTex) { panelTex = new Texture2D(1, 1); panelTex.SetPixel(0, 0, new Color(0.05f, 0.05f, 0.08f, 0.85f)); panelTex.Apply(); }
-            float w = 560 * k, x = 24 * k, y = 150 * k, pad = 18 * k, inner = w - 2 * pad;
-            float bh = sBody.CalcHeight(new GUIContent(body), inner), h = pad + 26 * k + 44 * k + bh + pad;
-            GUI.DrawTexture(new Rect(x, y, w, h), panelTex);
-            GUI.DrawTexture(new Rect(x, y, 4 * k, h), Texture2D.whiteTexture, ScaleMode.StretchToFill, false, 0, new Color(0.93f, 0.74f, 0.38f), 0, 0);
-            GUI.Label(new Rect(x + pad, y + pad, inner, 26 * k), "TUTORIAL", sSection);
-            GUI.Label(new Rect(x + pad, y + pad + 26 * k, inner, 44 * k), "Tutorial complete", sTitle);
-            GUI.Label(new Rect(x + pad, y + pad + 70 * k, inner, bh), body, sBody);
+            const float X = 24, Y = 150, Wd = 560;
+            float pad = UiTheme.G3, padY = UiTheme.G2;
+            string text = Body();
+            float x = UiTheme.V(X + 3 + pad), inner = UiTheme.V(Wd - 3 - 2 * pad), cy = UiTheme.V(Y + padY);
+            measure.text = "Tutorial complete"; float th = sTitle.CalcHeight(measure, inner);
+            measure.text = text; float bh = sBody.CalcHeight(measure, inner);
+            float h = UiTheme.V(padY + 20 + 8) + th + UiTheme.V(8 + UiTheme.RuleHeight + 16) + bh + UiTheme.V(padY);
+            UiImgui.InfoStrip(new Rect(X, Y, Wd, h / UiTheme.Scale));
+            UiTheme.Label(new Rect(x, cy, inner, UiTheme.V(20)), Eyebrow, UiImgui.Styles.Eyebrow); cy += UiTheme.V(20 + 8);
+            UiTheme.Label(new Rect(x, cy, inner, th), "Tutorial complete", sTitle); cy += th + UiTheme.V(8);
+            UiTheme.Fill(new Rect(x, cy, UiTheme.V(UiTheme.RuleWidth), Mathf.Max(1, UiTheme.V(UiTheme.RuleHeight))), UiTheme.Gold); cy += UiTheme.V(UiTheme.RuleHeight + 16);
+            UiTheme.Label(new Rect(x, cy, inner, bh), text, sBody);
         }
+        static readonly string Eyebrow = UiTheme.Spaced("Tutorial");
     }
 }

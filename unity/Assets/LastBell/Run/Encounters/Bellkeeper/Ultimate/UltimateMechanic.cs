@@ -115,7 +115,7 @@ namespace LastBell.Run
 
         public override void Cancel() { base.Cancel(); }
 
-        // a world label (OnGUI), shadowed. Labels drawn in the same GUI pass don't overlap: one that would land on an earlier one moves
+        // a world label (OnGUI), shadowed, in an EncounterCallouts theme style. Labels drawn in the same GUI pass don't overlap: one that would land on an earlier one moves
         // up a row (performance agent's screenshots, 2 Nov: two players side by side read "IV II gap IV" in P5). One copy for every phase.
         static readonly List<Rect> placed = new List<Rect>(); static int placedFrame = -1; static EventType placedEvent;
         // Unity caches laid-out text per colour, so a label whose colour changes every frame makes a new cache entry each frame
@@ -126,7 +126,7 @@ namespace LastBell.Run
         {
             var sp = cam.WorldToScreenPoint(new Vector3(world.x, height, world.z)); if (sp.z <= 0) return;
             if (placedFrame != Time.frameCount || placedEvent != Event.current.type) { placed.Clear(); placedFrame = Time.frameCount; placedEvent = Event.current.type; }
-            float w = style.CalcSize(new GUIContent(text)).x + 6, h = 26;
+            float w = style.CalcSize(new GUIContent(text)).x + UiTheme.V(6), h = UiTheme.V(26);
             var box = new Rect(sp.x - w / 2, Screen.height - sp.y - h / 2, w, h);
             for (int tries = 0; tries < 4; tries++)
             {
@@ -134,9 +134,8 @@ namespace LastBell.Run
                 if (!hit) break;
             }
             placed.Add(box);
-            var r = new Rect(sp.x - 130, box.y, 260, h);
-            style.normal.textColor = new Color(0, 0, 0, 0.85f); GUI.Label(new Rect(r.x + 1.5f, r.y + 1.5f, r.width, r.height), text, style);
-            style.normal.textColor = c; GUI.Label(r, text, style);
+            var r = new Rect(sp.x - UiTheme.V(130), box.y, UiTheme.V(260), h);
+            UiTheme.Label(r, text, style, c);   // shadowed, tinted through GUI.color (no re-layout when the colour blinks)
         }
     }
 

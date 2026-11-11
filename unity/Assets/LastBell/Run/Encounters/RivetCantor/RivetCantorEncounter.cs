@@ -697,8 +697,7 @@ namespace LastBell.Run
         public int ChorusNeed { get; private set; } = -1;    // -1: no Chorus live
         public int ChorusFilled { get; private set; }
         public int NumeralTicks, NumeralMin = int.MaxValue, NumeralMax, FillMatches, FillChecks;   // tests
-        Vector3 chorusAt; Vector3 camSide = Vector3.forward; GUIStyle numStyle;
-        static readonly Color InkShadow = new Color(0.05f, 0.04f, 0.03f, 0.85f);
+        Vector3 chorusAt; Vector3 camSide = Vector3.forward;
 
         void UpdateChorusNumeral()
         {
@@ -744,21 +743,9 @@ namespace LastBell.Run
             if (fwd.sqrMagnitude > 1e-4f) camSide = Vector3.Slerp(camSide, -fwd.normalized, 0.15f);
             var sp = cam.WorldToScreenPoint(chorusAt + camSide.normalized * (ChorusRadius + 0.4f) + Vector3.up * 0.3f);
             if (sp.z <= 0) return;
-            if (numStyle == null) numStyle = new GUIStyle(GUI.skin.label) { fontSize = 56, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
             var c = new Vector2(sp.x, Screen.height - sp.y);
-            var rect = new Rect(c.x - 50, c.y - 44, 100, 80);
-            string label = ChorusNeed.ToString();
-            numStyle.normal.textColor = InkShadow; GUI.Label(new Rect(rect.x + 3, rect.y + 3, rect.width, rect.height), label, numStyle);
-            numStyle.normal.textColor = Ivory; GUI.Label(rect, label, numStyle);
-            int slots = Mathf.Max(ChorusNeed, ChorusFilled);
-            float x0 = c.x - (slots * 18 - 6) / 2f;
-            for (int i = 0; i < slots; i++)
-            {
-                var old = GUI.color;
-                GUI.color = i < ChorusFilled ? Ivory : new Color(0.1f, 0.12f, 0.16f, 0.8f);
-                GUI.DrawTexture(new Rect(x0 + i * 18, c.y + 32, 12, 5), Texture2D.whiteTexture);
-                GUI.color = old;
-            }
+            EncounterCallouts.Numeral(new Vector2(c.x, c.y - UiTheme.V(4)), ChorusNeed.ToString());
+            MouldPressFx.SlotTicks(c.x, c.y + UiTheme.V(32), Mathf.Max(ChorusNeed, ChorusFilled), ChorusFilled);
         }
     }
 

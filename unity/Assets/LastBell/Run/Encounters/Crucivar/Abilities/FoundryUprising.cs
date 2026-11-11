@@ -350,24 +350,22 @@ namespace LastBell.Run
         sealed class CastingBar : MonoBehaviour
         {
             BossPart part; System.Func<bool> next;
-            string numeral; GUIStyle style;
+            string numeral;
             public void Init(BossPart p, System.Func<bool> isNext) { part = p; next = isNext; numeral = Numeral(p.Order); }
             void OnGUI()
             {
                 var cam = Camera.main; if (!cam || part == null || !part.Alive || part.MaxHp <= 0) return;
                 // above the glowing casting on an ink strip: over the casting itself it was lost in the glow
                 var sp = cam.WorldToScreenPoint(part.Pos + Vector3.up * 2.6f); if (sp.z <= 0) return;
-                if (style == null) style = new GUIStyle(GUI.skin.label) { fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-                style.fontSize = Mathf.RoundToInt(UiTheme.V(20));
+                var style = EncounterCallouts.Styles.TagLarge;
                 bool order = next != null, now = !order || next();   // only Hard has a kill order to show
                 float w = UiTheme.V(110), h = UiTheme.V(10), nw = UiTheme.V(30), pad = UiTheme.V(5), f = Mathf.Clamp01(part.Hp / part.MaxHp), a = now ? 1f : 0.5f;
                 // kept on screen and under the boss bar: a casting at the far rim sits right under it
                 float cx = Mathf.Clamp(sp.x, w, Screen.width - w), cy = Mathf.Clamp(Screen.height - sp.y - UiTheme.V(62), UiTheme.V(150), Screen.height - UiTheme.V(40));
                 var strip = new Rect(cx - (nw + w) / 2 - pad, cy - UiTheme.V(13), nw + w + pad * 2, UiTheme.V(26));
-                if (order && now) UiTheme.Fill(new Rect(strip.x - 2, strip.y - 2, strip.width + 4, strip.height + 4), new Color(1f, 0.95f, 0.82f, 0.9f));
-                UiTheme.Fill(strip, new Color(0.03f, 0.03f, 0.05f, 0.88f));
-                style.normal.textColor = new Color(1f, 0.95f, 0.82f, a);
-                GUI.Label(new Rect(strip.x + pad, strip.y, nw, strip.height), numeral, style);
+                if (order && now) UiTheme.Fill(new Rect(strip.x - 2, strip.y - 2, strip.width + 4, strip.height + 4), EncounterCallouts.Alpha(UiTheme.Ivory, 0.9f));
+                UiTheme.Fill(strip, UiTheme.InkDeep);
+                UiTheme.Label(new Rect(strip.x + pad, strip.y, nw, strip.height), numeral, style, EncounterCallouts.Alpha(UiTheme.Ivory, a));
                 var r = new Rect(strip.x + pad + nw, cy - h / 2, w, h);
                 UiTheme.Fill(r, new Color(0.22f, 0.12f, 0.08f, a));
                 UiTheme.Fill(new Rect(r.x, r.y, r.width * f, r.height), new Color(1f, 0.55f, 0.18f, a));
@@ -399,8 +397,8 @@ namespace LastBell.Run
         {
             var go = new GameObject("Numeral"); go.transform.SetParent(parent, false); go.transform.localPosition = Vector3.up * height;
             var tm = go.AddComponent<TextMesh>();
-            tm.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); go.GetComponent<MeshRenderer>().sharedMaterial = tm.font.material;
-            tm.anchor = TextAnchor.MiddleCenter; tm.characterSize = 0.16f; tm.fontSize = 64; tm.fontStyle = FontStyle.Bold; tm.color = new Color(1f, 0.95f, 0.82f); tm.text = text;
+            tm.font = UiTheme.SemiBold; go.GetComponent<MeshRenderer>().sharedMaterial = tm.font.material;   // the theme face, not the default font
+            tm.anchor = TextAnchor.MiddleCenter; tm.characterSize = 0.16f; tm.fontSize = EncounterCallouts.NumeralSize; tm.fontStyle = FontStyle.Normal; tm.color = UiTheme.Ivory; tm.text = text;
             go.AddComponent<FaceCamera>();
         }
 
