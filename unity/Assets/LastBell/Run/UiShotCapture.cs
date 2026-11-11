@@ -47,7 +47,12 @@ namespace LastBell.Run
             string dir = Arg("-lastbellOut") ?? Path.Combine(Application.persistentDataPath, "ui-shots"), name = Arg("-lastbellShotName") ?? "shot";
             Directory.CreateDirectory(dir);
             float wait = 0;
-            while ((RunDirector.Instance == null || RunDirector.Instance.State != RunState.Combat) && wait < 120) { wait += Time.unscaledDeltaTime; yield return null; }
+            while ((RunDirector.Instance == null || RunDirector.Instance.State != RunState.Combat) && wait < 120)
+            {
+                // a practice launch waits on its Ready screen: press Ready, as the tutorial autotest does
+                if (RunDirector.Instance != null && RunDirector.Instance.State == RunState.Ready) RunDirector.Instance.RequestReady();
+                wait += Time.unscaledDeltaTime; yield return null;
+            }
             float t0 = Time.unscaledTime;
             foreach (var t in times)
             {
