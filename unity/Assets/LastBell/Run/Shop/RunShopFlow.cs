@@ -162,130 +162,192 @@ namespace LastBell.Run.Shop
             // co-op: the shop closes after 90 s whatever the ready state (spec §5.4); solo waits for you (§6)
             if (!Run.Solo && Time.frameCount > openedAt && d.StateTicks >= ShopRun.CoopTimerSeconds * Sim.Hz) d.RequestReady();
             var kb = Keyboard.current;
-            if (kb != null && kb.rKey.wasPressedThisFrame) Do(Run.TryReroll(0, out var why), why);
+            if (kb != null && !d.Paused && kb.rKey.wasPressedThisFrame) Do(Run.TryReroll(0, out var why), why);
         }
 
         void Do(bool ok, string why) { LastRefusal = ok ? null : why; }
 
         // ---------------------------------------------------------------- screen
-        GUIStyle eyebrow, title, body, small, smallC, smallLow, price, chimes, btn, btnP, tierSt;
+        // The intermission in the main menu's language (UI sub-thread B): no panel or boxes. A light dim and the main menu's
+        // side gradient (mirrored, dark on the left) behind two columns: the stock as a list (icon, tier, name, effect,
+        // price, Buy / Lock text rows) under the header, and on the right the wallet, your build (Temper rows), allies
+        // (Chip in rows, co-op) and the footer (Reroll, Ready as the larger main action). Keyboard / controller focus is an
+        // ImguiFocus grid of two columns; focus opens on Ready and B returns to it. R rerolls; Enter / A confirms the
+        // focused row (RunDirector no longer readies on Enter while the shop is open).
+        GUIStyle tierSt, nameSt, nextSt, effectSt, priceSt, walletSt, walletUnitSt, smallSt, smallRight, buildSt, allySt, buildRow, popupSt;
         int styleH = -1;
-        static readonly Color RareCol = new Color(0.60f, 0.74f, 1.00f), KeyCol = UiTheme.GoldBright;
-        static Color TierCol(ItemTier t) => t == ItemTier.Common ? UiTheme.IvoryBody : t == ItemTier.Rare ? RareCol : KeyCol;
+        static Color TierCol(ItemTier t) => t == ItemTier.Common ? UiTheme.IvoryMuted : t == ItemTier.Rare ? UiTheme.Gold : UiTheme.GoldBright;
         static string TierName(ItemTier t) => t == ItemTier.Common ? "COMMON" : t == ItemTier.Rare ? "RARE" : "KEYSTONE";
+        readonly ImguiFocus focus = new ImguiFocus { Columns = 2 };
+        int seen = -9, rowCount, readyRow = -1;
+        static readonly LastBell.Run.HintLine KeyHints = new LastBell.Run.HintLine((HintAction.Confirm, "Select"), (HintAction.Reroll, "Reroll"), (HintAction.Pause, "Pause"));
+        static readonly LastBell.Run.HintLine PadHints = new LastBell.Run.HintLine((HintAction.Confirm, "Select"), (HintAction.Back, "To Ready"));
 
         void Styles()
         {
-            if (styleH == Screen.height && eyebrow != null) return;
+            if (styleH == Screen.height && tierSt != null) return;
             styleH = Screen.height;
-            eyebrow = UiTheme.Style(14, true, TextAnchor.MiddleLeft, UiTheme.GoldLabel);
-            title = UiTheme.Style(30, true, TextAnchor.MiddleLeft, UiTheme.Ivory);
-            body = UiTheme.Style(16, false, TextAnchor.UpperLeft, UiTheme.IvoryBody, true);
-            small = UiTheme.Style(14, false, TextAnchor.UpperLeft, UiTheme.IvoryMuted, true);
-            smallC = UiTheme.Style(14, false, TextAnchor.MiddleCenter, UiTheme.IvoryMuted);
-            smallLow = UiTheme.Style(14, false, TextAnchor.LowerLeft, UiTheme.IvoryMuted, true);
-            price = UiTheme.Style(18, true, TextAnchor.MiddleLeft, UiTheme.Gold);
-            chimes = UiTheme.Style(28, true, TextAnchor.MiddleRight, UiTheme.GoldBright);
-            tierSt = UiTheme.Style(13, true, TextAnchor.MiddleLeft, UiTheme.IvoryBody);
-            btn = UiTheme.ButtonStyle(15); btnP = UiTheme.ButtonStyle(18, true);
+            tierSt = UiTheme.Style(UiTheme.SizeMicro, true, TextAnchor.MiddleLeft, UiTheme.IvoryMuted);
+            nameSt = UiTheme.Style(UiTheme.SizeHeading, true, TextAnchor.MiddleLeft, UiTheme.Ivory);
+            effectSt = UiTheme.Style(UiTheme.SizeNumeric, false, TextAnchor.UpperLeft, UiTheme.IvoryBody, true);
+            nextSt = UiTheme.Style(UiTheme.SizeHeading, false, TextAnchor.MiddleLeft, UiTheme.IvoryBody);
+            smallRight = UiTheme.Style(UiTheme.SizeLabel, false, TextAnchor.MiddleRight, UiTheme.IvoryMuted);
+            buildRow = UiTheme.Style(18, true, TextAnchor.MiddleCenter, UiTheme.Ivory);
+            priceSt = UiTheme.Style(UiTheme.SizeHeading, true, TextAnchor.MiddleRight, UiTheme.Gold);
+            walletSt = UiTheme.Style(40, true, TextAnchor.MiddleRight, UiTheme.GoldBright);
+            walletUnitSt = UiTheme.Style(UiTheme.SizeLabel, true, TextAnchor.MiddleRight, UiTheme.GoldLabel);
+            smallSt = UiTheme.Style(UiTheme.SizeLabel, false, TextAnchor.UpperLeft, UiTheme.IvoryMuted, true);
+            buildSt = UiTheme.Style(UiTheme.SizeNumeric, true, TextAnchor.MiddleLeft, UiTheme.Ivory);
+            allySt = UiTheme.Style(UiTheme.SizeNumeric, true, TextAnchor.MiddleLeft, UiTheme.Ivory);
+            popupSt = UiTheme.Style(30, true, TextAnchor.MiddleLeft, UiTheme.GoldBright);
         }
         static Rect R(float x, float y, float w, float h) => UiTheme.R(x, y, w, h);
-        bool Button(float x, float y, float w, float h, string text, bool enabled, GUIStyle st = null)
+        // a focus row (registered in draw order); the label rests in RestLabel and turns GoldBright with the strip on focus
+        bool Row(float x, float y, float w, float h, string label, bool enabled, GUIStyle st = null)
         {
-            bool keep = GUI.enabled; GUI.enabled = keep && enabled;
-            bool hit = GUI.Button(R(x, y, w, h), text, st ?? btn);
-            GUI.enabled = keep; return hit;
+            rowCount++;
+            return UiImgui.Row(focus, new Rect(x, y, w, h), label, st ?? UiImgui.Styles.Row, enabled);
         }
+        // an empty grid cell: keeps the two-column grid aligned (skipped by navigation, like a disabled row)
+        void Gap() { rowCount++; focus.Register(false); }
 
-        // One screen, no scrolling or paging (Chzy18, 29 Oct): the panel height follows the content, worst case a full
-        // 4-player party (3 allies; the game is 1-4 players since 1 Nov) and a long build, which fits 1080 virtual px.
-        const float Pad = 24, HeadH = 102, CardH = 320, CardGap = 14, ChipW = 290, ChipH = 36, ChipGap = 8, AllyW = 368, AllyH = 64, FootH = 48;
-        static int Rows(int n, int perRow) => n <= 0 ? 1 : (n + perRow - 1) / perRow;
+        // Layout, virtual px. One screen, no scrolling or paging (Chzy18, 29 Oct): worst case a full 4-player party (3 allies)
+        // and a long build still fit 1080.
+        const float Top = 64, StockTop = 236, ColGap = 56, BuildW = 420, RowH = 38;
+        static int Rows(int n, int perRow) => n <= 0 ? 0 : (n + perRow - 1) / perRow;
 
         void OnGUI()
         {
             ClearPopup();
-            if (!Showing) return;
+            if (!Showing || d.Paused) return;   // Pause draws over the arena, not over the shop
             GUI.depth = -1;   // above the run HUD
             Styles();
+            var s = UiImgui.Styles;
+            bool fresh = RunHud.FreshFrame(ref seen);
+            focus.Begin(); rowCount = 0;
             var me = Run.Slot(0);
             bool coop = !Run.Solo;
-            var allies = Run.Slots.Where(s => s != me).ToList();
-            float vw = UiTheme.VirtualWidth, W = Mathf.Min(1560, vw - 64), iw = W - 2 * Pad;
-            int chipsPerRow = Mathf.Max(1, (int)((iw + ChipGap) / (ChipW + ChipGap)));
-            float chipW = (iw - (chipsPerRow - 1) * ChipGap) / chipsPerRow;   // chips stretch to fill the row
-            int alliesPerRow = Mathf.Max(1, (int)((iw + 12) / (AllyW + 12)));
-            float buildH = 26 + Rows(me.Items.Count, chipsPerRow) * (ChipH + ChipGap) + 12;
-            float allyH = coop ? 26 + Rows(allies.Count, alliesPerRow) * (AllyH + 10) + 8 : 0;
-            float H = Pad + HeadH + CardH + 20 + buildH + allyH + FootH + Pad;
-            float x0 = (vw - W) / 2, y0 = Mathf.Max(16, (1080 - H) / 2);
-            UiTheme.Frame(R(x0, y0, W, H), UiTheme.InkDeep);
-            float x = x0 + Pad, y = y0 + Pad;
+            var allies = Run.Slots.Where(o => o != me).ToList();
 
-            // header: visit, next boss, wallet, this visit's earnings
-            UiTheme.Label(R(x, y, iw, 20), UiTheme.Spaced(d.Mode == RunMode.Practice ? "Practice shop" : Run.FinalShop ? "Final shop" : $"Shop {Run.Visit} of {Run.TotalVisits}"), eyebrow);
-            UiTheme.Label(R(x, y + 22, iw - 340, 40), "INTERMISSION  ·  next: " + Run.NextBoss, title);
-            string wallet = $"{me.Chimes}  CHIMES"; float tw = chimes.CalcSize(new GUIContent(wallet)).x / UiTheme.Scale;
-            UiTheme.Label(R(x + iw - 320, y + 8, 320, 40), wallet, chimes);
-            if (Coin) GUI.DrawTexture(R(x + iw - tw - 50, y + 8, 40, 40), Coin, ScaleMode.ScaleToFit, true);
-            UiTheme.Label(R(x + iw - 340, y + 46, 340, 18), $"Keystones {me.Keystones}/{ItemCatalog.KeystonesPerRun}  ·  earned this run {me.Earned}", UiTheme.Style(13, false, TextAnchor.MiddleRight, UiTheme.IvoryMicro));
-            if (Run.Ledger.Count > 0) UiTheme.Label(R(x, y + 72, iw, 20), string.Join("     ", Run.Ledger), small);
-            y += HeadH;
+            // columns: content clamped to the centre 1920 on ultrawide; the stock takes what the build column leaves
+            float vw = UiTheme.VirtualWidth, left = UiTheme.G6 + Mathf.Max(0, (vw - 1920) / 4);
+            float total = Mathf.Min(1260, vw - left - UiTheme.G6), stockW = total - BuildW - ColGap, bx = left + stockW + ColGap;
+            // dim + the main menu's side gradient, mirrored: solid ink under both columns, fading out over ~340 px past them
+            // (the texture is dark over its first 57 % once mirrored), so the arena shows on the right
+            UiTheme.Fill(new Rect(0, 0, Screen.width, Screen.height), new Color(UiTheme.ModalDim.r, UiTheme.ModalDim.g, UiTheme.ModalDim.b, UiTheme.ModalDim.a * 0.5f));
+            const float fadeW = 800; float gx = left + total + UiTheme.G3 - 0.57f * fadeW;
+            UiTheme.Fill(R(0, 0, gx + 1, UiTheme.VirtualHeight), new Color(UiTheme.GradientInk.r, UiTheme.GradientInk.g, UiTheme.GradientInk.b, 0.985f));
+            UiImgui.SideGradient(new Rect(gx, 0, fadeW, UiTheme.VirtualHeight), false);
 
-            // six cards
-            int cards = me.StockCount; float cw = (iw - (cards - 1) * CardGap) / cards;   // 6 cards, 7 with Fourth Choice
-            for (int i = 0; i < cards; i++) Card(me, i, x + i * (cw + CardGap), y, cw, CardH);
-            y += CardH + 20;
+            // header: visit, Intermission, next boss; the run's earnings since the last shop
+            string eb = d.Mode == RunMode.Practice ? "Practice shop" : Run.FinalShop ? "Final shop" : $"Shop {Run.Visit} of {Run.TotalVisits}";
+            float y = UiImgui.Header(new Rect(left, Top, stockW, 0), eb, "Intermission") + 14;
+            UiTheme.Label(R(left, y, stockW, 26), "Next:  " + Run.NextBoss, nextSt);
+            y += 30;
+            if (Run.Ledger.Count > 0) UiTheme.Label(R(left, y, stockW, 20), string.Join("     ", Run.Ledger), smallSt);
 
-            // owned items with Temper (chips wrapping in rows)
-            UiTheme.Label(R(x, y, iw, 20), UiTheme.Spaced("Your build") + (me.Items.Count == 0 ? "      nothing yet" : $"      {me.Items.Count} items"), eyebrow);
-            float cy = y + 26; int k = 0;
+            // wallet, top of the build column
+            string wallet = me.Chimes.ToString(); float ww = walletSt.CalcSize(new GUIContent(wallet)).x / UiTheme.Scale;
+            UiTheme.Label(R(bx, Top + 6, BuildW - 84, 52), wallet, walletSt);
+            UiTheme.Label(R(bx, Top + 22, BuildW, 20), "CHIMES", walletUnitSt);
+            if (Coin) GUI.DrawTexture(R(bx + BuildW - 84 - ww - 48, Top + 12, 40, 40), Coin, ScaleMode.ScaleToFit, true);
+            UiTheme.Label(R(bx, Top + 60, BuildW, 18), $"Keystones {me.Keystones}/{ItemCatalog.KeystonesPerRun}  ·  earned this run {me.Earned}", s.Hint, UiTheme.IvoryMicro);
+            // stock: one entry per card, Buy / Lock in the grid's two columns
+            int cards = me.StockCount;
+            float avail = UiTheme.VirtualHeight - UiTheme.G6 - StockTop, ih = Mathf.Min(116, avail / cards);
+            for (int i = 0; i < cards; i++) Entry(me, i, left, StockTop + i * ih, stockW, ih);
+            float stockBottom = StockTop + cards * ih;
+
+            // build column: your build, allies, footer
+            float by = StockTop;
+            UiTheme.Label(R(bx, by, BuildW, 20), UiTheme.Spaced("Your build"), s.Eyebrow);
+            UiTheme.Label(R(bx, by, BuildW, 20), me.Items.Count == 0 ? "nothing yet" : $"{me.Items.Count} items", smallRight);
+            by += 30;
+            int perCol = me.Items.Count > 8 ? 2 : 1; float chipW = perCol == 1 ? BuildW : (BuildW - 16) / 2, chipH = 34;
+            int k = 0;
             foreach (var o in me.Items.ToArray())
             {
-                float ox = x + (k % chipsPerRow) * (chipW + ChipGap), oy = cy + (k / chipsPerRow) * (ChipH + ChipGap); k++;
+                float ox = bx + (k % perCol) * (chipW + 16), oy = by + (k / perCol) * chipH; k++;
                 bool temperable = o.Def.Tempered.HasValue && !o.Tempered;
-                UiTheme.Frame(R(ox, oy, chipW, ChipH), UiTheme.Ink, false, false);
-                var ic = ItemIcon(o.Def, false); if (ic) GUI.DrawTexture(R(ox + 4, oy + 4, 28, 28), ic, ScaleMode.ScaleToFit, true);
-                UiTheme.Label(R(ox + 38, oy + 9, chipW - 38 - (temperable ? 112 : 8), 22), o.Def.Name + (o.Tempered ? " +" : ""), UiTheme.Style(15, true, TextAnchor.UpperLeft, TierCol(o.Def.Tier)));
-                if (temperable && Button(ox + chipW - 108, oy + 3, 104, ChipH - 6, $"Temper {ItemCatalog.TemperPrice}", me.Chimes >= ItemCatalog.TemperPrice)) Do(Run.TryTemper(0, o.Def.Id, out var why), why);
+                var ic = ItemIcon(o.Def, false); if (ic) GUI.DrawTexture(R(ox, oy + 4, 26, 26), ic, ScaleMode.ScaleToFit, true);
+                float tw = temperable ? (perCol == 1 ? 150 : 84) : 0;
+                UiTheme.Label(R(ox + 34, oy, chipW - 34 - tw, chipH), o.Def.Name + (o.Tempered ? " +" : ""), buildSt, o.Def.Tier == ItemTier.Common ? UiTheme.Ivory : TierCol(o.Def.Tier));
+                if (temperable)
+                {
+                    if (Row(ox + chipW - tw, oy + 1, tw, chipH - 2, perCol == 1 ? $"Temper  {ItemCatalog.TemperPrice}" : $"+ {ItemCatalog.TemperPrice}", me.Chimes >= ItemCatalog.TemperPrice, buildRow)) Do(Run.TryTemper(0, o.Def.Id, out var why), why);
+                }
+                else Gap();
+                Gap();   // each build line is one grid row: down steps to the next item
             }
-            y += buildH;
+            by += Rows(me.Items.Count, perCol) * chipH + 18;
 
-            // allies (co-op only): build, wallet, ready, chip in
             if (coop)
             {
-                UiTheme.Label(R(x, y, iw, 20), UiTheme.Spaced("Allies") + $"      chip in: each ally can receive {ShopRun.GiftCapPerVisit} per visit", eyebrow);
-                float ay0 = y + 26; int n = 0;
+                UiTheme.Label(R(bx, by, BuildW, 20), UiTheme.Spaced("Allies"), s.Eyebrow);
+                UiTheme.Label(R(bx, by, BuildW, 20), $"chip in: {ShopRun.GiftCapPerVisit} each per visit", smallRight);
+                by += 28;
                 foreach (var a in allies)
                 {
-                    float ax = x + (n % alliesPerRow) * (AllyW + 12), ay = ay0 + (n / alliesPerRow) * (AllyH + 10); n++;
-                    UiTheme.Frame(R(ax, ay, AllyW, AllyH), UiTheme.Ink, false, false);
-                    UiTheme.Label(R(ax + 12, ay + 6, AllyW - 24, 20), $"{a.ClassName}  ·  {a.Chimes} Chimes  ·  got {a.ReceivedThisVisit}/{ShopRun.GiftCapPerVisit}{(a.Ready ? "  ·  READY" : "")}", UiTheme.Style(14, true, TextAnchor.UpperLeft, UiTheme.Ivory));
-                    UiTheme.Label(R(ax + 12, ay + 30, AllyW - 136, 30), a.Items.Count == 0 ? "no items" : string.Join(", ", a.Items.Select(o => o.Def.Name + (o.Tempered ? "+" : ""))), small);
-                    if (Button(ax + AllyW - 116, ay + 28, 104, 30, "Chip in 50", me.Chimes >= 50 && a.ReceivedThisVisit + 50 <= ShopRun.GiftCapPerVisit)) Do(Run.TryGift(0, a.Slot, 50, out var why), why);
+                    UiTheme.Label(R(bx, by, BuildW - 130, 24), $"{a.ClassName}  ·  {a.Chimes} Chimes{(a.Ready ? "  ·  Ready" : "")}", allySt, a.Ready ? UiTheme.Gold : UiTheme.Ivory);
+                    UiTheme.Label(R(bx, by + 24, BuildW - 130, 34), a.Items.Count == 0 ? "no items" : string.Join(", ", a.Items.Select(o => o.Def.Name + (o.Tempered ? "+" : ""))), smallSt);
+                    if (Row(bx + BuildW - 126, by + 6, 126, 40, "Chip in 50", me.Chimes >= 50 && a.ReceivedThisVisit + 50 <= ShopRun.GiftCapPerVisit, buildRow)) Do(Run.TryGift(0, a.Slot, 50, out var why), why);
+                    Gap();
+                    F(bx, by + 58, BuildW, 1, UiTheme.RuleFaint);
+                    by += 62;
                 }
-                y += allyH;
             }
 
-            // footer: reroll, refusal / hints, ready timer, ready
-            float fy = y0 + H - Pad - FootH;
+            // footer, bottom of the build column: what happened / the rule, the co-op timer, Reroll and Ready
+            float fy = UiTheme.VirtualHeight - UiTheme.G6 - 56, my = fy - 70;
+            fy = Mathf.Max(fy, by + 70); my = fy - 70;
+            string msg = LastRefusal ?? (me.LockUsed ? "Lock used this visit." : "Lock keeps one card through rerolls (one lock per visit, free).");
+            UiTheme.Label(R(bx, my, BuildW, 22), msg, smallSt, LastRefusal != null ? UiTheme.Danger : UiTheme.IvoryMuted);
+            UiTheme.Label(R(bx, my + 22, BuildW, 40), coop ? $"The shop closes when everyone is ready or after {ShopRun.CoopTimerSeconds} s: {Mathf.Max(0, ShopRun.CoopTimerSeconds - d.StateTicks / Sim.Hz)} s left." : "Unspent Chimes stay in your wallet. The shop waits for you.", smallSt, coop ? UiTheme.Gold : UiTheme.IvoryMicro);
+            F(bx, fy - 6, BuildW, 1, UiTheme.RuleFaint);
             int rp = Run.RerollPrice(me);
-            if (Button(x, fy, 200, FootH, $"Reroll {rp}  (R)", me.Chimes >= rp)) Do(Run.TryReroll(0, out var why), why);
-            UiTheme.Label(R(x + 220, fy + 4, iw - 520, 20), LastRefusal ?? (me.LockUsed ? "Lock used this visit." : "Lock keeps one card through rerolls (one lock per visit, free)."), LastRefusal != null ? UiTheme.Style(15, true, TextAnchor.UpperLeft, UiTheme.Danger) : small);
-            UiTheme.Label(R(x + 220, fy + 26, iw - 520, 20), coop ? $"The shop closes when everyone is ready or after {ShopRun.CoopTimerSeconds} s: {Mathf.Max(0, ShopRun.CoopTimerSeconds - d.StateTicks / Sim.Hz)} s left." : "Unspent Chimes stay in your wallet. The shop waits for you.", coop ? UiTheme.Style(14, true, TextAnchor.UpperLeft, UiTheme.Gold) : small);
-            if (Button(x + iw - 280, fy, 280, FootH, me.Ready ? "WAITING FOR ALLIES" : "READY  (Enter)", !me.Ready, btnP)) Leave();
-            LastPanel = new Rect(x0, y0, W, H);
+            if (Row(bx, fy, BuildW * 0.44f, 56, InputHints.Label($"Reroll {rp}", HintAction.Reroll), me.Chimes >= rp)) Do(Run.TryReroll(0, out var why), why);
+            readyRow = rowCount;
+            if (Row(bx + BuildW * 0.44f, fy, BuildW * 0.56f, 56, me.Ready ? "Waiting for allies" : InputHints.Label("Ready", HintAction.Ready), !me.Ready, s.Primary)) Leave();
+            UiTheme.Label(R(bx, fy + 60, BuildW, 18), InputHints.Last == InputHints.Device.Gamepad ? PadHints.Text : KeyHints.Text, s.Hint);
+
+            if (fresh) focus.Reset(readyRow);
+            if (focus.Cancelled && !fresh) focus.Index = readyRow;   // B: back to Ready
+            LastPanel = new Rect(left, Top, total, Mathf.Max(stockBottom, fy + 78) - Top);
         }
-        // the largest size (down to 14) at which the name's longest word fits on one line, so names only wrap at spaces
-        static int WordFit(string text, int size, float width)
+
+        // One stock entry: the item's 64 px icon, tier and tags, name and effect on the left; price and the Buy / Lock rows
+        // on the right; a faint rule under it. A locked card carries a gold left bar; a sold one keeps its place.
+        void Entry(PlayerBuild me, int i, float x, float y, float w, float h)
         {
-            for (; size > 14; size--)
+            var def = me.Stock[i];
+            bool locked = me.Locked == i;
+            const float actW = 236;
+            string slotName = i < ShopRun.ClassSlots || i == ShopRun.ExtraClassSlot ? me.ClassName : i < ShopRun.ClassSlots + ShopRun.GeneralSlots ? "General" : "Rare or Keystone";
+            F(x, y + h - 1, w, 1, UiTheme.RuleFaint);
+            if (def == null)
             {
-                var st = UiTheme.Style(size, true, TextAnchor.UpperLeft, UiTheme.Ivory);
-                if (text.Split(' ').All(w => st.CalcSize(new GUIContent(w)).x / UiTheme.Scale <= width)) break;
+                UiTheme.Label(R(x + 80, y + 10, w - 80, 18), UiTheme.Spaced(slotName), tierSt, UiTheme.IvoryMicro);
+                UiTheme.Label(R(x + 80, y + 30, w - 80, 28), "Sold", nameSt, UiTheme.IvoryMicro);
+                Gap(); Gap(); return;
             }
-            return size;
+            if (locked) F(x - UiTheme.G2, y + 8, 3, h - 16, UiTheme.Gold);
+            var ic = ItemIcon(def, true);
+            if (ic) GUI.DrawTexture(R(x, y + 10, 64, 64), ic, ScaleMode.ScaleToFit, true);
+            float tx = x + 80, tw = w - 80 - actW - 16;
+            string tags = TierName(def.Tier) + (def.Tags != ItemTag.None ? "  ·  " + def.Tags.ToString().ToUpperInvariant() : "") + (locked ? "  ·  LOCKED" : "");
+            UiTheme.Label(R(tx, y + 8, tw, 16), tags, tierSt, TierCol(def.Tier));
+            UiTheme.Label(R(tx, y + 24, tw, 30), def.Name, nameSt);
+            string effect = def.Card(false) + (Run.Solo && def.SoloNote != null ? "  " + def.SoloNote : "");
+            UiTheme.Label(R(tx, y + 56, tw, h - 60), effect, effectSt);
+            // price and actions
+            float ax = x + w - actW;
+            UiTheme.Label(R(ax, y + 10, actW - 34, 30), def.Price.ToString(), priceSt);
+            if (Coin) GUI.DrawTexture(R(ax + actW - 28, y + 13, 24, 24), Coin, ScaleMode.ScaleToFit, true);
+            bool keyCap = def.Tier == ItemTier.Keystone && me.Keystones >= ItemCatalog.KeystonesPerRun;
+            if (Row(ax, y + 46, actW * 0.5f, RowH, keyCap ? "Keystones full" : "Buy", me.Chimes >= def.Price && !keyCap, buildRow)) Do(Run.TryBuy(0, i, out var why), why);
+            if (Row(ax + actW * 0.5f, y + 46, actW * 0.5f, RowH, locked ? "Locked" : "Lock", !me.LockUsed, buildRow)) Do(Run.TryLock(0, i, out var why), why);
         }
+        static void F(float x, float y, float w, float h, Color c) => UiTheme.Fill(UiTheme.R(x, y, w, h), c);
         public Rect LastPanel { get; private set; }   // virtual px; the autotest checks it fits one screen
 
         // accepted item icons (Codex, 29 Oct batch): Resources/Run/Icons/items/<id without class prefix>-64|128
@@ -299,42 +361,12 @@ namespace LastBell.Run.Shop
             if (Showing && t > 0.8f) return;   // the shop's own ledger takes over
             Styles();
             float a = Mathf.Clamp01(t / 0.25f) * (1 - Mathf.Clamp01((t - 2.0f) / 0.6f)), rise = 18 * Mathf.Clamp01(t / 2.6f);
-            string text = $"+{LastPopup} CHIMES"; var st = UiTheme.Style(30, true, TextAnchor.MiddleLeft, UiTheme.GoldBright);
+            string text = $"+{LastPopup} CHIMES"; var st = popupSt;
             float w = st.CalcSize(new GUIContent(text)).x / UiTheme.Scale, cx = UiTheme.VirtualWidth / 2, y = 480 - rise;
             var keep = GUI.color; GUI.color = new Color(1, 1, 1, a);
             if (Burst) GUI.DrawTexture(R(cx - (w + 56) / 2, y - 4, 48, 48), Burst, ScaleMode.ScaleToFit, true);
             UiTheme.Label(R(cx - (w + 56) / 2 + 56, y, w + 8, 40), text, st, new Color(UiTheme.GoldBright.r, UiTheme.GoldBright.g, UiTheme.GoldBright.b, a));
             GUI.color = keep;
-        }
-
-        void Card(PlayerBuild me, int i, float x, float y, float w, float h)
-        {
-            var def = me.Stock[i];
-            bool locked = me.Locked == i;
-            UiTheme.Frame(R(x, y, w, h), locked ? UiTheme.FocusFill : UiTheme.Ink, i == ShopRun.SpecialSlot, false);
-            float px = x + 14, pw = w - 28, cy = y + 14;
-            string slotName = i < ShopRun.ClassSlots || i == ShopRun.ExtraClassSlot ? me.ClassName : i < ShopRun.ClassSlots + ShopRun.GeneralSlots ? "General" : "Rare or Keystone";
-            if (def == null)
-            {
-                UiTheme.Label(R(px, cy, pw, 18), UiTheme.Spaced(slotName), UiTheme.Style(12, true, TextAnchor.UpperLeft, UiTheme.IvoryMicro));
-                UiTheme.Label(R(x, y + h / 2 - 10, w, 20), "sold", smallC);
-                return;
-            }
-            // icon on the left, tier and name beside it
-            var ic = ItemIcon(def, true); float tx = px + (ic ? 74 : 0);
-            if (ic) GUI.DrawTexture(R(px, cy, 64, 64), ic, ScaleMode.ScaleToFit, true);
-            UiTheme.Label(R(tx, cy, px + pw - tx, 18), TierName(def.Tier) + (def.Tags != ItemTag.None ? "  ·  " + def.Tags.ToString().ToUpperInvariant() : ""), UiTheme.Style(13, true, TextAnchor.UpperLeft, TierCol(def.Tier)));
-            UiTheme.Label(R(tx, cy + 20, px + pw - tx, 48), def.Name, UiTheme.Style(WordFit(def.Name, 19, px + pw - tx), true, TextAnchor.UpperLeft, UiTheme.Ivory, true));
-            cy += 76;
-            UiTheme.Label(R(px, cy, pw, 130), def.Card(false), body);
-            cy += 134;
-            float by = y + h - 14 - 40;
-            if (Run.Solo && def.SoloNote != null) UiTheme.Label(R(px, by - 34 - 40, pw, 40), def.SoloNote, smallLow);   // sits just above the price, however narrow the card
-            if (Coin) GUI.DrawTexture(R(px, by - 30, 24, 24), Coin, ScaleMode.ScaleToFit, true);
-            UiTheme.Label(R(px + (Coin ? 30 : 0), by - 30, pw, 24), $"{def.Price} Chimes", price);
-            bool keyCap = def.Tier == ItemTier.Keystone && me.Keystones >= ItemCatalog.KeystonesPerRun;
-            if (Button(px, by, pw * 0.62f, 40, "Buy", me.Chimes >= def.Price && !keyCap)) Do(Run.TryBuy(0, i, out var why), why);
-            if (Button(px + pw * 0.66f, by, pw * 0.34f, 40, locked ? "Locked" : "Lock", !me.LockUsed)) Do(Run.TryLock(0, i, out var why), why);
         }
     }
 }

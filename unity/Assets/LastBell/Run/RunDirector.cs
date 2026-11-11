@@ -467,7 +467,7 @@ namespace LastBell.Run
                 {
                     if (kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame)
                     {
-                        if (State == RunState.Ready) RequestReady();
+                        if (State == RunState.Ready && !Shop.RunShopFlow.Showing) RequestReady();   // the shop's Enter confirms its focused row (Ready is one of them)
                     }
                     // dev shortcuts (labelled in the HUD): finish the current boss / jump it to its next phase
                     if (State == RunState.Combat && Boss && !Boss.Dead)
