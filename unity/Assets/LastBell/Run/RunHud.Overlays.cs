@@ -14,9 +14,12 @@ namespace LastBell.Run
         readonly ImguiFocus pauseFocus = new ImguiFocus(), resultsFocus = new ImguiFocus(), readyFocus = new ImguiFocus();
         int pauseSeen = -9, resultsSeen = -9, readySeen = -9;
         GUIStyle ovCardTitle, ovPrimaryInset, ovRecap, ovRecapR, ovRecapMuted, ovRecapHead, ovCause;
+        static GUIStyle ovHint; static int ovHintHeight = -1;
         int ovStyleHeight = -1;
         static readonly HintLine PauseHints = new HintLine((HintAction.Confirm, "Select"), (HintAction.Back, "Resume"));
         static readonly HintLine SelectHint = new HintLine((HintAction.Confirm, "Select"));
+        static readonly HintLine ReadyHints = new HintLine((HintAction.Ready, "Ready"), (HintAction.Pause, "Pause"));
+        static readonly HintLine ResultHints = new HintLine((HintAction.Confirm, "Select"), (HintAction.Retry, "Retry"), (HintAction.MainMenu, "Main Menu"));
 
         void OverlayStyles()
         {
@@ -30,6 +33,15 @@ namespace LastBell.Run
             ovRecapMuted = UiTheme.Style(UiTheme.SizeLabel, false, TextAnchor.MiddleLeft, UiTheme.IvoryMuted);
             ovRecapHead = UiTheme.Style(UiTheme.SizeLabel, true, TextAnchor.MiddleLeft, UiTheme.Danger);
             ovCause = UiTheme.Style(UiTheme.SizeHeading, true, TextAnchor.MiddleLeft, UiTheme.Ivory);
+        }
+        // the footer hint line: 14 px IvoryMuted (the kit's Hint is 12 px Micro, too small over a bright floor)
+        internal static GUIStyle HintStyle
+        {
+            get
+            {
+                if (ovHint == null || ovHintHeight != Screen.height) { ovHintHeight = Screen.height; ovHint = UiTheme.Style(14, false, TextAnchor.MiddleCenter, UiTheme.IvoryMuted); }
+                return ovHint;
+            }
         }
 
         // True on the first OnGUI pass of the first frame an overlay is drawn again (it wasn't drawn last frame): the screen
@@ -64,9 +76,18 @@ namespace LastBell.Run
         // ---------------------------------------------------------------- shared pieces
         // the centred overlay column: header, rows, hint line, over the centre band
         static float ColumnX(float w) => UiTheme.VirtualWidth / 2 - w / 2;
-        static void HintText(float y, string text) { if (!string.IsNullOrEmpty(text)) UiTheme.Label(UiTheme.R(0, y, UiTheme.VirtualWidth, 20), text, UiImgui.Styles.Hint); }
-        // Results' fuller dim: the HUD underneath reads as background, not as a second layer
-        void DeepDim() { Dim(); UiTheme.Fill(new Rect(0, 0, Screen.width, Screen.height), A(UiTheme.Backdrop, 0.35f)); }
+        static void HintText(float y, string text) { if (!string.IsNullOrEmpty(text)) UiTheme.Label(UiTheme.R(0, y, UiTheme.VirtualWidth, 22), text, HintStyle); }
+        // the centre overlays' dim (Pause, Results): the HUD underneath reads as background, not as a second layer
+        void DeepDim() { Dim(); UiTheme.Fill(new Rect(0, 0, Screen.width, Screen.height), A(UiTheme.Backdrop, 0.4f)); }
+        // A small card (Ready, downed, the recap tooltip): ink that fades out over its right part (the main menu's side
+        // gradient, mirrored) so it reads as a strip over the arena, not a box, with a 4 px Gold bar on the left.
+        internal static void SoftStrip(Rect v, float fade = 220)
+        {
+            float solid = Mathf.Max(0, v.width - fade * 0.57f);
+            UiTheme.Fill(UiTheme.R(v.x, v.y, solid + 1, v.height), A(UiTheme.GradientInk, 0.9f));
+            UiImgui.SideGradient(new Rect(v.x + solid, v.y, fade, v.height), false, 0.9f);
+            UiTheme.Fill(UiTheme.R(v.x, v.y, 4, v.height), UiTheme.Gold);
+        }
         string Ellipsize(GUIStyle st, string t, float maxW)
         {
             if (Wv(st, t) <= maxW) return t;
@@ -100,13 +121,16 @@ namespace LastBell.Run
             float w = 640, twoLines = 2 * s.Body.lineHeight / UiTheme.Scale + 2;
             while (w < 960 && Hv(s.Body, body, w - 2 * pad) > twoLines) w += 40;
             float bh = Mathf.Min(Hv(s.Body, body, w - 2 * pad), twoLines);
-            float h = pad + 26 + 38 + 6 + 2 + 14 + bh + 14 + 48 + pad - 8;
+            float h = pad + 26 + 38 + 6 + 2 + 14 + bh + 14 + 48 + 8 + 22 + pad - 8;
             float x = ColumnX(w), y0 = 168, tx = x + pad;
-            UiImgui.InfoStrip(new Rect(x, y0, w, h));
+            SoftStrip(new Rect(x, y0, w + 160, h));
             readyFocus.Begin(); if (fresh) readyFocus.Reset(0);
             float y = UiImgui.Header(new Rect(tx, y0 + pad - 4, w - 2 * pad, 0), RunDifficulty.Name(d.Difficulty), head, false, null, ovCardTitle) + 14;
             T(tx, y, w - 2 * pad, bh + 4, body, s.Body); y += bh + 14;
-            if (UiImgui.Row(readyFocus, new Rect(tx - 16, y, 300, 48), InputHints.Label("Ready", HintAction.Ready), ovPrimaryInset)) d.RequestReady();
+            if (UiImgui.Row(readyFocus, new Rect(tx - 16, y, 340, 48), "Ready", ovPrimaryInset)) d.RequestReady();
+            y += 56;
+            var hs = HintStyle; var al = hs.alignment; hs.alignment = TextAnchor.MiddleLeft;
+            UiTheme.Label(S(tx, y, w, 20), ReadyHints.Text, hs); hs.alignment = al;
         }
 
         // ---------------------------------------------------------------- downed card
@@ -115,7 +139,7 @@ namespace LastBell.Run
         void DownedCard()
         {
             OverlayStyles();
-            const float w = 600, pad = UiTheme.G3;
+            const float pad = UiTheme.G3;
             // a catalogued boss attack shows its 64 px icon, with the attack name and boss beside it (BossAttackIcons)
             // the last hit only if it took you to 0 and is the defeat cause; a scripted wipe (an empty tower, Severance, Last
             // Light) downs you with its own cause, and shows its family's icon with the attack name and boss on a second line
@@ -132,15 +156,16 @@ namespace LastBell.Run
                 else { ka = BossAttackIcons.Get(wd.LastDamageAttackId); scripted = ka != null; }
             }
             var ki = BossAttackIcons.Icon(ka);
-            float h = pad + 20 + 8 + 30 + (scripted ? 26 : 0) + pad, x = ColumnX(w), y = 270;
+            string a = "Struck by ", cause = ka != null && !scripted ? ka.Label : d.DefeatCause ?? "?";
+            float wa = Wv(ovCause, a), textW = Mathf.Min(620, wa + Wv(ovCause, cause) + 4), w = pad + (ki != null ? 64 + UiTheme.G2 : 0) + textW + pad;
+            // above the arena's centre (the boss and its telegraphs), just under the boss bar
+            float h = pad + 20 + 8 + 30 + (scripted ? 26 : 0) + pad, x = ColumnX(w), y = 150;
             h = Mathf.Max(h, ki != null ? 64 + 2 * pad : 0);
-            UiImgui.InfoStrip(new Rect(x, y, w, h));
+            SoftStrip(new Rect(x, y, w + 160, h));
             float tx = x + pad;
             if (ki != null) { GUI.DrawTexture(S(tx, y + h / 2 - 32, 64, 64), ki, ScaleMode.ScaleToFit, true); tx += 64 + UiTheme.G2; }
             float tw = x + w - pad - tx, yy = y + pad;
-            UiTheme.Label(S(tx, yy, tw, 20), UiTheme.Spaced("Down"), UiImgui.Styles.Eyebrow, UiTheme.Danger); yy += 28;
-            string a = "Struck by ", cause = ka != null && !scripted ? ka.Label : d.DefeatCause ?? "?";
-            float wa = Wv(ovCause, a);
+            UiTheme.Label(S(tx, yy, tw, 20), UiTheme.Spaced("Down"), UiImgui.Styles.Eyebrow); yy += 28;
             T(tx, yy, wa + 2, 30, a, ovCause, UiTheme.IvoryBody);
             T(tx + wa, yy, tw - wa, 30, Ellipsize(ovCause, cause, tw - wa), ovCause, UiTheme.Gold); yy += 30;
             if (scripted) T(tx, yy, tw, 26, ka.Label, ovRecap, UiTheme.IvoryMuted);
@@ -151,17 +176,17 @@ namespace LastBell.Run
         {
             OverlayStyles();
             bool fresh = FreshFrame(ref pauseSeen);
-            Dim();
+            DeepDim();
             bool test = LastBell.Menu.MenuReturnBridge.TestSession, practice = d.Mode == RunMode.Practice;
             var s = UiImgui.Styles;
             int nb = test ? 4 : 3;
             const float CW = 480, primaryH = 56, rowH = 48;
             float headH = 26 + 65 + 4 + 2, h = headH + 36 + primaryH + (nb - 1) * rowH + 24 + 20;
             float cx = ColumnX(CW), y0 = UiTheme.VirtualHeight / 2 - h / 2;
-            UiImgui.Band(new Rect(0, y0 - 150, UiTheme.VirtualWidth, h + 300));
+            UiImgui.Band(new Rect(0, y0 - 220, UiTheme.VirtualWidth, h + 440));
             pauseFocus.Begin(); if (fresh) pauseFocus.Reset(0);
             float y = UiImgui.Header(new Rect(cx, y0, CW, 0), RunEyebrow, "Paused", true) + 36;
-            if (UiImgui.Row(pauseFocus, new Rect(cx, y, CW, primaryH), InputHints.Label("Resume", HintAction.Resume), s.Primary)) d.SetPaused(false);
+            if (UiImgui.Row(pauseFocus, new Rect(cx, y, CW, primaryH), "Resume", s.Primary)) d.SetPaused(false);
             y += primaryH;
             if (UiImgui.Row(pauseFocus, new Rect(cx, y, CW, rowH), practice ? "Restart Practice" : "Restart Run")) d.RequestRetry();
             y += rowH;
@@ -215,7 +240,8 @@ namespace LastBell.Run
 
             bool recap = !d.Victory && w != null && w.TakenLog.Count > 0, meter = w != null && w.RunMeter.Count > 0;
             float vw = UiTheme.VirtualWidth;
-            const float CW = 560, rowH = 32, y0 = 190;
+            const float rowH = 32, y0 = 190;
+            float CW = UiTheme.VirtualWidth < 1700 ? 480 : 560;   // 4:3: a narrower centre leaves the recap room
             // side columns: as wide as fit beside the centre (4:3 included), at least the meter's width
             float gap = vw < 1700 ? UiTheme.G4 : 72, SW = Mathf.Clamp((Mathf.Min(vw, 1920) - CW - 2 * gap - 2 * UiTheme.G4) / 2, MeterW, 440);
             float cx = ColumnX(CW);
@@ -234,13 +260,13 @@ namespace LastBell.Run
                 y += rowH;
             }
             y += 30;
-            if (UiImgui.Row(resultsFocus, new Rect(cx, y, CW, 56), InputHints.Label(practice ? "Retry Practice" : "Retry Run", HintAction.Retry), s.Primary)) d.RequestRetry();
+            if (UiImgui.Row(resultsFocus, new Rect(cx, y, CW, 56), practice ? "Retry Practice" : "Retry Run", s.Primary)) d.RequestRetry();
             y += 56;
-            if (UiImgui.Row(resultsFocus, new Rect(cx, y, CW, 48), InputHints.Label("Main Menu", HintAction.MainMenu))) d.ReturnToMenu();
+            if (UiImgui.Row(resultsFocus, new Rect(cx, y, CW, 48), "Main Menu")) d.ReturnToMenu();
             y += 48;
             if (test && UiImgui.Row(resultsFocus, new Rect(cx, y, CW, 48), "Test Setup")) LastBell.Menu.MenuReturnBridge.Return(true);
             if (test) y += 48;
-            HintText(y + 24, SelectHint.Text);
+            HintText(y + 24, ResultHints.Text);
 
             // right: damage meter, unframed, tops aligned with the header
             if (meter) Meter(cx + CW + gap + (SW - MeterW) / 2, y0 + 16, w.RunMeter, "DAMAGE · whole " + (practice ? "practice" : "run"), d.RunTicks / 60f, 0, false);
@@ -252,7 +278,7 @@ namespace LastBell.Run
                 float rx = cx - gap - SW, yy = y0;
                 ColumnHead(rx, yy, SW, "Death recap"); yy += 40;
                 T(rx, yy, SW, 20, "last hits taken, oldest first", ovRecapMuted); yy += 28;
-                const float numW = 170;   // damage, hp, time
+                const float numW = 150;   // damage, hp, time
                 int last = w.TakenLog[w.TakenLog.Count - 1].tick, hover = -1;
                 var mouse = Event.current.mousePosition;
                 for (int i = from; i < w.TakenLog.Count; i++)
@@ -267,9 +293,9 @@ namespace LastBell.Run
                     if (icon != null) { GUI.DrawTexture(S(rx, ty + (lineH - ic) / 2, ic, ic), icon, ScaleMode.ScaleToFit, true); lx = rx + ic + 10; }
                     string what = at != null ? at.Label : e.source; float ww = SW - numW - 10 - (lx - rx);
                     T(lx, ty, ww, lineH, Ellipsize(ovRecap, what, ww), ovRecap, fatal ? UiTheme.Ivory : UiTheme.IvoryBody);
-                    T(rx + SW - numW, ty, 50, lineH, "-" + e.damage, ovRecapR, fatal ? UiTheme.Danger : UiTheme.IvoryBody);
-                    T(rx + SW - numW + 52, ty, 64, lineH, "hp " + e.hpAfter, ovRecapR, UiTheme.IvoryMuted);
-                    T(rx + SW - numW + 116, ty, 54, lineH, $"{(e.tick - last) / 60f:0.0}s", ovRecapR, UiTheme.IvoryMuted);
+                    T(rx + SW - numW, ty, 44, lineH, "-" + e.damage, ovRecapR, fatal ? UiTheme.Danger : UiTheme.IvoryBody);
+                    T(rx + SW - numW + 46, ty, 56, lineH, "hp " + e.hpAfter, ovRecapR, UiTheme.IvoryMuted);
+                    T(rx + SW - numW + 102, ty, 48, lineH, $"{(e.tick - last) / 60f:0.0}s", ovRecapR, UiTheme.IvoryMuted);
                     if (!fatal) F(rx, yy + rh - 1, SW, 1, UiTheme.RuleFaint);
                     if (at != null && S(rx - 14, yy, SW + 14, rh).Contains(mouse)) hover = i;
                     yy += rh;
