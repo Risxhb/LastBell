@@ -113,8 +113,9 @@ void OnGUI()
   Sprint, Move (gameplay).
 - **Gameplay hints are always keyboard/mouse:** gameplay input (`KeyboardMouseInput`) reads no gamepad at all.
   Its bindings now live in `KeyboardMouseInput.SlotKeys` / `PotionKey`, which InputHints reads, so hints can't drift.
-- **Gamepad has no button of its own** for Pause, Retry, Main Menu or Reroll; on a gamepad those are reached by focusing
-  the row and pressing A, so their hints are empty. Only Confirm/Ready (A) and Back/Resume (B) have gamepad hints.
+- **Gamepad has no button of its own** for Retry or Main Menu; on a gamepad those are reached by focusing the row and
+  pressing A, so their hints are empty. Confirm/Ready (A), Back/Resume (B), Pause (Start, RunHud.OverlayInput) and the
+  shop's Reroll (Y, RunShopFlow) have gamepad hints (sub-thread B, Nov 11).
 - Last device: any keyboard key, mouse click or mouse movement → keyboard; any standard-gamepad button or a stick past
   half → gamepad. Other joysticks (rudder pedals) never count. WebGL stays on keyboard.
 

@@ -35,7 +35,9 @@ namespace LastBell
                 {
                     case HintAction.Confirm: case HintAction.Ready: return "A";
                     case HintAction.Back: case HintAction.Resume: return "B";
-                    default: return "";   // Pause, Retry, Main Menu, Reroll: no gamepad button of their own
+                    case HintAction.Pause: return "Start";   // RunHud.OverlayInput
+                    case HintAction.Reroll: return "Y";      // the intermission shop (RunShopFlow)
+                    default: return "";   // Retry, Main Menu: no gamepad button of their own (focus the row, press A)
                 }
             switch (action)
             {

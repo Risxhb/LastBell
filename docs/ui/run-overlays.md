@@ -11,8 +11,8 @@ rows with the gold strip, and full keyboard / controller focus.
 | Pause | `RunHud.Overlays.cs` `Pause` | dim + centre band | **Resume**, Restart Run / Practice, Main Menu, (Test Setup) | resumes |
 | Results | `Results` | deeper dim + centre band | **Retry Run / Practice**, Main Menu, (Test Setup) | — |
 | LAN client Results | `LanResults` | deeper dim + centre band | Leave Session | — |
-| Ready card | `ReadyCard` | ink strip, gold left bar | **Ready** | — |
-| Downed card | `DownedCard` | ink strip, gold left bar | none | — |
+| Ready card | `ReadyCard` | soft ink strip (fades right), 4 px gold bar | **Ready** | — |
+| Downed card | `DownedCard` (lower third) | soft ink strip, 4 px gold bar | none | — |
 | Shop | `Shop/RunShopFlow.cs` | light dim + mirrored side gradient (left) | per card Buy / Lock, Temper, Chip in, Reroll, **Ready** | focus back to Ready |
 
 - **Header:** `UiImgui.Header`, centred on Pause and Results (eyebrow = difficulty + "run", or "Practice"), left-aligned
@@ -22,9 +22,11 @@ rows with the gold strip, and full keyboard / controller focus.
   two-column grid (Buy | Lock per card, one line per build item and ally, Reroll | Ready); empty cells are skipped.
 - **Old hotkeys:** Esc still toggles Pause in `RunDirector`, R / M still retry / leave on Results, R still rerolls.
   Enter no longer readies straight from `RunDirector` while the shop is open (it confirms the focused shop row; Ready is
-  one of them). The shop is hidden while paused. **New:** the gamepad's Start toggles Pause (`RunHud.OverlayInput`).
-- **Hints:** row labels use `InputHints.Label`; the footer lines use `HintLine` (in `RunHud.Overlays.cs`), built per
-  device from `InputHints.Key`.
+  one of them). The shop is hidden while paused. **New:** the gamepad's Start toggles Pause (`RunHud.OverlayInput`; it
+  resumes any time but never opens Pause on the menu, in a boss intro or over Results) and Y rerolls in the shop;
+  `InputHints` shows both.
+- **Hints:** row labels carry no key; each overlay has one 14 px hint line (`HintLine` in `RunHud.Overlays.cs`, built
+  per device from `InputHints.Key`), e.g. "Enter  Select  ·  R  Retry  ·  M  Main Menu" / "A  Select".
 - **Colours:** theme tokens only. The shop's rare tier is Gold (was a hard-coded blue); keystone GoldBright; common
   IvoryMuted.
 - **Death recap:** 15 px rows (was 13), 32-34 px apart, side columns sized to fit 4:3.

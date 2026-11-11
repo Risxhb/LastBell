@@ -162,7 +162,8 @@ namespace LastBell.Run.Shop
             // co-op: the shop closes after 90 s whatever the ready state (spec §5.4); solo waits for you (§6)
             if (!Run.Solo && Time.frameCount > openedAt && d.StateTicks >= ShopRun.CoopTimerSeconds * Sim.Hz) d.RequestReady();
             var kb = Keyboard.current;
-            if (kb != null && !d.Paused && kb.rKey.wasPressedThisFrame) Do(Run.TryReroll(0, out var why), why);
+            var pad = Gamepad.current;   // R, or Y on a gamepad (InputHints)
+            if (!d.Paused && (kb != null && kb.rKey.wasPressedThisFrame || pad != null && pad.buttonNorth.wasPressedThisFrame)) Do(Run.TryReroll(0, out var why), why);
         }
 
         void Do(bool ok, string why) { LastRefusal = ok ? null : why; }
@@ -181,7 +182,7 @@ namespace LastBell.Run.Shop
         readonly ImguiFocus focus = new ImguiFocus { Columns = 2 };
         int seen = -9, rowCount, readyRow = -1;
         static readonly LastBell.Run.HintLine KeyHints = new LastBell.Run.HintLine((HintAction.Confirm, "Select"), (HintAction.Reroll, "Reroll"), (HintAction.Pause, "Pause"));
-        static readonly LastBell.Run.HintLine PadHints = new LastBell.Run.HintLine((HintAction.Confirm, "Select"), (HintAction.Back, "Back to Ready"));
+        static readonly LastBell.Run.HintLine PadHints = new LastBell.Run.HintLine((HintAction.Confirm, "Select"), (HintAction.Reroll, "Reroll"), (HintAction.Back, "Back to Ready"));
 
         void Styles()
         {
@@ -246,7 +247,7 @@ namespace LastBell.Run.Shop
             UiTheme.Label(R(left, y, stockW, 26), "Next:  " + Run.NextBoss, nextSt);
             y += 30;
             // one line, clipped: a long run of payouts never runs into the first card
-            if (Run.Ledger.Count > 0) UiTheme.Label(R(left, y, stockW, 20), string.Join("      ·      ", Run.Ledger), ledgerSt);
+            if (Run.Ledger.Count > 0) UiTheme.Label(R(left, y, stockW, 20), LedgerLine(stockW), ledgerSt);
 
             // wallet, top of the build column
             // a small header of its own, level with the screen's: eyebrow, then coin, amount and unit in one line
@@ -265,7 +266,7 @@ namespace LastBell.Run.Shop
             // build column: your build, allies, footer
             float by = StockTop;
             UiTheme.Label(R(bx, by, BuildW, 20), UiTheme.Spaced("Your build"), s.Eyebrow);
-            UiTheme.Label(R(bx, by, BuildW, 20), me.Items.Count == 0 ? "nothing yet" : me.Items.Count == 1 ? "1 item" : $"{me.Items.Count} items", smallRight);
+            UiTheme.Label(R(bx, by, BuildW, 20), me.Items.Count == 0 ? "items you buy appear here" : (me.Items.Count == 1 ? "1 item" : $"{me.Items.Count} items") + (me.Items.Any(o => o.Def.Tempered.HasValue && !o.Tempered) ? "  ·  Temper strengthens one" : ""), smallRight);
             by += 30;
             int perCol = me.Items.Count > 8 ? 2 : 1; float chipW = perCol == 1 ? BuildW : (BuildW - 16) / 2, chipH = 34;
             int k = 0;
@@ -330,7 +331,7 @@ namespace LastBell.Run.Shop
             F(x, y + h - 1, w, 1, UiTheme.RuleFaint);
             if (def == null)
             {
-                UiTheme.Label(R(x + 80, y + 10, w - 80, 18), UiTheme.Spaced(slotName), tierSt, UiTheme.IvoryMicro);
+                UiTheme.Label(R(x + 80, y + 10, w - 80, 18), (slotName + " card").ToUpperInvariant(), tierSt, UiTheme.IvoryMicro);
                 UiTheme.Label(R(x + 80, y + 26, w - 80, 30), "Sold", nameSt, UiTheme.IvoryMuted);
                 UiTheme.Label(R(x + 80, y + 58, w - 80, 20), "Bought this visit.", smallSt, UiTheme.IvoryMicro);
                 Gap(); Gap(); return;
@@ -351,6 +352,22 @@ namespace LastBell.Run.Shop
             bool keyCap = def.Tier == ItemTier.Keystone && me.Keystones >= ItemCatalog.KeystonesPerRun;
             if (Row(ax, y + 46, actW * 0.5f, RowH, keyCap ? "Keystones full" : "Buy", me.Chimes >= def.Price && !keyCap, buildRow)) Do(Run.TryBuy(0, i, out var why), why);
             if (Row(ax + actW * 0.5f, y + 46, actW * 0.5f, RowH, locked ? "Locked" : "Lock", !me.LockUsed, buildRow)) Do(Run.TryLock(0, i, out var why), why);
+        }
+        // the payouts since the last shop on one line: as many as fit, then "+N more" (never cut mid-word)
+        string ledgerText; int ledgerCount = -1; float ledgerWidth;
+        string LedgerLine(float width)
+        {
+            if (ledgerCount == Run.Ledger.Count && ledgerWidth == width && ledgerText != null) return ledgerText;
+            ledgerCount = Run.Ledger.Count; ledgerWidth = width;
+            const string sep = "      ·      "; string line = "";
+            for (int i = 0; i < Run.Ledger.Count; i++)
+            {
+                string next = line.Length == 0 ? Run.Ledger[i] : line + sep + Run.Ledger[i];
+                string more = i + 1 < Run.Ledger.Count ? sep + $"+{Run.Ledger.Count - i - 1} more" : "";
+                if (ledgerSt.CalcSize(new GUIContent(next + more)).x / UiTheme.Scale > width && line.Length > 0) { line += sep + $"+{Run.Ledger.Count - i} more"; break; }
+                line = next;
+            }
+            return ledgerText = line;
         }
         static void F(float x, float y, float w, float h, Color c) => UiTheme.Fill(UiTheme.R(x, y, w, h), c);
         public Rect LastPanel { get; private set; }   // virtual px; the autotest checks it fits one screen

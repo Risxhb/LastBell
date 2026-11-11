@@ -81,12 +81,13 @@ namespace LastBell.Run
         void DeepDim() { Dim(); UiTheme.Fill(new Rect(0, 0, Screen.width, Screen.height), A(UiTheme.Backdrop, 0.4f)); }
         // A small card (Ready, downed, the recap tooltip): ink that fades out over its right part (the main menu's side
         // gradient, mirrored) so it reads as a strip over the arena, not a box, with a 4 px Gold bar on the left.
+        // fade: the gradient's width at the right end; the ink is solid up to xMax - 0.43 fade and clear at xMax
         internal static void SoftStrip(Rect v, float fade = 220)
         {
             // the solid part ends exactly where the gradient starts (whole screen pixels, no overlap) and matches its
             // ~0.985 ink, so no seam shows between them
-            float solid = Mathf.Max(0, v.width - fade * 0.57f);
-            var r = UiTheme.R(v.x, v.y, solid, v.height); float x0 = Mathf.Round(r.x), x1 = Mathf.Round(r.xMax);
+            fade = Mathf.Min(fade, v.width);
+            var r = UiTheme.R(v.x, v.y, v.width - fade, v.height); float x0 = Mathf.Round(r.x), x1 = Mathf.Round(r.xMax);
             UiTheme.Fill(new Rect(x0, r.y, x1 - x0, r.height), A(UiTheme.GradientInk, 0.9f * 0.985f));
             var g = UiTheme.R(0, v.y, fade, v.height); var o = GUI.color; GUI.color = new Color(1, 1, 1, 0.9f);
             GUI.DrawTextureWithTexCoords(new Rect(x1, g.y, g.width, g.height), UiTheme.SideGradient, new Rect(1, 0, -1, 1), true); GUI.color = o;
@@ -126,8 +127,8 @@ namespace LastBell.Run
             while (w < 960 && Hv(s.Body, body, w - 2 * pad) > twoLines) w += 40;
             float bh = Mathf.Min(Hv(s.Body, body, w - 2 * pad), twoLines);
             float h = pad + 26 + 38 + 6 + 2 + 14 + bh + 14 + 48 + 8 + 22 + pad - 8;
-            float x = ColumnX(w) - 60, y0 = 168, tx = x + pad;
-            SoftStrip(new Rect(x, y0, w + 160, h));
+            float x = ColumnX(w + 60), y0 = 168, tx = x + pad;
+            SoftStrip(new Rect(x, y0, w + 60, h), (w + 60) * 0.5f);
             readyFocus.Begin(); if (fresh) readyFocus.Reset(0);
             float y = UiImgui.Header(new Rect(tx, y0 + pad - 4, w - 2 * pad, 0), RunDifficulty.Name(d.Difficulty), head, false, null, ovCardTitle) + 14;
             T(tx, y, w - 2 * pad, bh + 4, body, s.Body); y += bh + 14;
@@ -162,10 +163,11 @@ namespace LastBell.Run
             var ki = BossAttackIcons.Icon(ka);
             string a = "Struck by ", cause = ka != null && !scripted ? ka.Label : d.DefeatCause ?? "?";
             float wa = Wv(ovCause, a), textW = Mathf.Min(620, wa + Wv(ovCause, cause) + 4), w = pad + (ki != null ? 64 + UiTheme.G2 : 0) + textW + pad;
-            // above the arena's centre (the boss and its telegraphs), just under the boss bar
-            float h = pad + 20 + 8 + 30 + (scripted ? 26 : 0) + pad, x = ColumnX(w), y = 150;
+            // the lower third, over the player panel: clear of the boss and its telegraphs, and of your downed hero
+            float h = pad + 20 + 8 + 30 + (scripted ? 26 : 0) + pad;
             h = Mathf.Max(h, ki != null ? 64 + 2 * pad : 0);
-            SoftStrip(new Rect(x, y, w + 160, h));
+            float x = ColumnX(w + 60), y = PanelTop - UiTheme.G6 - h;
+            SoftStrip(new Rect(x, y, w + 60, h), (w + 60) * 0.5f);
             float tx = x + pad;
             if (ki != null) { GUI.DrawTexture(S(tx, y + h / 2 - 32, 64, 64), ki, ScaleMode.ScaleToFit, true); tx += 64 + UiTheme.G2; }
             float tw = x + w - pad - tx, yy = y + pad;
@@ -247,7 +249,7 @@ namespace LastBell.Run
             const float rowH = 32, y0 = 190;
             float CW = UiTheme.VirtualWidth < 1700 ? 480 : 560;   // 4:3: a narrower centre leaves the recap room
             // side columns: as wide as fit beside the centre (4:3 included), at least the meter's width
-            float gap = vw < 1700 ? UiTheme.G4 : 72, SW = Mathf.Clamp((Mathf.Min(vw, 1920) - CW - 2 * gap - 2 * UiTheme.G4) / 2, MeterW, 440);
+            float gap = vw < 1700 ? UiTheme.G6 : 72, SW = Mathf.Clamp((Mathf.Min(vw, 1920) - CW - 2 * gap - 2 * UiTheme.G4) / 2, MeterW, 440);
             float cx = ColumnX(CW);
             UiImgui.Band(new Rect(0, y0 - 150, vw, 900));
             resultsFocus.Begin(); if (fresh) resultsFocus.Reset(0);
@@ -354,7 +356,7 @@ namespace LastBell.Run
             foreach (var (a, label) in items)
             {
                 string k = InputHints.Key(a, device); if (string.IsNullOrEmpty(k)) continue;
-                if (sb.Length > 0) sb.Append("        ");
+                if (sb.Length > 0) sb.Append("      ·      ");
                 sb.Append(k).Append("  ").Append(label);
             }
             return sb.ToString();
