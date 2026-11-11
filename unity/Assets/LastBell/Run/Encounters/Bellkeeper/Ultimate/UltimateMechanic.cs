@@ -126,7 +126,7 @@ namespace LastBell.Run
         {
             var sp = cam.WorldToScreenPoint(new Vector3(world.x, height, world.z)); if (sp.z <= 0) return;
             if (placedFrame != Time.frameCount || placedEvent != Event.current.type) { placed.Clear(); placedFrame = Time.frameCount; placedEvent = Event.current.type; }
-            float w = style.CalcSize(new GUIContent(text)).x + UiTheme.V(6), h = UiTheme.V(26);
+            float w = style.CalcSize(new GUIContent(text)).x + UiTheme.V(20), h = EncounterCallouts.TagHeight(style);
             var box = new Rect(sp.x - w / 2, Screen.height - sp.y - h / 2, w, h);
             for (int tries = 0; tries < 4; tries++)
             {
@@ -134,8 +134,8 @@ namespace LastBell.Run
                 if (!hit) break;
             }
             placed.Add(box);
-            var r = new Rect(sp.x - UiTheme.V(130), box.y, UiTheme.V(260), h);
-            UiTheme.Label(r, text, style, c);   // shadowed, tinted through GUI.color (no re-layout when the colour blinks)
+            EncounterCallouts.TagBack(box, c);   // ink strip + a tick in the mechanic's colour; the word itself in Ivory
+            UiTheme.Label(box, text, style, EncounterCallouts.Alpha(UiTheme.Ivory, c.a));   // shadowed, tinted through GUI.color (no re-layout when the colour blinks)
         }
     }
 

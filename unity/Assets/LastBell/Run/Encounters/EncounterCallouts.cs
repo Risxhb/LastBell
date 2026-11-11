@@ -10,7 +10,7 @@ namespace LastBell.Run
     public static class EncounterCallouts
     {
         // ---- sizes at 1080p ----
-        public const int TagSize = UiTheme.SizeBody;          // names and jobs over players, words on floor spots
+        public const int TagSize = UiTheme.SizeBody + 2;      // names and jobs over players, words on floor spots (read mid-fight)
         public const int TagLargeSize = UiTheme.SizeHeading;  // numerals on rings and gaps, bigger floor words
         public const int BannerSize = UiTheme.SizeDisplay;    // the fight's one-line callout under the boss bar
         // Soak numerals must be impossible to miss (content rules §5): well above the ramp's display size.
@@ -40,12 +40,26 @@ namespace LastBell.Run
         }
 
         public static Color Alpha(Color c, float a) => new Color(c.r, c.g, c.b, c.a * a);
+        // Ink behind world tags (as the tutorial's tags and info strips), so a word stays legible over a lit floor or a beam.
+        public static readonly Color TagInk = new Color(UiTheme.InkDeep.r, UiTheme.InkDeep.g, UiTheme.InkDeep.b, 0.7f);
 
-        // The fight's one-line callout across the screen, yFraction down from the top (screen px for the height).
+        // One height per tag style, so tags of different words line up (screen px).
+        public static float TagHeight(GUIStyle style) => Mathf.Round(style.fontSize * 1.55f);
+
+        // A world tag's backing: a small ink strip with a 2 px left tick in the tag's own colour (screen px).
+        public static void TagBack(Rect box, Color tick)
+        {
+            UiTheme.Fill(box, TagInk);
+            UiTheme.Fill(new Rect(box.x, box.y, Mathf.Max(1, UiTheme.V(2)), box.height), new Color(tick.r, tick.g, tick.b, Mathf.Min(1, tick.a)));
+        }
+
+        // The fight's one-line callout across the screen, yFraction down from the top, over a soft centre band (UiImgui.Band,
+        // as the Results overlay) so it holds over the boss and the floor.
         public static void Banner(float yFraction, string text, Color color, GUIStyle style = null)
         {
-            var s = style ?? Styles.Banner;
-            UiTheme.Label(new Rect(0, Screen.height * yFraction, Screen.width, s.fontSize * 1.6f), text, s, color);
+            var s = style ?? Styles.Banner; float y = Screen.height * yFraction, h = s.fontSize * 1.6f;
+            UiImgui.Band(new Rect(0, (y - h * 0.6f) / UiTheme.Scale, UiTheme.VirtualWidth, h * 2.2f / UiTheme.Scale), 0.85f * Mathf.Min(1, color.a));
+            UiTheme.Label(new Rect(0, y, Screen.width, h), text, s, color);
         }
 
         // A big soak numeral centred on a screen point, with a soft ink drop shadow (3 px at 1080p).
@@ -57,6 +71,11 @@ namespace LastBell.Run
             var keep = s.normal.textColor; var old = GUI.color; s.normal.textColor = Color.white;
             float a = Mathf.Ceil(alpha * old.a * 8f) / 8f;
             GUI.color = Alpha(UiTheme.InkDeep, 0.9f * a); UiTheme.RawLabel(new Rect(r.x + o, r.y + o, r.width, r.height), text, s);
+            // a thin ink outline as well: a numeral sits on lit tower rims and beams
+            float t = Mathf.Max(1, Mathf.Round(UiTheme.V(1.5f)));
+            GUI.color = Alpha(UiTheme.InkDeep, 0.8f * a);
+            UiTheme.RawLabel(new Rect(r.x - t, r.y, r.width, r.height), text, s); UiTheme.RawLabel(new Rect(r.x + t, r.y, r.width, r.height), text, s);
+            UiTheme.RawLabel(new Rect(r.x, r.y - t, r.width, r.height), text, s); UiTheme.RawLabel(new Rect(r.x, r.y + t, r.width, r.height), text, s);
             GUI.color = Alpha(UiTheme.Ivory, a); UiTheme.RawLabel(r, text, s);
             s.normal.textColor = keep; GUI.color = old;
         }

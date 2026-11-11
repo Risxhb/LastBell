@@ -42,7 +42,7 @@ namespace LastBell.Run
                 sResult = UiTheme.Style(TutorialDirector.BodySize, true, TextAnchor.UpperLeft, UiTheme.GoldBright, true);
             }
             float pad = UiTheme.G3, padY = UiTheme.G2;
-            float x = UiTheme.V(TutorialDirector.CardX + 3 + pad), inner = UiTheme.V(TutorialDirector.CardW - 3 - pad - UiTheme.G6), cy = UiTheme.V(TutorialDirector.CardY + padY);
+            float x = UiTheme.V(TutorialDirector.CardX + 3 + pad), inner = UiTheme.V(TutorialDirector.CardW - 3 - pad - TutorialDirector.PadR), cy = UiTheme.V(TutorialDirector.CardY + padY);
             float th = H(sTitle, "Tutorial complete", inner), lh = H(sBody, lead, inner), rh = H(sResult, result, inner), nh = H(sBody, next, inner);
             float h = UiTheme.V(padY + 20 + 8) + th + UiTheme.V(8 + UiTheme.RuleHeight + 16) + lh + UiTheme.V(14) + rh + UiTheme.V(14) + nh + UiTheme.V(padY);
             TutorialDirector.CardBack(h / UiTheme.Scale);

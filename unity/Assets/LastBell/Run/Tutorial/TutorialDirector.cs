@@ -200,11 +200,11 @@ namespace LastBell.Run
         // bar, no box), a spaced Gold eyebrow with the step count, the Ivory title and the 96x2 Gold rule, then the body in the
         // theme's body style. Emphasis (<b> in the step text) is drawn in GoldBright rather than fake bold. Key names in the
         // step text come from InputHints (the gameplay bindings); the continue hint follows the last device used.
-        internal const float CardX = 24, CardY = 150, CardW = 600, PadL = UiTheme.G3, PadR = UiTheme.G6, PadY = UiTheme.G2, CardFade = 120;
+        internal const float CardX = 24, CardY = 150, CardW = 660, PadL = UiTheme.G3, PadR = 120, PadY = UiTheme.G2, CardFade = 200;
         internal const int TitleSize = 28;   // the main menu's primary-row size: a card title, smaller than a screen title (52)
         // Read mid-fight, so the card body is two steps above the ramp's SizeBody (17 at 1080p: ~13 px at 900p was too small).
         internal const int BodySize = UiTheme.SizeBody + 2;
-        internal static readonly Color CardInk = new Color(UiTheme.InkDeep.r, UiTheme.InkDeep.g, UiTheme.InkDeep.b, 0.8f);
+        internal static readonly Color CardInk = new Color(UiTheme.InkDeep.r, UiTheme.InkDeep.g, UiTheme.InkDeep.b, 0.78f);
         // The card's backing: an InfoStrip (ink + 3 px Gold left bar) whose last CardFade units fade out like the main menu's
         // side gradient, so it reads as an ink strip over the arena rather than a box. vh: virtual height.
         internal static void CardBack(float vh)
@@ -286,7 +286,7 @@ namespace LastBell.Run
         {
             var sp = cam.WorldToScreenPoint(world); if (sp.z <= 0) return;
             measure.text = text; var size = st.CalcSize(measure);
-            float m = UiTheme.V(16), w = size.x + UiTheme.V(20), hh = size.y + UiTheme.V(8);
+            float m = UiTheme.V(16), w = size.x + UiTheme.V(20), hh = EncounterCallouts.TagHeight(st);
             var r = new Rect(Mathf.Clamp(sp.x - w / 2, m, Screen.width - m - w), Mathf.Clamp(Screen.height - sp.y - hh / 2, m, Screen.height - m - hh), w, hh);
             if (r.Overlaps(cardScreen)) return;
             UiTheme.Fill(r, CardInk);
