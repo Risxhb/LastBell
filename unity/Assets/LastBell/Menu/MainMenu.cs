@@ -31,7 +31,8 @@ namespace LastBell.Menu
             MenuReturnBridge.TestSession=false;
             if(MapPreviewCapture.Requested){MapPreviewCapture.Launch();return;}
             // Existing run diagnostics retain their own entry point.
-            if (RunAutoTest.Requested) { SceneManager.LoadScene(RunMaps.All[0].RunScene); return; }
+            // the shop suite (-lastbellShopTest) too: it starts from the run scene's own Menu state
+            if (RunAutoTest.Requested || Run.Shop.RunShopAutoTest.Requested) { SceneManager.LoadScene(RunMaps.All[0].RunScene); return; }
             // Only the -lastbellMenuTest diagnostic stays here: the live showcase (battle, arena rotation, menu music), no UI.
             if (MenuSmokeTest.Requested) MenuSmokeTest.PrepareInput();
             MenuSettings.Restore();
