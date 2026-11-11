@@ -125,6 +125,9 @@ namespace LastBell.Menu
             Check("remote attack damages the host's actual boss",damaged);
             Check("host creates a live combat hazard",hazard);
             Check("remote player uses class abilities, not just the basic attack",classAction);
+            // UI sub-thread C: the host's party cards show each remote player, titled with their lobby name, in roster order
+            Check("host party cards: one per remote player, titled with the lobby name",d && d.World!=null && lanRoster!=null
+                && RunPartyCards.Allies(d).Select(p=>RunPartyCards.Title(d,p)).SequenceEqual(lanRoster.Remote.Select(m=>m.Name)));
             // the boss's own presentation the client must mirror: force the mechanics a short fight never reaches
             if (session && d && d.State==RunState.Combat && d.Boss)
             {
@@ -221,7 +224,7 @@ namespace LastBell.Menu
         IEnumerator ClientFight(LanSessionCoordinator session)
         {
             float until=Time.realtimeSinceStartup+150; bool observedCombat=false, observedDamage=false, observedResult=false, observedHazard=false, observedTelegraph=false, observedProjectile=false, observedHud=false, observedOwnCooldown=false;
-            float combatSince=-1, combatTime=0; int combatFrames=0; bool shotCombat=false;
+            float combatSince=-1, combatTime=0; int combatFrames=0; bool shotCombat=false, partyCards=false;
             int musicExpected=0, musicPlaying=0; bool sawNormal=false; bool wantMusic=false, sawAurelion=false; bool sawProps=false, sawAnnouncement=false, shownAnnouncement=false, sawClock=false, clockMoved=false; double firstBeat=-1;
             int numbersSent=0, numbersShown=0, replicaShown=-1, bulletsSent=0; string bossName=""; TempoTyrantAudio tempoAudio=null; string lastTrack="";
             bool rosterMatched=false; float maxLead=0; LanWorldFrame lastFrame=null; int snapshots=0, movedFrames=0; Vector3 lastSnapshotPos=Vector3.zero; Vector3 lastDrawn=Vector3.zero; bool haveDrawn=false;
@@ -233,6 +236,12 @@ namespace LastBell.Menu
                     var d=RunDirector.Instance; var me=session.Lobby!=null ? state.Players.Find(p=>p.Id==session.Lobby.LocalId) : null;
                     if (!rosterMatched) { var view=session.ClientView; rosterMatched=session.Lobby.Members.All(m=>view.NameOf(m.Id)==m.Name && view.ClassOf(m.Id)==m.ClassName); }
                     maxLead=Mathf.Max(maxLead,session.ClientView.PredictionLead);
+                    // UI sub-thread C: a party card for every other player in the lobby, titled with their lobby name
+                    if (d && d.World!=null && session.Lobby!=null && !partyCards)
+                    {
+                        var others=RunPartyCards.Allies(d).Select(p=>RunPartyCards.Title(d,p)).OrderBy(n=>n,StringComparer.Ordinal);
+                        partyCards=others.SequenceEqual(session.Lobby.Members.Where(m=>m.Id!=session.Lobby.LocalId).Select(m=>m.Name).OrderBy(n=>n,StringComparer.Ordinal));
+                    }
                     // the normal RunHud draws the replica: the director holds this client's player, fed by the host's numbers
                     observedHud |= RunHud.LanClientView && d && d.Player && d.World!=null && me!=null && d.Player.Hp==me.Hp && d.Player.Kit.NetCooldowns!=null && (state.Boss==null || (d.Boss && d.Boss.Hp==state.Boss.Hp));
                     observedOwnCooldown |= me!=null && me.Cooldowns.Skip(1).Any(c=>c>0.001f);
@@ -286,6 +295,7 @@ namespace LastBell.Menu
             Check("client receives player projectile state",observedProjectile);
             Check("client receives fight results",observedResult);
             Check("client HUD shows the host's fight (health, cooldowns, boss)",observedHud);
+            Check("client party cards: one per other player, titled with the lobby name",partyCards);
             Check("client sees its own class abilities go on cooldown",observedOwnCooldown);
             Check("client draws every lobby player with their lobby name and class",rosterMatched);
             Debug.Log("[LAN smoke] client music: boss track playing on "+musicPlaying+"/"+musicExpected+" combat frames (last: "+lastTrack+")"+(tempoAudio ? " · "+tempoAudio.StatusText : ""));
