@@ -29,6 +29,13 @@ namespace LastBell.Menu
         // Boss step rows (Risxhb, October 25, 2026): Bosses, then Minibosses, each a row of cards like the arena step.
         // Buttons stay indexed by RunDirector.Bosses; only their placement follows these rows. The final boss is last.
         public static readonly string[] MinibossPrefixes={"Chimebound Oracle","Dial Warden","Pendulum Sentinel","Escapement Twins","Rivet Cantor","Crucible Skater","Briar Metronome","Silt Carillon","Vesper Seedkeeper"};
+        // Browser demo cut (Risx, 11 Nov 2026): Boss Rush only, on the arenas WebDemoBuild ships; minibosses and Start Run are
+        // greyed out because their models are left out of the download.
+#if UNITY_WEBGL && !UNITY_EDITOR
+        public static readonly bool DemoCut=true;
+#else
+        public static readonly bool DemoCut=false;
+#endif
         public static bool IsMiniboss(int encounter)=>System.Array.Exists(MinibossPrefixes,p=>RunDirector.Bosses[encounter].Name.StartsWith(p));
         static readonly string[] BossOrder={"Aurelion","Crucivar","Sylvara","Tempo Tyrant"};
         public static int[] BossRow{get{
@@ -57,7 +64,9 @@ namespace LastBell.Menu
         GameObject ownedPanel;
         public void Build(ConfrontationMenu owner,Transform parent,string hero)
         {
-            selection=owner;Hero=hero;SavedHero=hero;MapIndex=Mathf.Clamp(SavedMap,0,RunMaps.All.Length-1);EncounterIndex=Mathf.Clamp(SavedEncounter,0,RunDirector.Bosses.Length-1);PhaseIndex=Mathf.Clamp(SavedPhase,1,PhasesOf(EncounterIndex));
+            selection=owner;Hero=hero;SavedHero=hero;MapIndex=Mathf.Clamp(SavedMap,0,RunMaps.All.Length-1);EncounterIndex=Mathf.Clamp(SavedEncounter,0,RunDirector.Bosses.Length-1);
+            if(DemoCut){if(IsMiniboss(EncounterIndex))EncounterIndex=BossRow[0];if(!RunMaps.InBuild(MapIndex))for(int m=0;m<RunMaps.All.Length;m++)if(RunMaps.InBuild(m)){MapIndex=m;break;}}
+            PhaseIndex=Mathf.Clamp(SavedPhase,1,PhasesOf(EncounterIndex));
             var panel=MenuUI.Panel("Test Rush setup",parent,Vector2.zero,Vector2.one,UiTheme.Backdrop);panel.raycastTarget=true;transform.SetParent(panel.transform,false);
             ownedPanel=panel.gameObject;panelBase=panel;
             BuildBackdrop(panel.transform);
@@ -98,6 +107,11 @@ namespace LastBell.Menu
             SectionLabel("Minibosses",B,.425f,miniRow.Length);
             MiniPerRow=Mathf.Max(5,bossRow.Length);
             for(int k=0;k<miniRow.Length;k++){int at=miniRow[k];int col=k%MiniPerRow,row=k/MiniPerRow;float x=.04f+col*bossCard,top=.42f-row*.096f;EncounterButtons[at]=BossCard(at,k,true,B,new Vector2(x,top-.084f),new Vector2(x+bossCard,top),()=>SelectEncounter(at),out encounterLabels[at],out encounterFocus[at],out encounterArt[at]);}
+            if(DemoCut)
+            {
+                foreach(int at in miniRow){EncounterButtons[at].interactable=false;EncounterButtons[at].gameObject.AddComponent<CanvasGroup>().alpha=.35f;}
+                for(int i=0;i<MapButtons.Length;i++)if(!RunMaps.InBuild(i)){MapButtons[i].interactable=false;MapButtons[i].gameObject.AddComponent<CanvasGroup>().alpha=.35f;}
+            }
             // Phase row: one tab per phase of the selected boss, Phase 1 first
             MenuUI.Text(UiTheme.Spaced("Start Phase"),B,new Vector2(.035f,.195f),new Vector2(.5f,.227f),15,MenuUI.Gold,TextAnchor.MiddleLeft);
             phaseNote=MenuUI.Text("",B,new Vector2(.5f,.195f),new Vector2(.965f,.227f),UiTheme.SizeLabel,new Color(UiTheme.GoldLabel.r,UiTheme.GoldLabel.g,UiTheme.GoldLabel.b,.7f),TextAnchor.MiddleRight);
@@ -130,8 +144,8 @@ namespace LastBell.Menu
         public void Back(){if(Loading)return;if(BossStep)ShowStep(false);else Close();}
         public void OpenBossStep(){ShowStep(true);}
         public static Texture2D Preview(int i)=>Resources.Load<Texture2D>("Menu/Maps/"+RunMaps.All[i].Id);
-        public void SelectMap(int i){if(Loading||i<0||i>=MapButtons.Length)return;MapIndex=SavedMap=i;Refresh();}
-        public void SelectEncounter(int i){if(Loading||i<0||i>=EncounterButtons.Length)return;if(i!=EncounterIndex)PhaseIndex=SavedPhase=1;EncounterIndex=SavedEncounter=i;Refresh();if(BossStep)LinkBossStep();}
+        public void SelectMap(int i){if(Loading||i<0||i>=MapButtons.Length||(DemoCut&&!RunMaps.InBuild(i)))return;MapIndex=SavedMap=i;Refresh();}
+        public void SelectEncounter(int i){if(Loading||i<0||i>=EncounterButtons.Length||(DemoCut&&IsMiniboss(i)))return;if(i!=EncounterIndex)PhaseIndex=SavedPhase=1;EncounterIndex=SavedEncounter=i;Refresh();if(BossStep)LinkBossStep();}
         public void SelectPhase(int n){if(Loading||n<1||n>PhasesOf(EncounterIndex))return;PhaseIndex=SavedPhase=n;Refresh();}
         public void CycleAllies(){if(Loading)return;RunParty.Selected=(RunParty.Selected+1)%(RunParty.MaxAllies+1);Refresh();}
         // the phase row holds only the selected boss's phases, so its links follow the selection
@@ -149,6 +163,7 @@ namespace LastBell.Menu
             if(map<0||map>=RunMaps.All.Length||encounter<0||encounter>=RunDirector.Bosses.Length)return "Choose a valid map and encounter.";
             if(!RunMaps.InBuild(map))return "Arena unavailable in this build.";
             if(!Preview(map))return "Current arena preview unavailable. Launch is disabled.";
+            if(DemoCut&&IsMiniboss(encounter))return "Minibosses are not in the browser demo.";
             if(encounter==Campaign.BonusIndex&&!Campaign.OverclockedUnlocked)return Campaign.LockedReason;   // campaign unlock
             // Current bosses create their own shapes/props and use shared arena bounds. BossEntry.Map is an authored
             // default, not a geometry dependency. New encounters requiring scene objects must add a capability check here.
@@ -156,7 +171,7 @@ namespace LastBell.Menu
         }
         void Refresh()
         {
-            for(int i=0;i<mapLabels.Length;i++){mapLabels[i].text=RunMaps.All[i].Name+(Preview(i)?"":" (unavailable)");mapFocus[i].Chosen=i==MapIndex;}
+            for(int i=0;i<mapLabels.Length;i++){mapLabels[i].text=RunMaps.All[i].Name+(Preview(i)&&RunMaps.InBuild(i)?"":" (unavailable)");mapFocus[i].Chosen=i==MapIndex;}
             for(int i=0;i<encounterLabels.Length;i++){encounterLabels[i].text=CardName(i)+(i==Campaign.BonusIndex&&!Campaign.OverclockedUnlocked?" (locked)":"");encounterFocus[i].Chosen=i==EncounterIndex;}
             int phaseCount=PhasesOf(EncounterIndex);PhaseIndex=Mathf.Clamp(PhaseIndex,1,phaseCount);
             for(int p=0;p<PhaseButtons.Length;p++){PhaseButtons[p].gameObject.SetActive(p<phaseCount);phaseFocus[p].Chosen=p+1==PhaseIndex;}

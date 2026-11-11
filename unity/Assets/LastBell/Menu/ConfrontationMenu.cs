@@ -32,7 +32,7 @@ namespace LastBell.Menu
         // Start Run was greyed out for players from October 27, 2026 (Risxhb) until the campaign existed. It is back for the
         // campaign (Risx, November 4, 2026; Run/Campaign.cs): tutorial, three arenas of minibosses and bosses, the Bellkeeper.
         // Set false to grey it out again (shown but not clickable, skipped by keyboard and controller focus).
-        public static bool StartRunEnabled = true;
+        public static bool StartRunEnabled = !TestRushSetup.DemoCut;   // the browser demo is Boss Rush only
         public CharacterPresenter Hero { get; private set; }
         public CharacterPresenter Boss { get; private set; }
         public Transform BossWrapper { get; private set; }
