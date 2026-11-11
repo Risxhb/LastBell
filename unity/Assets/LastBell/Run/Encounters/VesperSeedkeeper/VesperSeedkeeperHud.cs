@@ -67,21 +67,4 @@ namespace LastBell.Run
             if (shownReplica > ReplicaNumeralsShown) ReplicaNumeralsShown = shownReplica;
         }
     }
-
-    // LAN client: a Vesper cord view. The host sends the cord at its stake; this stretches the glowing bar from the replica
-    // vessel (flat, 1 m up, as the host draws it) to the stake every frame.
-    public sealed class VesperNetCord : MonoBehaviour
-    {
-        Transform boss, bar;
-        public void Bind(Transform vessel, Transform view) { boss = vessel; bar = view; }
-        void LateUpdate()
-        {
-            if (!bar || !boss) return;
-            var from = Sim.Flat(boss.position); var to = Sim.Flat(transform.position);
-            var d = to - from;
-            bar.position = (from + to) / 2 + Vector3.up * 1.0f;
-            bar.rotation = Quaternion.LookRotation(d.sqrMagnitude > 1e-4f ? d : Vector3.forward);
-            bar.localScale = new Vector3(0.08f, 0.08f, d.magnitude);
-        }
-    }
 }
