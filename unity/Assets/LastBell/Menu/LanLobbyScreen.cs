@@ -65,7 +65,7 @@ namespace LastBell.Menu
         // text rows with the highlight strip, drawn chevrons, underline input fields and centre-band dialogs.
         Canvas canvas; RectTransform root, frame; GameObject connectPage, lobbyPage, nameCard, leaveConfirm;
         InputField address, port, nameField; Text status, playingAs, nameError, notice, bossName, arenaName, hint, hostAddress, leaveBody, editNameLabel;
-        Header header; Chooser bossChooser, arenaChooser; CanvasGroup frameGroup; RawImage backdropArt;
+        Header header; Chooser bossChooser, arenaChooser; CanvasGroup frameGroup; RawImage backdropArt; Image sideGradient;
         public Button HostButton, JoinButton, EditNameButton, ConfirmNameButton, ReadyButton, StartButton, BackButton, BossPrev, BossNext, ArenaPrev, ArenaNext, LeaveButton, StayButton;
         RawImage arenaArt;
         public sealed class Slot
@@ -107,7 +107,7 @@ namespace LastBell.Menu
             backdropArt.color = new Color(.42f, .42f, .48f, 1); backdropArt.enabled = false;
             var last = RunMaps.All.Length > 0 ? TestRushSetup.Preview(Mathf.Clamp(TestRushSetup.SavedMap, 0, RunMaps.All.Length - 1)) : null;
             if (last) { backdropArt.texture = last; backdropArt.enabled = true; }
-            MenuUI.SideGradient(root, new Vector2(.42f, 0), Vector2.one);
+            sideGradient = MenuUI.SideGradient(root, new Vector2(.42f, 0), Vector2.one);
             // One content frame for everything but the backdrop: ultrawide narrows it to a centred 16:9 frame (Update).
             frame = MenuUI.Rect("Content", root, Vector2.zero, Vector2.one); frameGroup = frame.gameObject.AddComponent<CanvasGroup>();
             header = MenuUI.Header(frame, "LAN Multiplayer", "HOST OR JOIN", new Vector2(.04f, .835f), new Vector2(.6f, .955f));
@@ -430,7 +430,11 @@ namespace LastBell.Menu
             frame.anchorMin = new Vector2((1 - w) * .5f, 0); frame.anchorMax = new Vector2((1 + w) * .5f, 1);
             PlaceChooser(bossChooser); PlaceChooser(arenaChooser);
             // a dialog fades the page behind it, so its rows never read as part of the dialog
-            float page = NameCardOpen || LeaveConfirmOpen ? .18f : 1; if (frameGroup.alpha != page) frameGroup.alpha = page;
+            float page = NameCardOpen || LeaveConfirmOpen ? 0 : 1; if (frameGroup.alpha != page) frameGroup.alpha = page;
+            // connect page: controls on the right over the side gradient (the main menu's layout); lobby page: the cards
+            // span the screen, so an even darker tint replaces the gradient and no card sits on a brighter floor
+            bool lobbyPage = Current == Page.Lobby; if (sideGradient.enabled == lobbyPage) sideGradient.enabled = !lobbyPage;
+            var tint = lobbyPage ? new Color(.26f, .26f, .31f, 1) : new Color(.42f, .42f, .48f, 1); if (backdropArt.color != tint) backdropArt.color = tint;
             // status: under the column on the connect page, centred over the footer in the lobby
             var sr = status.rectTransform; var want = Current == Page.Lobby ? new Vector2(.04f, .16f) : new Vector2(.6f, .16f);
             if (sr.anchorMin != want) { sr.anchorMin = want; status.alignment = Current == Page.Lobby ? TextAnchor.MiddleCenter : TextAnchor.MiddleLeft; }
@@ -447,23 +451,26 @@ namespace LastBell.Menu
             float w = Mathf.Min(c.Label.preferredWidth, c.Label.rectTransform.rect.width);
             next.anchorMin = next.anchorMax = new Vector2(0, .5f); next.anchoredPosition = new Vector2(44 + w + 22, 0);
         }
+        // A focused input field swallows uGUI navigation, so a gamepad could never leave it. Up/Down (dpad, stick or
+        // arrows; a single-line field has no use for them) step out along the field's own navigation links. LateUpdate:
+        // after the EventSystem's pass, so the new row doesn't receive the same press and move again.
+        void LateUpdate()
+        {
+            var sel = EventSystem.current ? EventSystem.current.currentSelectedGameObject : null;
+            var field = sel ? sel.GetComponent<InputField>() : null;
+            float sy = Gamepad.current != null ? Gamepad.current.leftStick.y.ReadValue() : 0; int step = 0;
+            if (Mathf.Abs(sy) > .6f) { if (!stickYHeld) step = sy > 0 ? 1 : -1; stickYHeld = true; } else if (Mathf.Abs(sy) < .3f) stickYHeld = false;
+            if (!field || !field.isFocused) return;   // not editing: uGUI navigation already handled it
+            if (Pressed(k => k.upArrowKey.wasPressedThisFrame, g => g.dpad.up.wasPressedThisFrame)) step = 1;
+            if (Pressed(k => k.downArrowKey.wasPressedThisFrame, g => g.dpad.down.wasPressedThisFrame)) step = -1;
+            var to = step > 0 ? field.navigation.selectOnUp : step < 0 ? field.navigation.selectOnDown : null;
+            if (to && to.IsInteractable()) { field.DeactivateInputField(); Focus(to); }
+        }
         static bool Pressed(Func<Keyboard, bool> k, Func<Gamepad, bool> g) => (Keyboard.current != null && k(Keyboard.current)) || (Gamepad.current != null && g(Gamepad.current));
         void HandleInput()
         {
             bool typing = EventSystem.current && EventSystem.current.currentSelectedGameObject && EventSystem.current.currentSelectedGameObject.GetComponent<InputField>();
             if (Pressed(k => k.escapeKey.wasPressedThisFrame, g => g.buttonEast.wasPressedThisFrame)) { Back(); return; }
-            // A focused input field swallows uGUI navigation, so a gamepad could never leave it. Up/Down (dpad, stick or
-            // arrows; a single-line field has no use for them) step out along the field's own navigation links.
-            if (typing)
-            {
-                var field = EventSystem.current.currentSelectedGameObject.GetComponent<InputField>();
-                float sy = Gamepad.current != null ? Gamepad.current.leftStick.y.ReadValue() : 0; int step = 0;
-                if (Mathf.Abs(sy) > .6f) { if (!stickYHeld) step = sy > 0 ? 1 : -1; stickYHeld = true; } else if (Mathf.Abs(sy) < .3f) stickYHeld = false;
-                if (Pressed(k => k.upArrowKey.wasPressedThisFrame, g => g.dpad.up.wasPressedThisFrame)) step = 1;
-                if (Pressed(k => k.downArrowKey.wasPressedThisFrame, g => g.dpad.down.wasPressedThisFrame)) step = -1;
-                var to = step > 0 ? field.navigation.selectOnUp : step < 0 ? field.navigation.selectOnDown : null;
-                if (field.isFocused && to && to.IsInteractable()) { field.DeactivateInputField(); Focus(to); return; }   // only while editing: otherwise uGUI moves itself
-            }
             if (NameCardOpen) { if (Pressed(k => k.enterKey.wasPressedThisFrame || k.numpadEnterKey.wasPressedThisFrame, g => false)) ConfirmName(); return; }
             if (LeaveConfirmOpen || typing || Current != Page.Lobby || Lobby == null || session.Loading) return;
             float sx = Gamepad.current != null ? Gamepad.current.leftStick.x.ReadValue() : 0; int stick = 0;
