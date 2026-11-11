@@ -21,12 +21,28 @@ namespace LastBell.Run
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Boot()
         {
-            if (Arg("-lastbellUiShots") == null || FindAnyObjectByType<UiShotCapture>()) return;
+            if ((Arg("-lastbellUiShots") == null && Arg("-lastbellCaptureRes") == null) || FindAnyObjectByType<UiShotCapture>()) return;
             var go = new GameObject("UI shot capture"); DontDestroyOnLoad(go); go.AddComponent<UiShotCapture>();
+        }
+
+        // -lastbellCaptureRes 1280x720: hold a windowed size for captures. The menu re-applies the player's saved resolution
+        // (MenuSettings.Restore) over -screen-width; this only reads it back, never writes the saved settings.
+        int resW, resH;
+        void Awake()
+        {
+            var r = Arg("-lastbellCaptureRes"); if (r == null) return;
+            var p = r.ToLowerInvariant().Split('x');
+            if (p.Length == 2) { int.TryParse(p[0], out resW); int.TryParse(p[1], out resH); }
+        }
+        void LateUpdate()
+        {
+            if (resW > 0 && resH > 0 && (Screen.width != resW || Screen.height != resH || Screen.fullScreenMode != FullScreenMode.Windowed))
+                Screen.SetResolution(resW, resH, FullScreenMode.Windowed);
         }
 
         IEnumerator Start()
         {
+            if (Arg("-lastbellUiShots") == null) yield break;
             var times = Arg("-lastbellUiShots").Split(',').Select(s => float.Parse(s, CultureInfo.InvariantCulture)).OrderBy(t => t).ToArray();
             string dir = Arg("-lastbellOut") ?? Path.Combine(Application.persistentDataPath, "ui-shots"), name = Arg("-lastbellShotName") ?? "shot";
             Directory.CreateDirectory(dir);
