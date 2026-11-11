@@ -234,7 +234,7 @@ namespace LastBell.Menu
 
         // ---------------------------------------------------------------- settings
         // Settings replaces the navigation column in place, in the same language as the menu and Boss Rush:
-        // eyebrow, title and gold rule, text rows with a highlight strip, faint dividers, Gold primary + text Back.
+        // eyebrow, title and gold rule, text rows with a highlight strip, faint dividers; Back and Apply are text rows too.
         void BuildSettings()
         {
             var block=MenuUI.Panel("Settings modal",safe,Vector2.zero,Vector2.one,new Color(0,0,0,.35f));block.raycastTarget=true;settings=block.gameObject;
@@ -289,7 +289,7 @@ namespace LastBell.Menu
                 var close=blocker.gameObject.AddComponent<Button>();close.transition=Selectable.Transition.None;close.navigation=new Navigation{mode=Navigation.Mode.None};close.onClick.AddListener(CloseResolutionList);
                 var frame=MenuUI.Panel("Resolution list",col,new Vector2(.46f,RowY(2)),new Vector2(1,RowY(2)),new Color(UiTheme.InkDeep.r,UiTheme.InkDeep.g,UiTheme.InkDeep.b,.97f));
                 frame.raycastTarget=true;frame.rectTransform.pivot=new Vector2(.5f,1);frame.rectTransform.anchoredPosition=new Vector2(0,-2);
-                var edge=frame.gameObject.AddComponent<Outline>();edge.effectColor=new Color(UiTheme.Gold.r,UiTheme.Gold.g,UiTheme.Gold.b,.7f);edge.effectDistance=new Vector2(1,-1);
+                MenuUI.Stroke(frame.transform,UiTheme.StripEdge,1);   // the shared 1 px edge (a uGUI Outline redraws the whole quad)
                 var viewport=MenuUI.Rect("Viewport",frame.transform,Vector2.zero,Vector2.one,new Vector2(4,4));viewport.gameObject.AddComponent<RectMask2D>();
                 var content=MenuUI.Rect("Content",viewport,new Vector2(0,1),new Vector2(1,1));content.pivot=new Vector2(.5f,1);content.anchoredPosition=Vector2.zero;
                 var scroll=frame.gameObject.AddComponent<ScrollRect>();scroll.viewport=viewport;scroll.content=content;scroll.horizontal=false;scroll.movementType=ScrollRect.MovementType.Clamped;scroll.scrollSensitivity=itemH;

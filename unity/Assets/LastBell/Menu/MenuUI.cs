@@ -134,40 +134,6 @@ namespace LastBell.Menu
         public static void Style(Text t,int size){t.font=size>=20?UiTheme.SemiBold:UiTheme.Regular;t.fontStyle=FontStyle.Normal;t.lineSpacing=1.08f;Shadow(t,.8f);}
         public static Shadow Shadow(Graphic g,float alpha)
         {var s=g.GetComponent<Shadow>();if(!s)s=g.gameObject.AddComponent<Shadow>();s.effectColor=new Color(0,0,0,alpha);s.effectDistance=new Vector2(1.5f,-1.5f);return s;}
-        // Framed panel: fill, 1 px GoldDim border, inset dark line, gold L-bracket corners with diamonds.
-        public static Image FramedPanel(string name,Transform parent,Vector2 min,Vector2 max,Color? fill=null,bool ornaments=true)
-        {
-            var p=Panel(name,parent,min,max,fill??UiTheme.Ink);
-            Stroke(p.transform,UiTheme.GoldDim,1,0);Stroke(p.transform,new Color(0,0,0,.5f),1,3);
-            if(ornaments)Ornaments(p.transform);
-            return p;
-        }
-        public static void Ornaments(Transform panel,float len=10,float thick=2,float offset=2)
-        {
-            for(int i=0;i<4;i++)
-            {
-                var a=new Vector2(i%2,i/2);var sign=new Vector2(a.x>0?-1:1,a.y>0?-1:1);
-                var corner=Rect("Corner",panel,a,a);corner.sizeDelta=Vector2.zero;corner.anchoredPosition=-sign*offset;
-                var h=Panel("Bracket",corner,Vector2.zero,Vector2.zero,UiTheme.Gold);h.rectTransform.pivot=new Vector2(a.x,a.y);h.rectTransform.sizeDelta=new Vector2(len,thick);
-                var v=Panel("Bracket",corner,Vector2.zero,Vector2.zero,UiTheme.Gold);v.rectTransform.pivot=new Vector2(a.x,a.y);v.rectTransform.sizeDelta=new Vector2(thick,len);
-                var d=Rect("Corner diamond",corner,Vector2.zero,Vector2.zero).gameObject.AddComponent<FocusDiamond>();d.rectTransform.sizeDelta=new Vector2(6,6);d.color=UiTheme.Gold;d.raycastTarget=false;
-            }
-        }
-        // House button. Rest: Ink fill, GoldDim edge, ivory label. Focus/hover: warm fill, GoldBright edge, diamond and underline.
-        // The label is the first Text child (tests read it); marker and underline are drawn graphics, not glyphs.
-        public static Button Button(string name,Transform parent,Vector2 min,Vector2 max,UnityAction action)
-        {
-            var r=Rect(name,parent,min,max,new Vector2(9,7));var im=r.gameObject.AddComponent<Image>();im.color=new Color(UiTheme.Ink.r,UiTheme.Ink.g,UiTheme.Ink.b,.85f);im.raycastTarget=true;
-            var b=r.gameObject.AddComponent<Button>();b.targetGraphic=im;Tint(b);
-            var o=Stroke(r,UiTheme.GoldDim,1,0);
-            var label=Text(name,r,Vector2.zero,Vector2.one,22);
-            label.resizeTextForBestFit=true;label.resizeTextMinSize=13;label.resizeTextMaxSize=22;
-            var focus=r.gameObject.AddComponent<MenuFocus>();focus.Fill=im;focus.Stroke=o;focus.Label=label;
-            var marker=Rect("Focus diamond",r,new Vector2(0,.5f),new Vector2(0,.5f)).gameObject.AddComponent<FocusDiamond>();
-            marker.rectTransform.sizeDelta=new Vector2(10,16);marker.rectTransform.anchoredPosition=new Vector2(18,0);marker.color=UiTheme.GoldBright;marker.raycastTarget=false;focus.Marker=marker.gameObject;
-            var line=Panel("Focus underline",r,new Vector2(.3f,0),new Vector2(.7f,0),UiTheme.Gold);line.rectTransform.pivot=new Vector2(.5f,0);line.rectTransform.sizeDelta=new Vector2(0,2);line.rectTransform.anchoredPosition=new Vector2(0,5);focus.Underline=line.gameObject;
-            b.onClick.AddListener(action);return b;
-        }
         // Edge-only border: four quads, so translucent fills never pick up a gold cast (uGUI Outline redraws the whole quad).
         public static StrokeGraphic Stroke(Transform parent,Color color,float thickness=1,float inset=0)
         {
@@ -252,48 +218,6 @@ namespace LastBell.Menu
             if (Label) Label.color = !live ? new Color(Rest.r, Rest.g, Rest.b, .35f) : on ? UiTheme.GoldBright : Rest;
             if (Strip) { Strip.enabled = on; foreach (var e in Strip.GetComponentsInChildren<Image>(true)) if (e != Strip) e.enabled = on; }
             if (Icon) Icon.color = on ? UiTheme.GoldBright : IconRest;
-        }
-    }
-
-    // Focus cue for the older boxed house button (MenuUI.Button: now only the LAN lobby; the Showcase menu UI and
-    // Hero Selection were removed in the UI clean-up). The main-menu language uses NavFocus; this goes when the lobby
-    // moves to text rows.
-    // A drawn diamond and underline plus warm fill / bright edge, so focus never
-    // relies on colour alone. Optional parts may be null (older callers only set Marker).
-    public sealed class MenuFocus : MonoBehaviour, ISelectHandler, IDeselectHandler, IPointerEnterHandler, IPointerExitHandler
-    {
-        public GameObject Marker, Underline;
-        public Image Fill; public Outline Edge; public Graphic Stroke; public Text Label;
-        public bool Primary;
-        Selectable owner;
-        bool selected, hovered;
-        void Awake() { owner = GetComponent<Selectable>(); }
-        void Start() { Refresh(); }
-        void OnDisable() { hovered = false; }
-        public void OnSelect(BaseEventData data) { selected = true; Refresh(); }
-        public void OnDeselect(BaseEventData data) { selected = false; Refresh(); }
-        public void OnPointerEnter(PointerEventData data) { hovered = true; Refresh(); }
-        public void OnPointerExit(PointerEventData data) { hovered = false; Refresh(); }
-        bool live;
-        void LateUpdate() { bool l = !owner || owner.IsInteractable(); if (l != live) Refresh(); }
-        void Refresh()
-        {
-            live = !owner || owner.IsInteractable();
-            bool on = (selected || hovered) && live;
-            if (Marker) Marker.SetActive(on);
-            if (Underline) Underline.SetActive(on);
-            if (Primary)
-            {
-                if (Fill) Fill.color = !live ? UiTheme.DisabledFill : on ? UiTheme.GoldBright : UiTheme.Gold;
-                if (Edge) Edge.effectColor = on ? UiTheme.Ivory : UiTheme.GoldBright;
-                if (Stroke) Stroke.color = on ? UiTheme.Ivory : UiTheme.GoldBright;
-                if (Label) Label.color = live ? UiTheme.PrimaryInk : UiTheme.DisabledLabel;
-                return;
-            }
-            if (Fill) Fill.color = on ? UiTheme.FocusFill : new Color(UiTheme.Ink.r, UiTheme.Ink.g, UiTheme.Ink.b, .85f);
-            if (Edge) Edge.effectColor = on ? UiTheme.GoldBright : live ? UiTheme.GoldDim : new Color(0, 0, 0, 0);
-            if (Stroke) Stroke.color = on ? UiTheme.GoldBright : live ? UiTheme.GoldDim : new Color(0, 0, 0, 0);
-            if (Label) Label.color = !live ? new Color(UiTheme.Ivory.r, UiTheme.Ivory.g, UiTheme.Ivory.b, .35f) : on ? UiTheme.Ivory : new Color(UiTheme.Ivory.r, UiTheme.Ivory.g, UiTheme.Ivory.b, .82f);
         }
     }
 

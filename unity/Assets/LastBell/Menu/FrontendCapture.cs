@@ -107,6 +107,7 @@ namespace LastBell.Menu
             yield return Until(() => screen.Session && screen.Session.Lobby != null && screen.Session.Lobby.Members.Count >= 2, 10);
             yield return new WaitForSecondsRealtime(1.5f);
             yield return Shot("lan-lobby-host.png");
+            StyleChecks(screen);
             screen.Back(); yield return Frames(4);
             Check("Back opens the leave dialog", screen.LeaveConfirmOpen);
             yield return Shot("lan-leave.png");
@@ -179,6 +180,19 @@ namespace LastBell.Menu
             yield return Press(GamepadButton.South);
             yield return Until(() => FindAnyObjectByType<ConfrontationMenu>(), 20);
             Check("A on Leave returns to the main menu", FindAnyObjectByType<ConfrontationMenu>());
+        }
+
+        // The lobby speaks the main menu's language (UI uniformity plan, section 3).
+        void StyleChecks(LanLobbyScreen screen)
+        {
+            var buttons = screen.GetComponentsInChildren<Button>(true);
+            Check("lobby: every button is a text row or chevron (NavFocus, no boxed fill)", buttons.Length > 10 && buttons.All(b => b.GetComponent<NavFocus>() && (!b.targetGraphic || b.targetGraphic.color.a == 0)));
+            Check("lobby: boss, arena and class choosers use drawn chevrons", new[] { screen.BossNext, screen.ArenaPrev, screen.Slots[0].Next }.All(b => b.GetComponentInChildren<ClassSelectionArrow>(true)));
+            var texts = screen.GetComponentsInChildren<Text>(true);
+            Check("lobby: header eyebrow, Ivory title and 96x2 gold rule", texts.Any(t => t.text == UiTheme.Spaced("LAN Lobby")) && texts.Any(t => t.text == "Lobby" && t.color == UiTheme.Ivory)
+                && screen.GetComponentsInChildren<Image>(true).Any(i => i.name == "Title rule" && i.rectTransform.sizeDelta == new Vector2(UiTheme.RuleWidth, UiTheme.RuleHeight)));
+            Check("lobby: right side gradient", screen.GetComponentsInChildren<Image>(true).Any(i => i.name == "Right contrast gradient" && i.sprite && i.sprite.texture == UiTheme.SideGradient));
+            Check("lobby: no corner ornaments or boxed fields", !screen.GetComponentsInChildren<Transform>(true).Any(t => t.name == "Corner") && screen.GetComponentsInChildren<InputField>(true).All(f => f.targetGraphic && f.targetGraphic.color.a == 0));
         }
 
         // ---------------------------------------------------------------- helpers
