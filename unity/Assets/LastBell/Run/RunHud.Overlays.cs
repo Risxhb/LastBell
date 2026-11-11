@@ -83,9 +83,13 @@ namespace LastBell.Run
         // gradient, mirrored) so it reads as a strip over the arena, not a box, with a 4 px Gold bar on the left.
         internal static void SoftStrip(Rect v, float fade = 220)
         {
+            // the solid part ends exactly where the gradient starts (whole screen pixels, no overlap) and matches its
+            // ~0.985 ink, so no seam shows between them
             float solid = Mathf.Max(0, v.width - fade * 0.57f);
-            UiTheme.Fill(UiTheme.R(v.x, v.y, solid + 1, v.height), A(UiTheme.GradientInk, 0.9f));
-            UiImgui.SideGradient(new Rect(v.x + solid, v.y, fade, v.height), false, 0.9f);
+            var r = UiTheme.R(v.x, v.y, solid, v.height); float x0 = Mathf.Round(r.x), x1 = Mathf.Round(r.xMax);
+            UiTheme.Fill(new Rect(x0, r.y, x1 - x0, r.height), A(UiTheme.GradientInk, 0.9f * 0.985f));
+            var g = UiTheme.R(0, v.y, fade, v.height); var o = GUI.color; GUI.color = new Color(1, 1, 1, 0.9f);
+            GUI.DrawTextureWithTexCoords(new Rect(x1, g.y, g.width, g.height), UiTheme.SideGradient, new Rect(1, 0, -1, 1), true); GUI.color = o;
             UiTheme.Fill(UiTheme.R(v.x, v.y, 4, v.height), UiTheme.Gold);
         }
         string Ellipsize(GUIStyle st, string t, float maxW)
@@ -122,7 +126,7 @@ namespace LastBell.Run
             while (w < 960 && Hv(s.Body, body, w - 2 * pad) > twoLines) w += 40;
             float bh = Mathf.Min(Hv(s.Body, body, w - 2 * pad), twoLines);
             float h = pad + 26 + 38 + 6 + 2 + 14 + bh + 14 + 48 + 8 + 22 + pad - 8;
-            float x = ColumnX(w), y0 = 168, tx = x + pad;
+            float x = ColumnX(w) - 60, y0 = 168, tx = x + pad;
             SoftStrip(new Rect(x, y0, w + 160, h));
             readyFocus.Begin(); if (fresh) readyFocus.Reset(0);
             float y = UiImgui.Header(new Rect(tx, y0 + pad - 4, w - 2 * pad, 0), RunDifficulty.Name(d.Difficulty), head, false, null, ovCardTitle) + 14;
