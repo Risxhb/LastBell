@@ -135,7 +135,8 @@ namespace LastBell.Run
             Check("Sylvara's practice lookup still finds Sylvara (first Verdant Chimes entry)", RunDirector.Bosses[RunDirector.SylvaraPractice].Name.StartsWith("Sylvara"));
             Check("run order unchanged (Vesper Seedkeeper excluded)", !RunDirector.RunOrder.Contains(enc));
             Check("listed in the Minibosses row", LastBell.Menu.TestRushSetup.MinibossRow.Contains(enc) && !LastBell.Menu.TestRushSetup.BossRow.Contains(enc));
-            Check("tutorial entry still last", RunDirector.Bosses[RunDirector.Bosses.Length - 1].Name == RunDirector.TutorialName);
+            // entries were added after the tutorial since (Rivet Cantor, the bonus fight), so only its presence is checked
+            Check("tutorial entry still registered, practice only", RunDirector.TutorialPractice >= 0 && !RunDirector.Bosses[RunDirector.TutorialPractice].InRun);
             float boot = 0; while (RunDirector.Instance == null && boot < 4) { boot += Time.deltaTime; yield return null; }
             if (RunDirector.Instance == null) UnityEngine.SceneManagement.SceneManager.LoadScene(RunMaps.All[map].RunScene);
             float waitMenu = 0; while ((RunDirector.Instance == null || RunDirector.Instance.State != RunState.Menu) && waitMenu < 30) { waitMenu += Time.deltaTime; yield return null; }
