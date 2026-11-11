@@ -23,6 +23,7 @@ namespace LastBell.Menu
         // Allies (bots) row (Chzy18, 24 Oct: every test build lets you pick 0-7 bots): one cycling text row for RunParty.Selected
         public Button AlliesButton {get;private set;}
         Text alliesLabel;RectTransform alliesPrev,alliesNext,content;
+        readonly System.Collections.Generic.List<Text> miniLabels=new System.Collections.Generic.List<Text>();int miniSizedFor=-1;
         public static int MaxPhases{get{int n=1;foreach(var b in RunDirector.Bosses)n=Mathf.Max(n,b.Phases);return n;}}
         public static int PhasesOf(int encounter)=>encounter>=0&&encounter<RunDirector.Bosses.Length?RunDirector.Bosses[encounter].Phases:1;
         // Boss step rows (Risxhb, October 25, 2026): Bosses, then Minibosses, each a row of cards like the arena step.
@@ -166,6 +167,17 @@ namespace LastBell.Menu
             title.SetActive(!BossStep);
             var reason=Incompatibility(MapIndex,EncounterIndex);Valid=reason==null;LaunchButton.interactable=Valid&&!Loading;ContinueButton.interactable=!Loading&&RunMaps.InBuild(MapIndex)&&Preview(MapIndex);
         }
+        // Miniboss names share one size: each fits one line by best fit, then the row takes the smallest (redone when the
+        // window size changes), so a long name never shrinks alone.
+        void UniformMiniNames()
+        {
+            int key=Screen.width*10000+Screen.height;if(key==miniSizedFor||!BossStep||miniLabels.Count==0)return;miniSizedFor=key;
+            foreach(var l in miniLabels){l.resizeTextForBestFit=true;l.resizeTextMaxSize=18;}
+            Canvas.ForceUpdateCanvases();
+            float scale=miniLabels[0].canvas?miniLabels[0].canvas.scaleFactor:1;int size=18;
+            foreach(var l in miniLabels){l.cachedTextGenerator.Populate(l.text,l.GetGenerationSettings(l.rectTransform.rect.size));int used=Mathf.FloorToInt(l.cachedTextGenerator.fontSizeUsedForBestFit/Mathf.Max(.01f,scale));if(used>0)size=Mathf.Min(size,used);}
+            foreach(var l in miniLabels){l.resizeTextMaxSize=Mathf.Max(12,size);}
+        }
         public static string AlliesText(int bots)=>"Bot allies: "+(bots==0?"none":bots.ToString());
         void Update()
         {
@@ -174,6 +186,7 @@ namespace LastBell.Menu
             // Ultrawide (wider than ~1.95:1): keep the cards and footer in a centred 16:9 column; the backdrop stays full width.
             var area=((RectTransform)panelBase.transform).rect;float aspect=area.height>0?area.width/area.height:1.78f,w=aspect>1.95f?1.7778f/aspect:1;
             content.anchorMin=new Vector2((1-w)*.5f,0);content.anchorMax=new Vector2((1+w)*.5f,1);
+            UniformMiniNames();
             if(alliesLabel&&alliesPrev){float x=MenuUI.HalfWidth(alliesLabel)+18;alliesPrev.anchoredPosition=new Vector2(-x,0);alliesNext.anchoredPosition=new Vector2(x,0);}
             // No still image: a dark panel until the live showcase starts, then only the orbiting arena shows.
             panelBase.color=new Color(UiTheme.Backdrop.r,UiTheme.Backdrop.g,UiTheme.Backdrop.b,stillAlpha);
@@ -302,7 +315,7 @@ namespace LastBell.Menu
                 MenuUI.Text((slot+1).ToString("00"),inner,new Vector2(.04f,.62f),new Vector2(.3f,.96f),12,MenuUI.Gold,TextAnchor.MiddleLeft);
                 // one line, one size across the row: the name runs under the portrait over the left and bottom shades
                 if(portrait){var low=MenuUI.Rect("Name floor",inner,Vector2.zero,new Vector2(1,.7f)).gameObject.AddComponent<RawImage>();low.texture=cardFade;low.raycastTarget=false;}
-                label=MenuUI.Text("",inner,new Vector2(.04f,.04f),new Vector2(.97f,.6f),18,MenuUI.Ivory,TextAnchor.LowerLeft);label.resizeTextMaxSize=18;
+                label=MenuUI.Text("",inner,new Vector2(.04f,.05f),new Vector2(.97f,.42f),18,MenuUI.Ivory,TextAnchor.LowerLeft);label.resizeTextMaxSize=18;miniLabels.Add(label);
             }
             else
             {
@@ -312,7 +325,7 @@ namespace LastBell.Menu
                 label.resizeTextMaxSize=portrait?22:26;
             }
             // best fit wraps before it shrinks: long boss names take two lines at full size, mini names stay one line
-            label.resizeTextForBestFit=true;label.resizeTextMinSize=mini?14:16;label.lineSpacing=.95f;f.CardLabel=label;Shadow(label,.9f);
+            label.resizeTextForBestFit=true;label.resizeTextMinSize=mini?12:16;label.lineSpacing=.95f;f.CardLabel=label;Shadow(label,.9f);
             var accent=MenuUI.Panel("Chosen accent",inner,Vector2.zero,new Vector2(1,0),MenuUI.Gold);accent.rectTransform.sizeDelta=new Vector2(0,mini?3:4);accent.rectTransform.pivot=new Vector2(.5f,0);f.Accent=accent;
             return b;
         }
@@ -337,8 +350,9 @@ namespace LastBell.Menu
         // Footer actions use the main menu's entries: transparent hit area, Ivory label (first Text child) and the gold
         // highlight strip on focus. The step's primary action (Continue / Launch) is larger, like Start Run.
         static Button NavButton(string name,Transform parent,Vector2 min,Vector2 max,UnityEngine.Events.UnityAction action,int size)=>MenuUI.Row(name,parent,min,max,action,size,Vector2.zero);
-        Button TextButton(string name,Transform parent,Vector2 min,Vector2 max,UnityEngine.Events.UnityAction action)=>NavButton(name,parent,min,max,action,24);
-        Button PrimaryButton(string name,Transform parent,Vector2 min,Vector2 max,UnityEngine.Events.UnityAction action)=>NavButton(name,parent,min,max,action,28);
+        // Back sits on the footer's left edge and the main action on its right edge, like Settings and the LAN lobby.
+        Button TextButton(string name,Transform parent,Vector2 min,Vector2 max,UnityEngine.Events.UnityAction action){var b=NavButton(name,parent,min,max,action,24);b.GetComponentInChildren<Text>().alignment=TextAnchor.MiddleLeft;return b;}
+        Button PrimaryButton(string name,Transform parent,Vector2 min,Vector2 max,UnityEngine.Events.UnityAction action){var b=NavButton(name,parent,min,max,action,28);b.GetComponentInChildren<Text>().alignment=TextAnchor.MiddleRight;return b;}
         // Explicit grid navigation keeps keyboard/controller focus inside this panel and predictable between rows.
         static void Link(params Button[][] rows)=>MenuUI.LinkGrid(System.Array.ConvertAll(rows,r=>(Selectable[])r));
     }

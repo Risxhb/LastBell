@@ -65,7 +65,7 @@ namespace LastBell.Menu
         // text rows with the highlight strip, drawn chevrons, underline input fields and centre-band dialogs.
         Canvas canvas; RectTransform root, frame; GameObject connectPage, lobbyPage, nameCard, leaveConfirm;
         InputField address, port, nameField; Text status, playingAs, nameError, notice, bossName, arenaName, hint, hostAddress, leaveBody, editNameLabel;
-        Header header; Chooser bossChooser, arenaChooser;
+        Header header; Chooser bossChooser, arenaChooser; CanvasGroup frameGroup;
         public Button HostButton, JoinButton, EditNameButton, ConfirmNameButton, ReadyButton, StartButton, BackButton, BossPrev, BossNext, ArenaPrev, ArenaNext, LeaveButton, StayButton;
         RawImage arenaArt;
         public sealed class Slot
@@ -102,7 +102,7 @@ namespace LastBell.Menu
             MenuUI.Panel("Backdrop", root, Vector2.zero, Vector2.one, UiTheme.Backdrop);
             MenuUI.SideGradient(root, new Vector2(.42f, 0), Vector2.one);
             // One content frame for everything but the backdrop: ultrawide narrows it to a centred 16:9 frame (Update).
-            frame = MenuUI.Rect("Content", root, Vector2.zero, Vector2.one);
+            frame = MenuUI.Rect("Content", root, Vector2.zero, Vector2.one); frameGroup = frame.gameObject.AddComponent<CanvasGroup>();
             header = MenuUI.Header(frame, "LAN Multiplayer", "Host or Join", new Vector2(.04f, .835f), new Vector2(.6f, .955f));
             playingAs = MenuUI.Text("", frame, new Vector2(.6f, .905f), new Vector2(.96f, .955f), UiTheme.SizeBody, UiTheme.IvoryMuted, TextAnchor.MiddleRight);
             status = MenuUI.Text("", frame, new Vector2(.04f, .16f), new Vector2(.96f, .2f), 19, UiTheme.IvoryBody);
@@ -196,14 +196,17 @@ namespace LastBell.Menu
             hostAddress = MenuUI.Text("", t, new Vector2(.04f, .775f), new Vector2(.6f, .825f), 18, UiTheme.IvoryMuted, TextAnchor.MiddleLeft);
             // Boss (left) and arena (right): the host's choosers; clients see the same values without chevrons.
             MenuUI.Text(UiTheme.Spaced("Boss"), t, new Vector2(.04f, .735f), new Vector2(.47f, .765f), 14, UiTheme.GoldLabel, TextAnchor.MiddleLeft);
+            // left-aligned choosers under their eyebrows: the value label starts after the previous chevron and the next
+            // chevron follows the rendered text (PlaceChooser, every frame)
             var bossBox = MenuUI.Rect("Boss chooser", t, new Vector2(.04f, .675f), new Vector2(.47f, .735f));
             bossChooser = MenuUI.Chooser(bossBox, "", Vector2.zero, Vector2.one, 26, () => CycleBoss(-1), () => CycleBoss(1));
             bossName = bossChooser.Label; BossPrev = bossChooser.Previous; BossNext = bossChooser.Next;
             MenuUI.Text(UiTheme.Spaced("Arena"), t, new Vector2(.53f, .735f), new Vector2(.96f, .765f), 14, UiTheme.GoldLabel, TextAnchor.MiddleLeft);
-            arenaArt = MenuUI.Rect("Arena preview", t, new Vector2(.53f, .678f), new Vector2(.585f, .732f)).gameObject.AddComponent<RawImage>(); arenaArt.raycastTarget = false;
-            var arenaBox = MenuUI.Rect("Arena chooser", t, new Vector2(.59f, .675f), new Vector2(.96f, .735f));
+            arenaArt = MenuUI.Rect("Arena preview", t, new Vector2(.535f, .678f), new Vector2(.59f, .732f)).gameObject.AddComponent<RawImage>(); arenaArt.raycastTarget = false;
+            var arenaBox = MenuUI.Rect("Arena chooser", t, new Vector2(.595f, .675f), new Vector2(.96f, .735f));
             arenaChooser = MenuUI.Chooser(arenaBox, "", Vector2.zero, Vector2.one, 26, () => CycleArena(-1), () => CycleArena(1));
             arenaName = arenaChooser.Label; ArenaPrev = arenaChooser.Previous; ArenaNext = arenaChooser.Next;
+            foreach (var label in new[] { bossName, arenaName }) { label.alignment = TextAnchor.MiddleLeft; label.rectTransform.offsetMin = new Vector2(44, 3); label.rectTransform.offsetMax = new Vector2(-44, -3); }
             notice = MenuUI.Text("", t, new Vector2(.04f, .638f), new Vector2(.96f, .672f), 18, UiTheme.GoldBright);
             for (int i = 0; i < Slots.Length; i++) Slots[i] = BuildSlot(i, t);
             ReadyButton = MenuUI.Row("Ready", t, new Vector2(.41f, .035f), new Vector2(.59f, .105f), ToggleReady, 24, Vector2.zero);
@@ -219,9 +222,10 @@ namespace LastBell.Menu
             float x = left + i * (width + gap);
             var s = new Slot();
             s.Fill = MenuUI.Panel("Player slot " + (i + 1), t, new Vector2(x, .2f), new Vector2(x + width, .625f), new Color(0, 0, 0, .35f));
-            s.Card = s.Fill.rectTransform; s.Edge = MenuUI.Stroke(s.Card, UiTheme.RuleFaint, 1);
+            s.Card = s.Fill.rectTransform; s.Edge = MenuUI.Stroke(s.Card, UiTheme.RuleFaint, 1.5f);   // 1.5: a 1 px edge drops out at odd scales
             var accent = MenuUI.Panel("Your accent", s.Card, Vector2.zero, new Vector2(1, 0), UiTheme.Gold); accent.rectTransform.pivot = new Vector2(.5f, 0); accent.rectTransform.sizeDelta = new Vector2(0, 4);
-            s.Art = MenuUI.Rect("Class model", s.Card, new Vector2(.04f, .30f), new Vector2(.96f, .97f)).gameObject.AddComponent<RawImage>(); s.Art.raycastTarget = false;
+            var holder = MenuUI.Rect("Class model frame", s.Card, new Vector2(.04f, .30f), new Vector2(.96f, .88f));   // the fitter fills this, not the card
+            s.Art = MenuUI.Rect("Class model", holder, Vector2.zero, Vector2.one).gameObject.AddComponent<RawImage>(); s.Art.raycastTarget = false;
             var fit = s.Art.gameObject.AddComponent<AspectRatioFitter>(); fit.aspectMode = AspectRatioFitter.AspectMode.FitInParent; fit.aspectRatio = 512f / 560;   // never stretch the model
             MenuUI.Text((i + 1).ToString("00"), s.Card, new Vector2(.04f, .9f), new Vector2(.4f, .98f), 14, UiTheme.Gold, TextAnchor.MiddleLeft);
             s.HostTag = MenuUI.Text(UiTheme.Spaced("Host"), s.Card, new Vector2(.5f, .9f), new Vector2(.96f, .98f), 13, UiTheme.GoldBright, TextAnchor.MiddleRight);
@@ -410,7 +414,7 @@ namespace LastBell.Menu
         }
 
         // ------------------------------------------------------------------ per frame
-        bool stickHeld; int artMap = -2; Texture2D artTexture;
+        bool stickHeld, stickYHeld; int artMap = -2; Texture2D artTexture;
         void Update()
         {
             if (!canvas) return;
@@ -419,13 +423,38 @@ namespace LastBell.Menu
             // Ultrawide (wider than ~1.95:1): the content keeps a centred 16:9 frame; backdrop and gradient stay full width.
             var area = root.rect; float aspect = area.height > 0 ? area.width / area.height : 1.78f, w = aspect > 1.95f ? 1.7778f / aspect : 1;
             frame.anchorMin = new Vector2((1 - w) * .5f, 0); frame.anchorMax = new Vector2((1 + w) * .5f, 1);
-            bossChooser?.Place(); arenaChooser?.Place();
+            PlaceChooser(bossChooser); PlaceChooser(arenaChooser);
+            // a dialog fades the page behind it, so its rows never read as part of the dialog
+            float page = NameCardOpen || LeaveConfirmOpen ? .18f : 1; if (frameGroup.alpha != page) frameGroup.alpha = page;
+            // status: under the column on the connect page, centred over the footer in the lobby
+            var sr = status.rectTransform; var want = Current == Page.Lobby ? new Vector2(.04f, .16f) : new Vector2(.6f, .16f);
+            if (sr.anchorMin != want) { sr.anchorMin = want; status.alignment = Current == Page.Lobby ? TextAnchor.MiddleCenter : TextAnchor.MiddleLeft; }
+        }
+        static void PlaceChooser(Chooser c)
+        {
+            if (c == null || !c.Label) return;
+            var prev = (RectTransform)c.Previous.transform; var next = (RectTransform)c.Next.transform;
+            prev.anchorMin = prev.anchorMax = new Vector2(0, .5f); prev.anchoredPosition = new Vector2(20, 0);
+            float w = Mathf.Min(c.Label.preferredWidth, c.Label.rectTransform.rect.width);
+            next.anchorMin = next.anchorMax = new Vector2(0, .5f); next.anchoredPosition = new Vector2(44 + w + 22, 0);
         }
         static bool Pressed(Func<Keyboard, bool> k, Func<Gamepad, bool> g) => (Keyboard.current != null && k(Keyboard.current)) || (Gamepad.current != null && g(Gamepad.current));
         void HandleInput()
         {
             bool typing = EventSystem.current && EventSystem.current.currentSelectedGameObject && EventSystem.current.currentSelectedGameObject.GetComponent<InputField>();
             if (Pressed(k => k.escapeKey.wasPressedThisFrame, g => g.buttonEast.wasPressedThisFrame)) { Back(); return; }
+            // A focused input field swallows uGUI navigation, so a gamepad could never leave it. Up/Down (dpad, stick or
+            // arrows; a single-line field has no use for them) step out along the field's own navigation links.
+            if (typing)
+            {
+                var field = EventSystem.current.currentSelectedGameObject.GetComponent<InputField>();
+                float sy = Gamepad.current != null ? Gamepad.current.leftStick.y.ReadValue() : 0; int step = 0;
+                if (Mathf.Abs(sy) > .6f) { if (!stickYHeld) step = sy > 0 ? 1 : -1; stickYHeld = true; } else if (Mathf.Abs(sy) < .3f) stickYHeld = false;
+                if (Pressed(k => k.upArrowKey.wasPressedThisFrame, g => g.dpad.up.wasPressedThisFrame)) step = 1;
+                if (Pressed(k => k.downArrowKey.wasPressedThisFrame, g => g.dpad.down.wasPressedThisFrame)) step = -1;
+                var to = step > 0 ? field.navigation.selectOnUp : step < 0 ? field.navigation.selectOnDown : null;
+                if (field.isFocused && to && to.IsInteractable()) { field.DeactivateInputField(); Focus(to); return; }   // only while editing: otherwise uGUI moves itself
+            }
             if (NameCardOpen) { if (Pressed(k => k.enterKey.wasPressedThisFrame || k.numpadEnterKey.wasPressedThisFrame, g => false)) ConfirmName(); return; }
             if (LeaveConfirmOpen || typing || Current != Page.Lobby || Lobby == null || session.Loading) return;
             float sx = Gamepad.current != null ? Gamepad.current.leftStick.x.ReadValue() : 0; int stick = 0;
@@ -494,7 +523,7 @@ namespace LastBell.Menu
                 s.Tag.color = m != null && m.Ready ? UiTheme.GoldBright : UiTheme.IvoryMicro;
                 s.Prev.gameObject.SetActive(mine); s.Next.gameObject.SetActive(mine);
                 s.Prev.interactable = s.Next.interactable = mine && !lobby.LocalReady && !loading;
-                float edge = mine ? 2 : 1;
+                float edge = mine ? 2 : 1.5f;
                 if (s.Edge && s.Edge.Thickness != edge) { s.Edge.color = mine ? UiTheme.GoldBright : UiTheme.RuleFaint; s.Edge.Thickness = edge; s.Edge.SetVerticesDirty(); }
                 var accent = s.Card.Find("Your accent"); if (accent && accent.gameObject.activeSelf != mine) accent.gameObject.SetActive(mine);
             }
