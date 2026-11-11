@@ -134,7 +134,9 @@ namespace LastBell.Run
             Check("not in the run order", !RunDirector.RunOrder.Contains(enc));
             Check("listed in the Minibosses row", LastBell.Menu.TestRushSetup.MinibossRow.Contains(enc) && !LastBell.Menu.TestRushSetup.BossRow.Contains(enc));
             Check("card name is 'Escapement Twins'", LastBell.Menu.TestRushSetup.CardName(enc) == "Escapement Twins");
-            Check("the tutorial is still the last entry", RunDirector.TutorialPractice == RunDirector.Bosses.Length - 1);
+            // entries are looked up by name, never by index; the integration added Rivet Cantor and the campaign bonus after the
+            // tutorial (9 Nov), so only check the tutorial is still there and practice only
+            Check("the tutorial entry is still registered, practice only", RunDirector.TutorialPractice >= 0 && !RunDirector.Bosses[RunDirector.TutorialPractice].InRun);
             Check("rotation: four abilities in each phase",
                 EscapementTwinsEncounter.Rotation(false).Distinct().Count() == 4 && EscapementTwinsEncounter.Rotation(true).Distinct().Count() == 4);
 
