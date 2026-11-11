@@ -108,6 +108,7 @@ namespace LastBell.Run.Networking
             hud = director.GetComponent<RunHud>();
             RunHud.LanClientView = true;
             RunHud.LanLeave = () => { if (LanSessionCoordinator.Instance) LanSessionCoordinator.Instance.Leave(); };
+            RunPartyCards.NameOf = p => { foreach (var a in actors) if (a.Value.Player == p) return NameOf(a.Key); return null; };   // party cards
             if (hud) hud.enabled = true;
             fxReplay = new LanFxReplay(playerFx, fx, id => actors.TryGetValue(id, out var a) ? a.Player : null, () => boss) { Replica = PlayReplica };
             hazardView = new LanHazardView(fx); localInput = new KeyboardMouseInput(); KeyboardMouseInput.Blocked = false;
@@ -321,19 +322,26 @@ namespace LastBell.Run.Networking
             cam.orthographic = false; cam.transform.position = Vector3.Lerp(cam.transform.position, target + offset, 1 - Mathf.Exp(-Time.deltaTime * 12));
             cam.transform.rotation = Quaternion.LookRotation(-offset + Vector3.up); cam.fieldOfView = 44;
         }
-        GUIStyle nameStyle;
+        GUIStyle nameStyle, leaveStyle; int styleHeight = -1;
         void OnGUI()
         {
-            // RunHud draws the fight; this adds Leave and a name over each other player.
-            if (GUI.Button(new Rect(Screen.width - 150, 20, 130, 35), "Leave session")) { if (LanSessionCoordinator.Instance) LanSessionCoordinator.Instance.Leave(); return; }
+            // RunHud draws the fight; this adds Leave and a name over each other player. Leave is a main-menu text row (RestLabel,
+            // GoldBright over the highlight strip on hover) in the top-right corner, clear of the boss bar.
+            if (styleHeight != Screen.height || nameStyle == null)
+            {
+                styleHeight = Screen.height;
+                nameStyle = UiTheme.Style(UiTheme.SizeLabel + 1, true, TextAnchor.LowerCenter, UiTheme.Ivory);
+                leaveStyle = UiTheme.Style(UiTheme.SizeNumeric + 3, true, TextAnchor.MiddleCenter, UiTheme.Ivory);
+            }
+            float vw = UiTheme.VirtualWidth, right = vw - Mathf.Max(0, (vw - 1920) / 2) - UiTheme.G4;
+            if (UiImgui.Row(new Rect(right - 180, UiTheme.G2, 180, 36), "Leave session", leaveStyle)) { if (LanSessionCoordinator.Instance) LanSessionCoordinator.Instance.Leave(); return; }
             if (current == null || lobby == null || !cam) return;
-            if (nameStyle == null) nameStyle = new GUIStyle(GUI.skin.label) { alignment = TextAnchor.LowerCenter, fontSize = 14, normal = { textColor = new Color(0.95f, 0.92f, 0.82f) } };
             foreach (var pair in actors)
             {
                 if (pair.Key == lobby.LocalId) continue;
                 var point = cam.WorldToScreenPoint(pair.Value.Player.transform.position + Vector3.up * (2.3f + pair.Value.ShownHeight));
                 if (point.z <= 0) continue;
-                GUI.Label(new Rect(point.x - 90, Screen.height - point.y - 24, 180, 24), NameOf(pair.Key), nameStyle);
+                UiTheme.Label(new Rect(point.x - UiTheme.V(90), Screen.height - point.y - UiTheme.V(24), UiTheme.V(180), UiTheme.V(24)), NameOf(pair.Key), nameStyle);
             }
         }
         // ---------------- hostile bullets ----------------
@@ -464,7 +472,7 @@ namespace LastBell.Run.Networking
         void OnDestroy()
         {
             if (lobby != null) lobby.WorldReceived -= Receive;
-            RunHud.LanClientView = false; RunHud.LanLeave = null; BossEncounter.NetIdOf = null; BossEncounter.NetPlayerOf = null;
+            RunHud.LanClientView = false; RunHud.LanLeave = null; RunPartyCards.NameOf = null; BossEncounter.NetIdOf = null; BossEncounter.NetPlayerOf = null;
             if (director) director.DetachLanReplica();
             hazardView?.Clear();
             try { ClearProps(); ClearMirrors(); } catch (Exception ex) { Debug.Log("[LAN] client cleanup: " + ex.Message); }
