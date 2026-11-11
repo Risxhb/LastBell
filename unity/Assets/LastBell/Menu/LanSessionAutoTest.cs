@@ -203,7 +203,8 @@ namespace LastBell.Menu
                 case RivetCantorEncounter r: return r.ReplicaNumeralsShown;
                 case SylvaraEncounter sy: return sy.NetRoots + sy.NetColourRingsMax;
                 case BellkeeperEncounter bk: return bk.ReplicaLookFrames;
-                case EscapementTwinsEncounter et: return et.NetTockSynced>0 && (et.TockPresenter==null || !et.TockPresenter.HasModel || et.NetTockClips>0) ? et.NetTockSynced : 0;   // with the rigged Tock, its clip must arrive too
+                case EscapementTwinsEncounter et: return et.NetTockSynced>0 && (et.TockPresenter==null || !et.TockPresenter.HasModel || et.NetTockClips>0)
+                    && (!EscapementTwinsProps.Has(EscapementTwinsProps.Sun) || et.NetMarkModelsMade>0) ? et.NetTockSynced : 0;   // with the rigged Tock, its clip must arrive too; with the marker models, the client must build them
                 case BriarMetronomeEncounter bm: return bm.NetNumeralViews + bm.NetHedgesMade;
                 case CrucivarEncounter cv: return cv.NetMissed>0 ? 0 : cv.NetEffects;
                 default: return -1;

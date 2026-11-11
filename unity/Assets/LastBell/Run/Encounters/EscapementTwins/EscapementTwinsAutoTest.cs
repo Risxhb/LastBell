@@ -267,10 +267,25 @@ namespace LastBell.Run
             while (!(boss.Current == "between blocks" || boss.Current == "turning") && !boss.Dead && t < timeout)
             {
                 t += Time.deltaTime; Keep(); CountDowns();
-                if (!shot && d.World.Hazards.Count > 0 && d.World.Hazards.Live.Any(h => h.Age > h.ResolveAt / 2)) { shot = true; yield return Snap($"{(boss.Phase2 ? "p2" : "p1")}_{name}_{d.World.Players.Count}p"); }
+                if (!shot && d.World.Hazards.Count > 0 && d.World.Hazards.Live.Any(h => h.Age > h.ResolveAt / 2)) { shot = true; yield return Snap($"{(boss.Phase2 ? "p2" : "p1")}_{name}_{d.World.Players.Count}p"); PropFrames(name); }
                 yield return null;
             }
             if (t >= timeout) Check(atk + " ends", false, $"timed out after {timeout}s, at '{boss.Current}'");
+        }
+        // in-game frames of the art-pass props (9 Nov): the gameplay camera (RunDirector.FollowOffset) and a close camera on a
+        // marked player (Pallet Lock) or on a Counterpoise weight, once per party size and phase
+        readonly HashSet<string> propShots = new HashSet<string>();
+        void PropFrames(string atk)
+        {
+            if (atk != EscapementTwinsEncounter.Pallet && atk != EscapementTwinsEncounter.Counter) return;
+            string tag = $"{(boss.Phase2 ? "p2" : "p1")}_{atk}_{d.World.Players.Count}p";
+            if (!propShots.Add(tag)) return;
+            var props = FindObjectsByType<EscapementPropFacing>(FindObjectsSortMode.None);
+            Vector3 focus = d.Player.transform.position;
+            if (atk == EscapementTwinsEncounter.Counter && props.Length > 0) focus = Sim.Flat(props[0].transform.position);
+            else if (atk == EscapementTwinsEncounter.Pallet) foreach (var pl in d.World.Players) if (boss.MarkOf(pl) >= 0) { focus = pl.transform.position; break; }
+            RenderShot($"props_{tag}_game", focus + new Vector3(0, 13f, 9.7f), focus + Vector3.up, 44);
+            RenderShot($"props_{tag}_close", focus + new Vector3(0, 3f, 8f), focus + Vector3.up * 2.4f, 40);
         }
         List<string> SpawnedInBlock() { var l = new List<string>(); for (int i = 0; i < spawned.Count; i++) if (spawnTick[i] >= blockStart) l.Add(spawned[i]); return l; }
         readonly HashSet<PlayerController> wasDown = new HashSet<PlayerController>();
@@ -279,6 +294,8 @@ namespace LastBell.Run
         IEnumerator AbilityChecks(string atk, int n, bool full)
         {
             bool p2 = boss.Phase2; string ph = p2 ? "P2" : "P1";
+            // the model counters are read before the block starts: its first markers / weights spawn on the tick it starts
+            int markModels = boss.MarkModelsMade, weightModels = boss.WeightModelsMade;
             int t0 = 0, locks = 0, swaps = 0, vol = 0, soaks = 0, empty = 0, punish = 0, lockLog = 0, volLog = 0, soakLog = 0;
             yield return Block(atk, () =>
             {
@@ -299,6 +316,9 @@ namespace LastBell.Run
                         log.Count == want && log[0].brass == R.BrassCount(n) && log[0].cobalt == n - R.BrassCount(n) && (want < 2 || log[1].brass == log[0].cobalt),
                         string.Join("; ", log.Select(l => $"lock {l.lockNo}: {l.brass}/{l.cobalt}")));
                     Check($"{n}p {ph} Pallet Lock: markers removed afterwards", boss.MarkedCount == 0);
+                    bool haveMarks = EscapementTwinsProps.Has(EscapementTwinsProps.Sun) && EscapementTwinsProps.Has(EscapementTwinsProps.Moon);
+                    Check($"{n}p {ph} Pallet Lock: {(haveMarks ? "sun / moon marker models" : "sphere stand-ins (no marker models in this build)")} over every mark, rebuilt on each flip",
+                        haveMarks ? boss.MarkModelsMade - markModels >= n * want : boss.MarkModelsMade == markModels, $"{boss.MarkModelsMade - markModels} models for {n} players x {want} locks");
                     Note($"Pallet Lock hits on the bots: {HitsSince(t0, "Pallet Lock")}");
                     break;
                 }
@@ -318,6 +338,9 @@ namespace LastBell.Run
                     Check($"{n}p {ph} Counterpoise: {circles} circle(s) resolve, none empty (no wipe)", boss.SoaksResolved - soaks == circles && boss.SoakEmpty == empty,
                         string.Join("; ", log.Select(l => $"set {l.set} need {l.need} got {l.inside}")));
                     Check($"{n}p {ph} Counterpoise: every circle soaked by at least its numeral", log.All(l => l.inside >= l.need));
+                    bool haveWeight = EscapementTwinsProps.Has(EscapementTwinsProps.Weight);
+                    Check($"{n}p {ph} Counterpoise: {(haveWeight ? "a numeral weight model" : "a TextMesh stand-in (no weight model)")} over every circle",
+                        haveWeight ? boss.WeightModelsMade - weightModels == circles : boss.WeightModelsMade == weightModels, $"{boss.WeightModelsMade - weightModels} weights for {circles} circles");
                     break;
                 }
                 default:
