@@ -21,15 +21,23 @@ namespace LastBell.Run
     //   Rink Lap        the band from 8.5 m to the wall, then a full lap (45 to anyone it passes there), then Pirouette: a 6 m
     //                   circle at the centre (50). Then dizzy 3.5 s: the major punish window, every cast.
     //
-    // 50%: it finishes the current attack, then a harmless 2 s reheat (damageable, no heal). No enrage. Placeholder look only:
-    // code-built primitives, no model, clips or audio. Every warning wears the raid style (HazardSystem.RaidStyle, Brass
+    // 50%: it finishes the current attack, then a harmless 2 s reheat (damageable, no heal). No enrage. Look (9 Nov art pass):
+    // the rigged CrucibleSkater model (20 clips) and the CrucibleLadle prop, each with its labelled primitive stand-in as the
+    // fallback when the model is missing. No audio of its own. Every warning wears the raid style (HazardSystem.RaidStyle, Brass
     // Foundry motif). PhaseName and Lesson stay empty; names live in Current / BlockLog for tests and diagnostics.
     public sealed class CrucibleSkaterEncounter : BossEncounter
     {
         public override string Id => "boss.crucible-skater";
         public override string DisplayName => "The Crucible Skater";
         public override string Lesson => "";
-        public override bool Placeholder => true;
+        public override bool Placeholder => !presenter || !presenter.HasModel;
+        CharacterPresenter presenter; BossClipCues cues; public CharacterPresenter Presenter => presenter;
+        public BossClipCues Cues => cues;
+        public static readonly string[] ClipNames = { "Idle", "Walk", "CarveTrack", "CarveCrouch", "CarveLoop", "CarveTurn", "CheckWindup", "CheckLoop",
+            "ChargeLoop", "Trip", "StuckLoop", "TossRaise", "TossLoop", "TossFlick", "LapLoopL", "LapLoopR", "PirouetteLoop", "DizzyLoop", "Reheat", "Defeat" };
+        void Clip(string name, int ticks) => cues?.Play(name, Mathf.Max(1, ticks));
+        void Loop(string name) { if (cues != null) cues.Loop = name; }
+        Vector3 lastPos; bool moving;
         public override float NextPhaseFraction() => 0.49f;
         public const int Motif = 3;   // Telegraph-Style v2 area motif: Brass Foundry
         public const int MaxHpMedium = 8400;   // doubled after review (3 Nov); solo base, scaled for the party below
@@ -71,7 +79,7 @@ namespace LastBell.Run
         System.Random rng;
         readonly List<PlayerController> marked = new List<PlayerController>();
 
-        // look (placeholder)
+        // look: the model (or the stand-in) sits under `spinner`, which the code spins and wobbles
         Transform body, spinner, bowl; Renderer core;
         float spin, spinRate, wobble;
 
@@ -94,13 +102,20 @@ namespace LastBell.Run
             transform.position = p;
         }
 
-        // ---------------- placeholder body ----------------
+        // ---------------- body: the rigged model, else the labelled stand-in ----------------
         protected override void Build()
         {
             PhaseName = "";
             R.Bound = CombatWorld.PlayerBound;
-            body = new GameObject("Crucible Skater (STAND-IN placeholder)").transform; body.SetParent(transform, false);
+            body = new GameObject("Crucible Skater").transform; body.SetParent(transform, false);
             spinner = new GameObject("Spinner").transform; spinner.SetParent(body, false);
+            presenter = CharacterPresenter.Create(spinner, "CrucibleSkater", 1.5f, 1f, 0, host => { BuildStandIn(host); return host; });
+            cues = new BossClipCues(presenter);
+            if (!presenter.HasModel) body.name = "Crucible Skater (STAND-IN placeholder)";
+            lastPos = transform.position;
+        }
+        void BuildStandIn(Transform spinner)
+        {
             Prim.Make(PrimitiveKind.Capsule, spinner, new Vector3(0, 0.95f, 0), new Vector3(0.62f, 0.6f, 0.5f), Brass).name = "Body (stand-in)";
             Prim.Make(PrimitiveKind.Sphere, spinner, new Vector3(0, 1.55f, 0.08f), new Vector3(0.42f, 0.42f, 0.36f), Ivory).name = "Mask (stand-in)";
             bowl = Prim.Make(PrimitiveKind.Cylinder, spinner, new Vector3(0, 1.88f, 0), new Vector3(0.62f, 0.12f, 0.62f), Brass);
@@ -141,7 +156,7 @@ namespace LastBell.Run
                 };
                 foreach (var w in steps) yield return w;
                 ClearMarks();
-                Current = "between blocks"; Stuck = false; Dizzy = false; spinRate = 0;
+                Current = "between blocks"; Stuck = false; Dizzy = false; spinRate = 0; Loop("Idle");
                 yield return R.Ticks(R.GapSeconds);
             }
         }
@@ -149,6 +164,9 @@ namespace LastBell.Run
         protected override void StepAlways()
         {
             StepLadles();
+            // the skating loop whenever it travels while nothing else is held (WalkTo, between moves)
+            var p = transform.position; moving = Sim.Flat(p - lastPos).magnitude * Sim.Hz > 2f; lastPos = p;
+            if (!Dead) cues?.Step(moving && cues.Loop == "Idle");
             if (!Phase2 && !GatePending && Hp * 2 <= MaxHp) GatePending = true;
         }
 
@@ -206,7 +224,10 @@ namespace LastBell.Run
                     arriveT[k] = startT[k] >= Never ? Never : startT[k] + Mathf.Max(4, Mathf.CeilToInt(Sim.Flat(stop[k] - from[k]).magnitude / R.SkateSpeed * Sim.Hz));
                     if (arriveT[k] < Never) h.ResolveAt = Mathf.Max(h.Age + 1, arriveT[k] + 1 - spawnT[k]);
                 }
-                if (t == 0) { Windup(0.2f); }
+                if (t == 0) { Windup(0.2f); Clip("CarveTrack", track); Loop("CarveTrack"); }
+                // face the first lane while it tracks (presentation; every leg sets its own facing when it starts)
+                if (t < lockT[0] && lanes[0] != null) transform.rotation = Quaternion.Euler(0, lanes[0].Yaw, 0);
+                if (t == lockT[0]) { Clip("CarveCrouch", crouch); Loop("CarveLoop"); }
                 // skating
                 if (t >= startT[cur])
                 {
@@ -226,6 +247,7 @@ namespace LastBell.Run
                         Wake(lanes[cur]);
                         Trail("Carve trail", from[cur], stop[cur], trailLife);
                         W.BossFx.ChargeLand(transform.position); CameraShake.Shake(0.08f, 0.12f); Release(0.6f);
+                        Clip("CarveTurn", R.Ticks(0.35f));
                         cur++;
                     }
                 }
@@ -233,7 +255,7 @@ namespace LastBell.Run
                 yield return 1;
             }
             W.BossFx.ChargeTrail(transform, false);
-            ClearMarks();
+            ClearMarks(); Loop("Idle");
             if (Hard) foreach (var w in Retrace(from, stop, trailLife)) yield return w;
             Current = "Figure Carve (recovery)";
             yield return R.Ticks(0.4f);
@@ -259,7 +281,7 @@ namespace LastBell.Run
                 });
                 lanes.Add((h, at, at + dur)); at += dur;
             }
-            W.BossFx.ChargeTrail(transform, true);
+            W.BossFx.ChargeTrail(transform, true); Loop("CarveLoop");
             for (int t = 0; t < at; t++)
             {
                 foreach (var (h, s, e) in lanes)
@@ -272,7 +294,7 @@ namespace LastBell.Run
                 }
                 yield return 1;
             }
-            W.BossFx.ChargeTrail(transform, false);
+            W.BossFx.ChargeTrail(transform, false); Loop("Idle"); Clip("CarveTurn", R.Ticks(0.35f));
             W.BossFx.ChargeLand(transform.position);
         }
 
@@ -353,6 +375,7 @@ namespace LastBell.Run
                 Spawn(ring); if (ring.Tele != null) { ring.Tele.Friendly(BlockRim); ring.Tele.Order = 2; }
                 Spawn(lane);
                 Numeral.Show(W, ring, need.ToString(), 2.4f);
+                Clip("CheckWindup", R.Ticks(0.8f)); Loop("CheckLoop");
                 for (int t = 0; t <= res + 1; t++) { Aim(); Windup(t / (float)res); yield return 1; }
                 quarry.Marks.Remove(MechanicIcons.CarriedMark); marked.Remove(quarry);
                 CheckLog.Add((Tick, quarry, blocked, blockers, share));
@@ -360,9 +383,10 @@ namespace LastBell.Run
                 {
                     // tripped: stuck in front of the blockers, the bonus punish window
                     Trips++; Current = "Body Check (tripped)"; Stuck = true; wobble = 1;
+                    Clip("Trip", R.Ticks(0.6f)); Loop("StuckLoop");
                     W.BossFx.ChargeLand(ring.Origin); CameraShake.Shake(0.14f, 0.2f); Release(1.2f);
                     int s0 = Tick; yield return R.Ticks(R.StuckSeconds);
-                    PunishLog.Add((s0, Tick, "tripped")); Stuck = false; wobble = 0;
+                    PunishLog.Add((s0, Tick, "tripped")); Stuck = false; wobble = 0; Loop("Idle");
                 }
                 else
                 {
@@ -370,10 +394,10 @@ namespace LastBell.Run
                     Charges++; Current = "Body Check (charge)";
                     var a = Pos; var b = R.ClampToBound(a, a + dir * R.LaneLength);
                     Trail("Check trail", a, b, R.Ticks(Phase2 ? R.TrailLifeP2 : R.TrailLife));
-                    W.BossFx.ChargeTrail(transform, true);
+                    W.BossFx.ChargeTrail(transform, true); Loop("ChargeLoop");
                     int dur = Mathf.Max(4, Mathf.CeilToInt(Sim.Flat(b - a).magnitude / R.ChargeSpeed * Sim.Hz));
                     for (int t = 1; t <= dur; t++) { MoveTo(Vector3.Lerp(a, b, t / (float)dur)); yield return 1; }
-                    W.BossFx.ChargeTrail(transform, false); W.BossFx.ChargeLand(transform.position); CameraShake.Shake(0.18f, 0.25f); Release(1f);
+                    W.BossFx.ChargeTrail(transform, false); W.BossFx.ChargeLand(transform.position); CameraShake.Shake(0.18f, 0.25f); Release(1f); Loop("Idle");
                     yield return R.Ticks(0.5f);
                 }
             }
@@ -388,6 +412,8 @@ namespace LastBell.Run
             var spots = R.PourSpots(R.PourLayouts[rng.Next(R.PourLayouts.Length)] + (rng.Next(2) == 0 ? 0 : 180));
             int land = Warn(R.PourLand), gap = R.PoursInSequence(n) ? Warn(R.PourGapSolo) : 0;
             var pours = new List<Hazard>();
+            if (!withLap) { Clip("TossRaise", R.Ticks(0.6f)); Loop("TossLoop"); }
+            tossFlicks = !withLap;
             for (int i = 0; i < 2; i++)
             {
                 int need = counts[i];
@@ -411,7 +437,10 @@ namespace LastBell.Run
             Release(0.8f);
             if (withLap) foreach (var w in Lap()) yield return w;
             for (int guard = 0; guard < 900 && pours.Exists(IsLive); guard++) yield return 1;
+            if (tossFlicks) Loop("Idle");
+            tossFlicks = false;
         }
+        bool tossFlicks;   // the crucible is held aloft: flick it as each ladle leaves (not during the Rink Lap)
 
         // ================= 4. Rink Lap -> Pirouette =================
         IEnumerable<int> Lap()
@@ -428,10 +457,12 @@ namespace LastBell.Run
             // to the rim during the warning
             var rim = Sim.Dir(a0) * R.BossBound; var start = Pos;
             int go = Mathf.Max(4, Mathf.Min(warn - 2, Mathf.CeilToInt(Sim.Flat(rim - start).magnitude / R.SkateSpeed * Sim.Hz)));
+            Loop("Walk");
             for (int t = 0; t < warn; t++) { if (t < go) MoveTo(Vector3.Lerp(start, rim, (t + 1) / (float)go)); Windup(t / (float)warn); yield return 1; }
             Current = pre + "Rink Lap (lapping)";
             W.BossFx.ChargeTrail(transform, true);
             float sign = lapSign; lapSign = -lapSign; int bandHits = 0;
+            Loop(sign > 0 ? "LapLoopR" : "LapLoopL");   // facing ang + 90 (sign +1) puts the centre on its right
             for (int t = 1; t <= lap; t++)
             {
                 float ang = a0 + sign * 360f * t / lap;
@@ -456,20 +487,20 @@ namespace LastBell.Run
                 LockAt = 0, ResolveAt = pw, Damage = R.PirouetteDmg, Knockback = 0, Stun = 6,
             });
             circle.OnResolve = hz => { pirouetteHits = hz.Hit.Count; W.BossFx.TollResolve(Vector3.zero, 0, R.PirouetteRadius); CameraShake.Shake(0.16f, 0.22f); Release(1.2f); };
-            var from = Pos; int toC = R.Ticks(R.ToCentreTime);
+            var from = Pos; int toC = R.Ticks(R.ToCentreTime); Loop("Walk");
             for (int t = 0; t <= pw; t++)
             {
                 if (t < toC) MoveTo(Vector3.Lerp(from, Vector3.zero, (t + 1) / (float)toC));
-                else spinRate = Mathf.Lerp(200f, 1400f, (t - toC) / (float)Mathf.Max(1, pw - toC));
+                else { if (t == toC) Loop("PirouetteLoop"); spinRate = Mathf.Lerp(200f, 1400f, (t - toC) / (float)Mathf.Max(1, pw - toC)); }
                 Windup(t / (float)pw);
                 yield return 1;
             }
             spinRate = 0;
             LapLog.Add((Tick, bandHits, pirouetteHits));
             // dizzy at the centre: the major punish window (nothing of its own is live)
-            Current = "Rink Lap (dizzy)"; Dizzy = true; wobble = 1;
+            Current = "Rink Lap (dizzy)"; Dizzy = true; wobble = 1; Loop("DizzyLoop");
             int s0 = Tick; yield return R.Ticks(R.DizzySeconds);
-            PunishLog.Add((s0, Tick, "dizzy")); Dizzy = false; wobble = 0;
+            PunishLog.Add((s0, Tick, "dizzy")); Dizzy = false; wobble = 0; Loop("Idle");
         }
 
         // ================= the 50% reheat =================
@@ -478,7 +509,7 @@ namespace LastBell.Run
             GatePending = false; ClearMarks();
             Current = "Reheat"; Log("Reheat"); ShiftStart = Tick; HpAtShiftStart = Hp;
             CameraShake.Shake(0.12f, 0.3f);
-            int n = R.Ticks(R.ShiftSeconds);
+            int n = R.Ticks(R.ShiftSeconds); Clip("Reheat", n); Loop("Idle");
             for (int t = 0; t < n; t++) { spinRate = 900f * Mathf.Sin(Mathf.PI * t / n); Windup(t / (float)n); yield return 1; }   // harmless: nothing spawned
             spinRate = 0; Phase2 = true; Release(1.5f); ShiftEnd = Tick;
             Log("phase 2");
@@ -497,8 +528,7 @@ namespace LastBell.Run
         public int LadleCount => ladles.Count;
         void Ladle(Vector3 from, Vector3 to, int start, int end)
         {
-            var t = Prim.Make(PrimitiveKind.Sphere, transform.parent, from, Vector3.one * 0.7f, Molten, 2f);
-            t.name = "Ladle of brass (placeholder)"; t.gameObject.SetActive(false);
+            var t = MakeLadle(from); t.gameObject.SetActive(false);
             ladles.Add(new Flying { View = t, From = from, To = to, Start = start, End = end });
         }
         void StepLadles()
@@ -506,9 +536,22 @@ namespace LastBell.Run
             for (int i = ladles.Count - 1; i >= 0; i--)
             {
                 var f = ladles[i];
+                // the flick lands its release frame (0.22 s into the 0.5 s clip) on the ladle leaving; when another ladle is still
+                // to come (solo pours) the crucible is raised again after it
+                if (tossFlicks && Age == f.Start - R.Ticks(0.22f))
+                {
+                    Clip("TossFlick", R.Ticks(0.5f));
+                    bool more = false; foreach (var o in ladles) if (o != f && o.Start > f.Start) more = true;
+                    if (more) cues?.At(R.Ticks(0.5f), "TossRaise", R.Ticks(0.6f)); else Loop("Idle");
+                }
                 if (Age < f.Start) continue;
                 float u = Mathf.Clamp01((Age - f.Start) / (float)Mathf.Max(1, f.End - f.Start));
-                if (f.View) { f.View.gameObject.SetActive(true); f.View.position = Vector3.Lerp(f.From, f.To, u) + Vector3.up * (9f * u * (1 - u) + 0.3f); }
+                if (f.View)
+                {
+                    f.View.gameObject.SetActive(true); f.View.position = Vector3.Lerp(f.From, f.To, u) + Vector3.up * (9f * u * (1 - u) + 0.3f);
+                    var fwd = Sim.Flat(f.To - f.From); if (fwd.sqrMagnitude < 0.01f) fwd = Vector3.forward;
+                    f.View.rotation = Quaternion.LookRotation(fwd) * Quaternion.Euler(0, 90, 0) * Quaternion.Euler(18f * Mathf.Sin(u * 9f), 0, 0);
+                }
                 if (Age >= f.End) { if (f.View) Destroy(f.View.gameObject); ladles.RemoveAt(i); }
             }
         }
@@ -527,8 +570,11 @@ namespace LastBell.Run
             if (!spinner) return;
             spin += rate * dt;
             float wob = wobbleK > 0 ? Mathf.Sin(Time.time * 9f) * 9f * wobbleK : 0;
-            spinner.localRotation = Quaternion.Euler(wob, spin, dead ? 70 : wob * 0.6f);
+            // the model plays its own Defeat clip, so only the stand-in tips over
+            bool model = presenter && presenter.HasModel;
+            spinner.localRotation = dead && model ? Quaternion.Euler(0, spin, 0) : Quaternion.Euler(wob, spin, dead ? 70 : wob * 0.6f);
             if (core) Prim.SetGlow(core, Molten * (1.2f + glow * 1.4f));
+            if (presenter) presenter.GlowLevel = 0.8f + glow * 0.9f;
         }
 
         // ---------------- LAN ----------------
@@ -540,8 +586,18 @@ namespace LastBell.Run
         public override Transform MakeNetProp(byte kind)
         {
             if (kind != 0) return null;
-            var t = Prim.Make(PrimitiveKind.Sphere, transform.parent, Vector3.zero, Vector3.one * 0.7f, Molten, 2f);
-            t.name = "Ladle of brass (LAN)"; return t;
+            var t = MakeLadle(Vector3.zero); t.name += " (LAN)"; return t;
+        }
+        // a thrown ladle: the CrucibleLadle model (no clips), else the molten sphere stand-in
+        Transform MakeLadle(Vector3 at)
+        {
+            var root = new GameObject("Ladle of brass").transform; root.SetParent(transform.parent, false); root.position = at;
+            var pr = CharacterPresenter.Create(root, "CrucibleLadle", 1.5f, 1f, 0, h =>
+            {
+                Prim.Make(PrimitiveKind.Sphere, h, Vector3.zero, Vector3.one * 0.7f, Molten, 2f).name = "Ladle of brass (stand-in)"; return h;
+            });
+            if (!pr.HasModel) root.name = "Ladle of brass (placeholder)";
+            return root;
         }
         public override void CaptureNetLook(Networking.LanWorldFrame.BossState into)
         {
@@ -576,7 +632,8 @@ namespace LastBell.Run
         protected override void OnDefeat()
         {
             ClearLadles(); ClearMarks();
-            Stuck = false; Dizzy = false; spinRate = 0; wobble = 0;
+            Stuck = false; Dizzy = false; spinRate = 0; wobble = 0; tossFlicks = false;
+            cues?.Clear(); if (presenter) presenter.Action("Defeat", 150);
             W.Fx.Crescendo(transform.position, true, 2, true);
         }
 
