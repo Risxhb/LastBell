@@ -454,37 +454,31 @@ namespace LastBell.Run
             root = hand = null; pool.Clear(); for (int i = 0; i < 4; i++) plates[i] = null; plans.Clear();
         }
 
-        static GUIStyle nameStyle, bigStyle, numStyle;
         public void DrawGui(Camera cam)
         {
             if (!Running || cam == null || !root) return;
-            if (nameStyle == null)
-            {
-                nameStyle = new GUIStyle(GUI.skin.label) { fontSize = 16, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-                numStyle = new GUIStyle(nameStyle) { fontSize = 20 }; bigStyle = new GUIStyle(nameStyle) { fontSize = 40 };
-            }
+            var nameStyle = EncounterCallouts.Styles.Tag; var numStyle = EncounterCallouts.Styles.TagLarge;
             float t = T; int k = Mathf.FloorToInt(t / Beat) + 1, s = SoakHour(k);
             Label(cam, PlateOf(k), 0.3f, UltimateState.Roman[s + 1] + " SOAK in " + (k * Beat - t).ToString("0.0") + "s", EscapementRelay.DutyColors[0], nameStyle);
             for (int ci = 0; ci < 3; ci++)
             {
                 bool on = CurtOn(ci, t), soon = CurtSoon(ci, t); if (!on && !soon) continue;
                 var d = Dir(Curtains[ci].a); var pp = Perp(d); float line = on ? CurtLine(ci, t) : -10.5f;
-                for (int g = 0; g < 4; g++) { var q = pp * GapOff[g] + d * line; if (q.magnitude < 12.3f) Label(cam, q, 0.9f, UltimateState.Roman[orders[ci][g] + 1], new Color(1f, 0.82f, 0.48f), numStyle); }
-                if (soon) Label(cam, d * -10.8f, 0.3f, "CURTAIN in " + (CurtStart(ci, t) - t).ToString("0.0") + "s", Color.white, nameStyle);
+                for (int g = 0; g < 4; g++) { var q = pp * GapOff[g] + d * line; if (q.magnitude < 12.3f) Label(cam, q, 0.9f, UltimateState.Roman[orders[ci][g] + 1], UiTheme.GoldBright, numStyle); }
+                if (soon) Label(cam, d * -10.8f, 0.3f, "CURTAIN in " + (CurtStart(ci, t) - t).ToString("0.0") + "s", UiTheme.Ivory, nameStyle);
             }
             // your own echoes carry your hour numeral: they only kill you
-            if (W.Players.Count > 0) foreach (var m in mines) if (!m.Done && m.Owner == W.Players[0]) Label(cam, m.P, 0.15f, UltimateState.Roman[m.OwnerHour + 1], new Color(0.97f, 0.94f, 0.86f), numStyle);
+            if (W.Players.Count > 0) foreach (var m in mines) if (!m.Done && m.Owner == W.Players[0]) Label(cam, m.P, 0.15f, UltimateState.Roman[m.OwnerHour + 1], UiTheme.Ivory, numStyle);
             for (int i = 0; i < W.Players.Count; i++)
             {
                 var p = W.Players[i]; if (p.Down) continue;
                 var job = JobOf(p) ?? (SoakHour(k) == HourOf(p) % Hours ? "SOAK next" : "KEEP MOVING");
-                Label(cam, p.transform.position, 2.9f, (i == 0 ? "YOU " : "") + UltimateState.Roman[HourOf(p) + 1] + "  " + job, job.StartsWith("SOAK") ? EscapementRelay.DutyColors[0] : job.StartsWith("CURTAIN") ? new Color(1f, 0.82f, 0.48f) : Color.white, nameStyle);
+                Label(cam, p.transform.position, 2.9f, (i == 0 ? "YOU " : "") + UltimateState.Roman[HourOf(p) + 1] + "  " + job, job.StartsWith("SOAK") ? EscapementRelay.DutyColors[0] : job.StartsWith("CURTAIN") ? UiTheme.GoldBright : UiTheme.Ivory, nameStyle);
             }
             var rs = RewindSoon(t);
             if (rs.HasValue || RewindAt(t))
             {
-                bigStyle.normal.textColor = RewindAt(t) ? new Color(1f, 0.6f, 0.45f) : Color.Lerp(new Color(1f, 0.4f, 0.3f), Color.white, Blink);
-                GUI.Label(new Rect(0, Screen.height * 0.2f, Screen.width, 60), RewindAt(t) ? "<< REWIND" : $"REWIND in {rs.Value:0.0}s", bigStyle);
+                EncounterCallouts.Banner(0.2f, RewindAt(t) ? "<< REWIND" : $"REWIND in {rs.Value:0.0}s", RewindAt(t) ? EncounterCallouts.Alpha(UiTheme.Danger, 0.85f) : Color.Lerp(UiTheme.Danger, UiTheme.Ivory, Blink));
             }
         }
         public string HudText(PlayerController p)

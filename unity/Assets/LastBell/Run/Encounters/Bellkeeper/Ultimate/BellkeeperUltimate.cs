@@ -291,7 +291,6 @@ namespace LastBell.Run
         public override float[] HudMarks => new[] { SegEnd[0], SegEnd[1], SegEnd[2], SegEnd[3] };
         public override float NextPhaseFraction() => Mathf.Max(0.01f, SegEnd[(int)Segment] - 0.01f);
 
-        static GUIStyle glyphStyle;
         // The phases' labels share the skin's bold font at these sizes; P2 is the first to use → ✓ –. Measuring them once on the
         // first frame loads the fonts and their OpenType tables then (performance agent, 2 Nov: a 79 ms font load at the P1 -> P2 change).
         // Every printable ASCII character plus the symbols, bold and regular: the first debt timer ("DEBT 6.0s": the '.') still
@@ -362,12 +361,12 @@ namespace LastBell.Run
         }
         void DrawGlyphs(Camera cam)
         {
-            if (glyphStyle == null) glyphStyle = new GUIStyle(GUI.skin.label) { fontSize = 15, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, normal = { textColor = new Color(0.96f, 0.93f, 0.84f) } };
+            var glyphStyle = EncounterCallouts.Styles.Tag;
             foreach (var p in W.Players)
             {
                 var text = Ult.GlyphText(p, W.Tick); if (text == null) continue;
                 var sp = cam.WorldToScreenPoint(p.transform.position + Vector3.up * 3.4f); if (sp.z <= 0) continue;
-                GUI.Label(new Rect(sp.x - 90, Screen.height - sp.y - 12, 180, 24), text, glyphStyle);
+                UiTheme.Label(new Rect(sp.x - UiTheme.V(90), Screen.height - sp.y - UiTheme.V(12), UiTheme.V(180), UiTheme.V(24)), text, glyphStyle, UiTheme.Ivory);
             }
         }
     }

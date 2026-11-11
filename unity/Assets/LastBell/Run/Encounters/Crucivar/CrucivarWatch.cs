@@ -317,11 +317,9 @@ namespace LastBell.Run
             cam.fieldOfView = 50;
         }
 
-        GUIStyle style;
         void OnGUI()
         {
             if (d == null || bots.Count == 0) return;
-            style ??= new GUIStyle(GUI.skin.label) { fontSize = 16, normal = { textColor = new Color(1f, 0.95f, 0.85f) } };
             var boss = d.Boss as CrucivarEncounter;
             var lines = new List<string>
             {
@@ -329,8 +327,10 @@ namespace LastBell.Run
                 boss ? $"Crucivar {boss.Hp}/{boss.MaxHp} · {boss.Current}" + (boss.Rite != null ? $" · loop {boss.Rite.Loops}" : "") : "",
             };
             foreach (var b in bots) lines.Add($"{b.Name}: {b.Hits} hits, {b.Damage} damage, would have gone down {b.Downs}x");
-            GUI.Box(new Rect(10, 10, 560, 26 + 22 * lines.Count), GUIContent.none);
-            for (int i = 0; i < lines.Count; i++) GUI.Label(new Rect(20, 16 + 22 * i, 540, 22), lines[i], style);
+            // watch mode is a developer view: the theme's info strip (ink, gold left bar) instead of a default-skin box
+            var style = EncounterCallouts.Styles.Diagnostics; float lh = UiTheme.V(22);
+            UiImgui.InfoStrip(new Rect(10, 10, 560, 26 + 22 * lines.Count), UiTheme.InkStrip);
+            for (int i = 0; i < lines.Count; i++) UiTheme.Label(new Rect(UiTheme.V(24), UiTheme.V(16) + lh * i, UiTheme.V(540), lh), lines[i], style);
         }
     }
 }

@@ -311,16 +311,10 @@ namespace LastBell.Run
         }
 
         // Labels, drawn by the encounter's OnGUI: words on the spots, each player's hour and duty in its colour, REWIND.
-        static GUIStyle spotStyle, nameStyle, bigStyle;
         public void DrawGui(Camera cam)
         {
             if (!Running || NextBeatTick < 0 || cam == null) return;
-            if (spotStyle == null)
-            {
-                spotStyle = new GUIStyle(GUI.skin.label) { fontSize = 16, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
-                nameStyle = new GUIStyle(spotStyle) { fontSize = 17 };
-                bigStyle = new GUIStyle(spotStyle) { fontSize = 40 };
-            }
+            var spotStyle = EncounterCallouts.Styles.Tag; var nameStyle = spotStyle;
             Label(cam, Plate(Beat), 0.3f, "PLATE", DutyColors[0], spotStyle);
             if (Duties >= 2) Label(cam, ChainSpot(Beat), 0.3f, "CHAIN", DutyColors[1], spotStyle);
             if (Duties >= 3 || Duties == 1) Label(cam, Weight(Beat, 2), 1.0f, "TOCK", DutyColors[2], spotStyle);
@@ -334,8 +328,7 @@ namespace LastBell.Run
             if (RewindAfterNext || Dir < 0)
             {
                 bool soon = RewindAfterNext; float blink = Blink;
-                bigStyle.normal.textColor = soon ? Color.Lerp(new Color(1f, 0.45f, 0.35f), Color.white, blink) : new Color(1f, 0.6f, 0.5f, 0.7f);
-                GUI.Label(new Rect(0, Screen.height * 0.2f, Screen.width, 60), soon ? "REWIND NEXT BEAT" : "<< REWINDING", bigStyle);
+                EncounterCallouts.Banner(0.2f, soon ? "REWIND NEXT BEAT" : "<< REWINDING", soon ? Color.Lerp(UiTheme.Danger, UiTheme.Ivory, blink) : EncounterCallouts.Alpha(UiTheme.Danger, 0.7f));
             }
         }
 
