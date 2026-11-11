@@ -238,10 +238,12 @@ namespace LastBell.Run
         }
 
         // Standing-hazard damage (cooling slag): no knockback, stun or interrupt, and nothing mitigates it.
-        public void ReceiveBurn(Hazard h, int dmg)
+        public void ReceiveBurn(Hazard h, int dmg) => ReceiveBurn(h, dmg, !h.BurnKeepsRevive);
+        // resetsRevive: any burn the player stands in resets a revive, not only h (the highest rate, which deals the damage)
+        public void ReceiveBurn(Hazard h, int dmg, bool resetsRevive)
         {
             if (Down || dmg <= 0) return;
-            Hp = Mathf.Max(0, Hp - dmg); if (!h.BurnKeepsRevive) LastHurtTick = World.Tick;
+            Hp = Mathf.Max(0, Hp - dmg); if (resetsRevive) LastHurtTick = World.Tick;
             World.ReportPlayerHit(this, h, dmg);
             RunHud.Float(transform.position + Vector3.up * 2.4f, "-" + dmg, new Color(1f, 0.6f, 0.25f));
             if (Hp == 0) GoDown();
