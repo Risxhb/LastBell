@@ -34,7 +34,7 @@ namespace LastBell.Run
             styleHeight = Screen.height;
             eyebrow = UiTheme.Style(UiTheme.SizeMicro, true, TextAnchor.MiddleLeft, UiTheme.Gold);
             title = UiTheme.Style(UiTheme.SizeNumeric + 1, true, TextAnchor.MiddleLeft, UiTheme.Ivory);
-            value = UiTheme.Style(UiTheme.SizeMicro, true, TextAnchor.MiddleRight, UiTheme.IvoryMuted);
+            value = UiTheme.Style(UiTheme.SizeLabel + 1, true, TextAnchor.MiddleRight, UiTheme.IvoryBody);   // readable at 768p
             status = UiTheme.Style(UiTheme.SizeMicro, true, TextAnchor.MiddleRight, UiTheme.Ivory);
         }
         static string Spaced(string s) { if (!spaced.TryGetValue(s, out var r)) spaced[s] = r = UiTheme.Spaced(s); return r; }
@@ -105,7 +105,8 @@ namespace LastBell.Run
             bool downNow = p.Down && !p.Dead;
             UiTheme.Fill(S(x, y, W, H), Fa(A(UiTheme.InkDeep, downNow ? 0.9f : 0.8f)));
             float barW = downNow ? 4 + Mathf.Sin(now * 6f) : 3;
-            UiTheme.Fill(S(x, y, barW, H), Fa(p.Dead ? UiTheme.IvoryMicro : downNow ? UiTheme.Danger : UiTheme.Gold));
+            bool reviving = downNow && p.ReviveProgress > 0.001f;   // the revive turns the bar Ivory, as it does the bell ring
+            UiTheme.Fill(S(x, y, reviving ? 3 : barW, H), Fa(p.Dead ? UiTheme.IvoryMicro : reviving ? UiTheme.Ivory : downNow ? UiTheme.Danger : UiTheme.Gold));
 
             const float pad = 14;
             float cx = x + pad, cw = W - pad - 10;
@@ -131,7 +132,9 @@ namespace LastBell.Run
             {
                 float bleed = Mathf.Clamp01(1 - p.DownedTicks / (PlayerController.BleedOutSeconds * Sim.Hz));
                 // the bleed-out drains as a muted Ivory timer (not red: it read as a full health bar); the revive fills over it
-                UiTheme.Fill(S(bx, by, bw * bleed, 6), A(UiTheme.Ivory, 0.32f));
+                // Ivory .55 with a 1 px red underline; the last quarter runs out in red
+                UiTheme.Fill(S(bx, by, bw * bleed, 6), bleed < 0.25f ? UiTheme.BossRed : A(UiTheme.Ivory, 0.55f));
+                UiTheme.Fill(S(bx, by + 5, bw * bleed, 1), UiTheme.BossRed);
                 if (p.ReviveProgress > 0) UiTheme.Fill(S(bx, by, bw * Mathf.Clamp01(p.ReviveProgress), 6), UiTheme.Ivory);
             }
             else if (!p.Dead)

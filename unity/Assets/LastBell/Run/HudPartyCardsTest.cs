@@ -145,7 +145,7 @@ namespace LastBell.Run
 
             // banner and demo caption on the theme
             RunHud.Banner("ENRAGE", UiTheme.Danger, 3);
-            RunHud.CaptionTitle = "Party cards"; RunHud.CaptionBody = "Bots and LAN allies: class, health, and the down and revive state, bottom left.";
+            RunHud.CaptionTitle = "Party cards"; RunHud.CaptionBody = "Each ally's class, health and down / revive state, bottom left.";
             yield return Wait(0.3f);
             Check("banner is showing", RunHud.CurrentBanner == "ENRAGE");
             yield return Shot("banner-caption");

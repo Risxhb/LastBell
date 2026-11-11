@@ -1280,17 +1280,18 @@ namespace LastBell.Run
         // the player panel's class-state chips; Ivory heading and IvoryBody body on the theme type ramp.
         // Narrow (640) and fading to clear on the right (critic round 1: a wide opaque box covered telegraphs).
         const float CaptionH = 96, CaptionW = 640;
-        float CaptionTop => PanelTop - 34 - 16 - CaptionH;   // virtual; Labels keep world labels above it
+        float CaptionTop => PanelTop - 34 - 40 - CaptionH;   // virtual; Labels keep world labels above it
         void CaptionText()
         {
             if (string.IsNullOrEmpty(CaptionTitle)) return;
             float w = Mathf.Min(CaptionW, Mathf.Min(UiTheme.VirtualWidth, 1920) - 80), x = UiTheme.VirtualWidth / 2 - w / 2, y = CaptionTop;
-            UiTheme.Fill(S(x, y, w * 0.6f, CaptionH), A(UiTheme.InkDeep, 0.78f));
-            var o = GUI.color; GUI.color = new Color(1, 1, 1, 0.78f);   // the right 40 % fades out (the menu's side gradient, mirrored)
-            GUI.DrawTextureWithTexCoords(S(x + w * 0.6f, y, w * 0.4f, CaptionH), UiTheme.SideGradient, new Rect(1, 0, -1, 1), true); GUI.color = o;
+            UiTheme.Fill(S(x, y, w * 0.75f, CaptionH), A(UiTheme.InkDeep, 0.78f));
+            var o = GUI.color; GUI.color = new Color(1, 1, 1, 0.78f);   // the right quarter fades out (the menu's side gradient, mirrored)
+            GUI.DrawTextureWithTexCoords(S(x + w * 0.75f, y, w * 0.25f, CaptionH), UiTheme.SideGradient, new Rect(1, 0, -1, 1), true); GUI.color = o;
             F(x, y, 3, CaptionH, UiTheme.Gold);
-            T(x + 24, y + 12, w - 48, 28, CaptionTitle, heading);
-            T(x + 24, y + 44, w - 48, 44, CaptionBody ?? "", captionBody);
+            float tw = w * 0.75f - 24;   // text stays on the solid ink
+            T(x + 24, y + 12, tw, 28, CaptionTitle, heading);
+            T(x + 24, y + 44, tw, 44, CaptionBody ?? "", captionBody);
         }
 
         // The big centre call (Aurelion wipes, the enrage warning): theme Display type in the caller's colour with the theme
