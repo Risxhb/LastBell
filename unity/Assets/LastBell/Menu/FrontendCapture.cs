@@ -44,7 +44,6 @@ namespace LastBell.Menu
             Application.runInBackground = true; padOnly = Has("-lastbellFrontendPad");
             var args = Environment.GetCommandLineArgs(); int at = Array.IndexOf(args, "-lastbellOut");
             output = at >= 0 && at + 1 < args.Length ? args[at + 1] : Path.Combine(Application.persistentDataPath, "frontend-capture"); Directory.CreateDirectory(output);
-            prefix = (padOnly ? "pad-" : "") + Screen.width + "x" + Screen.height + "-";
             var old = InputSystem.settings; old.hideFlags = HideFlags.DontUnloadUnusedAsset; var test = Instantiate(old); test.hideFlags = HideFlags.DontUnloadUnusedAsset;
             test.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus; InputSystem.settings = test;
             pad = InputSystem.AddDevice<Gamepad>("FrontendCapturePad"); keyboard = InputSystem.AddDevice<Keyboard>("FrontendCaptureKeyboard");
@@ -56,6 +55,7 @@ namespace LastBell.Menu
             while ((!(menu = FindAnyObjectByType<ConfrontationMenu>()) || !menu.Canvas) && Time.realtimeSinceStartup < until) yield return null;
             yield return new WaitForSecondsRealtime(3);
             Check("main menu loaded", menu);
+            yield return ForceWindowSize();
             if (menu) yield return padOnly ? PadMenus(menu) : Menus(menu);
             menu = FindAnyObjectByType<ConfrontationMenu>();
             if (menu) yield return padOnly ? PadLobby(menu) : Lobby(menu);
@@ -103,14 +103,34 @@ namespace LastBell.Menu
             int port = FreePort(); screen.SetConnectTarget("127.0.0.1", port);
             screen.HostButton.onClick.Invoke(); yield return Frames(6);
             Check("Host opens the lobby", screen.Current == LanLobbyScreen.Page.Lobby);
+            // three guests fill the four player cards (one ready)
             raw.Add(LanLobby.Connect("127.0.0.1", port, LanLobbyScreen.BuildId(), "Arcanist", "Guest Two"));
-            yield return Until(() => screen.Session && screen.Session.Lobby != null && screen.Session.Lobby.Members.Count >= 2, 10);
+            raw.Add(LanLobby.Connect("127.0.0.1", port, LanLobbyScreen.BuildId(), "Chimesinger", "Guest Three"));
+            raw.Add(LanLobby.Connect("127.0.0.1", port, LanLobbyScreen.BuildId(), "Tollbreaker", "Guest Four"));
+            yield return Until(() => screen.Session && screen.Session.Lobby != null && screen.Session.Lobby.Members.Count >= 4, 10);
+            yield return new WaitForSecondsRealtime(.5f); raw[0].SetReady(true);
             yield return new WaitForSecondsRealtime(1.5f);
             yield return Shot("lan-lobby-host.png");
             StyleChecks(screen);
             screen.Back(); yield return Frames(4);
             Check("Back opens the leave dialog", screen.LeaveConfirmOpen);
             yield return Shot("lan-leave.png");
+            screen.LeaveButton.onClick.Invoke();
+            yield return Until(() => FindAnyObjectByType<ConfrontationMenu>(), 20); yield return new WaitForSecondsRealtime(1);
+            foreach (var l in raw) l.Dispose(); raw.Clear();
+            yield return ForceWindowSize();   // the main menu restored the saved resolution again
+
+            // client view: an in-process host, this screen joins it
+            int port2 = FreePort(); var remote = LanLobby.Host(port2, LanLobbyScreen.BuildId(), "Arcanist", "Remote Host"); raw.Add(remote);
+            LanLobbyScreen.Open();
+            yield return Until(() => LanLobbyScreen.Instance && SceneManager.GetActiveScene().path == LanLobbyScreen.ScenePath, 20); yield return Frames(6);
+            screen = LanLobbyScreen.Instance; if (!screen) yield break;
+            screen.SetConnectTarget("127.0.0.1", port2); screen.JoinButton.onClick.Invoke();
+            yield return Until(() => screen.Session && screen.Session.Lobby != null && screen.Session.Lobby.Connected, 10);
+            yield return new WaitForSecondsRealtime(1.5f);
+            Check("Connect joins as a client", screen.Current == LanLobbyScreen.Page.Lobby && !screen.IsHost);
+            yield return Shot("lan-lobby-client.png");
+            screen.Back(); yield return Frames(4); yield return Shot("lan-leave-client.png");
             screen.LeaveButton.onClick.Invoke();
             yield return Until(() => FindAnyObjectByType<ConfrontationMenu>(), 20); yield return new WaitForSecondsRealtime(1);
         }
@@ -193,6 +213,24 @@ namespace LastBell.Menu
                 && screen.GetComponentsInChildren<Image>(true).Any(i => i.name == "Title rule" && i.rectTransform.sizeDelta == new Vector2(UiTheme.RuleWidth, UiTheme.RuleHeight)));
             Check("lobby: right side gradient", screen.GetComponentsInChildren<Image>(true).Any(i => i.name == "Right contrast gradient" && i.sprite && i.sprite.texture == UiTheme.SideGradient));
             Check("lobby: no corner ornaments or boxed fields", !screen.GetComponentsInChildren<Transform>(true).Any(t => t.name == "Corner") && screen.GetComponentsInChildren<InputField>(true).All(f => f.targetGraphic && f.targetGraphic.color.a == 0));
+        }
+
+        // The main menu restores a saved Settings resolution over -screen-width/-height; captures need the asked-for size.
+        // The window is resized for this run only (the saved preference is not touched).
+        IEnumerator ForceWindowSize()
+        {
+            var args = Environment.GetCommandLineArgs();
+            int Arg(string name) { int i = Array.IndexOf(args, name); return i >= 0 && i + 1 < args.Length && int.TryParse(args[i + 1], out int v) ? v : 0; }
+            int w = Arg("-screen-width"), h = Arg("-screen-height");
+            if (w > 0 && h > 0 && (Screen.width != w || Screen.height != h))
+            {
+                Note("window was " + Screen.width + "x" + Screen.height + " (saved Settings resolution); resized to " + w + "x" + h);
+                Screen.SetResolution(w, h, FullScreenMode.Windowed); float until = Time.realtimeSinceStartup + 5;
+                while ((Screen.width != w || Screen.height != h) && Time.realtimeSinceStartup < until) yield return null;
+                yield return new WaitForSecondsRealtime(1);
+            }
+            prefix = (padOnly ? "pad-" : "") + Screen.width + "x" + Screen.height + "-";
+            Check("window is " + w + "x" + h, w == 0 || (Screen.width == w && Screen.height == h));
         }
 
         // ---------------------------------------------------------------- helpers
