@@ -102,7 +102,7 @@ namespace LastBell.Menu
             MenuUI.Text(UiTheme.Spaced("Start Phase"),B,new Vector2(.035f,.195f),new Vector2(.5f,.227f),15,MenuUI.Gold,TextAnchor.MiddleLeft);
             phaseNote=MenuUI.Text("",B,new Vector2(.5f,.195f),new Vector2(.965f,.227f),UiTheme.SizeLabel,new Color(UiTheme.GoldLabel.r,UiTheme.GoldLabel.g,UiTheme.GoldLabel.b,.7f),TextAnchor.MiddleRight);
             PhaseButtons=new Button[MaxPhases];phaseLabels=new Text[PhaseButtons.Length];phaseFocus=new NavFocus[PhaseButtons.Length];
-            for(int p=0;p<PhaseButtons.Length;p++){int n=p+1;float x=.04f+p*.15f;PhaseButtons[p]=Tab("Phase "+n,B,new Vector2(x,.135f),new Vector2(x+.15f,.19f),()=>SelectPhase(n),out phaseLabels[p],out phaseFocus[p]);}
+            float phaseW=.92f/Mathf.Max(5,PhaseButtons.Length);for(int p=0;p<PhaseButtons.Length;p++){int n=p+1;float x=.04f+p*phaseW;PhaseButtons[p]=Tab("Phase "+n,B,new Vector2(x,.135f),new Vector2(x+phaseW,.19f),()=>SelectPhase(n),out phaseLabels[p],out phaseFocus[p]);}
 
             // Footer: one text action on the left (Main Menu / Back), the step's primary action on the right.
             MenuUI.Panel("Footer rule",C,new Vector2(.04f,.122f),new Vector2(.96f,.1235f),Faint);
@@ -167,16 +167,13 @@ namespace LastBell.Menu
             title.SetActive(!BossStep);
             var reason=Incompatibility(MapIndex,EncounterIndex);Valid=reason==null;LaunchButton.interactable=Valid&&!Loading;ContinueButton.interactable=!Loading&&RunMaps.InBuild(MapIndex)&&Preview(MapIndex);
         }
-        // Miniboss names share one size: each fits one line by best fit, then the row takes the smallest (redone when the
-        // window size changes), so a long name never shrinks alone.
+        // Miniboss names share one size and stay on one line: 18 px, 16 px on 4:3-ish screens (the longest name,
+        // "Chimebound Oracle", fits a card at either size). Redone when the window size changes.
         void UniformMiniNames()
         {
-            int key=Screen.width*10000+Screen.height;if(key==miniSizedFor||!BossStep||miniLabels.Count==0)return;miniSizedFor=key;
-            foreach(var l in miniLabels){l.resizeTextForBestFit=true;l.resizeTextMaxSize=18;}
-            Canvas.ForceUpdateCanvases();
-            float scale=miniLabels[0].canvas?miniLabels[0].canvas.scaleFactor:1;int size=18;
-            foreach(var l in miniLabels){l.cachedTextGenerator.Populate(l.text,l.GetGenerationSettings(l.rectTransform.rect.size));int used=Mathf.FloorToInt(l.cachedTextGenerator.fontSizeUsedForBestFit/Mathf.Max(.01f,scale));if(used>0)size=Mathf.Min(size,used);}
-            foreach(var l in miniLabels){l.resizeTextMaxSize=Mathf.Max(12,size);}
+            int key=Screen.width*10000+Screen.height;if(key==miniSizedFor||miniLabels.Count==0)return;miniSizedFor=key;
+            int size=Screen.width<Screen.height*1.5f?16:18;
+            foreach(var l in miniLabels){l.resizeTextForBestFit=false;l.fontSize=size;l.horizontalOverflow=HorizontalWrapMode.Overflow;}
         }
         public static string AlliesText(int bots)=>"Bot allies: "+(bots==0?"none":bots.ToString());
         void Update()
@@ -273,7 +270,7 @@ namespace LastBell.Menu
             var art=MenuUI.Rect("Current playable arena preview",inner,Vector2.zero,Vector2.one).gameObject.AddComponent<RawImage>();art.texture=Preview(i);art.raycastTarget=false;
             var fit=art.gameObject.AddComponent<AspectRatioFitter>();fit.aspectMode=AspectRatioFitter.AspectMode.EnvelopeParent;fit.aspectRatio=16f/9;f.Art=art;
             var fade=MenuUI.Rect("Name shade",inner,Vector2.zero,new Vector2(1,.62f)).gameObject.AddComponent<RawImage>();fade.texture=cardFade;fade.raycastTarget=false;
-            MenuUI.Text((i+1).ToString("00"),inner,new Vector2(.02f,.80f),new Vector2(.5f,.98f),14,MenuUI.Gold,TextAnchor.MiddleLeft);
+            Shadow(MenuUI.Text((i+1).ToString("00"),inner,new Vector2(.04f,.80f),new Vector2(.5f,.98f),14,MenuUI.Gold,TextAnchor.MiddleLeft),1);
             label=MenuUI.Text("",inner,new Vector2(.02f,.03f),new Vector2(.98f,.24f),21,MenuUI.Ivory,TextAnchor.MiddleLeft);label.resizeTextForBestFit=true;label.resizeTextMinSize=12;label.resizeTextMaxSize=21;f.CardLabel=label;Shadow(label,.9f);
             var accent=MenuUI.Panel("Chosen accent",inner,Vector2.zero,new Vector2(1,0),MenuUI.Gold);accent.rectTransform.sizeDelta=new Vector2(0,4);accent.rectTransform.pivot=new Vector2(.5f,0);f.Accent=accent;
             return b;
@@ -312,14 +309,14 @@ namespace LastBell.Menu
             }
             if(mini)
             {
-                MenuUI.Text((slot+1).ToString("00"),inner,new Vector2(.04f,.62f),new Vector2(.3f,.96f),12,MenuUI.Gold,TextAnchor.MiddleLeft);
+                Shadow(MenuUI.Text((slot+1).ToString("00"),inner,new Vector2(.04f,.62f),new Vector2(.3f,.96f),12,MenuUI.Gold,TextAnchor.MiddleLeft),1);
                 // one line, one size across the row: the name runs under the portrait over the left and bottom shades
                 if(portrait){var low=MenuUI.Rect("Name floor",inner,Vector2.zero,new Vector2(1,.7f)).gameObject.AddComponent<RawImage>();low.texture=cardFade;low.raycastTarget=false;}
                 label=MenuUI.Text("",inner,new Vector2(.04f,.05f),new Vector2(.97f,.42f),18,MenuUI.Ivory,TextAnchor.LowerLeft);label.resizeTextMaxSize=18;miniLabels.Add(label);
             }
             else
             {
-                MenuUI.Text((slot+1).ToString("00"),inner,new Vector2(.04f,.80f),new Vector2(.5f,.98f),14,MenuUI.Gold,TextAnchor.MiddleLeft);
+                Shadow(MenuUI.Text((slot+1).ToString("00"),inner,new Vector2(.04f,.80f),new Vector2(.5f,.98f),14,MenuUI.Gold,TextAnchor.MiddleLeft),1);
                 label=portrait?MenuUI.Text("",inner,new Vector2(.05f,.03f),new Vector2(.95f,.38f),22,MenuUI.Ivory,TextAnchor.LowerLeft)
                               :MenuUI.Text("",inner,new Vector2(.06f,.2f),new Vector2(.94f,.8f),26,MenuUI.Ivory,TextAnchor.MiddleCenter);
                 label.resizeTextMaxSize=portrait?22:26;

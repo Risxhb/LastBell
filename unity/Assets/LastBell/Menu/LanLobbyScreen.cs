@@ -65,7 +65,7 @@ namespace LastBell.Menu
         // text rows with the highlight strip, drawn chevrons, underline input fields and centre-band dialogs.
         Canvas canvas; RectTransform root, frame; GameObject connectPage, lobbyPage, nameCard, leaveConfirm;
         InputField address, port, nameField; Text status, playingAs, nameError, notice, bossName, arenaName, hint, hostAddress, leaveBody, editNameLabel;
-        Header header; Chooser bossChooser, arenaChooser; CanvasGroup frameGroup; RawImage backdropArt; Image sideGradient;
+        Header header; Chooser bossChooser, arenaChooser; CanvasGroup frameGroup; RawImage backdropArt; Image sideGradient, footerRule;
         public Button HostButton, JoinButton, EditNameButton, ConfirmNameButton, ReadyButton, StartButton, BackButton, BossPrev, BossNext, ArenaPrev, ArenaNext, LeaveButton, StayButton;
         RawImage arenaArt;
         public sealed class Slot
@@ -115,7 +115,7 @@ namespace LastBell.Menu
             playingAs = MenuUI.Text("", frame, new Vector2(.6f, .905f), new Vector2(.96f, .955f), UiTheme.SizeBody, UiTheme.IvoryMuted, TextAnchor.MiddleRight);
             status = MenuUI.Text("", frame, new Vector2(.04f, .16f), new Vector2(.96f, .2f), 19, UiTheme.IvoryBody);
             hint = MenuUI.Text("", frame, new Vector2(.15f, .126f), new Vector2(.85f, .158f), 15, UiTheme.IvoryMuted);
-            MenuUI.Panel("Footer rule", frame, new Vector2(.04f, .122f), new Vector2(.96f, .1235f), UiTheme.RuleFaint);
+            footerRule = MenuUI.Panel("Footer rule", frame, new Vector2(.04f, .122f), new Vector2(.96f, .1235f), UiTheme.RuleFaint);
             BackButton = MenuUI.Row("Back", frame, new Vector2(.035f, .035f), new Vector2(.19f, .105f), Back, 24, Vector2.zero);
             BackButton.GetComponentInChildren<Text>().alignment = TextAnchor.MiddleLeft;
             BuildConnectPage(); BuildLobbyPage(); BuildNameCard(); BuildLeaveConfirm();
@@ -201,15 +201,16 @@ namespace LastBell.Menu
             lobbyPage = MenuUI.Rect("Lobby page", frame, Vector2.zero, Vector2.one).gameObject; var t = lobbyPage.transform;
             hostAddress = MenuUI.Text("", t, new Vector2(.04f, .775f), new Vector2(.6f, .825f), 18, UiTheme.IvoryMuted, TextAnchor.MiddleLeft);
             // Boss (left) and arena (right): the host's choosers; clients see the same values without chevrons.
-            MenuUI.Text(UiTheme.Spaced("Boss"), t, new Vector2(.04f, .735f), new Vector2(.47f, .765f), 14, UiTheme.GoldLabel, TextAnchor.MiddleLeft);
+            MenuUI.Text(UiTheme.Spaced("Boss"), t, new Vector2(.04f, .735f), new Vector2(.38f, .765f), 14, UiTheme.GoldLabel, TextAnchor.MiddleLeft);
             // left-aligned choosers under their eyebrows: the value label starts after the previous chevron and the next
             // chevron follows the rendered text (PlaceChooser, every frame)
-            var bossBox = MenuUI.Rect("Boss chooser", t, new Vector2(.04f, .675f), new Vector2(.47f, .735f));
+            var bossBox = MenuUI.Rect("Boss chooser", t, new Vector2(.04f, .675f), new Vector2(.38f, .735f));
             bossChooser = MenuUI.Chooser(bossBox, "", Vector2.zero, Vector2.one, 26, () => CycleBoss(-1), () => CycleBoss(1));
             bossName = bossChooser.Label; BossPrev = bossChooser.Previous; BossNext = bossChooser.Next;
-            MenuUI.Text(UiTheme.Spaced("Arena"), t, new Vector2(.53f, .735f), new Vector2(.96f, .765f), 14, UiTheme.GoldLabel, TextAnchor.MiddleLeft);
-            arenaArt = MenuUI.Rect("Arena preview", t, new Vector2(.535f, .678f), new Vector2(.59f, .732f)).gameObject.AddComponent<RawImage>(); arenaArt.raycastTarget = false;
-            var arenaBox = MenuUI.Rect("Arena chooser", t, new Vector2(.595f, .675f), new Vector2(.96f, .735f));
+            MenuUI.Text(UiTheme.Spaced("Arena"), t, new Vector2(.40f, .735f), new Vector2(.8f, .765f), 14, UiTheme.GoldLabel, TextAnchor.MiddleLeft);
+            arenaArt = MenuUI.Rect("Arena preview", t, new Vector2(.405f, .681f), new Vector2(.452f, .729f)).gameObject.AddComponent<RawImage>(); arenaArt.raycastTarget = false;
+            MenuUI.Stroke(arenaArt.transform, UiTheme.RuleFaint, 1.5f);   // the card edge
+            var arenaBox = MenuUI.Rect("Arena chooser", t, new Vector2(.455f, .675f), new Vector2(.8f, .735f));
             arenaChooser = MenuUI.Chooser(arenaBox, "", Vector2.zero, Vector2.one, 26, () => CycleArena(-1), () => CycleArena(1));
             arenaName = arenaChooser.Label; ArenaPrev = arenaChooser.Previous; ArenaNext = arenaChooser.Next;
             foreach (var label in new[] { bossName, arenaName }) { label.alignment = TextAnchor.MiddleLeft; label.rectTransform.offsetMin = new Vector2(44, 3); label.rectTransform.offsetMax = new Vector2(-44, -3); }
@@ -350,7 +351,7 @@ namespace LastBell.Menu
         void BuildNameCard()
         {
             nameCard = Dialog("Name card", "LAN Profile", "CHOOSE A NAME", out var c);
-            MenuUI.Text("Other players see this name in the lobby and over your character. It's saved on this computer.", c, new Vector2(.05f, .53f), new Vector2(.95f, .65f), UiTheme.SizeBody, UiTheme.IvoryBody);
+            MenuUI.Text("Other players see this name in the lobby and over your character. It's saved on this computer.", c, new Vector2(-.12f, .53f), new Vector2(1.12f, .65f), UiTheme.SizeBody, UiTheme.IvoryBody);
             nameField = Field(c, new Vector2(.2f, .39f), new Vector2(.8f, .49f), LanProfile.Saved ?? "", "Your name");
             nameField.characterLimit = LanPlayerName.MaxLength + 4;   // room to type spaces that get trimmed
             nameField.textComponent.alignment = TextAnchor.MiddleCenter; ((Text)nameField.placeholder).alignment = TextAnchor.MiddleCenter;
@@ -404,6 +405,13 @@ namespace LastBell.Menu
             Current = page; connectPage.SetActive(page == Page.Connect); lobbyPage.SetActive(page == Page.Lobby);
             header.Eyebrow.text = UiTheme.Spaced(page == Page.Lobby ? "LAN Lobby" : "LAN Multiplayer");
             header.Title.text = page == Page.Lobby ? "LOBBY" : "HOST OR JOIN";
+            // connect page: header, rows and Back together in the right-hand column over the gradient (the main menu keeps
+            // its logo and rows on the dark side); lobby page: header top left and the footer across the screen
+            float x0 = page == Page.Lobby ? .04f : .60f, x1 = page == Page.Lobby ? .6f : .96f;
+            foreach (var part in new Graphic[] { header.Eyebrow, header.Title }) { var r = part.rectTransform; r.anchorMin = new Vector2(x0, r.anchorMin.y); r.anchorMax = new Vector2(x1, r.anchorMax.y); }
+            var rule = header.Rule.rectTransform; rule.anchorMin = new Vector2(x0, rule.anchorMin.y); rule.anchorMax = new Vector2(x0, rule.anchorMax.y);
+            footerRule.rectTransform.anchorMin = new Vector2(page == Page.Lobby ? .04f : .60f, .122f);
+            var back = (RectTransform)BackButton.transform; back.anchorMin = new Vector2(page == Page.Lobby ? .035f : .595f, .035f); back.anchorMax = new Vector2(page == Page.Lobby ? .19f : .75f, .105f);
             if (page == Page.Lobby)
             {
                 // Lobby: Left/Right change class, so focus moves only up/down between Ready, Start and Back.
@@ -435,8 +443,9 @@ namespace LastBell.Menu
             float page = NameCardOpen || LeaveConfirmOpen ? 0 : 1; if (frameGroup.alpha != page) frameGroup.alpha = page;
             // connect page: controls on the right over the side gradient (the main menu's layout); lobby page: the cards
             // span the screen, so an even darker tint replaces the gradient and no card sits on a brighter floor
-            bool lobbyPage = Current == Page.Lobby; if (sideGradient.enabled == lobbyPage) sideGradient.enabled = !lobbyPage;
-            var tint = lobbyPage ? new Color(.26f, .26f, .31f, 1) : new Color(.42f, .42f, .48f, 1); if (backdropArt.color != tint) backdropArt.color = tint;
+            bool lobbyPage = Current == Page.Lobby, dialog = NameCardOpen || LeaveConfirmOpen, gradient = !lobbyPage && !dialog;
+            if (sideGradient.enabled != gradient) sideGradient.enabled = gradient;
+            var tint = lobbyPage || dialog ? new Color(.22f, .22f, .27f, 1) : new Color(.42f, .42f, .48f, 1); if (backdropArt.color != tint) backdropArt.color = tint;
             // status: under the column on the connect page, centred over the footer in the lobby
             var sr = status.rectTransform; var want = Current == Page.Lobby ? new Vector2(.04f, .16f) : new Vector2(.6f, .16f);
             if (sr.anchorMin != want) { sr.anchorMin = want; status.alignment = Current == Page.Lobby ? TextAnchor.MiddleCenter : TextAnchor.MiddleLeft; }
@@ -555,6 +564,14 @@ namespace LastBell.Menu
             }
             // buttons and status
             ReadyButton.interactable = connected && !loading;
+            // the host's main action is Start fight; a client's is Ready, which then takes Start's place and size
+            var rr = (RectTransform)ReadyButton.transform; var readyText = ReadyButton.GetComponentInChildren<Text>();
+            var rmin = hosting ? new Vector2(.36f, .035f) : new Vector2(.71f, .03f);
+            if (rr.anchorMin != rmin)
+            {
+                rr.anchorMin = rmin; rr.anchorMax = hosting ? new Vector2(.64f, .105f) : new Vector2(.96f, .108f);
+                readyText.alignment = hosting ? TextAnchor.MiddleCenter : TextAnchor.MiddleRight; readyText.resizeTextMaxSize = readyText.fontSize = hosting ? 24 : 28;
+            }
             ReadyButton.GetComponentInChildren<Text>().text = connected && lobby.LocalReady ? "Not ready" : "Ready";
             StartButton.gameObject.SetActive(hosting); StartButton.interactable = hosting && lobby.CanStart && !loading;
             status.text = error ?? (lobby != null && lobby.Error != null ? lobby.Error
