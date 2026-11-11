@@ -88,7 +88,10 @@ namespace LastBell.Run
             res = $"{Screen.width}x{Screen.height}";
             yield return Wait(1f);
             Note("resolution " + res);
-            yield return Until(() => d.State == RunState.Combat && d.Boss && d.World != null, 60, "practice combat");
+            // -lastbellOut turns off the practice auto-start (RunDirector.AutoReady): the test readies itself
+            yield return Until(() => (d.State == RunState.Ready || d.State == RunState.Combat) && d.World != null, 60, "practice arena");
+            if (d && d.State == RunState.Ready) { yield return Wait(0.5f); d.RequestReady(); }
+            yield return Until(() => d.State == RunState.Combat && d.Boss && d.World != null, 30, "practice combat");
             if (!d || d.State != RunState.Combat) { Finish(); yield break; }
             topUp = true;
             yield return Wait(4f);   // the bots spread out and the class state fills
