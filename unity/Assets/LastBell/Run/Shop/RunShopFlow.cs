@@ -268,18 +268,25 @@ namespace LastBell.Run.Shop
             UiTheme.Label(R(bx, by, BuildW, 20), UiTheme.Spaced("Your build"), s.Eyebrow);
             UiTheme.Label(R(bx, by, BuildW, 20), me.Items.Count == 0 ? "items you buy appear here" : (me.Items.Count == 1 ? "1 item" : $"{me.Items.Count} items") + (me.Items.Any(o => o.Def.Tempered.HasValue && !o.Tempered) ? "  ·  Temper strengthens one" : ""), smallRight);
             by += 30;
-            int perCol = me.Items.Count > 8 ? 2 : 1; float chipW = perCol == 1 ? BuildW : (BuildW - 16) / 2, chipH = 34;
+            // the list takes what the allies and the footer leave: rows shrink (34 -> 20 px) and the list goes to 2 columns past
+            // 8 items, 3 if it still doesn't fit, so a full party and a long build stay on one screen (shop autotest)
+            float listBottom = UiTheme.VirtualHeight - UiTheme.G6 - 56 - 70 - 10 - (coop ? 28 + allies.Count * 62 : 0) - 18, buildAvail = listBottom - by;
+            int n = me.Items.Count, perCol = n > 8 ? 2 : 1;
+            float chipH = n == 0 ? 34 : Mathf.Min(34, buildAvail / Rows(n, perCol));
+            if (chipH < 20) { perCol = 3; chipH = Mathf.Min(34, buildAvail / Rows(n, perCol)); }
+            chipH = Mathf.Max(chipH, 16);
+            float chipW = (BuildW - (perCol - 1) * 16) / perCol, icon = Mathf.Min(26, chipH - 6);
             int k = 0;
             foreach (var o in me.Items.ToArray())
             {
                 float ox = bx + (k % perCol) * (chipW + 16), oy = by + (k / perCol) * chipH; k++;
                 bool temperable = o.Def.Tempered.HasValue && !o.Tempered;
-                var ic = ItemIcon(o.Def, false); if (ic) GUI.DrawTexture(R(ox, oy + 4, 26, 26), ic, ScaleMode.ScaleToFit, true);
-                float tw = temperable ? (perCol == 1 ? 150 : 84) : 0;
-                UiTheme.Label(R(ox + 34, oy, chipW - 34 - tw, chipH), o.Def.Name + (o.Tempered ? " +" : ""), buildSt, o.Def.Tier == ItemTier.Common ? UiTheme.Ivory : TierCol(o.Def.Tier));
+                var ic = ItemIcon(o.Def, false); if (ic) GUI.DrawTexture(R(ox, oy + (chipH - icon) / 2, icon, icon), ic, ScaleMode.ScaleToFit, true);
+                float tw = temperable ? (perCol == 1 ? 150 : perCol == 2 ? 72 : 52) : 0, nw = chipW - icon - 8 - tw - 4;
+                UiTheme.Label(R(ox + icon + 8, oy, nw, chipH), Fit(o.Def.Name + (o.Tempered ? " +" : ""), nw), buildSt, o.Def.Tier == ItemTier.Common ? UiTheme.Ivory : TierCol(o.Def.Tier));
                 if (temperable)
                 {
-                    if (Row(ox + chipW - tw, oy + 1, tw, chipH - 2, perCol == 1 ? $"Temper  {ItemCatalog.TemperPrice}" : $"+ {ItemCatalog.TemperPrice}", me.Chimes >= ItemCatalog.TemperPrice, buildRow)) Do(Run.TryTemper(0, o.Def.Id, out var why), why);
+                    if (Row(ox + chipW - tw, oy + 1, tw, chipH - 2, perCol == 1 ? $"Temper  {ItemCatalog.TemperPrice}" : $"+{ItemCatalog.TemperPrice}", me.Chimes >= ItemCatalog.TemperPrice, buildRow)) Do(Run.TryTemper(0, o.Def.Id, out var why), why);
                 }
                 else Gap();
                 Gap();   // each build line is one grid row: down steps to the next item
@@ -368,6 +375,18 @@ namespace LastBell.Run.Shop
                 line = next;
             }
             return ledgerText = line;
+        }
+        // a build item's name cut to fit its column ("Berserker's Pa…"), cached per name and width
+        readonly System.Collections.Generic.Dictionary<(string, int, int), string> fitCache = new System.Collections.Generic.Dictionary<(string, int, int), string>();
+        string Fit(string name, float width)
+        {
+            var key = (name, Mathf.RoundToInt(width), Screen.height);
+            if (fitCache.TryGetValue(key, out var hit)) return hit;
+            if (fitCache.Count > 512) fitCache.Clear();
+            float W(string t) => buildSt.CalcSize(new GUIContent(t)).x / UiTheme.Scale;
+            string t2 = name;
+            if (W(t2) > width) { while (t2.Length > 1 && W(t2 + "…") > width) t2 = t2.Substring(0, t2.Length - 1); t2 = t2.TrimEnd() + "…"; }
+            return fitCache[key] = t2;
         }
         static void F(float x, float y, float w, float h, Color c) => UiTheme.Fill(UiTheme.R(x, y, w, h), c);
         public Rect LastPanel { get; private set; }   // virtual px; the autotest checks it fits one screen
