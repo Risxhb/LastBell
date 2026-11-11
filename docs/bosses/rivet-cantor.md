@@ -6,9 +6,11 @@ mask, a resonant-gold chest core and a great foundry drum slung at his hip. He l
 call-and-response: he calls, the party answers.
 
 - **Status:** proposal (November 3, 2026), review answers applied the same day (see "Review decisions"), replacing the earlier "Tuner of the Great Cast" draft (still in git
-  history). Practice-only encounter in the current player. **Rigged model** since November 10, 2026
+  history). Practice-only encounter in the current player. **Rigged model** in the main player since November 10, 2026
   (`Characters/RivetCantor/Resources/Characters/RivetCantor.glb`, 14 clips; the 26 Oct rig re-keyed for this design,
-  strike frames timed to gameplay ticks by `BossClipCues`). No final FX or audio. Not in the run.
+  strike frames timed to gameplay ticks by `BossClipCues`; drum in his right hand and mallet in his left, mirrored from
+  the text below). Art pass (9 Nov 2026): a rivet-headed mallet in place of the old tuning fork, and model props for the
+  rivets and chains (see "Art" below). No final FX or audio. Not in the run.
 - **Sources read:** `docs/design/content-rules.md` (this brief follows §5 and §10), `docs/bosses/pendulum-sentinel.md`,
   and Chzy18's merged bosses for ideas: Aurelion v4 (Meridian Tower soaks, Zenith Marks, Ecliptic Order), Crucivar v4
   (Forge Rite loop, Casting Order, Ember Brand, punish windows), Sylvara v3 (Two-Colour Choir, Pruning Arc).
@@ -21,8 +23,13 @@ call-and-response: he calls, the party answers.
 
 - 3.2 m tall against a 1.8 m human: a broad brass bell-shaped torso, ivory mask, gold chest core, the drum at his left
   hip (cobalt skin, brass hoops) and a rivet-headed mallet in his right hand.
-- **Model:** the rigged Rivet Cantor GLB (drum and mallet animated). If the model can't load, the old primitive
-  stand-in (brass cylinder body, ivory sphere head, cobalt drum disc, mallet cylinder, labelled "STAND-IN") is used.
+- **Art (9 Nov 2026, `art/miniboss-rivet-cantor`):** the rigged body holds the drum in his right hand and the
+  **mallet** in his left (the model's hands; the fork was cut out and the mallet bone-parented, clips unchanged). Props:
+  a **rivet head** punches up out of a torn floor plate where each Rivet Run warning has just resolved (gone in 0.9 s);
+  **brass chains** hang between chained players (or a player and the drum), sagging while shorter than 7 m and straight
+  when safe, then snap or lash at the lock; a cobalt-banded **shackle** at each end. Presentation only; LAN clients see
+  them too. Prompts, critic scores and report: `build-evidence/miniboss-art-20261109/rivet-cantor/` (outside git).
+- **Fallback:** without the GLBs, a labelled primitive stand-in body ("STAND-IN" in the hierarchy) and primitive props.
 - **The call queue:** while he sings a verse, one glyph per call floats above his head, oldest lowest:
   a gold disc for *Chorus*, four ivory beads for *Solo*. A glyph disappears when the floor answers it. This is the
   "score" players read; the floor telegraph for each answer appears at the same moment as its glyph.
@@ -153,7 +160,8 @@ the chains are hazards that hit only *other* players, so bots keep out of them l
 1. **Empty Chorus:** a heavy hit (80 to everyone standing), not a wipe. Done.
 2. **Solo matters solo:** yes. Each Solo also hits everyone within 2.5 m of him (40); the Chorus grew to 4 m so the band between them (2.5–4 m) holds a whole party. Done.
 3. **Chain pairing:** by the order numerals I–II, III–IV, shown over the chained players. Done.
-4. **Model:** keep the earlier Meshy model and re-rig/animate it for the drum and mallet. Done (November 9, 2026, `feature/miniboss-models`); in the main player since November 10.
+4. **Model:** keep the earlier Meshy model and re-rig/animate it for the drum and mallet. Done 9 Nov (rig and clips
+   on `feature/miniboss-models`; the mallet and props on `art/miniboss-rivet-cantor`); in the main player since November 10.
 5. **Run slot:** none yet. Bosses will share arenas and the gameplay loop is not decided; he stays practice-only on the
    Crucivar map.
 6. **LAN lobby:** add him to `LanLobby.Encounters` after all the miniboss work is done.
