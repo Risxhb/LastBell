@@ -61,13 +61,30 @@ namespace LastBell.Run
             lines.Add(line); Debug.Log("[overlay-test] " + line);
         }
         void Note(string s) { lines.Add("      " + s); Debug.Log("[overlay-test] " + s); }
+        // the size asked for on the command line (-screen-width / -screen-height): the menu restores the saved resolution
+        // at launch, so the test sets it again (and before every picture, in case a scene load restored it)
+        static int ArgInt(string a, int fallback)
+        {
+            var args = Environment.GetCommandLineArgs(); int i = Array.FindIndex(args, x => x.Equals(a, StringComparison.OrdinalIgnoreCase));
+            return i >= 0 && i + 1 < args.Length && int.TryParse(args[i + 1], out int v) ? v : fallback;
+        }
+        static readonly int wantW = ArgInt("-screen-width", 1600), wantH = ArgInt("-screen-height", 900);
+        IEnumerator Size()
+        {
+            if (Screen.width == wantW && Screen.height == wantH) yield break;
+            MenuFlowTest.SetResolution(wantW, wantH);
+            float t = 0; while ((Screen.width != wantW || Screen.height != wantH) && t < 3) { t += Time.unscaledDeltaTime; yield return null; }
+            yield return null; yield return null;
+            if (Screen.width != wantW || Screen.height != wantH) Note($"window is {Screen.width}x{Screen.height}, asked {wantW}x{wantH}");
+        }
         IEnumerator Shot(string name)
         {
             if (Application.isBatchMode) yield break;
+            yield return Size();
             yield return null; yield return new WaitForEndOfFrame();
             var tex = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
             tex.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0); tex.Apply();
-            File.WriteAllBytes(Path.Combine(dir, $"{++shots:00}_{name}_{res}.png"), tex.EncodeToPNG()); Destroy(tex);
+            File.WriteAllBytes(Path.Combine(dir, $"{++shots:00}_{name}_{Screen.width}x{Screen.height}.png"), tex.EncodeToPNG()); Destroy(tex);
         }
         IEnumerator Until(Func<bool> cond, float seconds, string what)
         {
@@ -109,8 +126,9 @@ namespace LastBell.Run
         // ---------------------------------------------------------------- the run
         IEnumerator Main()
         {
-            res = $"{Screen.width}x{Screen.height}";
             yield return Wait(1.5f);
+            yield return Size();
+            res = $"{Screen.width}x{Screen.height}";
             Note("resolution " + res + (PadWalk ? ", controller walkthrough" : ""));
             Campaign.Travel = false;
             Check("shop enabled (-lastbellShop)", Shop.RunShopFlow.Enabled);
