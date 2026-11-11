@@ -9,8 +9,8 @@ namespace LastBell.Run
     public sealed class TutorialCompletePanel : MonoBehaviour
     {
         public static TutorialCompletePanel Current { get; private set; }
-        RunDirector d; string lead = "", tail = "", body = ""; bool practice; InputHints.Device bodyFor; bool built;
-        GUIStyle sTitle, sBody; int styledFor = -1; readonly GUIContent measure = new GUIContent();
+        RunDirector d; string lead = "", result = "", next = "";
+        GUIStyle sTitle, sBody, sResult; int styledFor = -1; readonly GUIContent measure = new GUIContent();
 
         public static void Show(RunDirector director, IReadOnlyList<TutorialDirector.Record> records)
         {
@@ -19,28 +19,17 @@ namespace LastBell.Run
             p.d = director; Current = p;
             int drills = records.Count(r => r.Tries > 1 || !r.Passed);
             var missed = records.Where(r => !r.Passed).Select(r => r.Title).ToList();
-            p.lead = "The Tempo Tyrant falls. You've seen every mechanic in the game so far: read the shape, step out, punish.\n\n"
-                + (missed.Count == 0 ? "Every mechanic handled." : "To practise: " + string.Join(", ", missed) + ".");
-            p.practice = director.Mode != RunMode.Run; p.built = false;
-            p.tail = p.practice ? "" : "\n\nNext: Skyward Spire. Three minibosses guard Aurelion.";
+            p.lead = "The Tempo Tyrant falls. You've seen every mechanic in the game so far: read the shape, step out, punish.";
+            p.result = missed.Count == 0 ? "Every mechanic handled." : "To practise: " + string.Join(", ", missed) + ".";
+            // Retry and Main Menu are rows on the results band beside this card, so the card only points onward
+            p.next = director.Mode == RunMode.Run ? "Next: Skyward Spire. Three minibosses guard Aurelion." : "Next: Boss Rush, to fight any boss for real.";
         }
 
         void OnDestroy() { if (Current == this) Current = null; }
 
-        // The retry hint comes from InputHints ("Retry (R)"; no key on a gamepad, where Retry is a focusable row), so the
-        // body is rebuilt when the last device used changes.
-        string Body()
-        {
-            if (built && bodyFor == InputHints.Last) return body;
-            built = true; bodyFor = InputHints.Last;
-            var retry = InputHints.Key(HintAction.Retry);
-            return body = lead + (practice
-                ? "\n\nNext: Boss Rush to fight any boss for real, or " + (retry.Length > 0 ? "Retry (" + retry + ")" : "Retry") + " to run the tutorial again."
-                : tail);
-        }
-
-        // Same card as the tutorial's instruction panel (TutorialDirector): UiImgui.InfoStrip, spaced Gold eyebrow, Ivory
-        // title, 96x2 Gold rule, theme body text. Left side, beside the centred Results band.
+        // Same card as the tutorial's instruction panel (TutorialDirector.CardBack): an ink strip with a Gold left bar fading out
+        // on the right, spaced Gold eyebrow, Ivory title, 96x2 Gold rule; the lead in body text, the result as a GoldBright
+        // line, then where to go next. Left side, beside the centred Results band.
         void OnGUI()
         {
             if (!d || (d.State != RunState.Cleared && d.State != RunState.Results)) { if (d && d.State != RunState.Combat) Destroy(this); return; }
@@ -49,21 +38,22 @@ namespace LastBell.Run
             {
                 styledFor = Screen.height;
                 sTitle = UiTheme.Style(TutorialDirector.TitleSize, true, TextAnchor.UpperLeft, UiTheme.Ivory, true);
-                sBody = UiTheme.Style(UiTheme.SizeBody, false, TextAnchor.UpperLeft, UiTheme.IvoryBody, true);
+                sBody = UiTheme.Style(TutorialDirector.BodySize, false, TextAnchor.UpperLeft, UiTheme.IvoryBody, true);
+                sResult = UiTheme.Style(TutorialDirector.BodySize, true, TextAnchor.UpperLeft, UiTheme.GoldBright, true);
             }
-            const float X = 24, Y = 150, Wd = 560;
             float pad = UiTheme.G3, padY = UiTheme.G2;
-            string text = Body();
-            float x = UiTheme.V(X + 3 + pad), inner = UiTheme.V(Wd - 3 - 2 * pad), cy = UiTheme.V(Y + padY);
-            measure.text = "Tutorial complete"; float th = sTitle.CalcHeight(measure, inner);
-            measure.text = text; float bh = sBody.CalcHeight(measure, inner);
-            float h = UiTheme.V(padY + 20 + 8) + th + UiTheme.V(8 + UiTheme.RuleHeight + 16) + bh + UiTheme.V(padY);
-            UiImgui.InfoStrip(new Rect(X, Y, Wd, h / UiTheme.Scale));
+            float x = UiTheme.V(TutorialDirector.CardX + 3 + pad), inner = UiTheme.V(TutorialDirector.CardW - 3 - pad - UiTheme.G6), cy = UiTheme.V(TutorialDirector.CardY + padY);
+            float th = H(sTitle, "Tutorial complete", inner), lh = H(sBody, lead, inner), rh = H(sResult, result, inner), nh = H(sBody, next, inner);
+            float h = UiTheme.V(padY + 20 + 8) + th + UiTheme.V(8 + UiTheme.RuleHeight + 16) + lh + UiTheme.V(14) + rh + UiTheme.V(14) + nh + UiTheme.V(padY);
+            TutorialDirector.CardBack(h / UiTheme.Scale);
             UiTheme.Label(new Rect(x, cy, inner, UiTheme.V(20)), Eyebrow, UiImgui.Styles.Eyebrow); cy += UiTheme.V(20 + 8);
             UiTheme.Label(new Rect(x, cy, inner, th), "Tutorial complete", sTitle); cy += th + UiTheme.V(8);
             UiTheme.Fill(new Rect(x, cy, UiTheme.V(UiTheme.RuleWidth), Mathf.Max(1, UiTheme.V(UiTheme.RuleHeight))), UiTheme.Gold); cy += UiTheme.V(UiTheme.RuleHeight + 16);
-            UiTheme.Label(new Rect(x, cy, inner, bh), text, sBody);
+            UiTheme.Label(new Rect(x, cy, inner, lh), lead, sBody); cy += lh + UiTheme.V(14);
+            UiTheme.Label(new Rect(x, cy, inner, rh), result, sResult); cy += rh + UiTheme.V(14);
+            UiTheme.Label(new Rect(x, cy, inner, nh), next, sBody);
         }
-        static readonly string Eyebrow = UiTheme.Spaced("Tutorial");
+        float H(GUIStyle st, string text, float width) { measure.text = text; return st.CalcHeight(measure, width); }
+        static readonly string Eyebrow = UiTheme.Spaced("Tutorial · Complete");
     }
 }

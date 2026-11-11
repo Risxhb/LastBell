@@ -37,7 +37,7 @@ namespace LastBell.Run
         public string Body { get; private set; } = "";
         public string Status { get => status; private set { status = value; StatusBad = false; } }   // progress / result line under the body
         string status = "";
-        public bool StatusBad { get; private set; }            // the status reports a miss (drawn in Danger, else GoldBright)
+        public bool StatusBad { get; private set; }            // the status reports a miss (drawn in Danger, else muted gold)
         public bool WaitingForContinue { get; private set; }
         public int StepIndex { get; private set; }
         public string StepId { get; private set; } = "";
@@ -200,9 +200,20 @@ namespace LastBell.Run
         // bar, no box), a spaced Gold eyebrow with the step count, the Ivory title and the 96x2 Gold rule, then the body in the
         // theme's body style. Emphasis (<b> in the step text) is drawn in GoldBright rather than fake bold. Key names in the
         // step text come from InputHints (the gameplay bindings); the continue hint follows the last device used.
-        const float CardX = 24, CardY = 150, CardW = 560, PadL = UiTheme.G3, PadR = UiTheme.G3, PadY = UiTheme.G2;
+        internal const float CardX = 24, CardY = 150, CardW = 600, PadL = UiTheme.G3, PadR = UiTheme.G6, PadY = UiTheme.G2, CardFade = 120;
         internal const int TitleSize = 28;   // the main menu's primary-row size: a card title, smaller than a screen title (52)
-        GUIStyle sTitle, sBody, sStatus, sKey, sCount, sTag; int styledFor = -1;
+        // Read mid-fight, so the card body is two steps above the ramp's SizeBody (17 at 1080p: ~13 px at 900p was too small).
+        internal const int BodySize = UiTheme.SizeBody + 2;
+        internal static readonly Color CardInk = new Color(UiTheme.InkDeep.r, UiTheme.InkDeep.g, UiTheme.InkDeep.b, 0.8f);
+        // The card's backing: an InfoStrip (ink + 3 px Gold left bar) whose last CardFade units fade out like the main menu's
+        // side gradient, so it reads as an ink strip over the arena rather than a box. vh: virtual height.
+        internal static void CardBack(float vh)
+        {
+            UiImgui.InfoStrip(new Rect(CardX, CardY, CardW - CardFade, vh), CardInk);
+            UiImgui.SideGradient(new Rect(CardX + CardW - CardFade, CardY, CardFade, vh), false, CardInk.a);
+        }
+        Rect cardScreen;   // where the card was drawn this pass (world tags keep out from under it)
+        GUIStyle sTitle, sBody, sStatus, sKey, sCount, sTag, sTagLarge; int styledFor = -1;
         readonly GUIContent measure = new GUIContent();
         string bodySource, bodyShown, eyebrowFor, eyebrow, countShown = ""; int countFor = -1, countOf = -1;
         static string emphOpen;
@@ -211,11 +222,12 @@ namespace LastBell.Run
             if (styledFor == Screen.height) return;
             styledFor = Screen.height;
             sTitle = UiTheme.Style(TitleSize, true, TextAnchor.UpperLeft, UiTheme.Ivory, true);
-            sBody = UiTheme.Style(UiTheme.SizeBody, false, TextAnchor.UpperLeft, UiTheme.IvoryBody, true); sBody.richText = true;
-            sStatus = UiTheme.Style(UiTheme.SizeBody, true, TextAnchor.UpperLeft, UiTheme.GoldBright, true);
+            sBody = UiTheme.Style(BodySize, false, TextAnchor.UpperLeft, UiTheme.IvoryBody, true); sBody.richText = true;
+            sStatus = UiTheme.Style(BodySize, true, TextAnchor.UpperLeft, UiTheme.GoldBright, true);
             sKey = UiTheme.Style(UiTheme.SizeNumeric, true, TextAnchor.MiddleLeft, UiTheme.GoldLabel);
             sCount = UiTheme.Style(UiTheme.SizeLabel, false, TextAnchor.MiddleRight, UiTheme.IvoryMuted);
             sTag = UiTheme.Style(EncounterCallouts.TagSize, true, TextAnchor.MiddleCenter, UiTheme.Ivory);   // as the encounter callouts
+            sTagLarge = UiTheme.Style(EncounterCallouts.TagLargeSize, true, TextAnchor.MiddleCenter, UiTheme.Ivory);   // numerals on the floor
         }
         // the step text's <b>emphasis</b> as GoldBright (a rich-text colour: UiTheme.Label tints it with the body colour and
         // draws the shadow pass black), cached per body string
@@ -233,24 +245,25 @@ namespace LastBell.Run
             if (Finished || W == null || !d || (d.State != RunState.Combat && d.State != RunState.Cleared && d.State != RunState.Results) || d.Paused) return;
             GUI.depth = -20;   // above RunHud (0) and encounter HUDs
             Styles();
-            var cam = Camera.main;
-            // over-head tags and floor labels (world to screen)
-            if (cam && d.State == RunState.Combat)
-            {
-                foreach (var kv in Labels) if (kv.Key && !kv.Key.Down) WorldTag(cam, kv.Key.transform.position + Vector3.up * 3.0f, kv.Value);
-                foreach (var (at, text) in FloorLabels) WorldTag(cam, at + Vector3.up * 0.4f, text);
-                if (PlayerGoal.HasValue && GoalLabel.Length > 0) WorldTag(cam, PlayerGoal.Value + Vector3.up * 0.4f, GoalLabel);
-            }
             // the instruction card: left side, below the boss bar, clear of the floor shapes in the middle (laid out in screen px)
             if (!ReferenceEquals(eyebrowFor, Section)) { eyebrowFor = Section; eyebrow = UiTheme.Spaced("Tutorial · " + Section); }
             if (countFor != StepNumber || countOf != StepCount) { countFor = StepNumber; countOf = StepCount; countShown = StepNumber + " / " + StepCount; }
             string body = ShownBody(), cont = WaitingForContinue ? ContinueHint() : null;
             float x = UiTheme.V(CardX + 3 + PadL), inner = UiTheme.V(CardW - 3 - PadL - PadR), y0 = UiTheme.V(CardY);
             float th = Height(sTitle, Title, inner), bh = Height(sBody, body, inner), sh = Status.Length > 0 ? Height(sStatus, Status, inner) : 0;
-            // eyebrow 20, gap 8, title, gap 8, rule 2, gap 16, body, [gap 12, status], [gap 14, continue 22]
+            // eyebrow 20, gap 8, title, gap 8, rule 2, gap 16, body, [gap 20, status], [gap 14, continue 22]
             float h = UiTheme.V(PadY + 20 + 8) + th + UiTheme.V(8 + UiTheme.RuleHeight + 16) + bh
-                + (sh > 0 ? UiTheme.V(12) + sh : 0) + (cont != null ? UiTheme.V(14 + 22) : 0) + UiTheme.V(PadY);
-            UiImgui.InfoStrip(new Rect(CardX, CardY, CardW, h / UiTheme.Scale));
+                + (sh > 0 ? UiTheme.V(20) + sh : 0) + (cont != null ? UiTheme.V(14 + 22) : 0) + UiTheme.V(PadY);
+            cardScreen = new Rect(UiTheme.V(CardX), y0, UiTheme.V(CardW), h);
+            // over-head tags and floor labels (world to screen), under the card
+            var cam = Camera.main;
+            if (cam && d.State == RunState.Combat)
+            {
+                foreach (var kv in Labels) if (kv.Key && !kv.Key.Down) WorldTag(cam, kv.Key.transform.position + Vector3.up * 3.0f, kv.Value, sTag);
+                foreach (var (at, text) in FloorLabels) WorldTag(cam, at + Vector3.up * 0.4f, text, sTagLarge);
+                if (PlayerGoal.HasValue && GoalLabel.Length > 0) WorldTag(cam, PlayerGoal.Value + Vector3.up * 0.4f, GoalLabel, sTag);
+            }
+            CardBack(h / UiTheme.Scale);
             float cy = y0 + UiTheme.V(PadY);
             UiTheme.Label(new Rect(x, cy, inner, UiTheme.V(20)), eyebrow, UiImgui.Styles.Eyebrow);
             UiTheme.Label(new Rect(x, cy, inner, UiTheme.V(20)), countShown, sCount);
@@ -258,7 +271,7 @@ namespace LastBell.Run
             UiTheme.Label(new Rect(x, cy, inner, th), Title, sTitle); cy += th + UiTheme.V(8);
             UiTheme.Fill(new Rect(x, cy, UiTheme.V(UiTheme.RuleWidth), Mathf.Max(1, UiTheme.V(UiTheme.RuleHeight))), UiTheme.Gold); cy += UiTheme.V(UiTheme.RuleHeight + 16);
             UiTheme.Label(new Rect(x, cy, inner, bh), body, sBody); cy += bh;
-            if (sh > 0) { cy += UiTheme.V(12); UiTheme.Label(new Rect(x, cy, inner, sh), Status, sStatus, StatusBad ? UiTheme.Danger : UiTheme.GoldBright); cy += sh; }
+            if (sh > 0) { cy += UiTheme.V(20); UiTheme.Label(new Rect(x, cy, inner, sh), Status, sStatus, StatusBad ? UiTheme.Danger : UiTheme.GoldLabel); cy += sh; }
             if (cont != null) { cy += UiTheme.V(14); UiTheme.Label(new Rect(x, cy, inner, UiTheme.V(22)), cont, sKey); }
         }
         // "Press Enter to continue" / "Press A to continue", for the last device used (Update accepts both)
@@ -267,14 +280,18 @@ namespace LastBell.Run
             var key = InputHints.Key(HintAction.Confirm);
             return key == "A" ? "Press A to continue" : key == "Enter" ? "Press Enter to continue" : "Press " + key + " to continue";
         }
-        // a tag over a player or a floor spot: the encounter callouts' tag style on a soft ink strip
-        void WorldTag(Camera cam, Vector3 world, string text)
+        // a tag over a player or a floor spot: a small info strip (card ink, 2 px Gold left tick) in the encounter callouts' tag
+        // style; kept 16 px inside the screen, and hidden where the card covers it
+        void WorldTag(Camera cam, Vector3 world, string text, GUIStyle st)
         {
             var sp = cam.WorldToScreenPoint(world); if (sp.z <= 0) return;
-            measure.text = text; var size = sTag.CalcSize(measure);
-            var r = new Rect(sp.x - size.x / 2 - UiTheme.V(10), Screen.height - sp.y - size.y / 2 - UiTheme.V(4), size.x + UiTheme.V(20), size.y + UiTheme.V(8));
-            UiTheme.Fill(r, UiTheme.InkStrip);
-            UiTheme.Label(r, text, sTag);
+            measure.text = text; var size = st.CalcSize(measure);
+            float m = UiTheme.V(16), w = size.x + UiTheme.V(20), hh = size.y + UiTheme.V(8);
+            var r = new Rect(Mathf.Clamp(sp.x - w / 2, m, Screen.width - m - w), Mathf.Clamp(Screen.height - sp.y - hh / 2, m, Screen.height - m - hh), w, hh);
+            if (r.Overlaps(cardScreen)) return;
+            UiTheme.Fill(r, CardInk);
+            UiTheme.Fill(new Rect(r.x, r.y, Mathf.Max(1, UiTheme.V(2)), r.height), UiTheme.Gold);
+            UiTheme.Label(r, text, st);
         }
     }
 }
