@@ -86,6 +86,7 @@ namespace LastBell.Menu
         void OnDestroy()
         {
             if (Instance == this) Instance = null;
+            if (navigationHeldUntil > 0 && EventSystem.current) EventSystem.current.sendNavigationEvents = true;   // never leave navigation off
             foreach (var s in Slots) if (s != null && s.Texture) { if (s.Cam) s.Cam.targetTexture = null; s.Texture.Release(); Destroy(s.Texture); }
         }
 
@@ -423,6 +424,7 @@ namespace LastBell.Menu
         void Update()
         {
             if (!canvas) return;
+            ReleaseNavigation();
             HandleInput();
             Refresh();
             // Ultrawide (wider than ~1.95:1): the content keeps a centred 16:9 frame; backdrop and gradient stay full width.
@@ -464,7 +466,14 @@ namespace LastBell.Menu
             if (Pressed(k => k.upArrowKey.wasPressedThisFrame, g => g.dpad.up.wasPressedThisFrame)) step = 1;
             if (Pressed(k => k.downArrowKey.wasPressedThisFrame, g => g.dpad.down.wasPressedThisFrame)) step = -1;
             var to = step > 0 ? field.navigation.selectOnUp : step < 0 ? field.navigation.selectOnDown : null;
-            if (to && to.IsInteractable()) { field.DeactivateInputField(); Focus(to); }
+            // the EventSystem sees the same press a frame later; hold its navigation for two frames so the new row
+            // doesn't move again
+            if (to && to.IsInteractable()) { field.DeactivateInputField(); Focus(to); EventSystem.current.sendNavigationEvents = false; navigationHeldUntil = Time.frameCount + 2; }
+        }
+        int navigationHeldUntil;
+        void ReleaseNavigation()
+        {
+            if (navigationHeldUntil > 0 && Time.frameCount >= navigationHeldUntil && EventSystem.current) { EventSystem.current.sendNavigationEvents = true; navigationHeldUntil = 0; }
         }
         static bool Pressed(Func<Keyboard, bool> k, Func<Gamepad, bool> g) => (Keyboard.current != null && k(Keyboard.current)) || (Gamepad.current != null && g(Gamepad.current));
         void HandleInput()
