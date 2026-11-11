@@ -65,7 +65,7 @@ namespace LastBell.Menu
         // text rows with the highlight strip, drawn chevrons, underline input fields and centre-band dialogs.
         Canvas canvas; RectTransform root, frame; GameObject connectPage, lobbyPage, nameCard, leaveConfirm;
         InputField address, port, nameField; Text status, playingAs, nameError, notice, bossName, arenaName, hint, hostAddress, leaveBody, editNameLabel;
-        Header header; Chooser bossChooser, arenaChooser; CanvasGroup frameGroup;
+        Header header; Chooser bossChooser, arenaChooser; CanvasGroup frameGroup; RawImage backdropArt;
         public Button HostButton, JoinButton, EditNameButton, ConfirmNameButton, ReadyButton, StartButton, BackButton, BossPrev, BossNext, ArenaPrev, ArenaNext, LeaveButton, StayButton;
         RawImage arenaArt;
         public sealed class Slot
@@ -100,10 +100,17 @@ namespace LastBell.Menu
             key.color = new Color(1f, .95f, .88f); key.transform.rotation = Quaternion.Euler(28, 160, 0);
             canvas = MenuUI.Canvas(transform); root = (RectTransform)canvas.transform;
             MenuUI.Panel("Backdrop", root, Vector2.zero, Vector2.one, UiTheme.Backdrop);
+            // The lobby has no live scene: the selected arena's preview art stands in for it, darkened, like Boss Rush's
+            // backdrop (the connect page shows the last arena used). The cards and text keep their contrast.
+            backdropArt = MenuUI.Rect("Arena backdrop", root, Vector2.zero, Vector2.one).gameObject.AddComponent<RawImage>(); backdropArt.raycastTarget = false;
+            var envelope = backdropArt.gameObject.AddComponent<AspectRatioFitter>(); envelope.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent; envelope.aspectRatio = 16f / 9;
+            backdropArt.color = new Color(.42f, .42f, .48f, 1); backdropArt.enabled = false;
+            var last = RunMaps.All.Length > 0 ? TestRushSetup.Preview(Mathf.Clamp(TestRushSetup.SavedMap, 0, RunMaps.All.Length - 1)) : null;
+            if (last) { backdropArt.texture = last; backdropArt.enabled = true; }
             MenuUI.SideGradient(root, new Vector2(.42f, 0), Vector2.one);
             // One content frame for everything but the backdrop: ultrawide narrows it to a centred 16:9 frame (Update).
             frame = MenuUI.Rect("Content", root, Vector2.zero, Vector2.one); frameGroup = frame.gameObject.AddComponent<CanvasGroup>();
-            header = MenuUI.Header(frame, "LAN Multiplayer", "Host or Join", new Vector2(.04f, .835f), new Vector2(.6f, .955f));
+            header = MenuUI.Header(frame, "LAN Multiplayer", "HOST OR JOIN", new Vector2(.04f, .835f), new Vector2(.6f, .955f));
             playingAs = MenuUI.Text("", frame, new Vector2(.6f, .905f), new Vector2(.96f, .955f), UiTheme.SizeBody, UiTheme.IvoryMuted, TextAnchor.MiddleRight);
             status = MenuUI.Text("", frame, new Vector2(.04f, .16f), new Vector2(.96f, .2f), 19, UiTheme.IvoryBody);
             hint = MenuUI.Text("", frame, new Vector2(.15f, .126f), new Vector2(.85f, .158f), 15, UiTheme.IvoryMuted);
@@ -123,7 +130,6 @@ namespace LastBell.Menu
             connectPage = MenuUI.Rect("Connect page", frame, Vector2.zero, Vector2.one).gameObject;
             var c = MenuUI.Rect("Connect column", connectPage.transform, new Vector2(.60f, .2f), new Vector2(.96f, .82f));
             float Y(int i) => .87f - i * .105f; const float H = .085f;
-            Color cueColor = new Color(UiTheme.Gold.r, UiTheme.Gold.g, UiTheme.Gold.b, .6f);
             void Caption(string text, int i) => MenuUI.Text(text, c, new Vector2(0, Y(i)), new Vector2(.4f, Y(i) + H), UiTheme.SizeBody, UiTheme.IvoryBody, TextAnchor.MiddleLeft);
             void Eyebrow(string text, float y) => MenuUI.Text(UiTheme.Spaced(text), c, new Vector2(0, y), new Vector2(1, y + .04f), 14, UiTheme.GoldLabel, TextAnchor.MiddleLeft);
             // name: a value row (caption left, the name as the row's label, a chevron cue); it opens the name card
@@ -131,7 +137,6 @@ namespace LastBell.Menu
             editNameLabel = EditNameButton.GetComponentInChildren<Text>(); var nr = editNameLabel.rectTransform;
             nr.anchorMin = new Vector2(.42f, 0); nr.offsetMin = new Vector2(12, 3); nr.offsetMax = new Vector2(-34, -3); editNameLabel.alignment = TextAnchor.MiddleLeft;
             MenuUI.Text("Your name", EditNameButton.transform, Vector2.zero, new Vector2(.42f, 1), UiTheme.SizeBody, UiTheme.IvoryBody, TextAnchor.MiddleLeft);
-            var cue = MenuUI.Chevron(EditNameButton.transform, true, 16, cueColor); cue.anchorMin = cue.anchorMax = new Vector2(1, .5f); cue.anchoredPosition = new Vector2(-14, 0);
             var divider = MenuUI.Panel("Row divider", c, new Vector2(0, Y(0) - .012f), new Vector2(1, Y(0) - .012f), UiTheme.RuleFaint); divider.rectTransform.sizeDelta = new Vector2(0, 1);
             Eyebrow("Host a game", Y(1) + .02f);
             HostButton = MenuUI.Row("Host LAN game", c, new Vector2(0, Y(2) + .02f), new Vector2(1, Y(2) + .02f + H + .01f), Host, 28, Vector2.zero);
@@ -141,7 +146,7 @@ namespace LastBell.Menu
             address = Field(c, new Vector2(.42f, Y(4)), new Vector2(1, Y(4) + H), PlayerPrefs.GetString(AddressKey, "127.0.0.1"), "192.168.0.10");
             Caption("Port", 5);
             port = Field(c, new Vector2(.42f, Y(5)), new Vector2(.7f, Y(5) + H), PlayerPrefs.GetInt(PortKey, DefaultPort).ToString(), DefaultPort.ToString()); port.contentType = InputField.ContentType.IntegerNumber;
-            JoinButton = MenuUI.Row("Connect", c, new Vector2(.42f, Y(6)), new Vector2(1, Y(6) + H), Join, 24, Vector2.zero);
+            JoinButton = MenuUI.Row("Connect", c, new Vector2(0, Y(6)), new Vector2(1, Y(6) + H), Join, 24, Vector2.zero);
             JoinButton.GetComponentInChildren<Text>().alignment = TextAnchor.MiddleLeft;
             MenuUI.Text("Trusted local networks only. The host's screen shows the address to type.", c, new Vector2(0, Y(7) - .02f), new Vector2(1, Y(7) + H - .01f), 15, UiTheme.IvoryMuted, TextAnchor.UpperLeft);
         }
@@ -151,7 +156,7 @@ namespace LastBell.Menu
         {
             var r = MenuUI.Rect("Input", parent, min, max);
             var hit = r.gameObject.AddComponent<Image>(); hit.color = new Color(0, 0, 0, 0); hit.raycastTarget = true;
-            var strip = MenuUI.Strip(r);
+            var strip = MenuUI.Strip(r); strip.color = new Color(UiTheme.StripFill.r, UiTheme.StripFill.g, UiTheme.StripFill.b, UiTheme.StripFill.a * .5f);   // quieter: the underline carries focus
             var line = MenuUI.Panel("Field underline", r, Vector2.zero, new Vector2(1, 0), UiTheme.Ivory);
             line.rectTransform.pivot = new Vector2(.5f, 0); line.rectTransform.sizeDelta = new Vector2(0, 1); line.rectTransform.anchoredPosition = new Vector2(0, 4);
             var input = r.gameObject.AddComponent<InputField>(); input.targetGraphic = hit; input.transition = Selectable.Transition.None;
@@ -209,7 +214,7 @@ namespace LastBell.Menu
             foreach (var label in new[] { bossName, arenaName }) { label.alignment = TextAnchor.MiddleLeft; label.rectTransform.offsetMin = new Vector2(44, 3); label.rectTransform.offsetMax = new Vector2(-44, -3); }
             notice = MenuUI.Text("", t, new Vector2(.04f, .638f), new Vector2(.96f, .672f), 18, UiTheme.GoldBright);
             for (int i = 0; i < Slots.Length; i++) Slots[i] = BuildSlot(i, t);
-            ReadyButton = MenuUI.Row("Ready", t, new Vector2(.41f, .035f), new Vector2(.59f, .105f), ToggleReady, 24, Vector2.zero);
+            ReadyButton = MenuUI.Row("Ready", t, new Vector2(.36f, .035f), new Vector2(.64f, .105f), ToggleReady, 24, Vector2.zero);
             StartButton = MenuUI.Row("Start fight", t, new Vector2(.71f, .03f), new Vector2(.96f, .108f), StartFight, 28, Vector2.zero);
             StartButton.GetComponentInChildren<Text>().alignment = TextAnchor.MiddleRight;
             foreach (var b in new[] { BossPrev, BossNext, ArenaPrev, ArenaNext }) b.navigation = new Navigation { mode = Navigation.Mode.None };
@@ -343,14 +348,14 @@ namespace LastBell.Menu
         }
         void BuildNameCard()
         {
-            nameCard = Dialog("Name card", "LAN Profile", "Choose a name", out var c);
+            nameCard = Dialog("Name card", "LAN Profile", "CHOOSE A NAME", out var c);
             MenuUI.Text("Other players see this name in the lobby and over your character. It's saved on this computer.", c, new Vector2(.05f, .53f), new Vector2(.95f, .65f), UiTheme.SizeBody, UiTheme.IvoryBody);
             nameField = Field(c, new Vector2(.2f, .39f), new Vector2(.8f, .49f), LanProfile.Saved ?? "", "Your name");
             nameField.characterLimit = LanPlayerName.MaxLength + 4;   // room to type spaces that get trimmed
             nameField.textComponent.alignment = TextAnchor.MiddleCenter; ((Text)nameField.placeholder).alignment = TextAnchor.MiddleCenter;
             nameError = MenuUI.Text("", c, new Vector2(.05f, .31f), new Vector2(.95f, .38f), 16, UiTheme.Gold);
-            var back = MenuUI.Row("Back", c, new Vector2(.2f, .16f), new Vector2(.46f, .28f), Back, 24, Vector2.zero);
-            ConfirmNameButton = MenuUI.Row("Confirm", c, new Vector2(.54f, .16f), new Vector2(.8f, .28f), ConfirmName, 28, Vector2.zero);
+            var back = MenuUI.Row("Back", c, new Vector2(.02f, .16f), new Vector2(.48f, .28f), Back, 24, Vector2.zero);
+            ConfirmNameButton = MenuUI.Row("Confirm", c, new Vector2(.52f, .16f), new Vector2(.98f, .28f), ConfirmName, 28, Vector2.zero);
             // field above, Back / Confirm side by side under it (wrap-around both ways)
             nameField.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnDown = ConfirmNameButton, selectOnUp = ConfirmNameButton };
             back.navigation = new Navigation { mode = Navigation.Mode.Explicit, selectOnRight = ConfirmNameButton, selectOnLeft = ConfirmNameButton, selectOnUp = nameField, selectOnDown = nameField };
@@ -373,10 +378,10 @@ namespace LastBell.Menu
         }
         void BuildLeaveConfirm()
         {
-            leaveConfirm = Dialog("Leave card", "LAN Lobby", "Leave the lobby?", out var c);
+            leaveConfirm = Dialog("Leave card", "LAN Lobby", "LEAVE THE LOBBY?", out var c);
             leaveBody = MenuUI.Text("", c, new Vector2(.05f, .5f), new Vector2(.95f, .62f), UiTheme.SizeBody, UiTheme.IvoryBody);
-            StayButton = MenuUI.Row("Stay", c, new Vector2(.2f, .3f), new Vector2(.46f, .42f), Back, 28, Vector2.zero);
-            LeaveButton = MenuUI.Row("Leave", c, new Vector2(.54f, .3f), new Vector2(.8f, .42f), Leave, 24, Vector2.zero);
+            StayButton = MenuUI.Row("Stay", c, new Vector2(.02f, .3f), new Vector2(.48f, .42f), Back, 28, Vector2.zero);
+            LeaveButton = MenuUI.Row("Leave", c, new Vector2(.52f, .3f), new Vector2(.98f, .42f), Leave, 24, Vector2.zero);
             Horizontal(StayButton, LeaveButton);
             leaveConfirm.SetActive(false);
         }
@@ -397,7 +402,7 @@ namespace LastBell.Menu
         {
             Current = page; connectPage.SetActive(page == Page.Connect); lobbyPage.SetActive(page == Page.Lobby);
             header.Eyebrow.text = UiTheme.Spaced(page == Page.Lobby ? "LAN Lobby" : "LAN Multiplayer");
-            header.Title.text = page == Page.Lobby ? "Lobby" : "Host or Join";
+            header.Title.text = page == Page.Lobby ? "LOBBY" : "HOST OR JOIN";
             if (page == Page.Lobby)
             {
                 // Lobby: Left/Right change class, so focus moves only up/down between Ready, Start and Back.
@@ -429,6 +434,10 @@ namespace LastBell.Menu
             // status: under the column on the connect page, centred over the footer in the lobby
             var sr = status.rectTransform; var want = Current == Page.Lobby ? new Vector2(.04f, .16f) : new Vector2(.6f, .16f);
             if (sr.anchorMin != want) { sr.anchorMin = want; status.alignment = Current == Page.Lobby ? TextAnchor.MiddleCenter : TextAnchor.MiddleLeft; }
+            // the hint line follows the controls: under the column on the connect page, centred in the lobby and dialogs
+            bool column = Current == Page.Connect && !NameCardOpen && !LeaveConfirmOpen; float fx = frame.anchorMin.x, fw = frame.anchorMax.x - frame.anchorMin.x;
+            var hr = hint.rectTransform; var hmin = new Vector2(column ? fx + .6f * fw : fx + .15f * fw, .126f);
+            if (hr.anchorMin != hmin) { hr.anchorMin = hmin; hr.anchorMax = new Vector2(column ? fx + .96f * fw : fx + .85f * fw, .158f); hint.alignment = column ? TextAnchor.MiddleLeft : TextAnchor.MiddleCenter; }
         }
         static void PlaceChooser(Chooser c)
         {
@@ -500,6 +509,7 @@ namespace LastBell.Menu
             arenaName.text = map >= 0 ? RunMaps.All[map].Name : "—";
             if (map != artMap) { artMap = map; artTexture = map >= 0 ? TestRushSetup.Preview(map) : null; }
             arenaArt.texture = artTexture; arenaArt.enabled = artTexture;
+            if (artTexture && backdropArt.texture != artTexture) { backdropArt.texture = artTexture; backdropArt.enabled = true; }
             if (connected && lobby.SelectionRevision != seenSelection)
             {
                 if (!hosting && seenSelection >= 0) noticeUntil = Time.unscaledTime + 5;
