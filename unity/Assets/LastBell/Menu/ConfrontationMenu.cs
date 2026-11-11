@@ -125,10 +125,13 @@ namespace LastBell.Menu
             // One player for everything (4 Nov 2026): Start Run, Boss Rush and Multiplayer (the LAN lobby) on one menu.
             StartButton=Nav("Start Run",panel,.58f,StartRun,28);RushButton=Nav("Boss Rush",panel,.48f,BossRush);
             StartButton.interactable=StartRunEnabled;   // greyed out: NavFocus dims a non-interactable label
+#if UNITY_WEBGL && !UNITY_EDITOR
+            // The browser demo ships without LAN: no Multiplayer row and no lobby scene (WebDemoBuild), and the rows below move up.
+            SettingsButton=Nav("Settings",panel,.38f,OpenSettings);ExitButton=Nav("Exit",panel,.28f,Exit);
+            ExitButton.GetComponentInChildren<Text>().text="Return to Menu";
+#else
             MultiplayerButton=Nav("Multiplayer",panel,.38f,OpenLan);
             SettingsButton=Nav("Settings",panel,.28f,OpenSettings);ExitButton=Nav("Exit",panel,.18f,Exit);
-#if UNITY_WEBGL && !UNITY_EDITOR
-            ExitButton.GetComponentInChildren<Text>().text="Return to Menu";
 #endif
             // Class picker keeps its approved place above Start Run, as a secondary control.
             selectClass=MenuUI.Text(UiTheme.Spaced("Select Class"),panel,new Vector2(0,.705f),new Vector2(1,.745f),13,new Color(MenuUI.Gold.r,MenuUI.Gold.g,MenuUI.Gold.b,.72f));
