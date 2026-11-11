@@ -240,9 +240,17 @@ namespace LastBell.Run
             yield return BeginFight(20261103);
             if (boss == null) yield break;
             Check("fight opens in phase 1 at 96 BPM", !boss.Phase2 && Mathf.Approximately(boss.Bpm, 96) && boss.BeatTicks == 38);
-            Check("placeholder stand-in body (no model) and no ability text", boss.Placeholder && boss.PhaseName == "" && boss.Lesson == "" && !SiltCarillonHud.ShowDiagnostics && boss.transform.Find("Silt Carillon (STAND-IN, labelled placeholder)"));
+            Check("no ability text", boss.PhaseName == "" && boss.Lesson == "" && !SiltCarillonHud.ShowDiagnostics);
+            // miniboss art pass (9 Nov 2026): the rigged body replaces the stand-in; the stand-in stays as the fallback
+            if (boss.Presenter && boss.Presenter.HasModel)
+            {
+                var missing = SiltCarillonEncounter.ClipNames.Where(c => !boss.Presenter.Has(c)).ToList();
+                Check($"the rigged model is loaded with all {SiltCarillonEncounter.ClipNames.Length} clips, no stand-in built", !boss.Placeholder && missing.Count == 0 && !boss.GetComponentsInChildren<Transform>().Any(t => t.name.Contains("STAND-IN")),
+                    missing.Count > 0 ? "missing: " + string.Join(", ", missing) : "");
+            }
+            else Check("no rigged model in this build: the labelled stand-in is used (Placeholder)", boss.Placeholder && boss.GetComponentsInChildren<Transform>().Any(t => t.name == "Silt Carillon (STAND-IN, labelled placeholder)"));
             Check("practice phase row matches the encounter (2 phases)", boss.PhaseStarts.Length == RunDirector.Bosses[RunDirector.SiltCarillonPractice].Phases);
-            RenderShot("standin_front", new Vector3(0, 3.4f, 9.5f), new Vector3(0, 1.8f, 0), 40);
+            RenderShot("body_front", new Vector3(0, 3.4f, 9.5f), new Vector3(0, 1.8f, 0), 40);
 
             // 1. the opening High Tide + Sunken Bells: the walker rings the lone bell
             Section("High Tide + Sunken Bells (solo)");
@@ -255,6 +263,12 @@ namespace LastBell.Run
             Check("the High Tide floods the ring from 7 m to the edge (burn 25/s after 5 beats), drawn in the raid look", d.World.Hazards.Live.Any(h => h.Source == "Silt Tide" && h.Shape == HazardShape.Ring && Mathf.Approximately(h.Inner, 7) && h.BurnPerSecond == 25 && h.LockAt == 190 && h.FillToLock));
             Check("no ability names in the boss panel: no live hazard carries a mechanic tag", d.World.Hazards.Live.All(h => string.IsNullOrEmpty(h.MechanicId)));
             yield return Wait(1.5f);
+            var bp = boss.FirstBellPresenter;
+            Check("a Sunken Bell prop surfaced in the bell circle (the SiltBell model with its 4 clips), off the boss's own hierarchy",
+                boss.BellViewsLive == 1 && boss.BellModelLoaded && bp && SiltCarillonEncounter.BellClipNames.All(c => bp.Has(c)) && !bp.transform.IsChildOf(boss.transform) &&
+                boss.PropRoots.All(r => Sim.Flat(r.position - first.Origin).magnitude < 0.05f),
+                $"views {boss.BellViewsLive}, model {boss.BellModelLoaded}");
+            Check("the boss's own presenter is still the first one under the boss (LAN body capture)", boss.GetComponentInChildren<CharacterPresenter>() == boss.Presenter);
             Overhead("solo_high_tide_bell");
             yield return Grab("solo_high_tide_bell_camera");
             yield return Until(() => boss.Drained, 15, "Drained");
@@ -284,6 +298,9 @@ namespace LastBell.Run
             Check("a player who keeps walking takes no drop and no mound", HitsSince(start, "Silt Fall", d.Player) == 0 && HitsSince(start, "Silt Mound", d.Player) == 0,
                 $"{HitsSince(start, "Silt Fall", d.Player)} drops, {HitsSince(start, "Silt Mound", d.Player)} mound ticks");
             Check("every drop leaves a mound and every mound sets; nothing is left live", boss.MoundsSpawned == boss.DropsLanded && boss.MoundsSet == boss.MoundsSpawned && boss.FallLive == 0 && d.World.Hazards.Count == 0);
+            yield return Wait(0.6f);
+            Check("every mound got a SiltMound heap, and the heaps are gone once the mounds set", boss.MoundViews >= boss.MoundsSpawned && boss.MoundModelLoaded && boss.MoundViewsLive == 0,
+                $"{boss.MoundViews} views for {boss.MoundsSpawned} mounds, {boss.MoundViewsLive} still live");
 
             // 3. Drowned Peal (outgoing)
             Section("Drowned Peal (solo + dummies)");
