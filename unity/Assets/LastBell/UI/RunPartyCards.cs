@@ -32,7 +32,7 @@ namespace LastBell.Run
         {
             if (styleHeight == Screen.height && title != null) return;
             styleHeight = Screen.height;
-            eyebrow = UiTheme.Style(UiTheme.SizeMicro - 1, false, TextAnchor.MiddleLeft, UiTheme.GoldLabel);
+            eyebrow = UiTheme.Style(UiTheme.SizeMicro, true, TextAnchor.MiddleLeft, UiTheme.Gold);
             title = UiTheme.Style(UiTheme.SizeNumeric + 1, true, TextAnchor.MiddleLeft, UiTheme.Ivory);
             value = UiTheme.Style(UiTheme.SizeMicro, true, TextAnchor.MiddleRight, UiTheme.IvoryMuted);
             status = UiTheme.Style(UiTheme.SizeMicro, true, TextAnchor.MiddleRight, UiTheme.Ivory);
@@ -99,9 +99,13 @@ namespace LastBell.Run
             a = p.Dead ? 0.5f : 1f;
             var old = GUI.color; GUI.color = new Color(old.r, old.g, old.b, old.a * a);   // labels; fills take Fa()
 
-            // UiImgui.InfoStrip's look (ink strip, 3 px left bar), drawn here so a dead card can dim; the bar turns with the state
-            UiTheme.Fill(S(x, y, W, H), Fa(UiTheme.InkStrip));
-            UiTheme.Fill(S(x, y, 3, H), Fa(p.Dead ? UiTheme.IvoryMicro : p.Down ? UiTheme.Danger : UiTheme.Gold));
+            // UiImgui.InfoStrip's look (ink strip, 3 px left bar), drawn here so a dead card can dim. The ink is denser than the
+            // world-text strip (critic round 1: red floors tinted the cards), more so while down; the bar turns with the state and
+            // pulses 3-5 px while down so a downed ally is seen at a glance.
+            bool downNow = p.Down && !p.Dead;
+            UiTheme.Fill(S(x, y, W, H), Fa(A(UiTheme.InkDeep, downNow ? 0.9f : 0.8f)));
+            float barW = downNow ? 4 + Mathf.Sin(now * 6f) : 3;
+            UiTheme.Fill(S(x, y, barW, H), Fa(p.Dead ? UiTheme.IvoryMicro : downNow ? UiTheme.Danger : UiTheme.Gold));
 
             const float pad = 14;
             float cx = x + pad, cw = W - pad - 10;
@@ -112,10 +116,13 @@ namespace LastBell.Run
             string st; Color sc;
             if (p.Dead) { st = "DEAD"; sc = UiTheme.IvoryMuted; }
             else if (p.Down && p.ReviveProgress > 0.001f) { st = "REVIVING"; sc = UiTheme.Ivory; }
-            else if (p.Down) { st = Down(Mathf.CeilToInt(PlayerController.BleedOutSeconds - p.DownedTicks / (float)Sim.Hz)); sc = UiTheme.Danger; }
+            else if (p.Down) { st = Down(Mathf.CeilToInt(PlayerController.BleedOutSeconds - p.DownedTicks / (float)Sim.Hz)); sc = UiTheme.Ivory; }
             else if (now < t.upUntil) { st = "REVIVED"; sc = UiTheme.GoldBright; }
             else { st = Num(hp); sc = f < 0.3f ? UiTheme.Danger : UiTheme.IvoryMuted; }
-            UiTheme.Label(S(cx, y + 20, cw, 20), st, p.Down || now < t.upUntil ? status : value, sc);
+            var stSt = p.Down || now < t.upUntil ? status : value;
+            // DOWN: Ivory on a small red tag (red text vanished over red telegraphs)
+            if (downNow && p.ReviveProgress <= 0.001f) { float tw = stSt.CalcSize(new GUIContent(st)).x / UiTheme.Scale + 12; UiTheme.Fill(S(cx + cw - tw + 6, y + 22, tw, 16), UiTheme.BossRed); }
+            UiTheme.Label(S(cx, y + 20, cw, 20), st, stSt, sc);
 
             // bar: 6 px trough; health (chip trail + flash), or while down the bleed-out left with the revive over it
             float bx = cx, by = y + H - 14, bw = cw;
@@ -123,7 +130,8 @@ namespace LastBell.Run
             if (p.Down && !p.Dead)
             {
                 float bleed = Mathf.Clamp01(1 - p.DownedTicks / (PlayerController.BleedOutSeconds * Sim.Hz));
-                UiTheme.Fill(S(bx, by, bw * bleed, 6), A(UiTheme.Danger, 0.55f));
+                // the bleed-out drains as a muted Ivory timer (not red: it read as a full health bar); the revive fills over it
+                UiTheme.Fill(S(bx, by, bw * bleed, 6), A(UiTheme.Ivory, 0.32f));
                 if (p.ReviveProgress > 0) UiTheme.Fill(S(bx, by, bw * Mathf.Clamp01(p.ReviveProgress), 6), UiTheme.Ivory);
             }
             else if (!p.Dead)

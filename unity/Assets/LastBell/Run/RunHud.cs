@@ -331,7 +331,7 @@ namespace LastBell.Run
                 long t = Stamp();
                 Boss(); t = Sec("boss block", t);
                 PlayerPanel(); t = Sec("player panel", t);
-                if (d.State != RunState.Results) RunPartyCards.Draw(d, Left, UiTheme.VirtualHeight - UiTheme.G4); t = Sec("party cards", t);   // bots and LAN allies (UI/RunPartyCards.cs)
+                if (d.State != RunState.Results) RunPartyCards.Draw(d, Margin, UiTheme.VirtualHeight - UiTheme.G4); t = Sec("party cards", t);   // bots and LAN allies (UI/RunPartyCards.cs)
                 BannerText(); CaptionText(); t = Sec("banner + caption", t);
                 Floats(); t = Sec("floats", t);
                 Labels(); t = Sec("world labels", t);
@@ -1194,8 +1194,8 @@ namespace LastBell.Run
                 for (int i = 0; i < parts.Length; i++)
                 {
                     // the main menu's small info card: ink strip, 3 px Gold left bar (UiImgui.InfoStrip), Gold label
-                    UiImgui.InfoStrip(new Rect(px, py, widths[i], 24), UiTheme.InkStrip);
-                    DrawSegs(px + 11, py, 24, TimeSegs(parts[i]), pill);   // a segment is centred in its width + 4, so +11 puts it 10 past the bar
+                    UiImgui.InfoStrip(new Rect(px, py, widths[i], 24), A(UiTheme.InkDeep, 0.8f));
+                    DrawSegs(px + 11, py, 24, TimeSegs(parts[i]), pill, UiTheme.GoldBright);   // a segment is centred in its width + 4, so +11 puts it 10 past the bar
                     px += widths[i] + 8;
                 }
             }
@@ -1278,13 +1278,17 @@ namespace LastBell.Run
         GUIStyle num => numStyle ?? (numStyle = new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter });
         // Demo caption (CaptionTitle / CaptionBody): the main menu's info card (ink strip, 3 px Gold left bar), centred above
         // the player panel's class-state chips; Ivory heading and IvoryBody body on the theme type ramp.
-        const float CaptionH = 96;
+        // Narrow (640) and fading to clear on the right (critic round 1: a wide opaque box covered telegraphs).
+        const float CaptionH = 96, CaptionW = 640;
         float CaptionTop => PanelTop - 34 - 16 - CaptionH;   // virtual; Labels keep world labels above it
         void CaptionText()
         {
             if (string.IsNullOrEmpty(CaptionTitle)) return;
-            float w = Mathf.Min(1100, Mathf.Min(UiTheme.VirtualWidth, 1920) - 80), x = UiTheme.VirtualWidth / 2 - w / 2, y = CaptionTop;
-            UiImgui.InfoStrip(new Rect(x, y, w, CaptionH));
+            float w = Mathf.Min(CaptionW, Mathf.Min(UiTheme.VirtualWidth, 1920) - 80), x = UiTheme.VirtualWidth / 2 - w / 2, y = CaptionTop;
+            UiTheme.Fill(S(x, y, w * 0.6f, CaptionH), A(UiTheme.InkDeep, 0.78f));
+            var o = GUI.color; GUI.color = new Color(1, 1, 1, 0.78f);   // the right 40 % fades out (the menu's side gradient, mirrored)
+            GUI.DrawTextureWithTexCoords(S(x + w * 0.6f, y, w * 0.4f, CaptionH), UiTheme.SideGradient, new Rect(1, 0, -1, 1), true); GUI.color = o;
+            F(x, y, 3, CaptionH, UiTheme.Gold);
             T(x + 24, y + 12, w - 48, 28, CaptionTitle, heading);
             T(x + 24, y + 44, w - 48, 44, CaptionBody ?? "", captionBody);
         }
@@ -1295,6 +1299,7 @@ namespace LastBell.Run
         {
             var t = CurrentBanner; if (t == null) return;
             float vw = UiTheme.VirtualWidth, y = UiTheme.VirtualHeight * 0.3f;
+            T(2, y + 2, vw, 64, t, bannerSt, A(Color.black, 0.55f));   // a heavier 2 px shadow under the theme's own 1 px one
             T(0, y, vw, 64, t, bannerSt, bannerColor);
             UiImgui.Rule(vw / 2 - UiTheme.RuleWidth / 2, y + 66);
         }
