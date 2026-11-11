@@ -29,22 +29,26 @@ namespace LastBell.Run
         PlayerInput latched;
         bool armed;   // gameplay presses are ignored until every action key has been released once (UI clicks can't leak)
         public static bool Blocked;   // set while a menu/panel owns the mouse
+        // The gameplay bindings, in one place: InputHints reads these, so on-screen key hints match what is read here.
+        // Slot 0 (primary) is the left mouse button and Dash the right; slots 1-4 are these keys.
+        public static readonly Key[] SlotKeys = { Key.Digit2, Key.Digit3, Key.Digit4, Key.Digit5 };
+        public const Key PotionKey = Key.F;
 
         public void Poll()
         {
             var kb = Keyboard.current; var m = Mouse.current; if (kb == null) return;
             bool lmb = m != null && m.leftButton.isPressed, rmb = m != null && m.rightButton.isPressed;
-            bool anyHeld = lmb || rmb || kb.digit2Key.isPressed || kb.digit3Key.isPressed || kb.digit4Key.isPressed
-                           || kb.digit5Key.isPressed || kb.spaceKey.isPressed;
+            bool anyHeld = lmb || rmb || kb[SlotKeys[0]].isPressed || kb[SlotKeys[1]].isPressed || kb[SlotKeys[2]].isPressed
+                           || kb[SlotKeys[3]].isPressed || kb.spaceKey.isPressed;
             if (Blocked) { armed = false; latched = default; return; }
             if (!armed) { if (!anyHeld) armed = true; return; }
             latched.P0 |= m != null && m.leftButton.wasPressedThisFrame;
-            latched.P1 |= kb.digit2Key.wasPressedThisFrame;
-            latched.P2 |= kb.digit3Key.wasPressedThisFrame;
-            latched.P3 |= kb.digit4Key.wasPressedThisFrame;
-            latched.P4 |= kb.digit5Key.wasPressedThisFrame;
+            latched.P1 |= kb[SlotKeys[0]].wasPressedThisFrame;
+            latched.P2 |= kb[SlotKeys[1]].wasPressedThisFrame;
+            latched.P3 |= kb[SlotKeys[2]].wasPressedThisFrame;
+            latched.P4 |= kb[SlotKeys[3]].wasPressedThisFrame;
             latched.Dash |= m != null && m.rightButton.wasPressedThisFrame;
-            latched.Potion |= kb.fKey.wasPressedThisFrame;
+            latched.Potion |= kb[PotionKey].wasPressedThisFrame;
         }
 
         public PlayerInput Read(PlayerController who)
@@ -58,7 +62,7 @@ namespace LastBell.Run
             r.Move = Vector2.ClampMagnitude(a, 1);
             r.Sprint = kb.leftShiftKey.isPressed || kb.rightShiftKey.isPressed;
             r.H0 = m != null && m.leftButton.isPressed;
-            r.H1 = kb.digit2Key.isPressed; r.H2 = kb.digit3Key.isPressed; r.H3 = kb.digit4Key.isPressed; r.H4 = kb.digit5Key.isPressed;
+            r.H1 = kb[SlotKeys[0]].isPressed; r.H2 = kb[SlotKeys[1]].isPressed; r.H3 = kb[SlotKeys[2]].isPressed; r.H4 = kb[SlotKeys[3]].isPressed;
             r.Aim = who.transform.position + who.transform.forward * 3;
             var cam = Camera.main;
             if (cam && m != null)

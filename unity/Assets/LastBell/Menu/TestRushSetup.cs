@@ -22,7 +22,7 @@ namespace LastBell.Menu
         public Button[] PhaseButtons {get;private set;}
         // Allies (bots) row (Chzy18, 24 Oct: every test build lets you pick 0-7 bots): one tab that cycles RunParty.Selected
         public Button AlliesButton {get;private set;}
-        Text alliesLabel;TestRushFocus alliesFocus;
+        Text alliesLabel;NavFocus alliesFocus;
         public static int MaxPhases{get{int n=1;foreach(var b in RunDirector.Bosses)n=Mathf.Max(n,b.Phases);return n;}}
         public static int PhasesOf(int encounter)=>encounter>=0&&encounter<RunDirector.Bosses.Length?RunDirector.Bosses[encounter].Phases:1;
         // Boss step rows (Risxhb, October 25, 2026): Bosses, then Minibosses, each a row of cards like the arena step.
@@ -42,14 +42,14 @@ namespace LastBell.Menu
         public bool Valid {get;private set;}
         public bool Loading {get;private set;}
         public bool OwnsFocus=>ownedPanel&&EventSystem.current.currentSelectedGameObject&&EventSystem.current.currentSelectedGameObject.transform.IsChildOf(ownedPanel.transform);
-        static readonly Color Muted=new Color(.93f,.88f,.76f,.62f), Faint=new Color(.93f,.88f,.76f,.16f);
-        Text[] mapLabels,encounterLabels,phaseLabels;TestRushFocus[] phaseFocus;Text phaseNote;Text arenaTitle,titleEyebrow,backLabel;Image titleRule;RawImage[] encounterArt;
+        static readonly Color Faint=UiTheme.RuleFaint;
+        Text[] mapLabels,encounterLabels,phaseLabels;NavFocus[] phaseFocus;Text phaseNote;Text backLabel;Header title;RawImage[] encounterArt;
         GameObject arenaGroup,bossGroup;Button backButton;
         // Two steps on the main menu: arena first, then the boss (encounter) with hero, difficulty and launch.
         public bool BossStep {get;private set;}
         int MiniPerRow=6;
         public Button ContinueButton {get;private set;}
-        TestRushFocus[] mapFocus,encounterFocus;
+        NavFocus[] mapFocus,encounterFocus;
         Image panelBase;MenuShowcase live;float stillAlpha=1;bool liveRequested;
         Texture2D shade,strip,cardFade;
         ConfrontationMenu selection;
@@ -57,7 +57,7 @@ namespace LastBell.Menu
         public void Build(ConfrontationMenu owner,Transform parent,string hero)
         {
             selection=owner;Hero=hero;SavedHero=hero;MapIndex=Mathf.Clamp(SavedMap,0,RunMaps.All.Length-1);EncounterIndex=Mathf.Clamp(SavedEncounter,0,RunDirector.Bosses.Length-1);PhaseIndex=Mathf.Clamp(SavedPhase,1,PhasesOf(EncounterIndex));
-            var panel=MenuUI.Panel("Test Rush setup",parent,Vector2.zero,Vector2.one,new Color(.012f,.014f,.026f,1));panel.raycastTarget=true;transform.SetParent(panel.transform,false);
+            var panel=MenuUI.Panel("Test Rush setup",parent,Vector2.zero,Vector2.one,UiTheme.Backdrop);panel.raycastTarget=true;transform.SetParent(panel.transform,false);
             ownedPanel=panel.gameObject;panelBase=panel;
             BuildBackdrop(panel.transform);
             arenaGroup=MenuUI.Rect("Arena step",panel.transform,Vector2.zero,Vector2.one).gameObject;
@@ -71,15 +71,11 @@ namespace LastBell.Menu
             // hero and difficulty; both are chosen on the main menu).
 
             // Featured selection: the arena on step one, the encounter on step two.
-            titleEyebrow=MenuUI.Text("",panel.transform,new Vector2(.04f,.735f),new Vector2(.6f,.765f),14,MenuUI.Gold,TextAnchor.MiddleLeft);
-            arenaTitle=MenuUI.Text("",panel.transform,new Vector2(.04f,.645f),new Vector2(.75f,.74f),64,MenuUI.Ivory,TextAnchor.MiddleLeft);
-            arenaTitle.resizeTextForBestFit=true;arenaTitle.resizeTextMinSize=30;arenaTitle.resizeTextMaxSize=64;
-            Shadow(arenaTitle,.8f);
-            titleRule=MenuUI.Panel("Title rule",panel.transform,new Vector2(.04f,.638f),new Vector2(.04f,.638f),MenuUI.Gold);titleRule.rectTransform.sizeDelta=new Vector2(96,2);titleRule.rectTransform.pivot=new Vector2(0,.5f);
+            title=MenuUI.Header(panel.transform,"Selected Arena","",new Vector2(.04f,.735f),new Vector2(.6f,.765f),new Vector2(.04f,.645f),new Vector2(.75f,.74f),new Vector2(.04f,.638f),64,30);
 
             // Arena step: arena cards.
             SectionLabel("Arena",A,.37f,RunMaps.All.Length);
-            MapButtons=new Button[RunMaps.All.Length];mapLabels=new Text[MapButtons.Length];mapFocus=new TestRushFocus[MapButtons.Length];
+            MapButtons=new Button[RunMaps.All.Length];mapLabels=new Text[MapButtons.Length];mapFocus=new NavFocus[MapButtons.Length];
             float cardWidth=.92f/MapButtons.Length;
             for(int i=0;i<MapButtons.Length;i++)
             {
@@ -88,7 +84,7 @@ namespace LastBell.Menu
             }
 
             // Boss step: two rows of cards in the arena step's style, Bosses above Minibosses. No title, summary or note.
-            EncounterButtons=new Button[RunDirector.Bosses.Length];encounterLabels=new Text[EncounterButtons.Length];encounterFocus=new TestRushFocus[EncounterButtons.Length];encounterArt=new RawImage[EncounterButtons.Length];
+            EncounterButtons=new Button[RunDirector.Bosses.Length];encounterLabels=new Text[EncounterButtons.Length];encounterFocus=new NavFocus[EncounterButtons.Length];encounterArt=new RawImage[EncounterButtons.Length];
             var bossRow=BossRow;var miniRow=MinibossRow;
             float bossCard=.92f/Mathf.Max(5,bossRow.Length);
             // rows sit 0.06 higher than before the phase row (Chzy18, October 29, 2026), so the phase tabs fit above the footer
@@ -100,9 +96,9 @@ namespace LastBell.Menu
             MiniPerRow=Mathf.Max(5,bossRow.Length);
             for(int k=0;k<miniRow.Length;k++){int at=miniRow[k];int col=k%MiniPerRow,row=k/MiniPerRow;float x=.04f+col*bossCard,top=.42f-row*.096f;EncounterButtons[at]=BossCard(at,k,true,B,new Vector2(x,top-.084f),new Vector2(x+bossCard,top),()=>SelectEncounter(at),out encounterLabels[at],out encounterFocus[at],out encounterArt[at]);}
             // Phase row: one tab per phase of the selected boss, Phase 1 first
-            MenuUI.Text(Spaced("Start Phase"),B,new Vector2(.035f,.195f),new Vector2(.5f,.227f),15,MenuUI.Gold,TextAnchor.MiddleLeft);
+            MenuUI.Text(UiTheme.Spaced("Start Phase"),B,new Vector2(.035f,.195f),new Vector2(.5f,.227f),15,MenuUI.Gold,TextAnchor.MiddleLeft);
             phaseNote=MenuUI.Text("",B,new Vector2(.5f,.195f),new Vector2(.965f,.227f),UiTheme.SizeLabel,new Color(UiTheme.GoldLabel.r,UiTheme.GoldLabel.g,UiTheme.GoldLabel.b,.7f),TextAnchor.MiddleRight);
-            PhaseButtons=new Button[MaxPhases];phaseLabels=new Text[PhaseButtons.Length];phaseFocus=new TestRushFocus[PhaseButtons.Length];
+            PhaseButtons=new Button[MaxPhases];phaseLabels=new Text[PhaseButtons.Length];phaseFocus=new NavFocus[PhaseButtons.Length];
             for(int p=0;p<PhaseButtons.Length;p++){int n=p+1;float x=.04f+p*.15f;PhaseButtons[p]=Tab("Phase "+n,B,new Vector2(x,.135f),new Vector2(x+.15f,.19f),()=>SelectPhase(n),out phaseLabels[p],out phaseFocus[p]);}
 
             // Footer: one text action on the left (Main Menu / Back), the step's primary action on the right.
@@ -123,7 +119,7 @@ namespace LastBell.Menu
             if(boss)LinkBossStep();
             else Link(MapButtons,new[]{backButton,ContinueButton});
             backLabel.text=boss?"Back":"Main Menu";
-            if(arenaTitle)Refresh();
+            if(title!=null)Refresh();
             EventSystem.current.SetSelectedGameObject(boss?EncounterButtons[EncounterIndex].gameObject:MapButtons[MapIndex].gameObject);
         }
         public void Continue(){if(Loading)return;ShowStep(true);}
@@ -161,12 +157,11 @@ namespace LastBell.Menu
             for(int i=0;i<encounterLabels.Length;i++){encounterLabels[i].text=CardName(i)+(i==Campaign.BonusIndex&&!Campaign.OverclockedUnlocked?" (locked)":"");encounterFocus[i].Chosen=i==EncounterIndex;}
             int phaseCount=PhasesOf(EncounterIndex);PhaseIndex=Mathf.Clamp(PhaseIndex,1,phaseCount);
             for(int p=0;p<PhaseButtons.Length;p++){PhaseButtons[p].gameObject.SetActive(p<phaseCount);phaseFocus[p].Chosen=p+1==PhaseIndex;}
-            phaseNote.text=Spaced(phaseCount==1?"Phase 1 only":phaseCount.ToString("00")+" phases");
-            alliesLabel.text=Spaced("Allies (bots)")+"   "+RunParty.Selected;alliesFocus.Chosen=RunParty.Selected>0;
+            phaseNote.text=UiTheme.Spaced(phaseCount==1?"Phase 1 only":phaseCount.ToString("00")+" phases");
+            alliesLabel.text=UiTheme.Spaced("Allies (bots)")+"   "+RunParty.Selected;alliesFocus.Chosen=RunParty.Selected>0;
             // the arena step names the selected arena; the boss step shows only its card rows
-            arenaTitle.text=RunMaps.All[MapIndex].Name.ToUpperInvariant();
-            titleEyebrow.text=Spaced("Selected Arena");
-            arenaTitle.gameObject.SetActive(!BossStep);titleEyebrow.gameObject.SetActive(!BossStep);titleRule.gameObject.SetActive(!BossStep);
+            title.Title.text=RunMaps.All[MapIndex].Name.ToUpperInvariant();
+            title.SetActive(!BossStep);
             var reason=Incompatibility(MapIndex,EncounterIndex);Valid=reason==null;LaunchButton.interactable=Valid&&!Loading;ContinueButton.interactable=!Loading&&RunMaps.InBuild(MapIndex)&&Preview(MapIndex);
         }
         void Update()
@@ -174,7 +169,7 @@ namespace LastBell.Menu
             if(!panelBase)return;
             UpdateLive();
             // No still image: a dark panel until the live showcase starts, then only the orbiting arena shows.
-            panelBase.color=new Color(.012f,.014f,.026f,stillAlpha);
+            panelBase.color=new Color(UiTheme.Backdrop.r,UiTheme.Backdrop.g,UiTheme.Backdrop.b,stillAlpha);
         }
         public void Launch()
         {
@@ -237,24 +232,21 @@ namespace LastBell.Menu
             cardFade.Apply();
             var left=MenuUI.Rect("Left shade",panel,Vector2.zero,new Vector2(.75f,1)).gameObject.AddComponent<RawImage>();left.texture=strip;left.color=new Color(1,1,1,.8f);left.raycastTarget=false;
         }
-        // CTA tracking: single space between letters, two between words (Spaced() uses three).
-        static string Tracked(string s)=>string.Join("  ",System.Array.ConvertAll(s.ToUpperInvariant().Split(' '),w=>string.Join(" ",w.ToCharArray())));
         static readonly Color FocusGold=new Color(UiTheme.GoldDim.r,UiTheme.GoldDim.g,UiTheme.GoldDim.b,.6f); // focus edge: GoldDim 0.6, never Ivory
-        static string Spaced(string s)=>string.Join("   ",System.Array.ConvertAll(s.ToUpperInvariant().Split(' '),w=>string.Join(" ",w.ToCharArray())));
         // MenuUI.Text already adds a shadow; reuse it (stronger alpha) instead of stacking a second one.
         static void Shadow(Text t,float a)=>MenuUI.Shadow(t,a);
         void SectionLabel(string label,Transform parent,float y,int count)
         {
-            MenuUI.Text(Spaced(label),parent,new Vector2(.035f,y),new Vector2(.5f,y+.032f),15,MenuUI.Gold,TextAnchor.MiddleLeft);
-            MenuUI.Text(Spaced(count.ToString("00")+" AVAILABLE"),parent,new Vector2(.5f,y),new Vector2(.965f,y+.032f),UiTheme.SizeLabel,new Color(UiTheme.GoldLabel.r,UiTheme.GoldLabel.g,UiTheme.GoldLabel.b,.7f),TextAnchor.MiddleRight);
+            MenuUI.Text(UiTheme.Spaced(label),parent,new Vector2(.035f,y),new Vector2(.5f,y+.032f),15,MenuUI.Gold,TextAnchor.MiddleLeft);
+            MenuUI.Text(UiTheme.Spaced(count.ToString("00")+" AVAILABLE"),parent,new Vector2(.5f,y),new Vector2(.965f,y+.032f),UiTheme.SizeLabel,new Color(UiTheme.GoldLabel.r,UiTheme.GoldLabel.g,UiTheme.GoldLabel.b,.7f),TextAnchor.MiddleRight);
         }
-        static (Button button,Image frame,TestRushFocus focus) Base(string name,Transform parent,Vector2 min,Vector2 max,UnityEngine.Events.UnityAction action,Vector2 inset)
+        static (Button button,Image frame,NavFocus focus) Base(string name,Transform parent,Vector2 min,Vector2 max,UnityEngine.Events.UnityAction action,Vector2 inset)
         {
             var r=MenuUI.Rect(name,parent,min,max,inset);var im=r.gameObject.AddComponent<Image>();im.color=new Color(0,0,0,.35f);
             var b=r.gameObject.AddComponent<Button>();b.targetGraphic=im;b.transition=Selectable.Transition.None;b.onClick.AddListener(action);
-            var f=r.gameObject.AddComponent<TestRushFocus>();f.Button=b;return (b,im,f);
+            var f=r.gameObject.AddComponent<NavFocus>();f.Mode=NavFocus.Kind.Card;return (b,im,f);
         }
-        Button ArenaCard(int i,Transform parent,Vector2 min,Vector2 max,UnityEngine.Events.UnityAction action,out Text label,out TestRushFocus focus)
+        Button ArenaCard(int i,Transform parent,Vector2 min,Vector2 max,UnityEngine.Events.UnityAction action,out Text label,out NavFocus focus)
         {
             var (b,frame,f)=Base(RunMaps.All[i].Name,parent,min,max,action,new Vector2(8,0));focus=f;f.Frame=frame;f.Grow=1.02f;f.ChosenEdge=UiTheme.GoldBright;f.FocusEdge=FocusGold;
             var inner=MenuUI.Rect("Card art",b.transform,Vector2.zero,Vector2.one,new Vector2(2,2));inner.gameObject.AddComponent<RectMask2D>();
@@ -263,7 +255,7 @@ namespace LastBell.Menu
             var fit=art.gameObject.AddComponent<AspectRatioFitter>();fit.aspectMode=AspectRatioFitter.AspectMode.EnvelopeParent;fit.aspectRatio=16f/9;f.Art=art;
             var fade=MenuUI.Rect("Name shade",inner,Vector2.zero,new Vector2(1,.62f)).gameObject.AddComponent<RawImage>();fade.texture=cardFade;fade.raycastTarget=false;
             MenuUI.Text((i+1).ToString("00"),inner,new Vector2(.02f,.80f),new Vector2(.5f,.98f),14,MenuUI.Gold,TextAnchor.MiddleLeft);
-            label=MenuUI.Text("",inner,new Vector2(.02f,.03f),new Vector2(.98f,.24f),21,MenuUI.Ivory,TextAnchor.MiddleLeft);label.resizeTextForBestFit=true;label.resizeTextMinSize=12;label.resizeTextMaxSize=21;f.Label=label;Shadow(label,.9f);
+            label=MenuUI.Text("",inner,new Vector2(.02f,.03f),new Vector2(.98f,.24f),21,MenuUI.Ivory,TextAnchor.MiddleLeft);label.resizeTextForBestFit=true;label.resizeTextMinSize=12;label.resizeTextMaxSize=21;f.CardLabel=label;Shadow(label,.9f);
             var accent=MenuUI.Panel("Chosen accent",inner,Vector2.zero,new Vector2(1,0),MenuUI.Gold);accent.rectTransform.sizeDelta=new Vector2(0,4);accent.rectTransform.pivot=new Vector2(.5f,0);f.Accent=accent;
             return b;
         }
@@ -283,7 +275,7 @@ namespace LastBell.Menu
         // Fighter card: the boss's portrait under the arena card's frame (number, gold accent, focus). Boss cards show the
         // whole body with the name along the bottom; half-height miniboss cards show the upper body with the name on the
         // left. A boss without a portrait keeps the name-only card.
-        Button BossCard(int encounter,int slot,bool mini,Transform parent,Vector2 min,Vector2 max,UnityEngine.Events.UnityAction action,out Text label,out TestRushFocus focus,out RawImage art)
+        Button BossCard(int encounter,int slot,bool mini,Transform parent,Vector2 min,Vector2 max,UnityEngine.Events.UnityAction action,out Text label,out NavFocus focus,out RawImage art)
         {
             var (b,frame,f)=Base(CardName(encounter),parent,min,max,action,new Vector2(8,0));focus=f;f.Frame=frame;f.Grow=mini?1.03f:1.02f;f.ChosenEdge=UiTheme.GoldBright;f.FocusEdge=FocusGold;
             var inner=MenuUI.Rect("Card face",b.transform,Vector2.zero,Vector2.one,new Vector2(2,2));inner.gameObject.AddComponent<RectMask2D>();
@@ -311,79 +303,35 @@ namespace LastBell.Menu
                               :MenuUI.Text("",inner,new Vector2(.06f,.2f),new Vector2(.94f,.8f),26,MenuUI.Ivory,TextAnchor.MiddleCenter);
                 label.resizeTextMaxSize=portrait?22:26;
             }
-            label.resizeTextForBestFit=true;label.resizeTextMinSize=11;f.Label=label;Shadow(label,.9f);
+            label.resizeTextForBestFit=true;label.resizeTextMinSize=11;f.CardLabel=label;Shadow(label,.9f);
             var accent=MenuUI.Panel("Chosen accent",inner,Vector2.zero,new Vector2(1,0),MenuUI.Gold);accent.rectTransform.sizeDelta=new Vector2(0,mini?3:4);accent.rectTransform.pivot=new Vector2(.5f,0);f.Accent=accent;
             return b;
         }
-        Button Tab(string name,Transform parent,Vector2 min,Vector2 max,UnityEngine.Events.UnityAction action,out Text label,out TestRushFocus focus)
+        Button Tab(string name,Transform parent,Vector2 min,Vector2 max,UnityEngine.Events.UnityAction action,out Text label,out NavFocus focus)
         {
-            var (b,frame,f)=Base(name,parent,min,max,action,new Vector2(8,0));focus=f;frame.color=new Color(0,0,0,.42f);
+            var (b,frame,f)=Base(name,parent,min,max,action,new Vector2(8,0));focus=f;f.Mode=NavFocus.Kind.Tab;frame.color=new Color(0,0,0,.42f);
             var line=MenuUI.Panel("Tab underline",b.transform,Vector2.zero,new Vector2(1,0),Faint);line.rectTransform.sizeDelta=new Vector2(0,2);line.rectTransform.pivot=new Vector2(.5f,0);f.Frame=line;f.FocusEdge=FocusGold;
             var mark=MenuUI.Rect("Chosen diamond",b.transform,new Vector2(0,.5f),new Vector2(0,.5f)).gameObject.AddComponent<FocusDiamond>();
             mark.rectTransform.sizeDelta=new Vector2(10,16);mark.rectTransform.anchoredPosition=new Vector2(18,0);mark.color=MenuUI.Gold;mark.raycastTarget=false;f.Accent=mark;
             label=MenuUI.Text(name,b.transform,Vector2.zero,Vector2.one,21);label.rectTransform.offsetMin=new Vector2(30,3);label.rectTransform.offsetMax=new Vector2(-12,-3);
-            label.resizeTextForBestFit=true;label.resizeTextMinSize=12;label.resizeTextMaxSize=21;f.Label=label;
+            label.resizeTextForBestFit=true;label.resizeTextMinSize=12;label.resizeTextMaxSize=21;f.CardLabel=label;
             return b;
         }
         Button Chip(string caption,string value,string hint,Transform parent,Vector2 min,Vector2 max,UnityEngine.Events.UnityAction action,out Text valueLabel)
         {
             var (b,frame,f)=Base(caption,parent,min,max,action,new Vector2(6,0));frame.color=new Color(0,0,0,.45f);
             var line=MenuUI.Panel("Chip edge",b.transform,Vector2.zero,new Vector2(0,1),Faint);line.rectTransform.sizeDelta=new Vector2(3,0);line.rectTransform.pivot=new Vector2(0,.5f);f.Frame=line;
-            MenuUI.Text(Spaced(caption),b.transform,new Vector2(.04f,.55f),new Vector2(.96f,.95f),12,MenuUI.Gold,TextAnchor.MiddleLeft);
-            valueLabel=MenuUI.Text(value,b.transform,new Vector2(.04f,.05f),new Vector2(.70f,.6f),22,MenuUI.Ivory,TextAnchor.MiddleLeft);f.Label=valueLabel;
+            MenuUI.Text(UiTheme.Spaced(caption),b.transform,new Vector2(.04f,.55f),new Vector2(.96f,.95f),12,MenuUI.Gold,TextAnchor.MiddleLeft);
+            valueLabel=MenuUI.Text(value,b.transform,new Vector2(.04f,.05f),new Vector2(.70f,.6f),22,MenuUI.Ivory,TextAnchor.MiddleLeft);f.CardLabel=valueLabel;
             MenuUI.Text(hint+"  ›",b.transform,new Vector2(.6f,.05f),new Vector2(.96f,.6f),13,UiTheme.GoldLabel,TextAnchor.MiddleRight).horizontalOverflow=HorizontalWrapMode.Overflow;
             return b;
         }
         // Footer actions use the main menu's entries: transparent hit area, Ivory label (first Text child) and the gold
         // highlight strip on focus. The step's primary action (Continue / Launch) is larger, like Start Run.
-        Button NavButton(string name,Transform parent,Vector2 min,Vector2 max,UnityEngine.Events.UnityAction action,int size)
-        {
-            var r=MenuUI.Rect(name,parent,min,max);var im=r.gameObject.AddComponent<Image>();im.color=new Color(0,0,0,0);im.raycastTarget=true;
-            var b=r.gameObject.AddComponent<Button>();b.targetGraphic=im;b.transition=Selectable.Transition.None;b.onClick.AddListener(action);
-            var label=MenuUI.Text(name,r,Vector2.zero,Vector2.one,size);label.resizeTextForBestFit=true;label.resizeTextMinSize=13;label.resizeTextMaxSize=size;
-            var f=r.gameObject.AddComponent<ConfrontationNavFocus>();f.Label=label;f.Strip=selection.Strip(r);
-            return b;
-        }
+        static Button NavButton(string name,Transform parent,Vector2 min,Vector2 max,UnityEngine.Events.UnityAction action,int size)=>MenuUI.Row(name,parent,min,max,action,size,Vector2.zero);
         Button TextButton(string name,Transform parent,Vector2 min,Vector2 max,UnityEngine.Events.UnityAction action)=>NavButton(name,parent,min,max,action,24);
         Button PrimaryButton(string name,Transform parent,Vector2 min,Vector2 max,UnityEngine.Events.UnityAction action)=>NavButton(name,parent,min,max,action,28);
         // Explicit grid navigation keeps keyboard/controller focus inside this panel and predictable between rows.
-        static void Link(params Button[][] rows)
-        {
-            for(int r=0;r<rows.Length;r++)for(int i=0;i<rows[r].Length;i++)
-            {
-                var row=rows[r];float frac=row.Length>1?i/(float)(row.Length-1):.5f;
-                Button Near(int k)=>k<0||k>=rows.Length?null:rows[k][Mathf.RoundToInt(frac*(rows[k].Length-1))];
-                row[i].navigation=new Navigation{mode=Navigation.Mode.Explicit,selectOnLeft=i>0?row[i-1]:null,selectOnRight=i<row.Length-1?row[i+1]:null,selectOnUp=Near(r-1),selectOnDown=Near(r+1)};
-            }
-        }
-    }
-    // Visual state for Test Rush controls: chosen (gold), focused (bright, slightly raised) and resting (muted).
-    public sealed class TestRushFocus:MonoBehaviour,IPointerEnterHandler,IPointerExitHandler
-    {
-        public Button Button;public Graphic Frame,Label,Art,Accent;public bool Chosen,Primary,AccentOnFocusOnly;public float Grow=1;
-        public Color ChosenEdge=MenuUI.Gold,FocusEdge=new Color(UiTheme.GoldDim.r,UiTheme.GoldDim.g,UiTheme.GoldDim.b,.6f); // cards: GoldBright chosen / GoldDim hover
-        static readonly Color Rest=new Color(.93f,.88f,.76f,.62f), Edge=new Color(.93f,.88f,.76f,.16f);
-        bool hovered;
-        public bool Focused=>hovered||EventSystem.current&&EventSystem.current.currentSelectedGameObject==gameObject;
-        public void OnPointerEnter(PointerEventData data){hovered=true;}
-        public void OnPointerExit(PointerEventData data){hovered=false;}
-        void OnDisable(){hovered=false;}
-        void LateUpdate()
-        {
-            bool on=Focused&&(!Button||Button.interactable);bool live=!Button||Button.interactable;
-            if(Primary)
-            {
-                if(Frame)Frame.color=!live?new Color(.22f,.2f,.17f,.9f):on?new Color(1f,.86f,.56f):MenuUI.Gold;
-                if(Label)Label.color=live?new Color(.07f,.05f,.02f):new Color(.6f,.57f,.5f);
-            }
-            else
-            {
-                if(Frame)Frame.color=Chosen?ChosenEdge:on?FocusEdge:Edge;
-                if(Art)Art.color=Chosen?Color.white:on?new Color(.85f,.85f,.88f):new Color(.42f,.42f,.48f);
-                if(Label)Label.color=Chosen?MenuUI.Gold:on?MenuUI.Ivory:Rest;
-                if(Accent)Accent.enabled=AccentOnFocusOnly?on:Chosen;
-            }
-            float target=on?Grow:1;var s=transform.localScale.x;s=Mathf.MoveTowards(s,target,Time.unscaledDeltaTime*.6f);transform.localScale=new Vector3(s,s,1);
-        }
+        static void Link(params Button[][] rows)=>MenuUI.LinkGrid(System.Array.ConvertAll(rows,r=>(Selectable[])r));
     }
 }
