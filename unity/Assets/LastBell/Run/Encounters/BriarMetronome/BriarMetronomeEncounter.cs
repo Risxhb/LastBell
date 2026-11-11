@@ -332,11 +332,29 @@ namespace LastBell.Run
             var b = new Hazard { Source = "Bramble hedge", Shape = HazardShape.Lane, Kind = HazardKind.Ground, Origin = section.Origin, Yaw = section.Yaw, Length = section.Length,
                 Width = section.Width, LockAt = 0, ResolveAt = Sim.Ticks(60), BurnPerSecond = HedgeBurn, ClipRadius = section.ClipRadius };
             Spawn(b); hedgeBurns.Add(b);
-            var mid = section.Origin + Sim.Dir(section.Yaw) * (section.Length / 2) + Vector3.up * 0.45f;
-            var view = Prim.Make(PrimitiveKind.Cube, transform.parent, mid, new Vector3(section.Width * 0.8f, 0.9f, section.Length), Bramble, 0f, Quaternion.Euler(0, section.Yaw, 0));
-            view.name = "Hedge (placeholder)"; hedgeProps.Add(view);
+            hedgeProps.Add(HedgeView(section.Origin, section.Yaw, section.Length, section.Width, ""));
         }
-        void ClearHedgeProps() { foreach (var t in hedgeProps) if (t) Destroy(t.gameObject); hedgeProps.Clear(); }
+        void ClearHedgeProps() { foreach (var t in hedgeProps) BriarProps.Retire(t); hedgeProps.Clear(); }
+
+        // One hedge section's view: the bramble hedge model (1 m modules laid end to end, variant by position, no RNG) rising
+        // out of the floor, or the primitive stand-in. Presentation only: the lane hazard is the hit shape (no collider).
+        Transform HedgeView(Vector3 origin, float yaw, float length, float width, string tag)
+        {
+            if (!BriarProps.Has(BriarProps.Hedge(0)))
+            {
+                var mid = origin + Sim.Dir(yaw) * (length / 2) + Vector3.up * 0.45f;
+                var cube = Prim.Make(PrimitiveKind.Cube, transform.parent, mid, new Vector3(width * 0.8f, 0.9f, length), Bramble, 0f, Quaternion.Euler(0, yaw, 0));
+                cube.name = "Hedge (placeholder" + tag + ")"; return cube;
+            }
+            var root = new GameObject("Bramble hedge" + tag).transform; root.SetParent(transform.parent, false);
+            root.SetPositionAndRotation(Sim.Flat(origin), Quaternion.Euler(0, yaw, 0));
+            int n = Mathf.Max(1, Mathf.RoundToInt(length / BriarProps.HedgeModule)); float m = length / n;
+            int seed = Mathf.Abs(Mathf.RoundToInt(origin.x * 7 + origin.z * 13 + yaw));
+            for (int k = 0; k < n; k++)
+                BriarProps.Spawn(BriarProps.Hedge(seed + k), root, Vector3.forward * (m * (k + 0.5f)), 0, new Vector3(1, 1, m / BriarProps.HedgeModule));
+            root.gameObject.AddComponent<BriarProps.Grow>();
+            return root;
+        }
 
         sealed class Graft
         {
@@ -377,7 +395,7 @@ namespace LastBell.Run
         {
             var g = new Graft { Season = season, Pen = season, Pos = R.GraftSpot(transform.position, Spoke0, season), Born = Age, Hp = GraftHp };
             g.BloomAt = Age + BloomTicks;
-            g.View = GraftView(season, g.Pos + Vector3.up * 0.7f);
+            g.View = GraftView(season, g.Pos);
             // the bloom timer: a filling ring at its base (nobody is hit by it; Affects nobody)
             g.Timer = Spawn(new Hazard { Source = "Season Graft", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = g.Pos, Radius = R.GraftBody,
                 LockAt = 0, ResolveAt = BloomTicks, Damage = 0, HitOnResolve = false, Affects = _ => false });
@@ -393,17 +411,24 @@ namespace LastBell.Run
                 if (Solid && dealt > 0) TakeHit(dealt, transform.position + Vector3.up * HitHeight, false);
                 return dealt;
             };
-            g.Part.OnCleared = _ => { if (g.View) Destroy(g.View.gameObject); };
+            g.Part.OnCleared = _ => { BriarProps.Retire(g.View); g.View = null; };
             W.Parts.Add(g.Part);
             grafts.Add(g);
         }
 
+        // A graft's view, pivot on the floor at the graft: the season's grafted-stump model (Spring blossom, Summer crown,
+        // Autumn plum leaves, Winter frost twig) or the primitive stand-in, with the season numeral above it either way.
         Transform GraftView(int season, Vector3 at)
         {
-            var v = Prim.Make(PrimitiveKind.Cone, transform.parent, at, new Vector3(0.9f, 1.4f, 0.9f), Leaf, 0.5f);
-            v.name = $"Season graft {R.Numeral(season)} (placeholder)";
-            Prim.Make(PrimitiveKind.Sphere, v, new Vector3(0, -0.45f, 0), new Vector3(1.8f, 0.4f, 1.8f), Moss);
-            Label(v, R.Numeral(season), 1.2f, Ivory, 0.14f);
+            var v = new GameObject($"Season graft {R.Numeral(season)}").transform; v.SetParent(transform.parent, false); v.position = at;
+            if (BriarProps.Spawn(BriarProps.Graft(season), v, Vector3.zero, 0, Vector3.one)) v.gameObject.AddComponent<BriarProps.Grow>();
+            else
+            {
+                v.name += " (placeholder)";
+                Prim.Make(PrimitiveKind.Cone, v, new Vector3(0, 0.7f, 0), new Vector3(0.9f, 1.4f, 0.9f), Leaf, 0.5f);
+                Prim.Make(PrimitiveKind.Sphere, v, new Vector3(0, 0.25f, 0), new Vector3(1.8f, 0.4f, 1.8f), Moss);
+            }
+            Label(v, R.Numeral(season), 1.9f, Ivory, 0.14f);
             return v;
         }
 
@@ -419,7 +444,7 @@ namespace LastBell.Run
                     var o = OwnerOf(g.Season);
                     GraftLog.Add((Tick, g.Season, o ? W.Players.IndexOf(o) : -1, true, Age - g.Born));
                     RunHud.Float(g.Pos + Vector3.up * 1.8f, "CUT", new Color(0.6f, 1f, 0.6f));
-                    if (g.View) Destroy(g.View.gameObject);
+                    BriarProps.Retire(g.View); g.View = null;
                     continue;
                 }
                 if (!g.Blooming && Age >= g.BloomAt)
@@ -436,7 +461,7 @@ namespace LastBell.Run
                         // pollen: every standing player
                         var pollen = new Hazard { Source = "Pollen", Shape = HazardShape.Circle, Kind = HazardKind.Ground, Origin = g.Pos, Radius = 999, Damage = PollenDmg, Knockback = 0, Stun = 0, Flinch = false };
                         foreach (var p in W.Players) { if (p.Down) continue; pollen.Hit.Add(p); p.ReceiveHit(pollen); PollenHits++; }
-                        if (g.View) Destroy(g.View.gameObject);
+                        BriarProps.Retire(g.View); g.View = null;
                         CameraShake.Shake(0.12f, 0.2f);
                     };
                     g.Bloom = Spawn(b);
@@ -664,9 +689,7 @@ namespace LastBell.Run
             {
                 var h = live[i];
                 if (h == null || !h.Replica || h.Cancelled || h.Source != "Bramble hedge" || replicaHedges.ContainsKey(h)) continue;
-                var mid = h.Origin + Sim.Dir(h.Yaw) * (h.Length / 2) + Vector3.up * 0.45f;
-                var view = Prim.Make(PrimitiveKind.Cube, transform.parent, mid, new Vector3(h.Width * 0.8f, 0.9f, h.Length), Bramble, 0f, Quaternion.Euler(0, h.Yaw, 0));
-                view.name = "Hedge (placeholder, LAN)"; replicaHedges[h] = view; NetHedgesMade++;
+                replicaHedges[h] = HedgeView(h.Origin, h.Yaw, h.Length, h.Width, ", LAN"); NetHedgesMade++;
             }
             scratchHazards.Clear();
             foreach (var kv in replicaHedges)
@@ -675,7 +698,7 @@ namespace LastBell.Run
                 if (on) { on = false; for (int i = 0; i < live.Count; i++) if (live[i] == kv.Key) { on = true; break; } }
                 if (!on) scratchHazards.Add(kv.Key);
             }
-            foreach (var h in scratchHazards) { if (replicaHedges[h]) Destroy(replicaHedges[h].gameObject); replicaHedges.Remove(h); }
+            foreach (var h in scratchHazards) { BriarProps.Retire(replicaHedges[h]); replicaHedges.Remove(h); }
         }
 
         void ClearReplica()

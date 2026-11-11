@@ -338,6 +338,7 @@ namespace LastBell.Run
             int bossHp = boss.Hp; int dealt = d.World.DamagePart(d.World.Parts[0], 10, spot, "test");
             Check("next to its own graft, the owner's hit cuts it and also hits the boss", dealt == 10 && boss.Hp == bossHp - 10);
             Overhead("solo_hedges_grafts");
+            PropChecks(spot);
             PlaceMe(far);
             yield return Until(() => boss.Rooted, 40, "Rooted (solo)");
             Check("uncut grafts bloom (6 m burst and pollen)", boss.GraftsBloomed >= 2 && HitsSince(start, "Pollen", d.Player) >= 2);
@@ -429,6 +430,26 @@ namespace LastBell.Run
             var still = left.Where(h => d.World.Hazards.Live.Contains(h)).ToList();
             Check($"{what}: everything it leaves ({left.Count}: {string.Join(", ", left.Select(h => h.Source).Distinct())}) is gone within 5 s, no boss parts", still.Count == 0 && parts == 0,
                 string.Join(", ", still.Select(h => h.Source)));
+        }
+
+        // the art pass's prop models (Resources/BriarProps): hedges and grafts are models with no collider, or the stand-ins
+        void PropChecks(Vector3 graftSpot)
+        {
+            var all = FindObjectsByType<Transform>(FindObjectsSortMode.None);
+            int hedgeModels = all.Count(t => t.name.StartsWith("BriarHedge_")), graftModels = all.Count(t => t.name.StartsWith("BriarGraft_"));
+            int standIns = all.Count(t => t.name.StartsWith("Hedge (placeholder") || (t.name.StartsWith("Season graft") && t.name.EndsWith("(placeholder)")));
+            if (BriarProps.Has(BriarProps.Hedge(0)) && BriarProps.Has(BriarProps.Graft(0)))
+            {
+                bool noColliders = all.Where(t => t.name.StartsWith("BriarHedge_") || t.name.StartsWith("BriarGraft_")).All(t => t.GetComponentsInChildren<Collider>().Length == 0);
+                Check($"prop models: hedge modules and season grafts are models, no stand-ins, no colliders ({hedgeModels} hedge modules, {graftModels} grafts)",
+                    hedgeModels > 0 && graftModels == 2 && standIns == 0 && noColliders, $"{standIns} stand-ins");
+                var g = Sim.Flat(graftSpot);
+                RenderShot("prop_graft_game", g + new Vector3(0, 11f, -14f), g + Vector3.up * 1.4f, 40);
+                RenderShot("prop_graft_close", g + new Vector3(0, 2.6f, -7f), g + Vector3.up * 0.9f, 40);
+                var h = Sim.Dir(boss.Spoke0 + 90) * 8f;
+                RenderShot("prop_hedge_close", h + new Vector3(-4.5f, 2.6f, -4.5f), h + Vector3.up * 0.6f, 40);
+            }
+            else Note($"prop models missing from this build: stand-ins used ({standIns})");
         }
 
         IEnumerator BlockWithShots(string atk, int n, string tag)
