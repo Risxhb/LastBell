@@ -59,7 +59,7 @@ namespace LastBell.Menu
                 var strips = menu.Canvas.GetComponentsInChildren<Image>(true).Where(i => i.name == "Highlight strip").ToArray();
                 Check("main menu strips use the shared texture", strips.Length > 10 && strips.All(s => s.sprite && s.sprite.texture == UiTheme.StripTexture));
                 Check("main menu rows on NavFocus", menu.StartButton.GetComponent<NavFocus>() && menu.RushButton.GetComponent<NavFocus>() && menu.PreviousButton.GetComponent<NavFocus>());
-                Check("Settings Apply is a text row (no gold box)", menu.ApplyButton.GetComponent<NavFocus>() && !menu.ApplyButton.GetComponent<MenuFocus>() && menu.ApplyButton.GetComponent<Image>().color.a == 0);
+                Check("Settings Apply is a text row (no gold box)", menu.ApplyButton.GetComponent<NavFocus>() && menu.ApplyButton.GetComponent<Image>().color.a == 0);
                 var apply = menu.ApplyButton.GetComponentInChildren<Text>(); var back = menu.SettingsBackButton.GetComponentInChildren<Text>();
                 Check("Apply is the larger main action", apply.text == "Apply" && apply.fontSize > back.fontSize);
                 menu.OpenSettings(); yield return null; yield return null;

@@ -53,8 +53,8 @@ Shared textures (built once, never destroy them; tint with `GUI.color` / `Graphi
 - `Mode = Card`: `Frame`, `Art`, `CardLabel`, `Accent`, `Chosen`, `Grow`, `ChosenEdge`, `FocusEdge`. Chosen → GoldBright frame + accent + Gold label; focus → GoldDim edge, brighter art, Ivory label, slight grow.
 - `Mode = Tab`: same states as Card; set `Frame` to the underline and `Accent` to the diamond.
 
-`MenuFocus` (the boxed house button from `MenuUI.Button`) still exists for the LAN lobby only (sub-thread E removed
-the Showcase menu UI and Hero Selection). It goes when the lobby moves to rows; don't use it on new screens.
+The boxed house button (`MenuUI.Button` + `MenuFocus`), `MenuUI.FramedPanel` and `MenuUI.Ornaments` are gone: the LAN
+lobby, their last user, moved to text rows, choosers, underline input fields and centre-band dialogs (sub-thread A).
 
 `MenuUI.Ink` now equals `UiTheme.Ink` (was a third copy with .97 alpha; only Hero Selection's header used the default).
 

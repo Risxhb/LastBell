@@ -4,7 +4,8 @@ param(
     [ValidateSet('Bellkeeper','Aurelion','Crucivar','Sylvara','Tempo Tyrant','Chimebound Oracle','Pendulum Sentinel','Dial Warden','Escapement Twins','Rivet Cantor','Crucible Skater','Briar Metronome','Silt Carillon','Vesper Seedkeeper')][string]$Boss='Bellkeeper',
     [ValidateSet('test','skyward-spire','brass-foundry','verdant-chimes','shattered-hour','metronome-court')][string]$Arena='test',
     [ValidateRange(1,3)][int]$PeerCount=1,
-    [ValidateSet('Tollbreaker','Chimesinger','Arcanist')][string]$ClientClass='Arcanist'
+    [ValidateSet('Tollbreaker','Chimesinger','Arcanist')][string]$ClientClass='Arcanist',
+    [ValidateRange(30,600)][int]$HostReadySeconds=75   # a busy machine may need ~180 s for the host to load
 )
 $ErrorActionPreference = 'Stop'
 if (-not (Test-Path -LiteralPath $Player -PathType Leaf)) { throw "Player not found: $Player" }
@@ -20,7 +21,7 @@ try {
     $common = @('-timestamps','-screen-fullscreen','0','-screen-width','1280','-screen-height','720','-lastbellLanPort',"$port",'-lastbellLanClientClass',$ClientClass)
     $hostArgs = $common + @('-lastbellProfile','Host','-lastbellLanSmokeHost','-lastbellLanPeerCount',"$PeerCount",'-lastbellLanBoss',('"'+$Boss+'"'),'-lastbellLanArena',$Arena,'-lastbellOut',('"'+$hostOut+'"'),'-logFile',('"'+$hostLog+'"'))
     $hostProc = Start-Process -FilePath $Player -ArgumentList $hostArgs -WindowStyle Hidden -PassThru
-    $deadline = [DateTime]::UtcNow.AddSeconds(75)
+    $deadline = [DateTime]::UtcNow.AddSeconds($HostReadySeconds)
     $ready = $false
     while ([DateTime]::UtcNow -lt $deadline -and -not $hostProc.HasExited) {
         if ((Test-Path -LiteralPath $hostLog) -and (Select-String -LiteralPath $hostLog -Pattern '\[LAN smoke\] HOST READY' -Quiet)) { $ready = $true; break }
