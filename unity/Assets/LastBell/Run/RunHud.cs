@@ -7,7 +7,7 @@ namespace LastBell.Run
     // Functional IMGUI HUD and menus for the run loop (stand-in for final UI art). Everything shown is read from the
     // live gameplay state each frame; nothing here changes rules. Hazard names are spelled out while they warn, so the
     // fight reads with audio off. Layout is in virtual 1080p units (UiTheme.R / V); styles are rebuilt per screen height.
-    public sealed class RunHud : MonoBehaviour
+    public sealed partial class RunHud : MonoBehaviour
     {
         struct FloatText { public Vector3 pos; public string text; public Color color; public float age, jx; }
         static readonly List<FloatText> floats = new List<FloatText>();
