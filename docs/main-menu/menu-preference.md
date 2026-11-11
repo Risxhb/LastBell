@@ -1,5 +1,7 @@
 # Saved main-menu preference — October 23, 2026
 
+> **Retired November 10, 2026.** The Confrontation menu is the only main menu. The Showcase/Alternative choice, the Settings > UI page (`MenuAppearancePanel`) and its restart probe were removed. `MenuAppearance` now only holds the scene list and the startup router (`MenuAppearance.Route`); a saved `LastBell.Menu.Style` key is ignored. The text below is history.
+
 Choose **Settings > UI > Main Menu** in either menu. **Alternative Confrontation** and **Original Showcase** switch immediately and save the preference. The alternative is selected for the current local user. It remains the sole active menu after gameplay, class-selection/practice exits and application restart until explicitly changed in UI settings.
 
 `MenuAppearance` stores `LastBell.Menu.Style` in PlayerPrefs and owns menu routing. Normal startup remains the first build scene, but its Awake guard redirects to the saved menu before constructing its UI/showcase. The alternate has the same guard. Switches use Single scene loads; there is one active menu and one persistent music owner. Existing class/difficulty preferences and original showcase/music controls remain intact. Explicit old diagnostic flags continue to exercise their original showcase fixtures without overwriting the user's saved preference.

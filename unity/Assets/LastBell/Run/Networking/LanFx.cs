@@ -28,7 +28,7 @@ namespace LastBell.Run.Networking
     public sealed class LanFxCapture : IDisposable
     {
         public const int MaxPending = 400;   // per snapshot; the oldest go first if the host falls behind
-        readonly LanHostRoster roster;
+        readonly int[] remoteIds;   // the roster's remote ids in player order, copied once: the per-hit lookup allocates nothing
         readonly List<LanWorldFrame.Effect> pending = new List<LanWorldFrame.Effect>();
         readonly Action<LanFxTarget, string, object[]> hook;
         readonly Action<Vector3, int, PlayerController> damageHook;
@@ -37,9 +37,14 @@ namespace LastBell.Run.Networking
         readonly Stack<LanWorldFrame.Effect> damagePool = new Stack<LanWorldFrame.Effect>();
         readonly List<LanWorldFrame.Effect> damageOut = new List<LanWorldFrame.Effect>();
         public int Dropped { get; private set; }
-        public LanFxCapture(LanHostRoster roster)
+        public LanFxCapture(LanHostRoster roster) : this(roster, null) { }
+        // autotest: a capture with given remote player ids (players 1..n of the world), no lobby needed
+        public LanFxCapture(int[] remoteIds) : this(null, remoteIds) { }
+        LanFxCapture(LanHostRoster roster, int[] ids)
         {
-            this.roster = roster; hook = Record; LanFx.Record = hook; damageHook = RecordDamage; LanFx.RecordDamage = damageHook;
+            if (ids == null && roster != null) { var r = roster.Remote; ids = new int[r.Count]; for (int i = 0; i < ids.Length; i++) ids[i] = r[i].Id; }
+            remoteIds = ids ?? new int[0];
+            hook = Record; LanFx.Record = hook; damageHook = RecordDamage; LanFx.RecordDamage = damageHook;
         }
         public void Dispose()
         {
@@ -95,7 +100,7 @@ namespace LastBell.Run.Networking
         {
             int index = w.Players.IndexOf(p);
             if (index == 0) return 0;
-            return index > 0 && roster != null && index - 1 < roster.Remote.Count ? roster.Remote[index - 1].Id : -1;   // no roster: autotest
+            return index > 0 && index - 1 < remoteIds.Length ? remoteIds[index - 1] : -1;
         }
         static bool Finite(float f) => !float.IsNaN(f) && !float.IsInfinity(f) && Math.Abs(f) <= 10000;
 

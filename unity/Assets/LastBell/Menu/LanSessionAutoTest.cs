@@ -203,7 +203,8 @@ namespace LastBell.Menu
                 case RivetCantorEncounter r: return r.ReplicaNumeralsShown;
                 case SylvaraEncounter sy: return sy.NetRoots + sy.NetColourRingsMax;
                 case BellkeeperEncounter bk: return bk.ReplicaLookFrames;
-                case EscapementTwinsEncounter et: return et.NetTockSynced>0 && (et.TockPresenter==null || !et.TockPresenter.HasModel || et.NetTockClips>0) ? et.NetTockSynced : 0;   // with the rigged Tock, its clip must arrive too
+                case EscapementTwinsEncounter et: return et.NetTockSynced>0 && (et.TockPresenter==null || !et.TockPresenter.HasModel || et.NetTockClips>0)
+                    && (!EscapementTwinsProps.Has(EscapementTwinsProps.Sun) || et.NetMarkModelsMade>0) ? et.NetTockSynced : 0;   // with the rigged Tock, its clip must arrive too; with the marker models, the client must build them
                 case BriarMetronomeEncounter bm: return bm.NetNumeralViews + bm.NetHedgesMade;
                 case CrucivarEncounter cv: return cv.NetMissed>0 ? 0 : cv.NetEffects;
                 default: return -1;
@@ -295,6 +296,8 @@ namespace LastBell.Menu
             Debug.Log("[LAN smoke] client boss presentation: props sent "+sawProps+", most drawn "+(view2?view2.PropsShown:0)+"; announcement sent "+sawAnnouncement+", shown "+shownAnnouncement
                 +"; strike numbers sent "+numbersSent+", shown "+numbersShown+"; clock "+(sawClock?(clockMoved?"moving":"still"):"none")+"; replayed Aurelion effects "+(view2?view2.ReplicaEffects:0));
             if (sawProps) Check("client draws the boss's orbs and thrown objects",view2 && view2.PropsShown>0);
+            var rivetReplica=FindAnyObjectByType<RivetCantorEncounter>(FindObjectsInactive.Include);   // art pass 9 Nov: his rivet and chain props
+            if (rivetReplica) Debug.Log("[LAN smoke] client Rivet Cantor props: rivet pops drawn "+RivetPop.Spawned+" ("+RivetPop.ModelSpawned+" from the model), chains drawn "+rivetReplica.ReplicaChainsShown+" (locks: "+RivetChainView.Snapped+" snapped, "+RivetChainView.Lashed+" lashed)");
             Check("client boss looks run without errors",view2 && view2.LookFailures==0);
             if (bulletsSent>0) Check("client draws the host's bullets ("+bulletsSent+" in one snapshot)",view2 && view2.BulletsSeen>0);
             if (replicaShown>=0) Check("client draws the boss's own overlays ("+bossName+": "+replicaShown+")",replicaShown>0);

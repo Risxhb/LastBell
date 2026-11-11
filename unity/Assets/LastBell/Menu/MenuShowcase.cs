@@ -53,7 +53,7 @@ namespace LastBell.Menu
             if (Manual) UnityEngine.SceneManagement.SceneManager.SetActiveScene(gameObject.scene); // stage lighting stays in this scene
             BuildFade();
             if (Manual) { Activate(requested >= 0 ? requested : 0); requested = -1; Started = true; return; }
-            Activate(0); MenuShowcaseTest.Install(); Started = true;
+            Activate(0); Started = true;
         }
         public void Show(int stage) { if (Stages != null && stage >= 0 && stage < Stages.Length) requested = stage; }
         void ManualUpdate()

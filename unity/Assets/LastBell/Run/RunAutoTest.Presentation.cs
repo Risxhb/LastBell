@@ -211,29 +211,44 @@ namespace LastBell.Run
         IEnumerator LanDamageChecks()
         {
             yield return PhaseToMenu();
-            d.SelectAllies(1);
+            d.SelectAllies(3);
             if (!d.StartPractice(RunDirector.Classes[0], RunDirector.AurelionPractice)) { Check("hit feel: LAN practice accepted", false); yield break; }
             yield return Until(() => RunDirector.Instance && RunDirector.Instance.State == RunState.Ready, 30, "LAN damage ready");
             if (RunDirector.Instance != d) { directorLog.AddRange(d.Log); d = RunDirector.Instance; d.InputOverride = bot; bot.Clear(); }
             long m0, m;
-            // the same with a LAN host recording (review PRES-LAN-ALLOC, 9 Nov): typed, pooled damage effects, drained
-            // every 10 hits as the host's snapshots do; one dealer's hits in one tick travel as one effect
-            var cap = new Networking.LanFxCapture(null);
+            // the same with a LAN host recording (review PRES-LAN-ALLOC, 9-10 Nov): typed, pooled damage effects, drained
+            // every 10 hits as the host's snapshots do; one dealer's hits in one tick travel as one effect. Dealers: the host
+            // (id 0), three remote players (ids 3, 5, 7 for world players 1-3, through the capture's id lookup) and no one
+            var ps = d.World.Players; int[] ids = { 3, 5, 7 };
+            Check("hit feel: LAN dealer check has the host and three remote players", ps.Count == 4, ps.Count + " players");
+            PlayerController Dealer(int i) { int k = i % 5; return k < ps.Count ? ps[k] : null; }
+            var cap = new Networking.LanFxCapture(ids);
             try
             {
                 var drained = new System.Collections.Generic.List<Networking.LanWorldFrame.Effect>(64);
-                int effects = 0, sum = 0, want = 0;
-                for (int i = 0; i < 200; i++) { HitFeel.BossDamage(new Vector3(i % 7, 0, 0), 10, (i & 1) == 0 ? d.Player : null); if (i % 10 == 9) { drained.Clear(); cap.Drain(drained); } }
+                int effects = 0, sum = 0, want = 0, badIds = 0; var seen = new bool[8];
+                for (int i = 0; i < 200; i++) { HitFeel.BossDamage(new Vector3(i % 7, 0, 0), 10, Dealer(i)); if (i % 10 == 9) { drained.Clear(); cap.Drain(drained); } }
                 GC.Collect(); m0 = HitFeel.AllocNow();
                 for (int i = 0; i < 5000; i++)
                 {
                     int amount = 10 + i % 300; want += amount;
-                    HitFeel.BossDamage(new Vector3(i % 7, 0, 0), amount, (i & 1) == 0 ? d.Player : null);
-                    if (i % 10 == 9) { drained.Clear(); cap.Drain(drained); effects += drained.Count; for (int k = 0; k < drained.Count; k++) sum += drained[k].Args[1].I; }
+                    HitFeel.BossDamage(new Vector3(i % 7, 0, 0), amount, Dealer(i));
+                    if (i % 10 == 9)
+                    {
+                        drained.Clear(); cap.Drain(drained); effects += drained.Count;
+                        for (int k = 0; k < drained.Count; k++)
+                        {
+                            var a = drained[k].Args; sum += a[1].I;
+                            bool none = a[2].Kind == Networking.LanWorldFrame.EffectArg.None;
+                            int id = none ? -1 : a[2].I;
+                            if (none) seen[4] = true; else if (id == 0) seen[0] = true; else { int at = Array.IndexOf(ids, id); if (at >= 0) seen[at + 1] = true; else badIds++; }
+                        }
+                    }
                 }
                 m = HitFeel.AllocNow() - m0;
                 Check("hit feel: 5000 LAN-recorded hits allocate nothing", m <= 0 && effects > 0, $"{m} bytes, {effects} effects");
-                Check("hit feel: LAN damage effects carry every point of damage", sum == want && effects <= 1000, $"{sum} of {want} in {effects} effects");
+                Check("hit feel: LAN damage effects carry every point of damage", sum == want && effects <= 2500, $"{sum} of {want} in {effects} effects");
+                Check("hit feel: LAN damage names the host and each remote player by their lobby id", badIds == 0 && seen[0] && seen[1] && seen[2] && seen[3] && seen[4], $"{badIds} wrong ids; host {seen[0]}, ids 3/5/7 {seen[1]}/{seen[2]}/{seen[3]}, no dealer {seen[4]}");
             }
             finally { cap.Dispose(); HitFeel.ClearTransient(); }
         }

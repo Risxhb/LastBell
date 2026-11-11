@@ -398,7 +398,6 @@ namespace LastBell.Run
         }
 
         // ---- Souls-style boss reveal / defeat: no panel, the name large over the arena on a soft dark band ----
-        static Texture2D band;
         GUIStyle fitSt;
         // A copy of `st` whose font shrinks (never grows) until `text` fits `maxW` virtual px. The shrunk size snaps down to
         // one of FitSteps, so a new long name never asks the font for a size it hasn't laid out yet (perf report
@@ -503,16 +502,8 @@ namespace LastBell.Run
             var sz = warmSt.CalcSize(warmText);
             warmSt.Draw(new Rect(0, 0, sz.x, sz.y), warmText, false, false, false, false);   // GUI.color is clear: nothing shows
         }
-        static Texture2D Band()
-        {
-            if (band) return band;
-            band = new Texture2D(1, 64, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave, wrapMode = TextureWrapMode.Clamp };
-            for (int y = 0; y < 64; y++) { float v = y / 63f, a = Mathf.Sin(v * Mathf.PI); band.SetPixel(0, y, new Color(0.01f, 0.012f, 0.025f, 0.78f * a * a)); }
-            band.Apply(); return band;
-        }
         // soft full-width band behind the reveal text, faded by `a`
-        void DrawBand(float y, float h, float a)
-        { var o = GUI.color; GUI.color = new Color(1, 1, 1, a); GUI.DrawTexture(S(0, y, UiTheme.VirtualWidth, h), Band(), ScaleMode.StretchToFill, true); GUI.color = o; }
+        void DrawBand(float y, float h, float a) => UiImgui.Band(new Rect(0, y, UiTheme.VirtualWidth, h), a);
         // thin gold rules flowing out from the title, each ending in a small diamond; `grow` animates them outward
         void Rules(float cx, float y, float halfText, float grow, Color c)
         {
@@ -760,29 +751,9 @@ namespace LastBell.Run
         // ---------------------------------------------------------------------------------------------------------
         // Results in the menus' language: no boxes. A soft dark band, an eyebrow + rule per column, faint row dividers and
         // text actions with the gold highlight strip (keys R / M still work).
-        static Texture2D stripTex;
-        static Texture2D StripTex()
-        {
-            if (stripTex) return stripTex;
-            stripTex = new Texture2D(128, 1, TextureFormat.RGBA32, false) { hideFlags = HideFlags.HideAndDontSave, wrapMode = TextureWrapMode.Clamp };
-            for (int i = 0; i < 128; i++) { float u = i / 127f, a = Mathf.SmoothStep(0, 1, Mathf.Clamp01(u / .22f)) * Mathf.SmoothStep(0, 1, Mathf.Clamp01((1 - u) / .32f)); stripTex.SetPixel(i, 0, new Color(1, 1, 1, a)); }
-            stripTex.Apply(); return stripTex;
-        }
-        static readonly GUIStyle hit = new GUIStyle();
-        // text action with the main menu's highlight strip on hover
-        bool StripButton(float x, float y, float w, float h, string label, GUIStyle st)
-        {
-            var r = S(x, y, w, h); bool over = r.Contains(Event.current.mousePosition);
-            if (over)
-            {
-                var o = GUI.color; var g = UiTheme.Gold;
-                GUI.color = new Color(g.r, g.g, g.b, .26f); GUI.DrawTexture(r, StripTex(), ScaleMode.StretchToFill, true);
-                GUI.color = new Color(g.r, g.g, g.b, .55f); GUI.DrawTexture(new Rect(r.x, r.y, r.width, Px), StripTex()); GUI.DrawTexture(new Rect(r.x, r.yMax - Px, r.width, Px), StripTex());
-                GUI.color = o;
-            }
-            T(x, y, w, h, label, st, over ? UiTheme.GoldBright : new Color(UiTheme.Ivory.r, UiTheme.Ivory.g, UiTheme.Ivory.b, .78f));
-            return GUI.Button(r, GUIContent.none, hit);
-        }
+        // text action with the main menu's highlight strip on hover (UiImgui.Row; the Ivory .78 rest colour is this screen's own)
+        static readonly Color resultRest = new Color(UiTheme.Ivory.r, UiTheme.Ivory.g, UiTheme.Ivory.b, .78f);
+        bool StripButton(float x, float y, float w, float h, string label, GUIStyle st) => UiImgui.Row(new Rect(x, y, w, h), label, st, resultRest);
         string Ellipsize(GUIStyle st, string t, float maxW)
         {
             if (Wv(st, t) <= maxW) return t;
@@ -847,9 +818,9 @@ namespace LastBell.Run
                 y += rowH;
             }
             y += 30;
-            if (StripButton(cx, y, CW, 48, practice ? "Retry Practice  (R)" : "Retry Run  (R)", resultPrimary)) d.RequestRetry();
+            if (StripButton(cx, y, CW, 48, InputHints.Label(practice ? "Retry Practice" : "Retry Run", HintAction.Retry), resultPrimary)) d.RequestRetry();
             y += 52;
-            if (StripButton(cx, y, CW, 44, "Main Menu  (M)", resultAction)) d.ReturnToMenu();
+            if (StripButton(cx, y, CW, 44, InputHints.Label("Main Menu", HintAction.MainMenu), resultAction)) d.ReturnToMenu();
             y += 48;
             if (test && StripButton(cx, y, CW, 44, "Test Setup", resultAction)) LastBell.Menu.MenuReturnBridge.Return(true);
 
