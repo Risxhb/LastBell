@@ -149,7 +149,7 @@ namespace LastBell.Menu
             port = Field(c, new Vector2(.42f, Y(5)), new Vector2(.7f, Y(5) + H), PlayerPrefs.GetInt(PortKey, DefaultPort).ToString(), DefaultPort.ToString()); port.contentType = InputField.ContentType.IntegerNumber;
             JoinButton = MenuUI.Row("Connect", c, new Vector2(0, Y(6)), new Vector2(1, Y(6) + H), Join, 24, Vector2.zero);
             JoinButton.GetComponentInChildren<Text>().alignment = TextAnchor.MiddleLeft;
-            MenuUI.Text("Trusted local networks only. The host's screen shows the address to type.", c, new Vector2(0, Y(7) - .02f), new Vector2(1, Y(7) + H - .01f), 15, UiTheme.IvoryMuted, TextAnchor.UpperLeft);
+            MenuUI.Text("Trusted local networks only. The host's screen shows its address.", c, new Vector2(0, Y(7) - .02f), new Vector2(1, Y(7) + H - .01f), 15, UiTheme.IvoryMuted, TextAnchor.UpperLeft);
         }
         // Input field in the row language, no box: a transparent hit area, an underline (Ivory .35, GoldBright on focus),
         // the highlight strip on focus or hover, a GoldBright caret and a muted placeholder.
@@ -159,7 +159,7 @@ namespace LastBell.Menu
             var hit = r.gameObject.AddComponent<Image>(); hit.color = new Color(0, 0, 0, 0); hit.raycastTarget = true;
             var strip = MenuUI.Strip(r); strip.color = new Color(UiTheme.StripFill.r, UiTheme.StripFill.g, UiTheme.StripFill.b, UiTheme.StripFill.a * .5f);   // quieter: the underline carries focus
             var line = MenuUI.Panel("Field underline", r, Vector2.zero, new Vector2(1, 0), UiTheme.Ivory);
-            line.rectTransform.pivot = new Vector2(.5f, 0); line.rectTransform.sizeDelta = new Vector2(0, 1); line.rectTransform.anchoredPosition = new Vector2(0, 4);
+            line.rectTransform.pivot = new Vector2(.5f, 0); line.rectTransform.sizeDelta = new Vector2(0, 2); line.rectTransform.anchoredPosition = new Vector2(0, 4);   // 2: a 1 px line drops out below 1080p
             var input = r.gameObject.AddComponent<InputField>(); input.targetGraphic = hit; input.transition = Selectable.Transition.None;
             var text = MenuUI.Text("", r, Vector2.zero, Vector2.one, 22, UiTheme.Ivory, TextAnchor.MiddleLeft); text.supportRichText = false;
             text.rectTransform.offsetMin = new Vector2(12, 6); text.rectTransform.offsetMax = new Vector2(-12, -3);
@@ -201,16 +201,16 @@ namespace LastBell.Menu
             lobbyPage = MenuUI.Rect("Lobby page", frame, Vector2.zero, Vector2.one).gameObject; var t = lobbyPage.transform;
             hostAddress = MenuUI.Text("", t, new Vector2(.04f, .775f), new Vector2(.6f, .825f), 18, UiTheme.IvoryMuted, TextAnchor.MiddleLeft);
             // Boss (left) and arena (right): the host's choosers; clients see the same values without chevrons.
-            MenuUI.Text(UiTheme.Spaced("Boss"), t, new Vector2(.04f, .735f), new Vector2(.38f, .765f), 14, UiTheme.GoldLabel, TextAnchor.MiddleLeft);
+            MenuUI.Text(UiTheme.Spaced("Boss"), t, new Vector2(.04f, .735f), new Vector2(.27f, .765f), 14, UiTheme.GoldLabel, TextAnchor.MiddleLeft);
             // left-aligned choosers under their eyebrows: the value label starts after the previous chevron and the next
             // chevron follows the rendered text (PlaceChooser, every frame)
-            var bossBox = MenuUI.Rect("Boss chooser", t, new Vector2(.04f, .675f), new Vector2(.38f, .735f));
+            var bossBox = MenuUI.Rect("Boss chooser", t, new Vector2(.04f, .675f), new Vector2(.27f, .735f));
             bossChooser = MenuUI.Chooser(bossBox, "", Vector2.zero, Vector2.one, 26, () => CycleBoss(-1), () => CycleBoss(1));
             bossName = bossChooser.Label; BossPrev = bossChooser.Previous; BossNext = bossChooser.Next;
-            MenuUI.Text(UiTheme.Spaced("Arena"), t, new Vector2(.40f, .735f), new Vector2(.8f, .765f), 14, UiTheme.GoldLabel, TextAnchor.MiddleLeft);
-            arenaArt = MenuUI.Rect("Arena preview", t, new Vector2(.405f, .681f), new Vector2(.452f, .729f)).gameObject.AddComponent<RawImage>(); arenaArt.raycastTarget = false;
+            MenuUI.Text(UiTheme.Spaced("Arena"), t, new Vector2(.274f, .735f), new Vector2(.7f, .765f), 14, UiTheme.GoldLabel, TextAnchor.MiddleLeft);
+            arenaArt = MenuUI.Rect("Arena preview", t, new Vector2(.279f, .681f), new Vector2(.326f, .729f)).gameObject.AddComponent<RawImage>(); arenaArt.raycastTarget = false;
             MenuUI.Stroke(arenaArt.transform, UiTheme.RuleFaint, 1.5f);   // the card edge
-            var arenaBox = MenuUI.Rect("Arena chooser", t, new Vector2(.455f, .675f), new Vector2(.8f, .735f));
+            var arenaBox = MenuUI.Rect("Arena chooser", t, new Vector2(.329f, .675f), new Vector2(.7f, .735f));   // Boss over card 1, Arena over card 2
             arenaChooser = MenuUI.Chooser(arenaBox, "", Vector2.zero, Vector2.one, 26, () => CycleArena(-1), () => CycleArena(1));
             arenaName = arenaChooser.Label; ArenaPrev = arenaChooser.Previous; ArenaNext = arenaChooser.Next;
             foreach (var label in new[] { bossName, arenaName }) { label.alignment = TextAnchor.MiddleLeft; label.rectTransform.offsetMin = new Vector2(44, 3); label.rectTransform.offsetMax = new Vector2(-44, -3); }
@@ -225,7 +225,7 @@ namespace LastBell.Menu
         // gets a GoldBright edge and the gold accent; its class has drawn chevrons.
         Slot BuildSlot(int i, Transform t)
         {
-            const float left = .04f, width = .2125f, gap = .0167f;
+            const float left = .04f, gap = .0167f, width = (.92f - 3 * gap) / 4;   // the four cards fill the .04-.96 column
             float x = left + i * (width + gap);
             var s = new Slot();
             s.Fill = MenuUI.Panel("Player slot " + (i + 1), t, new Vector2(x, .2f), new Vector2(x + width, .625f), new Color(0, 0, 0, .35f));
@@ -354,7 +354,6 @@ namespace LastBell.Menu
             MenuUI.Text("Other players see this name in the lobby and over your character. It's saved on this computer.", c, new Vector2(-.12f, .53f), new Vector2(1.12f, .65f), UiTheme.SizeBody, UiTheme.IvoryBody);
             nameField = Field(c, new Vector2(.2f, .39f), new Vector2(.8f, .49f), LanProfile.Saved ?? "", "Your name");
             nameField.characterLimit = LanPlayerName.MaxLength + 4;   // room to type spaces that get trimmed
-            nameField.textComponent.alignment = TextAnchor.MiddleCenter; ((Text)nameField.placeholder).alignment = TextAnchor.MiddleCenter;
             nameError = MenuUI.Text("", c, new Vector2(.05f, .31f), new Vector2(.95f, .38f), 16, UiTheme.Gold);
             var back = MenuUI.Row("Back", c, new Vector2(.02f, .16f), new Vector2(.48f, .28f), Back, 24, Vector2.zero);
             ConfirmNameButton = MenuUI.Row("Confirm", c, new Vector2(.52f, .16f), new Vector2(.98f, .28f), ConfirmName, 28, Vector2.zero);
@@ -411,7 +410,7 @@ namespace LastBell.Menu
             foreach (var part in new Graphic[] { header.Eyebrow, header.Title }) { var r = part.rectTransform; r.anchorMin = new Vector2(x0, r.anchorMin.y); r.anchorMax = new Vector2(x1, r.anchorMax.y); }
             var rule = header.Rule.rectTransform; rule.anchorMin = new Vector2(x0, rule.anchorMin.y); rule.anchorMax = new Vector2(x0, rule.anchorMax.y);
             footerRule.rectTransform.anchorMin = new Vector2(page == Page.Lobby ? .04f : .60f, .122f);
-            var back = (RectTransform)BackButton.transform; back.anchorMin = new Vector2(page == Page.Lobby ? .035f : .595f, .035f); back.anchorMax = new Vector2(page == Page.Lobby ? .19f : .75f, .105f);
+            var back = (RectTransform)BackButton.transform; back.anchorMin = new Vector2(page == Page.Lobby ? .035f : .60f, .035f); back.anchorMax = new Vector2(page == Page.Lobby ? .19f : .75f, .105f);
             if (page == Page.Lobby)
             {
                 // Lobby: Left/Right change class, so focus moves only up/down between Ready, Start and Back.
@@ -457,6 +456,8 @@ namespace LastBell.Menu
         static void PlaceChooser(Chooser c)
         {
             if (c == null || !c.Label) return;
+            float gutter = c.Next.gameObject.activeSelf ? 44 : 10;   // a client's read-only value starts under its eyebrow
+            if (c.Label.rectTransform.offsetMin.x != gutter) c.Label.rectTransform.offsetMin = new Vector2(gutter, 3);
             var prev = (RectTransform)c.Previous.transform; var next = (RectTransform)c.Next.transform;
             prev.anchorMin = prev.anchorMax = new Vector2(0, .5f); prev.anchoredPosition = new Vector2(20, 0);
             float w = Mathf.Min(c.Label.preferredWidth, c.Label.rectTransform.rect.width);
@@ -564,14 +565,12 @@ namespace LastBell.Menu
             }
             // buttons and status
             ReadyButton.interactable = connected && !loading;
-            // the host's main action is Start fight; a client's is Ready, which then takes Start's place and size
-            var rr = (RectTransform)ReadyButton.transform; var readyText = ReadyButton.GetComponentInChildren<Text>();
-            var rmin = hosting ? new Vector2(.36f, .035f) : new Vector2(.71f, .03f);
-            if (rr.anchorMin != rmin)
-            {
-                rr.anchorMin = rmin; rr.anchorMax = hosting ? new Vector2(.64f, .105f) : new Vector2(.96f, .108f);
-                readyText.alignment = hosting ? TextAnchor.MiddleCenter : TextAnchor.MiddleRight; readyText.resizeTextMaxSize = readyText.fontSize = hosting ? 24 : 28;
-            }
+            // the host's main action is Start fight; a client's is Ready, so it gets the main action's size
+            var readyText = ReadyButton.GetComponentInChildren<Text>();
+            int readySize = hosting ? 24 : 28;
+            if (readyText.fontSize != readySize) readyText.resizeTextMaxSize = readyText.fontSize = readySize;
+            // focus lands on Ready when the page opens, possibly before it was interactable: put it back once usable
+            if (ReadyButton.interactable && !LeaveConfirmOpen && EventSystem.current && !EventSystem.current.currentSelectedGameObject) Focus(ReadyButton);
             ReadyButton.GetComponentInChildren<Text>().text = connected && lobby.LocalReady ? "Not ready" : "Ready";
             StartButton.gameObject.SetActive(hosting); StartButton.interactable = hosting && lobby.CanStart && !loading;
             status.text = error ?? (lobby != null && lobby.Error != null ? lobby.Error

@@ -167,12 +167,11 @@ namespace LastBell.Menu
             title.SetActive(!BossStep);
             var reason=Incompatibility(MapIndex,EncounterIndex);Valid=reason==null;LaunchButton.interactable=Valid&&!Loading;ContinueButton.interactable=!Loading&&RunMaps.InBuild(MapIndex)&&Preview(MapIndex);
         }
-        // Miniboss names share one size and stay on one line: 18 px, 16 px on 4:3-ish screens (the longest name,
-        // "Chimebound Oracle", fits a card at either size). Redone when the window size changes.
+        // Miniboss names share one size (18) and stay on one line; the longest, "Chimebound Oracle", fits a 4:3 card.
         void UniformMiniNames()
         {
             int key=Screen.width*10000+Screen.height;if(key==miniSizedFor||miniLabels.Count==0)return;miniSizedFor=key;
-            int size=Screen.width<Screen.height*1.5f?16:18;
+            const int size=18;   // 16 read ~10 px at 1024x768
             foreach(var l in miniLabels){l.resizeTextForBestFit=false;l.fontSize=size;l.horizontalOverflow=HorizontalWrapMode.Overflow;}
         }
         public static string AlliesText(int bots)=>"Bot allies: "+(bots==0?"none":bots.ToString());
