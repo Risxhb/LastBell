@@ -13,7 +13,9 @@ namespace LastBell.Run.Networking
         readonly List<LanLobby.Member> remote = new List<LanLobby.Member>();
         readonly Dictionary<int, int> lastInput = new Dictionary<int, int>();   // newest input sequence received per player
         public int LastInput(int id) => lastInput.TryGetValue(id, out int s) ? s : -1;
-        public IReadOnlyList<LanLobby.Member> Remote => remote.AsReadOnly();
+        // one read-only view, made once: AsReadOnly() builds a new wrapper on every call, and this is read per hit and per player
+        readonly IReadOnlyList<LanLobby.Member> remoteView;
+        public IReadOnlyList<LanLobby.Member> Remote => remoteView;
         public string Error { get; private set; }
         public LanHostRoster(LanLobby lobby)
         {
@@ -26,6 +28,7 @@ namespace LastBell.Run.Networking
                 inputs.Add(member.Id, new LanRemoteInput());
             }
             remote.Sort((a, b) => a.Id.CompareTo(b.Id));
+            remoteView = remote.AsReadOnly();
             lobby.InputReceived += OnInput;
             Active = this;
         }
