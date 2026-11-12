@@ -52,6 +52,8 @@ namespace LastBell.Arenas.MetronomeCourt
         public Color LightTint { get; private set; }
         public bool SkyActive => skyMat && RenderSettings.skybox == skyMat;
         public int LanternPoolCount => pools.Count;
+        public float PoolGain { get; private set; }   // r4: the floor pools' level this frame (steady in every fight)
+        readonly float[] poolLo = new float[4], poolHi = new float[4]; readonly int[] poolSeen = new int[4];
         public float RodAngle { get; private set; }
         public bool ShowingCracks { get; private set; }
         public bool Preview { get; private set; }
@@ -1047,12 +1049,39 @@ namespace LastBell.Arenas.MetronomeCourt
             }
             var inward = -Sim.Flat(at).normalized;
             var go = new GameObject("LanternPool"); go.transform.SetParent(root, false);
-            go.transform.localPosition = new Vector3(at.x, 0.02f, at.z) + inward * 1.6f;
-            var mesh = new Mesh { name = "PoolQuad" };
-            const float h = 0.9f;   // half-extent: a 1.8 m pool
-            mesh.vertices = new[] { new Vector3(-h, 0, -h), new Vector3(-h, 0, h), new Vector3(h, 0, -h), new Vector3(h, 0, h) };
-            mesh.uv = new[] { new Vector2(0, 0), new Vector2(0, 1), new Vector2(1, 0), new Vector2(1, 1) };
-            mesh.triangles = new[] { 0, 1, 2, 1, 3, 2 }; mesh.RecalculateBounds();
+            Mesh mesh;
+            if (Mathf.Abs(Sim.Flat(at).magnitude - PostRadius) < 0.05f)
+            {
+                // r4 (B3 critic 1: "a small round smudge, not light cast by a lantern", centred in the band with a dark gap
+                // to the parapet): under a rim post the pool is a soft ellipse lying along the dial band, 2.4 m long. Its
+                // peak sits on the outer part of the band (12.95 m) and it runs out to the parapet foot below the lantern
+                // and in to nothing at the 12.5 m movement bound, so no pool light lies inside the play space.
+                const float rIn = 12.5f, rPeak = 12.95f, rOut = ParapetRadius - 0.21f, halfDeg = 5.3f; const int segs = 8;
+                float mid = Mathf.Atan2(at.x, at.z) * Mathf.Rad2Deg;
+                var pv = new Vector3[(segs + 1) * 3]; var puv = new Vector2[(segs + 1) * 3]; var pt = new int[segs * 12];
+                for (int s = 0; s <= segs; s++)
+                {
+                    float u = s / (float)segs, a = (mid + Mathf.Lerp(-halfDeg, halfDeg, u)) * Mathf.Deg2Rad; var d = new Vector3(Mathf.Sin(a), 0, Mathf.Cos(a));
+                    pv[s * 3] = d * rIn; puv[s * 3] = new Vector2(u, 0f); pv[s * 3 + 1] = d * rPeak; puv[s * 3 + 1] = new Vector2(u, 0.5f); pv[s * 3 + 2] = d * rOut; puv[s * 3 + 2] = new Vector2(u, 1f);
+                    if (s == segs) continue;
+                    for (int row = 0; row < 2; row++)
+                    {
+                        int b = s * 3 + row, k = (s * 2 + row) * 6;
+                        pt[k] = b; pt[k + 1] = b + 1; pt[k + 2] = b + 3; pt[k + 3] = b + 1; pt[k + 4] = b + 4; pt[k + 5] = b + 3;
+                    }
+                }
+                mesh = new Mesh { name = "PoolBandArc" }; mesh.vertices = pv; mesh.uv = puv; mesh.triangles = pt; mesh.RecalculateBounds();
+                go.transform.localPosition = new Vector3(0, 0.02f, 0);
+            }
+            else
+            {
+                go.transform.localPosition = new Vector3(at.x, 0.02f, at.z) + inward * 1.6f;
+                mesh = new Mesh { name = "PoolQuad" };
+                const float h = 0.9f;   // half-extent: a 1.8 m pool
+                mesh.vertices = new[] { new Vector3(-h, 0, -h), new Vector3(-h, 0, h), new Vector3(h, 0, -h), new Vector3(h, 0, h) };
+                mesh.uv = new[] { new Vector2(0, 0), new Vector2(0, 1), new Vector2(1, 0), new Vector2(1, 1) };
+                mesh.triangles = new[] { 0, 1, 2, 1, 3, 2 }; mesh.RecalculateBounds();
+            }
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
             var r = go.AddComponent<MeshRenderer>(); r.sharedMaterial = poolMat;
             r.shadowCastingMode = ShadowCastingMode.Off; r.receiveShadows = false;
@@ -1365,12 +1394,31 @@ namespace LastBell.Arenas.MetronomeCourt
                 mpb.SetColor(PBase, glassTint * 0.6f); mpb.SetColor(PEmission, glassTint * (0.6f + 0.75f * LanternGlow(x))); r.SetPropertyBlock(mpb);
             }
             if (poolMpb == null) poolMpb = new MaterialPropertyBlock();
+            // r4 (November 12 critic, B3): the pools lie on the dial band and the tempo ring, so they follow the steady
+            // floor-light rule in every fight, the Tempo Tyrant's included: one fixed level, no glow following the rod,
+            // no beat pulse and no transition flash. (They swung 0.56..1.37 over two seconds of Haste before.) Only the
+            // hazard dim and the tempo colour still change them; the lantern glass, the ring and the metronome pulse.
+            PoolGain = (quiet ? 0.6f : 1f) * (0.7f + 0.6f * SteadyNear);
+            // evidence from a real fight (the autotest cannot be changed in this round): the level the pools were actually
+            // given on every settled-tempo frame of a Tempo Tyrant fight, kept per tempo and hazard-dim state and written
+            // to the log once when the fight ends. Steady means max/min is 1 inside each state.
+            if (fight && tyrant && (tempoBlend <= 0f || tempoBlend >= 1f) && pools.Count > 0)
+            {
+                var pc = LightTint * PoolGain; float pl = pc.r * 0.299f + pc.g * 0.587f + pc.b * 0.114f; int st = (tempoBlend >= 1f ? 0 : 2) + (quiet ? 1 : 0);   // by the settled look, not the clock: the blend trails a tempo change by a frame
+                poolLo[st] = poolSeen[st] == 0 ? pl : Mathf.Min(poolLo[st], pl); poolHi[st] = Mathf.Max(poolHi[st], pl); poolSeen[st]++;
+            }
+            else if (!fight && poolSeen[0] + poolSeen[1] + poolSeen[2] + poolSeen[3] > 60)
+            {
+                float worst = 1f; var parts = new List<string>(); var names = new[] { "Haste", "Haste dimmed", "Normal", "Normal dimmed" };
+                for (int s = 0; s < 4; s++)
+                    if (poolSeen[s] > 0) { worst = Mathf.Max(worst, poolLo[s] > 0 ? poolHi[s] / poolLo[s] : 99f); parts.Add($"{names[s]} {poolLo[s]:0.000}..{poolHi[s]:0.000} ({poolSeen[s]} frames)"); }
+                Debug.Log($"[metronome-court] floor pools in the Tempo Tyrant fight: worst max/min {worst:0.000} within a tempo and hazard-dim state; " + string.Join(", ", parts));
+                System.Array.Clear(poolSeen, 0, 4); System.Array.Clear(poolHi, 0, 4); System.Array.Clear(poolLo, 0, 4);
+            }
             foreach (var (r, x) in pools)
             {
                 if (!r) continue;
-                float near = LightsPulse ? Mathf.Exp(-(x - LanternPulseX) * (x - LanternPulseX) / 6f) : SteadyNear;
-                float k = (quiet ? 0.6f : 1f) * (0.7f + 0.6f * near) * (1 + 0.06f * BeatPulse + 0.25f * flash);   // gentle: floor glow, not a strobe
-                poolMpb.SetColor(PColorHigh, LightTint * k); r.SetPropertyBlock(poolMpb);
+                poolMpb.SetColor(PColorHigh, LightTint * PoolGain); r.SetPropertyBlock(poolMpb);
             }
             var seamTint = frenzy && LightsPulse && Mathf.PerlinNoise(Time.time * 7, 1.7f) > 0.55f ? CrackGlow : tint;
             mpb.SetColor(PBase, seamTint); mpb.SetColor(PEmission, seamTint * ((haste ? 0.6f : 0.45f) + 0.3f * flash));
