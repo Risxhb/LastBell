@@ -1317,22 +1317,62 @@ namespace LastBell.Arenas.MetronomeCourt
         // round 3 (N6): an aged-brass chain swag between neighbouring near-rim bollards, hung from rings on their collars
         void BuildSwags(Transform stat)
         {
-            var chain = M(Brass * 0.6f, 0.4f, 0.8f);
+            // r4 (November 12 critic, T3: "a straight brown wire" at range, "a segmented leather belt" close up): real links.
+            // Each link is an eight-sided ring of bars, 24 cm long and 10.5 cm wide in 3.4 cm stock, and every other link is
+            // turned a quarter turn about the chain, so the swag shows a broad link and a narrow one in turn from any side.
+            // It hangs 0.45 m (was 0.3) from an eye on each bollard collar, in a painted iron-brown (not a dark metal, which
+            // went black in shade). One mesh per swag (each was 18 flat plates). Pass 1 had square four-bar links ("a ladder",
+            // "staggered bricks", critic 1) butting straight into the collar.
+            var chain = PlainM(Brass * 0.3f, 0.3f);
             var sorted = new List<Vector3>(rimBollards); sorted.Sort((p, q) => Mathf.Atan2(p.x, p.z).CompareTo(Mathf.Atan2(q.x, q.z)));
             for (int i = 0; i + 1 < sorted.Count; i++)
             {
                 Vector3 a = sorted[i], b = sorted[i + 1];
                 if (Vector3.Angle(a, b) > 30f) continue;   // the bridge gap
                 var dirAB = (b - a).normalized; Vector3 from = a + Vector3.up * 0.53f + dirAB * 0.22f, to = b + Vector3.up * 0.53f - dirAB * 0.22f;
-                foreach (var ring in new[] { from, to }) P(PrimitiveKind.Cube, stat, ring, new Vector3(0.08f, 0.08f, 0.02f), chain, Quaternion.LookRotation(dirAB).eulerAngles, "SwagRing");
-                const int links = 18; const float sag = 0.3f;
+                var cv = new List<Vector3>(); var ct = new List<int>();
+                void Face(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, Vector3 outward)
+                {
+                    if (Vector3.Dot(Vector3.Cross(p1 - p0, p2 - p0), outward) < 0) { var sw = p1; p1 = p3; p3 = sw; }
+                    int k = cv.Count; cv.Add(p0); cv.Add(p1); cv.Add(p2); cv.Add(p3); ct.Add(k); ct.Add(k + 1); ct.Add(k + 2); ct.Add(k); ct.Add(k + 2); ct.Add(k + 3);
+                }
+                // an open square bar from p0 to p1, `w` thick, `n` = the link's normal. Each end runs on by 0.207 w, which
+                // mitres the outer edge of a 45 degree corner exactly
+                void Tube(Vector3 p0, Vector3 p1, Vector3 n, float w)
+                {
+                    var d = (p1 - p0).normalized; var side = Vector3.Cross(n, d).normalized; p0 -= d * w * 0.207f; p1 += d * w * 0.207f;
+                    var ring = new[] { n + side, n - side, -n - side, -n + side };
+                    for (int k = 0; k < ring.Length; k++)
+                    {
+                        Vector3 o0 = ring[k] * (w * 0.5f), o1 = ring[(k + 1) % ring.Length] * (w * 0.5f);
+                        Face(p0 + o0, p1 + o0, p1 + o1, p0 + o1, o0 + o1);
+                    }
+                }
+                // one link: an eight-sided ring in its own x-z plane (z along the chain), its four corners cut
+                void Link(Vector3 c, Quaternion q, float len, float wid, float st)
+                {
+                    float hl = len / 2 - st / 2, hw = wid / 2 - st / 2, ch = Mathf.Min(hw, hl) * 0.62f; var n = q * Vector3.up;
+                    Vector3 At(float x, float z) => c + q * new Vector3(x, 0, z);
+                    var o = new[] { At(hw, -(hl - ch)), At(hw, hl - ch), At(hw - ch, hl), At(-(hw - ch), hl), At(-hw, hl - ch), At(-hw, -(hl - ch)), At(-(hw - ch), -hl), At(hw - ch, -hl) };
+                    for (int k = 0; k < 8; k++) Tube(o[k], o[(k + 1) % 8], n, st);
+                }
+                // the eye on each collar: an upright ring, half its width into the collar, that the end link passes through
+                foreach (var (eye, sgn) in new[] { (from, 1f), (to, -1f) }) Link(eye - dirAB * (sgn * 0.005f), Quaternion.LookRotation(dirAB) * Quaternion.Euler(0, 0, 90), 0.125f, 0.125f, 0.03f);
+                const float sag = 0.45f, linkLen = 0.24f, linkW = 0.105f, stock = 0.034f, pitch = linkLen - 2 * stock + 0.006f;
                 Vector3 Pt(float s) => Vector3.Lerp(from, to, s) + Vector3.down * (sag * 4 * s * (1 - s));
+                // equal steps along the curve, not along the chord, so the links keep their length where the swag is steep
+                const int steps = 240; var arc = new float[steps + 1];
+                for (int k = 1; k <= steps; k++) arc[k] = arc[k - 1] + (Pt(k / (float)steps) - Pt((k - 1) / (float)steps)).magnitude;
+                int links = Mathf.Max(1, Mathf.RoundToInt(arc[steps] / pitch)); int ai = 0;
                 for (int k = 0; k < links; k++)
                 {
-                    Vector3 p0 = Pt(k / (float)links), p1 = Pt((k + 1) / (float)links), seg = p1 - p0;
-                    var q = Quaternion.LookRotation(seg) * Quaternion.Euler(0, 0, k % 2 == 0 ? 0 : 90);
-                    P(PrimitiveKind.Cube, stat, (p0 + p1) / 2, new Vector3(0.05f, 0.018f, seg.magnitude * 1.05f), chain, q.eulerAngles, "SwagLink");
+                    float target = (k + 0.5f) / links * arc[steps]; while (ai < steps - 1 && arc[ai + 1] < target) ai++;
+                    float s = (ai + Mathf.InverseLerp(arc[ai], arc[ai + 1], target)) / steps;
+                    Vector3 c = Pt(s), tan = (Pt(Mathf.Min(1, s + 0.01f)) - Pt(Mathf.Max(0, s - 0.01f))).normalized;
+                    Link(c, Quaternion.LookRotation(tan) * Quaternion.Euler(0, 0, k % 2 == 0 ? 0 : 90), linkLen, linkW, stock);
                 }
+                var swag = new Mesh { name = "Swag" }; swag.SetVertices(cv); swag.SetTriangles(ct, 0); swag.RecalculateNormals(); swag.RecalculateBounds();
+                Mesh(stat, swag, chain, "Swag");
             }
         }
         readonly List<(Transform t, float radius, float angle, float y, float speed)> cloudBanks = new List<(Transform, float, float, float, float)>();
