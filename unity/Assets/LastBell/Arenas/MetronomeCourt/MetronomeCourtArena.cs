@@ -102,7 +102,10 @@ namespace LastBell.Arenas.MetronomeCourt
         // ---- floor stone: shared tiling detail (albedo grain + a faint normal), one material per shade ----
         static Texture2D floorAlbedo, floorNormal;
         static readonly Dictionary<int, Material> floorMats = new Dictionary<int, Material>();
-        public const float FloorTile = 2.5f;   // metres per detail tile (planar UVs from Sector)
+        // r4 (November 12 critic, T1): 8 m per tile (was 2.5). The texture now carries broad painted patches 2 to 4 m across,
+        // and every slab samples it at its own offset and quarter turn, so each slab shows its own light-to-dark sweep
+        // and the variation breaks at the joints: painted slabs instead of one cloudy plate.
+        public const float FloorTile = 8f;   // metres per detail tile (planar UVs from Sector)
         static Material FloorM(Color c, float smooth = 0.18f)
         {
             int key = Mathf.RoundToInt(c.r * 255) | Mathf.RoundToInt(c.g * 255) << 8 | Mathf.RoundToInt(c.b * 255) << 16 | Mathf.RoundToInt(smooth * 15) << 24;
@@ -117,7 +120,8 @@ namespace LastBell.Arenas.MetronomeCourt
         }
         public static bool FloorDetailReady => floorAlbedo && floorNormal;
 
-        // tileable value-noise fbm: albedo around 1.0 +-6% with a few darker pits; the normal comes from the same height
+        // tileable value noise: albedo around 1.0, a broad +-6% sweep under a +-3% grain, with a few darker pits; the (unused)
+        // normal comes from the same height
         static void BuildFloorDetail()
         {
             if (floorAlbedo && floorNormal) return;
@@ -132,10 +136,14 @@ namespace LastBell.Arenas.MetronomeCourt
             for (int y = 0; y < S; y++)
                 for (int x = 0; x < S; x++)
                 {
-                    float u = x / (float)S, v = y / (float)S, n = 0, amp = 0.5f, sum = 0;
-                    for (int o = 0, p = 8; o < 3; o++, p *= 2) { n += Noise(u * p, v * p, p) * amp; sum += amp; amp *= 0.5f; }   // no finest octave: it only aliases at gameplay distance
-                    n /= sum;
-                    float pit = Noise(u * 16, v * 16, 16); if (pit > 0.86f) n -= (pit - 0.86f) * 1.25f;   // sparse pits
+                    // r4 (T1): the cloudy grain keeps its physical size (0.31 m and 0.15 m features on the 8 m tile) at half
+                    // its old strength, so its blotches no longer read across the joints; under it, two broad octaves
+                    // (4 m and 2 m features) give the slab-scale painted sweep; a few shallow pits
+                    float u = x / (float)S, v = y / (float)S;
+                    float grain = Noise(u * 26, v * 26, 26) * 0.67f + Noise(u * 52, v * 52, 52) * 0.33f;
+                    float broad = Noise(u * 2, v * 2, 2) * 0.62f + Noise(u * 4 + 3.1f, v * 4 + 1.7f, 4) * 0.38f;
+                    float n = 0.5f + (grain - 0.5f) * 0.5f + (broad - 0.5f) * 1.7f;
+                    float pit = Noise(u * 52 + 9.3f, v * 52 + 4.1f, 52); if (pit > 0.88f) n -= (pit - 0.88f) * 0.8f;   // sparse pits
                     h[y * S + x] = n;
                 }
             // the normal map comes from a 5x5 box-blurred height, so it carries only broad undulation (no specular sparkle)
@@ -147,11 +155,12 @@ namespace LastBell.Arenas.MetronomeCourt
                     hb[y * S + x] = acc / 25f;
                 }
             var alb = new Color32[S * S]; var nrm = new Color32[S * S];
+            float hMean = 0; foreach (float hv in h) hMean += hv; hMean /= h.Length;   // r4: the broad octaves have few lattice points, so their mean is not exactly 0.5; centre on it so the floor keeps its brightness
             for (int y = 0; y < S; y++)
                 for (int x = 0; x < S; x++)
                 {
                     float n = h[y * S + x];
-                    byte a = (byte)Mathf.Clamp(Mathf.RoundToInt((0.98f + (n - 0.5f) * 0.12f) * 255), 0, 255);
+                    byte a = (byte)Mathf.Clamp(Mathf.RoundToInt((0.98f + (n - hMean) * 0.12f) * 255), 0, 255);
                     alb[y * S + x] = new Color32(a, a, a, 255);
                     float dx = (hb[y * S + (x + 2) % S] - hb[y * S + (x + S - 2) % S]) * 1.5f, dy = (hb[((y + 2) % S) * S + x] - hb[((y + S - 2) % S) * S + x]) * 1.5f;   // from the blurred height
                     var nv = new Vector3(-dx, -dy, 1).normalized;
@@ -181,6 +190,95 @@ namespace LastBell.Arenas.MetronomeCourt
             var go = new GameObject(name); go.transform.SetParent(parent, false); go.transform.localPosition = pos;
             go.AddComponent<MeshFilter>().sharedMesh = mesh; go.AddComponent<MeshRenderer>().sharedMaterial = mat;
             return go.transform;
+        }
+
+        // ---- r4 (T1, pass 2): the slab paint atlas ----
+        // Critic 1 on pass 1: the per-slab sweep was too weak to see, the chips were hard triangles on the spokes that read
+        // as arrowheads, and the entry path was four whole slabs tinted 21 luminance lighter, a pale wedge under the south
+        // warnings. So the paint now lives in a small atlas of slab-shaped cells, and each slab is mapped onto one cell by
+        // its own arc and radius. Every mark is soft and follows the slab: a broad light-to-dark sweep (8 to 10 luminance
+        // end to end on a third of the cells, half that on the rest), one or two soft pigment patches, a faint grain, and
+        // darker wear along the rim-side edge. Twelve cells also carry one chip at a corner: an irregular soft-edged
+        // hollow about 9% darker with a faint light lip. The last four cells belong to the four slabs beside the south
+        // spoke and add the entry path: one soft streak 1.5 m wide, painted in world space so it runs across the joints,
+        // 8 luminance at the rim and gone by the inner edge of the middle band. Albedo only: matte, no normal map, no light.
+        const int SlabCols = 8, SlabRows = 4, SlabCell = 64, SlabPlain = 16, SlabChipped = 12;   // 16 plain + 12 chipped + 4 entry-path cells
+        const float SlabPaintMean = 0.86f;   // the atlas stores paint x this, so lighter marks have headroom; SlabM divides it back out
+        static readonly int[] ChippedOuterSlabs = { 2, 5, 9, 14, 16, 21 };   // of the 24 outer slabs: uneven, not mirrored
+        static Texture2D slabAtlas;
+        static readonly Dictionary<int, Material> slabMats = new Dictionary<int, Material>();
+        static Material SlabM(Color c)
+        {
+            int key = Mathf.RoundToInt(c.r * 255) | Mathf.RoundToInt(c.g * 255) << 8 | Mathf.RoundToInt(c.b * 255) << 16;
+            if (slabMats.TryGetValue(key, out var m) && m) return m;
+            BuildFloorDetail(); BuildSlabAtlas();
+            m = Prim.Material(c / SlabPaintMean); m.name = "MetronomeCourt_Slab_" + key;
+            m.SetFloat("_Smoothness", 0.12f); m.SetFloat("_Metallic", 0f);
+            m.SetTexture("_BaseMap", slabAtlas); m.SetTexture("_MainTex", slabAtlas);
+            return slabMats[key] = m;
+        }
+        // the UV rectangle of one cell, half a texel inside its edge; a flip is a negative width or height
+        static Rect SlabCellRect(int cell, bool flipU, bool flipV)
+        {
+            float w = 1f / SlabCols, h = 1f / SlabRows, pad = 0.5f / (SlabCols * SlabCell), padV = 0.5f / (SlabRows * SlabCell);
+            float x = (cell % SlabCols) * w + pad, y = (cell / SlabCols) * h + padV; w -= 2 * pad; h -= 2 * padV;
+            return new Rect(flipU ? x + w : x, flipV ? y + h : y, flipU ? -w : w, flipV ? -h : h);
+        }
+        static void BuildSlabAtlas()
+        {
+            if (slabAtlas) return;
+            int W = SlabCols * SlabCell, H = SlabRows * SlabCell; var px = new Color32[W * H];
+            float Hash(int x, int y, int s) { uint n = (uint)(x * 374761393 + y * 668265263 + s * 1442695041); n = (n ^ (n >> 13)) * 1274126177u; return ((n ^ (n >> 16)) & 0xffff) / 65535f; }
+            float Noise(float x, float y, int s)
+            {
+                int xi = Mathf.FloorToInt(x), yi = Mathf.FloorToInt(y); float fx = x - xi, fy = y - yi; fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy);
+                return Mathf.Lerp(Mathf.Lerp(Hash(xi, yi, s), Hash(xi + 1, yi, s), fx), Mathf.Lerp(Hash(xi, yi + 1, s), Hash(xi + 1, yi + 1, s), fx), fy);
+            }
+            // threshold smoothstep (0 at e0, 1 at e1, either order). Mathf.SmoothStep(a, b, t) is an interpolation, not this.
+            float Sm(float e0, float e1, float x) { float t = Mathf.Clamp01((x - e0) / (e1 - e0)); return t * t * (3 - 2 * t); }
+            // the four entry-path slabs: (inner radius, outer radius, first angle, last angle), as in Build()
+            var pathSlabs = new[] { (9.8f, DialInner, 0f, 15f), (9.8f, DialInner, 345f, 360f), (6.6f, 9.8f, 0f, 10f), (6.6f, 9.8f, 350f, 360f) };
+            for (int cell = 0; cell < SlabCols * SlabRows; cell++)
+            {
+                var r = new System.Random(4100 + cell); float R() => (float)r.NextDouble();
+                float dir = R() * Mathf.PI * 2, amp = cell % 3 == 0 ? 0.05f + 0.012f * R() : 0.02f + 0.014f * R();   // half the end-to-end sweep
+                float ox = R() * 40, oy = R() * 40, wearSide = R();
+                bool chipped = cell >= SlabPlain && cell < SlabPlain + SlabChipped; bool chipAtRim = cell % 2 == 0;
+                float chipU = 0.06f + 0.02f * R(), chipV = chipAtRim ? 0.80f - 0.03f * R() : 0.075f + 0.02f * R(), chipSx = 0.10f + 0.04f * R(), chipSy = 0.09f + 0.04f * R();   // a rim-side chip sits just inside the tempo ring, which would cover it at the very corner
+                int path = cell - SlabPlain - SlabChipped;
+                for (int y = 0; y < SlabCell; y++)
+                    for (int x = 0; x < SlabCell; x++)
+                    {
+                        float u = (x + 0.5f) / SlabCell, v = (y + 0.5f) / SlabCell;
+                        float val = 1f + amp * 2f * ((u - 0.5f) * Mathf.Cos(dir) + (v - 0.5f) * Mathf.Sin(dir));              // the broad sweep
+                        val += (Noise(u * 2.2f + ox, v * 2.2f + oy, cell) - 0.5f) * 0.075f;                                     // one or two pigment patches
+                        val += (Noise(u * 9f + ox, v * 9f + oy, cell + 77) - 0.5f) * 0.03f;                                   // faint grain, about 30 cm
+                        float rimWear = Sm(0.06f + 0.10f * Noise(u * 5f + ox, 3.3f, cell + 9), 0f, 1f - v);      // irregular band along the rim-side edge
+                        val -= rimWear * (0.05f + 0.045f * Noise(u * 3f + oy, 7.7f, cell + 5));
+                        if (wearSide > 0.5f) val -= Sm(0.04f + 0.04f * Noise(1.1f, v * 4f + ox, cell + 3), 0f, wearSide > 0.75f ? u : 1f - u) * 0.025f;   // and down one side on half the cells
+                        float tintR = 1f, tintB = 1f;
+                        if (chipped)
+                        {
+                            float d = new Vector2((u - chipU) / chipSx, (v - chipV) / chipSy).magnitude + (Noise(u * 15f + ox, v * 15f + oy, cell + 31) - 0.5f) * 0.55f;
+                            float hollow = Sm(1.05f, 0.7f, d), lip = Sm(1.45f, 1.1f, d) * (1f - hollow);
+                            val += lip * 0.04f - hollow * 0.10f;
+                        }
+                        if (path >= 0)
+                        {
+                            var (pr0, pr1, pa0, pa1) = pathSlabs[path];
+                            float ang = Mathf.Lerp(pa0, pa1, u) * Mathf.Deg2Rad, rad = Mathf.Lerp(pr0, pr1, v), wx = Mathf.Sin(ang) * rad;
+                            float streak = Mathf.Exp(-(wx * wx) / (0.62f * 0.62f)) * Sm(6.6f, 12.2f, rad);
+                            streak *= 0.85f + 0.3f * Noise(wx * 1.3f + 5f, rad * 0.9f, 901);   // uneven, like footfall, not an airbrushed stripe
+                            val += streak * 0.07f; tintR += streak * 0.02f; tintB -= streak * 0.045f;
+                        }
+                        float g = Mathf.Clamp01(val * SlabPaintMean);
+                        int cx = (cell % SlabCols) * SlabCell + x, cy = (cell / SlabCols) * SlabCell + y;
+                        px[cy * W + cx] = new Color(Mathf.Clamp01(g * tintR), g, Mathf.Clamp01(g * tintB), 1f);
+                    }
+            }
+            slabAtlas = new Texture2D(W, H, TextureFormat.RGBA32, true, false) { name = "MetronomeCourt_SlabAtlas", wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Trilinear, anisoLevel = 4 };
+            slabAtlas.SetPixels32(px); slabAtlas.Apply(true, Application.isPlaying);   // readable in the editor, for the menu's baked copy
+            slabAtlas.mipMapBias = -0.5f;   // cells are small: stay a little sharper before neighbouring cells start to blend in the high mips
         }
 
         // r4 (B1): the court's big round masses. The same profile and shading as Prim's cylinder and cone (one smooth
@@ -236,7 +334,7 @@ namespace LastBell.Arenas.MetronomeCourt
 
         // flat-topped annular sector block (top at y = 0, `depth` deep), angles in degrees clockwise from +z. `gap` is a
         // half-joint inset applied as a parallel offset (constant width at every radius), not a constant angle.
-        static Mesh Sector(float r0, float r1, float a0, float a1, float depth, int seg = 6, float gap = 0, float bevel = 0, int uvRot = 0, Vector2 uvOff = default)
+        static Mesh Sector(float r0, float r1, float a0, float a1, float depth, int seg = 6, float gap = 0, float bevel = 0, int uvRot = 0, Vector2 uvOff = default, Rect uvCell = default)
         {
             var v = new List<Vector3>(); var t = new List<int>();
             void Quad(Vector3 a, Vector3 b, Vector3 c, Vector3 d) { int i = v.Count; v.Add(a); v.Add(b); v.Add(c); v.Add(d); t.Add(i); t.Add(i + 1); t.Add(i + 2); t.Add(i); t.Add(i + 2); t.Add(i + 3); }
@@ -276,6 +374,12 @@ namespace LastBell.Arenas.MetronomeCourt
             for (int i = 0; i < v.Count; i++)
             {
                 var q = new Vector2(v[i].x, v[i].z);
+                if (uvCell.width != 0f)
+                {   // r4 (T1): the slab's own polar extent onto one atlas cell (u along the arc, v from the inner edge to the rim side)
+                    float along = Mathf.DeltaAngle(a0, Mathf.Atan2(q.x, q.y) * Mathf.Rad2Deg) / (a1 - a0), across = (q.magnitude - r0) / (r1 - r0);
+                    uv[i] = new Vector2(uvCell.x + Mathf.Clamp01(along) * uvCell.width, uvCell.y + Mathf.Clamp01(across) * uvCell.height);
+                    continue;
+                }
                 for (int k = 0; k < (uvRot & 3); k++) q = new Vector2(-q.y, q.x);
                 uv[i] = q / FloorTile + uvOff;
             }
@@ -393,14 +497,18 @@ namespace LastBell.Arenas.MetronomeCourt
             Material Shade(bool inner, int outerIndex = -1)
             {
                 float k = inner ? 0.97f : 1f;
-                if (rng.Next(12) == 0) return FloorM(FloorStone * 0.95f * k, 0.18f);
-                var m = FloorM(FloorStone * jitter[rng.Next(jitter.Length)] * k);
+                // the same random draws as before (one, or two when the slab is not weathered), so later placements hold
+                Color c = rng.Next(12) == 0 ? FloorStone * 0.95f * k : FloorStone * jitter[rng.Next(jitter.Length)] * k;
                 // pass 4 (final critic: wear should gather at the rim as lighter, warmer pigment): the outer band leans warm and
                 // its worn slabs are a step lighter; the middle band is unchanged, so the wear fades out by mid-radius
-                var worn = Color.Lerp(FloorStone, StoneWarm, 0.3f);
                 // (pass-4 critic: the separately lighter worn slabs read as hard-edged patchwork, so they now differ by 2 % only)
-                if (outerIndex >= 0) m = (outerIndex * 7) % 5 == 1 ? FloorM(Color.Lerp(FloorStone, StoneWarm, 0.45f) * 1.02f, 0.18f) : FloorM(worn * (outerIndex % 2 == 0 ? 0.99f : 1.005f));
-                return m;
+                // r4 (T1 critic 1: "the outer band is still a two-tone patchwork", 93 against 120): every outer slab now comes
+                // from the warm worn family, within 1.5% of each other. A 1-in-12 weathered slab used to keep the cool dark
+                // stone here, 20-odd luminance under its neighbours. The family is 3% lower, so the band sits about 6 over
+                // the inner band instead of 9.
+                if (outerIndex >= 0)
+                    c = (outerIndex * 7) % 5 == 1 ? Color.Lerp(FloorStone, StoneWarm, 0.4f) * 0.985f : Color.Lerp(FloorStone, StoneWarm, 0.3f) * 0.97f * (outerIndex % 2 == 0 ? 0.992f : 1.008f);
+                return SlabM(c);
             }
             const float gap = 0.025f, bevel = 0.04f;   // 4 cm: wide enough to span pixels (a 2 cm facet crawled when moving)   // half-joint: joints are a constant 0.05 m everywhere
             Mesh(stat, Sector(0, 2.6f, 0, 360, 0.3f, 48, gap, bevel), FloorM(FloorStone * 0.97f), "FloorCentre");
@@ -411,7 +519,22 @@ namespace LastBell.Arenas.MetronomeCourt
                 for (int i = 0; i < count; i++)
                 {
                     float span = 360f / count, a0 = off + i * span;
-                    Mesh(stat, Sector(r0, r1, a0, a0 + span, 0.3f, 6, gap, bevel, rng.Next(4), new Vector2((float)rng.NextDouble(), (float)rng.NextDouble())), Shade(r0 < 3f, r0 > 9f ? i : -1), "Slab");
+                    // r4 (T1, pass 2): each slab is mapped onto one painted cell of the slab atlas (BuildSlabAtlas). The three
+                    // draws that used to turn and shift the shared noise now pick the cell and its flips, so the random
+                    // sequence is unchanged. Outer slabs keep their rim side up (the wear is painted there); six of them,
+                    // unevenly spaced, take a chipped cell, turned so the chip lies at the corner away from the hour spoke.
+                    // The four slabs beside the south spoke in the outer and middle bands take the entry-path cells.
+                    int turn = rng.Next(4); float pick = (float)rng.NextDouble(); rng.NextDouble();
+                    bool outerBand = r0 > 9f, middleBand = !outerBand && r0 > 6f, pathSlab = (outerBand || middleBand) && (i == 0 || i == count - 1);
+                    int cell = Mathf.Min(SlabPlain - 1, (int)(pick * SlabPlain)); bool flipU = (turn & 1) == 1, flipV = (turn & 2) == 2;
+                    if (pathSlab) { cell = SlabPlain + SlabChipped + (outerBand ? 0 : 2) + (i == 0 ? 0 : 1); flipU = flipV = false; }
+                    else if (outerBand)
+                    {
+                        flipV = false;
+                        if (System.Array.IndexOf(ChippedOuterSlabs, i) is int chipAt && chipAt >= 0) { cell = SlabPlain + chipAt * 2 % SlabChipped; flipU = i % 2 == 0; }
+                    }
+                    var slabMesh = Sector(r0, r1, a0, a0 + span, 0.3f, 6, gap, bevel, uvCell: SlabCellRect(cell, flipU, flipV));
+                    Mesh(stat, slabMesh, Shade(r0 < 3f, outerBand ? i : -1), "Slab");
                 }
             // hairline cracks removed (October 25, 2026): 2.5 cm strips are sub-pixel at gameplay distance and crawled when
             // the camera moved. The random draws they used are kept so every later random choice stays the same.
