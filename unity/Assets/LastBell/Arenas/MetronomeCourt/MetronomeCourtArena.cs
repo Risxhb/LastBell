@@ -755,8 +755,9 @@ namespace LastBell.Arenas.MetronomeCourt
             // an ivory border course inside each curb, running-bond paving with a brass cross-joint every five rows
             P(PrimitiveKind.Cube, stat, new Vector3(0, -0.41f, 21f), new Vector3(5.3f, 0.7f, 15f), StoneM(FloorGrout), name: "BridgeDeck");
             P(PrimitiveKind.Cube, stat, new Vector3(0, 0.04f, 13.8f), new Vector3(4.6f, 0.08f, 0.45f), StoneM(Ivory), name: "BridgeSill");
-            P(PrimitiveKind.Cube, stat, new Vector3(0, 0.03f, 14.04f), new Vector3(4.6f, 0.06f, 0.03f), BrassM, name: "BridgeSillNosing");
+            P(PrimitiveKind.Cube, stat, new Vector3(0, 0.03f, 14.04f), new Vector3(4.6f, 0.06f, 0.03f), M(BrassInlay, 0.45f, 0.8f), name: "BridgeSillNosing");   // r4 (T8): the dull inlay brass of the cross-joints (bright brass here was the last long warm line in the south fight view)
             const float paveZ0 = 14.08f, pave = 1.15f, paveHalf = 2.03f;
+            var paveRng = new System.Random(977); int lastPick = -1;   // r4 (T8): each slab's own tone
             for (int row = 0; row < 12; row++)
             {
                 float pz = paveZ0 + pave * 0.5f + row * pave, off = row % 2 == 0 ? 0f : pave * 0.5f;   // running bond
@@ -764,15 +765,22 @@ namespace LastBell.Arenas.MetronomeCourt
                 {
                     float l = Mathf.Max(x0, -paveHalf), r = Mathf.Min(x0 + pave, paveHalf);
                     if (r - l < 0.2f) continue;
-                    int pick = Mathf.Abs(Mathf.RoundToInt(x0 * 7 + row * 3)) % 4;
+                    // Pass 2 (critic 1: slabs of one family were within 1 luminance of each other and each course took
+                    // one step, "bands plus a centre stripe"): every slab draws its own tone from five, never its neighbour's
+                    int pick = paveRng.Next(5); if (pick == lastPick) pick = (pick + 1 + paveRng.Next(4)) % 5; lastPick = pick;
                     // October 27 pass 3: textured paving (surface kit) with a warmer, worn centre path
                     var paveC = Mathf.Abs((l + r) / 2) < 1.2f ? new Color(0.53f, 0.50f, 0.46f) : new Color(0.46f, 0.46f, 0.47f);
                     // pass 4 (critic: "blocky, hard-stepped patches"): a soft paving texture, gentler value steps between slabs
-                    var slab = row % 5 == 3 && pick == 1 ? PavingM(paveC * 0.9f) : PavingM(paveC * new[] { 0.96f, 1.0f, 1.03f, 0.985f }[pick]);
-                    P(PrimitiveKind.Cube, stat, new Vector3((l + r) / 2, -0.05f, pz), new Vector3(r - l - 0.05f, 0.1f, pave - 0.05f), slab, name: "BridgeSlab");
+                    // r4 (November 12 critic, T8: "the paving texture barely reads (large flat light squares)"): wider steps
+                    // from slab to slab (were within 7%), over a paving texture that now carries real stains
+                    var slab = PavingM(paveC * new[] { 0.85f, 0.92f, 1.0f, 1.08f, 1.16f }[pick]);
+                    P(PrimitiveKind.Cube, stat, new Vector3((l + r) / 2, -0.05f, pz), new Vector3(r - l - 0.035f, 0.1f, pave - 0.035f), slab, name: "BridgeSlab");   // r4 (T8): 3.5 cm joints (were 5)
                 }
                 if (row % 5 == 4) P(PrimitiveKind.Cube, stat, new Vector3(0, 0.003f, pz + pave * 0.5f), new Vector3(paveHalf * 2, 0.006f, 0.04f), M(BrassInlay, 0.45f, 0.8f), name: "BridgeBrassJoint");
             }
+            // r4 (T8): a cool grey joint fill 5 mm under the slab tops. (Pass 1's was darker and 1 cm down: "a black grid"
+            // behind the HUD, critic 1. Before that the joints showed the deck 6 cm down.)
+            P(PrimitiveKind.Cube, stat, new Vector3(0, -0.03f, paveZ0 + pave * 6f), new Vector3(paveHalf * 2, 0.05f, pave * 12f), StoneM(FloorGrout * 0.8f), name: "BridgeJointFill");
             P(PrimitiveKind.Cube, stat, new Vector3(0, -0.05f, 28.22f), new Vector3(4.06f, 0.1f, 0.5f), StoneM(Ivory * 0.92f), name: "BridgeEndCourse");
             for (int s = -1; s <= 1; s += 2)
             {
@@ -786,7 +794,7 @@ namespace LastBell.Arenas.MetronomeCourt
                     Mesh(stat, Frustum(0.06f, 0.06f, 0.045f, 0.045f, 0.42f), StoneM(Ivory), "BridgeBaluster", new Vector3(rx, 0.12f, bz));
                 }
                 P(PrimitiveKind.Cube, stat, new Vector3(rx, 0.58f, 21.4f), new Vector3(0.16f, 0.08f, 13.8f), StoneM(Ivory), name: "BridgeRail");
-                P(PrimitiveKind.Cube, stat, new Vector3(rx, 0.635f, 21.4f), new Vector3(0.18f, 0.03f, 13.8f), M(Brass * 0.7f, 0.5f, 0.8f), name: "BridgeRailCap");
+                P(PrimitiveKind.Cube, stat, new Vector3(rx, 0.635f, 21.4f), new Vector3(0.23f, 0.03f, 13.8f), StoneM(new Color(0.5f, 0.495f, 0.48f)), name: "BridgeRailCap");   // r4 (T8): stone (the brass caps were "long orange-brown planks", the strongest warm line by the HUD); brass stays on the post caps. Pass 2: a cooler, darker stone than the rail, overhanging it by 3.5 cm a side (critic 1: "one ivory band")
                 // a low newel ends each rail at the court (under 0.8 m: never hides a player)
                 // pass 6 (Risxhb: the brass post caps "look basic"): each post gets a plinth course, a sunk panel on its two
                 // long faces, an ivory cornice slab that overhangs the shaft, and a stepped brass cap. The rail posts also carry

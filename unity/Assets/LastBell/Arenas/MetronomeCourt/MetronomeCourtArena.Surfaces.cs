@@ -17,7 +17,7 @@ namespace LastBell.Arenas.MetronomeCourt
         static readonly Dictionary<Surface, Texture2D> surfaceTex = new Dictionary<Surface, Texture2D>();
         static readonly Dictionary<Surface, float> surfaceMean = new Dictionary<Surface, float>();
         // metres covered by one texture repeat
-        static float TileOf(Surface s) => s == Surface.Masonry || s == Surface.Weathered || s == Surface.Coursed ? 3.6f : s == Surface.Ivory ? 2.0f : s == Surface.Brass ? 1.2f : s == Surface.Iron ? 2.0f : s == Surface.Slate ? 1.8f : s == Surface.Paving ? 2.4f : 0.8f;
+        static float TileOf(Surface s) => s == Surface.Masonry || s == Surface.Weathered || s == Surface.Coursed ? 3.6f : s == Surface.Ivory ? 2.0f : s == Surface.Brass ? 1.2f : s == Surface.Iron ? 2.0f : s == Surface.Slate ? 1.8f : s == Surface.Paving ? 6.9f : 0.8f;   // r4 (T8): paving repeats every 6.9 m, six bridge courses (2.4 m repeated the same stain on every second course)
         public int SurfaceUvBakes { get; private set; }
 
         static Surface Classify(Color c, float metal, bool glow)
@@ -174,8 +174,14 @@ namespace LastBell.Arenas.MetronomeCourt
                         case Surface.Paving:
                         {   // pass 4 (critic: "blocky, hard-stepped patches" on the bridge): the slabs are separate stones, so the
                             // paving texture carries only soft wear: broad mottle and a few soft stains, no blocks and no steps
-                            val = 1f + 0.1f * (SNoise(u * 3, v * 3, 3, 61) - 0.5f) + 0.05f * (SNoise(u * 6, v * 6, 6, 62) - 0.5f);
-                            val -= 0.07f * Mathf.SmoothStep(0.62f, 0.8f, SNoise(u * 4, v * 4, 4, 63));
+                            // r4 (T8): the repeat is 6.9 m now, so every frequency is three times what it was (the mottle keeps
+                            // its size). The stains had been handed to Mathf.SmoothStep (an interpolation), which spread them
+                            // into an even tint. Now two or three soft dark stains a slab from two layers of different size, and
+                            // a few paler worn patches.
+                            val = 1f + 0.1f * (SNoise(u * 9, v * 9, 9, 61) - 0.5f) + 0.05f * (SNoise(u * 18, v * 18, 18, 62) - 0.5f);
+                            val -= 0.07f * Edge(0.5f, 0.8f, SNoise(u * 11, v * 11, 11, 63));
+                            val -= 0.05f * Edge(0.55f, 0.8f, SNoise(u * 17 + 0.31f, v * 17 + 0.77f, 17, 65));
+                            val += 0.05f * Edge(0.6f, 0.82f, SNoise(u * 8 + 0.37f, v * 8 + 0.61f, 8, 64));
                             break;
                         }
                         case Surface.Cloth:
