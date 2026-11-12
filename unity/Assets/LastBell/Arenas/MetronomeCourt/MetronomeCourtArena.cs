@@ -185,6 +185,19 @@ namespace LastBell.Arenas.MetronomeCourt
             go.AddComponent<MeshRenderer>().sharedMaterial = mat;
             return go.transform;
         }
+        // r4 (T2, pass 2): painted metal with no surface-kit texture. The iron texture lays its plate lines level in world
+        // space, which read as courses on the sloping metronome stiles; these parts carry their plates as geometry instead.
+        static readonly Color T2Stile = new Color(0.20f, 0.215f, 0.26f), T2Strap = new Color(0.245f, 0.26f, 0.31f), T2StileEdge = new Color(0.47f, 0.475f, 0.5f),
+            T2CaseDark = new Color(0.056f, 0.059f, 0.074f), T2Panel = new Color(0.14f, 0.147f, 0.174f);
+        static readonly Dictionary<int, Material> plainMats = new Dictionary<int, Material>();
+        static Material PlainM(Color c, float smooth, float metal = 0f)
+        {
+            int key = Mathf.RoundToInt(c.r * 255) | Mathf.RoundToInt(c.g * 255) << 8 | Mathf.RoundToInt(c.b * 255) << 16 | Mathf.RoundToInt(smooth * 15) << 24 | (metal > 0.5f ? 1 : 0) << 28;
+            if (plainMats.TryGetValue(key, out var m) && m) return m;
+            m = Prim.Material(c); m.name = "MetronomeCourt_Plain_" + key; m.SetFloat("_Smoothness", smooth); m.SetFloat("_Metallic", metal);
+            return plainMats[key] = m;
+        }
+
         Transform Mesh(Transform parent, Mesh mesh, Material mat, string name, Vector3 pos = default)
         {
             var go = new GameObject(name); go.transform.SetParent(parent, false); go.transform.localPosition = pos;
@@ -1529,13 +1542,92 @@ namespace LastBell.Arenas.MetronomeCourt
             // dark iron back case (trapezoid), tapered open front frame with brass edge bevels and tempo-lit seams
             Frame = new GameObject("Frame").transform; Frame.SetParent(m, false);
             float baseHalf = 3.4f, topHalf = 0.6f, h = FrameHeight;
-            Mesh(Frame, Trapezoid(baseHalf - 0.2f, topHalf - 0.05f, h - 0.1f, 0.8f), M(new Color(0.10f, 0.11f, 0.13f), 0.15f, 0f), "BackCase", new Vector3(0, 0.1f, -0.15f));
-            Mesh(Frame, Trapezoid(baseHalf - 0.75f, topHalf * 0.4f, h - 1.2f, 0.05f), M(new Color(0.07f, 0.075f, 0.09f), 0.1f, 0f), "CaseRecess", new Vector3(0, 0.5f, 0.15f));
+            // r4 (November 12 critic, T2): the back case was "a flat near-black plane" carrying stone courses (its plain dark
+            // material was classified as masonry), and the 1.6 m stiles were the same value, so only the brass bevels drew
+            // the A. Pass 2, after critic 1 (pass 1 lifted the stiles until the landmark lost its dark mass, and the iron
+            // texture drew level lines across them, which read as slate boards):
+            //   - the stiles are plain charcoal iron, one step above the old value and still well under the sky, each built
+            //     from three plates joined by riveted straps that lie square to the slope, with a neutral lit edge strip;
+            //   - the case behind is the darkest value on the landmark, so the frame separates from it by depth;
+            //   - each side of the scale plate carries three inset riveted panels that follow the taper, a clear step
+            //     lighter than the case and set in from the stile, so the dark case still outlines the frame.
+            // No new emission, no texture on the stiles.
+            Mesh(Frame, Trapezoid(baseHalf - 0.2f, topHalf - 0.05f, h - 0.1f, 0.8f), SurfM(new Color(0.10f, 0.11f, 0.14f), Surface.Iron, 0.15f), "BackCase", new Vector3(0, 0.1f, -0.15f));
+            var caseDark = PlainM(T2CaseDark, 0.05f);
+            void Quad(List<Vector3> v, List<int> t, Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, Vector3 outward)
+            {
+                if (Vector3.Dot(Vector3.Cross(p1 - p0, p2 - p0), outward) < 0) { var s1 = p1; p1 = p3; p3 = s1; }
+                int i = v.Count; v.Add(p0); v.Add(p1); v.Add(p2); v.Add(p3); t.Add(i); t.Add(i + 1); t.Add(i + 2); t.Add(i); t.Add(i + 2); t.Add(i + 3);
+            }
+            void Slab(List<Vector3> v, List<int> t, Vector3 a, Vector3 b, Vector3 c, Vector3 d, float z0, float z1)   // a quad in XY (a, b, c, d in order round it), from z0 back to z1 front
+            {
+                Vector3 F(Vector3 p) => new Vector3(p.x, p.y, z1); Vector3 B(Vector3 p) => new Vector3(p.x, p.y, z0); var mid = (a + b + c + d) / 4;
+                Quad(v, t, F(a), F(b), F(c), F(d), Vector3.forward);
+                var ring = new[] { a, b, c, d };
+                for (int k = 0; k < 4; k++) { Vector3 e0 = ring[k], e1 = ring[(k + 1) % 4]; Quad(v, t, B(e0), B(e1), F(e1), F(e0), (e0 + e1) / 2 - mid); }
+            }
+            void Box(List<Vector3> v, List<int> t, Vector3 c, Quaternion r, Vector3 size)   // a turned box without its back face
+            {
+                Vector3 hx = r * new Vector3(size.x / 2, 0, 0), hy = r * new Vector3(0, size.y / 2, 0), hz = r * new Vector3(0, 0, size.z / 2);
+                Quad(v, t, c - hx - hy + hz, c + hx - hy + hz, c + hx + hy + hz, c - hx + hy + hz, hz);
+                Quad(v, t, c + hx - hy - hz, c + hx + hy - hz, c + hx + hy + hz, c + hx - hy + hz, hx);
+                Quad(v, t, c - hx - hy - hz, c - hx + hy - hz, c - hx + hy + hz, c - hx - hy + hz, -hx);
+                Quad(v, t, c - hx + hy - hz, c + hx + hy - hz, c + hx + hy + hz, c - hx + hy + hz, hy);
+                Quad(v, t, c - hx - hy - hz, c + hx - hy - hz, c + hx - hy + hz, c - hx - hy + hz, -hy);
+            }
+            void Bake(List<Vector3> v, List<int> t, Material mat, string nm)
+            {
+                var bm = new Mesh { name = nm }; bm.SetVertices(v); bm.SetTriangles(t, 0); bm.RecalculateNormals(); bm.RecalculateBounds();
+                Mesh(Frame, bm, mat, nm);
+            }
+            var rivetBrass = SurfM(Brass * 0.55f, Surface.Brass, 0.3f);
+            {
+                // the case panels: one mesh for all six, one for their rivets
+                float StileInner(float y) => Mathf.Lerp(baseHalf, topHalf, y / h) - 0.83f;   // the inner edge of the stile at height y
+                var pv = new List<Vector3>(); var pt = new List<int>(); var rivV = new List<Vector3>(); var rivT = new List<int>();
+                // The recess plate. It was a Trapezoid(), whose court-side face carries a normal that points north, so it was
+                // lit from behind by the tempo spot light and read lighter than anything set on it. Built facing the court.
+                float rb = baseHalf - 0.75f, rt = topHalf * 0.4f;
+                Slab(pv, pt, new Vector3(-rb, 0.5f, 0), new Vector3(rb, 0.5f, 0), new Vector3(rt, h - 0.7f, 0), new Vector3(-rt, h - 0.7f, 0), 0.10f, 0.15f);
+                Bake(pv, pt, caseDark, "CaseRecess"); pv = new List<Vector3>(); pt = new List<int>();
+                foreach (var (y0, y1) in new[] { (0.95f, 1.95f), (2.5f, 4.5f), (4.8f, 6.3f) })
+                    foreach (float s in new[] { -1f, 1f })
+                    {
+                        const float xin = 0.34f, margin = 0.24f; float xo0 = StileInner(y0) - margin, xo1 = StileInner(y1) - margin;
+                        Vector3 a = new Vector3(s * xin, y0, 0), b = new Vector3(s * xo0, y0, 0), c = new Vector3(s * xo1, y1, 0), d = new Vector3(s * xin, y1, 0);
+                        Slab(pv, pt, a, b, c, d, 0.15f, 0.19f);
+                        foreach (var (corner, dx, dy) in new[] { (a, 1f, 1f), (b, -1f, 1f), (c, -1f, -1f), (d, 1f, -1f) })
+                            Box(rivV, rivT, corner + new Vector3(s * dx * 0.13f, dy * 0.13f, 0.2f), Quaternion.identity, new Vector3(0.11f, 0.11f, 0.03f));
+                    }
+                Bake(pv, pt, PlainM(T2Panel, 0.15f), "CasePanels");
+                Bake(rivV, rivT, rivetBrass, "CaseRivets");
+            }
+            var stileIron = PlainM(T2Stile, 0.25f); var stileEdge = PlainM(T2StileEdge, 0.25f);
+            var strapV = new List<Vector3>(); var strapT = new List<int>(); var seamV = new List<Vector3>(); var seamT = new List<int>(); var studV = new List<Vector3>(); var studT = new List<int>();
             for (int s = -1; s <= 1; s += 2)
             {
                 var a = new Vector3(baseHalf * s, 0, 0.35f); var b = new Vector3(topHalf * s, h, 0.35f);
                 var rot = Quaternion.FromToRotation(Vector3.up, (b - a).normalized);
-                var stile = P(PrimitiveKind.Cube, Frame, (a + b) / 2, new Vector3(1.6f, (b - a).magnitude, 0.8f), IronM, name: "Stile"); stile.localRotation = rot;
+                var stile = P(PrimitiveKind.Cube, Frame, (a + b) / 2, new Vector3(1.6f, (b - a).magnitude, 0.8f), stileIron, name: "Stile"); stile.localRotation = rot;
+                var chamfer = P(PrimitiveKind.Cube, Frame, (a + b) / 2 + new Vector3(0.72f * s, 0, 0.41f), new Vector3(0.14f, (b - a).magnitude, 0.05f), stileEdge, name: "StileChamfer"); chamfer.localRotation = rot;   // r4 (T2): the lit outer edge
+                // r4 (T2, pass 2): three plates a stile, joined by straps square to the slope: a strap a touch lighter than
+                // the plate, a dark joint line under it, and two rows of brass studs. The middle strap is split round the
+                // tempo seam. Stile space: x across (+ is the outer edge), y up the slope, z out of the face.
+                Vector3 OnFace(float x, float y, float z) => (a + b) / 2 + rot * new Vector3(x * s, y, 0.4f + z);
+                float len = (b - a).magnitude;
+                foreach (float f in new[] { 0.16f, 0.5f, 0.84f })
+                {
+                    float y = (f - 0.5f) * len;
+                    foreach (var (x0, x1) in f == 0.5f ? new[] { (-0.47f, 0.07f), (0.25f, 0.63f) } : new[] { (-0.47f, 0.63f) })
+                    {
+                        Box(strapV, strapT, OnFace((x0 + x1) / 2, y, 0.008f), rot, new Vector3(x1 - x0, 0.30f, 0.016f));
+                        Box(seamV, seamT, OnFace((x0 + x1) / 2, y - 0.175f, 0.003f), rot, new Vector3(x1 - x0, 0.05f, 0.006f));
+                        int n = Mathf.Max(2, Mathf.RoundToInt((x1 - x0) / 0.3f));
+                        for (int k = 0; k < n; k++)
+                            foreach (float dy in new[] { -0.075f, 0.075f })
+                                Box(studV, studT, OnFace(Mathf.Lerp(x0 + 0.1f, x1 - 0.1f, k / (n - 1f)), y + dy, 0.026f), rot, new Vector3(0.11f, 0.11f, 0.02f));
+                    }
+                }
                 var trim = P(PrimitiveKind.Cube, Frame, (a + b) / 2 + new Vector3(-0.64f * s, 0, 0.41f), new Vector3(0.3f, (b - a).magnitude, 0.05f), M(Brass * 0.7f, 0.4f, 0.8f), name: "StileBevel"); trim.localRotation = rot;   // pass 4: aged, low-gloss brass (critic: an orange bloom inside the case)
                 // tempo seam: the middle 60% of the stile only, so it accents rather than out-glowing everything
                 var seam = P(PrimitiveKind.Cube, Frame, (a + b) / 2 + new Vector3(0.16f * s, 0, 0.42f), new Vector3(0.1f, (b - a).magnitude * 0.6f, 0.02f), M(HasteTint, 0.2f, 0, true), name: "StileSeam"); seam.localRotation = rot;   // pass 4: a broader, dimmer seam (critic: thin emissive lines)
@@ -1548,6 +1640,7 @@ namespace LastBell.Arenas.MetronomeCourt
                 }
                 Mesh(Frame, Frustum(0.7f, 0.15f, 0.03f, 0.15f, 1.1f), IronM, "Gusset", new Vector3((baseHalf - 1.0f) * s, 0.6f, 0.5f));
             }
+            Bake(strapV, strapT, PlainM(T2Strap, 0.25f), "StileStraps"); Bake(seamV, seamT, caseDark, "StileJoints"); Bake(studV, studT, rivetBrass, "StileStuds");
             // frenzy cracks: 7 branching cracks that start at the stile/brace joints and the base corners and run into the
             // case, plus dark chips knocked out of the bevel (all hidden until Broken Cadence)
             var crng = new System.Random(71);
