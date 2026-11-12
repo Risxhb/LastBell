@@ -409,7 +409,7 @@ namespace LastBell.Arenas.MetronomeCourt
                 }
             }
             // belfry spires on the flanks, rising from the sea to well above the rim (outside every gameplay frame's floor)
-            var mid1 = StoneM(new Color(0.27f, 0.27f, 0.37f)); var roof = SlateM(new Color(0.19f, 0.20f, 0.29f));   // middle layer: dusty indigo; pass 4: slate roofs
+            var mid1 = HazeOf(StoneM(new Color(0.27f, 0.27f, 0.37f)), 0.8f); var roof = HazeOf(SlateM(new Color(0.19f, 0.20f, 0.29f)), 0.8f);   // r4 (B5): with the haze lift (the west belfry was the black tower beside the master gear)   // middle layer: dusty indigo; pass 4: slate roofs
             var bellM = M(new Color(0.45f, 0.33f, 0.18f), 0.4f, 0.8f); var glow = M(WindowGlow * 0.9f, 0.2f, 0, true);
             foreach (var (a, r, topY) in new[] { (76f, 37f, 5f), (104f, 42f, 8f), (256f, 39f, 6.5f), (284f, 35f, 3.5f) })
             {

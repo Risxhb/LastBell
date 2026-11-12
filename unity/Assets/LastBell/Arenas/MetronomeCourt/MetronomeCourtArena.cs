@@ -688,7 +688,12 @@ namespace LastBell.Arenas.MetronomeCourt
                 RenderSettings.skybox = skyMat;
             }
             RenderSettings.fog = true; RenderSettings.fogMode = FogMode.Linear; RenderSettings.fogStartDistance = FogStart; RenderSettings.fogEndDistance = FogEnd;
-            RenderSettings.fogColor = new Color(0.13f, 0.14f, 0.22f);
+            // r4 (B5 critic 1): the haze colour sits near the sky behind the skyline (it was darker than every part of the sky, so
+            // the farthest towers, fully fogged, were the blackest and hardest shapes in the frame: an inverted depth order)
+            RenderSettings.fogColor = new Color(0.24f, 0.24f, 0.36f);
+            // the sky below the horizon equals the fog colour by design (the far void and the abyss bowl fade into it). After
+            // critic 2: it still held the old colour, so the bowl's rim showed as a hard arc in the overview.
+            if (skyMat) skyMat.SetColor("_Low", RenderSettings.fogColor);
         }
 
         void UpdateWorldLighting(bool haste, bool frenzy)
@@ -716,21 +721,26 @@ namespace LastBell.Arenas.MetronomeCourt
             float y = pos.y, seg = h / 3f;
             var toward = -Sim.Flat(pos).normalized; var side = Vector3.Cross(Vector3.up, toward);
             float faceYaw = Mathf.Atan2(toward.x, toward.z) * Mathf.Rad2Deg;
-            var winM = M(Sim.Flat(pos).magnitude > 55f ? WindowGlow * 1.5f : WindowGlow, 0.2f, 0, true);   // far towers: brighter so the fog doesn't erase them
+            var winM = M(Sim.Flat(pos).magnitude > 55f ? WindowGlow * 0.9f : WindowGlow * 0.68f, 0.2f, 0, true);   // far towers: brighter so the fog doesn't erase them   // r4 (B5 critic 1): cores were 207 to 255; now a quiet warm 170 to 190
             // October 27: atmospheric recession, near towers dark stone, far ones dissolving toward dusty indigo/violet
             float far = Mathf.Round(Mathf.InverseLerp(40f, 76f, Sim.Flat(pos).magnitude) * 3f) / 3f;   // four steps: shared materials
             var StoneDark = Color.Lerp(MetronomeCourtArena.StoneDark, new Color(0.30f, 0.30f, 0.42f), far);
-            var IronM = M(Color.Lerp(Iron, new Color(0.21f, 0.21f, 0.31f), far), 0.35f, 0.6f);
+            // r4 (B5): roof slate instead of metallic iron (the metal mirrored the dark sky: 17 m black spires), and every tower
+            // material carries the mid-distance haze lift, like the arch bridges, so a shadowed face is not the void's value
+            var IronM = HazeOf(SlateM(Color.Lerp(new Color(0.19f, 0.20f, 0.29f), new Color(0.25f, 0.25f, 0.36f), far)));
+            // r4 (November 12 critic, B5): the towers stood on y = -14 while the cloud sea lies at -16.5 to -27, so in low
+            // and close views each one showed a flat underside hanging over the cloud. A foot now runs 18 m down into the sea.
+            Mesh(stat, Frustum(w * 0.56f, w * 0.56f, w * 0.5f, w * 0.5f, 18f), HazeOf(StoneM(StoneDark * 0.9f)), "TowerFoot", new Vector3(pos.x, y - 18f, pos.z));
             for (int k = 0; k < 3; k++)
             {
                 float ww = w * (1 - 0.18f * k);
-                Mesh(stat, Frustum(ww * 0.5f, ww * 0.5f, ww * 0.45f, ww * 0.45f, seg), StoneM(StoneDark * (0.9f + 0.1f * k)), "TowerTier", new Vector3(pos.x, y, pos.z));   // October 27: tapered tiers, not prisms
-                P(PrimitiveKind.Cube, stat, new Vector3(pos.x, y + seg, pos.z), new Vector3(ww + 0.4f, 0.3f, ww + 0.4f), StoneM(StoneDark * 0.8f), name: "TowerCornice");
+                Mesh(stat, Frustum(ww * 0.5f, ww * 0.5f, ww * 0.45f, ww * 0.45f, seg), HazeOf(StoneM(StoneDark * (0.9f + 0.1f * k))), "TowerTier", new Vector3(pos.x, y, pos.z));   // October 27: tapered tiers, not prisms
+                P(PrimitiveKind.Cube, stat, new Vector3(pos.x, y + seg, pos.z), new Vector3(ww + 0.4f, 0.3f, ww + 0.4f), HazeOf(StoneM(StoneDark * 0.8f)), name: "TowerCornice");
                 // corner buttresses break the box into a gothic mass
                 for (int c = 0; c < 4; c++)
                 {
                     var o = Quaternion.Euler(0, c * 90 + 45, 0) * Vector3.forward * (ww * 0.68f);
-                    Mesh(stat, Frustum(0.32f, 0.32f, 0.12f, 0.12f, seg * 0.9f), StoneM(StoneDark * 0.85f), "Buttress", new Vector3(pos.x, y, pos.z) + o);
+                    Mesh(stat, Frustum(0.32f, 0.32f, 0.12f, 0.12f, seg * 0.9f), HazeOf(StoneM(StoneDark * 0.85f)), "Buttress", new Vector3(pos.x, y, pos.z) + o);
                 }
                 // pointed-arch slit windows (a narrow slit plus a rotated cap) on the side facing the court
                 if (k < 2 || !bell)
@@ -745,8 +755,8 @@ namespace LastBell.Arenas.MetronomeCourt
                 if (k == 2 && bell)
                 {
                     var arch = new Vector3(pos.x, y + seg * 0.55f, pos.z) + toward * (ww / 2 + 0.03f);
-                    P(PrimitiveKind.Cube, stat, arch, new Vector3(ww * 0.36f, seg * 0.44f, 0.05f), M(BellGlow, 0.2f, 0, true), new Vector3(0, faceYaw, 0), "BellOpening");
-                    P(PrimitiveKind.Cube, stat, arch + Vector3.up * (seg * 0.22f) + toward * 0.01f, new Vector3(ww * 0.255f, ww * 0.255f, 0.05f), M(BellGlow, 0.2f, 0, true), new Vector3(0, faceYaw, 45), "BellArchPoint");
+                    P(PrimitiveKind.Cube, stat, arch, new Vector3(ww * 0.36f, seg * 0.26f, 0.05f), M(BellGlow * 0.45f, 0.2f, 0, true), new Vector3(0, faceYaw, 0), "BellOpening");   // r4 (B5): shorter and dimmer (it was the brightest thing beside the metronome)
+                    P(PrimitiveKind.Cube, stat, arch + Vector3.up * (seg * 0.13f) + toward * 0.01f, new Vector3(ww * 0.255f, ww * 0.255f, 0.05f), M(BellGlow * 0.45f, 0.2f, 0, true), new Vector3(0, faceYaw, 45), "BellArchPoint");
                     P(PrimitiveKind.Cube, stat, arch + Vector3.down * (seg * 0.05f) + toward * 0.04f, new Vector3(ww * 0.2f, ww * 0.2f, 0.05f), IronM, new Vector3(0, faceYaw, 0), "BellSilhouette");
                 }
                 y += seg;
@@ -816,14 +826,17 @@ namespace LastBell.Arenas.MetronomeCourt
         // r4 (B4): mid-distance stone and iron with a faint haze-coloured emission. These structures stand 30 to 50 m from the
         // fight camera, nearer than the scene fog starts, and a face the key light misses fell to the void's value. The lift
         // is the same for every colour, so lit faces barely change and shadowed ones settle near luminance 35 to 45.
-        static readonly Dictionary<Material, Material> hazeMats = new Dictionary<Material, Material>();
+        static readonly Dictionary<(Material, int), Material> hazeMats = new Dictionary<(Material, int), Material>();
         static readonly Color HazeLift = new Color(0.035f, 0.038f, 0.07f);   // linear (an HDR colour property is not gamma-converted): about 45,48,66 on screen by itself
-        static Material HazeOf(Material src)
+        // strength scales the lift: 1 for structures 40 m and more from the court, less for nearer ones (B5: the flank
+        // belfries, 35 to 39 m out, went flat lilac at full strength)
+        static Material HazeOf(Material src, float strength = 1f)
         {
-            if (hazeMats.TryGetValue(src, out var m) && m) return m;
-            m = new Material(src) { name = src.name + "_Haze" };
-            m.EnableKeyword("_EMISSION"); m.SetColor("_EmissionColor", HazeLift);
-            return hazeMats[src] = m;
+            var key = (src, Mathf.RoundToInt(strength * 20));
+            if (hazeMats.TryGetValue(key, out var m) && m) return m;
+            m = new Material(src) { name = src.name + "_Haze" + key.Item2 };
+            m.EnableKeyword("_EMISSION"); m.SetColor("_EmissionColor", HazeLift * strength);
+            return hazeMats[key] = m;
         }
         static Material HazeM(Color c) => HazeOf(M(c, 0.1f));
 
@@ -1112,7 +1125,7 @@ namespace LastBell.Arenas.MetronomeCourt
             }
 
             // far city layer: flat fog-coloured silhouettes at 90-140 m (the fog swallows them into a second skyline)
-            var farM = M(new Color(0.11f, 0.12f, 0.18f), 0.1f); var farWin = M(new Color(0.3f, 0.2f, 0.1f), 0.2f, 0, true);
+            var farM = M(new Color(0.11f, 0.12f, 0.18f), 0.1f); var farWin = M(new Color(0.24f, 0.17f, 0.08f), 0.2f, 0, true);
             var far = new GameObject("Far city").transform; far.SetParent(root, false);
             for (int i = 0; i < 26; i++)
             {
@@ -1120,7 +1133,8 @@ namespace LastBell.Arenas.MetronomeCourt
                 float r = 95f + (float)arng.NextDouble() * 45f, h = 18f + (float)arng.NextDouble() * 34f, w = 5f + (float)arng.NextDouble() * 6f;
                 var pos = Quaternion.Euler(0, a + 180f, 0) * Vector3.forward * r; pos.y = -20f;
                 var yaw = new Vector3(0, a, 0);
-                P(PrimitiveKind.Cube, far, pos + Vector3.up * h / 2, new Vector3(w, h, 1.5f), farM, yaw, "FarTower");
+                // r4 (B5 critic 1): each silhouette runs 30 m further down (its foot sat at -20, above the far cloud: a cut bottom edge)
+                P(PrimitiveKind.Cube, far, pos + Vector3.up * (h / 2 - 15f), new Vector3(w, h + 30f, 1.5f), farM, yaw, "FarTower");
                 P(PrimitiveKind.Cone, far, pos + Vector3.up * (h + 5f), new Vector3(w * 0.7f, 10f, 1.5f), farM, yaw, "FarSpire");
                 if (i % 3 == 0) P(PrimitiveKind.Cube, far, pos + Vector3.up * h * 0.7f - Sim.Flat(pos).normalized * 0.8f, new Vector3(0.5f, 1.2f, 0.1f), farWin, yaw, "FarWindow");
             }
