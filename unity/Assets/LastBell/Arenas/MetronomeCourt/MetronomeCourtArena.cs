@@ -183,6 +183,57 @@ namespace LastBell.Arenas.MetronomeCourt
             return go.transform;
         }
 
+        // r4 (B1): the court's big round masses. The same profile and shading as Prim's cylinder and cone (one smooth
+        // lathe, unit size, scaled by the transform), but with 180 steps instead of 28, so a 15 m rim shows no corners
+        // (2 mm of sag per facet instead of 9 cm). The seam sits at the north (-z), behind the metronome plinth. Each
+        // vertex keeps its unwrapped angle in uv.x, which BakeSurfaceUVs uses in place of atan2 (no facet of smeared
+        // texture where the angle wraps), and uv.y says whether it belongs to a cylinder's wall (1) or to a cap or cone (0).
+        // The old meshes shared their rim vertices between cap and wall, so the wall got the cap's mapping at both
+        // ends and its courses were stretched flat (B1 critic 1: "a plain smooth cylinder"). Here every profile corner
+        // is split for the mapping, with the smooth normals of the unsplit lathe, so the shading is unchanged.
+        const int RoundSteps = 180;
+        static readonly Dictionary<PrimitiveKind, Mesh> roundMeshes = new Dictionary<PrimitiveKind, Mesh>();
+        static Mesh RoundMesh(PrimitiveKind kind)
+        {
+            if (roundMeshes.TryGetValue(kind, out var cached) && cached) return cached;
+            var prof = kind == PrimitiveKind.Cone ? new[] { new Vector2(0, -0.5f), new Vector2(0.5f, -0.5f), new Vector2(0, 0.5f) }
+                                                  : new[] { new Vector2(0, -1), new Vector2(0.5f, -1), new Vector2(0.5f, 1), new Vector2(0, 1) };
+            int n = prof.Length; var v = new List<Vector3>(); var t = new List<int>(); var ang = new float[RoundSteps + 1];
+            for (int s = 0; s <= RoundSteps; s++)
+            {
+                float a = ang[s] = -Mathf.PI + 2 * Mathf.PI * s / RoundSteps, sn = Mathf.Sin(a), cs = Mathf.Cos(a);   // clockwise from +z, starting at -z
+                foreach (var p in prof) v.Add(new Vector3(p.x * sn, p.y, p.x * cs));
+            }
+            for (int s = 0; s < RoundSteps; s++)
+                for (int i = 0; i < n - 1; i++)
+                {
+                    int a0 = s * n + i, a1 = a0 + 1, b0 = (s + 1) * n + i, b1 = b0 + 1;
+                    t.Add(a0); t.Add(b0); t.Add(a1); t.Add(b0); t.Add(b1); t.Add(a1);   // faces outward
+                }
+            var smooth = new Mesh(); smooth.SetVertices(v); smooth.SetTriangles(t, 0); smooth.RecalculateNormals();
+            var nr = smooth.normals;   // the first and last rings share positions: give them one normal, so the seam does not shade
+            for (int i = 0; i < n; i++) { var avg = (nr[i] + nr[RoundSteps * n + i]).normalized; nr[i] = avg; nr[RoundSteps * n + i] = avg; }
+            if (Application.isPlaying) Destroy(smooth); else DestroyImmediate(smooth);
+            var fv = new List<Vector3>(); var fn = new List<Vector3>(); var fuv = new List<Vector2>(); var ft = new List<int>(); int per = (n - 1) * 2;
+            for (int s = 0; s <= RoundSteps; s++)
+                for (int i = 0; i < n - 1; i++)
+                {
+                    float wall = kind == PrimitiveKind.Cylinder && prof[i].x > 0 && prof[i + 1].x > 0 ? 1f : 0f;
+                    for (int k = 0; k < 2; k++) { fv.Add(v[s * n + i + k]); fn.Add(nr[s * n + i + k]); fuv.Add(new Vector2(ang[s], wall)); }
+                    if (s == RoundSteps) continue;
+                    int a0 = s * per + i * 2, a1 = a0 + 1, b0 = a0 + per, b1 = b0 + 1;
+                    ft.Add(a0); ft.Add(b0); ft.Add(a1); ft.Add(b0); ft.Add(b1); ft.Add(a1);
+                }
+            var m = new Mesh { name = "Round_" + kind }; m.SetVertices(fv); m.SetNormals(fn); m.SetUVs(0, fuv); m.SetTriangles(ft, 0); m.RecalculateBounds();
+            return roundMeshes[kind] = m;
+        }
+        Transform Round(PrimitiveKind kind, Transform parent, Vector3 pos, Vector3 scale, Material mat, Vector3? euler = null, string name = null)
+        {
+            var tr = Mesh(parent, RoundMesh(kind), mat, name ?? kind.ToString(), pos);
+            tr.localScale = scale; tr.localRotation = Quaternion.Euler(euler ?? Vector3.zero);
+            return tr;
+        }
+
         // flat-topped annular sector block (top at y = 0, `depth` deep), angles in degrees clockwise from +z. `gap` is a
         // half-joint inset applied as a parallel offset (constant width at every radius), not a constant angle.
         static Mesh Sector(float r0, float r1, float a0, float a1, float depth, int seg = 6, float gap = 0, float bevel = 0, int uvRot = 0, Vector2 uvOff = default)
@@ -284,8 +335,15 @@ namespace LastBell.Arenas.MetronomeCourt
             var rng = new System.Random(23);
 
             // ---- combat floor: grout disc, three bands of paved wedges, dark dial border ----
-            P(PrimitiveKind.Cylinder, stat, new Vector3(0, -0.36f, 0), new Vector3(FloorRadius * 2, 0.34f, FloorRadius * 2), StoneM(FloorGrout), name: "Grout");
-            P(PrimitiveKind.Cylinder, stat, new Vector3(0, -3.6f, 0), new Vector3(FloorRadius * 2 + 1.6f, 3.0f, FloorRadius * 2 + 1.6f), StoneM(StoneDark), name: "PlatformDrum");
+            // r4 (November 12 critic, B1): the grout disc, drum, rim ledge, ledge trim, keel and lower tier were the shared
+            // 28-step primitives round a 96 to 120-segment floor: straight chords with corners in every south-half frame
+            // (9 cm of sag per facet at the ledge). Round() builds the same profiles with 180 steps; positions, scales
+            // and top heights are unchanged (the ledge top stays at -0.06, clear of the grout: the October 26 fix).
+            // The grout disc stops 0.2 m inside the floor edge (B1 critic 2: "a new pale hairline at the south gate"). At the
+            // full 13.1 m its round wall shared a surface with the dial band's 96-segment outer wall and showed through
+            // between that wall's vertices; the 28-sided disc had hidden behind it. The joints it fills end at 12.4 m.
+            Round(PrimitiveKind.Cylinder, stat, new Vector3(0, -0.36f, 0), new Vector3(FloorRadius * 2 - 0.4f, 0.34f, FloorRadius * 2 - 0.4f), StoneM(FloorGrout), name: "Grout");
+            Round(PrimitiveKind.Cylinder, stat, new Vector3(0, -3.6f, 0), new Vector3(FloorRadius * 2 + 1.6f, 3.0f, FloorRadius * 2 + 1.6f), StoneM(StoneDark), name: "PlatformDrum");
             // gothic bays round the drum under the court (pointed dark recesses) and four teal banner drops
             for (int i = 0; i < 16; i++)
             {
@@ -323,9 +381,9 @@ namespace LastBell.Arenas.MetronomeCourt
             // October 26, 2026: the ledge top used to sit at -0.02, the same height as the grout disc's top that fills
             // every joint, so the two fought inside the joints and the joints seemed to shift while moving. It now sits at
             // -0.06, clear of the grout.
-            P(PrimitiveKind.Cylinder, stat, new Vector3(0, -1.11f, 0), new Vector3(29.9f, 1.05f, 29.9f), StoneM(StoneDark * 1.1f), name: "RimLedge");   // cylinder: scale.y = half-height; top at -0.06
-            P(PrimitiveKind.Cylinder, stat, new Vector3(0, -0.16f, 0), new Vector3(30.1f, 0.08f, 30.1f), M(Brass * 0.45f, 0.4f, 0.8f), name: "RimLedgeTrim");   // a band on the ledge edge, below its top (no shared surface)
-            P(PrimitiveKind.Cone, stat, new Vector3(0, -10.5f, 0), new Vector3(FloorRadius * 2 + 1.6f, 7f, FloorRadius * 2 + 1.6f), StoneM(StoneDark), new Vector3(180, 0, 0), "PlatformKeel");
+            Round(PrimitiveKind.Cylinder, stat, new Vector3(0, -1.11f, 0), new Vector3(29.9f, 1.05f, 29.9f), StoneM(StoneDark * 1.1f), name: "RimLedge");   // cylinder: scale.y = half-height; top at -0.06
+            Round(PrimitiveKind.Cylinder, stat, new Vector3(0, -0.16f, 0), new Vector3(30.1f, 0.08f, 30.1f), M(Brass * 0.45f, 0.4f, 0.8f), name: "RimLedgeTrim");   // a band on the ledge edge, below its top (no shared surface)
+            Round(PrimitiveKind.Cone, stat, new Vector3(0, -10.5f, 0), new Vector3(FloorRadius * 2 + 1.6f, 7f, FloorRadius * 2 + 1.6f), StoneM(StoneDark), new Vector3(180, 180, 0), "PlatformKeel");   // point down; the extra half turn keeps the texture seam at the north
             // one calm stone family with a wider +-7% jitter on a darker base (keeps telegraph contrast), a shared grain
             // detail, bevelled slab edges, and 1 in 12 slabs weathered (darker, with a damp sheen)
             // October 27: one cool limestone family; a narrower jitter so the disc stops reading as alternating pie wedges
@@ -548,7 +606,7 @@ namespace LastBell.Arenas.MetronomeCourt
                 Tower(stat, bellPos, 30f, 6f, rng, true);
             }
             P(PrimitiveKind.Cone, stat, new Vector3(0, -62, 0), new Vector3(300, 50, 300), M(Abyss, 0.1f), new Vector3(180, 0, 0), "AbyssBowl");
-            P(PrimitiveKind.Cylinder, stat, new Vector3(0, -8.5f, 0), new Vector3(FloorRadius * 2 + 4f, 1.5f, FloorRadius * 2 + 4f), StoneM(StoneDark * 0.75f), name: "LowerTier");
+            Round(PrimitiveKind.Cylinder, stat, new Vector3(0, -8.5f, 0), new Vector3(FloorRadius * 2 + 4f, 1.5f, FloorRadius * 2 + 4f), StoneM(StoneDark * 0.75f), name: "LowerTier");
             for (int i = 0; i < 7; i++)
             {
                 float a = 200 + i * (320f / 7) % 320; if (Mathf.Abs(Mathf.DeltaAngle(a, 0)) < 40) continue;   // keep the south camera arc clear

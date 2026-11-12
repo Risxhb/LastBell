@@ -399,11 +399,13 @@ namespace LastBell.Arenas.MetronomeCourt
                 }
                 // r3 (critic: "stray brown rods under the buttress"): one straight rail across the whole arc stuck out past the
                 // curved gallery at both ends; the rail is now a chord between each pair of neighbouring posts
+                // r4 (B1 critic 1: "the lower-tier brass rail is still straight chords between posts", 8 cm off the arc
+                // over each 3.2 m span): each rail is an arc between its two posts, on the gallery's own curve
                 for (int k = 0; k + 1 < railPosts.Count; k++)
                 {
                     if (float.IsNaN(railPosts[k].x) || float.IsNaN(railPosts[k + 1].x)) continue;
-                    var span = railPosts[k + 1] - railPosts[k];
-                    P(PrimitiveKind.Cube, stat, (railPosts[k] + railPosts[k + 1]) / 2, new Vector3(0.06f, 0.06f, span.magnitude + 0.06f), rail, Quaternion.LookRotation(span).eulerAngles, "GalleryRail");
+                    float ra = a0 + 6 + 11 * k;   // the angle of post k (the loop above)
+                    Mesh(stat, Sector(16.82f, 16.88f, ra - 0.1f, ra + 11.1f, 0.06f, 6), rail, "GalleryRail", Vector3.up * -6.32f);
                 }
             }
             // belfry spires on the flanks, rising from the sea to well above the rim (outside every gameplay frame's floor)

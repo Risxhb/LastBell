@@ -63,6 +63,8 @@ namespace LastBell.Arenas.MetronomeCourt.EditorTools
                 Fight("23_fight_west_rim" + suffix, new Vector3(-12f, 0, -5f));        // like 26: the west flank
                 Fight("24_fight_centre" + suffix, Vector3.zero);                       // like 04 / 11
                 Fight("25_fight_north" + suffix, new Vector3(0, 0, -9f));              // the far rim and the banner posts
+                Fight("26_fight_east_rim" + suffix, new Vector3(12f, 0, -5f));         // B4: the east flank (player frame 26)
+                Fight("27_fight_northwest" + suffix, new Vector3(-8.6f, 0, -8.6f));    // B4: the master gear past the north-west rim
             }
             Shot("01_overview", new Vector3(32, 32, 43), new Vector3(0, -1, -3));
             Shot("02_gameplay_projection_centre", follow, Vector3.up);

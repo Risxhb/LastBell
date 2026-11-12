@@ -191,23 +191,32 @@ namespace LastBell.Arenas.MetronomeCourt
                 var mesh = Instantiate(src); mesh.name = src.name + " (box UV)";
                 var v = mesh.vertices; var n = mesh.normals; var uv = new Vector2[v.Length];
                 var l2w = mf.transform.localToWorldMatrix; var nrm = l2w.inverse.transpose;
-                bool round = src.name.StartsWith("Prim_Cylinder") || src.name.StartsWith("Prim_Cone") || src.name.StartsWith("Sector");
+                // r4 (B1): a Round_ lathe keeps each vertex's unwrapped angle in uv.x (seam at its local -z). World angle =
+                // latheC + latheS x that angle, so the wrap never falls inside a facet (atan2 flipped sign across one facet
+                // at due north and squeezed a whole turn of texture into it).
+                bool lathe = src.name.StartsWith("Round_"); var srcUv = lathe ? src.uv : null; float latheC = 0, latheS = 1;
+                if (lathe)
+                {
+                    var d0 = l2w.MultiplyVector(Vector3.forward); var d1 = l2w.MultiplyVector(Vector3.right);
+                    latheC = Mathf.Atan2(d0.x, d0.z); latheS = Mathf.DeltaAngle(latheC * Mathf.Rad2Deg, Mathf.Atan2(d1.x, d1.z) * Mathf.Rad2Deg) >= 0 ? 1 : -1;
+                }
+                bool round = lathe || src.name.StartsWith("Prim_Cylinder") || src.name.StartsWith("Prim_Cone") || src.name.StartsWith("Sector");
                 var centre = mf.transform.position;
                 for (int i = 0; i < v.Length; i++)
                 {
                     var p = l2w.MultiplyPoint3x4(v[i]); var w = n.Length > i ? nrm.MultiplyVector(n[i]).normalized : Vector3.up;
                     float ax = Mathf.Abs(w.x), ay = Mathf.Abs(w.y), az = Mathf.Abs(w.z);
-                    if (round && ay < 0.6f)
+                    if (lathe ? srcUv[i].y > 0.5f : round && ay < 0.6f)   // a lathe says which vertices are wall; older round parts are judged by their normal
                     {   // pass 3: wrap-around mapping on round sides (arc length about the part's axis), so a drum or ledge
                         // carries continuous courses instead of a per-vertex patchwork of planar projections
                         var d = p - centre; float rad = Mathf.Max(0.3f, new Vector2(d.x, d.z).magnitude);
-                        uv[i] = new Vector2(Mathf.Atan2(d.x, d.z) * rad, p.y) / tile;
+                        uv[i] = new Vector2((lathe ? latheC + latheS * srcUv[i].x : Mathf.Atan2(d.x, d.z)) * rad, p.y) / tile;
                     }
                     else if (round)
                     {   // pass 4: tops of round parts (the rim ledge ring) in polar form: courses run round the ring and joints
                         // point at the centre, instead of straight bands that read as steps across the ledge
                         var d = p - centre; float rad = new Vector2(d.x, d.z).magnitude;
-                        uv[i] = new Vector2(Mathf.Atan2(d.x, d.z) * Mathf.Max(rad, 0.3f), rad) / tile;
+                        uv[i] = new Vector2((lathe ? latheC + latheS * srcUv[i].x : Mathf.Atan2(d.x, d.z)) * Mathf.Max(rad, 0.3f), rad) / tile;
                     }
                     else uv[i] = (ay >= ax && ay >= az ? new Vector2(p.x, p.z) : ax >= az ? new Vector2(p.z, p.y) : new Vector2(p.x, p.y)) / tile;
                 }
