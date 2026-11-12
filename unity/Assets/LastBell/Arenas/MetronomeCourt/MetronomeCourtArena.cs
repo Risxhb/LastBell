@@ -53,6 +53,7 @@ namespace LastBell.Arenas.MetronomeCourt
         public bool SkyActive => skyMat && RenderSettings.skybox == skyMat;
         public int LanternPoolCount => pools.Count;
         public float PoolGain { get; private set; }   // r4: the floor pools' level this frame (steady in every fight)
+        const float GlassBase = 0.85f, GlassGain = 0.22f, GlassFlash = 0.05f, GlassCap = 0.975f;   // r4 (B2): lantern glass emission = cream x min(cap, base + gain x chase); the flash lifts the others toward the cap
         readonly float[] poolLo = new float[4], poolHi = new float[4]; readonly int[] poolSeen = new int[4];
         public float RodAngle { get; private set; }
         public bool ShowingCracks { get; private set; }
@@ -745,19 +746,73 @@ namespace LastBell.Arenas.MetronomeCourt
         // could hide a player at the wall, so camera-side perimeter pieces are low bollards with a lantern on top.
         static bool CameraSide(Vector3 at) => at.z > -4f;
 
-        void Lantern(Transform root, Vector3 at, float scale, bool pool = false, bool turret = false)
+        // r4 (B2 critic 1: "the pane is a flat slab: no hot centre, no falloff to the frame"): the lantern glass carries a
+        // small painted glow map on its emission. A soft flame-height hot spot in the lower middle, a little darker toward
+        // the frame, a fifth darker and cooler toward the top, and a slightly warmer foot. The map peaks at 1, so the
+        // emission level set in Update is still the brightest value a pane can show.
+        static Material glassMat; static Texture2D glassGlow; static Mesh paneMesh;
+        static Material GlassM()
+        {
+            if (glassMat) return glassMat;
+            if (!glassGlow)
+            {
+                const int W = 32, H = 64; var px = new Color32[W * H];
+                for (int y = 0; y < H; y++)
+                    for (int x = 0; x < W; x++)
+                    {
+                        float u = (x + 0.5f) / W, v = (y + 0.5f) / H;
+                        float hot = Mathf.Exp(-((u - 0.5f) * (u - 0.5f)) / (0.34f * 0.34f) - ((v - 0.36f) * (v - 0.36f)) / (0.40f * 0.40f));
+                        float val = (0.92f + 0.08f * hot) * Mathf.Lerp(1f, 0.84f, Mathf.SmoothStep(0.62f, 1f, v));
+                        float warm = Mathf.SmoothStep(0.45f, 0f, v), cool = Mathf.SmoothStep(0.62f, 1f, v);   // warmer foot, cooler head
+                        px[y * W + x] = new Color(val, val * (1f - 0.02f * warm), val * (1f - 0.06f * warm + 0.03f * cool), 1f);
+                    }
+                glassGlow = new Texture2D(W, H, TextureFormat.RGBA32, false, false) { name = "MetronomeCourt_GlassGlow", wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
+                glassGlow.SetPixels32(px); glassGlow.Apply(false, Application.isPlaying);   // readable in the editor, for the menu's baked copy
+            }
+            glassMat = new Material(M(new Color(0.3f, 0.27f, 0.19f), 0.6f, 0, true)) { name = "MetronomeCourt_LanternGlass" };
+            glassMat.EnableKeyword("_EMISSION"); glassMat.SetTexture("_EmissionMap", glassGlow);
+            return glassMat;
+        }
+        // a unit box whose two broad faces (+z and -z) carry 0..1 UVs for the glow map; its thin edges sample the map's middle
+        static Mesh PaneMesh()
+        {
+            if (paneMesh) return paneMesh;
+            var v = new List<Vector3>(); var n = new List<Vector3>(); var uv = new List<Vector2>(); var t = new List<int>();
+            foreach (var d in new[] { Vector3.forward, Vector3.back, Vector3.right, Vector3.left, Vector3.up, Vector3.down })
+            {
+                var a = Vector3.Cross(d, Mathf.Abs(d.y) > 0.5f ? Vector3.forward : Vector3.up); var w = Vector3.Cross(d, a); int b = v.Count;
+                foreach (var c in new[] { d - a - w, d + a - w, d + a + w, d - a + w })
+                {
+                    var p = c * 0.5f; v.Add(p); n.Add(d);
+                    uv.Add(Mathf.Abs(d.z) > 0.5f ? new Vector2(p.x + 0.5f, p.y + 0.5f) : new Vector2(0.5f, Mathf.Abs(d.y) > 0.5f ? 0.5f : p.y + 0.5f));
+                }
+                bool flip = Vector3.Dot(Vector3.Cross(v[b + 2] - v[b], v[b + 1] - v[b]), d) < 0;   // same winding as Prim's box (clockwise front faces)
+                if (flip) { t.Add(b); t.Add(b + 1); t.Add(b + 2); t.Add(b); t.Add(b + 2); t.Add(b + 3); }
+                else { t.Add(b); t.Add(b + 2); t.Add(b + 1); t.Add(b); t.Add(b + 3); t.Add(b + 2); }
+            }
+            paneMesh = new Mesh { name = "LanternPaneBox" }; paneMesh.SetVertices(v); paneMesh.SetNormals(n); paneMesh.SetUVs(0, uv); paneMesh.SetTriangles(t, 0); paneMesh.RecalculateBounds();
+            return paneMesh;
+        }
+
+        void Lantern(Transform root, Vector3 at, float scale, bool pool = false, bool turret = false, float yaw = 0)
         {
             var l = new GameObject("Lantern").transform; l.SetParent(root, false); l.localPosition = at;
+            // r4 (B2): turned with its post or bollard. The glass box used to stay square to the world inside a turret turned
+            // by the post's rim angle, so its corners stuck out past the columns and the drum.
+            l.localRotation = Quaternion.Euler(0, yaw, 0);
             // r3 (October 28 critic: "an orange ping-pong ball stuck in a frame"): four lit glass panes inside the corner bars,
             // so the cage reads as a lit box with dark mullions, round a small egg-shaped flame (the old 0.38 m ball cut
             // through the bars). Both take the lantern glow; the glass is blended toward cream in Update.
-            var glassM = M(new Color(0.3f, 0.27f, 0.19f), 0.6f, 0, true);
+            var glassM = GlassM();
             for (int k = 0; k < 4; k++)
             {
                 // final fix (critic: glass filled half the turret, slivers at the seams): in a turret the panes run from the
                 // plinth to the drum and overlap at the corners
-                float pr = turret ? 0.2f : 0.135f, pw = turret ? 0.42f : 0.27f, ph = turret ? 0.62f : 0.4f, py = turret ? 0.09f : 0f;
-                var pane = P(PrimitiveKind.Cube, l, Quaternion.Euler(0, k * 90, 0) * Vector3.forward * pr * scale + Vector3.up * py * scale, new Vector3(pw, ph, 0.012f) * scale, glassM, new Vector3(0, k * 90, 0), "LanternPane");
+                // r4 (B2 critic 1): the panes now run 4 cm up into the drum (turret) or the drip band (bollard), so their
+                // sunlit top faces are hidden: from above those edges were a white line brighter than the glass itself
+                float pr = turret ? 0.2f : 0.135f, pw = turret ? 0.42f : 0.27f, ph = turret ? 0.70f : 0.44f, py = turret ? 0.13f : 0f;
+                var pane = Mesh(l, PaneMesh(), glassM, "LanternPane", Quaternion.Euler(0, k * 90, 0) * Vector3.forward * pr * scale + Vector3.up * py * scale);
+                pane.localScale = new Vector3(pw, ph, 0.012f) * scale; pane.localRotation = Quaternion.Euler(0, k * 90, 0);
                 lanternGlass.Add((pane.GetComponent<Renderer>(), at.x));
             }
             var core = P(PrimitiveKind.Sphere, l, Vector3.down * 0.02f * scale, new Vector3(0.16f, 0.22f, 0.16f) * scale, M(new Color(1f, 0.94f, 0.81f), 0.2f, 0, true), name: "LanternCore");
@@ -1110,7 +1165,7 @@ namespace LastBell.Arenas.MetronomeCourt
                 Mesh(stat, Frustum(0.16f, 0.16f, 0.21f, 0.21f, 0.06f), StoneM(Ivory), "BollardCapital", at + Vector3.up * 0.63f).localRotation = by;
                 Mesh(stat, Frustum(0.22f, 0.22f, 0.22f, 0.22f, 0.035f), StoneM(Ivory * 0.92f), "BollardAbacus", at + Vector3.up * 0.69f).localRotation = by;
                 Mesh(stat, Frustum(0.2f, 0.2f, 0.15f, 0.15f, 0.05f), agedB, "BollardCap", at + Vector3.up * 0.725f).localRotation = by;
-                Lantern(root, at + Vector3.up * 0.96f, 0.75f);   // the lantern base sits on the bollard cap
+                Lantern(root, at + Vector3.up * 0.96f, 0.75f, yaw: yaw);   // the lantern base sits on the bollard cap
                 if (Mathf.Abs(Sim.Flat(at).magnitude - PostRadius) < 0.05f) rimBollards.Add(at);
                 return;
             }
@@ -1193,7 +1248,7 @@ namespace LastBell.Arenas.MetronomeCourt
             }
             float ph = Mathf.Abs(at.x * 3.1f + at.z * 1.7f);
             swingers.Add((hinge, fq, 2.5f, ph, 0.9f)); swingers.Add((tails, Quaternion.identity, 6f, ph + 0.6f, 0.9f));
-            Lantern(root, at + Vector3.up * 3.86f, 1f, pool: true, turret: true);   // r3: on the turret plinth, under the drum
+            Lantern(root, at + Vector3.up * 3.86f, 1f, pool: true, turret: true, yaw: yaw);   // r3: on the turret plinth, under the drum
         }
 
         void BuildMetronome(Transform m)
@@ -1369,14 +1424,16 @@ namespace LastBell.Arenas.MetronomeCourt
             if (mpb == null) mpb = new MaterialPropertyBlock();   // survives a script reload
             // lantern glow follows the rod's lean across the rim; all flash together on accented transition ticks
             LanternPulseX = phase * 14f;
-            float LanternGlow(float x)
+            // r4 (B2): the chase level without the transition flash; the core and the glow ring take the full flash, the glass a little
+            float LanternChase(float x)
             {
                 float near = LightsPulse ? Mathf.Exp(-(x - LanternPulseX) * (x - LanternPulseX) / 6f) : SteadyNear;
-                // soft-capped (never clips to white) with the flicker, the hazard dim and the tick flash applied after the cap
+                // soft-capped (never clips to white) with the flicker and the hazard dim applied after the cap
                 float raw = (haste ? 1.3f : 1.0f) * (0.8f + 2.2f * near) * (1 + 0.3f * BeatPulse);
                 float e = 1.15f * Mathf.Clamp01(raw / 3.5f) * (LightsPulse ? 0.92f + 0.16f * Mathf.PerlinNoise(x * 1.7f, Time.time * 3f) : 1f);
-                return e * (quiet ? 0.6f : 1f) + 0.9f * flash;   // pass 3: lantern glass no longer white-hot
+                return e * (quiet ? 0.6f : 1f);
             }
+            float LanternGlow(float x) => LanternChase(x) + 0.9f * flash;
             foreach (var (r, x) in lanterns)
             {
                 if (!r) continue;
@@ -1391,7 +1448,16 @@ namespace LastBell.Arenas.MetronomeCourt
             foreach (var (r, x) in lanternGlass)
             {
                 if (!r) continue;
-                mpb.SetColor(PBase, glassTint * 0.6f); mpb.SetColor(PEmission, glassTint * (0.6f + 0.75f * LanternGlow(x))); r.SetPropertyBlock(mpb);
+                // r4 (November 12 critic, B2): the glass took 0.6 + 0.75 x glow with the flash inside the glow, 1.5 to 2.2 x
+                // cream, and clipped to pure white under the rod and on every transition tick wherever no tonemapping is
+                // applied (the autotest's elevation frames, and any camera without the post stack): the brightest thing
+                // in the shot, pulling the eye off the metronome. It now follows its own lower curve, capped just under
+                // 1 x cream, so it keeps its colour. A lantern away from the rod sits at about 0.9; the one under the rod
+                // is a clear step brighter (the cap); a transition tick lifts the others most of the way to the cap but
+                // not onto it, so the lantern under the rod stays the brightest through the flash.
+                float glass = GlassBase + GlassGain * LanternChase(x);
+                if (flash > 0) glass = Mathf.Max(glass, Mathf.Min(GlassCap - 0.025f, glass + GlassFlash * flash * (quiet ? 0.6f : 1f)));
+                mpb.SetColor(PBase, glassTint * 0.6f); mpb.SetColor(PEmission, glassTint * Mathf.Min(GlassCap, glass)); r.SetPropertyBlock(mpb);
             }
             if (poolMpb == null) poolMpb = new MaterialPropertyBlock();
             // r4 (November 12 critic, B3): the pools lie on the dial band and the tempo ring, so they follow the steady

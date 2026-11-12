@@ -33,10 +33,14 @@ namespace LastBell.Arenas.MetronomeCourt.EditorTools
 
             var cam = Camera.main; int shots = 0; float baseFov = cam.fieldOfView;
             if (arena.SkyActive) cam.clearFlags = CameraClearFlags.Skybox;
-            void Shot(string name, Vector3 pos, Vector3 target, int width = 1920, int height = 1080, float fov = 0)
+            void Shot(string name, Vector3 pos, Vector3 target, int width = 1920, int height = 1080, float fov = 0, bool post = true)
             {
                 if (!Want(name)) return;
                 cam.fieldOfView = fov > 0 ? fov : baseFov;
+                // r4 (B2): the autotest renders its elevation frames (02, 40) with a plain copy of the camera, which has no
+                // post stack, so no tonemapping: emission above 1 clips to white there. post = false reproduces that.
+                var camData = cam.GetComponent<UnityEngine.Rendering.Universal.UniversalAdditionalCameraData>(); bool hadPost = camData && camData.renderPostProcessing;
+                if (camData) camData.renderPostProcessing = post && hadPost;
                 cam.transform.SetPositionAndRotation(pos, Quaternion.LookRotation(target - pos));
                 var rt = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32); cam.targetTexture = rt;
                 bool async = ShaderUtil.allowAsyncCompilation;   // avoid the grey async-compilation fallback in the first render
@@ -46,7 +50,7 @@ namespace LastBell.Arenas.MetronomeCourt.EditorTools
                 var tex = new Texture2D(width, height, TextureFormat.RGB24, false); tex.ReadPixels(new Rect(0, 0, width, height), 0, 0); tex.Apply();
                 File.WriteAllBytes(Path.Combine(output, name + ".png"), tex.EncodeToPNG());
                 RenderTexture.active = prev; cam.targetTexture = null; UnityEngine.Object.DestroyImmediate(tex); UnityEngine.Object.DestroyImmediate(rt);
-                cam.fieldOfView = baseFov; shots++;
+                cam.fieldOfView = baseFov; if (camData) camData.renderPostProcessing = hadPost; shots++;
             }
             var follow = new Vector3(0, 13, 9.7f);   // RunDirector.LateUpdate offset; looks at the follow point + 1 m
             void Fight(string name, Vector3 player) => Shot(name, player + follow, player + Vector3.up, 2560, 1440);   // r4: the fight camera at the player build's resolution
@@ -81,7 +85,13 @@ namespace LastBell.Arenas.MetronomeCourt.EditorTools
             Shot("14_closeup_banner_post", new Vector3(-9.6f, 4.4f, -2.6f), new Vector3(-13.3f, 2.7f, -5.5f));   // the rim post at 247.5 degrees
             // r4 (November 12 critic): the fight camera at the bounds the critic judged from, and one close view per item
             FightViews("");
-            Shot("30_tt_metronome_elevation", new Vector3(0, 6, 4), new Vector3(0, 5, -19.5f), 1280, 720, 50);       // the autotest frames 02 and 40
+            // B2: put the chase peak on a lantern each view can see. Beat 0.24 leans the rod over the north-east rim post
+            // (x = 10.2), the left-most post of the elevation view; beat 0 puts it over the east post (x = 13.3) of the close-up.
+            var beatField = typeof(MetronomeCourtArena).GetField("previewBeat", flags);
+            void Lean(double beat) { beatField.SetValue(arena, beat); update.Invoke(arena, null); }
+            Lean(0.24);
+            Shot("30_tt_metronome_elevation", new Vector3(0, 6, 4), new Vector3(0, 5, -19.5f), 1280, 720, 50, false);       // the autotest frames 02 and 40
+            Lean(0);
             Shot("31_closeup_east_post_lantern", new Vector3(9.6f, 4.9f, -2.6f), new Vector3(13.3f, 4.0f, -5.5f));   // B2: the post under the rod at the chase peak
             Shot("32_rim_southwest_low", new Vector3(-5.5f, 5.5f, 21f), new Vector3(-9.5f, -0.6f, 11.5f));           // B1, T6: ledge, trim and drum edge
             Shot("33_bridge_mouth", new Vector3(0, 4.6f, 9.6f), new Vector3(0, 0.3f, 14.6f));                        // B6: bollards and newels
@@ -96,13 +106,15 @@ namespace LastBell.Arenas.MetronomeCourt.EditorTools
             Shot("41_bollard_from_above", new Vector3(5.5f, 5.2f, 10.2f), new Vector3(5.51f, 0.9f, 13.3f));          // T7: the cap from the fight camera side
             Shot("42_bridge_deck", new Vector3(0, 8.5f, 31f), new Vector3(0, 0, 20f));                               // T8: rails and paving
             Shot("43_pier_roof_east", new Vector3(13f, 3.5f, 3f), new Vector3(19.5f, -4.5f, -5.5f));                 // T4: the lit side
-            Shot("44_pool_close", new Vector3(-4.0f, 3.2f, -8.5f), new Vector3(-5.3f, 0, -12.9f));                          // B3: a floor pool under its rim post
+            Shot("45_bollard_plan_southeast", new Vector3(10.18f, 5.5f, 10.5f), new Vector3(10.18f, 0.6f, 10.18f), 1080, 1080, 30);   // B2: lantern against its bollard, from straight above (the 45-degree rim bollard)
+            Shot("44_pool_close",new Vector3(-4.0f, 3.2f, -8.5f), new Vector3(-5.3f, 0, -12.9f));                          // B3: a floor pool under its rim post
             // B2: every light flashing together on a transition tick (the autotest frame 40 catches this in frenzy)
             if (wanted.Length == 0 || wanted.Any(w => w.StartsWith("30_", StringComparison.OrdinalIgnoreCase) || w.StartsWith("31_", StringComparison.OrdinalIgnoreCase)))
             {
                 var flashField = typeof(MetronomeCourtArena).GetField("flash", flags);
-                flashField.SetValue(arena, 1f); update.Invoke(arena, null);
-                Shot("30_tt_metronome_elevation_flash", new Vector3(0, 6, 4), new Vector3(0, 5, -19.5f), 1280, 720, 50);
+                flashField.SetValue(arena, 1f); Lean(0.24);
+                Shot("30_tt_metronome_elevation_flash", new Vector3(0, 6, 4), new Vector3(0, 5, -19.5f), 1280, 720, 50, false);
+                flashField.SetValue(arena, 1f); Lean(0);
                 Shot("31_closeup_east_post_lantern_flash", new Vector3(9.6f, 4.9f, -2.6f), new Vector3(13.3f, 4.0f, -5.5f));
                 flashField.SetValue(arena, 0f); update.Invoke(arena, null);
             }
