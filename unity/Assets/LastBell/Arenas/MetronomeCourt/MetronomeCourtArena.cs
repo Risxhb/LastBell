@@ -610,6 +610,7 @@ namespace LastBell.Arenas.MetronomeCourt
             for (int i = 0; i < 7; i++)
             {
                 float a = 200 + i * (320f / 7) % 320; if (Mathf.Abs(Mathf.DeltaAngle(a, 0)) < 40) continue;   // keep the south camera arc clear
+                if (i == 1) continue;   // r4 (B4): the bridge at 246 degrees stood between the court and the master gear: three dark piers across the west-rim frame, hiding the hub
                 ArchBridge(stat, a, 34 + (i % 3) * 6f, rng);
             }
 
@@ -729,35 +730,65 @@ namespace LastBell.Arenas.MetronomeCourt
         {
             var radial = Quaternion.Euler(0, angle, 0) * Vector3.forward;
             var dir = Quaternion.Euler(0, angle + 30f, 0) * Vector3.forward; var tangent = Vector3.Cross(Vector3.up, dir);   // 30 degrees off tangent
-            var centre = radial * r + Vector3.up * -6f; var col = r < 47f ? new Color(0.16f, 0.17f, 0.25f) : new Color(0.12f, 0.13f, 0.19f);
-            float span = 18f, yaw = Mathf.Atan2(tangent.x, tangent.z) * Mathf.Rad2Deg;
-            P(PrimitiveKind.Cube, stat, centre + Vector3.up * 6f, new Vector3(span, 1.2f, 3f), M(col, 0.1f), new Vector3(0, yaw, 0), "BridgeDeck");
+            var centre = radial * r + Vector3.up * -6f; var col = r < 47f ? new Color(0.21f, 0.22f, 0.31f) : new Color(0.17f, 0.18f, 0.26f);   // r4 (B4): one atmospheric step lighter; the near decks crossed the east-rim fight frame as black planks
+            // r4 (B4), pass 2. The bridges are seen from above and down their length from the fight camera, where they read
+            // as dark planks and bars: a bare 18 m deck that overhung its outer piers by 3 m and ended in the air, on three
+            // 1.6 x 3 m slabs 22 m tall whose shadow sides rendered near black (luminance 3 to 8). Now each bridge spans
+            // between two end turrets (square, tapered, with a pyramid cap just above the deck) over one slim middle pier
+            // and two wider arches; the deck carries a paved walk between a kerb on each edge; and every part carries a
+            // faint haze lift (HazeM), so a face in shadow sits in the mid-distance layer instead of going black.
+            float span = 18f, yaw = Mathf.Atan2(tangent.x, tangent.z) * Mathf.Rad2Deg; const float pierGap = 8.1f;
+            var stone = HazeM(col); var stoneB = HazeM(col * 0.93f); var by = Quaternion.Euler(0, yaw, 0);
+            P(PrimitiveKind.Cube, stat, centre + Vector3.up * 6f, new Vector3(span, 1.2f, 3f), stone, new Vector3(0, yaw, 0), "BridgeDeck");
             for (int k = -1; k <= 1; k++)
             {
-                P(PrimitiveKind.Cube, stat, centre + tangent * (k * span / 3) + Vector3.up * -5f, new Vector3(1.6f, 22f, 3f), M(col, 0.1f), new Vector3(0, yaw, 0), "BridgePier");   // pass 3: runs down into the cloud (was 12 m, ended in the void)
+                var foot = centre + tangent * (k * pierGap) + Vector3.up * -16f;   // down in the cloud (pass 3: was 12 m tall and ended in the void)
+                if (k == 0) Mesh(stat, Frustum(0.95f, 0.95f, 0.7f, 0.7f, 22f), stone, "BridgePier", foot).localRotation = by;
+                else
+                {
+                    Mesh(stat, Frustum(1.15f, 1.15f, 1.0f, 1.0f, 24.4f), stone, "BridgeTurret", foot).localRotation = by;
+                    Mesh(stat, Frustum(1.12f, 1.12f, 1.12f, 1.12f, 0.25f), HazeM(col * 1.12f), "BridgeTurretCornice", foot + Vector3.up * 24.4f).localRotation = by;
+                    Mesh(stat, Frustum(1.0f, 1.0f, 0.04f, 0.04f, 1.7f), HazeM(col * 0.8f), "BridgeTurretCap", foot + Vector3.up * 24.65f).localRotation = by;
+                }
                 if (k < 1)
                 {
-                    var mid = centre + tangent * ((k + 0.5f) * span / 3);
-                    float rad = (span / 3 - 1.6f) / 2f, springY = 5.4f - rad;   // crown just under the deck
+                    var mid = centre + tangent * ((k + 0.5f) * pierGap);
+                    float rad = (pierGap - 1.9f) / 2f, springY = 5.4f - rad;   // crown just under the deck
                     var frame = Quaternion.LookRotation(dir, Vector3.up);       // local x = tangent, y = up, z = radial
-                    for (int v = 0; v < 7; v++)
+                    for (int v = 0; v < 9; v++)
                     {
-                        float ang = Mathf.Lerp(-90f, 90f, (v + 0.5f) / 7f);
+                        float ang = Mathf.Lerp(-90f, 90f, (v + 0.5f) / 9f);
                         var off = tangent * (Mathf.Sin(ang * Mathf.Deg2Rad) * rad) + Vector3.up * (springY + Mathf.Cos(ang * Mathf.Deg2Rad) * rad);
-                        var vs = P(PrimitiveKind.Cube, stat, mid + off, new Vector3(1.0f, 0.55f, 3f), M(col * 0.95f, 0.1f), null, "BridgeVoussoir");
+                        var vs = P(PrimitiveKind.Cube, stat, mid + off, new Vector3(1.14f, 0.55f, 2.4f), stoneB, null, "BridgeVoussoir");
                         vs.localRotation = frame * Quaternion.Euler(0, 0, -ang);
                     }
                     foreach (var sx in new[] { -1, 1 })   // spandrels fill the haunches up to the deck
                     {
-                        var sp = P(PrimitiveKind.Cube, stat, mid + tangent * (sx * rad * 0.95f) + Vector3.up * (springY + rad * 0.85f), new Vector3(1.4f, rad * 0.7f, 3f), M(col, 0.1f), null, "BridgeSpandrel");
+                        var sp = P(PrimitiveKind.Cube, stat, mid + tangent * (sx * rad * 0.82f) + Vector3.up * (springY + rad * 0.86f), new Vector3(rad * 0.56f, rad * 0.62f, 2.2f), stone, null, "BridgeSpandrel");
                         sp.localRotation = frame;
                     }
                 }
             }
-            P(PrimitiveKind.Cube, stat, centre + Vector3.up * 6.9f, new Vector3(span, 0.6f, 0.3f), M(col * 1.1f, 0.1f), new Vector3(0, yaw, 0), "BridgeParapet");
+            P(PrimitiveKind.Cube, stat, centre + Vector3.up * 6.63f, new Vector3(span - 2.4f, 0.08f, 2.2f), HazeM(col * 1.04f), new Vector3(0, yaw, 0), "BridgeWalk");
+            foreach (var s in new[] { -1f, 1f })
+                P(PrimitiveKind.Cube, stat, centre + Vector3.up * 6.9f + dir * (s * 1.35f), new Vector3(span - 2.2f, 0.6f, 0.3f), HazeM(col * 1.1f), new Vector3(0, yaw, 0), "BridgeParapet");
             for (int k = -1; k <= 1; k++)
-                P(PrimitiveKind.Cube, stat, centre + tangent * (k * span / 3 + 1.5f) + Vector3.up * 6.9f - dir * 0.16f, new Vector3(0.45f, 0.4f, 0.05f), M(WindowGlow * 1.3f, 0.2f, 0, true), new Vector3(0, yaw, 0), "BridgeWindow");
+                P(PrimitiveKind.Cube, stat, centre + tangent * (k * 5f + 1.5f) + Vector3.up * 6.9f - dir * 1.51f, new Vector3(0.45f, 0.4f, 0.05f), M(WindowGlow * 1.3f, 0.2f, 0, true), new Vector3(0, yaw, 0), "BridgeWindow");
         }
+
+        // r4 (B4): mid-distance stone and iron with a faint haze-coloured emission. These structures stand 30 to 50 m from the
+        // fight camera, nearer than the scene fog starts, and a face the key light misses fell to the void's value. The lift
+        // is the same for every colour, so lit faces barely change and shadowed ones settle near luminance 35 to 45.
+        static readonly Dictionary<Material, Material> hazeMats = new Dictionary<Material, Material>();
+        static readonly Color HazeLift = new Color(0.035f, 0.038f, 0.07f);   // linear (an HDR colour property is not gamma-converted): about 45,48,66 on screen by itself
+        static Material HazeOf(Material src)
+        {
+            if (hazeMats.TryGetValue(src, out var m) && m) return m;
+            m = new Material(src) { name = src.name + "_Haze" };
+            m.EnableKeyword("_EMISSION"); m.SetColor("_EmissionColor", HazeLift);
+            return hazeMats[src] = m;
+        }
+        static Material HazeM(Color c) => HazeOf(M(c, 0.1f));
 
         static string Roman(int n) => new[] { "", "I", "II", "III", "IIII", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII" }[n];
 
@@ -980,25 +1011,34 @@ namespace LastBell.Arenas.MetronomeCourt
         void BuildAmbience(Transform root)
         {
             var arng = new System.Random(97);
-            var gearM = M(new Color(0.17f, 0.18f, 0.26f), 0.35f, 0.6f);   // October 27: mid-distance iron, not a black wall
-            var gearTrim = M(Brass * 0.35f, 0.4f, 0.8f);
+            // r4 (November 12 critic, B4): from the fight camera at the east and west rims the gears crossed the frame as
+            // near-black planks with floating teeth (iron at the void's value, metallic, so it mirrored the dark sky; spokes
+            // 1.7 m wide; tops 10 m above the rim). Now: plated iron lifted one atmospheric step toward the towers' dusty
+            // indigo and matte, so the key light models it; each gear sits 6 to 8 m farther out and lower, its top at or
+            // under the rim, the lower half in the cloud sea; spokes a third slimmer; an aged-brass edge band on the rim and
+            // a brass collar and boss on the hub, so what shows above the cloud reads as a gear.
+            var gearM = HazeOf(SurfM(new Color(0.29f, 0.30f, 0.41f), Surface.Iron, 0.2f));   // pass 2: with the haze lift, so the wheel is not black on black in the wide views
+            var gearTrim = SurfM(Brass * 0.62f, Surface.Brass, 0.3f); var gearEdge = SurfM(Brass * 0.58f, Surface.Brass, 0.3f);   // pass 2: painted, not metallic (metal mirrored the dark sky and vanished)
             // October 27 (critic: a wall of solid gears crowded the landmark): openwork gears (rim, spokes, hub; the sky shows
             // through) moved off the metronome's sky opening. One master gear on the west flank, half sunk in the cloud sea,
             // a smaller partner above it, and a third low in the east cloud. Each faces the court.
-            foreach (var (pos, radius, teeth, dir) in new[] { (new Vector3(-33f, -4f, -24f), 13f, 30, 0.5f), (new Vector3(-44f, -7f, -8f), 7f, 18, -1.2f), (new Vector3(36f, -9f, -14f), 8f, 20, 0.8f) })
+            foreach (var (pos, radius, teeth, dir) in new[] { (new Vector3(-39f, -16.5f, -28f), 13f, 30, 0.5f), (new Vector3(-50f, -9.5f, -10f), 7f, 18, -1.2f), (new Vector3(47f, -11.5f, 3f), 8f, 20, 0.8f) })
             {
                 var g = new GameObject("Sky gear").transform; g.SetParent(root, false); g.localPosition = pos;
                 g.localRotation = Quaternion.LookRotation(-Sim.Flat(pos).normalized, Vector3.up);
                 var spin = new GameObject("Spin").transform; spin.SetParent(g, false);
                 Mesh(spin, Sector(radius * 0.8f, radius, 0, 360, 0.7f, 72), gearM, "GearRim").localRotation = Quaternion.Euler(90, 0, 0);
-                P(PrimitiveKind.Cylinder, spin, new Vector3(0, 0, -0.35f), new Vector3(radius * 0.3f, 0.5f, radius * 0.3f), gearTrim, new Vector3(90, 0, 0), "GearHub");
+                Mesh(spin, Sector(radius * 0.9f, radius * 0.97f, 0, 360, 0.06f, 72), gearEdge, "GearRimEdge", new Vector3(0, 0, 0.05f)).localRotation = Quaternion.Euler(90, 0, 0);
+                P(PrimitiveKind.Cylinder, spin, new Vector3(0, 0, -0.35f), new Vector3(radius * 0.3f, 0.5f, radius * 0.3f), gearM, new Vector3(90, 0, 0), "GearHub");
+                Mesh(spin, Sector(radius * 0.11f, radius * 0.15f, 0, 360, 0.12f, 36), gearTrim, "GearHubCollar", new Vector3(0, 0, 0.2f)).localRotation = Quaternion.Euler(90, 0, 0);
+                P(PrimitiveKind.Cylinder, spin, new Vector3(0, 0, 0.12f), new Vector3(radius * 0.1f, 0.14f, radius * 0.1f), gearTrim, new Vector3(90, 0, 0), "GearHubBoss");
                 for (int k = 0; k < teeth; k++)
                 {
                     float a = k * 360f / teeth;
                     P(PrimitiveKind.Cube, spin, Quaternion.Euler(0, 0, a) * Vector3.up * (radius + 0.6f), new Vector3(radius * 0.14f, 1.4f, 0.6f), gearM, new Vector3(0, 0, a), "GearTooth");
                 }
-                for (int k = 0; k < 3; k++)   // six broad spokes (three bars through the hub) with wide gaps for the sky
-                    P(PrimitiveKind.Cube, spin, new Vector3(0, 0, -0.35f), new Vector3(radius * 0.13f, radius * 1.7f, 0.5f), gearM, new Vector3(0, 0, k * 60f), "GearSpoke");
+                for (int k = 0; k < 3; k++)   // six spokes (three bars through the hub) with wide gaps for the sky
+                    P(PrimitiveKind.Cube, spin, new Vector3(0, 0, -0.35f), new Vector3(radius * 0.085f, radius * 1.7f, 0.5f), gearM, new Vector3(0, 0, k * 60f), "GearSpoke");
                 gears.Add((spin, dir));
             }
 

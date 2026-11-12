@@ -31,6 +31,13 @@ namespace LastBell.Arenas.MetronomeCourt.EditorTools
             for (int i = 0; i < 3; i++) update.Invoke(arena, null);   // tempo colours, lantern chase, probe render, sky
             Inventory(arena.transform);
 
+            // r4 (B4): "dump" lists every renderer taller than 8 m (name, bounds, base colour), to name a shape seen in a frame
+            if (wanted.Contains("dump", StringComparer.OrdinalIgnoreCase))
+                foreach (var r in arena.GetComponentsInChildren<MeshRenderer>().Where(r => r.bounds.size.y > 8f && r.sharedMaterial))
+                {
+                    var b = r.bounds; var c = r.sharedMaterial.HasProperty("_BaseColor") ? r.sharedMaterial.GetColor("_BaseColor") : Color.black;
+                    Debug.Log($"METRONOME ARENA TALL: {r.name} | centre {b.center.x:0.0},{b.center.y:0.0},{b.center.z:0.0} | size {b.size.x:0.0},{b.size.y:0.0},{b.size.z:0.0} | colour {c.r:0.00},{c.g:0.00},{c.b:0.00} | {r.sharedMaterial.name}");
+                }
             var cam = Camera.main; int shots = 0; float baseFov = cam.fieldOfView;
             if (arena.SkyActive) cam.clearFlags = CameraClearFlags.Skybox;
             void Shot(string name, Vector3 pos, Vector3 target, int width = 1920, int height = 1080, float fov = 0, bool post = true)
