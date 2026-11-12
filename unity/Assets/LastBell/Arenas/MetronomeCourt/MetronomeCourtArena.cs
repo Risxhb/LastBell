@@ -1227,7 +1227,17 @@ namespace LastBell.Arenas.MetronomeCourt
                 P(PrimitiveKind.Sphere, l, Vector3.up * 0.48f * scale, Vector3.one * 0.07f * scale, BrassM, name: "LanternFinial");
             }
             var glowRing = P(PrimitiveKind.Cube, l, (turret ? Vector3.zero : Vector3.up * 0.25f) * scale, (turret ? new Vector3(0.2f, 0.02f, 0.2f) : new Vector3(0.34f, 0.02f, 0.34f)) * scale, M(new Color(1f, 0.7f, 0.3f), 0.2f, 0, true), name: "LanternGlowRing");
-            lanterns.Add((glowRing.GetComponent<Renderer>(), at.x));
+            lanterns.Add((glowRing.GetComponent<Renderer>(), at.x)); lanternRings.Add((glowRing.GetComponent<Renderer>(), at.x));
+            if (!turret)
+            {   // r4 (November 12 critic, T7: from 13 m up each lamp was "a dark square cap with a thin tempo-tinted rim", teal
+                // in Normal, close to the player's teal effects): a cream lip 4 cm wide round the foot of the cap, in the
+                // glass's cream at a lower level (it faces the sky, so it is lit as well as glowing)
+                // Pass 2 (critic 1: "a stone slab, not light", "a hat on a tray", uneven round the rim): the lip stops 1 cm
+                // outside the cap's eave (it stood 4 cm out, past the bars), it is matt and nearly all emission, so the sun no
+                // longer sets its value, and the glow ring 1 cm further out is the dimmer outer step of the spill
+                var lip = P(PrimitiveKind.Cube, l, Vector3.up * 0.262f * scale, new Vector3(0.32f, 0.016f, 0.32f) * scale, M(new Color(0.3f, 0.27f, 0.19f), 0.1f, 0, true), name: "LanternLip");
+                lanternLips.Add((lip.GetComponent<Renderer>(), at.x));
+            }
             P(PrimitiveKind.Cube, l, Vector3.down * 0.24f * scale, new Vector3(0.4f, 0.05f, 0.4f) * scale, BrassM, name: "LanternBase");
             lanterns.Add((core.GetComponent<Renderer>(), at.x));
             if (pool) LanternPool(root, at);
@@ -1281,6 +1291,9 @@ namespace LastBell.Arenas.MetronomeCourt
         readonly List<(Transform t, Quaternion rest, float amp, float phase, float speed)> swingers = new List<(Transform, Quaternion, float, float, float)>();
         readonly List<(Transform t, float speed)> spinners = new List<(Transform, float)>();
         readonly List<(Renderer r, float x)> lanternGlass = new List<(Renderer, float)>();
+        // r4 (T7): the glow rings again (they stay in `lanterns` too, for the count), re-tinted most of the way to cream after
+        // the lantern loop, and the cream lips under the bollard caps
+        readonly List<(Renderer r, float x)> lanternRings = new List<(Renderer, float)>(), lanternLips = new List<(Renderer, float)>();
         float swayTime;
         readonly List<Vector3> rimBollards = new List<Vector3>();
         // round 3 (N2): banner cloth, lighter teal with a faint teal emission so a banner on the shade face still reads
@@ -2014,6 +2027,19 @@ namespace LastBell.Arenas.MetronomeCourt
                 float glass = GlassBase + GlassGain * LanternChase(x);
                 if (flash > 0) glass = Mathf.Max(glass, Mathf.Min(GlassCap - 0.025f, glass + GlassFlash * flash * (quiet ? 0.6f : 1f)));
                 mpb.SetColor(PBase, glassTint * 0.6f); mpb.SetColor(PEmission, glassTint * Mathf.Min(GlassCap, glass)); r.SetPropertyBlock(mpb);
+            }
+            // r4 (T7): the glow ring under a cap is nearly all cream (it took the full tempo colour: saturated teal in Normal)
+            // at about half the glass level; the lip inside it is the glass's cream at 0.8 of the glass level
+            var glowRingTint = Color.Lerp(tint, glassTint, 0.85f);
+            foreach (var (r, x) in lanternRings)
+            {
+                if (!r) continue;
+                mpb.SetColor(PBase, glowRingTint * 0.15f); mpb.SetColor(PEmission, glowRingTint * 0.55f * Mathf.Min(1f, 0.8f + 0.2f * LanternGlow(x))); r.SetPropertyBlock(mpb);
+            }
+            foreach (var (r, x) in lanternLips)
+            {
+                if (!r) continue;
+                mpb.SetColor(PBase, glassTint * 0.1f); mpb.SetColor(PEmission, glassTint * 0.8f * Mathf.Min(GlassCap, GlassBase + GlassGain * LanternChase(x))); r.SetPropertyBlock(mpb);
             }
             if (poolMpb == null) poolMpb = new MaterialPropertyBlock();
             // r4 (November 12 critic, B3): the pools lie on the dial band and the tempo ring, so they follow the steady
