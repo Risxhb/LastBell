@@ -205,6 +205,84 @@ namespace LastBell.Arenas.MetronomeCourt
             return go.transform;
         }
 
+        // ---- r4 (T6): the coping paint atlas ----
+        // The rim ledge top was one flat band. It is now a ring of coping blocks, and each block is mapped by its own arc
+        // and width onto one cell of this atlas (u along the arc, v from the parapet side to the outer edge). Every cell
+        // carries a faint sweep, pigment patches and grain, dirt gathered against the parapet foot, a worn lighter
+        // nosing along the outer edge and a little grime at the joints. The last two cells add the soot under a lantern
+        // post: a soft dark patch round the foot of the post, washed toward the outer edge. Albedo only, outside the bound.
+        const int CopingCols = 4, CopingRows = 4, CopingCell = 128, CopingPlain = 12;   // 12 plain (cells 3 and 8 chipped) + 4 soot cells
+        const float CopingPaintMean = 0.9f, CopingR0 = 13.76f, CopingR1 = 14.97f;
+        static Texture2D copingAtlas;
+        static readonly Dictionary<int, Material> copingMats = new Dictionary<int, Material>();
+        static Material CopingM(Color c)
+        {
+            int key = Mathf.RoundToInt(c.r * 255) | Mathf.RoundToInt(c.g * 255) << 8 | Mathf.RoundToInt(c.b * 255) << 16;
+            if (copingMats.TryGetValue(key, out var m) && m) return m;
+            BuildCopingAtlas();
+            m = Prim.Material(c / CopingPaintMean); m.name = "MetronomeCourt_Coping_" + key;
+            m.SetFloat("_Smoothness", 0.14f); m.SetFloat("_Metallic", 0f);
+            m.SetTexture("_BaseMap", copingAtlas); m.SetTexture("_MainTex", copingAtlas);
+            return copingMats[key] = m;
+        }
+        static Rect CopingCellRect(int cell, bool flipU)
+        {
+            float w = 1f / CopingCols, h = 1f / CopingRows, pad = 0.5f / (CopingCols * CopingCell), padV = 0.5f / (CopingRows * CopingCell);
+            float x = (cell % CopingCols) * w + pad, y = (cell / CopingCols) * h + padV; w -= 2 * pad; h -= 2 * padV;
+            return new Rect(flipU ? x + w : x, y, flipU ? -w : w, h);
+        }
+        static void BuildCopingAtlas()
+        {
+            if (copingAtlas) return;
+            int W = CopingCols * CopingCell, H = CopingRows * CopingCell; var px = new Color32[W * H];
+            float Hash(int x, int y, int s) { uint n = (uint)(x * 374761393 + y * 668265263 + s * 1442695041); n = (n ^ (n >> 13)) * 1274126177u; return ((n ^ (n >> 16)) & 0xffff) / 65535f; }
+            float Noise(float x, float y, int s)
+            {
+                int xi = Mathf.FloorToInt(x), yi = Mathf.FloorToInt(y); float fx = x - xi, fy = y - yi; fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy);
+                return Mathf.Lerp(Mathf.Lerp(Hash(xi, yi, s), Hash(xi + 1, yi, s), fx), Mathf.Lerp(Hash(xi, yi + 1, s), Hash(xi + 1, yi + 1, s), fx), fy);
+            }
+            const float arc = 1.87f, wide = CopingR1 - CopingR0;   // a block in metres: along the arc at the post radius, and across
+            for (int cell = 0; cell < CopingCols * CopingRows; cell++)
+            {
+                var r = new System.Random(5200 + cell); float R() => (float)r.NextDouble();
+                float dir = R() * Mathf.PI * 2, amp = 0.012f + 0.016f * R(), ox = R() * 40, oy = R() * 40;
+                bool soot = cell >= CopingPlain, chipped = cell == 3 || cell == 8;
+                float stU = 0.2f + 0.6f * R(), stV = 0.3f + 0.5f * R(), stR = 0.16f + 0.1f * R(), chipS = 1.1f + 0.5f * R(), sootR = 0.22f + 0.045f * (cell - CopingPlain);   // soot ring width differs cell to cell
+                for (int y = 0; y < CopingCell; y++)
+                    for (int x = 0; x < CopingCell; x++)
+                    {
+                        float u = (x + 0.5f) / CopingCell, v = (y + 0.5f) / CopingCell;
+                        float val = 1f + amp * 2f * ((u - 0.5f) * Mathf.Cos(dir) + (v - 0.5f) * Mathf.Sin(dir));
+                        val += (Noise(u * 2.6f + ox, v * 2f + oy, cell) - 0.5f) * 0.12f;                                   // pigment patches
+                        val -= 0.07f * Mathf.Exp(-(((u - stU) * arc) * ((u - stU) * arc) + ((v - stV) * wide) * ((v - stV) * wide)) / (stR * stR * 4f));   // one broad stain
+                        val += (Noise(u * 11f + ox, v * 8f + oy, cell + 77) - 0.5f) * 0.03f;                               // grain
+                        val -= 0.2f * Edge(0.3f + 0.22f * Noise(u * 5f + ox, 2.2f, cell + 9), 0.02f, v);                 // dirt against the parapet foot
+                        val += 0.09f * Edge(0.76f + 0.1f * Noise(u * 4f + oy, 6.1f, cell + 5), 0.97f, v);                // worn nosing
+                        val -= 0.1f * Edge(0.06f + 0.06f * Noise(1.7f, v * 4f + ox, cell + 13), 0.008f, Mathf.Min(u, 1 - u));                                          // grime at the joints
+                        float warm = 0;
+                        if (soot)
+                        {   // pass 2 (critic 1: "lopsided, merges with the cast shadow"): an even ring round the plinth, about 0.5 m wide, a warm brown-black
+                            float du = (u - 0.5f) * arc, dv = (v - (PostRadius - CopingR0) / wide) * wide;
+                            float d = Mathf.Sqrt(du * du + dv * dv) + (Noise(u * 7f + ox, v * 5f + oy, cell + 31) - 0.5f) * 0.1f;
+                            warm = d < 0.3f ? 1f : Mathf.Exp(-((d - 0.3f) * (d - 0.3f)) / (sootR * sootR));
+                            val -= 0.3f * warm;   // after critic 2 ("the darkest thing on the ledge"): a core near 50, was 35
+                        }
+                        if (chipped)
+                        {   // one broken outer corner, 7 to 10 cm: a dark hollow with a pale lip
+                            float du = u * arc / (0.09f * chipS), dv = (1 - v) * wide / (0.075f * chipS);
+                            float d = Mathf.Sqrt(du * du + dv * dv) + (Noise(u * 40f + ox, v * 26f + oy, cell + 51) - 0.5f) * 0.5f;
+                            float hollow = Edge(1.1f, 0.8f, d); val += 0.06f * Edge(1.6f, 1.2f, d) * (1 - hollow) - 0.24f * hollow;
+                        }
+                        float g = Mathf.Clamp01(val * CopingPaintMean);
+                        int cx = (cell % CopingCols) * CopingCell + x, cy = (cell / CopingCols) * CopingCell + y;
+                        px[cy * W + cx] = new Color(Mathf.Clamp01(g * (1 + 0.1f * warm)), g, g * (1 - 0.16f * warm), 1f);
+                    }
+            }
+            copingAtlas = new Texture2D(W, H, TextureFormat.RGBA32, true, false) { name = "MetronomeCourt_CopingAtlas", wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Trilinear, anisoLevel = 4 };
+            copingAtlas.SetPixels32(px); copingAtlas.Apply(true, Application.isPlaying);   // readable in the editor, for the menu's baked copy
+            copingAtlas.mipMapBias = -0.5f;
+        }
+
         // ---- r4 (T1, pass 2): the slab paint atlas ----
         // Critic 1 on pass 1: the per-slab sweep was too weak to see, the chips were hard triangles on the spokes that read
         // as arrowheads, and the entry path was four whole slabs tinted 21 luminance lighter, a pale wedge under the south
@@ -460,7 +538,7 @@ namespace LastBell.Arenas.MetronomeCourt
             // full 13.1 m its round wall shared a surface with the dial band's 96-segment outer wall and showed through
             // between that wall's vertices; the 28-sided disc had hidden behind it. The joints it fills end at 12.4 m.
             Round(PrimitiveKind.Cylinder, stat, new Vector3(0, -0.36f, 0), new Vector3(FloorRadius * 2 - 0.4f, 0.34f, FloorRadius * 2 - 0.4f), StoneM(FloorGrout), name: "Grout");
-            Round(PrimitiveKind.Cylinder, stat, new Vector3(0, -3.6f, 0), new Vector3(FloorRadius * 2 + 1.6f, 3.0f, FloorRadius * 2 + 1.6f), StoneM(StoneDark), name: "PlatformDrum");
+            Round(PrimitiveKind.Cylinder, stat, new Vector3(0, -3.6f, 0), new Vector3(FloorRadius * 2 + 1.6f, 3.0f, FloorRadius * 2 + 1.6f), SurfM(StoneDark * 1.12f, Surface.Coursed), name: "PlatformDrum");   // r4 (T6): coursed, with drawn joints
             // gothic bays round the drum under the court (pointed dark recesses) and four teal banner drops
             for (int i = 0; i < 16; i++)
             {
@@ -498,8 +576,43 @@ namespace LastBell.Arenas.MetronomeCourt
             // October 26, 2026: the ledge top used to sit at -0.02, the same height as the grout disc's top that fills
             // every joint, so the two fought inside the joints and the joints seemed to shift while moving. It now sits at
             // -0.06, clear of the grout.
-            Round(PrimitiveKind.Cylinder, stat, new Vector3(0, -1.11f, 0), new Vector3(29.9f, 1.05f, 29.9f), StoneM(StoneDark * 1.1f), name: "RimLedge");   // cylinder: scale.y = half-height; top at -0.06
-            Round(PrimitiveKind.Cylinder, stat, new Vector3(0, -0.16f, 0), new Vector3(30.1f, 0.08f, 30.1f), M(Brass * 0.45f, 0.4f, 0.8f), name: "RimLedgeTrim");   // a band on the ledge edge, below its top (no shared surface)
+            // r4 (November 12 critic, T6): the ledge top was "a wide flat grey band with no joints, edge moulding or grime",
+            // the drum a plain dark cylinder, and the thin brass trim "a brown wire along the edge". Now:
+            //   - the ledge wall and the drum carry coursed masonry with drawn joints;
+            //   - the top outside the parapet is a ring of coping blocks, one every 7.5 degrees (about 1.9 m), with 2 cm
+            //     joints and a 4 cm bevel, in three close stone values, each painted from the coping atlas. A lantern post
+            //     stands on the middle of every third block, and that block carries the soot under it;
+            //   - a pale stone string course under the coping replaces the brass trim;
+            //   - a drip course at the foot of the ledge wall throws a shadow line onto the top of the drum.
+            // The coping tops sit at y = 0, where the posts and bollards stand (the bare ledge at -0.06 left them 6 cm in
+            // the air). The three blocks under the bridge mouth are left out.
+            Round(PrimitiveKind.Cylinder, stat, new Vector3(0, -1.11f, 0), new Vector3(29.9f, 1.05f, 29.9f), SurfM(StoneDark * 1.38f, Surface.Coursed), name: "RimLedge");   // cylinder: scale.y = half-height; top at -0.06
+            {
+                var crng = new System.Random(61);
+                var jointShift = new float[48]; for (int k = 0; k < 48; k++) jointShift[k] = ((float)crng.NextDouble() - 0.5f) * 0.5f;   // degrees, at the joint before block k
+                for (int i = 0; i < 48; i++)
+                {
+                    float a = i * 7.5f; if (Mathf.Abs(Mathf.DeltaAngle(a, 0)) < 11f) continue;   // the bridge deck covers these
+                    bool post = i % 3 == 0 && i != 24;   // posts stand every 22.5 degrees; none at the metronome (north)
+                    int cell = post ? CopingPlain + crng.Next(4) : crng.Next(CopingPlain); bool flip = crng.Next(2) == 0;
+                    // pass 2 (critic 1: "flat fills, identical in length"): five values in an irregular order, joints shifted
+                    // up to 6 cm either way (a block stays under 2 m), and two of the twelve plain cells carry a broken corner
+                    float shade = 1.0f + 0.065f * crng.Next(5);   // after critic 2: a span of about 17 luminance (0.98 to 1.45 gave 25 to 30, "alternating light and dark panels")
+                    float j0 = jointShift[i], j1 = jointShift[(i + 1) % 48];
+                    Mesh(stat, Sector(CopingR0, CopingR1, a - 3.75f + j0, a + 3.75f + j1, 0.06f, 3, 0.01f, 0.04f, uvCell: CopingCellRect(cell, flip)), CopingM(StoneDark * shade), "Coping");
+                }
+                // the slot between the last block each side and the bridge deck (the blocks end on a radius, the deck on a straight edge)
+                foreach (float sx in new[] { -1f, 1f })
+                    P(PrimitiveKind.Cube, stat, new Vector3(sx * 2.775f, -0.034f, 14.08f), new Vector3(0.25f, 0.06f, 1.16f), StoneM(StoneDark * 1.2f), name: "CopingMouthFill");   // top 4 mm under the block tops
+            }
+            // One plain band, 9 cm proud of the wall, under the coping (no shared surface). Pass 2 tried a moulded profile (a
+            // fillet, a band and a dark throat); critic 2 found its grooves about 1 px wide in the player, broken into dashes,
+            // the "thin repeated trim that crawls". No line under 2 px at the fight camera, so the band stays plain.
+            // The three courses are rings, not discs: a full disc under the court is a whole extra layer for the renderer to
+            // shade behind the floor (pass 2 had five such discs and ran the fight at about 152 fps; as rings it runs at 186).
+            Mesh(stat, Sector(14.9f, 15.08f, 0, 360, 0.22f, 180), StoneM(Color.Lerp(StoneDark, Ivory, 0.55f)), "RimStringCourse", new Vector3(0, -0.08f, 0));
+            Mesh(stat, Sector(14.9f, 15.15f, 0, 360, 0.22f, 180), StoneM(StoneDark * 1.3f), "RimDripCourse", new Vector3(0, -1.96f, 0));   // 0.2 m proud at the foot of the ledge wall
+            Mesh(stat, Sector(13.85f, 13.98f, 0, 360, 0.3f, 180), StoneM(StoneDark * 1.25f), "DrumSillCourse", new Vector3(0, -5.15f, 0));   // pass 2: one course round the drum at the bay sills, which stand proud of it
             Round(PrimitiveKind.Cone, stat, new Vector3(0, -10.5f, 0), new Vector3(FloorRadius * 2 + 1.6f, 7f, FloorRadius * 2 + 1.6f), StoneM(StoneDark), new Vector3(180, 180, 0), "PlatformKeel");   // point down; the extra half turn keeps the texture seam at the north
             // one calm stone family with a wider +-7% jitter on a darker base (keeps telegraph contrast), a shared grain
             // detail, bevelled slab edges, and 1 in 12 slabs weathered (darker, with a damp sheen)

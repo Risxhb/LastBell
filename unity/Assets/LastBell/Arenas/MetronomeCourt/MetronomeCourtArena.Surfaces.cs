@@ -13,11 +13,11 @@ namespace LastBell.Arenas.MetronomeCourt
     public sealed partial class MetronomeCourtArena
     {
         public static bool SurfaceKit = true;   // review switch; the October 27 pass-1 build had no kit
-        enum Surface { None, Masonry, Ivory, Brass, Iron, Cloth, Slate, Paving, Weathered }   // r3: Weathered (pier masonry), assigned explicitly   // pass 4: slate roofs and soft bridge paving (assigned explicitly)
+        enum Surface { None, Masonry, Ivory, Brass, Iron, Cloth, Slate, Paving, Weathered, Coursed }   // r4 (T6): Coursed (rim ledge wall and drum), assigned explicitly   // r3: Weathered (pier masonry), assigned explicitly   // pass 4: slate roofs and soft bridge paving (assigned explicitly)
         static readonly Dictionary<Surface, Texture2D> surfaceTex = new Dictionary<Surface, Texture2D>();
         static readonly Dictionary<Surface, float> surfaceMean = new Dictionary<Surface, float>();
         // metres covered by one texture repeat
-        static float TileOf(Surface s) => s == Surface.Masonry || s == Surface.Weathered ? 3.6f : s == Surface.Ivory ? 2.0f : s == Surface.Brass ? 1.2f : s == Surface.Iron ? 2.0f : s == Surface.Slate ? 1.8f : s == Surface.Paving ? 2.4f : 0.8f;
+        static float TileOf(Surface s) => s == Surface.Masonry || s == Surface.Weathered || s == Surface.Coursed ? 3.6f : s == Surface.Ivory ? 2.0f : s == Surface.Brass ? 1.2f : s == Surface.Iron ? 2.0f : s == Surface.Slate ? 1.8f : s == Surface.Paving ? 2.4f : 0.8f;
         public int SurfaceUvBakes { get; private set; }
 
         static Surface Classify(Color c, float metal, bool glow)
@@ -61,6 +61,9 @@ namespace LastBell.Arenas.MetronomeCourt
             int x0 = ((xi % p) + p) % p, y0 = ((yi % p) + p) % p, x1 = (x0 + 1) % p, y1 = (y0 + 1) % p;
             return Mathf.Lerp(Mathf.Lerp(SHash(x0, y0, seed), SHash(x1, y0, seed), fx), Mathf.Lerp(SHash(x0, y1, seed), SHash(x1, y1, seed), fx), fy);
         }
+        // 0 below e0, 1 above e1, smooth between (e0 > e1 falls instead). Mathf.SmoothStep(a, b, t) is an interpolation from
+        // a to b, not this threshold.
+        static float Edge(float e0, float e1, float x) { float k = Mathf.Clamp01((x - e0) / (e1 - e0)); return k * k * (3 - 2 * k); }
         static float Broad(float u, float v, int seed) => (SNoise(u * 3, v * 3, 3, seed) * 0.6f + SNoise(u * 6, v * 6, 6, seed + 1) * 0.4f) - 0.5f;   // -0.5..0.5, no fine octave
 
         static Texture2D SurfaceTexture(Surface s)
@@ -88,6 +91,24 @@ namespace LastBell.Arenas.MetronomeCourt
                             val *= Mathf.Lerp(1f, 1.12f, Mathf.SmoothStep(0.80f, 0.90f, rv) * Mathf.SmoothStep(0.985f, 0.95f, rv));   // lit upper arris
                             if (SHash(block, row, 14) > 0.6f && fu + (1 - rv) * 0.6f < 0.3f) val *= 0.84f;   // a chipped corner
                             val *= Mathf.Lerp(0.5f, 1f, Mathf.SmoothStep(0.03f, 0.09f, joint));             // painted joint, one value step down
+                            break;
+                        }
+                        case Surface.Coursed:
+                        {   // r4 (November 12 critic, T6: "blank bands"): the rim ledge wall and the drum. Masonry's courses and
+                            // blocks, with the joints really drawn. (Masonry hands its joint and arris edges to
+                            // Mathf.SmoothStep, which interpolates, so they come out as one even tint and only the per-block
+                            // steps show.) A 4 cm joint two value steps down, a lit arris along the top of each block, and
+                            // a face that darkens toward its foot.
+                            int row = Mathf.FloorToInt(v * 5); float rv = v * 5 - row;
+                            float off = SHash(row, 0, 11) * 0.6f + (row % 2) * 0.5f, bu = (u * 2 + off) % 2f; int block = Mathf.FloorToInt(bu); float fu = bu - block;
+                            float bed = Mathf.Min(rv, 1 - rv) * 0.72f, head = Mathf.Min(fu, 1 - fu) * 1.8f, joint = Mathf.Min(bed, head);   // metres to the nearest joint
+                            val = 0.82f + 0.28f * SHash(block, row, 12);
+                            val *= 1 + 0.12f * (SNoise(u * 2, v * 2, 2, 15) - 0.5f) + 0.07f * (SNoise(u * 5, v * 5, 5, 16) - 0.5f);   // pigment patches
+                            val *= Mathf.Lerp(0.91f, 1.03f, rv);                                               // darker toward the foot of the block
+                            float top = (1 - rv) * 0.72f;
+                            val *= 1 + 0.3f * Edge(0.02f, 0.035f, top) * Edge(0.1f, 0.06f, top);          // lit arris under the bed joint
+                            if (SHash(block, row, 14) > 0.6f && fu + (1 - rv) * 0.6f < 0.3f) val *= 0.86f;    // a chipped corner
+                            val *= Mathf.Lerp(0.56f, 1f, Edge(0.012f, 0.03f, joint));                         // the joint
                             break;
                         }
                         case Surface.Weathered:
