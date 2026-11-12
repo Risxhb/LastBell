@@ -494,7 +494,8 @@ namespace LastBell.Arenas.MetronomeCourt
                 if (Mathf.Abs(Mathf.DeltaAngle(a, 0)) < 5f || Mathf.Abs(Mathf.DeltaAngle(a, 180)) < 5f) continue;   // bridge gap; never in front of the metronome
                 Post(stat, root, Quaternion.Euler(0, a, 0) * Vector3.forward * PostRadius, a);
             }
-            foreach (var s in new[] { -1, 1 }) Post(stat, root, new Vector3(3.15f * s, 0, PostRadius), 0);   // clear of the bridge newels
+            // r4 (November 12 critic, B6): the two court-mouth bollards are gone. Each stood 0.7 m from a bridge newel, so
+            // each side of the entry showed two capped posts side by side. The newel now carries the lantern (below).
             BuildSwags(stat);
 
             // ---- south entry bridge (decorative approach; not part of the combat bound) ----
@@ -538,19 +539,56 @@ namespace LastBell.Arenas.MetronomeCourt
                 // pass 6 (Risxhb: the brass post caps "look basic"): each post gets a plinth course, a sunk panel on its two
                 // long faces, an ivory cornice slab that overhangs the shaft, and a stepped brass cap. The rail posts also carry
                 // a brass ball finial; the newel at the court mouth stays under 0.8 m, so it has no ball.
-                var capBrass = M(Brass * 0.6f, 0.4f, 0.8f); var sunk = StoneM(Ivory * 0.78f);
-                void PostKit(Vector3 baseAt, float half, float height, bool ball, string nm)
+                // r4 (B6 critic 1: "the brass still renders rust-chocolate"): painted aged brass, not metallic. The metal mirrored
+                // the dusk sky and came out near 53,31,12 on the finial balls.
+                // after critic 2: the pylon panels are a lifted blue charcoal (StoneDark x 0.85 crushed to warm black, 26,20,19)
+                var capBrass = SurfM(Brass * 0.8f, Surface.Brass, 0.35f); var sunk = StoneM(Ivory * 0.78f); var panelDark = StoneM(new Color(0.25f, 0.28f, 0.37f));
+                // railSide: +1 or -1 when the bridge rail butts into the post's +z or -z face (that face stays plain stone)
+                void PostKit(Vector3 baseAt, float half, float height, bool ball, string nm, float railSide = 0)
                 {
                     P(PrimitiveKind.Cube, stat, baseAt + Vector3.up * height / 2, new Vector3(half * 2, height, half * 2), StoneM(Ivory), name: nm);
                     P(PrimitiveKind.Cube, stat, baseAt + Vector3.up * 0.06f, new Vector3(half * 2 + 0.08f, 0.12f, half * 2 + 0.08f), StoneM(Ivory * 0.9f), name: nm + "Plinth");
                     foreach (var sx in new[] { -1f, 1f })
-                        P(PrimitiveKind.Cube, stat, baseAt + new Vector3(sx * (half + 0.004f), height * 0.52f, 0), new Vector3(0.02f, height * 0.5f, half * 1.2f), sunk, name: nm + "Panel");
+                        P(PrimitiveKind.Cube, stat, baseAt + new Vector3(sx * (half + 0.004f), height * 0.52f, 0), new Vector3(0.02f, height * 0.5f, half * 1.2f), ball ? sunk : panelDark, name: nm + "Panel");
+                    if (!ball)
+                    {
+                        // r4 (B6 critic 1: "a lamp set on a gatepost, in a different kit from the banded rim bollards"): the
+                        // entry pylon takes the bollards' vocabulary. A dark chamfered base one step wider, a dark sunk panel
+                        // with a brass diamond boss on all four faces, and a brass band under the cornice. Mass, not height.
+                        // after critic 2 ("a dark slab under the newel base reads as a detached shadow plate"): the base is a
+                        // step narrower and runs 7 cm down past the deck top (-0.06), so it bears on the deck instead of
+                        // hovering over it; and the face the rail butts into has no panel or boss (half a brass diamond
+                        // poked out beside the rail end).
+                        Mesh(stat, Frustum(half + 0.08f, half + 0.08f, half + 0.055f, half + 0.055f, 0.14f), StoneM(StoneDark * 1.25f), nm + "Base", baseAt + Vector3.down * 0.07f);
+                        foreach (var sz in new[] { -1f, 1f })
+                            if (sz != railSide) P(PrimitiveKind.Cube, stat, baseAt + new Vector3(0, height * 0.52f, sz * (half + 0.004f)), new Vector3(half * 1.2f, height * 0.5f, 0.02f), panelDark, name: nm + "Panel");
+                        foreach (var (dx, dz) in new[] { (1f, 0f), (-1f, 0f), (0f, 1f), (0f, -1f) })
+                            if (dz == 0 || dz != railSide) P(PrimitiveKind.Cube, stat, baseAt + new Vector3(dx * (half + 0.014f), height * 0.52f, dz * (half + 0.014f)), new Vector3(0.09f, 0.09f, 0.025f), capBrass, new Vector3(0, dx != 0 ? 90f : 0f, 45f), nm + "Boss");
+                        Mesh(stat, Frustum(half + 0.014f, half + 0.014f, half + 0.014f, half + 0.014f, 0.045f), capBrass, nm + "Band", baseAt + Vector3.up * (height - 0.075f));
+                    }
                     Mesh(stat, Frustum(half + 0.05f, half + 0.05f, half + 0.05f, half + 0.05f, 0.05f), StoneM(Ivory * 0.92f), nm + "Cornice", baseAt + Vector3.up * height);
-                    Mesh(stat, Frustum(half + 0.01f, half + 0.01f, half - 0.03f, half - 0.03f, 0.035f), capBrass, nm + "CapBand", baseAt + Vector3.up * (height + 0.05f));
-                    Mesh(stat, Frustum(half - 0.03f, half - 0.03f, 0.05f, 0.05f, ball ? 0.13f : 0.07f), capBrass, nm + "Cap", baseAt + Vector3.up * (height + 0.085f));
-                    if (ball) P(PrimitiveKind.Sphere, stat, baseAt + Vector3.up * (height + 0.27f), Vector3.one * 0.13f, capBrass, name: nm + "Ball");
+                    // r4 (B6): the full brass caps rendered as big dark rust pyramids, the darkest warm mass beside the HUD.
+                    // A rail post now ends in a stone weathering band and a stone pyramid under a small brass ball. The newel
+                    // at the court mouth is the entry pylon: a low brass plinth and the lantern the mouth bollard used to
+                    // carry (the same lantern height as the rim bollards, so the near side stays low).
+                    Mesh(stat, Frustum(half + 0.01f, half + 0.01f, half - 0.03f, half - 0.03f, 0.035f), StoneM(Ivory * 0.84f), nm + "CapBand", baseAt + Vector3.up * (height + 0.05f));
+                    if (ball)
+                    {
+                        // pass 2: a stepped fillet under the pyramid (the bare pyramid on a thin slab read plain), a larger ball
+                        Mesh(stat, Frustum(half - 0.03f, half - 0.03f, half - 0.06f, half - 0.06f, 0.035f), StoneM(Ivory * 0.96f), nm + "CapFillet", baseAt + Vector3.up * (height + 0.085f));
+                        Mesh(stat, Frustum(half - 0.075f, half - 0.075f, 0.04f, 0.04f, 0.13f), StoneM(Ivory * 0.9f), nm + "Cap", baseAt + Vector3.up * (height + 0.12f));
+                        P(PrimitiveKind.Sphere, stat, baseAt + Vector3.up * (height + 0.305f), Vector3.one * 0.13f, capBrass, name: nm + "Ball");
+                    }
+                    else
+                    {
+                        Mesh(stat, Frustum(0.2f, 0.2f, 0.16f, 0.16f, 0.05f), capBrass, nm + "LanternPlinth", baseAt + Vector3.up * (height + 0.085f));
+                        Lantern(root, baseAt + Vector3.up * (height + 0.335f), 0.75f);
+                    }
                 }
-                PostKit(new Vector3(rx, 0, 14.55f), 0.25f, 0.62f, false, "BridgeNewel");
+                PostKit(new Vector3(rx, 0, 14.55f), 0.25f, 0.62f, false, "BridgeNewel", 1f);
+                // pass 2 (B6 critic 1: "the outer bridge end keeps the old crowding"): the far end gets the same lantern pylon
+                // in place of a loose bollard standing against the rail's end
+                PostKit(new Vector3(rx, 0, 28.1f), 0.25f, 0.62f, false, "BridgeEndNewel", -1f);
                 for (int k = 1; k < 4; k++)
                     PostKit(new Vector3(rx, 0, 13.9f + k * 3.75f), 0.21f, 0.66f, true, "BridgePost");
                 // piers with stone arches on the outer faces, and a dark recessed spandrel wall behind them so they silhouette
@@ -568,8 +606,7 @@ namespace LastBell.Arenas.MetronomeCourt
                     }
                 }
             }
-            // lanterns at the far end of the bridge (bollard kit)
-            foreach (var sx in new[] { -1, 1 }) Post(stat, root, new Vector3(2.45f * sx, 0, 28.1f), 0);
+            // (the far end's lanterns now sit on the end newels above; they were two more bollards)
 
             // ---- north plinth and the independent giant metronome ----
             var m = new GameObject("Metronome (arena object)").transform; m.SetParent(root, false); m.localPosition = new Vector3(0, 0, MetronomeZ);
