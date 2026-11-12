@@ -174,7 +174,12 @@ namespace LastBell.Arenas.MetronomeCourt
             // r3 (F8): the rib stones carry the soft paving mottle; the coursed masonry smeared into diagonal streaks on them
             var ribStone = PavingM(StoneDark * 1.25f); var ribStoneB = PavingM(StoneDark * 1.15f); var mortar = StoneM(StoneDark * 0.45f);
             // r3 (F2): a lighter, greener weathered slate, so the roof no longer matches the fog and vanishes from above
-            var pierSlate = SurfM(new Color(0.30f, 0.31f, 0.33f), Surface.Slate, 0.1f);   // round 3: matte and neutral (round 2 read as a glass pyramid)
+            // r4 (November 12 critic, T4: "a smooth pyramid with pale, glassy faces"): one slate value, dead matt, with the
+            // specular highlight switched off. Pass 2 (critic 1: "shade faces are crushed", 17 where they had been 28): the
+            // gloss had been most of the shade faces' light, so the slate takes the haze lift the far masonry has.
+            var pierSlateFlat = SurfM(new Color(0.27f, 0.28f, 0.30f), Surface.Slate, 0f);
+            pierSlateFlat.SetFloat("_Smoothness", 0f); pierSlateFlat.SetFloat("_SpecularHighlights", 0f); pierSlateFlat.EnableKeyword("_SPECULARHIGHLIGHTS_OFF");
+            var pierSlate = HazeOf(pierSlateFlat, 0.45f);
             var finialIron = M(new Color(0.17f, 0.18f, 0.26f), 0.35f, 0.6f);
             var lead = M(new Color(0.45f, 0.47f, 0.50f), 0.2f); var walk = PavingM(new Color(0.29f, 0.31f, 0.36f)); var coping = StoneM(new Color(0.32f, 0.32f, 0.35f));
             // r3 (F1): cream candle light behind iron louvres in the belfry openings (cream, not orange: the warnings stay hottest)
@@ -226,10 +231,24 @@ namespace LastBell.Arenas.MetronomeCourt
                     P(PrimitiveKind.Cube, stat, corner + Vector3.up * 0.35f, new Vector3(0.36f, 0.7f, 0.36f), capStone, new Vector3(0, a, 0), "PierPinnacleShaft");
                     P(PrimitiveKind.Cube, stat, corner + Vector3.up * 0.73f, new Vector3(0.42f, 0.06f, 0.42f), quoin, new Vector3(0, a, 0), "PierPinnacleBand");   // r3: a capping band and a finial (critic: "bare spikes")
                     Mesh(stat, Frustum(0.2f, 0.2f, 0.02f, 0.02f, 1.1f), capStone, "RisingPierPinnacle", corner + Vector3.up * 0.76f).localRotation = rot;
-                    // round 3 (N1): two rings of crockets pitched 30 degrees out, so the spikes read as Gothic pinnacles
-                    foreach (float ct in new[] { 0.33f, 0.66f })
-                        foreach (var fd in new[] { rot * Vector3.forward, rot * Vector3.back, rot * Vector3.right, rot * Vector3.left })
-                            P(PrimitiveKind.Cube, stat, corner + Vector3.up * (0.76f + 1.1f * ct) + fd * (0.2f - 0.18f * ct + 0.03f), new Vector3(0.08f, 0.08f, 0.12f), capStone, (Quaternion.LookRotation(fd) * Quaternion.Euler(-30f, 0, 0)).eulerAngles, "PierPinnacleCrocket");
+                    // round 3 (N1): two rings of crockets, so the spikes read as Gothic pinnacles
+                    // r4 (T4: "the crockets are cube studs"): each crocket is a leaf that climbs up and out of the face and
+                    // curls over at its tip (two tapered wedges). The eight of a pinnacle are one mesh (they were eight cubes).
+                    // Pass 1 made them thin arms on the faces ("coat hooks", critic 1); pass 2 shrank them until critic 2 read
+                    // "squared studs" again. Final: on the four arrises, a wedge 12 cm wide at its root that rises 45 degrees
+                    // for 15 cm and curls down 5 cm at the tip; the upper ring at 0.7 of that.
+                    var leaves = new List<CombineInstance>();
+                    foreach (float ct in new[] { 0.3f, 0.62f })
+                        foreach (var fd in new[] { rot * new Vector3(1, 0, 1).normalized, rot * new Vector3(1, 0, -1).normalized, rot * new Vector3(-1, 0, 1).normalized, rot * new Vector3(-1, 0, -1).normalized })
+                        {
+                            float ls = ct < 0.5f ? 1f : 0.7f;
+                            var root = corner + Vector3.up * (0.76f + 1.1f * ct) + fd * ((0.2f - 0.18f * ct) * 1.414f - 0.03f);
+                            var climb = Quaternion.LookRotation(fd) * Quaternion.Euler(45f, 0, 0); var hook = Quaternion.LookRotation(fd) * Quaternion.Euler(125f, 0, 0);
+                            leaves.Add(new CombineInstance { mesh = Frustum(0.06f, 0.04f, 0.038f, 0.028f, 0.15f), transform = Matrix4x4.TRS(root, climb, Vector3.one * ls) });
+                            leaves.Add(new CombineInstance { mesh = Frustum(0.038f, 0.028f, 0.02f, 0.016f, 0.06f), transform = Matrix4x4.TRS(root + climb * Vector3.up * (0.14f * ls), hook, Vector3.one * ls) });
+                        }
+                    var leafMesh = new Mesh { name = "PierPinnacleCrockets" }; leafMesh.CombineMeshes(leaves.ToArray(), true, true); leafMesh.RecalculateBounds();
+                    Mesh(stat, leafMesh, capStone, "PierPinnacleCrockets");
                     P(PrimitiveKind.Sphere, stat, corner + Vector3.up * 1.9f, Vector3.one * 0.12f, agedBrassP, null, "PierPinnacleFinial");
                 }
                 Mesh(stat, Frustum(1.47f, 1.47f, 1.47f, 1.47f, 0.1f), capStone, "PierHeadString", L(0, 1.72f, 0)).localRotation = rot;
@@ -247,11 +266,33 @@ namespace LastBell.Arenas.MetronomeCourt
                         P(PrimitiveKind.Cube, stat, c0 + along * m + Vector3.up * 2.67f, new Vector3(0.54f, 0.04f, 0.24f), coping, new Vector3(0, a + yawOff, 0), "PierMerlonCoping");
                     }
                 }
-                Mesh(stat, Frustum(1.05f, 1.05f, 0.04f, 0.04f, 1.7f), pierSlate, "RisingPierRoof", L(0, 2.15f, 0)).localRotation = rot;
-                foreach (var (cx, cz) in new[] { (-1f, -1f), (-1f, 1f), (1f, -1f), (1f, 1f) })
+                // r4 (T4): the roof is seven slate courses, shorter toward the apex, in one value. The foot of each course
+                // stands 3 cm proud of the course below, so every lap has a real edge and shadow. (Pass 1 had four deep
+                // courses in two values with a 5 cm lap: critic 1 read "a stepped pyramid" with "a pagoda lid".) Each hip
+                // is one short lead roll per course, lying on that course's corner (one straight strip cut through the
+                // course noses), and the hips end under a lead collar round the foot of the finial. One mesh for the slate
+                // and one for the lead.
                 {
-                    Vector3 c = L(cx * 1.05f, 2.15f, cz * 1.05f), apexPt = L(0, 3.85f, 0), ax = apexPt - c;
-                    P(PrimitiveKind.Cube, stat, (c + apexPt) / 2, new Vector3(0.09f, ax.magnitude, 0.05f), lead, Quaternion.FromToRotation(Vector3.up, ax).eulerAngles, "PierRoofHip");
+                    var lap = new[] { 0f, 0.19f, 0.36f, 0.51f, 0.65f, 0.78f, 0.9f, 1f };
+                    var slates = new List<CombineInstance>(); var leads = new List<CombineInstance>();
+                    for (int k = 0; k < 7; k++)
+                    {
+                        float y0 = 1.7f * lap[k], y1 = 1.7f * lap[k + 1];
+                        float h0 = Mathf.Lerp(1.05f, 0.1f, lap[k]) + (k > 0 ? 0.03f : 0f), h1 = Mathf.Lerp(1.05f, 0.1f, lap[k + 1]);
+                        slates.Add(new CombineInstance { mesh = Frustum(h0, h0, h1, h1, y1 - y0), transform = Matrix4x4.TRS(L(0, 2.15f + y0, 0), rot, Vector3.one) });
+                        foreach (var (cx, cz) in new[] { (-1f, -1f), (-1f, 1f), (1f, -1f), (1f, 1f) })
+                        {
+                            // after critic 2 ("black ticks at the joints", "a zip past the roof line"): each roll runs 4 cm on
+                            // under the foot of the next, and sits 1.5 cm in on the corner so it does not stand off the slate
+                            Vector3 c0 = L(cx * (h0 - 0.015f), 2.15f + y0 + 0.01f, cz * (h0 - 0.015f)), c1 = L(cx * (h1 - 0.015f), 2.15f + y1 + 0.01f, cz * (h1 - 0.015f));
+                            leads.Add(new CombineInstance { mesh = Frustum(0.04f, 0.04f, 0.036f, 0.036f, 1f), transform = Matrix4x4.TRS(c0, Quaternion.FromToRotation(Vector3.up, c1 - c0) * rot, new Vector3(1, (c1 - c0).magnitude + (k < 6 ? 0.04f : 0f), 1)) });
+                        }
+                    }
+                    leads.Add(new CombineInstance { mesh = Frustum(0.15f, 0.15f, 0.12f, 0.12f, 0.07f), transform = Matrix4x4.TRS(L(0, 3.83f, 0), rot, Vector3.one) });
+                    var slateMesh = new Mesh { name = "RisingPierRoof" }; slateMesh.CombineMeshes(slates.ToArray(), true, true); slateMesh.RecalculateBounds();
+                    Mesh(stat, slateMesh, pierSlate, "RisingPierRoof");
+                    var leadMesh = new Mesh { name = "PierRoofHips" }; leadMesh.CombineMeshes(leads.ToArray(), true, true); leadMesh.RecalculateBounds();
+                    Mesh(stat, leadMesh, lead, "PierRoofHips");
                 }
                 Mesh(stat, Frustum(0.1f, 0.1f, 0.02f, 0.02f, 0.45f), finialIron, "RisingPierFinial", L(0, 3.8f, 0)).localRotation = rot;
                 P(PrimitiveKind.Sphere, stat, L(0, 4.27f, 0), Vector3.one * 0.14f, agedBrassP, null, "RisingPierBall");
